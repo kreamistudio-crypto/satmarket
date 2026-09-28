@@ -35120,3 +35120,154 @@ lo stesso; e lo stesso giro sul client di prima rifa' il difetto
 («Ricevi» rosso dopo il tab Vendi, «Invia» verde dopo il tab Compra).
 Nessun errore dell'app, nessuno scorrimento laterale. **DA AVERE:** il
 telefono.
+
+## La ronda del nodo riconosce da sola i pagamenti, e gira ogni ora (28 set 2026)
+
+**IL PROBLEMA, trovato da Andrea**: la ronda del nodo
+(`ronda-nodo.sh`, chiamata da `ronda.sh`, il lunedi' alle 9 UTC)
+chiamava «pagamento SCONOSCIUTO» ogni hash di `lncli listpayments` che
+non stava nell'elenco imparato con `--impara`. Da quando il nodo paga
+ogni giorno — i payout del mercatino dalla cassaforte nodo, i payout P2P
+di mostrod — ogni pagamento normale era un allarme falso: 29 in una
+settimana, 63 da riconciliare a mano il 28 set (tutti veri, con uno
+script di sola lettura). E un furto vero si sarebbe letto in mezzo a
+loro, una volta a settimana.
+
+**LA DECISIONE: UN PAGAMENTO E' CONOSCIUTO SE UNA FONTE LO SPIEGA.** Il
+giudice nuovo, `deploy/nodo/ronda-pagamenti.py` (solo stdlib, lo chiama
+`ronda-nodo.sh`), chiede in quest'ordine — prima la macchina, poi il
+giro su Tor: 1) `mostro.db` in sola lettura (la fattura del compratore
+decodificata qui, gemella di `leggi_bolt11(…, con_hash=True)`; la dev
+fee; il payout in volo; le colonne si CHIEDONO al database, una che
+manca e' una fonte in meno); 2) i log di mostrod, solo le righe con cui
+mostrod dice di aver PAGATO («Invoice with hash: … paid!», le due della
+dev fee) — l'unica strada per i payout a un Lightning address, di cui
+il database non tiene l'hash; 3) un FAILED seguito da un SUCCEEDED
+della stessa cifra verso la stessa destinazione; 4) il VPS,
+`POST /api/nodo/pagamenti-noti`, che dice si'/no per hash guardando
+`payout_tentati` e i `payout_hash` delle tre tabelle che pagano. Quello
+che nessuna fonte spiega ALLARMA SUBITO, UNA volta, con cifra,
+destinazione, descrizione e cosa fare: verificare (il comando sul VPS e
+`--impara <inizio dell'hash>` se e' tuo), e solo dopo revocare il
+macaroon di LNbits (`deletemacaroonid 1`, che ferma anche i payout del
+mercatino). Quello che non si e' potuto VERIFICARE (VPS muto, 403/404,
+mostro.db illeggibile, log illeggibili) aspetta, e allarma «NON
+VERIFICATO» solo dopo tre ore — contate dalla prima volta che non si e'
+potuto, non dalla nascita del pagamento. Il riassunto di ogni giorno
+(«Ieri il nodo ha pagato N volte, per X sats: tutte riconosciute
+(Barattolo …, mostrod …)») va nel canale del nodo col giro lungo, anche
+a zero pagamenti: e' anche la prova che la ronda gira.
+
+**OGNI ORA, MA NON TUTTO.** Il timer passa a ogni ora (drop-in
+`nodo-ronda.timer.d/ogni-ora.conf`, minuto 5: si toglie un file per
+tornare indietro). Il giro corto fa pagamenti, HTLC e canali. Il resto
+di `ronda.sh` — finestra, disco, RAM, superficie, backup — e' il GIRO
+LUNGO, il primo dalle 9 UTC di ogni giorno (timbro in
+`~/nodo/.ronda-giro-lungo`, scritto solo a giro riuscito: un Telegram
+caduto lo fa rifare all'ora dopo, e il riassunto non parte due volte
+perche' lo ricorda il giudice). Il perche': sono misure SENZA MEMORIA,
+e ogni ora ripeterebbero lo stesso allarme ventiquattro volte al giorno
+(la superficie fino al `--impara`). Da settimanali diventano
+quotidiane, che e' comunque un passo avanti.
+
+**DUE COSE DI PRIMA CHE OGNI ORA SAREBBERO DIVENTATE RUMORE.** «HTLC in
+volo, con zero trade attesi» avrebbe gridato a ogni scambio P2P, ogni
+ora, per giorni: la hold invoice E' un HTLC in volo. Adesso allarma
+solo un HTLC a meno di 20 blocchi dalla scadenza — mostrod molla la
+presa a 24 (`escrow_deadline_margin_blocks`), LND chiude il canale a
+10: sotto 20 vuol dire che mostrod non l'ha mollata. «lncli non
+risponde» usciva con `exit 1` PRIMA del controllo del backup (il
+difetto del marcatore, di nuovo) e senza dire niente a Telegram: adesso
+il backup gira lo stesso, e lncli muto allarma dopo tre ore (un
+riavvio non e' un guasto), poi una volta al giorno.
+
+**LA SICUREZZA DEL «LO DICONO I LOG».** Riconoscere un hash perche'
+compare nei log di mostrod e' una porta: mostrod stampa eventi interi
+(`{:#?}`), e dentro un evento c'e' testo di chiunque — un metodo di
+pagamento che dicesse «Hash: <il mio>» spiegherebbe un furto. Quindi la
+riga deve essere di tracing (ora, livello), il MODULO che paga subito
+dopo il livello (`mostrod::app::release` o `::dev_fee`: mostrod non usa
+span, verificato sul sorgente) e il messaggio esatto; i colori ANSI si
+tolgono prima. La tortura l'ha provato anche con la riga INTERA scritta
+dentro un evento su una riga sola: non passa, perche' sta dopo il
+modulo di chi la stampa.
+
+**LA PORTA DEL VPS** e' il calco di quella dello sconto (vuoto o
+segnaposto = 404, 403 a segreto sbagliato, confronto a byte e a tempo
+costante, porta PRIMA del corpo, `no-store`), col suo segreto
+`RONDA_NODO_SEGRETO`, una riga nel pannello delle leve e una
+«🔎 Ronda del nodo» nel journal per domanda. Esce un booleano e
+nient'altro; una tabella che non si legge dice NO, perche' un no
+sbagliato suona e un si' sbagliato nasconde. Sta accanto alla memoria
+degli hash (dopo `_prendi_la_mano`), NON accanto allo sconto: il blocco
+P2P ha una sentinella che vieta di nominarci LNbits, e l'ha presa al
+primo giro della suite. Sul nodo il segreto sta in
+`/etc/ronda/barattolo.env` (cartella 700, file 600) e arriva a curl
+dalla configurazione letta da stdin (`-K -`), mai dagli argomenti: `ps`
+non lo vede.
+
+**LE STRADE SCARTATE.** Il FILE FIRMATO dal VPS al posto della rotta:
+andrebbe rigenerato e trasportato a ogni payout, e fra un giro e
+l'altro resterebbe indietro, cioe' allarmerebbe su pagamenti veri.
+TUTTA la ronda ogni ora: vedi sopra. Riconoscere da soli gli
+AUTOPAGAMENTI (ribilanciamenti): non chiesto, e un gesto tuo si impara
+con `--impara <hash>`, che adesso impara QUEL pagamento e non tutti.
+Il nome del segreto fra le FORME dello scanner della CI: toccherebbe il
+workflow (e il job `pronto` puo' cadere, vedi PRODUZIONE); il segreto
+si genera ESADECIMALE da 64 apposta, e `FORMA_HEX` lo prende ovunque
+nel repo e nella storia. Un collaudo nella gabbia della CI, per la
+stessa ragione (l'elenco sta nel workflow): il banco dal vivo e' girato
+in locale, qui sotto.
+
+**UN DIFETTO CHE SOLO IL BANCO DAL VIVO POTEVA TROVARE**: dentro le
+virgolette della configurazione di curl la barra rovescia e' un escape.
+Su Windows il percorso del corpo arrivava «C:UsersAndrea…» e ogni
+domanda tornava «000». Sul nodo i percorsi non ne hanno, ma un segreto
+o un URL con una virgoletta si sarebbe rotto uguale: ogni valore passa
+da `_per_curl`, e c'e' la prova.
+
+**PROVATO.** `prove_ronda_nodo` (105): la porta (404/403/200, header
+non ASCII, tetto di 50, forma, maiuscole, un booleano e niente
+dettagli, tabella mancante che dice no, porta prima del corpo), le due
+meta' che parlano la stessa lingua (la risposta della rotta letta dalla
+ronda, il tetto uguale, un hash non risposto = non-so e mai no), la
+bolt11 letta dal nodo uguale a quella del server su una fattura vera e
+tre di cartone, `mostro.db` con e senza le colonne nuove, i log (payout
+riuscito e fallito, dev fee: si'; eventi, hold invoice, altri moduli,
+la riga forgiata: no), e il verdetto sui cinque casi chiesti — PAGAMENTO
+DI BARATTOLO riconosciuto dal VPS; di MOSTROD dalla macchina, senza
+bussare al VPS; FAILED RIPETUTI poi riuscito, e i tre FAILED che non si
+appoggiano (altra destinazione, altra cifra, dopo il riuscito);
+SCONOSCIUTO che grida subito, con cifra, destinazione, descrizione e la
+revoca DOPO la verifica; VPS CHE NON RISPONDE (aspetta, il primo quando
+non si sposta, grida oltre le tre ore, tace se il VPS torna prima;
+mostro.db illeggibile; 60 hash in due domande con la seconda muta) —
+piu' HTLC, guasti, riassunto, e un giro intero di `main()` con lncli,
+Telegram e VPS di cartone (baseline vecchia di soli hash letta come
+«imparato», allarme una volta sola, riassunto una volta al giorno,
+`--impara` col prefisso, lncli muto). Le sentinelle di `ronda.sh`,
+`ronda-nodo.sh`, del timer e dei fine riga LF (`deploy/nodo/` ha il
+suo `.gitattributes`). Emendate col perche' `_censimento` (il pannello
+CHIAMA `ronda_nodo_attiva`, la quinta volta della trappola) e
+`_SEGRETI_FINTI`. TORTURA 26 su 26 (due sopravvissute al primo giro,
+tutt'e due buchi delle prove: un hash di cartone senza lettere, che
+`.upper()` non cambia, e nessuna riga del modulo che paga con un altro
+messaggio). BANCO DAL VIVO: il server vero su 127.0.0.1 (config di
+cartone, eventi di avvio spenti) e il giudice del nodo con curl vero —
+si'/no giusti, il segreto mai sulla riga di comando, 403, 404, 400,
+VPS spento, e un giro intero contro il server: 12 su 12. BANCO DI
+`ronda.sh` in bash con sudo, docker, curl e date di cartone: giro
+corto alle 8, lungo alle 9 e timbro, corto alle 10, lungo alle 14 del
+giorno dopo se alle 9 la macchina era spenta, `--prova` che non timbra,
+Telegram giu' che fa rifare il giro lungo: 16 su 16.
+
+**DA FARE, E NIENTE DI VERO E' PROVATO**: i passi di PRODUZIONE, «LA
+RONDA DEL NODO OGNI ORA», nell'ordine — il segreto sul VPS, poi il
+nodo. Al primo giro sul nodo si guardano tre cose che qui non si
+potevano vedere: il FORMATO VERO dei log di mostrod (il passo 3 lo fa
+vedere prima: se non combacia, i payout a un Lightning address si
+riconosceranno solo dal VPS o a mano); che `mostro.db` si apra in
+`mode=ro` mentre mostrod scrive; e che il VPS risponda da Tor in meno
+di 90 secondi. E la riga delle SETTE COSE APERTE sulla riconciliazione
+LND↔Mostro: questo cantiere ne fa la meta' dei pagamenti in USCITA, ora
+per ora; gli incassi restano di `orfani.py`.

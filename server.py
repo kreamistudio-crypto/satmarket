@@ -9435,6 +9435,117 @@ def _prendi_la_mano(tabella: str, riga_id: int, verso: str,
     return bool(cur.rowcount)
 
 
+# LA PORTA DELLA RONDA DEL NODO (28 set 2026): ogni ora la ronda del
+# nodo Mostro guarda i pagamenti usciti dal suo LND, e per quelli che
+# non sa spiegare da sola (mostro.db, i log di mostrod) viene a
+# chiedere qui «questo hash e' un payout di Barattolo?». Stessa forma
+# della porta dello sconto — vuoto o segnaposto = la rotta NON ESISTE
+# (404) — ma UN SEGRETO SUO, perche' si ruota da solo: chi lo ruba
+# impara se un hash che ha GIA' in mano e' un nostro payout, e non
+# puo' far pagare niente a nessuno. Il gemello sul nodo sta in
+# /etc/ronda/barattolo.env (RONDA_SEGRETO). Vedi PRODUZIONE, «LA RONDA
+# DEL NODO OGNI ORA».
+try:
+    from config import RONDA_NODO_SEGRETO
+except ImportError:
+    RONDA_NODO_SEGRETO = ""
+# quanti hash in una domanda: la ronda chiede solo quelli che non sa
+# spiegare, e di solito sono zero o pochi. Il tetto e' lo stesso che il
+# nodo rispetta (MAX_HASH_PER_DOMANDA in deploy/nodo/ronda-pagamenti.py).
+MAX_HASH_RONDA_NODO = 50
+FORMA_HASH_PAGAMENTO = re.compile(r"^[0-9a-f]{64}$")
+
+
+def ronda_nodo_attiva() -> bool:
+    """La porta della ronda del nodo ESISTE? Il calco di
+    `eventi_p2p_attivi`: senza segreto la rotta non c'e' (404), e la
+    ronda — dopo tre ore di «non so» — allarma dicendo perche'."""
+    return bool(RONDA_NODO_SEGRETO
+                and not RONDA_NODO_SEGRETO.startswith("INCOLLA"))
+
+
+def _porta_ronda_nodo(autorizzazione: str) -> None:
+    """404 a porta chiusa, 403 a segreto sbagliato, confronto a tempo
+    costante e a BYTE: il calco di `_porta_sconto_p2p`."""
+    if not ronda_nodo_attiva():
+        raise HTTPException(404, "Non trovato")
+    atteso = ("Bearer " + RONDA_NODO_SEGRETO).encode("utf-8")
+    if not hmac.compare_digest(
+            str(autorizzazione or "").encode("utf-8"), atteso):
+        raise HTTPException(403, "Segreto sbagliato")
+
+
+def _pagamenti_noti_barattolo(con, hashes) -> dict:
+    """{hash: True|False}: questi pagamenti usciti dal nodo sono payout
+    di Barattolo? Alza ValueError sulla forma storta e sul tetto — mai
+    un 400 diretto — cosi' la prova non ha bisogno di FastAPI.
+    NOTO VUOL DIRE TENTATO DA NOI: l'hash sta nella memoria degli hash
+    (`payout_tentati`, dove `_prendi_la_mano` lo scrive PRIMA di
+    toccare LNbits, quindi anche un pagamento partito un attimo fa) o
+    nel `payout_hash` di una delle tre tabelle che pagano. Un tentativo
+    fallito e' noto anche lui: e' un nostro tentativo, e sul nodo
+    compare come FAILED.
+    ⚠️ ESCE UN BOOLEANO E NIENT'ALTRO, il patto di
+    `_sconti_per_chiavi_p2p`: mai l'ordine, la cifra, la persona, la
+    cassaforte. Alla ronda serve sapere se deve gridare, non di chi e'.
+    UNA TABELLA CHE NON SI LEGGE DICE NO, e il verso e' voluto: un «no»
+    sbagliato fa suonare un allarme da guardare, un «si'» sbagliato
+    nasconderebbe un furto."""
+    if not isinstance(hashes, list) or not hashes:
+        raise ValueError("Nessun hash")
+    if len(hashes) > MAX_HASH_RONDA_NODO:
+        raise ValueError("Troppi hash in una domanda sola")
+    lista = []
+    for h in hashes:
+        h = str(h).strip().lower()
+        if not FORMA_HASH_PAGAMENTO.fullmatch(h):
+            raise ValueError("Hash in una forma sconosciuta")
+        lista.append(h)
+    posti = ",".join("?" * len(lista))
+    noti = set()
+    for colonna, tabella in (("hash", "payout_tentati"),
+                             ("payout_hash", "ordini"),
+                             ("payout_hash", "rimborsi_asta"),
+                             ("payout_hash", "pagamenti")):
+        try:
+            noti.update(str(r[0]).lower() for r in con.execute(
+                f"SELECT {colonna} FROM {tabella} "
+                f"WHERE lower({colonna}) IN ({posti})", lista))
+        except sqlite3.OperationalError:
+            pass
+    return {h: h in noti for h in lista}
+
+
+@app.post("/api/nodo/pagamenti-noti")
+async def pagamenti_noti_nodo(req: Request):
+    """La ronda del nodo chiede, per gli hash dei pagamenti che non sa
+    spiegare, se sono payout di Barattolo. POST e non GET, come lo
+    sconto: gli hash non finiscono nei log di Caddy. Se questa rotta
+    tace o sbaglia, la ronda non grida subito: aspetta, e grida solo
+    dopo tre ore di «non so». I giudici sono `_porta_ronda_nodo` e
+    `_pagamenti_noti_barattolo`."""
+    _porta_ronda_nodo(req.headers.get("authorization", ""))
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    con = db()
+    try:
+        noti = _pagamenti_noti_barattolo(
+            con, d.get("hashes") if isinstance(d, dict) else None)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    # UNA RIGA NEL JOURNAL PER DOMANDA: chi ha chiesto cosa si ricostruisce
+    # da qui (la ronda chiede solo quando non sa spiegare, quindi poche).
+    print(f"🔎 Ronda del nodo: chiesti {len(noti)} hash, "
+          f"{sum(noti.values())} sono payout nostri", flush=True)
+    return JSONResponse({"ok": True, "noti": noti},
+                        headers={"Cache-Control": "no-store"})
+
+
+
 # I MOTIVI DI UN PAYOUT CHE NON ARRIVA (20 set 2026, ordine #152).
 # Fino a ieri l'avviso diceva «LNbits ha risposto 520», cioe' il numero
 # di una porta sbattuta: chi lo leggeva non sapeva se guardare il nodo,
@@ -25208,6 +25319,15 @@ def _leve_stato():
                   "P2P_SCONTO_SEGRETO", sconto_p2p_attivo(),
                   spento="il coordinatore non può chiedere chi ha lo "
                          "sconto: fa prezzo pieno a tutti"),
+            # LA RONDA DEL NODO (28 set 2026): esce il FATTO che la
+            # porta e' aperta, mai il segreto.
+            _leva("Ronda del nodo — porta dei pagamenti",
+                  "RONDA_NODO_SEGRETO", ronda_nodo_attiva(),
+                  acceso="ogni ora la ronda del nodo chiede qui se i "
+                         "pagamenti usciti da LND sono payout nostri",
+                  spento="la ronda del nodo non può chiedere: i payout "
+                         "del mercatino le restano «non verificati», e "
+                         "dopo tre ore allarma"),
             # GLI AVVISI DEL P2P (patch 0007): esce il FATTO che la
             # porta e' aperta, mai il segreto. Da spenta non e' un
             # guasto muto: gli avvisi ci sono lo stesso, ma solo i

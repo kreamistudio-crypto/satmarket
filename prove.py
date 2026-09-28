@@ -28415,6 +28415,8 @@ _SEGRETI_FINTI = {
     "P2P_SCONTO_SEGRETO": "SEGRETO-porta-dello-sconto-p2p",
     # la porta da cui il coordinatore racconta gli scambi (patch 0007)
     "P2P_EVENTI_SEGRETO": "SEGRETO-porta-degli-eventi-p2p",
+    # la porta da cui la ronda del nodo chiede i payout (28 set 2026)
+    "RONDA_NODO_SEGRETO": "SEGRETO-porta-della-ronda-del-nodo",
     "DB": "SEGRETO-percorso-database",
 }
 
@@ -28616,8 +28618,10 @@ def _censimento(acceso, dopo=None):
     # il pannello CHIAMA `eventi_p2p_attivi`, la quarta volta della
     # stessa trappola — e ha smascherato il guaio in due prove sole
     # («int object is not callable»), tutt'e due lontane dal P2P.
+    # E la porta della ronda del nodo (28 set 2026): la quinta volta,
+    # col suo `ronda_nodo_attiva()` — stesse tre esplosioni lontane.
     for f in ("webhook_attivo", "relay_chiavi_attivo", "sconto_p2p_attivo",
-              "eventi_p2p_attivi", "_leva", "_elenco",
+              "eventi_p2p_attivi", "ronda_nodo_attiva", "_leva", "_elenco",
               "_prezzo_banner", "_p2p_leve", "_segreto_p2p_vivo",
               "_nodo_configurato", "cassaforte_nuova",
               # il guardiano del ponte (set 2026): la sua riga CHIAMA
@@ -95070,6 +95074,576 @@ def _livelli_dal_sorgente():
     return amb["LIVELLI"]
 
 
+def _ronda_nodo_modulo():
+    """deploy/nodo/ronda-pagamenti.py caricato come modulo: e' solo
+    stdlib, e il suo main() non parte all'import."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "ronda_pagamenti_prova",
+        os.path.join(QUI, "deploy", "nodo", "ronda-pagamenti.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def prove_ronda_nodo():
+    """LA RONDA DEL NODO RICONOSCE DA SOLA I PAGAMENTI (28 set 2026).
+    Il nodo paga ogni giorno (payout del mercatino dalla cassaforte
+    nodo, payout P2P di mostrod) e la ronda di prima chiamava
+    SCONOSCIUTO ogni pagamento non imparato a mano: 63 allarmi falsi in
+    una settimana. Qui si provano le due meta': la porta del VPS che
+    dice si'/no per un hash, e il giudice del nodo che chiede prima a
+    mostro.db e ai log di mostrod, poi al VPS, e grida solo per quel
+    che nessuno spiega — o, se una fonte e' muta, dopo tre ore."""
+    import sqlite3
+    import tempfile
+    import hmac as _hmac
+    print("\n[la ronda del nodo: i pagamenti che si riconoscono da soli]")
+
+    def H(n):
+        # hash di cartone costruiti qui: nessun esadecimale da 64
+        # caratteri scritto nel file, che lo scanner dei segreti
+        # prenderebbe per una chiave. Il numero IN TESTA, come in un
+        # hash vero: i prefissi che l'allarme suggerisce a --impara
+        # devono distinguere un pagamento dall'altro.
+        return f"{n:08x}" * 8
+
+    # --- 1) LA PORTA DEL VPS -----------------------------------------
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    def amb_con(segreto):
+        amb = {"__builtins__": __builtins__, "HTTPException": _H,
+               "hmac": _hmac, "re": re, "sqlite3": sqlite3}
+        amb["RONDA_NODO_" + "SEGRETO"] = segreto
+        for costante in ("MAX_HASH_RONDA_NODO = ", "FORMA_HASH_PAGAMENTO = "):
+            i = _SORGENTE.index(costante)
+            exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+        for f in ("ronda_nodo_attiva", "_porta_ronda_nodo",
+                  "_pagamenti_noti_barattolo"):
+            exec(pezzo(f), amb)
+        return amb
+
+    a = amb_con("porta-" + "finta")
+    prova("il tetto di una domanda e' 50 hash", 50, a["MAX_HASH_RONDA_NODO"])
+    con = sqlite3.connect(":memory:")
+    con.executescript("""
+      CREATE TABLE payout_tentati(tabella TEXT, riga_id INT, hash TEXT,
+        quando INT, esito TEXT, cassaforte TEXT, scade INT);
+      CREATE TABLE ordini(id INTEGER PRIMARY KEY, payout_hash TEXT);
+      CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY, payout_hash TEXT);
+      CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, payout_hash TEXT);
+    """)
+    con.execute("INSERT INTO payout_tentati VALUES('ordini',152,?,1,"
+                "'uscito','nodo',0)", (H(1),))
+    con.execute("INSERT INTO payout_tentati VALUES('ordini',129,?,1,"
+                "'fallito','nodo',0)", (H(2),))
+    con.execute("INSERT INTO ordini VALUES(77,?)", (H(3),))
+    con.execute("INSERT INTO rimborsi_asta VALUES(5,?)", (H(4),))
+    con.execute("INSERT INTO pagamenti VALUES(9,?)", (H(5),))
+    con.execute("INSERT INTO payout_tentati VALUES('ordini',153,?,1,"
+                "'uscito','nodo',0)", (H(0xFADE),))
+    per = a["_pagamenti_noti_barattolo"]
+    prova("un payout nella memoria degli hash: si'", {H(1): True},
+          per(con, [H(1)]))
+    prova("...anche un tentativo FALLITO e' nostro (sul nodo e' un FAILED)",
+          {H(2): True}, per(con, [H(2)]))
+    prova("il payout_hash di un ordine, di un rimborso d'asta, di uno "
+          "sblocco: si'", {H(3): True, H(4): True, H(5): True},
+          per(con, [H(3), H(4), H(5)]))
+    prova("un hash che Barattolo non ha mai tentato: no", {H(99): False},
+          per(con, [H(99)]))
+    prova("le maiuscole si normalizzano (un hash con le lettere)",
+          {H(0xFADE): True}, per(con, [H(0xFADE).upper()]))
+    esce = json.dumps(per(con, [H(1), H(3), H(99)]))
+    prova("ESCE UN BOOLEANO E NIENT'ALTRO: nessun ordine, esito, cassaforte",
+          True, all(x not in esce for x in ("152", "77", "uscito", "nodo",
+                                            "ordini", "tentati")))
+    vuoto = sqlite3.connect(":memory:")
+    vuoto.execute("CREATE TABLE payout_tentati(tabella TEXT, riga_id INT, "
+                  "hash TEXT)")
+    vuoto.execute("INSERT INTO payout_tentati VALUES('ordini',1,?)", (H(1),))
+    prova("una tabella che manca dice no, e le altre rispondono lo stesso",
+          {H(1): True, H(3): False}, per(vuoto, [H(1), H(3)]))
+
+    def alza(hs):
+        try:
+            per(con, hs)
+            return "passa"
+        except ValueError:
+            return "ValueError"
+    prova("nessun hash: ValueError", "ValueError", alza([]))
+    prova("non una lista: ValueError", "ValueError", alza(H(1)))
+    prova("51 hash: oltre il tetto", "ValueError",
+          alza([H(i) for i in range(51)]))
+    prova("50 hash: dentro", "passa", alza([H(i) for i in range(50)]))
+    prova("un hash corto: ValueError", "ValueError", alza([H(1)[:63]]))
+    prova("un hash con una lettera fuori dall'esadecimale: ValueError",
+          "ValueError", alza(["g" + H(1)[1:]]))
+
+    def porta(segreto, header):
+        try:
+            amb_con(segreto)["_porta_ronda_nodo"](header)
+            return 200
+        except _H as e:
+            return e.code
+    vero = "porta-" + "finta"
+    prova("senza segreto la rotta non esiste (404)", 404,
+          porta("", "Bearer " + vero))
+    prova("col segnaposto la rotta non esiste (404)", 404,
+          porta("INCOLLA_QUI_UN_SEGRETO_CASUALE", "Bearer x"))
+    prova("segreto sbagliato: 403", 403, porta(vero, "Bearer altro"))
+    prova("senza Bearer: 403", 403, porta(vero, vero))
+    prova("un header non ASCII e' un 403, non un'esplosione", 403,
+          porta(vero, "Bearer caffè"))
+    prova("il segreto giusto passa", 200, porta(vero, "Bearer " + vero))
+    rotta = _SORGENTE[_SORGENTE.index('@app.post("/api/nodo/pagamenti-noti")'):]
+    rotta = rotta[:rotta.index("\n\n\n")]
+    prova("la rotta passa dalla porta PRIMA di leggere il corpo", True,
+          rotta.index("_porta_ronda_nodo(") < rotta.index("await req.json()"))
+    prova("...un corpo che non e' un oggetto non esplode (non e' .get su una "
+          "lista)", True, "isinstance(d, dict)" in rotta)
+    prova("...risponde {ok, noti}, e non si cacha", True,
+          '{"ok": True, "noti": noti}' in rotta and "no-store" in rotta)
+    prova("il pannello delle leve dice se la porta e' aperta, mai il segreto",
+          True, '"RONDA_NODO_SEGRETO", ronda_nodo_attiva(),' in _SORGENTE)
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    prova("config_esempio la dichiara col segnaposto", True,
+          '\nRONDA_NODO_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"\n' in esempio)
+
+    # --- 2) LE DUE META' PARLANO LA STESSA LINGUA ---------------------
+    r = _ronda_nodo_modulo()
+    prova("il nodo rispetta il tetto della rotta", a["MAX_HASH_RONDA_NODO"],
+          r.MAX_HASH_PER_DOMANDA)
+    risposta = per(con, [H(1), H(99)])
+    prova("la risposta della rotta, letta dalla ronda, e' la stessa",
+          (risposta, ""), r.interpreta_risposta(
+              "200", json.dumps({"ok": True, "noti": risposta}), [H(1), H(99)]))
+    ir = r.interpreta_risposta
+    prova("000 = il VPS non risponde: un non-so", None, ir("000", "", [H(1)])[0])
+    prova("...e il motivo lo dice", True, "non risponde" in ir("000", "", [H(1)])[1])
+    prova("404 = porta chiusa, e il motivo nomina la leva", True,
+          "RONDA_NODO_SEGRETO" in ir("404", "", [H(1)])[1])
+    prova("403 = segreti che non combaciano", True,
+          "segreto" in ir("403", "", [H(1)])[1])
+    prova("500: non so", None, ir("500", "x", [H(1)])[0])
+    prova("200 ma non JSON: non so", None, ir("200", "<html>", [H(1)])[0])
+    prova("200 con ok falso: non so", None,
+          ir("200", json.dumps({"ok": False, "noti": {H(1): True}}), [H(1)])[0])
+    prova("un hash chiesto e NON risposto: non e' un no, e' un non-so", None,
+          ir("200", json.dumps({"ok": True, "noti": {H(1): True}}),
+             [H(1), H(2)])[0])
+    prova("un valore che non e' un booleano: non so", None,
+          ir("200", json.dumps({"ok": True, "noti": {H(1): "si"}}), [H(1)])[0])
+    # IL SEGRETO NON PASSA DALLA RIGA DI COMANDO: curl legge la sua
+    # configurazione da stdin (-K -), e dentro le virgolette di quella
+    # configurazione la barra rovescia e' un escape — il banco dal vivo
+    # su Windows ha visto il percorso del corpo arrivare «C:UsersAndrea…»
+    prova("un valore con barre rovesce e virgolette arriva intero a curl",
+          r'C:\\Temp\\x \"y\"', r._per_curl(r'C:\Temp\x "y"'))
+    chiedi = open(os.path.join(QUI, "deploy", "nodo", "ronda-pagamenti.py"),
+                  encoding="utf-8").read()
+    chiedi = chiedi[chiedi.index("def chiedi_al_vps("):]
+    chiedi = chiedi[:chiedi.index("\n\n\ndef ")]
+    prova("il segreto sta nella configurazione da stdin, mai negli argomenti",
+          True, '"-K", "-"' in chiedi and "Bearer {_per_curl(segreto)}" in chiedi
+          and "input=cfg" in chiedi and "segreto" not in chiedi[
+              chiedi.index("cmd = ["):chiedi.index("input=cfg")])
+
+    # --- 3) LA BOLT11 LETTA SUL NODO, GEMELLA DI QUELLA DEL SERVER ----
+    amb = {"re": re}
+    for c in ("_BECH32_ALFABETO = ", "_BECH32_GEN = "):
+        i = _SORGENTE.index(c)
+        exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    exec(pezzo("leggi_bolt11"), amb)
+    fatture = [BOLT11_VERA_7468] + [
+        bolt11_finta(s, 3600, 1790000000 + s, phash=n)
+        for s, n in ((1000, 7), (7301, 2 ** 255 + 12345), (0, 1))]
+    prova("il nodo legge dalla bolt11 lo stesso hash del server",
+          [amb["leggi_bolt11"](f, con_hash=True)["hash"] for f in fatture],
+          [r.hash_da_bolt11(f) for f in fatture])
+    prova("...e la fattura vera ha un hash vero (non vuoto)", 64,
+          len(r.hash_da_bolt11(BOLT11_VERA_7468)))
+    rotta_bolt = BOLT11_VERA_7468[:-1] + ("q" if BOLT11_VERA_7468[-1] != "q" else "p")
+    prova("un checksum rotto non afferma niente", "", r.hash_da_bolt11(rotta_bolt))
+    prova("un Lightning address non e' una bolt11", "",
+          r.hash_da_bolt11("pedro@walletofsatoshi.com"))
+
+    # --- 4) MOSTRO.DB, IN SOLA LETTURA ---------------------------------
+    m = sqlite3.connect(":memory:")
+    m.execute("CREATE TABLE orders(id TEXT, status TEXT, buyer_invoice TEXT, "
+              "dev_fee_payment_hash CHAR(64), payout_payment_hash CHAR(64))")
+    m.executemany("INSERT INTO orders VALUES(?,?,?,?,?)", [
+        ("o1", "success", bolt11_finta(7264, 3600, 1790000000, phash=int(H(41), 16)),
+         H(42), None),
+        ("o2", "settled-hold-invoice", "pedro@walletofsatoshi.com", None, H(43)),
+        ("o3", "pending", None, None, None),
+        ("o4", "success", "lnbc1spazzatura", "corto", None)])
+    prova("la fattura del compratore (decodificata), la dev fee, il payout "
+          "in volo", {H(41), H(42), H(43)}, r.hash_da_mostro(m))
+    vecchio = sqlite3.connect(":memory:")
+    vecchio.execute("CREATE TABLE orders(id TEXT, buyer_invoice TEXT)")
+    vecchio.execute("INSERT INTO orders VALUES('o1', ?)",
+                    (bolt11_finta(100, 3600, 1790000000, phash=int(H(44), 16)),))
+    prova("un mostro.db senza le colonne nuove: una fonte in meno, non "
+          "un'esplosione", {H(44)}, r.hash_da_mostro(vecchio))
+
+    # --- 5) I LOG DI MOSTROD: SOLO LE RIGHE CHE PAGANO -----------------
+    E = "\x1b"
+    log = "\n".join([
+        f"{E}[2m2026-09-24T10:00:00.123456Z{E}[0m {E}[32m INFO{E}[0m "
+        f"{E}[2mmostrod::app::release{E}[0m{E}[2m:{E}[0m Order Id "
+        f"992e288e-1111-2222-3333-444455556666: Invoice with hash: {H(51)} paid!",
+        f"2026-09-24T10:00:01Z  WARN mostrod::app::release: Order Id "
+        f"992e288e-1111-2222-3333-444455556666: Invoice with hash: {H(52)} "
+        "has failed! reason: Some(NoRoute) (code 2), htlc attempts: 0",
+        f"2026-09-24T10:00:02Z  INFO mostrod::app::dev_fee:    Amount: 22 "
+        f"sats, Hash: {H(53)}",
+        f"2026-09-24T10:00:03Z ERROR mostrod::app::dev_fee:    Payment hash: {H(54)}",
+        # un evento stampato intero: dentro c'e' testo di chiunque
+        "2026-09-24T10:00:04Z  INFO mostrod::app::dispute: Publishing "
+        "dispute event: Event {",
+        f'    content: "Hash: {H(61)}",',
+        f'    tags: ["pm", "Invoice with hash: {H(62)} paid!"],',
+        # l'hold invoice accettata e' un pagamento IN ENTRATA
+        f"2026-09-24T10:00:05Z  INFO mostrod::util: Invoice with hash {H(63)} accepted!",
+        # le parole giuste nel modulo sbagliato
+        f"2026-09-24T10:00:06Z  INFO mostrod::app::order: Invoice with hash: {H(64)} paid!",
+        # il modulo che paga, ma una riga che non dice di aver pagato
+        f"2026-09-24T10:00:08Z  WARN mostrod::app::release: Hash: {H(66)} "
+        "non combacia con la fattura",
+        # e la riga INTERA scritta dentro un evento, su una riga sola
+        "2026-09-24T10:00:07Z  INFO mostrod::app::dispute: Event { content: "
+        f'"mostrod::app::release: Order Id 1-2: Invoice with hash: {H(65)} paid!" }}',
+    ])
+    prova("payout riuscito e fallito, dev fee: si'; eventi, hold invoice e "
+          "moduli che non pagano: no", {H(51), H(52), H(53), H(54)},
+          r.hash_dai_log(log))
+
+    # --- 6) IL VERDETTO -------------------------------------------------
+    T0 = 1790000000
+
+    def pag(n, status="SUCCEEDED", sats=1000, t=T0, fee=1):
+        return {"payment_hash": H(n), "status": status, "value_sat": str(sats),
+                "fee_sat": str(fee), "creation_time_ns": str(t * 10 ** 9),
+                "payment_request": f"lnbc-finta-{n}"}
+
+    dest = {}
+
+    def dest_di(p):
+        return dest.get(p["payment_hash"], "")
+
+    def vps_che_dice(si, chiesti):
+        def f(hs):
+            chiesti.append(list(hs))
+            return {h: h in si for h in hs}, ""
+        return f
+
+    def vps_muto(chiesti):
+        def f(hs):
+            chiesti.append(list(hs))
+            return None, "il VPS non risponde (Tor lento o VPS giu')"
+        return f
+
+    g = r.giudica
+    # il pagamento di Barattolo
+    chiesti = []
+    v = g([pag(1)], {}, {}, [], vps_che_dice({H(1)}, chiesti), dest_di, {}, T0)
+    prova("PAGAMENTO DI BARATTOLO: riconosciuto dal VPS, nessun allarme",
+          ({H(1): "barattolo"}, []), (v["riconosciuti"], v["sconosciuti"]))
+    # quello di mostrod: non si chiede nemmeno al VPS
+    chiesti = []
+    v = g([pag(41), pag(51)], {}, {H(41): "mostro", H(51): "mostro-log"}, [],
+          vps_che_dice(set(), chiesti), dest_di, {}, T0)
+    prova("PAGAMENTO DI MOSTROD (database e log): riconosciuto sul nodo",
+          {H(41): "mostro", H(51): "mostro-log"}, v["riconosciuti"])
+    prova("...e al VPS non si chiede niente: le fonti della macchina vengono "
+          "prima di un giro su Tor", [], chiesti)
+    # i gia' noti non si richiedono
+    chiesti = []
+    v = g([pag(1), pag(2)], {H(1): "barattolo", H(2): "imparato"}, {}, [],
+          vps_che_dice(set(), chiesti), dest_di, {}, T0)
+    prova("i gia' noti non si richiedono a nessuno", ([], {}),
+          (chiesti, v["riconosciuti"]))
+    # FAILED ripetuti
+    dest.update({H(70): "02aa", H(71): "02aa", H(72): "02aa", H(73): "02bb",
+                 H(74): "02aa", H(75): "02aa"})
+    pagamenti = [pag(70, "FAILED", 5000, T0), pag(71, "FAILED", 5000, T0 + 60),
+                 pag(72, "SUCCEEDED", 5000, T0 + 120),
+                 pag(73, "FAILED", 5000, T0 + 30),   # altra destinazione
+                 pag(74, "FAILED", 4000, T0 + 30),   # altra cifra
+                 pag(75, "FAILED", 5000, T0 + 200)]  # DOPO il riuscito
+    chiesti = []
+    v = g(pagamenti, {}, {}, [], vps_che_dice({H(72)}, chiesti), dest_di, {}, T0)
+    prova("FAILED RIPETUTI poi un SUCCEEDED, stessa cifra e destinazione: "
+          "nessun allarme", ("ritentato", "ritentato", "barattolo"),
+          (v["riconosciuti"].get(H(70)), v["riconosciuti"].get(H(71)),
+           v["riconosciuti"].get(H(72))))
+    prova("...ma un FAILED verso un'altra destinazione, di un'altra cifra, o "
+          "DOPO il riuscito si giudica da solo (e qui nessuno lo spiega)",
+          [H(73), H(74), H(75)], sorted(p["payment_hash"] for p in v["sconosciuti"]))
+    prova("...e al VPS si chiedono solo quelli che il nodo non ha spiegato",
+          [sorted([H(72), H(73), H(74), H(75)])], [sorted(c) for c in chiesti])
+    dest[H(76)] = ""
+    v = g([pag(76, "FAILED", 5000, T0), pag(72, "SUCCEEDED", 5000, T0 + 9)],
+          {}, {}, [], vps_che_dice({H(72)}, []), dest_di, {}, T0)
+    prova("un FAILED senza destinazione leggibile non si appoggia a nessuno",
+          [H(76)], [p["payment_hash"] for p in v["sconosciuti"]])
+    # lo sconosciuto
+    v = g([pag(90, sats=247707)], {}, {}, [], vps_che_dice(set(), []),
+          dest_di, {}, T0)
+    prova("PAGAMENTO SCONOSCIUTO: tutte le fonti hanno risposto, nessuna lo "
+          "spiega → allarme SUBITO", [H(90)],
+          [p["payment_hash"] for p in v["sconosciuti"]])
+    testo = r.testo_allarme(v["sconosciuti"][0], "02" + "c" * 64,
+                            "Boltz swap")
+    prova("l'allarme dice cifra all'italiana, destinazione, descrizione",
+          True, all(x in testo for x in ("247.707 sats", "02" + "c" * 64,
+                                         "«Boltz swap»", "SCONOSCIUTO")))
+    prova("...e cosa fare: verificare, riconoscerlo se e' tuo, e solo dopo "
+          "revocare il macaroon di LNbits", True,
+          all(x in testo for x in ("VERIFICA", "--impara " + H(90)[:16],
+                                   "payout_tentati", "deletemacaroonid 1")))
+    prova("...nell'ordine giusto: la revoca viene DOPO la verifica", True,
+          testo.index("VERIFICA") < testo.index("deletemacaroonid"))
+    # il VPS che non risponde
+    chiesti = []
+    v = g([pag(91)], {}, {}, [], vps_muto(chiesti), dest_di, {}, T0)
+    prova("VPS CHE NON RISPONDE: nessun allarme, il pagamento aspetta",
+          ([], [], [H(91)]), (v["sconosciuti"], v["non_verificati"],
+                              list(v["in_attesa"])))
+    prova("...col quando della prima volta e il perche'", (T0, True),
+          (v["in_attesa"][H(91)][0], "non risponde" in v["in_attesa"][H(91)][1]))
+    v2 = g([pag(91)], {}, {}, [], vps_muto([]), dest_di, v["in_attesa"],
+           T0 + 2 * 3600)
+    prova("...due ore dopo, ancora muto: aspetta ancora, e il primo quando "
+          "non si sposta", ([], T0), (v2["non_verificati"],
+                                     v2["in_attesa"][H(91)][0]))
+    v3 = g([pag(91)], {}, {}, [], vps_muto([]), dest_di, v2["in_attesa"],
+           T0 + 3 * 3600 + 1)
+    prova("...oltre le tre ore: allarme NON VERIFICATO", ([H(91)], {}),
+          ([p["payment_hash"] for p, _, _ in v3["non_verificati"]],
+           v3["in_attesa"]))
+    testo = r.testo_allarme(v3["non_verificati"][0][0], "", "",
+                            v3["non_verificati"][0][2])
+    prova("...e l'allarme dice che non e' verificato, e perche'", True,
+          "NON VERIFICATO" in testo and "non risponde" in testo)
+    v4 = g([pag(91)], {}, {}, [], vps_che_dice({H(91)}, []), dest_di,
+           v2["in_attesa"], T0 + 2 * 3600 + 60)
+    prova("il VPS che torna prima delle tre ore lo riconosce: nessun allarme",
+          ({H(91): "barattolo"}, {}), (v4["riconosciuti"], v4["in_attesa"]))
+    v = g([pag(92)], {}, {}, ["mostro.db non si legge (disk I/O error)"],
+          vps_che_dice(set(), []), dest_di, {}, T0)
+    prova("mostro.db illeggibile: il «no» del VPS non basta, il pagamento "
+          "aspetta", ([], [H(92)]), (v["sconosciuti"], list(v["in_attesa"])))
+    tanti = [pag(1000 + i) for i in range(60)]
+    risposte = iter([({H(1000 + i): i < 3 for i in range(50)}, ""),
+                     (None, "il VPS non risponde (Tor lento o VPS giu')")])
+    v = g(tanti, {}, {}, [], lambda hs: next(risposte), dest_di, {}, T0)
+    prova("60 hash in due domande, la seconda muta: i si' della prima "
+          "valgono, i suoi no allarmano, gli altri 10 aspettano",
+          (3, 47, 10), (len(v["riconosciuti"]), len(v["sconosciuti"]),
+                        len(v["in_attesa"])))
+
+    # --- 7) HTLC, GUASTI, RIASSUNTO -------------------------------------
+    canali = [{"remote_pubkey": "03" + "d" * 64, "pending_htlcs": [
+        {"incoming": True, "amount": "7338", "hash_lock": "aa",
+         "expiration_height": 900100},
+        {"incoming": True, "amount": "12000", "hash_lock": "bb",
+         "expiration_height": 900015}]}]
+    vicini = r.giudica_htlc(canali, 900000)
+    prova("una hold invoice a 100 blocchi e' uno scambio in corso, non un "
+          "allarme; a 15 blocchi si'", ["htlc:bb"], [k for k, _ in vicini])
+    prova("...e l'allarme dice cifra e blocchi", True,
+          "12.000 sats a 15 blocchi" in vicini[0][1])
+    gu = {}
+    prova("un guasto appena nato, con tre ore di tolleranza: zitto", False,
+          r.guasto(gu, "lncli", True, T0, 3 * 3600))
+    prova("...dopo tre ore: grida", True,
+          r.guasto(gu, "lncli", True, T0 + 3 * 3600, 3 * 3600))
+    prova("...un'ora dopo, ancora vero: zitto (una volta al giorno)", False,
+          r.guasto(gu, "lncli", True, T0 + 4 * 3600, 3 * 3600))
+    prova("...ventiquattro ore dopo l'ultimo avviso: grida di nuovo", True,
+          r.guasto(gu, "lncli", True, T0 + 27 * 3600, 3 * 3600))
+    r.guasto(gu, "lncli", False, T0 + 28 * 3600, 0)
+    prova("...e quando passa esce dalla memoria", {}, gu)
+    import datetime as _dt
+    ieri = _dt.date(2026, 9, 27)
+    t_ieri = int(_dt.datetime(2026, 9, 27, 14, tzinfo=_dt.timezone.utc).timestamp())
+    t_oggi = t_ieri + 86400
+    giorno = [pag(1, sats=247707, t=t_ieri), pag(2, sats=14837, t=t_ieri),
+              pag(3, sats=77760, t=t_ieri), pag(4, "FAILED", 5000, t_ieri),
+              pag(5, sats=999, t=t_oggi)]
+    noti = {H(1): "barattolo", H(2): "barattolo", H(3): "mostro",
+            H(4): "ritentato"}
+    testo = r.testo_riassunto(giorno, noti, {}, ieri, {}, 0)
+    prova("IL RIASSUNTO: «ieri il nodo ha pagato N volte, tutte riconosciute»",
+          True, "Ieri il nodo ha pagato 3 volte, per 340.304 sats: tutte "
+                "riconosciute (Barattolo 2, mostrod 1)." in testo)
+    prova("...i falliti spiegati, e i pagamenti di oggi fuori", True,
+          "Tentativi falliti: 1, tutti spiegati." in testo and "999" not in testo)
+    prova("...e finisce col marcatore", True,
+          testo.endswith("--- fine riassunto"))
+    del noti[H(2)]
+    testo = r.testo_riassunto(giorno, noti, {H(2): T0}, ieri, {}, 2)
+    prova("un pagamento non riconosciuto si vede nel riassunto", True,
+          "⚠️ 1 NO" in testo and "Allarmi ancora aperti: 1" in testo)
+    prova("...e gli HTLC in volo si contano, senza allarme", True,
+          "HTLC in volo adesso: 2" in testo)
+    prova("zero pagamenti: lo dice lo stesso (e' la prova che la ronda gira)",
+          True, "Ieri il nodo non ha pagato niente." in
+          r.testo_riassunto([], {}, {}, ieri, {}, 0))
+
+    # --- 8) UN GIRO INTERO DI main(), CON IL MONDO DI CARTONE -----------
+    cartella = tempfile.mkdtemp(prefix="ronda-prova-")
+    mondo = {"pagamenti": [pag(1, t=T0), pag(41, t=T0), pag(90, sats=247707, t=T0),
+                           pag(91, t=T0)],
+             "lncli_muto": False, "vps_muto": False}
+    avvisi, domande = [], []
+
+    def lncli_finto(*a):
+        if mondo["lncli_muto"]:
+            raise RuntimeError("connection refused")
+        if a[0] == "listpayments":
+            return {"payments": mondo["pagamenti"]}
+        if a[0] == "listchannels":
+            return {"channels": [{"remote_pubkey": "03" + "d" * 64,
+                                  "pending_htlcs": []}]}
+        if a[0] == "getinfo":
+            return {"block_height": 900000}
+        if a[0] == "decodepayreq":
+            return {"destination": "02" + "e" * 64, "description": "finta"}
+        raise RuntimeError(a)
+
+    def vps_finto(hs, segreti):
+        domande.append(list(hs))
+        if mondo["vps_muto"]:
+            return None, "il VPS non risponde (Tor lento o VPS giu')"
+        return {h: h == H(1) for h in hs}, ""
+
+    vecchi = {k: getattr(r, k) for k in ("lncli", "fonti_locali", "chiedi_al_vps",
+                                        "avvisa", "leggi_segreti", "CARTELLA")}
+    r.lncli = lncli_finto
+    r.fonti_locali = lambda: ({H(41): "mostro"}, [])
+    r.chiedi_al_vps = vps_finto
+    r.avvisa = lambda t: avvisi.append(t) or True
+    r.leggi_segreti = lambda: {}
+    r.CARTELLA = cartella
+    orologio = [T0]
+    vecchio_time = r.time.time
+    r.time.time = lambda: orologio[0]
+    try:
+        # una baseline VECCHIA, com'e' oggi sul nodo: solo gli hash
+        with open(os.path.join(cartella, "pagamenti_noti"), "w") as f:
+            f.write(H(500) + "\n")
+        mondo["vps_muto"] = False
+        mondo["pagamenti"][3] = pag(91, t=T0)
+        rc = r.main(["ronda-pagamenti.py"])
+        prova("main: i due sconosciuti gridano (exit 9), uno per allarme",
+              (9, 2), (rc, len(avvisi)))
+        prova("...e sono proprio loro", True,
+              any("247.707 sats" in x for x in avvisi))
+        noti = r.leggi_noti()
+        prova("...i riconosciuti entrano nei noti CON LA FONTE, la baseline "
+              "vecchia vale «imparato»",
+              ("barattolo", "mostro", "imparato", None),
+              (noti.get(H(1)), noti.get(H(41)), noti.get(H(500)), noti.get(H(90))))
+        prova("...e il 91, che il VPS non conosce, grida anche lui", True,
+              H(91) not in noti)
+        avvisi.clear()
+        domande.clear()
+        orologio[0] = T0 + 3600
+        rc = r.main(["ronda-pagamenti.py"])
+        prova("il giro dopo: gli allarmi gia' partiti non si ripetono", (0, []),
+              (rc, avvisi))
+        prova("...e al VPS si richiedono solo i non spiegati", [sorted([H(90), H(91)])],
+              [sorted(d) for d in domande])
+        # --giorno: il riassunto parte una volta sola per giorno
+        orologio[0] = T0 + 86400
+        r.main(["ronda-pagamenti.py", "--giorno"])
+        r.main(["ronda-pagamenti.py", "--giorno"])
+        riassunti = [a for a in avvisi if "Pagamenti del nodo" in a]
+        prova("--giorno: il riassunto parte, e UNA volta sola per giorno", 1,
+              len(riassunti))
+        prova("...e nomina gli allarmi ancora aperti", True,
+              "Allarmi ancora aperti: 2" in riassunti[0])
+        # --impara con un prefisso: solo quello
+        r.main(["ronda-pagamenti.py", "--impara", H(90)[:16]])
+        noti = r.leggi_noti()
+        prova("--impara <prefisso>: impara SOLO quello", ("imparato", False),
+              (noti.get(H(90)), H(91) in noti))
+        allarmati = [l.split()[0] for l in open(os.path.join(cartella, "pagamenti_allarmati"))]
+        prova("...e lo toglie dagli allarmi aperti", [H(91)], allarmati)
+        prova("--impara con un prefisso corto si rifiuta", True,
+              "almeno 8" in r.impara(mondo["pagamenti"], r.leggi_noti(), "0000"))
+        gemelli = [{"payment_hash": H(1)},
+                   {"payment_hash": H(1)[:10] + "e" * 54}]
+        prova("--impara con un prefisso di due pagamenti si rifiuta", True,
+              "ne serve UNO" in r.impara(gemelli, r.leggi_noti(), H(1)[:10]))
+        # un pagamento nuovo col VPS muto: niente allarme per tre ore
+        avvisi.clear()
+        mondo["pagamenti"].append(pag(95, t=T0 + 86400))
+        mondo["vps_muto"] = True
+        orologio[0] = T0 + 86400 + 60
+        r.main(["ronda-pagamenti.py"])
+        orologio[0] += 2 * 3600
+        r.main(["ronda-pagamenti.py"])
+        prova("VPS muto per due ore: nessun allarme", [], avvisi)
+        orologio[0] += 3600 + 60
+        r.main(["ronda-pagamenti.py"])
+        prova("...oltre le tre ore: UN allarme «non verificato»", (1, True),
+              (len(avvisi), "NON VERIFICATO" in avvisi[0]))
+        # lncli muto: tre ore di tolleranza, poi una volta al giorno
+        avvisi.clear()
+        mondo["lncli_muto"] = True
+        prova("lncli muto: exit 1, zitto al primo giro", (1, []),
+              (r.main(["ronda-pagamenti.py"]), avvisi))
+        orologio[0] += 3 * 3600
+        r.main(["ronda-pagamenti.py"])
+        prova("...dopo tre ore: l'allarme che i pagamenti NON sono sorvegliati",
+              True, len(avvisi) == 1 and "NON sono sorvegliati" in avvisi[0])
+        mondo["lncli_muto"] = False
+    finally:
+        r.time.time = vecchio_time
+        for k, val in vecchi.items():
+            setattr(r, k, val)
+
+    # --- 9) GLI SCRIPT DI BASH: il giro corto, il giro lungo, il timer ---
+    sh = open(os.path.join(QUI, "deploy", "nodo", "ronda.sh"), encoding="utf-8").read()
+    corto = sh[sh.index('if [ "$LUNGO" = 0 ]'):]
+    corto = corto[:corto.index("\nfi\n")]
+    prova("ronda.sh: il giro corto chiama il giudice dei pagamenti e chiude "
+          "col marcatore", True,
+          "sudo /usr/local/bin/ronda-nodo.sh\n" in corto
+          and "echo '--- fine ronda'" in corto)
+    prova("...la superficie gira solo nel giro lungo", True,
+          "ronda-superficie" not in corto and "ronda-superficie.sh" in sh)
+    prova("...il giro lungo chiama --giorno (riassunto e backup)", True,
+          "sudo /usr/local/bin/ronda-nodo.sh --giorno" in sh)
+    prova("...il marcatore chiude TUTTI i rami (corto, silenzioso, con "
+          "allarmi)", 3, sh.count("echo '--- fine ronda'"))
+    prova("...il giorno si timbra solo a giro riuscito, e --prova non timbra",
+          True, sh.index('echo "$OGGI" > "$TIMBRO"') > sh.index("ronda-superficie.sh")
+          and '[ "$PROVA" = 0 ] && echo "$OGGI" > "$TIMBRO"' in sh)
+    rn = open(os.path.join(QUI, "deploy", "nodo", "ronda-nodo.sh"), encoding="utf-8").read()
+    prima_backup = rn[:rn.index("/var/backups/nodo")]
+    prova("ronda-nodo.sh: nessun exit prima del backup nel giro lungo", True,
+          '[ "$MODO" = "--giorno" ] || [ "$MODO" = "--prova" ] || exit 0' in prima_backup
+          and prima_backup.index("ronda-pagamenti.py") < prima_backup.index("exit"))
+    timer = open(os.path.join(QUI, "deploy", "nodo", "nodo-ronda.timer.d",
+                              "ogni-ora.conf"), encoding="utf-8").read()
+    prova("il timer: l'OnCalendar vecchio si AZZERA prima di quello nuovo, "
+          "ogni ora", True,
+          "OnCalendar=\nOnCalendar=*-*-* *:05:00\n" in timer)
+    for nome in ("ronda.sh", "ronda-nodo.sh", "ronda-avvisa.sh",
+                 "ronda-pagamenti.py"):
+        b = open(os.path.join(QUI, "deploy", "nodo", nome), "rb").read()
+        prova(f"{nome}: fine riga LF (sul nodo un CR rompe bash)", 0,
+              b.count(b"\r"))
+
+
+
 def prove_p2p_sconto():
     """LE COMMISSIONI PER PERSONA (set 2026): lo sconto fedelta' del
     P2P. Lo sconto vero lo applica il coordinatore (patch 0005 del
@@ -106862,6 +107436,7 @@ def main():
               prove_bundle_nostr,
               prove_relay_chiavi,
               prove_p2p_sconto,
+              prove_ronda_nodo,
               prove_livello_accanto_al_titolo,
               prove_p2p_server,
         prove_p2p_libro,

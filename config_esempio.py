@@ -727,6 +727,14 @@ P2P_SCONTO_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
 # avvisi restano quelli del libro pubblico (presa, concluso, annullato,
 # scaduto), che allora partono subito invece di aspettare il coordinatore.
 P2P_EVENTI_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
+# Il segreto con cui la RONDA DEL NODO chiede a /api/nodo/pagamenti-noti
+# se un pagamento uscito dal nodo e' un payout di Barattolo (28 set
+# 2026): risponde solo si'/no per ogni hash. Lo stesso valore va sul nodo
+# in /etc/ronda/barattolo.env (`RONDA_SEGRETO`). UN SEGRETO SUO, diverso
+# dagli altri due: si ruota da solo. Si genera con `openssl rand -hex 32`.
+# Vuoto o segnaposto = la rotta NON ESISTE (404), e la ronda allarma
+# dopo tre ore di pagamenti che non ha potuto verificare.
+RONDA_NODO_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
 # LA RIGA A OGNI PASSATA DELL'OROLOGIO P2P (17 set 2026): una al minuto
 # nel journal, anche quando non trova niente — e' quella che distingue
 # «gira a vuoto» da «non gira», che un giorno e' costata un'ora.

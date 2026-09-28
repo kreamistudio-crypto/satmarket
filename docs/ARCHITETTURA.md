@@ -247,6 +247,22 @@
   `paga_venditore` rifiuta una fattura già tentata da un'ALTRA
   cassaforte: stessa preimage, due pagamenti. `leggi_bolt11(...,
   con_hash=True)` dà il payment hash senza chiedere a LNbits.
+  LA PORTA DELLA RONDA DEL NODO (28 set 2026): la stessa memoria
+  risponde al nodo. `POST /api/nodo/pagamenti-noti` ({"hashes": [...]},
+  al massimo 50) dice per ogni hash SOLO si'/no: e' un nostro
+  tentativo se sta in `payout_tentati` (scritto dalla mano PRIMA della
+  POST a LNbits, quindi anche un pagamento partito un attimo fa, e anche
+  un fallito) o nel `payout_hash` di `ordini`, `rimborsi_asta`,
+  `pagamenti`. Mai l'ordine, la cifra, la cassaforte. Una tabella che
+  non si legge dice no: un no sbagliato fa suonare un allarme da
+  guardare, un si' sbagliato nasconderebbe un furto. La porta e' il
+  calco di quella dello sconto (`RONDA_NODO_SEGRETO`, vuoto o
+  segnaposto = 404, confronto a byte e a tempo costante, porta PRIMA
+  del corpo), col suo segreto, e una riga «🔎 Ronda del nodo» nel
+  journal per domanda. Chi la chiama e perche' — il giudice dei
+  pagamenti del nodo, `deploy/nodo/ronda-pagamenti.py`, che prima di
+  bussare qui ha gia' chiesto a mostro.db e ai log di mostrod — sta in
+  PRODUZIONE, «LA RONDA DEL NODO OGNI ORA».
   SE MANCA LA FATTURA: `azione: 'chiedi_fattura'` scrive il passo
   `serve_fattura/altra_cassaforte`; finché è l'ultima riga della linea
   del tempo `stadio_pagamento` dà `gesto_venditore` pur restando «in

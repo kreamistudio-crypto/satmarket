@@ -499,6 +499,100 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   primo giro NON si cura con `--impara`: o e' vero, o la ronda legge
   male l'`iptables -S` vero (provata solo su un banco finto) — si
   guarda prima. Rollback: il `.prima-22set` al suo posto.
+- LA RONDA DEL NODO OGNI ORA, E I PAGAMENTI CHE SI RICONOSCONO DA SOLI
+  (28 set 2026). Quattro file in `deploy/nodo/`, copie di quel che
+  gira sul nodo: `ronda.sh` (in `~/nodo`, la chiama il timer),
+  `ronda-nodo.sh` e `ronda-pagamenti.py` (in `/usr/local/bin`, da
+  root via sudo), `ronda-avvisa.sh` (invariato), più il drop-in
+  `nodo-ronda.timer.d/ogni-ora.conf`. OGNI ORA al minuto 5 il giro
+  corto: pagamenti usciti da LND, HTLC a meno di 20 blocchi dalla
+  scadenza, canali. Il PRIMO giro dalle 9 UTC è il giro lungo di prima
+  (finestra, disco, RAM, superficie, backup) più il riassunto dei
+  pagamenti di ieri sul canale del nodo. Un pagamento è riconosciuto se
+  lo spiega mostro.db (fattura del compratore, dev fee, payout in
+  volo), una riga di pagamento nei log di mostrod, un FAILED ritentato
+  con successo (stessa cifra, stessa destinazione) o il VPS
+  (`POST /api/nodo/pagamenti-noti`, via Tor, si'/no per hash, segreto
+  `RONDA_NODO_SEGRETO`). Nessuno lo spiega → allarme SUBITO, una volta,
+  con cifra, destinazione, descrizione e cosa fare. Una fonte muta (VPS
+  giu', mostro.db illeggibile) → aspetta, e allarma solo dopo tre ore.
+  Lo stato sta in `/var/lib/ronda/`: `pagamenti_noti` (ora «hash
+  fonte»: le righe di solo hash valgono «imparato»),
+  `pagamenti_in_attesa`, `pagamenti_allarmati`, `guasti`, `riassunti`;
+  il giorno del giro lungo in `~/nodo/.ronda-giro-lungo`. I gesti a
+  mano: `sudo /usr/local/bin/ronda-nodo.sh --impara <inizio dell'hash>`
+  (solo quel pagamento; senza argomento, tutti come prima) e
+  `sudo /usr/local/bin/ronda-nodo.sh --prova` (riassunto subito).
+  L'ORDINE È QUESTO, UN COMANDO ALLA VOLTA: prima il codice sul VPS
+  (il push: senza segreto la porta risponde 404 e non fa niente), poi
+  il segreto sul VPS, poi il nodo.
+  1) IL SEGRETO, sul PC: `python -c "import secrets; print(secrets.token_hex(32))"`.
+  UNO SUO, non quello dello sconto né quello degli eventi. Esadecimale
+  apposta: se mai finisse in un file del repo, lo scanner della CI lo
+  prende come ogni esadecimale da 64. Mai nel canale del nodo, MAI in
+  una chat con Claude.
+  2) SUL VPS, nel `config.py`: la riga `RONDA_NODO_SEGRETO = "..."`,
+  poi `sudo systemctl restart barattolo`. Il pannello «⚙️ Stato delle
+  leve» deve dire accesa «Ronda del nodo — porta dei pagamenti». La
+  porta dal VPS stesso, senza il segreto (non finisce nella history):
+  `curl -s -o /dev/null -w "%{http_code}\n" -X POST http://127.0.0.1:8080/api/nodo/pagamenti-noti -H "Content-Type: application/json" -d '{}'`
+  → `403` (aperta, e senza segreto non si entra); `404` = la riga non
+  e' stata letta.
+  3) SUL NODO, TRE LETTURE PRIMA DI TOCCARE: `systemctl cat nodo-ronda.timer nodo-ronda.service`
+  (l'`ExecStart` deve essere `/home/debian/nodo/ronda.sh` e l'utente
+  `debian`: se no ci si ferma e si manda l'uscita); `sudo -l | grep ronda`
+  (la riga di `ronda-nodo.sh` NON deve finire con `""`, che vieterebbe
+  `--giorno`: se finisce cosi' ci si ferma); e il formato vero dei log
+  di mostrod, che il giudice legge:
+  `docker logs --since 720h nodo-mostro-1 2>&1 | grep -a "Invoice with hash" | tail -2 | sed 's/\x1b\[[0-9;]*m//g'`
+  — deve cominciare con l'ora, poi `INFO` o `WARN`, poi
+  `mostrod::app::release: Order Id …`. Un formato diverso non e' un
+  guasto: vuol dire che i payout a un Lightning address si
+  riconosceranno solo dal VPS o con `--impara`, e si manda l'uscita.
+  4) DAL PC, in PowerShell, i quattro file dal repo (`cmd /c` conta:
+  il `>` di PowerShell 5.1 riscrive i byte in UTF-16):
+  `git -C C:\Users\Andrea\Documents\GitHub\satmarket fetch origin`
+  `cmd /c "for %f in (ronda-pagamenti.py ronda-nodo.sh ronda.sh) do git -C C:\Users\Andrea\Documents\GitHub\satmarket show origin/main:deploy/nodo/%f > %TEMP%\%f"`
+  `cmd /c "git -C C:\Users\Andrea\Documents\GitHub\satmarket show origin/main:deploy/nodo/nodo-ronda.timer.d/ogni-ora.conf > %TEMP%\ogni-ora.conf"`
+  `Get-FileHash $env:TEMP\ronda-pagamenti.py,$env:TEMP\ronda-nodo.sh,$env:TEMP\ronda.sh,$env:TEMP\ogni-ora.conf | ForEach-Object { $_.Hash.ToLower() + "  " + (Split-Path $_.Path -Leaf) }`
+  `scp -i $env:USERPROFILE\.ssh\lnvps $env:TEMP\ronda-pagamenti.py $env:TEMP\ronda-nodo.sh $env:TEMP\ronda.sh $env:TEMP\ogni-ora.conf debian@vm-1937.lnvps.cloud:/tmp/`
+  5) SUL NODO, i byte: `cd /tmp && sed -i 's/\r$//' ronda-pagamenti.py ronda-nodo.sh ronda.sh ogni-ora.conf && sha256sum ronda-pagamenti.py ronda-nodo.sh ronda.sh ogni-ora.conf`
+  (le stesse cifre del PC), poi `bash -n ronda-nodo.sh && sh -n ronda.sh && python3 -m py_compile ronda-pagamenti.py && echo sintassi ok`.
+  6) SUL NODO, le copie per tornare indietro:
+  `sudo cp /usr/local/bin/ronda-nodo.sh /root/ronda-nodo.sh.prima-28set && cp ~/nodo/ronda.sh ~/nodo/ronda.sh.prima-28set && sudo cp /var/lib/ronda/pagamenti_noti /root/pagamenti_noti.prima-28set`
+  7) SUL NODO, il segreto: `sudo install -d -m 700 /etc/ronda` e poi
+  `sudo nano /etc/ronda/barattolo.env` con DUE righe —
+  `RONDA_URL=https://barattolo.store/api/nodo/pagamenti-noti` e
+  `RONDA_SEGRETO=` seguito dal segreto del passo 1 — e infine
+  `sudo chmod 600 /etc/ronda/barattolo.env`. (Tor e' di serie,
+  `172.28.1.3:9050`: la riga `TOR_SOCKS=` serve solo a cambiarlo.)
+  8) SUL NODO, al loro posto:
+  `sudo install -m 755 /tmp/ronda-pagamenti.py /tmp/ronda-nodo.sh /usr/local/bin/ && install -m 755 /tmp/ronda.sh ~/nodo/ronda.sh`
+  9) IL PRIMO GIRO A MANO: `sudo /usr/local/bin/ronda-nodo.sh` — una
+  riga `ronda-pagamenti: N letti, K riconosciuti adesso (barattolo …,
+  mostro …), 0 sconosciuti, 0 in attesa, …` (i pagamenti dopo
+  l'`--impara` del 28 set si riconoscono adesso). Se dice `fonti mute:
+  il VPS dice 403` il segreto non combacia; `404` la riga del VPS
+  manca; `non risponde` Tor o il VPS. Se su Telegram arriva un
+  «🚨 PAGAMENTO SCONOSCIUTO» ci si FERMA e lo si guarda: e' vero finche'
+  non si dimostra il contrario. Poi `sudo /usr/local/bin/ronda-nodo.sh --prova`:
+  su Telegram «(PROVA) 🧾 Pagamenti del nodo, ieri …» chiuso da
+  `--- fine riassunto`, e nel terminale la riga del backup.
+  10) IL TIMER, OGNI ORA:
+  `sudo install -D -m 644 /tmp/ogni-ora.conf /etc/systemd/system/nodo-ronda.timer.d/ogni-ora.conf && sudo systemctl daemon-reload && sudo systemctl restart nodo-ronda.timer && systemctl list-timers nodo-ronda.timer`
+  — il prossimo scatto e' a `:05` dell'ora che viene, non lunedi'.
+  11) DOPO IL PRIMO SCATTO: `journalctl -u nodo-ronda --since "70 min ago" --no-pager | tail -6`
+  — `ronda: giro corto …`, la riga di `ronda-pagamenti`, `--- fine
+  ronda`. Il giorno dopo, alle 9:05 UTC, il giro lungo e il riassunto.
+  TORNARE INDIETRO, SUL NODO (il VPS non serve toccarlo: senza chi
+  chiede, la porta non fa niente; per chiuderla si toglie la riga dal
+  config e si riavvia):
+  `sudo rm /etc/systemd/system/nodo-ronda.timer.d/ogni-ora.conf && sudo systemctl daemon-reload && sudo systemctl restart nodo-ronda.timer`
+  `sudo install -m 755 /root/ronda-nodo.sh.prima-28set /usr/local/bin/ronda-nodo.sh && install -m 755 ~/nodo/ronda.sh.prima-28set ~/nodo/ronda.sh`
+  `sudo sed -i 's/ .*//' /var/lib/ronda/pagamenti_noti` — ⚠️ QUESTO
+  CONTA: la ronda di prima legge la riga INTERA come hash, e «hash
+  barattolo» non combacia con niente, quindi senza questo sed
+  griderebbe su ogni pagamento riconosciuto nel frattempo.
 - I PROVIDER DI SCORTA DEL PREZZO (15 set 2026): `settings-price.toml`
   in `deploy/nodo/` e' la sezione `[price]` da appendere a
   `~/nodo/mostro/settings.toml` (yadio + CoinGecko + currency-api +
