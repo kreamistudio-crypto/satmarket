@@ -28071,3 +28071,46 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   non tagli l'alone del picco (la prova lo confronta coi numeri del
   keyframe), e il file e' 1000×259: il 3x della misura nuova su un
   telefono da 400.
+- LE DISPUTE P2P (28 set 2026, perché in CANTIERI, «Le dispute P2P per
+  i moderatori»). DUE META', e la terza da fare.
+  L'ANNULLO INSIEME A DISPUTA APERTA (client). mostrod accetta
+  l'annullo insieme anche da `dispute`, e aprire una disputa non
+  cancella una richiesta di annullo fatta prima. Nel client lo stato
+  RESTA `in_disputa` e la richiesta è una NOTA sulla riga,
+  `annulloDisputa` (`chiesto` | `proposto`): per il coordinatore
+  l'ordine è in disputa, la restore dice `dispute`, e nella ripresa la
+  disputa sta sopra l'annullo (`P2P_RIPRESA_PASSO`). La nota la
+  scrivono: `avanzaOrdineP2P` (le due azioni `cooperative-cancel-
+  initiated-by-*` a disputa aperta, e l'ingresso in disputa da
+  `annullo_chiesto`/`annullo_proposto`), `applicaMessaggioP2P` dal
+  messaggio PASSATO (è un dato come la controparte), `riprendiDa
+  RestoreP2P`, `adottaScambiServerP2P` (l'«annullo chiesto» del server
+  a disputa aperta, e l'ingresso in disputa), e `annulloGiaChiestoP2P`
+  — il `invalid-pubkey` a un «chiedi» su uno scambio preso vuol dire
+  «l'avevi già chiesto tu». Cade quando lo stato esce dalla disputa. La
+  leggono `azioniSecondarieP2P` (senza nota «Chiedi di annullare»,
+  `proposto` «Accetta», `chiesto` niente), `statoTestoP2P`,
+  `attesaAltraParteP2P`, `esitoGestoRaggiuntoP2P` e i due fogli
+  (`corpoAnnulloDisputaP2P`). `P2P_ANNULLA_INSIEME` non contiene
+  `in_disputa`.
+  I MODERATORI LO SANNO (server). `_manda_evento_p2p`, dopo gli avvisi
+  alle parti e nella stessa connessione, chiama `_disputa_evento_p2p`
+  dentro un `try` suo. Al momento `disputa` nasce la riga in
+  `p2p_dispute` (una per ordine: `INSERT OR IGNORE`) e ogni moderatore
+  (`_moderatori_p2p`: `ADMIN_IDS`, più 999 in collaudo) riceve
+  `_testo_disputa_aperta_p2p`; chi è una delle parti lo legge lì. Un
+  momento che chiude (`_chiusura_disputa_p2p`: `(esito, chiusa_da)`,
+  esito `compratore` | `venditore`, chiusa da `moderatore` | `parti` |
+  `scadenza` | `sconosciuto`) chiude la riga e avvisa
+  (`_testo_disputa_chiusa_p2p`). UNA CHIUSURA DA MODERATORE SENZA UNA
+  RIGA `decisione` DELLO STESSO ESITO NEL REGISTRO È UN ALLARME. Il
+  registro `p2p_dispute_registro` è append-only (`_registro_disputa_
+  p2p`); la fusione degli account rinomina chi ha fatto il gesto.
+  L'anti-doppione è `p2p_avvisi` coi momenti `disputa_mod` e
+  `disputa_chiusa_mod`; gli avvisi ai moderatori non guardano
+  l'interruttore degli avvisi P2P. IL SERVER NON FIRMA E NON TIENE
+  CHIAVI DI MODERATORE: nel blocco non c'è un posto dove starebbero, e
+  una sentinella lo tiene così.
+  DA FARE: la sezione «⚖️ Moderazione P2P» (elenco, presa, chat,
+  decisione con motivo a registro prima della firma) e il client delle
+  parti per `admin-took-dispute`.

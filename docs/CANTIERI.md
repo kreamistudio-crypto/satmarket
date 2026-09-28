@@ -35779,3 +35779,73 @@ del Redmi consegnava JPEG neri, e le foto l'annuncio non le ha mai avute.
 Il buco della modifica che svuotava le foto, qui «visto e non curato»,
 è curato lì. Resta vero, e resta di questa voce, il difetto
 dell'orientamento: una foto storta non si spoglia più a bisturi.
+
+Le dispute P2P per i moderatori, secondo pezzo: dal campo, e l'avviso
+ai moderatori (28 set 2026). **DAL CAMPO.** Col primo pezzo in linea
+Andrea — chi vende, i sats bloccati sono i suoi — tocca tre volte
+«Chiedi di annullare» sull'ordine d3fc7356 e riceve tre «il profilo di
+scambio non è stato riconosciuto». Il suo diario dice il perché: un
+`cooperative-cancel-initiated-by-you` alle …145 e la disputa di Alan
+alle …166, ventuno secondi dopo. **LETTO SUL SORGENTE** (upstream
+`v0.18.8`, via lettore che riassume): `cancel_active_order` risponde
+`invalid_pubkey` in due casi — chi firma non è una delle parti, o è LA
+STESSA PERSONA che l'annullo l'aveva già chiesto (`initiator !=
+counterparty_pubkey`) — e `dispute.rs` non tocca
+`cancel_initiator_pubkey` né i due `*_cooperativecancel`: aprire una
+disputa non cancella la richiesta. Quindi per mostrod mancava solo il
+sì di Alan, e la strada per chiuderla era il suo tocco. **I DUE DIFETTI
+DEL PRIMO PEZZO**: 1) quel «no» veniva detto con la frase del profilo
+non riconosciuto; 2) la richiesta fatta PRIMA della disputa si perdeva
+— il messaggio arrivava dopo quello della disputa ed era «passato», e in
+ordine la riga passava da `annullo_chiesto` a `in_disputa` senza
+portarsela — quindi a chi aveva chiesto restava un bottone che riceve
+solo no, e a chi doveva accettare non compariva «Accetta». **LA CURA**:
+la nota `annulloDisputa` entra nella disputa da tutte le strade
+(macchina a stati, messaggio passato, restore, archivio del server), e
+`annulloGiaChiestoP2P` legge il `invalid-pubkey` a un «chiedi» su uno
+scambio preso come «l'avevi già chiesto»: la riga prende la richiesta,
+il bottone sparisce, e la frase non giura («Se non l'avevi chiesto tu,
+scrivici») perché il primo caso, da qui, non si distingue.
+**L'AVVISO AI MODERATORI** (punto 3 del cantiere): a ogni
+`dispute-opened` la disputa prende la sua riga (`p2p_dispute`) e ogni
+moderatore riceve ordine, chi l'ha aperta, le due persone, importo,
+metodo e da quando la garanzia è bloccata; le chiusure si riconoscono
+dagli eventi della 0007 e si dicono (dalle parti, dal moderatore, per
+scadenza); il registro `p2p_dispute_registro` è append-only. **IL
+CONTROLLO INCROCIATO** deciso con la chiave: una chiusura da moderatore
+senza una riga `decisione` dello stesso esito a registro è un ALLARME a
+tutti i moderatori. **SCELTE**: i moderatori sono `ADMIN_IDS` (nessuna
+leva nuova); gli avvisi ai moderatori non guardano l'interruttore degli
+avvisi P2P; il moderatore che è una delle parti riceve l'avviso con
+scritto che non la decide lui; il rimando alla sezione dell'app NON è
+nel testo finché la sezione non c'è. **VISTO E NON TOCCATO**:
+l'anti-doppione `disputa_mod` è coperto anche dalla riga della disputa
+(una per ordine), cioè le due guardie si coprono a vicenda — la tortura
+lo ha detto, ed è rimasto perché `p2p_avvisi` è anche il registro di chi
+è stato avvisato. **PROVATO.** `prove_annullo_in_disputa` (ora 49, col
+banco «dal campo»: la riapertura coi messaggi nell'ordine del diario,
+in ordine, la restore, i sei modi del «no»);
+`prove_dispute_p2p_moderatori` (41: sentinelle, la tabella delle
+chiusure, una disputa intera coi giudici veri);
+`collaudo_dispute_p2p` (29, nuovo, in CI: il server vero con l'invio
+vero e Telegram di cartone) e `collaudo_scambi_ovunque` (64, col caso
+dell'annullo proposto prima della disputa). Tortura: 13 su 13 sul
+client; 19 su 21 sul server, poi strette le prove — la garanzia a dieci
+secondi dalla presa cadeva nello stesso minuto, la sentinella esplodeva
+invece di dire rosso, e la disputa chiusa che si richiude ora si guarda
+anche a registro (resta muta la sola guardia doppia). La prima suite ha
+trovato una rossa vera: il censimento della fusione degli account, che
+vuole ogni tabella con un `tg_id` — le due tabelle nuove ora seguono
+l'utente. Suite intera severa senza config nel worktree (su 3db47d4):
+17.081 verdi e 0 rosse; i 27 collaudi della CI verdi nella gabbia.
+**NON PROVATO**: il coordinatore vero, i telefoni, Telegram vero; il
+giro dal vivo di questo pezzo non è stato fatto. **IL WORKFLOW È STATO
+TOCCATO** (il collaudo nuovo entra per nome): il job `pronto` può
+restare indietro, si guarda dopo il push. **DA AVERE**: il tocco di
+Alan sulla disputa d3fc7356 e, dal nodo, `cancel_initiator_pubkey`
+dell'ordine (la query è in PRODUZIONE, «LE DISPUTE P2P»); il primo
+avviso vero ai moderatori. **DA FARE** (il resto del cantiere): la
+sezione «⚖️ Moderazione P2P» — dove sta la decide Andrea su uno scatto
+—, la chiave del moderatore sul telefono, presa e decisione col motivo
+a registro prima della firma, la chat col moderatore, «Un moderatore ha
+preso la disputa» alle parti, e la prova di come si toglie un solver.

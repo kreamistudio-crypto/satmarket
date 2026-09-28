@@ -2213,3 +2213,70 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   un disegno che dice «BETA» dopo la beta è peggio di niente, mentre
   il foglio si aggiusta da solo: a fee pari al listino smette di dire
   «beta».
+- LE DISPUTE P2P (28 set 2026) — COSA C'È OGGI, e cosa manca. Da
+  questo deploy, a ogni `dispute-opened` di mostrod ogni moderatore
+  (`ADMIN_IDS`) riceve su Telegram l'ordine, chi l'ha aperta, le due
+  persone, importo, metodo e da quando la garanzia è bloccata; la
+  disputa ha la sua riga in `p2p_dispute` e ogni passo una riga in
+  `p2p_dispute_registro`. Nel journal le righe cominciano con «⚖️
+  Disputa P2P». ⚠️ LA SEZIONE «⚖️ Moderazione P2P» NELL'APP NON C'È
+  ANCORA, e nessuna chiave di moderatore è stata aggiunta al nodo: fino
+  ad allora una disputa si chiude in uno dei tre modi qui sotto.
+  COME SI LEGGE UNA DISPUTA SUL NODO (sola lettura; MAI `SELECT *` su
+  `orders`: porta `preimage` e `buyer_invoice`, che in una chat non ci
+  vanno):
+  `sqlite3 -readonly -header -column ~/nodo/mostro/mostro.db "SELECT d.status AS disputa, d.order_previous_status AS prima, COALESCE(d.solver_pubkey,'-') AS solver, datetime(d.created_at,'unixepoch') AS aperta, o.id AS ordine, o.kind, o.status, o.amount, o.fee, o.fiat_amount, o.fiat_code, o.payment_method, o.buyer_dispute, o.seller_dispute, datetime(o.invoice_held_at,'unixepoch') AS hold_pagata, o.hash FROM disputes d JOIN orders o ON o.id=d.order_id ORDER BY d.created_at DESC LIMIT 3;"`
+  poi la garanzia: `cd ~/nodo && docker compose exec lnd lncli lookupinvoice <hash>`
+  (`state` `ACCEPTED` = sats bloccati; `expiry_height` dentro `htlcs`)
+  e `docker compose exec lnd lncli getinfo | grep block_height`: la
+  scadenza è `(expiry_height − block_height) × 10 minuti`.
+  CHI HA CHIESTO L'ANNULLO, quando un «Chiedi di annullare» riceve un
+  no: `sqlite3 -readonly -header -column ~/nodo/mostro/mostro.db "SELECT status, substr(seller_pubkey,1,8) AS vende, substr(buyer_pubkey,1,8) AS compra, substr(cancel_initiator_pubkey,1,8) AS annullo_chiesto_da, seller_cooperativecancel AS v_annulla, buyer_cooperativecancel AS c_annulla, buyer_dispute, seller_dispute FROM orders WHERE id LIKE '<primi 8 dell'ordine>%';"`
+  — se `annullo_chiesto_da` è la chiave di chi sta riprovando, mostrod
+  risponde `invalid_pubkey`: la conferma deve venire dall'ALTRA parte.
+  I log: `cd ~/nodo && docker compose logs mostro --since 4h 2>&1 | grep -i -E "<primi 8>|cant|InvalidPubkey" | tail -40`.
+  I TRE MODI DI CHIUDERLA, dal più sicuro:
+  1) LE PARTI SI ACCORDANO. Una tocca «Chiedi di annullare», l'altra
+  «Accetta di annullare» (o «Chiedi di annullare»: per mostrod il
+  secondo `cancel` è la conferma): la hold si cancella, i sats tornano
+  a chi vende, la disputa si chiude come `SellerRefunded`. Oppure chi
+  vende libera i sats dalla pagina dello scambio, e vanno a chi compra.
+  Nessuna chiave di moderatore. I moderatori leggono «Disputa P2P
+  chiusa dalle parti».
+  2) NESSUNO FA NIENTE. Il guardiano delle scadenze di mostrod guarda
+  solo `active` e `fiat-sent`: una disputa non la tocca. Alla scadenza
+  dell'HTLC LND lo molla da solo e i sats tornano a chi vende; l'ordine
+  resta `dispute` nel database del nodo. Dopo quella data «i sats vanno
+  a chi compra» non si può più fare.
+  3) IL MODERATORE DECIDE (`admin-take-dispute`, poi `admin-settle` =
+  i sats a chi compra, o `admin-cancel` = i sats a chi vende): dalla
+  sezione dell'app, quando ci sarà. La chiave è UNA PER MODERATORE E
+  VIVE SOLO SUL SUO TELEFONO (decisione di Andrea, 28 set 2026: mai sul
+  VPS, mai la nsec del nodo portata fuori); sul nodo la aggiunge Andrea
+  con `admin-add-solver`, firmato dalla chiave del nodo SENZA farla
+  uscire da lì (`npub` = legge e decide, `npub:read` = legge e parla
+  ma non decide). La procedura per aggiungerla si scrive col resto
+  della sezione.
+  ⚠️ `lncli cancelinvoice <hash>` A MANO È SOLO EMERGENZA: restituisce
+  i sats a chi vende scavalcando mostrod, che resta con l'ordine in
+  `dispute` e il libro storto.
+  L'ALLARME «chiusa SENZA una decisione a registro»: mostrod ha
+  raccontato una chiusura da moderatore (`released` o `canceled` di
+  `mostro` col dettaglio `admin`) e nel registro del server la
+  decisione non c'è — qualcuno ha usato una chiave di moderatore senza
+  passare dall'app. Finché nessuna chiave è stata aggiunta al nodo può
+  venire solo dalla chiave del NODO. COSA FARE: 1) chiedere all'altro
+  moderatore se è stato lui; 2) se no, sul nodo guardare chi ha preso
+  la disputa (`solver` nella prima query di questa voce) e togliergli
+  il ruolo. ⚠️ Un comando per TOGLIERE un solver nel protocollo non
+  l'ho trovato (la pagina dice che «si possono togliere» e non dice
+  come): la strada letta sul codice, MAI PROVATA, è una riga nel
+  database del nodo — copia prima, con l'API `backup` di sqlite e non
+  con un `cp` a caldo — `UPDATE users SET is_solver=0 WHERE pubkey='<chiave esadecimale>' AND is_solver=1;`
+  (mostrod cerca il solver nel database a ogni richiesta). Si prova su
+  una chiave usa-e-getta PRIMA di averne bisogno.
+  IL REGISTRO, sul VPS: `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT ordine, gesto, tg_id, datetime(quando,'unixepoch','localtime'), esito, motivo FROM p2p_dispute_registro ORDER BY id DESC LIMIT 20;"`
+  e le dispute: `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT ordine, stato, aperta_da, compratore, venditore, presa_da, esito, chiusa_da, datetime(aperta_il,'unixepoch','localtime') FROM p2p_dispute ORDER BY aperta_il DESC LIMIT 20;"`.
+  ⚠️ UNA DISPUTA APERTA PRIMA DI QUESTO DEPLOY NON HA LA SUA RIGA (la
+  riga nasce all'evento `dispute-opened`): la sua chiusura non arriva
+  ai moderatori, e non è un guasto.
