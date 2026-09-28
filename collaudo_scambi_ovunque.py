@@ -66,6 +66,14 @@ d66347c2 di Alan):
      e annulla con la chiave giusta — al primo colpo se l'archivio e'
      gia' arrivato, al secondo (uno solo) se arriva dopo il «no».
 
+E DAL 28 SET 2026 (le dispute P2P: l'annullo insieme a disputa aperta):
+
+ 14. a disputa aperta una parte chiede di annullare: il server racconta
+     «annullo chiesto» a lei e «annullo proposto» all'altra, e il CLIENT
+     VERO sulla risposta vera NON torna indietro dalla disputa — la riga
+     resta «in disputa» e prende la nota (`annulloDisputa`), su tutt'e
+     due i dispositivi; all'annullo accettato va ad annullata.
+
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
 `collaudo_pagamento_p2p`), niente Telegram, niente relay, niente
 coordinatore.
@@ -221,6 +229,9 @@ for (const id of Object.keys(archivio)) {
   const o = archivio[id];
   out.cifre[id] = [o.euro, o.euroMax || 0, o.premium || 0, fermoAnnulloP2P(o)];
 }
+/* (28 set 2026) la nota dell'annullo a disputa aperta */
+out.note = {};
+for (const id of Object.keys(archivio)) out.note[id] = [archivio[id].stato, archivio[id].annulloDisputa || ''];
 process.stdout.write(JSON.stringify(out));
 """
     cart = tempfile.mkdtemp(prefix="annullati_")
@@ -623,6 +634,31 @@ def main():
     prova("il telefono con la chiave sbagliata gia' salvata si corregge da solo, e annulla",
           [[1, 1, True, "compro", "pubblicato"], "ok:canceled", ["cancel:" + KC]],
           [r.get("adottata", r), r.get("esito"), r.get("firme")])
+
+    print("\n14) l'annullo insieme a disputa aperta (28 set 2026)")
+    # la disputa del passo 11 e' ancora aperta (l'ha aperta chi compra):
+    # chi vende chiede di annullare d'accordo
+    banco.evento(DISPUTA, "cancel-requested", t + 570, "seller")
+    prova("a disputa aperta chi vende chiede di annullare: il server lo racconta ai due lati",
+          ["annullo_chiesto", "annullo_proposto"],
+          [voce(V, DISPUTA, "stato")[0], voce(C, DISPUTA, "stato")[0]])
+    in_disputa = lambda lato: {DISPUTA: {
+        "id": DISPUTA, "lato": lato, "indice": 0, "pubTrade": "", "stato": "in_disputa",
+        "euro": 20, "metodi": ["Revolut"], "preso": True, "creato": t, "ultimaMossa": t + 560}}
+    for chi, lato, nota in ((V, "vendo", "chiesto"), (C, "compro", "proposto")):
+        risposta = {o: v for o, v in scambi(chi)["scambi"].items() if o == DISPUTA}
+        r = client_sulla_risposta(risposta, in_disputa(lato), [])
+        prova(f"il client vero ({lato}): la riga RESTA in disputa e prende la nota «{nota}»",
+              {DISPUTA: ["in_disputa", nota]}, r.get("note", r))
+    banco.evento(DISPUTA, "canceled", t + 580, "buyer", "cooperative")
+    prova("l'altra parte accetta: annullato per tutt'e due", ["annullato", "annullato"],
+          [voce(V, DISPUTA, "stato")[0], voce(C, DISPUTA, "stato")[0]])
+    risposta = {o: v for o, v in scambi(C)["scambi"].items() if o == DISPUTA}
+    con_nota = in_disputa("compro")
+    con_nota[DISPUTA]["annulloDisputa"] = "proposto"
+    r = client_sulla_risposta(risposta, con_nota, [])
+    prova("...e il client vero porta la riga dalla disputa ad annullata", "annullato",
+          (r.get("note", {}).get(DISPUTA) or [r])[0])
 
     print(f"\n{banco.PASSATE} ok, {banco.FALLITE} NO")
     return 1 if banco.FALLITE else 0

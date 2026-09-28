@@ -49662,6 +49662,19 @@ function avanzaOrdineP2P(ordine, azione, payload){
   if (azione === 'rate') { o.votabile = true; return o; }
   /* il voto e' andato: il gesto sparisce, lo scambio resta dov'e' */
   if (azione === 'rate-received') { o.votato = true; return o; }
+  /* a disputa aperta la richiesta di annullo e' una NOTA, non uno
+     stato: vedi «L'ANNULLO INSIEME A DISPUTA APERTA» */
+  const nota = (o.stato === 'in_disputa' && !finito)
+    ? ({'cooperative-cancel-initiated-by-you': 'chiesto',
+        'cooperative-cancel-initiated-by-peer': 'proposto'})[azione] || '' : '';
+  if (nota) {
+    o.annulloDisputa = nota;
+    o.aggiornato = Math.floor(Date.now() / 1000);
+    o.cantDo = '';
+    o.errore = '';
+    o.nonPartito = false;
+    return o;
+  }
   const nuovo = mossaDopoRilascioP2P(o, azione, ord) || AVANZA_P2P[azione];
   if (nuovo && !finito) {
     /* IL GIRO MORTO SI SCRIVE (17 set 2026): vedi P2P_GIRO_APERTO */
@@ -49682,6 +49695,8 @@ function avanzaOrdineP2P(ordine, azione, payload){
     else if (P2P_GIRO_APERTO.indexOf(nuovo) >= 0 || nuovo === 'attivo') o.preso = true;
     /* una mossa vera del coordinatore chiude anche lo stato grezzo */
     delete o.statoGrezzo;
+    /* ...e la nota dell'annullo vive solo dentro la disputa */
+    if (nuovo !== 'in_disputa') delete o.annulloDisputa;
     /* DOVE SI E' FERMATO (27 set 2026): il passo della pagina su cui
        l'annullo e' caduto — lo legge `fermoAnnulloP2P` */
     if ((nuovo === 'annullato' || nuovo === 'rifiutato') && typeof P2P_PROGRESSO !== 'undefined')
@@ -49825,6 +49840,35 @@ const P2P_ANNULLA_INSIEME = ['attesa_mia_fattura', 'attesa_hold_venditore',
    in custodia e c'e' una controparte dall'altra parte. Prima non
    c'e' niente da contendere, dopo la cosa e' decisa. */
 const P2P_DISPUTABILI = ['attivo', 'pagamento_ritentato', 'euro_inviati'];
+/* ═══ L'ANNULLO INSIEME A DISPUTA APERTA (28 set 2026, la disputa di
+   prova di Alan: 13.739 sats in garanzia e nessun moderatore) ═══════
+   Il coordinatore lo accetta (letto su `cancel.rs` di mostrod 0.18.8:
+   `Status::Active | Status::FiatSent | Status::Dispute` vanno tutti
+   all'annullo insieme), cancella la garanzia — i sats tornano a chi li
+   ha bloccati — e chiude la disputa da se'. Da noi in `in_disputa` il
+   bottone non c'era: due persone d'accordo restavano ad aspettare un
+   moderatore.
+   LO STATO RESTA `in_disputa`, e la richiesta e' una NOTA sulla riga
+   (`annulloDisputa`: 'chiesto' | 'proposto'), non gli stati
+   `annullo_chiesto`/`annullo_proposto`: per il coordinatore l'ordine
+   E' ancora in disputa — la restore dice `dispute` — e nella ripresa
+   la disputa sta sopra l'annullo (P2P_RIPRESA_PASSO), quindi la prima
+   rilettura avrebbe rimesso la riga a «Disputa aperta» portandosi via
+   il bottone «Accetta» a chi doveva premerlo.
+   La nota la scrive `avanzaOrdineP2P` (che resta autosufficiente: la
+   tabellina delle due azioni sta dentro di lei), la porta l'archivio
+   del server (`adottaScambiServerP2P`), e cade appena lo stato esce
+   dalla disputa. */
+/* PURA: le parole del foglio di conferma, a disputa aperta. A chi
+   compra si dice la cosa che conta: annullare riporta i sats a chi
+   vende, e chi ha gia' mandato gli euro non deve farlo. */
+function corpoAnnulloDisputaP2P(o, modo){
+  const testa = modo === 'accetta'
+    ? 'Lo scambio si annulla, la disputa si chiude e i sats tornano a chi li aveva bloccati.'
+    : 'La disputa è aperta, ma potete ancora chiuderla fra voi: se anche l\'altra persona è d\'accordo lo scambio si annulla, la disputa si chiude e i sats tornano a chi li ha bloccati.';
+  return testa + (o && o.lato === 'compro'
+    ? ' Se hai già inviato gli euro non annullare: aspetta il moderatore.' : '');
+}
 /* PURA: i gesti che stanno SOTTO il bottone pieno. Mai il passo
    successivo — quello e' uno solo ed e' azioniDisponibili. */
 function azioniSecondarieP2P(o, rec){
@@ -49837,6 +49881,12 @@ function azioniSecondarieP2P(o, rec){
   if (P2P_ANNULLA_SUBITO.indexOf(o.stato) >= 0) fuori.push('ritira');
   else if (P2P_ANNULLA_INSIEME.indexOf(o.stato) >= 0) fuori.push('annulla');
   if (o.stato === 'annullo_proposto') fuori.push('accetta-annullo');
+  /* a disputa aperta ci si puo' ancora mettere d'accordo (28 set 2026):
+     chi ha gia' chiesto aspetta, chi ha ricevuto la proposta accetta */
+  if (o.stato === 'in_disputa') {
+    if (o.annulloDisputa === 'proposto') fuori.push('accetta-annullo');
+    else if (o.annulloDisputa !== 'chiesto') fuori.push('annulla');
+  }
   /* LA PORTA DI RISERVA (17 set 2026): se il messaggio che chiede la
      fattura nuova non arriva su questo dispositivo — un relay fermo,
      una riga ripresa dalla sola restore, che dice `settled-hold-invoice`
@@ -50048,6 +50098,8 @@ function attesaAltraParteP2P(o){
   else if (s === 'annullo_chiesto') cosa = 'deve accettare di annullare';
   else if (s === 'rilasciato' || s === 'pagamento_ritentato')
     return {chi: '', cosa: 'I sats sono in pagamento verso ' + (compro ? 'il tuo wallet' : 'chi compra')};
+  else if (s === 'in_disputa' && o.annulloDisputa === 'chiesto') cosa = 'deve accettare di annullare';
+  else if (s === 'in_disputa' && o.annulloDisputa === 'proposto') return null;
   else if (s === 'in_disputa') return {chi: 'Un moderatore', cosa: 'deve decidere'};
   if (!cosa) return null;
   return {chi: altro, cosa};
@@ -50102,6 +50154,14 @@ function statoTestoP2P(o){
     return {t: s.t, d: 'La fattura che avevi dato è scaduta prima che i sats venissero liberati, '
       + 'quindi il pagamento non è riuscito. I sats non sono persi: sono fermi al sicuro e restano tuoi. '
       + 'Dai una fattura nuova e ripartono.'};
+  /* A DISPUTA APERTA, L'ANNULLO CHIESTO O PROPOSTO (28 set 2026) */
+  if (o && o.stato === 'in_disputa' && o.annulloDisputa === 'chiesto')
+    return {t: s.t, d: 'Hai chiesto di annullare d\'accordo: serve anche il sì di '
+      + nomeControparteP2P(o, 'chi ha scambiato con te')
+      + '. Finché non arriva la disputa resta aperta, e i sats restano bloccati.'};
+  if (o && o.stato === 'in_disputa' && o.annulloDisputa === 'proposto')
+    return {t: s.t, d: nomeControparteP2P(o, 'L\'altra persona')
+      + ' propone di annullare d\'accordo. Se accetti, la disputa si chiude e i sats tornano a chi li ha bloccati.'};
   /* IL PAGAMENTO NON PASSATO, DETTO A CHI VENDE (23 set 2026): lo sa
      dal server (`payoutFallito`, vedi `applicaPagamentoP2P`), e la
      riga dice le due cose che contano — il gesto e' di chi compra, e
@@ -56117,6 +56177,7 @@ function annullaScambioP2P(){
     titolo: subito ? 'Annulli l\'ordine?' : 'Chiedi di annullare?',
     corpo: subito
       ? 'L\'ordine esce dal libro. Nessuno ha ancora scambiato niente con te.'
+      : o.stato === 'in_disputa' ? corpoAnnulloDisputaP2P(o, 'chiedi')
       : 'Lo scambio si annulla solo se anche l\'altra persona è d\'accordo. Se lo è, i sats tornano a chi li ha bloccati.',
     /* «ANNULLA» COME IL BOTTONE (27 set 2026): «✕ Annulla l'ordine»,
        «Sto annullando l'ordine…», «Ordine annullato ✓» — e il foglio in
@@ -56133,7 +56194,8 @@ function accettaAnnulloP2P(){
   haptic();
   chiediConferma({
     titolo: 'Accetti di annullare?',
-    corpo: 'Lo scambio si chiude e i sats tornano a chi li aveva bloccati. Nessuno perde niente.',
+    corpo: o.stato === 'in_disputa' ? corpoAnnulloDisputaP2P(o, 'accetta')
+      : 'Lo scambio si chiude e i sats tornano a chi li aveva bloccati. Nessuno perde niente.',
     etichetta: 'Sì, annulliamo',
     indietro: 'Indietro',
     /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
@@ -58366,6 +58428,15 @@ function adottaScambiServerP2P(locali){
       /* LO STATO, in avanti e una volta per fotografia */
       if (!s.ripreso) {
         s.ripreso = true;
+        /* A DISPUTA APERTA l'annullo chiesto che il server racconta non e'
+           un passo indietro: e' la nota (28 set 2026, «L'ANNULLO INSIEME A
+           DISPUTA APERTA») */
+        const notaS = gia.stato === 'in_disputa'
+          ? ({annullo_chiesto: 'chiesto', annullo_proposto: 'proposto'})[s.stato] || '' : '';
+        if (notaS && gia.annulloDisputa !== notaS) {
+          diarioP2P('archivio ' + String(id).slice(0, 8) + ': a disputa aperta il server dice ' + s.stato);
+          gia.annulloDisputa = notaS; gia.aggiornato = adesso; mosso = true;
+        }
         const da = P2P_RIPRESA_PASSO[gia.stato], a = P2P_RIPRESA_PASSO[s.stato];
         const q = Math.floor(Number(s.quando) || 0);
         /* ⚠️ ALLO STESSO GRADINO VALE L'ORA (25 set 2026, caso A): «dove
@@ -60056,7 +60127,10 @@ const P2P_NON_RISULTA = 'Nessuna risposta, e dallo stato riletto il passo non ri
 function esitoGestoRaggiuntoP2P(id, gesto){
   const e = ESITI_GESTO_P2P[gesto];
   const o = ordiniP2P()[id];
-  return !!(e && o) && e.stati.indexOf(o.stato) >= 0;
+  if (!(e && o)) return false;
+  /* a disputa aperta la richiesta di annullo e' la nota sulla riga */
+  if (gesto === 'chiedi' && o.stato === 'in_disputa' && o.annulloDisputa === 'chiesto') return true;
+  return e.stati.indexOf(o.stato) >= 0;
 }
 async function attendiGestoP2P(id, gesto, chiamata){
   const esito = ESITI_GESTO_P2P[gesto];

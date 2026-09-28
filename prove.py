@@ -108912,12 +108912,182 @@ def prove_card_annullati():
     prova("...solo loro: gli altri fogli restano come sono", 2, nudo.count("indietro: 'Indietro'"))
 
 
+def prove_annullo_in_disputa():
+    """L'ANNULLO INSIEME A DISPUTA APERTA (28 set 2026, la disputa di
+    prova di Alan: 13.739 sats in garanzia, nessun moderatore, e le due
+    parti d'accordo senza un bottone per dirlo). Il coordinatore lo
+    accetta — `cancel.rs` di mostrod 0.18.8 manda `Status::Dispute`
+    all'annullo insieme, cancella la garanzia e chiude la disputa — e da
+    noi in `in_disputa` il gesto non c'era.
+    LA SCELTA: lo stato resta `in_disputa` e la richiesta e' una NOTA
+    sulla riga (`annulloDisputa`), perche' per il coordinatore l'ordine
+    e' ancora in disputa: la restore dice `dispute`, e nella ripresa la
+    disputa sta sopra l'annullo — con gli stati di sempre la prima
+    rilettura si sarebbe portata via «Accetta» a chi doveva premerlo."""
+    import json as _json, shutil as _sh, subprocess as _sp, tempfile as _tf, os as _os
+    print("\n[l'annullo insieme a disputa aperta]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+    blocco_const = lambda nome: (lambda i: mini[i:mini.index("\n};", i) + 3])(
+        mini.index("const " + nome + " = {"))
+
+    # --- 1) LE SENTINELLE -------------------------------------------------
+    _lista = lambda nome: set(re.findall(
+        r"'([a-z_]+)'", re.search(r"const " + nome + r" = \[[^\]]*\];", mini).group(0)))
+    prova("la disputa NON entra nella lista dell'annullo di sempre: ha il suo ramo, con la nota",
+          False, "in_disputa" in _lista("P2P_ANNULLA_INSIEME"))
+    prova("...e da una disputa non se ne apre un'altra", False,
+          "in_disputa" in _lista("P2P_DISPUTABILI"))
+    av = nudo(fn("function avanzaOrdineP2P(ordine, azione, payload){"))
+    prova("la macchina a stati scrive la nota PRIMA di guardare la tabella", True,
+          0 < av.find("o.annulloDisputa = nota;") < av.find("AVANZA_P2P[azione]"))
+    prova("...resta autosufficiente (la tabellina delle due azioni e' dentro di lei)", True,
+          "annulloInDisputaP2P" not in mini
+          and "'cooperative-cancel-initiated-by-you': 'chiesto'" in av
+          and "'cooperative-cancel-initiated-by-peer': 'proposto'" in av)
+    prova("...e la nota cade quando lo stato esce dalla disputa", True,
+          "if (nuovo !== 'in_disputa') delete o.annulloDisputa;" in av)
+    for firma, modo in (("function annullaScambioP2P(){", "chiedi"),
+                        ("function accettaAnnulloP2P(){", "accetta")):
+        prova(f"il foglio di «{modo}» a disputa aperta dice le parole della disputa", True,
+              f"o.stato === 'in_disputa' ? corpoAnnulloDisputaP2P(o, '{modo}')" in nudo(fn(firma)))
+    ads = nudo(fn("function adottaScambiServerP2P(locali){"))
+    prova("l'archivio del server porta la nota, prima di giudicare il passo", True,
+          0 < ads.find("({annullo_chiesto: 'chiesto', annullo_proposto: 'proposto'})[s.stato]")
+          < ads.find("const da = P2P_RIPRESA_PASSO[gia.stato]")
+          and "gia.annulloDisputa = notaS; gia.aggiornato = adesso; mosso = true;" in ads)
+    corpo = nudo(fn("function corpoAnnulloDisputaP2P(o, modo){"))
+    prova("le parole di casa: «garanzia» e «sats», mai «escrow» ne' «coordinatore»", [False, False, False],
+          [w in corpo.lower() for w in ("escrow", "coordinatore", "relay")])
+
+    node = _sh.which("node")
+    if not node:
+        salta("il banco dell'annullo a disputa aperta", "node non c'e'")
+        return
+    liste = "\n".join(re.findall(r"^const P2P_[A-Z_]+ = \[[^\]]*\];", mini, re.M))
+    banco = "\n".join([
+        blocco_const("AVANZA_P2P"), blocco_const("STATI_P2P"), blocco_const("P2P_PROGRESSO"),
+        blocco_const("MOTIVI_CANTDO"), blocco_const("P2P_DA_RESTORE"),
+        blocco_const("P2P_RIPRESA_PASSO"), blocco_const("ESITI_GESTO_P2P"), liste,
+        fn("function azioniSecondarieP2P(o, rec){"), fn("function gestoRecensioneP2P(o, rec){"),
+        fn("function chiaveCantDo(payload){"), fn("function motivoCantDo(payload){"),
+        fn("function importoBolt11(pr){"), fn("function leggiBolt11(pr){"),
+        "let p2pInfo = {fee: 0.02}; let p2pControparti = {};",
+        fn("function commissioneVivaP2P(){"), fn("function feeMiaP2P(o){"),
+        fn("function nettoLatoP2P(o, sats){"), fn("function scontoMancatoP2P(o, miei){"),
+        fn("function lordoDaMieiP2P(o, miei){"),
+        fn("function recapitoEuroArrivatoP2P(o){"), fn("function aspettaRecapitoP2P(o){"),
+        fn("function nomeControparteP2P(o, ripiego){"), fn("function statoTestoP2P(o){"),
+        fn("function mossaDopoRilascioP2P(o, azione, ord){"),
+        fn("function avanzaOrdineP2P(ordine, azione, payload){"),
+        fn("function euroTabacchinoP2P(metodi){"),
+        re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0),
+        fn("function azioniDisponibili(o){"), fn("function attesaAltraParteP2P(o){"),
+        fn("function corpoAnnulloDisputaP2P(o, modo){"),
+        fn("function statoDaRestoreP2P(o, statoMostro){"),
+        fn("function riprendiDaRestoreP2P(o, statoMostro){"),
+        "let archivio = {}; function ordiniP2P(){ return archivio; }",
+        fn("function esitoGestoRaggiuntoP2P(id, gesto){"),
+    ]) + r"""
+const out = {};
+const CHIESTO = 'cooperative-cancel-initiated-by-you', PROPOSTO = 'cooperative-cancel-initiated-by-peer';
+const base = lato => ({id: 'd', lato, stato: 'in_disputa', peer: 'p', euro: 10, cantDo: 'vecchio', errore: 'vecchio'});
+const pochi = o => [o.stato, o.annulloDisputa || '', azioniSecondarieP2P(o), azioniDisponibili(o)];
+// 1) la disputa nuda: si puo' chiedere di annullare, da tutt'e due i lati
+out.nuda = [pochi(base('compro')), pochi(base('vendo'))];
+out.soloVista = azioniSecondarieP2P(Object.assign(base('compro'), {soloVista: true}));
+// 2) chi chiede e chi riceve la proposta
+const chi = avanzaOrdineP2P(base('compro'), CHIESTO, null);
+const pro = avanzaOrdineP2P(base('vendo'), PROPOSTO, null);
+out.chiesto = pochi(chi); out.proposto = pochi(pro);
+out.pulito = [chi.cantDo, chi.errore, base('compro').annulloDisputa === undefined];
+// 3) fuori dalla disputa e' tutto come prima
+const att = {id: 'a', lato: 'compro', stato: 'attivo', peer: 'p'};
+out.daAttivo = [pochi(avanzaOrdineP2P(att, CHIESTO, null)), pochi(avanzaOrdineP2P(att, PROPOSTO, null))];
+// 4) LA RILETTURA NON SI PORTA VIA LA NOTA: la restore dice `dispute`
+out.restoreSullaNota = [riprendiDaRestoreP2P(pro, 'dispute'), riprendiDaRestoreP2P(chi, 'dispute')];
+//    ...mentre sugli stati di sempre se la sarebbe portata via (il perche' della scelta)
+out.restoreSulVecchio = (riprendiDaRestoreP2P({lato: 'vendo', stato: 'annullo_proposto'}, 'dispute') || {}).stato;
+// 5) dove va a finire
+out.accettato = pochi(avanzaOrdineP2P(pro, 'cooperative-cancel-accepted', null));
+out.moderatorePrende = pochi(avanzaOrdineP2P(pro, 'admin-took-dispute', null));
+out.moderatoreChiude = [pochi(avanzaOrdineP2P(chi, 'admin-settled', null)), pochi(avanzaOrdineP2P(chi, 'admin-canceled', null))];
+out.rilasciato = pochi(avanzaOrdineP2P(Object.assign({}, chi, {lato: 'vendo'}), 'released', null));
+// 6) un finale non si riapre, e non prende note
+out.finale = pochi(avanzaOrdineP2P({id: 'f', lato: 'compro', stato: 'annullato'}, PROPOSTO, null));
+// 7) le frasi
+out.frasi = [statoTestoP2P(base('compro')), statoTestoP2P(chi), statoTestoP2P(pro)];
+p2pControparti = {d: {nome: 'Alan Rossi'}};
+out.frasiNome = [statoTestoP2P(chi).d, statoTestoP2P(pro).d];
+out.aspetta = [attesaAltraParteP2P(base('compro')), attesaAltraParteP2P(chi), attesaAltraParteP2P(pro)];
+p2pControparti = {};
+// 8) l'attesa che rilegge: «chiesto» a disputa aperta e' la nota
+archivio = {nuda: base('compro'), chi: chi, pro: pro, ann: {stato: 'annullato'}, vec: {stato: 'annullo_chiesto'}};
+archivio.chi = Object.assign({}, chi);
+out.esiti = ['nuda', 'chi', 'pro', 'ann', 'vec'].map(k => [k, esitoGestoRaggiuntoP2P(k, 'chiedi'), esitoGestoRaggiuntoP2P(k, 'accetta')]);
+// 9) il foglio
+out.fogli = [corpoAnnulloDisputaP2P({lato: 'compro'}, 'chiedi'), corpoAnnulloDisputaP2P({lato: 'vendo'}, 'chiedi'),
+             corpoAnnulloDisputaP2P({lato: 'compro'}, 'accetta'), corpoAnnulloDisputaP2P({lato: 'vendo'}, 'accetta')];
+process.stdout.write(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp(prefix="anndisp_")
+    p1 = _os.path.join(cart, "banco.js")
+    open(p1, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p1], capture_output=True, text=True, timeout=60, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco dell'annullo a disputa aperta gira", "", (r.stderr or "")[-600:])
+    if r.returncode or not r.stdout.strip():
+        return
+    o = _json.loads(r.stdout)
+    prova("1) a disputa aperta si puo' chiedere di annullare, da tutt'e due i lati, e resta il solo gesto",
+          [["in_disputa", "", ["annulla"], ""]] * 2, o["nuda"])
+    prova("...ma non dalla riga solo da guardare (la chiave e' su un altro dispositivo)", [], o["soloVista"])
+    prova("2) chi ha chiesto: la riga resta in disputa, con la nota, e non ha piu' niente da premere",
+          ["in_disputa", "chiesto", [], ""], o["chiesto"])
+    prova("...chi riceve la proposta: resta in disputa, e il gesto e' «Accetta»",
+          ["in_disputa", "proposto", ["accetta-annullo"], ""], o["proposto"])
+    prova("...il «no» vecchio si pulisce, e la riga di partenza non e' stata toccata",
+          ["", "", True], o["pulito"])
+    prova("3) fuori dalla disputa e' tutto come prima: gli stati di sempre, senza nota",
+          [["annullo_chiesto", "", [], ""], ["annullo_proposto", "", ["accetta-annullo"], ""]], o["daAttivo"])
+    prova("4) la restore che dice `dispute` non si porta via la nota (non muove niente)",
+          [None, None], o["restoreSullaNota"])
+    prova("...mentre sugli stati di sempre l'avrebbe fatto: e' il perche' della scelta",
+          "in_disputa", o["restoreSulVecchio"])
+    prova("5) accettato: annullato, e la nota cade", ["annullato", "", [], ""], o["accettato"])
+    prova("...un moderatore prende la disputa: la proposta resta in piedi",
+          ["in_disputa", "proposto", ["accetta-annullo"], ""], o["moderatorePrende"])
+    prova("...un moderatore decide: finale, e la nota cade",
+          [["concluso", "", [], ""], ["annullato", "", [], ""]], o["moderatoreChiude"])
+    prova("...chi vende libera lo stesso: la nota cade", ["rilasciato", ""], o["rilasciato"][:2])
+    prova("6) un finale non si riapre e non prende note", ["annullato", "", [], ""], o["finale"])
+    prova("7) le tre frasi: la disputa, la richiesta mia, la proposta dell'altra persona",
+          [{"t": "Disputa aperta", "d": "Un moderatore esaminerà lo scambio. I sats restano bloccati fino alla decisione."},
+           {"t": "Disputa aperta", "d": "Hai chiesto di annullare d'accordo: serve anche il sì di chi ha scambiato con te. Finché non arriva la disputa resta aperta, e i sats restano bloccati."},
+           {"t": "Disputa aperta", "d": "L'altra persona propone di annullare d'accordo. Se accetti, la disputa si chiude e i sats tornano a chi li ha bloccati."}],
+          o["frasi"])
+    prova("...col nome, quando la pagina lo mostra",
+          [True, True], [" di Alan. " in o["frasiNome"][0], o["frasiNome"][1].startswith("Alan propone")])
+    prova("...e «✋ Aspetta» dice chi: il moderatore, l'altra persona, o niente se il gesto e' mio",
+          [{"chi": "Un moderatore", "cosa": "deve decidere"},
+           {"chi": "Alan", "cosa": "deve accettare di annullare"}, None], o["aspetta"])
+    prova("8) l'attesa che rilegge: «chiedi» e' fatto con la nota, non con la disputa nuda",
+          [["nuda", False, False], ["chi", True, False], ["pro", False, False],
+           ["ann", True, True], ["vec", True, False]], o["esiti"])
+    AVVISO = " Se hai già inviato gli euro non annullare: aspetta il moderatore."
+    prova("9) il foglio: a chi compra l'avviso degli euro, a chi vende no",
+          [True, False, True, False], [f.endswith(AVVISO) for f in o["fogli"]])
+    prova("...e dice che la disputa si chiude e dove vanno i sats", [True] * 4,
+          ["la disputa si chiude" in f and "i sats tornano a chi li" in f for f in o["fogli"]])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
