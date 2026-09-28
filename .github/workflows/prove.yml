@@ -77,6 +77,7 @@ jobs:
              collaudo_recensione_p2p.py collaudo_pagamento_p2p.py
              collaudo_avvisi_in_ordine_p2p.py
              collaudo_paycode_riconosciuto.py collaudo_scambi_ovunque.py
+             collaudo_dispute_p2p.py
              collaudo_pausa.py collaudo_due_teste.py
              collaudo_consegna_firmata.py collaudo_ricategorizza.py
              collaudo_ricerca.py collaudo_sblocco_banner.py collaudo_servizio_dove.py
@@ -169,6 +170,7 @@ jobs:
              collaudo_avvisi_in_ordine_p2p
              collaudo_paycode_riconosciuto
              collaudo_scambi_ovunque
+             collaudo_dispute_p2p
              collaudo_racconti_bozza
              collaudo_sponsor
              collaudo_numeri_negozio

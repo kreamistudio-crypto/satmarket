@@ -49697,6 +49697,10 @@ function avanzaOrdineP2P(ordine, azione, payload){
     delete o.statoGrezzo;
     /* ...e la nota dell'annullo vive solo dentro la disputa */
     if (nuovo !== 'in_disputa') delete o.annulloDisputa;
+    /* ...dove ENTRA con la richiesta che c'era gia' (28 set 2026, la
+       disputa d3fc7356): aprire una disputa non la cancella */
+    else if (o.stato === 'annullo_chiesto') o.annulloDisputa = 'chiesto';
+    else if (o.stato === 'annullo_proposto') o.annulloDisputa = 'proposto';
     /* DOVE SI E' FERMATO (27 set 2026): il passo della pagina su cui
        l'annullo e' caduto — lo legge `fermoAnnulloP2P` */
     if ((nuovo === 'annullato' || nuovo === 'rifiutato') && typeof P2P_PROGRESSO !== 'undefined')
@@ -50374,6 +50378,23 @@ function applicaMessaggioP2P(ord, dentro){
     }
     if (!(ord.satsNetti > 0) && eco.satsNetti > 0) {
       ord.satsNetti = eco.satsNetti; preso = true;
+    }
+    /* ⚠️ E L'ANNULLO CHIESTO PRIMA DELLA DISPUTA E' ANCORA LI' (28 set
+       2026, dal campo: la disputa d3fc7356). Chi vende aveva chiesto di
+       annullare 21 secondi prima che chi compra aprisse la disputa:
+       aprirla NON cancella la richiesta (in `dispute.rs` di mostrod
+       0.18.8 quei campi non si toccano), quindi per il coordinatore
+       manca solo il si' dell'altra persona. Qui il messaggio della
+       richiesta e' PASSATO — la disputa e' venuta dopo — e non muove lo
+       stato; ma la NOTA e' un dato come la controparte, e si prende:
+       senza, a chi aveva chiesto restava un bottone che riceve solo
+       «no», e a chi doveva accettare non compariva «Accetta».
+       (`eco` viene dalla riga di ADESSO, in disputa: la nota la decide
+       la stessa tabellina di `avanzaOrdineP2P`.) */
+    if (ord.stato === 'in_disputa' && !ord.annulloDisputa && eco.annulloDisputa) {
+      ord.annulloDisputa = eco.annulloDisputa; preso = true;
+      diarioP2P('msg ' + String(ord.id).slice(0, 8) + ': l\'annullo '
+                + eco.annulloDisputa + ' prima della disputa vale ancora');
     }
     if (preso) {
       scriviOrdineP2P(ord);
@@ -56246,6 +56267,9 @@ async function inviaAnnulloP2P(modo){
   } catch(e) {
     /* «gia' annullato» o «non c'e' piu'» a un annullo: e' riuscito */
     if (typeof annulloGiaFattoP2P === 'function' && annulloGiaFattoP2P(e, id)) toast(detto());
+    /* ...e il «no» a chi l'aveva gia' chiesto si dice per quel che e' */
+    else if (typeof annulloGiaChiestoP2P === 'function' && annulloGiaChiestoP2P(e, id, gesto))
+      toast(P2P_ANNULLO_GIA_CHIESTO, 7000);
     else {
       const agg = ordiniP2P()[id] || o;
       agg.errore = ragioneGestoP2P(e);
@@ -58004,6 +58028,10 @@ function riprendiDaRestoreP2P(o, statoMostro){
   const r = Object.assign({}, o, {stato: nuovo,
     aggiornato: Math.floor(Date.now() / 1000),
     cantDo: '', errore: '', nonPartito: false});
+  /* l'annullo chiesto entra nella disputa come nota (28 set 2026) */
+  if (nuovo === 'in_disputa' && o.stato === 'annullo_chiesto') r.annulloDisputa = 'chiesto';
+  else if (nuovo === 'in_disputa' && o.stato === 'annullo_proposto') r.annulloDisputa = 'proposto';
+  else if (nuovo !== 'in_disputa') delete r.annulloDisputa;
   delete r.giroMorto;
   delete r.statoGrezzo;
   return r;
@@ -58454,6 +58482,10 @@ function adottaScambiServerP2P(locali){
              cronaca del server (27 set 2026) */
           if (s.stato === 'annullato' || s.stato === 'rifiutato')
             gia.fermoA = Math.max(P2P_PROGRESSO[gia.stato] || 0, fermoDaMomentiP2P(s.momenti));
+          /* l'annullo chiesto entra nella disputa come nota (28 set 2026) */
+          if (s.stato === 'in_disputa' && gia.stato === 'annullo_chiesto') gia.annulloDisputa = 'chiesto';
+          else if (s.stato === 'in_disputa' && gia.stato === 'annullo_proposto') gia.annulloDisputa = 'proposto';
+          else if (s.stato !== 'in_disputa') delete gia.annulloDisputa;
           gia.stato = s.stato; gia.aggiornato = adesso;
           gia.cantDo = ''; gia.errore = ''; gia.nonPartito = false;
           delete gia.giroMorto; delete gia.statoGrezzo;
@@ -59994,6 +60026,30 @@ function annulloGiaFattoP2P(e, id){
     scriviOrdineP2P(agg);
   }
   diarioP2P('annullo ' + String(id).slice(0, 8) + ': «' + e.motivo + '» = gia\' annullato, riuscito');
+  return true;
+}
+/* «L'AVEVI GIA' CHIESTO» (28 set 2026, dal campo: la disputa d3fc7356,
+   tre «Chiedi di annullare» e tre «il profilo di scambio non è stato
+   riconosciuto»). Letto su `cancel_active_order` di mostrod 0.18.8: a un
+   annullo insieme risponde `invalid_pubkey` in DUE casi — chi firma non
+   e' una delle due parti, oppure e' LA STESSA PERSONA che l'annullo
+   l'aveva gia' chiesto (la conferma deve venire dall'altra). Su uno
+   scambio preso, con la riga e la chiave in mano, il secondo e' il caso
+   di tutti i giorni: si dice per quel che e', la riga prende la
+   richiesta (la nota a disputa aperta, lo stato altrimenti) e il
+   bottone sparisce. La frase non giura: se la richiesta non era sua lo
+   dice, e dice cosa fare. Vale per il solo «chiedi». */
+const P2P_ANNULLO_GIA_CHIESTO = 'Risulta già una tua richiesta di annullare: ora serve il sì dell\'altra persona. Se non l\'avevi chiesto tu, scrivici';
+function annulloGiaChiestoP2P(e, id, gesto){
+  if (gesto !== 'chiedi' || !(e && e.cantDo && e.motivo === 'invalid-pubkey')) return false;
+  const o = ordiniP2P()[id];
+  if (!o) return false;
+  if (o.stato === 'in_disputa') o.annulloDisputa = 'chiesto';
+  else if (P2P_ANNULLA_INSIEME.indexOf(o.stato) >= 0 && o.preso) o.stato = 'annullo_chiesto';
+  else return false;
+  o.cantDo = ''; o.errore = '';
+  scriviOrdineP2P(o);
+  diarioP2P('annullo ' + String(id).slice(0, 8) + ': «invalid-pubkey» a una richiesta = gia\' chiesto da me');
   return true;
 }
 async function riallineaScambioP2P(id, motivo, leggero){

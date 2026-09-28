@@ -636,6 +636,16 @@ def main():
           [r.get("adottata", r), r.get("esito"), r.get("firme")])
 
     print("\n14) l'annullo insieme a disputa aperta (28 set 2026)")
+    # (dal campo, la disputa d3fc7356) l'annullo chiesto PRIMA della
+    # disputa: il telefono era rimasto ad «annullo proposto», il server
+    # dice «in disputa» — la riga entra nella disputa con la sua nota
+    risposta = {o: v for o, v in scambi(C)["scambi"].items() if o == DISPUTA}
+    prima = {DISPUTA: {"id": DISPUTA, "lato": "compro", "indice": 0, "pubTrade": "",
+                       "stato": "annullo_proposto", "euro": 20, "metodi": ["Revolut"],
+                       "preso": True, "creato": t, "ultimaMossa": t + 555}}
+    r = client_sulla_risposta(risposta, prima, [])
+    prova("l'annullo proposto prima della disputa entra nella disputa come nota",
+          {DISPUTA: ["in_disputa", "proposto"]}, r.get("note", r))
     # la disputa del passo 11 e' ancora aperta (l'ha aperta chi compra):
     # chi vende chiede di annullare d'accordo
     banco.evento(DISPUTA, "cancel-requested", t + 570, "seller")

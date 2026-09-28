@@ -5176,6 +5176,51 @@ def init_db():
         fonte TEXT DEFAULT 'libro'
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_attese_scade ON p2p_attese(scade);
+    CREATE TABLE IF NOT EXISTS p2p_dispute(
+        -- LE DISPUTE P2P, UNA RIGA PER ORDINE (28 set 2026): nasce quando
+        -- mostrod racconta `dispute-opened`, e da li' la vedono i
+        -- moderatori. `aperta_da` e' 'compra' | 'vende'; le due parti
+        -- sono gli account detti da mostrod in quel momento (0 = un
+        -- altro client). `stato`: aperta | presa | chiusa. `presa_da` e
+        -- `chiave_moderatore` li scrive il moderatore che la prende —
+        -- la chiave PUBBLICA del suo profilo di moderatore: la privata
+        -- non passa mai di qui. `esito`: 'compratore' | 'venditore',
+        -- cioe' dove sono andati i sats; `chiusa_da`: moderatore |
+        -- parti | scadenza | sconosciuto. `disputa` e' l'id che mostrod
+        -- da' alla disputa (non e' quello dell'ordine): lo dichiara il
+        -- telefono di una delle parti, e il moderatore lo VERIFICA
+        -- prendendola.
+        ordine TEXT PRIMARY KEY,
+        disputa TEXT DEFAULT '',
+        giro INTEGER DEFAULT 0,
+        aperta_il INTEGER NOT NULL,
+        aperta_da TEXT DEFAULT '',
+        compratore INTEGER DEFAULT 0,
+        venditore INTEGER DEFAULT 0,
+        stato TEXT NOT NULL DEFAULT 'aperta',
+        presa_da INTEGER DEFAULT 0,
+        presa_il INTEGER DEFAULT 0,
+        chiave_moderatore TEXT DEFAULT '',
+        esito TEXT DEFAULT '',
+        chiusa_da TEXT DEFAULT '',
+        chiusa_il INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS p2p_dispute_registro(
+        -- IL REGISTRO DELLE DISPUTE P2P: append-only, una riga per
+        -- gesto — aperta, presa, decisione (col MOTIVO scritto, PRIMA
+        -- che il telefono del moderatore firmi), chiusa, allarme.
+        -- `tg_id` e' chi ha fatto il gesto (0 = mostrod), `chiave` la
+        -- chiave pubblica di moderatore usata.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ordine TEXT NOT NULL,
+        gesto TEXT NOT NULL,
+        tg_id INTEGER DEFAULT 0,
+        quando INTEGER NOT NULL,
+        esito TEXT DEFAULT '',
+        motivo TEXT DEFAULT '',
+        chiave TEXT DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_p2p_dispute_registro ON p2p_dispute_registro(ordine);
     CREATE TABLE IF NOT EXISTS p2p_indice(
         -- IL PAVIMENTO DELL'INDICE DELLE TRADE KEY (set 2026): quante
         -- chiavi usa-e-getta quel profilo ha gia' BRUCIATO. Serve a
@@ -13996,6 +14041,16 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM p2p_avvisi WHERE tg_id=?", (id_nostr,))
         con.execute("UPDATE p2p_attese SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        # ...e le DISPUTE P2P (28 set 2026): le due parti e chi l'ha
+        # presa seguono l'utente come in `p2p_scambi`; nel registro
+        # cambia il NOME di chi ha fatto il gesto, non il gesto — la
+        # persona e' la stessa, e una decisione intestata a un account
+        # che non esiste piu' non la ritroverebbe nessuno.
+        for colonna in ("compratore", "venditore", "presa_da"):
+            con.execute(f"UPDATE p2p_dispute SET {colonna}=? WHERE {colonna}=?",
+                        (id_telegram, id_nostr))
+        con.execute("UPDATE p2p_dispute_registro SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         # Il sale del profilo di scambio segue l'utente. Qui la PK E'
         # il tg_id, quindi le due meta' POSSONO collidere — e allora
@@ -45874,6 +45929,234 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     return fuori
 
 
+# ---------- LE DISPUTE P2P PER I MODERATORI (28 set 2026) ------------
+# Dalla disputa di prova di Alan: mostrod raccontava `dispute-opened`, il
+# server avvisava l'altra parte («i moderatori vi contatteranno») e
+# NESSUN MODERATORE riceveva niente. Qui la disputa prende una riga sua
+# (`p2p_dispute`), i moderatori lo sanno subito, e ogni passo lascia una
+# riga nel REGISTRO (`p2p_dispute_registro`, append-only).
+# IL SERVER NON DECIDE E NON FIRMA NIENTE: la chiave di un moderatore
+# vive solo sul suo telefono (decisione di Andrea: mai sul VPS, mai sul
+# nodo). Di qui passano l'avviso, l'elenco, il motivo scritto PRIMA del
+# gesto — e il controllo incrociato: quando mostrod racconta che un
+# moderatore ha chiuso una disputa e nel registro la decisione non
+# c'e', suona l'allarme. Lo scopre, non lo ferma: e' il limite
+# dichiarato di questa strada.
+# CHI SONO I MODERATORI: gli stessi del mercatino (`ADMIN_IDS`).
+P2P_DISPUTA_STORICO_GIORNI = 30
+P2P_DISPUTA_ESITI = {
+    "compratore": "i sats vanno a chi compra",
+    "venditore": "i sats tornano a chi vende",
+}
+
+
+def _moderatori_p2p() -> list:
+    """Chi riceve gli avvisi delle dispute P2P (nel collaudo anche
+    l'identita' 999, come `notifica_admin`)."""
+    chi = set(int(a) for a in ADMIN_IDS)
+    if MODALITA_COLLAUDO:
+        chi.add(999)
+    return sorted(chi)
+
+
+def _chiusura_disputa_p2p(momento: str, attore: str, dettaglio: str) -> tuple:
+    """PURA: questo momento CHIUDE una disputa aperta? Torna `(esito,
+    chiusa_da)` o `("", "")`. `esito` dice dove sono andati i sats
+    (`compratore` | `venditore`), `chiusa_da` chi l'ha chiusa:
+    • `moderatore` — `admin-settle` o `admin-cancel`, che la patch 0007
+      racconta come `released`/`canceled` di `mostro` col dettaglio
+      `admin`;
+    • `parti` — chi vende ha liberato, o i due hanno annullato insieme
+      (mostrod lo accetta anche a disputa aperta, e la chiude da se');
+    • `scadenza` — un annullo che non e' di nessuno dei due: la garanzia
+      e' arrivata al capolinea;
+    • `sconosciuto` — lo scambio risulta concluso e il rilascio non
+      l'abbiamo sentito."""
+    if momento == "rilasciato":
+        if attore == "mostro":
+            return ("compratore", "moderatore" if dettaglio == "admin" else "sconosciuto")
+        return ("compratore", "parti")
+    if momento == "annullato":
+        if attore == "mostro" and dettaglio == "admin":
+            return ("venditore", "moderatore")
+        if dettaglio == "cooperative":
+            return ("venditore", "parti")
+        return ("venditore", "scadenza")
+    if momento == "concluso":
+        return ("compratore", "sconosciuto")
+    return ("", "")
+
+
+def _persona_disputa_p2p(con, tg_id: int) -> str:
+    """Una parte, detta a un moderatore: nome e @username, GIA' SCAPPATI
+    — o la frase di chi non e' dei nostri (un altro client: il server
+    conosce solo la sua chiave usa-e-getta)."""
+    tg_id = int(tg_id or 0)
+    if not tg_id:
+        return "non è un utente di Barattolo (scambia da un'altra app)"
+    r = con.execute("SELECT nome, username FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    nome = html.escape(str((r["nome"] if r else "") or "")) or f"utente {tg_id}"
+    user = html.escape(str((r["username"] if r else "") or ""))
+    return nome + (f" (@{user})" if user else "")
+
+
+def _testo_disputa_aperta_p2p(d: dict, per: int) -> str:
+    """PURA: l'avviso a UN moderatore di una disputa appena aperta.
+    `d` porta `ordine`, `aperta_da` ('compra' | 'vende' | ''), le due
+    persone gia' dette (`compra`, `vende`, scappate), i numeri del libro
+    (`sats`, `euro`, `metodi`, scappati) e i due id; `garanzia_il` e'
+    l'ora in cui mostrod ha visto la garanzia pagata, o 0.
+    SE IL MODERATORE E' UNA DELLE PARTI LO LEGGE SUBITO: quella disputa
+    non la decide lui."""
+    corto = html.escape(str(d.get("ordine") or "")[:8])
+    chi = {"compra": "chi compra", "vende": "chi vende"}.get(d.get("aperta_da"), "")
+    sats = int(d.get("sats") or 0)
+    euro = str(d.get("euro") or "")
+    importo = (f"{_fmt_sats(sats)} sats" if sats > 0 else "")
+    if euro:
+        importo += (" per " if importo else "") + euro
+    righe = [f"⚖️ <b>Disputa P2P aperta</b> sull'ordine <code>{corto}</code>"
+             + (f", da <b>{chi}</b>" if chi else "") + ".", "",
+             f"• Compra: {d.get('compra') or '—'}",
+             f"• Vende: {d.get('vende') or '—'}",
+             f"• Importo: {importo or 'il libro non lo dice'}",
+             f"• Metodo: {d.get('metodi') or 'il libro non lo dice'}"]
+    if int(d.get("garanzia_il") or 0) > 0:
+        righe.append("• Garanzia bloccata dal " + time.strftime(
+            "%d/%m/%Y %H:%M", time.localtime(int(d["garanzia_il"]))))
+    righe += ["", "I sats restano in garanzia finché un moderatore non decide "
+              "o le due parti non si accordano."]
+    if per and per in (int(d.get("compratore") or 0), int(d.get("venditore") or 0)):
+        righe.append("⚠️ <b>Sei una delle due parti:</b> questa disputa la "
+                     "decide un altro moderatore.")
+    return "\n".join(righe)
+
+
+def _testo_disputa_chiusa_p2p(corto: str, esito: str, chiusa_da: str,
+                              decisione) -> str:
+    """PURA: l'avviso ai moderatori di una disputa che si e' chiusa.
+    `decisione` e' la riga del registro che la spiega (`nome` e `motivo`
+    gia' scappati), o None. UNA CHIUSURA DA MODERATORE SENZA DECISIONE A
+    REGISTRO E' UN ALLARME: qualcuno ha usato una chiave di moderatore
+    senza passare dall'app."""
+    dove = P2P_DISPUTA_ESITI.get(esito, "")
+    testa = f"(ordine <code>{html.escape(corto)}</code>)"
+    if chiusa_da == "moderatore" and decisione:
+        return (f"⚖️ <b>Disputa P2P decisa</b> {testa}: {dove}.\n\n"
+                f"Deciso da {decisione.get('nome') or 'un moderatore'}. "
+                f"Motivo: «{decisione.get('motivo') or '—'}»")
+    if chiusa_da == "moderatore":
+        return (f"🚨 <b>Disputa P2P chiusa SENZA una decisione a registro</b> "
+                f"{testa}: il coordinatore dice che un moderatore ha deciso "
+                f"«{dove}», ma nell'app nessuno ha registrato questa decisione.\n\n"
+                "Se non sei stato tu, una chiave di moderatore può essere in "
+                "mani sbagliate: va tolta dal nodo SUBITO (PRODUZIONE, «LE "
+                "DISPUTE P2P»).")
+    if chiusa_da == "parti":
+        come = ("chi vende ha liberato i sats" if esito == "compratore"
+                else "le due parti hanno annullato d'accordo")
+        return (f"✅ <b>Disputa P2P chiusa dalle parti</b> {testa}: {come}, "
+                f"{dove}. Non c'è più niente da decidere.")
+    if chiusa_da == "scadenza":
+        return (f"⏰ <b>Disputa P2P chiusa senza una decisione</b> {testa}: lo "
+                f"scambio è stato annullato e {dove}.")
+    return (f"ℹ️ <b>Disputa P2P chiusa</b> {testa}: lo scambio risulta "
+            f"concluso, {dove}.")
+
+
+def _registro_disputa_p2p(con, ordine: str, gesto: str, tg_id: int,
+                          quando: int, esito: str = "", motivo: str = "",
+                          chiave: str = "") -> None:
+    """Una riga nel registro, e basta: append-only, mai un UPDATE."""
+    con.execute("INSERT INTO p2p_dispute_registro(ordine, gesto, tg_id, quando, "
+                "esito, motivo, chiave) VALUES(?,?,?,?,?,?,?)",
+                (ordine, gesto, int(tg_id or 0), int(quando), esito, motivo, chiave))
+
+
+def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
+    """DALL'EVENTO DI MOSTROD AGLI AVVISI PER I MODERATORI: lista di
+    `(tg_id, testo)`. Pura sulla connessione; scrive la riga della
+    disputa, il registro e l'anti-doppione (PRIMA dell'invio, il patto
+    dei timbri).
+    DUE FATTI: la disputa che si APRE (la riga nasce, e lo sanno tutti i
+    moderatori) e la disputa che si CHIUDE — da un moderatore, dalle
+    parti o per scadenza (`_chiusura_disputa_p2p`). Un evento che non e'
+    nessuno dei due torna una lista vuota.
+    GLI AVVISI AI MODERATORI NON GUARDANO L'INTERRUTTORE degli avvisi
+    P2P: quello e' di chi scambia, questo e' un dovere."""
+    ordine, momento, giro = ev["ordine"], fatto["momento"], fatto["giro"]
+    corto = ordine[:8]
+    fuori = []
+    if momento == "disputa":
+        aperta_da = {"buyer": "compra", "seller": "vende"}.get(ev["attore"], "")
+        nata = con.execute(
+            "INSERT OR IGNORE INTO p2p_dispute(ordine, giro, aperta_il, "
+            "aperta_da, compratore, venditore, stato) VALUES(?,?,?,?,?,?,'aperta')",
+            (ordine, giro, ev["ts"], aperta_da, fatto["compratore"],
+             fatto["venditore"])).rowcount
+        if not nata:
+            con.commit()
+            return []
+        _registro_disputa_p2p(con, ordine, "aperta", {
+            "compra": fatto["compratore"], "vende": fatto["venditore"]
+        }.get(aperta_da, 0), ev["ts"])
+        dati = _dati_frase_p2p(con, ordine)
+        g = con.execute("SELECT MAX(quando) AS q FROM p2p_momenti WHERE ordine=? "
+                        "AND giro=? AND momento='garanzia_pagata'",
+                        (ordine, giro)).fetchone()
+        d = {"ordine": ordine, "aperta_da": aperta_da,
+             "compratore": fatto["compratore"], "venditore": fatto["venditore"],
+             "compra": _persona_disputa_p2p(con, fatto["compratore"]),
+             "vende": _persona_disputa_p2p(con, fatto["venditore"]),
+             "sats": dati["sats"], "euro": dati["euro"], "metodi": dati["metodi"],
+             "garanzia_il": int((g["q"] if g else 0) or 0)}
+        for mod in _moderatori_p2p():
+            if con.execute(
+                    "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, "
+                    "tg_id, quando, fonte) VALUES(?,'disputa_mod',?,?,?,'mostro')",
+                    (ordine, giro, mod, adesso)).rowcount:
+                fuori.append((mod, _testo_disputa_aperta_p2p(d, mod)))
+        print(f"⚖️ Disputa P2P: {corto} aperta da {aperta_da or '—'} (giro "
+              f"{giro}): moderatori da avvisare {[m for m, _ in fuori]}", flush=True)
+        con.commit()
+        return fuori
+    esito, chiusa_da = _chiusura_disputa_p2p(momento, ev["attore"], ev["dettaglio"])
+    if not esito:
+        return []
+    riga = con.execute("SELECT stato, presa_da FROM p2p_dispute WHERE ordine=?",
+                       (ordine,)).fetchone()
+    if not riga or riga["stato"] == "chiusa":
+        return []
+    con.execute("UPDATE p2p_dispute SET stato='chiusa', esito=?, chiusa_da=?, "
+                "chiusa_il=? WHERE ordine=? AND stato<>'chiusa'",
+                (esito, chiusa_da, ev["ts"], ordine))
+    decisione = None
+    if chiusa_da == "moderatore":
+        r = con.execute(
+            "SELECT tg_id, motivo FROM p2p_dispute_registro WHERE ordine=? "
+            "AND gesto='decisione' AND esito=? ORDER BY id DESC LIMIT 1",
+            (ordine, esito)).fetchone()
+        if r:
+            decisione = {"nome": _persona_disputa_p2p(con, r["tg_id"]),
+                         "motivo": html.escape(str(r["motivo"] or ""))}
+    _registro_disputa_p2p(
+        con, ordine, "allarme" if (chiusa_da == "moderatore" and not decisione)
+        else "chiusa", 0, ev["ts"], esito, chiusa_da)
+    testo = _testo_disputa_chiusa_p2p(corto, esito, chiusa_da, decisione)
+    for mod in _moderatori_p2p():
+        if con.execute(
+                "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, "
+                "tg_id, quando, fonte) VALUES(?,'disputa_chiusa_mod',?,?,?,'mostro')",
+                (ordine, giro, mod, adesso)).rowcount:
+            fuori.append((mod, testo))
+    print(f"⚖️ Disputa P2P: {corto} chiusa ({chiusa_da}, {esito})"
+          + ("" if chiusa_da != "moderatore" or decisione
+             else " — SENZA DECISIONE A REGISTRO: allarme"), flush=True)
+    con.commit()
+    return fuori
+
+
 async def _respiro_presa_p2p(ordine: str):
     """LA FRASE DELLA PRESA ASPETTA I SUOI NUMERI: l'evento di mostrod
     arriva un attimo prima che il libro mostri la presa (a prezzo di
@@ -45909,6 +46192,13 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
         con = db()
         try:
             avvisi = _avvisi_evento_p2p(con, ev, fatto, int(time.time()))
+            # ...e i MODERATORI, se l'evento apre o chiude una disputa
+            # (28 set 2026). Un guasto qui non toglie l'avviso alle parti.
+            try:
+                avvisi = avvisi + _disputa_evento_p2p(con, ev, fatto, int(time.time()))
+            except Exception as e:
+                print(f"⚠️ Disputa P2P {ev['ordine'][:8]}: avviso ai moderatori "
+                      f"saltato ({type(e).__name__}: {e})", flush=True)
         finally:
             con.close()
         if fatto["momento"] == "rilasciato" and _P2P_SVEGLIA["ev"] is not None:

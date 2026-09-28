@@ -109188,13 +109188,394 @@ process.stdout.write(JSON.stringify(out));
     prova("...e dice che la disputa si chiude e dove vanno i sats", [True] * 4,
           ["la disputa si chiude" in f and "i sats tornano a chi li" in f for f in o["fogli"]])
 
+    # --- 3) DAL CAMPO (28 set 2026, la disputa d3fc7356) -------------------
+    # Chi vende aveva chiesto di annullare 21 secondi PRIMA che chi compra
+    # aprisse la disputa. Per mostrod la richiesta resta in piedi (aprire
+    # la disputa non la tocca) e a ogni nuovo «chiedi» risponde
+    # `invalid_pubkey`: la conferma deve venire dall'altra persona.
+    appl = nudo(fn("function applicaMessaggioP2P(ord, dentro){"))
+    prova("il messaggio PASSATO lascia la nota, come lascia la controparte", True,
+          "if (ord.stato === 'in_disputa' && !ord.annulloDisputa && eco.annulloDisputa) {" in appl
+          and appl.index("ord.annulloDisputa = eco.annulloDisputa; preso = true;") < appl.index("if (preso) {"))
+    inv = nudo(fn("async function inviaAnnulloP2P(modo){"))
+    prova("il «no» a chi l'aveva gia' chiesto si guarda DOPO il «gia' annullato» e PRIMA del «non riuscito»", True,
+          0 < inv.find("annulloGiaFattoP2P(e, id)") < inv.find("annulloGiaChiestoP2P(e, id, gesto)")
+          < inv.find("toast('Non è riuscito: ' + agg.errore);"))
+    frase = re.search(r"const P2P_ANNULLO_GIA_CHIESTO = '((?:[^'\\]|\\.)*)';", mini).group(1)
+    prova("...con le parole di casa, e senza giurare", [False, False, True],
+          ["profilo" in frase.lower(), "coordinatore" in frase.lower(), "Se non l\\'avevi chiesto tu" in frase])
+    blocco = lambda inizio, fine: mini[mini.index(inizio):mini.index(fine, mini.index(inizio)) + len(fine)]
+    banco3 = "\n".join([
+        blocco_const("AVANZA_P2P"), blocco_const("STATI_P2P"), blocco_const("P2P_PROGRESSO"),
+        blocco_const("MOTIVI_CANTDO"), blocco_const("P2P_GIRO_MORTO"),
+        blocco_const("P2P_TOAST_GIRO_MORTO"), blocco_const("P2P_DA_RESTORE"),
+        blocco_const("P2P_RIPRESA_PASSO"), blocco_const("ESITI_GESTO_P2P"),
+        blocco_const("ANNULLI_P2P"), liste,
+        "const P2P_TOAST_HOLD = 'TOCCA', P2P_TOAST_FATTURA_NUOVA = 'FATTURA', P2P_TOAST_FATTURA = 'DOVE';",
+        fn("function azioniSecondarieP2P(o, rec){"), fn("function gestoRecensioneP2P(o, rec){"),
+        fn("function chiaveCantDo(payload){"), fn("function motivoCantDo(payload){"),
+        fn("function importoBolt11(pr){"), fn("function leggiBolt11(pr){"),
+        "let p2pInfo = {fee: 0.02, scadenzaSec: 900}; let p2pControparti = {};",
+        fn("function commissioneVivaP2P(){"), fn("function feeMiaP2P(o){"),
+        fn("function nettoLatoP2P(o, sats){"), fn("function scontoMancatoP2P(o, miei){"),
+        fn("function lordoDaMieiP2P(o, miei){"),
+        fn("function recapitoEuroArrivatoP2P(o){"), fn("function aspettaRecapitoP2P(o){"),
+        fn("function nomeControparteP2P(o, ripiego){"), fn("function statoTestoP2P(o){"),
+        fn("function holdVivaP2P(o){"),
+        fn("function mossaDopoRilascioP2P(o, azione, ord){"),
+        fn("function avanzaOrdineP2P(ordine, azione, payload){"),
+        fn("function euroTabacchinoP2P(metodi){"),
+        re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0),
+        fn("function azioniDisponibili(o){"),
+        fn("function statoDaRestoreP2P(o, statoMostro){"),
+        fn("function riprendiDaRestoreP2P(o, statoMostro){"),
+        "function altroFoglioAperto(){ return false; } function apriIncassoP2P(){}",
+        "function seguibileP2P(id){ return false; } function apriHoldP2P(){}",
+        fn("function passoDopoGaranziaP2P(o){"), "function evidenziaPassoP2P(){}",
+        fn("function applicaMessaggioP2P(ord, dentro){"),
+        "const diario = []; function diarioP2P(r){ diario.push(r); }",
+        "let righe = {}, toasts = [];",
+        "function ordiniP2P(){ return righe; } function scriviOrdineP2P(o){ righe[o.id] = o; return o; }",
+        "function provvisorioP2P(){ return false; } function rinominaOrdineP2P(){}",
+        "function intestaOrdiniP2P(){ return Promise.resolve(true); }",
+        "function p2pRitirato(){ return false; } function archiviaRitiratoP2P(){ return false; }",
+        "function toast(m){ toasts.push(String(m)); } function haptic(){} function go(){}",
+        "function renderP2P(){} function renderOrdineP2P(){} function chiudiFoglioP2P(){}",
+        "async function mostroRiascolta(){} function pianificaMetodoP2P(){} function pianificaAutoRecapito(){}",
+        "let p2pOrdineAperto = 'd', p2pHoldOrdine = ''; const document = {querySelector: s => null};",
+        "let cambioVivo = false, eurPerSat = 0; const P2P_PRESA_FRESCA_S = 120;",
+        "const finti = {attesaTesto: {textContent: ''}}; function el(id){ return finti[id] || null; }",
+        "function attesaP2P(){ return () => {}; }",
+        "let copione = null; const chiamate = [];",
+        "function chiamataOrdineP2P(o, azione){ chiamate.push(azione); const c = copione;",
+        "  return new Promise((ok, no) => setTimeout(() => {",
+        "    if (c.esito === 'ok') ok({action: 'x'});",
+        "    else no(Object.assign(new Error('La richiesta è stata rifiutata: ' + c.esito), {cantDo: true, motivo: c.esito}));",
+        "  }, 5)); }",
+        "let p2pRiallineoInVolo = {}; async function riallineaScambioP2P(){ return false; }",
+        fn("function ragioneGestoP2P(e){"),
+        "const P2P_NON_PARTITO = 'non partito';",
+        fn("function annulloGiaFattoP2P(e, id){"),
+        fn("function annulloGiaChiestoP2P(e, id, gesto){"),
+        re.search(r"const P2P_ANNULLO_GIA_CHIESTO = [^\n]*;", mini).group(0),
+        fn("function esitoGestoRaggiuntoP2P(id, gesto){"),
+        fn("async function attendiGestoP2P(id, gesto, chiamata){"),
+        "let P2P_TARDA_MS = 10000; const P2P_TARDA_TESTO = '', P2P_NON_RISULTA = 'non risulta';",
+        fn("async function inviaAnnulloP2P(modo){"),
+    ]) + r"""
+const T = 1790625145;   // l'ora vera del diario: la richiesta, 21 secondi prima della disputa
+const CHIESTO = 'cooperative-cancel-initiated-by-you', PROPOSTO = 'cooperative-cancel-initiated-by-peer';
+function riga(stato, extra){ righe = {d: Object.assign({id: 'd', lato: 'vendo', stato, peer: 'p', preso: true,
+  euro: 10, metodi: [], cantDo: '', errore: ''}, extra || {})}; toasts = []; diario.length = 0; chiamate.length = 0; }
+const arriva = (azione, quando, payload) => applicaMessaggioP2P(righe.d, {action: azione, quando, payload: payload || null});
+const foto = () => [righe.d.stato, righe.d.annulloDisputa || '', righe.d.ultimaMossa || 0, azioniSecondarieP2P(righe.d)];
+(async () => {
+  const out = {};
+  // a) LA RIAPERTURA DEL DIARIO: la disputa arriva per prima, la richiesta dopo — ed e' passata
+  riga('attivo', {ultimaMossa: T - 400});
+  arriva('dispute-initiated-by-peer', T + 21); arriva(CHIESTO, T);
+  out.replay = foto(); out.replayDiario = diario.filter(r => r.indexOf('vale ancora') > 0).length;
+  // b) lo stesso, dal lato di chi deve accettare
+  riga('attivo', {lato: 'compro', ultimaMossa: T - 400});
+  arriva('dispute-initiated-by-you', T + 21); arriva(PROPOSTO, T);
+  out.replayAltro = foto();
+  // c) IN ORDINE: la richiesta, poi la disputa — entra nella disputa come nota
+  riga('attivo', {ultimaMossa: T - 400});
+  arriva(CHIESTO, T); const meta = righe.d.stato; arriva('dispute-initiated-by-peer', T + 21);
+  out.inOrdine = [meta].concat(foto());
+  riga('attivo', {lato: 'compro', ultimaMossa: T - 400});
+  arriva(PROPOSTO, T); arriva('dispute-initiated-by-you', T + 21);
+  out.inOrdineAltro = foto();
+  // d) fuori dalla disputa un annullo passato non lascia niente
+  riga('euro_inviati', {ultimaMossa: T + 50}); arriva(PROPOSTO, T);
+  out.fuori = foto();
+  // e) la nota che c'e' non si riscrive, e un messaggio passato che non e' un annullo non la tocca
+  riga('in_disputa', {ultimaMossa: T + 21, annulloDisputa: 'proposto'});
+  arriva(CHIESTO, T); arriva('buyer-took-order', T - 300);
+  out.resta = foto();
+  // f) la ripresa dalla restore: l'annullo chiesto entra nella disputa
+  out.restore = ['annullo_chiesto', 'annullo_proposto', 'attivo'].map(s => {
+    const r = riprendiDaRestoreP2P({id: 'd', lato: 'vendo', stato: s, annulloDisputa: s === 'attivo' ? 'chiesto' : undefined}, 'dispute');
+    return [r.stato, r.annulloDisputa || '']; });
+  out.restoreFuori = (r => [r.stato, 'annulloDisputa' in r])(riprendiDaRestoreP2P(
+    {id: 'd', lato: 'vendo', stato: 'in_disputa', annulloDisputa: 'chiesto'}, 'canceled-by-admin'));
+  // g) IL «NO» A CHI L'AVEVA GIA' CHIESTO: i tre tentativi del campo
+  riga('in_disputa', {ultimaMossa: T + 21, cantDo: 'vecchio no'}); copione = {esito: 'invalid-pubkey'};
+  await inviaAnnulloP2P('chiedi');
+  out.giaChiesto = [toasts.slice(), foto(), righe.d.cantDo, righe.d.errore, chiamate.slice()];
+  riga('attivo', {ultimaMossa: T - 400}); await inviaAnnulloP2P('chiedi');
+  out.giaChiestoAttivo = [toasts.length === 1 && toasts[0].indexOf('Risulta già') === 0, righe.d.stato];
+  // ...ma non e' un lasciapassare: gli altri no restano no, e gli altri gesti pure
+  riga('in_disputa', {ultimaMossa: T + 21}); copione = {esito: 'is-not-your-order'};
+  await inviaAnnulloP2P('chiedi'); out.altroNo = [toasts[0].indexOf('Non è riuscito') === 0, foto()[1]];
+  riga('in_disputa', {ultimaMossa: T + 21, annulloDisputa: 'proposto'}); copione = {esito: 'invalid-pubkey'};
+  await inviaAnnulloP2P('accetta'); out.accettaNo = [toasts[0].indexOf('Non è riuscito') === 0, foto()[1]];
+  riga('pubblicato', {preso: false, mio: true}); copione = {esito: 'invalid-pubkey'};
+  await inviaAnnulloP2P('ritira'); out.ritiraNo = [toasts[0].indexOf('Non è riuscito') === 0, righe.d.stato];
+  riga('attesa_mia_hold', {preso: false}); copione = {esito: 'invalid-pubkey'};
+  await inviaAnnulloP2P('chiedi'); out.nonPresoNo = [toasts[0].indexOf('Non è riuscito') === 0, righe.d.stato];
+  process.stdout.write(JSON.stringify(out));
+})();
+"""
+    cart = _tf.mkdtemp(prefix="anndisp3_")
+    p3 = _os.path.join(cart, "campo.js")
+    open(p3, "w", encoding="utf-8").write(banco3)
+    r3 = _sp.run([node, p3], capture_output=True, text=True, timeout=60, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco del campo gira", "", (r3.stderr or "")[-700:])
+    if r3.returncode or not r3.stdout.strip():
+        return
+    c = _json.loads(r3.stdout)
+    T = 1790625145
+    prova("a) la riapertura (disputa prima, richiesta dopo): la richiesta PASSATA lascia la nota, e il bottone sparisce",
+          [["in_disputa", "chiesto", T + 21, []], 1], [c["replay"], c["replayDiario"]])
+    prova("b) ...e dall'altro lato compare «Accetta»",
+          ["in_disputa", "proposto", T + 21, ["accetta-annullo"]], c["replayAltro"])
+    prova("c) in ordine (richiesta, poi disputa): la richiesta entra nella disputa come nota",
+          ["annullo_chiesto", "in_disputa", "chiesto", T + 21, []], c["inOrdine"])
+    prova("...e dall'altro lato pure",
+          ["in_disputa", "proposto", T + 21, ["accetta-annullo"]], c["inOrdineAltro"])
+    prova("d) fuori dalla disputa un annullo passato non lascia niente",
+          ["euro_inviati", "", T + 50], c["fuori"][:3])
+    prova("e) la nota che c'e' resta quella, e il resto del passato non la tocca",
+          ["in_disputa", "proposto", T + 21, ["accetta-annullo"]], c["resta"])
+    prova("f) la ripresa dalla restore porta l'annullo dentro la disputa (e non inventa note)",
+          [["in_disputa", "chiesto"], ["in_disputa", "proposto"], ["in_disputa", "chiesto"]], c["restore"])
+    prova("...e uscendo dalla disputa la nota cade", ["annullato", False], c["restoreFuori"])
+    prova("g) il «no» a chi l'aveva gia' chiesto: la frase giusta, la nota, il bottone via, il no cancellato",
+          [["Risulta già una tua richiesta di annullare: ora serve il sì dell'altra persona. "
+            "Se non l'avevi chiesto tu, scrivici"],
+           ["in_disputa", "chiesto", T + 21, []], "", "", ["cancel"]], c["giaChiesto"])
+    prova("...da uno scambio attivo la riga va ad «annullo chiesto»", [True, "annullo_chiesto"],
+          c["giaChiestoAttivo"])
+    prova("...ma non e' un lasciapassare: un altro «no» resta un no", [True, ""], c["altroNo"])
+    prova("...chi ACCETTA e riceve quel no non l'aveva «gia' chiesto»", [True, "proposto"], c["accettaNo"])
+    prova("...il ritiro nemmeno, e uno scambio mai preso nemmeno",
+          [[True, "pubblicato"], [True, "attesa_mia_hold"]], [c["ritiraNo"], c["nonPresoNo"]])
+
+
+def prove_dispute_p2p_moderatori():
+    """LE DISPUTE P2P ARRIVANO AI MODERATORI (28 set 2026, dalla disputa
+    di prova di Alan: 13.739 sats in garanzia e nessun moderatore
+    avvisato). mostrod raccontava `dispute-opened`, il server lo diceva
+    all'altra parte, e li' finiva.
+    ADESSO la disputa ha una riga sua (`p2p_dispute`), i moderatori
+    ricevono subito ordine, parti, importo, metodo e chi l'ha aperta, e
+    ogni passo lascia una riga nel registro (`p2p_dispute_registro`).
+    QUEL CHE SI ROMPE IN SILENZIO: l'avviso che suona due volte (il retry
+    di mostrod), il moderatore che e' una delle parti e non lo sa, un
+    nome o un motivo non scappati dentro un messaggio HTML, la chiusura
+    attribuita alla persona sbagliata — e soprattutto L'ALLARME: una
+    chiusura da moderatore senza decisione a registro vuol dire che una
+    chiave di moderatore ha parlato a mostrod senza passare dall'app.
+    E UNA REGOLA: la chiave PRIVATA di un moderatore non passa mai dal
+    server (decisione di Andrea: vive solo sul suo telefono)."""
+    print("\n[le dispute P2P arrivano ai moderatori]")
+    src = _SORGENTE
+    i0 = src.index("# ---------- LE DISPUTE P2P PER I MODERATORI")
+    blocco = src[i0:src.index("\nasync def _respiro_presa_p2p(", i0)]
+    nudo = codice(_senza_prosa(blocco))
+
+    # --- 1) LE SENTINELLE -------------------------------------------------
+    for tabella in ("p2p_dispute", "p2p_dispute_registro"):
+        prova(f"la tabella {tabella} nasce con le altre del P2P", True,
+              f"CREATE TABLE IF NOT EXISTS {tabella}(" in src)
+    invio = pezzo("_manda_evento_p2p")
+    prova("l'invio chiama i moderatori DOPO gli avvisi alle parti, nella stessa connessione", True,
+          0 < invio.find("avvisi = _avvisi_evento_p2p(con, ev, fatto, int(time.time()))")
+          < invio.find("avvisi = avvisi + _disputa_evento_p2p(con, ev, fatto, int(time.time()))")
+          < invio.find("con.close()"))
+    prova("...e un guasto li' non toglie l'avviso alle parti: la chiamata sta nel SUO try, e somma", True,
+          bool(re.search(r"try:\s+avvisi = avvisi \+ _disputa_evento_p2p\(con, ev, fatto, "
+                         r"int\(time\.time\(\)\)\)\s+except Exception as e:\s+print\(", invio)))
+    for spia in ("nsec", "privata", "secret", "sk_", "firma("):
+        prova(f"nel blocco non c'e' posto per «{spia}»: il server non firma", False,
+              spia in nudo.lower())
+    prova("il registro e' append-only: nessun UPDATE, nessun DELETE", [False, False],
+          ["UPDATE p2p_dispute_registro" in nudo, "DELETE FROM p2p_dispute_registro" in src])
+    prova("i moderatori sono quelli del mercatino, piu' il 999 del collaudo", True,
+          "chi = set(int(a) for a in ADMIN_IDS)" in nudo and "if MODALITA_COLLAUDO:" in nudo)
+
+    # --- 2) I GIUDICI PURI ------------------------------------------------
+    con, amb = _banco_eventi_p2p()
+    schema = ""
+    for tabella, fine in (("p2p_dispute", "\n    );"),
+                          ("p2p_dispute_registro", "ON p2p_dispute_registro(ordine);")):
+        i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
+        schema += src[i:src.index(fine, i) + len(fine)] + "\n"
+    con.executescript(schema + "ALTER TABLE utenti ADD COLUMN nome TEXT DEFAULT '';"
+                      "ALTER TABLE utenti ADD COLUMN username TEXT DEFAULT '';")
+    amb.update(ADMIN_IDS=[500, 501], MODALITA_COLLAUDO=False)
+    exec(src[src.index("\nP2P_DISPUTA_ESITI = {") + 1:src.index("}\n", src.index("\nP2P_DISPUTA_ESITI = {")) + 2], amb)
+    for f in ("_moderatori_p2p", "_chiusura_disputa_p2p", "_persona_disputa_p2p",
+              "_testo_disputa_aperta_p2p", "_testo_disputa_chiusa_p2p",
+              "_registro_disputa_p2p", "_disputa_evento_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    chiude = amb["_chiusura_disputa_p2p"]
+    prova("cosa chiude una disputa, e chi: la tabella intera",
+          [("compratore", "moderatore"), ("compratore", "sconosciuto"), ("compratore", "parti"),
+           ("venditore", "moderatore"), ("venditore", "parti"), ("venditore", "scadenza"),
+           ("venditore", "scadenza"), ("venditore", "scadenza"), ("compratore", "sconosciuto"),
+           ("", ""), ("", ""), ("", ""), ("", ""), ("", "")],
+          [chiude("rilasciato", "mostro", "admin"), chiude("rilasciato", "mostro", ""),
+           chiude("rilasciato", "seller", ""),
+           chiude("annullato", "mostro", "admin"), chiude("annullato", "buyer", "cooperative"),
+           chiude("annullato", "mostro", "escrow-deadline"), chiude("annullato", "seller", "admin"),
+           chiude("annullato", "buyer", ""), chiude("concluso", "mostro", ""),
+           chiude("disputa", "buyer", ""), chiude("annullo_chiesto", "seller", ""),
+           chiude("fiat", "buyer", ""), chiude("tornato", "buyer", "republished"),
+           chiude("payout_fallito", "mostro", "NO_ROUTE")])
+    amb["MODALITA_COLLAUDO"] = True
+    prova("in collaudo c'e' anche il 999", [500, 501, 999], amb["_moderatori_p2p"]())
+    amb["MODALITA_COLLAUDO"] = False
+    prova("...in produzione no", [500, 501], amb["_moderatori_p2p"]())
+
+    # --- 3) IL BANCO: una disputa intera, coi giudici veri ----------------
+    ORA = 1_790_000_000
+    KA, KB = "a" * 64, "b" * 64
+    for tg, nome, user in ((111, "Bea <i>", "bea"), (222, "Alan & co", ""), (500, "Moderatore Uno", "mod1")):
+        con.execute("INSERT INTO utenti(tg_id, nome, username) VALUES(?,?,?)", (tg, nome, user))
+    for k, tg in ((KA, 111), (KB, 222)):
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,?)", (k, tg, ORA))
+    ordini = ["0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc%02d" % n for n in range(1, 8)]
+    for o in ordini:
+        con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,sats,euro,metodi) "
+                    "VALUES(?,?,?,'in-progress','sell',1,13603,'10,00 €','[\"Contanti\"]')", (o, 222, ORA))
+    con.commit()
+
+    def manda(ordine, azione, ts, attore="mostro", dettaglio="", **extra):
+        d = {"v": 1, "order": ordine, "action": azione, "ts": ts, "buyer": KA, "seller": KB,
+             "actor": attore}
+        if dettaglio:
+            d["detail"] = dettaglio
+        d.update(extra)
+        ev = amb["_evento_p2p_pulito"](d, ts)
+        fatto = amb["_registra_evento_p2p"](con, ev, ts)
+        if fatto is None:
+            return None
+        return amb["_disputa_evento_p2p"](con, ev, fatto, ts)
+
+    def apri(ordine, t, da="buyer", **extra):
+        # la garanzia DUE MINUTI dopo la presa (dalla tortura: a dieci
+        # secondi cadevano nello stesso minuto, e l'ora della presa
+        # passava per quella della garanzia)
+        manda(ordine, "taken", t - 130, "buyer", "take", **extra)
+        manda(ordine, "hold-invoice-paid", t + 10, "seller", **extra)
+        return manda(ordine, "dispute-opened", t + 20, da, **extra)
+
+    riga = lambda o: dict(con.execute("SELECT * FROM p2p_dispute WHERE ordine=?", (o,)).fetchone() or {})
+    registro = lambda o: [(r["gesto"], r["tg_id"], r["esito"], r["motivo"]) for r in con.execute(
+        "SELECT * FROM p2p_dispute_registro WHERE ordine=? ORDER BY id", (o,))]
+
+    prova("la presa e la garanzia non dicono niente ai moderatori", [[], []],
+          [manda(ordini[6], "taken", ORA, "buyer", "take"),
+           manda(ordini[6], "hold-invoice-paid", ORA + 5, "seller")])
+    detto = apri(ordini[0], ORA)
+    prova("la disputa si apre: un avviso a OGNI moderatore, e a nessun altro", [500, 501],
+          [c for c, _ in detto])
+    t0 = detto[0][1]
+    prova("...con l'ordine e chi l'ha aperta", True,
+          t0.startswith("⚖️ <b>Disputa P2P aperta</b> sull'ordine <code>0f3a5c1e</code>, da <b>chi compra</b>."))
+    prova("...le due persone, SCAPPATE, con lo @username di chi ce l'ha",
+          [True, True], ["• Compra: Bea &lt;i&gt; (@bea)" in t0, "• Vende: Alan &amp; co\n" in t0])
+    prova("...l'importo e il metodo del libro", [True, True],
+          ["• Importo: 13.603 sats per 10,00 €" in t0, "• Metodo: Contanti" in t0])
+    prova("...e da quando la garanzia e' bloccata (l'ora di mostrod)", True,
+          "• Garanzia bloccata dal " + time.strftime("%d/%m/%Y %H:%M", time.localtime(ORA + 10)) in t0)
+    prova("...e dice dove stanno i sats", True,
+          "I sats restano in garanzia finché un moderatore non decide o le due parti non si accordano." in t0)
+    prova("la riga della disputa", ["aperta", "compra", 111, 222, ORA + 20, 1, "", "", 0],
+          [riga(ordini[0]).get(k) for k in ("stato", "aperta_da", "compratore", "venditore",
+                                            "aperta_il", "giro", "esito", "chiusa_da", "presa_da")])
+    prova("...e il registro comincia, col nome di chi l'ha aperta", [("aperta", 111, "", "")],
+          registro(ordini[0]))
+    prova("il retry di mostrod non suona e non scrive", [None, 1],
+          [manda(ordini[0], "dispute-opened", ORA + 20, "buyer"), len(registro(ordini[0]))])
+    # un SECONDO evento di disputa sullo stesso ordine (un'altra ora): la
+    # riga c'e' gia', e i moderatori non risentono niente
+    prova("...e nemmeno una seconda apertura sullo stesso ordine", [[], 1],
+          [manda(ordini[0], "dispute-opened", ORA + 25, "seller"), len(registro(ordini[0]))])
+    prova("la richiesta di annullo a disputa aperta non e' una chiusura", [[], "aperta"],
+          [manda(ordini[0], "cancel-requested", ORA + 30, "seller"), riga(ordini[0])["stato"]])
+    detto = manda(ordini[0], "canceled", ORA + 40, "buyer", "cooperative")
+    prova("annullato d'accordo: «chiusa dalle parti», a ogni moderatore",
+          [[500, 501], True],
+          [[c for c, _ in detto],
+           detto[0][1] == "✅ <b>Disputa P2P chiusa dalle parti</b> (ordine <code>0f3a5c1e</code>): "
+           "le due parti hanno annullato d'accordo, i sats tornano a chi vende. "
+           "Non c'è più niente da decidere."])
+    prova("...la riga si chiude, e il registro lo dice",
+          [["chiusa", "venditore", "parti", ORA + 40], ("chiusa", 0, "venditore", "parti")],
+          [[riga(ordini[0])[k] for k in ("stato", "esito", "chiusa_da", "chiusa_il")],
+           registro(ordini[0])[-1]])
+    quante = len(registro(ordini[0]))
+    prova("una disputa chiusa non si richiude: nessun avviso, nessuna riga in piu' a registro",
+          [[], quante, "parti"],
+          [manda(ordini[0], "canceled", ORA + 50, "mostro", "admin"),
+           len(registro(ordini[0])), riga(ordini[0])["chiusa_da"]])
+
+    apri(ordini[1], ORA + 100)
+    detto = manda(ordini[1], "released", ORA + 130, "mostro", "admin",
+                  sats=13603, sats_buyer=13467, sats_seller=13739)
+    prova("decisione da moderatore SENZA riga a registro: ALLARME", [True, True, True],
+          ["🚨 <b>Disputa P2P chiusa SENZA una decisione a registro</b>" in detto[0][1],
+           "«i sats vanno a chi compra»" in detto[0][1], "va tolta dal nodo SUBITO" in detto[0][1]])
+    prova("...a registro resta l'allarme", ("allarme", 0, "compratore", "moderatore"),
+          registro(ordini[1])[-1])
+
+    apri(ordini[2], ORA + 200)
+    amb["_registro_disputa_p2p"](con, ordini[2], "decisione", 500, ORA + 220, "compratore",
+                                 "per l'altro esito", "c" * 64)
+    amb["_registro_disputa_p2p"](con, ordini[2], "decisione", 500, ORA + 225, "venditore",
+                                 "Nessun <euro> & niente prove", "c" * 64)
+    detto = manda(ordini[2], "canceled", ORA + 230, "mostro", "admin")
+    prova("decisione da moderatore A REGISTRO: «decisa», col nome e il motivo scappati",
+          "⚖️ <b>Disputa P2P decisa</b> (ordine <code>0f3a5c1e</code>): i sats tornano a chi vende.\n\n"
+          "Deciso da Moderatore Uno (@mod1). Motivo: «Nessun &lt;euro&gt; &amp; niente prove»",
+          detto[0][1])
+    prova("...e a registro resta la chiusura, non un allarme", "chiusa", registro(ordini[2])[-1][0])
+    apri(ordini[3], ORA + 300)
+    amb["_registro_disputa_p2p"](con, ordini[3], "decisione", 500, ORA + 320, "venditore", "x", "")
+    detto = manda(ordini[3], "released", ORA + 330, "mostro", "admin")
+    prova("una decisione a registro per l'ALTRO esito non copre questa: allarme", True,
+          "chiusa SENZA una decisione a registro" in detto[0][1])
+
+    amb["ADMIN_IDS"] = [500, 222]
+    detto = apri(ordini[4], ORA + 400, "seller")
+    testi = dict(detto)
+    prova("il moderatore che e' una delle parti lo legge, l'altro no", [True, False],
+          ["⚠️ <b>Sei una delle due parti:</b> questa disputa la decide un altro moderatore." in testi[222],
+           "Sei una delle due parti" in testi[500]])
+    prova("...e la disputa e' aperta da chi vende", ["vende", ("aperta", 222, "", "")],
+          [riga(ordini[4])["aperta_da"], registro(ordini[4])[0]])
+    amb["ADMIN_IDS"] = [500, 501]
+    detto = apri(ordini[5], ORA + 500, "buyer", seller="e" * 64)
+    prova("la parte che scambia da un'altra app si dice cosi', e vale 0", [True, 0],
+          ["• Vende: non è un utente di Barattolo (scambia da un'altra app)" in detto[0][1],
+           riga(ordini[5])["venditore"]])
+    detto = manda(ordini[5], "expired", ORA + 530, "mostro", "escrow-deadline", seller="e" * 64)
+    prova("la garanzia al capolinea: «chiusa senza una decisione»", [True, "scadenza"],
+          ["⏰ <b>Disputa P2P chiusa senza una decisione</b>" in detto[0][1], riga(ordini[5])["chiusa_da"]])
+    prova("un annullo su un ordine mai in disputa non dice niente", [[], {}],
+          [manda(ordini[6], "canceled", ORA + 600, "seller"), riga(ordini[6])])
+    # GLI AVVISI AI MODERATORI NON GUARDANO L'INTERRUTTORE DEGLI AVVISI P2P
+    con.execute("UPDATE utenti SET avvisi_p2p=0 WHERE tg_id=500")
+    con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,sats,euro,metodi) "
+                "VALUES('0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc99',222,?,'in-progress','sell',1,0,'','')", (ORA,))
+    detto = apri("0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc99", ORA + 700)
+    prova("il moderatore con gli avvisi P2P spenti lo riceve lo stesso: e' un dovere", [500, 501],
+          [c for c, _ in detto])
+    prova("...e senza i numeri del libro la frase lo dice, non inventa", [True, True],
+          ["• Importo: il libro non lo dice" in detto[0][1], "• Metodo: il libro non lo dice" in detto[0][1]])
+    con.close()
+
 
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
