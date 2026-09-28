@@ -6379,6 +6379,23 @@
   `spoglia_foto_esistenti.py` (anteprima di default, `--scrivi` per
   farlo; verifica i pixel prima di sostituire, e `os.replace` è
   atomico, quindi si può girare a server acceso).
+  L'ORIENTAMENTO SI APPLICA PRIMA DI TOGLIERLO (set 2026, cantiere
+  foto-senza-exif). Il tag Orientation è l'unico metadato che dice come
+  DISEGNARE la foto: il telefono salva i pixel sdraiati e scrive
+  «ruotala». Il bisturi lo tagliava col resto dell'APP1, e la foto
+  restava sdraiata per sempre, coi pixel IDENTICI: la guardia dei pixel
+  (qui e in `spoglia_foto_esistenti.py`) non poteva vederlo. Adesso
+  `spoglia_metadati` risponde None a una foto con Orientation 2..8, e
+  ogni porta ripiega su `converti_in_jpeg`, che la raddrizza con
+  `exif_transpose`; l'import Nostr, che sul None non scrive, tiene l'URL
+  (e il browser la raddrizza da sé); lo script retroattivo la lascia
+  com'è. Senza EXIF, con Orientation 1, con un valore fuori scala (lo 0
+  dei programmi che «azzerano» i tag) o con un EXIF illeggibile vale
+  l'orientamento NORMALE, e il bisturi va avanti. Dalla Mini App il
+  caso vivo era la BUSTA DI RITIRO e la foto del contenuto digitale,
+  che partono grezze (`readAsDataURL`, niente canvas): le foto degli
+  annunci passano dal canvas o da `/foto/anteprima`, che raddrizzavano
+  già.
   NESSUNA FOTO SPARISCE IN SILENZIO (ago 2026, caso dal campo: «carico
   un JPG dal computer, qualche mega, e non succede NULLA — nessun
   errore, nessun chip»). La causa NON era il canvas, ed è la prima

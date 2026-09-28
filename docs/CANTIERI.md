@@ -35688,3 +35688,94 @@ disputa di Alan coi due telefoni dopo il deploy, e sul nodo la riga
 della disputa (`disputes.status`) e la hold `CANCELED`. Il resto del
 cantiere (avviso ai moderatori, sezione «⚖️ Moderazione P2P», chat,
 procedura in PRODUZIONE) segue.
+
+## L'ORIENTAMENTO PRIMA DEL BISTURI (28 set 2026, cantiere foto-senza-exif)
+
+**Il sintomo**: l'annuncio **#461** («Lotto Demo Ps1…», pubblicato il
+28 set alle 20:54:33 ora italiana e **modificato 45 secondi dopo**) in
+vetrina senza foto. Visto dal vivo, dall'API pubblica: `foto` è la
+stringa VUOTA e `/foto/a461_0.jpg` risponde 404, mentre i quattro
+annunci prima (#457-#460) hanno i loro file, e rispondono 200. È la
+forma del caso **354** (colonna vuota, non un file sparito), quello
+curato il 14 set da `a21a235` («Nessuna foto sparisce in silenzio»).
+Andrea: «sono foto senza EXIF, era già un problema di giorni fa».
+
+**LA PREMESSA NON ERA QUELLA, ed è la prima cosa da tenere.** Le due
+foto dell'utente (MediaTek Camera, 4080×3060, 3 e 5 MB) l'EXIF ce
+l'hanno: APP1 da 28 KB, `Orientation=1`, niente GPS, e **nessun JFIF**.
+E nessun percorso del codice legge l'EXIF per decidere qualcosa, tranne
+`exif_transpose`, che senza EXIF non fa niente. Passate dal banco (server
+del worktree in collaudo, relay morti) su OGNI strada — `ridimensiona`
+nel Chromium del pane, `salva_foto` dal canvas e grezze,
+`/api/foto/anteprima`, pubblicazione senza foto e poi modifica con le
+foto — entrano tutte, e sono servite con 200. **Il #461 NON È
+RIPRODOTTO**, e la sua causa resta aperta.
+
+**IL DIFETTO CHE IL BANCO HA TROVATO È UN ALTRO, e sta sul lato opposto:
+le foto CON l'orientamento.** Una JPEG con `Orientation=6` che arriva
+grezza al server usciva **sdraiata** (4000×3000 invece di 3000×4000):
+`spoglia_metadati` taglia l'APP1, e con lui l'istruzione di rotazione,
+senza applicarla. I pixel sono identici, quindi la guardia dei pixel
+(quella del cantiere GPS e dello script retroattivo) non poteva
+accorgersene. Dalla Mini App ci arrivavano davvero la busta di ritiro e
+la foto del contenuto digitale, che partono grezze: un'etichetta
+fotografata in verticale arrivava al compratore sdraiata. Le foto degli
+annunci no: il canvas raddrizza, e `converti_in_jpeg` pure.
+
+**LA CURA È NELLA PORTA UNICA**, senza funzioni nuove, così i cinque
+banchi che la montano non cambiano: `spoglia_metadati` risponde None
+quando Orientation vale 2..8, e ogni chiamante ripiega sulla
+conversione, che raddrizza. Senza EXIF, con 1, con lo 0 dei programmi
+che «azzerano» i tag, con un valore fuori scala o con un EXIF
+illeggibile: normale, come fanno `exif_transpose` e i browser. Senza
+Pillow non si legge niente e si resta come prima. **IL PREZZO È
+DICHIARATO**: la busta storta ora esce in JPEG a 1200 px, q88 (è il
+ripiego già scritto per i formati che non si sanno spogliare);
+l'import Nostr di una foto storta tiene l'URL invece del file locale;
+e lo script retroattivo le lascia com'erano.
+
+**SCARTATO**: raddrizzare «a bisturi», riscrivendo l'Orientation a 1
+dentro l'APP1 invece di toglierlo. I pixel restano sdraiati, e la
+promessa «niente metadati» cadrebbe proprio sul segmento che li
+contiene. Scartato anche trattare le foto senza EXIF in modo speciale:
+lo erano già, e il banco lo ha misurato.
+
+**PROVATO.** `prove_foto_metadati`, il blocco dell'orientamento: la
+storta 6 va alla conversione e ne esce verticale col rosso in alto,
+senza EXIF né GPS; tutti e sette gli orientamenti storti vanno alla
+conversione; la foto senza EXIF torna IDENTICA e dritta; l'1 col GPS e
+lo 0 «azzerato» passano dal bisturi coi pixel intatti; il 9 fuori scala
+è normale, e anche l'EXIF rotto (Pillow lo legge vuoto); il PNG storto
+va alla conversione; e `_documento_busta` vera,
+dall'inizio alla fine: l'etichetta storta arriva dritta in JPEG, quella
+senza EXIF byte per byte. Dal vivo sul banco, prima e dopo: screenshot
+PNG, foto senza EXIF, foto ruotata con EXIF e GPS, EXIF azzerato e le
+due foto dell'utente, su `salva_foto` grezze e dal canvas. Prima la
+ruotata usciva 4000×3000 sdraiata; dopo esce 900×1200 dritta; le altre
+sono invariate. Tortura su una copia: 5 mutazioni su 6 uccise; la
+sesta («EXIF illeggibile = storta») è EQUIVALENTE — il ramo `except`
+scatta solo se la foto non si apre, e lì l'esito è None comunque.
+**NON PROVATO**: un telefono vero (il canvas è quello del Chromium
+desktop, che memoria ne ha); la busta dal vivo (provata nel banco di
+`prove.py`, non con un ordine vero); i file già sul VPS.
+
+**DA AVERE per il #461**, tutto in sola lettura e sul VPS, quindi a
+mano di Andrea: il journal fra le 20:50 e le 21:00 del 28 set (le righe
+«📷 Anteprima convertita/NON convertita» dicono se un telefono non ce
+l'ha fatta); le date dei file `a461_*` in `foto/` (se c'erano e sono
+state tolte dalla modifica, o se non ci sono mai stati); e dal venditore
+quale telefono, e se ha visto un toast. ⚠️ **E UN BUCO VISTO E NON
+CURATO**, perché senza i fatti sarebbe una cura a indovinare: la
+MODIFICA con foto nuove, se `salva_foto` le scarta tutte, scrive
+`foto=''` e cancella dal disco le vecchie (letto nel codice di
+`modifica_annuncio`, non provato dal vivo). Il toast lo dice, ma
+l'annuncio resta senza foto, e combacia col #461 (pubblicato, poi
+modificato dopo 45 secondi).
+
+⚠️ **AGGIORNAMENTO AL MERGE (28 set 2026)**: questa voce è nata PRIMA
+che si trovasse la causa, e arriva su main DOPO. La causa del #461 l'ha
+trovata il cantiere della tela nera («LA TELA NERA», più su): il canvas
+del Redmi consegnava JPEG neri, e le foto l'annuncio non le ha mai avute.
+Il buco della modifica che svuotava le foto, qui «visto e non curato»,
+è curato lì. Resta vero, e resta di questa voce, il difetto
+dell'orientamento: una foto storta non si spoglia più a bisturi.

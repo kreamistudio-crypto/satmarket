@@ -15775,9 +15775,29 @@ def spoglia_metadati(raw: bytes) -> bytes | None:
     sono automaticamente respinti: si guarda il file vero, e se non
     porta niente passa com'e' — un GIF di norma i metadati non li ha
     proprio, e convertirlo per un pericolo teorico vorrebbe dire
-    cambiare il file di qualcuno senza che serva."""
+    cambiare il file di qualcuno senza che serva.
+
+    L'ORIENTAMENTO SI APPLICA PRIMA DI TOGLIERLO (set 2026). Il tag
+    Orientation e' un metadato come gli altri, ma e' l'unico che dice
+    come DISEGNARE la foto: un telefono salva i pixel sdraiati e scrive
+    «ruotala di 90 gradi». Tagliato col resto dell'APP1, la foto resta
+    sdraiata per sempre — e il controllo dei pixel non se ne accorge,
+    perche' i pixel sono davvero gli stessi. Quindi una foto STORTA
+    (2..8) non si spoglia a bisturi: si risponde None e chi chiama
+    ripiega su `converti_in_jpeg`, che la raddrizza con exif_transpose.
+    Senza EXIF, con Orientation 1, con un valore fuori scala (lo 0 dei
+    programmi che «azzerano» i tag) o con un EXIF che non si legge:
+    orientamento NORMALE, e il bisturi va avanti come sempre."""
     if not raw:
         return None
+    if ImmaginePillow:
+        try:
+            with ImmaginePillow.open(io.BytesIO(raw)) as img:
+                storta = img.getexif().get(0x0112, 1) in range(2, 9)
+        except Exception:
+            storta = False
+        if storta:
+            return None
     if raw[:2] == b"\xff\xd8":
         pulito = _spoglia_jpeg(raw)
     elif raw[:8] == b"\x89PNG\r\n\x1a\n":
