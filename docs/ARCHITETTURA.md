@@ -6723,6 +6723,25 @@
   l'iniziale, onerror ripiega sul tappo di sempre e poi
   sull'iniziale). Ordini e card della griglia SENZA avatar (deciso);
   in DEMO iniziali e basta.
+  IL VOLTO UNICO (28 set 2026): dal difetto ricorrente del «?» ogni
+  volto di una persona passa da `voltoHTML(p, cls, opz)` con UNA cache,
+  `cacheVolti` (blocco «IL VOLTO UNICO» subito sotto `avatarImg`, che
+  fuori di li' non si chiama piu'). Tre gradini: foto sopra l'iniziale
+  (maiuscola, `inizialeVolto`; il «—» non e' un nome); senza nome la
+  SAGOMA (`.volto-sagoma`, maschera in `currentColor`) finche' la
+  risposta non c'e' o chi guarda non ha sessione; il «?» (`volto-ignoto`)
+  solo quando chi doveva sapere ha risposto e non sa. Ogni volto porta
+  `data-volto` — «p2p:<id>» per chi ha pubblicato un ordine, «n:<negozio>»
+  per il mercatino, «io» per chi guarda — e `ricordaVolto` riscrive sul
+  posto i volti gia' disegnati quando nome o foto arrivano (un «non so»
+  arrivato dopo non cancella mai un nome). Dieci posti, censiti in
+  `prove_volto_unico`: classifica, testata del negozio, recensioni,
+  riquadro venditore del dettaglio, Profilo, account aperti, anello del
+  libro P2P, «Chi ha pubblicato», fila in vetrina, `cardParte` (scambio e
+  ordine); il tappo in testata legge la stessa cache. I volti del P2P
+  entrano da `prendiFacceP2P(facce, chiesti)`: gli id chiesti e non
+  tornati diventano «?», e dalle fotografie del libro solo se la
+  risposta porta `miei` (il server ha riconosciuto chi guarda).
   I RELAY SONO UNA LEVA (ago 2026): dove Barattolo scrive e legge su
   Nostr si cambia dal config del VPS, non con un commit. Erano CINQUE
   elenchi scritti a mano — `RELAYS_VERIFICA` nel server, `RELAYS`

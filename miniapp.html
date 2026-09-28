@@ -6428,6 +6428,14 @@
      — mai un'immagine rotta, il patto della mascotte */
   .avatar .av-foto,
   .fb-faccia .av-foto{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  /* LA SAGOMA DEL VOLTO CHE ASPETTA (28 set 2026, «il volto unico»):
+     quando il nome non si sa ancora il tondo non resta vuoto e non
+     dice «?» — mostra una persona qualunque, testa e spalle, nel colore
+     dell'iniziale e piu' tenue. Una maschera sola per tutti i tondi, in
+     percentuale: dal francobollo da 20px al volto da 48. */
+  .volto-sagoma{width:62%;height:62%;background:currentColor;opacity:.55;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4.5'/%3E%3Cpath d='M3 22c0-5 4-8 9-8s9 3 9 8z'/%3E%3C/svg%3E") center/contain no-repeat;
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4.5'/%3E%3Cpath d='M3 22c0-5 4-8 9-8s9 3 9 8z'/%3E%3C/svg%3E") center/contain no-repeat}
   /* min-width:0 e' quello che rende EFFICACE l'overflow-wrap ereditato
      dal corpo: un figlio flex non scende mai sotto il proprio contenuto
      (min-width:auto), quindi con un nome lungo senza spazi la parola
@@ -12941,6 +12949,121 @@ function avatarImg(nome){
   const n = (nome || '').replace(/[^A-Za-z0-9_.-]/g, '');
   return n ? `<img class="av-foto" src="${fotoUrl(n)}" alt="" onerror="this.remove()">` : '';
 }
+/* ============ IL VOLTO UNICO (28 set 2026, difetto ricorrente) =====
+   Il «?» al posto della foto di una persona e' tornato piu' volte, e
+   ogni volta si e' curato UN posto: la card del libro, la fila in
+   vetrina, l'ordine appena pubblicato, poi il profilo. Il perche' era
+   uno solo: ogni posto disegnava il volto per conto suo — `avatarImg`
+   piu' un'iniziale scritta a mano — e ognuno aveva il suo ripiego
+   («?», «—», la «T» di «Tu», la «I» di «Il venditore»), cioe' la sua
+   idea di «non lo so». Curarne uno lasciava gli altri com'erano.
+   ADESSO IL VOLTO PASSA DA QUI, OVUNQUE: `voltoHTML` lo disegna, dalla
+   stessa cache (`cacheVolti`), con la stessa scala in tre gradini:
+   • la FOTO se c'e' (sopra l'iniziale, che resta la rete se il file
+     non arriva), altrimenti l'INIZIALE del nome;
+   • nessun nome, ma la risposta non e' ancora arrivata — o chi guarda
+     non ha una sessione, e il server il volto non glielo manda —: la
+     SAGOMA, un segno neutro che dice «una persona» senza dire chi.
+     Mai il buco vuoto (bocciato dal campo il 17 set 2026) e mai il
+     «?», che e' un'affermazione: «non sappiamo chi e'»;
+   • il «?» SOLO quando chi doveva sapere HA RISPOSTO e non sa: il
+     server interrogato che non conosce quell'ordine (un altro client
+     del libro), il nome che il server non ha. Per un utente di
+     Barattolo il cui nome il server conosce non esce mai.
+   IL VOLTO SI AGGIORNA DA SOLO DOVE E' GIA' DISEGNATO: ogni volto con
+   una chiave la porta scritta (`data-volto`), e quando nome o foto
+   arrivano in ritardo (`ricordaVolto`) i volti con quella chiave si
+   riscrivono sul posto — senza aspettare il render di chi li ha
+   disegnati, che puo' non arrivare piu' (la fila in vetrina non si
+   ridisegna se gli ordini non cambiano).
+   LE CHIAVI: «p2p:<id>» per chi ha pubblicato un ordine del libro (il
+   server lo dice per ORDINE e mai per persona: il tg_id non esce),
+   «n:<negozio>» per una persona del mercatino (il codice pubblico con
+   cui si apre il suo negozio), «io» per chi guarda. Senza chiave il
+   volto si disegna lo stesso, e non si aggiorna: e' la card d'esempio
+   del giro guidato, che il suo volto se lo porta con se'.
+   PURO fuori da `ridisegnaVolti` (che tace senza `document`): i banchi
+   di prove.py lo ritagliano intero, da qui alla riga di chiusura. */
+let cacheVolti = {};
+/* il trattino e' il segnaposto di chi non ha un nome («—» nella
+   classifica e sotto gli annunci), non un nome: la sua iniziale
+   sarebbe una lineetta */
+function nomeVolto(nome){
+  const s = String(nome == null ? '' : nome).trim();
+  return (s === '—' || s === '-') ? '' : s;
+}
+/* lo spread non spezza le emoji (c'e' chi si chiama 🔥Marco), e la
+   maiuscola e' quella che il tappo in testata ha sempre scritto */
+function inizialeVolto(nome){
+  const c = [...nomeVolto(nome)][0];
+  return c ? c.toLocaleUpperCase('it-IT') : '';
+}
+/* la chiave finisce in un attributo e in un confronto: stesso
+   alfabeto dei codici e degli id degli ordini, il resto si butta */
+function chiaveVolto(k){
+  return String(k || '').replace(/[^A-Za-z0-9:_.-]/g, '');
+}
+/* Quel che si sa di una persona entra nella cache: il nome se c'e', la
+   foto se la risposta ne dice qualcosa (anche «nessuna», cioe' ''), e
+   «ignoto» solo finche' un nome non c'e' — un «non lo so» arrivato dopo
+   non cancella mai un nome gia' saputo. Vero se qualcosa e' cambiato, e
+   allora i volti gia' disegnati con quella chiave si riscrivono. */
+function ricordaVolto(chiave, p){
+  const k = chiaveVolto(chiave);
+  if (!k || !p) return false;
+  const prima = cacheVolti[k] || {nome: '', avatar: '', ignoto: false};
+  const nome = nomeVolto(p.nome) || prima.nome;
+  const avatar = typeof p.avatar === 'string' ? p.avatar : prima.avatar;
+  const ignoto = !nome && (!!p.ignoto || prima.ignoto);
+  const nuovo = {nome, avatar, ignoto};
+  const cambiato = !cacheVolti[k] || nome !== prima.nome
+    || avatar !== prima.avatar || ignoto !== prima.ignoto;
+  cacheVolti[k] = nuovo;
+  if (cambiato) ridisegnaVolti(k);
+  return cambiato;
+}
+function statoVolto(v){
+  return inizialeVolto(v.nome) ? '' : v.ignoto ? 'volto-ignoto' : 'volto-attesa';
+}
+function dentroVolto(v){
+  const ini = inizialeVolto(v.nome);
+  return avatarImg(v.avatar) + (ini ? esc(ini) : v.ignoto ? '?'
+    : '<span class="volto-sagoma" aria-hidden="true"></span>');
+}
+function ridisegnaVolti(k){
+  if (typeof document === 'undefined' || !document.querySelectorAll) return;
+  const v = cacheVolti[k];
+  if (!v) return;
+  const stato = statoVolto(v);
+  document.querySelectorAll('[data-volto]').forEach(e => {
+    if (e.getAttribute('data-volto') !== k) return;
+    e.innerHTML = dentroVolto(v);
+    e.classList.remove('volto-attesa', 'volto-ignoto');
+    if (stato) e.classList.add(stato);
+  });
+}
+/* IL VOLTO, l'unica funzione che lo scrive. `p` e' quel che il chiamante
+   sa adesso ({nome, avatar, negozio, ignoto}); `cls` la classe del suo
+   tondo (`avatar`, `p2p-faccia`, ...: la misura resta di chi disegna);
+   `opz.chiave` la chiave (senza, vale «n:<negozio>» se c'e' un negozio),
+   `opz.tag` div o span, `opz.attr` gli attributi in piu' GIA' SCAPPATI
+   (la porta del negozio sul volto delle card). */
+function voltoHTML(p, cls, opz){
+  const o = opz || {};
+  const q = p || {};
+  const k = chiaveVolto(o.chiave || (q.negozio ? 'n:' + q.negozio : ''));
+  let v;
+  if (k) { ricordaVolto(k, q); v = cacheVolti[k]; }
+  else v = {nome: nomeVolto(q.nome),
+            avatar: typeof q.avatar === 'string' ? q.avatar : '',
+            ignoto: !!q.ignoto};
+  const stato = statoVolto(v);
+  const tag = o.tag === 'div' ? 'div' : 'span';
+  return '<' + tag + ' class="' + cls + (stato ? ' ' + stato : '') + '"'
+    + (k ? ' data-volto="' + esc(k) + '"' : '') + (o.attr || '') + '>'
+    + dentroVolto(v) + '</' + tag + '>';
+}
+/* ============ fine del volto unico ============ */
 /* Le condizioni dell'oggetto (lug 2026): catalogo id -> {nome, desc}.
    Il segno e' la PILLOLA COLORATA di condPill() — la scala parla col
    colore (verde pieno → verde tenue → ambra → arancio → grigio,
@@ -17891,7 +18014,7 @@ function rigaClassifica(v, mia){
   return `
     <div class="seller"${apre}>
       <div class="cl-pos">${medaglia || v.posizione + '°'}</div>
-      <div class="avatar">${avatarImg(v.avatar)}${esc((v.nome||'?')[0])}</div>
+      ${voltoHTML({nome: v.nome, avatar: v.avatar, negozio: cod, ignoto: true}, 'avatar', {tag: 'div'})}
       <div class="who" style="min-width:0">
         <b>${esc(v.nome)}</b>${titoloRiga(v.titolo, v.livello_numero)}
         <div class="rep">${rep}</div>${contanoInClassifica(v)}
@@ -18779,7 +18902,8 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
     ${bannerNegozio(v)}
     ${raccontoNegozio(v)}
     <div class="seller${tondi ? ' con-tondi' : ''}" style="margin-top:14px">
-      <div class="avatar">${avatarImg(v.avatar)}${esc((v.nome||'?')[0])}</div>
+      ${voltoHTML({nome: v.nome, avatar: v.avatar, negozio: v.negozio,
+                   ignoto: true}, 'avatar', {tag: 'div'})}
       <div class="who"><b>${esc(v.nome||'—')}${badge}${fiducia}</b>
         ${titoloRiga(v.titolo, v.livello_numero)}
         <div class="rep">${rep}</div>
@@ -18852,7 +18976,8 @@ function feedbackNegozioHTML(feedback, nFeedback){
   const riga = f => {
     const cod = (f.da_negozio||'').replace(/[^A-Za-z0-9]/g,'');
     const chi = f.da_nome || '';
-    const faccia = `<span class="fb-faccia">${avatarImg(f.da_avatar)}${esc((chi||'?')[0])}</span>`;
+    const faccia = voltoHTML({nome: chi, avatar: f.da_avatar, negozio: cod,
+                              ignoto: true}, 'fb-faccia');
     const nome = chi
       ? (cod ? `<b class="fb-chi" onclick="apriNegozio('${cod}')">${esc(chi)}</b>`
              : `<b>${esc(chi)}</b>`)
@@ -19073,11 +19198,18 @@ function cardParteOrdine(o, lato){
     npub: vende ? o.nostrVenditore : o.nostrCompratore});
   /* il nome di battesimo per la frase del tondo, come nel negozio */
   const primo = volto.nome ? String(volto.nome).split(' ')[0] : '';
+  /* IL VOLTO E' DELLA PERSONA, non dell'etichetta (28 set 2026): prima
+     la card senza volto metteva nel tondo la «I» di «Il venditore».
+     Il server manda il volto di ogni parte che conosce: se manca, la
+     persona non c'e' piu' e il tondo dice «?». Nel demo non c'e' un
+     server da interrogare, e resta la sagoma. */
+  const faccia = {nome: volto.nome, avatar: volto.avatar,
+                  negozio: volto.negozio, ignoto: !DEMO};
   return (o.role === 'admin'
       ? `<div class="parte-chi">${vende ? 'Chi vende' : 'Chi compra'}</div>` : '')
     + cardParte(c, primo ? 'a ' + esc(primo)
                          : (vende ? 'al venditore' : "all'acquirente"), {
-      link: true,
+      link: true, volto: faccia,
       nota: `<div class="trust-note">💬 <span>${soggetto} non ha contatti pubblici, ma le trattative non sono necessarie: il deposito di garanzia protegge l'affare. Per i problemi c'è la disputa, e interviene un moderatore.</span></div>`});
 }
 
@@ -24944,7 +25076,8 @@ function openDetail(id){
       <div class="desc-tit">Descrizione</div>
       <div class="desc">${descrizioneHTML(l)}</div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
-        <div class="avatar">${avatarImg(l.avatar)}${esc(l.seller[0])}</div>
+        ${voltoHTML({nome: l.seller, avatar: l.avatar, negozio: l.negozio,
+                     ignoto: true}, 'avatar', {tag: 'div'})}
         <div class="who"><b>${esc(l.seller)}</b>${
           /* il 🟣 in fila coi badge, come nella testata del negozio:
              solo l'icona — la verifica si racconta di la' */
@@ -30112,7 +30245,8 @@ function renderProfilo(){
   const tondi = tondiVenditore('', '', '', (myUsername||myNegozio) ? 'mio' : '');
   box.innerHTML = `
     <div class="seller${tondi ? ' con-tondi' : ''}" style="margin-top:14px">
-      <div class="avatar">${avatarImg(myAvatar)}${esc(nome[0])}</div>
+      ${voltoHTML({nome: myNome || myUsername, avatar: myAvatar}, 'avatar',
+                  {tag: 'div', chiave: 'io'})}
       <div class="who"><b>${esc(nome)}${badge}</b>
         ${titoloRiga(nomeTitolo(myTitolo), myLivello && myLivello.numero)}
         <div class="rep">${rep}</div>
@@ -30715,8 +30849,14 @@ async function ignoraDoppione(idImportato, idNativo){
    tappo di sempre — e se pure quello manca, this.remove() e resta
    l'iniziale sul tappo disegnato in CSS, il patto della mascotte. */
 function renderAvatar(){
-  /* lo spread non spezza le emoji: c'e' chi si chiama 🔥Marco */
-  const ini = [...(myNome || myUsername || 'Tu')][0].toUpperCase();
+  /* IL TAPPO E' IL VOLTO DI CHI GUARDA, dalla stessa cache (28 set 2026,
+     «il volto unico»): prima che /api/me risponda scriveva la «T» di
+     «Tu», cioe' una lettera inventata — adesso resta il tappo, che e'
+     gia' il volto neutro di casa, e la lettera arriva col nome. E il
+     giro dalla cache riscrive anche la testata del Profilo, se e' gia'
+     disegnata. */
+  ricordaVolto('io', {nome: myNome || myUsername, avatar: myAvatar});
+  const ini = inizialeVolto(cacheVolti.io.nome);
   const oro = myDistintivi.some(d=>d.ottenuto);
   const foto = (myAvatar || '').replace(/[^A-Za-z0-9_.-]/g, '');
   document.querySelectorAll('.avatar-btn').forEach(a=>{
@@ -42554,7 +42694,8 @@ function renderAccountSheet(){
               + ` onkeydown="if(event.key==='Enter'||event.key===' ')`
               + `{event.preventDefault();cambiaAccount(${c.tg_id})}"`)
           + ` style="margin-top:8px${attivo?'':';cursor:pointer'}">`
-          + `<div class="avatar">${avatarImg(c.avatar)}${esc([...nome][0]||'?')}</div>`
+          + voltoHTML({nome: c.nome || c.username, avatar: c.avatar,
+                       negozio: c.negozio, ignoto: true}, 'avatar', {tag: 'div'})
           + `<div class="who"><b>${esc(nome)}</b>`
           + `<div class="rep">${c.username?'@'+esc(c.username)+' · ':''}`
           + `${attivo?'sei qui':'tocca per passare a questo account'}</div></div>`
@@ -44582,11 +44723,14 @@ function anelloScadenzaP2P(o, adesso){
      stopPropagation vive in apriNegozioP2P: senza, il tocco cadrebbe
      anche su prendiOrdineP2P. Senza un negozio da aprire il volto
      resta un volto: nessun onclick, il tocco scivola sulla card. */
-  const dentro = '<span class="p2p-faccia"' + (f.negozio
+  /* IL VOLTO E' QUELLO UNICO (28 set 2026): la chiave e' l'ordine, e
+     la card d'esempio — che il volto se lo porta — non ne ha una */
+  const dentro = voltoHTML(f, 'p2p-faccia', {
+    chiave: o.faccia ? '' : 'p2p:' + o.id,
+    attr: f.negozio
       ? ' role="button" tabindex="0" data-negozio="' + esc(f.negozio)
         + '" onclick="apriNegozioP2P(event, this.dataset.negozio)"'
-      : '') + '>' + avatarImg(f.avatar)
-    + esc((f.nome || '?')[0]) + '</span>';
+      : ''});
   return '<span class="p2p-anello' + stato
     + '" role="img" title="' + esc(aria) + '" aria-label="' + esc(aria) + '">'
     + '<svg viewBox="0 0 24 24" aria-hidden="true">'
@@ -48575,7 +48719,10 @@ function voltoMioP2P(){
 }
 function voltoCardNuovaP2P(id){
   if (!id) return;
-  if (!p2pFacce[id] && ordineMioP2P(id)) p2pFacce[id] = voltoMioP2P();
+  if (!p2pFacce[id] && ordineMioP2P(id)) {
+    p2pFacce[id] = voltoMioP2P();
+    ricordaVolto('p2p:' + id, p2pFacce[id]);
+  }
   p2pVoltoRiprove[id] = 0;
   setTimeout(() => { riprovaVoltoP2P(id).catch(() => {}); }, P2P_VOLTO_RIPROVE_MS[0]);
 }
@@ -50511,7 +50658,7 @@ function battitoAnelloneP2P(){
    col tratto di casa per non mettere un 📅 di un'altra mano accanto
    alla stella e all'omino. Se un giorno i giorni tornassero, il
    disegno sta in git — e il nome NON si riusa per altro. */
-function repRiquadroP2P(f){
+function repRiquadroP2P(f, id){
   if (!f) return '';
   const media = (f.voti > 0 && f.media > 0)
     ? esc(f.media.toLocaleString('it-IT',
@@ -50532,8 +50679,7 @@ function repRiquadroP2P(f){
      L'ETICHETTA SOTTO DICE DOVE PORTA il tocco quando c'e' un negozio
      da aprire: e' l'unico segno visibile che questa sezione e' un
      bersaglio, e senza negozio torna a dire soltanto chi e'. */
-  const volto = '<span class="p2p-rep-volto">' + avatarImg(f.avatar)
-    + esc((f.nome || '?')[0]) + '</span>';
+  const volto = voltoHTML(f, 'p2p-rep-volto', {chiave: id ? 'p2p:' + id : ''});
   return sezioneNuovoP2P({
     ico: '', titolo: 'Chi ha pubblicato quest\'ordine',
     porta: f.negozio || '',
@@ -51138,7 +51284,7 @@ function renderDettaglioP2P(){
     (tuo ? '<div class="p2p-box p2p-tuo">È il tuo ordine: l\'hai pubblicato tu, e non si può prendere.</div>' : '') +
     metodiDettP2P(o) +
     notaTabacchinoDettP2P(o) +
-    repRiquadroP2P(p2pFacce[o.id]) +
+    repRiquadroP2P(p2pFacce[o.id], o.id) +
     anelloneP2P(o) +
     (tuo ? '' : avvisoPresaTabacchinoP2P(o)) +
     /* IL CONTO SCORPORATO sotto l'anello: il calco del foglio «Paga»
@@ -58128,7 +58274,8 @@ async function chiediFotoLibroP2P(){
     d = await r.json();
   } catch(e) { return false; }
   const facce = (d && d.facce && typeof d.facce === 'object') ? d.facce : {};
-  for (const id in facce) { p2pFacce[id] = facce[id]; p2pFacceChieste.add(id); }
+  prendiFacceP2P(facce);
+  for (const id in facce) p2pFacceChieste.add(id);
   /* i cambi di Barattozon escono a TUTTI, anche a chi guarda senza
      sessione: non sono un volto, sono il metro di un premio che sta
      gia' sulla card (26 set 2026) */
@@ -58145,6 +58292,12 @@ async function chiediFotoLibroP2P(){
   /* i volti chiesti gia' qui: la domanda del render non ripartirebbe
      per un id che la fotografia ha gia' detto di non conoscere */
   p2pLibro.ordini.forEach(o => p2pFacceChieste.add(o.id));
+  /* ...e chi non ha un volto nella fotografia e' uno che il server non
+     conosce — ma SOLO se il server ha riconosciuto chi guarda: `miei`
+     esce soltanto allora, ed e' lo stesso cancello dei volti. Senza,
+     i volti non arrivano per regola e il tondo resta la sagoma. */
+  if (Array.isArray(d && d.miei))
+    prendiFacceP2P(facce, p2pLibro.ordini.map(o => o.id));
   return true;
 }
 /* Il libro vero e' arrivato (lo chiama `caricaLibroP2P`): diventa la
@@ -58547,7 +58700,7 @@ function cardVetrinaP2P(o){
       <div class="ph-wrap">
         <div class="ph p2p-vt-fondo">${fondo}</div>
         <span class="p2p-vt-lato ${compro ? 'compra' : 'vendi'}">${lato}</span>
-        <span class="p2p-vt-volto">${avatarImg(f.avatar)}${esc((f.nome || '?')[0])}</span>
+        ${voltoHTML(f, 'p2p-vt-volto', {chiave: 'p2p:' + o.id})}
         <div class="tag-price"><div class="price"><span class="p2p-vt-verbo">${verboEuro}</span>${euro}<span class="unit eur">€</span></div>${sotto ? `<div class="price-sub">${sotto}</div>` : ''}</div>
       </div>
       <div class="info">
@@ -58603,7 +58756,8 @@ async function chiediFotoVetrinaP2P(){
   if (!r.ok) return false;
   const d = await r.json();
   const facce = (d && d.facce && typeof d.facce === 'object') ? d.facce : {};
-  for (const id in facce) { p2pFacce[id] = facce[id]; p2pFacceChieste.add(id); }
+  prendiFacceP2P(facce);
+  for (const id in facce) p2pFacceChieste.add(id);
   /* e i cambi di Barattozon, che la fotografia porta a tutti (26 set
      2026): il premio scelto sulla card della fila, anche senza sessione */
   prendiCambiPubP2P(d && d.cambi);
@@ -58620,6 +58774,11 @@ async function chiediFotoVetrinaP2P(){
   }
   const libro = libroDaEventi(eventi);
   if (libro.info && !p2pInfo) p2pInfo = libro.info;
+  /* chi non ha un volto nella fotografia e' uno che il server non
+     conosce, col cancello di `chiediFotoLibroP2P`: solo se il server ha
+     riconosciuto chi guarda (`miei`) */
+  if (Array.isArray(d && d.miei))
+    prendiFacceP2P(facce, libro.ordini.map(o => o.id));
   p2pVetrinaFoto = {ordini: libro.ordini, eventi, quando};
   return true;
 }
@@ -58779,6 +58938,24 @@ let p2pOrdiniRegistrati = new Set();   // gia' detti al server, in questa sessio
 let p2pFacce = {};                     // ordine -> {nome, avatar, media, voti}
 let p2pFacceChieste = new Set();       // gia' chiesti: mai due volte
 let p2pFacceGiro = null;               // la domanda in volo
+/* I VOLTI ARRIVATI DAL SERVER (28 set 2026, «il volto unico»): la
+   reputazione per ordine resta in `p2pFacce` (stelle, voti, giorni,
+   negozio), il VOLTO entra nella cache unica — e da li' si riscrive da
+   solo in ogni card, fila o riquadro gia' disegnati. Gli id CHIESTI che
+   la risposta non porta sono ordini che il server non conosce: il «?»
+   e' per loro, e un volto arrivato dopo lo sostituisce. */
+function prendiFacceP2P(facce, chiesti){
+  let nuove = 0;
+  for (const id in facce) {
+    p2pFacce[id] = facce[id];
+    ricordaVolto('p2p:' + id, facce[id]);
+    nuove++;
+  }
+  (chiesti || []).forEach(id => {
+    if (id && !facce[id]) ricordaVolto('p2p:' + id, {ignoto: true});
+  });
+  return nuove;
+}
 /* I CAMBI DI BARATTOZON (26 set 2026): ordine -> euro per bitcoin con
    cui chi l'ha pubblicato ha fatto i sats. Arrivano dal server accanto
    ai volti e con la fotografia del libro; il giudice che li usa e'
@@ -58973,8 +59150,7 @@ async function chiediFacceP2P(ids){
       if (!r.ok) return false;
       const d = await r.json();
       const facce = (d && d.facce) || {};
-      let nuove = 0;
-      for (const id in facce) { p2pFacce[id] = facce[id]; nuove++; }
+      let nuove = prendiFacceP2P(facce, lista);
       /* e il cambio di Barattozon, che viaggia accanto ai volti */
       if (prendiCambiPubP2P(d && d.cambi)) nuove++;
       return nuove > 0;
@@ -59127,7 +59303,7 @@ function cardParte(c, chi, opz){
   const canali = !!tondiVenditore(c.telegram, c.npub, chi, '');
   return '<div class="seller' + (tondi ? ' con-tondi' : '') + '">'
     + '<div class="seller-porta"' + porta + '>'
-    + '<div class="avatar">' + avatarImg(c.avatar) + esc(String(nome)[0]) + '</div>'
+    + voltoHTML(op.volto || Object.assign({ignoto: true}, c), 'avatar', {tag: 'div'})
     + '<div class="who"><b>' + esc(nome) + '</b>'
     + titoloRiga(c.titolo, c.livello_numero)
     + (rep.length ? '<div class="rep">' + rep.join(' · ') + '</div>' : '')

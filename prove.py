@@ -13157,6 +13157,17 @@ def pezzo_js(mini, firma, fine="\n\n"):
     return mini[i:mini.index(fine, i)]
 
 
+def volto_unico_js(mini):
+    """IL VOLTO UNICO (28 set 2026): il blocco intero di miniapp.html —
+    la cache `cacheVolti`, l'iniziale, la scala dei tre gradini e il
+    ridisegno dei volti gia' disegnati — da infilare nei banchi node che
+    disegnano un volto. Vuole dal banco `esc` e `avatarImg` (le finte di
+    ciascuno restano le sue), e va messo PRIMA del codice che gira: la
+    cache e' un `let`, e chiamarla prima della sua riga e' un errore."""
+    return pezzo_js(mini, "/* ============ IL VOLTO UNICO",
+                    "/* ============ fine del volto unico ============ */") + "\n"
+
+
 # LA BOLT11 VERA del 16 set 2026: 7468 sats, scadenza 3600 s, cltv 80,
 # nata alle 14:28:38 UTC — quella che il foglio ha suggerito e il
 # coordinatore ha rifiutato. E' pubblica (una fattura non porta segreti)
@@ -25913,6 +25924,7 @@ def prove_classifica_recensioni_tutte():
              pezzo_js(mini, "function renderClassifica(", "\n}\n") + "\n}"]
     banco = "\n".join(pezzi) + """
 function avatarImg(n){ return ''; }
+""" + volto_unico_js(mini) + """
 const BOX = {innerHTML: ''};
 const el = id => id === 'classificaCorpo' ? BOX : null;
 let classificaDati = null, classificaFiltro = 0;
@@ -49735,6 +49747,7 @@ def prove_feedback_tre_e_tondi():
         ]
         banco = ("let isAdmin = false; let aptiche = 0;\n"
                  "function avatarImg(n){ return n ? '<img src=\"/foto/' + n + '\">' : ''; }\n"
+                 + volto_unico_js(mini) +
                  "function haptic(){ aptiche++; }\n"
                  "const DOM = {};\n"
                  "function el(id){ return DOM[id] || null; }\n"
@@ -50307,6 +50320,10 @@ def prove_card_parte_ordine():
              "  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')\n"
              "  .replace(/\"/g,'&quot;').replace(/'/g,'&#39;');\n"
              "function avatarImg(n){ return n ? '<img src=\"/foto/' + n + '\">' : ''; }\n"
+             # la card nel demo non ha un server da interrogare (il suo
+             # volto mancante resta la sagoma): qui si e' fuori dal demo
+             "let DEMO = false;\n"
+             + volto_unico_js(mini)
              + "\n".join(pezzi) + "\n" + r"""
 const out = {};
 const tondi = h => (h.match(/class="tondo (\w+)"/g) || []).map(x => x.slice(13, -1));
@@ -51449,6 +51466,10 @@ def prove_libro_subito():
              # 2026): le funzioni VERE, e la cache dichiarata qui sotto
              + pezzo_js(mini, "function idMostroVero(id){", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function prendiCambiPubP2P(m){", "\n}\n") + "\n}\n"
+             # i volti della fotografia entrano nella cache del volto
+             # unico, con `prendiFacceP2P` (28 set 2026)
+             + volto_unico_js(mini)
+             + pezzo_js(mini, "function prendiFacceP2P(facce, chiesti){", "\n}\n") + "\n}\n"
              + blocco)
     banco = r"""
 const MEM = {}; let MEMORIA_MUTA = false;
@@ -53022,6 +53043,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const fmt = n => n.toLocaleString('it-IT').replace(/\./g,' ');
 const fmtEur = e => e.toLocaleString('it-IT', {minimumFractionDigits:2, maximumFractionDigits:2});
 function avatarImg(n){ n = (n || '').replace(/[^A-Za-z0-9_.-]/g, ''); return n ? '<img class="av-foto" src="/foto/' + n + '">' : ''; }
+""" + volto_unico_js(mini) + r"""
 const P2P_AFFARE_OTTIMO = 10, P2P_AFFARE_SUPER = 15;
 const P2P_TABACCHINO = 'Contanti al tabacchino';
 const P2P_TABACCHINO_PM = /^Contanti al tabacchino(?:\s+(\d+\.\d{2}))?$/;
@@ -53106,6 +53128,7 @@ const INVITO_ONION = {p2p: ''};
         + pezzo_js(mini, "function nettoLatoP2P(o, sats){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function idMostroVero(id){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function prendiCambiPubP2P(m){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function prendiFacceP2P(facce, chiesti){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function tagValore(ev, nome){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function tagValori(ev, nome){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function euroTabacchinoP2P(metodi){", "\n}\n") + "\n}\n" \
@@ -53137,6 +53160,9 @@ out.fissoSuper = cardVetrinaP2P(O('fs', 'sell', 30, {sats: 46400, metodi: ['Revo
 out.storta = cardVetrinaP2P(O('a"><script>', 'sell', 10, {metodi: ['<img src=x onerror=alert(1)>']}));
 cambioVivo = false; eurPerSat = 0;
 out.muto = cardVetrinaP2P(O('m1', 'sell', 10));
+/* (28 set 2026) chi il server ha detto di non conoscere */
+ricordaVolto('p2p:ig1', {ignoto: true});
+out.ignoto = cardVetrinaP2P(O('ig1', 'sell', 10));
 cambioVivo = true; eurPerSat = 0.00075;
 /* QUALI ORDINI */
 LAPIDI = new Set(['lap']);
@@ -53192,6 +53218,13 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
               url: FETCH[0] && FETCH[0].url, metodo: FETCH[0] && FETCH[0].metodo,
               auth: FETCH[0] && FETCH[0].h['X-Tg-Init-Data'], volto: p2pFacce.f7 && p2pFacce.f7.nome,
               prossimo: TIMERS.map(t => t.ms > 14000 && t.ms <= 15000), primaCard: (el('p2pVetrinaFila').innerHTML.match(/data-p2p="([^"]+)"/) || [])[1]};
+  /* (28 set 2026) il volto della fotografia entra nella cache unica; gli
+     altri restano in attesa — la risposta non porta `miei`, quindi il
+     server non ha detto di conoscere chi guarda */
+  out.voltiFila = [cacheVolti['p2p:f7'] && cacheVolti['p2p:f7'].nome,
+                   !!(cacheVolti['p2p:f2'] && cacheVolti['p2p:f2'].ignoto),
+                   (el('p2pVetrinaFila').innerHTML.match(/volto-sagoma/g) || []).length,
+                   el('p2pVetrinaFila').innerHTML.includes('data-volto="p2p:f7">L</span>')];
   const prima = el('p2pVetrinaFila').scritte;
   renderVetrinaP2P();
   out.doppioArmo = TIMERS.length;
@@ -53286,6 +53319,10 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           quando: ADESSO, miei: ['altro1']};
   daCapo(); renderVetrinaP2P(); await giro();
   out.dalServer = ids();
+  /* (28 set 2026) col cancello aperto (`miei`), chi non ha volto nella
+     fotografia e' uno che il server non conosce: il «?» */
+  out.ignotoDalServer = [!!(cacheVolti['p2p:h1'] && cacheVolti['p2p:h1'].ignoto),
+                         el('p2pVetrinaFila').innerHTML.includes('volto-ignoto')];
   /* ...e ogni risposta prende il posto della precedente (un altro account
      sullo stesso telefono: l'ordine non e' piu' mio) */
   delete FOTO.miei;
@@ -53411,7 +53448,9 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           ['p2p-vt-lato vendi">Vendi BTC<' in c("compra"),
            '<div class="price"><span class="p2p-vt-verbo">Ricevi</span>80<span' in c("compra"),
            '<span class="p2p-vt-verbo">Invia</span><span class="p2p-vt-cifra">≈ 105\u202f019 sats</span>' in c("compra"),
-           ">g</span>" in c("compra"), '<div class="title">SEPA Instant</div>' in c("compra")])
+           # la maiuscola e' quella del volto unico (28 set 2026): la
+           # stessa iniziale in ogni posto, «giulia» o «Giulia»
+           ">G</span>" in c("compra"), '<div class="title">SEPA Instant</div>' in c("compra")])
     # (27 set 2026) la card e' sempre di un altro: niente ramo del «mio»
     prova("LA CARD NON HA PIU' UN RAMO «MIO»: ne' la classe, ne' «il tuo ordine», ne' il mio "
           "volto, ne' l'unione dei miei appena nati", [],
@@ -53437,8 +53476,16 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
     prova("SATS FISSI: −12 di adesso da «Ottimo affare», +12 niente, il fisso a −16 «Super»",
           [True, False, True, True], ["⚡ Ottimo affare" in c("bzOttimo"), "affare</span>" in c("bzContro"),
                                       "BADGE" in c("bzContro"), "⚡⚡ Super affare" in c("fissoSuper")])
-    prova("senza volto il tappo dice «?»; a cambio muto nessun numero inventato",
-          [True, False], [">?</span>" in c("bz"), "sats</span>" in c("muto")])
+    # IL VOLTO UNICO (28 set 2026): senza volto, finche' nessuno ha
+    # detto «non lo conosco», la card mostra la SAGOMA — il «?» e' solo
+    # di chi il server interrogato non conosce
+    prova("senza volto la sagoma e non il «?»; a cambio muto nessun numero inventato",
+          [True, True, False, False],
+          ["volto-sagoma" in c("bz"), "volto-attesa" in c("bz"), ">?</span>" in c("bz"),
+           "sats</span>" in c("muto")])
+    prova("...e il «?» solo per chi il server non conosce, con la sua classe",
+          [True, True, False], [">?</span>" in c("ignoto"), "volto-ignoto" in c("ignoto"),
+                                "volto-sagoma" in c("ignoto")])
     prova("il testo di sconosciuti passa scappato: id e metodo", [False, False, True],
           ["<script>" in c("storta"), "<img src=x" in c("storta"),
            "&lt;img src=x onerror=alert(1)&gt;" in c("storta")])
@@ -53460,6 +53507,9 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           {"display": "", "card": 6, "conta": "6", "fetch": 1, "url": "/api/p2p/libro",
            "metodo": "GET", "auth": "INIT", "volto": "Luca", "prossimo": [True],
            "primaCard": "f7"}, o["fila"])
+    prova("(28 set 2026) ...il volto della fotografia entra nella cache unica e nella card; "
+          "gli altri restano la sagoma: senza `miei` nessuno e' «?»",
+          ["Luca", False, 5, True], o["voltiFila"])
     prova("(26 set 2026) ...e i cambi di Barattozon della fotografia entrano, solo per un id vero",
           [90000, False], o["cambiFila"])
     prova("...armarlo di nuovo non fa due giri", 1, o["doppioArmo"])
@@ -53485,6 +53535,8 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           ["h1"], o["dallaFotoArchivio"])
     prova("...e fuori anche quello che sto prendendo", [], o["stoPrendendo"])
     prova("...sull'ALTRO dispositivo lo dice il server (`miei`)", ["h1"], o["dalServer"])
+    prova("(28 set 2026) ...e col server che riconosce chi guarda, chi non ha volto nella "
+          "fotografia dice «?»", [True, True], o["ignotoDalServer"])
     prova("...e ogni risposta prende il posto della precedente", ["altro1", "h1"],
           o["rispostaNuova"])
     prova("SOLO MIEI: la fila si comporta come vuota — sparisce col titolo e il conto, "
@@ -55823,6 +55875,7 @@ function avatarImg(nome){
   const n = (nome || '').replace(/[^A-Za-z0-9_.-]/g, '');
   return n ? '<img class="av-foto" src="/foto/' + n + '" alt="" onerror="this.remove()">' : '';
 }
+""" + volto_unico_js(mini) + r"""
 let cambioVivo = true, eurPerSat = 0.0005, p2pInfo = null;
 const ora = 2000000000;
 const ev = (kind, tags, created) => ({kind, tags, created_at: created || 1});
@@ -55890,6 +55943,8 @@ out.stelNiente = stellineP2P(null);
    stelline compaiono solo se quel volto ha voti */
 p2pFacce = {};
 out.rigaSenzaRep = rigaOrdineP2P(out.fisso);
+ricordaVolto('p2p:ord-ig', {ignoto: true});
+out.rigaIgnota = rigaOrdineP2P(Object.assign({}, out.fisso, {id: 'ord-ig'}));
 p2pFacce = {[out.fisso.id]: {nome: 'Ada', avatar: 'av_x.jpg',
                              media: 4.8, voti: 12}};
 out.rigaConFaccia = rigaOrdineP2P(out.fisso);
@@ -56657,11 +56712,20 @@ console.log(JSON.stringify(out));
           "p2p-rep" in out["rigaConFaccia"]
           and out["rigaConFaccia"].index("p2p-euro")
               < out["rigaConFaccia"].index("p2p-rep"))
-    prova("senza volto il tappo col «?»: mai un anello vuoto", True,
-          'class="p2p-faccia">?</span>' in out["rigaSenzaRep"]
+    # ⚠️ IL VOLTO UNICO (28 set 2026) ha stretto la regola del 17 set:
+    # mai un anello vuoto, ma nemmeno il «?» per chi non e' ancora
+    # arrivato — dentro c'e' la SAGOMA, e il «?» e' solo di chi il
+    # server ha detto di non conoscere
+    prova("senza volto la sagoma: mai un anello vuoto, e mai il «?» di attesa", True,
+          'class="p2p-faccia volto-attesa" data-volto="p2p:ord-1">'
+          '<span class="volto-sagoma" aria-hidden="true"></span></span>' in out["rigaSenzaRep"]
+          and ">?<" not in out["rigaSenzaRep"]
           and "av-foto" not in out["rigaSenzaRep"]
           and "p2p-rep" not in out["rigaSenzaRep"]
           and "p2p-anello" in out["rigaSenzaRep"])
+    prova("...e il «?» per chi il server non conosce", True,
+          'class="p2p-faccia volto-ignoto" data-volto="p2p:ord-ig">?</span>'
+          in out["rigaIgnota"])
     prova("...e un volto senza voti porta la faccia, non la riga", True,
           "p2p-faccia" in out["rigaFacciaSenzaVoti"]
           and "p2p-rep" not in out["rigaFacciaSenzaVoti"])
@@ -56669,7 +56733,7 @@ console.log(JSON.stringify(out));
     # <img>, l'iniziale del nome sul tondo scuro — la stessa scala di
     # ripieghi delle card degli annunci.
     prova("...e senza foto l'iniziale sul tondo, senza <img>", True,
-          'class="p2p-faccia">B</span>' in out["rigaFacciaSenzaVoti"]
+          'class="p2p-faccia" data-volto="p2p:ord-1">B</span>' in out["rigaFacciaSenzaVoti"]
           and "av-foto" not in out["rigaFacciaSenzaVoti"])
     # ...e la variante piccola dell'anello e' USCITA col suo nome:
     # l'anello e' sempre la cornice del volto, pure quando il volto
@@ -57063,7 +57127,7 @@ def prove_p2p_dettaglio():
         "function fasciaTabacchinoP2P(scade, adesso){",
         "function avvisoPresaTabacchinoP2P(o, adesso){",
         "function notaTabacchinoDettP2P(o){",
-        "function repRiquadroP2P(f){",
+        "function repRiquadroP2P(f, id){",
         "function monetaP2P(o){",
         "function segnoMonetaP2P(o){",
         "function commissioneVivaP2P(){",
@@ -57190,6 +57254,7 @@ function avatarImg(nome){
   const n = (nome || '').replace(/[^A-Za-z0-9_.-]/g, '');
   return n ? '<img class="av-foto" src="/foto/' + n + '" alt="" onerror="this.remove()">' : '';
 }
+""" + volto_unico_js(mini) + r"""
 let negoziAperti = [];
 function apriNegozio(chi){ negoziAperti.push(chi); }
 /* IL DOM DI CARTONE: due nodi, e quel che ci si scrive dentro si
@@ -57348,9 +57413,13 @@ out.repSenza = repRiquadroP2P(null);
 out.repPiena = repRiquadroP2P({nome: 'Ada', media: 4.8, voti: 12,
                                avatar: 'av_x.jpg', negozio: 'ab12cd34'});
 out.repSenzaVoti = repRiquadroP2P({nome: 'Bruno', media: 0, voti: 0});
-/* senza FOTO resta l'iniziale sul tondo, come nell'anello delle card */
+/* senza FOTO resta l'iniziale sul tondo, come nell'anello delle card.
+   (28 set 2026) Con la chiave dell'ordine, come la chiama la pagina:
+   senza, il volto unico legherebbe il volto al negozio — e qui Ada e Cip
+   sono due persone finte con lo stesso codice, cioe' per la cache la
+   stessa persona, con la foto di Ada. */
 out.repSenzaFoto = repRiquadroP2P({nome: 'Cip', media: 5, voti: 2,
-                                   negozio: 'ab12cd34'});
+                                   negozio: 'ab12cd34'}, 'ord-cip');
 /* senza NEGOZIO la sezione non e' un bersaglio, e l'etichetta lo dice */
 out.repSenzaNegozio = repRiquadroP2P({nome: 'Dina', media: 5, voti: 2,
                                       avatar: 'av_y.jpg'});
@@ -58525,6 +58594,7 @@ def prove_parti_si_vedono():
              "  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')\n"
              "  .replace(/\"/g,'&quot;').replace(/'/g,'&#39;');\n"
              "function avatarImg(n){ return n ? '<img src=\"/foto/' + n + '\">' : ''; }\n"
+             + volto_unico_js(mini) +
              "let p2pOrdineAperto = 'ord-1', render = 0;\n"
              "function renderOrdineP2P(){ render++; }\n"
              "let risposta = {}, chiamate = 0;\n"
@@ -61449,6 +61519,8 @@ def prove_volti_libro():
         "  if (url.endsWith('/p2p/ordini')) { ids.forEach(i => registrati.add(i)); return {ok: true}; }\n"
         "  const facce = {}; ids.forEach(i => { if (registrati.has(i)) facce[i] = {nome: 'Ada'}; });\n"
         "  return {ok: true, json: async () => ({facce})}; }\n"
+        # i volti arrivati entrano nella cache del volto unico
+        + volto_unico_js(mini)
         + volti +
         "(async () => { const out = {};\n"
         "  out.primaNo = (await chiediFacceP2P(['ord-1'])) === false && !p2pFacce['ord-1'];\n"
@@ -106978,6 +107050,8 @@ def prove_volto_card_ascolto():
         pezzo_js(mini, "const P2P_FINALI = ", "\n"),
         fn("function tagValore(ev, nome){"), fn("function tagValori(ev, nome){"),
         fn("function ordineDaEvento(ev, adesso){"),
+        # i volti arrivati entrano nella cache del volto unico
+        volto_unico_js(mini),
         volti, ascolto,
         "function ridisegnaLibroFermoP2P(){ fermiN++; renderP2P(); }",
     ])
@@ -107048,6 +107122,325 @@ const ev = (id) => ({kind: 38383, id: 'e-' + id, pubkey: 'm', created_at: ora, t
     prova("c) la card sparita dal libro non si richiede", [0, 0], o["sparito"])
     prova("d) le riprove finiscono da sole: cinque domande e poi silenzio", [5, 5, True], o["muto"])
     prova("e) col libro non davanti il volto entra in cache senza ridisegnare", [True, 0, 0], o["dietro"])
+
+
+def prove_volto_unico():
+    """IL VOLTO UNICO (28 set 2026, difetto ricorrente trovato da Andrea):
+    il «?» al posto della foto di una persona e' tornato piu' volte, curato
+    ogni volta in UN posto (card del libro, fila in vetrina, ordine appena
+    pubblicato), e poi e' comparso nel profilo. Ogni posto disegnava il
+    volto per conto suo, con il suo ripiego. Adesso il volto passa da una
+    funzione sola (`voltoHTML`) con una cache sola (`cacheVolti`), in tre
+    gradini — foto/iniziale, SAGOMA finche' non si sa, «?» solo per chi il
+    server interrogato non conosce — e si riscrive da solo dove e' gia'
+    disegnato quando nome o foto arrivano in ritardo.
+    Qui: il CENSIMENTO come sentinella (dieci chiamate, una per posto, e
+    `avatarImg` solo dentro il blocco), il blocco in node col suo DOM di
+    cartone, e per OGNI posto la sua chiamata vera — ritagliata dal file,
+    non ricopiata — valutata coi dati di quel posto."""
+    print("\n[il volto unico: una funzione, una cache, tre gradini]")
+    import shutil as _sh, subprocess as _sp, tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    blocco = volto_unico_js(mini)
+    corpo = blocco.rstrip("\n")
+    fuori = mini.replace(corpo, "")
+
+    # --- 1) IL CENSIMENTO, come sentinella -----------------------------
+    # I POSTI: prefisso della chiamata -> la funzione che la contiene.
+    # Un volto disegnato in un posto nuovo fa rosso il conto qui sotto:
+    # si aggiunge al censimento, con la sua prova, o si torna al difetto.
+    POSTI = {
+        "classifica": ("voltoHTML({nome: v.nome, avatar: v.avatar, negozio: cod",
+                       "function rigaClassifica(v, mia){"),
+        "negozio": ("voltoHTML({nome: v.nome, avatar: v.avatar, negozio: v.negozio",
+                    "function renderNegozio(v, annunci, feedback=[], esauriti=[]){"),
+        "recensioni": ("voltoHTML({nome: chi, avatar: f.da_avatar",
+                       "function feedbackNegozioHTML(feedback, nFeedback){"),
+        "riquadro venditore": ("voltoHTML({nome: l.seller", None),
+        "profilo": ("voltoHTML({nome: myNome || myUsername", "function renderProfilo(){"),
+        "account": ("voltoHTML({nome: c.nome || c.username", "function renderAccountSheet(){"),
+        "card del libro": ("voltoHTML(f, 'p2p-faccia'", "function anelloScadenzaP2P(o, adesso){"),
+        "chi ha pubblicato": ("voltoHTML(f, 'p2p-rep-volto'", "function repRiquadroP2P(f, id){"),
+        "fila in vetrina": ("voltoHTML(f, 'p2p-vt-volto'", "function cardVetrinaP2P(o){"),
+        "card dell'altra parte": ("voltoHTML(op.volto || Object.assign",
+                                  "function cardParte(c, chi, opz){"),
+    }
+    prova("il volto si disegna da dieci posti, ognuno col suo nome nel censimento",
+          [10, [1] * 10], [fuori.count("voltoHTML("),
+                           [fuori.count(v[0]) for v in POSTI.values()]])
+    prova("...e ogni chiamata sta nella funzione del suo posto", [],
+          [k for k, (pref, fn) in POSTI.items()
+           if fn and pref not in pezzo_js(mini, fn, "\n}\n")])
+    # il riquadro «Chi ha pubblicato» si riscrive da solo SOLO se chi lo
+    # chiama gli passa l'ordine: senza, la chiave e' quella del negozio
+    # e la risposta dei volti (che parla per ordine) non lo trova
+    prova("...e la pagina del dettaglio passa al riquadro la chiave dell'ordine", [1, 0],
+          [mini.count("repRiquadroP2P(p2pFacce[o.id], o.id)"),
+           mini.count("repRiquadroP2P(p2pFacce[o.id])")])
+    _det = mini.index(POSTI["riquadro venditore"][0])
+    prova("...il riquadro venditore e' quello del dettaglio, che apre il negozio", True,
+          'onclick="apriNegozioDaAnnuncio()"' in mini[_det - 300:_det])
+    prova("`avatarImg` si chiama SOLO dal volto unico: nessun posto scrive una foto per conto suo",
+          [1, 1], [corpo.count("avatarImg("), fuori.count("avatarImg(")])
+    prova("...e nessun posto scrive piu' un'iniziale a mano: niente «'?')[0]», «nome[0]», «seller[0]»",
+          [0, 0, 0, 0], [len(re.findall(r"'\?'\)\[0\]", fuori)),
+                         len(re.findall(r"(?:nome|chi|seller)\s*\|\|\s*'\?'", fuori)),
+                         fuori.count("esc(nome[0])") + fuori.count("esc(l.seller[0])"),
+                         fuori.count("String(nome)[0]")])
+    _av = pezzo_js(mini, "function renderAvatar(){", "\n}\n")
+    prova("il tappo in testata legge la stessa cache e la stessa iniziale, e non inventa la «T» di «Tu»",
+          [True, True, False], ["ricordaVolto('io'," in _av,
+                                "inizialeVolto(cacheVolti.io.nome)" in _av, "'Tu'" in _av])
+    _css = mini[mini.index("<style"):mini.index("</style>")]
+    _sag = _css[_css.index(".volto-sagoma{"):]
+    _sag = _sag[:_sag.index("}\n") + 1]
+    prova("la sagoma e' una maschera nel colore dell'iniziale: segue il tondo nei due temi, "
+          "e per tutte le misure", [True, True, True, True],
+          ["background:currentColor" in _sag, "-webkit-mask:url(" in _sag,
+           "mask:url(" in _sag.replace("-webkit-mask:url(", ""), "width:62%" in _sag])
+    _prendi = pezzo_js(mini, "function prendiFacceP2P(facce, chiesti){", "\n}\n")
+    # sei: la porta stessa, la risposta a una domanda, le due fotografie
+    # (libro e fila) coi loro volti, e le due coi loro «?» dietro al cancello
+    prova("i volti del P2P entrano in cache da una porta sola (risposta, fotografia, fila)",
+          [6, 1, True],
+          [mini.count("prendiFacceP2P(facce"), mini.count("p2pFacce[id] = facce[id]"),
+           "p2pFacce[id] = facce[id]" in _prendi])
+    prova("...e il «?» dalle fotografie solo col cancello del server (`miei`)", 2,
+          mini.count("if (Array.isArray(d && d.miei))\n    prendiFacceP2P(facce, "))
+
+    node = _sh.which("node")
+    if not node:
+        salta("il banco del volto unico gira in node", "node non c'e'")
+        return
+
+    # --- 2) LE CHIAMATE VERE, ritagliate dal file ----------------------
+    def chiamata(pref):
+        """Dal prefisso alla parentesi che chiude la chiamata, saltando
+        le stringhe: e' il testo esatto che la pagina esegue."""
+        i = mini.index(pref)
+        j = i + len("voltoHTML")
+        prof, q = 0, ""
+        while True:
+            ch = mini[j]
+            if q:
+                if ch == "\\":
+                    j += 2
+                    continue
+                if ch == q:
+                    q = ""
+            elif ch in "'\"`":
+                q = ch
+            elif ch == "(":
+                prof += 1
+            elif ch == ")":
+                prof -= 1
+                if prof == 0:
+                    return mini[i:j + 1]
+            j += 1
+    chiamate = {k: chiamata(v[0]) for k, v in POSTI.items()}
+    _cpo = pezzo_js(mini, "function cardParteOrdine(o, lato){", "\n}\n")
+    _fi = _cpo.index("const faccia = ") + len("const faccia = ")
+    faccia_ordine = _cpo[_fi:_cpo.index(";", _fi)]
+
+    banco = (
+        "const esc = s => String(s == null ? '' : s).replace(/[&<>\"']/g, c =>"
+        " ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\n"
+        "function fotoUrl(n){ return '/foto/' + n; }\n"
+        + pezzo_js(mini, "function avatarImg(nome){", "\n}\n") + "\n}\n"
+        + blocco
+        + "let p2pFacce = {};\n"
+        + _prendi + "\n}\n"
+        + pezzo_js(mini, "function renderAvatar(){", "\n}\n") + "\n}\n"
+        + "const CHIAMATE = " + json.dumps(chiamate) + ";\n"
+        + "const FACCIA_ORDINE = " + json.dumps(faccia_ordine) + ";\n"
+        + r"""
+let DEMO = false, VETRINA = false, myNome = '', myUsername = '', myAvatar = '',
+    myDistintivi = [];
+/* IL DOM DI CARTONE: i nodi con la chiave nascono dal markup che il posto
+   ha appena scritto — la stessa chiave che il ridisegno cerchera' */
+let NODI = [], BOTTONI = [];
+const document = {querySelectorAll: s => s === '[data-volto]' ? NODI
+                                        : s === '.avatar-btn' ? BOTTONI : []};
+function monta(html){
+  NODI = [];
+  const re = /class="([^"]*)" data-volto="([^"]*)"/g; let m;
+  while ((m = re.exec(html))) {
+    const cls = new Set(m[1].split(' ')), k = m[2];
+    NODI.push({innerHTML: '(com\'era)', getAttribute: a => a === 'data-volto' ? k : null,
+               classList: {add: c => cls.add(c), remove: (...c) => c.forEach(x => cls.delete(x))},
+               classi: () => [...cls].sort().join(' ')});
+  }
+  return NODI.length;
+}
+/* la chiamata vera, coi nomi del suo posto */
+function valuta(expr, scope){
+  const f = eval('(function(' + Object.keys(scope).join(',') + '){ return ' + expr + '; })');
+  return f(...Object.values(scope));
+}
+const faccia = h => { const m = h.match(/^<(?:div|span) class="([^"]*)"(?: data-volto="([^"]*)")?[^>]*>([\s\S]*)<\/(?:div|span)>$/);
+  return m ? {classe: m[1], chiave: m[2] || '', dentro: m[3]} : {errore: h}; };
+const out = {};
+
+/* ---- A) IL BLOCCO DA SOLO ---- */
+out.iniziali = ['mario', '  ada ', '🔥Marco', 'élodie', '—', '-', '', null].map(inizialeVolto);
+out.tre = [voltoHTML({nome: 'Ada', avatar: 'av_a.jpg'}, 'avatar'),
+           voltoHTML({}, 'avatar'), voltoHTML({ignoto: true}, 'avatar'),
+           voltoHTML({nome: '—', ignoto: true}, 'fb-faccia', {tag: 'div'})];
+cacheVolti = {};
+ricordaVolto('k1', {nome: 'Ada', avatar: 'a.jpg'});
+out.cambio = [ricordaVolto('k1', {nome: 'Ada', avatar: 'a.jpg'}),     // niente di nuovo
+              ricordaVolto('k1', {ignoto: true}),                      // il «non so» dopo
+              cacheVolti.k1.nome, cacheVolti.k1.ignoto,
+              ricordaVolto('k1', {avatar: ''}), cacheVolti.k1.avatar,  // «nessuna foto»
+              ricordaVolto('k1', {nome: 'Bea'}), cacheVolti.k1.nome];
+out.chiaveVeleno = voltoHTML({nome: 'X'}, 'avatar', {chiave: 'p2p:a"><script>'});
+/* il ridisegno: solo la chiave giusta, e solo se qualcosa cambia */
+cacheVolti = {};
+monta(voltoHTML({}, 'p2p-faccia', {chiave: 'p2p:o1'})
+      + voltoHTML({}, 'p2p-faccia', {chiave: 'p2p:o2'}));
+ricordaVolto('p2p:o1', {nome: 'Gino', avatar: 'g.jpg'});
+out.ridisegno = NODI.map(n => [n.innerHTML, n.classi()]);
+NODI.forEach(n => { n.innerHTML = '(fermo)'; });
+ricordaVolto('p2p:o1', {nome: 'Gino'});
+out.fermo = NODI[0].innerHTML;
+
+/* ---- B) OGNI POSTO, con la sua chiamata ---- */
+const P = (k, scope) => faccia(valuta(CHIAMATE[k], scope));
+cacheVolti = {};
+out.posti = {
+  classifica: [P('classifica', {v: {nome: 'Ada Rossi', avatar: ''}, cod: 'ab12'}),
+               P('classifica', {v: {nome: '—', avatar: ''}, cod: 'zz99'})],
+  negozio: [P('negozio', {v: {nome: 'Bruno', avatar: 'av_b.jpg', negozio: 'bb11'}}),
+            P('negozio', {v: {nome: '', avatar: '', negozio: 'bb22'}})],
+  recensioni: [P('recensioni', {chi: 'carla', f: {da_avatar: ''}, cod: 'cc11'}),
+               P('recensioni', {chi: '', f: {da_avatar: ''}, cod: ''})],
+  'riquadro venditore': [P('riquadro venditore', {l: {seller: 'Dario', avatar: '', negozio: 'dd11'}}),
+                         P('riquadro venditore', {l: {seller: '—', avatar: '', negozio: ''}})],
+  account: [P('account', {c: {nome: '', username: 'franco', avatar: '', negozio: 'ff11'}})],
+  'card dell\'altra parte': [
+    P('card dell\'altra parte', {op: {}, c: {nome: 'Ivo', negozio: 'ii11'}}),
+    P('card dell\'altra parte', {op: {}, c: {nome: '', negozio: 'ii22'}})],
+};
+/* la card di un ORDINE: il volto e' della persona, non dell'etichetta */
+const ordine = volto => P('card dell\'altra parte', {
+  op: {volto: valuta(FACCIA_ORDINE, {volto, DEMO})}, c: {nome: 'Il venditore'}});
+out.ordine = [ordine({nome: 'Lia', avatar: '', negozio: 'll11'}), ordine({})];
+DEMO = true; out.ordineDemo = ordine({}); DEMO = false;
+
+/* il PROFILO: prima che /api/me risponda, poi quando arriva (il tappo
+   ridisegna la testata gia' in pagina) */
+cacheVolti = {};
+const tappo = {cl: new Set(), ini: {textContent: 'x'},
+  classList: {toggle: (c, s) => 0}, querySelector: s => s === '.av-ini' ? tappo.ini : null};
+BOTTONI = [tappo];
+const prof0 = P('profilo', {myNome: '', myUsername: '', myAvatar: ''});
+monta(valuta(CHIAMATE.profilo, {myNome: '', myUsername: '', myAvatar: ''}));
+renderAvatar();
+out.profiloPrima = [prof0, tappo.ini.textContent];
+myNome = 'elena'; myAvatar = 'av_e.jpg';
+renderAvatar();
+out.profiloDopo = [NODI.map(n => [n.innerHTML, n.classi()]), tappo.ini.textContent];
+
+/* il P2P: card del libro, riquadro e fila, in attesa; poi la risposta
+   del server porta un volto e dice «non lo conosco» a un altro */
+cacheVolti = {}; p2pFacce = {};
+const anello = id => valuta(CHIAMATE['card del libro'], {f: p2pFacce[id] || {}, o: {id},
+                            esc});
+const primaP2P = [anello('o1'), valuta(CHIAMATE['chi ha pubblicato'], {f: {}, id: 'o1'}),
+                  valuta(CHIAMATE['fila in vetrina'], {f: {}, o: {id: 'o2'}})];
+out.p2pPrima = primaP2P.map(faccia);
+monta(primaP2P.join(''));
+prendiFacceP2P({o1: {nome: 'Ada', avatar: 'av_a.jpg', negozio: 'ab12cd34'}}, ['o1', 'o2']);
+out.p2pDopo = NODI.map(n => [n.getAttribute('data-volto'), n.innerHTML, n.classi()]);
+/* un «non lo conosco» arrivato dopo (una fotografia senza quell'id) non
+   toglie un volto saputo: chi il server conosce non diventa mai «?» */
+prendiFacceP2P({}, ['o1']);
+out.p2pResta = faccia(anello('o1'));
+/* la card d'esempio del giro guidato si porta il volto, senza chiave */
+out.esempio = faccia(valuta(CHIAMATE['card del libro'], {f: {nome: 'Esempio', voti: 24},
+                             o: {id: 'x', faccia: {nome: 'Esempio'}}}));
+process.stdout.write(JSON.stringify(out));
+""")
+    cart = _tf.mkdtemp(prefix="volto_unico_")
+    pth = os.path.join(cart, "volto_unico.js")
+    open(pth, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, pth], capture_output=True, text=True, timeout=60, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco del volto unico gira in node", "", (r.stderr or "")[-700:])
+    if r.returncode or not r.stdout.strip():
+        return
+    o = json.loads(r.stdout.strip())
+    SAGOMA = '<span class="volto-sagoma" aria-hidden="true"></span>'
+    FOTO = lambda n: f'<img class="av-foto" src="/foto/{n}" alt="" onerror="this.remove()">'
+
+    # --- il blocco ---
+    prova("l'iniziale: la prima lettera maiuscola, le emoji intere, e il trattino non e' un nome",
+          ["M", "A", "🔥", "É", "", "", "", ""], o["iniziali"])
+    prova("I TRE GRADINI: foto sopra l'iniziale; la SAGOMA finche' non si sa; il «?» solo "
+          "per chi e' davvero sconosciuto",
+          ['<span class="avatar">' + FOTO("av_a.jpg") + 'A</span>',
+           '<span class="avatar volto-attesa">' + SAGOMA + '</span>',
+           '<span class="avatar volto-ignoto">?</span>',
+           '<div class="fb-faccia volto-ignoto">?</div>'], o["tre"])
+    prova("la cache: niente di nuovo = niente ridisegno; un «non so» dopo non cancella il nome; "
+          "«nessuna foto» toglie la foto; il nome nuovo vince",
+          [False, False, "Ada", False, True, "", True, "Bea"], o["cambio"])
+    prova("la chiave passa dal suo alfabeto: niente esce dall'attributo", True,
+          'data-volto="p2p:ascript"' in o["chiaveVeleno"] and "<script" not in o["chiaveVeleno"])
+    prova("IL VOLTO ARRIVATO IN RITARDO SI RISCRIVE DA SOLO dov'e' gia' disegnato, e solo "
+          "con la sua chiave",
+          [[FOTO("g.jpg") + "G", "p2p-faccia"], ["(com'era)", "p2p-faccia volto-attesa"]],
+          o["ridisegno"])
+    prova("...e se non cambia niente non tocca il DOM", "(fermo)", o["fermo"])
+
+    # --- ogni posto ---
+    ps = o["posti"]
+    prova("CLASSIFICA: il nome noto da' l'iniziale, con la chiave del negozio; il «—» del "
+          "server (nessun nome) il «?»",
+          [{"classe": "avatar", "chiave": "n:ab12", "dentro": "A"},
+           {"classe": "avatar volto-ignoto", "chiave": "n:zz99", "dentro": "?"}], ps["classifica"])
+    prova("NEGOZIO (la testata): foto e iniziale; senza nome dal server il «?»",
+          [{"classe": "avatar", "chiave": "n:bb11", "dentro": FOTO("av_b.jpg") + "B"},
+           {"classe": "avatar volto-ignoto", "chiave": "n:bb22", "dentro": "?"}], ps["negozio"])
+    prova("RECENSIONI: il francobollo di chi l'ha scritta; «Un utente» (che non c'e' piu') il «?»",
+          [{"classe": "fb-faccia", "chiave": "n:cc11", "dentro": "C"},
+           {"classe": "fb-faccia volto-ignoto", "chiave": "", "dentro": "?"}], ps["recensioni"])
+    prova("RIQUADRO VENDITORE del dettaglio: l'iniziale del venditore; il «—» il «?»",
+          [{"classe": "avatar", "chiave": "n:dd11", "dentro": "D"},
+           {"classe": "avatar volto-ignoto", "chiave": "", "dentro": "?"}], ps["riquadro venditore"])
+    prova("ACCOUNT APERTI: senza nome vale lo username, mai il «?»",
+          [{"classe": "avatar", "chiave": "n:ff11", "dentro": "F"}], ps["account"])
+    prova("CARD DELL'ALTRA PARTE (scambio P2P): il volto del server; senza nome il «?»",
+          [{"classe": "avatar", "chiave": "n:ii11", "dentro": "I"},
+           {"classe": "avatar volto-ignoto", "chiave": "n:ii22", "dentro": "?"}],
+          ps["card dell'altra parte"])
+    prova("...e nella card di un ORDINE il volto e' della persona, non la «I» di «Il venditore»: "
+          "senza volto dal server il «?», nel demo la sagoma",
+          [[{"classe": "avatar", "chiave": "n:ll11", "dentro": "L"},
+            {"classe": "avatar volto-ignoto", "chiave": "", "dentro": "?"}],
+           {"classe": "avatar volto-attesa", "chiave": "", "dentro": SAGOMA}],
+          [o["ordine"], o["ordineDemo"]])
+    prova("PROFILO: prima che /api/me risponda la sagoma (mai «?», mai la «T» di «Tu»), e il "
+          "tappo resta senza lettera",
+          [{"classe": "avatar volto-attesa", "chiave": "io", "dentro": SAGOMA}, ""],
+          o["profiloPrima"])
+    prova("...e quando il nome arriva la testata gia' disegnata si riscrive da sola, col tappo",
+          [[[FOTO("av_e.jpg") + "E", "avatar"]], "E"], o["profiloDopo"])
+    prova("P2P, IN ATTESA: card del libro, «Chi ha pubblicato» e fila in vetrina con la "
+          "sagoma e la chiave dell'ordine",
+          [{"classe": "p2p-faccia volto-attesa", "chiave": "p2p:o1", "dentro": SAGOMA},
+           {"classe": "p2p-rep-volto volto-attesa", "chiave": "p2p:o1", "dentro": SAGOMA},
+           {"classe": "p2p-vt-volto volto-attesa", "chiave": "p2p:o2", "dentro": SAGOMA}],
+          o["p2pPrima"])
+    prova("...la risposta del server riscrive sul posto: il volto per chi conosce, il «?» per "
+          "chi non conosce",
+          [["p2p:o1", FOTO("av_a.jpg") + "A", "p2p-faccia"],
+           ["p2p:o1", FOTO("av_a.jpg") + "A", "p2p-rep-volto"],
+           ["p2p:o2", "?", "p2p-vt-volto volto-ignoto"]], o["p2pDopo"])
+    prova("...e un «non lo conosco» arrivato dopo non toglie il volto a chi il server conosce",
+          "A", o["p2pResta"].get("dentro", "")[-1:])
+    prova("...la card d'esempio del giro guidato si porta il suo volto, senza chiave", ["", "E"],
+          [o["esempio"].get("chiave"), o["esempio"].get("dentro")])
 
 
 def prove_schermo_segue_mostro():
@@ -107854,7 +108247,7 @@ def main():
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullati_ritocchi, prove_card_annullati,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullati_ritocchi, prove_card_annullati,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,

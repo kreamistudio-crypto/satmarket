@@ -35422,3 +35422,60 @@ fermo E scrittura diretta caduta) l'avviso non lo direbbe — la difesa
 e' la riga `📖 [p2p] libro:` della console e il conto per relay nel
 journal, come prima. Il libro resta comunque l'UNIONE di tutti quelli
 che rispondono.
+
+## Il volto unico: il «?» solo per chi e' davvero sconosciuto (28 set 2026)
+
+Difetto ricorrente trovato da Andrea: il «?» al posto della foto o
+dell'iniziale di una persona, curato ogni volta in UN posto (card del
+libro, fila in vetrina, ordine appena pubblicato) e ricomparso nel
+profilo. LA CAUSA ERA UNA: ogni posto disegnava il volto da se' —
+`avatarImg` piu' un'iniziale a mano — col suo ripiego («?», «—», la «T»
+di «Tu», la «I» di «Il venditore»).
+
+IL CENSIMENTO (da dove nome e foto, e quando si resta senza). Mercatino,
+tutto dalla stessa risposta del server che disegna il posto: classifica
+(`/api/classifica`, nome «—» se manca la riga), testata del negozio e
+recensioni (`/api/negozio`: `venditore`, `da_nome`/`da_avatar`; vuoto
+solo per un autore sparito), riquadro venditore del dettaglio (l'annuncio:
+`venditore`, «—» se manca), account aperti (portachiavi: nome o
+username), card dell'altra parte in un ordine (`volto_*` di
+`/api/orders`, assente solo se la persona non c'e' piu'). Chi guarda:
+Profilo e tappo da `/api/me` — PRIMA della risposta erano la «T» di «Tu».
+P2P, in ritardo per costruzione: anello del libro, «Chi ha pubblicato» e
+fila in vetrina da `/api/p2p/facce` e dalle fotografie di
+`/api/p2p/libro` (solo con sessione), per ORDINE; l'ordine appena mio dal
+profilo (`voltoMioP2P`); la card dell'altra parte da
+`/api/p2p/controparte` (prima c'e' la riga «non sappiamo niente», non un
+volto). Senza volto restano: chi guarda senza sessione (per regola), gli
+ordini di altri client, la finestra fra pubblicazione e intestazione.
+
+LA CURA: `voltoHTML` + `cacheVolti` (vedi ARCHITETTURA, «IL VOLTO
+UNICO»): foto/iniziale, SAGOMA mentre non si sa (mai il buco vuoto,
+bocciato il 17 set, e mai il «?» di attesa), «?» solo dopo un «non lo
+conosco» del server; `data-volto` sui dieci posti e il ridisegno sul posto
+all'arrivo. Il «?» dalle fotografie si da' solo con `miei` nella
+risposta: senza, il server puo' non aver riconosciuto chi guarda, e
+sarebbe un «?» su ogni card.
+
+PROVATO: `prove_volto_unico` (30) — il censimento come sentinella (dieci
+chiamate, una per posto, `avatarImg` solo nel blocco, nessuna iniziale a
+mano), il blocco in node con un DOM di cartone, e per ogni posto la sua
+chiamata VERA ritagliata dal file coi dati di quel posto: nome noto →
+iniziale, nessuna risposta → sagoma, risposta senza nome → «?», e l'arrivo
+in ritardo che riscrive profilo, libro, riquadro e fila gia' disegnati.
+Emendate col perche' le prove che aspettavano il «?» in attesa
+(`prove_p2p_libro`, `prove_card_p2p_vetrina`) e la «g» minuscola, piu' i
+banchi che disegnano un volto (`volto_unico_js`). Tortura 16 su 16 (una
+sopravvissuta al primo giro: il dettaglio che chiama il riquadro senza la
+chiave dell'ordine — ora ha la sua sentinella). Dal vivo via CDP a 375 px
+nei due temi, server della copia con relay morto: profilo in sagoma e poi
+«C» senza ridisegnare la pagina, libro con la risposta dei volti
+trattenuta (tre sagome) e poi foto, «A» e «?» per l'ordine sconosciuto,
+fila che passa da tre sagome agli stessi tre volti, negozio e dettaglio
+con la foto; nessun errore, nessuno scorrimento laterale.
+
+DA AVERE: il telefono, sul profilo dove Andrea ha visto il «?». Dal
+codice non si ricava QUALE posto fosse (nessuno scriveva il «?» su un
+nome che il server manda: era sempre un volto non ancora arrivato o una
+pagina che ne aveva uno vuoto in mano), e adesso lo dice il segno: la
+sagoma e' un'attesa, il «?» un «non lo conosco» del server.
