@@ -42011,9 +42011,13 @@ def prove_scoprire():
     # in attesa di un asset educa a non guardarla).
     # nome del file -> titolo che l'app ci scrive sopra: serve alla
     # fascia del contrasto qui sotto, che si deriva dal titolo
+    # ⚠️ IL P2P NON C'E' PIU' (30 set 2026): la sua card e' diventata la
+    # «P2P in arrivo», che il titolo dell'app non lo scrive — scrive la
+    # scritta del lancio su un velo suo (`lancio`), e il suo contrasto lo
+    # prova la sezione 6bis, derivato dal CSS. Il suo FILE resta sorvegliato
+    # qui sotto con le sorelle (`FILE_CARD`): esiste e regge le due misure.
     BANNER = {"lampo.webp": "Offerte a tempo",
-              "sconto.webp": "Sconti dei negozi",
-              "p2p.webp": "P2P"}
+              "sconto.webp": "Sconti dei negozi"}
     # ...E L'ELENCO SI DERIVA DAL CATALOGO invece di essere ricordato
     # (ago 2026, col primo spazio in vetrina): la fascia si misura per
     # le card su cui l'APP scrive il titolo, e lo spazio in vetrina non
@@ -42028,7 +42032,12 @@ def prove_scoprire():
     _cat = _cat[:_cat.index("\n];")]
     _voci = re.split(r"\n  \{id: ", _cat)[1:]
     _senza = {re.match(r"'([a-z0-9]+)'", v).group(1) + ".webp"
-              for v in _voci if "titoloDentro" not in v}
+              for v in _voci
+              if "titoloDentro" not in v and "lancio: true" not in v}
+    # ...e i FILE da misurare sono quelli di TUTTE le voci del catalogo:
+    # chi non porta il titolo dell'app porta comunque un banner
+    FILE_CARD = {re.match(r"'([a-z0-9]+)'", v).group(1) + ".webp"
+                 for v in _voci}
     prova("la fascia si misura per le card che l'app titola",
           set(), _senza ^ set(BANNER))
     # LA MISURA DELLA CARD SI LEGGE DAL CSS, e non si ribatte qui: e'
@@ -42047,7 +42056,7 @@ def prove_scoprire():
     # sarebbero tagliati su un rapporto che la card non ha
     prova("...e il rapporto combacia con la larghezza",
           CARD_W, int(_mis.group(2)))
-    for _f in BANNER:
+    for _f in sorted(FILE_CARD):
         prova(f"il banner {_f} esiste", True,
               os.path.exists(os.path.join("assets", "scoprire", _f)))
     # ...e sono abbastanza grandi PER IL CRITERIO e non per un numero
@@ -42073,7 +42082,7 @@ def prove_scoprire():
         _webW = re.search(r"html\.fuori-telegram \.scoprire-card\{"
                           r"width:(\d+)px\}", mini)
         _minW = max(CARD_W * 3, int(_webW.group(1)) * 2 if _webW else 0)
-        for _f in BANNER:
+        for _f in sorted(FILE_CARD):
             _w, _h = _Im.open(os.path.join("assets", "scoprire", _f)).size
             prova("...e %s regge 3x sul mobile e 2x sul web" % _f,
                   (True, True),
@@ -42317,8 +42326,17 @@ def prove_scoprire():
     prova("la card del P2P e' la prima della fila", True,
           0 <= _cat.find("{id: 'p2p',") < _cat.find("{id: 'lampo',")
           < _cat.find("{id: 'sconto',"))
+    # ⚠️ DAL 30 SET 2026 PASSA DA toccaLancioP2P e non da vaiP2P: la card
+    # «P2P in arrivo» porta al coming soon ANCHE chi prova gia' il P2P
+    # (la card annuncia, non apre), e solo a P2P aperto a tutti prende la
+    # strada del tasto. Il comportamento lo prova il banco qui sotto.
     prova("...e il suo tocco porta al «coming soon»", True,
-          "tocca: () => vaiP2P()" in _cat)
+          "tocca: () => toccaLancioP2P()" in _cat)
+    _tl = pezzo_js(mini, "function toccaLancioP2P(){", "\n}")
+    prova("...che a P2P aperto e' la strada del tasto, sennò il coming soon",
+          (True, True),
+          ("if (l && l.stato === 'ora') { vaiP2P(); return; }" in _tl,
+           "go('p2ppresto');" in _tl))
     # RESTA SEMPRE, ANCHE A CHI HA GIA' VOTATO (ago 2026, decisione
     # di Andrea che ROVESCIA la sparizione della nascita: la sezione
     # P2P si tiene in vista). La prova CAMBIA LATO col perche'
@@ -42326,8 +42344,13 @@ def prove_scoprire():
     # cantiere toglie. Il titolo dice il NOME e mai «Avvisami», quindi
     # a chi ha gia' votato non ripete nessun invito, e la pagina dove
     # porta ha il conteggio, che dopo il voto e' la cosa interessante.
-    prova("resta anche a chi ha gia' votato", True,
-          "vivo: () => true," in _cat)
+    # ⚠️ DAL 30 SET 2026 NON E' PIU' `() => true`: la card vive finche' il
+    # SERVER dice che c'e' (`p2p_arrivo` della busta). Resta pero' vero
+    # quel che questa prova sorveglia — il voto non la tocca: il suo
+    # giudice guarda la sola busta, mai `interessiMiei`.
+    prova("resta anche a chi ha gia' votato", (True, False),
+          ("vivo: () => !!lancioP2P()," in _cat,
+           "interessi" in pezzo_js(mini, "function lancioP2P(){", "\n}")))
     # ...E IL FLAG DEL «LO SO GIA'» NON C'E' PIU': esisteva per il solo
     # lampo di questa card (senza, comparendo e sparendo ~300ms dopo a
     # chi aveva gia' votato), e da quando la card non dipende dal voto
@@ -42533,13 +42556,13 @@ def prove_scoprire():
     # riga qui sotto continua a chiedere che nessun'altra card
     # sposti il suo titolo. Chi ne aggiungesse una TERZA (una terza
     # misura? un ripensamento sul mobile?) viene a leggere qui.
-    prova("il titolo del P2P ha la sua regola, e solo lui", (True, 2),
-          ('.scoprire-card[data-id="p2p"] .sc-titolo{'
-           'left:30px;font-size:20px}' in mini,
-           mini.count('data-id="p2p"] .sc-titolo{')))
-    prova("...e nessun'altra card sposta il suo titolo", 0,
+    # ⚠️ LA DEROGA DEL P2P SE N'E' ANDATA COL SUO TITOLO (30 set 2026):
+    # la card «P2P in arrivo» il titolo dell'app non lo porta piu', e le
+    # due regole (mobile e web) che lo spostavano sarebbero morte. ZERO, e
+    # nessun'altra card sposta il suo titolo.
+    prova("nessuna card sposta il suo titolo", 0,
           sum(mini.count('data-id="%s"] .sc-titolo{' % _i)
-              for _i in ("lampo", "sconto")))
+              for _i in ("p2p", "lampo", "sconto")))
     # ...e la fascia del contrasto LEGGE quell'override, o
     # continuerebbe a sorvegliare dove il titolo stava ieri: e' la
     # riga che tiene vera la prova del contrasto qui sotto (torturata
@@ -42735,12 +42758,103 @@ def prove_scoprire():
                       (_lc + .05) / (_lmax + .05) >= 4.5)
     except ImportError:
         salta("contrasto del titolo: serve Pillow")
+
+    # ---- 6bis. LA SCRITTA DEL LANCIO (30 set 2026, card «P2P in
+    # arrivo»): tre righe su un VELO del colore del fondo del disegno,
+    # pieno fino a un punto e poi sfumato. Il contrasto si DERIVA dai
+    # numeri del CSS, che e' dove vive la garanzia: A RIPOSO il blocco
+    # lascia alle righe una larghezza (card meno i due padding) che
+    # finisce dentro la parte PIENA, quindi e' crema e oro su un colore
+    # pieno qualunque cosa ci sia sotto. AL PICCO DEL BATTITO la data
+    # cresce verso destra (transform-origin a sinistra) e il suo 10% in
+    # piu' entra nella sfumatura: li' si misura sul FILE vero, composto
+    # col velo alla sua trasparenza e col disegno spostato del suo left.
+    # Tutto in em del blocco, come il CSS: la card e' larga 272/16 em.
+    _lb = _blocco("\n  .sc-lancio{")
+    _corpoL = _num(_lb, "font-size:")
+    _pad = re.search(r"padding:0 ([\d.]+)em 0 ([\d.]+)em", _lb)
+    _vel = re.search(r"linear-gradient\(90deg,#([0-9A-Fa-f]{6}) ([\d.]+)em,"
+                     r"rgba\((\d+),(\d+),(\d+),0\) ([\d.]+)em\)", _lb)
+    prova("la scritta del lancio dichiara corpo, padding e velo", True,
+          bool(_corpoL and _pad and _vel))
+    _pr, _pl = float(_pad.group(1)), float(_pad.group(2))
+    _pieno, _zero = float(_vel.group(2)), float(_vel.group(6))
+    _fondoV = tuple(int(_vel.group(1)[i:i + 2], 16) for i in (0, 2, 4))
+    prova("...e il velo sfuma verso lo STESSO colore del suo pieno", True,
+          _fondoV == tuple(int(_vel.group(i)) for i in (3, 4, 5)))
+    _dx = CARD_W / _corpoL - _pr          # dove finiscono le righe, in em
+    prova("a riposo le righe finiscono dentro la parte piena del velo",
+          True, _pl < _dx <= _pieno)
+
+    def _hex(sel):
+        _c = re.search(r"color:#([0-9A-Fa-f]{6})", _blocco(sel)).group(1)
+        return tuple(int(_c[i:i + 2], 16) for i in (0, 2, 4))
+
+    def _lumL(px):
+        def _c(v):
+            v /= 255
+            return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+        return .2126 * _c(px[0]) + .7152 * _c(px[1]) + .0722 * _c(px[2])
+
+    _colori = {"sigla": _hex("\n  .sc-l-pre{"),
+               "frase": _hex("\n  .sc-l-riga{"),
+               "data": _hex("\n  .sc-l-boom{")}
+    for _chi, _col in _colori.items():
+        prova("...e la %s regge sul velo pieno" % _chi, True,
+              (_lumL(_col) + .05) / (_lumL(_fondoV) + .05) >= 4.5)
+    # IL PICCO: la scala piu' grande del battito, letta dai keyframes
+    _kb = mini[mini.index("@keyframes sc-battito{"):]
+    _kb = _kb[:_kb.index("\n  }")]
+    _picco = max(float(x) for x in re.findall(r"scale\(([\d.]+)\)", _kb))
+    prova("il battito ingrandisce la data, e poco", True, 1 < _picco <= 1.15)
+    prova("...crescendo verso destra, dal suo bordo sinistro", True,
+          "transform-origin:left center" in _blocco("\n  .sc-l-boom{"))
+    _sposta = re.search(r'\.scoprire-card\[data-id="p2p"\] img\{left:'
+                        r'([\d.]+)%\}', mini)
+    prova("il disegno del P2P scivola a destra di una quota dichiarata",
+          True, bool(_sposta))
+    try:
+        from PIL import Image as _Im
+        _im = _Im.open(os.path.join("assets", "scoprire", "p2p.webp")
+                       ).convert("RGB")
+        _F = _im.size[0] / CARD_W
+        _x0 = _pieno * _corpoL                         # px CSS
+        _x1 = (_pl + (_dx - _pl) * _picco) * _corpoL
+        _off = CARD_W * float(_sposta.group(1)) / 100
+        _peggio = 0
+        for _x in range(int(_x0), int(_x1) + 1):
+            _a = max(0.0, min(1.0, (_zero * _corpoL - _x)
+                              / ((_zero - _pieno) * _corpoL)))
+            for _y in range(0, CARD_H, 1):
+                _ix = int((_x - _off) * _F)
+                _px = (_fondoV if _ix < 0 else
+                       _im.getpixel((min(_ix, _im.size[0] - 1),
+                                     min(int(_y * _F), _im.size[1] - 1))))
+                _mix = tuple(_a * f + (1 - _a) * q
+                             for f, q in zip(_fondoV, _px))
+                _peggio = max(_peggio, _lumL(_mix))
+        prova("al picco del battito la data regge anche sulla sfumatura",
+              True, (_lumL(_colori["data"]) + .05) / (_peggio + .05) >= 4.5)
+    except ImportError:
+        salta("contrasto della scritta del lancio: serve Pillow")
     # lo spegnimento deve VINCERE per specificita': col selettore nudo
     # perdeva contro [data-id="lampo"] img e i disegni si muovevano
     # anche in reduced-motion — la sentinella diceva che la regola
     # c'era, il giro CDP ha detto che non vinceva mai
     prova("...e reduced-motion spegne il disegno (e VINCE)", True,
           ".scoprire-card[data-id] img{animation:none}" in mini)
+    # ...e il battito della data della card «P2P in arrivo» (30 set 2026).
+    # La sua regola sta PIU' GIU' nel foglio del blocco reduce, quindi a
+    # parita' di specificita' vincerebbe lei: lo spegnimento deve pesare
+    # DI PIU' (quattro classi contro tre), non solo esserci.
+    _red = mini[mini.index("@media (prefers-reduced-motion:reduce){\n"
+                           "    .scoprire-card[data-id] img{animation:none}"):]
+    _red = _red[:_red.index("}}") + 2]
+    prova("...e spegne il battito della data, pesando di piu'",
+          (True, True),
+          (".scoprire-card .sc-lancio[class] .sc-l-boom{animation:none}"
+           in _red,
+           mini.index(_red) < mini.index(".sc-lancio.fx-battito .sc-l-boom{")))
 
 
 def prove_scoprire_p2p(mini=None, node=None):
@@ -42784,6 +42898,8 @@ def prove_scoprire_p2p(mini=None, node=None):
              + _fetta("const RACCONTI = {", "\n};")
              + _fetta("const SCOPRIRE = [", "\n];")
              + "\n" + _fetta("function vociSponsor(){", "\n}") + "\n"
+             + _fetta("function lancioP2P(){", "\n}") + "\n"
+             + _fetta("function toccaLancioP2P(){", "\n}") + "\n"
              + _fetta("const vociScoprire = ", ";\n")
              + "\nlet scoprireFirma = '';\n"
              + _fetta("function renderScoprire(){", "\n}") + "\n"
@@ -42832,6 +42948,10 @@ function renderGrid(){ scritte.push('renderGrid'); }
 function loadListings(){ scritte.push('loadListings');
   return Promise.resolve(); }
 function vaiP2P(){ scritte.push('vaiP2P'); }
+function go(v){ scritte.push('go:' + v); }
+/* LA CARD «P2P IN ARRIVO» (30 set 2026): lo stato che manda la busta.
+   Si parte da quello di questi giorni, e il banco lo muove. */
+let p2pArrivo = {stato: 'arrivo', fino: '2026-10-10'};
 /* MUTO apposta: questo banco prova il DISPATCH del tocco, e la
    sequenza delle scritte e' quel che confronta — le frecce
    hanno la loro prova, qui sarebbero rumore in mezzo ai gesti. */
@@ -42871,7 +42991,9 @@ dice("...e non porta l aria-pressed dell interruttore", false,
 
 scritte = [];
 toccaScoperta('p2p');
-dice('il suo tocco porta al coming soon', ['vaiP2P'], scritte);
+// ⚠️ DAL 30 SET 2026 NON PASSA DA vaiP2P: la card annuncia, e porta al
+// coming soon anche chi il P2P lo prova gia' (vaiP2P lo aprirebbe)
+dice('il suo tocco porta al coming soon', ['go:p2ppresto'], scritte);
 dice('...e non sfiora nessun filtro', [false, false],
      [filtroLampo, filtroSconto]);
 
@@ -42897,7 +43019,7 @@ dice('...e senza occasioni resta lei sola', ['p2p'], idCard());
 // IL PREZZO DICHIARATO: con una card fissa la sezione non puo' piu'
 // sparire — il display:none era la proprieta' piu' forte del blocco,
 // e questa riga e' il posto dove il suo prezzo si vede.
-dice('...e la sezione non sparisce piu', '',
+dice('...e la sezione resta, per lei', '',
      nodi['scoprireSez'].style.display);
 
 vistaBarattolo = true;
@@ -42946,8 +43068,10 @@ dice('...e con lo slug ma senza codice negozio nemmeno',
 const codiceCard = codiceVero || 'ab12cd34';
 RACCONTI['to-the-moon'].negozio = codiceCard;
 rifai();
-dice('col codice e la prima della fila',
-     ['sponsor-to-the-moon','p2p','lampo','sconto'], idCard());
+// ⚠️ DAL 30 SET 2026 E' LA SECONDA: davanti c'e' la card «P2P in
+// arrivo», che non entra nell'ordine degli spazi
+dice('col codice e la prima degli spazi, dietro la card P2P',
+     ['p2p','sponsor-to-the-moon','lampo','sconto'], idCard());
 
 const cardDi = id => nodi['scoprireStrip'].innerHTML
   .split('data-id="' + id + '"')[1].split('</div>')[0];
@@ -42991,8 +43115,8 @@ const utpt = {slug: 'un-tempo-per-te', titolo: 'Un tempo per te',
               emoji: '🌱', negozio: 'cd34ef56'};
 sponsorizzati = [utpt, {slug: 'to-the-moon'}];
 rifai();
-dice('due spazi: due card in testa, nell ordine della busta',
-     ['sponsor-un-tempo-per-te','sponsor-to-the-moon','p2p','lampo','sconto'],
+dice('due spazi: due card dietro la P2P, nell ordine della busta',
+     ['p2p','sponsor-un-tempo-per-te','sponsor-to-the-moon','lampo','sconto'],
      idCard());
 const cardU = cardDi('sponsor-un-tempo-per-te');
 dice('...e la pagina del server ha lo stesso aspetto: banner, pastiglia, niente titolo dell app',
@@ -43014,7 +43138,7 @@ dice('...e quello dell altra al suo, col suo slug',
 sponsorizzati = [{slug: 'to-the-moon'}, utpt];
 rifai();
 dice('l ordine rovesciato nella busta rovescia le card',
-     ['sponsor-to-the-moon','sponsor-un-tempo-per-te','p2p','lampo','sconto'],
+     ['p2p','sponsor-to-the-moon','sponsor-un-tempo-per-te','lampo','sconto'],
      idCard());
 
 // LA SCADENZA DI UNO NON TOCCA L'ALTRO: il server smette di mandare
@@ -43022,7 +43146,7 @@ dice('l ordine rovesciato nella busta rovescia le card',
 sponsorizzati = [utpt];
 rifai();
 dice('scaduto To The Mooon resta Un tempo per te',
-     ['sponsor-un-tempo-per-te','p2p','lampo','sconto'], idCard());
+     ['p2p','sponsor-un-tempo-per-te','lampo','sconto'], idCard());
 
 // FAIL-CLOSED PER VOCE: una pagina senza codice non nasce, e le altre
 // restano; uno slug fuori forma nemmeno; un doppione conta una volta.
@@ -43031,7 +43155,7 @@ sponsorizzati = [{slug: 'un-tempo-per-te', titolo: 'X', negozio: ''},
                  {slug: 'to-the-moon'}];
 rifai();
 dice('una voce senza codice o fuori forma non nasce, e le altre restano',
-     ['sponsor-to-the-moon','p2p','lampo','sconto'], idCard());
+     ['p2p','sponsor-to-the-moon','lampo','sconto'], idCard());
 
 // IL TITOLO DAL SERVER PASSA DA esc(): niente di un catalogo entra nudo
 sponsorizzati = [{slug: 'un-tempo-per-te', titolo: 'A <b>"B"</b>',
@@ -43049,7 +43173,7 @@ sponsorizzati = [utpt, {slug: 'to-the-moon'}];
 vistaBarattolo = true;
 rifai();
 dice('col barattolo restano le card che navigano',
-     ['sponsor-un-tempo-per-te','sponsor-to-the-moon','p2p'], idCard());
+     ['p2p','sponsor-un-tempo-per-te','sponsor-to-the-moon'], idCard());
 
 // E ALLA SCADENZA SE NE VANNO DA SOLE, senza che nessuna scopa passi:
 // il server smette di mandarle, e la fila guarda quella.
@@ -43058,7 +43182,178 @@ sponsorizzati = [];
 rifai();
 dice('alla scadenza le card se ne vanno da sole',
      ['p2p','lampo','sconto'], idCard());
+
+// ---- LA CARD «P2P IN ARRIVO» (30 set 2026) ------------------------
+// La scritta la decide la BUSTA, la data si scrive dalla leva spezzando
+// la stringa (niente Date: in UTC sui fusi a ovest direbbe il 9), e il
+// tocco cambia strada solo a P2P aperto a tutti.
+const cardP = () => cardDi('p2p');
+p2pArrivo = {stato: 'arrivo', fino: '2026-10-10'};
+rifai();
+dice('fino alla data dice il giorno, grande', [true, true, true],
+     [cardP().includes('>In arrivo il<'),
+      cardP().includes('class="sc-l-boom">10/10/26<'),
+      nodi['scoprireStrip'].innerHTML.includes(
+        'aria-label="Scambio P2P: in arrivo il 10/10/26"')]);
+dice('...col battito, e senza il titolo dell app', [true, false],
+     [cardP().includes('class="sc-lancio fx-battito"'),
+      cardP().includes('class="sc-titolo"')]);
+dice('...e la riserva dice la stessa frase', true,
+     cardP().includes('<span class="sc-emoji">₿</span>Scambio P2P: in arrivo il 10/10/26'));
+
+// il cambio della busta ARRIVA a schermo: stesso id, testo diverso, e la
+// firma se ne accorge (senza il testo nella firma resterebbe la data)
+p2pArrivo = {stato: 'breve', fino: '2026-10-10'};
+renderScoprire();
+dice('data passata col P2P chiuso: «in arrivo a breve», senza la data',
+     [true, false], [cardP().includes('class="sc-l-boom lungo">a breve<'),
+                     cardP().includes('10/10/26')]);
+scritte = [];
+toccaScoperta('p2p');
+dice('...e il tocco resta al coming soon', ['go:p2ppresto'], scritte);
+
+p2pArrivo = {stato: 'ora', fino: '2026-10-10'};
+renderScoprire();
+dice('P2P aperto a tutti: «Ora disponibile»', true,
+     cardP().includes('class="sc-l-boom lungo">Ora disponibile<'));
+scritte = [];
+toccaScoperta('p2p');
+dice('...e il tocco prende la strada del tasto', ['vaiP2P'], scritte);
+
+// SENZA BUSTA NON C'E': server di ieri, DEMO, card spenta o finita
+p2pArrivo = null;
+rifai();
+dice('senza la busta la card non c e', ['lampo','sconto'], idCard());
+occasioniServer = {lampo: 0, sconto: 0};
+rifai();
+dice('...e senza niente da scoprire la sezione sparisce', 'none',
+     nodi['scoprireSez'].style.display);
+
+// FAIL-CLOSED SULLA FORMA: una data storta o uno stato sconosciuto non
+// accendono una card con una data inventata
+for (const storto of [{stato: 'arrivo', fino: '10/10/2026'},
+                      {stato: 'arrivo', fino: '2026-10-1'},
+                      {stato: 'arrivo'}, {stato: 'boh', fino: '2026-10-10'},
+                      'arrivo']) {
+  p2pArrivo = storto;
+  rifai();
+  // senza card vive la sezione si SPEGNE e la striscia non si riscrive:
+  // l'HTML li' dentro e' quello di prima, quindi si guarda il display
+  dice('una busta storta non accende la card: ' + JSON.stringify(storto),
+       'none', nodi['scoprireSez'].style.display);
+}
+// ...e un testo che arrivasse dal server passerebbe da esc()
+p2pArrivo = {stato: 'arrivo', fino: '2026-10-10'};
+occasioniServer = {lampo: 1, sconto: 1};
+rifai();
+dice('di nuovo in testa, davanti alle occasioni', ['p2p','lampo','sconto'],
+     idCard());
 """
+
+def prove_p2p_in_arrivo():
+    """LA CARD «P2P IN ARRIVO» (30 set 2026, richiesta di Andrea): la
+    prima card di «Da scoprire» dice a tutti il giorno del lancio, e il
+    giorno del lancio cambia faccia da sola.
+
+    Le cose che qui possono rompersi in silenzio: una data storta nel
+    config che accende una card con una data inventata; la card che dice
+    «ora disponibile» mentre il P2P e' aperto ai soli tester (il tocco
+    porterebbe al coming soon); la data ripetuta DOPO il giorno, cioe'
+    una promessa mancata sotto gli occhi di tutti; e la card che non se
+    ne va mai. Il giudice e la leva si fanno GIRARE, con un orologio
+    finto e un config finto."""
+    print("\n[la card «P2P in arrivo»]")
+    import types as _ty
+    src = open("server.py", encoding="utf-8").read()
+
+    # ---- 1. LA LEVA: il blocco di caricamento vero, con un config finto
+    _i = src.index("# LA CARD «P2P IN ARRIVO» (30 set 2026, richiesta di Andrea)")
+    _j = src.index("P2P_ARRIVO_CODA_GIORNI = 14", _i)
+    _carica = src[_i:_j]
+
+    def _leva(valore, manca=False):
+        _cfg = _ty.ModuleType("config")
+        if not manca:
+            _cfg.P2P_IN_ARRIVO_FINO = valore
+        _vecchio = sys.modules.get("config")
+        sys.modules["config"] = _cfg
+        try:
+            amb = {"re": re, "time": time, "print": lambda *a, **k: None}
+            exec(_carica, amb)
+            return amb["P2P_IN_ARRIVO_FINO"]
+        finally:
+            if _vecchio is None:
+                sys.modules.pop("config", None)
+            else:
+                sys.modules["config"] = _vecchio
+
+    prova("senza la riga nel config vale il default del codice, il 10/10",
+          "2026-10-10", _leva(None, manca=True))
+    prova("...e la riga del config vince", "2026-11-03", _leva("2026-11-03"))
+    prova("None e la stringa vuota spengono la card", (None, None),
+          (_leva(None), _leva("")))
+    # FAIL-CLOSED SULLA FORMA: la card confronta come STRINGA, quindi
+    # anche una data vera ma senza lo zero («2026-10-9») la spegne
+    prova("una data storta spegne la card invece di inventarne una",
+          [None] * 6,
+          [_leva(v) for v in ("10/10/2026", "2026-10-9", "2026-13-01",
+                              "2026-02-30", "domani", 20261010)])
+
+    # ---- 2. IL GIUDICE, con l'orologio e le leve finte
+    amb = {"time": time, "P2P_ARRIVO_CODA_GIORNI": 14,
+           "P2P_IN_ARRIVO_FINO": "2026-10-10", "_aperto": [False]}
+    amb["_p2p_vetrina_per"] = lambda tg: amb["_aperto"][0] if tg == 0 else True
+    exec(pezzo("_p2p_arrivo"), amb)
+    _giudice = amb["_p2p_arrivo"]
+
+    def _il(giorno, ora_=12):
+        return time.mktime(time.strptime("%s %d" % (giorno, ora_),
+                                          "%Y-%m-%d %H"))
+
+    def _stato(giorno, ora_=12):
+        r = _giudice(_il(giorno, ora_))
+        return r and r["stato"]
+
+    prova("fino alla data compresa: «arrivo»", ["arrivo"] * 3,
+          [_stato("2026-09-30"), _stato("2026-10-10", 0),
+           _stato("2026-10-10", 23)])
+    prova("...e porta la data della leva", "2026-10-10",
+          _giudice(_il("2026-10-01"))["fino"])
+    prova("data passata col P2P chiuso: «breve», per sempre", ["breve"] * 2,
+          [_stato("2026-10-11", 0), _stato("2027-03-01")])
+    # «APERTO» E' LA RISPOSTA PER L'ANONIMO, non per chi guarda: un
+    # tester vede le card in vetrina da prima del lancio, e se il giudice
+    # chiedesse per lui la card direbbe «ora» a chi non puo' entrare
+    _src_g = pezzo("_p2p_arrivo")
+    prova("«aperto» lo dice la risposta per l'anonimo", True,
+          "if _p2p_vetrina_per(0):" in _src_g)
+    amb["_aperto"][0] = True
+    prova("P2P aperto a tutti: «ora», anche prima della data",
+          ["ora"] * 3, [_stato("2026-10-08"), _stato("2026-10-10"),
+                        _stato("2026-10-20")])
+    prova("...fino a 14 giorni dopo la data compresi, poi la card se ne va",
+          ("ora", None, None),
+          (_stato("2026-10-24", 23), _stato("2026-10-25", 0),
+           _stato("2027-01-01")))
+    amb["P2P_IN_ARRIVO_FINO"] = None
+    prova("a leva spenta la card non c'e', aperto o chiuso", (None, None),
+          (_giudice(_il("2026-10-01")),
+           (amb["_aperto"].__setitem__(0, False), _giudice(_il("2026-10-01")))[1]))
+
+    # ---- 3. LE STRADE: la busta la porta, il pannello la mostra
+    _lista = src[src.index("async def lista_annunci("):
+                 src.index("async def pubblica(")]
+    prova("la busta di prima pagina porta lo stato, uguale per tutti", True,
+          'risposta["p2p_arrivo"] = _p2p_arrivo()' in _lista)
+    prova("...e il pannello delle leve mostra la data", True,
+          '_leva("Card «P2P in arrivo», data", "P2P_IN_ARRIVO_FINO",' in src)
+    _es = open("config_esempio.py", encoding="utf-8").read()
+    prova("...e il config d'esempio la dichiara col default del codice",
+          True, '\nP2P_IN_ARRIVO_FINO = "2026-10-10"' in _es)
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client la legge dalla busta, e un'assenza non e' una bugia",
+          True, "if (j.p2p_arrivo !== undefined)" in mini)
+
 
 def prove_sponsor():
     """LO SPAZIO IN VETRINA (ago 2026): un progetto compra una
@@ -46764,8 +47059,10 @@ def prove_strisce_web():
                '.sc-titolo{position:absolute;left:14px;top:0;bottom:0;'
                'width:96px',
                'font-size:17px',
-               '.scoprire-card[data-id="p2p"] .sc-titolo{'
-               'left:30px;font-size:20px}',
+               # (la deroga del titolo P2P se n'e' andata il 30 set 2026
+               # col suo titolo: al suo posto il corpo della card «P2P in
+               # arrivo», da cui dipende tutto il suo blocco in em)
+               'justify-content:center;padding:0 7.75em 0 1em;font-size:16px;',
                'font-size:11px'):
         prova("la Mini App non cambia: %s" % _r[:44], True, _r in mini)
 
@@ -46789,18 +47086,16 @@ def prove_strisce_web():
         ("left", "html.fuori-telegram .sc-titolo{", "\n  .sc-titolo{"),
         ("width", "html.fuori-telegram .sc-titolo{", "\n  .sc-titolo{"),
         ("font-size", "html.fuori-telegram .sc-titolo{", "\n  .sc-titolo{"),
-        ("left", 'html.fuori-telegram .scoprire-card[data-id="p2p"]'
-                 ' .sc-titolo{', '\n  .scoprire-card[data-id="p2p"]'
-                 ' .sc-titolo{'),
-        ("font-size", 'html.fuori-telegram .scoprire-card[data-id="p2p"]'
-                      ' .sc-titolo{', '\n  .scoprire-card[data-id="p2p"]'
-                      ' .sc-titolo{'),
+        # LA CARD «P2P IN ARRIVO» (30 set 2026): il suo blocco e' tutto
+        # in em, quindi cresce col solo corpo — che deve crescere col
+        # fattore della card, o la scritta scivolerebbe fuori dal velo
+        ("font-size", "html.fuori-telegram .sc-lancio{", "\n  .sc-lancio{"),
     ]
     for _ch, _selW, _selM in _coppie:
         _w, _m = _num(_web, _selW, _ch + ":"), _num(mini, _selM, _ch + ":")
         # tolleranza 3%: i valori sono arrotondati a numeri leggibili
         prova("il titolo cresce col fattore della card (%s%s)"
-              % (_ch, " p2p" if "p2p" in _selW else ""), True,
+              % (_ch, " lancio" if "lancio" in _selW else ""), True,
               _w is not None and abs(_w / _m - _kW) < .03 * _kW)
 
     # ---- 5. IL VETRO DEL BARATTOLO e' l'unica card il cui contenuto
@@ -113346,6 +113641,7 @@ def main():
               prove_scoprire,
         prove_strisce_web,
               prove_scoprire_p2p,
+              prove_p2p_in_arrivo,
               prove_sponsor,
               prove_numeri_negozio,
               prove_racconto_girato,

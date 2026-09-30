@@ -2858,6 +2858,47 @@
   non cambierebbe comunque. I chiamanti tornano QUATTRO, e la prova
   chiede che il voto NON sia uno di loro — che e' l'affermazione piu'
   forte delle due.
+  ⚠️ DAL 30 SET 2026 E' LA CARD «P2P IN ARRIVO» (richiesta di Andrea),
+  e tre righe qui sopra non valgono piu': il titolo «P2P» di tre
+  caratteri, la sezione che «non puo' piu' sparire» e il posto DOPO gli
+  spazi in vetrina. La card dice a TUTTI il giorno del lancio — «SCAMBIO
+  P2P / In arrivo il / 10/10/26», la data grande e d'oro che batte due
+  volte come un cuore — e sta DAVANTI anche agli spazi in vetrina: la
+  voce porta `inTesta`, e `vociScoprire` mette le voci in testa, poi gli
+  spazi nell'ordine della busta (quello di `/sponsor ordine`, che non la
+  contiene), poi le card fisse. IL TOCCO porta al «Qualcosa di nuovo e'
+  in arrivo» con «Avvisami» anche a chi prova gia' il P2P (la card
+  annuncia, non apre): solo nello stato «ora» passa da `vaiP2P`.
+  LO STATO LO DICE IL SERVER, uguale per tutti: `p2p_arrivo` della busta
+  di prima pagina, dal giudice `_p2p_arrivo` sulla leva
+  `P2P_IN_ARRIVO_FINO` (default «2026-10-10» NEL CODICE, cosi' la card
+  arriva col deploy). «arrivo» fino alla data compresa, «breve» dopo col
+  P2P chiuso (la data non si ripete: sarebbe una promessa mancata),
+  «ora» quando `_p2p_vetrina_per(0)` — la risposta per l'ANONIMO, cioe'
+  P2P acceso, `P2P_IN_VETRINA` e fase di prova vuota — e fino a
+  `P2P_ARRIVO_CODA_GIORNI` (14) dopo la data; poi None e la card se ne
+  va. Una data storta nel config la SPEGNE, e senza busta (server di
+  ieri, DEMO) la card non c'e': la sezione torna a poter sparire. La
+  data a schermo si fa spezzando la stringa, mai con un Date (in UTC
+  sui fusi a ovest direbbe il 9). La FIRMA della fila porta anche il
+  testo delle voci il cui testo e' una funzione: stesso id da «In
+  arrivo» a «Ora disponibile», e senza il testo il cambio non
+  arriverebbe a schermo.
+  LA SCRITTA NON STA NEL DISEGNO NE' NELLA SCATOLA DEL TITOLO: il ₿
+  scivola a destra del 15% e a sinistra c'e' un VELO del colore del
+  fondo del file (#1A191C), pieno fino a 9,4em e sfumato a 13,4em. Il
+  blocco `.sc-lancio` e' tutto in em dal suo corpo (16px, 30,6 sul web:
+  una regola sola per crescere) e il suo padding di destra lascia alle
+  righe 9,25em — il testo sta sul colore pieno per costruzione, e la
+  prova del contrasto lo DERIVA dal CSS; al picco del battito (scala
+  1,1 da sinistra) la data entra nella sfumatura, e li' la prova
+  compone il velo sul file vero. Misurata dal vivo: la data finisce a
+  137px su 150 di velo pieno. La deroga `.scoprire-card[data-id="p2p"]
+  .sc-titolo` (mobile e web) e' morta col titolo, ed e' tolta.
+  IL BATTITO si spegne con «Effetti ridotti» dalla regola universale, e
+  con `prefers-reduced-motion` da una regola che deve PESARE di piu'
+  (sta prima nel foglio). La variante scartata sugli scatti era una
+  lama di luce che attraversava la card.
   IN TESTA E NON IN CODA (decisione di Andrea, col costo ACCETTATO e
   misurato): a 320px si vede una card quasi piena piu' uno spicchio,
   quindi chi non scorre non vede piu' le offerte a tempo. La spinta

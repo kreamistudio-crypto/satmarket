@@ -736,6 +736,14 @@ P2P_IN_VETRINA = False
 # passo, la voce in «Info P2P» —, e il client crede solo a tutt'e due:
 # la leva E il 38385 del coordinatore. Solo True accende.
 P2P_CAUZIONE = False
+# LA CARD «P2P IN ARRIVO» (30 set 2026): la prima card di «Da scoprire»,
+# per tutti. Fino a questa data (compresa) dice «In arrivo il 10/10/26»;
+# passata la data col P2P ancora chiuso dice «in arrivo a breve»; col P2P
+# aperto a tutti (P2P_IN_VETRINA = True e P2P_PROVA_IDS vuota) dice «Ora
+# disponibile» e porta al P2P vero, e 14 giorni dopo la data se ne va.
+# Il default nel codice e' "2026-10-10" e vale anche senza questa riga.
+# None o "" = card spenta. Solo AAAA-MM-GG: una data storta la spegne.
+P2P_IN_ARRIVO_FINO = "2026-10-10"
 # LO SCONTO FEDELTA' SUL P2P (set 2026): punti percentuali IN MENO
 # sulla propria meta' per chi e' pioniere OPPURE ha il livello 5 (uno
 # sconto solo, non si sommano). ⚠️ Lo sconto vero lo applica il

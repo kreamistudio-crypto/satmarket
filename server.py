@@ -20321,6 +20321,9 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # sempre. Viaggia qui perche' e' la busta di chi sta guardando
         # la vetrina, anonimi compresi.
         risposta["p2p_vetrina"] = _p2p_vetrina_per(user["id"] if user else 0)
+        # ...e la card «P2P in arrivo» di «Da scoprire» (30 set 2026):
+        # uguale per tutti, e None quando non c'e'
+        risposta["p2p_arrivo"] = _p2p_arrivo()
     con.close()
     return risposta
 
@@ -25613,6 +25616,15 @@ def _leve_stato():
                          "P2P_PROVA_IDS le vede solo chi prova",
                   spento="le card P2P in vetrina le vedono solo i "
                          "moderatori e chi è nella fase di prova"),
+            # LA CARD «P2P IN ARRIVO» (30 set 2026): la data del lancio
+            # che la prima card di «Da scoprire» dice a tutti
+            _leva("Card «P2P in arrivo», data", "P2P_IN_ARRIVO_FINO",
+                  P2P_IN_ARRIVO_FINO or "",
+                  acceso="fino a questa data la card dice «In arrivo "
+                         "il…»; poi «in arrivo a breve»; col P2P aperto "
+                         "a tutti «Ora disponibile», per "
+                         f"{P2P_ARRIVO_CODA_GIORNI} giorni dopo la data",
+                  spento="nessuna card «P2P in arrivo» in «Da scoprire»"),
             _leva("Tetto ordini P2P (€)", "P2P_MAX_EURO", P2P_MAX_EURO,
                   acceso="il foglio Pubblica rifiuta gli importi sopra "
                          "questa cifra; il tetto in sats del "
@@ -41131,6 +41143,77 @@ def _p2p_vetrina_per(tg_id) -> bool:
     if tg and (e_admin(tg) or tg in P2P_PROVA_IDS):
         return True
     return bool(P2P_IN_VETRINA) and not P2P_PROVA_IDS
+
+
+def _p2p_arrivo(adesso=None):
+    """LA CARD «P2P IN ARRIVO» (30 set 2026): in che stato e', uguale
+    per TUTTI — None se non c'e', sennò {stato, fino}.
+
+    TRE STATI, e il terzo e' la porta del lancio:
+    - «arrivo»: fino alla data compresa. Il giorno stesso la frase «in
+      arrivo il 10/10» e' ancora vera: arriva oggi.
+    - «breve»: data passata e P2P non ancora aperto. La data NON si
+      ripete — scritta dopo il giorno sarebbe una promessa mancata sotto
+      gli occhi di tutti — e la card dice «in arrivo a breve».
+    - «ora»: il P2P e' aperto a TUTTI. Lo dice `_p2p_vetrina_per(0)`,
+      cioe' la risposta per l'ANONIMO: P2P acceso, P2P_IN_VETRINA
+      accesa e fase di prova vuota. Non la sola costante — con qualcuno
+      ancora in P2P_PROVA_IDS la card direbbe «ora disponibile» e il
+      tocco porterebbe al coming soon. Dura fino a
+      P2P_ARRIVO_CODA_GIORNI dopo la data, poi la card se ne va.
+    Il giorno e' quello del server (`time.localtime`, come ogni altra
+    data di qui): la card cambia a mezzanotte, non a un'ora precisa."""
+    if not P2P_IN_ARRIVO_FINO:
+        return None
+    ora = time.time() if adesso is None else adesso
+    oggi = time.strftime("%Y-%m-%d", time.localtime(ora))
+    if _p2p_vetrina_per(0):
+        # mezzogiorno del giorno della leva, cosi' un cambio d'ora non
+        # sposta il conto di un giorno
+        mezzodi = time.mktime(time.strptime(
+            P2P_IN_ARRIVO_FINO + " 12", "%Y-%m-%d %H"))
+        fine = time.strftime("%Y-%m-%d", time.localtime(
+            mezzodi + P2P_ARRIVO_CODA_GIORNI * 86400))
+        if oggi > fine:
+            return None
+        return {"stato": "ora", "fino": P2P_IN_ARRIVO_FINO}
+    return {"stato": "arrivo" if oggi <= P2P_IN_ARRIVO_FINO else "breve",
+            "fino": P2P_IN_ARRIVO_FINO}
+
+
+# (La leva sta DOPO il suo giudice e non prima: il giudice la legge
+# alla chiamata, e le prove che eseguono `_p2p_vetrina_per` ne
+# ritagliano il testo fino al `def` seguente — qui in mezzo ci
+# sarebbe finita anche lei, senza `re` ne' `time`.)
+# LA CARD «P2P IN ARRIVO» (30 set 2026, richiesta di Andrea): la prima
+# card di «Da scoprire», per TUTTI, dice il giorno del lancio. La data
+# e' questa leva, e la card la scrive com'e' («In arrivo il 10/10/26»):
+# spostare il lancio vuol dire cambiare questa riga, e la card segue.
+# ⚠️ IL DEFAULT STA NEL CODICE, e non e' pigrizia: la card deve
+# comparire col deploy, senza che il config del VPS debba impararla —
+# una leva nuova la' non compare da sola. None o "" = card SPENTA.
+# FAIL-CLOSED SULLA FORMA: una data storta non accende una card con una
+# data inventata, la spegne, e lo si dice all'avvio. Solo AAAA-MM-GG a
+# due cifre: la card la confronta come STRINGA col giorno di oggi, e
+# «2026-10-9» verrebbe dopo «2026-10-10».
+try:
+    from config import P2P_IN_ARRIVO_FINO
+except ImportError:
+    P2P_IN_ARRIVO_FINO = "2026-10-10"
+if P2P_IN_ARRIVO_FINO:
+    try:
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(P2P_IN_ARRIVO_FINO)):
+            raise ValueError
+        time.strptime(str(P2P_IN_ARRIVO_FINO), "%Y-%m-%d")
+    except ValueError:
+        print("[p2p] P2P_IN_ARRIVO_FINO non e' una data AAAA-MM-GG: la "
+              "card «P2P in arrivo» resta SPENTA")
+        P2P_IN_ARRIVO_FINO = None
+P2P_IN_ARRIVO_FINO = P2P_IN_ARRIVO_FINO or None
+# ...e quanti giorni dopo quella data la card «Ora disponibile» se ne
+# va da sola: la novita' e' finita, e il P2P ha il suo tasto nella barra.
+P2P_ARRIVO_CODA_GIORNI = 14
+
 
 
 def sconto_p2p_attivo() -> bool:

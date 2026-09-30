@@ -1217,7 +1217,11 @@
      non vinceva mai (ago 2026). `[data-id]` pareggia l'attributo e
      vince per ordine. */
   @media (prefers-reduced-motion:reduce){
-    .scoprire-card[data-id] img{animation:none}}
+    .scoprire-card[data-id] img{animation:none}
+    /* ...e il battito della data della card «P2P in arrivo». La sua
+       regola sta PIU' GIU' nel foglio, quindi pareggiare non basta
+       (vincerebbe l'ordine, cioe' lei): `.scoprire-card` in testa la batte */
+    .scoprire-card .sc-lancio[class] .sc-l-boom{animation:none}}
   /* Il ripiego se il banner non arriva (DEMO da file://, o il file
      non ancora disegnato): emoji + testo dell'app, crema fissa sul
      bruno del fondo — che e' scuro in tutti e due i temi. Il
@@ -1246,24 +1250,58 @@
     font-family:'Baloo 2',system-ui,sans-serif;font-size:17px;
     line-height:1.15;font-weight:800;color:#FAF4E4}
   .scoprire-card img ~ .sc-titolo{display:flex}
-  /* IL TITOLO DEL P2P STA PIU' A DESTRA E PIU' GRANDE, e SOLO il suo
-     (ago 2026, decisione di Andrea): «P2P» e' tre caratteri, e nella
-     scatola tarata su «Sconti dei negozi» si perdeva in un angolo.
-     Le sorelle non si toccano — i loro titoli quella scatola la
-     riempiono davvero, e allargarli li manderebbe a capo.
-     MISURATO PRIMA DI FISSARLO, e i numeri sono la ragione di QUESTI
-     numeri: spostare a destra fa DUE lavori, allontana dalla scia che
-     sale a destra e scavalca la sua coda in basso a sinistra (a
-     left:14 un corpo da 21 non passerebbe, a left:18 si). Il filo del
-     disegno sta a x=318 sull'immagine (816 di larghezza); qui la
-     fascia sorvegliata finisce a 282, cioe' 12px CSS di margine —
-     ed e' CRESCIUTO da quando la card e' piu' grande: erano 3px a
-     250x115, e quel «capolinea» si e' allontanato da solo, perche'
-     la fascia e' in px CSS mentre la scia si scala col disegno.
-     Chi lo sposta ancora o lo ingrandisce lo sente dalla CI — la
-     fascia del contrasto legge QUESTA regola, non piu' la sola base:
-     senza, avrebbe continuato a guardare dove il titolo stava ieri. */
-  .scoprire-card[data-id="p2p"] .sc-titolo{left:30px;font-size:20px}
+  /* LA CARD «P2P IN ARRIVO» (30 set 2026, richiesta di Andrea): la
+     scritta grande — «In arrivo il 10/10/26» — non sta nella scatola
+     del titolo (96px, tarata su «Sconti dei negozi») e non sta nella
+     zona quieta del disegno, che finisce a ~106px dove sale la scia.
+     QUINDI IL DISEGNO SCIVOLA A DESTRA E A SINISTRA C'E' UN VELO. Il ₿
+     si sposta del 15% (resta intero: finisce a 258 su 272, e le monete
+     di destra si tagliano al bordo, che dice «c'e' dell'altro»), e la
+     scritta sta su un velo del colore del fondo del disegno (#1A191C)
+     PIENO fino a 9,4em e che sfuma a niente a 13,4em — il ₿ comincia
+     li'. Il testo non esce mai dalla parte piena: il blocco e' largo
+     quanto la card (17em) e il padding di destra ne lascia alle righe
+     9,25 — oltre vanno a capo. In em DEL BLOCCO e non delle righe: un
+     tetto scritto sulla riga si misurerebbe col SUO corpo, e la data,
+     che e' 2em, ne avrebbe il doppio. Cosi' il contrasto non dipende da cosa c'e'
+     sotto — e' crema e oro su un colore pieno, per costruzione — e la
+     prova lo DERIVA da questi numeri invece di campionare un file.
+     TUTTO IN EM DAL CORPO DEL BLOCCO (16px): la variante del web ne
+     cambia uno solo, il corpo, e il resto cresce col fattore della card.
+     Colori FISSI nei due temi, come tutto cio' che vive su una foto.
+     Si mostra SOLO con l'immagine (img ~), come il titolo: sull'errore
+     parla la riserva, che porta la stessa frase. */
+  .scoprire-card[data-id="p2p"] img{left:15%}
+  .sc-lancio{position:absolute;inset:0;display:none;flex-direction:column;
+    justify-content:center;padding:0 7.75em 0 1em;font-size:16px;
+    background:linear-gradient(90deg,#1A191C 9.4em,rgba(26,25,28,0) 13.4em)}
+  .scoprire-card img ~ .sc-lancio{display:flex}
+  .sc-lancio > span{position:relative;font-weight:800}
+  .sc-l-pre{font-size:.7em;letter-spacing:.1em;text-transform:uppercase;
+    color:#FFA53D;margin-bottom:.15em}
+  .sc-l-riga{font-family:'Baloo 2',system-ui,sans-serif;font-size:1.2em;
+    line-height:1.05;color:#FAF4E4}
+  /* il botto: la data, grande e d'oro — ed e' lei che si muove */
+  .sc-l-boom{font-family:'Baloo 2',system-ui,sans-serif;font-size:2em;
+    line-height:1.05;color:#FFC94D;transform-origin:left center}
+  .sc-l-boom.lungo{font-size:1.45em}
+  /* IL BATTITO (scelto da Andrea sugli scatti, fra il battito e una
+     lama di luce che attraversava la card): la data batte due volte,
+     come un cuore, e fra un battito e l'altro riposa; a ogni colpo le si
+     accende un alone d'oro.
+     La card resta FERMA (il patto «il disegno si muove, la card no»):
+     si muove la data, mai il bersaglio. E si spegne con «Effetti
+     ridotti» senza una riga in piu': la regola universale di
+     html.fx-ridotti la porta a `none`, cioe' alla data ferma e senza
+     alone. */
+  .sc-lancio.fx-battito .sc-l-boom{
+    animation:sc-battito 2.6s ease-in-out infinite}
+  @keyframes sc-battito{
+    0%,40%,100%{transform:scale(1);text-shadow:none}
+    10%{transform:scale(1.1);text-shadow:0 0 .35em rgba(255,190,60,.75)}
+    20%{transform:scale(1);text-shadow:0 0 .15em rgba(255,190,60,.35)}
+    28%{transform:scale(1.06);text-shadow:0 0 .3em rgba(255,190,60,.6)}
+  }
   /* LA PASTIGLIA CHE DICE «e' pubblicita'» (ago 2026): sta in alto a
      DESTRA, l'angolo libero — il titolo delle sorelle vive a
      sinistra. DI CARTA, crema fissa su inchiostro: la lingua di
@@ -9055,12 +9093,9 @@
        Chi lo cresce di piu' della card sposta il titolo verso la scia
        dorata e lo sente dalla CI. */
     html.fuori-telegram .sc-titolo{left:26.8px;width:183.5px;font-size:32.5px}
-    /* il P2P tiene la sua deroga anche qui (titolo corto, piu' a
-       destra e piu' grande), scalata dello stesso fattore. Serve un
-       selettore SUO: la base desktop ha una classe in meno
-       dell'override mobile e da sola perderebbe per specificita'. */
-    html.fuori-telegram .scoprire-card[data-id="p2p"] .sc-titolo{
-      left:57.4px;font-size:38.2px}
+    /* la card «P2P in arrivo» (30 set 2026): tutto il suo blocco e' in
+       em, quindi basta il corpo — 16 per lo stesso fattore della card */
+    html.fuori-telegram .sc-lancio{font-size:30.6px}
     html.fuori-telegram .cat-cella{width:160px}
     /* col quadrato piu' grande il nome sale di un gradino: 11px sotto
        una card da 160 si legge come una didascalia dimenticata. 15 e'
@@ -14066,6 +14101,11 @@ let regioniServer = null;    // {regione: quanti} dal server, per i Filtri
    volta» era la tappa, e dai negozi in vetrina piu' d'uno insieme e'
    una lista. */
 let sponsorizzati = [];
+/* LA CARD «P2P IN ARRIVO» (30 set 2026), dalla stessa busta:
+   {stato: 'arrivo'|'breve'|'ora', fino: 'AAAA-MM-GG'} oppure null = la
+   card non c'e'. Chiave assente = server di ieri = resta quel che
+   c'era: all'avvio null, cioe' niente card e nessuna data inventata. */
+let p2pArrivo = null;
 /* LE PAGINE DEI NEGOZI CONSIGLIATI che il server dice PUBBLICATE e col
    logo (set 2026), dalla stessa busta: [{slug, titolo, emoji, negozio}].
    La scrive SOLO loadListings, e sempre per intero — una lista che non
@@ -14432,6 +14472,10 @@ async function loadListings(anonimo){
   if (j.p2p && typeof j.p2p === 'object') p2pLevaPubblica = j.p2p;
   /* ...e le card P2P in vetrina (26 set 2026): le decide il server */
   if (j.p2p_vetrina !== undefined) p2pInVetrina = j.p2p_vetrina === true;
+  /* ...e la card «P2P in arrivo» di «Da scoprire» (30 set 2026) */
+  if (j.p2p_arrivo !== undefined)
+    p2pArrivo = j.p2p_arrivo && typeof j.p2p_arrivo === 'object'
+      ? j.p2p_arrivo : null;
   if (j.totale !== undefined) vetrinaTotale = j.totale;
   if (j.conteggi) conteggiServer = j.conteggi;
   if (j.regioni) regioniServer = j.regioni;
@@ -16679,26 +16723,17 @@ const SCOPRIRE = [
      — e la pagina dove porta ha il CONTEGGIO, che a chi aspetta
      interessa proprio dopo il voto. L'invito vive DENTRO, dove il
      bottone diventa «✓ Ti avviseremo» da solo.
-     A CHI HA VOTATO NON MOSTRA NIENTE DI DIVERSO, e non e' una
-     rinuncia: il titolo e' l'unico posto dove questa card parla, e li'
-     non entra un carattere di piu' — la fascia del contrasto finisce
-     a 282 sui 318 dove comincia la scia dorata, quindi il capolinea
-     sono i TRE caratteri di «P2P». Il quarto porta la fascia a 342 e
-     la CI diventa rossa; «✓ Ti avviseremo» va a capo in una scatola
-     da 96px e arriva a 390. E l'aria-label resta il NOME per la
-     ragione per cui lo e' a schermo: il nome di un comando che cambia
-     con uno stato invisibile agli altri non e' piu' un nome.
+     A CHI HA VOTATO NON MOSTRA NIENTE DI DIVERSO: il nome di un
+     comando che cambia con uno stato invisibile agli altri non e' piu'
+     un nome. (La data invece cambia, ma e' la STESSA per tutti.)
      IN TESTA e non in coda (decisione di Andrea, col costo accettato
      e MISURATO): a 320px si vede una card quasi piena piu' uno
      spicchio, quindi chi non scorre non vede piu' le offerte a tempo.
      Quel costo era temporaneo finche' la card si toglieva da sola; da
      quando resta e' PERMANENTE, ed e' stato accettato sapendolo.
-     E LA SEZIONE NON PUO' PIU' SPARIRE, che e' il secondo prezzo:
-     `display:none` era la proprieta' piu' forte di questo blocco —
-     nei giorni senza occasioni costava zero, adesso costa i suoi
-     166px. Con lei se n'e' andato il flag del «lo so gia'», che
-     esisteva per il solo lampo di questa card: il suo nome non si
-     scrive nemmeno qui, che a contarne zero c'e' una prova.
+     Con lei se n'e' andato il flag del «lo so gia'», che esisteva per
+     il solo lampo di questa card: il suo nome non si scrive nemmeno
+     qui, che a contarne zero c'e' una prova.
      SUI NUMERI, e va ricordato quando si leggeranno: dando la card al
      P2P e non alle Aste, il duello fra i due like non vale piu' — il
      P2P vince perche' e' piu' esposto, non perche' lo aspetta piu'
@@ -16706,11 +16741,27 @@ const SCOPRIRE = [
      guarda la CRESCITA ASSOLUTA del P2P.
      NIENTE anello e niente interruttore: `accesa` risponde sempre no
      — la card non si accende, si tocca e si va — e il template le
-     toglie anche l'aria-pressed. */
-  {id: 'p2p', file: 'p2p.webp', emoji: '₿', testo: 'P2P',
-   vivo: () => true,
+     toglie anche l'aria-pressed.
+     ⚠️ DAL 30 SET 2026 E' LA CARD «P2P IN ARRIVO» (richiesta di
+     Andrea): il titolo «P2P» e' diventato la scritta grande del lancio
+     — «In arrivo il 10/10/26» — e la card e' salita DAVANTI anche agli
+     spazi in vetrina (`inTesta`: la fila e' in `vociScoprire`, e
+     l'ordine che scegliamo dal bot resta quello, dietro di lei).
+     LA DATA LA DICE IL SERVER, uguale per tutti (`p2p_arrivo` della
+     busta, leva P2P_IN_ARRIVO_FINO): il client non ne inventa una, e
+     SENZA la busta — server di ieri, DEMO — la card non c'e'. Quindi
+     la sezione PUO' di nuovo sparire, quando non c'e' niente da
+     scoprire: il prezzo dei 166px sempre occupati se n'e' andato con
+     la card fissa.
+     IL TOCCO PORTA AL «COMING SOON» ANCHE A CHI PROVA IL P2P: la card
+     annuncia, e chi e' in fase di prova il P2P vero ce l'ha nella
+     barra. Solo quando il server dice «ora» (P2P aperto a TUTTI) il
+     tocco passa da vaiP2P, cioe' dalla strada del tasto. */
+  {id: 'p2p', file: 'p2p.webp', emoji: '₿', inTesta: true, lancio: true,
+   testo: () => (lancioP2P() || {}).nome || '',
+   vivo: () => !!lancioP2P(),
    accesa: () => false,
-   tocca: () => vaiP2P()},
+   tocca: () => toccaLancioP2P()},
   {id: 'lampo', file: 'lampo.webp', emoji: '⚡', testo: 'Offerte a tempo',
    vivo: () => DEMO ? listings.some(l => lampoAttiva(l))
                     : !!(occasioniServer && occasioniServer.lampo),
@@ -16778,10 +16829,48 @@ function vociSponsor(){
   });
   return fuori;
 }
-/* la fila intera: gli spazi in testa, poi le card fisse. La leggono il
-   renderer e il tocco, e nessun altro — due letture della stessa fila
-   un giorno direbbero due card diverse sotto lo stesso dito. */
-const vociScoprire = () => vociSponsor().concat(SCOPRIRE);
+/* LA CARD «P2P IN ARRIVO» (30 set 2026): cosa dice, dallo stato che
+   manda il server — null quando non c'e'. Tre righe (la sigla, la
+   frase, il botto) e il NOME intero, che e' l'aria-label e la riserva:
+   senza immagine la card deve dire la stessa cosa.
+   LA DATA SI SCRIVE DALLA LEVA, mai da un orologio di qui: «2026-10-10»
+   diventa «10/10/26» spezzando la stringa, senza Date — un Date la
+   leggerebbe in UTC e sui fusi a ovest direbbe il 9. Una data che non
+   ha quella forma non arriva a schermo: il server la spegne prima, e
+   qui la card non nasce. */
+function lancioP2P(){
+  const a = p2pArrivo;
+  if (!a || typeof a !== 'object') return null;
+  if (a.stato === 'ora')
+    return {stato: 'ora', pre: 'Scambio P2P', riga: '',
+            boom: 'Ora disponibile', lungo: true,
+            nome: 'Scambio P2P: ora disponibile'};
+  if (a.stato === 'breve')
+    return {stato: 'breve', pre: 'Scambio P2P', riga: 'In arrivo',
+            boom: 'a breve', lungo: true,
+            nome: 'Scambio P2P: in arrivo a breve'};
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(a.fino || ''));
+  if (a.stato !== 'arrivo' || !m) return null;
+  const data = m[3] + '/' + m[2] + '/' + m[1].slice(2);
+  return {stato: 'arrivo', pre: 'Scambio P2P', riga: 'In arrivo il',
+          boom: data, lungo: false,
+          nome: 'Scambio P2P: in arrivo il ' + data};
+}
+/* ...e il suo tocco: finche' non e' «ora» porta al «Qualcosa di nuovo
+   e' in arrivo» — dove si vota «Avvisami» — per TUTTI, anche per chi
+   il P2P lo prova gia' (la card annuncia, non apre). Da «ora» e' la
+   strada del tasto della barra. */
+function toccaLancioP2P(){
+  const l = lancioP2P();
+  if (l && l.stato === 'ora') { vaiP2P(); return; }
+  go('p2ppresto');
+}
+/* la fila intera: la card «P2P in arrivo» davanti a tutto (`inTesta`),
+   poi gli spazi in vetrina nell'ordine della busta, poi le card fisse.
+   La leggono il renderer e il tocco, e nessun altro — due letture della
+   stessa fila un giorno direbbero due card diverse sotto lo stesso dito. */
+const vociScoprire = () => SCOPRIRE.filter(v => v.inTesta)
+  .concat(vociSponsor(), SCOPRIRE.filter(v => !v.inTesta));
 let scoprireFirma = '';
 function renderScoprire(){
   /* Col barattolo restano le sole card che NAVIGANO (ago 2026,
@@ -16803,8 +16892,13 @@ function renderScoprire(){
   el('scoprireSez').style.display = vive.length ? '' : 'none';
   if (!vive.length) return;
   /* La firma dice quali card ci sono E quale e' accesa: si ridisegna
-     solo quando cambia qualcosa, mai mentre si guarda. */
-  const firma = vive.map(v => v.id + (v.accesa() ? '!' : '')).join('|');
+     solo quando cambia qualcosa, mai mentre si guarda.
+     ...E COSA DICE UNA CARD IL CUI TESTO E' UNA FUNZIONE (30 set 2026):
+     la card «P2P in arrivo» tiene lo stesso id da «In arrivo il…» a
+     «Ora disponibile», e senza il testo nella firma il cambio della
+     busta non arriverebbe mai a schermo. */
+  const firma = vive.map(v => v.id + (v.accesa() ? '!' : '')
+    + (typeof v.testo === 'function' ? '@' + v.testo() : '')).join('|');
   if (firma === scoprireFirma) return;
   scoprireFirma = firma;
   /* img e .sc-riserva devono restare FRATELLI ADIACENTI: il ripiego
@@ -16846,8 +16940,17 @@ function renderScoprire(){
        lo direbbe due volte. La RISERVA invece resta sempre — e' il
        ripiego di quando l'immagine non arriva, e li' un nome ci
        vuole. */
-    const titolo = v.titoloDentro ? ''
+    const titolo = (v.titoloDentro || v.lancio) ? ''
       : `<span class="sc-titolo" aria-hidden="true">${testo}</span>`;
+    /* LA SCRITTA DEL LANCIO (30 set 2026) prende il posto del titolo
+       sulla card «P2P in arrivo»: tre righe su un velo suo, e il
+       battito della data nella classe. Testi nostri, ma passano da
+       esc() lo stesso — la regola di questo template. */
+    const l = v.lancio ? lancioP2P() : null;
+    const lancio = !l ? '' : `<span class="sc-lancio fx-battito" aria-hidden="true"
+      ><span class="sc-l-pre">${esc(l.pre)}</span>${l.riga
+        ? `<span class="sc-l-riga">${esc(l.riga)}</span>` : ''
+      }<span class="sc-l-boom${l.lungo ? ' lungo' : ''}">${esc(l.boom)}</span></span>`;
     return `
     <div class="scoprire-card${v.accesa() ? ' attiva' : ''}" role="button"
          tabindex="0" data-id="${v.id}" aria-label="${testo}"${premuto}
@@ -16856,7 +16959,7 @@ function renderScoprire(){
       <img src="/assets/scoprire/${file}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
       ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${testo}</span
-      >${titolo}${pastiglia}
+      >${titolo}${lancio}${pastiglia}
     </div>`;
   }).join('');
   aggiornaFrecce('scoprireStrip');

@@ -31980,3 +31980,121 @@ il `daemon-reload`. L'esito lo dice il verbale del giro dopo.
 **DA GUARDARE.** Il primo deploy con una lettura lunga in corso: nel
 journal «⏹ Connettore … lettura fermata dallo spegnimento» e uno stop
 di pochi secondi invece di un SIGKILL.
+
+## La card «P2P in arrivo» in «Da scoprire» (30 set 2026)
+
+Richiesta di Andrea: in «Da scoprire», PRIMA di tutti i banner
+sponsorizzati, una card per lo scambio P2P con la scritta d'impatto «In
+arrivo il 10/10/26», per TUTTI (anche chi non prova il P2P), stesso
+formato delle altre; al tocco il «Qualcosa di nuovo è in arrivo» con
+«Avvisami», non il P2P vero; una data in una leva, e il giorno del
+lancio una proposta mia.
+
+**LA CARD «P2P» ESISTEVA GIÀ, E DIVENTA QUESTA.** Portava al coming
+soon col titolo «P2P», dopo gli spazi in vetrina. Due card P2P nella
+stessa fila sarebbero state un doppione: la voce `p2p` di `SCOPRIRE`
+cambia faccia e posto (`inTesta: true`), e `vociScoprire` mette le voci
+in testa, POI gli spazi nell'ordine della busta — quello che si sceglie
+dal bot con `/sponsor ordine`, già su main, che la card non la contiene
+— poi le card fisse. Il tocco (`toccaLancioP2P`) porta al coming soon
+anche chi prova già il P2P: la card annuncia, e chi prova ha il P2P nel
+tasto della barra.
+
+**LA GRAFICA.** L'immagine è quella della card di prima (il ₿ con le
+monete in euro, `assets/scoprire/p2p.webp`), spostata a destra del 15%;
+a sinistra un VELO del colore del fondo del file (#1A191C), pieno fino a
+9,4em e sfumato a 13,4em, con tre righe: «SCAMBIO P2P» in arancio, «In
+arrivo il» in crema, la data grande e d'oro. La scritta non stava né
+nella zona quieta del disegno (finisce a ~106px, dove sale la scia) né
+nella scatola del titolo (96px, tarata su «Sconti dei negozi»). Il
+blocco è tutto in em dal suo corpo: sul web cambia il solo corpo (30,6)
+e il resto cresce col fattore della card. La deroga del titolo P2P
+(mobile e web) è morta col titolo, ed è tolta.
+**DUE VARIANTI NEGLI SCATTI**, scelta di Andrea: A, IL BATTITO — la
+data batte due volte come un cuore, con un alone d'oro, e riposa (ciclo
+2,6 s, scala 1,1 da sinistra). Scartata B, IL BAGLIORE: una lama di luce
+che attraversava la card ogni 5 s dietro le parole. (Al primo scatto la
+lama aveva il bordo NETTO: un gradiente a 100° su una lama più alta che
+larga non arriva a zero agli angoli; a 90° con la diagonale fatta dallo
+skew era morbida. Tolta insieme alla variante.) Il battito si spegne
+con «Effetti ridotti» dalla regola universale, e con
+`prefers-reduced-motion` da una regola che deve PESARE di più: sta prima
+nel foglio, e a parità vincerebbe l'animazione.
+
+**IL TEMPO, LA PROPOSTA ACCETTATA.** La leva `P2P_IN_ARRIVO_FINO` vale
+«2026-10-10» NEL CODICE (la card arriva col deploy, senza toccare il
+config del VPS), None o "" la spengono, e una data che non è AAAA-MM-GG a
+due cifre la spegne col journal che lo dice — la card confronta come
+stringa, e «2026-10-9» verrebbe dopo «2026-10-10». Il giudice
+`_p2p_arrivo`, uguale per tutti, nella busta di prima pagina
+(`p2p_arrivo`): «arrivo» fino alla data compresa; «breve» se la data
+passa col P2P chiuso — «In arrivo a breve», e la data NON si ripete:
+dopo il giorno sarebbe una promessa mancata sotto gli occhi di tutti;
+«ora» — «Ora disponibile», e il tocco passa da `vaiP2P` — quando il P2P è
+aperto a TUTTI, per 14 giorni dopo la data, poi la card se ne va.
+**«APERTO A TUTTI» È `_p2p_vetrina_per(0)`**, la risposta per
+l'ANONIMO: P2P acceso, `P2P_IN_VETRINA` e `P2P_PROVA_IDS` vuota. Non la
+sola costante: con qualcuno ancora in prova la card direbbe «ora» e il
+tocco porterebbe al coming soon. Il giorno del lancio quindi non si
+tocca niente in più delle due righe già scritte in PRODUZIONE.
+**LA STRADA SCARTATA**: la card che sparisce il giorno del lancio.
+Andrea ha preferito i 14 giorni di «Ora disponibile».
+Senza la busta (server di ieri, DEMO) la card non c'è, cioè nessuna
+data inventata: e la sezione «Da scoprire» torna a poter sparire, che
+col «P2P» fisso non poteva. La data a schermo si scrive spezzando la
+stringa, mai con un Date (in UTC, sui fusi a ovest direbbe il 9).
+**LA FIRMA DELLA FILA** porta ora anche il testo delle voci il cui testo
+è una funzione: la card tiene lo stesso id da «In arrivo» a «Ora
+disponibile», e senza il testo nella firma il cambio della busta non
+sarebbe mai arrivato a schermo (lo prende la mutazione 2).
+
+**LE PROVE.** `prove_p2p_in_arrivo`, nuova (15): la leva col suo blocco
+VERO e un config finto (default, riga che vince, None, sei date
+storte), il giudice con un orologio finto sui tre stati, i confini
+(il giorno stesso, la mezzanotte dopo, il quattordicesimo giorno alle 23
+e il quindicesimo a mezzanotte), «aperto» chiesto per l'anonimo, busta,
+pannello, config d'esempio e lettore del client. In `prove_scoprire`: la
+card P2P esce dalle fasce del titolo (il suo file resta sorvegliato con
+le sorelle, per misura e rapporto), e la sezione 6bis deriva il
+contrasto dal CSS — a riposo le righe stanno sul velo pieno, e al
+picco del battito la data si misura sul file vero composto col velo.
+Emendate col perché le prove del tocco (`toccaLancioP2P`), del «resta a
+chi ha votato» (il giudice guarda la sola busta) e della deroga del
+titolo (ora zero). Il banco di `prove_scoprire_p2p`: la card davanti
+agli spazi in ogni fila, i tre stati a schermo, il tocco che cambia
+strada solo a «ora», la sezione che sparisce senza busta, cinque buste
+storte che non accendono niente. `prove_strisce_web`: il corpo del
+blocco cresce col fattore della card.
+**DUE TRAPPOLE DEL GIRO.** 1) Il banco leggeva l'HTML di una striscia
+che il renderer, senza card vive, spegne ma NON riscrive: la prova
+giusta è il display della sezione. 2) La leva caricata accanto a
+`P2P_IN_VETRINA` finiva dentro la fetta che `prove_p2p_server` e
+`prove_barattozon_mercato` eseguono (da `P2P_MAX_EURO` a «LO SCONTO
+FEDELTA'»), senza `re` né `time`: due esplosioni. Spostata PRIMA del
+giudice, è finita nella fetta di `prove_card_p2p_vetrina`, che ritaglia
+`_p2p_vetrina_per` fino al `def` seguente. Invece di allargare le loro
+fette, la leva sta DOPO il suo giudice (la legge alla chiamata), con una
+riga che dice perché.
+
+**PROVATO.** Suite intera severa senza config nel worktree ribasato su
+f899eae: 17.651 verdi e 0 rosse (17.596 al giro prima, su f3d0091); i 28 collaudi della CI verdi nella gabbia senza rete. Tortura 12 su 12 (la card fuori
+testa, la firma senza testo, il giorno stesso «breve», «aperto» chiesto
+per un tester, le righe fuori dal velo, il velo accorciato, l'anno
+intero, il tocco che apre sempre il P2P, reduced-motion che non spegne,
+la busta senza stato, il web che non cresce, la data senza zero). Dal
+vivo via CDP su una COPIA dell'albero col config da `config_esempio.py`
+(collaudo acceso, relay morto): la card prima della fila con la busta
+vera, il tocco vero che apre `view-p2ppresto` («ora»: `view-p2p`), la
+data che finisce a 137px sui 150 del velo pieno (262 su 288 sul web a
+1200), il battito `none` con reduced-motion e con «Effetti ridotti», a
+320 nessuno scorrimento laterale, nessun errore JS. Scatti a 375 nei
+due temi (fila, due varianti con una GIF per ciclo, foglio al tocco,
+tre stati) mandati ad Andrea e approvati prima del push; gli spazi e le
+occasioni della fila negli scatti erano seminati nella pagina, la card
+P2P veniva dalla busta.
+
+**DA GUARDARE.** Sul telefono il battito (lo scatto è un fotogramma,
+la GIF un ciclo: il ritmo vero si sente solo in mano). Il 10 ottobre,
+acceso il lancio, che la card dica «Ora disponibile» e porti al P2P; il
+25 ottobre che se ne sia andata. Se il lancio slitta, la riga nel
+config del VPS (PRODUZIONE, «LA CARD «P2P IN ARRIVO»»).

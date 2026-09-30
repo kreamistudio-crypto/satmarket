@@ -56,6 +56,20 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Barattolo (lo annuncia `/api/p2p/canale`, e il server rifa' la
   fotografia subito), entro un minuto e un quarto se nasce da un altro
   client di Mostro (il giro dell'orologio piu' quello della fila).
+- LA CARD «P2P IN ARRIVO» (30 set 2026): la prima card di «Da scoprire»
+  dice a tutti «In arrivo il 10/10/26». La data e' la leva
+  `P2P_IN_ARRIVO_FINO`, che vale «2026-10-10» NEL CODICE: col deploy la
+  card c'e' senza toccare il config del VPS. **SE IL LANCIO SLITTA** si
+  aggiunge al `config.py` del VPS `P2P_IN_ARRIVO_FINO = "AAAA-MM-GG"` e
+  si riavvia; per toglierla, `P2P_IN_ARRIVO_FINO = None`. Una data
+  storta la spegne (il journal lo dice all'avvio: «[p2p]
+  P2P_IN_ARRIVO_FINO non e' una data»). **IL GIORNO DEL LANCIO NON SI
+  TOCCA NIENTE IN PIU'**: con le due righe qui sopra (`P2P_PROVA_IDS =
+  []` e `P2P_IN_VETRINA = True`) la card diventa da sola «Ora
+  disponibile» e porta al P2P vero; 14 giorni dopo la data se ne va.
+  Se la data passa col P2P ancora chiuso dice «In arrivo a breve». Si
+  guarda nel pannello «⚙️ Stato delle leve», riga «Card «P2P in
+  arrivo», data».
 - LE NOTIFICHE PRECISE DEL P2P (16 set 2026) non hanno una leva loro:
   girano con `P2P_ATTIVO`, dentro lo stesso orologio del campanello,
   e leggono il libro dai relay del coordinator e poi dallo specchio.
