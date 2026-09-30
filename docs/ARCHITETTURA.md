@@ -26543,9 +26543,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   un mio ritiro mai preso, senza uno stato. Con `p2pErrore` la
   striscia si disegna lo stesso. `p2pRitirato` = annullato senza sats,
   MIO e mai preso (`preso` dalla macchina a stati); a filtro spento
-  `passaStatoMieiP2P` nasconde «Annullati» (`mostraAnnullatiP2P` dallo
-  stato vuoto); la scopa lampo è del solo `rifiutato`; la ✕ lascia una
-  lapide di `P2P_LAPIDE_TOLTO_S`. Le fatture di chi compra: il blocco
+  `passaStatoMieiP2P` nasconde «Annullati» (ci si arriva SOLO dalla
+  pillola del filtro: dal 30 set 2026 lo stato vuoto è solo «Nessuno
+  scambio in corso» e «Vai al libro ordini»); la scopa lampo è del
+  solo `rifiutato`; la ✕ lascia una lapide di `P2P_LAPIDE_TOLTO_S`.
+  Le fatture di chi compra: il blocco
   resta la sola finestra del coordinatore (`finestraFatturaP2P`, dal
   38385); le 23 ore (`vitaMinimaFatturaP2P`) sono un consiglio, la
   fattura più corta parte col toast di `avvisoFatturaCortaP2P`.

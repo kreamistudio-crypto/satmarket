@@ -31242,3 +31242,36 @@ vecchio»); inquadrare il codice di un ALTRO scambio; il moderatore sul terzo
 telefono. **IL WORKFLOW È STATO TOCCATO** (`collaudo_contanti_p2p.py` e
 `schnorr_puro.py` nel compileall, il collaudo nell'elenco della CI):
 `pronto` può restare indietro, si guarda dopo il push.
+
+## «I miei scambi» vuoto: solo la frase e il bottone (30 set 2026)
+
+Ritocco di Andrea. Senza scambi da mostrare, la pagina adesso dice solo
+«Nessuno scambio in corso» e sotto «Vai al libro ordini», sul velo di
+sempre. Via le monete grandi in mezzo alla pagina (l'`h2` con
+l'immagine e la sua regola `.scambi-vuoto .scambi-img` da 160px), e via
+«Vedi i N scambi annullati»: gli annullati si guardano SOLO dalla
+pillola «Annullati» del filtro, come ogni altro gruppo. Con lei se ne
+sono andati `mieiMorti` e `mostraAnnullatiP2P`, che non chiamava
+nessun altro. Lo stato vuoto è un testo fisso: non guarda le righe.
+DECISO DI NON TOCCARE: con soli scambi annullati (o conclusi) in cima
+resta l'intestazione di sempre, monete piccole e «0 scambi aperti · 0
+tocca a te» — è la regola già provata di `intestaScambiP2P` («solo
+scambi finiti: l'intestazione resta, coi suoi zeri»), non lo stato vuoto.
+PROVATO: prove_intestazione_scambi emendata col perché — il velo senza
+monete; l'espressione dopo `scambiP2P() ||` è fatta di sole stringhe
+(nessuna variabile, nessun ramo); letta con un parser HTML vero dà in
+fila il div, la frase e il bottone, e nient'altro, coi tag chiusi; niente
+«annullat» nello stato vuoto e niente `mostraAnnullatiP2P`/`mieiMorti`
+nella pagina; le regole dell'intestazione da tredici a dodici; i posti
+timbrati dell'immagine da cinque a quattro. prove_scambi_ovunque: la
+pillola «Annullati» resta l'unica strada. Tortura 9 su 9 (la riga
+condizionale, le monete, un testo in più, una variabile, l'ordine
+rovesciato, la funzione, la misura CSS, un tag aperto, gli annullati a
+parole). Dal vivo via CDP a 375 px nei due temi, sul server di una copia
+con relay morti: nessuno scambio, un solo annullato (niente riga) e il
+filtro «Annullati» (la card c'è); nessuno scorrimento laterale.
+Suite intera severa senza config nel worktree da origin/main (293285f):
+17.266 verdi e 0 rosse; i 27 collaudi della CI verdi nella gabbia senza
+rete. Dopo il rebase su f5806d0 (il contanti di persona): di nuovo la
+suite intera, 17.347 verdi e 0 rosse, e i 28 collaudi della CI verdi;
+la tortura e il giro dal vivo sono dell'albero di prima.

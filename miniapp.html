@@ -2341,11 +2341,11 @@
     line-height:1.3;color:var(--ink-soft)}
   .scambi-conto:empty{display:none}
   .scambi-conto b{color:var(--sats-text);font-weight:800}
-  /* SENZA SCAMBI l'intestazione si fa grande e scende al centro: la
-     stessa immagine piu' alta, lo stesso velo al posto della carta
-     dell'`.empty`, la frase e il bottone per il libro. */
+  /* SENZA SCAMBI il velo al posto della carta dell'`.empty`, con la
+     frase e il bottone per il libro — e niente monete (30 set 2026,
+     ritocco di Andrea: il logo grande in mezzo alla pagina se n'e'
+     andato). */
   .empty.scambi-vuoto{background:var(--sats-soft);border-color:transparent}
-  .scambi-vuoto .scambi-img{height:160px;margin:0 auto 12px}
   /* E NEL FILTRO CHE NON LASCIA PASSARE NIENTE le stesse monete, in
      piccolo (22 set 2026, ritocco di Andrea), al posto del logo P2P:
      in questa pagina il simbolo e' quello dell'intestazione. 56px, cioe'
@@ -46142,23 +46142,16 @@ function renderP2P(){
      in corso» e la strada per il libro — il bottone fa quel che fa la
      voce «Libro ordini» della nav, `go('p2p')`. L'invito al + se n'e'
      andato con lui: il libro e' il posto da cui si comincia, e il +
-     sta comunque nella barra. L'immagine porta lo stesso alt
-     dell'intestazione, che qui sotto si toglie: di titoli ce n'e'
-     sempre uno. */
-  /* ...e gli annullati, che dalla lista escono da soli (24 set 2026),
-     dallo stato vuoto si raggiungono con un tocco: il conto e' quello
-     del giudice unico dei gruppi */
-  const mieiMorti = mieiTutti.filter(o => gruppoScambioP2P(o) === 'morti').length;
+     sta comunque nella barra.
+     ⚠️ E DAL 30 SET 2026 SOLO LA FRASE E IL BOTTONE (ritocco di Andrea):
+     via le monete grandi in mezzo alla pagina, e via «Vedi i N scambi
+     annullati» — gli annullati si guardano SOLO dalla pillola
+     «Annullati» del filtro, come ogni altro gruppo. Lo stato vuoto non
+     guarda nessuna riga: e' un testo fisso. */
   if (mieiBox) mieiBox.innerHTML = scambiP2P()
-    || '<div class="empty scambi-vuoto"><h2 class="scambi-tit">'
-     + '<img class="scambi-img" src="/assets/scambi-intestazione.webp" width="682" height="459"'
-     + ' alt="I miei scambi" aria-label="I miei scambi" onerror="this.replaceWith(this.alt)"></h2>'
+    || '<div class="empty scambi-vuoto">'
      + '<span class="empty-title">Nessuno scambio in corso</span>'
      + '<button type="button" class="btn orange" onclick="go(\'p2p\')">Vai al libro ordini</button>'
-     + (mieiMorti
-         ? '<div class="hint"><button type="button" class="scopri-link" onclick="mostraAnnullatiP2P()">Vedi '
-           + (mieiMorti === 1 ? 'lo scambio annullato' : 'i ' + mieiMorti + ' scambi annullati') + '</button></div>'
-         : '')
      + '</div>';
   /* l'intestazione DOPO il corpo, e non con la riga di strumenti: il
      conto deve contare le righe che scambiP2P ha appena adottato o
@@ -58075,14 +58068,6 @@ function passaStatoMieiP2P(o, f){
   if (!f || !f.length) return gruppoScambioP2P(o) !== 'morti';
   return f.indexOf(gruppoScambioP2P(o)) >= 0;
 }
-/* la scorciatoia dello stato vuoto: «vedi gli annullati» accende la
-   sola pillola dello storico */
-function mostraAnnullatiP2P(){
-  haptic();
-  p2pMieiFiltro = ['morti'];
-  p2pMieiFiltroBozza = null;
-  renderP2P();
-}
 /* I QUATTRO ORDINI DEI PROPRI SCAMBI: il piu' recente (di casa), i
    «da fare» prima, e l'importo nei due versi.
    ⚠️ IL RECENTE GUARDA `quando` PRIMA DI `creato`, e non e' un
@@ -59227,7 +59212,8 @@ function scambiP2P(){
   /* A FILTRO SPENTO E SOLI ANNULLATI si torna allo stato vuoto di
      sempre (24 set 2026): gli annullati escono da soli dalla lista, e
      un «nessuno passa il filtro» su un filtro che non c'e' sarebbe una
-     bugia — la strada per vederli la mette lo stato vuoto stesso. */
+     bugia — per vederli c'e' la pillola «Annullati» del filtro (dal 30
+     set 2026 lo stato vuoto non li nomina piu'). */
   if (!mostrati.length && !filtroAccesoMieiP2P(p2pMieiFiltro)) return '';
   if (!mostrati.length)
     return '<div class="empty"><img class="scambi-img scambi-mini" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">'

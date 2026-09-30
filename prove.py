@@ -75780,7 +75780,8 @@ def prove_intestazione_scambi():
     il logo P2P. Adesso comincia con un'immagine sua — due monete che si
     scambiano di posto, bitcoin e un euro — su un velo tenue, e sotto la
     riga viva del conto; il titolo scritto se ne va e resta nell'alt.
-    Senza scambi, la stessa immagine in grande fa lo stato vuoto.
+    Senza scambi, la stessa immagine in grande faceva lo stato vuoto:
+    dal 30 set 2026 restano solo la frase e il bottone per il libro.
 
     ⚠️ LE QUATTRO COSE CHE QUESTE PROVE SORVEGLIANO: il conto viene dal
     giudice del pallino (`gruppoScambioP2P`, `quantiToccaAMeP2P`) e non
@@ -75952,7 +75953,9 @@ def prove_intestazione_scambi():
                           r"[^{}]*)\{([^}]*)\}", _css_nudo)]
     # il conto dice che il censimento qui sotto non e' cieco: una regola
     # nuova dell'intestazione entra nel conto e nel controllo insieme
-    prova("le regole dell'intestazione sono tredici", 13, len(regole))
+    # ...dodici dal 30 set 2026: se n'e' andata la misura delle monete
+    # nello stato vuoto, che non le mostra piu'
+    prova("le regole dell'intestazione sono dodici", 12, len(regole))
     prova("...e nessuna ha effetti che «effetti ridotti» dovrebbe spegnere",
           [], [(sel, d) for sel, c in regole
                for d in ("animation", "transition", "filter", "box-shadow",
@@ -75997,9 +76000,11 @@ def prove_intestazione_scambi():
           in css)
     prova("nel filtro vuoto le monete sono piccole", True,
           ".empty .scambi-mini{height:56px" in css)
-    prova("senza scambi l'immagine e' piu' grande, sullo stesso velo", True,
-          "  .scambi-vuoto .scambi-img{height:160px" in css
-          and ".empty.scambi-vuoto{background:var(--sats-soft)" in css)
+    # EMENDATA (30 set 2026): le monete dello stato vuoto se ne sono
+    # andate, e con loro la loro misura; il velo resta
+    prova("senza scambi lo stesso velo, e nessuna misura per le monete", [True, False],
+          [".empty.scambi-vuoto{background:var(--sats-soft)" in css,
+           ".scambi-vuoto .scambi-img" in css])
     # LA RIGA DI STRUMENTI TIENE L'ARIA DENTRO IL BLOCCO: senza cappello
     # il suo margine collasserebbe fuori, e da attaccata starebbe
     # incollata al bordo — misurato dal vivo: 13px sopra, dipinti
@@ -76078,10 +76083,51 @@ def prove_intestazione_scambi():
     _da = max(rp.find("if (mieiBox) mieiBox.innerHTML = scambiP2P()"), 0)
     _a = rp.find("intestaScambiP2P(mieiRigheP2P());", _da)
     vuoto = rp[_da:(_a if _a > _da else len(rp))]
-    prova("senza scambi: le monete in grande, sul velo", True,
-          """'<div class="empty scambi-vuoto"><h2 class="scambi-tit">'"""
-          in vuoto and ('src="%s"' % URL) in vuoto
-          and 'alt="I miei scambi" aria-label="I miei scambi"' in vuoto)
+    # ⚠️ ROVESCIATA (30 set 2026, ritocco di Andrea): le monete in
+    # grande non ci sono piu', e nemmeno «Vedi i N scambi annullati».
+    # Restano il velo, la frase e il bottone — e basta.
+    prova("senza scambi: il velo, e niente monete", True,
+          """'<div class="empty scambi-vuoto">'""" in vuoto
+          and "<img" not in vuoto and "scambi-tit" not in vuoto
+          and "webp" not in vuoto)
+    # LA FORMA INTERA, letta come la legge il browser: si incollano i
+    # pezzi di stringa dell'espressione dopo `||`, e fuori dalle stringhe
+    # non deve restare niente se non i `+` — nessuna variabile, nessun
+    # ramo che a volte aggiunga una riga. Poi un parser HTML vero conta
+    # quel che c'e' dentro, in ordine.
+    _dopo = vuoto[vuoto.find("scambiP2P()") + len("scambiP2P()"):]
+    _dopo = _dopo[_dopo.find("||") + 2:_dopo.find(";")] if "||" in _dopo else ""
+    _pezzi = re.findall(r"'((?:[^'\\]|\\.)*)'", _dopo)
+    _fuori = re.sub(r"'((?:[^'\\]|\\.)*)'", "", _dopo)
+    prova("...ed e' un testo fisso: fra le stringhe solo dei +", "",
+          re.sub(r"[\s+]", "", _fuori) if _dopo else "manca")
+    import html.parser as _hp
+    class _Lettore(_hp.HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.fila, self.pila = [], []
+        def handle_starttag(self, tag, attrs):
+            self.pila.append(tag)
+            self.fila.append(("<" + tag, dict(attrs).get("class", "")))
+        def handle_endtag(self, tag):
+            if self.pila and self.pila[-1] == tag:
+                self.pila.pop()
+            else:
+                self.fila.append(("chiusa storta", tag))
+        def handle_data(self, d):
+            if d.strip():
+                self.fila.append(("testo", d.strip()))
+    _l = _Lettore()
+    _l.feed("".join(_pezzi).replace("\\'", "'"))
+    _l.close()
+    prova("...con dentro la frase e il bottone per il libro, e nient'altro",
+          [("<div", "empty scambi-vuoto"),
+           ("<span", "empty-title"), ("testo", "Nessuno scambio in corso"),
+           ("<button", "btn orange"), ("testo", "Vai al libro ordini")],
+          _l.fila)
+    prova("...coi tag chiusi tutti", [], _l.pila)
+    prova("...e senza nominare gli annullati", [False, False, False],
+          ["nnullat" in vuoto, "mostraAnnullatiP2P" in mini, "mieiMorti" in mini])
     prova("...«Nessuno scambio in corso»", True,
           '<span class="empty-title">Nessuno scambio in corso</span>' in vuoto)
     prova("...e il bottone per il libro, lo stesso gesto della voce della nav",
@@ -76109,7 +76155,9 @@ def prove_intestazione_scambi():
     # ⚠️ I POSTI SONO QUATTRO dal 23 set 2026: le monete stanno anche
     # nel libro vuoto, al posto del logo P2P (ritocco di Andrea)
     # ...e CINQUE dal 26 set 2026: lo sfondo delle card P2P in vetrina
-    prova("i posti che la mostrano escono timbrati col suo hash", 5,
+    # ...e di nuovo QUATTRO dal 30 set 2026: lo stato vuoto dei miei
+    # scambi non la mostra piu' (ritocco di Andrea)
+    prova("i posti che la mostrano escono timbrati col suo hash", 4,
           timbrata.count(firma))
     # ⚠️ IL CONTENITORE ERA TROPPO GRANDE (22 set 2026, sera). Questa
     # riga diceva «la pagina non incorpora NESSUNA webp» e voleva dire
@@ -81731,9 +81779,14 @@ def prove_scambi_ovunque():
           and "else if (P2P_GIRO_APERTO.indexOf(nuovo) >= 0 || nuovo === 'attivo') o.preso = true;" in av)
     prova("il filtro spento nasconde gli annullati, che stanno sotto la loro pillola", True,
           "if (!f || !f.length) return gruppoScambioP2P(o) !== 'morti';"
-          in pezzo_js(mini, "function passaStatoMieiP2P(o, f){", "\n}")
-          and "function mostraAnnullatiP2P(){" in mini
-          and 'onclick="mostraAnnullatiP2P()"' in pezzo_js(mini, "function renderP2P(){", "\n}\n"))
+          in pezzo_js(mini, "function passaStatoMieiP2P(o, f){", "\n}"))
+    # EMENDATA (30 set 2026, ritocco di Andrea): la scorciatoia «Vedi gli
+    # annullati» dello stato vuoto se n'e' andata, e con lei la sua
+    # funzione — la pillola «Annullati» del filtro resta l'unica strada
+    prova("...e ci si arriva solo dalla pillola del filtro", [False, False, True],
+          ["function mostraAnnullatiP2P(" in mini,
+           "mostraAnnullatiP2P" in pezzo_js(mini, "function renderP2P(){", "\n}\n"),
+           "{k: 'morti', n: 'Annullati'}" in mini])
     prova("...e la scopa tiene il lampo al solo rifiutato", True,
           "const lampo = o.stato === 'rifiutato';" in pezzo_js(mini, "function pulisciScambiP2P(){", "\n}"))
     prova("la ✕ lascia una lapide lunga quanto lo storico del server", True,
