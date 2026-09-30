@@ -225,19 +225,22 @@ in ogni sessione:
 
 ## Adesso
 
-Lanciando in rodaggio su community italiana, senza limiti di prezzo
-attivi (la leva `TETTO_SATS_ANNUNCIO` esiste ma è spenta). Quali leve
-sono ACCESE lo dice il pannello «⚙️ Stato delle leve» dell'admin, che
-chiede al valore VIVO e non alla costante nel codice.
+Stato al 30 set 2026 (parola di Andrea):
+- LANCIO PUBBLICO DEL P2P IL 10 OTTOBRE 2026: quel giorno si accende la
+  leva `P2P_IN_VETRINA` nel config del VPS (nel codice è False;
+  PRODUZIONE, «LE CARD P2P IN VETRINA»).
+- I PIONIERI sono congelati a 101.
+- La cassaforte del mercatino è quella «nodo» (LNbits self-hosted col
+  LND del nodo: Cantieri, «Il doppio wallet»).
+- In preparazione l'aggiornamento a Mostro 0.19.0.
+- Nessun limite di prezzo attivo (`TETTO_SATS_ANNUNCIO` spenta). Quali
+  leve sono ACCESE lo dice il pannello «⚙️ Stato delle leve» dell'admin,
+  che chiede al valore VIVO e non alla costante nel codice.
 
-Backlog concordato: commissione minima fissa; poi post-lancio: tracking
-verificato via API corrieri (che porterà la MAPPA dei punti nel
-varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
-MiCA prima di crescere.
-
-Da riprendere quando i cantieri in corso saranno chiusi (ago 2026,
-segnati da Andrea — non sono ancora decisi, sono da riprendere): il
-LUOGO DEL RITIRO A MANO salvato e richiamato a ogni annuncio; «I MIEI
-ANNUNCI» resa più fruibile; i PRIVILEGI DEI PIONIERI (la coorte esiste
-già, non dà ancora niente); il LOCKER DI RISERVA (un secondo punto se il
-primo non va).
+Backlog concordato: commissione minima fissa; post-lancio il tracking
+verificato via API corrieri (con la MAPPA dei punti), l'escrow on-chain
+2-di-3, il parere legale MiCA prima di crescere. Da riprendere (ago 2026,
+segnati da Andrea, non ancora decisi): il luogo del ritiro a mano
+salvato e richiamato a ogni annuncio; «I miei annunci» più fruibile; i
+privilegi dei pionieri (la coorte esiste, non dà ancora niente); il
+locker di riserva (un secondo punto se il primo non va).
