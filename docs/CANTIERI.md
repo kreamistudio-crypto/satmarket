@@ -31504,9 +31504,32 @@ le attive); un preferito è di una variante, e la sua card mostra la
 famiglia; le anteprime SEO del negozio (`_seo_negozio`) contano ancora
 le righe, non le famiglie; la ricerca AI non riduce le famiglie.
 
-DA GUARDARE: dopo il deploy, il primo giro dei connettori nel journal e
-le famiglie di AGORA con la query di PRODUZIONE; poi le 129 righe
-rimesse in vetrina, e la home.
+LA CHIUSURA, SUL VERO (30 set 2026, sera). Il giro del collegamento 3
+e' passato alle 20:09 e le famiglie sono nate: COWBOY Limited Edition
+(`c3:e:…`), 1st EDITION (`c3:p:37`) e due che il cartone non aveva, i
+cappelli Golden Hat (edizione, `c3:e:…`) e Stacker Hat (`c3:p:755`).
+Le 129 righe in revisione (111 COWBOY + 18 1st EDITION, tutte con la
+famiglia) sono tornate attive col comando di PRODUZIONE — 129 righe,
+nessuna finita a venduto —; controprova: Golden Hat 11 attivi, COWBOY
+126 attivi e 21 venduti, 1st EDITION 18, Stacker Hat 4, nessuna riga
+in revisione. In home e nel negozio AGORA fa CINQUE card: le quattro
+famiglie e l'annuncio 342 pubblicato a mano, senza famiglia, giusto da
+solo (verificato da Andrea). IL GIRO LENTO, che e' la lezione della
+sera: il catalogo vero di AGORA ha circa 2.200 varianti (17:49: 30
+nuovi, 120 aggiornati, 2.053 rimandati), la lettura prende minuti, e
+otto riavvii da deploy in quattro ore lo uccidevano a meta' — il #2,
+tre prodotti, finiva; il #3 no, e dall'esterno sembrava saltato. Si
+legge cosi': `ultimo_giro` del collegamento fermo, e nel journal il
+`🏪 woo #2` senza il `#3` dopo. Nessuna riga di codice da cambiare: si
+aspetta un intervallo senza deploy. E NEL JOURNAL, IN PASSANDO: il
+credito Anthropic a zero («credit balance is too low») — la
+moderazione AI (singola e a lotti) e la ricategorizzazione sono
+fail-open, quindi il mercatino non si ferma ma entra tutto col solo
+filtro parole, e gli importati restano in «Altro». Decide Andrea.
+
+DA GUARDARE: le 30 varianti l'ora che AGORA fa ancora entrare (finiscono
+dentro le famiglie, ma ogni giro rilegge 2.200 varianti); il credito
+Anthropic.
 
 ## Una Garlanda: le foto, il banner e il logo (30 set 2026)
 
