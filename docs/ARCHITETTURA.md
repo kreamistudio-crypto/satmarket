@@ -27967,6 +27967,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   se Caddy dà 502 all'HTML stesso il client non esiste ancora, e lì
   serve il server (CANTIERI, «I deploy non devono far cadere l'app»).
   Prova: `prove_server_che_si_riavvia`.
+  E IL GIRO DEI CONNETTORI SI FERMA ALLO SPEGNIMENTO (1 ott 2026): il
+  gancio `ferma_i_giri_lunghi` (`@app.on_event("shutdown")`) accende
+  `_SI_CHIUDE`, un `threading.Event` perche' lo legge un altro filo, e
+  `chiama_api_negozio` lo guarda PRIMA di ogni pagina alzando
+  `SpegnimentoInCorso`. Si ferma la LETTURA, che non scrive niente, e
+  mai la riconciliazione, che scrive riga per riga; `_un_connettore`
+  non conta lo spegnimento fra gli errori del negozio (giudica il
+  SEGNALE, non il tipo dell'eccezione) e non comincia a scrivere dopo
+  una lettura finita mentre si chiude; `sincronizza_connettori` non
+  parte e non passa al collegamento dopo. Senza, il filo di
+  `asyncio.to_thread` teneva in vita il processo fino al SIGKILL di
+  systemd. Prova: `prove_connettore_interrompibile`. La metà di
+  macchina (Caddy che aspetta, il tetto dello stop) sta in PRODUZIONE,
+  «IL RIAVVIO DOLCE».
 - LE ROTTE PUBBLICHE, l'elenco per intero (la regola ferrea 3 in
   CLAUDE.md tiene il divieto — mai StaticFiles su una directory — e le
   due sentinelle; l'elenco sta qui perché cresce a ogni cantiere, e a

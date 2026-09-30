@@ -722,6 +722,43 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   mai `--force`. Il giudice di `deploy.sh` resta quello di sempre (su
   main, in avanti, `prove` e `segreti` in `success`, punta firmata): il
   ref spostato a mano è solo il campanello.
+- IL RIAVVIO DOLCE (1 ott 2026): un deploy non deve far vedere un 502.
+  DUE PEZZI SUL VPS, tutt'e due fuori dalla repo come il resto della
+  macchina (il drop-in ha la sua copia in `deploy/utente/`):
+  1) CADDY ASPETTA IL BACKEND invece di rispondere 502. In TUTTI E DUE i
+     blocchi del Caddyfile (il sito e l'onion) la riga `reverse_proxy …:8080`
+     e' diventata un blocco con `lb_try_duration 30s` e
+     `lb_try_interval 250ms`: col backend spento Caddy ritenta la
+     connessione ogni quarto di secondo per 30 secondi, e la richiesta
+     arriva quando il server e' su. Copre la PAGINA stessa, le foto, i
+     font e il webhook di Telegram, che il client non puo' coprire.
+     Ritenta solo quando la connessione NON e' partita, quindi una POST
+     non arriva due volte al server. Copia di prima:
+     `/etc/caddy/Caddyfile.prima-del-riavvio-dolce`. Si controlla con
+     `caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile` e
+     si ricarica con `systemctl reload caddy`, che non interrompe nessuno
+     e con una configurazione storta tiene la vecchia.
+     TORNARE INDIETRO: `cp -a /etc/caddy/Caddyfile.prima-del-riavvio-dolce
+     /etc/caddy/Caddyfile && systemctl reload caddy`.
+  2) IL DROP-IN `barattolo.service.d/riavvio-dolce.conf` (copia in
+     `deploy/utente/barattolo-riavvio-dolce.conf`, col perche' di ogni
+     riga): `TimeoutStopSec=20` e
+     `Environment=UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN=10`. Si posa ACCANTO
+     a `utente.conf` senza toccarlo, poi `systemctl daemon-reload`; vale
+     dal riavvio SUCCESSIVO (il primo deploy). Prima di posarlo:
+     `python3 -m uvicorn --help | grep graceful` deve rispondere, o la
+     variabile non la legge nessuno. Dopo un riavvio si vede nel processo:
+     `tr '\0' '\n' < /proc/$(systemctl show -p MainPID --value barattolo)/environ | grep UVICORN`.
+     TORNARE INDIETRO: `rm` del drop-in e `systemctl daemon-reload`.
+  I 30 SECONDI DI CADDY VALGONO SE IL BUCO CI STA DENTRO: di solito ~1,5
+  s (il journal del 30 set, cinque riavvii), ma alle 20:50 lo stop e'
+  durato 90 s e systemd ha dovuto ammazzare il processo (SIGKILL). La
+  cura di quello sta nel codice — il giro dei connettori si ferma allo
+  spegnimento (ARCHITETTURA, «IL SERVER CHE SI RIAVVIA») — e il tetto
+  dei 20 secondi e' la rete per ogni altro filo lungo.
+  COME SI MISURA UN BUCO: `journalctl -u barattolo --since today -o
+  short-precise | grep -E "Stopping|Started|Application startup
+  complete"`; uno stop ammazzato lo dice `grep -iE "timed out|kill"`.
 - LE SESSIONI CLOUD (24 set 2026, regola di Andrea): una sessione di
   Claude Code che gira nel cloud (claude.ai/code, o una sessione spostata
   lì dal PC) lavora su un ramo `cantiere/<nome>` e apre una PR verso

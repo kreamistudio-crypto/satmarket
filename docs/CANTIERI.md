@@ -31908,3 +31908,75 @@ link già condiviso prima del deploy mostra il brand finché la cache non
 scade (per Telegram c'è @WebpageBot). Sul telefono, il link aperto
 davvero dentro Telegram e nell'app Android. Il tasto indietro richiude
 il cassetto (prezzo dichiarato, come per i Consigliati).
+
+## I deploy non devono far cadere l'app, la metà del server (1 ott 2026)
+
+**LA SCELTA DI ANDREA**: la strada A (Caddy che aspetta il backend,
+`lb_try_duration 30s` e `lb_try_interval 250ms`, nei DUE blocchi del
+Caddyfile — il sito e l'onion) più `--timeout-graceful-shutdown 10` su
+uvicorn, più `TimeoutStopSec=20` e il connettore interrompibile. Scartate
+con il loro perché: il socket tenuto da systemd (tre pezzi da toccare,
+fra cui il drop-in di `cambio-utente`, e un errore lascia il sito giù) e
+i due processi col testimone (gli startup accendono gli orologi: per il
+tempo della staffetta avvisi e pagamenti girerebbero due volte).
+
+**LA MISURA HA CAMBIATO LA CURA.** Il journal del 30 set: cinque riavvii,
+quattro con un buco di ~1,5 s e uno, alle 20:50:44, con lo stop durato
+90,08 s — «State 'stop-sigterm' timed out. Killing», SIGKILL. Novanta
+sono il tetto di serie di systemd: il processo non voleva morire. Il
+connettore di AGORA stava leggendo circa 2.200 varianti in un filo di
+`asyncio.to_thread`, e Python prima di uscire aspetta i suoi fili: un
+filo non si cancella da fuori. **`--timeout-graceful-shutdown` NON ci
+arrivava** — dice a uvicorn quanto aspettare le RICHIESTE, non i fili —
+e va scritto, perché era la cura che sembrava ovvia. Resta (non costa
+niente, e vale per le richieste lente), ma la cura sono le altre due.
+
+**IL CONNETTORE INTERROMPIBILE.** Un `threading.Event` (`_SI_CHIUDE`)
+acceso dal gancio di spegnimento e guardato dal tubo unico
+`chiama_api_negozio` prima di ogni pagina: la lettura esce al più dopo
+la pagina in volo. SI FERMA LA LETTURA E NON LA SCRITTURA: le fasi sono
+«leggi TUTTO, traduci, vaglia, riconcilia», la lettura non scrive niente
+e il giro dopo ricomincia da capo; la riconciliazione scrive riga per
+riga e si lascia finire. LO SPEGNIMENTO NON SI CONTA fra gli errori del
+negozio — contato, un deploy durante una lettura lunga sarebbe un
+«errore di fila», e a soglia il collegamento finirebbe rotto col
+messaggio al venditore — e il giudice guarda il SEGNALE, non il tipo
+dell'eccezione, così un lettore che la riveste non inganna. STRADA
+SCARTATA: fermare anche la riconciliazione — gira sul loop, che durante
+quel `for` non processa nemmeno il segnale, e interromperla a metà
+vorrebbe dire saltare le sparizioni con righe già scritte: il tetto dei
+20 secondi copre quel caso come oggi lo copriva il SIGKILL dei 90.
+
+**IL DROP-IN PASSA DALL'AMBIENTE**, non da `ExecStart`:
+`Environment=UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN=10` (uvicorn legge ogni
+opzione come `UVICORN_<OPZIONE>`: `auto_envvar_prefix` in
+`uvicorn/main.py`, letto sul sorgente della 0.51). La riga `ExecStart`
+resta una sola, e una variabile che un uvicorn vecchio non conosce si
+ignora, mentre una flag sconosciuta lo farebbe non partire. Copia in
+`deploy/utente/barattolo-riavvio-dolce.conf`; la procedura e il ritorno
+indietro in PRODUZIONE, «IL RIAVVIO DOLCE».
+
+**PROVATO.** `prove_connettore_interrompibile` fa girare i pezzi VERI
+(tubo, `_un_connettore`, `sincronizza_connettori`, gancio) con un negozio
+finto lento e un filo vero: 500 pagine da 20 ms, il gancio a 250 ms, e
+dal gancio all'uscita di `asyncio.run` — cioè fili compresi — sotto il
+secondo; lo spegnimento non contato, niente scritture, il set «in corso»
+vuoto; per controllo il giro intero senza spegnimento e il negozio muto
+che resta un errore contato; il lettore che riveste l'eccezione, la
+lettura finita mentre si chiude, il tubo che non bussa, l'orologio che
+non parte e non passa al prossimo. Tortura 8 su 8 (tre esplodono col
+tetto di 5 s invece di dire rosso: la suite le conta come fallite).
+Suite intera severa senza config nel worktree ribasato su 63f4e2c (il
+link condiviso che apre la storia, arrivato in mezzo): 17.613 verdi e 0
+rosse; i 28 collaudi della CI nella gabbia sullo stesso albero.
+
+**SUL VPS, A MANO DA ANDREA**, un passo alla volta con l'uscita letta
+prima del successivo: copia del Caddyfile e sua lettura, l'unità coi
+drop-in, la conferma del SIGKILL delle 20:50 nel journal (fatti prima di
+questo commit); poi la modifica di Caddy, `caddy validate`, il `reload`,
+la prova con una raffica di richieste durante un riavvio, il drop-in e
+il `daemon-reload`. L'esito lo dice il verbale del giro dopo.
+
+**DA GUARDARE.** Il primo deploy con una lettura lunga in corso: nel
+journal «⏹ Connettore … lettura fermata dallo spegnimento» e uno stop
+di pochi secondi invece di un SIGKILL.

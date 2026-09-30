@@ -47,6 +47,7 @@ import socket
 import sqlite3
 import ssl
 import sys
+import threading
 import time
 import unicodedata
 import urllib.request
@@ -57087,6 +57088,34 @@ CONSEGNE_NEGOZIO = ("spedizione", "ritiro", "entrambe")
 # al riavvio non c'e' nessun giro in volo.
 _CONNETTORI_IN_CORSO = set()
 
+# IL GIRO SI FERMA ALLO SPEGNIMENTO (1 ott 2026, dal campo: alle 20:50
+# del 30 set un deploy ha tenuto il mercatino GIU' 90 secondi — systemd
+# ha dovuto ammazzarlo col SIGKILL, «stop-sigterm timed out»). Il
+# connettore di AGORA stava leggendo circa 2.200 varianti, e la lettura
+# gira in un filo di `asyncio.to_thread`: uvicorn chiude la porta e
+# smette di aspettare le richieste, ma Python, prima di uscire, ASPETTA
+# che quel filo finisca il suo giro — e un filo non si cancella da
+# fuori. Il segnale e' un `threading.Event` e non un bool perche' lo
+# legge un altro filo; lo accende il gancio di spegnimento qui sotto, e
+# lo guarda `chiama_api_negozio` PRIMA di ogni pagina: la lettura si
+# ferma al piu' dopo la pagina in volo.
+# SI FERMA LA LETTURA E NON LA SCRITTURA, ed e' la scelta da tenere:
+# la lettura non scrive niente (le fasi sono «leggi TUTTO, traduci,
+# vaglia, riconcilia»), quindi fermarla non lascia niente a meta' e il
+# giro dopo ricomincia da capo; la riconciliazione invece scrive riga
+# per riga, e si lascia finire.
+_SI_CHIUDE = threading.Event()
+
+
+class SpegnimentoInCorso(RuntimeError):
+    """La lettura fermata perche' il server si spegne: non e' un
+    negozio che non risponde, e non si conta fra i suoi errori."""
+
+
+@app.on_event("shutdown")
+async def ferma_i_giri_lunghi():
+    _SI_CHIUDE.set()
+
 
 def url_api_ammesso(url: str) -> bool:
     """Il guardiano delle chiamate alle API di un negozio.
@@ -57145,7 +57174,11 @@ def chiama_api_negozio(metodo: str, url: str,
     dice lo stato e un pezzo di corpo, mai le intestazioni — un token
     in un journal e' un token pubblico.
 
-    Sincrona: va chiamata in asyncio.to_thread."""
+    Sincrona: va chiamata in asyncio.to_thread.
+    E GUARDA `_SI_CHIUDE` PRIMA DI BUSSARE: e' qui, nell'unico tubo,
+    che una lettura di mille pagine si ferma allo spegnimento."""
+    if _SI_CHIUDE.is_set():
+        raise SpegnimentoInCorso("il server si sta spegnendo")
     if not url_api_ammesso(url):
         raise RuntimeError("indirizzo non ammesso")
     req = urllib.request.Request(url, method=metodo, headers={
@@ -57404,7 +57437,7 @@ async def sincronizza_connettori():
     riconciliazione. Per questo `leggi_catalogo_*` alza e qui si esce
     prima di toccare una riga."""
     global _prossimo_giro_connettori
-    if not CONNETTORI_NEGOZIO_APERTI:
+    if not CONNETTORI_NEGOZIO_APERTI or _SI_CHIUDE.is_set():
         return
     if time.time() < _prossimo_giro_connettori:
         return
@@ -57426,6 +57459,8 @@ async def sincronizza_connettori():
     # letture e dieci conversioni diverse nello stesso giro
     cambio = cambio_per_import()
     for riga in collegati:
+        if _SI_CHIUDE.is_set():
+            break
         try:
             await _un_connettore(dict(riga), cambio, importa_negozio)
         except Exception as e:
@@ -57462,7 +57497,21 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
                 lettore, c["url_negozio"], credenziali,
                 chiama_api_negozio, MAX_PRODOTTI_CONNETTORE)
         except Exception as e:
+            # LO SPEGNIMENTO NON SI CONTA: contato, ogni deploy durante
+            # una lettura lunga sarebbe un «errore di fila», e a soglia
+            # il collegamento finirebbe dichiarato rotto con tanto di
+            # messaggio al venditore — per colpa nostra. Si guarda il
+            # SEGNALE e non il tipo dell'eccezione: un lettore che la
+            # rivestisse la farebbe passare per un guasto vero.
+            if _SI_CHIUDE.is_set():
+                print(f"⏹ Connettore #{c['id']}: lettura fermata dallo "
+                      "spegnimento, riprende al prossimo giro")
+                return
             await _connettore_in_errore(c, str(e)[:200])
+            return
+        if _SI_CHIUDE.is_set():
+            # letto per intero proprio mentre si chiude: non si comincia
+            # a scrivere adesso, il giro dopo rilegge e riconcilia
             return
         righe = importa_negozio.traduci(prodotti, c["fonte"], cambio)
         # la moderazione sulle sole righe nuove o col testo cambiato

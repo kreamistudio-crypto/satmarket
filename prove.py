@@ -91194,6 +91194,231 @@ def prove_connettori_ingresso():
                       "WHERE origine_chiave='a'").fetchone()[0])
 
 
+def prove_connettore_interrompibile():
+    """IL GIRO DEI CONNETTORI SI FERMA ALLO SPEGNIMENTO (1 ott 2026,
+    dal campo: il 30 set alle 20:50 un deploy ha tenuto giu' il
+    mercatino 90 secondi — «stop-sigterm timed out», SIGKILL — perche'
+    la lettura di AGORA girava in un filo di `asyncio.to_thread` e
+    Python, prima di uscire, aspetta i suoi fili).
+
+    Si fanno GIRARE i pezzi veri di server.py — il tubo
+    `chiama_api_negozio`, `_un_connettore`, `sincronizza_connettori` e
+    il gancio `ferma_i_giri_lunghi` — con un negozio finto che risponde
+    piano e un filo VERO: la domanda e' quella del cantiere, cioe' se
+    dopo il gancio la lettura esce in un attimo invece che a fine
+    catalogo. E le tre cose che non devono succedere: lo spegnimento
+    contato come errore del negozio (a soglia il collegamento
+    finirebbe «rotto», col messaggio al venditore), una scrittura
+    cominciata mentre si chiude, un giro nuovo che parte."""
+    import asyncio as _aio, json as _json, threading as _th, time as _t
+    import urllib as _ul, urllib.request, urllib.error  # noqa: F401
+    print("\n[il giro dei connettori si ferma allo spegnimento]")
+    src = _SORGENTE
+
+    # --- la forma: un segnale, un gancio, il tubo che guarda prima ---
+    prova("il segnale e' UNO, ed e' un Event (lo legge un altro filo)",
+          1, src.count("_SI_CHIUDE = threading.Event()"))
+    prova("...threading sta fra gli import in cima", True,
+          "\nimport threading\n" in src[:src.index("\napp = FastAPI(")])
+    prova("il gancio di spegnimento lo accende", True,
+          '@app.on_event("shutdown")\nasync def ferma_i_giri_lunghi():\n'
+          '    _SI_CHIUDE.set()' in src)
+    tubo = codice(pezzo("chiama_api_negozio"))
+    prova("il tubo guarda il segnale PRIMA di bussare", True,
+          0 <= tubo.find("_SI_CHIUDE.is_set()") < tubo.find("_APRITORE_API.open"))
+
+    def blocco(inizio, fine):
+        i = src.index(inizio)
+        return src[i:src.index(fine, i)]
+
+    def asincrona(nome):
+        return "async " + pezzo(nome)
+
+    def banco():
+        """Un mondo di cartone per i pezzi veri, nuovo a ogni scena."""
+        g = {"asyncio": _aio, "json": _json, "threading": _th,
+             "time": _t, "urllib": _ul, "print": lambda *a, **k: None}
+        exec(blocco("_SI_CHIUDE = threading.Event()",
+                    "\n\n\n@app.on_event"), g)
+        g["app"] = type("App", (), {"on_event": staticmethod(
+            lambda *_: (lambda f: f))})()
+        exec(blocco('@app.on_event("shutdown")\nasync def ferma_i_giri_lunghi',
+                    "\n\n\n"), g)
+        exec(pezzo("chiama_api_negozio"), g)
+        exec(pezzo("_json_o_niente"), g)
+        exec(asincrona("_un_connettore"), g)
+        exec(asincrona("sincronizza_connettori"), g)
+        st = {"pagine": 0, "errori": [], "scritture": 0, "chiusi": 0,
+              "ritardo": 0.0, "guasto_a": None, "letto_poi_chiude": False,
+              "pagine_catalogo": 5, "riveste": False}
+
+        class Risposta:
+            status = 200
+            headers = {}
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self, n): return b'{"prodotti": [1]}'
+
+        class Apritore:
+            def open(self, req, timeout=None):
+                st["pagine"] += 1
+                if st["guasto_a"] and st["pagine"] >= st["guasto_a"]:
+                    raise OSError("negozio muto")
+                _t.sleep(st["ritardo"])
+                return Risposta()
+
+        def lettore(url, cred, chiama, tetto):
+            prodotti = []
+            for n in range(st["pagine_catalogo"]):
+                try:
+                    chiama("GET", f"{url}?p={n}", {})
+                except Exception as e:
+                    if st["riveste"]:      # un lettore che riveste l'errore
+                        raise RuntimeError(f"pagina {n} fallita: {e}")
+                    raise
+                prodotti.append(n)
+            if st["letto_poi_chiude"]:
+                g["_SI_CHIUDE"].set()
+            return prodotti, "", True
+
+        async def in_errore(c, e):
+            st["errori"].append(e)
+
+        async def chiudi(c, esito):
+            st["chiusi"] += 1
+
+        class Con:
+            def close(self): pass
+
+        def riconcilia(*a, **k):
+            st["scritture"] += 1
+            return {"saltati": []}
+
+        mod = type("M", (), {})()
+        mod.LETTORI = {"finto": lettore}
+        mod.traduci = lambda prodotti, fonte, cambio: []
+        mod.riconcilia_connettore = riconcilia
+        g.update({"_APRITORE_API": Apritore(),
+                  "url_api_ammesso": lambda u: True,
+                  "TETTO_RISPOSTA_API": 10**6,
+                  "_CONNETTORI_IN_CORSO": set(),
+                  "_decifra_contenuto": lambda x: "{}",
+                  "MAX_PRODOTTI_CONNETTORE": 10**6,
+                  "_connettore_in_errore": in_errore,
+                  "_righe_da_giudicare": lambda righe, c: ([], []),
+                  "db": lambda: Con(),
+                  "MSG_RIGA_NON_GIUDICATA": "x",
+                  "MAX_NUOVI_CONNETTORE_GIRO": 30,
+                  "_salva_foto_connettore": lambda *a: None,
+                  "_chiudi_giro_connettore": chiudi})
+        c = {"id": 7, "fonte": "finto", "credenziali": "",
+             "url_negozio": "https://negozio.example"}
+        return g, st, mod, c
+
+    # 1) LA SCENA DEL 30 SET: un catalogo lungo, letto piano in un filo
+    #    vero, e a meta' arriva lo spegnimento
+    g, st, mod, c = banco()
+    st.update(ritardo=0.02, pagine_catalogo=500)     # 10 s di lettura
+
+    async def scena():
+        compito = _aio.ensure_future(g["_un_connettore"](c, {}, mod))
+        await _aio.sleep(0.25)
+        await g["ferma_i_giri_lunghi"]()
+        tempi["gancio"] = _t.monotonic()
+        await _aio.wait_for(compito, 5)
+
+    # il cronometro va dal gancio a quando `asyncio.run` e' USCITO: e'
+    # li' che aspetta i fili, cioe' li' che il 30 set si restava appesi
+    tempi = {}
+    _aio.run(scena())
+    durata = _t.monotonic() - tempi["gancio"]
+    prova("allo spegnimento la lettura esce in un attimo, non a fine catalogo",
+          True, durata < 1.0 and st["pagine"] < 100)
+    prova("...e lo spegnimento NON si conta fra gli errori del negozio",
+          [], st["errori"])
+    prova("...niente scritture cominciate mentre si chiude", 0,
+          st["scritture"] + st["chiusi"])
+    prova("...e il collegamento non resta segnato «in corso»", set(),
+          g["_CONNETTORI_IN_CORSO"])
+
+    # 2) IL CONTROLLO: senza spegnimento il giro arriva in fondo e scrive
+    g, st, mod, c = banco()
+    _aio.run(g["_un_connettore"](c, {}, mod))
+    prova("senza spegnimento: letto tutto, scritto, report chiuso",
+          (5, 1, 1, []), (st["pagine"], st["scritture"], st["chiusi"],
+                          st["errori"]))
+
+    # 3) ...e un guasto VERO resta un errore contato
+    g, st, mod, c = banco()
+    st["guasto_a"] = 3
+    _aio.run(g["_un_connettore"](c, {}, mod))
+    prova("un negozio muto resta un errore contato, e non si scrive",
+          (1, 0), (len(st["errori"]), st["scritture"]))
+
+    # 4) un lettore che RIVESTE l'eccezione non inganna il giudice
+    g, st, mod, c = banco()
+    st.update(riveste=True, pagine_catalogo=50)
+    g["_SI_CHIUDE"].set()
+    _aio.run(g["_un_connettore"](c, {}, mod))
+    prova("errore rivestito dal lettore, a spegnimento acceso: non contato",
+          ([], 0, 0), (st["errori"], st["scritture"], st["pagine"]))
+
+    # 5) letto per intero proprio mentre si chiude: non si scrive
+    g, st, mod, c = banco()
+    st["letto_poi_chiude"] = True
+    _aio.run(g["_un_connettore"](c, {}, mod))
+    prova("letto tutto mentre si chiude: la scrittura non comincia",
+          (0, 0, []), (st["scritture"], st["chiusi"], st["errori"]))
+
+    # 6) il tubo, da solo: a segnale acceso non bussa nemmeno
+    g, st, mod, c = banco()
+    g["_SI_CHIUDE"].set()
+    try:
+        g["chiama_api_negozio"]("GET", "https://negozio.example/x", {})
+        esito = "ha bussato"
+    except Exception as e:
+        esito = type(e).__name__
+    prova("il tubo a segnale acceso alza SpegnimentoInCorso senza bussare",
+          ("SpegnimentoInCorso", 0), (esito, st["pagine"]))
+
+    # 7) il giro dell'orologio: non parte, e non passa al prossimo
+    g, st, mod, c = banco()
+    g.update(CONNETTORI_NEGOZIO_APERTI=True, _prossimo_giro_connettori=0.0,
+             SECONDI_SYNC_CONNETTORI=3600)
+    def db_vietato():
+        raise AssertionError("ha aperto il database")
+    g["db"] = db_vietato
+    g["_SI_CHIUDE"].set()
+    try:
+        _aio.run(g["sincronizza_connettori"]())
+        esito = "fermo"
+    except AssertionError as e:
+        esito = str(e)
+    prova("a spegnimento acceso il giro dell'orologio non parte", "fermo", esito)
+
+    g, st, mod, c = banco()
+    fatti = []
+
+    class Righe:
+        def execute(self, *a):
+            return self
+        def fetchall(self):
+            return [{"id": 1}, {"id": 2}, {"id": 3}]
+        def close(self):
+            pass
+
+    async def uno_finto(riga, cambio, imp):
+        fatti.append(riga["id"])
+        g["_SI_CHIUDE"].set()        # lo spegnimento arriva durante il primo
+
+    g.update(CONNETTORI_NEGOZIO_APERTI=True, _prossimo_giro_connettori=0.0,
+             SECONDI_SYNC_CONNETTORI=3600, db=lambda: Righe(),
+             cambio_per_import=lambda: {}, _un_connettore=uno_finto)
+    _aio.run(g["sincronizza_connettori"]())
+    prova("...e se arriva a meta' giro, il collegamento dopo non comincia",
+          [1], fatti)
+
+
 def prove_connettori_varianti():
     """VARIANTI E DIGITALI DAI NEGOZI COLLEGATI (set 2026), dalle due
     segnalazioni di «Un tempo per te»: il libro in PDF o cartaceo che
@@ -113225,6 +113450,7 @@ def main():
               prove_connettori_woo, prove_connettori_registro,
               prove_connettori_ingresso,
               prove_connettori_varianti,
+              prove_connettore_interrompibile,
               prove_famiglie,
               prove_connettori_cassetto,
               prove_finestra,
