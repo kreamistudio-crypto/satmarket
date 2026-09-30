@@ -3527,8 +3527,14 @@
   testa, gli altri dietro nell'ordine del vocabolario). Il VOCABOLARIO
   (`slug_sponsorizzabili`) e' la somma di due cataloghi che restano due:
   le pagine del server con `banner: True` — prima — e `SLUG_SPONSOR`,
-  il catalogo di casa; da qui «prima Un tempo per te, poi To The Mooon»
-  senza nessun gesto. La scadenza di uno non tocca l'altro: il gate in
+  il catalogo di casa. L'ORDINE DI SERIE E' QUELLO DI ACCENSIONE (30 set
+  2026, decisione di Andrea, che rovescia il «prima Un tempo per te» del
+  24): `sponsor_dal:<slug>` si scrive quando uno spazio si accende da
+  spento (un rinnovo non la tocca), e `sponsor_ordine` mette a sinistra
+  chi si e' acceso prima; gli spazi accesi prima della data stanno
+  davanti, e fra loro il catalogo di casa. L'ordine SCELTO (le frecce del
+  pannello, o `/sponsor ordine`) vince, e chi non vi e' nominato segue
+  nell'ordine di serie. La scadenza di uno non tocca l'altro: il gate in
   lettura e' per slug (`sponsor_fino(slug)`). ACCESO NON VUOL DIRE
   VISIBILE: la busta di prima pagina porta `sponsorizzati`
   (`sponsorizzati_pubblici`) — `{slug}` per il catalogo di casa,
@@ -3546,7 +3552,13 @@
   (tutti), `/sponsor ordine <slug> <slug>` (l'ordine). Il preavviso
   delle 72 ore e' uno per spazio, col timbro `sponsor_scadenza:<slug>`
   (quello unico di ieri vale ancora per lo slug che nomina).
-  Il pannello dello spazio non esiste: si governa solo dal bot. ⚠️ NON SI PROVA NIENTE PRIMA DI CREDERCI,
+  DAL PANNELLO SI DECIDE SOLO L'ORDINE (30 set 2026): il cassetto
+  «📣 Ordine dei banner» mostra gli spazi accesi con ↑/↓ e, a ordine
+  scelto, «↺ Torna all'ordine di serie». Le porte sono
+  `GET /api/admin/sponsor` e `POST /api/admin/sponsor/ordine` (la fila
+  degli accesi, o `{"serie": true}` che la cancella), dei soli
+  moderatori col 403 prima del corpo. Accendere e spegnere restano del
+  bot. ⚠️ NON SI PROVA NIENTE PRIMA DI CREDERCI,
   al contrario di `/canale`: li' si manda un messaggio di collaudo
   perche' il permesso su un canale altrui non dipende da noi, qui lo
   slug si valida contro `SLUG_SPONSOR` — che e' roba di casa — e non
@@ -3726,7 +3738,10 @@
   `assets/consigliati/<slug>.webp`, preparato da
   `prepara_logo_consigliato.py` (ritaglio sopra la soglia 8, 432px che
   sono il 3x dei 144 della card piu' grande, WebP q90 con la
-  trasparenza). La rotta `/assets/consigliati/{slug}.webp` serve lo
+  trasparenza; con la SCALA facoltativa, `0.86`, il disegno occupa
+  quella parte del riquadro e il resto e' margine trasparente dentro il
+  file — cosi' stanno Una Garlanda e Un tempo per te, che pieni
+  toccavano il bordo del quadrato). La rotta `/assets/consigliati/{slug}.webp` serve lo
   spazio sempre e le pagine del server solo pubblicate col logo — al
   contrario delle foto, il logo di una bozza non serve all'anteprima.
   LA BOZZA NON HA STRADE: la busta la lascia fuori per chiunque, e

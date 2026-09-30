@@ -17,10 +17,13 @@ IL GIRO, nell'ordine in cui lo farebbe Andrea:
     e' admin la risposta di un messaggio qualunque;
   - accende To The Mooon e Un tempo per te — che e' ancora IN BOZZA:
     nella busta resta solo To The Mooon, e il bot l'ha detto;
-  - il moderatore pubblica la pagina: due card, prima Un tempo per te e
-    poi To The Mooon, col codice del negozio risolto e mai il tg_id; il
-    banner si serve;
+  - il moderatore pubblica la pagina: due card, prima To The Mooon (si
+    e' acceso prima: l'ordine di serie e' quello di accensione, 30 set
+    2026) e poi Un tempo per te, col codice del negozio risolto e mai il
+    tg_id; il banner si serve;
   - `/sponsor ordine` rovescia la fila;
+  - le frecce del pannello (30 set 2026): la porta e' dei moderatori, la
+    fila storta si rifiuta, e l'ordine scritto e' quello della busta;
   - la scadenza di uno non tocca l'altro, nei due versi;
   - `/sponsor <slug> spento` spegne quello solo, `/sponsor spento` tutti;
   - il preavviso: uno per spazio, e una volta sola per scadenza;
@@ -130,8 +133,10 @@ def giro(c, SRV, cat):
     fila, _ = busta()
     prova("a spazi spenti la busta porta una fila vuota", [], fila)
     t = bot("/sponsor")
+    # (spenti e senza data: l'ordine di serie mette avanti il catalogo
+    # di casa, 30 set 2026)
     prova("/sponsor nudo dice lo stato di tutti, nell'ordine", True,
-          t.index(PAGINA) < t.index(CASA) and t.count("spento") >= 2)
+          t.index(CASA) < t.index(PAGINA) and t.count("spento") >= 2)
     prova("...e dice che la pagina e' in bozza", True,
           bozza_di(t, PAGINA))
     prova("...e insegna i gesti nuovi: uno, tutti, l'ordine", True,
@@ -151,8 +156,12 @@ def giro(c, SRV, cat):
           PAGINA in t and "in vetrina" in t)
     prova("...e il bot dice che la card compare solo pubblicata", True,
           "IN BOZZA" in t and "scadenza corre" in t)
-    prova("i due spazi sono accesi, nell'ordine di partenza", [PAGINA, CASA],
-          SRV.sponsor_accesi())
+    prova("i due spazi sono accesi, nell'ordine di accensione",
+          [CASA, PAGINA], SRV.sponsor_accesi())
+    dal = [int(SRV.impostazione(f"sponsor_dal:{x}", "") or 0)
+           for x in (CASA, PAGINA)]
+    prova("...e ognuno ha la sua data d'accensione, in quell'ordine", True,
+          0 < dal[0] <= dal[1])
     fila, testo = busta()
     prova("in bozza la busta porta solo To The Mooon", [{"slug": CASA}], fila)
     prova("...e il banner della bozza non si serve", 404,
@@ -170,10 +179,10 @@ def giro(c, SRV, cat):
     prova("il moderatore pubblica la pagina", (200, "pubblicato"),
           (r.status_code, r.json().get("stato")))
     fila, testo = busta()
-    prova("due card, prima Un tempo per te e poi To The Mooon, col codice "
-          "risolto", [{"slug": PAGINA, "titolo": cat["titolo"],
-                       "emoji": cat["emoji"], "negozio": codice},
-                      {"slug": CASA}], fila)
+    prova("due card, prima To The Mooon e poi Un tempo per te, col codice "
+          "risolto", [{"slug": CASA},
+                      {"slug": PAGINA, "titolo": cat["titolo"],
+                       "emoji": cat["emoji"], "negozio": codice}], fila)
     prova("...e il tg_id del venditore non viaggia", False,
           '"venditore_tg"' in testo)
     r = c.get(f"/assets/scoprire/{PAGINA}.webp")
@@ -188,20 +197,76 @@ def giro(c, SRV, cat):
     prova("...e la bozza non la dice piu'", False, bozza_di(t, PAGINA))
 
     print("\n[l'ordine]")
-    t = bot(f"/sponsor ordine {CASA} {PAGINA}")
-    prova("/sponsor ordine rovescia la fila", [CASA, PAGINA],
+    t = bot(f"/sponsor ordine {PAGINA} {CASA}")
+    prova("/sponsor ordine rovescia la fila", [PAGINA, CASA],
           slug_in(busta()[0]))
     prova("...e il bot la ridice", True,
-          "1. <b>" + CASA in t and "2. <b>" + PAGINA in t)
-    t = bot(f"/sponsor ordine {PAGINA} mai-visto")
+          "1. <b>" + PAGINA in t and "2. <b>" + CASA in t)
+    t = bot(f"/sponsor ordine {CASA} mai-visto")
     prova("un nome inventato nell'ordine non cambia niente", (True,
-          [CASA, PAGINA]), ("mai-visto" in t, slug_in(busta()[0])))
+          [PAGINA, CASA]), ("mai-visto" in t, slug_in(busta()[0])))
     t = bot("/sponsor ordine")
     prova("...e un ordine vuoto nemmeno, e il bot fa l'esempio", (True,
-          [CASA, PAGINA]), ("/sponsor ordine" in t, slug_in(busta()[0])))
-    bot(f"/sponsor ordine {PAGINA}")
+          [PAGINA, CASA]), ("/sponsor ordine" in t, slug_in(busta()[0])))
+    bot(f"/sponsor ordine {CASA}")
     prova("nominarne uno lo mette in testa, gli altri seguono",
+          [CASA, PAGINA], slug_in(busta()[0]))
+    bot(f"/sponsor ordine {PAGINA}")
+    prova("...e nominarne un altro rimette in testa lui",
           [PAGINA, CASA], slug_in(busta()[0]))
+
+    print("\n[le frecce del pannello]")
+    prova("la porta degli spazi e' dei moderatori", [401, 403],
+          [c.get("/api/admin/sponsor", headers=h).status_code
+           for h in (ANONIMO, VENDITORE)])
+    r = c.get("/api/admin/sponsor", headers=MODERATORE)
+    d = r.json()
+    prova("...e al moderatore dice gli spazi nell'ordine, accesi e no",
+          (200, [PAGINA, CASA], True),
+          (r.status_code, [x["slug"] for x in d["spazi"] if x["fino"] > 0],
+           d["scelto"]))
+    prova("...e nessun tg_id nella risposta", False,
+          '"venditore_tg"' in r.text)
+    prova("scrivere l'ordine e' dei moderatori", [401, 403],
+          [c.post("/api/admin/sponsor/ordine", headers=h,
+                  json={"ordine": [CASA, PAGINA]}).status_code
+           for h in (ANONIMO, VENDITORE)])
+    prova("...e una fila storta non scrive niente", ([400, 400, 400],
+          [PAGINA, CASA]),
+          ([c.post("/api/admin/sponsor/ordine", headers=MODERATORE,
+                   json=j).status_code
+            for j in ({"ordine": []}, {"ordine": "tutti"},
+                      {"ordine": [CASA, "mai-visto"]})],
+           slug_in(busta()[0])))
+    r = c.post("/api/admin/sponsor/ordine", headers=MODERATORE,
+               json={"ordine": [CASA, PAGINA]})
+    prova("la freccia sposta: la busta ha l'ordine nuovo", (200, [CASA, PAGINA]),
+          (r.status_code, slug_in(busta()[0])))
+    t = bot("/sponsor")
+    prova("...e il bot lo ridice", True,
+          "1. <b>" + CASA in t and "2. <b>" + PAGINA in t)
+    r = c.post("/api/admin/sponsor/ordine", headers=MODERATORE,
+               json={"ordine": [PAGINA, CASA]})
+    prova("...e si torna indietro con la freccia opposta",
+          (200, [PAGINA, CASA]), (r.status_code, slug_in(busta()[0])))
+    # «TORNA ALL'ORDINE DI SERIE»: la fila scelta si cancella e le card
+    # tornano in ordine di accensione (To The Mooon si e' acceso prima)
+    prova("...e una chiave di serie storta non cancella niente",
+          (400, [PAGINA, CASA]),
+          (c.post("/api/admin/sponsor/ordine", headers=MODERATORE,
+                  json={"serie": "si"}).status_code, slug_in(busta()[0])))
+    r = c.post("/api/admin/sponsor/ordine", headers=MODERATORE,
+               json={"serie": True})
+    prova("torna all'ordine di serie: la fila d'accensione, e non e' piu' "
+          "scelta", (200, [CASA, PAGINA], False, ""),
+          (r.status_code, slug_in(busta()[0]), r.json().get("scelto"),
+           SRV.impostazione("sponsor_ordine", "")))
+    prova("...e chi non e' moderatore non ci torna", 403,
+          c.post("/api/admin/sponsor/ordine", headers=VENDITORE,
+                 json={"serie": True}).status_code)
+    # (si rimette la fila del giro, che i pezzi dopo si aspettano)
+    c.post("/api/admin/sponsor/ordine", headers=MODERATORE,
+           json={"ordine": [PAGINA, CASA]})
 
     print("\n[la scadenza di uno non tocca l'altro]")
     ora = int(time.time())

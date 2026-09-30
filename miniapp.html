@@ -39470,6 +39470,12 @@ async function loadAdminStats(){
        come i banner — il cassetto c'e' anche quando nessuna aspetta
        niente, perche' e' l'unico posto da cui una bozza si guarda */
     try { await caricaRaccontiAdmin(); } catch(e) { admRacconti = []; }
+    /* gli spazi di «Da scoprire» (30 set 2026): il cassetto dell'ordine */
+    try {
+      const rs = await fetch(`${API_BASE}/admin/sponsor`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      admSponsor = rs.ok ? await rs.json() : null;
+    } catch(e) { admSponsor = null; }
     let rev = [];
     if (s.in_revisione) {
       try {
@@ -39588,6 +39594,7 @@ async function loadAdminStats(){
         <div style="margin-top:10px">${resto.map(rigaBanner).join('')}</div>`) : '');
       })()}
       ${boxRacconti(admRacconti)}
+      ${boxSponsor(admSponsor)}
       ${decisi.length ? cassettoAdm('accAdmDecisi', '↩︎',
         'Decisi di recente', decisi.length, `
         <div class="sub">Si può ancora ripensarci: rimette l'annuncio in attesa.</div>
@@ -40484,6 +40491,94 @@ function boxRacconti(lista){
     bozze ? `${bozze} in bozza` : `${lista.length} pubblicat${lista.length === 1 ? 'a' : 'e'}`, `
     <div class="sub">Una pagina in bozza la vedete voi moderatori e, sul suo negozio, il suo venditore: fuori da vetrina, ricerca, link condivisi e anteprime finché non la pubblicate. Il link dell'anteprima si apre solo a voi e a lui.</div>
     <div style="margin-top:10px">${righe}</div>`);
+}
+
+/* 📣 L'ORDINE DEI BANNER IN «DA SCOPRIRE» (30 set 2026, richiesta di
+   Andrea): gli spazi ACCESI nell'ordine delle card, da sinistra, con le
+   frecce su/giu' — il gesto piu' semplice che si fa col pollice, senza
+   trascinare niente in una pagina che scorre. Di serie l'ordine e'
+   quello di accensione (il primo sponsorizzato a sinistra); una freccia
+   lo trasforma in ordine SCELTO, che resta finche' non lo si cambia.
+   Accendere e spegnere restano del bot: qui c'e' solo il DOVE. Gli
+   spenti si nominano in una riga, senza frecce: non hanno una card.
+   Una freccia che non porterebbe da nessuna parte (su per il primo,
+   giu' per l'ultimo) non c'e', e lascia il suo posto vuoto perche' le
+   altre restino in colonna. Gli slug finiscono negli onclick:
+   filtro-alfabeto sulla loro forma, come nel cassetto delle pagine. */
+let admSponsor = null;
+const nomeSpazio = x => x.titolo
+  || (RACCONTI[x.slug] && RACCONTI[x.slug].titolo) || x.slug;
+function boxSponsor(d){
+  if (!d || !Array.isArray(d.spazi) || !d.spazi.length) return '';
+  const accesi = d.spazi.filter(x => x.fino > 0);
+  const spenti = d.spazi.filter(x => !(x.fino > 0));
+  const freccia = (slug, verso, c) => c
+    ? `<button class="btn ghost" style="flex:0 0 44px;width:44px;height:44px;padding:0"
+         aria-label="${verso < 0 ? 'Sposta a sinistra' : 'Sposta a destra'}"
+         onclick="spostaSponsor('${slug}',${verso})">${verso < 0 ? '↑' : '↓'}</button>`
+    : `<span style="flex:0 0 44px"></span>`;
+  const righe = accesi.map((x, k) => {
+    const slug = String(x.slug || '').replace(/[^a-z0-9-]/g, '');
+    const data = new Date(x.fino * 1000).toLocaleDateString('it-IT',
+      {day:'numeric', month:'long', year:'numeric'});
+    return `
+      <div class="order">
+        <div class="row" style="gap:8px;align-items:center">
+          <b style="min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis">${k + 1}. ${esc(x.emoji || '')} ${esc(nomeSpazio(x))}</b>
+          ${freccia(slug, -1, k > 0)}${freccia(slug, 1, k < accesi.length - 1)}
+        </div>
+        <div class="sub">In vetrina fino al ${esc(data)}${x.bozza
+          ? ' · ⚠️ pagina in bozza: la card non si vede' : ''}</div>
+      </div>`;
+  }).join('');
+  return cassettoAdm('accAdmSponsor', '📣', 'Ordine dei banner',
+    `${accesi.length} in vetrina`, `
+    <div class="sub">L'ordine delle card in «Da scoprire», da sinistra a destra. ${d.scelto
+      ? 'L\'avete scelto voi: resta così finché non lo cambiate. Chi si accende dopo arriva in fondo.'
+      : 'Di serie: il primo sponsorizzato a sinistra, gli altri a seguire. Con le frecce lo scegliete voi, e resta finché non lo cambiate.'}</div>
+    <div style="margin-top:10px">${righe || '<div class="sub">Nessuno spazio acceso: si accendono dal bot con <code>/sponsor</code>.</div>'}</div>
+    ${spenti.length ? `<div class="sub" style="margin-top:6px">Spenti: ${
+      spenti.map(x => esc(nomeSpazio(x))).join(', ')}</div>` : ''}
+    ${d.scelto ? `<button class="btn ghost" style="margin-top:10px"
+      onclick="ordineSponsorDiSerie()">↺ Torna all'ordine di serie</button>` : ''}`);
+}
+/* «TORNA ALL'ORDINE DI SERIE» (30 set 2026, richiesta di Andrea): c'e'
+   solo quando un ordine scelto c'e' — un bottone che non cambierebbe
+   niente non si mostra —, e chiede conferma perche' la fila scelta a
+   mano non torna indietro da sola. */
+function ordineSponsorDiSerie(){
+  chiediConferma({
+    titolo: "Tornare all'ordine di serie?",
+    corpo: "Le card tornano in ordine di accensione: il primo sponsorizzato a sinistra, gli altri a seguire. L'ordine che avete scelto con le frecce si perde.",
+    etichetta: "Torna all'ordine di serie",
+    poi: async () => {
+      try {
+        const r = await fetch(`${API_BASE}/admin/sponsor/ordine`,
+          {method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+           body: JSON.stringify({serie: true})});
+        const d = await r.json().catch(()=>({}));
+        if (!r.ok) { toast(d.detail || 'Operazione non riuscita', 4000); return; }
+        toast('Ordine di serie');
+      } catch(e) { toast('Rete assente: riprova'); return; }
+      loadAdminStats();
+    }});
+}
+async function spostaSponsor(slug, verso){
+  haptic();
+  const fila = ((admSponsor && admSponsor.spazi) || [])
+    .filter(x => x.fino > 0).map(x => x.slug);
+  const i = fila.indexOf(slug), j = i + verso;
+  if (i < 0 || j < 0 || j >= fila.length) return;
+  [fila[i], fila[j]] = [fila[j], fila[i]];
+  try {
+    const r = await fetch(`${API_BASE}/admin/sponsor/ordine`,
+      {method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+       body: JSON.stringify({ordine: fila})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Operazione non riuscita', 4000); return; }
+    toast('Ordine salvato');
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  loadAdminStats();
 }
 
 /* Il registro della moderazione: riepilogo degli ultimi 30 giorni +

@@ -43422,8 +43422,13 @@ def prove_sponsor():
                    if r_.get("banner") is True]
     prova("il vocabolario: le pagine col banner, poi il catalogo di casa",
           tuple(_col_banner) + amb["SLUG_SPONSOR"], voc)
-    prova("...e l'ordine di partenza e' quello chiesto da Andrea", True,
-          voc.index("un-tempo-per-te") < voc.index("to-the-moon"))
+    # L'ORDINE DI SERIE NON E' PIU' QUELLO DEL VOCABOLARIO (30 set 2026,
+    # decisione di Andrea che rovescia il «prima Un tempo per te» del 24):
+    # e' quello di ACCENSIONE, e fra gli spazi accesi prima della data
+    # (nessuna riga `sponsor_dal:`) viene prima il catalogo di casa
+    amb["_SPONSOR"] = None
+    prova("...e senza date l'ordine di serie mette To The Mooon in testa",
+          "to-the-moon", amb["sponsor_ordine"]()[0])
     prova("...e una pagina senza banner non si accende", [],
           [s_ for s_ in voc if s_ in _rac.RACCONTI_NEGOZI
            and _rac.RACCONTI_NEGOZI[s_].get("banner") is not True])
@@ -43474,8 +43479,8 @@ def prove_sponsor():
     # l'altro. Col catalogo vero.
     _k2 = "sponsor_fino:un-tempo-per-te"
     _rileggi({_k: _ora + 60, _k2: _ora + 60})
-    prova("due spazi accesi insieme, nell'ordine di partenza",
-          ["un-tempo-per-te", slug_vero], amb["sponsor_accesi"]())
+    prova("due spazi accesi insieme, senza data: prima To The Mooon",
+          [slug_vero, "un-tempo-per-te"], amb["sponsor_accesi"]())
     _rileggi({_k: _ora - 1, _k2: _ora + 60})
     prova("...e se scade To The Mooon resta Un tempo per te",
           ["un-tempo-per-te"], amb["sponsor_accesi"]())
@@ -43504,14 +43509,51 @@ def prove_sponsor():
     prova("...scrivendo solo quelli del vocabolario", slug_vero,
           tavola.get("sponsor_ordine"))
 
+    # L'ORDINE DI SERIE E' QUELLO DI ACCENSIONE (30 set 2026): il primo
+    # sponsorizzato a sinistra. Girato sulle date, nei due versi, e con
+    # uno spazio acceso prima che la data esistesse (va davanti).
+    _d = "sponsor_dal:"
+    _rileggi({_k: _ora + 60, _k2: _ora + 60,
+              _d + slug_vero: _ora - 50, _d + "un-tempo-per-te": _ora - 90})
+    prova("accesi in due: prima chi si e' acceso prima",
+          ["un-tempo-per-te", slug_vero], amb["sponsor_accesi"]())
+    _rileggi({_k: _ora + 60, _k2: _ora + 60,
+              _d + slug_vero: _ora - 90, _d + "un-tempo-per-te": _ora - 50})
+    prova("...e nell'altro verso l'altro", [slug_vero, "un-tempo-per-te"],
+          amb["sponsor_accesi"]())
+    _rileggi({_k: _ora + 60, _k2: _ora + 60, _d + slug_vero: _ora - 50})
+    prova("...e chi era acceso prima della data sta davanti",
+          ["un-tempo-per-te", slug_vero], amb["sponsor_accesi"]())
+    _rileggi({_k: _ora + 60, _k2: _ora + 60,
+              _d + slug_vero: _ora - 90, _d + "un-tempo-per-te": _ora - 50,
+              "sponsor_ordine": "un-tempo-per-te"})
+    prova("...ma l'ordine scelto vince sulle date",
+          ["un-tempo-per-te", slug_vero], amb["sponsor_accesi"]())
+    _rileggi({_k: _ora + 60, _k2: _ora + 60, _d + slug_vero: "ieri"})
+    prova("...e una data storta vale «da prima di tutti», mai un errore",
+          [slug_vero, "un-tempo-per-te"], amb["sponsor_accesi"]())
+
     # ACCENDERE UNO NON TOCCA L'ALTRO, e uno slug inventato non scrive.
     _rileggi({_k2: _ora + 60})
     scritte.clear()
-    prova("accendere uno scrive la sua riga e basta",
-          (slug_vero, [(_k, str(_ora + 99))]),
-          (amb["imposta_sponsor"](slug_vero, _ora + 99), scritte[:]))
+    _esito = amb["imposta_sponsor"](slug_vero, _ora + 99)
+    prova("accendere uno scrive la sua scadenza e la sua data d'accensione",
+          (slug_vero, [f"sponsor_dal:{slug_vero}", _k], str(_ora + 99)),
+          (_esito, [k for k, v in scritte], dict(scritte).get(_k)))
+    prova("...e la data e' adesso", True,
+          abs(int(dict(scritte).get(f"sponsor_dal:{slug_vero}", 0))
+              - int(time.time())) <= 2)
     prova("...e l'altro resta com'era", _ora + 60,
           amb["sponsor_fino"]("un-tempo-per-te"))
+    # IL RINNOVO NON E' UNO SPONSOR NUOVO: la data resta, e con lei il
+    # posto nella fila; e spegnere non la scrive
+    scritte.clear()
+    amb["imposta_sponsor"](slug_vero, _ora + 999)
+    prova("rinnovare uno spazio acceso non tocca la sua data", [_k],
+          [k for k, v in scritte])
+    scritte.clear()
+    amb["imposta_sponsor"](slug_vero, 0)
+    prova("...e spegnerlo nemmeno", [_k], [k for k, v in scritte])
     scritte.clear()
     prova("uno slug inventato non scrive niente", ("", []),
           (amb["imposta_sponsor"]("mai-visto", _ora + 99), scritte[:]))
@@ -43541,16 +43583,20 @@ def prove_sponsor():
           [{"slug": slug_vero}], _busta(_due))
     _pub = dict(_due, **{"racconto_pubblicato:un-tempo-per-te": _ora})
     _cat_utpt = _rac.RACCONTI_NEGOZI["un-tempo-per-te"]
+    # (senza date, l'ordine di serie mette To The Mooon in testa: 30 set)
     prova("...pubblicata: due card, nell'ordine giusto, col codice risolto",
-          [{"slug": "un-tempo-per-te", "titolo": _cat_utpt["titolo"],
-            "emoji": _cat_utpt["emoji"], "negozio": "ab12cd34"},
-           {"slug": slug_vero}], _busta(_pub))
+          [{"slug": slug_vero},
+           {"slug": "un-tempo-per-te", "titolo": _cat_utpt["titolo"],
+            "emoji": _cat_utpt["emoji"], "negozio": "ab12cd34"}],
+          _busta(_pub))
     prova("...e il tg_id del venditore non esce", False,
           str(_cat_utpt.get("venditore_tg")) in repr(_busta(_pub)))
+    # (l'ordine scelto va CONTRO quello di serie, o la prova passerebbe
+    # anche con un ordine scelto ignorato)
     prova("...e l'ordine scelto vale anche qui",
-          [slug_vero, "un-tempo-per-te"],
+          ["un-tempo-per-te", slug_vero],
           [x["slug"] for x in _busta(dict(
-              _pub, sponsor_ordine=f"{slug_vero}"))])
+              _pub, sponsor_ordine="un-tempo-per-te"))])
     prova("...e la scadenza di To The Mooon non tocca Un tempo per te",
           ["un-tempo-per-te"],
           [x["slug"] for x in _busta(dict(_pub, **{_k: _ora - 1}))])
@@ -43574,16 +43620,23 @@ def prove_sponsor():
     # gate: `imposta_sponsor` e' l'unico posto che scrive, e lo
     # chiama solo il comando del bot. Un orologio che spegnesse
     # sarebbe uno stato in piu' da tenere in pari con la lettura.
-    _fn, _scrittori = "", set()
+    # DAL 30 SET 2026 L'ORDINE HA UN SECONDO SCRITTORE, le frecce del
+    # pannello (`ordine_sponsor_admin`): la sentinella si divide in due, e
+    # ACCENDERE E SPEGNERE restano del solo bot
+    _fn, _accende, _ordina = "", set(), set()
     for _r in src.split("\n"):
         _m = re.match(r"(?:async )?def (\w+)\(", _r)
         if _m:
             _fn = _m.group(1)
-        elif (("imposta_sponsor(" in _r or "imposta_ordine_sponsor(" in _r)
-              and _fn not in ("imposta_sponsor", "imposta_ordine_sponsor")):
-            _scrittori.add(_fn)
-    prova("a scrivere lo spazio e il suo ordine e' il solo comando del bot",
-          {"comando_sponsor"}, _scrittori)
+        elif _fn not in ("imposta_sponsor", "imposta_ordine_sponsor"):
+            if "imposta_sponsor(" in _r:
+                _accende.add(_fn)
+            if "imposta_ordine_sponsor(" in _r:
+                _ordina.add(_fn)
+    prova("ad accendere e spegnere uno spazio e' il solo comando del bot",
+          {"comando_sponsor"}, _accende)
+    prova("...e l'ordine lo scrivono il bot e le frecce del pannello",
+          {"comando_sponsor", "ordine_sponsor_admin"}, _ordina)
 
     # ---- 1b. LA DATA, NON I GIORNI RIMASTI ----------------------
     # Decisione di Andrea: quella riga si confronta col CALENDARIO, e
@@ -44335,6 +44388,150 @@ async function fetch(u){ url.push(u);
             if "'sponsor:' +" in l_ and "apriNegozio(" in l_]
     prova("a mandare «sponsor:» e' la sola card sponsorizzata", 1,
           len(_chi))
+
+    # ---- 7. LE FRECCE DEL PANNELLO (30 set 2026, richiesta di Andrea) --
+    # L'ordine delle card in «Da scoprire» si cambia dal cassetto 📣 del
+    # pannello, con su/giu' accanto a ogni spazio acceso. Le porte sono
+    # dei moderatori, e il 403 viene PRIMA di leggere il corpo; la fila
+    # passa dal vocabolario; e dalla porta non esce nessun tg_id.
+    for _nome in ("lista_sponsor_admin", "ordine_sponsor_admin"):
+        _f = pezzo(_nome)
+        prova(f"«{_nome}» e' dei soli moderatori, e lo chiede per primo",
+              True, "e_admin(user[\"id\"])" in _f
+              and _f.index("e_admin(") < (_f.index("leggi_json(")
+                                          if "leggi_json(" in _f
+                                          else len(_f)))
+    _fo = pezzo("ordine_sponsor_admin")
+    prova("...la fila vuota o storta si rifiuta, uno spazio inventato pure",
+          (True, True), ("isinstance(ordine, list) and ordine" in _fo,
+                         "all(s in voc for s in ordine):\n        raise HTTPException(400"
+                         in _fo))
+    prova("...e scrive con lo stesso gesto del bot", True,
+          "imposta_ordine_sponsor(ordine)" in _fo)
+    # «TORNA ALL'ORDINE DI SERIE»: una chiave sua, vero booleano — mai
+    # una lista vuota, che una fila persa per strada manderebbe da sola
+    prova("«torna all'ordine di serie» e' una chiave sua, vero booleano, "
+          "e cancella la fila scelta", True,
+          'if d.get("serie") is True:\n        imposta_ordine_sponsor([])'
+          in _fo)
+    _sa = pezzo("_spazi_admin")
+    prova("il cassetto riceve slug, titolo, emoji, scadenza e bozza: "
+          "nient'altro", ['"bozza"', '"emoji"', '"fino"', '"slug"',
+                          '"titolo"'],
+          sorted(set(re.findall(r'"(?:slug|titolo|emoji|fino|bozza|'
+                                r'negozio|venditore_tg|nome)"(?=:)', _sa))))
+    prova("...e le rotte stanno sotto /api/admin/", True,
+          '@app.get("/api/admin/sponsor")' in src
+          and '@app.post("/api/admin/sponsor/ordine")' in src)
+
+    # IL CASSETTO E LA FRECCIA, girati in node: il renderer vero su una
+    # fila di cartone, e la freccia vera con una fetch finta che si
+    # ricorda cosa ha mandato
+    import shutil as _sh, subprocess as _sp, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("il cassetto 📣 in node", "node non installato")
+        return
+    _js = ("const esc = s => String(s == null ? '' : s)"
+           ".replace(/&/g,'&amp;').replace(/</g,'&lt;')"
+           ".replace(/>/g,'&gt;').replace(/\"/g,'&quot;');\n"
+           "const RACCONTI = {'to-the-moon': {titolo: 'To The Mooon!'}};\n"
+           "const accAdmAperti = new Set();\n"
+           "let mandato = null, ricaricato = 0, detto = '', conferma = null;\n"
+           "const chiediConferma = c => { conferma = c; };\n"
+           "const haptic = () => {}, toast = t => { detto = t; },"
+           " loadAdminStats = () => { ricaricato++; },"
+           " authHdr = () => 'x', API_BASE = '/api';\n"
+           "globalThis.fetch = async (u, o) => { mandato = {u, o};"
+           " return {ok: true, json: async () => ({ok: true})}; };\n"
+           + pezzo_js(mini, "const cassettoAdm = ", "`;\n") + "`;\n"
+           + pezzo_js(mini, "let admSponsor = null;", "\n/* Il registro")
+           + "\n" + r"""
+const esiti = [];
+const dice = (che, atteso, avuto) => esiti.push([che,
+  JSON.stringify(atteso) === JSON.stringify(avuto) ? 'ok'
+    : 'atteso ' + JSON.stringify(atteso) + ', avuto ' + JSON.stringify(avuto)]);
+const conta = (s, p) => s.split(p).length - 1;
+const FUTURO = Math.floor(Date.now() / 1000) + 86400 * 30;
+admSponsor = {scelto: false, spazi: [
+  {slug: 'to-the-moon', titolo: '', emoji: '', fino: FUTURO, bozza: false},
+  {slug: 'una-garlanda', titolo: 'Una <b>Garlanda</b>', emoji: '🌾', fino: FUTURO, bozza: true},
+  {slug: 'un-tempo-per-te', titolo: 'Un tempo per te', emoji: '🌱', fino: FUTURO, bozza: false},
+  {slug: 'spento-1', titolo: 'Spento', emoji: '', fino: 0, bozza: false}]};
+const h = boxSponsor(admSponsor);
+dice('il cassetto nasce, col suo id', 1, conta(h, 'id="accAdmSponsor"'));
+dice('...una riga per spazio ACCESO, nell\'ordine', ['1.', '2.', '3.'],
+     [...h.matchAll(/<b[^>]*>(\d+\.)/g)].map(m => m[1]));
+dice('...il titolo dal catalogo di casa quando il server non lo manda', 1,
+     conta(h, 'To The Mooon!'));
+dice('...e il titolo del server passa da esc', [0, 1],
+     [conta(h, 'Una <b>Garlanda</b>'), conta(h, 'Una &lt;b&gt;Garlanda&lt;/b&gt;')]);
+dice('...due frecce per riga, tranne su per il primo e giu per l\'ultimo',
+     [2, 2], [conta(h, "',-1)"), conta(h, "',1)")]);
+dice('...il primo non sale e l\'ultimo non scende', [0, 0],
+     [conta(h, "spostaSponsor('to-the-moon',-1)"),
+      conta(h, "spostaSponsor('un-tempo-per-te',1)")]);
+dice('...la pagina in bozza lo dice', 1, conta(h, 'pagina in bozza'));
+dice('...e gli spenti si nominano, senza frecce', [1, 0],
+     [conta(h, 'Spenti: Spento'), conta(h, "spostaSponsor('spento-1'")]);
+dice('...e l\'ordine di serie lo dice', 1,
+     conta(h, 'il primo sponsorizzato a sinistra'));
+dice('scelto a mano, il cassetto lo dice', 1,
+     conta(boxSponsor(Object.assign({}, admSponsor, {scelto: true})),
+           'finché non lo cambiate'));
+dice('il bottone dell\'ordine di serie non c\'e\' se l\'ordine e\' gia\' di serie',
+     0, conta(h, 'ordineSponsorDiSerie()'));
+dice('...e c\'e\' quando l\'ordine e\' scelto', 1,
+     conta(boxSponsor(Object.assign({}, admSponsor, {scelto: true})),
+           'ordineSponsorDiSerie()'));
+dice('senza spazi, nessun cassetto', ['', ''],
+     [boxSponsor(null), boxSponsor({spazi: []})]);
+// (il nome della riga e' testo passato da esc, e li' lo slug storto
+// e' innocuo: la domanda e' sugli onclick)
+dice('uno slug storto non entra nell\'onclick', [],
+     [...boxSponsor({spazi: [{slug: "x');alert(1);('", fino: FUTURO},
+                             {slug: 'b', fino: FUTURO}]})
+       .matchAll(/onclick="([^"]*)"/g)].map(m => m[1])
+       .filter(o => /alert|[;()]\s*\(/.test(o.replace(/^spostaSponsor\('[a-z0-9-]*',-?1\)$/, ''))));
+(async () => {
+  await spostaSponsor('una-garlanda', -1);
+  dice('la freccia su scambia con quello prima, e manda la fila dei soli accesi',
+       ['/api/admin/sponsor/ordine', 'POST',
+        ['una-garlanda', 'to-the-moon', 'un-tempo-per-te']],
+       [mandato.u, mandato.o.method, JSON.parse(mandato.o.body).ordine]);
+  dice('...e ridisegna il pannello', 1, ricaricato);
+  mandato = null;
+  await spostaSponsor('un-tempo-per-te', 1);
+  dice('una freccia oltre il bordo non manda niente', null, mandato);
+  await spostaSponsor('un-tempo-per-te', -1);
+  dice('...e giu per il secondo scambia con il terzo',
+       ['to-the-moon', 'un-tempo-per-te', 'una-garlanda'],
+       JSON.parse(mandato.o.body).ordine);
+  mandato = null; ricaricato = 0;
+  ordineSponsorDiSerie();
+  dice('torna all\'ordine di serie: prima chiede, e non manda niente',
+       [true, null], [!!(conferma && conferma.poi), mandato]);
+  await conferma.poi();
+  dice('...confermato manda la chiave sua, e ridisegna',
+       [{serie: true}, 1], [JSON.parse(mandato.o.body), ricaricato]);
+  for (const [che, v] of esiti) console.log(v + '|' + che);
+})();
+""")
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as _f:
+        _f.write(_js)
+        _perc = _f.name
+    _r = _sp.run([_node, _perc], capture_output=True, text=True,
+                 encoding="utf-8")
+    os.unlink(_perc)
+    _esiti = [l_.split("|", 1)[::-1] for l_ in (_r.stdout or "").splitlines()
+              if "|" in l_]
+    if not _esiti:
+        prova("il banco del cassetto 📣 gira", "",
+              (_r.stderr or "nessuna uscita")[:300])
+        return
+    for _che, _avuto in _esiti:
+        prova(_che, "ok", _avuto)
 
 
 def prove_numeri_negozio():

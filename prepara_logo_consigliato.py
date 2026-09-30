@@ -29,7 +29,15 @@ client, per lo spazio sponsorizzato): e' quello che fa entrare il
 negozio fra i Consigliati. `prove.py` controlla che a ogni `logo` vero
 corrisponda il suo file, e viceversa.
 
-    python prepara_logo_consigliato.py percorso/del/logo.png slug
+4) LA SCALA, facoltativa (30 set 2026, Una Garlanda): un disegno che
+   riempie tutto il riquadro non lascia aria, e il ritocco `logo_giu`
+   lo spinge fuori dal quadrato — la cima tagliata, vista dal telefono.
+   Con `0.86` il disegno occupa l'86% del riquadro, e il resto e' un
+   margine TRASPARENTE uguale su ogni lato, dentro il file: non si puo'
+   metterlo nel PNG d'origine, il ritaglio del punto 1 lo toglierebbe.
+   Senza, il logo riempie il riquadro come sempre.
+
+    python prepara_logo_consigliato.py percorso/del/logo.png slug [scala]
 """
 import os
 import re
@@ -44,10 +52,18 @@ QUALITA = 90
 
 
 def main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4):
         print(__doc__.strip().splitlines()[-1].strip())
         return 1
     sorgente, slug = sys.argv[1], sys.argv[2].strip().lower()
+    try:
+        scala = float(sys.argv[3]) if len(sys.argv) == 4 else 1.0
+    except ValueError:
+        scala = 0.0
+    # sotto la meta' non e' piu' un ritocco: il marchio sparirebbe
+    if not 0.5 <= scala <= 1.0:
+        print(f"scala non valida: «{sys.argv[3]}» (un numero fra 0.5 e 1)")
+        return 1
     # la forma degli slug delle rotte dei racconti: niente che possa
     # diventare un percorso fuori dalla cartella
     if not re.fullmatch(r"[a-z0-9-]{2,40}", slug):
@@ -72,15 +88,21 @@ def main():
     disegno = im.crop(bb)
     # il ridimensionamento in alfa PREMOLTIPLICATO: sui bordi semitrasparenti
     # il colore dei pixel invisibili non deve colare dentro il disegno
-    fattore = min(1.0, LATO / max(disegno.size))
+    fattore = min(1.0, LATO * scala / max(disegno.size))
     misura = (max(1, round(disegno.size[0] * fattore)),
               max(1, round(disegno.size[1] * fattore)))
     finale = (disegno.convert("RGBa").resize(misura, Image.LANCZOS)
               .convert("RGBA"))
     # un'immagine NUOVA e non la copia: cosi' non si porta dietro nessun
     # profilo o metadato del file d'origine
-    pulita = Image.new("RGBA", finale.size)
-    pulita.paste(finale)
+    # ...col margine della scala tutt'attorno, uguale su ogni lato: il
+    # lato lungo della tela torna quello che il disegno avrebbe avuto
+    # senza scala, e nel riquadro il disegno ne occupa la `scala`
+    lungo = max(finale.size)
+    m = round((lungo / scala - lungo) / 2) if scala < 1 else 0
+    pulita = Image.new("RGBA", (finale.size[0] + 2 * m,
+                                finale.size[1] + 2 * m), (0, 0, 0, 0))
+    pulita.paste(finale, (m, m))
     os.makedirs(CARTELLA, exist_ok=True)
     destino = os.path.join(CARTELLA, slug + ".webp")
     pulita.save(destino, "WEBP", quality=QUALITA, method=6)

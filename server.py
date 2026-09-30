@@ -1838,7 +1838,9 @@ def imposta_canale(valore: str) -> str:
 # (lo tiene una prova di prove_racconti_bozza), quindi ogni spazio ha
 # una leva sola.
 # LO STATO E' UNA RIGA PER NEGOZIO, `sponsor_fino:<slug>` (l'istante in
-# cui scade, 0 = spento), piu' l'ordine delle card, `sponsor_ordine`.
+# cui scade, 0 = spento), piu' l'ordine delle card, `sponsor_ordine`,
+# e dal 30 set 2026 `sponsor_dal:<slug>` (quando si e' acceso l'ultima
+# volta: l'ordine di serie, il primo sponsorizzato a sinistra).
 # Le due righe di ieri (`sponsor_slug` + `sponsor_fino`) si leggono
 # ancora, e solo per lo slug che nominano, finche' la sua riga nuova
 # non c'e': uno spazio acceso prima del deploy resta acceso fino alla
@@ -1866,11 +1868,12 @@ NEGOZIO_SPONSOR_CASA = {"to-the-moon": "1b9a53e6"}
 # di toglierla anche qui.
 STORIA_CASA_NEL_NEGOZIO = ("to-the-moon",)
 
-_SPONSOR = None     # None = mai letto; {"fino": {slug: fino}, "ordine": [...]}
+_SPONSOR = None     # None = mai letto; {"fino": {...}, "ordine": [...], "dal": {...}}
 
 
 def slug_sponsorizzabili() -> tuple:
-    """IL VOCABOLARIO DEGLI SPAZI, nell'ordine di partenza delle card: le
+    """IL VOCABOLARIO DEGLI SPAZI (il suo ordine e' solo lo spareggio fra
+    spazi accesi alla stessa data: vedi `sponsor_ordine`): le
     pagine del server che hanno il loro banner (il disegno della card
     con il nome dentro, in `assets/scoprire/<slug>.webp`), poi il
     catalogo di casa. Una pagina senza banner non si puo' accendere: la
@@ -1906,22 +1909,42 @@ def _sponsor_righe() -> dict:
                 fino[s] = int(riga)
             except ValueError:
                 fino[s] = 0
+        # quando ogni spazio si e' ACCESO l'ultima volta (30 set 2026):
+        # l'ordine di serie delle card. Senza riga (acceso prima del
+        # deploy, o mai) vale 0, cioe' «da prima di tutti»
+        dal = {}
+        for s in slug_sponsorizzabili():
+            try:
+                dal[s] = int(impostazione(f"sponsor_dal:{s}", "") or 0)
+            except ValueError:
+                dal[s] = 0
         ordine = [x for x in (impostazione("sponsor_ordine", "")
                               or "").split(",") if x]
-        _SPONSOR = {"fino": fino, "ordine": ordine}
+        _SPONSOR = {"fino": fino, "ordine": ordine, "dal": dal}
     return _SPONSOR
 
 
 def sponsor_ordine() -> list:
     """TUTTI gli spazi, accesi o no, nell'ordine delle card: prima quelli
-    che `/sponsor ordine` ha nominato, nell'ordine in cui li ha nominati,
-    poi gli altri nell'ordine del vocabolario. Uno slug dell'ordine che
-    non e' piu' nel vocabolario si salta in silenzio: l'ordine dice
-    DOVE, mai SE."""
+    che un moderatore ha messo in fila (le frecce del pannello, o
+    `/sponsor ordine`), nell'ordine scelto, poi gli altri nell'ORDINE DI
+    SERIE. Uno slug dell'ordine che non e' piu' nel vocabolario si salta
+    in silenzio: l'ordine dice DOVE, mai SE.
+    L'ORDINE DI SERIE E' QUELLO DI ACCENSIONE (30 set 2026, decisione di
+    Andrea, che rovescia il «prima le pagine del server» del 24 set): il
+    primo sponsorizzato a sinistra, gli altri a seguire. Uno spazio
+    acceso prima che esistesse `sponsor_dal:` non ha la data, e sta
+    davanti; fra quelli senza data viene prima il catalogo di casa —
+    To The Mooon, lo spazio che c'era da agosto —, poi il vocabolario."""
     voc = slug_sponsorizzabili()
-    scelti = list(dict.fromkeys(
-        s for s in _sponsor_righe()["ordine"] if s in voc))
-    return scelti + [s for s in voc if s not in scelti]
+    righe = _sponsor_righe()
+    scelti = list(dict.fromkeys(s for s in righe["ordine"] if s in voc))
+    dal = righe.get("dal", {})
+    resto = sorted((s for s in voc if s not in scelti),
+                   key=lambda s: (dal.get(s, 0),
+                                  0 if s in SLUG_SPONSOR else 1,
+                                  voc.index(s)))
+    return scelti + resto
 
 
 def sponsor_fino(slug: str, adesso: int | None = None) -> int:
@@ -1999,6 +2022,12 @@ def imposta_sponsor(slug: str, fino: int) -> str:
     slug = (slug or "").strip().lower()
     if slug not in slug_sponsorizzabili():
         return ""
+    # SI ACCENDE DA SPENTO: la data dell'ordine di serie. Un rinnovo a
+    # spazio acceso non la tocca — non e' uno sponsor nuovo, e non deve
+    # perdere il suo posto nella fila
+    adesso = int(time.time())
+    if int(fino) > adesso and not sponsor_fino(slug, adesso):
+        scrivi_impostazione(f"sponsor_dal:{slug}", str(adesso))
     scrivi_impostazione(f"sponsor_fino:{slug}", str(max(0, int(fino))))
     _SPONSOR = None
     return slug
@@ -2014,6 +2043,67 @@ def imposta_ordine_sponsor(slugs) -> list:
     scrivi_impostazione("sponsor_ordine", ",".join(scelti))
     _SPONSOR = None
     return sponsor_ordine()
+
+
+def _spazi_admin() -> dict:
+    """Gli spazi per il cassetto del pannello, nell'ordine delle card:
+    per ognuno se e' acceso e fino a quando, e se la sua pagina e' in
+    bozza (acceso ma invisibile). `scelto` dice se l'ordine l'ha messo
+    in fila un moderatore o e' quello di serie."""
+    fuori = []
+    for s in sponsor_ordine():
+        r = RACCONTI_NEGOZI.get(s) or {}
+        fuori.append({"slug": s, "titolo": r.get("titolo") or "",
+                      "emoji": r.get("emoji") or "",
+                      "fino": sponsor_fino(s),
+                      "bozza": bool(r) and racconto_stato(s) != "pubblicato"})
+    return {"spazi": fuori, "scelto": bool(_sponsor_righe()["ordine"])}
+
+
+@app.get("/api/admin/sponsor")
+def lista_sponsor_admin(x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: gli spazi in vetrina di «Da scoprire», per il cassetto
+    📣 del pannello (30 set 2026). Il 403 PRIMA di tutto, come le
+    sorelle. Accendere e spegnere restano del bot (`/sponsor`): dal
+    pannello si decide solo l'ORDINE."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    return _spazi_admin()
+
+
+@app.post("/api/admin/sponsor/ordine")
+async def ordine_sponsor_admin(req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: le frecce del cassetto 📣 (30 set 2026, richiesta di
+    Andrea). Il client manda la fila degli spazi ACCESI nel nuovo ordine,
+    e quella fila diventa l'ordine scelto — resta finche' un moderatore
+    non la cambia. Chi non vi e' nominato (gli spenti, e chi si accende
+    dopo) segue nell'ordine di serie: lo spazio nuovo arriva in coda, a
+    destra. Gli slug passano dal vocabolario (`imposta_ordine_sponsor`),
+    e una lista vuota o storta non scrive niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    # «TORNA ALL'ORDINE DI SERIE» (30 set 2026): si cancella la fila
+    # scelta, e le card tornano in ordine di accensione. Una chiave sua,
+    # vero booleano, e non una lista vuota: una fila persa per strada non
+    # deve poter cancellare l'ordine scelto
+    if d.get("serie") is True:
+        imposta_ordine_sponsor([])
+        return dict(_spazi_admin(), ok=True)
+    ordine = d.get("ordine")
+    if not (isinstance(ordine, list) and ordine
+            and all(isinstance(s, str) for s in ordine)):
+        raise HTTPException(400, "Ordine non valido")
+    voc = slug_sponsorizzabili()
+    if not all(s in voc for s in ordine):
+        raise HTTPException(400, "Uno spazio non esiste")
+    imposta_ordine_sponsor(ordine)
+    return dict(_spazi_admin(), ok=True)
 
 
 # ======== LE PAGINE DEI NEGOZI CONSIGLIATI, IN BOZZA (set 2026) ========

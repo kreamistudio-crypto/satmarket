@@ -118,12 +118,17 @@ RACCONTI_NEGOZI = {
         # il logo della card «Consigliati», da logo.png: lo stesso
         # disegno della foto 6, ma un altro file (sul bruno delle
         # categorie, con la trasparenza). Entra nella card solo a pagina
-        # pubblicata.
+        # pubblicata. ALL'86% DEL RIQUADRO (30 set 2026, dal telefono di
+        # Andrea):
+        #   python prepara_logo_consigliato.py logo.png una-garlanda 0.86
         "logo": True,
-        # il peso del disegno sta al 59% dell'altezza (la spiga in basso,
-        # gli stami sottili in cima): -6 lo riporta al centro, con la
-        # stessa misura del -4 di «Un tempo per te» (al 56%)
-        "logo_giu": -6,
+        # E DUE PIXEL PIU' GIU' (scelto da Andrea sulla simulazione).
+        # Era -6, il centro del PESO (al 59% dell'altezza, la spiga in
+        # basso): ma il disegno riempiva tutto il riquadro, e 6px in su
+        # lo portavano 1,7px oltre il bordo del quadrato — la cima
+        # tagliata. All'86% e +2 ha ~11,7px d'aria sopra e ~7,3 sotto
+        # nel quadrato da 84: non tocca mai i bordi.
+        "logo_giu": 2,
         # il banner della card nella pagina «Consigliati», 1040x498
         "banner": True,
         "blocchi": [
@@ -233,12 +238,16 @@ RACCONTI_NEGOZI = {
         #   un-tempo-per-te-5.webp    il dettaglio, 1:1
         "foto": True,
         # il logo della card «Consigliati», da logo.pdf: entra nella card
-        # solo a pagina pubblicata
+        # solo a pagina pubblicata. ALL'86% DEL RIQUADRO (30 set 2026,
+        # come Una Garlanda): pieno, col suo -4 arrivava a 0,3px dal
+        # bordo alto del quadrato.
+        #   python prepara_logo_consigliato.py logo.png un-tempo-per-te 0.86
         "logo": True,
         # il peso del disegno sta al 56% dell'altezza (il riquadro scuro
-        # col nome in basso, il camino sottile in cima): centrato a
-        # riquadro pare sceso di ~4px, e -4 lo riporta al centro
-        "logo_giu": -4,
+        # col nome in basso, il camino sottile in cima): era -4 a logo
+        # pieno; all'86% la stessa correzione e' ~-3, e -2 tiene il
+        # camino a ~7,5px dal bordo del quadrato da 84
+        "logo_giu": -2,
         # il banner della card nella pagina «Consigliati», 1040x498
         "banner": True,
         "blocchi": [
