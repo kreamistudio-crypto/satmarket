@@ -2295,20 +2295,46 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   pubblica, che compare in fondo alla pagina sotto «Le chiavi dei
   moderatori» (`npub1…`, col suo «Copia»). Gli altri moderatori ricevono
   un avviso.
-  2) ANDREA LA AGGIUNGE AL NODO, con `admin-add-solver`, che il
-  coordinatore accetta SOLO dalla chiave del nodo. La chiave del nodo
-  NON ESCE DAL NODO: il comando si lancia là. ⚠️ LETTO E MAI PROVATO —
-  lo strumento è `mostro-cli` (README: `cargo install mostro-cli`; vuole
-  `MOSTRO_PUBKEY`, `RELAYS` e, per i comandi da admin, `ADMIN_NSEC`; il
-  comando è `admaddsolver`). Le sue opzioni esatte NON le ho lette:
-  prima di tutto `mostro-cli admaddsolver --help`. La nsec si passa
-  dall'ambiente leggendola dal file del nodo, MAI scritta a mano nella
-  riga di comando (resterebbe nella cronologia della shell) e mai
-  incollata in una chat. La prima volta si fa INSIEME, un comando alla
-  volta, e la procedura vera si riscrive qui con quel che si è visto.
-  La chiave si aggiunge CON PIENI POTERI (`npub1…` e basta): un
-  moderatore in sola lettura (`npub1…:read`) prende e parla ma non
-  decide, e per ora non ce ne sono (decisione di Andrea).
+  2) ANDREA LA AGGIUNGE AL NODO. ⚠️ NON col messaggio `admin-add-solver`
+  da `mostro-cli` sul nodo, ed è una scelta e non una scorciatoia: quel
+  messaggio è firmato dalla chiave del nodo e parte verso i relay
+  pubblici, e dalla shell dell'host partirebbe dall'IP del nodo — Tor lo
+  attraversano i container, non l'host — cioè i relay vedrebbero la
+  chiave del coordinator arrivare da `185.18.221.96`. È la correlazione
+  che tutto il nodo è fatto per non produrre. Se un giorno si vorrà il
+  messaggio vero, va da un container che esce SOLO dalla SOCKS di Tor:
+  cantiere suo.
+  QUEL CHE IL COMANDO FA, letto su `admin_add_solver.rs` di mostrod
+  0.18.8, è UNA RIGA in `users` (`is_solver = 1`, `is_admin = 0`,
+  `category = 2` = legge e decide; `1` sarebbe la sola lettura), e
+  mostrod la rilegge dal database a ogni richiesta (`find_solver_pubkey`):
+  la riga scritta a mano vale come il messaggio. FATTA COSÌ IL 30 SET
+  2026 per le chiavi di Andrea e di Alan, tre comandi con `sudo` e
+  `python3` (sul nodo `sqlite3` non c'è), su `/home/debian/nodo/mostro/mostro.db`:
+  a) GUARDARE, in sola lettura (`mode=ro`): `PRAGMA table_info(users)`
+  (le colonne vere: pubkey, is_admin, admin_password, is_solver,
+  is_banned, category, last_trade_index, total_reviews, total_rating,
+  last_rating, max_rating, min_rating, created_at), il conto degli
+  utenti, chi è già solver o admin, e che le chiavi NUOVE non ci siano;
+  b) COPIARE con l'API `backup` di sqlite, mai `cp` a caldo (WAL):
+  `sudo python3 -c "import sqlite3; s=sqlite3.connect('/home/debian/nodo/mostro/mostro.db'); d=sqlite3.connect('/home/debian/nodo/mostro/mostro.db.prima-solver-<data>'); s.backup(d); d.close(); s.close()"`
+  e rileggere la copia (stesso conto di utenti);
+  c) SCRIVERE con la guardia, in una transazione `BEGIN IMMEDIATE`: prima
+  `SELECT COUNT(*) FROM users WHERE pubkey IN (...)` deve dare 0, poi
+  `INSERT INTO users(pubkey, is_admin, is_solver, is_banned, category, created_at) VALUES(?,0,1,0,2,?)`
+  per ogni chiave (esadecimale, 64 caratteri: la npub si traduce PRIMA,
+  col checksum verificato), e `commit` SOLO se `rowcount` totale è il
+  numero di chiavi; altrimenti `rollback`. Poi la rilettura: `SELECT
+  substr(pubkey,1,8),is_admin,is_solver,category,is_banned FROM users
+  WHERE is_solver=1` → `(…, 0, 1, 2, 0)` per ognuna. Nessun riavvio.
+  IL RITORNO INDIETRO: `DELETE FROM users WHERE pubkey=? AND is_solver=1`
+  con commit a `rowcount == 1` (stessa guardia), oppure la copia rimessa
+  al posto del database a mostrod FERMO. La copia va cancellata dopo la
+  prima disputa di prova riuscita: è un database intero, con dentro le
+  hold invoice.
+  La chiave si aggiunge CON PIENI POTERI (`category = 2`): un moderatore
+  in sola lettura (`category = 1`) prende e parla ma non decide, e per
+  ora non ce ne sono (decisione di Andrea).
   3) la prova che è andata: il moderatore tocca «Prendi la disputa» su
   una disputa di prova. Se la chiave non è sul nodo l'app risponde «la
   tua chiave di moderatore non è ancora stata aggiunta al nodo».
