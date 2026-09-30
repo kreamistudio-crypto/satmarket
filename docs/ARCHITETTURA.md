@@ -28114,3 +28114,59 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   DA FARE: la sezione «⚖️ Moderazione P2P» (elenco, presa, chat,
   decisione con motivo a registro prima della firma) e il client delle
   parti per `admin-took-dispute`.
+- LA SEZIONE «⚖️ MODERAZIONE P2P» (29 set 2026, perché in CANTIERI, «Le
+  dispute P2P per i moderatori, terzo pezzo»). È la terza metà che la
+  voce «LE DISPUTE P2P» dava da fare.
+  LA CHIAVE. Una per moderatore, nata a caso sul dispositivo
+  (`creaChiaveModeratoreP2P`) e scritta in `localStorage` sotto
+  `barattolo_p2p_moderatore@<conto>` SOLO dopo che il server ha preso la
+  pubblica (`POST /api/p2p/moderazione/chiave`, tabella `p2p_moderatori`).
+  Non si ricava dal seme del conto e non ha copia. Il server non ha un
+  campo dove la privata potrebbe passare.
+  IL SERVER (blocco «LA MODERAZIONE DELLE DISPUTE P2P», giudici puri
+  sulla connessione che tornano `(codice, corpo)`): sette rotte POST —
+  `/api/p2p/moderazione` (l'elenco), `/chiave`, `/prendi`, `/lascia`,
+  `/decisione`, `/esito`, tutte dietro `_moderatore_o_403`, e
+  `/api/p2p/disputa`, di tutti, con cui una delle PARTI dichiara l'id
+  che mostrod ha dato alla disputa (vale la prima, e chi non è parte
+  riceve un sì che non scrive). `_prendi_disputa_p2p` va in DUE TEMPI —
+  prima della firma chiede il permesso e lo scrive, dopo (`fatto`) la
+  disputa risulta presa ed escono gli avvisi alle parti e agli altri
+  moderatori; `_decisione_disputa_p2p` vuole la disputa presa da chi
+  chiede, la chiave della presa, un `true` letterale e il motivo
+  (`P2P_MOTIVO_MIN` = 20). Chi è una delle parti prende 403 da tutt'e
+  due. La riga `decisione` è quella che `_disputa_evento_p2p` cerca alla
+  chiusura. L'elenco serve testo NUDO (lo scappa il client), e le due
+  trade key solo a chi ha preso la disputa.
+  IL CLIENT, DAL LATO DEL MODERATORE (blocco suo, dopo «fine
+  dell'archivio del server»): `moderatoreChiama` firma con la chiave di
+  moderatore un kind 14 al coordinatore e aspetta la risposta — del
+  coordinatore, scritta a quella chiave, di DOPO la domanda, con
+  l'azione attesa o un `cant-do`; il `request_id` si guarda quando c'è.
+  `admin-take-dispute` va nella busta `dispute` con l'ID DELLA DISPUTA;
+  `admin-settle` e `admin-cancel` nella busta `order` con l'id
+  dell'ordine. `eseguiPresaDisputaP2P` VERIFICA che l'ordine della
+  risposta sia quello, e tiene le due trade key nell'archivio del
+  dispositivo (`barattolo_p2p_moderazione@<conto>`). Senza l'id
+  dichiarato lo cerca fra i 38386 del coordinatore
+  (`disputaFraEventiP2P`: stesso lato, entro `MOD_ID_FINESTRA_S`, e con
+  due candidate non sceglie). `eseguiDecisioneP2P`: PRIMA il registro,
+  POI la firma. La seconda conferma si apre un giro dopo la prima
+  (`setTimeout`), perché `eseguiConferma` rimette il bottone com'era
+  dopo aver eseguito il gesto.
+  IL CLIENT, DAL LATO DELLE PARTI (nel motore): `admin-took-dispute`
+  scrive `o.moderatore` e NON `o.peer`; `dispute-initiated-by-*` scrive
+  `o.disputaId`, che `dichiaraDisputaP2P` (fuori dal motore) dice al
+  server una volta. `bloccoModeratoreP2P` è il riquadro nella pagina
+  dello scambio.
+  LA CHAT: un canale per parte, fra la chiave dello scambio e la chiave
+  del moderatore, con la ricetta dei recapiti (`chiaviPeer`: ECDH, HKDF,
+  le due etichette di mostro-core). `bustaChatP2P` e `apriBustaChatP2P`
+  servono i due lati; dentro vale solo la firma delle due voci del
+  canale. I messaggi stanno sulla riga (`chatMod`) per la parte e
+  nell'archivio del dispositivo per il moderatore. `mostroRiascolta`
+  aggiunge gli autori del canale (`autoriModeratoreP2P`) e
+  `mostroArriva` li smista prima del coordinatore. Solo testo.
+  LA PAGINA: `view-p2pmod`, aggiunta a `VISTE_NAV_P2P` con `.add` (le
+  quattro viste di tutti restano quattro), accende «I miei scambi»; la
+  striscia è `#p2pModStriscia`; il rimando dal pannello è `#admModP2P`.

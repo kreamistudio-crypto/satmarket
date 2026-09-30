@@ -2222,6 +2222,8 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Disputa P2P». ⚠️ LA SEZIONE «⚖️ Moderazione P2P» NELL'APP NON C'È
   ANCORA, e nessuna chiave di moderatore è stata aggiunta al nodo: fino
   ad allora una disputa si chiude in uno dei tre modi qui sotto.
+  (Dal 29 set 2026 la sezione C'È: vedi «LA MODERAZIONE DELLE DISPUTE
+  P2P: LA PROCEDURA», più sotto.)
   COME SI LEGGE UNA DISPUTA SUL NODO (sola lettura; MAI `SELECT *` su
   `orders`: porta `preimage` e `buyer_invoice`, che in una chat non ci
   vanno):
@@ -2280,3 +2282,73 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   ⚠️ UNA DISPUTA APERTA PRIMA DI QUESTO DEPLOY NON HA LA SUA RIGA (la
   riga nasce all'evento `dispute-opened`): la sua chiusura non arriva
   ai moderatori, e non è un guasto.
+- LA MODERAZIONE DELLE DISPUTE P2P: LA PROCEDURA (29 set 2026). Dal
+  deploy della sezione «⚖️ Moderazione P2P» la voce qui sopra («LE
+  DISPUTE P2P») resta vera per le letture sul nodo e per i tre modi di
+  chiudere; cade la sua riga «la sezione nell'app non c'è ancora».
+  DOVE STA: in cima a «I miei scambi», una striscia che vede SOLO chi è
+  moderatore (`ADMIN_IDS`), col numero delle dispute aperte; dal Profilo,
+  Amministrazione → «⚖️ Moderazione P2P».
+  PRIMA VOLTA, PER OGNI MODERATORE (una volta per dispositivo):
+  1) nella pagina, «🔑 Crea la mia chiave di moderatore». La chiave
+  nasce sul telefono e non lo lascia: al server va la sola chiave
+  pubblica, che compare in fondo alla pagina sotto «Le chiavi dei
+  moderatori» (`npub1…`, col suo «Copia»). Gli altri moderatori ricevono
+  un avviso.
+  2) ANDREA LA AGGIUNGE AL NODO, con `admin-add-solver`, che il
+  coordinatore accetta SOLO dalla chiave del nodo. La chiave del nodo
+  NON ESCE DAL NODO: il comando si lancia là. ⚠️ LETTO E MAI PROVATO —
+  lo strumento è `mostro-cli` (README: `cargo install mostro-cli`; vuole
+  `MOSTRO_PUBKEY`, `RELAYS` e, per i comandi da admin, `ADMIN_NSEC`; il
+  comando è `admaddsolver`). Le sue opzioni esatte NON le ho lette:
+  prima di tutto `mostro-cli admaddsolver --help`. La nsec si passa
+  dall'ambiente leggendola dal file del nodo, MAI scritta a mano nella
+  riga di comando (resterebbe nella cronologia della shell) e mai
+  incollata in una chat. La prima volta si fa INSIEME, un comando alla
+  volta, e la procedura vera si riscrive qui con quel che si è visto.
+  La chiave si aggiunge CON PIENI POTERI (`npub1…` e basta): un
+  moderatore in sola lettura (`npub1…:read`) prende e parla ma non
+  decide, e per ora non ce ne sono (decisione di Andrea).
+  3) la prova che è andata: il moderatore tocca «Prendi la disputa» su
+  una disputa di prova. Se la chiave non è sul nodo l'app risponde «la
+  tua chiave di moderatore non è ancora stata aggiunta al nodo».
+  QUANDO ARRIVA UNA DISPUTA: 1) l'avviso su Telegram dice ordine, parti,
+  importo, metodo e chi l'ha aperta; 2) nella pagina si apre la disputa e
+  si guarda QUANDO SCADE LA GARANZIA — dopo quella data i sats tornano a
+  chi vende da soli e «a chi compra» non si può più decidere; 3) «Prendi
+  la disputa»: le due parti vengono avvisate (Telegram e app) e da quel
+  momento possono scrivere al moderatore; 4) si parla con TUTT'E DUE, un
+  canale a testa (uno non legge l'altro), e si chiede quel che hanno:
+  ora del pagamento, nome di chi ha pagato, numero della ricevuta. SOLO
+  TESTO: le foto non passano, e un link a una foto è una dichiarazione,
+  non una prova; 5) si scrive il MOTIVO (almeno 20 caratteri: resta nel
+  registro col nome) e si tocca uno dei due gesti, «I sats vanno a chi
+  compra» o «I sats tornano a chi vende», con le sue due conferme.
+  LE REGOLE: non si decide una disputa di cui si è parte (l'app e il
+  server lo impediscono: la prende l'altro moderatore); non si decide
+  senza aver sentito tutt'e due, salvo che una non risponda entro un
+  tempo detto prima nella chat; nel dubbio e senza prove, vale la regola
+  di casa — i sats tornano a chi li ha bloccati — e si scrive nel motivo;
+  se l'app dice «la disputa presa NON è di questo ordine» CI SI FERMA e
+  si avvisa Andrea.
+  SE IL GESTO NON RIESCE: «Nessuna risposta» NON vuol dire «non fatto» —
+  il coordinatore risponde via Tor e può tardare. Si aspetta un minuto,
+  si tocca «↻ Aggiorna» e si guarda se la disputa è passata fra le
+  chiuse; solo se è ancora «Presa» si riprova. Un «no» del coordinatore
+  resta a registro (`non_riuscita`).
+  TELEFONO PERSO, O MODERATORE CHE ESCE: la sua chiave si toglie dal
+  nodo (vedi «L'ALLARME» nella voce qui sopra: la riga SQL è letta e mai
+  provata), lui ne crea una nuova da un altro dispositivo, e Andrea la
+  aggiunge. Le dispute che aveva preso le riprende la chiave del nodo
+  (il coordinatore lo permette alla sola chiave del nodo).
+  IL REGISTRO: la query è nella voce qui sopra. I gesti che ci finiscono:
+  `aperta`, `id_dichiarato`, `id_diverso`, `chiave`, `presa_chiesta`,
+  `presa`, `presa_fallita`, `decisione`, `non_riuscita`, `chiusa`,
+  `allarme`. Le chiavi registrate:
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT tg_id, chiave, datetime(creata,'unixepoch','localtime') FROM p2p_moderatori;"`
+  COSA NON È PROVATO: tutto quel che parla col coordinatore VERO. I
+  messaggi del moderatore sono costruiti sulle pagine del protocollo e
+  provati contro un coordinatore finto; che mostrod 0.18.8-bar5 li
+  accetti si vede solo con la prima disputa di prova presa e decisa da
+  una chiave aggiunta al nodo. Fino ad allora la strada sicura per una
+  disputa vera resta l'accordo fra le parti.

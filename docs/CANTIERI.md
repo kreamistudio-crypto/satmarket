@@ -35849,3 +35849,75 @@ sezione «⚖️ Moderazione P2P» — dove sta la decide Andrea su uno scatto
 —, la chiave del moderatore sul telefono, presa e decisione col motivo
 a registro prima della firma, la chat col moderatore, «Un moderatore ha
 preso la disputa» alle parti, e la prova di come si toglie un solver.
+
+Le dispute P2P per i moderatori, terzo pezzo: la sezione «⚖️
+Moderazione P2P» (29 set 2026). **LE SCELTE DI ANDREA**: il posto è una
+VOCE PROPRIA — una striscia in cima a «I miei scambi», visibile solo ai
+moderatori, col rimando dal pannello 👑 — scelta su due bozze
+fotografate (in fondo a Info P2P servivano 7.880 px di scorrimento per
+arrivarci); nessun moderatore in sola lettura per ora. **COSA C'È**: la
+chiave del moderatore nata sul telefono (al server la sola pubblica),
+l'elenco, «Prendi la disputa», un canale cifrato per ognuna delle due
+parti, e i due gesti finali — «I sats vanno a chi compra», «I sats
+tornano a chi vende» — con motivo scritto, due conferme e la riga a
+registro PRIMA della firma. Alle parti: «Un moderatore ha preso la
+disputa» (Telegram e app) e il riquadro per scrivergli, che è anche la
+strada delle prove. **LETTO SULLE PAGINE DEL PROTOCOLLO**
+(mostro.network/protocol, via lettore che riassume): `admin-take-dispute`
+vuole la busta `dispute` e l'id DELLA DISPUTA, non dell'ordine;
+`admin-settle`/`admin-cancel` la busta `order` e l'id dell'ordine; alle
+parti arriva `admin-took-dispute` con la chiave del moderatore nel campo
+`peer`; la chat di disputa è ECDH fra la trade key e la chiave del
+moderatore, con le stesse due etichette dei recapiti. **UN DIFETTO CHE
+C'ERA GIÀ**, trovato leggendo: `avanzaOrdineP2P` scriveva in `o.peer`
+ogni `payload.peer` — quindi alla presa di una disputa la chiave del
+moderatore avrebbe preso il posto della controparte (recapiti e volto
+compresi). Curato. **LE DECISIONI MIE**, da confermare: 1) l'id della
+disputa lo DICHIARA il telefono di una delle parti (mostrod glielo
+scrive all'apertura) e il moderatore lo VERIFICA prendendola — mostrod
+risponde con l'ordine, e se non è quello l'app si ferma; senza
+dichiarazione lo si cerca fra gli eventi pubblici delle dispute, e con
+due candidate non si sceglie. SCARTATO far dire l'id a mostrod con la
+patch 0007: vuole un fork nuovo sul nodo; 2) la presa in DUE TEMPI sul
+server (permesso prima, conferma dopo), perché gli avvisi alle parti
+partano solo a presa riuscita; 3) la chat è SOLO TESTO: una foto
+vorrebbe un posto dove stare, cioè un server; 4) la chiave non ha
+copia: persa, se ne fa un'altra. **IL LIMITE, ridetto**: chi ha la
+chiave può parlare a mostrod senza passare dall'app; l'allarme del
+secondo pezzo lo scopre, non lo ferma. **PROVATO.**
+`prove_moderazione_p2p` (127): sentinelle, i giudici del server su una
+disputa intera, e il client VERO in node contro un COORDINATORE FINTO
+che apre le buste, verifica la firma sul messaggio ri-serializzato e
+risponde secondo il copione — la presa nei suoi sei modi, la decisione
+nei suoi sei, la chat nei due versi con l'intruso, la busta dal futuro e
+l'altra parte che non legge, la pagina, chi non è moderatore.
+`collaudo_dispute_p2p` (51): le sette rotte sul server vero, e il
+cerchio che si chiude senza allarme. Tortura: 22 su 22 sul client e sui
+primi giudici del server; 10 su 12 sulle mutazioni del server rimaste,
+e le due mute sono guardie doppie — il confronto delle chiavi copriva il
+«prima prendi» (ora un caso li separa), e la `WHERE disputa=''`
+dell'UPDATE dell'id copre l'`if` che la precede. Dal vivo (server dalla copia, relay
+morto, disputa seminata dalla porta vera degli eventi, Chrome headless a
+375 e 320, chiaro e scuro): la striscia (67 px), la pagina, la chiave
+creata davvero e mai in pagina, «Prendi la disputa» che a relay morto
+dice che il messaggio non è partito e lascia la disputa aperta, il
+riquadro della decisione (bottoni da 50 px, campi a 16 px, nessuno
+scorrimento laterale), le due conferme, l'indietro che torna a «I miei
+scambi», il rimando dal pannello, l'estraneo (403 e pagina vuota), e il
+lato della parte. **IL GIRO DAL VIVO HA TROVATO UN DIFETTO**: la seconda
+conferma portava l'etichetta della prima («Sì, continua») sul bottone
+che decide — `eseguiConferma` rimette il bottone com'era dopo il gesto.
+Curato aprendo la seconda un giro dopo. **VISTO E NON TOCCATO**: lo
+stesso difetto ce l'ha la seconda conferma dei gesti sulla cassaforte
+(`gestoCassaforte`), che apre il foglio da dentro il gesto. **E IL BANCO
+HA MENTITO DUE VOLTE**: saltando il tour del P2P col suo bottone la
+pagina tornava indietro nella cronologia fino a uscire (il tour si
+timbra come visto, non si clicca), e un evento seminato a 25 minuti di
+distanza era un 400 (`P2P_EVENTO_OROLOGIO_S`). **NON PROVATO**: niente
+di quel che parla col coordinatore VERO — che mostrod 0.18.8-bar5
+accetti i tre messaggi del moderatore, la chat con un'altra app, il
+telefono. `admin-add-solver` sul nodo: letto, mai lanciato. **DA
+FARE, con Andrea**: aggiungere la prima chiave al nodo (PRODUZIONE, «LA
+MODERAZIONE DELLE DISPUTE P2P: LA PROCEDURA»), e una disputa di prova
+presa e decisa da capo a fondo, coi due telefoni; la prova di come si
+toglie una chiave.
