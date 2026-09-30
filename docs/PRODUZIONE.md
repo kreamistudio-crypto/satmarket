@@ -773,6 +773,18 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   COME SI MISURA UN BUCO: `journalctl -u barattolo --since today -o
   short-precise | grep -E "Stopping|Started|Application startup
   complete"`; uno stop ammazzato lo dice `grep -iE "timed out|kill"`.
+  POSATO IL 1 OTT 2026, tutt'e due i pezzi. LA PROVA CHE SI RIFA' (un
+  riavvio vero: mai durante un deploy in corso) — 60 richieste attraverso
+  Caddy con un restart nel mezzo, deve dire solo 200:
+  `( for i in $(seq 1 60); do curl -s -o /dev/null -w "%{http_code}
+  %{time_total}\n" --max-time 40 https://barattolo.store/api/salute;
+  sleep 0.25; done > /tmp/prova-riavvio.txt ) & sleep 3; systemctl
+  restart barattolo; wait; awk '{print $1}' /tmp/prova-riavvio.txt |
+  sort | uniq -c; sort -k2 -n /tmp/prova-riavvio.txt | tail -3`
+  (il primo giro: 60 a 200, la piu' lenta 1,6 s — quella nel buco).
+  IL CONTROLLO SUL PROCESSO VIVO dopo un riavvio: `systemctl show
+  barattolo -p ActiveEnterTimestamp` e la riga `tr … environ | grep
+  UVICORN` qui sopra, che deve dire `UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN=10`.
 - LE SESSIONI CLOUD (24 set 2026, regola di Andrea): una sessione di
   Claude Code che gira nel cloud (claude.ai/code, o una sessione spostata
   lì dal PC) lavora su un ramo `cantiere/<nome>` e apre una PR verso

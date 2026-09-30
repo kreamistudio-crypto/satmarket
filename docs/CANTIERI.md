@@ -31666,7 +31666,9 @@ l'onion. Suite intera severa senza config nel worktree da origin/main
 (a9a0352): 17.455 verdi e 0 rosse; i 28 collaudi della CI nella gabbia.
 
 **DA GUARDARE.** Il primo deploy vero con l'app aperta sul telefono;
-e, scelta la metà del server, la stessa prova su barattolo.store.
+e, scelta la metà del server, la stessa prova su barattolo.store —
+fatta il 1 ott, 60 su 60 a 200 attraverso Caddy con un riavvio nel
+mezzo (vedi «la metà del server»).
 
 ## La cauzione di chi prende, solo nel contanti di persona (1 ott 2026, cantiere B)
 
@@ -31975,7 +31977,20 @@ prima del successivo: copia del Caddyfile e sua lettura, l'unità coi
 drop-in, la conferma del SIGKILL delle 20:50 nel journal (fatti prima di
 questo commit); poi la modifica di Caddy, `caddy validate`, il `reload`,
 la prova con una raffica di richieste durante un riavvio, il drop-in e
-il `daemon-reload`. L'esito lo dice il verbale del giro dopo.
+il `daemon-reload`.
+L'ESITO (1 ott 2026, uscite lette una per una): Caddy — le due righe in
+TUTTI E DUE i blocchi, «Valid configuration» (col solo avviso estetico
+«Caddyfile input is not formatted»), `reload` fatto e caddy attivo. LA
+PROVA SUL VERO, su f899eae: 60 richieste a `/api/salute` attraverso
+Caddy, una ogni quarto di secondo, con un `systemctl restart barattolo`
+nel mezzo — **60 su 60 a 200, nessun 502**; le più lente 0,135, 0,139 e
+**1,626 s**, cioè quella arrivata nel buco ha ASPETTATO il server invece
+di prendersi il 502. Il drop-in posato dalla copia della repo (`install`
+condizionato a `uvicorn --help` che conosce l'opzione), `daemon-reload`:
+due file in `barattolo.service.d`, `TimeoutStopUSec=20s` (era 1min 30s),
+e nell'ambiente `UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN=10` accanto a `HOME`.
+La variabile vale dal processo nato al riavvio DOPO la posa: il
+controllo sul processo vivo è il passo 7, al deploy di questo verbale.
 
 **DA GUARDARE.** Il primo deploy con una lettura lunga in corso: nel
 journal «⏹ Connettore … lettura fermata dallo spegnimento» e uno stop
