@@ -398,3 +398,28 @@ si dichiara coordinator Mostro** — cioè si perde esattamente ciò per
 cui il nodo esce solo da Tor.
 E `docs/DEV_FEE.md` DICE UN'ALTRA COSA dal codice («LNURL: 15s»): vale
 il codice, e la discrepanza è nell'issue.
+
+LA CAUZIONE DI CHI PRENDE SI ACCENDE CON LA `-bar6` (1 ott 2026, cantiere
+B, decisione di Andrea; il verbale in CANTIERI, «La cauzione di chi
+prende», la liturgia in PRODUZIONE, «LA SALITA A MOSTRO 0.19.0», punto
+7-bis). Le due righe qui sopra — «`bond_enabled` false (coerente con
+`[anti_abuse_bond]` commentata)» e «oggi abbandonare non costa NULLA:
+`[anti_abuse_bond]` è opt-in e sul nostro nodo è tutta commentata» —
+restano VERE fino a quel riavvio, e da lì DIVENTANO FALSE per il solo
+metodo «Contanti»: la patch 0008 del fork limita l'`anti_abuse_bond` ai
+metodi che `only_payment_methods` nomina, e le tarature sono
+`amount_pct = 0.03`, `base_amount_sats = 1000`, `apply_to = "take"`,
+`slash_on_waiting_timeout = false`, `hold_invoice_expiration_window =
+900` (che nella 0.19.0 è SOLO la scadenza della richiesta di cauzione,
+#999). Il 38385 le annuncia (`bond_enabled true`, i sette `bond_*`, il
+nostro `bond_only_payment_methods Contanti`). Quel che NON cambia: i
+900 secondi restano 900, e il timeout che brucia resta SPENTO — la
+cauzione si perde solo per la direttiva del moderatore (`bond_resolution`),
+quindi «la cura per "15 minuti sono pochi" sono i bond» resta un
+cantiere DOPO, quando le cauzioni sono provate. Restano NON provati sul
+nodo vero, finché non si fa la prova a due telefoni della liturgia: la
+richiesta lasciata scadere (LND la cancella a 900 s, mostrod riporta
+l'ordine a `pending` senza dire niente al taker), la corsa fra due
+prese (vince chi paga per primo), la bruciatura e il payout della metà
+(`add-bond-invoice`, 15 giorni), e il `cargo test` dei due moduli della
+0008.

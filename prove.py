@@ -73853,6 +73853,8 @@ console.log(JSON.stringify(out));
             pezzo_js(mini, f, "\n}\n") + "\n}"
             for f in ("function statoDaRestoreP2P(o, statoMostro){",
                       "function riprendiDaRestoreP2P(o, statoMostro){",
+                      # la cauzione a fine scambio (1 ott 2026): la ripresa la chiama
+                      "function cauzioneAFineP2P(o){",
                       "function diarioP2P(riga){")
         ) + "\n" + "\n".join(
             pezzo_js(mini, f, "\n}\n") + "\n}"
@@ -100495,6 +100497,8 @@ console.log(JSON.stringify(out));
         re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0),
         fn("function azioniDisponibili(o){"), fn("function gestoRecensioneP2P(o, rec){"),
         fn("function gruppoScambioP2P(o){"), fn("function applicaPagamentoP2P(o, esito){"),
+        # la cauzione a fine scambio (1 ott 2026): il pagamento riuscito la chiama
+        fn("function cauzioneAFineP2P(o){"),
     ])
     out = gira("il pagamento a chi compra, nel motore", motore + r"""
 const out = {};
@@ -100605,7 +100609,11 @@ console.log(JSON.stringify(out));
             in fn("function scambiP2P(){"),
         "  battitoControlloTabP2P();\n  battitoPagamentiP2P();" in mini])
     out = gira("la domanda del pagamento", blocco + "\n"
-               + fn("function applicaPagamentoP2P(o, esito){") + r"""
+               + fn("function applicaPagamentoP2P(o, esito){") + "\n"
+               # la cauzione a fine scambio (1 ott 2026): il pagamento
+               # riuscito la chiama, e lei chiede la lista dei finali
+               + fn("function cauzioneAFineP2P(o){") + "\n"
+               + mini[mini.index("const P2P_FINALI = "):mini.index("\n", mini.index("const P2P_FINALI = "))] + r"""
 let DEMO = false, VETRINA = false, myTgId = 111;
 const API_BASE = '/api';
 function authHdr(){ return 'x'; }
@@ -110335,6 +110343,8 @@ def prove_annullo_in_disputa():
         fn("function corpoAnnulloDisputaP2P(o, modo){"),
         fn("function statoDaRestoreP2P(o, statoMostro){"),
         fn("function riprendiDaRestoreP2P(o, statoMostro){"),
+        # la cauzione a fine scambio (1 ott 2026): la ripresa la chiama
+        fn("function cauzioneAFineP2P(o){"),
         "let archivio = {}; function ordiniP2P(){ return archivio; }",
         fn("function esitoGestoRaggiuntoP2P(id, gesto){"),
     ]) + r"""
@@ -110473,6 +110483,8 @@ process.stdout.write(JSON.stringify(out));
         fn("function azioniDisponibili(o){"),
         fn("function statoDaRestoreP2P(o, statoMostro){"),
         fn("function riprendiDaRestoreP2P(o, statoMostro){"),
+        # la cauzione a fine scambio (1 ott 2026): la ripresa la chiama
+        fn("function cauzioneAFineP2P(o){"),
         "function altroFoglioAperto(){ return false; } function apriIncassoP2P(){}",
         "function seguibileP2P(id){ return false; } function apriHoldP2P(){}",
         fn("function passoDopoGaranziaP2P(o){"), "function evidenziaPassoP2P(){}",

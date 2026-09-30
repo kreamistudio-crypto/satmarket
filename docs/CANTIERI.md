@@ -31667,3 +31667,181 @@ l'onion. Suite intera severa senza config nel worktree da origin/main
 
 **DA GUARDARE.** Il primo deploy vero con l'app aperta sul telefono;
 e, scelta la metà del server, la stessa prova su barattolo.store.
+
+## La cauzione di chi prende, solo nel contanti di persona (1 ott 2026, cantiere B)
+
+**LA DECISIONE DI ANDREA**, dopo l'analisi del 30 set (studio del 25
+set, §3a, e studio della 0.19.0): negli scambi in contanti di persona
+chi PRENDE l'ordine blocca una piccola cauzione — l'`anti_abuse_bond` di
+mostrod 0.19.0, una SECONDA hold invoice subito dopo il take — così chi
+non si presenta all'incontro la perde e chi vende non resta coi sats
+bloccati per niente. SOLO per il metodo «Contanti»: gli altri, Barattozon
+compreso, senza. Le tarature: `amount_pct` 0.03 (RoboSats parte dal 3%;
+su 250 € fa 7,5 €, su 50 € 1,5 €; l'1% dello studio era un caffè),
+`base_amount_sats` 1000, `apply_to = "take"` (chi prende; `both` è una
+riga di config il giorno che compaiono ordini di acquisto in contanti,
+e la patch copre già il terzo cancello), `slash_on_waiting_timeout`
+false (la cauzione si perde SOLO per la direttiva del moderatore),
+`hold_invoice_expiration_window` 900 (nella 0.19.0 quel numero è SOLO la
+scadenza della richiesta di cauzione, #999: verificato sui byte, due
+righe in flow.rs e nient'altro; 5 minuti con un wallet esterno sono
+pochi), `only_payment_methods = ["Contanti"]`. Patch 0008 con tutt'e
+quattro i pezzi, dietro la leva `P2P_CAUZIONE` spenta; si accende sul
+nodo nello STESSO riavvio della salita a 0.19.0, col libro fermo.
+
+**COME FUNZIONA, letto sui byte di v0.19.0 e mostro-core 0.16.0** (e
+sul diff con la v0.18.8). Chi paga: con `take`, chi prende — nel caso
+di persona tipico chi vende pubblica e chi compra prende, e la garanzia
+di chi vende viene chiesta SOLO dopo che la cauzione è bloccata: un
+compratore che non paga non fa nemmeno partire la hold del venditore.
+Quanto: `max(round(pct × sats del taker), base)`. Quando torna: da
+sola su OGNI uscita che non è una bruciatura (rilascio, tutti gli
+annulli, i timeout con la leva spenta, la scadenza nel libro, la corsa
+persa, la richiesta mai pagata) — e mostrod NON manda nessun
+«restituita»: cancella la hold e basta. Quando si perde: la direttiva
+del moderatore (`bond_resolution` dentro `admin-settle`/`admin-cancel`,
+indipendente da dove vanno i sats; un lato senza cauzione fa rifiutare
+TUTTA la decisione con `invalid-payload`) o il timeout, spento;
+allora la hold si salda subito, metà al nodo e metà alla controparte,
+che riceve `add-bond-invoice` con `slashed_at` e ha 15 giorni per
+rispondere con una fattura dell'importo esatto (richiesta ogni 300 s;
+poi `forfeited`, tutto al nodo). Cosa vede il client: dopo il take
+`pay-bond-invoice`, stessa forma di `pay-invoice` con `amount` = LA
+CAUZIONE; l'ordine resta `pending` nel libro per tutti finché non è
+bloccata (vince chi paga per primo, gli altri ricevono `canceled`;
+rimandare la presa dalla stessa chiave restituisce la stessa bolt11);
+la richiesta SCADE con `hold_invoice_expiration_window` e a chi non paga
+mostrod NON DICE NIENTE (LND cancella, `on_bond_invoice_canceled`
+riporta l'ordine a `pending`); la restore-session non mostra la presa a
+cauzione non pagata (i campi del taker vivono sulla riga della
+cauzione) e a chi ha pubblicato dice `waiting-taker-bond`. DIFFERENZE
+DALLA 0.18.8: la richiesta non pagata viveva 24 ore (default LND) e
+teneva l'ordine in `waiting-taker-bond` per un giorno — la 0.19.0 la fa
+scadere con la finestra (#999) e ha la scopa
+`job_reconcile_stranded_taker_bonds`; il maker bond ha una scadenza
+(#994) e il maker può annullare mentre la paga (#996); `amt`/`fa`
+coerenti nella finestra (#986); il rilascio è una CAS con tre
+tentativi; le due migrazioni (#964) le avevamo già dalla `-bar5`.
+MOSTRO NON SA APPLICARLA PER METODO: `taker_bond_required()` e
+`maker_bond_required()` non ricevono l'ordine, `payment_method` è una
+stringa che nessuno guarda.
+
+**LA PATCH 0008** (`deploy/mostro/README.md`, la voce; il patcher a
+`--secco`, verificato sul PC su un clone della v0.19.0 con le sette
+applicate via `git am` — e `git am` delle otto su un secondo clone dà
+l'albero byte per byte uguale). A) la porta per metodo: il campo
+`only_payment_methods` in `[anti_abuse_bond]` (serde default: vuoto =
+tutti), `bond_applies_to_order` (parola intera, senza maiuscole, sulle
+virgole: il tabacchino resta fuori, «Contanti,Revolut» entra),
+`*_required_for(&order)` nei tre cancelli, il tag
+`bond_only_payment_methods` nel 38385. Se sbaglia, sbaglia in chiusura.
+B) la rilettura della 0005: `apply_party_fees` gira a ogni tentativo di
+presa e scrive UNA riga per ordine, con due prese in gara l'ultima
+sovrascrive quella del vincitore e `seller_fee` ripiega su `order.fee`
+(lo sconto dello 0,5% perso o regalato, mai un flusso rotto): al blocco
+la riga si riscrive per il vincitore, su una COPIA dell'ordine — i
+numeri della sua riga della cauzione restano, la fattura di chi compra
+è già stata validata contro quelli. C) il buco della 0007: un sell
+preso senza fattura riparte da `resume_take_after_bond` e scavalcava
+l'aggancio 5 (niente `taken`, niente Telegram «preso» a chi vende).
+D) `bond-slashed` al server (la quattordicesima azione), da
+`notify_bond_slashed`, che i tre posti chiamano solo a bruciatura
+confermata: il lato che l'ha persa nel dettaglio, `sats` la cauzione,
+`sats_buyer`/`sats_seller` quanto riceve ognuno. ⚠️ NON COMPILATA sul
+PC: il primo `cargo` è il punto 4 della liturgia; le due literal
+complete dei test di nip33 hanno il campo nuovo, o i test non
+compilerebbero.
+
+**IL CLIENT.** `cauzioneDaInfoP2P` legge gli otto tag; DUE CHIAVI
+(`cauzioneServeP2P`, pura): la leva `P2P_CAUZIONE` in busta E
+`bond_enabled` del 38385, il metodo dell'ORDINE (non quello scelto
+alla presa, che il coordinatore non vede), `apply_to`. L'importo
+ricalca `compute_bond_amount`; prima della presa una stima (i sats
+detti, la cifra fissa, il mercato sul capo alto di un intervallo) nel
+dettaglio, sotto la regola del contanti. `pay-bond-invoice` →
+`attesa_mia_cauzione` (passo 0: l'ordine non è preso davvero finché la
+cauzione non è bloccata; in `P2P_GIRO_APERTO`, giro morto «cauzione»),
+`P2P_IMPORTO_CAUZIONE` tiene l'`amount` della richiesta e del
+`bond-slashed` fuori dal lordo dello scambio (portano lo STESSO
+SmallOrder con dentro la cauzione: scritto nel lordo direbbe che lo
+scambio vale il 3% di sé). Il foglio della richiesta è UNO per due
+richieste (`p2pHoldModo`: «🔐 Blocca la cauzione»), si apre e si chiude
+da solo, toast «Tocca a te». LA SCADENZA LA DICE LA BOLT11
+(`cauzioneVivaP2P`, ripiego sulla finestra del 38385 dal momento
+dell'arrivo): la frase «La cauzione non è stata bloccata in tempo» e
+il «↻ Riprendi l'ordine» (stessa presa, stessa chiave: mostrod fa una
+cauzione nuova); il bottone pieno solo a richiesta viva. «bloccata» la
+scrive il primo messaggio dello scambio dopo la richiesta,
+«restituita» un finale senza `bond-slashed` (`cauzioneAFineP2P`, anche
+dal «concluso» detto dal server a chi vende e dalla restore — la
+macchina a stati non li vede), «persa» il `bond-slashed` coi suoi sats;
+una mai bloccata resta «chiesta» (un giro morto non restituisce
+niente). `add-bond-invoice` → `o.incasso` (la parte, `slashed_at`, i
+giorni dal 38385), il riquadro «Metà della cauzione… è tua» col bottone
+«Incassa», il foglio `p2pCauzioneSheet` (dal wallet NWC o incollata,
+l'importo ESATTO), poi `bond-invoice-accepted` e
+`bond-payout-completed`. Nel PASSATO di `applicaMessaggioP2P` la
+richiesta, la bruciatura e la metà si prendono come dati. La restore:
+`waiting-taker-bond` e `waiting-maker-bond` sono «pubblicato». Il
+moderatore: la terza domanda nella card («Brucia la cauzione di chi
+compra/vende», spenta di serie, solo sugli scambi in contanti e per il
+lato che ha preso — `cauzione_di` dal server), a registro come riga
+`cauzione` accanto alla `decisione`, al coordinatore come
+`bond_resolution` solo se si brucia; `invalid-payload` con la spunta
+→ «su quel lato non c'è una cauzione da bruciare». «Info P2P» ha la
+voce viva. IL SERVER: la leva (solo True accende; busta `cauzione`;
+pannello), `bond-slashed` con gli importi (`P2P_AZIONI_CON_SATS`) →
+`cauzione_persa`, fuori dal peso (non decide lo stato del client), i
+sats NON in `p2p_scambi`, avviso a tutt'e due (a chi l'ha persa la
+notizia coi sats, a chi vince il gesto e i quindici giorni),
+`_cauzione_di_p2p` (chi ha preso), la decisione con `cauzione`.
+
+**SCARTATO.** Un quinto passo nello stepper (il primo passo nomina la
+cauzione, e basta). Un messaggio «cauzione restituita» dal nodo (non
+esiste: si deduce, e la spec lo garantisce). Un evento `bond-requested`
+al server (il client lo sa dal filo). Applicare `apply_party_fees`
+all'ordine vero al blocco (avrebbe potuto cambiare `fee` dopo la
+validazione della fattura di chi compra). La leva del client senza il
+38385, o il 38385 senza la leva.
+
+**PROVATO.** `prove_cauzione_p2p` (nuova, 93 righe: le
+sentinelle del client e del server, i giudici del server sullo schema
+vero — `bond-slashed` coi tre importi, la strada intera fino ai due
+avvisi coi sats dell'evento, i sats dello scambio intatti,
+l'idempotenza, `_cauzione_di_p2p`, la decisione con e senza cauzione
+sulle due tabelle vere —, la patch e il patcher, e il banco node col
+lettore del 38385, il metodo, a chi serve, quanto, i giri interi di chi
+compra e di chi vende, il giro morto, la bruciatura, la metà, viva o
+scaduta con una bolt11 vera, i riquadri, il dettaglio, Info P2P, il
+moderatore, la restore); `prove_p2p_motore` ha la scena col
+coordinatore di cartone (il take di un contanti risponde
+`pay-bond-invoice`, il foglio si apre da solo col titolo suo, il lordo
+intatto, a cauzione pagata lo scambio riparte e il foglio si chiude);
+emendate col perché `prove_p2p_stati`, `prove_p2p_eventi` (14 azioni,
+la tabella dei destinatari), `prove_moderazione_p2p`,
+`prove_card_tinte_stato`, `prove_intestazione_scambi`,
+`prove_p2p_server` (otto chiavi in busta), `prove_barattozon_mercato`,
+`prove_p2p_recapito_passo`, e i banchi che ritagliano
+`azioniDisponibili`/`statoTestoP2P`/`infoDaEvento`/`renderDettaglioP2P`
+(la trappola dei DUE RITAGLI, tre volte). `collaudo_pagamento_p2p`
+passo 10 (in CI): `bond-slashed` dalla porta vera, `cauzione_persa`,
+gli avvisi coi sats, i sats dello scambio intatti, i rifiuti. Tortura
+13 su 14 mutazioni uccise: la sopravvissuta («la cauzione bruciata detta solo all'altra parte», ruoli = altri) e' EQUIVALENTE, perche' l'attore di bond-slashed e' sempre mostro (lo fissa la patch) e altri e' tutt'e due — dichiarata, non inseguita; al primo giro erano 12, e la seconda sopravvissuta (i sats della cauzione tolti dalla frase) e' morta con la prova sulla strada intera fino agli avvisi (le sopravvissute e il perché: qui sotto). Suite intera
+severa senza config nel worktree ribasato su origin/main (a9a0352):
+17.551 verdi e 0 rosse (al primo giro 17.442 e sei rosse, tutte della trappola dei DUE RITAGLI: cinque banchi che ritagliano riprendiDaRestoreP2P o applicaPagamentoP2P da soli e non trovavano cauzioneAFineP2P, curati aggiungendo il pezzo); i 28 collaudi della CI 28 verdi nella gabbia senza rete.
+Dal vivo via CDP a 375 px nei due temi, sul server di una copia col
+relay morto e la leva accesa, tre righe seminate: la presa con la
+cauzione da pagare (pagina e foglio col QR), la pagina con la cauzione
+bloccata, la fine scambio con la cauzione restituita — nessuno
+scorrimento laterale.
+
+**DA GUARDARE.** Il `cargo test` e la build sul nodo (punto 4). La
+prova a due telefoni della liturgia (PRODUZIONE, punto 7-bis e la
+prova): il Revolut senza cauzione, il Contanti con la cauzione e il
+foglio, la richiesta lasciata scadere, la disputa con la spunta e
+l'incasso della metà, la spunta su un lato senza cauzione. La leva
+`P2P_CAUZIONE` sul VPS solo DOPO che il 38385 dice `bond_enabled
+true`. `apply_to = "both"` il giorno che servono ordini di acquisto in
+contanti. Il timeout che brucia, quando le cauzioni sono provate. Le
+righe di `docs/NODO-MOSTRO.md` che dicono la cauzione spenta (la nota
+in fondo le data).
