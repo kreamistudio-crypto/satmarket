@@ -32113,3 +32113,96 @@ la GIF un ciclo: il ritmo vero si sente solo in mano). Il 10 ottobre,
 acceso il lancio, che la card dica «Ora disponibile» e porti al P2P; il
 25 ottobre che se ne sia andata. Se il lancio slitta, la riga nel
 config del VPS (PRODUZIONE, «LA CARD «P2P IN ARRIVO»»).
+
+## I loghi dei Consigliati con l'aria attorno, e l'ordine dei banner in «Da scoprire» (30 set 2026)
+
+**LA RICHIESTA.** Dal telefono di Andrea: nella card «Consigliati» il logo
+di Una Garlanda stava troppo in alto e si tagliava in cima. Più piccolo,
+un po' più giù, mai a toccare i bordi, allineato con gli altri. A lavoro
+in corso ne sono arrivate altre tre: l'ORDINE DEI BANNER in «Da scoprire»
+(di serie per accensione, cambiabile a mano dal pannello, To The Mooon
+prima e Una Garlanda subito dopo), lo stesso trattamento al logo di Un
+tempo per te, e un «Torna all'ordine di serie».
+
+**IL TAGLIO ERA ARITMETICA.** Il riquadro del logo è il 90% del quadrato
+(75,6 px sul telefono, 3,8 di margine per lato) e il disegno di Una
+Garlanda lo riempiva in altezza: il suo `logo_giu` -6 lo portava 1,7 px
+oltre il bordo del quadrato, che ha `overflow:hidden`. Un tempo per te,
+col suo -4, arrivava a 0,3 px: lo toccava. `prepara_logo_consigliato.py`
+prende ora una SCALA facoltativa: il disegno occupa quella parte del
+riquadro e il resto è margine trasparente, uguale su ogni lato, dentro
+il file — nel PNG d'origine non si può, il ritaglio sopra la soglia lo
+toglierebbe. Senza scala il file esce identico byte per byte (verificato
+su tutti e due i loghi). Scelti sulla simulazione della card (quadrato da
+84 a 3x, bruno, `contain`, lo spostamento): Una Garlanda 0.86 e +2 — la
+scelta di Andrea, ~11,7 px d'aria sopra e ~7,3 sotto —, Un tempo per te
+0.86 e -2, la sua correzione del peso ridotta in proporzione (~7,5 px
+sopra il camino). La lezione del -6: il centro del PESO misurato
+sull'alfa non è quello che vede l'occhio quando in cima ci sono tratti
+sottili che pesano poco ma si contano.
+
+**L'ORDINE DI SERIE È QUELLO DI ACCENSIONE**, e rovescia la scelta del 24
+set («prima Un tempo per te, poi To The Mooon», che veniva dall'ordine
+del vocabolario). `sponsor_dal:<slug>` si scrive quando uno spazio si
+accende DA SPENTO; un rinnovo non la tocca, o rinnovare farebbe perdere
+il posto. Gli spazi accesi prima che la data esistesse non l'hanno e
+stanno davanti, e fra loro viene prima il catalogo di casa: To The Mooon,
+lo spazio che c'era da agosto. Il vocabolario resta com'era, ma il suo
+ordine adesso è solo lo spareggio.
+L'ORDINE SCELTO è la riga di sempre, `sponsor_ordine`: vince, e chi non
+vi è nominato segue nell'ordine di serie. Le frecce scrivono la fila dei
+soli ACCESI: gli spenti non hanno una card, e chi si accende dopo arriva
+in fondo, a destra.
+
+**IL CASSETTO «📣 ORDINE DEI BANNER»** nel pannello: gli spazi accesi in
+fila con la scadenza e «pagina in bozza» quando è così, ↑/↓ da 44 px
+(la freccia che non porterebbe da nessuna parte non c'è, e lascia il
+posto vuoto perché le altre restino in colonna), gli spenti nominati in
+una riga, e «↺ Torna all'ordine di serie» — solo a ordine scelto, e con
+conferma, perché la fila scelta a mano non torna da sola. Le porte:
+`GET /api/admin/sponsor` e `POST /api/admin/sponsor/ordine`, dei soli
+moderatori col 403 prima del corpo; la fila passa dal vocabolario, e
+tornare all'ordine di serie è una chiave SUA (`{"serie": true}`, vero
+booleano) e mai una lista vuota, che una fila persa per strada
+manderebbe da sola. Accendere e spegnere restano del bot: la sentinella
+degli scrittori si è divisa in due, e l'ordine adesso ne ha due.
+IN PRODUZIONE «To The Mooon prima, Una Garlanda subito dopo» viene da
+sé: To The Mooon non ha la data e sta davanti, e Una Garlanda, accesa
+dopo averla pubblicata, arriva alla sua destra. Due casi vogliono le
+frecce: un ordine già scritto col bot in passato (vince lui), o Un tempo
+per te acceso anche lui (Una Garlanda arriverebbe terza).
+
+**SCARTATO.** Il trascinamento (in una pagina che scorre, col pollice, si
+confonde con lo scorrimento: le frecce sono un tocco); un ordine a
+numeri; scrivere la fila di TUTTI gli spazi, spenti compresi (uno
+spento riacceso tornerebbe al suo vecchio posto invece che in fondo);
+«torna all'ordine di serie» come lista vuota; il logo rimpicciolito dal
+CSS invece che nel file (una regola per un logo solo).
+
+**PROVATO.** Suite intera severa senza config nel worktree ribasato su
+f899eae (dopo due rebase: la cauzione di chi prende, i deploy che non fanno cadere l'app e il link condiviso che apre la storia — nessun simbolo in comune, cercati per nome): 17.649 verdi e 0 rosse; i 28 collaudi della CI nella gabbia. E DOPO IL TERZO REBASE, su 32a79df (la card «P2P in arrivo», che sta in testa a «Da scoprire» fuori dall'ordine degli spazi, e il riavvio dolce): le famiglie toccate dai due lati — sponsor, «Da scoprire» col P2P, P2P in arrivo, Consigliati, pagine in bozza, fogli di casa, strisce web — 730 verdi e 0 rosse, e i 28 collaudi; la suite intera sta sull'albero di prima. Al primo giro, sull'albero di prima, una rossa ed era mia: il censimento della domanda unica (`chiediConferma`) contava 74, e «Tornare all'ordine di serie?» è la settantacinquesima — dopo averla aggiunta erano girate solo le famiglie degli sponsor. `prove_sponsor`:
+l'ordine per data nei due versi, lo spazio senza data davanti, l'ordine
+scelto che vince, la data storta, la data scritta all'accensione e non al
+rinnovo né allo spegnimento, le porte e la chiave di serie, e un banco in
+node che gira il cassetto, le frecce e il bottone veri. `collaudo_sponsor`
+sul server vero: l'ordine d'accensione, il rovescio della fila girato
+CONTRO l'ordine nuovo (col vecchio verso non avrebbe provato niente), le
+frecce (401/403, fila storta 400, la busta che cambia, il bot che la
+ridice) e l'ordine di serie. Tortura: 13 su 13 (la data non scritta, il
+rinnovo che la riscrive, le date ignorate, le pagine davanti al catalogo
+di casa, lo slug inventato — preso al secondo giro, quando la sentinella
+ha guardato il rifiuto invece del controllo —, il primo che sale, lo
+slug nudo nell'onclick, la freccia che manda gli spenti, la bozza taciuta,
+la chiave di serie che accetta una stringa, il bottone sempre, niente
+conferma, la serie che non cancella). Dal vivo via CDP a 375 px nei due
+temi, su una copia col db finto (pagine pubblicate e spazi accesi SOLO
+lì, venditori di collaudo 222 e 111): la card coi tre loghi accesi uno
+alla volta (col giro fermato: con gli effetti ridotti riporta al primo
+ogni 4 s), la fila «Da scoprire» con To The Mooon e Una Garlanda, il
+cassetto con le frecce e col bottone. Nessuno sbordo. Scatti mandati ad
+Andrea e approvati.
+
+**DA GUARDARE.** Dopo il deploy, il cassetto 📣 in produzione: che ordine
+dice, e se è «scelto» (un `/sponsor ordine` del passato). Poi, pubblicata
+Una Garlanda, `/sponsor una-garlanda 30` e la fila. La card sul telefono
+coi loghi nuovi.
