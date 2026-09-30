@@ -26370,10 +26370,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (buyer/seller/mostro), un dettaglio-macchina, e SOLO su
   `released`/`success` tre importi (l'ordine, il netto a chi compra,
   il totale bloccato da chi vende). MAI fatture, preimage, hash, testi,
-  coordinate. Le tredici azioni: taken, hold-invoice-requested,
+  coordinate. Le quattordici azioni: taken, hold-invoice-requested,
   hold-invoice-paid, buyer-invoice-requested, buyer-invoice-added,
   fiat-sent, released, success, cancel-requested, canceled, expired,
-  dispute-opened, payout-failed.
+  dispute-opened, payout-failed, e dal 1 ott 2026 (patch 0008)
+  bond-slashed — la cauzione bruciata, coi tre importi anche lei
+  (`P2P_AZIONI_CON_SATS`: la cauzione, e quanto ne riceve ognuno) e il
+  lato che l'ha persa nel dettaglio; i suoi sats NON entrano in
+  `p2p_scambi`, che tiene quelli dello scambio.
   QUATTRO GIUDICI PURI: `_evento_p2p_pulito` (la forma: un'azione fuori
   elenco è un 400; l'ora di mostrod a più di `P2P_EVENTO_OROLOGIO_S`
   dalla nostra è un 400, perché è parte della chiave);
@@ -26392,7 +26396,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   vocabolario del libro (`_momento_evento_p2p`): preso,
   garanzia_chiesta, garanzia_pagata, fattura_chiesta, fattura_data,
   fiat, rilasciato, concluso, annullo_chiesto, annullato, tornato,
-  scaduto, disputa, payout_fallito.
+  scaduto, disputa, payout_fallito, cauzione_persa (fuori dal peso
+  `_PESO_MOMENTO_P2P`: non decide lo stato del client, che lo sa dal
+  suo `bond-slashed`; lo sentono tutt'e due — chi l'ha persa la
+  notizia coi suoi sats, chi vince la metà il GESTO, la fattura
+  dall'app entro quindici giorni).
   I MOMENTI NATI IN COPPIA: mostrod fa certi passi a due a due nello
   stesso istante, con due POST indipendenti che arrivano nell'ordine
   che capita. Non si indovina: il `detail` dice quale ramo è passato, e
@@ -26546,6 +26554,67 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   senza guardare la vista, solo su una richiesta ancora pagabile
   (`holdVivaP2P`: la data della bolt11 più `expiration_seconds`).
   Il verbale: CANTIERI, «I silenzi del P2P».
+  LA CAUZIONE DI CHI PRENDE, SOLO NEL CONTANTI DI PERSONA (1 ott 2026,
+  cantiere B, decisione di Andrea; il perché in CANTIERI e nello studio
+  del 25 set, §3a). È l'`anti_abuse_bond` di mostrod 0.19.0 — una
+  SECONDA hold invoice che chi PRENDE paga subito dopo il take, prima di
+  tutto il resto — acceso sul nodo solo per il metodo «Contanti» dalla
+  patch 0008 del fork (`deploy/mostro/README.md`). DUE CHIAVI, tutt'e
+  due accese: la leva del server `P2P_CAUZIONE` (in busta come
+  `cauzione`, pannello «Stato delle leve») dice al client di MOSTRARLA —
+  la cifra prima della presa, il passo, «Info P2P» —, il 38385 del
+  coordinatore (`bond_enabled` più i sette tag `bond_*`, e il nostro
+  `bond_only_payment_methods`) dice che il nodo la CHIEDE; il client
+  crede solo a tutt'e due (`cauzioneServeP2P`, pura: la leva, il 38385,
+  il metodo dell'ORDINE confrontato come parola intera senza maiuscole
+  — non quello scelto alla presa, che il coordinatore non vede — e
+  `apply_to`: `take` chi prende, `make` chi pubblica, `both` tutt'e
+  due). L'importo ricalca `compute_bond_amount`: max(round(pct × sats),
+  base), sui sats del taker (`importoCauzioneP2P`); prima della presa è
+  una stima (`satsBaseCauzioneP2P`: i sats detti, poi la cifra fissa,
+  poi il mercato sul capo alto di un intervallo), e la cifra vera la
+  dice la richiesta. IL FILO: dopo `take-sell`/`take-buy` arriva
+  `pay-bond-invoice` (stessa forma di `pay-invoice`, con `amount` = LA
+  CAUZIONE: `P2P_IMPORTO_CAUZIONE` lo tiene fuori dal lordo dello
+  scambio, come `bond-slashed`) → stato `attesa_mia_cauzione` (passo 0:
+  l'ordine non è preso davvero finché la cauzione non è bloccata, e nel
+  libro resta `pending` per tutti — vince chi paga per primo, gli altri
+  ricevono `canceled`), il foglio della richiesta è LO STESSO della
+  garanzia col modo `p2pHoldModo` (`apriCauzioneP2P`, «🔐 Blocca la
+  cauzione»), si apre da solo e si chiude da solo. LA SCADENZA LA DICE
+  LA BOLT11 (`cauzioneVivaP2P`: `x` letto da `leggiBolt11`, ripiego
+  su `hold_invoice_expiration_window` del 38385 — che dalla 0.19.0 è
+  VIVA e serve solo a questo, #999 — dal momento dell'arrivo): il
+  coordinatore a chi non paga NON dice niente, LND cancella e l'ordine
+  torna `pending`; la frase «La cauzione non è stata bloccata in tempo»
+  e il «↻ Riprendi l'ordine» (la stessa presa, la stessa chiave: il
+  coordinatore fa una cauzione nuova). Un `canceled` in quello stato è
+  il giro morto «cauzione» (un altro ha pagato prima, o chi ha
+  pubblicato ha ritirato: il coordinatore non dice quale). A cauzione
+  bloccata il primo messaggio dello scambio (`add-invoice`,
+  `pay-invoice`…) la segna `bloccata` — il coordinatore non lo dice mai
+  — e un finale senza `bond-slashed` la segna `restituita`
+  (`cauzioneAFineP2P`, anche dal «concluso» detto dal server a chi
+  vende e dalla restore): la spec garantisce il rilascio su OGNI uscita
+  che non è una bruciatura. Si PERDE solo per la direttiva del
+  moderatore (`bond_resolution` dentro `admin-settle`/`admin-cancel`: la
+  terza domanda della card, `cauzioneModP2P`, sugli scambi in contanti
+  e per il lato che ha preso — `cauzione_di` dal server —, a registro
+  come riga `cauzione` accanto alla `decisione`; un lato senza cauzione
+  fa rifiutare TUTTA la decisione con `invalid-payload`, e il client lo
+  dice) o per il timeout, spento sul nodo: arriva `bond-slashed`
+  (`persa`, coi sats), metà va al nodo e metà alla controparte, che
+  riceve `add-bond-invoice` (`bond_payout_request`: la sua parte e
+  `slashed_at`, più i giorni dal 38385) → `o.incasso`, il riquadro
+  «Metà della cauzione… è tua» col bottone «Incassa» e il foglio
+  `p2pCauzioneSheet` (dal wallet NWC o incollata, l'importo ESATTO),
+  `add-bond-invoice` con la terna di sempre, poi `bond-invoice-accepted`
+  e `bond-payout-completed`. La restore dice `waiting-taker-bond` e
+  `waiting-maker-bond` solo a chi ha pubblicato: sono «pubblicato», mai
+  uno stato grezzo; a chi prende non li dice (i suoi campi vivono sulla
+  riga della cauzione, non sull'ordine). Nel passato di
+  `applicaMessaggioP2P` la richiesta, la bruciatura e la metà che mi
+  spetta si prendono come dati.
   LA RIPRESA DALLA RESTORE (17 set 2026): lo stato che il coordinatore
   dà nella restore-session muove anche le righe GIÀ LOCALI, non solo fa
   nascere quelle che mancano. `P2P_DA_RESTORE` traduce il vocabolario

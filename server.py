@@ -25623,6 +25623,17 @@ def _leve_stato():
                          "250 di serie anche senza la riga nel config",
                   spento="nessun tetto per il contanti di persona: vale "
                          "solo il tetto generale, se acceso"),
+            # LA CAUZIONE DI CHI PRENDE (1 ott 2026): la leva del client;
+            # a chiederla e' il coordinatore (settings.toml del nodo,
+            # `[anti_abuse_bond]` + la patch 0008), che la annuncia nel 38385
+            _leva("Cauzione nel contanti di persona", "P2P_CAUZIONE",
+                  P2P_CAUZIONE,
+                  acceso="il client mostra la cauzione di chi prende un "
+                         "ordine in contanti — cifra, passo, Info P2P — "
+                         "se anche il 38385 del coordinatore la annuncia",
+                  spento="il client non promette nessuna cauzione; se il "
+                         "coordinatore la chiede lo stesso, la richiesta "
+                         "arriva e si gestisce, senza cifre dette prima"),
             # LO SCONTO FEDELTA': la leva dice la cifra che il CLIENT
             # mostra; a scontare davvero e' il coordinatore (patch
             # 0005), che chiede a /api/p2p/sconto. Due righe perche'
@@ -40820,6 +40831,22 @@ try:
     P2P_IN_VETRINA = P2P_IN_VETRINA is True
 except ImportError:
     P2P_IN_VETRINA = False
+# LA CAUZIONE DI CHI PRENDE, NEL CONTANTI DI PERSONA (1 ott 2026,
+# cantiere B, decisione di Andrea): l'`anti_abuse_bond` di mostrod
+# 0.19.0, acceso sul nodo SOLO per il metodo «Contanti» (patch 0008 del
+# fork). Questa leva dice al CLIENT di mostrarla — la cifra prima della
+# presa, il passo, la voce in «Info P2P» — e viaggia in busta come
+# `cauzione`; a chiederla davvero e' il coordinatore, che la annuncia
+# nel suo 38385 (`bond_enabled`), e il client crede solo a tutt'e due.
+# Solo True accende: una stringa o un numero restano spenti.
+try:
+    from config import P2P_CAUZIONE
+    if not isinstance(P2P_CAUZIONE, bool):
+        print("[p2p] P2P_CAUZIONE non e' True/False: la cauzione nel client "
+              "resta SPENTA")
+    P2P_CAUZIONE = P2P_CAUZIONE is True
+except ImportError:
+    P2P_CAUZIONE = False
 # LO SCONTO FEDELTA' SUL P2P (set 2026, deciso con Alan): chi e'
 # PIONIERE oppure ha raggiunto il livello 5 paga mezzo punto in meno
 # sulla SUA meta' della commissione — 1% invece dell'1,5% della beta.
@@ -41033,7 +41060,11 @@ def _p2p_leve() -> dict:
             # regola, per il solo metodo «Contanti», in pubblicazione e
             # in presa; 250 di serie, 0 = spento
             "maxEuroContanti": int(P2P_CONTANTI_MAX_EURO),
-            "minEuroBz": int(BARATTOZON_MIN_EURO)}
+            "minEuroBz": int(BARATTOZON_MIN_EURO),
+            # la cauzione di chi prende nel contanti (1 ott 2026): il
+            # client la mostra solo con questa E col 38385 del
+            # coordinatore che la annuncia; viaggia sempre, anche falsa
+            "cauzione": bool(P2P_CAUZIONE)}
 
 
 def _p2p_per(tg_id) -> dict:
@@ -45544,7 +45575,14 @@ P2P_AZIONI_EVENTO = (
     "taken", "hold-invoice-requested", "hold-invoice-paid",
     "buyer-invoice-requested", "buyer-invoice-added", "fiat-sent",
     "released", "success", "cancel-requested", "canceled", "expired",
-    "dispute-opened", "payout-failed")
+    "dispute-opened", "payout-failed",
+    # LA CAUZIONE BRUCIATA (1 ott 2026, patch 0008): il dettaglio dice
+    # a chi era (`buyer` | `seller`), `sats` quanto era, `sats_buyer` e
+    # `sats_seller` quanto ne riceve ognuno — a chi ha vinto la meta',
+    # che deve incassarla dall'app entro quindici giorni
+    "bond-slashed")
+# le azioni che portano importi: le due di chiusura e la cauzione bruciata
+P2P_AZIONI_CON_SATS = ("released", "success", "bond-slashed")
 P2P_ATTORI_EVENTO = ("buyer", "seller", "mostro")
 FORMA_DETTAGLIO_P2P = re.compile(r"[A-Za-z0-9_-]{0,40}")
 # quanto l'ora di mostrod puo' stare lontana dalla nostra: i due orologi
@@ -45580,7 +45618,8 @@ def _momento_evento_p2p(azione: str, dettaglio: str) -> str:
             "success": "concluso",
             "cancel-requested": "annullo_chiesto",
             "dispute-opened": "disputa",
-            "payout-failed": "payout_fallito"}.get(azione, "")
+            "payout-failed": "payout_fallito",
+            "bond-slashed": "cauzione_persa"}.get(azione, "")
 
 
 def _evento_p2p_pulito(d, adesso: int) -> dict:
@@ -45625,7 +45664,7 @@ def _evento_p2p_pulito(d, adesso: int) -> dict:
           "venditore_key": chiavi["seller"],
           "momento": _momento_evento_p2p(azione, dettaglio),
           "sats": 0, "sats_compratore": 0, "sats_venditore": 0}
-    if azione in ("released", "success"):
+    if azione in P2P_AZIONI_CON_SATS:
         for campo, chiave in (("sats", "sats"), ("sats_buyer", "sats_compratore"),
                               ("sats_seller", "sats_venditore")):
             v = d.get(campo)
@@ -45730,7 +45769,9 @@ def _registra_evento_p2p(con, ev: dict, adesso: int, cambio: float = 0.0):
     # dice riga per riga.
     for riga in _riconcilia_parti_p2p(con, ev["ordine"], adesso):
         print(riga, flush=True)
-    if ev["sats"] > 0:
+    # ...ma quelli della cauzione bruciata no (1 ott 2026): sono un'altra
+    # cifra, e qui dentro stanno i sats dello SCAMBIO
+    if ev["sats"] > 0 and ev["azione"] != "bond-slashed":
         con.execute("UPDATE p2p_scambi SET sats=?, sats_compratore=?, "
                     "sats_venditore=? WHERE ordine=?",
                     (ev["sats"], ev["sats_compratore"], ev["sats_venditore"],
@@ -45798,6 +45839,10 @@ def _destinatari_evento_p2p(momento: str, attore: str, dettaglio: str,
     elif momento == "payout_fallito":
         ruoli = ["compra"]
     elif momento in ("concluso", "scaduto"):
+        ruoli = ["compra", "vende"]
+    elif momento == "cauzione_persa":
+        # la bruciatura e' un gesto del moderatore: la sente chi l'ha
+        # persa e chi ne riceve la meta' (che deve INCASSARLA dall'app)
         ruoli = ["compra", "vende"]
     elif momento in ("annullo_chiesto", "annullato", "tornato", "disputa"):
         ruoli = altri
@@ -45989,6 +46034,24 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
                 + ":</b> apri «Dove ricevere i sats» e dai una fattura nuova."
                 "\n\n<i>I sats restano fermi per te finché il pagamento non "
                 "passa.</i>")
+    if momento == "cauzione_persa":
+        # LA CAUZIONE BRUCIATA (1 ott 2026): il dettaglio dice di chi era.
+        # A chi l'ha persa la notizia, a chi vince la meta' il GESTO —
+        # la fattura dall'app entro la finestra del nodo
+        # (`payout_claim_window_days`, 15: il client legge il numero vivo
+        # dal 38385, qui si dice a parole), dopo il servizio se la tiene.
+        persa = int(dati.get("cauzione") or 0)
+        mia = int(dati.get("cauzione_vende" if vende else "cauzione_compra") or 0)
+        io_perdo = (dettaglio == "seller") == vende
+        if io_perdo:
+            return ("🔐 <b>La tua cauzione è stata bruciata"
+                    + (f": {_fmt_sats(persa)} sats" if persa > 0 else "") + ".</b> "
+                    "Un moderatore ha deciso che non ti sei presentato all'incontro: "
+                    f"metà va a {l_altro}, metà al servizio.")
+        return (f"⚖️ <b>Metà della cauzione di {l_altro} è tua"
+                + (f": {_fmt_sats(mia)} sats" if mia > 0 else "") + ".</b> "
+                "Apri la pagina dello scambio nell'app e dai una fattura di "
+                "quell'importo entro quindici giorni: dopo, il servizio se la tiene.")
     return ""
 
 
@@ -46070,6 +46133,11 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     ordine, momento, giro = ev["ordine"], fatto["momento"], fatto["giro"]
     corto = ordine[:8]
     dati = _dati_frase_p2p(con, ordine)
+    # i sats della cauzione bruciata stanno nell'EVENTO, non nel libro
+    # (1 ott 2026): la frase li prende da qui
+    if momento == "cauzione_persa":
+        dati.update(cauzione=ev["sats"], cauzione_compra=ev["sats_compratore"],
+                    cauzione_vende=ev["sats_venditore"])
     # chi ha PUBBLICATO: l'altro lato rispetto a chi ha preso
     lato_maker = {"buyer": "vende", "seller": "compra"}.get(fatto["preso_dal"], "")
     fuori = []
@@ -46514,6 +46582,10 @@ def _riga_disputa_p2p(con, r, io: int) -> dict:
         "vende": nudo(_persona_disputa_p2p(con, r["venditore"])),
         "compra_nostro": bool(r["compratore"]), "vende_nostro": bool(r["venditore"]),
         "sats": dati["sats"], "euro": nudo(dati["euro"]), "metodi": nudo(dati["metodi"]),
+        # CHI HA MESSO LA CAUZIONE (1 ott 2026): chi ha PRESO secondo
+        # mostrod (`apply_to = take` sul nodo) — 'compra' | 'vende' | ''.
+        # Il client la propone solo sugli scambi in contanti.
+        "cauzione_di": _cauzione_di_p2p(con, ordine),
         "garanzia_il": int((g["q"] if g else 0) or 0),
         "sei_parte": parte,
         "presa_da": (nudo(_persona_disputa_p2p(con, r["presa_da"])) if r["presa_da"] else ""),
@@ -46534,6 +46606,17 @@ def _riga_disputa_p2p(con, r, io: int) -> dict:
             fuori["chiave_compratore"] = s["chiave_compratore"] or ""
             fuori["chiave_venditore"] = s["chiave_venditore"] or ""
     return fuori
+
+
+def _cauzione_di_p2p(con, ordine: str) -> str:
+    """PURA sulla connessione: il lato che ha messo la cauzione, cioe'
+    chi ha PRESO l'ordine secondo la cronaca di mostrod (`preso_dal` in
+    `p2p_scambi`). Vuoto se non si sa: allora il moderatore non ha la
+    spunta, e brucia niente."""
+    s = con.execute("SELECT preso_dal FROM p2p_scambi WHERE ordine=?",
+                    (ordine,)).fetchone()
+    return {"buyer": "compra", "seller": "vende"}.get(
+        (s["preso_dal"] if s else "") or "", "")
 
 
 def _dispute_per_moderatore_p2p(con, io: int, adesso: int) -> dict:
@@ -46642,7 +46725,12 @@ def _decisione_disputa_p2p(con, io: int, d: dict, adesso: int) -> tuple:
     esito = str(d.get("esito") or "")
     chiave = str(d.get("chiave") or "").strip().lower()
     motivo = " ".join(str(d.get("motivo") or "").split())
+    # LA CAUZIONE (1 ott 2026): di chi si brucia — 'compratore' |
+    # 'venditore' — o vuota (nessuna: e' il caso di sempre)
+    cauzione = str(d.get("cauzione") or "")
     if not FORMA_ORDINE_P2P.fullmatch(ordine) or esito not in P2P_DISPUTA_ESITI:
+        return (400, "Richiesta non valida")
+    if cauzione and cauzione not in P2P_DISPUTA_ESITI:
         return (400, "Richiesta non valida")
     if d.get("conferma") is not True:
         return (400, "Manca la conferma")
@@ -46663,8 +46751,13 @@ def _decisione_disputa_p2p(con, io: int, d: dict, adesso: int) -> tuple:
         return (409, "Questa non è la chiave con cui hai preso la disputa")
     _registro_disputa_p2p(con, ordine, "decisione", io, adesso, esito=esito,
                           motivo=motivo, chiave=chiave)
+    # ...e la cauzione bruciata ha la sua riga, accanto: `esito` dice di
+    # chi era (1 ott 2026). Senza spunta, niente riga.
+    if cauzione:
+        _registro_disputa_p2p(con, ordine, "cauzione", io, adesso, esito=cauzione,
+                              motivo=motivo, chiave=chiave)
     con.commit()
-    return (200, {"ok": True, "esito": esito})
+    return (200, {"ok": True, "esito": esito, "cauzione": cauzione})
 
 
 def _esito_gesto_disputa_p2p(con, io: int, ordine, esito, motivo, adesso: int) -> tuple:

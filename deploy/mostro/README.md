@@ -1,4 +1,13 @@
-# IL FORK DI MOSTRO — sette patch sopra il tag v0.19.0
+# IL FORK DI MOSTRO — otto patch sopra il tag v0.19.0
+
+**Dal 1 ottobre 2026 le patch sono OTTO**: la 0008 (la cauzione di chi
+prende, solo per il metodo «Contanti») sta sopra la 0007 ed è stata
+fatta sul PC come le sette del 30 set — patcher a `--secco` su un clone
+pulito della `v0.19.0` con le sette applicate via `git am`, un commit,
+`git format-patch`; e `git am` delle otto su un secondo clone dà l'albero
+byte per byte uguale. Dove sotto si legge «sette» vale per le sette di
+prima; la 0008 ha la sua voce in fondo a «LE SETTE PATCH» e la sua riga
+nella tabella dei patcher. ⚠️ Nemmeno lei è stata compilata sul PC.
 
 Qui dentro non c'è codice in servizio: ci sono le patch che il nodo Mostro di
 Dublino applica sopra il sorgente upstream, prodotte con
@@ -193,10 +202,15 @@ stanno nel compose del nodo, servizio `mostro`:
 `BARATTOLO_SCONTO_SEGRETO=<lo stesso di P2P_SCONTO_SEGRETO sul VPS>`.
 ⚠️ Il segreto è un segreto: mai nel canale Telegram del nodo, entra nel
 backup age col resto del compose.
-NON COPERTO, e dichiarato: la strada dei BOND (`[anti_abuse_bond]`, da
-noi spenta) mette `order.fee` nel contesto di chi prende e può far
-correre più prese sullo stesso ordine. Prima di accendere i bond questa
-patch si rilegge.
+NON COPERTO fino al 1 ott 2026, e dichiarato: la strada dei BOND
+(`[anti_abuse_bond]`) mette `order.fee` nel contesto di chi prende e può
+far correre più prese sullo stesso ordine. RILETTA per il cantiere della
+cauzione: `apply_party_fees` gira a OGNI tentativo di presa e scrive UNA
+riga per ordine (`INSERT OR REPLACE`), quindi con due prese in gara
+l'ultima sovrascrive la riga del vincitore e al blocco `seller_fee` non
+trova i suoi numeri e ripiega su `order.fee` — lo sconto dello 0,5%
+perso o regalato, mai un flusso rotto. La cura sta nella 0008 (pezzo B):
+al blocco della cauzione la riga si riscrive per il VINCITORE.
 Nasce da `patch-0005-fee-per-parte.py` (con `barattolo_fee.rs` accanto;
 `--secco` prova le ancore senza scrivere) e vive qui come `.patch`
 esportato dal nodo.
@@ -304,9 +318,12 @@ nel libro), `dispute_action`, e le due chiusure del moderatore.
 (`add_invoice_action` → `show_hold_invoice`) l'aggancio tiene una COPIA
 e avvisa solo a gesto riuscito; e l'annullo di chi aveva preso avvisa
 PRIMA che `edit_pubkeys_order` gli cancelli le chiavi dall'ordine.
-NON COPERTO, e dichiarato: la strada dei BOND (le prese in gara sullo
-stesso ordine) e il ramo Cashu non hanno agganci; su questo nodo sono
-spenti tutti e due.
+NON COPERTO, e dichiarato: il ramo Cashu non ha agganci (spento). La
+strada dei BOND dal 1 ott 2026 ce li ha, nella 0008: il ramo
+`resume_take_after_bond` senza fattura (che scavalcava l'aggancio 5) e
+l'evento `bond-slashed`; le prese in gara sullo stesso ordine restano
+senza aggancio finché nessuna cauzione si blocca (l'ordine è ancora
+`pending` per tutti), e la presa vera parte al blocco.
 Nasce da `patch-0007-eventi-al-server.py` (con `barattolo_eventi.rs`
 accanto; `--secco` prova le ancore senza scrivere). Il patcher, oltre
 alle ancore uniche, controlla tre cose che Rust non controlla perché
@@ -316,7 +333,57 @@ dichiarato — e che nessun aggancio sia finito sotto `#[cfg(test)]`. I
 fine-riga sono quelli del file che trova (un `barattolo_fee.rs` arrivato
 in CRLF da un checkout Windows non fa cadere l'ancora).
 
-## I SETTE PATCHER
+**0008 — LA CAUZIONE SOLO PER CERTI METODI DI PAGAMENTO** (1 ott 2026,
+cantiere B, decisione di Andrea; `src/config/types.rs`, `src/app/bond/`
+`flow.rs`, `mod.rs`, `slash.rs`, `take_buy.rs`, `take_sell.rs`,
+`util.rs`, `nip33.rs`, `barattolo_eventi.rs`, `settings.tpl.toml`: 19
+agganci in 10 file più due moduli di test in coda). Negli scambi in
+CONTANTI di persona chi prende blocca una piccola cauzione
+(l'`anti_abuse_bond` di mostrod: una seconda hold invoice) così chi non
+si presenta la perde. Ma upstream la cauzione è TUTTO o NIENTE:
+`taker_bond_required()` e `maker_bond_required()` non ricevono l'ordine,
+e `payment_method` è una stringa che nessuno guarda. Quattro pezzi:
+**A)** un campo `only_payment_methods = ["Contanti"]` in
+`[anti_abuse_bond]` (serde default: assente o vuoto = ogni metodo, cioè
+upstream), `bond_applies_to_order(&order)` che spezza
+`order.payment_method` sulle virgole e confronta la PAROLA INTERA senza
+maiuscole («Contanti al tabacchino 23.47» resta fuori, «Contanti,Revolut»
+entra: chi prende può scegliere il contante, la stessa regola del tetto
+nel client), i tre punti di chiamata (`take_buy`, `take_sell`,
+`publish_order`) che passano da `*_required_for(&order)` — tutti già
+dentro un `if bond_required` — e il tag `bond_only_payment_methods` nel
+38385, che il client legge vivo come la fee. Se sbaglia, sbaglia in
+CHIUSURA: nessuna cauzione, cioè il comportamento di ieri.
+**B)** la rilettura della 0005 (sopra): al blocco `apply_party_fees` si
+riesegue per il vincitore su una COPIA dell'ordine — l'ordine tiene i
+numeri della sua riga della cauzione, contro cui la fattura di chi
+compra è già stata validata.
+**C)** il buco della 0007: un ordine sell preso senza fattura riparte da
+`resume_take_after_bond` e non passa dal ramo di `take_sell` agganciato;
+copiati lì `taken`/`invoice-next` e `buyer-invoice-requested`.
+**D)** l'evento `bond-slashed` (la quattordicesima azione di
+`barattolo_eventi.rs`, `ACTIONS` da 12 a 13 voci): da
+`notify_bond_slashed`, che i tre posti dove la bruciatura è CONFERMATA
+(timeout, admin-settle, admin-cancel) chiamano — col lato che l'ha persa
+nel dettaglio (`buyer` | `seller`), `sats` = la cauzione, `sats_buyer` e
+`sats_seller` = quanto riceve ognuno; senza, chi vince metà cauzione lo
+saprebbe solo aprendo l'app entro quindici giorni. Le due literal
+complete di `AntiAbuseBondSettings` nei test di `nip33.rs` ricevono il
+campo nuovo (senza, i TEST non compilerebbero). I test: `payment_method_in`
+su otto forme, i tre cancelli spenti senza config, il tag emesso solo
+con una lista e la cauzione accesa, il toml con e senza chiave — nel
+filtro del `cargo test` entrano `barattolo_bond` e
+`toml_only_payment_methods`. Niente migrazioni: il rollback resta la
+riga dell'immagine nel compose, più `enabled = false` (o il blocco
+commentato) in `settings.toml`. ⚠️ Non compilata sul PC: le firme sono
+state lette sul clone della v0.19.0 con le sette applicate, e il primo
+`cargo` è quello del nodo, punto 4 della liturgia. Nasce da
+`patch-0008-cauzione-solo-contanti.py` (`--secco` prova le ancore senza
+scrivere; pretende la 0005 e la 0007 sotto; controlla che
+`bond-slashed` sia entrata in `ACTIONS` e nel vocabolario dei dettagli,
+e che nessun aggancio sia finito sotto `#[cfg(test)]`).
+
+## GLI OTTO PATCHER
 
 Dal 22 set 2026 OGNI patch ha il suo script accanto, tutti con la stessa
 forma: si lanciano dalla radice di `mostro-src`, provano TUTTE le ancore
@@ -335,12 +402,14 @@ fermano («porta gia' questa modifica»).
 | 0005 | `patch-0005-fee-per-parte.py` + `barattolo_fee.rs` | 7 agganci in 6 file |
 | 0006 | `patch-0006-perche-e-fallito.py` | `src/app/release.rs`, 1 |
 | 0007 | `patch-0007-eventi-al-server.py` + `barattolo_eventi.rs` | 25 agganci in 13 file |
+| 0008 | `patch-0008-cauzione-solo-contanti.py` | 19 agganci in 10 file, più i test in coda a `flow.rs` e `nip33.rs` (1 ott 2026) |
 
 I primi tre sono nati il 22 set 2026 (fino ad allora quelle patch
 esistevano solo come `.patch`, da ritocchi a mano sul nodo); la 0004 ha
 avuto `--secco` lo stesso giorno (prima scriveva e basta, un file alla
 volta). L'ordine e' quello: la 0007 pretende `src/barattolo_fee.rs`
-della 0005, e si ferma se non c'e'.
+della 0005, e si ferma se non c'e'; la 0008 pretende tutt'e due i
+moduli, cioe' la 0005 E la 0007.
 
 ## COSA CURA, E COSA NO
 
@@ -568,10 +637,10 @@ conflitto, l'albero e' byte per byte quello dei sette patcher, e il
 git clone https://github.com/MostroP2P/mostro.git ~/nodo/mostro-src
 cd ~/nodo/mostro-src
 git switch -c barattolo/v0.19.0 v0.19.0        # d53e41d
-git am ~/nodo/patch-bar6/000[1-7]-*.patch      # le sette, copiate dal PC con scp
-git log --oneline v0.19.0..HEAD                 # sette righe, la 0001 in fondo
+git am ~/nodo/patch-bar6/000[1-8]-*.patch      # le otto, copiate dal PC con scp
+git log --oneline v0.19.0..HEAD                 # otto righe, la 0001 in fondo
 docker build -f docker/Dockerfile --target builder -t mostro-test:bar6 .
-docker run --rm mostro-test:bar6 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle publish spam_gate
+docker run --rm mostro-test:bar6 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle publish spam_gate barattolo_bond toml_only_payment_methods
 docker build -f docker/Dockerfile -t mostro:v0.19.0-bar6 .
 ```
 

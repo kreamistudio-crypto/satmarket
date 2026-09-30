@@ -41,7 +41,14 @@ gira il SERVER VERO su un database usa-e-getta, e si cammina:
      «Sats in pagamento» — con la riga del pagamento non passato se e'
      quello il caso — e MAI «concluso»; se il pagamento e' passato nel
      minuto l'attesa tace; e il «Scambio concluso!» gli arriva col
-     success, anche dopo che l'attesa e' partita.
+     success, anche dopo che l'attesa e' partita;
+ 10. LA CAUZIONE BRUCIATA (1 ott 2026, cantiere B, patch 0008): mostrod
+     racconta `bond-slashed` coi tre importi e il lato che l'ha persa;
+     entra dalla stessa porta, si registra come `cauzione_persa`, NON
+     riscrive i sats dello scambio, e avvisa tutt'e due — chi l'ha
+     persa coi suoi sats, chi vince la meta' col gesto da fare
+     nell'app entro quindici giorni; un lato fuori vocabolario e un
+     importo che non e' un intero sono un 400.
 
 NON TOCCA NIENTE DI VERO: il modulo `config` viene sostituito PRIMA
 dell'import di server, o si aprirebbe il database di casa. Nessuna
@@ -465,6 +472,45 @@ def main():
     con.close()
     prova("...e l'attesa di chi vende tace, e se ne va", ([], 0),
           (partiti, rimaste))
+
+    print("\n10) la cauzione bruciata: un evento in piu', dalla stessa porta")
+    CAUZ = {"sats": 1500, "sats_buyer": 0, "sats_seller": 750}
+    detti = avvisi(PASSATO, "bond-slashed", ora - 3, dettaglio="buyer", **CAUZ) or []
+    prova("«bond-slashed» avvisa tutt'e due", sorted([COMPRA, VENDE]),
+          sorted(chi for chi, _ in detti))
+    prova("...a chi l'ha persa la notizia coi suoi sats", True,
+          dict(detti).get(COMPRA, "").startswith(
+              "🔐 <b>La tua cauzione è stata bruciata: 1.500 sats.</b>"))
+    # (il nome dell'altra parte, se il libro lo sa, prende il posto di «chi compra»)
+    prova("...a chi vince la meta', il gesto: la fattura dall'app, entro quindici giorni", True,
+          dict(detti).get(VENDE, "").startswith("⚖️ <b>Metà della cauzione di ")
+          and ": 750 sats.</b>" in dict(detti).get(VENDE, "")
+          and "entro quindici giorni" in dict(detti).get(VENDE, "")
+          and "dai una fattura" in dict(detti).get(VENDE, ""))
+    con = con_db()
+    riga = con.execute("SELECT sats, sats_compratore, sats_venditore FROM p2p_scambi "
+                       "WHERE ordine=?", (PASSATO,)).fetchone()
+    momenti = [r[0] for r in con.execute(
+        "SELECT momento FROM p2p_momenti WHERE ordine=? ORDER BY quando", (PASSATO,))]
+    con.close()
+    prova("...si registra come «cauzione_persa» DOPO il concluso, e i sats dello scambio restano quelli",
+          (True, (7300, 7228, 7372)),
+          (momenti[-1] == "cauzione_persa" and "concluso" in momenti,
+           (riga["sats"], riga["sats_compratore"], riga["sats_venditore"])))
+    prova("...lo stesso evento una seconda volta non avvisa piu'", None,
+          avvisi(PASSATO, "bond-slashed", ora - 3, dettaglio="buyer", **CAUZ))
+    def storto(**k):
+        d = {"v": 1, "order": PASSATO, "action": "bond-slashed", "ts": ora, "buyer": CHIAVE_COMPRA,
+             "seller": CHIAVE_VENDE, "actor": "mostro", "detail": "buyer"}
+        d.update(CAUZ); d.update(k)
+        try:
+            SRV._evento_p2p_pulito(d, ora)
+            return 200
+        except ValueError as e:
+            return str(e)
+    prova("un importo che non e' un intero, o negativo, e' un rifiuto; un lato che e' una frase pure",
+          ("Importo fuori misura", "Importo fuori misura", "Dettaglio in una forma sconosciuta"),
+          (storto(sats="1500"), storto(sats_seller=-1), storto(detail="chi compra")))
 
     print(f"\n{PASSATE} passate, {FALLITE} fallite")
     return 1 if FALLITE else 0

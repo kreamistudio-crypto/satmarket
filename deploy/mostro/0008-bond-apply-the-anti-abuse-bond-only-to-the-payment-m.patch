@@ -1,0 +1,471 @@
+From 2f6634509e02621bdde218346e4759d59fd71dac Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@barattolo.store>
+Date: Wed, 30 Sep 2026 22:18:42 +0200
+Subject: [PATCH] bond: apply the anti-abuse bond only to the payment methods
+ the policy names
+
+---
+ settings.tpl.toml       |   4 ++
+ src/app/bond/flow.rs    | 103 ++++++++++++++++++++++++++++++++++++++++
+ src/app/bond/mod.rs     |   1 +
+ src/app/bond/slash.rs   |   8 ++++
+ src/app/take_buy.rs     |   4 +-
+ src/app/take_sell.rs    |   4 +-
+ src/barattolo_eventi.rs |  46 +++++++++++++++++-
+ src/config/types.rs     |  28 +++++++++++
+ src/nip33.rs            |  59 +++++++++++++++++++++++
+ src/util.rs             |   4 +-
+ 10 files changed, 256 insertions(+), 5 deletions(-)
+
+diff --git a/settings.tpl.toml b/settings.tpl.toml
+index c5e2601..54ebea8 100644
+--- a/settings.tpl.toml
++++ b/settings.tpl.toml
+@@ -272,6 +272,10 @@ port = 50051
+ # # Seconds a maker has to pay the maker bond (apply_to = "make" | "both").
+ # # Past it the unpublished order expires and the maker is told. Must be > 0.
+ # maker_bond_payment_timeout_seconds = 900
++# Barattolo fork (patch 0008): the bond applies only to orders whose
++# payment_method lists one of these (whole word, case-insensitive).
++# Empty or absent = every method, i.e. upstream.
++# only_payment_methods = ["Contanti"]
+ 
+ # Cashu escrow mode (docs/cashu/). Opt-in, disabled by default. When enabled
+ # the node runs WITHOUT LND and escrows trades in NUT-11 2-of-3 Cashu tokens
+diff --git a/src/app/bond/flow.rs b/src/app/bond/flow.rs
+index ec4fba0..9888544 100644
+--- a/src/app/bond/flow.rs
++++ b/src/app/bond/flow.rs
+@@ -93,6 +93,42 @@ pub fn maker_bond_required() -> bool {
+         .is_some_and(|cfg| cfg.apply_to.applies_to_maker())
+ }
+ 
++/// Barattolo fork (patch 0008): does the node's bond policy cover this
++/// order's payment methods? `only_payment_methods` empty = every order.
++pub fn bond_applies_to_order(order: &Order) -> bool {
++    Settings::get_bond()
++        .map(|cfg| payment_method_in(&order.payment_method, &cfg.only_payment_methods))
++        .unwrap_or(false)
++}
++
++/// Pure half of [`bond_applies_to_order`]: `payment_method` is the order's
++/// comma-separated list, `allowed` the policy's. Whole word, trimmed,
++/// case-insensitive; an empty policy covers everything.
++pub fn payment_method_in(payment_method: &str, allowed: &[String]) -> bool {
++    let allowed: Vec<String> = allowed
++        .iter()
++        .map(|a| a.trim().to_lowercase())
++        .filter(|a| !a.is_empty())
++        .collect();
++    if allowed.is_empty() {
++        return true;
++    }
++    payment_method
++        .split(',')
++        .map(|m| m.trim().to_lowercase())
++        .any(|m| allowed.contains(&m))
++}
++
++/// [`taker_bond_required`] for THIS order (patch 0008).
++pub fn taker_bond_required_for(order: &Order) -> bool {
++    taker_bond_required() && bond_applies_to_order(order)
++}
++
++/// [`maker_bond_required`] for THIS order (patch 0008).
++pub fn maker_bond_required_for(order: &Order) -> bool {
++    maker_bond_required() && bond_applies_to_order(order)
++}
++
+ /// True when a `Locked` **taker** bond already exists among `bonds` — the
+ /// signal that the order's trade is committed and no further take may
+ /// begin (it must be rejected with `PendingOrderExists`).
+@@ -1104,6 +1140,17 @@ async fn on_bond_invoice_accepted(
+     // touch these fields (so racing takers couldn't clobber each
+     // other); now that we know the winner, copy their snapshot.
+     let order = promote_taker_context_to_order(pool, order, &current).await?;
++    // Barattolo fork (patch 0008): re-apply the per-party fees for the
++    // WINNER. Patch 0005 writes one side row per order at every take
++    // attempt; with concurrent bonds the last attempt's row overwrites the
++    // winner's. The order keeps the numbers of its bond row (the buyer's
++    // invoice was validated against them): only the side row is refreshed.
++    {
++        let mut ricalcolo = order.clone();
++        let buyer = order.buyer_pubkey.clone().unwrap_or_default();
++        let seller = order.seller_pubkey.clone().unwrap_or_default();
++        crate::barattolo_fee::apply_party_fees(pool, &mut ricalcolo, &buyer, &seller).await;
++    }
+ 
+     let my_keys = get_keys()?;
+     resume_take_after_bond(pool, order, my_keys, request_id).await
+@@ -2055,6 +2102,12 @@ async fn resume_take_after_bond(
+                     .await;
+                     return Err(MostroCantDo(CantDoReason::NotAllowedByStatus));
+                 }
++                // Barattolo fork (patch 0008): the bonded take of a sell order
++                // without a buyer invoice resumes here and never passes through
++                // take_sell's hook (patch 0007): the same two events, so the
++                // server tells the maker what comes next.
++                crate::barattolo_eventi::emit_taken(&order_updated, "invoice-next");
++                crate::barattolo_eventi::emit("buyer-invoice-requested", &order_updated, "mostro");
+                 Ok(())
+             }
+         }
+@@ -4916,3 +4969,53 @@ mod tests {
+         }
+     }
+ }
++
++#[cfg(test)]
++mod barattolo_bond_methods {
++    // Barattolo fork (patch 0008): the bond only for the payment methods
++    // the policy names, compared whole-word and case-insensitively.
++    use super::{bond_applies_to_order, maker_bond_required_for, payment_method_in, taker_bond_required_for};
++
++    fn v(a: &[&str]) -> Vec<String> {
++        a.iter().map(|s| s.to_string()).collect()
++    }
++
++    #[test]
++    fn empty_policy_covers_every_method() {
++        assert!(payment_method_in("SEPA", &v(&[])));
++        assert!(payment_method_in("", &v(&[])));
++        assert!(payment_method_in("SEPA", &v(&["", "  "])));
++    }
++
++    #[test]
++    fn whole_word_case_insensitive() {
++        let p = v(&["Contanti"]);
++        assert!(payment_method_in("Contanti", &p));
++        assert!(payment_method_in("contanti", &p));
++        assert!(payment_method_in("Revolut, Contanti", &p));
++        assert!(payment_method_in(" CONTANTI ,SEPA", &p));
++        // Barattozon has its own exact name: a prefix is not a match
++        assert!(!payment_method_in("Contanti al tabacchino 23.47", &p));
++        assert!(!payment_method_in("SEPA,Revolut", &p));
++        assert!(!payment_method_in("", &p));
++    }
++
++    #[test]
++    fn policy_entries_are_trimmed_and_lowercased() {
++        assert!(payment_method_in("contanti", &v(&[" Contanti "])));
++        assert!(payment_method_in("SEPA", &v(&["", "sepa"])));
++    }
++
++    #[test]
++    fn gates_are_off_without_config() {
++        // No global config in unit tests: every gate stays inert, as the
++        // upstream ones do.
++        let order = mostro_core::order::Order {
++            payment_method: "Contanti".to_string(),
++            ..Default::default()
++        };
++        assert!(!bond_applies_to_order(&order));
++        assert!(!taker_bond_required_for(&order));
++        assert!(!maker_bond_required_for(&order));
++    }
++}
+diff --git a/src/app/bond/mod.rs b/src/app/bond/mod.rs
+index 98b4fc0..ad081ea 100644
+--- a/src/app/bond/mod.rs
++++ b/src/app/bond/mod.rs
+@@ -23,6 +23,7 @@ pub use flow::{
+     reconcile_stranded_taker_bonds, release_bond, release_bonds_for_order,
+     release_bonds_for_order_or_warn, release_taker_bonds_for_order_or_warn, request_maker_bond,
+     request_taker_bond, resubscribe_active_bonds, taker_bond_required,
++    bond_applies_to_order, maker_bond_required_for, payment_method_in, taker_bond_required_for,
+     trade_committed_by_locked_taker_bond, TakerContext,
+ };
+ pub use math::{compute_bond_amount, compute_node_share};
+diff --git a/src/app/bond/slash.rs b/src/app/bond/slash.rs
+index de76bb1..03d3fe3 100644
+--- a/src/app/bond/slash.rs
++++ b/src/app/bond/slash.rs
+@@ -768,6 +768,14 @@ pub async fn notify_bond_slashed(order: &Order, slashed: &Bond) {
+         None,
+     )
+     .await;
++    // Barattolo fork (patch 0008): tell the marketplace server, so it warns
++    // the loser and reminds the winner to claim their share.
++    crate::barattolo_eventi::emit_bond_slashed(
++        order,
++        &slashed.pubkey,
++        slashed.amount_sats,
++        slashed.node_share_sats.unwrap_or(0),
++    );
+ }
+ 
+ /// The counterparty the share of `bond` goes to, read off `order` while
+diff --git a/src/app/take_buy.rs b/src/app/take_buy.rs
+index ed9b57e..9985bba 100644
+--- a/src/app/take_buy.rs
++++ b/src/app/take_buy.rs
+@@ -78,7 +78,9 @@ pub async fn take_buy_action(
+     // a committed trade. The committed-trade gate must therefore only
+     // count `Locked` *taker* bonds; otherwise a locked maker bond would
+     // wrongly block every taker with `PendingOrderExists`.
+-    let bond_required = bond::taker_bond_required();
++    // Barattolo fork (patch 0008): only for the payment methods the node's
++    // policy names (`only_payment_methods`, empty = every method).
++    let bond_required = bond::taker_bond_required_for(&order);
+     if bond_required {
+         let active = crate::app::bond::db::find_active_bonds_for_order(pool, order.id).await?;
+         if bond::trade_committed_by_locked_taker_bond(&active) {
+diff --git a/src/app/take_sell.rs b/src/app/take_sell.rs
+index 4deeb33..11f2cbe 100644
+--- a/src/app/take_sell.rs
++++ b/src/app/take_sell.rs
+@@ -124,7 +124,9 @@ pub async fn take_sell_action(
+     // a committed trade. The committed-trade gate must therefore only
+     // count `Locked` *taker* bonds; otherwise a locked maker bond would
+     // wrongly block every taker with `PendingOrderExists`.
+-    let bond_required = bond::taker_bond_required();
++    // Barattolo fork (patch 0008): only for the payment methods the node's
++    // policy names (`only_payment_methods`, empty = every method).
++    let bond_required = bond::taker_bond_required_for(&order);
+     if bond_required {
+         let active = crate::app::bond::db::find_active_bonds_for_order(pool, order.id).await?;
+         if bond::trade_committed_by_locked_taker_bond(&active) {
+diff --git a/src/barattolo_eventi.rs b/src/barattolo_eventi.rs
+index 841d1b2..442d3d3 100644
+--- a/src/barattolo_eventi.rs
++++ b/src/barattolo_eventi.rs
+@@ -47,7 +47,7 @@ const HEARTBEAT_EVERY: Duration = Duration::from_secs(60);
+ /// Every action this daemon may send. The patcher checks each hook against
+ /// this list, and `event_of` drops anything else: a typo must be loud in the
+ /// log, never a new kind of event on the wire.
+-pub const ACTIONS: [&str; 12] = [
++pub const ACTIONS: [&str; 13] = [
+     "taken",
+     "hold-invoice-requested",
+     "hold-invoice-paid",
+@@ -60,6 +60,8 @@ pub const ACTIONS: [&str; 12] = [
+     "canceled",
+     "expired",
+     "dispute-opened",
++    // patch 0008: a bond was slashed (detail = whose)
++    "bond-slashed",
+ ];
+ /// The thirteenth, with its own entry point because it carries a reason.
+ pub const PAYOUT_FAILED: &str = "payout-failed";
+@@ -76,6 +78,8 @@ pub const PAYOUT_FAILED: &str = "payout-failed";
+ //   canceled                cooperative | republished | pending | admin
+ //   expired                 book | taker-timeout | maker-timeout | escrow-deadline
+ //   released                admin (a moderator settled a dispute)
++//   bond-slashed            buyer | seller (whose bond was slashed; `sats` = the
++//                           bond, `sats_buyer` / `sats_seller` = what each receives)
+ //   payout-failed           LND's failure reason (NO_ROUTE, TIMEOUT, …) when the
+ //                           payment was sent; before the claim (upstream #908
+ //                           routes every pre-claim failure through one point)
+@@ -218,7 +222,10 @@ pub fn payload(event: &Event) -> serde_json::Value {
+     if let Some(detail) = &event.detail {
+         body["detail"] = serde_json::json!(detail);
+     }
+-    let closing = event.action == "released" || event.action == "success";
++    let closing = matches!(
++        event.action.as_str(),
++        "released" | "success" | "bond-slashed"
++    );
+     if let (true, Some((amount, to_buyer, from_seller))) = (closing, event.sats) {
+         body["sats"] = serde_json::json!(amount);
+         body["sats_buyer"] = serde_json::json!(to_buyer);
+@@ -410,6 +417,41 @@ pub fn emit_taken(order: &Order, next: &str) {
+     emit_detail("taken", order, taker, next);
+ }
+ 
++/// A bond was slashed (patch 0008): `slashed` is the bonded party's trade
++/// key, `amount` the bond, `node_share` what the node keeps; the rest goes
++/// to the counterparty, and the server reminds them to claim it. Sent only
++/// when the order still names the side, which is where the three callers
++/// stand (the timeout path notifies BEFORE clearing the taker's keys).
++pub fn emit_bond_slashed(order: &Order, slashed: &str, amount: i64, node_share: i64) {
++    if endpoint().is_none() {
++        return;
++    }
++    let side = actor_of(
++        order.buyer_pubkey.as_deref(),
++        order.seller_pubkey.as_deref(),
++        slashed,
++    );
++    if side == "mostro" {
++        warn!(
++            "barattolo_eventi: order {}: slashed key names no side, bond-slashed not sent",
++            order.id
++        );
++        return;
++    }
++    let share = amount.saturating_sub(node_share.max(0)).max(0);
++    let (to_buyer, to_seller) = if side == "buyer" { (0, share) } else { (share, 0) };
++    match event_of("bond-slashed", order, "mostro", Some(side)) {
++        Some(mut event) => {
++            event.sats = Some((amount, to_buyer, to_seller));
++            spawn_delivery(event, None);
++        }
++        None => warn!(
++            "barattolo_eventi: order {}: bond-slashed is not a known action, nothing sent",
++            order.id
++        ),
++    }
++}
++
+ /// The payout to the buyer failed; `reason_code` is LND's
+ /// `payment.failure_reason`, the same number patch 0006 logs.
+ pub fn emit_payout_failed(order: &Order, reason_code: i32) {
+diff --git a/src/config/types.rs b/src/config/types.rs
+index 09e700e..70fe9c9 100644
+--- a/src/config/types.rs
++++ b/src/config/types.rs
+@@ -110,6 +110,12 @@ pub struct AntiAbuseBondSettings {
+         deserialize_with = "deserialize_maker_bond_payment_timeout_seconds"
+     )]
+     pub maker_bond_payment_timeout_seconds: u64,
++    /// Barattolo fork (patch 0008): the payment methods the bond applies
++    /// to. Each comma-separated entry of the order's `payment_method` is
++    /// compared whole-word, trimmed, case-insensitively. Empty (the
++    /// default) = every method, i.e. upstream behaviour.
++    #[serde(default)]
++    pub only_payment_methods: Vec<String>,
+ }
+ 
+ fn default_bond_amount_pct() -> f64 {
+@@ -190,6 +196,7 @@ impl Default for AntiAbuseBondSettings {
+             payout_max_retries: default_payout_max_retries(),
+             payout_claim_window_days: default_payout_claim_window_days(),
+             maker_bond_payment_timeout_seconds: default_maker_bond_payment_timeout_seconds(),
++            only_payment_methods: Vec::new(),
+         }
+     }
+ }
+@@ -945,6 +952,27 @@ mod anti_abuse_bond_tests {
+         assert_eq!(parsed.anti_abuse_bond.base_amount_sats, 1_000);
+     }
+ 
++    #[test]
++    fn toml_only_payment_methods_barattolo() {
++        // Barattolo fork (patch 0008): the list parses, and its absence
++        // is the empty list (= every method).
++        #[derive(serde::Deserialize)]
++        struct Stub {
++            anti_abuse_bond: AntiAbuseBondSettings,
++        }
++        let parsed: Stub = toml::from_str(
++            "[anti_abuse_bond]\nenabled = true\nonly_payment_methods = [\"Contanti\", \"SEPA\"]",
++        )
++        .expect("toml parses");
++        assert_eq!(
++            parsed.anti_abuse_bond.only_payment_methods,
++            vec!["Contanti".to_string(), "SEPA".to_string()]
++        );
++        let bare: Stub = toml::from_str("[anti_abuse_bond]\nenabled = true").expect("parses");
++        assert!(bare.anti_abuse_bond.only_payment_methods.is_empty());
++        assert!(AntiAbuseBondSettings::default().only_payment_methods.is_empty());
++    }
++
+     #[test]
+     fn toml_apply_to_both() {
+         #[derive(serde::Deserialize)]
+diff --git a/src/nip33.rs b/src/nip33.rs
+index 58bec9e..2c69b2c 100644
+--- a/src/nip33.rs
++++ b/src/nip33.rs
+@@ -743,6 +743,14 @@ fn bond_policy_tags(
+                 "bond_payout_claim_window_days",
+                 vec![bond.payout_claim_window_days.to_string()],
+             ));
++            // Barattolo fork (patch 0008): which payment methods the bond
++            // applies to; absent = every method.
++            if !bond.only_payment_methods.is_empty() {
++                tags.push(Tag::custom(
++                    "bond_only_payment_methods",
++                    vec![bond.only_payment_methods.join(",")],
++                ));
++            }
+         }
+     }
+     tags
+@@ -1348,6 +1356,7 @@ mod tests {
+             payout_max_retries: 5,
+             payout_claim_window_days: 30,
+             maker_bond_payment_timeout_seconds: 900,
++            only_payment_methods: Vec::new(),
+         };
+ 
+         let tags = bond_tags(Some(&bond));
+@@ -1929,6 +1938,7 @@ mod tests {
+             payout_max_retries: 3,
+             payout_claim_window_days: 14,
+             maker_bond_payment_timeout_seconds: 900,
++            only_payment_methods: Vec::new(),
+         };
+ 
+         let take_tags = bond_tags(Some(&base));
+@@ -2022,3 +2032,52 @@ mod tests {
+         assert_eq!(status_p, status_w);
+     }
+ }
++
++#[cfg(test)]
++mod barattolo_bond_methods_tag {
++    // Barattolo fork (patch 0008): the info event names the payment
++    // methods the bond applies to, and only when there are some.
++    use super::bond_policy_tags;
++    use crate::config::types::AntiAbuseBondSettings;
++
++    fn valore(tags: &[nostr_sdk::Tag], nome: &str) -> Option<String> {
++        tags.iter().find_map(|tag| {
++            let vec = tag.clone().to_vec();
++            if vec.first().map(String::as_str) == Some(nome) {
++                vec.get(1).cloned()
++            } else {
++                None
++            }
++        })
++    }
++
++    #[test]
++    fn only_payment_methods_tag_when_set() {
++        let bond = AntiAbuseBondSettings {
++            enabled: true,
++            only_payment_methods: vec!["Contanti".to_string(), "SEPA".to_string()],
++            ..AntiAbuseBondSettings::default()
++        };
++        let tags = bond_policy_tags(Some(&bond));
++        assert_eq!(
++            valore(&tags, "bond_only_payment_methods").as_deref(),
++            Some("Contanti,SEPA")
++        );
++    }
++
++    #[test]
++    fn no_tag_when_empty_or_disabled() {
++        let ogni = AntiAbuseBondSettings {
++            enabled: true,
++            ..AntiAbuseBondSettings::default()
++        };
++        assert!(valore(&bond_policy_tags(Some(&ogni)), "bond_only_payment_methods").is_none());
++        let spenta = AntiAbuseBondSettings {
++            enabled: false,
++            only_payment_methods: vec!["Contanti".to_string()],
++            ..AntiAbuseBondSettings::default()
++        };
++        assert!(valore(&bond_policy_tags(Some(&spenta)), "bond_only_payment_methods").is_none());
++        assert!(valore(&bond_policy_tags(None), "bond_only_payment_methods").is_none());
++    }
++}
+diff --git a/src/util.rs b/src/util.rs
+index b419c61..3e94bdc 100644
+--- a/src/util.rs
++++ b/src/util.rs
+@@ -331,7 +331,9 @@ pub async fn publish_order(
+     // and range (Phase 6) orders take this path; range orders size the
+     // bond against `max_amount` (worst-case exposure) and resolve slashes
+     // proportionally per taken slice — see `maker_bond_notional_sats`.
+-    let maker_bond_required = crate::app::bond::maker_bond_required();
++    // Barattolo fork (patch 0008): only for the payment methods the node's
++    // policy names (`only_payment_methods`, empty = every method).
++    let maker_bond_required = crate::app::bond::maker_bond_required_for(&new_order_db);
+     if maker_bond_required {
+         let notional = maker_bond_notional_sats(&new_order_db)?;
+         new_order_db.status = Status::WaitingMakerBond.to_string();
+-- 
+2.55.0.windows.3
+

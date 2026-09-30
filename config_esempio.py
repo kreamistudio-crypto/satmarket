@@ -725,6 +725,17 @@ P2P_CONTANTI_MAX_EURO = 250
 # il giorno del lancio si svuota la lista E si mette True qui.
 # Solo True accende: una stringa o un numero restano spenti.
 P2P_IN_VETRINA = False
+# LA CAUZIONE DI CHI PRENDE, NEL CONTANTI DI PERSONA (1 ott 2026): chi
+# prende un ordine in contanti blocca una piccola cauzione (una seconda
+# hold invoice, il 3% con un pavimento di 1.000 sats) che torna a fine
+# scambio e si perde solo se un moderatore decide che non si e'
+# presentato all'incontro. A CHIEDERLA E' IL COORDINATORE: la sezione
+# `[anti_abuse_bond]` del suo settings.toml, con la patch 0008 del fork
+# che la limita al metodo «Contanti» (deploy/mostro/README.md). Questa
+# leva dice al CLIENT di mostrarla — la cifra prima della presa, il
+# passo, la voce in «Info P2P» —, e il client crede solo a tutt'e due:
+# la leva E il 38385 del coordinatore. Solo True accende.
+P2P_CAUZIONE = False
 # LO SCONTO FEDELTA' SUL P2P (set 2026): punti percentuali IN MENO
 # sulla propria meta' per chi e' pioniere OPPURE ha il livello 5 (uno
 # sconto solo, non si sommano). ⚠️ Lo sconto vero lo applica il

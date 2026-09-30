@@ -56376,6 +56376,9 @@ def prove_p2p_libro():
         "function icoPersonaP2P(){",
         "function stellineP2P(f){",
         "function infoDaEvento(ev){",
+        # i tag della cauzione (1 ott 2026): infoDaEvento li chiede
+        "function cauzioneDaInfoP2P(ev){",
+        "function cauzioneSpentaP2P(){",
         # la guardia del protocollo e la chiave della controparte dalla
         # restore (30 set 2026, con lo studio della 0.19.0)
         "function guardiaProtocolloP2P(info){",
@@ -57882,6 +57885,13 @@ def prove_p2p_dettaglio():
         "function giudiceContantiP2P(euro, metodi, tetto){",
         "function regolaContantiFoglioP2P(metodi, tetto, lato){",
         "function maxEuroContantiP2P(){",
+        # la cauzione di chi prende (1 ott 2026): la riga e i suoi giudici
+        "function rigaCauzioneDettP2P(o, info, leva){",
+        "function cauzioneServeP2P(o, info, leva){",
+        "function cauzioneInfoP2P(info){",
+        "function cauzioneSpentaP2P(){",
+        "function metodoInCauzioneP2P(metodi, lista){",
+        "function cauzioneAccesaP2P(){",
         "function renderDettaglioP2P(){",
         "function apriDettaglioP2P(id){",
         "function confermaDettaglioP2P(){",
@@ -64281,6 +64291,10 @@ def prove_p2p_motore():
             # conto (l'altro e' quello del dettaglio).
             "function cartelloFeeP2P(o){",
             "function mezzaCommissioneP2P(fee){",
+            # la cauzione (1 ott 2026): il lettore del 38385 e la sua
+            # «spenta» vivono accanto a infoDaEvento, fuori dal motore
+            "function cauzioneDaInfoP2P(ev){",
+            "function cauzioneSpentaP2P(){",
             "function satsMercatoP2P(o){",
             "function euroFiloTabacchinoP2P(esatto, fisso){",
             "function feeMiaP2P(o){",
@@ -64735,6 +64749,45 @@ function reset(){
     await mostroArriva(ev2);
     out.nonMio = ordiniP2P()['x1'].stato === 'euro_inviati';
   }
+
+  /* ---- 2-ter) LA CAUZIONE DI CHI PRENDE (1 ott 2026): su un ordine in
+     contanti il coordinatore di cartone risponde al take con
+     `pay-bond-invoice`; il foglio si apre DA SOLO col titolo suo, il
+     lordo dello scambio resta intatto, e a cauzione pagata (il messaggio
+     dopo) lo scambio riparte e il foglio si chiude ---- */
+  reset();
+  p2pLibro.ordini.push({id: '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60003', lato: 'sell', euro: 50, sats: 100000, metodi: ['Contanti'], premium: 0});
+  p2pInfo.cauzione = {accesa: true, pct: 0.03, base: 1000, applyTo: 'take', metodi: ['contanti'],
+                      timeoutBrucia: false, quotaNodo: 0.5, giorniIncasso: 15};
+  const BONDC = 'lnbc15u1cauzionefinta';
+  rispondi = r => {
+    const d = r.dentro;
+    if (d.action === 'take-sell')
+      return [ordine('pay-bond-invoice', d.request_id, d.id,
+                     {payment_request: [{id: d.id, amount: 1500, fiat_amount: 50, payment_method: 'Contanti'}, BONDC, null]})];
+    return [];
+  };
+  await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60003');
+  await finoA(() => !!(ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60003'] || {}).cauzione);
+  await pausa(30);
+  let oc = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60003'];
+  out.cauzioneAspetta = oc.stato;
+  out.cauzioneArrivata = !!(oc.cauzione && oc.cauzione.bolt11 === BONDC && oc.cauzione.sats === 1500 && oc.cauzione.stato === 'chiesta');
+  out.cauzioneLordoIntatto = !(oc.satsNetti > 0) && !(oc.satsMiei > 0);
+  await finoA(() => qr.length >= 1, 1500);
+  out.cauzioneApertaDaSola = qr.length === 1 && aperti.indexOf('p2pHoldSheet') >= 0
+                          && qr[0] === ('lightning:' + BONDC).toUpperCase();
+  if (!qr.length) await apriCauzioneP2P();
+  out.cauzioneTitolo = (nodi.p2pHoldTit || {}).textContent;
+  out.cauzioneFoglioDice = String((nodi.p2pHoldCorpo || {}).innerHTML || '').indexOf('torna a fine scambio') >= 0
+                         && nodi.p2pHoldInvoice.textContent === BONDC;
+  out.cauzioneToast = toasts.some(x => x.indexOf('blocca la cauzione') >= 0);
+  manda(ordine('add-invoice', null, '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60003',
+               {order: {id: '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60003', amount: 97000, fiat_amount: 50}}), oc.pubTrade);
+  await pausa();
+  oc = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60003'];
+  out.dopoCauzione = [oc.stato, oc.cauzione.stato, chiusi.indexOf('p2pHoldSheet') >= 0,
+                      toasts.some(x => x.indexOf('Cauzione bloccata') >= 0)];
 
   /* ---- 3) IL GIRO DI CHI VENDE, e il foglio che si chiude ------ */
   reset();
@@ -66034,6 +66087,16 @@ function reset(){
         "invoiceColTextContent": "la fattura si scrive col testo, mai nel markup",
         "holdChiusoDaSolo": "il foglio si chiude quando i sats sono bloccati",
         "dopoHold": ("...e lo scambio e' attivo", "attivo"),
+        # la cauzione di chi prende (1 ott 2026), col coordinatore di cartone
+        "cauzioneAspetta": ("su un ordine in contanti il take riceve la cauzione da bloccare", "attesa_mia_cauzione"),
+        "cauzioneArrivata": "...la richiesta si legge: bolt11, 1500 sats, «chiesta»",
+        "cauzioneLordoIntatto": "...e il lordo dello scambio NON e' la cauzione",
+        "cauzioneApertaDaSola": "il foglio della cauzione si apre DA SOLO, una volta, col suo QR",
+        "cauzioneTitolo": ("...col titolo suo", "🔐 Blocca la cauzione"),
+        "cauzioneFoglioDice": "...dice che torna a fine scambio, e la bolt11 sta nel testo",
+        "cauzioneToast": "...e lo dice a voce: «blocca la cauzione»",
+        "dopoCauzione": ("a cauzione pagata lo scambio riparte, la cauzione e' «bloccata», il foglio si chiude e lo si dice",
+                         ["attesa_mia_fattura", "bloccata", True, True]),
         "rilascioChiesto": "chi vende libera i sats",
         "rilascioSenzaIndice": "...senza rimandare l'indice",
         "rilascioConId": "...e con l'id dello scambio",
@@ -66336,6 +66399,9 @@ def prove_p2p_stati():
         fn("function aspettaRecapitoP2P(o){"),
         fn("function nomeControparteP2P(o, ripiego){"),
         fn("function statoTestoP2P(o){"),
+        # la cauzione di chi prende (1 ott 2026): il bottone e la frase
+        # chiedono se la richiesta e' ancora viva
+        fn("function cauzioneVivaP2P(o, adesso){"),
         # la cifra in euro di uno scambio: il giudice unico delle due
         # viste, e l'unico che sa dire un INTERVALLO
         "const fmtEur = e => e.toLocaleString('it-IT', "
@@ -66456,7 +66522,7 @@ out.rate = vot.votabile === true && vot.stato === attivo.stato;
 
 // 6) i due bottoni non compaiono mai insieme, e mai a chi non tocca
 out.mai2 = ['prendo','attesa_mia_fattura','attesa_hold_venditore',
-  'attesa_fattura_compratore','attesa_mia_hold','attivo','euro_inviati',
+  'attesa_fattura_compratore','attesa_mia_hold','attesa_mia_cauzione','attivo','euro_inviati',
   'rilasciato','concluso','annullato','in_disputa','annullo_chiesto',
   'annullo_proposto','senza_risposta','rifiutato','pagamento_ritentato',
   'fattura_nuova']
@@ -66547,7 +66613,7 @@ out.secSenza = azioniSecondarieP2P(null);
    azione per il coordinatore e due gesti diversi per chi guarda —
    offrirli tutti e due direbbe che sono due cose */
 out.maiDueAnnulli = ['pubblico','pubblicato','prendo','attesa_mia_fattura',
-  'attesa_hold_venditore','attesa_fattura_compratore','attesa_mia_hold',
+  'attesa_hold_venditore','attesa_fattura_compratore','attesa_mia_hold','attesa_mia_cauzione',
   'attivo','euro_inviati','rilasciato','concluso','annullato','in_disputa',
   'annullo_chiesto','annullo_proposto','senza_risposta','rifiutato',
   'pagamento_ritentato']
@@ -72618,7 +72684,9 @@ def prove_p2p_server():
              # il minimo di Barattozon (30 set 2026), in busta con le leve
              "BARATTOZON_MIN_EURO": 25,
              # il tetto del contanti di persona (30 set 2026), in busta
-             "P2P_CONTANTI_MAX_EURO": 250}
+             "P2P_CONTANTI_MAX_EURO": 250,
+             # la cauzione di chi prende (1 ott 2026), in busta
+             "P2P_CAUZIONE": False}
         exec(pezzo("_p2p_leve"), a)
         return a["_p2p_leve"]()
     relay = ["wss://relay.mostro.network", "wss://nos.lol"]
@@ -72638,7 +72706,7 @@ def prove_p2p_server():
     # (30 set 2026) OTTO: il minimo di Barattozon e il tetto del contanti
     # di persona sono entrati insieme, da due cantieri
     prova("le chiavi sono otto e sono sempre quelle",
-          ["attivo", "commissione", "maxEuro", "maxEuroContanti", "minEuroBz", "mostro", "relay",
+          ["attivo", "cauzione", "commissione", "maxEuro", "maxEuroContanti", "minEuroBz", "mostro", "relay",
            "specchio"],
           sorted(piena.keys()))
     # IL LISTINO VIAGGIA SEMPRE, come npub e relay: e' pubblico, e il
@@ -74613,6 +74681,8 @@ def prove_p2p_card_scambio():
         "function nomeControparteP2P(o, ripiego){",
         "function statoTestoP2P(o){",
         "function azioniDisponibili(o){",
+        # la cauzione (1 ott 2026): i due qui sopra la chiedono
+        "function cauzioneVivaP2P(o, adesso){",
         "function p2pTogliibile(o, adesso){",
         "function euroTestoP2P(o){",
         "function metodoSceltoP2P(o){",
@@ -75568,6 +75638,8 @@ def prove_p2p_vista_miei():
     pezzi += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
         "function recapitoEuroArrivatoP2P(o){",
         "function azioniDisponibili(o){",
+        # la cauzione (1 ott 2026): azioniDisponibili la chiede
+        "function cauzioneVivaP2P(o, adesso){",
         "function gruppoScambioP2P(o){",
         "function filtroAccesoMieiP2P(f){",
         "function passaStatoMieiP2P(o, f){",
@@ -75868,6 +75940,7 @@ def prove_pallino_scambi():
         "function mieiRigheP2P(){",
         "function recapitoEuroArrivatoP2P(o){",
         "function azioniDisponibili(o){",
+        "function cauzioneVivaP2P(o, adesso){",
         "function gruppoScambioP2P(o){",
         "function quantiToccaAMeP2P(righe){",
         "function aggiornaPallinoScambiP2P(){")]
@@ -76334,7 +76407,7 @@ def prove_intestazione_scambi():
     _stati = re.findall(r"^  ([a-z_]+): \{",
                         mini[_sm:mini.index("\n};", _sm)], re.M)
     prova("...e sono due stati che la macchina conosce davvero", True,
-          len(_stati) == 19
+          len(_stati) == 20
           and {"prendo", "senza_risposta"} <= set(_stati))
     prova("...lo stesso giudice con cui il foglio del filtro conta i gruppi",
           True, "gruppoScambioP2P(o) === k" in
@@ -76475,6 +76548,7 @@ def prove_intestazione_scambi():
     pezzi_js += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
         "function recapitoEuroArrivatoP2P(o){",
         "function azioniDisponibili(o){",
+        "function cauzioneVivaP2P(o, adesso){",
         "function gruppoScambioP2P(o){",
         "function presoP2P(o){",
         "function quantiToccaAMeP2P(righe){",
@@ -76662,6 +76736,10 @@ console.log(JSON.stringify(out));
            "attesa_hold_venditore": ["corso preso", "corso preso"],
            "attesa_fattura_compratore": ["corso preso", "corso preso"],
            "attesa_mia_hold": ["corso preso", "fare preso"],
+           # la cauzione da bloccare (1 ott 2026): «fare» solo con una
+           # richiesta VIVA in mano (la bolt11 dice la scadenza), e la
+           # riga nuda del banco non ce l'ha — quindi «corso», dai due lati
+           "attesa_mia_cauzione": ["corso preso", "corso preso"],
            "attivo": ["corso preso", "corso preso"],
            "euro_inviati": ["corso preso", "fare preso"],
            "rilasciato": ["corso preso", "corso preso"],
@@ -77499,6 +77577,8 @@ console.log(JSON.stringify(out));
               ("attesa_hold_venditore", ("confirmed", "confirmed")),
               ("attesa_fattura_compratore", ("confirmed", "confirmed")),
               ("attesa_mia_hold", ("locked", "locked")),
+              # la cauzione da bloccare (1 ott 2026): un gesto mio, arancio
+              ("attesa_mia_cauzione", ("locked", "locked")),
               ("attivo", ("confirmed", "locked")),
               ("euro_inviati", ("confirmed", "confirmed")),
               ("rilasciato", ("shipped", "shipped")),
@@ -77510,7 +77590,7 @@ console.log(JSON.stringify(out));
               ("annullato", ("annullato", "annullato")),
               ("pagamento_ritentato", ("locked", "locked")))}, o)
     prova("...e gli stati sono tutti quelli della macchina, nessuno escluso",
-          (19, []), (len(stati), [x for x in stati if x not in o]))
+          (20, []), (len(stati), [x for x in stati if x not in o]))
 
     def colore(classe):
         return INCHIOSTRO.get(classe.replace(" tinta tono-", ""), "senza tinta")
@@ -78276,7 +78356,8 @@ def prove_barattozon_mercato():
           "ord.cambioPub = ordine.amount > 0 ? campi.cambio * 1e8 : 0;" in _inv)
     prova("la busta delle leve porta il minimo, la rotta del canale lo applica dopo il tetto, il pannello lo censisce",
           True,
-          '"minEuroBz": int(BARATTOZON_MIN_EURO)}' in pezzo("_p2p_leve")
+          # (1 ott 2026) dopo il minimo c'e' la cauzione, e la busta chiude su di lei
+          '"minEuroBz": int(BARATTOZON_MIN_EURO),' in pezzo("_p2p_leve")
           # la riga INTERA del giudizio, non il solo nome (la tortura ha
           # lasciato viva un «if False and …» che il nome da solo non vedeva)
           and "    if _tabacchino_libro([metodo]) and not _paycode_sopra_minimo(euro, BARATTOZON_MIN_EURO):\n        raise HTTPException(" in src
@@ -80532,6 +80613,9 @@ def _banco_eventi_p2p(eventi_attivi=True):
         exec(src[i:src.index("\n", i)].split("  #")[0], amb)
     for blocco, fine in (("STATI_LIBRO_PRESO = (", ")\n"),
                          ("P2P_AZIONI_EVENTO = (", ")\n"),
+                         # ...e le azioni che portano importi (1 ott 2026,
+                         # la cauzione bruciata e' la terza)
+                         ("P2P_AZIONI_CON_SATS = (", ")\n"),
                          ("P2P_ATTORI_EVENTO = (", ")\n"),
                          ("P2P_MOMENTI_FINALI = (", ")\n"),
                          ("P2P_MOMENTI_IN_CORSO = (", ")\n"),
@@ -80750,7 +80834,11 @@ def prove_p2p_eventi():
         ("tornato", "mostro", "taker-timeout", [A, B]),
         ("disputa", "buyer", "", [B]),
         ("disputa", "seller", "", [A]),
-        ("payout_fallito", "mostro", "NO_ROUTE", [A]))
+        ("payout_fallito", "mostro", "NO_ROUTE", [A]),
+        # la cauzione bruciata (1 ott 2026): un gesto del moderatore, la
+        # sentono tutti e due — chi l'ha persa e chi ne incassa la meta'
+        ("cauzione_persa", "mostro", "buyer", [A, B]),
+        ("cauzione_persa", "mostro", "seller", [A, B]))
     for momento, attore, dettaglio, atteso in TABELLA:
         prova(f"«{momento}»/{dettaglio or '—'} da {attore} lo sente {atteso or 'nessuno'}",
               atteso, [t for t, _ in dest(momento, attore, dettaglio, A, B)])
@@ -85861,7 +85949,8 @@ def prove_p2p_recapito_passo():
     amb.update({"chiave_nostr_provata": lambda u: "", "hex_to_npub": lambda h: "",
                 "NOMI_TITOLI": {}, "livello_utente": lambda xp, aff: {"nome": "Novizio", "numero": 1}})
     for _blocco in ("P2P_MOMENTI_FINALI = (", "P2P_MOMENTI_IN_CORSO = (",
-                    "P2P_AZIONI_EVENTO = (", "P2P_ATTORI_EVENTO = ("):
+                    "P2P_AZIONI_EVENTO = (", "P2P_AZIONI_CON_SATS = (",
+                    "P2P_ATTORI_EVENTO = ("):
         _i = src.index("\n" + _blocco) + 1
         exec(src[_i:src.index(")\n", _i) + 2], amb)
     for _riga in ("FORMA_DETTAGLIO_P2P = ", "P2P_EVENTO_OROLOGIO_S = ",
@@ -110906,7 +110995,9 @@ def prove_contanti_a_mano():
              "MOSTRO_RELAY_SPECCHIO": [], "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
              "P2P_CONTANTI_MAX_EURO": 250,
              # il minimo di Barattozon, entrato nella busta lo stesso giorno
-             "BARATTOZON_MIN_EURO": 25}
+             "BARATTOZON_MIN_EURO": 25,
+             # la cauzione (1 ott 2026), entrata in busta il giorno dopo
+             "P2P_CAUZIONE": False}
     exec(_senza_prosa(pezzo("_p2p_leve")), amb_l)
     prova("la busta delle leve porta `maxEuroContanti`, intero", 250, amb_l["_p2p_leve"]()["maxEuroContanti"])
     prova("...e viaggia anche a zero (spenta), mai assente", 0,
@@ -111721,8 +111812,10 @@ def prove_moderazione_p2p():
     dec = nudo(fn("async function eseguiDecisioneP2P(ordine, esito){"))
     prova("PRIMA IL REGISTRO, POI LA FIRMA: l'ordine che non si inverte", True,
           0 < dec.find("await modFetch('moderazione/decisione'") < dec.find("await moderatoreChiama("))
-    prova("...col `conferma: true` scritto, e il motivo", True,
-          "{ordine: ordine, esito: esito, motivo: motivo, conferma: true, chiave: k.pub}" in dec)
+    # (1 ott 2026) ...e la cauzione da bruciare, o vuota: la terza domanda
+    prova("...col `conferma: true` scritto, il motivo e la cauzione", True,
+          "{ordine: ordine, esito: esito, motivo: motivo, conferma: true, chiave: k.pub,\n"
+          "       cauzione: cauzione}" in dec)
     pre = nudo(fn("async function eseguiPresaDisputaP2P(ordine){"))
     prova("la presa chiede al server PRIMA di firmare, e glielo conferma DOPO", True,
           0 < pre.find("modFetch('moderazione/prendi', {ordine: ordine, chiave: k.pub})")
@@ -111804,6 +111897,8 @@ def prove_moderazione_p2p():
               "_disputa_evento_p2p", "_chiave_moderatore_p2p", "_registra_chiave_moderatore_p2p",
               # la prova d'incontro del contanti (30 set 2026): senza tabella vale None
               "_incontro_da_riga_p2p", "_incontro_p2p",
+              # chi ha messo la cauzione (1 ott 2026): la riga lo dice
+              "_cauzione_di_p2p",
               "_dichiara_disputa_p2p", "_riga_disputa_p2p", "_dispute_per_moderatore_p2p",
               "_prendi_disputa_p2p", "_lascia_disputa_p2p", "_decisione_disputa_p2p",
               "_esito_gesto_disputa_p2p"):
@@ -111939,7 +112034,8 @@ def prove_moderazione_p2p():
     prova("...e nessuno di quei tentativi ha lasciato una decisione a registro", 0,
           len([r for r in registro() if r[0] == "decisione"]))
     prova("la decisione buona: a registro, col motivo ripulito degli spazi",
-          [(200, {"ok": True, "esito": "venditore"}),
+          # (1 ott 2026) ...e la cauzione, vuota: nessuna si brucia
+          [(200, {"ok": True, "esito": "venditore", "cauzione": ""}),
            ("decisione", 500, "venditore", "Nessun <euro> girato: lo dicono tutti e due.")],
           [decidi(con, 500, buona, ORA + 800), registro()[-1]])
     prova("...il gesto non riuscito resta accanto, e solo chi l'ha presa lo scrive",
@@ -112070,7 +112166,8 @@ def prove_moderazione_p2p():
     prova("PRIMA IL REGISTRO, POI LA FIRMA — nei fatti",
           ["server:moderazione/decisione", "publish", "server:moderazione"], dz["ordine"])
     prova("...a registro: ordine, esito, il motivo ripulito, il true della conferma, la chiave pubblica",
-          [{"ordine": ORD_B, "esito": "venditore", "motivo": MOTIVO, "conferma": True}, True],
+          [{"ordine": ORD_B, "esito": "venditore", "motivo": MOTIVO, "conferma": True,
+            "cauzione": ""}, True],
           [{k: v for k, v in dz["corpo"].items() if k != "chiave"}, dz["corpoChiave"]])
     prova("...al coordinatore: busta `order`, `admin-cancel`, l'id dell'ORDINE, firmato dal moderatore",
           [["order", "admin-cancel", ORD_B, None], [True, True]], [dz["messaggio"], dz["firmato"]])
@@ -112128,11 +112225,519 @@ def prove_moderazione_p2p():
           [[["disputa", {"ordine": "a", "disputa": DISP_B}]], 1], o["dichiara"])
 
 
+def prove_cauzione_p2p():
+    """LA CAUZIONE DI CHI PRENDE, SOLO NEL CONTANTI DI PERSONA (1 ott 2026,
+    cantiere B, decisione di Andrea).
+
+    Negli scambi in contanti chi prende l'ordine blocca una piccola
+    cauzione — l'`anti_abuse_bond` di mostrod 0.19.0, una seconda hold
+    invoice — cosi' chi non si presenta all'incontro la perde e chi vende
+    non resta coi sats bloccati per niente. Sul nodo la accende la patch
+    0008 del fork, SOLO per il metodo «Contanti»; nel client vive dietro
+    la leva `P2P_CAUZIONE` (spenta) E il 38385 del coordinatore.
+
+    Le cose che qui si rompono in silenzio: l'importo della cauzione
+    scritto nel lordo dello scambio (i due messaggi portano lo STESSO
+    SmallOrder, con `amount` = la cauzione); la richiesta scaduta che il
+    coordinatore non dice (la bolt11 si'); «restituita» detta su una
+    cauzione mai bloccata, o «bloccata» su un giro morto; la cauzione
+    chiesta a chi ha pubblicato con `apply_to = take`; il metodo
+    confrontato per pezzo (Barattozon entrerebbe); e sul server i sats
+    della cauzione bruciata scritti al posto di quelli dello scambio.
+    Per questo le sentinelle dicono solo dove stanno le righe; il banco
+    node cammina i giri interi con le funzioni VERE, e i giudici del
+    server girano sullo schema vero."""
+    print("\n[la cauzione di chi prende, solo nel contanti di persona]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    def riga(firma):
+        i = mini.index(firma)
+        return mini[i:mini.index("\n", i)]
+
+    def blocco_const(nome):
+        i = mini.index("const " + nome + " = {")
+        return mini[i:mini.index("\n};", i) + 3]
+
+    # --- 1) LE SENTINELLE DEL CLIENT ---------------------------------
+    info = fn("function infoDaEvento(ev){")
+    prova("il 38385 porta la cauzione, letta da un lettore suo", True,
+          "cauzione: cauzioneDaInfoP2P(ev)," in info)
+    lettore = nudo(fn("function cauzioneDaInfoP2P(ev){"))
+    for tag in ("bond_enabled", "bond_amount_pct", "bond_base_amount_sats", "bond_apply_to",
+                "bond_only_payment_methods", "bond_slash_on_waiting_timeout",
+                "bond_slash_node_share_pct", "bond_payout_claim_window_days"):
+        prova(f"...il lettore legge `{tag}`", True, f"'{tag}'" in lettore)
+    prova("...e `bond_enabled` vale acceso solo se e' la parola `true`", True,
+          "if (tag('bond_enabled') !== 'true') return cauzioneSpentaP2P();" in lettore)
+    tab = blocco_const("AVANZA_P2P")
+    prova("`pay-bond-invoice` porta a uno stato suo, prima del primo passo", True,
+          "'pay-bond-invoice': 'attesa_mia_cauzione'," in tab
+          and "attesa_mia_cauzione: 0," in blocco_const("P2P_PROGRESSO")
+          and "attesa_mia_cauzione: {t: 'Blocca la cauzione'," in blocco_const("STATI_P2P")
+          and "attesa_mia_cauzione: 'locked'" in blocco_const("P2P_TINTA_STATO"))
+    i_ga = mini.index("const P2P_GIRO_APERTO = ")
+    prova("...ed e' un giro aperto: un ritorno da li' e' una notizia (giro morto «cauzione»)", True,
+          "'attesa_mia_hold', 'attesa_mia_cauzione'];" in mini[i_ga:mini.index("];", i_ga) + 2]
+          and ": o.stato === 'attesa_mia_cauzione' ? 'cauzione' : 'prima';" in fn("function avanzaOrdineP2P(ordine, azione, payload){"))
+    avanza = nudo(fn("function avanzaOrdineP2P(ordine, azione, payload){"))
+    prova("l'importo dei messaggi della cauzione NON entra nel lordo dello scambio", True,
+          "const amt = P2P_IMPORTO_CAUZIONE.indexOf(azione) >= 0 ? 0" in avanza
+          and "const P2P_IMPORTO_CAUZIONE = ['pay-bond-invoice', 'bond-slashed'];" in mini)
+    prova("le due restore della cauzione sono «pubblicato», non uno stato grezzo", True,
+          "'waiting-taker-bond': 'pubblicato'," in blocco_const("P2P_DA_RESTORE")
+          and "'waiting-maker-bond': 'pubblicato'," in blocco_const("P2P_DA_RESTORE"))
+    azioni = nudo(fn("function azioniDisponibili(o){"))
+    prova("il bottone pieno «Blocca la cauzione» c'e' solo con la richiesta viva", True,
+          "if (o.stato === 'attesa_mia_cauzione') return cauzioneVivaP2P(o) ? 'cauzione' : '';" in azioni)
+    ren = fn("function renderOrdineP2P(){")
+    prova("nella pagina: il primo passo nomina la cauzione (solo a chi la mette), il bottone, il riquadro sotto il conto, il «Riprendi» a richiesta scaduta",
+          [True, True, True, True],
+          ["if (!o.mio && (o.cauzione || cauzioneServeQuiP2P(o)))" in ren,
+           "cauzione: '<button class=\"btn orange\" onclick=\"apriCauzioneP2P()\">🔐 Blocca la cauzione</button>'," in ren,
+           0 < ren.find("+ conto + '</div>' +") < ren.find("riquadroCauzioneP2P(o) +") < ren.find("riquadroIncassoCauzioneP2P(o) +") < ren.find("anelloneTabacchinoP2P(o) +"),
+           "(o.stato === 'attesa_mia_cauzione' && !o.soloVista && !cauzioneVivaP2P(o)" in ren])
+    prova("il foglio della richiesta e' UNO per due richieste: il modo dice quale", True,
+          "let p2pHoldModo = 'hold';" in mini
+          and "p2pHoldModo = 'cauzione';" in fn("async function apriCauzioneP2P(){")
+          and "p2pHoldModo = 'hold';" in fn("async function apriHoldP2P(){")
+          and "if (p2pHoldModo === 'cauzione') {" in fn("function renderHoldP2P(){")
+          and "const r = richiestaFoglioP2P(ordiniP2P()[p2pHoldOrdine]);" in fn("function copiaHoldP2P(){"))
+    app = nudo(fn("function applicaMessaggioP2P(ord, dentro){"))
+    prova("all'ingresso in «cauzione da bloccare» il toast e il foglio da solo; all'uscita il foglio si chiude", True,
+          "if (nuovo.stato === 'attesa_mia_cauzione' && prima !== 'attesa_mia_cauzione'" in app
+          and "if (seguibileP2P(nuovo.id)) apriCauzioneP2P();" in app
+          and "if (p2pHoldOrdine === nuovo.id && prima === 'attesa_mia_cauzione'" in app)
+    prova("il «concluso» detto dal server a chi vende, e la fotografia della restore, restituiscono la cauzione bloccata", True,
+          "return cauzioneAFineP2P(r);" in fn("function applicaPagamentoP2P(o, esito){")
+          and "return cauzioneAFineP2P(r);" in fn("function riprendiDaRestoreP2P(o, statoMostro){")
+          and "o = cauzioneAFineP2P(o);" in fn("function riquadroCauzioneP2P(o){"))
+    prova("...e nel PASSATO la richiesta, la bruciatura e la meta' che mi spetta si prendono come dati", True,
+          "if (!ord.cauzione && eco.cauzione && ord.stato === 'attesa_mia_cauzione') {" in app
+          and "if (eco.incasso && JSON.stringify(eco.incasso) !== JSON.stringify(ord.incasso || null)) {" in app)
+    dett = fn("function renderDettaglioP2P(){")
+    prova("il dettaglio di chi sta per prendere dice la cauzione dopo la regola del contanti, mai al proprietario", True,
+          0 < dett.find("regolaContantiFoglioP2P(") < dett.find("(tuo ? '' : rigaCauzioneDettP2P(o, p2pInfo, cauzioneAccesaP2P())) +") < dett.find("repRiquadroP2P("))
+    prova("«Info P2P» ha la voce viva della cauzione", True,
+          '<li id="p2pInfoCauzione"></li>' in mini
+          and "if (cauz) cauz.innerHTML = testoCauzioneInfoP2P(p2pInfo, cauzioneAccesaP2P());" in fn("function renderP2PInfo(){"))
+    dec = nudo(fn("async function eseguiDecisioneP2P(ordine, esito){"))
+    prova("il moderatore: la cauzione a registro E al coordinatore come `bond_resolution`, solo se si brucia", True,
+          "cauzione: cauzione}" in dec
+          and "payload: cauzione ? {bond_resolution: {slash_seller: cauzione === 'venditore'," in dec
+          and "slash_buyer: cauzione === 'compratore'}} : null" in dec
+          and "err.motivo === 'invalid-payload'" in dec)
+    prova("...e la terza domanda sta nella card, prima dei due gesti", True,
+          0 < fn("function cardDisputaModP2P(d, ho){").find("+ cauzioneModP2P(d, bozze)")
+          < fn("function cardDisputaModP2P(d, ho){").find("decidiDisputaP2P(this.dataset.o, \\'compratore\\')"))
+    prova("l'incasso della cauzione ha il suo foglio e la sua funzione, con la stessa guardia della fattura", True,
+          'id="p2pCauzioneSheet"' in mini
+          and "if (b.sats !== o.incasso.sats) {" in fn("async function inviaFatturaCauzioneP2P(){")
+          and "await chiamataOrdineP2P(o, 'add-bond-invoice', {payment_request: [null, bolt, null]});" in fn("async function inviaFatturaCauzioneP2P(){"))
+    for spia in ("localStorage", "el(", "document", "fetch(", "await ", "toast("):
+        prova(f"i giudici della cauzione sono puri: nessun `{spia}`", False,
+              spia in nudo(fn("function cauzioneServeP2P(o, info, leva){")
+                           + fn("function metodoInCauzioneP2P(metodi, lista){")
+                           + fn("function importoCauzioneP2P(sats, info){")
+                           + fn("function cauzioneVivaP2P(o, adesso){")))
+
+    # --- 2) LE SENTINELLE DEL SERVER ----------------------------------
+    prova("la leva P2P_CAUZIONE: solo True accende, e senza la riga e' spenta", True,
+          "    P2P_CAUZIONE = P2P_CAUZIONE is True\nexcept ImportError:\n    P2P_CAUZIONE = False\n" in src)
+    prova("...viaggia in busta come `cauzione`, e il pannello la censisce", True,
+          '"cauzione": bool(P2P_CAUZIONE)}' in pezzo("_p2p_leve")
+          and '_leva("Cauzione nel contanti di persona", "P2P_CAUZIONE",' in src)
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    prova("...e il config d'esempio la porta, spenta", True, "\nP2P_CAUZIONE = False\n" in esempio)
+    prova("`bond-slashed` e' la quattordicesima azione, e porta importi", True,
+          '"bond-slashed")' in src[src.index("P2P_AZIONI_EVENTO = ("):src.index("P2P_ATTORI_EVENTO")]
+          and 'P2P_AZIONI_CON_SATS = ("released", "success", "bond-slashed")' in src
+          and "if azione in P2P_AZIONI_CON_SATS:" in pezzo("_evento_p2p_pulito"))
+    prova("...i cui sats NON vanno nella riga dello scambio", True,
+          'if ev["sats"] > 0 and ev["azione"] != "bond-slashed":' in pezzo("_registra_evento_p2p"))
+    prova("la decisione del moderatore accetta `cauzione` (di chi, o vuota) e la scrive a registro accanto", True,
+          'if cauzione and cauzione not in P2P_DISPUTA_ESITI:' in pezzo("_decisione_disputa_p2p")
+          and '_registro_disputa_p2p(con, ordine, "cauzione", io, adesso, esito=cauzione,' in pezzo("_decisione_disputa_p2p"))
+    prova("...e la card del moderatore dice di chi e' la cauzione (chi ha preso)", True,
+          '"cauzione_di": _cauzione_di_p2p(con, ordine),' in pezzo("_riga_disputa_p2p"))
+
+    # --- 3) I GIUDICI DEL SERVER GIRANO -------------------------------
+    con, amb = _banco_eventi_p2p()
+    ORA = 1_790_000_000
+    A, B = 111, 222
+    pul, mom, dest, testo = (amb["_evento_p2p_pulito"], amb["_momento_evento_p2p"],
+                             amb["_destinatari_evento_p2p"], amb["_testo_evento_p2p"])
+    corpo = {"v": 1, "order": "5a1e0000-c0c0-4a2b-9c3d-0000000000c1", "action": "bond-slashed",
+             "ts": ORA, "buyer": "b" * 64, "seller": "a" * 64, "actor": "mostro",
+             "detail": "buyer", "sats": 1500, "sats_buyer": 0, "sats_seller": 750}
+    ev = pul(corpo, ORA)
+    prova("`bond-slashed` entra con i tre importi e diventa «cauzione_persa»",
+          ["cauzione_persa", 1500, 0, 750, "buyer"],
+          [ev["momento"], ev["sats"], ev["sats_compratore"], ev["sats_venditore"], ev["dettaglio"]])
+    prova("...lo sentono tutt'e due", [A, B], [t for t, _ in dest("cauzione_persa", "mostro", "buyer", A, B)])
+    dati = {"sats": 100000, "euro": "50,00 €", "metodi": "Contanti",
+            "cauzione": 1500, "cauzione_compra": 0, "cauzione_vende": 750}
+    t_perde = testo("cauzione_persa", "buyer", "compra", dati)
+    t_vince = testo("cauzione_persa", "buyer", "vende", dati)
+    prova("a chi l'ha persa la notizia coi suoi sats, a chi vince il GESTO con la sua meta' e i quindici giorni",
+          [True, True, True, True],
+          [t_perde.startswith("🔐 <b>La tua cauzione è stata bruciata: 1.500 sats.</b>") and "metà va a chi vende" in t_perde,
+           t_vince.startswith("⚖️ <b>Metà della cauzione di chi compra è tua: 750 sats.</b>"),
+           "entro quindici giorni" in t_vince and "dai una fattura" in t_vince,
+           "bruciata" not in t_vince])
+    prova("...e a lati girati le frasi si girano", [True, True],
+          [testo("cauzione_persa", "seller", "vende", dict(dati, cauzione_compra=750, cauzione_vende=0)).startswith("🔐 <b>La tua cauzione"),
+           testo("cauzione_persa", "seller", "compra", dict(dati, cauzione_compra=750, cauzione_vende=0)).startswith("⚖️ <b>Metà della cauzione di chi vende è tua: 750 sats.</b>")])
+    # i sats dello SCAMBIO non si toccano: prima il success, poi la cauzione bruciata
+    reg = amb["_registra_evento_p2p"]
+    ORD = "5a1e0000-c0c0-4a2b-9c3d-0000000000c1"
+    for tg, chiave in ((A, "b" * 64), (B, "a" * 64)):
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,?)", (chiave, tg, ORA))
+    reg(con, pul(dict(corpo, action="taken", detail="hold-next", actor="buyer", ts=ORA - 100), ORA), ORA)
+    reg(con, pul(dict(corpo, action="success", detail=None, ts=ORA - 50, sats=7300, sats_buyer=7228, sats_seller=7372), ORA), ORA)
+    fatto = reg(con, ev, ORA)
+    r = con.execute("SELECT sats, sats_compratore, sats_venditore FROM p2p_scambi WHERE ordine=?", (ORD,)).fetchone()
+    prova("la cauzione bruciata si registra (momento suo) e lascia i sats dello scambio com'erano",
+          ["cauzione_persa", 7300, 7228, 7372],
+          [fatto and fatto["momento"], r["sats"], r["sats_compratore"], r["sats_venditore"]])
+    # ...e la STRADA INTERA, dall'evento agli avvisi: i sats della cauzione
+    # vengono dall'evento, non dal libro, e la frase li porta
+    detti = dict(amb["_avvisi_evento_p2p"](con, ev, fatto, ORA))
+    prova("...e per la strada intera i due avvisi portano i sats dell'evento: la cauzione persa a chi compra, la meta' a chi vende",
+          [True, True],
+          [detti.get(A, "").startswith("🔐 <b>La tua cauzione è stata bruciata: 1.500 sats.</b>"),
+           detti.get(B, "").startswith("⚖️ <b>Metà della cauzione di ") and ": 750 sats.</b>" in detti.get(B, "")])
+    prova("...e un secondo arrivo dello stesso evento non si registra due volte", None, reg(con, ev, ORA))
+    peso = {}
+    i_p = src.index("\n_PESO_MOMENTO_P2P = {") + 1
+    exec(src[i_p:src.index("}\n", i_p) + 2], peso)
+    prova("...e `cauzione_persa` NON decide lo stato del client (fuori dal peso), ne' chiude il giro", True,
+          "cauzione_persa" not in peso["_PESO_MOMENTO_P2P"] and "cauzione_persa" not in amb["P2P_MOMENTI_FINALI"]
+          and "cauzione_persa" not in amb["P2P_MOMENTI_IN_CORSO"])
+    # chi ha messo la cauzione: chi ha PRESO secondo mostrod
+    amb_c = {"__builtins__": __builtins__}
+    exec(_senza_prosa(pezzo("_cauzione_di_p2p")), amb_c)
+    con.execute("UPDATE p2p_scambi SET preso_dal='buyer' WHERE ordine=?", (ORD,))
+    c1 = amb_c["_cauzione_di_p2p"](con, ORD)
+    con.execute("UPDATE p2p_scambi SET preso_dal='seller' WHERE ordine=?", (ORD,))
+    c2 = amb_c["_cauzione_di_p2p"](con, ORD)
+    con.execute("UPDATE p2p_scambi SET preso_dal='' WHERE ordine=?", (ORD,))
+    prova("chi ha messo la cauzione: compra se ha preso chi compra, vende se chi vende, vuoto se non si sa",
+          ["compra", "vende", "", ""],
+          [c1, c2, amb_c["_cauzione_di_p2p"](con, ORD), amb_c["_cauzione_di_p2p"](con, "5a1e0000-0000-4a2b-9c3d-000000000000")])
+    # la decisione con la cauzione, sullo schema vero delle due tabelle
+    for tabella in ("p2p_dispute", "p2p_dispute_registro"):
+        i = src.index("CREATE TABLE IF NOT EXISTS " + tabella + "(")
+        # (fino alla parentesi che chiude: i commenti dello schema portano dei `;`)
+        con.executescript(src[i:src.index("\n    );", i) + 7])
+    amb_d = {"__builtins__": __builtins__, "re": re}
+    for r_ in ("FORMA_ORDINE_P2P = ", "P2P_MOTIVO_MIN = ", "P2P_MOTIVO_MAX = "):
+        i = src.index("\n" + r_) + 1
+        exec(src[i:src.index("\n", i)].split("  #")[0], amb_d)
+    i = src.index("\nP2P_DISPUTA_ESITI = {") + 1
+    exec(src[i:src.index("}\n", i) + 2], amb_d)
+    exec(_senza_prosa(pezzo("_registro_disputa_p2p")), amb_d)
+    exec(_senza_prosa(pezzo("_decisione_disputa_p2p")), amb_d)
+    con.execute("INSERT INTO p2p_dispute(ordine, stato, compratore, venditore, aperta_da, aperta_il, "
+                "presa_da, presa_il, chiave_moderatore) VALUES(?,?,?,?,?,?,?,?,?)",
+                (ORD, "presa", A, B, "compra", ORA, 999, ORA + 10, "c" * 64))
+    MOTIVO = "Nessuna prova d'incontro e chi compra non risponde da tre giorni."
+    base = {"ordine": ORD, "esito": "venditore", "motivo": MOTIVO, "conferma": True, "chiave": "c" * 64}
+    dec = amb_d["_decisione_disputa_p2p"]
+    prova("la decisione con la cauzione di chi compra: 200, la dice, e a registro DUE righe (decisione, cauzione)",
+          [(200, {"ok": True, "esito": "venditore", "cauzione": "compratore"}),
+           [("decisione", "venditore"), ("cauzione", "compratore")]],
+          [dec(con, 999, dict(base, cauzione="compratore"), ORA + 20),
+           [(r["gesto"], r["esito"]) for r in con.execute(
+               "SELECT gesto, esito FROM p2p_dispute_registro WHERE ordine=? ORDER BY id", (ORD,))]])
+    senza = dec(con, 999, dict(base), ORA + 30)
+    prova("...senza cauzione, 200 con la cauzione vuota e una riga sola; una cauzione storta e' un 400",
+          [(200, {"ok": True, "esito": "venditore", "cauzione": ""}), 1, 400],
+          [senza, con.execute("SELECT COUNT(*) FROM p2p_dispute_registro WHERE ordine=? AND quando=?",
+                              (ORD, ORA + 30)).fetchone()[0],
+           dec(con, 999, dict(base, cauzione="tutti"), ORA + 40)[0]])
+    con.close()
+
+    # --- 4) LA PATCH 0008 DEL FORK -----------------------------------
+    patcher = open("deploy/mostro/patch-0008-cauzione-solo-contanti.py", encoding="utf-8").read()
+    patch = [f for f in os.listdir("deploy/mostro") if f.startswith("0008-") and f.endswith(".patch")]
+    prova("la patch 0008 c'e' UNA volta, in LF, e il patcher accanto con `--secco`", [1, True, True],
+          [len(patch), bool(patch) and b"\r" not in open("deploy/mostro/" + patch[0], "rb").read(),
+           'SECCO = "--secco" in sys.argv' in patcher])
+    testo_patch = open("deploy/mostro/" + patch[0], encoding="utf-8").read() if patch else ""
+    for pezzo_ in ("pub only_payment_methods: Vec<String>,", "pub fn payment_method_in(payment_method: &str, allowed: &[String]) -> bool {",
+                   "let bond_required = bond::taker_bond_required_for(&order);",
+                   "crate::app::bond::maker_bond_required_for(&new_order_db);",
+                   '"bond_only_payment_methods",', "pub fn emit_bond_slashed(order: &Order, slashed: &str, amount: i64, node_share: i64) {",
+                   "crate::barattolo_fee::apply_party_fees(pool, &mut ricalcolo, &buyer, &seller).await;",
+                   'crate::barattolo_eventi::emit_taken(&order_updated, "invoice-next");',
+                   "pub const ACTIONS: [&str; 13] = [", "mod barattolo_bond_methods {", "mod barattolo_bond_methods_tag {"):
+        prova(f"...e porta «{pezzo_[:48]}»", True, pezzo_ in testo_patch)
+    prova("la regola del confronto e' quella del client: parola intera, senza maiuscole, sulle virgole", True,
+          ".split(',')" in testo_patch and ".map(|m| m.trim().to_lowercase())" in testo_patch
+          and ".any(|m| allowed.contains(&m))" in testo_patch)
+    prova("il patcher pretende la 0005 e la 0007 sotto, e le ancore col loro conto (le due literal dei test: 2)", True,
+          '("src/barattolo_fee.rs", "0005"), ("src/barattolo_eventi.rs", "0007")' in patcher
+          and '"            only_payment_methods: Vec::new(),\\n", "dopo", 2),' in patcher)
+    readme = open("deploy/mostro/README.md", encoding="utf-8").read()
+    prova("il README del fork la censisce, e la liturgia la lancia dopo la 0007", True,
+          "| 0008 | `patch-0008-cauzione-solo-contanti.py` |" in readme
+          and "patch-0008-cauzione-solo-contanti.py --secco" in open("docs/PRODUZIONE.md", encoding="utf-8").read())
+
+    # --- 5) IL BANCO NODE: i giri interi con le funzioni vere ---------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco della cauzione", "node non c'e'")
+        return
+    liste = "\n".join(re.findall(r"^const P2P_[A-Z_]+ = \[[^\]]*\];", mini, re.M))
+    pezzi = "\n".join([
+        blocco_const("AVANZA_P2P"), blocco_const("STATI_P2P"), blocco_const("P2P_PROGRESSO"),
+        blocco_const("MOTIVI_CANTDO"), blocco_const("P2P_GIRO_MORTO"), blocco_const("P2P_DA_RESTORE"),
+        liste, riga("const P2P_CONTANTI = "),
+        re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0),
+        fn("function cauzioneSpentaP2P(){"), fn("function cauzioneDaInfoP2P(ev){"),
+        fn("function cauzioneInfoP2P(info){"), fn("function cauzioneAccesaP2P(){"),
+        fn("function metodoInCauzioneP2P(metodi, lista){"), fn("function cauzioneServeP2P(o, info, leva){"),
+        fn("function cauzioneServeQuiP2P(o){"), fn("function importoCauzioneP2P(sats, info){"),
+        fn("function satsBaseCauzioneP2P(o){"), fn("function cauzioneVivaP2P(o, adesso){"),
+        fn("function satsCauzioneP2P(o){"), fn("function cauzioneAFineP2P(o){"),
+        fn("function rigaCauzioneDettP2P(o, info, leva){"),
+        fn("function riquadroCauzioneP2P(o){"), fn("function riquadroIncassoCauzioneP2P(o){"),
+        fn("function testoCauzioneInfoP2P(info, leva){"),
+        fn("function contantiAManoP2P(metodi){"),
+        fn("function cauzioneModSceltaP2P(ordine){"), fn("function cauzioneModP2P(d, bozze){"),
+        fn("function cauzioneFraseModP2P(ordine){"),
+        fn("function mossaDopoRilascioP2P(o, azione, ord){"),
+        fn("function avanzaOrdineP2P(ordine, azione, payload){"),
+        fn("function euroTabacchinoP2P(metodi){"), fn("function combaciaEsattoP2P(esatto, intero){"),
+        fn("function euroFiloTabacchinoP2P(esatto, fisso){"),
+        fn("function chiaveCantDo(payload){"), fn("function motivoCantDo(payload){"),
+        fn("function importoBolt11(pr){"), fn("function leggiBolt11(pr){"),
+        fn("function commissioneVivaP2P(){"), fn("function feeMiaP2P(o){"),
+        fn("function nettoLatoP2P(o, sats){"), fn("function scontoMancatoP2P(o, miei){"),
+        fn("function lordoDaMieiP2P(o, miei){"),
+        fn("function recapitoEuroArrivatoP2P(o){"), fn("function aspettaRecapitoP2P(o){"),
+        fn("function nomeControparteP2P(o, ripiego){"), fn("function statoTestoP2P(o){"),
+        fn("function azioniDisponibili(o){"), fn("function statoDaRestoreP2P(o, statoMostro){"),
+        "const FATT_VERA = " + json.dumps(BOLT11_VERA_7468) + ";"]) + r"""
+/* ---- il cartone ---- */
+const fmt = n => String(n);
+const esc = s => String(s);
+const dataBreveP2P = ts => 'D' + ts;
+let cambioVivo = true, eurPerSat = 0.001;
+function satsMercatoP2P(o){ return Math.round(o.euro / eurPerSat * (1 - (o.premium || 0) / 100)); }
+function tabacchinoP2P(){ return false; }
+function tagValore(ev, n){ const t = (ev.tags || []).filter(x => x[0] === n)[0]; return t ? t[1] : ''; }
+let p2pModBozze = {};
+function bozzaModP2P(o, c, v){ (p2pModBozze[o] = p2pModBozze[o] || {})[c] = v; }
+let leva = {cauzione: true};
+function p2pCoord(){ return leva; }
+function percheFallitoP2P(){ return ''; }
+const out = {};
+const T = 1790000000;
+const EV = {kind: 38385, tags: [['bond_enabled', 'true'], ['bond_amount_pct', '0.03'],
+  ['bond_base_amount_sats', '1000'], ['bond_apply_to', 'take'], ['bond_only_payment_methods', 'Contanti'],
+  ['bond_slash_on_waiting_timeout', 'false'], ['bond_slash_node_share_pct', '0.5'],
+  ['bond_payout_claim_window_days', '15']]};
+let p2pInfo = {fee: 0.03, holdFinestra: 900, cauzione: cauzioneDaInfoP2P(EV)};
+/* 1) il lettore del 38385 */
+out.letto = p2pInfo.cauzione;
+out.spenta = cauzioneDaInfoP2P({kind: 38385, tags: [['bond_enabled', 'false'], ['bond_amount_pct', '0.03']]});
+out.assente = cauzioneDaInfoP2P({kind: 38385, tags: []});
+out.listaVuota = cauzioneDaInfoP2P({kind: 38385, tags: [['bond_enabled', 'true']]}).metodi;
+out.listaSporca = cauzioneDaInfoP2P({kind: 38385, tags: [['bond_enabled', 'true'], ['bond_only_payment_methods', ' Contanti , SEPA,, ']]}).metodi;
+/* 2) il metodo, parola intera e senza maiuscole */
+out.metodo = [metodoInCauzioneP2P(['Contanti'], ['contanti']), metodoInCauzioneP2P(['contanti '], ['contanti']),
+  metodoInCauzioneP2P(['Revolut', 'Contanti'], ['contanti']), metodoInCauzioneP2P(['Contanti al tabacchino 23.47'], ['contanti']),
+  metodoInCauzioneP2P(['SEPA'], ['contanti']), metodoInCauzioneP2P([], ['contanti']),
+  metodoInCauzioneP2P(['SEPA'], []), metodoInCauzioneP2P(['SEPA'], ['', ' '])];
+/* 3) a chi serve */
+const contanti = {metodi: ['Contanti'], mio: false};
+out.serve = [cauzioneServeP2P(contanti, p2pInfo, true), cauzioneServeP2P(contanti, p2pInfo, false),
+  cauzioneServeP2P({metodi: ['Contanti'], mio: true}, p2pInfo, true),
+  cauzioneServeP2P({metodi: ['SEPA']}, p2pInfo, true),
+  cauzioneServeP2P({metodi: ['Contanti', 'SEPA']}, p2pInfo, true),
+  cauzioneServeP2P(contanti, {cauzione: out.spenta}, true), cauzioneServeP2P(contanti, null, true),
+  cauzioneServeP2P({metodi: ['Contanti'], mio: true}, {cauzione: Object.assign({}, p2pInfo.cauzione, {applyTo: 'make'})}, true),
+  cauzioneServeP2P(contanti, {cauzione: Object.assign({}, p2pInfo.cauzione, {applyTo: 'make'})}, true),
+  cauzioneServeP2P({metodi: ['Contanti'], mio: true}, {cauzione: Object.assign({}, p2pInfo.cauzione, {applyTo: 'both'})}, true),
+  cauzioneServeP2P({metodi: ['SEPA']}, {cauzione: Object.assign({}, p2pInfo.cauzione, {metodi: []})}, true)];
+out.serveQui = cauzioneServeQuiP2P(contanti); leva = {cauzione: false}; out.serveQuiSpenta = cauzioneServeQuiP2P(contanti); leva = {cauzione: true};
+/* 4) quanto, con la formula del coordinatore */
+out.importo = [importoCauzioneP2P(100000, p2pInfo), importoCauzioneP2P(20000, p2pInfo), importoCauzioneP2P(0, p2pInfo),
+  importoCauzioneP2P(40010, p2pInfo), importoCauzioneP2P(41150, p2pInfo),
+  importoCauzioneP2P(100000, {cauzione: Object.assign({}, p2pInfo.cauzione, {pct: 0})}),
+  importoCauzioneP2P(100000, {cauzione: out.spenta}), importoCauzioneP2P(100000, null)];
+out.base = [satsBaseCauzioneP2P({satsNetti: 7000, sats: 5000, euro: 50}), satsBaseCauzioneP2P({sats: 5000, euro: 50}),
+  satsBaseCauzioneP2P({euro: 50}), satsBaseCauzioneP2P({euro: 20, euroMax: 100}), satsBaseCauzioneP2P(null)];
+/* 5) il giro di chi COMPRA un ordine in contanti */
+function cammina(inizio, passi){
+  let o = inizio, tappe = [];
+  for (const [azione, payload] of passi) { o = avanzaOrdineP2P(o, azione, payload || null); tappe.push([o.stato, azioniDisponibili(o), (o.cauzione || {}).stato || '-']); }
+  return {ord: o, tappe};
+}
+const compro = {id: 'a', lato: 'compro', stato: 'prendo', euro: 50, sats: 0, satsNetti: 0, metodi: ['Contanti'], cantDo: '', errore: ''};
+const vendo = {id: 'b', lato: 'vendo', stato: 'prendo', euro: 50, sats: 0, satsNetti: 0, metodi: ['Contanti'], cantDo: '', errore: ''};
+const BOND = 'lnbc15u1cauzionefinta';
+const PAY = {payment_request: [{id: 'a', amount: 1500, fiat_amount: 50, payment_method: 'Contanti'}, BOND, null]};
+const gc = cammina(compro, [['pay-bond-invoice', PAY],
+  ['add-invoice', {order: {amount: 97000, fiat_amount: 50, payment_method: 'Contanti'}}],
+  ['waiting-seller-to-pay', null], ['buyer-took-order', {peer: {pubkey: 'cc'.repeat(32)}}],
+  ['fiat-sent-ok', null], ['released', null], ['purchase-completed', null]]);
+out.giroCompro = gc.tappe;
+const dopoBond = avanzaOrdineP2P(compro, 'pay-bond-invoice', PAY);
+out.cauzioneLetta = [dopoBond.cauzione.bolt11, dopoBond.cauzione.sats, dopoBond.cauzione.stato, dopoBond.cauzione.scade, dopoBond.satsNetti, dopoBond.satsMiei || 0, dopoBond.euro, dopoBond.metodi, dopoBond.preso === true];
+out.comproFine = [gc.ord.cauzione.stato, gc.ord.satsMiei, gc.ord.satsNetti > 97000, gc.ord.satsNetti !== 1500];
+/* 6) il giro di chi VENDE: due richieste in fila, prima la cauzione poi la garanzia */
+const gv = cammina(vendo, [['pay-bond-invoice', PAY],
+  ['pay-invoice', {payment_request: [null, 'lnbc1000u1qqqq', 100000]}],
+  ['hold-invoice-payment-accepted', null], ['fiat-sent-ok', null], ['hold-invoice-payment-settled', null]]);
+out.giroVendo = gv.tappe;
+/* a chi vende il «concluso» lo dice il SERVER (il pagamento riuscito),
+   non un messaggio: la cauzione torna anche per quella strada */
+const concV = Object.assign({}, gv.ord, {stato: 'concluso'});
+out.vendoHold = [gv.ord.hold && gv.ord.hold.bolt11, gv.ord.cauzione.bolt11, gv.ord.cauzione.stato,
+  cauzioneAFineP2P(concV).cauzione.stato, riquadroCauzioneP2P(concV).indexOf('Cauzione restituita') >= 0,
+  cauzioneAFineP2P(gv.ord).cauzione.stato, cauzioneAFineP2P(Object.assign({}, persaPrimaV(), {stato: 'concluso'})).cauzione.stato,
+  cauzioneAFineP2P(Object.assign({}, dopoBond, {stato: 'annullato'})).cauzione.stato];
+function persaPrimaV(){ return Object.assign({}, gv.ord, {cauzione: Object.assign({}, gv.ord.cauzione, {stato: 'persa'})}); }
+/* 7) il giro che muore prima della cauzione: nessuna «restituita» su una cauzione mai bloccata */
+const morto = avanzaOrdineP2P(dopoBond, 'canceled', null);
+out.morto = [morto.stato, morto.giroMorto, morto.cauzione.stato, statoTestoP2P(morto).d.indexOf('qualcun altro ha pagato la sua prima di te') >= 0];
+const tornato = avanzaOrdineP2P(dopoBond, 'new-order', {order: {id: 'a'}});
+out.tornato = [tornato.stato, tornato.giroMorto, tornato.cauzione.stato, statoTestoP2P(tornato).d.indexOf('riprendilo') >= 0];
+/* 8) bruciata: dopo l'annullo del moderatore, la bruciatura vince sulla «restituita» */
+const attivoV = gv.tappe[2][0] === 'attivo' ? cammina(vendo, [['pay-bond-invoice', PAY], ['pay-invoice', {payment_request: [null, 'lnbc1000u1qqqq', 100000]}], ['hold-invoice-payment-accepted', null]]).ord : null;
+const annullato = avanzaOrdineP2P(attivoV, 'admin-canceled', null);
+const persa = avanzaOrdineP2P(annullato, 'bond-slashed', {order: {id: 'b', amount: 1500}});
+out.persa = [annullato.cauzione.stato, persa.stato, persa.cauzione.stato, persa.cauzione.persa, persa.satsNetti === annullato.satsNetti && persa.satsNetti > 1500, riquadroCauzioneP2P(persa).indexOf('Cauzione persa') >= 0];
+const persaPrima = avanzaOrdineP2P(avanzaOrdineP2P(attivoV, 'bond-slashed', {order: {amount: 1500}}), 'admin-canceled', null);
+out.persaResta = persaPrima.cauzione.stato;
+/* 9) la meta' che mi spetta */
+const vinc = avanzaOrdineP2P(annullato, 'add-bond-invoice', {bond_payout_request: {order: {id: 'b', amount: 750}, slashed_at: T}});
+out.incasso = [vinc.incasso, vinc.satsNetti === annullato.satsNetti, vinc.stato];
+const acc = avanzaOrdineP2P(vinc, 'bond-invoice-accepted', null);
+const pag = avanzaOrdineP2P(acc, 'bond-payout-completed', null);
+const ri = avanzaOrdineP2P(pag, 'add-bond-invoice', {bond_payout_request: {order: {amount: 750}, slashed_at: T}});
+out.incassoStati = [acc.incasso.stato, pag.incasso.stato, ri.incasso.stato];
+out.incassoTesti = [riquadroIncassoCauzioneP2P(vinc).indexOf('Incassa 750 sats') >= 0 && riquadroIncassoCauzioneP2P(vinc).indexOf('D' + (T + 15 * 86400)) >= 0,
+  riquadroIncassoCauzioneP2P(acc).indexOf('Fattura ricevuta') >= 0, riquadroIncassoCauzioneP2P(pag).indexOf('Cauzione incassata') >= 0,
+  riquadroIncassoCauzioneP2P(Object.assign({}, vinc, {soloVista: true})).indexOf('<button') < 0, riquadroIncassoCauzioneP2P({}) === ''];
+/* 10) viva o scaduta: la bolt11 se si legge, la finestra del 38385 se no */
+const conScade = Object.assign({}, dopoBond, {cauzione: Object.assign({}, dopoBond.cauzione, {scade: T + 100, quando: T})});
+out.viva = [cauzioneVivaP2P(conScade, T + 99), cauzioneVivaP2P(conScade, T + 100),
+  cauzioneVivaP2P(Object.assign({}, dopoBond, {cauzione: Object.assign({}, dopoBond.cauzione, {scade: 0, quando: T})}), T + 899),
+  cauzioneVivaP2P(Object.assign({}, dopoBond, {cauzione: Object.assign({}, dopoBond.cauzione, {scade: 0, quando: T})}), T + 900),
+  cauzioneVivaP2P({}), cauzioneVivaP2P(null)];
+const veraScaduta = avanzaOrdineP2P(compro, 'pay-bond-invoice', {payment_request: [null, FATT_VERA, null]});
+out.veraScaduta = [veraScaduta.cauzione.sats, veraScaduta.cauzione.scade > 0, cauzioneVivaP2P(veraScaduta), azioniDisponibili(veraScaduta), statoTestoP2P(veraScaduta).t];
+const vivaO = Object.assign({}, dopoBond, {cauzione: Object.assign({}, dopoBond.cauzione, {scade: 4102444800})});
+out.vivaBottone = [azioniDisponibili(vivaO), statoTestoP2P(vivaO).t];
+/* 11) i riquadri e le righe */
+out.riquadri = [riquadroCauzioneP2P(dopoBond).indexOf('Cauzione da bloccare') >= 0, riquadroCauzioneP2P(avanzaOrdineP2P(dopoBond, 'add-invoice', {order: {amount: 97000}})).indexOf('Cauzione bloccata') >= 0,
+  riquadroCauzioneP2P(gc.ord).indexOf('Cauzione restituita') >= 0, riquadroCauzioneP2P(morto), riquadroCauzioneP2P({stato: 'attivo'})];
+out.dett = [rigaCauzioneDettP2P({metodi: ['Contanti'], euro: 100, sats: 0}, p2pInfo, true),
+  rigaCauzioneDettP2P({metodi: ['Contanti'], euro: 100, sats: 0}, p2pInfo, false), rigaCauzioneDettP2P({metodi: ['SEPA'], euro: 100}, p2pInfo, true)];
+out.info = [testoCauzioneInfoP2P(p2pInfo, true), testoCauzioneInfoP2P(p2pInfo, false), testoCauzioneInfoP2P(null, true)];
+/* 12) il moderatore */
+out.mod = [cauzioneModP2P({ordine: 'o1', cauzione_di: 'compra', metodi: 'Contanti, Revolut'}, {}),
+  cauzioneModP2P({ordine: 'o1', cauzione_di: 'vende', metodi: 'Contanti'}, {cauzione: 'venditore'}).indexOf(' checked') >= 0,
+  cauzioneModP2P({ordine: 'o1', cauzione_di: 'compra', metodi: 'SEPA'}, {}), cauzioneModP2P({ordine: 'o1', cauzione_di: '', metodi: 'Contanti'}, {}),
+  cauzioneModP2P({ordine: 'o1', cauzione_di: 'compra', metodi: 'Contanti al tabacchino'}, {})];
+bozzaModP2P('o1', 'cauzione', 'compratore');
+out.modScelta = [cauzioneModSceltaP2P('o1'), cauzioneFraseModP2P('o1'), cauzioneModSceltaP2P('o2'), cauzioneFraseModP2P('o2')];
+bozzaModP2P('o1', 'cauzione', 'tutti'); out.modStorta = cauzioneModSceltaP2P('o1');
+/* 13) la restore */
+out.restore = [statoDaRestoreP2P({lato: 'vendo'}, 'waiting-taker-bond'), statoDaRestoreP2P({lato: 'compro'}, 'WAITING-MAKER-BOND')];
+console.log(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp(prefix="cauzione_")
+    pb = os.path.join(cart, "banco.js")
+    open(pb, "w", encoding="utf-8").write(pezzi)
+    rr = _sp.run([node, pb], capture_output=True, text=True, timeout=120, encoding="utf-8")
+    prova("il banco della cauzione gira", "", (rr.stderr or "")[-900:])
+    if rr.returncode != 0:
+        return
+    o = _json.loads(rr.stdout)
+    prova("il lettore del 38385: acceso, 3%, pavimento 1000, take, «contanti», niente timeout, meta' al nodo, 15 giorni",
+          {"accesa": True, "pct": 0.03, "base": 1000, "applyTo": "take", "metodi": ["contanti"],
+           "timeoutBrucia": False, "quotaNodo": 0.5, "giorniIncasso": 15}, o["letto"])
+    prova("...`false` e il tag assente sono la stessa «spenta»; la lista si pulisce", [True, True, [], ["contanti", "sepa"]],
+          [o["spenta"]["accesa"] is False and o["spenta"]["pct"] == 0, o["assente"] == o["spenta"], o["listaVuota"], o["listaSporca"]])
+    prova("il metodo: parola intera, senza maiuscole e spazi; il tabacchino no; lista vuota = tutti",
+          [True, True, True, False, False, False, True, True], o["metodo"])
+    prova("a chi serve: chi prende un contanti con leva e 38385 accesi; mai a chi pubblica con `take`; mai su altri metodi; `make` e `both` girano",
+          [True, False, False, False, True, False, False, True, False, True, True], o["serve"])
+    prova("...e la scorciatoia col contesto vivo", [True, False], [o["serveQui"], o["serveQuiSpenta"]])
+    # 1200.3 → 1200 e 1234.5 → 1235: lo stesso `round()` del coordinatore
+    # (mezzo si allontana dallo zero, come in Rust)
+    prova("quanto: max(round(3% × sats), 1000); 0 sats o pct 0 = il pavimento; spenta = 0",
+          [3000, 1000, 1000, 1200, 1235, 1000, 0, 0], o["importo"])
+    prova("la base della stima: i sats detti, poi la cifra fissa, poi il mercato (sul capo alto di un intervallo)",
+          [7000, 5000, 50000, 100000, 0], o["base"])
+    prova("il giro di chi COMPRA in contanti: cauzione da bloccare col bottone, poi i passi di sempre con la cauzione «bloccata», e alla fine «restituita»",
+          [["attesa_mia_cauzione", "cauzione", "chiesta"], ["attesa_mia_fattura", "fattura", "bloccata"],
+           ["attesa_hold_venditore", "", "bloccata"], ["attivo", "", "bloccata"], ["euro_inviati", "", "bloccata"],
+           ["rilasciato", "", "bloccata"], ["concluso", "", "restituita"]], o["giroCompro"])
+    prova("la richiesta letta: bolt11, 1500 sats, «chiesta», scadenza non leggibile = 0; il LORDO resta zero, la cifra e il metodo entrano, e l'ordine e' preso",
+          ["lnbc15u1cauzionefinta", 1500, "chiesta", 0, 0, 0, 50, ["Contanti"], True], o["cauzioneLetta"])
+    prova("...e a fine giro il mio lato e' quello dell'add-invoice e il lordo sta sopra: mai la cauzione",
+          ["restituita", 97000, True, True], o["comproFine"])
+    prova("il giro di chi VENDE: prima la cauzione, poi la garanzia (due richieste, due fogli), poi il resto fino a «in pagamento»",
+          [["attesa_mia_cauzione", "cauzione", "chiesta"], ["attesa_mia_hold", "hold", "bloccata"], ["attivo", "", "bloccata"],
+           ["euro_inviati", "rilascia", "bloccata"], ["rilasciato", "", "bloccata"]], o["giroVendo"])
+    prova("...con le due bolt11 al loro posto; e al «concluso» detto dal server la cauzione torna (in pagamento no; una persa resta persa; una mai bloccata resta com'era)",
+          ["lnbc1000u1qqqq", "lnbc15u1cauzionefinta", "bloccata", "restituita", True, "bloccata", "persa", "chiesta"], o["vendoHold"])
+    prova("il giro che muore prima della cauzione: annullato col giro morto «cauzione», la cauzione resta «chiesta» (mai bloccata, mai «restituita»), e la frase dice i due casi",
+          ["annullato", "cauzione", "chiesta", True], o["morto"])
+    prova("...e l'eco del new-order la riporta nel libro, con la frase del «riprendilo»", ["pubblicato", "cauzione", "chiesta", True], o["tornato"])
+    prova("bruciata: l'annullo del moderatore direbbe «restituita», il `bond-slashed` che gli sta accanto dice «persa» coi suoi sats, e il lordo non si tocca",
+          ["restituita", "annullato", "persa", 1500, True, True], o["persa"])
+    prova("...nell'altro ordine (prima bruciata, poi annullato) resta persa", "persa", o["persaResta"])
+    prova("la meta' che mi spetta: 750 sats, l'ora della bruciatura, quindici giorni per incassarla, lo stato non si muove",
+          [{"sats": 750, "da": 1790000000, "scade": 1790000000 + 15 * 86400, "stato": "chiesta"}, True, "annullato"], o["incasso"])
+    prova("...accettata, poi pagata, e una richiesta ripetuta dopo il pagamento non riapre niente",
+          ["accettata", "pagata", "pagata"], o["incassoStati"])
+    prova("...coi suoi riquadri: il bottone «Incassa» con la data, «Fattura ricevuta», «incassata», niente bottone a sola vista, niente senza incasso",
+          [True, True, True, True, True], o["incassoTesti"])
+    prova("viva o scaduta: la scadenza della bolt11 se c'e', la finestra del 38385 (900) dal momento dell'arrivo se no; senza richiesta mai viva",
+          [True, False, True, False, False, False], o["viva"])
+    prova("una bolt11 VERA e scaduta: letta (7468, con la scadenza), non viva, niente bottone, e la frase della cauzione non bloccata in tempo",
+          [7468, True, False, "", "La cauzione non è stata bloccata in tempo"], o["veraScaduta"])
+    prova("...e viva: il bottone e il titolo di sempre", ["cauzione", "Blocca la cauzione"], o["vivaBottone"])
+    prova("i riquadri: da bloccare, bloccata, restituita; niente su un giro morto o senza cauzione",
+          [True, True, True, "", ""], o["riquadri"])
+    prova("la riga del dettaglio: circa 3000 sats (3%, almeno 1000) col contanti e la leva; niente a leva spenta o su un altro metodo",
+          [True, "", ""], [("circa <b>3000 sats</b>" in o["dett"][0] and "(il 3%, almeno 1000 sats)" in o["dett"][0]
+                            and "torna a fine scambio" in o["dett"][0]), o["dett"][1], o["dett"][2]])
+    prova("«Info P2P»: la voce viva (3%, almeno 1000, «Contanti», 50% all'altra persona, 15 giorni) e la voce spenta",
+          [True, True, True],
+          [("il <b>3%</b> dei sats, almeno 1000 sats" in o["info"][0] and "«Contanti»" in o["info"][0]
+            and "50% va all'altra persona" in o["info"][0] and "15 giorni" in o["info"][0]),
+           "in questo momento non c'è" in o["info"][1], "in questo momento non c'è" in o["info"][2]])
+    prova("il moderatore: la spunta per chi ha preso un contanti (chi compra), spuntata dalla bozza; niente su SEPA, senza chi, o col tabacchino",
+          [True, True, "", "", ""],
+          [("Brucia la cauzione di chi compra" in o["mod"][0] and 'data-c="compratore"' in o["mod"][0] and "metà va a chi vende" in o["mod"][0]),
+           o["mod"][1], o["mod"][2], o["mod"][3], o["mod"][4]])
+    prova("...la scelta dalla bozza, la frase della conferma, e una parola storta vale «nessuna»",
+          ["compratore", "\n\nLa cauzione di chi compra viene bruciata: metà all'altra persona, metà al servizio.", "", "", ""],
+          o["modScelta"] + [o["modStorta"]])
+    prova("la restore: i due stati della cauzione sono «pubblicato», anche a maiuscole", ["pubblicato", "pubblicato"], o["restore"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
-    for f in (prove_contanti_a_mano, prove_filtro_italiano, prove_autocomplete_comuni,
+    for f in (prove_contanti_a_mano, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
               prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,

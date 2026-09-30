@@ -3029,6 +3029,9 @@
      foglio del codice. I paragrafi respirano poco, i due gesti stanno
      affiancati con l'area di tocco piena, la riga del fatto e' scura. */
   .contanti-box{color:var(--ink-soft);font-size:13px;line-height:1.45}
+  .cauzione-box{color:var(--ink-soft);font-size:13px;line-height:1.45}
+  .cauzione-box .contanti-gesti{margin-top:8px}
+  .cauzione-regola{margin-top:8px}
   .contanti-box p{margin:6px 0 0}
   .contanti-gps{display:flex;gap:8px;align-items:flex-start;margin-top:8px;
     font-size:12.5px;cursor:pointer}
@@ -10231,6 +10234,7 @@ document.getElementById('cartello')?.remove();</script>
       <p>Il metodo «Contanti» è l'<b>incontro a mano</b>: chi compra sats porta le banconote, chi vende le conta e libera i sats <b>lì, davanti a lui</b>. Una banconota non lascia ricevuta, quindi le regole sono tre e valgono dall'inizio.</p>
       <ol class="sicu-passi">
         <li id="p2pInfoContantiTetto"></li>
+        <li id="p2pInfoCauzione"></li>
         <li><b>Il rilascio sul posto.</b> A chi compra: <i>Consegna i contanti solo quando chi vende preme «Libera i sats» davanti a te, e controlla che lo scambio risulti concluso prima di andare via.</i> A chi vende: <i>Conta i contanti davanti a chi ti paga, poi premi «Libera i sats» lì, davanti a lui: chi compra deve vedere lo scambio concluso prima di andare via.</i> Mai prima di vedersi, mai dopo essersi salutati.</li>
         <li><b>L'incontro.</b> Vedetevi in un posto pubblico e di giorno — un bar, un incontro bitcoin —, contate le banconote insieme, e mai grosse cifre da soli.</li>
       </ol>
@@ -12165,6 +12169,14 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="p2pHoldTit">🔒 Blocca i sats</h3>
     <div id="p2pHoldCorpo"></div>
+  </div>
+
+  <!-- LA META' DELLA CAUZIONE BRUCIATA ALL'ALTRA PERSONA (1 ott 2026):
+       una fattura dell'importo esatto, dal wallet o incollata -->
+  <div class="sheet" id="p2pCauzioneSheet" role="dialog" aria-modal="true" aria-labelledby="p2pCauzioneTit">
+    <div class="grab"></div>
+    <h3 id="p2pCauzioneTit">⚖️ Incassa la cauzione</h3>
+    <div id="p2pCauzioneCorpo"></div>
   </div>
 
   <!-- LA PROVA D'INCONTRO DEL CONTANTI (30 set 2026): un telefono mostra
@@ -44860,12 +44872,93 @@ function infoDaEvento(ev){
        38385 del nostro nodo emette DAVVERO (verificato): il commit
        `c6efb2d` (#952) lo rinomina upstream, e il giorno che il tag
        sparisse la finestra tornerebbe al default di 3600 s. */
+    /* ⚠️ E DALLA 0.19.0 `hold_invoice_expiration_window` E' TORNATA
+       VIVA, con un mestiere solo (1 ott 2026, letta sui byte di
+       v0.19.0, upstream #999): e' la SCADENZA della richiesta di
+       cauzione di chi prende — `taker_bond_invoice_expiry` in
+       src/app/bond/flow.rs, e nient'altro in tutto il daemon. Chi
+       deve dire quanto resta per pagare la cauzione legge PRIMA la
+       bolt11 (`leggiBolt11`) e ripiega su questo numero: vedi
+       `cauzioneVivaP2P`. Per la hold della garanzia resta MORTA. */
     holdFinestra: Math.floor(num('hold_invoice_expiration_window')),
     fattFinestra: Math.floor(num('invoice_expiration_window')),
+    /* LA CAUZIONE DI CHI PRENDE (1 ott 2026, cantiere B): i tag
+       `bond_*` con cui il coordinatore annuncia la sua politica, letti
+       da `cauzioneDaInfoP2P` — e la lista dei metodi a cui si applica,
+       che e' un tag del NOSTRO fork (patch 0008). */
+    cauzione: cauzioneDaInfoP2P(ev),
     valute: String(tagValore(ev, 'fiat_currencies_accepted') || '')
       .split(',').map(s => s.trim().toUpperCase()).filter(Boolean),
     versione: String(tagValore(ev, 'mostro_version') || ''),
     quando: Number(ev.created_at) || 0
+  };
+}
+
+/* ═══ LA CAUZIONE DI CHI PRENDE (1 ott 2026, cantiere B) ════════════
+   Negli scambi in CONTANTI di persona chi prende l'ordine blocca una
+   piccola cauzione — una SECONDA hold invoice, dopo il take e prima
+   di tutto il resto — cosi' chi non si presenta all'incontro la perde
+   e chi vende non resta coi sats bloccati per niente. E' l'`anti_abuse_bond`
+   di mostrod (0.19.0, docs/ANTI_ABUSE_BOND.md), acceso sul nostro
+   nodo SOLO per il metodo «Contanti» con la patch 0008 del fork: il
+   coordinatore la chiede a chi prende quando fra i metodi dell'ORDINE
+   c'e' quello (la parola intera, senza maiuscole), mai per gli altri
+   metodi, Barattozon compreso.
+   QUEL CHE IL CLIENT SA, letto sui byte di v0.19.0:
+   • dopo `take-sell`/`take-buy` arriva `pay-bond-invoice`, stessa forma
+     di `pay-invoice` (`payment_request: [ordine, bolt11, null]`) con
+     `amount` = i sats della CAUZIONE, non dello scambio;
+   • finche' la cauzione non e' bloccata l'ordine resta `pending` nel
+     libro e chiunque puo' prenderlo: vince chi paga per primo, gli
+     altri ricevono `canceled`; rimandare la presa dalla stessa chiave
+     restituisce la stessa bolt11;
+   • la richiesta SCADE (`hold_invoice_expiration_window`, #999): LND la
+     cancella, il coordinatore libera e riporta l'ordine nel libro, e a
+     chi doveva pagare NON DICE NIENTE — la scadenza la legge il client
+     dalla bolt11 (`cauzioneVivaP2P`);
+   • a cauzione bloccata lo scambio riparte come sempre (`add-invoice`,
+     `pay-invoice`…); la cauzione TORNA da sola su ogni uscita che non
+     e' una bruciatura (rilascio, annulli, scadenze), e il coordinatore
+     non manda nessun «restituita»: lo si deduce dallo stato finale;
+   • si PERDE in due soli casi — la direttiva del moderatore nella
+     disputa (`bond_resolution`) o il timeout, che sul nostro nodo e'
+     spento — e allora arriva `bond-slashed`; meta' va al nodo e meta'
+     alla controparte, che riceve `add-bond-invoice` e ha quindici
+     giorni per rispondere con una fattura (`bond-invoice-accepted`,
+     poi `bond-payout-completed`).
+   DUE CHIAVI, TUTT'E DUE ACCESE: la leva del server (`P2P_CAUZIONE`,
+   in busta come `cauzione`) e il 38385 del coordinatore (`bond_enabled`).
+   La leva dice «questa app la mostra», il 38385 dice «il nodo la
+   chiede»: senza il secondo la prima non inventa niente, e senza la
+   prima il messaggio arriva lo stesso e si gestisce, senza cifre
+   promesse prima. */
+/* la cauzione «spenta», in una funzione e non in una costante: la
+   leggono due posti del client (qui e il motore), e i banchi che
+   ritagliano una funzione sola non si portano dietro un `const` */
+function cauzioneSpentaP2P(){
+  return {accesa: false, pct: 0, base: 0, applyTo: '',
+          metodi: [], timeoutBrucia: false, quotaNodo: 0, giorniIncasso: 0};
+}
+
+/* PURA: i tag `bond_*` del 38385. `bond_enabled` c'e' sempre da quando
+   il daemon parla di cauzioni (una `false` esplicita); gli altri solo
+   quando e' `true`. `bond_only_payment_methods` e' del fork: la lista
+   separata da virgole, gia' senza maiuscole e senza spazi — vuota o
+   assente = ogni metodo, che e' l'upstream. */
+function cauzioneDaInfoP2P(ev){
+  const tag = n => String(tagValore(ev, n) || '').trim();
+  const num = n => { const v = Number(tag(n)); return Number.isFinite(v) ? v : 0; };
+  if (tag('bond_enabled') !== 'true') return cauzioneSpentaP2P();
+  return {
+    accesa: true,
+    pct: num('bond_amount_pct'),
+    base: Math.floor(num('bond_base_amount_sats')),
+    applyTo: tag('bond_apply_to').toLowerCase(),
+    metodi: tag('bond_only_payment_methods').split(',')
+      .map(s => s.trim().toLowerCase()).filter(Boolean),
+    timeoutBrucia: tag('bond_slash_on_waiting_timeout') === 'true',
+    quotaNodo: num('bond_slash_node_share_pct'),
+    giorniIncasso: Math.floor(num('bond_payout_claim_window_days'))
   };
 }
 
@@ -45737,6 +45830,9 @@ function renderP2PInfo(){
      leva spenta la voce lo dice invece di inventare un numero */
   const tettoC = el('p2pInfoContantiTetto');
   if (tettoC) tettoC.innerHTML = testoTettoContantiP2P(maxEuroContantiP2P());
+  /* LA CAUZIONE, VIVA (1 ott 2026): la leva del server E il 38385 */
+  const cauz = el('p2pInfoCauzione');
+  if (cauz) cauz.innerHTML = testoCauzioneInfoP2P(p2pInfo, cauzioneAccesaP2P());
   /* LA COMMISSIONE, dallo stesso giudice del conto dello scambio: le
      due cifre non possono divergere perche' la fonte e' una sola. La
      frase la scrive `testoFeeInfoP2P` (25 set 2026: la beta, il prezzo
@@ -49978,6 +50074,8 @@ const AVANZA_P2P = {
   'waiting-seller-to-pay': 'attesa_hold_venditore',
   'waiting-buyer-invoice': 'attesa_fattura_compratore',
   'pay-invoice': 'attesa_mia_hold',
+  /* la cauzione di chi prende (1 ott 2026): stessa forma di pay-invoice */
+  'pay-bond-invoice': 'attesa_mia_cauzione',
   'hold-invoice-payment-accepted': 'attivo',
   'buyer-took-order': 'attivo',
   'invoice-updated': 'attivo',
@@ -50009,6 +50107,8 @@ const AVANZA_P2P = {
    nella fattura o mette nella hold — e sottrargli di nuovo la meta'
    (la lettura del 14 set) faceva chiedere 7468 dove ne voleva 7543. */
 const P2P_IMPORTO_MIO = ['add-invoice', 'hold-invoice-payment-accepted', 'buyer-took-order'];
+/* ...e le due azioni il cui `amount` e' la CAUZIONE, non lo scambio */
+const P2P_IMPORTO_CAUZIONE = ['pay-bond-invoice', 'bond-slashed'];
 /* ═══ DOPO IL RILASCIO LE STESSE AZIONI VOGLIONO DIRE UN'ALTRA COSA
    (17 set 2026, lo scambio 3fcdb207: 14.837 sats fermi nel nodo) ═════
    Chi vende libera, il coordinatore incassa la garanzia
@@ -50078,7 +50178,8 @@ function applicaPagamentoP2P(o, esito){
     const q = Math.floor(Number(esito.quando) || 0);
     if (q > (Number(r.ultimaMossa) || 0)) r.ultimaMossa = q;
     r.aggiornato = Math.floor(Date.now() / 1000);
-    return r;
+    /* ...e la cauzione di chi ha preso torna con lui (1 ott 2026) */
+    return cauzioneAFineP2P(r);
   }
   if (esito.stato !== 'fallito' && esito.stato !== 'in_corso') return null;
   const fallito = esito.stato === 'fallito';
@@ -50108,7 +50209,13 @@ function avanzaOrdineP2P(ordine, azione, payload){
        coordinatore rifiutava. I giudici: `satsDaRicevereP2P` (la
        fattura), `satsScambioP2P` (la card), `satsDetti` del conto
        (l'unico posto dove il lordo E' la cosa giusta: fa il Subtotale). */
-    const amt = Math.floor(Number(ord.amount) || 0);
+    /* ⚠️ SUI MESSAGGI DELLA CAUZIONE `amount` E' LA CAUZIONE (1 ott
+       2026): `pay-bond-invoice` e `bond-slashed` portano lo stesso
+       SmallOrder con dentro i sats della cauzione, non dello scambio —
+       letto sui byte (`request_taker_bond`, `notify_bond_slashed`).
+       Scritto nel lordo direbbe che lo scambio vale il 3% di se stesso. */
+    const amt = P2P_IMPORTO_CAUZIONE.indexOf(azione) >= 0 ? 0
+              : Math.floor(Number(ord.amount) || 0);
     if (amt > 0 && P2P_IMPORTO_MIO.indexOf(azione) >= 0) {
       o.satsMiei = amt;
       /* PRIMA del lordo: se lo sconto promesso non e' arrivato, il
@@ -50157,6 +50264,51 @@ function avanzaOrdineP2P(ordine, azione, payload){
       }
     }
   }
+  /* LA CAUZIONE DA BLOCCARE (1 ott 2026): la terna e' quella di
+     `pay-invoice`, la scadenza la dice la bolt11 stessa. Una richiesta
+     nuova sostituisce la vecchia: una presa rifatta dopo la scadenza
+     porta una cauzione nuova. */
+  if (azione === 'pay-bond-invoice' && p && Array.isArray(p.payment_request)) {
+    const bolt = typeof p.payment_request[1] === 'string' ? p.payment_request[1] : '';
+    if (bolt) {
+      const b = leggiBolt11(bolt);
+      const detto = ord ? Math.floor(Number(ord.amount) || 0) : 0;
+      o.cauzione = {bolt11: bolt, sats: importoBolt11(bolt) || detto || 0,
+                    quando: Math.floor(Date.now() / 1000),
+                    scade: b && b.scade > 0 ? b.scade : 0, stato: 'chiesta'};
+    }
+  }
+  /* LA CAUZIONE PERSA: non muove lo stato (lo muove l'annullo o la
+     decisione che le sta accanto), scrive com'e' andata */
+  if (azione === 'bond-slashed') {
+    const persa = ord ? Math.floor(Number(ord.amount) || 0) : 0;
+    o.cauzione = Object.assign({}, o.cauzione || {}, {stato: 'persa', persa: persa});
+    o.aggiornato = Math.floor(Date.now() / 1000);
+    return o;
+  }
+  /* LA META' CHE MI SPETTA: `bond_payout_request` porta l'ordine con
+     `amount` = la mia parte e l'ora della bruciatura, da cui si conta
+     la scadenza coi giorni del 38385 */
+  if (azione === 'add-bond-invoice') {
+    const r = p && p.bond_payout_request;
+    const sats = r && r.order ? Math.floor(Number(r.order.amount) || 0) : 0;
+    const da = r ? Math.floor(Number(r.slashed_at) || 0) : 0;
+    const giorni = cauzioneInfoP2P(p2pInfo).giorniIncasso || 15;
+    if (sats > 0) {
+      const prima = o.incasso || {};
+      o.incasso = {sats: sats, da: da, scade: da > 0 ? da + giorni * 86400 : 0,
+                   stato: prima.stato === 'pagata' ? 'pagata' : 'chiesta'};
+    }
+    o.aggiornato = Math.floor(Date.now() / 1000);
+    return o;
+  }
+  if (azione === 'bond-invoice-accepted' || azione === 'bond-payout-completed') {
+    if (o.incasso && o.incasso.stato !== 'pagata')
+      o.incasso = Object.assign({}, o.incasso,
+        {stato: azione === 'bond-payout-completed' ? 'pagata' : 'accettata'});
+    o.aggiornato = Math.floor(Date.now() / 1000);
+    return o;
+  }
   /* ⚠️ IL MODERATORE NON E' LA CONTROPARTE (28 set 2026): quando un
      moderatore prende la disputa il coordinatore scrive alle due parti
      `admin-took-dispute` con la SUA chiave nel campo `peer` — lo stesso
@@ -50195,7 +50347,8 @@ function avanzaOrdineP2P(ordine, azione, payload){
     /* IL GIRO MORTO SI SCRIVE (17 set 2026): vedi P2P_GIRO_APERTO */
     if (P2P_GIRO_APERTO.indexOf(o.stato) >= 0
         && (nuovo === 'pubblicato' || nuovo === 'annullato')) {
-      o.giroMorto = o.stato === 'attesa_mia_hold' ? 'hold' : 'prima';
+      o.giroMorto = o.stato === 'attesa_mia_hold' ? 'hold'
+                  : o.stato === 'attesa_mia_cauzione' ? 'cauzione' : 'prima';
       /* la richiesta del giro morto non si paga piu': il coordinatore
          l'ha gia' annullata. Sull'ANNULLATO resta — li' e' la ricevuta
          che tiene la riga (vedi p2pRitirato) e nessun bottone la apre. */
@@ -50220,6 +50373,19 @@ function avanzaOrdineP2P(ordine, azione, payload){
        l'annullo e' caduto — lo legge `fermoAnnulloP2P` */
     if ((nuovo === 'annullato' || nuovo === 'rifiutato') && typeof P2P_PROGRESSO !== 'undefined')
       o.fermoA = P2P_PROGRESSO[o.stato] || 0;
+    /* LA CAUZIONE SEGUE LO SCAMBIO (1 ott 2026): il coordinatore non
+       dice mai «bloccata» ne' «restituita» — si deduce. Da «da
+       bloccare» a un passo dello scambio vuol dire che l'ha vista
+       pagata (senza, il passo non parte); un finale senza `bond-slashed`
+       vuol dire che l'ha liberata (la spec: torna su OGNI uscita che
+       non e' una bruciatura). Una persa resta persa. */
+    if (o.cauzione && o.cauzione.stato !== 'persa') {
+      if (o.stato === 'attesa_mia_cauzione' && nuovo !== 'pubblicato' && nuovo !== 'annullato')
+        o.cauzione = Object.assign({}, o.cauzione, {stato: 'bloccata'});
+      else if (o.cauzione.stato === 'bloccata'
+               && (nuovo === 'concluso' || nuovo === 'annullato' || nuovo === 'pubblicato'))
+        o.cauzione = Object.assign({}, o.cauzione, {stato: 'restituita'});
+    }
     o.stato = nuovo;
     o.aggiornato = Math.floor(Date.now() / 1000);
     o.cantDo = '';
@@ -50240,14 +50406,21 @@ function avanzaOrdineP2P(ordine, azione, payload){
    `giroMorto` vale 'hold' se toccava a ME bloccare i sats, 'prima'
    altrimenti; lo legge statoTestoP2P, e si toglie alla presa dopo. */
 const P2P_GIRO_APERTO = ['attesa_mia_fattura', 'attesa_hold_venditore',
-  'attesa_fattura_compratore', 'attesa_mia_hold'];
+  'attesa_fattura_compratore', 'attesa_mia_hold', 'attesa_mia_cauzione'];
 const P2P_GIRO_MORTO = {
   pubblicato: {t: 'Di nuovo nel libro',
     hold: 'Il giro di prima si è chiuso senza che la garanzia venisse bloccata: nessun sat si è mosso, e l\'ordine è tornato nel libro. Se qualcuno lo riprende te lo diciamo subito: il tempo per bloccare i sats è poco.',
-    prima: 'Chi aveva preso l\'ordine non ha proseguito: nessun sat si è mosso, e l\'ordine è tornato nel libro.'},
+    prima: 'Chi aveva preso l\'ordine non ha proseguito: nessun sat si è mosso, e l\'ordine è tornato nel libro.',
+    /* la cauzione non pagata in tempo (1 ott 2026) */
+    cauzione: 'La cauzione non è stata bloccata in tempo: nessun sat si è mosso, e l\'ordine è tornato nel libro. Se ti interessa ancora, riprendilo.'},
   annullato: {t: 'Scambio annullato',
     hold: 'Si è chiuso prima che la garanzia venisse bloccata: nessun sat si è mosso.',
-    prima: 'Si è chiuso prima che la garanzia venisse bloccata: nessun sat si è mosso.'}
+    prima: 'Si è chiuso prima che la garanzia venisse bloccata: nessun sat si è mosso.',
+    /* PRIMA CHE LA CAUZIONE FOSSE BLOCCATA (1 ott 2026): per il
+       coordinatore e' lo stesso `canceled` in due casi — un altro ha
+       pagato la sua cauzione prima di te (vince chi paga per primo), o
+       chi aveva pubblicato ha ritirato l'ordine — e non dice quale */
+    cauzione: 'Si è chiuso prima che la tua cauzione fosse bloccata: o qualcun altro ha pagato la sua prima di te, o chi aveva pubblicato ha ritirato l\'ordine. Nessun sat si è mosso.'}
 };
 /* LA RICHIESTA E' ANCORA PAGABILE? Il toast «tocca a te» non deve
    suonare su una richiesta morta: alla riapertura il relay ripete i
@@ -50262,12 +50435,171 @@ function holdVivaP2P(o){
   const finestra = (p2pInfo && p2pInfo.scadenzaSec > 0) ? p2pInfo.scadenzaSec : 900;
   return Math.floor(Date.now() / 1000) < b.quando + finestra;
 }
+/* ═══ LA CAUZIONE, LE FUNZIONI DEL MOTORE (1 ott 2026) ═══════════════
+   Il perche' e il disegno stanno sopra `cauzioneDaInfoP2P`, accanto al
+   lettore del 38385; qui vivono i giudici e i riquadri, dentro il
+   motore, perche' e' il motore a chiamarli. */
+function cauzioneInfoP2P(info){
+  return (info && info.cauzione) || cauzioneSpentaP2P();
+}
+/* la leva del server, in busta come `cauzione` (true/false) */
+function cauzioneAccesaP2P(){
+  const c = p2pCoord();
+  return !!(c && c.cauzione === true);
+}
+/* PURA, e ricalca la regola del coordinatore (patch 0008,
+   `bond_applies_to_order`): fra i metodi dell'ORDINE — non quello
+   scelto alla presa, che il coordinatore non vede — ce n'e' uno della
+   lista, confrontato come parola intera e senza maiuscole. Lista vuota
+   = ogni metodo. */
+function metodoInCauzioneP2P(metodi, lista){
+  const l = (lista || []).map(s => String(s || '').trim().toLowerCase()).filter(Boolean);
+  if (!l.length) return true;
+  return (metodi || []).some(m => l.indexOf(String(m || '').trim().toLowerCase()) >= 0);
+}
+/* PURA: a QUESTA riga il coordinatore chiedera' la cauzione? `leva` e'
+   la chiave del server, `info` il 38385. Chi la mette lo dice
+   `apply_to`: `take` chi prende, `make` chi pubblica, `both` tutt'e due. */
+function cauzioneServeP2P(o, info, leva){
+  const c = cauzioneInfoP2P(info);
+  if (!o || !leva || !c.accesa) return false;
+  if (!metodoInCauzioneP2P(o.metodi, c.metodi)) return false;
+  const prende = !o.mio;
+  if (c.applyTo === 'both') return true;
+  if (c.applyTo === 'make') return !prende;
+  return prende;
+}
+function cauzioneServeQuiP2P(o){
+  return cauzioneServeP2P(o, p2pInfo, cauzioneAccesaP2P());
+}
+/* PURA: quanti sats, con la formula del coordinatore letta sui byte
+   (`compute_bond_amount` in src/app/bond/math.rs):
+   max(round(pct × sats), base). Sui sats del TAKER, cioe' l'importo
+   dello scambio a mercato, col premio gia' applicato. 0 = non si sa. */
+function importoCauzioneP2P(sats, info){
+  const c = cauzioneInfoP2P(info);
+  const s = Math.floor(Number(sats) || 0);
+  if (!c.accesa) return 0;
+  const base = Math.max(0, c.base);
+  if (s <= 0 || !(c.pct > 0)) return base;
+  return Math.max(Math.round(s * c.pct), base);
+}
+/* la base su cui STIMARE la cauzione prima della presa: i sats detti
+   dal coordinatore se ci sono, se no la cifra fissa, se no il mercato
+   al cambio di adesso (su un intervallo, il capo alto: e' l'esposizione
+   peggiore, e la cifra vera la dira' la richiesta) */
+function satsBaseCauzioneP2P(o){
+  if (!o) return 0;
+  if (o.satsNetti > 0) return o.satsNetti;
+  if (o.sats > 0) return o.sats;
+  const euro = o.euroMax > 0 ? o.euroMax : o.euro;
+  return euro > 0 ? satsMercatoP2P({euro: euro, premium: o.premium || 0, metodi: o.metodi}) : 0;
+}
+/* LA RICHIESTA E' ANCORA PAGABILE? Come `holdVivaP2P`, ma la scadenza
+   qui e' quella VERA: la legge la bolt11 (`x`, in secondi), e senza
+   bolt11 leggibile vale la finestra del 38385 (300 s dal template, 900
+   sul nostro nodo dal 1 ott 2026) dal momento in cui e' arrivata. */
+function cauzioneVivaP2P(o, adesso){
+  const c = o && o.cauzione;
+  if (!c || !c.bolt11) return false;
+  const ora = adesso || Math.floor(Date.now() / 1000);
+  if (c.scade > 0) return ora < c.scade;
+  const finestra = (p2pInfo && p2pInfo.holdFinestra > 0) ? p2pInfo.holdFinestra : 300;
+  return ora < (c.quando || 0) + finestra;
+}
+function satsCauzioneP2P(o){
+  const c = o && o.cauzione;
+  return c && c.sats > 0 ? c.sats : 0;
+}
+/* PURA: A FINE SCAMBIO LA CAUZIONE BLOCCATA E' TORNATA. La macchina a
+   stati lo scrive da se' (`avanzaOrdineP2P`), ma «concluso» arriva
+   anche da fuori — il pagamento riuscito detto dal SERVER a chi vende
+   (`applicaPagamentoP2P`) e la fotografia della restore — e da li' la
+   riga deve dire lo stesso. Una persa resta persa; una mai bloccata
+   resta com'era (un giro morto non restituisce niente). */
+function cauzioneAFineP2P(o){
+  const c = o && o.cauzione;
+  if (!c || c.stato !== 'bloccata') return o;
+  if (P2P_FINALI.indexOf(o.stato) < 0 && o.stato !== 'pubblicato') return o;
+  return Object.assign({}, o, {cauzione: Object.assign({}, c, {stato: 'restituita'})});
+}
+/* la riga della cauzione nel dettaglio di chi sta per prendere: la
+   cifra e' una STIMA (la dice la richiesta), la regola no */
+function rigaCauzioneDettP2P(o, info, leva){
+  if (!cauzioneServeP2P(Object.assign({}, o, {mio: false}), info, leva)) return '';
+  const c = cauzioneInfoP2P(info);
+  const stima = importoCauzioneP2P(satsBaseCauzioneP2P(o), info);
+  return '<div class="hint cauzione-regola">🔐 <b>La cauzione di chi prende.</b> '
+    + 'Per prendere quest\'ordine in contanti blocchi una piccola cauzione'
+    + (stima > 0 ? ' di circa <b>' + fmt(stima) + ' sats</b>' : '')
+    + (c.pct > 0 ? ' (il ' + esc(String(Math.round(c.pct * 1000) / 10).replace('.', ',')) + '%'
+        + (c.base > 0 ? ', almeno ' + fmt(c.base) + ' sats' : '') + ')' : '')
+    + ': resta nel tuo wallet e <b>torna a fine scambio</b>. La perdi solo se un moderatore '
+    + 'decide che non ti sei presentato all\'incontro.'
+    + ' Finché non è bloccata, l\'ordine resta nel libro e qualcun altro può prenderlo.</div>';
+}
+/* il riquadro nella pagina dello scambio, dal lato di chi la cauzione
+   l'ha messa: cosa sta facendo adesso, e alla fine com'e' andata */
+function riquadroCauzioneP2P(o){
+  o = cauzioneAFineP2P(o);
+  const c = o && o.cauzione;
+  if (!c) return '';
+  const sats = c.sats > 0 ? fmt(c.sats) + ' sats' : 'la cauzione';
+  let h = '';
+  if (c.stato === 'persa')
+    h = '<b>🔐 Cauzione persa:</b> ' + esc(c.persa > 0 ? fmt(c.persa) + ' sats' : sats)
+      + '. Un moderatore ha deciso che non ti sei presentato all\'incontro: metà va a chi ha scambiato con te, metà al servizio.';
+  else if (c.stato === 'restituita')
+    h = '<b>🔐 Cauzione restituita:</b> ' + esc(sats) + ' sono tornati nel tuo wallet.';
+  else if (c.stato === 'bloccata')
+    h = '<b>🔐 Cauzione bloccata:</b> ' + esc(sats) + ', in sospeso nel tuo wallet. Torna a fine scambio.';
+  else if (o.stato === 'attesa_mia_cauzione')
+    h = '<b>🔐 Cauzione da bloccare:</b> ' + esc(sats) + '. Torna a fine scambio: la perdi solo se un moderatore decide che non ti sei presentato.';
+  else return '';
+  return '<div class="p2p-box cauzione-box">' + h + '</div>';
+}
+/* LA META' CHE MI SPETTA (chi VINCE una cauzione bruciata): il
+   coordinatore la chiede con `add-bond-invoice` e aspetta una fattura
+   di quell'importo esatto, per quindici giorni; poi se la tiene tutta */
+function riquadroIncassoCauzioneP2P(o){
+  const i = o && o.incasso;
+  if (!i || !(i.sats > 0)) return '';
+  const quanto = fmt(i.sats) + ' sats';
+  if (i.stato === 'pagata')
+    return '<div class="p2p-box cauzione-box"><b>⚖️ Cauzione incassata:</b> ' + esc(quanto) + ' sono arrivati nel tuo wallet.</div>';
+  if (i.stato === 'accettata')
+    return '<div class="p2p-box cauzione-box"><b>⚖️ Fattura ricevuta:</b> il pagamento di ' + esc(quanto) + ' è in corso.</div>';
+  const entro = i.scade > 0 ? ' Dai una fattura <b>entro il ' + esc(dataBreveP2P(i.scade)) + '</b>: dopo, il servizio se la tiene.' : '';
+  return '<div class="p2p-box cauzione-box"><b>⚖️ Metà della cauzione dell\'altra persona è tua:</b> ' + esc(quanto) + '.' + entro
+    + (o.soloVista ? '' : '<div class="contanti-gesti"><button type="button" class="btn orange" onclick="apriIncassoCauzioneP2P()">⚡ Incassa ' + esc(quanto) + '</button></div>')
+    + '</div>';
+}
+/* la voce in «Info P2P», coi numeri vivi del 38385 e della leva */
+function testoCauzioneInfoP2P(info, leva){
+  const c = cauzioneInfoP2P(info);
+  if (!leva || !c.accesa)
+    return '<b>La cauzione di chi prende:</b> in questo momento non c\'è: chi prende un ordine in contanti non blocca niente prima dell\'incontro.';
+  const chi = c.applyTo === 'both' ? 'chi prende e chi pubblica' : c.applyTo === 'make' ? 'chi pubblica' : 'chi prende';
+  const dove = c.metodi.length ? ' negli scambi con ' + esc(c.metodi.map(m => '«' + m.charAt(0).toUpperCase() + m.slice(1) + '»').join(', ')) : ' in ogni scambio';
+  return '<b>La cauzione di chi prende:</b>' + dove + ' ' + chi + ' blocca una piccola cauzione'
+    + (c.pct > 0 ? ' — il <b>' + esc(String(Math.round(c.pct * 1000) / 10).replace('.', ',')) + '%</b> dei sats'
+        + (c.base > 0 ? ', almeno ' + fmt(c.base) + ' sats' : '') + ' —' : '')
+    + ' che resta nel suo wallet e torna a fine scambio. La perde solo se un moderatore decide che non si è presentato all\'incontro'
+    + (c.timeoutBrucia ? ', o se lascia scadere il tempo di un passo' : '')
+    + (c.quotaNodo > 0 && c.quotaNodo < 1 ? ': allora ' + esc(String(Math.round((1 - c.quotaNodo) * 100))) + '% va all\'altra persona e il resto al servizio' : '')
+    + (c.giorniIncasso > 0 ? ' (chi la riceve ha ' + c.giorniIncasso + ' giorni per incassarla dall\'app)' : '')
+    + '.';
+}
+
+
 const P2P_TOAST_HOLD = '⚡ Tocca a te: blocca i sats in garanzia';
+const P2P_TOAST_CAUZIONE = '🔐 Tocca a te: blocca la cauzione';
 const P2P_TOAST_FATTURA_NUOVA = '⚠️ Il pagamento dei tuoi sats non è riuscito: serve una fattura nuova';
 const P2P_TOAST_GIRO_MORTO = {
   pubblicato: 'Il giro si è chiuso senza garanzia: l\'ordine è tornato nel libro',
   annullato: 'Scambio annullato prima della garanzia: nessun sat si è mosso'
 };
+const P2P_TOAST_CAUZIONE_MORTA = 'Chiuso prima che la cauzione fosse bloccata: nessun sat si è mosso';
 
 /* PURA: l'UNICO bottone pieno della pagina. Chi compra consegna dove
    ricevere i sats e poi dice «ho inviato gli euro»; chi vende blocca
@@ -50278,6 +50610,9 @@ function azioniDisponibili(o){
      chiavi stanno su un altro dispositivo, e un bottone che non puo'
      firmare niente e' peggio di nessun bottone */
   if (o.soloVista) return '';
+  /* la cauzione di chi prende (1 ott 2026): finche' la richiesta e'
+     viva; scaduta, il gesto e' riprendere l'ordine (un bottone secondario) */
+  if (o.stato === 'attesa_mia_cauzione') return cauzioneVivaP2P(o) ? 'cauzione' : '';
   if (o.lato === 'compro' && o.stato === 'attesa_mia_fattura') return 'fattura';
   /* il pagamento dei sats e' fallito: l'unico gesto e' la fattura nuova */
   if (o.lato === 'compro' && o.stato === 'fattura_nuova')      return 'fattura-nuova';
@@ -50448,6 +50783,10 @@ const P2P_PROGRESSO = {
   prendo: 0, senza_risposta: 0, rifiutato: 0, pubblico: 0, pubblicato: 0,
   attesa_mia_fattura: 1, attesa_hold_venditore: 1,
   attesa_fattura_compratore: 1, attesa_mia_hold: 1,
+  /* la cauzione viene PRIMA del primo passo: il primo passo e' «Ordine
+     preso», e con la cauzione da bloccare l'ordine non e' ancora
+     preso davvero — resta nel libro (1 ott 2026) */
+  attesa_mia_cauzione: 0,
   attivo: 2,
   /* il pagamento che fallisce viene DOPO il rilascio: stessa tacca */
   euro_inviati: 3, rilasciato: 3, pagamento_ritentato: 3, fattura_nuova: 3,
@@ -50494,6 +50833,11 @@ const STATI_P2P = {
   attesa_hold_venditore: {t: 'Chi vende sta bloccando i sats', d: 'Appena sono al sicuro in garanzia te lo diciamo: da lì potrai inviare gli euro.'},
   attesa_fattura_compratore: {t: 'Chi compra sta indicando dove ricevere', d: 'Appena lo fa ti chiederemo di bloccare i sats.'},
   attesa_mia_hold: {t: 'Blocca i sats', d: 'Paga la richiesta: i sats restano bloccati in garanzia e non escono finché non li liberi tu.'},
+  /* LA CAUZIONE DI CHI PRENDE (1 ott 2026): la richiesta scaduta ha
+     un'altra frase, la sceglie statoTestoP2P */
+  attesa_mia_cauzione: {t: 'Blocca la cauzione', d: 'Paga la richiesta: è una piccola cauzione che resta in sospeso nel tuo wallet e torna a fine scambio. Finché non è bloccata l\'ordine resta nel libro, e qualcun altro può prenderlo prima di te.',
+                        t_scaduta: 'La cauzione non è stata bloccata in tempo',
+                        d_scaduta: 'La richiesta è scaduta e l\'ordine è tornato nel libro: nessun sat si è mosso. Se ti interessa ancora, riprendilo.'},
   attivo: {t: 'Sats in garanzia', d_compro: 'I sats sono al sicuro in garanzia. Ora manda gli euro al recapito indicato da chi vende, poi dillo qui.',
            d_vendo: 'I tuoi sats sono bloccati. Aspetta che chi compra mandi gli euro.'},
   euro_inviati: {t: 'Euro inviati', d_compro: 'Hai detto di aver mandato gli euro: appena chi vende li vede, libera i sats.',
@@ -50556,7 +50900,7 @@ const STATI_P2P = {
    qualcosa. */
 const P2P_TINTA_STATO = {
   prendo: '', pubblico: '', pubblicato: '',
-  attesa_mia_fattura: 'locked', attesa_mia_hold: 'locked',
+  attesa_mia_fattura: 'locked', attesa_mia_hold: 'locked', attesa_mia_cauzione: 'locked',
   attivo: 'locked', pagamento_ritentato: 'locked', fattura_nuova: 'locked',
   attesa_hold_venditore: 'confirmed', attesa_fattura_compratore: 'confirmed',
   euro_inviati: 'confirmed', annullo_chiesto: 'confirmed',
@@ -50649,6 +50993,10 @@ function statoTestoP2P(o){
      2026): la frase dei sats tornati indietro non e' la sua */
   if (s.t_ritirato && typeof p2pRitirato === 'function' && p2pRitirato(o))
     return {t: s.t_ritirato, d: s.d_ritirato};
+  /* LA CAUZIONE SCADUTA (1 ott 2026): il coordinatore non lo dice, la
+     bolt11 si'. La frase cambia, lo stato resta finche' non si riprende */
+  if (o && o.stato === 'attesa_mia_cauzione' && s.t_scaduta && !cauzioneVivaP2P(o))
+    return {t: s.t_scaduta, d: s.d_scaduta};
   /* lo stato che non conosciamo: la parola del coordinatore, grezza */
   if (o && o.statoGrezzo)
     return {t: 'Stato: «' + o.statoGrezzo + '»',
@@ -50885,6 +51233,18 @@ function applicaMessaggioP2P(ord, dentro){
     if (!ord.hold && eco.hold && ord.stato === 'attesa_mia_hold') {
       ord.hold = eco.hold; preso = true;
     }
+    /* ...e la cauzione (1 ott 2026): la richiesta se manca, la
+       bruciatura e la meta' che mi spetta sempre — sono fatti, non mosse */
+    if (!ord.cauzione && eco.cauzione && ord.stato === 'attesa_mia_cauzione') {
+      ord.cauzione = eco.cauzione; preso = true;
+    }
+    if (eco.cauzione && eco.cauzione.stato === 'persa'
+        && !(ord.cauzione && ord.cauzione.stato === 'persa')) {
+      ord.cauzione = eco.cauzione; preso = true;
+    }
+    if (eco.incasso && JSON.stringify(eco.incasso) !== JSON.stringify(ord.incasso || null)) {
+      ord.incasso = eco.incasso; preso = true;
+    }
     /* ⚠️ E LA CIFRA E' UN DATO COME LA CONTROPARTE (17 set 2026, il
        foglio senza «Copia la cifra»): l'importo del mio lato lo porta
        il solo `add-invoice`, e su un dispositivo che riapre i messaggi
@@ -51000,6 +51360,40 @@ function applicaMessaggioP2P(ord, dentro){
     chiudiFoglioP2P('p2pHoldSheet');
     p2pHoldOrdine = '';
   }
+  /* ...e lo stesso foglio, con la cauzione (1 ott 2026) */
+  if (p2pHoldOrdine === nuovo.id && prima === 'attesa_mia_cauzione'
+      && nuovo.stato !== 'attesa_mia_cauzione') {
+    chiudiFoglioP2P('p2pHoldSheet');
+    p2pHoldOrdine = '';
+    if (nuovo.cauzione && nuovo.cauzione.stato === 'bloccata') {
+      haptic();
+      toast('🔐 Cauzione bloccata ✅', 5000);
+    }
+  }
+  /* TOCCA A TE: LA CAUZIONE (1 ott 2026), come la garanzia — ovunque
+     si sia, e il foglio si apre da solo se si sta guardando lo scambio */
+  if (nuovo.stato === 'attesa_mia_cauzione' && prima !== 'attesa_mia_cauzione'
+      && cauzioneVivaP2P(nuovo)) {
+    haptic();
+    toast(P2P_TOAST_CAUZIONE, 6000);
+    if (seguibileP2P(nuovo.id)) apriCauzioneP2P();
+  }
+  if (nuovo.giroMorto === 'cauzione' && prima === 'attesa_mia_cauzione')
+    toast(P2P_TOAST_CAUZIONE_MORTA, 6000);
+  /* la cauzione persa, e la meta' che mi spetta, si dicono a voce */
+  if (nuovo.cauzione && nuovo.cauzione.stato === 'persa'
+      && !(ord.cauzione && ord.cauzione.stato === 'persa')) {
+    haptic();
+    toast('🔐 La tua cauzione è stata bruciata: lo dice la pagina dello scambio', 8000);
+  }
+  if (nuovo.incasso && nuovo.incasso.stato === 'chiesta'
+      && !(ord.incasso && ord.incasso.stato === 'chiesta' && ord.incasso.sats === nuovo.incasso.sats)) {
+    haptic();
+    toast('⚖️ Metà della cauzione dell\'altra persona è tua: incassala dalla pagina dello scambio', 8000);
+  }
+  if (nuovo.incasso && nuovo.incasso.stato === 'pagata'
+      && !(ord.incasso && ord.incasso.stato === 'pagata'))
+    toast('⚖️ Cauzione incassata ✅', 6000);
   /* LA GARANZIA E' BLOCCATA, E CHI VENDE TORNA DAL WALLET (19 set 2026,
      dal giro dal vivo): la si paga FUORI dall'app, e al ritorno non
      c'era niente che dicesse com'era andata ne' cosa toccava — il
@@ -52088,6 +52482,8 @@ function renderDettaglioP2P(){
     /* la regola e il tetto del contanti, a chi sta per prendere (30 set 2026) */
     regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo] : (o.metodi || []), maxEuroContantiP2P(),
                             compro ? 'compro' : 'vendo') +
+    /* la cauzione di chi prende, PRIMA di premere (1 ott 2026) */
+    (tuo ? '' : rigaCauzioneDettP2P(o, p2pInfo, cauzioneAccesaP2P())) +
     repRiquadroP2P(p2pFacce[o.id], o.id) +
     anelloneP2P(o) +
     (tuo ? '' : avvisoPresaTabacchinoP2P(o)) +
@@ -52881,6 +53277,14 @@ function renderOrdineP2P(){
      scambio. */
   if (o.mio) passi[0] = {t: 'Ordine pubblicato',
     d: o.lato === 'compro' ? 'Aspetta chi ti vende i sats' : 'Aspetta chi ti compra i sats'};
+  /* CON LA CAUZIONE IL PRIMO PASSO LA NOMINA (1 ott 2026): l'ordine e'
+     preso davvero solo a cauzione bloccata, e il passo lo dice. Vale
+     per chi la mette (chi prende: `o.cauzione` c'e' gia', o il giudice
+     dice che arrivera'), mai per chi ha pubblicato. */
+  if (!o.mio && (o.cauzione || cauzioneServeQuiP2P(o)))
+    passi[0] = {t: 'Ordine preso', d: o.lato === 'compro'
+      ? 'Blocca la cauzione, poi di\' dove ricevere i sats'
+      : 'Blocca la cauzione, poi invia i sats'};
   /* col PayCode il terzo passo ha il suo nome (23 set 2026) */
   if (tabOrd) passi[2] = {t: 'PayCode pagato',
     d: o.lato === 'compro' ? 'Alla cassa del tabacchino, in contanti' : 'Chi compra l\'ha pagato alla cassa'};
@@ -52927,6 +53331,8 @@ function renderOrdineP2P(){
     fattura: '<button class="btn orange" onclick="apriIncassoP2P()">💸 Dove ricevere i sats</button>',
     'fattura-nuova': '<button class="btn orange" onclick="apriIncassoP2P()">⚡ Dai una fattura nuova</button>',
     hold: '<button class="btn orange" onclick="apriHoldP2P()">🔒 Blocca i sats</button>',
+    /* la cauzione di chi prende (1 ott 2026) */
+    cauzione: '<button class="btn orange" onclick="apriCauzioneP2P()">🔐 Blocca la cauzione</button>',
     'euro-inviati': tabOrd
       ? '<button class="btn orange" onclick="euroInviatiP2P()">✅ Ho pagato al tabacchino</button>'
       : '<button class="btn orange" onclick="euroInviatiP2P()">✅ Ho inviato gli euro</button>',
@@ -52976,6 +53382,10 @@ function renderOrdineP2P(){
     /* il conto veste il lato della RIGA, non del tab del libro (24
        set 2026): vedi il CSS di `.p2p-ord.lato-vendo` */
     '<div class="p2p-ord lato-' + (o.lato === 'vendo' ? 'vendo' : 'compro') + '">' + conto + '</div>' +
+    /* LA CAUZIONE, sotto il conto (1 ott 2026): la riga di chi l'ha
+       messa e, dall'altro lato, la meta' che gli spetta se e' bruciata */
+    riquadroCauzioneP2P(o) +
+    riquadroIncassoCauzioneP2P(o) +
     anelloneTabacchinoP2P(o) +
     '<div class="p2p-passi"><div class="steps">' +
       passi.map((p, i) =>
@@ -53032,6 +53442,10 @@ function renderOrdineP2P(){
       ? (o.mio
          ? '<button class="btn ghost" onclick="riprovaPubblicazioneP2P()">↻ Riprova a pubblicare</button>'
          : '<button class="btn ghost" onclick="riprovaPresaP2P()">↻ Riprova</button>') : '') +
+    /* LA CAUZIONE SCADUTA SI RIPRENDE (1 ott 2026): la stessa presa,
+       con la stessa chiave — il coordinatore fa una cauzione nuova */
+    (o.stato === 'attesa_mia_cauzione' && !o.soloVista && !cauzioneVivaP2P(o)
+      ? '<button class="btn ghost" onclick="riprovaPresaP2P()">↻ Riprendi l\'ordine</button>' : '') +
     /* la riga che spiega perche' lo scambio RESTA: senza, un ordine
        senza risposta e' una riga che non se ne va e non dice perche'.
        Dice la RAGIONE (la chiave serve a riprenderlo) e non il solo
@@ -53155,6 +53569,16 @@ function rimettiBozzaRecensioneP2P(b){
    nostro da verificare e da annullare, qui non c'e' niente da
    annullare e la conferma la manda il coordinatore, che chiude il
    foglio da solo. */
+/* IL FOGLIO E' UNO PER DUE RICHIESTE (1 ott 2026): la garanzia di chi
+   vende (`o.hold`) e la cauzione di chi prende (`o.cauzione`). Chi
+   apre dice quale (`p2pHoldModo`), e da li' titolo, frase, QR e
+   «Copia» leggono la richiesta giusta. */
+let p2pHoldModo = 'hold';
+function richiestaFoglioP2P(o){
+  if (!o) return null;
+  const r = p2pHoldModo === 'cauzione' ? o.cauzione : o.hold;
+  return r && r.bolt11 ? r : null;
+}
 async function apriHoldP2P(){
   const id = p2pOrdineAperto;
   const o = ordiniP2P()[id];
@@ -53164,16 +53588,61 @@ async function apriHoldP2P(){
   }
   haptic();
   p2pHoldOrdine = id;
+  p2pHoldModo = 'hold';
   renderHoldP2P();
   el('sheetBg').classList.add('open');
   el('p2pHoldSheet').classList.add('open');
   await disegnaQr(el('p2pHoldQr'),
                   ('lightning:' + o.hold.bolt11.trim()).toUpperCase(), 'Alphanumeric');
 }
+async function apriCauzioneP2P(){
+  const id = p2pOrdineAperto;
+  const o = ordiniP2P()[id];
+  if (!o || !o.cauzione || !o.cauzione.bolt11) {
+    toast('La richiesta della cauzione non è ancora arrivata');
+    return;
+  }
+  if (!cauzioneVivaP2P(o)) {
+    toast('La richiesta è scaduta: riprendi l\'ordine, ne arriva una nuova');
+    return;
+  }
+  haptic();
+  p2pHoldOrdine = id;
+  p2pHoldModo = 'cauzione';
+  renderHoldP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pHoldSheet').classList.add('open');
+  await disegnaQr(el('p2pHoldQr'),
+                  ('lightning:' + o.cauzione.bolt11.trim()).toUpperCase(), 'Alphanumeric');
+}
+function renderCauzioneP2P(o){
+  const box = el('p2pHoldCorpo');
+  const c = o.cauzione;
+  const quanti = c.sats > 0 ? fmt(c.sats) + ' sats' : '';
+  const adesso = Math.floor(Date.now() / 1000);
+  const resta = c.scade > 0 ? c.scade - adesso
+    : ((p2pInfo && p2pInfo.holdFinestra > 0) ? p2pInfo.holdFinestra : 300) - (adesso - (c.quando || 0));
+  const min = resta > 0 ? Math.max(1, Math.round(resta / 60)) : 0;
+  const tit = el('p2pHoldTit'); if (tit) tit.textContent = '🔐 Blocca la cauzione';
+  box.innerHTML =
+    '<div class="hint">' + (quanti ? 'Paga <b>' + esc(quanti) + '</b> dal tuo wallet: ' : 'Paga dal tuo wallet: ') +
+      'è la <b>cauzione</b> dello scambio in contanti. Resta in sospeso nel tuo wallet e <b>torna a fine scambio</b>; la perdi solo se un moderatore decide che non ti sei presentato.' +
+      (min ? ' Hai circa ' + min + (min === 1 ? ' minuto' : ' minuti') + ': scaduta, l\'ordine resta nel libro e va ripreso.' : '') + '</div>' +
+    '<div class="qr" id="p2pHoldQr"></div>' +
+    '<div class="invoice" id="p2pHoldInvoice"></div>' +
+    '<button class="btn ghost" onclick="copiaHoldP2P()">📋 Copia la richiesta</button>' +
+    '<div class="hint">Quando la cauzione è bloccata questo foglio si chiude da solo e lo scambio va avanti: non c\'è niente da confermare.</div>';
+  el('p2pHoldInvoice').textContent = c.bolt11;
+}
 function renderHoldP2P(){
   const box = el('p2pHoldCorpo');
   const o = ordiniP2P()[p2pHoldOrdine];
+  if (p2pHoldModo === 'cauzione') {
+    if (box && o && o.cauzione) renderCauzioneP2P(o);
+    return;
+  }
   if (!box || !o || !o.hold) return;
+  const tit = el('p2pHoldTit'); if (tit) tit.textContent = '🔒 Blocca i sats';
   const quanti = o.hold.sats > 0 ? fmt(o.hold.sats) + ' sats' : '';
   /* ⚠️ IL TEMPO LO DA' `expiration_seconds`, MAI
      `hold_invoice_expiration_window` (13 set 2026): la seconda non la
@@ -53196,9 +53665,90 @@ function renderHoldP2P(){
 /* la fattura si legge dall'ordine e non da un onclick: e' lunga
    duecento caratteri e non va interpolata in un attributo */
 function copiaHoldP2P(){
-  const o = ordiniP2P()[p2pHoldOrdine];
-  if (!o || !o.hold) return;
-  copiaLink(o.hold.bolt11, 'Richiesta di pagamento copiata 📋');
+  const r = richiestaFoglioP2P(ordiniP2P()[p2pHoldOrdine]);
+  if (!r) return;
+  copiaLink(r.bolt11, 'Richiesta di pagamento copiata 📋');
+}
+/* ---- INCASSARE LA META' DELLA CAUZIONE (1 ott 2026) ----
+   Col wallet collegato la fattura la fa lui (la stessa strada di
+   `fatturaDalWalletP2P`: importo esatto, guardia sulla cifra); se no si
+   incolla. Al coordinatore parte `add-bond-invoice` con la terna di
+   sempre, e lui risponde `bond-invoice-accepted` — poi, a pagamento
+   riuscito, `bond-payout-completed`. */
+let p2pCauzioneIncasso = '';
+function apriIncassoCauzioneP2P(){
+  const id = p2pOrdineAperto;
+  const o = ordiniP2P()[id];
+  if (!o || !o.incasso || !(o.incasso.sats > 0)) return;
+  haptic();
+  p2pCauzioneIncasso = id;
+  const box = el('p2pCauzioneCorpo');
+  const quanto = fmt(o.incasso.sats) + ' sats';
+  box.innerHTML =
+    '<div class="hint">Ti spettano <b>' + esc(quanto) + '</b> della cauzione bruciata all\'altra persona. '
+    + 'Serve una fattura Lightning di <b>quell\'importo esatto</b>'
+    + (o.incasso.scade > 0 ? ', entro il <b>' + esc(dataBreveP2P(o.incasso.scade)) + '</b>' : '') + '.</div>'
+    + '<div class="hint" id="p2pCauzioneAvviso" style="display:none"></div>'
+    + '<textarea id="p2pCauzioneInp" rows="3" placeholder="Incolla qui la fattura (lnbc…)"></textarea>'
+    + '<button class="btn orange" onclick="inviaFatturaCauzioneP2P()">⚡ Invia la fattura</button>';
+  el('sheetBg').classList.add('open');
+  el('p2pCauzioneSheet').classList.add('open');
+  if (walletNwcFattura()) fatturaCauzioneDalWalletP2P(id);
+}
+async function fatturaCauzioneDalWalletP2P(id){
+  const o = ordiniP2P()[id];
+  const w = walletNwcFattura();
+  const av = el('p2pCauzioneAvviso');
+  const dillo = m => { if (av) { av.textContent = m; av.style.display = ''; } };
+  if (!o || !w || !o.incasso) return false;
+  const deve = o.incasso.sats;
+  dillo('⚡ Chiedo la fattura al wallet…');
+  let cliente = null;
+  try {
+    const scaduto = new Promise((ok, no) => setTimeout(() => no(new Error('il wallet non risponde')), P2P_NWC_ATTESA_MS));
+    const lavoro = (async () => {
+      cliente = await clientNwc(w);
+      return cliente.fattura(deve, 'Barattolo P2P cauzione ' + String(o.id).slice(0, 8), 7 * 86400, P2P_NWC_ATTESA_MS);
+    })();
+    const r = await Promise.race([lavoro, scaduto]);
+    const bolt = String((r && r.invoice) || '').trim();
+    const b = leggiBolt11(bolt);
+    if (!b) throw new Error('ha risposto con una fattura che non si legge');
+    if (b.sats !== deve) throw new Error('ha fatto una fattura di ' + fmt(b.sats) + ' sats invece di ' + fmt(deve));
+    if (p2pCauzioneIncasso !== id) return false;
+    await chiamataOrdineP2P(o, 'add-bond-invoice', {payment_request: [null, bolt, null]});
+    chiudiFoglioP2P('p2pCauzioneSheet');
+    p2pCauzioneIncasso = '';
+    toast('⚡ Fattura fatta dal wallet e inviata ✅');
+    return true;
+  } catch(e){
+    dillo('Il wallet non ha dato la fattura (' + ((e && e.message) || 'errore') + '). Puoi incollarne una qui.');
+    return false;
+  } finally { if (cliente) cliente.chiudi(); }
+}
+async function inviaFatturaCauzioneP2P(){
+  const id = p2pCauzioneIncasso;
+  const o = ordiniP2P()[id];
+  const inp = el('p2pCauzioneInp');
+  if (!o || !o.incasso || !inp) return;
+  const bolt = String(inp.value || '').trim();
+  const b = leggiBolt11(bolt);
+  if (!b) { toast('Questa non sembra una fattura Lightning'); return; }
+  if (b.sats !== o.incasso.sats) {
+    toast('La fattura deve essere di ' + fmt(o.incasso.sats) + ' sats esatti: questa è di ' + fmt(b.sats));
+    return;
+  }
+  haptic();
+  const rip = attesaP2P('Mando la fattura…');
+  try {
+    await chiamataOrdineP2P(o, 'add-bond-invoice', {payment_request: [null, bolt, null]});
+    chiudiFoglioP2P('p2pCauzioneSheet');
+    p2pCauzioneIncasso = '';
+    toast('⚡ Fattura inviata ✅');
+  } catch(e) {
+    toast('Non è riuscito: ' + ragioneGestoP2P(e), 8000);
+  } finally { rip(); }
+  if (p2pOrdineAperto === id) renderOrdineP2P();
 }
 
 /* ---- il foglio di dove ricevere i sats ---- */
@@ -58970,6 +59520,17 @@ async function statoPubblicoOrdini(ids){
    disputa e i finali stanno in cima, cosi' vincono su tutto tranne che
    su un finale gia' scritto. PURA: torna la riga nuova, o null. */
 const P2P_DA_RESTORE = {
+  /* I DUE STATI DELLA CAUZIONE (1 ott 2026, mostrod 0.19.0): la restore
+     li dice a chi ha PUBBLICATO — un ordine con qualcuno che sta
+     pagando la cauzione (`waiting-taker-bond`) e' ancora nel libro, e
+     uno la cui cauzione del maker non e' pagata (`waiting-maker-bond`,
+     che sul nostro nodo non si produce: `apply_to = take`) nel libro
+     non c'e' ancora. Per chi guarda sono «pubblicato», che e' passo 0:
+     non muove niente, ma non finisce in `statoGrezzo`. A chi PRENDE la
+     restore non li dice mai: i suoi campi vivono sulla riga della
+     cauzione, non sull'ordine. */
+  'waiting-taker-bond': 'pubblicato',
+  'waiting-maker-bond': 'pubblicato',
   'waiting-buyer-invoice': {compro: 'attesa_mia_fattura', vendo: 'attesa_fattura_compratore'},
   'waiting-payment': {compro: 'attesa_hold_venditore', vendo: 'attesa_mia_hold'},
   'active': 'attivo',
@@ -58988,7 +59549,7 @@ const P2P_RESTORE_FERMI = ['pending', 'in-progress'];
 const P2P_RIPRESA_PASSO = {
   prendo: 0, pubblico: 0, pubblicato: 0, senza_risposta: 0,
   attesa_mia_fattura: 1, attesa_hold_venditore: 1,
-  attesa_fattura_compratore: 1, attesa_mia_hold: 1,
+  attesa_fattura_compratore: 1, attesa_mia_hold: 1, attesa_mia_cauzione: 0,
   attivo: 2, annullo_chiesto: 2, annullo_proposto: 2,
   /* ⚠️ I TRE DEL DOPO-RILASCIO STANNO ALLA PARI (17 set 2026): la
      restore dice `settled-hold-invoice` in tutt'e tre i casi — in
@@ -59020,7 +59581,8 @@ function riprendiDaRestoreP2P(o, statoMostro){
   else if (nuovo !== 'in_disputa') delete r.annulloDisputa;
   delete r.giroMorto;
   delete r.statoGrezzo;
-  return r;
+  /* la cauzione bloccata torna con la fine dello scambio (1 ott 2026) */
+  return cauzioneAFineP2P(r);
 }
 
 /* ═══ IL MIO ORDINE SI FIRMA CON LA CHIAVE DI CHI L'HA PUBBLICATO ════
@@ -61277,7 +61839,7 @@ let p2pMod = null;               // l'elenco del server
 let p2pModQuando = 0;
 let p2pModInVolo = null;
 let p2pModAperta = '';           // la disputa aperta nella pagina
-let p2pModBozze = {};            // ordine -> {motivo, compra, vende}
+let p2pModBozze = {};            // ordine -> {motivo, compra, vende, cauzione}
 let p2pModSub = null, p2pModSubFirma = '';
 
 function moderatoreP2P(){
@@ -61551,6 +62113,40 @@ async function eseguiPresaDisputaP2P(ordine){
   renderModerazioneP2P();
 }
 
+/* ---- LA CAUZIONE NELLA DECISIONE (1 ott 2026, cantiere B) ----
+   Negli scambi in contanti chi ha PRESO l'ordine ha bloccato una
+   cauzione (`apply_to = take` sul nodo), e il moderatore decide se
+   bruciargliela — «non si e' presentato all'incontro» — con la
+   direttiva `bond_resolution` dentro `admin-settle` o `admin-cancel`,
+   letta sui byte di mostrod 0.19.0 (docs/ANTI_ABUSE_BOND.md, §7):
+   indipendente da dove vanno i sats, e se si chiede di bruciare un lato
+   che una cauzione non ce l'ha il coordinatore rifiuta TUTTA la
+   decisione con `invalid-payload`. Chi l'ha messa lo dice il server
+   (`cauzione_di`, da chi ha preso secondo mostrod); la spunta e' spenta
+   di serie, perche' la regola scritta in «Info P2P» brucia solo con la
+   prova d'incontro mancata, e quella la guarda il moderatore. */
+function cauzioneModSceltaP2P(ordine){
+  const v = String((p2pModBozze[ordine] || {}).cauzione || '');
+  return (v === 'compratore' || v === 'venditore') ? v : '';
+}
+function cauzioneModP2P(d, bozze){
+  const lato = {compra: 'compratore', vende: 'venditore'}[d && d.cauzione_di] || '';
+  if (!lato || !contantiAManoP2P(String(d.metodi || '').split(','))) return '';
+  const chi = lato === 'compratore' ? 'chi compra' : 'chi vende';
+  const altro = lato === 'compratore' ? 'chi vende' : 'chi compra';
+  const spunta = (bozze || {}).cauzione === lato;
+  return '<label class="contanti-gps"><input type="checkbox" data-o="' + esc(d.ordine) + '" data-c="' + lato + '"'
+    + (spunta ? ' checked' : '')
+    + ' onchange="bozzaModP2P(this.dataset.o, \'cauzione\', this.checked ? this.dataset.c : \'\')">'
+    + '<span>🔐 <b>Brucia la cauzione di ' + chi + '</b>: metà va a ' + altro + ', metà al servizio. '
+    + 'Solo se non si è presentato all\'incontro (nessuna prova «Siamo insieme»): se no resta a chi l\'ha messa.</span></label>';
+}
+function cauzioneFraseModP2P(ordine){
+  const c = cauzioneModSceltaP2P(ordine);
+  if (!c) return '';
+  return '\n\nLa cauzione di ' + (c === 'compratore' ? 'chi compra' : 'chi vende')
+    + ' viene bruciata: metà all\'altra persona, metà al servizio.';
+}
 /* ---- i due gesti finali ---- */
 const MOD_ESITI_P2P = {
   compratore: {azione: 'admin-settle', attese: ['admin-settled'],
@@ -61577,7 +62173,7 @@ function decidiDisputaP2P(ordine, esito){
   chiediConferma({
     titolo: e.frase + '?',
     corpo: quanto + (esito === 'compratore' ? ' vanno a chi compra: ' : ' tornano a chi vende: ')
-      + chi + '.\n\nUna volta decisa, la disputa non si riapre.',
+      + chi + '.' + cauzioneFraseModP2P(ordine) + '\n\nUna volta decisa, la disputa non si riapre.',
     etichetta: 'Sì, continua',
     /* LA SECONDA SI APRE UN GIRO DOPO (dal giro dal vivo): il foglio e'
        uno, e `eseguiConferma` rimette il bottone com'era DOPO aver
@@ -61597,21 +62193,33 @@ async function eseguiDecisioneP2P(ordine, esito){
   const k = chiaveModeratoreP2P();
   if (!e || !k) return;
   const motivo = motivoModP2P(ordine);
+  /* la cauzione: a registro col resto, e al coordinatore come
+     `bond_resolution` — solo quando si brucia; senza, il payload resta
+     `null` come ieri, che per mostrod vuol dire «nessuna cauzione tocca» */
+  const cauzione = cauzioneModSceltaP2P(ordine);
   const rip = attesaP2P('Scrivo la decisione…');
   let scritta = false;
   try {
     /* PRIMA IL REGISTRO, POI LA FIRMA: e' l'ordine che non si inverte */
     await modFetch('moderazione/decisione',
-      {ordine: ordine, esito: esito, motivo: motivo, conferma: true, chiave: k.pub});
+      {ordine: ordine, esito: esito, motivo: motivo, conferma: true, chiave: k.pub,
+       cauzione: cauzione});
     scritta = true;
     const t = el('attesaTesto'); if (t) t.textContent = 'Lo dico al coordinatore…';
     await moderatoreChiama(
-      messaggioMostro(e.azione, {requestId: nuovaRichiestaP2P(), indice: null, id: ordine}),
+      messaggioMostro(e.azione, {requestId: nuovaRichiestaP2P(), indice: null, id: ordine,
+        payload: cauzione ? {bond_resolution: {slash_seller: cauzione === 'venditore',
+                                               slash_buyer: cauzione === 'compratore'}} : null}),
       e.attese);
     delete p2pModBozze[ordine];
     toast(e.fatto, 6000);
   } catch(err) {
-    const perche = String(err && err.message || err);
+    /* «invalid-payload» con la cauzione spuntata: su quel lato non c'e'
+       una cauzione da bruciare, e il coordinatore non ha deciso NIENTE
+       — si toglie la spunta e si ridecide (una seconda riga a registro) */
+    const perche = (cauzione && err && err.cantDo && err.motivo === 'invalid-payload')
+      ? 'su quel lato non c\'è una cauzione da bruciare: togli la spunta e ridecidi'
+      : String(err && err.message || err);
     if (scritta) modFetch('moderazione/esito',
       {ordine: ordine, esito: esito, motivo: perche}).catch(() => {});
     toast((scritta && err && err.silenzio)
@@ -61813,6 +62421,9 @@ function cardDisputaModP2P(d, ho){
   }
   h += '<div class="mod-decidi"><b>La decisione</b>'
     + '<div class="hint">Scrivi il motivo: resta nel registro col tuo nome, e lo leggono gli altri moderatori.</div>'
+    /* LA TERZA DOMANDA, sugli scambi in contanti con una cauzione (1
+       ott 2026): bruciarla o no, indipendente da dove vanno i sats */
+    + cauzioneModP2P(d, bozze)
     + '<textarea id="p2pModMotivo" rows="3" maxlength="1000" placeholder="Perché decidi così (almeno '
     + MOD_MOTIVO_MIN + ' caratteri)" data-o="' + esc(d.ordine) + '" '
     + 'oninput="bozzaModP2P(this.dataset.o, \'motivo\', this.value)">' + esc(bozze.motivo || '') + '</textarea>'

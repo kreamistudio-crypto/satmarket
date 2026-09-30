@@ -2476,7 +2476,13 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `cp ~/nodo/mostro/mostro.db ~/nodo/mostro/mostro.db.prima-bar6`
   (il percorso è quello che il compose monta sotto `/config`:
   `docker inspect nodo-mostro-1 | grep -A3 Binds`).
-  1) SUL PC, i dieci file al nodo, in una cartella NUOVA e FUORI da
+  ⚠️ DAL 1 OTT 2026 LE PATCH SONO OTTO (la 0008: la cauzione di chi
+  prende, solo per «Contanti» — CANTIERI, «La cauzione di chi prende»):
+  `patch-000*.py` la porta gia', la stringa a secco e il commit stanno
+  sotto la 0007, e nello STESSO riavvio si accende la cauzione nel
+  `settings.toml` (punto 7-bis). Le righe che dicono «sette» valgono
+  per le sette di prima.
+  1) SUL PC, gli undici file al nodo, in una cartella NUOVA e FUORI da
   `mostro-src` (`ssh UTENTE@NODO mkdir -p nodo/patch-bar6` prima):
   `scp deploy/mostro/patch-000*.py deploy/mostro/barattolo_fee.rs deploy/mostro/barattolo_eventi.rs UTENTE@NODO:nodo/patch-bar6/`
   Poi sul nodo `sha256sum ~/nodo/patch-bar6/barattolo_eventi.rs ~/nodo/patch-bar6/barattolo_fee.rs`
@@ -2490,8 +2496,11 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   «3 sostituzioni in src/app/dev_fee.rs», «4 sostituzioni in 3 file»,
   «7 agganci in 6 file», «a secco: l'ancora c'e', UNA volta», «25 agganci
   in 13 file, tutte le ancore uniche, 13 azioni note» — le STESSE
-  stringhe della `-bar5`, verificate sul PC il 30 set. Un FERMO
-  qualunque si incolla a Claude e non si tocca niente a mano.
+  stringhe della `-bar5`, verificate sul PC il 30 set — e poi, per la
+  0008, «A SECCO: 19 agganci in 10 file, tutte le ancore al loro conto,
+  14 azioni note, i due moduli di test in coda» (verificata sul PC il
+  1 ott). Un FERMO qualunque si incolla a Claude e non si tocca niente
+  a mano.
   `python3 ~/nodo/patch-bar6/patch-0001-lnurl-tor-freddo.py --secco`
   `python3 ~/nodo/patch-bar6/patch-0001-lnurl-tor-freddo.py && git add -A && git commit -m "lnurl: raise HTTP timeouts so Tor-routed coordinators can resolve LNURL"`
   `python3 ~/nodo/patch-bar6/patch-0002-dev-fee-zero.py --secco`
@@ -2506,15 +2515,21 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `python3 ~/nodo/patch-bar6/patch-0006-perche-e-fallito.py && git add -A && git commit -m "release: log why a payout has failed"`
   `python3 ~/nodo/patch-bar6/patch-0007-eventi-al-server.py --secco`
   `python3 ~/nodo/patch-bar6/patch-0007-eventi-al-server.py && git add -A && git commit -m "events: tell the marketplace server about every order transition"`
-  Alla fine `git log --oneline v0.19.0..HEAD` deve dire SETTE righe, la
-  0001 in fondo. (Strada equivalente: `git am ~/nodo/patch-bar6/000[1-7]-*.patch`
-  con le sette `.patch` del repo copiate: stesso albero, verificato sul
-  PC il 30 set.)
+  `python3 ~/nodo/patch-bar6/patch-0008-cauzione-solo-contanti.py --secco`
+  `python3 ~/nodo/patch-bar6/patch-0008-cauzione-solo-contanti.py && git add -A && git commit -m "bond: apply the anti-abuse bond only to the payment methods the policy names"`
+  Alla fine `git log --oneline v0.19.0..HEAD` deve dire OTTO righe, la
+  0001 in fondo. (Strada equivalente: `git am ~/nodo/patch-bar6/000[1-8]-*.patch`
+  con le otto `.patch` del repo copiate: stesso albero, verificato sul
+  PC il 30 set per le sette e il 1 ott per l'ottava.)
   4) I TEST PRIMA DELLA BUILD VERA, il primo `cargo` di questo fork
   sulla 0.19.0 (il filtro della `-bar5` più `publish` e `spam_gate`,
   i due moduli che la 0.19.0 tocca di più):
   `docker build -f docker/Dockerfile --target builder -t mostro-test:bar6 .`
-  `docker run --rm mostro-test:bar6 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle publish spam_gate`
+  `docker run --rm mostro-test:bar6 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle publish spam_gate barattolo_bond toml_only_payment_methods`
+  (gli ultimi due sono i test della 0008: `barattolo_bond_methods` in
+  `flow.rs`, `barattolo_bond_methods_tag` in `nip33.rs` e il toml in
+  `config::types`; devono comparire fra i verdi, o la patch non e'
+  entrata dove credeva).
   Si guardano `pre_claim_failures_by_class` fra i verdi di
   `barattolo_eventi`, e di upstream `release_action_closes_dispute` (o
   come si chiama il test che ora aspetta `Released`) in `app::release`,
@@ -2525,7 +2540,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   e si riparte dal tag (`git reset --hard v0.19.0`). Niente ritocchi a
   mano sul nodo.
   5) VERDI: `git format-patch v0.19.0..HEAD -o ~/nodo/patch-bar6/export`
-  e le sette tornano sul PC con `scp`, in `deploy/mostro/`, coi nomi di
+  e le otto tornano sul PC con `scp`, in `deploy/mostro/`, coi nomi di
   sempre: `diff` contro quelle nel repo deve dire solo l'`index`, il
   `From` e la `Date` (i blob, gli hash e l'ora del commit), MAI una riga
   di codice — se ne dice una, il nodo ha un sorgente diverso dal repo e
@@ -2535,8 +2550,42 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   7) IL COMPOSE (`cd ~/nodo`, copia prima: `cp docker-compose.yml
   docker-compose.yml.prima-bar6`): la SOLA riga dell'immagine a
   `mostro:v0.19.0-bar6`. Le cinque variabili d'ambiente (tre della 0005,
-  due della 0007) restano com'erano; `settings.toml` NON si tocca (una
-  riga `transport = "nip44"`, se c'è, la 0.19.0 la accetta).
+  due della 0007) restano com'erano (una riga `transport = "nip44"` nel
+  `settings.toml`, se c'è, la 0.19.0 la accetta).
+  7-bis) LA CAUZIONE, NELLO STESSO RIAVVIO (1 ott 2026, decisione di
+  Andrea: tarature 3%, pavimento 1.000 sats, `take`, timeout spento,
+  finestra a 900, solo «Contanti»). PRIMA la copia:
+  `cp ~/nodo/mostro/settings.toml ~/nodo/mostro/settings.toml.prima-bar6`
+  Poi si guarda com'è, in sola lettura:
+  `grep -n "anti_abuse_bond\|hold_invoice_expiration_window\|^enabled\|^apply_to\|^amount_pct\|^base_amount_sats\|only_payment_methods" ~/nodo/mostro/settings.toml`
+  — `[anti_abuse_bond]` deve essere COMMENTATA (o assente) e
+  `hold_invoice_expiration_window = 300`. Due modifiche con `nano
+  ~/nodo/mostro/settings.toml`: a) in `[lightning]`, la riga
+  `hold_invoice_expiration_window = 300` diventa
+  `hold_invoice_expiration_window = 900` — nella 0.19.0 quel numero è
+  SOLO la scadenza della richiesta di cauzione di chi prende
+  (`taker_bond_invoice_expiry`, #999, e nient'altro in tutto il daemon:
+  verificato sui byte), e 5 minuti per pagare una hold con un wallet
+  esterno sono pochi; b) in FONDO al file, un blocco NUOVO (non si
+  scommenta il template: si scrive quel che serve), ⚠️ dopo l'ultima
+  sezione e prima di un eventuale `[cashu]` commentato non conta:
+  ```
+  [anti_abuse_bond]
+  enabled = true
+  amount_pct = 0.03
+  base_amount_sats = 1000
+  apply_to = "take"
+  slash_on_waiting_timeout = false
+  only_payment_methods = ["Contanti"]
+  ```
+  (`slash_node_share_pct` 0.5, `payout_claim_window_days` 15 e
+  `maker_bond_payment_timeout_seconds` 900 restano ai default del
+  template; `only_payment_methods` è il campo della 0008 — sulla
+  `-bar5` NON esiste, ed è la ragione per cui il rollback lo toglie.)
+  Poi si rilegge: `grep -n -A7 "^\[anti_abuse_bond\]" ~/nodo/mostro/settings.toml`
+  e `grep -n "hold_invoice_expiration_window" ~/nodo/mostro/settings.toml`
+  → il blocco di sette righe e `= 900`. ⚠️ Il blocco vale dall'`up -d`
+  del punto 8: fino ad allora gira ancora la `-bar5` senza cauzione.
   8) IL LIBRO FERMO, di nuovo (la query della fase 1, punto d): se è
   fermo, `docker compose up -d mostro` (`up -d`, non `restart`). Poi:
   `docker inspect --format '{{.Config.Image}}' nodo-mostro-1` dice
@@ -2545,12 +2594,36 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   NESSUNA riga di migrazione, `barattolo_eventi: order events go to …`
   e `barattolo_fee` col suo battito; il 38385 nuovo dice
   `mostro_version 0.19.0` e `protocol_version 2` («Info P2P» del
-  client, o dai relay). Nel journal, per una settimana, nessun
+  client, o dai relay) — E LA CAUZIONE: `bond_enabled true`,
+  `bond_apply_to take`, `bond_amount_pct 0.03`, `bond_base_amount_sats
+  1000`, `bond_slash_on_waiting_timeout false`,
+  `bond_only_payment_methods Contanti`, `hold_invoice_expiration_window
+  900` («Info P2P» del client, che dal 1 ott dice la voce «La cauzione
+  di chi prende» a leva accesa; o i tag del 38385 letti dai relay).
+  8-bis) LA LEVA DEL CLIENT, SUL VPS, solo DOPO che il 38385 dice
+  `bond_enabled true`: `nano ~/satmarket/config.py`, la riga
+  `P2P_CAUZIONE = True` (solo `True` accende), poi `sudo systemctl
+  restart barattolo` e il pannello «⚙️ Stato delle leve» → «Cauzione nel
+  contanti di persona: acceso». Il client crede solo a tutt'e due: la
+  leva E il 38385. Accesa prima del nodo, promette una cifra che il nodo
+  non chiede; il nodo acceso senza la leva chiede la cauzione lo stesso
+  e il client la gestisce, senza dirla prima. Nel journal, per una settimana, nessun
   `no Mostro transport for event kind`: sarebbe un client v1 che bussa
   (non un guasto nostro, ma lo si sa).
   9) IL ROLLBACK, se serve: UNA riga — nel compose l'immagine a
   `mostro:v0.18.8-bar5` e `docker compose up -d mostro`; niente
-  migrazioni da disfare. PRIMA, in sola lettura, il residuo:
+  migrazioni da disfare. ⚠️ PIU' IL `settings.toml`, dal 1 ott 2026: la
+  `-bar5` non conosce `only_payment_methods`, e con `enabled = true`
+  chiederebbe la cauzione su OGNI metodo — quindi PRIMA dell'`up -d`
+  si rimette la copia (`cp ~/nodo/mostro/settings.toml.prima-bar6
+  ~/nodo/mostro/settings.toml`), oppure a mano `enabled = false` nel
+  blocco. Le cauzioni gia' bloccate tornano da sole al loro ciclo (LND
+  le cancella alla scadenza, o mostrod al primo giro utile); una
+  bruciata in attesa di incasso (`pending-payout`) la paga la `-bar5`
+  lo stesso, che il payout ce l'ha dalla 0.18.x. Sul VPS `P2P_CAUZIONE
+  = False` e riavvio, o il client promette una cauzione che non c'è.
+  ⚠️ `hold_invoice_expiration_window = 900` sulla `-bar5` non fa
+  niente (configurazione morta), si puo' lasciare. PRIMA, in sola lettura, il residuo:
   `sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); print(c.execute(\"SELECT id, status FROM disputes WHERE status='cooperatively-canceled'\").fetchall())"`
   `[]` = rollback secco. Righe = dispute FINALI chiuse dalle parti
   sulla 0.19.0, con uno stato che mostro-core 0.14.6 non sa leggere:
@@ -2568,3 +2641,22 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   ripreso su un dispositivo pulito che trova la controparte dal
   coordinatore (`chiave_peer` assente dal server, `peer` che arriva
   dalla restore: la riga del diario «ripresa» lo dice).
+  E LA CAUZIONE, con `P2P_PROVA_IDS` chiusa ai due telefoni (1 ott
+  2026): a) un ordine Revolut preso NON riceve `pay-bond-invoice` e va
+  come oggi; b) un ordine «Contanti» pubblicato da A e preso da B: su B
+  «🔐 Blocca la cauzione» col foglio aperto da solo (≈3% dei sats,
+  almeno 1.000), sul libro l'ordine resta `pending` finché B non paga;
+  B paga → il foglio si chiude, «Cauzione bloccata», e a A arriva la
+  richiesta della garanzia (o il recapito, secondo il verso); poi lo
+  scambio di sempre, e al «concluso» su B «Cauzione restituita» (il
+  wallet di B la vede tornare); c) una richiesta LASCIATA SCADERE
+  apposta (15 minuti): l'ordine è ancora nel libro, su B la frase «La
+  cauzione non è stata bloccata in tempo» col «Riprendi l'ordine», e
+  `lncli lookupinvoice <hash>` dice CANCELED; d) una disputa chiusa dal
+  moderatore con la spunta «Brucia la cauzione di chi compra»: su B
+  «Cauzione persa», su A la riga della metà con «Incassa», il Telegram a
+  tutt'e due (`bond-slashed` nel journal del VPS), A dà la fattura →
+  «Fattura ricevuta» → «Cauzione incassata»; e la stessa spunta su un
+  lato SENZA cauzione deve tornare «su quel lato non c'è una cauzione da
+  bruciare». Nel database del nodo, in sola lettura, `SELECT role, state,
+  amount_sats, slashed_reason FROM bonds` racconta le stesse cose.
