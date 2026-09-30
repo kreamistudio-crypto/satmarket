@@ -382,8 +382,12 @@ TEST_NIP33 = (
     "    // methods the bond applies to, and only when there are some.\n"
     "    use super::bond_policy_tags;\n"
     "    use crate::config::types::AntiAbuseBondSettings;\n"
+    # `Tag` come lo vede nip33.rs, dal prelude di nostr-sdk 0.45 (il modulo
+    # di test upstream fa lo stesso): `nostr_sdk::Tag` a quel percorso non
+    # esiste, e la build dei test della -bar6 si e' fermata qui (1 ott 2026)
+    "    use nostr_sdk::prelude::*;\n"
     "\n"
-    "    fn valore(tags: &[nostr_sdk::Tag], nome: &str) -> Option<String> {\n"
+    "    fn valore(tags: &[Tag], nome: &str) -> Option<String> {\n"
     "        tags.iter().find_map(|tag| {\n"
     "            let vec = tag.clone().to_vec();\n"
     "            if vec.first().map(String::as_str) == Some(nome) {\n"

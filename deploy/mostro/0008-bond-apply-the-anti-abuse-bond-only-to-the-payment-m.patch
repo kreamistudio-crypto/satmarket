@@ -1,6 +1,6 @@
-From 2f6634509e02621bdde218346e4759d59fd71dac Mon Sep 17 00:00:00 2001
+From 70830607d3af2de3b8dd214873a1816350c66679 Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
-Date: Wed, 30 Sep 2026 22:18:42 +0200
+Date: Thu, 1 Oct 2026 00:02:55 +0200
 Subject: [PATCH] bond: apply the anti-abuse bond only to the payment methods
  the policy names
 
@@ -13,9 +13,9 @@ Subject: [PATCH] bond: apply the anti-abuse bond only to the payment methods
  src/app/take_sell.rs    |   4 +-
  src/barattolo_eventi.rs |  46 +++++++++++++++++-
  src/config/types.rs     |  28 +++++++++++
- src/nip33.rs            |  59 +++++++++++++++++++++++
+ src/nip33.rs            |  60 +++++++++++++++++++++++
  src/util.rs             |   4 +-
- 10 files changed, 256 insertions(+), 5 deletions(-)
+ 10 files changed, 257 insertions(+), 5 deletions(-)
 
 diff --git a/settings.tpl.toml b/settings.tpl.toml
 index c5e2601..54ebea8 100644
@@ -364,7 +364,7 @@ index 09e700e..70fe9c9 100644
      fn toml_apply_to_both() {
          #[derive(serde::Deserialize)]
 diff --git a/src/nip33.rs b/src/nip33.rs
-index 58bec9e..2c69b2c 100644
+index 58bec9e..2f99fbe 100644
 --- a/src/nip33.rs
 +++ b/src/nip33.rs
 @@ -743,6 +743,14 @@ fn bond_policy_tags(
@@ -398,7 +398,7 @@ index 58bec9e..2c69b2c 100644
          };
  
          let take_tags = bond_tags(Some(&base));
-@@ -2022,3 +2032,52 @@ mod tests {
+@@ -2022,3 +2032,53 @@ mod tests {
          assert_eq!(status_p, status_w);
      }
  }
@@ -409,8 +409,9 @@ index 58bec9e..2c69b2c 100644
 +    // methods the bond applies to, and only when there are some.
 +    use super::bond_policy_tags;
 +    use crate::config::types::AntiAbuseBondSettings;
++    use nostr_sdk::prelude::*;
 +
-+    fn valore(tags: &[nostr_sdk::Tag], nome: &str) -> Option<String> {
++    fn valore(tags: &[Tag], nome: &str) -> Option<String> {
 +        tags.iter().find_map(|tag| {
 +            let vec = tag.clone().to_vec();
 +            if vec.first().map(String::as_str) == Some(nome) {
