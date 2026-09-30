@@ -110,19 +110,33 @@ def giro(c, SRV, cat):
         SRV.scrivi_impostazione(f"sponsor_fino:{slug}", str(int(quando)))
         SRV._SPONSOR = None
 
+    def bozza_di(t, s):
+        """l'avviso «in bozza» sta sulla riga sotto QUELLO spazio: nel
+        messaggio intero lo scriverebbe anche un'altra pagina in bozza
+        (Una Garlanda, dal 30 set 2026, col suo banner)"""
+        righe = t.splitlines()
+        i = next((n for n, x in enumerate(righe) if f"<b>{s}</b>" in x), -1)
+        return i >= 0 and i + 1 < len(righe) and "pagina in bozza" in righe[i + 1]
+
     print("\n[il vocabolario e lo stato]")
-    prova("il vocabolario: prima la pagina del server, poi To The Mooon",
-          (PAGINA, CASA), SRV.slug_sponsorizzabili())
+    # le pagine del server COL BANNER stanno tutte prima del catalogo di
+    # casa: quante sono lo dice il catalogo, non un elenco scritto qui
+    voc = SRV.slug_sponsorizzabili()
+    prova("il vocabolario: prima le pagine del server col banner, poi To "
+          "The Mooon", (True, CASA, []),
+          (PAGINA in voc, voc[-1],
+           [s for s in voc[:-1] if s not in SRV.RACCONTI_NEGOZI
+            or SRV.RACCONTI_NEGOZI[s].get("banner") is not True]))
     fila, _ = busta()
     prova("a spazi spenti la busta porta una fila vuota", [], fila)
     t = bot("/sponsor")
     prova("/sponsor nudo dice lo stato di tutti, nell'ordine", True,
           t.index(PAGINA) < t.index(CASA) and t.count("spento") >= 2)
     prova("...e dice che la pagina e' in bozza", True,
-          "pagina in bozza" in t)
+          bozza_di(t, PAGINA))
     prova("...e insegna i gesti nuovi: uno, tutti, l'ordine", True,
-          all(x in t for x in (f"/sponsor {PAGINA} 30",
-                               f"/sponsor {PAGINA} spento",
+          all(x in t for x in (f"/sponsor {voc[0]} 30",
+                               f"/sponsor {voc[0]} spento",
                                "/sponsor spento", "/sponsor ordine")))
     t = bot("/sponsor", chi=111)
     prova("a chi non e' admin il comando non esiste", False,
@@ -171,7 +185,7 @@ def giro(c, SRV, cat):
     t = bot("/sponsor")
     prova("/sponsor nudo li dice accesi tutt'e due, con la data", 2,
           t.count("in vetrina fino al"))
-    prova("...e la bozza non la dice piu'", False, "pagina in bozza" in t)
+    prova("...e la bozza non la dice piu'", False, bozza_di(t, PAGINA))
 
     print("\n[l'ordine]")
     t = bot(f"/sponsor ordine {CASA} {PAGINA}")
