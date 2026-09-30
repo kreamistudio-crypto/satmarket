@@ -28219,3 +28219,98 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   LA PAGINA: `view-p2pmod`, aggiunta a `VISTE_NAV_P2P` con `.add` (le
   quattro viste di tutti restano quattro), accende «I miei scambi»; la
   striscia è `#p2pModStriscia`; il rimando dal pannello è `#admModP2P`.
+
+- IL CONTANTI DI PERSONA NEL P2P (30 set 2026, perché in CANTIERI, «Il
+  contanti di persona nel P2P: tetto, regola, prova d'incontro,
+  privacy»). La voce «Contanti» di `P2P_METODI` è l'incontro a mano;
+  `P2P_CONTANTI` la nomina e `contantiAManoP2P(metodi)` la cerca per
+  PAROLA INTERA (il tabacchino ha il suo nome esatto e resta fuori);
+  `scambioInContantiP2P(o)` guarda il metodo scelto alla presa, o i
+  metodi dell'ordine quando una scelta non c'è.
+  IL TETTO. La leva `P2P_CONTANTI_MAX_EURO` (250 di serie ANCHE senza
+  la riga nel config, 0 = spenta) viaggia in busta con le leve come
+  `maxEuroContanti` (`_p2p_leve`, sette chiavi) e sta nel pannello
+  «Stato delle leve». La giudica il client, con UN giudice puro
+  (`giudiceContantiP2P(euro, metodi, tetto)` → '' o la frase) in tre
+  posti: `valeNuovoOrdineP2P` (sulle due cifre, prima dei metodi),
+  `confermaDettaglioP2P` (cifra fissa, sul metodo scelto o su quelli
+  dell'ordine) e `confermaQuantoP2P` (la cifra scelta di un intervallo).
+  Il coordinatore non lo conosce, come per `P2P_MAX_EURO`.
+  LA REGOLA. Tre costanti — `REGOLA_CONTANTI_COMPRA`,
+  `REGOLA_CONTANTI_VENDE`, `CONSIGLI_CONTANTI` — e quattro posti:
+  `regolaContantiFoglioP2P(metodi, tetto, lato)` sotto il metodo nel
+  foglio Pubblica e nel dettaglio di chi prende (dal proprio lato, col
+  tetto), `riquadroContantiP2P(o)` nella pagina dello scambio (sopra il
+  bottone del passo, finché lo stato sta in `P2P_DISPUTABILI`, e a
+  `in_disputa` con la sola prova), e la voce «Contanti di persona» di
+  «Info P2P» (`#p2pinfo-contanti`, il tetto vivo in
+  `#p2pInfoContantiTetto` da `testoTettoContantiP2P`, scritto da
+  `renderP2PInfo`), che ripete le costanti alla lettera — una prova le
+  confronta. `rilasciaP2P` col contanti chiede «Hai contato i contanti
+  davanti a chi ti ha pagato?» nella stessa `chiediConferma`.
+  LA PROVA D'INCONTRO (client, blocco «IL CONTANTI DI PERSONA: LA PROVA
+  D'INCONTRO», dopo la moderazione). Due note firmate con la chiave
+  usa-e-getta dello scambio (`chiaveOrdinePresenzaP2P`): eventi Nostr
+  di kind `P2P_KIND_PRESENZA` (27383, mai su un relay), tag `d` =
+  ordine, `ruolo` = mostra | legge, `e` = id della mostrata (solo su
+  legge), contenuto `contenutoPresenzaP2P(nonce, geo)` scritto A MANO
+  in una funzione sola (`{"v":1,"nonce":…,"geo":{lat,lon,acc}|null}`,
+  numeri già come stringhe a cinque decimali, `geoPresenzaP2P`). Chi
+  MOSTRA (`presenzaMostraP2P`): la posizione se la casella
+  `#p2pPresenzaGps` è accesa (`posizionePresenzaP2P`, timeout 8 s, un no
+  è null), `notaMostraP2P` + `finalizeEvent`, la riga del QR
+  (`testoQrPresenzaP2P`: `BRTL-INCONTRO-1:ordine:chiave:ora:nonce:
+  lat/lon/acc|-:firma`, TUTTA MAIUSCOLA coi due punti, modo alfanumerico
+  del QR), il foglio `#p2pPresenzaSheet` con `disegnaQr` e «Copia il
+  codice d'incontro», e l'orologio (`avviaOrologioPresenzaP2P`: ogni 5 s
+  la rotta degli scambi, per dieci minuti, finché il foglio è aperto —
+  alla prova il foglio si chiude da solo). Chi LEGGE
+  (`presenzaLeggiP2P`), tre strade in ordine: `tg.showScanQrPopup`
+  (Telegram ≥ 6.4), `BarcodeDetector` + `getUserMedia` (Chrome Android,
+  `avviaCameraPresenzaP2P`, si ferma quando il foglio si chiude), il
+  campo «incolla». Il testo letto passa da `presenzaRicevutaP2P` →
+  `leggiQrPresenzaP2P(testo, o, adesso)` (PURA: prefisso, sette pezzi,
+  minuscolo rimesso, ordine mio, chiave = `o.peer`, ora entro
+  `P2P_PRESENZA_FINESTRA_S`, `verifyEvent`) → `firmaEInviaPresenzaP2P`
+  (`notaLeggeP2P` + `finalizeEvent`, `POST /api/p2p/presenza` `{ordine,
+  mostrata, letta}`) → `segnaIncontroP2P` (la riga prende `presenza`:
+  `{ora, distanza, posizioni, precisione, posizioniVia}`). La prova
+  arriva anche dal server: `incontro` nella rotta degli scambi →
+  `presenzaDaServerP2P` in `rigaDaServerP2P` e `adottaScambiServerP2P`.
+  IL SERVER (blocco «LA PROVA D'INCONTRO DEL CONTANTI DI PERSONA», FUORI
+  dal blocco della moderazione — là una sentinella conta sette rotte e
+  vieta «firma(» —, giudici puri sulla connessione che tornano `(codice,
+  corpo)`). `POST /api/p2p/presenza` (`verifica_utente`, P2P acceso,
+  `leggi_json`) → `_registra_presenza_p2p(con, io, d, adesso)`:
+  `_nota_presenza_p2p` su ognuna delle due note (`verifica_firma_nostr`
+  — id ricalcolato, coincurve —, kind, tag `d`, ruolo, contenuto v1,
+  `_geo_presenza_p2p` in misura), poi INSIEME (mostra+legge, `e` =
+  id della mostrata, chiavi diverse, entro `P2P_PRESENZA_FINESTRA_S`
+  600 s fra loro e `P2P_PRESENZA_OROLOGIO_S` 900 s da adesso), poi
+  contro lo SCAMBIO (`p2p_scambi.chiave_compratore/chiave_venditore` =
+  le due chiavi, sennò 409 «non ha ancora detto» o 403; nessun momento
+  di `P2P_PRESENZA_MOMENTI_CHIUSI` nel giro corrente, sennò 409). Una
+  riga per ordine in `p2p_presenze` (chiavi, le due ore, le posizioni,
+  `distanza_m` da `_distanza_metri_p2p`, `posizioni`, `prova` = la
+  copia delle due note, `caricata_da`, `quando`); una seconda torna la
+  prima con `gia`. `_incontro_p2p(con, ordine)` (None senza tabella)
+  entra in `_riga_disputa_p2p` e in `_scambi_p2p` come `incontro` =
+  `_incontro_da_riga_p2p` (`{ora, distanza, posizioni, precisione,
+  posizioni_via}`). Chi carica è irrilevante: a provare sono le firme.
+  LA PRIVACY. `_scorda_posizioni_presenza_p2p` (lat/lon/acc e `prova`
+  a NULL, `posizioni_via` = adesso; ora, distanza e chiavi restano) da
+  `_manda_evento_p2p` quando il momento sta in
+  `P2P_PRESENZA_MOMENTI_CHIUSI` (`rilasciato`, `concluso`, `annullato`,
+  `scaduto`, `tornato`, più i due passaggi del libro della disputa), e
+  `_scopa_presenze_p2p` dall'orologio dei dieci minuti
+  (`pulisci_presenze_p2p`): posizioni oltre `P2P_PRESENZA_POSIZIONI_S`
+  (15 giorni), riga oltre `P2P_LIBRO_MEMORIA_S`. `esegui_fusione`
+  rinomina `caricata_da`. «I tuoi dati» (voce P2P) lo dice.
+  IL MODERATORE: `rigaIncontroModP2P(d, aperta)` nella card
+  (`cardDisputaModP2P`): «Incontro confermato …» con distanza e
+  precisione, «posizioni cancellate» quando lo sono, «Nessuna prova
+  d'incontro» solo sugli scambi in contanti, e a card aperta la cautela
+  sul GPS. LE PROVE: `prove_contanti_a_mano`, `collaudo_contanti_p2p`,
+  e `schnorr_puro.py` (BIP-340 puro, SOLO per i banchi: monta
+  `ChiaveXOnly` al posto di `ChiavePubblicaNostr` dove coincurve non
+  c'è, dentro il giudice vero).

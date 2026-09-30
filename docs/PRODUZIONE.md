@@ -2378,3 +2378,35 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   accetti si vede solo con la prima disputa di prova presa e decisa da
   una chiave aggiunta al nodo. Fino ad allora la strada sicura per una
   disputa vera resta l'accordo fra le parti.
+
+- IL CONTANTI DI PERSONA (30 set 2026; perché in CANTIERI, «Il contanti
+  di persona nel P2P»). IL TETTO è `P2P_CONTANTI_MAX_EURO` e vale **250
+  anche senza la riga nel config del VPS**: non serve aggiungere niente
+  per il lancio. Per cambiarlo, la riga nel config (`P2P_CONTANTI_MAX_
+  EURO = 200`, o `0` per spegnerlo) e `sudo systemctl restart barattolo`;
+  il pannello «⚙️ Stato delle leve» dice il valore VIVO («Tetto contanti
+  di persona (€)»). Sta SOTTO `P2P_MAX_EURO` quando quello è acceso.
+  LA TABELLA `p2p_presenze` nasce da sola al primo riavvio (`CREATE
+  TABLE IF NOT EXISTS`): niente migrazione a mano. Verifica in sola
+  lettura: `sqlite3 ~/satmarket/satmarket.db ".schema p2p_presenze"`.
+  IN UNA DISPUTA SUL CONTANTI il moderatore legge la riga «🤝 Incontro
+  confermato…» o «Nessuna prova d'incontro» nella card della disputa;
+  la regola scritta in «Info P2P» è quella di Hodl Hodl: senza prova
+  d'incontro i sats tornano a chi li ha bloccati, con la prova e nessun
+  rilascio vanno a chi compra. Le due firme le ha già verificate il
+  server; la posizione viene dal GPS dei telefoni e si può falsificare.
+  Per guardare la riga dal VPS (sola lettura): `sqlite3
+  ~/satmarket/satmarket.db "SELECT ordine, ora_mostra, ora_legge,
+  distanza_m, posizioni, posizioni_via, caricata_da FROM p2p_presenze
+  ORDER BY quando DESC LIMIT 20"` — le colonne `lat_*`/`lon_*`/`acc_*` e
+  `prova` sono a NULL/vuote dopo la chiusura (o dopo quindici giorni,
+  dalla scopa dell'orologio: riga «🧹 P2P: N prove d'incontro
+  alleggerite o tolte» nel journal). Se una disputa si apre e la riga
+  ha ancora le posizioni, quelle restano finché lo scambio non si
+  chiude: è voluto, servono al moderatore.
+  COSA NON È PROVATO sul VPS: la rotta col coordinatore vero (le due
+  chiavi arrivano da `p2p_scambi`, che le scrive la patch 0007 agli
+  eventi: se un evento si è perso, la rotta risponde 409 «non ha ancora
+  detto le due chiavi» e i due telefoni devono riprovare dopo un
+  minuto); lo scanner di Telegram e la fotocamera dell'APK su telefoni
+  veri.

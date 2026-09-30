@@ -31102,3 +31102,139 @@ client altrui legga «26 EUR» col `pm` esatto è letto sui byte
 il conto sul telefono. La differenza a carico di chi pubblica su una
 presa vera. Il default a mercato: se Andrea vuole che Barattozon parta
 fisso, è `p2pNuovoFisso` all'apertura del foglio col tabacchino.
+
+Il contanti di persona nel P2P: tetto, regola, prova d'incontro, privacy (30
+set 2026, cantiere A prima del lancio del 10 ottobre). **LE DECISIONI DI
+ANDREA**: tetto di 250 € per scambio in contanti di persona, e tutti i punti
+dello studio del 25 set (`docs/STUDIO-CONTANTI-A-MANO-2026-09-25.md`) attivi
+dal 10 ottobre, compresa la prova d'incontro che lo studio metteva «dopo».
+Barattozon non c'entra: il tabacchino ha il suo tetto (i 999 € di Amazon) e
+il suo nome esatto. **IL TETTO**: la leva `P2P_CONTANTI_MAX_EURO`, gemella
+di `P2P_MAX_EURO`, che vale **250 anche senza la riga nel config** — il
+config del VPS non eredita niente da `config_esempio.py`, e un tetto che
+nasce spento «finché qualcuno non aggiunge la riga» al lancio non c'è; 0 =
+spento. Viaggia in busta con le leve (`maxEuroContanti`, la settima chiave),
+sta nel pannello «Stato delle leve», e lo giudica il client in TRE posti con
+UN giudice (`giudiceContantiP2P`): il foglio Pubblica sulle due cifre, la
+conferma del dettaglio a cifra fissa, il foglio «Quanto» sulla cifra scelta
+di un intervallo. Con più metodi e «Contanti» fra questi si giudica lo
+stesso, perché chi prende può scegliere proprio quello. La parola si
+confronta INTERA (`contantiAManoP2P`): il filtro del libro cerca per pezzo,
+e con quello Barattozon entrerebbe. **LA REGOLA DEL RILASCIO SUL POSTO**,
+tre costanti (`REGOLA_CONTANTI_COMPRA`, `REGOLA_CONTANTI_VENDE`,
+`CONSIGLI_CONTANTI`) scritte in quattro posti — sotto il metodo nel foglio
+Pubblica (dal proprio lato, col tetto), nel dettaglio di chi prende, nel
+riquadro «💶 Contanti di persona» della pagina dello scambio (finché i sats
+sono in garanzia, `P2P_DISPUTABILI`, e a disputa aperta), e in «Info P2P»
+(voce «Contanti di persona», il tetto VIVO da `renderP2PInfo`, la cautela
+sul GPS e la regola della disputa scritta PRIMA: senza prova d'incontro i
+sats tornano a chi li ha bloccati, con la prova e nessun rilascio vanno a
+chi compra). Una prova confronta Info P2P con le costanti parola per parola.
+Il «Libera i sats» col contanti chiede «Hai contato i contanti davanti a chi
+ti ha pagato?»: stessa `chiediConferma`, testo del contanti — il conto delle
+domande resta 74. **LA PROVA D'INCONTRO «🤝 SIAMO INSIEME»**: due note
+firmate con le chiavi usa-e-getta dello scambio. Chi mostra compone un
+evento Nostr di kind `P2P_KIND_PRESENZA` (27383, mai su un relay) con tag
+`d` = ordine e `ruolo` = mostra, nonce e — facoltativa, consigliata, casella
+accesa di serie, il browser chiede il suo permesso — la posizione; lo firma
+e lo disegna come QR in una riga
+`BRTL-INCONTRO-1:ordine:chiave:ora:nonce:posizione:firma`, TUTTA MAIUSCOLA
+coi due punti come separatore per entrare nel modo alfanumerico del QR (un
+quarto più rado: la lezione della invoice). Chi legge ricostruisce la nota
+dalla riga, la VERIFICA (firma, ordine mio, chiave dell'altra parte, ora
+entro dieci minuti) e la CONTROFIRMA (`ruolo` = legge, tag `e` = id della
+mostrata, la sua posizione); le due note vanno a `POST /api/p2p/presenza`,
+che le verifica daccapo col giudice di casa (`verifica_firma_nostr`, id
+ricalcolato) contro le due chiavi che mostrod ha detto per l'ordine
+(`p2p_scambi`), rifiuta lo scambio chiuso, e scrive UNA riga per ordine in
+`p2p_presenze` (la prima; una seconda torna quella, con `gia`). Chi carica è
+irrilevante: a provare sono le due firme, che nessuno dei due può fabbricare
+da solo. L'altro telefono — e il dispositivo che non ha caricato niente — la
+ritrova dalla rotta degli scambi (`incontro` → `presenza` sulla riga), e il
+foglio di chi mostra si chiude da solo chiedendo al server ogni cinque
+secondi. IL CONTENUTO SI SCRIVE CON UNA FUNZIONE SOLA
+(`contenutoPresenzaP2P`, stringa a mano, posizione già come stringhe a
+cinque decimali): chi legge deve rifarlo byte per byte, e un
+`JSON.stringify` di un oggetto potrebbe ordinare o arrotondare diversamente
+su un altro browser. LEGGERE IL CODICE, tre strade in ordine: lo scanner di
+Telegram (`showScanQrPopup`, dalla 6.4: iPhone e Android dentro l'app), la
+fotocamera del browser dove `BarcodeDetector` esiste (Chrome Android:
+l'APK), e incollare il codice che l'altra persona ha copiato — un telefono
+che non sa leggere non resta senza il gesto. **IL MODERATORE** legge nella
+card della disputa «🤝 Incontro confermato alle … del …, a N m di distanza
+(precisione ±M m)» o «Nessuna prova d'incontro» (questa solo sugli scambi in
+contanti), con la cautela scritta accanto: il GPS si può falsificare, è una
+conferma e non una prova assoluta; a pesare è l'ora, con due firme nello
+stesso minuto. **LA PRIVACY**: le posizioni (e la copia delle due note, che
+le porta) si scordano quando la parte in contanti si chiude — `rilasciato`,
+`concluso`, `annullato`, `scaduto`, `tornato` (`_manda_evento_p2p`,
+guardato) — e comunque dopo quindici giorni dall'orologio
+(`pulisci_presenze_p2p` → `_scopa_presenze_p2p`); restano l'ora e la
+distanza, che se ne vanno con la cronaca a quaranta giorni. «I tuoi dati» lo
+dice per intero. `rilasciato` sta fra i momenti che chiudono per una
+ragione: da lì chi vende ha già liberato i sats — i contanti li ha avuti — e
+una disputa sul pagamento dei sats non ha niente da chiedere all'incontro.
+**LE FIRME VERE ANCHE IN CI** (`schnorr_puro.py`, nuovo, solo per i banchi):
+il server verifica con coincurve, che in CI non c'è, e le prove fino a ieri
+controllavano le firme vere solo dove coincurve c'era. Il modulo è la
+ricetta di riferimento del BIP-340 in Python puro (lento, aritmetica
+affine), montato al posto di `ChiavePubblicaNostr` DENTRO il giudice vero;
+dove coincurve c'è, i due si controllano a vicenda nei due versi. Non entra
+nel server: là resta il fail-closed. **SCARTATO**: NFC nell'APK come prova
+di vicinanza più forte — Web NFC c'è solo in Chrome Android, non su iPhone
+né dentro Telegram, quindi sarebbe una quarta strada per una fetta sola di
+utenti: si propone (nel report) e non si fa; il bond di Mostro (3a dello
+studio) resta per dopo il lancio, come da studio; la cauzione fatta in casa
+(3b) resta scartata. **PROVATO**: `prove_contanti_a_mano` (81: la leva nei
+tre posti, le sentinelle del client e del server, i giudici del server con
+firme vere di `schnorr_puro` — il giro buono, quindici rifiuti uno per
+ragione col loro codice e la loro frase, la seconda prova, lo scambio chiuso
+nel giro corrente e non in quello precedente, lo scordare alla chiusura e la
+scopa a quindici e a quaranta giorni —, il banco del client in node con
+nostr-tools vero e IL GIRO CROSS: le due note fatte dal client passano il
+giudice del server in Python); `collaudo_contanti_p2p` (23, server vero: P2P
+spento → 409, la rotta, la rotta degli scambi nei due versi, `gia`, 400,
+403, lo sconosciuto con le note buone che passa, il coordinatore che non ha
+ancora raccontato → 409, la card del moderatore con e senza prova, la
+chiusura che scorda, la scopa, lo scambio chiuso → 409; nella gabbia senza
+rete). Emendate: `prove_p2p_server` (sette chiavi in busta), le tre banchi
+che montano il foglio Pubblica, il dettaglio e la moderazione (i pezzi
+nuovi), `_banco_eventi_p2p` non toccato (`_incontro_p2p` vale None senza la
+tabella). Tortura: 32 su 32 (al primo giro 30: un mutante era SQL invalido e
+la prova ESPLODEVA su un rifiuto del giudice invece di farsi rossa — resa
+robusta con `_inc`/`_gia`, che su un rifiuto mettono la frase al posto del
+numero; al secondo giro le tre mutazioni ripassate sono uccise con rosse
+nominate e nessun botto). Suite intera severa senza config nel worktree (su
+4084cba): 17.305 verdi e 0 rosse. DAL VIVO (server dalla copia, relay morto,
+eventi dalla porta vera col bearer, tre Chrome headless via CDP a 375 e
+densità 2, chiaro e scuro): il foglio Pubblica con 300 € rifiuta con la
+frase del tetto e mostra la regola sotto il metodo; il dettaglio di chi
+prende pure; la pagina dello scambio ai due lati col riquadro; «Mostra il
+codice» disegna il QR (posizione data col permesso di Chrome e
+`setGeolocationOverride`); LA SCANSIONE È VERA nel senso che conta: lo
+scatto del QR di A è stato DECODIFICATO con zxing-cpp (un lettore vero) e il
+testo combacia col client carattere per carattere; il testo è entrato in B
+dalla porta dello scanner di Telegram (`showScanQrPopup` di cartone,
+callback del client) → 200, «✅ Incontro confermato alle 20:33, a 15 m di
+distanza (precisione ±12 m)» su B, il foglio di A chiuso da solo con la
+stessa riga; un profilo nuovo di 111 ritrova la prova dal server (riga solo
+da guardare); la strada «incolla» su B senza lo scanner (foglio con la
+casella, testo incollato, «Conferma» → `gia` → confermato); la disputa
+aperta dalla porta degli eventi → la card del moderatore con la riga e la
+cautela; la chiusura da moderatore → nel db posizioni e copia a NULL, ora e
+distanza ferme, la card dice «posizioni cancellate»; Info P2P col tetto
+vivo; «I tuoi dati». **NON PROVATO**: la fotocamera del browser
+(`BarcodeDetector` non c'è in Chrome headless su Windows: la strada 2 è
+scritta e non esercitata); lo scanner VERO di Telegram su iPhone e Android;
+il permesso del GPS chiesto da un telefono vero e il suo timeout; il
+coordinatore vero; i due telefoni veri. **DA FARE CON DUE TELEFONI VERI**:
+uno scambio in contanti preso (Telegram su uno, l'APK sull'altro): A «Mostra
+il codice» con la posizione, B «Inquadra» — su Telegram deve aprirsi lo
+scanner suo e chiudersi da solo al codice buono, sull'APK la fotocamera del
+browser —, poi entrambe le pagine con «Incontro confermato» e la distanza;
+rifare con la posizione negata (deve passare, «senza posizioni»); rifare a
+codice scaduto (undici minuti: «Il codice è vecchio»); inquadrare il codice
+di un ALTRO scambio; il moderatore sul terzo telefono. **IL WORKFLOW È STATO
+TOCCATO** (`collaudo_contanti_p2p.py` e `schnorr_puro.py` nel compileall, il
+collaudo nell'elenco della CI): `pronto` può restare indietro, si guarda
+dopo il push.
