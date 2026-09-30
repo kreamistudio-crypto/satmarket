@@ -47155,10 +47155,13 @@ def prove_script_nel_workflow():
     prova("nessuna prova e' definita e mai eseguita", [], orfane)
 
 
-TETTO_CLAUDE_MD = 545   # misurato: 518 righe il giorno del taglio, piu' 20;
-                        # salito a 539 col doppio wallet (la cosa aperta
-                        # del macaroon dedicato, 5 righe vere) e a 545 col
-                        # namespace prestato del nodo (una REGOLA, 6 righe)
+TETTO_CLAUDE_MD = 262   # misurato: 518 righe il giorno del taglio, piu' 20;
+                        # salito a 539 col doppio wallet e a 545 col
+                        # namespace prestato del nodo; SCESO a 262 il 30 set
+                        # 2026 (242 righe + 20): il nodo Mostro e' andato in
+                        # docs/NODO-MOSTRO.md e le regole di sessione sono
+                        # entrate in forma corta. Vedi CANTIERI, «SESSIONI
+                        # PIU' LEGGERE ALL'AVVIO».
 
 
 def prove_bussola():
