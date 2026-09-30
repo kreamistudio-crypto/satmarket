@@ -122,13 +122,14 @@ RACCONTI_NEGOZI = {
         # Andrea):
         #   python prepara_logo_consigliato.py logo.png una-garlanda 0.86
         "logo": True,
-        # E DUE PIXEL PIU' GIU' (scelto da Andrea sulla simulazione).
-        # Era -6, il centro del PESO (al 59% dell'altezza, la spiga in
-        # basso): ma il disegno riempiva tutto il riquadro, e 6px in su
-        # lo portavano 1,7px oltre il bordo del quadrato — la cima
-        # tagliata. All'86% e +2 ha ~11,7px d'aria sopra e ~7,3 sotto
-        # nel quadrato da 84: non tocca mai i bordi.
-        "logo_giu": 2,
+        # E CENTRATO NEL QUADRATO (1 ott 2026, dal telefono di Andrea:
+        # a +2 stava troppo in basso). Era -6, il centro del PESO (al 59%
+        # dell'altezza, la spiga in basso): ma il disegno riempiva tutto
+        # il riquadro, e 6px in su lo portavano 1,7px oltre il bordo del
+        # quadrato — la cima tagliata. Poi +2, scelto sulla simulazione,
+        # e sul telefono pareva sceso. All'86% e 0 ha ~9,5px d'aria sopra
+        # e sotto nel quadrato da 84: non tocca mai i bordi.
+        "logo_giu": 0,
         # il banner della card nella pagina «Consigliati», 1040x498
         "banner": True,
         "blocchi": [
