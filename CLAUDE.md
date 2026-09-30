@@ -12,7 +12,7 @@ Tre file in `docs/`, e NON sono import: si aprono quando servono.
   giudici unici, e il perché di ogni pezzo.
 - `CANTIERI.md` — perché è fatto così: un paragrafo per cantiere, in
   ordine di tempo, con le decisioni, le strade scartate e le lezioni.
-- `PRODUZIONE.md` — la macchina, la catena del deploy, le procedure. (Più i due audit: `docs/AUDIT-PAGAMENTI-2026-09-19.md` e `docs/AUDIT-2-CLIENT-MOSTRO-2026-09-23.md`; e gli studi `docs/STUDIO-BOLT-CARD-2026-09-24.md`, `docs/STUDIO-RISTORANTI-2026-09-24.md` e `docs/STUDIO-CONTANTI-A-MANO-2026-09-25.md`.)
+- `PRODUZIONE.md` — la macchina, la catena del deploy, le procedure. (Più i due audit: `docs/AUDIT-PAGAMENTI-2026-09-19.md` e `docs/AUDIT-2-CLIENT-MOSTRO-2026-09-23.md`; e gli studi `docs/STUDIO-BOLT-CARD-2026-09-24.md`, `docs/STUDIO-RISTORANTI-2026-09-24.md`, `docs/STUDIO-CONTANTI-A-MANO-2026-09-25.md` e `docs/STUDIO-MOSTRO-0190-2026-09-30.md`.)
 
 Non c'è un indice e non deve nascerne uno: si cerca per NOME.
 `grep -n "sconto carrello" docs/*.md` — ogni voce porta il suo nome
