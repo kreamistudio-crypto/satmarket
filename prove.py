@@ -32479,9 +32479,11 @@ def prove_onion():
     prova("...e i due URL di export/modello anche", 2,
           mini.count("${location.origin}${API_BASE}"))
     # E IL CENSIMENTO: nel CODICE del client `location.origin` resta
-    # in CINQUE posti — il ripiego del giudice, i due tag relay del
-    # login/collegamento Nostr, i due URL qui sopra — e da nessun'altra
-    # parte. Cosi' la condivisione nuova di domani non puo' nascere col
+    # in SEI posti — il ripiego del giudice, i due tag relay del
+    # login/collegamento Nostr, i due URL qui sopra, e (30 set 2026) il
+    # portinaio del server che si riavvia, che non COMPONE un link ma
+    # CONFRONTA: una richiesta e' «di casa» se va dove si sta guardando,
+    # e su onion casa e' proprio l'onion — e da nessun'altra parte. Cosi' la condivisione nuova di domani non puo' nascere col
     # dominio sbagliato senza che questa riga lo dica.
     #
     # ⚠️ SI GUARDA IL CODICE E NON LA PROSA, ed e' la trappola gia'
@@ -32516,7 +32518,9 @@ def prove_onion():
                 _i = _j + len(_a)
         if "location.origin" in _pulita.split("//")[0]:
             _vive.append(_r.strip())
-    prova("...e nel codice non ne restano altri in giro", 5, len(_vive))
+    prova("...il sesto e' il portinaio, che confronta e non condivide",
+          True, "origine: location.origin, avviso: avvisoRiprovo});" in mini)
+    prova("...e nel codice non ne restano altri in giro", 6, len(_vive))
 
     # --- 4) il login Telegram non si offre su onion ----------------
     # Il Login Widget funziona SOLO sul dominio registrato con
@@ -48694,6 +48698,214 @@ def prove_pct_libera(node):
           "[]", (r.stdout or "").strip())
 
 
+def prove_server_che_si_riavvia(mini, node):
+    """IL SERVER CHE SI RIAVVIA (30 set 2026, dal campo: una decina di
+    deploy in una sera, e due volte l'app aperta proprio durante il
+    riavvio non e' partita — il /me tornava il 502 di Caddy e il client
+    si fermava li').
+
+    Il portinaio `fetchCheRiprova` si fa GIRARE in node, quello vero
+    estratto dal client, contro un server finto che cade e si rialza e
+    con un orologio finto (l'attesa sposta l'orologio invece di
+    dormire). Le domande sono quelle del cantiere: si rialza da solo?
+    Si arrende dopo circa 30 secondi e restituisce l'ultima risposta?
+    Lascia stare cio' che non e' suo — i 503 JSON dell'app, gli altri
+    indirizzi, una POST rimasta senza risposta, chi ha abortito? La
+    pastiglia «Un attimo, riprovo…» si accende e SI SPEGNE, anche con
+    due richieste in attesa insieme?"""
+    import subprocess as _sp, tempfile as _tf
+    print("\n🔁 Il server che si riavvia")
+    # --- la forma: montato PRIMA di qualunque fetch, e con la pastiglia ---
+    i_app = mini.index("const API_BASE = location.protocol")
+    i_monta = mini.index("window.fetch = fetchCheRiprova(")
+    prova("il portinaio si monta nello script dell'app...", True,
+          i_app < i_monta)
+    prova("...PRIMA di ogni fetch del file", 0, mini[:i_monta].count("fetch("))
+    prova("...e ce n'e' uno solo", 1, mini.count("window.fetch = "))
+    prova("la pastiglia c'e', col testo del cantiere", 1, mini.count(
+        '<div class="riprovo" id="riprovo" role="status">'
+        'Un attimo, riprovo…</div>'))
+    prova("...e si accende con la sua classe", True,
+          ".riprovo.show{opacity:1" in mini)
+    if not node:
+        salta("il portinaio risponde giusto", "node non installato")
+        return
+    pezzi = "".join(pezzo_js(mini, f) + chr(10) for f in (
+        "const RIPROVO_ATTESE_MS", "function rispostaDelPortinaio(",
+        "function fetchCheRiprova(", "function attendiRiprovo("))
+    banco = pezzi + r"""
+const ORIGINE = 'https://barattolo.store';
+const guai = [];
+const vedi = (nome, atteso, avuto) => {
+  const a = JSON.stringify(atteso), b = JSON.stringify(avuto);
+  if (a !== b) guai.push(`${nome}: atteso ${a}, avuto ${b}`);
+};
+const risp = (status, tipo) => ({status, ok: status < 400,
+  headers: {get: k => k.toLowerCase() === 'content-type' ? (tipo || null) : null}});
+const PORTINAIO = () => risp(502, null);            // Caddy, backend spento
+const JSON_APP = s => risp(s, 'application/json');  // l'app che risponde
+// un server finto: una scaletta di esiti, uno per chiamata
+function banco(scaletta){
+  const b = {chiamate: [], attese: [], avvisi: [], t: 0};
+  const vero = async (input, init) => {
+    b.chiamate.push(input);
+    const e = scaletta[Math.min(b.chiamate.length - 1, scaletta.length - 1)];
+    if (e instanceof Error) throw e;
+    return e;
+  };
+  b.fetch = fetchCheRiprova(vero, {
+    attendi: async (ms, segnale) => {
+      b.attese.push(ms); b.t += ms;
+      if (segnale && segnale.aborted) {
+        const e = new Error('annullata'); e.name = 'AbortError'; throw e;
+      }
+    },
+    ora: () => b.t, origine: ORIGINE,
+    avviso: acceso => b.avvisi.push(acceso)});
+  return b;
+}
+const muto = () => new TypeError('Failed to fetch');
+
+(async () => {
+  // 1) il riavvio vero: tre 502 del portinaio, poi il server c'e'
+  let b = banco([PORTINAIO(), PORTINAIO(), PORTINAIO(), JSON_APP(200)]);
+  let r = await b.fetch('/api/me', {headers: {}});
+  vedi('riavvio: arriva la risposta buona', 200, r.status);
+  vedi('riavvio: quattro chiamate', 4, b.chiamate.length);
+  vedi('riavvio: attese crescenti', [500, 1000, 2000], b.attese);
+  vedi('riavvio: la pastiglia si accende e si spegne', [true, false], b.avvisi);
+
+  // 2) il server che non torna: ci si arrende entro ~30 s e si prosegue
+  b = banco([PORTINAIO()]);
+  r = await b.fetch('/api/listings');
+  vedi('giu\' per sempre: torna l\'ultimo 502 a chi ha chiamato', 502, r.status);
+  vedi('giu\' per sempre: attese fino al tetto', [500, 1000, 2000, 4000, 8000, 8000], b.attese);
+  vedi('giu\' per sempre: circa 30 secondi, mai di piu\'', true,
+       b.t <= 30000 && b.t >= 20000);
+  vedi('giu\' per sempre: pastiglia spenta alla resa', [true, false], b.avvisi);
+
+  // 3) il 503 dell'app e' una RISPOSTA: non si riprova
+  for (const s of [503, 502, 504]) {
+    b = banco([JSON_APP(s), JSON_APP(200)]);
+    r = await b.fetch('/api/salute');
+    vedi(`${s} JSON dell'app: una chiamata sola`, [1, s], [b.chiamate.length, r.status]);
+    vedi(`${s} JSON dell'app: nessuna pastiglia`, [], b.avvisi);
+  }
+  // ...e nemmeno gli altri errori: 500, 404, 401, 429
+  for (const s of [500, 404, 401, 429]) {
+    b = banco([risp(s, 'text/html'), JSON_APP(200)]);
+    r = await b.fetch('/api/me');
+    vedi(`${s}: non e' il portinaio, una chiamata sola`, 1, b.chiamate.length);
+  }
+  // ...mentre 503 e 504 del portinaio si' (anche con la pagina HTML di Caddy)
+  for (const [s, t] of [[503, null], [504, 'text/html; charset=utf-8'], [502, 'text/plain']]) {
+    b = banco([risp(s, t), JSON_APP(200)]);
+    r = await b.fetch('/api/me');
+    vedi(`${s} ${t} del portinaio: riprova`, [2, 200], [b.chiamate.length, r.status]);
+  }
+
+  // 4) le letture si rifanno anche a rete muta; le scritture NO
+  b = banco([muto(), muto(), JSON_APP(200)]);
+  r = await b.fetch('/api/orders');
+  vedi('lettura a rete muta: riprova', [3, 200], [b.chiamate.length, r.status]);
+  b = banco([muto(), JSON_APP(200)]);
+  let err = null;
+  try { await b.fetch('/api/orders', {method: 'POST', body: '{}'}); }
+  catch (e) { err = e.name; }
+  vedi('POST a rete muta: NON si rifa\' (poteva essere arrivata)', ['TypeError', 1, []],
+       [err, b.chiamate.length, b.avvisi]);
+  for (const m of ['POST', 'post', 'PUT', 'DELETE', 'PATCH']) {
+    b = banco([PORTINAIO(), JSON_APP(200)]);
+    r = await b.fetch('/api/orders', {method: m, body: '{"x":1}'});
+    vedi(`${m} col 502 del portinaio: si rifa' (non era arrivata a nessuno)`,
+         [2, 200], [b.chiamate.length, r.status]);
+  }
+  // un corpo a flusso si legge una volta: niente seconda volta
+  b = banco([PORTINAIO(), JSON_APP(200)]);
+  r = await b.fetch('/api/foto', {method: 'POST', body: {getReader(){}}});
+  vedi('corpo a flusso: una chiamata sola', [1, 502], [b.chiamate.length, r.status]);
+
+  // 5) solo le richieste di casa
+  for (const u of ['https://api.coingecko.com/x', 'wss://relay.example/',
+                   'http://barattolo.store/api/me', '//altro.example/api/me']) {
+    b = banco([PORTINAIO(), JSON_APP(200)]);
+    r = await b.fetch(u);
+    vedi(`fuori casa (${u}): una chiamata sola`, 1, b.chiamate.length);
+  }
+  for (const u of ['/api/me', 'api/me', 'https://barattolo.store/api/me',
+                   new URL('https://barattolo.store/api/me')]) {
+    b = banco([PORTINAIO(), JSON_APP(200)]);
+    r = await b.fetch(u);
+    vedi(`di casa (${u}): riprova`, 2, b.chiamate.length);
+  }
+
+  // 6) chi ha abortito resta padrone
+  b = banco([Object.assign(new Error('x'), {name: 'AbortError'}), JSON_APP(200)]);
+  err = null;
+  try { await b.fetch('/api/me'); } catch (e) { err = e.name; }
+  vedi('AbortError: non si riprova', ['AbortError', 1], [err, b.chiamate.length]);
+  const ctl = new AbortController();
+  b = banco([PORTINAIO()]);
+  let giri = 0;
+  b.fetch = fetchCheRiprova(async () => { giri++; if (giri === 2) ctl.abort(); return PORTINAIO(); }, {
+    attendi: attendiRiprovo, ora: () => Date.now(), origine: ORIGINE,
+    avviso: a => b.avvisi.push(a)});
+  err = null;
+  const t0 = Date.now();
+  // l'attesa vera (quella del client): abortita a meta', si ferma subito
+  const ctl2 = new AbortController();
+  setTimeout(() => ctl2.abort(), 50);
+  try { await attendiRiprovo(5000, ctl2.signal); } catch (e) { err = e.name; }
+  vedi('attendiRiprovo: il signal la interrompe subito', ['AbortError', true],
+       [err, Date.now() - t0 < 1000]);
+  err = null;
+  try { await b.fetch('/api/me', {signal: ctl.signal}); } catch (e) { err = e.name; }
+  vedi('abortita mentre aspettava: si ferma e la pastiglia si spegne',
+       ['AbortError', 2, [true, false]], [err, giri, b.avvisi]);
+
+  // 7) due richieste in attesa insieme: la pastiglia resta accesa finche'
+  //    non hanno finito TUTT'E DUE
+  const avvisi = [];
+  let tick = 0;
+  const lento = fetchCheRiprova(async (u) => (tick++ < 3 ? PORTINAIO() : JSON_APP(200)), {
+    attendi: (ms) => new Promise(ok => setTimeout(ok, 5)), ora: () => 0,
+    origine: ORIGINE, avviso: a => avvisi.push(a)});
+  await Promise.all([lento('/api/me'), lento('/api/listings')]);
+  vedi('due in attesa: accesa una volta per ciascuna, spenta alla fine',
+       [true, true, true, false], avvisi);
+
+  // 8) una Request si clona a ogni giro (il corpo si consuma)
+  let cloni = 0;
+  const req = {url: 'https://barattolo.store/api/x', method: 'POST', bodyUsed: false,
+               signal: null, clone(){ cloni++; return this; }};
+  b = banco([PORTINAIO(), PORTINAIO(), JSON_APP(200)]);
+  r = await b.fetch(req);
+  vedi('Request: un clone per tentativo', [3, 3, 200], [cloni, b.chiamate.length, r.status]);
+
+  console.log(JSON.stringify(guai));
+})().catch(e => { console.log(JSON.stringify(['esploso: ' + e])); });
+"""
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                               encoding="utf-8") as f:
+        f.write(banco)
+        percorso = f.name
+    # IL TETTO DEL BANCO: un portinaio che non si arrende piu' gira per
+    # sempre sull'orologio finto — lo si vuole ROSSO, non una CI appesa
+    try:
+        r = _sp.run([node, percorso], capture_output=True, text=True,
+                    encoding="utf-8", timeout=60)
+    except _sp.TimeoutExpired:
+        os.unlink(percorso)
+        prova("il portinaio si arrende (il banco finisce)", "", "appeso")
+        return
+    os.unlink(percorso)
+    if r.returncode != 0:
+        prova("il portinaio gira", "", (r.stderr or "")[:300])
+        return
+    prova("il portinaio risponde giusto in tutti i casi",
+          "[]", (r.stdout or "").strip())
+
+
 def prove_centro_fila(mini, node):
     """IL GIUDICE DEL CENTRO, FATTO GIRARE (ago 2026): le sentinelle
     dicono che esiste ed e' uno, mai che RISPONDA giusto — e la
@@ -48856,6 +49068,7 @@ def prove_sintassi_client():
     prove_frase_xp(mini, node)
     prove_corsa_zona(mini, node)
     prove_riempimento(mini, node)
+    prove_server_che_si_riavvia(mini, node)
     prove_commenti_css(mini)
     prove_chiavi_doppie(mini)
 

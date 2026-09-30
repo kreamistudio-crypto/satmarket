@@ -27855,6 +27855,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   non secondi, il freno sulla cura — sta in CANTIERI, «Il guardiano
   del ponte verso LND»; i comandi in PRODUZIONE, «IL GUARDIANO DEL
   PONTE».
+- IL SERVER CHE SI RIAVVIA (30 set 2026): nel client un portinaio
+  solo attorno a `fetch`, `fetchCheRiprova` in cima allo script
+  dell'app, montato PRIMA di ogni chiamata. Riprova da solo, con
+  attese crescenti (`RIPROVO_ATTESE_MS`, poi 8 s fino a
+  `RIPROVO_TETTO_MS` = 30 s), e accende la pastiglia `#riprovo`
+  («Un attimo, riprovo…») finché almeno una richiesta aspetta; alla
+  resa restituisce l'ultima risposta, e chi ha chiamato fa quel che
+  faceva prima. Il giudice del «non c'è» è `rispostaDelPortinaio`:
+  502/503/504 che NON sono JSON — quelli dell'app (il 503 di
+  `/api/salute`, il cambio che manca) sono JSON e restano risposte.
+  Solo le richieste di casa; la rete muta si riprova solo sulle
+  letture (una POST senza risposta può essere arrivata); chi passa un
+  `signal` resta padrone dell'attesa. Copre le chiamate, NON la pagina:
+  se Caddy dà 502 all'HTML stesso il client non esiste ancora, e lì
+  serve il server (CANTIERI, «I deploy non devono far cadere l'app»).
+  Prova: `prove_server_che_si_riavvia`.
 - LE ROTTE PUBBLICHE, l'elenco per intero (la regola ferrea 3 in
   CLAUDE.md tiene il divieto — mai StaticFiles su una directory — e le
   due sentinelle; l'elenco sta qui perché cresce a ogni cantiere, e a

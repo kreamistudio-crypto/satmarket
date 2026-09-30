@@ -31609,3 +31609,61 @@ prima del push.
 e il logo nella fila delle categorie sul telefono (il -6 è una
 taratura, non una misura vista lì). Il QR, il giorno che EcoOasi è
 attiva.
+
+## I deploy non devono far cadere l'app (30 set 2026)
+
+**DAL CAMPO.** La sera del 30 set il servizio è ripartito una decina di
+volte per i deploy, e due volte l'app aperta proprio durante un riavvio
+non è partita: il `/api/me` tornava il 502 di Caddy, il `.json()`
+esplodeva e si restava fuori.
+
+**LA METÀ DEL CLIENT, FATTA.** Un portinaio solo attorno a `fetch`
+(`fetchCheRiprova`, ARCHITETTURA «IL SERVER CHE SI RIAVVIA») invece di
+duecento chiamate rese pazienti una per una: attese 0,5-1-2-4-8 s e poi
+8 s fino a circa 30, la pastiglia «Un attimo, riprovo…» in alto (dove il
+toast non arriva), poi si prosegue con l'ultima risposta. COSA NON SI
+RIPROVA, ed è la parte pensata: i 502/503/504 JSON, che sono dell'app e
+sono risposte; gli indirizzi non di casa; una POST a rete muta, che può
+essere arrivata — il 502 di Caddy invece dice che il server non c'era, e
+rifarla è come ripremere il bottone un attimo dopo; chi ha abortito.
+STRADA SCARTATA: riprovare solo il `/me` dell'avvio — la seconda
+apertura caduta di stasera poteva essere un tocco qualsiasi.
+
+**QUEL CHE IL CLIENT NON PUÒ FARE**: se il 502 cade sulla PAGINA stessa
+(l'HTML), di client non ce n'è ancora; e le immagini e i font chiesti
+durante il riavvio restano rotti fino al prossimo giro (non passano da
+`fetch`). Tutt'e due sono la metà del server.
+
+**LA METÀ DEL SERVER: PROPOSTA, IN ATTESA DELLA SCELTA DI ANDREA** (non si
+tocca `deploy.sh`, Caddy né systemd finché non sceglie). Le tre strade
+messe sul tavolo: Caddy che ritenta sul backend (`lb_try_duration`),
+consigliata; il socket tenuto da systemd durante il riavvio; due
+processi che si passano il testimone, sconsigliata finché gli startup
+accendono lavori in background (due orologi = avvisi e pagamenti
+doppi).
+
+**PROVATO.** `prove_server_che_si_riavvia`: il portinaio VERO estratto dal
+client, fatto girare in node contro un server finto che cade e si rialza
+e un orologio finto — riavvio, resa entro il tetto, 503 JSON, 500/404/
+401/429, 503/504 del portinaio, POST col 502 e a rete muta, corpo a
+flusso, origini, AbortError e signal abortito in attesa, due richieste
+insieme (la pastiglia si spegne solo alla seconda), la Request clonata a
+ogni giro; più le sentinelle (montato prima di ogni `fetch(` del file,
+uno solo, la pastiglia). Tortura 11 su 11, e il banco ha un tetto di 60 s
+perché un portinaio che non si arrende non appenda la CI. Dal vivo su una
+COPIA nello scratchpad (config da `config_esempio.py`, collaudo acceso,
+relay morto) dietro un Caddy di cartone che risponde 502 vuoto a backend
+spento e riavvia uvicorn davvero: A) l'app aperta col backend spento
+subito dopo l'HTML — `/api/me` 502, 502, poi 401→200 al terzo giro, e
+l'app è entrata da sola come Compratore; B) app aperta, backend giù 10 e
+15 s, una chiamata nel mezzo: pastiglia accesa per tutto il buco, 200
+all'arrivo del server, pastiglia spenta, nessun errore JS in console.
+
+EMENDATA COL PERCHÉ la sentinella di onion che censisce `location.origin`
+nel codice del client: da 5 a 6, e la sesta si nomina — il portinaio non
+compone un link per altri, confronta «di casa», e su onion casa è
+l'onion. Suite intera severa senza config nel worktree da origin/main
+(a9a0352): 17.455 verdi e 0 rosse; i 28 collaudi della CI nella gabbia.
+
+**DA GUARDARE.** Il primo deploy vero con l'app aperta sul telefono;
+e, scelta la metà del server, la stessa prova su barattolo.store.

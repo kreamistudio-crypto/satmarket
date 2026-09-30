@@ -8755,6 +8755,19 @@
     box-shadow:0 8px 20px rgba(0,0,0,.18);
   }
   .toast.show{opacity:1;transform:translateX(-50%)}
+  /* «Un attimo, riprovo…» (30 set 2026): la pastiglia del server che si
+     riavvia, accesa da fetchCheRiprova finche' una richiesta lo aspetta.
+     Stessa pelle del toast ma in ALTO, dove il toast non arriva: i due
+     possono stare a schermo insieme senza coprirsi. */
+  .riprovo{
+    position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top));
+    transform:translateX(-50%) translateY(-12px);
+    background:var(--toast-bg);color:var(--toast-text);font-weight:700;font-size:13.5px;
+    padding:10px 18px;border-radius:16px;opacity:0;transition:.25s;z-index:10002;
+    pointer-events:none;width:max-content;max-width:min(92vw,420px);text-align:center;
+    box-shadow:0 8px 20px rgba(0,0,0,.18);
+  }
+  .riprovo.show{opacity:1;transform:translateX(-50%)}
   /* «← Torna» del negozio e della pagina sicurezza: rettangolo come
      tutti gli altri bottoni dall'ago 2026 (era l'ultima pillola
      rimasta su quelle due pagine) */
@@ -12720,6 +12733,8 @@ document.getElementById('cartello')?.remove();</script>
   <!-- La pastiglia del gesto «tira giù per aggiornare» -->
   <div class="ptr" id="ptr" aria-hidden="true"><span>↻</span></div>
   <div class="toast" id="toast"></div>
+  <!-- «Un attimo, riprovo…»: il server che si riavvia (vedi fetchCheRiprova) -->
+  <div class="riprovo" id="riprovo" role="status">Un attimo, riprovo…</div>
   <div id="attesaOverlay"><div class="attesa-card"><img class="attesa-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="attesa-clessidra">⏳</span><span class="attesa-anello"></span><span class="attesa-spunta" aria-hidden="true">✓</span> <span id="attesaTesto">Invio sats in corso…</span></div></div>
 </div>
 
@@ -12737,6 +12752,121 @@ document.getElementById('cartello')?.remove();</script>
    In produzione non serve toccare nulla: servita da https funziona. */
 const API_BASE = location.protocol.startsWith('http') ? '/api' : 'http://localhost:8080/api';
 const tg = window.Telegram?.WebApp;
+
+/* ══ IL SERVER CHE SI RIAVVIA (30 set 2026) ══════════════════════
+   Ogni deploy riavvia il servizio, e per quei pochi secondi Caddy
+   risponde 502 al posto suo: la sera del 30 set, fra una decina di
+   riavvii, l'app aperta proprio in quell'istante non partiva — il /me
+   tornava 502, il `.json()` esplodeva e si restava fuori. Qui c'e' UN
+   portinaio solo, attorno a `fetch`, invece di duecento chiamate da
+   rendere pazienti una per una: se il server non c'e', si aspetta un
+   attimo e si riprova (attese crescenti, per circa 30 secondi), con la
+   pastiglia «Un attimo, riprovo…» in cima; poi si prosegue, e chi ha
+   chiamato riceve l'ultima risposta come l'avrebbe avuta senza di lui.
+   CHI SI RIPROVA E CHI NO, ed e' la parte che non si allarga:
+   • solo le richieste DI CASA (stessa origine): i relay, CoinGecko e
+     gli altri indirizzi passano intatti;
+   • un 502/503/504 si riprova solo se NON l'ha scritto l'app: i 503
+     del server sono JSON col loro `detail` («non sto bene», il cambio
+     che manca) e sono una risposta, non un'assenza — quello di Caddy
+     col backend spento non e' JSON;
+   • la rete muta (TypeError) si riprova SOLO per le letture: una POST
+     partita e rimasta senza risposta puo' essere arrivata, e rifarla
+     da soli sarebbe un ordine doppio. Il 502 di Caddy invece dice che
+     il server non c'era: la richiesta non e' arrivata a nessuno, e
+     rifarla e' come premere di nuovo il bottone, un attimo dopo;
+   • chi ha passato un `signal` resta padrone: l'attesa si interrompe
+     appena lo abortisce, e il suo tetto vale piu' del nostro. */
+const RIPROVO_ATTESE_MS = [500, 1000, 2000, 4000, 8000];  // poi 8 s fino al tetto
+const RIPROVO_TETTO_MS = 30000;
+
+/* Il 502/503/504 del PORTINAIO (Caddy col backend spento), e non uno
+   scritto dall'app: quelli dell'app sono sempre JSON. */
+function rispostaDelPortinaio(r){
+  if (!r || ![502, 503, 504].includes(r.status)) return false;
+  const tipo = (r.headers && r.headers.get && r.headers.get('content-type')) || '';
+  return !/json/i.test(tipo);
+}
+
+/* Il fetch paziente. Tutto quel che tocca il mondo arriva da fuori
+   (il fetch vero, l'attesa, l'orologio, la pastiglia): cosi' la prova
+   lo fa girare in node con un server finto che cade e si rialza. */
+function fetchCheRiprova(fetchVero, {attendi, ora, origine, avviso}){
+  let inAttesa = 0;   // quante richieste stanno aspettando il server
+  const segna = d => { inAttesa += d; avviso(inAttesa > 0); };
+  const diCasa = input => {
+    try {
+      const u = new URL(typeof input === 'string' ? input
+                        : (input && input.url) || String(input), origine);
+      return u.origin === origine;
+    } catch (e) { return false; }
+  };
+  return async function fetchPaziente(input, init){
+    const metodo = String((init && init.method)
+      || (input && typeof input === 'object' && input.method) || 'GET').toUpperCase();
+    const lettura = ['GET', 'HEAD', 'OPTIONS'].includes(metodo);
+    const corpo = init && init.body;
+    // un corpo a flusso si legge una volta sola: niente seconda volta
+    const rifacibile = !(corpo && typeof corpo.getReader === 'function')
+      && !(input && typeof input === 'object' && input.bodyUsed);
+    if (!diCasa(input) || !rifacibile) return fetchVero(input, init);
+    const segnale = (init && init.signal) || (input && input.signal) || null;
+    // una Request si consuma: ne teniamo una intatta da clonare
+    const copia = () => (input && typeof input === 'object'
+      && typeof input.clone === 'function') ? input.clone() : input;
+    const inizio = ora();
+    let tentativo = 0, aspettando = false;
+    try {
+      for (;;) {
+        let r, errore;
+        try { r = await fetchVero(copia(), init); }
+        catch (e) { errore = e; }
+        const daRifare = errore
+          ? (lettura && errore.name !== 'AbortError' && !(segnale && segnale.aborted))
+          : rispostaDelPortinaio(r);
+        const attesa = RIPROVO_ATTESE_MS[Math.min(tentativo,
+                                                  RIPROVO_ATTESE_MS.length - 1)];
+        if (!daRifare || ora() - inizio + attesa > RIPROVO_TETTO_MS) {
+          if (errore) throw errore;
+          return r;
+        }
+        if (!aspettando) { aspettando = true; segna(+1); }
+        tentativo++;
+        await attendi(attesa, segnale);
+      }
+    } finally {
+      if (aspettando) segna(-1);
+    }
+  };
+}
+
+/* L'attesa che si interrompe col `signal` di chi ha chiamato */
+function attendiRiprovo(ms, segnale){
+  return new Promise((ok, no) => {
+    if (segnale && segnale.aborted) return no(segnale.reason
+      || new DOMException('Richiesta annullata', 'AbortError'));
+    const t = setTimeout(() => {
+      if (segnale) segnale.removeEventListener('abort', via);
+      ok();
+    }, ms);
+    const via = () => { clearTimeout(t); no(segnale.reason
+      || new DOMException('Richiesta annullata', 'AbortError')); };
+    if (segnale) segnale.addEventListener('abort', via, {once: true});
+  });
+}
+
+/* La pastiglia: accesa finche' almeno una richiesta aspetta il server */
+function avvisoRiprovo(acceso){
+  const p = document.getElementById('riprovo');
+  if (p) p.classList.toggle('show', acceso);
+}
+
+if (typeof window.fetch === 'function' && location.protocol.startsWith('http')) {
+  window.fetch = fetchCheRiprova(window.fetch.bind(window), {
+    attendi: attendiRiprovo, ora: () => Date.now(),
+    origine: location.origin, avviso: avvisoRiprovo});
+}
+
 let DEMO = !API_BASE;
 let VETRINA = false;   // browser in produzione: annunci veri, sola lettura
 let WEB = false;       // browser col login web: cookie di sessione, app completa
