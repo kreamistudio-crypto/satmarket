@@ -3441,6 +3441,28 @@
   ridisegno futuro richiuderebbe il racconto sotto le dita di chi
   legge. Mai localStorage: e' lo stato di una pagina, non una
   preferenza.
+  IL LINK APRE LA STORIA (30 set 2026, ritocco di Andrea): chi arriva
+  al negozio da un link — il Condividi o `/negozio/CODICE`, in
+  Telegram, nel browser o nell'app Android, che passano tutti da
+  `apriNegozioDaUrl` — lo trova APERTO, come chi tocca la card: chi
+  manda il link di un negozio con la storia manda la storia. Chi naviga
+  dall'app resta col cassetto chiuso. Il valore e' `DAL_LINK` e non
+  `true`: a disegno fatto `apriNegozio` lo richiude se quella che si
+  vede e' la BOZZA del venditore, perche' dal link si apre solo una
+  pagina pubblicata. Un negozio senza storia ha il cassetto «aperto» e
+  niente da disegnare.
+  E L'ANTEPRIMA DEL LINK NE MOSTRA LA COPERTINA: `_copertina_negozio`
+  mette nell'og:image di `/negozio/{chi}` la copertina in JPEG
+  (`assets/og/racconto-<slug>.jpg`, 1200x514, da `og_racconti.py`,
+  committata — il WebP non lo leggono tutti i crawler), col giudice del
+  negozio: `racconto_pubblico` per le pagine del server, per il
+  catalogo di casa `STORIA_CASA_NEL_NEGOZIO`, gemella di
+  `consigliato: true` e tenuta in pari da una prova. Il disco si chiede
+  prima, o resta il brand. ROVESCIA «l'anteprima social resta quella
+  del brand», che stava scritta senza un perche' da difendere.
+  PREZZO DICHIARATO: il tasto indietro ridisegna il negozio col
+  cassetto chiuso (`ridisegnaNegozio`), come gia' per la card dei
+  Consigliati.
   IL GATE E' IN LETTURA e NESSUNA SCOPA SPEGNE NIENTE — il patto di
   `ferie_fino` e di `lampo_scadenza`: alla scadenza il server smette
   di mandare lo slug nella busta di prima pagina, e la card sparisce
@@ -3610,8 +3632,9 @@
   home e NON e' una rotta. `foto: false` = segnaposto con l'etichetta
   in anteprima e nessun riquadro in pubblico; `rac-piccola` per marchio
   e QR (stretti e fermi); `/assets/racconti/` conosce i due cataloghi.
-  L'anteprima social del negozio resta quella del brand anche a pagina
-  pubblicata, come per To The Mooon. Il perche' di ogni pezzo e le
+  L'anteprima social del negozio, a pagina pubblicata, e' la COPERTINA
+  della storia (dal 30 set 2026, «IL LINK APRE LA STORIA»; prima era
+  quella del brand, come per To The Mooon). Il perche' di ogni pezzo e le
   strade scartate: Cantieri, «Una Garlanda in bozza».
   ⚠️ E LE PORTE SONO TRE, e la bozza la vede anche il VENDITORE (set
   2026, stesso giorno): `/api/me/racconti` gli da' le pagine del SUO
@@ -4275,6 +4298,10 @@
   senza rinominarli. «tutto» NON ha la sua figura, ed è voluto:
   `/categoria/tutto` non è un reparto, e il vocabolario delle pagine è
   chiuso su `CATEGORIE`.
+  DAL 30 SET 2026 LA STESSA ROTTA SERVE LE COPERTINE DELLE STORIE
+  (`racconto-<slug>.jpg`, `FORMA_OG_RACCONTO`) con la stretta dei loghi:
+  il catalogo di casa se la sua storia e' nel negozio, una pagina del
+  server solo pubblicata — vedi «IL LINK APRE LA STORIA».
   IL REPARTO VUOTO tiene tutto: il link funziona, la card si disegna e
   l'anteprima dice la verità («Ancora nessun oggetto in questo
   reparto»), col `noindex` e senza canonical.

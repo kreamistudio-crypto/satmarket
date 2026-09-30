@@ -18468,6 +18468,8 @@ let negozioPag = {chi:null, cursore:null, caricando:false};
    il racconto sotto le dita di chi sta leggendo. Mai localStorage:
    e' lo stato di una pagina, non una preferenza. */
 let raccontoAperto = false;
+/* il valore che apre il cassetto dal LINK (vedi `apriNegozioDaUrl`) */
+const DAL_LINK = 'link';
 
 /* `anteprima` (set 2026) e' la pagina IN BOZZA che il moderatore ha
    chiesto alla sua porta (`apriAnteprimaRacconto`): si appende al
@@ -18516,6 +18518,10 @@ async function apriNegozio(chi, aperto, anteprima, da, ridisegno){
         && d.venditore.negozio === myNegozio)
       anteprima = await bozzaDelVenditore(myNegozio);
     if (anteprima && d.venditore) d.venditore.racconto = anteprima;
+    /* dal link si apre solo la storia PUBBLICATA (vedi `DAL_LINK`): la
+       bozza che il venditore vede sul suo negozio resta chiusa, come
+       per chi naviga */
+    if (anteprima && aperto === DAL_LINK) raccontoAperto = false;
     renderNegozio(d.venditore, annunci, d.feedback||[], d.esauriti||[]);
   } catch(e) { toast('Negozio non trovato'); }
 }
@@ -63283,10 +63289,23 @@ function renderWallet(){
    diventa la chiave della entry di cronologia e della paginazione. */
 const NEGOZIO_URL = location.pathname.match(/^\/negozio\/([^/-]+)/);
 let negozioAperto = false;
+/* IL LINK APRE LA STORIA (30 set 2026, ritocco di Andrea): chi arriva da
+   un link — il Condividi del negozio o /negozio/CODICE scritto a mano,
+   in Telegram, nel browser o nell'app Android, che passano tutti di qui
+   — trova la pagina raccontata gia' APERTA, con le foto, e il negozio
+   sotto. E' la stessa ragione della card dei Consigliati: chi manda il
+   link di un negozio che ha una storia manda soprattutto la storia, e
+   l'anteprima in chat ne mostra la copertina (`_copertina_negozio` sul
+   server). Chi entra navigando dall'app resta com'era, col cassetto
+   chiuso. `DAL_LINK` e non `true`: a disegno fatto `apriNegozio` la
+   richiude se quella che si vede e' una BOZZA del venditore — il link
+   apre solo una pagina pubblicata. Un negozio senza storia non ha
+   niente da aprire, e il cassetto aperto non disegna niente.
+   `DAL_LINK` sta accanto a `raccontoAperto`, prima di chi la legge. */
 function apriNegozioDaUrl(){
   if (!NEGOZIO_URL || negozioAperto) return;
   negozioAperto = true;
-  apriNegozio(decodeURIComponent(NEGOZIO_URL[1]));
+  apriNegozio(decodeURIComponent(NEGOZIO_URL[1]), DAL_LINK);
 }
 /* Stesso patto per il link condiviso di un annuncio: /annuncio/{id}
    apre il dettaglio appena la vetrina e' carica. Con la vetrina a

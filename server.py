@@ -1855,6 +1855,15 @@ SLUG_SPONSOR = ("to-the-moon",)
 # `RACCONTI` del client c'e' prove_numeri_negozio. Le pagine del server
 # (`racconti.py`) non passano di qui: il loro legame e' gia' nel catalogo.
 NEGOZIO_SPONSOR_CASA = {"to-the-moon": "1b9a53e6"}
+# ...E QUALI DI LORO HANNO LA STORIA NEL NEGOZIO (30 set 2026, l'anteprima
+# del link condiviso): il gemello di `consigliato: true` nel `RACCONTI`
+# del client, che e' il giudice della storia per il catalogo di casa. Al
+# server serve per una cosa sola, la copertina nell'og:image di
+# /negozio/{chi} (`_copertina_negozio`): la pagina coi meta la legge un
+# crawler, che il JavaScript non lo esegue. Due copie in pari per
+# prove_storia_dal_link — tolta a mano la storia di la', la prova dice
+# di toglierla anche qui.
+STORIA_CASA_NEL_NEGOZIO = ("to-the-moon",)
 
 _SPONSOR = None     # None = mai letto; {"fino": {slug: fino}, "ordine": [...]}
 
@@ -61583,7 +61592,9 @@ def _seo_negozio(chi: str):
     """(titolo, testa, corpo) di un negozio: nome, quanti oggetti, le
     stelle, e l'elenco della merce come collegamenti veri.
     L'avatar NON ci va — e' un francobollo da 128px, sotto la misura
-    minima delle card — quindi l'immagine e' quella del brand.
+    minima delle card — quindi l'immagine e' quella del brand, o la
+    COPERTINA DELLA STORIA per un negozio che ne ha una pubblicata (30
+    set 2026: `_copertina_negozio`).
     Il tg_id serve solo a contare gli annunci e non esce da qui, come
     in tutta la vetrina; il canonical porta il CODICE del negozio letto
     dal database e mai il `chi` arrivato dall'URL, che potrebbe essere
@@ -61629,7 +61640,9 @@ def _seo_negozio(chi: str):
     testa = _testa_seo(
         f"{nome} su Barattolo",
         f"{conto} — paghi in sats, e restano nel deposito di garanzia "
-        f"finché la merce non è arrivata.", url, indicizza=indicizza)
+        f"finché la merce non è arrivata.", url,
+        immagine=_copertina_negozio(v["negozio"], v["tg_id"]),
+        indicizza=indicizza)
     corpo = f"<h1>{_testo(nome)}</h1><p>{_testo(conto)}</p>{schede}"
     return f"{_testo(nome)} — il negozio su Barattolo", testa, corpo
 
@@ -62651,10 +62664,60 @@ FILE_SCOPRIRE = ("lampo.webp", "sconto.webp", "p2p.webp",
 # «tutto»: /categoria/tutto non e' un reparto.
 FILE_OG = {f"{s}.jpg" for s in SLUG_CATEGORIE}
 
+# LE COPERTINE DELLE STORIE nella stessa cartella (30 set 2026): l'og:image
+# di un negozio con la pagina raccontata, `racconto-<slug>.jpg`, preparata
+# da og_racconti.py. Il prefisso tiene i due vocabolari separati — nessuno
+# slug di reparto comincia cosi'.
+# LA WHITELIST E' QUELLA DEI LOGHI E DEI BANNER, stretta, e non quella
+# delle foto: la foto di una bozza si serve perche' l'anteprima del
+# moderatore deve vederla, la copertina in JPEG la chiede solo un crawler
+# arrivato da un link — e un link la nomina solo a pagina pubblicata.
+FORMA_OG_RACCONTO = re.compile(r"^racconto-([a-z0-9-]{2,40})\.jpg$")
+# la misura che og_racconti.py scrive, dichiarata nei meta: e' una sola
+OG_RACCONTO = (1200, 514)
+
+
+def _copertina_servibile(slug: str) -> bool:
+    """La copertina di questo slug si puo' mostrare? Il catalogo di casa
+    se la sua storia e' nel negozio; una pagina del server se e'
+    PUBBLICATA. Fail-closed: uno slug di nessuno dei due, no."""
+    if slug in SLUG_SPONSOR:
+        return slug in STORIA_CASA_NEL_NEGOZIO
+    return slug in RACCONTI_NEGOZI and racconto_stato(slug) == "pubblicato"
+
+
+def _copertina_negozio(codice: str, tg_id=None):
+    """L'OG:IMAGE DI UN NEGOZIO: la copertina della sua storia, se ne ha
+    una che si vede, sennò il brand (30 set 2026, decisione di Andrea che
+    ROVESCIA «l'anteprima social resta quella del brand»: il link
+    condiviso di un negozio con la storia la apre gia' aperta, e chi lo
+    riceve in chat deve vedere la stessa pagina che trovera').
+    IL GIUDICE E' QUELLO DEL NEGOZIO: per le pagine del server
+    `racconto_pubblico`, lo stesso che mette la storia nella risposta di
+    /api/negozio — quindi la copertina c'e' esattamente quando c'e' la
+    storia; per il catalogo di casa il codice di NEGOZIO_SPONSOR_CASA e
+    il gemello di `consigliato`. L'ESISTENZA SI CHIEDE AL DISCO, il patto
+    di `_immagine_reparto`: un og:image che risponde 404 e' peggio di
+    nessuno, e una copertina nuova prima di og_racconti.py ricade sul
+    brand invece di bucare la card."""
+    slug = ""
+    if codice:
+        slug = next((s for s in STORIA_CASA_NEL_NEGOZIO
+                     if NEGOZIO_SPONSOR_CASA.get(s) == codice), "")
+        if not slug:
+            r = racconto_pubblico(codice, tg_id)
+            slug = (r or {}).get("slug") or ""
+    nome = f"racconto-{slug}.jpg"
+    if slug and FORMA_OG_RACCONTO.match(nome) \
+            and os.path.exists(os.path.join("assets", "og", nome)):
+        return (f"{URL_PUBBLICO}/assets/og/{nome}", *OG_RACCONTO)
+    return IMMAGINE_BRAND
+
 
 @app.get("/assets/og/{nome}")
 def asset_og(nome: str, if_none_match: str = Header("")):
-    if nome not in FILE_OG:
+    m = FORMA_OG_RACCONTO.match(nome)
+    if nome not in FILE_OG and not (m and _copertina_servibile(m.group(1))):
         raise HTTPException(404, "immagine non trovata")
     percorso = os.path.join("assets", "og", nome)
     if not os.path.exists(percorso):

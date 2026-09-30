@@ -26,9 +26,13 @@ LE PORTE CHE SI BUSSANO, e il verso di ognuna:
     nemmeno al venditore, che la bozza sul suo negozio la riceve dalla
     porta sua;
   - la pagina `/negozio/{codice}`, la home con `?bozza=` e la mappa del
-    sito: niente, ne' prima ne' dopo la pubblicazione (l'anteprima
-    social di un negozio resta quella del brand, la scelta gia' fatta
-    per To The Mooon);
+    sito: niente del TESTO, ne' prima ne' dopo la pubblicazione; e
+    nessuna immagine della pagina finche' e' in bozza. Pubblicata, la
+    pagina del negozio porta nell'og:image la COPERTINA in JPEG (30 set
+    2026, decisione di Andrea che rovescia «l'anteprima social resta
+    quella del brand»: il link condiviso apre la storia gia' aperta, e
+    l'anteprima in chat ne mostra la copertina) — e la rotta la serve
+    solo allora;
   - il gesto: pubblicare lo fa solo il moderatore e chiede un venditore
     vero; dopo, il racconto esce a chiunque apra QUEL negozio e a
     nessun altro; tornare in bozza lo toglie di nuovo;
@@ -130,8 +134,10 @@ def giro(c, SRV, SLUG, NOME):
     banner_salvato = cat.get("banner")
     # LE IMMAGINI DELLA PAGINA come le cercherebbe una risposta che le
     # linka: nessuna pagina pubblica le deve nominare finche' e' in bozza
+    # (con la copertina in JPEG dell'anteprima del link dal 30 set 2026)
+    copertina = f"/assets/og/racconto-{SLUG}.jpg"
     immagini = (f"/assets/racconti/{SLUG}-", f"/assets/scoprire/{SLUG}.",
-                f"/assets/consigliati/{SLUG}.")
+                f"/assets/consigliati/{SLUG}.", copertina)
 
     def linkate(testo):
         return [s for s in immagini if s in testo]
@@ -240,6 +246,8 @@ def giro(c, SRV, SLUG, NOME):
           [linkate(c.get(u).text) for u in (f"/negozio/{codice}",
                                             f"/?bozza={SLUG}",
                                             f"/api/negozio/{codice}?limit=12")])
+    prova("...e la copertina dell'anteprima, in bozza, risponde 404", 404,
+          c.get(copertina).status_code)
     prova("il pannello riconosce il venditore, col codice risolto",
           (codice, {"trovato": True, "nome": NOME}),
           (lista[SLUG].get("negozio"), lista[SLUG].get("venditore")))
@@ -321,11 +329,26 @@ def giro(c, SRV, SLUG, NOME):
     r = c.get("/api/me/racconti", headers=VENDITORE)
     prova("la porta del venditore la dice pubblicata", ["pubblicato"],
           [x.get("stato") for x in r.json().get("racconti") or []])
+    # ⚠️ EMENDATA IL 30 SET 2026: qui c'era «l'anteprima social del
+    # negozio resta quella del brand». Adesso, pubblicata, l'og:image e'
+    # la COPERTINA in JPEG — con la sua misura — e la rotta la serve; il
+    # testo della storia e le foto WebP restano fuori dalla pagina coi
+    # meta, che le legge un crawler e non il renderer.
     r = c.get(f"/negozio/{codice}")
-    prova("l'anteprima social del negozio resta quella del brand", [],
-          trovate(r.text))
-    prova("...senza le immagini della pagina, nemmeno pubblicata", [],
+    og = f'<meta property="og:image" content="{SRV.URL_PUBBLICO}{copertina}">'
+    prova("l'anteprima del negozio pubblicato e' la copertina della storia",
+          (True, True, True),
+          (og in r.text,
+           '<meta property="og:image:width" content="1200">' in r.text,
+           '<meta property="og:image:height" content="514">' in r.text))
+    prova("...e il brand non c'e' piu'", False,
+          "/assets/icona-512.png" in r.text.split("og:image", 1)[1][:200])
+    prova("...senza il testo della storia", [], trovate(r.text))
+    prova("...ne' le sue foto: solo la copertina dell'anteprima", [copertina],
           linkate(r.text))
+    r = c.get(copertina)
+    prova("...e la rotta la serve, in JPEG", (200, "image/jpeg"),
+          (r.status_code, r.headers.get("content-type", "")))
 
     print("\n[fra i Consigliati: pubblicata, e col logo]")
     cat["logo"] = False
@@ -375,6 +398,11 @@ def giro(c, SRV, SLUG, NOME):
     prova("...e dai Consigliati esce subito, anche col logo", [], mia)
     prova("...e il suo banner torna 404", 404,
           c.get(f"/assets/scoprire/{SLUG}.webp").status_code)
+    prova("...e l'anteprima del negozio torna al brand, con la copertina "
+          "404", (False, True, 404),
+          (copertina in c.get(f"/negozio/{codice}").text,
+           "/assets/icona-512.png" in c.get(f"/negozio/{codice}").text,
+           c.get(copertina).status_code))
     cat["logo"] = logo_salvato
 
     print("\n[la precedenza: col codice nel catalogo il tg_id non conta]")

@@ -31845,3 +31845,66 @@ true`. `apply_to = "both"` il giorno che servono ordini di acquisto in
 contanti. Il timeout che brucia, quando le cauzioni sono provate. Le
 righe di `docs/NODO-MOSTRO.md` che dicono la cauzione spenta (la nota
 in fondo le data).
+
+## Il link condiviso apre la storia (30 set 2026)
+
+Ritocco di Andrea: chi apre il link di un negozio con una pagina
+raccontata pubblicata (To The Mooon, Un Tempo per Te, Una Garlanda e le
+prossime) trova la storia già APERTA, con le foto, e il negozio sotto.
+Vale per il Condividi e per `/negozio/CODICE`, in Telegram, nel browser
+e nell'app Android. Chi naviga dall'app la trova come prima; i negozi
+senza storia restano come sono. E l'anteprima del link mostra la
+copertina della storia.
+
+**IL CLIENT.** Tutte le strade del link passano da `apriNegozioDaUrl`,
+che legge il percorso (l'app Android apre lo stesso indirizzo): adesso
+passa `DAL_LINK` ad `apriNegozio`. Non `true`, perché la bozza che il
+venditore vede sul suo negozio deve restare chiusa anche dal link — si
+apre solo una pagina pubblicata. La costante sta accanto a
+`raccontoAperto`, prima di chi la legge.
+
+**L'ANTEPRIMA.** Rovescia «l'anteprima social resta quella del brand»
+(Architettura, voce delle pagine in bozza), scritta senza un perché da
+difendere. `_copertina_negozio` è il giudice dell'og:image di
+`/negozio/{chi}`: la copertina se il negozio ha una storia che si vede,
+sennò il brand. Per le pagine del server chiede a `racconto_pubblico`,
+lo stesso della storia in `/api/negozio`; per To The Mooon, che vive
+nel catalogo del client, a `STORIA_CASA_NEL_NEGOZIO`, gemella di
+`consigliato: true` (una prova le tiene in pari). Le copertine sono
+JPEG in `assets/og/racconto-<slug>.jpg`, preparate da `og_racconti.py`
+e committate, 1200x514; sopra i 280 KB la qualità scende a passi (il
+tetto di WhatsApp). La rotta `/assets/og/` le serve solo a storia
+visibile.
+
+**LE STRADE SCARTATE.** 1) La copertina WebP com'è nell'og:image: non
+tutti i crawler la leggono (la ragione di `og_categorie.py`). 2) La tela
+1200x630: bande sopra e sotto, o il nome tagliato ai lati. 3) Comporla
+al volo: Pillow nella richiesta di un crawler. 4) `apriNegozio(chi,
+true)` dal link: avrebbe aperto anche la bozza del venditore.
+
+**PROVATO.** `prove_storia_dal_link` (40): il cassetto girato in node
+coi pezzi veri (aperto dal link con la copertina e «Chiudi la storia»,
+chiuso navigando, la card dei Consigliati come prima, niente per chi non
+ha storia, la bozza chiusa dal link), il giudice in tutti i rami, la
+forma della rotta, le copie in pari, i JPEG alla misura e sotto il tetto
+e uguali a occhio alla copertina di oggi (differenza media, non byte:
+un'altra libjpeg in CI li scrive diversi). Emendate col perché la
+sentinella del brand in `prove_racconti_bozza` e
+`collaudo_racconti_bozza` (pubblicata la copertina coi suoi 1200x514,
+404 in bozza e di nuovo dopo «Rimetti in bozza»); `og_racconti.py` nel
+compileall. Tortura 12 su 12. Suite intera severa senza config nel
+worktree ribasato su f3d0091: 17.598 verdi e 0 rosse; i 28 collaudi
+della CI verdi nella gabbia senza rete. Dal vivo a 375 px nei due temi,
+su una copia con config d'esempio (collaudo acceso, relay morto) e
+database nuovo — Una Garlanda pubblicata, un annuncio inserito a mano —
+aprendo il link da fuori: storia aperta con le sei immagini, la merce
+sotto, nessuno scorrimento laterale; dalla scheda dell'annuncio al
+venditore il cassetto è chiuso; il negozio con la sola bozza esce senza
+storia; il `curl` della pagina ha la copertina nell'og:image, e il brand
+sul negozio senza storia.
+
+**DA GUARDARE.** Telegram e WhatsApp tengono in cache le anteprime: un
+link già condiviso prima del deploy mostra il brand finché la cache non
+scade (per Telegram c'è @WebpageBot). Sul telefono, il link aperto
+davvero dentro Telegram e nell'app Android. Il tasto indietro richiude
+il cassetto (prezzo dichiarato, come per i Consigliati).

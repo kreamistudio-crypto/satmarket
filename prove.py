@@ -32372,6 +32372,16 @@ def _amb_seo():
               "_spezza_pagina", "_monta_pagina",
               "_riga_sitemap", "_sitemap"):
         exec(pezzo(f), amb)
+    # IL GIUDICE DELLA COPERTINA (30 set 2026): `_seo_negozio` lo chiama,
+    # e si monta VERO — nessuna pagina del server pubblicata, qui, quindi
+    # solo il negozio di casa esce con la sua copertina (vedi
+    # prove_storia_dal_link, che lo gira in tutti i casi)
+    amb["racconto_pubblico"] = lambda codice, tg_id=None: None
+    for riga in ("NEGOZIO_SPONSOR_CASA = {", "STORIA_CASA_NEL_NEGOZIO = (",
+                 "FORMA_OG_RACCONTO = ", "OG_RACCONTO = ("):
+        i = _SORGENTE.index(riga)
+        exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    exec(pezzo("_copertina_negozio"), amb)
     i = _SORGENTE.index("META_GENERICI = _meta_anteprima(")
     exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
     i = _SORGENTE.index("META_SICUREZZA = _meta_anteprima(")
@@ -44835,10 +44845,19 @@ def prove_racconti_bozza():
     # a un moderatore sarebbe un secondo giudice della bozza
     prova("...e non guarda ne' il catalogo ne' chi bussa", (False, False),
           ("RACCONTI_NEGOZI" in _neg, "e_admin(" in _neg))
-    # L'ANTEPRIMA SOCIAL resta quella del brand, la scelta di To The
-    # Mooon: il giudice dei meta del negozio non sa dei racconti
-    prova("i meta del negozio non sanno dei racconti", False,
-          "racconto" in pezzo("_seo_negozio").lower())
+    # ⚠️ EMENDATA IL 30 SET 2026 (decisione di Andrea che ROVESCIA
+    # «l'anteprima social resta quella del brand»): il link di un negozio
+    # con la storia la apre gia' aperta, e l'anteprima in chat ne mostra
+    # la copertina. La domanda di qui resta la meta' che conta — la
+    # BOZZA non deve uscire nemmeno da li' —, quindi i meta del negozio
+    # non leggono ne' il catalogo ne' lo stato: chiedono al solo giudice
+    # della copertina, che passa da `racconto_pubblico` come la rotta del
+    # negozio (vedi prove_storia_dal_link).
+    _sn = codice(pezzo("_seo_negozio"))
+    prova("i meta del negozio chiedono la copertina al suo giudice, e "
+          "non leggono ne' il catalogo ne' lo stato", (True, False, False),
+          ('_copertina_negozio(v["negozio"], v["tg_id"])' in _sn,
+           "RACCONTI_NEGOZI" in _sn, "racconto_stato(" in _sn))
     for nome in ("lista_racconti_admin", "decidi_racconto_admin"):
         _a = codice(pezzo(nome))
         prova(f"{nome}: la guardia e' quella delle sorelle", True,
@@ -105996,6 +106015,273 @@ console.log(JSON.stringify(OUT));
                                            .get("testo") or "")))
 
 
+def prove_storia_dal_link():
+    """IL LINK CONDIVISO APRE LA STORIA (30 set 2026, ritocco di Andrea).
+    Chi apre il link di un negozio con una pagina raccontata pubblicata
+    — il Condividi o /negozio/CODICE, in Telegram, nel browser o nell'app
+    Android — la trova gia' APERTA; chi entra navigando dall'app la trova
+    come prima; un negozio senza storia resta com'e'. E l'anteprima del
+    link mostra la COPERTINA della storia invece del brand.
+
+    QUEL CHE SI ROMPE IN SILENZIO, e si prova qui:
+    1) il cassetto, girato in node coi pezzi VERI (apriNegozioDaUrl,
+       apriNegozio, raccontoDi, raccontoNegozio e il catalogo di casa):
+       aperto dal link, chiuso navigando, niente per chi non ha storia, e
+       la bozza del venditore chiusa anche dal link;
+    2) il giudice della copertina sul server, in tutti i rami — casa,
+       pagina pubblicata, niente storia, file mancante, codice vuoto — e
+       la rotta che la serve solo a storia visibile;
+    3) le due copie che devono stare in pari: la tupla del server col
+       `consigliato: true` del client, e la misura dichiarata coi file."""
+    import shutil as _sh, subprocess as _sp, tempfile as _tf
+    print("\n[🔗 il link condiviso apre la storia]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+
+    # ---- 1. il cassetto, girato --------------------------------------
+    # IL LINK E' L'UNICO A CHIEDERE `DAL_LINK`: un'altra strada che lo
+    # passasse aprirebbe la storia a chi naviga, ed e' quel che Andrea ha
+    # chiesto di NON cambiare
+    _chiamate = [r for r in mini.split("\n")
+                 if "apriNegozio(" in r and "DAL_LINK" in r]
+    prova("a passare DAL_LINK ad apriNegozio e' il solo link diretto",
+          ["  apriNegozio(decodeURIComponent(NEGOZIO_URL[1]), DAL_LINK);"],
+          [r.rstrip("\r") for r in _chiamate])
+    # ...e la costante sta PRIMA di chi la legge, o un apriNegozio con
+    # l'anteprima chiamato presto cadrebbe nella zona morta del `const`
+    prova("DAL_LINK nasce prima di apriNegozio", True,
+          mini.index("const DAL_LINK = ")
+          < mini.index("async function apriNegozio(chi, aperto,"))
+    _node = _sh.which("node")
+    if not _node:
+        salta("il cassetto girato", "node non installato")
+    else:
+        def _fetta(inizio, fine):
+            i = mini.index(inizio)
+            return mini[i:mini.index(fine, i) + len(fine)]
+        _js = ("""
+let VETRINA = true, DEMO = false, myNegozio = '', negozioPag = {};
+const API_BASE = '/api', LIMITE_PAGINA = 12;
+const authHdr = () => 'x', toast = m => { disegni.push('toast:' + m); };
+const mapListing = x => x, inCatalogo = () => {};
+let bozza = null;
+async function bozzaDelVenditore(){ return bozza; }
+const disegni = [];
+function renderNegozio(v){ disegni.push({aperto: raccontoAperto,
+                                         html: raccontoNegozio(v)}); }
+async function fetch(u){
+  const chi = decodeURIComponent(u.split('/api/negozio/')[1].split('?')[0]);
+  return {ok: true, json: async () => ({annunci: [], venditore:
+    {negozio: chi === 'casa' ? RACCONTI['to-the-moon'].negozio : 'ff99ee88'}})};
+}
+let location = {pathname: '/negozio/casa-to-the-mooon'};
+""" + pezzo_js(mini, "const esc = ", "\nconst el =") + "\n"
+            + _fetta("let raccontoAperto = false;", "const DAL_LINK = 'link';")
+            + "\n" + _fetta("const RACCONTI = {", "\n};") + "\n"
+            + _fetta("function raccontoDi(v){", "\n}") + "\n"
+            + _fetta("function raccontoNegozio(v){", "\n}") + "\n"
+            # l'avviso della bozza: il renderer lo chiama in anteprima
+            + _fetta("function avvisoBozzaRacconto(r){", "\n}") + "\n"
+            + pezzo_js(mini, "async function apriNegozio(chi, aperto, "
+                             "anteprima, da, ridisegno){") + "\n"
+            + _fetta("const NEGOZIO_URL = ", ";") + "\n"
+            + _fetta("let negozioAperto = false;", ";") + "\n"
+            + _fetta("function apriNegozioDaUrl(){", "\n}") + """
+const aspetta = () => new Promise(r => setTimeout(r, 0));
+(async () => {
+  const esito = {};
+  const ultimo = () => disegni[disegni.length - 1];
+  const come = d => d && typeof d === 'object'
+    ? {aperto: d.aperto, storia: d.html.length > 200,
+       corpoAperto: d.html.includes('rac-corpo aperto'),
+       chiudi: d.html.includes('Chiudi la storia'),
+       copertina: d.html.includes('/assets/racconti/to-the-moon-cop.webp')}
+    : d;
+  apriNegozioDaUrl(); await aspetta(); await aspetta();
+  esito.link = come(ultimo());
+  const quanti = disegni.length;
+  apriNegozioDaUrl(); await aspetta(); await aspetta();
+  esito.linkDueVolte = disegni.length - quanti;
+  await apriNegozio('casa');
+  esito.navigando = come(ultimo());
+  await apriNegozio('casa', true);
+  esito.consigliati = come(ultimo());
+  await apriNegozio('senza', DAL_LINK);
+  esito.senzaStoria = come(ultimo());
+  VETRINA = false; myNegozio = RACCONTI['to-the-moon'].negozio;
+  bozza = Object.assign({}, RACCONTI['to-the-moon'],
+                        {slug: 'to-the-moon', anteprima: 'venditore'});
+  await apriNegozio('casa', DAL_LINK);
+  esito.bozzaDalLink = come(ultimo());
+  await apriNegozio('casa', true);
+  esito.bozzaDaiConsigliati = come(ultimo()).aperto;
+  bozza = null;
+  await apriNegozio('casa', DAL_LINK);
+  esito.venditoreSenzaBozza = come(ultimo()).aperto;
+  console.log(JSON.stringify(esito));
+})();
+""")
+        with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8") as _f:
+            _f.write(_js)
+            _p = _f.name
+        _r = _sp.run([_node, _p], capture_output=True, text=True,
+                     encoding="utf-8")
+        os.unlink(_p)
+        try:
+            _e = json.loads((_r.stdout or "").strip().splitlines()[-1])
+        except Exception:
+            _e = None
+        if _e is None:
+            prova("il banco del cassetto gira", "", (_r.stderr or "")[:400])
+        else:
+            aperta = {"aperto": True, "storia": True, "corpoAperto": True,
+                      "chiudi": True, "copertina": True}
+            prova("dal link la storia nasce APERTA, con la copertina e il "
+                  "bottone che la chiude", aperta, _e["link"])
+            prova("...e il link si legge una volta sola", 0,
+                  _e["linkDueVolte"])
+            prova("navigando dall'app la storia e' chiusa, come prima",
+                  {"aperto": False, "storia": True, "corpoAperto": False,
+                   "chiudi": False, "copertina": True}, _e["navigando"])
+            prova("...e la card dei Consigliati la apre ancora", aperta,
+                  _e["consigliati"])
+            # il cassetto e' «aperto», ma non c'e' niente da disegnare: il
+            # negozio senza storia esce com'e' sempre uscito
+            prova("un negozio senza storia resta com'e', anche dal link",
+                  {"aperto": True, "storia": False, "corpoAperto": False,
+                   "chiudi": False, "copertina": False}, _e["senzaStoria"])
+            prova("la bozza del venditore dal link resta chiusa", False,
+                  _e["bozzaDalLink"]["aperto"])
+            prova("...mentre l'anteprima dei Consigliati e del moderatore "
+                  "la apre come prima", True, _e["bozzaDaiConsigliati"])
+            prova("...e senza bozza il venditore vede la storia aperta come "
+                  "tutti", True, _e["venditoreSenzaBozza"])
+
+    # ---- 2. il giudice della copertina -------------------------------
+    import racconti as _rac
+    chiesti = []
+    stato = {"una-garlanda": "pubblicato"}
+    amb = {"os": os, "re": re, "URL_PUBBLICO": "https://barattolo.store",
+           "RACCONTI_NEGOZI": _rac.RACCONTI_NEGOZI,
+           "racconto_stato": lambda s_: stato.get(s_, "bozza")}
+
+    def _pubblico(codice_, tg_id=None):
+        chiesti.append(codice_)
+        return {"slug": "una-garlanda"} if codice_ == "ab12cd34" else None
+    amb["racconto_pubblico"] = _pubblico
+    for riga in ("IMMAGINE_BRAND = (", "SLUG_SPONSOR = (",
+                 "NEGOZIO_SPONSOR_CASA = {", "STORIA_CASA_NEL_NEGOZIO = (",
+                 "FORMA_OG_RACCONTO = ", "OG_RACCONTO = ("):
+        i = src.index(riga)
+        exec(src[i:src.index("\n", i)], amb)
+    for f in ("_copertina_servibile", "_copertina_negozio"):
+        exec(pezzo(f), amb)
+    cop = amb["_copertina_negozio"]
+    brand = amb["IMMAGINE_BRAND"]
+    url = "https://barattolo.store/assets/og/racconto-%s.jpg"
+    prova("il negozio di casa con la storia: la sua copertina",
+          (url % "to-the-moon", 1200, 514),
+          cop(amb["NEGOZIO_SPONSOR_CASA"]["to-the-moon"], None))
+    prova("una pagina del server pubblicata: la sua copertina",
+          (url % "una-garlanda", 1200, 514), cop("ab12cd34", 613))
+    prova("...chiesta al giudice del pubblicato, col tg_id del negozio",
+          ["ab12cd34"], chiesti)
+    prova("un negozio senza storia: il brand, come prima", brand,
+          cop("ff99ee88", 5))
+    del chiesti[:]
+    prova("...e senza codice il brand, senza nemmeno chiedere",
+          (brand, []), (cop("", 5), chiesti))
+    # L'ESISTENZA SI CHIEDE AL DISCO: una copertina arrivata prima di
+    # og_racconti.py ricade sul brand, mai su un og:image che fa 404
+    amb["racconto_pubblico"] = lambda c_, t_=None: {"slug": "mai-esistita"}
+    prova("una storia senza il suo JPEG: il brand, mai un 404", brand,
+          cop("ab12cd34", 613))
+    amb["racconto_pubblico"] = _pubblico
+    # tolta a mano la storia di casa, il negozio torna al brand
+    amb["STORIA_CASA_NEL_NEGOZIO"] = ()
+    prova("tolta la storia di casa, il brand", brand,
+          cop(amb["NEGOZIO_SPONSOR_CASA"]["to-the-moon"], None))
+    serv = amb["_copertina_servibile"]
+    prova("...e la sua copertina non si serve piu'", False,
+          serv("to-the-moon"))
+    amb["STORIA_CASA_NEL_NEGOZIO"] = ("to-the-moon",)
+    prova("la rotta serve: casa con la storia, pagina pubblicata",
+          (True, True), (serv("to-the-moon"), serv("una-garlanda")))
+    prova("...e non serve: pagina in bozza, slug di nessuno",
+          (False, False), (serv("un-tempo-per-te"), serv("mai-esistita")))
+    _og = codice(pezzo("asset_og"))
+    prova("la rotta chiede alla forma e al giudice della copertina", True,
+          "FORMA_OG_RACCONTO.match(nome)" in _og
+          and "_copertina_servibile(m.group(1))" in _og)
+    # LA FORMA NON LASCIA PASSARE UN PERCORSO: niente barre, niente punti
+    for nome_ in ("racconto-../config.jpg", "racconto-a/b.jpg",
+                  "racconto-una-garlanda.webp", "racconto-.jpg",
+                  "RACCONTO-una-garlanda.jpg"):
+        prova(f"la forma rifiuta «{nome_}»", None,
+              amb["FORMA_OG_RACCONTO"].match(nome_))
+
+    # ---- 3. le copie in pari -----------------------------------------
+    # IL GEMELLO DI `consigliato: true`: la voce del catalogo di casa che
+    # ha la storia nel negozio, letta dal client VERO
+    _cli = pezzo_js(mini, "const RACCONTI = {", "\n};\n")
+    _voci = re.split(r"^  '([a-z0-9-]+)': \{$", _cli, flags=re.M)[1:]
+    _con_storia = {_voci[k] for k in range(0, len(_voci), 2)
+                   if re.search(r"^    consigliato: true,", _voci[k + 1],
+                                re.M)}
+    prova("la tupla del server combacia col `consigliato: true` del client",
+          _con_storia, set(amb["STORIA_CASA_NEL_NEGOZIO"]))
+    prova("...e il catalogo di casa si e' letto davvero", True,
+          "to-the-moon" in _voci)
+    _ogpy = open("og_racconti.py", encoding="utf-8").read()
+    prova("lo script scrive la misura che il server dichiara", True,
+          "LARGO, ALTO = %d, %d" % amb["OG_RACCONTO"] in _ogpy)
+    _cop = sorted(n[:-9] for n in os.listdir("assets/racconti")
+                  if n.endswith("-cop.webp"))
+    prova("ogni storia con la copertina ha il suo JPEG", [],
+          [s_ for s_ in _cop
+           if not os.path.exists("assets/og/racconto-%s.jpg" % s_)])
+    prova("...e nessun JPEG senza la sua storia", [],
+          [n for n in os.listdir("assets/og") if n.startswith("racconto-")
+           and n[9:-4] not in _cop])
+    try:
+        from PIL import Image as _Img
+    except ImportError:
+        if SEVERE:
+            prova("Pillow per le misure delle copertine", True, False)
+        else:
+            salta("le misure delle copertine", "Pillow non e' installata")
+        return
+    import importlib.util as _iu
+    _spec = _iu.spec_from_file_location("og_racconti", "og_racconti.py")
+    _ogr = _iu.module_from_spec(_spec)
+    _spec.loader.exec_module(_ogr)
+    for s_ in _cop:
+        f_ = "assets/og/racconto-%s.jpg" % s_
+        with _Img.open(f_) as im:
+            prova(f"{s_}: JPEG opaco alla misura dichiarata",
+                  ("JPEG", "RGB", amb["OG_RACCONTO"]),
+                  (im.format, im.mode, im.size))
+        prova(f"{s_}: sotto il tetto di WhatsApp", True,
+              os.path.getsize(f_) <= _ogr.TETTO_BYTE)
+        # IL FILE E' QUELLO DELLA COPERTINA DI OGGI: ridisegnata la
+        # copertina senza rilanciare lo script, l'anteprima in chat
+        # mostrerebbe quella vecchia
+        # A OCCHIO E NON A BYTE: un'altra libjpeg (la CI) comprime lo
+        # stesso disegno in byte diversi, e la domanda e' se il disegno
+        # e' quello — la differenza media per canale resta sotto 3 su 255
+        # per la stessa copertina, e ne salta decine per un'altra
+        import io as _io
+        from PIL import ImageChops as _Ch, ImageStat as _St
+        _nuova = _io.BytesIO(_ogr.componi(
+            "assets/racconti/%s-cop.webp" % s_))
+        with _Img.open(_nuova) as a_, _Img.open(f_) as b_:
+            _diff = max(_St.Stat(_Ch.difference(a_.convert("RGB"),
+                                                b_.convert("RGB"))).mean)
+        prova(f"{s_}: e' la copertina di oggi (og_racconti.py rilanciato)",
+              True, _diff < 3)
+
+
 def prove_consigliati():
     """LA CARD «CONSIGLIATI» E LA SUA PAGINA (set 2026).
 
@@ -112839,6 +113125,7 @@ def main():
               prove_numeri_negozio,
               prove_racconto_girato,
               prove_racconti_bozza,
+              prove_storia_dal_link,
               prove_consigliati,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
