@@ -32240,3 +32240,19 @@ viste e la home non ribatte; ricaricata batte di nuovo; con
 `fx-ridotti` e con reduced-motion nessuna animazione; nessuno sbordo.
 
 **DA GUARDARE.** Sul telefono, all'apertura dentro Telegram.
+
+## Il logo di Una Garlanda centrato nella card «Consigliati» (1 ott 2026)
+
+Ritocco di Andrea dal telefono: a `logo_giu` +2 (la scelta di ieri sulla
+simulazione, «I loghi dei Consigliati con l'aria attorno», qui sopra) il
+fiore pareva troppo in basso e fuori centro. Adesso 0: all'86% del
+riquadro ha ~9,5 px d'aria sopra e sotto nel quadrato da 84, e non tocca
+i bordi. LA LEZIONE: la simulazione a 3x sul bruno ha mostrato bene il
+taglio, non il centro percepito sul telefono — per una taratura di due
+pixel l'occhio che conta è quello del telefono. PROVATO: suite intera
+severa senza config nel worktree da origin/main (482bbfc), 17.687 verdi
+e 0 rosse; i 28 collaudi della CI nella gabbia (dopo il rebase su
+5ca3ba3, il battito della card «P2P in arrivo»: le famiglie toccate,
+600 verdi, e i 28 collaudi); dal vivo via CDP a 375
+px nei due temi, i tre loghi accesi uno alla volta (translateY 0 per Una
+Garlanda), nessuno sbordo. DA GUARDARE: il telefono.
