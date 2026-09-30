@@ -31205,36 +31205,40 @@ la prova ESPLODEVA su un rifiuto del giudice invece di farsi rossa — resa
 robusta con `_inc`/`_gia`, che su un rifiuto mettono la frase al posto del
 numero; al secondo giro le tre mutazioni ripassate sono uccise con rosse
 nominate e nessun botto). Suite intera severa senza config nel worktree (su
-4084cba): 17.305 verdi e 0 rosse. DAL VIVO (server dalla copia, relay morto,
-eventi dalla porta vera col bearer, tre Chrome headless via CDP a 375 e
-densità 2, chiaro e scuro): il foglio Pubblica con 300 € rifiuta con la
-frase del tetto e mostra la regola sotto il metodo; il dettaglio di chi
-prende pure; la pagina dello scambio ai due lati col riquadro; «Mostra il
-codice» disegna il QR (posizione data col permesso di Chrome e
-`setGeolocationOverride`); LA SCANSIONE È VERA nel senso che conta: lo
-scatto del QR di A è stato DECODIFICATO con zxing-cpp (un lettore vero) e il
-testo combacia col client carattere per carattere; il testo è entrato in B
-dalla porta dello scanner di Telegram (`showScanQrPopup` di cartone,
-callback del client) → 200, «✅ Incontro confermato alle 20:33, a 15 m di
-distanza (precisione ±12 m)» su B, il foglio di A chiuso da solo con la
-stessa riga; un profilo nuovo di 111 ritrova la prova dal server (riga solo
-da guardare); la strada «incolla» su B senza lo scanner (foglio con la
-casella, testo incollato, «Conferma» → `gia` → confermato); la disputa
-aperta dalla porta degli eventi → la card del moderatore con la riga e la
-cautela; la chiusura da moderatore → nel db posizioni e copia a NULL, ora e
-distanza ferme, la card dice «posizioni cancellate»; Info P2P col tetto
-vivo; «I tuoi dati». **NON PROVATO**: la fotocamera del browser
-(`BarcodeDetector` non c'è in Chrome headless su Windows: la strada 2 è
-scritta e non esercitata); lo scanner VERO di Telegram su iPhone e Android;
-il permesso del GPS chiesto da un telefono vero e il suo timeout; il
-coordinatore vero; i due telefoni veri. **DA FARE CON DUE TELEFONI VERI**:
-uno scambio in contanti preso (Telegram su uno, l'APK sull'altro): A «Mostra
-il codice» con la posizione, B «Inquadra» — su Telegram deve aprirsi lo
-scanner suo e chiudersi da solo al codice buono, sull'APK la fotocamera del
-browser —, poi entrambe le pagine con «Incontro confermato» e la distanza;
-rifare con la posizione negata (deve passare, «senza posizioni»); rifare a
-codice scaduto (undici minuti: «Il codice è vecchio»); inquadrare il codice
-di un ALTRO scambio; il moderatore sul terzo telefono. **IL WORKFLOW È STATO
-TOCCATO** (`collaudo_contanti_p2p.py` e `schnorr_puro.py` nel compileall, il
-collaudo nell'elenco della CI): `pronto` può restare indietro, si guarda
-dopo il push.
+4084cba): 17.305 verdi e 0 rosse; dopo il rebase su 293285f (il minimo di
+Barattozon, entrato nella busta delle leve lo stesso giorno) tre rosse
+dell'incrocio — la busta con due chiavi nuove, il banco di Barattozon a
+mercato senza il giudice del contanti — curate nei banchi, e la suite intera
+rigirata sull'albero definitivo: 17.342 verdi e 0 rosse; i 28 collaudi della
+CI verdi nella gabbia. DAL VIVO (server dalla copia, relay morto, eventi
+dalla porta vera col bearer, tre Chrome headless via CDP a 375 e densità 2,
+chiaro e scuro): il foglio Pubblica con 300 € rifiuta con la frase del tetto
+e mostra la regola sotto il metodo; il dettaglio di chi prende pure; la
+pagina dello scambio ai due lati col riquadro; «Mostra il codice» disegna il
+QR (posizione data col permesso di Chrome e `setGeolocationOverride`); LA
+SCANSIONE È VERA nel senso che conta: lo scatto del QR di A è stato
+DECODIFICATO con zxing-cpp (un lettore vero) e il testo combacia col client
+carattere per carattere; il testo è entrato in B dalla porta dello scanner
+di Telegram (`showScanQrPopup` di cartone, callback del client) → 200, «✅
+Incontro confermato alle 20:33, a 15 m di distanza (precisione ±12 m)» su B,
+il foglio di A chiuso da solo con la stessa riga; un profilo nuovo di 111
+ritrova la prova dal server (riga solo da guardare); la strada «incolla» su
+B senza lo scanner (foglio con la casella, testo incollato, «Conferma» →
+`gia` → confermato); la disputa aperta dalla porta degli eventi → la card
+del moderatore con la riga e la cautela; la chiusura da moderatore → nel db
+posizioni e copia a NULL, ora e distanza ferme, la card dice «posizioni
+cancellate»; Info P2P col tetto vivo; «I tuoi dati». **NON PROVATO**: la
+fotocamera del browser (`BarcodeDetector` non c'è in Chrome headless su
+Windows: la strada 2 è scritta e non esercitata); lo scanner VERO di
+Telegram su iPhone e Android; il permesso del GPS chiesto da un telefono
+vero e il suo timeout; il coordinatore vero; i due telefoni veri. **DA FARE
+CON DUE TELEFONI VERI**: uno scambio in contanti preso (Telegram su uno,
+l'APK sull'altro): A «Mostra il codice» con la posizione, B «Inquadra» — su
+Telegram deve aprirsi lo scanner suo e chiudersi da solo al codice buono,
+sull'APK la fotocamera del browser —, poi entrambe le pagine con «Incontro
+confermato» e la distanza; rifare con la posizione negata (deve passare,
+«senza posizioni»); rifare a codice scaduto (undici minuti: «Il codice è
+vecchio»); inquadrare il codice di un ALTRO scambio; il moderatore sul terzo
+telefono. **IL WORKFLOW È STATO TOCCATO** (`collaudo_contanti_p2p.py` e
+`schnorr_puro.py` nel compileall, il collaudo nell'elenco della CI):
+`pronto` può restare indietro, si guarda dopo il push.
