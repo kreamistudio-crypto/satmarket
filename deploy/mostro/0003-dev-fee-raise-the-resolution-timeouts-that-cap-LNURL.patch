@@ -1,25 +1,9 @@
-From a075d0c50e41e1992323ffbaff8085d70c866e76 Mon Sep 17 00:00:00 2001
+From 1e1bcc007e3a2c725f67262ee1694ab2c924007e Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
-Date: Tue, 22 Sep 2026 13:40:10 +0200
+Date: Wed, 30 Sep 2026 21:02:33 +0200
 Subject: [PATCH 3/7] dev fee: raise the resolution timeouts that cap LNURL
  below its own budget
 
-Resolving the dev fee invoice is two HTTPS round-trips on two different
-domains (the .well-known document, then the callback). Under a
-transparent Tor proxy each one pays a cold-circuit cost of ~10.6s, so
-the resolution needs roughly 21s of wall clock before it can succeed at
-all -- against an inner cap of 15s and an outer cap of 20s. Neither
-could ever be met on a cold circuit, and raising the per-request LNURL
-budgets alone does not help while these two decide first.
-
-Raise the inner cap to 75s, which clears twice the per-request budget,
-and the outer one to 90s so it stays above the inner cap instead of
-pre-empting it. Both remain well under the 5 minute staleness window
-after which a PENDING claim is released. The timeouts around the LND
-payment itself are untouched: the observed failure was NoAPIResponse
-during resolution.
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 ---
  src/app/dev_fee.rs | 13 ++++++++++---
  1 file changed, 10 insertions(+), 3 deletions(-)

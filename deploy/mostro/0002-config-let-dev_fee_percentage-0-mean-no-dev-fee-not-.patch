@@ -1,22 +1,9 @@
-From 97c32afc1126c0cd77143c9c9b87fd610802730c Mon Sep 17 00:00:00 2001
+From 3255b525f856ba4becb64257cde986e3a477ed5d Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
-Date: Tue, 22 Sep 2026 13:40:09 +0200
+Date: Wed, 30 Sep 2026 21:02:33 +0200
 Subject: [PATCH 2/7] config: let dev_fee_percentage = 0 mean no dev fee, not
  an invalid value
 
-MIN_DEV_FEE_PERCENTAGE (0.10) rejected zero, so a coordinator that
-cannot pay the dev fee at all had no way to say so: the only options
-were to pay at least 10% of its fee or to fail startup validation.
-Orders with dev_fee = 0 are already excluded from the payment queue by
-find_unpaid_dev_fees, so zero is a meaningful, already-supported state
-everywhere except this check.
-
-Treat 0 as the explicit opt-out and keep everything else as it was:
-negatives stay invalid, the band between zero and the minimum stays
-invalid, and the maximum is untouched. Comparisons are ordering only,
-so no float equality is introduced.
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 ---
  src/config/util.rs | 15 ++++++++++++---
  1 file changed, 12 insertions(+), 3 deletions(-)

@@ -44471,6 +44471,14 @@ function infoDaEvento(ev){
     fee: num('fee'),
     pow: num('pow'),
     powPrimo: num('pow_first_contact') || num('pow'),
+    /* LA VERSIONE DEL PROTOCOLLO (30 set 2026, con lo studio della
+       0.19.0): «2» e' il kind 14 che questa app parla da sempre; «1»
+       sarebbe il gift wrap, che mostrod 0.19.0 non parla piu' e questa
+       app non ha mai parlato. Si LEGGE, e a giudicarla e'
+       guardiaProtocolloP2P: qui 0 vuol dire «il tag non c'e'» (un
+       daemon prima della 0.18.0, o l'info di cartone dei banchi), mai
+       un numero inventato al posto suo. */
+    protocollo: Math.floor(num('protocol_version')),
     maxSats: Math.floor(num('max_order_amount')),
     minSats: Math.floor(num('min_order_amount')),
     /* LA FINESTRA CHE DECIDE E' QUESTA, ed e' PER GESTO: quindici
@@ -49234,6 +49242,16 @@ async function identitaMieP2P(mz){
    una risposta, e il vuoto vero arriva dentro una risposta. Le righe
    trovate si versano in `dentro`, che e' comune alle domande di questo
    giro: due liste della stessa persona non si contraddicono. */
+/* PURA: la trade key dell'ALTRA parte, come la dice una riga della
+   restore-session di mostrod 0.19.0 (`counterparty_trade_pubkey`, #966:
+   `seller_pubkey` per chi compra, `buyer_pubkey` per chi vende, null
+   finche' nessuno ha preso). Sulla 0.18.8 il campo non c'e' e torna '':
+   e' la stessa tolleranza di serde dall'altro lato. Solo 64 esadecimali,
+   minuscoli — e' una chiave, e ci si derivano le chiavi dei recapiti. */
+function chiavePeerRestoreP2P(r){
+  const k = String((r && r.counterparty_trade_pubkey) || '').trim().toLowerCase();
+  return /^[0-9a-f]{64}$/.test(k) ? k : '';
+}
 async function unaRestoreP2P(relay, mostro, info, identitaSk, dentro){
   const NT = window.NostrTools;
   const tkSk = NT.utils.bytesToHex(NT.generateSecretKey());
@@ -49248,6 +49266,7 @@ async function unaRestoreP2P(relay, mostro, info, identitaSk, dentro){
      quell'ordine non l'ha mai visto. E' la PUBKEY e mai il segreto:
      questa riga finisce in memoria e nessuno la scrive sul disco. */
   const identitaPub = NT.getPublicKey(NT.utils.hexToBytes(identitaSk));
+  guardiaProtocolloP2P(info);
   let risposto = false;
   let sub = null;
   try {
@@ -49267,6 +49286,7 @@ async function unaRestoreP2P(relay, mostro, info, identitaSk, dentro){
               if (r && r.order_id)
                 dentro[String(r.order_id)] = {indice: r.trade_index | 0,
                                               stato: String(r.status || ''),
+                                              peer: chiavePeerRestoreP2P(r),
                                               identita: identitaPub};
             risposto = true;
             basta();
@@ -49482,6 +49502,7 @@ async function mostroChiama(skTrade, msg, opz){
      nello stesso respiro */
   await mostroRiascolta();
   const info = await mostroInfoP2P();
+  guardiaProtocolloP2P(info);
   const bits = o.primoContatto ? (info.powPrimo || 0) : (info.pow || 0);
   const adesso = Math.floor(Date.now() / 1000);
   const mostro = mostroHexP2P();
@@ -49541,6 +49562,25 @@ async function mostroInfoP2P(){
   try { await caricaLibroP2P(); } catch(e){}
   return p2pInfo || {fee: 0, pow: 0, powPrimo: 0, maxSats: 0, minSats: 0,
                      valute: [], versione: '', quando: 0};
+}
+
+/* LA GUARDIA DEL PROTOCOLLO (30 set 2026): la spec del trasporto v2
+   di Mostro (TRANSPORT_V2_SPEC, §3.1) chiede a un client v2 di leggere
+   `protocol_version` dal 38385 PRIMA di parlare. Fail-closed su un
+   numero che non e' il nostro: un kind 14 verso un nodo che parla
+   un'altra versione morirebbe in silenzio, e questa e' l'unica riga
+   che lo dice a voce, prima di ogni gesto, della restore e della
+   moderazione. IL TAG ASSENTE (0) PASSA, ed e' una scelta dichiarata:
+   lo scrivono i daemon dalla 0.18.0 in su e il nostro nodo lo scrive
+   da settembre, mentre gli info di cartone dei banchi e dei collaudi
+   non lo portano — fermarli qui fermerebbe ogni prova per una riga di
+   prudenza che col nostro nodo non scatta mai. */
+const P2P_PROTOCOLLO = 2;
+function guardiaProtocolloP2P(info){
+  const v = info ? (Number(info.protocollo) || 0) : 0;
+  if (v && v !== P2P_PROTOCOLLO)
+    throw Object.assign(new Error('Il servizio di scambio parla una versione (v' + v + ') che questa app non conosce: aggiorna l\'app'), {protocollo: v});
+  return true;
 }
 
 /* ---- perche' il coordinatore dice di no ----
@@ -58835,6 +58875,18 @@ function adottaOrdiniAltroveP2P(locali){
          d66347c2): la riga di una presa caduta sul MIO ordine torna la
          riga del mio ordine, e da qui in giu' si ragiona su quella */
       if (typeof riparaChiaveMakerP2P === 'function' && riparaChiaveMakerP2P(id, locali)) nati++;
+      /* LA CONTROPARTE DAL COORDINATORE (30 set 2026, con mostrod
+         0.19.0, #966): la restore dice anche la trade key dell'altra
+         parte. E' la SECONDA fonte del `peer` — la prima resta il
+         server, dagli eventi della 0007 (`chiave_peer`) — e vale per
+         una riga che non ce l'ha: un ordine nato prima della 0007, o
+         ripreso col server muto. Sulla 0.18.8 il campo manca, la voce
+         porta '' e qui non succede niente. Mai la propria chiave. */
+      if (!gia.peer && voce.peer && voce.peer !== gia.pubTrade) {
+        gia.peer = voce.peer;
+        scriviOrdineP2P(gia);
+        nati++;
+      }
       /* LA RIPRESA: lo stato del coordinatore muove la riga locale, UNA
          volta per fotografia (`ripresa` sulla voce, che vive in memoria
          e rinasce a ogni restore) — la lista resta la stessa per tutta
@@ -61029,6 +61081,7 @@ async function moderatoreChiama(msg, attese){
     const NT = window.NostrTools;
     const relay = await mostroConnetti();
     const info = await mostroInfoP2P();
+    guardiaProtocolloP2P(info);
     const mostro = mostroHexP2P();
     const conv = NT.nip44.getConversationKey(NT.utils.hexToBytes(k.sk), mostro);
     const adesso = Math.floor(Date.now() / 1000);

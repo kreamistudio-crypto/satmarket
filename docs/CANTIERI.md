@@ -31275,3 +31275,91 @@ Suite intera severa senza config nel worktree da origin/main (293285f):
 rete. Dopo il rebase su f5806d0 (il contanti di persona): di nuovo la
 suite intera, 17.347 verdi e 0 rosse, e i 28 collaudi della CI verdi;
 la tortura e il giro dal vivo sono dell'albero di prima.
+
+## Mostro 0.19.0, la fase 2: il fork rifatto, la liturgia -bar6, la guardia del protocollo (30 set 2026)
+
+**Da dove nasce.** Dallo studio `docs/STUDIO-MOSTRO-0190-2026-09-30.md`
+(commit `d9f5ea1`): il nodo gira `mostro:v0.18.8-bar5`, la 0.19.0 parla
+solo il protocollo v2 e toglie il gift wrap, e Andrea ha chiesto la fase
+2 — i patcher sulla 0.19.0 e la liturgia nel repo — più la fase 0 sul
+client «se è piccola e sicura». Il nodo, il VPS e il relay NON sono
+toccati: la salita è la fase 3, coi comandi in PRODUZIONE, e si fa a
+cantieri fermi.
+
+**Il fork.** Le sette `.patch` di `deploy/mostro/` sono RIFATTE sopra
+la `v0.19.0` (commit `d53e41d`) con la ricetta del 22 set: i sette
+patcher in fila su un checkout pulito del tag, un commit per patch col
+messaggio di sempre, autore «Barattolo», `git format-patch`. La sola
+modifica ai patcher è UNA parola nell'ancora 11 della 0007: dalla
+0.19.0 `release_action` chiude la disputa aperta come
+`DisputeStatus::Released` e non più `Settled` (upstream `#967`). Le
+altre sei entrano con le ancore di prima. Verificato in due strade: un
+secondo checkout del tag con `git am` delle sette nuove dà l'albero
+byte per byte uguale a quello dei patcher (diff vuoto). ⚠️ NIENTE È
+STATO COMPILATO: sul PC non c'è `cargo`, il primo build è il punto 4
+della liturgia. La lezione pagata nel primo giro dello studio: un
+`git worktree add` su Windows esce in CRLF e i patcher con le ancore
+`\n` dicono «0 volte» su tutto — non era upstream, era il fine-riga;
+il checkout si fa con `-c core.autocrlf=false`, e il README lo dice.
+⚠️ I `.patch` della 0.18.8 non esistono più nel repo (stanno in git,
+`d9f5ea1` e prima): se la fase 3 dovesse aspettare a lungo e servisse
+una `-bar5bis`, si ripescano da lì.
+
+**La liturgia `-bar6`** sta in PRODUZIONE («LA SALITA A MOSTRO 0.19.0»),
+copiata dalla `-bar5` con le differenze: la fase 1 in sola lettura
+(`transport` e `hold_invoice_expiration_window` nel `settings.toml`,
+l'immagine in servizio, l'albero pulito, IL LIBRO FERMO con la query
+sugli stati — rifatta un attimo prima dell'`up -d`, perché la build
+dura minuti), il backup del database anche senza migrazioni, la
+cartella `patch-bar6`, il branch `barattolo/v0.19.0`, `publish` e
+`spam_gate` in più nel filtro dei test, e il rollback a UNA riga con
+la query sulle dispute `cooperatively-canceled` prima.
+
+**La fase 0 sul client, quel che era piccolo e sicuro.** Due cose:
+1) `infoDaEvento` legge `protocol_version` dal 38385 (`protocollo`, 0 =
+tag assente) e `guardiaProtocolloP2P` — prima di ogni gesto in
+`mostroChiama`, della restore in `unaRestoreP2P` e della moderazione in
+`moderatoreChiama` — FERMA un numero che non è 2 con una frase di casa
+(«Il servizio di scambio parla una versione (vN) che questa app non
+conosce: aggiorna l'app»), come chiede la spec del trasporto v2 a un
+client v2. IL TAG ASSENTE PASSA, ed è dichiarato: i banchi e i collaudi
+hanno info di cartone senza tag, e col nostro nodo (che dice «2» da
+settembre) la guardia non scatta mai. La prima stesura diceva «Il
+coordinatore…» e la sentinella delle parole a schermo l'ha fermata:
+il custode non si nomina.
+2) La restore-session di mostrod 0.19.0 dice anche la trade key
+dell'altra parte (`counterparty_trade_pubkey`, `#966`):
+`chiavePeerRestoreP2P` la copia (64 esadecimali minuscoli, o niente) e
+l'adozione la usa SOLO su una riga senza `peer` e mai come propria
+chiave. È la SECONDA fonte del peer: la prima resta il server, dagli
+eventi della 0007. Sulla 0.18.8 il campo manca, la voce porta '' e non
+succede niente. Il timbro `identita: identitaPub}` resta l'ultimo
+campo della riga, perché una prova vecchia lo cerca così.
+SCARTATO, e dichiarato: `published_at` al posto di `ev.created_at`
+nel `creato` di `ordineDaEvento` — quel campo è il tempo della
+REVISIONE e il dedup del libro (`o.creato > g.creato`) e la memoria
+dei morti ci contano: sostituirlo terrebbe la revisione vecchia. Se un
+giorno serve l'età vera dell'ordine, è un campo a parte (`nato`) e un
+cantiere suo. Scartati anche i due DM al moderatore (`#945`): non sono
+piccoli. Il server non cambia.
+
+**Prove.** `prove_p2p_libro`: `protocol_version` letto e 0 quando manca;
+la guardia lascia passare v2, tag assente, `null` e un valore sporco,
+FERMA v1 e v3 dicendo quale; `chiavePeerRestoreP2P` su otto forme (64
+giusti, vuoto, null, non esadecimale, con un tag dentro, null intero,
+62 e 66 esadecimali). `prove_p2p_server`: la guardia nei tre posti,
+dopo la lettura dell'info e prima della firma; la restore copia la
+chiave; l'adozione la usa solo su una riga che non ce l'ha. Tortura
+6 su 6 — al primo giro la lunghezza storta sopravviveva (`{64}` mutato
+in `{1,64}` passava muto: mancavano i casi da 62 e 66), e i due casi
+sono entrati col perché scritto accanto. Le sezioni toccate
+(`p2p_libro`, `p2p_server`, `p2p_motore`, `nav_p2p`, `libro_subito`,
+bussola e tetto) verdi; suite intera severa senza config nel worktree
+da origin/main: 17.354 verdi e 0 rosse sulla base c019499 (al primo giro, prima del rebase, 17.213 verdi e UNA rossa — il banco della moderazione, che ritaglia moderatoreChiama senza il motore e non trovava la guardia: curata aggiungendo la guardia ai suoi pezzi, ed è la trappola dei DUE RITAGLI).
+
+**Cosa resta da guardare.** Il `cargo build` e i test sul nodo (fase 3,
+punto 4). La guardia col nodo vero: «Info P2P» dopo la salita deve dire
+`protocol_version 2` e nessun gesto deve fermarsi. La chiave della
+controparte dalla restore: si vede solo con la 0.19.0 in servizio e un
+dispositivo pulito col server muto (o un ordine nato prima della 0007).
+I due DM al moderatore, quando la sezione li vorrà usare.

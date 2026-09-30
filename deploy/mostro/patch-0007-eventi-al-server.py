@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 """Patch 0007 del fork — MOSTRO E' L'UNICA FONTE DEGLI AVVISI P2P.
 
-Si lancia SUL NODO, dentro ~/nodo/mostro-src sul branch barattolo/vX.Y.Z (0.18.8 o piu')
+Si lancia SUL NODO, dentro ~/nodo/mostro-src sul branch barattolo/vX.Y.Z (0.19.0 o piu':
+dalla 0.19.0 `release_action` chiude la disputa come `Released`, #967, e l'ancora 11 lo dice)
 (quindi SOPRA la 0005 e la 0006, che devono esserci gia'), con
 `barattolo_eventi.rs` nella STESSA cartella di questo script:
     python3 /percorso/patch-0007-eventi-al-server.py --secco  # prova e basta
@@ -178,7 +179,7 @@ AGGANCI = [
      "    " + E + "emit(\"fiat-sent\", &order, \"buyer\");\n", "dopo"),
     # 10. rilasciato: la transizione e' scritta, la disputa (se c'era) chiusa
     ("src/app/release.rs",
-     "    close_dispute_after_user_resolution(ctx, &order, DisputeStatus::Settled, my_keys, \"release\")\n"
+     "    close_dispute_after_user_resolution(ctx, &order, DisputeStatus::Released, my_keys, \"release\")\n"
      "        .await;\n",
      "\n"
      "    // Barattolo fork (patch 0007): tell the marketplace server.\n"

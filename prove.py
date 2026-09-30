@@ -56125,6 +56125,8 @@ def prove_p2p_libro():
     stella_js = mini[i_st:mini.index(";", mini.index("z';", i_st))]
     j_val = mini.index("const P2P_VALUTA = ")
     val_js = mini[j_val:mini.index(";", j_val) + 1]
+    j_pr = mini.index("const P2P_PROTOCOLLO = ")
+    pr_js = mini[j_pr:mini.index(";", j_pr) + 1]
     # ⚠️ I COMPAGNI DELL'ORDINAMENTO VANNO PORTATI DENTRO, o la
     # funzione ritagliata cerca costanti che qui non esistono: e' la
     # trappola dei DUE RITAGLI, gia' pagata col conto del dettaglio —
@@ -56133,7 +56135,7 @@ def prove_p2p_libro():
     # scratchpad, che e' il caso che non fa rumore).
     i_ord = mini.index("const P2P_ORDINI_LIBRO = ")
     ord_js = mini[i_ord:mini.index("(o.euro || 0);", i_ord) + 14]
-    pezzi = [esc_js, val_js, stella_js, ord_js] + [pezzo_js(mini, f) for f in (
+    pezzi = [esc_js, val_js, pr_js, stella_js, ord_js] + [pezzo_js(mini, f) for f in (
         "function contaFeedback(n, persone){",
         "function tagValore(ev, nome){",
         "function ordineDaEvento(ev, adesso){",
@@ -56143,6 +56145,10 @@ def prove_p2p_libro():
         "function icoPersonaP2P(){",
         "function stellineP2P(f){",
         "function infoDaEvento(ev){",
+        # la guardia del protocollo e la chiave della controparte dalla
+        # restore (30 set 2026, con lo studio della 0.19.0)
+        "function guardiaProtocolloP2P(info){",
+        "function chiavePeerRestoreP2P(r){",
         # la finestra della garanzia (set 2026, col tabacchino)
         "function finestraGaranziaP2P(info){",
         "function scadeTestoP2P(scade){",
@@ -56319,6 +56325,15 @@ out.latoStorto = ordineDaEvento(ev(38383, [['d','x'],['k','swap'],['fa','5']]), 
 out.kindStorto = ordineDaEvento(ev(38385, [['d','ord-1'],['k','sell'],['fa','5']]), ora);
 out.stato = ordineDaEvento(ev(38383, [['d','ord-5'],['k','sell'],['f','EUR'],['s','in-progress'],['amt','10'],['fa','5']]), ora);
 out.info = infoDaEvento(ev(38385, [['d','mostro-pk'],['fee','0.01'],['pow','0'],['max_order_amount','100000'],['min_order_amount','100'],['fiat_currencies_accepted','EUR, usd'],['mostro_version','0.18.2'],['hold_invoice_cltv_delta','432']], 5));
+out.infoProto = infoDaEvento(ev(38385, [['d','mostro-pk'],['protocol_version','2']]));
+out.infoV1 = infoDaEvento(ev(38385, [['d','mostro-pk'],['protocol_version','1']]));
+const provaGuardia = (info) => { try { return guardiaProtocolloP2P(info) === true ? 'passa' : 'strano'; } catch(e) { return 'ferma: ' + e.message; } };
+out.guardia = {v2: provaGuardia({protocollo: 2}), assente: provaGuardia({protocollo: 0}), nulla: provaGuardia(null),
+               v1: provaGuardia({protocollo: 1}), v3: provaGuardia({protocollo: 3}), sporco: provaGuardia({protocollo: 'boh'})};
+out.peerRestore = [chiavePeerRestoreP2P({counterparty_trade_pubkey: 'AB'.repeat(32)}), chiavePeerRestoreP2P({}),
+                   chiavePeerRestoreP2P({counterparty_trade_pubkey: null}), chiavePeerRestoreP2P({counterparty_trade_pubkey: 'xyz'}),
+                   chiavePeerRestoreP2P({counterparty_trade_pubkey: '<b>' + 'a'.repeat(61)}), chiavePeerRestoreP2P(null),
+                   chiavePeerRestoreP2P({counterparty_trade_pubkey: 'ab'.repeat(31)}), chiavePeerRestoreP2P({counterparty_trade_pubkey: 'ab'.repeat(33)})];
 out.infoStorta = infoDaEvento(ev(38383, [['fee','0.5']]));
 /* la finestra della garanzia (set 2026): dal cltv letto, col margine
    dichiarato; e «non lo so» e' uno zero, mai un negativo */
@@ -56691,6 +56706,27 @@ console.log(JSON.stringify(out));
           and inf["minSats"] == 100 and inf["valute"] == ["EUR", "USD"]
           and inf["versione"] == "0.18.2" and inf["quando"] == 5)
     prova("...e il pow del primo contatto ricade su pow", 0, inf["powPrimo"])
+    # LA VERSIONE DEL PROTOCOLLO (30 set 2026, con lo studio della
+    # 0.19.0): si legge dal 38385; 0 = «il tag non c'e'», mai un
+    # numero inventato. La guardia e' fail-closed su un numero che non
+    # e' il nostro e lascia passare il tag assente (i banchi e i
+    # collaudi hanno info di cartone senza tag), con la frase di casa.
+    prova("infoDaEvento legge protocol_version, e 0 quando il tag manca", True,
+          inf["protocollo"] == 0 and out["infoProto"]["protocollo"] == 2
+          and out["infoV1"]["protocollo"] == 1)
+    g = out["guardia"]
+    prova("la guardia del protocollo lascia passare il v2 e il tag assente", True,
+          g["v2"] == "passa" and g["assente"] == "passa" and g["nulla"] == "passa"
+          and g["sporco"] == "passa")
+    prova("...e FERMA un'altra versione, dicendo quale", True,
+          g["v1"].startswith("ferma: ") and "(v1)" in g["v1"] and "aggiorna l'app" in g["v1"]
+          and g["v3"].startswith("ferma: ") and "(v3)" in g["v3"])
+    # la chiave della controparte dalla restore (mostrod 0.19.0, #966):
+    # 64 esadecimali minuscoli o niente — sulla 0.18.8 il campo manca
+    # (la tortura del 30 set: senza le due lunghezze storte — 62 e 66
+    # esadecimali — il {64} mutato in {1,64} passava muto)
+    prova("chiavePeerRestoreP2P: 64 esadecimali minuscoli, o niente", True,
+          out["peerRestore"] == ["ab" * 32, "", "", "", "", "", "", ""])
     # la finestra della garanzia (set 2026, col tabacchino): il cltv
     # si LEGGE dal 38385 e il margine dei 24 blocchi e' prudenza
     # nostra, dichiarata — e «non lo so» resta uno zero
@@ -73298,6 +73334,26 @@ console.log(JSON.stringify(out));
           "request_id" in solo_codice(ur) or "p2pAttese" in solo_codice(ur))
     prova("...e tiene solo le risposte di restore-session", True,
           "d.action !== 'restore-session'" in ur)
+    # LA GUARDIA DEL PROTOCOLLO E LA CONTROPARTE (30 set 2026, con lo
+    # studio della 0.19.0): prima di ogni gesto, della restore e della
+    # moderazione si giudica `protocol_version`; la restore copia la
+    # chiave dell'altra parte, e l'adozione la usa SOLO su una riga che
+    # non ce l'ha (la prima fonte resta il server, dagli eventi della
+    # 0007), mai come propria chiave.
+    mc_g = pezzo_js(mini, "async function mostroChiama(", "\n}\n")
+    mo_g = pezzo_js(mini, "async function moderatoreChiama(", "\n}\n")
+    ad_g = pezzo_js(mini, "function adottaOrdiniAltroveP2P(locali){", "\n}\n")
+    prova("la guardia del protocollo sta prima di ogni gesto, della restore e della moderazione", True,
+          "guardiaProtocolloP2P(info);" in solo_codice(mc_g)
+          and "guardiaProtocolloP2P(info);" in solo_codice(ur)
+          and "guardiaProtocolloP2P(info);" in solo_codice(mo_g)
+          and solo_codice(mc_g).find("mostroInfoP2P()") < solo_codice(mc_g).find("guardiaProtocolloP2P(info);")
+          < solo_codice(mc_g).find("finalizeEvent("))
+    prova("la restore copia la chiave della controparte, per nome e ripulita", True,
+          "peer: chiavePeerRestoreP2P(r)" in ur)
+    prova("...e l'adozione la usa solo su una riga che non ce l'ha, mai la propria", True,
+          "if (!gia.peer && voce.peer && voce.peer !== gia.pubTrade) {" in solo_codice(ad_g)
+          and "gia.peer = voce.peer;" in solo_codice(ad_g))
     # ⚠️ FAIL-OPEN: se non si sa, si torna a sapere quel che si sapeva.
     # Un elenco vuoto spacciato per «non ne hai» marcherebbe come altrui
     # un ordine proprio — che e' il difetto, al contrario.
@@ -111327,6 +111383,10 @@ def prove_moderazione_p2p():
         fn("function firmaMostro(skHex, testo){"), fn("function provaIdentitaMostro(skIdentita, pubTrade, msgJson){"),
         fn("function bustaMostro(skTrade, skIdentita, msg){"),
         fn("function chiaveCantDo(payload){"), fn("function motivoCantDo(payload){"),
+        # la guardia del protocollo (30 set 2026): moderatoreChiama la
+        # chiama, e un banco che porta la funzione vecchia senza la nuova
+        # esplode muto dentro il try (la trappola dei DUE RITAGLI)
+        riga_js("const P2P_PROTOCOLLO = "), fn("function guardiaProtocolloP2P(info){"),
         "\n".join(riga_js("const " + n + " = ") for n in (
             "CHAT_INFO_CONV", "CHAT_INFO_FIRMA", "CHAT_TOLLERANZA", "CHAT_MAX_BYTE", "CHAT_RAFFICA")),
         "let p2pChiaviChat = {}; let p2pChatSecchio = {};",

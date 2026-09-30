@@ -1,21 +1,9 @@
-From b34e525f1d0164cc62e39ac5c0b48dd8719b5302 Mon Sep 17 00:00:00 2001
+From ea10cb56005111b8091955ad7a82c57705620eb1 Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
-Date: Tue, 22 Sep 2026 13:40:09 +0200
+Date: Wed, 30 Sep 2026 21:02:33 +0200
 Subject: [PATCH 1/7] lnurl: raise HTTP timeouts so Tor-routed coordinators can
  resolve LNURL
 
-A coordinator whose egress is a transparent Tor proxy measures ~10.6s
-for the first LNURL request on a cold circuit (dns 0.138s, connect
-0.138s, tls 10.336s); the same requests take ~0.9s once the circuit is
-warm. With the previous 4s/2s/2s budgets both the dev fee payout and
-Lightning-address invoice validation failed on every cold circuit, with
-nothing surfaced to the user.
-
-Raise the budgets to 30s/15s/10s, about 3x the measured cold-circuit
-cost. This widens the DoS bound on the serial message loop, which the
-comments now state explicitly.
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 ---
  src/lnurl.rs | 16 +++++++++++-----
  1 file changed, 11 insertions(+), 5 deletions(-)

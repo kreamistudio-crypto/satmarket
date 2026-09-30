@@ -1,6 +1,6 @@
-From 6bbd3d58bc05f98b89669479f638961f08219bf8 Mon Sep 17 00:00:00 2001
+From a1e4e54637e87298c0e0f8df10ea9f1fa97db49e Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
-Date: Tue, 22 Sep 2026 13:40:11 +0200
+Date: Wed, 30 Sep 2026 21:02:34 +0200
 Subject: [PATCH 5/7] fee: per-party fees, with the loyalty discount applied at
  the source
 
@@ -609,7 +609,7 @@ index 5a27532..14830b8 100644
              request_id,
              Some(order.id),
 diff --git a/src/main.rs b/src/main.rs
-index 3bf8044..cecec1a 100644
+index 63f16e5..ef838ba 100644
 --- a/src/main.rs
 +++ b/src/main.rs
 @@ -1,4 +1,5 @@
@@ -618,7 +618,7 @@ index 3bf8044..cecec1a 100644
  mod bitcoin_price;
  pub mod cashu;
  pub mod cli;
-@@ -73,6 +74,10 @@ async fn main() -> Result<()> {
+@@ -80,6 +81,10 @@ async fn main() -> Result<()> {
          exit(1);
      };
  
@@ -630,10 +630,10 @@ index 3bf8044..cecec1a 100644
      if NOSTR_CLIENT.set(util::connect_nostr().await?).is_err() {
          tracing::error!("No connection to nostr relay - closing Mostro!");
 diff --git a/src/util.rs b/src/util.rs
-index caca191..dccc2c1 100644
+index 86b4913..5f42a68 100644
 --- a/src/util.rs
 +++ b/src/util.rs
-@@ -1581,7 +1581,8 @@ pub async fn show_hold_invoice(
+@@ -1571,7 +1571,8 @@ pub async fn show_hold_invoice(
      let mut ln_client = lightning::LndConnector::new().await?;
      // Seller pays only the order amount and their Mostro fee
      // Dev fee is NOT charged to seller - it's paid by mostrod from its earnings

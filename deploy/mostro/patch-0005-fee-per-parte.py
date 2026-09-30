@@ -3,7 +3,7 @@
 """Patch 0005 del fork — le commissioni PER PARTE, con lo sconto fedelta'
 applicato alla fonte.
 
-Si lancia SUL NODO, dentro ~/nodo/mostro-src sul branch barattolo/v0.18.7,
+Si lancia SUL NODO, dentro ~/nodo/mostro-src sul branch barattolo/vX.Y.Z (0.19.0 o piu'),
 con `barattolo_fee.rs` nella STESSA cartella di questo script:
     python3 /percorso/patch-0005-fee-per-parte.py          # applica
     python3 /percorso/patch-0005-fee-per-parte.py --secco  # prova e basta

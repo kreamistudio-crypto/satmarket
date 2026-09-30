@@ -2410,3 +2410,134 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   detto le due chiavi» e i due telefoni devono riprovare dopo un
   minuto); lo scanner di Telegram e la fotocamera dell'APK su telefoni
   veri.
+- LA SALITA A MOSTRO 0.19.0, immagine `mostro:v0.19.0-bar6` (PREPARATA
+  il 30 set 2026, DA FARE sul nodo a cantieri fermi; il perché e i
+  numeri stanno in `docs/STUDIO-MOSTRO-0190-2026-09-30.md`). Le sette
+  patch del fork stanno in `deploy/mostro/` RIFATTE sopra la `v0.19.0`
+  (commit `d53e41d`), ognuna col suo patcher a `--secco`; la sola
+  differenza dalla `-bar5` è una parola nell'ancora 11 della 0007
+  (`Released`, upstream `#967`). ⚠️ NIENTE È STATO COMPILATO SUL PC: il
+  primo `cargo` è il punto 4. ✅ IL ROLLBACK TORNA A ESSERE UNA RIGA: la
+  0.19.0 non porta migrazioni (15 file, gli stessi della `-bar5`). Per
+  il resto è la liturgia della `-bar5`, un comando alla volta.
+  FASE 1 — PRIMA DI TOCCARE IL NODO, in sola lettura, tutt'e quattro:
+  a) `grep -n "transport\|hold_invoice_expiration_window" ~/nodo/mostro/settings.toml`
+  — `transport` o non c'è o dice `"nip44"` (⚠️ `"gift-wrap"` = la 0.19.0
+  NON PARTE: si corregge prima, e sarebbe una sorpresa da capire);
+  `hold_invoice_expiration_window` deve essere > 0 (300 dal template:
+  a 0 la 0.19.0 non parte).
+  b) `docker inspect --format '{{.Config.Image}}' nodo-mostro-1` → `mostro:v0.18.8-bar5`.
+  c) `cd ~/nodo/mostro-src && git status && git log -1 --oneline` →
+  `barattolo/v0.18.8`, albero pulito. Se non è pulito NON si va avanti.
+  d) IL LIBRO FERMO, ed è il controllo che si rifà ANCHE al punto 8 un
+  attimo prima dell'`up -d`, perché fra il punto 0 e il punto 8 passano
+  i minuti della build e qualcuno può aver preso un ordine (sul nodo
+  `sqlite3` non c'è: `python3` in sola lettura, `mode=ro`, la stessa
+  strada della procedura del solver):
+  `sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); print(c.execute('SELECT status, COUNT(*) FROM orders GROUP BY status ORDER BY 2 DESC').fetchall())"`
+  Devono comparire SOLO `pending` e stati finali (`success`, `canceled`,
+  `expired`, `canceled-by-admin`, `cooperatively-canceled`,
+  `settled-by-admin`, `completed-by-admin`). Uno solo fra
+  `waiting-payment`, `waiting-buyer-invoice`, `active`, `fiat-sent`,
+  `settled-hold-invoice`, `in-progress` o `dispute` = c'è uno scambio
+  in corso: si ASPETTA che finisca (un riavvio a metà presa fa scadere
+  i 900 s a qualcuno, e una hold in volo la si lascia dov'è). Un
+  `pending` va bene: è il libro, che riparte com'è.
+  FASE 3 — LA LITURGIA, a libro fermo:
+  0) IL BACKUP DEL DATABASE, anche se non ci sono migrazioni (costa un
+  secondo e copre il residuo delle dispute, punto 9):
+  `cp ~/nodo/mostro/mostro.db ~/nodo/mostro/mostro.db.prima-bar6`
+  (il percorso è quello che il compose monta sotto `/config`:
+  `docker inspect nodo-mostro-1 | grep -A3 Binds`).
+  1) SUL PC, i dieci file al nodo, in una cartella NUOVA e FUORI da
+  `mostro-src` (`ssh UTENTE@NODO mkdir -p nodo/patch-bar6` prima):
+  `scp deploy/mostro/patch-000*.py deploy/mostro/barattolo_fee.rs deploy/mostro/barattolo_eventi.rs UTENTE@NODO:nodo/patch-bar6/`
+  Poi sul nodo `sha256sum ~/nodo/patch-bar6/barattolo_eventi.rs ~/nodo/patch-bar6/barattolo_fee.rs`
+  contro gli stessi sul PC (`sha256sum` in Git Bash): devono combaciare.
+  2) SUL NODO, il sorgente nuovo: `cd ~/nodo/mostro-src && git fetch --tags`
+  e `git switch -c barattolo/v0.19.0 v0.19.0`; `git log -1 --oneline`
+  deve dire `d53e41d chore: Release mostro version 0.19.0`.
+  3) I SETTE PATCHER, in fila, ognuno PRIMA a secco e POI senza, con un
+  commit ciascuno. A secco devono dire, nell'ordine: «A SECCO: 3
+  sostituzioni in src/lnurl.rs», «2 sostituzioni in src/config/util.rs»,
+  «3 sostituzioni in src/app/dev_fee.rs», «4 sostituzioni in 3 file»,
+  «7 agganci in 6 file», «a secco: l'ancora c'e', UNA volta», «25 agganci
+  in 13 file, tutte le ancore uniche, 13 azioni note» — le STESSE
+  stringhe della `-bar5`, verificate sul PC il 30 set. Un FERMO
+  qualunque si incolla a Claude e non si tocca niente a mano.
+  `python3 ~/nodo/patch-bar6/patch-0001-lnurl-tor-freddo.py --secco`
+  `python3 ~/nodo/patch-bar6/patch-0001-lnurl-tor-freddo.py && git add -A && git commit -m "lnurl: raise HTTP timeouts so Tor-routed coordinators can resolve LNURL"`
+  `python3 ~/nodo/patch-bar6/patch-0002-dev-fee-zero.py --secco`
+  `python3 ~/nodo/patch-bar6/patch-0002-dev-fee-zero.py && git add -A && git commit -m "config: let dev_fee_percentage = 0 mean no dev fee, not an invalid value"`
+  `python3 ~/nodo/patch-bar6/patch-0003-dev-fee-cappelli.py --secco`
+  `python3 ~/nodo/patch-bar6/patch-0003-dev-fee-cappelli.py && git add -A && git commit -m "dev fee: raise the resolution timeouts that cap LNURL below its own budget"`
+  `python3 ~/nodo/patch-bar6/patch-0004-prezzo-mai-visto.py --secco`
+  `python3 ~/nodo/patch-bar6/patch-0004-prezzo-mai-visto.py && git add -A && git commit -m "order/take: answer PriceTooStale when no price is cached yet, instead of a silent internal error"`
+  `python3 ~/nodo/patch-bar6/patch-0005-fee-per-parte.py --secco`
+  `python3 ~/nodo/patch-bar6/patch-0005-fee-per-parte.py && git add -A && git commit -m "fee: per-party fees, with the loyalty discount applied at the source"`
+  `python3 ~/nodo/patch-bar6/patch-0006-perche-e-fallito.py --secco`
+  `python3 ~/nodo/patch-bar6/patch-0006-perche-e-fallito.py && git add -A && git commit -m "release: log why a payout has failed"`
+  `python3 ~/nodo/patch-bar6/patch-0007-eventi-al-server.py --secco`
+  `python3 ~/nodo/patch-bar6/patch-0007-eventi-al-server.py && git add -A && git commit -m "events: tell the marketplace server about every order transition"`
+  Alla fine `git log --oneline v0.19.0..HEAD` deve dire SETTE righe, la
+  0001 in fondo. (Strada equivalente: `git am ~/nodo/patch-bar6/000[1-7]-*.patch`
+  con le sette `.patch` del repo copiate: stesso albero, verificato sul
+  PC il 30 set.)
+  4) I TEST PRIMA DELLA BUILD VERA, il primo `cargo` di questo fork
+  sulla 0.19.0 (il filtro della `-bar5` più `publish` e `spam_gate`,
+  i due moduli che la 0.19.0 tocca di più):
+  `docker build -f docker/Dockerfile --target builder -t mostro-test:bar6 .`
+  `docker run --rm mostro-test:bar6 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle publish spam_gate`
+  Si guardano `pre_claim_failures_by_class` fra i verdi di
+  `barattolo_eventi`, e di upstream `release_action_closes_dispute` (o
+  come si chiama il test che ora aspetta `Released`) in `app::release`,
+  `transport_gift_wrap_refuses_to_start_with_a_clear_reason` in `config`
+  e i test di `publish`. Se la build o i test si fermano, l'errore si
+  incolla a Claude e si corregge NEL REPO; sul nodo
+  `git checkout -- . && rm -f src/barattolo_fee.rs src/barattolo_eventi.rs`
+  e si riparte dal tag (`git reset --hard v0.19.0`). Niente ritocchi a
+  mano sul nodo.
+  5) VERDI: `git format-patch v0.19.0..HEAD -o ~/nodo/patch-bar6/export`
+  e le sette tornano sul PC con `scp`, in `deploy/mostro/`, coi nomi di
+  sempre: `diff` contro quelle nel repo deve dire solo l'`index`, il
+  `From` e la `Date` (i blob, gli hash e l'ora del commit), MAI una riga
+  di codice — se ne dice una, il nodo ha un sorgente diverso dal repo e
+  ci si ferma.
+  6) LA BUILD VERA: `docker build -f docker/Dockerfile -t mostro:v0.19.0-bar6 .`
+  — tag nuovo; `mostro:v0.18.8-bar5` resta sulla macchina.
+  7) IL COMPOSE (`cd ~/nodo`, copia prima: `cp docker-compose.yml
+  docker-compose.yml.prima-bar6`): la SOLA riga dell'immagine a
+  `mostro:v0.19.0-bar6`. Le cinque variabili d'ambiente (tre della 0005,
+  due della 0007) restano com'erano; `settings.toml` NON si tocca (una
+  riga `transport = "nip44"`, se c'è, la 0.19.0 la accetta).
+  8) IL LIBRO FERMO, di nuovo (la query della fase 1, punto d): se è
+  fermo, `docker compose up -d mostro` (`up -d`, non `restart`). Poi:
+  `docker inspect --format '{{.Config.Image}}' nodo-mostro-1` dice
+  `-bar6`; `docker compose logs mostro --since 2m` dice `Transport:
+  nip44 (protocol v2, event kind 14)`, «Settings correctly loaded»,
+  NESSUNA riga di migrazione, `barattolo_eventi: order events go to …`
+  e `barattolo_fee` col suo battito; il 38385 nuovo dice
+  `mostro_version 0.19.0` e `protocol_version 2` («Info P2P» del
+  client, o dai relay). Nel journal, per una settimana, nessun
+  `no Mostro transport for event kind`: sarebbe un client v1 che bussa
+  (non un guasto nostro, ma lo si sa).
+  9) IL ROLLBACK, se serve: UNA riga — nel compose l'immagine a
+  `mostro:v0.18.8-bar5` e `docker compose up -d mostro`; niente
+  migrazioni da disfare. PRIMA, in sola lettura, il residuo:
+  `sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); print(c.execute(\"SELECT id, status FROM disputes WHERE status='cooperatively-canceled'\").fetchall())"`
+  `[]` = rollback secco. Righe = dispute FINALI chiuse dalle parti
+  sulla 0.19.0, con uno stato che mostro-core 0.14.6 non sa leggere:
+  i lettori di mostrod filtrano per stati aperti e non le toccano, si
+  lascia la riga com'è e si guarda il log al primo giro; la copia del
+  punto 0 si rimette SOLO se nel mezzo non c'è stato nient'altro (uno
+  scambio fatto sulla 0.19.0 sparirebbe con lei). `-bar5` resta sulla
+  macchina: un tag non si sovrascrive mai.
+  LA PROVA A DUE TELEFONI, dopo: quella della `-bar5` (23,47 € col
+  tabacchino, presa, garanzia, euro inviati, rilascio, il conto al
+  satoshi, il journal del VPS con `taken`/`hold-invoice-paid`/
+  `fiat-sent`/`released`/`success`), più le due cose NUOVE da guardare:
+  gesto e risposta più svelti di prima (è il `#992`: un relay muto non
+  costa più 10 s a evento), e — col client dal 30 set — un ordine
+  ripreso su un dispositivo pulito che trova la controparte dal
+  coordinatore (`chiave_peer` assente dal server, `peer` che arriva
+  dalla restore: la riga del diario «ripresa» lo dice).

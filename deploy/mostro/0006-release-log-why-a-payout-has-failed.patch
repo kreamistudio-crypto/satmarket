@@ -1,6 +1,6 @@
-From a795a1c833cee76ae901afaf1cc70348e80b7f4c Mon Sep 17 00:00:00 2001
+From 5d934db547cf575e5154a8fcd57853eba3500a9a Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
-Date: Tue, 22 Sep 2026 13:40:11 +0200
+Date: Wed, 30 Sep 2026 21:02:34 +0200
 Subject: [PATCH 6/7] release: log why a payout has failed
 
 ---
@@ -8,10 +8,10 @@ Subject: [PATCH 6/7] release: log why a payout has failed
  1 file changed, 13 insertions(+), 2 deletions(-)
 
 diff --git a/src/app/release.rs b/src/app/release.rs
-index 3e9886f..77d6a9f 100644
+index eff753b..31c40cc 100644
 --- a/src/app/release.rs
 +++ b/src/app/release.rs
-@@ -1074,9 +1074,20 @@ async fn dispatch_payout(
+@@ -1078,9 +1078,20 @@ async fn dispatch_payout(
                                  }
                              }
                              PaymentStatus::Failed => {

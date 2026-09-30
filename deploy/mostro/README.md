@@ -1,4 +1,4 @@
-# IL FORK DI MOSTRO — sette patch sopra il tag v0.18.8
+# IL FORK DI MOSTRO — sette patch sopra il tag v0.19.0
 
 Qui dentro non c'è codice in servizio: ci sono le patch che il nodo Mostro di
 Dublino applica sopra il sorgente upstream, prodotte con
@@ -29,6 +29,42 @@ pre-claim, sotto). Da sole ricostruiscono il fork: vedi «RICOSTRUIRE IL
 FORK DA ZERO», in fondo. ⚠️ NIENTE E' STATO COMPILATO SUL PC (non c'e'
 `cargo`): il primo `cargo build` della 0.18.8 col fork e' quello del
 nodo, punto 4 della liturgia `-bar5` in PRODUZIONE.
+
+**Dal 30 settembre 2026 le sette `.patch` stanno sopra la `v0.19.0`**
+(commit `d53e41d`, uscita il 29 set), con la stessa ricetta del 22 set:
+i sette patcher fatti girare in fila sul PC su un checkout PULITO del
+tag (⚠️ con `-c core.autocrlf=false`: un checkout Windows esce in CRLF
+e le ancore con `\n` non trovano niente — e' la trappola in cui e'
+caduto il primo giro dello studio), un commit per patch col messaggio
+di sempre, `git format-patch` a esportarle qui. La SOLA differenza dal
+fork della 0.18.8 e' UNA PAROLA nell'ancora 11 della 0007: dalla
+0.19.0 `release_action` chiude la disputa aperta come
+`DisputeStatus::Released` e non piu' `Settled` (upstream `#967`, «chi
+legge la disputa deve distinguere chi l'ha risolta»), e il patcher lo
+dice. Le altre sei entrano con le ancore di prima, perche' i file che
+toccano o non sono nel diff o cambiano altrove (`main.rs` aggiunge
+solo `pub mod publish;`, `order.rs` il rifiuto del range a meta').
+VERIFICATO IN DUE STRADE, come il 22 set: un secondo checkout del tag
+con `git am` delle sette nuove da' l'albero **byte per byte** uguale a
+quello dei patcher (diff vuoto). ⚠️ NIENTE E' STATO COMPILATO: il primo
+`cargo` della 0.19.0 col fork e' quello del nodo, punto 4 della liturgia
+`-bar6` in PRODUZIONE («LA SALITA A MOSTRO 0.19.0»). Finche' quella
+liturgia non e' fatta IN SERVIZIO resta la `-bar5` sulla 0.18.8, e i
+`.patch` di quella stanno nella storia di git (commit `d9f5ea1` e prima).
+
+COSA CAMBIA DALLA 0.18.8 ALLA 0.19.0, letto sul diff (lo studio intero
+sta in `docs/STUDIO-MOSTRO-0190-2026-09-30.md`): il gift wrap (protocollo
+v1) non c'e' piu' e `transport = "gift-wrap"` rifiuta l'avvio
+(`"nip44"` e' accettato, la riga assente vale nip44 — il nostro nodo
+parla nip44 dal 6 set); NESSUNA migrazione nuova (15 file, gli stessi
+della `-bar5`), quindi il rollback torna a essere la riga del compose;
+mostro-core 0.14.6 → 0.16.0 (la restore torna la trade key della
+controparte, la reputazione porta `since`, lo stato di disputa
+`cooperatively-canceled`); `#992` il publish si risolve al PRIMO relay
+che conferma (era ~10 s persi a evento con un relay muto); `published_at`
+sul 38383 e sul 38386; `hold_invoice_expiration_window` deve essere > 0
+(il nostro e' 300). Il resto sono bond, da noi spenti. Il client
+Barattolo parla il v2 da sempre e non cambia lingua.
 
 COSA CAMBIA DALLA 0.18.7 ALLA 0.18.8, letto sul diff: `#908` sposta la
 contabilita' dei payout falliti in un punto solo (`do_payment` si spacca
@@ -364,8 +400,11 @@ conosce (`VersionMissing`; `ignore_missing` non e' acceso). Quindi
 tornare a `-bar4` vuol dire O ripristinare il database dal backup fatto
 prima del deploy, O togliere a mano le due righe da `_sqlx_migrations`
 (la colonna in piu' resta, ed e' innocua per il vecchio binario). La
-sequenza sta in PRODUZIONE. Da `-bar5` a una `-bar6` sulla stessa 0.18.8
-invece resta la riga del compose, come sempre.
+sequenza sta in PRODUZIONE. Da `-bar6` (0.19.0) a `-bar5` (0.18.8)
+invece resta la riga del compose: la 0.19.0 NON porta migrazioni, e
+l'unico residuo e' una disputa chiusa dalle parti come
+`cooperatively-canceled` (stato che mostro-core 0.14.6 non sa leggere):
+si guarda PRIMA con la query in PRODUZIONE, «LA SALITA A MOSTRO 0.19.0».
 
 ⚠️ **`up -d`, non `restart`.** `docker compose restart mostro` riavvia
 il container ESISTENTE, che resta quello costruito sull'immagine
@@ -504,7 +543,7 @@ git fetch --tags
 git switch -c barattolo/vX.Y.Z vX.Y.Z
 python3 ~/nodo/patch-barN/patch-0001-lnurl-tor-freddo.py --secco     # e cosi' per le sette, poi senza --secco, un commit ciascuna
 docker build -f docker/Dockerfile --target builder -t mostro-test:barN .
-docker run --rm mostro-test:barN cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle
+docker run --rm mostro-test:barN cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle publish spam_gate   # gli ultimi due dalla 0.19.0
 docker build -f docker/Dockerfile -t mostro:vX.Y.Z-barN .
 ```
 
@@ -521,19 +560,19 @@ sono quella che DICE dove un'ancora non regge piu'.
 nuovo. Non serve il branch del vecchio nodo: bastano il sorgente upstream e le
 sette `.patch`, applicate in fila con `git am`. La sequenza e' stata
 provata il 22 set 2026 su un clone pulito di `MostroP2P/mostro` a
-`e67676d` (v0.18.8): le sette entrano una dopo l'altra senza un
+`e67676d` (v0.18.8) e il 30 set 2026 a `d53e41d` (v0.19.0): le sette entrano una dopo l'altra senza un
 conflitto, l'albero e' byte per byte quello dei sette patcher, e il
 `barattolo_eventi.rs` che ne esce e' quello di questa cartella.
 
 ```
 git clone https://github.com/MostroP2P/mostro.git ~/nodo/mostro-src
 cd ~/nodo/mostro-src
-git switch -c barattolo/v0.18.8 v0.18.8        # e67676d
-git am ~/nodo/patch-bar5/000[1-7]-*.patch      # le sette, copiate dal PC con scp
-git log --oneline v0.18.8..HEAD                 # sette righe, la 0001 in fondo
-docker build -f docker/Dockerfile --target builder -t mostro-test:bar5 .
-docker run --rm mostro-test:bar5 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle
-docker build -f docker/Dockerfile -t mostro:v0.18.8-bar5 .
+git switch -c barattolo/v0.19.0 v0.19.0        # d53e41d
+git am ~/nodo/patch-bar6/000[1-7]-*.patch      # le sette, copiate dal PC con scp
+git log --oneline v0.19.0..HEAD                 # sette righe, la 0001 in fondo
+docker build -f docker/Dockerfile --target builder -t mostro-test:bar6 .
+docker run --rm mostro-test:bar6 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle publish spam_gate
+docker build -f docker/Dockerfile -t mostro:v0.19.0-bar6 .
 ```
 
 Poi la riga dell'immagine nel compose, le cinque variabili d'ambiente
@@ -544,8 +583,9 @@ Tre cose da sapere prima di fidarsi del risultato:
 - **gli hash cambiano**: `git am` ricommitta, quindi i sette commit
   nuovi NON si chiameranno come quelli del nodo. Il contenuto si': e'
   quello dei `.patch`, che dal 22 set 2026 sono l'esportazione dei
-  sette patcher sulla 0.18.8 fatta sul PC (fino ad allora erano
-  l'esportazione dal nodo: sulla 0.18.7 le due cose coincidevano).
+  sette patcher sulla 0.19.0 fatta sul PC il 30 set 2026 (dal 22 set
+  lo erano sulla 0.18.8; fino ad allora erano l'esportazione dal nodo:
+  sulla 0.18.7 le due cose coincidevano).
 - **le `.patch` vanno sul nodo in LF**, com'è nel repo: il
   `.gitattributes` di questa cartella (`*.patch -text`) le tiene così
   anche su un checkout Windows, ma se passano da un editor o da uno

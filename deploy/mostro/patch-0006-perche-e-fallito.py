@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Patch 0006 del fork — «has failed!» dice PERCHE'.
 
-Si lancia SUL NODO, dentro ~/nodo/mostro-src sul branch barattolo/v0.18.7:
+Si lancia SUL NODO, dentro ~/nodo/mostro-src sul branch barattolo/vX.Y.Z (0.19.0 o piu'):
     python3 patch-0006-perche-e-fallito.py
 Tocca UN file con UNA sostituzione mirata (l'ancora deve comparire una
 volta, o si ferma senza scrivere niente), poi si committa e si esporta
