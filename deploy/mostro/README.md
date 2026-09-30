@@ -402,7 +402,7 @@ fermano («porta gia' questa modifica»).
 | 0005 | `patch-0005-fee-per-parte.py` + `barattolo_fee.rs` | 7 agganci in 6 file |
 | 0006 | `patch-0006-perche-e-fallito.py` | `src/app/release.rs`, 1 |
 | 0007 | `patch-0007-eventi-al-server.py` + `barattolo_eventi.rs` | 25 agganci in 13 file |
-| 0008 | `patch-0008-cauzione-solo-contanti.py` | 19 agganci in 10 file, più i test in coda a `flow.rs` e `nip33.rs` (1 ott 2026) |
+| 0008 | `patch-0008-cauzione-solo-contanti.py` | 20 agganci in 10 file (il ventesimo, 1 ott 2026, emenda il test della 0007 sugli importi), più i test in coda a `flow.rs` e `nip33.rs` (1 ott 2026) |
 
 I primi tre sono nati il 22 set 2026 (fino ad allora quelle patch
 esistevano solo come `.patch`, da ritocchi a mano sul nodo); la 0004 ha

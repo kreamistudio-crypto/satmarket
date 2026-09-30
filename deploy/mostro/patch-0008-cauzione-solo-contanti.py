@@ -282,6 +282,20 @@ AGGANCI = [
      "        event.action.as_str(),\n"
      "        \"released\" | \"success\" | \"bond-slashed\"\n"
      "    );\n", "al posto", 1),
+    # ...e il test della 0007 che fissava quella regola (1 ott 2026, dal
+    # 4b sul nodo: «bond-slashed left: true right: false»): dalla 0008 gli
+    # importi viaggiano anche su bond-slashed, e il server lo sa
+    # (P2P_AZIONI_CON_SATS). Ancora a tre righe: la stessa riga vive anche
+    # in emit_detail, che NON cambia (emit_bond_slashed mette i sats da se').
+    ("src/barattolo_eventi.rs",
+     "            event.sats = Some(closing_sats(15_000, 225, 225));\n"
+     "            let body = payload(&event);\n"
+     "            let closing = action == \"released\" || action == \"success\";\n",
+     "            event.sats = Some(closing_sats(15_000, 225, 225));\n"
+     "            let body = payload(&event);\n"
+     "            // patch 0008: a slashed bond carries its amounts too\n"
+     "            let closing = matches!(action, \"released\" | \"success\" | \"bond-slashed\");\n",
+     "al posto", 1),
     ("src/barattolo_eventi.rs",
      "    emit_detail(\"taken\", order, taker, next);\n}\n",
      "\n"

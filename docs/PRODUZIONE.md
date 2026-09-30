@@ -2560,7 +2560,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   «7 agganci in 6 file», «a secco: l'ancora c'e', UNA volta», «25 agganci
   in 13 file, tutte le ancore uniche, 13 azioni note» — le STESSE
   stringhe della `-bar5`, verificate sul PC il 30 set — e poi, per la
-  0008, «A SECCO: 19 agganci in 10 file, tutte le ancore al loro conto,
+  0008, «A SECCO: 20 agganci in 10 file, tutte le ancore al loro conto,
   14 azioni note, i due moduli di test in coda» (verificata sul PC il
   1 ott). Un FERMO qualunque si incolla a Claude e non si tocca niente
   a mano.

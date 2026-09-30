@@ -1,6 +1,6 @@
-From 70830607d3af2de3b8dd214873a1816350c66679 Mon Sep 17 00:00:00 2001
+From 1354277dac7bf48bd8958a15fa31e95b913b2beb Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
-Date: Thu, 1 Oct 2026 00:02:55 +0200
+Date: Thu, 1 Oct 2026 00:30:22 +0200
 Subject: [PATCH] bond: apply the anti-abuse bond only to the payment methods
  the policy names
 
@@ -11,11 +11,11 @@ Subject: [PATCH] bond: apply the anti-abuse bond only to the payment methods
  src/app/bond/slash.rs   |   8 ++++
  src/app/take_buy.rs     |   4 +-
  src/app/take_sell.rs    |   4 +-
- src/barattolo_eventi.rs |  46 +++++++++++++++++-
+ src/barattolo_eventi.rs |  49 +++++++++++++++++--
  src/config/types.rs     |  28 +++++++++++
  src/nip33.rs            |  60 +++++++++++++++++++++++
  src/util.rs             |   4 +-
- 10 files changed, 257 insertions(+), 5 deletions(-)
+ 10 files changed, 259 insertions(+), 6 deletions(-)
 
 diff --git a/settings.tpl.toml b/settings.tpl.toml
 index c5e2601..54ebea8 100644
@@ -226,7 +226,7 @@ index 4deeb33..11f2cbe 100644
          let active = crate::app::bond::db::find_active_bonds_for_order(pool, order.id).await?;
          if bond::trade_committed_by_locked_taker_bond(&active) {
 diff --git a/src/barattolo_eventi.rs b/src/barattolo_eventi.rs
-index 841d1b2..442d3d3 100644
+index 841d1b2..6303da7 100644
 --- a/src/barattolo_eventi.rs
 +++ b/src/barattolo_eventi.rs
 @@ -47,7 +47,7 @@ const HEARTBEAT_EVERY: Duration = Duration::from_secs(60);
@@ -310,6 +310,16 @@ index 841d1b2..442d3d3 100644
  /// The payout to the buyer failed; `reason_code` is LND's
  /// `payment.failure_reason`, the same number patch 0006 logs.
  pub fn emit_payout_failed(order: &Order, reason_code: i32) {
+@@ -590,7 +632,8 @@ mod tests {
+             // even if a caller fills them in for the wrong action
+             event.sats = Some(closing_sats(15_000, 225, 225));
+             let body = payload(&event);
+-            let closing = action == "released" || action == "success";
++            // patch 0008: a slashed bond carries its amounts too
++            let closing = matches!(action, "released" | "success" | "bond-slashed");
+             assert_eq!(body.get("sats").is_some(), closing, "{action}");
+             assert_eq!(body.get("sats_buyer").is_some(), closing, "{action}");
+             assert_eq!(body.get("sats_seller").is_some(), closing, "{action}");
 diff --git a/src/config/types.rs b/src/config/types.rs
 index 09e700e..70fe9c9 100644
 --- a/src/config/types.rs
