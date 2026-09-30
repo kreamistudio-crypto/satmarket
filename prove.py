@@ -57609,12 +57609,20 @@ def prove_p2p_dettaglio():
         # solo, «Stai vendendo ≈ 7 034 sats», senza la coda «sats».
         "function verboLatoP2P(o){",
         "function fraseLatoP2P(o){",
+        # il contanti di persona (30 set 2026): la riga della regola e il
+        # giudice del tetto, che il dettaglio e la conferma chiamano
+        "function contantiAManoP2P(metodi){",
+        "function giudiceContantiP2P(euro, metodi, tetto){",
+        "function regolaContantiFoglioP2P(metodi, tetto, lato){",
+        "function maxEuroContantiP2P(){",
         "function renderDettaglioP2P(){",
         "function apriDettaglioP2P(id){",
         "function confermaDettaglioP2P(){",
         "function metodoSceltoP2P(o){")]
     # le costanti e le due variabili del foglio: dal client, mai ribattute
     for riga in ("const P2P_VALUTA = ", "const P2P_VALUTE = ",
+                 "const P2P_CONTANTI = ", "const REGOLA_CONTANTI_COMPRA = ",
+                 "const REGOLA_CONTANTI_VENDE = ", "const CONSIGLI_CONTANTI = ",
                  "const P2P_GLIFI = ", "const P2P_ULTIMO_GIORNO_S = ",
                  "const P2P_ANELLO_VICINA_S = ", "const P2P_ANELLONE_TACCHE = ",
                  "const P2P_TABACCHINO = ", "const P2P_TABACCHINO_PM = ",
@@ -67617,6 +67625,12 @@ def prove_p2p_pubblica():
         + "\n" + _intera("function scadeDaCampoP2P(s){")
         + "\n" + _intera("function campoDaScadeP2P(epoch){")
         + "\n" + _intera("function tabacchinoP2P(metodi){")
+        # il contanti di persona (30 set 2026): il giudice del tetto e la
+        # leva, che `valeNuovoOrdineP2P` chiede a ogni cifra
+        + "\n" + re.search(r"const P2P_CONTANTI = [^\n]*;", mini).group(0)
+        + "\n" + _intera("function contantiAManoP2P(metodi){")
+        + "\n" + _intera("function giudiceContantiP2P(euro, metodi, tetto){")
+        + "\n" + _intera("function maxEuroContantiP2P(){")
         + "\n" + _intera("function metodoBaseP2P(m){")
         + "\n" + _intera("function euroTabacchinoP2P(metodi){")
         + "\n" + _intera("function metodoTabacchinoP2P(importo){")
@@ -72335,7 +72349,9 @@ def prove_p2p_server():
              "P2P_COMMISSIONE_PERCENTO": 2,
              "P2P_MAX_EURO": max_euro,
              # il minimo di Barattozon (30 set 2026), in busta con le leve
-             "BARATTOZON_MIN_EURO": 25}
+             "BARATTOZON_MIN_EURO": 25,
+             # il tetto del contanti di persona (30 set 2026), in busta
+             "P2P_CONTANTI_MAX_EURO": 250}
         exec(pezzo("_p2p_leve"), a)
         return a["_p2p_leve"]()
     relay = ["wss://relay.mostro.network", "wss://nos.lol"]
@@ -72352,9 +72368,10 @@ def prove_p2p_server():
           leve(True, "", relay)["attivo"])
     prova("accesa ma senza relay: attivo False (fail-closed)", False,
           leve(True, hexv, [])["attivo"])
-    # (30 set 2026) sette: e' entrato il minimo di Barattozon
-    prova("le chiavi sono sette e sono sempre quelle",
-          ["attivo", "commissione", "maxEuro", "minEuroBz", "mostro", "relay",
+    # (30 set 2026) OTTO: il minimo di Barattozon e il tetto del contanti
+    # di persona sono entrati insieme, da due cantieri
+    prova("le chiavi sono otto e sono sempre quelle",
+          ["attivo", "commissione", "maxEuro", "maxEuroContanti", "minEuroBz", "mostro", "relay",
            "specchio"],
           sorted(piena.keys()))
     # IL LISTINO VIAGGIA SEMPRE, come npub e relay: e' pubblico, e il
@@ -77995,7 +78012,7 @@ def prove_barattozon_mercato():
         + "\n".join(_riga(n) for n in (
             "P2P_TABACCHINO", "P2P_TABACCHINO_PM", "P2P_TABACCHINO_VITA_S",
             "P2P_PAYCODE_MIN_S", "P2P_PAYCODE_MAX_S", "P2P_TABACCHINO_MARGINE_S",
-            "P2P_PREMIO_TAB_MAX", "P2P_PAYCODE_MAX_EURO"))
+            "P2P_PREMIO_TAB_MAX", "P2P_PAYCODE_MAX_EURO", "P2P_CONTANTI"))
         + "\n" + "\n".join(_intera(f) for f in (
             "function interoP2P(testo){", "function centesimiP2P(testo){",
             "function centesimiTestoP2P(n){", "function tagValore(ev, nome){",
@@ -78006,6 +78023,9 @@ def prove_barattozon_mercato():
             "function euroFiloTabacchinoP2P(esatto, fisso){", "function combaciaEsattoP2P(esatto, intero){",
             "function giudiceImportoPayCodeP2P(euro){", "function giudiceMinimoPayCodeP2P(euro, minimo){",
             "function minEuroBzP2P(){", "function payCodeP2P(testo){",
+            # il contanti di persona (30 set 2026): il giudice del tetto che
+            # `valeNuovoOrdineP2P` chiama a ogni cifra
+            "function contantiAManoP2P(metodi){", "function giudiceContantiP2P(euro, metodi, tetto){",
             "function vitaLibroTabacchinoP2P(scade, adesso){",
             "function premioTabacchinoP2P(testo){", "function premioTestoP2P(n){",
             "function premioTestoTabP2P(n){", "function premioImplicitoTabacchinoP2P(euro, sats, cambio){",
@@ -79236,11 +79256,15 @@ def prove_pubblica_metodo_prima():
         "function renderNuovoOrdineP2P(){", "function scegliMetodoP2P(m){",
         "function cambiaCampoNuovoP2P(){", "function apriNuovoOrdineP2P(metodo){",
         # il bottone che pubblica veste il lato o Barattozon (24 set 2026)
-        "function vestitoInvioP2P(tab){")
+        "function vestitoInvioP2P(tab){",
+        # il contanti di persona (30 set 2026): la riga sotto il metodo
+        "function contantiAManoP2P(metodi){", "function giudiceContantiP2P(euro, metodi, tetto){",
+        "function regolaContantiFoglioP2P(metodi, tetto, lato){", "function maxEuroContantiP2P(){")
     _prog = (
         _blocco("const esc = ", "}[c]));") + "\n"
         + "\n".join(_riga(n) for n in (
             "P2P_VALUTE", "P2P_METODI", "P2P_TABACCHINO", "P2P_TABACCHINO_PM",
+            "P2P_CONTANTI", "REGOLA_CONTANTI_COMPRA", "REGOLA_CONTANTI_VENDE", "CONSIGLI_CONTANTI",
             "P2P_PREMIO_MAX", "P2P_POLLICE", "P2P_PREMIO_TAB_MAX", "P2P_PAYCODE_MAX_EURO",
             "P2P_PAYCODE_MIN_S", "P2P_PAYCODE_MAX_S", "P2P_TABACCHINO_VITA_S",
             "P2P_TABACCHINO_MARGINE_S", "P2P_MARGINE_HOLD_BLOCCHI", "P2P_SEC_PER_BLOCCO",
@@ -81490,7 +81514,9 @@ def prove_scambi_ovunque():
         i = _SORGENTE.index(c + " = ")
         exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
     for f in ("_euro_numero_p2p", "_euri_numero_p2p", "_metodi_lista_p2p", "_stato_scambio_p2p",
-              "_parti_mostro_p2p", "_tocca_a_me_p2p", "_scambi_p2p"):
+              "_parti_mostro_p2p", "_tocca_a_me_p2p",
+              # la prova d'incontro del contanti (30 set 2026): senza tabella vale None
+              "_incontro_da_riga_p2p", "_incontro_p2p", "_scambi_p2p"):
         exec(pezzo(f), amb)
     euro, metodi = amb["_euro_numero_p2p"], amb["_metodi_lista_p2p"]
     stato = amb["_stato_scambio_p2p"]
@@ -107500,7 +107526,10 @@ def prove_ritocchi_flusso_p2p():
         i = _SORGENTE.index(c + " = ")
         exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
     for f in ("_euro_numero_p2p", "_euri_numero_p2p", "_metodi_lista_p2p", "_stato_scambio_p2p",
-              "_parti_mostro_p2p", "_tocca_a_me_p2p", "_scambi_p2p", "_quanti_tocca_p2p"):
+              "_parti_mostro_p2p", "_tocca_a_me_p2p",
+              # la prova d'incontro del contanti (30 set 2026): senza tabella vale None
+              "_incontro_da_riga_p2p", "_incontro_p2p",
+              "_scambi_p2p", "_quanti_tocca_p2p"):
         exec(pezzo(f), amb)
     tocca = amb["_tocca_a_me_p2p"]
     prova("il giudice del server: chi compra tocca su fattura, fattura nuova, e attivo col recapito detto",
@@ -109991,6 +110020,597 @@ def prove_dispute_p2p_moderatori():
     con.close()
 
 
+BANCO_CONTANTI = r"""
+const fs = require('fs'), vm = require('vm');
+vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
+const NT = NostrTools;
+const window = {NostrTools: NT};
+const out = {};
+/* --- il mondo attorno: stub, mai la cosa vera --- */
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g,
+  c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c])); }
+function fmt(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+function dataBreveP2P(t){ return t ? '3 ott' : ''; }
+const P2P_DISPUTABILI = ['attivo', 'pagamento_ritentato', 'euro_inviati'];
+const nodi = {}; function el(id){ return nodi[id] || null; }
+let p2pLeve = null, p2pLevaPubblica = null;
+const p2pCoord = () => (p2pLeve && p2pLeve.mostro) ? p2pLeve : p2pLevaPubblica;
+let p2pInfo = null;
+const fmtEur = n => String(n);
+__PEZZI__
+/* --- i giudici puri --- */
+out.giudice = [giudiceContantiP2P(250, ['Contanti'], 250), giudiceContantiP2P(251, ['Contanti'], 250),
+  giudiceContantiP2P(1000, ['Contanti'], 0), giudiceContantiP2P(1000, ['SEPA'], 250),
+  giudiceContantiP2P(1000, ['Contanti al tabacchino 23.47'], 250),
+  giudiceContantiP2P(300, ['SEPA', 'Contanti'], 250), giudiceContantiP2P('300', ['Contanti'], '250')];
+out.scambio = [scambioInContantiP2P({metodi: ['SEPA', 'Contanti'], metodoScelto: 'SEPA'}),
+  scambioInContantiP2P({metodi: ['SEPA', 'Contanti'], metodoScelto: 'Contanti'}),
+  scambioInContantiP2P({metodi: ['SEPA', 'Contanti']}),
+  scambioInContantiP2P({metodi: ['Contanti al tabacchino 23.47']}),
+  scambioInContantiP2P({metodi: [' Contanti ']}), scambioInContantiP2P(null)];
+p2pLevaPubblica = {maxEuro: 0, maxEuroContanti: 250};
+out.leva = [maxEuroContantiP2P(), (p2pLevaPubblica = {maxEuroContanti: 0}, maxEuroContantiP2P()),
+  (p2pLevaPubblica = {maxEuroContanti: '250.9'}, maxEuroContantiP2P()), (p2pLevaPubblica = null, maxEuroContantiP2P())];
+p2pLevaPubblica = {maxEuro: 0, maxEuroContanti: 250};
+/* --- il foglio Pubblica: il giudice intero, coi campi veri --- */
+const base = {euro: '250', euroMax: '', sats: '', fisso: false, metodi: ['Contanti'], premio: 0,
+  premioTab: '', cambio: 0.0005, maxSats: 0, minSats: 0, maxEuro: 0, maxEuroContanti: 250,
+  lato: 'vendo', tab: {}, finestra: 0, adesso: 1790000000, scade: 0};
+out.pubblica = [
+  valeNuovoOrdineP2P(base).ok,
+  valeNuovoOrdineP2P(Object.assign({}, base, {euro: '251'})),
+  valeNuovoOrdineP2P(Object.assign({}, base, {euro: '100', euroMax: '300'})),
+  valeNuovoOrdineP2P(Object.assign({}, base, {euro: '300', metodi: ['SEPA']})).ok,
+  valeNuovoOrdineP2P(Object.assign({}, base, {euro: '300', metodi: ['SEPA', 'Contanti']})).manca,
+  valeNuovoOrdineP2P(Object.assign({}, base, {euro: '300', maxEuroContanti: 0})).ok,
+  /* il tetto generale acceso e piu' basso vince, con la sua frase */
+  valeNuovoOrdineP2P(Object.assign({}, base, {euro: '300', maxEuro: 200})).manca];
+/* --- la riga sotto il metodo --- */
+out.regola = [regolaContantiFoglioP2P(['Contanti'], 250, 'compro'), regolaContantiFoglioP2P(['SEPA'], 250, 'compro'),
+  regolaContantiFoglioP2P(['Contanti'], 0, 'compro'), regolaContantiFoglioP2P(['Contanti al tabacchino 5.00'], 250, 'vendo'),
+  regolaContantiFoglioP2P(['Contanti'], 250, 'vendo')];
+out.tetto = [testoTettoContantiP2P(250), testoTettoContantiP2P(0)];
+/* --- la prova d'incontro, il giro intero fra due chiavi vere --- */
+const skA = NT.generateSecretKey(), pubA = NT.getPublicKey(skA);
+const skB = NT.generateSecretKey(), pubB = NT.getPublicKey(skB);
+const ORD = '0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc01';
+const ADESSO = 1790000000;
+const geoA = {lat: '45.46420', lon: '9.19000', acc: '12'};
+const nonce = 'a1b2c3d4e5f60718';
+const evA = NT.finalizeEvent(notaMostraP2P(ORD, pubA, ADESSO, nonce, geoA), skA);
+const qr = testoQrPresenzaP2P(evA, nonce, geoA);
+const oB = {id: ORD, peer: pubA, indice: 1, pubTrade: pubB, metodi: ['Contanti'], lato: 'vendo', stato: 'attivo'};
+const letta = leggiQrPresenzaP2P(qr, oB, ADESSO + 30);
+out.qr = qr;
+out.lettura = {ok: letta.ok, perche: letta.perche || '',
+  idUguale: !!(letta.ok && letta.nota.id === evA.id),
+  contenutoUguale: !!(letta.ok && letta.nota.content === evA.content),
+  firmaVerificata: !!(letta.ok && NT.verifyEvent(letta.nota))};
+const geoB = {lat: '45.46430', lon: '9.19010', acc: '8'};
+const evB = letta.ok ? NT.finalizeEvent(notaLeggeP2P(ORD, pubB, ADESSO + 30, letta.nota.id, geoB), skB) : null;
+out.mostrata = evA; out.letta = evB; out.pubA = pubA; out.pubB = pubB;
+const evA0 = NT.finalizeEvent(notaMostraP2P(ORD, pubA, ADESSO, nonce, null), skA);
+out.senzaGeo = leggiQrPresenzaP2P(testoQrPresenzaP2P(evA0, nonce, null), oB, ADESSO).ok;
+out.letturaMinuscola = leggiQrPresenzaP2P(qr.toLowerCase(), oB, ADESSO + 30).ok;
+out.mostrataSenzaGeo = evA0;
+out.lettaSenzaGeo = NT.finalizeEvent(notaLeggeP2P(ORD, pubB, ADESSO + 5, evA0.id, null), skB);
+/* i rifiuti di chi legge, uno per ragione */
+const storto = qr.slice(0, -1) + (qr.endsWith('0') ? '1' : '0');
+out.rifiuti = [
+  leggiQrPresenzaP2P('ciao', oB, ADESSO).perche,
+  leggiQrPresenzaP2P(qr, Object.assign({}, oB, {id: 'altro-ordine-1234'}), ADESSO).perche,
+  leggiQrPresenzaP2P(qr, Object.assign({}, oB, {peer: pubB}), ADESSO).perche,
+  leggiQrPresenzaP2P(qr, Object.assign({}, oB, {peer: ''}), ADESSO).perche,
+  leggiQrPresenzaP2P(qr, oB, ADESSO + 700).perche,
+  leggiQrPresenzaP2P(storto, oB, ADESSO).perche,
+  leggiQrPresenzaP2P(qr.replace('45.46420/9.19000/12', 'x/y/z'), oB, ADESSO).perche,
+  leggiQrPresenzaP2P(qr.replace('45.46420/9.19000/12', '-'), oB, ADESSO).perche,
+  leggiQrPresenzaP2P(qr.replace('BRTL-INCONTRO-1', 'BRTL-INCONTRO-2'), oB, ADESSO).perche];
+out.geoBrowser = [geoPresenzaP2P({coords: {latitude: 45.4642, longitude: 9.19, accuracy: 12.4}}),
+  geoPresenzaP2P(null), geoPresenzaP2P({coords: {latitude: 'x', longitude: 9}}),
+  geoPresenzaP2P({coords: {latitude: 91, longitude: 9, accuracy: 1}}),
+  geoPresenzaP2P({coords: {latitude: -33.86882, longitude: 151.20929}})];
+out.contenuto = [contenutoPresenzaP2P('ab', null), contenutoPresenzaP2P('', {lat: '1.00000', lon: '2.00000', acc: '3'})];
+/* --- il riquadro della pagina dello scambio --- */
+const o = {id: ORD, lato: 'compro', stato: 'attivo', metodi: ['Contanti'], peer: pubA, indice: 1, pubTrade: pubB};
+const riq = x => riquadroContantiP2P(Object.assign({}, o, x));
+const r1 = riq({}), r2 = riq({lato: 'vendo'});
+const ha = (h, s) => h.indexOf(s) >= 0;
+out.riquadro = {
+  compro: [ha(r1, esc(REGOLA_CONTANTI_COMPRA)), !ha(r1, esc(REGOLA_CONTANTI_VENDE)), ha(r1, esc(CONSIGLI_CONTANTI)),
+    ha(r1, 'onclick="presenzaMostraP2P()"'), ha(r1, 'onclick="presenzaLeggiP2P()"'),
+    ha(r1, 'id="p2pPresenzaGps" checked'), ha(r1, 'si può falsificare')],
+  vendo: [ha(r2, esc(REGOLA_CONTANTI_VENDE)), !ha(r2, esc(REGOLA_CONTANTI_COMPRA))],
+  primaDellaGaranzia: riq({stato: 'attesa_hold_venditore'}),
+  concluso: riq({stato: 'concluso'}),
+  nonContanti: riq({metodi: ['SEPA']}),
+  sceltoSepa: riq({metodi: ['SEPA', 'Contanti'], metodoScelto: 'SEPA'}),
+  disputaSenza: [ha(riq({stato: 'in_disputa'}), "Nessuna prova d'incontro"), !ha(riq({stato: 'in_disputa'}), 'presenzaMostraP2P')],
+  conPresenza: [ha(riq({presenza: {ora: ADESSO, distanza: 12, posizioni: 2, precisione: 20}}), 'Incontro confermato'),
+    ha(riq({presenza: {ora: ADESSO, distanza: 12, posizioni: 2, precisione: 20}}), 'a 12 m di distanza (precisione ±20 m)'),
+    !ha(riq({presenza: {ora: ADESSO, distanza: 12, posizioni: 2}}), 'presenzaMostraP2P')],
+  soloVista: [!ha(riq({soloVista: true}), 'presenzaMostraP2P'), ha(riq({soloVista: true}), esc(REGOLA_CONTANTI_COMPRA))],
+  euroInviati: ha(riq({stato: 'euro_inviati'}), 'presenzaLeggiP2P')};
+out.distanza = [distanzaIncontroP2P({distanza: null, posizioni: 0}), distanzaIncontroP2P({distanza: null, posizioni: 1}),
+  distanzaIncontroP2P({distanza: 1200, posizioni: 2, precisione: 0}), distanzaIncontroP2P(null)];
+out.quando = quandoIncontroP2P(ADESSO);
+/* --- la card del moderatore --- */
+const d = {metodi: 'SEPA, Contanti', incontro: null};
+out.moderatore = [rigaIncontroModP2P(d, true), rigaIncontroModP2P({metodi: 'SEPA', incontro: null}, true),
+  rigaIncontroModP2P({metodi: 'SEPA', incontro: {ora: ADESSO, distanza: 5, posizioni: 2, precisione: 9}}, false),
+  rigaIncontroModP2P({metodi: 'Contanti', incontro: {ora: ADESSO, distanza: null, posizioni: 0, posizioni_via: true}}, true)];
+out.daServer = [presenzaDaServerP2P({ora: 5, distanza: null, posizioni: 0, precisione: null, posizioni_via: 1}),
+  presenzaDaServerP2P({ora: 0}), presenzaDaServerP2P(null),
+  presenzaDaServerP2P({ora: '7', distanza: '3', posizioni: '2', precisione: '4'})];
+process.stdout.write(JSON.stringify(out));
+"""
+
+
+def prove_contanti_a_mano():
+    """IL CONTANTI DI PERSONA NEL P2P (30 set 2026, decisione di Andrea:
+    tutti i punti dello studio attivi dal 10 ottobre; docs/STUDIO-
+    CONTANTI-A-MANO-2026-09-25.md).
+
+    QUATTRO COSE, e ognuna ha il suo banco: 1) IL TETTO — la leva
+    P2P_CONTANTI_MAX_EURO (250 di serie ANCHE senza la riga nel config),
+    in busta con le leve, giudicata dal client in pubblicazione e in
+    presa; 2) LA REGOLA DEL RILASCIO SUL POSTO, scritta nei quattro posti
+    (foglio Pubblica sotto il metodo, dettaglio di chi prende, pagina
+    dello scambio dal lato giusto, Info P2P) con le stesse costanti; 3)
+    LA PROVA D'INCONTRO — due note firmate con le chiavi usa-e-getta, il
+    QR fra i due telefoni, la rotta che verifica TUTT'E DUE le firme
+    contro le chiavi dette dal coordinatore, la riga per il moderatore;
+    4) LA PRIVACY delle posizioni, scordate alla chiusura e comunque
+    entro quindici giorni.
+
+    LE FIRME SONO VERE ANCHE IN CI: il server verifica con coincurve, che
+    in CI non c'e', e qui al suo posto entra `schnorr_puro.ChiaveXOnly` —
+    la ricetta di riferimento del BIP-340 in Python puro — dentro il
+    giudice VERO (`verifica_firma_nostr`, id ricalcolato). Dove coincurve
+    c'e', i due si controllano a vicenda. E il giro intero e' CROSS:
+    le note le fa il CLIENT in node con nostr-tools (mostra → QR → legge
+    → controfirma), e le giudica il SERVER in Python.
+
+    QUEL CHE SI ROMPE IN SILENZIO: un tetto che nasce spento «finche'
+    qualcuno non aggiunge la riga»; il giudice del contanti che confronta
+    per prefisso e ferma Barattozon; la regola scritta in quattro posti
+    con quattro frasi; una nota letta che non risponde a quella mostrata
+    (due prove di due incontri diversi incollate insieme); due note della
+    stessa chiave; una posizione che non si scorda mai; la rotta nuova
+    dentro il blocco della moderazione, dove una sentinella conta sette
+    rotte e vieta «firma(»."""
+    import json as _json, shutil as _sh, subprocess as _sp, tempfile as _tf, os as _os
+    import sqlite3, hashlib as _hl, math as _math, html as _html
+    import schnorr_puro
+    print("\n[il contanti di persona: tetto, regola, prova d'incontro, privacy]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    riga_js = lambda firma: mini[mini.index(firma):mini.index("\n", mini.index(firma))]
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    # --- 1) LA LEVA: 250 DI SERIE, IN BUSTA, NEL PANNELLO -----------------
+    prova("config_esempio porta la leva a 250", True, "\nP2P_CONTANTI_MAX_EURO = 250\n" in cfg)
+    prova("...e il server vale 250 ANCHE senza la riga (ImportError) e su un valore storto", True,
+          "except ImportError:\n    P2P_CONTANTI_MAX_EURO = 250\n" in src
+          and 'except (TypeError, ValueError):\n    P2P_CONTANTI_MAX_EURO = 250\n' in src)
+    prova("...un tetto negativo non e' un tetto", True,
+          'if P2P_CONTANTI_MAX_EURO < 0:\n        raise ValueError' in src)
+    amb_l = {"P2P_ATTIVO": True, "MOSTRO_HEX": "a" * 64, "MOSTRO_RELAY": ["ws://127.0.0.1:9"],
+             "MOSTRO_RELAY_SPECCHIO": [], "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
+             "P2P_CONTANTI_MAX_EURO": 250,
+             # il minimo di Barattozon, entrato nella busta lo stesso giorno
+             "BARATTOZON_MIN_EURO": 25}
+    exec(_senza_prosa(pezzo("_p2p_leve")), amb_l)
+    prova("la busta delle leve porta `maxEuroContanti`, intero", 250, amb_l["_p2p_leve"]()["maxEuroContanti"])
+    prova("...e viaggia anche a zero (spenta), mai assente", 0,
+          (amb_l.update(P2P_CONTANTI_MAX_EURO=0), amb_l["_p2p_leve"]()["maxEuroContanti"])[1])
+    prova("il pannello «Stato delle leve» ha la sua riga, col nome della leva", True,
+          '_leva("Tetto contanti di persona (€)", "P2P_CONTANTI_MAX_EURO",' in src)
+
+    # --- 2) LE SENTINELLE DEL CLIENT ---------------------------------------
+    prova("«Contanti» e' nel vocabolario dei metodi, e la costante lo nomina per intero",
+          [True, "const P2P_CONTANTI = 'Contanti';"],
+          ["'Contanti'," in riga_js("const P2P_METODI = "), riga_js("const P2P_CONTANTI = ")])
+    vale = nudo(fn("function valeNuovoOrdineP2P(v){"))
+    prova("il foglio Pubblica giudica il contanti su TUTT'E DUE le cifre, prima dei metodi", True,
+          0 < vale.find("giudiceContantiP2P(euro, v.metodi, v.maxEuroContanti)")
+          < vale.find("giudiceContantiP2P(max, v.metodi, v.maxEuroContanti)")
+          < vale.find("'Scegli almeno un metodo di pagamento'"))
+    prova("...e i campi del foglio portano la leva", True,
+          "maxEuroContanti: maxEuroContantiP2P()," in fn("function campiNuovoP2P(){"))
+    rn = nudo(fn("function renderNuovoOrdineP2P(){"))
+    prova("la regola sta SOTTO IL METODO nel foglio Pubblica, col tetto vivo e dal proprio lato", True,
+          "regolaContantiFoglioP2P(p2pNuovoMetodi, maxEuroContantiP2P(), compro ? 'compro' : 'vendo')" in rn)
+    rd = nudo(fn("function renderDettaglioP2P(){"))
+    prova("...e nel dettaglio di chi prende, sul metodo scelto o su quelli dell'ordine, dal suo lato", True,
+          "regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo] : (o.metodi || []), maxEuroContantiP2P(),"
+          in rd and "compro ? 'compro' : 'vendo') +" in rd)
+    cd = nudo(fn("function confermaDettaglioP2P(){"))
+    prova("alla presa il tetto si giudica PRIMA di chiudere il foglio e di aprire «Quanto»", True,
+          0 < cd.find("giudiceContantiP2P(o.euro, metPresa, maxEuroContantiP2P())")
+          < cd.find("chiudiFoglioP2P('p2pDettSheet')") < cd.find("apriQuantoP2P(id)"))
+    cq = nudo(fn("function confermaQuantoP2P(){"))
+    prova("...e su un intervallo sulla cifra scelta, prima della presa", True,
+          0 < cq.find("giudiceContantiP2P(g.euro,") < cq.find("eseguiPresaP2P(id, g.euro, p2pDettMetodo)"))
+    ren = nudo(fn("function renderOrdineP2P(){"))
+    prova("il riquadro del contanti sta nella pagina dello scambio, SOPRA il bottone del passo", True,
+          0 < ren.find("riquadroContantiP2P(o) +") < ren.find("(bottoni[azione] || '') +"))
+    ril = nudo(fn("function rilasciaP2P(){"))
+    prova("«Libera i sats» col contanti chiede del CONTEGGIO, e libera con lo stesso gesto", True,
+          "'Hai contato i contanti davanti a chi ti ha pagato?'" in ril
+          and "scambioInContantiP2P(o)" in ril
+          and "mossaOrdineP2P(o.id, 'release'" in ril)
+    # le quattro frasi sono UNA: Info P2P ripete le costanti alla lettera
+    testo = lambda nome: re.search(r"const %s = '((?:[^'\\]|\\.)*)';" % nome, mini).group(1).replace("\\'", "'")
+    i_info = mini.index('<div class="view" id="view-p2pinfo">')
+    info = mini[i_info:mini.index('<div class="view"', i_info + 10)]
+    prova("«Info P2P» ha la voce «Contanti di persona», col tetto vivo e la prova d'incontro", True,
+          '<h3 id="p2pinfo-contanti">Contanti di persona</h3>' in info
+          and '<li id="p2pInfoContantiTetto"></li>' in info
+          and "«Siamo insieme», la prova d'incontro" in info)
+    prova("...e la regola del rilascio la' e' la stessa frase del client, parola per parola", [True, True, True],
+          [testo("REGOLA_CONTANTI_COMPRA") in info, testo("REGOLA_CONTANTI_VENDE") in info,
+           testo("CONSIGLI_CONTANTI") in info])
+    prova("...con la cautela sul GPS e la regola della disputa scritta PRIMA", [True, True, True],
+          ["Il GPS si può falsificare" in info, "tornano a chi li ha bloccati" in info,
+           "vanno a chi compra" in info])
+    rpi = nudo(fn("function renderP2PInfo(){"))
+    prova("il tetto in Info P2P lo scrive `renderP2PInfo` dalla leva viva", True,
+          "testoTettoContantiP2P(maxEuroContantiP2P())" in rpi)
+    i_priv = mini.index('<div class="view" id="view-privacy">')
+    priv = mini[i_priv:mini.index('<div class="view"', i_priv + 10)]
+    prova("«I tuoi dati» dice la prova d'incontro: chi legge, per quanto, e che il GPS si falsifica", [True] * 5,
+          ["«🤝 Siamo insieme»" in priv, "quindici giorni" in priv, "quaranta giorni" in priv,
+           "un moderatore se si apre una disputa" in priv, "Il GPS si può falsificare" in priv])
+    card = nudo(fn("function cardDisputaModP2P(d, ho){"))
+    prova("la card del moderatore porta la riga dell'incontro, prima dello stato", True,
+          0 < card.find("rigaIncontroModP2P(d, aperta)") < card.find("if (d.stato === 'chiusa') {"))
+    prova("il foglio «Siamo insieme» esiste, e i due gesti sono nel blocco loro", [True, True, True],
+          ['id="p2pPresenzaSheet"' in mini,
+           "/* ============ IL CONTANTI DI PERSONA: LA PROVA D'INCONTRO (30 set 2026)" in mini,
+           "/* ============ fine del contanti di persona ============ */" in mini])
+    i_b = mini.index("/* ============ IL CONTANTI DI PERSONA: LA PROVA D'INCONTRO")
+    blocco = nudo(mini[i_b:mini.index("/* ============ fine del contanti di persona", i_b)])
+    prova("chi legge prova PRIMA lo scanner di Telegram (6.4), POI la fotocamera, POI incolla", True,
+          0 < blocco.find("tg.isVersionAtLeast?.('6.4') && typeof tg.showScanQrPopup === 'function'")
+          < blocco.find("window.BarcodeDetector && navigator.mediaDevices")
+          < blocco.find("id=\"p2pPresenzaIncolla\""))
+    invii = re.findall(r"body: JSON\.stringify\(([^)]*)\)", blocco)
+    prova("al server vanno l'ordine e le DUE note, e nessuna chiave privata",
+          ["{ordine: o.id, mostrata: mostrata, letta: letta}"], invii)
+    prova("...verso la rotta della presenza", True, "`${API_BASE}/p2p/presenza`" in blocco)
+    prova("la posizione passa da `getCurrentPosition` con un timeout, e un no e' null", True,
+          "navigator.geolocation.getCurrentPosition(fine, () => fine(null)," in blocco
+          and "timeout: 8000" in blocco)
+    prova("la fotocamera si ferma quando il foglio si chiude", True,
+          "if (!p2pPresenzaFlusso || !f || !f.classList.contains('open')) { fermaCameraPresenzaP2P(); return; }" in blocco)
+    prova("il contenuto della nota si scrive con UNA funzione (mai JSON.stringify di un oggetto)", True,
+          blocco.count("contenutoPresenzaP2P(") >= 3
+          and "JSON.stringify({v" not in blocco)
+    prova("la prova arriva dal server alla riga (`incontro` → `presenza`) nei due rami dell'adozione", [True, True],
+          ["o.presenza = presenzaDaServerP2P(s.incontro)" in fn("function rigaDaServerP2P(id, s, tk, stato, adesso){"),
+           "gia.presenza = presenzaDaServerP2P(s.incontro)" in fn("function adottaScambiServerP2P(locali){")])
+
+    # --- 3) LE SENTINELLE DEL SERVER ---------------------------------------
+    i_mod = src.index("# ---------- LA MODERAZIONE DELLE DISPUTE P2P")
+    blocco_mod = src[i_mod:src.index("\nasync def _respiro_presa_p2p(", i_mod)]
+    prova("la rotta della presenza sta FUORI dal blocco della moderazione (sette rotte, niente «firma(»)",
+          [False, True], ['@app.post("/api/p2p/presenza")' in blocco_mod,
+                          '@app.post("/api/p2p/presenza")' in src])
+    rotta = pezzo("presenza_p2p")
+    prova("...chiede un utente riconosciuto, il P2P acceso, e passa dal giudice puro", True,
+          0 < rotta.find("verifica_utente(x_tg_init_data, barattolo_sessione)")
+          < rotta.find('_p2p_per(user["id"])["attivo"]') < rotta.find("leggi_json(req)")
+          < rotta.find('_registra_presenza_p2p(con, user["id"], d, int(time.time()))'))
+    prova("la tabella nasce in init_db e segue l'utente nella fusione", [True, True],
+          ["CREATE TABLE IF NOT EXISTS p2p_presenze(" in pezzo("init_db"),
+           "UPDATE p2p_presenze SET caricata_da=? WHERE caricata_da=?" in pezzo("esegui_fusione")])
+    prova("la chiusura dello scambio SCORDA le posizioni (in `_manda_evento_p2p`, guardata)", True,
+          'if fatto["momento"] in P2P_PRESENZA_MOMENTI_CHIUSI:\n                    '
+          '_scorda_posizioni_presenza_p2p(con, ev["ordine"], int(time.time()))' in pezzo("_manda_evento_p2p"))
+    prova("...e l'orologio passa la scopa anche senza l'evento", True,
+          "pulisci_presenze_p2p()" in pezzo("orologio")
+          and "_scopa_presenze_p2p(con, int(time.time()))" in pezzo("pulisci_presenze_p2p"))
+    prova("la riga della disputa e la rotta degli scambi portano `incontro`", [True, True],
+          ['"incontro": _incontro_p2p(con, ordine),' in pezzo("_riga_disputa_p2p"),
+           '"incontro": _incontro_p2p(con, ordine),' in pezzo("_scambi_p2p")])
+    prova("il giudice verifica la firma col giudice di casa (id ricalcolato), mai a occhio", True,
+          "if not verifica_firma_nostr(ev):" in pezzo("_nota_presenza_p2p"))
+
+    # --- 4) I GIUDICI DEL SERVER, CON FIRME VERE ---------------------------
+    try:
+        from coincurve import PrivateKey as _Sk, PublicKeyXOnly as _Pk
+    except ImportError:
+        _Sk = _Pk = None
+    if _Sk is not None:
+        sk = _os.urandom(32)
+        m = _hl.sha256(b"barattolo").digest()
+        prova("[coincurve] schnorr_puro verifica una firma di coincurve, e coincurve una di schnorr_puro",
+              [True, True, False],
+              [schnorr_puro.verifica(schnorr_puro.pubblica(sk), m, _Sk(sk).sign_schnorr(m)),
+               _Pk(schnorr_puro.pubblica(sk)).verify(schnorr_puro.firma(sk, m, _os.urandom(32)), m),
+               schnorr_puro.verifica(schnorr_puro.pubblica(sk), _hl.sha256(b"altro").digest(),
+                                     _Sk(sk).sign_schnorr(m))])
+    schema = ""
+    for tabella, fine in (("p2p_scambi", "\n    );"), ("p2p_momenti", "\n    );"),
+                          ("p2p_presenze", "\n    );")):
+        i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
+        schema += src[i:src.index(fine, i) + len(fine)] + "\n"
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(schema)
+    amb = {"json": _json, "hashlib": _hl, "math": _math, "re": re, "html": _html,
+           "ChiavePubblicaNostr": schnorr_puro.ChiaveXOnly, "print": lambda *a, **k: None}
+    for riga in ("RE_HEX_64 = ", "RE_HEX_128 = ", "FORMA_ORDINE_P2P = ", "P2P_KIND_PRESENZA = ",
+                 "P2P_PRESENZA_RUOLI = ", "P2P_PRESENZA_FINESTRA_S = ", "P2P_PRESENZA_OROLOGIO_S = ",
+                 "P2P_PRESENZA_POSIZIONI_S = ", "P2P_LIBRO_MEMORIA_S = "):
+        i = src.index("\n" + riga) + 1
+        exec(src[i:src.index("\n", i)].split("  #")[0], amb)
+    i = src.index("\nP2P_PRESENZA_MOMENTI_CHIUSI = (") + 1
+    exec(src[i:src.index(")\n", i) + 2], amb)
+    for f in ("evento_non_firmato", "verifica_firma_nostr", "_tag_presenza_p2p", "_geo_presenza_p2p",
+              "_distanza_metri_p2p", "_nota_presenza_p2p", "_incontro_da_riga_p2p", "_incontro_p2p",
+              "_registra_presenza_p2p", "_scorda_posizioni_presenza_p2p", "_scopa_presenze_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    ORA = 1_790_000_000
+    ORD = "0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc01"
+    ORD2 = "1a2b3c4d-0000-4000-8000-000000000002"
+    skA, skB, skX = (_os.urandom(32) for _ in range(3))
+    pubA, pubB, pubX = (schnorr_puro.pubblica(k).hex() for k in (skA, skB, skX))
+
+    def nota(sk, ordine, ruolo, ora, geo=None, ref=None, nonce="0011223344556677", kind=None, contenuto=None):
+        tags = [["d", ordine], ["ruolo", ruolo]] + ([["e", ref]] if ref else [])
+        c = contenuto if contenuto is not None else _json.dumps(
+            {"v": 1, "nonce": nonce, "geo": geo}, separators=(",", ":"))
+        ev = amb["evento_non_firmato"](schnorr_puro.pubblica(sk).hex(),
+                                       amb["P2P_KIND_PRESENZA"] if kind is None else kind, tags, c, ora)
+        ev["sig"] = schnorr_puro.firma(sk, bytes.fromhex(ev["id"]), _os.urandom(32)).hex()
+        return ev
+
+    ev = nota(skA, ORD, "mostra", ORA, {"lat": 45.4642, "lon": 9.19, "acc": 12})
+    prova("una nota firmata con schnorr_puro passa dal giudice di casa; ritoccata, no", [True, False],
+          [amb["verifica_firma_nostr"](ev), amb["verifica_firma_nostr"](dict(ev, content=ev["content"] + " "))])
+    prova("la distanza: ~111 m per un millesimo di grado sull'equatore, 0 sullo stesso punto", [True, 0],
+          [105 <= amb["_distanza_metri_p2p"]({"lat": 0, "lon": 0}, {"lat": 0, "lon": 0.001}) <= 115,
+           amb["_distanza_metri_p2p"]({"lat": 45.1, "lon": 9.1}, {"lat": 45.1, "lon": 9.1})])
+    prova("la posizione in misura: numeri (anche come stringhe) si', bool, NaN, fuori misura e altro no",
+          [{"lat": 45.4642, "lon": 9.19, "acc": 12}, {"lat": 1.0, "lon": 2.0, "acc": 0}, None, None, None, None, None],
+          [amb["_geo_presenza_p2p"]({"lat": "45.46420", "lon": "9.19000", "acc": "12"}),
+           amb["_geo_presenza_p2p"]({"lat": 1, "lon": 2}), amb["_geo_presenza_p2p"]({"lat": True, "lon": 2}),
+           amb["_geo_presenza_p2p"]({"lat": float("nan"), "lon": 2}), amb["_geo_presenza_p2p"]({"lat": 91, "lon": 2}),
+           amb["_geo_presenza_p2p"]("45,9"), amb["_geo_presenza_p2p"](None)])
+    reg = amb["_registra_presenza_p2p"]
+    # UN RIFIUTO E' UNA ROSSA COL SUO NOME, mai un botto (dalla tortura: una
+    # mutazione che fa dire 400 al giudice faceva ESPLODERE la prova invece
+    # di farla rossa): `_inc` e `_gia` leggono la risposta, e su un rifiuto
+    # mettono la FRASE al posto del numero, cosi' il confronto la stampa
+    _inc = lambda ff: (ff["incontro"] if isinstance(ff, dict) and isinstance(ff.get("incontro"), dict)
+                       else {"ora": ff, "posizioni": ff, "distanza": None, "precisione": ff,
+                             "posizioni_via": ff})
+    _gia = lambda ff: ff.get("gia") if isinstance(ff, dict) else ff
+    mostrata = nota(skA, ORD, "mostra", ORA, {"lat": 45.4642, "lon": 9.19, "acc": 12})
+    letta = nota(skB, ORD, "legge", ORA + 30, {"lat": 45.4643, "lon": 9.1901, "acc": 8}, ref=mostrata["id"])
+    corpo = lambda **k: dict({"ordine": ORD, "mostrata": mostrata, "letta": letta}, **k)
+    prova("senza la riga del coordinatore (p2p_scambi) la prova aspetta: 409", 409, reg(con, 111, corpo(), ORA + 40)[0])
+    con.execute("INSERT INTO p2p_scambi(ordine, compratore, venditore, giro, chiave_compratore, chiave_venditore, aggiornato) "
+                "VALUES(?,?,?,?,?,?,?)", (ORD, 111, 222, 1, "", pubB, ORA))
+    prova("...e con una chiave sola pure", 409, reg(con, 111, corpo(), ORA + 40)[0])
+    con.execute("UPDATE p2p_scambi SET chiave_compratore=? WHERE ordine=?", (pubA, ORD))
+    prova("prima della prova, `_incontro_p2p` dice None", None, amb["_incontro_p2p"](con, ORD))
+    codice, fuori = reg(con, 111, corpo(), ORA + 40)
+    prova("il giro buono: 200, non «gia'», l'ora e' quella della nota LETTA, due posizioni, la distanza in metri",
+          [200, False, ORA + 30, 2, True, 12, False],
+          [codice, _gia(fuori), _inc(fuori)["ora"], _inc(fuori)["posizioni"],
+           5 <= (_inc(fuori)["distanza"] or 0) <= 30, _inc(fuori)["precisione"],
+           _inc(fuori)["posizioni_via"]])
+    r = con.execute("SELECT * FROM p2p_presenze WHERE ordine=?", (ORD,)).fetchone()
+    prova("la riga: le due chiavi al posto giusto, le posizioni, la copia delle note, chi ha caricato, il giro",
+          [pubA, pubB, 45.4642, 9.1901, 111, 1, True],
+          [r["chiave_mostra"], r["chiave_legge"], r["lat_mostra"], r["lon_legge"], r["caricata_da"], r["giro"],
+           '"mostrata":' in r["prova"] and '"letta":' in r["prova"]])
+    prova("una seconda prova sullo stesso ordine torna la PRIMA, con `gia`", [200, True, ORA + 30],
+          (lambda c, f: [c, _gia(f), _inc(f)["ora"]])(*reg(con, 222, corpo(
+              letta=nota(skB, ORD, "legge", ORA + 100, None, ref=mostrata["id"])), ORA + 110)))
+    prova("`_incontro_p2p` la legge; e su un database senza la tabella vale None", [ORA + 30, None],
+          [amb["_incontro_p2p"](con, ORD)["ora"],
+           amb["_incontro_p2p"](sqlite3.connect(":memory:"), ORD)])
+    # i rifiuti, uno per ragione — su un ordine nuovo, con le chiavi dette
+    con.execute("INSERT INTO p2p_scambi(ordine, compratore, venditore, giro, chiave_compratore, chiave_venditore, aggiornato) "
+                "VALUES(?,?,?,?,?,?,?)", (ORD2, 111, 222, 1, pubB, pubA, ORA))
+    m2 = nota(skA, ORD2, "mostra", ORA, None)
+    l2 = lambda **k: nota(skB, ORD2, "legge", ORA + 10, None, ref=m2["id"], **k)
+    c2 = lambda **k: dict({"ordine": ORD2, "mostrata": m2, "letta": l2()}, **k)
+    rifiuti = {
+        "corpo storto": reg(con, 111, "x", ORA),
+        "ordine in forma sconosciuta": reg(con, 111, c2(ordine="<b>"), ORA),
+        "nota illeggibile": reg(con, 111, c2(mostrata="x"), ORA),
+        "firma che non torna": reg(con, 111, c2(mostrata=dict(m2, content=m2["content"] + " ")), ORA),
+        "kind sbagliato": reg(con, 111, c2(mostrata=nota(skA, ORD2, "mostra", ORA, kind=1)), ORA),
+        "un altro scambio": reg(con, 111, c2(mostrata=nota(skA, ORD, "mostra", ORA)), ORA),
+        "ruolo sconosciuto": reg(con, 111, c2(mostrata=nota(skA, ORD2, "guarda", ORA)), ORA),
+        "contenuto illeggibile": reg(con, 111, c2(mostrata=nota(skA, ORD2, "mostra", ORA, contenuto="{")), ORA),
+        "versione sconosciuta": reg(con, 111, c2(mostrata=nota(skA, ORD2, "mostra", ORA, contenuto='{"v":2}')), ORA),
+        "due mostrate": reg(con, 111, c2(letta=nota(skB, ORD2, "mostra", ORA + 10, ref=m2["id"])), ORA),
+        "la letta non risponde alla mostrata": reg(con, 111, c2(letta=nota(skB, ORD2, "legge", ORA + 10, ref="f" * 64)), ORA),
+        "stessa chiave": reg(con, 111, c2(letta=nota(skA, ORD2, "legge", ORA + 10, ref=m2["id"])), ORA),
+        "troppo tempo fra le due": reg(con, 111, c2(letta=nota(skB, ORD2, "legge", ORA + 601, ref=m2["id"])), ORA + 601),
+        "troppo lontana da adesso": reg(con, 111, c2(), ORA + 10 + 901),
+        "chiavi non dello scambio": reg(con, 111, c2(letta=nota(skX, ORD2, "legge", ORA + 10, ref=m2["id"])), ORA + 10),
+    }
+    prova("i rifiuti, ognuno col suo codice e la sua frase",
+          {"corpo storto": (400, "Richiesta illeggibile"),
+           "ordine in forma sconosciuta": (400, "Ordine in una forma sconosciuta"),
+           "nota illeggibile": (400, "Nota illeggibile"),
+           "firma che non torna": (400, "La firma della nota non torna"),
+           "kind sbagliato": (400, "Non e' una nota di presenza"),
+           "un altro scambio": (400, "La nota parla di un altro scambio"),
+           "ruolo sconosciuto": (400, "Ruolo sconosciuto"),
+           "contenuto illeggibile": (400, "Contenuto illeggibile"),
+           "versione sconosciuta": (400, "Versione della nota sconosciuta"),
+           "due mostrate": (400, "Servono una nota mostrata e una letta"),
+           "la letta non risponde alla mostrata": (400, "La nota letta non risponde a quella mostrata"),
+           "stessa chiave": (400, "Le due note vengono dalla stessa chiave"),
+           "troppo tempo fra le due": (400, "Fra le due note e' passato troppo tempo: rifate il codice"),
+           "troppo lontana da adesso": (400, "L'ora della nota e' troppo lontana da adesso"),
+           "chiavi non dello scambio": (403, "Le firme non sono delle due chiavi di questo scambio")},
+          {k: (v[0], v[1]) for k, v in rifiuti.items()})
+    prova("...e nessun rifiuto ha scritto una riga", 0,
+          con.execute("SELECT COUNT(*) FROM p2p_presenze WHERE ordine=?", (ORD2,)).fetchone()[0])
+    con.execute("INSERT INTO p2p_momenti(ordine, momento, quando, fonte, giro) VALUES(?,?,?,?,?)",
+                (ORD2, "concluso", ORA + 5, "mostro", 1))
+    prova("a scambio chiuso (nel giro corrente) la prova non serve piu': 409", 409, reg(con, 111, c2(), ORA + 10)[0])
+    con.execute("UPDATE p2p_momenti SET giro=0 WHERE ordine=?", (ORD2,))
+    codice2, fuori2 = reg(con, 111, c2(), ORA + 10)
+    prova("...ma un «concluso» di un giro PRECEDENTE non conta; e senza posizioni la distanza e' None",
+          [200, None, 0, None], [codice2, _inc(fuori2)["distanza"], _inc(fuori2)["posizioni"],
+                                 _inc(fuori2)["precisione"]])
+    # la privacy: scordare le posizioni, alla chiusura e con la scopa
+    n = amb["_scorda_posizioni_presenza_p2p"](con, ORD, ORA + 1000)
+    r = con.execute("SELECT * FROM p2p_presenze WHERE ordine=?", (ORD,)).fetchone()
+    prova("alla chiusura le posizioni e la copia delle note se ne vanno; l'ora e la distanza restano",
+          [1, None, None, None, None, "", ORA + 1000, True, True],
+          [n, r["lat_mostra"], r["lon_mostra"], r["acc_legge"], r["lat_legge"], r["prova"], r["posizioni_via"],
+           r["distanza_m"] is not None, r["ora_legge"] == ORA + 30])
+    prova("...una seconda volta non tocca niente (idempotente), e `incontro` lo dice", [0, True, None],
+          [amb["_scorda_posizioni_presenza_p2p"](con, ORD, ORA + 2000),
+           amb["_incontro_p2p"](con, ORD)["posizioni_via"], amb["_incontro_p2p"](con, ORD)["precisione"]])
+    vita = amb["P2P_PRESENZA_POSIZIONI_S"]
+    con.execute("UPDATE p2p_presenze SET lat_mostra=1, lon_mostra=2, acc_mostra=3, posizioni_via=0 WHERE ordine=?", (ORD2,))
+    prova("la scopa: sotto i quindici giorni non tocca; sopra scorda le posizioni; sopra la cronaca toglie la riga",
+          [0, 1, 1, 0],
+          [amb["_scopa_presenze_p2p"](con, ORA + 10 + vita - 1),
+           amb["_scopa_presenze_p2p"](con, ORA + 10 + vita + 1),
+           (con.execute("SELECT posizioni_via, lat_mostra FROM p2p_presenze WHERE ordine=?", (ORD2,)).fetchone()[0] > 0
+            and con.execute("SELECT lat_mostra FROM p2p_presenze WHERE ordine=?", (ORD2,)).fetchone()[0] is None) and 1 or 0,
+           (amb["_scopa_presenze_p2p"](con, ORA + amb["P2P_LIBRO_MEMORIA_S"] + 100),
+            con.execute("SELECT COUNT(*) FROM p2p_presenze").fetchone()[0])[1]])
+    prova("i quindici giorni sono davvero quindici, e la finestra fra le note dieci minuti",
+          [15 * 86400, 600, 900], [vita, amb["P2P_PRESENZA_FINESTRA_S"], amb["P2P_PRESENZA_OROLOGIO_S"]])
+
+    # --- 5) IL BANCO DEL CLIENT: nostr-tools vero, e il giro CROSS ---------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco del contanti", "node non c'e'")
+        return
+    blocco_const = lambda nome: (lambda i: mini[i:mini.index("\n};", i) + 3])(mini.index("const " + nome + " = {"))
+    pezzi = "\n".join([
+        riga_js("const P2P_CONTANTI = "),
+        fn("function contantiAManoP2P(metodi){"), fn("function scambioInContantiP2P(o){"),
+        fn("function giudiceContantiP2P(euro, metodi, tetto){"),
+        riga_js("const REGOLA_CONTANTI_COMPRA = "), riga_js("const REGOLA_CONTANTI_VENDE = "),
+        riga_js("const CONSIGLI_CONTANTI = "),
+        fn("function regolaContantiFoglioP2P(metodi, tetto, lato){"), fn("function testoTettoContantiP2P(tetto){"),
+        fn("function quandoIncontroP2P(ts){"), fn("function distanzaIncontroP2P(p){"),
+        fn("function riquadroContantiP2P(o){"), fn("function rigaIncontroModP2P(d, aperta){"),
+        fn("function presenzaDaServerP2P(inc){"), fn("function maxEuroP2P(){"), fn("function maxEuroContantiP2P(){"),
+        # il giudice del foglio Pubblica, coi suoi attrezzi
+        fn("function interoP2P(testo){"), fn("function centesimiP2P(testo){"),
+        fn("function metodoBaseP2P(m){"), fn("function tabacchinoP2P(metodi){"),
+        riga_js("const P2P_TABACCHINO = "), riga_js("const P2P_TABACCHINO_PM = "),
+        fn("function valeNuovoOrdineP2P(v){"),
+        # la prova d'incontro
+        riga_js("const P2P_KIND_PRESENZA = "), riga_js("const P2P_PRESENZA_FINESTRA_S = "),
+        riga_js("const P2P_PRESENZA_PREFISSO = "),
+        fn("function contenutoPresenzaP2P(nonce, geo){"), fn("function geoPresenzaP2P(pos){"),
+        fn("function notaMostraP2P(ordine, pub, ora, nonce, geo){"),
+        fn("function notaLeggeP2P(ordine, pub, ora, idMostrata, geo){"),
+        fn("function testoQrPresenzaP2P(ev, nonce, geo){"),
+        fn("function leggiQrPresenzaP2P(testo, o, adesso){")])
+    cart = _tf.mkdtemp(prefix="contanti_")
+    pb = _os.path.join(cart, "banco.js")
+    open(pb, "w", encoding="utf-8").write(BANCO_CONTANTI.replace("__PEZZI__", pezzi))
+    rr = _sp.run([node, pb, "vendor/nostr.bundle.js"], capture_output=True, text=True,
+                 timeout=120, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco del contanti gira", "", (rr.stderr or "")[-900:])
+    if rr.returncode or not rr.stdout.strip():
+        return
+    o = _json.loads(rr.stdout)
+    frase = "In contanti di persona il massimo è 250 € per scambio: sopra, si divide in più ordini"
+    prova("il giudice: 250 passa, 251 no; leva spenta, altro metodo e il tabacchino non c'entrano; con due metodi conta",
+          ["", frase, "", "", "", frase, frase], o["giudice"])
+    prova("lo scambio e' in contanti per il metodo SCELTO, o per la voce fra i metodi; il tabacchino no",
+          [False, True, True, False, True, False], o["scambio"])
+    prova("la leva dal client: 250; zero e nulla sono spente; una cifra con la virgola si tronca",
+          [250, 0, 250, 0], o["leva"])
+    p = o["pubblica"]
+    prova("il foglio Pubblica: 250 ok; 251 no sul primo campo; 300 di massimo no sul secondo",
+          [True, {"ok": False, "manca": frase, "campo": "p2pNuovoEuro"},
+           {"ok": False, "manca": frase, "campo": "p2pNuovoEuroMax"}], p[:3])
+    prova("...con SEPA passa, con SEPA+Contanti no, a leva spenta passa, e il tetto generale piu' basso dice la sua",
+          [True, frase, True, "Troppi: il massimo è 200 €"], p[3:])
+    prova("la riga sotto il metodo: col contanti e il tetto, col contanti senza tetto, MAI per gli altri, e dal proprio lato",
+          [True, "", True, "", True],
+          [("al massimo <b>250 €</b>" in o["regola"][0] and "Consegna i contanti solo quando" in o["regola"][0]
+            and "posto pubblico" in o["regola"][0]), o["regola"][1],
+           ("al massimo" not in o["regola"][2] and "Consegna i contanti" in o["regola"][2]), o["regola"][3],
+           ("Conta i contanti davanti a chi ti paga" in o["regola"][4] and "Consegna i contanti" not in o["regola"][4])])
+    prova("la voce del tetto in Info P2P, con la cifra o senza", [True, True],
+          ["<b>250 €</b> per scambio in contanti" in o["tetto"][0], "non c'è un tetto" in o["tetto"][1]])
+    prova("chi mostra e chi legge si intendono: il codice si rilegge, l'id e il contenuto combaciano, la firma regge",
+          {"ok": True, "perche": "", "idUguale": True, "contenutoUguale": True, "firmaVerificata": True}, o["lettura"])
+    prova("la riga del QR ha sette pezzi, e' MAIUSCOLA (modo alfanumerico) e non porta chiavi private", [7, True, True],
+          [len(o["qr"].split(":")), o["qr"] == o["qr"].upper(),
+           o["qr"].startswith(("BRTL-INCONTRO-1:" + ORD + ":" + o["pubA"] + ":").upper())])
+    prova("...e chi legge la rimette in minuscolo: la stessa riga scritta minuscola si legge uguale", True,
+          o["letturaMinuscola"])
+    prova("...e senza posizione regge lo stesso", True, o["senzaGeo"])
+    prova("i rifiuti di chi legge, uno per ragione",
+          ["Questo non è un codice d'incontro di Barattolo", "Il codice è di un altro scambio",
+           "Il codice non è firmato dall'altra parte di questo scambio",
+           "Il codice non è firmato dall'altra parte di questo scambio", "Il codice è vecchio: fatelo rifare",
+           "La firma del codice non torna", "Codice illeggibile", "La firma del codice non torna",
+           "Questo non è un codice d'incontro di Barattolo"], o["rifiuti"])
+    prova("la posizione del browser: cinque decimali come stringhe, precisione intera; niente, storta o fuori misura = null",
+          [{"lat": "45.46420", "lon": "9.19000", "acc": "12"}, None, None, None,
+           {"lat": "-33.86882", "lon": "151.20929", "acc": "0"}], o["geoBrowser"])
+    prova("il contenuto si scrive uguale ai due lati, a mano",
+          ['{"v":1,"nonce":"ab","geo":null}', '{"v":1,"nonce":"","geo":{"lat":1.00000,"lon":2.00000,"acc":3}}'],
+          o["contenuto"])
+    # IL GIRO CROSS: le note fatte dal CLIENT, giudicate dal SERVER
+    con.execute("INSERT INTO p2p_scambi(ordine, compratore, venditore, giro, chiave_compratore, chiave_venditore, aggiornato) "
+                "VALUES(?,?,?,?,?,?,?)", ("c" * 8 + "-cros-4000-8000-" + "0" * 12, 111, 222, 1, o["pubA"], o["pubB"], ORA))
+    ORD_C = "c" * 8 + "-cros-4000-8000-" + "0" * 12
+    # le note del client parlano di ORD: si sposta la riga delle chiavi su quell'ordine
+    con.execute("DELETE FROM p2p_presenze WHERE ordine=?", (ORD,))
+    con.execute("UPDATE p2p_scambi SET chiave_compratore=?, chiave_venditore=? WHERE ordine=?", (o["pubA"], o["pubB"], ORD))
+    con.execute("DELETE FROM p2p_momenti WHERE ordine=?", (ORD,))
+    cc, ff = reg(con, 222, {"ordine": ORD, "mostrata": o["mostrata"], "letta": o["letta"]}, ADESSO_C := 1790000000 + 40)
+    prova("IL GIRO CROSS: le due note fatte dal client in node passano il giudice del server in Python",
+          [200, False, 1790000030, 2, True, 12],
+          [cc, _gia(ff), _inc(ff)["ora"], _inc(ff)["posizioni"],
+           5 <= (_inc(ff)["distanza"] or 0) <= 30, _inc(ff)["precisione"]])
+    con.execute("DELETE FROM p2p_presenze WHERE ordine=?", (ORD,))
+    cc0, ff0 = reg(con, 222, {"ordine": ORD, "mostrata": o["mostrataSenzaGeo"], "letta": o["lettaSenzaGeo"]}, 1790000010)
+    prova("...anche senza posizioni: 200, distanza None", [200, None, 0], [cc0, _inc(ff0)["distanza"], _inc(ff0)["posizioni"]])
+    # il riquadro
+    q = o["riquadro"]
+    prova("il riquadro a chi compra: la SUA regola, i consigli, i due gesti, la casella accesa, la cautela sul GPS",
+          [True] * 7, q["compro"])
+    prova("...a chi vende la sua, e non quella dell'altro", [True, True], q["vendo"])
+    prova("...niente prima della garanzia, a scambio concluso, senza contanti, o col metodo scelto SEPA",
+          ["", "", "", ""], [q["primaDellaGaranzia"], q["concluso"], q["nonContanti"], q["sceltoSepa"]])
+    prova("...a disputa aperta senza prova lo dice, senza gesti; con la prova dice l'incontro e la distanza",
+          [[True, True], [True, True, True]], [q["disputaSenza"], q["conPresenza"]])
+    prova("...la riga solo da guardare ha la regola ma non i gesti; a euro inviati il gesto c'e' ancora",
+          [[True, True], True], [q["soloVista"], q["euroInviati"]])
+    prova("la distanza si dice: senza posizioni, con una sola, coi metri (senza precisione a zero), niente su null",
+          [", senza posizioni", ", con la posizione di un solo telefono", ", a 1.200 m di distanza", ""], o["distanza"])
+    prova("l'ora dell'incontro si dice «alle HH:MM del …»", True, bool(re.fullmatch(r"alle \d\d:\d\d del 3 ott", o["quando"])))
+    m = o["moderatore"]
+    prova("il moderatore: «nessuna prova» sul contanti, niente su SEPA senza prova, la prova sempre, e «posizioni cancellate»",
+          [True, "", True, True],
+          ["Nessuna prova d'incontro" in m[0], m[1],
+           "Incontro confermato" in m[2] and "a 5 m di distanza (precisione ±9 m)" in m[2] and "si può falsificare" not in m[2],
+           "posizioni cancellate" in m[3] and "si può falsificare" in m[3]])
+    prova("la prova dal server entra nella riga con i suoi numeri, o non entra",
+          [{"ora": 5, "distanza": None, "posizioni": 0, "precisione": None, "posizioniVia": True}, None, None,
+           {"ora": 7, "distanza": 3, "posizioni": 2, "precisione": 4, "posizioniVia": False}], o["daServer"])
+    con.close()
+
+
 BANCO_MODERAZIONE = r"""
 const fs = require('fs'), vm = require('vm');
 vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
@@ -110477,6 +111097,8 @@ def prove_moderazione_p2p():
     for f in ("_moderatori_p2p", "_chiusura_disputa_p2p", "_persona_disputa_p2p",
               "_testo_disputa_aperta_p2p", "_testo_disputa_chiusa_p2p", "_registro_disputa_p2p",
               "_disputa_evento_p2p", "_chiave_moderatore_p2p", "_registra_chiave_moderatore_p2p",
+              # la prova d'incontro del contanti (30 set 2026): senza tabella vale None
+              "_incontro_da_riga_p2p", "_incontro_p2p",
               "_dichiara_disputa_p2p", "_riga_disputa_p2p", "_dispute_per_moderatore_p2p",
               "_prendi_disputa_p2p", "_lascia_disputa_p2p", "_decisione_disputa_p2p",
               "_esito_gesto_disputa_p2p"):
@@ -110656,6 +111278,12 @@ def prove_moderazione_p2p():
             "CHAT_INFO_CONV", "CHAT_INFO_FIRMA", "CHAT_TOLLERANZA", "CHAT_MAX_BYTE", "CHAT_RAFFICA")),
         "let p2pChiaviChat = {}; let p2pChatSecchio = {};",
         fn("function chiaviPeer(skHex, peerPub){"),
+        # la prova d'incontro del contanti sulla card (30 set 2026): i
+        # pezzi VERI che `rigaIncontroModP2P` chiama
+        riga_js("const P2P_CONTANTI = "),
+        fn("function contantiAManoP2P(metodi){"),
+        fn("function quandoIncontroP2P(ts){"),
+        fn("function distanzaIncontroP2P(p){"),
         chat, modulo])
     cart = _tf.mkdtemp(prefix="moderazione_")
     pb = _os.path.join(cart, "banco.js")
@@ -110795,7 +111423,7 @@ def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
-    for f in (prove_filtro_italiano, prove_autocomplete_comuni,
+    for f in (prove_contanti_a_mano, prove_filtro_italiano, prove_autocomplete_comuni,
               prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,

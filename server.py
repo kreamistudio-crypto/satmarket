@@ -5230,6 +5230,29 @@ def init_db():
         chiave TEXT NOT NULL,
         creata INTEGER DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS p2p_presenze(
+        -- LA PROVA D'INCONTRO DEL CONTANTI DI PERSONA (30 set 2026): i
+        -- due telefoni erano insieme, e lo hanno firmato tutt'e due con
+        -- la chiave usa-e-getta dello scambio. Una riga per ordine, la
+        -- PRIMA che arriva; le firme sono verificate PRIMA di scrivere.
+        -- Le POSIZIONI sono facoltative e si scordano (`posizioni_via`)
+        -- quando lo scambio si chiude, e comunque entro
+        -- P2P_PRESENZA_POSIZIONI_S: restano l'ora e la distanza.
+        ordine TEXT PRIMARY KEY,
+        giro INTEGER DEFAULT 0,
+        chiave_mostra TEXT NOT NULL,
+        chiave_legge TEXT NOT NULL,
+        ora_mostra INTEGER NOT NULL,
+        ora_legge INTEGER NOT NULL,
+        lat_mostra REAL, lon_mostra REAL, acc_mostra REAL,
+        lat_legge REAL, lon_legge REAL, acc_legge REAL,
+        distanza_m INTEGER,
+        posizioni INTEGER DEFAULT 0,
+        posizioni_via INTEGER DEFAULT 0,
+        prova TEXT DEFAULT '',
+        caricata_da INTEGER DEFAULT 0,
+        quando INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS p2p_indice(
         -- IL PAVIMENTO DELL'INDICE DELLE TRADE KEY (set 2026): quante
         -- chiavi usa-e-getta quel profilo ha gia' BRUCIATO. Serve a
@@ -14066,6 +14089,10 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE p2p_moderatori SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM p2p_moderatori WHERE tg_id=?", (id_nostr,))
+        # chi ha caricato una prova d'incontro (30 set 2026): non e' una
+        # chiave della riga, e' un'annotazione — un UPDATE semplice
+        con.execute("UPDATE p2p_presenze SET caricata_da=? WHERE caricata_da=?",
+                    (id_telegram, id_nostr))
         # Il sale del profilo di scambio segue l'utente. Qui la PK E'
         # il tg_id, quindi le due meta' POSSONO collidere — e allora
         # vince la meta' Telegram, che e' l'unica delle due a poter
@@ -25465,6 +25492,13 @@ def _leve_stato():
                          "mercato come a prezzo fisso",
                   spento="nessun minimo: vale solo il tetto di Amazon "
                          "(999 €)"),
+            _leva("Tetto contanti di persona (€)", "P2P_CONTANTI_MAX_EURO",
+                  P2P_CONTANTI_MAX_EURO,
+                  acceso="gli ordini col metodo «Contanti» non si "
+                         "pubblicano né si prendono sopra questa cifra; "
+                         "250 di serie anche senza la riga nel config",
+                  spento="nessun tetto per il contanti di persona: vale "
+                         "solo il tetto generale, se acceso"),
             # LO SCONTO FEDELTA': la leva dice la cifra che il CLIENT
             # mostra; a scontare davvero e' il coordinatore (patch
             # 0005), che chiede a /api/p2p/sconto. Due righe perche'
@@ -40628,6 +40662,23 @@ except (TypeError, ValueError):
     BARATTOZON_MIN_EURO = BARATTOZON_MIN_EURO_DEFAULT
     print("[p2p] BARATTOZON_MIN_EURO non e' un numero intero: vale il "
           f"default di {BARATTOZON_MIN_EURO_DEFAULT} €")
+# IL TETTO DEL CONTANTI DI PERSONA (30 set 2026, decisione di Andrea):
+# la gemella di P2P_MAX_EURO per il solo metodo «Contanti», giudicata
+# dal client in pubblicazione E in presa. ⚠️ IL DEFAULT E' 250 ANCHE
+# SENZA LA RIGA NEL CONFIG: il config del VPS non eredita niente da
+# `config_esempio.py`, e un tetto che nasce spento «finche' qualcuno
+# non aggiunge la riga» e' un tetto che al lancio non c'e'. 0 = spento.
+try:
+    from config import P2P_CONTANTI_MAX_EURO
+    P2P_CONTANTI_MAX_EURO = int(P2P_CONTANTI_MAX_EURO)
+    if P2P_CONTANTI_MAX_EURO < 0:
+        raise ValueError("un tetto negativo non e' un tetto")
+except ImportError:
+    P2P_CONTANTI_MAX_EURO = 250
+except (TypeError, ValueError):
+    P2P_CONTANTI_MAX_EURO = 250
+    print("[p2p] P2P_CONTANTI_MAX_EURO non e' un numero intero: vale il "
+          "tetto di serie, 250 €")
 # LE CARD P2P IN VETRINA (26 set 2026, richiesta di Andrea): al lancio
 # pubblico del P2P ogni ordine vivo del libro compare anche nella
 # vetrina del mercatino, come una card fra le card. Fino ad allora la
@@ -40854,6 +40905,10 @@ def _p2p_leve() -> dict:
             "maxEuro": int(P2P_MAX_EURO),
             # il minimo di Barattozon (30 set 2026): stessa regola,
             # lo giudica il client nel foglio, 0 = spento
+            # il tetto del contanti di persona (30 set 2026): stessa
+            # regola, per il solo metodo «Contanti», in pubblicazione e
+            # in presa; 250 di serie, 0 = spento
+            "maxEuroContanti": int(P2P_CONTANTI_MAX_EURO),
             "minEuroBz": int(BARATTOZON_MIN_EURO)}
 
 
@@ -46344,6 +46399,9 @@ def _riga_disputa_p2p(con, r, io: int) -> dict:
         "decisione": ({"esito": dec["esito"], "motivo": str(dec["motivo"] or ""),
                        "quando": int(dec["quando"] or 0)} if dec else None),
         "chiave_compratore": "", "chiave_venditore": "",
+        # la prova d'incontro del contanti di persona (30 set 2026): ora,
+        # distanza fra i due telefoni, quante posizioni c'erano — o None
+        "incontro": _incontro_p2p(con, ordine),
     }
     if mia and not parte:
         s = con.execute("SELECT chiave_compratore, chiave_venditore FROM p2p_scambi "
@@ -46698,6 +46756,15 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
             except Exception as e:
                 print(f"⚠️ Disputa P2P {ev['ordine'][:8]}: avviso ai moderatori "
                       f"saltato ({type(e).__name__}: {e})", flush=True)
+            # ...e a scambio CHIUSO le posizioni della prova d'incontro si
+            # scordano (30 set 2026): una disputa non si puo' piu' aprire,
+            # e il luogo non serve piu' a nessuno
+            try:
+                if fatto["momento"] in P2P_PRESENZA_MOMENTI_CHIUSI:
+                    _scorda_posizioni_presenza_p2p(con, ev["ordine"], int(time.time()))
+            except Exception as e:
+                print(f"⚠️ Presenza P2P {ev['ordine'][:8]}: posizioni non scordate "
+                      f"({type(e).__name__}: {e})", flush=True)
         finally:
             con.close()
         if fatto["momento"] == "rilasciato" and _P2P_SVEGLIA["ev"] is not None:
@@ -46773,6 +46840,243 @@ async def evento_p2p(req: Request):
         _foto_dopo_evento_p2p(ev)
     return JSONResponse({"ok": True, "nuovo": fatto is not None},
                         headers={"Cache-Control": "no-store"})
+
+
+# ---------- LA PROVA D'INCONTRO DEL CONTANTI DI PERSONA (30 set 2026) --
+# (docs/STUDIO-CONTANTI-A-MANO-2026-09-25.md, §2b; decisione di Andrea:
+# tutti i punti dello studio attivi dal 10 ottobre). Una banconota non
+# lascia ricevuta: in una disputa sul contanti il moderatore aveva una
+# parola contro l'altra. Adesso ha UN FATTO: i due telefoni erano
+# insieme alla stessa ora, e lo hanno firmato tutt'e due.
+# COME: un telefono mostra un QR con una NOTA firmata con la sua chiave
+# usa-e-getta dello scambio (kind P2P_KIND_PRESENZA, tag `d` = ordine,
+# `ruolo` = mostra, e nel contenuto un nonce e — facoltativa — la
+# posizione); l'altro la inquadra, controlla firma, ordine e ora, e
+# CONTROFIRMA con la propria chiave una seconda nota (`ruolo` = legge,
+# tag `e` = l'id della prima). Le due note arrivano qui insieme, si
+# verificano TUTT'E DUE (`verifica_firma_nostr`, id ricalcolato) contro
+# le due chiavi che mostrod ha detto per quell'ordine (`p2p_scambi`), e
+# solo allora nasce la riga. Chi carica e' irrilevante: a provare
+# l'incontro sono le due firme, che nessuno dei due puo' fabbricare da
+# solo — per questo la rotta chiede solo un utente riconosciuto.
+# IL GPS SI PUO' FALSIFICARE: la posizione e' una CONFERMA, non una
+# prova assoluta, e la pagina lo dice; il fatto che pesa e' l'ORA, con
+# due firme nello stesso minuto che non si fabbricano dopo. Le posizioni
+# si SCORDANO quando lo scambio si chiude (`_manda_evento_p2p`) e
+# comunque dopo P2P_PRESENZA_POSIZIONI_S; restano l'ora e la distanza.
+# I GIUDICI SONO PURI SULLA CONNESSIONE e tornano `(codice, corpo)`,
+# come quelli della moderazione. Il blocco sta FUORI da quello della
+# moderazione apposta: la' una sentinella conta sette rotte e vieta la
+# parola «firma(», e qui di firme si parla eccome (per verificarle).
+P2P_KIND_PRESENZA = 27383
+P2P_PRESENZA_RUOLI = ("mostra", "legge")
+P2P_PRESENZA_FINESTRA_S = 600      # fra la nota mostrata e quella letta
+P2P_PRESENZA_OROLOGIO_S = 900      # fra la nota letta e il nostro orologio
+P2P_PRESENZA_POSIZIONI_S = 15 * 86400
+# I MOMENTI CHE CHIUDONO LA PARTE IN CONTANTI: da `rilasciato` in poi chi
+# vende ha gia' liberato i sats — cioe' i contanti li ha avuti — e una
+# disputa sul pagamento dei sats (payout fallito) non ha niente da
+# chiedere all'incontro; `concluso`, `annullato`, `scaduto` e `tornato`
+# chiudono lo scambio; i due della disputa sono i passaggi del libro.
+P2P_PRESENZA_MOMENTI_CHIUSI = ("rilasciato", "concluso", "annullato", "scaduto", "tornato",
+                               "disputa_conclusa", "disputa_annullata")
+
+
+def _tag_presenza_p2p(ev, nome: str) -> str:
+    """PURA: il valore del primo tag `nome` di un evento, o ''."""
+    for t in (ev.get("tags") or []) if isinstance(ev, dict) else []:
+        if isinstance(t, list) and len(t) >= 2 and t[0] == nome:
+            return str(t[1])
+    return ""
+
+
+def _geo_presenza_p2p(v):
+    """PURA: una posizione `{lat, lon, acc}` coi numeri in misura, o None
+    — una posizione storta non e' un errore, e' una nota senza posizione."""
+    if not isinstance(v, dict):
+        return None
+    try:
+        lat, lon = float(v.get("lat")), float(v.get("lon"))
+        acc = float(v.get("acc") or 0)
+    except (TypeError, ValueError):
+        return None
+    if any(isinstance(v.get(k), bool) for k in ("lat", "lon", "acc")):
+        return None
+    if any(math.isnan(x) or math.isinf(x) for x in (lat, lon, acc)):
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180 and 0 <= acc <= 100000):
+        return None
+    return {"lat": round(lat, 5), "lon": round(lon, 5), "acc": int(round(acc))}
+
+
+def _distanza_metri_p2p(a, b) -> int:
+    """PURA: la distanza in metri fra due posizioni (haversine)."""
+    r = 6371000.0
+    la1, la2 = math.radians(a["lat"]), math.radians(b["lat"])
+    dla = la2 - la1
+    dlo = math.radians(b["lon"] - a["lon"])
+    h = math.sin(dla / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin(dlo / 2) ** 2
+    return int(round(2 * r * math.asin(min(1.0, math.sqrt(h)))))
+
+
+def _nota_presenza_p2p(ev, ordine: str) -> dict:
+    """PURA: una nota di presenza come la manda il telefono, verificata
+    — firma vera (id ricalcolato), kind giusto, ordine giusto, ruolo
+    noto, contenuto leggibile. ValueError con la frase, mai un 400
+    diretto: la prova non ha bisogno di FastAPI."""
+    if not isinstance(ev, dict):
+        raise ValueError("Nota illeggibile")
+    if not verifica_firma_nostr(ev):
+        raise ValueError("La firma della nota non torna")
+    if ev.get("kind") != P2P_KIND_PRESENZA:
+        raise ValueError("Non e' una nota di presenza")
+    if _tag_presenza_p2p(ev, "d") != ordine:
+        raise ValueError("La nota parla di un altro scambio")
+    ruolo = _tag_presenza_p2p(ev, "ruolo")
+    if ruolo not in P2P_PRESENZA_RUOLI:
+        raise ValueError("Ruolo sconosciuto")
+    try:
+        c = json.loads(ev.get("content") or "")
+    except ValueError:
+        raise ValueError("Contenuto illeggibile")
+    if not isinstance(c, dict) or c.get("v") != 1:
+        raise ValueError("Versione della nota sconosciuta")
+    return {"pubkey": ev["pubkey"], "ora": int(ev["created_at"]), "id": ev["id"],
+            "ruolo": ruolo, "geo": _geo_presenza_p2p(c.get("geo")),
+            "ref": _tag_presenza_p2p(ev, "e")}
+
+
+def _incontro_da_riga_p2p(r) -> dict:
+    """PURA: la riga di `p2p_presenze` come la leggono la pagina dello
+    scambio e il moderatore. `distanza` in metri o None; `precisione` la
+    peggiore delle due, finche' le posizioni ci sono."""
+    acc = [x for x in (r["acc_mostra"], r["acc_legge"]) if x is not None]
+    return {"ora": int(r["ora_legge"] or 0),
+            "distanza": (int(r["distanza_m"]) if r["distanza_m"] is not None else None),
+            "posizioni": int(r["posizioni"] or 0),
+            "precisione": (int(max(acc)) if acc else None),
+            "posizioni_via": bool(r["posizioni_via"])}
+
+
+def _incontro_p2p(con, ordine: str):
+    """La prova d'incontro di un ordine, o None. Un database senza la
+    tabella — i banchi di ieri — vale «nessuna prova», mai un errore
+    sulla pagina degli scambi o sulla card del moderatore."""
+    c = con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='p2p_presenze'")
+    if not c.fetchone():
+        return None
+    r = con.execute("SELECT * FROM p2p_presenze WHERE ordine=?", (ordine,)).fetchone()
+    return _incontro_da_riga_p2p(r) if r else None
+
+
+def _registra_presenza_p2p(con, io, d, adesso: int) -> tuple:
+    """LA PROVA D'INCONTRO, giudicata: `(codice, corpo)`. Le due note si
+    verificano una per una, poi INSIEME (una mostrata e una letta, la
+    letta che risponde alla mostrata, due chiavi diverse, vicine nel
+    tempo e vicine ad adesso), poi contro lo SCAMBIO: le due chiavi sono
+    quelle che mostrod ha detto (`p2p_scambi`), e lo scambio non e'
+    chiuso. Una riga per ordine, la PRIMA: una seconda prova torna quella
+    di prima, con `gia`."""
+    if not isinstance(d, dict):
+        return 400, "Richiesta illeggibile"
+    ordine = str(d.get("ordine") or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        return 400, "Ordine in una forma sconosciuta"
+    try:
+        m = _nota_presenza_p2p(d.get("mostrata"), ordine)
+        l = _nota_presenza_p2p(d.get("letta"), ordine)
+    except ValueError as e:
+        return 400, str(e)
+    if m["ruolo"] != "mostra" or l["ruolo"] != "legge":
+        return 400, "Servono una nota mostrata e una letta"
+    if l["ref"] != m["id"]:
+        return 400, "La nota letta non risponde a quella mostrata"
+    if m["pubkey"] == l["pubkey"]:
+        return 400, "Le due note vengono dalla stessa chiave"
+    if abs(l["ora"] - m["ora"]) > P2P_PRESENZA_FINESTRA_S:
+        return 400, "Fra le due note e' passato troppo tempo: rifate il codice"
+    if abs(int(adesso) - l["ora"]) > P2P_PRESENZA_OROLOGIO_S:
+        return 400, "L'ora della nota e' troppo lontana da adesso"
+    s = con.execute("SELECT giro, chiave_compratore, chiave_venditore FROM p2p_scambi "
+                    "WHERE ordine=?", (ordine,)).fetchone()
+    chiavi = ({s["chiave_compratore"] or "", s["chiave_venditore"] or ""} - {""}) if s else set()
+    if len(chiavi) != 2:
+        return 409, ("Il coordinatore non ha ancora detto le due chiavi di questo "
+                     "scambio: riprovate fra un minuto")
+    if {m["pubkey"], l["pubkey"]} != chiavi:
+        return 403, "Le firme non sono delle due chiavi di questo scambio"
+    giro = int(s["giro"] or 0)
+    segni = ",".join("?" for _ in P2P_PRESENZA_MOMENTI_CHIUSI)
+    chiuso = con.execute(
+        f"SELECT 1 FROM p2p_momenti WHERE ordine=? AND giro=? AND momento IN ({segni})",
+        (ordine, giro) + tuple(P2P_PRESENZA_MOMENTI_CHIUSI)).fetchone()
+    if chiuso:
+        return 409, "Questo scambio e' chiuso: la prova d'incontro non serve piu'"
+    gia = con.execute("SELECT * FROM p2p_presenze WHERE ordine=?", (ordine,)).fetchone()
+    if gia:
+        return 200, {"ok": True, "gia": True, "incontro": _incontro_da_riga_p2p(gia)}
+    dist = _distanza_metri_p2p(m["geo"], l["geo"]) if (m["geo"] and l["geo"]) else None
+    posizioni = int(bool(m["geo"])) + int(bool(l["geo"]))
+    con.execute(
+        "INSERT OR IGNORE INTO p2p_presenze(ordine, giro, chiave_mostra, chiave_legge, "
+        "ora_mostra, ora_legge, lat_mostra, lon_mostra, acc_mostra, lat_legge, lon_legge, "
+        "acc_legge, distanza_m, posizioni, posizioni_via, prova, caricata_da, quando) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?)",
+        (ordine, giro, m["pubkey"], l["pubkey"], m["ora"], l["ora"],
+         m["geo"]["lat"] if m["geo"] else None, m["geo"]["lon"] if m["geo"] else None,
+         m["geo"]["acc"] if m["geo"] else None,
+         l["geo"]["lat"] if l["geo"] else None, l["geo"]["lon"] if l["geo"] else None,
+         l["geo"]["acc"] if l["geo"] else None,
+         dist, posizioni,
+         json.dumps({"mostrata": d.get("mostrata"), "letta": d.get("letta")},
+                    separators=(",", ":"), ensure_ascii=False),
+         int(io or 0), int(adesso)))
+    con.commit()
+    r = con.execute("SELECT * FROM p2p_presenze WHERE ordine=?", (ordine,)).fetchone()
+    return 200, {"ok": True, "gia": False, "incontro": _incontro_da_riga_p2p(r)}
+
+
+def _scorda_posizioni_presenza_p2p(con, ordine: str, adesso: int) -> int:
+    """Le posizioni (e la copia delle due note, che le porta) se ne vanno;
+    l'ora, la distanza e le chiavi restano. Torna quante righe ha toccato."""
+    n = con.execute(
+        "UPDATE p2p_presenze SET lat_mostra=NULL, lon_mostra=NULL, acc_mostra=NULL, "
+        "lat_legge=NULL, lon_legge=NULL, acc_legge=NULL, prova='', posizioni_via=? "
+        "WHERE ordine=? AND posizioni_via=0", (int(adesso), ordine)).rowcount
+    con.commit()
+    return n
+
+
+def _scopa_presenze_p2p(con, adesso: int) -> int:
+    """La rete di sicurezza della privacy: le posizioni piu' vecchie di
+    P2P_PRESENZA_POSIZIONI_S si scordano anche se l'evento di chiusura
+    non e' mai arrivato, e la riga intera se ne va con la cronaca
+    (P2P_LIBRO_MEMORIA_S). Non fa commit: e' `_pulisci_memoria_p2p` a farlo."""
+    n = con.execute(
+        "UPDATE p2p_presenze SET lat_mostra=NULL, lon_mostra=NULL, acc_mostra=NULL, "
+        "lat_legge=NULL, lon_legge=NULL, acc_legge=NULL, prova='', posizioni_via=? "
+        "WHERE posizioni_via=0 AND quando<?",
+        (int(adesso), int(adesso) - P2P_PRESENZA_POSIZIONI_S)).rowcount
+    n += con.execute("DELETE FROM p2p_presenze WHERE quando<?",
+                     (int(adesso) - P2P_LIBRO_MEMORIA_S,)).rowcount
+    return n
+
+
+@app.post("/api/p2p/presenza")
+async def presenza_p2p(req: Request, x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """Le due note firmate della prova d'incontro. Chiunque sia
+    riconosciuto puo' caricarle: a provare sono le due firme."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    d = await leggi_json(req)
+    con = db()
+    try:
+        codice, corpo = _registra_presenza_p2p(con, user["id"], d, int(time.time()))
+    finally:
+        con.close()
+    return _risposta_moderazione(codice, corpo)
 
 
 # ---------- IL PAGAMENTO A CHI COMPRA, DETTO A CHI VENDE -------------
@@ -47162,6 +47466,9 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
             "payout_fallito": bool(q["payout_fallito"]),
             "recapito_detto": bool(recapito),
             "tocca": _tocca_a_me_p2p(q["stato"], lato, recapito),
+            # la prova d'incontro del contanti (30 set 2026), cosi' la vede
+            # anche il telefono che NON l'ha caricata
+            "incontro": _incontro_p2p(con, ordine),
             "momenti": [{"m": str(m.get("momento") or ""), "q": int(m.get("quando") or 0),
                          "a": str(m.get("attore") or ""), "d": str(m.get("dettaglio") or "")}
                         for m in momenti]}
@@ -50442,6 +50749,22 @@ def pulisci_indirizzi():
                   f"{n} allo scadere della finestra")
     except Exception as e:
         print(f"⚠️ Pulizia indirizzi saltata: {e}")
+
+
+def pulisci_presenze_p2p():
+    """La scopa delle prove d'incontro del contanti (30 set 2026),
+    chiamata dall'orologio: le posizioni si scordano dopo
+    P2P_PRESENZA_POSIZIONI_S anche se l'evento di chiusura non e' mai
+    arrivato, e la riga intera se ne va con la cronaca
+    (P2P_LIBRO_MEMORIA_S). Il conto lo fa `_scopa_presenze_p2p`."""
+    con = db()
+    try:
+        n = _scopa_presenze_p2p(con, int(time.time()))
+        con.commit()
+    finally:
+        con.close()
+    if n:
+        print(f"🧹 P2P: {n} prove d'incontro alleggerite o tolte", flush=True)
 
 
 def pulisci_avvisi():
@@ -58415,6 +58738,12 @@ async def orologio():
             pulisci_indirizzi()
         except Exception as e:
             print(f"⚠️ Pulizia indirizzi saltata: {e}")
+        try:
+            # le posizioni delle prove d'incontro del contanti (30 set
+            # 2026): vita corta anche se la chiusura non e' mai arrivata
+            pulisci_presenze_p2p()
+        except Exception as e:
+            print(f"⚠️ Pulizia prove d'incontro saltata: {e}")
         try:
             await avvisa_nuovi_iscritti()
         except Exception as e:

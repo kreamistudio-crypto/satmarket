@@ -707,6 +707,17 @@ BARATTOZON_MIN_EURO = 25
 # come a prezzo fisso. Lo giudica il foglio Pubblica (dalla busta delle
 # leve) e lo ripete la rotta del canale. Non dichiarata = 25; 0 = spento.
 BARATTOZON_MIN_EURO = 25
+# IL TETTO DEL CONTANTI DI PERSONA (30 set 2026, decisione di Andrea):
+# il massimo in euro di un ordine P2P col metodo «Contanti» — quello
+# dell'incontro a mano, NON «Contanti al tabacchino» di Barattozon, che
+# ha il suo tetto (i 999 € di Amazon). Vale sia per chi PUBBLICA sia per
+# chi PRENDE, lo giudica il client come P2P_MAX_EURO, e sta SOTTO quello
+# quando quello e' acceso. Perche' c'e': una banconota non lascia
+# ricevuta, e sopra una cifra il rischio di un incontro andato male non
+# lo copre nessuna garanzia (docs/STUDIO-CONTANTI-A-MANO-2026-09-25.md).
+# ⚠️ IL DEFAULT NEL CODICE E' 250, e vale anche senza questa riga: 0 =
+# spento, nessun tetto per il contanti.
+P2P_CONTANTI_MAX_EURO = 250
 # LE CARD P2P IN VETRINA (26 set 2026): gli ordini vivi del libro
 # compaiono anche fra gli annunci del mercatino, come card.
 # SPENTA le vedono solo i moderatori e chi e' in P2P_PROVA_IDS, per

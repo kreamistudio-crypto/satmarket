@@ -3024,6 +3024,24 @@
      card (il patto di `.acq-art .qta-mini`), e segue il tema. */
   .p2p-box{margin-top:8px;background:var(--chip-bg);border-radius:10px;
     padding:8px 10px;font-size:12.5px;color:var(--muted);font-weight:600}
+  /* IL CONTANTI DI PERSONA (30 set 2026): il riquadro nella pagina dello
+     scambio — la regola, i consigli, il gesto «Siamo insieme» — e il
+     foglio del codice. I paragrafi respirano poco, i due gesti stanno
+     affiancati con l'area di tocco piena, la riga del fatto e' scura. */
+  .contanti-box{color:var(--ink-soft);font-size:13px;line-height:1.45}
+  .contanti-box p{margin:6px 0 0}
+  .contanti-gps{display:flex;gap:8px;align-items:flex-start;margin-top:8px;
+    font-size:12.5px;cursor:pointer}
+  .contanti-gps input{margin:2px 0 0;flex:none;width:18px;height:18px}
+  .contanti-gesti{display:flex;gap:8px;margin-top:10px}
+  .contanti-gesti .btn{flex:1;min-height:44px;padding:10px 6px;font-size:13.5px}
+  .contanti-fatto{margin-top:8px;font-weight:800;color:var(--ink)}
+  .contanti-regola{margin-top:8px}
+  .presenza-video{display:block;width:100%;max-height:52vh;border-radius:12px;
+    background:#000;object-fit:cover;margin:8px 0}
+  #p2pPresenzaCorpo textarea{width:100%;box-sizing:border-box;margin:8px 0;
+    border:1px solid var(--field-line);border-radius:10px;padding:8px 10px;
+    font:inherit;font-size:13px;background:var(--bg);color:var(--ink)}
   /* La lista dei metodi e' testo di sconosciuti e puo' essere lunga
      quanto vuole: cede coi puntini, e a cedere e' SEMPRE lei — premio e
      scadenza sono le due cose che fanno decidere.
@@ -10168,6 +10186,22 @@ document.getElementById('cartello')?.remove();</script>
       <p><b>Se scade.</b> Ci sono due scadenze, e vanno tenute distinte. Quella <b>del libro</b> cade due ore prima di quella del PayCode: se nessuno ha preso l'ordine, esce dalla vetrina e a chi vende arriva un avviso — il PayCode vale ancora per poche ore, ma nessuno può più prenderlo; quando scade anche lui, l'ordine Amazon va rifatto e ripubblicato con un PayCode nuovo. Quella <b>del PayCode</b> conta quando i sats sono già in garanzia: la pagina dello scambio lo dice, ti avvisa <b>sei ore prima e un'ora prima</b> (anche su Telegram o Nostr, secondo le tue impostazioni) e mette in evidenza l'<b>annullo d'accordo</b>, con cui i sats tornano a chi li ha bloccati. Nessuno annulla da solo: se hai pagato in tempo, lo scontrino lo dimostra e chi vende libera.</p>
       <p class="sicu-nota">Prendi un ordine Barattozon solo se fai in tempo ad andare al tabacchino: quando mancano meno di sei ore, il dettaglio te lo ricorda prima di prenderlo.</p>
 
+      <!-- IL CONTANTI DI PERSONA (30 set 2026, decisione di Andrea:
+           tutti i punti dello studio attivi dal 10 ottobre). Le frasi
+           della regola sono le stesse costanti del client
+           (REGOLA_CONTANTI_*, CONSIGLI_CONTANTI): una prova le confronta.
+           Il tetto e' VIVO (la leva del server) e lo scrive
+           `renderP2PInfo` in #p2pInfoContantiTetto. -->
+      <h3 id="p2pinfo-contanti">Contanti di persona</h3>
+      <p>Il metodo «Contanti» è l'<b>incontro a mano</b>: chi compra sats porta le banconote, chi vende le conta e libera i sats <b>lì, davanti a lui</b>. Una banconota non lascia ricevuta, quindi le regole sono tre e valgono dall'inizio.</p>
+      <ol class="sicu-passi">
+        <li id="p2pInfoContantiTetto"></li>
+        <li><b>Il rilascio sul posto.</b> A chi compra: <i>Consegna i contanti solo quando chi vende preme «Libera i sats» davanti a te, e controlla che lo scambio risulti concluso prima di andare via.</i> A chi vende: <i>Conta i contanti davanti a chi ti paga, poi premi «Libera i sats» lì, davanti a lui: chi compra deve vedere lo scambio concluso prima di andare via.</i> Mai prima di vedersi, mai dopo essersi salutati.</li>
+        <li><b>L'incontro.</b> Vedetevi in un posto pubblico e di giorno — un bar, un incontro bitcoin —, contate le banconote insieme, e mai grosse cifre da soli.</li>
+      </ol>
+      <p><b>🤝 «Siamo insieme», la prova d'incontro.</b> Nella pagina dello scambio, quando vi vedete — dopo aver contato le banconote e prima che i sats siano liberati —, un telefono mostra un codice e l'altro lo inquadra. Ne resta una <b>prova firmata da tutti e due</b> con le chiavi usa-e-getta dello scambio: l'ora e, se lo permettete (è facoltativo, e consigliato), la posizione dei due telefoni e la distanza fra loro. La guarda solo un moderatore, in caso di disputa. <b>Il GPS si può falsificare:</b> la posizione è una conferma, non una prova assoluta. A pesare è l'ora, con due firme nello stesso minuto che non si fabbricano dopo.</p>
+      <p><b>In disputa, sul contanti.</b> Senza prova d'incontro i sats <b>tornano a chi li ha bloccati</b>: chi compra sats accetta di vedersi con l'app in mano, o non compra in contanti. Con la prova d'incontro e nessun rilascio, i sats <b>vanno a chi compra</b>: la firma di chi vende dice che l'incontro c'è stato, e il gesto si fa dopo aver contato. Lo scriviamo adesso, prima dello scambio, e non il giorno della disputa.</p>
+
       <h3>I tempi</h3>
       <!-- gli stessi segnaposto, per la stessa ragione: le finestre
            sono impostazioni del coordinatore e si LEGGONO -->
@@ -10729,6 +10763,7 @@ document.getElementById('cartello')?.remove();</script>
       <p>Dal <b>17 settembre 2026</b>, quando un ordine viene <b>preso</b>, le due parti si vedono: chi ha pubblicato e chi ha preso vedono il <b>profilo</b> l'uno dell'altra — lo stesso che sta già sotto ogni annuncio del mercatino: nome, foto, stelline, livello e titolo — e i <b>bottoni per scriversi</b> su Telegram o su Nostr, ma solo dove quei canali esistono davvero (la npub soltanto se ne hai dimostrato il possesso). <b>Prima della presa non si vede niente</b>, e non c'è nessun altro modo di chiederlo: a questa domanda il server risponde solo a una delle due parti di quello scambio. Il perché è che dall'altra parte c'è una persona a cui stai per mandare dei soldi veri, e un volto con una reputazione è quello che rende <i>pesabile</i> la fiducia — la stessa ragione per cui nel mercatino chi vende ha un nome. Te lo diciamo <b>prima</b>: nel foglio dove pubblichi e in quello dove prendi. Al posto dei campi dove prima ci si scriveva il proprio contatto a mano, che non erano verificati da nessuno.</p>
       <p><b>Chi entra con una chiave Nostr resta anonimo quando prende</b>: quella presa non viene annotata, chi ha pubblicato non saprà chi è, e nella pagina dello scambio legge che l'altra persona non si conosce. <b>A meno che non lo decida lui</b>: l'interruttore «Fatti riconoscere negli scambi» nel cassetto «🔔 Avvisi» — <b>spento di serie</b> — fa annotare la presa, mostra il suo profilo all'altra parte e apre le <b>recensioni</b> su quello scambio; lasciandolo spento resta invisibile, e su quegli scambi recensioni non ce ne sono. Vale da quando lo accende: gli scambi già presi restano come erano, e a cancellare il pregresso c'è «dimentica il profilo». Chi entra con una chiave e <b>pubblica</b>, invece, si mostra — col profilo che ha qui, cioè il nome e la foto della sua chiave: è così da quando le card del libro hanno un volto, e il foglio dove si pubblica lo dice prima.</p>
       <p>Le <b>conversazioni fuori da Barattolo</b> non sono nostre: se vi scrivete su Telegram o su Nostr quella chat è vostra e di chi la trasporta — non la leggiamo, non ce l'abbiamo, e <b>in una disputa non possiamo usarla</b>. A decidere sono i fatti dello scambio: chi ha bloccato i sats, chi ha detto di aver mandato gli euro, chi li ha liberati.</p>
+      <p>Dal <b>10 ottobre 2026</b>, negli scambi <b>in contanti di persona</b>, c'è il gesto «🤝 Siamo insieme»: un telefono mostra un codice e l'altro lo inquadra, e il server riceve <b>due note firmate</b> con le chiavi usa-e-getta dei due lati — l'<b>ora</b> e, solo se la allegate voi, la <b>posizione</b> dei due telefoni (è facoltativa: il browser ve la chiede, e si può dire di no; se la date, ne ricaviamo la distanza fra i due). <b>Chi la legge:</b> voi due nella pagina dello scambio, e un moderatore se si apre una disputa. <b>Per quanto:</b> le posizioni restano solo finché una disputa sui contanti è possibile — si cancellano quando i sats vengono liberati o lo scambio si chiude (annullato, scaduto, tornato nel libro), e in ogni caso entro <b>quindici giorni</b>; restano l'ora e la distanza, che se ne vanno con la cronaca dopo quaranta giorni. Il GPS si può falsificare: per noi è una conferma, non una prova assoluta.</p>
       <button class="btn ghost" onclick="apriProfiloP2P()">👤 Il tuo profilo di scambio</button>
       <p>Gli <b>ordini di scambio</b> sono pubblici per come è fatto il coordinatore: vivono sui relay e li legge chiunque, e da settembre 2026 <b>una copia sta anche sul nostro relay</b> — serve a far vedere il libro degli scambi anche quando i relay del coordinatore non rispondono. Non c'è scritto chi sei: un ordine porta l'importo, il metodo di pagamento e una <b>chiave usa-e-getta</b>, diversa a ogni scambio. Dei <b>messaggi che il coordinatore ti manda</b> durante lo scambio — buste cifrate, che si aprono solo dal tuo telefono — sul nostro relay <b>non teniamo copia</b>: per un giorno, fra il 17 e il 18 settembre 2026, l'abbiamo tenuta per avvisarti più in fretta, e da quando gli avvisi li racconta il coordinatore non serve più. Le <b>conversazioni</b> fra te e l'altra persona invece non passano di lì: sono cifrate e viaggiano sui relay del coordinatore, e sul nostro non ne teniamo copia.</p>
 
@@ -12095,6 +12130,15 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="p2pHoldTit">🔒 Blocca i sats</h3>
     <div id="p2pHoldCorpo"></div>
+  </div>
+
+  <!-- LA PROVA D'INCONTRO DEL CONTANTI (30 set 2026): un telefono mostra
+       il codice, l'altro lo inquadra — o lo incolla, dove la fotocamera
+       non legge. Vedi «IL CONTANTI DI PERSONA: LA PROVA D'INCONTRO». -->
+  <div class="sheet" id="p2pPresenzaSheet" role="dialog" aria-modal="true" aria-labelledby="p2pPresenzaTit">
+    <div class="grab"></div>
+    <h3 id="p2pPresenzaTit">🤝 Siamo insieme</h3>
+    <div id="p2pPresenzaCorpo"></div>
   </div>
 
   <div class="sheet" id="p2pIncassoSheet" role="dialog" aria-modal="true" aria-labelledby="p2pIncassoTit">
@@ -45348,6 +45392,10 @@ function renderP2PInfo(){
     if (q === 'premio') e.textContent = String(P2P_PREMIO_MAX);
     if (q === 'metodi') e.textContent = P2P_METODI.join(', ');
   });
+  /* IL TETTO DEL CONTANTI, VIVO (30 set 2026): la leva del server, e a
+     leva spenta la voce lo dice invece di inventare un numero */
+  const tettoC = el('p2pInfoContantiTetto');
+  if (tettoC) tettoC.innerHTML = testoTettoContantiP2P(maxEuroContantiP2P());
   /* LA COMMISSIONE, dallo stesso giudice del conto dello scambio: le
      due cifre non possono divergere perche' la fonte e' una sola. La
      frase la scrive `testoFeeInfoP2P` (25 set 2026: la beta, il prezzo
@@ -50867,6 +50915,11 @@ function confermaQuantoP2P(){
   if (!riga || !inp) return;
   const g = quantoValeP2P(riga, ripuliCifreP2P(inp));
   if (!g.ok) { toast(g.dillo); return; }
+  /* il tetto del contanti sulla cifra scelta (30 set 2026): lo stesso
+     giudice del dettaglio e del foglio Pubblica */
+  const troppo = giudiceContantiP2P(g.euro, p2pDettMetodo ? [p2pDettMetodo] : (riga.metodi || []),
+                                    maxEuroContantiP2P());
+  if (troppo) { toast(troppo); return; }
   const id = p2pQuantoOrdine;
   chiudiFoglioP2P('p2pQuantoSheet');
   p2pQuantoOrdine = '';
@@ -51666,6 +51719,9 @@ function renderDettaglioP2P(){
     (tuo ? '<div class="p2p-box p2p-tuo">È il tuo ordine: l\'hai pubblicato tu, e non si può prendere.</div>' : '') +
     metodiDettP2P(o) +
     notaTabacchinoDettP2P(o) +
+    /* la regola e il tetto del contanti, a chi sta per prendere (30 set 2026) */
+    regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo] : (o.metodi || []), maxEuroContantiP2P(),
+                            compro ? 'compro' : 'vendo') +
     repRiquadroP2P(p2pFacce[o.id], o.id) +
     anelloneP2P(o) +
     (tuo ? '' : avvisoPresaTabacchinoP2P(o)) +
@@ -51736,6 +51792,13 @@ function confermaDettaglioP2P(){
     toast('Scegli con quale metodo vuoi ' + (o.lato === 'sell' ? 'inviare' : 'ricevere') + ' gli euro');
     return;
   }
+  /* IL TETTO DEL CONTANTI ANCHE ALLA PRESA (30 set 2026): la cifra e' gia'
+     scritta da chi ha pubblicato, quindi il giudizio cade sul metodo che
+     si sta scegliendo; su un intervallo lo rifa' il foglio «Quanto» sulla
+     cifra scelta */
+  const metPresa = p2pDettMetodo ? [p2pDettMetodo] : (o.metodi || []);
+  const troppo = o.euroMax ? '' : giudiceContantiP2P(o.euro, metPresa, maxEuroContantiP2P());
+  if (troppo) { toast(troppo); return; }
   haptic();
   chiudiFoglioP2P('p2pDettSheet');
   if (o.euroMax) { apriQuantoP2P(id); return; }
@@ -52571,6 +52634,10 @@ function renderOrdineP2P(){
     (avviso ? '<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⚠️ <span>' + esc(avviso) + '</span></div>' : '') +
     /* A DISPUTA APERTA: il moderatore, e il canale per scrivergli (28 set 2026) */
     (typeof bloccoModeratoreP2P === 'function' ? bloccoModeratoreP2P(o) : '') +
+    /* IL CONTANTI DI PERSONA (30 set 2026): la regola dal proprio lato e
+       il gesto «Siamo insieme», SOPRA il bottone del passo — si legge
+       prima di liberare o di consegnare */
+    riquadroContantiP2P(o) +
     (bottoni[azione] || '') +
     /* IL RECAPITO STA SOTTO IL SUO GESTO (23 set 2026): subito dopo «Ho
        inviato gli euro», che e' dove l'IBAN si legge e si copia */
@@ -53307,12 +53374,17 @@ function euroInviatiP2P(){
 function rilasciaP2P(){
   const o = ordiniP2P()[p2pOrdineAperto];
   if (!o) return;
+  /* COL CONTANTI LA DOMANDA E' QUELLA DEL CONTEGGIO (30 set 2026): la
+     regola del rilascio sul posto, chiesta nel momento in cui conta */
+  const contanti = scambioInContantiP2P(o);
   chiediConferma({
-    titolo: 'Liberi i sats?',
+    titolo: contanti ? 'Hai contato i contanti davanti a chi ti ha pagato?' : 'Liberi i sats?',
     corpo: tabacchinoP2P(o.metodi)
       ? 'Fallo solo se su Amazon il tuo ordine da ' + fmtEur(o.euro) + ' € risulta pagato davvero. I sats partono verso chi compra e non tornano indietro.'
+      : contanti
+      ? 'Libera i sats solo lì, davanti a chi ti ha dato ' + fmtEur(o.euro) + ' € in contanti, dopo averli contati insieme. I sats partono verso chi compra e non tornano indietro.'
       : 'Fallo solo se hai ricevuto ' + fmtEur(o.euro) + ' € davvero. I sats partono verso chi compra e non tornano indietro.',
-    etichetta: 'Sì, libero i sats',
+    etichetta: contanti ? 'Sì, li ho contati: libero i sats' : 'Sì, libero i sats',
     /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
     poi: () => mossaOrdineP2P(o.id, 'release', 'Sats liberati ✅',
                               'Sto liberando i sats…')
@@ -53722,6 +53794,107 @@ function metodoTabacchinoP2P(importo){
 }
 function tabacchinoP2P(metodi){
   return (metodi || []).some(m => metodoBaseP2P(m) === P2P_TABACCHINO);
+}
+/* ---- IL CONTANTI DI PERSONA (30 set 2026, decisione di Andrea: tutti
+   i punti dello studio attivi dal 10 ottobre) ----
+   La voce «Contanti» del vocabolario e' l'incontro a mano: le banconote
+   passano da una tasca all'altra, e non lasciano ricevuta. Il tabacchino
+   e' un'altra cosa (Amazon incassa e l'ordine risulta pagato), e ha il
+   suo nome esatto: qui si confronta la PAROLA INTERA e non il prefisso
+   — il filtro del libro cerca per pezzo, e con quello Barattozon
+   entrerebbe. */
+const P2P_CONTANTI = 'Contanti';
+function contantiAManoP2P(metodi){
+  return (metodi || []).some(m => String(m || '').trim() === P2P_CONTANTI);
+}
+/* lo SCAMBIO e' in contanti se il metodo scelto alla presa e' quello, o —
+   quando una scelta non c'e' (chi ha pubblicato non sa quale metodo ha
+   scelto l'altra parte) — se «Contanti» sta fra i metodi dell'ordine:
+   il riquadro a chi pubblica con due metodi lo si mostra lo stesso,
+   che una regola in piu' non fa danno e una in meno si' */
+function scambioInContantiP2P(o){
+  if (!o) return false;
+  if (o.metodoScelto) return String(o.metodoScelto).trim() === P2P_CONTANTI;
+  return contantiAManoP2P(o.metodi);
+}
+/* PURO: la frase del tetto del contanti, o '' se la cifra ci sta.
+   `tetto` e' la leva del server (0 = spenta), `metodi` quelli
+   dell'ordine o quello scelto. Lo chiedono in TRE: chi pubblica, chi
+   prende a cifra fissa, chi prende su un intervallo — la stessa frase,
+   dallo stesso giudice, con lo stesso numero. */
+function giudiceContantiP2P(euro, metodi, tetto){
+  const t = Math.floor(Number(tetto)) || 0;
+  if (!(t > 0) || !contantiAManoP2P(metodi)) return '';
+  const n = Number(euro) || 0;
+  if (n <= t) return '';
+  return 'In contanti di persona il massimo è ' + fmt(t) + ' € per scambio: sopra, si divide in più ordini';
+}
+/* LE TRE FRASI DELLA REGOLA, scritte una volta: le legge il foglio
+   Pubblica sotto il metodo, il dettaglio di chi prende, la pagina dello
+   scambio (dal lato di chi compra e di chi vende) e «Info P2P». */
+const REGOLA_CONTANTI_COMPRA = 'Consegna i contanti solo quando chi vende preme «Libera i sats» davanti a te, e controlla che lo scambio risulti concluso prima di andare via.';
+const REGOLA_CONTANTI_VENDE = 'Conta i contanti davanti a chi ti paga, poi premi «Libera i sats» lì, davanti a lui: chi compra deve vedere lo scambio concluso prima di andare via.';
+const CONSIGLI_CONTANTI = 'Vedetevi in un posto pubblico e di giorno — un bar, un incontro bitcoin —, contate le banconote insieme, e mai grosse cifre da soli.';
+/* la riga sotto il metodo nel foglio Pubblica e nel dettaglio: la
+   regola e il tetto, quando «Contanti» e' fra i metodi */
+function regolaContantiFoglioP2P(metodi, tetto, lato){
+  if (!contantiAManoP2P(metodi)) return '';
+  const t = Math.floor(Number(tetto)) || 0;
+  /* la frase e' quella del PROPRIO lato: chi vende legge cosa deve fare
+     lui, non cosa deve fare chi gli paga */
+  const regola = lato === 'vendo' ? REGOLA_CONTANTI_VENDE : REGOLA_CONTANTI_COMPRA;
+  return '<div class="hint contanti-regola">💶 <b>Contanti di persona</b>' +
+    (t > 0 ? ' — al massimo <b>' + fmt(t) + ' €</b> per scambio: sopra, si divide in più ordini.' : '.') +
+    ' ' + esc(regola) + ' ' + esc(CONSIGLI_CONTANTI) + '</div>';
+}
+/* la voce del tetto in «Info P2P», col numero vivo della leva; a leva
+   spenta lo dice, invece di inventare una cifra */
+function testoTettoContantiP2P(tetto){
+  const t = Math.floor(Number(tetto)) || 0;
+  return t > 0
+    ? '<b>Il tetto:</b> al massimo <b>' + fmt(t) + ' €</b> per scambio in contanti, sia per chi pubblica sia per chi prende. Sopra, si divide in più scambi: il rischio di ogni incontro si ferma lì.'
+    : '<b>Il tetto:</b> in questo momento non c\'è un tetto per il contanti di persona; vale solo quello generale, se acceso. Sopra qualche centinaio di euro conviene dividere in più scambi.';
+}
+/* l'ora dell'incontro e la distanza, come si dicono nella pagina dello
+   scambio e al moderatore: «alle 17:42 del 3 ott», «a 12 m di distanza» */
+function quandoIncontroP2P(ts){
+  const n = Number(ts) || 0;
+  if (!n) return '';
+  const d = new Date(n * 1000);
+  return 'alle ' + d.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'})
+    + ' del ' + dataBreveP2P(n);
+}
+function distanzaIncontroP2P(p){
+  if (!p) return '';
+  if (p.distanza !== null && p.distanza !== undefined)
+    return ', a ' + fmt(Number(p.distanza)) + ' m di distanza'
+      + (p.precisione > 0 ? ' (precisione ±' + fmt(Number(p.precisione)) + ' m)' : '');
+  return Number(p.posizioni) === 1 ? ', con la posizione di un solo telefono' : ', senza posizioni';
+}
+/* IL RIQUADRO DEL CONTANTI NELLA PAGINA DELLO SCAMBIO: la regola dal
+   proprio lato, i consigli, e il gesto «Siamo insieme» finche' i sats
+   sono in garanzia; a disputa aperta resta la prova, o la sua assenza */
+function riquadroContantiP2P(o){
+  if (!scambioInContantiP2P(o)) return '';
+  const vivo = P2P_DISPUTABILI.indexOf(o.stato) >= 0;
+  const disputa = o.stato === 'in_disputa';
+  if (!vivo && !disputa) return '';
+  let h = '<div class="p2p-box contanti-box"><b>💶 Contanti di persona</b>' +
+    '<p>' + esc(o.lato === 'compro' ? REGOLA_CONTANTI_COMPRA : REGOLA_CONTANTI_VENDE) + '</p>' +
+    (vivo ? '<p>' + esc(CONSIGLI_CONTANTI) + '</p>' : '');
+  if (o.presenza && o.presenza.ora > 0)
+    h += '<div class="contanti-fatto">✅ Incontro confermato ' + esc(quandoIncontroP2P(o.presenza.ora))
+      + esc(distanzaIncontroP2P(o.presenza)) + '</div>';
+  else if (disputa)
+    h += '<div class="contanti-fatto">Nessuna prova d\'incontro per questo scambio.</div>';
+  else if (!o.soloVista)
+    h += '<p><b>🤝 Siamo insieme.</b> Quando vi vedete — dopo aver contato le banconote, prima di liberare i sats — un telefono mostra un codice e l\'altro lo inquadra: resta una prova firmata da tutti e due, con l\'ora e, se volete, la posizione, che un moderatore guarda in caso di disputa.</p>' +
+      '<label class="contanti-gps"><input type="checkbox" id="p2pPresenzaGps" checked><span>📍 Allega la posizione — facoltativa, consigliata. Il GPS si può falsificare: è una conferma, non una prova assoluta.</span></label>' +
+      '<div class="contanti-gesti">' +
+        '<button type="button" class="btn ghost" onclick="presenzaMostraP2P()">📱 Mostra il codice</button>' +
+        '<button type="button" class="btn ghost" onclick="presenzaLeggiP2P()">📷 Inquadra il codice</button>' +
+      '</div>';
+  return h + '</div>';
 }
 /* IL VESTITO DEI METODI (16 set 2026, decisione di Andrea): «Contanti
    al tabacchino» si presenta come BARATTOZON — il marchio al posto del
@@ -54753,6 +54926,15 @@ function valeNuovoOrdineP2P(v){
   if (tettoEuro > 0 && max > tettoEuro)
     return {ok: false, manca: 'Troppi: il massimo è ' + fmt(tettoEuro) + ' €',
             campo: 'p2pNuovoEuroMax'};
+  /* IL TETTO DEL CONTANTI DI PERSONA (30 set 2026): la leva
+     P2P_CONTANTI_MAX_EURO, per il solo metodo «Contanti», SOTTO quello
+     generale — con piu' metodi e «Contanti» fra questi vale lo stesso,
+     perche' chi prende puo' scegliere proprio quello. La frase e' del
+     giudice `giudiceContantiP2P`, lo stesso della presa. */
+  const contantiEuro = giudiceContantiP2P(euro, v.metodi, v.maxEuroContanti);
+  if (contantiEuro) return {ok: false, manca: contantiEuro, campo: 'p2pNuovoEuro'};
+  const contantiMax = giudiceContantiP2P(max, v.metodi, v.maxEuroContanti);
+  if (contantiMax) return {ok: false, manca: contantiMax, campo: 'p2pNuovoEuroMax'};
   if (!(v.metodi || []).length)
     return {ok: false, manca: 'Scegli almeno un metodo di pagamento',
             campo: 'p2pNuovoMetodiBtn'};
@@ -54895,6 +55077,8 @@ function campiNuovoP2P(){
     maxEuro: maxEuroP2P(),
     /* il minimo di Barattozon (30 set 2026), dalla stessa busta: 0 = spento */
     minEuroBz: minEuroBzP2P(),
+    /* ...e quello del contanti di persona (30 set 2026), stessa busta */
+    maxEuroContanti: maxEuroContantiP2P(),
     /* il tabacchino (set 2026): il lato, i tre dati, la finestra
        della garanzia letta viva (0 = non lo so) e l'ora, cosi' il
        giudice resta puro e il banco gli da' un orologio fermo */
@@ -55032,6 +55216,15 @@ function maxSatsTestoP2P(){
 function maxEuroP2P(){
   const c = p2pCoord();
   const n = c ? Math.floor(Number(c.maxEuro)) : 0;
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+/* IL TETTO DEL CONTANTI DI PERSONA (30 set 2026): la gemella, in busta
+   come `maxEuroContanti` — 250 di serie sul server, 0 = spenta. Vale
+   per il solo metodo «Contanti», in pubblicazione E in presa, e sta
+   sotto il tetto generale quando quello e' acceso. */
+function maxEuroContantiP2P(){
+  const c = p2pCoord();
+  const n = c ? Math.floor(Number(c.maxEuroContanti)) : 0;
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 /* IL TESTO SOTTO IL CAMPO, con due tetti possibili: quando la leva
@@ -55306,7 +55499,7 @@ function renderNuovoOrdineP2P(){
       (p2pNuovoMetodi.length ? '' : ' vuota') + '" aria-expanded="' +
       (p2pNuovoAperta ? 'true' : 'false') + '" onclick="apriTendinaMetodiP2P()">' +
       '<span>' + esc(scelti) + '</span><i aria-hidden="true">▾</i></button>',
-    sotto: p2pNuovoAperta
+    sotto: (p2pNuovoAperta
       ? '<div class="p2p-voci">' + metodiPubblicabiliP2P(compro ? 'compro' : 'vendo').map(m =>
           /* la voce col marchio stringe il respiro per farlo grande:
              la classe la chiede il CATALOGO, come la pillola */
@@ -55319,7 +55512,11 @@ function renderNuovoOrdineP2P(){
           /* il marchio accanto al nome, per chi ce l'ha (16 set 2026) */
           + marchioMetodoP2P(m, true) + '</button>').join('') +
         '</div>'
-      : ''
+      : '')
+      /* LA REGOLA DEL CONTANTI STA SUL METODO (30 set 2026): la riga
+         compare quando «Contanti» e' scelto, e dice il tetto — e' la
+         riga che cambia il gesto, non un avviso a ogni foglio */
+      + regolaContantiFoglioP2P(p2pNuovoMetodi, maxEuroContantiP2P(), compro ? 'compro' : 'vendo')
   });
 
   /* I TRE DATI DEL TABACCHINO (set 2026), solo quando la voce e'
@@ -58781,6 +58978,16 @@ function indiceDaChiaveP2P(mz, pub, max){
   }
   return 0;
 }
+/* PURA: la prova d'incontro come la dice il server (`incontro` della
+   rotta degli scambi), nella forma che la riga tiene (30 set 2026) */
+function presenzaDaServerP2P(inc){
+  if (!inc || !(Number(inc.ora) > 0)) return null;
+  return {ora: Math.floor(Number(inc.ora)),
+          distanza: (inc.distanza === null || inc.distanza === undefined) ? null : Number(inc.distanza),
+          posizioni: Number(inc.posizioni) || 0,
+          precisione: (inc.precisione === null || inc.precisione === undefined) ? null : Number(inc.precisione),
+          posizioniVia: !!inc.posizioni_via};
+}
 /* PURA: la riga nuova dai dati del server; `tk` e' la trade key
    ritrovata (null = solo da guardare) */
 function rigaDaServerP2P(id, s, tk, stato, adesso){
@@ -58811,6 +59018,8 @@ function rigaDaServerP2P(id, s, tk, stato, adesso){
   if (Number(s.cambio_presa) > 0) o.cambioPresa = Number(s.cambio_presa);
   if (s.preso) o.preso = true;
   if (!tk) o.soloVista = true;
+  /* la prova d'incontro del contanti (30 set 2026), dal server */
+  if (s.incontro && Number(s.incontro.ora) > 0) o.presenza = presenzaDaServerP2P(s.incontro);
   if (stato === 'annullato' || stato === 'rifiutato') o.fermoA = fermoDaMomentiP2P(s.momenti);
   if (s.payout_fallito && lato === 'vendo' && stato === 'rilasciato') o.payoutFallito = true;
   return o;
@@ -58879,6 +59088,11 @@ function adottaScambiServerP2P(locali){
       }
       if (!(gia.metodi && gia.metodi.length) && Array.isArray(s.metodi) && s.metodi.length) { gia.metodi = s.metodi.map(String); mosso = true; }
       if (s.preso && !gia.preso) { gia.preso = true; mosso = true; }
+      /* LA PROVA D'INCONTRO ARRIVA DAL SERVER (30 set 2026): l'ha caricata
+         l'altro telefono, o l'altro dispositivo — qui si prende e si tiene */
+      if (s.incontro && Number(s.incontro.ora) > 0 && !(gia.presenza && gia.presenza.ora > 0)) {
+        gia.presenza = presenzaDaServerP2P(s.incontro); mosso = true;
+      }
       /* la riga solo da guardare si PROMUOVE appena la chiave si ritrova */
       if (gia.soloVista && tk) {
         gia.pubTrade = tk.pub; gia.indice = tk.indice; delete gia.soloVista; mosso = true;
@@ -61156,6 +61370,19 @@ function scadenzaGaranziaModP2P(d, info){
   const f = finestraGaranziaP2P(info);
   return (d && d.garanzia_il > 0 && f > 0) ? d.garanzia_il + f : 0;
 }
+/* LA PROVA D'INCONTRO DEL CONTANTI, AL MODERATORE (30 set 2026): sugli
+   scambi in contanti di persona si dice SEMPRE — «confermato alle…» o
+   «nessuna prova» —, sugli altri solo quando una prova c'e'. La cautela
+   sul GPS sta scritta accanto, che e' dove la si legge prima di decidere. */
+function rigaIncontroModP2P(d, aperta){
+  const contanti = contantiAManoP2P(String(d.metodi || '').split(','));
+  const p = d.incontro;
+  if (p && p.ora > 0)
+    return '<div class="mod-riga mod-incontro">🤝 Incontro confermato ' + esc(quandoIncontroP2P(p.ora))
+      + esc(distanzaIncontroP2P(p)) + (p.posizioni_via ? ' · posizioni cancellate' : '') + '</div>'
+      + (aperta ? '<div class="hint">Le due firme sono verificate. La posizione viene dal GPS dei telefoni e si può falsificare: è una conferma, non una prova assoluta.</div>' : '');
+  return contanti ? '<div class="mod-riga mod-incontro">🤝 Nessuna prova d\'incontro</div>' : '';
+}
 const MOD_STATI_P2P = {aperta: 'Aperta', presa: 'Presa', chiusa: 'Chiusa'};
 const MOD_CHIUSA_DA_P2P = {moderatore: 'decisa da un moderatore', parti: 'chiusa dalle parti',
   scadenza: 'chiusa per scadenza', sconosciuto: 'chiusa'};
@@ -61171,7 +61398,10 @@ function cardDisputaModP2P(d, ho){
     + '<div class="mod-riga">' + (chi ? 'Aperta da ' + esc(chi) + ' · ' : '')
     + esc(dataBreveP2P(d.aperta_il)) + '</div>'
     + '<div class="mod-cifra"><b>' + (d.sats > 0 ? esc(fmt(d.sats)) + ' sats' : 'Sats non detti') + '</b>'
-    + (d.euro ? ' per ' + esc(d.euro) : '') + (d.metodi ? ' · ' + esc(d.metodi) : '') + '</div>';
+    + (d.euro ? ' per ' + esc(d.euro) : '') + (d.metodi ? ' · ' + esc(d.metodi) : '') + '</div>'
+    /* la prova d'incontro del contanti (30 set 2026): la riga che si legge
+       PRIMA di decidere, con la sua cautela quando la card e' aperta */
+    + rigaIncontroModP2P(d, aperta);
   if (d.stato === 'chiusa') {
     h += '<div class="mod-riga">' + esc(MOD_CHIUSA_DA_P2P[d.chiusa_da] || 'chiusa') + ': '
       + esc(d.esito === 'compratore' ? 'i sats a chi compra' : 'i sats a chi vende')
@@ -61266,6 +61496,348 @@ function renderModerazioneP2P(){
   }
 }
 /* ============ fine della moderazione delle dispute P2P ============ */
+
+/* ============ IL CONTANTI DI PERSONA: LA PROVA D'INCONTRO (30 set 2026) ============
+   (docs/STUDIO-CONTANTI-A-MANO-2026-09-25.md, §2b; decisione di Andrea:
+   tutto attivo dal 10 ottobre). Una banconota non lascia ricevuta: in
+   una disputa sul contanti il moderatore aveva una parola contro
+   l'altra. Il gesto «Siamo insieme» gli da' UN FATTO: i due telefoni
+   erano insieme alla stessa ora, e lo hanno firmato tutt'e due.
+
+   COME. Chi MOSTRA compone una nota — un evento Nostr di kind
+   P2P_KIND_PRESENZA, tag `d` = ordine e `ruolo` = mostra, nel
+   contenuto un nonce e (se l'ha permessa) la posizione — la firma con
+   la chiave usa-e-getta dello scambio e la fa disegnare come QR, in
+   una riga compatta: prefisso|ordine|chiave|ora|nonce|posizione|firma.
+   Chi LEGGE ricostruisce la nota dalla riga, la VERIFICA (firma vera,
+   ordine mio, chiave dell'altra parte, ora vicina), e la CONTROFIRMA
+   con la propria chiave in una seconda nota (`ruolo` = legge, tag `e`
+   = l'id della prima, la propria posizione se vuole). Le due note
+   partono insieme a `/api/p2p/presenza`, che le verifica daccapo contro
+   le due chiavi che il coordinatore ha detto per l'ordine e scrive la
+   riga; la risposta torna nella pagina come «✅ Incontro confermato».
+   L'altro telefono la ritrova dalla rotta degli scambi (`incontro`).
+
+   IL CONTENUTO SI SCRIVE CON UNA FUNZIONE SOLA (`contenutoPresenzaP2P`):
+   e' la stringa che si firma, e chi legge la deve rifare byte per byte
+   dalla riga del QR — per questo i numeri della posizione viaggiano
+   gia' come STRINGHE (cinque decimali, precisione intera), e non si
+   passa da JSON.stringify di un oggetto, che potrebbe ordinare o
+   arrotondare diversamente su un altro browser.
+
+   LEGGERE IL CODICE, tre strade in ordine: lo scanner di Telegram
+   (`showScanQrPopup`, iPhone e Android dentro l'app), la fotocamera del
+   browser dove sa leggere i codici (`BarcodeDetector`, Chrome Android:
+   e' l'APK), e — dove nessuna delle due c'e' — incollare il codice che
+   l'altra persona ha copiato dal suo foglio. Un telefono che non sa
+   leggere non deve restare senza il gesto.
+
+   LA POSIZIONE E' FACOLTATIVA E CONSIGLIATA: la casella nel riquadro e'
+   accesa di serie, e il browser chiede il suo permesso; un no, o un
+   timeout, e' una nota senza posizione, mai un gesto che non parte. Il
+   GPS si puo' falsificare, e la pagina lo dice: e' una conferma. */
+const P2P_KIND_PRESENZA = 27383;
+const P2P_PRESENZA_FINESTRA_S = 600;
+const P2P_PRESENZA_PREFISSO = 'BRTL-INCONTRO-1';
+const P2P_PRESENZA_ATTESA_MS = 5000;     /* il foglio di chi mostra chiede al server ogni tanto */
+const P2P_PRESENZA_ATTESA_MAX_MS = 10 * 60 * 1000;
+let p2pPresenzaOrdine = '', p2pPresenzaTesto = '', p2pPresenzaFlusso = null,
+    p2pPresenzaTimer = null, p2pPresenzaOrologio = null, p2pPresenzaInVolo = false;
+
+/* PURO: il contenuto della nota, UNA stesura per chi mostra e chi legge */
+function contenutoPresenzaP2P(nonce, geo){
+  return '{"v":1,"nonce":"' + String(nonce || '') + '","geo":'
+    + (geo ? '{"lat":' + geo.lat + ',"lon":' + geo.lon + ',"acc":' + geo.acc + '}' : 'null') + '}';
+}
+/* PURO: la posizione del browser nella forma che viaggia — stringhe con
+   cinque decimali (~1 m), precisione intera — o null */
+function geoPresenzaP2P(pos){
+  if (!pos || !pos.coords) return null;
+  const la = Number(pos.coords.latitude), lo = Number(pos.coords.longitude),
+        ac = Number(pos.coords.accuracy);
+  if (!Number.isFinite(la) || !Number.isFinite(lo)) return null;
+  if (Math.abs(la) > 90 || Math.abs(lo) > 180) return null;
+  return {lat: la.toFixed(5), lon: lo.toFixed(5),
+          acc: String(Number.isFinite(ac) && ac >= 0 ? Math.round(ac) : 0)};
+}
+/* PURI: le due note, non firmate */
+function notaMostraP2P(ordine, pub, ora, nonce, geo){
+  return {kind: P2P_KIND_PRESENZA, pubkey: pub, created_at: ora,
+          tags: [['d', String(ordine)], ['ruolo', 'mostra']],
+          content: contenutoPresenzaP2P(nonce, geo)};
+}
+function notaLeggeP2P(ordine, pub, ora, idMostrata, geo){
+  return {kind: P2P_KIND_PRESENZA, pubkey: pub, created_at: ora,
+          tags: [['d', String(ordine)], ['ruolo', 'legge'], ['e', String(idMostrata)]],
+          content: contenutoPresenzaP2P('', geo)};
+}
+/* PURO: la riga del QR da una nota mostrata firmata. TUTTA MAIUSCOLA e
+   coi due punti come separatore, per la stessa ragione della invoice:
+   cosi' entra nella modalita' ALFANUMERICA del QR (A-Z, 0-9, spazio e
+   `$%*+-./:`), che con 330 caratteri fa un codice piu' rado di un
+   quarto — e in un bar, con poca luce, e' la differenza fra un colpo e
+   tre. L'esadecimale e l'id dell'ordine si rimettono in minuscolo
+   leggendo; la posizione ha solo cifre, punto, barra e meno. */
+function testoQrPresenzaP2P(ev, nonce, geo){
+  return [P2P_PRESENZA_PREFISSO, ev.tags[0][1], ev.pubkey, String(ev.created_at), String(nonce),
+          geo ? geo.lat + '/' + geo.lon + '/' + geo.acc : '-', ev.sig].join(':').toUpperCase();
+}
+/* PURO: dalla riga del QR alla nota di chi mostra, ricostruita e
+   VERIFICATA — e' il codice giusto, di QUESTO scambio, firmato
+   dall'ALTRA parte, di adesso. Torna {ok, nota} o {ok:false, perche} */
+function leggiQrPresenzaP2P(testo, o, adesso){
+  const NT = window.NostrTools;
+  /* la riga viaggia maiuscola (vedi `testoQrPresenzaP2P`): qui si
+     rimette in minuscolo quel che era minuscolo — esadecimale e id */
+  const p = String(testo || '').trim().toUpperCase().split(':');
+  if (p.length !== 7 || p[0] !== P2P_PRESENZA_PREFISSO)
+    return {ok: false, perche: 'Questo non è un codice d\'incontro di Barattolo'};
+  const ordine = p[1].toLowerCase(), pub = p[2].toLowerCase(), oraTxt = p[3],
+        nonce = p[4].toLowerCase(), geoTxt = p[5], sig = p[6].toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(pub) || !/^[0-9a-f]{128}$/.test(sig)
+      || !/^[0-9a-f]{8,64}$/.test(nonce) || !/^[0-9]{1,12}$/.test(oraTxt))
+    return {ok: false, perche: 'Codice illeggibile'};
+  if (!o || ordine !== String(o.id).toLowerCase())
+    return {ok: false, perche: 'Il codice è di un altro scambio'};
+  if (!o.peer || pub !== o.peer)
+    return {ok: false, perche: 'Il codice non è firmato dall\'altra parte di questo scambio'};
+  let geo = null;
+  if (geoTxt !== '-') {
+    const g = geoTxt.split('/');
+    if (g.length !== 3 || g.some(x => !/^-?[0-9]+(\.[0-9]+)?$/.test(x)))
+      return {ok: false, perche: 'Codice illeggibile'};
+    geo = {lat: g[0], lon: g[1], acc: g[2]};
+  }
+  const ora = Number(oraTxt);
+  const ades = Number(adesso) > 0 ? Number(adesso) : Math.floor(Date.now() / 1000);
+  if (Math.abs(ades - ora) > P2P_PRESENZA_FINESTRA_S)
+    return {ok: false, perche: 'Il codice è vecchio: fatelo rifare'};
+  if (!NT || typeof NT.verifyEvent !== 'function')
+    return {ok: false, perche: 'La libreria delle firme non è arrivata'};
+  const ev = notaMostraP2P(ordine, pub, ora, nonce, geo);
+  ev.id = NT.getEventHash(ev);
+  ev.sig = sig;
+  if (!NT.verifyEvent(ev)) return {ok: false, perche: 'La firma del codice non torna'};
+  return {ok: true, nota: ev};
+}
+/* la chiave usa-e-getta di QUESTO scambio, su questo dispositivo, o null */
+function chiaveOrdinePresenzaP2P(o){
+  if (!o || !(o.indice > 0) || !o.pubTrade) return null;
+  const mz = mazzoMostro();
+  if (!mz || !mz.sk) return null;
+  try {
+    const tk = chiaveScambio(mz.sk, o.indice);
+    return tk.pub === o.pubTrade ? tk : null;
+  } catch(e) { return null; }
+}
+/* la posizione, se la casella e' accesa e il browser la da' entro pochi
+   secondi; un no e' null, mai un errore */
+function posizionePresenzaP2P(){
+  const c = el('p2pPresenzaGps');
+  const vuole = !c || c.checked;
+  if (!vuole || !navigator.geolocation) return Promise.resolve(null);
+  return new Promise(ok => {
+    let fatto = false;
+    const fine = pos => { if (!fatto) { fatto = true; ok(geoPresenzaP2P(pos)); } };
+    try {
+      navigator.geolocation.getCurrentPosition(fine, () => fine(null),
+        {enableHighAccuracy: true, timeout: 8000, maximumAge: 60000});
+    } catch(e) { fine(null); }
+    setTimeout(() => fine(null), 9000);
+  });
+}
+/* ---- chi MOSTRA ---- */
+async function presenzaMostraP2P(){
+  const o = ordiniP2P()[p2pOrdineAperto];
+  if (!o || !scambioInContantiP2P(o)) return;
+  if (o.soloVista) { toast('I gesti di questo scambio si fanno dal dispositivo dove l\'hai aperto'); return; }
+  const NT = window.NostrTools;
+  const tk = chiaveOrdinePresenzaP2P(o);
+  if (!NT || !tk) { toast('La chiave di questo scambio non è su questo dispositivo'); return; }
+  haptic();
+  const geo = await posizionePresenzaP2P();
+  const nonce = NT.utils.bytesToHex(crypto.getRandomValues(new Uint8Array(8)));
+  const ev = NT.finalizeEvent(notaMostraP2P(o.id, tk.pub, Math.floor(Date.now() / 1000), nonce, geo),
+                              NT.utils.hexToBytes(tk.sk));
+  p2pPresenzaOrdine = o.id;
+  p2pPresenzaTesto = testoQrPresenzaP2P(ev, nonce, geo);
+  renderPresenzaP2P('mostra', {geo: !!geo});
+  el('sheetBg').classList.add('open');
+  el('p2pPresenzaSheet').classList.add('open');
+  const ok = await disegnaQr(el('p2pPresenzaQr'), p2pPresenzaTesto, 'Alphanumeric');
+  if (!ok) toast('Non riesco a disegnare il codice: usa «Copia il codice»');
+  avviaOrologioPresenzaP2P(o.id);
+}
+function copiaPresenzaP2P(){
+  if (!p2pPresenzaTesto) return;
+  navigator.clipboard?.writeText(p2pPresenzaTesto);
+  toast('📋 Codice copiato');
+}
+/* il foglio di chi mostra si chiude da solo quando il server ha la prova:
+   la chiede ogni P2P_PRESENZA_ATTESA_MS, per al piu' dieci minuti, e solo
+   finche' il foglio e' aperto */
+function avviaOrologioPresenzaP2P(id){
+  fermaOrologioPresenzaP2P();
+  const da = Date.now();
+  p2pPresenzaOrologio = setInterval(async () => {
+    const f = el('p2pPresenzaSheet');
+    if (!f || !f.classList.contains('open') || Date.now() - da > P2P_PRESENZA_ATTESA_MAX_MS) {
+      fermaOrologioPresenzaP2P(); return;
+    }
+    if (!(await chiediScambiServerP2P())) return;
+    try { adottaScambiServerP2P(ordiniP2P()); } catch(e) {}
+    const o = ordiniP2P()[id];
+    if (o && o.presenza && o.presenza.ora > 0) {
+      fermaOrologioPresenzaP2P();
+      chiudiFoglioP2P('p2pPresenzaSheet');
+      toast('🤝 Incontro confermato');
+      if (p2pOrdineAperto === id) renderOrdineP2P();
+    }
+  }, P2P_PRESENZA_ATTESA_MS);
+}
+function fermaOrologioPresenzaP2P(){
+  if (p2pPresenzaOrologio) clearInterval(p2pPresenzaOrologio);
+  p2pPresenzaOrologio = null;
+}
+/* ---- chi LEGGE ---- */
+function presenzaLeggiP2P(){
+  const o = ordiniP2P()[p2pOrdineAperto];
+  if (!o || !scambioInContantiP2P(o)) return;
+  if (o.soloVista) { toast('I gesti di questo scambio si fanno dal dispositivo dove l\'hai aperto'); return; }
+  if (!o.peer) { toast('Non so ancora chi è l\'altra parte: aspetta che lo scambio sia preso'); return; }
+  if (!chiaveOrdinePresenzaP2P(o)) { toast('La chiave di questo scambio non è su questo dispositivo'); return; }
+  haptic();
+  p2pPresenzaOrdine = o.id;
+  /* 1) dentro Telegram: lo scanner suo, su iPhone e Android */
+  if (tg?.initData && tg.isVersionAtLeast?.('6.4') && typeof tg.showScanQrPopup === 'function') {
+    try {
+      tg.showScanQrPopup({text: 'Inquadra il codice sul telefono dell\'altra persona'}, testo => {
+        if (!presenzaRicevutaP2P(testo, o.id)) return false;
+        try { tg.closeScanQrPopup(); } catch(e) {}
+        return true;
+      });
+      return;
+    } catch(e) {}
+  }
+  /* 2) la fotocamera del browser, dove sa leggere i codici; 3) incollare */
+  const camera = !!(window.BarcodeDetector && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  renderPresenzaP2P('leggi', {camera: camera});
+  el('sheetBg').classList.add('open');
+  el('p2pPresenzaSheet').classList.add('open');
+  if (camera) avviaCameraPresenzaP2P();
+}
+/* il codice letto (dallo scanner, dalla fotocamera o incollato): si
+   verifica SUBITO, e se regge parte la controfirma. Torna true se e'
+   stato accettato — chi legge in loop smette li' */
+function presenzaRicevutaP2P(testo, id){
+  const o = ordiniP2P()[id];
+  if (!o || p2pPresenzaInVolo) return false;
+  const r = leggiQrPresenzaP2P(testo, o, Math.floor(Date.now() / 1000));
+  if (!r.ok) { toast(r.perche); return false; }
+  firmaEInviaPresenzaP2P(o, r.nota);
+  return true;
+}
+function incollaPresenzaP2P(){
+  const t = el('p2pPresenzaIncolla');
+  if (!t || !t.value.trim()) { toast('Incolla prima il codice'); return; }
+  presenzaRicevutaP2P(t.value, p2pPresenzaOrdine);
+}
+async function firmaEInviaPresenzaP2P(o, mostrata){
+  const NT = window.NostrTools;
+  const tk = chiaveOrdinePresenzaP2P(o);
+  if (!NT || !tk) { toast('La chiave di questo scambio non è su questo dispositivo'); return; }
+  fermaCameraPresenzaP2P();
+  p2pPresenzaInVolo = true;
+  const rip = attesaP2P('Sto registrando l\'incontro…');
+  try {
+    const geo = await posizionePresenzaP2P();
+    const letta = NT.finalizeEvent(
+      notaLeggeP2P(o.id, tk.pub, Math.floor(Date.now() / 1000), mostrata.id, geo),
+      NT.utils.hexToBytes(tk.sk));
+    const r = await fetch(`${API_BASE}/p2p/presenza`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({ordine: o.id, mostrata: mostrata, letta: letta})});
+    let d = null;
+    try { d = await r.json(); } catch(e) {}
+    if (!r.ok) throw new Error((d && d.detail) || 'Il server ha detto di no');
+    segnaIncontroP2P(o.id, d && d.incontro);
+    chiudiFoglioP2P('p2pPresenzaSheet');
+    toast('🤝 Incontro confermato');
+  } catch(e) {
+    toast('Incontro non registrato: ' + String(e && e.message || e));
+  } finally { rip(); p2pPresenzaInVolo = false; }
+}
+/* la prova entra nella riga dello scambio, e la pagina si ridisegna */
+function segnaIncontroP2P(id, inc){
+  const o = ordiniP2P()[id];
+  const p = presenzaDaServerP2P(inc);
+  if (!o || !p) return false;
+  o.presenza = p;
+  scriviOrdineP2P(o);
+  if (p2pOrdineAperto === id) renderOrdineP2P();
+  return true;
+}
+/* ---- la fotocamera del browser (Chrome Android) ---- */
+async function avviaCameraPresenzaP2P(){
+  const video = el('p2pPresenzaVideo');
+  if (!video) return;
+  try {
+    p2pPresenzaFlusso = await navigator.mediaDevices.getUserMedia(
+      {video: {facingMode: 'environment'}, audio: false});
+    video.srcObject = p2pPresenzaFlusso;
+    await video.play();
+  } catch(e) {
+    fermaCameraPresenzaP2P();
+    toast('La fotocamera non è disponibile: incolla il codice qui sotto');
+    return;
+  }
+  let det = null;
+  try { det = new BarcodeDetector({formats: ['qr_code']}); } catch(e) { det = null; }
+  if (!det) { fermaCameraPresenzaP2P(); return; }
+  const giro = async () => {
+    const f = el('p2pPresenzaSheet');
+    if (!p2pPresenzaFlusso || !f || !f.classList.contains('open')) { fermaCameraPresenzaP2P(); return; }
+    try {
+      const codici = await det.detect(video);
+      for (const c of (codici || []))
+        if (c && c.rawValue && presenzaRicevutaP2P(c.rawValue, p2pPresenzaOrdine)) return;
+    } catch(e) {}
+    p2pPresenzaTimer = setTimeout(giro, 300);
+  };
+  giro();
+}
+function fermaCameraPresenzaP2P(){
+  if (p2pPresenzaTimer) clearTimeout(p2pPresenzaTimer);
+  p2pPresenzaTimer = null;
+  if (p2pPresenzaFlusso) {
+    try { p2pPresenzaFlusso.getTracks().forEach(t => t.stop()); } catch(e) {}
+    p2pPresenzaFlusso = null;
+  }
+}
+/* ---- il foglio, nei due versi ---- */
+function renderPresenzaP2P(modo, opz){
+  const box = el('p2pPresenzaCorpo');
+  if (!box) return;
+  fermaCameraPresenzaP2P();
+  if (modo === 'mostra') {
+    box.innerHTML =
+      '<div class="hint">Fai inquadrare questo codice dal telefono dell\'altra persona: dalla sua pagina dello scambio, «📷 Inquadra il codice». Vale '
+        + Math.round(P2P_PRESENZA_FINESTRA_S / 60) + ' minuti'
+        + (opz && opz.geo ? ' e porta la tua posizione.' : ', senza posizione.') + '</div>' +
+      '<div class="qr" id="p2pPresenzaQr"></div>' +
+      '<button class="btn ghost" onclick="copiaPresenzaP2P()">📋 Copia il codice d\'incontro</button>' +
+      '<div class="hint">Se la fotocamera non legge, l\'altra persona può incollare il codice copiato. Quando l\'incontro è registrato questo foglio si chiude da solo.</div>';
+    return;
+  }
+  box.innerHTML =
+    (opz && opz.camera
+      ? '<video id="p2pPresenzaVideo" class="presenza-video" playsinline muted autoplay></video>' +
+        '<div class="hint">Inquadra il codice sul telefono dell\'altra persona.</div>'
+      : '<div class="hint">Su questo dispositivo la fotocamera non legge i codici: fatti mandare il codice copiato dall\'altra persona e incollalo qui.</div>') +
+    '<textarea id="p2pPresenzaIncolla" rows="3" placeholder="Incolla qui il codice…"></textarea>' +
+    '<button class="btn orange" onclick="incollaPresenzaP2P()">✅ Conferma il codice</button>';
+}
+/* ============ fine del contanti di persona ============ */
 
 /* Racconta un ordine appena pubblicato nel canale «Barattolo Vetrina»,
    come per un annuncio normale (chiesto da Andrea, set 2026). STA QUI
