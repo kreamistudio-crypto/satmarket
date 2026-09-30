@@ -30990,3 +30990,115 @@ perche' stanno a un grep di distanza).
 DA GUARDARE: il push, dopo lo sguardo di Andrea alla tabella e al
 CLAUDE.md nuovo; alla prossima sessione, che il richiamo della memoria
 peschi `cose-da-guardare.md` quando serve una verifica aperta.
+
+## Barattozon a mercato o a prezzo fisso, minimo 25 € (30 set 2026)
+
+LA RICHIESTA (Andrea): Barattozon funziona come gli ordini P2P normali,
+con la stessa scelta «a prezzo di mercato» o «prezzo fisso», e un PayCode
+sotto i 25 € non si pubblica. Prima di scrivere codice: c'è un motivo,
+oltre ai centesimi, per cui Barattozon era stato fatto solo a sats fissi?
+Worktree da `origin/main` (4084cba), commit firmati.
+
+**IL PUNTO 6, PRIMA DEL CODICE.** Il verbale del 22 set («Mostro 0.18.8 e
+gli importi con i centesimi») dice una ragione sola: `fiat_amount` è un
+i64 del protocollo, e coi sats fissi «la garanzia e il payout nascono al
+satoshi e nessuno paga la differenza». A mercato la differenza la paga
+chi pubblica, che è la decisione di oggi. Il resto reggeva già: il verso
+del premio di Barattozon è quello della sottrazione uniforme di mostro,
+quindi sul filo `premium` va com'è senza rovesciarlo; Barattozon è solo
+lato «vendo»; le card hanno già i due rami (`premioCardP2P`: il premio
+del filo se `amt` è 0, la convenienza vera se è fisso); il percorso
+(PayCode, recapito, riquadri, solleciti, canale, «I miei scambi») si
+aggancia a `tabacchinoP2P(metodi)`, cioè al `pm`, e non ai sats. Due
+cose da sapere e non bloccanti: 1) i tre lettori dell'esatto nel `pm`
+accettavano l'esatto solo se `round` combaciava col `fa`, e con
+l'arrotondamento per eccesso devono accettare anche `ceil`; 2) la
+differenza massima non è «circa 2%» ma quasi 4% — 25,01 € diventano 26,
+cioè 0,99 € — e il riepilogo la dice in euro. Nessun motivo per fermarsi.
+
+**LE DECISIONI.** La leva «Tipo di prezzo» è la STESSA sezione degli
+altri ordini, con una riga di aiuto sua (`notaTipoPrezzoTabP2P`), e sta
+PRIMA del percorso, perché il passo 4 e il riepilogo cambiano parole con
+lei; il default è quello di ogni ordine, mercato (`p2pNuovoFisso` parte
+falso: Andrea può volerlo fisso, ed è una riga). `campiNuovoP2P` passa
+`fisso` com'è — fino a ieri lo spegneva col tabacchino — e decide
+`ordineDaCampiP2P`: a prezzo fisso tutto com'era (l'intero più vicino nel
+`fa`, sats esatti col premio cotto, `premium` 0); a mercato `fa` =
+l'intero PER ECCESSO (`euroFiloTabacchinoP2P`, dai centesimi, che
+`Math.ceil(26.000000001)` farebbe 27), `amount` 0 e il premio del
+percorso sul filo. L'esatto resta nel `pm`, e i tre lettori (libro,
+restore, `_euro_libro`) passano da `combaciaEsattoP2P` — per difetto o
+per eccesso; sul server un insieme di due interi senza `math`, perché le
+prove estraggono la funzione da sola; ed è passato di lì anche il caso
+24,50 su 24, che il `round` a pari di Python non accettava. La stima a
+mercato di un Barattozon (`satsMercatoP2P`) sta sull'intero per eccesso:
+è il numero su cui il coordinatore farà i sats, e una stima sull'esatto
+sarebbe del 2% più bassa della presa. Il giudice del foglio: il minimo
+subito dopo il tetto di Amazon (giudice puro `giudiceMinimoPayCodeP2P`,
+ACCANTO a quello del tetto e non dentro: il form a mano del recapito
+chiama il tetto su un ordine già pubblicato, e il minimo lì non ha
+senso); a mercato niente cambio obbligatorio e niente tetti in sats,
+come per ogni ordine a mercato. Il riepilogo aggiunge «Prezzo: di
+mercato/fisso» e, a mercato, «Per il calcolo dei sats l'importo è
+arrotondato a 26 €: la differenza di 0,53 € la metti tu» — solo se una
+differenza c'è. Il cambio della riga (`cambioPub`) si scrive solo a sats
+fissi. IL MINIMO è la leva `BARATTOZON_MIN_EURO` (25 nel codice, il
+config del VPS vince; 0 = spento; storta = 25 e lo dice), in busta con
+le leve come `minEuroBz`, gemello `_paycode_sopra_minimo` nella rotta
+del canale dopo il tetto, riga nel pannello delle leve e in
+`config_esempio.py`; il passo 2 e Info P2P lo dicono col numero vivo
+(«senza minimo» era di Amazon, e resta vero solo a leva spenta).
+
+**QUEL CHE HANNO TROVATO LE PROVE, prima del banco.** 1) Con la leva
+vera anche col tabacchino, il ramo dei sats a mano di
+`valeNuovoOrdineP2P` chiedeva «Scrivi quanti sats» a un campo che il
+foglio non mostra: `v.fisso && !tab`. 2) Il custode non si nomina a
+schermo (regola di casa, fase 6): le frasi nuove dicevano «la fa il
+coordinatore alla presa», ora «si fissa alla presa». 3) Nove banchi node
+estraggono `ordineDaEvento`, `satsMercatoP2P` o la restore per firma e
+non sapevano i due giudici nuovi — e il banco del libro estrae con la
+riga vuota come fine, quindi una firma messa nella lista sbagliata
+inghiottiva trecento righe fino a un `const` già dichiarato. 4) Due
+banchi di cartone stubbano `euroTabacchinoP2P`: stub anche per il
+compagno. 5) «Le chiavi sono sei» della busta: sette.
+
+**STRADE SCARTATE.** Un contenitore diverso per la leva (una tappa
+numerata, o dentro il passo 4): è «lo stesso controllo degli ordini
+normali», e sta prima del percorso. Un default fisso per il solo
+Barattozon: sarebbe una scelta diversa da quella di tutti, e Andrea ha
+chiesto la stessa. Accettare l'esatto entro un euro (`|fa − esatto| < 1`)
+al posto dei due arrotondamenti: più largo di quel che il client scrive.
+Richiedere il cambio anche a mercato per mostrare sempre la stima: un
+muro senza ragione di protocollo, la riga dice «Aspetta un attimo» e il
+riepilogo tace la stima. Far contare il minimo nella spunta del passo 2
+(`passoTabacchinoP2P`): quel giudice dice DOVE si è, non se si può
+pubblicare — come per il tetto di Amazon, che nemmeno lui guarda.
+
+**PROVATO.** `prove.py` severa nel worktree SENZA config: 17.261 (dopo il rebase su b93ebda, le sessioni leggere) verdi e
+0 rosse (prove nuove in `prove_barattozon_mercato`: il minimo nel foglio
+e sul server nelle due modalità, l'eccesso 25,00→25 / 25,01→26 /
+999→999, il premio sul filo, il «Riprova» a mercato, il prezzo fisso
+invariato con 23,50→24, i tre lettori con un ordine di ieri identico e
+un pm che non combacia, le card con il premio fermo a tre cambi e la
+convenienza che si muove, la stima, la riga viva, i tre riepiloghi, la
+leva dal config con default/30/0/storta/negativo, gli ordini normali
+byte per byte; emendate col perché le prove che provavano il prezzo
+fisso con `fisso: false`, la firma di `rigaPremioTabP2P`, l'ordine delle
+scatole, «nessun minimo esiste» rovesciata). Tortura sulla copia:
+20 mutazioni su 20 uccise, in due giri — una viva al primo, la rotta del canale che non guardava piu' il minimo, che il nome della funzione da solo non vedeva: uccisa con la riga INTERA del giudizio. Collaudo sul server vero (la copia con relay morto, 8125): la
+busta porta `minEuroBz` 25, 24,99 → 400 col minimo, 25,00 e 25,47 → 200
+nelle due modalità, 1000 → il tetto di Amazon prima, 5 € con SEPA passa,
+premio storto 400 — 8 su 8. Giro dal vivo via CDP a 375 px, densità 3,
+nei due temi: il foglio con la leva, il minimo rifiutato col toast, il
+riepilogo a mercato con l'arrotondamento a 26 € e 0,53 €, il riepilogo a
+prezzo fisso, e le due card nel libro (mercato «3% meno conveniente»
+fermo, fisso «4% più conveniente» di adesso) — 24 controlli su 24. Gli
+scatti sono andati ad Andrea prima del push.
+
+**NON PROVATO, e dichiarato.** Un ordine Barattozon a mercato sul
+coordinatore VERO: che mostrod faccia i sats su 26 alla presa e che un
+client altrui legga «26 EUR» col `pm` esatto è letto sui byte
+(`get_market_amount_and_fee`), non visto. La presa vera, il recapito e
+il conto sul telefono. La differenza a carico di chi pubblica su una
+presa vera. Il default a mercato: se Andrea vuole che Barattozon parta
+fisso, è `p2pNuovoFisso` all'apertura del foglio col tabacchino.
