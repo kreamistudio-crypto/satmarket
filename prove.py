@@ -37915,8 +37915,15 @@ def prove_fogli_di_casa():
     # chi vende puo' mandarlo lo stesso, ma quella busta esce verso uno
     # sconosciuto, e una app esterna potrebbe non mostrarla nemmeno: si
     # chiede, dicendo cosa esce e verso chi.
-    prova("i gesti che passano dalla domanda unica sono settanta",
-          70, solo_codice(mini).count("chiediConferma({"))
+    # SETTANTUNO-SETTANTAQUATTRO (28 set 2026, la moderazione delle
+    # dispute P2P): creare la chiave di moderatore (nasce su quel
+    # dispositivo e va aggiunta al nodo: si dice prima), prendere una
+    # disputa (da li' la decide lui, e le parti vengono avvisate), e le
+    # DUE conferme della decisione — la prima dice dove vanno i sats e a
+    # chi, la seconda rilegge il motivo scritto. La decisione non si
+    # disfa: due volte, a carte scoperte, come i gesti sulla cassaforte.
+    prova("i gesti che passano dalla domanda unica sono settantaquattro",
+          74, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -109373,7 +109380,7 @@ def prove_dispute_p2p_moderatori():
     print("\n[le dispute P2P arrivano ai moderatori]")
     src = _SORGENTE
     i0 = src.index("# ---------- LE DISPUTE P2P PER I MODERATORI")
-    blocco = src[i0:src.index("\nasync def _respiro_presa_p2p(", i0)]
+    blocco = src[i0:src.index("# ---------- LA MODERAZIONE DELLE DISPUTE P2P", i0)]
     nudo = codice(_senza_prosa(blocco))
 
     # --- 1) LE SENTINELLE -------------------------------------------------
@@ -109570,12 +109577,812 @@ def prove_dispute_p2p_moderatori():
     con.close()
 
 
+BANCO_MODERAZIONE = r"""
+const fs = require('fs'), vm = require('vm');
+vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
+const NT = NostrTools;
+const window = {NostrTools: NT};
+const {bytesToHex, hexToBytes} = NT.utils;
+const out = {};
+/* --- il mondo attorno: stub, mai la cosa vera --- */
+let DEMO = false, VETRINA = false, isAdmin = true, myTgId = 999;
+const API_BASE = '/api';
+function authHdr(){ return 'collaudo'; }
+let toasts = []; function toast(m){ toasts.push(String(m)); }
+function haptic(){}
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmt(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+function dataBreveP2P(t){ return t ? 'il ' + t : ''; }
+function copiaLink(){}
+const nodi = {};
+function el(id){ return nodi[id] || (nodi[id] = {id, value: '', innerHTML: '', textContent: '',
+  focus(){}, setSelectionRange(){}, classList: {add(){}, remove(){}}}); }
+const document = {activeElement: null, querySelector: () => null};
+let vista = 'view-p2pmod'; function vistaAttivaP2P(){ return vista; }
+function attesaP2P(){ return () => {}; }
+function ragioneGestoP2P(e){ return String((e && e.message) || e); }
+const magazzino = {};
+const localStorage = {getItem: k => (k in magazzino ? magazzino[k] : null),
+                      setItem: (k, v) => { magazzino[k] = String(v); }};
+function chiaveP2P(base){ return base + '@' + myTgId; }
+async function caricaNostrTools(){}
+const conferme = [];
+function chiediConferma(c){ conferme.push(c); }
+let renderPag = 0; function renderOrdineP2P(){ renderPag++; }
+let p2pOrdineAperto = '';
+let p2pInfo = {holdBlocchi: 576, pow: 0, powPrimo: 0};
+async function mostroInfoP2P(){ return p2pInfo; }
+let P2P_ATTESA_MS = 250;
+const P2P_SCADENZA_MSG = 3600, P2P_LIBRO_MS = 200;
+let p2pRichiesta = 1000;
+
+/* --- IL COORDINATORE FINTO: ha la sua chiave, apre quel che gli arriva
+       come lo aprirebbe quello vero, e risponde secondo il copione --- */
+const MOSTRO = (() => { const sk = NT.generateSecretKey(); return {sk, pub: NT.getPublicKey(sk)}; })();
+function mostroHexP2P(){ return MOSTRO.pub; }
+const ricevuti = [], pubblicati = [], subs = [], eventi = [];
+let copione = {tipo: 'ok'};
+let ordineDetto = '';
+function combacia(f, ev){
+  if (f.kinds && f.kinds.indexOf(ev.kind) < 0) return false;
+  if (f.authors && f.authors.indexOf(ev.pubkey) < 0) return false;
+  if (f['#p'] && !ev.tags.some(t => t[0] === 'p' && f['#p'].indexOf(t[1]) >= 0)) return false;
+  if (f.since && ev.created_at < f.since) return false;
+  return true;
+}
+function consegna(ev){
+  for (const s of subs) if (!s.chiusa && s.filtri.some(f => combacia(f, ev)) && s.opz.onevent) s.opz.onevent(ev);
+  if (ev.kind === 14 && ev.tags.some(t => t[0] === 'p' && t[1] === MOSTRO.pub)) mostroFinto(ev);
+}
+const relay = {
+  connected: true,
+  publish(ev){ pubblicati.push(ev); eventi.push('publish'); setTimeout(() => consegna(ev), 2); return Promise.resolve('x'); },
+  subscribe(filtri, opz){
+    const s = {filtri, opz, chiusa: false, close(){ this.chiusa = true; }};
+    subs.push(s);
+    if (opz.oneose) setTimeout(() => {
+      for (const ev of libroDispute) if (filtri.some(f => combacia(f, ev)) && opz.onevent) opz.onevent(ev);
+      opz.oneose(); }, 2);
+    return s;
+  }
+};
+async function mostroConnetti(){ return relay; }
+async function mostroRiascolta(){}
+let libroDispute = [];
+function rispondi(a, busta, corpo){
+  const conv = NT.nip44.getConversationKey(MOSTRO.sk, a);
+  const adesso = Math.floor(Date.now() / 1000);
+  const m = {}; m[busta] = corpo;
+  const ev = NT.finalizeEvent({kind: 14, created_at: adesso, tags: [['p', a]],
+    content: NT.nip44.encrypt(JSON.stringify([m, null, null]), conv)}, MOSTRO.sk);
+  setTimeout(() => consegna(ev), 2);
+}
+function mostroFinto(ev){
+  if (!NT.verifyEvent(ev)) { ricevuti.push({guasto: 'firma della busta'}); return; }
+  let arr;
+  try {
+    arr = JSON.parse(NT.nip44.decrypt(ev.content, NT.nip44.getConversationKey(MOSTRO.sk, ev.pubkey)));
+  } catch(e) { ricevuti.push({guasto: 'non si apre'}); return; }
+  const busta = Object.keys(arr[0])[0], m = arr[0][busta];
+  /* la firma di dentro copre il messaggio RI-SERIALIZZATO, come fa mostrod */
+  let firmaOk = false;
+  try {
+    firmaOk = NT.schnorr.verify(hexToBytes(arr[1]),
+      NT.sha256(NT.utils.utf8Encoder.encode(JSON.stringify(arr[0]))), hexToBytes(ev.pubkey));
+  } catch(e) {}
+  ricevuti.push({da: ev.pubkey, busta, m, firmaOk, identita: arr[2],
+                 scadenza: ev.tags.some(t => t[0] === 'expiration')});
+  if (copione.tipo === 'silenzio') return;
+  if (copione.tipo === 'cantdo') {
+    rispondi(ev.pubkey, 'cant-do', {version: 2, request_id: m.request_id, id: m.id,
+                                    action: 'cant-do', payload: {cant_do: copione.motivo}});
+    return;
+  }
+  if (m.action === 'admin-take-dispute')
+    rispondi(ev.pubkey, 'dispute', {version: 2, request_id: null, id: m.id, action: 'admin-took-dispute',
+      payload: {order: {id: copione.tipo === 'altro-ordine' ? 'ffffffff-0000-4000-8000-000000000000' : ordineDetto,
+                        kind: 'sell', status: 'dispute', amount: 13603, fiat_code: 'EUR', fiat_amount: 10,
+                        payment_method: 'Contanti', premium: 0,
+                        buyer_trade_pubkey: COMPRA.pub, seller_trade_pubkey: VENDE.pub, created_at: 1}}});
+  else if (m.action === 'admin-settle')
+    rispondi(ev.pubkey, 'order', {version: 2, request_id: m.request_id, id: m.id, action: 'admin-settled', payload: null});
+  else if (m.action === 'admin-cancel')
+    rispondi(ev.pubkey, 'order', {version: 2, request_id: m.request_id, id: m.id, action: 'admin-canceled', payload: null});
+}
+/* --- IL SERVER FINTO: ricorda cosa gli si chiede, e in che ordine --- */
+const chiamate = [];
+let serverMod = {dispute: [], aperte: 0, chiave: '', moderatori: []};
+let serverNo = {};
+async function fetch(url, opz){
+  const percorso = url.replace('/api/p2p/', '');
+  const corpo = JSON.parse((opz && opz.body) || '{}');
+  chiamate.push({percorso, corpo}); eventi.push('server:' + percorso + (corpo.fatto ? ':fatto' : ''));
+  if (serverNo[percorso]) return {ok: false, status: serverNo[percorso][0],
+                                 json: async () => ({detail: serverNo[percorso][1]})};
+  if (percorso === 'moderazione/chiave') serverMod.chiave = corpo.chiave;
+  return {ok: true, status: 200, json: async () => (percorso === 'moderazione' ? serverMod : {ok: true})};
+}
+/* --- le due parti: una trade key a testa, e un mazzo di cartone --- */
+const chiave = () => { const sk = NT.generateSecretKey(); return {sk: bytesToHex(sk), pub: NT.getPublicKey(sk)}; };
+const COMPRA = chiave(), VENDE = chiave(), TERZO = chiave();
+let chiSono = COMPRA;
+function mazzoMostro(){ return {sk: 'mazzo', pub: 'identita', indice: 5}; }
+function chiaveScambio(){ return {sk: chiSono.sk, pub: chiSono.pub}; }
+let righe = {};
+function ordiniP2P(){ return righe; }
+function scriviOrdineP2P(o){ righe[o.id] = o; return o; }
+function ordiniAscoltoP2P(){ const m = {}; for (const k in righe) if (righe[k].pubTrade) m[righe[k].pubTrade] = righe[k]; return m; }
+function finestraGaranziaP2P(info){ return (info && info.holdBlocchi > 24) ? (info.holdBlocchi - 24) * 600 : 0; }
+__PEZZI__
+const pausa = ms => new Promise(r => setTimeout(r, ms));
+const ORD = '5a1e0000-d15b-4a2b-9c3d-0000000000a1', DISP = 'd15b0000-aaaa-4bbb-8ccc-0000000000d1';
+const disputa = extra => Object.assign({ordine: ORD, disputa: DISP, stato: 'aperta', aperta_il: 1790625166,
+  aperta_da: 'compra', compra: 'Alan <b>', vende: 'Bea & co', sats: 13603, euro: '10,00 €', metodi: 'Contanti',
+  garanzia_il: 1790623900, sei_parte: false, presa_da: '', presa_da_me: false, esito: '', chiusa_da: '',
+  chiusa_il: 0, decisione: null, chiave_compratore: '', chiave_venditore: ''}, extra || {});
+function giro(){ toasts = []; chiamate.length = 0; ricevuti.length = 0; pubblicati.length = 0; eventi.length = 0;
+  conferme.length = 0; serverNo = {}; copione = {tipo: 'ok'}; ordineDetto = ORD; }
+(async () => {
+  /* 0) LA CHIAVE: nasce qui, e al server va la sola pubblica */
+  serverMod = {dispute: [disputa()], aperte: 1, chiave: '', moderatori: []};
+  p2pMod = serverMod;
+  out.senzaChiave = [chiaveModeratoreP2P(), (prendiDisputaP2P(ORD), toasts.slice()), conferme.length];
+  giro();
+  await creaChiaveModeratoreP2P();
+  out.confermaChiave = [conferme.length, conferme[0].etichetta];
+  await conferme[0].poi();
+  const K = chiaveModeratoreP2P();
+  out.chiave = [!!K, /^[0-9a-f]{64}$/.test(K.sk), K.pub === NT.getPublicKey(hexToBytes(K.sk)),
+                chiamate.filter(c => c.percorso === 'moderazione/chiave').map(c => Object.keys(c.corpo).join(',') + '=' + (c.corpo.chiave === K.pub))];
+  out.chiaveMaiAlServer = chiamate.every(c => JSON.stringify(c.corpo).indexOf(K.sk) < 0);
+  out.chiavePerConto = Object.keys(magazzino).filter(k => k.indexOf('moderatore') >= 0);
+  /* il server dice di no alla chiave: sul dispositivo non resta niente */
+  giro(); delete magazzino[chiaveP2P(MOD_CHIAVE_P2P)];
+  serverNo['moderazione/chiave'] = [409, 'Questa chiave è già di un altro moderatore'];
+  await creaChiaveModeratoreP2P(); await conferme[0].poi();
+  out.chiaveRifiutata = [chiaveModeratoreP2P(), toasts[0]];
+  magazzino[chiaveP2P(MOD_CHIAVE_P2P)] = JSON.stringify(K);
+  serverMod.chiave = K.pub;
+
+  /* 1) PRENDI LA DISPUTA */
+  giro();
+  prendiDisputaP2P(ORD);
+  out.confermaPresa = [conferme.length, conferme[0].titolo];
+  await conferme[0].poi();
+  const r1 = ricevuti[0] || {};
+  out.presa = {ordine: eventi.slice(),
+    messaggio: [r1.busta, r1.m && r1.m.action, r1.m && r1.m.id, r1.m && r1.m.version, r1.m && r1.m.payload,
+                r1.m && Object.keys(r1.m).join(',')],
+    firmato: [r1.da === K.pub, r1.firmaOk, r1.identita, r1.scadenza],
+    corpi: chiamate.filter(c => c.percorso === 'moderazione/prendi').map(c => [c.corpo.ordine === ORD, c.corpo.chiave === K.pub, c.corpo.fatto === true]),
+    archivio: [archivioModP2P()[ORD].compra === COMPRA.pub, archivioModP2P()[ORD].vende === VENDE.pub],
+    toast: toasts.slice(), aperta: p2pModAperta === ORD};
+  /* ...il coordinatore risponde con UN ALTRO ordine: ci si ferma */
+  giro(); scriviArchivioModP2P({}); copione = {tipo: 'altro-ordine'};
+  await eseguiPresaDisputaP2P(ORD);
+  out.presaAltroOrdine = [eventi.slice(), toasts[0], Object.keys(archivioModP2P())];
+  /* ...la chiave non e' sul nodo */
+  giro(); copione = {tipo: 'cantdo', motivo: 'invalid_pubkey'};
+  await eseguiPresaDisputaP2P(ORD);
+  out.presaNonSulNodo = [eventi.slice(), toasts[0], chiamate[chiamate.length - 2].corpo.motivo];
+  /* ...il server dice di no PRIMA: al coordinatore non parte niente */
+  giro(); serverNo['moderazione/prendi'] = [403, 'Sei una delle due parti: questa disputa la decide un altro moderatore'];
+  await eseguiPresaDisputaP2P(ORD);
+  out.presaRifiutata = [eventi.filter(e => e === 'publish').length, toasts[0], chiamate.some(c => c.percorso === 'moderazione/lascia')];
+  /* ...il coordinatore tace */
+  giro(); copione = {tipo: 'silenzio'};
+  await eseguiPresaDisputaP2P(ORD);
+  out.presaSilenzio = [eventi.slice(), toasts[0]];
+  /* ...senza l'id dichiarato lo si cerca fra gli eventi pubblici */
+  const evD = (id, lato, quando) => NT.finalizeEvent({kind: 38386, created_at: quando,
+    tags: [['d', id], ['s', 'initiated'], ['initiator', lato], ['z', 'dispute']], content: ''}, MOSTRO.sk);
+  giro(); serverMod.dispute = [disputa({disputa: ''})];
+  libroDispute = [evD(DISP, 'buyer', 1790625170), evD('d15b0000-aaaa-4bbb-8ccc-0000000000d2', 'seller', 1790625160),
+                  evD('d15b0000-aaaa-4bbb-8ccc-0000000000d3', 'buyer', 1790620000)];
+  await eseguiPresaDisputaP2P(ORD);
+  out.presaCercata = [(ricevuti[0] || {m: {}}).m.id, toasts[0]];
+  giro(); libroDispute.push(evD('d15b0000-aaaa-4bbb-8ccc-0000000000d4', 'buyer', 1790625100));
+  await eseguiPresaDisputaP2P(ORD);
+  out.presaDueCandidate = [eventi.slice(), toasts[0]];
+  out.fraEventi = [disputaFraEventiP2P(libroDispute.slice(0, 3), disputa()), disputaFraEventiP2P(libroDispute, disputa()),
+                   disputaFraEventiP2P([], disputa()),
+                   disputaFraEventiP2P([evD('non-un-id', 'buyer', 1790625166)], disputa())];
+
+  /* 2) LA DECISIONE */
+  serverMod.dispute = [disputa({stato: 'presa', presa_da_me: true, presa_da: 'Tu'})];
+  const a0 = {}; a0[ORD] = {compra: COMPRA.pub, vende: VENDE.pub, chat: {}}; scriviArchivioModP2P(a0);
+  giro();
+  decidiDisputaP2P(ORD, 'venditore');
+  out.senzaMotivo = [conferme.length, toasts[0]];
+  bozzaModP2P(ORD, 'motivo', '   troppo   corto  ');
+  decidiDisputaP2P(ORD, 'venditore');
+  out.motivoCorto = conferme.length;
+  const MOTIVO = 'Nessun euro è mai girato: lo dicono tutti e due, e la ricevuta non c\'è.';
+  bozzaModP2P(ORD, 'motivo', '  ' + MOTIVO.replace(/ /g, '  ') + ' ');
+  decidiDisputaP2P(ORD, 'venditore');
+  out.primaConferma = [conferme.length, conferme[0].titolo, conferme[0].corpo, eventi.length];
+  /* la seconda si apre UN GIRO DOPO: subito non c'e' ancora */
+  out.secondaSubito = [conferme[0].poi(), conferme.length];
+  await pausa(10);
+  out.secondaConferma = [conferme.length, conferme[1].titolo, conferme[1].corpo, conferme[1].etichetta, eventi.length];
+  await conferme[1].poi();
+  const r2 = ricevuti[0] || {};
+  out.decisione = {ordine: eventi.slice(),
+    corpo: chiamate[0].corpo, corpoChiave: chiamate[0].corpo.chiave === K.pub,
+    messaggio: [r2.busta, r2.m && r2.m.action, r2.m && r2.m.id, r2.m && r2.m.payload],
+    firmato: [r2.da === K.pub, r2.firmaOk], toast: toasts.slice(), bozza: motivoModP2P(ORD)};
+  giro(); bozzaModP2P(ORD, 'motivo', MOTIVO);
+  decidiDisputaP2P(ORD, 'compratore'); conferme[0].poi(); await pausa(10); await conferme[1].poi();
+  out.decisioneCompra = [(ricevuti[0] || {m: {}}).m.action, conferme[0].titolo, toasts[0]];
+  /* ...il registro dice di no: al coordinatore non parte NIENTE */
+  giro(); bozzaModP2P(ORD, 'motivo', MOTIVO);
+  serverNo['moderazione/decisione'] = [409, 'Prima prendi la disputa'];
+  await eseguiDecisioneP2P(ORD, 'venditore');
+  out.decisioneSenzaRegistro = [eventi.slice(), toasts[0]];
+  /* ...il coordinatore dice di no, o tace: il registro lo sa */
+  giro(); copione = {tipo: 'cantdo', motivo: 'not_allowed_by_status'};
+  await eseguiDecisioneP2P(ORD, 'venditore');
+  out.decisioneNo = [eventi.slice(), chiamate[chiamate.length - 2].corpo, toasts[0].indexOf('Non è riuscito') === 0];
+  giro(); copione = {tipo: 'silenzio'};
+  await eseguiDecisioneP2P(ORD, 'venditore');
+  out.decisioneSilenzio = [eventi.slice(), toasts[0]];
+  /* ...una risposta VECCHIA del coordinatore non vale per la domanda di adesso */
+  giro(); copione = {tipo: 'silenzio'};
+  const vecchia = NT.finalizeEvent({kind: 14, created_at: Math.floor(Date.now() / 1000) - 600, tags: [['p', K.pub]],
+    content: NT.nip44.encrypt(JSON.stringify([{order: {version: 2, request_id: null, id: ORD, action: 'admin-canceled', payload: null}}, null, null]),
+      NT.nip44.getConversationKey(MOSTRO.sk, K.pub))}, MOSTRO.sk);
+  const falsa = NT.finalizeEvent({kind: 14, created_at: Math.floor(Date.now() / 1000), tags: [['p', K.pub]],
+    content: NT.nip44.encrypt(JSON.stringify([{order: {version: 2, request_id: null, id: ORD, action: 'admin-canceled', payload: null}}, null, null]),
+      NT.nip44.getConversationKey(hexToBytes(TERZO.sk), K.pub))}, hexToBytes(TERZO.sk));
+  const p = eseguiDecisioneP2P(ORD, 'venditore');
+  await pausa(40); consegna(vecchia); consegna(falsa);
+  for (const s of subs) if (!s.chiusa && s.opz.onevent) { s.opz.onevent(vecchia); s.opz.onevent(falsa); }
+  await p;
+  out.rispostaVecchia = toasts[0];
+
+  /* 3) LA CHAT: un canale per parte */
+  giro();
+  righe = {}; righe[ORD] = {id: ORD, lato: 'compro', stato: 'in_disputa', indice: 5, pubTrade: COMPRA.pub,
+                           peer: VENDE.pub, moderatore: K.pub};
+  chiSono = COMPRA; p2pOrdineAperto = ORD; vista = 'view-p2pordine';
+  await chatModeratoreInvia(righe[ORD], 'Ho pagato alle 18:40 <script>');
+  const busta1 = pubblicati[0];
+  out.chatParte = [busta1.kind, busta1.tags.length, righe[ORD].chatMod.length, righe[ORD].chatMod[0].mio];
+  /* il moderatore la riceve, dal lato giusto */
+  vista = 'view-p2pmod'; toasts = [];
+  chatModArriva(busta1);
+  out.chatAlModeratore = [((archivioModP2P()[ORD].chat || {}).compra || []).map(m => [m.testo, m.mio]),
+                          ((archivioModP2P()[ORD].chat || {}).vende || []).length, toasts.slice()];
+  chatModArriva(busta1);
+  out.chatNonRipete = archivioModP2P()[ORD].chat.compra.length;
+  /* il moderatore risponde */
+  nodi['p2pModChat-compra'] = {value: '  Mandami il numero della ricevuta  ', focus(){}};
+  pubblicati.length = 0;
+  await inviaChatModP2P(ORD, 'compra');
+  const busta2 = pubblicati[0];
+  toasts = []; vista = 'view-p2pordine';
+  chatModeratoreArriva(righe[ORD], busta2);
+  out.chatAllaParte = [righe[ORD].chatMod.map(m => [m.testo, m.mio]), toasts.slice()];
+  /* ...l'ALTRA parte quel canale non lo apre */
+  chiSono = VENDE;
+  const rigaV = {id: ORD, lato: 'vendo', stato: 'in_disputa', indice: 5, pubTrade: VENDE.pub, peer: COMPRA.pub, moderatore: K.pub};
+  out.altraParteNonLegge = [apriBustaChatP2P(chiaviModeratoreP2P(rigaV), busta2, [VENDE.pub, K.pub]),
+                            Object.keys(autoriModeratoreP2P()).length];
+  chiSono = COMPRA;
+  /* ...e una voce che in quel canale non c'entra non passa */
+  const kk = chiaviPeer(K.sk, COMPRA.pub);
+  const intruso = bustaChatP2P(kk, TERZO.sk, 'sono il moderatore, manda i sats', Math.floor(Date.now() / 1000));
+  const prima = righe[ORD].chatMod.length;
+  chatModeratoreArriva(righe[ORD], intruso.fuori);
+  out.intruso = [righe[ORD].chatMod.length === prima, apriBustaChatP2P(kk, intruso.fuori, [COMPRA.pub, K.pub])];
+  const futura = bustaChatP2P(kk, K.sk, 'dal futuro', Math.floor(Date.now() / 1000) + 600);
+  out.dalFuturo = apriBustaChatP2P(kk, futura.fuori, [COMPRA.pub, K.pub]);
+  out.sana = (apriBustaChatP2P(kk, bustaChatP2P(kk, K.sk, 'sana', Math.floor(Date.now() / 1000)).fuori, [COMPRA.pub, K.pub]) || {}).content;
+  /* la riga solo da guardare non ha il canale */
+  out.soloVista = chiaviModeratoreP2P(Object.assign({}, righe[ORD], {soloVista: true}));
+
+  /* 4) QUEL CHE SI VEDE */
+  out.bloccoSenza = bloccoModeratoreP2P({id: 'x', stato: 'in_disputa'});
+  out.bloccoFuori = bloccoModeratoreP2P({id: 'x', stato: 'attivo', moderatore: K.pub});
+  const blocco = bloccoModeratoreP2P(righe[ORD]);
+  out.blocco = [blocco.indexOf('Un moderatore ha preso la disputa') > 0, blocco.indexOf('&lt;script&gt;') > 0,
+                blocco.indexOf('<script>') < 0, blocco.indexOf('inviaChatModeratoreP2P()') > 0];
+  vista = 'view-p2pmod';
+  serverMod = {aperte: 2, chiave: K.pub, moderatori: [{nome: 'Andrea <i>', chiave: K.pub, io: true}],
+    dispute: [disputa({stato: 'presa', presa_da_me: true}),
+              disputa({ordine: '5a1e0000-d15b-4a2b-9c3d-0000000000a2', sei_parte: true}),
+              disputa({ordine: '5a1e0000-d15b-4a2b-9c3d-0000000000a3', stato: 'presa', presa_da: 'Alan'}),
+              disputa({ordine: '5a1e0000-d15b-4a2b-9c3d-0000000000a4', stato: 'chiusa', esito: 'venditore',
+                       chiusa_da: 'moderatore', chiusa_il: 5, decisione: {esito: 'venditore', motivo: 'perché <b>sì</b>', quando: 4}})]};
+  p2pMod = serverMod; p2pModAperta = ORD;
+  renderModerazioneP2P();
+  const pag = nodi.p2pModCorpo.innerHTML;
+  out.pagina = {scappa: [pag.indexOf('Alan &lt;b&gt;') > 0, pag.indexOf('Bea &amp; co') > 0, pag.indexOf('Andrea &lt;i&gt;') > 0,
+                         pag.indexOf('Alan <b>') < 0, pag.indexOf('&amp;lt;') < 0],
+    gesti: [(pag.match(/decidiDisputaP2P\(this\.dataset\.o, 'compratore'\)/g) || []).length,
+            (pag.match(/decidiDisputaP2P\(this\.dataset\.o, 'venditore'\)/g) || []).length,
+            (pag.match(/prendiDisputaP2P\(/g) || []).length],
+    scadenza: pag.indexOf('La garanzia scade circa il il ' + (1790623900 + 552 * 600)) > 0,
+    npub: pag.indexOf(NT.nip19.npubEncode(K.pub)) > 0, segreta: pag.indexOf(K.sk) >= 0,
+    nsec: /nsec1/.test(pag)};
+  p2pModAperta = '5a1e0000-d15b-4a2b-9c3d-0000000000a2'; renderModerazioneP2P();
+  out.paginaParte = [nodi.p2pModCorpo.innerHTML.indexOf('Sei una delle due parti') > 0,
+                     (nodi.p2pModCorpo.innerHTML.match(/decidiDisputaP2P\(/g) || []).length];
+  p2pModAperta = '5a1e0000-d15b-4a2b-9c3d-0000000000a3'; renderModerazioneP2P();
+  out.paginaAltro = [nodi.p2pModCorpo.innerHTML.indexOf('L\'ha presa Alan') > 0,
+                     (nodi.p2pModCorpo.innerHTML.match(/decidiDisputaP2P\(/g) || []).length];
+  renderStrisciaModP2P();
+  out.striscia = [nodi.p2pModStriscia.innerHTML.indexOf('2 dispute aperte') > 0,
+                  nodi.p2pModStriscia.innerHTML.indexOf("go('p2pmod')") > 0];
+  /* chi non e' moderatore non vede e non chiede niente */
+  isAdmin = false; chiamate.length = 0;
+  renderStrisciaModP2P(); renderModerazioneP2P();
+  await chiediModerazioneP2P(true);
+  out.nonModeratore = [nodi.p2pModStriscia.innerHTML, nodi.p2pModCorpo.innerHTML.indexOf('decidiDisputaP2P') < 0,
+                       nodi.p2pModCorpo.innerHTML.indexOf('Ordine ') < 0, chiamate.length];
+  isAdmin = true;
+
+  /* 5) LA DICHIARAZIONE DELL'ID, dal telefono di una parte */
+  giro(); p2pDisputeDette = {};
+  righe = {a: {id: 'a', disputaId: DISP}, b: {id: 'b'}, c: {id: 'c', disputaId: DISP, disputaDetta: 1}};
+  dichiaraDisputaP2P('a'); dichiaraDisputaP2P('a'); dichiaraDisputaP2P('b'); dichiaraDisputaP2P('c');
+  await pausa(20);
+  out.dichiara = [chiamate.map(c => [c.percorso, c.corpo]), righe.a.disputaDetta];
+  await pausa(P2P_ATTESA_MS + 100);
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { process.stderr.write('ESPLOSO: ' + (e && e.stack || e)); process.exit(1); });
+"""
+
+
+def prove_moderazione_p2p():
+    """LA SEZIONE «⚖️ MODERAZIONE P2P» (28 set 2026). Un moderatore
+    prende una disputa, parla con le due parti e decide dove vanno i
+    sats — con una chiave che vive SOLO sul suo telefono.
+    QUEL CHE SI ROMPE IN SILENZIO, e qui si fa girare: la chiave privata
+    che trova una strada verso il server; la firma che parte PRIMA che
+    la decisione sia a registro (e allora l'allarme suonerebbe su una
+    decisione vera); la disputa presa che non e' di quell'ordine; la
+    chiave del moderatore letta come la controparte; un messaggio nella
+    chat firmato da chi in quel canale non ha voce; il moderatore che e'
+    una delle parti; un nome non scappato.
+    IL COORDINATORE E' FINTO — ha la sua chiave, apre le buste come le
+    apre quello vero e risponde secondo il copione: prova che quel che
+    esce e' quel che il protocollo descrive, NON che mostrod lo accetti."""
+    import json as _json, shutil as _sh, subprocess as _sp, tempfile as _tf, os as _os
+    print("\n[la sezione «Moderazione P2P»]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+    i_mod = mini.index("/* ============ LA MODERAZIONE DELLE DISPUTE P2P")
+    f_mod = mini.index("/* ============ fine della moderazione delle dispute P2P ============ */")
+    modulo = mini[i_mod:f_mod]
+    i_chat = mini.index("/* ---- LA CHAT COL MODERATORE")
+    chat = mini[i_chat:mini.index("/* ---- L'IDENTITA' DI PAGAMENTO", i_chat)]
+    i_motore = mini.index("/* ============ IL MOTORE DELLO SCAMBIO")
+    f_motore = mini.index("/* ============ fine del motore dello scambio ============ */")
+
+    # --- 1) LE SENTINELLE DEL CLIENT ---------------------------------------
+    prova("il banco del moderatore vive FUORI dal motore, la chat delle parti dentro",
+          [True, True], [f_motore < i_mod, i_motore < i_chat < f_motore])
+    prova("...e la chat, nel motore, col server non ci parla", [0, 0],
+          [nudo(chat).count("fetch("), nudo(chat).count("modFetch(")])
+    # le CHIAMATE, non la definizione: cominciano tutte col nome della rotta
+    chiamate_server = re.findall(r"modFetch\('(?:[^()]|\([^()]*\))*\)", nudo(modulo))
+    prova("il banco chiama il server in otto punti", 8, len(chiamate_server))
+    prova("...e in NESSUNO passa la chiave privata", [],
+          [c for c in chiamate_server if ".sk" in c or "sk:" in c])
+    prova("la chiave nasce a caso su questo dispositivo, e al server va la pubblica", True,
+          "const sk = NT.generateSecretKey();" in modulo
+          and "await modFetch('moderazione/chiave', {chiave: k.pub});" in modulo)
+    crea = nudo(fn("async function creaChiaveModeratoreP2P(){"))
+    prova("...e si scrive sul dispositivo solo DOPO che il server l'ha presa", True,
+          0 < crea.find("modFetch('moderazione/chiave'") < crea.find("localStorage.setItem("))
+    dec = nudo(fn("async function eseguiDecisioneP2P(ordine, esito){"))
+    prova("PRIMA IL REGISTRO, POI LA FIRMA: l'ordine che non si inverte", True,
+          0 < dec.find("await modFetch('moderazione/decisione'") < dec.find("await moderatoreChiama("))
+    prova("...col `conferma: true` scritto, e il motivo", True,
+          "{ordine: ordine, esito: esito, motivo: motivo, conferma: true, chiave: k.pub}" in dec)
+    pre = nudo(fn("async function eseguiPresaDisputaP2P(ordine){"))
+    prova("la presa chiede al server PRIMA di firmare, e glielo conferma DOPO", True,
+          0 < pre.find("modFetch('moderazione/prendi', {ordine: ordine, chiave: k.pub})")
+          < pre.find("moderatoreChiama(")
+          < pre.find("modFetch('moderazione/prendi', {ordine: ordine, chiave: k.pub, fatto: true})"))
+    prova("...e VERIFICA che la disputa presa sia di quell'ordine, prima di tenerla", True,
+          0 < pre.find("String(ord.id || '').toLowerCase() !== String(ordine).toLowerCase()")
+          < pre.find("scriviArchivioModP2P(a)"))
+    av = nudo(fn("function avanzaOrdineP2P(ordine, azione, payload){"))
+    prova("il moderatore NON e' la controparte: `admin-took-dispute` non tocca `peer`", True,
+          "if (azione === 'admin-took-dispute') {\n    if (p && p.peer && p.peer.pubkey) o.moderatore = String(p.peer.pubkey);\n"
+          "  } else if (p && p.peer && p.peer.pubkey) o.peer = String(p.peer.pubkey);" in av)
+    mar = nudo(fn("async function mostroArriva(ev){"))
+    prova("a decidere e' l'autore: il canale del moderatore prima del coordinatore", True,
+          0 < mar.find("autoriModeratoreP2P()[ev.pubkey]") < mar.find("ev.pubkey !== mostroHexP2P()"))
+    ria = nudo(fn("async function mostroRiascolta(){"))
+    prova("...e l'ascolto cambia firma quando un moderatore prende la disputa", True,
+          "+ (conMod.length ? '|' + conMod.join(',') : '');" in ria
+          and "Object.keys(autoriChatP2P()).sort().concat(conMod)" in ria)
+    go = pezzo_js(mini, "function go(view){", "\n}\n")
+    prova("la pagina e la striscia si disegnano entrando, da ogni strada", True,
+          "if (view==='p2pmiei' || view==='p2pmod') {" in go
+          and "chiediModerazioneP2P(view==='p2pmod');" in go)
+    prova("la vista, la striscia e il rimando dal pannello ci sono",
+          [1, 1, 1], [mini.count('<div class="view" id="view-p2pmod">'),
+                      mini.count('<div id="p2pModStriscia"></div>'),
+                      mini.count('id="admModP2P" onclick="go(\'p2pmod\')"')])
+    prova("chi non e' moderatore non chiede niente: il giudice e' uno", True,
+          "return !!isAdmin && !DEMO && !VETRINA && !!myTgId;" in modulo
+          and "if (!moderatoreP2P()) return Promise.resolve(null);" in modulo)
+    for nome, testo in (("il banco", modulo), ("la chat", chat)):
+        frasi = " ".join(re.findall(r"'((?:[^'\\\n]|\\.)*)'", nudo(testo)))
+        prova(f"{nome}: nelle frasi niente «Nostr», «relay», «nsec», «escrow»", [],
+              [w for w in ("nostr", "relay", "nsec", "escrow") if w in frasi.lower()])
+
+    # --- 2) I GIUDICI DEL SERVER --------------------------------------------
+    i0 = src.index("# ---------- LA MODERAZIONE DELLE DISPUTE P2P")
+    blocco = src[i0:src.index("\nasync def _respiro_presa_p2p(", i0)]
+    cod = codice(_senza_prosa(blocco))
+    for spia in ("nsec", "privata", "decrypt", "firma(", "sign("):
+        prova(f"nel blocco del server non c'e' posto per «{spia}»", False, spia in cod.lower())
+    rotte = re.findall(r'@app\.post\("(/api/p2p/(?:moderazione[^"]*|disputa))"\)', blocco)
+    prova("le sette rotte", ["/api/p2p/disputa", "/api/p2p/moderazione", "/api/p2p/moderazione/chiave",
+                             "/api/p2p/moderazione/decisione", "/api/p2p/moderazione/esito",
+                             "/api/p2p/moderazione/lascia", "/api/p2p/moderazione/prendi"], sorted(rotte))
+    for r in rotte:
+        corpo_r = blocco[blocco.index(f'@app.post("{r}")'):].split("\n\n\n")[0]
+        prova(f"{r}: {'di tutti, con la sessione' if r.endswith('/disputa') else 'SOLO moderatori, prima di tutto'}",
+              True, ("verifica_utente(x_tg_init_data, barattolo_sessione)" in corpo_r)
+              if r.endswith("/disputa") else
+              0 < corpo_r.find("_moderatore_o_403(x_tg_init_data, barattolo_sessione)")
+              < (corpo_r.find("leggi_json(req)") if "leggi_json(req)" in corpo_r else corpo_r.find("db()")))
+    prova("il moderatore e' quello del mercatino, o e' un 403", True,
+          'if not e_admin(user["id"]):\n        raise HTTPException(403, "Riservato ai moderatori")'
+          in pezzo("_moderatore_o_403"))
+    prova("il motivo minimo e' lo stesso ai due lati",
+          re.search(r"\nP2P_MOTIVO_MIN = (\d+)", src).group(1),
+          re.search(r"const MOD_MOTIVO_MIN = (\d+);", mini).group(1))
+
+    con, amb = _banco_eventi_p2p()
+    schema = ""
+    for tabella, fine in (("p2p_dispute", "\n    );"),
+                          ("p2p_dispute_registro", "ON p2p_dispute_registro(ordine);"),
+                          ("p2p_moderatori", "\n    );")):
+        i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
+        schema += src[i:src.index(fine, i) + len(fine)] + "\n"
+    con.executescript(schema + "ALTER TABLE utenti ADD COLUMN nome TEXT DEFAULT '';"
+                      "ALTER TABLE utenti ADD COLUMN username TEXT DEFAULT '';")
+    amb.update(ADMIN_IDS=[500, 501, 111], MODALITA_COLLAUDO=False)
+    for riga in ("P2P_DISPUTA_STORICO_GIORNI = ", "P2P_MOTIVO_MIN = ", "P2P_MOTIVO_MAX = ",
+                 "FORMA_CHIAVE_P2P = "):
+        i = src.index("\n" + riga) + 1
+        exec(src[i:src.index("\n", i)], amb)
+    for bl, fine in (("P2P_DISPUTA_ESITI = {", "}\n"), ("FORMA_DISPUTA_P2P = re.compile(", ")\n")):
+        i = src.index("\n" + bl) + 1
+        exec(src[i:src.index(fine, i) + len(fine)], amb)
+    for f in ("_moderatori_p2p", "_chiusura_disputa_p2p", "_persona_disputa_p2p",
+              "_testo_disputa_aperta_p2p", "_testo_disputa_chiusa_p2p", "_registro_disputa_p2p",
+              "_disputa_evento_p2p", "_chiave_moderatore_p2p", "_registra_chiave_moderatore_p2p",
+              "_dichiara_disputa_p2p", "_riga_disputa_p2p", "_dispute_per_moderatore_p2p",
+              "_prendi_disputa_p2p", "_lascia_disputa_p2p", "_decisione_disputa_p2p",
+              "_esito_gesto_disputa_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    ORA = 1_790_000_000
+    KA, KB, KM, KN = "a" * 64, "b" * 64, "c" * 64, "d" * 64
+    ORD = "0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc01"
+    DISP = "d15b0000-aaaa-4bbb-8ccc-0000000000d1"
+    for tg, nome, user in ((111, "Bea <i>", "bea"), (222, "Alan & co", ""), (500, "Mod Uno", "mod1"),
+                           (501, "Mod Due", "")):
+        con.execute("INSERT INTO utenti(tg_id, nome, username) VALUES(?,?,?)", (tg, nome, user))
+    for k, tg in ((KA, 111), (KB, 222)):
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,?)", (k, tg, ORA))
+    con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,sats,euro,metodi) "
+                "VALUES(?,?,?,'in-progress','sell',1,13603,'10,00 €','[\"Contanti\"]')", (ORD, 222, ORA))
+    con.commit()
+
+    def manda(azione, ts, attore="mostro", dettaglio=""):
+        d = {"v": 1, "order": ORD, "action": azione, "ts": ts, "buyer": KA, "seller": KB, "actor": attore}
+        if dettaglio:
+            d["detail"] = dettaglio
+        ev = amb["_evento_p2p_pulito"](d, ts)
+        fatto = amb["_registra_evento_p2p"](con, ev, ts)
+        return amb["_disputa_evento_p2p"](con, ev, fatto, ts)
+    manda("taken", ORA, "buyer", "take")
+    manda("hold-invoice-paid", ORA + 200, "seller")
+    manda("dispute-opened", ORA + 300, "buyer")
+    riga = lambda: dict(con.execute("SELECT * FROM p2p_dispute WHERE ordine=?", (ORD,)).fetchone())
+    registro = lambda: [(r["gesto"], r["tg_id"], r["esito"], r["motivo"]) for r in con.execute(
+        "SELECT * FROM p2p_dispute_registro ORDER BY id")]
+    chiave, dich, prendi = (amb["_registra_chiave_moderatore_p2p"], amb["_dichiara_disputa_p2p"],
+                            amb["_prendi_disputa_p2p"])
+    decidi, elenco = amb["_decisione_disputa_p2p"], amb["_dispute_per_moderatore_p2p"]
+
+    prova("la chiave del moderatore: 64 esadecimali, e nient'altro",
+          [400, 400, 400, 200],
+          [chiave(con, 500, "npub1xxx", ORA)[0], chiave(con, 500, KM[:-1], ORA)[0],
+           chiave(con, 500, None, ORA)[0], chiave(con, 500, KM.upper(), ORA)[0]])
+    prova("...registrarla due volte non fa niente, cambiarla si' (e il registro lo ricorda)",
+          [{"ok": True, "nuova": False}, {"ok": True, "nuova": True, "cambiata": True},
+           [("chiave", 500, "", "registrata"), ("chiave", 500, "", "cambiata")]],
+          [chiave(con, 500, KM, ORA)[1], chiave(con, 500, KN, ORA)[1],
+           [r for r in registro() if r[0] == "chiave"]])
+    chiave(con, 500, KM, ORA)
+    prova("...e la stessa chiave non puo' essere di due persone", 409, chiave(con, 501, KM, ORA)[0])
+    chiave(con, 501, KN, ORA)
+    chiave(con, 111, "e" * 64, ORA)
+
+    prova("l'id della disputa lo dichiara una PARTE: chi non lo e' riceve un si' e non scrive niente",
+          [(200, {"ok": True}), ""], [dich(con, 500, ORD, DISP, ORA), riga()["disputa"]])
+    prova("...un id storto e' un 400", [400, 400],
+          [dich(con, 111, ORD, "non-un-id", ORA)[0], dich(con, 111, "x", DISP, ORA)[0]])
+    dich(con, 111, ORD, DISP.upper(), ORA)
+    prova("...vale la PRIMA dichiarazione, e una seconda diversa resta solo a registro",
+          [DISP, DISP, ("id_diverso", 222, "", "d15b0000-aaaa-4bbb-8ccc-0000000000d9")],
+          [riga()["disputa"], (dich(con, 222, ORD, "d15b0000-aaaa-4bbb-8ccc-0000000000d9", ORA), riga()["disputa"])[1],
+           registro()[-1]])
+
+    e = elenco(con, 500, ORA + 400)
+    d0 = e["dispute"][0]
+    prova("l'elenco: la disputa aperta, col testo NUDO (lo scappa il client)",
+          [1, "aperta", "compra", "Bea <i> (@bea)", "Alan & co", 13603, "10,00 €", "Contanti", ORA + 200, DISP],
+          [e["aperte"], d0["stato"], d0["aperta_da"], d0["compra"], d0["vende"], d0["sats"], d0["euro"],
+           d0["metodi"], d0["garanzia_il"], d0["disputa"]])
+    prova("...la mia chiave e quelle degli altri moderatori",
+          [KM, [("Bea <i> (@bea)", "e" * 64, False), ("Mod Uno (@mod1)", KM, True), ("Mod Due", KN, False)]],
+          [e["chiave"], [(m["nome"], m["chiave"], m["io"]) for m in e["moderatori"]]])
+    prova("...e le chiavi delle parti NON viaggiano finche' non l'ho presa io", ["", ""],
+          [d0["chiave_compratore"], d0["chiave_venditore"]])
+    prova("...a chi e' una delle parti l'elenco lo dice", True,
+          elenco(con, 111, ORA + 400)["dispute"][0]["sei_parte"])
+
+    prova("PRENDERE: non con una chiave che non e' la mia, non una disputa che non c'e'",
+          [409, 409, 404, 400],
+          [prendi(con, 500, ORD, KN, False, ORA)[0], prendi(con, 502, ORD, KM, False, ORA)[0],
+           prendi(con, 500, "0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc99", KM, False, ORA)[0],
+           prendi(con, 500, ORD, "zz", False, ORA)[0]])
+    prova("...e MAI chi e' una delle due parti, nemmeno a cose fatte",
+          [(403, []), (403, []), "aperta"],
+          [(lambda r: (r[0], r[2]))(prendi(con, 111, ORD, "e" * 64, False, ORA)),
+           (lambda r: (r[0], r[2]))(prendi(con, 111, ORD, "e" * 64, True, ORA)), riga()["stato"]])
+    r_prima = prendi(con, 500, ORD, KM, False, ORA + 500)
+    prova("prima della firma: si puo', resta a registro, la disputa e' ancora aperta e nessuno e' avvisato",
+          [200, [], "aperta", ("presa_chiesta", 500, "", "")],
+          [r_prima[0], r_prima[2], riga()["stato"], registro()[-1]])
+    prova("la decisione PRIMA della presa non si scrive", 409,
+          decidi(con, 500, {"ordine": ORD, "esito": "venditore", "motivo": "x" * 30, "conferma": True,
+                            "chiave": KM}, ORA)[0])
+    r_dopo = prendi(con, 500, ORD, KM, True, ORA + 510)
+    prova("dopo la firma: presa, col nome e la chiave, e a registro",
+          [200, "presa", 500, KM, ORA + 510, ("presa", 500, "", "")],
+          [r_dopo[0], riga()["stato"], riga()["presa_da"], riga()["chiave_moderatore"],
+           riga()["presa_il"], registro()[-1]])
+    prova("...avvisate le due parti e gli ALTRI moderatori, mai chi l'ha presa",
+          [111, 222, 111, 501], [c for c, _ in r_dopo[2]])
+    prova("...alle parti si dice che possono scrivergli; ai moderatori chi l'ha presa, scappato",
+          [True, True],
+          ["Un moderatore ha preso la disputa</b>" in r_dopo[2][0][1] and "scrivergli" in r_dopo[2][0][1],
+           r_dopo[2][3][1] == "⚖️ Mod Uno (@mod1) ha preso la disputa P2P sull'ordine <code>0f3a5c1e</code>."])
+    prova("...ripeterlo non riavvisa nessuno", [200, []],
+          (lambda r: [r[0], r[2]])(prendi(con, 500, ORD, KM, True, ORA + 520)))
+    prova("una disputa presa non la prende un altro", 409, prendi(con, 501, ORD, KN, False, ORA)[0])
+    e = elenco(con, 500, ORA + 600)["dispute"][0]
+    prova("adesso le chiavi delle due parti viaggiano, a chi l'ha presa e solo a lui",
+          [[KA, KB, True], ["", "", False]],
+          [[e["chiave_compratore"], e["chiave_venditore"], e["presa_da_me"]],
+           (lambda x: [x["chiave_compratore"], x["chiave_venditore"], x["presa_da_me"]])(
+               elenco(con, 501, ORA + 600)["dispute"][0])])
+
+    buona = {"ordine": ORD, "esito": "venditore", "conferma": True, "chiave": KM,
+             "motivo": "  Nessun   <euro> girato: lo dicono tutti e due.  "}
+    casi = [("senza conferma", dict(buona, conferma=None), 400),
+            ("la conferma dev'essere un true LETTERALE", dict(buona, conferma="true"), 400),
+            ("...non un 1", dict(buona, conferma=1), 400),
+            ("il motivo corto", dict(buona, motivo="troppo corto"), 400),
+            ("il motivo di soli spazi", dict(buona, motivo=" " * 60), 400),
+            ("il motivo che manca", {k: v for k, v in buona.items() if k != "motivo"}, 400),
+            ("il motivo enorme", dict(buona, motivo="x" * 1001), 400),
+            ("un esito che non esiste", dict(buona, esito="meta"), 400),
+            ("un'altra chiave", dict(buona, chiave=KN), 409),
+            ("senza chiave", dict(buona, chiave=""), 409),
+            ("un corpo che non e' un oggetto", ["x"], 400)]
+    for nome, corpo_d, atteso in casi:
+        prova(f"la decisione non si scrive: {nome}", atteso, decidi(con, 500, corpo_d, ORA + 700)[0])
+    prova("...ne' da un altro moderatore, ne' da una parte",
+          [409, 403], [decidi(con, 501, dict(buona, chiave=KN), ORA)[0],
+                       decidi(con, 111, dict(buona, chiave="e" * 64), ORA)[0]])
+    # (dalla tortura) l'altro moderatore che porta la chiave di chi l'ha
+    # presa: lo ferma il «prima prendi», non il confronto delle chiavi
+    prova("...nemmeno con la chiave di chi l'ha presa in mano: prima la prende", "Prima prendi la disputa",
+          decidi(con, 501, dict(buona, chiave=KM), ORA)[1])
+    quante = len(registro())
+    prova("...e nessuno di quei tentativi ha lasciato una decisione a registro", 0,
+          len([r for r in registro() if r[0] == "decisione"]))
+    prova("la decisione buona: a registro, col motivo ripulito degli spazi",
+          [(200, {"ok": True, "esito": "venditore"}),
+           ("decisione", 500, "venditore", "Nessun <euro> girato: lo dicono tutti e due.")],
+          [decidi(con, 500, buona, ORA + 800), registro()[-1]])
+    prova("...il gesto non riuscito resta accanto, e solo chi l'ha presa lo scrive",
+          [200, 404, ("non_riuscita", 500, "venditore", "Nessuna risposta (30 s)")],
+          [amb["_esito_gesto_disputa_p2p"](con, 500, ORD, "venditore", "Nessuna risposta (30 s)", ORA)[0],
+           amb["_esito_gesto_disputa_p2p"](con, 501, ORD, "venditore", "x", ORA)[0], registro()[-1]])
+    detto = manda("canceled", ORA + 900, "mostro", "admin")
+    prova("IL CERCHIO SI CHIUDE: mostrod racconta la chiusura, la decisione a registro c'e', nessun allarme",
+          [True, False, "chiusa"],
+          ["⚖️ <b>Disputa P2P decisa</b>" in detto[0][1]
+           and "Deciso da Mod Uno (@mod1). Motivo: «Nessun &lt;euro&gt; girato: lo dicono tutti e due.»" in detto[0][1],
+           "SENZA" in detto[0][1], riga()["stato"]])
+    e = elenco(con, 500, ORA + 1000)
+    prova("...e nell'elenco passa fra le chiuse, col motivo nudo",
+          [0, "chiusa", "venditore", "moderatore", "Nessun <euro> girato: lo dicono tutti e due."],
+          [e["aperte"], e["dispute"][0]["stato"], e["dispute"][0]["esito"], e["dispute"][0]["chiusa_da"],
+           e["dispute"][0]["decisione"]["motivo"]])
+    prova("...una disputa chiusa non si prende e non si decide", [409, 409],
+          [prendi(con, 501, ORD, KN, False, ORA)[0], decidi(con, 500, buona, ORA)[0]])
+    prova("...e dopo trenta giorni esce dall'elenco", [],
+          elenco(con, 500, ORA + 900 + 31 * 86400)["dispute"])
+    con.close()
+
+    # --- 3) IL BANCO: il client vero contro un coordinatore finto ------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco della moderazione", "node non c'e'")
+        return
+    riga_js = lambda firma: mini[mini.index(firma):mini.index("\n", mini.index(firma))]
+    blocco_const = lambda nome: (lambda i: mini[i:mini.index("\n};", i) + 3])(
+        mini.index("const " + nome + " = {"))
+    pezzi = "\n".join([
+        blocco_const("CAMPI_MOSTRO"), blocco_const("MOTIVI_CANTDO"),
+        fn("function canonicoMostro(campi, o){"), fn("function idMostroVero(id){"),
+        fn("function messaggioMostro(azione, opz){"), fn("function riferimentoRichiesta(msg){"),
+        fn("function messaggioDentro(msg){"), riga_js("function nuovaRichiestaP2P(){"),
+        fn("function firmaMostro(skHex, testo){"), fn("function provaIdentitaMostro(skIdentita, pubTrade, msgJson){"),
+        fn("function bustaMostro(skTrade, skIdentita, msg){"),
+        fn("function chiaveCantDo(payload){"), fn("function motivoCantDo(payload){"),
+        "\n".join(riga_js("const " + n + " = ") for n in (
+            "CHAT_INFO_CONV", "CHAT_INFO_FIRMA", "CHAT_TOLLERANZA", "CHAT_MAX_BYTE", "CHAT_RAFFICA")),
+        "let p2pChiaviChat = {}; let p2pChatSecchio = {};",
+        fn("function chiaviPeer(skHex, peerPub){"),
+        chat, modulo])
+    cart = _tf.mkdtemp(prefix="moderazione_")
+    pb = _os.path.join(cart, "banco.js")
+    open(pb, "w", encoding="utf-8").write(BANCO_MODERAZIONE.replace("__PEZZI__", pezzi))
+    r = _sp.run([node, pb, "vendor/nostr.bundle.js"], capture_output=True, text=True,
+                timeout=120, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco della moderazione gira", "", (r.stderr or "")[-900:])
+    if r.returncode or not r.stdout.strip():
+        return
+    o = _json.loads(r.stdout)
+    ORD_B = "5a1e0000-d15b-4a2b-9c3d-0000000000a1"
+    DISP_B = "d15b0000-aaaa-4bbb-8ccc-0000000000d1"
+    prova("senza chiave non si prende: lo si dice, e nessun foglio si apre",
+          [None, ["Prima crea la tua chiave di moderatore"], 0], o["senzaChiave"])
+    prova("creare la chiave si chiede prima", [1, "Sì, creala"], o["confermaChiave"])
+    prova("la chiave: c'e', e' una chiave vera, e al server e' andata la sola pubblica",
+          [True, True, True, ["chiave=true"]], o["chiave"])
+    prova("...la privata non e' in NESSUNA richiesta al server", True, o["chiaveMaiAlServer"])
+    prova("...e sul dispositivo sta sotto il nome del conto", ["barattolo_p2p_moderatore@999"],
+          o["chiavePerConto"])
+    prova("se il server la rifiuta, sul dispositivo non resta niente",
+          [None, "Non è riuscito: Questa chiave è già di un altro moderatore"], o["chiaveRifiutata"])
+    prova("prendere la disputa si chiede prima", [1, "Prendi la disputa?"], o["confermaPresa"])
+    p = o["presa"]
+    prova("LA PRESA, nell'ordine: il server, il coordinatore, il server che conferma, l'elenco",
+          ["server:moderazione/prendi", "publish", "server:moderazione/prendi:fatto", "server:moderazione"],
+          p["ordine"])
+    prova("...il messaggio e' quello del protocollo: busta `dispute`, l'ID DELLA DISPUTA, versione 2",
+          ["dispute", "admin-take-dispute", DISP_B, 2, None,
+           "version,request_id,trade_index,id,action,payload"], p["messaggio"])
+    prova("...firmato dalla chiave di moderatore (la firma regge al ri-serializzare), senza identita', con scadenza",
+          [True, True, None, True], p["firmato"])
+    prova("...al server ordine e chiave pubblica, e `fatto` solo la seconda volta",
+          [[True, True, False], [True, True, True]], p["corpi"])
+    prova("...le chiavi delle due parti, dette dal coordinatore, restano sul dispositivo",
+          [True, True], p["archivio"])
+    prova("...e lo dice", [["Disputa presa ✓"], True], [p["toast"], p["aperta"]])
+    prova("il coordinatore risponde con UN ALTRO ordine: ci si ferma, niente conferma, niente in archivio",
+          [["server:moderazione/prendi", "publish", "server:moderazione/lascia", "server:moderazione"],
+           "Non è riuscito: la disputa presa NON è di questo ordine. Non decidere niente: avvisa Andrea", []],
+          o["presaAltroOrdine"])
+    prova("la chiave non e' sul nodo: lo si dice con parole nostre, e il server lo sa",
+          [["server:moderazione/prendi", "publish", "server:moderazione/lascia", "server:moderazione"],
+           "Non è riuscito: la tua chiave di moderatore non è ancora stata aggiunta al nodo",
+           "la tua chiave di moderatore non è ancora stata aggiunta al nodo"], o["presaNonSulNodo"])
+    prova("il server dice di no PRIMA: al coordinatore non parte niente",
+          [0, "Non è riuscito: Sei una delle due parti: questa disputa la decide un altro moderatore", False],
+          o["presaRifiutata"])
+    prova("il coordinatore tace: non risulta presa, e il server lo sa",
+          [["server:moderazione/prendi", "publish", "server:moderazione/lascia", "server:moderazione"],
+           "Non è riuscito: Nessuna risposta (0 s)"], o["presaSilenzio"])
+    prova("senza l'id dichiarato lo si trova fra gli eventi pubblici: stesso lato, stessa ora",
+          [DISP_B, "Disputa presa ✓"], o["presaCercata"])
+    prova("...ma con DUE candidate non si sceglie: non parte niente",
+          [["server:moderazione"], True],
+          [o["presaDueCandidate"][0], o["presaDueCandidate"][1].startswith("Non è riuscito: non trovo il numero")])
+    prova("...il giudice degli eventi: una, due, nessuna, un id storto",
+          [DISP_B, "", "", ""], o["fraEventi"])
+    prova("LA DECISIONE senza motivo non apre nemmeno il foglio",
+          [0, "Prima scrivi il motivo: almeno 20 caratteri"], o["senzaMotivo"])
+    prova("...e gli spazi non fanno numero", 0, o["motivoCorto"])
+    MOTIVO = "Nessun euro è mai girato: lo dicono tutti e due, e la ricevuta non c'è."
+    prova("la PRIMA conferma dice dove vanno i sats e a chi, e non ha ancora fatto niente",
+          [1, "I sats tornano a chi vende?",
+           "13.603 sats (10,00 €) tornano a chi vende: Bea & co.\n\nUna volta decisa, la disputa non si riapre.", 0],
+          o["primaConferma"])
+    prova("la seconda si apre un giro DOPO la prima (o si ritroverebbe la sua etichetta sul bottone)",
+          [None, 1], o["secondaSubito"])
+    prova("la SECONDA rilegge il motivo, e ancora non e' partito niente",
+          [2, "Conferma definitiva",
+           "I sats tornano a chi vende.\n\nMotivo: «" + MOTIVO + "»\n\nLa decisione resta nel registro, col tuo nome.",
+           "Decido: i sats tornano a chi vende", 0], o["secondaConferma"])
+    dz = o["decisione"]
+    prova("PRIMA IL REGISTRO, POI LA FIRMA — nei fatti",
+          ["server:moderazione/decisione", "publish", "server:moderazione"], dz["ordine"])
+    prova("...a registro: ordine, esito, il motivo ripulito, il true della conferma, la chiave pubblica",
+          [{"ordine": ORD_B, "esito": "venditore", "motivo": MOTIVO, "conferma": True}, True],
+          [{k: v for k, v in dz["corpo"].items() if k != "chiave"}, dz["corpoChiave"]])
+    prova("...al coordinatore: busta `order`, `admin-cancel`, l'id dell'ORDINE, firmato dal moderatore",
+          [["order", "admin-cancel", ORD_B, None], [True, True]], [dz["messaggio"], dz["firmato"]])
+    prova("...lo dice, e la bozza del motivo si svuota",
+          [["Deciso: i sats tornano a chi vende ✓"], ""], [dz["toast"][-1:], dz["bozza"]])
+    prova("l'altro gesto e' `admin-settle`, e il foglio lo chiama col suo nome",
+          ["admin-settle", "I sats vanno a chi compra?", "Deciso: i sats vanno a chi compra ✓"],
+          o["decisioneCompra"])
+    prova("se il registro dice di no, al coordinatore non parte NIENTE",
+          [["server:moderazione/decisione", "server:moderazione"], "Non è riuscito: Prima prendi la disputa"],
+          o["decisioneSenzaRegistro"])
+    prova("se il coordinatore dice di no, il registro lo viene a sapere",
+          [["server:moderazione/decisione", "publish", "server:moderazione/esito", "server:moderazione"],
+           "venditore", True],
+          [o["decisioneNo"][0], o["decisioneNo"][1]["esito"], o["decisioneNo"][2]])
+    prova("se tace, si dice di GUARDARE prima di riprovare",
+          [["server:moderazione/decisione", "publish", "server:moderazione/esito", "server:moderazione"],
+           "Nessuna risposta: fra un minuto guarda se la disputa risulta chiusa, prima di riprovare"],
+          o["decisioneSilenzio"])
+    prova("una risposta VECCHIA, o di chi non e' il coordinatore, non vale per la domanda di adesso",
+          "Nessuna risposta: fra un minuto guarda se la disputa risulta chiusa, prima di riprovare",
+          o["rispostaVecchia"])
+    prova("LA CHAT: la parte scrive, in una busta col solo tag della conversazione",
+          [14, 1, 1, True], o["chatParte"])
+    prova("...il moderatore la riceve nel canale di QUELLA parte, e lo sente",
+          [[["Ho pagato alle 18:40 <script>", False]], 0, ["💬 Ti ha scritto chi compra"]],
+          o["chatAlModeratore"])
+    prova("...la stessa busta due volte e' un messaggio solo", 1, o["chatNonRipete"])
+    prova("...il moderatore risponde, e la parte lo legge",
+          [[["Ho pagato alle 18:40 <script>", True], ["Mandami il numero della ricevuta", False]],
+           ["💬 Il moderatore ti ha scritto"]], o["chatAllaParte"])
+    prova("...l'ALTRA parte quel canale non lo apre", None, o["altraParteNonLegge"][0])
+    prova("...una voce che in quel canale non c'entra non passa, nemmeno con la busta giusta",
+          [True, None], o["intruso"])
+    prova("...una busta dal futuro nemmeno, e una sana si'", [None, "sana"], [o["dalFuturo"], o["sana"]])
+    prova("...la riga solo da guardare non ha il canale", None, o["soloVista"])
+    prova("LA PAGINA DELLO SCAMBIO: senza moderatore dice che sono stati avvisati", True,
+          "I moderatori sono stati avvisati" in o["bloccoSenza"] and "textarea" not in o["bloccoSenza"])
+    prova("...fuori dalla disputa il riquadro non c'e'", "", o["bloccoFuori"])
+    prova("...a disputa presa: lo dice, i messaggi sono scappati, e c'e' il gesto",
+          [True, True, True, True], o["blocco"])
+    pg = o["pagina"]
+    prova("LA PAGINA DEI MODERATORI: i nomi sono scappati UNA volta", [True] * 5, pg["scappa"])
+    prova("...i due gesti finali solo sulla disputa presa da me, e nessun «Prendi» su quelle non aperte",
+          [1, 1, 0], pg["gesti"])
+    prova("...dice quando scade la garanzia, dalla finestra del coordinatore", True, pg["scadenza"])
+    prova("...mostra la chiave PUBBLICA da aggiungere al nodo, mai la privata",
+          [True, False, False], [pg["npub"], pg["segreta"], pg["nsec"]])
+    prova("...a chi e' una delle parti lo dice, e non gli da' nessun gesto", [True, 0], o["paginaParte"])
+    prova("...di una disputa presa da un altro dice chi, e nessun gesto", [True, 0], o["paginaAltro"])
+    prova("la striscia dice quante, e porta alla pagina", [True, True], o["striscia"])
+    prova("chi NON e' moderatore: niente striscia, niente dispute, nessuna richiesta al server",
+          ["", True, True, 0], o["nonModeratore"])
+    prova("l'id della disputa si dichiara UNA volta, solo se c'e', e poi si ricorda",
+          [[["disputa", {"ordine": "a", "disputa": DISP_B}]], 1], o["dichiara"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,

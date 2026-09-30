@@ -2910,6 +2910,40 @@
     .p2p-scambio.tono-shipped{--tinta:var(--ship-text)}
     .p2p-scambio.tono-released{--tinta:var(--trust-text)}
     .p2p-scambio.tono-dispute{--tinta:var(--danger)}
+    /* LA MODERAZIONE P2P (28 set 2026): la striscia, le card delle
+       dispute e la chat col moderatore. Nessun colore nuovo: il rosso e'
+       quello della disputa, il resto sono i token delle card. */
+    .mod-striscia{display:flex;align-items:center;justify-content:space-between;gap:10px;
+      width:100%;margin:0 0 12px;padding:12px 14px;border-radius:16px;
+      border:1px solid var(--field-line);background:var(--card);color:var(--ink);
+      font:inherit;text-align:left;cursor:pointer;min-height:44px}
+    .mod-striscia.viva{border-color:var(--danger);background:var(--warn-bg)}
+    .mod-striscia small{display:block;font-size:13px;color:var(--ink-soft);font-weight:600}
+    .mod-card{margin:10px 0;padding:12px 14px;border-radius:16px;
+      border:1px solid var(--field-line);background:var(--card)}
+    .mod-card.chiusa{opacity:.8}
+    .mod-testa{display:flex;align-items:center;justify-content:space-between;gap:8px;
+      width:100%;padding:0;border:0;background:none;color:inherit;font:inherit;
+      text-align:left;cursor:pointer;min-height:44px}
+    .mod-riga{font-size:13px;color:var(--ink-soft);margin-top:2px}
+    .mod-cifra{margin-top:6px}
+    .mod-parti{margin:10px 0;font-size:14px;line-height:1.5}
+    .mod-tit{margin:22px 0 4px;font-size:15px}
+    .mod-decidi{margin-top:14px;padding-top:12px;border-top:1px solid var(--field-line)}
+    .mod-decidi .btn,.chatmod .btn{margin-top:8px}
+    .mod-chiave{margin:8px 0;font-size:13px}
+    .mod-chiave code{display:block;overflow-wrap:anywhere;color:var(--ink-soft);margin:2px 0}
+    .chatmod{margin:12px 0;padding:12px 14px;border-radius:16px;
+      border:1px solid var(--field-line);background:var(--card)}
+    .chatmod small{color:var(--ink-soft);font-weight:600}
+    .chatmod-lista{margin:8px 0;max-height:260px;overflow-y:auto}
+    .chatmod-msg{margin:6px 0;padding:8px 10px;border-radius:12px;background:var(--chip-bg);
+      font-size:14px;line-height:1.4;overflow-wrap:anywhere;white-space:pre-wrap}
+    .chatmod-msg.mio{background:var(--sats-soft)}
+    .chatmod-msg small{display:block;font-size:12px}
+    .chatmod textarea,.mod-decidi textarea{width:100%;box-sizing:border-box;margin-top:6px;
+      padding:10px 12px;border-radius:12px;border:1px solid var(--field-line);
+      background:var(--bg);color:var(--ink);font:inherit;font-size:16px;resize:vertical}
     .p2p-scambio.tono-annullato{--tinta:var(--muted)}
     /* il riquadro resta staccato dalla card tinta: al posto del bordo
        trasparente, un filo del suo stesso inchiostro */
@@ -10034,6 +10068,9 @@ document.getElementById('cartello')?.remove();</script>
           <div id="p2pMieiTesta"></div>
         </div>
       </div>
+      <!-- LA STRISCIA DEI MODERATORI (28 set 2026): vuota per tutti gli
+           altri; la riempie renderStrisciaModP2P -->
+      <div id="p2pModStriscia"></div>
       <div id="p2pMieiCorpo"></div>
     </div>
   </div>
@@ -10217,6 +10254,24 @@ document.getElementById('cartello')?.remove();</script>
         <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
       </div>
       <div id="p2pOrdineCorpo"></div>
+    </div>
+  </div>
+
+  <!-- ============ VISTA: LA MODERAZIONE P2P (28 set 2026) ============
+       La pagina dei moderatori: le dispute degli scambi P2P. Ci si
+       arriva dalla striscia in cima a «I miei scambi» e dal pannello
+       👑; chi non e' moderatore la trova vuota, e le rotte che la
+       riempiono gli rispondono 403. Il cappello e' quello dei fogli,
+       come la pagina di uno scambio. -->
+  <div class="view" id="view-p2pmod">
+    <div class="sicu">
+      <div class="foglio-testa">
+        <button type="button" class="foglio-back" onclick="navIndietro()"
+                title="Torna indietro" aria-label="Torna indietro">&#10005;</button>
+        <h3>⚖️ Moderazione P2P</h3>
+        <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
+      </div>
+      <div id="p2pModCorpo"></div>
     </div>
   </div>
 
@@ -11540,6 +11595,9 @@ document.getElementById('cartello')?.remove();</script>
         <button type="button" class="grp-h" onclick="toggleGrp('grpAdmin')"
                 aria-expanded="false">Amministrazione<span class="fr">▾</span></button>
         <div class="grp-b">
+      <!-- il rimando alla moderazione delle dispute P2P (28 set 2026):
+           la sezione vive nel P2P, qui c'e' la porta -->
+      <button type="button" class="btn ghost" id="admModP2P" onclick="go('p2pmod')">⚖️ Moderazione P2P</button>
       <div id="adminStats"></div>
         </div>
       </div>
@@ -14438,6 +14496,8 @@ function voceNav(view){
      e la voce accesa dice la strada da cui ci si e' scesi */
   else if (view === 'p2p') view = 'p2plibro';
   else if (view === 'p2pordine') view = 'p2pmiei';
+  /* ...e la pagina dei moderatori pure (28 set 2026) */
+  else if (view === 'p2pmod') view = 'p2pmiei';
   /* Il ramo resta alle sole ASTE: quello di Sfoglia non esiste piu'.
      LA RIGA CHE SI ROVESCIA, col suo motivo — «MA LA NAV MENTIVA»:
      entrando in un reparto si accendeva Esplora su una vetrina
@@ -14508,6 +14568,11 @@ function vaiP2P(){
    cosi' vale anche per indietro e cronologia, la lezione di
    renderInteresse. */
 const VISTE_NAV_P2P = new Set(['p2p','p2pmiei','p2pordine','p2pinfo']);
+/* ...piu' la pagina dei moderatori (28 set 2026), che sta con «I miei
+   scambi» come la pagina di uno scambio. SI AGGIUNGE e non entra
+   nell'elenco: le quattro viste di tutti restano quattro, e questa la
+   apre solo chi e' moderatore. */
+VISTE_NAV_P2P.add('p2pmod');
 /* IL + GRIGIO (23 set 2026, richiesta di Andrea): fuori dal libro il
    tondo non pubblica — porta al libro, su «Compra BTC». La classe la
    scrive go() dalla vista, come nav-p2p; la LARGHEZZA si chiede qui
@@ -14651,6 +14716,14 @@ function go(view){
      nel libro non piu' (scuotiLogoP2P toglie la classe a fine giro) */
   if (view==='p2p' && !p2pLogoSalutato) { p2pLogoSalutato = true; scuotiLogoP2P(); }
   if (view==='p2pordine') renderOrdineP2P();
+  /* LA MODERAZIONE (28 set 2026): la striscia in cima a «I miei
+     scambi» e la sua pagina, solo per chi e' moderatore — a tutti gli
+     altri `chiediModerazioneP2P` non chiede niente */
+  if (view==='p2pmiei' || view==='p2pmod') {
+    renderStrisciaModP2P();
+    if (view==='p2pmod') renderModerazioneP2P();
+    chiediModerazioneP2P(view==='p2pmod');
+  }
   /* «Info P2P»: i numeri vengono dal 38385, e QUI e' l'unico
      posto da cui passano tutte le strade — il tasto della nav, il
      gesto indietro, la cronologia. Rinfrescarli a ogni ingresso e'
@@ -49267,7 +49340,11 @@ function ultimoVistoP2P(){
 async function mostroRiascolta(){
   const mappa = ordiniAscoltoP2P();
   const pubs = Object.keys(mappa).sort();
-  const firma = pubs.join(',') + '|' + Object.keys(autoriChatP2P()).sort().join(',');
+  /* ...e il canale col moderatore, a disputa presa (28 set 2026) */
+  const conMod = typeof autoriModeratoreP2P === 'function'
+    ? Object.keys(autoriModeratoreP2P()).sort() : [];
+  const firma = pubs.join(',') + '|' + Object.keys(autoriChatP2P()).sort().join(',')
+    + (conMod.length ? '|' + conMod.join(',') : '');
   if (!pubs.length) {
     try { if (p2pSub) p2pSub.close(); } catch(e){}
     p2pSub = null; p2pSubChiavi = '';
@@ -49285,7 +49362,7 @@ async function mostroRiascolta(){
      roba da scaricare e provare a decifrare. La busta la sanno
      firmare solo le due parti: cosi' il relay butta via il resto
      prima che arrivi qui. */
-  const chat = Object.keys(autoriChatP2P()).sort();
+  const chat = Object.keys(autoriChatP2P()).sort().concat(conMod);
   const filtri = [{kinds: [14], '#p': pubs, since: ultimoVistoP2P() - 600}];
   if (chat.length) filtri.push({kinds: [14], authors: chat,
                                 since: ultimoVistoP2P() - 600});
@@ -49314,6 +49391,9 @@ async function mostroArriva(ev){
      lascia stare. */
   const scambio = autoriChatP2P()[ev.pubkey];
   if (scambio) { campoArriva(scambio, ev); return; }
+  const colMod = typeof autoriModeratoreP2P === 'function'
+    ? autoriModeratoreP2P()[ev.pubkey] : null;
+  if (colMod) { chatModeratoreArriva(colMod, ev); return; }
   if (ev.pubkey !== mostroHexP2P()) return;    // non e' il coordinatore
   const pub = (ev.tags || []).filter(t => t[0] === 'p').map(t => t[1])[0];
   const ord = ordiniAscoltoP2P()[pub];
@@ -49656,7 +49736,21 @@ function avanzaOrdineP2P(ordine, azione, payload){
       }
     }
   }
-  if (p && p.peer && p.peer.pubkey) o.peer = String(p.peer.pubkey);
+  /* ⚠️ IL MODERATORE NON E' LA CONTROPARTE (28 set 2026): quando un
+     moderatore prende la disputa il coordinatore scrive alle due parti
+     `admin-took-dispute` con la SUA chiave nel campo `peer` — lo stesso
+     campo in cui, nel resto dello scambio, sta la chiave dell'altra
+     persona. Letta come le altre avrebbe sostituito la controparte: i
+     recapiti e il volto sarebbero diventati quelli del moderatore. */
+  if (azione === 'admin-took-dispute') {
+    if (p && p.peer && p.peer.pubkey) o.moderatore = String(p.peer.pubkey);
+  } else if (p && p.peer && p.peer.pubkey) o.peer = String(p.peer.pubkey);
+  /* L'ID DELLA DISPUTA: il coordinatore lo scrive a tutt'e due quando si
+     apre, e non e' quello dell'ordine — serve al moderatore per prenderla */
+  if ((azione === 'dispute-initiated-by-you' || azione === 'dispute-initiated-by-peer')
+      && p && typeof p.dispute === 'string'
+      && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.dispute))
+    o.disputaId = p.dispute.toLowerCase();
   /* un no non muove lo stato: dice perche', e lo scambio resta dov'e' */
   if (azione === 'cant-do') { o.cantDo = motivoCantDo(p); return o; }
   if (azione === 'rate') { o.votabile = true; return o; }
@@ -50158,6 +50252,10 @@ function statoTestoP2P(o){
     return {t: s.t, d: 'La fattura che avevi dato è scaduta prima che i sats venissero liberati, '
       + 'quindi il pagamento non è riuscito. I sats non sono persi: sono fermi al sicuro e restano tuoi. '
       + 'Dai una fattura nuova e ripartono.'};
+  /* A DISPUTA PRESA lo si dice (28 set 2026): la frase di prima
+     prometteva un moderatore, questa dice che c'e' */
+  if (o && o.stato === 'in_disputa' && o.moderatore && !o.annulloDisputa)
+    return {t: s.t, d: 'Un moderatore ha preso la disputa e sta esaminando lo scambio. I sats restano bloccati fino alla sua decisione.'};
   /* A DISPUTA APERTA, L'ANNULLO CHIESTO O PROPOSTO (28 set 2026) */
   if (o && o.stato === 'in_disputa' && o.annulloDisputa === 'chiesto')
     return {t: s.t, d: 'Hai chiesto di annullare d\'accordo: serve anche il sì di '
@@ -50391,6 +50489,9 @@ function applicaMessaggioP2P(ord, dentro){
        «no», e a chi doveva accettare non compariva «Accetta».
        (`eco` viene dalla riga di ADESSO, in disputa: la nota la decide
        la stessa tabellina di `avanzaOrdineP2P`.) */
+    /* ...e il moderatore e l'id della disputa, se mancano (28 set 2026) */
+    if (!ord.moderatore && eco.moderatore) { ord.moderatore = eco.moderatore; preso = true; }
+    if (!ord.disputaId && eco.disputaId) { ord.disputaId = eco.disputaId; preso = true; }
     if (ord.stato === 'in_disputa' && !ord.annulloDisputa && eco.annulloDisputa) {
       ord.annulloDisputa = eco.annulloDisputa; preso = true;
       diarioP2P('msg ' + String(ord.id).slice(0, 8) + ': l\'annullo '
@@ -50398,6 +50499,8 @@ function applicaMessaggioP2P(ord, dentro){
     }
     if (preso) {
       scriviOrdineP2P(ord);
+      if (ord.disputaId && typeof dichiaraDisputaP2P === 'function') dichiaraDisputaP2P(ord.id);
+      if (ord.moderatore) mostroRiascolta().catch(() => {});
       if (peerNuovo) { pianificaMetodoP2P(ord.id); pianificaAutoRecapito(ord.id); }
       if (p2pOrdineAperto === ord.id) renderOrdineP2P();
     }
@@ -50452,6 +50555,16 @@ function applicaMessaggioP2P(ord, dentro){
      TABACCHINO possono partire da soli — le condizioni vere si
      ricontrollano al momento dell'invio (vedi pianificaAutoRecapito).
      Il recapito RICORDATO no: dalla patch 0007 parte solo col gesto. */
+  /* LA DISPUTA (28 set 2026): l'id si dice al server, per il moderatore
+     che la prendera' (fuori dal motore: `dichiaraDisputaP2P`); e quando
+     un moderatore la prende lo si dice a voce, e l'orecchio si apre
+     anche sul suo canale */
+  if (nuovo.disputaId && typeof dichiaraDisputaP2P === 'function') dichiaraDisputaP2P(nuovo.id);
+  if (nuovo.moderatore && nuovo.moderatore !== ord.moderatore) {
+    haptic();
+    toast('⚖️ Un moderatore ha preso la disputa', 6000);
+    mostroRiascolta().catch(() => {});
+  }
   if (!ord.peer && nuovo.peer) {
     /* IL METODO PRIMA DEL RECAPITO, e l'ordine conta: senza la scelta
        gia' in mano il foglio di chi vende proporrebbe lui la forma. */
@@ -52449,6 +52562,8 @@ function renderOrdineP2P(){
       ? '<div class="trust-note"><span>📱</span><span>I messaggi cifrati di questo scambio sono sul dispositivo dove l\'hai aperto: qui lo vedi e lo segui, ma i gesti — la fattura, i sats, il recapito — si fanno da là.</span></div>'
       : '') +
     (avviso ? '<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⚠️ <span>' + esc(avviso) + '</span></div>' : '') +
+    /* A DISPUTA APERTA: il moderatore, e il canale per scrivergli (28 set 2026) */
+    (typeof bloccoModeratoreP2P === 'function' ? bloccoModeratoreP2P(o) : '') +
     (bottoni[azione] || '') +
     /* IL RECAPITO STA SOTTO IL SUO GESTO (23 set 2026): subito dopo «Ho
        inviato gli euro», che e' dove l'IBAN si legge e si copia */
@@ -56603,6 +56718,183 @@ function campoArriva(o, ev){
               dentro.pubkey === mia);
 }
 
+/* ---- LA CHAT COL MODERATORE (28 set 2026, le dispute P2P) ----
+   La chat LIBERA fra le due parti e' uscita con la fase 6 e non
+   rientra: questa e' un'altra cosa, e vive solo a disputa presa. Quando
+   un moderatore prende la disputa il coordinatore lo scrive alle due
+   parti (`admin-took-dispute`) e dice la sua chiave pubblica: da li'
+   ogni parte ha un canale SUO col moderatore — la ricetta e' quella
+   del protocollo, la stessa dei recapiti (`chiaviPeer`), fra la chiave
+   dello scambio e la chiave del moderatore. L'altra parte non lo legge,
+   Barattolo nemmeno: il server di questo canale non sa niente.
+   ⚠️ LA CHIAVE DEL MODERATORE LA DICE SOLO IL COORDINATORE, in un
+   messaggio cifrato verso la chiave dello scambio: non arriva dal
+   server e non si legge da un tag. E NON E' LA CONTROPARTE: sta in
+   `o.moderatore`, mai in `o.peer` (vedi `avanzaOrdineP2P`).
+   I MESSAGGI VIVONO SULLA RIGA (`chatMod`), come i recapiti: l'id di
+   dentro ferma il replay, e dentro vale solo la firma di una delle due
+   chiavi che in quel canale hanno voce — la mia e quella del moderatore.
+   E' ANCHE LA STRADA DELLE PROVE: quel che una parte ha in mano —
+   l'ora del bonifico, il nome di chi ha pagato, il numero della
+   ricevuta — lo scrive qui. Solo testo: una foto vorrebbe un posto dove
+   stare, e quel posto sarebbe un server. */
+const CHAT_MOD_MAX_TESTO = 1000;
+const CHAT_MOD_MAX_MSG = 200;
+let p2pChatModBozza = {};        // ordine -> quel che si sta scrivendo
+/* PURA (a parte l'ECDH in cache): la busta di un messaggio, dentro e
+   fuori. `skFirma` e' di chi scrive: la chiave dello scambio per una
+   parte, quella di moderatore per il moderatore. */
+function bustaChatP2P(k, skFirma, testo, quando){
+  const NT = window.NostrTools;
+  const dentro = NT.finalizeEvent({
+    kind: 1, created_at: quando, tags: [], content: testo
+  }, NT.utils.hexToBytes(skFirma));
+  const conv = NT.nip44.getConversationKey(k.conv.sk, k.conv.pub);
+  const fuori = NT.finalizeEvent({
+    kind: 14, created_at: quando,
+    tags: [['p', k.conv.pub]],
+    content: NT.nip44.encrypt(JSON.stringify(dentro), conv)
+  }, k.firma.sk);
+  return {dentro: dentro, fuori: fuori};
+}
+/* Una busta che arriva: gli stessi controlli dei recapiti, nello stesso
+   ordine — prima quel che non costa, per ultimo si decifra e si
+   verificano le firme. `voci` sono le chiavi che in quel canale possono
+   aver scritto. Torna l'evento di dentro, o null. */
+function apriBustaChatP2P(k, ev, voci){
+  const NT = window.NostrTools;
+  if (!k || !ev || ev.pubkey !== k.firma.pub) return null;
+  const adesso = Math.floor(Date.now() / 1000);
+  const pTag = (ev.tags || []).filter(t => t[0] === 'p');
+  if (pTag.length !== 1 || pTag[0][1] !== k.conv.pub) return null;
+  if ((ev.created_at || 0) > adesso + CHAT_TOLLERANZA) return null;
+  if ((ev.content || '').length > CHAT_MAX_BYTE) return null;
+  const secchio = p2pChatSecchio[k.firma.pub] || {quanti: 0, da: adesso};
+  if (adesso - secchio.da >= 60) { secchio.quanti = 0; secchio.da = adesso; }
+  if (++secchio.quanti > CHAT_RAFFICA) { p2pChatSecchio[k.firma.pub] = secchio; return null; }
+  p2pChatSecchio[k.firma.pub] = secchio;
+  if (!NT.verifyEvent(ev)) return null;
+  let dentro;
+  try {
+    dentro = JSON.parse(NT.nip44.decrypt(ev.content,
+      NT.nip44.getConversationKey(k.conv.sk, k.conv.pub)));
+  } catch(e) { return null; }
+  if (!dentro || dentro.kind !== 1 || !NT.verifyEvent(dentro)) return null;
+  if ((voci || []).indexOf(dentro.pubkey) < 0) return null;
+  if (Math.abs((dentro.created_at || 0) - (ev.created_at || 0)) > CHAT_TOLLERANZA) return null;
+  return dentro;
+}
+/* PURA: un messaggio entra nella lista se non c'e' gia', e la lista
+   resta in ordine di tempo e corta. Torna la lista nuova, o null se non
+   e' cambiato niente. */
+function posaMessaggioChatP2P(lista, m){
+  const l = Array.isArray(lista) ? lista : [];
+  if (!m || !m.id || l.some(x => x.id === m.id)) return null;
+  return l.concat([m]).sort((a, b) => (a.t || 0) - (b.t || 0)).slice(-CHAT_MOD_MAX_MSG);
+}
+function chiaviModeratoreP2P(o){
+  if (!o || !o.moderatore || o.soloVista) return null;
+  const mz = mazzoMostro();
+  if (!mz) return null;
+  try {
+    return chiaviPeer(chiaveScambio(mz.sk, o.indice).sk, o.moderatore);
+  } catch(e) { return null; }
+}
+/* gli autori da ascoltare: uno per scambio vivo preso da un moderatore */
+function autoriModeratoreP2P(){
+  const m = {};
+  const mappa = ordiniAscoltoP2P();
+  for (const pub in mappa) {
+    const k = chiaviModeratoreP2P(mappa[pub]);
+    if (k) m[k.firma.pub] = mappa[pub];
+  }
+  return m;
+}
+function chatModeratoreArriva(o, ev){
+  const k = chiaviModeratoreP2P(o);
+  const mz = mazzoMostro();
+  if (!k || !mz) return;
+  const mia = chiaveScambio(mz.sk, o.indice).pub;
+  const dentro = apriBustaChatP2P(k, ev, [mia, o.moderatore]);
+  if (!dentro) return;
+  const agg = ordiniP2P()[o.id] || o;
+  const mio = dentro.pubkey === mia;
+  const nuova = posaMessaggioChatP2P(agg.chatMod, {id: dentro.id, t: dentro.created_at || 0,
+    mio: mio, testo: String(dentro.content || '').slice(0, CHAT_MOD_MAX_TESTO)});
+  if (!nuova) return;
+  agg.chatMod = nuova;
+  const aperto = p2pOrdineAperto === agg.id && vistaAttivaP2P() === 'view-p2pordine';
+  if (!mio && !aperto) agg.chatModNuovi = 1;
+  scriviOrdineP2P(agg);
+  if (!mio) { haptic(); toast('💬 Il moderatore ti ha scritto', 6000); }
+  if (aperto) renderOrdineP2P();
+}
+async function chatModeratoreInvia(o, testo){
+  const mz = mazzoMostro();
+  if (!mz) throw new Error('Il profilo di scambio non si trova');
+  const k = chiaviModeratoreP2P(o);
+  if (!k) throw new Error('Nessun moderatore ha ancora preso la disputa');
+  const quando = Math.floor(Date.now() / 1000);
+  const b = bustaChatP2P(k, chiaveScambio(mz.sk, o.indice).sk, testo, quando);
+  const relay = await mostroConnetti();
+  await mostroRiascolta();
+  await relay.publish(b.fuori);
+  const agg = ordiniP2P()[o.id] || o;
+  agg.chatMod = posaMessaggioChatP2P(agg.chatMod,
+    {id: b.dentro.id, t: quando, mio: true, testo: testo}) || agg.chatMod;
+  scriviOrdineP2P(agg);
+  return agg;
+}
+async function inviaChatModeratoreP2P(){
+  const id = p2pOrdineAperto;
+  const o = ordiniP2P()[id];
+  const campo = el('p2pChatModTesto');
+  if (!o || !campo) return;
+  const testo = String(campo.value || '').trim().slice(0, CHAT_MOD_MAX_TESTO);
+  if (!testo) { toast('Scrivi qualcosa, prima'); return; }
+  haptic();
+  const rip = attesaP2P('Invio al moderatore…');
+  try {
+    await chatModeratoreInvia(o, testo);
+    delete p2pChatModBozza[id];
+  } catch(e) {
+    toast('Non è partito: ' + ragioneGestoP2P(e));
+  } finally { rip(); }
+  if (p2pOrdineAperto === id) renderOrdineP2P();
+}
+/* PURA: i messaggi di una chat, scappati. `io` e' il nome di chi
+   guarda, `altro` quello dell'altra voce. */
+function messaggiChatHTML(lista, altro){
+  const l = Array.isArray(lista) ? lista : [];
+  if (!l.length) return '<div class="hint">Ancora nessun messaggio.</div>';
+  return l.map(m => '<div class="chatmod-msg' + (m.mio ? ' mio' : '') + '">'
+    + '<small>' + esc(m.mio ? 'Tu' : altro)
+    + (m.t ? ' · ' + esc(dataBreveP2P(m.t)) : '') + '</small>'
+    + esc(m.testo) + '</div>').join('');
+}
+/* PURA: il riquadro della disputa nella pagina dello scambio. */
+function bloccoModeratoreP2P(o){
+  if (!o || o.stato !== 'in_disputa') return '';
+  if (!o.moderatore)
+    return '<div class="trust-note"><span>⚖️</span><span>I moderatori sono stati avvisati. '
+      + 'Appena uno prende la disputa, qui potrai scrivergli e mandargli quello che hai.</span></div>';
+  if (!chiaviModeratoreP2P(o))
+    return '<div class="trust-note"><span>⚖️</span><span><b>Un moderatore ha preso la disputa.</b> '
+      + 'Per scrivergli apri lo scambio dal dispositivo da cui l\'hai fatto.</span></div>';
+  return '<div class="chatmod">'
+    + '<b>⚖️ Un moderatore ha preso la disputa</b>'
+    + '<div class="hint">Scrivigli cosa è successo e cosa hai in mano: l\'ora del pagamento, '
+    + 'il nome di chi ha pagato, il numero della ricevuta. Quello che scrivi qui lo leggete '
+    + 'solo tu e lui.</div>'
+    + '<div class="chatmod-lista">' + messaggiChatHTML(o.chatMod, 'Moderatore') + '</div>'
+    + '<textarea id="p2pChatModTesto" rows="2" maxlength="' + CHAT_MOD_MAX_TESTO + '" '
+    + 'placeholder="Scrivi al moderatore…" '
+    + 'oninput="p2pChatModBozza[p2pOrdineAperto]=this.value">'
+    + esc(p2pChatModBozza[o.id] || '') + '</textarea>'
+    + '<button class="btn orange" onclick="inviaChatModeratoreP2P()">Invia al moderatore</button>'
+    + '</div>';
+}
+
 /* ---- L'IDENTITA' DI PAGAMENTO (set 2026, dal campo) ----
    «Dove ricevere gli euro» non e' piu' un campo di testo unico: il
    METODO dell'ordine sceglie il form (SEPA vuole intestatario e IBAN,
@@ -60229,6 +60521,612 @@ async function attendiGestoP2P(id, gesto, chiamata){
   throw Object.assign(new Error(P2P_NON_RISULTA), {silenzio: true, riletto: true});
 }
 /* ============ fine dell'archivio del server ============ */
+
+/* ============ LA MODERAZIONE DELLE DISPUTE P2P (28 set 2026) ============
+   La sezione «⚖️ Moderazione P2P»: la vede SOLO un moderatore — una
+   striscia in cima a «I miei scambi» e la sua pagina, col rimando dal
+   pannello 👑. Da qui un moderatore prende una disputa, parla con le
+   due parti e decide dove vanno i sats.
+   IL PATTO (deciso da Andrea prima del codice): LA CHIAVE DEL
+   MODERATORE VIVE SOLO SU QUESTO DISPOSITIVO. Nasce qui, a caso; al
+   server va la sola chiave PUBBLICA, che Andrea aggiunge al nodo; a
+   firmare verso il coordinatore e' questo telefono. Non si ricava dal
+   conto e non ha una copia: un telefono perso vuol dire una chiave
+   nuova, aggiunta al nodo al posto della vecchia.
+   I CONTROLLI: la sezione non si disegna a chi non e' moderatore (e le
+   rotte gli rispondono 403); chi e' una delle due parti non prende e
+   non decide (lo ferma il server); ogni decisione vuole il MOTIVO
+   SCRITTO e DUE conferme, e va a registro PRIMA della firma — se il
+   coordinatore racconta una chiusura che a registro non c'e', ai
+   moderatori arriva un allarme.
+   QUEL CHE NON PUO' FARE, detto: fermare chi ha la chiave e parla al
+   coordinatore senza passare di qui. Lo scopre, non lo ferma.
+   STA FUORI DAL MOTORE perche' col server ci parla; col coordinatore
+   parla con gli attrezzi del motore (`messaggioMostro`, `bustaMostro`,
+   il coro dei relay), firmando con la chiave di moderatore. */
+const MOD_CHIAVE_P2P = 'barattolo_p2p_moderatore';
+const MOD_ARCHIVIO_P2P = 'barattolo_p2p_moderazione';
+const MOD_MOTIVO_MIN = 20;       // lo stesso numero del server, che e' quello che decide
+const MOD_OGNI_MS = 30000;       // l'elenco non si richiede piu' spesso di cosi'
+const MOD_ID_FINESTRA_S = 180;   // quanto puo' distare l'evento pubblico dall'apertura
+let p2pMod = null;               // l'elenco del server
+let p2pModQuando = 0;
+let p2pModInVolo = null;
+let p2pModAperta = '';           // la disputa aperta nella pagina
+let p2pModBozze = {};            // ordine -> {motivo, compra, vende}
+let p2pModSub = null, p2pModSubFirma = '';
+
+function moderatoreP2P(){
+  return !!isAdmin && !DEMO && !VETRINA && !!myTgId;
+}
+function chiaveModeratoreP2P(){
+  try {
+    const v = JSON.parse(localStorage.getItem(chiaveP2P(MOD_CHIAVE_P2P)) || 'null');
+    return (v && /^[0-9a-f]{64}$/.test(v.sk || '') && /^[0-9a-f]{64}$/.test(v.pub || '')) ? v : null;
+  } catch(e) { return null; }
+}
+function archivioModP2P(){
+  try {
+    const v = JSON.parse(localStorage.getItem(chiaveP2P(MOD_ARCHIVIO_P2P)) || '{}');
+    return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+  } catch(e) { return {}; }
+}
+function scriviArchivioModP2P(a){
+  try { localStorage.setItem(chiaveP2P(MOD_ARCHIVIO_P2P), JSON.stringify(a)); } catch(e){}
+}
+function npubP2P(hex){
+  try { return window.NostrTools.nip19.npubEncode(hex); } catch(e) { return hex; }
+}
+async function modFetch(percorso, corpo){
+  const r = await fetch(`${API_BASE}/p2p/${percorso}`, {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify(corpo || {})});
+  let d = null;
+  try { d = await r.json(); } catch(e) {}
+  if (!r.ok) throw Object.assign(new Error((d && d.detail) || 'Il server ha detto di no'),
+                                 {codice: r.status});
+  return d || {};
+}
+/* ---- una delle due parti dice al server l'id della disputa ----
+   Il coordinatore chiama le dispute col LORO id, e lo scrive alle due
+   parti quando la disputa si apre. Al moderatore serve per prenderla.
+   Una volta per riga; se non parte si riprova alla prossima apertura. */
+let p2pDisputeDette = {};
+function dichiaraDisputaP2P(id){
+  const o = ordiniP2P()[id];
+  if (!o || !o.disputaId || o.disputaDetta || p2pDisputeDette[id]) return;
+  if (DEMO || VETRINA || !myTgId) return;
+  p2pDisputeDette[id] = true;
+  modFetch('disputa', {ordine: id, disputa: o.disputaId}).then(() => {
+    const agg = ordiniP2P()[id];
+    if (agg) { agg.disputaDetta = 1; scriviOrdineP2P(agg); }
+  }).catch(() => { delete p2pDisputeDette[id]; });
+}
+
+/* ---- l'elenco ---- */
+function chiediModerazioneP2P(forza){
+  if (!moderatoreP2P()) return Promise.resolve(null);
+  if (p2pModInVolo) return p2pModInVolo;
+  if (!forza && p2pMod && Date.now() - p2pModQuando < MOD_OGNI_MS) return Promise.resolve(p2pMod);
+  p2pModInVolo = modFetch('moderazione').then(d => {
+    p2pMod = d; p2pModQuando = Date.now();
+    adottaChiaviModP2P();
+    renderStrisciaModP2P();
+    if (vistaAttivaP2P() === 'view-p2pmod') renderModerazioneP2P();
+    ascoltaChatModP2P().catch(() => {});
+    return d;
+  }).catch(e => {
+    console.log('⚖️ [p2p] moderazione: l\'elenco non arriva (' + (e && e.message || e) + ')');
+    return p2pMod;
+  }).finally(() => { p2pModInVolo = null; });
+  return p2pModInVolo;
+}
+function disputaModP2P(ordine){
+  return ((p2pMod && p2pMod.dispute) || []).find(d => d.ordine === ordine) || null;
+}
+/* le due chiavi delle parti: le dice il coordinatore quando la disputa
+   si prende, e stanno nell'archivio di questo dispositivo; il server le
+   ridice a chi l'ha presa, per il dispositivo che le avesse perse */
+function adottaChiaviModP2P(){
+  const a = archivioModP2P();
+  let mosso = false;
+  for (const d of ((p2pMod && p2pMod.dispute) || [])) {
+    if (!d.presa_da_me || !d.chiave_compratore || !d.chiave_venditore) continue;
+    const r = a[d.ordine] || (a[d.ordine] = {chat: {}});
+    if (!r.compra) { r.compra = d.chiave_compratore; mosso = true; }
+    if (!r.vende) { r.vende = d.chiave_venditore; mosso = true; }
+  }
+  if (mosso) scriviArchivioModP2P(a);
+}
+
+/* ---- la chiave ---- */
+async function creaChiaveModeratoreP2P(){
+  if (!moderatoreP2P()) return;
+  const gia = chiaveModeratoreP2P();
+  const altrove = !gia && p2pMod && p2pMod.chiave;
+  chiediConferma({
+    titolo: altrove ? 'Creare una chiave nuova qui?' : 'Creare la tua chiave di moderatore?',
+    corpo: (altrove
+      ? 'La tua chiave di moderatore sta su un altro dispositivo. Creandone una qui, quella smette di essere la tua: '
+      : 'La chiave nasce su questo dispositivo e non lo lascia mai. ')
+      + 'La chiave nuova va aggiunta al nodo prima di poter prendere una disputa. '
+      + 'Se perdi questo dispositivo, se ne crea un\'altra.',
+    etichetta: 'Sì, creala',
+    poi: async () => {
+      const rip = attesaP2P('Creo la chiave…');
+      try {
+        await caricaNostrTools();
+        const NT = window.NostrTools;
+        const sk = NT.generateSecretKey();
+        const k = {sk: NT.utils.bytesToHex(sk), pub: NT.getPublicKey(sk),
+                   creata: Math.floor(Date.now() / 1000)};
+        await modFetch('moderazione/chiave', {chiave: k.pub});
+        localStorage.setItem(chiaveP2P(MOD_CHIAVE_P2P), JSON.stringify(k));
+        toast('Chiave creata: ora va aggiunta al nodo');
+      } catch(e) {
+        toast('Non è riuscito: ' + (e && e.message || e));
+      } finally { rip(); }
+      await chiediModerazioneP2P(true);
+      renderModerazioneP2P();
+    }
+  });
+}
+
+/* ---- parlare col coordinatore, da moderatore ----
+   UNA DOMANDA ALLA VOLTA: la risposta si riconosce perche' viene dal
+   coordinatore, e' scritta alla chiave di moderatore, e' di DOPO la
+   domanda e porta una delle azioni attese (o un no). Il `request_id`
+   si guarda quando c'e': il coordinatore non lo ricopia su tutte le
+   famiglie di messaggi (la lezione della sonda). */
+let p2pModChiamata = false;
+async function moderatoreChiama(msg, attese){
+  const k = chiaveModeratoreP2P();
+  if (!k) throw new Error('Su questo dispositivo non c\'è la tua chiave di moderatore');
+  if (p2pModChiamata) throw new Error('C\'è già un gesto in corso: aspetta che finisca');
+  p2pModChiamata = true;
+  let sub = null, t = null;
+  try {
+    await caricaNostrTools();
+    const NT = window.NostrTools;
+    const relay = await mostroConnetti();
+    const info = await mostroInfoP2P();
+    const mostro = mostroHexP2P();
+    const conv = NT.nip44.getConversationKey(NT.utils.hexToBytes(k.sk), mostro);
+    const adesso = Math.floor(Date.now() / 1000);
+    const rid = riferimentoRichiesta(msg);
+    return await new Promise((ok, no) => {
+      let chiuso = false;
+      const fine = (f, v) => { if (chiuso) return; chiuso = true; f(v); };
+      sub = relay.subscribe([{kinds: [14], authors: [mostro], '#p': [k.pub],
+                              since: adesso - CHAT_TOLLERANZA}], {
+        onevent(ev){
+          try {
+            if ((ev.created_at || 0) < adesso - CHAT_TOLLERANZA) return;
+            if (!NT.verifyEvent(ev) || ev.pubkey !== mostro) return;
+            const arr = JSON.parse(NT.nip44.decrypt(ev.content, conv));
+            const d = messaggioDentro(Array.isArray(arr) ? arr[0] : arr);
+            if (!d || !d.action) return;
+            if (d.request_id !== null && d.request_id !== undefined && d.request_id !== rid) return;
+            if (d.action === 'cant-do')
+              fine(no, Object.assign(new Error(motivoCantDo(d.payload)),
+                                     {cantDo: true, motivo: chiaveCantDo(d.payload)}));
+            else if (attese.indexOf(d.action) >= 0) fine(ok, d);
+          } catch(e) { /* non e' per noi, o non si apre */ }
+        }
+      });
+      const ev = {
+        kind: 14, pubkey: k.pub, created_at: adesso,
+        tags: [['p', mostro], ['expiration', String(adesso + P2P_SCADENZA_MSG)]],
+        content: NT.nip44.encrypt(bustaMostro(k.sk, null, msg), conv)
+      };
+      const bits = Math.max(info.pow || 0, info.powPrimo || 0);
+      if (bits > 0) NT.nip13.minePow(ev, bits);
+      const firmato = NT.finalizeEvent(ev, NT.utils.hexToBytes(k.sk));
+      relay.publish(firmato).catch(e => fine(no, e));
+      t = setTimeout(() => fine(no, Object.assign(
+        new Error('Nessuna risposta (' + Math.round(P2P_ATTESA_MS / 1000) + ' s)'),
+        {silenzio: true})), P2P_ATTESA_MS);
+    });
+  } finally {
+    p2pModChiamata = false;
+    clearTimeout(t);
+    try { if (sub) sub.close(); } catch(e){}
+  }
+}
+/* PURA: fra gli eventi pubblici delle dispute, quello di QUESTA — stesso
+   lato di chi l'ha aperta, nato a ridosso dell'apertura. Se i candidati
+   sono piu' d'uno NON si sceglie: torna ''. */
+function disputaFraEventiP2P(eventi, d){
+  const lato = {compra: 'buyer', vende: 'seller'}[d && d.aperta_da] || '';
+  const buoni = {};
+  for (const ev of (eventi || [])) {
+    const tag = n => ((ev.tags || []).find(t => t[0] === n) || [])[1] || '';
+    const id = String(tag('d')).toLowerCase();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) continue;
+    if (tag('z') && tag('z') !== 'dispute') continue;
+    if (lato && tag('initiator') && tag('initiator') !== lato) continue;
+    const nata = Number(tag('published_at')) || Number(ev.created_at) || 0;
+    if (Math.abs(nata - (d.aperta_il || 0)) > MOD_ID_FINESTRA_S) continue;
+    buoni[id] = true;
+  }
+  const ids = Object.keys(buoni);
+  return ids.length === 1 ? ids[0] : '';
+}
+async function cercaDisputaIdP2P(d){
+  await caricaNostrTools();
+  const relay = await mostroConnetti();
+  const mostro = mostroHexP2P();
+  const eventi = await new Promise(fine => {
+    const visti = [];
+    let sub = null, chiuso = false;
+    const basta = () => { if (chiuso) return; chiuso = true;
+      try { if (sub) sub.close(); } catch(e){} fine(visti); };
+    sub = relay.subscribe([{kinds: [38386], authors: [mostro],
+                            since: (d.aperta_il || 0) - 3600}], {
+      onevent(ev){ try { if (window.NostrTools.verifyEvent(ev)) visti.push(ev); } catch(e){} },
+      oneose(){ basta(); }
+    });
+    setTimeout(basta, P2P_LIBRO_MS);
+  });
+  return disputaFraEventiP2P(eventi, d);
+}
+
+/* ---- «Prendi la disputa» ---- */
+function prendiDisputaP2P(ordine){
+  const d = disputaModP2P(ordine);
+  if (!d) return;
+  haptic();
+  if (!chiaveModeratoreP2P()) { toast('Prima crea la tua chiave di moderatore'); return; }
+  chiediConferma({
+    titolo: 'Prendi la disputa?',
+    corpo: 'Da quel momento la decidi tu. Le due persone vengono avvisate, e potranno scriverti.',
+    etichetta: 'Sì, la prendo',
+    poi: () => eseguiPresaDisputaP2P(ordine)
+  });
+}
+async function eseguiPresaDisputaP2P(ordine){
+  const d = disputaModP2P(ordine);
+  const k = chiaveModeratoreP2P();
+  if (!d || !k) return;
+  const rip = attesaP2P('Prendo la disputa…');
+  let chiesta = false;
+  try {
+    const id = d.disputa || await cercaDisputaIdP2P(d);
+    if (!id) throw new Error('non trovo il numero di questa disputa: lo dice l\'app di una delle due parti quando la apre');
+    await modFetch('moderazione/prendi', {ordine: ordine, chiave: k.pub});
+    chiesta = true;
+    const r = await moderatoreChiama(
+      messaggioMostro('admin-take-dispute',
+        {requestId: nuovaRichiestaP2P(), indice: null, id: id, busta: 'dispute'}),
+      ['admin-took-dispute']);
+    const ord = (r.payload && r.payload.order) || null;
+    /* LA VERIFICA: l'id l'aveva dichiarato un telefono, o l'abbiamo
+       trovato noi per vicinanza. Il coordinatore dice di QUALE ordine
+       e' la disputa presa: se non e' questo, ci si ferma e lo si dice */
+    if (!ord || String(ord.id || '').toLowerCase() !== String(ordine).toLowerCase())
+      throw Object.assign(new Error('la disputa presa NON è di questo ordine. Non decidere niente: avvisa Andrea'),
+                          {altra: true});
+    const a = archivioModP2P();
+    const riga = a[ordine] || (a[ordine] = {chat: {}});
+    riga.compra = String(ord.buyer_trade_pubkey || riga.compra || '');
+    riga.vende = String(ord.seller_trade_pubkey || riga.vende || '');
+    riga.disputa = id;
+    scriviArchivioModP2P(a);
+    await modFetch('moderazione/prendi', {ordine: ordine, chiave: k.pub, fatto: true});
+    p2pModAperta = ordine;
+    toast('Disputa presa ✓');
+  } catch(e) {
+    const perche = (e && e.cantDo && e.motivo === 'invalid-pubkey')
+      ? 'la tua chiave di moderatore non è ancora stata aggiunta al nodo'
+      : String(e && e.message || e);
+    if (chiesta) modFetch('moderazione/lascia', {ordine: ordine, motivo: perche}).catch(() => {});
+    toast('Non è riuscito: ' + perche, 8000);
+  } finally { rip(); }
+  await chiediModerazioneP2P(true);
+  renderModerazioneP2P();
+}
+
+/* ---- i due gesti finali ---- */
+const MOD_ESITI_P2P = {
+  compratore: {azione: 'admin-settle', attese: ['admin-settled'],
+               frase: 'I sats vanno a chi compra', fatto: 'Deciso: i sats vanno a chi compra ✓'},
+  venditore:  {azione: 'admin-cancel', attese: ['admin-canceled'],
+               frase: 'I sats tornano a chi vende', fatto: 'Deciso: i sats tornano a chi vende ✓'}
+};
+function motivoModP2P(ordine){
+  return String((p2pModBozze[ordine] || {}).motivo || '').replace(/\s+/g, ' ').trim();
+}
+function decidiDisputaP2P(ordine, esito){
+  const d = disputaModP2P(ordine);
+  const e = MOD_ESITI_P2P[esito];
+  if (!d || !e) return;
+  haptic();
+  const motivo = motivoModP2P(ordine);
+  if (motivo.length < MOD_MOTIVO_MIN) {
+    toast('Prima scrivi il motivo: almeno ' + MOD_MOTIVO_MIN + ' caratteri');
+    const c = el('p2pModMotivo'); if (c) c.focus();
+    return;
+  }
+  const chi = esito === 'compratore' ? d.compra : d.vende;
+  const quanto = (d.sats > 0 ? fmt(d.sats) + ' sats' : 'I sats') + (d.euro ? ' (' + d.euro + ')' : '');
+  chiediConferma({
+    titolo: e.frase + '?',
+    corpo: quanto + (esito === 'compratore' ? ' vanno a chi compra: ' : ' tornano a chi vende: ')
+      + chi + '.\n\nUna volta decisa, la disputa non si riapre.',
+    etichetta: 'Sì, continua',
+    /* LA SECONDA SI APRE UN GIRO DOPO (dal giro dal vivo): il foglio e'
+       uno, e `eseguiConferma` rimette il bottone com'era DOPO aver
+       eseguito il gesto — aperta da qui dentro, la seconda conferma si
+       ritrovava l'etichetta della prima, «Sì, continua», proprio sul
+       bottone che decide */
+    poi: () => { setTimeout(() => chiediConferma({
+      titolo: 'Conferma definitiva',
+      corpo: e.frase + '.\n\nMotivo: «' + motivo + '»\n\nLa decisione resta nel registro, col tuo nome.',
+      etichetta: 'Decido: ' + e.frase.charAt(0).toLowerCase() + e.frase.slice(1),
+      poi: () => eseguiDecisioneP2P(ordine, esito)
+    }), 0); }
+  });
+}
+async function eseguiDecisioneP2P(ordine, esito){
+  const e = MOD_ESITI_P2P[esito];
+  const k = chiaveModeratoreP2P();
+  if (!e || !k) return;
+  const motivo = motivoModP2P(ordine);
+  const rip = attesaP2P('Scrivo la decisione…');
+  let scritta = false;
+  try {
+    /* PRIMA IL REGISTRO, POI LA FIRMA: e' l'ordine che non si inverte */
+    await modFetch('moderazione/decisione',
+      {ordine: ordine, esito: esito, motivo: motivo, conferma: true, chiave: k.pub});
+    scritta = true;
+    const t = el('attesaTesto'); if (t) t.textContent = 'Lo dico al coordinatore…';
+    await moderatoreChiama(
+      messaggioMostro(e.azione, {requestId: nuovaRichiestaP2P(), indice: null, id: ordine}),
+      e.attese);
+    delete p2pModBozze[ordine];
+    toast(e.fatto, 6000);
+  } catch(err) {
+    const perche = String(err && err.message || err);
+    if (scritta) modFetch('moderazione/esito',
+      {ordine: ordine, esito: esito, motivo: perche}).catch(() => {});
+    toast((scritta && err && err.silenzio)
+      ? 'Nessuna risposta: fra un minuto guarda se la disputa risulta chiusa, prima di riprovare'
+      : 'Non è riuscito: ' + perche, 9000);
+  } finally { rip(); }
+  await chiediModerazioneP2P(true);
+  renderModerazioneP2P();
+}
+
+/* ---- la chat con le due parti ----
+   Un canale per parte (vedi «LA CHAT COL MODERATORE», nel motore): la
+   chiave di moderatore da un lato, la chiave dello scambio di quella
+   persona dall'altro. I messaggi restano nell'archivio di questo
+   dispositivo. */
+function canaliModP2P(){
+  const k = chiaveModeratoreP2P();
+  const fuori = {};
+  if (!k || !window.NostrTools) return fuori;
+  const a = archivioModP2P();
+  for (const d of ((p2pMod && p2pMod.dispute) || [])) {
+    if (!d.presa_da_me || d.stato !== 'presa') continue;
+    const r = a[d.ordine];
+    if (!r) continue;
+    for (const lato of ['compra', 'vende']) {
+      if (!/^[0-9a-f]{64}$/.test(r[lato] || '')) continue;
+      try {
+        const kk = chiaviPeer(k.sk, r[lato]);
+        fuori[kk.firma.pub] = {ordine: d.ordine, lato: lato, k: kk, parte: r[lato],
+                               da: d.aperta_il || 0};
+      } catch(e) {}
+    }
+  }
+  return fuori;
+}
+async function ascoltaChatModP2P(){
+  if (!chiaveModeratoreP2P()) return;
+  if (!((p2pMod && p2pMod.dispute) || []).some(d => d.presa_da_me && d.stato === 'presa')) {
+    try { if (p2pModSub) p2pModSub.close(); } catch(e){}
+    p2pModSub = null; p2pModSubFirma = '';
+    return;
+  }
+  await caricaNostrTools();
+  const canali = canaliModP2P();
+  const autori = Object.keys(canali).sort();
+  const firma = autori.join(',');
+  if (!autori.length || (firma === p2pModSubFirma && p2pModSub)) return;
+  const relay = await mostroConnetti();
+  try { if (p2pModSub) p2pModSub.close(); } catch(e){}
+  p2pModSubFirma = firma;
+  const da = Math.min.apply(null, autori.map(a => canali[a].da || 0)) - 600;
+  p2pModSub = relay.subscribe([{kinds: [14], authors: autori, since: Math.max(0, da)}], {
+    onevent(ev){ try { chatModArriva(ev); } catch(e){} },
+    onclose(){ if (p2pModSubFirma === firma) { p2pModSub = null; p2pModSubFirma = ''; } }
+  });
+}
+function chatModArriva(ev){
+  const c = canaliModP2P()[ev && ev.pubkey];
+  const k = chiaveModeratoreP2P();
+  if (!c || !k) return;
+  const dentro = apriBustaChatP2P(c.k, ev, [c.parte, k.pub]);
+  if (!dentro) return;
+  const a = archivioModP2P();
+  const r = a[c.ordine] || (a[c.ordine] = {chat: {}});
+  r.chat = r.chat || {};
+  const mio = dentro.pubkey === k.pub;
+  const nuova = posaMessaggioChatP2P(r.chat[c.lato], {id: dentro.id, t: dentro.created_at || 0,
+    mio: mio, testo: String(dentro.content || '').slice(0, CHAT_MOD_MAX_TESTO)});
+  if (!nuova) return;
+  r.chat[c.lato] = nuova;
+  scriviArchivioModP2P(a);
+  if (!mio) { haptic(); toast('💬 Ti ha scritto ' + (c.lato === 'compra' ? 'chi compra' : 'chi vende'), 6000); }
+  if (vistaAttivaP2P() === 'view-p2pmod') renderModerazioneP2P();
+}
+async function inviaChatModP2P(ordine, lato){
+  const k = chiaveModeratoreP2P();
+  const campo = el('p2pModChat-' + lato);
+  const r = archivioModP2P()[ordine];
+  if (!k || !campo || !r || !r[lato]) return;
+  const testo = String(campo.value || '').trim().slice(0, CHAT_MOD_MAX_TESTO);
+  if (!testo) { toast('Scrivi qualcosa, prima'); return; }
+  haptic();
+  const rip = attesaP2P('Invio…');
+  try {
+    await caricaNostrTools();
+    const quando = Math.floor(Date.now() / 1000);
+    const b = bustaChatP2P(chiaviPeer(k.sk, r[lato]), k.sk, testo, quando);
+    const relay = await mostroConnetti();
+    await ascoltaChatModP2P();
+    await relay.publish(b.fuori);
+    const a = archivioModP2P();
+    const riga = a[ordine] || (a[ordine] = {chat: {}});
+    riga.chat = riga.chat || {};
+    riga.chat[lato] = posaMessaggioChatP2P(riga.chat[lato],
+      {id: b.dentro.id, t: quando, mio: true, testo: testo}) || riga.chat[lato];
+    scriviArchivioModP2P(a);
+    if (p2pModBozze[ordine]) delete p2pModBozze[ordine][lato];
+  } catch(e) {
+    toast('Non è partito: ' + ragioneGestoP2P(e));
+  } finally { rip(); }
+  renderModerazioneP2P();
+}
+function bozzaModP2P(ordine, campo, valore){
+  (p2pModBozze[ordine] = p2pModBozze[ordine] || {})[campo] = valore;
+}
+
+/* ---- quel che si vede ---- */
+function renderStrisciaModP2P(){
+  const box = el('p2pModStriscia');
+  if (!box) return;
+  if (!moderatoreP2P() || !p2pMod) { box.innerHTML = ''; return; }
+  const n = p2pMod.aperte | 0;
+  box.innerHTML = '<button type="button" class="mod-striscia' + (n ? ' viva' : '') + '" onclick="go(\'p2pmod\')">'
+    + '<span><b>⚖️ Moderazione P2P</b><small>'
+    + (n ? (n === 1 ? '1 disputa aperta' : n + ' dispute aperte') : 'Nessuna disputa aperta')
+    + ' · la vedi solo tu</small></span>'
+    + (n ? '<span class="badge dispute">' + n + '</span>' : '') + '</button>';
+}
+function apriDisputaModP2P(ordine){
+  haptic();
+  p2pModAperta = p2pModAperta === ordine ? '' : ordine;
+  renderModerazioneP2P();
+}
+/* PURA: quando scade la garanzia, per quel che si sa — l'ora in cui e'
+   stata bloccata piu' la finestra che il coordinatore dichiara. 0 = non
+   si sa, e allora non si dice. */
+function scadenzaGaranziaModP2P(d, info){
+  const f = finestraGaranziaP2P(info);
+  return (d && d.garanzia_il > 0 && f > 0) ? d.garanzia_il + f : 0;
+}
+const MOD_STATI_P2P = {aperta: 'Aperta', presa: 'Presa', chiusa: 'Chiusa'};
+const MOD_CHIUSA_DA_P2P = {moderatore: 'decisa da un moderatore', parti: 'chiusa dalle parti',
+  scadenza: 'chiusa per scadenza', sconosciuto: 'chiusa'};
+function cardDisputaModP2P(d, ho){
+  const aperta = p2pModAperta === d.ordine;
+  const scade = scadenzaGaranziaModP2P(d, p2pInfo);
+  const chi = {compra: 'chi compra', vende: 'chi vende'}[d.aperta_da] || '';
+  let h = '<div class="mod-card' + (d.stato === 'chiusa' ? ' chiusa' : '') + '">'
+    + '<button type="button" class="mod-testa" onclick="apriDisputaModP2P(this.dataset.o)" data-o="' + esc(d.ordine) + '">'
+    + '<b>Ordine ' + esc(String(d.ordine).slice(0, 8)) + '</b>'
+    + '<span class="badge ' + (d.stato === 'chiusa' ? 'annullato' : 'dispute') + '">'
+    + esc(MOD_STATI_P2P[d.stato] || d.stato) + '</span></button>'
+    + '<div class="mod-riga">' + (chi ? 'Aperta da ' + esc(chi) + ' · ' : '')
+    + esc(dataBreveP2P(d.aperta_il)) + '</div>'
+    + '<div class="mod-cifra"><b>' + (d.sats > 0 ? esc(fmt(d.sats)) + ' sats' : 'Sats non detti') + '</b>'
+    + (d.euro ? ' per ' + esc(d.euro) : '') + (d.metodi ? ' · ' + esc(d.metodi) : '') + '</div>';
+  if (d.stato === 'chiusa') {
+    h += '<div class="mod-riga">' + esc(MOD_CHIUSA_DA_P2P[d.chiusa_da] || 'chiusa') + ': '
+      + esc(d.esito === 'compratore' ? 'i sats a chi compra' : 'i sats a chi vende')
+      + ' · ' + esc(dataBreveP2P(d.chiusa_il)) + '</div>';
+    if (aperta && d.decisione)
+      h += '<div class="hint">Motivo: «' + esc(d.decisione.motivo) + '»</div>';
+    return h + '</div>';
+  }
+  if (scade) h += '<div class="mod-riga">La garanzia scade circa il ' + esc(dataBreveP2P(scade)) + '</div>';
+  if (!aperta) return h + '</div>';
+  h += '<div class="mod-parti"><div>Compra: <b>' + esc(d.compra) + '</b></div>'
+    + '<div>Vende: <b>' + esc(d.vende) + '</b></div></div>';
+  if (d.sei_parte)
+    return h + '<div class="trust-note" style="background:var(--warn-bg);color:var(--danger)"><span>⚠️</span>'
+      + '<span>Sei una delle due parti: questa disputa la decide un altro moderatore.</span></div></div>';
+  if (d.stato === 'presa' && !d.presa_da_me)
+    return h + '<div class="hint">L\'ha presa ' + esc(d.presa_da || 'un altro moderatore') + '.</div></div>';
+  if (d.stato === 'aperta')
+    return h + (ho
+      ? '<button class="btn orange" onclick="prendiDisputaP2P(this.dataset.o)" data-o="' + esc(d.ordine) + '">Prendi la disputa</button>'
+      : '<div class="hint">Per prenderla serve la tua chiave di moderatore su questo dispositivo.</div>')
+      + '</div>';
+  /* presa da me */
+  if (!ho)
+    return h + '<div class="hint">L\'hai presa tu, da un altro dispositivo: la chiave con cui decidere sta là.</div></div>';
+  const arch = archivioModP2P()[d.ordine] || {chat: {}};
+  const bozze = p2pModBozze[d.ordine] || {};
+  for (const [lato, nome, persona] of [['compra', 'chi compra', d.compra], ['vende', 'chi vende', d.vende]]) {
+    h += '<div class="chatmod"><b>💬 Con ' + esc(nome) + '</b> <small>' + esc(persona) + '</small>';
+    if (!arch[lato]) { h += '<div class="hint">La sua chiave non è su questo dispositivo.</div></div>'; continue; }
+    h += '<div class="chatmod-lista">' + messaggiChatHTML((arch.chat || {})[lato], nome.charAt(0).toUpperCase() + nome.slice(1)) + '</div>'
+      + '<textarea id="p2pModChat-' + lato + '" rows="2" maxlength="' + CHAT_MOD_MAX_TESTO + '" '
+      + 'placeholder="Scrivi a ' + esc(nome) + '…" data-o="' + esc(d.ordine) + '" data-c="' + lato + '" '
+      + 'oninput="bozzaModP2P(this.dataset.o, this.dataset.c, this.value)">' + esc(bozze[lato] || '') + '</textarea>'
+      + '<button class="btn ghost" data-o="' + esc(d.ordine) + '" data-c="' + lato + '" '
+      + 'onclick="inviaChatModP2P(this.dataset.o, this.dataset.c)">Invia a ' + esc(nome) + '</button></div>';
+  }
+  h += '<div class="mod-decidi"><b>La decisione</b>'
+    + '<div class="hint">Scrivi il motivo: resta nel registro col tuo nome, e lo leggono gli altri moderatori.</div>'
+    + '<textarea id="p2pModMotivo" rows="3" maxlength="1000" placeholder="Perché decidi così (almeno '
+    + MOD_MOTIVO_MIN + ' caratteri)" data-o="' + esc(d.ordine) + '" '
+    + 'oninput="bozzaModP2P(this.dataset.o, \'motivo\', this.value)">' + esc(bozze.motivo || '') + '</textarea>'
+    + '<button class="btn orange" data-o="' + esc(d.ordine) + '" onclick="decidiDisputaP2P(this.dataset.o, \'compratore\')">I sats vanno a chi compra</button>'
+    + '<button class="btn orange" data-o="' + esc(d.ordine) + '" onclick="decidiDisputaP2P(this.dataset.o, \'venditore\')">I sats tornano a chi vende</button>'
+    + '</div>';
+  return h + '</div>';
+}
+function renderModerazioneP2P(){
+  const box = el('p2pModCorpo');
+  if (!box) return;
+  if (!moderatoreP2P()) { box.innerHTML = '<div class="hint">Questa pagina è dei moderatori.</div>'; return; }
+  if (!p2pMod) {
+    box.innerHTML = '<div class="hint">Leggo le dispute…</div>';
+    chiediModerazioneP2P(true);
+    return;
+  }
+  const k = chiaveModeratoreP2P();
+  const ho = !!k && p2pMod.chiave === k.pub;
+  let testa = '<div class="hint">Le dispute degli scambi P2P. La vedi solo tu, perché sei un moderatore.</div>';
+  if (!ho) {
+    testa += '<div class="trust-note"><span>🔑</span><span>'
+      + (p2pMod.chiave
+         ? 'La tua chiave di moderatore sta su un altro dispositivo: da qui guardi, per prendere e decidere usa quello.'
+         : 'Per prendere una disputa ti serve una chiave di moderatore. Nasce su questo dispositivo e non lo lascia mai.')
+      + '</span></div><button class="btn ghost" onclick="creaChiaveModeratoreP2P()">'
+      + (p2pMod.chiave ? 'Crea una chiave nuova qui' : '🔑 Crea la mia chiave di moderatore') + '</button>';
+  }
+  const vive = p2pMod.dispute.filter(d => d.stato !== 'chiusa');
+  const chiuse = p2pMod.dispute.filter(d => d.stato === 'chiusa');
+  const chiavi = (p2pMod.moderatori || []).map(m =>
+    '<div class="mod-chiave"><b>' + esc(m.nome) + (m.io ? ' (tu)' : '') + '</b>'
+    + '<code>' + esc(npubP2P(m.chiave)) + '</code>'
+    + '<button type="button" class="scopri-link" data-k="' + esc(npubP2P(m.chiave)) + '" '
+    + 'onclick="copiaLink(this.dataset.k, \'Chiave copiata 📋\')">Copia</button></div>').join('');
+  /* le bozze e il fuoco: la pagina si riscrive, quel che si stava
+     scrivendo no (le bozze stanno in `p2pModBozze`) */
+  const fuoco = document.activeElement && document.activeElement.id;
+  box.innerHTML = testa
+    + (vive.length ? vive.map(d => cardDisputaModP2P(d, ho)).join('')
+                   : '<div class="hint">Nessuna disputa aperta.</div>')
+    + '<h4 class="mod-tit">Chiuse negli ultimi 30 giorni</h4>'
+    + (chiuse.length ? chiuse.map(d => cardDisputaModP2P(d, ho)).join('')
+                     : '<div class="hint">Nessuna.</div>')
+    + '<h4 class="mod-tit">Le chiavi dei moderatori</h4>'
+    + '<div class="hint">Sono le chiavi pubbliche da aggiungere al nodo: una chiave che non è stata aggiunta non può prendere dispute.</div>'
+    + (chiavi || '<div class="hint">Nessuna chiave registrata.</div>')
+    + '<button class="btn ghost" onclick="chiediModerazioneP2P(true)">↻ Aggiorna</button>';
+  if (fuoco && /^p2pMod/.test(fuoco) && el(fuoco)) {
+    const c = el(fuoco);
+    c.focus();
+    try { c.setSelectionRange(c.value.length, c.value.length); } catch(e){}
+  }
+}
+/* ============ fine della moderazione delle dispute P2P ============ */
 
 /* Racconta un ordine appena pubblicato nel canale «Barattolo Vetrina»,
    come per un annuncio normale (chiesto da Andrea, set 2026). STA QUI

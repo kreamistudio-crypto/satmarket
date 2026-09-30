@@ -5221,6 +5221,15 @@ def init_db():
         chiave TEXT DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_dispute_registro ON p2p_dispute_registro(ordine);
+    CREATE TABLE IF NOT EXISTS p2p_moderatori(
+        -- LE CHIAVI PUBBLICHE DEI MODERATORI P2P (28 set 2026): una per
+        -- persona, dichiarata dal suo telefono, dove vive la privata —
+        -- che di qui non passa e non ha una colonna. E' la chiave che
+        -- Andrea aggiunge al nodo (`admin-add-solver`).
+        tg_id INTEGER PRIMARY KEY,
+        chiave TEXT NOT NULL,
+        creata INTEGER DEFAULT 0
+    );
     CREATE TABLE IF NOT EXISTS p2p_indice(
         -- IL PAVIMENTO DELL'INDICE DELLE TRADE KEY (set 2026): quante
         -- chiavi usa-e-getta quel profilo ha gia' BRUCIATO. Serve a
@@ -14052,6 +14061,11 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                         (id_telegram, id_nostr))
         con.execute("UPDATE p2p_dispute_registro SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
+        # la chiave di moderatore segue la persona; se le due meta' ne
+        # avevano una a testa resta quella della meta' Telegram
+        con.execute("UPDATE OR IGNORE p2p_moderatori SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("DELETE FROM p2p_moderatori WHERE tg_id=?", (id_nostr,))
         # Il sale del profilo di scambio segue l'utente. Qui la PK E'
         # il tg_id, quindi le due meta' POSSONO collidere — e allora
         # vince la meta' Telegram, che e' l'unica delle due a poter
@@ -46155,6 +46169,436 @@ def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
              else " — SENZA DECISIONE A REGISTRO: allarme"), flush=True)
     con.commit()
     return fuori
+
+
+# ---------- LA MODERAZIONE DELLE DISPUTE P2P (28 set 2026) -----------
+# La sezione «⚖️ Moderazione P2P» dell'app, vista dal server. IL PATTO,
+# deciso da Andrea prima del codice: la chiave di un moderatore vive
+# SOLO sul suo telefono, e a mostrod parla lei — il server non firma,
+# non decifra e non vede ne' la chiave privata ne' la chat. Qui
+# passano: l'elenco, la chiave PUBBLICA di ogni moderatore (e' quella
+# che Andrea aggiunge al nodo con `admin-add-solver`), chi ha preso
+# cosa, e la DECISIONE COL SUO MOTIVO, scritta a registro PRIMA che il
+# telefono firmi: e' la riga che `_disputa_evento_p2p` cerca quando
+# mostrod racconta la chiusura, e se non la trova suona l'allarme.
+# I GIUDICI SONO PURI SULLA CONNESSIONE e tornano `(codice, corpo)`:
+# 200 col dizionario della risposta, o il codice del rifiuto con la
+# frase — mai un HTTPException, cosi' la prova non ha bisogno di FastAPI.
+# IL MODERATORE CHE E' UNA DELLE PARTI NON PRENDE E NON DECIDE: lo
+# ferma il server, non il bottone.
+P2P_MOTIVO_MIN = 20
+P2P_MOTIVO_MAX = 1000
+FORMA_CHIAVE_P2P = re.compile(r"[0-9a-f]{64}")
+FORMA_DISPUTA_P2P = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
+
+def _chiave_moderatore_p2p(con, tg_id: int) -> str:
+    """La chiave pubblica di moderatore registrata da questa persona, o ''."""
+    r = con.execute("SELECT chiave FROM p2p_moderatori WHERE tg_id=?",
+                    (int(tg_id or 0),)).fetchone()
+    return (r["chiave"] if r else "") or ""
+
+
+def _registra_chiave_moderatore_p2p(con, io: int, chiave, adesso: int) -> tuple:
+    """Il moderatore dichiara la chiave PUBBLICA del suo profilo di
+    moderatore. Una per persona: una chiave nuova prende il posto della
+    vecchia (il telefono perso), e il registro lo ricorda. La stessa
+    chiave non puo' essere di due persone."""
+    chiave = str(chiave or "").strip().lower()
+    if not FORMA_CHIAVE_P2P.fullmatch(chiave):
+        return (400, "Chiave non valida")
+    di = con.execute("SELECT tg_id FROM p2p_moderatori WHERE chiave=?",
+                     (chiave,)).fetchone()
+    if di and int(di["tg_id"]) != int(io):
+        return (409, "Questa chiave è già di un altro moderatore")
+    prima = _chiave_moderatore_p2p(con, io)
+    if prima == chiave:
+        return (200, {"ok": True, "nuova": False})
+    con.execute("INSERT INTO p2p_moderatori(tg_id, chiave, creata) VALUES(?,?,?) "
+                "ON CONFLICT(tg_id) DO UPDATE SET chiave=excluded.chiave, "
+                "creata=excluded.creata", (int(io), chiave, adesso))
+    _registro_disputa_p2p(con, "", "chiave", io, adesso,
+                          motivo=("cambiata" if prima else "registrata"),
+                          chiave=chiave)
+    con.commit()
+    return (200, {"ok": True, "nuova": True, "cambiata": bool(prima)})
+
+
+def _dichiara_disputa_p2p(con, io: int, ordine, disputa, adesso: int) -> tuple:
+    """Una delle due PARTI dice l'id che mostrod ha dato alla disputa
+    (gliel'ha scritto nel messaggio `dispute-initiated-by-*`): serve al
+    moderatore per prenderla, perche' mostrod le dispute le chiama col
+    LORO id e non con quello dell'ordine. E' una dichiarazione di un
+    telefono, e si tratta cosi': vale la PRIMA, una seconda diversa non
+    la riscrive (e resta nel registro), e il moderatore la VERIFICA
+    prendendola — mostrod gli risponde con l'ordine, e se non e' quello
+    il suo telefono si ferma. Chi non e' una delle parti riceve la
+    risposta di un ordine che non esiste."""
+    ordine = str(ordine or "").strip()
+    disputa = str(disputa or "").strip().lower()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine) or not FORMA_DISPUTA_P2P.fullmatch(disputa):
+        return (400, "Richiesta non valida")
+    r = con.execute("SELECT disputa, compratore, venditore FROM p2p_dispute "
+                    "WHERE ordine=?", (ordine,)).fetchone()
+    if not r or int(io) not in (int(r["compratore"] or 0), int(r["venditore"] or 0)):
+        return (200, {"ok": True})
+    if not r["disputa"]:
+        con.execute("UPDATE p2p_dispute SET disputa=? WHERE ordine=? AND disputa=''",
+                    (disputa, ordine))
+        _registro_disputa_p2p(con, ordine, "id_dichiarato", io, adesso, motivo=disputa)
+        con.commit()
+    elif r["disputa"] != disputa:
+        _registro_disputa_p2p(con, ordine, "id_diverso", io, adesso, motivo=disputa)
+        con.commit()
+    return (200, {"ok": True})
+
+
+def _riga_disputa_p2p(con, r, io: int) -> dict:
+    """Una disputa come la legge il moderatore `io`. I nomi sono quelli
+    del profilo (li vede anche nel mercatino), mai un recapito. Le due
+    trade key — pubbliche e usa-e-getta — viaggiano SOLO a chi l'ha
+    presa: servono al suo telefono per la chiave della chat.
+    ⚠️ QUI IL TESTO E' NUDO: a scapparlo e' il client, uno per uno,
+    come fa con tutto quel che disegna. I giudici dei messaggi Telegram
+    lo danno gia' scappato, quindi qui si toglie la loro scappata."""
+    nudo = lambda t: html.unescape(str(t or ""))
+    ordine = r["ordine"]
+    dati = _dati_frase_p2p(con, ordine)
+    g = con.execute("SELECT MAX(quando) AS q FROM p2p_momenti WHERE ordine=? "
+                    "AND giro=? AND momento='garanzia_pagata'",
+                    (ordine, r["giro"])).fetchone()
+    dec = con.execute("SELECT esito, motivo, quando FROM p2p_dispute_registro "
+                      "WHERE ordine=? AND gesto='decisione' ORDER BY id DESC LIMIT 1",
+                      (ordine,)).fetchone()
+    parte = int(io) in (int(r["compratore"] or 0), int(r["venditore"] or 0))
+    mia = int(r["presa_da"] or 0) == int(io) and r["stato"] == "presa"
+    fuori = {
+        "ordine": ordine, "disputa": r["disputa"] or "", "stato": r["stato"],
+        "aperta_il": int(r["aperta_il"] or 0), "aperta_da": r["aperta_da"] or "",
+        "compra": nudo(_persona_disputa_p2p(con, r["compratore"])),
+        "vende": nudo(_persona_disputa_p2p(con, r["venditore"])),
+        "compra_nostro": bool(r["compratore"]), "vende_nostro": bool(r["venditore"]),
+        "sats": dati["sats"], "euro": nudo(dati["euro"]), "metodi": nudo(dati["metodi"]),
+        "garanzia_il": int((g["q"] if g else 0) or 0),
+        "sei_parte": parte,
+        "presa_da": (nudo(_persona_disputa_p2p(con, r["presa_da"])) if r["presa_da"] else ""),
+        "presa_da_me": mia, "presa_il": int(r["presa_il"] or 0),
+        "esito": r["esito"] or "", "chiusa_da": r["chiusa_da"] or "",
+        "chiusa_il": int(r["chiusa_il"] or 0),
+        "decisione": ({"esito": dec["esito"], "motivo": str(dec["motivo"] or ""),
+                       "quando": int(dec["quando"] or 0)} if dec else None),
+        "chiave_compratore": "", "chiave_venditore": "",
+    }
+    if mia and not parte:
+        s = con.execute("SELECT chiave_compratore, chiave_venditore FROM p2p_scambi "
+                        "WHERE ordine=?", (ordine,)).fetchone()
+        if s:
+            fuori["chiave_compratore"] = s["chiave_compratore"] or ""
+            fuori["chiave_venditore"] = s["chiave_venditore"] or ""
+    return fuori
+
+
+def _dispute_per_moderatore_p2p(con, io: int, adesso: int) -> dict:
+    """L'ELENCO della sezione: le dispute aperte e prese, poi le chiuse
+    degli ultimi `P2P_DISPUTA_STORICO_GIORNI`; la chiave che `io` ha
+    registrato; e le chiavi di tutti i moderatori, perche' chi le
+    aggiunge al nodo le legga da qui e non da una chat."""
+    vive = con.execute("SELECT * FROM p2p_dispute WHERE stato<>'chiusa' "
+                       "ORDER BY aperta_il").fetchall()
+    chiuse = con.execute(
+        "SELECT * FROM p2p_dispute WHERE stato='chiusa' AND chiusa_il>=? "
+        "ORDER BY chiusa_il DESC", (adesso - P2P_DISPUTA_STORICO_GIORNI * 86400,)).fetchall()
+    moderatori = []
+    for m in con.execute("SELECT tg_id, chiave, creata FROM p2p_moderatori "
+                         "ORDER BY creata, tg_id"):
+        moderatori.append({"nome": html.unescape(_persona_disputa_p2p(con, m["tg_id"])),
+                           "chiave": m["chiave"], "creata": int(m["creata"] or 0),
+                           "io": int(m["tg_id"]) == int(io)})
+    return {"dispute": [_riga_disputa_p2p(con, r, io) for r in list(vive) + list(chiuse)],
+            "aperte": len(vive),
+            "chiave": _chiave_moderatore_p2p(con, io),
+            "moderatori": moderatori}
+
+
+def _prendi_disputa_p2p(con, io: int, ordine, chiave, fatto: bool, adesso: int) -> tuple:
+    """«Prendi la disputa», in DUE TEMPI. Prima della firma (`fatto`
+    falso) il server dice se si puo' e lo scrive a registro; dopo che
+    mostrod ha risposto di si' (`fatto` vero) la disputa risulta presa,
+    e di li' escono gli avvisi — alle due parti e agli altri moderatori.
+    Torna `(codice, corpo, avvisi)`.
+    NON SI PRENDE: una disputa di cui si e' una delle parti, una disputa
+    chiusa, una gia' presa da un altro, o con una chiave che non e'
+    quella registrata da chi chiede."""
+    ordine = str(ordine or "").strip()
+    chiave = str(chiave or "").strip().lower()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine) or not FORMA_CHIAVE_P2P.fullmatch(chiave):
+        return (400, "Richiesta non valida", [])
+    if chiave != _chiave_moderatore_p2p(con, io):
+        return (409, "Questa non è la chiave di moderatore che hai registrato", [])
+    r = con.execute("SELECT * FROM p2p_dispute WHERE ordine=?", (ordine,)).fetchone()
+    if not r:
+        return (404, "Disputa non trovata", [])
+    if int(io) in (int(r["compratore"] or 0), int(r["venditore"] or 0)):
+        return (403, "Sei una delle due parti: questa disputa la decide un altro moderatore", [])
+    if r["stato"] == "chiusa":
+        return (409, "Questa disputa è già chiusa", [])
+    if r["stato"] == "presa" and int(r["presa_da"] or 0) != int(io):
+        return (409, "Questa disputa l'ha già presa un altro moderatore", [])
+    if not fatto:
+        _registro_disputa_p2p(con, ordine, "presa_chiesta", io, adesso, chiave=chiave)
+        con.commit()
+        return (200, {"ok": True}, [])
+    if r["stato"] == "presa":
+        return (200, {"ok": True, "ripetuta": True}, [])
+    con.execute("UPDATE p2p_dispute SET stato='presa', presa_da=?, presa_il=?, "
+                "chiave_moderatore=? WHERE ordine=? AND stato='aperta'",
+                (int(io), adesso, chiave, ordine))
+    _registro_disputa_p2p(con, ordine, "presa", io, adesso, chiave=chiave)
+    corto = html.escape(ordine[:8])
+    avvisi = []
+    for parte in (int(r["compratore"] or 0), int(r["venditore"] or 0)):
+        if parte and con.execute(
+                "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, tg_id, "
+                "quando, fonte) VALUES(?,'disputa_presa',?,?,?,'moderatore')",
+                (ordine, r["giro"], parte, adesso)).rowcount:
+            avvisi.append((parte, "⚖️ <b>Un moderatore ha preso la disputa</b> sul tuo "
+                           "scambio. Apri lo scambio nell'app: da lì puoi scrivergli e "
+                           "mandargli quello che hai (ricevute, orari, messaggi).\n\n"
+                           "<i>I sats restano in garanzia finché non decide.</i>"))
+    chi = _persona_disputa_p2p(con, io)
+    for mod in _moderatori_p2p():
+        if mod != int(io):
+            avvisi.append((mod, f"⚖️ {chi} ha preso la disputa P2P sull'ordine "
+                           f"<code>{corto}</code>."))
+    con.commit()
+    return (200, {"ok": True}, avvisi)
+
+
+def _lascia_disputa_p2p(con, io: int, ordine, motivo, adesso: int) -> tuple:
+    """La presa non e' riuscita (mostrod ha detto di no, o non ha
+    risposto): resta la riga a registro, col perche'. Una disputa gia'
+    presa NON si lascia da qui: per mostrod e' di quel moderatore."""
+    ordine = str(ordine or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        return (400, "Richiesta non valida")
+    if not con.execute("SELECT 1 FROM p2p_dispute WHERE ordine=?", (ordine,)).fetchone():
+        return (404, "Disputa non trovata")
+    _registro_disputa_p2p(con, ordine, "presa_fallita", io, adesso,
+                          motivo=str(motivo or "")[:200])
+    con.commit()
+    return (200, {"ok": True})
+
+
+def _decisione_disputa_p2p(con, io: int, d: dict, adesso: int) -> tuple:
+    """LA DECISIONE A REGISTRO, PRIMA DELLA FIRMA. `d` porta `ordine`,
+    `esito` ('compratore' = i sats vanno a chi compra, 'venditore' = i
+    sats tornano a chi vende), `motivo` (scritto, almeno
+    `P2P_MOTIVO_MIN` caratteri), `conferma` (un `true` letterale: la
+    seconda conferma del foglio) e `chiave`.
+    DECIDE SOLO CHI L'HA PRESA, con la chiave con cui l'ha presa, e mai
+    una delle parti. Una decisione non ne cancella un'altra: il registro
+    le tiene tutte, e a contare per l'allarme e' che ce ne sia una dello
+    STESSO esito che mostrod raccontera'."""
+    d = d if isinstance(d, dict) else {}
+    ordine = str(d.get("ordine") or "").strip()
+    esito = str(d.get("esito") or "")
+    chiave = str(d.get("chiave") or "").strip().lower()
+    motivo = " ".join(str(d.get("motivo") or "").split())
+    if not FORMA_ORDINE_P2P.fullmatch(ordine) or esito not in P2P_DISPUTA_ESITI:
+        return (400, "Richiesta non valida")
+    if d.get("conferma") is not True:
+        return (400, "Manca la conferma")
+    if len(motivo) < P2P_MOTIVO_MIN:
+        return (400, f"Scrivi il motivo: almeno {P2P_MOTIVO_MIN} caratteri")
+    if len(motivo) > P2P_MOTIVO_MAX:
+        return (400, f"Il motivo è troppo lungo: al massimo {P2P_MOTIVO_MAX} caratteri")
+    r = con.execute("SELECT * FROM p2p_dispute WHERE ordine=?", (ordine,)).fetchone()
+    if not r:
+        return (404, "Disputa non trovata")
+    if int(io) in (int(r["compratore"] or 0), int(r["venditore"] or 0)):
+        return (403, "Sei una delle due parti: questa disputa la decide un altro moderatore")
+    if r["stato"] == "chiusa":
+        return (409, "Questa disputa è già chiusa")
+    if r["stato"] != "presa" or int(r["presa_da"] or 0) != int(io):
+        return (409, "Prima prendi la disputa")
+    if not chiave or chiave != (r["chiave_moderatore"] or ""):
+        return (409, "Questa non è la chiave con cui hai preso la disputa")
+    _registro_disputa_p2p(con, ordine, "decisione", io, adesso, esito=esito,
+                          motivo=motivo, chiave=chiave)
+    con.commit()
+    return (200, {"ok": True, "esito": esito})
+
+
+def _esito_gesto_disputa_p2p(con, io: int, ordine, esito, motivo, adesso: int) -> tuple:
+    """Il gesto firmato NON e' riuscito (mostrod ha detto di no, o ha
+    taciuto): la decisione a registro resta, e accanto il perche'. Il
+    gesto RIUSCITO non si dichiara: lo racconta mostrod."""
+    ordine = str(ordine or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        return (400, "Richiesta non valida")
+    r = con.execute("SELECT presa_da FROM p2p_dispute WHERE ordine=?", (ordine,)).fetchone()
+    if not r or int(r["presa_da"] or 0) != int(io):
+        return (404, "Disputa non trovata")
+    _registro_disputa_p2p(con, ordine, "non_riuscita", io, adesso,
+                          esito=str(esito or "")[:20], motivo=str(motivo or "")[:200])
+    con.commit()
+    return (200, {"ok": True})
+
+
+def _moderatore_o_403(x_tg_init_data: str, barattolo_sessione: str) -> dict:
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    return user
+
+
+def _risposta_moderazione(codice: int, corpo):
+    if codice != 200:
+        raise HTTPException(codice, str(corpo))
+    return JSONResponse(corpo, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/p2p/moderazione")
+async def moderazione_p2p(x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """SOLO MODERATORI: l'elenco delle dispute P2P. Nessun corpo."""
+    user = _moderatore_o_403(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        corpo = _dispute_per_moderatore_p2p(con, user["id"], int(time.time()))
+    finally:
+        con.close()
+    return _risposta_moderazione(200, corpo)
+
+
+@app.post("/api/p2p/moderazione/chiave")
+async def moderazione_chiave_p2p(req: Request, x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """SOLO MODERATORI: la chiave PUBBLICA del proprio profilo di
+    moderatore. Quella che decide resta sul telefono: qui non ha un
+    campo dove passare."""
+    user = _moderatore_o_403(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        codice, corpo = _registra_chiave_moderatore_p2p(
+            con, user["id"], d.get("chiave"), int(time.time()))
+    finally:
+        con.close()
+    if codice == 200 and corpo.get("nuova"):
+        print(f"⚖️ Moderazione P2P: {user['id']} ha "
+              f"{'cambiato' if corpo.get('cambiata') else 'registrato'} la sua "
+              "chiave di moderatore (va aggiunta al nodo)", flush=True)
+        chi = ""
+        con = db()
+        try:
+            chi = _persona_disputa_p2p(con, user["id"])
+        finally:
+            con.close()
+        for mod in _moderatori_p2p():
+            if mod != int(user["id"]):
+                try:
+                    await notifica(mod, f"⚖️ {chi} ha "
+                                   f"{'cambiato' if corpo.get('cambiata') else 'registrato'} "
+                                   "la sua chiave di moderatore P2P. Finché non è "
+                                   "aggiunta al nodo non può prendere dispute "
+                                   "(PRODUZIONE, «LE DISPUTE P2P»).")
+                except Exception:
+                    pass
+    return _risposta_moderazione(codice, corpo)
+
+
+@app.post("/api/p2p/moderazione/prendi")
+async def moderazione_prendi_p2p(req: Request, x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """SOLO MODERATORI: «Prendi la disputa», prima (`fatto` assente) e
+    dopo (`fatto: true`) la firma. Il giudice e' `_prendi_disputa_p2p`."""
+    user = _moderatore_o_403(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        codice, corpo, avvisi = _prendi_disputa_p2p(
+            con, user["id"], d.get("ordine"), d.get("chiave"),
+            d.get("fatto") is True, int(time.time()))
+    finally:
+        con.close()
+    for chi, testo in avvisi:
+        try:
+            await notifica(chi, testo)
+        except Exception as e:
+            print(f"⚠️ Moderazione P2P: avviso a {chi} saltato "
+                  f"({type(e).__name__}: {e})", flush=True)
+    if codice == 200 and d.get("fatto") is True:
+        print(f"⚖️ Disputa P2P: {str(d.get('ordine'))[:8]} presa da {user['id']}",
+              flush=True)
+    return _risposta_moderazione(codice, corpo)
+
+
+@app.post("/api/p2p/moderazione/lascia")
+async def moderazione_lascia_p2p(req: Request, x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """SOLO MODERATORI: la presa non e' riuscita, col perche'."""
+    user = _moderatore_o_403(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        codice, corpo = _lascia_disputa_p2p(
+            con, user["id"], d.get("ordine"), d.get("motivo"), int(time.time()))
+    finally:
+        con.close()
+    return _risposta_moderazione(codice, corpo)
+
+
+@app.post("/api/p2p/moderazione/decisione")
+async def moderazione_decisione_p2p(req: Request, x_tg_init_data: str = Header(""),
+                                    barattolo_sessione: str = Cookie("")):
+    """SOLO MODERATORI: la decisione col motivo, a registro PRIMA della
+    firma. Il giudice e' `_decisione_disputa_p2p`."""
+    user = _moderatore_o_403(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        codice, corpo = _decisione_disputa_p2p(con, user["id"], d, int(time.time()))
+    finally:
+        con.close()
+    if codice == 200:
+        print(f"⚖️ Disputa P2P: {str(d.get('ordine'))[:8]} decisione a registro "
+              f"({corpo['esito']}) di {user['id']}", flush=True)
+    return _risposta_moderazione(codice, corpo)
+
+
+@app.post("/api/p2p/moderazione/esito")
+async def moderazione_esito_p2p(req: Request, x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """SOLO MODERATORI: il gesto firmato non e' riuscito, col perche'."""
+    user = _moderatore_o_403(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        codice, corpo = _esito_gesto_disputa_p2p(
+            con, user["id"], d.get("ordine"), d.get("esito"), d.get("motivo"),
+            int(time.time()))
+    finally:
+        con.close()
+    return _risposta_moderazione(codice, corpo)
+
+
+@app.post("/api/p2p/disputa")
+async def disputa_dichiarata_p2p(req: Request, x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """Una delle due parti dice l'id della disputa. La risposta e'
+    sempre `{"ok": true}` quando la richiesta si legge: chi non e' della
+    partita non impara se quell'ordine ha una disputa."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        codice, corpo = _dichiara_disputa_p2p(
+            con, user["id"], d.get("ordine"), d.get("disputa"), int(time.time()))
+    finally:
+        con.close()
+    return _risposta_moderazione(codice, corpo)
 
 
 async def _respiro_presa_p2p(ordine: str):

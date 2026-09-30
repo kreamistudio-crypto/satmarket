@@ -30,6 +30,21 @@ Telegram di cartone che ricorda chi ha ricevuto cosa:
   9. un annullo su un ordine che non era in disputa non dice niente ai
      moderatori.
 
+E LE ROTTE DELLA SEZIONE «⚖️ Moderazione P2P», una per una, dal server
+vero:
+
+ 10. chi non e' moderatore prende 403 da tutte e sei, e sulla settima
+     (l'id della disputa, che e' di tutti) un si' che non scrive niente;
+ 11. il moderatore registra la sua chiave PUBBLICA, e l'elenco gliela
+     ridice; l'id della disputa lo dichiara una delle parti;
+ 12. «Prendi la disputa» nei due tempi: prima della firma niente
+     avvisi, dopo le due parti e nessun altro; le chiavi delle parti
+     viaggiano solo a chi l'ha presa;
+ 13. la decisione senza motivo, senza conferma, o prima della presa non
+     si scrive; quella buona va a registro — e quando mostrod racconta
+     la chiusura i moderatori leggono «decisa», col motivo, e NESSUN
+     allarme.
+
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
 `collaudo_pagamento_p2p`), niente Telegram, niente relay, niente
 coordinatore.
@@ -105,6 +120,16 @@ def registro(ordine):
             "SELECT * FROM p2p_dispute_registro WHERE ordine=? ORDER BY id", (ordine,))]
     finally:
         con.close()
+
+
+def _errore_senza_corpo(fn):
+    """Il rifiuto di una rotta che non legge un corpo, o None."""
+    try:
+        asyncio.run(fn())
+        return None
+    except Exception as e:
+        return (getattr(e, "status_code", type(e).__name__),
+                str(getattr(e, "detail", e)))
 
 
 def a(chi, detto):
@@ -227,6 +252,95 @@ def main():
     detto = manda(D[7], "canceled", t + 595, "seller")
     prova("un annullo su un ordine mai in disputa non arriva ai moderatori", [[], None],
           [a(MOD, detto), riga(D[7])])
+
+    print("\n10) le rotte della moderazione: chi non e' moderatore")
+    R = D[8]
+    fino_alla_disputa(R, t + 700)
+    DISP = "d15b0000-aaaa-4bbb-8ccc-0000000000d1"
+    KM = "c0" * 32
+    rotte = [(SRV.moderazione_chiave_p2p, {"chiave": KM}),
+             (SRV.moderazione_prendi_p2p, {"ordine": R, "chiave": KM}),
+             (SRV.moderazione_lascia_p2p, {"ordine": R, "motivo": "x"}),
+             (SRV.moderazione_decisione_p2p, {"ordine": R, "esito": "venditore", "conferma": True,
+                                              "motivo": "un motivo lungo abbastanza", "chiave": KM}),
+             (SRV.moderazione_esito_p2p, {"ordine": R, "esito": "venditore", "motivo": "x"})]
+    banco.come(banco.ESTRANEO)
+    prova("un utente qualunque: 403 da tutte le rotte dei moderatori, elenco compreso",
+          [403] * 6,
+          [(banco.errore(f, c) or (200,))[0] for f, c in rotte]
+          + [(lambda: (lambda e: e[0] if e else 200)(_errore_senza_corpo(SRV.moderazione_p2p)))()])
+    prova("...e sull'id della disputa, che e' di tutti, un si' che non scrive niente",
+          [True, ""], [banco.esito(SRV.disputa_dichiarata_p2p, {"ordine": R, "disputa": DISP}).get("ok"),
+                       riga(R)["disputa"]])
+    prova("...e il registro non ha visto niente di lui", [("aperta", C, "", "")], registro(R))
+
+    print("\n11) la chiave del moderatore, e l'id della disputa")
+    banco.come(MOD)
+    prova("la chiave si registra, ed e' quella pubblica",
+          [True, True], (lambda r: [r.get("ok"), r.get("nuova")])(
+              banco.esito(SRV.moderazione_chiave_p2p, {"chiave": KM})))
+    prova("...ridirla non cambia niente", False,
+          banco.esito(SRV.moderazione_chiave_p2p, {"chiave": KM}).get("nuova"))
+    prova("...una chiave storta e' un 400", 400, banco.errore(SRV.moderazione_chiave_p2p, {"chiave": "nsec1abc"})[0])
+    banco.come(C)
+    banco.esito(SRV.disputa_dichiarata_p2p, {"ordine": R, "disputa": DISP})
+    prova("una delle parti dichiara l'id della disputa", DISP, riga(R)["disputa"])
+    banco.come(MOD)
+    e = asyncio.run(SRV.moderazione_p2p())
+    e = __import__("json").loads(e.body)
+    d = [x for x in e["dispute"] if x["ordine"] == R][0]
+    prova("l'elenco: la disputa, l'id, i nomi NUDI, la chiave del moderatore",
+          ["aperta", DISP, "Chi <b>compra</b>", "Chi vende (@chi_vende)", KM, False, "", ""],
+          [d["stato"], d["disputa"], d["compra"], d["vende"], e["chiave"], d["sei_parte"],
+           d["chiave_compratore"], d["chiave_venditore"]])
+
+    print("\n12) prendi la disputa, nei due tempi")
+    del banco.DETTO[:]
+    prova("prima della firma: si puo', e non parte nessun avviso",
+          [True, [], "aperta"],
+          [banco.esito(SRV.moderazione_prendi_p2p, {"ordine": R, "chiave": KM}).get("ok"),
+           list(banco.DETTO), riga(R)["stato"]])
+    prova("la decisione prima della presa non si scrive", 409,
+          banco.errore(SRV.moderazione_decisione_p2p, rotte[3][1])[0])
+    banco.esito(SRV.moderazione_prendi_p2p, {"ordine": R, "chiave": KM, "fatto": True})
+    prova("dopo la firma: presa, e lo sanno le due parti (e nessun altro: il moderatore e' uno)",
+          ["presa", MOD, [C, V]],
+          [riga(R)["stato"], riga(R)["presa_da"], sorted(c for c, _ in banco.DETTO)[::-1]])
+    prova("...con la frase che dice di scrivergli", True,
+          all("Un moderatore ha preso la disputa" in x and "scrivergli" in x for _, x in banco.DETTO))
+    e = __import__("json").loads(asyncio.run(SRV.moderazione_p2p()).body)
+    d = [x for x in e["dispute"] if x["ordine"] == R][0]
+    prova("...e adesso le chiavi delle parti viaggiano a chi l'ha presa",
+          [banco.CHIAVE_COMPRA, banco.CHIAVE_VENDE, True],
+          [d["chiave_compratore"], d["chiave_venditore"], d["presa_da_me"]])
+    # il moderatore che e' una delle parti
+    SRV.ADMIN_IDS = [999, C]
+    banco.come(C)
+    banco.esito(SRV.moderazione_chiave_p2p, {"chiave": "d1" * 32})
+    fino_alla_disputa(D[7], t + 800)
+    prova("il moderatore che e' una delle parti non prende: 403", 403,
+          banco.errore(SRV.moderazione_prendi_p2p, {"ordine": D[7], "chiave": "d1" * 32})[0])
+    SRV.ADMIN_IDS = [999]
+    banco.come(MOD)
+
+    print("\n13) la decisione, e il cerchio che si chiude")
+    buona = dict(rotte[3][1])
+    for nome, corpo, atteso in (("senza motivo", dict(buona, motivo=""), 400),
+                                ("col motivo corto", dict(buona, motivo="corto"), 400),
+                                ("senza la conferma", dict(buona, conferma=False), 400),
+                                ("con un'altra chiave", dict(buona, chiave="d1" * 32), 409)):
+        prova(f"la decisione {nome} non si scrive", atteso,
+              banco.errore(SRV.moderazione_decisione_p2p, corpo)[0])
+    prova("...e a registro non c'e' nessuna decisione", [],
+          [x for x in registro(R) if x[0] == "decisione"])
+    prova("quella buona si'", [True, ("decisione", MOD, "venditore", "un motivo lungo abbastanza")],
+          [banco.esito(SRV.moderazione_decisione_p2p, buona).get("ok"), registro(R)[-1]])
+    detto = manda(R, "canceled", t + 760, "mostro", "admin")
+    prova("mostrod racconta la chiusura: «decisa», col motivo, e NESSUN allarme",
+          [True, True, False],
+          ["Disputa P2P decisa</b>" in a(MOD, detto)[0],
+           "Motivo: «un motivo lungo abbastanza»" in a(MOD, detto)[0], "SENZA" in a(MOD, detto)[0]])
+    prova("...e il registro finisce con la chiusura", "chiusa", registro(R)[-1][0])
 
     print(f"\n{banco.PASSATE} ok, {banco.FALLITE} NO")
     return 1 if banco.FALLITE else 0
