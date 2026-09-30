@@ -30871,3 +30871,122 @@ dall'app coi due telefoni, che è la sola prova che mostrod accetti i tre
 messaggi del moderatore; e la copia `mostro.db.prima-solver-20260930`
 cancellata dopo. (Il commit 07ec2b1 diceva di portare questa voce e non
 la portava: il banco che appende leggeva da stdin, e non c'era.)
+
+## SESSIONI PIU' LEGGERE ALL'AVVIO (30 set 2026)
+
+Richiesta di Andrea: ogni sessione di cantiere deve consumare il meno
+possibile per partire, misurando prima e dopo. Quattro pezzi: CLAUDE.md
+ridotto alle regole che servono in OGNI sessione; le note di memoria di
+Claude Code accorpate; la regola che i documenti grandi non si leggono
+mai interi, con l'archivio delle voci vecchie di CANTIERI; il vecchio
+ramo `cantiere/claude-md-snello`. Con tre garanzie date a metà giro:
+nessuna regola vincolante esce da CLAUDE.md (nel dubbio resta dentro),
+CANTIERI si sposta in archivio e non si cancella, e il push aspetta lo
+sguardo di Andrea sulla tabella e sul file nuovo.
+
+LA MISURA (caratteri; i token sono una STIMA a ~3,3 caratteri per token,
+che per l'italiano con gli accenti e' prudente):
+- CLAUDE.md: 545 righe, 34.918 caratteri (~10.600 token) → 242 righe,
+  14.808 caratteri (~4.500 token).
+- MEMORY.md, l'indice che entra a ogni sessione: 150 righe, 22.886
+  caratteri (~6.900 token) → 46 righe, 6.491 caratteri (~2.000 token).
+- Insieme, quel che si paga PRIMA di leggere una riga di codice: ~17.500
+  token → ~6.500, cioe' ~11.000 token in meno a sessione (-63%).
+- La nota richiamata piu' spesso (sessioni parallele, ricetta del
+  worktree): 963 righe e ~70.000 caratteri (~21.000 token) → 120 righe e
+  7.819 caratteri (~2.400 token), ogni volta che viene richiamata.
+- Le note di memoria in tutto: 148 file e 538.601 caratteri → 46 file e
+  195.786; quelle non le carica nessuno per intero, ma il richiamo
+  pesca da lì.
+
+COSA E' USCITO DA CLAUDE.md E DOVE E' FINITO:
+- «Il nodo Mostro» (392 righe: audit, risposte del team, sonda, tre
+  timer, dev fee sul circuito freddo) → `docs/NODO-MOSTRO.md`, INTERO e
+  senza ritocchi, nominato nella bussola. In CLAUDE.md restano 30 righe
+  con OGNI regola in forma corta: non e' il VPS; audit fatto e non si
+  ripropone; il documento nel canale Telegram e i canali non cifrati;
+  guarda-e-riferisci e il riavvio dal compose; il marcatore della ronda;
+  il backup senza channel.db; pow spento, 900 secondi fermi, dev fee a
+  zero e i domini LNURL che non si esentano da Tor; l'admin macaroon che
+  non si da'; i timer non provati.
+- Le procedure di produzione (catena del deploy per intero, ronda,
+  namespace) erano gia' in PRODUZIONE: la sezione tiene i fatti che
+  cambiano il gesto (push = online, il VPS tira solo main firmato e con
+  CI verde, il freno `.deploy-bocciato`, `pronto` che puo' restare
+  indietro, il config del VPS che vince sul default, il webhook).
+- Le regole ferree sono tutte al loro posto (1-9); la 8 nomina anche
+  NODO-MOSTRO.md e il tetto provato; la 9 assorbe «Affari si chiama
+  Ordini», che stava in una nota di memoria.
+- «Adesso» resta, in meno righe.
+
+COSA E' ENTRATO: la sezione «Come si lavora in ogni sessione», che
+prima viveva in nove note di memoria (e quindi arrivava solo quando il
+richiamo la pescava): solo quello che chiede; lavoro diretto senza
+subagenti; PR aperte prima di cominciare; il worktree da origin/main
+come cartella di lavoro; la firma del commit e il controllo della punta;
+push mio e deploy suo con le due condizioni; il VPS, il nodo e il relay
+fuori dal perimetro; mai relay veri; la pulizia a fine giro; cosa non
+si tocca. E in «Dove sta il resto» la regola nuova: CANTIERI,
+ARCHITETTURA e PRODUZIONE NON si leggono mai interi, si cerca la
+sezione col grep e si legge solo quella.
+
+IL TETTO di `prove.py` SCENDE da 545 a 262 (242 righe misurate + 20),
+col perche' nel commento: e' la cintura che impedisce al file di
+ricrescere senza che nessuno se ne accorga.
+
+L'ARCHIVIO DI CANTIERI: le voci piu' vecchie di 30 giorni al 30 set
+sono quelle di luglio e agosto 2026 — 84 voci, righe 13-5176, da «Fatti
+(lug 2026)» a «Il libro P2P diventa una vetrina» — e stanno in
+`docs/CANTIERI-ARCHIVIO-2026.md`, intere e senza ritocchi (lo script ha
+verificato riga per riga che l'insieme delle righe vecchie sia uguale a
+archivio + nuovo, e la coda identica al byte). Al loro posto in
+CANTIERI.md un indice di 84 titoli, una riga ciascuno. Il taglio sta
+alla voce «E POI IL COORDINATORE HA RISPOSTO» (set 2026), che e' la
+continuazione della voce di agosto sulla vetrina P2P e resta di qua per
+data: l'indice lo dice. CANTIERI passa da 35.948 a 30.873 righe — la
+gran parte e' di settembre, quindi l'archivio pesa il 14%, ed e' il
+motivo per cui la regola del grep vale piu' dell'archivio.
+
+LE NOTE DI MEMORIA (fuori dal repo, in
+`~/.claude/projects/.../memory/`): 148 → 46. Cancellate le nove con una
+regola che ora sta in CLAUDE.md; le cinque superate dai fatti (il
+promemoria del primo backup automatico — il timer e' scattato, lo dice
+il drill del 7 set —, il campanello superato dalla patch 0007, la
+fotografia del VPS del 23 ago, la simulazione dei soli id piccoli, la
+verifica una tantum di Nostrology); le quattro il cui contenuto sta gia'
+nei documenti (namespace prestato, dev fee, lightbox, silenzio del
+coordinator); e gli 86 verbali di cantiere (`cantiere-*`, studi, audit e
+simili), il cui verbale sta in CANTIERI: di ognuno sopravvive la riga
+delle cose aperte in UNA nota sola, `cose-da-guardare.md` (la riga si
+toglie a verifica fatta). Prima di cancellare, lo script ha controllato
+che ogni commit citato stia su origin/main (uno, 6238b56, e' abb08df
+ribasato). Riscritte due note: le sessioni parallele (solo le lezioni,
+la ricetta e' in CLAUDE.md) e «mai relay veri» (solo il come). Copia
+intera di tutto com'era, prima del taglio, nello scratchpad della
+sessione (`memoria-prima/`).
+
+IL VECCHIO RAMO `cantiere/claude-md-snello` (8 set 2026, cinque commit
+su base 08dd2ad): era il primo tentativo del trasloco in `docs/`, fatto
+poi su main per un'altra via (la bussola e il tetto). Gli unici cambi
+fuori dai documenti erano quattro puntatori «in CLAUDE.md» → «in docs/»
+in server.py, miniapp.html, prove.py e config_esempio.py, e su
+origin/main quelle frasi non ci sono piu': niente da recuperare.
+Cancellato con `-D` (non e' merged: e' superato).
+
+PROVE: prove_bussola (i due file nuovi nominati, nessun orfano, i
+rimandi dei sorgenti), prove_tetto_claude_md (242 ≤ 262),
+prove_altra_cassaforte e prove_app_android (leggono PRODUZIONE): 148
+verdi nel worktree senza config. La suite intera severa e i collaudi
+della CI: nel commit del cantiere.
+
+STRADE SCARTATE: un indice di CANTIERI per tutte le voci (la regola
+«nessun indice» resta: quello dell'archivio e' solo l'elenco dei titoli
+spostati, perche' il grep per nome li trovi ancora); un fan-out di
+subagenti per la memoria (lavoro diretto, con uno script che prova a
+secco e stampa la tabella prima di toccare); tenere il nodo Mostro in
+CLAUDE.md in forma lunga «per prudenza» (le regole ci sono tutte, i
+perche' stanno a un grep di distanza).
+
+DA GUARDARE: il push, dopo lo sguardo di Andrea alla tabella e al
+CLAUDE.md nuovo; alla prossima sessione, che il richiamo della memoria
+peschi `cose-da-guardare.md` quando serve una verifica aperta.
