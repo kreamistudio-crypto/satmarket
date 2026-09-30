@@ -25458,6 +25458,13 @@ def _leve_stato():
                          "coordinatore resta valido sotto",
                   spento="nessun tetto in euro: vale solo il tetto in "
                          "sats del coordinatore (38385)"),
+            _leva("Minimo PayCode Barattozon (€)", "BARATTOZON_MIN_EURO",
+                  BARATTOZON_MIN_EURO,
+                  acceso="il foglio Pubblica e la rotta del canale "
+                         "rifiutano un PayCode sotto questa cifra, a "
+                         "mercato come a prezzo fisso",
+                  spento="nessun minimo: vale solo il tetto di Amazon "
+                         "(999 €)"),
             # LO SCONTO FEDELTA': la leva dice la cifra che il CLIENT
             # mostra; a scontare davvero e' il coordinatore (patch
             # 0005), che chiede a /api/p2p/sconto. Due righe perche'
@@ -40602,6 +40609,25 @@ except (TypeError, ValueError):
     P2P_MAX_EURO = 0
     print("[p2p] P2P_MAX_EURO non e' un numero intero: il tetto in "
           "euro resta SPENTO")
+# IL MINIMO DI BARATTOZON (30 set 2026, decisione di Andrea, che rovescia
+# il «nessun minimo oltre lo zero» del 23 set): un PayCode sotto i 25 €
+# non si pubblica, a mercato come a prezzo fisso. Come il tetto in euro
+# la giudica il CLIENT nel foglio Pubblica, dalla busta delle leve
+# (`minEuroBz`), e la rotta del canale la ripete qui — l'unico posto in
+# cui l'importo di un PayCode arriva al server. Non dichiarata = 25, il
+# default del codice; zero = spento; storta = 25, e lo dice.
+BARATTOZON_MIN_EURO_DEFAULT = 25
+try:
+    from config import BARATTOZON_MIN_EURO
+    BARATTOZON_MIN_EURO = int(BARATTOZON_MIN_EURO)
+    if BARATTOZON_MIN_EURO < 0:
+        raise ValueError("un minimo negativo non e' un minimo")
+except ImportError:
+    BARATTOZON_MIN_EURO = BARATTOZON_MIN_EURO_DEFAULT
+except (TypeError, ValueError):
+    BARATTOZON_MIN_EURO = BARATTOZON_MIN_EURO_DEFAULT
+    print("[p2p] BARATTOZON_MIN_EURO non e' un numero intero: vale il "
+          f"default di {BARATTOZON_MIN_EURO_DEFAULT} €")
 # LE CARD P2P IN VETRINA (26 set 2026, richiesta di Andrea): al lancio
 # pubblico del P2P ogni ordine vivo del libro compare anche nella
 # vetrina del mercatino, come una card fra le card. Fino ad allora la
@@ -40825,7 +40851,10 @@ def _p2p_leve() -> dict:
             # il tetto in euro di Barattolo (set 2026): lo giudica il
             # CLIENT nel foglio Pubblica, 0 = spento. Viaggia sempre,
             # anche a zero: un'assenza direbbe «server di ieri»
-            "maxEuro": int(P2P_MAX_EURO)}
+            "maxEuro": int(P2P_MAX_EURO),
+            # il minimo di Barattozon (30 set 2026): stessa regola,
+            # lo giudica il client nel foglio, 0 = spento
+            "minEuroBz": int(BARATTOZON_MIN_EURO)}
 
 
 def _p2p_per(tg_id) -> dict:
@@ -42750,6 +42779,20 @@ def _importo_paycode_valido(euro) -> bool:
     except (TypeError, ValueError):
         return False
     return 0 < cent <= round(PAYCODE_EURO_MAX * 100)
+
+
+def _paycode_sopra_minimo(euro, minimo) -> bool:
+    """PURA: l'importo di un PayCode sta sopra il minimo di Barattozon
+    (30 set 2026)? A minimo zero o storto passa tutto — il minimo e'
+    una leva, e spenta non ferma nessuno. In centesimi, come il tetto:
+    24,99 contro 25 no, 25,00 si'. Il gemello del client e'
+    `giudiceMinimoPayCodeP2P`."""
+    try:
+        cent = round(float(euro) * 100)
+        m = int(minimo)
+    except (TypeError, ValueError):
+        return True
+    return m <= 0 or cent >= m * 100
 SVEGLIA_P2P_TESTI = {
     1: "⏳ Un tuo scambio in contanti al tabacchino scade fra circa sei "
        "ore. Se l'ordine Amazon non è ancora pagato, è il momento di "
@@ -42982,6 +43025,11 @@ async def annuncia_ordine_p2p_canale(req: Request,
     if _tabacchino_libro([metodo]) and not _importo_paycode_valido(euro):
         raise HTTPException(
             400, "Amazon accetta il pagamento in contanti fino a 999 € per ordine")
+    # ...e il minimo di Barattozon (30 set 2026), dopo il tetto di Amazon
+    # e con la stessa leva che legge il foglio
+    if _tabacchino_libro([metodo]) and not _paycode_sopra_minimo(euro, BARATTOZON_MIN_EURO):
+        raise HTTPException(
+            400, f"Un PayCode Barattozon vale almeno {BARATTOZON_MIN_EURO} €")
     # un ordine nuovo nel libro: la fotografia si rifa' subito, cosi' la
     # fila «Scambi P2P» di Esplora lo mostra al suo giro dopo (LA
     # FOTOGRAFIA SUBITO) — col canale acceso o spento. Il client manda
@@ -44830,7 +44878,12 @@ def _euro_libro(valori, metodi=None) -> str:
     Coi `metodi` (22 set 2026) l'importo esatto del tabacchino vince
     sull'intero del `fa` — ma SOLO se ci combacia arrotondato: un pm
     che dice 30 su un fa che dice 23 e' di un client che scrive a caso,
-    e comanda il numero su cui il coordinatore ha fatto i conti."""
+    e comanda il numero su cui il coordinatore ha fatto i conti.
+    COMBACIA PER DIFETTO O PER ECCESSO (30 set 2026, Barattozon a
+    mercato): a prezzo fisso il filo porta l'intero piu' vicino, a
+    mercato quello per eccesso — 25,47 sta bene su 25 e su 26 —, ed e'
+    la stessa regola di `combaciaEsattoP2P` nel client. Senza `math`,
+    apposta: le prove estraggono questa funzione da sola."""
     nums = []
     for v in valori or []:
         try:
@@ -44840,7 +44893,9 @@ def _euro_libro(valori, metodi=None) -> str:
         if n > 0:
             nums.append(n)
     esatto = max([_euro_tabacchino(m) for m in metodi or []] + [0.0])
-    if len(nums) == 1 and esatto > 0 and round(esatto) == nums[0]:
+    cent = round(esatto * 100)
+    tondi = {round(esatto), -(-cent // 100)}   # il piu' vicino, e per eccesso
+    if len(nums) == 1 and esatto > 0 and nums[0] in tondi:
         nums = [esatto]
 
     def it(n):

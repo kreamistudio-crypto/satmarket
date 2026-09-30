@@ -697,6 +697,16 @@ P2P_COMMISSIONE_PERCENTO = 2
 # cifra: il coordinatore non lo conosce e non lo applica. 0 =
 # spento, nessun tetto in euro.
 P2P_MAX_EURO = 0
+# IL MINIMO DI UN PAYCODE BARATTOZON (30 set 2026): sotto questa cifra
+# in euro un ordine «Contanti al tabacchino» non si pubblica, a mercato
+# come a prezzo fisso. Lo giudica il foglio Pubblica (dalla busta delle
+# leve) e lo ripete la rotta del canale. Non dichiarata = 25; 0 = spento.
+BARATTOZON_MIN_EURO = 25
+# IL MINIMO DI UN PAYCODE BARATTOZON (30 set 2026): sotto questa cifra
+# in euro un ordine «Contanti al tabacchino» non si pubblica, a mercato
+# come a prezzo fisso. Lo giudica il foglio Pubblica (dalla busta delle
+# leve) e lo ripete la rotta del canale. Non dichiarata = 25; 0 = spento.
+BARATTOZON_MIN_EURO = 25
 # LE CARD P2P IN VETRINA (26 set 2026): gli ordini vivi del libro
 # compaiono anche fra gli annunci del mercatino, come card.
 # SPENTA le vedono solo i moderatori e chi e' in P2P_PROVA_IDS, per

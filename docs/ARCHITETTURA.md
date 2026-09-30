@@ -25882,8 +25882,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   il PayCode o lo sconto al server, quindi nessun giudice lato server
   su di loro: e' scritto, non dimenticato. Il verbale: CANTIERI, «Il
   percorso guidato di Barattozon».
-  I LIMITI DI AMAZON (23 set 2026): 999 € per ordine e NESSUN minimo
-  oltre lo zero, nessuna commissione — `P2P_PAYCODE_MAX_EURO` col
+  I LIMITI DI AMAZON (23 set 2026): 999 € per ordine e nessun minimo DI
+  AMAZON oltre lo zero (il minimo e' NOSTRO, dal 30 set 2026: il
+  paragrafo qui sotto), nessuna commissione — `P2P_PAYCODE_MAX_EURO` col
   giudice puro `giudiceImportoPayCodeP2P` (in centesimi) nel foglio e
   nel form a mano, e sul server `PAYCODE_EURO_MAX` con
   `_importo_paycode_valido` nella rotta del canale, sul solo
@@ -25892,6 +25893,54 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   digitale, oro, abbonamenti a Prime, buoni regalo, 1-Click) e i posti (tabaccheria,
   bar, edicola, posta) stanno nelle parole: tappe, riquadro, Info. Il
   verbale: CANTIERI, «I limiti di Amazon».
+  BARATTOZON A MERCATO O A PREZZO FISSO, MINIMO 25 € (30 set 2026,
+  decisione di Andrea, che rovescia il «solo a sats fissi» del 22 set e
+  il «nessun minimo» del 23). Nel foglio la LEVA «Tipo di prezzo» c'e'
+  anche col tabacchino — la stessa sezione degli altri ordini, con una
+  riga di aiuto sua (`notaTipoPrezzoTabP2P`) — e sta PRIMA del percorso,
+  perche' il passo 4 e il riepilogo cambiano parole con lei
+  (`valuta + metodi + importo + (tab ? tipo + percorso : percorso + tipo)`).
+  `campiNuovoP2P` passa `fisso` com'e' (prima lo spegneva col tabacchino)
+  e decide `ordineDaCampiP2P`: a PREZZO FISSO tutto com'era — l'intero
+  piu' vicino nel `fiat_amount`, `amount` = i sats esatti col premio
+  cotto, `premium` 0 —; a MERCATO `fiat_amount` = l'intero PER ECCESSO
+  (`euroFiloTabacchinoP2P`, dai centesimi), `amount` 0 e il premio del
+  percorso sul filo: i sats li fa il coordinatore alla presa su
+  quell'intero, chi paga al tabacchino riceve sempre almeno il valore
+  di quel che paga e la differenza — sotto un euro, fino al 4% sul
+  minimo — la assorbe chi pubblica. L'esatto resta nel `pm`, e i tre
+  lettori — il libro (`ordineDaEvento`), la restore
+  (`applicaMessaggioP2P`) e `_euro_libro` sul server — lo accettano se
+  combacia per difetto O per eccesso (`combaciaEsattoP2P`; sul server un
+  insieme di due interi, senza `math` perche' le prove estraggono la
+  funzione da sola): gli ordini gia' nel libro si leggono identici. La
+  stima a mercato (`satsMercatoP2P`) su un Barattozon sta sull'intero
+  per eccesso, che e' il numero su cui il coordinatore fara' i sats. Il
+  giudice del foglio (`valeNuovoOrdineP2P`): il minimo subito dopo il
+  tetto di Amazon; a mercato non chiede il cambio ne' guarda i tetti in
+  sats (come ogni ordine a mercato), a prezzo fisso tutto com'era; e il
+  ramo dei sats a mano vale solo fuori dal tabacchino
+  (`v.fisso && !tab`, preso dalle prove al primo giro). La riga viva del
+  passo 4 (`rigaPremioTabP2P(euro, cambio, premio, fisso)`) a mercato
+  dice «circa N sats al cambio di adesso … La cifra esatta si fissa alla
+  presa, su 26 €», la coda del passo dice quando si fissa il cambio, e
+  il riepilogo aggiunge «Prezzo: di mercato/fisso» e, a mercato, «Per il
+  calcolo dei sats l'importo è arrotondato a 26 €: la differenza di
+  0,53 € la metti tu» — solo se una differenza c'e'. Le card non
+  cambiano codice: `premioCardP2P` da' il premio del filo se `amt` e' 0
+  (fermo col bitcoin) e la convenienza di adesso se e' fisso, come per
+  ogni ordine. Il cambio della riga (`cambioPub`) si scrive solo a sats
+  fissi. IL MINIMO: `BARATTOZON_MIN_EURO` sul server (25 nel codice, il
+  config del VPS vince; 0 = spento; storta = 25 e lo dice), in busta con
+  le leve come `minEuroBz` (`minEuroBzP2P` nel client, 0 = spento);
+  giudice puro `giudiceMinimoPayCodeP2P` nel foglio, ACCANTO a quello del
+  tetto di Amazon e non dentro (il form a mano del recapito, che chiama
+  il tetto su un ordine gia' pubblicato, il minimo non lo guarda);
+  gemello `_paycode_sopra_minimo` nella rotta del canale, dopo il tetto;
+  la riga nel pannello «Stato delle leve» e in `config_esempio.py`; il
+  passo 2 e Info P2P lo dicono col numero vivo. Il custode non si nomina
+  a schermo: le frasi nuove dicono «si fissa alla presa». Il verbale:
+  CANTIERI, «Barattozon a mercato o a prezzo fisso, minimo 25 €».
   IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea, rifatto due volte;
   il terzo giro il 24): nel libro, su «Vendi BTC», dal fondo del + rosso
   della barra scende A TENDINA la sua continuazione (`#navBarattozon`):
