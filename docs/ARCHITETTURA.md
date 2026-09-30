@@ -2899,6 +2899,16 @@
   con `prefers-reduced-motion` da una regola che deve PESARE di piu'
   (sta prima nel foglio). La variante scartata sugli scatti era una
   lama di luce che attraversava la card.
+  DUE COLPI E BASTA (1 ott 2026): un giro solo di `sc-battito` (1,04s,
+  i due colpi di prima senza la pausa in coda) e la data resta ferma
+  nella forma di riposo. Le viste si spengono con display:none, e al
+  ritorno sulla home il browser farebbe ripartire l'animazione: a
+  battito FINITO (`animationend`, `battitoLancioFinito`) la classe
+  `fx-battito` se ne va e `battitoLancioFatto` la tiene fuori dai
+  ridisegni. Ribatte solo un'app riaperta o ricaricata. Un evento e
+  non un tempo, al contrario della scossa del logo del libro: qui
+  conta che il battito sia stato VISTO — con la home nascosta a meta'
+  corsa l'evento non arriva e al ritorno si rifa' intero.
   IN TESTA E NON IN CODA (decisione di Andrea, col costo ACCETTATO e
   misurato): a 320px si vede una card quasi piena piu' uno spicchio,
   quindi chi non scorre non vede piu' le offerte a tempo. La spinta

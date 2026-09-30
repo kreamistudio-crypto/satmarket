@@ -42811,6 +42811,25 @@ def prove_scoprire():
     _kb = _kb[:_kb.index("\n  }")]
     _picco = max(float(x) for x in re.findall(r"scale\(([\d.]+)\)", _kb))
     prova("il battito ingrandisce la data, e poco", True, 1 < _picco <= 1.15)
+    # ⚠️ DUE COLPI E BASTA (1 ott 2026, ritocco di Andrea): batteva per
+    # sempre. Un giro solo, e il giro sono i due colpi — due massimi
+    # sopra la scala 1 fra un inizio e una fine a riposo; a riposo vuol
+    # dire scala 1 e NIENTE alone, cosi' fermarsi e' tornare alla forma
+    # normale e non restare a meta' colpo.
+    _regB = _blocco("\n  .sc-lancio.fx-battito .sc-l-boom{")
+    prova("...e batte UNA volta sola, mai per sempre", (True, False),
+          (bool(re.search(r"animation:sc-battito [\d.]+s ease-in-out 1\s*$",
+                          _regB)), "infinite" in _regB))
+    _fermo = re.search(r"0%,100%\{transform:scale\(1\);text-shadow:none\}",
+                       _kb)
+    _colpi = [(float(p), float(s)) for p, s in
+              re.findall(r"\n    (\d+)%\{transform:scale\(([\d.]+)\)", _kb)]
+    _su = [s for _, s in sorted(_colpi)]
+    prova("...un giro che parte e finisce fermo, con due colpi dentro",
+          (True, 2), (bool(_fermo),
+                      sum(1 for i, s in enumerate(_su) if s > 1
+                          and (i == 0 or _su[i - 1] <= s)
+                          and (i == len(_su) - 1 or _su[i + 1] < s))))
     prova("...crescendo verso destra, dal suo bordo sinistro", True,
           "transform-origin:left center" in _blocco("\n  .sc-l-boom{"))
     _sposta = re.search(r'\.scoprire-card\[data-id="p2p"\] img\{left:'
@@ -42906,6 +42925,7 @@ def prove_scoprire_p2p(mini=None, node=None):
              + _fetta("function toccaLancioP2P(){", "\n}") + "\n"
              + _fetta("const vociScoprire = ", ";\n")
              + "\nlet scoprireFirma = '';\n"
+             + _fetta("let battitoLancioFatto = false;", "\n}") + "\n"
              + _fetta("function renderScoprire(){", "\n}") + "\n"
              + _fetta("function toccaScoperta(id){", "\n}"))
     js = _CARTONE_SCOPRIRE + pezzi + _BANCO_SCOPRIRE
@@ -43202,6 +43222,25 @@ dice('fino alla data dice il giorno, grande', [true, true, true],
 dice('...col battito, e senza il titolo dell app', [true, false],
      [cardP().includes('class="sc-lancio fx-battito"'),
       cardP().includes('class="sc-titolo"')]);
+// ⚠️ IL BATTITO SI SENTE UNA VOLTA PER APERTURA (1 ott 2026): finito,
+// la classe se ne va dal nodo e i ridisegni non la rimettono — sennò al
+// ritorno sulla home (display:none che torna visibile) batterebbe di nuovo
+dice('...e ascolta la fine del battito', true,
+     cardP().includes('onanimationend="battitoLancioFinito(event)"'));
+const lanciato = {tolte: [], classList: {remove(c){ lanciato.tolte.push(c); }}};
+battitoLancioFinito({animationName: 'altro', currentTarget: lanciato});
+dice('...un altro movimento dentro la card non lo spegne', [false, []],
+     [battitoLancioFatto, lanciato.tolte]);
+battitoLancioFinito({animationName: 'sc-battito', currentTarget: lanciato});
+dice('...a battito finito la classe se ne va, e se ne ricorda',
+     [true, ['fx-battito']], [battitoLancioFatto, lanciato.tolte]);
+rifai();
+dice('...e il ridisegno della fila non lo fa ripartire', [true, false],
+     [cardP().includes('class="sc-lancio"'), cardP().includes('fx-battito')]);
+battitoLancioFatto = false;   // un ricaricamento riparte da capo
+rifai();
+dice('...mentre all apertura dopo un ricaricamento batte di nuovo', true,
+     cardP().includes('class="sc-lancio fx-battito"'));
 dice('...e la riserva dice la stessa frase', true,
      cardP().includes('<span class="sc-emoji">₿</span>Scambio P2P: in arrivo il 10/10/26'));
 

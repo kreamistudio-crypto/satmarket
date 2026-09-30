@@ -32206,3 +32206,37 @@ Andrea e approvati.
 dice, e se è «scelto» (un `/sponsor ordine` del passato). Poi, pubblicata
 Una Garlanda, `/sponsor una-garlanda 30` e la fila. La card sul telefono
 coi loghi nuovi.
+
+## Il battito della card «P2P in arrivo» si ferma (1 ott 2026, ritocco di Andrea a 1dc7aa1)
+
+La data batteva per sempre (`infinite`, un giro da 2,6s con due colpi
+nel primo 40%). Adesso a ogni apertura batte DUE volte, come prima, e
+si ferma nella forma normale. Il giro è lo stesso senza la pausa in
+coda: 1,04s, percentuali divise per 0,4, stessi colpi allo stesso passo,
+e l'`animationend` arriva quando la data si ferma. Il CSS da solo
+bastava a non ciclare, ma le viste si spengono con display:none e al
+ritorno sulla home l'animazione sarebbe ripartita: a battito finito
+`battitoLancioFinito` toglie `fx-battito` e `battitoLancioFatto` la
+tiene fuori dai ridisegni; un ricaricamento riparte da `false`. Evento
+e non tempo (il contrario della scossa del logo del libro), perché
+conta che il battito sia stato VISTO: con la home nascosta a metà corsa
+non arriva, e al ritorno si rifà intero. Effetti ridotti e
+reduced-motion invariati. Il commento della regola universale, che
+diceva «nessuno ascolta animationend», ora nomina l'eccezione.
+
+**SCARTATO.** Solo `1` al posto di `infinite` (ribatteva a ogni ritorno
+sulla home); un timer come la scossa del logo (consumerebbe il battito
+anche a home nascosta).
+
+**PROVATO.** `prove_scoprire`: un giro solo e mai `infinite`, il giro
+che parte e finisce a riposo (scala 1, niente alone) con due colpi
+dentro. Banco di `prove_scoprire_p2p` coi pezzi veri: la card ascolta la
+fine, un'altra animazione non la spegne, a fine battito la classe se ne
+va e il ridisegno non la rimette, dopo un ricaricamento torna. Tortura
+9 su 9. Dal vivo via CDP a 375 px nei due temi, su una copia col relay
+morto: due colpi contati fotogramma per fotogramma (picco 1,0999), poi
+nessuna animazione, trasformazione e ombra a `none`; un giro fra le
+viste e la home non ribatte; ricaricata batte di nuovo; con
+`fx-ridotti` e con reduced-motion nessuna animazione; nessuno sbordo.
+
+**DA GUARDARE.** Sul telefono, all'apertura dentro Telegram.

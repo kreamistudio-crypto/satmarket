@@ -1293,14 +1293,28 @@
      si muove la data, mai il bersaglio. E si spegne con «Effetti
      ridotti» senza una riga in piu': la regola universale di
      html.fx-ridotti la porta a `none`, cioe' alla data ferma e senza
-     alone. */
+     alone.
+     ⚠️ DUE COLPI E BASTA (1 ott 2026, ritocco di Andrea): batteva per
+     sempre, e una cosa che pulsa in eterno in cima alla home smette di
+     dire «guarda» e comincia a disturbare. Adesso UN giro solo, cioe'
+     i due colpi di prima, e poi la data resta ferma nella sua forma
+     normale (fill di serie: finita l'animazione torna la regola di
+     riposo, scala 1 e niente alone). I keyframes sono QUELLI DI PRIMA
+     senza la pausa in coda: il vecchio giro durava 2,6s e i colpi
+     stavano nel primo 40% (1,04s), quindi 1,04s con le percentuali
+     divise per 0,4 fa gli stessi colpi allo stesso passo — e
+     l'`animationend` arriva quando la data si ferma, non un secondo e
+     mezzo dopo. Che non riparta a ogni ritorno sulla home (le viste
+     si spengono con display:none, e un'animazione riparte da capo
+     quando torna visibile) lo decide il JS: vedi
+     `battitoLancioFinito`. */
   .sc-lancio.fx-battito .sc-l-boom{
-    animation:sc-battito 2.6s ease-in-out infinite}
+    animation:sc-battito 1.04s ease-in-out 1}
   @keyframes sc-battito{
-    0%,40%,100%{transform:scale(1);text-shadow:none}
-    10%{transform:scale(1.1);text-shadow:0 0 .35em rgba(255,190,60,.75)}
-    20%{transform:scale(1);text-shadow:0 0 .15em rgba(255,190,60,.35)}
-    28%{transform:scale(1.06);text-shadow:0 0 .3em rgba(255,190,60,.6)}
+    0%,100%{transform:scale(1);text-shadow:none}
+    25%{transform:scale(1.1);text-shadow:0 0 .35em rgba(255,190,60,.75)}
+    50%{transform:scale(1);text-shadow:0 0 .15em rgba(255,190,60,.35)}
+    70%{transform:scale(1.06);text-shadow:0 0 .3em rgba(255,190,60,.6)}
   }
   /* LA PASTIGLIA CHE DICE «e' pubblicita'» (ago 2026): sta in alto a
      DESTRA, l'angolo libero — il titolo delle sorelle vive a
@@ -9192,6 +9206,8 @@
      `none` E NON UNA DURATA A ZERO: e' la strada che quei blocchi
      battono da mesi, e in tutto il file nessuno ascolta `transitionend`
      o `animationend` — i cambi di stato restano, arrivano di scatto.
+     (L'unico ascolto, il battito della card «P2P in arrivo», e' fatto
+     apposta per NON arrivare coi ridotti: la data e' gia' ferma.)
      QUEL CHE LA REGOLA NON PUO' FARE DA SOLA sta scritto sotto di lei,
      e `prove_effetti_ridotti` lo censisce perche' un effetto nuovo non
      le sfugga: 1) dove c'era una sfocatura serve un COLORE PIENO, o il
@@ -16872,6 +16888,28 @@ function toccaLancioP2P(){
 const vociScoprire = () => SCOPRIRE.filter(v => v.inTesta)
   .concat(vociSponsor(), SCOPRIRE.filter(v => !v.inTesta));
 let scoprireFirma = '';
+/* IL BATTITO SI SENTE UNA VOLTA PER APERTURA (1 ott 2026, ritocco di
+   Andrea): la data della card «P2P in arrivo» batte due volte e si
+   ferma. Il CSS da solo non basta: le viste si spengono con
+   display:none, e al ritorno sulla home il browser farebbe ripartire
+   l'animazione da capo — cioe' due colpi a OGNI giro fra le schede.
+   Quindi a battito FINITO la classe se ne va e il segnalino lo ricorda
+   ai ridisegni della fila; un ricaricamento (o l'app riaperta) riparte
+   da `false`, e allora batte di nuovo.
+   `animationend` E NON UN TEMPO, al contrario della scossa del logo
+   del libro, e per la ragione opposta: li' serviva togliere la classe
+   anche a vista nascosta, qui serve che il battito sia stato VISTO.
+   Con la home nascosta a meta' corsa (un annuncio aperto da un link)
+   l'evento non arriva, la classe resta e il battito si rifa' intero al
+   ritorno; con gli effetti ridotti l'animazione non c'e', l'evento
+   nemmeno, e la data e' gia' ferma. Il nome si guarda perche' dentro
+   la card potra' muoversi altro, e il suo evento sale fin qui. */
+let battitoLancioFatto = false;
+function battitoLancioFinito(e){
+  if (e.animationName !== 'sc-battito') return;
+  battitoLancioFatto = true;
+  e.currentTarget.classList.remove('fx-battito');
+}
 function renderScoprire(){
   /* Col barattolo restano le sole card che NAVIGANO (ago 2026,
      decisione di Andrea): le card-INTERRUTTORE accendono filtri del
@@ -16947,7 +16985,9 @@ function renderScoprire(){
        battito della data nella classe. Testi nostri, ma passano da
        esc() lo stesso — la regola di questo template. */
     const l = v.lancio ? lancioP2P() : null;
-    const lancio = !l ? '' : `<span class="sc-lancio fx-battito" aria-hidden="true"
+    const lancio = !l ? '' : `<span class="sc-lancio${battitoLancioFatto
+      ? '' : ' fx-battito'}" aria-hidden="true"
+      onanimationend="battitoLancioFinito(event)"
       ><span class="sc-l-pre">${esc(l.pre)}</span>${l.riga
         ? `<span class="sc-l-riga">${esc(l.riga)}</span>` : ''
       }<span class="sc-l-boom${l.lungo ? ' lungo' : ''}">${esc(l.boom)}</span></span>`;
