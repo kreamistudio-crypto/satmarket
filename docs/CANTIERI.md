@@ -31507,3 +31507,82 @@ le righe, non le famiglie; la ricerca AI non riduce le famiglie.
 DA GUARDARE: dopo il deploy, il primo giro dei connettori nel journal e
 le famiglie di AGORA con la query di PRODUZIONE; poi le 129 righe
 rimesse in vetrina, e la home.
+
+## Una Garlanda: le foto, il banner e il logo (30 set 2026)
+
+**LA RICHIESTA.** Manuele ha mandato i materiali della pagina in bozza
+(«Una Garlanda in bozza», 23 set): le foto coi nomi originali, il
+banner e il logo. Abbinare le foto ai sette segnaposto trattandole come
+quelle di «Un tempo per te», il banner come il suo, il logo della card
+«Consigliati» con `prepara_logo_consigliato.py`. LA PAGINA RESTA IN
+BOZZA: la pubblica Andrea dal pannello dopo l'ok di Manuele.
+
+**LE FOTO, cinque su sei.** Copertina il labirinto nella risaia dall'alto
+(`15-47-06`, 21:9 al centro), le varietà i sacchetti e i chicchi
+(`15-47-15`), l'ecosistema risaie, alberi e stagni (`15-47-07`), la
+pileria le macine (`15-47-17`), le persone la famiglia (`15-47-21`), il
+logo il fiore del riso da `logo.png`. Restano fuori `15-47-14`, `-19`,
+`-23`, `-24 (2)` e `-25`. La ricetta di «Un tempo per te»: WebP q82
+senza metadati, mai ingrandite, sotto i 250 KB — e per starci la
+copertina (1120x480) e la famiglia (1200x675) scendono DI LATO invece
+che di qualità: 1120 basta a 375 px a densità 3. Nessuna verticale da
+ritagliare quadrata: erano tutte orizzontali.
+IL LOGO DENTRO LA STORIA sta su una TELA QUADRATA trasparente
+(599x599): la foto piccola è larga al più 200 px e il segnaposto
+l'aveva promessa quadrata come marchio e QR, mentre il fiore, verticale,
+usciva alto 340. Si è toccato il file e non il CSS.
+
+**IL QR DI ECOOASI È USCITO DAL CATALOGO** (decisione di Andrea, a metà
+cantiere): non è ancora attivo e non si sa quando lo sarà. La prima
+stesura lo teneva come segnaposto con una chiave `in_arrivo` per blocco
+(renderer, prove, collaudo); tolto il QR non la usava più nessuno, ed è
+stata tolta tutta invece di restare codice senza clienti. Il giorno che
+arriva torna come foto 4, piccola, sotto l'elenco che nomina EcoOasi (lo
+dice il commento nel catalogo).
+
+**IL BANNER NON È NELLA TESTATA DELLA PAGINA**: per «Un tempo per te» è
+la card del negozio nella pagina «Consigliati» (e dello spazio di «Da
+scoprire»), e così qui. Il primo banner (2:1) si ritagliava di 21 px
+sopra e sotto; Andrea l'ha poi rimandato già a 1040x498, e si usa così
+com'è — solo WebP q85 senza metadati (il profilo era sRGB: toglierlo non
+sposta i colori). CON IL BANNER LA PAGINA È ANCHE SPONSORIZZABILE, la
+regola del 24 set (`slug_sponsorizzabili`): tre prove dell'ordine degli
+sponsor avevano l'elenco scritto a mano con due nomi e sono diventate
+rosse; adesso leggono gli altri spazi dal vocabolario. Lo stesso in
+`collaudo_sponsor` (tre rosse): il vocabolario si confronta col catalogo,
+l'esempio del bot col primo spazio, e l'avviso «pagina in bozza» si
+cerca sulla riga di QUELLA pagina — nel messaggio intero adesso lo
+scrive anche Una Garlanda, e un server che non lo dicesse più per «Un
+tempo per te» passava muto (provato con la mutazione: rosso per riga,
+verde col messaggio intero).
+IL LOGO DELLA CARD da `prepara_logo_consigliato.py` (246x432), col peso
+al 59% dell'altezza: `logo_giu` -6, la stessa misura del -4 di «Un tempo
+per te» al 56%. Logo e banner contano solo a pagina pubblicata.
+
+**IL BANCO CHE GIUDICAVA PER IL VICINO.** Il banco del renderer delle
+pagine in bozza passa ogni pagina del catalogo con le STESSE etichette,
+e raccoglieva gli esiti in un DIZIONARIO: vinceva l'ultima pagina, e i
+controlli di Una Garlanda li giudicava «Un tempo per te». Si è visto
+perché una mutazione del renderer è passata muta. Adesso è una lista
+(chiesto da Andrea): la famiglia sale da 132 a 149 prove, e la stessa
+mutazione che tocca solo la foto piccola — che ha solo Una Garlanda — è
+rossa con la lista e verde col dizionario, provato tutt'e due.
+
+**PROVATO.** Suite intera severa senza config nel worktree ribasato su
+481d184: 17.448 verdi e 0 rosse; i 28 collaudi della CI nella gabbia. Tortura:
+la mutazione del banco qui sopra (le prove delle foto — file che ci
+sono, WebP senza metadati, 21:9, sotto i 250 KB — sono quelle di «Un
+tempo per te», che adesso girano anche su Una Garlanda). Dal vivo via CDP a 375 px
+nei due temi, su una COPIA dell'albero con la pagina legata al
+venditore di collaudo 222 e un config nuovo da `config_esempio.py`
+(collaudo acceso, relay morto): l'anteprima del moderatore con le sei
+immagini caricate e nessun segnaposto, la vista del venditore, e la
+pagina «Consigliati» col banner — per quella la pagina è stata segnata
+pubblicata SOLO nel database finto, senza premere «Pubblica», e poi
+rimessa in bozza. Nessuno sbordo. Scatti mandati ad Andrea e approvati
+prima del push.
+
+**DA GUARDARE.** Dopo che Andrea la pubblica: la card nei «Consigliati»
+e il logo nella fila delle categorie sul telefono (il -6 è una
+taratura, non una misura vista lì). Il QR, il giorno che EcoOasi è
+attiva.
