@@ -24301,6 +24301,49 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   primi `MAX_ENTRATI_REPORT`), la notifica li elenca e il cassetto li
   mostra (`riepilogoGiroConnettore`). Il perché in CANTIERI, «Varianti
   e prodotti digitali dai negozi collegati».
+- LE FAMIGLIE DI VARIANTI (30 set 2026, il negozio AGORA): l'esplosione
+  resta — un annuncio per variante, col suo prezzo, la sua giacenza, i
+  suoi ordini e il suo deposito di garanzia — e SOPRA ci si scrive la
+  famiglia. Tre colonne additive su `annunci`: `famiglia` ('' = nessuna,
+  il mondo di ieri), `famiglia_titolo` e `opzioni` (JSON
+  `[[nome, valore], ...]`). Le calcola `assegna_famiglie` in `traduci`,
+  PURA, sul catalogo letto nel giro: le varianti dello stesso padre sono
+  `p:<padre>`; prodotti DIVERSI il cui titolo differisce SOLO per un
+  numero d'edizione col cancelletto («#7», «#07/21», uno solo nel
+  titolo, confronto su lettere e cifre in minuscolo, quindi emoji e
+  spazi non contano) sono `e:<radice>` col «Numero» in testa alle
+  opzioni. Le scrive `_scrivi_famiglia` alla nascita e a ogni
+  aggiornamento, su ogni stato, col collegamento davanti
+  (`c<id>:...`): due negozi non si mescolano, e una famiglia che si
+  scioglie torna vuota al giro dopo. Le opzioni: Woo dagli `attributes`
+  della variazione, Shopify coi nomi di `options` del padre e i valori
+  `option1..3` della variante. LA VETRINA mostra il CAPOFILA
+  (`SQL_CAPOFILA`: la variante attiva più economica, a parità la più
+  vecchia) come condizione della WHERE — così paginazione, finestra
+  scorrevole, totale e conteggi restano quelli di sempre; vale in
+  vetrina, conteggi, regioni e negozio, e gli esauriti del negozio
+  hanno il gemello (`SQL_CAPOFILA_ESAURITI`: una famiglia viva non si
+  ripete fra gli esauriti, una finita ci va una volta). LA RICERCA per
+  parole no: lì la famiglia si riduce DOPO, alla prima variante
+  PERTINENTE (chi cerca il #07 trova il 7). `arricchisci_righe_vetrina`
+  aggiunge `famiglia_n` (le attive) e `famiglia_varia` (prezzi
+  diversi: la card dice «da»), `/api/listings/{id}` le sorelle
+  (`famiglia_varianti`: id, stato, opzioni; attive ed esaurite, al più
+  `MAX_SORELLE_FAMIGLIA`). IL CLIENT: la card di una famiglia porta il
+  titolo della famiglia, «N varianti» nello slot dei badge (per ultima,
+  e «Ne resta 1» tace) e «da» sul cartellino; la scheda i bottoncini
+  per opzione (`htmlVarianti`, i numeri in ordine di numero se sono
+  TUTTI numeri, sennò l'ordine del negozio) e un tocco APRE LA SCHEDA
+  DELLA SORELLA (`scegliVariante`, prima le disponibili e fra loro la
+  più simile) sostituendo il passo nella cronologia (`navSostituisci`).
+  Al carrello e all'ordine va la variante scelta perché È un annuncio:
+  nessun percorso d'acquisto sa che esiste una famiglia. IL CARRELLO:
+  `rileggiVenditore` non spegne più come «venduto» le sorelle di una
+  famiglia viva che il negozio non elenca (ne porta il capofila) — per
+  quelle nel carrello chiede la scheda —, `annunciPacco` tiene le
+  varianti scelte e una sola per famiglia senza scelte, e la cella
+  parla della SUA variante. «Altri oggetti» non ripropone la stessa
+  famiglia. Il perché in CANTIERI, «Le famiglie di varianti».
 - I CONNETTORI DEL NEGOZIO (ago 2026, cantiere in corso — oggi ci sono
   le TAPPE 1 e 2: schema, giudice, censimento, il modulo col
   traduttore Shopify e il giro orario a leva spenta. Il resto è

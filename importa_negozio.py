@@ -23,10 +23,13 @@ i traduttori e la riconciliazione restano PURI, cioe' collaudabili in
 `prove.py` con un catalogo di cartone.
 """
 import base64
+import hashlib
 import json
 import re
 import sqlite3
 import time
+import unicodedata
+from collections import Counter
 
 # La versione dell'API Shopify vive in una COSTANTE e non dentro gli
 # URL: quelle date hanno un ciclo di deprecazione (Shopify ne ritira
@@ -415,9 +418,16 @@ def esplodi_shopify(p: dict) -> list:
         return [p]
     pid = p.get("id")
     foto = [i for i in (p.get("images") or []) if isinstance(i, dict)]
+    # i NOMI delle opzioni stanno sul padre («Taglia», «Colore»), i
+    # valori sulla variante (option1..option3), nello stesso ordine
+    nomi = [str(o.get("name") or "").strip()
+            for o in (p.get("options") or []) if isinstance(o, dict)]
     figli = []
     for n, v in enumerate(varianti, 1):
         vid = v.get("id")
+        opzioni = [[nomi[i] if i < len(nomi) and nomi[i] else "Variante",
+                    str(v.get(f"option{i + 1}")).strip()]
+                   for i in range(3) if v.get(f"option{i + 1}")]
         # la foto DELLA variante davanti alle altre: il cartaceo ha la
         # sua copertina, e in vetrina e' la prima che si vede
         sue = [i for i in foto if v.get("image_id")
@@ -428,6 +438,8 @@ def esplodi_shopify(p: dict) -> list:
             p.get("title"), v.get("title") or f"variante {n}")
         figlio["variants"] = [v]
         figlio["images"] = sue + [i for i in foto if i not in sue]
+        figlio["_opzioni"] = opzioni or [["Variante", str(
+            v.get("title") or f"variante {n}").strip()]]
         figli.append(figlio)
     return figli
 
@@ -459,10 +471,9 @@ def esplodi_woo(p: dict) -> list:
         if not isinstance(v, dict):
             continue
         vid = v.get("id")
-        opzioni = ", ".join(
-            str(a.get("option")).strip()
-            for a in (v.get("attributes") or [])
-            if isinstance(a, dict) and a.get("option"))
+        attributi = [a for a in (v.get("attributes") or [])
+                     if isinstance(a, dict) and a.get("option")]
+        opzioni = ", ".join(str(a.get("option")).strip() for a in attributi)
         nome = opzioni or str(v.get("sku") or "").strip() or f"variante {n}"
         gestito, scorte = v.get("manage_stock"), v.get("stock_quantity")
         if gestito == "parent" or gestito is None:
@@ -489,6 +500,9 @@ def esplodi_woo(p: dict) -> list:
             "virtual": bool(v.get("virtual")) or bool(p.get("virtual")),
             "downloadable": (bool(v.get("downloadable"))
                              or bool(p.get("downloadable"))),
+            "_opzioni": [[str(a.get("name") or "").strip() or "Variante",
+                          str(a.get("option")).strip()]
+                         for a in attributi] or [["Variante", nome]],
         })
     return figli or [p]
 
@@ -510,9 +524,109 @@ def traduci(prodotti: list, fonte: str, cambio: dict) -> list:
     for p in prodotti:
         if not isinstance(p, dict):
             continue
+        # il titolo del PADRE, letto con la stessa ricetta dei figli:
+        # e' quello su cui si riconosce un'edizione numerata
+        titolo_padre = testo_negozio(p, fonte)[0]
         for figlio in esplodi(p):
-            righe.append(tr(figlio, cambio))
+            riga = tr(figlio, cambio)
+            riga["_padre"] = str(p.get("id") or "")
+            riga["_titolo_padre"] = titolo_padre
+            riga["_opzioni"] = figlio.get("_opzioni") or []
+            righe.append(riga)
+    assegna_famiglie(righe)
     return righe
+
+
+# --- LE FAMIGLIE (set 2026) --------------------------------------------
+# Il difetto dal campo: il negozio AGORA ha fatto entrare 150 righe
+# quasi identiche — «COWBOY Limited Edition #N/21 — Golden Yellow,
+# TAGLIA» — e la home si e' riempita di magliette gialle uguali.
+# L'ESPLOSIONE RESTA (un annuncio per variante, col suo prezzo e la sua
+# giacenza: e' quel che il motore dei soldi sa comprare, spedire e
+# rimborsare), e SOPRA ci si scrive la FAMIGLIA: quali righe sono lo
+# stesso prodotto, e con quali opzioni si distinguono. La vetrina ne
+# mostra una card sola, la scheda i bottoncini per scegliere.
+# DUE REGOLE, e la seconda e' stretta apposta:
+# · le varianti dello stesso prodotto padre sono una famiglia;
+# · prodotti DIVERSI dello stesso negozio il cui titolo differisce
+#   SOLO per un numero d'edizione col cancelletto («#7», «#07/21») sono
+#   una famiglia sola, col «Numero» come opzione in piu'. Solo col
+#   cancelletto: «Scarpe 42/43» o «Set 3 pezzi» non si toccano mai.
+#   Il confronto ignora maiuscole, spazi, emoji e segni (il #09 di
+#   AGORA porta «💛 » davanti al titolo, ed e' lo stesso prodotto).
+# Un prodotto con una variante sola e senza edizione resta com'era:
+# nessuna famiglia, nessuna differenza.
+
+_EDIZIONE = re.compile(r"#\s*(\d{1,4})(?:\s*/\s*(\d{1,4}))?")
+
+
+def _radice_titolo(titolo: str) -> str:
+    """La forma di confronto: solo lettere e cifre, in minuscolo."""
+    t = unicodedata.normalize("NFKC", str(titolo or "")).casefold()
+    return "".join(c for c in t if c.isalnum())
+
+
+def _pulisci_titolo(titolo: str) -> str:
+    """Il titolo senza il numero d'edizione, per la card di famiglia."""
+    t = _EDIZIONE.sub(" ", str(titolo or ""))
+    t = re.sub(r"\s{2,}", " ", t).strip(" \t-–—,·|")
+    return t or str(titolo or "").strip()
+
+
+def edizione_titolo(titolo: str):
+    """(radice, numero) se il titolo porta UN numero d'edizione col
+    cancelletto, altrimenti None. Due numeri nello stesso titolo non si
+    sa quale sia l'edizione: niente famiglia, meglio che indovinare."""
+    trovati = _EDIZIONE.findall(str(titolo or ""))
+    if len(trovati) != 1:
+        return None
+    radice = _radice_titolo(_EDIZIONE.sub(" ", titolo))
+    if not radice:
+        return None
+    num, di = trovati[0]
+    return radice, f"{num}/{di}" if di else num
+
+
+def assegna_famiglie(righe: list) -> None:
+    """Scrive su ogni riga `famiglia` (la chiave dentro il negozio, ''
+    = nessuna), `famiglia_titolo` e `opzioni` ([[nome, valore], ...]).
+    PURA: lavora sul catalogo letto in questo giro, e la chiave del
+    collegamento la aggiunge chi scrive (`_scrivi_famiglia`), cosi' due
+    negozi con lo stesso id di prodotto non si mescolano mai."""
+    vive = [r for r in righe if not r.get("saltato_perche")]
+    for r in righe:
+        r["famiglia"], r["famiglia_titolo"], r["opzioni"] = "", "", []
+    padri = {}
+    for r in vive:
+        padri.setdefault(r.get("_padre") or r["origine_chiave"], []).append(r)
+    # le edizioni: padri diversi con la stessa radice e un numero
+    edizioni = {}
+    for padre, figli in padri.items():
+        ed = edizione_titolo(figli[0].get("_titolo_padre") or "")
+        if ed:
+            edizioni.setdefault(ed[0], []).append((padre, ed[1]))
+    in_edizione = {}
+    for radice, membri in edizioni.items():
+        if len(membri) < 2:
+            continue
+        chiave = "e:" + hashlib.sha1(radice.encode()).hexdigest()[:12]
+        titoli = Counter(_pulisci_titolo(padri[p][0].get("_titolo_padre"))
+                         for p, _ in membri)
+        titolo = titoli.most_common(1)[0][0]
+        for padre, numero in membri:
+            in_edizione[padre] = (chiave, titolo, numero)
+    for padre, figli in padri.items():
+        if padre in in_edizione:
+            chiave, titolo, numero = in_edizione[padre]
+            for r in figli:
+                r["famiglia"], r["famiglia_titolo"] = chiave, titolo
+                r["opzioni"] = [["Numero", numero]] + list(
+                    r.get("_opzioni") or [])
+        elif len(figli) > 1:
+            titolo = figli[0].get("_titolo_padre") or ""
+            for r in figli:
+                r["famiglia"], r["famiglia_titolo"] = f"p:{padre}", titolo
+                r["opzioni"] = list(r.get("_opzioni") or [])
 
 
 # --- LA LETTURA DEL CATALOGO ------------------------------------------
@@ -1135,6 +1249,22 @@ def _riga_locale(con, connettore_id: int, chiave: str):
         (connettore_id, chiave)).fetchone()
 
 
+def _scrivi_famiglia(con, annuncio_id: int, connettore_id: int, r: dict):
+    """La famiglia della riga, a OGNI giro e su ogni stato (anche in
+    revisione e venduto): la decide il catalogo letto oggi, e una
+    famiglia che si scioglie torna vuota qui. La chiave porta il
+    collegamento davanti, cosi' due negozi non si mescolano mai.
+    Niente `modificato`: non e' un cambio del testo dell'annuncio."""
+    fam = r.get("famiglia") or ""
+    con.execute(
+        "UPDATE annunci SET famiglia=?, famiglia_titolo=?, opzioni=? "
+        "WHERE id=?",
+        (f"c{connettore_id}:{fam}" if fam else "",
+         (r.get("famiglia_titolo") or "")[:MAX_TITOLO] if fam else "",
+         json.dumps(r.get("opzioni") or [], ensure_ascii=False)
+         if fam else "", annuncio_id))
+
+
 def consegna_riga(connettore: dict, digitale: bool) -> dict:
     """La consegna e i costi da scrivere su UNA riga: quelli del
     cassetto per la merce che viaggia, «digitale» e tutto a zero per
@@ -1407,6 +1537,7 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
          -1 if r.get("quantita") is None else r["quantita"],
          adesso, adesso, stato))
     nuovo = cur.lastrowid
+    _scrivi_famiglia(con, nuovo, cid, r)
     # le foto DOPO l'insert: il nome del file vuole l'id
     foto = _foto_locali(con, nuovo, r["foto"], salva_foto)
     if foto:
@@ -1449,6 +1580,7 @@ def _aggiorna(con, gia, r: dict, connettore: dict, salva_foto, marchio,
         con.execute("UPDATE annunci SET quantita=?, "
                     "quantita_max=MAX(quantita_max,?) WHERE id=?",
                     (quantita, quantita, gia["id"]))
+    _scrivi_famiglia(con, gia["id"], connettore["id"], r)
     # --- la consegna (set 2026) ---------------------------------------
     # LA RIGA CHE CORREGGE IL PREGRESSO: un corso online importato
     # ieri con «🚚 Spedizione» e «🤝 Ritiro» torna digitale al primo

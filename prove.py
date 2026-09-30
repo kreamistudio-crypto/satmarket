@@ -17564,8 +17564,11 @@ def prove_stock_raccontato():
     prova("la ricerca AI resta ai soli attivi", True,
           "WHERE a.stato='attivo'" in corpo("cerca"))
     neg = corpo("negozio")
+    # (30 set 2026, le famiglie) il filtro degli attivi porta con se'
+    # il capofila: una famiglia di varianti e' una card anche qui
     prova("nel negozio gli attivi tengono il loro filtro", True,
-          "dove = \"a.venditore_id=? AND a.stato='attivo'\"" in neg)
+          "dove = f\"a.venditore_id=? AND a.stato='attivo' AND "
+          "{SQL_CAPOFILA}\"" in neg)
     # lo scaffale e' una query A PARTE: non entra nel `dove`, quindi
     # non tocca ne' `totale` ne' il cursore
     prova("lo scaffale non entra nel conteggio degli attivi", True,
@@ -33752,8 +33755,11 @@ def prove_anteprime():
     corpo_rotta = corpo_rotta[:corpo_rotta.index("\n\n\n")]
     stati_scheda = _re.findall(r"stato IN \(([^)]+)\)", corpo_rotta)
     stati_meta = _re.findall(r"stato IN \(([^)]+)\)", pezzo("_seo_annuncio"))
+    # (30 set 2026, le famiglie) la rotta ha un secondo `stato IN`, le
+    # sorelle della famiglia: si confronta l'INSIEME degli stati, e le
+    # sorelle devono stare negli stessi della scheda
     prova("l'anteprima parla degli stessi stati che la scheda serve",
-          stati_scheda, stati_meta)
+          sorted(set(stati_scheda)), stati_meta)
 
     # --- 6) il negozio: quel che esce e quel che non esce -----------
     neg = mn("rosina")
@@ -79735,6 +79741,8 @@ let tourInCorso = false, tourP2PInCorso = false, testModaleInCorso = false;
 let vistaBarattolo = false, filtroAsta = false, pollTimer = null;
 const DEMO = false, STORIA = true;
 let navSpingi = false, navGradinoReparto = 0, navApplicando = false, uscitaDopoAnnullo = false;
+/* (30 set 2026) la sorella di navSpingi: la scelta di una variante */
+let navSostituisci = false;
 let navUltimo = 0, navGiuInVolo = 0, navGuardiano = null;
 const location = {href: 'https://barattolo.store/', protocol: 'https:'};
 const tg = {get initData(){ return MODO === 'tg' ? 'x' : ''; }, close(){ CHIUSO++; },
@@ -90715,6 +90723,9 @@ def prove_connettori_ingresso():
               spedizione_extra_sats INT,
               fonte TEXT, connettore_id INT, origine_chiave TEXT,
               origine_foto TEXT, origine_stock_visto INT,
+              -- (set 2026) la famiglia la scrive il connettore
+              famiglia TEXT DEFAULT '', famiglia_titolo TEXT DEFAULT '',
+              opzioni TEXT DEFAULT '',
               creato INT, modificato INT, stato TEXT);
             CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
               stato TEXT, aggiornato INT);
@@ -91073,6 +91084,9 @@ def prove_connettori_varianti():
               taglia_pacco TEXT DEFAULT '',
               fonte TEXT, connettore_id INT, origine_chiave TEXT,
               origine_foto TEXT, origine_stock_visto INT,
+              -- (set 2026) la famiglia la scrive il connettore
+              famiglia TEXT DEFAULT '', famiglia_titolo TEXT DEFAULT '',
+              opzioni TEXT DEFAULT '',
               creato INT, modificato INT, stato TEXT);
             CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
               stato TEXT, aggiornato INT);
@@ -91259,6 +91273,363 @@ def prove_connettori_varianti():
                or "Maglia &amp; co: ha piu' varianti" in h])
         prova("...coi titoli del negozio escapati", (True, False),
               ("Libro &lt;0&gt;" in h, "<0>" in h))
+
+
+def prove_famiglie():
+    """LE FAMIGLIE DI VARIANTI (30 set 2026, il negozio AGORA): 19
+    prodotti «COWBOY Limited Edition #N/21» con le loro taglie facevano
+    150 annunci quasi uguali, e la home era piena di magliette gialle.
+    Ogni variante RESTA un annuncio (prezzo, giacenza, ordini, deposito
+    di garanzia: il motore dei soldi non cambia), la famiglia li lega e
+    la vetrina ne mostra uno.
+
+    LE COSE CHE QUI POSSONO ROMPERSI IN SILENZIO: il #09 col «💛 »
+    davanti che resta fuori dalla famiglia; un «42/43» o due numeri
+    nello stesso titolo presi per un'edizione; due negozi con lo stesso
+    id di prodotto mescolati; il capofila che non e' il piu' economico
+    o che e' un esaurito; le varianti finite di una famiglia viva
+    ripetute fra gli esauriti del negozio; la ricerca che cerca il #07 e
+    trova il capofila; un bottoncino che porta a una variante esaurita
+    quando ce n'e' una viva; i numeri in ordine alfabetico (01, 10, 02).
+    Le funzioni pure si GIRANO (anche il client, in node), il SQL gira
+    su un database di cartone, il resto del server si legge per forma."""
+    print("\n[le famiglie di varianti]")
+    import sqlite3, subprocess, tempfile
+    src = open("importa_negozio.py", encoding="utf-8").read()
+    m = {}
+    exec(compile(src, "importa_negozio.py", "exec"), m)
+    traduci, edizione = m["traduci"], m["edizione_titolo"]
+    CAMBIO = {"EUR": 100_000.0}
+
+    # --- il riconoscimento dell'edizione ----------------------------
+    prova("«#01/21» e' un'edizione, col numero come lo scrive il negozio",
+          "01/21", (edizione("COWBOY Limited Edition #01/21") or ("", ""))[1])
+    prova("...e «#7» pure", "7", (edizione("Stampa #7") or ("", ""))[1])
+    prova("il cuore davanti non cambia la radice", True,
+          edizione("💛 ɅGOᏒɅ COWBOY Limited Edition #09/21")[0]
+          == edizione("ɅGOᏒɅ COWBOY Limited Edition #01/21")[0])
+    prova("...e nemmeno maiuscole e spazi", True,
+          edizione("cowboy  LIMITED edition #3")[0]
+          == edizione("COWBOY Limited Edition #4")[0])
+    prova("senza cancelletto non e' un'edizione («Scarpe 42/43»)", None,
+          edizione("Scarpe 42/43"))
+    prova("due numeri nello stesso titolo: non si indovina", None,
+          edizione("Poster #1 e #2"))
+    prova("un titolo che e' SOLO un numero non fa radice", None,
+          edizione("#12"))
+
+    # --- l'assegnazione, sul percorso vero di traduci ----------------
+    def var(vid, taglia, prezzo="30.00", disp="instock"):
+        return {"id": vid, "price": prezzo, "regular_price": prezzo,
+                "status": "publish", "manage_stock": False,
+                "stock_quantity": None, "stock_status": disp,
+                "virtual": False, "downloadable": False,
+                "attributes": [{"name": "Colore", "option": "Golden Yellow"},
+                               {"name": "Taglia", "option": taglia}]}
+
+    def woo(pid, nome, variazioni=None):
+        return {"id": pid, "name": nome, "type": "variable" if variazioni
+                else "simple", "description": "<p>Maglia</p>",
+                "status": "publish", "catalog_visibility": "visible",
+                "price": "30.00", "regular_price": "30.00",
+                "manage_stock": False, "stock_quantity": None,
+                "stock_status": "instock", "images": [],
+                "categories": [{"name": "Abbigliamento"}],
+                **({"_variazioni": variazioni} if variazioni else {})}
+
+    righe = traduci([
+        woo(1, "ɅGOᏒɅ COWBOY Limited Edition #01/21",
+            [var(11, "S"), var(12, "M")]),
+        woo(9, "💛 ɅGOᏒɅ COWBOY Limited Edition #09/21",
+            [var(91, "S"), var(92, "M")]),
+        woo(37, "ɅGOᏒɅ COWBOY 1st EDITION", [var(371, "M"), var(372, "L")]),
+        woo(50, "Scarpe 42/43"),
+        woo(60, "Stampa #3/10"),
+        woo(70, "Poster #1 e #2"), woo(71, "Poster #3 e #4"),
+        woo(80, "Quadro #1/5"), woo(81, "Quadro #2/5"),
+    ], "woo", CAMBIO)
+    per = {r["origine_chiave"]: r for r in righe}
+    prova("nessuna riga saltata", [], [r["origine_chiave"] for r in righe
+                                      if r["saltato_perche"]])
+    cow = [per[k] for k in ("1:11", "1:12", "9:91", "9:92")]
+    prova("le magliette numerate sono UNA famiglia, il #09 compreso",
+          1, len({r["famiglia"] for r in cow}))
+    prova("...di edizione", True, cow[0]["famiglia"].startswith("e:"))
+    prova("...col titolo senza numero", "ɅGOᏒɅ COWBOY Limited Edition",
+          cow[2]["famiglia_titolo"])
+    prova("...e il Numero davanti alle opzioni del negozio",
+          [["Numero", "09/21"], ["Colore", "Golden Yellow"], ["Taglia", "M"]],
+          per["9:92"]["opzioni"])
+    prova("la 1st EDITION e' la famiglia del suo padre",
+          ("p:37", "ɅGOᏒɅ COWBOY 1st EDITION",
+           [["Colore", "Golden Yellow"], ["Taglia", "L"]]),
+          (per["37:372"]["famiglia"], per["37:372"]["famiglia_titolo"],
+           per["37:372"]["opzioni"]))
+    prova("i numerati SEMPLICI fanno famiglia col solo Numero",
+          (True, [["Numero", "2/5"]]),
+          (per["80"]["famiglia"] == per["81"]["famiglia"] != "",
+           per["81"]["opzioni"]))
+    prova("nessuna famiglia per 42/43, un numerato solo e i doppi numeri",
+          ["", "", "", ""],
+          [per[k]["famiglia"] for k in ("50", "60", "70", "71")])
+    prova("...e nemmeno opzioni", [[], []],
+          [per["50"]["opzioni"], per["60"]["opzioni"]])
+    # la famiglia si calcola sulle righe VIVE: una saltata non la tiene
+    # in piedi (e non ne prende una)
+    solo = traduci([woo(1, "ɅGOᏒɅ COWBOY Limited Edition #01/21",
+                        [var(11, "S"), var(12, "M")]),
+                    dict(woo(9, "💛 ɅGOᏒɅ COWBOY Limited Edition #09/21",
+                             [var(91, "S")]), name="")], "woo", CAMBIO)
+    prova("con l'altro numero saltato resta la famiglia delle taglie",
+          ["p:1", "p:1", ""], [r["famiglia"] for r in solo])
+
+    # --- Shopify: i nomi sul padre, i valori sulla variante ----------
+    felpa = {"id": 4, "title": "Felpa", "body_html": "", "status": "active",
+             "images": [], "options": [{"name": "Taglia"}, {"name": "Colore"}],
+             "variants": [{"id": 41, "title": "S / Nero", "price": "35.00",
+                           "option1": "S", "option2": "Nero",
+                           "inventory_management": None},
+                          {"id": 42, "title": "M / Nero", "price": "35.00",
+                           "option1": "M", "option2": "Nero",
+                           "inventory_management": None}]}
+    sh = traduci([felpa], "shopify", CAMBIO)
+    prova("Shopify: opzioni coi nomi del negozio",
+          [[["Taglia", "S"], ["Colore", "Nero"]],
+           [["Taglia", "M"], ["Colore", "Nero"]]], [r["opzioni"] for r in sh])
+    prova("...e senza nomi sul padre, «Variante» col titolo",
+          [["Variante", "S / Nero"]],
+          traduci([dict(felpa, options=[], variants=[
+              {k: v for k, v in felpa["variants"][0].items()
+               if not k.startswith("option")}, felpa["variants"][1]])],
+              "shopify", CAMBIO)[0]["opzioni"])
+    prova("un prodotto con una variante sola resta com'era",
+          ("4", "", []),
+          (lambda r: (r["origine_chiave"], r["famiglia"], r["opzioni"]))(
+              traduci([dict(felpa, variants=felpa["variants"][:1])],
+                      "shopify", CAMBIO)[0]))
+
+    # --- la scrittura: la chiave del collegamento davanti ------------
+    corpo = pezzo_src(src, "def _scrivi_famiglia(")
+    prova("la famiglia si scrive con il collegamento davanti", True,
+          'f"c{connettore_id}:{fam}"' in corpo)
+    prova("...alla nascita E a ogni aggiornamento", 2,
+          src.count("    _scrivi_famiglia(con, "))
+    prova("...e non tocca `modificato`", False, "modificato" in corpo.split(
+        '"""')[-1])
+
+    # --- il server: il capofila, sul SQL vero ------------------------
+    srv = open("server.py", encoding="utf-8").read()
+    for colonna in ("famiglia TEXT DEFAULT ''",
+                    "famiglia_titolo TEXT DEFAULT ''",
+                    "opzioni TEXT DEFAULT ''"):
+        prova(f"annunci.{colonna.split()[0]} nasce additiva", True,
+              f'"{colonna}"' in srv)
+    ns = {}
+    for nome in ("SQL_CAPOFILA = (", "SQL_CAPOFILA_ESAURITI = ("):
+        i = srv.index(nome)
+        exec(srv[i:srv.index("\n\n", i)], ns)
+    exec("import json\n" + pezzo("_opzioni_lista"), ns)
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, famiglia TEXT,"
+                " stato TEXT, prezzo_sats INT)")
+    con.executemany("INSERT INTO annunci VALUES(?,?,?,?)", [
+        (1, "", "attivo", 500),                 # senza famiglia
+        (2, "c3:e:x", "attivo", 3000),
+        (3, "c3:e:x", "attivo", 2000),          # il piu' economico
+        (4, "c3:e:x", "attivo", 2000),          # pari prezzo, id dopo
+        (5, "c3:e:x", "venduto", 100),          # esaurito: non conta
+        (6, "c3:e:x", "revisione", 50),         # in revisione: nemmeno
+        (7, "c4:e:x", "attivo", 9000),          # un ALTRO negozio
+        (8, "c3:p:9", "venduto", 10),           # famiglia finita tutta
+        (9, "c3:p:9", "venduto", 10),
+        (10, "", "venduto", 10)])
+    vetrina = [r[0] for r in con.execute(
+        "SELECT a.id FROM annunci a WHERE a.stato='attivo' AND "
+        + ns["SQL_CAPOFILA"] + " ORDER BY a.id")]
+    prova("in vetrina: i senza famiglia, e il capofila di ogni famiglia",
+          [1, 3, 7], vetrina)
+    esauriti = [r[0] for r in con.execute(
+        "SELECT a.id FROM annunci a WHERE a.stato='venduto' AND "
+        + ns["SQL_CAPOFILA_ESAURITI"] + " ORDER BY a.id")]
+    prova("fra gli esauriti: la famiglia viva no, quella finita una volta",
+          [8, 10], esauriti)
+    prova("le opzioni si leggono solo nella loro forma",
+          [[["Taglia", "M"]], [], [], []],
+          [ns["_opzioni_lista"](x) for x in
+           ('[["Taglia","M"]]', "rotto", '{"a":1}', None)])
+
+    # --- il server: dove passa la regola (forma) ---------------------
+    lista = pezzo("lista_annunci")
+    prova("la vetrina filtra sul capofila, tranne con la ricerca", True,
+          'dove = "a.stato=\'attivo\'" + ("" if q.strip() else " AND " + SQL_CAPOFILA)'
+          in lista)
+    prova("...la ricerca riduce la famiglia alla prima PERTINENTE", True,
+          "famiglie_viste" in lista and "SELECT a.id, a.famiglia" in lista)
+    prova("...e la ricerca di riserva (LIKE) prende il capofila", True,
+          "OR a.zona LIKE ?) AND \" + SQL_CAPOFILA" in lista)
+    prova("i conteggi e le regioni contano la famiglia una volta", True,
+          "WHERE a.stato='attivo' AND {SQL_CAPOFILA} " in lista
+          and "a.regione!='' AND {SQL_CAPOFILA} " in lista)
+    neg = pezzo("negozio")
+    prova("il negozio mostra il capofila...", True,
+          "AND {SQL_CAPOFILA}\"" in neg)
+    prova("...e gli esauriti la famiglia finita una volta", True,
+          "{SQL_CAPOFILA_ESAURITI}" in neg)
+    uno_a = pezzo("un_annuncio")
+    prova("la scheda porta le sorelle, senza revisione ne' rimossi", True,
+          'riga["famiglia_varianti"] = sorelle' in uno_a
+          and "stato IN ('attivo','venduto')" in uno_a
+          and "MAX_SORELLE_FAMIGLIA" in uno_a)
+    prova("CAMPI_VETRINA porta famiglia, titolo e opzioni", True,
+          '"a.famiglia, a.famiglia_titolo, a.opzioni, "' in srv)
+    arr = pezzo("arricchisci_righe_vetrina")
+    prova("i numeri della famiglia: una query per pagina, sui soli attivi",
+          True, "famiglia_n" in arr and "famiglia_varia" in arr
+          and "AND stato='attivo' GROUP BY famiglia" in arr)
+
+    # --- il client: in node ------------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    blocco = pezzo_js(mini, "const famiglieNote = {};",
+                      "/* Le sorelle arrivano")
+    card = pezzo_js(mini, "const cardHTML = l => {", "</div>`; };")
+    prova("la card usa il titolo della famiglia e il suo badge", True,
+          "famigliaCard(l) && l.famigliaTitolo" in card
+          and "card-varianti" in card and "price-da" in card)
+    prova("...e «Ne resta 1» tace su una famiglia", True,
+          "&& !famigliaCard(l) && ultimoPezzo(l)" in card)
+    prova("la scheda ha i bottoncini e chiede le sorelle", True,
+          "${famigliaScheda(l)}" in mini and "caricaFamiglia(l);" in mini)
+    prova("«Altri oggetti» non ripropone la stessa famiglia", True,
+          "!(l.famiglia && x.famiglia===l.famiglia)" in mini)
+    # IL CARRELLO (dal giro dal vivo): il negozio porta il solo capofila,
+    # e `rileggiVenditore` spegneva come «venduto» tutto quel che non
+    # c'era — la taglia scelta usciva dal carrello in silenzio
+    rilegg = pezzo_js(mini, "async function rileggiVenditore(l){")
+    prova("il carrello non spegne le sorelle di una famiglia viva", True,
+          "famVive.has(t.famiglia)" in rilegg
+          and "if (setScelte.has(t.id)) daChiedere.push(t.id);" in rilegg)
+    prova("...per quelle nel carrello chiede la scheda vera", True,
+          "fetch(`${API_BASE}/listings/${id}`" in rilegg
+          and "rs.status === 404" in rilegg)
+    prova("nel carrello la cella parla della SUA variante", True,
+          "cardHTML(Object.assign({}, x, {famigliaN: 0}))" in mini)
+    pacco_fn = pezzo_js(mini, "function annunciPacco(){")
+    js_pacco = "\n".join([
+        "const componibileNatura = x => 1;",
+        "let listings = " + json.dumps([
+            {"id": 1, "sellerId": 5, "stato": "attivo", "famiglia": ""},
+            {"id": 2, "sellerId": 5, "stato": "attivo", "famiglia": "f"},
+            {"id": 3, "sellerId": 5, "stato": "attivo", "famiglia": "f"},
+            {"id": 4, "sellerId": 5, "stato": "attivo", "famiglia": "f"},
+            {"id": 5, "sellerId": 5, "stato": "attivo", "famiglia": "g"},
+            {"id": 6, "sellerId": 5, "stato": "attivo", "famiglia": "g"},
+            {"id": 7, "sellerId": 9, "stato": "attivo", "famiglia": "f"}]) + ";",
+        "let paccoDati = {sellerId: 5, origineId: 3};",
+        "let setScelte = new Map([[3, 1], [4, 2]]);",
+        pacco_fn,
+        "console.log(JSON.stringify(annunciPacco().map(x => x.id)));"])
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js_pacco)
+        p = f.name
+    try:
+        rp = subprocess.run(["node", p], capture_output=True, text=True,
+                            encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        rp = None
+    os.unlink(p)
+    if rp is None:
+        salta("le celle del carrello girano in node (node assente)")
+    else:
+        prova("carrello: le scelte tutte, la provenienza in testa, UNA per "
+              "famiglia senza scelte, niente di un altro venditore",
+              [3, 1, 4, 5], json.loads(rp.stdout or "null")
+              if rp.returncode == 0 else rp.stderr[-300:])
+    prova("scegliere una variante SOSTITUISCE il passo nella cronologia",
+          True, "navSostituisci = true;\n  openDetail(id);" in mini
+          and "const sostituisci = navSostituisci; navSostituisci = false;"
+          in mini)
+    sorelle = []
+    k = 0
+    for num in ("01/21", "10/21", "02/21"):
+        for t in ("S", "M", "L"):
+            k += 1
+            sorelle.append({"id": k, "opzioni": [["Numero", num],
+                                                 ["Taglia", t]],
+                            "stato": "venduto" if (num, t) == ("02/21", "L")
+                            else "attivo"})
+    # un valore col markup, per esc(): in coda alle taglie, cosi' le
+    # taglie restano quelle del negozio e i numeri tutti numeri
+    sorelle.append({"id": 99, "opzioni": [["Numero", "01/21"],
+                                          ["Taglia", "<b>"]],
+                    "stato": "venduto"})
+    js = "\n".join([
+        "const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')"
+        ".replace(/>/g,'&gt;').replace(/\"/g,'&quot;');",
+        blocco,
+        "const sorelle = " + json.dumps(sorelle) + ";",
+        "const due_m = {id: 8, famiglia: 'f', opzioni: [['Numero','02/21'],['Taglia','M']]};",
+        "const out = {};",
+        "out.dims = dimensioniFamiglia(sorelle);",
+        "out.html = htmlVarianti(due_m, sorelle);",
+        "out.verso_l = variantePer(sorelle, sorelle[7], 'Taglia', 'L', out.dims).id;",
+        "out.verso_10 = variantePer(sorelle, sorelle[7], 'Numero', '10/21', out.dims).id;",
+        "out.verso_finite = variantePer(sorelle, sorelle[7], 'Taglia', '<b>', out.dims).id;",
+        "out.carte = [famigliaCard({}), famigliaCard({famiglia:'f', famigliaN:1}),"
+        " famigliaCard({famiglia:'f', famigliaN:11})];",
+        "out.scheda = [famigliaScheda({famiglia:''}), famigliaScheda({famiglia:'g', id:1})];",
+        "console.log(JSON.stringify(out));"])
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js)
+        p = f.name
+    try:
+        r = subprocess.run(["node", p], capture_output=True, text=True,
+                           encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        r = None
+    os.unlink(p)
+    if r is None:
+        salta("i bottoncini della famiglia girano in node (node assente)")
+        return
+    if r.returncode != 0:
+        prova("i bottoncini della famiglia girano in node", "",
+              r.stderr[-300:])
+        return
+    o = json.loads(r.stdout)
+    prova("le dimensioni nell'ordine del negozio",
+          ["Numero", "Taglia"], [d["nome"] for d in o["dims"]])
+    prova("...i numeri in ordine di NUMERO, non di testo",
+          ["01/21", "02/21", "10/21"], o["dims"][0]["valori"])
+    prova("...le taglie nell'ordine del negozio, non alfabetico",
+          ["S", "M", "L", "<b>"], o["dims"][1]["valori"])
+    h = o["html"]
+    prova("la scelta di adesso e' accesa (02/21 e M)", 2,
+          h.count('class="var-chip on"'))
+    prova("...e non ha un tocco (e' gia' lei)", 2,
+          h.count('aria-pressed="true">'))
+    prova("la L del 02 e' finita: il bottoncino e' spento", True,
+          'class="var-chip spento" aria-pressed="false" '
+          'onclick="scegliVariante(3)">L<' in h)
+    prova("...e il tocco porta alla L viva piu' vicina (quella del 01)", 3,
+          o["verso_l"])
+    prova("il 10 porta al 10 nella STESSA taglia", 5, o["verso_10"])
+    prova("un valore tutto finito porta comunque alla sua variante (che "
+          "dira' Esaurito)", 99, o["verso_finite"])
+    prova("i valori passano da esc()", True,
+          "&lt;b&gt;" in h and "<b>" not in h)
+    prova("la card conta solo una famiglia di almeno due", [0, 0, 11],
+          o["carte"])
+    prova("la scheda senza famiglia non disegna niente, con la famiglia "
+          "ignota lascia il posto", ["", '<div class="varianti" '
+                                         'id="famigliaScelta"></div>'],
+          o["scheda"])
+
+
+def pezzo_src(src, firma, fine="\n\n\n"):
+    """pezzo() su un sorgente gia' letto (qui: importa_negozio.py)."""
+    i = src.index(firma)
+    return src[i:src.index(fine, i)] if fine in src[i:] else src[i:]
 
 
 def prove_connettori_cassetto():
@@ -111725,6 +112096,7 @@ def main():
               prove_connettori_woo, prove_connettori_registro,
               prove_connettori_ingresso,
               prove_connettori_varianti,
+              prove_famiglie,
               prove_connettori_cassetto,
               prove_finestra,
               prove_ordini_prova,

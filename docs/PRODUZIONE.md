@@ -2150,6 +2150,33 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   «ha piu' varianti e non le ho potute leggere» è un lettore che non ha
   agganciato le variazioni (chiamata fuori dal lettore); «nessuna delle
   sue varianti e' in vendita» è il negozio.
+- LE FAMIGLIE DI UN NEGOZIO COLLEGATO (30 set 2026): le scrive il giro
+  dell'ora, quindi dopo il deploy compaiono al PRIMO giro e non prima.
+  Si guardano, in sola lettura, per collegamento:
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT famiglia, famiglia_titolo, stato, COUNT(*) FROM annunci WHERE connettore_id=<id> GROUP BY famiglia, stato"`
+  — righe con `famiglia` vuota = prodotti senza famiglia (o giro non
+  ancora passato).
+  NASCONDERE UN NEGOZIO DALLA VETRINA SENZA CANCELLARE NIENTE (il gesto
+  del 30 set 2026 su AGORA): lo stato `revisione`, che il giro NON
+  riaccende mai (lo aggiorna, lo spegne se il prodotto sparisce). È il
+  ↩︎ del moderatore fatto in blocco, e lascia fuori le righe con un
+  ordine vivo (anche dentro un carrello) e le aste. Prima la fotografia:
+  `sqlite3 -readonly ~/satmarket/satmarket.db ".backup /root/prima-<nome>.db"`.
+  ⚠️ LA TILDE SOTTO `sudo -u barattolo` NON È SUA: la espande la shell di
+  root prima che sudo parta, quindi diventa `/root/satmarket/...`, dove
+  `barattolo` non entra («unable to open database file», nessuna
+  modifica). Le SCRITTURE si fanno sul file vero,
+  `sudo -u barattolo sqlite3 -cmd ".timeout 5000" /srv/barattolo/dati/satmarket.db "..."`,
+  così il journal nasce suo accanto al database; le letture da root
+  restano con la tilde. Il gesto non passa dal registro della
+  moderazione (va scritto nel verbale) e il pallino dei moderatori
+  sale: su quelle righe nessuno preme ✅.
+  RIMETTERLE IN VETRINA, a famiglie scritte: prima si guarda (sopra) che
+  il giro abbia riempito `famiglia`, poi
+  `sudo -u barattolo sqlite3 -cmd ".timeout 5000" /srv/barattolo/dati/satmarket.db "UPDATE annunci SET stato=CASE WHEN quantita>0 THEN 'attivo' ELSE 'venduto' END WHERE connettore_id=<id> AND stato='revisione' AND famiglia!=''; SELECT changes();"`
+  — il `CASE` tiene l'invariante di casa (venduto ⇔ zero pezzi) per le
+  taglie finite nel frattempo, e `famiglia!=''` lascia in attesa ciò che
+  il giro non ha ancora legato.
 - I CARRELLI TOLTI (24 set 2026): il carrello torna quello di prima —
   uno solo, di un venditore alla volta, in memoria — e con i carrelli
   per venditore se ne va il PAGAMENTO UNICO, cioè la busta in

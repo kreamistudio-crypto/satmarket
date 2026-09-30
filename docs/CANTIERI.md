@@ -31363,3 +31363,147 @@ punto 4). La guardia col nodo vero: «Info P2P» dopo la salita deve dire
 controparte dalla restore: si vede solo con la 0.19.0 in servizio e un
 dispositivo pulito col server muto (o un ordine nato prima della 0007).
 I due DM al moderatore, quando la sezione li vorrà usare.
+
+## Le famiglie di varianti: una card per prodotto (30 set 2026)
+
+IL DIFETTO DAL CAMPO: il negozio AGORA (barattolo.store/negozio/49aa6ec6),
+collegato con WooCommerce, ha fatto entrare 150 righe quasi uguali —
+«ɅGOᏒɅ COWBOY Limited Edition #N/21 — Golden Yellow, TAGLIA», 19 numeri
+da 7 taglie (il #19 da 6), più la 1st EDITION da 18 varianti — perché da
+d3d3e0d ogni variante è un annuncio a sé. La home e la vetrina erano
+piene di magliette gialle identiche. Worktree da `origin/main` (b93ebda),
+commit firmati.
+
+**PRIMA DELLA CURA, IL GESTO SUL VPS.** Andrea ha chiesto di nasconderle
+subito senza cancellarle e senza rompere il collegamento. Letto il
+codice: il giro dell'ora NON riaccende mai una riga in `revisione` (la
+aggiorna, la spegne se sparisce), le ferie non nascondono (fanno il
+prezzo grigio), la pausa del connettore lascia gli annunci dove sono, e
+`rimosso` è la lapide che non risorge. Quindi il ↩︎ del moderatore fatto
+in blocco: `UPDATE ... SET stato='revisione'` sulle attive del
+collegamento 3, lasciando fuori le righe con un ordine vivo (anche in un
+carrello), le aste e — scelta approvata da Andrea — la più recente, così
+AGORA restava in vetrina con una card. Provato prima su un database
+finto; fotografia del database prima di scrivere. Risultato: 129 righe,
+controprova `attivo|1, revisione|129, venduto|20`, zero annunci su
+Nostr (niente da ritirare dai relay). LA TRAPPOLA DEL PRIMO GIRO: con
+`sudo -u barattolo sqlite3 ~/satmarket/...` la tilde la espande la shell
+di ROOT, quindi `barattolo` riceveva `/root/satmarket/satmarket.db` e non
+ci entra — «unable to open database file», nessuna modifica. Il percorso
+giusto è il file vero, `/srv/barattolo/dati/satmarket.db`: ora sta in
+PRODUZIONE, «LE FAMIGLIE DI UN NEGOZIO COLLEGATO». Il gesto non passa
+dal registro della moderazione: lo dice questo verbale.
+
+**LA SCELTA (Andrea, fra tre strade).** A) un annuncio unico con dentro
+le varianti: il modello «vero», ma `quantita` compare 293 volte in
+server.py e sotto ci sono pagamento, cassaforte, carrello, annulli,
+rimborsi e lo scarico verso il negozio — rifare le fondamenta sotto i
+soldi. B) il raggruppamento solo in vetrina: piccolo, ma senza la scelta
+della variante nella pagina. C) LA FAMIGLIA, scelta: ogni variante resta
+il suo annuncio (prezzo, giacenza, ordini, deposito di garanzia come
+oggi), la vetrina ne mostra una card, la scheda i bottoncini. La
+seconda regola, per i numeri d'edizione, l'ha approvata Andrea dopo la
+query sul vero (19 prodotti COWBOY #01…#19 e la 1st EDITION, padre 37),
+con la sua avvertenza: il #09 ha «💛 » davanti, quindi il confronto
+ignora emoji e spazi. LA FINESTRA RESTA 3 OGNI 12 (decisione di Andrea):
+la regola del punto 3 esisteva già da settembre, e con le famiglie il
+problema di AGORA si risolve alla radice; nel config del VPS non c'è
+nessuna riga `VETRINA_`.
+
+**LE DECISIONI DI STRUTTURA.** Le famiglie si calcolano in `traduci`,
+PURE, sul catalogo del giro (`assegna_famiglie`): varianti dello stesso
+padre = `p:<padre>`; padri DIVERSI con lo stesso titolo tranne UN numero
+col cancelletto = `e:<radice>`, col «Numero» in testa alle opzioni. Solo
+col cancelletto e uno solo per titolo: «Scarpe 42/43», «Set 3 pezzi» e
+«Poster #1 e #2» non fanno famiglia; un numerato solo nemmeno. La
+chiave nel database porta il collegamento davanti (`c3:e:…`), scritta
+da `_scrivi_famiglia` a ogni giro su ogni stato: una famiglia che si
+scioglie torna vuota da sola. Il capofila è una condizione della WHERE
+(`SQL_CAPOFILA`, la variante attiva più economica), e non un filtro
+dopo: paginazione, finestra, totale e conteggi restano quelli di sempre.
+La ricerca per parole invece riduce DOPO, alla prima variante
+pertinente — col capofila, cercare «cowboy 07» non avrebbe trovato
+niente. La scelta nella scheda APRE LA SORELLA al posto della scheda
+(`scegliVariante`, e la cronologia sostituisce invece di impilare): al
+carrello e all'ordine va la variante scelta perché È un annuncio, e il
+percorso d'acquisto non ne sa niente.
+
+**QUEL CHE HA TROVATO IL GIRO DAL VIVO, e senza il quale il cantiere
+avrebbe rotto il carrello.** `rileggiVenditore` prende la lista del
+negozio come verità sugli attivi e spegne come «venduto» quel che non
+c'è — e il negozio ora porta il solo capofila: la taglia scelta usciva
+dal carrello in silenzio (il 12 XS risultava venduto nel client, attivo
+sul server). Curato: le sorelle di una famiglia viva non si spengono a
+occhio, e per quelle nel carrello si chiede la scheda vera; la griglia
+del carrello tiene le scelte e UNA per famiglia senza scelte, e la
+cella parla della SUA variante (titolo con la taglia, niente «129
+varianti»). Il conto del server sul carrello (12 XS + 1st EDITION S)
+risponde con quelle due righe.
+
+**QUEL CHE HANNO TROVATO LE PROVE.** La sentinella delle chiavi ripetute
+di `mapListing` leggeva `? a.opzioni : []` come una seconda chiave:
+riscritte senza ternario. Due sentinelle emendate col perché (il filtro
+del negozio porta il capofila; la scheda ha un secondo `stato IN` per le
+sorelle, e si confronta l'insieme). Il banco della cronologia P2P
+dichiara a mano le variabili del motore: ci va `navSostituisci`. E la
+prova in node ha trovato un caso vero nell'ordine dei valori — con un
+valore non numerico in mezzo i numeri tornano all'ordine del negozio: è
+giusto così (sennò «2XL» finirebbe prima di «S»), e la prova è stata
+corretta, non il codice. La tortura ha lasciato viva una mutazione su
+dodici: la riga «esatta e viva» di `variantePer` era ridondante, tolta,
+e la regola scritta in una forma sola.
+
+**STRADE SCARTATE.** Nascondere con le ferie o con la pausa (non
+nascondono), o con `rimosso` (non risorge). L'annuncio unico con le
+varianti dentro (vedi sopra). Il capofila filtrato dopo la paginazione
+(pagine corte e totali falsi). Il capofila anche nella ricerca (il #07
+non si trova). Stringere la finestra a 2 su 12 (decisione di Andrea: si
+resta a 3). Ordinare sempre i valori come numeri («2XL» prima di «S»).
+Un parametro `varianti=1` sul negozio per il carrello: la griglia del
+carrello si sarebbe riempita di 147 celle.
+
+**PROVATO.** `prove.py` severa nel worktree SENZA config: 17.284 verdi e
+0 rosse. Prove nuove in `prove_famiglie` (59): l'edizione riconosciuta e
+i suoi falsi amici, l'assegnazione sul percorso vero di `traduci`
+(Woo e Shopify, il cuore, il numerato semplice, il saltato che non tiene
+in piedi la famiglia), la scrittura col collegamento davanti, il
+capofila e gli esauriti sul SQL vero, le rotte per forma, e il client in
+node (dimensioni, ordine dei valori, bottoncini accesi e spenti, dove
+porta un tocco, `esc`, la card, le celle del carrello). Emendate col
+perché: le due tabelle di cartone dei connettori (tre colonne nuove),
+il filtro del negozio, gli stati della scheda, il banco della
+cronologia P2P. Tortura: 13 mutazioni su 13 uccise (una viva al primo
+giro, vedi sopra). Collaudo sul server vero (`collaudo_connettori`,
+sezione 17): 161 verdi — AGORA di cartone con 4 numeri, il #09 col
+cuore, la L finita, la 1st EDITION, Shopify con le opzioni vere; la
+famiglia unica, il capofila, «da», conteggi, ricerca, negozio, scheda,
+l'acquisto che scala la variante, la famiglia che si scioglie. I 27
+collaudi della CI più connettori, finestra, ricerca, altri oggetti e
+pausa verdi nella gabbia senza rete. Giro dal vivo su una copia del
+worktree (config senza segreti, relay morto) col connettore vero e un
+WooCommerce finto tipo AGORA (150 righe → 10 card in vetrina): scelta
+del numero e della taglia col tocco vero, la S finita del 12 spenta che
+porta alla S del 01, la cronologia che non cresce, «Altri oggetti» senza
+la stessa famiglia, il carrello col 12 XS e il conto del server. DOPO I DUE REBASE, su c019499 e poi b071030 (contanti di persona,
+«I miei scambi» vuoto, Barattozon a mercato — nessun simbolo in comune,
+cercati per nome): le sezioni toccate e le sentinelle di rito, 749 verdi,
+e 33 collaudi nella gabbia; la suite intera sta sull'albero di prima.
+Scatti
+via CDP a 375 px nei due temi (home, negozio AGORA, scheda della COWBOY):
+mandati ad Andrea prima del push.
+
+**NON PROVATO, e dichiarato.** Il catalogo VERO di AGORA: le opzioni
+dipendono dai nomi degli attributi che AGORA ha scritto (se la taglia
+non è un attributo della variazione ma sta nel titolo, la famiglia c'è
+e i bottoncini dicono «Variante»). Le famiglie nascono al primo giro
+dopo il deploy, non prima: le 129 righe in revisione si rimettono in
+vetrina DOPO, col comando di PRODUZIONE. Il telefono. IMPERFEZIONI
+DICHIARATE: un filtro che scarta il capofila e tiene una sorella fa
+sparire la famiglia da quella vista (il capofila si sceglie fra tutte
+le attive); un preferito è di una variante, e la sua card mostra la
+famiglia; le anteprime SEO del negozio (`_seo_negozio`) contano ancora
+le righe, non le famiglie; la ricerca AI non riduce le famiglie.
+
+DA GUARDARE: dopo il deploy, il primo giro dei connettori nel journal e
+le famiglie di AGORA con la query di PRODUZIONE; poi le 129 righe
+rimesse in vetrina, e la home.

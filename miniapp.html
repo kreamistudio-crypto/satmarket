@@ -6964,6 +6964,28 @@
     padding:6px 12px;font-size:13px;font-weight:700}
   /* la scatola graduata dentro la pillola, appoggiata sulla riga del testo */
   .pill .taglia-ico{vertical-align:-3.5px;margin-right:1px}
+  /* LA FAMIGLIA NELLA SCHEDA (set 2026): una riga per opzione — il
+     nome sopra, i bottoncini sotto — col vestito delle pillole di
+     casa, e la scelta di adesso in inchiostro pieno come la categoria
+     accesa. «Spento» e' tratteggiato e grigio: con le altre scelte
+     quel valore non si compra, ma il tocco porta alla sorella piu'
+     vicina. L'area di tocco non scende sotto i 40px. */
+  .varianti{margin:12px 0 2px;display:flex;flex-direction:column;gap:10px}
+  .varianti:empty{display:none}
+  .var-nome{font-size:12.5px;font-weight:800;color:var(--ink-soft);
+    text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+  .var-chips{display:flex;flex-wrap:wrap;gap:7px}
+  .var-chip{min-width:44px;min-height:40px;padding:0 12px;cursor:pointer;
+    background:var(--card);color:var(--ink);border:1.5px solid var(--field-line);
+    border-radius:12px;font:inherit;font-size:14px;font-weight:700}
+  .var-chip.on{background:var(--ink);color:var(--on-ink);border-color:var(--ink);
+    font-weight:800;cursor:default}
+  .var-chip.spento{color:var(--muted);border-style:dashed;
+    text-decoration:line-through;text-decoration-thickness:1.5px}
+  .var-chip.on.spento{color:var(--on-ink);text-decoration:none}
+  .var-chip:not(.on):active{transform:scale(.95)}
+  /* il «da» del cartellino di una famiglia coi prezzi diversi */
+  .tag-price .price-da{font-size:11px;font-weight:700;color:#8A8271}
   /* Le condizioni come pillola colorata: la scala parla col colore —
      verde pieno → verde tenue → ambra → arancio → grigio. Coppie
      dalla palette di casa, contrasto AA nei due temi (dove la coppia
@@ -13645,7 +13667,16 @@ function mapListing(a){
     spedGratisEur:a.venditore_sped_gratis_eur||0,
     distintivi:a.venditore_distintivi||[],
     /* il titolo arriva GIA' col suo nome dal server: qui e' testo */
-    sellerTitolo:a.venditore_titolo||''};
+    sellerTitolo:a.venditore_titolo||'',
+    /* LA FAMIGLIA (set 2026, il negozio AGORA): '' = nessuna, e allora
+       tutto com'era. La card mostra il titolo della famiglia e quante
+       varianti ci sono; la scheda le opzioni di QUESTA variante e i
+       bottoncini per sceglierne un'altra (le sorelle arrivano con
+       /api/listings/{id}, vedi caricaFamiglia). */
+    famiglia:a.famiglia||'', famigliaTitolo:a.famiglia_titolo||'',
+    opzioni:(Array.isArray(a.opzioni) && a.opzioni) || [],
+    famigliaN:a.famiglia_n||0, famigliaVaria:a.famiglia_varia===true,
+    sorelle:(Array.isArray(a.famiglia_varianti) && a.famiglia_varianti) || null};
 }
 function mapOrder(o){
   const role = o.compratore_id===myTgId ? 'buyer'
@@ -14980,6 +15011,7 @@ const RADICE_MADRE = 'esplora';
    sapere da dove si viene: serve una bandierina, alzata da
    apriCategoria e consumata al primo giro di navRiflette. */
 let navSpingi = false;
+let navSostituisci = false;   // un giro solo: la scelta di una variante (set 2026)
 /* La profondita' del gradino del REPARTO spinto dalla home (0 = non
    c'e'): sotto quel gradino c'e' gia' `esplora|Tutto`. Serve a chi
    torna a «Tutto» (ritocco della card, pillola, tab Esplora, ricerca)
@@ -15267,6 +15299,9 @@ function navRiflette(){
      bandierina lasciata accesa perderebbe il suo giro e si
      scaricherebbe su una navigazione che non l'ha chiesta */
   const forza = navSpingi; navSpingi = false;
+  /* e la sua sorella (set 2026): la scelta di una variante sostituisce
+     la entry del dettaglio invece di spingerne una nuova */
+  const sostituisci = navSostituisci; navSostituisci = false;
   const ora = navPila(), st = history.state?.pila;
   if (navUguali(ora, st)) { navFreccia(ora); return; }
   /* Quanti gradini ci siamo scavati sotto i piedi: 0 = siamo sulla
@@ -15284,6 +15319,11 @@ function navRiflette(){
     try { history[come]({app:'brt', pila, d, sotto: sottoNuovo}, '', location.href); } catch(e){}
   };
   const sopra = extra => sotto ? sotto.concat(extra) : null;
+  if (sostituisci && st && ora.length === st.length) {
+    scrivi('replaceState', giu, ora, sotto);
+    navFreccia(ora);
+    return;
+  }
   const passo = passoPilaP2P(ora, st, sotto);
   if (passo === 'giu') { navGiu(); return; }
   if (passo === 'spingi') scrivi('pushState', giu + 1, ora, sopra([st]));
@@ -17819,7 +17859,7 @@ const cardHTML = l => {
      prezzo piu' basso e' un motivo piu' forte per toccare, e la
      scarsita' si dice comunque nella scheda. */
   const ultimo = !esa && !ferie && !asta && !lampo && !sconto
-    && ultimoPezzo(l);
+    && !famigliaCard(l) && ultimoPezzo(l);
   /* il prezzo mostrato viene dal giudice unico (prezzoMostrato): la
      lampo o lo sconto, mai i due insieme — e il dettaglio legge lo
      stesso, cosi' card e scheda non possono dire due cifre */
@@ -17856,7 +17896,11 @@ const cardHTML = l => {
        («ne restano N»). Nella scheda invece la pillola dice «Ultimo
        disponibile», che li' e' il singolare di «N disponibili» nella
        stessa fila: a cedere e' il luogo, mai il significato. */
-    : ultimo ? `<div class="card-ultimo">Ne resta 1</div>` : '';
+    : ultimo ? `<div class="card-ultimo">Ne resta 1</div>`
+    /* LA FAMIGLIA (set 2026) prende lo slot per ultima: e' un fatto
+       della card, non un'urgenza — e «Ne resta 1» su una famiglia
+       direbbe il pezzo del capofila, non della famiglia. */
+    : famigliaCard(l) ? `<div class="card-ultimo card-varianti">${famigliaCard(l)} varianti</div>` : '';
   /* Il barattolino: UNA fabbrica sola per la griglia e per la scheda
      (bottoneJar, ago 2026) — «stessa icona delle card, non una
      copia». stopPropagation: il tocco sul barattolino non apre il
@@ -17890,11 +17934,11 @@ const cardHTML = l => {
         <div class="ph">${l.photos && l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
           : l.emoji}</div>
-        <div class="tag-price${esa?' esaurito':ferie?' ferie':asta?' asta':''}">${(lampo||sconto||(acc&&piuBasso(g.v,l)))?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
+        <div class="tag-price${esa?' esaurito':ferie?' ferie':asta?' asta':''}">${(lampo||sconto||(acc&&piuBasso(g.v,l)))?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${famigliaCard(l) && l.famigliaVaria ? '<span class="price-da">da </span>' : ''}${p.big}</div><div class="price-sub">${p.small}</div></div>
         ${flash}
       </div>
       <div class="info">
-        <div class="title">${esc(l.title)}</div>
+        <div class="title">${esc(famigliaCard(l) && l.famigliaTitolo ? l.famigliaTitolo : l.title)}</div>
         ${/* La riga meta non sa niente del conteggio, ed e' tornata
              quella di sempre (ago 2026): col barattolino rimesso sui
              propri annunci il numero vive dentro la sua PASTIGLIA
@@ -21363,7 +21407,11 @@ async function sezioneAltriOggetti(l){
          cursore di quello vecchio gli darebbe una pagina 2 di un
          altro negozio */
       if (giro !== altriGiro) return;
-      altri = (d.annunci||[]).map(mapListing).filter(x=>x.id!==l.id);
+      /* ...e nemmeno la sua FAMIGLIA (set 2026): il capofila di
+         questa stessa maglietta non e' «un altro oggetto», e' lei in
+         un'altra taglia — si sceglie coi bottoncini qui sopra */
+      altri = (d.annunci||[]).map(mapListing).filter(x=>x.id!==l.id
+        && !(l.famiglia && x.famiglia===l.famiglia));
       altriPag.chi = chi;
       altriPag.cursore = d.cursore || null;
       inCatalogo(altri);
@@ -24353,8 +24401,23 @@ function svuotaPacco(){
    L'ordine non dipende dalla selezione: le celle non saltano. */
 function annunciPacco(){
   if (!paccoDati) return [];
-  const suoi = listings.filter(x => x.sellerId===paccoDati.sellerId
+  let suoi = listings.filter(x => x.sellerId===paccoDati.sellerId
                                     && x.stato==='attivo');
+  /* LA FAMIGLIA NEL CARRELLO (30 set 2026): una cella per famiglia,
+     come in vetrina — le varianti SCELTE (e quella di provenienza)
+     tutte, e se nessuna e' scelta una sola a rappresentarla. Le sorelle
+     passate dal catalogo aprendo le schede non si mettono in fila: per
+     un'altra taglia si apre la card e si sceglie coi bottoncini. */
+  const scelta = x => setScelte.has(x.id) || x.id === paccoDati.origineId;
+  const famScelte = new Set(suoi.filter(x => x.famiglia && scelta(x))
+                                .map(x => x.famiglia));
+  const famViste = new Set();
+  suoi = suoi.filter(x => {
+    if (!x.famiglia || scelta(x)) return true;
+    if (famScelte.has(x.famiglia) || famViste.has(x.famiglia)) return false;
+    famViste.add(x.famiglia);
+    return true;
+  });
   suoi.sort((a, b) => (b.id===paccoDati.origineId) - (a.id===paccoDati.origineId)
                    || componibileNatura(b) - componibileNatura(a));
   return suoi;
@@ -24400,8 +24463,10 @@ function cellaPacco(x){
          qta>1 ? 'Un pezzo in meno' : 'Togli dal carrello')}</div>`
     : `<button type="button" class="btn ghost pacco-btn"${dis?' disabled':''}
         onclick="aggiungiAlPacco(${x.id})">Aggiungi</button>`;
+  /* nel carrello la cella parla della SUA variante (titolo con la
+     taglia, niente «129 varianti»): quel che si aggiunge e' lei */
   return `<div class="pacco-cella" data-id="${x.id}">
-    ${cardHTML(x)}${segno}${comando}
+    ${cardHTML(Object.assign({}, x, {famigliaN: 0}))}${segno}${comando}
     ${dis ? `<div class="pacco-motivo">${esc(dis)}</div>` : ''}
   </div>`;
 }
@@ -24901,10 +24966,32 @@ async function rileggiVenditore(l){
         /* il negozio porta solo gli ATTIVI: chi non c'e' piu' e'
            venduto o rimosso, e nel catalogo va spento a mano */
         const freschi = new Set(mappati.map(x=>x.id));
+        /* ...TRANNE LE SORELLE DI UNA FAMIGLIA VIVA (30 set 2026): il
+           negozio di una famiglia porta il solo capofila, quindi la
+           taglia scelta non c'e' e NON vuol dire che sia finita. Per
+           quelle nel carrello si chiede la scheda vera (poche, e sono
+           le sole che contano); le altre restano come sono. */
+        const famVive = new Set(mappati.filter(x=>x.famiglia).map(x=>x.famiglia));
+        const daChiedere = [];
         listings.forEach(t => {
-          if (t.sellerId===l.sellerId && t.stato==='attivo'
-              && !freschi.has(t.id)) t.stato = 'venduto';
+          if (t.sellerId!==l.sellerId || t.stato!=='attivo' || freschi.has(t.id)) return;
+          if (t.famiglia && famVive.has(t.famiglia)) {
+            if (setScelte.has(t.id)) daChiedere.push(t.id);
+            return;
+          }
+          t.stato = 'venduto';
         });
+        await Promise.all(daChiedere.map(async id => {
+          try {
+            const rs = await fetch(`${API_BASE}/listings/${id}`,
+              {headers:{'X-Tg-Init-Data': authHdr()}});
+            if (rs.ok) inCatalogo([mapListing(await rs.json())]);
+            else if (rs.status === 404) {
+              const t = listings.find(x => x.id === id);
+              if (t) t.stato = 'venduto';
+            }
+          } catch(e) {}
+        }));
       }
     }
   } catch(e) {}
@@ -25197,6 +25284,7 @@ function openDetail(id){
               sfollamento, la stessa di «spedizione gratuita». Zero CSS
               nuovo, e la fila resta una fila di fatti. */
            : ultimoPezzo(l)?`<span class="pill"><b>Ultimo</b> disponibile</span>`:'')))}
+      ${famigliaScheda(l)}
       <div class="desc-tit">Descrizione</div>
       <div class="desc">${descrizioneHTML(l)}</div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
@@ -25412,7 +25500,122 @@ function openDetail(id){
      quel passo sparirebbe dalla cronologia. navRiflette e' idempotente:
      se non e' cambiato nulla non fa nulla. */
   navRiflette();
+  caricaFamiglia(l);                  // le sorelle, se non si sanno ancora
   sezioneAltriOggetti(l);             // in coda, fail-open: arriva quando arriva
+}
+
+/* ================ LA FAMIGLIA DI VARIANTI (set 2026) =================
+   Il difetto dal campo: il negozio AGORA faceva entrare 150 magliette
+   quasi uguali («COWBOY #N/21 — Golden Yellow, TAGLIA»), una card
+   ciascuna. Ogni variante RESTA un annuncio — prezzo, giacenza,
+   carrello, ordine e deposito di garanzia sono i suoi, e nessuno di
+   quei giri sa che esiste una famiglia —, ma la vetrina ne mostra una
+   card sola (il capofila, scelto dal server) e la scheda i bottoncini
+   per passare da una variante all'altra. Scegliere un bottoncino APRE
+   LA SCHEDA DI QUELLA VARIANTE al posto di questa: e' per questo che
+   al carrello e all'ordine va sempre la variante scelta, senza una
+   riga nuova nel percorso d'acquisto. */
+const famiglieNote = {};   // famiglia -> sorelle, per non richiederle a ogni scelta
+/* Il numero della card: quante varianti disponibili, 0 = card normale
+   (niente famiglia, o una famiglia di una sola variante rimasta). */
+function famigliaCard(l){
+  return (l && l.famiglia && l.famigliaN > 1) ? l.famigliaN : 0;
+}
+/* Le DIMENSIONI della famiglia, nell'ordine in cui il negozio le dice
+   («Numero», «Taglia»...), ognuna coi suoi valori: in ordine di numero
+   se sono tutti numeri (01/21, 02/21...), altrimenti nell'ordine del
+   negozio (S, M, L, XL — che in ordine alfabetico sarebbe sbagliato). */
+function dimensioniFamiglia(sorelle){
+  const nomi = [];
+  sorelle.forEach(s => (s.opzioni||[]).forEach(o => {
+    if (!nomi.includes(o[0])) nomi.push(o[0]); }));
+  return nomi.map(nome => {
+    const valori = [];
+    sorelle.forEach(s => {
+      const o = (s.opzioni||[]).find(x => x[0] === nome);
+      if (o && !valori.includes(o[1])) valori.push(o[1]);
+    });
+    if (valori.every(v => /^\d+/.test(v)))
+      valori.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+    return {nome, valori};
+  });
+}
+const valoreDi = (s, nome) => ((s.opzioni||[]).find(o => o[0] === nome) || [])[1];
+/* Dove porta un bottoncino: fra le sorelle con QUEL valore, prima le
+   disponibili, e fra loro quella che somiglia di piu' a questa (il
+   resto uguale, se c'e'). Se sono tutte finite, la piu' simile: la
+   scheda dira' «Esaurito», che e' la verita' su quella combinazione. */
+function variantePer(sorelle, attuale, nome, valore, dims){
+  const simili = s => dims.filter(d => d.nome !== nome
+    && valoreDi(s, d.nome) === valoreDi(attuale, d.nome)).length;
+  return sorelle.filter(s => valoreDi(s, nome) === valore)
+    .sort((a, b) => (b.stato === 'attivo') - (a.stato === 'attivo')
+                 || simili(b) - simili(a))[0] || null;
+}
+function htmlVarianti(l, sorelle){
+  const io = sorelle.find(s => s.id === l.id) || {id: l.id, opzioni: l.opzioni};
+  const dims = dimensioniFamiglia(sorelle);
+  if (!dims.length) return '';
+  return dims.map(d => `
+    <div class="var-dim">
+      <div class="var-nome">${esc(d.nome)}</div>
+      <div class="var-chips" role="group" aria-label="${esc(d.nome)}">${d.valori.map(v => {
+        const mio = valoreDi(io, d.nome) === v;
+        const dest = mio ? io : variantePer(sorelle, io, d.nome, v, dims);
+        /* spento = con le altre scelte di adesso quel valore non si
+           compra; il tocco resta vivo e porta alla sorella piu' vicina */
+        const vivo = sorelle.some(s => s.stato === 'attivo'
+          && valoreDi(s, d.nome) === v
+          && dims.every(x => x.nome === d.nome
+                          || valoreDi(s, x.nome) === valoreDi(io, x.nome)));
+        return `<button type="button" class="var-chip${mio ? ' on' : ''}${vivo ? '' : ' spento'}" aria-pressed="${mio}"${dest && !mio ? ` onclick="scegliVariante(${dest.id})"` : ''}>${esc(v)}</button>`;
+      }).join('')}</div>
+    </div>`).join('');
+}
+function famigliaScheda(l){
+  if (!l.famiglia) return '';
+  const sorelle = l.sorelle || famiglieNote[l.famiglia];
+  return `<div class="varianti" id="famigliaScelta">${sorelle ? htmlVarianti(l, sorelle) : ''}</div>`;
+}
+/* Le sorelle arrivano con la scheda del singolo annuncio: una fetch
+   sola per famiglia, poi restano in famiglieNote. Fail-open: senza
+   rete la scheda resta quella della variante aperta, comprabile. */
+async function caricaFamiglia(l){
+  if (!l.famiglia || DEMO) return;
+  if (l.sorelle) { famiglieNote[l.famiglia] = l.sorelle; return; }
+  if (famiglieNote[l.famiglia]) return;
+  try {
+    const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+    const r = await fetch(`${API_BASE}/listings/${l.id}`, opz);
+    if (!r.ok) return;
+    const m = mapListing(await r.json());
+    if (!m.sorelle) return;
+    famiglieNote[l.famiglia] = m.sorelle;
+    if (!currentListing || currentListing.id !== l.id) return;
+    const box = el('famigliaScelta');
+    if (box) box.innerHTML = htmlVarianti(l, m.sorelle);
+  } catch(e) {}
+}
+/* Il tocco su un bottoncino: si apre la scheda della sorella AL POSTO
+   di questa — nella cronologia sostituisce, non impila: tornare
+   indietro riporta da dove si era arrivati, non attraverso ogni taglia
+   provata. La sorella che non e' ancora in catalogo si chiede al
+   server (e' un annuncio come un altro). */
+async function scegliVariante(id){
+  if (!currentListing || currentListing.id === id) return;
+  haptic();
+  if (!listings.find(x => x.id === id)) {
+    try {
+      const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+      const r = await fetch(`${API_BASE}/listings/${id}`, opz);
+      if (!r.ok) { toast('Questa variante non è più disponibile'); return; }
+      const m = mapListing(await r.json());
+      if (m.famiglia && m.sorelle) famiglieNote[m.famiglia] = m.sorelle;
+      inCatalogo([m]);
+    } catch(e) { toast('Rete assente: riprova fra poco'); return; }
+  }
+  navSostituisci = true;
+  openDetail(id);
 }
 
 /* ---------------- lightbox: foto a tutto schermo con zoom ----------------

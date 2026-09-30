@@ -6749,6 +6749,18 @@ def init_db():
                     # `connettori_uscite`. -1 = mai letta, che e'
                     # diverso da «zero pezzi».
                     "origine_stock_visto INTEGER DEFAULT -1",
+                    # LA FAMIGLIA (set 2026, il negozio AGORA): le
+                    # varianti di uno stesso prodotto restano un
+                    # annuncio ciascuna — prezzo, giacenza, ordini e
+                    # cassaforte non cambiano — ma si sanno parenti.
+                    # '' = nessuna famiglia, il mondo di ieri. La
+                    # scrive SOLO il connettore (`_scrivi_famiglia`),
+                    # con la chiave del collegamento davanti; la
+                    # vetrina ne mostra il capofila (SQL_CAPOFILA) e
+                    # la scheda le `opzioni` ([[nome, valore], ...]).
+                    "famiglia TEXT DEFAULT ''",
+                    "famiglia_titolo TEXT DEFAULT ''",
+                    "opzioni TEXT DEFAULT ''",
                     # IL CONTEGGIO DELLE VISUALIZZAZIONI (set 2026):
                     # privato, lo vede solo il proprietario (e gli
                     # admin) — vedi la CREATE TABLE qui sopra per il
@@ -6915,6 +6927,10 @@ def init_db():
     # sono centinaia di letture per catalogo.
     con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_origine "
                 "ON annunci(connettore_id, origine_chiave)")
+    # Il capofila di una famiglia (set 2026) si chiede per OGNI riga
+    # della vetrina che ne ha una: l'indice lo trova senza scandire.
+    con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_famiglia "
+                "ON annunci(famiglia, stato, prezzo_sats, id)")
     # E il debito che questo cantiere paga: `contatto_nostr` non ha
     # mai avuto un indice, e ci passano l'import orario da Nostr, il
     # dopo-import e la deduplica dei doppioni. Reggeva coi numeri di
@@ -13351,6 +13367,49 @@ def strade_annuncio(a) -> set:
 # posti soli, questo e `origine_annuncio`.
 SQL_ORIGINE_ESTERNA = "(a.contatto_nostr!='' OR a.fonte!='')"
 
+# IL CAPOFILA DELLA FAMIGLIA (set 2026, il negozio AGORA): in vetrina
+# una famiglia di varianti e' UNA card, e la card e' la variante
+# disponibile piu' economica (a parita', la piu' vecchia). E' una
+# condizione della WHERE e non un filtro dopo, apposta: cosi' la
+# paginazione, la finestra scorrevole, il totale e i conteggi restano
+# quelli di sempre, senza una riga in piu'. Chi non ha famiglia passa.
+# IMPERFEZIONE DICHIARATA: il capofila si sceglie fra TUTTE le varianti
+# attive, non fra quelle che un filtro lascia passare — un filtro che
+# scarta il capofila e tiene una sorella fa sparire la famiglia da
+# quella vista. La ricerca per parole non ha questo difetto: li' la
+# famiglia si riduce DOPO, alla prima variante pertinente.
+SQL_CAPOFILA = ("(a.famiglia='' OR a.id=(SELECT b.id FROM annunci b "
+                "WHERE b.famiglia=a.famiglia AND b.stato='attivo' "
+                "ORDER BY b.prezzo_sats, b.id LIMIT 1))")
+
+# Lo scaffale degli esauriti del negozio, col gemello della regola: una
+# famiglia con anche una sola variante disponibile e' GIA' in vetrina
+# (non si ripete fra gli esauriti), e una famiglia finita tutta ci va
+# una volta sola.
+def _opzioni_lista(grezzo) -> list:
+    """Le opzioni di una variante dalla colonna JSON: [[nome, valore]],
+    e una lista vuota per tutto cio' che non ha quella forma."""
+    try:
+        v = json.loads(grezzo or "[]")
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(v, list):
+        return []
+    return [[str(o[0]), str(o[1])] for o in v
+            if isinstance(o, list) and len(o) == 2]
+
+
+# Quante sorelle al massimo porta la scheda: AGORA ne ha 132, e un
+# negozio con migliaia di combinazioni non deve gonfiare una risposta
+# che si chiede a ogni apertura.
+MAX_SORELLE_FAMIGLIA = 400
+
+SQL_CAPOFILA_ESAURITI = (
+    "(a.famiglia='' OR (NOT EXISTS (SELECT 1 FROM annunci b "
+    "WHERE b.famiglia=a.famiglia AND b.stato='attivo') AND a.id=("
+    "SELECT MIN(b.id) FROM annunci b WHERE b.famiglia=a.famiglia "
+    "AND b.stato='venduto')))")
+
 
 def origine_annuncio(a) -> str:
     """DA DOVE ARRIVA QUESTA RIGA: '' = nata qui | 'nostr' | 'shopify'
@@ -19054,6 +19113,11 @@ CAMPI_VETRINA = (
     # sentinel tecnico, vedi qtaMassimaAnnuncio lato client). 0 = nessun
     # limite, e vale solo se `a.consegna='servizio'`.
     "a.servizio_limite_ordine, "
+    # LA FAMIGLIA (set 2026): chiave, titolo della card e opzioni della
+    # variante — pubbliche per natura, sono quel che la scheda mostra
+    # nei bottoncini. I numeri della famiglia (quante, da quanto) li
+    # aggiunge arricchisci_righe_vetrina.
+    "a.famiglia, a.famiglia_titolo, a.opzioni, "
     # il massimo mai dichiarato NON esce da qui: lo legge
     # arricchisci_righe_vetrina per decidere il flag `ultimo`, e poi lo
     # butta via — grezzo racconterebbe «ne ha venduti N», che e' un dato
@@ -19264,6 +19328,28 @@ def arricchisci_righe_vetrina(righe):
         con.close()
         for r in righe:
             r["barattoli"] = salvati.get(r["id"], 0)
+    # 5) LA FAMIGLIA (set 2026): le opzioni escono come lista, e chi ha
+    # una famiglia porta anche QUANTE varianti sono disponibili e fra
+    # quali prezzi — la card dice «da» solo se i prezzi cambiano davvero.
+    # UNA query per pagina, e solo se nella pagina c'e' una famiglia.
+    for r in righe:
+        if "opzioni" in r:
+            r["opzioni"] = _opzioni_lista(r["opzioni"])
+    fam = sorted({r["famiglia"] for r in righe if r.get("famiglia")})
+    if fam:
+        con = db()
+        numeri = {x["famiglia"]: x for x in con.execute(
+            "SELECT famiglia, COUNT(*) AS n, MIN(prezzo_sats) AS da, "
+            "MAX(prezzo_sats) AS a, MIN(prezzo_eur) AS da_eur, "
+            "MAX(prezzo_eur) AS a_eur FROM annunci "
+            f"WHERE famiglia IN ({','.join('?' * len(fam))}) "
+            "AND stato='attivo' GROUP BY famiglia", fam)}
+        con.close()
+        for r in righe:
+            x = numeri.get(r.get("famiglia") or "")
+            r["famiglia_n"] = x["n"] if x else 0
+            r["famiglia_varia"] = bool(x) and (
+                x["da"] != x["a"] or (x["da_eur"] or 0) != (x["a_eur"] or 0))
     return righe
 
 
@@ -19883,7 +19969,9 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
     # venditore_id serve alla Mini App per "questo annuncio e' tuo"
     campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
-    dove = "a.stato='attivo'"
+    # una card per famiglia (SQL_CAPOFILA) — tranne con una ricerca per
+    # parole, dove la famiglia si riduce dopo, piu' in basso
+    dove = "a.stato='attivo'" + ("" if q.strip() else " AND " + SQL_CAPOFILA)
     par = []
     if cat and cat != "Tutto":
         dove += " AND a.categoria=?"
@@ -19984,7 +20072,7 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
             # Indice non disponibile: la ricerca di ieri, che qualche
             # risultato lo da'. Mai una vetrina vuota che finge.
             dove += (" AND (a.titolo LIKE ? OR a.descrizione LIKE ? "
-                     "OR a.zona LIKE ?)")
+                     "OR a.zona LIKE ?) AND " + SQL_CAPOFILA)
             par += [f"%{q.strip()}%"] * 3
         else:
             # I FILTRI SI APPLICANO ALLA ROSA INTERA, non alla pagina,
@@ -19992,12 +20080,24 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
             # direbbe il falso. Una lettura in piu' per una ricerca, e
             # in cambio il conto e' esatto.
             segni = ",".join("?" * len(ids_q)) or "NULL"
-            vivi = {r[0] for r in con.execute(
-                f"SELECT a.id FROM annunci a "
+            vivi = {r[0]: r[1] for r in con.execute(
+                f"SELECT a.id, a.famiglia FROM annunci a "
                 "JOIN utenti u ON u.tg_id = a.venditore_id "
                 f"WHERE {dove} AND a.id IN ({segni})", par + ids_q)} \
-                if ids_q else set()
-            ordinati = [i for i in ids_q if i in vivi]
+                if ids_q else {}
+            # UNA CARD PER FAMIGLIA ANCHE QUI (set 2026), ma la prima
+            # PERTINENTE e non il capofila: chi cerca «cowboy #07» deve
+            # trovare il 7, che il capofila (il piu' economico) non e'.
+            famiglie_viste = set()
+            ordinati = []
+            for i in ids_q:
+                if i not in vivi:
+                    continue
+                if vivi[i]:
+                    if vivi[i] in famiglie_viste:
+                        continue
+                    famiglie_viste.add(vivi[i])
+                ordinati.append(i)
     if not limit:
         # Client senza paginazione (JS vecchio in cache): l'array puro
         # di sempre, col tetto di sicurezza. Sotto i 500 annunci la
@@ -20050,10 +20150,12 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
             else con.execute(
             f"SELECT COUNT(*) AS n FROM annunci a WHERE {dove}",
             par).fetchone()["n"]
+        # (una famiglia conta UNO, come la card che mostra)
         risposta["conteggi"] = {
             r["categoria"]: r["n"] for r in con.execute(
-                "SELECT categoria, COUNT(*) AS n FROM annunci "
-                "WHERE stato='attivo' GROUP BY categoria")}
+                "SELECT a.categoria, COUNT(*) AS n FROM annunci a "
+                f"WHERE a.stato='attivo' AND {SQL_CAPOFILA} "
+                "GROUP BY a.categoria")}
         # Le regioni che hanno davvero annunci, col numero: il pannello
         # Filtri mostra solo queste (le vuote non compaiono proprio, come
         # le pillole delle categorie) e il client non hardcoda il
@@ -20061,8 +20163,9 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # seguono la categoria attiva ne' la ricerca.
         risposta["regioni"] = {
             r["regione"]: r["n"] for r in con.execute(
-                "SELECT regione, COUNT(*) AS n FROM annunci "
-                "WHERE stato='attivo' AND regione!='' GROUP BY regione")}
+                "SELECT a.regione, COUNT(*) AS n FROM annunci a "
+                f"WHERE a.stato='attivo' AND a.regione!='' AND {SQL_CAPOFILA} "
+                "GROUP BY a.regione")}
         # LE OCCASIONI PER LA SEZIONE «Da scoprire» (ago 2026): la card
         # delle offerte a tempo (e quella degli sconti) SPARISCE quando
         # non c'e' niente da mostrare — decisione di Andrea — quindi il
@@ -20637,10 +20740,27 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
                     "JOIN utenti u ON u.tg_id = a.venditore_id "
                     "WHERE a.id=? AND a.stato IN ('attivo','venduto')",
                     (annuncio_id,)).fetchone()
+    # LE SORELLE (set 2026): la scheda di una variante disegna i
+    # bottoncini delle opzioni, e per farlo le serve la famiglia intera
+    # — ogni variante col suo id, le sue opzioni e se si compra. Prezzo
+    # e resto li legge la scheda della variante scelta, che e' un
+    # annuncio come gli altri. Gli esauriti ci sono (si vedono spenti),
+    # rimossi e in revisione no: per il pubblico non esistono.
+    sorelle = []
+    if r and r["famiglia"]:
+        sorelle = [{"id": s["id"], "stato": s["stato"],
+                    "opzioni": _opzioni_lista(s["opzioni"])}
+                   for s in con.execute(
+                       "SELECT id, stato, opzioni FROM annunci "
+                       "WHERE famiglia=? AND stato IN ('attivo','venduto') "
+                       "ORDER BY id LIMIT ?", (r["famiglia"],
+                                               MAX_SORELLE_FAMIGLIA))]
     con.close()
     if not r:
         raise HTTPException(404, "Annuncio non trovato")
     riga = arricchisci_righe_vetrina([dict(r)])[0]
+    if riga.get("famiglia"):
+        riga["famiglia_varianti"] = sorelle
     if not user or (user["id"] != riga.get("venditore_id")
                     and not e_admin(user["id"])):
         riga.pop("visualizzazioni", None)
@@ -21318,7 +21438,10 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
             print(f"[!] Visite negozio: {e}")
     # venditore_id in piu' solo agli autenticati ("questo annuncio e' tuo")
     campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
-    dove = "a.venditore_id=? AND a.stato='attivo'"
+    # anche nel negozio una card per famiglia (set 2026): la bottega di
+    # AGORA non deve essere 130 magliette in fila, e la scelta della
+    # variante sta nella scheda
+    dove = f"a.venditore_id=? AND a.stato='attivo' AND {SQL_CAPOFILA}"
     prossimo, totale = None, None
     if limit:
         righe, prossimo = pagina_annunci(
@@ -21360,6 +21483,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
         f"SELECT {campi}, a.stato FROM annunci a "
         "JOIN utenti u ON u.tg_id=a.venditore_id "
         "WHERE a.venditore_id=? AND a.stato='venduto' "
+        f"AND {SQL_CAPOFILA_ESAURITI} "
         "ORDER BY a.creato DESC, a.id DESC LIMIT ?",
         (v["tg_id"], TETTO_ESAURITI))]
     annunci = arricchisci_righe_vetrina(righe)

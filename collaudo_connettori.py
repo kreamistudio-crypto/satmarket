@@ -400,6 +400,180 @@ def quanti_connettori():
     return n
 
 
+def maglia_woo(vid, prezzo, taglia, disponibile="instock"):
+    """Una variazione con DUE attributi, come quelle di AGORA."""
+    return {"id": vid, "price": prezzo, "regular_price": prezzo,
+            "status": "publish", "manage_stock": False,
+            "stock_quantity": None, "stock_status": disponibile,
+            "virtual": False, "downloadable": False,
+            "attributes": [{"id": 1, "name": "Colore",
+                            "option": "Golden Yellow"},
+                           {"id": 2, "name": "Taglia", "option": taglia}],
+            "image": None}
+
+
+def vetrina(**extra):
+    """La prima pagina vera della vetrina, come la chiede il client."""
+    return asyncio.run(SRV.lista_annunci(
+        limit=60, cursore="", q=extra.pop("q", ""), cat="", ordina="",
+        x_tg_init_data="", barattolo_sessione="", **extra))
+
+
+def famiglie_collaudo(wid):
+    base = len(CATALOGO_WOO)
+    numeri = {1: "#01/21", 2: "#02/21", 9: "#09/21", 19: "#19/21"}
+    for n, ed in numeri.items():
+        # il #09 porta il cuore davanti, come sul negozio vero
+        cuore = "💛 " if n == 9 else ""
+        CATALOGO_WOO.append(prodotto_woo(
+            300 + n, f"{cuore}ɅGOᏒɅ COWBOY Limited Edition {ed}", "30.00",
+            tipo="variable", gestito=False, categoria="Abbigliamento"))
+        VARIAZIONI_WOO[300 + n] = [
+            maglia_woo(3000 + n * 10 + k, prezzo, t, disp)
+            for k, (t, prezzo, disp) in enumerate((
+                ("S", "30.00", "instock"),
+                # la M del #02 costa di piu': la card dira' «da»
+                ("M", "32.00" if n == 2 else "30.00", "instock"),
+                # la L del #19 e' finita: il #19 ne ha una in meno
+                ("L", "30.00", "outofstock" if n == 19 else "instock")))]
+    CATALOGO_WOO.extend([
+        prodotto_woo(337, "ɅGOᏒɅ COWBOY 1st EDITION", "45.00",
+                     tipo="variable", gestito=False),
+        # un numero SENZA cancelletto non fa famiglia, e un solo
+        # prodotto numerato nemmeno
+        prodotto_woo(338, "Scarpe 42/43", "50.00", gestito=False),
+        prodotto_woo(339, "Stampa d'arte #3/10", "20.00", gestito=False),
+    ])
+    VARIAZIONI_WOO[337] = [maglia_woo(3371, "45.00", "M"),
+                           maglia_woo(3372, "45.00", "L")]
+    giro()
+    righe = [a for a in annunci(wid) if a["origine_chiave"].startswith(
+        tuple(str(x) for x in (301, 302, 309, 319, 337, 338, 339)))]
+    cow = [a for a in righe if "Limited" in a["titolo"]]
+    prova("le magliette numerate entrano tutte, una riga per variante",
+          (12, 11), (len(cow), sum(a["stato"] == "attivo" for a in cow)))
+    prova("...e sono UNA famiglia, anche il #09 col cuore davanti",
+          1, len({a["famiglia"] for a in cow}))
+    fam = cow[0]["famiglia"]
+    prova("...la chiave porta il collegamento davanti", True,
+          fam.startswith(f"c{wid}:e:"))
+    prova("...col titolo pulito dal numero", "ɅGOᏒɅ COWBOY Limited Edition",
+          cow[0]["famiglia_titolo"])
+    nove = next(a for a in cow if a["origine_chiave"] == "309:3091")
+    prova("le opzioni: il Numero davanti, poi colore e taglia",
+          [["Numero", "09/21"], ["Colore", "Golden Yellow"], ["Taglia", "M"]],
+          json.loads(nove["opzioni"]))
+    prima = next(a for a in righe if a["origine_chiave"].startswith("337:"))
+    prova("la 1st EDITION e' un'altra famiglia (niente numero)", True,
+          prima["famiglia"].startswith(f"c{wid}:p:")
+          and prima["famiglia"] != fam)
+    prova("un numero senza cancelletto e un numerato solo: nessuna famiglia",
+          ("", ""), (uno(wid, 338)["famiglia"], uno(wid, 339)["famiglia"]))
+
+    # LA VETRINA: una card per famiglia, ed e' la piu' economica
+    d = vetrina()
+    carte = [a for a in d["annunci"] if a.get("famiglia") == fam]
+    prova("in vetrina la famiglia e' UNA card", 1, len(carte))
+    prova("...la variante disponibile piu' economica (e la piu' vecchia)",
+          min((a["prezzo_sats"], a["id"]) for a in cow
+              if a["stato"] == "attivo")[1], carte[0]["id"])
+    prova("...con quante sono e il «da», perche' la M del #02 costa di piu'",
+          (11, True), (carte[0]["famiglia_n"], carte[0]["famiglia_varia"]))
+    prova("...e le opzioni come lista, non come testo", list,
+          type(carte[0]["opzioni"]))
+    prova("la 1st EDITION: una card anche lei, senza «da»", [(2, False)],
+          [(a["famiglia_n"], a["famiglia_varia"]) for a in d["annunci"]
+           if a.get("famiglia") == prima["famiglia"]])
+    con = SRV.db()
+    abbigliamento = con.execute(
+        "SELECT COUNT(*) FROM annunci WHERE categoria=? AND stato='attivo'",
+        (carte[0]["categoria"],)).fetchone()[0]
+    con.close()
+    prova("i conteggi per categoria contano la famiglia UNA volta", True,
+          d["conteggi"].get(carte[0]["categoria"], 0) < abbigliamento)
+
+    # LA RICERCA: la prima variante PERTINENTE, una volta sola
+    d = vetrina(q="cowboy limited 09")
+    trovate = [a for a in d["annunci"] if a.get("famiglia") == fam]
+    prova("cercando il #09 la famiglia esce una volta, ed e' il #09", True,
+          len(trovate) == 1 and "#09" in trovate[0]["titolo"])
+
+    # IL NEGOZIO: una card per famiglia, e le varianti finite della
+    # famiglia viva non si ripetono fra gli esauriti
+    neg = SRV.negozio(chi="abc123", limit=60, cursore="",
+                      x_tg_init_data="", barattolo_sessione="")
+    prova("nel negozio la famiglia e' una card", 1,
+          sum(a.get("famiglia") == fam for a in neg["annunci"]))
+    prova("...e la L esaurita del #19 non sta fra gli esauriti", 0,
+          sum(a.get("famiglia") == fam for a in neg.get("esauriti", [])))
+
+    # LA SCHEDA: tutte le sorelle vendibili o finite, con le opzioni
+    r = SRV.un_annuncio(nove["id"], x_tg_init_data="", barattolo_sessione="")
+    prova("la scheda porta le sorelle (esaurite comprese)", (12, 1),
+          (len(r["famiglia_varianti"]),
+           sum(s["stato"] == "venduto" for s in r["famiglia_varianti"])))
+    prova("...ognuna con le sue opzioni", ["Numero", "Colore", "Taglia"],
+          [o[0] for o in r["famiglia_varianti"][0]["opzioni"]])
+    prova("un annuncio senza famiglia non ne porta", None,
+          SRV.un_annuncio(uno(wid, 338)["id"], x_tg_init_data="",
+                          barattolo_sessione="").get("famiglia_varianti"))
+
+    # L'ACQUISTO VA ALLA VARIANTE: la M del #09 venduta qui scende lei,
+    # e le sorelle non se ne accorgono
+    ordine = ordine_pagato(nove["id"])
+    asyncio.run(SRV._incassa_ordine(ordine))
+    prova("comprata la M del #09: e' lei a finire", "venduto",
+          uno(wid, "309:3091")["stato"])
+    prova("...e le sorelle restano in vetrina", ("attivo", "attivo"),
+          (uno(wid, "309:3090")["stato"], uno(wid, "309:3092")["stato"]))
+    d = vetrina()
+    prova("...la famiglia resta UNA card, con una variante in meno",
+          [10], [a["famiglia_n"] for a in d["annunci"]
+                 if a.get("famiglia") == fam])
+
+    # LA FAMIGLIA SI SCIOGLIE: restano il #01 e la 1st EDITION
+    CATALOGO_WOO[:] = [p for p in CATALOGO_WOO
+                       if p["id"] not in (302, 309, 319)]
+    giro()
+    uno01 = uno(wid, "301:3010")
+    prova("rimasto solo il #01, e' una famiglia di taglie e basta", True,
+          uno01["famiglia"] == f"c{wid}:p:301"
+          and json.loads(uno01["opzioni"])[0][0] == "Colore")
+    prova("...e il titolo della card e' il suo",
+          "ɅGOᏒɅ COWBOY Limited Edition #01/21", uno01["famiglia_titolo"])
+
+    # SHOPIFY: i nomi delle opzioni stanno sul padre, i valori sulla
+    # variante (option1, option2)
+    tee = prodotto(40, "Felpa", "35.00", varianti=2)
+    tee["options"] = [{"name": "Taglia"}, {"name": "Colore"}]
+    tee["variants"][0].update(option1="S", option2="Nero")
+    tee["variants"][1].update(option1="M", option2="Nero")
+    CATALOGO.append(tee)
+    # un collegamento nuovo: quello della sezione 1 e' finito in errore
+    # alla sezione 10, apposta, e il giro non lo legge piu'
+    sid = collega(url="felpe.myshopify.com")
+    giro()
+    prova("Shopify: le opzioni hanno i nomi del negozio",
+          [["Taglia", "M"], ["Colore", "Nero"]],
+          json.loads(uno(sid, "40:401")["opzioni"]))
+    prova("...e le due felpe sono una famiglia di titolo «Felpa»",
+          (f"c{sid}:p:40", "Felpa"),
+          (uno(sid, "40:400")["famiglia"], uno(sid, "40:400")["famiglia_titolo"]))
+
+    # via, per non cambiare le sezioni che seguono (il cassetto conta i
+    # collegamenti del venditore): il collegamento di qui si toglie coi
+    # suoi annunci, e i prodotti di qui escono dai due cataloghi
+    con = SRV.db()
+    con.execute("UPDATE annunci SET stato='rimosso' WHERE connettore_id=?",
+                (sid,))
+    con.execute("DELETE FROM connettori WHERE id=?", (sid,))
+    con.commit()
+    con.close()
+    del CATALOGO_WOO[base:]
+    CATALOGO[:] = [p for p in CATALOGO if p["id"] != 40]
+    giro()
+
+
 def main():
     print("=" * 62)
     print("  IL COLLAUDO DEI CONNETTORI")
@@ -1064,6 +1238,14 @@ def main():
     giro()
     prova("il cartaceo rifornito sul negozio torna in vetrina", ("attivo", 2),
           (uno(wid, "18:182")["stato"], uno(wid, "18:182")["quantita"]))
+
+    # ---- 17. LE FAMIGLIE (set 2026) -----------------------------------
+    # IL DIFETTO DAL CAMPO: il negozio AGORA ha 19 prodotti «COWBOY
+    # Limited Edition #N/21», ognuno con le sue taglie, e la vetrina si
+    # era riempita di magliette gialle uguali. Ogni variante resta il
+    # suo annuncio; la famiglia li lega, la vetrina ne mostra UNO.
+    print("\n[le famiglie: una card per prodotto, la scelta nella scheda]")
+    famiglie_collaudo(wid)
 
     # ---- 7. il cassetto e i suoi endpoint (tappa 5) -----------------
     print("\n[tappa 5: il cassetto e i suoi endpoint]")
