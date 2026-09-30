@@ -102,34 +102,30 @@ RACCONTI_NEGOZI = {
                   "riso italiano. Qui si custodiscono e si coltivano "
                   "varietà antiche e tradizionali, alcune molto rare, "
                   "riproducendo i semi anno dopo anno."),
-        # LE FOTO NON SONO ANCORA ARRIVATE, e questa e' la riga del
-        # cantiere di una riga: quando ci sono, i file vanno in
-        # assets/racconti/ coi nomi qui sotto (WebP, larghe 1360 come
-        # quelle di To The Mooon) e `foto` passa a True. Nient'altro:
-        # la rotta li serve gia' (FORMA_RACCONTO + questo catalogo) e il
-        # renderer sa gia' dove metterli.
-        # Finche' e' False l'anteprima (dei moderatori e del venditore)
-        # mostra un segnaposto con l'etichetta, e chi arriva sulla pagina
-        # pubblicata non vede nessun riquadro: la storia esce senza
-        # immagini invece che con dei buchi.
-        #   una-garlanda-cop.webp  la copertina, 21:9 come l'hero di To The Mooon
-        #   una-garlanda-1.webp    le varietà
-        #   una-garlanda-2.webp    l'ecosistema
-        #   una-garlanda-3.webp    la pileria
-        #   una-garlanda-4.webp    il QR di EcoOasi (piccola)
-        #   una-garlanda-5.webp    le persone
-        #   una-garlanda-6.webp    il logo (piccola)
-        "foto": False,
-        # IL LOGO DELLA CARD «CONSIGLIATI» NON C'E' ANCORA: quando c'e',
-        #   python prepara_logo_consigliato.py <il PNG> una-garlanda
-        # e qui True. Puo' essere lo stesso disegno della foto 6 (il logo
-        # dentro la storia), ma e' un altro file: quella e' una foto del
-        # racconto, questo gira nella card sul bruno delle categorie e
-        # vuole la trasparenza.
-        "logo": False,
-        # E QUANTO SCENDE NEL QUADRATO, in pixel della card del telefono
-        # (negativo per salire): zero finche' il logo non si e' visto li'.
-        "logo_giu": 0,
+        # LE FOTO DI MANUELE (30 set 2026), con la ricetta di «Un tempo
+        # per te»: WebP q82 senza metadati, sotto i 250 KB, mai
+        # ingrandite. IL QR DI ECOOASI E' STATO TOLTO (decisione di
+        # Andrea): non e' ancora attivo e non si sa quando lo sara'. Il
+        # giorno che c'e', torna come foto 4, piccola, subito sotto
+        # l'elenco che nomina EcoOasi.
+        #   una-garlanda-cop.webp  il labirinto nella risaia, 21:9
+        #   una-garlanda-1.webp    le varietà: i sacchetti e i chicchi
+        #   una-garlanda-2.webp    l'ecosistema: risaie, alberi e stagni
+        #   una-garlanda-3.webp    la pileria: le macine
+        #   una-garlanda-5.webp    le persone: la famiglia
+        #   una-garlanda-6.webp    il logo, il fiore del riso (piccola)
+        "foto": True,
+        # il logo della card «Consigliati», da logo.png: lo stesso
+        # disegno della foto 6, ma un altro file (sul bruno delle
+        # categorie, con la trasparenza). Entra nella card solo a pagina
+        # pubblicata.
+        "logo": True,
+        # il peso del disegno sta al 59% dell'altezza (la spiga in basso,
+        # gli stami sottili in cima): -6 lo riporta al centro, con la
+        # stessa misura del -4 di «Un tempo per te» (al 56%)
+        "logo_giu": -6,
+        # il banner della card nella pagina «Consigliati», 1040x498
+        "banner": True,
         "blocchi": [
             {"t": "testo", "h": "COS'È",
              "p": ("Riso di varietà storiche, coltivato senza nessun "
@@ -195,9 +191,6 @@ RACCONTI_NEGOZI = {
                 "Lavorazione a pietra nella pileria aziendale",
                 "EcoOasi: custodi di natura e biodiversità",
             ]},
-            # il QR subito sotto la voce che lo nomina
-            {"t": "foto", "n": 4, "etichetta": "QR EcoOasi", "piccola": True,
-             "alt": "Il QR di EcoOasi"},
             {"t": "foto", "n": 5, "etichetta": "persone",
              "alt": "La Famiglia Stocchi"},
             {"t": "firma", "h": "Custodi di Natura e Biodiversità",

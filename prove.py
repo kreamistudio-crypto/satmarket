@@ -43176,15 +43176,21 @@ def prove_sponsor():
 
     # L'ORDINE: quelli nominati in testa, gli altri dietro come prima; un
     # nome che non c'e' piu' si salta, e un doppione conta una volta.
+    # (gli ALTRI spazi dal vocabolario vero, nel suo ordine: ogni pagina
+    # del server che riceve il suo banner ci entra da sola — Una
+    # Garlanda, 30 set 2026 — e un elenco scritto a mano la bocciava)
+    _resto = [s for s in amb["slug_sponsorizzabili"]()
+              if s not in (slug_vero, "un-tempo-per-te")]
     _rileggi({"sponsor_ordine": f"{slug_vero},un-tempo-per-te"})
     prova("l'ordine scelto vince su quello di partenza",
-          [slug_vero, "un-tempo-per-te"], amb["sponsor_ordine"]())
+          [slug_vero, "un-tempo-per-te"] + _resto, amb["sponsor_ordine"]())
     _rileggi({"sponsor_ordine": f"mai-visto,{slug_vero},{slug_vero}"})
+    _dietro = [s for s in amb["slug_sponsorizzabili"]() if s != slug_vero]
     prova("...un nome sparito si salta e un doppione conta una volta",
-          [slug_vero, "un-tempo-per-te"], amb["sponsor_ordine"]())
+          [slug_vero] + _dietro, amb["sponsor_ordine"]())
     _rileggi({})
     prova("...e scriverlo mette in testa i nominati",
-          [slug_vero, "un-tempo-per-te"],
+          [slug_vero] + _dietro,
           amb["imposta_ordine_sponsor"]([slug_vero, "mai-visto"]))
     prova("...scrivendo solo quelli del vocabolario", slug_vero,
           tavola.get("sponsor_ordine"))
@@ -44691,16 +44697,17 @@ def prove_racconti_bozza():
               re.findall(r"<[A-Za-z/]", _val))
     # IL CASO CHIESTO (23 set 2026): i sette segnaposto di Una Garlanda.
     # La copertina e' dell'hero, e il suo segnaposto lo scrive il
-    # renderer; le altre sei stanno nel catalogo.
+    # renderer; le altre stanno nel catalogo. IL QR DI ECOOASI E' USCITO
+    # (30 set 2026, decisione di Andrea: non e' ancora attivo, e non si
+    # sa quando lo sara'), quindi nel catalogo ne restano cinque.
     _ug = CAT.get("una-garlanda", {})
-    prova("Una Garlanda ha i suoi sei segnaposto nel catalogo",
-          sorted(["varietà", "ecosistema", "pileria", "persone", "logo",
-                  "QR EcoOasi"]),
+    prova("Una Garlanda ha le sue cinque foto nel catalogo, senza il QR",
+          sorted(["varietà", "ecosistema", "pileria", "persone", "logo"]),
           sorted(b.get("etichetta", "") for b in _ug.get("blocchi", [])
                  if b.get("t") == "foto"))
     prova("...piu' la copertina, dal renderer", True,
           "segnaposto('copertina'" in _rn)
-    prova("...e logo e QR sono le piccole", ["QR EcoOasi", "logo"],
+    prova("...e il logo e' la piccola", ["logo"],
           sorted(b.get("etichetta", "") for b in _ug.get("blocchi", [])
                  if b.get("piccola")))
     # IL LEGAME COL VENDITORE (23 set 2026): Una Garlanda ne ha uno, in
@@ -44962,14 +44969,19 @@ def prove_racconti_bozza():
     r = _sp.run([node, percorso], capture_output=True, text=True,
                 encoding="utf-8")
     os.unlink(percorso)
-    esiti = dict(l.split("|", 1)[::-1] for l in
-                 (r.stdout or "").splitlines() if "|" in l)
+    # UNA LISTA E NON UN DIZIONARIO (30 set 2026): il giro passa ogni
+    # pagina del catalogo con le STESSE etichette, e in un dizionario
+    # l'ultima sovrascriveva le altre — i controlli di Una Garlanda li
+    # giudicava Un tempo per te, e una mutazione del renderer che
+    # toccava solo lei passava muta
+    esiti = [l.split("|", 1)[::-1] for l in
+             (r.stdout or "").splitlines() if "|" in l]
     # UN BANCO MUTO E' ROSSO, il patto dei suoi gemelli
     if not esiti:
         prova("il banco delle pagine in bozza gira", "",
               (r.stderr or "nessuna uscita")[:300])
         return
-    for che, avuto in esiti.items():
+    for che, avuto in esiti:
         prova(che, "ok", avuto)
 
 
