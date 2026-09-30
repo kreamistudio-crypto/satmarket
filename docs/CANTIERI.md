@@ -35921,3 +35921,28 @@ FARE, con Andrea**: aggiungere la prima chiave al nodo (PRODUZIONE, «LA
 MODERAZIONE DELLE DISPUTE P2P: LA PROCEDURA»), e una disputa di prova
 presa e decisa da capo a fondo, coi due telefoni; la prova di come si
 toglie una chiave.
+
+Le dispute P2P per i moderatori, quarto pezzo: le due chiavi sul nodo
+(30 set 2026, solo documenti). **FATTO CON ANDREA**, un comando alla
+volta: le chiavi di moderatore di Andrea e di Alan sono solver sul nodo,
+con pieni poteri. **LA STRADA È CAMBIATA rispetto a quella scritta il
+29** (`mostro-cli` sul nodo, letta e mai provata): il messaggio
+`admin-add-solver` è firmato dalla chiave del nodo e parte verso i relay
+pubblici, e da `mostro-cli` sulla shell dell'host partirebbe dall'IP del
+nodo — Tor lo attraversano i container, non l'host — cioè i relay
+vedrebbero la chiave del coordinator arrivare dal suo IP. È la
+correlazione che il nodo esiste per non fare. Letto su
+`admin_add_solver.rs`, il comando fa UNA riga in `users`; scritta a mano
+vale uguale, senza rete e senza firma. Guardare (colonne vere, 19
+utenti, nessun solver, chiavi assenti), copiare con l'API `backup`
+(19 nella copia), scrivere con la guardia in `BEGIN IMMEDIATE` (commit
+solo a 2 righe): «scritte 2 righe, commit fatto», rilettura 21 utenti e
+le due righe `(…, 0, 1, 2, 0)`. La procedura vera è in PRODUZIONE al
+posto di quella letta. **E LA DISPUTA DI PROVA d3fc7356 È CHIUSA** (dice
+Andrea il 30 set): hold `458bee0b` `CANCELED` sul nodo, sats tornati a
+chi vendeva — l'annullo insieme del primo pezzo ha funzionato col
+coordinatore VERO. **DA AVERE**: la prima disputa di prova presa e decisa
+dall'app coi due telefoni, che è la sola prova che mostrod accetti i tre
+messaggi del moderatore; e la copia `mostro.db.prima-solver-20260930`
+cancellata dopo. (Il commit 07ec2b1 diceva di portare questa voce e non
+la portava: il banco che appende leggeva da stdin, e non c'era.)
