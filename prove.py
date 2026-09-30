@@ -37942,8 +37942,12 @@ def prove_fogli_di_casa():
     # DUE conferme della decisione — la prima dice dove vanno i sats e a
     # chi, la seconda rilegge il motivo scritto. La decisione non si
     # disfa: due volte, a carte scoperte, come i gesti sulla cassaforte.
-    prova("i gesti che passano dalla domanda unica sono settantaquattro",
-          74, solo_codice(mini).count("chiediConferma({"))
+    # SETTANTACINQUE (30 set 2026, l'ordine dei banner in «Da scoprire»):
+    # «Tornare all'ordine di serie?» (`ordineSponsorDiSerie`). La fila
+    # scelta con le frecce si cancella, e non torna da sola: si chiede,
+    # dicendo che cosa si perde.
+    prova("i gesti che passano dalla domanda unica sono settantacinque",
+          75, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
