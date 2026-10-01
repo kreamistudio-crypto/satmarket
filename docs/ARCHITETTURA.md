@@ -26500,7 +26500,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   di ogni coppia parla UNO — la presa (`hold-next`) copre la garanzia
   chiesta (`take`); la garanzia chiesta (`invoice`) copre la fattura
   data (`hold-next`); la garanzia pagata copre la fattura chiesta, che
-  non parla mai.
+  non parla mai — TRANNE CON LA CAUZIONE (1 ott 2026, l'ordine
+  82231748: Alan prende, paga la cauzione da un wallet esterno, e su
+  Telegram non gli arriva «indica dove ricevere i sats»). Con la
+  cauzione mostrod racconta la presa solo DOPO che è bloccata, quindi
+  le due metà mute non nascono più con l'app in mano: la fattura
+  chiesta parla a chi compra se la cauzione è SUA («🔐 Cauzione
+  bloccata ✓: ora indica dove ricevere i sats»), la garanzia chiesta
+  `take` a chi vende se è sua («…ora paga la garanzia, la richiesta è
+  nell'app»), e alla chiusura (concluso, annullato, tornato — non
+  quelle del moderatore, non dopo una bruciatura, non sul timeout che
+  brucia) chi l'aveva bloccata legge in coda «la cauzione torna nel
+  tuo wallet» (`_coda_cauzione_p2p`). DI CHI È lo dice
+  `_cauzione_di_evento_p2p`, pura, con le stesse due chiavi del client:
+  la leva `P2P_CAUZIONE` E il 38385 della fotografia del libro
+  (`_P2P_FOTO["info"]`, letto da `_cauzione_dal_38385_p2p` come
+  `cauzioneDaInfoP2P`: `bond_enabled`, `bond_apply_to`,
+  `bond_only_payment_methods`), più i metodi GREZZI dell'ordine nel
+  libro (parola intera, senza maiuscole: Barattozon resta fuori come
+  sul nodo). Chi ha preso lo dice `preso_dal`, e se la fattura chiesta
+  arriva PRIMA della presa — è il caso vero — lo sa il `lato` del
+  libro: in una vendita prende chi compra. Senza leva, senza 38385 in
+  memoria o con la cauzione spenta nel 38385 il server non inventa
+  niente e le due metà tacciono come prima. L'ORDINE DEI DUE POST NON
+  È UN SEGNALE: partono in due task (`spawn_delivery`) e Tor li
+  rimescola — la cura sta qui e non nella patch 0008, che non si
+  ricostruisce.
   L'ANTI-DOPPIONE È UNO (`p2p_avvisi`, PK ordine + momento + giro +
   persona): ci scrivono gli avvisi del coordinatore, la riserva del
   libro e il recapito, sempre PRIMA dell'invio. Una fattura nuova dopo

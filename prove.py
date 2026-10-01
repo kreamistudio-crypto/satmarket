@@ -81165,7 +81165,10 @@ def _banco_eventi_p2p(eventi_attivi=True):
            # il nome come la pagina lo mostra: qui lo decide la prova
            "_controparti_p2p": lambda c, ordini, per, adesso: {
                o: {"nome": nomi[per]} for o in ordini if per in nomi},
-           "_NOMI": nomi}
+           "_NOMI": nomi,
+           # la cauzione (1 ott 2026): la leva e il 38385 della
+           # fotografia, SPENTI di serie — la prova che li vuole li accende
+           "P2P_CAUZIONE": False, "_P2P_FOTO": {"info": None}}
     # le costanti si prendono dal sorgente, non si ricopiano: una
     # ricopiata resterebbe verde il giorno che quella vera cambia
     for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ",
@@ -81203,6 +81206,9 @@ def _banco_eventi_p2p(eventi_attivi=True):
               "_testo_libro_p2p", "_avvisi_libro_p2p", "eventi_p2p_attivi",
               "_momento_evento_p2p", "_evento_p2p_pulito",
               "_registra_evento_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p", "_destinatari_evento_p2p",
+              # di chi e' la cauzione, e la sua coda (1 ott 2026)
+              "_tag_evento_p2p", "_cauzione_dal_38385_p2p", "_cauzione_di_evento_p2p",
+              "_coda_cauzione_p2p",
               "_testo_evento_p2p", "_nome_altro_p2p", "_dati_frase_p2p",
               "_avvisi_evento_p2p", "_scarica_attese_p2p",
               # l'avviso superato e la presa detta (24 set 2026)
@@ -81385,6 +81391,8 @@ def prove_p2p_eventi():
         # ESTERNO, e chi vende torna nell'app senza sapere com'e' andata
         ("garanzia_pagata", "seller", "invoice-next", [A, B]),
         ("garanzia_pagata", "seller", "active", [A, B]),
+        # ...e con la CAUZIONE le due meta' mute parlano a chi l'ha
+        # bloccata (1 ott 2026): `cauzione_di`, provato in prove_cauzione_p2p
         ("fattura_chiesta", "mostro", "", []),
         ("fattura_data", "buyer", "active", [B]),
         ("fattura_data", "buyer", "hold-next", []),
@@ -113468,11 +113476,210 @@ def prove_cauzione_p2p():
     prova("...e a lati girati le frasi si girano", [True, True],
           [testo("cauzione_persa", "seller", "vende", dict(dati, cauzione_compra=750, cauzione_vende=0)).startswith("🔐 <b>La tua cauzione"),
            testo("cauzione_persa", "seller", "compra", dict(dati, cauzione_compra=750, cauzione_vende=0)).startswith("⚖️ <b>Metà della cauzione di chi vende è tua: 750 sats.</b>")])
+
+    # --- 4) CHI HA BLOCCATO LA CAUZIONE VIENE AVVISATO DEL PASSO DOPO --
+    # (1 ott 2026, l'ordine 82231748: Alan prende la vendita in contanti
+    # di Andrea, paga la cauzione da un wallet esterno, e mostrod manda
+    # `buyer-invoice-requested` e `taken` — in quest'ordine, due POST in
+    # due task. Il server: «fattura_chiesta: nessuno da avvisare», e ad
+    # Alan su Telegram non arriva «indica dove ricevere i sats». La regola
+    # «la fattura chiesta non parla mai» poggiava su «chi ha preso ha
+    # l'app in mano», che con la cauzione pagata fuori e' falso.)
+    print("  [chi ha bloccato la cauzione viene avvisato del passo dopo]")
+    dal38385, di_chi, coda = (amb["_cauzione_dal_38385_p2p"], amb["_cauzione_di_evento_p2p"],
+                              amb["_coda_cauzione_p2p"])
+    INFO = {"kind": 38385, "tags": [["bond_enabled", "true"], ["bond_apply_to", "take"],
+                                    ["bond_only_payment_methods", "Contanti"],
+                                    ["bond_slash_on_waiting_timeout", "false"],
+                                    ["bond_amount_pct", "0.03"]]}
+    prova("il 38385 si legge come lo legge il client: accesa, `take`, la lista senza maiuscole, il timeout che non brucia",
+          {"accesa": True, "a": "take", "metodi": ["contanti"], "timeout_brucia": False}, dal38385(INFO))
+    prova("...senza 38385, o con `bond_enabled` che non e' la parola `true`, e' spenta",
+          [False, False, False],
+          [dal38385(None)["accesa"], dal38385({"tags": [["bond_enabled", "false"]]})["accesa"],
+           dal38385({"tags": [["bond_enabled", "True "]]})["accesa"]])
+    prova("...la lista assente e' «ogni metodo» (l'upstream), e il timeout `true` brucia",
+          ([], True), (lambda c: (c["metodi"], c["timeout_brucia"]))(
+              dal38385({"tags": [["bond_enabled", "true"], ["bond_apply_to", "both"],
+                                 ["bond_slash_on_waiting_timeout", "true"]]})))
+    prova("di chi e' la cauzione: in una VENDITA in contanti e' di chi compra (ha preso), anche prima che mostrod dica chi ha preso",
+          ["compra", "compra"], [di_chi("", "sell", ["Contanti"], INFO, True),
+                                 di_chi("buyer", "", ["Contanti"], INFO, True)])
+    prova("...in un ACQUISTO e' di chi vende, e la parola di mostrod vince sul libro",
+          ["vende", "vende"], [di_chi("", "buy", ["Contanti"], INFO, True),
+                               di_chi("seller", "sell", ["Contanti"], INFO, True)])
+    prova("...senza la leva, senza il 38385, o con la cauzione spenta nel 38385: nessuna",
+          ["", "", ""], [di_chi("buyer", "sell", ["Contanti"], INFO, False),
+                         di_chi("buyer", "sell", ["Contanti"], None, True),
+                         di_chi("buyer", "sell", ["Contanti"], {"tags": [["bond_enabled", "false"]]}, True)])
+    prova("...il metodo e' una parola intera senza maiuscole: «contanti» si', Barattozon e Revolut no, e un ordine con due metodi di cui uno e' Contanti si'",
+          ["compra", "", "", "compra"],
+          [di_chi("buyer", "sell", ["CONTANTI"], INFO, True),
+           di_chi("buyer", "sell", ["Contanti al tabacchino 10.00"], INFO, True),
+           di_chi("buyer", "sell", ["Revolut"], INFO, True),
+           di_chi("buyer", "sell", ["Revolut", "Contanti"], INFO, True)])
+    prova("...la leva deve essere proprio True, e senza sapere ne' chi ha preso ne' il lato non si dice niente",
+          ["", ""], [di_chi("buyer", "sell", ["Contanti"], INFO, 1),
+                     di_chi("", "", ["Contanti"], INFO, True)])
+    prova("...`make` e' di chi ha pubblicato, `both` nomina chi ha preso, una parola ignota nessuno",
+          ["vende", "compra", ""],
+          [di_chi("buyer", "sell", ["Contanti"], {"tags": [["bond_enabled", "true"], ["bond_apply_to", "make"]]}, True),
+           di_chi("buyer", "sell", ["Contanti"], {"tags": [["bond_enabled", "true"], ["bond_apply_to", "BOTH"]]}, True),
+           di_chi("buyer", "sell", ["Contanti"], {"tags": [["bond_enabled", "true"], ["bond_apply_to", "maker"]]}, True)])
+    prova("A CHI: la fattura chiesta parla a chi compra SOLO se la cauzione e' sua; la garanzia chiesta `take` a chi vende SOLO se e' sua",
+          [[A], [], [B], [], []],
+          [[t for t, _ in dest("fattura_chiesta", "mostro", "", A, B, cauzione_di="compra")],
+           [t for t, _ in dest("fattura_chiesta", "mostro", "", A, B, cauzione_di="vende")],
+           [t for t, _ in dest("garanzia_chiesta", "mostro", "take", A, B, cauzione_di="vende")],
+           [t for t, _ in dest("garanzia_chiesta", "mostro", "take", A, B, cauzione_di="compra")],
+           [t for t, _ in dest("fattura_chiesta", "mostro", "", A, B)]])
+    prova("...e il resto della tabella non si muove con la cauzione", [[B], [A, B], [B]],
+          [[t for t, _ in dest("garanzia_chiesta", "mostro", "invoice", A, B, cauzione_di="compra")],
+           [t for t, _ in dest("garanzia_pagata", "seller", "active", A, B, cauzione_di="compra")],
+           [t for t, _ in dest("preso", "buyer", "invoice-next", A, B, cauzione_di="compra")]])
+    d_c = {"sats": 8000, "euro": "5,00 €", "metodi": "Contanti", "cauzione_di": "compra"}
+    d_v = dict(d_c, cauzione_di="vende")
+    prova("LE DUE FRASI: a chi compra «indica dove ricevere i sats», a chi vende «paga la garanzia» — e senza cauzione le vecchie",
+          [True, True, "", "🔒 <b>Paga la garanzia: la richiesta è nell'app.</b>"],
+          [testo("fattura_chiesta", "", "compra", d_c) == "🔐 <b>Cauzione bloccata ✓:</b> ora indica dove ricevere i sats.",
+           testo("garanzia_chiesta", "take", "vende", d_v) == "🔐 <b>Cauzione bloccata ✓:</b> ora paga la garanzia, la richiesta è nell'app.",
+           testo("fattura_chiesta", "", "compra", dict(d_c, cauzione_di="")),
+           testo("garanzia_chiesta", "take", "vende", dict(d_v, cauzione_di=""))])
+    prova("...e mai alla parte sbagliata: la fattura chiesta a chi vende, la garanzia `take` a chi compra, restano com'erano",
+          ["", "🔒 <b>Paga la garanzia: la richiesta è nell'app.</b>"],
+          [testo("fattura_chiesta", "", "vende", d_c), testo("garanzia_chiesta", "take", "compra", d_c)])
+    RIGA = "\n\n🔐 La cauzione che avevi bloccato torna nel tuo wallet."
+    prova("LA CODA «torna nel tuo wallet»: a chi l'ha bloccata, su concluso, annullato (anche per scadenza) e tornato",
+          [RIGA] * 4, [coda("concluso", "", "compra", d_c), coda("annullato", "cooperative", "compra", d_c),
+                       coda("annullato", "escrow-deadline", "compra", d_c), coda("tornato", "taker-timeout", "compra", d_c)])
+    prova("...mai all'altra parte, mai a scambio in corso, mai se un moderatore ha chiuso, mai dopo una bruciatura, mai sul timeout che brucia",
+          [""] * 6, [coda("concluso", "", "vende", d_c), coda("fiat", "", "compra", d_c),
+                     coda("annullato", "admin", "compra", d_c), coda("concluso", "", "compra", dict(d_c, cauzione_bruciata=True)),
+                     coda("tornato", "taker-timeout", "compra", dict(d_c, cauzione_timeout_brucia=True)),
+                     coda("concluso", "", "", dict(d_c, cauzione_di=""))])
+    # le sentinelle: da dove arrivano le due chiavi, e dove si attacca la coda
+    av = codice(_senza_prosa(pezzo("_avvisi_evento_p2p")))
+    prova("gli avvisi chiedono di chi e' la cauzione alla leva E al 38385 della fotografia, coi metodi grezzi del libro", True,
+          'dati["cauzione_di"] = _cauzione_di_evento_p2p(' in av
+          and '_P2P_FOTO["info"], P2P_CAUZIONE)' in av
+          and 'cauzione_di=dati["cauzione_di"])' in av
+          and "momento='cauzione_persa'" in av)
+    prova("...la coda si attacca DOPO la frase, e il libro porta `lato` e i metodi grezzi", True,
+          'testo += _coda_cauzione_p2p(momento, ev["dettaglio"], ruolo, dati)' in av
+          and "SELECT tg_id, preso_da, sats, euro, metodi, lato FROM p2p_ordini" in pezzo("_dati_frase_p2p")
+          and 'metodi_lista=[m for m in metodi if isinstance(m, str)]' in pezzo("_dati_frase_p2p"))
+    prova("i tre giudici sono puri (niente connessione, niente globali del server)", True,
+          all(spia not in codice(_senza_prosa(pezzo(f))) for f in
+              ("_cauzione_dal_38385_p2p", "_cauzione_di_evento_p2p", "_coda_cauzione_p2p")
+              for spia in ("con.", "_P2P_FOTO", "P2P_CAUZIONE", "execute(")))
+
+    # --- IL BANCO CAMMINA: lo scambio vero di stamattina, nei due versi --
+    registra, avvisi = amb["_registra_evento_p2p"], amb["_avvisi_evento_p2p"]
+    KA, KB = "b" * 64, "a" * 64             # A compra, B vende
+    for chi, pub in ((A, KA), (B, KB)):
+        con.execute("INSERT OR IGNORE INTO utenti VALUES(?,1)", (chi,))
+        con.execute("INSERT OR IGNORE INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", (pub, chi))
+    con.commit()
+    _tag = re.compile(r"</?[bi]>")
+
+    def libro(ordine, maker, lato, metodi):
+        con.execute("INSERT OR REPLACE INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, "
+                    "preso_da, euro, sats, metodi) VALUES(?,?,0,'pending',?,1,0,'5,00 €',8000,?)",
+                    (ordine, maker, lato, _json.dumps(metodi)))
+        con.commit()
+
+    def arriva(ordine, azione, attore, dettaglio, quando, **extra):
+        d = {"v": 1, "order": ordine, "action": azione, "ts": quando, "buyer": KA,
+             "seller": KB, "actor": attore, "detail": dettaglio or None}
+        d.update(extra)
+        e = pul(d, quando)
+        fatto = registra(con, e, quando)
+        return None if fatto is None else [(t, _tag.sub("", x)) for t, x in avvisi(con, e, fatto, quando)]
+
+    amb["P2P_CAUZIONE"] = True
+    amb["_P2P_FOTO"]["info"] = INFO
+    T = ORA + 1000
+    VEND = "5a1e0000-c0c0-4a2b-9c3d-0000000000c2"   # la vendita di B, in contanti
+    libro(VEND, B, "sell", ["Contanti"])
+    prova("LA VENDITA IN CONTANTI, nell'ordine di stamattina: la fattura chiesta arriva PRIMA della presa, e parla a chi compra",
+          [(A, "🔐 Cauzione bloccata ✓: ora indica dove ricevere i sats.")],
+          arriva(VEND, "buyer-invoice-requested", "mostro", "", T))
+    presa = arriva(VEND, "taken", "buyer", "invoice-next", T + 1)
+    prova("...poi la presa, a chi vende, con la frase di sempre", [B], [t for t, _ in presa])
+    prova("...«appena chi compra indica dove ricevere i sats, tocca a te bloccare la garanzia»", True,
+          presa[0][1].endswith("Appena chi compra indica dove ricevere i sats, tocca a te bloccare la garanzia."))
+    prova("la garanzia chiesta `invoice` a chi vende, la fattura data a nessuno (coppia)", ([B], []),
+          ([t for t, _ in arriva(VEND, "hold-invoice-requested", "mostro", "invoice", T + 60)],
+           arriva(VEND, "buyer-invoice-added", "buyer", "hold-next", T + 61)))
+    prova("la garanzia pagata a tutti e due, come sempre", [A, B],
+          [t for t, _ in arriva(VEND, "hold-invoice-paid", "seller", "active", T + 120)])
+    prova("il «pagato» a chi vende; il rilascio a nessuno", ([B], []),
+          ([t for t, _ in arriva(VEND, "fiat-sent", "buyer", "", T + 200)],
+           arriva(VEND, "released", "seller", "", T + 300)))
+    fine = arriva(VEND, "success", "mostro", "", T + 310, sats=8000, sats_buyer=7900, sats_seller=8100)
+    prova("il concluso a tutti e due: a chi compra con la coda della cauzione, a chi vende senza",
+          (True, False, True),
+          (fine[0][1].endswith("🔐 La cauzione che avevi bloccato torna nel tuo wallet."),
+           "cauzione" in fine[1][1].lower(), [t for t, _ in fine] == [A, B]))
+    timbri = [tuple(r) for r in con.execute(
+        "SELECT tg_id, momento FROM p2p_avvisi WHERE ordine=? ORDER BY quando, tg_id", (VEND,))]
+    prova("NESSUN DOPPIONE: a chi compra tre avvisi, a chi vende cinque, ognuno una volta",
+          [(A, "fattura_chiesta"), (B, "preso"), (B, "garanzia_chiesta"), (A, "garanzia_pagata"),
+           (B, "garanzia_pagata"), (B, "fiat"), (A, "concluso"), (B, "concluso")], timbri)
+
+    ACQ = "5a1e0000-c0c0-4a2b-9c3d-0000000000c3"   # l'acquisto di A, in contanti: prende B
+    libro(ACQ, A, "buy", ["Contanti"])
+    presa = arriva(ACQ, "taken", "seller", "hold-next", T + 1000)
+    prova("L'ACQUISTO IN CONTANTI: la presa a chi compra (ha pubblicato), con la frase di sempre",
+          ([A], True), ([t for t, _ in presa],
+                        presa[0][1].endswith("Appena chi vende blocca la garanzia, tocca a te indicare dove ricevere i sats.")))
+    prova("...e la garanzia chiesta `take` — muta senza cauzione — parla a chi vende, tornato dal wallet",
+          [(B, "🔐 Cauzione bloccata ✓: ora paga la garanzia, la richiesta è nell'app.")],
+          arriva(ACQ, "hold-invoice-requested", "mostro", "take", T + 1001))
+    prova("la garanzia pagata a tutti e due; la fattura chiesta che le fa coppia tace (la cauzione non e' di chi compra)",
+          ([A, B], []), ([t for t, _ in arriva(ACQ, "hold-invoice-paid", "seller", "invoice-next", T + 1100)],
+                         arriva(ACQ, "buyer-invoice-requested", "mostro", "", T + 1101)))
+    ann = arriva(ACQ, "canceled", "buyer", "cooperative", T + 1200)
+    prova("chi compra accetta di annullare: a chi vende l'annullo, con la coda della cauzione", (True, True),
+          ([t for t, _ in ann] == [B], ann[0][1].endswith("🔐 La cauzione che avevi bloccato torna nel tuo wallet.")))
+
+    SENZA = "5a1e0000-c0c0-4a2b-9c3d-0000000000c4"   # la stessa vendita, via Revolut
+    libro(SENZA, B, "sell", ["Revolut"])
+    prova("SENZA CAUZIONE (Revolut, leva accesa): la fattura chiesta tace come prima, la presa parla a chi vende",
+          ([], [B]), (arriva(SENZA, "buyer-invoice-requested", "mostro", "", T + 2000),
+                      [t for t, _ in arriva(SENZA, "taken", "buyer", "invoice-next", T + 2001)]))
+    BZ = "5a1e0000-c0c0-4a2b-9c3d-0000000000c5"      # Barattozon: «Contanti» dentro, ma non e' contanti
+    libro(BZ, B, "sell", ["Contanti al tabacchino 10.00"])
+    prova("...e Barattozon resta fuori come sul nodo", [],
+          arriva(BZ, "buyer-invoice-requested", "mostro", "", T + 3000))
+    amb["P2P_CAUZIONE"] = False
+    SPENTA = "5a1e0000-c0c0-4a2b-9c3d-0000000000c6"
+    libro(SPENTA, B, "sell", ["Contanti"])
+    prova("...e a leva spenta il contanti torna muto, anche col 38385 che la annuncia", [],
+          arriva(SPENTA, "buyer-invoice-requested", "mostro", "", T + 4000))
+    amb["P2P_CAUZIONE"] = True
+    amb["_P2P_FOTO"]["info"] = None
+    MUTO = "5a1e0000-c0c0-4a2b-9c3d-0000000000c7"
+    libro(MUTO, B, "sell", ["Contanti"])
+    prova("...e senza il 38385 in memoria (relay muti) il server non inventa la cauzione", [],
+          arriva(MUTO, "buyer-invoice-requested", "mostro", "", T + 5000))
+    amb["_P2P_FOTO"]["info"] = INFO
+    BRUCIA = "5a1e0000-c0c0-4a2b-9c3d-0000000000c8"  # la cauzione bruciata PRIMA della chiusura
+    libro(BRUCIA, B, "sell", ["Contanti"])
+    arriva(BRUCIA, "taken", "buyer", "invoice-next", T + 6000)
+    arriva(BRUCIA, "bond-slashed", "mostro", "buyer", T + 6100, sats=1000, sats_buyer=0, sats_seller=500)
+    chiuso = arriva(BRUCIA, "canceled", "mostro", "admin", T + 6200)
+    prova("dopo una bruciatura (e su una chiusura del moderatore) la coda non parte: a chi compra l'annullo e basta",
+          [True, True], [t == A and "cauzione" not in x.lower() for t, x in chiuso if t == A]
+          + [t == B and "cauzione" not in x.lower() for t, x in chiuso if t == B])
+    amb["P2P_CAUZIONE"] = False
+    amb["_P2P_FOTO"]["info"] = None
     # i sats dello SCAMBIO non si toccano: prima il success, poi la cauzione bruciata
     reg = amb["_registra_evento_p2p"]
     ORD = "5a1e0000-c0c0-4a2b-9c3d-0000000000c1"
     for tg, chiave in ((A, "b" * 64), (B, "a" * 64)):
-        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,?)", (chiave, tg, ORA))
+        # (le due chiavi le ha gia' messe la sezione 4, qui sopra)
+        con.execute("INSERT OR IGNORE INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,?)", (chiave, tg, ORA))
     reg(con, pul(dict(corpo, action="taken", detail="hold-next", actor="buyer", ts=ORA - 100), ORA), ORA)
     reg(con, pul(dict(corpo, action="success", detail=None, ts=ORA - 50, sats=7300, sats_buyer=7228, sats_seller=7372), ORA), ORA)
     fatto = reg(con, ev, ORA)

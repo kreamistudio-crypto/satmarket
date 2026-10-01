@@ -32514,3 +32514,141 @@ server con la pagina ricopiata: i numeri qui sopra.
 rispondere subito anche col proprio archivio vero. Se resta un ritardo,
 non è più questo: il prossimo sospetto è il numero di card nella
 striscia dei miei scambi, che si ridipinge anche lei a ogni tocco.
+
+
+## Chi blocca la cauzione viene avvisato del passo dopo (1 ott 2026, difetto dal nodo)
+
+**IL DIFETTO, dalla prova vera di stamattina** (ordine `82231748`,
+vendita da 5 € in Contanti di Andrea, nodo `mostro:v0.19.0-bar6` con la
+cauzione accesa): Alan prende, paga la cauzione (1000 sats, bloccata
+alle 08:02:11), e mostrod manda al server `buyer-invoice-requested` e
+poi `taken`, tutt'e due 200. Journal: «fattura_chiesta da mostro:
+nessuno da avvisare (giro 0)», poi «preso/invoice-next da buyer (giro
+1): avvisati [chi vende]». Ad Alan su Telegram non arriva «tocca a te:
+indica dove ricevere i sats», anche se nell'app il passo c'è. La regola
+che lo taceva («la fattura chiesta non parla MAI: o è la metà della
+coppia con la garanzia pagata, o nasce con una presa fatta proprio da
+chi compra, che ha l'app in mano») era giusta SENZA cauzione: con la
+cauzione mostrod racconta la presa solo DOPO che è bloccata
+(`resume_take_after_bond`, letto su v0.19.0: la vendita senza fattura
+emette `taken`/invoice-next e `buyer-invoice-requested`, l'acquisto
+passa da `show_hold_invoice` e quindi `taken`/hold-next e
+`hold-invoice-requested`/take), e chi ha preso è appena tornato da un
+wallet esterno — la stessa ragione dell'eccezione della garanzia pagata.
+
+**DOVE SI CURA, e perché sul server.** La domanda era «server o ordine
+degli eventi nella patch 0008 (taken prima di buyer-invoice-requested)».
+L'ordine non è un segnale: i due POST partono in due task
+(`spawn_delivery`) e Tor li rimescola — stamattina sono arrivati al
+contrario dell'emissione, e un giorno arriveranno dritti. Servirebbe
+un `detail` nuovo nella patch (una build del nodo in più), mentre il
+server sa già tutto quel che serve: la leva `P2P_CAUZIONE`, il 38385
+del coordinatore (che la fotografia del libro tiene grezzo e firmato in
+`_P2P_FOTO["info"]`, e serve al client), i metodi dell'ordine nel libro
+e chi ha preso. Cura sul server, nessuna build.
+
+**COSA CAMBIA.** Tre giudici puri accanto ai destinatari:
+`_cauzione_dal_38385_p2p` (il calco di `cauzioneDaInfoP2P` del client:
+`bond_enabled` solo se la parola `true`, `bond_apply_to`,
+`bond_only_payment_methods` senza maiuscole, `bond_slash_on_waiting_timeout`),
+`_cauzione_di_evento_p2p` (DI CHI è la cauzione — `compra` | `vende` |
+'' — con le due chiavi del client, la leva E il 38385, il metodo
+dell'ordine come parola intera senza maiuscole come `taker_bond_required_for`
+della 0008 — «Contanti al tabacchino 10.00» non è «contanti», Barattozon
+resta fuori come sul nodo —, e chi ha preso da `preso_dal` o, se mostrod
+non l'ha ancora detto perché la fattura chiesta arriva PRIMA della
+presa, dal `lato` del libro: in una vendita prende chi compra; `make` è
+di chi ha pubblicato, `both` nomina chi ha preso) e `_coda_cauzione_p2p`
+(la riga «🔐 La cauzione che avevi bloccato torna nel tuo wallet» in
+coda a concluso, annullato e tornato — mai a chi non l'ha messa, mai
+sulle chiusure del moderatore `admin` che può averla bruciata con la
+direttiva e allora parla `bond-slashed`, mai dopo una `cauzione_persa`
+in cronaca, mai sul `taker-timeout` se il nodo lì la brucia).
+`_destinatari_evento_p2p` prende `cauzione_di`: la fattura chiesta
+parla a chi compra se la cauzione è SUA, la garanzia chiesta `take` a
+chi vende se è sua; senza cauzione tacciono come prima. Le due frasi:
+«🔐 Cauzione bloccata ✓: ora indica dove ricevere i sats» e «🔐
+Cauzione bloccata ✓: ora paga la garanzia, la richiesta è nell'app».
+`_dati_frase_p2p` porta `lato` e i metodi GREZZI; `_avvisi_evento_p2p`
+scrive `cauzione_di`, la bruciatura già vista e il timeout che brucia, e
+il journal dice «cauzione di chi compra» quando c'è.
+
+**GLI ALTRI PASSI DELLA CAUZIONE, controllati.** Cauzione DA PAGARE
+(`pay-bond-invoice`): nessun evento al server, e non serve — è il gesto
+di chi prende con l'app in mano, il foglio si apre da solo; se la
+richiesta scade mostrod non dice niente a nessuno e l'ordine non ha mai
+lasciato il libro, quindi nemmeno chi ha pubblicato ha niente da sapere
+(coerente: la presa non gli era stata detta). Cauzione BLOCCATA: era il
+buco, nei due versi (vendita → chi compra; acquisto → chi vende, dove la
+garanzia chiesta `take` era muta perché «parla la presa» — ma la presa
+parla a chi ha PUBBLICATO). Cauzione RESTITUITA: il coordinatore non
+manda nessun «restituita» (lo deduce il client dallo stato finale,
+`cauzioneAFineP2P`), su Telegram non lo diceva nessuno: adesso la coda,
+una volta, sull'avviso di chiusura. DOPPIONI: nessuno — nei due versi
+ogni persona sente ogni momento una volta (provato sui timbri di
+`p2p_avvisi`); la garanzia pagata resta l'unica eccezione del
+censimento di `prove_p2p_eventi` (la fattura chiesta ha attore
+`mostro`), ma la ragione è la stessa e sta scritta nella docstring.
+
+**SE IL 38385 NON C'È** (relay muti, server appena partito prima della
+prima fotografia): il server non inventa la cauzione e le due metà
+tacciono come prima — fail-closed, come il client. La fotografia gira a
+ogni passata intera dell'orologio del P2P, cioè entro un minuto.
+
+**PROVE.** `prove_cauzione_p2p`, sezione 4 (128 in tutto): il lettore
+del 38385 sui tag veri e sui casi storti (`True `, `false`, lista
+assente = ogni metodo), di chi è la cauzione nei due versi e con la
+parola di mostrod o il lato del libro, leva non-True, senza 38385,
+Barattozon, due metodi di cui uno Contanti, `make`/`both`/parola
+ignota; i destinatari con `cauzione_di` e il resto della tabella che non
+si muove; le due frasi e il loro silenzio alla parte sbagliata; la coda
+nei quattro casi sì e nei sei casi no; le sentinelle (le due chiavi, i
+metodi grezzi, la coda dopo la frase, i tre giudici puri); e il BANCO
+che cammina con le funzioni vere: la vendita in contanti nell'ordine di
+stamattina (fattura chiesta PRIMA della presa) fino al concluso con la
+coda a chi compra e non a chi vende, otto timbri senza doppioni;
+l'acquisto in contanti (presa a chi compra, «paga la garanzia» a chi
+vende, la fattura chiesta che fa coppia tace, l'annullo cooperativo con
+la coda a chi vende); Revolut muto a leva accesa, Barattozon fuori,
+leva spenta muta, 38385 assente muto, la bruciatura e la chiusura del
+moderatore senza coda. `collaudo_avvisi_in_ordine_p2p`, scenario 6
+sulla ROTTA VERA coi suoi task e il suo respiro: la fattura chiesta
+parte SUBITO a chi compra senza aspettare la presa, poi la presa a chi
+vende, due timbri; a leva spenta la stessa strada muta (25 su 25).
+Tortura 19 su 19 sulla copia (la fattura muta, `take` con qualunque
+cauzione, il filtro dei metodi tolto, la leva a 1, il lato del libro
+tolto, `both` muto, `bond_enabled` senza maiuscole, la lista coi
+maiuscoli, la coda su admin / dopo bruciatura / sul timeout che brucia /
+a chi non l'ha messa / non attaccata, gli avvisi che non chiedono di
+chi è, la bruciatura non guardata, le due frasi alla parte sbagliata,
+`make` di chi ha preso, i metodi grezzi vuoti: tutte rosse). Al primo
+giro UNA prova ha trovato un lasco vero: la frase «paga la garanzia»
+usciva anche a chi compra dal giudice puro (i destinatari non glielo
+avrebbero mai mandato, ma la funzione pura deve dire il vero da sola):
+stretta a chi vende. Suite intera severa senza config nel worktree ribasato su
+origin/main (a1a63cb): 17.782 verdi e 0 rosse, due volte (prima e
+dopo il verbale). La CI di main era ROSSA dal f58b940 per lo scanner
+dei segreti (il vettore della NIP-49, 64 esadecimali): la cura è di
+un'altra sessione — cronologia e workflow compresi, spezzare la riga
+non bastava — e questo cantiere si è ribasato sopra la sua correzione
+prima del push (8d42c6f), rigirando lì le sezioni toccate e i
+collaudi.
+Verbale qui e il paragrafo delle coppie in ARCHITETTURA; CLAUDE.md non
+si tocca (nessuna regola cambia).
+
+**NON PROVATO.** Il giro vero sul nodo: la prossima presa in contanti
+con la cauzione (con Alan) deve lasciare nel journal «🛰️ Evento P2P: …
+«fattura_chiesta» da mostro (giro 0): avvisati [chi compra]» e su
+Telegram «🔐 Cauzione bloccata ✓: ora indica dove ricevere i sats»; e,
+alla chiusura, la coda. L'acquisto in contanti con la cauzione (il verso
+`take` di chi vende) non è mai successo sul coordinatore.
+
+**DA GUARDARE.** Se un giorno il 38385 dicesse `bond_apply_to both`, la
+coda nomina solo chi ha PRESO: chi ha pubblicato con la sua cauzione non
+la sente (decisione: è quello tornato dal wallet che non sa). E il conto
+dei giri: la fattura chiesta arrivata PRIMA della presa prende il giro
+PRIMA della presa (0 al primo scambio); su un ordine tornato in vetrina
+e ripreso dalla STESSA persona, se la seconda fattura chiesta arrivasse
+prima della seconda presa, il suo timbro potrebbe coincidere con quello
+del giro prima e l'anti-doppione la fermerebbe — caso raro, dichiarato,
+non curato.
