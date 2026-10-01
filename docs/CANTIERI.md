@@ -34702,3 +34702,237 @@ e lì la strada è la fotocamera nella pagina (sopra). Da guardare anche:
 il ritorno dalla fotocamera su un Android con poca memoria (il sistema
 può chiudere la WebView mentre la fotocamera è aperta, e il form si
 perde).
+
+## I negozi grandi: l'AI guarda solo chi entra, i lettori fino a mille, il rodaggio e il respiro del giro (1 ott 2026)
+
+**DA DOVE SI PARTIVA.** Il punto 4 del verbale «Database is locked»
+(qui sopra): col tetto di lettura a 200 un negozio da mille prodotti
+non entrava MAI per intero — i lettori ripartono da pagina 1 a ogni
+giro e si fermavano sempre allo stesso punto — e la moderazione
+giudicava a ogni giro TUTTE le righe mai viste per farne entrare
+trenta (su 2.200 righe, trentasei volte il necessario). Le decisioni di
+Andrea, alla lettera: 1) la moderazione AI giudica solo le righe che
+entrano nel giro (testo cambiato + le prime `max_nuovi` mai viste); 2)
+i lettori leggono oltre i 200 prodotti — il valore di
+`MAX_PRODOTTI_CONNETTORE` (mille per i Woo), cosa serve a Shopify oltre
+i 250 (la pausa vera nel lettore), senza che un Woo lento superi il
+tempo del giro e si dichiari rotto; 3) il rodaggio: cento nuovi a giro
+nelle prime 24 ore dal collegamento, poi trenta; 4) il timeout del
+database anche nei 19 script a mano. Il WAL resta fuori, se ne riparla
+dopo il 10 ottobre. A lavoro in corso il punto 5: `collaudo_db_contesa`
+instabile in CI («cade a volte su una prova a tempo, in locale passa
+sempre»), da rendere stabile, e la CI che stampi quale riga cade.
+
+**1) L'AI GUARDA SOLO CHI ENTRA.** `_righe_da_giudicare(righe, c,
+tetto_nuove)`: delle righe mai viste vanno all'AI le prime
+`tetto_nuove`, le altre si marcano `rimandata` e non si giudicano; il
+testo CAMBIATO di chi è già in vetrina si giudica sempre (è la tenuta
+in pari, non un ingresso). Il filtro parole NON OCCUPA UN POSTO —
+trenta prodotti fermati dalle parole in testa al catalogo si sarebbero
+presi i trenta posti a ogni giro, per sempre — e si chiede SOLO FINCHÉ
+C'È POSTO: gira nel ciclo principale, e duemila domande a ogni ora
+sarebbero un'attesa di tutto il server per verdetti da buttare (chiusi
+i posti, anche un vietato si rimanda: lo fermerà al suo turno).
+`_una_riga` non fa nascere una rimandata nemmeno quando un posto si
+libera (la giudicata che esplode). Il marchio «la moderazione non ha
+potuto guardarlo» non tocca le rimandate: nel report stanno fra gli
+«in arrivo ai prossimi giri», non fra i saltati. UN CONTO SOLO: i posti
+del giro li calcola `_nuovi_per_giro(c)` una volta, e li passa a chi
+giudica e a chi fa nascere — due conti separati potrebbero dire numeri
+diversi. Col server vero, sulle 2.200 righe: l'AI ne guarda 100 al
+primo giro (il rodaggio), 30 a regime, più i testi cambiati; ieri
+2.140 a ogni giro.
+
+**2) I LETTORI FINO A MILLE.** `MAX_PRODOTTI_CONNETTORE = 1000` di
+serie, nel codice e nel config d'esempio, per Woo E Shopify: i Woo sono
+dieci pagine (il tetto delle pagine resta 50, cinquemila prodotti),
+Shopify quattro. SHOPIFY, LA PAUSA VERA: `PAUSA_PAGINE_SHOPIFY` = 0,5 s
+— il ritmo del suo limite, due richieste al secondo su un secchio da
+quaranta — DENTRO il ciclo del lettore, prima di ogni pagina dopo la
+prima; il dormire arriva nella busta `ritmo` (`ritmo["dormi"]`, di
+serie `time.sleep`), come il trasporto. Mille prodotti, un secondo e
+mezzo di attese. La costante con quel nome era stata tolta ad agosto
+perché nessun ciclo la prendeva: adesso la prende il ciclo. IL WOO
+LENTO, LA LETTURA A TEMPO: il server passa al lettore `ritmo =
+{"entro": adesso + CONNETTORI_VARIANTI_MAX_S, "segno": ...}` (480 s,
+due minuti prima della scadenza di 600, che resta la cintura per chi
+non risponde affatto) e il lettore si ferma DA SOLO: quel che ha letto
+è un giro buono, non un errore. Fermo FRA LE VARIAZIONI (il caso vero:
+una chiamata per prodotto variabile) il catalogo resta COMPLETO — la
+lista dei prodotti è intera, mancano i dettagli di alcuni: quelli
+tornano marcati `_variazioni_al_prossimo`, `traduci_woo` ne fa una riga
+`_figlie_intatte`, e `riconcilia_connettore` non spegne le loro figlie
+`pid:vid` (che nessuno ha cercato, non sono sparite) mentre le
+sparizioni vere dello stesso giro si fanno; il report conta
+`varianti_al_prossimo` senza riempire i saltati (cinquecento voci
+sarebbero un report da cinquanta KB e un allarme falso). Fermo FRA LE
+PAGINE (il caso estremo) la lettura è PARZIALE come al tetto, anche se
+`X-WP-Total` dice «ci stanno tutti». LA ROTAZIONE: `segno["dopo"]` è
+l'id dell'ultimo prodotto variabile letto, e il giro dopo riparte da lì,
+in cerchio; il segno viaggia nel report del giro
+(`ultimo_esito.varianti_dopo`), quindi si scrive solo a giro chiuso e
+sopravvive ai deploy; se il tempo finisce prima della prima variazione
+resta dov'era. L'avviso al venditore: «il tuo negozio risponde piano:
+in questo giro abbiamo letto le varianti di N prodotti su M, le altre
+al prossimo giro — intanto quelle già in vetrina restano come sono».
+Nel collaudo lo STESSO Woo lento, senza la lettura a tempo, scade e si
+conta come errore (a cinque di fila: rotto, col messaggio al
+venditore); con la lettura a tempo il collegamento resta attivo e
+tutte le figlie entrano in tre giri.
+
+**3) IL RODAGGIO.** `MAX_NUOVI_CONNETTORE_RODAGGIO = 100` per
+`ORE_RODAGGIO_CONNETTORE = 24`, poi `MAX_NUOVI_CONNETTORE_GIRO` (30).
+Non rallenta mai (col regime più alto vale lui), 0 su una delle due lo
+spegne, regime a 0 resta «nessun tetto». LE ORE PARTONO DAL PRIMO
+ANNUNCIO ENTRATO, non da `connettori.creato`: dal set 2026 «la nascita»
+di un negozio è quando i costi di spedizione sono detti — prima il
+catalogo non si legge (`tariffe_da_dire`) — e chi li dice due giorni
+dopo il collegamento avrebbe trovato il rodaggio già finito senza un
+solo annuncio entrato. Nel caso normale è la stessa ora: il primo
+annuncio nasce al primo giro, secondi dopo il collegamento. Le due leve
+sono nel config d'esempio e nel pannello «⚙️ Stato delle leve».
+
+**4) GLI SCRIPT A MANO.** I 19 script che aprono il database vivo
+(`censimento_*`, `ricategorizza`, `sposta_a_mano`, `orfani`,
+`assegna_sottocategorie`, `recupera_*`…) aprono con `timeout=15`, come
+`db()` e `importa_nostr`: un commit del giro o il backup non li fanno
+più morire dopo i 5 s di default. Un censimento in `prove.py` guarda la
+CARTELLA (ogni `sqlite3.connect` fuori da server, prove e collaudi deve
+avere la sua pazienza), quindi lo script di domani entra nel conto da
+solo.
+
+**QUELLO CHE IL COLLAUDO HA TROVATO: LA FAME DI LUCCHETTO.** Col
+traffico vero durante il giro del negozio grande — le cento nascite del
+rodaggio — una scrittura della app con 0,2 s di pazienza moriva
+«database is locked», e non sempre. Le connessioni cronometrate
+(durata di ogni istruzione, per thread) hanno detto perché: le
+transazioni del giro sono brevi (5–20 ms) ma UNA DIETRO L'ALTRA, zero
+buchi fra l'una e l'altra; sqlite non fa la fila, chi aspetta riprova a
+intervalli (1, 2, 5, 10… ms) e ogni volta trova il giro già dentro la
+transazione dopo — 333 istruzioni del giro durante 0,59 s di attesa
+della app. Il traffico da solo, senza giro: 192 richieste, la più lenta
+32 ms. In produzione ogni richiesta autenticata scrive (l'upsert
+dell'utente) e l'attesa avviene nel ciclo principale: il server intero
+fermo per la fase di scrittura del giro, che col tetto a mille è cinque
+volte più lunga. LA CURA, IL RESPIRO: dopo ogni riga che ha scritto,
+`riconcilia_connettore` lascia il database libero per TANTO TEMPO
+QUANTO L'HA TENUTO — escluso il tempo degli scaricamenti, al più
+`RESPIRO_MAX_S` (0,1 s), mai a transazione aperta — e lo stesso fra i
+lotti delle sparizioni: metà del tempo suo, metà di tutti, qualunque
+sia il disco. Il giro è in un thread, il conto lo paga lui. Lo stesso
+giro, prima e dopo: la scrittura HTTP più lenta 0,71–0,79 s → 0,03–0,05
+s; il ciclo principale fermo 0,6–0,8 s → 0,13–0,19 s (quel «fermo» era
+la rotta bloccata nell'attesa, non la traduzione); il giro delle cento
+nascite 1,0–1,3 → 2,9–4,4 s, quello di regime con 230 scritture 2,1 →
+7,9–9,6 s su questo disco (sul VPS, coi commit più veloci, meno).
+
+**5) `collaudo_db_contesa` STABILE, E LA CI CHE DICE QUALE RIGA CADE.**
+La corsa di `6d44c63` è caduta al primo tentativo («23 passate, 1
+fallite») ed è passata al secondo; quale riga, non si può più sapere:
+`collaudi_ci.py` stampava le ultime quaranta righe, e dopo la riga
+caduta il collaudo stampa le centinaia di «🏪» del giro. Le prove a
+tempo erano tre: la rotta impaziente da 0,2 s (contro le raffiche di
+commit muore di fame di lucchetto, cioè secondo il disco — il candidato
+più forte, soprattutto nella parte del negozio grande), «almeno
+quaranta scritture» (conta quanto è veloce il disco della CI) e «dopo
+circa un secondo» (un cronometro su un thread). Adesso: la SONDA dentro
+lo scaricatore — una scrittura con una connessione sua mentre il giro è
+fermo nella foto: deterministica, 24 su 24, e con le foto rimesse
+dentro la transazione muore (provato dalla tortura) —; le rotte con due
+secondi di pazienza, e solo «hanno scritto e non sono morte»; la
+pazienza di `db()` con un Event e con l'ORDINE (finisce dopo il
+rilascio e molto prima dei quindici secondi) invece del cronometro. La
+parte del negozio grande è passata, coi numeri di oggi, nel collaudo
+nuovo `collaudo_negozi_grandi` (nella CI). E `collaudi_ci.py` stampa
+SEMPRE le righe «✗» di un collaudo rosso, con l'atteso e l'avuto,
+ovunque stiano nell'uscita, e un'annotazione `::error::` per ognuna
+(GitHub le mostra in cima alla corsa senza aprire il registro).
+
+**LE STRADE SCARTATE.** La scadenza più lunga invece della lettura a
+tempo: un giro da 17–50 minuti è fragile a ogni deploy (che lo ammazza
+a metà e butta il lavoro) e tiene in coda tutti gli altri negozi. Le
+variazioni lette in parallelo: il tempo diviso per quattro, ma quattro
+PHP occupati sul WordPress del venditore ogni ora, cioè sul suo negozio
+vero. Il segno della rotazione in memoria (ripartirebbe da capo a ogni
+deploy: nei giorni dei deploy la coda di un negozio lento non
+arriverebbe mai), in `timbri` o in una colonna nuova: il report del
+giro è già il posto giusto — si scrive solo a giro chiuso e muore col
+collegamento. Le sparizioni sospese su tutto il catalogo quando la
+lettura si ferma fra le variazioni: un negozio sempre lento non avrebbe
+spento più niente; si protegge solo quel che non si è cercato. L'àncora
+del rodaggio su `connettori.creato` (sopra). Il respiro fisso (5 ms):
+su un disco lento non basta, su uno veloce spreca; proporzionale si
+adatta da solo. Le transazioni del giro raggruppate a lotti: meno
+commit, ma i buchi restano rari — la fame è la stessa. Saltare le
+riscritture delle righe identiche (ogni giro riscrive OGNI riga già in
+vetrina: per un negozio da 2.200 righe, 2.200 commit all'ora): è la
+cura del volume, tocca `modificato` e il resto di `_aggiorna`, ed è una
+decisione — in fondo al rapporto. Il WAL: fuori, come deciso, fino a
+dopo il 10 (e non avrebbe curato la fame: lo scrittore resta uno).
+
+**PROVATO.** `prove_negozi_grandi`, nuova (83): il giudice delle righe
+girato su un database su file (le prime tre mai viste, i fermati dalle
+parole che non prendono posto, chiusi i posti tre domande al filtro e
+non mille); il giro intero coi pezzi veri di server.py e il modulo vero,
+con un'AI di cartone che annota cosa le si chiede (cento nel rodaggio,
+trenta a regime, i testi cambiati in più; l'AI che tace: le trenta del
+turno aspettano dicendolo e le altre restano in arrivo; quaranta fucili
+in testa che non prendono i trenta posti; il segno che viaggia nel
+report e torna al lettore, un report storto che vale «da capo», un giro
+morto che non lo scrive); il rodaggio coi suoi confini (un minuto prima
+e dopo le ventiquattro ore, il primo annuncio di QUEL negozio, le leve a
+zero, il rodaggio che non rallenta); la lettura a tempo coi lettori veri
+e un orologio di cartone (ferma fra le variazioni col catalogo completo,
+la rotazione in cerchio per tre giri, tutto letto col tempo che basta,
+ferma fra le pagine e parziale anche se X-WP-Total dice «ci stanno», il
+segno che resta dov'era, l'avviso detto una volta); le figlie che non si
+spengono e le sparizioni vere che si fanno nello stesso giro; la
+rimandata che non nasce nemmeno col posto libero; la pausa di Shopify
+contata (fra le pagine, mai prima della prima, e di serie un sonno
+vero); i valori di serie; il censimento degli script; il pannello; il
+respiro contato (quante pause, mai a transazione aperta, senza gli
+scaricamenti, proporzionale, col tetto, fra i lotti). Emendate col
+perché: `prove_connettori_ingresso` (il tetto dai posti del giro),
+`prove_connettore_interrompibile` (il banco coi nomi nuovi),
+`prove_negozi_fuori_dal_ciclo` (la pausa contata e non aspettata:
+quarantanove mezzi secondi), `prove_collaudi_in_ci` (le righe rosse
+girate su un'uscita con la rossa in cima e cento righe di rumore dopo),
+`prove_db_contesa_negozi` (non esplode più quando la riga non c'è: lo
+dice rosso col suo nome — preso dalla tortura). `collaudo_negozi_grandi`
+(31, nella CI): i numeri sopra, tre volte su tre e anche senza
+`coincurve` né `pillow_heif`, come in CI. `collaudo_db_contesa`
+riscritto (10): cinque volte su cinque, senza le due librerie, e sotto
+il carico di una tortura in parallelo (l'attesa più lunga di una rotta
+0,03–0,08 s). `collaudo_connettori` 161 su 161. TORTURA 50 su 50 sulla
+copia, ognuna uccisa da una prova col suo nome; due rimettono il guasto
+del 1 ott (le foto dentro la transazione della nascita): le prende
+`prove_db_contesa_negozi` e, col server vero, la sonda di
+`collaudo_db_contesa`. Al primo giro un botto — la sezione di ieri
+esplodeva invece di dire rosso — curato e rigirato pulito. SUITE INTERA
+SEVERA: sull'albero 075ecf4 più il cantiere 18.495 verdi e 0 rosse;
+ribasato su df36eaa (arrivati 6d44c63 e df36eaa, la fotocamera e «📷
+Scatta foto»: nessun mio simbolo nei loro diff) 18.509 verdi e 0 rosse
+sull'albero del commit del codice 633a5b6, e i 33 collaudi della CI
+verdi nella gabbia sullo stesso albero. I due passi dei segreti come nel
+workflow, con la controprova: puliti. Dal vivo nel browser niente: il
+cantiere è il giro del server (il pannello delle leve si prova eseguendo
+`_leve_stato`).
+
+**COSA NON HO PROVATO, E COSA GUARDARE.** Il VPS: il deploy e il
+primo giro vero di un negozio grande col respiro (`🏪 woo #<id>: …`
+nel diario, nessun `database is locked`, la durata del giro). Un Woo
+vero lento e uno Shopify vero oltre i 250 (il secchio di Shopify non
+l'abbiamo mai toccato davvero). La memoria del VPS con mille prodotti
+e le loro variazioni in RAM. Le famiglie a edizione quando la lettura a
+tempo si ferma a metà di una famiglia: per un'ora un'edizione letta da
+sola può staccarsi dalla sua card (le non lette restano col capofila di
+ieri) — si guarda nel diario se capita. Un negozio collegato che aspetta
+i costi di spedizione da più di 24 ore: il rodaggio comincia al primo
+annuncio, provato solo nelle prove.
+
+**IL CONFIG DEL VPS.** Niente da AGGIUNGERE: i valori nuovi sono i
+default del codice. Ma il config vince: prima del deploy, in sola
+lettura, `grep -n "MAX_PRODOTTI_CONNETTORE\|MAX_NUOVI_CONNETTORE\|ORE_RODAGGIO\|DB_BUSY_TIMEOUT" ~/satmarket/config.py`
+— una riga `MAX_PRODOTTI_CONNETTORE = 200` (copiata dal config d'esempio
+di prima) va portata a 1000 o cancellata, e si riavvia (PRODUZIONE, «I
+NEGOZI GRANDI»).
