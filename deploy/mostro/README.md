@@ -427,7 +427,22 @@ Il difetto ha due facce, e le patch le trattano in modo diverso.
 
 ## IN SERVIZIO
 
-Immagine `mostro:v0.18.8-bar5` dal 22 set 2026: le sette patch di questa
+Immagine `mostro:v0.19.0-bar6` dal 1 ott 2026: le OTTO patch di questa
+cartella sopra la `v0.19.0` (`d53e41d`), otto commit sul nodo sul branch
+`barattolo/v0.19.0` (la 0001 è `e8b6b14`), 520 test `cargo` verdi nello
+stadio `builder`, e la cauzione di chi prende accesa nel `settings.toml`
+solo per «Contanti» (PRODUZIONE, «LA SALITA A MOSTRO 0.19.0, COM'È
+ANDATA»). La `-bar5` resta sulla macchina come tag di rollback: con lei
+va rimesso anche il `settings.toml` dalla copia `prima-bar6`, perché la
+0.18.8 non conosce `only_payment_methods` e chiederebbe la cauzione su
+ogni metodo. Sul nodo i patcher hanno morso due volte al primo `cargo`
+(il tipo `Tag` e il test della 0007 sugli importi, tutt'e due nella
+0008): le due correzioni stanno nei commit `482bbfc` e `beb01bd`, e la
+lezione resta quella del 22 set — sul PC non c'è `cargo`, il primo build
+è quello del nodo, e la liturgia prevede di tornare al commit della
+patch prima, rimettere il solo patcher nuovo e rifare i test.
+
+Fino al 1 ott 2026, immagine `mostro:v0.18.8-bar5` dal 22 set 2026: le sette patch di questa
 cartella sopra la `v0.18.8`, commit sul nodo `8a5eef9..1489f38` (la
 liturgia sta in PRODUZIONE, «LA SALITA A MOSTRO 0.18.8»); sul nodo 440
 test `cargo` passati, 15 migrazioni nel database, e il primo scambio

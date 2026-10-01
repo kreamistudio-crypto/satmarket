@@ -2500,9 +2500,11 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   detto le due chiavi» e i due telefoni devono riprovare dopo un
   minuto); lo scanner di Telegram e la fotocamera dell'APK su telefoni
   veri.
-- LA SALITA A MOSTRO 0.19.0, immagine `mostro:v0.19.0-bar6` (PREPARATA
-  il 30 set 2026, DA FARE sul nodo a cantieri fermi; il perché e i
-  numeri stanno in `docs/STUDIO-MOSTRO-0190-2026-09-30.md`). Le sette
+- LA SALITA A MOSTRO 0.19.0, immagine `mostro:v0.19.0-bar6` (preparata
+  il 30 set 2026, ✅ FATTA SUL NODO IL 1 OTT 2026 con la cauzione — com'è
+  andata, e cosa è cambiato strada facendo, sta nella voce «LA SALITA A
+  MOSTRO 0.19.0, COM'È ANDATA», più sotto; il perché e i numeri stanno in
+  `docs/STUDIO-MOSTRO-0190-2026-09-30.md`). Le sette
   patch del fork stanno in `deploy/mostro/` RIFATTE sopra la `v0.19.0`
   (commit `d53e41d`), ognuna col suo patcher a `--secco`; la sola
   differenza dalla `-bar5` è una parola nell'ancora 11 della 0007
@@ -2723,3 +2725,88 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   lato SENZA cauzione deve tornare «su quel lato non c'è una cauzione da
   bruciare». Nel database del nodo, in sola lettura, `SELECT role, state,
   amount_sats, slashed_reason FROM bonds` racconta le stesse cose.
+- LA SALITA A MOSTRO 0.19.0, COM'È ANDATA (1 ott 2026, la liturgia qui
+  sopra eseguita da Andrea un comando alla volta, i comandi scritti da
+  Claude; il nodo gira `mostro:v0.19.0-bar6` con le OTTO patch e la
+  cauzione accesa solo per «Contanti»). In ordine:
+  FASE 1 il 30 set: `transport = "nip44"`, finestra 300, `-bar5` in
+  servizio, `barattolo/v0.18.8` pulito a `1489f38`, libro fermo
+  (canceled 120, success 15, expired 9, cooperatively-canceled 2 — stato
+  di ORDINE, terminale, non il residuo delle dispute —, pending 1,
+  canceled-by-admin 1). Poi la pausa fino al push della cauzione
+  (`f3d0091`), coi due controlli sul PC: la liturgia riletta da
+  origin/main e gli otto patcher a secco su un checkout LF pulito di
+  `v0.19.0`.
+  0) Il backup con l'API `backup` di SQLite e `sudo` (mostrod acceso),
+  176128 byte come l'originale, poi `debian:debian 600` come
+  l'originale. 1) I dieci file (otto patcher e i due `.rs`) in
+  `~/nodo/patch-bar6/`, copiati NON dalla working copy del PC — ferma a
+  giorni prima, senza la 0008 — ma da un export di origin/main (LF,
+  impronte uguali ai blob): le dieci impronte combaciavano. 2) Il tag
+  `v0.19.0` fetchato, `barattolo/v0.19.0` da `d53e41d`, il vecchio branch
+  lasciato lì. 3) Le otto stringhe a secco esattamente quelle attese,
+  otto commit.
+  4) IL PUNTO CHE HA MORSO, DUE VOLTE, ed era la ragione per cui il
+  primo `cargo` è sul nodo: il builder compila (615 s), i test NO.
+  Prima `nostr_sdk::Tag` nel modulo di test della 0008 in `nip33.rs`
+  («cannot find type Tag in crate nostr_sdk»): con nostr-sdk 0.45 `Tag`
+  si prende dal prelude, come fa nip33.rs stesso — corretto il patcher
+  (`482bbfc`). Poi 519 verdi e UN rosso,
+  `amounts_travel_only_when_the_trade_closes` della 0007: non un difetto
+  della 0008 ma la sua REGOLA (una cauzione bruciata porta i suoi
+  importi, e il server la segue già in `P2P_AZIONI_CON_SATS`) contro un
+  test della 0007 che gira su tutto il vocabolario, ora di tredici
+  azioni; la cura sta dove sta la regola, cioè nel patcher 0008, che
+  emenda anche quel test — ventesimo aggancio, ancora a tre righe
+  perché la stessa riga vive anche in `emit_detail`, che non cambia
+  (`beb01bd`); la stringa a secco è da allora «20 agganci in 10 file».
+  Ogni volta: `git reset --hard` al commit della 0007 sul nodo, il solo
+  patcher nuovo via scp con la sua impronta, secco, commit, di nuovo 4a
+  e 4b. ALLA FINE 520 verdi e 0 rossi (zero test nel blocco
+  `cashu_mint`, che non è nostro), coi tre della 0008 e
+  `pre_claim_failures_by_class` della 0007 fra i verdi.
+  5) Le otto `.patch` esportate dal nodo e confrontate sul PC
+  (`confronta_patch.py`, per numero): corpi IDENTICI — stat e ogni hunk,
+  senza le righe `index` — e tre sole intestazioni diverse, da mettere
+  a verbale perché la liturgia diceva «solo index, From e Date»: l'AUTORE
+  (sul nodo i commit li firma l'utente git del nodo, nel repo
+  «Barattolo»), il NUMERO nell'oggetto (`[PATCH n/8]` contro `n/7` e
+  `[PATCH]`, con l'a capo dell'oggetto lungo che si sposta) e la
+  VERSIONE DI GIT in coda (2.47.3 contro 2.55 di Windows). Il primo giro
+  del confronto le contava come differenze e diceva «ci si ferma»: il
+  giudice è stato corretto, non il verdetto.
+  6) `mostro:v0.19.0-bar6` (`f65d34e397b7`), la `-bar5` lasciata in uso.
+  7) SOLO la copia del compose: riga 57 e 7-bis fatti INSIEME subito
+  prima dell'`up -d`, decisione di Andrea, perché nessun `compose up`
+  nel mezzo potesse ricreare `mostro` con l'immagine nuova e il settings
+  vecchio, o il contrario — ed è la regola da tenere: compose e
+  `settings.toml` si cambiano nello stesso respiro del riavvio.
+  8) Al via (il 1 ott, a cantieri dell'app fermi): libro fermo (solo
+  pending e stati finali), riga 57, copia del `settings.toml`, finestra
+  a 900 (riga 15) e il blocco `[anti_abuse_bond]` di sette righe in
+  coda (293-299, dopo un `[cashu]` commentato), `up -d`: in servizio
+  `-bar6`, nel log «Transport: nip44 (protocol v2, event kind 14)», i
+  prezzi su tutti e quattro i relay, nessun error, panic o migrazione.
+  Il 38385 letto dallo SPECCHIO: `mostro_version 0.19.0`,
+  `protocol_version 2`, `bond_enabled true`, `bond_apply_to take`,
+  `bond_amount_pct 0.03`, `bond_base_amount_sats 1000`,
+  `bond_slash_on_waiting_timeout false`, `bond_only_payment_methods
+  Contanti`, `hold_invoice_expiration_window 900`; `expiration_seconds`
+  900 e `fee 0.03` come prima. ⚠️ Sulla macchina del relay `jq` non c'è:
+  lo scan si fa con `/app/strfry` e i tag si filtrano con `python3`,
+  non col `jq` scritto nella liturgia.
+  8-bis) Sul VPS: online `9e3f91f` (contiene la cauzione `f6f9765` e la
+  guardia del protocollo `b071030`; la CI era senza budget, ma il deploy
+  di quei commit era già passato), nessun `.deploy-bocciato`;
+  `P2P_CAUZIONE = True` alla riga 116 del config, riavvio dolce,
+  servizio attivo e ascolto P2P sullo specchio. Il pannello delle leve:
+  esito NON riportato nel verbale (Andrea lo guarda dall'app).
+  COSA RESTA: la prova a due telefoni con Alan (quella della `-bar5`,
+  più la presa in «Contanti» che deve chiedere la cauzione e una presa
+  Barattozon che NON deve chiederla, e un ordine ripreso su un
+  dispositivo pulito che trova la controparte dal coordinatore); il
+  journal di mostrod per una settimana senza `no Mostro transport for
+  event kind`. IL ROLLBACK resta quello del punto 9: riga 57 a
+  `mostro:v0.18.8-bar5` E `settings.toml` dalla copia `prima-bar6`, poi
+  `up -d`; prima la query sulle dispute `cooperatively-canceled`; sul VPS
+  `P2P_CAUZIONE = False` e riavvio.

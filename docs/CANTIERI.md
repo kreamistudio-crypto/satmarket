@@ -32256,3 +32256,57 @@ e 0 rosse; i 28 collaudi della CI nella gabbia (dopo il rebase su
 600 verdi, e i 28 collaudi); dal vivo via CDP a 375
 px nei due temi, i tre loghi accesi uno alla volta (translateY 0 per Una
 Garlanda), nessuno sbordo. DA GUARDARE: il telefono.
+
+## Mostro 0.19.0, la fase 3: il nodo sale alla -bar6 con la cauzione (1 ott 2026)
+
+**Cosa si è fatto.** La liturgia di PRODUZIONE («LA SALITA A MOSTRO
+0.19.0») eseguita sul nodo da Andrea, un comando alla volta, coi comandi
+scritti da Claude e il nodo fuori dal suo perimetro; la fase 1 il 30 set,
+la pausa fino al push della cauzione (`f3d0091`, la patch 0008 nella
+stessa build), i punti 0-7 il 1 ott, l'`up -d` al via di Andrea a
+cantieri dell'app fermi. Il nodo gira `mostro:v0.19.0-bar6`: otto patch
+sopra la `v0.19.0`, protocollo v2 soltanto, la cauzione di chi prende
+accesa solo per «Contanti». Il racconto passo per passo, coi numeri, sta
+in PRODUZIONE («LA SALITA A MOSTRO 0.19.0, COM'È ANDATA»).
+
+**Le decisioni prese strada facendo, coi perché.**
+1) I file per il nodo NON dalla working copy del PC, ferma a giorni prima
+e senza la 0008, ma da un export di origin/main: le impronte si
+confrontano contro i blob, e la copia condivisa fra più sessioni non si
+muove per un deploy.
+2) Il patcher 0008 ha morso DUE volte al primo `cargo` sul nodo, ed è
+esattamente il caso per cui la liturgia dice «il primo build è sul nodo»:
+`nostr_sdk::Tag` nel modulo di test (il tipo si prende dal prelude, come
+fa nip33.rs: `482bbfc`), e il test della 0007 «gli importi viaggiano solo
+alla chiusura» rosso su `bond-slashed`. Qui la scelta: NON il test da
+solo e NON la patch — la 0008 cambia la regola apposta (una cauzione
+bruciata porta i suoi importi, e il server lo sa già), quindi è il
+patcher 0008 a emendare anche quel test, con un aggancio a tre righe
+perché la stessa riga vive in `emit_detail` che non cambia (`beb01bd`,
+«20 agganci in 10 file»). Le patch 0001-0007 non si sono mosse di un
+byte. Ogni correzione: reset al commit della 0007 sul nodo, il solo
+patcher nuovo con la sua impronta, secco, commit, 4a e 4b di nuovo.
+3) Il confronto del punto 5 era scritto per «solo index, From e Date» e
+sul nodo le differenze sono tre intestazioni in più: l'autore git del
+nodo, il numero `[PATCH n/8]` con l'a capo che si sposta, la versione di
+git in coda. Si è corretto il GIUDICE (`confronta_patch.py`: per numero,
+corpi senza `index`, dalla stat alla coda) e non il verdetto: gli otto
+corpi hanno la stessa impronta sul nodo e nel repo.
+4) Riga 57 del compose e 7-bis INSIEME subito prima dell'`up -d`
+(decisione di Andrea): fra la build e il riavvio sono passate ore, e un
+`compose up` qualunque nel mezzo avrebbe ricreato `mostro` con una coppia
+storta — immagine nuova col settings vecchio, o la `-bar5` col blocco
+della cauzione che non sa leggere. Regola da tenere per ogni salita che
+tocca anche il `settings.toml`.
+5) Sulla macchina del relay `jq` non c'è: il 38385 si legge con
+`/app/strfry scan` e un `python3` al posto del `jq` della liturgia.
+
+**Cosa resta da guardare.** La prova a due telefoni con Alan: lo scambio
+di sempre, più una presa in «Contanti» che chiede la cauzione, una presa
+Barattozon che non la chiede, e un ordine ripreso su un dispositivo
+pulito che trova la controparte dal coordinatore (`peer` dalla restore).
+Il pannello delle leve sul VPS (`P2P_CAUZIONE` accesa alla riga 116 del
+config, riavvio fatto): esito da riportare. Il journal di mostrod per
+una settimana senza `no Mostro transport for event kind`. La riga «IL
+NODO GIRA LA 0.18.7» nella sezione del nodo di CLAUDE.md è vecchia di due
+salite: si corregge quando CLAUDE.md si tocca per una regola (regola 8).
