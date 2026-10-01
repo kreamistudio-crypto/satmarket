@@ -32970,3 +32970,127 @@ se la URI porta anche altri relay, ma se ne porta uno solo il login col
 bunker nsec.app resta impossibile da questa rete, e lo dice l'errore.
 3) La PR #17 «Entrare con Amber» (ago 2026) è ancora aperta su GitHub
 ma il suo codice è su `main` da allora: va chiusa.
+
+## Il venditore può annullare un ordine (1 ott 2026)
+
+**Il caso.** Un venditore aveva finito l'oggetto senza togliere
+l'annuncio; più persone l'hanno comprato e pagato, e lui doveva avvisarle
+a mano una per una, perché da chi vende un ordine non si poteva
+annullare: l'unica strada era che OGNI compratore aprisse una disputa e
+un moderatore la decidesse. Prima di scrivere codice, il censimento di
+quel che c'era: il COMPRATORE annulla solo da 'creato' (non pagato:
+`annulla_ordine`, lapide e riacciuffo), da pagato in poi può solo
+confermare o aprire una DISPUTA (locked/shipped/delivered); il VENDITORE
+non annulla niente, su nessuno stato; il MODERATORE decide una disputa in
+tre modi (`risolvi_disputa`: venditore, rimborso, reso) e riapre un
+'confirmed'/'refund' incagliato. Il RIMBORSO è una strada sola,
+`_rimborsa_compratore`: prova la fattura incollata, poi il Lightning
+address del compratore; senza un metodo l'ordine va in 'refund' e il
+compratore sceglie dal pannello dell'ordine (address, o una invoice di
+esattamente quell'importo, via `deposita_invoice`). «Riscuoti i tuoi
+sats» è un'altra cosa: il foglio dei rimborsi d'ASTA (`rimborsi_asta`,
+`/api/rimborsi/{id}/invoice`), che qui non c'entra.
+
+**Cosa si è deciso, coi perché.**
+1) NESSUNO STATO NUOVO. L'annullo del venditore usa 'refund'/'refunded'
+(i sats tornano) e la lapide 'annullato' (mai pagato): il frontend, lo
+stepper e le notifiche li conoscono già, e il timbro
+`annullato_dal_venditore_il` + `motivo_annullo` (+ `nota_annullo`,
+`esauriti_annullo`) dice CHI ha chiuso l'affare. Nel client il giudice è
+`annulloVenditore(o)`: timbro E stato, perché un ordine riacciuffato da un
+saldo tardivo porta ancora il timbro ma è un ordine normale.
+2) SOLO PRIMA DELLA SPEDIZIONE: 'creato' e 'locked'. Da 'shipped' in poi
+un pacco in viaggio si chiude con la consegna o con una disputa, e a
+pagamento in volo verso chi vende (`_in_pagamento`) il gesto è rifiutato
+come gli altri. Su 'creato' vale la liturgia dell'annullo del compratore
+(pagamento controllato PRIMA, CAS, lapide, mai DELETE) con una differenza:
+l'offerta dietro l'ordine DECADE invece di restare ripagabile, perché qui
+a dire di no è chi vende.
+3) IL MOTIVO È UN CATALOGO, non testo libero: esaurito, spedizione, altro
+(con la nota, 3-200 caratteri, scappata). Il gemello nel client è
+sorvegliato in CI. Doppia conferma: il foglio del motivo e poi la domanda
+di casa col motivo ripetuto — muove sats e non si torna indietro.
+4) LA MERCE SI SISTEMA ALL'ANNULLO, NON AL RIMBORSO. È la differenza con la
+disputa, dove lo stock risale quando i sats sono tornati (il pacco è
+tornato indietro intero): qui la merce non è mai partita e la decisione
+sulla giacenza è di adesso. Gli esauriti vanno in pausa col 'venduto' di
+sempre (`_pausa_esauriti`: quantità 0, MAX intatto, offerte decadute), il
+resto torna in vetrina col MAX, mai un 'rimosso'; nei set riga per riga,
+col foglio che chiede QUALE pezzo. Per questo `_rimborsa_compratore` su un
+ordine col timbro non tocca lo stock né il registro dei negozi, anche
+quando paga giorni dopo dalla fattura incollata — altrimenti il pezzo si
+conterebbe due volte (visto nel collaudo: 5 → 6).
+5) IL GIUDICE UNICO DELLE OFFERTE DECADUTE. Il blocco che decade le offerte
+all'esaurimento stava dentro `ricarica_quantita`; da oggi è
+`_decadi_offerte_esaurito`, chiamato dalla ricarica a zero e dalla pausa
+dell'annullo. Due copie direbbero due regole il giorno che una cambia.
+6) GLI AVVISI. Al compratore SUBITO e SEMPRE, prima di provare a pagare:
+chi, cosa, perché, quanto, «per intero, spedizione compresa» e come
+riceverli — se il rimborso resta in volo o aspetta un metodo, lui deve
+sapere comunque che l'ordine è saltato. Poi, quando i sats partono, le
+parole dell'annullo al posto di quelle della disputa; nel ramo senza
+metodo si tace (l'avviso ha già detto come fare), salvo quando l'address
+c'era e non ha pagato. Chi vende riceve la ricevuta del rimborso.
+7) GLI ABUSI SI GUARDANO SENZA AUTOMATISMI (decisione di Andrea). L'annullo
+resta nello storico di chi vende (la card dice «Hai annullato la
+vendita», al compratore «Annullato dal venditore»); il polso dei
+moderatori dice a ogni annullo il conto degli annulli PAGATI in 30 giorni
+(`_conta_annulli_venditore`: refund/refunded, non le lapidi, che il reaper
+spazza e non hanno fatto male a nessuno), e dal terzo
+(`ANNULLI_VENDITORE_ALLARME`) parte un avviso a parte. La reputazione non
+si tocca; il feedback del compratore sull'ordine rimborsato resta il suo,
+ed è la via «umana» per farlo pesare.
+8) IL FOGLIO STA PRIMA DI `#confermaSheet` NEL DOM. Messo dopo, copriva la
+seconda domanda: lo ha detto il giro dal vivo (il tocco vero su «Sì,
+annulla» rispondeva un altro bottone), e il banco col `click()` non lo
+avrebbe mai visto.
+
+**Strade scartate.** Un quinto esito del moderatore o uno stato
+'annullato_venditore' (regola 4: niente stati nuovi senza aggiornare
+tutto); il rimborso parziale per riga nei set (due mosse Lightning
+coordinate: resta integrale, per l'ordine intero); far decidere allo
+stock del negozio collegato anche gli esauriti (un pezzo dichiarato
+finito di là non c'è, e rimetterglielo nel conto sarebbe una bugia);
+un automatismo sulla reputazione o un tetto agli annulli (prima si
+guarda, poi si decide).
+
+**Il compratore e l'ordine pagato (il punto 5 di Andrea).** Oggi NO: il
+compratore annulla solo prima di pagare. Da 'locked' può solo aspettare
+o disputare, e la disputa — che è il gesto giusto quando c'è un torto —
+è sproporzionata per un ripensamento. Proposta, NON fatta: un «Annulla»
+del compratore su 'locked' nelle prime ore e solo se nulla è partito
+(niente tracking, niente busta, niente contenuto digitale consegnato),
+con lo STESSO motore di oggi (CAS a 'refund', `_rimborsa_compratore`,
+stock che risale come nella disputa) e un timbro suo
+(`annullato_dal_compratore_il`); con una finestra (es. 2 ore) perché
+dopo il venditore può aver già speso per l'etichetta; il venditore
+avvisato col motivo; e il conto degli annulli anche per i compratori.
+Il rischio da pesare prima: l'opzione gratuita sul cambio sugli ordini
+in euro (chi compra annulla se il BTC si muove contro di lui), la stessa
+ragione dei 900 secondi del P2P — da qui la finestra corta.
+
+**Provato.** `prove_annullo_venditore` (82): la forma (porte, CAS, lapide,
+pausa, giudice unico, registro, avvisi, polso, migrazione, catalogo
+gemello), il giro vero della rotta in memoria coi pezzi veri (mono
+esaurito, non posso spedire, altro, set con un pezzo esaurito, senza
+metodo e poi la fattura, address che non paga, la lapide del non pagato,
+i rifiuti, il terzo annullo), il client in node (`annulloVenditore`,
+`motivoAnnulloTesto`, `verboOrdine`, `markupAnnullaVendita`,
+`corpoAnnullaVendita`). Otto sentinelle-censimento emendate col perché
+(«Indietro» 3, `passoDeposito` 3, le offerte nel giudice unico,
+`_avvisa_offerte_esaurito` 3, `chiediConferma` 76).
+`collaudo_annullo_venditore` col server vero e il LNbits di cartone (26,
+in CI nella gabbia): esaurito con address → refunded subito, pausa,
+due avvisi, polso; senza metodo → 'refund', poi la fattura paga e lo
+stock non raddoppia; la lapide; i rifiuti; il terzo annullo → allarme;
+/api/orders porta i campi. Tortura 25 su 25 (baseline 82 e 26, uguali
+al repo). Suite intera severa senza config nel worktree da origin/main (a653320): 17.776 verdi e 0 rosse (al giro prima l'unica rossa era il collaudo nuovo fuori dal compileall del workflow, aggiunto). Dal vivo via CDP a 375 nei due temi, sull'app vera con
+un LNbits di cartone locale e il relay morto, col TOCCO VERO: il
+bottone, il foglio (esaurito e altro con la nota), la seconda conferma,
+l'ordine annullato dai due lati, il compratore che incolla la fattura e
+viene rimborsato, la lista con i verbi, l'avviso letto dal journal.
+
+**Da guardare.** Il telefono, dentro Telegram: il foglio sopra il
+foglio, la tastiera sulla nota. Il primo annullo vero in produzione e il
+polso che arriva ai moderatori. La decisione sul «Annulla» del
+compratore a ordine pagato (sopra).
