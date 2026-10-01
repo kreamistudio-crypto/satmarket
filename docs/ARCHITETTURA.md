@@ -5819,6 +5819,18 @@
   lista la sa tenere, e sui browser moderni ha comunque la precedenza.
   `setdefault` e non assegnazione: il documento della busta ha già una
   CSP sua, con la sandbox, e non deve perderla.
+  LE CINTURE E LA CSP IN PROVA (1 ott 2026, cantiere «CSP e le voci
+  aperte degli audit»): il middleware `cinture_http` — che nel file
+  sta PRIMA di `no_iframe`, cioè gli gira DENTRO — mette su ogni
+  risposta nosniff, Referrer-Policy, Permissions-Policy (solo ciò che
+  l'app non usa: microfono, pagamenti, USB, MIDI) e HSTS dove
+  `_host_con_hsts` lo ammette (mai onion, collaudo, locale); e sulle
+  sole pagine HTML di casa la `Content-Security-Policy-Report-Only`
+  (`CSP_PROVA`), che riferisce al cestino `POST /api/csp-report` e non
+  blocca niente. Il widget ha la sua (`CSP_WIDGET`, con l'impronta
+  sha256 del suo unico script e senza `frame-ancestors`). Le direttive
+  coi loro perché, e come si leggono le righe `🛡️ CSP:` del journal,
+  stanno in CANTIERI, «CSP e le voci aperte degli audit — 1)».
   DOVE SI PRENDE IL CODICE: foglio `#widgetSheet` — «Widget per il
   web» (il nome l'ha scelto Andrea) — aperto dal Profilo e dal
   dettaglio del PROPRIO annuncio. Il campo è `readonly` e non `disabled` — da un disabled il
@@ -8648,7 +8660,16 @@
   `SERVIZI_ATTIVI` e `ASTA_ABILITATA` e per la stessa ragione — apre
   una superficie di rischio e si accende dal VPS con un gesto, mai per
   effetto di un deploy — più `BANNER_LIVELLO` e `BANNER_LINK_VIETATI`.
-  Login web dal browser: `POST /api/login/telegram` riceve i dati
+  Login web dal browser: DAL 1 OTT 2026 il Login Widget usa
+  `data-auth-url` e Telegram MANDA il browser a `GET
+  /api/login/telegram/ritorno` coi dati firmati nella query (prima
+  `data-onauth` + `POST /api/login/telegram`, ma il widget eseguiva
+  quella stringa con `eval` — l'unico della pagina, e l'ostacolo alla
+  CSP): stessa verifica (`verifica_login_widget`), stessa porta
+  (`apri_sessione`), 303 alla pagina di partenza (`da`, giudicata da
+  `_dove_tornare`: solo un percorso assoluto di casa), e `?accesso=no`
+  sul rifiuto, che il client traduce nel toast di sempre. La POST
+  resta per il collaudo. Il widget riceve i dati
   firmati dal Login Widget ufficiale e apre una sessione — tabella
   `sessioni` (in DB SOLO l'hash SHA-256 del token), cookie
   `barattolo_sessione` HttpOnly + Secure (fuori collaudo) +

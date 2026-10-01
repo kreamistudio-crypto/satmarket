@@ -33269,3 +33269,193 @@ pagina resta quella dello scambio in contanti, col foglio chiuso e
 «✓ Incontro confermato» — chi compra col bottone «Ho consegnato i
 contanti», chi vende con «✋ Aspetta», che prima sarebbe tornato alla
 lista. Non provato: le due firme vere coi due telefoni.
+
+## CSP e le voci aperte degli audit — 1) le cinture HTTP, la CSP in prova, il login web a redirect (1 ott 2026)
+
+Il cantiere riapre i due audit (`docs/AUDIT-PAGAMENTI-2026-09-19.md`,
+`docs/AUDIT-2-CLIENT-MOSTRO-2026-09-23.md`) e cura le voci rimaste
+aperte una per commit, in questo ordine deciso da Andrea: CSP e
+intestazioni (questa voce), la SSRF dal Lightning address, le foto, i
+tetti e i freni, le quattro piccole (compare_digest, admin per id,
+`deploy.sh`, le action), le chiavi P2P firmate, le rotte P2P nuove
+(disputa, presenza, «dimentica»), i negozi fuori dal ciclo principale.
+REGOLA DEL CANTIERE: l'app deve restare sicura E funzionante, e per chi
+la usa non cambia niente oltre al necessario. Le patch Rust (M4, M6, B6)
+e i `/tmp` del nodo si scrivono e salgono col prossimo giro del nodo;
+A2 (il seme del profilo lo ricava il server) resta com'è, dichiarata.
+
+**DA DOVE SI PARTIVA, verificato dal vivo e non dedotto:** il 1 ott
+`curl -sI https://barattolo.store/` rispondeva SENZA nessuna
+intestazione di sicurezza — niente CSP (quella di `no_iframe` vive
+dietro `PROTEGGI_IFRAME`, che nel codice e nel config è spenta), niente
+HSTS, niente nosniff, niente Referrer-Policy. I due audit dicevano «solo
+`frame-ancestors`», ed era vero solo a leva accesa. E il premio di un
+XSS era cresciuto: nel `localStorage` vivono il segreto NWC, la
+sessione bunker, il mazzo del profilo P2P e, dal 29 set, la chiave
+privata del moderatore.
+
+**LE CINTURE (`cinture_http`, middleware, su ogni risposta, con
+`setdefault`):** `X-Content-Type-Options: nosniff` (ogni rotta di casa
+dichiara il suo tipo), `Referrer-Policy: strict-origin-when-cross-origin`
+(il default dei browser, scritto), `Permissions-Policy` che spegne SOLO
+ciò che l'app non usa mai (microfono, pagamenti del browser, USB, MIDI
+— fotocamera e posizione NON si nominano: nell'iframe di Telegram Web
+a concederle è il genitore, e una riga nostra potrebbe solo toglierle),
+e `Strict-Transport-Security` di un anno, senza `includeSubDomains`
+(il relay è un sottodominio con la sua vita) e senza `preload`
+(irreversibile), SOLO dove il giudice `_host_con_hsts` lo ammette: mai
+sull'onion (TLS non ne ha), mai in collaudo, mai su un indirizzo
+locale. Il middleware sta PRIMA di `no_iframe` nel file, cioè gli gira
+DENTRO: vede la risposta prima che la leva dell'iframe ci metta la sua
+CSP, così la riga in prova non si perde il giorno che quella si accende.
+
+**LA CSP, IN PROVA (`Content-Security-Policy-Report-Only`, sulle sole
+pagine HTML di casa, non ai widget e non a chi ha già una CSP vera):**
+`default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org;
+style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:;
+font-src 'self'; connect-src 'self' wss:; frame-src https://oauth.telegram.org;
+worker-src 'self'; manifest-src 'self'; media-src 'self' blob:;
+object-src 'none'; base-uri 'none'; form-action 'self';
+report-uri /api/csp-report` (in collaudo anche `ws:`, per il relay morto
+di 127.0.0.1:9). Il browser NON blocca niente: riferisce. I perché,
+direttiva per direttiva: `'unsafe-inline'` sugli script perché la pagina
+ha tre blocchi inline e circa ottocento `onclick=` nel markup e nei
+template (censiti: 247 nel markup, 548 nei template) — un nonce li
+spegnerebbe TUTTI, perché coi nonce i browser ignorano
+`'unsafe-inline'`, ed è la fase 2, dopo la delega degli handler; senza
+nonce la CSP ferma i pezzi che un XSS tipicamente porta (script da host
+estranei, `<base>`, plugin, form verso fuori) e NON lo script inline,
+e lo si dichiara. `telegram.org` per il SDK e il Login Widget;
+`oauth.telegram.org` è l'iframe del bottone del widget. `connect-src
+wss:` senza elenco perché i relay di Mostro e NIP-46 cambiano da config
+e quelli di NWC e del bunker li sceglie l'utente dal suo wallet:
+elencarli romperebbe i wallet degli utenti. `img-src https:` perché le
+foto degli annunci importati da Nostr il cui download è fallito restano
+su host esterni, per scelta. NIENTE `'unsafe-eval'`, ed è la ragione
+del login a redirect (sotto). NIENTE `frame-ancestors`: in report-only
+i browser lo ignorano, e a tenerlo è `no_iframe` con la sua leva.
+NIENTE `upgrade-insecure-requests`: l'onion e il collaudo sono su http.
+Il WIDGET ha la SUA, più stretta: `default-src 'none'; img-src 'self'
+https: data:; style-src 'unsafe-inline'; script-src 'sha256-…'`
+(l'impronta del suo unico script, `_impronta_script(WIDGET_JS)`:
+sha256 del solo contenuto fra i tag, in base64, come la calcola il
+browser) e senza `frame-ancestors`, che lì sarebbe il contrario del
+mestiere.
+
+**IL CESTINO (`POST /api/csp-report`):** senza sessione per forza
+(riferisce anche chi non è entrato), quindi con tre argini — 16 KB di
+corpo letti A PEZZI (un Content-Length che mente non cambia niente),
+la stessa riga una volta al minuto, al massimo 120 righe al minuto in
+tutto (chi ci POSTA a raffica riempie 120 righe e poi tace fino al
+minuto dopo) — e risponde SEMPRE 204, anche al JSON storto. Legge le
+due forme (`csp-report` del `report-uri` e `body` della Reporting API),
+tiene direttiva, URL bloccato, file e riga, pagina e campione, taglia
+e toglie i caratteri di controllo: il journal non deve eseguire niente
+di ciò che un estraneo ci manda. La riga è `🛡️ CSP: <direttiva> ←
+<bloccato> @ <file>:<riga> (<pagina>) «<campione>»`. La guardia CSRF lo
+lascia passare per nome: ci POSTA il browser da solo, con l'Origin che
+gli pare (anche `null`), e la rotta non fa niente che una CSRF possa
+usare. COME SI LEGGONO LE VIOLAZIONI: `journalctl -u barattolo --since
+"1 day ago" | grep "CSP:"` — ogni riga dice QUALE direttiva, COSA è
+stato bloccato e DA QUALE pagina; una riga che nomina un host che l'app
+usa davvero (un relay, un wallet, un'estensione) è una cosa da mettere
+nella CSP prima di accenderla, una riga che nomina un host estraneo è
+un tentativo o un'estensione del browser dell'utente (quelle di Firefox
+infilano `moz-extension://`). Quando per qualche giorno il journal è
+pulito, si propone come accenderla davvero.
+
+**IL LOGIN WEB A REDIRECT (`GET /api/login/telegram/ritorno`,
+`data-auth-url` nel client):** letto dal vivo nel file
+`telegram-widget.js?22`, il Login Widget col `data-onauth` faceva
+`eval` sulla stringa dell'attributo (`__parseFunction`): era l'UNICA
+cosa in pagina a chiedere `'unsafe-eval'`, e sarebbe stata l'ostacolo
+alla CSP vera. Col `data-auth-url` Telegram MANDA il browser alla
+nostra rotta coi dati firmati nella query (id, nome, username, foto,
+auth_date, hash): la verifica è la stessa di sempre
+(`verifica_login_widget`, firma e cinque minuti), la sessione si apre
+dalla stessa porta (`apri_sessione`), e si torna con un 303 alla
+pagina da cui si era partiti — `da`, un percorso di casa giudicato da
+`_dove_tornare`: assoluto, mai `//altrove`, mai uno schema, mai una
+query — tolto dalla query PRIMA della firma. Un login rifiutato torna
+alla stessa pagina con `?accesso=no`, e il client dice «Accesso non
+riuscito, riprova» come diceva prima (`avvisoAccessoNegato` in
+`avvia()`, che poi toglie il parametro dalla barra con `replaceState`).
+L'URL del ritorno è RELATIVO (`urlRitornoLogin`): il widget lo risolve
+da sé con un'ancora, e ogni uso di `location.origin` nel file è
+censito. Per chi entra non cambia niente: prima la pagina si ricaricava
+da sola dopo la POST, adesso la ricarica il redirect. Dentro Telegram la
+rotta non si vede mai (la Mini App entra con l'initData, com'è sempre
+stato), e la POST `/api/login/telegram` resta per il collaudo su
+localhost, dove il widget vero non compare.
+
+**LE STRADE SCARTATE.** Un nonce per richiesta sui quattro `<script>`
+(la fessura in `_monta_pagina` c'è già): avrebbe spento gli ottocento
+handler. `'unsafe-eval'` nella CSP per tenere il `data-onauth`: era
+l'unico eval, e toglierlo costava una rotta. `Permissions-Policy` con
+`camera=(self), geolocation=(self)`: in un iframe cross-origin non
+aggiunge niente e può solo togliere. HSTS da Caddy: il Caddyfile non è
+nel repo e non lo guarda nessuna prova; qui invece ha il suo giudice e
+la sua sentinella. Un'intestazione CSP sulla busta e sul contenuto
+digitale: hanno già la loro (`sandbox; default-src 'none'`), e il
+`setdefault` le lascia stare.
+
+**PROVATO.** `prove_csp_prova` (66): le costanti e i giudici eseguiti
+davvero — la CSP senza `unsafe-eval` e senza `frame-ancestors`,
+l'inline dichiarato solo su script e stili, `ws:` solo in collaudo,
+HSTS solo sul dominio pubblico (mai onion, collaudo, locale); il
+cestino con la riga, i caratteri di controllo tolti, il campione
+tagliato, la stessa riga una volta al minuto, il tetto di 120 al
+minuto e il minuto dopo; l'impronta del widget contro lo sha256 del
+corpo; `_dove_tornare` coi cinque modi di uscire di casa; le
+sentinelle sul middleware (setdefault, solo HTML, non ai widget, non
+sopra una CSP vera, prima di `no_iframe` nel file), sulla rotta (a
+pezzi, 413, 204, senza sessione, senza database), sulla guardia CSRF,
+sul client (niente `data-onauth`, `data-auth-url` nei due posti, URL
+relativo, la frase del no, l'avvio che la chiede), sulla CI (il
+collaudo entra per nome). `collaudo_csp.py` (36, nella CI): il SERVER
+VERO con fastapi — le intestazioni sulla pagina, sul js e sul widget
+(l'impronta contro il corpo SERVITO, byte per byte), il cestino che
+scrive UNA riga su due report uguali, 413 oltre 16 KB, 204 al JSON
+storto, la CSRF che lo lascia passare e ferma ancora `/api/logout`; il
+login a redirect firmato col `BOT_TOKEN` di cartone — 303 alla pagina
+di partenza, cookie HttpOnly SameSite=lax più il portachiavi, `/api/me`
+che riconosce, l'uscita, il rientro, la firma storta che torna con
+`?accesso=no` senza cookie, dieci minuti fa che non vale, `da` fuori
+casa che va alla radice — e la Mini App che entra con l'initData e la
+POST del collaudo che risponde ancora. Tortura 23 su 23 sulla
+copia (al primo giro 20 su 23: la sentinella del 303 contava un solo
+303 e la mutazione ne lasciava uno; l'avvio che non chiama
+`avvisoAccessoNegato` faceva esplodere la sezione con `index` invece
+di dare una rossa; un'ancora del banco sbagliata). Suite intera severa
+senza config nel worktree da `origin/main` (`2a504a8`): 18.063 verdi e
+0 rosse; i 30 collaudi della CI verdi nella gabbia.
+DAL VIVO nel Browser pane (server da una copia nello scratchpad,
+collaudo, leva P2P accesa, relay morto) a 375 px: le intestazioni lette
+con `curl` sulla pagina, sul widget e sul js; il login a redirect con un
+URL FIRMATO col token di cartone — entrata (si atterra su `/p2p`, `WEB`
+vero, `/api/me` 200), il Profilo con «Esci», l'uscita (`/api/me` 401,
+torna il collaudo), il rientro (il banner «Ciao Compratore — sei su
+Barattolo dal browser»), la firma storta (toast «Accesso non riuscito,
+riprova» e la barra ripulita), e il link relativo risolto a
+`…/ritorno?da=%2Fnegozio%2Fab12cd34` dalla pagina di un negozio; tre
+violazioni PROVOCATE apposta dalla pagina (uno script, un foglio di
+stile e un'immagine da host estranei) arrivate nel journal come tre
+righe `🛡️ CSP:` — la prova che il browser vero le manda e la CSRF le
+lascia passare; e nell'uso normale — home, P2P col tour, Profilo, il
+foglio «Entra con Nostr» col bunker, il wallet — NESSUNA riga.
+
+**COSA NON HO PROVATO.** Il widget VERO di Telegram (su localhost non
+compare: vuole il dominio di BotFather) — quindi il giro «entrata dal
+sito con Telegram» col bottone vero lo fa Andrea su barattolo.store;
+il telefono e l'APK (il guscio carica la stessa pagina: le
+intestazioni le riceve uguali); le violazioni nei browser degli utenti
+(Firefox con le estensioni, Telegram Web, la WebView dell'app), che
+sono proprio quelle che il periodo in report-only serve a vedere.
+
+**DA GUARDARE.** 1) Il journal per qualche giorno: `grep "CSP:"`.
+2) Quando è pulito, la proposta per accenderla: la stessa CSP come
+`Content-Security-Policy` vera, con `frame-ancestors` dentro (così
+`no_iframe` diventa superfluo), e la fase 2 — nonce + delega degli
+handler — come cantiere a sé. 3) Il bottone del Login Widget: Andrea
+lo prova sul sito.
+

@@ -442,6 +442,18 @@ quelle sono a posto. **Cura:** solo id.
 
 ## M8 — Nessuna CSP sugli script, e l'initData vale 24 ore
 
+> ✅ **CURATA (la metà CSP) il 1 ott 2026** dal cantiere «CSP e le voci
+> aperte degli audit» (vedi `docs/CANTIERI.md`): dal vivo il sito non
+> aveva NESSUNA intestazione di sicurezza (il `frame-ancestors` vive
+> dietro una leva spenta). Adesso: nosniff, Referrer-Policy,
+> Permissions-Policy, HSTS sul solo dominio pubblico, e la CSP in
+> **report-only** col cestino `/api/csp-report` — si accende davvero
+> dopo qualche giorno di journal pulito. Il Login Widget è passato a
+> `data-auth-url` (GET `/api/login/telegram/ritorno`) perché col
+> `data-onauth` faceva `eval`, l'unico in pagina. L'initData a 24 ore
+> resta com'è (leva `ORE_INITDATA`, decisione di ago 2026). Il testo
+> che segue resta com'era.
+
 L'unica `Content-Security-Policy` è `frame-ancestors` (`server.py:1605`).
 `miniapp.html` ha 289 `innerHTML`; c'è un `esc()` e non ho verificato che
 sia usato ovunque (client non letto). Un XSS riuscito legge

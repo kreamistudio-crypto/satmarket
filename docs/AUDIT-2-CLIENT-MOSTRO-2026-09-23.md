@@ -309,6 +309,18 @@ quell'id esista ed appartenga a chi chiede.
 
 ## M4 — Un XSS ruberebbe il wallet: la CSP sugli script non c'è ancora
 
+> ✅ **CURATA (in prova) il 1 ott 2026** dal cantiere «CSP e le voci
+> aperte degli audit» (vedi `docs/CANTIERI.md`): CSP in **report-only**
+> su tutte le pagine (`script-src 'self' 'unsafe-inline'
+> https://telegram.org`, `object-src 'none'`, `base-uri 'none'`,
+> `connect-src 'self' wss:`…) col cestino `/api/csp-report` e i suoi
+> argini; il widget ha la sua con l'impronta sha256 dello script; le
+> altre intestazioni (nosniff, Referrer-Policy, Permissions-Policy,
+> HSTS sul dominio pubblico) sono vere da subito. Il nonce proposto qui
+> sotto è la fase 2: coi nonce i browser ignorano `'unsafe-inline'`, e
+> gli ottocento `onclick` della pagina smetterebbero di funzionare —
+> prima la delega degli handler. Il testo che segue resta com'era.
+
 Non è una falla nuova (M8 del primo audit, ancora aperta) ma il premio è
 cambiato. Nel `localStorage` vivono: il segreto NWC (`barattolo_nwc@<tg_id>`,
 `miniapp.html:38702`, con `pay_invoice` per il mercatino), la chiave client
