@@ -2216,6 +2216,23 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   «ha piu' varianti e non le ho potute leggere» è un lettore che non ha
   agganciato le variazioni (chiamata fuori dal lettore); «nessuna delle
   sue varianti e' in vendita» è il negozio.
+- «DATABASE IS LOCKED» E IL GIRO DEI NEGOZI (1 ott 2026, Cantieri,
+  «Database is locked»): il giro teneva una transazione di scrittura
+  aperta per tutta la durata delle foto e le rotte morivano dopo 5 s.
+  Da oggi le foto si scaricano fuori da ogni transazione, la riga nasce
+  in due commit brevi, le sparizioni vanno a lotti di 25 e `db()` apre
+  con `timeout=DB_BUSY_TIMEOUT` (15 s nel codice; la riga nel config del
+  VPS NON serve, si aggiunge solo per cambiarlo). AL PRIMO GIRO DOPO IL
+  DEPLOY si guarda, in sola lettura:
+  `journalctl -u barattolo --since "2h ago" | grep -E "database is locked|🏪|Connettore|Timbro"`
+  — la fila dei `🏪 …` e il riepilogo `🏪 woo #<id>: N nuovi, …` SENZA
+  un `database is locked` in mezzo o dopo, e nessun `Timbro «…» non
+  scritto`; durante il giro `satmarket.db-journal` compare e sparisce
+  (commit brevi) invece di restare aperto per minuti. Se un `locked`
+  ricompare, si incolla la riga PRIMA: dice chi teneva il lucchetto.
+  Il WAL NON è acceso (pro e contro nel verbale): se un giorno si
+  accende, prima la procedura qui (backup e ripristino con `-wal` e
+  `-shm`, prova del `-readonly` a server fermo).
 - LE FAMIGLIE DI UN NEGOZIO COLLEGATO (30 set 2026): le scrive il giro
   dell'ora, quindi dopo il deploy compaiono al PRIMO giro e non prima.
   Si guardano, in sola lettura, per collegamento:

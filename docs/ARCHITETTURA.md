@@ -23994,6 +23994,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `presenta_release.py` nel repo fa entrambi (una tantum, idempotente,
   legge e ESTENDE la lista follow esistente senza mai sovrascriverla,
   gira sul VPS con la chiave della piattaforma dal config).
+- IL LUCCHETTO DI SQLITE E IL GIRO DEI NEGOZI (1 ott 2026, Cantieri,
+  «Database is locked»): il database è UNO per tutto il mercatino, col
+  rollback journal classico (niente WAL, valutato e non acceso), e
+  sqlite ha UNO scrittore alla volta su tutto il file. Le rotte parlano
+  con sqlite nel ciclo principale, in modo sincrono: ogni attesa sul
+  lucchetto è un'attesa di tutto il server. Da qui le due regole.
+  1) `db()` apre con `timeout=DB_BUSY_TIMEOUT` (15 s, config che
+  vince): copre quel che è lungo per natura — il backup con l'API di
+  sqlite tiene il file in lettura per tutta la copia — e non è una
+  cura per le transazioni lunghe. 2) CHI SCRIVE DA UN THREAD NON TIENE
+  MAI UNA TRANSAZIONE APERTA ATTORNO A UN'ATTESA: la riconciliazione
+  dei negozi (`importa_negozio.riconcilia_connettore`, nel thread della
+  cura 8) scarica le foto FUORI da ogni transazione — la riga nuova
+  nasce in due commit brevi con le foto in mezzo, l'aggiornamento
+  scarica prima di `rifletti_pendenti` e passa `foto` pronto ad
+  `_aggiorna` — e spegne le sparizioni a lotti di `LOTTO_SPEGNIMENTI`
+  (25). Python apre la transazione alla prima scrittura
+  (`isolation_level` legacy) e la chiude al `commit`: fra due commit
+  del giro non c'è nessun lucchetto. Lo prova per esecuzione
+  `prove_db_contesa_negozi` (una seconda connessione a timeout 0 che
+  scrive durante ogni download) e, col server vero,
+  `collaudo_db_contesa`.
 - `config.py` — TUTTE le chiavi e impostazioni. NON è nella repo
   (.gitignore) e NON deve MAI entrarci. `config_esempio.py` è il modello.
 - `importa_nostr.py` — importa annunci NIP-99/NIP-15 da Nostr.

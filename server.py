@@ -1961,9 +1961,30 @@ def su_onion() -> bool:
 
 
 # ------------------------- DATABASE --------------------------------
+# QUANTO ASPETTA UNA CONNESSIONE SUL LUCCHETTO (1 ott 2026, «database is
+# locked»). Sqlite ha UNO scrittore alla volta su tutto il file, e una
+# connessione che trova il lucchetto preso aspetta fino a questo tempo
+# prima di alzare «database is locked». Il default di Python sono 5
+# secondi, e NON ERA SCRITTO: il 1 ott 2026 il giro di un negozio
+# collegato ha tenuto il lucchetto per minuti (le foto scaricate dentro
+# la transazione, curato in `importa_negozio`) e ogni rotta che
+# scriveva moriva dopo i suoi 5 secondi. Adesso le scritture del giro
+# sono brevi per costruzione; i 15 secondi coprono quel che resta
+# lungo per natura — il backup con l'API di sqlite (pre-deploy e
+# giornaliero) tiene il file in lettura per tutta la copia, e un
+# commit che gli capita addosso aspetta invece di morire. Lo stesso
+# numero di `importa_nostr`, per la stessa ragione. Il prezzo e'
+# dichiarato: le rotte parlano con sqlite nel ciclo principale, quindi
+# un'attesa qui e' un'attesa di TUTTO il server — e proprio per
+# questo la cura vera sono le transazioni brevi, non il numero.
+try:
+    from config import DB_BUSY_TIMEOUT
+except ImportError:
+    DB_BUSY_TIMEOUT = 15
+
 
 def db():
-    con = sqlite3.connect(DB)
+    con = sqlite3.connect(DB, timeout=DB_BUSY_TIMEOUT)
     con.row_factory = sqlite3.Row
     return con
 

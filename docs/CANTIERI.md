@@ -34385,3 +34385,215 @@ Telegram) con la fotocamera spenta — il selettore dei file la
 Permissions-Policy non lo governa, ma si guarda; se si fosse spento, la
 cura è togliere `camera=()`.
 
+
+## «Database is locked»: il giro dei negozi chiudeva il database alle rotte (1 ott 2026)
+
+**DA DOVE SI PARTIVA.** Alle 16:44 UTC del 1 ott barattolo.store non
+rispondeva più: nel diario, alle 16:40-16:41, il giro del connettore
+«STACKER NEWS» (righe `🏪 … Apple iPhone Flexi Cases — iPhone XR —
+21.00 €`), poi `⚠️ Timbro «p2p_libro_visto» non scritto (database is
+locked)` e decine di `sqlite3.OperationalError: database is locked`
+nelle rotte; `lsof` mostrava il solo processo del servizio con
+`satmarket.db` e `satmarket.db-journal` aperti (nessun altro scrittore:
+era lui contro se stesso). Andrea ha riavviato. Il sospetto era giusto:
+dalla cura 8 (vedi sopra, «i negozi collegati fuori dal ciclo
+principale») la riconciliazione gira in un THREAD, quindi le rotte
+scrivono MENTRE gira — e il giro teneva una transazione di scrittura
+aperta per minuti. Prima della cura 8 lo stesso codice bloccava il
+server intero (nessuno rispondeva) ma senza «locked»: non c'era nessun
+altro a chiedere il lucchetto. La cura 8 ha reso visibile una
+transazione lunga che c'era da agosto.
+
+**LA CAUSA, sul codice.** 1) In `_una_riga` la riga NUOVA faceva
+`INSERT` (Python apre la transazione lì: `isolation_level` legacy),
+`_scrivi_famiglia`, poi `_foto_locali` — un download per foto, fino a
+10 s l'uno, più Pillow — poi l'`UPDATE` delle foto e SOLO POI
+`con.commit()`. Il lucchetto di scrittura di sqlite (RESERVED, che
+tiene fuori ogni altro scrittore) restava preso per tutta la durata
+delle foto: cinque foto lente = quasi un minuto a riga, e il giro ne
+fa fino a 30 nuove. 2) Sulla riga che c'è già, `_aggiorna` scaricava
+le foto cambiate DOPO `rifletti_pendenti`, che scrive: stesso guasto,
+più raro (solo a foto cambiate con una vendita pendente). 3) `db()`
+apriva `sqlite3.connect(DB)` senza timeout, cioè coi 5 s di default di
+Python, non scritti da nessuna parte: ogni rotta che scriveva aspettava
+5 s e moriva. 4) Le sparizioni spegnevano tutta la vetrina in una
+transazione sola (brevi, ma senza tetto). Il giornale è il rollback
+journal classico (niente WAL): i lettori passano finché il commit non
+chiede l'EXCLUSIVE, gli scrittori no.
+
+**LA CURA.** Nessuna transazione lunga nel giro dei negozi, per
+costruzione. 1) LA NASCITA IN DUE COMMIT BREVI: `INSERT` + famiglia +
+`commit` (la riga nasce COMPLETA, con gli URL del negozio al posto
+delle foto: lo stato di un download fallito, che la vetrina sa già
+mostrare), poi le foto FUORI da ogni transazione, poi `UPDATE foto` +
+`commit`. Il nome del file vuole l'id, quindi prima dell'insert non si
+può scaricare. Un crash fra i due commit lascia esattamente quel che
+lascerebbe un download fallito (gli URL, mai ritentati — com'era). 2)
+L'AGGIORNAMENTO scarica PRIMA di qualunque scrittura: il blocco delle
+foto sta in `_una_riga` prima di `rifletti_pendenti`, e `_aggiorna`
+riceve `foto` già pronto (firma cambiata: `foto` al posto di
+`salva_foto`; non scarica più niente). Niente foto nuove = niente
+download, come sempre. 3) LE SPARIZIONI A LOTTI: un commit ogni
+`LOTTO_SPEGNIMENTI` (25) spegnimenti. 4) `db()` dichiara il tempo
+d'attesa: `sqlite3.connect(DB, timeout=DB_BUSY_TIMEOUT)`, 15 s di
+default e il config del VPS vince (riga nel config d'esempio). Perché
+15 e non 5: le scritture del giro adesso durano un commit, e quel che
+resta lungo per natura è il BACKUP con l'API di sqlite (pre-deploy e
+giornaliero), che tiene il file in lettura per tutta la copia — un
+commit che gli capita addosso aspetta invece di morire; è lo stesso
+numero di `importa_nostr` («timeout generoso: quando gira dal server
+il database è conteso»). Il prezzo è dichiarato nel commento: le rotte
+parlano con sqlite nel ciclo principale, quindi un'attesa lì è
+un'attesa di TUTTO il server — ed è per questo che la cura vera sono
+le transazioni brevi, non il numero.
+
+**IL WAL, VALUTATO E NON ACCESO** (Andrea ha chiesto pro e contro
+prima). PRO: in WAL i lettori non aspettano mai lo scrittore e lo
+scrittore non aspetta i lettori (oggi un commit chiede l'EXCLUSIVE e
+aspetta che ogni `SELECT` in corso finisca; un lettore può prendere
+BUSY durante un commit); un commit è un fsync invece di due; sotto
+carico di lettura è più veloce. CONTRO: a) NON avrebbe curato il 1
+ott: le rotte morte erano SCRITTRICI, e in WAL lo scrittore è uno
+alla volta esattamente come oggi — la cura resta la transazione
+breve; b) il database diventa tre file (`.db`, `-wal`, `-shm`) in
+`dati/`: una copia a mano col `cp` perde quel che sta nel `-wal`
+(i due backup di casa usano l'API `.backup`, che va bene), e un
+RIPRISTINO di una copia deve cancellare `-wal` e `-shm` vecchi
+accanto al file, o sqlite prova a riapplicarli; c) le letture da
+root (`sqlite3 -readonly` nelle procedure, i censimenti con
+`mode=ro`) vogliono che `-shm` esista o che la cartella sia
+scrivibile — col server acceso c'è, a server spento una lettura
+`-readonly` di un WAL può dire «unable to open»; d) il `-wal` cresce
+finché un lettore lo tiene aperto (il checkpoint automatico scatta a
+1000 pagine, ma non può superare un lettore vivo); e) è PERSISTENTE:
+`PRAGMA journal_mode=WAL` si scrive nel file una volta e vale per
+ogni connessione da lì in poi, quindi è un gesto sul VPS (col server
+fermo è più pulito) e il rollback è `PRAGMA journal_mode=DELETE`; f)
+le ronde che leggono a server acceso (censimenti) oggi possono
+prendere BUSY durante un commit, in WAL no — è l'unico guadagno che
+riguarda le ronde. PROPOSTA: non adesso (lancio il 10 ott, backup e
+procedure scritte sul file singolo); da riconsiderare dopo il lancio
+se nel diario compaiono attese dei lettori, e allora con la procedura
+scritta in PRODUZIONE (gesto, `-wal`/`-shm` nel backup e nel
+ripristino, prova del `-readonly`).
+
+**IL NEGOZIO GRANDE** (punto 4 di Andrea: mille prodotti e migliaia di
+varianti, l'import deve andare avanti a ogni giro senza bloccare
+l'app). Girato nel collaudo col server vero: un Woo di cartone da
+1.000 prodotti, 300 dei quali `variable` con 5 taglie = 2.200 righe,
+foto finte, AI contata e non chiamata, le rotte che scrivono durante
+il giro. I NUMERI, lato nostro (senza la rete e senza Haiku, cioè
+solo il database e il codice): col tetto di lettura di oggi
+(`MAX_PRODOTTI_CONNETTORE` = 200) il giro legge 200 prodotti in 64
+chiamate al negozio, traduce 440 righe, l'AI giudica TUTTE le 440 (22
+lotti da 20), ne entrano 30, 410 «rimandate», `parziale=True`: 0,5-1,1
+s a giro, rotte mai morte. Col tetto alzato a 1.000 (patch nel
+collaudo): 312 chiamate al negozio (10 pagine + 300 di variazioni),
+2.200 righe, l'AI ne giudica 2.140 (107 lotti) a OGNI giro, 30 entrano,
+1,1-1,5 s a giro, rotte mai morte. Quindi, oggi, col tetto dei 30: a)
+UN NEGOZIO DA MILLE NON ENTRA MAI PER INTERO: i lettori ripartono da
+pagina 1 a ogni giro e si fermano al tetto di 200 prodotti (e il
+tetto è dichiarato, il report dice «gli altri non entrano»); i 200
+letti (440 righe) entrano in 15 giri = 15 ore, i prodotti 201-1000
+restano fuori finché il tetto non sale NEL CONFIG DEL VPS. b) LA
+MODERAZIONE SI PAGA A OGNI GIRO su tutto il letto e mai entrato:
+`_righe_da_giudicare` chiama «nuove» le righe mai viste, e
+`_modera_righe_negozio` le giudica tutte prima che `max_nuovi` ne
+faccia nascere 30; il verdetto delle altre si butta e si rifà fra
+un'ora. Col tetto a 200: 22+21+…+1 ≈ 170 lotti Haiku per un negozio
+che ne vale 22. Con 2.200 righe: 107 lotti a giro per 72 giri (3
+giorni a 30/ora), ≈ 3.900 lotti ≈ 78.000 verdetti per 2.140 righe
+(36 volte il necessario); a ~3 k token per lotto sono ~12 M token di
+Haiku per un negozio, contro ~0,3 M. In tempo: 107 lotti a 3 in volo
+(`PARALLELI_MODERAZIONE`) e 2-4 s l'uno ≈ 1,5-2,5 minuti di AI a ogni
+giro — nel ciclo principale via `to_thread`, non blocca, ma allunga
+il giro e il costo. c) LA LETTURA di un Woo grande: 312 chiamate HTTP
+a giro; a 0,5 s l'una sono 2,6 minuti, dentro i 600 s di
+`CONNETTORI_LETTURA_MAX_S`; un Woo lento (1 s a chiamata) con 1.000
+prodotti TUTTI variabili fa 1.010 chiamate = 17 minuti → scade a
+ogni giro, e dopo 5 giri il collegamento si dichiara rotto. Shopify
+porta le varianti dentro il prodotto: 1.000 prodotti sono 4 pagine,
+ma oltre 250 letti il commento di `MAX_PRODOTTI_CONNETTORE` chiede
+una pausa VERA nel lettore prima di alzare. PROPOSTA (da decidere,
+niente fatto): 1) PRIMA DI TUTTO giudicare solo quel che entra —
+`nuove` = le righe col testo CAMBIATO (già in vetrina) più le prime
+`max_nuovi` mai viste; le altre mai viste si contano «rimandate»
+senza chiedere all'AI (un flag sulla riga che `_una_riga` legge). Il
+costo torna il minimo (22 lotti per 440 righe, 107 per 2.140, una
+volta sola) e ogni ritocco al tetto smette di costare in AI. 2)
+`MAX_PRODOTTI_CONNETTORE = 1000` nel config del VPS per i Woo (le
+pagine ci sono, il tetto delle pagine è 50); per Shopify oltre 250
+prima la pausa nel lettore. 3) IL TETTO DEI 30 è una scelta sulla
+HOME (ordinata per data: «chi vende una cosa sola sparisce sotto
+mille righe nate nello stesso secondo»), non sul server: a 30/ora
+1.000 prodotti sono 34 ore e 2.200 righe 3 giorni; a 100/ora 10 ore e
+22 ore. Le mille righe arrivano in home comunque, prima o poi: il
+tetto diluisce, non risolve (lo dice già il suo commento). Le due
+strade: (A) 100 a giro, semplice, da mettere nel config del VPS il
+giorno che un negozio grande si collega; (B) IL RODAGGIO: 100 a giro
+nelle prime 24 ore dal collegamento (`connettori.creato`), poi 30 —
+il negozio nuovo entra in un giorno, il regime resta quello di oggi
+per gli aggiornamenti. Consiglio la (B) dopo la (1): è il «farlo
+crescere quando il negozio è appena collegato» di Andrea, costa dieci
+righe, e senza la (1) qualunque tetto più alto paga l'AI di più solo
+nei primi giri. Il collaudo `collaudo_db_contesa` stampa questi numeri
+a ogni giro di CI: quando si cambia una leva, si rilegge lì.
+
+**LE STRADE SCARTATE.** `BEGIN IMMEDIATE` nel giro: prende il
+lucchetto prima e lo tiene uguale, cura il deadlock non la durata.
+Ritentare la rotta su «locked»: un retry nel ciclo principale è
+un'altra attesa di tutto il server. Scaricare le foto PRIMA
+dell'insert con un id prenotato (un `INSERT` vuoto + commit, foto,
+poi il resto): è la stessa cosa dei due commit, con una riga a metà
+in più da spiegare. Ritentare al giro dopo le foto rimaste URL:
+cambierebbe il profilo di carico di oggi (un negozio con le foto su
+un host morto costerebbe 10 s a foto a OGNI giro), e il caso «crash
+fra i due commit» è lo stesso del download fallito, già accettato —
+da riprendere se si vede nel diario. Il WAL adesso: sopra. Un
+`timeout` nei 19 script a mano che aprono il database vivo
+(`censimento_*`, `ricategorizza`, `sposta_a_mano`…): sono fuori
+dall'app, si rilanciano a mano; proposto, non fatto.
+
+**PROVATO.** `prove_db_contesa_negozi` (25): la riconciliazione VERA
+su un database SU FILE, con lo scaricatore di cartone che durante
+ogni download prova a scrivere con una seconda connessione a timeout
+0 (prima della cura: 0 su 10, dopo: 10 su 10, e `in_transaction`
+sempre falso); la riga che nasce con gli URL e finisce coi nomi
+locali; il crash durante le foto (un `SystemExit`, perché una
+`Exception` `_foto_locali` la ingoia come download fallito — presa
+dalla tortura) che lascia la riga completa con gli URL;
+l'aggiornamento con una pendente da riflettere e la foto cambiata,
+download fuori transazione e pendente riflessa lo stesso; sessanta
+sparizioni in lotti 25/25/10 letti dalla `set_trace_callback`; il
+giro lungo in un THREAD (foto da 0,3 s) con le rotte che scrivono
+ogni 10 ms con mezzo secondo di pazienza: decine di scritture, zero
+«locked», foto comprese; le sentinelle sul timeout dichiarato (15,
+config che vince, config d'esempio), sull'ordine foto→rifletti,
+sull'`_aggiorna` che non scarica, sui due commit della nascita.
+`collaudo_db_contesa` (24, nella CI): il SERVER VERO — `sincronizza_
+connettori`, il thread, `db()` — con un Woo di cartone paginato e lo
+scaricatore che dorme 0,15 s a foto: 12 righe, 3,8 s di giro, 111-116
+scritture di una rotta IMPAZIENTE (`DB_BUSY_TIMEOUT` a 0,2 s per la
+durata del giro) senza una morte; la pazienza di `db()` (un thread
+tiene `BEGIN IMMEDIATE` per un secondo: una connessione a timeout 0
+muore, `db()` scrive dopo 1,1 s); il negozio grande (sopra). Tortura
+10 su 10 sulla copia (primo commit tolto, riga nata senza foto, foto
+dopo `rifletti`, lotto tolto e lotto a 1000, `db()` senza timeout e
+a 5, secondo commit tolto, config d'esempio senza la leva, download
+sempre). Suite intera severa e i collaudi della CI nella gabbia: nel
+verbale del push.
+
+**COSA GUARDARE NEL DIARIO al prossimo giro del negozio** (per
+Andrea, in sola lettura): `journalctl -u barattolo --since "2h ago" |
+grep -E "database is locked|🏪|Connettore|Timbro"` — deve esserci la
+fila dei `🏪 …` del negozio e la riga di riepilogo `🏪 woo #<id>: N
+nuovi, …` SENZA nessun `database is locked` in mezzo e dopo; i
+`Timbro «…» non scritto` non devono più comparire; `lsof` durante il
+giro mostra il `-journal` che compare e sparisce (commit brevi) invece
+di restare aperto per minuti. Se un `locked` ricompare, la riga
+PRIMA dice chi teneva il lucchetto: si incolla.
+
+**COSA NON HO PROVATO.** Il VPS (deploy, primo giro vero di STACKER
+NEWS con le foto vere: lo dice il diario); un Woo vero da mille
+prodotti (i numeri di sopra sono senza rete e senza Haiku); la
+memoria del VPS con 2.200 righe tradotte in RAM.

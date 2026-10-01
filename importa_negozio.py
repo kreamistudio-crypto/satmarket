@@ -74,6 +74,17 @@ MAX_FOTO = 5
 # cassetto, e duecento titoli a giro la gonfierebbero per niente.
 MAX_ENTRATI_REPORT = 30
 
+# IL LOTTO DELLE SPARIZIONI (1 ott 2026, «database is locked»): quanti
+# annunci si spengono fra un commit e l'altro nel ciclo delle
+# sparizioni. Il database e' UNO per tutto il mercatino e sqlite ha un
+# solo scrittore alla volta: una transazione che spegne trecento righe
+# in un colpo tiene fuori le rotte per tutto il tempo. Il lotto e'
+# piccolo apposta — il commit costa un fsync, non ha senso farne uno a
+# riga — e un crash a meta' lascia un lotto spento e il resto da
+# spegnere al giro dopo, che per le sparizioni e' esattamente quel che
+# succederebbe comunque.
+LOTTO_SPEGNIMENTI = 25
+
 # Quel che si dice al venditore quando il catalogo non ci sta nel
 # tetto di lettura, e la seconda meta' e' quella che prima MANCAVA: la
 # frase di ieri prometteva «il resto arriva ai giri successivi», ed
@@ -1328,7 +1339,16 @@ def _foto_locali(con, annuncio_id: int, urls: list, salva_foto) -> str:
     """Scarica le foto e torna il JSON dei nomi locali. Un download
     fallito lascia l'URL com'era: meglio una foto che arriva dal
     negozio del venditore che nessuna foto (e' la regola di
-    `localizza_foto`)."""
+    `localizza_foto`).
+
+    SI CHIAMA FUORI DA OGNI TRANSAZIONE, ed e' la regola del 1 ott 2026
+    («database is locked»): ogni download vale fino a dieci secondi, piu'
+    Pillow, e sqlite ha UNO scrittore alla volta — una transazione aperta
+    qui attorno teneva il mercatino intero fuori dal database per tutta
+    la durata delle foto, e le rotte morivano col loro timeout. Il
+    chiamante scarica PRIMA di scrivere (l'aggiornamento) o fra due
+    commit brevi (la nascita). `prove_db_contesa_negozi` lo gira con una
+    seconda connessione che scrive durante ogni download."""
     nomi = []
     for i, u in enumerate(urls or []):
         nome = None
@@ -1439,6 +1459,12 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
     # il giro dopo se il catalogo ci sta), spegnerle a torto toglie
     # merce vera a chi vende senza che nessuno lo sappia.
     if completo:
+        # A LOTTI, con un commit ogni LOTTO_SPEGNIMENTI (1 ott 2026):
+        # una vetrina intera spenta in una transazione sola e' una
+        # scrittura lunga, e le scritture lunghe sono vietate in questo
+        # giro — il database e' di tutti, non del connettore. La lista
+        # si legge tutta PRIMA (`fetchall`) per non tenere un cursore
+        # aperto sull'annunci mentre si scrive sopra.
         for riga in con.execute(
                 "SELECT id, titolo, origine_chiave FROM annunci "
                 "WHERE connettore_id=? AND stato IN ('attivo','revisione')",
@@ -1448,6 +1474,8 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
             spegni_annuncio(con, riga["id"], "rimosso")
             esito["spenti"] += 1
             print(f"    🗑 tolto dal negozio: {riga['titolo'][:50]}")
+            if esito["spenti"] % LOTTO_SPEGNIMENTI == 0:
+                con.commit()
     else:
         print(f"    ⏸ lettura parziale: le sparizioni non si giudicano")
 
@@ -1489,6 +1517,22 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
                                            "non si ricrea da solo"})
         return
 
+    # --- LE FOTO PRIMA DI OGNI SCRITTURA (1 ott 2026) -----------------
+    # Sulla riga che c'e' gia' i download stanno QUI, prima di
+    # `rifletti_pendenti`: quella e' la prima scrittura della riga, e
+    # da li' in poi la connessione ha una transazione aperta — cioe'
+    # il lucchetto di scrittura dell'intero database — finche' non si
+    # fa commit. Scaricare dentro quel tratto, com'era prima, teneva il
+    # mercatino fermo per tutta la durata delle foto. Niente foto
+    # nuove = niente download, come sempre.
+    foto = None
+    if gia:
+        foto_url = json.dumps(r["foto"]) if r["foto"] else ""
+        if foto_url and foto_url == (gia["origine_foto"] or ""):
+            foto = gia["foto"]          # stesse foto: niente ri-download
+        else:
+            foto = _foto_locali(con, gia["id"], r["foto"], salva_foto)
+
     quantita = r.get("quantita")
     if quantita is not None and gia:
         # PRIMA si spengono le pendenti che il calo esterno copre, POI
@@ -1501,7 +1545,7 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
                                      _saldo_pendente(con, gia["id"]))
 
     if gia:
-        _aggiorna(con, gia, r, connettore, salva_foto, marchio, quantita,
+        _aggiorna(con, gia, r, connettore, foto, marchio, quantita,
                   esito, adesso)
         return
 
@@ -1541,7 +1585,10 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
         "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (connettore["tg_id"], r["titolo"], r["descrizione"],
          r.get("categoria") or "Altro", r["prezzo_sats"],
-         connettore["zona"], "", "eur", r["prezzo_eur"],
+         # le foto: gli URL del negozio, finche' il secondo commit (sotto)
+         # non ci mette i nomi locali
+         connettore["zona"], json.dumps(r["foto"]) if r["foto"] else "",
+         "eur", r["prezzo_eur"],
          1 if quantita is None else quantita,
          1 if quantita is None else quantita,
          # LE TARIFFE nella valuta del collegamento (euro ancorato o sats
@@ -1557,12 +1604,22 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
          adesso, adesso, stato))
     nuovo = cur.lastrowid
     _scrivi_famiglia(con, nuovo, cid, r)
-    # le foto DOPO l'insert: il nome del file vuole l'id
+    # LA NASCITA E' IN DUE COMMIT BREVI (1 ott 2026), e le foto stanno
+    # IN MEZZO, fuori da tutt'e due: il nome del file vuole l'id, quindi
+    # non si possono scaricare prima dell'insert — e scaricarle dentro
+    # la transazione, com'era, teneva il lucchetto di scrittura del
+    # database per dieci secondi a foto (le rotte morivano «database
+    # is locked», 1 ott 2026, il giro di STACKER NEWS). La riga nasce
+    # COMPLETA al primo commit, con gli URL del negozio al posto delle
+    # foto (lo stato di un download fallito, che la vetrina sa gia'
+    # mostrare); il secondo commit ci mette i nomi locali. Un crash fra
+    # i due lascia esattamente quel che lascerebbe un download fallito.
+    con.commit()          # commit per riga: un crash a meta' giro
+    #                       lascia solo annunci completi
     foto = _foto_locali(con, nuovo, r["foto"], salva_foto)
     if foto:
         con.execute("UPDATE annunci SET foto=? WHERE id=?", (foto, nuovo))
-    con.commit()          # commit per riga: un crash a meta' giro
-    #                       lascia solo annunci completi
+        con.commit()
     esito["nuovi"] += 1
     if marchio:
         esito["in_revisione"] += 1
@@ -1578,15 +1635,17 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
           f"{' · digitale' if r.get('digitale') else ''}")
 
 
-def _aggiorna(con, gia, r: dict, connettore: dict, salva_foto, marchio,
+def _aggiorna(con, gia, r: dict, connettore: dict, foto: str, marchio,
               quantita, esito: dict, adesso: int):
     """La riga c'e' gia': si ricopre il contenuto (la fonte comanda) e
-    si lascia stare tutto il resto."""
+    si lascia stare tutto il resto.
+
+    `foto` ARRIVA GIA' PRONTA (il JSON dei nomi locali, o quello di
+    ieri se gli URL non sono cambiati): la scarica `_una_riga` prima
+    di qualunque scrittura, perche' qui dentro la transazione e' gia'
+    aperta e un download la terrebbe aperta per tutto il mercatino
+    (1 ott 2026, «database is locked»)."""
     foto_url = json.dumps(r["foto"]) if r["foto"] else ""
-    if foto_url and foto_url == (gia["origine_foto"] or ""):
-        foto = gia["foto"]          # stesse foto: niente ri-download
-    else:
-        foto = _foto_locali(con, gia["id"], r["foto"], salva_foto)
     con.execute(
         "UPDATE annunci SET titolo=?, descrizione=?, prezzo_sats=?, "
         "valuta='eur', prezzo_eur=?, foto=?, origine_foto=?, "

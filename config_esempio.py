@@ -222,6 +222,12 @@ MAX_QUANTITA_ANNUNCIO = 999999  # pezzi massimi per annuncio (quantita'
 MAX_RIGHE_SET = 8            # annunci DIVERSI massimi in un set
                              # («Riempi il barattolo»): un pacco vero,
                              # non un camion
+DB_BUSY_TIMEOUT = 15         # secondi che una connessione aspetta sul
+                             # lucchetto di sqlite prima di dire
+                             # «database is locked» (1 ott 2026). Copre
+                             # il backup che tiene il file in lettura;
+                             # le scritture lunghe non si curano da qui
+                             # ma rendendole brevi
 MAX_PREFERITI = 10           # quanti annunci ATTIVI stanno «nel tuo
                              # barattolo». Piccolo apposta: e' una
                              # selezione, non una lista dei desideri

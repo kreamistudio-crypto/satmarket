@@ -118193,6 +118193,248 @@ def prove_freni():
           2000 <= len(amb3["_P2P_SESSIONI_VOLTI"]) <= 5000)
 
 
+def prove_db_contesa_negozi():
+    """«DATABASE IS LOCKED» (1 ott 2026): il giro di un negozio collegato
+    ha bloccato il mercatino intero. Dalla cura 8 la riconciliazione gira
+    in un thread, quindi le rotte scrivono MENTRE gira — e la riga nuova
+    faceva INSERT, scaricava le foto (dieci secondi l'una) e solo poi
+    commit: il lucchetto di scrittura di sqlite restava preso per tutta
+    la durata delle foto, e ogni rotta moriva dopo i 5 secondi del
+    timeout di Python (che nessuno aveva scritto).
+
+    Qui la riconciliazione VERA gira su un database SU FILE (in memoria
+    non si contende), e lo scaricatore di cartone fa quel che faceva
+    una rotta quel giorno: prova a scrivere con una SECONDA connessione
+    impaziente (timeout 0) nel bel mezzo del download. Prima della cura
+    moriva dieci volte su dieci; adesso passa sempre, e la connessione
+    del giro non ha mai una transazione aperta mentre scarica. Poi le
+    sparizioni a lotti, il giro lungo con le rotte che scrivono davvero
+    da un altro thread, e le sentinelle sul timeout dichiarato."""
+    print("\n🔒 Il giro dei negozi non chiude il database alle rotte")
+    import contextlib
+    import importlib
+    import io
+    import sqlite3
+    import tempfile
+    import threading
+    ne = importlib.import_module("importa_negozio")
+
+    CONNETTORE = {"id": 7, "fonte": "woo", "tg_id": 111, "zona": "Pavia (PV)",
+                  "consegna": "spedizione", "spedizione_eur": 0.0,
+                  "spedizione_punto_eur": 0.0, "spedizione_punto_dichiarata": 0,
+                  "spedizione_extra_eur": 0.0}
+
+    def banco():
+        percorso = os.path.join(tempfile.mkdtemp(prefix="barattolo-contesa-"), "x.db")
+        con = sqlite3.connect(percorso)
+        con.row_factory = sqlite3.Row
+        con.executescript("""
+            CREATE TABLE annunci(id INTEGER PRIMARY KEY AUTOINCREMENT,
+              venditore_id INT, titolo TEXT, descrizione TEXT,
+              categoria TEXT, prezzo_sats INT, zona TEXT, foto TEXT,
+              valuta TEXT, prezzo_eur REAL, quantita INT, quantita_max INT,
+              consegna TEXT, spedizione_eur REAL, spedizione_punto_eur REAL,
+              spedizione_punto_dichiarata INT, spedizione_extra_eur REAL,
+              spedizione_sats INT, spedizione_punto_sats INT,
+              spedizione_extra_sats INT,
+              fonte TEXT, connettore_id INT, origine_chiave TEXT,
+              origine_foto TEXT, origine_stock_visto INT,
+              famiglia TEXT DEFAULT '', famiglia_titolo TEXT DEFAULT '',
+              opzioni TEXT DEFAULT '',
+              creato INT, modificato INT, stato TEXT);
+            CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+              stato TEXT, aggiornato INT);
+            CREATE TABLE ordine_righe(ordine_id INT, annuncio_id INT);
+            CREATE TABLE connettori_uscite(id INTEGER PRIMARY KEY AUTOINCREMENT,
+              annuncio_id INT, delta INT, stato TEXT, aggiornato INT);
+            CREATE TABLE timbri(nome TEXT PRIMARY KEY, valore TEXT, quando INT);
+        """)
+        con.commit()
+        return percorso, con
+
+    def riga(k, foto=()):
+        return {"origine_chiave": str(k), "titolo": f"Cosa {k}", "descrizione": "x",
+                "prezzo_sats": 1000, "prezzo_eur": 7.5, "quantita": 5,
+                "attivo": True, "foto": list(foto)}
+
+    def rotta_che_scrive(percorso, timeout=0):
+        """Quel che faceva `timbro_scrivi` quel giorno: una connessione
+        sua, una scrittura, un commit. Torna 'ok' o 'locked'."""
+        r = sqlite3.connect(percorso, timeout=timeout)
+        try:
+            r.execute("INSERT OR REPLACE INTO timbri VALUES('p2p_libro_visto','1',1)")
+            r.commit()
+            return "ok"
+        except sqlite3.OperationalError as e:
+            return "locked" if "locked" in str(e) else str(e)
+        finally:
+            r.close()
+
+    def gira(con, righe, salva_foto, **kw):
+        kw.setdefault("completo", True)
+        with contextlib.redirect_stdout(io.StringIO()):
+            return ne.riconcilia_connettore(con, CONNETTORE, righe, salva_foto, {}, **kw)
+
+    # --- 1) la nascita: le foto fuori dalla transazione -------------------
+    percorso, con = banco()
+    esiti = []
+
+    def scarica_e_contendi(annuncio_id, i, u):
+        esiti.append((con.in_transaction, rotta_che_scrive(percorso)))
+        return f"a{annuncio_id}_{i}.jpg"
+
+    righe = [riga(k, (f"https://cdn/{k}a.jpg", f"https://cdn/{k}b.jpg")) for k in range(5)]
+    esito = gira(con, righe, scarica_e_contendi)
+    prova("cinque righe nuove con due foto l'una: dieci download", 10, len(esiti))
+    prova("durante OGNI download la connessione del giro NON ha una transazione aperta",
+          [False] * 10, [t for t, _ in esiti])
+    prova("...e la rotta impaziente scrive dieci volte su dieci (prima: zero)",
+          ["ok"] * 10, [e for _, e in esiti])
+    prova("il giro ha scritto le cinque righe", 5, esito["nuovi"])
+    nate = con.execute("SELECT foto, origine_foto FROM annunci ORDER BY id").fetchall()
+    prova("...coi nomi locali al posto degli URL dopo il secondo commit",
+          [["a1_0.jpg", "a1_1.jpg"]], [json.loads(nate[0]["foto"])])
+    prova("...e gli URL del negozio in origine_foto", ["https://cdn/0a.jpg", "https://cdn/0b.jpg"],
+          json.loads(nate[0]["origine_foto"]))
+    # LA RIGA NASCE COMPLETA AL PRIMO COMMIT: se il processo muore durante
+    # le foto, in vetrina restano gli URL del negozio — lo stato di un
+    # download fallito, non una riga senza foto. Il crash e' un SystemExit
+    # e non una Exception: quella `_foto_locali` la ingoia come un download
+    # fallito, e la prova non distinguerebbe piu' niente (tortura, m2).
+    percorso2, con2 = banco()
+
+    def esplode(annuncio_id, i, u):
+        raise SystemExit("il processo muore qui")
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        try:
+            ne._una_riga(con2, CONNETTORE, riga(9, ("https://cdn/9.jpg",)), esplode, {},
+                         {"nuovi": 0, "in_revisione": 0, "entrati": [], "saltati": [],
+                          "falliti": [], "rimandati": 0, "aggiornati": 0, "riaccesi": 0,
+                          "consegna_corretta": 0}, 1)
+        except BaseException:
+            pass
+    con2.rollback()
+    prova("un crash durante le foto lascia la riga COMPLETA, con gli URL del negozio",
+          ('["https://cdn/9.jpg"]', "attivo"),
+          tuple(con2.execute("SELECT foto, stato FROM annunci").fetchone()))
+    con2.close()
+
+    # --- 2) l'aggiornamento: le foto PRIMA di `rifletti_pendenti` ---------
+    # Il caso che la prova sulla nascita non vede: la riga c'e' gia', il
+    # negozio ha scalato lo stock (10 → 9) e c'e' una vendita pendente da
+    # riflettere — cioe' una SCRITTURA prima delle foto. Ieri il download
+    # stava dopo quella scrittura, dentro la sua transazione.
+    con.execute("UPDATE annunci SET origine_stock_visto=10, quantita=10 WHERE id=1")
+    con.execute("INSERT INTO connettori_uscite(annuncio_id,delta,stato) VALUES(1,-1,'pendente')")
+    con.commit()
+    esiti.clear()
+    r1 = riga(0, ("https://cdn/0nuova.jpg",))
+    r1["quantita"] = 9
+    esito = gira(con, [r1] + righe[1:], scarica_e_contendi)
+    prova("la foto cambiata si riscarica (una sola)", 1, len(esiti))
+    prova("...fuori da ogni transazione e con la rotta che passa", [(False, "ok")], esiti)
+    prova("...la pendente si riflette lo stesso", "riflessa",
+          con.execute("SELECT stato FROM connettori_uscite WHERE annuncio_id=1").fetchone()[0])
+    prova("...e la riga porta la foto nuova, locale", ["a1_0.jpg"],
+          json.loads(con.execute("SELECT foto FROM annunci WHERE id=1").fetchone()[0]))
+    prova("stesse foto di ieri: nessun download (come sempre)", 5, esito["aggiornati"])
+
+    # --- 3) le sparizioni a lotti ------------------------------------------
+    percorso3, con3 = banco()
+    gira(con3, [riga(k) for k in range(60)], lambda *a: None)
+    tracce = []
+    con3.set_trace_callback(tracce.append)
+    esito = gira(con3, [], lambda *a: None)
+    con3.set_trace_callback(None)
+    prova("sessanta righe sparite dal catalogo si spengono", 60, esito["spenti"])
+    lotti, corrente = [], 0
+    for sql in tracce:
+        if sql.startswith("UPDATE annunci SET stato='rimosso'"):
+            corrente += 1
+        elif sql.strip().upper() == "COMMIT":
+            lotti.append(corrente)
+            corrente = 0
+    prova("...in lotti di LOTTO_SPEGNIMENTI con un commit fra l'uno e l'altro",
+          [25, 25, 10], [n for n in lotti if n])
+    prova("...e il lotto e' piccolo", True, 1 < ne.LOTTO_SPEGNIMENTI <= 50)
+    con3.close()
+
+    # --- 4) il giro lungo MENTRE le rotte scrivono, da un altro thread ------
+    # La riproduzione alla lettera: foto lente (0,3 s l'una, due per riga)
+    # in un thread come nel server, e il ciclo principale che scrive ogni
+    # pochi millisecondi con la pazienza di mezzo secondo. Col codice di
+    # ieri ogni riga teneva il lucchetto 0,6 s e la rotta moriva; adesso
+    # le transazioni del giro durano quanto un commit.
+    percorso4, con4 = banco()
+    con4.close()
+    finito = threading.Event()
+    conto = {"ok": 0, "locked": 0, "altro": []}
+
+    def foto_lenta(annuncio_id, i, u):
+        time.sleep(0.3)
+        return f"a{annuncio_id}_{i}.jpg"
+
+    def il_thread():
+        c = sqlite3.connect(percorso4)
+        c.row_factory = sqlite3.Row
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                ne.riconcilia_connettore(
+                    c, CONNETTORE,
+                    [riga(k, (f"https://cdn/{k}a.jpg", f"https://cdn/{k}b.jpg"))
+                     for k in range(4)],
+                    foto_lenta, {}, completo=True)
+        finally:
+            c.close()
+            finito.set()
+
+    t = threading.Thread(target=il_thread, daemon=True)
+    t.start()
+    while not finito.is_set():
+        e = rotta_che_scrive(percorso4, timeout=0.5)
+        if e == "ok":
+            conto["ok"] += 1
+        elif e == "locked":
+            conto["locked"] += 1
+        else:
+            conto["altro"].append(e)
+        time.sleep(0.01)
+    t.join(10)
+    prova("quattro righe con foto lente, e le rotte hanno scritto davvero nel frattempo",
+          True, conto["ok"] >= 20)
+    prova("...senza MAI un «database is locked» (ieri: a ogni riga)", (0, []),
+          (conto["locked"], conto["altro"]))
+    c = sqlite3.connect(percorso4)
+    prova("...e il giro ha finito il suo lavoro, foto comprese", 4,
+          c.execute("SELECT COUNT(*) FROM annunci WHERE foto LIKE '%.jpg%' "
+                    "AND foto NOT LIKE '%https://%'").fetchone()[0])
+    c.close()
+    con.close()
+
+    # --- 5) le sentinelle: il timeout dichiarato, le foto fuori posto -------
+    prova("db() dichiara il tempo d'attesa sul lucchetto", True,
+          "sqlite3.connect(DB, timeout=DB_BUSY_TIMEOUT)" in pezzo("db"))
+    prova("...quindici secondi, e il config del VPS vince", True,
+          "    from config import DB_BUSY_TIMEOUT\nexcept ImportError:\n"
+          "    DB_BUSY_TIMEOUT = 15\n" in _SORGENTE)
+    prova("...e il config d'esempio lo porta", True,
+          "DB_BUSY_TIMEOUT = 15" in open("config_esempio.py", encoding="utf-8").read())
+    src = open("importa_negozio.py", encoding="utf-8").read()
+    una = codice(_pezzo_da(src, "_una_riga"))
+    agg = codice(src[src.index("def _aggiorna("):])
+    prova("nell'aggiornamento le foto si scaricano PRIMA di rifletti_pendenti", True,
+          0 <= una.find("_foto_locali(con, gia[\"id\"]") < una.find("rifletti_pendenti("))
+    prova("...e `_aggiorna` non scarica piu' niente: riceve le foto pronte", True,
+          "_foto_locali" not in agg and "_aggiorna(con, gia, r, connettore, foto," in una)
+    nascita = una[una.find("nuovo = cur.lastrowid"):]
+    prova("alla nascita le foto stanno fra i due commit", True,
+          0 <= nascita.find("con.commit()") < nascita.find("_foto_locali(con, nuovo")
+          < nascita.find("con.commit()", nascita.find("_foto_locali(con, nuovo")))
+    prova("...e la riga nasce con gli URL del negozio al posto delle foto", True,
+          'connettore["zona"], json.dumps(r["foto"]) if r["foto"] else "",' in una)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -118419,6 +118661,7 @@ def main():
               prove_chiavi_p2p_firmate,
               prove_rotte_p2p_riverificate,
               prove_negozi_fuori_dal_ciclo,
+              prove_db_contesa_negozi,
               prove_freni,
               prove_config_esempio):
         try:
