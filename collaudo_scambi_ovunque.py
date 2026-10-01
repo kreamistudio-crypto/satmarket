@@ -205,6 +205,9 @@ def client_sulla_risposta(risposta, locali, libro):
              mini.index("\n}\n", mini.index("function riprendiDaRestoreP2P(o, statoMostro){")) + 3],
         mini[mini.index("const P2P_INDICE_CERCA_MAX = "):
              mini.index("\n}\n", mini.index("function adottaScambiServerP2P(locali){")) + 3],
+        # (1 ott 2026, «📍 Sono qui») le presenze del contanti che la riga
+        # del server porta con se', legate al giro
+        js(mini, "function presenzeDaServerP2P(p, giro){"), js(mini, "function uniscePresenzeP2P(a, b){"),
         mini[mini.index("function p2pRitirato(o){"):mini.index("\n}", mini.index("function p2pRitirato(o){")) + 2],
         js(mini, "function lapidiP2P(){"), js(mini, "function lapideP2P(o){"),
         js(mini, "function lapidataP2P(id){"), js(mini, "function archiviaRitiratoP2P(id){"),
@@ -292,6 +295,7 @@ def client_che_annulla(risposta, ordine, locali, chiavi, maker, archivio_dopo):
         fino("const P2P_DA_RESTORE = {", "function riprendiDaRestoreP2P(o, statoMostro){"),
         fino("function indiceMakerP2P(id, mz, o){", "function riparaChiaveMakerP2P(id, locali){"),
         fino("const P2P_INDICE_CERCA_MAX = ", "function adottaScambiServerP2P(locali){"),
+        js(mini, "function presenzeDaServerP2P(p, giro){"), js(mini, "function uniscePresenzeP2P(a, b){"),
         js(mini, "async function chiamataOrdineP2P(o, azione, payload){"),
         fino("const P2P_NON_TUO = ", "async function nonTuoOrdineP2P("),
     ])
