@@ -112464,7 +112464,8 @@ out.mod.regola = [
     scarto_s: null, distanza: null, posizioni_via: false, appuntamento: null, regola: 'senza_prova'}}, true),
   rigaIncontroModP2P({metodi: 'Contanti', incontro: null, presenze: null}, true),
   rigaIncontroModP2P({metodi: 'SEPA', incontro: null, presenze: null}, true),
-  rigaIncontroModP2P({metodi: 'Contanti', incontro: null, presenze: Object.assign({}, SOLO_C, {regola: undefined})}, true)];
+  rigaIncontroModP2P({metodi: 'Contanti', incontro: null, presenze: Object.assign({}, SOLO_C, {regola: undefined})}, true),
+  rigaIncontroModP2P({metodi: 'SEPA', incontro: null, presenze: Object.assign({}, SOLO_C, {regola: 'decide_moderatore'})}, true)];
 /* ...e nel riquadro, dai due lati, la regola con la sua eccezione */
 out.eccezione = [r1, r2].map(h => ha(h, esc(REGOLA_DISPUTA_CONTANTI) + ' ' + esc(REGOLA_DISPUTA_ECCEZIONE)));
 out.distanza = [distanzaIncontroP2P({distanza: null, posizioni: 0}), distanzaIncontroP2P({distanza: null, posizioni: 1}),
@@ -113590,8 +113591,8 @@ def prove_contanti_a_mano():
           ["⚖️" in rgm[0], decide in rgm[1], 0 < rgm[1].find(decide) < rgm[1].find("si può falsificare"), "⚖️" in rgm[2]])
     prova("...a disputa chiusa non si ripete; senza prova la regola di sempre, anche quando il server non ha dati",
           [True, True, True], [senza in rgm[3], "📍 Nessuna prova d'incontro" in rgm[4], senza in rgm[4]])
-    prova("...niente sugli altri metodi, e niente se il server il campo non lo manda", ["", False],
-          [rgm[5], "⚖️" in rgm[6]])
+    prova("...niente sugli altri metodi (anche coi dati), e niente se il server il campo non lo manda", ["", False, False],
+          [rgm[5], "⚖️" in rgm[7], "⚖️" in rgm[6]])
     prova("IL RIQUADRO, dai due lati: la regola con la sua eccezione, in fila", [True, True], o["eccezione"])
     prova("la distanza della prova col QR: senza posizioni, con una sola, coi metri, niente su null",
           [", senza posizioni", ", con la posizione di un solo telefono", ", a 1.200 m di distanza", ""], o["distanza"])
