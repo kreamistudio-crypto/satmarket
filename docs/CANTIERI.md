@@ -34936,3 +34936,99 @@ lettura, `grep -n "MAX_PRODOTTI_CONNETTORE\|MAX_NUOVI_CONNETTORE\|ORE_RODAGGIO\|
 — una riga `MAX_PRODOTTI_CONNETTORE = 200` (copiata dal config d'esempio
 di prima) va portata a 1000 o cancellata, e si riavvia (PRODUZIONE, «I
 NEGOZI GRANDI»).
+
+## La fotocamera dentro la pagina, e il «+» nel riquadro delle foto (1 ott 2026, seguito di «📷 Scatta foto»)
+
+**DAL TELEFONO**, parola di Andrea dopo df36eaa: nell'app Android «📷
+Scatta foto» apre la fotocamera; nella Mini App di Telegram Android apre
+la GALLERIA — Telegram `capture` lo ignora (era il «non lo so» del
+verbale di prima).
+
+**LA CURA.** Il bottone chiama `scattaFoto`, che smista. Fuori da
+Telegram — app Android e browser — resta l'input con capture, che lì
+funziona. Dentro Telegram la fotocamera la apre la pagina: lo strato
+`#fotocamera`, nero a schermo pieno, getUserMedia sulla posteriore,
+l'otturatore, poi la foto ferma con «↺ Rifai» e «✓ Usa questa foto», e
+la ✕. Lo scatto è il fotogramma intero in JPEG e passa da
+`aggiungiFoto([file], true)`: ridimensionamento, il ripiego in piccolo e
+sul server come ogni foto (l'orientamento non serve, il fotogramma
+arriva già dritto). Dentro Telegram senza getUserMedia: l'input di oggi
+e un toast che lo dice. Permesso negato, nessuna fotocamera, fotocamera
+occupata, un no qualunque: lo strato resta aperto con la frase giusta,
+«↻ Riprova» e «Scegli una foto dal telefono» — che c'è anche mentre la
+fotocamera si apre, l'uscita se il permesso non risponde mai. Nel
+riquadro, sopra «Aggiungi foto», un grande «+» arancio al posto della
+macchina fotografica (chiesto da Andrea); i due bottoni restano.
+
+**PERCHÉ È FATTA COSÌ.** Lo strato sta nel motore della navigazione come
+il lightbox: senza una entry nella cronologia il tasto indietro di
+Telegram chiuderebbe la Mini App invece della fotocamera. `camGiro`
+numera le accensioni: il permesso lasciato in sospeso, poi la ✕, poi il
+sì — la fotocamera si spegne da sola e non si riaccende in uno strato
+chiuso (e un no tardivo non ci scrive il suo errore). La fotocamera si
+spegne a ogni chiusura e quando Telegram va in secondo piano: la
+lucina non resta accesa. L'uscita clicca l'input PRIMA di chiudere,
+perché un selettore di file si apre solo dentro un tocco (dopo
+un'attesa il browser lo ignora in silenzio). Il video in `contain`:
+quel che si vede è quel che si scatta. Uno scatto nero si DICE e non si
+blocca: il giudice della tela nera non deve poter chiudere la strada a
+una foto buona.
+
+**PERMISSIONS-POLICY E CSP.** `camera=(self)` basta: dentro Telegram la
+Mini App è il documento di cima della WebView, e la pagina risponde
+`allowsFeature('camera') = true`. La CSP in prova non tocca niente: il
+video prende il flusso da `srcObject` (non è un URL, `media-src` non
+c'entra), l'anteprima è un `blob:` (già in `img-src`), i gesti sono
+`onclick` come gli altri. Dal vivo nessuna riga `🛡️ CSP` nel diario.
+
+**LE STRADE SCARTATE.** La fotocamera nella pagina anche nell'app
+Android: lì capture funziona e apre la fotocamera VERA del telefono (zoom,
+HDR, messa a fuoco), meglio della nostra. Lasciare l'iPhone sull'input:
+probabilmente capture lì funziona, ma la richiesta è una strada sola
+dentro Telegram, e se getUserMedia manca si ricade proprio sull'input.
+Il ripiego automatico sull'input dopo un errore: il selettore non si
+aprirebbe (fuori dal tocco), quindi è un bottone. Un timeout sul permesso:
+l'utente può metterci quanto vuole a decidere; l'uscita è sempre a vista.
+Bloccare lo scatto nero: sopra.
+
+**PROVATO.** `prove_fotocamera_pagina` (42): sentinelle sul «+», sullo
+strato (dialogo, video `playsinline muted`, la ✕ da `navIndietro`, i
+gesti e le parole chieste, z 75, i pezzi di ogni stato, `contain`) e sul
+motore (lo strato fra lightbox e tour nella pila, chiuso da
+`navChiudiStrato`, guardato dall'osservatore); il banco node che fa
+girare il codice VERO con una fotocamera di cartone e un motore che
+chiude lo strato DOPO, come il popstate: fuori da Telegram l'input; senza
+getUserMedia l'input e il toast; il tetto delle cinque prima della
+fotocamera; l'attesa, il vivo coi vincoli giusti, il tocco a video non
+pronto che non vale, lo scatto (JPEG 0,92, anteprima, video fermo),
+Rifai, lo scatto nero detto e usabile, «Usa questa foto» (chiude dalla
+porta di tutti, spegne la lucina, la foto ad aggiungiFoto come dalla
+fotocamera), il DOPPIO tocco prima della chiusura che ne manda una, il
+secondo piano in vivo e a foto scattata, la finestra del permesso, la
+risposta tardiva e il no tardivo, i quattro no coi loro perché, Riprova,
+due accensioni che non lasciano due flussi, l'uscita col selettore
+prima della chiusura, `toBlob` nullo. `prove_foto_scarti`: la sentinella
+del bottone ora pretende `scattaFoto()`; in `prove_contanti_a_mano` la
+sentinella «IL QR NON C'È PIÙ» cercava `getUserMedia` nel file intero:
+ora lo cerca FUORI dal blocco della fotocamera degli annunci (la sua
+domanda è il QR del P2P), controprova fatta. Tortura 34 su 34. Dal vivo nel
+Browser pane (copia, config d'esempio in collaudo, relay morti), a 375 px
+col dito, con la pagina «dentro Telegram» (l'hash `tgWebAppData` di
+collaudo, `initData` vero per lo script di Telegram): con la
+getUserMedia vera del pane — che fotocamere non ne ha — lo strato
+nella cronologia e l'errore «Non trovo nessuna fotocamera»; l'uscita
+clicca l'input della fotocamera e chiude; con un flusso VERO da una tela
+animata (`captureStream`): vivo, otturatore col dito, rivedi, Rifai,
+secondo scatto, «Usa questa foto» → miniatura 900×1200, traccia `ended`,
+cronologia giù di un gradino; il tasto indietro di Telegram
+(`back_button_pressed`) chiude la fotocamera e lascia il form; il
+permesso negato con la sua frase; il «+» in chiaro e in scuro
+(`#FFB25C`). Intestazioni lette con curl. Suite intera severa e
+collaudi della CI: nel verbale del commit.
+
+**COSA NON HO PROVATO, E TOCCA AL TELEFONO.** La fotocamera vera dentro
+Telegram: il permesso di Telegram Android (la sua finestra, quella del
+bot se la chiede), la WebView di Telegram iPhone (getUserMedia in
+WKWebView, il permesso a ogni apertura), la qualità dello scatto, il
+ritorno da Telegram in secondo piano, il tasto indietro vero. L'app
+Android non è cambiata.

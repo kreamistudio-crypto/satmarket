@@ -6615,6 +6615,29 @@
   il rovescio di «trascinale»: sul computer `capture` non apre nessuna
   fotocamera e il riquadro di prima basta. Il permesso è
   `camera=(self)` delle cinture: con `camera=()` il bottone si spegne.
+  LA FOTOCAMERA DENTRO LA PAGINA (1 ott 2026, seguito): la WebView di
+  Telegram Android `capture` lo ignora e apriva la galleria. Il bottone
+  chiama `scattaFoto`, che smista: fuori da Telegram (`!tg?.initData`:
+  app Android, browser) l'input con capture; dentro Telegram, iPhone
+  compreso, `apriFotocamera` — lo strato `#fotocamera` (z 75, fra
+  lightbox e tour) con getUserMedia sulla posteriore (`facingMode
+  ideal environment`, 1920×1440 ideali, niente audio); dentro Telegram
+  senza getUserMedia l'input con un toast. Lo strato è nel motore della
+  navigazione (`{t:'cam'}` in `navPila`, `chiudiFotocamera` in
+  `navChiudiStrato`, la classe guardata da `navMotore`): la ✕, «Usa
+  questa foto», l'uscita e il tasto di Telegram chiudono tutti da
+  `navIndietro`. Stati in `data-stato` (attesa | vivo | rivedi |
+  errore) scritti da `camStato`; `camGiro` numera le accensioni, così
+  un sì o un no di getUserMedia arrivato dopo la chiusura spegne e
+  tace; il flusso si spegne a ogni chiusura e quando Telegram va in
+  secondo piano, e al ritorno si riaccende solo se si stava
+  inquadrando. Lo scatto è il fotogramma intero in JPEG 0,92
+  (`scattaDalVivo`), e «Usa questa foto» lo passa ad
+  `aggiungiFoto([file], true)`: la stessa preparazione di ogni foto. Un
+  fotogramma piatto (`telaPiatta`) si dice e non si blocca. «Scegli una
+  foto dal telefono» (`camRipiego`) clicca l'input PRIMA di chiudere:
+  il selettore si apre solo dentro un tocco. Nel riquadro, sopra
+  «Aggiungi foto», un grande «+» al posto della macchina fotografica.
   Con lui gli ALTRI QUATTRO SILENZI, che erano il vero tema: 1)
   l'errore dell'anteprima si ingoiava (`if (r.ok)` senza else) e in
   pagina restava il segnaposto «verrà convertita alla pubblicazione»

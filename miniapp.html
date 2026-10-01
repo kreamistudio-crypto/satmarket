@@ -7912,6 +7912,11 @@
     padding:26px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;cursor:pointer;
   }
   .photo-drop .big{font-size:30px;display:block;margin-bottom:6px}
+  /* il «+» (1 ott 2026): grande, nell'arancio dei sats, e stretto sulla
+     sua riga — il glifo ha aria sopra e sotto, e senza line-height:1
+     spingerebbe giu' l'etichetta */
+  .photo-drop .big.piu{font-size:56px;line-height:1;font-weight:700;
+    color:var(--sats-text);margin-bottom:2px}
   /* «o trascinale qui» solo dove un file si puo' trascinare: sul
      telefono non esiste il gesto, e prometterlo sarebbe una bugia */
   .photo-drop .trascina{display:none}
@@ -7934,6 +7939,49 @@
   @media(hover:hover) and (pointer:fine){
     .photo-drop .foto-scelte{display:none}
   }
+  /* LA FOTOCAMERA DENTRO LA PAGINA (1 ott 2026): nero pieno sopra tutto
+     tranne tour e cartello (z 75: fra il lightbox e il tour, l'ordine di
+     navPila). Il video in `contain` e non `cover`: quel che si vede e'
+     quel che si scatta, senza bordi tagliati a sorpresa. I colori sono
+     fissi e non del tema: sopra una fotocamera il chiaro non esiste. */
+  #fotocamera{position:fixed;inset:0;z-index:75;background:#000;color:#fff;display:none}
+  #fotocamera.open{display:block}
+  #camVideo,#camFoto{position:absolute;inset:0;width:100%;height:100%;
+    object-fit:contain;background:#000}
+  #camFoto{display:none}
+  #fotocamera[data-stato="rivedi"] #camFoto{display:block}
+  #fotocamera[data-stato="rivedi"] #camVideo,
+  #fotocamera[data-stato="errore"] #camVideo{visibility:hidden}
+  #fotocamera .cam-x{position:absolute;top:calc(12px + env(safe-area-inset-top));right:12px;
+    width:44px;height:44px;border-radius:50%;border:0;background:rgba(0,0,0,.55);
+    color:#fff;font:inherit;font-size:20px;font-weight:800;cursor:pointer}
+  #fotocamera .cam-piede{position:absolute;left:0;right:0;bottom:0;display:flex;
+    flex-direction:column;align-items:center;gap:12px;
+    padding:28px 16px calc(18px + env(safe-area-inset-bottom));
+    background:linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.7) 40%)}
+  #fotocamera .cam-avviso{max-width:420px;text-align:center;font-size:14.5px;
+    font-weight:700;line-height:1.45}
+  #fotocamera .cam-avviso:empty{display:none}
+  #fotocamera .cam-azioni{display:none;gap:10px;width:100%;max-width:420px;justify-content:center}
+  #fotocamera[data-stato="vivo"] .cam-solo-vivo,
+  #fotocamera[data-stato="rivedi"] .cam-solo-rivedi,
+  #fotocamera[data-stato="errore"] .cam-solo-errore{display:flex}
+  #fotocamera .cam-otturatore{width:76px;height:76px;padding:0;border-radius:50%;
+    border:5px solid #fff;background:rgba(255,255,255,.22);cursor:pointer}
+  #fotocamera .cam-otturatore:active{background:#fff}
+  #fotocamera .cam-btn{flex:1 1 0;min-width:0;min-height:48px;border-radius:var(--radius-btn);
+    border:1.5px solid rgba(255,255,255,.75);background:rgba(0,0,0,.35);color:#fff;
+    font:inherit;font-weight:800;font-size:15px;padding:10px 12px;cursor:pointer}
+  #fotocamera .cam-btn.primario{background:var(--sats);border-color:var(--sats);
+    box-shadow:0 3px 0 var(--sats-deep)}
+  /* l'uscita: un link sottile mentre la fotocamera si apre o e' accesa,
+     un bottone vero quando la fotocamera non c'e' — li' e' la strada */
+  #fotocamera .cam-ripiego{min-height:44px;border:0;background:none;color:#fff;
+    font:inherit;font-size:14px;font-weight:700;text-decoration:underline;cursor:pointer}
+  #fotocamera[data-stato="rivedi"] .cam-ripiego{display:none}
+  #fotocamera[data-stato="errore"] .cam-ripiego{width:100%;max-width:420px;min-height:48px;
+    border-radius:var(--radius-btn);background:var(--sats);text-decoration:none;
+    font-size:15px;font-weight:800;box-shadow:0 3px 0 var(--sats-deep)}
   /* il riquadro si accende mentre la foto ci passa sopra: il segnale
      che il bersaglio c'e' davvero */
   .photo-drop.sopra{border-color:var(--sats);background:var(--sats-soft);color:var(--sats-text)}
@@ -11140,7 +11188,11 @@ document.getElementById('cartello')?.remove();</script>
         <div class="photo-drop" onclick="el('sellPhotos').click()"
              ondragenter="fotoSopra(event,true)" ondragover="fotoSopra(event,true)"
              ondragleave="fotoSopra(event,false)" ondrop="fotoLasciate(event)">
-          <span class="big">📸</span><span id="sellFotoEtichetta">Aggiungi foto (fino a 5)</span>
+          <!-- IL «+» (1 ott 2026, chiesto da Andrea): la macchina
+               fotografica diceva «foto» ma non «caricane una»; il + e' il
+               segno che ovunque vuol dire aggiungi. Decorativo: l'etichetta
+               sotto dice gia' tutto a chi legge con la voce. -->
+          <span class="big piu" aria-hidden="true">+</span><span id="sellFotoEtichetta">Aggiungi foto (fino a 5)</span>
           <span class="trascina">o trascinale qui</span>
           <!-- Le due scelte solo dove c'e' un dito (il CSS): sul
                computer `capture` non apre nessuna fotocamera — il
@@ -11151,7 +11203,7 @@ document.getElementById('cartello')?.remove();</script>
                bottone risale al riquadro e apre ANCHE la galleria. -->
           <div class="foto-scelte">
             <button type="button" class="foto-scelta" id="sellBtnScatta"
-                    onclick="event.stopPropagation(); el('sellScatta').click()">📷 Scatta foto</button>
+                    onclick="event.stopPropagation(); scattaFoto()">📷 Scatta foto</button>
             <button type="button" class="foto-scelta" id="sellBtnGalleria"
                     onclick="event.stopPropagation(); el('sellPhotos').click()">🖼️ Dalla galleria</button>
           </div>
@@ -11897,6 +11949,39 @@ document.getElementById('cartello')?.remove();</script>
     <button class="foto-nav lb-nav next" aria-label="Foto successiva" title="Foto successiva">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     <div id="lbDots"></div>
+  </div>
+
+  <!-- LA FOTOCAMERA DENTRO LA PAGINA (1 ott 2026, dal telefono di Andrea):
+       nella Mini App di Telegram Android «📷 Scatta foto» apriva la
+       GALLERIA — la WebView di Telegram ignora `capture`. Dentro Telegram
+       la fotocamera la apriamo noi (scattaFoto → apriFotocamera): la
+       posteriore a schermo pieno, lo scatto, «Rifai» e «Usa questa foto».
+       E' uno STRATO del motore della navigazione come il lightbox (`cam`
+       in navPila): la ✕, il tasto indietro di Telegram e il gesto lo
+       chiudono dalla stessa porta. Gli stati li scrive `camStato` in
+       data-stato (attesa | vivo | rivedi | errore) e il CSS mostra solo i
+       pezzi di quello stato. «Scegli una foto dal telefono» c'e' SEMPRE
+       tranne a foto scattata: e' l'uscita se il permesso non arriva mai. -->
+  <div id="fotocamera" role="dialog" aria-modal="true" aria-label="Fotocamera" data-stato="attesa">
+    <video id="camVideo" playsinline muted autoplay></video>
+    <img id="camFoto" alt="La foto appena scattata">
+    <button type="button" class="cam-x" onclick="navIndietro()" title="Chiudi"
+            aria-label="Chiudi la fotocamera">✕</button>
+    <div class="cam-piede">
+      <div id="camAvviso" class="cam-avviso" role="status" aria-live="polite"></div>
+      <div class="cam-azioni cam-solo-vivo">
+        <button type="button" id="camOtturatore" class="cam-otturatore"
+                onclick="scattaDalVivo()" aria-label="Scatta la foto"></button>
+      </div>
+      <div class="cam-azioni cam-solo-rivedi">
+        <button type="button" class="cam-btn" onclick="rifaiScatto()">↺ Rifai</button>
+        <button type="button" class="cam-btn primario" onclick="usaScatto()">✓ Usa questa foto</button>
+      </div>
+      <div class="cam-azioni cam-solo-errore">
+        <button type="button" class="cam-btn" onclick="accendiFotocamera()">↻ Riprova</button>
+      </div>
+      <button type="button" class="cam-ripiego" onclick="camRipiego()">Scegli una foto dal telefono</button>
+    </div>
   </div>
 
   <!-- ============ TOUR DI BENVENUTO: velo + riflettore + fumetto ============ -->
@@ -15535,7 +15620,8 @@ function navVista(){
    ricostruire la vetrina e a distinguere due entry diverse. */
 const chiaveVetrina = () => ramoVetrina + '|' + activeCat;
 /* La pila: la vista in fondo, sopra gli strati nell'ordine in cui si
-   coprono (che e' quello degli z-index: fogli 41, lightbox 70, tour 80,
+   coprono (che e' quello degli z-index: fogli 41, lightbox 70,
+   fotocamera 75, tour 80,
    tour del P2P 84,
    cartello 90). Il picker va per ultimo fra i fogli — e' l'unico che si
    apre SOPRA un altro, e nel markup non sta in coda. */
@@ -15545,6 +15631,7 @@ function navPila(){
     .sort((a,b) => (a==='pickerSheet') - (b==='pickerSheet'))
     .forEach(id => p.push({t:'f', k:id}));
   if (el('lightbox')?.classList.contains('open')) p.push({t:'lb', k:''});
+  if (el('fotocamera')?.classList.contains('open')) p.push({t:'cam', k:''});
   if (tourInCorso)       p.push({t:'tour', k:''});
   if (tourP2PInCorso)    p.push({t:'tourp2p', k:''});
   if (testModaleInCorso) p.push({t:'test', k:''});
@@ -15559,6 +15646,7 @@ const navUguali = (a,b) => !!a && !!b && a.length===b.length
    col foglio che lo possiede (closeSheet lo uccideva sempre). */
 function navChiudiStrato(s){
   if (s.t==='lb')   return chiudiLightbox();
+  if (s.t==='cam')  return chiudiFotocamera();
   if (s.t==='tour') return chiudiTour();
   if (s.t==='tourp2p') return chiudiTourP2P();
   if (s.t==='test') return chiudiModaleTest();
@@ -15948,7 +16036,7 @@ function navMotore(){
      risulta a saldo zero da solo, senza scriverlo da nessuna parte. */
   const occhio = new MutationObserver(() => navRiflette());
   [...document.querySelectorAll('.view, .sheet'),
-   el('lightbox'), el('tour'), el('tourP2P'), el('testModale')].forEach(n =>
+   el('lightbox'), el('fotocamera'), el('tour'), el('tourP2P'), el('testModale')].forEach(n =>
     n && occhio.observe(n, {attributes:true, attributeFilter:['class']}));
   addEventListener('popstate', e => {
     /* Chrome ha gia' mostrato la pagina d'arrivo: si arriva secchi. In
@@ -43058,6 +43146,185 @@ async function fotoLasciate(ev){
   await aggiungiFoto(files);
   renderFotoPreview();
 }
+
+/* ============ «📷 SCATTA FOTO»: CHI APRE LA FOTOCAMERA (1 ott 2026) ============
+   Dal telefono di Andrea, il giorno di df36eaa: nell'app Android
+   l'input con `capture` apre la fotocamera, nella Mini App di Telegram
+   Android apre la GALLERIA — la WebView di Telegram `capture` lo
+   ignora. Quindi lo smistamento:
+   - FUORI da Telegram (app Android, browser) resta l'input con capture,
+     che li' funziona;
+   - DENTRO Telegram la fotocamera la apriamo noi, nella pagina, con
+     getUserMedia — iPhone compreso, una strada sola per la Mini App;
+   - dentro Telegram senza getUserMedia (WebView vecchia) si torna
+     all'input e lo si DICE.
+   L'input si apre solo DENTRO un tocco dell'utente: per questo i due
+   ripieghi lo chiamano subito, mai dopo un'attesa. */
+function scattaFoto(){
+  /* il tetto prima della fotocamera: aprirla per poi rifiutare lo
+     scatto sarebbe la beffa */
+  if (sellFoto.length >= 5) { toast('Massimo 5 foto'); return; }
+  if (!tg?.initData) { el('sellScatta').click(); return; }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    toast('Questo Telegram non apre la fotocamera dentro la pagina: scatta o scegli la foto dal selettore del telefono', 8000);
+    el('sellScatta').click();
+    return;
+  }
+  apriFotocamera();
+}
+
+/* LO STRATO DELLA FOTOCAMERA. Il flusso acceso vive in `camFlusso` e si
+   spegne SEMPRE alla chiusura (la lucina della fotocamera non resta
+   accesa a strato chiuso). `camGiro` numera le accensioni: una risposta
+   di getUserMedia che arriva dopo la chiusura — il permesso lasciato
+   in sospeso, poi la ✕ — trova un giro diverso, spegne quel che ha
+   avuto e tace. */
+let camFlusso = null, camScatto = null, camScattoUrl = '', camGiro = 0;
+
+function camStato(stato, avviso){
+  el('fotocamera').dataset.stato = stato;
+  el('camAvviso').textContent = avviso || '';
+}
+
+function apriFotocamera(){
+  if (!el('fotocamera')) return;
+  haptic();
+  el('fotocamera').classList.add('open');
+  document.body.style.overflow = 'hidden';   // sotto non si scorre
+  accendiFotocamera();
+}
+
+async function accendiFotocamera(){
+  const giro = ++camGiro;
+  spegniFlussoCamera();         // mai due flussi: il nuovo prende il posto
+  camStato('attesa', 'Sto aprendo la fotocamera…');
+  let flusso;
+  try {
+    /* la posteriore se c'e' (`ideal`: un telefono con una sola
+       fotocamera la da' lo stesso), 4:3 come le foto del telefono; la
+       foto finisce comunque a 1200 px dalla preparazione di sempre */
+    flusso = await navigator.mediaDevices.getUserMedia({audio: false,
+      video: {facingMode: {ideal: 'environment'},
+              width: {ideal: 1920}, height: {ideal: 1440}}});
+  } catch(e) {
+    if (giro === camGiro) camStato('errore', motivoFotocamera(e));
+    return;
+  }
+  if (giro !== camGiro || !el('fotocamera').classList.contains('open')) {
+    flusso.getTracks().forEach(t => { try { t.stop(); } catch(e){} });
+    return;
+  }
+  camFlusso = flusso;
+  const v = el('camVideo');
+  v.srcObject = flusso;
+  try { await v.play(); } catch(e){}
+  if (giro === camGiro) camStato('vivo');
+}
+
+/* Il perche' detto in italiano, e sempre con la strada dopo: il
+   bottone «Scegli una foto dal telefono» sta sotto la frase. */
+function motivoFotocamera(e){
+  const n = e?.name || '';
+  if (n === 'NotAllowedError' || n === 'SecurityError' || n === 'PermissionDeniedError')
+    return 'La fotocamera non è permessa. Per scattare da qui consentila a Telegram nelle impostazioni del telefono (e al bot, se Telegram te lo chiede), oppure scegli una foto dal telefono.';
+  if (n === 'NotFoundError' || n === 'OverconstrainedError' || n === 'DevicesNotFoundError')
+    return 'Non trovo nessuna fotocamera su questo telefono: scegli una foto dal telefono.';
+  if (n === 'NotReadableError' || n === 'TrackStartError' || n === 'AbortError')
+    return 'La fotocamera è occupata da un\'altra app: chiudila e tocca «Riprova», oppure scegli una foto dal telefono.';
+  return 'Non riesco ad aprire la fotocamera: tocca «Riprova», oppure scegli una foto dal telefono.';
+}
+
+/* LO SCATTO: il fotogramma del video, intero, in un JPEG di qualita'.
+   Niente EXIF da raddrizzare — il fotogramma arriva gia' dritto come lo
+   si vede —, e da qui in giu' e' una foto come le altre: «Usa questa
+   foto» la passa ad aggiungiFoto, cioe' alla stessa preparazione
+   (1200 px, il ripiego in piccolo e sul server). */
+async function scattaDalVivo(){
+  const v = el('camVideo');
+  if (!camFlusso || !v.videoWidth) return;    // non ancora acceso: il tocco non vale
+  haptic();
+  const c = document.createElement('canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  const blob = await new Promise(r => {
+    try { c.toBlob(r, 'image/jpeg', 0.92); } catch(e){ r(null); }
+  });
+  if (!blob) { camStato('vivo', 'Lo scatto non è riuscito: riprova'); return; }
+  camScatto = new File([blob], 'scatto-' + Date.now() + '.jpg', {type: 'image/jpeg'});
+  if (camScattoUrl) URL.revokeObjectURL(camScattoUrl);
+  camScattoUrl = URL.createObjectURL(blob);
+  el('camFoto').src = camScattoUrl;
+  try { v.pause(); } catch(e){}
+  /* un fotogramma nero (la fotocamera appena accesa, il dito
+     sull'obiettivo) si DICE, non si blocca: chi guarda l'anteprima
+     decide, e il giudice della tela nera non deve poter chiudere la
+     strada a una foto buona */
+  camStato('rivedi', telaPiatta(c) ? 'Sembra tutta nera: meglio rifarla' : '');
+}
+
+function rifaiScatto(){
+  camScatto = null;
+  if (camScattoUrl) { URL.revokeObjectURL(camScattoUrl); camScattoUrl = ''; }
+  el('camFoto').removeAttribute('src');
+  /* il flusso puo' essersi spento mentre si guardava la foto (Telegram
+     in secondo piano): allora si riaccende */
+  if (!camFlusso) { accendiFotocamera(); return; }
+  el('camVideo').play().catch(() => {});
+  camStato('vivo');
+}
+
+async function usaScatto(){
+  const file = camScatto;
+  if (!file) return;
+  camScatto = null;             // un secondo tocco non la manda due volte
+  navIndietro();                // la stessa porta della ✕ e del tasto di Telegram
+  await aggiungiFoto([file], true);
+  renderFotoPreview();
+}
+
+/* L'USCITA, nello STESSO tocco: il selettore si apre solo dentro un
+   gesto dell'utente, quindi prima lui e poi la chiusura. Dentro
+   Telegram Android il selettore e' la galleria: chi non ha la
+   fotocamera qui sceglie una foto gia' scattata. */
+function camRipiego(){
+  el('sellScatta').click();
+  navIndietro();
+}
+
+function spegniFlussoCamera(){
+  if (camFlusso) camFlusso.getTracks().forEach(t => { try { t.stop(); } catch(e){} });
+  camFlusso = null;
+  const v = el('camVideo');
+  if (v) v.srcObject = null;
+}
+
+/* La chiude il motore della navigazione (navChiudiStrato), mai a mano:
+   la ✕, «Usa questa foto», l'uscita e il tasto di Telegram passano tutti
+   da navIndietro. */
+function chiudiFotocamera(){
+  camGiro++;                    // una risposta in volo non riaccende niente
+  spegniFlussoCamera();
+  el('fotocamera').classList.remove('open');
+  document.body.style.overflow = '';
+  camScatto = null;
+  if (camScattoUrl) { URL.revokeObjectURL(camScattoUrl); camScattoUrl = ''; }
+  el('camFoto').removeAttribute('src');
+}
+
+/* Telegram in secondo piano: la fotocamera si spegne (batteria, e la
+   lucina che resterebbe accesa), e al ritorno si riaccende SOLO se si
+   stava inquadrando. Durante l'attesa no: e' il momento in cui il
+   telefono chiede il permesso, e su Android quella finestra puo'
+   nascondere la pagina — la richiesta in volo e' ancora nostra e la
+   sua risposta arriva da sola; chiederne un'altra la rincorrerebbe. A
+   foto scattata nemmeno: si sta guardando la foto, e «Rifai» la
+   riaccende quando serve. */
+document.addEventListener('visibilitychange', () => {
+  const f = el('fotocamera');
+  if (!f || !f.classList.contains('open')) return;
+  if (document.hidden) { spegniFlussoCamera(); return; }
+  if (f.dataset.stato === 'vivo' && !camFlusso) accendiFotocamera();
+});
 
 /* L'anteprima che non si apre nemmeno come <img>: stessa sorte della
    foto che non si sa disegnare — il riquadro, mai il buco rotto. */

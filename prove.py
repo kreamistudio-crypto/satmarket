@@ -13743,9 +13743,12 @@ def prove_foto_scarti():
     _b = mini.find('<div class="foto-scelte">')
     prova("sentinella: i due bottoni stanno DENTRO il riquadro delle foto",
           True, 0 < _a < _b and "</div>" not in mini[_a:_b])
+    # (1 ott 2026, seguito) «📷 Scatta foto» passa da scattaFoto, che
+    # smista: l'input con capture fuori da Telegram, la fotocamera nella
+    # pagina dentro (prove_fotocamera_pagina)
     prova("sentinella: «📷 Scatta foto» apre la fotocamera, «🖼️ Dalla galleria» "
           "la galleria", [True, True],
-          ["el('sellScatta').click()\">📷 Scatta foto</button>" in _scelte,
+          ["scattaFoto()\">📷 Scatta foto</button>" in _scelte,
            "el('sellPhotos').click()\">🖼️ Dalla galleria</button>" in _scelte])
     # senza lo stop il tocco risale al riquadro, che apre ANCHE la galleria
     prova("sentinella: ...e nessuno dei due risale al riquadro", 2,
@@ -14791,6 +14794,360 @@ def prove_foto_metadati():
           "toDataURL('image/jpeg'" in open("miniapp.html",
                                            encoding="utf-8").read())
 
+
+
+def prove_fotocamera_pagina():
+    """«📷 Scatta foto» dentro Telegram (1 ott 2026, seguito di df36eaa).
+
+    Dal telefono di Andrea: nell'app Android l'input con `capture` apre
+    la fotocamera, nella Mini App di Telegram Android apre la GALLERIA —
+    la WebView di Telegram `capture` lo ignora. Dentro Telegram la
+    fotocamera adesso la apre la pagina (getUserMedia): la posteriore a
+    schermo pieno, lo scatto, «Rifai», «Usa questa foto», la chiusura, e
+    lo scatto passa da aggiungiFoto come ogni altra foto. Fuori da
+    Telegram resta l'input. Le sentinelle dicono come e' scritto; il
+    banco node lo FA GIRARE con una fotocamera di cartone, che e' l'unico
+    modo di rispondere a «la lucina si spegne?», «il permesso negato
+    lascia una strada?», «la risposta tardiva riaccende uno strato
+    chiuso?»."""
+    print("\n[la fotocamera dentro la pagina]")
+    import shutil as _sh
+    import subprocess as _sp
+    import json as _js
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL MARKUP E IL CSS ------------------------------------------
+    # il «+» al posto della macchina fotografica, nel riquadro
+    _a = mini.find('<div class="photo-drop"')
+    _b = mini.find('<div class="foto-scelte">')
+    riq = mini[_a:_b] if 0 < _a < _b else ""
+    prova("il riquadro apre col «+», non con la macchina fotografica",
+          [True, False], ['<span class="big piu" aria-hidden="true">+</span>' in riq,
+                          "📸" in riq])
+    _piu = pezzo_js(mini, "  .photo-drop .big.piu{", "}")
+    prova("...grande, nell'arancio dei sats, stretto sulla sua riga",
+          [True, True, True], ["font-size:56px" in _piu, "line-height:1" in _piu,
+                               "var(--sats-text)" in _piu])
+    _f = mini[mini.find('<div id="fotocamera"'):]
+    _f = _f[:_f.find('\n  </div>\n') if '\n  </div>\n' in _f else _f.find('\r\n  </div>\r\n')]
+    prova("lo strato della fotocamera c'e', ed e' un dialogo",
+          True, 'role="dialog"' in _f and 'aria-modal="true"' in _f)
+    # senza playsinline l'iPhone apre il video a schermo intero suo, fuori
+    # dalla pagina, e i nostri bottoni non ci sono piu'
+    _v = _f[_f.find('<video'):]
+    _v = _v[:_v.find('>') + 1]
+    prova("il video e' inline e muto (l'iPhone lo vuole)", [True, True],
+          ["playsinline" in _v, "muted" in _v])
+    prova("la ✕ chiude dalla porta di tutti, navIndietro", True,
+          'class="cam-x" onclick="navIndietro()"' in _f)
+    prova("i gesti dello strato: scatto, rifai, usa, riprova, uscita",
+          [True] * 5, ['onclick="scattaDalVivo()"' in _f, 'onclick="rifaiScatto()"' in _f,
+                       'onclick="usaScatto()"' in _f, 'onclick="accendiFotocamera()"' in _f,
+                       'onclick="camRipiego()"' in _f])
+    prova("...con le parole chieste", [True, True, True],
+          ["↺ Rifai" in _f, "✓ Usa questa foto" in _f,
+           "Scegli una foto dal telefono" in _f])
+    _cz = pezzo_js(mini, "  #fotocamera{", "}")
+    prova("sopra tutto tranne tour e cartello: z 75, nero pieno",
+          [True, True, True], ["z-index:75" in _cz, "background:#000" in _cz,
+                               "position:fixed" in _cz])
+    # ogni stato mostra i SUOI pezzi, e a foto scattata l'uscita sparisce
+    prova("il CSS mostra i pezzi di ogni stato", [True, True, True, True],
+          ['#fotocamera[data-stato="vivo"] .cam-solo-vivo' in mini,
+           '#fotocamera[data-stato="rivedi"] .cam-solo-rivedi' in mini,
+           '#fotocamera[data-stato="errore"] .cam-solo-errore' in mini,
+           '#fotocamera[data-stato="rivedi"] .cam-ripiego{display:none}' in mini])
+    prova("quel che si vede e' quel che si scatta: contain, non cover", True,
+          "object-fit:contain" in pezzo_js(mini, "  #camVideo,#camFoto{", "}"))
+
+    # --- 2) LO STRATO NEL MOTORE DELLA NAVIGAZIONE ----------------------
+    # la ✕, il tasto indietro di Telegram e il gesto passano dalla stessa
+    # porta solo se lo strato e' nella pila, se il motore lo sa chiudere e
+    # se l'osservatore guarda la sua classe (senza, nessuna entry nella
+    # cronologia: il tasto di Telegram chiuderebbe la Mini App)
+    _pila = pezzo_js(mini, "function navPila(){", "\n}\n")
+    _lb = _pila.find("p.push({t:'lb'")
+    _cam = _pila.find("if (el('fotocamera')?.classList.contains('open')) p.push({t:'cam', k:''});")
+    _tour = _pila.find("if (tourInCorso)")
+    prova("la fotocamera e' uno strato della pila, fra lightbox e tour",
+          True, 0 < _lb < _cam < _tour)
+    prova("...che il motore sa chiudere", True,
+          "if (s.t==='cam')  return chiudiFotocamera();"
+          in pezzo_js(mini, "function navChiudiStrato(s){", "\n}\n"))
+    prova("...e di cui l'osservatore guarda la classe", True,
+          "el('fotocamera')," in pezzo_js(mini, "function navMotore(){", "\n}\n"))
+
+    # --- 3) IL BANCO: smistamento e strato, girati per davvero ----------
+    if not _sh.which("node"):
+        salta("la fotocamera nella pagina, girata per davvero", "node non installato")
+        return
+    _pz = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function scattaFoto(){", "function camStato(stato, avviso){",
+        "function apriFotocamera(){", "async function accendiFotocamera(){",
+        "function motivoFotocamera(e){", "async function scattaDalVivo(){",
+        "function rifaiScatto(){", "async function usaScatto(){",
+        "function camRipiego(){", "function spegniFlussoCamera(){",
+        "function chiudiFotocamera(){"))
+    _pz += pezzo_js(mini, "let camFlusso = null,", "\n") + "\n"
+    _pz += pezzo_js(mini, "document.addEventListener('visibilitychange', () => {",
+                    "\n});\n") + "\n});\n"
+    _banco = r"""
+      // il telefono di cartone: il DOM che serve allo strato, la
+      // fotocamera che risponde come dice CASO, il motore della
+      // navigazione che chiude lo strato come farebbe il popstate
+      let CASO = {}, LOG = [];
+      const lista = () => { const s = new Set(); return {add: c => s.add(c),
+        remove: c => s.delete(c), contains: c => s.has(c)}; };
+      const NODI = {
+        fotocamera: {classList: lista(), dataset: {stato: 'attesa'}},
+        camAvviso: {textContent: ''},
+        camVideo: {srcObject: null, videoWidth: 0, videoHeight: 0, giocato: 0, fermo: 0,
+          play(){ this.giocato++; return Promise.resolve(); }, pause(){ this.fermo++; }},
+        camFoto: {src: '', removeAttribute(a){ if (a === 'src') this.src = ''; }},
+        sellScatta: {click(){ LOG.push('input'); }},
+      };
+      const el = id => NODI[id];
+      let sellFoto = [], toasts = [], aggiunte = [];
+      const tg = {initData: 'x'};
+      function toast(t){ toasts.push(String(t)); }
+      function haptic(){}
+      function renderFotoPreview(){}
+      async function aggiungiFoto(files, daFotocamera){ aggiunte.push([files, daFotocamera]); }
+      function telaPiatta(){ return !!CASO.nera; }
+      // ASINCRONO come il vero: navIndietro chiede history.back(), e lo
+      // strato lo chiude il popstate, piu' tardi. Un banco che chiudesse
+      // subito non vedrebbe mai il doppio tocco su «Usa questa foto».
+      function navIndietro(){ LOG.push('indietro');
+        setTimeout(() => {
+          if (NODI.fotocamera.classList.contains('open')) chiudiFotocamera(); }, 0); }
+      const body = {style: {overflow: ''}};
+      let ascoltaVista = null, nascosto = false;
+      globalThis.document = {
+        body,
+        get hidden(){ return nascosto; },
+        addEventListener(tipo, fn){ if (tipo === 'visibilitychange') ascoltaVista = fn; },
+        createElement(){ return {width: 0, height: 0,
+          getContext(){ return {drawImage(){}}; },
+          toBlob(cb, tipo, q){ CASO.tipo = tipo; CASO.q = q;
+            cb(CASO.blobNullo ? null : new Blob(['jpeg'], {type: tipo})); }}; }};
+      if (typeof File === 'undefined')
+        globalThis.File = class extends Blob { constructor(p, n, o){ super(p, o); this.name = n; } };
+      let URLI = 0, REVOCATI = 0;
+      globalThis.URL = {createObjectURL(){ return 'blob:' + (++URLI); },
+                        revokeObjectURL(){ REVOCATI++; }};
+      // la fotocamera: ogni flusso conta le sue tracce spente
+      let FLUSSI = [], CHIESTE = [], SOSPESA = null, RIFIUTA = null;
+      function flussoNuovo(){
+        const f = {spente: 0, getTracks(){ return [{stop: () => f.spente++}]; }};
+        FLUSSI.push(f); return f;
+      }
+      const mediaFinti = {getUserMedia(vincoli){
+        CHIESTE.push(vincoli);
+        if (CASO.sospesa) return new Promise((r, n) => { SOSPESA = r; RIFIUTA = n; });
+        if (CASO.errore) return Promise.reject({name: CASO.errore});
+        return Promise.resolve(flussoNuovo());
+      }};
+      globalThis.navigator = {mediaDevices: mediaFinti};
+      const pausa = () => new Promise(r => setTimeout(r, 0));
+    """ + _pz + r"""
+      async function daCapo(caso){
+        await pausa(); await pausa();   // il popstate del giro di prima e' arrivato
+        CASO = caso || {}; LOG = []; toasts = []; aggiunte = []; CHIESTE = [];
+        FLUSSI = []; SOSPESA = null; sellFoto = []; tg.initData = 'x';
+        NODI.fotocamera.classList.remove('open'); NODI.fotocamera.dataset.stato = 'attesa';
+        NODI.camVideo.srcObject = null; NODI.camVideo.videoWidth = 0;
+        NODI.camVideo.videoHeight = 0; NODI.camVideo.giocato = 0; NODI.camVideo.fermo = 0;
+        globalThis.navigator.mediaDevices = mediaFinti;
+        camFlusso = null; camScatto = null; camScattoUrl = ''; nascosto = false;
+      }
+      const aperta = () => NODI.fotocamera.classList.contains('open');
+      const stato = () => NODI.fotocamera.dataset.stato;
+      (async () => {
+        const O = {};
+        // 1) FUORI da Telegram: l'input con capture, come oggi
+        await daCapo(); tg.initData = '';
+        scattaFoto(); await pausa();
+        O.fuori = [LOG, aperta(), CHIESTE.length];
+        // 2) dentro Telegram senza getUserMedia: l'input, e lo si dice
+        await daCapo(); globalThis.navigator.mediaDevices = undefined;
+        scattaFoto(); await pausa();
+        O.senzaGum = [LOG, aperta(), (toasts[0] || '').slice(0, 52)];
+        // 3) il tetto prima della fotocamera
+        await daCapo(); sellFoto = [1, 2, 3, 4, 5];
+        scattaFoto(); await pausa();
+        O.tetto = [LOG, aperta(), CHIESTE.length, toasts];
+        // 4) dentro Telegram: lo strato, l'attesa, poi il vivo
+        await daCapo(); CASO.sospesa = true;
+        scattaFoto();
+        O.attesa = [aperta(), stato(), NODI.camAvviso.textContent, body.style.overflow,
+                    CHIESTE[0]];
+        SOSPESA(flussoNuovo()); await pausa(); await pausa();
+        O.vivo = [stato(), NODI.camVideo.srcObject === FLUSSI[0], NODI.camVideo.giocato,
+                  NODI.camAvviso.textContent];
+        // 5) il tocco sull'otturatore a video non ancora pronto non vale
+        await scattaDalVivo();
+        O.prestoTocco = [stato(), camScatto];
+        // 6) lo scatto: un JPEG intero, l'anteprima, il video fermo
+        NODI.camVideo.videoWidth = 1920; NODI.camVideo.videoHeight = 1440;
+        await scattaDalVivo();
+        O.scatto = [stato(), camScatto && camScatto.type, /^scatto-\d+\.jpg$/.test(camScatto && camScatto.name),
+                    CASO.tipo, CASO.q, NODI.camFoto.src.startsWith('blob:'), NODI.camVideo.fermo,
+                    NODI.camAvviso.textContent];
+        // 7) Rifai: si torna a inquadrare, lo scatto di prima se ne va
+        rifaiScatto();
+        O.rifai = [stato(), camScatto, NODI.camFoto.src, NODI.camVideo.giocato];
+        // 8) lo scatto nero si dice, non si blocca
+        CASO.nera = true; await scattaDalVivo();
+        O.nera = [stato(), NODI.camAvviso.textContent, !!camScatto];
+        CASO.nera = false;
+        // 9) Usa questa foto: lo strato si chiude dalla porta di tutti, la
+        // lucina si spegne, e la foto va dove vanno le altre
+        await usaScatto(); await pausa();
+        O.usa = [LOG, aperta(), FLUSSI[0].spente, camFlusso, body.style.overflow,
+                 aggiunte.length, aggiunte[0] && aggiunte[0][0].length,
+                 aggiunte[0] && aggiunte[0][0][0] instanceof Blob,
+                 aggiunte[0] && aggiunte[0][1], NODI.camVideo.srcObject];
+        O.usaDueVolte = aggiunte.length;
+        // 9bis) IL DOPPIO TOCCO: due «Usa questa foto» prima che il
+        // popstate chiuda lo strato mandano UNA foto
+        await daCapo(); scattaFoto(); await pausa(); await pausa();
+        NODI.camVideo.videoWidth = 1920; NODI.camVideo.videoHeight = 1440;
+        await scattaDalVivo();
+        const u1 = usaScatto(), u2 = usaScatto(); await u1; await u2; await pausa();
+        O.usaDueVolte = [aggiunte.length, LOG.filter(x => x === 'indietro').length];
+        // 10) il flusso spento mentre si guardava la foto: Rifai lo riaccende
+        await daCapo(); scattaFoto(); await pausa(); await pausa();
+        NODI.camVideo.videoWidth = 1280; NODI.camVideo.videoHeight = 960;
+        await scattaDalVivo(); nascosto = true; ascoltaVista();
+        O.nascostaRivedi = [FLUSSI[0].spente, camFlusso, stato()];
+        nascosto = false; ascoltaVista(); await pausa();
+        O.tornataRivedi = [CHIESTE.length, stato()];
+        rifaiScatto(); await pausa(); await pausa();
+        O.rifaiRiaccende = [CHIESTE.length, stato(), NODI.camVideo.srcObject === FLUSSI[1]];
+        // 11) in secondo piano mentre si inquadra: spenta, poi riaccesa
+        nascosto = true; ascoltaVista();
+        O.nascostaVivo = [FLUSSI[1].spente, camFlusso];
+        nascosto = false; ascoltaVista(); await pausa(); await pausa();
+        O.tornataVivo = [CHIESTE.length, stato(), !!camFlusso];
+        navIndietro();
+        // 12) nascosta DURANTE l'attesa (la finestra del permesso): niente spegni
+        await daCapo(); CASO.sospesa = true; scattaFoto();
+        nascosto = true; ascoltaVista(); nascosto = false; ascoltaVista();
+        O.attesaNascosta = [CHIESTE.length, stato()];
+        SOSPESA(flussoNuovo()); await pausa(); await pausa();
+        O.attesaPoiVivo = [stato(), FLUSSI[0].spente];
+        navIndietro();
+        // 13) LA RISPOSTA TARDIVA: il permesso in sospeso, poi la ✕, poi il
+        // si' — la fotocamera non si riaccende in uno strato chiuso
+        await daCapo(); CASO.sospesa = true; scattaFoto();
+        navIndietro(); await pausa();
+        SOSPESA(flussoNuovo()); await pausa(); await pausa();
+        O.tardiva = [aperta(), FLUSSI[0].spente, camFlusso, NODI.camVideo.srcObject];
+        // ...e il NO tardivo non scrive il suo errore in uno strato chiuso
+        await daCapo(); CASO.sospesa = true; scattaFoto();
+        navIndietro(); await pausa();
+        RIFIUTA({name: 'NotAllowedError'}); await pausa(); await pausa();
+        O.noTardivo = [aperta(), stato(), NODI.camAvviso.textContent];
+        // 14) i no della fotocamera: ognuno col suo perche', e la strada
+        const NO = {};
+        for (const n of ['NotAllowedError', 'NotFoundError', 'NotReadableError', 'Boh']) {
+          await daCapo({errore: n}); scattaFoto(); await pausa(); await pausa();
+          NO[n] = [aperta(), stato(), NODI.camAvviso.textContent];
+          navIndietro();
+        }
+        O.no = NO;
+        // 15) Riprova dopo un no: una richiesta nuova, e se va il vivo
+        await daCapo({errore: 'NotReadableError'}); scattaFoto(); await pausa(); await pausa();
+        CASO.errore = null; await accendiFotocamera(); await pausa();
+        O.riprova = [CHIESTE.length, stato()];
+        // una seconda accensione a fotocamera accesa spegne la prima: mai
+        // due flussi, mai una lucina orfana
+        await accendiFotocamera(); await pausa();
+        O.dueAccensioni = [FLUSSI.length, FLUSSI[0].spente, FLUSSI[1].spente, stato()];
+        navIndietro();
+        // 16) l'uscita: il selettore PRIMA della chiusura, nello stesso tocco
+        await daCapo({errore: 'NotAllowedError'}); scattaFoto(); await pausa(); await pausa();
+        LOG = []; camRipiego(); await pausa();
+        O.ripiego = [LOG, aperta()];
+        // 17) lo scatto che il telefono non sa fare (toBlob nullo)
+        await daCapo({blobNullo: true}); scattaFoto(); await pausa(); await pausa();
+        NODI.camVideo.videoWidth = 640; NODI.camVideo.videoHeight = 480;
+        await scattaDalVivo();
+        O.blobNullo = [stato(), NODI.camAvviso.textContent, camScatto];
+        navIndietro();
+        console.log(JSON.stringify(O));
+      })().catch(e => console.log(JSON.stringify({rotto: String(e && e.stack || e)})));
+    """
+    _r = _sp.run(["node", "-e", _banco], capture_output=True, text=True,
+                 encoding="utf-8", timeout=60)
+    try:
+        v = _js.loads((_r.stdout or "").strip().splitlines()[-1])
+    except Exception:
+        v = None
+    if not v or "rotto" in v:
+        prova("il banco della fotocamera gira", True,
+              f"node ha detto: {((v or {}).get('rotto') or _r.stderr or '')[:400]}")
+        return
+    prova("il banco della fotocamera gira", True, True)
+    prova("fuori da Telegram: l'input con capture, nessuna fotocamera nostra",
+          [["input"], False, 0], v["fuori"])
+    prova("dentro Telegram senza getUserMedia: l'input, e lo si dice",
+          [["input"], False, "Questo Telegram non apre la fotocamera dentro la pag"],
+          v["senzaGum"])
+    prova("a cinque foto non si apre niente", [[], False, 0, ["Massimo 5 foto"]], v["tetto"])
+    prova("dentro Telegram: lo strato si apre e dice che sta aprendo",
+          [True, "attesa", "Sto aprendo la fotocamera…", "hidden",
+           {"audio": False, "video": {"facingMode": {"ideal": "environment"},
+                                      "width": {"ideal": 1920}, "height": {"ideal": 1440}}}],
+          v["attesa"])
+    prova("...poi il flusso nel video, che parte: si inquadra",
+          ["vivo", True, 1, ""], v["vivo"])
+    prova("il tocco a video non ancora pronto non scatta", ["vivo", None], v["prestoTocco"])
+    prova("lo scatto: un JPEG di qualita', l'anteprima, il video fermo",
+          ["rivedi", "image/jpeg", True, "image/jpeg", 0.92, True, 1, ""], v["scatto"])
+    prova("Rifai: di nuovo il vivo, lo scatto di prima se ne va",
+          ["vivo", None, "", 2], v["rifai"])
+    prova("lo scatto nero si dice, e resta usabile",
+          ["rivedi", "Sembra tutta nera: meglio rifarla", True], v["nera"])
+    prova("Usa questa foto: chiude dalla porta di tutti, spegne la lucina, "
+          "la foto va ad aggiungiFoto come dalla fotocamera",
+          [["indietro"], False, 1, None, "", 1, 1, True, True, None], v["usa"])
+    prova("...e il doppio tocco, prima che lo strato si chiuda, ne manda UNA",
+          [1, 1], v["usaDueVolte"])
+    prova("Telegram in secondo piano a foto scattata: la fotocamera si spegne",
+          [1, None, "rivedi"], v["nascostaRivedi"])
+    prova("...al ritorno non si riaccende da sola (si guarda la foto)",
+          [1, "rivedi"], v["tornataRivedi"])
+    prova("...e Rifai la riaccende", [2, "vivo", True], v["rifaiRiaccende"])
+    prova("in secondo piano mentre si inquadra: spenta", [1, None], v["nascostaVivo"])
+    prova("...e al ritorno riaccesa", [3, "vivo", True], v["tornataVivo"])
+    prova("nascosta durante l'attesa del permesso: non si rincorre la richiesta",
+          [1, "attesa"], v["attesaNascosta"])
+    prova("...e il si' che arriva accende il vivo", ["vivo", 0], v["attesaPoiVivo"])
+    prova("LA RISPOSTA TARDIVA: chiusa prima del si', la fotocamera si spegne e tace",
+          [False, 1, None, None], v["tardiva"])
+    prova("...e il no tardivo non scrive in uno strato chiuso",
+          [False, "attesa", "Sto aprendo la fotocamera…"], v["noTardivo"])
+    _no = v["no"]
+    prova("i no restano nello strato, con la strada dopo", [[True, "errore"]] * 4,
+          [_no[k][:2] for k in ("NotAllowedError", "NotFoundError", "NotReadableError", "Boh")])
+    prova("...il permesso negato dice dove consentirlo",
+          True, _no["NotAllowedError"][2].startswith("La fotocamera non è permessa")
+          and "impostazioni del telefono" in _no["NotAllowedError"][2])
+    prova("...nessuna fotocamera, occupata, e il no qualunque: ognuno il suo",
+          [True, True, True],
+          [_no["NotFoundError"][2].startswith("Non trovo nessuna fotocamera"),
+           _no["NotReadableError"][2].startswith("La fotocamera è occupata"),
+           _no["Boh"][2].startswith("Non riesco ad aprire la fotocamera")])
+    prova("...e ognuno offre la foto dal telefono",
+          [True] * 4, ["scegli una foto dal telefono" in _no[k][2] for k in _no])
+    prova("Riprova dopo un no: una richiesta nuova, e il vivo", [2, "vivo"], v["riprova"])
+    prova("...e una seconda accensione spegne la prima: mai due flussi",
+          [2, 1, 0, "vivo"], v["dueAccensioni"])
+    prova("l'uscita: il selettore PRIMA della chiusura (si apre solo dentro il tocco)",
+          [["input", "indietro"], False], v["ripiego"])
+    prova("lo scatto che il telefono non sa fare: lo si dice, si resta a inquadrare",
+          ["vivo", "Lo scatto non è riuscito: riprova", None], v["blobNullo"])
 
 def prove_foto_spenta():
     """«NESSUNA» VUOL DIRE OVUNQUE, ANCHE A LUI (ago 2026, dal campo:
@@ -113021,10 +113378,19 @@ def prove_contanti_a_mano():
     card = nudo(fn("function cardDisputaModP2P(d, ho){"))
     prova("la card del moderatore porta la riga dell'incontro, prima dello stato", True,
           0 < card.find("rigaIncontroModP2P(d, aperta)") < card.find("if (d.stato === 'chiusa') {"))
+    # (1 ott 2026, sera) la fotocamera e' tornata nella pagina, ma per le
+    # FOTO DEGLI ANNUNCI dentro Telegram («📷 Scatta foto»,
+    # prove_fotocamera_pagina): getUserMedia vive li' e solo li'. Fuori da
+    # quel blocco non deve ricomparire — che e' la domanda di questa
+    # sentinella: il QR e la sua fotocamera se ne sono andati dal P2P.
+    # Blocco non trovato = si guarda il file intero, come prima.
+    _ia = mini.find("/* ============ «📷 SCATTA FOTO»: CHI APRE LA FOTOCAMERA")
+    _ib = mini.find("document.addEventListener('visibilitychange', () => {", max(_ia, 0))
+    _fuori_cam = mini[:_ia] + mini[_ib:] if 0 <= _ia < _ib else mini
     prova("IL QR NON C'E' PIU': ne' il foglio, ne' lo scanner di Telegram, ne' la fotocamera, ne' la riga del codice",
           [False, False, False, False, False],
           ['id="p2pPresenzaSheet"' in mini, "showScanQrPopup" in mini, "BarcodeDetector" in mini,
-           "getUserMedia" in mini, "BRTL-INCONTRO" in mini])
+           "getUserMedia" in _fuori_cam, "BRTL-INCONTRO" in mini])
     prova("...e il foglio non e' piu' fra quelli dei gesti", "const P2P_FOGLI_GESTO = ['p2pHoldSheet', 'p2pIncassoSheet', 'p2pCampiSheet'];",
           riga_js("const P2P_FOGLI_GESTO = "))
     # COL CONTANTI IL RECAPITO E' L'APPUNTAMENTO, e le parole lo dicono
@@ -119307,7 +119673,7 @@ def main():
               prove_abbandonati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
               prove_initdata, prove_portachiavi,
-              prove_foto, prove_foto_scarti,
+              prove_foto, prove_foto_scarti, prove_fotocamera_pagina,
               prove_duplica_annuncio, prove_avatar,
               prove_foto_spenta, prove_foto_telegram_fallita,
               prove_nome_da_nostr, prove_foto_nostr_relay_muti,
