@@ -1,5 +1,19 @@
 # IL FORK DI MOSTRO — otto patch sopra il tag v0.19.0
 
+**Dal 1 ottobre 2026 (sera) i due moduli `.rs` sono cambiati** — cantiere
+«CSP e le voci aperte degli audit», cura 9: in `barattolo_fee.rs`
+l'interruttore della domanda dello sconto (3 fallimenti di fila → 60 s
+di pausa) e il tetto di 64 KB alla risposta letta a pezzi; in
+`barattolo_eventi.rs` via il ripiego sul segreto della 0005 (senza
+`BARATTOLO_EVENTI_SEGRETO` gli eventi sono spenti). Le `.patch` 0005 e
+0007 portano i moduli nuovi, e la 0008 il contesto spostato di
+`barattolo_eventi.rs` (diff innestati nelle `.patch` di prima, stessi
+header); le altre cinque sono byte per byte quelle del 30 set.
+Verificato con `git am` su due cloni puliti: l'albero è quello degli
+otto patcher. ⚠️ NON compilato sul PC: è il lavoro del prossimo giro
+del nodo (`-bar7`). Il verbale sta in CANTIERI, «CSP e le voci aperte
+degli audit — 9)».
+
 **Dal 1 ottobre 2026 le patch sono OTTO**: la 0008 (la cauzione di chi
 prende, solo per il metodo «Contanti») sta sopra la 0007 ed è stata
 fatta sul PC come le sette del 30 set — patcher a `--secco` su un clone

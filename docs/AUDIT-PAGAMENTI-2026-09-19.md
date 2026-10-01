@@ -404,6 +404,12 @@ giorni» è il segno di una hold invoice, non di un guasto.
 
 ## M4 — La domanda dello sconto gira nel ciclo SERIALE di mostro: fino a 12 s per presa
 
+> ✅ **PATCH SCRITTA il 1 ott 2026**, sale col prossimo giro del nodo
+> (cantiere «CSP e le voci aperte degli audit», cura 9): l'interruttore
+> in `barattolo_fee.rs` — dopo 3 fallimenti di fila la domanda si salta
+> per 60 s, fee piena — con la sua prova unitaria. Il testo che segue
+> resta com'era.
+
 Lo dice la patch stessa (`barattolo_fee.rs`, `LOOKUP_BUDGET`): «the take
 handler runs in the serial message loop, so this is also the longest a
 dead server can stall a take». Con Barattolo irraggiungibile (deploy,
@@ -436,6 +442,12 @@ porta una firma Schnorr della chiave su una sfida del server (la verifica
 c'è già: `verifica_evento_login`).
 
 ## M6 — Un evento falso dice «sats in garanzia» a chi sta per mandare euro
+
+> ✅ **PATCH SCRITTA il 1 ott 2026**, sale col prossimo giro del nodo
+> (cura 9): `ENV_SECRET_FALLBACK` non esiste più in
+> `barattolo_eventi.rs` — senza `BARATTOLO_EVENTI_SEGRETO` gli eventi
+> sono spenti. Lato server i due segreti sono distinti dal 18 set. Il
+> testo che segue resta com'era.
 
 `/api/p2p/evento` è fatta bene (vedi «sano»), ma il suo segreto è un
 Bearer statico e, lato Rust, **ricade su quello dello sconto**

@@ -356,10 +356,13 @@ risposta su `/` e `/miniapp.html` (gli script sono inline: serve il nonce sui
   non esiste più. Com'era: è ancora lì (`server.py:12401`).
 - **B1:** ✅ CURATA il 1 ott 2026 (cura 5): `hmac.compare_digest`. Com'era:
   si confrontava ancora con `!=` (`server.py:6938`).
-- **M4 (12 s nel ciclo seriale):** `LOOKUP_BUDGET` è ancora 12 s e la
+- **M4 (12 s nel ciclo seriale):** ✅ patch scritta il 1 ott 2026 (cura 9,
+  l'interruttore dopo 3 fallimenti), sale col prossimo giro del nodo.
+  Com'era: `LOOKUP_BUDGET` è ancora 12 s e la
   domanda dello sconto gira ancora dentro la presa (`barattolo_fee.rs:55`);
   nessun interruttore dopo N fallimenti.
-- **M6 (i due segreti):** `ENV_SECRET_FALLBACK` c'è ancora
+- **M6 (i due segreti):** ✅ patch scritta il 1 ott 2026 (cura 9), sale col
+  prossimo giro del nodo. Com'era: `ENV_SECRET_FALLBACK` c'è ancora
   (`barattolo_eventi.rs:34`): se sul nodo manca `BARATTOLO_EVENTI_SEGRETO`, chi
   legge il segreto dello sconto fabbrica eventi. Da verificare col comando in
   fondo.
@@ -395,13 +398,16 @@ risposta su `/` e `/miniapp.html` (gli script sono inline: serve il nonce sui
   scavalca chiamando `sudo` da sé: una tempesta di restart spegne l'onion e
   il ponte. Accettato dal cantiere; una regola polkit con un rate limit, o un
   wrapper sudoers che rifiuta più di un restart al minuto, lo chiude.
-- **B5 — Nomi fissi in `/tmp` da root sul nodo:** `ronda-liquidita.sh` scrive
+- **B5 — Nomi fissi in `/tmp` da root sul nodo** (✅ curato nel repo il 1
+  ott 2026, cura 9: `mktemp`; gli script vanno ricopiati sul nodo)**:** `ronda-liquidita.sh` scrive
   `/tmp/liq-ch.json` e `/tmp/liq-info.json`, `ronda-tor.sh` `/tmp/ronda-tor-fwd`.
   Se sull'host esiste un utente non root (su LNVPS Debian di solito c'è
   `debian`), un symlink piazzato prima farebbe scrivere root altrove — a meno
   che `fs.protected_symlinks=1`, che è il default di Debian e lo blocca. Da
   confermare col comando in fondo; cura `mktemp`.
-- **B6 — La risposta dello sconto si legge tutta in memoria:** `ask_server`
+- **B6 — La risposta dello sconto si legge tutta in memoria** (✅ patch
+  scritta il 1 ott 2026, cura 9: tetto di 64 KB letto a pezzi; sale col
+  prossimo giro del nodo)**:** `ask_server`
   (`barattolo_fee.rs:136`) fa `response.text()` senza tetto. Un server
   compromesso che risponde con un corpo da gigabyte lo fa scaricare a mostrod
   dentro il ciclo seriale. Cura: `Content-Length` sopra 64 KB = no.

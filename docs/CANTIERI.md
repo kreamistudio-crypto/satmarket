@@ -33996,3 +33996,81 @@ avrebbe un giro dal vivo, e un Woo vero non è nel perimetro (vedi
 dopo il deploy dice la verità: `journalctl -u barattolo | grep
 Connettore`); la memoria del VPS con due riconciliazioni di seguito.
 
+
+## CSP e le voci aperte degli audit — 9) le patch Rust e i /tmp del nodo, scritte oggi e in attesa del prossimo giro del nodo (1 ott 2026)
+
+Tre voci degli audit vivono nel fork di Mostro e una nelle ronde del
+nodo: per decisione di Andrea si SCRIVONO oggi e SALGONO col prossimo
+giro del nodo (la prossima immagine `-bar7`, con la liturgia di
+PRODUZIONE «LA SALITA A MOSTRO 0.19.0»). ⚠️ NIENTE È STATO COMPILATO
+SUL PC (non c'è `cargo`), come per le otto patch di prima: il primo
+`cargo build`/`cargo test` è quello del nodo.
+
+**M4 — l'interruttore della domanda dello sconto (`barattolo_fee.rs`).**
+La domanda a `/api/p2p/sconto` gira nel ciclo seriale di mostrod con un
+budget di 12 s: a Barattolo giù ogni presa costava 12 s a TUTTO il
+coordinatore, e una raffica di prese da chiavi usa-e-getta lo teneva
+fermo gratis. Adesso un interruttore: dopo `BREAKER_FAILS` (3)
+fallimenti di fila la domanda si salta per `BREAKER_PAUSE` (60 s) — fee
+piena, il fail-closed di sempre — e poi si riprova; un successo azzera
+il conto. La metà pura è `breaker_after(fails, now, ok)`, con la sua
+prova unitaria; lo stato in due atomici (`FAILS`, `PAUSED_UNTIL`). Il
+budget resta 12 s: col battito a 60 s il circuito è caldo e la domanda
+costa un secondo; scenderlo avrebbe fatto pagare a fee piena la prima
+presa dopo un circuito freddo.
+
+**B6 — il tetto alla risposta dello sconto (`barattolo_fee.rs`).**
+`ask_server` leggeva `response.text()` senza tetto: un server
+compromesso con una risposta da gigabyte la faceva scaricare a mostrod
+dentro il ciclo seriale. Adesso `MAX_ANSWER_BYTES` (64 KB): si rifiuta
+un `Content-Length` sopra, e il corpo si legge A PEZZI (`chunk()`)
+fermandosi al tetto — un corpo chunked senza lunghezza non si ingoia
+intero.
+
+**M6 — via il ripiego del segreto degli eventi (`barattolo_eventi.rs`).**
+`ENV_SECRET_FALLBACK`: senza `BARATTOLO_EVENTI_SEGRETO` sul nodo gli
+eventi usavano il segreto dello sconto, cioè i due segreti erano uno e
+chi leggeva quello dello sconto fabbricava eventi («sats in garanzia» a
+chi sta per mandare euro). Adesso `endpoint_from(url, secret)`: senza
+il SUO segreto gli eventi sono SPENTI. La prova unitaria rovesciata:
+«only its own secret and no fallback on the 0005 one». ⚠️ PRIMA DI
+SALIRE, sul nodo: `docker compose exec mostro sh -c 'env | grep -o
+"^BARATTOLO_[A-Z_]*"'` deve elencare `BARATTOLO_EVENTI_SEGRETO`, o dal
+giro dopo gli avvisi dello scambio tacciono.
+
+**B5 — i nomi fissi in `/tmp` delle ronde (`ronda-liquidita.sh`,
+`ronda-tor.sh`).** Scritti da root con nomi fissi: su un host con un
+utente non root (su LNVPS c'è `debian`) un symlink piazzato prima
+farebbe scrivere root altrove, a meno di `fs.protected_symlinks=1`.
+Adesso `mktemp -d` con `trap` di pulizia (liquidità: il percorso passa
+al Python per `TMPD`) e `mktemp` per il file del FORWARD di tor. ⚠️ Gli
+script vanno RICOPIATI sul nodo (`/usr/local/bin/`), come ogni ronda.
+
+**LE OTTO PATCH RIFATTE, come il 30 set.** I due moduli `.rs` sono
+cambiati, e le `.patch` 0005 e 0007 li portano dentro: gli otto patcher
+sono stati fatti girare in fila sul PC su un clone PULITO della
+`v0.19.0` (`d53e41d`, `-c core.autocrlf=false`), un commit per patch
+col messaggio di prima, `git format-patch` a esportarle; nel repo si
+sono innestati i SOLI diff cambiati (0005, 0007 e la 0008, che tocca
+`barattolo_eventi.rs` e ne eredita il contesto spostato) dentro le
+`.patch` di prima, con gli stessi header e lo stesso messaggio — le
+altre cinque hanno il diff byte per byte uguale. VERIFICATO IN DUE STRADE: `git am` delle
+otto nuove su un secondo clone pulito dà l'albero dei patcher
+(`f9b656a…`), e `git am` delle otto DEL REPO (sei di prima più le due
+innestate) su un terzo clone dà lo STESSO albero.
+
+**COSA DEVE FARE ANDREA SUL NODO, al prossimo giro:** la liturgia
+`-bar7` di PRODUZIONE («LA SALITA A MOSTRO 0.19.0», stessi passi: le
+otto `.patch` via scp, `git am`, `cargo test` sui moduli
+`barattolo_fee` e `barattolo_eventi` — i due test nuovi si chiamano
+`the_breaker_pauses_after_three_failures_and_resets_on_success` e
+`only_its_own_secret_and_no_fallback_on_the_0005_one` —, l'immagine,
+il compose); prima il controllo di `BARATTOLO_EVENTI_SEGRETO`; e le due
+ronde ricopiate.
+
+**PROVATO.** Solo quel che si può senza `cargo`: `bash -n` sulle due
+ronde; le otto `.patch` applicate con `git am` su due cloni puliti con
+l'albero identico ai patcher. **Non provato:** la compilazione e i test
+Rust (sul nodo), e l'interruttore dal vivo (lo si vede nel journal di
+mostrod: «discount lookup paused for 60s»).
+
