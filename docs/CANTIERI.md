@@ -33935,3 +33935,64 @@ lat/lon e `prova`, tiene ora e distanza.
 coordinatore vero (presa, decisione firmata, un ordine tornato nel
 libro e ripreso: la seconda coppia che fa «Siamo insieme»).
 
+
+## CSP e le voci aperte degli audit — 8) i negozi collegati fuori dal ciclo principale (1 ott 2026)
+
+La riverifica del 1 ott, sui negozi collegati (WooCommerce, Shopify).
+Le guardie c'erano — Shopify con l'host forzato a `*.myshopify.com`,
+Woo con `url_api_ammesso` (solo https:443, IP pubblico), niente
+redirect, 5 MB, 15 s, le credenziali cifrate con Fernet e mai nei log
+— ma tre cose stavano nel posto sbagliato. 1) `riconcilia_connettore`
+(coi download delle foto e Pillow dentro) girava NEL CICLO PRINCIPALE,
+chiamata sincrona da una funzione async: finché scaricava, il server
+non rispondeva a nessuno. 2) `sincronizza_connettori` girava DENTRO
+`orologio()` e senza scadenza: un catalogo lento teneva fermi i passi
+dopo (scadenze, pagamenti in volo, ritentativi dei payout). 3)
+`_variazioni_woo` paginava all'infinito, e Shopify con un `Link: next`
+su una pagina vuota pure. E sul VPS i negozi sono aperti a tutti
+(`CONNETTORI_NEGOZIO_APERTI` e `_PER_TUTTI`, parola di Andrea): l'URL
+lo scrive il venditore, quindi i tre guasti erano a portata di chiunque.
+
+**LA CURA.** 1) La riconciliazione in un thread (`asyncio.to_thread`),
+con la connessione sqlite che nasce e muore lì dentro. 2) La LETTURA
+con una scadenza: `asyncio.wait_for` a `CONNETTORI_LETTURA_MAX_S` (600
+s: dieci minuti bastano a duecento prodotti con le varianti anche da un
+negozio lento); scaduta, si conta come un errore di lettura (a soglia
+il collegamento si dichiara rotto, come per un 500), e il thread che
+leggeva finisce da solo e il suo risultato si butta — era in sola
+lettura. 3) Il giro in un task suo: l'orologio LANCIA
+`sincronizza_connettori_in_sfondo()` con `create_task` e va avanti; uno
+alla volta (`_SYNC_CONNETTORI_VIVO`: se il giro di un'ora fa gira
+ancora, questo non parte). 4) I tetti alle pagine in
+`importa_negozio.py`: `MAX_PAGINE_VARIAZIONI_WOO` (10 pagine, mille
+varianti per prodotto) e `MAX_PAGINE_CATALOGO` (50, cinquemila
+prodotti) — oltre si ALZA, come su una risposta storta: un giro che
+fallisce si conta e si riprova fra un'ora, una lista a metà mai (è il
+patto del lettore: le sparizioni si giudicano solo su un catalogo
+completo).
+
+**LE STRADE SCARTATE.** `wait_for` sull'intero giro del connettore:
+cancellerebbe la riconciliazione a metà scrittura, e il guardiano «uno
+alla volta per collegamento» si libererebbe con un thread ancora
+vivo. Un tetto alle pagine più stretto: duecento prodotti stanno in
+due pagine, mille varianti è già un prodotto strano, ma un negozio
+vero con cinquecento varianti esiste. Il freno sulle prove manuali di
+`/api/me/connettori`: cura 4.
+
+**PROVATO.** `prove_negozi_fuori_dal_ciclo` (9): i lettori VERI di
+`importa_negozio` con un negozio di cartone che non finisce mai — le
+variazioni alzano dopo esattamente il tetto di pagine, Shopify col
+`next` su una pagina vuota alza al tetto, i tetti larghi, il catalogo
+Woo col suo; le sentinelle sul thread (con la connessione nata lì), la
+scadenza che si conta come errore, i dieci minuti, il task uno alla
+volta, l'orologio che lancia senza aspettare. Le nove sezioni dei
+connettori rigirate verdi (il banco di `prove_connettore_interrompibile`
+conosce la scadenza). Tortura 10 su 10 sulla copia. Non c'è
+un giro dal vivo: il negozio di cartone del banco è lo stesso che
+avrebbe un giro dal vivo, e un Woo vero non è nel perimetro (vedi
+«Cosa non ho provato»).
+
+**COSA NON HO PROVATO.** Un WooCommerce vero (il primo giro sul VPS
+dopo il deploy dice la verità: `journalctl -u barattolo | grep
+Connettore`); la memoria del VPS con due riconciliazioni di seguito.
+
