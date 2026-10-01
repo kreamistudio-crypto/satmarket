@@ -33531,3 +33531,63 @@ in produzione; qui il nodo è di cartone): alla prima vendita con
 incasso automatico dopo il deploy il journal deve dire la solita riga
 del payout, e non «Scartata».
 
+
+## La spunta del rimborso nel dettaglio dell'ordine (1 ott 2026)
+
+Prova vera di Andrea: l'ordine 203, annullato dal venditore
+(`f921497`), `refunded` con `payout_stato` uscito e i sats arrivati a
+chi aveva comprato. In «I tuoi ordini» il venditore leggeva
+«Rimborsato», nel dettaglio l'ultimo passo «Sats rimborsati
+all'acquirente» restava «adesso» (il cerchio tratteggiato), senza la
+spunta. DUE difetti nello stesso stepper di `openOrder`:
+1) nell'annullo del venditore `progress` era `{refund:1, refunded:2}`
+su tre passi — sfasato di uno: a `refunded` il pallino stava
+sull'ultimo passo, a `refund` sul gesto dell'annullo già fatto;
+2) nella storia della disputa il `+ (o.tracking ? 1 : 0)` era rimasto
+staccato DOPO la graffa del blocco dell'annullo (inserito in mezzo alla
+somma in `2cb6de0`): l'a-capo prima dell'`if` chiude l'assegnazione e
+il «+» diventa un'istruzione morta. Effetto: su una disputa decisa dal
+moderatore CON un tracciamento il rimborsato restava senza spunta, e in
+disputa il pallino «adesso» stava un passo indietro. La sentinella di
+allora cercava il TESTO della somma e passava col pezzo morto.
+
+**LA CURA.** La somma torna in una riga sola, prima dell'annullo;
+l'annullo va a `{refund:2, refunded:3}`. L'ultimo passo è UNO per le
+due storie, `passoRimborso(o, s, perChiCompra, perGliAltri)`: a
+`refund` dice «Rimborso dei tuoi sats» / «Rimborso all'acquirente» —
+«In attesa: i sats non sono ancora usciti» (prima diceva già «Ti
+abbiamo rimborsato» su un passo non ancora successo); a `refunded` le
+parole di sempre più la DATA dell'uscita, « · il 1 ottobre 2026».
+La data è `aggiornato`, solo su `refunded` (`rimborsatoIl` in
+mapOrder): `_rimborsa_compratore` lo scrive nello STESSO update che
+porta a `refunded`, e su uno stato assorbente nessuno lo tocca più —
+è già l'ancora della finestra che purga gli indirizzi. Nessuna colonna
+nuova, nessun tocco al server. Quando il client gira lo stato da sé
+(il toast «Rimborso in arrivo») la data manca fino alla rilettura: la
+spunta c'è lo stesso. Negli stati di prima (disputa, reso) l'ultimo
+passo resta com'era.
+
+**PROVATO.** `prove_spunta_rimborso` (43): sei sentinelle (la somma
+nella stessa istruzione e nessun «+» dopo una graffa, il passo unico
+usato due volte, la resa dei passi che il banco imita, la data da
+`aggiornato` solo su `refunded`, l'update del server) e il banco node
+con lo stepper VERO estratto da `openOrder`: annullo e disputa ×
+compratore, venditore, moderatore × con e senza tracciamento × rimborsato
+con la data, rimborsato senza data, in attesa — più disputa e reso col
+pallino al posto di sempre, col tracciamento e senza. Emendata la
+sentinella di `prove_annullo_venditore` sugli indici. Tortura 6 su 6
+sulla copia (gli indici vecchi, il «+» staccato di nuovo, niente data,
+`refund` senza attesa, la data da `creato`, l'ultimo passo tolto).
+Suite intera severa senza config nel worktree: da origin/main (5ae9573) 18.135 verdi e 0
+rosse; i 30 collaudi della CI verdi nella gabbia. Ribasato su `48ee607`
+(solo documenti): le due sezioni toccate e le dieci che leggono
+CLAUDE.md e i documenti, 761 verdi. DAL VIVO
+sulla copia in collaudo (relay morto) via Chrome headless a 375 px,
+densità 3, chiaro e scuro, venditore 222 e compratore 111, quattro
+ordini seminati (annullo rimborsato e in attesa, disputa col
+tracciamento rimborsata e in attesa): sedici scatti, la spunta e la
+data dove il rimborso è uscito, il cerchio tratteggiato «in attesa»
+dove no, nessuno scorrimento laterale.
+
+**DA GUARDARE.** L'ordine 203 dopo il deploy: dai due lati, la spunta e
+la data del 1 ottobre.

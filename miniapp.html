@@ -14029,6 +14029,11 @@ function mapOrder(o){
        ordine normale. */
     annullatoDalVenditore:o.annullato_venditore_il||0,
     motivoAnnullo:o.motivo_annullo||'', notaAnnullo:o.nota_annullo||'',
+    /* QUANDO IL RIMBORSO E' USCITO (1 ott 2026): su 'refunded' e'
+       `aggiornato`, scritto nello STESSO update che chiude l'ordine
+       (_rimborsa_compratore) e mai piu' toccato dopo — e' la stessa
+       ancora della finestra che purga gli indirizzi. Altrove 0. */
+    rimborsatoIl:o.stato==='refunded' ? (o.aggiornato||0) : 0,
     /* LA PORTA DEL TIMER (ago 2026): quando uno sblocco AUTOMATICO e'
        passato di qui (0 = mai). Su 'confirmed' dice che a chiudere
        l'affare e' stato il TEMPO e non una persona */
@@ -29798,16 +29803,22 @@ function openOrder(id){
         : {t:'Decisione del moderatore', d:s==='dispute'?'Il moderatore sta esaminando il caso'
             : (o.role==='buyer' ? 'Disputa risolta a tuo favore'
                                 : 'Disputa risolta a favore dell\'acquirente')},
-      o.role==='buyer'
-        ? {t:'Ti abbiamo rimborsato i sats', d:'Rimborso integrale, nessuna commissione'}
-        : {t:'Sats rimborsati all\'acquirente', d:'Rimborso integrale, l\'annuncio torna in vetrina'},
+      passoRimborso(o, s, 'Rimborso integrale, nessuna commissione',
+                          'Rimborso integrale, l\'annuncio torna in vetrina'),
     ];
     /* `progress` e' un INDICE dentro `steps` (vedi il render piu'
        sotto), quindi il passo della spedizione, quando c'e', sposta
        di uno tutti quelli che vengono dopo. Chi aggiunge un passo
        qui e si dimentica questa riga accende il pallino sul passo
        sbagliato, che e' un difetto che non si vede leggendo. */
+    /* IL «+» STACCATO (1 ott 2026, dal campo: ordine 203): la somma qui
+       sotto stava a cavallo del blocco dell'annullo, con l'`if` in
+       mezzo — l'a-capo chiudeva l'assegnazione e il «+ (o.tracking ...)»
+       restava una riga morta dopo la graffa. Con un tracciamento il
+       pallino del rimborsato si fermava sul passo del rimborso, senza
+       spunta. La somma sta in una riga sola, PRIMA dell'annullo. */
     progress = {dispute:2, return_pending:2, return_shipped:2, refund:3, refunded:4}[s]
+             + (o.tracking ? 1 : 0);
     /* L'ANNULLO DEL VENDITORE (1 ott 2026) racconta un'altra storia con
        gli stessi stati: nessuna disputa, nessun moderatore, nessun
        pacco — il deposito, il gesto di chi vende col suo motivo, i sats
@@ -29819,13 +29830,15 @@ function openOrder(id){
         passoDeposito,
         {t:o.role==='seller' ? 'Hai annullato l\'ordine' : 'Il venditore ha annullato l\'ordine',
          d:`Motivo: ${esc(motivoAnnulloTesto(o))}`},
-        o.role==='buyer'
-          ? {t:'Ti abbiamo rimborsato i sats', d:'Rimborso integrale, spedizione compresa'}
-          : {t:'Sats rimborsati all\'acquirente', d:'Rimborso integrale, spedizione compresa'},
+        passoRimborso(o, s, 'Rimborso integrale, spedizione compresa',
+                            'Rimborso integrale, spedizione compresa'),
       ];
-      progress = {refund:1, refunded:2}[s];
+      /* il pallino sta sul passo che ASPETTA: a 'refund' l'annullo e'
+         fatto e manca l'uscita (indice 2), a 'refunded' e' tutto fatto
+         (3, oltre l'ultimo). Era {refund:1, refunded:2}: il rimborsato
+         restava «adesso», senza la spunta. */
+      progress = {refund:2, refunded:3}[s];
     }
-             + (o.tracking ? 1 : 0);
   } else {
     /* la finestra di conferma del digitale e' corta: il codice si
        prova subito (il gemello delle 72 ore del fisico). I numeri
@@ -35857,6 +35870,28 @@ const MOTIVI_ANNULLO_VENDITORE = {
 function annulloVenditore(o){
   return !!(o && o.annullatoDalVenditore
             && ['refund','refunded','annullato'].includes(o.state));
+}
+/* PURA: L'ULTIMO PASSO DELLO STEPPER DEL RIMBORSO (1 ott 2026, dal
+   campo: ordine 203, annullato dal venditore, rimborso uscito — nella
+   lista «Rimborsato», nel dettaglio il passo finale senza spunta). UNO
+   per le due storie, la disputa decisa dal moderatore e l'annullo del
+   venditore, che cambiano solo la riga sotto (`perChiCompra`,
+   `perGliAltri`). A 'refund' i sats non sono ancora usciti e il passo
+   lo dice, «in attesa»; a 'refunded' e' il fatto, con la DATA
+   dell'uscita quando la conosciamo (`rimborsatoIl`, vedi mapOrder). Negli
+   stati di prima (disputa, reso) il passo e' ancora da venire e resta
+   com'era. */
+function passoRimborso(o, s, perChiCompra, perGliAltri){
+  const compra = o.role==='buyer';
+  if (s==='refund') return {
+    t: compra ? 'Rimborso dei tuoi sats' : 'Rimborso all\'acquirente',
+    d: 'In attesa: i sats non sono ancora usciti'};
+  const quando = (s==='refunded' && o.rimborsatoIl)
+    ? ` · il ${new Date(o.rimborsatoIl*1000).toLocaleDateString('it-IT',
+        {day:'numeric', month:'long', year:'numeric'})}` : '';
+  return compra
+    ? {t:'Ti abbiamo rimborsato i sats', d:perChiCompra + quando}
+    : {t:'Sats rimborsati all\'acquirente', d:perGliAltri + quando};
 }
 /* PURA: il motivo in parole, con la nota di «altro». Testo NUDO: chi lo
    mette nel markup lo scappa. */

@@ -115974,7 +115974,7 @@ def prove_annullo_venditore():
           "if (annulloVenditore(o)) {" in bottone
           and bottone.index("if (annulloVenditore(o)) {")
           > bottone.index("progress = {dispute:2, return_pending:2")
-          and "progress = {refund:1, refunded:2}[s];" in bottone)
+          and "progress = {refund:2, refunded:3}[s];" in bottone)
     prova("la testa di 'refund' e 'refunded' e la nota del rimborsato "
           "distinguono l'annullo dalla disputa", [True] * 3,
           ["Il venditore ha annullato: scegli qui sotto" in bottone,
@@ -116089,6 +116089,156 @@ console.log(JSON.stringify({
            {"corpo": {"motivo": "esaurito", "nota": "", "esauriti": []}},
            {"corpo": {"motivo": "spedizione", "nota": "", "esauriti": []}}],
           e["corpi"])
+
+
+def prove_spunta_rimborso():
+    """LA SPUNTA DEL RIMBORSO NEL DETTAGLIO DELL'ORDINE (1 ott 2026, dal
+    campo: ordine 203, annullato dal venditore, rimborso uscito — nella
+    lista «Rimborsato», nel dettaglio l'ultimo passo senza spunta).
+
+    Due difetti nello stesso stepper: nell'annullo del venditore gli
+    indici erano sfasati di uno ({refund:1, refunded:2} su tre passi:
+    il rimborsato restava «adesso»), e nella storia della disputa il
+    «+ (o.tracking ? 1 : 0)» era rimasto staccato dopo la graffa
+    dell'annullo — una riga morta, e con un tracciamento il pallino del
+    rimborsato si fermava sul passo del rimborso. La sentinella di
+    allora cercava il TESTO della somma e passava anche col pezzo morto:
+    per questo qui il banco node fa girare lo stepper VERO, estratto da
+    openOrder, e guarda cosa si accende davvero."""
+    print("\n[la spunta del rimborso nel dettaglio dell'ordine]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    srv = open("server.py", encoding="utf-8").read()
+
+    # ---- 1. le sentinelle: dove stanno i pezzi ----------------------
+    oo = mini[mini.index("function openOrder(id){"):]
+    oo = oo[:oo.index("\n}\n")]
+    prova("la somma del tracciamento sta nella STESSA istruzione della "
+          "disputa, prima dell'annullo", True,
+          "refund:3, refunded:4}[s]\n             + (o.tracking ? 1 : 0);"
+          in oo.replace("\r\n", "\n")
+          and oo.index("+ (o.tracking ? 1 : 0);")
+          < oo.index("if (annulloVenditore(o)) {"))
+    prova("...e nessuna riga che comincia col «+» dopo una graffa", False,
+          "}\n             + (o.tracking" in oo.replace("\r\n", "\n"))
+    prova("l'ultimo passo e' UNO per le due storie", 2,
+          oo.count("passoRimborso(o, s, "))
+    prova("la resa dei passi e' quella che il banco imita", True,
+          "${i<progress?'done':i===progress?'now':'todo'}" in oo)
+    prova("la data viene da `aggiornato` e SOLO su 'refunded'", True,
+          "rimborsatoIl:o.stato==='refunded' ? (o.aggiornato||0) : 0," in mini)
+    # ...e lato server `aggiornato` e' l'uscita: scritto nello stesso
+    # update che porta a 'refunded'
+    i = srv.index("UPDATE ordini SET stato='refunded', cambio_eur=?, ")
+    prova("il server scrive `aggiornato` nell'update che chiude il rimborso",
+          True, "aggiornato=? WHERE id=?" in srv[i:i + 160])
+
+    # ---- 2. il banco: lo stepper vero, caso per caso ----------------
+    node = _sh.which("node")
+    if not node:
+        salta("lo stepper del rimborso, eseguito", "node non c'e'")
+        return
+    blocco = oo[oo.index("  const passoDeposito = s==='creato'"):
+                oo.index("  /* Le frasi di chiusura parlano a CHI legge")]
+    js = ("const esc = x => String(x);\n"
+          "const codiceTracking = (o, s) => o.tracking;\n"
+          "const rigaCorretto = () => '';\n"
+          "const inPagamento = () => false;\n"
+          "const dataAppuntamento = () => '';\n"
+          "const TEMPI = {confermaDig: 72};\n"
+          + pezzo_js(mini, "const MOTIVI_ANNULLO_VENDITORE = {", "};\n") + "};\n"
+          + pezzo_js(mini, "function annulloVenditore(o){", "\n}\n") + "\n}\n"
+          + pezzo_js(mini, "function passoRimborso(o, s, perChiCompra, perGliAltri){",
+                     "\n}\n") + "\n}\n"
+          + pezzo_js(mini, "function motivoAnnulloTesto(o){", "\n}\n") + "\n}\n"
+          + "function stepper(o){ const s = o.state;\n" + blocco
+          + "\n  return steps.map((st,i) => [i<progress?'done':i===progress?'now':'todo', st.t, st.d]); }\n"
+          + "const casi = JSON.parse(process.argv[2]);\n"
+          + "console.log(JSON.stringify(casi.map(stepper)));\n")
+    QUANDO = 1790856000          # 1 ott 2026, mezzogiorno UTC
+    casi, attesi = [], []
+    for storia in ("annullo", "disputa"):
+        for ruolo in ("buyer", "seller", "admin"):
+            for tracking in ("", "RR123456789IT"):
+                base = {"role": ruolo, "tracking": tracking,
+                        "corriere": "Poste" if tracking else "",
+                        "annullatoDalVenditore": 1790850000 if storia == "annullo" else 0,
+                        "motivoAnnullo": "esaurito" if storia == "annullo" else ""}
+                ultimo_fatto = ("Ti abbiamo rimborsato i sats" if ruolo == "buyer"
+                                else "Sats rimborsati all'acquirente")
+                ultimo_attesa = ("Rimborso dei tuoi sats" if ruolo == "buyer"
+                                 else "Rimborso all'acquirente")
+                # rimborsato, con la data: tutto fatto, l'ultimo con la data
+                casi.append(dict(base, state="refunded", rimborsatoIl=QUANDO))
+                attesi.append(("tutti fatti", ultimo_fatto, " · il 1 ottobre 2026"))
+                # rimborsato senza data (il client che l'ha appena girato
+                # da se'): la spunta c'e' lo stesso, la data no
+                casi.append(dict(base, state="refunded", rimborsatoIl=0))
+                attesi.append(("tutti fatti", ultimo_fatto, None))
+                # in attesa: tutti fatti tranne l'ultimo, che e' «adesso»
+                casi.append(dict(base, state="refund", rimborsatoIl=0))
+                attesi.append(("ultimo adesso", ultimo_attesa,
+                               "In attesa: i sats non sono ancora usciti"))
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as f:
+        f.write(js)
+    try:
+        out = _sp.run([node, f.name, _json.dumps(casi)], capture_output=True,
+                      encoding="utf-8", timeout=60)
+        avuti = _json.loads(out.stdout or "null") or out.stderr[-400:]
+    except Exception as e:
+        avuti = f"node e' esploso: {e}"
+    finally:
+        os.unlink(f.name)
+    if not isinstance(avuti, list):
+        prova("lo stepper del rimborso gira nel banco", "una lista", avuti)
+        return
+    for caso, att, passi in zip(casi, attesi, avuti):
+        nome = (f"{'annullo' if caso['annullatoDalVenditore'] else 'disputa'}"
+                f"{' col tracciamento' if caso['tracking'] else ''}, "
+                f"{caso['role']}, {caso['state']}"
+                f"{' con la data' if caso.get('rimborsatoIl') else ''}")
+        stati = [p[0] for p in passi]
+        forma = ("tutti fatti" if set(stati) == {"done"}
+                 else "ultimo adesso" if stati == ["done"] * (len(stati) - 1) + ["now"]
+                 else stati)
+        riga = passi[-1][2] or ""
+        dove = (riga.endswith(att[2]) if att[2] and att[2].startswith(" · ")
+                else riga == att[2] if att[2]
+                else " · il " not in riga)
+        prova(nome, (att[0], att[1], True), (forma, passi[-1][1], dove))
+
+    # ---- 3. gli stati di prima non si muovono -----------------------
+    # in disputa e nel reso il pallino resta sul passo di sempre, anche
+    # col tracciamento (che prima del «+» staccato contava, e ora conta
+    # di nuovo)
+    prima = []
+    for st, adesso in (("dispute", "Decisione del moderatore"),
+                       ("return_pending", "Restituzione dell'oggetto"),
+                       ("return_shipped", "Restituzione dell'oggetto")):
+        for tracking in ("", "RR123456789IT"):
+            prima.append((st, tracking, adesso))
+    casi2 = [{"role": "buyer", "state": st, "tracking": tr,
+              "corriere": "Poste" if tr else "", "annullatoDalVenditore": 0}
+             for st, tr, _ in prima]
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as f:
+        f.write(js)
+    try:
+        out = _sp.run([node, f.name, _json.dumps(casi2)], capture_output=True,
+                      encoding="utf-8", timeout=60)
+        avuti2 = _json.loads(out.stdout or "null") or out.stderr[-400:]
+    except Exception as e:
+        avuti2 = f"node e' esploso: {e}"
+    finally:
+        os.unlink(f.name)
+    prova("disputa e reso: il pallino sul passo di sempre, col tracciamento "
+          "e senza", [x[2] for x in prima],
+          [next((p[1] for p in passi if p[0] == "now"), None) for passi in avuti2]
+          if isinstance(avuti2, list) else avuti2)
 
 
 def prove_csp_prova():
@@ -116462,7 +116612,8 @@ def main():
               prove_senza_condizione, prove_sottocategorie,
               prove_ricategorizza, prove_collaudo_ricategorizza,
               prove_asta, prove_proxy_asta,
-              prove_annullo, prove_annullo_venditore, prove_abbandonati,
+              prove_annullo, prove_annullo_venditore, prove_spunta_rimborso,
+              prove_abbandonati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
               prove_initdata, prove_portachiavi,
               prove_foto, prove_foto_scarti,
