@@ -44072,6 +44072,13 @@ function firmatarioEstensione(){
    anche tre relay lenti si leggono, invece di sembrare un'app
    piantata. */
 const BUNKER_CONNETTI_MS = 15000;
+/* LA GRAZIA DEL CORO (1 ott 2026): dal primo relay che si connette,
+   quanto si aspettano gli altri prima di partire. Damus, nos.lol e i
+   relay di serie di Amber rispondono in un decimo di secondo da qui
+   (misurato); un relay morto costa i 15 secondi qui sopra, e la
+   grazia e' quel che impedisce a UN morto di tenere fermo il codice.
+   Chi arriva dopo si chiude: vedi apriStanzeNip46. */
+const NIP46_GRAZIA_MS = 2500;
 
 /* I PERMESSI CHE CHIEDIAMO AL FIRMATARIO, in un posto solo: le firme
    che questa app sa chiedere sono DUE — la sfida del login (22242) e
@@ -44088,56 +44095,134 @@ const NIP46_PERMESSI = 'sign_event:22242,sign_event:30402';
    telefonate lo facciamo a mano coi suoi mattoni: sono tre chiamate.
    Con skHex si RIUSA la chiave client di una sessione già approvata
    (conservata in localStorage, vedi ricordaBunker): il bunker ci
-   riconosce e non rifà il rito dell'autorizzazione. */
-async function firmatarioBunker(uri, skHex){
+   riconosce e non rifà il rito dell'autorizzazione.
+
+   LA STANZA E' UN CORO DI RELAY (1 ott 2026, dal campo: «se il primo
+   non risponde deve poter interrogare il secondo e così via»). Fino a
+   ieri ci si agganciava al PRIMO relay che accettava la websocket e
+   si parlava solo con lui — e un relay può accettare la connessione e
+   poi tacere per sempre: `relay.damus.io`, misurato da qui, apre in
+   mezzo secondo e non risponde a NESSUNA richiesta, nemmeno sul kind
+   1. Con la regola di ieri il primo posto della lista era una
+   trappola: si aspettavano i due minuti del timeout umano e si
+   cadeva, senza mai provare il secondo. Adesso ci si connette a TUTTI
+   i relay della URI insieme (`apriStanzeNip46`), si ascolta su tutti,
+   ogni richiesta parte su tutti, e la prima risposta che arriva vale
+   (le copie si scartano per id). Un relay che chiude l'ascolto esce
+   dal coro; si cade solo quando il coro è vuoto. E' quel che fanno i
+   client NIP-46 di riferimento (nostr-tools, Amber stesso), ed è la
+   NIP-46 letta per intero: «via the specified relays», al plurale. */
+
+/* IL CORO SI APRE IN PARALLELO, e si parte appena c'è una voce: ogni
+   relay si chiama insieme agli altri col suo timeout, e si va avanti
+   quando TUTTI hanno risposto oppure — dal primo che si connette —
+   dopo NIP46_GRAZIA_MS. La grazia esiste perché un relay morto costa
+   i 15 secondi del timeout, e con la sola «aspetto tutti» il codice
+   comparirebbe dopo quindici secondi ogni volta che uno della lista
+   non c'è (misurato ad ago 2026 con nsec.app in testa). Chi si
+   connette DOPO la grazia si chiude subito: la stanza è esattamente
+   l'elenco che si scrive nella URI e su cui si ascolta, mai di più —
+   o il telefono potrebbe rispondere su un relay che nessuno ascolta.
+   IL TIMEOUT SI OTTIENE SOLO COSTRUENDO IL RELAY A MANO, ed è la riga
+   da non «semplificare» tornando alla factory statica: quella passa
+   le opzioni al COSTRUTTORE e poi chiama `relay.connect()` SENZA
+   argomenti, quindi il suo `opts?.timeout` è per sempre undefined. E
+   senza timeout, se la socket resta appesa in CONNECTING — un exit
+   node che scarta i pacchetti, un relay morto — quella promise NON SI
+   RISOLVE MAI: era il buco, «Chiamo il bunker…» e poi silenzio. */
+async function apriStanzeNip46(relays){
+  const NT = window.NostrTools;
+  const vive = [], rifiuti = [];
+  let tardi = false, primaVoce;
+  const prima = new Promise(ok => { primaVoce = ok; });
+  const tutte = Promise.allSettled(relays.map(async (r) => {
+    const relay = new NT.Relay(r);
+    try {
+      await relay.connect({timeout: BUNKER_CONNETTI_MS});
+      if (tardi) {
+        console.log(`🟪 [coro] ${r} è arrivato dopo la grazia: lo chiudo`);
+        try { relay.close(); } catch(_){}
+        return;
+      }
+      vive.push({url: r, relay});
+      console.log(`🟪 [coro] relay connesso: ${r}`);
+      primaVoce();
+    } catch(e){
+      /* sul timeout la libreria rigetta con una STRINGA e sul resto
+         con un Error: `e?.message || String(e)` li prende tutti e due */
+      const motivo = e?.message || String(e);
+      rifiuti.push(`${r} → ${motivo}`);
+      console.log(`🟪 [coro] relay non raggiungibile: ${r} (${motivo})`);
+    }
+  }));
+  await Promise.race([tutte,
+    prima.then(() => new Promise(ok => setTimeout(ok, NIP46_GRAZIA_MS)))]);
+  tardi = true;
+  return {vive, rifiuti};
+}
+
+/* IL CIFRARIO LO SCEGLIE CHI RISPONDE (1 ott 2026). La NIP-46 dice
+   NIP-44 e noi scriviamo in NIP-44 — Amber risponde in NIP-44, letto
+   nel suo sorgente — ma un firmatario di ieri risponde in NIP-04, e
+   fino a oggi quella risposta finiva nel «non era per noi» in
+   silenzio. Si prova NIP-44 e poi NIP-04; dal primo messaggio che si
+   apre in NIP-04 anche le NOSTRE richieste passano a NIP-04, perché
+   chi parla una lingua sola non legge l'altra. Senza `pubRemota` (il
+   QR: il mittente non si conosce in anticipo, è proprio quel che si
+   aspetta di scoprire) la chiave di conversazione si deriva da CHI
+   HA SCRITTO. Un contenuto che non si apre in nessuno dei due modi
+   è un messaggio per qualcun altro: null, e si resta in ascolto. */
+function cifrarioNip46(NT, skLocale, pubRemota, modoIniziale){
+  let modo = modoIniziale === 'nip04' ? 'nip04' : 'nip44';
+  const chiave44 = (pub) => NT.nip44.getConversationKey(skLocale, pub);
+  const fissa = pubRemota ? chiave44(pubRemota) : null;
+  return {
+    get modo(){ return modo; },
+    scrivi(testo, pub){
+      const a = pub || pubRemota;
+      return modo === 'nip04' ? NT.nip04.encrypt(skLocale, a, testo)
+                              : NT.nip44.encrypt(testo, fissa || chiave44(a));
+    },
+    leggi(ev){
+      try {
+        return JSON.parse(NT.nip44.decrypt(ev.content, fissa || chiave44(ev.pubkey)));
+      } catch(e){}
+      try {
+        const msg = JSON.parse(NT.nip04.decrypt(skLocale, ev.pubkey, ev.content));
+        if (modo !== 'nip04') {
+          modo = 'nip04';
+          console.log('🟪 [bunker] il firmatario parla NIP-04: da qui in poi anche noi');
+        }
+        return msg;
+      } catch(e){ return null; }       // non era per noi
+    },
+  };
+}
+
+async function firmatarioBunker(uri, skHex, modoCifrario){
   await caricaNostrTools();
   const NT = window.NostrTools;
   const m = uri.trim().match(/^bunker:\/\/([0-9a-f]{64})\??(.*)$/i);
   if (!m) throw new Error('URI bunker:// non valida');
   const bunkerPub = m[1].toLowerCase();
   const par = new URLSearchParams(m[2]);
-  const relays = par.getAll('relay');
+  const relays = [...new Set(par.getAll('relay'))];
   if (!relays.length) throw new Error('la URI non indica nessun relay');
   console.log(`🟪 [bunker] URI ok (${bunkerPub.slice(0,8)}…), relay: ${relays.join(' ')}`
     + (skHex ? ' — riuso la sessione conservata' : ''));
   const skLocale = skHex ? NT.utils.hexToBytes(skHex) : NT.generateSecretKey();
   const pubLocale = NT.getPublicKey(skLocale);
-  const chiave = NT.nip44.getConversationKey(skLocale, bunkerPub);
-  let relay = null, scelto = '';
-  const rifiuti = [];
-  for (const r of relays) {
-    bunkerDice(`Chiamo ${r}…`);
-    /* IL TIMEOUT SI OTTIENE SOLO COSTRUENDO IL RELAY A MANO, ed è la
-       riga da non «semplificare» tornando alla factory statica: quella
-       passa le opzioni al COSTRUTTORE e poi chiama `relay.connect()`
-       SENZA argomenti, quindi il suo `opts?.timeout` è per sempre
-       undefined. E senza timeout, se la socket resta appesa in
-       CONNECTING — un exit node che scarta i pacchetti, un relay morto
-       — quella promise NON SI RISOLVE MAI: era il buco, «Chiamo il
-       bunker…» e poi silenzio, senza un errore da nessuna parte. La
-       stessa cura sta già in `pubblicaEventoSuRelay`, col suo «un
-       relay morto non deve tenere in ostaggio la modifica». */
-    try {
-      relay = new NT.Relay(r);
-      await relay.connect({timeout: BUNKER_CONNETTI_MS});
-      scelto = r;
-      console.log(`🟪 [bunker] relay connesso: ${r}`);
-      break;
-    }
-    catch(e){
-      /* sul timeout la libreria rigetta con una STRINGA e sul resto
-         con un Error: `e?.message || String(e)` li prende tutti e due */
-      relay = null;
-      const motivo = e?.message || String(e);
-      rifiuti.push(`${r} → ${motivo}`);
-      console.log(`🟪 [bunker] relay non raggiungibile: ${r} (${motivo})`);
-    }
-  }
-  /* QUALE relay e COSA ha risposto, mai «nessun relay raggiungibile» e
-     basta: senza quei due dati chi legge non può decidere di cambiare
+  const cifra = cifrarioNip46(NT, skLocale, bunkerPub, modoCifrario);
+  bunkerDice(`Chiamo ${relays.join(' · ')}…`);
+  const coro = await apriStanzeNip46(relays);
+  /* QUALI relay e COSA hanno risposto, mai «nessun relay raggiungibile»
+     e basta: senza quei dati chi legge non può decidere di cambiare
      bunker, che è l'unica cosa che può fare da solo. */
-  if (!relay) throw new Error('nessun relay raggiungibile — ' + rifiuti.join(' · '));
+  if (!coro.vive.length) throw new Error('nessun relay raggiungibile — ' + coro.rifiuti.join(' · '));
+  const nomi = () => coro.vive.map(v => v.url).join(' · ');
+  bunkerDice(`In ascolto su ${nomi()}: chiamo il bunker…`);
   const attese = {};   // id richiesta -> {ok, no} della Promise in corso
+  let finito = false;  // la chiusura NOSTRA di fine giro: niente da dire
   /* Fa cadere le attese in corso con lo stesso motivo. Serve quando la
      strada si chiude sotto i piedi: da lì in poi la risposta non può
      PIÙ arrivare, e stare i due minuti del timeout umano vuol dire
@@ -44150,73 +44235,105 @@ async function firmatarioBunker(uri, skHex){
       at.no(new Error(motivo));
     }
   }
-  relay.subscribe([{kinds:[24133], '#p':[pubLocale]}], {onevent(ev){
-    let msg;
-    try { msg = JSON.parse(NT.nip44.decrypt(ev.content, chiave)); }
-    catch(e){ return; }               // non era per noi (o cifrario vecchio)
-    if (msg.result === 'auth_url') {  // il bunker vuole il tuo permesso
-      /* PRIMA del lookup in attese: un'auth_url che arriva tardi
-         (l'umano è lento, la richiesta magari è già scaduta) va
-         mostrata LO STESSO — buttarla lasciava il flusso muto. */
-      console.log(`🟪 [bunker] ← auth_url (id ${msg.id}): serve l'autorizzazione`);
-      apriAutorizzazioneBunker(msg.error);
-      return;                         // la vera risposta arriverà dopo
+  /* UNA VOCE ESCE DAL CORO: un CLOSED (restricted, rate-limited…) o la
+     websocket che muore. Finché resta un altro relay si va avanti e lo
+     si dice; a coro vuoto le attese cadono, perché la risposta non ha
+     più nessuna strada per arrivare. */
+  function esce(v, motivo){
+    const i = coro.vive.indexOf(v);
+    if (i < 0 || finito) return;
+    coro.vive.splice(i, 1);
+    try { v.relay.close(); } catch(_){}
+    console.log(`🟪 [bunker] ${v.url} ha chiuso l'ascolto: ${motivo}`);
+    if (coro.vive.length) {
+      bunkerDice(`${v.url} ha chiuso (${motivo}): resto in ascolto su ${nomi()}`);
+      return;
     }
-    const at = attese[msg.id];
-    if (!at) { console.log(`🟪 [bunker] ← risposta per una richiesta che non aspetto più (id ${msg.id})`); return; }
-    console.log(`🟪 [bunker] ← risposta per id ${msg.id}: ${msg.error ? 'ERRORE ' + msg.error : 'ok'}`);
-    delete attese[msg.id];
-    if (msg.error) at.no(new Error(msg.error)); else at.ok(msg.result);
-  },
-  /* IL RELAY PUÒ CHIUDERCI L'ASCOLTO — un CLOSED (auth-required,
-     restricted, rate-limited…) o la websocket che muore: la libreria
-     chiama questa in tutti e due i casi. Senza, la risposta del bunker
-     non poteva più arrivare e non lo sapeva nessuno.
-     L'USCITA A MANI VUOTE È LA CHIUSURA NOSTRA di fine giro — anche
-     `chiudi()` passa di qui — e lì non c'è niente da far cadere e
-     niente da dire. */
-  onclose(motivo){
     if (!Object.keys(attese).length) return;
-    const testo = `${scelto} ha chiuso l'ascolto: ${motivo || 'connessione caduta'}`;
-    console.log(`🟪 [bunker] ${testo}`);
-    saltano(testo);
-  }});
+    saltano(`${v.url} ha chiuso l'ascolto: ${motivo} — e non resta nessun altro relay`);
+  }
+  function ascolta(v){
+    v.relay.subscribe([{kinds:[24133], '#p':[pubLocale]}], {onevent(ev){
+      const msg = cifra.leggi(ev);
+      if (!msg) return;               // non era per noi
+      if (msg.result === 'auth_url') {  // il bunker vuole il tuo permesso
+        /* PRIMA del lookup in attese: un'auth_url che arriva tardi
+           (l'umano è lento, la richiesta magari è già scaduta) va
+           mostrata LO STESSO — buttarla lasciava il flusso muto. */
+        console.log(`🟪 [bunker] ← auth_url (id ${msg.id}): serve l'autorizzazione`);
+        apriAutorizzazioneBunker(msg.error);
+        return;                         // la vera risposta arriverà dopo
+      }
+      const at = attese[msg.id];
+      /* la stessa risposta può arrivare da più relay: la prima vale,
+         le copie si scartano qui, in silenzio */
+      if (!at) { console.log(`🟪 [bunker] ← risposta già servita o non attesa (id ${msg.id}, via ${v.url})`); return; }
+      console.log(`🟪 [bunker] ← risposta per id ${msg.id} via ${v.url}: ${msg.error ? 'ERRORE ' + msg.error : 'ok'}`);
+      delete attese[msg.id];
+      if (msg.error) at.no(new Error(msg.error)); else at.ok(msg.result);
+    },
+    onclose(motivo){
+      /* L'AUTH NIP-42 SI FIRMA CON LA CHIAVE DEL CLIENT (1 ott 2026):
+         i relay dedicati al NIP-46 (auth.nostr1.com, fra quelli di
+         serie di Amber) chiudono l'ascolto con «auth-required» e
+         vogliono una firma — la nostra chiave effimera basta, non è
+         mai quella dell'utente. Una volta sola per relay: se rifiuta
+         anche la firma, esce dal coro col suo motivo. */
+      if (/^auth-required: /.test(motivo || '') && !v.autenticato) {
+        v.autenticato = true;
+        console.log(`🟪 [bunker] ${v.url} chiede l'AUTH: firmo con la chiave del client`);
+        v.relay.auth(evt => NT.finalizeEvent(evt, skLocale))
+          .then(() => ascolta(v))
+          .catch(e => esce(v, `auth rifiutata: ${e?.message || String(e)}`));
+        return;
+      }
+      esce(v, motivo || 'connessione caduta');
+    }});
+  }
+  coro.vive.slice().forEach(ascolta);
   function chiama(metodo, params, timeoutMs){
     return new Promise((ok, no)=>{
       const id = Math.random().toString(36).slice(2);
+      const destinatari = coro.vive.slice();
+      if (!destinatari.length) { no(new Error('nessun relay è rimasto in ascolto')); return; }
       attese[id] = {ok, no};
       const ev = NT.finalizeEvent({kind:24133,
         created_at: Math.floor(Date.now()/1000), tags:[['p', bunkerPub]],
-        content: NT.nip44.encrypt(JSON.stringify({id, method:metodo, params}), chiave)},
+        content: cifra.scrivi(JSON.stringify({id, method:metodo, params}))},
         skLocale);
-      console.log(`🟪 [bunker] → ${metodo} (id ${id})`);
-      relay.publish(ev).catch(e=>{
+      console.log(`🟪 [bunker] → ${metodo} (id ${id}) su ${destinatari.map(v => v.url).join(' · ')}`);
+      const rifiutata = [];
+      destinatari.forEach(v => v.relay.publish(ev).catch(e=>{
         const motivo = e?.message || String(e);
         /* DUE COSE DIVERSE, e confonderle costa una connessione buttata
            via. «publish timed out» vuol dire che l'evento È PARTITO e
            manca solo l'OK del relay, che su Tor può tardare più dei
            4,4s che la libreria si dà — lì si ASPETTA, o si butta una
            chiamata ancora viva. Un rifiuto vero (OK:false — blocked,
-           auth-required, restricted…) dice invece che la richiesta non
-           è entrata: la risposta non può arrivare, e si cade subito
-           dicendo CHI l'ha rifiutata e con che parole. */
+           auth-required, restricted…) dice che su QUEL relay la
+           richiesta non è entrata: si cade solo quando l'hanno
+           rifiutata TUTTI, perché finché uno l'ha presa la risposta
+           può ancora arrivare — e si dice chi e con che parole. */
         if (/timed out/i.test(motivo)) {
-          console.log(`🟪 [bunker] ${scelto} tarda l'OK (${motivo}): resto in ascolto`);
+          console.log(`🟪 [bunker] ${v.url} tarda l'OK (${motivo}): resto in ascolto`);
           return;
         }
-        console.log(`🟪 [bunker] ${scelto} ha rifiutato ${metodo}: ${motivo}`);
-        if (attese[id]) { delete attese[id];
-          no(new Error(`${scelto} ha rifiutato la richiesta: ${motivo}`)); }
-      });
+        console.log(`🟪 [bunker] ${v.url} ha rifiutato ${metodo}: ${motivo}`);
+        rifiutata.push(`${v.url} → ${motivo}`);
+        if (rifiutata.length >= destinatari.length && attese[id]) {
+          delete attese[id];
+          no(new Error(`ogni relay ha rifiutato la richiesta: ${rifiutata.join(' · ')}`));
+        }
+      }));
       /* La firma aspetta un ESSERE UMANO che approva su un altro
          dispositivo: 2 minuti. Le chiamate di servizio restano a 30s. */
       const ms = timeoutMs || 30000;
       setTimeout(()=>{ if (attese[id]) { delete attese[id];
         console.log(`🟪 [bunker] ⏱ ${metodo} senza risposta dopo ${ms/1000}s`);
-        /* IL NOME DEL RELAY ANCHE QUI: «il bunker non risponde» non
+        /* I NOMI DEI RELAY ANCHE QUI: «il bunker non risponde» non
            dice se a tacere è il bunker o la strada per arrivarci, e
            sono due guasti con due rimedi diversi. */
-        no(new Error(`nessuna risposta dal bunker in ${ms/1000}s (via ${scelto})`)); } }, ms);
+        no(new Error(`nessuna risposta dal bunker in ${ms/1000}s (via ${nomi() || 'nessun relay vivo'})`)); } }, ms);
     });
   }
   /* Il terzo parametro della connect sono i PERMESSI richiesti: senza,
@@ -44225,12 +44342,16 @@ async function firmatarioBunker(uri, skHex){
      sul telefono. Chiederli qui = un'autorizzazione sola, chiara.
      Timeout umano (120s): la prima connect può voler dire aprire
      l'app del bunker e approvare, in 30s non ci si sta. */
+  const chiudi = () => {
+    finito = true;
+    coro.vive.slice().forEach(v => { try { v.relay.close(); } catch(e){} });
+  };
   try {
     await chiama('connect', [bunkerPub, par.get('secret') || '',
                              NIP46_PERMESSI], 120000);
   } catch(e){
     if (!/already connected/i.test(e.message || '')) {
-      try { relay.close(); } catch(_){}   // niente websocket orfane
+      chiudi();                       // niente websocket orfane
       throw e;
     }
     /* "already connected" NON è un errore: nsec.app risponde così
@@ -44242,7 +44363,7 @@ async function firmatarioBunker(uri, skHex){
   return {
     pubkey: () => chiama('get_public_key', []),
     firma:  async (evento) => JSON.parse(await chiama('sign_event', [JSON.stringify(evento)], 120000)),
-    chiudi: () => { try { relay.close(); } catch(e){} },
+    chiudi,
     /* per ricordaBunker: uri + chiave client = la sessione riusabile */
     sessione: {uri: uri.trim(), sk: NT.utils.bytesToHex(skLocale)},
   };
@@ -44256,25 +44377,39 @@ async function firmatarioBunker(uri, skHex){
    la URI la scriviamo NOI, la mostriamo come QR, e il firmatario ci
    chiama. Il protocollo e' lo stesso (NIP-46), cambia solo chi bussa.
 
-   IL RELAY DELLA URI E' QUELLO A CUI SIAMO GIA' CONNESSI, ed e' LA
-   riga da non ammorbidire: ci si connette PRIMA e si scrive nel QR
-   solo il relay SCELTO. Elencandoli tutti e tre, il telefono potrebbe
-   rispondere sul secondo mentre noi ascoltiamo il primo — e quel
-   difetto non fallisce da nessuna parte: sul telefono si legge
-   «collegato», qui si aspetta per sempre.
+   NELLA URI VANNO TUTTI I RELAY SU CUI SI ASCOLTA, e sono gli stessi
+   (1 ott 2026): ieri ce n'era UNO solo — «elencandoli tutti il
+   telefono potrebbe rispondere sul secondo mentre noi ascoltiamo il
+   primo» — ed era vero, ma la cura giusta non era una stanza sola:
+   era ascoltare su tutte. Con una sola, un relay che accetta la
+   websocket e poi tace (damus, misurato) o che il telefono non
+   raggiunge faceva un QR che si inquadra, si approva, e qui non
+   arriva niente — il difetto dal campo. Il firmatario pubblica su
+   OGNI relay della URI (Amber: `publishAndConfirm` sulla lista), e
+   basta che uno dei due lati funzioni.
+
+   L'ASCOLTO SI APRE PRIMA DEL CODICE: il kind 24133 è effimero, i
+   relay non lo conservano, e una risposta arrivata un attimo prima
+   della sottoscrizione è persa per sempre. Ieri si sottoscriveva
+   dopo aver disegnato il QR; ora prima.
 
    IL SEGRETO E' LA PORTA, e si accetta SOLO lui: verso la nostra
    chiave effimera puo' cifrare CHIUNQUE veda il QR, quindi senza
    quel confronto basterebbe un «ack» di passaggio per legarci al
-   firmatario sbagliato. E' quel che NIP-46 chiede, ed e' anche
-   l'unica cosa che rende sicuro mostrare un codice su uno schermo.
+   firmatario sbagliato. E' quel che NIP-46 chiede («client MUST
+   validate the secret»), ed e' anche l'unica cosa che rende sicuro
+   mostrare un codice su uno schermo. Amber (6.6.6, letto nel sorgente)
+   risponde col segreto: `nostrConnectSecret.ifBlank { "ack" }`.
 
    E QUANDO IL FIRMATARIO SI E' FATTO VIVO, il resto e' il bunker di
-   sempre: si compone la sua `bunker://` e si chiama `firmatarioBunker`
-   con la chiave client appena usata. Cosi' il motore NIP-46 resta UNO
-   — e soprattutto la sessione che si conserva ha la FORMA di sempre,
-   quindi la coda delle firme, la modifica firmata e `bunkerSalvato()`
-   funzionano senza sapere che questa strada esiste.
+   sempre: si compone la sua `bunker://` con gli stessi relay e si
+   chiama `firmatarioBunker` con la chiave client appena usata. Cosi'
+   il motore NIP-46 resta UNO — e soprattutto la sessione che si
+   conserva ha la FORMA di sempre, quindi la coda delle firme, la
+   modifica firmata e `bunkerSalvato()` funzionano senza sapere che
+   questa strada esiste. Chi ha risposto e' la chiave PER-CONNESSIONE
+   del firmatario (Amber ne conia una per app), non quella
+   dell'utente: quella arriva dopo, con `get_public_key`.
    IL SECRET NON SI RIPETE nella seconda connect: e' servito una volta,
    alla presentazione, e certi firmatari lo trattano come usa-e-getta —
    ripresentarlo vorrebbe dire rischiare un rifiuto DOPO che l'utente
@@ -44283,11 +44418,10 @@ const NOSTRCONNECT_ATTESA_MS = 180000;   /* 3 minuti: dall'altra parte
    c'e' un umano che prende il telefono, apre l'app, inquadra e
    approva. Coi 30s delle chiamate di servizio non ci si sta. */
 let nostrQrGiro = 0;
-
 async function firmatarioNostrConnect(){
   await caricaNostrTools();
   const NT = window.NostrTools;
-  const relays = (relayNip46 || []).slice();
+  const relays = [...new Set(relayNip46 || [])];
   /* Senza la lista dal server non si inventa niente: un QR che punta a
      un relay scelto a caso e' un codice che si scansiona e non porta
      da nessuna parte. Il bottone non nasce nemmeno (vedi
@@ -44296,28 +44430,58 @@ async function firmatarioNostrConnect(){
   const skLocale = NT.generateSecretKey();
   const pubLocale = NT.getPublicKey(skLocale);
   const segreto = NT.utils.bytesToHex(NT.generateSecretKey()).slice(0, 32);
-  let relay = null, scelto = '';
-  const rifiuti = [];
-  for (const r of relays) {
-    bunkerDice(`Preparo l'appuntamento su ${r}…`);
-    try {
-      /* il relay a mano col suo timeout, per la ragione scritta in
-         firmatarioBunker: la factory statica il timeout non lo passa */
-      relay = new NT.Relay(r);
-      await relay.connect({timeout: BUNKER_CONNETTI_MS});
-      scelto = r;
-      console.log(`🟪 [qr] relay connesso: ${r}`);
-      break;
-    } catch(e){
-      relay = null;
-      const motivo = e?.message || String(e);
-      rifiuti.push(`${r} → ${motivo}`);
-      console.log(`🟪 [qr] relay non raggiungibile: ${r} (${motivo})`);
-    }
-  }
-  if (!relay) throw new Error('nessun relay raggiungibile — ' + rifiuti.join(' · '));
+  const cifra = cifrarioNip46(NT, skLocale, null);
+  bunkerDice(`Preparo l'appuntamento su ${relays.join(' · ')}…`);
+  const coro = await apriStanzeNip46(relays);
+  if (!coro.vive.length) throw new Error('nessun relay raggiungibile — ' + coro.rifiuti.join(' · '));
+  const stanza = coro.vive.map(v => v.url);
+  const nomi = () => coro.vive.map(v => v.url).join(' · ');
+  const risposta = new Promise((ok, no)=>{
+    const t = setTimeout(()=> no(new Error(
+      `nessuna risposta in ${NOSTRCONNECT_ATTESA_MS/60000} minuti (via ${stanza.join(' · ')})`)),
+      NOSTRCONNECT_ATTESA_MS);
+    /* il relay puo' chiuderci l'ascolto (auth-required, rate-limit,
+       websocket caduta): finche' ne resta un altro si va avanti, a coro
+       vuoto si cade — senza stare i tre minuti per niente */
+    const esce = (v, motivo) => {
+      const i = coro.vive.indexOf(v);
+      if (i < 0) return;
+      coro.vive.splice(i, 1);
+      try { v.relay.close(); } catch(_){}
+      console.log(`🟪 [qr] ${v.url} ha chiuso l'ascolto: ${motivo}`);
+      if (coro.vive.length) return;
+      clearTimeout(t);
+      no(new Error(`${v.url} ha chiuso l'ascolto: ${motivo} — e non resta nessun altro relay`));
+    };
+    const ascolta = (v) => {
+      v.relay.subscribe([{kinds:[24133], '#p':[pubLocale]}], {onevent(ev){
+        const msg = cifra.leggi(ev);
+        if (!msg) return;              // non era per noi
+        if (msg.result !== segreto) {
+          console.log(`🟪 [qr] ← messaggio senza il segreto giusto (via ${v.url}): ignorato`);
+          return;
+        }
+        console.log(`🟪 [qr] ← eccolo: ${ev.pubkey.slice(0,8)}… via ${v.url}`);
+        clearTimeout(t);
+        ok(ev.pubkey);
+      },
+      onclose(motivo){
+        if (/^auth-required: /.test(motivo || '') && !v.autenticato) {
+          v.autenticato = true;
+          console.log(`🟪 [qr] ${v.url} chiede l'AUTH: firmo con la chiave del client`);
+          v.relay.auth(evt => NT.finalizeEvent(evt, skLocale))
+            .then(() => ascolta(v))
+            .catch(e => esce(v, `auth rifiutata: ${e?.message || String(e)}`));
+          return;
+        }
+        esce(v, motivo || 'connessione caduta');
+      }});
+    };
+    coro.vive.slice().forEach(ascolta);
+  });
+  risposta.catch(()=>{});   // il rifiuto lo raccoglie l'await qui sotto
   const uri = 'nostrconnect://' + pubLocale
-    + '?relay=' + encodeURIComponent(scelto)
+    + '?' + stanza.map(r => 'relay=' + encodeURIComponent(r)).join('&')
     + '&secret=' + segreto
     + '&perms=' + encodeURIComponent(NIP46_PERMESSI)
     + '&name=' + encodeURIComponent('Barattolo')
@@ -44325,44 +44489,15 @@ async function firmatarioNostrConnect(){
        quello di casa e non il .onion, che li' non direbbe niente a
        nessuno — e' lo stesso giudice dei link da condividere */
     + '&url=' + encodeURIComponent(baseCondivisione());
-  console.log(`🟪 [qr] appuntamento su ${scelto} (client ${pubLocale.slice(0,8)}…)`);
+  console.log(`🟪 [qr] appuntamento su ${stanza.join(' · ')} (client ${pubLocale.slice(0,8)}…)`);
   await mostraQrConnessione(uri);
   let remoto;
-  try {
-    remoto = await new Promise((ok, no)=>{
-      const t = setTimeout(()=> no(new Error(
-        `nessuna risposta in ${NOSTRCONNECT_ATTESA_MS/60000} minuti`)),
-        NOSTRCONNECT_ATTESA_MS);
-      relay.subscribe([{kinds:[24133], '#p':[pubLocale]}], {onevent(ev){
-        let msg;
-        /* la chiave di conversazione si deriva da CHI HA SCRITTO: qui
-           il mittente non lo conosciamo in anticipo — e' proprio quel
-           che stiamo aspettando di scoprire */
-        try {
-          const chiave = NT.nip44.getConversationKey(skLocale, ev.pubkey);
-          msg = JSON.parse(NT.nip44.decrypt(ev.content, chiave));
-        } catch(e){ return; }          // non era per noi (o cifrario vecchio)
-        if (msg.result !== segreto) {
-          console.log(`🟪 [qr] ← messaggio senza il segreto giusto: ignorato`);
-          return;
-        }
-        console.log(`🟪 [qr] ← eccolo: ${ev.pubkey.slice(0,8)}…`);
-        clearTimeout(t);
-        ok(ev.pubkey);
-      },
-      /* il relay puo' chiuderci l'ascolto (auth-required, rate-limit,
-         websocket caduta): senza questo ramo la risposta non potrebbe
-         piu' arrivare e si starebbero i tre minuti per niente */
-      onclose(motivo){
-        clearTimeout(t);
-        no(new Error(`${scelto} ha chiuso l'ascolto: ${motivo || 'connessione caduta'}`));
-      }});
-    });
-  } finally { try { relay.close(); } catch(e){} }
+  try { remoto = await risposta; }
+  finally { coro.vive.slice().forEach(v => { try { v.relay.close(); } catch(e){} }); }
   bunkerDice('Firmatario collegato: preparo la firma…');
   return await firmatarioBunker(
-    'bunker://' + remoto + '?relay=' + encodeURIComponent(scelto),
-    NT.utils.bytesToHex(skLocale));
+    'bunker://' + remoto + '?' + stanza.map(r => 'relay=' + encodeURIComponent(r)).join('&'),
+    NT.utils.bytesToHex(skLocale), cifra.modo);
 }
 
 /* Il codice a schermo, e la stringa sotto per chi ha il firmatario su

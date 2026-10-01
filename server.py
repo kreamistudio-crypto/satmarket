@@ -40706,28 +40706,34 @@ if not RELAYS_VERIFICA:
 # Sono una lista SEPARATA da RELAYS_VERIFICA e non la stessa: li' si
 # cercano note pubbliche (kind 1) e la scelta e' «dove la gente
 # scrive», qui passa una conversazione cifrata fra due chiavi
-# effimere e la scelta e' «chi non chiede l'autenticazione e non
-# butta via gli eventi kind 24133». Il primo e' quello dedicato:
-# nsec.app lo tiene su per questo mestiere ed e' quello che i
-# firmatari (Amber in testa) trovano gia' configurato.
-# ORDINE = PRECEDENZA, e il primo posto si paga: il client prova dal
-# primo e si ferma al primo che risponde, ma un relay MUTO si porta
-# via i 15 secondi del timeout PRIMA che il codice compaia — e chi
-# guarda vede una sala d'attesa e basta. Quindi in testa va quello che
-# risponde, non quello piu' specializzato.
-# MISURATO e non supposto (ago 2026, dal banco): `relay.nsec.app` —
-# che sarebbe IL relay dedicato al NIP-46 — da qui non risponde
-# nemmeno a una GET, mentre damus e nos.lol rispondono in un decimo di
-# secondo. Resta in lista, in coda: se un domani torna su fa il suo
-# mestiere, e intanto non fa aspettare nessuno. Chi ritocca l'ordine
-# lo RIMISURI (una GET a ognuno) invece di andare a memoria.
-# E nella URI del QR ci finisce SOLO il relay scelto — vedi il
-# commento di firmatarioNostrConnect: e' la riga che impedisce alla
-# stanza di essere due.
+# effimere e la scelta e' «chi non butta via gli eventi kind 24133 e
+# risponde in fretta».
+# LA STANZA E' UN CORO (1 ott 2026): il client si connette a TUTTI
+# insieme, ascolta su tutti e scrive nel QR tutti quelli vivi (vedi
+# `apriStanzeNip46` e `firmatarioNostrConnect`), quindi l'ordine non
+# e' piu' una precedenza — e' solo l'ordine in cui si leggono. Quel
+# che conta e' che ognuno RISPONDA alle richieste, non che accetti la
+# websocket: `relay.damus.io` (che stava in testa) da qui apre in 0,6 s
+# e poi non risponde a NESSUNA REQ, nemmeno sul kind 1 — col client di
+# ieri, che si fermava al primo connesso, il QR finiva proprio li' e
+# la risposta del telefono non arrivava mai. Via.
+# MISURATO il 1 ott 2026 (una REQ sul kind 24133, in sola lettura):
+# nrs.primal.net conn 0,12 s / EOSE 0,06 s; bucket.coracle.social
+# 0,60 / 0,43; relay.nip46.com 1,98 / 0,50; nos.lol 0,13 / 0,08 (a
+# volte «rate-limited: server busy»); relay.nsec.app timeout a 8 s;
+# auth.nostr1.com chiede l'AUTH NIP-42 (il client la sa firmare, ma
+# non serve metterlo in lista); relay.damus.io muto. I primi tre sono
+# i relay DI SERIE di Amber (`defaultAppRelays` in AmberSettings.kt):
+# sono quelli che il telefono sa raggiungere per costruzione. Chi
+# ritocca la lista la RIMISURI con una REQ (non una GET: damus alla
+# GET risponde) invece di andare a memoria.
+# ⚠️ E' una COSTANTE nel codice, non una leva del config: sul VPS non
+# c'e' niente da aggiungere.
 RELAYS_NIP46 = [
-    "wss://relay.damus.io",
+    "wss://nrs.primal.net",
+    "wss://bucket.coracle.social",
+    "wss://relay.nip46.com",
     "wss://nos.lol",
-    "wss://relay.nsec.app",
 ]
 CHARSET_BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
