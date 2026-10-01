@@ -60,7 +60,7 @@ jobs:
              censimento_scadenze.py collaudo_fatture_scadute.py
              collaudo_rotte_metodi.py
              collaudo_in_pagamento.py collaudo_altra_cassaforte.py
-             collaudo_chiusura_saas.py
+             collaudo_chiusura_saas.py collaudo_csp.py
              ripulisci_anello_nostr.py
              ricategorizza.py sposta_a_mano.py ritaglia_categorie.py
              presenta_release.py config_esempio.py prova_notifica.py
@@ -187,6 +187,7 @@ jobs:
              collaudo_annullo_venditore
              collaudo_pionieri
              collaudo_contanti_p2p
+             collaudo_csp
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.

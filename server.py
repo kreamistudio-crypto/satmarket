@@ -1544,6 +1544,10 @@ async def guardia_csrf(request, call_next):
     visto da uvicorn puo' ballare, l'Host inoltrato e' affidabile."""
     if (request.method in ("POST", "PUT", "PATCH", "DELETE")
             and request.url.path.startswith("/api")
+            # il cestino delle violazioni CSP ne resta fuori (ott 2026):
+            # ci POSTA il browser da solo, con l'Origin che gli pare (anche
+            # `null`), e la rotta non fa niente che una CSRF possa usare
+            and request.url.path != "/api/csp-report"
             and not request.headers.get("x-tg-init-data")
             and ("barattolo_sessione" in request.cookies
                  or request.url.path.startswith("/api/login/"))):
@@ -1552,6 +1556,206 @@ async def guardia_csrf(request, call_next):
             return JSONResponse({"detail": "Origine non consentita"},
                                 status_code=403)
     return await call_next(request)
+
+
+# ------------------ LE CINTURE HTTP E LA CSP IN PROVA ---------------
+# (1 ott 2026, cantiere «CSP e le voci aperte degli audit»)
+# Dal vivo barattolo.store rispondeva SENZA nessuna intestazione di
+# sicurezza: niente CSP (quella di `no_iframe` vive dietro la leva
+# PROTEGGI_IFRAME, spenta), niente HSTS, niente nosniff. Qui ci sono le
+# quattro che costano zero e non cambiano niente a chi usa l'app:
+#  - nosniff: il browser non indovina un tipo diverso da quello
+#    dichiarato (ogni rotta di casa lo dichiara: js, woff2, json, html);
+#  - Referrer-Policy: quel che i browser fanno gia' di default, scritto;
+#  - Permissions-Policy: SOLO cio' che l'app non usa mai (microfono,
+#    pagamenti del browser, USB, MIDI). Fotocamera e posizione NON si
+#    nominano: dentro l'iframe di Telegram Web a concederle e' il
+#    genitore, e una riga qui potrebbe solo toglierle;
+#  - HSTS, solo sul dominio pubblico: mai sull'onion (che il TLS non ce
+#    l'ha) ne' in collaudo (http://127.0.0.1). Un anno, senza
+#    includeSubDomains (il relay e' un sottodominio con la sua vita) e
+#    senza preload (irreversibile).
+# E LA CSP, IN PROVA: `Content-Security-Policy-Report-Only` sulle sole
+# pagine HTML. Il browser NON blocca niente — riferisce soltanto, a
+# `/api/csp-report`, e la riga finisce nel journal con «🛡️ CSP:». E' il
+# patto del cantiere: si guarda per qualche giorno cosa l'app usa
+# davvero, e solo poi si decide come accenderla.
+# PERCHE' `'unsafe-inline'` SUGLI SCRIPT: la pagina ha tre blocchi
+# inline e circa ottocento `onclick=` nel markup e nei template. Un
+# nonce li spegnerebbe TUTTI (coi nonce i browser ignorano
+# 'unsafe-inline'): e' la fase 2, dopo la delega degli handler. Senza
+# nonce la CSP ferma i pezzi che un XSS tipicamente porta — script da
+# host estranei, `<base>`, plugin, form verso fuori — e NON lo script
+# inline: lo si dichiara invece di lasciarlo intendere.
+# NIENTE `'unsafe-eval'`, ed e' la ragione del login web a redirect
+# (`login_telegram_ritorno`): il Login Widget col `data-onauth` faceva
+# `eval` sulla stringa, ed era l'unica cosa in pagina a chiederlo.
+# `connect-src 'self' wss:`: i relay di Mostro e NIP-46 cambiano da
+# config, e quelli di NWC e del bunker li sceglie l'utente dal suo
+# wallet — elencarli romperebbe i wallet degli utenti. In collaudo anche
+# `ws:`, per il relay morto di 127.0.0.1:9.
+# `img-src https:`: le foto degli annunci importati da Nostr il cui
+# download e' fallito restano su host esterni, per scelta.
+# `frame-ancestors` NON c'e': in report-only i browser lo ignorano, e a
+# tenerlo e' `no_iframe` con la sua leva.
+CINTURE_HTTP = (
+    ("X-Content-Type-Options", "nosniff"),
+    ("Referrer-Policy", "strict-origin-when-cross-origin"),
+    ("Permissions-Policy", "microphone=(), payment=(), usb=(), midi=()"),
+)
+HSTS_UN_ANNO = "max-age=31536000"
+DIRETTIVE_CSP_PROVA = (
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://telegram.org",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self'",
+    "connect-src 'self' wss:",
+    "frame-src https://oauth.telegram.org",
+    "worker-src 'self'",
+    "manifest-src 'self'",
+    "media-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "report-uri /api/csp-report",
+)
+
+
+def _csp_prova(collaudo: bool = MODALITA_COLLAUDO) -> str:
+    """La CSP in prova delle pagine, come stringa. In collaudo il relay
+    morto sta su ws://127.0.0.1:9 e la pagina gira su http: senza `ws:`
+    ogni giro dal vivo riempirebbe il journal di falsi allarmi."""
+    d = list(DIRETTIVE_CSP_PROVA)
+    if collaudo:
+        d = [x + " ws:" if x.startswith("connect-src") else x for x in d]
+    return "; ".join(d)
+
+
+CSP_PROVA = _csp_prova()
+
+
+def _host_con_hsts(host: str, collaudo: bool = MODALITA_COLLAUDO) -> bool:
+    """HSTS solo dove c'e' un TLS da promettere: il dominio pubblico.
+    Mai sull'onion, mai in collaudo, mai su un indirizzo locale."""
+    h = (host or "").split(":")[0].strip().lower()
+    if collaudo or not h or h.endswith(".onion"):
+        return False
+    if h in ("localhost", "testserver") or h.startswith(("127.", "10.", "192.168.")):
+        return False
+    return True
+
+
+@app.middleware("http")
+async def cinture_http(request, call_next):
+    """Le cinture su OGNI risposta, con `setdefault`: chi ha gia' la sua
+    riga la tiene. La CSP in prova va alle sole pagine HTML di casa: non
+    ai widget (che hanno la loro, con l'impronta dello script) e non a
+    chi risponde gia' con una CSP vera (i documenti della busta).
+    STA PRIMA DI `no_iframe` NEL FILE, cioe' gli gira DENTRO: cosi' vede
+    la risposta prima che la leva dell'iframe ci metta la sua CSP, e la
+    riga in prova non si perde il giorno che quella si accende."""
+    r = await call_next(request)
+    for nome, valore in CINTURE_HTTP:
+        r.headers.setdefault(nome, valore)
+    if _host_con_hsts(request.headers.get("host", "")):
+        r.headers.setdefault("Strict-Transport-Security", HSTS_UN_ANNO)
+    if (r.headers.get("content-type", "").startswith("text/html")
+            and not request.url.path.startswith("/widget/")
+            and "Content-Security-Policy" not in r.headers):
+        r.headers.setdefault("Content-Security-Policy-Report-Only", CSP_PROVA)
+    return r
+
+
+# IL CESTINO DELLE VIOLAZIONI: dove il browser riferisce. Senza
+# autenticazione per forza (riferisce anche chi non e' entrato), quindi
+# con tre argini: 16 KB di corpo letti a pezzi, una riga sola al minuto
+# per la stessa violazione, e un tetto di righe al minuto in tutto — chi
+# ci POSTA a raffica riempie al massimo CSP_REPORT_RIGHE_MINUTO righe,
+# poi tace fino al minuto dopo. Risponde SEMPRE 204, anche al JSON
+# storto: non e' una rotta che debba spiegare niente a chi la chiama.
+CSP_REPORT_MAX_BYTE = 16_384
+CSP_REPORT_RIGHE_MINUTO = 120
+_CSP_VISTE: dict = {}          # riga -> quando l'abbiamo scritta
+_CSP_MINUTO = [0, 0]           # [minuto, righe scritte in quel minuto]
+
+
+def _riga_csp(dati) -> str:
+    """Da un report del browser a una riga di journal, o '' se non c'e'
+    niente da dire. Legge le due forme — `{"csp-report": {...}}` del
+    `report-uri` e `{"type": ..., "body": {...}}` della Reporting API —
+    e tiene solo i campi che dicono COSA e' stato bloccato e DOVE,
+    tagliati e ripuliti dai caratteri di controllo: il journal non deve
+    eseguire niente di cio' che un estraneo ci manda."""
+    if not isinstance(dati, dict):
+        return ""
+    r = dati.get("csp-report")
+    if r is None:
+        r = dati.get("body")
+    if not isinstance(r, dict):
+        return ""
+
+    def campo(*nomi):
+        for n in nomi:
+            v = r.get(n)
+            if v not in (None, ""):
+                return re.sub(r"[\x00-\x1f\x7f]", " ", str(v))[:160]
+        return ""
+
+    direttiva = campo("effective-directive", "effectiveDirective",
+                      "violated-directive", "violatedDirective")
+    bloccato = campo("blocked-uri", "blockedURL")
+    if not direttiva and not bloccato:
+        return ""
+    fonte = campo("source-file", "sourceFile")
+    riga = campo("line-number", "lineNumber")
+    documento = campo("document-uri", "documentURL")
+    campione = campo("script-sample", "sample")[:80]
+    dove = f" @ {fonte}:{riga}" if fonte else ""
+    testo = f"🛡️ CSP: {direttiva or '?'} ← {bloccato or '?'}{dove} ({documento})"
+    if campione:
+        testo += f" «{campione}»"
+    return testo
+
+
+def _csp_da_scrivere(testo: str, adesso: float) -> bool:
+    """La stessa riga una volta al minuto, e al massimo
+    CSP_REPORT_RIGHE_MINUTO righe al minuto in tutto."""
+    minuto = int(adesso // 60)
+    if _CSP_MINUTO[0] != minuto:
+        _CSP_MINUTO[0], _CSP_MINUTO[1] = minuto, 0
+    if _CSP_MINUTO[1] >= CSP_REPORT_RIGHE_MINUTO:
+        return False
+    if len(_CSP_VISTE) > 2000:
+        _CSP_VISTE.clear()
+    if adesso - _CSP_VISTE.get(testo, 0) < 60:
+        return False
+    _CSP_VISTE[testo] = adesso
+    _CSP_MINUTO[1] += 1
+    return True
+
+
+@app.post("/api/csp-report")
+async def csp_report(req: Request):
+    """Il browser riferisce una violazione della CSP in prova. Niente
+    sessione (vedi sopra), niente scrittura sul database: una riga nel
+    journal, e basta. Il corpo si legge A PEZZI col tetto: un
+    Content-Length che mente non cambia niente."""
+    corpo = b""
+    async for pezzo in req.stream():
+        corpo += pezzo
+        if len(corpo) > CSP_REPORT_MAX_BYTE:
+            return Response(status_code=413)
+    try:
+        dati = json.loads(corpo.decode("utf-8", "replace"))
+    except Exception:
+        return Response(status_code=204)
+    # la Reporting API ne manda una LISTA per volta
+    for d in (dati if isinstance(dati, list) else [dati])[:10]:
+        testo = _riga_csp(d)
+        if testo and _csp_da_scrivere(testo, time.time()):
+            print(testo, flush=True)
+    return Response(status_code=204)
 
 
 @app.middleware("http")
@@ -8539,6 +8743,55 @@ async def login_telegram(req: Request, response: Response,
     apri_sessione(response, int(user["id"]), barattolo_portachiavi,
                   barattolo_sessione)
     return {"ok": True}
+
+
+FORMA_RITORNO_LOGIN = re.compile(r"/[A-Za-z0-9_\-./]*")
+
+
+def _dove_tornare(da) -> str:
+    """Il percorso di casa da cui era partito il login, o la radice.
+    Solo un percorso ASSOLUTO di questo sito: niente `//altrove` (che il
+    browser legge come un altro host), niente schema, niente query — e'
+    la riga che impedisce di usare il login come trampolino."""
+    da = str(da or "")
+    if FORMA_RITORNO_LOGIN.fullmatch(da) and not da.startswith("//"):
+        return da
+    return "/"
+
+
+@app.get("/api/login/telegram/ritorno")
+async def login_telegram_ritorno(req: Request,
+                                 barattolo_portachiavi: str = Cookie(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """IL LOGIN WEB A REDIRECT (1 ott 2026, cantiere CSP). Il Login
+    Widget col `data-onauth` chiamava una funzione nostra — ma per farlo
+    faceva `eval` sulla stringa dell'attributo, e una CSP senza
+    `'unsafe-eval'` lo avrebbe rotto. Col `data-auth-url` Telegram MANDA
+    il browser qui, coi dati firmati nella query (id, nome, username,
+    foto, auth_date, hash): la verifica e' la stessa di sempre
+    (`verifica_login_widget`: firma e cinque minuti), la sessione si
+    apre dalla stessa porta (`apri_sessione`), e si torna con un 303
+    alla pagina da cui si era partiti (`da`, un percorso di casa). Per
+    chi entra non cambia niente: prima la pagina si ricaricava da sola
+    dopo la POST, adesso la ricarica il redirect.
+    Un login rifiutato NON e' un errore nudo: si torna alla stessa
+    pagina con `?accesso=no`, e il client dice «Accesso non riuscito,
+    riprova» come diceva prima. Dentro Telegram questa rotta non si vede
+    mai: la Mini App entra con l'initData, come sempre. E la POST di
+    prima resta, per il collaudo su localhost dove il widget vero non
+    compare."""
+    d = dict(req.query_params)
+    da = _dove_tornare(d.pop("da", ""))
+    try:
+        user = verifica_login_widget(d)
+    except HTTPException:
+        return RedirectResponse(da + "?accesso=no", status_code=303)
+    user["id"] = int(user["id"])
+    upsert_utente(user)
+    risposta = RedirectResponse(da, status_code=303)
+    apri_sessione(risposta, user["id"], barattolo_portachiavi,
+                  barattolo_sessione)
+    return risposta
 
 
 @app.get("/api/sessioni")
@@ -62727,6 +62980,25 @@ addEventListener('load',d);addEventListener('resize',d);d()})();
 </script>"""
 
 
+def _impronta_script(testo: str) -> str:
+    """L'impronta CSP di uno script inline: sha256 del SOLO contenuto
+    fra i due tag, in base64, come la calcola il browser."""
+    dentro = testo[testo.index(">", testo.index("<script")) + 1:
+                   testo.index("</script>")]
+    return "sha256-" + base64.b64encode(
+        hashlib.sha256(dentro.encode("utf-8")).digest()).decode("ascii")
+
+
+# LA CSP IN PROVA DEL WIDGET (ott 2026): e' l'unica pagina fatta per
+# l'iframe di un estraneo, quindi la sua e' piu' stretta di quella
+# dell'app — niente script tranne QUELLO, riconosciuto dall'impronta —
+# e senza `frame-ancestors`, che qui sarebbe il contrario del mestiere.
+CSP_WIDGET = ("default-src 'none'; img-src 'self' https: data:; "
+              "style-src 'unsafe-inline'; "
+              f"script-src '{_impronta_script(WIDGET_JS)}'; "
+              "base-uri 'none'; report-uri /api/csp-report")
+
+
 def _widget_pagina(corpo: str, titolo: str) -> Response:
     """Il guscio. `X-Frame-Options` NON si mette qui, ed e' il punto di
     tutta la rotta: questa e' l'unica pagina del sito fatta per stare
@@ -62740,7 +63012,9 @@ def _widget_pagina(corpo: str, titolo: str) -> Response:
              f"</head><body>{corpo}{WIDGET_JS}</body></html>")
     return Response(html_, media_type="text/html; charset=utf-8",
                     headers={"Cache-Control":
-                             f"public, max-age={CACHE_WIDGET}"})
+                             f"public, max-age={CACHE_WIDGET}",
+                             "Content-Security-Policy-Report-Only":
+                             CSP_WIDGET})
 
 
 def _widget_niente(messaggio: str) -> Response:

@@ -43947,7 +43947,7 @@ function montaPorteAccount(dai){
     s.setAttribute('data-telegram-login', 'ilbarattolobot');
     s.setAttribute('data-size', 'medium');
     s.setAttribute('data-request-access', 'write');
-    s.setAttribute('data-onauth', 'onTelegramAuth(user)');
+    s.setAttribute('data-auth-url', urlRitornoLogin());
     posto.appendChild(s);
     porte.appendChild(posto);
   }
@@ -44062,23 +44062,34 @@ function bottoneLoginTelegram(){
   s.setAttribute('data-telegram-login', 'ilbarattolobot');
   s.setAttribute('data-size', 'medium');
   s.setAttribute('data-request-access', 'write');  // può scriverci: avvisi!
-  s.setAttribute('data-onauth', 'onTelegramAuth(user)');
+  s.setAttribute('data-auth-url', urlRitornoLogin());
   posto.appendChild(s);
 }
-/* Telegram ci consegna l'utente firmato: lo giriamo al server, che
-   verifica la firma e apre la sessione (cookie). Poi si ricarica e
-   avvia() ci riconosce dal cookie. */
-window.onTelegramAuth = async function(user){
+/* IL LOGIN WEB A REDIRECT (1 ott 2026, cantiere CSP): col
+   `data-auth-url` Telegram manda il browser alla nostra rotta coi dati
+   firmati nella query; il server verifica, apre il cookie e torna qui
+   con un 303, e avvia() ci riconosce dal cookie come prima. C'era
+   `data-onauth` con una funzione nostra, ma il widget la eseguiva con
+   `eval` — e una CSP senza 'unsafe-eval' lo avrebbe rotto. `da` e' il
+   percorso da cui si parte, cosi' si torna sulla stessa pagina come
+   faceva il reload di prima. RELATIVO, e non con location.origin: il
+   widget lo risolve da se' con un'ancora (`a.href`), e ogni uso di
+   location.origin nel file e' censito apposta. */
+function urlRitornoLogin(){
+  return API_BASE + '/login/telegram/ritorno?da='
+    + encodeURIComponent(location.pathname);
+}
+/* ...e un login rifiutato torna con `?accesso=no`: la stessa frase di
+   prima, e il parametro si toglie dalla barra senza ricaricare. */
+function avvisoAccessoNegato(){
+  if (!/[?&]accesso=no(&|$)/.test(location.search)) return;
+  toast('Accesso non riuscito, riprova', 5000);
   try {
-    const r = await fetch(`${API_BASE}/login/telegram`, {method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(user)});
-    if (!r.ok) throw new Error('login rifiutato');
-    location.reload();
-  } catch (e) {
-    toast('Accesso non riuscito, riprova', 5000);
-  }
-};
+    const u = new URL(location.href);
+    u.searchParams.delete('accesso');
+    history.replaceState(null, '', u.pathname + u.search + u.hash);
+  } catch(e){}
+}
 /* Solo collaudo: finto login web con l'identità corrente, per provare
    il percorso col cookie senza il widget vero. */
 async function provaLoginWeb(){
@@ -64894,6 +64905,7 @@ async function avvia(){
      non nasce un secondo elenco da tenere in pari. */
   apriSicurezzaDaUrl();
   apriPrivacyDaUrl();
+  avvisoAccessoNegato();
   /* PRIMA di ogni fetch: se si atterra su /categoria/{slug}, la prima
      pagina dev'essere gia' quella del reparto — una richiesta sola
      invece di una vetrina intera scaricata per buttarla via. */

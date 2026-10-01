@@ -116081,6 +116081,224 @@ console.log(JSON.stringify({
           e["corpi"])
 
 
+def prove_csp_prova():
+    """LE CINTURE HTTP, LA CSP IN PROVA E IL LOGIN WEB A REDIRECT (1 ott
+    2026, cantiere «CSP e le voci aperte degli audit»).
+
+    Dal vivo barattolo.store rispondeva senza nessuna intestazione di
+    sicurezza. Qui: le cinture che non cambiano niente a chi usa l'app
+    (nosniff, referrer, permissions, HSTS solo sul dominio pubblico),
+    la CSP in modalita' REPORT-ONLY — il browser riferisce e non blocca
+    — col cestino `/api/csp-report` e i suoi argini, e il login web a
+    redirect (`data-auth-url`), che toglie l'unico `eval` della pagina:
+    quello che il Login Widget faceva sul `data-onauth`. Le funzioni
+    pure girano DAVVERO; le rotte hanno la sentinella sul testo, e la
+    risposta vera la prova `collaudo_csp.py` (fastapi in prove.py non
+    c'e')."""
+    import base64
+    import hashlib
+    print("\n🛡️ Le cinture HTTP e la CSP in prova")
+
+    # --- le costanti e i giudici, eseguiti davvero ---------------------
+    i = _SORGENTE.index("CINTURE_HTTP = (")
+    j = _SORGENTE.index('@app.middleware("http")\nasync def cinture_http(')
+    amb = {"MODALITA_COLLAUDO": False, "re": re}
+    exec(_SORGENTE[i:j], amb)
+    csp = amb["_csp_prova"](False)
+    direttive = dict(d.split(" ", 1) for d in csp.split("; "))
+    prova("la CSP in prova NON chiede unsafe-eval", False, "'unsafe-eval'" in csp)
+    # l'inline e' dichiarato, non nascosto: ottocento onclick e tre
+    # blocchi inline, e un nonce li spegnerebbe tutti (fase 2)
+    prova("...e l'inline dichiarato sta su script e stili, e basta", 2,
+          csp.count("'unsafe-inline'"))
+    prova("gli script: casa, inline, e telegram.org per SDK e widget",
+          "'self' 'unsafe-inline' https://telegram.org", direttive["script-src"])
+    prova("object-src e base-uri chiusi", ["'none'", "'none'"],
+          [direttive["object-src"], direttive["base-uri"]])
+    prova("le form restano in casa", "'self'", direttive["form-action"])
+    prova("l'unico iframe ammesso e' il bottone del Login Widget",
+          "https://oauth.telegram.org", direttive["frame-src"])
+    # i relay li scelgono il config e i wallet degli utenti: wss: tutto
+    prova("connect-src: casa e qualunque relay cifrato",
+          "'self' wss:", direttive["connect-src"])
+    prova("...e in collaudo anche ws:, per il relay morto",
+          "connect-src 'self' wss: ws:",
+          [d for d in amb["_csp_prova"](True).split("; ")
+           if d.startswith("connect-src")][0])
+    prova("le foto importate restano su host esterni: img-src https:",
+          True, "https:" in direttive["img-src"])
+    prova("il cestino e' nominato", "/api/csp-report", direttive["report-uri"])
+    # in report-only i browser lo ignorano: lo tiene no_iframe
+    prova("niente frame-ancestors in prova (resta a no_iframe)", False,
+          "frame-ancestors" in csp)
+    prova("default-src 'self' e' la rete di fondo", "'self'",
+          direttive["default-src"])
+
+    cinture = dict(amb["CINTURE_HTTP"])
+    prova("nosniff c'e'", "nosniff", cinture["X-Content-Type-Options"])
+    prova("...e il referrer e' quello di default dei browser",
+          "strict-origin-when-cross-origin", cinture["Referrer-Policy"])
+    # fotocamera e posizione NON si nominano: nell'iframe di Telegram
+    # Web a concederle e' il genitore, e una riga qui potrebbe solo
+    # toglierle
+    prova("Permissions-Policy non tocca fotocamera e posizione", [],
+          [p for p in ("camera", "geolocation")
+           if p in cinture["Permissions-Policy"]])
+    prova("...e spegne solo cio' che l'app non usa", True,
+          "microphone=()" in cinture["Permissions-Policy"])
+
+    hsts = amb["_host_con_hsts"]
+    prova("HSTS sul dominio pubblico", True, hsts("barattolo.store", False))
+    prova("...mai sull'onion, che TLS non ne ha", False,
+          hsts("abcdefghijklmnop.onion", False))
+    prova("...mai in collaudo", False, hsts("barattolo.store", True))
+    prova("...mai su un indirizzo locale", [False, False, False],
+          [hsts("127.0.0.1:8080", False), hsts("localhost", False), hsts("", False)])
+    prova("...e un anno, senza preload ne' sottodomini", "max-age=31536000",
+          amb["HSTS_UN_ANNO"])
+
+    # --- il middleware: il testo ---------------------------------------
+    mw = pezzo("cinture_http")
+    prova("il middleware aggiunge, non sovrascrive", True, "setdefault(" in mw)
+    prova("la CSP in prova va alle sole pagine HTML", True,
+          'startswith("text/html")' in mw)
+    prova("...non ai widget, che hanno la loro", True,
+          'request.url.path.startswith("/widget/")' in mw)
+    prova("...e non a chi ha gia' una CSP vera (la busta)", True,
+          '"Content-Security-Policy" not in r.headers' in mw)
+    prova("l'HSTS passa dal giudice dell'host", True, "_host_con_hsts(" in mw)
+    # gira DENTRO no_iframe (prima nel file = piu' interno): vede la
+    # risposta prima che la leva dell'iframe ci metta la sua CSP
+    prova("le cinture stanno PRIMA di no_iframe nel file", True,
+          _SORGENTE.index("async def cinture_http(")
+          < _SORGENTE.index("async def no_iframe("))
+
+    # --- il cestino: la riga e gli argini, eseguiti davvero -------------
+    i = _SORGENTE.index("CSP_REPORT_MAX_BYTE = ")
+    j = _SORGENTE.index('@app.post("/api/csp-report")')
+    amb2 = {"re": re}
+    exec(_SORGENTE[i:j], amb2)
+    riga = amb2["_riga_csp"]
+    r = riga({"csp-report": {"effective-directive": "script-src",
+                             "blocked-uri": "https://evil.example/x.js",
+                             "source-file": "https://barattolo.store/",
+                             "line-number": 12,
+                             "document-uri": "https://barattolo.store/",
+                             "script-sample": "alert(1)"}})
+    prova("la riga del journal dice cosa, dove e in quale pagina",
+          "\U0001f6e1\ufe0f CSP: script-src \u2190 https://evil.example/x.js"
+          " @ https://barattolo.store/:12 (https://barattolo.store/) \u00abalert(1)\u00bb", r)
+    prova("...e legge anche la forma della Reporting API", True,
+          "img-src \u2190 http://x" in riga({"type": "csp-violation",
+                                             "body": {"effectiveDirective": "img-src",
+                                                      "blockedURL": "http://x"}}))
+    sporco = riga({"csp-report": {"blocked-uri": "a\nb\x1bc\rd",
+                                  "violated-directive": "img-src"}})
+    prova("i caratteri di controllo non arrivano al journal", [],
+          [ch for ch in sporco if ord(ch) < 32])
+    prova("il campione si taglia a 80", True,
+          len(riga({"csp-report": {"blocked-uri": "x", "script-sample": "y" * 500}})) < 200)
+    prova("niente da dire = riga vuota", ["", "", ""],
+          [riga(None), riga({}), riga({"csp-report": {"altro": 1}})])
+    scrivere = amb2["_csp_da_scrivere"]
+    t0 = 1_800_000_000.0
+    prova("la prima volta si scrive", True, scrivere("A", t0))
+    prova("...la stessa riga nel minuto no", False, scrivere("A", t0 + 30))
+    prova("...dopo un minuto di nuovo si'", True, scrivere("A", t0 + 61))
+    t1 = t0 + 600
+    tante = [scrivere(f"riga {n}", t1) for n in range(amb2["CSP_REPORT_RIGHE_MINUTO"] + 5)]
+    prova("il tetto di righe al minuto regge", amb2["CSP_REPORT_RIGHE_MINUTO"],
+          tante.count(True))
+    prova("...e al minuto dopo si riparte", True, scrivere("altra", t1 + 60))
+    prova("il cestino non cresce per sempre", True, "_CSP_VISTE.clear()" in pezzo("_csp_da_scrivere"))
+    rotta = pezzo("csp_report")
+    prova("la rotta legge il corpo a pezzi, col tetto", True,
+          "async for pezzo in req.stream():" in rotta and "CSP_REPORT_MAX_BYTE" in rotta)
+    prova("...risponde 413 oltre il tetto e 204 a tutto il resto", True,
+          "status_code=413" in rotta and "status_code=204" in rotta)
+    prova("...senza sessione: riferisce anche chi non e' entrato", False,
+          "verifica_utente" in rotta)
+    prova("...e senza toccare il database", False, "db()" in rotta)
+    prova("la guardia CSRF la lascia passare per nome", True,
+          'request.url.path != "/api/csp-report"' in pezzo("guardia_csrf"))
+
+    # --- il widget: la SUA CSP, con l'impronta dello script ------------
+    i = _SORGENTE.index('WIDGET_JS = """')
+    j = _SORGENTE.index("\n\n\ndef _widget_pagina(")
+    amb3 = {"base64": base64, "hashlib": hashlib}
+    exec(_SORGENTE[i:j], amb3)
+    dentro = amb3["WIDGET_JS"].split("<script>", 1)[1].split("</script>")[0]
+    atteso = "sha256-" + base64.b64encode(hashlib.sha256(dentro.encode()).digest()).decode()
+    prova("l'impronta e' lo sha256 del solo contenuto fra i tag", atteso,
+          amb3["_impronta_script"](amb3["WIDGET_JS"]))
+    cw = amb3["CSP_WIDGET"]
+    prova("il widget: nessuno script tranne il suo", True,
+          f"script-src '{atteso}'" in cw and "'unsafe-inline'" not in cw.split("script-src")[1].split(";")[0])
+    prova("...default-src 'none' e niente frame-ancestors", True,
+          cw.startswith("default-src 'none'") and "frame-ancestors" not in cw)
+    prova("...e la pagina del widget la porta davvero", True,
+          "Content-Security-Policy-Report-Only" in pezzo("_widget_pagina")
+          and "CSP_WIDGET" in pezzo("_widget_pagina"))
+
+    # --- il login web a redirect ---------------------------------------
+    i = _SORGENTE.index("FORMA_RITORNO_LOGIN = ")
+    j = _SORGENTE.index('@app.get("/api/login/telegram/ritorno")')
+    amb4 = {"re": re}
+    exec(_SORGENTE[i:j], amb4)
+    dove = amb4["_dove_tornare"]
+    prova("si torna alla pagina di partenza", "/negozio/ab12cd34", dove("/negozio/ab12cd34"))
+    prova("...ma mai fuori casa", ["/", "/", "/", "/", "/"],
+          [dove("//evil.example"), dove("https://evil.example/"), dove(""),
+           dove("/a?b=1"), dove("negozio")])
+    rl = pezzo("login_telegram_ritorno")
+    prova("la verifica e' quella di sempre", True, "verifica_login_widget(d)" in rl)
+    prova("...e la sessione si apre dalla porta unica", True, "apri_sessione(" in rl)
+    # 303 sul si' E sul no, e mai un 302: un POST-redirect-GET vuole
+    # il 303, e il tortura ha preso la variante con un solo 303
+    prova("...con un 303 a dove si era, sul si' e sul no", (2, False),
+          (rl.count("status_code=303"), "302" in rl))
+    prova("...e `_dove_tornare` decide dove", True, "_dove_tornare(" in rl)
+    prova("`da` si toglie PRIMA della firma", True, 'd.pop("da"' in rl)
+    prova("un login rifiutato torna con ?accesso=no, non con un errore nudo",
+          True, '"?accesso=no"' in rl)
+    prova("la POST del collaudo resta", True,
+          '@app.post("/api/login/telegram")' in _SORGENTE)
+
+    # --- il client -----------------------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    # si conta l'ATTRIBUTO messo sul tag, non la parola: nei commenti
+    # compare apposta, a dire perche' non c'e' piu'
+    prova("client: niente piu' data-onauth (era l'unico eval della pagina)",
+          0, mini.count("setAttribute('data-onauth'"))
+    prova("client: il widget usa data-auth-url, nei DUE posti", 2,
+          mini.count("s.setAttribute('data-auth-url', urlRitornoLogin());"))
+    prova("client: e onTelegramAuth non esiste piu'", 0, mini.count("onTelegramAuth"))
+    url = pezzo_js(mini, "function urlRitornoLogin(")
+    prova("client: la rotta del ritorno, col percorso di partenza", True,
+          "/login/telegram/ritorno?da=" in url
+          and "encodeURIComponent(location.pathname)" in url)
+    # relativo: il widget lo risolve da se', e location.origin e' censito
+    prova("client: ...relativa, senza location.origin", False,
+          "location.origin" in url)
+    neg = pezzo_js(mini, "function avvisoAccessoNegato(")
+    prova("client: il no dice la frase di sempre", True,
+          "Accesso non riuscito, riprova" in neg)
+    prova("...e toglie il parametro dalla barra senza ricaricare", True,
+          "replaceState" in neg and "searchParams.delete('accesso')" in neg)
+    i = mini.index("async function avvia(")
+    # `find` e non `index`: una chiamata sparita deve dare una rossa col
+    # suo nome, non far esplodere la sezione
+    k = mini.find("avvisoAccessoNegato();", i)
+    prova("client: l'avvio lo chiede", True, k > 0 and k - i < 3000)
+    prova("client: lo script del widget e' lo stesso di prima", 2,
+          mini.count("s.src = 'https://telegram.org/js/telegram-widget.js?22';"))
+
+    # --- la CI: il collaudo entra per nome --------------------------------
+    wf = open(os.path.join(".github", "workflows", "prove.yml"), encoding="utf-8").read()
+    prova("il collaudo delle cinture e' nella CI, compilato e lanciato", True,
+          "collaudo_csp.py" in wf and "\n             collaudo_csp\n" in wf)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -116299,6 +116517,7 @@ def main():
               prove_badge_nostr,
               prove_reputazione_nostr,
               prove_nip89_handler,
+              prove_csp_prova,
               prove_config_esempio):
         try:
             f()
