@@ -37,8 +37,14 @@ def main():
     print("\n[la sfida del login, per IP e solo in chiaro]")
     chiaro = {"X-Forwarded-For": "93.184.216.34"}   # un IP pubblico VERO (198.51.100.x e' «di documentazione», e per ipaddress privato)
     stati = [c.get("/api/login/nostr/sfida", headers=chiaro).status_code for _ in range(31)]
-    prova("trenta sfide passano, la trentunesima e' un 429", [200] * 30 + [429], stati)
-    prova("...e un altro IP ha il suo secchio", 200,
+    # senza coincurve (la gabbia della CI non lo installa) la sfida e' un
+    # 503 «login Nostr spento», e il freno viene PRIMA di quel controllo
+    # apposta: quel che si prova e' «mai 429 per trenta, 429 al 31°»
+    aperta = 200 if S.ChiavePubblicaNostr is not None else 503
+    print(f"    (la sfida risponde {aperta}: coincurve "
+          f"{'c\'e\'' if aperta == 200 else 'manca, login Nostr spento'})")
+    prova("trenta sfide passano il freno, la trentunesima e' un 429", [aperta] * 30 + [429], stati)
+    prova("...e un altro IP ha il suo secchio", aperta,
           c.get("/api/login/nostr/sfida", headers={"X-Forwarded-For": "151.101.1.1"}).status_code)
     onion = {"X-Forwarded-For": "127.0.0.1", "Host": "abcdefghijklmnop.onion"}
     stati = [c.get("/api/login/nostr/sfida", headers=onion).status_code for _ in range(40)]
