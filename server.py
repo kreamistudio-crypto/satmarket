@@ -62572,7 +62572,13 @@ def vendor_nostr():
     se' perche' `getConversationKey` la restituisce gia' passata
     dall'extract, cioe' irreversibile. Un diff di dodici righe su un
     file da 250 KB, mai una ricostruzione: chi aggiorna la libreria
-    rimette quelle righe, e prove_bundle_nostr le pretende."""
+    rimette quelle righe, e prove_bundle_nostr le pretende.
+    Dal 1 ott 2026 porta anche un INNESTO, `nip49` (la chiave di
+    moderatore che esce solo cifrata): scrypt e pbkdf2 di @noble/hashes
+    2.0.1 e nip49.ts di nostr-tools, copiati a byte uguali in fondo al
+    file da `innesta_nip49.py`, con il loro export. Chi aggiorna la
+    libreria rifa' anche l'innesto: prove_chiave_moderatore_portatile
+    lo pretende sul vettore di prova della NIP."""
     return FileResponse("vendor/nostr.bundle.js",
                         media_type="application/javascript",
                         headers={"Cache-Control": "public, max-age=86400"})

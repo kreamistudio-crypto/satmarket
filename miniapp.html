@@ -2985,6 +2985,13 @@
     .mod-decidi .btn,.chatmod .btn{margin-top:8px}
     .mod-chiave{margin:8px 0;font-size:13px}
     .mod-chiave code{display:block;overflow-wrap:anywhere;color:var(--ink-soft);margin:2px 0}
+    /* la chiave cifrata (ncryptsec): una riga lunga di lettere e cifre
+       che si deve poter leggere e selezionare intera */
+    .mod-cifrata{width:100%;box-sizing:border-box;min-height:96px;margin-top:6px;
+      font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.45;
+      overflow-wrap:anywhere;word-break:break-all}
+    #modChiaveCorpo .btn{margin-top:8px}
+    #modChiaveCorpo .hint+.hint{margin-top:6px}
     .chatmod{margin:12px 0;padding:12px 14px;border-radius:16px;
       border:1px solid var(--field-line);background:var(--card)}
     .chatmod small{color:var(--ink-soft);font-weight:600}
@@ -12070,6 +12077,16 @@ document.getElementById('cartello')?.remove();</script>
     <h3 id="p2pProfiloTit">👤 Il tuo profilo di scambio</h3>
     <div id="p2pProfiloCorpo"></div>
   </div>
+  <!-- LA COPIA DELLA CHIAVE DI MODERATORE (1 ott 2026): un foglio per
+       due gesti, esporta e importa, che `renderChiaveModP2P` riempie.
+       La chiave privata ne esce SOLO cifrata (NIP-49) e ci rientra
+       solo passando dalla password: il server non vede ne' l'una ne'
+       l'altra. Il titolo lo scrive il render, col textContent. -->
+  <div class="sheet" id="modChiaveSheet" role="dialog" aria-modal="true" aria-labelledby="modChiaveTit">
+    <div class="grab"></div>
+    <h3 id="modChiaveTit">🔑 La chiave di moderatore</h3>
+    <div id="modChiaveCorpo"></div>
+  </div>
   <!-- IL FOGLIO «PUBBLICA» E' A PIENO SCHERMO (set 2026, ridisegno):
        cinque sezioni non stanno in un foglio dal basso, e a scorrere
        dentro una finestra dentro una pagina si perde il fondo. La
@@ -15398,6 +15415,8 @@ function navChiudiStrato(s){
   if (s.t==='tourp2p') return chiudiTourP2P();
   if (s.t==='test') return chiudiModaleTest();
   if (s.k==='pickerSheet') return chiudiPicker();
+  /* la chiave cifrata e le password non restano in pagina a foglio chiuso */
+  if (s.k==='modChiaveSheet') pulisciChiaveModP2P();
   el(s.k)?.classList.remove('open');
   if (!document.querySelector('.sheet.open')) el('sheetBg').classList.remove('open');
   if (s.k==='paySheet' && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
@@ -27370,6 +27389,8 @@ function closeSheet(){
   el('confermaSheet').classList.remove('open');
   el('jarShareSheet').classList.remove('open');
   el('p2pProfiloSheet').classList.remove('open');
+  el('modChiaveSheet').classList.remove('open');
+  pulisciChiaveModP2P();
   el('p2pNuovoSheet').classList.remove('open');
   el('p2pDettSheet').classList.remove('open');
   el('p2pQuantoSheet').classList.remove('open');
@@ -43825,8 +43846,13 @@ async function provaLoginWeb(){
    hmac, hkdf, secp256k1) che il file conteneva gia' -- il suffisso
    serve a svegliare la cache di un giorno della rotta, e a dire a
    chi legge che il bundle non e' quello di serie. Il numero in coda
-   sale a ogni export aggiunto: chi ne mette un sesto lo alzi, o i
-   browser di chi ha gia' aperto l'app terranno il file di ieri. */
+   sale a ogni export aggiunto: chi ne mette un altro lo alzi, o i
+   browser di chi ha gia' aperto l'app terranno il file di ieri.
+   `-mostro3` (1 ott 2026) e' il SESTO, `nip49`: non un export in
+   piu' di codice che c'era gia', ma un INNESTO — scrypt e pbkdf2 di
+   @noble/hashes piu' nip49.ts di nostr-tools, copiati a byte uguali
+   in fondo al bundle (`innesta_nip49.py`) — per la chiave di
+   moderatore che esce solo cifrata (vedi «la copia della chiave»). */
 let nostrToolsPromessa = null;
 /* I PEZZI CHE IL CLIENT CHIAMA, e il bundle deve averli TUTTI (set 2026,
    dal campo: il primo new-order verso il coordinatore moriva su
@@ -43848,8 +43874,8 @@ let nostrToolsPromessa = null;
    pezzo che qualcuno chiamera' fra sei mesi entra nel conto da solo. */
 const PEZZI_NOSTR = ['Relay', 'finalizeEvent', 'generateSecretKey',
   'getEventHash', 'getPublicKey', 'hkdf', 'hmac', 'nip04', 'nip13',
-  'nip19', 'nip44', 'nip47', 'schnorr', 'secp256k1', 'sha256', 'utils',
-  'verifyEvent'];
+  'nip19', 'nip44', 'nip47', 'nip49', 'schnorr', 'secp256k1', 'sha256',
+  'utils', 'verifyEvent'];
 /* DUE MESSAGGI E NON UNO (17 set 2026, dal campo: su un'installazione
    FRESCA il P2P diceva «versione vecchia» mentre la libreria non era
    arrivata affatto — e mandava a svuotare una cache che non c'entrava
@@ -43903,7 +43929,7 @@ function caricaNostrTools(){
   if (window.NostrTools) { esigiBundleNostr(); return Promise.resolve(); }
   if (!nostrToolsPromessa) nostrToolsPromessa = new Promise((ok, no)=>{
     const s = document.createElement('script');
-    s.src = `${FOTO_BASE}/vendor/nostr.js?v=2.23.12-mostro2`;
+    s.src = `${FOTO_BASE}/vendor/nostr.js?v=2.23.12-mostro3`;
     /* si azzera come nel ramo dell'errore di rete: cosi' chi svuota la
        cache e riprova non deve ricaricare la pagina */
     s.onload = ()=>{ try { esigiBundleNostr(); ok(); }
@@ -62180,7 +62206,7 @@ async function creaChiaveModeratoreP2P(){
       ? 'La tua chiave di moderatore sta su un altro dispositivo. Creandone una qui, quella smette di essere la tua: '
       : 'La chiave nasce su questo dispositivo e non lo lascia mai. ')
       + 'La chiave nuova va aggiunta al nodo prima di poter prendere una disputa. '
-      + 'Se perdi questo dispositivo, se ne crea un\'altra.',
+      + 'Se perdi questo dispositivo la ritrovi solo da una copia esportata; sennò se ne crea un\'altra.',
     etichetta: 'Sì, creala',
     poi: async () => {
       const rip = attesaP2P('Creo la chiave…');
@@ -62199,6 +62225,224 @@ async function creaChiaveModeratoreP2P(){
       await chiediModerazioneP2P(true);
       renderModerazioneP2P();
     }
+  });
+}
+
+/* ---- la copia della chiave: esce SOLO cifrata (1 ott 2026) ----
+   La chiave di moderatore nasce sul telefono e non ha copia: telefono
+   perso = chiave nuova da registrare e da aggiungere al nodo. Da qui
+   si puo' ESPORTARE — ma la privata non esce mai in chiaro: solo nella
+   forma NIP-49 (`ncryptsec1…`), cifrata con una password che sceglie il
+   moderatore (scrypt con log_n 16, XChaCha20-Poly1305), e si IMPORTA su
+   un altro dispositivo con la stessa password. Il server non vede ne'
+   la chiave ne' la password: le due funzioni non chiamano `fetch`, e
+   l'unica chiamata al server dell'import e' la pubblica
+   (`moderazione/chiave`), la stessa della creazione, SOLO quando la
+   chiave registrata per questa persona e' un'altra — se e' la stessa il
+   nodo la riconosce gia' e non c'e' niente da dire. LA PASSWORD NON SI
+   RECUPERA: non la conosciamo e la copia senza di lei non vale niente;
+   lo si dice prima di cifrare. Il foglio si pulisce da solo a ogni
+   chiusura (closeSheet e navChiudiStrato): la cifrata e le password
+   non restano in pagina. Lo scrypt gira con le gemelle ASINCRONE del
+   bundle, che cedono il passo ogni 10 ms: un telefono lento non si
+   pianta. La prova del nove sta DENTRO l'export — la copia appena fatta
+   si riapre con la stessa password e deve dare la stessa pubblica —
+   perche' una copia che non si riapre si scopre il giorno del telefono
+   perso, cioe' troppo tardi. */
+const MOD_PASSWORD_MIN = 8;
+let modChiaveModo = '';        // 'esporta' | 'importa' (vuoto = foglio chiuso)
+let modChiaveCifrata = '';     // l'ncryptsec appena prodotto: vive solo a foglio aperto
+let modChiaveFile = '';        // il testo del file caricato per l'import
+function pulisciChiaveModP2P(){
+  modChiaveModo = ''; modChiaveCifrata = ''; modChiaveFile = '';
+  const box = el('modChiaveCorpo');
+  if (box) box.innerHTML = '';
+}
+function apriChiaveModP2P(modo){
+  if (!moderatoreP2P()) return;
+  haptic();
+  pulisciChiaveModP2P();
+  modChiaveModo = modo === 'esporta' ? 'esporta' : 'importa';
+  renderChiaveModP2P();
+  el('sheetBg').classList.add('open');
+  el('modChiaveSheet').classList.add('open');
+}
+/* il campo nascosto `username` con un nome fisso e' lo stesso trucco del
+   codice segreto del profilo: cosi' il gestore di password del browser
+   si OFFRE di salvare la password con un'etichetta parlante */
+const MOD_CAMPO_UTENTE = '<input type="text" name="username" value="barattolo-chiave-di-moderatore" autocomplete="username" '
+  + 'readonly tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px">';
+function renderChiaveModP2P(){
+  const box = el('modChiaveCorpo');
+  if (!box || !modChiaveModo) return;
+  const k = chiaveModeratoreP2P();
+  el('modChiaveTit').textContent = modChiaveModo === 'esporta'
+    ? '📤 Esporta la chiave di moderatore' : '📥 Importa una chiave di moderatore';
+  if (modChiaveModo === 'esporta') {
+    if (!k) { box.innerHTML = '<div class="hint">Su questo dispositivo non c\'è una chiave da esportare.</div>'; return; }
+    if (modChiaveCifrata) {
+      box.innerHTML = '<div class="hint">Questa è la tua chiave di moderatore, <b>cifrata</b> con la password che hai scelto. '
+        + 'Senza la password non si apre, e la password non la conosciamo: conserva tutt\'e due nel gestore di password, '
+        + 'mai nello stesso messaggio.</div>'
+        + '<textarea class="mod-cifrata" id="modChiaveTesto" readonly rows="5" spellcheck="false" aria-label="La chiave cifrata"></textarea>'
+        + '<button class="btn orange" onclick="copiaChiaveCifrataModP2P()">📋 Copia la chiave cifrata</button>'
+        + '<button class="btn ghost" onclick="scaricaChiaveCifrataModP2P()">💾 Scarica come file</button>'
+        + '<div class="hint">Dentro Telegram il file può non scaricarsi: in quel caso copia il testo.</div>';
+      /* il testo entra col .value: mai dentro un template */
+      el('modChiaveTesto').value = modChiaveCifrata;
+      return;
+    }
+    const nota = (p2pMod && p2pMod.chiave && p2pMod.chiave !== k.pub)
+      ? '<div class="trust-note"><span>⚠️</span><span>La chiave su questo dispositivo non è quella registrata per te: esporti una chiave vecchia.</span></div>'
+      : '';
+    box.innerHTML = '<div class="hint">La chiave esce <b>solo cifrata</b> (NIP-49) con una password che scegli adesso: '
+      + 'il testo che ottieni si può copiare o salvare come file, e con la stessa password la chiave torna su un altro dispositivo. '
+      + '<b>Se dimentichi la password la copia è persa</b>: non la conosciamo e non possiamo recuperarla.</div>'
+      + nota
+      + '<form id="modChiaveForm" onsubmit="eseguiEsportaChiaveModP2P(); return false;">'
+      + MOD_CAMPO_UTENTE
+      + '<div class="field"><label>Password (almeno ' + MOD_PASSWORD_MIN + ' caratteri)</label>'
+      + '<input type="password" id="modChiavePw1" name="password" autocomplete="new-password" spellcheck="false"></div>'
+      + '<div class="field"><label>Ripeti la password</label>'
+      + '<input type="password" id="modChiavePw2" autocomplete="new-password" spellcheck="false"></div>'
+      + '<button type="submit" class="btn orange">🔐 Cifra ed esporta</button>'
+      + '</form>';
+    return;
+  }
+  box.innerHTML = '<div class="hint">Incolla la chiave cifrata (comincia con <span class="mono">ncryptsec1…</span>) '
+    + 'o carica il file, e scrivi la password con cui l\'hai esportata. La chiave si ricostruisce <b>qui, sul dispositivo</b>: '
+    + 'al server non arrivano né lei né la password.</div>'
+    + '<form id="modChiaveForm" onsubmit="eseguiImportaChiaveModP2P(); return false;">'
+    + MOD_CAMPO_UTENTE
+    + '<div class="field"><label>La chiave cifrata</label>'
+    + '<textarea class="mod-cifrata" id="modChiaveIn" rows="4" autocomplete="off" spellcheck="false" placeholder="ncryptsec1…"></textarea></div>'
+    + '<input type="file" id="modChiaveFile" accept=".txt,.ncryptsec,text/plain" style="display:none" onchange="leggiFileChiaveModP2P(this)">'
+    + '<button type="button" class="btn ghost" onclick="el(\'modChiaveFile\').click()">📂 Carica il file</button>'
+    + '<div class="field"><label>La password</label>'
+    + '<input type="password" id="modChiavePw1" name="password" autocomplete="current-password" spellcheck="false"></div>'
+    + '<button type="submit" class="btn orange">📥 Importa la chiave</button>'
+    + '</form>';
+  if (modChiaveFile) el('modChiaveIn').value = modChiaveFile;
+}
+async function eseguiEsportaChiaveModP2P(){
+  const k = chiaveModeratoreP2P();
+  if (!k || modChiaveModo !== 'esporta') return;
+  const p1 = el('modChiavePw1').value, p2 = el('modChiavePw2').value;
+  if (p1.length < MOD_PASSWORD_MIN) { toast('La password vuole almeno ' + MOD_PASSWORD_MIN + ' caratteri'); return; }
+  if (p1 !== p2) { toast('Le due password non sono uguali: riscrivile'); return; }
+  const rip = attesaP2P('Cifro la chiave…');
+  try {
+    await caricaNostrTools();
+    const NT = window.NostrTools;
+    const cifrata = await NT.nip49.encryptAsync(NT.utils.hexToBytes(k.sk), p1);
+    /* la prova del nove, prima di consegnarla */
+    const riaperta = await NT.nip49.decryptAsync(cifrata, p1);
+    if (NT.getPublicKey(riaperta) !== k.pub) throw new Error('la copia non si riapre');
+    modChiaveCifrata = cifrata;
+  } catch(e) {
+    toast('Non è riuscito: ' + (e && e.message || e));
+    return;
+  } finally { rip(); }
+  renderChiaveModP2P();
+}
+function copiaChiaveCifrataModP2P(){
+  if (!modChiaveCifrata) return;
+  copiaLink(modChiaveCifrata, 'Chiave cifrata copiata: mettila nel gestore di password 🔐');
+}
+function scaricaChiaveCifrataModP2P(){
+  if (!modChiaveCifrata) return;
+  const k = chiaveModeratoreP2P();
+  const nome = 'barattolo-moderatore-' + (k ? npubP2P(k.pub).slice(0, 13) : 'chiave') + '.ncryptsec.txt';
+  const url = URL.createObjectURL(new Blob([modChiaveCifrata + '\n'], {type: 'text/plain'}));
+  const a = document.createElement('a');
+  a.href = url; a.download = nome;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast('File scaricato: ' + nome);
+}
+function leggiFileChiaveModP2P(input){
+  const f = input.files && input.files[0];
+  if (!f) return;
+  /* un ncryptsec sono ~160 caratteri: un file grande non e' una chiave */
+  if (f.size > 4096) { toast('Questo file non sembra una chiave cifrata'); input.value = ''; return; }
+  f.text().then(t => {
+    modChiaveFile = String(t || '').trim();
+    const c = el('modChiaveIn');
+    if (c) c.value = modChiaveFile;
+    toast('File letto: ora la password');
+  }).catch(() => toast('Non riesco a leggere il file'));
+  input.value = '';
+}
+/* tollera gli a capo del file, gli spazi di una copia e le maiuscole di
+   una tastiera che corregge: resta la sola riga che e' la chiave */
+function ncryptsecPulito(t){
+  const m = String(t || '').toLowerCase().match(/ncryptsec1[a-z0-9]+/);
+  return m ? m[0] : '';
+}
+/* le tre ragioni per cui una copia non si apre, dette con parole
+   diverse: la libreria alza «invalid tag» per la password sbagliata (e
+   per un testo cifrato toccato), il checksum per una copia rovinata,
+   prefisso e versione per un testo che non e' un ncryptsec */
+function ragioneImportChiaveModP2P(e){
+  const m = String(e && e.message || e);
+  if (/invalid tag/i.test(m)) return 'Password sbagliata (o copia rovinata): la chiave non si apre';
+  if (/checksum|prefix|version|bech32|invalid/i.test(m)) return 'Questa copia è rovinata o non è una chiave cifrata';
+  return 'Non è riuscito: ' + m;
+}
+async function eseguiImportaChiaveModP2P(){
+  if (!moderatoreP2P() || modChiaveModo !== 'importa') return;
+  const cifrata = ncryptsecPulito(el('modChiaveIn').value);
+  const pw = el('modChiavePw1').value;
+  if (!cifrata) { toast('Non vedo una chiave cifrata: comincia con ncryptsec1'); return; }
+  if (!pw) { toast('Serve la password con cui l\'hai esportata'); return; }
+  const rip = attesaP2P('Apro la chiave…');
+  let k = null;
+  try {
+    await caricaNostrTools();
+    const NT = window.NostrTools;
+    const sk = await NT.nip49.decryptAsync(cifrata, pw);
+    k = {sk: NT.utils.bytesToHex(sk), pub: NT.getPublicKey(sk),
+         creata: Math.floor(Date.now() / 1000), importata: 1};
+  } catch(e) {
+    toast(ragioneImportChiaveModP2P(e));
+    return;
+  } finally { rip(); }
+  const gia = chiaveModeratoreP2P();
+  if (gia && gia.pub === k.pub) {
+    chiudiFoglioP2P('modChiaveSheet'); pulisciChiaveModP2P();
+    toast('Questa chiave è già su questo dispositivo ✓');
+    return;
+  }
+  const registrata = (p2pMod && p2pMod.chiave) || '';
+  const diversa = !!gia;
+  const daRegistrare = registrata !== k.pub;
+  const fine = async () => {
+    const rip2 = attesaP2P('Importo la chiave…');
+    try {
+      /* al server la sola PUBBLICA, e solo se quella registrata e' un'altra;
+         sul dispositivo si scrive DOPO, come alla creazione */
+      if (daRegistrare) await modFetch('moderazione/chiave', {chiave: k.pub});
+      localStorage.setItem(chiaveP2P(MOD_CHIAVE_P2P), JSON.stringify(k));
+      chiudiFoglioP2P('modChiaveSheet'); pulisciChiaveModP2P();
+      toast(daRegistrare ? 'Chiave importata e registrata ✓' : 'Chiave importata: è quella che il nodo conosce ✓');
+    } catch(e) {
+      toast('Non è riuscito: ' + (e && e.message || e));
+    } finally { rip2(); }
+    await chiediModerazioneP2P(true);
+    renderModerazioneP2P();
+  };
+  if (!diversa && !daRegistrare) { await fine(); return; }
+  chiediConferma({
+    titolo: 'Usare questa chiave qui?',
+    corpo: (diversa
+      ? 'Su questo dispositivo c\'è già una chiave di moderatore diversa: da adesso quella smette di funzionare qui, e se non ne hai una copia esportata è persa. '
+      : '')
+      + (daRegistrare
+         ? (registrata ? 'La chiave registrata per te oggi è un\'altra: questa prende il suo posto e quella smette di funzionare ovunque. ' : '')
+           + 'Se questa chiave non è ancora sul nodo, va aggiunta prima di poter prendere una disputa.'
+         : 'È la chiave già registrata per te: il nodo la riconosce.'),
+    etichetta: 'Sì, usala',
+    poi: fine
   });
 }
 
@@ -62691,11 +62935,15 @@ function renderModerazioneP2P(){
   if (!ho) {
     testa += '<div class="trust-note"><span>🔑</span><span>'
       + (p2pMod.chiave
-         ? 'La tua chiave di moderatore sta su un altro dispositivo: da qui guardi, per prendere e decidere usa quello.'
-         : 'Per prendere una disputa ti serve una chiave di moderatore. Nasce su questo dispositivo e non lo lascia mai.')
+         ? 'La tua chiave di moderatore sta su un altro dispositivo: da qui guardi, per prendere e decidere usa quello — o portala qui da una copia esportata.'
+         : 'Per prendere una disputa ti serve una chiave di moderatore. Nasce su questo dispositivo, e ne esce solo cifrata con una password tua.')
       + '</span></div><button class="btn ghost" onclick="creaChiaveModeratoreP2P()">'
-      + (p2pMod.chiave ? 'Crea una chiave nuova qui' : '🔑 Crea la mia chiave di moderatore') + '</button>';
+      + (p2pMod.chiave ? 'Crea una chiave nuova qui' : '🔑 Crea la mia chiave di moderatore') + '</button>'
+      + '<button class="btn ghost" onclick="apriChiaveModP2P(\'importa\')">📥 Importa una chiave</button>';
   }
+  /* la copia: solo chi HA una chiave qui puo' esportarla, e la pagina
+     dice se e' quella registrata o una vecchia (l'altra riga lo dice) */
+  if (k) testa += '<button class="btn ghost" onclick="apriChiaveModP2P(\'esporta\')">📤 Esporta la chiave (cifrata)</button>';
   const vive = p2pMod.dispute.filter(d => d.stato !== 'chiusa');
   const chiuse = p2pMod.dispute.filter(d => d.stato === 'chiusa');
   const chiavi = (p2pMod.moderatori || []).map(m =>

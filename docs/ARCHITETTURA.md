@@ -28456,6 +28456,38 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   LA PAGINA: `view-p2pmod`, aggiunta a `VISTE_NAV_P2P` con `.add` (le
   quattro viste di tutti restano quattro), accende «I miei scambi»; la
   striscia è `#p2pModStriscia`; il rimando dal pannello è `#admModP2P`.
+  LA COPIA DELLA CHIAVE (1 ott 2026, perché in CANTIERI, «Esporta /
+  importa la chiave di moderatore»). La privata esce SOLO cifrata,
+  nella forma NIP-49 (`ncryptsec1…`: scrypt log_n 16 r 8 p 1 sulla
+  password in NFKC, XChaCha20-Poly1305 col byte di sicurezza come aad,
+  versione 2) con una password del moderatore, e rientra su un altro
+  dispositivo con la stessa password. Il foglio è `#modChiaveSheet`
+  (`apriChiaveModP2P('esporta'|'importa')`, `renderChiaveModP2P`), in
+  closeSheet e pulito anche da `navChiudiStrato`. L'export
+  (`eseguiEsportaChiaveModP2P`): due password uguali di almeno
+  `MOD_PASSWORD_MIN` (8), `nip49.encryptAsync`, e la PROVA DEL NOVE —
+  la copia si riapre con la stessa password e deve dare la stessa
+  pubblica — prima di consegnarla; la cifrata entra nel campo col
+  `.value`, si copia (`copiaLink`) o si scarica
+  (`barattolo-moderatore-<npub>.ncryptsec.txt`, un Blob). L'import
+  (`eseguiImportaChiaveModP2P`): `ncryptsecPulito` tollera a capo,
+  spazi e maiuscole; `nip49.decryptAsync`; la password sbagliata e la
+  copia rovinata hanno due frasi (`ragioneImportChiaveModP2P`); poi il
+  giudizio — stessa chiave già qui = niente; chiave DIVERSA già qui o
+  chiave registrata diversa = `chiediConferma` che dice che cosa smette
+  di funzionare; la pubblica va al server (`moderazione/chiave`, la
+  rotta della creazione) SOLO se quella registrata è un'altra, e la
+  scrittura sul dispositivo viene DOPO, come alla creazione. Il server
+  non vede né la chiave né la password: le funzioni non hanno `fetch`.
+  IL BUNDLE: `nip49` è il sesto export di `/vendor/nostr.js`
+  (`?v=2.23.12-mostro3`, SW `barattolo-v10`), ma non è un export di
+  codice che c'era già — è un INNESTO in fondo al file, scritto da
+  `innesta_nip49.py` (nello scratchpad del cantiere, ricetta in
+  CANTIERI): pbkdf2.js e scrypt.js di @noble/hashes 2.0.1 a byte uguali,
+  sei utility, nip49.ts di nostr-tools 2.23.12 (`encrypt49`/`decrypt49`,
+  perché i nudi sono di nip04) e due gemelle asincrone che cedono il
+  passo ogni 10 ms. `prove_chiave_moderatore_portatile` lo pretende sul
+  vettore di prova della NIP.
 
 - IL CONTANTI DI PERSONA NEL P2P (30 set 2026, perché in CANTIERI, «Il
   contanti di persona nel P2P: tetto, regola, prova d'incontro,

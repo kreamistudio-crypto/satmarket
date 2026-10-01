@@ -37946,8 +37946,14 @@ def prove_fogli_di_casa():
     # «Tornare all'ordine di serie?» (`ordineSponsorDiSerie`). La fila
     # scelta con le frecce si cancella, e non torna da sola: si chiede,
     # dicendo che cosa si perde.
-    prova("i gesti che passano dalla domanda unica sono settantacinque",
-          75, solo_codice(mini).count("chiediConferma({"))
+    # SETTANTASEI (1 ott 2026, la copia della chiave di moderatore):
+    # «Usare questa chiave qui?» (`eseguiImportaChiaveModP2P`), solo
+    # quando l'import TOGLIE qualcosa — una chiave diversa gia' su quel
+    # dispositivo, che smette di funzionare li', o la chiave registrata
+    # per quella persona, che questa sostituisce ovunque. Importare la
+    # stessa chiave gia' registrata su un telefono vuoto non chiede.
+    prova("i gesti che passano dalla domanda unica sono settantasei",
+          76, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -51823,23 +51829,27 @@ def prove_bundle_nostr():
                        ("sha256", "sha256: () => sha256,"),
                        ("hmac", "hmac: () => hmac,"),
                        ("hkdf", "hkdf: () => ({ extract, expand }),"),
-                       ("secp256k1", "secp256k1: () => secp256k1,")):
+                       ("secp256k1", "secp256k1: () => secp256k1,"),
+                       # il SESTO (1 ott 2026) e' un innesto, non un export di
+                       # codice che c'era gia': prove_chiave_moderatore_portatile
+                       ("nip49", "nip49: () => nip49_exports,")):
         # == 1 e non `in`: una chiave doppia in un object literal e' JS lecito
         # (l'ultima vince, la lezione di acqDati) e uno script di patch girato
         # due volte l'ha prodotta davvero -- la prova deve vederlo.
         prova(f"bundle: `{nome}` e' nel blocco degli export, UNA volta", 1,
               blocco.count(riga))
-    prova("bundle: il loader sveglia la cache col suffisso -mostro2", True,
-          "/vendor/nostr.js?v=2.23.12-mostro2`" in mini)
+    prova("bundle: il loader sveglia la cache col suffisso -mostro3", True,
+          "/vendor/nostr.js?v=2.23.12-mostro3`" in mini)
     # il suffisso di ieri non deve sopravvivere: chi aggiunge un export
     # e lascia il vecchio ?v= regala il bundle di ieri a chi ha gia'
     # aperto l'app, e il guasto si vede solo su quei browser.
     # L'ancora e' l'URL INTERO e non il solo suffisso: `-mostro` da solo
     # vive anche nella prosa del commento che lo spiega, e la prova
     # sarebbe rossa per colpa di una spiegazione.
-    prova("bundle: il ?v= di ieri (nudo o -mostro) non c'e' piu'", True,
+    prova("bundle: il ?v= di ieri (nudo, -mostro o -mostro2) non c'e' piu'", True,
           "nostr.js?v=2.23.12`" not in mini
-          and "nostr.js?v=2.23.12-mostro`" not in mini)
+          and "nostr.js?v=2.23.12-mostro`" not in mini
+          and "nostr.js?v=2.23.12-mostro2`" not in mini)
     # LE DUE LISTE DEL SW FANNO DUE MESTIERI (17 set 2026): il bundle
     # non sta piu' nell'addAll ATOMICO — con la dispensa che rispetta la
     # query la voce nuda non rispondeva alla richiesta timbrata, e si
@@ -51854,8 +51864,10 @@ def prove_bundle_nostr():
     prova("bundle: dentro la dispensa a runtime del SW", True,
           "const IN_DISPENSA = new Set([...PRECACHE, '/vendor/nostr.js']);"
           in swjs)
+    # v10 (1 ott 2026): il bundle con l'innesto nip49 — la dispensa a
+    # runtime lo serve CACHE-FIRST, e si rifa' solo con un SW nuovo
     prova("bundle: la VERSIONE del SW e' salita col cambio dell'elenco", True,
-          int(re.search(r"barattolo-v(\d+)", swjs).group(1)) >= 9)
+          int(re.search(r"barattolo-v(\d+)", swjs).group(1)) >= 10)
     prova("bundle: la rotta dichiara che non e' il bundle di serie", True,
           "prove_bundle_nostr" in _SORGENTE and "cinque export in piu'" in _SORGENTE)
 
@@ -112858,7 +112870,9 @@ def prove_moderazione_p2p():
           [nudo(chat).count("fetch("), nudo(chat).count("modFetch(")])
     # le CHIAMATE, non la definizione: cominciano tutte col nome della rotta
     chiamate_server = re.findall(r"modFetch\('(?:[^()]|\([^()]*\))*\)", nudo(modulo))
-    prova("il banco chiama il server in otto punti", 8, len(chiamate_server))
+    # NOVE dal 1 ott 2026: l'import della chiave registra la pubblica
+    # (`moderazione/chiave`, la stessa rotta della creazione)
+    prova("il banco chiama il server in nove punti", 9, len(chiamate_server))
     prova("...e in NESSUNO passa la chiave privata", [],
           [c for c in chiamate_server if ".sk" in c or "sk:" in c])
     prova("la chiave nasce a caso su questo dispositivo, e al server va la pubblica", True,
@@ -113791,12 +113805,351 @@ console.log(JSON.stringify(out));
     prova("la restore: i due stati della cauzione sono «pubblicato», anche a maiuscole", ["pubblicato", "pubblicato"], o["restore"])
 
 
+BANCO_CHIAVE_PORTATILE = r"""
+const fs = require('fs'), vm = require('vm');
+vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
+const NT = NostrTools;
+const window = {NostrTools: NT};
+const {bytesToHex, hexToBytes} = NT.utils;
+const out = {};
+/* --- il diario: tutto cio' che esce dalla pagina, per cercarci dentro
+       quel che NON deve uscire (la privata, la password) --- */
+const diario = [];
+for (const m of ['log', 'warn', 'error', 'info']) console[m] = (...a) => diario.push(a.map(String).join(' '));
+let DEMO = false, VETRINA = false, isAdmin = true, myTgId = 999;
+const API_BASE = '/api';
+function authHdr(){ return 'collaudo'; }
+let toasts = []; function toast(m){ toasts.push(String(m)); }
+function haptic(){}
+const fetches = [], tutteLeChiamate = [];
+async function fetch(url, opz){ const f = {url, body: String((opz && opz.body) || '')};
+  fetches.push(f); tutteLeChiamate.push(f); eventi.push('fetch');
+  return {ok: true, status: 200, json: async () => ({ok: true})}; }
+const nodi = {};
+function el(id){ return nodi[id] || (nodi[id] = {id, value: '', innerHTML: '', textContent: '',
+  files: null, click(){ eventi.push('click:' + id); }, classList: {add(){}, remove(){}, contains(){ return false; }}}); }
+const anchors = [];
+const document = {activeElement: null, body: {appendChild(){}},
+  createElement(t){ const a = {t, click(){ anchors.push(a); }, remove(){}}; return a; }};
+class Blob { constructor(parti, opz){ this.parti = parti; this.opz = opz; } }
+const URL = {createObjectURL(b){ return 'blob:' + b.parti.join(''); }, revokeObjectURL(){}};
+function setTimeout(){}
+const eventi = [];
+const magazzino = {};
+const localStorage = {getItem: k => (k in magazzino ? magazzino[k] : null),
+                      setItem: (k, v) => { eventi.push('setItem'); magazzino[k] = String(v); }};
+function chiaveP2P(base){ return base + '@' + myTgId; }
+async function caricaNostrTools(){}
+const conferme = [];
+function chiediConferma(c){ conferme.push(c); }
+function attesaP2P(){ return () => {}; }
+let chiusure = 0; function chiudiFoglioP2P(){ chiusure++; }
+let copiati = []; function copiaLink(t){ copiati.push(t); }
+let p2pMod = null;
+async function chiediModerazioneP2P(){ return p2pMod; }
+function renderModerazioneP2P(){}
+function moderatoreP2P(){ return !!isAdmin && !DEMO && !VETRINA && !!myTgId; }
+__PEZZI__
+
+(async () => {
+  const PW = 'segreta-123-ﬁne';   // con una legatura: NFKC la scioglie in «fine»
+  const sk = NT.generateSecretKey();
+  const k = {sk: bytesToHex(sk), pub: NT.getPublicKey(sk), creata: 1};
+  const salva = x => { magazzino[chiaveP2P(MOD_CHIAVE_P2P)] = JSON.stringify(x); };
+  const letta = () => JSON.parse(magazzino[chiaveP2P(MOD_CHIAVE_P2P)] || 'null');
+
+  // --- il vettore della NIP, dal bundle vero
+  out.vettore = bytesToHex(await NT.nip49.decryptAsync(
+    'ncryptsec1qgg9947rlpvqu76pj5ecreduf9jxhselq2nae2kghhvd5g7dgjtcxfqtd67p9m0w57lspw8gsq6yphnm8623nsl8xn9j4jdzz84zm3frztj3z7s35vpzmqf6ksu8r89qk5z2zxfmu5gv8th8wclt0h4p', 'nostr'));
+  out.vettoreSync = bytesToHex(NT.nip49.decrypt(
+    'ncryptsec1qgg9947rlpvqu76pj5ecreduf9jxhselq2nae2kghhvd5g7dgjtcxfqtd67p9m0w57lspw8gsq6yphnm8623nsl8xn9j4jdzz84zm3frztj3z7s35vpzmqf6ksu8r89qk5z2zxfmu5gv8th8wclt0h4p', 'nostr'));
+  // le quattro combinazioni combaciano
+  const cs = NT.nip49.encrypt(sk, PW), ca = await NT.nip49.encryptAsync(sk, PW);
+  out.quattro = [NT.nip49.decrypt(cs, PW), NT.nip49.decrypt(ca, PW),
+                 await NT.nip49.decryptAsync(cs, PW), await NT.nip49.decryptAsync(ca, PW)]
+    .every(b => bytesToHex(b) === k.sk) && cs !== ca;
+  out.nfkc = bytesToHex(await NT.nip49.decryptAsync(ca, 'segreta-123-fine')) === k.sk;
+
+  // --- ESPORTA: la copia esce cifrata, si riapre, e non porta la privata
+  salva(k); p2pMod = {chiave: k.pub, dispute: [], moderatori: []};
+  apriChiaveModP2P('esporta');
+  out.titoloEsporta = el('modChiaveTit').textContent;
+  out.formEsporta = el('modChiaveCorpo').innerHTML;
+  el('modChiavePw1').value = 'corta'; el('modChiavePw2').value = 'corta';
+  await eseguiEsportaChiaveModP2P();
+  out.corta = [toasts.pop(), modChiaveCifrata];
+  el('modChiavePw1').value = PW; el('modChiavePw2').value = PW + 'x';
+  await eseguiEsportaChiaveModP2P();
+  out.diverse = [toasts.pop(), modChiaveCifrata];
+  el('modChiavePw2').value = PW;
+  await eseguiEsportaChiaveModP2P();
+  const cifrata = modChiaveCifrata;
+  out.cifrata = {forma: /^ncryptsec1[a-z0-9]+$/.test(cifrata), lunga: cifrata.length,
+                 portaLaPrivata: cifrata.includes(k.sk), inPagina: el('modChiaveCorpo').innerHTML.includes(cifrata),
+                 nelCampo: el('modChiaveTesto').value === cifrata,
+                 riapre: bytesToHex(await NT.nip49.decryptAsync(cifrata, PW)) === k.sk,
+                 toastDopo: toasts.length};
+  copiaChiaveCifrataModP2P();
+  scaricaChiaveCifrataModP2P();
+  out.copiaEFile = {copiato: copiati[0] === cifrata, nome: anchors[0] && anchors[0].download,
+                    contenuto: anchors[0] && anchors[0].href === 'blob:' + cifrata + '\n'};
+  pulisciChiaveModP2P();
+  out.pulito = [modChiaveCifrata, el('modChiaveCorpo').innerHTML, modChiaveModo];
+
+  // --- IMPORTA su un dispositivo VUOTO, la stessa chiave registrata:
+  //     niente domanda, niente server
+  delete magazzino[chiaveP2P(MOD_CHIAVE_P2P)];
+  fetches.length = 0; eventi.length = 0; toasts.length = 0; conferme.length = 0; chiusure = 0;
+  apriChiaveModP2P('importa');
+  out.titoloImporta = el('modChiaveTit').textContent;
+  out.formImporta = el('modChiaveCorpo').innerHTML;
+  el('modChiaveIn').value = '  ' + cifrata.toUpperCase() + '\n';   // maiuscole e a capo: come arriva da un file
+  el('modChiavePw1').value = PW;
+  await eseguiImportaChiaveModP2P();
+  out.importaUguale = {giusta: !!letta() && letta().pub === k.pub && letta().sk === k.sk && letta().importata === 1,
+                       fetches: fetches.length, conferme: conferme.length, chiusure, toast: toasts.pop()};
+
+  // --- la password sbagliata e la copia rovinata: due frasi diverse,
+  //     e il dispositivo non si tocca
+  delete magazzino[chiaveP2P(MOD_CHIAVE_P2P)]; eventi.length = 0;
+  apriChiaveModP2P('importa');
+  el('modChiaveIn').value = cifrata; el('modChiavePw1').value = 'sbagliata';
+  await eseguiImportaChiaveModP2P();
+  out.sbagliata = [toasts.pop(), letta(), eventi.length];
+  el('modChiaveIn').value = cifrata.slice(0, -1) + (cifrata.endsWith('q') ? 'p' : 'q'); el('modChiavePw1').value = PW;
+  await eseguiImportaChiaveModP2P();
+  out.rovinata = [toasts.pop(), letta(), eventi.length];
+  el('modChiaveIn').value = NT.nip19.nsecEncode(sk); el('modChiavePw1').value = PW;
+  await eseguiImportaChiaveModP2P();
+  out.nsecNuda = [toasts.pop(), letta(), eventi.length];
+  el('modChiaveIn').value = cifrata; el('modChiavePw1').value = '';
+  await eseguiImportaChiaveModP2P();
+  out.senzaPassword = [toasts.pop(), letta(), eventi.length];
+
+  // --- una chiave DIVERSA gia' sul dispositivo: si chiede, e prima del
+  //     si' non si tocca niente
+  const sk2 = NT.generateSecretKey();
+  const k2 = {sk: bytesToHex(sk2), pub: NT.getPublicKey(sk2), creata: 2};
+  salva(k2); eventi.length = 0; fetches.length = 0; conferme.length = 0;
+  apriChiaveModP2P('importa');
+  el('modChiaveIn').value = cifrata; el('modChiavePw1').value = PW;
+  await eseguiImportaChiaveModP2P();
+  out.diversa = {conferme: conferme.length, titolo: conferme[0] && conferme[0].titolo,
+                 corpo: conferme[0] && conferme[0].corpo, primaDelSi: letta().pub === k2.pub, fetchesPrima: fetches.length};
+  await conferme[0].poi();
+  out.diversaDopo = {letta: letta().pub === k.pub, fetches: fetches.length, eventi: eventi.slice()};
+
+  // --- la chiave registrata e' un'altra: si chiede, e al si' va al server
+  //     la sola PUBBLICA, prima della scrittura sul dispositivo
+  delete magazzino[chiaveP2P(MOD_CHIAVE_P2P)];
+  p2pMod = {chiave: k2.pub, dispute: [], moderatori: []};
+  eventi.length = 0; fetches.length = 0; conferme.length = 0;
+  apriChiaveModP2P('importa');
+  el('modChiaveIn').value = cifrata; el('modChiavePw1').value = PW;
+  await eseguiImportaChiaveModP2P();
+  out.registrata = {conferme: conferme.length, corpo: conferme[0] && conferme[0].corpo, primaDelSi: letta(), fetchesPrima: fetches.length};
+  await conferme[0].poi();
+  out.registrataDopo = {letta: letta().pub === k.pub, eventi: eventi.slice(),
+                        fetch: fetches[0] && {url: fetches[0].url, body: fetches[0].body}};
+
+  // --- la stessa chiave gia' sul dispositivo: niente da fare
+  conferme.length = 0; fetches.length = 0; eventi.length = 0;
+  apriChiaveModP2P('importa');
+  el('modChiaveIn').value = cifrata; el('modChiavePw1').value = PW;
+  await eseguiImportaChiaveModP2P();
+  out.giaQui = [toasts.pop(), conferme.length, fetches.length, eventi.length];
+
+  // --- il file
+  pulisciChiaveModP2P(); apriChiaveModP2P('importa');
+  leggiFileChiaveModP2P({files: [{size: 999999, text: async () => cifrata}], value: 'x'});
+  out.fileGrosso = [toasts.pop(), modChiaveFile];
+  leggiFileChiaveModP2P({files: [{size: 170, text: async () => cifrata + '\r\n'}], value: 'x'});
+  await new Promise(r => process.nextTick(r)); await new Promise(r => process.nextTick(r));
+  out.fileBuono = [modChiaveFile === cifrata, el('modChiaveIn').value === cifrata, toasts.pop()];
+
+  // --- quel che NON deve uscire: la privata e la password, da nessuna parte
+  const tutto = diario.join('\n') + tutteLeChiamate.map(f => f.url + f.body).join('\n');
+  out.fuga = {privata: tutto.includes(k.sk) || tutto.includes(k2.sk), password: tutto.includes(PW) || tutto.includes('segreta'),
+              righeDiario: diario.length, pubblicaNelFetch: tutteLeChiamate.some(f => f.body.includes(k.pub)),
+              chiamate: tutteLeChiamate.length};
+  console.log = (m) => process.stdout.write(m);
+  console.log(JSON.stringify(out));
+})().catch(e => { process.stdout.write(JSON.stringify({errore: String(e && e.stack || e)})); });
+"""
+
+
+def prove_chiave_moderatore_portatile():
+    """ESPORTA / IMPORTA LA CHIAVE DI MODERATORE (1 ott 2026). La chiave
+    nasce sul telefono e non aveva copia: telefono perso = chiave nuova.
+    Adesso esce — ma SOLO cifrata (NIP-49, `ncryptsec1…`) con una
+    password del moderatore — e rientra su un altro dispositivo con la
+    stessa password. Il server non vede ne' la chiave ne' la password.
+    QUEL CHE SI ROMPE IN SILENZIO, e qui si fa girare: la privata che
+    esce in chiaro (in un fetch, in un log, nel template della pagina);
+    una copia che si fa ma non si riapre; una password sbagliata che
+    sovrascrive la chiave di prima; l'import che sostituisce una chiave
+    senza chiedere; la pubblica che non arriva al server quando quella
+    registrata e' un'altra, o che ci arriva quando e' la stessa; il
+    bundle che non e' piu' quello della NIP (il vettore di prova).
+    L'INNESTO nel bundle si prova sul vettore di prova della NIP-49 e
+    sulle quattro combinazioni sync/async: una scrypt sbagliata farebbe
+    comunque andata e ritorno con se stessa, e solo il vettore la vede."""
+    import json as _json, shutil as _sh, subprocess as _sp, tempfile as _tf, os as _os
+    print("\n[la chiave di moderatore: esporta e importa, solo cifrata]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    bundle = open("vendor/nostr.bundle.js", encoding="utf-8").read()
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    i0 = mini.index("/* ---- la copia della chiave: esce SOLO cifrata")
+    i1 = mini.index("/* ---- parlare col coordinatore, da moderatore ----", i0)
+    blocco = mini[i0:i1]
+    codice = nudo(blocco)
+
+    # --- 1) IL BUNDLE: l'innesto c'e', una volta, con i suoi pezzi -------
+    prova("bundle: l'innesto NIP-49 c'e' una volta, con scrypt, pbkdf2 e nip49", [1, 1, 1, 1, 1, 1],
+          [bundle.count("fine dell'innesto NIP-49 di Barattolo"), bundle.count("  function scrypt("),
+           bundle.count("  async function scryptAsync("), bundle.count("  function pbkdf2("),
+           bundle.count("  function encrypt49("), bundle.count("  async function decryptAsync49(")])
+    prova("...esportato come `nip49` con le quattro porte", True,
+          "    nip49: () => nip49_exports,\n" in bundle
+          and all(f"    {n}: () => {n}49" in bundle for n in ("encrypt", "decrypt", "encryptAsync", "decryptAsync")))
+    prova("...e la ricetta e' quella della NIP: scrypt r=8 p=1 su NFKC, aad = il byte di sicurezza, versione 2", True,
+          bundle.count('password.normalize("NFKC"), salt, { N: n, r: 8, p: 1, dkLen: 32 }') == 4
+          and bundle.count("concatBytes(Uint8Array.from([2]), Uint8Array.from([logn]), salt, nonce, aad, ciphertext)") == 2)
+    prova("il client esige `nip49` dal bundle, e il timbro e' salito", True,
+          "'nip47', 'nip49', 'schnorr'" in mini and "/vendor/nostr.js?v=2.23.12-mostro3`" in mini)
+
+    # --- 2) LE SENTINELLE DEL CLIENT -------------------------------------
+    prova("le due funzioni della copia non chiamano `fetch`, e `modFetch` una volta sola: la pubblica",
+          [0, 1, True], [codice.count("fetch("), codice.count("modFetch("),
+                         "await modFetch('moderazione/chiave', {chiave: k.pub});" in codice])
+    prova("...e il blocco non scrive sulla console (ne' privata ne' password nei log)", 0,
+          codice.count("console."))
+    imp = nudo(fn("async function eseguiImportaChiaveModP2P(){"))
+    prova("l'import: PRIMA la pubblica al server (se serve), POI la scrittura sul dispositivo", True,
+          0 < imp.find("if (daRegistrare) await modFetch('moderazione/chiave'")
+          < imp.find("localStorage.setItem(chiaveP2P(MOD_CHIAVE_P2P), JSON.stringify(k));"))
+    prova("...e la chiave si scrive solo dentro `fine`, cioe' dopo la domanda quando c'e'", 1,
+          imp.count("localStorage.setItem("))
+    prova("...la domanda unica dice le due perdite: la chiave diversa qui, quella registrata altrove", True,
+          "già una chiave di moderatore diversa: da adesso quella smette di funzionare qui" in imp
+          and "questa prende il suo posto e quella smette di funzionare ovunque" in imp
+          and "titolo: 'Usare questa chiave qui?'" in imp)
+    esp = nudo(fn("async function eseguiEsportaChiaveModP2P(){"))
+    prova("l'export cifra con la gemella asincrona e si RIAPRE prima di consegnare (la prova del nove)", True,
+          0 < esp.find("NT.nip49.encryptAsync(NT.utils.hexToBytes(k.sk), p1)")
+          < esp.find("NT.nip49.decryptAsync(cifrata, p1)")
+          < esp.find("if (NT.getPublicKey(riaperta) !== k.pub) throw")
+          < esp.find("modChiaveCifrata = cifrata;"))
+    prova("...due password uguali e lunghe almeno MOD_PASSWORD_MIN (8)", True,
+          "const MOD_PASSWORD_MIN = 8;" in blocco
+          and "if (p1.length < MOD_PASSWORD_MIN)" in esp and "if (p1 !== p2)" in esp)
+    ren = nudo(fn("function renderChiaveModP2P(){"))
+    prova("i campi sono password: new-password all'export, current-password all'import, col username fisso", [2, 1, True],
+          [ren.count('type="password" id="modChiavePw1" name="password" autocomplete="new-password"')
+           + ren.count('type="password" id="modChiavePw2" autocomplete="new-password"'),
+           ren.count('type="password" id="modChiavePw1" name="password" autocomplete="current-password"'),
+           'name="username" value="barattolo-chiave-di-moderatore" autocomplete="username"' in blocco])
+    prova("la cifrata entra nel campo col .value, mai nel template", True,
+          "el('modChiaveTesto').value = modChiaveCifrata;" in ren
+          and "modChiaveCifrata +" not in ren and "+ modChiaveCifrata" not in ren)
+    prova("l'avviso sulla password persa sta PRIMA di cifrare, e il file si offre dopo", True,
+          0 < ren.find("Se dimentichi la password la copia è persa") < ren.find("Cifra ed esporta")
+          and "scaricaChiaveCifrataModP2P()" in ren and "copiaChiaveCifrataModP2P()" in ren)
+    prova("il foglio esiste una volta, closeSheet lo chiude e lo pulisce, la cronologia pure", [1, True, True],
+          [mini.count('<div class="sheet" id="modChiaveSheet"'),
+           "  el('modChiaveSheet').classList.remove('open');\n  pulisciChiaveModP2P();\n"
+           in pezzo_js(mini, "function closeSheet(){", "\n}"),
+           "if (s.k==='modChiaveSheet') pulisciChiaveModP2P();" in pezzo_js(mini, "function navChiudiStrato(s){", "\n}")])
+    pag = nudo(fn("function renderModerazioneP2P(){"))
+    prova("nella pagina: «Importa» accanto a «Crea» quando la chiave non e' qui, «Esporta» solo se una chiave c'e'", True,
+          "apriChiaveModP2P(\\'importa\\')" in pag and "if (k) testa += " in pag
+          and "apriChiaveModP2P(\\'esporta\\')" in pag
+          and pag.find("creaChiaveModeratoreP2P()") < pag.find("apriChiaveModP2P(\\'importa\\')") < pag.find("if (k) testa += "))
+    prova("il sesto export e' nella rotta e nel suo documento", True,
+          "innesta_nip49.py" in _SORGENTE and "prove_chiave_moderatore_portatile" in _SORGENTE)
+
+    # --- 3) IL BANCO: il bundle vero e le funzioni vere, in node ---------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco della chiave portatile", "node non c'e'")
+        return
+    pezzi = "\n".join([
+        "const MOD_CHIAVE_P2P = 'barattolo_p2p_moderatore';",
+        fn("function chiaveModeratoreP2P(){"), fn("function npubP2P(hex){"),
+        fn("async function modFetch(percorso, corpo){"),
+        blocco])
+    cart = _tf.mkdtemp(prefix="chiave_portatile_")
+    pb = _os.path.join(cart, "banco.js")
+    open(pb, "w", encoding="utf-8").write(BANCO_CHIAVE_PORTATILE.replace("__PEZZI__", pezzi))
+    r = _sp.run([node, pb, "vendor/nostr.bundle.js"], capture_output=True, text=True,
+                timeout=180, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco della chiave portatile gira", "", (r.stderr or "")[-900:])
+    if r.returncode or not r.stdout.strip():
+        return
+    o = _json.loads(r.stdout)
+    prova("banco: nessun errore", None, o.get("errore"))
+    if o.get("errore"):
+        return
+    VET = "3501454135014541350145413501453fefb02227e449e57cf4d3a3ce05378683"
+    prova("IL VETTORE DELLA NIP-49 (password «nostr», log_n 16) si apre alla chiave attesa, sync e async",
+          [VET, VET], [o["vettore"], o["vettoreSync"]])
+    prova("...le quattro combinazioni sync/async combaciano, e NFKC scioglie la legatura", [True, True],
+          [o["quattro"], o["nfkc"]])
+    prova("ESPORTA: titolo e form (due password, l'avviso prima)", True,
+          o["titoloEsporta"].startswith("📤") and 'id="modChiavePw2"' in o["formEsporta"]
+          and "Se dimentichi la password" in o["formEsporta"])
+    prova("...password corta e password diverse si fermano a parole, senza cifrare", True,
+          str(o["corta"][0]).startswith("La password vuole almeno 8") and o["corta"][1] == ""
+          and str(o["diverse"][0]).startswith("Le due password non sono uguali") and o["diverse"][1] == "")
+    c = o["cifrata"]
+    prova("...la copia e' un ncryptsec, non porta la privata, sta nel campo e non nel template, e si riapre",
+          {"forma": True, "portaLaPrivata": False, "inPagina": False, "nelCampo": True, "riapre": True, "toastDopo": 0},
+          {k: c[k] for k in ("forma", "portaLaPrivata", "inPagina", "nelCampo", "riapre", "toastDopo")})
+    prova("...si copia intera e si scarica con quel nome e quel contenuto", [True, True, True],
+          [o["copiaEFile"]["copiato"], str(o["copiaEFile"]["nome"]).startswith("barattolo-moderatore-npub1")
+           and str(o["copiaEFile"]["nome"]).endswith(".ncryptsec.txt"), o["copiaEFile"]["contenuto"]])
+    prova("...e la pulizia del foglio non lascia niente", ["", "", ""], o["pulito"])
+    u = o["importaUguale"]
+    prova("IMPORTA su un dispositivo vuoto la chiave registrata: nessuna domanda, nessun fetch, chiave scritta (maiuscole e a capo tollerati)",
+          [True, 0, 0, 1, True],
+          [u["giusta"], u["fetches"], u["conferme"], u["chiusure"], "è quella che il nodo conosce" in u["toast"]])
+    prova("...la password sbagliata lo dice e non tocca il dispositivo", [True, None, 0],
+          [str(o["sbagliata"][0]).startswith("Password sbagliata"), o["sbagliata"][1], o["sbagliata"][2]])
+    prova("...la copia rovinata lo dice con un'altra frase, e non tocca il dispositivo", [True, None, 0],
+          [str(o["rovinata"][0]).startswith("Questa copia è rovinata"), o["rovinata"][1], o["rovinata"][2]])
+    prova("...una nsec nuda non e' una copia, e senza password non si parte", [True, True, None, 0],
+          [str(o["nsecNuda"][0]).startswith("Non vedo una chiave cifrata"), str(o["senzaPassword"][0]).startswith("Serve la password"),
+           o["senzaPassword"][1], o["nsecNuda"][2] + o["senzaPassword"][2]])
+    d = o["diversa"]
+    prova("una chiave DIVERSA gia' qui: si chiede, dicendo che quella smette di funzionare, e prima del si' resta lei",
+          [1, "Usare questa chiave qui?", True, True, 0],
+          [d["conferme"], d["titolo"], "già una chiave di moderatore diversa" in str(d["corpo"]), d["primaDelSi"], d["fetchesPrima"]])
+    prova("...al si' la chiave importata prende il posto, senza passare dal server (era quella registrata)",
+          [True, 0, ["setItem"]], [o["diversaDopo"]["letta"], o["diversaDopo"]["fetches"], o["diversaDopo"]["eventi"]])
+    rg = o["registrata"]
+    prova("la chiave registrata e' un'altra: si chiede, e prima del si' niente al server e niente sul dispositivo",
+          [1, True, None, 0], [rg["conferme"], "prende il suo posto" in str(rg["corpo"]), rg["primaDelSi"], rg["fetchesPrima"]])
+    prova("...al si' va al server la sola PUBBLICA, e la scrittura sul dispositivo viene DOPO",
+          [True, ["fetch", "setItem"], "/api/p2p/moderazione/chiave", True],
+          [o["registrataDopo"]["letta"], o["registrataDopo"]["eventi"], o["registrataDopo"]["fetch"]["url"],
+           o["registrataDopo"]["fetch"]["body"].startswith('{"chiave":"') and '"sk"' not in o["registrataDopo"]["fetch"]["body"]])
+    prova("la stessa chiave gia' qui: un toast, niente domanda, niente server, niente scrittura",
+          [True, 0, 0, 0], [str(o["giaQui"][0]).startswith("Questa chiave è già su questo dispositivo"), o["giaQui"][1], o["giaQui"][2], o["giaQui"][3]])
+    prova("il file: uno grosso non e' una chiave, uno buono finisce nel campo", [True, "", True, True, True],
+          [str(o["fileGrosso"][0]).startswith("Questo file non sembra"), o["fileGrosso"][1],
+           o["fileBuono"][0], o["fileBuono"][1], str(o["fileBuono"][2]).startswith("File letto")])
+    prova("NESSUNA FUGA: la privata e la password non escono in nessun log ne' in nessun fetch; la pubblica si'",
+          {"privata": False, "password": False, "righeDiario": 0, "pubblicaNelFetch": True, "chiamate": 1}, o["fuga"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_contanti_a_mano, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,

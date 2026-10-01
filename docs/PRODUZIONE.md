@@ -2385,6 +2385,18 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   pubblica, che compare in fondo alla pagina sotto «Le chiavi dei
   moderatori» (`npub1…`, col suo «Copia»). Gli altri moderatori ricevono
   un avviso.
+  1b) SUBITO DOPO, LA COPIA (dal 1 ott 2026): «📤 Esporta la chiave
+  (cifrata)», una password di almeno 8 caratteri scritta due volte, e il
+  testo `ncryptsec1…` che esce si copia nel gestore di password (o si
+  scarica come file; dentro Telegram il file può non scaricarsi, il
+  testo sì). La password NON si recupera: senza, la copia non vale
+  niente. Senza copia, telefono perso = chiave nuova, e si riparte dal
+  punto 2. SU UN TELEFONO NUOVO: «📥 Importa una chiave», si incolla il
+  testo (o si carica il file) e la password; se la chiave è quella già
+  registrata il nodo la riconosce e non c'è altro da fare; se sul
+  telefono c'è già una chiave diversa, o quella registrata è un'altra,
+  l'app lo dice e chiede prima di sostituirla (una chiave sostituita
+  ovunque va aggiunta al nodo come al punto 2, se non lo era già).
   2) ANDREA LA AGGIUNGE AL NODO. ⚠️ NON col messaggio `admin-add-solver`
   da `mostro-cli` sul nodo, ed è una scelta e non una scorciatoia: quel
   messaggio è firmato dalla chiave del nodo e parte verso i relay

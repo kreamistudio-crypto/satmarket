@@ -12,7 +12,7 @@
    se cambi quelli, o l'elenco, alzala e le dispense vecchie si
    svuotano da sole. */
 
-const VERSIONE = 'barattolo-v9';
+const VERSIONE = 'barattolo-v10';
 const CACHE_STATICA = `statica-${VERSIONE}`;
 
 // La dispensa: solo asset di casa, immutabili o quasi. Mai pagine HTML

@@ -32310,3 +32310,111 @@ config, riavvio fatto): esito da riportare. Il journal di mostrod per
 una settimana senza `no Mostro transport for event kind`. La riga «IL
 NODO GIRA LA 0.18.7» nella sezione del nodo di CLAUDE.md è vecchia di due
 salite: si corregge quando CLAUDE.md si tocca per una regola (regola 8).
+
+## Esporta / importa la chiave di moderatore (1 ott 2026)
+
+Richiesta di Andrea. La chiave da moderatore P2P nasce sul telefono
+(«🔑 Crea la mia chiave di moderatore», 29 set) e non aveva copia:
+telefono perso = chiave nuova da registrare e da aggiungere al nodo.
+Adesso nella sezione «⚖️ Moderazione P2P», solo per i moderatori:
+«📤 Esporta la chiave (cifrata)» quando una chiave c'è sul dispositivo,
+«📥 Importa una chiave» accanto a «Crea» quando non c'è.
+
+**DECISIONI.** 1) La privata esce SOLO cifrata, nella forma NIP-49
+(`ncryptsec1…`, scrypt log_n 16 sulla password in NFKC,
+XChaCha20-Poly1305): mai in chiaro, mai una nsec. Password scelta dal
+moderatore, due campi uguali, almeno 8 caratteri, e l'avviso PRIMA di
+cifrare che senza password la copia è persa — non la conosciamo e non
+la recuperiamo. 2) Il server non vede né la chiave né la password: le
+funzioni della copia non hanno `fetch`; l'import chiama
+`moderazione/chiave` (la rotta della creazione) con la sola pubblica e
+SOLO se quella registrata per la persona è un'altra — se è la stessa il
+nodo la conosce già e non c'è niente da dire. La scrittura sul
+dispositivo viene DOPO il server, come alla creazione. 3) Una chiave
+diversa già sul dispositivo, o una chiave registrata diversa: si
+chiede (settantaseiesima domanda unica, «Usare questa chiave qui?»),
+dicendo che cosa smette di funzionare e dove; la stessa chiave già qui
+non fa niente. 4) La prova del nove sta DENTRO l'export: la copia
+appena fatta si riapre con la stessa password e deve dare la stessa
+pubblica, perché una copia che non si riapre si scopre il giorno del
+telefono perso. 5) Copia o file: `copiaLink` e un Blob scaricato come
+`barattolo-moderatore-<npub>.ncryptsec.txt`; dentro Telegram il file
+può non scaricarsi, e la pagina lo dice. 6) Il foglio si pulisce da
+solo a ogni chiusura (closeSheet e navChiudiStrato): cifrata e
+password non restano in pagina. 7) Password sbagliata e copia rovinata
+hanno due frasi diverse (la libreria alza «invalid tag» per la prima,
+checksum/prefisso/versione per la seconda).
+
+**IL BUNDLE.** nostr-tools non mette `nip49` nel bundle di serie (vive
+in un entry point suo per via di scrypt), e il nostro `/vendor/nostr.js`
+non lo aveva. Niente ricostruzione (il patto del file: «un diff di
+dodici righe, mai una ricostruzione»): un INNESTO in fondo al file,
+prima del `return __toCommonJS`, scritto da `innesta_nip49.py` —
+pbkdf2.js e scrypt.js di @noble/hashes 2.0.1 (la versione che
+nostr-tools 2.23.12 dichiara, la stessa già dentro il bundle) copiati a
+byte uguali con import/export tolti, le sei utility che mancavano
+(utf8ToBytes, kdfInputToBytes, nextTick, asyncLoop, byteSwap,
+byteSwap32, swap32IfBE), nip49.ts di nostr-tools 2.23.12 verbatim con i
+nomi `encrypt49`/`decrypt49` perché `encrypt`/`decrypt` nudi sono già di
+nip04, e due gemelle ASINCRONE scritte da noi che chiamano `scryptAsync`
+(cede il passo ogni 10 ms: un telefono non si pianta). Sesto export
+`nip49`, `?v=2.23.12-mostro3`, SW `barattolo-v10` (la dispensa serve il
+bundle cache-first e si rifà solo con un SW nuovo), `nip49` in
+`PEZZI_NOSTR`. Lo script vive nello scratchpad del cantiere e la
+ricetta è qui: scaricare `nostr-tools@2.23.12` e `@noble/hashes@2.0.1`
+con `npm pack`, togliere import/export e JSDoc, rientrare a due spazi,
+controllare che i nomi definiti non esistano già e quelli chiesti sì.
+In node lo scrypt a log_n 16 costa ~125 ms.
+
+**SCARTATO.** Ricostruire il bundle con esbuild (250 KB di diff che
+nessuno legge); uno scrypt scritto a mano (un KDF sbagliato fa andata e
+ritorno con se stesso e nessuna prova lo vede — solo il vettore della
+NIP, che infatti è la prova); esportare la nsec in chiaro «per
+comodità»; mandare la cifrata al server come backup (il server non deve
+avere nemmeno la cifrata: una password debole la aprirebbe lì).
+
+**PROVATO.** `prove_chiave_moderatore_portatile` (37): l'innesto nel
+bundle (una volta, con i suoi pezzi, la ricetta della NIP a stringa), le
+sentinelle del client (niente fetch, una modFetch con la sola pubblica,
+nessun console, server prima della scrittura, la domanda con le due
+perdite, la prova del nove, i campi password con new/current-password e
+l'username fisso, la cifrata nel .value e mai nel template, il foglio in
+closeSheet e nella cronologia, i bottoni nella pagina); il banco node
+col bundle VERO e le funzioni VERE: il vettore di prova della NIP-49
+(password «nostr», log_n 16) si apre alla chiave attesa sync e async, le
+quattro combinazioni combaciano, NFKC scioglie la legatura; export con
+password corta/diverse fermato a parole, la copia non porta la privata
+e si riapre, copia e file col nome e il contenuto giusti, la pulizia;
+import su dispositivo vuoto della chiave registrata (maiuscole e a capo
+tollerati, nessuna domanda, nessun fetch), password sbagliata e copia
+rovinata con due frasi e il dispositivo intatto, nsec nuda e password
+vuota fermate prima, chiave diversa già qui (si chiede, prima del sì
+resta lei, al sì cambia senza server), chiave registrata diversa (si
+chiede, al sì la sola pubblica al server e la scrittura DOPO), la
+stessa chiave già qui, il file grosso e il file buono; NESSUNA FUGA
+(privata e password in nessun log né fetch, la pubblica sì). Emendate
+`prove_bundle_nostr` (sesto export, -mostro3, SW ≥ 10), il conto della
+domanda unica (76) e le nove chiamate al server del banco dei
+moderatori. Tortura 15 su 15 (la prova del nove tolta, server dopo la
+scrittura, pubblica sempre o privata al server, la domanda tolta, le due
+frasi fuse, la cifrata nel template, la privata in un console.log, le
+password diverse passate, la cronologia che non pulisce, nip49 fuori da
+PEZZI_NOSTR, scrypt r=4, niente NFKC, l'aad tolto: tutte rosse; al primo
+giro una mutazione faceva ESPLODERE la prova invece di farla rossa, un
+toast mancante letto con .startswith — guardie str()). Suite intera
+severa senza config nel worktree da origin/main (9e3f91f): 17.732 verdi
+e 0 rosse, due volte (prima e dopo i verbali). Dal vivo nel Browser pane a 375
+px nei due temi, server dalla copia col relay morto e identità 999:
+chiave creata, foglio dell'export (avviso, due password), la cifrata nel
+campo e non nell'HTML, chiave tolta dal dispositivo e reimportata dal
+testo in MAIUSCOLE con spazi — stessa npub di prima, «è quella che il
+nodo conosce», nessun fetch oltre l'elenco —, foglio dell'import,
+nessuno scorrimento laterale.
+
+**NON PROVATO.** Il download del file dentro Telegram su iPhone (il
+testo si copia comunque); il tempo dello scrypt su un telefono lento
+(in node 125 ms; sul telefono stimati 1-3 s, col velo d'attesa).
+
+**DA GUARDARE.** Sul telefono: esportare, dimenticare la chiave,
+importare. E il giorno che nostr-tools si aggiorna: rifare l'innesto
+PRIMA di pensare che il bundle «ha già nip49».
