@@ -13979,14 +13979,6 @@ function mapOrder(o){
        disputa risolta, ed e' cio' che rende un ordine finito in
        'confirmed'/'refund' ancora DECIDIBILE da un moderatore */
     disputata:o.disputata||0,
-    /* L'ANNULLO DEL VENDITORE (1 ott 2026): quando chi vende ha
-       rinunciato a sats GIA' depositati (0 = mai). Su 'refund' e
-       'refunded' e' cio' che fa dire ai testi «il venditore ha
-       annullato» invece della frase della disputa, che qui sarebbe
-       falsa. Il motivo e' testo libero di chi vende: alla resa passa
-       SEMPRE da esc(). */
-    annullatoVenditore:o.annullato_venditore_il||0,
-    motivoAnnullo:o.motivo_annullo||'',
     /* LA PORTA DEL TIMER (ago 2026): quando uno sblocco AUTOMATICO e'
        passato di qui (0 = mai). Su 'confirmed' dice che a chiudere
        l'affare e' stato il TEMPO e non una persona */
@@ -29706,24 +29698,7 @@ function openOrder(id){
   const rigaSpedizione = () =>
     `${esc(o.corriere)} — tracking ${codiceTracking(o, s)}${rigaCorretto(o.trackingCorretto)}`;
   let steps, progress;
-  if (o.annullatoVenditore && ['refund','refunded'].includes(s)) {
-    /* L'ANNULLO DEL VENDITORE (1 ott 2026): niente disputa, niente
-       moderatore — chi vende ha rinunciato e i sats tornano a chi ha
-       comprato. Tre passi, e il secondo porta il motivo se c'e'. Sta
-       PRIMA del ramo della disputa perche' condivide i suoi due stati
-       ('refund'/'refunded') e il flag e' l'unica cosa che li distingue. */
-    steps = [
-      passoDeposito,
-      {t:'Ordine annullato dal venditore',
-       d:(o.role==='seller' ? 'Hai annullato: non potevi più consegnare'
-                            : 'Il venditore non può più consegnare')
-         + (o.motivoAnnullo ? ' — «' + esc(o.motivoAnnullo) + '»' : '')},
-      o.role==='buyer'
-        ? {t:'Ti abbiamo rimborsato i sats', d:'Rimborso integrale, nessuna commissione'}
-        : {t:'Sats rimborsati all\'acquirente', d:'Rimborso integrale, l\'annuncio torna in vetrina'},
-    ];
-    progress = {refund:2, refunded:3}[s];
-  } else if (['dispute','refund','refunded','return_pending','return_shipped'].includes(s)) {
+  if (['dispute','refund','refunded','return_pending','return_shipped'].includes(s)) {
     /* Storia della disputa: la cassaforte racconta il congelamento */
     const conReso = ['return_pending','return_shipped'].includes(s);
     steps = [
@@ -29871,12 +29846,8 @@ function openOrder(id){
       d:o.role==='buyer'  ? `Ti abbiamo rimborsato ${cifraOrdine(o, o.listing.price)} (integrale)`
                           : 'I sats sono tornati all\'acquirente'}
     : s==='refund'              ? {ic:'↩️', b:'Rimborso in corso',
-      d:o.annullatoVenditore
-        ? (o.role==='buyer'  ? 'Il venditore ha annullato: scegli qui sotto come ricevere i tuoi sats'
-         : o.role==='seller' ? 'Hai annullato: i sats tornano all\'acquirente appena ci dice dove riceverli'
-         :                     'Annullato dal venditore: i sats tornano all\'acquirente')
-        : (o.role==='buyer'  ? 'Disputa vinta! Scegli qui sotto come ricevere i tuoi sats'
-                             : 'Disputa decisa: i sats tornano all\'acquirente')}
+      d:o.role==='buyer'  ? 'Disputa vinta! Scegli qui sotto come ricevere i tuoi sats'
+                          : 'Disputa decisa: i sats tornano all\'acquirente'}
     : ['return_pending','return_shipped'].includes(s)
       /* IL RESO E' UN GESTO, e finche' non e' partito e' di chi ha
          comprato: la riga diceva «Rimborso alla restituzione: i sats
@@ -30054,7 +30025,7 @@ function openOrder(id){
           <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore', this)">⚡ Dai i sats al venditore</button>
         </div>`:''}
       ${o.role==='buyer' && s==='refund' ? refundPanel(o) : ''}
-      ${o.role==='buyer' && s==='refunded' ? `<div class="trust-note">↩️ <span>${o.annullatoVenditore ? 'Il venditore ha annullato l\'ordine' : 'Disputa risolta a tuo favore'}: il <b>rimborso integrale</b> è stato inviato al tuo wallet.</span></div>`:''}
+      ${o.role==='buyer' && s==='refunded' ? `<div class="trust-note">↩️ <span>Disputa risolta a tuo favore: il <b>rimborso integrale</b> è stato inviato al tuo wallet.</span></div>`:''}
       ${o.role==='buyer' && s==='return_pending' ? `
         <div class="payout">
           <h4>↩️ Rispedisci l'oggetto per il rimborso</h4>
@@ -30157,19 +30128,6 @@ function openOrder(id){
           <div class="hint avviso-tracking" id="shipAvviso" style="display:none"></div>
           <button class="btn orange" onclick="markShipped()">📦 Segna come spedito</button>
         </div>`):''}
-      ${/* L'ANNULLO DEL VENDITORE (1 ott 2026): a sats gia' depositati
-           chi vende puo' rinunciare, e i sats tornano a chi ha comprato
-           senza passare da un moderatore. Chiuso in un <details> perche'
-           e' la strada rara, e aperta sotto gli occhi inviterebbe a
-           prenderla. Solo su 'locked' — a pacco partito la strada e' la
-           disputa — e mai con un pagamento in corso. */''}
-      ${o.role==='seller' && s==='locked' && !inPagamento(o) ? `
-        <details style="margin-top:10px">
-          <summary class="hint" style="cursor:pointer;color:var(--danger);font-weight:800">✖️ Non puoi più consegnarlo?</summary>
-          <div class="hint" style="margin-top:6px">Se l'oggetto non c'è più o non puoi spedirlo, annulla l'ordine: i <b>${fmt(o.listing.price)} sats</b> tornano <b>per intero</b> all'acquirente — subito se ha un Lightning address — e l'annuncio torna in vetrina a rimborso fatto. L'acquirente potrà lasciarti un feedback.</div>
-          <textarea id="motivoAnnullo" maxlength="200" style="min-height:38px" placeholder="Motivo (facoltativo): lo leggerà l'acquirente"></textarea>
-          <button class="btn danger-ghost" onclick="annullaDaVenditore(this)">✖️ Annulla l'ordine e rimborsa l'acquirente</button>
-        </details>`:''}
       ${busteOrdine(o)}
       ${pannelloServizioCompratore(o)}
       ${o.role==='buyer' && s==='creato' ? pannelloDaPagare(o)
@@ -35495,21 +35453,17 @@ async function rimuoviNpub(){
 
 /* ---- pannello rimborso dell'acquirente (disputa vinta) ---- */
 function refundPanel(o){
-  /* il perche' del rimborso (1 ott 2026): una disputa vinta o un
-     venditore che ha annullato — i sats sono gli stessi, la frase no */
-  const perche = o.annullatoVenditore ? 'Il venditore ha annullato l\'ordine'
-                                      : 'Hai vinto la disputa';
   if (myLnAddress) return `
     <div class="payout">
       <h4>↩️ Rimborso in elaborazione</h4>
-      <div class="hint">${perche}: <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> in arrivo su <b>${esc(myLnAddress)}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
+      <div class="hint">Hai vinto la disputa: <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> in arrivo su <b>${esc(myLnAddress)}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
       <textarea id="sellerInvoice" placeholder="lnbc… (invoice di ${fmt(o.listing.price)} sats)"></textarea>
       <button class="btn orange" onclick="saveSellerInvoice(this)">↩️ Ricevi il rimborso</button>
     </div>`;
   return `
     <div class="payout">
       <h4>↩️ Ricevi il tuo rimborso</h4>
-      <div class="hint">${o.annullatoVenditore ? 'Il venditore ha annullato l\'ordine' : 'La disputa è stata risolta <b>a tuo favore</b>'}: ti aspettano <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> (rimborso integrale).
+      <div class="hint">La disputa è stata risolta <b>a tuo favore</b>: ti aspettano <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> (rimborso integrale).
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address per riceverli subito (e per tutti gli incassi futuri).</div>
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
       <button class="btn orange" onclick="saveLnAddress(this)">⚡ Ricevi con Lightning address</button>
@@ -36570,42 +36524,6 @@ async function markConsegnaMano(){
       if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
       currentOrder.state='shipped'; currentOrder.corriere='Ritiro in zona';
       toast('🤝 Consegna a mano registrata'); openOrder(currentOrder.id);
-    }});
-}
-
-/* L'ANNULLO DEL VENDITORE (1 ott 2026): a sats gia' depositati chi
-   vende rinuncia, e i sats tornano a chi ha comprato senza passare da
-   un moderatore (POST /orders/{id}/annulla-venditore → 'refund', e da
-   li' _rimborsa_compratore come per una disputa vinta). La conferma
-   dice il prezzo per intero, perche' e' un gesto che non si disfa. Il
-   velo ha il suo testo: i sats si muovono davvero. */
-async function annullaDaVenditore(btn){
-  haptic();
-  chiediConferma({
-    titolo: 'Annulli l\'ordine e rimborsi l\'acquirente?',
-    corpo: 'Tutti i sats tornano all\'acquirente (rimborso integrale) e '
-         + 'l\'annuncio torna in vetrina. Non si può tornare indietro, e '
-         + 'l\'acquirente potrà lasciarti un feedback.',
-    etichetta: 'Sì, annulla e rimborsa',
-    poi: async () => {
-      const motivo = (el('motivoAnnullo')?.value || '').trim();
-      if (DEMO) { currentOrder.state='refunded'; currentOrder.annullatoVenditore=1; currentOrder.motivoAnnullo=motivo; toast('↩️ Ordine annullato: acquirente rimborsato'); openOrder(currentOrder.id); return; }
-      const ripristina = bottoneInAttesa(btn, 'Rimborso in corso…');
-      const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/annulla-venditore`, {
-        method:'POST',
-        headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-        body: JSON.stringify({motivo})});
-      const d = await r.json().catch(()=>({}));
-      ripristina();
-      if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
-      currentOrder.state = d.stato || 'refund';
-      currentOrder.annullatoVenditore = 1; currentOrder.motivoAnnullo = motivo;
-      toast(d.stato==='refunded' ? '↩️ Ordine annullato: acquirente rimborsato'
-          : d.non_chiesto ? '✖️ Annullato. Il rimborso non è potuto partire ora (il nostro nodo non risponde): riparte da solo'
-          : '✖️ Annullato: il rimborso parte appena l\'acquirente ci dice dove riceverlo');
-      const id = currentOrder.id;
-      try { await loadOrders(); renderOrders(); } catch(e) {}
-      openOrder(id);
     }});
 }
 

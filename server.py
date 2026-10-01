@@ -7931,18 +7931,6 @@ def init_db():
                     "fattura_rinnovata_il INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
-    # L'ANNULLO DEL VENDITORE (1 ott 2026): quando chi vende, a sats
-    # GIA' in cassaforte, dichiara di non poter piu' consegnare e i
-    # sats tornano a chi ha comprato (vedi `annulla_da_venditore`). Il
-    # pattern di `busta_il`: il flag E il quando in una colonna sola,
-    # 0 = mai. `motivo_annullo` e' la frase facoltativa di chi vende,
-    # che chi compra legge nell'ordine e nell'avviso.
-    for colonna in ("annullato_venditore_il INTEGER DEFAULT 0",
-                    "motivo_annullo TEXT DEFAULT ''"):
-        try:
-            con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
-        except sqlite3.OperationalError:
-            pass
     # I CREDITI DA RECUPERARE: il pagamento rimasto appeso sulla
     # cassaforte d'origine quando l'ordine e' stato pagato da un'altra.
     # Quei sats sono impegnati LA' finche' quel pagamento non si decide:
@@ -52049,15 +52037,10 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
 
 async def _rimborsa_compratore(ordine_id: int) -> dict:
     """Rimborsa integralmente l'acquirente (disputa decisa a suo
-    favore, o — dal 1 ott 2026 — venditore che ha annullato a sats
-    gia' depositati), provando: 1. la sua invoice di rimborso, 2. il
-    suo Lightning address. Se non c'e' un metodo, l'ordine va in
-    'refund' e l'acquirente viene invitato a fornirne uno nella Mini
-    App. L'annuncio torna in vetrina.
-    I SATS SI MUOVONO UGUALE NEI DUE CASI, e cambiano solo le PAROLE:
-    `annullato_venditore_il` dice quale delle due storie raccontare, e
-    senza quel bivio a chi compra arriverebbe «disputa risolta a tuo
-    favore» su una disputa mai aperta."""
+    favore), provando: 1. la sua invoice di rimborso, 2. il suo
+    Lightning address. Se non c'e' un metodo, l'ordine va in 'refund'
+    e l'acquirente viene invitato a fornirne uno nella Mini App.
+    L'annuncio torna in vetrina."""
     async with _lucchetti_ordine[ordine_id]:
         con = db()
         o = con.execute("SELECT * FROM ordini WHERE id=?", (ordine_id,)).fetchone()
@@ -52067,11 +52050,6 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         if o["stato"] in ("refunded", "released", "creato", "annullato"):
             con.close()          # gia' risolto (o mai pagato): niente doppioni
             return {"ok": o["stato"] == "refunded", "stato": o["stato"]}
-        # il bivio delle parole (vedi la docstring): l'annullo di chi
-        # vende, col suo motivo gia' ripulito all'ingresso
-        annullo = bool(_campo(o, "annullato_venditore_il", 0))
-        motivo = html.escape(_campo(o, "motivo_annullo", ""))
-        inciso_motivo = f" Il motivo: «{motivo}»." if motivo else ""
         if o["payout_stato"] in ("incerto", "in_volo"):
             con.close()          # gemello di _sblocca_sats: mai due uscite
             return {"ok": False, "stato": o["stato"], "incerto": True}
@@ -52168,46 +52146,22 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                 # e' di nuovo in vetrina, il post non deve mentire
                 asyncio.create_task(promo_venduto(r["annuncio_id"],
                                                   venduto=False))
-            if annullo:
-                # L'ANNULLO DI CHI VENDE: nessuna disputa, nessun
-                # moderatore — a chi compra si dice la cosa vera e si
-                # lascia la porta del feedback, che e' il prezzo
-                # dichiarato per chi rinuncia a un affare pagato
-                await notifica(o["compratore_id"],
-                               f"✖️ <b>Il venditore ha annullato l'ordine</b> "
-                               f"«{titolo}»: non può più consegnarlo."
-                               f"{inciso_motivo} Il rimborso integrale di "
-                               f"<b>{_fmt_sats(importo)} sats</b> è in arrivo "
-                               f"nel tuo wallet. ⭐ Com'è andata? Apri "
-                               f"l'ordine nella Mini App e lascia un feedback.")
-                await notifica(o["venditore_id"],
-                               f"✖️ <b>Hai annullato l'ordine</b> «{titolo}»: "
-                               f"i sats sono tornati all'acquirente e "
-                               f"l'annuncio è tornato in vetrina — se "
-                               f"l'oggetto non c'è più, mettilo in pausa o "
-                               f"rimuovilo dalla Mini App."
-                               + ("\n\n" + _coda_magazzino(magazzino)
-                                  if magazzino else ""))
-            else:
-                await notifica(o["compratore_id"],
-                               f"↩️ <b>Disputa risolta a tuo favore:</b> il rimborso di "
-                               f"<b>{_fmt_sats(importo)} sats</b> è in arrivo nel tuo wallet. "
-                               f"⭐ Com'è andata? Apri l'ordine nella Mini App e "
-                               f"lascia un feedback.")
-                await notifica(o["venditore_id"],
-                               "⚖️ La disputa è stata risolta a favore dell'acquirente: "
-                               "i sats gli sono stati rimborsati e l'annuncio è tornato "
-                               "in vetrina. ⭐ Puoi lasciare un feedback dall'ordine "
-                               "nella Mini App."
-                               + ("\n\n" + _coda_magazzino(magazzino)
-                                  if magazzino else ""))
+            await notifica(o["compratore_id"],
+                           f"↩️ <b>Disputa risolta a tuo favore:</b> il rimborso di "
+                           f"<b>{_fmt_sats(importo)} sats</b> è in arrivo nel tuo wallet. "
+                           f"⭐ Com'è andata? Apri l'ordine nella Mini App e "
+                           f"lascia un feedback.")
+            await notifica(o["venditore_id"],
+                           "⚖️ La disputa è stata risolta a favore dell'acquirente: "
+                           "i sats gli sono stati rimborsati e l'annuncio è tornato "
+                           "in vetrina. ⭐ Puoi lasciare un feedback dall'ordine "
+                           "nella Mini App."
+                           + ("\n\n" + _coda_magazzino(magazzino)
+                              if magazzino else ""))
             # Il polso dei moderatori: anche gli esiti storti contano
             await polso_ordini_admin(
-                (f"✖️ <b>Ordine annullato dal venditore e rimborsato:</b> "
-                 if annullo else
-                 f"↩️ <b>Ordine rimborsato al compratore:</b> ")
-                + f"«{titolo}» — {_fmt_sats(importo)} sats. "
-                f"Restano {{aperti}} ordini aperti.")
+                f"↩️ <b>Ordine rimborsato al compratore:</b> «{titolo}» — "
+                f"{_fmt_sats(importo)} sats. Restano {{aperti}} ordini aperti.")
             return {"ok": True, "stato": "refunded"}
 
         # Nessun metodo di rimborso disponibile: si mette in attesa
@@ -52224,12 +52178,6 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         con.close()
         await notifica(
             o["compratore_id"], _msg_ritentiamo(importo) if ritenta else
-            (f"✖️ <b>Il venditore ha annullato l'ordine:</b> non può più "
-             f"consegnarlo.{inciso_motivo} Per ricevere il rimborso "
-             f"integrale di <b>{_fmt_sats(importo)} sats</b>: apri l'ordine "
-             f"nella Mini App e imposta il tuo Lightning address, oppure "
-             f"incolla una invoice di esattamente quell'importo.")
-            if annullo else
             f"⚖️ <b>Disputa risolta a tuo favore!</b> Per ricevere il "
             f"rimborso di <b>{_fmt_sats(importo)} sats</b>: apri l'ordine nella "
             f"Mini App e imposta il tuo Lightning address, oppure "
@@ -53233,105 +53181,6 @@ async def annulla_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
     con.commit()
     con.close()
     return {"ok": True}
-
-
-MOTIVO_ANNULLO_MAX = 200     # la frase di chi vende, che chi compra legge
-
-
-@app.post("/api/orders/{ordine_id}/annulla-venditore")
-async def annulla_da_venditore(ordine_id: int, req: Request,
-                               x_tg_init_data: str = Header(""),
-                               barattolo_sessione: str = Cookie("")):
-    """IL VENDITORE RINUNCIA A SATS GIA' IN CASSAFORTE (1 ott 2026,
-    richiesta di Andrea): l'oggetto si e' rotto, l'ha venduto altrove,
-    non puo' spedire — e fino a ieri l'unica strada era lasciare
-    l'ordine fermo finche' chi aveva comprato apriva una disputa e un
-    moderatore decideva. Adesso chi vende lo dice da solo, e i sats
-    tornano a chi ha comprato SENZA passare da un moderatore.
-
-    E' il gemello di `annulla_ordine` (chi compra, a sats MAI arrivati)
-    ma dall'altra parte del pagamento, e per questo non e' la stessa
-    rotta: la' non si muove un sat e la riga diventa una lapide; qui i
-    sats ci sono, sono di chi ha comprato, e devono TORNARE INDIETRO.
-    L'escrow di Barattolo e' custodiale (LNbits), non una hold invoice:
-    «annullare» non e' lasciar scadere un HTLC, e' un PAGAMENTO
-    Lightning in uscita verso il compratore — automatico se ha un
-    Lightning address, altrimenti con la fattura che incolla lui.
-
-    NIENTE STATO NUOVO: l'ordine passa a 'refund' — «i sats spettano a
-    chi ha comprato, li stiamo rendendo» — che e' esattamente la frase
-    di quello stato, e da li' la strada e' quella gia' collaudata di
-    `_rimborsa_compratore`: address → rimborso immediato e 'refunded';
-    senza → resta 'refund' e chi compra incolla una fattura
-    (`deposita_invoice`) o mette l'address, come per una disputa
-    vinta. Il rimborso e' INTEGRALE, protezione compresa: l'affare e'
-    saltato per mano di chi vende, a chi compra non si trattiene nulla.
-
-    SOLO DA 'locked' E SOLO CHI VENDE: a pacco partito la strada resta
-    la disputa, perche' un oggetto in viaggio non si «annulla». Il
-    passaggio e' un CAS sullo stato DENTRO il lucchetto dell'ordine,
-    cosi' una conferma di chi compra arrivata nello stesso istante
-    (ritiro, servizio) o una spedizione segnata da un'altra scheda non
-    trovano piu' 'locked' e si fermano da sole — e viceversa. Il
-    rimborso parte FUORI dal lucchetto, che `_rimborsa_compratore`
-    prende da se'. Un'uscita gia' in corso sulla riga (`payout_stato`
-    non vuoto: un moderatore ci ha messo mano) ferma tutto PRIMA: qui
-    non si decide niente sopra a un pagamento in volo.
-
-    `annullato_venditore_il` resta scritto per sempre, ed e' cio' che
-    permette ai testi (avvisi, stepper, pannello del rimborso) di dire
-    la verita' — «il venditore ha annullato» — invece della frase
-    della disputa, che su questo ordine sarebbe falsa. `disputata`
-    resta 0: non c'e' stata nessuna lite e un moderatore non ha
-    niente da decidere, i sats hanno gia' un padrone. Il feedback di
-    chi compra si apre a 'refunded' come sempre (STATI_FEEDBACK): e'
-    il prezzo dichiarato per chi rinuncia a un affare gia' pagato."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    d = await leggi_json(req)
-    motivo = " ".join(str(d.get("motivo") or "").split())[:MOTIVO_ANNULLO_MAX]
-    adesso = int(time.time())
-    async with _lucchetti_ordine[ordine_id]:
-        con = db()
-        o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=?",
-                        (ordine_id, user["id"])).fetchone()
-        if not o or o["stato"] != "locked":
-            con.close()
-            raise HTTPException(400, "Operazione non permessa")
-        if o["payout_stato"]:
-            con.close()
-            raise HTTPException(409, "Su questo ordine c'è già un pagamento "
-                                     "in corso: scrivi ai moderatori")
-        cur = con.execute(
-            "UPDATE ordini SET stato='refund', annullato_venditore_il=?, "
-            "motivo_annullo=?, aggiornato=? WHERE id=? AND stato='locked'",
-            (adesso, motivo, adesso, ordine_id))
-        if cur.rowcount == 0:
-            # la corsa l'ha vinta l'altra scheda: una conferma o una
-            # spedizione hanno mosso l'ordine durante la nostra lettura
-            con.commit()
-            con.close()
-            raise HTTPException(409, "L'ordine è andato avanti proprio "
-                                     "adesso: ricaricalo e guarda")
-        con.commit()
-        con.close()
-    r = await _rimborsa_compratore(ordine_id)
-    if not r.get("ok"):
-        # A chi vende si dice che il gesto e' fatto anche quando i sats
-        # non sono ancora partiti: il rimborso aspetta un metodo di chi
-        # compra (o il nodo che tace), e l'annuncio torna in vetrina
-        # SOLO a rimborso fatto — e' `_rimborsa_compratore` a farlo,
-        # nel suo ramo riuscito, come per una disputa. Qui una volta
-        # sola: i giri successivi sono suoi.
-        await notifica(o["venditore_id"],
-                       f"✖️ <b>Hai annullato l'ordine #{ordine_id}.</b> I "
-                       f"sats tornano all'acquirente appena ci dice dove "
-                       f"riceverli; a rimborso fatto l'annuncio torna in "
-                       f"vetrina — se l'oggetto non c'è più, mettilo in "
-                       f"pausa o rimuovilo dalla Mini App.")
-    return {"ok": True, "stato": r.get("stato") or "refund",
-            "rimborsato": bool(r.get("ok")),
-            "non_chiesto": bool(r.get("non_chiesto")),
-            "incerto": bool(r.get("incerto") or r.get("in_volo"))}
 
 
 @app.get("/api/orders")
@@ -55175,11 +55024,8 @@ async def sollecita_venditori_fermi():
                     + ("<b>consegna il codice</b>."
                        if digitale else
                        "<b>segna la spedizione</b> col tracciamento.")
-                    # (1 ott 2026) la via d'uscita e' SUA, non piu' un
-                    # messaggio al compratore: vedi annulla_da_venditore
-                    + " Se non puoi più portarlo a termine, annulla "
-                      "l'ordine dalla Mini App: i sats tornano subito "
-                      "all'acquirente.")
+                    + " Se non puoi più portarlo a termine, dillo "
+                      "all'acquirente: potrà farsi rimborsare.")
                 if r["solleciti_venditore"] == 0:
                     # Una volta sola: al compratore non si chiede niente,
                     # gli si dice come stanno le cose e dov'e' la maniglia.
