@@ -32322,10 +32322,15 @@ server anche i passi della cauzione, e il server ha un destinatario in
 più da imparare a ogni passo nuovo — è il genere di buco che solo uno
 scambio vero fa vedere.
 
-**Cosa resta da guardare.** Un ordine ripreso su un dispositivo pulito
-che trova la controparte dal coordinatore (`peer` dalla restore), non
-provato. Il journal di mostrod per una settimana senza `no Mostro
-transport for event kind`. La riga «IL
+**Il dispositivo pulito, provato** (1 ott, stesso giorno): uno scambio
+preso da un account e ripreso dallo stesso account su un altro
+dispositivo compare con la controparte e si conclude da lì. La prova
+dice l'esito, non quale delle due fonti ha dato il `peer` — il server
+per primo, la restore del coordinatore per seconda —, e per chi scambia
+non conta; la riga «ripresa» del diario lo direbbe.
+
+**Cosa resta da guardare.** Il journal di mostrod per una settimana
+senza `no Mostro transport for event kind`. La riga «IL
 NODO GIRA LA 0.18.7» nella sezione del nodo di CLAUDE.md è vecchia di due
 salite: si corregge quando CLAUDE.md si tocca per una regola (regola 8).
 

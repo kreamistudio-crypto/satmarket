@@ -2826,10 +2826,15 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   «indica dove ricevere i sats» (`fattura_chiesta` da `mostro`: «nessuno
   da avvisare»), curato sul server in `1759be4`. Il pannello delle leve:
   «Cauzione nel contanti di persona» ACCESA.
-  COSA RESTA: un ordine ripreso su un dispositivo pulito che trova la
-  controparte dal coordinatore (`peer` dalla restore, non provato); il
-  journal di mostrod per una settimana senza `no Mostro transport for
-  event kind`. IL ROLLBACK resta quello del punto 9: riga 57 a
+  E IL DISPOSITIVO PULITO (1 ott, stesso giorno): uno scambio preso da
+  un account e ripreso dallo STESSO account su un altro dispositivo
+  compare con la controparte e si conclude da lì. Quale delle due fonti
+  abbia dato il `peer` — il server per primo (`chiave_peer`, dagli
+  eventi della 0007) o la restore del coordinatore (`counterparty_trade_pubkey`,
+  la seconda) — la prova non lo distingue, e per chi scambia non conta:
+  lo dice la riga «ripresa» del diario, se un giorno servisse.
+  COSA RESTA: il journal di mostrod per una settimana senza `no Mostro
+  transport for event kind`. IL ROLLBACK resta quello del punto 9: riga 57 a
   `mostro:v0.18.8-bar5` E `settings.toml` dalla copia `prima-bar6`, poi
   `up -d`; prima la query sulle dispute `cooperatively-canceled`; sul VPS
   `P2P_CAUZIONE = False` e riavvio.
