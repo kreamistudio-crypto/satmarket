@@ -48352,6 +48352,37 @@ function chiaveScambio(sk, indice){
   }
   throw new Error('chiave di scambio non derivabile');
 }
+/* la privata di una pubkey del mazzo: l'identita', o una trade key
+   derivata (si cercano gli indici fino al pavimento piu' uno: una chiave
+   che si registra e' sempre o l'identita' o l'ultima nata) */
+function skDiPubP2P(pub, mz){
+  if (!mz || !pub) return '';
+  if (mz.pub === pub) return mz.sk;
+  const fino = (mz.indice | 0) + 2;
+  for (let i = 0; i <= fino; i++) {
+    try { const tk = chiaveScambio(mz.sk, i); if (tk.pub === pub) return tk.sk; } catch(e) { break; }
+  }
+  return '';
+}
+const KIND_FIRMA_CHIAVE_P2P = 27384;
+/* le note firmate, una per chiave di cui si ha la privata: kind suo, il
+   tag di casa e il tg_id di chi registra (il server pretende lo stesso) */
+function firmeChiaviP2P(lista, mz){
+  const NT = window.NostrTools;
+  if (!NT || !mz || !myTgId) return [];
+  const adesso = Math.floor(Date.now() / 1000);
+  const firme = [];
+  for (const pub of lista) {
+    const sk = skDiPubP2P(pub, mz);
+    if (!sk) continue;
+    try {
+      firme.push(NT.finalizeEvent({kind: KIND_FIRMA_CHIAVE_P2P, created_at: adesso,
+        tags: [['t', 'barattolo/p2p/chiave'], ['tg', String(myTgId)]], content: ''},
+        NT.utils.hexToBytes(sk)));
+    } catch(e) {}
+  }
+  return firme;
+}
 /* Al server vanno SOLO le pubkey: e' l'unica fetch di questo blocco che
    scrive, e il suo corpo e' `{pubkeys}` e nient'altro. Fail-open: una
    registrazione persa si rifa' al prossimo ingresso nella pagina. */
@@ -48367,6 +48398,14 @@ async function registraChiaviP2P(pubkeys){
   const mz = mazzoMostro();
   const corpo = {pubkeys: lista};
   if (mz) { corpo.identita = mz.pub; corpo.indice = mz.indice | 0; }
+  /* LA PROVA DI POSSESSO (1 ott 2026, cantiere CSP e audit): per ogni
+     chiave che si registra, una nota firmata con QUELLA chiave e col
+     proprio tg_id dentro — e' quel che impedisce di registrare la trade
+     key di un altro per prestargli lo sconto. Fail-open: una chiave di
+     cui qui non c'e' la privata (o senza NostrTools) si registra lo
+     stesso, nuda, come ieri; la firma e' un premio, non una porta. */
+  const firme = firmeChiaviP2P(lista, mz);
+  if (firme.length) corpo.firme = firme;
   try {
     const r = await fetch(`${API_BASE}/p2p/chiavi`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},

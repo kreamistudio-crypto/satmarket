@@ -5271,7 +5271,13 @@ def init_db():
         -- e' un rischio che non compra niente.
         pubkey TEXT PRIMARY KEY,
         tg_id INTEGER NOT NULL,
-        creato INTEGER
+        creato INTEGER,
+        -- LA FIRMA (1 ott 2026, la M5 dell'audit del 19 set): 1 se il
+        -- telefono ha PROVATO di possedere la chiave, firmandoci una
+        -- nota col proprio tg_id dentro. Senza, la riga vale per gli
+        -- avvisi ma non per lo sconto (dopo P2P_FIRMA_CHIAVI_DAL).
+        firmata INTEGER DEFAULT 0,
+        firmata_il INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_chiavi_p2p_tg ON chiavi_p2p(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_ordini(
@@ -6716,6 +6722,12 @@ def init_db():
                     "premio REAL DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
+        except sqlite3.OperationalError:
+            pass
+    # la firma delle chiavi P2P (1 ott 2026, M5): vedi lo schema
+    for colonna in ("firmata INTEGER DEFAULT 0", "firmata_il INTEGER DEFAULT 0"):
+        try:
+            con.execute(f"ALTER TABLE chiavi_p2p ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
     # le due trade key dette da mostrod (24 set 2026, «I miei scambi
@@ -41825,13 +41837,18 @@ def _sconti_per_chiavi_p2p(con, pubkeys) -> dict:
     if len(pubkeys) > MAX_PUBKEY_SCONTO_P2P:
         raise ValueError("Troppe chiavi in una domanda sola")
     esito = {}
+    # LA FIRMA SI PRETENDE DA P2P_FIRMA_CHIAVI_DAL (1 ott 2026, M5): fino
+    # ad allora vale anche la riga nuda, com'era, cosi' nessuno perde lo
+    # sconto nei giorni in cui i telefoni si rifirmano da soli
+    pretende_firma = int(time.time()) >= P2P_FIRMA_CHIAVI_DAL
     for p in pubkeys:
         p = str(p).strip().lower()
         if not FORMA_PUBKEY_P2P.fullmatch(p):
             raise ValueError("Chiave in una forma sconosciuta")
-        r = con.execute("SELECT tg_id FROM chiavi_p2p WHERE pubkey=?",
+        r = con.execute("SELECT tg_id, firmata FROM chiavi_p2p WHERE pubkey=?",
                         (p,)).fetchone()
-        esito[p] = bool(r and _sconto_p2p(con, r[0])["attivo"])
+        esito[p] = bool(r and (int(r[1] or 0) == 1 or not pretende_firma)
+                        and _sconto_p2p(con, r[0])["attivo"])
     return esito
 
 
@@ -42028,7 +42045,54 @@ def _pavimento_indice_p2p(con, tg_id: int, identita, indice, adesso: int):
 
 
 
-def _registra_chiavi_p2p(con, tg_id: int, pubkeys, adesso: int) -> dict:
+# LA FIRMA DELLE CHIAVI P2P (1 ott 2026, la M5 dell'audit del 19 set,
+# riverificata il 23 e il 1 ott). `chiavi_p2p` accettava qualunque
+# 64-hex: un pioniere poteva registrare sotto il SUO account la trade
+# key di un amico (che usa un altro client) e prestargli lo sconto
+# fedelta', perche' `/api/p2p/sconto` risponde «vero» per quella
+# chiave. Da oggi il telefono PROVA di possedere ogni chiave che
+# registra: una nota firmata con quella chiave (kind
+# KIND_FIRMA_CHIAVE_P2P), col proprio tg_id in un tag, fresca di
+# un'ora al massimo. La verifica e' `verifica_firma_nostr`, la stessa
+# del login e della prova d'incontro.
+# RETROCOMPATIBILE, in due modi: 1) una chiave SENZA firma si registra
+# ancora — serve agli avvisi, che non sono un premio — ma resta
+# `firmata=0`; 2) lo sconto la pretende firmata SOLO da
+# P2P_FIRMA_CHIAVI_DAL in poi: fino ad allora vale anche la riga nuda,
+# com'era ieri. La pagina si carica viva (no-store) e il client rimanda
+# le chiavi a ogni avvio, quindi ogni telefono che apre Barattolo prima
+# di quella data si ritrova firmato da solo; chi non la apre mai non ha
+# scambi in corso, e al primo scambio la firma parte con la presa.
+KIND_FIRMA_CHIAVE_P2P = 27384
+TAG_FIRMA_CHIAVE_P2P = "barattolo/p2p/chiave"
+FINESTRA_FIRMA_CHIAVE_S = 3600
+P2P_FIRMA_CHIAVI_DAL = 1792022400   # 15 ott 2026, 00:00 UTC
+
+
+def _firma_chiave_p2p(ev, tg_id: int, adesso: int) -> str:
+    """La pubkey che questa nota PROVA di possedere, o ''. Firma vera
+    (`verifica_firma_nostr`), kind suo, il tag `t` di casa, il tag `tg`
+    uguale a chi registra, orologio entro FINESTRA_FIRMA_CHIAVE_S."""
+    if not isinstance(ev, dict):
+        return ""
+    try:
+        if ev.get("kind") != KIND_FIRMA_CHIAVE_P2P:
+            return ""
+        tags = ev.get("tags") or []
+        t = {x[0]: x[1] for x in tags if isinstance(x, list) and len(x) >= 2}
+        if t.get("t") != TAG_FIRMA_CHIAVE_P2P or t.get("tg") != str(int(tg_id)):
+            return ""
+        if abs(int(adesso) - int(ev.get("created_at") or 0)) > FINESTRA_FIRMA_CHIAVE_S:
+            return ""
+        if not verifica_firma_nostr(ev):
+            return ""
+        return str(ev.get("pubkey") or "").lower()
+    except Exception:
+        return ""
+
+
+def _registra_chiavi_p2p(con, tg_id: int, pubkeys, adesso: int,
+                         firme=None) -> dict:
     """Scrive le pubkey di UN utente. Idempotente per costruzione (la PK
     e' la pubkey e l'INSERT e' OR IGNORE): il client le rimanda a ogni
     avvio e non nasce mai un doppione. Alza ValueError — mai un 400
@@ -42037,7 +42101,11 @@ def _registra_chiavi_p2p(con, tg_id: int, pubkeys, adesso: int) -> dict:
     UNA PUBKEY GIA' DI UN ALTRO NON SI RUBA: l'OR IGNORE la lascia a chi
     l'ha registrata per primo (due mazzi non condividono mai una chiave,
     che nasce casuale: se succede e' lo stesso codice importato su due
-    account, e la riga di prima resta quella vera)."""
+    account, e la riga di prima resta quella vera).
+    `firme` (1 ott 2026): le note firmate, una per chiave; quelle buone
+    timbrano `firmata=1` SOLO sulle righe di questo account — una firma
+    su una chiave registrata da un altro non sposta niente. Torna anche
+    `firmate`, quante ne ha timbrate stavolta."""
     if not isinstance(pubkeys, list) or not pubkeys:
         raise ValueError("Nessuna chiave da registrare")
     pulite = []
@@ -42057,8 +42125,17 @@ def _registra_chiavi_p2p(con, tg_id: int, pubkeys, adesso: int) -> dict:
         scritte += con.execute(
             "INSERT OR IGNORE INTO chiavi_p2p(pubkey, tg_id, creato) "
             "VALUES(?,?,?)", (p, tg_id, adesso)).rowcount
+    firmate = 0
+    for ev in (firme if isinstance(firme, list) else [])[:MAX_CHIAVI_P2P]:
+        p = _firma_chiave_p2p(ev, tg_id, adesso)
+        if p and p in pulite:
+            firmate += con.execute(
+                "UPDATE chiavi_p2p SET firmata=1, firmata_il=? "
+                "WHERE pubkey=? AND tg_id=? AND firmata=0",
+                (adesso, p, tg_id)).rowcount
     con.commit()
-    return {"registrate": scritte, "totale": len(gia) + scritte}
+    return {"registrate": scritte, "totale": len(gia) + scritte,
+            "firmate": firmate}
 
 
 def _ordini_puliti_p2p(ordini) -> list:
@@ -43130,7 +43207,8 @@ async def registra_chiavi_p2p(req: Request, x_tg_init_data: str = Header(""),
     adesso = int(time.time())
     try:
         esito = _registra_chiavi_p2p(con, user["id"],
-                                     (d or {}).get("pubkeys"), adesso)
+                                     (d or {}).get("pubkeys"), adesso,
+                                     firme=(d or {}).get("firme"))
     except ValueError as e:
         con.close()
         raise HTTPException(400, str(e))

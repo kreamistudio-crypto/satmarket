@@ -14193,8 +14193,10 @@ def prove_foto_scarti():
     prova("sentinella: ...con la cancellazione MORBIDA, mai una DELETE",
           False, "DELETE FROM annunci" in codice(_pub))
     _sf = pezzo("salva_foto")
+    # nove dal 1 ott 2026: il nono e' la foto anomala (cura 3 del
+    # cantiere «CSP e le voci aperte degli audit»)
     prova("sentinella: ogni scarto di salva_foto dice QUALE foto", True,
-          codice(_sf).count("scarti.append(posto + ") == 8
+          codice(_sf).count("scarti.append(posto + ") == 9
           and "scarti.append(\"" not in codice(_sf)
           and "scarti.append(f\"" not in codice(_sf))
     prova("sentinella: il collaudo delle rotte vere c'e'", True,
@@ -15421,6 +15423,10 @@ def prove_duplica_annuncio():
             # eredita le dipendenze)
             i = _SORGENTE.index("NOME_FOTO = re.compile(")
             exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            i = _SORGENTE.index("TETTO_PIXEL_FOTO = ")
+            amb["threading"] = __import__("threading")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            exec(pezzo("_foto_anomala"), amb)
             for f in ("miniatura_jpeg", "_salva_una_foto", "copia_foto",
                       "foto_da_copiare"):
                 exec(pezzo(f), amb)
@@ -15609,6 +15615,10 @@ def prove_avatar():
                    "print": lambda *a, **k: None}
             i = _SORGENTE.index("MINIATURA_LATO = ")
             exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            i = _SORGENTE.index("TETTO_PIXEL_FOTO = ")
+            amb["threading"] = __import__("threading")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            exec(pezzo("_foto_anomala"), amb)
             for f in ("miniatura_jpeg", "_miniatura_da_rifare",
                       "genera_miniature_mancanti"):
                 exec(pezzo(f), amb)
@@ -63014,8 +63024,10 @@ def prove_p2p_chiavi():
     # qualunque cosa in coda al `{pubkeys:`.
     chiavi_corpo = set(re.findall(r"corpo\.(\w+) =", cod))
     chiavi_corpo |= set(re.findall(r"const corpo = \{(\w+):", cod))
-    prova("...e le chiavi del corpo sono esattamente quelle tre",
-          {"pubkeys", "identita", "indice"}, chiavi_corpo)
+    # quattro dal 1 ott 2026: `firme`, le note di possesso (cura 6 del
+    # cantiere «CSP e le voci aperte degli audit»), mai una privata
+    prova("...e le chiavi del corpo sono esattamente quelle quattro",
+          {"pubkeys", "identita", "indice", "firme"}, chiavi_corpo)
     prova("...senza un `sk` fra loro", False,
           any("sk" in c for c in chiavi_corpo))
     prova("...e il `body:` non porta un letterale che le scavalchi", True,
@@ -63195,8 +63207,10 @@ def prove_p2p_chiavi():
     # quando. Erano arrivate a OTTO — il gate del campanello, la coda, la
     # gemella, l'eco del gesto — e sono cadute col campanello generico.
     # Il censimento resta chiuso: una quarta si guarda qui.
-    prova("le colonne sono tre e sono quelle",
-          ["creato", "pubkey", "tg_id"],
+    # cinque dal 1 ott 2026: `firmata` e `firmata_il` sono la prova di
+    # possesso (cura 6), e non un posto per una privata
+    prova("le colonne sono cinque e sono quelle",
+          ["creato", "firmata", "firmata_il", "pubkey", "tg_id"],
           sorted(re.findall(r"^\s+(\w+) (?:TEXT|INTEGER)", ddl, re.M)))
     post = src[src.index('@app.post("/api/p2p/chiavi")'):
                src.index('@app.delete("/api/p2p/chiavi")')]
@@ -63310,12 +63324,13 @@ def prove_p2p_chiavi():
             return reg(*a)
         except ValueError as e:
             return "NO " + str(e)
-    prova("la prima pubkey si registra", {"registrate": 1, "totale": 1},
+    # `firmate` dal 1 ott 2026 (cura 6): quante note buone hanno timbrato
+    prova("la prima pubkey si registra", {"registrate": 1, "totale": 1, "firmate": 0},
           tenta(con, 111, [A], 1000))
-    prova("...la stessa di nuovo non raddoppia", {"registrate": 0, "totale": 1},
+    prova("...la stessa di nuovo non raddoppia", {"registrate": 0, "totale": 1, "firmate": 0},
           tenta(con, 111, [A], 1001))
     prova("le maiuscole si accettano abbassandole",
-          {"registrate": 1, "totale": 2}, tenta(con, 111, [B.upper()], 1002))
+          {"registrate": 1, "totale": 2, "firmate": 0}, tenta(con, 111, [B.upper()], 1002))
     prova("...e in colonna e' minuscola", B, con.execute(
         "SELECT pubkey FROM chiavi_p2p WHERE tg_id=111 AND pubkey=?", (B,)).fetchone()[0])
     prova("una forma storta e' un NO e non scrive", True,
@@ -63327,7 +63342,7 @@ def prove_p2p_chiavi():
     prova("oltre il tetto e' un NO, e non scrive nemmeno la prima", True,
           str(tenta(con, 111, ["c" * 64, "d" * 64], 1004)).startswith("NO")
           and con.execute("SELECT COUNT(*) FROM chiavi_p2p WHERE tg_id=111").fetchone()[0] == 2)
-    prova("una pubkey gia' di un altro non si ruba", {"registrate": 0, "totale": 0},
+    prova("una pubkey gia' di un altro non si ruba", {"registrate": 0, "totale": 0, "firmate": 0},
           tenta(con, 222, [A], 1005))
     prova("...e resta a chi l'aveva", 111, con.execute(
         "SELECT tg_id FROM chiavi_p2p WHERE pubkey=?", (A,)).fetchone()[0])
@@ -63535,7 +63550,8 @@ const corpo = f => JSON.parse(f.opt.body);
   out.cloudPortaIlMazzo = JSON.parse(cloud.get('mostro_mazzo')).sk === m.sk;
   out.fetchUna = chiaviF().length === 1 && chiaviF()[0].opt.method === 'POST';
   const c0 = corpo(chiaviF()[0]);
-  out.corpoTreChiavi = JSON.stringify(Object.keys(c0).sort()) === JSON.stringify(['identita','indice','pubkeys']);
+  /* quattro dal 1 ott 2026: `firme`, le note di possesso (cura 6) */
+  out.corpoTreChiavi = JSON.stringify(Object.keys(c0).sort()) === JSON.stringify(['firme','identita','indice','pubkeys']);
   out.corpoPortaPubEIndice = c0.pubkeys.length === 1 && c0.pubkeys[0] === m.pub
     && c0.identita === m.pub && c0.indice === 0;
   out.skMaiInRete = !JSON.stringify(fetches).includes(m.sk);
@@ -63990,7 +64006,7 @@ const corpo = f => JSON.parse(f.opt.body);
         "cloudPrimaLettoPoiScritto": "il cloud si legge PRIMA e si scrive DOPO",
         "cloudPortaIlMazzo": "...e nel cloud c'e' il mazzo",
         "fetchUna": "al server parte UNA POST",
-        "corpoTreChiavi": "...col corpo a tre chiavi e nient'altro",
+        "corpoTreChiavi": "...col corpo a quattro chiavi e nient'altro (le firme comprese)",
         "corpoPortaPubEIndice": "...che sono la pubkey, l'identita' e l'indice",
         "skMaiInRete": "...e il segreto non e' in nessuna fetch",
         "pavimentoAlza": "il pavimento del server alza l'indice locale",
@@ -116832,6 +116848,107 @@ def prove_quattro_piccole():
           all(re.search(r"@[0-9a-f]{40}\s+# v\d", r) for r in wf.splitlines() if "uses:" in r))
 
 
+def prove_chiavi_p2p_firmate():
+    """LE CHIAVI P2P FIRMATE (1 ott 2026, cantiere «CSP e le voci aperte
+    degli audit», cura 6: la M5 dell'audit del 19 set). `chiavi_p2p`
+    accettava qualunque 64-hex, e lo sconto fedelta' si poteva prestare
+    registrando la trade key di un amico. Qui le funzioni VERE girano su
+    sqlite in memoria con un verificatore di cartone (quello vero,
+    `verifica_firma_nostr`, ha le sue prove e coincurve in CI non c'e'):
+    la registrazione nuda resta, la firma timbra, lo sconto la pretende
+    solo dalla data della transizione."""
+    print("\n🔏 Le chiavi P2P firmate")
+    import sqlite3
+    import time as _t
+    con = sqlite3.connect(":memory:")
+    i = _SORGENTE.index("    CREATE TABLE IF NOT EXISTS chiavi_p2p(")
+    con.executescript(_SORGENTE[i:_SORGENTE.index(";", _SORGENTE.index("firmata_il", i)) + 1])
+    cols = [r[1] for r in con.execute("PRAGMA table_info(chiavi_p2p)")]
+    prova("lo schema nuovo porta firmata e firmata_il", True,
+          "firmata" in cols and "firmata_il" in cols)
+    prova("...e la migrazione le da' ai database vecchi", True,
+          'con.execute(f"ALTER TABLE chiavi_p2p ADD COLUMN {colonna}")' in _SORGENTE
+          and '"firmata INTEGER DEFAULT 0", "firmata_il INTEGER DEFAULT 0"' in _SORGENTE)
+    amb = {"re": re, "time": _t, "FORMA_PUBKEY_P2P": re.compile(r"^[0-9a-f]{64}$"),
+           "MAX_CHIAVI_P2P": 500, "MAX_PUBKEY_SCONTO_P2P": 4,
+           # il verificatore di cartone: la firma e' buona se dice «ok»
+           "verifica_firma_nostr": lambda ev: ev.get("sig") == "ok",
+           "_sconto_p2p": lambda con, tg: {"attivo": tg == 111}}
+    i = _SORGENTE.index("KIND_FIRMA_CHIAVE_P2P = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    for f in ("_firma_chiave_p2p", "_registra_chiavi_p2p", "_sconti_per_chiavi_p2p"):
+        exec(pezzo(f), amb)
+    reg, sconti = amb["_registra_chiavi_p2p"], amb["_sconti_per_chiavi_p2p"]
+    A, B, C = "a" * 64, "b" * 64, "c" * 64
+    ORA = 1_790_000_000
+
+    def nota(pub, tg=111, quando=ORA, kind=None, sig="ok", tag="barattolo/p2p/chiave"):
+        return {"kind": amb["KIND_FIRMA_CHIAVE_P2P"] if kind is None else kind,
+                "pubkey": pub, "created_at": quando, "sig": sig,
+                "tags": [["t", tag], ["tg", str(tg)]], "content": ""}
+
+    def riga(pub):
+        r = con.execute("SELECT tg_id, firmata FROM chiavi_p2p WHERE pubkey=?", (pub,)).fetchone()
+        return tuple(r) if r else None
+
+    e = reg(con, 111, [A], ORA)
+    prova("una chiave nuda si registra ancora (gli avvisi non sono un premio)",
+          {"registrate": 1, "totale": 1, "firmate": 0}, e)
+    prova("...ma resta non firmata", (111, 0), riga(A))
+    e = reg(con, 111, [A, B], ORA, firme=[nota(A), nota(B)])
+    prova("con le note buone si timbra: due firmate, una registrata", (1, 2), (e["registrate"], e["firmate"]))
+    prova("...e le righe lo dicono", [(111, 1), (111, 1)], [riga(A), riga(B)])
+    reg(con, 111, [A], ORA + 10, firme=[nota(A)])
+    prova("una firma ripetuta non ritimbra (idempotente)", 1,
+          con.execute("SELECT firmata FROM chiavi_p2p WHERE pubkey=?", (A,)).fetchone()[0])
+    # --- i no del giudice della nota -----------------------------------
+    g = amb["_firma_chiave_p2p"]
+    prova("firma storta: no", "", g(nota(C, sig="no"), 111, ORA))
+    prova("tg_id di un altro nel tag: no", "", g(nota(C, tg=222), 111, ORA))
+    prova("kind sbagliato: no", "", g(nota(C, kind=1), 111, ORA))
+    prova("tag di casa diverso: no", "", g(nota(C, tag="altro"), 111, ORA))
+    prova("nota vecchia di due ore: no", "", g(nota(C, quando=ORA - 7200), 111, ORA))
+    prova("nota dal futuro di due ore: no", "", g(nota(C, quando=ORA + 7200), 111, ORA))
+    prova("non un dizionario: no", ["", ""], [g(None, 111, ORA), g("x", 111, ORA)])
+    prova("la nota buona dice la sua pubkey", C, g(nota(C), 111, ORA))
+    # --- la chiave di un altro non si firma da qui --------------------------
+    reg(con, 222, [C], ORA)
+    e = reg(con, 111, [C], ORA, firme=[nota(C, tg=111)])
+    prova("la chiave registrata da un altro non si ruba ne' si timbra", (0, (222, 0)),
+          (e["firmate"], riga(C)))
+    # --- lo sconto: prima e dopo la data della transizione ------------------
+    # B torna NUDA prima del confronto: e' lei a dire la differenza fra
+    # prima e dopo la data (la tortura l'ha presa con tutt'e due firmate)
+    con.execute("UPDATE chiavi_p2p SET firmata=0 WHERE pubkey=?", (B,))
+    amb["time"] = type("T", (), {"time": staticmethod(lambda: amb["P2P_FIRMA_CHIAVI_DAL"] - 1)})
+    prova("prima della data anche la riga nuda ha lo sconto", {A: True, B: True},
+          sconti(con, [A, B]))
+    amb["time"] = type("T", (), {"time": staticmethod(lambda: amb["P2P_FIRMA_CHIAVI_DAL"])})
+    prova("dalla data la firma si pretende: la nuda perde lo sconto, la firmata no",
+          {A: True, B: False}, sconti(con, [A, B]))
+    prova("...e una chiave mai vista resta False, come sempre", {C: False},
+          sconti(con, [C]))
+    prova("la data della transizione e' il 15 ott 2026", 1792022400, amb["P2P_FIRMA_CHIAVI_DAL"])
+    # --- la rotta e il client ---------------------------------------------
+    prova("la rotta passa le firme al giudice", True,
+          'firme=(d or {}).get("firme")' in pezzo("registra_chiavi_p2p"))
+    mini = open("miniapp.html", encoding="utf-8").read()
+    fc = pezzo_js(mini, "function firmeChiaviP2P(")
+    prova("client: la nota si firma con finalizeEvent, kind suo, tag di casa e tg_id",
+          True, "NT.finalizeEvent(" in fc and "KIND_FIRMA_CHIAVE_P2P" in fc
+          and "'barattolo/p2p/chiave'" in fc and "String(myTgId)" in fc)
+    prova("client: il kind e' lo stesso del server", True,
+          "const KIND_FIRMA_CHIAVE_P2P = 27384;" in mini and "KIND_FIRMA_CHIAVE_P2P = 27384" in _SORGENTE)
+    rc = pezzo_js(mini, "async function registraChiaviP2P(")
+    prova("client: le firme viaggiano con le chiavi, e solo se ce ne sono", True,
+          "firmeChiaviP2P(lista, mz)" in rc and "if (firme.length) corpo.firme = firme;" in rc)
+    sd = pezzo_js(mini, "function skDiPubP2P(")
+    prova("client: la privata si cerca nel mazzo (identita' e trade key)", True,
+          "mz.pub === pub" in sd and "chiaveScambio(mz.sk, i)" in sd)
+    prova("client: fail-open, una chiave senza privata resta nuda", True,
+          "if (!sk) continue;" in fc)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -117055,6 +117172,7 @@ def main():
               prove_ssrf_ln_address,
               prove_foto_anomala,
               prove_quattro_piccole,
+              prove_chiavi_p2p_firmate,
               prove_config_esempio):
         try:
             f()
