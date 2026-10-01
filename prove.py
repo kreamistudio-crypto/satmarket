@@ -116949,6 +116949,126 @@ def prove_chiavi_p2p_firmate():
           "if (!sk) continue;" in fc)
 
 
+def prove_rotte_p2p_riverificate():
+    """LE ROTTE P2P NATE DOPO GLI AUDIT, RIVERIFICATE (1 ott 2026,
+    cantiere «CSP e le voci aperte degli audit», cura 7). Le funzioni
+    VERE su sqlite in memoria: `lascia` che rifiuta una disputa presa e
+    scarta l'id dichiarato caduto, la decisione che rifiuta la cauzione
+    del lato sbagliato, la prova d'incontro che vale solo per il giro
+    corrente (e la coppia nuova che scrive la sua), «dimentica» che
+    scorda le posizioni delle prove firmate con le mie chiavi, la CAS
+    dell'annullo che ripete «nessun payout in volo» nel lucchetto, e il
+    moderatore che cerca prima il 38386."""
+    print("\n🧷 Le rotte P2P nate dopo gli audit, riverificate")
+    import sqlite3
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+
+    def ddl(nome):
+        i = _SORGENTE.index(f"    CREATE TABLE IF NOT EXISTS {nome}(")
+        return _SORGENTE[i:_SORGENTE.index(");", i) + 2]
+
+    for t in ("p2p_dispute", "p2p_dispute_registro", "p2p_presenze"):
+        con.executescript(ddl(t))
+    con.executescript("""
+        CREATE TABLE p2p_scambi(ordine TEXT PRIMARY KEY, giro INTEGER DEFAULT 0,
+            preso_dal TEXT DEFAULT '', chiave_compratore TEXT DEFAULT '',
+            chiave_venditore TEXT DEFAULT '');
+        CREATE TABLE p2p_momenti(ordine TEXT, giro INTEGER, momento TEXT);""")
+    amb = {"re": re, "json": json, "FORMA_ORDINE_P2P": re.compile(r"^[0-9a-f-]{36}$"),
+           "P2P_DISPUTA_ESITI": {"compratore", "venditore"},
+           "P2P_MOTIVO_MIN": 20, "P2P_MOTIVO_MAX": 1000}
+    for f in ("_registro_disputa_p2p", "_lascia_disputa_p2p", "_cauzione_di_p2p",
+              "_decisione_disputa_p2p", "_incontro_da_riga_p2p", "_incontro_p2p",
+              "_dimentica_presenze_p2p"):
+        exec(pezzo(f), amb)
+    O = "11111111-2222-3333-4444-555555555555"
+    O2 = "aaaaaaaa-2222-3333-4444-555555555555"
+    K = "k" * 64
+    con.execute("INSERT INTO p2p_dispute(ordine, disputa, aperta_il, compratore, venditore, stato) "
+                "VALUES(?, 'd1d1d1d1-0000-0000-0000-000000000000', 1, 111, 222, 'aperta')", (O,))
+    con.execute("INSERT INTO p2p_dispute_registro(ordine, gesto, tg_id, quando, motivo) "
+                "VALUES(?, 'id_dichiarato', 111, 1, 'd1d1d1d1-0000-0000-0000-000000000000')", (O,))
+    con.execute("INSERT INTO p2p_dispute(ordine, disputa, aperta_il, compratore, venditore, stato, "
+                "presa_da, chiave_moderatore) VALUES(?, 'd2d2d2d2-0000-0000-0000-000000000000', 1, "
+                "111, 222, 'presa', 999, ?)", (O2, K))
+    con.execute("INSERT INTO p2p_scambi(ordine, giro, preso_dal) VALUES(?, 0, 'buyer')", (O2,))
+    # --- lascia ---------------------------------------------------------------
+    lascia = amb["_lascia_disputa_p2p"]
+    prova("lascia: una disputa PRESA non si lascia, e lo dice un 409", 409,
+          lascia(con, 998, O2, "boh", 10)[0])
+    prova("...senza righe nel registro di quella disputa", 0,
+          con.execute("SELECT COUNT(*) FROM p2p_dispute_registro WHERE ordine=?", (O2,)).fetchone()[0])
+    prova("lascia: su una aperta la presa fallita va a registro", 200, lascia(con, 999, O, "no", 10)[0])
+    prova("...e l'id DICHIARATO caduto si scarta, col suo gesto a registro",
+          ("", 1),
+          (con.execute("SELECT disputa FROM p2p_dispute WHERE ordine=?", (O,)).fetchone()[0],
+           con.execute("SELECT COUNT(*) FROM p2p_dispute_registro WHERE ordine=? AND gesto='id_scartato'",
+                       (O,)).fetchone()[0]))
+    prova("lascia: una disputa che non c'e' e' un 404", 404,
+          lascia(con, 999, "ffffffff-2222-3333-4444-555555555555", "", 10)[0])
+    # un id scritto da MOSTROD (nessun `id_dichiarato` a registro) non si
+    # scarta: e' un fatto, non una dichiarazione
+    O3 = "33333333-2222-3333-4444-555555555555"
+    con.execute("INSERT INTO p2p_dispute(ordine, disputa, aperta_il, compratore, venditore, stato) "
+                "VALUES(?, 'd3d3d3d3-0000-0000-0000-000000000000', 1, 111, 222, 'aperta')", (O3,))
+    prova("lascia: l'id scritto da mostrod resta anche a presa fallita",
+          (200, "d3d3d3d3-0000-0000-0000-000000000000"),
+          (lascia(con, 999, O3, "muto", 11)[0],
+           con.execute("SELECT disputa FROM p2p_dispute WHERE ordine=?", (O3,)).fetchone()[0]))
+    # --- la cauzione nella decisione --------------------------------------
+    dec = amb["_decisione_disputa_p2p"]
+    base = {"ordine": O2, "esito": "venditore", "chiave": K, "conferma": True,
+            "motivo": "non si e' presentato all'incontro, nessuna prova"}
+    prova("decisione: la cauzione del lato che NON l'ha messa e' un 400", 400,
+          dec(con, 999, dict(base, cauzione="venditore"), 20)[0])
+    prova("...quella del lato giusto passa (chi ha preso: compra)", (200, "compratore"),
+          (lambda e: (e[0], e[1].get("cauzione")))(dec(con, 999, dict(base, cauzione="compratore"), 21)))
+    prova("...e senza cauzione si decide come prima", 200, dec(con, 999, dict(base), 22)[0])
+    prova("...mentre una cauzione fuori catalogo resta un 400", 400,
+          dec(con, 999, dict(base, cauzione="tutti"), 23)[0])
+    # --- la prova d'incontro vale per il giro corrente ------------------------
+    A, B = "a" * 64, "b" * 64
+    con.execute("INSERT INTO p2p_presenze(ordine, giro, chiave_mostra, chiave_legge, ora_mostra, "
+                "ora_legge, lat_mostra, lon_mostra, acc_mostra, distanza_m, posizioni, quando) "
+                "VALUES(?, 0, ?, ?, 100, 110, 45.1, 9.1, 20, 30, 1, 100)", (O2, A, B))
+    inc = amb["_incontro_p2p"]
+    prova("incontro: al giro 0 la prova c'e'", 30, inc(con, O2)["distanza"])
+    con.execute("UPDATE p2p_scambi SET giro=1 WHERE ordine=?", (O2,))
+    prova("...al giro 1 (ordine tornato e ripreso) NON c'e' piu'", None, inc(con, O2))
+    prova("...e senza una riga in p2p_scambi si legge com'era (i banchi di ieri)", 30,
+          inc(con, "zzzzzzzz-2222-3333-4444-555555555555") if False else
+          (con.execute("DELETE FROM p2p_scambi WHERE ordine=?", (O2,)) and inc(con, O2)["distanza"]))
+    con.execute("INSERT INTO p2p_scambi(ordine, giro, preso_dal) VALUES(?, 1, 'buyer')", (O2,))
+    rp = pezzo("_registra_presenza_p2p")
+    # la riga INTERA della query: «WHERE ordine=? AND giro=?» da solo lo
+    # dice anche la query dei momenti chiusi (la tortura l'ha preso)
+    prova("sentinella: il «gia'» guarda ordine E giro, e la prova vecchia se ne va", True,
+          "SELECT * FROM p2p_presenze WHERE ordine=? AND giro=?" in rp
+          and "DELETE FROM p2p_presenze WHERE ordine=? AND giro<>?" in rp)
+    # --- dimentica scorda le posizioni delle prove firmate con le mie chiavi ---
+    dim = amb["_dimentica_presenze_p2p"]
+    prova("dimentica: la riga firmata con una mia chiave perde le posizioni", 1, dim(con, [B], 500))
+    r = con.execute("SELECT lat_mostra, prova, posizioni_via, distanza_m, chiave_legge FROM p2p_presenze "
+                    "WHERE ordine=?", (O2,)).fetchone()
+    prova("...posizioni e copia delle note via, ora e distanza e chiavi restano",
+          (None, "", 500, 30, B), tuple(r))
+    prova("...una seconda volta non tocca niente", 0, dim(con, [B], 600))
+    prova("...e senza chiavi, o con chiavi non mie, zero", (0, 0), (dim(con, [], 7), dim(con, ["c" * 64], 7)))
+    prova("sentinella: la rotta «dimentica» la chiama PRIMA di cancellare le chiavi", True,
+          pezzo("dimentica_chiavi_p2p").index("_dimentica_presenze_p2p(")
+          < pezzo("dimentica_chiavi_p2p").index("DELETE FROM chiavi_p2p"))
+    # --- la CAS dell'annullo ------------------------------------------------
+    prova("annullo: la CAS nel lucchetto ripete «nessun payout in volo»", True,
+          "WHERE id=? AND stato='locked' AND COALESCE(payout_stato,'')=''" in pezzo("annulla_vendita"))
+    # --- il moderatore cerca prima il 38386 ------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    pd = pezzo_js(mini, "function prendiDisputaP2P(")
+    prova("client: il moderatore cerca l'id sul 38386 PRIMA del dichiarato", True,
+          "id = await cercaDisputaIdP2P(d);" in pd and "if (!id) id = d.disputa || '';" in pd
+          and pd.index("cercaDisputaIdP2P(d)") < pd.index("d.disputa"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -117173,6 +117293,7 @@ def main():
               prove_foto_anomala,
               prove_quattro_piccole,
               prove_chiavi_p2p_firmate,
+              prove_rotte_p2p_riverificate,
               prove_config_esempio):
         try:
             f()

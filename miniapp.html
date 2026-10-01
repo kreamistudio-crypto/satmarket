@@ -63408,7 +63408,14 @@ async function eseguiPresaDisputaP2P(ordine){
   const rip = attesaP2P('Prendo la disputa…');
   let chiesta = false;
   try {
-    const id = d.disputa || await cercaDisputaIdP2P(d);
+    /* PRIMA IL 38386 DI MOSTROD, POI L'ID DICHIARATO (1 ott 2026): l'id
+       che una parte ha detto e' una dichiarazione di un telefono — storta o
+       apposta, bloccava la presa, o faceva prendere un'altra disputa —;
+       quello firmato dal coordinatore e' un fatto. Il dichiarato resta il
+       ripiego per quando il relay tace. */
+    let id = '';
+    try { id = await cercaDisputaIdP2P(d); } catch(e) { id = ''; }
+    if (!id) id = d.disputa || '';
     if (!id) throw new Error('non trovo il numero di questa disputa: lo dice l\'app di una delle due parti quando la apre');
     await modFetch('moderazione/prendi', {ordine: ordine, chiave: k.pub});
     chiesta = true;
