@@ -34219,3 +34219,126 @@ l'albero identico ai patcher. **Non provato:** la compilazione e i test
 Rust (sul nodo), e l'interruttore dal vivo (lo si vede nel journal di
 mostrod: «discount lookup paused for 60s»).
 
+## Contanti: la prova d'incontro senza QR («📍 Sono qui») e l'appuntamento (1 ott 2026)
+
+**LA DECISIONE DI ANDREA, dopo la prova reale di oggi**: il QR di «🤝
+Siamo insieme» non aggiungeva sicurezza (si inquadra anche da una foto
+mandata in chat). Al suo posto due presenze INDIPENDENTI, e
+l'appuntamento con l'ora e un indirizzo valido. QR, scanner di Telegram
+e fotocamera escono dal flusso e dalla pagina (foglio, video, casella,
+orologio da cinque secondi, la rotta `/api/p2p/presenza`); le prove col
+QR già nate restano leggibili dal moderatore, sul loro giro.
+
+**«📍 SONO QUI»**: un bottone per parte, facoltativo; premuto registra
+SEMPRE ora e posizione, e prima del primo tocco c'è la frase di Andrea.
+Nota firmata con la trade key (kind 27383, ruolo `qui`) e verificata
+dal server contro le chiavi del GIRO corrente: il lato lo dice la
+chiave, l'ora è quella del NOSTRO orologio (la firmata deve starle
+entro cinque minuti). Si ripreme fino a cinque volte per lato e la
+prima resta: chi tocca per sbaglio a casa lo rifà all'incontro. La
+posizione negata parte con la sola ora, detto nel toast e nella riga.
+In Telegram la posizione si chiede al LocationManager (8.0): su Android
+la sua WebView al GPS del browser spesso non arriva. Alle parti la
+propria riga e l'ORA dell'altra, mai la sua posizione.
+
+**IL CONFRONTO** lo fa il server per il moderatore: «Incontro
+probabile» entro 15 minuti (la finestra Andrea l'aveva lasciata a me,
+coi quindici per esempio: tenuti) coi telefoni non lontani — oltre 500
+m più le due precisioni, la proposta mia —, con le due ore e la
+distanza; poi «alla stessa ora, ma lontani», «non insieme», «presente
+solo chi compra/chi vende alle …», «nessuna prova». Con l'appuntamento,
+«presenti all'ora» entro ±30 minuti e i metri dal luogo. Fra più tocchi
+vince la prova più forte: l'ha trovato il collaudo, la prima stesura a
+parità di minuto prendeva la coppia senza posizione. Le distanze si
+calcolano all'arrivo e restano quando le posizioni se ne vanno.
+
+**L'APPUNTAMENTO** lo fissa e lo cambia CHI VENDE, nel suo recapito
+«📍 Dove vedervi» (cifrato fra i telefoni, come sempre): «🕒 Quando» col
+selettore del telefono, il luogo dai suggerimenti o da «📍 Usa la mia
+posizione»; a mano resta possibile, senza link, con l'avviso gentile.
+Sul filo resta testo composto: un client di ieri legge tre righe vere.
+In cima, per tutti e due, l'appuntamento, il luogo e «🧭 Apri nel
+navigatore» (Apple Mappe su iPhone, `geo:` su Android fuori da
+Telegram, Google Maps altrove). Al server SOLO ora e coordinate, in una
+nota firmata da chi vende, mai il testo; le versioni restano, e una
+presenza si confronta con quella IN VIGORE quando è arrivata (cambiarlo
+dopo non sposta chi c'era, e la card lo dice); a disputa aperta non si
+cambia più. Chi compra riceve l'avviso, col freno di sempre.
+
+**LA FONTE DEGLI INDIRIZZI: PHOTON** (OpenStreetMap, fatto per cercare
+mentre si scrive), dal nostro server: gli arriva SOLO il testo cercato,
+filtro Italia, un freno (30 ricerche al minuto a testa, 120 in tutto),
+memoria in RAM di sei ore, POST perché il testo non finisca nel
+registro. «Usa la mia posizione» non esce: il comune vicino lo dà il
+nostro elenco. SCARTATI Nominatim (la sua policy vieta
+l'autocompletamento), Google e Apple (chiavi, contratti, e i dati a chi
+ne vive).
+
+**LA REGOLA DELLA DISPUTA**, nelle parole di Andrea, in Info P2P e nel
+riquadro del contanti; prima di «Ho consegnato i contanti», a chi non ha
+segnato la presenza, l'avviso nella stessa conferma, con «Indietro».
+
+**PRIVACY E LE DUE CURE DELLA SICUREZZA** — le due voci che la cura 7
+di «CSP e le voci aperte degli audit» ha lasciato APERTE per questo
+cantiere (il giro nel «già» e in `_incontro_p2p`; le posizioni da
+scordare al «dimentica» prima delle chiavi), chiuse qui. Posizioni,
+punto e copie delle note via alla chiusura e comunque entro quindici
+giorni; mai nei log; mai all'altra parte. La presenza è legata al GIRO,
+sul server e nel telefono. «Dimentica il profilo» toglie presenze e
+appuntamenti miei, con UNA eccezione voluta e da guardare: su uno
+scambio con la parte in contanti ANCORA APERTA resta l'ora (la
+posizione no), o chi ha segnato «Sono qui», incassato e negato
+cancellerebbe con un tocco la presenza che l'altra persona ha visto.
+Chiuso lo scambio, va via anche quella.
+
+**PROVATO.** `prove_contanti_a_mano` (158: le firme vere anche in CI,
+con `schnorr_puro` dentro il giudice vero; le note fatte dal client in
+node e giudicate dal server), `prove_luoghi_appuntamento` (21),
+`prove_contanti_pagina_leggera` (32), il contanti in `prove_p2p_eventi`,
+sette banchi emendati; `collaudo_contanti_p2p` (44, server vero e
+Photon di cartone sul loopback). Sull'albero di partenza (eb1487a):
+suite intera severa senza config 18.230 verdi e 0 rosse; un collaudo
+della CI rosso per colpa mia (`collaudo_scambi_ovunque`: il suo client
+in node non conosceva `presenzeDaServerP2P` e `uniscePresenzeP2P`),
+curato, 64 ok. TORTURA sulla copia: 52 mutazioni (30 sul server, 22
+sul client), 50 uccise al primo giro. Le due vive passavano sentinelle
+sul TESTO — C09, un `if (false)` davanti all'invio dell'appuntamento al
+server; C16, l'adozione che teneva le presenze del giro vecchio — e le
+prende adesso un banco che ESEGUE il codice vero in node (il foglio di
+chi vende coi suoi quattro esiti, le righe dell'adozione legate al
+giro): rigirate su una copia fresca, uccise. S15 e S16, le due di
+«dimentica», le prende il collaudo (S16 passa apposta la sentinella sul
+testo: è il caso per cui la coppia prova-collaudo esiste). RIBASATO su
+8a46ba6 (il cantiere della sicurezza, col ritiro delle presenze dalla
+cura 7): rebase pulito, i simboli che si incrociano cercati per nome,
+una definizione ciascuno; suite intera severa 18.362 verdi e 0 rosse, e
+con le prove nuove della tortura 18.371 verdi e 0 rosse sull'albero
+finale (ac18df6); i 31 collaudi della CI verdi nella gabbia (su
+8326b9f: dopo sono cambiati solo `prove.py` e CANTIERI); le
+quattordici sezioni toccate anche COME IN CI,
+senza coincurve, fastapi, httpx e anthropic (un `sitecustomize` che li
+fa mancare davvero, la lezione della cura 4): 1.132 verdi e 0 saltate;
+il collaudo senza coincurve: 45 ok. DAL VIVO sulla copia in collaudo
+(relay morto, nessuna nsec), tre Chrome a 375 px come tre telefoni — 111, 222
+e il moderatore 999: l'appuntamento coi suggerimenti veri di Photon
+(chiamato dal PC), la card in cima e il navigatore, «Sono qui» dai due
+lati e con la posizione negata, l'avviso prima di «Ho consegnato i
+contanti», l'indirizzo a mano, la card del moderatore nei tre casi;
+sedici scatti nei due temi mandati ad Andrea prima del push. Sul
+RIBASATO, il giro della CSP in prova (arrivata su main dopo il primo
+giro): l'uso normale del contanti non lascia nessuna riga «🛡️ CSP:», e
+una violazione provocata dalla pagina ne lascia una (un `eval` dal
+DevTools non vale come controprova: lì la CSP non si applica).
+
+**NON PROVATO**: il LocationManager e il GPS di un telefono vero; il
+selettore della data dentro Telegram su iPhone e Android; il navigatore
+su un telefono vero; Photon dal VPS; il recapito cifrato fra due
+telefoni veri (coi relay morti viaggia dalle porte del client,
+dichiarato); il coordinatore vero.
+
+**DA GUARDARE**: uno scambio vero a due telefoni (Telegram e APK) con
+l'appuntamento, il navigatore, «Sono qui» dai due lati e uno senza
+posizione, poi la card del moderatore su una disputa di prova; sul VPS,
+dopo il deploy, che Photon risponda (`🗺️ Luoghi P2P: i suggerimenti
+tacciono` nel journal vorrebbe dire di no).
+
