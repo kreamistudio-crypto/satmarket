@@ -51,6 +51,13 @@ PER_PAGINA = 250
 # WordPress ne concede 100 e non 250, ed e' un tetto SUO: chiederne di
 # piu' non fa una pagina piu' grande, fa un 400.
 PER_PAGINA_WOO = 100
+# I TETTI ALLE PAGINE (1 ott 2026, cura 8): un negozio che risponde
+# sempre una pagina piena — o Shopify con un `Link: next` su una pagina
+# vuota — faceva girare il lettore per sempre, con la memoria che
+# cresce. Oltre il tetto si ALZA, come su una risposta storta: un giro
+# che fallisce si conta e si riprova fra un'ora, una lista a meta' no.
+MAX_PAGINE_VARIAZIONI_WOO = 10     # mille varianti per prodotto: oltre non e' un prodotto
+MAX_PAGINE_CATALOGO = 50           # cinquemila prodotti letti: il tetto e' molto prima
 
 # I tagli del testo, IDENTICI alle colonne del database. Non sono un
 # gusto: sono la ragione per cui `testo_negozio` esiste (vedi sotto).
@@ -690,7 +697,12 @@ def leggi_catalogo_shopify(dominio: str, credenziali: dict, chiama,
            f"/products.json?limit={PER_PAGINA}")
     intestazioni = {"X-Shopify-Access-Token":
                     (credenziali or {}).get("token", "")}
+    pagine = 0
     while url and len(prodotti) < tetto:
+        pagine += 1
+        if pagine > MAX_PAGINE_CATALOGO:
+            raise RuntimeError("il catalogo non finisce mai: oltre "
+                               f"{MAX_PAGINE_CATALOGO} pagine")
         stato, corpo, risposta = chiama("GET", url, intestazioni)
         if stato != 200:
             raise RuntimeError(f"Shopify ha risposto {stato}")
@@ -1042,6 +1054,9 @@ def leggi_catalogo_woo(url_negozio: str, credenziali: dict, chiama,
             restano = True
             break
         pagina += 1
+        if pagina > MAX_PAGINE_CATALOGO:
+            raise RuntimeError("il catalogo non finisce mai: oltre "
+                               f"{MAX_PAGINE_CATALOGO} pagine")
     # NIENTE TETTI IN SILENZIO, ed e' un difetto vero preso provando e
     # non leggendo: con cento prodotti per pagina e un tetto di
     # duecento si atterra ESATTAMENTE sul tetto, quindi il confronto
@@ -1100,6 +1115,10 @@ def _variazioni_woo(base: str, pid: int, intestazioni: dict, chiama) -> list:
         if len(fetta) < PER_PAGINA_WOO:
             return variazioni
         pagina += 1
+        if pagina > MAX_PAGINE_VARIAZIONI_WOO:
+            raise RuntimeError(f"il prodotto {pid} ha piu' di "
+                               f"{MAX_PAGINE_VARIAZIONI_WOO * PER_PAGINA_WOO} "
+                               "variazioni: non e' un catalogo che si possa leggere")
 
 
 LETTORI = {"shopify": leggi_catalogo_shopify, "woo": leggi_catalogo_woo}

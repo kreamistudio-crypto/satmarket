@@ -58264,6 +58264,10 @@ except ImportError:
     CONNETTORI_NEGOZIO_PER_TUTTI = False
 
 SECONDI_SYNC_CONNETTORI = 3600
+# la scadenza della LETTURA di un catalogo (1 ott 2026, cura 8): dieci
+# minuti bastano a duecento prodotti con le loro varianti anche da un
+# negozio lento; oltre e' un negozio che non risponde, e si conta cosi'
+CONNETTORI_LETTURA_MAX_S = 600
 _prossimo_giro_connettori = 0.0   # 0 = primo giro subito all'avvio
 
 # Quanti prodotti leggere per connettore per giro. Il target
@@ -58712,6 +58716,27 @@ async def _modera_righe_negozio(righe: list) -> tuple[list, dict]:
     return ammesse, marchi
 
 
+_SYNC_CONNETTORI_VIVO = False
+
+
+async def sincronizza_connettori_in_sfondo():
+    """IL GIRO IN UN TASK SUO (1 ott 2026, cura 8): l'orologio lo
+    LANCIA e va avanti, invece di aspettarlo — un catalogo lento teneva
+    fermi i passi dopo (scadenze, pagamenti in volo, ritentativi dei
+    payout) per tutta la durata della lettura. Uno alla volta: se il
+    giro di un'ora fa sta ancora girando, questo non parte."""
+    global _SYNC_CONNETTORI_VIVO
+    if _SYNC_CONNETTORI_VIVO:
+        return
+    _SYNC_CONNETTORI_VIVO = True
+    try:
+        await sincronizza_connettori()
+    except Exception as e:
+        print(f"⚠️ Sync dei negozi collegati saltato (riprovo tra un'ora): {e}")
+    finally:
+        _SYNC_CONNETTORI_VIVO = False
+
+
 async def sincronizza_connettori():
     """Il giro dei cataloghi collegati: una volta all'ora, un
     connettore alla volta, fail-open.
@@ -58779,9 +58804,20 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
             # la BUSTA INTERA delle credenziali e non un campo: Shopify ha
             # un token, Woo una chiave e un segreto, e a sapere che forma
             # hanno e' il lettore — qui si sa solo che sono un dizionario
-            prodotti, avviso, completo = await asyncio.to_thread(
-                lettore, c["url_negozio"], credenziali,
-                chiama_api_negozio, MAX_PRODOTTI_CONNETTORE)
+            # CON UNA SCADENZA (1 ott 2026, cura 8): un negozio che
+            # risponde una pagina al minuto teneva il giro appeso per
+            # ore. Scaduto il tempo la lettura si conta come un errore
+            # (a soglia il collegamento si dichiara rotto, come per un
+            # 500); il thread che leggeva finisce da solo e il suo
+            # risultato si butta — era in sola lettura, non scrive niente.
+            prodotti, avviso, completo = await asyncio.wait_for(
+                asyncio.to_thread(lettore, c["url_negozio"], credenziali,
+                                  chiama_api_negozio, MAX_PRODOTTI_CONNETTORE),
+                timeout=CONNETTORI_LETTURA_MAX_S)
+        except asyncio.TimeoutError:
+            await _connettore_in_errore(
+                c, f"la lettura del catalogo ha superato {CONNETTORI_LETTURA_MAX_S} secondi")
+            return
         except Exception as e:
             # LO SPEGNIMENTO NON SI CONTA: contato, ogni deploy durante
             # una lettura lunga sarebbe un «errore di fila», e a soglia
@@ -58835,15 +58871,22 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
                 if not r.get("saltato_perche") and \
                         r["origine_chiave"] not in viste:
                     r["saltato_perche"] = MSG_RIGA_NON_GIUDICATA
-        con = db()
-        try:
-            esito = importa_negozio.riconcilia_connettore(
-                con, c, righe, _salva_foto_connettore,
-                {k: v[1] for k, v in marchi.items()},
-                completo=completo,
-                max_nuovi=MAX_NUOVI_CONNETTORE_GIRO)
-        finally:
-            con.close()
+        # LA RICONCILIAZIONE IN UN THREAD (1 ott 2026, cura 8): dentro ci
+        # sono i download delle foto (urllib, 10 s l'uno) e Pillow, e fin
+        # qui giravano NEL CICLO PRINCIPALE — finche' scaricava, il
+        # server non rispondeva a nessuno. La connessione al database
+        # nasce e muore nel thread, com'e' giusto per sqlite.
+        def _riconcilia():
+            con = db()
+            try:
+                return importa_negozio.riconcilia_connettore(
+                    con, c, righe, _salva_foto_connettore,
+                    {k: v[1] for k, v in marchi.items()},
+                    completo=completo,
+                    max_nuovi=MAX_NUOVI_CONNETTORE_GIRO)
+            finally:
+                con.close()
+        esito = await asyncio.to_thread(_riconcilia)
         if avviso:
             esito["saltati"].append({"titolo": "", "perche": avviso})
         await _chiudi_giro_connettore(c, esito)
@@ -60277,7 +60320,8 @@ async def orologio():
             # lo stesso mestiere (una fonte esterna che comanda) e
             # condividono il dopo-giro — la ricategorizzazione, che
             # gira in coda a quello, pesca gia' anche le loro righe.
-            await sincronizza_connettori()
+            # in un task suo (cura 8): l'orologio non lo aspetta
+            asyncio.create_task(sincronizza_connettori_in_sfondo())
         except Exception as e:
             print(f"⚠️ Sync dei negozi collegati saltato (riprovo tra "
                   f"un'ora): {e}")

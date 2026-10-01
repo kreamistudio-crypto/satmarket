@@ -78316,10 +78316,15 @@ def prove_p2p_campanello():
     tabella = codice(src[s_i:src.index("ON chiavi_p2p(tg_id);", s_i)])
     colonne = [r.strip().split()[0] for r in tabella.split("\n")
                if r.startswith("        ") and not r.strip().startswith("--")]
-    prova("chiavi_p2p torna a tre colonne: di chi e' la chiave, e da quando",
-          ["pubkey", "tg_id", "creato"], colonne)
-    prova("...e nessun ALTER rimette quelle del gate", False,
-          "ALTER TABLE chiavi_p2p" in codice(src))
+    # cinque dal 1 ott 2026 (cura 6 del cantiere «CSP e le voci aperte
+    # degli audit»): `firmata` e `firmata_il` sono la prova di possesso,
+    # non il gate; e l'unico ALTER su chiavi_p2p rimette QUELLE due
+    prova("chiavi_p2p: di chi e' la chiave, da quando, e se l'ha firmata",
+          ["pubkey", "tg_id", "creato", "firmata", "firmata_il"], colonne)
+    prova("...e nessun ALTER rimette quelle del gate", [], [
+          c for c in ("ultimo_nudge", "coperto", "rimandato", "gesto", "eco_fino")
+          if c in codice(src)[codice(src).index("ALTER TABLE chiavi_p2p") - 400:
+                            codice(src).index("ALTER TABLE chiavi_p2p")]])
     # ...e nel client
     prova("il telefono non dice piu' «sto facendo un gesto»", False,
           "function dichiaraGestoP2P(" in _mini or "/p2p/gesto" in _mini)
@@ -91947,6 +91952,8 @@ def prove_connettore_interrompibile():
         g.update({"_APRITORE_API": Apritore(),
                   "url_api_ammesso": lambda u: True,
                   "TETTO_RISPOSTA_API": 10**6,
+                  # la scadenza della lettura (cura 8, ott 2026)
+                  "CONNETTORI_LETTURA_MAX_S": 600,
                   "_CONNETTORI_IN_CORSO": set(),
                   "_decifra_contenuto": lambda x: "{}",
                   "MAX_PRODOTTI_CONNETTORE": 10**6,
@@ -98471,7 +98478,7 @@ def prove_ronda_nodo():
             self.code, self.detail = code, detail
 
     def amb_con(segreto):
-        amb = {"__builtins__": __builtins__, "HTTPException": _H,
+        amb = {"__builtins__": __builtins__, "HTTPException": _H, "time": time,
                "hmac": _hmac, "re": re, "sqlite3": sqlite3}
         amb["RONDA_NODO_" + "SEGRETO"] = segreto
         for costante in ("MAX_HASH_RONDA_NODO = ", "FORMA_HASH_PAGAMENTO = "):
@@ -99015,7 +99022,7 @@ def prove_p2p_sconto():
             self.code, self.detail = code, detail
 
     def amb_con(punti, segreto=""):
-        amb = {"__builtins__": __builtins__, "HTTPException": _H,
+        amb = {"__builtins__": __builtins__, "HTTPException": _H, "time": time,
                "hmac": _hmac, "re": re,
                "P2P_SCONTO_FEDELTA_PERCENTO": punti,
                "P2P_SCONTO_LIVELLO": 5, "MAX_PUBKEY_SCONTO_P2P": 4}
@@ -99026,6 +99033,9 @@ def prove_p2p_sconto():
         exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
         i = _SORGENTE.index("FORMA_PUBKEY_P2P = ")
         exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+        # la data della transizione delle chiavi firmate (cura 6, ott 2026)
+        i = _SORGENTE.index("KIND_FIRMA_CHIAVE_P2P = ")
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
         for f in ("livello_utente", "sconto_p2p_attivo", "_sconto_p2p_fatti",
                   "_sconto_p2p", "_sconti_per_chiavi_p2p",
                   "_porta_sconto_p2p"):
@@ -114654,10 +114664,14 @@ def prove_cauzione_p2p():
     i = src.index("\nP2P_DISPUTA_ESITI = {") + 1
     exec(src[i:src.index("}\n", i) + 2], amb_d)
     exec(_senza_prosa(pezzo("_registro_disputa_p2p")), amb_d)
+    exec(_senza_prosa(pezzo("_cauzione_di_p2p")), amb_d)
     exec(_senza_prosa(pezzo("_decisione_disputa_p2p")), amb_d)
     con.execute("INSERT INTO p2p_dispute(ordine, stato, compratore, venditore, aperta_da, aperta_il, "
                 "presa_da, presa_il, chiave_moderatore) VALUES(?,?,?,?,?,?,?,?,?)",
                 (ORD, "presa", A, B, "compra", ORA, 999, ORA + 10, "c" * 64))
+    # dal 1 ott 2026 (cura 7) la decisione confronta la cauzione col lato
+    # che l'ha messa: qui ha preso chi compra
+    con.execute("UPDATE p2p_scambi SET preso_dal='buyer' WHERE ordine=?", (ORD,))
     MOTIVO = "Nessuna prova d'incontro e chi compra non risponde da tre giorni."
     base = {"ordine": ORD, "esito": "venditore", "motivo": MOTIVO, "conferma": True, "chiave": "c" * 64}
     dec = amb_d["_decisione_disputa_p2p"]
@@ -117069,6 +117083,85 @@ def prove_rotte_p2p_riverificate():
           and pd.index("cercaDisputaIdP2P(d)") < pd.index("d.disputa"))
 
 
+def prove_negozi_fuori_dal_ciclo():
+    """I NEGOZI COLLEGATI FUORI DAL CICLO PRINCIPALE (1 ott 2026, cantiere
+    «CSP e le voci aperte degli audit», cura 8). La riconciliazione — coi
+    download delle foto dentro — girava nel ciclo principale, il giro
+    dei cataloghi dentro l'orologio senza scadenza, e le paginazioni di
+    Woo e Shopify non avevano un tetto. Qui i lettori VERI girano con un
+    negozio di cartone che non finisce mai, e le sentinelle guardano il
+    thread, la scadenza e il task."""
+    print("\n🏪 I negozi collegati fuori dal ciclo principale")
+    import importlib
+    ne = importlib.import_module("importa_negozio")
+
+    def pagina_piena(n):
+        return {"lista": [{"id": i, "name": f"p{i}", "price": "1", "status": "publish",
+                           "stock_status": "instock", "type": "simple"} for i in range(n)]}
+
+    chiamate = []
+
+    # il negozio di cartone si FERMA da solo oltre le 500 pagine: un lettore
+    # senza tetto deve dare una rossa col nome, non far girare il banco per
+    # sempre (la tortura e' rimasta appesa cosi')
+    def woo_senza_fine(metodo, url, intestazioni):
+        chiamate.append(url)
+        if len(chiamate) > 500:
+            raise RuntimeError("il banco si ferma: il lettore non ha un tetto")
+        return 200, pagina_piena(ne.PER_PAGINA_WOO), {}
+
+    try:
+        ne._variazioni_woo("https://negozio.tld", 7, {}, woo_senza_fine)
+        esito = "finito"
+    except RuntimeError as e:
+        esito = "alzato: " + str(e)[:40]
+    prova("le variazioni di un prodotto senza fine ALZANO, non girano per sempre", True,
+          esito.startswith("alzato"))
+    prova("...dopo esattamente il tetto di pagine", ne.MAX_PAGINE_VARIAZIONI_WOO, len(chiamate))
+
+    chiamate.clear()
+
+    def shopify_senza_fine(metodo, url, intestazioni):
+        chiamate.append(url)
+        if len(chiamate) > 500:
+            raise RuntimeError("il banco si ferma: il lettore non ha un tetto")
+        return 200, {"products": []}, {"Link": "<https://x.myshopify.com/admin/api/v/products.json?page_info=zz>; rel=\"next\""}
+
+    try:
+        ne.leggi_catalogo_shopify("x.myshopify.com", {"token": "t"}, shopify_senza_fine)
+        esito = "finito"
+    except RuntimeError as e:
+        esito = "alzato: " + str(e)[:40]
+    prova("Shopify con un next su una pagina vuota ALZA al tetto", True,
+          esito.startswith("alzato") and len(chiamate) == ne.MAX_PAGINE_CATALOGO)
+    prova("i tetti sono larghi: mille varianti, cinquemila prodotti", True,
+          ne.MAX_PAGINE_VARIAZIONI_WOO * ne.PER_PAGINA_WOO >= 1000
+          and ne.MAX_PAGINE_CATALOGO * ne.PER_PAGINA_WOO >= 5000)
+    prova("il catalogo Woo col tetto di pagine", True,
+          "if pagina > MAX_PAGINE_CATALOGO:" in open("importa_negozio.py", encoding="utf-8").read())
+    # --- il server: thread, scadenza, task ----------------------------------
+    unc = pezzo("_un_connettore")
+    prova("la riconciliazione gira in un thread, con la connessione nata li' dentro", True,
+          "esito = await asyncio.to_thread(_riconcilia)" in unc
+          and unc.index("def _riconcilia():") < unc.index("con = db()")
+          and "importa_negozio.riconcilia_connettore(" in unc.split("def _riconcilia():")[1])
+    prova("la lettura ha una scadenza, e scaduta si conta come un errore", True,
+          "asyncio.wait_for(" in unc and "timeout=CONNETTORI_LETTURA_MAX_S" in unc
+          and "except asyncio.TimeoutError:" in unc
+          and "await _connettore_in_errore(" in unc.split("except asyncio.TimeoutError:")[1].split("except Exception")[0])
+    i = _SORGENTE.index("CONNETTORI_LETTURA_MAX_S = ")
+    prova("...di dieci minuti", "CONNETTORI_LETTURA_MAX_S = 600",
+          _SORGENTE[i:_SORGENTE.index("\n", i)])
+    sf = pezzo("sincronizza_connettori_in_sfondo")
+    prova("il giro gira in un task suo, uno alla volta", True,
+          "if _SYNC_CONNETTORI_VIVO:" in sf and "await sincronizza_connettori()" in sf
+          and "_SYNC_CONNETTORI_VIVO = False" in sf.split("finally:")[1])
+    oro = pezzo("orologio")
+    prova("...e l'orologio lo LANCIA senza aspettarlo", True,
+          "asyncio.create_task(sincronizza_connettori_in_sfondo())" in oro
+          and "await sincronizza_connettori()" not in oro)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -117294,6 +117387,7 @@ def main():
               prove_quattro_piccole,
               prove_chiavi_p2p_firmate,
               prove_rotte_p2p_riverificate,
+              prove_negozi_fuori_dal_ciclo,
               prove_config_esempio):
         try:
             f()
