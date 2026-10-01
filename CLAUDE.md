@@ -23,8 +23,9 @@ I documenti in `docs/` NON sono import: si aprono quando servono.
   `docs/STUDIO-BOLT-CARD-2026-09-24.md`,
   `docs/STUDIO-RISTORANTI-2026-09-24.md`,
   `docs/STUDIO-CONTANTI-A-MANO-2026-09-25.md`,
-  `docs/STUDIO-MOSTRO-0190-2026-09-30.md` (la 0.19.0 in preparazione) e
-  `docs/STUDIO-HACKATHON-RGB-2026-10.md` (Torino, 17-18 ott 2026).
+  `docs/STUDIO-MOSTRO-0190-2026-09-30.md` (la 0.19.0 in preparazione),
+  `docs/STUDIO-HACKATHON-RGB-2026-10.md` (Torino, 17-18 ott 2026) e
+  `docs/STUDIO-LIQUIDITA-NODO-2026-10-01.md` (sweep e canale da 5M).
 
 I DOCUMENTI GRANDI NON SI LEGGONO MAI INTERI: CANTIERI (2 MB),
 ARCHITETTURA (2 MB) e PRODUZIONE sono da migliaia di righe, e una
