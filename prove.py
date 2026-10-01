@@ -99100,14 +99100,15 @@ def prove_p2p_sconto():
     con.executescript("""
       CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, coorte TEXT DEFAULT '',
         xp INT DEFAULT 0, vendite_ok INT DEFAULT 0, acquisti_ok INT DEFAULT 0);
-      CREATE TABLE chiavi_p2p(pubkey TEXT PRIMARY KEY, tg_id INT, creato INT);
+      CREATE TABLE chiavi_p2p(pubkey TEXT PRIMARY KEY, tg_id INT, creato INT,
+                              firmata INT DEFAULT 0, firmata_il INT DEFAULT 0);
     """)
     PION, NORM, MAES, ORFA, MAI = ("a" * 64, "b" * 64, "c" * 64, "d" * 64,
                                    "e" * 64)
     con.executemany("INSERT INTO utenti VALUES(?,?,?,?,?)", [
         (111, "pioniere", 10, 0, 0), (222, "", 900, 10, 10),
         (333, "", 4000, 30, 15)])
-    con.executemany("INSERT INTO chiavi_p2p VALUES(?,?,0)", [
+    con.executemany("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", [
         (PION, 111), (NORM, 222), (MAES, 333), (ORFA, 9999)])
     per = a["_sconti_per_chiavi_p2p"]
     prova("pioniere e non: un si' e un no", {PION: True, NORM: False},
