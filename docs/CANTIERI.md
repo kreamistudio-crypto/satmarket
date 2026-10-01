@@ -33849,3 +33849,89 @@ esterni. 2) Se un giorno coincurve mancasse sul VPS, nessuna chiave si
 firmerebbe e dal 15 ottobre nessuno avrebbe lo sconto: il login Nostr
 lo direbbe prima (503).
 
+
+## CSP e le voci aperte degli audit — 7) le rotte P2P nate dopo gli audit (1 ott 2026)
+
+La riverifica del 1 ott ha guardato le rotte nate dopo il 23 set —
+moderazione P2P, «Siamo insieme», cauzione, annullo del venditore, la
+ronda, la fotografia del libro — e ha trovato cinque cose piccole e
+una media. Le posizioni dei contanti erano a posto: lat/lon non escono
+da nessuna rotta, mai nel journal né in un avviso, azzerate alla
+chiusura e dalla scopa a 15/40 giorni. La ronda e la cauzione pure.
+
+**L'ID DELLA DISPUTA (media).** `/api/p2p/disputa` teneva la PRIMA
+dichiarazione di una parte e il moderatore mandava `admin-take-dispute`
+con quell'id: una parte che dichiarava un UUID inventato bloccava la
+presa dall'app; con l'UUID di un'ALTRA disputa vera il moderatore la
+prendeva sul nodo (se ne accorgeva subito dopo, non decideva). Cura in
+due pezzi: 1) il client cerca PRIMA il 38386 firmato da mostrod
+(`cercaDisputaIdP2P`) e usa il dichiarato solo come ripiego quando il
+relay tace — un fatto prima di una dichiarazione; 2) `lascia`, a presa
+fallita, SCARTA l'id se l'aveva dichiarato un telefono (il registro
+dice `id_dichiarato` → `id_scartato`), così il prossimo tentativo non
+sbatte sullo stesso numero per sempre. Un id di mostrod non si scarta.
+
+**`lascia` (bassa).** Qualunque admin poteva scrivere `presa_fallita`
+su qualunque disputa, anche presa da un altro: adesso su una `presa` è
+un 409, senza righe nel registro altrui.
+
+**LA CAUZIONE NELLA DECISIONE (bassa).** `decisione` accettava
+`cauzione` di un lato che una cauzione non ce l'ha: mostrod avrebbe
+rifiutato TUTTA la decisione con `invalid-payload`. Adesso si confronta
+con `_cauzione_di_p2p` (chi ha preso, secondo mostrod) e il lato
+sbagliato è un 400 con le parole.
+
+**LA PROVA D'INCONTRO PER GIRO (medio-bassa).** La riga di
+`p2p_presenze` era una per ordine senza guardare il `giro`: un ordine
+tornato nel libro e ripreso da un altro trovava `gia` con la prova
+VECCHIA (la coppia nuova non poteva registrare la sua) e il moderatore
+leggeva «incontro confermato» di altre persone. Adesso `_incontro_p2p`
+legge solo la riga del giro corrente di `p2p_scambi` (senza una riga lì
+si legge com'era: i banchi di ieri), il «già» guarda ordine E giro, e
+la prova di un giro precedente se ne va quando la coppia nuova scrive
+la sua. La chiave primaria resta `ordine`: una riga per ordine, quella
+del giro vivo.
+
+**«DIMENTICA» (bassa).** `DELETE /api/p2p/chiavi` non toccava
+`p2p_presenze`: adesso, PRIMA di cancellare le chiavi (sono loro a
+dire quali prove sono mie), `_dimentica_presenze_p2p` scorda le
+posizioni e la copia delle note delle righe firmate con una delle mie
+chiavi, come alla chiusura dello scambio; ora, distanza e chiavi
+restano, perché sono anche dell'altra persona e al moderatore serve
+sapere che l'incontro c'è stato.
+
+**LA CAS DELL'ANNULLO (bassa).** `annulla_vendita` leggeva «nessun
+payout in volo» FUORI dal lucchetto e la CAS dentro controllava solo
+`stato='locked'`: adesso la CAS ripete `COALESCE(payout_stato,'')=''`.
+
+**NON FATTO, E PERCHÉ.** La fotografia del libro (`/api/p2p/libro`:
+risposta pre-serializzata, cache LRU dei cookie) e il tetto per persona
+a `p2p_ordini`: sono i freni e i tetti, cioè la cura 4, coi numeri da
+concordare. Le posizioni nei backup age: restano, e si dichiara (il
+backup è cifrato e il canale Telegram tiene tutto).
+
+**PROVATO.** `prove_rotte_p2p_riverificate` (22): le funzioni VERE su
+sqlite in memoria (le tre tabelle dal DDL del server, `p2p_scambi` e
+`p2p_momenti` ridotte) — `lascia` che rifiuta una presa con un 409 e
+senza righe, che a registro mette la presa fallita e scarta l'id
+dichiarato col suo gesto, il 404; la decisione con la cauzione del lato
+sbagliato (400), di quello giusto (200), senza (200), fuori catalogo
+(400); l'incontro che c'è al giro 0, non c'è al giro 1, e si legge
+com'era senza `p2p_scambi`; la sentinella sul «già» per giro e sul
+DELETE della prova vecchia; «dimentica» che scorda una riga firmata con
+la mia chiave (posizioni e note via, ora/distanza/chiavi restano),
+idempotente, zero senza chiavi o con chiavi non mie, e la rotta che la
+chiama PRIMA di cancellare; la CAS; il client che cerca prima il 38386.
+I banchi della moderazione che ricompongono la decisione conoscono
+`_cauzione_di_p2p` (nove sezioni rigirate verdi). Tortura 11 su 11
+sulla copia. DAL VIVO sulla copia in collaudo (Admin 999, righe
+seminate nel database): `moderazione/lascia` su una disputa presa da
+un altro → 409; `moderazione/decisione` con la cauzione del lato che
+non l'ha messa → 400 con le parole, del lato giusto → 200; «dimentica»
+con una prova d'incontro firmata con la mia chiave → la riga perde
+lat/lon e `prova`, tiene ora e distanza.
+
+**COSA NON HO PROVATO.** Il giro intero coi due telefoni e il
+coordinatore vero (presa, decisione firmata, un ordine tornato nel
+libro e ripreso: la seconda coppia che fa «Siamo insieme»).
+
