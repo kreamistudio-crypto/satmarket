@@ -34342,3 +34342,46 @@ posizione, poi la card del moderatore su una disputa di prova; sul VPS,
 dopo il deploy, che Photon risponda (`🗺️ Luoghi P2P: i suggerimenti
 tacciono` nel journal vorrebbe dire di no).
 
+**IL RITOCCO DOPO GLI SCATTI** (Andrea, la stessa sera: ok agli scatti,
+e le sue risposte alle note). 1) LA REGOLA PRECISATA, nelle sue parole:
+«Ma se chi compra ha segnato la presenza all'ora e vicino al luogo
+dell'appuntamento e chi vende no, la disputa non va in automatico a chi
+vende: decide il moderatore» (`REGOLA_DISPUTA_ECCEZIONE`), accanto alla
+regola in Info P2P e nel riquadro; la conferma di «Ho consegnato i
+contanti» porta la sola regola, perché la legge chi la presenza non l'ha
+segnata. Al moderatore la dice il server per il caso (`regola` nel
+confronto: «incontro», «decide_moderatore», «senza_prova») e la card la
+scrive a card aperta, come la cautela, solo sul contanti. «Vicino» è
+entro 500 m più la precisione di quella presenza, la misura di
+«lontani»; senza posizione o senza il punto del luogo vale la regola di
+sempre. «E chi vende no» l'ho letto alla lettera — nessuna presenza di
+chi vende all'ora e vicino al luogo, quindi anche chi vende presente ma
+altrove o a un'altra ora —: DA GUARDARE con Andrea. 2) «Dimentica» che
+tiene l'ora su uno scambio aperto, 3) l'appuntamento solo di chi vende,
+4) il freno degli avvisi: confermati come sono. 5) LA FOTOCAMERA SPENTA:
+`camera=()` nella Permissions-Policy (la usava solo il QR); la posizione
+resta non nominata, la chiede «Sono qui»; emendate col perché la prova e
+il collaudo della cura 1, più una guardia se una parte dell'app tornasse
+a chiedere la fotocamera. 6) Il contatore dei suggerimenti resta il suo.
+PROVATO: `prove_contanti_a_mano` 169 (la regola per il caso sul
+confronto puro, col confine di 510 e 511 m a ±10 m; le frasi alla
+lettera; la card per il caso; il riquadro; la conferma con la sola
+regola), `collaudo_contanti_p2p` 45 (col server vero uno scambio arriva
+a «decide_moderatore»), `collaudo_csp` 36; le sezioni toccate come in CI
+436 verdi, il collaudo senza coincurve 46 ok. Tortura del ritocco sulla
+copia: 17 uccise su 17 (sette sul server, compresa l'intestazione, e
+dieci sul client). Suite intera severa sull'albero finale (b4fb7f2)
+18.383 verdi e 0 rosse; i 31 collaudi della CI verdi nella gabbia, sullo
+stesso albero. DAL VIVO sulla copia aggiornata, coi tre Chrome:
+l'intestazione con `camera=()`, la pagina che dice fotocamera no e
+posizione sì, il selettore delle foto che si apre ancora, «Sono qui» con
+la posizione, la regola con l'eccezione nel riquadro e in Info P2P, e
+uno scambio E dalla porta vera — l'appuntamento col suggerimento vero di
+Photon, «Sono qui» solo di chi compra a 4 m dal luogo, la disputa — con
+la card che dice «decide il moderatore» (e una senza prova che dice la
+regola di sempre); quattro scatti nei due temi. NON PROVATO: «Scatta
+foto» nel selettore delle foto di un telefono vero (Chrome Android, APK,
+Telegram) con la fotocamera spenta — il selettore dei file la
+Permissions-Policy non lo governa, ma si guarda; se si fosse spento, la
+cura è togliere `camera=()`.
+
