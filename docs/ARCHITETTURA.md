@@ -11353,6 +11353,28 @@
   dal libro in pagina e gli scrive la lapide ma la riga resta, la scopa
   non ha piu' la soglia zero, l'archivio del server lo fa nascere. Il
   verbale: CANTIERI, «"Annulla" dice non riuscito ma annulla».
+  DOPO OGNI GESTO SI TORNA A «I MIEI SCAMBI» (1 ott 2026): a gesto
+  RIUSCITO `dopoGestoP2P(id)` (fuori dal motore, non alza mai) mette la
+  spunta «Fatto» nel velo per `P2P_TORNA_MS`, chiude i fogli del gesto
+  (`P2P_FOGLI_GESTO`) e cambia vista NELLO STESSO giro — la cronologia
+  la sistema `passoPilaP2P`, sotto i miei resta il libro — e accende la
+  card (`p2pCardInEvidenza`, `evidenzaCardP2P`: classe `appena-fatto`,
+  contorno arancio per 2,4 s, ritardo negativo `--fatto-da` perche' un
+  ridisegno non rifaccia il lampo; a effetti ridotti fermo, lo spegne un
+  timer). Si RESTA se `tornaAiMieiP2P(o)` dice no, cioe' se
+  `azioniDisponibili` ha ancora un bottone (il giudice del 👉), se non
+  si sta guardando quello scambio, o se sopra c'e' un foglio d'altro; ad
+  app nascosta aspetta il primo piano (`aspettaPrimoPianoP2P`). Gli
+  agganci: `mossaOrdineP2P` (euro, rilascio; il «gia' fatto» con
+  `dopoGestoRilettoP2P` + `esitoGestoRaggiuntoP2P`), `inviaAnnulloP2P`
+  via `tornaDopoAnnulloP2P` (chiedi e accetta, non il ritiro),
+  `inviaIncassoP2P` e `fatturaDalWalletP2P` (`fatturaPassataP2P` sul
+  riletto), `inviaCampoP2P` fuori dal try, la prova d'incontro dai due
+  lati; la garanzia e la cauzione da `scriviOrdineP2P` →
+  `mossaScrittaP2P(prima, o)`, solo per lo scambio di cui si e' aperta
+  la richiesta (`p2pPagamentoAperto`) e solo uscendo in avanti
+  (`P2P_PAGATO_VERSO`). Il toast del gesto resta solo dove si resta. Il
+  verbale: CANTIERI, «Dopo ogni gesto si torna a I miei scambi».
   IL MIO ORDINE SI FIRMA CON LA CHIAVE DI CHI L'HA PUBBLICATO (28 set
   2026): la trade key di un gesto si deriva da `riga.indice`, e una riga
   scritta da una PRESA sotto l'id di un ordine mio porta l'indice della

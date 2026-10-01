@@ -33131,3 +33131,105 @@ viene rimborsato, la lista con i verbi, l'avviso letto dal journal.
 foglio, la tastiera sulla nota. Il primo annullo vero in produzione e il
 polso che arriva ai moderatori. La decisione sul «Annulla» del
 compratore a ordine pagato (sopra).
+## Dopo ogni gesto si torna a «I miei scambi» (1 ott 2026)
+
+Ritocco di Andrea. Fatto il proprio passo in uno scambio, si restava
+nella pagina davanti a «✋ Aspetta», e per vedere gli altri scambi si
+tornava indietro a mano. Adesso, appena il gesto RISULTA RIUSCITO, il
+velo dice «Fatto» con la spunta per un secondo e si torna a «I miei
+scambi», con la card di quello scambio contornata d'arancio per un
+attimo e lo stato già aggiornato. I gesti: la cauzione, la garanzia,
+dove ricevere i sats (a mano e dal wallet collegato), il recapito degli
+euro, «Ho inviato gli euro» / «Ho consegnato i contanti», «Libera i
+sats», chiedere o accettare l'annullo, «Siamo insieme» dai due lati.
+
+**LE DECISIONI.** 1) L'eccezione ha UN giudice, quello di sempre: si
+resta se dopo il gesto `azioniDisponibili` ha ancora un bottone (dopo
+la cauzione la fattura o la garanzia, dopo la garanzia il recapito
+degli euro). È la stessa domanda del 👉 sulla card, del pallino e del
+gruppo «Tocca a te»: `tornaAiMieiP2P` non ha una lista di stati sua, e
+una prova lo tiene così. 2) «Riuscito» vuol dire CONFERMATO: la
+risposta del coordinatore o lo stato riletto da `attendiGestoP2P`; il
+«già fatto» solo quando il riallineo lo mostra fatto
+(`dopoGestoRilettoP2P`); il recapito quando è partito; la prova
+d'incontro quando il server ce l'ha; la garanzia e la cauzione — che si
+pagano da un wallet esterno — quando la riga esce IN AVANTI dal loro
+stato, visto da `scriviOrdineP2P` (`mossaScrittaP2P`, l'unico posto da
+cui passano messaggio, archivio del server e restore). Un «no» resta
+nella pagina col suo messaggio. 3) Si torna solo se si sta guardando
+QUELLO scambio e nessun foglio d'altro è aperto; ad app in sottofondo
+(la garanzia pagata dal wallet) il ritorno aspetta il primo piano,
+perché spunta e card vanno viste. 4) I fogli del gesto si chiudono
+NELLO STESSO giro del cambio di vista: la cronologia la sistema
+`passoPilaP2P` come per ogni figlia del libro, e l'indietro da «I miei
+scambi» va al libro — mai al foglio chiuso né allo scambio. 5) Dove si
+torna, la spunta prende il posto del toast del gesto; dove si resta il
+toast resta. La fattura corta si dice sempre: è un avviso. 6) La card
+accesa riparte da dov'era a ogni ridisegno (ritardo negativo
+`--fatto-da`), ed è un contorno e non un fondo: il fondo è già la tinta
+dello stato, che è quel che si deve leggere.
+
+**LE STRADE SCARTATE.** Un giudice del ritorno con una lista di stati
+suoi (si scollerebbe dal 👉). Tornare a gesto partito, prima della
+risposta. Tornare anche quando il riallineo scopre una garanzia pagata
+ieri: la regola vale solo per lo scambio di cui si è aperta la
+richiesta in questa sessione (`p2pPagamentoAperto`), sennò chi apre uno
+scambio verrebbe rimbalzato via. Scrivere la cronologia a mano col
+ritorno: `passoPilaP2P` la sa già scendere. FUORI DI PROPOSITO il ritiro
+del mio ordine mai preso (la sua pagina dice «Ordine annullato» a chi
+la guarda, scelta del 26 set) e la disputa (non è fra i gesti chiesti).
+
+**PROVATO.** `prove_dopo_gesto_p2p` (48): le sentinelle gesto per gesto
+— l'aggancio DOPO la conferma e mai nel ramo del «no», il censimento
+delle chiamate, la scrittura della riga col «prima» dopo il pallino —
+e il banco node con le funzioni VERE (`azioniDisponibili`, il velo, la
+spunta, `mossaOrdineP2P`, `inviaAnnulloP2P`, `scriviOrdineP2P`): il
+giudice su quindici casi, la garanzia e la cauzione fatte solo in
+avanti, il ritorno coi fogli chiusi prima della vista, chi è altrove
+che non viene tirato via, il buio che aspetta il primo piano, il «no»
+che resta, il «già fatto» che torna solo dopo il riallineo (e mai su uno
+scambio che il riallineo trova annullato), il ritiro fuori. `prove_indietro_dal_libro` ha tre giri nuovi (gesto col foglio
+aperto dai miei, dallo scambio aperto dal libro, dopo la conferma) sulle
+tre vie dell'indietro: sotto i miei resta il libro. Emendata col perché
+la sentinella del «già fatto» di `prove_schermo_segue_mostro`; il
+commento del recapito non dice più «relay» (la regola delle parole).
+Tortura 12 su 12 sulla copia (al primo giro 11: il «già fatto» su
+uno scambio che il riallineo trova annullato non aveva una prova —
+ora sì). Suite intera severa senza config nel worktree da
+`origin/main`: su `2dbac06` 17.906 verdi e 0 rosse, i 29 collaudi
+della CI verdi nella gabbia; ribasato su `f921497` (l'annullo del
+venditore nel mercatino e la fusione con Alan; conflitto solo in coda
+a CANTIERI, tenute entrambe) di nuovo intera: 17.999 verdi e 0
+rosse, i 29 collaudi verdi.
+DAL VIVO nel Browser pane (server da una copia nello scratchpad,
+collaudo, leva P2P accesa, relay morto) a 375 px nei due temi, coi due
+lati (Compratore 111 e Venditore 222) e un coordinatore di cartone
+nella pagina: `chiamataOrdineP2P` sostituita da una che risponde come
+mostrod e fa entrare la risposta dalla porta vera
+(`applicaMessaggioP2P`), `campoInvia` che scrive il recapito senza
+relay. Visti: dove ricevere i sats → «Fatto» → miei con la card accesa
+(«Chi vende sta bloccando i sats ✋ Aspetta», tema chiaro); «Ho inviato
+gli euro» col tocco vero (tema scuro); la cauzione bloccata che RESTA e
+apre da sola «Dove ricevere i sats»; la garanzia pagata che RESTA col
+bottone del recapito in evidenza, e il recapito inviato che torna (tema
+scuro); «Libera i sats» che torna; «Chiedi di annullare» che torna; un
+«no» del coordinatore che resta col suo avviso; la garanzia pagata ad
+app nascosta che aspetta e torna al primo piano. Dopo ogni ritorno la
+pila era mercatino → libro → miei, e l'indietro portava al libro senza
+riaprire niente. Contorno della card misurato (arancio, fermo a effetti
+ridotti, spento dal timer), nessuno scorrimento laterale a 375. In
+console solo gli errori attesi del banco (relay morto, 409 del seme).
+
+**COSA NON HO PROVATO.** Il coordinatore vero (con Tor in mezzo le
+risposte arrivano tardi: il ritorno parte dallo stato riletto, ed è
+provato solo a banco); la fattura dal wallet NWC dal vivo; «Siamo
+insieme» dal vivo coi due telefoni (QR e firme vere: provati gli
+agganci, non il giro); il telefono vero e l'APK.
+
+**DA GUARDARE.** 1) Chi vende, dopo «Siamo insieme», di solito ha la
+mossa dall'altra parte (aspetta «Ho consegnato i contanti») e quindi
+torna alla lista mentre è ancora all'incontro: è la regola applicata
+alla lettera; se alla prova vera disturba, il contanti diventa
+un'eccezione dichiarata. 2) Un filtro di «I miei scambi» che nasconde
+il gruppo della card la lascia fuori vista: il ritorno c'è, la card
+accesa no.

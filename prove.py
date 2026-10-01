@@ -80798,7 +80798,13 @@ const SCENARI = {
   tourLibro: ['p2p', 'p2pmiei', 'p2p+p2pTour', '<', '<'],
   tourCasa: ['p2p+p2pTour', '<'],
   ordineFoglio: ['p2p', 'p2pmiei', 'ordine', '+p2pVotoSheet', '-p2pVotoSheet', '<', '<', '<'],
-  voloPerso: ['p2p', 'p2pmiei', '+p2pFiltroMieiSheet', 'perso', '-p2pFiltroMieiSheet', 'tardi', 'p2pinfo', '<', '<']
+  voloPerso: ['p2p', 'p2pmiei', '+p2pFiltroMieiSheet', 'perso', '-p2pFiltroMieiSheet', 'tardi', 'p2pinfo', '<', '<'],
+  /* DOPO OGNI GESTO SI TORNA A «I MIEI SCAMBI» (1 ott 2026): il foglio del
+     gesto si chiude nello stesso giro del cambio di vista (`dopoGestoP2P`),
+     e l'indietro non deve riportare ne' al foglio ne' allo scambio */
+  gestoDaiMiei: ['p2p', 'p2pmiei', 'ordine', '+p2pHoldSheet', 'p2pHoldSheet>p2pmiei', '<', '<'],
+  gestoDalLibro: ['p2p', 'ordine', '+p2pIncassoSheet', 'p2pIncassoSheet>p2pmiei', '<', '<'],
+  gestoConferma: ['p2p', 'p2pmiei', 'ordine', '+confermaSheet', '-confermaSheet', 'p2pmiei', '<', '<']
 };
 /* IL GIRO A CASO: una strada qualunque dentro il P2P — voci della nav,
    scambi aperti, fogli aperti e chiusi a mano, il profilo e il
@@ -81039,6 +81045,17 @@ async function aCaso(n, via){
         "voloPerso": (["p2p", "p2pmiei", "p2pmiei+p2pFiltroMieiSheet", "p2pmiei+p2pFiltroMieiSheet", "p2pmiei",
                        "p2pmiei", "p2pinfo", "p2p", "esplora"], 6, "esplora p2p p2pinfo",
                       "un passo nostro il cui popstate non arriva non ammutolisce il motore: passato il secondo e mezzo si riscrive, e la pila torna giusta"),
+        # DOPO OGNI GESTO SI TORNA A «I MIEI SCAMBI» (1 ott 2026): sotto i
+        # miei resta il libro, e il foglio chiuso non ha piu' una entry
+        "gestoDaiMiei": (["p2p", "p2pmiei", "p2pordine", "p2pordine+p2pHoldSheet", "p2pmiei", "p2p", "esplora"], 4,
+                         "esplora p2p p2pmiei",
+                         "dopo un gesto col suo foglio aperto si torna ai miei: l'indietro va al libro, mai al foglio chiuso ne' allo scambio"),
+        "gestoDalLibro": (["p2p", "p2pordine", "p2pordine+p2pIncassoSheet", "p2pmiei", "p2p", "esplora"], 3,
+                          "esplora p2p p2pmiei",
+                          "...anche dallo scambio aperto dal libro: i miei prendono il posto dello scambio, sopra il libro"),
+        "gestoConferma": (["p2p", "p2pmiei", "p2pordine", "p2pordine+confermaSheet", "p2pordine", "p2pmiei", "p2p", "esplora"], 5,
+                          "esplora p2p p2pmiei",
+                          "...e dopo il foglio della conferma, gia' chiuso quando il gesto parte"),
     }
     _VIE = {"tg": "tasto di Telegram", "sistema": "swipe del browser, con l'istantanea di Chrome",
             "apk": "swipe nell'app Android, col guardiano"}
@@ -110476,8 +110493,13 @@ def prove_schermo_segue_mostro():
     # il riallineo che partiva DOPO l'errore — quando il «non riuscito»
     # era gia' stato detto — e' salito DENTRO l'attesa (`attendiGestoP2P`),
     # che rilegge lo stato prima di dire di no. Il «gia' fatto» resta.
+    # EMENDATA (1 ott 2026, «dopo ogni gesto si torna a I miei scambi»):
+    # il «gia' fatto» esce lo stesso subito, ma prima aggancia il ritorno
+    # a quel che il riallineo mostrera' — vedi prove_dopo_gesto_p2p
+    _gf = mo.find("if (typeof gestoGiaFattoP2P === 'function' && gestoGiaFattoP2P(e, id)) {")
     prova("...e lo stesso per «ho inviato gli euro» e «libera i sats»", True,
-          "if (typeof gestoGiaFattoP2P === 'function' && gestoGiaFattoP2P(e, id)) return;" in mo
+          0 < _gf < mo.find("dopoGestoRilettoP2P(id, () => esitoGestoRaggiuntoP2P(id, azione))", _gf)
+          < mo.find("return;", _gf) < mo.find("agg.errore = ragioneGestoP2P(e);", _gf)
           and "attendiGestoP2P(id, azione, chiamata)" in mo)
     ap = nudo(fn("function apriOrdineP2P(id){"))
     prova("...aprendo uno scambio vivo si riallinea, leggero, mai i finali ne' prima della presa", True,
@@ -113774,6 +113796,383 @@ def prove_moderazione_p2p():
           [[["disputa", {"ordine": "a", "disputa": DISP_B}]], 1], o["dichiara"])
 
 
+def prove_dopo_gesto_p2p():
+    """DOPO OGNI GESTO SI TORNA A «I MIEI SCAMBI» (1 ott 2026, ritocco di
+    Andrea).
+
+    Appena un gesto dello scambio risulta riuscito — la cauzione, la
+    garanzia, dove ricevere i sats, il recapito, gli euro inviati, il
+    rilascio, l'annullo chiesto o accettato, «Siamo insieme» — il velo dice
+    «Fatto» e si torna a «I miei scambi», con la card accesa per un attimo.
+    Si resta se il passo dopo tocca ANCORA a chi l'ha fatto.
+
+    Le cose che qui si rompono in silenzio: il ritorno detto PRIMA della
+    conferma (o su un «no»); un giudice suo con una lista di stati, che si
+    scolla da quello del 👉 sulla card; la garanzia pagata ieri che il
+    riallineo scopre oggi e tira via chi ha appena aperto lo scambio; chi
+    e' andato altrove e viene strappato; il foglio chiuso che resta nella
+    cronologia sotto «I miei scambi». Per questo le sentinelle dicono solo
+    dove stanno gli agganci, e il banco node fa girare le funzioni VERE."""
+    print("\n[dopo ogni gesto si torna a «I miei scambi»]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    def riga(firma):
+        i = mini.index(firma)
+        return mini[i:mini.index("\n", i)]
+
+    # --- 1) IL GIUDICE E' QUELLO DI SEMPRE ---------------------------
+    torna = nudo(fn("function tornaAiMieiP2P(o){"))
+    prova("si torna solo se il passo non tocca piu' a chi ha fatto il gesto: il giudice del 👉", True,
+          "return !!o && !o.soloVista && !azioniDisponibili(o);" in torna)
+    prova("...e non ha una lista di stati sua", [], re.findall(r"'[a-z_]+'", torna))
+    corpo = nudo(fn("async function tornaAdessoP2P(id){"))
+    prova("si torna solo guardando QUELLO scambio, e un foglio d'altro aperto ferma tutto", True,
+          "p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine'" in corpo
+          and "!altroFoglioSuScambioP2P()" in corpo)
+    prova("...ad app in sottofondo il ritorno aspetta il primo piano", True,
+          "if (document.visibilityState === 'hidden') { aspettaPrimoPianoP2P(id); return false; }" in corpo)
+    prova("...la spunta «Fatto», poi i fogli del gesto chiusi e la vista cambiata NELLO STESSO giro", True,
+          0 < corpo.find("await spuntaAttesaP2P('Fatto', P2P_TORNA_MS);")
+          < corpo.find("P2P_FOGLI_GESTO.forEach(") < corpo.find("go('p2pmiei');")
+          < corpo.find("portaAVistaCardP2P(id);")
+          and corpo.count("await ") == 1)
+    prova("dopoGestoP2P non alza mai: chi la chiama ha gia' un gesto riuscito", True,
+          "try { return await tornaAdessoP2P(id); }" in fn("async function dopoGestoP2P(id){")
+          and "catch(e) {" in fn("async function dopoGestoP2P(id){"))
+
+    # --- 2) GLI AGGANCI, GESTO PER GESTO -----------------------------
+    GANCIO = "typeof dopoGestoP2P === 'function' && await dopoGestoP2P("
+    mo = nudo(fn("async function mossaOrdineP2P(id, azione, fatto, sto){"))
+    prova("gli euro e il rilascio: DOPO la conferma (o lo stato riletto), e il toast solo se si resta", True,
+          0 < mo.find("attendiGestoP2P(id, azione, chiamata)")
+          < mo.find("if (!(" + GANCIO + "id))) toast(fatto);") < mo.find("} catch(e) {"))
+    prova("...il «gia' fatto» torna solo se il riallineo lo mostra fatto, e un «no» resta nella pagina", True,
+          "dopoGestoRilettoP2P(id, () => esitoGestoRaggiuntoP2P(id, azione))" in mo
+          and "dopoGestoP2P(" not in mo[mo.find("agg.errore = ragioneGestoP2P(e);"):])
+    an = nudo(fn("async function inviaAnnulloP2P(modo){"))
+    prova("l'annullo chiesto o accettato: dopo la conferma, e dopo il «gia' annullato»; mai su un «no»", True,
+          an.count("typeof tornaDopoAnnulloP2P === 'function' && await tornaDopoAnnulloP2P(id, gesto)") == 2
+          and 0 < an.find("attendiGestoP2P(id, gesto, chiamata)") < an.find("tornaDopoAnnulloP2P(")
+          and "tornaDopoAnnulloP2P(" not in an[an.find("agg.errore = ragioneGestoP2P(e);"):])
+    prova("...il ritiro del mio ordine mai preso resta com'era (scelta del 26 set)", True,
+          "if (gesto === 'ritira' || typeof dopoGestoP2P !== 'function') return false;"
+          in fn("async function tornaDopoAnnulloP2P(id, gesto){"))
+    inc = nudo(fn("async function inviaIncassoP2P(){"))
+    prova("dove ricevere i sats, a mano: dopo la risposta, e la fattura corta si dice comunque", True,
+          0 < inc.find("await chiamataOrdineP2P(o, 'add-invoice'")
+          < inc.find("const torna = " + GANCIO + "o.id);") < inc.find("} catch(e) {")
+          and "else if (!torna) toast('Inviato ✅');" in inc)
+    prova("...il «gia' fatto» e la risposta in ritardo tornano solo a fattura passata (un annullo non e' un «fatto»)", True,
+          "dopoGestoRilettoP2P(o.id, fatturaPassataP2P)" in inc
+          and "fatturaPassataP2P(agg)" in inc
+          and inc.find("fatturaPassataP2P(agg)") > inc.find("riallineaScambioP2P(o.id, 'attesa').then("))
+    fw = nudo(fn("async function fatturaDalWalletP2P(id){"))
+    prova("...e dal wallet collegato, dopo la risposta", True,
+          0 < fw.find("await chiamataOrdineP2P(o, 'add-invoice'") < fw.find(GANCIO + "id)")
+          < fw.find("return true;"))
+    ca = nudo(fn("async function inviaCampoP2P(tipo, btn){"))
+    prova("il recapito: quando un relay l'ha preso, FUORI dal try — dopo, niente puo' dire «non e' partito»", True,
+          0 < ca.find("await campoInvia(o, tipo, testo);") < ca.find("} catch(e) {")
+          < ca.find("return;", ca.find("} catch(e) {")) < ca.find(GANCIO + "o.id)"))
+    fp = nudo(fn("async function firmaEInviaPresenzaP2P(o, mostrata){"))
+    prova("«Siamo insieme», chi legge: quando il server ha la prova", True,
+          0 < fp.find("if (!r.ok) throw") < fp.find("segnaIncontroP2P(o.id, d && d.incontro);")
+          < fp.find(GANCIO + "o.id)") < fp.rfind("} catch(e) {"))
+    op = nudo(fn("function avviaOrologioPresenzaP2P(id){"))
+    prova("...e chi mostra: quando la sua sonda trova la prova sul server", True,
+          0 < op.find("if (o && o.presenza && o.presenza.ora > 0) {") < op.find(GANCIO + "id)"))
+    prova("la garanzia e la cauzione: il gesto comincia aprendo la richiesta da pagare", [True, True],
+          ["p2pPagamentoAperto = id;" in fn("async function apriHoldP2P(){"),
+           "p2pPagamentoAperto = id;" in fn("async function apriCauzioneP2P(){")])
+    sc = fn("function scriviOrdineP2P(o){")
+    prova("...e il loro «fatto» lo vede la scrittura della riga, con la riga di PRIMA, dopo il pallino", True,
+          0 < sc.find("const prima = tutti[o.id];") < sc.find("tutti[o.id] = o;")
+          and 0 < sc.find("aggiornaPallinoScambiP2P();")
+          < sc.find("if (typeof mossaScrittaP2P === 'function') mossaScrittaP2P(prima, o);"))
+    prova("la disputa non e' fra i gesti che tornano", False,
+          "dopoGestoP2P" in fn("async function inviaDisputaP2P(){"))
+    # IL CENSIMENTO: un gesto nuovo che torna deve passare di qui. Le
+    # chiamate, commenti tolti: la definizione; gli agganci qui sopra (gli
+    # euro e il rilascio, la fattura a mano due volte, dal wallet, il
+    # recapito, la prova d'incontro due volte = 7); l'annullo, il «gia'
+    # fatto» riletto, il primo piano, la garanzia e la cauzione = 12
+    prova("i posti che chiamano il ritorno sono quelli detti qui sopra", 12,
+          nudo(mini).count("dopoGestoP2P("))
+
+    # --- 3) LA CARD ACCESA -------------------------------------------
+    rs = fn("function rigaScambioP2P(o){")
+    prova("la card del gesto appena fatto si accende, e un ridisegno la riprende da dov'era", True,
+          "const acceso = typeof evidenzaCardP2P === 'function' ? evidenzaCardP2P(o.id) : 0;" in rs
+          and "(acceso ? ' appena-fatto\" style=\"--fatto-da:-' + acceso + 'ms' : '')" in rs)
+    i_css = mini.index("@keyframes p2pAppenaFatto")
+    css = mini[i_css:mini.index("}\n  }", i_css) + 1]
+    prova("...l'alone e' un contorno (il fondo e' della tinta dello stato), e a effetti ridotti sta fermo", True,
+          "outline:2.5px solid var(--sats)" in css and "animation-delay:var(--fatto-da,0ms)" in css
+          and "@media (prefers-reduced-motion:reduce){" in css
+          and ".p2p-ord.p2p-scambio.appena-fatto{animation:none}" in css
+          and "background" not in css)
+
+    # --- 4) IL BANCO: le funzioni vere, in node ----------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco del ritorno dopo il gesto", "node non c'e'")
+        return
+    i_b = mini.index("/* ---- DOPO OGNI GESTO SI TORNA A «I MIEI SCAMBI»")
+    blocco = mini[i_b:mini.index("/* ============ fine dell'archivio del server ============ */", i_b)]
+    i_e = mini.index("const ESITI_GESTO_P2P = {")
+    pezzi = "\n".join([
+        riga("const MOSTRO_ORDINI_CHIAVE = "), riga("const P2P_FINALI = "),
+        mini[i_e:mini.index("\n};", i_e) + 3],
+        mini[mini.index("const ANNULLI_P2P = {"):mini.index("\n};", mini.index("const ANNULLI_P2P = {")) + 3],
+        riga("let P2P_SPUNTA_MS = "),
+        fn("function chiaveP2P(base){"), fn("function ordiniP2P(){"), fn("function scriviOrdineP2P(o){"),
+        fn("function nomeProvvisorioP2P(indice){"), fn("function provvisorioP2P(id){"),
+        fn("function recapitoEuroArrivatoP2P(o){"), fn("function cauzioneVivaP2P(o, adesso){"),
+        fn("function azioniDisponibili(o){"), fn("function altroFoglioAperto(){"),
+        fn("function bottoneInAttesa(btn, testo){"), fn("function attesaP2P(testo, btn){"),
+        fn("function spuntaAttesaP2P(testo, ms){"), fn("function ragioneGestoP2P(e){"),
+        fn("function gestoGiaFattoP2P(e, id){"), fn("function esitoGestoRaggiuntoP2P(id, gesto){"),
+        fn("async function mossaOrdineP2P(id, azione, fatto, sto){"),
+        fn("async function inviaAnnulloP2P(modo){"), fn("async function tornaDopoAnnulloP2P(id, gesto){"),
+        blocco]) + r"""
+/* ---- il cartone ---- */
+const store = new Map();
+const localStorage = {getItem: k => store.has(k) ? store.get(k) : null,
+                      setItem: (k, v) => { store.set(k, String(v)); }};
+let myTgId = 111, p2pInfo = null, P2P_NON_PARTITO = 'Il messaggio non è partito';
+let p2pOrdineAperto = '', VISTA = 'view-p2pordine', APERTI = [], VISIBILE = 'visible';
+let VELO = new Set(), TESTO = '';
+let p2pHoldOrdine = '', p2pIncassoOrdine = '', p2pCampiOrdine = '';
+let GO = [], TOAST = [], FERMATI = 0, RIALLINEA = null, p2pRiallineoInVolo = {};
+P2P_TORNA_MS = 5; P2P_SPUNTA_MS = 5;
+function vistaAttivaP2P(){ return VISTA; }
+function diarioP2P(){}
+function toast(m){ TOAST.push(m); }
+function haptic(){}
+function aggiornaPallinoScambiP2P(){}
+function fermaOrologioPresenzaP2P(){ FERMATI++; } function fermaCameraPresenzaP2P(){}
+function renderOrdineP2P(){}
+function go(v){ GO.push(v + (APERTI.length ? '+' + APERTI.join('+') : '')); VISTA = 'view-' + v; }
+const NODI = {};
+function el(id){
+  if (!NODI[id]) NODI[id] = {
+    id,
+    set textContent(t){ if (id === 'attesaTesto') TESTO = t; }, get textContent(){ return TESTO; },
+    classList: {
+      add(...cs){ cs.forEach(c => { if (id === 'attesaOverlay') VELO.add(c);
+        else if (c === 'open' && id !== 'sheetBg' && !APERTI.includes(id)) APERTI.push(id); }); },
+      remove(...cs){ cs.forEach(c => { if (id === 'attesaOverlay') VELO.delete(c);
+        else if (c === 'open') APERTI = APERTI.filter(x => x !== id); }); },
+      contains(c){ return id === 'attesaOverlay' ? VELO.has(c) : (c === 'open' && APERTI.includes(id)); }
+    }};
+  return NODI[id];
+}
+let ASCOLTI = [];
+const document = {
+  get visibilityState(){ return VISIBILE; },
+  addEventListener(t, f){ ASCOLTI.push(f); }, removeEventListener(t, f){ ASCOLTI = ASCOLTI.filter(x => x !== f); },
+  querySelectorAll(s){ return s === '.sheet.open' ? APERTI.map(id => ({id})) : []; },
+  querySelector(){ return null; }
+};
+const window = {innerHeight: 800}; const CSS = {escape: s => s};
+function riallineaScambioP2P(id){
+  if (!p2pRiallineoInVolo[id]) p2pRiallineoInVolo[id] = (async () => {
+    await new Promise(r => setTimeout(r, 3));
+    if (RIALLINEA) { const o = ordiniP2P()[id]; Object.assign(o, RIALLINEA); scriviOrdineP2P(o); }
+  })().finally(() => { delete p2pRiallineoInVolo[id]; });
+  return p2pRiallineoInVolo[id];
+}
+/* la chiamata al coordinatore: risponde, e la risposta muove la riga
+   PRIMA che il gesto riprenda — come `mostroArriva`, che applica il
+   messaggio nello stesso giro in cui scioglie l'attesa */
+let RISPOSTA = null;
+function chiamataOrdineP2P(o){
+  return new Promise((ok, no) => setTimeout(() => {
+    const r = RISPOSTA;
+    if (r.no) return no(r.no);
+    const riga = ordiniP2P()[o.id]; Object.assign(riga, r.riga); scriviOrdineP2P(riga); ok({});
+  }, 2));
+}
+function attendiGestoP2P(id, gesto, chiamata){ return chiamata; }
+const pausa = ms => new Promise(r => setTimeout(r, ms || 30));
+function azzera(righe, vista){
+  store.clear(); (righe || []).forEach(o => scriviOrdineP2P(o));
+  p2pOrdineAperto = (righe && righe[0]) ? righe[0].id : ''; VISTA = vista || 'view-p2pordine';
+  APERTI = []; VISIBILE = 'visible'; VELO = new Set(); TESTO = ''; GO = []; TOAST = []; FERMATI = 0;
+  RIALLINEA = null; RISPOSTA = null; ASCOLTI = []; p2pRitornoInAttesa = ''; p2pPagamentoAperto = '';
+  p2pCardInEvidenza = {id: '', da: 0};
+}
+const R = (id, lato, stato, piu) => Object.assign({id, lato, stato, peer: 'P'}, piu || {});
+(async () => {
+  const out = {};
+  /* 1) il giudice, stato per stato */
+  const casi = [
+    R('a', 'compro', 'euro_inviati'), R('a', 'vendo', 'rilasciato'), R('a', 'compro', 'attesa_mia_fattura'),
+    R('a', 'vendo', 'attesa_mia_hold'), R('a', 'vendo', 'attivo'), R('a', 'vendo', 'attivo', {campiMiei: {euro: {}}}),
+    R('a', 'compro', 'attivo', {campiLoro: {euro: {}}}), R('a', 'compro', 'attivo'),
+    R('a', 'compro', 'annullo_chiesto'), R('a', 'vendo', 'annullato'), R('a', 'vendo', 'attesa_hold_venditore'),
+    R('a', 'compro', 'attesa_mia_cauzione', {cauzione: {bolt11: 'x', scade: 9e9}}),
+    R('a', 'compro', 'euro_inviati', {soloVista: true}), R('a', 'vendo', 'euro_inviati')];
+  out.giudice = casi.map(tornaAiMieiP2P).concat([tornaAiMieiP2P(null)]);
+  out.pagato = [['attesa_mia_hold', 'attivo'], ['attesa_mia_hold', 'attesa_fattura_compratore'],
+                ['attesa_mia_hold', 'annullato'], ['attesa_mia_hold', 'pubblicato'],
+                ['attesa_mia_cauzione', 'attesa_mia_fattura'], ['attesa_mia_cauzione', 'attesa_mia_hold'],
+                ['attesa_mia_cauzione', 'pubblicato'], ['attesa_mia_cauzione', 'annullato'],
+                ['attivo', 'euro_inviati']].map(c => pagamentoRiuscitoP2P(c[0], c[1]));
+  out.fattura = ['attesa_hold_venditore', 'attivo', 'rilasciato', 'attesa_mia_fattura', 'fattura_nuova', 'annullato']
+    .map(s => fatturaPassataP2P({stato: s})).concat([fatturaPassataP2P(null)]);
+  p2pCardInEvidenza = {id: 'c', da: 1000};
+  out.evidenza = [evidenzaCardP2P('c', 1000), evidenzaCardP2P('c', 3399), evidenzaCardP2P('c', 3400),
+                  evidenzaCardP2P('d', 1500), evidenzaCardP2P('c', 999)];
+
+  /* 2) il ritorno: dove si torna, e cosa resta */
+  azzera([R('t1', 'compro', 'euro_inviati')]);
+  const v1 = await dopoGestoP2P('t1');
+  out.torna = [v1, GO, [...VELO], TESTO, p2pCardInEvidenza.id];
+  azzera([R('t2', 'vendo', 'attivo', {campiMiei: {euro: {}}})]);
+  APERTI = ['p2pHoldSheet', 'p2pIncassoSheet', 'p2pPresenzaSheet']; p2pHoldOrdine = 't2'; p2pIncassoOrdine = 't2';
+  out.fogli = [await dopoGestoP2P('t2'), GO, APERTI, p2pHoldOrdine, p2pIncassoOrdine, FERMATI];
+  azzera([R('t3', 'compro', 'attesa_mia_fattura')]);
+  out.resta = [await dopoGestoP2P('t3'), GO, [...VELO]];
+  azzera([R('t4', 'compro', 'euro_inviati')], 'view-p2pmiei');
+  out.altrove = [await dopoGestoP2P('t4'), GO];
+  azzera([R('t5', 'compro', 'euro_inviati')]); p2pOrdineAperto = 'altro';
+  out.altroScambio = [await dopoGestoP2P('t5'), GO];
+  azzera([R('t6', 'compro', 'euro_inviati')]); APERTI = ['p2pProfiloSheet'];
+  out.altroFoglio = [await dopoGestoP2P('t6'), GO, APERTI];
+  azzera([R('t7', 'compro', 'euro_inviati')]); VISIBILE = 'hidden';
+  const h = await dopoGestoP2P('t7');
+  const buio = [h, GO.slice(), ASCOLTI.length];
+  VISIBILE = 'visible'; ASCOLTI.slice().forEach(f => f()); await pausa();
+  out.buio = buio.concat([GO, ASCOLTI.length]);
+  azzera([R('t8', 'compro', 'euro_inviati')]); VELO = new Set(['on', 'anello']);
+  out.veloDelGesto = [await dopoGestoP2P('t8'), [...VELO].sort()];
+
+  /* 3) la garanzia e la cauzione, dalla scrittura della riga */
+  const paga = async (prima, dopo, aperto) => {
+    azzera([prima]); p2pPagamentoAperto = aperto === undefined ? prima.id : aperto;
+    const o = ordiniP2P()[prima.id]; Object.assign(o, dopo); scriviOrdineP2P(o);
+    const subito = GO.length; await pausa();
+    return [subito, GO, p2pPagamentoAperto];
+  };
+  out.garanzia = await paga(R('g1', 'vendo', 'attesa_mia_hold'), {stato: 'attivo', campiMiei: {euro: {}}});
+  out.garanziaRecapito = await paga(R('g2', 'vendo', 'attesa_mia_hold'), {stato: 'attivo'});
+  out.garanziaAltra = await paga(R('g3', 'vendo', 'attesa_mia_hold'), {stato: 'attesa_fattura_compratore'});
+  out.garanziaAnnullo = await paga(R('g4', 'vendo', 'attesa_mia_hold'), {stato: 'annullato'});
+  out.garanziaDiIeri = await paga(R('g5', 'vendo', 'attesa_mia_hold'), {stato: 'attivo', campiMiei: {euro: {}}}, '');
+  out.cauzione = await paga(R('k1', 'compro', 'attesa_mia_cauzione'), {stato: 'attesa_mia_fattura'});
+  out.cauzioneMorta = await paga(R('k2', 'compro', 'attesa_mia_cauzione'), {stato: 'pubblicato'});
+
+  /* 4) i gesti veri: euro inviati, rilascio, annullo */
+  azzera([R('m1', 'compro', 'attivo', {campiLoro: {euro: {}}})]);
+  RISPOSTA = {riga: {stato: 'euro_inviati'}};
+  await mossaOrdineP2P('m1', 'fiat-sent', 'Fatto ✅', 'Sto avvisando…');
+  out.euro = [GO, TOAST, [...VELO]];
+  azzera([R('m2', 'vendo', 'euro_inviati')]);
+  RISPOSTA = {riga: {stato: 'rilasciato'}};
+  await mossaOrdineP2P('m2', 'release', 'Sats liberati ✅', 'Sto liberando i sats…');
+  out.rilascio = [GO, TOAST];
+  azzera([R('m3', 'compro', 'attivo', {campiLoro: {euro: {}}})]);
+  RISPOSTA = {no: new Error('Il coordinatore ha detto di no')};
+  await mossaOrdineP2P('m3', 'fiat-sent', 'Fatto ✅', 'Sto avvisando…');
+  out.no = [GO, TOAST, ordiniP2P().m3.errore, ordiniP2P().m3.stato];
+  azzera([R('m4', 'compro', 'attivo', {campiLoro: {euro: {}}})]);
+  RISPOSTA = {no: Object.assign(new Error('no'), {cantDo: true, motivo: 'not-allowed-by-status'})};
+  RIALLINEA = {stato: 'euro_inviati'};
+  await mossaOrdineP2P('m4', 'fiat-sent', 'Fatto ✅', 'Sto avvisando…');
+  const giaSubito = GO.slice(); await pausa();
+  out.giaFatto = [giaSubito, GO];
+  azzera([R('m5', 'compro', 'attivo', {campiLoro: {euro: {}}})]);
+  RISPOSTA = {no: Object.assign(new Error('no'), {cantDo: true, motivo: 'not-allowed-by-status'})};
+  RIALLINEA = null;
+  await mossaOrdineP2P('m5', 'fiat-sent', 'Fatto ✅', 'Sto avvisando…'); await pausa();
+  out.giaFattoFermo = [GO, ordiniP2P().m5.stato];
+  /* il riallineo trova lo scambio ANNULLATO nel frattempo: nessuno ha piu'
+     niente da fare, ma non e' il «fatto» di questo gesto */
+  azzera([R('m6', 'compro', 'attivo', {campiLoro: {euro: {}}})]);
+  RISPOSTA = {no: Object.assign(new Error('no'), {cantDo: true, motivo: 'not-allowed-by-status'})};
+  RIALLINEA = {stato: 'annullato'};
+  await mossaOrdineP2P('m6', 'fiat-sent', 'Fatto ✅', 'Sto avvisando…'); await pausa();
+  out.giaFattoAnnullato = [GO, ordiniP2P().m6.stato];
+  azzera([R('n1', 'compro', 'attivo', {campiLoro: {euro: {}}, preso: true})]);
+  RISPOSTA = {riga: {stato: 'annullo_chiesto'}};
+  await inviaAnnulloP2P('chiedi');
+  out.chiedi = [GO, TOAST];
+  azzera([R('n2', 'vendo', 'annullo_proposto')]);
+  RISPOSTA = {riga: {stato: 'annullato'}};
+  await inviaAnnulloP2P('accetta');
+  out.accetta = [GO, TOAST];
+  azzera([R('n3', 'vendo', 'pubblicato', {mio: true})]);
+  RISPOSTA = {riga: {stato: 'annullato'}};
+  await inviaAnnulloP2P('ritira');
+  out.ritira = [GO, TOAST];
+  console.log(JSON.stringify(out));
+})().catch(e => { console.error('ESPLOSO: ' + (e && e.stack || e)); process.exit(1); });
+"""
+    cart = _tf.mkdtemp(prefix="dopo_gesto_")
+    pb = os.path.join(cart, "banco.js")
+    open(pb, "w", encoding="utf-8").write(pezzi)
+    rr = _sp.run([node, pb], capture_output=True, text=True, timeout=120, encoding="utf-8")
+    prova("il banco del ritorno dopo il gesto gira", "", (rr.stderr or "")[-900:])
+    if rr.returncode != 0:
+        return
+    o = _json.loads(rr.stdout)
+    prova("IL GIUDICE: si torna dove il passo dopo e' dell'altra persona (o di nessuno); si resta dove e' ancora mio",
+          [True, True, False, False, False, True, False, True, True, True, True, False, False, False, False],
+          o["giudice"])
+    prova("...la garanzia e la cauzione sono «fatte» solo uscendo IN AVANTI (mai con l'annullo o il giro morto)",
+          [True, True, False, False, True, True, False, False, False], o["pagato"])
+    prova("...la fattura e' passata quando la riga non la chiede piu', e non e' annullata",
+          [True, True, True, False, False, False, False], o["fattura"])
+    prova("...la card accesa: per 2,4 secondi, solo lei, contando da quando e' cominciata",
+          [1, 2400, 0, 0, 0], o["evidenza"])
+    prova("IL RITORNO: «Fatto» con la spunta, poi «I miei scambi», il velo giu', la card accesa",
+          [True, ["p2pmiei"], [], "Fatto", "t1"], o["torna"])
+    prova("...i fogli del gesto si chiudono PRIMA del cambio di vista, nello stesso giro",
+          [True, ["p2pmiei"], [], "", "", 1], o["fogli"])
+    prova("...se il passo dopo e' ancora mio si resta, e il velo non si alza nemmeno",
+          [False, [], []], o["resta"])
+    prova("...chi e' andato altrove non viene tirato via (altra vista, altro scambio, altro foglio)",
+          [[False, []], [False, []], [False, [], ["p2pProfiloSheet"]]],
+          [o["altrove"], o["altroScambio"], o["altroFoglio"]])
+    prova("...ad app in sottofondo aspetta, e torna appena l'app e' davanti",
+          [False, [], 1, ["p2pmiei"], 0], o["buio"])
+    prova("...dentro il velo del gesto la spunta e' la sua, e a chiuderlo resta chi l'ha alzato",
+          [True, ["anello", "fatto", "on"]], o["veloDelGesto"])
+    prova("LA GARANZIA PAGATA DAL WALLET: si torna al giro dopo la scrittura, se il passo dopo non e' mio",
+          [0, ["p2pmiei"], ""], o["garanzia"])
+    prova("...col recapito degli euro ancora da dare si resta", [0, [], ""], o["garanziaRecapito"])
+    prova("...con la fattura di chi compra ancora da arrivare si torna", [0, ["p2pmiei"], ""], o["garanziaAltra"])
+    prova("...un annullo non e' un «fatto», e la richiesta resta quella aperta", [0, [], "g4"], o["garanziaAnnullo"])
+    prova("...e una garanzia pagata ieri, che il riallineo scopre oggi, non tira via nessuno",
+          [0, [], ""], o["garanziaDiIeri"])
+    prova("LA CAUZIONE: dopo tocca ancora a chi l'ha bloccata (la fattura), quindi si resta",
+          [0, [], ""], o["cauzione"])
+    prova("...e il giro morto della cauzione non e' un «fatto»", [0, [], "k2"], o["cauzioneMorta"])
+    prova("GLI EURO INVIATI: confermati, si torna; la spunta al posto del toast, il velo giu'",
+          [["p2pmiei"], [], []], o["euro"])
+    prova("IL RILASCIO: lo stesso", [["p2pmiei"], []], o["rilascio"])
+    prova("UN «NO» RESTA NELLA PAGINA col suo messaggio",
+          [[], ["Il coordinatore ha detto di no"], "Il coordinatore ha detto di no", "attivo"], o["no"])
+    prova("IL «GIA' FATTO»: si torna solo quando il riallineo lo mostra fatto, non prima",
+          [[], ["p2pmiei"]], o["giaFatto"])
+    prova("...e se il riallineo non lo mostra si resta", [[], "attivo"], o["giaFattoFermo"])
+    prova("...anche quando il riallineo trova lo scambio annullato: non tocca piu' a nessuno, ma non e' il «fatto» del gesto",
+          [[], "annullato"], o["giaFattoAnnullato"])
+    prova("L'ANNULLO CHIESTO e quello ACCETTATO tornano, senza il toast",
+          [[["p2pmiei"], []], [["p2pmiei"], []]], [o["chiedi"], o["accetta"]])
+    prova("...il RITIRO del mio ordine mai preso resta nella sua pagina, col suo toast",
+          [[], ["Ordine annullato ✓"]], o["ritira"])
+
+
 def prove_cauzione_p2p():
     """LA CAUZIONE DI CHI PRENDE, SOLO NEL CONTANTI DI PERSONA (1 ott 2026,
     cantiere B, decisione di Andrea).
@@ -115679,7 +116078,7 @@ def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
-    for f in (prove_contanti_a_mano, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
+    for f in (prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
               prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,

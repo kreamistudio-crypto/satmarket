@@ -3163,6 +3163,19 @@
      di sempre da subito. */
   @keyframes p2pNuova{from{background:var(--sats-soft)}to{background:var(--card)}}
   .p2p-ord.p2p-nuova{animation:p2pNuova 1.5s ease-out}
+  /* LA CARD DEL GESTO APPENA FATTO (1 ott 2026, «dopo ogni gesto si torna
+     a I miei scambi»): un alone arancio attorno, che resta un momento e
+     si spegne. Il contorno e non il fondo: il fondo e' gia' della tinta
+     dello stato, e lo stato aggiornato e' proprio quel che si deve
+     leggere. `--fatto-da` e' il ritardo NEGATIVO con cui un ridisegno
+     riprende l'alone da dov'era. Con gli effetti ridotti l'alone e' fermo
+     e lo spegne il codice, a tempo scaduto. */
+  @keyframes p2pAppenaFatto{0%,60%{outline-color:var(--sats)}100%{outline-color:transparent}}
+  .p2p-ord.p2p-scambio.appena-fatto{outline:2.5px solid var(--sats);outline-offset:3px;
+    animation:p2pAppenaFatto 2.4s ease-out forwards;animation-delay:var(--fatto-da,0ms)}
+  @media (prefers-reduced-motion:reduce){
+    .p2p-ord.p2p-scambio.appena-fatto{animation:none}
+  }
   /* IL LIBRO SUBITO (26 set 2026): lo scheletro delle card quando non
      c'e' niente da mostrare — fermo, della misura di una card vera —,
      la riga «aggiorno…» fissa sopra la barra, e l'anellino sul bottone
@@ -49388,12 +49401,17 @@ function rinominaOrdineP2P(o, nuovoId){
 }
 function scriviOrdineP2P(o){
   const tutti = ordiniP2P();
+  const prima = tutti[o.id];
   tutti[o.id] = o;
   try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
   /* IL PALLINO DEGLI SCAMBI SEGUE L'ARCHIVIO: ognuna delle cinque
      scritture lo ricalcola (vedi «IL PALLINO SU I MIEI SCAMBI»). Vive
      fuori dal motore, e nel banco del motore non c'e': da qui il typeof */
   if (typeof aggiornaPallinoScambiP2P === 'function') aggiornaPallinoScambiP2P();
+  /* ...e la garanzia o la cauzione pagate da un wallet esterno: e' qui
+     che si vede la riga uscirne, da qualunque strada arrivi (1 ott 2026,
+     vedi «DOPO OGNI GESTO SI TORNA A "I MIEI SCAMBI"») */
+  if (typeof mossaScrittaP2P === 'function') mossaScrittaP2P(prima, o);
   return o;
 }
 /* ---- QUANDO UNO SCAMBIO SI PUO' TOGLIERE ----
@@ -54290,6 +54308,8 @@ async function apriHoldP2P(){
   haptic();
   p2pHoldOrdine = id;
   p2pHoldModo = 'hold';
+  /* il gesto comincia qui: a garanzia bloccata si torna (1 ott 2026) */
+  if (typeof p2pPagamentoAperto !== 'undefined') p2pPagamentoAperto = id;
   renderHoldP2P();
   el('sheetBg').classList.add('open');
   el('p2pHoldSheet').classList.add('open');
@@ -54310,6 +54330,7 @@ async function apriCauzioneP2P(){
   haptic();
   p2pHoldOrdine = id;
   p2pHoldModo = 'cauzione';
+  if (typeof p2pPagamentoAperto !== 'undefined') p2pPagamentoAperto = id;
   renderHoldP2P();
   el('sheetBg').classList.add('open');
   el('p2pHoldSheet').classList.add('open');
@@ -54529,8 +54550,10 @@ async function fatturaDalWalletP2P(id){
     ricordaFatturaP2P(id, b.scade);
     chiudiFoglioP2P('p2pIncassoSheet');
     p2pIncassoOrdine = '';
+    /* riuscito: il ritorno a «I miei scambi» come dal foglio a mano (1 ott 2026) */
+    const torna = typeof dopoGestoP2P === 'function' && await dopoGestoP2P(id);
     if (cortaW) toast('⚡ ' + avvisoFatturaCortaP2P(b.scade, adessoW), 8000);
-    else toast('⚡ Fattura fatta dal wallet e inviata ✅');
+    else if (!torna) toast('⚡ Fattura fatta dal wallet e inviata ✅');
     return true;
   } catch(e){
     dillo('Il wallet non ha dato la fattura (' + ((e && e.message) || 'errore') + '). Puoi incollarne una qui, o dare il tuo indirizzo Lightning.');
@@ -54905,15 +54928,20 @@ async function inviaIncassoP2P(){
     ricordaFatturaP2P(o.id, scadeData);
     chiudiFoglioP2P('p2pIncassoSheet');
     p2pIncassoOrdine = '';
-    /* la fattura corta e' partita: lo si dice, col tempo che ha */
+    /* riuscito: si torna a «I miei scambi» se il passo dopo non e' mio
+       (1 ott 2026). La fattura corta si dice comunque, col tempo che ha:
+       e' un avviso, non un «fatto» */
+    const torna = typeof dopoGestoP2P === 'function' && await dopoGestoP2P(o.id);
     if (corta) toast(avvisoFatturaCortaP2P(scadeData, Math.floor(Date.now() / 1000)), 8000);
-    else toast('Inviato ✅');
+    else if (!torna) toast('Inviato ✅');
   } catch(e) {
     /* «non si puo' in questo momento» = il passo e' gia' fatto: si
        rilegge lo stato invece di mostrare un errore (25 set 2026) */
     if (typeof gestoGiaFattoP2P === 'function' && gestoGiaFattoP2P(e, o.id)) {
       chiudiFoglioP2P('p2pIncassoSheet');
       p2pIncassoOrdine = '';
+      if (typeof dopoGestoRilettoP2P === 'function')
+        dopoGestoRilettoP2P(o.id, fatturaPassataP2P).catch(() => {});
       return;
     }
     const perche = ragioneIncassoP2P(e, testo);
@@ -54928,6 +54956,8 @@ async function inviaIncassoP2P(){
           chiudiFoglioP2P('p2pIncassoSheet');
           p2pIncassoOrdine = '';
           toast('La fattura era già arrivata: scambio aggiornato ✅');
+          if (typeof dopoGestoP2P === 'function' && fatturaPassataP2P(agg))
+            dopoGestoP2P(o.id).catch(() => {});
         }
       }).catch(() => {});
     /* la pagina sotto ripete l'ultimo «no» (`o.cantDo`), e quello
@@ -55040,10 +55070,18 @@ async function mossaOrdineP2P(id, azione, fatto, sto){
     const chiamata = chiamataOrdineP2P(o, azione);
     await (typeof attendiGestoP2P === 'function'
       ? attendiGestoP2P(id, azione, chiamata) : chiamata);
-    toast(fatto);
+    /* riuscito: si torna a «I miei scambi» se il passo dopo non e' mio
+       (1 ott 2026) — e allora la spunta del velo dice «Fatto» al posto
+       del toast */
+    if (!(typeof dopoGestoP2P === 'function' && await dopoGestoP2P(id))) toast(fatto);
   } catch(e) {
-    /* il passo gia' fatto non e' un errore: si rilegge (25 set 2026) */
-    if (typeof gestoGiaFattoP2P === 'function' && gestoGiaFattoP2P(e, id)) return;
+    /* il passo gia' fatto non e' un errore: si rilegge (25 set 2026), e
+       se la riga riletta lo mostra fatto si torna come sopra */
+    if (typeof gestoGiaFattoP2P === 'function' && gestoGiaFattoP2P(e, id)) {
+      if (typeof dopoGestoRilettoP2P === 'function')
+        dopoGestoRilettoP2P(id, () => esitoGestoRaggiuntoP2P(id, azione)).catch(() => {});
+      return;
+    }
     const agg = ordiniP2P()[id] || o;
     agg.errore = ragioneGestoP2P(e);
     scriviOrdineP2P(agg);
@@ -58437,10 +58475,12 @@ async function inviaAnnulloP2P(modo){
     const chiamata = chiamataOrdineP2P(o, 'cancel');
     await (typeof attendiGestoP2P === 'function'
       ? attendiGestoP2P(id, gesto, chiamata) : chiamata);
-    toast(detto());
+    if (!(typeof tornaDopoAnnulloP2P === 'function' && await tornaDopoAnnulloP2P(id, gesto))) toast(detto());
   } catch(e) {
     /* «gia' annullato» o «non c'e' piu'» a un annullo: e' riuscito */
-    if (typeof annulloGiaFattoP2P === 'function' && annulloGiaFattoP2P(e, id)) toast(detto());
+    if (typeof annulloGiaFattoP2P === 'function' && annulloGiaFattoP2P(e, id)) {
+      if (!(typeof tornaDopoAnnulloP2P === 'function' && await tornaDopoAnnulloP2P(id, gesto))) toast(detto());
+    }
     /* ...e il «no» a chi l'aveva gia' chiesto si dice per quel che e' */
     else if (typeof annulloGiaChiestoP2P === 'function' && annulloGiaChiestoP2P(e, id, gesto))
       toast(P2P_ANNULLO_GIA_CHIESTO, 7000);
@@ -58452,6 +58492,14 @@ async function inviaAnnulloP2P(modo){
     }
   } finally { rip(); }
   if (p2pOrdineAperto === id) renderOrdineP2P();
+}
+/* DOPO L'ANNULLO SI TORNA A «I MIEI SCAMBI» (1 ott 2026): chiederlo e
+   accettarlo sono gesti dello scambio come gli altri. Il RITIRO del mio
+   ordine mai preso no: la sua pagina dice «Ordine annullato» a chi la
+   sta guardando, ed e' una scelta del 26 set che qui non si rovescia. */
+async function tornaDopoAnnulloP2P(id, gesto){
+  if (gesto === 'ritira' || typeof dopoGestoP2P !== 'function') return false;
+  return dopoGestoP2P(id);
 }
 
 /* ═══ LA RECENSIONE DI UNO SCAMBIO (set 2026) ═══════════════════════
@@ -59566,12 +59614,18 @@ async function inviaCampoP2P(tipo, btn){
     /* la riga segue la correzione: e' da li' che il conto alla
        rovescia di chi vende legge la data */
     if (tabRiga) { o.tabacchino = tabRiga; scriviOrdineP2P(o); }
-    toast('Recapito inviato a chi compra ✓');
     renderCampiP2P();
   } catch(e) {
     toast('Non è partito: ' + String(e && e.message || e));
+    rip();
+    return;
   }
   rip();
+  /* e' partito davvero, preso in consegna: si torna a «I miei scambi» se il
+     passo dopo non e' mio (1 ott 2026). Fuori dal `try`: il recapito e'
+     partito, e niente di quel che succede dopo puo' dire «non e' partito» */
+  if (!(typeof dopoGestoP2P === 'function' && await dopoGestoP2P(o.id)))
+    toast('Recapito inviato a chi compra ✓');
 }
 
 /* ---- la disputa ----
@@ -60169,7 +60223,11 @@ function rigaScambioP2P(o){
   /* LA CARD SPENTA (27 set 2026): annullato o mai preso, lo stesso
      grigio per tutti — vedi `.p2p-scambio.spenta` nel CSS */
   const spenta = o.stato === 'annullato' || o.stato === 'rifiutato';
+  /* LA CARD DEL GESTO APPENA FATTO (1 ott 2026): accesa per un attimo,
+     e un ridisegno a meta' la riprende da dov'era — vedi `evidenzaCardP2P` */
+  const acceso = typeof evidenzaCardP2P === 'function' ? evidenzaCardP2P(o.id) : 0;
   return '<div class="p2p-ord p2p-scambio' + tonoCardP2P(o) + (spenta ? ' spenta' : '')
+    + (acceso ? ' appena-fatto" style="--fatto-da:-' + acceso + 'ms' : '')
     + '" role="button" tabindex="0" data-id="' + esc(o.id) + '" '
     + 'onclick="apriOrdineP2P(this.dataset.id)">'
     /* LA DATA DI CHIUSURA STA NELL'ANGOLO (22 set 2026, richiesta di
@@ -62613,6 +62671,164 @@ async function attendiGestoP2P(id, gesto, chiamata){
   diarioP2P('gesto ' + gesto + ' ' + String(id).slice(0, 8) + ': nessuna risposta, e lo stato riletto non lo mostra');
   throw Object.assign(new Error(P2P_NON_RISULTA), {silenzio: true, riletto: true});
 }
+/* ---- DOPO OGNI GESTO SI TORNA A «I MIEI SCAMBI» (1 ott 2026, ritocco
+   di Andrea) ----
+   Fatto il proprio passo, la pagina dello scambio non ha piu' niente da
+   chiedere: si restava li' davanti a «✋ Aspetta», e per vedere gli altri
+   scambi si tornava indietro a mano. Adesso, appena il gesto RISULTA
+   RIUSCITO, il velo dice «Fatto» con la spunta per un attimo e si torna
+   a «I miei scambi», con la card di quello scambio accesa per un attimo
+   e lo stato gia' aggiornato.
+   L'ECCEZIONE E' UNA SOLA, e il giudice e' quello di sempre: se dopo il
+   gesto il passo tocca ANCORA a chi l'ha fatto (`azioniDisponibili` ha
+   un bottone — dopo la cauzione la fattura o la garanzia, dopo la
+   garanzia il recapito degli euro), si resta. E' la stessa domanda del
+   👉 sulla card, del pallino e del gruppo «Tocca a te»: una lista di
+   stati sua si scollerebbe da loro al primo stato nuovo.
+   «RIUSCITO» VUOL DIRE CONFERMATO, MAI SPERATO: la risposta del
+   coordinatore o lo stato riletto (`attendiGestoP2P`), il «gia' fatto»
+   solo dopo che il riallineo lo mostra, il recapito quando un relay
+   l'ha preso in consegna, la prova d'incontro quando il server ce l'ha,
+   la garanzia e la cauzione quando la riga ESCE in avanti dal loro
+   stato — si pagano da un wallet esterno, e il loro «fatto» arriva da
+   solo (`mossaScrittaP2P`, dalla scrittura della riga). Un gesto che
+   fallisce resta nella pagina col suo messaggio: qui non ci arriva.
+   SI TORNA SOLO SE SI STA GUARDANDO QUELLO SCAMBIO: chi nel frattempo e'
+   andato altrove non viene tirato via, e un foglio d'altro aperto sopra
+   ferma tutto. Ad app in sottofondo — la garanzia pagata dal wallet — il
+   ritorno aspetta che l'app torni davanti: la spunta e la card accesa
+   vanno viste, non consumate al buio.
+   L'INDIETRO NON RIPORTA A UN FOGLIO CHIUSO: i fogli del gesto si
+   chiudono nello STESSO giro del cambio di vista, e la cronologia la
+   sistema `passoPilaP2P` come per ogni figlia del libro — scende i
+   gradini dello scambio e del foglio, e sotto «I miei scambi» resta il
+   libro. */
+let P2P_TORNA_MS = 1000;           // la spunta «Fatto»: `let` per il banco
+const P2P_EVIDENZA_MS = 2400;      // quanto resta accesa la card
+/* i fogli che un gesto apre sulla pagina dello scambio: si chiudono col
+   ritorno. Ogni altro foglio aperto vuol dire «sta facendo altro». */
+const P2P_FOGLI_GESTO = ['p2pHoldSheet', 'p2pIncassoSheet', 'p2pCampiSheet', 'p2pPresenzaSheet'];
+let p2pCardInEvidenza = {id: '', da: 0};
+let p2pRitornoInAttesa = '';       // l'id che aspetta il primo piano
+let p2pPagamentoAperto = '';       // lo scambio di cui si e' aperta la garanzia o la cauzione
+/* PURA: dopo il gesto si torna a «I miei scambi»? Solo se il passo non
+   tocca piu' a chi l'ha fatto. La riga solo da guardare non fa gesti. */
+function tornaAiMieiP2P(o){
+  return !!o && !o.soloVista && !azioniDisponibili(o);
+}
+/* PURA: la garanzia o la cauzione sono andate a buon fine? La riga e'
+   uscita IN AVANTI dallo stato in cui si pagavano — da li' si esce anche
+   con un annullo o col giro morto, e quelli non sono un «fatto». */
+const P2P_PAGATO_VERSO = {
+  attesa_mia_hold: ['attesa_fattura_compratore', 'attivo', 'euro_inviati', 'rilasciato',
+                    'pagamento_ritentato', 'fattura_nuova', 'concluso'],
+  attesa_mia_cauzione: ['attesa_mia_fattura', 'attesa_hold_venditore',
+                        'attesa_fattura_compratore', 'attesa_mia_hold', 'attivo']
+};
+function pagamentoRiuscitoP2P(prima, dopo){
+  const verso = P2P_PAGATO_VERSO[prima];
+  return !!verso && verso.indexOf(dopo) >= 0;
+}
+/* la chiama `scriviOrdineP2P` a ogni scrittura, con la riga di prima: e'
+   l'unico posto da cui passano TUTTE le strade che muovono lo stato — il
+   messaggio del coordinatore, l'archivio del server, la restore. Vale
+   solo per lo scambio di cui si e' aperta la richiesta da pagare: una
+   garanzia pagata ieri che il riallineo scopre oggi non e' un gesto di
+   adesso. Il ritorno parte al giro dopo, a scrittura finita e pagina
+   ridisegnata. */
+function mossaScrittaP2P(prima, o){
+  if (!prima || !o || p2pPagamentoAperto !== o.id) return;
+  if (!pagamentoRiuscitoP2P(prima.stato, o.stato)) return;
+  p2pPagamentoAperto = '';
+  diarioP2P('gesto ' + String(o.id).slice(0, 8) + ': pagato (' + prima.stato + ' → ' + o.stato + ')');
+  setTimeout(() => { dopoGestoP2P(o.id).catch(() => {}); }, 0);
+}
+/* PURA: la fattura di chi compra e' passata? La riga non chiede piu'
+   dove ricevere i sats, e lo scambio non e' finito storto: un annullo
+   arrivato nel frattempo non e' il «fatto» di questo gesto. */
+function fatturaPassataP2P(o){
+  return !!o && ['attesa_mia_fattura', 'fattura_nuova', 'annullato', 'rifiutato'].indexOf(o.stato) < 0;
+}
+function altroFoglioSuScambioP2P(){
+  return [...document.querySelectorAll('.sheet.open')]
+    .some(s => P2P_FOGLI_GESTO.indexOf(s.id) < 0);
+}
+/* il gesto e' riuscito: si torna, o si resta. Torna true se si e' tornati.
+   NON ALZA MAI: la chiamano gesti gia' riusciti, e un suo errore finito
+   nel `catch` di chi chiama direbbe «non e' partito» di una cosa partita */
+async function dopoGestoP2P(id){
+  try { return await tornaAdessoP2P(id); }
+  catch(e) { diarioP2P('ritorno ' + String(id).slice(0, 8) + ': ' + ((e && e.message) || e)); return false; }
+}
+async function tornaAdessoP2P(id){
+  const o = ordiniP2P()[id];
+  if (!tornaAiMieiP2P(o)) return false;
+  const guarda = () => p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine'
+    && !altroFoglioSuScambioP2P();
+  if (!guarda()) return false;
+  if (document.visibilityState === 'hidden') { aspettaPrimoPianoP2P(id); return false; }
+  /* la spunta dentro il velo del gesto, se c'e'; se no un velo suo */
+  const giaSu = el('attesaOverlay').classList.contains('on');
+  const rip = giaSu ? null : attesaP2P('');
+  try { await spuntaAttesaP2P('Fatto', P2P_TORNA_MS); }
+  finally { if (rip) rip(); }
+  if (!guarda()) return false;
+  P2P_FOGLI_GESTO.forEach(f => { const s = el(f); if (s) s.classList.remove('open'); });
+  if (!altroFoglioAperto()) el('sheetBg').classList.remove('open');
+  p2pHoldOrdine = ''; p2pIncassoOrdine = '';
+  if (typeof p2pCampiOrdine !== 'undefined') p2pCampiOrdine = '';
+  if (typeof fermaOrologioPresenzaP2P === 'function') { fermaOrologioPresenzaP2P(); fermaCameraPresenzaP2P(); }
+  p2pCardInEvidenza = {id: id, da: Date.now()};
+  diarioP2P('gesto ' + String(id).slice(0, 8) + ': fatto, torno a «I miei scambi» (' + o.stato + ')');
+  go('p2pmiei');
+  portaAVistaCardP2P(id);
+  return true;
+}
+/* il «gia' fatto» e la risposta in ritardo: il gesto conta solo quando il
+   riallineo in volo mostra la riga dove il gesto la voleva */
+async function dopoGestoRilettoP2P(id, giunto){
+  try { await (p2pRiallineoInVolo[id] || Promise.resolve()); } catch(e) {}
+  if (giunto(ordiniP2P()[id])) return dopoGestoP2P(id);
+  return false;
+}
+function aspettaPrimoPianoP2P(id){
+  if (p2pRitornoInAttesa) { p2pRitornoInAttesa = id; return; }
+  p2pRitornoInAttesa = id;
+  const quando = () => {
+    if (document.visibilityState === 'hidden') return;
+    document.removeEventListener('visibilitychange', quando);
+    const chi = p2pRitornoInAttesa;
+    p2pRitornoInAttesa = '';
+    if (chi) dopoGestoP2P(chi).catch(() => {});
+  };
+  document.addEventListener('visibilitychange', quando);
+}
+/* PURA: da quanti ms la card di questo scambio e' accesa, o 0 se non lo
+   e'. La card si riscrive a ogni giro di `renderP2P`, e il ritardo
+   NEGATIVO fa ripartire l'animazione dal punto in cui era invece che
+   dall'inizio: un ridisegno a meta' non fa un secondo lampo. */
+function evidenzaCardP2P(id, adesso){
+  const e = p2pCardInEvidenza;
+  if (!e.id || e.id !== id) return 0;
+  const passati = (adesso === undefined ? Date.now() : adesso) - e.da;
+  return passati >= 0 && passati < P2P_EVIDENZA_MS ? passati + 1 : 0;
+}
+function portaAVistaCardP2P(id){
+  let card = null;
+  try { card = document.querySelector('#p2pMieiCorpo .p2p-scambio[data-id="' + CSS.escape(id) + '"]'); } catch(e) {}
+  if (card) {
+    const r = card.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > window.innerHeight)
+      try { card.scrollIntoView({block: 'center'}); } catch(e) {}
+  }
+  /* a tempo scaduto la card si spegne anche se nessuno la ridisegna: con
+     gli effetti ridotti l'alone e' fermo, e resterebbe acceso per sempre */
+  setTimeout(() => {
+    if (evidenzaCardP2P(p2pCardInEvidenza.id)) return;   // un'altra si e' accesa nel frattempo
+    document.querySelectorAll('#p2pMieiCorpo .p2p-scambio.appena-fatto')
+      .forEach(n => n.classList.remove('appena-fatto'));
+  }, P2P_EVIDENZA_MS + 50);
+}
 /* ============ fine dell'archivio del server ============ */
 
 /* ============ LA MODERAZIONE DELLE DISPUTE P2P (28 set 2026) ============
@@ -63702,8 +63918,10 @@ function avviaOrologioPresenzaP2P(id){
     if (o && o.presenza && o.presenza.ora > 0) {
       fermaOrologioPresenzaP2P();
       chiudiFoglioP2P('p2pPresenzaSheet');
-      toast('🤝 Incontro confermato');
       if (p2pOrdineAperto === id) renderOrdineP2P();
+      /* il server ha la prova: si torna a «I miei scambi» se il passo
+         dopo non e' mio (1 ott 2026) */
+      if (!(typeof dopoGestoP2P === 'function' && await dopoGestoP2P(id))) toast('🤝 Incontro confermato');
     }
   }, P2P_PRESENZA_ATTESA_MS);
 }
@@ -63774,7 +63992,8 @@ async function firmaEInviaPresenzaP2P(o, mostrata){
     if (!r.ok) throw new Error((d && d.detail) || 'Il server ha detto di no');
     segnaIncontroP2P(o.id, d && d.incontro);
     chiudiFoglioP2P('p2pPresenzaSheet');
-    toast('🤝 Incontro confermato');
+    /* ...e anche da questo lato (1 ott 2026) */
+    if (!(typeof dopoGestoP2P === 'function' && await dopoGestoP2P(o.id))) toast('🤝 Incontro confermato');
   } catch(e) {
     toast('Incontro non registrato: ' + String(e && e.message || e));
   } finally { rip(); p2pPresenzaInVolo = false; }
