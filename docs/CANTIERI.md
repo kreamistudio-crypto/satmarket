@@ -35032,3 +35032,128 @@ bot se la chiede), la WebView di Telegram iPhone (getUserMedia in
 WKWebView, il permesso a ogni apertura), la qualità dello scatto, il
 ritorno da Telegram in secondo piano, il tasto indietro vero. L'app
 Android non è cambiata.
+
+## Hackathon RGB di Torino: l'infrastruttura preparata prima, su signet (1 ott 2026)
+
+Il cantiere che segue lo studio del 1 ott (commit 48ee607): SOLO setup
+e prove, niente integrazione in Barattolo, per ordine di Andrea e per
+decisione di Alan (tutto in versione di prova, separato da Barattolo,
+non è detto che RGB entri mai in produzione). Il verbale operativo —
+macchine, accessi senza segreti, comandi per riavviare, cosa si
+dichiara, la scaletta di Torino, le domande ai mentor — sta in
+`docs/HACKATHON-SETUP.md`; i file della VM e del portatile in
+`deploy/rgb/` (compose, `rgb.py`, `backup-rgb.sh` e le unit,
+`punti.mjs`, `consiglio.py`, `qvac.config.json`). Qui le decisioni e i
+perché.
+
+**Dove.** Una VM nuova su LNVPS Dublino (`vm-2050.lnvps.cloud`, Debian
+13, 2 vCPU / 4 GB / 63 GB, in sats), scelta da Andrea fra tre opzioni:
+Hetzner scartato perché l'account è quello della produzione e Hetzner
+vieta i nodi per iscritto (un bitcoind signet è un nodo anche se vale
+zero); tutto sul portatile tenuto come riserva, non scelto (un solo
+punto di guasto il giorno del pitch). Niente sul VPS, sul nodo Mostro
+o sul relay, e il 10 ottobre non si tocca.
+
+**Cosa c'è sopra, e perché così.** bitcoind 30.2 su signet con
+`txindex`, electrs 0.11.0 e `rgb-proxy-server` 0.3.0 in docker compose,
+le stesse immagini con cui rgb-lib fa le sue prove (registro hashbeam):
+un bitcoind NOSTRO invece dei soli endpoint pubblici di Utexo perché lo
+studio li segnava non verificati per il 17-18, e un pitch che dipende
+dall'Esplora di un terzo è il rischio che si evita a pochi euro. Nessuna
+porta su 0.0.0.0: docker scrive in iptables prima di ufw, quindi
+electrs e proxy stanno su 127.0.0.1 e il portatile ci arriva solo dal
+tunnel SSH; ufw lascia entrare la sola 22. `rgb-lib` Python 0.3.0b7 in
+un venv (ruota pronta per Linux x86_64 E per Windows: niente toolchain
+Rust) e un banco a comandi, `rgb.py`, un wallet per nome con
+`chiavi.json` a 0600 e lo stash in `wallet/`; ogni comando apre UN
+wallet e chiude, per la regola di rgb-lib «never instantiate a wallet
+in multiple places». RGB Lightning Node scartato (early alpha, senza
+release, Lightning spenta su mainnet dal fork Utexo): resta la riserva
+se i mentor lo chiedono.
+
+**Gli asset.** Nomi decisi da Andrea strada facendo: niente «BRT»
+(ricorda Bartolini) e niente «CAFFE-LUCA» — il ticker NIA ammette SOLO
+maiuscole e cifre da 1 a 8 (niente trattini; `rgb.py` lo dice prima di
+chiamare la libreria). **JAR** «Punti Barattolo», 21.000.000 dal wallet
+`barattolo`; **MOON** «Punti To The Mooon», 1.000.000 dal wallet del
+negozio di prova, `to-the-mooon` (rinominato da `caffe-luca` con un
+`mv`: lo script ricava tutto dal nome della cartella e rgb-lib non
+scrive percorsi assoluti nello stash, provato col saldo intatto dopo).
+Un NIA non si rigonfia: la quantità si decide una volta. Gli asset_id
+sono pubblici e stanno nel documento.
+
+**Il backup**, calco di `backup-relay.sh`: lo script fa prima la
+fotografia di rgb-lib (`rgb.py backup`, una per wallet, ne tiene tre),
+poi l'archivio con chiavi, stash grezzo, fotografie, `.env`, compose,
+script e unit, con le guardie (ogni wallet con `chiavi.json` e una
+fotografia, i tre file di casa, un tetto di 200 MB perché la catena non
+ci finisca), cifrato con la sola chiave PUBBLICA age della macchina — la
+TERZA chiave age, generata sul PC, segreta su `BarattoloBackup\rgb-prova.key`
+e Bitwarden — in `/var/backups/rgb` a `root:pull` 640; timer alle
+03:30. Il PC tira in pull con l'utente `pull` (chiave
+`rgb_backup_ed25519` vincolata a `internal-sftp -R`, shell valida: con
+`nologin` il `command=` si rompe, lezione del nodo): gamba `rgb/` in
+`pull.ps1` e `[rgb]` in `rclone.conf`. Drill fatto: archivio aperto sul
+PC con la chiave, dentro i due `chiavi.json`, le fotografie, `.env`,
+compose, unit; cartella temporanea cancellata. Scoperto per caso che il
+pull del NODO falliva dal 7 set (verbale in NODO-MOSTRO).
+
+**La catena end-to-end, con transazioni vere su signet.** Il wallet
+utente è WDK + modulo RGB di Utexo (`@utexo/wdk-wallet-rgb` 2.0.3 su
+`rgb-sdk` 1.0.3 e `rgb-lib` 0.3.0-beta.8), nel WSL2 del PC perché il
+binario nativo esiste solo per linux-x64, linux-arm64 e darwin-arm64;
+`punti.mjs` è il suo banco. Il giro: fattura witness dell'utente (che
+non ha un sat) per «100 di qualunque asset», invio dal negozio,
+consignment sul proxy, validazione e ACK dell'utente, broadcast del
+negozio, un blocco (324537): tx `80a922b66b977d42995b34e993ffab4e
+c09988f08fdef83edc3d7c0da2d119c3` (qui e sotto gli id sono spezzati a
+metà con uno spazio: la guardia dei segreti della CI prende ogni 64-hex
+come chiave privata), con l'OP_RETURN e l'uscita witness da 1000 sats.
+Poi 30.000 sats all'utente dal wallet barattolo (`rgb.py btc`, tx
+`e34d42afe504a8ed22dcd6ab549dc2fa 195066af7ef91f7ca377a3b33b73f78f`),
+i suoi UTXO colorabili, la fattura blind del negozio e il riscatto di
+40 MOON (`punti.mjs riscatta`, tx `26579fd80a2811545d1b715a696929d3
+2e9cb50b2f6dacf47594ab93b4955d84`), validato dal negozio, trasmesso
+dall'utente, confermato: utente 60 MOON settled, negozio 999.940,
+backup finali fatti. Lezioni: la PRIMA fattura è «qualunque asset»
+(`AssetNotFound` se chiedi MOON per nome prima di averlo visto);
+witness per il primo contatto e blind dopo; le fatture portano
+l'endpoint del proxy dentro, 127.0.0.1 vale sui due lati grazie al
+tunnel; beta.7 (Python) e beta.8 (Utexo) si capiscono — era il rischio
+numero uno dello studio ed è chiuso; `@utexo/rgb-lib-linux-x64` non
+entra da solo con `npm install` e si ricompila con node-gyp
+(`build-essential`); il volume del proxy in docker va dato a 1000:1000
+o il processo muore in `EACCES`.
+
+**QVAC** sul PC in Windows nativo: `@qvac/cli` 0.14.0, `qvac doctor`
+verde, `qvac serve --openai` su 127.0.0.1:11434 con Qwen3 0.6B
+(scelto da `qvac configure --yes --modality chat`), e `consiglio.py`
+che passa saldo e prezzo e riceve un JSON a schema
+`{usa_punti, sconto_sats, asset_id, motivo}`. Al primo giro il modello
+ha sbagliato l'aritmetica (1 punto → 200 sats) e il controllo del
+programma l'ha bocciata: la cura è passargli il conto già fatto
+(`massimo_usabile`) e lasciargli la scelta — il modello propone, la
+regola decide. Due prove verdi (2000 sats → 100 punti; 300 sats → 60).
+Da provare Qwen3 1.7B per un «motivo» meno scarno.
+
+**L'opzione di Alan** (wallet WDK che parla NWC, Barattolo come client
+NWC che paga e legge i punti): studiata e scritta nel documento,
+sezione 7-bis. In breve: nel WDK non c'è un servizio NWC, ma
+`@getalby/sdk` 8.0.3 ha `NWCWalletService`; i moduli Lightning del WDK
+(Spark; `wdk-rgb-lightning` di Utexo) non fanno signet; la parte RGB via
+NWC (metodi nostri `rgb_list_assets`, `rgb_make_invoice`) non ha bisogno
+di Lightning e vale 6-10 ore di base, da fare prima e dichiarare; il
+pagamento self-custodial una slide. Decide Alan dopo aver sentito gli
+organizzatori.
+
+**Strade scartate e non provato.** Vedi il documento, sezione 9: Qwen3
+1.7B, il modulo browser Darkhorse, `rgb-sdk-web`, il proxy pubblico
+dietro Caddy, il ripristino COMPLETO della VM da zero (fatto solo il
+drill dell'archivio e il `ripristina` dello stash su una copia, sul
+PC). Prove di questo cantiere: `rgb.py` provato sul PC con la ruota
+Windows prima di salire sulla VM (nuovo, rifiuto di rigenerare, ticker
+storto, backup, ripristino in cartella vuota, errori di rgb-lib puliti);
+`backup-rgb.sh` con `sh -n`; `pull.ps1` col parser di PowerShell e un
+giro vero (rgb=True); il resto dal vivo, sopra. Nessuna riga di
+Barattolo toccata: la suite gira per la bussola, il tetto di CLAUDE.md
+e la guardia dei segreti.

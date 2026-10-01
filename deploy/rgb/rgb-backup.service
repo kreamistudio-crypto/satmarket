@@ -1,0 +1,6 @@
+[Unit]
+Description=Backup della VM rgb-prova (chiavi e stash dei wallet RGB, mai la catena)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/backup-rgb.sh

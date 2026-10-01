@@ -87,6 +87,19 @@ voluto**: ripristinare uno stato vecchio di un canale e trasmettere un
 commitment obsoleto è il modo classico di perdere i fondi — per i canali
 esiste solo l'SCB, che li CHIUDE. Lo script non si fida di `--exclude`:
 guarda DENTRO l'archivio e si ferma se lo trova.
+⚠️ **IL PULL DAL PC ERA ROTTO DAL 7 SET AL 1 OTT 2026** (`storico.log`
+sul PC: ultimo `ok` il 6 set 21:09, poi `nodo=False` ogni giorno con
+«permission denied» su `/var/backups/nodo`). Gli archivi nascevano
+ogni notte, a `debian:pull` 640, ma la riga 19 di `backup-nodo.sh`
+faceva `install -d -m 700 -o debian -g debian` e **richiudeva la
+cartella ogni notte** a 700: la correzione a mano del 7 set durava fino
+alle 03:30. Curato da Andrea il 1 ott: `install -d -m 750 -o debian -g
+pull` (copia dello script in `backup-nodo.sh.prima-pull`), pull dal PC
+riuscito fino a `nodo-20261001-0330.tgz.age`. La lezione: un permesso
+messo a mano su una cartella che uno script RICREA non è una cura, e
+`storico.log` va letto — tre settimane di `FALLITO` non avevano
+suonato. Scoperto per caso dal cantiere dell'hackathon RGB
+(`docs/HACKATHON-SETUP.md`), aggiungendo la gamba `rgb/` al pull.
 
 `pow_first_contact` resta **SPENTO**, e non per prudenza generica: non
 c'è spam in corso (zero utenti), il modo in cui fallisce è silenzioso in
