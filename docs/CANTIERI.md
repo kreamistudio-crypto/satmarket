@@ -32301,13 +32301,31 @@ tocca anche il `settings.toml`.
 5) Sulla macchina del relay `jq` non c'è: il 38385 si legge con
 `/app/strfry scan` e un `python3` al posto del `jq` della liturgia.
 
-**Cosa resta da guardare.** La prova a due telefoni con Alan: lo scambio
-di sempre, più una presa in «Contanti» che chiede la cauzione, una presa
-Barattozon che non la chiede, e un ordine ripreso su un dispositivo
-pulito che trova la controparte dal coordinatore (`peer` dalla restore).
-Il pannello delle leve sul VPS (`P2P_CAUZIONE` accesa alla riga 116 del
-config, riavvio fatto): esito da riportare. Il journal di mostrod per
-una settimana senza `no Mostro transport for event kind`. La riga «IL
+**La prova a due telefoni, fatta.** LA PROVA A DUE TELEFONI (1 ott 2026, la mattina, Andrea con due
+account): in «Contanti», ordine `82231748` (vendita da 5 €), chi prende
+ha pagato la cauzione da 1.000 sats — il pavimento, perché il 3% era
+meno —, poi la garanzia, «Siamo insieme» col QR, il rilascio; la hold
+della cauzione (`387c53d5…`) risulta CANCELED, cioè restituita. Le fee
+in `barattolo_fees`: 68 + 68 sats su 6.764, l'1% a testa con
+`discount 1` per tutt'e due, 136 trattenuti dal nodo e ~134 netti dopo
+1,66 di rete. Con un altro metodo e con Barattozon NESSUNA cauzione
+chiesta: la porta per metodo della 0008 fa quel che dice. IL DIFETTO
+TROVATO: dopo la cauzione chi compra non ha ricevuto su Telegram
+«indica dove ricevere i sats» (`fattura_chiesta` da `mostro`: «nessuno
+da avvisare»), curato sul server in `1759be4`. Il pannello delle leve:
+«Cauzione nel contanti di persona» ACCESA.
+È il primo scambio in produzione sulla 0.19.0 e il primo con la
+cauzione: pagata, tenuta per la durata dell'incontro e restituita al
+rilascio, senza toccare la fee per parte della 0005 (1% a testa, come
+prima). La cosa da tenere è il difetto dell'avviso: la 0007 racconta al
+server anche i passi della cauzione, e il server ha un destinatario in
+più da imparare a ogni passo nuovo — è il genere di buco che solo uno
+scambio vero fa vedere.
+
+**Cosa resta da guardare.** Un ordine ripreso su un dispositivo pulito
+che trova la controparte dal coordinatore (`peer` dalla restore), non
+provato. Il journal di mostrod per una settimana senza `no Mostro
+transport for event kind`. La riga «IL
 NODO GIRA LA 0.18.7» nella sezione del nodo di CLAUDE.md è vecchia di due
 salite: si corregge quando CLAUDE.md si tocca per una regola (regola 8).
 

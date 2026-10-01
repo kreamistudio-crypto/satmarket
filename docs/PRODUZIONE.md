@@ -2812,11 +2812,22 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   di quei commit era già passato), nessun `.deploy-bocciato`;
   `P2P_CAUZIONE = True` alla riga 116 del config, riavvio dolce,
   servizio attivo e ascolto P2P sullo specchio. Il pannello delle leve:
-  esito NON riportato nel verbale (Andrea lo guarda dall'app).
-  COSA RESTA: la prova a due telefoni con Alan (quella della `-bar5`,
-  più la presa in «Contanti» che deve chiedere la cauzione e una presa
-  Barattozon che NON deve chiederla, e un ordine ripreso su un
-  dispositivo pulito che trova la controparte dal coordinatore); il
+  «Cauzione nel contanti di persona» accesa.
+  LA PROVA A DUE TELEFONI (1 ott 2026, la mattina, Andrea con due
+  account): in «Contanti», ordine `82231748` (vendita da 5 €), chi prende
+  ha pagato la cauzione da 1.000 sats — il pavimento, perché il 3% era
+  meno —, poi la garanzia, «Siamo insieme» col QR, il rilascio; la hold
+  della cauzione (`387c53d5…`) risulta CANCELED, cioè restituita. Le fee
+  in `barattolo_fees`: 68 + 68 sats su 6.764, l'1% a testa con
+  `discount 1` per tutt'e due, 136 trattenuti dal nodo e ~134 netti dopo
+  1,66 di rete. Con un altro metodo e con Barattozon NESSUNA cauzione
+  chiesta: la porta per metodo della 0008 fa quel che dice. IL DIFETTO
+  TROVATO: dopo la cauzione chi compra non ha ricevuto su Telegram
+  «indica dove ricevere i sats» (`fattura_chiesta` da `mostro`: «nessuno
+  da avvisare»), curato sul server in `1759be4`. Il pannello delle leve:
+  «Cauzione nel contanti di persona» ACCESA.
+  COSA RESTA: un ordine ripreso su un dispositivo pulito che trova la
+  controparte dal coordinatore (`peer` dalla restore, non provato); il
   journal di mostrod per una settimana senza `no Mostro transport for
   event kind`. IL ROLLBACK resta quello del punto 9: riga 57 a
   `mostro:v0.18.8-bar5` E `settings.toml` dalla copia `prima-bar6`, poi
