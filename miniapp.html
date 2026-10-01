@@ -47873,7 +47873,29 @@ function mazzoDaTesto(testo){
    codice rida' le stesse chiavi su un altro dispositivo. `getPublicKey`
    fa da giudice dello scalare: se per un indice non e' valido (una
    possibilita' su 2^128, ma il ramo esiste) si prova col suffisso. */
+/* ⚠️ E SI DERIVA UNA VOLTA SOLA (1 ott 2026, dal telefono: «Compra BTC»
+   e «Vendi BTC» rispondevano in ritardo a OGNI tocco). Il tab chiama
+   renderP2P, che dipinge anche «I miei scambi», e l'adozione
+   dell'archivio del server rideriva la trade key di ogni scambio a ogni
+   giro — e dove la restore non dice l'indice, `indiceDaChiaveP2P` ne
+   prova fino a cinquanta per scambio. Ogni prova e' un `getPublicKey`,
+   cioe' una moltiplicazione sulla curva: misurati dal vivo ~210 ms per
+   tocco a CPU 4x con dodici scambi in archivio. La funzione e' pura
+   (stesso codice e stesso indice, stessa chiave), quindi il risultato
+   si tiene: dal secondo giro costa una lettura in una Map.
+   LA MEMORIA VIVE ADDOSSO ALLA FUNZIONE e non in una `let` accanto: i
+   banchi la ritagliano da sola, con la sola riga di MAZZO_INFO, e una
+   memoria che viaggia con lei non lascia indietro nessuno. Come quella
+   dell'ECDH della chat (`p2pChiaviChat`) sta solo nella pagina e se ne
+   va con lei — il codice da cui si deriva sta comunque sul telefono —
+   e oltre quattromila voci si svuota e riparte.
+   Si restituisce sempre un oggetto NUOVO: chi lo riceve puo'
+   scriverci sopra senza sporcare la copia tenuta. */
 function chiaveScambio(sk, indice){
+  const memo = chiaveScambio.memo || (chiaveScambio.memo = new Map());
+  const voce = sk + '|' + indice;
+  const gia = memo.get(voce);
+  if (gia) return {sk: gia.sk, pub: gia.pub, indice};
   const NT = window.NostrTools;
   const enc = new TextEncoder();
   const skB = NT.utils.hexToBytes(sk);
@@ -47882,7 +47904,10 @@ function chiaveScambio(sk, indice){
     const cand = NT.hmac(NT.sha256, skB, enc.encode(msg));
     try {
       const pub = NT.getPublicKey(cand);
-      return {sk: NT.utils.bytesToHex(cand), pub, indice};
+      const tk = {sk: NT.utils.bytesToHex(cand), pub};
+      if (memo.size >= 4000) memo.clear();
+      memo.set(voce, tk);
+      return {sk: tk.sk, pub, indice};
     } catch(e) {}
   }
   throw new Error('chiave di scambio non derivabile');

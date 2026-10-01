@@ -114144,12 +114144,179 @@ def prove_chiave_moderatore_portatile():
           {"privata": False, "password": False, "righeDiario": 0, "pubblicaNelFetch": True, "chiamate": 1}, o["fuga"])
 
 
+def prove_tocco_scheda_p2p():
+    # IL TOCCO SU «COMPRA BTC» / «VENDI BTC» NON ASPETTA NIENTE (1 ott
+    # 2026, dal telefono: il ritardo c'era a OGNI tocco). La misura dal
+    # vivo a CPU 4x ha detto dove andava il tempo: il tab chiama
+    # renderP2P, che dipinge anche «I miei scambi», e l'adozione
+    # dell'archivio del server rideriva la trade key di ogni scambio a
+    # ogni giro — 648 `getPublicKey` per render con dodici scambi, ~180
+    # ms. Niente rete: il 38385 sta gia' in memoria e la guardia del
+    # protocollo vive solo davanti ai gesti. La cura e' la memoria di
+    # `chiaveScambio`, e queste prove fissano le tre cose: la memoria
+    # c'e' e regge, il cambio scheda e' sincrono e non parla col
+    # coordinatore, la guardia resta dov'era.
+    print("\n-- il tocco sui tab del P2P non aspetta (memoria delle trade key) --")
+    import shutil as _sh, subprocess as _sp, tempfile as _tf, json as _json
+    mini = open("miniapp.html", encoding="utf-8").read()
+    ck = pezzo_js(mini, "function chiaveScambio(sk, indice){", "\n}\n")
+    prova("chiaveScambio tiene le chiavi derivate, e la memoria viaggia CON la funzione", True,
+          "const memo = chiaveScambio.memo || (chiaveScambio.memo = new Map());" in ck
+          and "const voce = sk + '|' + indice;" in ck
+          and "if (gia) return {sk: gia.sk, pub: gia.pub, indice};" in ck
+          and "memo.set(voce, tk);" in ck)
+    prova("...con un tetto, e restituendo sempre un oggetto nuovo", True,
+          "if (memo.size >= 4000) memo.clear();" in ck
+          and "return {sk: tk.sk, pub, indice};" in ck
+          and "return gia;" not in ck and "return tk;" not in ck)
+    sl = pezzo_js(mini, "function setLatoP2P(lato, senzaScossa){", "\n}\n")
+    prova("il cambio scheda e' SINCRONO e non parla con nessuno", [False, True, False, False, False, False],
+          ["async function setLatoP2P(" in mini, "renderP2P();" in sl, "fetch(" in sl, "await " in sl,
+           "mostroInfoP2P" in sl, "guardiaProtocolloP2P" in sl])
+    rp = re.sub(r"/\*[\s\S]*?\*/", "", pezzo_js(mini, "function renderP2P(){", "\n}\n"))
+    # renderP2P non e' async, quindi non puo' aspettare niente: il solo
+    # `await` che contiene sta nella callback in sottofondo dell'adozione
+    prova("...e il ridisegno non aspetta il 38385 ne' la guardia", [False, False, False],
+          ["async function renderP2P(" in mini, "mostroInfoP2P(" in rp,
+           "guardiaProtocolloP2P(" in rp])
+    prova("il 38385 si legge una volta e si tiene: chi lo chiede ha la copia in memoria", True,
+          "async function mostroInfoP2P(){\n  if (p2pInfo) return p2pInfo;" in mini)
+    gu = {}
+    for f in ("async function mostroChiama(skTrade, msg, opz){",
+              "async function unaRestoreP2P(relay, mostro, info, identitaSk, dentro){",
+              "async function moderatoreChiama(msg, attese){"):
+        gu[f.split("(")[0].split()[-1]] = "guardiaProtocolloP2P(info);" in pezzo_js(mini, f, "\n}\n")
+    prova("la guardia del protocollo resta PRIMA dei gesti che parlano col coordinatore",
+          {"mostroChiama": True, "unaRestoreP2P": True, "moderatoreChiama": True}, gu)
+
+    node = _sh.which("node")
+    if not node:
+        salta("la memoria delle trade key gira", "node non c'e'")
+        return
+    def _cost(nome, fine=";\n"):
+        i = mini.index("const " + nome + " = ")
+        return mini[i:mini.index(fine, i) + len(fine)]
+    # i pezzi VERI: MAZZO_INFO e chiaveScambio, e l'adozione dell'archivio
+    # con quel che le serve (gli stessi ritagli di prove_scambi_ovunque)
+    pezzi = (re.search(r"const MAZZO_INFO = [^\n]+", mini).group(0) + "\n"
+             + ck + "\n}\n"
+             + "\n".join(_cost(n) for n in ("P2P_DA_RESTORE", "P2P_RESTORE_FERMI", "P2P_RIPRESA_PASSO",
+                                              "P2P_FINALI", "P2P_INDICE_CERCA_MAX", "P2P_INDICE_CERCA_MIN",
+                                              "P2P_GIRO_APERTO"))
+             + "\n" + _cost("STATI_P2P", "\n};\n") + "\n" + _cost("P2P_PROGRESSO", "\n};\n") + "\n"
+             + "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}"
+                         for f in ("function statoDaRestoreP2P(o, statoMostro){",
+                                   "function diarioP2P(riga){",
+                                   "function fermoDaMomentiP2P(momenti){",
+                                   "function presenzaDaServerP2P(inc){",
+                                   "function indiceDaChiaveP2P(mz, pub, max){",
+                                   "function rigaDaServerP2P(id, s, tk, stato, adesso){",
+                                   "function chiaveScambioDaServerP2P(mz, id, s){",
+                                   "function adottaScambiServerP2P(locali){")))
+    banco = pezzi + r"""
+const cr = require('crypto');
+// un NostrTools di cartone che CONTA le moltiplicazioni sulla curva:
+// l'HMAC e' quello vero, la «pubblica» e' uno sha256 della privata
+let pk = 0, pkRotta = false;
+const window = {NostrTools: {
+  utils: {hexToBytes: h => Uint8Array.from(Buffer.from(h, 'hex')),
+          bytesToHex: b => Buffer.from(b).toString('hex')},
+  sha256: 'sha256',
+  hmac: (h, k, m) => Uint8Array.from(cr.createHmac('sha256', Buffer.from(k)).update(Buffer.from(m)).digest()),
+  getPublicKey: c => { pk++; if (pkRotta) throw new Error('scalare'); return cr.createHash('sha256').update(Buffer.from(c)).digest('hex'); }
+}};
+let p2pDiario = [];
+let p2pMieiOrdini = null, p2pScambiServer = null;
+let ordiniFinti = {};
+function scriviOrdineP2P(o){ ordiniFinti[o.id] = o; return o; }
+function lapidataP2P(id){ return false; }
+const SK = 'ab'.repeat(32), SK2 = 'cd'.repeat(32);
+let mazzoFinto = {sk: SK, pub: 'P'.repeat(64), indice: 40};
+function mazzoMostro(){ return mazzoFinto; }
+const log0 = console.log; console.log = () => {};
+const out = {};
+// 1) la stessa chiave due volte: UNA derivazione, stesso risultato
+pk = 0;
+const a1 = chiaveScambio(SK, 3), a2 = chiaveScambio(SK, 3);
+out.una = [pk, a1.sk === a2.sk && a1.pub === a2.pub, a1 !== a2];
+// ...ed e' quella di sempre: l'HMAC col segreto sull'etichetta di casa
+out.vera = a1.sk === cr.createHmac('sha256', Buffer.from(SK, 'hex')).update(MAZZO_INFO + 3).digest('hex');
+// 2) l'indice in lettere e' lo stesso messaggio: nessuna derivazione nuova, e l'indice e' quello chiesto
+pk = 0;
+const a3 = chiaveScambio(SK, '3');
+out.lettere = [pk, a3.pub === a1.pub, a3.indice];
+// 3) un altro indice o un altro codice: chiave nuova
+pk = 0;
+const b = chiaveScambio(SK, 4), c = chiaveScambio(SK2, 3);
+out.diversi = [pk, b.pub !== a1.pub, c.pub !== a1.pub];
+// 4) chi scrive sull'oggetto avuto non sporca la memoria
+a1.pub = 'sporco'; a1.sk = 'sporco';
+const a4 = chiaveScambio(SK, 3);
+out.pulita = a4.pub === a2.pub && a4.sk === a2.sk;
+// 5) il tetto: oltre quattromila voci si riparte
+for (let i = 100; i < 4200; i++) chiaveScambio(SK, i);
+out.tetto = chiaveScambio.memo.size <= 4000 && chiaveScambio.memo.size > 0;
+// 6) lo scalare che non va: si lancia, e niente finisce in memoria
+chiaveScambio.memo.clear(); pkRotta = true;
+let lanciato = false;
+try { chiaveScambio(SK, 9); } catch(e) { lanciato = /non derivabile/.test(e.message); }
+pkRotta = false;
+out.rotta = [lanciato, chiaveScambio.memo.size];
+// 7) IL DIFETTO: l'adozione dell'archivio a ogni ridisegno. Sei scambi,
+//    tre miei a indici che la restore non dice (la ricerca li trova) e
+//    tre di un'ALTRA identita' (la ricerca va fino in fondo)
+chiaveScambio.memo.clear();
+const archivio = {};
+[7, 20, 33].forEach((i, n) => {
+  archivio['mio-' + n] = {lato: 'compro', stato: 'annullato', chiave_mia: chiaveScambio(SK, i).pub,
+    chiave_peer: 'f'.repeat(64), euro: 10, sats: 15000, metodi: ['SEPA'], creato: 1000, quando: 2000, momenti: []};
+});
+[0, 1, 2].forEach(n => {
+  archivio['altra-' + n] = {lato: 'vendo', stato: 'annullato', chiave_mia: String(n).repeat(64),
+    chiave_peer: 'e'.repeat(64), euro: 10, sats: 15000, metodi: ['SEPA'], creato: 1000, quando: 2000, momenti: []};
+});
+chiaveScambio.memo.clear();
+p2pMieiOrdini = {}; p2pScambiServer = archivio; ordiniFinti = {};
+const giri = [];
+for (let g = 0; g < 4; g++) { pk = 0; adottaScambiServerP2P(ordiniFinti); giri.push(pk); }
+out.giri = giri;
+out.righe = ['mio-0', 'mio-1', 'mio-2'].map(id => ordiniFinti[id] && ordiniFinti[id].indice)
+  .concat(['altra-0', 'altra-1', 'altra-2'].map(id => !!(ordiniFinti[id] && ordiniFinti[id].soloVista)));
+console.log = log0;
+console.log(JSON.stringify(out));
+"""
+    with _tf.TemporaryDirectory() as d:
+        f = os.path.join(d, "tocco.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = _sp.run([node, f], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    if r.returncode:
+        prova("la memoria delle trade key gira", "", (r.stdout or "") + (r.stderr or "")[-800:])
+        return
+    o = _json.loads(r.stdout.strip().splitlines()[-1])
+    prova("la stessa trade key due volte: una derivazione sola, stessa chiave, oggetti distinti",
+          [1, True, True], o["una"])
+    prova("...ed e' la chiave di sempre (HMAC del codice sull'etichetta di casa)", True, o["vera"])
+    prova("l'indice in lettere non deriva di nuovo, e torna l'indice chiesto", [0, True, "3"], o["lettere"])
+    prova("un altro indice o un altro codice: chiave nuova", [2, True, True], o["diversi"])
+    prova("chi scrive sull'oggetto avuto non sporca la memoria", True, o["pulita"])
+    prova("oltre quattromila voci la memoria riparte", True, o["tetto"])
+    prova("lo scalare che non va si lancia, e non finisce in memoria", [True, 0], o["rotta"])
+    # cinquanta gia' al primo giro: la ricerca dell'indice passa per gli
+    # stessi indici per ogni scambio, e ognuno si deriva una volta sola
+    # (prima della cura erano 213 a OGNI giro)
+    prova("IL DIFETTO: l'adozione dell'archivio deriva ogni indice una volta, e ai giri dopo NIENTE",
+          [50, 0, 0, 0], o["giri"])
+    prova("...e le righe sono quelle di prima: i miei coi loro indici, gli altri solo da guardare",
+          [7, 20, 33, True, True, True], o["righe"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_contanti_a_mano, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,

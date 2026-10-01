@@ -26742,7 +26742,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   almeno `P2P_INDICE_CERCA_MIN` = 50) confrontata con `chiave_mia` —
   combacia, riga governabile; no, riga `soloVista` (niente gesti in
   `azioniDisponibili`/`azioniSecondarieP2P`, la card e la pagina lo
-  dicono, si promuove quando l'indice arriva). Le righe locali si
+  dicono, si promuove quando l'indice arriva). LE DERIVATE SI TENGONO
+  (1 ott 2026): l'adozione gira dentro `renderP2P`, cioè a ogni tocco
+  dei tab «Compra/Vendi BTC», del filtro, di «I miei scambi», e
+  `chiaveScambio` ha una memoria ADDOSSO (`chiaveScambio.memo`, una Map
+  `sk|indice` → chiave, tetto 4000, un oggetto nuovo a ogni risposta):
+  la stessa trade key si deriva una volta per pagina. Verbale: CANTIERI,
+  «Il tocco su Compra/Vendi BTC non aspetta». Le righe locali si
   muovono solo in avanti (`P2P_RIPRESA_PASSO`, `ripreso` sulla
   fotografia) e prendono quel che manca. Non nasce su una lapide, per
   un mio ritiro mai preso, senza uno stato. Con `p2pErrore` la

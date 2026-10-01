@@ -32418,3 +32418,99 @@ testo si copia comunque); il tempo dello scrypt su un telefono lento
 **DA GUARDARE.** Sul telefono: esportare, dimenticare la chiave,
 importare. E il giorno che nostr-tools si aggiorna: rifare l'innesto
 PRIMA di pensare che il bundle «ha già nip49».
+
+## Il tocco su Compra/Vendi BTC non aspetta (1 ott 2026)
+
+Difetto dal telefono, da stamattina: nel P2P il tocco su «Compra BTC» o
+«Vendi BTC» reagiva con un ritardo evidente, e a OGNI tocco, non solo al
+primo. **LA MISURA, prima di toccare niente** (Chrome headless via CDP a
+375 px, CPU 4x come un telefono, server da una copia col relay morto, la
+sonda dal rilascio del dito al fotogramma dopo il click, più il
+profilatore): col libro di 40 ordini e nessuno scambio il tocco
+ridisegnava in ~18 ms — quindi niente rete e niente calcolo sul libro.
+Seminati un mazzo e un archivio del server di dodici scambi (otto miei a
+indici che la restore non dice, quattro di un'altra identità): **205–235
+ms dal dito al fotogramma, a ogni tocco**, e il profilo diceva dove —
+`setLatoP2P → renderP2P → scambiP2P → adottaScambiServerP2P →
+indiceDaChiaveP2P → chiaveScambio → getPublicKey`. Il tab chiama
+`renderP2P`, che dipinge INSIEME il libro e «I miei scambi»; l'adozione
+dell'archivio rideriva la trade key di ogni scambio a ogni giro, e dove
+la restore non dice l'indice `indiceDaChiaveP2P` ne prova fino a
+cinquanta per scambio: 648 `getPublicKey` (una moltiplicazione sulla
+curva ciascuna) per render. Quella che il dettaglio dal telefono
+indovinava: qualcosa rifatto da capo invece che tenuto.
+
+**NIENTE RETE, ED È VERIFICATO E NON DEDOTTO**: il 38385
+(`protocol_version`, i tag della cauzione, la fee) sta già in memoria in
+`p2pInfo`, letto col libro, e `mostroInfoP2P` risponde dalla copia; la
+guardia del protocollo vive solo in `mostroChiama`, `unaRestoreP2P` e
+`moderatoreChiama`, cioè prima dei gesti che parlano col coordinatore;
+`setLatoP2P` e `renderP2P` sono sincroni. Quella parte della richiesta
+era già vera, e ora la fissa una prova.
+
+**LA CURA È UNA MEMORIA, E STA ADDOSSO ALLA FUNZIONE.** `chiaveScambio`
+è pura (stesso codice e stesso indice, stessa chiave), quindi tiene il
+risultato in `chiaveScambio.memo`, una Map `sk|indice` → chiave, con un
+tetto di 4000 voci e un oggetto NUOVO a ogni risposta (chi lo riceve può
+scriverci sopra). Addosso e non in una `let` accanto perché una dozzina
+di banchi ritaglia `chiaveScambio` da sola, con la sola riga di
+`MAZZO_INFO`: una memoria che viaggia con lei non lascia indietro
+nessuno. Come la memoria gemella dell'ECDH della chat (`p2pChiaviChat`)
+vive solo nella pagina. Lo scalare che non va (una su 2^128) si lancia
+come prima e non finisce in memoria.
+
+**GLI ALTRI TOCCHI DEL P2P** (punto 3), misurati allo stesso modo come
+lavoro sincrono del gesto: «Applica» del filtro, «I miei scambi», il
+ritorno ai miei e al libro avevano lo STESSO difetto (172–184 ms, 648
+derivazioni) e la stessa cura li porta a 8–12 ms; aprire il filtro, il
+dettaglio di un ordine e la pagina di uno scambio non ne soffrivano
+(0–2 derivazioni, 2–8 ms). I tab: da 180–184 a 9–12 ms; dal dito al
+fotogramma da 215–247 a 35–54 ms, lavoro del click da 184–218 a 9–15
+ms (nei 35 ci sono ~12 ms che il browser mette fra il rilascio e il
+click anche a pagina vuota).
+
+**SCARTATO.** Spezzare `renderP2P` perché il tab ridipinga il solo
+libro: sarebbe stato il refactoring di un renderer che ha UN posto da
+cui passano tutte le strade (e i freni per sessione), per curare un
+sintomo — gli stessi 180 ms restavano su «I miei scambi» e sul filtro.
+Una memoria della sola ricerca dell'indice: la ricerca è il caso
+peggiore, ma anche la derivazione singola si rifaceva a ogni giro, e
+una cura sola in un posto solo le copre tutte e due, più tutti gli
+altri posti che derivano (la chat, il moderatore, la cintura del mazzo). Portare la ricerca fuori dal render (in
+sottofondo): resta la cosa da fare se l'archivio crescesse di un ordine
+di grandezza, oggi il primo giro (all'apertura della vista) costa una
+volta per pagina.
+
+**PERCHÉ «DA STAMATTINA» NON L'HO POTUTO VERIFICARE** dal telefono, e lo
+dichiaro come ipotesi: il costo cresce con gli scambi dell'archivio e
+con quelli di cui la restore non dice l'indice — e quando la restore
+TACE (`p2pMieiOrdini` resta null: «il silenzio non è una risposta»)
+ogni scambio passa dalla ricerca. Un nodo appena riavviato alla 0.19.0
+è il candidato naturale; la cura vale in tutti e due i casi.
+
+**PROVATO.** `prove_tocco_scheda_p2p` (15): la memoria addosso, il
+tetto e l'oggetto nuovo; il cambio scheda sincrono e senza fetch, senza
+`mostroInfoP2P` né guardia, e il ridisegno uguale; il 38385 servito
+dalla copia; la guardia ancora nei tre posti dei gesti; e il banco node
+coi pezzi VERI (MAZZO_INFO, `chiaveScambio` e l'adozione dell'archivio
+coi ritagli di `prove_scambi_ovunque`) e un NostrTools di cartone che
+CONTA le moltiplicazioni: la stessa chiave una volta sola ed è l'HMAC di
+sempre, l'indice in lettere non rideriva, un altro indice o codice sì,
+l'oggetto avuto si sporca senza sporcare la memoria, il tetto, lo
+scalare rotto fuori dalla memoria, e IL DIFETTO — sei scambi, tre miei e
+tre di un'altra identità: 50 derivazioni al primo giro (ogni indice una
+volta: prima erano 213 a ogni giro) e 0, 0, 0 ai giri dopo, con le righe
+uguali a prima. Tortura 7 su 7 (memoria spenta, oggetto condiviso, senza
+tetto, voce senza indice, lo scalare rotto in memoria, il tab che chiede
+il 38385, la guardia tolta da `mostroChiama`; al primo giro il banco
+della tortura non girava affatto — mancava `server.py` nella copia — e
+«0 rosse» si leggeva come sette vive: la riga «intatto» l'ha detto).
+Suite intera severa senza config nel worktree da origin/main
+(f58b940): 17.747 verdi e 0 rosse; i 28 collaudi della CI nella
+gabbia, verdi. Dal vivo via CDP a 375 px e CPU 4x, prima/dopo sullo stesso
+server con la pagina ricopiata: i numeri qui sopra.
+
+**DA GUARDARE.** Il telefono: «Compra BTC» / «Vendi BTC» devono
+rispondere subito anche col proprio archivio vero. Se resta un ritardo,
+non è più questo: il prossimo sospetto è il numero di card nella
+striscia dei miei scambi, che si ridipinge anche lei a ogni tocco.
