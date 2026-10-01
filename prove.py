@@ -29437,13 +29437,17 @@ def prove_canale_bot():
     amb3 = {}
     exec(pezzo("e_admin"), amb3)
     amb3.update(ADMIN_IDS=[555], MODALITA_COLLAUDO=False)
-    exec("ADMIN_BOT_USERNAME = " + repr(("alanbimbati", "aandreaiita")), amb3)
     exec(pezzo("e_admin_bot"), amb3)
     ok = amb3["e_admin_bot"]
-    prova("i due username passano", True,
+    # DAL 1 OTT 2026 GLI USERNAME NON BASTANO PIU' (la M7 dell'audit del
+    # 19 set): uno username si lascia e si riprende, e chi se lo fosse
+    # preso avrebbe ereditato /punti, cioe' dove finiscono i pacchi
+    prova("i due username di una volta NON passano piu'", False,
           ok({"id": 1, "username": "AlanBimbati"})
-          and ok({"id": 2, "username": "aandreaiita"}))
-    prova("maiuscole comprese", True, ok({"id": 1, "username": "ALANBIMBATI"}))
+          or ok({"id": 2, "username": "aandreaiita"}))
+    prova("...nemmeno maiuscoli", False, ok({"id": 1, "username": "ALANBIMBATI"}))
+    prova("...e la tupla degli username non esiste piu' nel codice", 0,
+          _SORGENTE.count("ADMIN_BOT_USERNAME"))
     prova("i moderatori di sempre passano", True, ok({"id": 555}))
     prova("un estraneo no", False, ok({"id": 3, "username": "tizio"}))
     prova("e nemmeno chi non ha username", False, ok({"id": 3}))
@@ -116761,6 +116765,73 @@ def prove_foto_anomala():
           'warnings.simplefilter("error", ImmaginePillow.DecompressionBombWarning)' in _SORGENTE)
 
 
+def prove_quattro_piccole():
+    """LE QUATTRO PICCOLE DEGLI AUDIT (1 ott 2026, cantiere «CSP e le voci
+    aperte degli audit», cura 5): B1 (la firma dell'initData con `!=`),
+    M7 (i comandi del bot per username: la sua prova sta nel banco del
+    bot), B7 del secondo audit (deploy.sh che a file dei firmatari
+    assente tornava a fidarsi dell'autore, testo libero) e B8 (le action
+    della CI inchiodate allo sha, non al tag)."""
+    print("\n🔩 Le quattro piccole degli audit")
+    import hashlib
+    import hmac
+    import json
+    import time
+    from urllib.parse import parse_qsl
+
+    class HTTPException(Exception):
+        """fastapi in prove.py non c'e': basta il codice e il motivo"""
+        def __init__(self, status_code, detail=""):
+            super().__init__(detail)
+            self.status_code = status_code
+
+    # --- B1: la firma dell'initData a tempo costante, e GIRA ----------
+    amb = {"hmac": hmac, "hashlib": hashlib, "json": json, "time": time,
+           "parse_qsl": parse_qsl, "BOT_TOKEN": "0:prova",
+           "MODALITA_COLLAUDO": False, "ORE_INITDATA": 24,
+           "MSG_INITDATA_SCADUTO": "scaduto", "HTTPException": HTTPException}
+    exec(pezzo("_utente_da_initdata"), amb)
+    chiave = hmac.new(b"WebAppData", b"0:prova", hashlib.sha256).digest()
+    campi = {"auth_date": str(int(time.time())),
+             "user": json.dumps({"id": 7, "first_name": "Tizio"})}
+    controllo = "\n".join(f"{k}={v}" for k, v in sorted(campi.items()))
+    firma = hmac.new(chiave, controllo.encode(), hashlib.sha256).hexdigest()
+    buono = "&".join(f"{k}={v}" for k, v in campi.items()) + "&hash=" + firma
+    # in un try: un confronto rovesciato deve dare una rossa col nome,
+    # non far esplodere la sezione (la lezione della tortura)
+    try:
+        aperto = amb["_utente_da_initdata"](buono)["id"]
+    except HTTPException as e:
+        aperto = e.status_code
+    prova("B1: un initData firmato apre", 7, aperto)
+    storto = buono[:-1] + ("0" if buono[-1] != "0" else "1")
+    try:
+        amb["_utente_da_initdata"](storto)
+        esito = "aperto"
+    except HTTPException as e:
+        esito = e.status_code
+    prova("...e uno con la firma ritoccata e' un 401", 401, esito)
+    u = pezzo("_utente_da_initdata")
+    prova("B1: il confronto e' hmac.compare_digest, e il != non c'e' piu'", True,
+          "hmac.compare_digest(hash_calcolato" in u and "!= hash_ricevuto" not in u)
+    # --- B7: deploy.sh a file dei firmatari assente RIFIUTA --------------
+    sh = open("deploy.sh", encoding="utf-8").read().replace("\r\n", "\n")
+    prova("B7: a file assente il giudice rifiuta, con un motivo che lo dice",
+          True, 'if [[ ! -s "$FIRMATARI" ]]; then' in sh
+          and "manca il file dei firmatari" in sh)
+    prova("...e la cintura di cartone sull'autore non esiste piu'", 0,
+          sh.count("NOSTRI=") + sh.count("BARATTOLO_AUTORI") + sh.count("non e' dei nostri"))
+    prova("...la firma si verifica sempre, senza un ramo che la salta", True,
+          'verify-commit "$sha"' in sh and sh.count("allowedSignersFile") >= 1)
+    # --- B8: le action inchiodate allo sha -------------------------------
+    wf = open(os.path.join(".github", "workflows", "prove.yml"), encoding="utf-8").read()
+    usi = re.findall(r"uses:\s*([^\s#]+)", wf)
+    prova("B8: ogni action e' inchiodata a uno sha di 40 esadecimali", [],
+          [u for u in usi if not re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", u)])
+    prova("...col tag scritto accanto, per chi legge", True,
+          all(re.search(r"@[0-9a-f]{40}\s+# v\d", r) for r in wf.splitlines() if "uses:" in r))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -116983,6 +117054,7 @@ def main():
               prove_csp_prova,
               prove_ssrf_ln_address,
               prove_foto_anomala,
+              prove_quattro_piccole,
               prove_config_esempio):
         try:
             f()

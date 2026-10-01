@@ -20,9 +20,9 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
         with:
           python-version: "3.12"
 
@@ -290,7 +290,7 @@ jobs:
       CARTONE_HEX: 's/\b([0-9a-f])\1{63}\b//g;s/\bf91e9d7c30894cb0[0-9a-f]{48}\b//g;s/\b85d68c6972360099[0-9a-f]{48}\b//g;s/\b3501454135014541[0-9a-f]{48}\b//g'
       FORMA_HEX: '\b[0-9a-f]{64}\b'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
         with:
           # Serve la cronologia INTERA (di serie il checkout e' shallow
           # e nel runner non c'e' proprio). Un segreto committato e poi
@@ -464,7 +464,7 @@ jobs:
       # divergenza non ce n'e'. Il primo giro era passato solo perche'
       # CREAVA il ref; dal secondo push in poi cadeva sempre, con la
       # bandierina ferma e la CI rossa a ogni commit di chiunque.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
         with:
           fetch-depth: 0
       # --force NO, e non e' pignoleria: `pronto` deve poter solo

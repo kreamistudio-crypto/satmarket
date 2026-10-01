@@ -8646,7 +8646,9 @@ def _utente_da_initdata(init_data: str) -> dict:
         controllo = "\n".join(f"{k}={v}" for k, v in sorted(dati.items()))
         chiave = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
         hash_calcolato = hmac.new(chiave, controllo.encode(), hashlib.sha256).hexdigest()
-        if hash_calcolato != hash_ricevuto:
+        # a tempo costante (1 ott 2026, la B1 dell'audit del 19 set): era
+        # l'unica delle cinque porte firmate a confrontare con `!=`
+        if not hmac.compare_digest(hash_calcolato, str(hash_ricevuto)):
             raise ValueError("firma non valida")
         user = json.loads(dati["user"])
         eta = int(time.time()) - int(dati.get("auth_date", 0))
@@ -14960,7 +14962,6 @@ async def avvia_fusione(id_telegram: int, codice: str):
 # ed e' esattamente il tipo di riga che si dimentica nella tastiera
 # aggiunta fra sei mesi.
 
-ADMIN_BOT_USERNAME = ("alanbimbati", "aandreaiita")
 SFOGLIA_PER_PAGINA = 5      # annunci per schermata nel bot
 
 # Il cappello della griglia. Dice in una riga che questa e' la vista
@@ -14973,15 +14974,15 @@ TESTO_SFOGLIA = ("🗂 <b>Sfoglia il mercatino</b>\n"
 
 def e_admin_bot(mittente: dict) -> bool:
     """Chi puo' dare i comandi di servizio al bot: i moderatori di
-    sempre (ADMIN_IDS) piu' i due username scritti qui sopra.
-    L'username arriva dal MESSAGGIO e non dal database, ed e' la cosa
-    da non allentare: e' Telegram a dirci chi ha scritto, mentre la
-    riga `utenti` la scriviamo noi e potrebbe portare uno username
-    vecchio di mesi — quello di uno che nel frattempo l'ha cambiato,
-    o peggio quello che qualcun altro si e' preso dopo di lui."""
-    if e_admin(mittente.get("id") or 0):
-        return True
-    return (mittente.get("username") or "").lower() in ADMIN_BOT_USERNAME
+    sempre (ADMIN_IDS), e basta. Riceve il MITTENTE del messaggio —
+    e' Telegram a dirci chi ha scritto — e guarda il solo id.
+    FINO AL 1 OTT 2026 passavano anche due username scritti nel
+    codice (la M7 dell'audit del 19 set): uno username Telegram si
+    puo' lasciare e riprendere, e chi se lo fosse preso avrebbe
+    ereditato `/canale`, `/sponsor`, `/vetrina` e `/punti` — cioe'
+    DOVE finiscono i pacchi. Andrea e Alan stanno in ADMIN_IDS del
+    VPS (verificato da Andrea), quindi non serviva a nessuno."""
+    return e_admin(mittente.get("id") or 0)
 
 
 def _riga_webapp() -> list:

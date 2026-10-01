@@ -32,8 +32,9 @@
 #      b) va IN AVANTI rispetto a quel che gira (niente ritorni a una
 #         versione vecchia, niente storia riscritta);
 #      c) la punta e' FIRMATA da una chiave scritta in un file di
-#         QUESTA macchina — o, finche' quel file non c'e', ha almeno un
-#         autore dei nostri, che e' una cintura di cartone (vedi sotto);
+#         QUESTA macchina — e se quel file non c'e', o e' vuoto, non
+#         si tira NIENTE (dal 1 ott 2026: prima c'era una cintura di
+#         cartone sull'autore, vedi sotto);
 #      d) la CI e' verde SU DI LUI, chiesto a GitHub col token di sola
 #         lettura di questa macchina (giudice_deploy.py).
 #    Se uno fallisce NON SI TIRA, si scrive nel journal e si avvisano
@@ -76,15 +77,17 @@ BACKUP_DA_TENERE=5
 # GitHub non puo' riscrivere. Formato di ssh (`allowed_signers`), una
 # riga per chiave: `andrea namespaces="git" ssh-ed25519 AAAA...`.
 # Si guarda la sola PUNTA: chi firma la punta risponde di quel che c'e'
-# sotto, ed e' il gesto «questo lo rilascio io». Finche' il file non
-# c'e' (o e' vuoto) la firma NON si chiede, e ogni deploy lo dice.
+# sotto, ed e' il gesto «questo lo rilascio io».
+# A FILE ASSENTE (O VUOTO) NON SI TIRA NIENTE (1 ott 2026, la B7 del
+# secondo audit). Fino a ieri c'era una «cintura di cartone»: senza il
+# file, bastava che l'AUTORE della punta fosse uno di noi — ma in git
+# l'autore e' TESTO LIBERO, lo scrive chiunque. Le firme sono accese
+# dal 23 set; il caso che questa riga copre e' il file sparito per un
+# errore di ripristino, e in quel caso il deploy deve FERMARSI e
+# dirlo, non tornare a fidarsi di una riga che chiunque scrive.
+# Per spegnere le firme apposta: PRODUZIONE, «IL DEPLOY CHE SI FIDA
+# SOLO DI MAIN» — si rimette il file, non si toglie.
 FIRMATARI="${BARATTOLO_FIRMATARI:-/etc/barattolo-deploy/firmatari}"
-# LA CINTURA DI CARTONE, per i giorni senza firme: l'autore della punta
-# dev'essere uno di noi. In git l'autore e' TESTO LIBERO — lo scrive
-# chiunque — quindi questa riga non ferma nessuno che sappia cosa fa:
-# ferma il bot, la action di terzi, il commit arrivato da chissa' dove.
-# La cura vera e' il file qui sopra.
-NOSTRI="${BARATTOLO_AUTORI:-kreami.studio@gmail.com 62957276+alanbimbati@users.noreply.github.com}"
 AVVISA_ATTESA_DOPO=600   # secondi di «aspetto» prima di dirlo a qualcuno
 
 cd "$CARTELLA" || { echo "❌ non trovo $CARTELLA"; exit 1; }
@@ -239,19 +242,14 @@ giudica() {
     MOTIVO="${sha:0:8} non viene DOPO ${QUI:0:8}, che e' quel che gira: un ritorno indietro o una storia riscritta"
     return 10
   fi
-  if [[ -s "$FIRMATARI" ]]; then
-    if ! git -c gpg.ssh.allowedSignersFile="$FIRMATARI" \
-           verify-commit "$sha" >/dev/null 2>&1; then
-      MOTIVO="${sha:0:8} non porta la firma di una chiave di $FIRMATARI"
-      return 10
-    fi
-  else
-    chi="$(git log -1 --format=%ae "$sha" 2>/dev/null)"
-    case " $NOSTRI " in
-      *" $chi "*) ;;
-      *) MOTIVO="${sha:0:8} ha per autore «$chi», che non e' dei nostri"
-         return 10 ;;
-    esac
+  if [[ ! -s "$FIRMATARI" ]]; then
+    MOTIVO="manca il file dei firmatari ($FIRMATARI): senza, nessuna punta si tira"
+    return 10
+  fi
+  if ! git -c gpg.ssh.allowedSignersFile="$FIRMATARI" \
+         verify-commit "$sha" >/dev/null 2>&1; then
+    MOTIVO="${sha:0:8} non porta la firma di una chiave di $FIRMATARI"
+    return 10
   fi
   MOTIVO="$(python3 giudice_deploy.py ci "$sha" 2>/dev/null)"
   esito=$?
