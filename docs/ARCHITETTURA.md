@@ -1187,8 +1187,10 @@
   motivo, rimborso: sostituisce quella della disputa) e il pannello del
   rimborso dicono «il venditore ha annullato» invece di «disputa vinta»;
   `verboOrdine` sulla card: «Hai annullato la vendita» / «Annullato dal
-  venditore». Il compratore NON annulla ancora un ordine pagato: resta
-  da decidere (CANTIERI, «Il venditore può annullare un ordine»).
+  venditore». IL COMPRATORE NON ANNULLA UN ORDINE GIÀ PAGATO, deciso
+  (Andrea, 1 ott 2026): a sats depositati la sua sola strada resta la
+  DISPUTA, e `annulla_ordine` continua ad aprirsi solo su 'creato' (il
+  perché in CANTIERI, «Il venditore può annullare un ordine»).
   E NESSUNA RIGA SI CANCELLA SENZA AVER CHIESTO A LNBITS (ago 2026):
   è l'invariante, ed è la stessa regola delle lapidi arrivata fino in
   fondo. Il reaper buttava via gli ordini 'creato' scaduti con un

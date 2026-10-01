@@ -33127,10 +33127,20 @@ bottone, il foglio (esaurito e altro con la nota), la seconda conferma,
 l'ordine annullato dai due lati, il compratore che incolla la fattura e
 viene rimborsato, la lista con i verbi, l'avviso letto dal journal.
 
+**DECISO (Andrea, 1 ott 2026): il compratore NON può annullare un ordine
+già pagato.** La proposta qui sopra non si fa: a sats depositati resta
+solo la disputa, e `annulla_ordine` si apre solo prima del pagamento
+come sempre. Il perché è quello già scritto: un «Annulla» del compratore
+a sats in cassaforte sarebbe un'opzione gratuita sul cambio per gli
+ordini in euro — chi compra annullerebbe quando il BTC si muove contro di
+lui — e la disputa, con un moderatore in mezzo, è il freno giusto per un
+ripensamento; il venditore invece annulla perché NON PUÒ consegnare, che
+è un fatto suo e non una scommessa. Chi ci ripensa a sats già depositati
+parla col venditore, che da oggi può annullare lui.
+
 **Da guardare.** Il telefono, dentro Telegram: il foglio sopra il
 foglio, la tastiera sulla nota. Il primo annullo vero in produzione e il
-polso che arriva ai moderatori. La decisione sul «Annulla» del
-compratore a ordine pagato (sopra).
+polso che arriva ai moderatori.
 ## Dopo ogni gesto si torna a «I miei scambi» (1 ott 2026)
 
 Ritocco di Andrea. Fatto il proprio passo in uno scambio, si restava
