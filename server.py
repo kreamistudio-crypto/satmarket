@@ -7843,7 +7843,19 @@ def init_db():
                     # il libro mastro incrocia, e un id numerico li'
                     # dentro sarebbe l'unica riga di `ordini` che
                     # nomina una persona invece di una bottega.
-                    "punto_preso_da TEXT DEFAULT ''"):
+                    "punto_preso_da TEXT DEFAULT ''",
+                    # L'ANNULLO DEL VENDITORE (1 ott 2026): QUANDO chi
+                    # vende ha annullato (0 = mai), il MOTIVO in una
+                    # parola del catalogo MOTIVI_ANNULLO_VENDITORE, la
+                    # nota libera di «altro» e gli annunci che ha
+                    # dichiarato esauriti (id separati da virgola: nei
+                    # set si giudica riga per riga). Restano scritti
+                    # anche a rimborso fatto: sono lo storico che il
+                    # moderatore conta (_conta_annulli_venditore).
+                    "annullato_dal_venditore_il INTEGER DEFAULT 0",
+                    "motivo_annullo TEXT DEFAULT ''",
+                    "nota_annullo TEXT DEFAULT ''",
+                    "esauriti_annullo TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -21985,6 +21997,51 @@ async def _avvisa_offerte_esaurito(compratori: list, titolo: str):
             print(f"⚠️ Avviso offerta decaduta saltato ({tg_id}): {e}")
 
 
+def _decadi_offerte_esaurito(con, annuncio_id: int) -> list:
+    """Le offerte vive su un annuncio che si e' appena esaurito: decadono
+    TUTTE E TRE, come all'esaurimento per vendita (_incassa_ordine), e
+    nella transazione del chiamante. Non esiste davvero l'alternativa
+    «restano vive»: scadenze_offerte guarda `a.stato != 'attivo'` e le
+    raccoglierebbe comunque entro dieci minuti, col testo generico —
+    farlo qui compra la tempestivita' e LE PAROLE VERE, non la
+    correttezza. Anche le 'accettata': compra() rifiuta gia' l'annuncio
+    non attivo, quindi un accordo su merce che non c'e' non e' onorabile
+    (decisione di Andrea, ed e' l'asimmetria dichiarata con le FERIE —
+    dove invece una stretta di mano gia' data TRATTIENE la partenza: li'
+    la merce c'e' e il venditore e' solo via).
+    Torna i compratori da avvisare (_avvisa_offerte_esaurito).
+    GIUDICE UNICO dal 1 ott 2026: lo chiamano la ricarica a zero
+    (ricarica_quantita) e l'annullo del venditore per «esaurito»
+    (_pausa_esauriti) — due copie direbbero due regole il giorno che una
+    cambia."""
+    decadute = []
+    vive = con.execute(
+        "SELECT id, compratore_id FROM offerte WHERE annuncio_id=? "
+        "AND stato IN ('proposta','controproposta','accettata')",
+        (annuncio_id,)).fetchall()
+    if vive:
+        con.execute(
+            "UPDATE offerte SET stato='decaduta', aggiornato=? "
+            "WHERE annuncio_id=? AND stato IN "
+            "('proposta','controproposta','accettata')",
+            (int(time.time()), annuncio_id))
+        decadute = [r["compratore_id"] for r in vive]
+    # ...e le offerte sul CARRELLO che contengono il pezzo (ago
+    # 2026): la composizione non e' piu' onorabile, accettate
+    # comprese — la stessa regola delle singole.
+    vive_c = con.execute(
+        "SELECT id, compratore_id FROM offerte WHERE annuncio_id=0 "
+        "AND stato IN ('proposta','controproposta','accettata') AND "
+        "id IN (SELECT offerta_id FROM offerte_righe WHERE "
+        "annuncio_id=?)", (annuncio_id,)).fetchall()
+    for v in vive_c:
+        con.execute("UPDATE offerte SET stato='decaduta', "
+                    "aggiornato=? WHERE id=?",
+                    (int(time.time()), v["id"]))
+        decadute.append(v["compratore_id"])
+    return decadute
+
+
 @app.post("/api/listings/{annuncio_id}/quantita")
 async def ricarica_quantita(annuncio_id: int, req: Request,
                             x_tg_init_data: str = Header(""),
@@ -22083,32 +22140,9 @@ async def ricarica_quantita(annuncio_id: int, req: Request,
     # l'asimmetria dichiarata con le FERIE — dove invece una stretta di
     # mano gia' data TRATTIENE la partenza: li' la merce c'e' e il
     # venditore e' solo via).
-    decadute = []
-    if esaurito_ora:
-        vive = con.execute(
-            "SELECT id, compratore_id FROM offerte WHERE annuncio_id=? "
-            "AND stato IN ('proposta','controproposta','accettata')",
-            (annuncio_id,)).fetchall()
-        if vive:
-            con.execute(
-                "UPDATE offerte SET stato='decaduta', aggiornato=? "
-                "WHERE annuncio_id=? AND stato IN "
-                "('proposta','controproposta','accettata')",
-                (int(time.time()), annuncio_id))
-            decadute = [r["compratore_id"] for r in vive]
-        # ...e le offerte sul CARRELLO che contengono il pezzo (ago
-        # 2026): la composizione non e' piu' onorabile, accettate
-        # comprese — la stessa regola delle singole.
-        vive_c = con.execute(
-            "SELECT id, compratore_id FROM offerte WHERE annuncio_id=0 "
-            "AND stato IN ('proposta','controproposta','accettata') AND "
-            "id IN (SELECT offerta_id FROM offerte_righe WHERE "
-            "annuncio_id=?)", (annuncio_id,)).fetchall()
-        for v in vive_c:
-            con.execute("UPDATE offerte SET stato='decaduta', "
-                        "aggiornato=? WHERE id=?",
-                        (int(time.time()), v["id"]))
-            decadute.append(v["compratore_id"])
+    # (il blocco che stava qui e' diventato _decadi_offerte_esaurito il
+    # 1 ott 2026: da allora lo chiama anche l'annullo del venditore)
+    decadute = _decadi_offerte_esaurito(con, annuncio_id) if esaurito_ora else []
     con.commit()
     con.close()
     if riattivato:
@@ -52055,6 +52089,14 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             return {"ok": False, "stato": o["stato"], "incerto": True}
         c_utente = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                                (o["compratore_id"],)).fetchone()
+        # L'ANNULLO DEL VENDITORE (1 ott 2026): se a chiudere l'ordine
+        # e' stato chi vende, la merce e' gia' stata sistemata
+        # all'annullo (annulla_vendita) e le parole non parlano di
+        # disputa. Si legge con `keys()` e non con un aiutante: i banchi
+        # che eseguono questo pezzo montano tabelle piu' strette di
+        # quella vera, e li' la colonna non c'e'.
+        annullo = bool("annullato_dal_venditore_il" in o.keys()
+                       and o["annullato_dal_venditore_il"])
         # Rimborso integrale: articolo, spedizione e protezione tornano
         # tutti al compratore (l'affare e' saltato, la protezione non
         # si e' consumata) — e' il totale, zero commissioni.
@@ -52119,25 +52161,32 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             # il massimo di ieri. Chiudere la falla dove nasce vale piu'
             # che aspettare la scopa del riavvio.
             righe = _righe_ordine(con, o)
-            for r in righe:
-                con.execute("UPDATE annunci SET quantita=quantita+?, "
-                            "quantita_max=MAX(quantita_max,quantita+?), "
-                            "stato='attivo' WHERE id=?",
-                            (r["quantita"], r["quantita"], r["annuncio_id"]))
-            # IL REGISTRO VA RIMESSO IN PARI, o la vendita rimborsata
-            # continuerebbe a sottrarre un pezzo fantasma A OGNI GIRO,
-            # per sempre: il sync ricopre la giacenza dalla lettura
-            # esterna e la pendente e' quel che la corregge. Se il
-            # negozio non l'aveva ancora scalata le due si cancellano in
-            # silenzio; se l'aveva gia' fatto, i pezzi vanno RIMESSI e
-            # glielo si dice. Stessa transazione dello stock, per la
-            # ragione del gemello in `_incassa_ordine`.
-            magazzino = registra_uscita_negozio(con, ordine_id, righe,
-                                                "rimborso")
+            magazzino = []
+            # SU UN ORDINE ANNULLATO DAL VENDITORE LO STOCK NON SI TOCCA
+            # (1 ott 2026): la merce non e' mai partita e chi vende l'ha
+            # gia' sistemata all'annullo — gli esauriti in pausa, il
+            # resto in vetrina. Rimetterla qui, magari giorni dopo dalla
+            # fattura incollata, la conterebbe due volte.
+            if not annullo:
+                for r in righe:
+                    con.execute("UPDATE annunci SET quantita=quantita+?, "
+                                "quantita_max=MAX(quantita_max,quantita+?), "
+                                "stato='attivo' WHERE id=?",
+                                (r["quantita"], r["quantita"], r["annuncio_id"]))
+                # IL REGISTRO VA RIMESSO IN PARI, o la vendita rimborsata
+                # continuerebbe a sottrarre un pezzo fantasma A OGNI GIRO,
+                # per sempre: il sync ricopre la giacenza dalla lettura
+                # esterna e la pendente e' quel che la corregge. Se il
+                # negozio non l'aveva ancora scalata le due si cancellano in
+                # silenzio; se l'aveva gia' fatto, i pezzi vanno RIMESSI e
+                # glielo si dice. Stessa transazione dello stock, per la
+                # ragione del gemello in `_incassa_ordine`.
+                magazzino = registra_uscita_negozio(con, ordine_id, righe,
+                                                    "rimborso")
             con.commit()
             titolo = html.escape(_titolo_ordine(righe)[:60])
             con.close()
-            for r in righe:
+            for r in (righe if not annullo else []):
                 # ...e torna disponibile anche sulla piazza Nostr
                 asyncio.create_task(annuncio_su_nostr(r["annuncio_id"],
                                                       "active",
@@ -52146,21 +52195,35 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                 # e' di nuovo in vetrina, il post non deve mentire
                 asyncio.create_task(promo_venduto(r["annuncio_id"],
                                                   venduto=False))
-            await notifica(o["compratore_id"],
-                           f"↩️ <b>Disputa risolta a tuo favore:</b> il rimborso di "
-                           f"<b>{_fmt_sats(importo)} sats</b> è in arrivo nel tuo wallet. "
-                           f"⭐ Com'è andata? Apri l'ordine nella Mini App e "
-                           f"lascia un feedback.")
-            await notifica(o["venditore_id"],
-                           "⚖️ La disputa è stata risolta a favore dell'acquirente: "
-                           "i sats gli sono stati rimborsati e l'annuncio è tornato "
-                           "in vetrina. ⭐ Puoi lasciare un feedback dall'ordine "
-                           "nella Mini App."
-                           + ("\n\n" + _coda_magazzino(magazzino)
-                              if magazzino else ""))
+            if annullo:
+                # le parole dell'annullo: il motivo gliel'ha gia' detto
+                # l'avviso di annulla_vendita, qui si dice che i sats
+                # sono partiti
+                await notifica(o["compratore_id"],
+                               f"↩️ <b>Rimborso dell'ordine annullato:</b> "
+                               f"<b>{_fmt_sats(importo)} sats</b> in arrivo nel "
+                               f"tuo wallet, per intero. ⭐ Com'è andata? Apri "
+                               f"l'ordine nella Mini App e lascia un feedback.")
+                await notifica(o["venditore_id"],
+                               "↩️ Ordine annullato: i sats sono tornati per "
+                               "intero all'acquirente.")
+            else:
+                await notifica(o["compratore_id"],
+                               f"↩️ <b>Disputa risolta a tuo favore:</b> il rimborso di "
+                               f"<b>{_fmt_sats(importo)} sats</b> è in arrivo nel tuo wallet. "
+                               f"⭐ Com'è andata? Apri l'ordine nella Mini App e "
+                               f"lascia un feedback.")
+                await notifica(o["venditore_id"],
+                               "⚖️ La disputa è stata risolta a favore dell'acquirente: "
+                               "i sats gli sono stati rimborsati e l'annuncio è tornato "
+                               "in vetrina. ⭐ Puoi lasciare un feedback dall'ordine "
+                               "nella Mini App."
+                               + ("\n\n" + _coda_magazzino(magazzino)
+                                  if magazzino else ""))
             # Il polso dei moderatori: anche gli esiti storti contano
             await polso_ordini_admin(
-                f"↩️ <b>Ordine rimborsato al compratore:</b> «{titolo}» — "
+                f"↩️ <b>Ordine {'annullato dal venditore e ' if annullo else ''}"
+                f"rimborsato al compratore:</b> «{titolo}» — "
                 f"{_fmt_sats(importo)} sats. Restano {{aperti}} ordini aperti.")
             return {"ok": True, "stato": "refunded"}
 
@@ -52176,12 +52239,24 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                      int(time.time()), ordine_id))
         con.commit()
         con.close()
-        await notifica(
-            o["compratore_id"], _msg_ritentiamo(importo) if ritenta else
-            f"⚖️ <b>Disputa risolta a tuo favore!</b> Per ricevere il "
-            f"rimborso di <b>{_fmt_sats(importo)} sats</b>: apri l'ordine nella "
-            f"Mini App e imposta il tuo Lightning address, oppure "
-            f"incolla una invoice di esattamente quell'importo.")
+        if annullo and not ritenta:
+            # L'ANNULLO DEL VENDITORE: l'avviso di annulla_vendita ha
+            # gia' detto al compratore come ricevere i sats; qui si
+            # parla solo se la strada automatica C'ERA e non ha pagato
+            if c_utente and c_utente["ln_address"]:
+                await notifica(
+                    o["compratore_id"],
+                    f"↩️ <b>Il rimborso di {_fmt_sats(importo)} sats non è "
+                    f"partito</b> sul tuo Lightning address: apri l'ordine "
+                    f"nella Mini App e incolla una invoice di esattamente "
+                    f"quell'importo, o ricontrolla l'address nel Profilo.")
+        else:
+            await notifica(
+                o["compratore_id"], _msg_ritentiamo(importo) if ritenta else
+                f"⚖️ <b>Disputa risolta a tuo favore!</b> Per ricevere il "
+                f"rimborso di <b>{_fmt_sats(importo)} sats</b>: apri l'ordine nella "
+                f"Mini App e imposta il tuo Lightning address, oppure "
+                f"incolla una invoice di esattamente quell'importo.")
         # Il gemello del ramo di sopra: anche qui chi ha perso deve
         # saperlo, e una volta sola
         if o["disputata"] and primo_giro:
@@ -53130,6 +53205,288 @@ async def controlla_abbandonati():
             # si attarda che un pagamento perso di vista.
             print(f"⚠️ Ultimo sguardo sul pagamento #{p['id']} "
                   f"saltato: {e}")
+
+
+# ---------- L'ANNULLO DEL VENDITORE (1 ott 2026) ---------------------
+# Caso vero dal campo: un venditore aveva finito l'oggetto senza togliere
+# l'annuncio, piu' persone l'hanno comprato e pagato, e lui doveva
+# avvisarle a mano una per una perche' un ordine, da chi vende, non si
+# poteva annullare. Da oggi puo', finche' non ha spedito: i sats tornano
+# per intero al compratore (spedizione compresa) per la stessa strada dei
+# rimborsi di sempre (`_rimborsa_compratore`: Lightning address, poi la
+# fattura incollata), il compratore riceve subito un avviso col motivo, e
+# l'ordine passa a 'refund'/'refunded' — gli stati che esistono gia',
+# nessuno nuovo. Il MOTIVO e' una parola del catalogo, mai testo libero
+# da solo: «altro» vuole la nota. Con «esaurito» l'annuncio si mette in
+# pausa da solo (giacenza a zero: il 'venduto' di sempre, l'invariante
+# venduto <=> quantita=0 di ricarica_quantita), cosi' non lo compra
+# nessun altro. Il catalogo ha il suo gemello nel client
+# (MOTIVI_ANNULLO_VENDITORE in miniapp.html), sorvegliato in CI.
+MOTIVI_ANNULLO_VENDITORE = {
+    "esaurito": "Oggetto esaurito",
+    "spedizione": "Non posso spedire",
+    "altro": "Altro",
+}
+# Dal terzo annullo in trenta giorni i moderatori ricevono un avviso a
+# parte: NESSUN automatismo sulla reputazione (decisione di Andrea, 1 ott
+# 2026), solo un occhio umano che sa dove guardare. Il polso dice il
+# conto a ogni annullo, l'allarme scatta alla soglia.
+ANNULLI_VENDITORE_ALLARME = 3
+ANNULLI_VENDITORE_GIORNI = 30
+
+
+def _conta_annulli_venditore(con, venditore_id: int, adesso: int = 0) -> int:
+    """Quanti ordini PAGATI questo venditore ha annullato negli ultimi
+    ANNULLI_VENDITORE_GIORNI giorni: le righe che l'annullo ha portato
+    a 'refund'/'refunded' — quelle che hanno fatto tornare dei sats — e
+    non le lapidi degli ordini mai pagati, che il reaper spazza entro
+    un'ora e che non hanno fatto male a nessuno."""
+    adesso = adesso or int(time.time())
+    return con.execute(
+        "SELECT COUNT(*) AS n FROM ordini WHERE venditore_id=? "
+        "AND annullato_dal_venditore_il >= ? "
+        "AND stato IN ('refund','refunded')",
+        (venditore_id,
+         adesso - ANNULLI_VENDITORE_GIORNI * 86400)).fetchone()["n"]
+
+
+def _motivo_annullo(o) -> str:
+    """Il motivo dell'annullo del venditore, in parole: l'etichetta del
+    catalogo e — per «altro» — la nota, gia' scappata per i tubi HTML
+    delle notifiche (il patto del titolo in `polso_ordini_admin`)."""
+    motivo = _campo(o, "motivo_annullo")
+    testo = MOTIVI_ANNULLO_VENDITORE.get(motivo, "")
+    nota = (_campo(o, "nota_annullo") or "").strip()
+    if motivo == "altro" and nota:
+        testo = f"{testo}: {html.escape(nota[:200])}"
+    return testo or "senza motivo"
+
+
+def _pausa_esauriti(con, annunci: list) -> list:
+    """Gli annunci che chi vende ha dichiarato esauriti vanno in pausa:
+    quantita 0 e 'venduto' (l'invariante di ricarica_quantita, e quindi
+    card grigia, scaffale «Esauriti di recente», link vivo — tutto
+    gratis), le offerte vive decadono. `quantita_max` non si tocca: la
+    memoria dei pezzi attraversa la pausa, come nella ricarica a zero.
+    IDEMPOTENTE: un annuncio gia' in pausa non riparte, e torna solo i
+    PASSAGGI — [{annuncio_id, titolo, decadute}] — perche' le piazze si
+    avvisano di un cambiamento, non di uno stato."""
+    passaggi = []
+    for annuncio_id in annunci:
+        a = con.execute("SELECT stato, titolo FROM annunci WHERE id=?",
+                        (annuncio_id,)).fetchone()
+        if not a or a["stato"] != "attivo":
+            continue
+        con.execute("UPDATE annunci SET quantita=0, stato='venduto' "
+                    "WHERE id=?", (annuncio_id,))
+        passaggi.append({"annuncio_id": annuncio_id,
+                         "titolo": a["titolo"] or "",
+                         "decadute": _decadi_offerte_esaurito(con, annuncio_id)})
+    return passaggi
+
+
+def _avvisa_piazze_annullo(passaggi: list, tornati: list):
+    """Dopo il commit: le due piazze (Nostr e il canale) sanno chi e'
+    andato in pausa — ✅ Venduto, come nella ricarica a zero — e chi e'
+    tornato in vetrina; chi aveva offerto su un esaurito lo viene a
+    sapere. In sottofondo, come fanno ricarica_quantita e il rimborso."""
+    for p in passaggi:
+        asyncio.create_task(annuncio_su_nostr(p["annuncio_id"], "sold",
+                                              solo_aggiornamento=True))
+        asyncio.create_task(promo_venduto(p["annuncio_id"]))
+        if p["decadute"]:
+            asyncio.create_task(
+                _avvisa_offerte_esaurito(p["decadute"], p["titolo"]))
+    for annuncio_id in tornati:
+        asyncio.create_task(annuncio_su_nostr(annuncio_id, "active",
+                                              solo_aggiornamento=True))
+        asyncio.create_task(promo_venduto(annuncio_id, venduto=False))
+
+
+@app.post("/api/orders/{ordine_id}/annulla-vendita")
+async def annulla_vendita(ordine_id: int, req: Request,
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """IL VENDITORE ANNULLA (1 ott 2026; il cappello sta sopra
+    MOTIVI_ANNULLO_VENDITORE). Due porte, per lo stato:
+    - 'creato' (nessun sat mosso): la liturgia di `annulla_ordine` —
+      pagamento controllato PRIMA, CAS, LAPIDE 'annullato' e mai DELETE
+      — con l'offerta che DECADE invece di restare ripagabile: qui a
+      dire di no e' chi vende;
+    - 'locked' (sats in cassaforte, niente spedito): CAS a 'refund' col
+      timbro e il motivo, la merce sistemata — gli esauriti in pausa
+      riga per riga (anche nei set), il resto torna in vetrina — poi
+      l'avviso al compratore col motivo, il polso ai moderatori e il
+      rimborso per la strada di sempre.
+    Da 'shipped' in poi NO: un pacco in viaggio si chiude con la
+    consegna o con una disputa, non da qui. E a pagamento in volo verso
+    chi vende nemmeno (`_in_pagamento`).
+    LA MERCE SI SISTEMA ALL'ANNULLO, NON AL RIMBORSO, ed e' la differenza
+    con la disputa: li' lo stock risale quando i sats sono tornati (il
+    pacco e' tornato indietro intero), qui la merce non e' mai partita e
+    la decisione sulla giacenza e' di adesso — per questo
+    `_rimborsa_compratore` su un ordine annullato dal venditore NON
+    tocca lo stock, anche se il rimborso parte giorni dopo dalla fattura
+    incollata. Un annuncio 'rimosso' resta rimosso: in vetrina torna
+    solo chi era 'attivo' o 'venduto'."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    motivo = str(d.get("motivo") or "").strip()
+    if motivo not in MOTIVI_ANNULLO_VENDITORE:
+        raise HTTPException(400, "Scegli un motivo per l'annullo")
+    nota = str(d.get("nota") or "").strip()[:200] if motivo == "altro" else ""
+    if motivo == "altro" and len(nota) < 3:
+        raise HTTPException(400, "Con «Altro» servono due parole di motivo: "
+                                 "le legge l'acquirente")
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=?",
+                    (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if o["stato"] not in ("creato", "locked"):
+        con.close()
+        raise HTTPException(400, "Questo ordine non si può più annullare: "
+                                 "è già spedito o concluso. Se c'è un "
+                                 "problema, scrivi ai moderatori col numero "
+                                 "dell'ordine")
+    if _in_pagamento(o):
+        con.close()
+        raise HTTPException(409, _rifiuto_in_pagamento(o, "annullo"))
+    righe = _righe_ordine(con, o)
+    con.close()
+    # gli esauriti: nel mono e' l'unico pezzo, nel set li dice chi vende
+    # — e devono essere righe DI QUEST'ORDINE, mai un id a caso
+    esauriti = []
+    if motivo == "esaurito":
+        if len(righe) == 1:
+            esauriti = [righe[0]["annuncio_id"]]
+        else:
+            suoi = {r["annuncio_id"] for r in righe}
+            try:
+                detti = [int(x) for x in (d.get("esauriti") or [])]
+            except (TypeError, ValueError):
+                detti = []
+            esauriti = [x for x in dict.fromkeys(detti) if x in suoi]
+            if not esauriti:
+                raise HTTPException(400, "Dimmi quale pezzo del set è "
+                                         "esaurito")
+    adesso = int(time.time())
+    titolo = html.escape(_titolo_ordine(righe)[:60])
+    motivo_testo = MOTIVI_ANNULLO_VENDITORE[motivo] + (
+        f": {html.escape(nota)}" if nota else "")
+    esauriti_colonna = ",".join(str(x) for x in esauriti)
+
+    if o["stato"] == "creato":
+        # la liturgia di annulla_ordine: la fattura puo' essere ancora
+        # viva nel wallet del compratore, quindi PRIMA si guarda se e'
+        # stata pagata — e allora l'ordine va avanti, e si annulla da
+        # pagato, coi sats che tornano
+        if o["payment_hash"] and await invoice_pagata(o["payment_hash"],
+                                                      o["cassaforte"]):
+            raise HTTPException(409, "Il pagamento è appena arrivato: fra "
+                                     "un attimo l'ordine risulterà pagato e "
+                                     "potrai annullarlo da lì, coi sats che "
+                                     "tornano all'acquirente")
+        con = db()
+        cur = con.execute(
+            "UPDATE ordini SET stato='annullato', "
+            "annullato_dal_venditore_il=?, motivo_annullo=?, nota_annullo=?, "
+            "esauriti_annullo=?, aggiornato=? WHERE id=? AND stato='creato'",
+            (adesso, motivo, nota, esauriti_colonna, adesso, ordine_id))
+        if cur.rowcount == 0:
+            con.commit()
+            con.close()
+            raise HTTPException(409, "Il pagamento è arrivato proprio adesso: "
+                                     "ricarica e annulla dall'ordine pagato")
+        # l'offerta dietro l'ordine DECADE — non resta ripagabile come
+        # nell'annullo del compratore, perche' qui a dire di no e' chi
+        # vende. Le righe dei set restano: la lapide puo' essere
+        # riacciuffata da un saldo tardivo, come sempre.
+        con.execute("UPDATE offerte SET ordine_id=0, stato='decaduta', "
+                    "aggiornato=? WHERE ordine_id=?", (adesso, ordine_id))
+        passaggi = _pausa_esauriti(con, esauriti)
+        con.commit()
+        con.close()
+        _avvisa_piazze_annullo(passaggi, [])
+        await notifica(
+            o["compratore_id"],
+            f"✖️ <b>Il venditore ha annullato il tuo ordine «{titolo}»</b> "
+            f"prima del pagamento — motivo: {motivo_testo}. Non pagare la "
+            f"fattura: nessun sat è stato trattenuto. (Se l'avevi appena "
+            f"pagata, l'ordine riparte da solo e ti avviso.)")
+        return {"ok": True, "stato": "annullato"}
+
+    # 'locked': i sats sono in cassaforte e tornano per intero
+    con = db()
+    cur = con.execute(
+        "UPDATE ordini SET stato='refund', annullato_dal_venditore_il=?, "
+        "motivo_annullo=?, nota_annullo=?, esauriti_annullo=?, aggiornato=? "
+        "WHERE id=? AND stato='locked'",
+        (adesso, motivo, nota, esauriti_colonna, adesso, ordine_id))
+    if cur.rowcount == 0:
+        con.commit()
+        con.close()
+        raise HTTPException(409, "L'ordine è cambiato proprio adesso: "
+                                 "ricarica la pagina e riprova")
+    # LA MERCE: gli esauriti in pausa, il resto torna in vetrina —
+    # incremento RELATIVO col MAX che sale, come nel rimborso di una
+    # disputa, e mai su un annuncio 'rimosso'
+    tornati = []
+    for r in righe:
+        if r["annuncio_id"] in esauriti:
+            continue
+        a = con.execute("SELECT stato FROM annunci WHERE id=?",
+                        (r["annuncio_id"],)).fetchone()
+        if not a or a["stato"] not in ("attivo", "venduto"):
+            continue
+        con.execute("UPDATE annunci SET quantita=quantita+?, "
+                    "quantita_max=MAX(quantita_max,quantita+?), "
+                    "stato='attivo' WHERE id=?",
+                    (r["quantita"], r["quantita"], r["annuncio_id"]))
+        tornati.append(r["annuncio_id"])
+    passaggi = _pausa_esauriti(con, esauriti)
+    # il registro dei negozi collegati si rimette in pari SOLO sulle
+    # righe tornate in vetrina: un pezzo dichiarato esaurito di la' non
+    # c'e', e rimetterglielo nel conto sarebbe una bugia
+    registra_uscita_negozio(
+        con, ordine_id,
+        [r for r in righe if r["annuncio_id"] not in esauriti], "rimborso")
+    n_annulli = _conta_annulli_venditore(con, o["venditore_id"], adesso)
+    con.commit()
+    con.close()
+    _avvisa_piazze_annullo(passaggi, tornati)
+    importo = o["prezzo_sats"]
+    # L'AVVISO AL COMPRATORE PARTE SUBITO E SEMPRE, prima di provare a
+    # pagare: se il rimborso resta in volo o aspetta un metodo, lui deve
+    # sapere comunque che l'ordine e' saltato e perche'
+    await notifica(
+        o["compratore_id"],
+        f"✖️ <b>Il venditore ha annullato il tuo ordine «{titolo}»</b> — "
+        f"motivo: {motivo_testo}. I tuoi <b>{_fmt_sats(importo)} sats</b> "
+        f"tornano per intero, spedizione compresa: se hai un Lightning "
+        f"address arrivano da soli, altrimenti apri l'ordine nella Mini "
+        f"App e scegli come riceverli.")
+    # IL POLSO DICE IL CONTO, e alla soglia parte l'allarme: e' cosi' che
+    # un venditore che annulla spesso si vede, senza toccare la
+    # reputazione da soli
+    await polso_ordini_admin(
+        f"✖️ <b>Ordine annullato dal venditore:</b> «{titolo}» — "
+        f"{_fmt_sats(importo)} sats, motivo: {motivo_testo}. È il "
+        f"{n_annulli}° annullo di questo venditore in "
+        f"{ANNULLI_VENDITORE_GIORNI} giorni. Restano {{aperti}} ordini aperti.")
+    if n_annulli >= ANNULLI_VENDITORE_ALLARME:
+        try:
+            await notifica_admin(
+                f"⚠️ <b>Un venditore ha annullato {n_annulli} ordini pagati "
+                f"in {ANNULLI_VENDITORE_GIORNI} giorni</b> (l'ultimo: "
+                f"«{titolo}», ordine #{ordine_id}). Nessun automatismo sulla "
+                f"reputazione: dagli un'occhiata dal suo profilo.")
+        except Exception as e:
+            print(f"⚠️ Allarme annulli del venditore non partito: {e}")
+    esito = await _rimborsa_compratore(ordine_id)
+    return {"ok": True, "stato": esito.get("stato", "refund"),
+            "rimborso": esito}
 
 
 @app.post("/api/orders/{ordine_id}/annulla")

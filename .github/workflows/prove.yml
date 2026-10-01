@@ -106,6 +106,7 @@ jobs:
              collaudo_quantita_servizi.py
              collaudo_pionieri.py
              collaudo_contanti_p2p.py schnorr_puro.py
+             collaudo_annullo_venditore.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
@@ -183,6 +184,7 @@ jobs:
              collaudo_nuova_fattura
              collaudo_classifica
              collaudo_quantita_servizi
+             collaudo_annullo_venditore
              collaudo_pionieri
              collaudo_contanti_p2p
 

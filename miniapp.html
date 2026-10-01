@@ -12312,6 +12312,24 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
+  <!-- ============ SHEET ANNULLA L'ORDINE, LATO VENDITORE (1 ott 2026) ============
+       Chi vende chiude un ordine non ancora spedito: il motivo e' una
+       voce del catalogo (le stesse parole del server, sorvegliate in
+       CI), «Altro» vuole due parole, e nei set «esaurito» chiede QUALE
+       pezzo. Questo foglio e' la prima conferma; la seconda e' il
+       foglio di casa (chiediConferma), col motivo ripetuto — e per
+       questo sta PRIMA di #confermaSheet nel DOM: fra due fogli aperti
+       copre chi viene dopo, e la seconda domanda deve stare sopra
+       (visto dal vivo: messo dopo, restava nascosto sotto questo). Il
+       corpo lo scrive markupAnnullaVendita() a ogni scelta. -->
+  <div class="sheet" id="annullaVenditaSheet" role="dialog" aria-modal="true" aria-labelledby="annullaVenditaTit">
+    <div class="grab"></div>
+    <h3 id="annullaVenditaTit">✖️ Annulli l'ordine?</h3>
+    <div id="annullaVenditaCorpo"></div>
+    <button class="btn orange" id="annullaVenditaOk" style="margin-top:12px" onclick="confermaAnnullaVendita(this)">✖️ Annulla l'ordine</button>
+    <button class="btn ghost" onclick="navIndietro()">Indietro</button>
+  </div>
+
   <!-- ============ SHEET CONFERMA (ago 2026) ============
        LA DOMANDA, una volta sola. Nasce col ritiro dell'offerta e
        serve subito anche accetta e rifiuta: tre fogli quasi identici
@@ -13979,6 +13997,13 @@ function mapOrder(o){
        disputa risolta, ed e' cio' che rende un ordine finito in
        'confirmed'/'refund' ancora DECIDIBILE da un moderatore */
     disputata:o.disputata||0,
+    /* L'ANNULLO DEL VENDITORE (1 ott 2026): quando chi vende ha chiuso
+       l'ordine (0 = mai), il motivo del catalogo e la nota di «altro».
+       Si legge SOLO insieme allo stato (annulloVenditore): un ordine
+       riacciuffato da un saldo tardivo porta ancora il timbro ma e' un
+       ordine normale. */
+    annullatoDalVenditore:o.annullato_dal_venditore_il||0,
+    motivoAnnullo:o.motivo_annullo||'', notaAnnullo:o.nota_annullo||'',
     /* LA PORTA DEL TIMER (ago 2026): quando uno sblocco AUTOMATICO e'
        passato di qui (0 = mai). Su 'confirmed' dice che a chiudere
        l'affare e' stato il TEMPO e non una persona */
@@ -29498,6 +29523,11 @@ async function copiaNumeroOrdine(id){
 function verboOrdine(o){
   if (o.role === 'admin') return '⚖️ Da moderare';
   const compra = o.role === 'buyer';
+  /* L'ANNULLO DEL VENDITORE (1 ott 2026) si legge gia' dalla card, da
+     tutti e due i lati: e' lo storico che chi vende si porta dietro, e
+     a chi compra dice CHI ha chiuso l'affare prima ancora di aprirlo */
+  if (annulloVenditore(o))
+    return compra ? 'Annullato dal venditore' : 'Hai annullato la vendita';
   if (o.state === 'released') return compra ? 'Hai comprato' : 'Hai venduto';
   if (CONCLUSI.includes(o.state))
     return compra ? 'Acquisto non concluso' : 'Vendita non conclusa';
@@ -29753,6 +29783,23 @@ function openOrder(id){
        qui e si dimentica questa riga accende il pallino sul passo
        sbagliato, che e' un difetto che non si vede leggendo. */
     progress = {dispute:2, return_pending:2, return_shipped:2, refund:3, refunded:4}[s]
+    /* L'ANNULLO DEL VENDITORE (1 ott 2026) racconta un'altra storia con
+       gli stessi stati: nessuna disputa, nessun moderatore, nessun
+       pacco — il deposito, il gesto di chi vende col suo motivo, i sats
+       che tornano. Si SOSTITUISCE la storia della disputa invece di
+       ritoccarla passo per passo: il tracciamento qui non esiste (non
+       si annulla da spedito), e `progress` segue i tre passi. */
+    if (annulloVenditore(o)) {
+      steps = [
+        passoDeposito,
+        {t:o.role==='seller' ? 'Hai annullato l\'ordine' : 'Il venditore ha annullato l\'ordine',
+         d:`Motivo: ${esc(motivoAnnulloTesto(o))}`},
+        o.role==='buyer'
+          ? {t:'Ti abbiamo rimborsato i sats', d:'Rimborso integrale, spedizione compresa'}
+          : {t:'Sats rimborsati all\'acquirente', d:'Rimborso integrale, spedizione compresa'},
+      ];
+      progress = {refund:1, refunded:2}[s];
+    }
              + (o.tracking ? 1 : 0);
   } else {
     /* la finestra di conferma del digitale e' corta: il codice si
@@ -29844,10 +29891,16 @@ function openOrder(id){
                           : 'I sats sono stati consegnati al venditore'}
     : s==='refunded'            ? {ic:'↩️', b:'Deposito rimborsato',
       d:o.role==='buyer'  ? `Ti abbiamo rimborsato ${cifraOrdine(o, o.listing.price)} (integrale)`
+       :annulloVenditore(o) ? 'Hai annullato l\'ordine: i sats sono tornati all\'acquirente'
                           : 'I sats sono tornati all\'acquirente'}
+    /* L'ANNULLO DEL VENDITORE (1 ott 2026): gli stessi due stati del
+       rimborso, ma nessuno ha vinto niente — lo dice la testa */
     : s==='refund'              ? {ic:'↩️', b:'Rimborso in corso',
-      d:o.role==='buyer'  ? 'Disputa vinta! Scegli qui sotto come ricevere i tuoi sats'
-                          : 'Disputa decisa: i sats tornano all\'acquirente'}
+      d:annulloVenditore(o)
+        ? (o.role==='buyer' ? 'Il venditore ha annullato: scegli qui sotto come ricevere i tuoi sats'
+                            : 'Hai annullato l\'ordine: i sats tornano all\'acquirente')
+        : (o.role==='buyer' ? 'Disputa vinta! Scegli qui sotto come ricevere i tuoi sats'
+                            : 'Disputa decisa: i sats tornano all\'acquirente')}
     : ['return_pending','return_shipped'].includes(s)
       /* IL RESO E' UN GESTO, e finche' non e' partito e' di chi ha
          comprato: la riga diceva «Rimborso alla restituzione: i sats
@@ -29869,7 +29922,10 @@ function openOrder(id){
                                                          : 'I tuoi sats stanno arrivando')
                           : 'Barattolo sta consegnando i sats al venditore'}
     : s==='dispute'             ? {ic:'⚖️', b:'Deposito congelato', d:'Disputa in corso: i sats restano fermi fino alla decisione'}
-    : s==='annullato'           ? {ic:'✖️', b:'Ordine annullato',   d:'Nessun pagamento è stato trattenuto'}
+    : s==='annullato'           ? {ic:'✖️', b:'Ordine annullato',
+      d:!annulloVenditore(o) ? 'Nessun pagamento è stato trattenuto'
+       :o.role==='seller' ? 'Hai annullato prima del pagamento: nessun sat trattenuto'
+                          : 'Il venditore l\'ha annullato prima del pagamento: nessun sat trattenuto'}
     /* DA PAGARE NON E' «AL SICURO» (24 set 2026, dal campo): la riga
        qui sotto era il ripiego di TUTTI gli stati senza una testa sua,
        'creato' compreso — e a chi non aveva ancora pagato diceva che i
@@ -30025,7 +30081,7 @@ function openOrder(id){
           <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore', this)">⚡ Dai i sats al venditore</button>
         </div>`:''}
       ${o.role==='buyer' && s==='refund' ? refundPanel(o) : ''}
-      ${o.role==='buyer' && s==='refunded' ? `<div class="trust-note">↩️ <span>Disputa risolta a tuo favore: il <b>rimborso integrale</b> è stato inviato al tuo wallet.</span></div>`:''}
+      ${o.role==='buyer' && s==='refunded' ? `<div class="trust-note">↩️ <span>${annulloVenditore(o) ? 'Il venditore ha annullato l\'ordine' : 'Disputa risolta a tuo favore'}: il <b>rimborso integrale</b> è stato inviato al tuo wallet.</span></div>`:''}
       ${o.role==='buyer' && s==='return_pending' ? `
         <div class="payout">
           <h4>↩️ Rispedisci l'oggetto per il rimborso</h4>
@@ -30132,6 +30188,13 @@ function openOrder(id){
       ${pannelloServizioCompratore(o)}
       ${o.role==='buyer' && s==='creato' ? pannelloDaPagare(o)
         + `<button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>` : ''}
+      ${/* L'ANNULLO DEL VENDITORE (1 ott 2026): finche' non ha spedito
+            — in attesa del pagamento o coi sats gia' in cassaforte — e
+            mai a pagamento in volo. Da 'shipped' in poi il bottone non
+            c'e': un pacco in viaggio si chiude con la consegna o con
+            una disputa. Foglio del motivo + conferma di casa: due
+            domande, perche' muove sats e non si torna indietro. */''}
+      ${o.role==='seller' && ['creato','locked'].includes(s) && !inPagamento(o) ? `<button class="btn danger-ghost" onclick="apriAnnullaVendita()">✖️ Annulla l'ordine</button>` : ''}
       ${!inPagamento(o) && o.role==='seller' && s==='shipped' ? `<button class="btn ghost" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${notaTrackingSbagliato(o, s)}
       ${o.role==='buyer' && s==='delivered' && !inPagamento(o) ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
@@ -35453,17 +35516,23 @@ async function rimuoviNpub(){
 
 /* ---- pannello rimborso dell'acquirente (disputa vinta) ---- */
 function refundPanel(o){
+  /* L'ANNULLO DEL VENDITORE (1 ott 2026): stesso pannello, altra
+     ragione — nessuna disputa vinta, un affare saltato per mano di chi
+     vende */
+  const perche = annulloVenditore(o)
+    ? `Il venditore ha annullato l'ordine (${esc(motivoAnnulloTesto(o))})`
+    : 'Hai vinto la disputa';
   if (myLnAddress) return `
     <div class="payout">
       <h4>↩️ Rimborso in elaborazione</h4>
-      <div class="hint">Hai vinto la disputa: <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> in arrivo su <b>${esc(myLnAddress)}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
+      <div class="hint">${perche}: <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> in arrivo su <b>${esc(myLnAddress)}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
       <textarea id="sellerInvoice" placeholder="lnbc… (invoice di ${fmt(o.listing.price)} sats)"></textarea>
       <button class="btn orange" onclick="saveSellerInvoice(this)">↩️ Ricevi il rimborso</button>
     </div>`;
   return `
     <div class="payout">
       <h4>↩️ Ricevi il tuo rimborso</h4>
-      <div class="hint">La disputa è stata risolta <b>a tuo favore</b>: ti aspettano <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> (rimborso integrale).
+      <div class="hint">${annulloVenditore(o) ? `${perche}` : 'La disputa è stata risolta <b>a tuo favore</b>'}: ti aspettano <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> (rimborso integrale${annulloVenditore(o) ? ', spedizione compresa' : ''}).
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address per riceverli subito (e per tutti gli incassi futuri).</div>
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
       <button class="btn orange" onclick="saveLnAddress(this)">⚡ Ricevi con Lightning address</button>
@@ -35739,6 +35808,136 @@ async function annullaOrdine(){
       await loadOrders(); renderOrders();
       toast('✖️ Ordine annullato'); go('affari');
     }});
+}
+
+/* ---- L'ANNULLO DEL VENDITORE (1 ott 2026) ----
+   Il gemello lato client di annulla_vendita: un ordine non ancora
+   spedito si chiude da chi vende, coi sats che tornano per intero a
+   chi compra. Le funzioni PURE (annulloVenditore, motivoAnnulloTesto,
+   markupAnnullaVendita, corpoAnnullaVendita) si provano in node; le
+   altre toccano il DOM e la rete. */
+/* Il catalogo dei motivi, gemello di MOTIVI_ANNULLO_VENDITORE del
+   server (la parita' e' sorvegliata in CI): le parole che legge
+   l'acquirente nell'avviso e nell'ordine. */
+const MOTIVI_ANNULLO_VENDITORE = {
+  esaurito: 'Oggetto esaurito',
+  spedizione: 'Non posso spedire',
+  altro: 'Altro',
+};
+/* PURA: e' stato CHI VENDE a chiudere l'ordine? Vale solo insieme allo
+   stato — i sats che tornano (refund/refunded) o mai pagato
+   (annullato): un ordine riacciuffato da un saldo tardivo porta ancora
+   il timbro ma e' un ordine normale, e qui risponde no. */
+function annulloVenditore(o){
+  return !!(o && o.annullatoDalVenditore
+            && ['refund','refunded','annullato'].includes(o.state));
+}
+/* PURA: il motivo in parole, con la nota di «altro». Testo NUDO: chi lo
+   mette nel markup lo scappa. */
+function motivoAnnulloTesto(o){
+  const base = MOTIVI_ANNULLO_VENDITORE[o.motivoAnnullo] || 'senza motivo';
+  return (o.motivoAnnullo === 'altro' && o.notaAnnullo)
+    ? `${base}: ${o.notaAnnullo}` : base;
+}
+let motivoAnnulloScelto = '';
+/* PURA: il corpo del foglio — la frase sui sats, le tre voci (quella
+   scelta evidenziata, nella veste del picker di casa), la nota per
+   «altro», e nei set la lista dei pezzi per «esaurito». */
+function markupAnnullaVendita(o, motivo){
+  const pagato = o.state !== 'creato';
+  const righe = (o.righe && o.righe.length > 1) ? o.righe : [];
+  const intro = pagato
+    ? `I <b>${fmt(o.listing.price)} sats</b> depositati tornano <b>per intero</b> all'acquirente, spedizione compresa, e lui riceve subito un avviso col motivo. L'annullo resta nel tuo storico.`
+    : `L'acquirente non ha ancora pagato: l'ordine si chiude e lui riceve subito un avviso col motivo.`;
+  return `<div class="hint" style="margin-bottom:8px">${intro}</div>
+    <div class="picker-lista" role="radiogroup" aria-label="Motivo dell'annullo">${Object.entries(MOTIVI_ANNULLO_VENDITORE).map(([k,v]) =>
+      `<button type="button" role="radio" aria-checked="${k===motivo}" class="picker-voce${k===motivo?' sel':''}" onclick="scegliMotivoAnnullo('${k}')">${esc(v)}${k===motivo?'<span class="p-check">✓</span>':''}</button>`).join('')}</div>
+    ${motivo==='esaurito' && righe.length ? `<div class="hint">Quale pezzo è esaurito? Quelli non segnati tornano in vetrina.</div>
+      <div id="annullaEsauriti">${righe.map(r => `<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:700;margin-top:6px;cursor:pointer"><input type="checkbox" value="${r.annuncio_id}" style="margin-top:2px"> <span>${esc(r.titolo)}</span></label>`).join('')}</div>` : ''}
+    ${motivo==='esaurito' && !righe.length ? `<div class="hint">L'annuncio va in pausa da solo (giacenza a zero): nessun altro potrà comprarlo finché non lo ricarichi.</div>` : ''}
+    ${motivo==='altro' ? `<div class="field" style="margin-top:8px"><textarea id="annullaNota" rows="2" maxlength="200" autocomplete="off" style="width:100%;resize:vertical;font:inherit;font-size:14px" placeholder="Due parole per l'acquirente (le legge lui)"></textarea></div>` : ''}`;
+}
+/* PURA: il corpo della richiesta al server, o la frase che dice cosa
+   manca — la stessa porta del server, detta prima e meglio. */
+function corpoAnnullaVendita(o, motivo, nota, esauriti){
+  if (!MOTIVI_ANNULLO_VENDITORE[motivo]) return {errore: 'Scegli un motivo'};
+  nota = (nota || '').trim();
+  if (motivo === 'altro' && nota.length < 3)
+    return {errore: 'Con «Altro» servono due parole per l\'acquirente'};
+  const set = !!(o.righe && o.righe.length > 1);
+  if (motivo === 'esaurito' && set && !(esauriti || []).length)
+    return {errore: 'Segna quale pezzo è esaurito'};
+  return {corpo: {motivo, nota: motivo === 'altro' ? nota : '',
+                  esauriti: (motivo === 'esaurito' && set) ? esauriti.map(Number) : []}};
+}
+function apriAnnullaVendita(){
+  haptic();
+  const o = currentOrder; if (!o) return;
+  motivoAnnulloScelto = '';
+  el('annullaVenditaTit').textContent = o.state === 'creato'
+    ? '✖️ Annulli l\'ordine non pagato?' : '✖️ Annulli l\'ordine?';
+  disegnaAnnullaVendita();
+  el('sheetBg').classList.add('open');
+  el('annullaVenditaSheet').classList.add('open');
+}
+function disegnaAnnullaVendita(){
+  /* la nota scritta e le spunte sopravvivono al ridisegno delle voci */
+  const nota = el('annullaNota') ? el('annullaNota').value : '';
+  const spunte = [...document.querySelectorAll('#annullaEsauriti input:checked')].map(i => i.value);
+  el('annullaVenditaCorpo').innerHTML = markupAnnullaVendita(currentOrder, motivoAnnulloScelto);
+  if (el('annullaNota')) el('annullaNota').value = nota;
+  spunte.forEach(v => {
+    const i = document.querySelector(`#annullaEsauriti input[value="${v}"]`);
+    if (i) i.checked = true;
+  });
+  el('annullaVenditaOk').disabled = !motivoAnnulloScelto;
+}
+function scegliMotivoAnnullo(m){ haptic(); motivoAnnulloScelto = m; disegnaAnnullaVendita(); }
+function confermaAnnullaVendita(btn){
+  const o = currentOrder; if (!o) return;
+  const r = corpoAnnullaVendita(o, motivoAnnulloScelto,
+    el('annullaNota') ? el('annullaNota').value : '',
+    [...document.querySelectorAll('#annullaEsauriti input:checked')].map(i => i.value));
+  if (r.errore) { toast(r.errore); return; }
+  const motivo = MOTIVI_ANNULLO_VENDITORE[motivoAnnulloScelto]
+    + (r.corpo.nota ? `: ${r.corpo.nota}` : '');
+  /* LA SECONDA CONFERMA e' il foglio di casa, col motivo ripetuto: il
+     gesto muove sats e non si torna indietro. `poi` RESTITUISCE la
+     promessa (la lezione del velo P2P): eseguiConferma l'aspetta. */
+  chiediConferma({
+    titolo: 'Confermi l\'annullo?',
+    corpo: (o.state === 'creato'
+      ? 'L\'ordine si chiude e l\'acquirente riceve l\'avviso.'
+      : `I ${fmt(o.listing.price)} sats tornano all'acquirente e l'ordine si chiude: non si torna indietro.`)
+      + ` Motivo: ${motivo}`,
+    etichetta: 'Sì, annulla l\'ordine', indietro: 'Indietro',
+    poi: () => inviaAnnullaVendita(o.id, r.corpo)});
+}
+async function inviaAnnullaVendita(id, corpo){
+  el('annullaVenditaSheet').classList.remove('open');
+  if (!document.querySelector('.sheet.open')) el('sheetBg').classList.remove('open');
+  if (DEMO) {
+    const o = orders.find(x => x.id === id);
+    if (o) { o.state = o.state === 'creato' ? 'annullato' : 'refunded';
+             o.annullatoDalVenditore = Math.floor(Date.now()/1000);
+             o.motivoAnnullo = corpo.motivo; o.notaAnnullo = corpo.nota; }
+    renderOrders(); openOrder(id); toast('✖️ Ordine annullato'); return;
+  }
+  try {
+    const r = await fetch(`${API_BASE}/orders/${id}/annulla-vendita`, {method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify(corpo)});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Annullo non riuscito', 6000); return; }
+    await loadOrders(); renderOrders();
+    /* la lapide di un ordine mai pagato non si vede in lista: si torna
+       agli ordini, come fa l'annullo di chi compra */
+    if (d.stato === 'annullato') { toast('✖️ Ordine annullato: l\'acquirente è avvisato'); go('affari'); return; }
+    openOrder(id);
+    toast(d.stato === 'refunded'
+      ? '✖️ Ordine annullato: i sats sono tornati all\'acquirente'
+      : '✖️ Ordine annullato: l\'acquirente è avvisato e sceglie come ricevere i sats', 6000);
+  } catch(e) { toast('Rete assente: riprova'); }
 }
 
 const CORRIERI = ['Poste Italiane','BRT','GLS','SDA','DHL','UPS','InPost',

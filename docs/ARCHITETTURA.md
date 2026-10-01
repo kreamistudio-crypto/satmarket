@@ -1156,6 +1156,63 @@
   consegna in compra() sta ora PRIMA del fail-fast dello stock: la
   ripresa confronta la scelta.) I set restano fuori dalla ripresa,
   dichiarato.
+  L'ANNULLO DEL VENDITORE (1 ott 2026, caso vero dal campo: un oggetto
+  finito senza togliere l'annuncio, più compratori che avevano già
+  pagato, e chi vende che doveva avvisarli a mano uno per uno). Rotta
+  `POST /api/orders/{id}/annulla-vendita` (`annulla_vendita`), SOLO per
+  il venditore e SOLO finché non ha spedito: 'creato' e 'locked', mai da
+  'shipped' in poi (un pacco in viaggio si chiude con la consegna o con
+  una disputa) e mai a pagamento in volo verso chi vende
+  (`_in_pagamento`, 409). Il MOTIVO è una parola del catalogo
+  `MOTIVI_ANNULLO_VENDITORE` (esaurito, spedizione, altro — col gemello
+  nel client, parità sorvegliata in CI); «altro» vuole la nota (3-200
+  caratteri), che viaggia scappata. NESSUNO STATO NUOVO: su 'creato' è la
+  liturgia di `annulla_ordine` (pagamento controllato PRIMA, CAS, LAPIDE
+  'annullato', mai DELETE) con l'offerta che DECADE invece di restare
+  ripagabile; su 'locked' un CAS a 'refund' col timbro
+  (`annullato_dal_venditore_il`, `motivo_annullo`, `nota_annullo`,
+  `esauriti_annullo`, quattro colonne nella migrazione di sempre), poi
+  `_rimborsa_compratore` per la strada dei rimborsi: Lightning address,
+  altrimenti la fattura incollata da `deposita_invoice` a 'refund'. LA
+  MERCE SI SISTEMA ALL'ANNULLO, NON AL RIMBORSO, ed è la differenza con
+  la disputa: lì lo stock risale quando i sats sono tornati (il pacco è
+  tornato indietro intero), qui non è mai partita e si decide adesso —
+  gli esauriti vanno in pausa (`_pausa_esauriti`: quantità 0 e 'venduto',
+  l'invariante di `ricarica_quantita`, `quantita_max` intatto, offerte
+  decadute dal giudice unico `_decadi_offerte_esaurito`, che da quel
+  giorno serve anche la ricarica a zero), il resto torna in vetrina col
+  MAX, mai un 'rimosso'; nei set riga per riga (`esauriti` è la lista
+  degli id, e deve essere di quell'ordine). Per questo
+  `_rimborsa_compratore` su un ordine col timbro (`annullo`, letto con
+  `keys()` perché i banchi montano tabelle più strette) NON tocca lo
+  stock né il registro dei negozi, anche se paga giorni dopo; il registro
+  (`registra_uscita_negozio`, "rimborso") si rimette in pari solo sulle
+  righe tornate. GLI AVVISI: al compratore SUBITO e SEMPRE, prima di
+  provare a pagare — chi, cosa, perché, quanto, «per intero, spedizione
+  compresa» e come riceverli —, poi le parole dell'annullo al posto di
+  quelle della disputa quando i sats partono («Rimborso dell'ordine
+  annullato»), e nel ramo senza metodo si tace (l'avviso dell'annullo ha
+  già detto come fare) salvo quando l'address c'era e non ha pagato. AGLI
+  ABUSI SI GUARDA SENZA AUTOMATISMI (decisione di Andrea): il polso dei
+  moderatori dice il conto (`_conta_annulli_venditore`: gli annulli
+  PAGATI in 30 giorni, refund/refunded, non le lapidi) e dal terzo
+  (`ANNULLI_VENDITORE_ALLARME`) parte un avviso a parte; la reputazione
+  non si tocca, il feedback del compratore resta il suo. Nel client:
+  `annulloVenditore(o)` (timbro E stato fra refund/refunded/annullato: un
+  ordine riacciuffato da un saldo tardivo porta ancora il timbro ma è un
+  ordine normale), `motivoAnnulloTesto`, il bottone «✖️ Annulla l'ordine»
+  (seller, creato/locked, mai in pagamento), il foglio
+  `#annullaVenditaSheet` (voci del picker di casa, nota per «altro»,
+  spunte dei pezzi nei set; `markupAnnullaVendita` e
+  `corpoAnnullaVendita` sono PURE e si provano in node) che sta PRIMA di
+  `#confermaSheet` nel DOM perché la seconda conferma — `chiediConferma`
+  col motivo ripetuto, `poi` che restituisce la promessa — deve stare
+  sopra; la testa, la storia della cassaforte (deposito, annullo col
+  motivo, rimborso: sostituisce quella della disputa) e il pannello del
+  rimborso dicono «il venditore ha annullato» invece di «disputa vinta»;
+  `verboOrdine` sulla card: «Hai annullato la vendita» / «Annullato dal
+  venditore». Il compratore NON annulla ancora un ordine pagato: resta
+  da decidere (CANTIERI, «Il venditore può annullare un ordine»).
   E NESSUNA RIGA SI CANCELLA SENZA AVER CHIESTO A LNBITS (ago 2026):
   è l'invariante, ed è la stessa regola delle lapidi arrivata fino in
   fondo. Il reaper buttava via gli ordini 'creato' scaduti con un

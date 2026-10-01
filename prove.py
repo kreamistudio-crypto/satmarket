@@ -12554,8 +12554,10 @@ def prove_dettaglio_ordine():
           "'Sats nel deposito di garanzia'" in det)
     prova("la riga sotto resta vera per tutti e due", True,
           "d: 'Il pagamento è custodito dalla piattaforma'" in det)
+    # TRE dal 1 ott 2026: la storia dell'annullo del venditore (dentro il
+    # ramo della disputa, che sostituisce) comincia dallo stesso passo
     prova("e la dicono ENTRAMBI i rami del riquadro (disputa compresa)",
-          2, det.count("passoDeposito,"))
+          3, det.count("passoDeposito,"))
 
     # ---- IL TRACCIAMENTO NON SPARISCE QUANDO SERVE (ago 2026, dal
     # campo: su un ordine SDA da 9 cifre il codice non lo vedeva piu'
@@ -17739,27 +17741,36 @@ def prove_pausa():
 
     # ---- 25-31: le offerte ----------------------------------------
     TRE = "('proposta','controproposta','accettata')"
+    # HA CAMBIATO CASA (1 ott 2026, l'annullo del venditore): il blocco
+    # che decade le offerte vive dentro `_decadi_offerte_esaurito`, un
+    # giudice unico con DUE chiamanti — la ricarica a zero e la pausa
+    # dell'annullo per «esaurito». Le sentinelle guardano il giudice, e
+    # la ricarica deve CHIAMARLO dal ramo della pausa, prima del commit.
+    dec = solo_codice(corpo("_decadi_offerte_esaurito"))
     prova("le offerte vive si leggono sui tre stati", True,
-          f"AND stato IN {TRE}" in ric)
+          f"AND stato IN {TRE}" in dec)
     # HA CAMBIATO LATO (ago 2026, l'offerta sul carrello): le
     # occorrenze erano due — la SELECT delle vive e l'UPDATE che le
     # decade — e sono diventate TRE con la SELECT delle offerte di
     # CARRELLO che contengono il pezzo in pausa: anche loro decadono,
     # la composizione non e' piu' onorabile.
     prova("...e decadono sugli stessi tre", True,
-          f"stato='decaduta'" in ric and ric.count(TRE) == 3)
+          f"stato='decaduta'" in dec and dec.count(TRE) == 3)
     prova("la decadenza sta DENTRO il ramo della pausa", True,
-          prima(ric, "if esaurito_ora:", "stato='decaduta'"))
+          "_decadi_offerte_esaurito(con, annuncio_id) if esaurito_ora else []"
+          in ric and "stato='decaduta'" not in ric)
     prova("...e PRIMA del commit (una transazione sola)", True,
-          prima(ric, "stato='decaduta'", "con.commit()"))
+          prima(ric, "_decadi_offerte_esaurito(", "con.commit()"))
     avv = solo_codice(corpo("_avvisa_offerte_esaurito"))
     prova("il titolo dell'avviso nasce scappato", True,
           "html.escape(" in avv)
     prova("l'avviso non dice la bugia della vendita", False,
           "qualcun altro" in avv)
     prova("...ne' quella della vetrina", False, "in vetrina" in avv)
-    # la definizione piu' UNA chiamata sola: due occorrenze in tutto
-    prova("e parte solo dal ramo della pausa", 2,
+    # la definizione piu' UNA chiamata per ogni strada verso la pausa:
+    # la ricarica a zero e — dal 1 ott 2026 — l'annullo del venditore
+    # (_avvisa_piazze_annullo), tre occorrenze in tutto
+    prova("e parte solo dal ramo della pausa", 3,
           _SORGENTE.count("_avvisa_offerte_esaurito("))
     prova("...che e' dentro il ramo della pausa", True,
           prima(ric, "elif esaurito_ora:", "_avvisa_offerte_esaurito("))
@@ -37952,8 +37963,11 @@ def prove_fogli_di_casa():
     # dispositivo, che smette di funzionare li', o la chiave registrata
     # per quella persona, che questa sostituisce ovunque. Importare la
     # stessa chiave gia' registrata su un telefono vuoto non chiede.
-    prova("i gesti che passano dalla domanda unica sono settantasei",
-          76, solo_codice(mini).count("chiediConferma({"))
+    # SETTANTASETTE (1 ott 2026, l'annullo del venditore): «Confermi
+    # l'annullo?» (`confermaAnnullaVendita`), la seconda domanda dopo il
+    # foglio del motivo — muove sats e non si torna indietro.
+    prova("i gesti che passano dalla domanda unica sono settantasette",
+          77, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -111563,7 +111577,9 @@ def prove_card_annullati():
     prova("...e chi chiede di annullare lo chiama «Indietro»", [True, True],
           ["indietro: 'Indietro'," in pezzo_js(mini, "function annullaScambioP2P(){", "\n}\n"),
            "indietro: 'Indietro'," in pezzo_js(mini, "function accettaAnnulloP2P(){", "\n}\n")])
-    prova("...solo loro: gli altri fogli restano come sono", 2, nudo.count("indietro: 'Indietro'"))
+    # ...e dal 1 ott 2026 anche l'annullo del VENDITORE sul mercatino
+    # (confermaAnnullaVendita): chiede di annullare, quindi «Indietro»
+    prova("...solo loro: gli altri fogli restano come sono", 3, nudo.count("indietro: 'Indietro'"))
 
 
 def prove_annullo_in_disputa():
@@ -114979,6 +114995,626 @@ console.log(JSON.stringify(out));
           [7, 20, 33, True, True, True], o["righe"])
 
 
+def prove_annullo_venditore():
+    """IL VENDITORE PUO' ANNULLARE UN ORDINE (1 ott 2026). Caso vero: un
+    oggetto finito senza togliere l'annuncio, piu' compratori che hanno
+    pagato, e chi vende che doveva avvisarli uno per uno perche' da li'
+    un ordine non si annullava. Qui: le sentinelle sulla FORMA (gli
+    stati che aprono la porta, il CAS, la lapide, lo stock sistemato
+    all'annullo e non al rimborso, il catalogo gemello), il GIRO VERO
+    della rotta su un database in memoria coi pezzi veri — il mono,
+    il set con un pezzo esaurito, il «non posso spedire», il rimborso
+    che aspetta un metodo e arriva dopo senza contare la merce due
+    volte, la lapide del non pagato, i rifiuti, l'allarme ai moderatori
+    — e il lato client in node."""
+    import asyncio
+    import html as _html
+    import shutil
+    import sqlite3
+    import subprocess
+    import tempfile
+    from collections import defaultdict
+    print("\n[l'annullo del venditore]")
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    def pezzo_async(nome):
+        return "async " + pezzo(nome)
+
+    # ============ 1. LA FORMA ==========================================
+    rotta = codice(pezzo("annulla_vendita"))
+    prova("la rotta e' del VENDITORE e di nessun altro", True,
+          "WHERE id=? AND venditore_id=?" in rotta
+          and '@app.post("/api/orders/{ordine_id}/annulla-vendita")'
+          in _SORGENTE)
+    prova("si annulla solo PRIMA della spedizione: 'creato' e 'locked'",
+          True, """o["stato"] not in ("creato", "locked")""" in rotta)
+    prova("...e mai a pagamento in volo verso chi vende", True,
+          "if _in_pagamento(o):" in rotta
+          and '_rifiuto_in_pagamento(o, "annullo")' in rotta)
+    prova("il motivo e' del catalogo, «altro» vuole la nota", True,
+          "if motivo not in MOTIVI_ANNULLO_VENDITORE:" in rotta
+          and 'if motivo == "altro" and len(nota) < 3:' in rotta)
+    prova("'creato': pagamento controllato PRIMA, CAS, lapide, mai DELETE",
+          True, "invoice_pagata" in rotta
+          and rotta.index("invoice_pagata") < rotta.index("stato='annullato'")
+          and "WHERE id=? AND stato='creato'" in rotta
+          and "DELETE FROM" not in rotta)
+    prova("'locked': CAS a 'refund' col timbro e il motivo", True,
+          "UPDATE ordini SET stato='refund', annullato_dal_venditore_il=?"
+          in rotta and "WHERE id=? AND stato='locked'" in rotta
+          and rotta.count("rowcount == 0") == 2)
+    prova("gli esauriti vanno in pausa (quantita 0 e 'venduto'), il "
+          "resto torna in vetrina col MAX, mai un 'rimosso'", True,
+          "_pausa_esauriti(con, esauriti)" in rotta
+          and "quantita_max=MAX(quantita_max,quantita+?)" in rotta
+          and """a["stato"] not in ("attivo", "venduto")""" in rotta)
+    pausa = codice(pezzo("_pausa_esauriti"))
+    prova("la pausa e' il 'venduto' di sempre, idempotente, e le offerte "
+          "decadono dal giudice unico", True,
+          "SET quantita=0, stato='venduto'" in pausa
+          and 'a["stato"] != "attivo"' in pausa
+          and "_decadi_offerte_esaurito(con, annuncio_id)" in pausa
+          and "quantita_max" not in pausa.split("passaggi = []")[1])
+    prova("il giudice unico delle offerte decadute lo chiamano la ricarica "
+          "a zero E la pausa dell'annullo", 2,
+          _SORGENTE.count("_decadi_offerte_esaurito(con, annuncio_id)"))
+    prova("il registro dei negozi si rimette in pari SOLO sulle righe "
+          "tornate in vetrina", True,
+          '[r for r in righe if r["annuncio_id"] not in esauriti], "rimborso"'
+          in rotta)
+    prova("l'avviso al compratore porta il motivo e «per intero», e parte "
+          "PRIMA del rimborso", True,
+          "motivo: {motivo_testo}" in rotta and "per intero" in rotta
+          and rotta.index("tornano per intero") < rotta.index("await _rimborsa_compratore("))
+    prova("il polso dice il conto e l'allarme scatta alla soglia", True,
+          "_conta_annulli_venditore(con, o[\"venditore_id\"], adesso)" in rotta
+          and "if n_annulli >= ANNULLI_VENDITORE_ALLARME:" in rotta
+          and "notifica_admin(" in rotta)
+    conta = codice(pezzo("_conta_annulli_venditore"))
+    prova("si contano gli annulli PAGATI (refund/refunded), non le lapidi",
+          True, "stato IN ('refund','refunded')" in conta
+          and "annullato_dal_venditore_il >= ?" in conta)
+    prova("l'offerta dietro il non pagato DECADE (non resta ripagabile)",
+          True, "UPDATE offerte SET ordine_id=0, stato='decaduta'" in rotta)
+    rimb = codice(pezzo("_rimborsa_compratore"))
+    prova("il rimborso di un ordine annullato dal venditore NON tocca lo "
+          "stock (lo ha gia' sistemato l'annullo)", True,
+          '"annullato_dal_venditore_il" in o.keys()' in rimb
+          and "if not annullo:" in rimb
+          and rimb.index("if not annullo:") < rimb.index("UPDATE annunci SET quantita=quantita+?")
+          and "for r in (righe if not annullo else []):" in rimb)
+    prova("...e le parole non parlano di disputa", True,
+          "Rimborso dell'ordine annullato" in rimb
+          and "annullato dal venditore e " in rimb
+          and "Il rimborso di {_fmt_sats(importo)} sats non è" in rimb)
+    prova("le quattro colonne nascono nella migrazione di sempre", [True] * 4,
+          [f'"{c}' in _SORGENTE for c in (
+              "annullato_dal_venditore_il INTEGER DEFAULT 0",
+              "motivo_annullo TEXT DEFAULT ''",
+              "nota_annullo TEXT DEFAULT ''",
+              "esauriti_annullo TEXT DEFAULT ''")])
+    prova("nessuno stato nuovo: la rotta usa solo quelli del vocabolario",
+          True, all(f"stato='{s}'" in rotta for s in ("refund", "annullato"))
+          and "stato='annullato_venditore'" not in _SORGENTE)
+    prova("i commenti non nominano la parola-spia dell'indirizzo", False,
+          "indirizzo" in pezzo("_rimborsa_compratore"))
+
+    # --- il catalogo e il suo gemello nel client ----------------------
+    amb_cat = {}
+    i = _SORGENTE.index("MOTIVI_ANNULLO_VENDITORE = {")
+    exec(_SORGENTE[i:_SORGENTE.index("\n}\n", i) + 3], amb_cat)
+    catalogo = amb_cat["MOTIVI_ANNULLO_VENDITORE"]
+    mini = open("miniapp.html", encoding="utf-8").read()
+    j = mini.index("const MOTIVI_ANNULLO_VENDITORE = {")
+    gemello = dict(re.findall(r"\n  (\w+): '([^']+)',", mini[j:mini.index("};", j)]))
+    prova("il catalogo dei motivi e' lo stesso nei due lati", catalogo, gemello)
+    prova("...con le tre voci chieste: esaurito, spedizione, altro",
+          ["esaurito", "spedizione", "altro"], list(catalogo))
+
+    # ============ 2. IL GIRO VERO ======================================
+    class Mondo:
+        pass
+
+    class Asincrono:
+        """asyncio di cartone: create_task registra e chiude; Lock e' vero."""
+        Lock = asyncio.Lock
+
+        def __init__(self, registro):
+            self.registro = registro
+
+        def create_task(self, coro):
+            self.registro.append(coro.__name__)
+            coro.close()
+
+    class Http(Exception):
+        def __init__(self, status_code, detail=""):
+            super().__init__(detail)
+            self.status_code, self.detail = status_code, detail
+
+    def mondo(stato="locked", address="compra@wallet.tld", righe=None,
+              esito="pagato", payout_stato="", payout_verso="", pagata=False,
+              annunci_stato="attivo"):
+        """Un ordine 222 -> 111 da 1300 sats (1000 l'articolo, 200 di
+        spedizione, 100 di protezione) su un annuncio da 3 pezzi, o un
+        SET con le `righe` date [(annuncio_id, quantita, titolo)]."""
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.executescript("""
+            CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+              compratore_id INT, venditore_id INT, prezzo_sats INT,
+              stato TEXT, payment_hash TEXT DEFAULT 'h1',
+              invoice_rimborso TEXT DEFAULT '', quantita INT DEFAULT 1,
+              spedizione_sats INT DEFAULT 200, protezione_sats INT DEFAULT 100,
+              sconto_sats INT DEFAULT 0, payout_stato TEXT DEFAULT '',
+              payout_verso TEXT DEFAULT '', payout_tentativi INT DEFAULT 0,
+              payout_ultimo INT DEFAULT 0, disputata INT DEFAULT 0,
+              sbloccato_auto_il INT DEFAULT 0, cassaforte TEXT DEFAULT 'saas',
+              cambio_eur REAL DEFAULT 0,
+              annullato_dal_venditore_il INT DEFAULT 0,
+              motivo_annullo TEXT DEFAULT '', nota_annullo TEXT DEFAULT '',
+              esauriti_annullo TEXT DEFAULT '', creato INT, aggiornato INT);
+            CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
+              annuncio_id INT, quantita INT, unitario_sats INT, titolo TEXT);
+            CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT,
+              titolo TEXT, stato TEXT, quantita INT, quantita_max INT);
+            CREATE TABLE offerte(id INTEGER PRIMARY KEY, annuncio_id INT,
+              compratore_id INT, ordine_id INT DEFAULT 0, stato TEXT,
+              aggiornato INT DEFAULT 0);
+            CREATE TABLE offerte_righe(offerta_id INT, annuncio_id INT);
+            CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, ln_address TEXT);
+        """)
+        vero.execute("INSERT INTO utenti VALUES(111,?)", (address,))
+        vero.execute("INSERT INTO utenti VALUES(222,'')")
+        vero.execute("INSERT INTO annunci VALUES(7,222,'Miele di castagno',?,2,3)",
+                     (annunci_stato,))
+        vero.execute("INSERT INTO annunci VALUES(8,222,'Cera d api','attivo',4,5)")
+        vero.execute("INSERT INTO annunci VALUES(9,222,'Rimosso','rimosso',0,1)")
+        # un'offerta viva sul 7 e una sul carrello che lo contiene
+        vero.execute("INSERT INTO offerte VALUES(1,7,333,0,'proposta',0)")
+        vero.execute("INSERT INTO offerte VALUES(2,0,444,0,'accettata',0)")
+        vero.execute("INSERT INTO offerte_righe VALUES(2,7)")
+        # l'offerta da cui e' nato l'ordine: 'accettata' finche' non si
+        # paga, 'conclusa' dal pagamento (_incassa_ordine)
+        vero.execute("INSERT INTO offerte VALUES(3,7,111,1,?,0)",
+                     ("accettata" if stato == "creato" else "conclusa",))
+        ora = int(time.time())
+        if righe:
+            vero.execute("INSERT INTO ordini(id,annuncio_id,compratore_id,"
+                         "venditore_id,prezzo_sats,stato,quantita,payout_stato,"
+                         "payout_verso,creato,aggiornato) "
+                         "VALUES(1,0,111,222,1300,?,?,?,?,?,?)",
+                         (stato, sum(q for _, q, _ in righe), payout_stato,
+                          payout_verso, ora, ora))
+            for aid, q, t in righe:
+                vero.execute("INSERT INTO ordine_righe(ordine_id,annuncio_id,"
+                             "quantita,unitario_sats,titolo) VALUES(1,?,?,500,?)",
+                             (aid, q, t))
+        else:
+            vero.execute("INSERT INTO ordini(id,annuncio_id,compratore_id,"
+                         "venditore_id,prezzo_sats,stato,payout_stato,"
+                         "payout_verso,creato,aggiornato) "
+                         "VALUES(1,7,111,222,1300,?,?,?,?,?)",
+                         (stato, payout_stato, payout_verso, ora, ora))
+        vero.commit()
+
+        class Con:
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        m = Mondo()
+        m.vero, m.detto, m.polso, m.avvisi, m.pagati = vero, [], [], [], []
+        m.registro, m.piazze, m.chi = [], [], 222
+
+        async def _notifica(tg, testo):
+            m.detto.append((tg, testo))
+
+        async def _polso(riga):
+            m.polso.append(riga)
+
+        async def _admin(testo):
+            m.avvisi.append(testo)
+
+        async def _paga(bolt11, importo, taccuino, cassaforte="", riga=None):
+            m.pagati.append((bolt11, importo, cassaforte))
+            return esito
+
+        async def _da_address(addr, sats):
+            return f"lnbc-da-{addr}-{sats}"
+
+        async def _pagata(h, cf=""):
+            return pagata
+
+        async def _cambio():
+            return 100000.0
+
+        def _registra(con, oid, righe, tipo):
+            m.registro.append((tipo, [r["annuncio_id"] for r in righe]))
+            return []
+
+        async def _leggi(req):
+            return m.corpo
+
+        amb = {"db": Con, "time": time, "html": _html, "re": re,
+               "asyncio": Asincrono(m.piazze), "defaultdict": defaultdict,
+               "HTTPException": Http, "Header": lambda d="": d,
+               "Cookie": lambda d="": d, "Request": object,
+               "verifica_utente": lambda *a, **k: {"id": m.chi},
+               "leggi_json": _leggi, "notifica": _notifica,
+               "polso_ordini_admin": _polso, "notifica_admin": _admin,
+               "paga_venditore": _paga, "invoice_da_ln_address": _da_address,
+               "invoice_pagata": _pagata, "cambio_btc_eur": _cambio,
+               "registra_uscita_negozio": _registra,
+               "_timbra_pagamento": lambda *a, **k: None,
+               "_in_volo": lambda *a, **k: None,
+               "_sospendi_pagamento": lambda *a, **k: None,
+               "_cassaforte_uscita": lambda o: "saas",
+               "_msg_ritentiamo": lambda *a, **k: "ritentiamo",
+               "MAX_TENTATIVI_PAYOUT": 5, "print": lambda *a, **k: None,
+               "PAGATO": "pagato", "NON_PAGATO": "non_pagato",
+               "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto",
+               "OCCUPATO": "occupato", "LnbitsMuto": type("LnbitsMuto", (Exception,), {}),
+               "_lucchetti_ordine": defaultdict(asyncio.Lock)}
+
+        async def _congela(*a, **k):
+            return None
+        amb["_congela_pagamento"] = _congela
+        # i pezzi VERI: niente stub di quel che si sta provando
+        exec(_SORGENTE[i:_SORGENTE.index("\n}\n", i) + 3], amb)
+        for costante in ("ANNULLI_VENDITORE_ALLARME = ",
+                         "ANNULLI_VENDITORE_GIORNI = "):
+            k = _SORGENTE.index(costante)
+            exec(_SORGENTE[k:_SORGENTE.index("\n", k)], amb)
+        for nome in ("_campo", "_in_pagamento", "_rifiuto_in_pagamento",
+                     "_righe_ordine", "_titolo_ordine", "_fmt_sats",
+                     "_coda_magazzino", "_conta_annulli_venditore",
+                     "_motivo_annullo", "_decadi_offerte_esaurito",
+                     "_pausa_esauriti", "_avvisa_piazze_annullo"):
+            exec(pezzo(nome), amb)
+        for nome in ("annuncio_su_nostr", "promo_venduto",
+                     "_avvisa_offerte_esaurito"):
+            exec(f"async def {nome}(*a, **k):\n    return None", amb)
+        exec(pezzo_async("_rimborsa_compratore"), amb)
+        exec(pezzo_async("annulla_vendita"), amb)
+        m.amb = amb
+        return m
+
+    def annulla(m, corpo, chi=222):
+        m.corpo, m.chi = corpo, chi
+        try:
+            return gira(m.amb["annulla_vendita"](1, None))
+        except Http as e:
+            return e
+
+    def riga(m, oid=1):
+        return dict(m.vero.execute("SELECT * FROM ordini WHERE id=?",
+                                   (oid,)).fetchone())
+
+    def annuncio(m, aid):
+        a = m.vero.execute("SELECT stato, quantita, quantita_max FROM annunci "
+                           "WHERE id=?", (aid,)).fetchone()
+        return (a["stato"], a["quantita"], a["quantita_max"])
+
+    def offerte(m):
+        return [tuple(r) for r in m.vero.execute(
+            "SELECT id, stato, ordine_id FROM offerte ORDER BY id")]
+
+    def http(r):
+        return getattr(r, "status_code", None)
+
+    # --- 2a. il mono esaurito, compratore col Lightning address --------
+    m = mondo()
+    r = annulla(m, {"motivo": "esaurito"})
+    prova("mono esaurito: ok, rimborsato subito, per intero (1300, non 1000)",
+          (True, "refunded", [("lnbc-da-compra@wallet.tld-1300", 1300, "saas")]),
+          (r.get("ok"), r.get("stato"), m.pagati))
+    o = riga(m)
+    prova("...la riga: refunded, il timbro, il motivo, l'esaurito",
+          ("refunded", True, "esaurito", "", "7"),
+          (o["stato"], o["annullato_dal_venditore_il"] > 0, o["motivo_annullo"],
+           o["nota_annullo"], o["esauriti_annullo"]))
+    prova("...l'annuncio e' in PAUSA: quantita 0, 'venduto', il MAX intatto",
+          ("venduto", 0, 3), annuncio(m, 7))
+    prova("...le offerte vive sul 7 e sul carrello che lo contiene decadono; "
+          "quella conclusa dal pagamento resta",
+          [(1, "decaduta", 0), (2, "decaduta", 0), (3, "conclusa", 1)],
+          offerte(m))
+    prova("...le piazze: sold su Nostr, ✅ sul canale, gli offerenti avvisati",
+          ["annuncio_su_nostr", "promo_venduto", "_avvisa_offerte_esaurito"],
+          m.piazze)
+    prova("...il registro dei negozi: nessuna riga (l'unico pezzo e' esaurito)",
+          [("rimborso", [])], m.registro)
+    prova("...il compratore sa subito: chi, cosa, perche', quanto, per intero",
+          [True] * 5,
+          [x in m.detto[0][1] for x in ("Il venditore ha annullato",
+                                        "Miele di castagno", "Oggetto esaurito",
+                                        "1.300", "per intero")]
+          if m.detto and m.detto[0][0] == 111 else m.detto)
+    prova("...poi il rimborso partito, a tutti e due, senza la parola disputa",
+          ([111, 222], True, False),
+          ([d[0] for d in m.detto[1:]],
+           "Rimborso dell'ordine annullato" in m.detto[1][1],
+           any("isputa" in d[1] for d in m.detto)))
+    prova("...il polso: l'annullo col conto (1°), poi il rimborso", (2, True, True),
+          (len(m.polso), "È il 1° annullo" in m.polso[0],
+           "annullato dal venditore e rimborsato" in m.polso[1]))
+    prova("...nessun allarme sotto la soglia", [], m.avvisi)
+
+    # --- 2b. «non posso spedire»: la merce torna in vetrina -----------
+    m = mondo(annunci_stato="venduto")
+    m.vero.execute("UPDATE annunci SET quantita=0 WHERE id=7")
+    r = annulla(m, {"motivo": "spedizione"})
+    prova("non posso spedire: refunded, e il pezzo TORNA in vetrina "
+          "(da venduto/0 a attivo/1, il MAX non cala)",
+          ("refunded", ("attivo", 1, 3)), (r.get("stato"), annuncio(m, 7)))
+    prova("...le offerte restano vive: la merce c'e'",
+          [(1, "proposta", 0), (2, "accettata", 0), (3, "conclusa", 1)],
+          offerte(m))
+    prova("...il registro dei negozi disfa la vendita del 7",
+          [("rimborso", [7])], m.registro)
+    prova("...le piazze: active e il ✅ che se ne va",
+          ["annuncio_su_nostr", "promo_venduto"], m.piazze)
+    prova("...il motivo nell'avviso", True, "Non posso spedire" in m.detto[0][1])
+
+    # --- 2c. «altro» con la nota, scappata ----------------------------
+    m = mondo()
+    r = annulla(m, {"motivo": "altro", "nota": " rotto <b>ieri</b> "})
+    prova("altro: la nota viaggia col motivo, scappata per i tubi HTML",
+          ("refunded", "rotto <b>ieri</b>", True),
+          (r.get("stato"), riga(m)["nota_annullo"],
+           "Altro: rotto &lt;b&gt;ieri&lt;/b&gt;" in m.detto[0][1]))
+    prova("...l'annuncio torna in vetrina (non e' un esaurito)",
+          ("attivo", 3, 3), annuncio(m, 7))
+
+    # --- 2d. il SET: un pezzo esaurito, l'altro torna -----------------
+    m = mondo(righe=[(7, 1, "Miele di castagno"), (8, 2, "Cera d'api")])
+    r = annulla(m, {"motivo": "esaurito"})
+    prova("set senza dire quale: 400, e niente si muove",
+          (400, "locked"), (http(r), riga(m)["stato"]))
+    r = annulla(m, {"motivo": "esaurito", "esauriti": [8, 99, "8"]})
+    prova("set: l'8 in pausa, il 7 torna (+1), gli id altrui ignorati",
+          ("refunded", ("venduto", 0, 5), ("attivo", 3, 3), "8"),
+          (r.get("stato"), annuncio(m, 8), annuncio(m, 7),
+           riga(m)["esauriti_annullo"]))
+    prova("...il registro solo sulla riga tornata",
+          [("rimborso", [7])], m.registro)
+    prova("...il titolo dell'avviso e' quello del set",
+          True, "Miele di castagno + 1 altri" in m.detto[0][1])
+
+    # --- 2e. senza metodo: 'refund', e il rimborso arriva DOPO --------
+    m = mondo(address="")
+    r = annulla(m, {"motivo": "spedizione"})
+    prova("senza Lightning address: l'ordine resta 'refund', ok lo stesso",
+          (True, "refund", [], ("attivo", 3, 3)),
+          (r.get("ok"), r.get("stato"), m.pagati, annuncio(m, 7)))
+    prova("...al compratore UN avviso (l'annullo dice gia' come ricevere), "
+          "niente «disputa», niente doppione",
+          ([111], True),
+          ([d[0] for d in m.detto],
+           "scegli come riceverli" in m.detto[0][1]))
+    # giorni dopo incolla la fattura: _rimborsa_compratore riparte
+    m.vero.execute("UPDATE ordini SET invoice_rimborso='lnbc-incollata'")
+    m.vero.commit()
+    r = gira(m.amb["_rimborsa_compratore"](1))
+    prova("la fattura incollata paga, per intero, e lo stock NON si conta "
+          "due volte", ("refunded", [("lnbc-incollata", 1300, "saas")],
+                        ("attivo", 3, 3), [("rimborso", [7])]),
+          (r.get("stato"), m.pagati, annuncio(m, 7), m.registro))
+    prova("...e le parole sono quelle dell'annullo",
+          True, "Rimborso dell'ordine annullato" in m.detto[-2][1]
+          and "Ordine annullato: i sats sono tornati" in m.detto[-1][1])
+    # il Lightning address c'era ma non ha pagato: glielo si dice
+    m = mondo(esito="non_pagato")
+    annulla(m, {"motivo": "spedizione"})
+    prova("address che non paga: 'refund' e l'avviso «non è partito»",
+          ("refund", True),
+          (riga(m)["stato"], any("non è partito" in d[1] for d in m.detto)))
+
+    # --- 2f. il non pagato: la lapide ---------------------------------
+    m = mondo(stato="creato")
+    r = annulla(m, {"motivo": "esaurito"})
+    prova("'creato': lapide 'annullato', nessun sat mosso, il motivo scritto",
+          ("annullato", "annullato", [], "esaurito"),
+          (r.get("stato"), riga(m)["stato"], m.pagati, riga(m)["motivo_annullo"]))
+    prova("...l'offerta dietro l'ordine decade (e si stacca), le altre pure "
+          "per l'esaurito", [(1, "decaduta", 0), (2, "decaduta", 0),
+                             (3, "decaduta", 0)], offerte(m))
+    prova("...l'annuncio in pausa anche qui", ("venduto", 0, 3), annuncio(m, 7))
+    prova("...al compratore: non pagare, nessun sat trattenuto",
+          True, "Non pagare la fattura" in m.detto[0][1]
+          and "prima del pagamento" in m.detto[0][1])
+    prova("...nessun polso: non e' un ordine coi sats", [], m.polso)
+    m = mondo(stato="creato", pagata=True)
+    r = annulla(m, {"motivo": "spedizione"})
+    prova("'creato' ma la fattura e' PAGATA: 409, si annulla da pagato",
+          (409, "creato"), (http(r), riga(m)["stato"]))
+
+    # --- 2g. i rifiuti -------------------------------------------------
+    m = mondo(stato="shipped")
+    prova("spedito: 400 con le parole giuste", (400, True),
+          (http(annulla(m, {"motivo": "altro", "nota": "ci ho ripensato"})),
+           "già spedito" in str(annulla(m, {"motivo": "spedizione"}).detail)))
+    for stato in ("delivered", "confirmed", "dispute", "released", "refunded"):
+        m = mondo(stato=stato)
+        prova(f"{stato}: 400", 400, http(annulla(m, {"motivo": "spedizione"})))
+    m = mondo()
+    prova("il compratore non puo' (400), e nemmeno un estraneo",
+          (400, 400), (http(annulla(m, {"motivo": "spedizione"}, chi=111)),
+                       http(annulla(m, {"motivo": "spedizione"}, chi=555))))
+    prova("...e l'ordine non si e' mosso", "locked", riga(m)["stato"])
+    prova("motivo sconosciuto / vuoto: 400", (400, 400),
+          (http(annulla(m, {"motivo": "boh"})), http(annulla(m, {}))))
+    prova("«altro» senza nota (o con due lettere): 400", (400, 400),
+          (http(annulla(m, {"motivo": "altro"})),
+           http(annulla(m, {"motivo": "altro", "nota": "ok"}))))
+    m = mondo(payout_stato="in_volo", payout_verso="venditore")
+    prova("pagamento in volo verso chi vende: 409", 409,
+          http(annulla(m, {"motivo": "spedizione"})))
+    prova("...dopo i rifiuti nessun avviso e' partito", ([], []),
+          (m.detto, m.pagati))
+    m = mondo(righe=[(9, 1, "Rimosso"), (8, 1, "Cera d'api")])
+    annulla(m, {"motivo": "spedizione"})
+    prova("un annuncio 'rimosso' nel set resta rimosso; l'altro torna",
+          (("rimosso", 0, 1), ("attivo", 5, 5)), (annuncio(m, 9), annuncio(m, 8)))
+
+    # --- 2h. l'allarme ai moderatori ----------------------------------
+    m = mondo()
+    ora = int(time.time())
+    # due annulli pagati di ieri, uno di due mesi fa, e una lapide
+    for oid, quando, stato in ((2, ora - 86400, "refunded"),
+                               (3, ora - 2 * 86400, "refund"),
+                               (4, ora - 70 * 86400, "refunded"),
+                               (5, ora - 3600, "annullato")):
+        m.vero.execute("INSERT INTO ordini(id,annuncio_id,compratore_id,"
+                       "venditore_id,prezzo_sats,stato,"
+                       "annullato_dal_venditore_il,motivo_annullo,creato,"
+                       "aggiornato) VALUES(?,7,111,222,100,?,?,'altro',?,?)",
+                       (oid, stato, quando, quando, quando))
+    m.vero.commit()
+    r = annulla(m, {"motivo": "spedizione"})
+    prova("il terzo annullo pagato in 30 giorni: il polso lo conta (3°) e "
+          "l'allarme parte UNA volta", (True, 1, True),
+          ("È il 3° annullo" in m.polso[0], len(m.avvisi),
+           "annullato 3 ordini pagati in 30 giorni" in m.avvisi[0]))
+    prova("...il conto ignora quello di due mesi fa e la lapide", 3,
+          m.amb["_conta_annulli_venditore"](m.vero, 222, ora))
+
+    # ============ 3. IL LATO CLIENT ====================================
+    bottone = mini[mini.index("function openOrder(id){"):]
+    bottone = bottone[:bottone.index("\n}\n")]
+    prova("il bottone c'e' per chi VENDE, su creato e locked, mai in pagamento",
+          True, "o.role==='seller' && ['creato','locked'].includes(s) "
+          "&& !inPagamento(o) ? `<button class=\"btn danger-ghost\" "
+          "onclick=\"apriAnnullaVendita()\">" in bottone)
+    prova("la storia della cassaforte si sostituisce DOPO quella della "
+          "disputa, coi suoi tre passi", True,
+          "if (annulloVenditore(o)) {" in bottone
+          and bottone.index("if (annulloVenditore(o)) {")
+          > bottone.index("progress = {dispute:2, return_pending:2")
+          and "progress = {refund:1, refunded:2}[s];" in bottone)
+    prova("la testa di 'refund' e 'refunded' e la nota del rimborsato "
+          "distinguono l'annullo dalla disputa", [True] * 3,
+          ["Il venditore ha annullato: scegli qui sotto" in bottone,
+           "Hai annullato l\\'ordine: i sats sono tornati" in bottone,
+           "annulloVenditore(o) ? 'Il venditore ha annullato l\\'ordine' : 'Disputa risolta a tuo favore'" in bottone])
+    prova("il foglio esiste, con le voci del picker e la seconda conferma",
+          [True] * 3,
+          ['id="annullaVenditaSheet"' in mini,
+           "class=\"picker-voce${k===motivo?' sel':''}\"" in mini,
+           "chiediConferma({" in mini[mini.index("function confermaAnnullaVendita("):
+                                       mini.index("async function inviaAnnullaVendita(")]])
+    prova("`poi` restituisce la promessa (la lezione del velo P2P)", True,
+          "poi: () => inviaAnnullaVendita(o.id, r.corpo)" in mini)
+    prova("mapOrder porta i tre campi", [True] * 3,
+          [x in mini for x in ("annullatoDalVenditore:o.annullato_dal_venditore_il||0",
+                               "motivoAnnullo:o.motivo_annullo||''",
+                               "notaAnnullo:o.nota_annullo||''")])
+
+    node = shutil.which("node")
+    if not node:
+        salta("il lato client dell'annullo in node", "node non c'e'")
+        return
+    js = "\n".join([
+        pezzo_js(mini, "const fmt = n =>", "\n"),
+        pezzo_js(mini, "const esc = s =>", ";\n") + ";",
+        pezzo_js(mini, "const CONCLUSI = [", "\n"),
+        pezzo_js(mini, "const MOTIVI_ANNULLO_VENDITORE = {", "};\n") + "};",
+        pezzo_js(mini, "function annulloVenditore(o){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function motivoAnnulloTesto(o){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function markupAnnullaVendita(o, motivo){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function corpoAnnullaVendita(o, motivo, nota, esauriti){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function verboOrdine(o){", "\n}\n") + "\n}",
+        """
+const O = (state, role, x) => Object.assign({id: 1, state, role,
+  listing: {title: 'Miele', price: 1300}, righe: []}, x || {});
+const ann = {annullatoDalVenditore: 1759300000, motivoAnnullo: 'altro', notaAnnullo: 'rotto <b>'};
+const set = {righe: [{annuncio_id: 7, quantita: 1, titolo: 'Miele <b>'}, {annuncio_id: 8, quantita: 2, titolo: 'Cera'}]};
+const m1 = markupAnnullaVendita(O('locked', 'seller'), '');
+const m2 = markupAnnullaVendita(O('locked', 'seller', set), 'esaurito');
+const m3 = markupAnnullaVendita(O('locked', 'seller'), 'esaurito');
+const m4 = markupAnnullaVendita(O('creato', 'seller'), 'altro');
+console.log(JSON.stringify({
+  giudice: [annulloVenditore(O('refund', 'buyer', ann)), annulloVenditore(O('refunded', 'seller', ann)),
+            annulloVenditore(O('annullato', 'buyer', ann)), annulloVenditore(O('locked', 'buyer', ann)),
+            annulloVenditore(O('refund', 'buyer')), annulloVenditore(null)],
+  motivo: [motivoAnnulloTesto(O('refund', 'buyer', ann)),
+           motivoAnnulloTesto(O('refund', 'buyer', {motivoAnnullo: 'esaurito'})),
+           motivoAnnulloTesto(O('refund', 'buyer', {}))],
+  verbi: [verboOrdine(O('refund', 'buyer', ann)), verboOrdine(O('refunded', 'seller', ann)),
+          verboOrdine(O('refunded', 'buyer')), verboOrdine(O('refunded', 'seller')),
+          verboOrdine(O('locked', 'seller', ann))],
+  m1: {voci: (m1.match(/class="picker-voce/g) || []).length, sel: (m1.match(/ sel"/g) || []).length,
+       sats: /1\\D?300 sats/.test(m1), nota: m1.includes('annullaNota'),
+       pezzi: m1.includes('annullaEsauriti')},
+  m2: {pezzi: m2.includes('annullaEsauriti'), scappato: m2.includes('Miele &lt;b&gt;'),
+       valori: (m2.match(/value="(\\d+)"/g) || []), sel: m2.includes('aria-checked="true"')},
+  m3: {pezzi: m3.includes('annullaEsauriti'), pausa: m3.includes('va in pausa')},
+  m4: {nota: m4.includes('annullaNota'), intro: m4.includes('non ha ancora pagato')},
+  corpi: [corpoAnnullaVendita(O('locked', 'seller'), '', '', []),
+          corpoAnnullaVendita(O('locked', 'seller'), 'altro', ' ok ', []),
+          corpoAnnullaVendita(O('locked', 'seller'), 'altro', ' si è rotto ', []),
+          corpoAnnullaVendita(O('locked', 'seller', set), 'esaurito', '', []),
+          corpoAnnullaVendita(O('locked', 'seller', set), 'esaurito', 'x', ['8']),
+          corpoAnnullaVendita(O('locked', 'seller'), 'esaurito', 'x', []),
+          corpoAnnullaVendita(O('locked', 'seller'), 'spedizione', 'x', ['7'])],
+}));
+"""])
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js)
+    try:
+        out = subprocess.run([node, f.name], capture_output=True,
+                             encoding="utf-8", errors="replace", timeout=60)
+        e = json.loads(out.stdout or "null")
+    except Exception as ex:
+        e = None
+        print(f"      node e' esploso: {ex}")
+    finally:
+        os.unlink(f.name)
+    if e is None:
+        prova("il banco node gira", "", (out.stderr or "")[:400])
+        return
+    prova("annulloVenditore: refund/refunded/annullato col timbro, mai senza "
+          "e mai su un ordine vivo", [True, True, True, False, False, False],
+          e["giudice"])
+    prova("motivoAnnulloTesto: etichetta + nota di «altro», o la sola "
+          "etichetta, o «senza motivo»",
+          ["Altro: rotto <b>", "Oggetto esaurito", "senza motivo"], e["motivo"])
+    prova("verboOrdine: l'annullo si legge dai due lati; la disputa e "
+          "l'ordine vivo come prima",
+          ["Annullato dal venditore", "Hai annullato la vendita",
+           "Acquisto non concluso", "Vendita non conclusa", "Stai vendendo"],
+          e["verbi"])
+    prova("il foglio senza scelta: tre voci, nessuna scelta, la cifra, "
+          "niente nota ne' pezzi",
+          {"voci": 3, "sel": 0, "sats": True, "nota": False, "pezzi": False},
+          e["m1"])
+    prova("esaurito su un set: i pezzi (titoli scappati) coi loro id, e "
+          "la voce scelta", {"pezzi": True, "scappato": True,
+                             "valori": ['value="7"', 'value="8"'], "sel": True},
+          e["m2"])
+    prova("esaurito su un mono: niente lista, la frase della pausa",
+          {"pezzi": False, "pausa": True}, e["m3"])
+    prova("altro su un non pagato: la nota, e l'intro di chi non ha pagato",
+          {"nota": True, "intro": True}, e["m4"])
+    prova("corpoAnnullaVendita: la porta del server detta prima",
+          [{"errore": "Scegli un motivo"},
+           {"errore": "Con «Altro» servono due parole per l'acquirente"},
+           {"corpo": {"motivo": "altro", "nota": "si è rotto", "esauriti": []}},
+           {"errore": "Segna quale pezzo è esaurito"},
+           {"corpo": {"motivo": "esaurito", "nota": "", "esauriti": [8]}},
+           {"corpo": {"motivo": "esaurito", "nota": "", "esauriti": []}},
+           {"corpo": {"motivo": "spedizione", "nota": "", "esauriti": []}}],
+          e["corpi"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -114993,7 +115629,7 @@ def main():
               prove_senza_condizione, prove_sottocategorie,
               prove_ricategorizza, prove_collaudo_ricategorizza,
               prove_asta, prove_proxy_asta,
-              prove_annullo, prove_abbandonati,
+              prove_annullo, prove_annullo_venditore, prove_abbandonati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
               prove_initdata, prove_portachiavi,
               prove_foto, prove_foto_scarti,
