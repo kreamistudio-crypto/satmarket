@@ -8693,12 +8693,25 @@
   nella URI, MAI un «ack» generico. Un messaggio col segreto sbagliato
   si IGNORA e si resta in ascolto: chiudere l'attesa al primo
   estraneo sarebbe un modo di far fallire il login di qualcun altro.
-  UN RELAY SOLO NELLA URI, ed è il difetto silenzioso che questa riga
-  impedisce: ci si connette PRIMA e nel codice si scrive solo il relay
-  che ha risposto — con la lista intera il telefono potrebbe
-  rispondere sul relay B mentre noi ascoltiamo sull'A, e da fuori si
-  vede «il telefono dice fatto e qui non arriva niente». La stanza
-  dev'essere UNA.
+  LA STANZA È UN CORO (1 ott 2026, rovescia la riga di ago 2026 «un
+  relay solo nella URI»): ci si connette a TUTTI i relay della lista
+  insieme (`apriStanzeNip46`: ogni relay col suo timeout, si parte dal
+  primo che risponde dopo `NIP46_GRAZIA_MS`, chi arriva dopo si
+  chiude), si ASCOLTA su tutti, e nel codice si scrivono tutti quelli
+  vivi — esattamente quelli su cui si ascolta, mai di più. Il timore
+  di ieri («il telefono risponde su B mentre noi ascoltiamo su A») era
+  vero, ma la cura era ascoltare su tutti, non una stanza sola: con
+  una sola, un relay che accetta la websocket e poi tace faceva un
+  codice che si inquadra, si approva, e qui non arriva niente — il
+  difetto dal campo. L'ASCOLTO SI APRE PRIMA DI DISEGNARE IL CODICE
+  (il 24133 è effimero: un relay non lo conserva). Il firmatario
+  pubblica su ogni relay della URI (Amber: `publishAndConfirm` sulla
+  lista, letto nel sorgente) e firma con una chiave PER-CONNESSIONE —
+  è `ev.pubkey` della risposta, non la chiave dell'utente, che arriva
+  dopo con `get_public_key`. Il cifrario (`cifrarioNip46`) prova
+  NIP-44 e poi NIP-04, e dal primo messaggio NIP-04 scrive anche lui
+  in NIP-04; l'`auth-required` di un relay si firma con la chiave
+  effimera del client (`relay.auth`), mai con quella dell'utente.
   E SI DELEGA AL BUNKER, che è ciò che ha tenuto piccolo il cantiere:
   scoperta la chiave del firmatario si compone una `bunker://` e si
   chiama `firmatarioBunker(uri, skHex)` — quindi il motore NIP-46
@@ -8720,16 +8733,18 @@
   in vetrina `/api/me` non esiste. Quindi in DEMO, da `file://` e su
   un server di ieri il bottone semplicemente non c'è, e
   `firmatarioNostrConnect` alza da sé come cintura.
-  ⚠️ L'ORDINE DELLA LISTA È PRECEDENZA, E IL PRIMO POSTO SI PAGA: il
-  client prova dal primo e si ferma al primo che risponde, ma un relay
-  MUTO si porta via i 15 secondi del timeout PRIMA che il codice
-  compaia — e chi guarda vede una sala d'attesa e basta. MISURATO e
-  non supposto: `relay.nsec.app`, che sarebbe IL relay dedicato al
-  NIP-46, da qui non risponde nemmeno a una GET (12 s), mentre damus e
-  nos.lol rispondono in ~0,14 s; con nsec.app in testa il QR
-  compariva dopo quindici secondi, con damus in testa dopo uno. Resta
-  in lista, in coda. Chi ritocca l'ordine lo RIMISURI (una GET a
-  ognuno) invece di andare a memoria.
+  ⚠️ LA LISTA SI MISURA CON UNA REQ, NON CON UNA GET (1 ott 2026):
+  dal 1 ott l'ordine non è più una precedenza (il coro parte da chi
+  risponde, e un morto costa al massimo la grazia), ma un posto in
+  lista è un posto nel QR, e quel che conta è che il relay RISPONDA
+  alle richieste: `relay.damus.io` apre la websocket in 0,6 s e poi
+  non risponde a nessuna REQ, nemmeno sul kind 1 — alla GET invece
+  risponde, ed è così che ad ago 2026 era finito in testa. Oggi la
+  lista è `nrs.primal.net`, `bucket.coracle.social`, `relay.nip46.com`
+  (i tre di serie di Amber, `defaultAppRelays`: il telefono li
+  raggiunge per costruzione) più `nos.lol`; le misure stanno nel
+  commento di `RELAYS_NIP46`. `relay.nsec.app` resta fuori: da qui va
+  in timeout, e il bunker di nsec.app lo porta già nella sua URI.
   IL DISEGNO DEL CODICE HA UNA FABBRICA SOLA (`disegnaQr(box, testo,
   modo)`, estratta da `mostraQr`): il QR della invoice resta
   alfanumerico MAIUSCOLO (la modalità dei wallet) e questo passa in

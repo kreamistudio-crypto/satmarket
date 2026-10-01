@@ -32868,3 +32868,105 @@ un gradino (`.contanti-box .contanti-consigli`).
 **DA GUARDARE.** Sul telefono, al prossimo scambio in contanti: che i
 due numeri si leggano come un ordine e che il cassetto si apra col
 pollice.
+
+## Il coro dei relay NIP-46: il QR che Amber inquadrava e qui non arrivava niente (1 ott 2026)
+
+Il compito (Andrea, dal campo): «da PC mostra il QR, da Amber lo
+scansiono e poi non accade nulla»; e col bunker «tanti hanno problemi
+perché alcuni relay non rispondono: se il primo non risponde deve poter
+interrogare il secondo e così via».
+
+**IL FATTO, MISURATO.** Una REQ in sola lettura sul kind 24133 verso i
+tre relay della lista di ago 2026: `relay.damus.io` apre la websocket
+in 0,6 s e poi NON RISPONDE A NIENTE — nemmeno a una REQ sul kind 1 —
+per 8 secondi; `nos.lol` risponde in 0,08 s (a volte «rate-limited:
+server busy»); `relay.nsec.app` va in timeout. E damus stava IN TESTA,
+messo lì ad ago 2026 perché «alla GET risponde in 0,14 s»: una GET
+dice che il server c'è, non che serve le sottoscrizioni. Col client di
+ieri — «ci si ferma al primo relay che accetta la websocket» — il PC si
+agganciava a damus, scriveva SOLO damus nel QR, Amber pubblicava la
+risposta lì (letto nel sorgente: `publishAndConfirm` sui relay della
+URI, cifratura NIP-44, `result` = il segreto, `nostrConnectSecret.ifBlank
+{ "ack" }` in 6.6.6), e la sottoscrizione del PC su damus non riceveva
+mai niente. Stesso meccanismo sul `bunker://`: un relay che accetta la
+connessione e tace si prendeva i due minuti del timeout umano, e il
+secondo relay della URI non veniva mai provato.
+
+**LA CURA: TUTTI INSIEME.** `apriStanzeNip46(relays)` apre ogni relay in
+parallelo col suo timeout (`BUNKER_CONNETTI_MS`), e si va avanti quando
+hanno risposto tutti oppure — dal primo che si connette — dopo
+`NIP46_GRAZIA_MS` (2,5 s): un morto non tiene più fermo il codice per
+quindici secondi, e chi arriva dopo la grazia si chiude, perché la
+stanza dev'essere esattamente l'elenco su cui si ascolta. Da lì
+`firmatarioBunker` ascolta su ogni relay vivo, manda ogni richiesta a
+tutti, accetta la prima risposta (le copie si scartano per id), fa
+uscire dal coro chi chiude l'ascolto, e cade solo a coro vuoto — o
+quando TUTTI hanno rifiutato la richiesta («ogni relay ha rifiutato:
+chi e con che parole»). `firmatarioNostrConnect` fa lo stesso: apre
+l'ascolto su tutti PRIMA di disegnare il codice (il 24133 è effimero,
+una risposta arrivata prima della sottoscrizione è persa), scrive nel
+QR tutti i relay vivi, e passa al bunker gli stessi. Due cose in più,
+lette nel sorgente di Amber e nella NIP-46: il cifrario
+(`cifrarioNip46`) prova NIP-44 e poi NIP-04 e dal primo messaggio
+NIP-04 scrive anche lui in NIP-04 — un firmatario di ieri rispondeva e
+finiva nel «non era per noi» muto —; e l'`auth-required` di un relay si
+firma con la chiave effimera del client (`relay.auth`), mai con quella
+dell'utente, una volta sola per relay. La lista del server
+(`RELAYS_NIP46`) diventa `nrs.primal.net`, `bucket.coracle.social`,
+`relay.nip46.com` (i tre di serie di Amber, `defaultAppRelays`) più
+`nos.lol`: misure nel commento. È una costante, sul VPS non c'è niente
+da fare.
+
+**STRADE SCARTATE.** 1) Tenere una stanza sola e «scegliere meglio» il
+relay: la scelta si fa dal PC, e il telefono può non raggiungere quel
+relay — il coro è l'unica forma che regge a un lato solo che funziona.
+2) Accettare un «ack» generico nel QR: la NIP-46 dice «client MUST
+validate the secret», Amber lo rimanda, e senza quel confronto chiunque
+veda il codice ci lega al firmatario sbagliato. 3) Aspettare TUTTI i
+relay prima del codice: un morto costa 15 s, e il QR comparirebbe
+sempre dopo quindici secondi. 4) `auth.nostr1.com` in lista (è di
+serie in Amber): chiede l'AUTH, che il client ora sa fare, ma tre
+relay dedicati che non la chiedono bastano, e ogni relay in più è un
+QR più denso. 5) Tenere damus «in coda»: un posto in lista è un posto
+nel QR e nel coro, e un relay che accetta e tace è tempo perso per il
+telefono.
+
+**PROVATO.** `prove_bunker_muto` e `prove_login_qr` riscritte per il
+coro (90 prove, 0 rosse, le due sezioni girate da sole; sentinelle sul
+testo e DUE banchi di cartone in node): il caso dal campo — il primo
+relay tace, la risposta arriva dal SECONDO e il bunker è collegato —,
+la stessa risposta da due relay che vale una volta, un relay che chiude
+mentre l'altro è vivo (si resta) e tutti e due che chiudono (si cade
+subito col motivo), un rifiuto a metà (si resta) e di tutti (si cade
+nominandoli), «publish timed out» che non fa cadere, il firmatario che
+risponde in NIP-04 e la richiesta dopo che parte in NIP-04,
+l'auth-required firmato e il relay che poi risponde, LA GRAZIA (un
+relay che non risponde alla connect non tiene fermo il coro oltre
+2,5 s né i 15 del timeout); per il QR: con un relay vivo il codice ne
+porta uno, con due li porta tutti e due, l'ascolto è già aperto quando
+il codice compare, l'impostore non apre, il segreto giusto dal secondo
+relay apre e al bunker passano gli stessi relay, senza relay nessun
+codice. I tre pezzi JS si estraggono interi (nessuna riga vuota dentro,
+che `pezzo_js` taglia alla prima). Gli script del client passano `node
+--check`. La suite intera severa (`PROVE_SEVERE=1 python prove.py`),
+nel worktree senza config, ribasato su `764fbfd` (l'annullo del
+venditore, ultimo main): 17.819 passate, 4 rosse — le stesse 4 di
+sempre (il barattolo AVIF, manca il plugin di Pillow in locale; in
+CI c'e'). In gabbia anche `collaudo_letture_relay`,
+`collaudo_rotte_metodi` e `collaudo_porta_timer`, verdi.
+
+**COSA NON HO PROVATO DAL VIVO.** Nessun Amber vero inquadrato: il
+sorgente dice che risponde col segreto in NIP-44 sui relay della URI,
+e i relay nuovi rispondono alle REQ da qui, ma «da qui» non è «dal
+telefono di Andrea». Il giro end-to-end — PC, QR, Amber, approva,
+entra — va fatto a mano dopo il deploy; se non entra, le righe 🟪 della
+console del PC dicono quale relay ha parlato e cosa.
+
+**DA GUARDARE.** 1) La misura dei relay andrebbe rifatta ogni tanto
+con una REQ (il commento di `RELAYS_NIP46` dice come): oggi i quattro
+rispondono, domani chissà. 2) Il bunker di nsec.app porta nella sua URI
+`relay.nsec.app`, che da qui va in timeout: col coro non cambia niente
+se la URI porta anche altri relay, ma se ne porta uno solo il login col
+bunker nsec.app resta impossibile da questa rete, e lo dice l'errore.
+3) La PR #17 «Entrare con Amber» (ago 2026) è ancora aperta su GitHub
+ma il suo codice è su `main` da allora: va chiusa.
