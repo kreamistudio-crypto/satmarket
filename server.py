@@ -1568,10 +1568,14 @@ async def guardia_csrf(request, call_next):
 #  - nosniff: il browser non indovina un tipo diverso da quello
 #    dichiarato (ogni rotta di casa lo dichiara: js, woff2, json, html);
 #  - Referrer-Policy: quel che i browser fanno gia' di default, scritto;
-#  - Permissions-Policy: SOLO cio' che l'app non usa mai (microfono,
-#    pagamenti del browser, USB, MIDI). Fotocamera e posizione NON si
-#    nominano: dentro l'iframe di Telegram Web a concederle e' il
-#    genitore, e una riga qui potrebbe solo toglierle;
+#  - Permissions-Policy: SOLO cio' che l'app non usa mai (fotocamera,
+#    microfono, pagamenti del browser, USB, MIDI). La FOTOCAMERA si
+#    spegne dal 1 ott 2026 (decisione di Andrea nel cantiere «📍 Sono
+#    qui»): la usava solo il QR di «Siamo insieme», uscito dal flusso, e
+#    le foto degli annunci passano dal selettore dei file, che questa
+#    riga non tocca. La POSIZIONE invece NON si nomina: la chiede «📍
+#    Sono qui», e dentro l'iframe di Telegram Web a concederla e' il
+#    genitore — una riga qui potrebbe solo toglierla;
 #  - HSTS, solo sul dominio pubblico: mai sull'onion (che il TLS non ce
 #    l'ha) ne' in collaudo (http://127.0.0.1). Un anno, senza
 #    includeSubDomains (il relay e' un sottodominio con la sua vita) e
@@ -1602,7 +1606,7 @@ async def guardia_csrf(request, call_next):
 CINTURE_HTTP = (
     ("X-Content-Type-Options", "nosniff"),
     ("Referrer-Policy", "strict-origin-when-cross-origin"),
-    ("Permissions-Policy", "microphone=(), payment=(), usb=(), midi=()"),
+    ("Permissions-Policy", "camera=(), microphone=(), payment=(), usb=(), midi=()"),
 )
 HSTS_UN_ANNO = "max-age=31536000"
 DIRETTIVE_CSP_PROVA = (
@@ -48533,7 +48537,18 @@ def _confronto_presenze_p2p(presenze: list, appuntamenti: list) -> dict:
     arrivata (`appuntamento`, l'id della versione): «all'ora» entro
     P2P_APPUNTAMENTO_FINESTRA_S, e la distanza dal luogo calcolata
     all'arrivo. In testa quello in vigore alla prima presenza scelta (o
-    l'ultimo), con quante versioni ci sono state e se e' cambiato DOPO."""
+    l'ultimo), con quante versioni ci sono state e se e' cambiato DOPO.
+    LA REGOLA DELLA DISPUTA che vale per il caso (`regola`, 1 ott 2026,
+    precisata da Andrea): «incontro» se la prova c'e' (probabile);
+    «decide_moderatore» se chi compra ha segnato la presenza ALL'ORA e
+    VICINO AL LUOGO dell'appuntamento e chi vende no — una qualunque delle
+    sue presenze, e «chi vende no» vuol dire nessuna delle sue cosi':
+    allora la disputa non va in automatico a chi vende; altrimenti
+    «senza_prova», cioe' se chi vende dice di non aver ricevuto i
+    contanti si da' ragione a lui. Vicino vuol dire entro
+    P2P_SONO_QUI_LONTANI_M piu' la precisione di quella presenza, la
+    stessa misura di «lontani»; senza posizione o senza il punto del
+    luogo non si puo' dire, e vale la regola di sempre."""
     def di(lato):
         return [p for p in presenze if p.get("lato") == lato]
 
@@ -48558,6 +48573,11 @@ def _confronto_presenze_p2p(presenze: list, appuntamenti: list) -> dict:
         return {"ora": ora_app, "scarto_s": scarto,
                 "all_ora": (abs(scarto) <= P2P_APPUNTAMENTO_FINESTRA_S) if scarto is not None else None,
                 "dist_luogo": int(dist) if dist is not None else None}
+
+    def al_luogo(p):
+        r = rispetto(p)
+        return bool(r and r["all_ora"] and r["dist_luogo"] is not None
+                    and r["dist_luogo"] <= P2P_SONO_QUI_LONTANI_M + int(p.get("acc") or 0))
 
     def vista(p, tutte):
         return {"ora": int(p["ora"]), "posizione": bool(p.get("posizione")),
@@ -48616,6 +48636,12 @@ def _confronto_presenze_p2p(presenze: list, appuntamenti: list) -> dict:
             "ora": int(in_vigore.get("ora_incontro") or 0), "punto": bool(in_vigore.get("punto")),
             "versioni": len(appuntamenti),
             "cambiato_dopo": prima is not None and any(int(a["quando"]) > prima for a in appuntamenti)}
+    if fuori["esito"] == "probabile":
+        fuori["regola"] = "incontro"
+    elif any(al_luogo(p) for p in compra) and not any(al_luogo(p) for p in vende):
+        fuori["regola"] = "decide_moderatore"
+    else:
+        fuori["regola"] = "senza_prova"
     return fuori
 
 

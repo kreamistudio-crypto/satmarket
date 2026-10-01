@@ -61,7 +61,7 @@ from urllib.parse import parse_qs, urlparse
 import collaudo_pagamento_p2p as banco
 import schnorr_puro
 
-ORD = ["c0a7a271-d15b-4a2b-9c3d-0000000000%02x" % n for n in range(1, 8)]
+ORD = ["c0a7a271-d15b-4a2b-9c3d-0000000000%02x" % n for n in range(1, 9)]
 MOD = 999
 SK_VENDE = hashlib.sha256(b"collaudo contanti: chi vende").digest()
 SK_COMPRA = hashlib.sha256(b"collaudo contanti: chi compra").digest()
@@ -337,6 +337,17 @@ def main():
     con.commit()
     con.close()
     manda(ORD[4], "dispute-opened", t + 340, "buyer")
+    # LA REGOLA PER IL CASO (1 ott 2026, precisata da Andrea dopo gli
+    # scatti): chi compra c'era, all'ora e vicino al luogo; chi vende no
+    manda(ORD[7], "taken", t + 400, "buyer", "take")
+    manda(ORD[7], "hold-invoice-paid", t + 410, "seller")
+    adesso = int(time.time())
+    banco.come(V)
+    banco.esito(SRV.appuntamento_p2p, {"ordine": ORD[7], "nota": nota(
+        SK_VENDE, ORD[7], "appuntamento", adesso, quando=adesso + 600, geo=PUNTO)})
+    banco.come(C)
+    banco.esito(SRV.sono_qui_p2p, {"ordine": ORD[7], "nota": nota(SK_COMPRA, ORD[7], "qui", adesso, geo=GEO_C)})
+    manda(ORD[7], "dispute-opened", t + 430, "buyer")
     m = moderazione()
     per = {d["ordine"]: d for d in m["dispute"]}
     c0 = (per.get(ORD[0]) or {}).get("presenze") or {}
@@ -349,6 +360,13 @@ def main():
           [((c0.get("compra") or {}).get("appuntamento") or {}).get("all_ora"),
            0 <= (((c0.get("compra") or {}).get("appuntamento") or {}).get("dist_luogo") or -1) <= 15,
            (c0.get("appuntamento") or {}).get("versioni"), (c0.get("appuntamento") or {}).get("cambiato_dopo")])
+    c7 = (per.get(ORD[7]) or {}).get("presenze") or {}
+    prova("LA REGOLA PER IL CASO, dal server vero: chi compra all'appuntamento e vicino, chi vende no → decide il "
+          "moderatore; con l'incontro, «incontro»",
+          ["solo_compra", True, True, "decide_moderatore", "incontro"],
+          [c7.get("esito"), ((c7.get("compra") or {}).get("appuntamento") or {}).get("all_ora"),
+           0 <= (((c7.get("compra") or {}).get("appuntamento") or {}).get("dist_luogo") or -1) <= 15,
+           c7.get("regola"), c0.get("regola")])
     prova("...uno scambio in contanti senza niente: nessun confronto e nessuna prova (il client dice «nessuna»)",
           [True, None, None], [ORD[3] in per, per[ORD[3]]["presenze"], per[ORD[3]]["incontro"]])
     prova("...la prova col QR di ieri resta leggibile, sul suo giro", [t + 330, 12],

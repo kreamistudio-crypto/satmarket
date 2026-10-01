@@ -112452,6 +112452,21 @@ out.mod = {
     rigaIncontroModP2P({metodi: 'Contanti', incontro: null, presenze: C1}, false)],
   durata: [durataModP2P(20), durataModP2P(162), durataModP2P(-2100), durataModP2P(9780), durataModP2P(7200)],
   metri: [metriModP2P(25), metriModP2P(1234), metriModP2P(5200), metriModP2P(999.6), metriModP2P('x')]};
+/* (1 ott 2026) LA REGOLA PER IL CASO, detta al moderatore: il campo
+   `regola` del server, a disputa aperta e sul contanti */
+const SOLO_C = {esito: 'solo_compra', compra: presenza(ORA_V, true, 9, rAll(-120, 40)), vende: null, scarto_s: null,
+  distanza: null, posizioni_via: false, appuntamento: APP};
+out.mod.regola = [
+  rigaIncontroModP2P({metodi: 'Contanti', incontro: null, presenze: Object.assign({}, C1, {regola: 'incontro'})}, true),
+  rigaIncontroModP2P({metodi: 'Contanti', incontro: null, presenze: Object.assign({}, SOLO_C, {regola: 'decide_moderatore'})}, true),
+  rigaIncontroModP2P({metodi: 'Contanti', incontro: null, presenze: Object.assign({}, SOLO_C, {regola: 'decide_moderatore'})}, false),
+  rigaIncontroModP2P({metodi: 'Contanti', incontro: null, presenze: {esito: 'nessuna', compra: null, vende: null,
+    scarto_s: null, distanza: null, posizioni_via: false, appuntamento: null, regola: 'senza_prova'}}, true),
+  rigaIncontroModP2P({metodi: 'Contanti', incontro: null, presenze: null}, true),
+  rigaIncontroModP2P({metodi: 'SEPA', incontro: null, presenze: null}, true),
+  rigaIncontroModP2P({metodi: 'Contanti', incontro: null, presenze: Object.assign({}, SOLO_C, {regola: undefined})}, true)];
+/* ...e nel riquadro, dai due lati, la regola con la sua eccezione */
+out.eccezione = [r1, r2].map(h => ha(h, esc(REGOLA_DISPUTA_CONTANTI) + ' ' + esc(REGOLA_DISPUTA_ECCEZIONE)));
 out.distanza = [distanzaIncontroP2P({distanza: null, posizioni: 0}), distanzaIncontroP2P({distanza: null, posizioni: 1}),
   distanzaIncontroP2P({distanza: 1200, posizioni: 2, precisione: 0}), distanzaIncontroP2P(null)];
 out.quando = quandoIncontroP2P(ADESSO);
@@ -112650,6 +112665,7 @@ def prove_contanti_pagina_leggera():
         riga_js("const CONSIGLI_CONTANTI = "),
         riga_js("const REGOLA_BREVE_CONTANTI_COMPRA = "), riga_js("const REGOLA_BREVE_CONTANTI_VENDE = "),
         riga_js("const SPIEGA_SONO_QUI = "), riga_js("const REGOLA_DISPUTA_CONTANTI = "),
+        riga_js("const REGOLA_DISPUTA_ECCEZIONE = "),
         fn("function consigliIncontroP2P(lato){"), fn("function pagaInContantiP2P(o){"),
         fn("function metodoSceltoP2P(o){"), blocco_const("STATI_CONTANTI_P2P"),
         fn("function statoContantiP2P(o, t){"), fn("function gestoPagoP2P(o){"),
@@ -112830,13 +112846,28 @@ def prove_contanti_a_mano():
           and '<li id="p2pInfoContantiTetto"></li>' in info
           and "<b>📍 «Sono qui», la prova d'incontro.</b>" in info
           and "<b>🕒 L'appuntamento.</b>" in info)
-    prova("...e le regole la' sono le stesse frasi del client, parola per parola — anche quella della disputa",
-          [True, True, True, True],
+    prova("...e le regole la' sono le stesse frasi del client, parola per parola — anche quella della disputa, con l'eccezione",
+          [True, True, True, True, True],
           [testo("REGOLA_CONTANTI_COMPRA") in info, testo("REGOLA_CONTANTI_VENDE") in info,
-           testo("CONSIGLI_CONTANTI") in info, testo("REGOLA_DISPUTA_CONTANTI") in info])
+           testo("CONSIGLI_CONTANTI") in info,
+           testo("REGOLA_DISPUTA_CONTANTI") + " " + testo("REGOLA_DISPUTA_ECCEZIONE") in info,
+           testo("REGOLA_DISPUTA_CONTANTI") in info])
     prova("...la regola della disputa e' quella di Andrea, alla lettera",
           "Se chi vende dice di non aver ricevuto i contanti e non c'è la prova d'incontro, "
           "in disputa si dà ragione a chi vende.", testo("REGOLA_DISPUTA_CONTANTI"))
+    # (1 ott 2026, dopo gli scatti) LA PRECISAZIONE DI ANDREA: chi compra
+    # che si e' presentato all'appuntamento non perde in automatico
+    prova("...e la sua eccezione, precisata da Andrea, anche: in Info P2P, nel riquadro e (per il caso) al moderatore",
+          ["Ma se chi compra ha segnato la presenza all'ora e vicino al luogo dell'appuntamento e chi vende no, "
+           "la disputa non va in automatico a chi vende: decide il moderatore.",
+           "⚖️ Chi compra ha segnato la presenza all'ora e vicino al luogo dell'appuntamento e chi vende no: "
+           "la disputa non va in automatico a chi vende, decide il moderatore.",
+           "⚖️ Non c'è la prova d'incontro: se chi vende dice di non aver ricevuto i contanti, "
+           "in disputa si dà ragione a chi vende."],
+          [testo("REGOLA_DISPUTA_ECCEZIONE"), testo("REGOLA_DISPUTA_MOD_DECIDE"), testo("REGOLA_DISPUTA_MOD_SENZA")])
+    eui = nudo(fn("function euroInviatiP2P(){"))
+    prova("...e la conferma di «Ho consegnato i contanti» porta la SOLA regola: la legge chi la presenza non l'ha segnata",
+          [True, False], ["REGOLA_DISPUTA_CONTANTI" in eui, "REGOLA_DISPUTA_ECCEZIONE" in eui])
     prova("...e la frase prima del primo tocco anche",
           "Registra ora e posizione: facoltativo, ma aiuta a risolvere le dispute.", testo("SPIEGA_SONO_QUI"))
     prova("...con la cautela sul GPS, la posizione mai all'altro, e niente QR", [True, True, False, False],
@@ -113242,6 +113273,33 @@ def prove_contanti_a_mano():
     prova("le posizioni scordate si dicono, e le distanze di prima restano", [True, 25],
           (lambda c: [c["posizioni_via"], c["distanza"]])(cp(
               [P(1, "compra", ORA, via=ORA + 99), P(2, "vende", ORA + 60, vic={"1": 25}, via=ORA + 99)], [])))
+    # LA REGOLA PER IL CASO (1 ott 2026, precisata da Andrea dopo gli
+    # scatti): il server dice quale vale, il moderatore la legge detta
+    rg = lambda pres, apps=(A1,): cp(pres, list(apps))["regola"]
+    prova("LA REGOLA PER IL CASO: senza prova quella di sempre; con l'incontro nessuna",
+          ["senza_prova", "incontro"],
+          [rg([], ()), rg([P(1, "compra", ORA), P(2, "vende", ORA + 120, vic={"1": 25})], ())])
+    prova("...chi compra all'ora e vicino al luogo e chi vende no: decide il moderatore (anche col tocco di casa davanti)",
+          ["decide_moderatore", "decide_moderatore"],
+          [rg([P(1, "compra", ORA + 1700, app_=7, dl=40)]),
+           rg([P(1, "compra", ORA - 7200), P(2, "compra", ORA + 1700, app_=7, dl=40)])])
+    prova("...ma non lontano dal luogo, fuori dall'ora, senza posizione, senza appuntamento, ne' per chi vende",
+          ["senza_prova"] * 5,
+          [rg([P(1, "compra", ORA + 1700, app_=7, dl=900)]),
+           rg([P(1, "compra", ORA + 1800 + 1801, app_=7, dl=40)]),
+           rg([P(1, "compra", ORA + 1700, pos=False, app_=7)]),
+           rg([P(1, "compra", ORA + 1700, dl=40)]),
+           rg([P(1, "vende", ORA + 1700, app_=7, dl=40)])])
+    prova("...vicino e' entro 500 m piu' la precisione di QUELLA presenza: 510 si', 511 no (a ±10 m)",
+          ["decide_moderatore", "senza_prova"],
+          [rg([P(1, "compra", ORA + 1700, acc=10, app_=7, dl=510)]),
+           rg([P(1, "compra", ORA + 1700, acc=10, app_=7, dl=511)])])
+    prova("...«e chi vende no» vale anche per chi vende presente ma non all'appuntamento; c'erano tutti e due, no",
+          [["ore_diverse", "decide_moderatore"], ["ore_diverse", "senza_prova"]],
+          [(lambda c: [c["esito"], c["regola"]])(cp(
+              [P(1, "compra", ORA + 1700, app_=7, dl=40), P(2, "vende", ORA + 5300, app_=7, dl=30)], [A1])),
+           (lambda c: [c["esito"], c["regola"]])(cp(
+              [P(1, "compra", ORA + 800, app_=7, dl=40), P(2, "vende", ORA + 2100, app_=7, dl=30)], [A1]))])
 
     # LA PRIVACY: scordare, scopare, dimenticare
     n = amb["_scorda_posizioni_presenza_p2p"](con, ORD, ORA + 1000)
@@ -113325,7 +113383,7 @@ def prove_contanti_a_mano():
         riga_js("const REGOLA_CONTANTI_COMPRA = "), riga_js("const REGOLA_CONTANTI_VENDE = "),
         riga_js("const CONSIGLI_CONTANTI = "), riga_js("const REGOLA_BREVE_CONTANTI_COMPRA = "),
         riga_js("const REGOLA_BREVE_CONTANTI_VENDE = "), riga_js("const SPIEGA_SONO_QUI = "),
-        riga_js("const REGOLA_DISPUTA_CONTANTI = "),
+        riga_js("const REGOLA_DISPUTA_CONTANTI = "), riga_js("const REGOLA_DISPUTA_ECCEZIONE = "),
         fn("function regolaContantiFoglioP2P(metodi, tetto, lato){"), fn("function testoTettoContantiP2P(tetto){"),
         fn("function quandoIncontroP2P(ts){"), fn("function distanzaIncontroP2P(p){"),
         fn("function consigliIncontroP2P(lato){"), fn("function passoDueContantiP2P(o, a){"),
@@ -113346,7 +113404,8 @@ def prove_contanti_a_mano():
         fn("function dataTabacchinoP2P(epoch){"), fn("function leggiDataTabacchinoP2P(testo){"),
         riga_js("const CAUTELA_INCONTRO_MOD = "), fn("function durataModP2P(s){"), fn("function metriModP2P(m){"),
         fn("function rigaAppuntamentoModP2P(c){"), fn("function righeConfrontoModP2P(c){"),
-        fn("function rigaIncontroModP2P(d, aperta){"),
+        riga_js("const REGOLA_DISPUTA_MOD_DECIDE = "), riga_js("const REGOLA_DISPUTA_MOD_SENZA = "),
+        fn("function regolaDisputaModP2P(c){"), fn("function rigaIncontroModP2P(d, aperta){"),
         fn("function maxEuroP2P(){"), fn("function maxEuroContantiP2P(){"),
         # il giudice del foglio Pubblica, coi suoi attrezzi
         fn("function interoP2P(testo){"), fn("function centesimiP2P(testo){"),
@@ -113520,6 +113579,20 @@ def prove_contanti_a_mano():
     prova("le durate e i metri come si leggono", [["meno di un minuto", "3 min", "35 min", "2 h 43 min", "2 h"],
                                                    ["25 m", "1,2 km", "5,2 km", "1 km", ""]],
           [md["durata"], md["metri"]])
+    import html as _html
+    rgm = [_html.unescape(x) for x in md["regola"]]
+    decide = ("⚖️ Chi compra ha segnato la presenza all'ora e vicino al luogo dell'appuntamento e chi vende no: "
+              "la disputa non va in automatico a chi vende, decide il moderatore.")
+    senza = ("⚖️ Non c'è la prova d'incontro: se chi vende dice di non aver ricevuto i contanti, "
+             "in disputa si dà ragione a chi vende.")
+    prova("LA REGOLA AL MODERATORE, per il caso: con l'incontro niente; chi compra all'appuntamento e chi vende no: decide lui",
+          [False, True, True, False],
+          ["⚖️" in rgm[0], decide in rgm[1], 0 < rgm[1].find(decide) < rgm[1].find("si può falsificare"), "⚖️" in rgm[2]])
+    prova("...a disputa chiusa non si ripete; senza prova la regola di sempre, anche quando il server non ha dati",
+          [True, True, True], [senza in rgm[3], "📍 Nessuna prova d'incontro" in rgm[4], senza in rgm[4]])
+    prova("...niente sugli altri metodi, e niente se il server il campo non lo manda", ["", False],
+          [rgm[5], "⚖️" in rgm[6]])
+    prova("IL RIQUADRO, dai due lati: la regola con la sua eccezione, in fila", [True, True], o["eccezione"])
     prova("la distanza della prova col QR: senza posizioni, con una sola, coi metri, niente su null",
           [", senza posizioni", ", con la posizione di un solo telefono", ", a 1.200 m di distanza", ""], o["distanza"])
     prova("l'ora della prova col QR si dice «alle HH:MM del …»", True, bool(re.fullmatch(r"alle \d\d:\d\d del 3 ott", o["quando"])))
@@ -117162,12 +117235,19 @@ def prove_csp_prova():
     prova("nosniff c'e'", "nosniff", cinture["X-Content-Type-Options"])
     prova("...e il referrer e' quello di default dei browser",
           "strict-origin-when-cross-origin", cinture["Referrer-Policy"])
-    # fotocamera e posizione NON si nominano: nell'iframe di Telegram
-    # Web a concederle e' il genitore, e una riga qui potrebbe solo
-    # toglierle
-    prova("Permissions-Policy non tocca fotocamera e posizione", [],
-          [p for p in ("camera", "geolocation")
-           if p in cinture["Permissions-Policy"]])
+    # EMENDATA (1 ott 2026, decisione di Andrea nel cantiere «📍 Sono
+    # qui»): la FOTOCAMERA si spegne — la usava solo il QR di «Siamo
+    # insieme», uscito dal flusso. La POSIZIONE resta non nominata: la
+    # chiede «Sono qui», e nell'iframe di Telegram Web a concederla e' il
+    # genitore — una riga qui potrebbe solo toglierla
+    prova("Permissions-Policy spegne la fotocamera e non tocca la posizione", [True, False],
+          ["camera=()" in cinture["Permissions-Policy"], "geolocation" in cinture["Permissions-Policy"]])
+    # ...e se la fotocamera tornasse in pagina, questa riga la spegnerebbe
+    # in silenzio: la guardia lo dice prima (le foto degli annunci passano
+    # dal selettore dei file, che la riga non tocca)
+    _pagina = open("miniapp.html", encoding="utf-8").read()
+    prova("...e nessuna parte dell'app chiede la fotocamera (getUserMedia, BarcodeDetector, lo scanner di Telegram)", [],
+          [x for x in ("getUserMedia", "BarcodeDetector", "showScanQrPopup", "mediaDevices") if x in _pagina])
     prova("...e spegne solo cio' che l'app non usa", True,
           "microphone=()" in cinture["Permissions-Policy"])
 

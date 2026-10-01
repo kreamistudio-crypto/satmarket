@@ -10384,7 +10384,7 @@ document.getElementById('cartello')?.remove();</script>
       </ol>
       <p><b>🕒 L'appuntamento.</b> Chi vende indica <b>dove e quando</b> vedervi: il giorno e l'ora col selettore del telefono, e il luogo come <b>indirizzo vero</b> — mentre lo scrive gli proponiamo indirizzi esistenti, o usa la sua posizione. Chi compra lo trova in cima alla pagina dello scambio, con <b>«🧭 Apri nel navigatore»</b>. Se l'appuntamento cambia, l'altra persona riceve l'avviso.</p>
       <p><b>📍 «Sono qui», la prova d'incontro.</b> Quando arrivate, ognuno tocca «Sono qui» dal suo telefono, senza aspettare l'altro: si registrano l'<b>ora esatta</b> e, se il telefono la dà, la <b>posizione</b>, firmate con la chiave usa-e-getta dello scambio. È <b>facoltativo</b>, per la privacy, ma aiuta a risolvere le dispute. L'altra persona vede l'ora in cui l'hai segnato, <b>mai la tua posizione</b>; un moderatore, solo in caso di disputa, vede se eravate lì insieme, all'ora e vicino al luogo dell'appuntamento. <b>Il GPS si può falsificare:</b> la posizione è una conferma, non una prova assoluta.</p>
-      <p><b>In disputa, sul contanti.</b> Se chi vende dice di non aver ricevuto i contanti e non c'è la prova d'incontro, in disputa si dà ragione a chi vende. Lo scriviamo adesso, prima dello scambio, e non il giorno della disputa.</p>
+      <p><b>In disputa, sul contanti.</b> Se chi vende dice di non aver ricevuto i contanti e non c'è la prova d'incontro, in disputa si dà ragione a chi vende. Ma se chi compra ha segnato la presenza all'ora e vicino al luogo dell'appuntamento e chi vende no, la disputa non va in automatico a chi vende: decide il moderatore. Lo scriviamo adesso, prima dello scambio, e non il giorno della disputa.</p>
 
       <h3>I tempi</h3>
       <!-- gli stessi segnaposto, per la stessa ragione: le finestre
@@ -55667,6 +55667,13 @@ const REGOLA_BREVE_CONTANTI_VENDE = 'Conta i contanti davanti a chi ti paga, poi
    contanti» e «Info P2P» — una prova le confronta parola per parola. */
 const SPIEGA_SONO_QUI = 'Registra ora e posizione: facoltativo, ma aiuta a risolvere le dispute.';
 const REGOLA_DISPUTA_CONTANTI = 'Se chi vende dice di non aver ricevuto i contanti e non c\'è la prova d\'incontro, in disputa si dà ragione a chi vende.';
+/* ...e LA SUA ECCEZIONE (1 ott 2026, precisata da Andrea dopo gli scatti):
+   chi compra che si e' presentato all'appuntamento non perde in
+   automatico. Sta accanto alla regola nel riquadro e in «Info P2P»; la
+   conferma di «Ho consegnato i contanti» porta solo la regola, perche'
+   la legge chi la presenza non l'ha segnata. Il moderatore la trova
+   detta per il SUO caso (`regolaDisputaModP2P`). */
+const REGOLA_DISPUTA_ECCEZIONE = 'Ma se chi compra ha segnato la presenza all\'ora e vicino al luogo dell\'appuntamento e chi vende no, la disputa non va in automatico a chi vende: decide il moderatore.';
 /* i consigli dietro «Consigli per l'incontro ›», dal proprio lato: la
    coda della regola per prima, poi il posto, la prova d'incontro, la
    cautela sul GPS */
@@ -55833,7 +55840,7 @@ function riquadroContantiP2P(o, azione){
       '<div class="contanti-righe">' + righePresenzeP2P(o) + '</div>' +
       (o.soloVista || !mia ? '' : '<button type="button" class="scopri-link contanti-ancora" onclick="sonoQuiP2P()">📍 Segna di nuovo</button>') +
     '</div>' +
-    '<div class="contanti-disputa">⚖️ ' + esc(REGOLA_DISPUTA_CONTANTI) + '</div>';
+    '<div class="contanti-disputa">⚖️ ' + esc(REGOLA_DISPUTA_CONTANTI) + ' ' + esc(REGOLA_DISPUTA_ECCEZIONE) + '</div>';
   h += '<details class="contanti-consigli" data-o="' + esc(o.id) + '"'
     + (p2pConsigliAperti[o.id] ? ' open' : '')
     + ' ontoggle="p2pConsigliAperti[this.dataset.o] = this.open">'
@@ -64095,6 +64102,19 @@ function righeConfrontoModP2P(c){
   if (c.appuntamento) righe.push(rigaAppuntamentoModP2P(c));
   return righe;
 }
+/* LA REGOLA DELLA DISPUTA PER IL CASO (1 ott 2026, precisata da Andrea
+   dopo gli scatti): quale vale lo dice il server (`regola` del
+   confronto), qui ci sono le parole — le stesse della regola e della sua
+   eccezione in «Info P2P» e nel riquadro, dette per il caso. Con la prova
+   d'incontro non si aggiunge niente; senza dati dal server vale la regola
+   di sempre; un server che il campo non lo manda non fa dire niente. */
+const REGOLA_DISPUTA_MOD_DECIDE = '⚖️ Chi compra ha segnato la presenza all\'ora e vicino al luogo dell\'appuntamento e chi vende no: la disputa non va in automatico a chi vende, decide il moderatore.';
+const REGOLA_DISPUTA_MOD_SENZA = '⚖️ Non c\'è la prova d\'incontro: se chi vende dice di non aver ricevuto i contanti, in disputa si dà ragione a chi vende.';
+function regolaDisputaModP2P(c){
+  const r = c ? c.regola : 'senza_prova';
+  return r === 'decide_moderatore' ? REGOLA_DISPUTA_MOD_DECIDE
+    : r === 'senza_prova' ? REGOLA_DISPUTA_MOD_SENZA : '';
+}
 function rigaIncontroModP2P(d, aperta){
   const contanti = contantiAManoP2P(String(d.metodi || '').split(','));
   const p = d.incontro;
@@ -64103,8 +64123,12 @@ function rigaIncontroModP2P(d, aperta){
       + esc(distanzaIncontroP2P(p)) + (p.posizioni_via ? ' · posizioni cancellate' : '') + '</div>'
       + (aperta ? '<div class="hint">Le due firme sono verificate. La posizione viene dal GPS dei telefoni e si può falsificare: è una conferma, non una prova assoluta.</div>' : '');
   const righe = righeConfrontoModP2P(d.presenze);
-  if (!righe.length) return contanti ? '<div class="mod-riga mod-incontro">📍 Nessuna prova d\'incontro</div>' : '';
-  return righe.map(r => '<div class="mod-riga mod-incontro">' + esc(r) + '</div>').join('')
+  /* la regola si legge dove si decide: a disputa aperta, sul contanti */
+  const regola = aperta && contanti ? regolaDisputaModP2P(d.presenze) : '';
+  const riga = r => '<div class="mod-riga mod-incontro">' + esc(r) + '</div>';
+  if (!righe.length)
+    return contanti ? '<div class="mod-riga mod-incontro">📍 Nessuna prova d\'incontro</div>' + (regola ? riga(regola) : '') : '';
+  return righe.map(riga).join('') + (regola ? riga(regola) : '')
     + (aperta ? '<div class="hint">' + esc(CAUTELA_INCONTRO_MOD) + '</div>' : '');
 }
 const MOD_STATI_P2P = {aperta: 'Aperta', presa: 'Presa', chiusa: 'Chiusa'};

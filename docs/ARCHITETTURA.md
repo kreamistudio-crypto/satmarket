@@ -5823,7 +5823,9 @@
   aperte degli audit»): il middleware `cinture_http` — che nel file
   sta PRIMA di `no_iframe`, cioè gli gira DENTRO — mette su ogni
   risposta nosniff, Referrer-Policy, Permissions-Policy (solo ciò che
-  l'app non usa: microfono, pagamenti, USB, MIDI) e HSTS dove
+  l'app non usa: fotocamera — dal 1 ott 2026, uscito il QR del
+  contanti —, microfono, pagamenti, USB, MIDI; mai la posizione, che
+  chiede «📍 Sono qui») e HSTS dove
   `_host_con_hsts` lo ammette (mai onion, collaudo, locale); e sulle
   sole pagine HTML di casa la `Content-Security-Policy-Report-Only`
   (`CSP_PROVA`), che riferisce al cestino `POST /api/csp-report` e non
@@ -28693,8 +28695,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   azione)` porta la TESTA della regola (`REGOLA_BREVE_CONTANTI_COMPRA` /
   `_VENDE`, una prova la tiene uguale all'inizio della frase intera), il
   passo «📍 Sono qui» (`.contanti-incontro`, filo verde: dal 1 ott al
-  posto di «🤝 Siamo insieme»), la regola della disputa in una riga
-  (`.contanti-disputa`, `REGOLA_DISPUTA_CONTANTI`) e i consigli in un
+  posto di «🤝 Siamo insieme»), la regola della disputa con la sua
+  eccezione (`.contanti-disputa`, `REGOLA_DISPUTA_CONTANTI` +
+  `REGOLA_DISPUTA_ECCEZIONE`, la stessa coppia in «Info P2P»; la
+  conferma di «Ho consegnato» porta la sola regola) e i consigli in un
   `<details>` (`consigliIncontroP2P(lato)`: la coda della regola,
   `CONSIGLI_CONTANTI`, «Sono qui», il GPS) che si ricorda aperto in
   `p2pConsigliAperti` (il ridisegno confronta l'outerHTML). A disputa
@@ -28783,13 +28787,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   posizione, precisione, quante volte) col loro rapporto con
   l'appuntamento IN VIGORE QUANDO SONO ARRIVATE (`all_ora` entro
   `P2P_APPUNTAMENTO_FINESTRA_S` 30 min, `dist_luogo`), e in testa
-  l'appuntamento (ora, punto, versioni, `cambiato_dopo`). Le parole le
-  scrive il client: `righeConfrontoModP2P` e `rigaAppuntamentoModP2P`
+  l'appuntamento (ora, punto, versioni, `cambiato_dopo`). E `regola`,
+  la regola della disputa che vale per il caso (precisata da Andrea il
+  1 ott 2026): `incontro` se la prova c'è; `decide_moderatore` se una
+  presenza di chi compra è all'ora e vicino al luogo (entro 500 m più
+  la sua precisione) e nessuna di chi vende lo è; se no `senza_prova`.
+  Le parole le scrive il client: `righeConfrontoModP2P` e `rigaAppuntamentoModP2P`
   dentro `rigaIncontroModP2P(d, aperta)` («📍 Incontro probabile: …»,
   «📍 Presente solo chi compra alle …», «📍 Nessuna prova d'incontro»,
   «🕒 Appuntamento …: presenti all'ora dell'appuntamento, chi compra a
   N m e chi vende a M m dal luogo», «cambiato N volte» / «⚠️ cambiato
-  dopo la prima presenza»), e a card aperta `CAUTELA_INCONTRO_MOD`. LA
+  dopo la prima presenza»), e a card aperta, sul contanti, la regola
+  per il caso (`regolaDisputaModP2P`: «⚖️ … decide il moderatore» o
+  «⚖️ Non c'è la prova d'incontro: … si dà ragione a chi vende») e
+  `CAUTELA_INCONTRO_MOD`. LA
   PROVA COL QR DI IERI (`p2p_presenze`) non si scrive più ma si legge:
   `_incontro_p2p(con, ordine, giro)` sul SUO giro, `incontro` nella card
   («🤝 Incontro confermato col codice (QR) …»); alle parti non viaggia
