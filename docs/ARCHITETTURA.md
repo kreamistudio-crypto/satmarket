@@ -7996,11 +7996,12 @@
   non è più modificabile; guardie della vetrina (solo attivi, niente
   negozi in ferie) e l'hashtag della categoria in coda, lo stesso dei
   post — toccandolo si ritrova la stessa roba.
-  I COMANDI DI SERVIZIO sono dei moderatori di sempre più i due
-  username scritti nel CODICE (`ADMIN_BOT_USERNAME`: alanbimbati,
-  aandreaiita). L'username si legge dal MESSAGGIO e non dalla riga
-  `utenti`: quella potrebbe portarne uno vecchio di mesi, magari già
-  preso da qualcun altro. A chi non è admin NON si dice «non sei
+  I COMANDI DI SERVIZIO sono dei moderatori di sempre (`ADMIN_IDS`), e
+  basta: `e_admin_bot` riceve il mittente del messaggio e ne guarda il
+  solo id. Fino al 1 ott 2026 passavano anche due username scritti nel
+  codice (`ADMIN_BOT_USERNAME`): uno username si lascia e si riprende,
+  e chi se lo fosse preso avrebbe ereditato `/punti` — tolti (cantiere
+  «CSP e le voci aperte degli audit», cura 5). A chi non è admin NON si dice «non sei
   autorizzato» — direbbe a un curioso che quel comando esiste: riceve
   la risposta di un messaggio qualunque, cioè i bottoni.
   Negozio del venditore: colonna `utenti.negozio` = codice pubblico

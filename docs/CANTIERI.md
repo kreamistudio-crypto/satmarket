@@ -33690,3 +33690,74 @@ del sito (Andrea): è il tetto al corpo che il server non mette. 2) Il
 giorno di un HEIC da 200 MP nel journal: se la conversione pesa
 troppo, il tetto scende a 150 e si dice.
 
+
+## CSP e le voci aperte degli audit — 5) le quattro piccole: compare_digest, admin del bot per id, deploy.sh a file assente, le action inchiodate (1 ott 2026)
+
+Quattro voci basse dei due audit, curate insieme perché costano poco e
+non cambiano niente a chi usa l'app. (La cura 4 — i tetti e i freni —
+aspetta i numeri concordati con Andrea, ed è per questo che la 5 la
+precede.)
+
+**B1 — la firma dell'initData con `!=`.** `_utente_da_initdata` era
+l'unica delle cinque porte firmate (widget, webhook, le due porte P2P
+e lei) a confrontare l'HMAC con `!=`: adesso `hmac.compare_digest`,
+come le altre. Non era sfruttabile via rete in pratica; era una
+disomogeneità, e le disomogeneità si allargano.
+
+**M7 — i comandi di servizio del bot per username.** `e_admin_bot`
+accettava `ADMIN_IDS` OPPURE due username scritti nel codice
+(`alanbimbati`, `aandreaiita`): uno username Telegram si lascia e si
+riprende, e chi se lo fosse preso avrebbe ereditato `/canale`,
+`/sponsor`, `/vetrina` e `/punti` — cioè DOVE finiscono i pacchi. Via
+la tupla: resta `e_admin(id)`, e basta. Andrea ha verificato che
+`ADMIN_IDS` del VPS contiene lui e Alan, quindi nessuno perde niente.
+
+**B7 (secondo audit) — la cintura di cartone di `deploy.sh`.** A file
+dei firmatari ASSENTE lo script tornava a fidarsi dell'AUTORE della
+punta (`NOSTRI`, `BARATTOLO_AUTORI`), che in git è testo libero. Le
+firme sono accese dal 23 set; il caso che quella riga copriva è il
+file sparito per un errore di ripristino, e in quel caso il deploy deve
+FERMARSI e dirlo («manca il file dei firmatari … senza, nessuna punta si
+tira»), non tornare a fidarsi di una riga che chiunque scrive. Via la
+variabile, via il ramo: la firma si verifica sempre. Per spegnere le
+firme apposta si rimette il file (PRODUZIONE, «IL DEPLOY CHE SI FIDA
+SOLO DI MAIN»), non si toglie. ⚠️ Vale al prossimo giro del VPS: il
+giudice è sempre lo script GIÀ in produzione (la copia sotto `/run`),
+quindi questo commit lo tira ancora il `deploy.sh` di prima, e dal
+giro dopo giudica il nuovo.
+
+**B8 — le action della CI inchiodate allo sha.** `actions/checkout@v5`
+e `actions/setup-python@v6` erano tag mobili: un tag si sposta, uno
+sha no. Adesso lo sha di 40 esadecimali col tag scritto accanto
+(`# v5`, `# v6`). Il danno possibile era un rosso finto (il VPS non si
+fida della CI ma della firma); si chiude lo stesso, e gli
+aggiornamenti delle action da oggi sono un gesto: si cambia lo sha,
+non si eredita.
+
+**LE STRADE SCARTATE.** Tenere gli username «per comodità» con un
+avviso: il rischio stava proprio nel fatto che nessuno guarda.
+Spegnere la cintura con un flag: un flag è un'altra riga che chiunque
+scrive. Dependabot per le action: è una cosa in più da sorvegliare,
+e il repo ne ha già abbastanza.
+
+**PROVATO.** `prove_quattro_piccole` (9): `_utente_da_initdata` VERA
+con un `BOT_TOKEN` di cartone — un initData firmato apre, uno con
+l'ultimo carattere ritoccato è un 401 — e la sentinella che il `!=`
+non c'è più; `deploy.sh` letto: a file assente il giudice rifiuta con
+un motivo che lo dice, `NOSTRI`/`BARATTOLO_AUTORI`/«non e' dei nostri»
+non esistono più, `verify-commit` senza un ramo che lo salta; il
+workflow: ogni `uses:` inchiodato a uno sha di 40 esadecimali, col tag
+accanto. Nel banco del bot (`prove_canale_bot`) le prove degli
+username si sono rovesciate col perché: i due username di una volta
+NON passano più, nemmeno maiuscoli, la tupla non esiste più nel
+codice, i moderatori di sempre passano. Le due sezioni che leggono
+`deploy.sh` (`prove_deploy`, `prove_giudice_deploy`) verdi. `bash -n
+deploy.sh` pulito. Tortura 8 su 8 sulla copia. Non c'è
+niente da vedere dal vivo: tre delle quattro non hanno un gesto, e il
+bot risponde ai comandi di servizio come prima a chi sta in
+`ADMIN_IDS`.
+
+**COSA NON HO PROVATO.** Il `deploy.sh` nuovo sul VPS (gira dal giro
+dopo questo: si guarda `journalctl -u barattolo-deploy -n 3` al push
+successivo, che deve dire «🚀 … firma richiesta» come sempre).
+

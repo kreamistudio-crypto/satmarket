@@ -348,10 +348,11 @@ risposta su `/` e `/miniapp.html` (gli script sono inline: serve il nonce sui
   un macaroon: la GET cieca non lo porta) e a LNbits su `127.0.0.1:5001`.
 - **M5 (chiavi P2P senza firma):** `_registra_chiavi_p2p` (`server.py:37385`)
   accetta ancora qualunque 64-hex; lo sconto si presta.
-- **M7 (comandi del bot per username):** `ADMIN_BOT_USERNAME`
-  (`server.py:12401`) è ancora lì.
-- **B1:** la firma dell'initData si confronta ancora con `!=`
-  (`server.py:6938`).
+- **M7 (comandi del bot per username):** ✅ CURATA il 1 ott 2026 (cura 5
+  del cantiere «CSP e le voci aperte degli audit»): `ADMIN_BOT_USERNAME`
+  non esiste più. Com'era: è ancora lì (`server.py:12401`).
+- **B1:** ✅ CURATA il 1 ott 2026 (cura 5): `hmac.compare_digest`. Com'era:
+  si confrontava ancora con `!=` (`server.py:6938`).
 - **M4 (12 s nel ciclo seriale):** `LOOKUP_BUDGET` è ancora 12 s e la
   domanda dello sconto gira ancora dentro la presa (`barattolo_fee.rs:55`);
   nessun interruttore dopo N fallimenti.
@@ -401,14 +402,17 @@ risposta su `/` e `/miniapp.html` (gli script sono inline: serve il nonce sui
   (`barattolo_fee.rs:136`) fa `response.text()` senza tetto. Un server
   compromesso che risponde con un corpo da gigabyte lo fa scaricare a mostrod
   dentro il ciclo seriale. Cura: `Content-Length` sopra 64 KB = no.
-- **B7 — La cintura di cartone del deploy resta scritta:** a file dei
+- **B7 — La cintura di cartone del deploy resta scritta** (✅ CURATA il 1 ott
+  2026, cura 5: a file assente «rifiutato», `NOSTRI` non esiste più; vale
+  dal giro del VPS successivo al deploy di questo commit)**:** a file dei
   firmatari assente `deploy.sh` accetta l'autore fra `NOSTRI`
   (`deploy.sh:87`), che è testo libero. Le firme sono ACCESE (23 set: una
   punta nuda rifiutata), quindi oggi non morde; ma se il file sparisse per
   un errore di ripristino, il deploy tornerebbe a fidarsi di una riga che
   chiunque scrive, e lo direbbe solo nel journal. Cura: a file assente
   «rifiutato», non «cintura».
-- **B8 — Le action della CI non sono inchiodate allo sha** (`actions/checkout@v5`,
+- **B8 — Le action della CI non sono inchiodate allo sha** (✅ CURATA il 1
+  ott 2026, cura 5: sha di 40 esadecimali col tag accanto) (`actions/checkout@v5`,
   `actions/setup-python@v6`). Sono di GitHub, il token è `contents: read`, e
   il VPS non si fida della CI ma della firma: il danno possibile è un rosso
   finto. Basso, e si dichiara.

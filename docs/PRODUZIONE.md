@@ -1825,9 +1825,12 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   I QUATTRO CONTROLLI di `deploy.sh`, tutti PRIMA di toccare qualcosa:
   a) il commit STA SU MAIN (antenato di `origin/main`); b) va IN AVANTI
   rispetto a quel che gira; c) la punta è FIRMATA da una chiave di
-  `/etc/barattolo-deploy/firmatari` — o, finché quel file non c'è, ha
-  un autore dei nostri, che è una cintura di cartone (in git l'autore è
-  testo libero); d) la CI è VERDE su di lui: `giudice_deploy.py` lo
+  `/etc/barattolo-deploy/firmatari` — e se quel file non c'è, o è
+  vuoto, NON SI TIRA NIENTE (dal 1 ott 2026, cura 5 del cantiere «CSP e
+  le voci aperte degli audit»; prima c'era una cintura di cartone
+  sull'autore della punta, che in git è testo libero: per spegnere le
+  firme apposta si rimette il file, non si toglie); d) la CI è VERDE su
+  di lui: `giudice_deploy.py` lo
   chiede alle Actions di GitHub (il giro nato da un push SU MAIN, coi
   lavori `prove` e `segreti` in `success`).
   TRE ESITI. Si tira → «🚀 Barattolo aggiornato (sha)», con una riga

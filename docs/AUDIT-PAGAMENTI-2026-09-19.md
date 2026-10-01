@@ -449,6 +449,11 @@ valutare un HMAC del corpo al posto del Bearer.
 
 ## M7 — Comandi di servizio del bot concessi per USERNAME
 
+> ✅ **CURATA il 1 ott 2026** (cantiere «CSP e le voci aperte degli
+> audit», cura 5): `ADMIN_BOT_USERNAME` non esiste più, `e_admin_bot`
+> guarda il solo id; Andrea e Alan stanno in `ADMIN_IDS` del VPS. Il
+> testo che segue resta com'era.
+
 `e_admin_bot` (`server.py:10631`) accetta `ADMIN_IDS` **oppure** due
 username scritti nel codice (`server.py:10620`). Uno username Telegram si
 può lasciare e riprendere: chi se lo prende eredita `/canale`, `/sponsor`,
@@ -483,7 +488,9 @@ con gli script inline di oggi vuol dire nonce o hash.
 
 # BASSA
 
-- **B1 — La firma dell'initData si confronta con `!=`** (`server.py:6840`)
+- **B1 — La firma dell'initData si confronta con `!=`** ✅ CURATA il 1 ott
+  2026 (cantiere «CSP e le voci aperte degli audit», cura 5):
+  `hmac.compare_digest`, come le altre quattro porte. Com'era: (`server.py:6840`)
   e non con `hmac.compare_digest` come fanno il widget, il webhook e le due
   porte P2P. Non sfruttabile in pratica via rete, ma è l'unica delle cinque.
 - **B2 — `prezzo_eur` accetta `inf`/`nan`** (`server.py:9067`): il parser
