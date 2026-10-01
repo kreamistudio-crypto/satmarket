@@ -1568,14 +1568,17 @@ async def guardia_csrf(request, call_next):
 #  - nosniff: il browser non indovina un tipo diverso da quello
 #    dichiarato (ogni rotta di casa lo dichiara: js, woff2, json, html);
 #  - Referrer-Policy: quel che i browser fanno gia' di default, scritto;
-#  - Permissions-Policy: SOLO cio' che l'app non usa mai (fotocamera,
-#    microfono, pagamenti del browser, USB, MIDI). La FOTOCAMERA si
-#    spegne dal 1 ott 2026 (decisione di Andrea nel cantiere «📍 Sono
-#    qui»): la usava solo il QR di «Siamo insieme», uscito dal flusso, e
-#    le foto degli annunci passano dal selettore dei file, che questa
-#    riga non tocca. La POSIZIONE invece NON si nomina: la chiede «📍
-#    Sono qui», e dentro l'iframe di Telegram Web a concederla e' il
-#    genitore — una riga qui potrebbe solo toglierla;
+#  - Permissions-Policy: si spegne SOLO cio' che l'app non usa mai
+#    (microfono, pagamenti del browser, USB, MIDI). La FOTOCAMERA resta
+#    al nostro sito, `camera=(self)`: la usano le FOTO DEGLI ANNUNCI —
+#    «Scatta foto» nel selettore del telefono — anche se nella pagina
+#    non c'e' nessun getUserMedia. Lezione pagata il 1 ott 2026: col
+#    ritocco di «📍 Sono qui» qui c'era `camera=()` («le foto passano dal
+#    selettore dei file, che questa riga non tocca» — falso), e sul
+#    telefono di Andrea, pubblicando un annuncio, «Scatta foto» era
+#    sparito: restava solo la libreria. La POSIZIONE non si nomina: la
+#    chiede «📍 Sono qui», e dentro l'iframe di Telegram Web a
+#    concederla e' il genitore — una riga qui potrebbe solo toglierla;
 #  - HSTS, solo sul dominio pubblico: mai sull'onion (che il TLS non ce
 #    l'ha) ne' in collaudo (http://127.0.0.1). Un anno, senza
 #    includeSubDomains (il relay e' un sottodominio con la sua vita) e
@@ -1606,7 +1609,7 @@ async def guardia_csrf(request, call_next):
 CINTURE_HTTP = (
     ("X-Content-Type-Options", "nosniff"),
     ("Referrer-Policy", "strict-origin-when-cross-origin"),
-    ("Permissions-Policy", "camera=(), microphone=(), payment=(), usb=(), midi=()"),
+    ("Permissions-Policy", "camera=(self), microphone=(), payment=(), usb=(), midi=()"),
 )
 HSTS_UN_ANNO = "max-age=31536000"
 DIRETTIVE_CSP_PROVA = (

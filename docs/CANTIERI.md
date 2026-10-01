@@ -34597,3 +34597,35 @@ PRIMA dice chi teneva il lucchetto: si incolla.
 NEWS con le foto vere: lo dice il diario); un Woo vero da mille
 prodotti (i numeri di sopra sono senza rete e senza Haiku); la
 memoria del VPS con 2.200 righe tradotte in RAM.
+
+## La fotocamera torna al nostro sito: `camera=(self)` (1 ott 2026, sera, urgente)
+
+**DALLA PRODUZIONE**, parola di Andrea: dal ritocco di «📍 Sono qui»
+(b82068d) la Permissions-Policy diceva `camera=()`, e sul telefono,
+pubblicando un annuncio, «Scatta foto» non compariva più: si poteva solo
+scegliere dalla libreria. La cura: `camera=(self)` in `CINTURE_HTTP`, la
+fotocamera permessa al nostro sito come prima di quella riga (per un
+documento di casa `self` è il valore di serie); gli altri permessi
+spenti come prima — microfono, pagamenti, USB, MIDI —, la posizione non
+nominata.
+
+**LA LEZIONE.** Le foto degli annunci usano la fotocamera del telefono
+anche senza nessun `getUserMedia` nella pagina: «Scatta foto» del
+selettore dei file (`<input type="file" accept="image/*">`) passa dallo
+stesso permesso, e la Permissions-Policy lo spegne. Io avevo scritto il
+contrario («il selettore dei file la riga non lo tocca»), l'avevo
+provato solo nel Chrome del computer — dove il selettore si apre lo
+stesso, ma la voce «Scatta foto» non esiste — e l'avevo messo fra le
+cose da guardare sul telefono, a push già fatto. Una riga che spegne una
+capacità del telefono si prova SUL TELEFONO prima del push, o non si
+spegne.
+
+**LE PROVE.** La sentinella della cura 1 (`prove_csp_prova`) adesso
+pretende `camera=(self)` e nessun `camera=()`, la posizione non nominata
+e gli altri quattro spenti, nell'ordine; via la guardia «nessuna parte
+dell'app chiede la fotocamera», che aveva senso solo a fotocamera
+spenta. `collaudo_csp` legge l'intestazione vera dal server. Da
+origin/main (075ecf4): suite intera severa 18.408 verdi e 0 rosse; i 32
+collaudi della CI verdi nella gabbia. NON PROVATO: il telefono — appena
+il deploy è su, pubblicando un annuncio «Scatta foto» deve tornare
+(Andrea).

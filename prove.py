@@ -117236,21 +117236,21 @@ def prove_csp_prova():
     prova("nosniff c'e'", "nosniff", cinture["X-Content-Type-Options"])
     prova("...e il referrer e' quello di default dei browser",
           "strict-origin-when-cross-origin", cinture["Referrer-Policy"])
-    # EMENDATA (1 ott 2026, decisione di Andrea nel cantiere «📍 Sono
-    # qui»): la FOTOCAMERA si spegne — la usava solo il QR di «Siamo
-    # insieme», uscito dal flusso. La POSIZIONE resta non nominata: la
-    # chiede «Sono qui», e nell'iframe di Telegram Web a concederla e' il
-    # genitore — una riga qui potrebbe solo toglierla
-    prova("Permissions-Policy spegne la fotocamera e non tocca la posizione", [True, False],
-          ["camera=()" in cinture["Permissions-Policy"], "geolocation" in cinture["Permissions-Policy"]])
-    # ...e se la fotocamera tornasse in pagina, questa riga la spegnerebbe
-    # in silenzio: la guardia lo dice prima (le foto degli annunci passano
-    # dal selettore dei file, che la riga non tocca)
-    _pagina = open("miniapp.html", encoding="utf-8").read()
-    prova("...e nessuna parte dell'app chiede la fotocamera (getUserMedia, BarcodeDetector, lo scanner di Telegram)", [],
-          [x for x in ("getUserMedia", "BarcodeDetector", "showScanQrPopup", "mediaDevices") if x in _pagina])
-    prova("...e spegne solo cio' che l'app non usa", True,
-          "microphone=()" in cinture["Permissions-Policy"])
+    # EMENDATA DI NUOVO (1 ott 2026, sera, urgente dalla produzione): la
+    # FOTOCAMERA RESTA AL NOSTRO SITO, `camera=(self)`. Col ritocco di «📍
+    # Sono qui» qui si pretendeva `camera=()`, e sul telefono di Andrea,
+    # pubblicando un annuncio, «Scatta foto» era sparito dal selettore:
+    # le foto degli annunci usano la fotocamera del telefono ANCHE SENZA
+    # getUserMedia. Spenta la riga, spenta la fotocamera degli annunci.
+    # La POSIZIONE resta non nominata: la chiede «Sono qui», e
+    # nell'iframe di Telegram Web a concederla e' il genitore
+    pp = [x.strip() for x in cinture["Permissions-Policy"].split(",")]
+    prova("Permissions-Policy lascia la fotocamera al nostro sito (camera=(self)): le foto degli annunci la usano",
+          [True, False], ["camera=(self)" in pp, "camera=()" in pp])
+    prova("...non tocca la posizione, che chiede «Sono qui»", [],
+          [x for x in pp if x.startswith("geolocation")])
+    prova("...e spegne come prima solo cio' che l'app non usa: microfono, pagamenti, USB, MIDI",
+          ["camera=(self)", "microphone=()", "payment=()", "usb=()", "midi=()"], pp)
 
     hsts = amb["_host_con_hsts"]
     prova("HSTS sul dominio pubblico", True, hsts("barattolo.store", False))

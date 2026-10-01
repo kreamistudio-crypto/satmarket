@@ -61,7 +61,7 @@ def main():
           g.headers.get("content-security-policy"))
     prova("nosniff, referrer e permissions ci sono",
           ["nosniff", "strict-origin-when-cross-origin",
-           "camera=(), microphone=(), payment=(), usb=(), midi=()"],
+           "camera=(self), microphone=(), payment=(), usb=(), midi=()"],
           [g.headers.get("x-content-type-options"), g.headers.get("referrer-policy"),
            g.headers.get("permissions-policy")])
     prova("niente HSTS in collaudo (la pagina gira su http)", None,

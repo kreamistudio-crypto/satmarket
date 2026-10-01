@@ -5823,9 +5823,10 @@
   aperte degli audit»): il middleware `cinture_http` — che nel file
   sta PRIMA di `no_iframe`, cioè gli gira DENTRO — mette su ogni
   risposta nosniff, Referrer-Policy, Permissions-Policy (solo ciò che
-  l'app non usa: fotocamera — dal 1 ott 2026, uscito il QR del
-  contanti —, microfono, pagamenti, USB, MIDI; mai la posizione, che
-  chiede «📍 Sono qui») e HSTS dove
+  l'app non usa: microfono, pagamenti, USB, MIDI; la fotocamera resta
+  al nostro sito, `camera=(self)`, perché la usano le foto degli
+  annunci dal selettore del telefono — spenta, sparisce «Scatta foto»;
+  mai la posizione, che chiede «📍 Sono qui») e HSTS dove
   `_host_con_hsts` lo ammette (mai onion, collaudo, locale); e sulle
   sole pagine HTML di casa la `Content-Security-Policy-Report-Only`
   (`CSP_PROVA`), che riferisce al cestino `POST /api/csp-report` e non
