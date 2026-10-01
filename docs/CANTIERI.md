@@ -32670,3 +32670,121 @@ e ripreso dalla STESSA persona, se la seconda fattura chiesta arrivasse
 prima della seconda presa, il suo timbro potrebbe coincidere con quello
 del giro prima e l'anti-doppione la fermerebbe — caso raro, dichiarato,
 non curato.
+
+## L'annullo del venditore, a sats già in cassaforte (1 ott 2026)
+
+Il compito (Andrea): chi compra paga, chi vende non può più spedire —
+si è rotto, l'ha venduto altrove — e annulla l'ordine; chi compra ha
+il rimborso automatico. «Con le hold invoice sarebbe praticamente
+automatico».
+
+**IL PERCHÉ, E LA CORREZIONE SULLA HOLD INVOICE.** L'escrow di
+Barattolo è custodiale su LNbits: chi compra paga una fattura normale
+e i sats stanno nella cassaforte. Una hold invoice qui non c'è (le
+hold invoice vivono nel P2P Mostro, che è un'altra macchina e un
+altro cantiere). Quindi «annullare» non è lasciar spirare un HTLC: è
+un PAGAMENTO Lightning in uscita verso chi ha comprato. E quel
+pagamento esisteva già — `_rimborsa_compratore`, la strada della
+disputa vinta: Lightning address → subito, altrimenti 'refund' e la
+fattura che chi compra incolla da `deposita_invoice`. L'automatismo
+chiesto c'è se chi compra ha un address; senza, gli tocca un gesto,
+esattamente come oggi per una disputa vinta. Fino a ieri la sola
+strada per un venditore che non poteva spedire era lasciare l'ordine
+fermo finché il compratore apriva una disputa e un moderatore
+decideva: giorni, e un umano, per un caso in cui non c'è niente da
+decidere — i sats hanno già un padrone.
+
+**LA CURA.** Rotta nuova `POST /api/orders/{id}/annulla-venditore`
+(`annulla_da_venditore`): solo chi vende, solo da 'locked', mai con
+`payout_stato` non vuoto (409: un moderatore ci ha già messo mano).
+CAS 'locked' → 'refund' DENTRO il lucchetto dell'ordine, con
+`annullato_venditore_il` (il timbro, pattern di `busta_il`) e
+`motivo_annullo` (`MOTIVO_ANNULLO_MAX` 200, spazi collassati, mai
+obbligatorio); poi `_rimborsa_compratore` FUORI dal lucchetto, che lo
+prende da sé. NIENTE STATO NUOVO: 'refund' dice già «i sats spettano
+a chi ha comprato, li stiamo rendendo», e chiude da sola spedizione e
+conferma — le due porte vogliono 'locked'/'shipped', e un ordine in
+'refund' non lo trovano più. `disputata` resta 0: nessuna lite, e un
+moderatore non ha niente da decidere. Il rimborso è integrale,
+protezione compresa (l'affare è saltato per mano di chi vende: a chi
+compra non si trattiene nulla). Vetrina e stock tornano a rimborso
+FATTO, nel ramo riuscito di `_rimborsa_compratore`, come per la
+disputa — e l'avviso a chi vende dice «se l'oggetto non c'è più,
+mettilo in pausa». Le PAROLE hanno il loro bivio e i sats no:
+`_rimborsa_compratore` legge `annullato_venditore_il` per gli avvisi
+e il polso (mai «disputa» su un ordine che non l'ha avuta; il motivo
+viaggia scappato); il client legge `annullatoVenditore`/`motivoAnnullo`
+per lo stepper (tre passi, il secondo col motivo), la testa, la nota
+di fiducia e `refundPanel`. La maniglia di chi vende è un `<details>`
+chiuso sotto il pannello della consegna — la strada rara non si
+mette sotto gli occhi — con la conferma che dice il prezzo per
+intero e il velo che dice «Rimborso in corso…», perché i sats si
+muovono davvero. Il promemoria automatico al venditore fermo diceva
+«dillo all'acquirente: potrà farsi rimborsare»; ora dice «annulla
+l'ordine dalla Mini App: i sats tornano subito all'acquirente».
+
+**STRADE SCARTATE.** 1) Uno stato nuovo ('annullato_venditore'):
+avrebbe toccato STATES, stepper, filtri, feedback, coda dei fermi,
+risolvi_disputa — e avrebbe detto la stessa cosa di 'refund'. 2)
+`disputata=1` per rendere il caso decidibile dal moderatore: sarebbe
+una bugia (conta come disputa persa nello Specchiato) e non c'è
+niente da decidere. 3) Lasciare l'ordine in 'locked' col flag e
+rimborsare da lì: fra il flag e il rimborso spedizione e conferma
+sarebbero rimaste aperte. 4) Permetterlo da 'shipped': un pacco in
+viaggio non si annulla, la strada è la disputa. 5) Rimettere subito
+l'annuncio in vetrina: divergerebbe dalla disputa, e chi non può
+spedire di solito non la vuole; torna a rimborso fatto. 6) La lapide
+'annullato' come per `annulla_ordine`: là non c'è nessun sat, qui ci
+sono, e una lapide che custodisce sats sarebbe un ordine che sparisce
+dalla coda dei fermi.
+
+**PROVATO.** `collaudo_annullo_venditore.py` (43 prove, il SERVER
+VERO su un database usa-e-getta, verde anche dentro la gabbia senza
+rete di `collaudi_ci.py`, aggiunto alla CI nei due elenchi): chi
+compra con address → 'refunded' sul posto, stock e vetrina tornano,
+timbro e motivo scritti, `disputata` 0, `payout_stato` 'uscito', un
+avviso a testa che dice «annullato» e mai «disputa»; senza metodo →
+'refund', la vetrina NON torna, chi compra sente come riceverli, chi
+vende sa che il gesto è fatto, poi la fattura incollata chiude a
+'refunded' e la vetrina torna; le porte chiuse (chi compra,
+l'estraneo, 'creato', 'shipped', il secondo annullo, `payout_stato`
+'incerto' → 409 che nomina i moderatori, e l'ordine non si muove);
+dopo l'annullo `segna_spedito` e `conferma_ricezione` rifiutano e
+`_sblocca_sats` non parte; il motivo si collassa e si tronca al
+tetto, e un motivo non-testo non rompe; il feedback di chi compra
+passa su 'refunded' e aspetta su 'refund'; la ronda del libro mastro
+tace. I sette collaudi vicini (feedback, porta del timer, in
+pagamento, altra cassaforte, chiusura SaaS, LNbits muto, fatture
+scadute) rigirati verdi. Gli script del client passano `node --check`.
+COSA E' GIRATO SU QUALE ALBERO: il cantiere e' nato su `b85a26e`
+(main del 25 set) e li' `prove.py` ha detto 15.854 passate e 4
+rosse; main nel frattempo era corso di 98 commit, quindi rebase su
+`1759be4` (1 ott, «Chi blocca la cauzione viene avvisato del passo
+dopo»), due conflitti risolti a mano — gli elenchi della CI e il
+censimento della domanda unica, che su main era salito a 76 e con
+questa voce fa 77 — e sull'albero ribasato `PROVE_SEVERE=1 prove.py`
+ha detto 17.779 passate e 4 rosse: le stesse 4 di sempre (il
+barattolo AVIF, manca il plugin di Pillow in locale; in CI c'e'),
+verificate una per una. Gli altri due censimenti del client
+(`d.non_chiesto` 4→5, `passoDeposito,` 2→3) sono passati lisci nel
+rebase. Gli otto collaudi (il nuovo e i sette vicini) rigirati
+verdi sull'albero ribasato, dentro la gabbia. Nota di rito: ho
+lavorato sul ramo `cantiere/annullo-venditore` nella working copy
+principale, pulita all'inizio, non in un worktree — la regola del
+worktree e' arrivata su main durante il cantiere.
+
+**COSA NON HO PROVATO DAL VIVO.** Nessun sat vero (`paga_venditore`
+sostituito) e nessun browser: il `<details>`, il velo, lo stepper a
+tre passi e la nota del rimborso vanno guardati con un server locale
+in MODALITA_COLLAUDO — Venditore 222 su un ordine 'locked', poi
+Compratore 111 sul pannello del rimborso.
+
+**DA GUARDARE.** 1) Un ordine in 'refund' senza metodo del compratore
+non ha un sollecito automatico — e vale anche per la disputa vinta di
+ieri: oggi lo tiene in vista la coda dei fermi dei moderatori. Un
+`sollecita_rimborsi` gemello di `sollecita_incassi` è il cantiere
+naturale, e con questa rotta i 'refund' diventeranno più frequenti.
+2) Il profilo non conta gli annulli di chi vende (lo Specchiato conta
+le dispute perse): `annullato_venditore_il` è già scritto, il giorno
+che servirà si conta. 3) Il rimborso parziale non esiste, dichiarato
+come per la disputa.

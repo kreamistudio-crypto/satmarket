@@ -1073,6 +1073,37 @@
   concorrenti). Nel client `publish()` passa da `bottoneInAttesa`
   (bottone spento + overlay fino alla risposta): la causa prima era
   il fetch lento (foto base64 + moderazione AI) col dito che ritocca.
+  L'ANNULLO DEL VENDITORE (1 ott 2026): `POST
+  /api/orders/{id}/annulla-venditore` (`annulla_da_venditore`), il
+  gemello di `annulla_ordine` dall'altra parte del pagamento — là non
+  si muove un sat e la riga diventa lapide, qui i sats sono in
+  cassaforte e TORNANO a chi ha comprato, senza passare da un
+  moderatore. L'escrow è custodiale (LNbits), non una hold invoice:
+  annullare è un pagamento in USCITA, e quel pagamento è
+  `_rimborsa_compratore`, la strada della disputa vinta. Solo chi
+  vende, solo da 'locked' (a pacco partito la strada resta la
+  disputa), mai con `payout_stato` non vuoto (409, un'uscita è già in
+  corso); CAS 'locked'→'refund' dentro il lucchetto dell'ordine con
+  `annullato_venditore_il` (timbro, pattern di `busta_il`) e
+  `motivo_annullo` (`MOTIVO_ANNULLO_MAX` 200, spazi collassati), poi
+  `_rimborsa_compratore` FUORI dal lucchetto: Lightning address →
+  'refunded' subito, senza → resta 'refund' e chi compra incolla la
+  fattura da `deposita_invoice` o mette l'address (lo stesso giro di
+  ieri). NIENTE STATO NUOVO e `disputata` resta 0: 'refund' dice già
+  «i sats spettano al compratore», e chiude da sola `segna_spedito` e
+  `conferma_ricezione`. Vetrina e stock tornano a rimborso FATTO, nel
+  ramo riuscito di `_rimborsa_compratore`, come per la disputa. Il
+  rimborso è integrale, protezione compresa. Nelle PAROLE il bivio è
+  `annullato_venditore_il`: in `_rimborsa_compratore` (avvisi e polso,
+  mai «disputa» su un ordine che non l'ha avuta) e nel client
+  `annullatoVenditore`/`motivoAnnullo` (stepper a tre passi col
+  motivo, testa dell'ordine, nota di fiducia, `refundPanel`; la
+  maniglia è un `<details>` chiuso sotto il pannello della consegna,
+  `annullaDaVenditore` con conferma e velo). Il feedback di chi compra
+  si apre a 'refunded' come sempre. Il promemoria automatico al
+  venditore fermo (`sollecita_venditori_fermi`) ora indica questa
+  strada. Collaudo: `collaudo_annullo_venditore.py`, in CI. Il perché
+  e le strade scartate in CANTIERI, «L'annullo del venditore».
   L'ANNULLO VERO E LE LAPIDI (ago 2026, giro urgente dal campo — tre
   problemi riprodotti prima di toccare). 1) IL QR DEL PAYSHEET ERA
   FINTO: un pattern CSS decorativo che non codificava niente
