@@ -11633,26 +11633,81 @@ CONSIGLIO_LNURL = (
 )
 
 
+# LA FORMA DI UN LIGHTNING ADDRESS (ott 2026): la parte locale e il
+# dominio di LUD-16, e basta. Si giudica PRIMA di comporre un URL, cosi'
+# un «nome» con una barra o un punto interrogativo dentro non diventa
+# un altro percorso sul server del wallet.
+FORMA_LN_NOME = re.compile(r"[a-z0-9._+-]{1,64}")
+FORMA_LN_DOMINIO = re.compile(r"[a-z0-9-]+(\.[a-z0-9-]+)+")
+# Il tetto su cio' che si LEGGE da un wallet: un payRequest sta in
+# qualche centinaio di byte, e oltre 64 KB non e' piu' un LNURL.
+TETTO_RISPOSTA_LNURL = 65_536
+
+
+async def _url_lnurl_ammesso(url: str) -> bool:
+    """LA GUARDIA ANTI-SSRF DEL LNURL-PAY (1 ott 2026, la M2 dell'audit
+    del 19 set, riverificata il 23). Prima di oggi `invoice_da_ln_address`
+    seguiva i redirect e faceva la seconda GET al `callback` che il
+    wallet DICHIARAVA — un URL qualunque, anche `http://127.0.0.1:5001/…`
+    (LNbits) o la 18080 del ponte verso LND: una GET cieca dentro la
+    rete di casa, ripetuta a ogni incasso, su un dominio scelto dal
+    venditore. E' la stessa regola delle API dei negozi
+    (`url_api_ammesso`: solo https sulla 443, host RISOLTO a un
+    indirizzo pubblico, mai loopback, privati, link-local), ma col DNS
+    in un thread: qui si sta nel ciclo principale, e una risoluzione
+    lenta fermerebbe tutti."""
+    return await asyncio.to_thread(url_api_ammesso, url)
+
+
+def _json_lnurl(r) -> dict:
+    """Il JSON di una risposta LNURL, o {} se e' troppo grossa o non
+    e' un oggetto. httpx il corpo l'ha gia' in mano — il tetto limita
+    quel che si legge, non quel che si scarica — ma un dizionario da
+    megabyte non entra nel parser."""
+    corpo = getattr(r, "content", None)
+    if corpo is not None and len(corpo) > TETTO_RISPOSTA_LNURL:
+        return {}
+    letto = r.json()
+    return letto if isinstance(letto, dict) else {}
+
+
 async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
     """INCASSO AUTOMATICO: dato il Lightning address del venditore
     (es. mario@walletofsatoshi.com), chiede al suo wallet una invoice
     dell'importo giusto, senza che il venditore debba fare nulla.
     E' il protocollo standard LNURL-pay. Ritorna la invoice (bolt11)
-    oppure None se qualcosa non va."""
+    oppure None se qualcosa non va.
+    DAL 1 OTT 2026 NON ESCE DI CASA ALLA CIECA: la forma dell'indirizzo
+    si giudica prima di comporre l'URL, la partenza e il `callback`
+    passano TUTT'E DUE da `_url_lnurl_ammesso`, i redirect non si
+    seguono (un 3xx e' un no), e la risposta ha un tetto. Un wallet
+    onesto non se ne accorge: risponde in https sulla 443 da un
+    indirizzo pubblico, che e' quel che LUD-06 gli chiede."""
     try:
         nome, dominio = ln_address.strip().lower().split("@")
+        if not FORMA_LN_NOME.fullmatch(nome) or not FORMA_LN_DOMINIO.fullmatch(dominio):
+            return None
         msat = sats * 1000
-        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as c:
-            r = await c.get(f"https://{dominio}/.well-known/lnurlp/{nome}")
+        partenza = f"https://{dominio}/.well-known/lnurlp/{nome}"
+        if not await _url_lnurl_ammesso(partenza):
+            return None
+        async with httpx.AsyncClient(timeout=20, follow_redirects=False) as c:
+            r = await c.get(partenza)
             r.raise_for_status()
-            meta = r.json()
+            meta = _json_lnurl(r)
             if meta.get("tag") != "payRequest":
                 return None
             if not (meta.get("minSendable", 0) <= msat <= meta.get("maxSendable", 0)):
                 return None   # il wallet non accetta questo importo
-            r = await c.get(meta["callback"], params={"amount": msat})
+            # IL CALLBACK LO SCRIVE IL WALLET, e si giudica come la
+            # partenza: LUD-06 ammette un altro host (i grandi wallet
+            # ne usano due), non un altro schema ne' un'altra porta.
+            callback = str(meta.get("callback") or "")
+            if not await _url_lnurl_ammesso(callback):
+                return None
+            r = await c.get(callback, params={"amount": msat})
             r.raise_for_status()
-            pr = r.json().get("pr") or None
+            pr = _json_lnurl(r).get("pr") or None
             if not pr:
                 return None
             # LA FATTURA LA SCRIVE IL BENEFICIARIO, quindi si rilegge
@@ -38009,7 +38064,10 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
             # spiega, il secondo resta quello di sempre; tutti e due
             # finiscono col CONSIGLIO, che e' l'unica cosa che serve
             # davvero a chi e' rimasto senza incassi.
-            perche = diagnosi_ln_address(addr.split("@")[-1])
+            # il DNS in un thread (ott 2026): questa rotta e' async, e
+            # una risoluzione lenta teneva fermo il ciclo principale
+            perche = await asyncio.to_thread(diagnosi_ln_address,
+                                             addr.split("@")[-1])
             if perche == "bip353":
                 raise HTTPException(400,
                     "Questo è un indirizzo BIP-353 (è il tipo che usa "

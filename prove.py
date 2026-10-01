@@ -2696,7 +2696,13 @@ def prove_importo_uscita():
                     "maxSendable": 10 ** 12,
                     "callback": "https://dominio.tld/cb"}, pr),
                "importo_invoice": _importo,
+               # la guardia anti-SSRF (ott 2026) qui dice sempre si':
+               # il suo giudizio ha la prova sua, prove_ssrf_ln_address
+               "url_api_ammesso": lambda u: True,
+               "asyncio": __import__("asyncio"), "re": re,
                "print": lambda *a, **k: None}
+        i_ln = _SORGENTE.index("FORMA_LN_NOME = ")
+        exec(_SORGENTE[i_ln:_SORGENTE.index("async def invoice_da_ln_address(")], amb)
         exec(pezzo_async("invoice_da_ln_address"), amb)
         return gira(amb["invoice_da_ln_address"]("io@dominio.tld", chiesti))
 
@@ -8349,10 +8355,14 @@ def prove_pagamento_incerto():
 
         amb = {"httpx": _finto_lnurl(
                    {"tag": "payRequest", "minSendable": 1,
-                    "maxSendable": 10**9, "callback": "http://w/cb"},
+                    "maxSendable": 10**9, "callback": "https://w.tld/cb"},
                    "lnbc1-coniata"),
                "importo_invoice": _importo,
+               "url_api_ammesso": lambda u: True,
+               "asyncio": __import__("asyncio"), "re": re,
                "print": lambda *a, **k: None, "LnbitsMuto": LnbitsMuto}
+        i_ln = _SORGENTE.index("FORMA_LN_NOME = ")
+        exec(_SORGENTE[i_ln:_SORGENTE.index("async def invoice_da_ln_address(")], amb)
         exec(pezzo_async("invoice_da_ln_address"), amb)
         try:
             return gira(amb["invoice_da_ln_address"]("io@wallet.tld", 100))
@@ -116299,6 +116309,145 @@ def prove_csp_prova():
           "collaudo_csp.py" in wf and "\n             collaudo_csp\n" in wf)
 
 
+def prove_ssrf_ln_address():
+    """LA SSRF DAL LIGHTNING ADDRESS (1 ott 2026, la M2 dell'audit del 19
+    set, riverificata il 23). `invoice_da_ln_address` seguiva i redirect
+    e faceva la GET al `callback` dichiarato dal wallet, qualunque fosse:
+    anche LNbits su 127.0.0.1:5001 o il ponte sulla 18080. Qui la
+    funzione VERA gira con un wallet di cartone e un DNS di cartone, e
+    si guarda che la GET verso casa NON PARTA — non che la funzione
+    torni None."""
+    import asyncio
+    import ipaddress
+    import socket
+    import types
+    from urllib.parse import urlparse
+    print("\n🛡️ La SSRF dal Lightning address")
+
+    # --- il giudice VERO dell'URL, col DNS di cartone -------------------
+    DNS = {"dominio.tld": "93.184.216.34", "cdn.dominio.tld": "151.101.1.1",
+           "ponte.interno": "10.77.0.1", "casa.tld": "127.0.0.1",
+           "locale.tld": "169.254.1.1"}
+
+    def getaddrinfo(host, port, *a, **k):
+        if host not in DNS:
+            raise socket.gaierror("non esiste")
+        return [(0, 0, 0, "", (DNS[host], 0))]
+
+    amb = {"urlparse": urlparse, "ipaddress": ipaddress,
+           "socket": types.SimpleNamespace(getaddrinfo=getaddrinfo)}
+    exec(pezzo("url_foto_ammesso"), amb)
+    exec(pezzo("url_api_ammesso"), amb)
+    ammesso = amb["url_api_ammesso"]
+    prova("un wallet pubblico in https passa", True,
+          ammesso("https://dominio.tld/.well-known/lnurlp/io"))
+    prova("http no, anche se pubblico", False, ammesso("http://dominio.tld/cb"))
+    prova("un'altra porta no", False, ammesso("https://dominio.tld:8080/cb"))
+    prova("loopback scritto in chiaro no", False, ammesso("https://127.0.0.1:443/x"))
+    prova("un dominio che risolve a loopback no", False, ammesso("https://casa.tld/cb"))
+    prova("...o a un indirizzo privato (il ponte)", False, ammesso("https://ponte.interno/x"))
+    prova("...o link-local", False, ammesso("https://locale.tld/x"))
+    prova("un dominio che non esiste no", False, ammesso("https://nessuno.tld/x"))
+
+    # --- la funzione VERA col wallet di cartone -------------------------
+    def banco(callback, dominio="dominio.tld", nome="io", chiesti=100,
+              fattura_vale=100, primo_stato=200, corpo_grosso=False):
+        chiamate, kw_client = [], {}
+
+        class R:
+            def __init__(self, dati, stato=200):
+                self._d, self.status_code = dati, stato
+                self.content = (b"x" * 70_000) if corpo_grosso else b"{}"
+
+            def raise_for_status(self):
+                if self.status_code >= 300:
+                    raise RuntimeError(f"HTTP {self.status_code}")
+
+            def json(self):
+                return self._d
+
+        class C:
+            def __init__(self, **kw):
+                kw_client.update(kw)
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def get(self, url, **kw):
+                chiamate.append(url)
+                if ".well-known" in url:
+                    return R({"tag": "payRequest", "minSendable": 1,
+                              "maxSendable": 10 ** 12, "callback": callback},
+                             primo_stato)
+                return R({"pr": "lnbc1-coniata"})
+
+        async def _importo(_b):
+            return fattura_vale
+
+        a = {"httpx": types.SimpleNamespace(AsyncClient=C), "asyncio": asyncio,
+             "importo_invoice": _importo, "url_api_ammesso": ammesso,
+             "LnbitsMuto": type("LnbitsMuto", (Exception,), {}),
+             "re": re, "print": lambda *x, **k: None}
+        i = _SORGENTE.index("FORMA_LN_NOME = ")
+        j = _SORGENTE.index("async def invoice_da_ln_address(")
+        exec(_SORGENTE[i:j], a)
+        exec("async " + pezzo("invoice_da_ln_address"), a)
+        esito = asyncio.run(a["invoice_da_ln_address"](f"{nome}@{dominio}", chiesti))
+        return esito, chiamate, kw_client
+
+    esito, chiamate, kw = banco("https://dominio.tld/cb")
+    prova("wallet onesto: due GET e la fattura", ("lnbc1-coniata", 2),
+          (esito, len(chiamate)))
+    prova("...senza seguire i redirect", False, kw.get("follow_redirects", True))
+    esito, chiamate, _ = banco("https://cdn.dominio.tld/cb")
+    prova("un callback su un ALTRO host pubblico passa (LUD-06 lo ammette)",
+          "lnbc1-coniata", esito)
+    for nome_caso, cb in (("http", "http://dominio.tld/cb"),
+                          ("loopback", "https://127.0.0.1:5001/api/v1/x"),
+                          ("il ponte", "https://ponte.interno:443/v1/x"),
+                          ("un'altra porta", "https://dominio.tld:18080/cb"),
+                          ("vuoto", "")):
+        esito, chiamate, _ = banco(cb)
+        prova(f"callback {nome_caso}: nessuna seconda GET, niente fattura",
+              (None, 1), (esito, len(chiamate)))
+    esito, chiamate, _ = banco("https://dominio.tld/cb", dominio="127.0.0.1")
+    prova("dominio loopback: NESSUNA GET, nemmeno la prima", (None, 0),
+          (esito, len(chiamate)))
+    esito, chiamate, _ = banco("https://dominio.tld/cb", nome="../../altro")
+    prova("un nome con le barre non compone nessun URL", (None, 0),
+          (esito, len(chiamate)))
+    esito, chiamate, _ = banco("https://dominio.tld/cb", dominio="dominio")
+    prova("un dominio senza punto non e' un dominio", (None, 0),
+          (esito, len(chiamate)))
+    # il dominio col percorso dentro: senza la forma, l'URL che ne esce
+    # risolve davvero (l'host e' buono) e la GET partirebbe
+    esito, chiamate, _ = banco("https://dominio.tld/cb", dominio="dominio.tld/altro")
+    prova("un dominio con una barra dentro non compone nessun URL", (None, 0),
+          (esito, len(chiamate)))
+    esito, chiamate, _ = banco("https://dominio.tld/cb", primo_stato=302)
+    prova("un redirect sulla partenza e' un no", (None, 1), (esito, len(chiamate)))
+    esito, _, _ = banco("https://dominio.tld/cb", corpo_grosso=True)
+    prova("una risposta oltre il tetto non si legge", None, esito)
+    esito, _, _ = banco("https://dominio.tld/cb", fattura_vale=101)
+    prova("...e l'importo si rilegge come prima", None, esito)
+
+    # --- le sentinelle sulla forma ---------------------------------------
+    lna = pezzo("invoice_da_ln_address")
+    prova("sentinella: follow_redirects=False, scritto", True,
+          "follow_redirects=False" in lna and "follow_redirects=True" not in lna)
+    prova("sentinella: partenza E callback passano dalla guardia", 2,
+          lna.count("await _url_lnurl_ammesso("))
+    prova("sentinella: la guardia e' quella delle API dei negozi, in un thread",
+          True, "asyncio.to_thread(url_api_ammesso, url)" in pezzo("_url_lnurl_ammesso"))
+    prova("sentinella: la forma si giudica prima dell'URL", True,
+          lna.index("FORMA_LN_NOME.fullmatch") < lna.index("partenza = "))
+    prova("sentinella: la diagnosi del dominio non blocca il ciclo", True,
+          "await asyncio.to_thread(diagnosi_ln_address," in pezzo("salva_ln_address"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -116518,6 +116667,7 @@ def main():
               prove_reputazione_nostr,
               prove_nip89_handler,
               prove_csp_prova,
+              prove_ssrf_ln_address,
               prove_config_esempio):
         try:
             f()
