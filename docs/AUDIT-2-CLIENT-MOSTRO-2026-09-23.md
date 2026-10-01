@@ -338,7 +338,9 @@ risposta su `/` e `/miniapp.html` (gli script sono inline: serve il nonce sui
 
 ## M5 — Dal primo audit, ancora aperte e riverificate su `eb26d02`
 
-- **M2 (SSRF cieca dal Lightning address):** `invoice_da_ln_address` fa
+- **M2 (SSRF cieca dal Lightning address):** ✅ CURATA il 1 ott 2026
+  (cantiere «CSP e le voci aperte degli audit», cura 2). Com'era:
+  `invoice_da_ln_address` fa
   ancora `follow_redirects=True` e nessun controllo sull'IP del `callback`
   (`server.py:9748`); la guardia anti-SSRF che esiste (`url_foto_ammesso`,
   `server.py:14017`) è solo per le foto del CSV. Ora che il servizio gira da

@@ -364,6 +364,15 @@ chiudendo; altrimenti ci si ferma e si avvisa.
 
 ## M2 — SSRF cieca dal Lightning address
 
+> ✅ **CURATA il 1 ott 2026** dal cantiere «CSP e le voci aperte degli
+> audit», cura 2 (vedi `docs/CANTIERI.md`): forma di LUD-16 giudicata
+> prima dell'URL, partenza e `callback` passano da `url_api_ammesso`
+> (solo https:443, host risolto a un IP pubblico) col DNS in un thread,
+> `follow_redirects=False`, tetto di 64 KB sul JSON letto. La prova
+> chiesta qui sotto — un `callback` su 127.0.0.1, su un IP privato, su
+> `http://`, con un redirect: nessuna GET deve partire — è
+> `prove_ssrf_ln_address`. Il testo che segue resta com'era.
+
 `salva_ln_address` valida solo «c'è una @ e un punto» (`server.py:31354`),
 poi `invoice_da_ln_address` (`server.py:8131`) fa una GET a
 `https://{dominio}/…` **seguendo i redirect**, e una seconda GET al

@@ -33459,3 +33459,75 @@ sono proprio quelle che il periodo in report-only serve a vedere.
 handler — come cantiere a sé. 3) Il bottone del Login Widget: Andrea
 lo prova sul sito.
 
+
+## CSP e le voci aperte degli audit — 2) la SSRF dal Lightning address (1 ott 2026)
+
+La M2 dell'audit del 19 set, riverificata aperta il 23 e il 1 ott:
+`invoice_da_ln_address` seguiva i redirect (`follow_redirects=True`) e
+faceva la seconda GET al `callback` che il wallet DICHIARAVA — un URL
+qualunque, anche `http://127.0.0.1:5001/…` (LNbits) o la 18080 del
+ponte verso LND, o un indirizzo privato della rete di Hetzner — a ogni
+incasso automatico, su un dominio scelto dal venditore. Cieca e di sola
+GET, ma dentro casa, e da quando il servizio gira da `barattolo` dalla
+18080 si arriva alla REST di LND. `salva_ln_address` controllava solo
+«una @ e un punto».
+
+**LA CURA, tutta dentro la funzione e in una guardia sua.** 1) La FORMA
+prima della rete (`FORMA_LN_NOME`, `FORMA_LN_DOMINIO`: la parte locale
+e il dominio di LUD-16, e basta), così un «nome» con una barra dentro
+non diventa un altro percorso sul server del wallet. 2) La partenza E
+il `callback` passano TUTT'E DUE da `_url_lnurl_ammesso`, che è
+`url_api_ammesso` — la regola delle API dei negozi, già scritta: solo
+https sulla 443, host RISOLTO a un indirizzo pubblico, mai loopback,
+privati, link-local, multicast — ma col DNS in un thread
+(`asyncio.to_thread`), perché qui si sta nel ciclo principale e una
+risoluzione lenta fermerebbe tutti. Un callback su un ALTRO host
+pubblico passa: LUD-06 lo ammette, e i grandi wallet ne usano due. 3)
+`follow_redirects=False`: un 3xx è un no (httpx alza su un redirect
+non seguito). 4) Un tetto di 64 KB su ciò che si LEGGE (`_json_lnurl`):
+httpx il corpo l'ha già in mano, il tetto limita il parser, non il
+download — detto invece di lasciato intendere; e una risposta che non è
+un oggetto vale {}. 5) `diagnosi_ln_address` (il `getaddrinfo` che
+sceglie le parole dell'errore) esce dal ciclo principale con
+`asyncio.to_thread`. Un wallet onesto non se ne accorge: risponde in
+https sulla 443 da un indirizzo pubblico, che è quel che LUD-06 gli
+chiede. Il rilancio di `LnbitsMuto` e la rilettura dell'importo restano
+quelli di sempre.
+
+**LE STRADE SCARTATE.** Una guardia sua, copia di `url_foto_ammesso`:
+la regola vive in un posto solo. Lo stream per non scaricare un corpo
+da gigabyte: i banchi (il wallet di cartone di `_finto_lnurl`) parlano
+con `get`, e il wallet è di chi ha una sessione, quindi basta il tetto
+sul parser. Il rate limit sulla rotta `ln-address`: è la cura 4, coi
+numeri da concordare. Il DNS rebinding fra giudizio e connessione resta
+il rischio residuo dichiarato in `url_foto_ammesso`.
+
+**PROVATO.** `prove_ssrf_ln_address` (28): il giudice VERO
+(`url_api_ammesso` + `url_foto_ammesso`) con un DNS di cartone — https
+pubblico sì; http, altra porta, loopback scritto o risolto, privato (il
+ponte), link-local, dominio inesistente no; la funzione VERA col wallet
+di cartone che registra le GET e gli argomenti del client: due GET e la
+fattura sul wallet onesto, `follow_redirects` falso, un callback su un
+altro host pubblico che passa, cinque callback storti (http, loopback,
+il ponte, altra porta, vuoto) con UNA sola GET e niente fattura, il
+dominio loopback e il nome con le barre con ZERO GET, il dominio senza
+punto, il 302 sulla partenza, il corpo oltre il tetto, l'importo
+sbagliato che si scarta come prima; le sentinelle (niente
+`follow_redirects=True`, due passaggi dalla guardia, la guardia in un
+thread, la forma prima dell'URL, la diagnosi in un thread). I due
+banchi di prima (`prove_importo_uscita`, `prove_pagamento_incerto`)
+emendati: la guardia nel loro ambiente dice sempre sì, e il callback
+parla https come un wallet vero. Tortura 13 su 13 (al primo giro 12 su 14: mancava il caso del dominio con una barra dentro, aggiunto; e «il loopback senza `is_loopback`» è una mutazione equivalente — da Python 3.13 127.0.0.0/8 è anche `is_private` — scartata) sulla
+copia. Suite intera severa senza config: vedi il verbale della cura
+successiva per il conto sull'albero pushato. DAL VIVO sulla copia in
+collaudo: `POST /api/me/ln-address` con `x@127.0.0.1` → 400 senza
+nessuna GET; con un indirizzo vero e pubblico la guardia passa, la GET
+al wallet parte, e il giro si ferma dove deve sul nodo di cartone
+(LNbits di collaudo spento → 503 «il nostro nodo non risponde»).
+
+**COSA NON HO PROVATO.** Un incasso vero su un Lightning address dal
+VPS (l'ultimo wallet reale che ha risposto è quello dei pagamenti già
+in produzione; qui il nodo è di cartone): alla prima vendita con
+incasso automatico dopo il deploy il journal deve dire la solita riga
+del payout, e non «Scartata».
+
