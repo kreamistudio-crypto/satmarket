@@ -49,6 +49,7 @@ import ssl
 import sys
 import threading
 import time
+import warnings
 import unicodedata
 import urllib.request
 import zipfile
@@ -16032,25 +16033,100 @@ os.makedirs(CONTENUTI_DIR, exist_ok=True)
 MAX_DOC_BUSTA = 15 * 1024 * 1024
 
 
+# LA FOTO ANOMALA (1 ott 2026, cantiere «CSP e le voci aperte degli
+# audit», cura 3). Fin qui Pillow decodificava per intero qualunque
+# cosa passasse la regex e `verify()`: un PNG da 100 KB che dichiara
+# 30.000x30.000 pixel (900 megapixel, 2,7 GB di RGB) e' una «bomba di
+# decompressione», e un JPEG da 15 MB passava verbatim senza che
+# nessuno ne contasse i pixel — poi lo decodificavano per intero
+# `_foto_vuota` e `miniatura_jpeg`, e lo avrebbero decodificato i
+# telefoni di chi sfoglia. Il default di Pillow (avviso a 89 MP,
+# errore a 179) non bastava: l'avviso non ferma niente, e un telefono
+# di oggi fa 200 MP.
+# LA REGOLA DI ANDREA: nessuna foto VERA da telefono si rifiuta, anche
+# da 50-200 megapixel; si rifiutano i file ANOMALI. Due giudizi, letti
+# dalla sola INTESTAZIONE (Pillow apre senza decodificare):
+#  1) oltre TETTO_PIXEL_FOTO non e' una foto di nessun telefono;
+#  2) sopra BOMBA_SOPRA_PIXEL, meno di BOMBA_BYTE_PER_PIXEL byte per
+#     pixel e' una bomba: una foto vera ne porta da 0,04 in su (48 MP
+#     HEIC in 2 MB), una bomba 0,001 (49 MP in 50 KB). Sotto i 30 MP
+#     la regola non si applica: decodificare 30 MP non fa male a
+#     nessuno, e una grafica piatta legittima non deve cadere qui.
+# E IL TETTO LO SA ANCHE PILLOW: `MAX_IMAGE_PIXELS` allo stesso numero
+# e l'avviso di bomba trasformato in ERRORE, cosi' ogni `open` del
+# server — avatar, banner, live, documenti — si ferma al tetto senza
+# un giudice apposta, e `verify()` risponde «non e' una foto».
+# IL JPEG SI DECODIFICA GIA' PICCOLO: `draft` chiede al decoder la
+# scala DCT ridotta (1/2, 1/4, 1/8), cosi' una foto da 200 MP entra in
+# memoria come una da 3 — e' il modo in cui i 200 MP «si
+# ridimensionano come oggi» senza 600 MB di RGB. Solo sul JPEG: HEIC,
+# PNG e WebP non lo sanno fare, e per loro valgono il tetto e il
+# freno. IL FRENO: al massimo DUE decodifiche piene alla volta
+# (`_FRENO_DECODIFICA`); la terza aspetta qualche secondo invece di
+# sommarsi in memoria — un utente non se ne accorge, cinque HEIC da
+# 200 MP in cinque richieste insieme non buttano giu' il server.
+TETTO_PIXEL_FOTO = 250_000_000
+BOMBA_SOPRA_PIXEL = 30_000_000
+BOMBA_BYTE_PER_PIXEL = 0.02
+_FRENO_DECODIFICA = threading.BoundedSemaphore(2)
+
+
+def _foto_anomala(raw: bytes) -> str:
+    """Il motivo per cui questa immagine NON va decodificata, o ''.
+    Legge la sola intestazione. Fail-open come `_e_immagine`: senza
+    Pillow, o se non si apre, '' — a dire di no sara' chi decodifica."""
+    if not raw or not ImmaginePillow:
+        return ""
+    try:
+        with ImmaginePillow.open(io.BytesIO(raw)) as img:
+            w, h = img.size
+    except (ImmaginePillow.DecompressionBombWarning,
+            ImmaginePillow.DecompressionBombError):
+        return f"immagine oltre {TETTO_PIXEL_FOTO // 1_000_000} megapixel"
+    except Exception:
+        return ""
+    pixel = int(w) * int(h)
+    if pixel > TETTO_PIXEL_FOTO:
+        return (f"immagine da {pixel // 1_000_000} megapixel: oltre il "
+                f"tetto di {TETTO_PIXEL_FOTO // 1_000_000}")
+    if pixel > BOMBA_SOPRA_PIXEL and len(raw) / pixel < BOMBA_BYTE_PER_PIXEL:
+        return "immagine anomala: troppi pixel per quanto pesa"
+    return ""
+
+
+if ImmaginePillow:
+    ImmaginePillow.MAX_IMAGE_PIXELS = TETTO_PIXEL_FOTO
+    warnings.simplefilter("error", ImmaginePillow.DecompressionBombWarning)
+
+
 def converti_in_jpeg(raw: bytes):
     """Riporta ai ranghi qualsiasi formato che Pillow sa leggere
     (HEIC compreso, se c'e' pillow-heif): un JPEG max 1200px, come
     quelli che il telefono prepara da solo. None se non si apre.
     Questa e' l'UNICA compressione della filiera per i formati che
     passano dal server (il file che esce e' definitivo, mai
-    riconvertito): quindi qualita' alta, 88."""
+    riconvertito): quindi qualita' alta, 88.
+    DAL 1 OTT 2026 la foto anomala si ferma PRIMA di decodificare, il
+    JPEG si decodifica gia' piccolo (`draft`, a una misura doppia del
+    risultato: l'ultimo passo resta un LANCZOS di almeno 2x, nitido
+    come prima) e le decodifiche piene passano dal freno."""
     try:
-        img = ImmaginePillow.open(io.BytesIO(raw))
-        # L'orientamento EXIF va applicato QUI: il canvas del browser
-        # lo fa da solo, Pillow no — senza, le foto verticali degli
-        # iPhone arriverebbero sdraiate
-        img = ImageOps.exif_transpose(img)
-        img = img.convert("RGB")
-        # LANCZOS anche qui: il filtro di default e' piu' morbido
-        img.thumbnail((1200, 1200), ImmaginePillow.Resampling.LANCZOS)
-        out = io.BytesIO()
-        img.save(out, "JPEG", quality=88)
-        return out.getvalue()
+        if _foto_anomala(raw):
+            return None
+        with _FRENO_DECODIFICA:
+            img = ImmaginePillow.open(io.BytesIO(raw))
+            if img.format == "JPEG":
+                img.draft("RGB", (2400, 2400))
+            # L'orientamento EXIF va applicato QUI: il canvas del browser
+            # lo fa da solo, Pillow no — senza, le foto verticali degli
+            # iPhone arriverebbero sdraiate
+            img = ImageOps.exif_transpose(img)
+            img = img.convert("RGB")
+            # LANCZOS anche qui: il filtro di default e' piu' morbido
+            img.thumbnail((1200, 1200), ImmaginePillow.Resampling.LANCZOS)
+            out = io.BytesIO()
+            img.save(out, "JPEG", quality=88)
+            return out.getvalue()
     except Exception:
         return None
 
@@ -16073,10 +16149,15 @@ def miniatura_jpeg(raw: bytes):
     """La versione francobollo per le card della vetrina (vedi ricetta
     qui sopra). None senza Pillow o su errore: la card ripiega da
     sola sulla foto grande (fail-open)."""
-    if not ImmaginePillow:
+    if not ImmaginePillow or _foto_anomala(raw):
         return None
     try:
         img = ImmaginePillow.open(io.BytesIO(raw))
+        # il JPEG grande si decodifica gia' piccolo (ott 2026): sopra i
+        # 4 MP il decoder scende di scala, restando sopra il doppio del
+        # lato della miniatura — il ritaglio LANCZOS dopo e' lo stesso
+        if img.format == "JPEG" and img.size[0] * img.size[1] > 4_000_000:
+            img.draft("RGB", (MINIATURA_LATO * 2, MINIATURA_LATO * 2))
         img = img.convert("RGB")
         # Quadrata senza mai ingrandire: se la foto e' piccola, il
         # quadrato si adatta al suo lato corto
@@ -16127,10 +16208,17 @@ def _foto_vuota(raw: bytes) -> bool:
     sta qui sopra). Fail-OPEN come `_e_immagine`: senza Pillow, o su
     qualunque errore, si risponde di no — meglio una foto storta in
     vetrina che una buona rifiutata."""
-    if not raw or not ImmaginePillow:
+    if not raw or not ImmaginePillow or _foto_anomala(raw):
         return False
     try:
-        img = ImmaginePillow.open(io.BytesIO(raw)).convert("RGB")
+        img = ImmaginePillow.open(io.BytesIO(raw))
+        # il JPEG grande si decodifica gia' piccolo (ott 2026), ma SOLO
+        # sopra i 4 MP: il file rotto dal campo era da 0,4 MP, e la
+        # scala ridotta fonderebbe le colonne di un pixel in piu'
+        # colori, cioe' nasconderebbe proprio quel che si cerca
+        if img.format == "JPEG" and img.size[0] * img.size[1] > 4_000_000:
+            img.draft("RGB", (256, 256))
+        img = img.convert("RGB")
         # I colori si contano per PRIMI e con un tetto: su una foto
         # vera Pillow si ferma appena lo supera e torna None, quindi
         # il caso normale costa una scansione e nient'altro.
@@ -16508,6 +16596,14 @@ def salva_foto(annuncio_id: int, foto_lista: list,
             # PNG/WebP grezzi: gia' prima finivano in un file .jpg;
             # con Pillow diventano JPEG per davvero
             raw = converti_in_jpeg(raw) or raw
+        # LA FOTO ANOMALA SI DICE (ott 2026): il JPEG passa verbatim, e
+        # senza questa riga un JPEG da 900 megapixel finiva sul disco e
+        # sui telefoni di chi sfoglia. Le altre strade ci passano gia'
+        # dentro `converti_in_jpeg`; qui il motivo arriva all'utente.
+        motivo = _foto_anomala(raw) if raw else ""
+        if motivo:
+            scarti.append(posto + motivo)
+            continue
         # I METADATI NON ESCONO DI QUI (set 2026). Dalla Mini App
         # questa foto arriva gia' nuda — il canvas i metadati non li sa
         # scrivere — ma questa e' un'API, e la promessa la fa la porta,
@@ -21047,6 +21143,11 @@ async def anteprima_foto(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Foto illeggibile")
     if len(raw) > 15_000_000:
         raise HTTPException(400, "Foto troppo grande (max 15MB)")
+    # la foto anomala si dice con le sue parole (ott 2026), prima di
+    # decodificare: legge la sola intestazione
+    motivo = await asyncio.to_thread(_foto_anomala, raw)
+    if motivo:
+        raise HTTPException(400, "Foto non accettata: " + motivo)
     jpeg = await asyncio.to_thread(converti_in_jpeg, raw)
     if not jpeg:
         print(f"📷 Anteprima NON convertita: {m.group(1)}, "

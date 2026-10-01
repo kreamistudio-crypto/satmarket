@@ -9298,6 +9298,10 @@ def prove_busta_ritiro():
         if _Im:
             i = _SORGENTE.index("SEGMENTI_JPEG_TENUTI = ")
             exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            i = _SORGENTE.index("TETTO_PIXEL_FOTO = ")
+            amb["threading"] = __import__("threading")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            exec(pezzo("_foto_anomala"), amb)
             for _f in ("_spoglia_jpeg", "_spoglia_png", "_spoglia_webp",
                        "_porta_metadati", "spoglia_metadati",
                        "converti_in_jpeg"):
@@ -13627,6 +13631,10 @@ def prove_foto_scarti():
             # pezzo VERO esploderebbe invece di dire la sua
             i = _SORGENTE.index("SEGMENTI_JPEG_TENUTI = ")
             exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            i = _SORGENTE.index("TETTO_PIXEL_FOTO = ")
+            amb["threading"] = __import__("threading")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            exec(pezzo("_foto_anomala"), amb)
             for f in ("converti_in_jpeg", "miniatura_jpeg", "_foto_vuota",
                       "_salva_una_foto", "_e_immagine", "_spoglia_jpeg",
                       "_spoglia_png", "_spoglia_webp", "_porta_metadati",
@@ -14219,9 +14227,14 @@ def prove_foto_vuota():
         salta("il giudice della foto vuota, girato per davvero",
               "Pillow non e' installata")
     else:
-        amb = {"io": io, "ImmaginePillow": Image, "ImageStat": ImageStat}
+        amb = {"io": io, "ImmaginePillow": Image, "ImageStat": ImageStat,
+               "threading": __import__("threading")}
         i = _SORGENTE.index("FOTO_COLORI_MIN = ")
         exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+        # il giudice della foto anomala (ott 2026), che _foto_vuota chiama
+        i = _SORGENTE.index("TETTO_PIXEL_FOTO = ")
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+        exec(pezzo("_foto_anomala"), amb)
         exec(pezzo("_foto_vuota"), amb)
         vuota = amb["_foto_vuota"]
 
@@ -14284,6 +14297,7 @@ def prove_foto_vuota():
         senza = {"io": io, "ImmaginePillow": None, "ImageStat": None,
                  "FOTO_COLORI_MIN": amb["FOTO_COLORI_MIN"],
                  "FOTO_PIATTA_SD": amb["FOTO_PIATTA_SD"]}
+        exec(pezzo("_foto_anomala"), senza)
         exec(pezzo("_foto_vuota"), senza)
         prova("senza Pillow non si rifiuta niente (fail-open)",
               False, senza["_foto_vuota"](jpeg(
@@ -14303,6 +14317,10 @@ def prove_foto_vuota():
             # adesso chiama: senza, il pezzo vero esplode qui
             i = _SORGENTE.index("SEGMENTI_JPEG_TENUTI = ")
             exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb2)
+            i = _SORGENTE.index("TETTO_PIXEL_FOTO = ")
+            amb2["threading"] = __import__("threading")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb2)
+            exec(pezzo("_foto_anomala"), amb2)
             for f in ("converti_in_jpeg", "miniatura_jpeg", "_foto_vuota",
                       "_salva_una_foto", "_e_immagine", "_spoglia_jpeg",
                       "_spoglia_png", "_spoglia_webp", "_porta_metadati",
@@ -14340,8 +14358,11 @@ def prove_foto_vuota():
     giudice = pezzo("_foto_vuota")
     # il fail-open e' la meta' che protegge chi pubblica: senza Pillow
     # non si giudica nessuno
+    # (dal 1 ott 2026 la stessa riga si astiene anche sulla foto ANOMALA:
+    # quella la rifiuta salva_foto con le sue parole, e decodificarla
+    # qui per dire se e' vuota sarebbe proprio il danno da evitare)
     prova("sentinella: senza Pillow il giudice si astiene", True,
-          "if not raw or not ImmaginePillow:" in giudice)
+          "if not raw or not ImmaginePillow or _foto_anomala(raw):" in giudice)
     # BOX e' la media esatta — LANCZOS sui pattern periodici oscilla, e
     # misurerebbe il filtro invece della foto
     # `codice()` toglie i commenti: LANCZOS il giudice lo NOMINA, per
@@ -14386,6 +14407,10 @@ def prove_foto_metadati():
                "ImageStat": ImageStat}
         i = _SORGENTE.index("SEGMENTI_JPEG_TENUTI = ")
         exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+        i = _SORGENTE.index("TETTO_PIXEL_FOTO = ")
+        amb["threading"] = __import__("threading")
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+        exec(pezzo("_foto_anomala"), amb)
         for f in ("_spoglia_jpeg", "_spoglia_png", "_spoglia_webp",
                   "_porta_metadati", "spoglia_metadati",
                   "converti_in_jpeg", "_e_immagine",
@@ -116598,6 +116623,144 @@ def prove_ssrf_ln_address():
           "await asyncio.to_thread(diagnosi_ln_address," in pezzo("salva_ln_address"))
 
 
+def prove_foto_anomala():
+    """LA FOTO ANOMALA E IL JPEG DECODIFICATO GIA' PICCOLO (1 ott 2026,
+    cantiere «CSP e le voci aperte degli audit», cura 3). Pillow
+    decodificava per intero qualunque cosa passasse la regex: una bomba
+    di decompressione da 100 KB valeva gigabyte di RAM, e un JPEG da
+    15 MB passava verbatim senza che nessuno ne contasse i pixel. La
+    regola di Andrea: nessuna foto VERA da telefono si rifiuta (anche
+    200 MP), si rifiutano i file ANOMALI. Qui i giudici girano per
+    DAVVERO su immagini costruite apposta: le bombe PNG si fabbricano
+    a mano (intestazione + zlib di zeri, pochi KB per centinaia di
+    megapixel), e la foto grande e' rumore vero da 40 MP."""
+    print("\n📷 La foto anomala")
+    import io
+    import os
+    import struct
+    import time
+    import zlib
+    try:
+        from PIL import Image, ImageOps, ImageStat
+    except ImportError:
+        salta("il giudice della foto anomala, girato per davvero",
+              "Pillow non e' installata")
+        return
+    amb = {"io": io, "ImmaginePillow": Image, "ImageOps": ImageOps,
+           "ImageStat": ImageStat, "threading": __import__("threading"),
+           "warnings": __import__("warnings")}
+    i = _SORGENTE.index("TETTO_PIXEL_FOTO = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    # il tetto che il server da' a Pillow, uguale qui
+    i = _SORGENTE.find("if ImmaginePillow:\n    ImmaginePillow.MAX_IMAGE_PIXELS")
+    prova("il tetto di Pillow si imposta all'avvio del server", True, i >= 0)
+    if i >= 0:
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    i = _SORGENTE.index("MINIATURA_LATO = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    i = _SORGENTE.index("FOTO_COLORI_MIN = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    for f in ("_foto_anomala", "converti_in_jpeg", "miniatura_jpeg", "_foto_vuota", "_e_immagine"):
+        exec(pezzo(f), amb)
+    anomala = amb["_foto_anomala"]
+
+    def png_piatto(w, h):
+        """Un PNG grigio a 8 bit, tutto zeri: w*h pixel in pochi KB."""
+        def chunk(tipo, dati):
+            c = struct.pack(">I", len(dati)) + tipo + dati
+            return c + struct.pack(">I", zlib.crc32(tipo + dati) & 0xffffffff)
+        z = zlib.compressobj(9)
+        riga = b"\x00" * (w + 1)
+        corpo = b"".join(z.compress(riga) for _ in range(h)) + z.flush()
+        return (b"\x89PNG\r\n\x1a\n"
+                + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 0, 0, 0, 0))
+                + chunk(b"IDAT", corpo) + chunk(b"IEND", b""))
+
+    def jpeg_rumore(w, h):
+        im = Image.frombytes("L", (w, h), os.urandom(w * h))
+        out = io.BytesIO()
+        im.save(out, "JPEG", quality=85)
+        return out.getvalue()
+
+    piccola = io.BytesIO()
+    Image.effect_noise((640, 480), 60).save(piccola, "JPEG")
+    piccola = piccola.getvalue()
+    prova("una foto normale non e' anomala", "", anomala(piccola))
+    prova("il vuoto e un file che non si apre non sono anomali (fail-open)",
+          ["", ""], [anomala(b""), anomala(b"%PDF-1.4 niente")])
+    # --- la bomba: 400 MP in pochi KB ---------------------------------
+    bomba = png_piatto(20_000, 20_000)
+    prova("una bomba da 400 MP pesa pochi KB (il banco e' onesto)", True,
+          len(bomba) < 2_000_000)
+    prova("...ed e' anomala: oltre il tetto", True,
+          "megapixel" in anomala(bomba))
+    prova("...converti_in_jpeg non la decodifica", None, amb["converti_in_jpeg"](bomba))
+    prova("...miniatura_jpeg nemmeno", None, amb["miniatura_jpeg"](bomba))
+    prova("...e per Pillow col tetto del server non e' nemmeno un'immagine",
+          False, amb["_e_immagine"](bomba))
+    # --- la bomba sotto il tetto: 49 MP in 50 KB ----------------------
+    bomba2 = png_piatto(7_000, 7_000)
+    prova("49 MP in pochi KB: anomala per i byte per pixel", True,
+          "anomala" in anomala(bomba2) and len(bomba2) < 200_000)
+    prova("...e non si decodifica", None, amb["converti_in_jpeg"](bomba2))
+    prova("...nemmeno per la miniatura", None, amb["miniatura_jpeg"](bomba2))
+    prova("...e la foto vuota si astiene (fail-open: la rifiuta salva_foto)",
+          False, amb["_foto_vuota"](bomba2))
+    # --- sotto i 30 MP la regola dei byte non si applica --------------
+    liscia = png_piatto(5_000, 4_000)
+    prova("20 MP piatti in pochi KB passano (sotto i 30 MP non si giudica)",
+          "", anomala(liscia))
+    # --- la foto grande VERA: rumore da 40 MP, decodificato piccolo ---
+    grande = jpeg_rumore(8_000, 5_000)
+    prova("40 MP di rumore pesano come una foto vera (>0,02 B/px)", True,
+          len(grande) / 40_000_000 > amb["BOMBA_BYTE_PER_PIXEL"])
+    prova("...e non sono anomali", "", anomala(grande))
+    t0 = time.time()
+    conv = amb["converti_in_jpeg"](grande)
+    durata = time.time() - t0
+    misura = (0, 0)
+    if conv:
+        with Image.open(io.BytesIO(conv)) as im:
+            misura = im.size
+    prova("...converti_in_jpeg la riporta a 1200px", 1200, max(misura))
+    prova("...in meno di quattro secondi: il JPEG si decodifica gia' piccolo",
+          True, durata < 4)
+    mini = amb["miniatura_jpeg"](grande)
+    lato_mini = None
+    if mini:
+        with Image.open(io.BytesIO(mini)) as im:
+            lato_mini = im.size
+    prova("...e la miniatura e' il quadrato di sempre", (640, 640), lato_mini)
+    prova("...e non e' vuota", False, amb["_foto_vuota"](grande))
+    # --- il tetto e' quello dei telefoni di oggi, con margine ----------
+    prova("il tetto ammette i 200 MP dei telefoni", True,
+          amb["TETTO_PIXEL_FOTO"] >= 200_000_000)
+    prova("...e Pillow lo sa", amb["TETTO_PIXEL_FOTO"], Image.MAX_IMAGE_PIXELS)
+    prova("la soglia della bomba sta sopra le foto da telefono comuni", True,
+          amb["BOMBA_SOPRA_PIXEL"] >= 24_000_000)
+    # --- le sentinelle ---------------------------------------------------
+    cj = pezzo("converti_in_jpeg")
+    k_an, k_op = cj.find("_foto_anomala(raw)"), cj.find("ImmaginePillow.open(")
+    prova("sentinella: converti si ferma PRIMA di aprire", True, 0 <= k_an < k_op)
+    k_dr, k_ex = cj.find("img.draft("), cj.find("exif_transpose")
+    prova("sentinella: il draft solo sul JPEG, prima dell'EXIF", True,
+          'if img.format == "JPEG":' in cj and 0 <= k_dr < k_ex)
+    prova("sentinella: le decodifiche piene passano dal freno", True,
+          "with _FRENO_DECODIFICA:" in cj)
+    mj = pezzo("miniatura_jpeg")
+    prova("sentinella: la miniatura rifiuta l'anomala e scende di scala sopra i 4 MP",
+          True, "_foto_anomala(raw)" in mj and "> 4_000_000" in mj and "img.draft(" in mj)
+    fv = pezzo("_foto_vuota")
+    prova("sentinella: la foto vuota NON scende di scala sotto i 4 MP (il caso dal campo)",
+          True, "> 4_000_000" in fv and "img.draft(" in fv)
+    prova("sentinella: salva_foto dice il motivo all'utente", True,
+          "motivo = _foto_anomala(raw)" in pezzo("salva_foto"))
+    prova("sentinella: l'anteprima la giudica prima di convertire", True,
+          "asyncio.to_thread(_foto_anomala, raw)" in pezzo("anteprima_foto"))
+    prova("sentinella: l'avviso di bomba di Pillow e' un errore", True,
+          'warnings.simplefilter("error", ImmaginePillow.DecompressionBombWarning)' in _SORGENTE)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -116819,6 +116982,7 @@ def main():
               prove_nip89_handler,
               prove_csp_prova,
               prove_ssrf_ln_address,
+              prove_foto_anomala,
               prove_config_esempio):
         try:
             f()
