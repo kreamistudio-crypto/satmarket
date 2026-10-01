@@ -34629,3 +34629,76 @@ origin/main (075ecf4): suite intera severa 18.408 verdi e 0 rosse; i 32
 collaudi della CI verdi nella gabbia. NON PROVATO: il telefono — appena
 il deploy è su, pubblicando un annuncio «Scatta foto» deve tornare
 (Andrea).
+
+## «📷 Scatta foto» oltre alla galleria, pubblicando un annuncio (1 ott 2026)
+
+**DA DOVE SI PARTIVA.** Parola di Andrea: pubblicando o modificando un
+annuncio, dentro Telegram e nell'app Android il bottone delle foto
+apriva solo la libreria — nessun modo di fotografare l'oggetto al
+momento. Il riquadro aveva UN input (`#sellPhotos`, `accept="image/*,
+.heic,.heif" multiple`), e cosa offrire lo decideva il selettore di
+chi ospita la pagina.
+
+**LA CURA.** Due bottoni dentro il riquadro: «📷 Scatta foto» apre un
+input nuovo, `#sellScatta` (`accept="image/*" capture="environment"`,
+senza `multiple`) — la fotocamera POSTERIORE diretta, una foto per
+volta —, e «🖼️ Dalla galleria» apre `#sellPhotos` com'era. Tutti e due
+passano da `fotoScelte` → `aggiungiFoto`: la foto scattata si prepara
+come le altre (ridimensionamento a 1200 px, orientamento, il ripiego in
+piccolo e sul server). L'unica differenza è la frase della lista vuota:
+dalla fotocamera dice «la fotocamera», non «la galleria» (dentro
+Telegram e fuori). Lo `stopPropagation` sui bottoni: senza, il tocco
+risale al riquadro e apre ANCHE la galleria. Sul computer — `(hover:
+hover) and (pointer:fine)` — le due scelte non si mostrano: lì
+`capture` non apre nessuna fotocamera e il riquadro di prima (tocco e
+trascinamento) basta. Riquadro intero nascosto in modifica Nostr come
+prima: i bottoni ci stanno dentro.
+
+**LA PERMISSIONS-POLICY BASTA.** `camera=(self)` (6d44c63) è l'unica
+riga che nomina la fotocamera: niente nel Caddyfile (lo dice
+PRODUZIONE), niente meta, niente altri middleware. Dentro Telegram
+Android e iPhone la Mini App è il documento di CIMA della WebView, e
+`self` è barattolo.store; nell'app Android (TWA) lo stesso. Dal vivo la
+pagina risponde `allowsFeature('camera') = true` (microfono `false`).
+Dove NON basterebbe da sola: Telegram Web, che ci mette in un iframe
+— lì decide anche l'`allow` del genitore; ma è un computer, e le
+scelte lì non si mostrano.
+
+**LE STRADE SCARTATE.** Un solo bottone con `capture`: toglie la
+galleria a chi ha già le foto. Una fotocamera dentro la pagina con
+`getUserMedia`: un cantiere vero (anteprima, scatto, permessi, iOS) per
+una cosa che il telefono sa già fare; resta la strada se una WebView
+ignora `capture` (sotto). Cambiare l'etichetta «Aggiungi foto (fino a
+5)»: resta il titolo del riquadro, le scelte stanno sotto.
+
+**PROVATO.** `prove_foto_scarti`: sentinelle sul markup (capture
+posteriore, niente `multiple` sulla fotocamera, la galleria con
+`multiple` e HEIC e senza capture, i bottoni DENTRO il riquadro — nessun
+`</div>` fra i due —, chi apre cosa, i due stop, la regola del dito nel
+CSS, `fotoScelte` che dice la fonte) e il banco node che fa girare
+`fotoScelte` VERA coi due input: la foto scattata entra dalla tela come
+quella della galleria e l'input si svuota; a mani vuote le quattro
+frasi giuste e nessuna foto. Tortura 11 su 11 (capture tolto o
+frontale, `multiple` sulla fotocamera, capture sulla galleria, bottone
+che apre l'input sbagliato, stop tolto, media query tolta, fonte non
+passata, frase della fotocamera uguale alla galleria, input non
+svuotato, scelte fuori dal riquadro — quest'ultima sopravviveva alla
+prima stesura, che guardava solo l'ordine). Dal vivo nel Browser pane
+(copia in scratchpad, config da `config_esempio.py` in collaudo, relay
+morti) a 375 px col dito emulato: i due bottoni (140×44) nel riquadro,
+chiaro e scuro; ogni bottone apre il SUO input e una volta sola; un
+JPEG 4000×3000 fatto passare da `#sellScatta` entra come miniatura a
+1200×901 e l'input si svuota; la lista vuota dice «i permessi della
+fotocamera»; l'intestazione `camera=(self)` letta con curl; da desktop
+le scelte `display:none` e «o trascinale qui» al suo posto. Nessuna
+riga CSP nel diario.
+
+**COSA NON HO PROVATO, E TOCCA AL TELEFONO.** La fotocamera vera: il
+Browser pane non ne ha, e cosa fa `capture` lo decide la WebView di
+chi ospita. Telegram iPhone (WKWebView) e l'app Android (Chrome)
+rispettano `capture`; per Telegram Android NON lo so — se la sua WebView
+lo ignora, «📷 Scatta foto» aprirà lo stesso selettore della galleria,
+e lì la strada è la fotocamera nella pagina (sopra). Da guardare anche:
+il ritorno dalla fotocamera su un Android con poca memoria (il sistema
+può chiudere la WebView mentre la fotocamera è aperta, e il form si
+perde).

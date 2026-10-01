@@ -13711,6 +13711,54 @@ def prove_foto_scarti():
     for gancio in ("ondragenter", "ondragover", "ondragleave", "ondrop"):
         prova(f"sentinella: il riquadro ascolta {gancio}", True,
               gancio in riquadro)
+    # 1bis) «📷 SCATTA FOTO» (1 ott 2026). Dentro Telegram e nell'app
+    # Android il selettore apriva solo la libreria. Due input, due
+    # bottoni: la fotocamera posteriore DIRETTA (capture, una per volta)
+    # e la galleria com'era (anche piu' foto insieme, HEIC compresa).
+    def _input(id_):
+        j = mini.find(f'id="{id_}"')
+        if j < 0:
+            return ""
+        a = mini.rfind("<input", 0, j)
+        return mini[a:mini.index(">", j) + 1]
+    _cam, _gal = _input("sellScatta"), _input("sellPhotos")
+    prova("sentinella: l'input della fotocamera c'e' e chiede la posteriore",
+          [True, True, True], ['type="file"' in _cam,
+                               'capture="environment"' in _cam,
+                               'accept="image/*"' in _cam])
+    prova("sentinella: ...una foto per volta, e passa da fotoScelte",
+          [False, True], ["multiple" in _cam,
+                          'onchange="fotoScelte(event)"' in _cam])
+    prova("sentinella: la galleria resta com'era: piu' foto, HEIC, niente capture",
+          [True, True, False, True],
+          ["multiple" in _gal, ".heic,.heif" in _gal, "capture" in _gal,
+           'onchange="fotoScelte(event)"' in _gal])
+    _scelte = mini[mini.find('<div class="foto-scelte">'):]
+    _scelte = _scelte[:_scelte.find("</div>")]
+    # DENTRO e non solo DOPO: fra l'apertura del riquadro e le scelte
+    # non si chiude nessun div (prima ci sono solo le sue tre span) —
+    # fuori dal riquadro i bottoni perderebbero il suo hidden in
+    # modifica Nostr e la regola del dito
+    _a = mini.find('<div class="photo-drop"')
+    _b = mini.find('<div class="foto-scelte">')
+    prova("sentinella: i due bottoni stanno DENTRO il riquadro delle foto",
+          True, 0 < _a < _b and "</div>" not in mini[_a:_b])
+    prova("sentinella: «📷 Scatta foto» apre la fotocamera, «🖼️ Dalla galleria» "
+          "la galleria", [True, True],
+          ["el('sellScatta').click()\">📷 Scatta foto</button>" in _scelte,
+           "el('sellPhotos').click()\">🖼️ Dalla galleria</button>" in _scelte])
+    # senza lo stop il tocco risale al riquadro, che apre ANCHE la galleria
+    prova("sentinella: ...e nessuno dei due risale al riquadro", 2,
+          _scelte.count("event.stopPropagation();"))
+    # sul computer capture non apre nessuna fotocamera: li' le due scelte
+    # non si mostrano, e il riquadro resta quello di prima
+    _css = re.search(r"@media\(hover:hover\) and \(pointer:fine\)\{\s*"
+                     r"\.photo-drop \.foto-scelte\{display:none\}", mini)
+    prova("sentinella: le due scelte spariscono dove non c'e' un dito",
+          True, bool(_css))
+    prova("sentinella: fotoScelte dice ad aggiungiFoto da quale input arriva",
+          True, "aggiungiFoto(ev.target.files, ev.target.id === 'sellScatta')"
+          in pezzo_js(mini, "async function fotoScelte(ev){", "\n}\n"))
     i = mini.index("function fotoSopra(")
     prova("sentinella: ed e' il preventDefault a renderlo un bersaglio",
           True, "ev.preventDefault()" in mini[i:mini.index("\n}", i)])
@@ -13797,7 +13845,8 @@ def prove_foto_scarti():
             "function telaPiatta(sorgente){", "function jpegVuoto(uri){",
             "async function jpegDaBitmap(file, larg, alt){",
             "async function ripiegoFoto(file, larg, alt){",
-            "function ridimensiona(file){", "async function aggiungiFoto(files){"))
+            "function ridimensiona(file){", "async function aggiungiFoto(files, daFotocamera){",
+            "async function fotoScelte(ev){"))
         _banco = """
           // il banco: un telefono finto, con la tela, il decode in
           // piccolo e il server che si comportano come dice CASO
@@ -13946,7 +13995,33 @@ def prove_foto_scarti():
             out.rumore = await giro({bitmap:'ok', rumore:true}, 'rumore');
             out.bitmapNeraTelaBuona = await giro({bitmap:'ok',
               telaBitmap:BITMAP_NERA}, 'bitmapNeraTelaBuona');
-            console.log(JSON.stringify({out, DETTAGLI, NERE_ENTRATE}));
+            // --- «📷 SCATTA FOTO» (1 ott 2026): fotoScelte VERA coi due
+            // input. La foto scattata entra dalla stessa strada (stesso
+            // CASO della buona, stessa fonte), e a mani vuote ognuno dei
+            // due dice il SUO permesso, dentro Telegram e fuori.
+            const SCELTE = {};
+            async function scelta(id, files, conTg){
+              CASO = Object.assign({decode:'ok', larg:4080, alt:3060,
+                                    tela:BUONA, server:'ok', bitmap:'no',
+                                    telaBitmap:BITMAP, bw:4080, bh:3060,
+                                    chiesteBitmap:0, chiamateServer:0});
+              globalThis.createImageBitmap = undefined;
+              tg.initData = conTg ? 'x' : '';
+              toasts = []; sellFoto = []; anteprimeMute.clear();
+              const ev = {target: {id, files, value: 'IMG_0001.jpg'}};
+              await fotoScelte(ev);
+              tg.initData = 'x';
+              return [sellFoto.length, sellFoto[0] === BUONA, toasts[0] || '',
+                      ev.target.value];
+            }
+            const FOTO = [{name:'image.jpg', type:'image/jpeg', size:2400000}];
+            SCELTE.scattata = await scelta('sellScatta', FOTO, true);
+            SCELTE.galleria = await scelta('sellPhotos', FOTO, true);
+            SCELTE.vuotaFotocameraTg = await scelta('sellScatta', [], true);
+            SCELTE.vuotaGalleriaTg = await scelta('sellPhotos', [], true);
+            SCELTE.vuotaFotocamera = await scelta('sellScatta', [], false);
+            SCELTE.vuotaGalleria = await scelta('sellPhotos', [], false);
+            console.log(JSON.stringify({out, DETTAGLI, NERE_ENTRATE, SCELTE}));
           })();
         """
         _r = _sp5.run(["node", "-e", _banco], capture_output=True,
@@ -14061,6 +14136,31 @@ def prove_foto_scarti():
             # sparisce senza che qualcuno lo dica
             prova("REGOLA: o la foto entra, o qualcuno parla. Sempre.",
                   [], [k for k, r in v.items() if r[0] == 0 and r[1] == 0])
+            # «📷 SCATTA FOTO» (1 ott 2026): la foto della fotocamera e
+            # quella della galleria fanno la STESSA strada — entrano, dalla
+            # tela, in silenzio, e l'input si svuota per lo scatto dopo
+            _sc = _tutto["SCELTE"]
+            prova("la foto scattata entra come quella della galleria",
+                  [1, True, "", ""], _sc["scattata"])
+            prova("...e la galleria resta com'era", [1, True, "", ""],
+                  _sc["galleria"])
+            # a mani vuote ognuno dice il SUO permesso: «galleria» a chi
+            # ha appena scattato lo manderebbe nel posto sbagliato
+            prova("la fotocamera a mani vuote, in Telegram, dice la fotocamera",
+                  "Non ho ricevuto nessuna foto: controlla che Telegram "
+                  "possa usare la fotocamera", _sc["vuotaFotocameraTg"][2])
+            prova("...la galleria a mani vuote, in Telegram, dice la galleria",
+                  "Non ho ricevuto nessuna foto: controlla che Telegram "
+                  "possa accedere alla galleria", _sc["vuotaGalleriaTg"][2])
+            prova("...e fuori da Telegram i permessi giusti, tutti e due",
+                  ["Non ho ricevuto nessuna foto: controlla i permessi "
+                   "della fotocamera",
+                   "Non ho ricevuto nessuna foto: controlla i permessi "
+                   "della galleria"],
+                  [_sc["vuotaFotocamera"][2], _sc["vuotaGalleria"][2]])
+            prova("...e a mani vuote nessuna foto entra", [0, 0, 0, 0],
+                  [_sc[k][0] for k in ("vuotaFotocameraTg", "vuotaGalleriaTg",
+                                       "vuotaFotocamera", "vuotaGalleria")])
     # LA REGOLA E' DI STRUTTURA, non di memoria: `ridimensiona` e i suoi
     # due aiutanti non hanno piu' una bocca — rispondono {foto} o
     # {motivo} — e a parlare e' il chiamante, in un posto solo. Finche'
@@ -14071,7 +14171,7 @@ def prove_foto_scarti():
               "async function ripiegoFoto("):
         prova(f"sentinella: {f.split()[-1][:-1]} non parla, risponde",
               False, "toast(" in pezzo_js(mini, f, "\n}\n"))
-    _agg = pezzo_js(mini, "async function aggiungiFoto(files){", "\n}\n")
+    _agg = pezzo_js(mini, "async function aggiungiFoto(files, daFotocamera){", "\n}\n")
     prova("sentinella: ...e chi la chiama dice SEMPRE il no", True,
           "if (!esito.foto)" in _agg and "esito.motivo ||" in _agg)
     # i tre chiamanti prendono .foto: con la risposta vecchia (una

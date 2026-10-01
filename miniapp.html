@@ -7918,6 +7918,22 @@
   @media(hover:hover) and (pointer:fine){
     .photo-drop .trascina{display:block;font-size:12px;font-weight:600;margin-top:3px;opacity:.75}
   }
+  /* LE DUE SCELTE DEL TELEFONO (1 ott 2026): «📷 Scatta foto» e «🖼️
+     Dalla galleria», affiancate sotto l'etichetta. Il rovescio della
+     regola di «trascinale»: qui si mostrano solo dove c'e' un dito,
+     perche' sul computer `capture` non apre nessuna fotocamera e il
+     riquadro di prima basta. Il fondo e' quello delle card e il bordo
+     quello dei campi: bottoni di servizio dentro un bersaglio, non
+     azioni che competono con «Pubblica». */
+  .photo-drop .foto-scelte{display:flex;gap:8px;margin-top:14px}
+  .photo-drop .foto-scelta{flex:1 1 0;min-width:0;min-height:44px;
+    border:1.5px solid var(--field-line);border-radius:var(--radius-btn);
+    background:var(--bg);color:var(--ink);font:inherit;font-weight:800;
+    font-size:14px;padding:10px 8px;cursor:pointer}
+  .photo-drop .foto-scelta:active{transform:scale(.98)}
+  @media(hover:hover) and (pointer:fine){
+    .photo-drop .foto-scelte{display:none}
+  }
   /* il riquadro si accende mentre la foto ci passa sopra: il segnale
      che il bersaglio c'e' davvero */
   .photo-drop.sopra{border-color:var(--sats);background:var(--sats-soft);color:var(--sats-text)}
@@ -11108,6 +11124,17 @@ document.getElementById('cartello')?.remove();</script>
       <div id="editBanner" style="display:none;margin:2px 0 14px;padding:10px 14px;background:var(--sats-soft);border:1.5px solid #F7C87F;border-radius:14px;font-size:13px;font-weight:700;color:var(--sats-text)"></div>
       <div class="field">
         <input type="file" id="sellPhotos" accept="image/*,.heic,.heif" multiple style="display:none" onchange="fotoScelte(event)">
+        <!-- «📷 SCATTA FOTO» (1 ott 2026): dentro Telegram e nell'app
+             Android il selettore qui sopra apriva solo la libreria, e
+             chi vende col telefono in mano non poteva fotografare
+             l'oggetto al momento. `capture="environment"` chiede al
+             telefono la fotocamera POSTERIORE, diretta: una foto per
+             volta (niente multiple, la fotocamera non ne da' di piu').
+             La foto scattata passa da fotoScelte come le altre — la
+             stessa preparazione, lo stesso ripiego sul server. Il
+             permesso e' quello della Permissions-Policy, camera=(self):
+             con camera=() questo bottone si spegne. -->
+        <input type="file" id="sellScatta" accept="image/*" capture="environment" style="display:none" onchange="fotoScelte(event)">
         <!-- Si tocca E si trascina: sul desktop il riquadro tratteggiato
              chiede di essere usato cosi', e per un anno non lo era. -->
         <div class="photo-drop" onclick="el('sellPhotos').click()"
@@ -11115,6 +11142,19 @@ document.getElementById('cartello')?.remove();</script>
              ondragleave="fotoSopra(event,false)" ondrop="fotoLasciate(event)">
           <span class="big">📸</span><span id="sellFotoEtichetta">Aggiungi foto (fino a 5)</span>
           <span class="trascina">o trascinale qui</span>
+          <!-- Le due scelte solo dove c'e' un dito (il CSS): sul
+               computer `capture` non apre nessuna fotocamera — il
+               Chrome del desktop la ignora e mostra i file — e due
+               bottoni che fanno la stessa cosa sarebbero una bugia; li'
+               il riquadro resta quello di prima, tocco e trascinamento.
+               Lo stopPropagation non e' un vezzo: senza, il tocco sul
+               bottone risale al riquadro e apre ANCHE la galleria. -->
+          <div class="foto-scelte">
+            <button type="button" class="foto-scelta" id="sellBtnScatta"
+                    onclick="event.stopPropagation(); el('sellScatta').click()">📷 Scatta foto</button>
+            <button type="button" class="foto-scelta" id="sellBtnGalleria"
+                    onclick="event.stopPropagation(); el('sellPhotos').click()">🖼️ Dalla galleria</button>
+          </div>
         </div>
         <!-- LA REGOLA DELLE FOTO IN MODIFICA (ago 2026): o tutte o
              nessuna — se ne carichi di nuove sostituiscono in blocco
@@ -42924,14 +42964,17 @@ function ridimensiona(file){
 }
 
 async function fotoScelte(ev){
-  await aggiungiFoto(ev.target.files);
+  /* due input arrivano qui — la galleria e la fotocamera (1 ott
+     2026) — e dicono chi sono solo per la lista vuota qui sotto */
+  await aggiungiFoto(ev.target.files, ev.target.id === 'sellScatta');
   ev.target.value = '';       // cosi' si puo' riscegliere lo stesso file
   renderFotoPreview();
 }
 
-/* Le foto arrivano da DUE gesti — il selettore e il trascinamento — e
-   da qui in giu' la strada e' una sola. */
-async function aggiungiFoto(files){
+/* Le foto arrivano da TRE gesti — la galleria, la fotocamera e il
+   trascinamento — e da qui in giu' la strada e' una sola: la foto
+   scattata si prepara come quella scelta, col suo stesso ripiego. */
+async function aggiungiFoto(files, daFotocamera){
   if (editandoNostr) {
     toast('Le foto degli annunci importati si cambiano dal tuo client Nostr', 6000);
     return;
@@ -42949,9 +42992,15 @@ async function aggiungiFoto(files){
        change anche sull'ANNULLA del picker, con la lista vuota — chi
        annulla puo' leggere questo avviso a vuoto. Meglio un avviso
        di troppo che il silenzio che ha aperto il caso. */
+    /* (1 ott 2026) dalla fotocamera il permesso che manca e' l'altro:
+       dire «galleria» a chi ha appena scattato lo manderebbe a
+       cercare nel posto sbagliato */
+    const permesso = daFotocamera
+      ? ['usare la fotocamera', 'della fotocamera']
+      : ['accedere alla galleria', 'della galleria'];
     toast(tg?.initData
-      ? 'Non ho ricevuto nessuna foto: controlla che Telegram possa accedere alla galleria'
-      : 'Non ho ricevuto nessuna foto: controlla i permessi della galleria', 8000);
+      ? `Non ho ricevuto nessuna foto: controlla che Telegram possa ${permesso[0]}`
+      : `Non ho ricevuto nessuna foto: controlla i permessi ${permesso[1]}`, 8000);
     return;
   }
   for (const file of files){

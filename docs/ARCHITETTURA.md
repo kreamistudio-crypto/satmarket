@@ -6601,6 +6601,20 @@
   che `fotoScelte` ora si limita a chiamare. «o trascinale qui» si
   mostra solo sotto `(hover:hover) and (pointer:fine)`: sul telefono
   quel gesto non esiste e prometterlo sarebbe una bugia.
+  «📷 SCATTA FOTO» (1 ott 2026): dentro Telegram e nell'app Android il
+  selettore apriva solo la libreria. Nel riquadro, due bottoni:
+  «📷 Scatta foto» apre `#sellScatta` (`accept="image/*"
+  capture="environment"`, senza `multiple`: la fotocamera posteriore
+  diretta, una foto per volta) e «🖼️ Dalla galleria» apre `#sellPhotos`
+  com'era (più foto, HEIC). Tutti e due finiscono in `fotoScelte` →
+  `aggiungiFoto(files, daFotocamera)`: la stessa preparazione e lo
+  stesso ripiego, e la sola differenza è la frase della lista vuota
+  (fotocamera o galleria). Lo `stopPropagation` sui bottoni impedisce
+  al tocco di risalire al riquadro, che aprirebbe ANCHE la galleria.
+  Le due scelte si NASCONDONO sotto `(hover:hover) and (pointer:fine)`,
+  il rovescio di «trascinale»: sul computer `capture` non apre nessuna
+  fotocamera e il riquadro di prima basta. Il permesso è
+  `camera=(self)` delle cinture: con `camera=()` il bottone si spegne.
   Con lui gli ALTRI QUATTRO SILENZI, che erano il vero tema: 1)
   l'errore dell'anteprima si ingoiava (`if (r.ok)` senza else) e in
   pagina restava il segnaposto «verrà convertita alla pubblicazione»
