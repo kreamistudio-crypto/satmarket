@@ -116969,11 +116969,10 @@ def prove_rotte_p2p_riverificate():
     cantiere «CSP e le voci aperte degli audit», cura 7). Le funzioni
     VERE su sqlite in memoria: `lascia` che rifiuta una disputa presa e
     scarta l'id dichiarato caduto, la decisione che rifiuta la cauzione
-    del lato sbagliato, la prova d'incontro che vale solo per il giro
-    corrente (e la coppia nuova che scrive la sua), «dimentica» che
-    scorda le posizioni delle prove firmate con le mie chiavi, la CAS
-    dell'annullo che ripete «nessun payout in volo» nel lucchetto, e il
-    moderatore che cerca prima il 38386."""
+    del lato sbagliato,
+    la CAS dell'annullo che ripete «nessun payout in volo» nel lucchetto, e il
+    moderatore che cerca prima il 38386. (Le presenze dei contanti sono
+    uscite da questa cura: le rifa' il cantiere «📍 Sono qui».)"""
     print("\n🧷 Le rotte P2P nate dopo gli audit, riverificate")
     import sqlite3
     con = sqlite3.connect(":memory:")
@@ -116994,8 +116993,7 @@ def prove_rotte_p2p_riverificate():
            "P2P_DISPUTA_ESITI": {"compratore", "venditore"},
            "P2P_MOTIVO_MIN": 20, "P2P_MOTIVO_MAX": 1000}
     for f in ("_registro_disputa_p2p", "_lascia_disputa_p2p", "_cauzione_di_p2p",
-              "_decisione_disputa_p2p", "_incontro_da_riga_p2p", "_incontro_p2p",
-              "_dimentica_presenze_p2p"):
+              "_decisione_disputa_p2p"):
         exec(pezzo(f), amb)
     O = "11111111-2222-3333-4444-555555555555"
     O2 = "aaaaaaaa-2222-3333-4444-555555555555"
@@ -117042,37 +117040,9 @@ def prove_rotte_p2p_riverificate():
     prova("...e senza cauzione si decide come prima", 200, dec(con, 999, dict(base), 22)[0])
     prova("...mentre una cauzione fuori catalogo resta un 400", 400,
           dec(con, 999, dict(base, cauzione="tutti"), 23)[0])
-    # --- la prova d'incontro vale per il giro corrente ------------------------
-    A, B = "a" * 64, "b" * 64
-    con.execute("INSERT INTO p2p_presenze(ordine, giro, chiave_mostra, chiave_legge, ora_mostra, "
-                "ora_legge, lat_mostra, lon_mostra, acc_mostra, distanza_m, posizioni, quando) "
-                "VALUES(?, 0, ?, ?, 100, 110, 45.1, 9.1, 20, 30, 1, 100)", (O2, A, B))
-    inc = amb["_incontro_p2p"]
-    prova("incontro: al giro 0 la prova c'e'", 30, inc(con, O2)["distanza"])
-    con.execute("UPDATE p2p_scambi SET giro=1 WHERE ordine=?", (O2,))
-    prova("...al giro 1 (ordine tornato e ripreso) NON c'e' piu'", None, inc(con, O2))
-    prova("...e senza una riga in p2p_scambi si legge com'era (i banchi di ieri)", 30,
-          inc(con, "zzzzzzzz-2222-3333-4444-555555555555") if False else
-          (con.execute("DELETE FROM p2p_scambi WHERE ordine=?", (O2,)) and inc(con, O2)["distanza"]))
-    con.execute("INSERT INTO p2p_scambi(ordine, giro, preso_dal) VALUES(?, 1, 'buyer')", (O2,))
-    rp = pezzo("_registra_presenza_p2p")
-    # la riga INTERA della query: «WHERE ordine=? AND giro=?» da solo lo
-    # dice anche la query dei momenti chiusi (la tortura l'ha preso)
-    prova("sentinella: il «gia'» guarda ordine E giro, e la prova vecchia se ne va", True,
-          "SELECT * FROM p2p_presenze WHERE ordine=? AND giro=?" in rp
-          and "DELETE FROM p2p_presenze WHERE ordine=? AND giro<>?" in rp)
-    # --- dimentica scorda le posizioni delle prove firmate con le mie chiavi ---
-    dim = amb["_dimentica_presenze_p2p"]
-    prova("dimentica: la riga firmata con una mia chiave perde le posizioni", 1, dim(con, [B], 500))
-    r = con.execute("SELECT lat_mostra, prova, posizioni_via, distanza_m, chiave_legge FROM p2p_presenze "
-                    "WHERE ordine=?", (O2,)).fetchone()
-    prova("...posizioni e copia delle note via, ora e distanza e chiavi restano",
-          (None, "", 500, 30, B), tuple(r))
-    prova("...una seconda volta non tocca niente", 0, dim(con, [B], 600))
-    prova("...e senza chiavi, o con chiavi non mie, zero", (0, 0), (dim(con, [], 7), dim(con, ["c" * 64], 7)))
-    prova("sentinella: la rotta «dimentica» la chiama PRIMA di cancellare le chiavi", True,
-          pezzo("dimentica_chiavi_p2p").index("_dimentica_presenze_p2p(")
-          < pezzo("dimentica_chiavi_p2p").index("DELETE FROM chiavi_p2p"))
+    # (la prova d'incontro per giro e «dimentica» che scorda le presenze sono
+    #  USCITE da questa cura per decisione di Andrea, 1 ott 2026: le rifa' il
+    #  cantiere «📍 Sono qui», che sostituisce il QR e le include)
     # --- la CAS dell'annullo ------------------------------------------------
     prova("annullo: la CAS nel lucchetto ripete «nessun payout in volo»", True,
           "WHERE id=? AND stato='locked' AND COALESCE(payout_stato,'')=''" in pezzo("annulla_vendita"))

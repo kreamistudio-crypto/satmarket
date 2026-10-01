@@ -43229,33 +43229,6 @@ async def registra_chiavi_p2p(req: Request, x_tg_init_data: str = Header(""),
     return {"ok": True, **esito}
 
 
-def _dimentica_presenze_p2p(con, pubkeys, adesso: int) -> int:
-    """«Dimentica» scorda anche le prove d'incontro (1 ott 2026,
-    riverifica): le posizioni e la copia delle due note delle righe
-    firmate con una delle MIE chiavi se ne vanno subito, come alla
-    chiusura dello scambio. L'ora, la distanza e le chiavi restano: sono
-    anche dell'altra persona, e al moderatore serve sapere che
-    l'incontro c'e' stato. Torna quante righe ha toccato; senza la
-    tabella (i banchi di ieri) zero."""
-    chiavi = [str(p) for p in (pubkeys or []) if p]
-    if not chiavi:
-        return 0
-    if not con.execute("SELECT name FROM sqlite_master WHERE type='table' "
-                       "AND name='p2p_presenze'").fetchone():
-        return 0
-    n = 0
-    for i in range(0, len(chiavi), 200):
-        fetta = chiavi[i:i + 200]
-        segni = ",".join("?" for _ in fetta)
-        n += con.execute(
-            "UPDATE p2p_presenze SET lat_mostra=NULL, lon_mostra=NULL, acc_mostra=NULL, "
-            "lat_legge=NULL, lon_legge=NULL, acc_legge=NULL, prova='', posizioni_via=? "
-            f"WHERE posizioni_via=0 AND (chiave_mostra IN ({segni}) "
-            f"OR chiave_legge IN ({segni}))",
-            [int(adesso)] + fetta + fetta).rowcount
-    return n
-
-
 @app.delete("/api/p2p/chiavi")
 def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
                          barattolo_sessione: str = Cookie("")):
@@ -43271,13 +43244,6 @@ def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
     Barattolo."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
-    # e le POSIZIONI delle prove d'incontro firmate con le mie chiavi
-    # (1 ott 2026): si scordano PRIMA di cancellare le chiavi, perche'
-    # sono le chiavi a dire quali prove sono mie
-    _dimentica_presenze_p2p(
-        con, [r[0] for r in con.execute(
-            "SELECT pubkey FROM chiavi_p2p WHERE tg_id=?", (user["id"],))],
-        int(time.time()))
     tolte = con.execute("DELETE FROM chiavi_p2p WHERE tg_id=?",
                         (user["id"],)).rowcount
     volti = con.execute("DELETE FROM p2p_ordini WHERE tg_id=?",
@@ -48098,23 +48064,10 @@ def _incontro_p2p(con, ordine: str):
     """La prova d'incontro di un ordine, o None. Un database senza la
     tabella — i banchi di ieri — vale «nessuna prova», mai un errore
     sulla pagina degli scambi o sulla card del moderatore."""
-    tabelle = {x[0] for x in con.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' "
-        "AND name IN ('p2p_presenze', 'p2p_scambi')")}
-    if "p2p_presenze" not in tabelle:
+    c = con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='p2p_presenze'")
+    if not c.fetchone():
         return None
-    # DEL GIRO CORRENTE (1 ott 2026, riverifica): un ordine tornato nel
-    # libro e ripreso da un altro e' un altro incontro, e la prova di
-    # prima — di altre persone — non deve dire «confermato» a questo
-    giro = None
-    if "p2p_scambi" in tabelle:
-        s = con.execute("SELECT giro FROM p2p_scambi WHERE ordine=?", (ordine,)).fetchone()
-        giro = int(s["giro"] or 0) if s else None
-    if giro is None:
-        r = con.execute("SELECT * FROM p2p_presenze WHERE ordine=?", (ordine,)).fetchone()
-    else:
-        r = con.execute("SELECT * FROM p2p_presenze WHERE ordine=? AND giro=?",
-                        (ordine, giro)).fetchone()
+    r = con.execute("SELECT * FROM p2p_presenze WHERE ordine=?", (ordine,)).fetchone()
     return _incontro_da_riga_p2p(r) if r else None
 
 
@@ -48161,13 +48114,9 @@ def _registra_presenza_p2p(con, io, d, adesso: int) -> tuple:
         (ordine, giro) + tuple(P2P_PRESENZA_MOMENTI_CHIUSI)).fetchone()
     if chiuso:
         return 409, "Questo scambio e' chiuso: la prova d'incontro non serve piu'"
-    gia = con.execute("SELECT * FROM p2p_presenze WHERE ordine=? AND giro=?",
-                      (ordine, giro)).fetchone()
+    gia = con.execute("SELECT * FROM p2p_presenze WHERE ordine=?", (ordine,)).fetchone()
     if gia:
         return 200, {"ok": True, "gia": True, "incontro": _incontro_da_riga_p2p(gia)}
-    # la prova di un GIRO PRECEDENTE (1 ott 2026): era di altre persone, e
-    # la riga e' una per ordine — se ne va, e questa coppia scrive la sua
-    con.execute("DELETE FROM p2p_presenze WHERE ordine=? AND giro<>?", (ordine, giro))
     dist = _distanza_metri_p2p(m["geo"], l["geo"]) if (m["geo"] and l["geo"]) else None
     posizioni = int(bool(m["geo"])) + int(bool(l["geo"]))
     con.execute(
