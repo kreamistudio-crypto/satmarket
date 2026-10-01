@@ -11371,11 +11371,13 @@
   `dopoGestoRilettoP2P` + `esitoGestoRaggiuntoP2P`), `inviaAnnulloP2P`
   via `tornaDopoAnnulloP2P` (chiedi e accetta, non il ritiro),
   `inviaIncassoP2P` e `fatturaDalWalletP2P` (`fatturaPassataP2P` sul
-  riletto), `inviaCampoP2P` fuori dal try, la prova d'incontro dai due
-  lati; la garanzia e la cauzione da `scriviOrdineP2P` →
+  riletto), `inviaCampoP2P` fuori dal try; la garanzia e la cauzione da `scriviOrdineP2P` →
   `mossaScrittaP2P(prima, o)`, solo per lo scambio di cui si e' aperta
   la richiesta (`p2pPagamentoAperto`) e solo uscendo in avanti
-  (`P2P_PAGATO_VERSO`). Il toast del gesto resta solo dove si resta. Il
+  (`P2P_PAGATO_VERSO`). Il toast del gesto resta solo dove si resta.
+  «SIAMO INSIEME» NON TORNA, dai due lati (ritocco dello stesso giorno):
+  si e' all'incontro e il passo dopo arriva subito, quindi la prova
+  d'incontro resta nella pagina col suo «🤝 Incontro confermato». Il
   verbale: CANTIERI, «Dopo ogni gesto si torna a I miei scambi».
   IL MIO ORDINE SI FIRMA CON LA CHIAVE DI CHI L'HA PUBBLICATO (28 set
   2026): la trade key di un gesto si deriva da `riga.indice`, e una riga

@@ -62685,11 +62685,15 @@ async function attendiGestoP2P(id, gesto, chiamata){
    garanzia il recapito degli euro), si resta. E' la stessa domanda del
    👉 sulla card, del pallino e del gruppo «Tocca a te»: una lista di
    stati sua si scollerebbe da loro al primo stato nuovo.
+   E «SIAMO INSIEME» NON E' FRA I GESTI CHE TORNANO (ritocco di Andrea
+   lo stesso giorno): si e' all'incontro, e il passo dopo — i contanti
+   consegnati, poi contati e liberati — arriva subito; tornare alla lista
+   in mezzo a un incontro e riaprire lo scambio un minuto dopo era un
+   giro in piu'. La prova d'incontro, dai due lati, resta nella pagina.
    «RIUSCITO» VUOL DIRE CONFERMATO, MAI SPERATO: la risposta del
    coordinatore o lo stato riletto (`attendiGestoP2P`), il «gia' fatto»
    solo dopo che il riallineo lo mostra, il recapito quando un relay
-   l'ha preso in consegna, la prova d'incontro quando il server ce l'ha,
-   la garanzia e la cauzione quando la riga ESCE in avanti dal loro
+   l'ha preso in consegna, la garanzia e la cauzione quando la riga ESCE in avanti dal loro
    stato — si pagano da un wallet esterno, e il loro «fatto» arriva da
    solo (`mossaScrittaP2P`, dalla scrittura della riga). Un gesto che
    fallisce resta nella pagina col suo messaggio: qui non ci arriva.
@@ -63919,9 +63923,10 @@ function avviaOrologioPresenzaP2P(id){
       fermaOrologioPresenzaP2P();
       chiudiFoglioP2P('p2pPresenzaSheet');
       if (p2pOrdineAperto === id) renderOrdineP2P();
-      /* il server ha la prova: si torna a «I miei scambi» se il passo
-         dopo non e' mio (1 ott 2026) */
-      if (!(typeof dopoGestoP2P === 'function' && await dopoGestoP2P(id))) toast('🤝 Incontro confermato');
+      /* «SIAMO INSIEME» NON RIPORTA AI MIEI SCAMBI (1 ott 2026, ritocco
+         di Andrea a 86a11dd): si e' all'incontro e il passo dopo arriva
+         subito — si resta nella pagina, dai due lati */
+      toast('🤝 Incontro confermato');
     }
   }, P2P_PRESENZA_ATTESA_MS);
 }
@@ -63992,8 +63997,8 @@ async function firmaEInviaPresenzaP2P(o, mostrata){
     if (!r.ok) throw new Error((d && d.detail) || 'Il server ha detto di no');
     segnaIncontroP2P(o.id, d && d.incontro);
     chiudiFoglioP2P('p2pPresenzaSheet');
-    /* ...e anche da questo lato (1 ott 2026) */
-    if (!(typeof dopoGestoP2P === 'function' && await dopoGestoP2P(o.id))) toast('🤝 Incontro confermato');
+    /* ...e si resta anche da questo lato: vedi la sonda di chi mostra */
+    toast('🤝 Incontro confermato');
   } catch(e) {
     toast('Incontro non registrato: ' + String(e && e.message || e));
   } finally { rip(); p2pPresenzaInVolo = false; }

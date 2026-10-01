@@ -33243,3 +33243,29 @@ alla lettera; se alla prova vera disturba, il contanti diventa
 un'eccezione dichiarata. 2) Un filtro di «I miei scambi» che nasconde
 il gruppo della card la lascia fuori vista: il ritorno c'è, la card
 accesa no.
+
+## «Siamo insieme» non riporta a «I miei scambi» (1 ott 2026)
+
+Ritocco di Andrea a `86a11dd`, e chiude il punto 1 del «da guardare»
+della voce qui sopra. Dopo «🤝 Siamo insieme» NESSUNO dei due torna alla
+lista: si è all'incontro e il passo dopo — i contanti consegnati, poi
+contati e liberati — arriva subito, quindi tornare ai miei e riaprire
+lo scambio un minuto dopo era un giro in più. Tolti i due agganci
+(`firmaEInviaPresenzaP2P` per chi legge, la sonda di
+`avviaOrologioPresenzaP2P` per chi mostra): a prova arrivata il foglio
+si chiude e resta il toast «🤝 Incontro confermato» di prima. Tutto il
+resto del ritorno è com'era; il ritiro del mio ordine mai preso e
+l'apertura della disputa restano fuori, per decisione.
+
+**PROVATO.** In `prove_dopo_gesto_p2p` le due sentinelle diventano una
+rovesciata (nessun `dopoGestoP2P` nei due lati, il toast dopo la prova)
+e il censimento delle chiamate scende da 12 a 10, col perché. Tortura 3
+su 3 sulla copia (il ritorno rimesso da un lato o dall'altro, il toast
+tolto). Suite intera severa senza config nel worktree da `origin/main`
+(`f47271f`): 17.998 verdi e 0 rosse. Dal vivo nel Browser pane (copia
+nello scratchpad, relay morto) a 375 px nei due temi, con la sonda vera
+di chi mostra e la risposta del server di cartone: dai due lati la
+pagina resta quella dello scambio in contanti, col foglio chiuso e
+«✓ Incontro confermato» — chi compra col bottone «Ho consegnato i
+contanti», chi vende con «✋ Aspetta», che prima sarebbe tornato alla
+lista. Non provato: le due firme vere coi due telefoni.

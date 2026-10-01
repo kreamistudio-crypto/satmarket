@@ -113802,9 +113802,10 @@ def prove_dopo_gesto_p2p():
 
     Appena un gesto dello scambio risulta riuscito — la cauzione, la
     garanzia, dove ricevere i sats, il recapito, gli euro inviati, il
-    rilascio, l'annullo chiesto o accettato, «Siamo insieme» — il velo dice
-    «Fatto» e si torna a «I miei scambi», con la card accesa per un attimo.
-    Si resta se il passo dopo tocca ANCORA a chi l'ha fatto.
+    rilascio, l'annullo chiesto o accettato — il velo dice «Fatto» e si
+    torna a «I miei scambi», con la card accesa per un attimo. Si resta se
+    il passo dopo tocca ANCORA a chi l'ha fatto, e dopo «Siamo insieme»
+    sempre: si e' all'incontro (ritocco di Andrea lo stesso giorno).
 
     Le cose che qui si rompono in silenzio: il ritorno detto PRIMA della
     conferma (o su un «no»); un giudice suo con una lista di stati, che si
@@ -113882,13 +113883,18 @@ def prove_dopo_gesto_p2p():
     prova("il recapito: quando un relay l'ha preso, FUORI dal try — dopo, niente puo' dire «non e' partito»", True,
           0 < ca.find("await campoInvia(o, tipo, testo);") < ca.find("} catch(e) {")
           < ca.find("return;", ca.find("} catch(e) {")) < ca.find(GANCIO + "o.id)"))
+    # EMENDATA (1 ott 2026, ritocco di Andrea a 86a11dd): «Siamo insieme»
+    # NON riporta ai miei scambi, dai due lati — si e' all'incontro e il
+    # passo dopo arriva subito. Resta il toast di sempre, a prova arrivata.
     fp = nudo(fn("async function firmaEInviaPresenzaP2P(o, mostrata){"))
-    prova("«Siamo insieme», chi legge: quando il server ha la prova", True,
-          0 < fp.find("if (!r.ok) throw") < fp.find("segnaIncontroP2P(o.id, d && d.incontro);")
-          < fp.find(GANCIO + "o.id)") < fp.rfind("} catch(e) {"))
     op = nudo(fn("function avviaOrologioPresenzaP2P(id){"))
-    prova("...e chi mostra: quando la sua sonda trova la prova sul server", True,
-          0 < op.find("if (o && o.presenza && o.presenza.ora > 0) {") < op.find(GANCIO + "id)"))
+    prova("«Siamo insieme» resta nella pagina, dai due lati: niente ritorno, il toast a prova arrivata",
+          [False, False, True, True],
+          ["dopoGestoP2P" in fp, "dopoGestoP2P" in op,
+           0 < fp.find("segnaIncontroP2P(o.id, d && d.incontro);")
+           < fp.find("toast('🤝 Incontro confermato');") < fp.rfind("} catch(e) {"),
+           0 < op.find("if (o && o.presenza && o.presenza.ora > 0) {")
+           < op.find("toast('🤝 Incontro confermato');")])
     prova("la garanzia e la cauzione: il gesto comincia aprendo la richiesta da pagare", [True, True],
           ["p2pPagamentoAperto = id;" in fn("async function apriHoldP2P(){"),
            "p2pPagamentoAperto = id;" in fn("async function apriCauzioneP2P(){")])
@@ -113902,9 +113908,10 @@ def prove_dopo_gesto_p2p():
     # IL CENSIMENTO: un gesto nuovo che torna deve passare di qui. Le
     # chiamate, commenti tolti: la definizione; gli agganci qui sopra (gli
     # euro e il rilascio, la fattura a mano due volte, dal wallet, il
-    # recapito, la prova d'incontro due volte = 7); l'annullo, il «gia'
-    # fatto» riletto, il primo piano, la garanzia e la cauzione = 12
-    prova("i posti che chiamano il ritorno sono quelli detti qui sopra", 12,
+    # recapito = 5); l'annullo, il «gia' fatto» riletto, il primo piano,
+    # la garanzia e la cauzione = 10. EMENDATA (1 ott 2026): erano 12, coi
+    # due della prova d'incontro, che non torna piu'
+    prova("i posti che chiamano il ritorno sono quelli detti qui sopra", 10,
           nudo(mini).count("dopoGestoP2P("))
 
     # --- 3) LA CARD ACCESA -------------------------------------------
