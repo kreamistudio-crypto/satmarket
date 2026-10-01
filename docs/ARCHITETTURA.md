@@ -28579,6 +28579,31 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `renderP2PInfo`), che ripete le costanti alla lettera — una prova le
   confronta. `rilasciaP2P` col contanti chiede «Hai contato i contanti
   davanti a chi ti ha pagato?» nella stessa `chiediConferma`.
+  LA PAGINA DELLO SCAMBIO ALLEGGERITA (1 ott 2026, CANTIERI, «La pagina
+  dello scambio in contanti, alleggerita»). `riquadroContantiP2P(o,
+  azione)` porta la TESTA della regola (`REGOLA_BREVE_CONTANTI_COMPRA` /
+  `_VENDE`, una prova la tiene uguale all'inizio della frase intera), il
+  passo «🤝 Siamo insieme» (`.contanti-incontro`, filo verde) e i
+  consigli in un `<details>` (`consigliIncontroP2P(lato)`: la coda della
+  regola, `CONSIGLI_CONTANTI`, la prova, il GPS) che si ricorda aperto in
+  `p2pConsigliAperti` (il ridisegno confronta l'outerHTML). A incontro
+  fatto, e a disputa, è una riga. `passoDueContantiP2P(o, azione)` mette
+  il «2» sopra il bottone solo se il bottone pieno è `euro-inviati` o
+  `rilascia` (e allora c'è anche l'«1»). LE PAROLE DEL GESTO col SOLO
+  contanti: `pagaInContantiP2P(o)` (metodo scelto o arrivato con
+  `metodoSceltoP2P`, o l'unico dell'ordine — più stretto di
+  `scambioInContantiP2P`) le decide per `gestoPagoP2P` («Ho consegnato i
+  contanti», acceso e spento), la conferma di `euroInviatiP2P` (con
+  `REGOLA_CONTANTI_COMPRA` intera), `statoContantiP2P(o, t)` (le righe di
+  `STATI_CONTANTI_P2P`, chiamato da `statoTestoP2P`), il terzo passo, la
+  riga «✋ Aspetta», il titolo «📍 Dove vedervi» di
+  `riquadroRecapitoP2P(testo, titolo)` e «Totale da consegnare» nel
+  conto (`contoDettP2P` col segnale `consegna`, che passa la SOLA
+  `renderOrdineP2P`: il libro non lo passa mai). Fuori dal blocco del contanti
+  si chiamano con `typeof`. Sul server `_dati_frase_p2p` dà `contanti`
+  (i metodi del libro sono esattamente `["Contanti"]`) e
+  `_testo_evento_p2p` sul momento `fiat` dice «ti ha consegnato … in
+  contanti», dopo il ramo del PayCode.
   LA PROVA D'INCONTRO (client, blocco «IL CONTANTI DI PERSONA: LA PROVA
   D'INCONTRO», dopo la moderazione). Due note firmate con la chiave
   usa-e-getta dello scambio (`chiaveOrdinePresenzaP2P`): eventi Nostr

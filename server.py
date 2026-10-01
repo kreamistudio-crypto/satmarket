@@ -46249,6 +46249,16 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
                 "scambio.\n\n<i>Non esiste una conferma automatica e i sats "
                 "non si liberano da soli. Hai 24 ore a vista: te lo ricordiamo "
                 "qui.</i>")
+    # IL CONTANTI DI PERSONA (1 ott 2026): il gesto di chi compra si
+    # chiama «Ho consegnato i contanti», e l'avviso lo dice con le sue
+    # parole. Solo sull'ordine col SOLO metodo «Contanti»: con due metodi
+    # il server non sa quale e' stato scelto (la scelta viaggia cifrata
+    # fra i due telefoni), e la frase di tutti resta vera.
+    if momento == "fiat" and dati.get("contanti"):
+        return (f"💶 <b>{altro} dice di averti consegnato "
+                f"{cifra + ' in contanti' if cifra else 'i contanti'}:</b> "
+                "contali e libera i sats, lì di persona.\n\n"
+                "<i>Libera solo dopo averli contati, davanti a chi ti paga.</i>")
     if momento == "fiat":
         return (f"💶 <b>{altro} dice di aver inviato {cifra or 'gli euro'}:</b> "
                 "controlla il conto e rilascia i sats.\n\n"
@@ -46381,7 +46391,7 @@ def _dati_frase_p2p(con, ordine: str) -> dict:
     esce senza cifre."""
     dati = {"sats": 0, "euro": "", "metodi": "", "netto": 0, "totale": 0,
             "maker": 0, "preso_da": 0, "recapito_detto": False,
-            "tabacchino": False,
+            "tabacchino": False, "contanti": False,
             # la cauzione (1 ott 2026): il lato dell'ordine e i metodi
             # GREZZI servono a dire di chi e'; `cauzione_di` e le due
             # righe accanto le scrive `_avvisi_evento_p2p`
@@ -46406,7 +46416,11 @@ def _dati_frase_p2p(con, ordine: str) -> dict:
                     maker=int(r["tg_id"] or 0), preso_da=int(r["preso_da"] or 0),
                     # Barattozon: le frasi col PayCode (23 set 2026)
                     tabacchino=_tabacchino_libro(
-                        [m for m in metodi if isinstance(m, str)]))
+                        [m for m in metodi if isinstance(m, str)]),
+                    # il contanti di persona, SOLO lui (1 ott 2026): le
+                    # parole di «Ho consegnato i contanti»
+                    contanti=_metodi_libro(
+                        [m for m in metodi if isinstance(m, str)]) == ["Contanti"])
     s = con.execute("SELECT sats, sats_compratore, sats_venditore, giro "
                     "FROM p2p_scambi WHERE ordine=?", (ordine,)).fetchone()
     if s and int(s["sats"] or 0) > 0:

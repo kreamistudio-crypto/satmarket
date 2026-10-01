@@ -32793,3 +32793,78 @@ naturale, e con questa rotta i 'refund' diventeranno più frequenti.
 le dispute perse): `annullato_venditore_il` è già scritto, il giorno
 che servirà si conta. 3) Il rimborso parziale non esiste, dichiarato
 come per la disputa.
+
+## La pagina dello scambio in contanti, alleggerita (1 ott 2026)
+
+Ritocco di Andrea dalla prova di stamattina (ordine 82231748, 5 €
+Contanti, con la cauzione): il riquadro «💶 Contanti di persona» con
+«🤝 Siamo insieme» c'era ma si perdeva, spiccava solo «Ho inviato gli
+euro», e c'era troppo testo da leggere.
+
+**DECISO.** La regola in UNA frase scura, la testa di quella intera
+(«Consegna i contanti solo quando chi vende preme «Libera i sats»
+davanti a te.»; per chi vende «Conta i contanti davanti a chi ti paga,
+poi premi «Libera i sats» lì, davanti a lui.»). «Siamo insieme» è il
+PASSO 1, in un riquadro col filo verde e i due gesti verdi pieni, con
+«appena vi vedete · consigliato» e la casella della posizione; il
+bottone del pagamento è il PASSO 2 («Poi, al momento di pagare» / «Poi,
+contati i contanti»). I numeri ci sono solo quando il bottone pieno è
+quello del pagamento: chi vende che deve ancora dire DOVE vedersi lo fa
+prima dell'incontro, e un «1» sopra quel bottone mentirebbe. Tutto il
+resto — la coda della regola («controlla che lo scambio risulti
+concluso»), i consigli, cosa lascia la prova, la cautela sul GPS — sta
+dietro «Consigli per l'incontro ›», chiuso di serie. Fatto l'incontro
+il riquadro è una riga, «✓ Incontro confermato alle …» (la distanza
+resta al moderatore); a disputa senza prova, una riga anche lei.
+Col SOLO contanti il gesto di chi compra dice «Ho consegnato i
+contanti»: bottone (anche quello spento che aspetta il recapito), la
+conferma — che porta la regola INTERA, perché a incontro fatto il
+riquadro non la dice più e quello è il momento in cui conta —, lo stato
+«Contanti consegnati» e le sue frasi, il terzo passo, la riga «✋
+Aspetta», il titolo del recapito («📍 Dove vedervi»), la riga del
+conto in cima («Totale da consegnare» invece di «Totale da inviare»:
+secondo ritocco di Andrea, la accende la sola pagina dello scambio col
+segnale `consegna` di `contoDettP2P`, e il libro resta com'è) e l'avviso
+Telegram a chi vende («… dice di averti consegnato 5,00 € in contanti:
+contali e libera i sats, lì di persona»). «Libera i sats» resta con
+«Hai contato i contanti davanti a chi ti ha pagato?».
+
+**IL CONFINE DELLE PAROLE È PIÙ STRETTO DEL RIQUADRO.** Il riquadro si
+mostra anche su un ordine a due metodi senza scelta nota (una regola in
+più non fa danno); le parole del gesto no: `pagaInContantiP2P` vuole il
+metodo scelto o arrivato, o «Contanti» come UNICO metodo. Il server, che
+la scelta non la vede (viaggia cifrata fra i due telefoni), dice
+«consegnato» solo sul libro col solo «Contanti».
+
+**SCARTATO.** Togliere del tutto i consigli (sono il significato della
+regola: si spostano, non si perdono); la distanza nella riga
+dell'incontro (Andrea ha chiesto «una riga»); spostare il riquadro
+sotto il bottone (l'ordine dei passi è la richiesta).
+
+**PROVATO.** `prove_contanti_pagina_leggera` (27): l'ordine dei pezzi
+nella pagina, il verbo dal giudice acceso e spento, il PayCode che vince,
+la conferma con la regola intera, il «Totale da consegnare» acceso dalla sola
+pagina, lo stato prima del verso di chi
+pubblica, la riga «Aspetta», il titolo del recapito, il CSS; sul server
+la frase col banco degli avvisi vero e il timbro dal libro (solo
+«Contanti» sì; SEPA+Contanti, tabacchino, SEPA no); il banco node con le
+funzioni vere: l'ordine regola → passo 1 → consigli, tutti i consigli
+nel cassetto, chiuso di serie e ricordato aperto, la riga sola a
+incontro fatto e a disputa, il passo 2 nei soli due casi, le teste delle
+regole, il giudice stretto su dieci casi. Emendate `prove_contanti_a_mano`
+(il riquadro con la testa della regola, la riga sola senza distanza) e
+le ancore di `riquadroRecapitoP2P(testo, titolo)` e della conferma del
+PayCode. Tortura 6 su 6 (giudice largo — preso al secondo giro, il caso
+«Contanti» per primo mancava —, cassetto che si richiude, numeri sopra
+ogni bottone, timbro del server largo, testa diversa dalla frase,
+riquadro pieno a incontro fatto). Dal vivo via CDP e nel Browser pane,
+server dalla copia col relay morto: a 375 e 320 px nei due temi, i due
+gesti su una riga alti 44, il cassetto aperto resta aperto al
+ridisegno, nessuno scorrimento laterale. Al primo scatto i consigli
+uscivano a 15 px e senza pallini: la pagina sta dentro `.sicu`, che
+azzera gli elenchi con la stessa specificità e scritta dopo — si sale di
+un gradino (`.contanti-box .contanti-consigli`).
+
+**DA GUARDARE.** Sul telefono, al prossimo scambio in contanti: che i
+due numeri si leggano come un ordine e che il cassetto si apra col
+pollice.

@@ -3099,6 +3099,40 @@
   .contanti-gesti .btn{flex:1;min-height:44px;padding:10px 6px;font-size:13.5px}
   .contanti-fatto{margin-top:8px;font-weight:800;color:var(--ink)}
   .contanti-regola{margin-top:8px}
+  /* LA PAGINA DELLO SCAMBIO IN CONTANTI, ALLEGGERITA (1 ott 2026,
+     ritocco di Andrea dalla prova dell'ordine 82231748): la regola in
+     una frase scura, il gesto «Siamo insieme» come PASSO 1 in un
+     riquadro col filo verde della garanzia — si vede prima del bottone
+     arancio senza fargli concorrenza di colore —, i consigli dietro un
+     tocco, e a incontro fatto una riga sola. Il passo 2 sta subito
+     sopra il bottone del gesto, col numero gemello. */
+  .contanti-regola-forte{font-size:14px;font-weight:800;color:var(--ink);line-height:1.4}
+  .contanti-incontro{margin-top:10px;padding:10px 8px;border:2px solid var(--trust);
+    border-radius:12px;background:var(--card)}
+  .contanti-passo{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;
+    color:var(--ink);font-size:14.5px}
+  .contanti-num{display:inline-flex;align-items:center;justify-content:center;
+    flex:none;width:22px;height:22px;border-radius:50%;background:var(--trust);
+    color:var(--on-trust);font-size:12.5px;font-weight:800}
+  .contanti-quando{font-size:12px;color:var(--muted);font-weight:700}
+  .contanti-incontro .contanti-gesti{margin-top:8px;gap:6px}
+  /* a 320 px «📷 Inquadra il codice» deve stare su una riga: misurato */
+  .contanti-incontro .contanti-gesti .btn{padding:10px 4px;font-size:13px;gap:4px;white-space:nowrap}
+  .contanti-consigli{margin-top:6px}
+  .contanti-consigli>summary{cursor:pointer;list-style:none;display:flex;
+    align-items:center;min-height:36px;font-size:13px;font-weight:800;color:var(--ink)}
+  .contanti-consigli>summary::-webkit-details-marker{display:none}
+  .contanti-consigli .freccia{display:inline-block;margin-left:6px;transition:transform .15s}
+  .contanti-consigli[open] .freccia{transform:rotate(90deg)}
+  /* la pagina dello scambio sta dentro `.sicu`, che azzera gli elenchi e
+     ingrandisce i `li` con la stessa specificita' e scritta DOPO: qui si
+     sale di un gradino (misurato dal vivo, 15px e nessun pallino) */
+  .contanti-box .contanti-consigli ul{margin:0 0 2px;padding-left:18px;list-style:disc}
+  .contanti-box .contanti-consigli li{margin:4px 0 0;font-size:13px;line-height:1.45;
+    font-weight:600;color:var(--ink-soft)}
+  .contanti-ridotto{margin-bottom:10px;font-size:13.5px;font-weight:800;color:var(--trust-text)}
+  .contanti-poi{display:flex;align-items:center;gap:8px;margin:12px 0 8px;
+    font-size:13.5px;font-weight:800;color:var(--ink)}
   .presenza-video{display:block;width:100%;max-height:52vh;border-radius:12px;
     background:#000;object-fit:cover;margin:8px 0}
   #p2pPresenzaCorpo textarea{width:100%;box-sizing:border-box;margin:8px 0;
@@ -51330,10 +51364,15 @@ function attesaAltraParteP2P(o){
   const altro = nomeControparteP2P(o, compro ? 'chi vende' : 'chi compra');
   const s = o.stato;
   let cosa = '';
+  /* col contanti di persona gli euro si consegnano (1 ott 2026); il
+     giudice vive nel blocco del contanti, da qui il typeof */
+  const contanti = typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o);
   if (s === 'attesa_hold_venditore') cosa = 'sta bloccando i sats in garanzia';
   else if (s === 'attesa_fattura_compratore') cosa = 'sta indicando dove ricevere i sats';
-  else if (s === 'attivo') cosa = compro ? 'deve indicarti dove inviare gli euro' : 'deve inviarti gli euro';
-  else if (s === 'euro_inviati') cosa = 'deve controllare gli euro e liberare i sats';
+  else if (s === 'attivo') cosa = compro ? 'deve indicarti dove inviare gli euro'
+    : contanti ? 'deve consegnarti i contanti' : 'deve inviarti gli euro';
+  else if (s === 'euro_inviati') cosa = contanti
+    ? 'deve contare i contanti e liberare i sats' : 'deve controllare gli euro e liberare i sats';
   else if (s === 'fattura_nuova') cosa = 'deve dare una fattura nuova';
   else if (s === 'annullo_chiesto') cosa = 'deve accettare di annullare';
   else if (s === 'rilasciato' || s === 'pagamento_ritentato')
@@ -51418,6 +51457,11 @@ function statoTestoP2P(o){
   if (vende && o.stato === 'rilasciato' && o.payoutFallito)
     return {t: s.t_vendo || s.t, d: 'Il pagamento verso chi compra non è passato. '
       + 'Chi compra deve dare una fattura nuova: non devi fare niente.'};
+  /* IL CONTANTI DI PERSONA HA LE SUE FRASI (1 ott 2026): a garanzia
+     bloccata e dopo «Ho consegnato i contanti» gli euro non si mandano.
+     Il giudice vive nel blocco del contanti: da qui il typeof */
+  const c = typeof statoContantiP2P === 'function' ? statoContantiP2P(o, s.t) : null;
+  if (c) return c;
   /* il verso di chi ha PUBBLICATO vince sul lato: e' la stessa riga
      letta da un'altra parte del banco, e la sua frase e' un'altra */
   const mio = !!(o && o.mio);
@@ -52641,7 +52685,11 @@ function contoDettP2P(o){
        toglie dall'elenco. */
     + '<div class="ctrl-chiusa">'
     + r(compro ? 'Ricevi' : 'Invia', cifra('netto'), 'tot sats')
-    + r(compro ? 'Totale da inviare' : 'Ricevi', cifreEuro, 'tot euro')
+    /* COL CONTANTI DI PERSONA GLI EURO SI CONSEGNANO (1 ott 2026,
+       ritocco di Andrea): `consegna` lo accende la SOLA pagina dello
+       scambio, col giudice stretto `pagaInContantiP2P`; il libro non lo
+       passa mai e resta «Totale da inviare» */
+    + r(compro ? (o.consegna ? 'Totale da consegnare' : 'Totale da inviare') : 'Ricevi', cifreEuro, 'tot euro')
     + '</div>'
     + '</div>';
 }
@@ -53329,7 +53377,11 @@ function recapitoCompratoreP2P(o){
   if (!o || o.lato !== 'compro' || !loro.euro) return '';
   if (tabacchinoP2P(o.metodi) && payCodeDaTestoP2P(loro.euro.testo))
     return riquadroPayCodeP2P(o);
-  return riquadroRecapitoP2P(loro.euro.testo)
+  /* col contanti di persona il recapito e' il posto dell'incontro, e
+     il titolo lo dice (1 ott 2026): gli euro non si «mandano» */
+  return riquadroRecapitoP2P(loro.euro.testo,
+                             typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o)
+                               ? '📍 Dove vedervi' : '')
     /* IL RECAPITO PUO' ARRIVARE PRIMA DELLA GARANZIA (i dati del
        tabacchino partono alla presa, e un'app di ieri — o un altro
        client — manda ancora il recapito ricordato): finche' la pagina non
@@ -53373,12 +53425,12 @@ function righeRecapitoP2P(testo){
    valore SENZA SPAZI — anche quando e' arrivato con gli spazi: e' la
    forma che il sito della banca accetta sempre, e col dito si
    prenderebbero anche quelli della vista. */
-function riquadroRecapitoP2P(testo){
+function riquadroRecapitoP2P(testo, titolo){
   const righe = righeRecapitoP2P(testo);
   if (!righe.length) return '';
   const FORMA_IBAN = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{8,30}$/;
   return '<div class="p2p-recapito">'
-    + '<div class="p2p-paycode-tit">💶 Dove mandare gli euro</div>'
+    + '<div class="p2p-paycode-tit">' + esc(titolo || '💶 Dove mandare gli euro') + '</div>'
     + righe.map(r => {
         if (r.testa) return '<div class="p2p-recapito-testa">' + esc(r.testa) + '</div>';
         const nudo = r.v.replace(/\s+/g, '');
@@ -53662,6 +53714,9 @@ function renderOrdineP2P(){
     passi[0] = {t: 'Ordine preso', d: o.lato === 'compro'
       ? 'Blocca la cauzione, poi di\' dove ricevere i sats'
       : 'Blocca la cauzione, poi invia i sats'};
+  /* il contanti di persona ha il suo terzo passo (1 ott 2026) */
+  if (!tabOrd && typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o)) passi[2] = {t: 'Contanti consegnati',
+    d: o.lato === 'compro' ? 'Di persona, a chi vende' : 'Contati davanti a chi compra'};
   /* col PayCode il terzo passo ha il suo nome (23 set 2026) */
   if (tabOrd) passi[2] = {t: 'PayCode pagato',
     d: o.lato === 'compro' ? 'Alla cassa del tabacchino, in contanti' : 'Chi compra l\'ha pagato alla cassa'};
@@ -53698,7 +53753,9 @@ function renderOrdineP2P(){
   const conto = contoDettP2P(Object.assign(comeLibroP2P(o),
                                            {satsDetti: o.satsNetti || 0,
                                             scontoMancato: !!o.scontoMancato,
-                                            mio: true}));
+                                            mio: true,
+                                            consegna: typeof pagaInContantiP2P === 'function'
+                                              && pagaInContantiP2P(o)}));
   const azione = azioniDisponibili(o);
   /* chi vende e riapre l'app a scambio attivo: se l'avviso del
      recapito non era partito, parte adesso (le condizioni le guarda
@@ -53712,7 +53769,8 @@ function renderOrdineP2P(){
     cauzione: '<button class="btn orange" onclick="apriCauzioneP2P()">🔐 Blocca la cauzione</button>',
     'euro-inviati': tabOrd
       ? '<button class="btn orange" onclick="euroInviatiP2P()">✅ Ho pagato al tabacchino</button>'
-      : '<button class="btn orange" onclick="euroInviatiP2P()">✅ Ho inviato gli euro</button>',
+      /* il contanti di persona ha il suo verbo (1 ott 2026) */
+      : '<button class="btn orange" onclick="euroInviatiP2P()">✅ ' + esc(gestoPagoP2P(o)) + '</button>',
     /* il gesto di chi vende a garanzia bloccata (18 set 2026) */
     recapito: '<button class="btn orange" onclick="apriCampiP2P()">💶 Indica dove ricevere gli euro</button>',
     /* col PayCode il rilascio e' un riquadro con i due gesti e il
@@ -53790,7 +53848,8 @@ function renderOrdineP2P(){
     /* IL CONTANTI DI PERSONA (30 set 2026): la regola dal proprio lato e
        il gesto «Siamo insieme», SOPRA il bottone del passo — si legge
        prima di liberare o di consegnare */
-    riquadroContantiP2P(o) +
+    riquadroContantiP2P(o, azione) +
+    passoDueContantiP2P(o, azione) +
     (bottoni[azione] || '') +
     /* IL RECAPITO STA SOTTO IL SUO GESTO (23 set 2026): subito dopo «Ho
        inviato gli euro», che e' dove l'IBAN si legge e si copia */
@@ -53805,7 +53864,7 @@ function renderOrdineP2P(){
        foglio dei recapiti non esiste: senza, lo scambio resterebbe
        fermo per sempre su un bottone spento. */
     (aspettaRecapitoP2P(o)
-      ? '<button class="btn orange" disabled>✅ Ho inviato gli euro</button>'
+      ? '<button class="btn orange" disabled>✅ ' + esc(gestoPagoP2P(o)) + '</button>'
         + '<div class="hint">Si accende quando arriva il recapito. '
         + '<button type="button" class="scopri-link" onclick="recapitoAltroveP2P()">Te l\'ha già dato per un\'altra strada?</button></div>'
       : '') +
@@ -54642,16 +54701,30 @@ function recapitoAltroveP2P(){
   });
 }
 /* ---- i due gesti che muovono lo scambio ---- */
+/* IL VERBO DEL GESTO DI CHI PAGA (1 ott 2026): col contanti di persona
+   gli euro non si «inviano», si consegnano — sul bottone, su quello
+   spento che aspetta il recapito, e nella conferma */
+function gestoPagoP2P(o){
+  return typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o)
+    ? 'Ho consegnato i contanti' : 'Ho inviato gli euro';
+}
 function euroInviatiP2P(){
   const o = ordiniP2P()[p2pOrdineAperto];
   if (!o) return;
   const tab = tabacchinoP2P(o.metodi);
+  /* COL CONTANTI LA CONFERMA PORTA LA REGOLA INTERA (1 ott 2026): a
+     incontro fatto il riquadro e' una riga, e questo e' il momento in
+     cui la regola conta */
+  const contanti = !tab && typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o);
   chiediConferma({
-    titolo: tab ? 'Hai pagato il PayCode al tabacchino?' : 'Hai inviato gli euro?',
+    titolo: tab ? 'Hai pagato il PayCode al tabacchino?'
+      : contanti ? 'Hai consegnato i contanti?' : 'Hai inviato gli euro?',
     corpo: tab
       ? 'Dillo solo dopo aver pagato davvero ' + fmtEur(o.euro) + ' € in contanti alla cassa. Tieni lo scontrino: chi vende controlla su Amazon che l\'ordine risulti saldato e libera i sats.'
+      : contanti
+      ? 'Dillo quando consegni ' + fmtEur(o.euro) + ' € a chi vende, lì di persona. ' + REGOLA_CONTANTI_COMPRA
       : 'Dillo solo dopo aver davvero mandato ' + fmtEur(o.euro) + ' € con il metodo concordato. Chi vende lo vedrà e libererà i sats.',
-    etichetta: tab ? 'Sì, ho pagato' : 'Sì, li ho inviati',
+    etichetta: tab ? 'Sì, ho pagato' : contanti ? 'Sì, li ho consegnati' : 'Sì, li ho inviati',
     /* ⚠️ LA PROMESSA SI RESTITUISCE, e non e' stile: `eseguiConferma`
        ASPETTA `poi()` e nel suo `finally` rimette giu' il velo. Col
        corpo a blocco e nessun `return` qui tornava `undefined`, quindi
@@ -55128,6 +55201,58 @@ function giudiceContantiP2P(euro, metodi, tetto){
 const REGOLA_CONTANTI_COMPRA = 'Consegna i contanti solo quando chi vende preme «Libera i sats» davanti a te, e controlla che lo scambio risulti concluso prima di andare via.';
 const REGOLA_CONTANTI_VENDE = 'Conta i contanti davanti a chi ti paga, poi premi «Libera i sats» lì, davanti a lui: chi compra deve vedere lo scambio concluso prima di andare via.';
 const CONSIGLI_CONTANTI = 'Vedetevi in un posto pubblico e di giorno — un bar, un incontro bitcoin —, contate le banconote insieme, e mai grosse cifre da soli.';
+/* LA PAGINA DELLO SCAMBIO DICE LA REGOLA IN UNA FRASE (1 ott 2026,
+   ritocco di Andrea dalla prova dell'ordine 82231748: il riquadro c'era
+   ma si perdeva, e la pagina pareva confusa). La frase intera resta nel
+   foglio Pubblica, nel dettaglio e in «Info P2P»; nella pagina sta la
+   sua TESTA, scura e da sola, e la coda — «controlla che risulti
+   concluso prima di andare via» — apre i consigli dietro il tocco.
+   Una prova tiene ogni testa uguale all'inizio della sua frase intera:
+   se una delle due cambia senza l'altra, la CI lo dice. */
+const REGOLA_BREVE_CONTANTI_COMPRA = 'Consegna i contanti solo quando chi vende preme «Libera i sats» davanti a te.';
+const REGOLA_BREVE_CONTANTI_VENDE = 'Conta i contanti davanti a chi ti paga, poi premi «Libera i sats» lì, davanti a lui.';
+/* i consigli dietro «Consigli per l'incontro ›», dal proprio lato: la
+   coda della regola per prima, poi quel che diceva il riquadro di prima
+   — il posto, la prova d'incontro, la cautela sul GPS */
+function consigliIncontroP2P(lato){
+  return [lato === 'vendo'
+      ? 'Chi compra deve vedere lo scambio concluso prima di andare via.'
+      : 'Prima di andare via controlla che lo scambio risulti concluso.',
+    CONSIGLI_CONTANTI,
+    '«Siamo insieme» lascia una prova firmata da tutti e due, con l\'ora e, se la allegate, la posizione: la guarda un moderatore, solo in caso di disputa.',
+    'La posizione è facoltativa e consigliata. Il GPS si può falsificare: è una conferma, non una prova assoluta.'];
+}
+/* LE PAROLE DEL GESTO SONO PIU' STRETTE DEL RIQUADRO (1 ott 2026): «Ho
+   consegnato i contanti», il passo e gli avvisi cambiano solo quando il
+   metodo dello scambio E' il contanti — scelto alla presa, arrivato
+   dall'altra parte (`metodoSceltoP2P`, che non si fida di un metodo
+   fuori elenco), o l'unico dell'ordine. Con due metodi e nessuna scelta
+   nota il riquadro si mostra lo stesso, perche' una regola in piu' non
+   fa danno; un bottone che dicesse «contanti» a chi paga con SEPA,
+   invece, mentirebbe. Lo stesso confine lo tiene il server negli avvisi
+   (`_dati_frase_p2p`, il solo metodo «Contanti»). */
+function pagaInContantiP2P(o){
+  if (!o) return false;
+  const m = metodoSceltoP2P(o);
+  if (m) return m === P2P_CONTANTI;
+  const met = o.metodi || [];
+  return met.length === 1 && String(met[0] || '').trim() === P2P_CONTANTI;
+}
+/* le due righe di `STATI_P2P` che col contanti di persona cambiano
+   parole (1 ott 2026), e il giudice che le sceglie: lo chiama
+   `statoTestoP2P`, per la pagina e per la card. Torna {t, d} o null. */
+const STATI_CONTANTI_P2P = {
+  attivo: {d_compro: 'I sats sono al sicuro in garanzia. Quando vi vedete, consegna i contanti e dillo qui.',
+           d_vendo: 'I tuoi sats sono bloccati. Quando vi vedete, chi compra ti consegna i contanti.'},
+  euro_inviati: {t: 'Contanti consegnati',
+                 d_compro: 'Hai detto di aver consegnato i contanti: chi vende li conta e libera i sats davanti a te.',
+                 d_vendo: 'Chi compra dice di averti consegnato i contanti. Contali davanti a lui, poi libera i sats.'}
+};
+function statoContantiP2P(o, t){
+  const c = o && pagaInContantiP2P(o) && STATI_CONTANTI_P2P[o.stato];
+  if (!c) return null;
+  return {t: c.t || t, d: o.lato === 'vendo' ? c.d_vendo : c.d_compro};
+}
 /* la riga sotto il metodo nel foglio Pubblica e nel dettaglio: la
    regola e il tetto, quando «Contanti» e' fra i metodi */
 function regolaContantiFoglioP2P(metodi, tetto, lato){
@@ -55164,30 +55289,70 @@ function distanzaIncontroP2P(p){
       + (p.precisione > 0 ? ' (precisione ±' + fmt(Number(p.precisione)) + ' m)' : '');
   return Number(p.posizioni) === 1 ? ', con la posizione di un solo telefono' : ', senza posizioni';
 }
-/* IL RIQUADRO DEL CONTANTI NELLA PAGINA DELLO SCAMBIO: la regola dal
-   proprio lato, i consigli, e il gesto «Siamo insieme» finche' i sats
-   sono in garanzia; a disputa aperta resta la prova, o la sua assenza */
-function riquadroContantiP2P(o){
+/* IL RIQUADRO DEL CONTANTI NELLA PAGINA DELLO SCAMBIO finche' i sats
+   sono in garanzia: la regola dal proprio lato in UNA frase, il gesto
+   «Siamo insieme» come primo passo dell'incontro, i consigli dietro un
+   tocco. A incontro fatto, e a disputa aperta, il riquadro e' una riga.
+   ⚠️ ALLEGGERITO IL 1 OTT 2026 (ritocco di Andrea, dalla prova
+   dell'ordine 82231748 da 5 € con la cauzione): era quattro paragrafi
+   — regola intera, consigli, la spiegazione di «Siamo insieme», la
+   cautela sul GPS — e nella pagina spiccava solo il bottone arancio.
+   Niente e' sparito: la coda della regola, i consigli, la prova e il
+   GPS stanno dietro «Consigli per l'incontro ›»; la regola intera la
+   ripetono la conferma di chi consegna e quella di chi libera, cioe'
+   il momento in cui conta. E LA RIGA DELL'INCONTRO FATTO NON PORTA PIU'
+   LA REGOLA: quella torna nelle due conferme, che sono proprio il
+   passo dopo «Siamo insieme».
+   IL CASSETTO DEI CONSIGLI SI RICORDA APERTO (`p2pConsigliAperti`): la
+   pagina si ridisegna a ogni giro del libro, e `posaPezziP2P` confronta
+   l'outerHTML — un <details> aperto a mano ha `open`, quello nuovo no,
+   e si richiuderebbe sotto il dito al primo giro. */
+let p2pConsigliAperti = {};
+function riquadroContantiP2P(o, azione){
   if (!scambioInContantiP2P(o)) return '';
   const vivo = P2P_DISPUTABILI.indexOf(o.stato) >= 0;
   const disputa = o.stato === 'in_disputa';
   if (!vivo && !disputa) return '';
-  let h = '<div class="p2p-box contanti-box"><b>💶 Contanti di persona</b>' +
-    '<p>' + esc(o.lato === 'compro' ? REGOLA_CONTANTI_COMPRA : REGOLA_CONTANTI_VENDE) + '</p>' +
-    (vivo ? '<p>' + esc(CONSIGLI_CONTANTI) + '</p>' : '');
   if (o.presenza && o.presenza.ora > 0)
-    h += '<div class="contanti-fatto">✅ Incontro confermato ' + esc(quandoIncontroP2P(o.presenza.ora))
-      + esc(distanzaIncontroP2P(o.presenza)) + '</div>';
-  else if (disputa)
-    h += '<div class="contanti-fatto">Nessuna prova d\'incontro per questo scambio.</div>';
-  else if (!o.soloVista)
-    h += '<p><b>🤝 Siamo insieme.</b> Quando vi vedete — dopo aver contato le banconote, prima di liberare i sats — un telefono mostra un codice e l\'altro lo inquadra: resta una prova firmata da tutti e due, con l\'ora e, se volete, la posizione, che un moderatore guarda in caso di disputa.</p>' +
-      '<label class="contanti-gps"><input type="checkbox" id="p2pPresenzaGps" checked><span>📍 Allega la posizione — facoltativa, consigliata. Il GPS si può falsificare: è una conferma, non una prova assoluta.</span></label>' +
-      '<div class="contanti-gesti">' +
-        '<button type="button" class="btn ghost" onclick="presenzaMostraP2P()">📱 Mostra il codice</button>' +
-        '<button type="button" class="btn ghost" onclick="presenzaLeggiP2P()">📷 Inquadra il codice</button>' +
+    return '<div class="p2p-box contanti-box contanti-ridotto">✓ Incontro confermato '
+      + esc(quandoIncontroP2P(o.presenza.ora)) + '</div>';
+  if (disputa)
+    return '<div class="p2p-box contanti-box contanti-ridotto">Nessuna prova d\'incontro per questo scambio.</div>';
+  const vendo = o.lato === 'vendo';
+  let h = '<div class="p2p-box contanti-box">' +
+    '<div class="contanti-regola-forte">💶 ' + esc(vendo ? REGOLA_BREVE_CONTANTI_VENDE : REGOLA_BREVE_CONTANTI_COMPRA) + '</div>';
+  if (!o.soloVista)
+    h += '<div class="contanti-incontro">' +
+        '<div class="contanti-passo">' + (passoDueContantiP2P(o, azione) ? '<span class="contanti-num">1</span>' : '') +
+          '<b>🤝 Siamo insieme</b><span class="contanti-quando">appena vi vedete · consigliato</span></div>' +
+        '<div class="contanti-gesti">' +
+          '<button type="button" class="btn primary" onclick="presenzaMostraP2P()">📱 Mostra il codice</button>' +
+          '<button type="button" class="btn primary" onclick="presenzaLeggiP2P()">📷 Inquadra il codice</button>' +
+        '</div>' +
+        '<label class="contanti-gps"><input type="checkbox" id="p2pPresenzaGps" checked><span>📍 Allega la posizione (facoltativa)</span></label>' +
       '</div>';
+  h += '<details class="contanti-consigli" data-o="' + esc(o.id) + '"'
+    + (p2pConsigliAperti[o.id] ? ' open' : '')
+    + ' ontoggle="p2pConsigliAperti[this.dataset.o] = this.open">'
+    + '<summary>Consigli per l\'incontro<span class="freccia">›</span></summary><ul>'
+    + consigliIncontroP2P(o.lato).map(c => '<li>' + esc(c) + '</li>').join('')
+    + '</ul></details>';
   return h + '</div>';
+}
+/* IL PASSO 2, SUBITO SOPRA IL BOTTONE DEL GESTO (1 ott 2026): c'e' solo
+   quando il riquadro mostra ancora «Siamo insieme» E il bottone pieno
+   e' quello del pagamento — «Ho consegnato i contanti» per chi compra,
+   «Libera i sats» per chi vende. Con un altro bottone (chi vende indica
+   dove vedersi, PRIMA dell'incontro) i numeri mentirebbero sull'ordine,
+   e allora non ci sono: ne' qui ne' l'«1» del riquadro. `a` e' il
+   bottone pieno della pagina (`azioniDisponibili`, che il chiamante ha
+   gia'). Torna la riga, o ''. */
+function passoDueContantiP2P(o, a){
+  if (!o || !scambioInContantiP2P(o) || o.soloVista) return '';
+  if (P2P_DISPUTABILI.indexOf(o.stato) < 0 || (o.presenza && o.presenza.ora > 0)) return '';
+  if (a !== 'euro-inviati' && a !== 'rilascia') return '';
+  return '<div class="contanti-poi"><span class="contanti-num">2</span>'
+    + (a === 'rilascia' ? 'Poi, contati i contanti' : 'Poi, al momento di pagare') + '</div>';
 }
 /* IL VESTITO DEI METODI (16 set 2026, decisione di Andrea): «Contanti
    al tabacchino» si presenta come BARATTOZON — il marchio al posto del
