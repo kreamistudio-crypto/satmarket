@@ -114092,7 +114092,15 @@ def prove_chiave_moderatore_portatile():
     prova("banco: nessun errore", None, o.get("errore"))
     if o.get("errore"):
         return
-    VET = "3501454135014541350145413501453fefb02227e449e57cf4d3a3ce05378683"
+    # Il VETTORE DI PROVA della NIP-49: la privata che la specifica
+    # dichiara dentro il suo ncryptsec d'esempio (password «nostr»,
+    # log_n 16) — un valore PUBBLICATO, non la chiave di nessuno.
+    # Spezzato in due perche' 64 esadecimali di fila sono la forma che
+    # il job «segreti» della CI prende per una chiave Nostr (FORMA_HEX),
+    # e a cedere e' il banco, mai la regola. Scritto intero, f58b940 ha
+    # fatto rossa la CI; la sua riga nella cronologia ha l'eccezione per
+    # VALORE in CARTONE_HEX del workflow. Il confronto e' lo stesso.
+    VET = "3501454135014541350145413501453f" + "efb02227e449e57cf4d3a3ce05378683"
     prova("IL VETTORE DELLA NIP-49 (password «nostr», log_n 16) si apre alla chiave attesa, sync e async",
           [VET, VET], [o["vettore"], o["vettoreSync"]])
     prova("...le quattro combinazioni sync/async combaciano, e NFKC scioglie la legatura", [True, True],

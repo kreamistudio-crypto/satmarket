@@ -275,7 +275,16 @@ jobs:
       # contenga a sua volta sessantaquattro esadecimali di fila; oggi
       # nel LEGGIMI stanno a gruppi di otto, e l'albero e' pulito anche
       # SENZA questa eccezione (provato in locale sui due passi).
-      CARTONE_HEX: 's/\b([0-9a-f])\1{63}\b//g;s/\bf91e9d7c30894cb0[0-9a-f]{48}\b//g;s/\b85d68c6972360099[0-9a-f]{48}\b//g'
+      # E IL VETTORE DI PROVA DELLA NIP-49 (1 ott 2026): la privata che
+      # la specifica dichiara dentro il suo ncryptsec d'esempio
+      # (password «nostr», log_n 16), scritta intera nel banco di
+      # prove_chiave_moderatore_portatile da f58b940 — un valore
+      # pubblicato nella NIP, non la chiave di nessuno, e la storia non
+      # si riscrive. Stesso trattamento degli sha256: per VALORE, col
+      # prefisso di 16; in prove.py oggi sta spezzato in due, e l'albero
+      # e' pulito anche SENZA questa eccezione (provato in locale sui
+      # due passi).
+      CARTONE_HEX: 's/\b([0-9a-f])\1{63}\b//g;s/\bf91e9d7c30894cb0[0-9a-f]{48}\b//g;s/\b85d68c6972360099[0-9a-f]{48}\b//g;s/\b3501454135014541[0-9a-f]{48}\b//g'
       FORMA_HEX: '\b[0-9a-f]{64}\b'
     steps:
       - uses: actions/checkout@v5
