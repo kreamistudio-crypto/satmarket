@@ -59,6 +59,21 @@ PER_PAGINA_WOO = 100
 MAX_PAGINE_VARIAZIONI_WOO = 10     # mille varianti per prodotto: oltre non e' un prodotto
 MAX_PAGINE_CATALOGO = 50           # cinquemila prodotti letti: il tetto e' molto prima
 
+# LA PAUSA FRA LE PAGINE DI SHOPIFY (1 ott 2026, «negozi grandi»): col
+# tetto di lettura a mille il catalogo di Shopify si pagina davvero
+# (250 prodotti a pagina), e il suo limite torna a contare — due
+# richieste al secondo per negozio, un secchio da quaranta che si
+# svuota a quel ritmo. Mezzo secondo fra una pagina e l'altra E' quel
+# ritmo: il secchio non si riempie mai, qualunque sia il catalogo, e
+# mille prodotti costano un secondo e mezzo di attesa in tutto.
+# ⚠️ E STAVOLTA SI PRENDE. Una costante con questo nome era sparita ad
+# agosto perche' nessun ciclo la usava — la promessa di una pausa che
+# non c'era. Adesso sta DENTRO il ciclo del lettore, prima di ogni
+# pagina dopo la prima, e il dormire arriva iniettato come il
+# trasporto (`ritmo["dormi"]`): le prove lo contano invece di
+# aspettarlo.
+PAUSA_PAGINE_SHOPIFY = 0.5
+
 # I tagli del testo, IDENTICI alle colonne del database. Non sono un
 # gusto: sono la ragione per cui `testo_negozio` esiste (vedi sotto).
 MAX_TITOLO = 120
@@ -85,6 +100,31 @@ MAX_ENTRATI_REPORT = 30
 # succederebbe comunque.
 LOTTO_SPEGNIMENTI = 25
 
+# IL RESPIRO DEL GIRO (1 ott 2026, «negozi grandi», trovato dal collaudo
+# col traffico vero). Le transazioni del giro sono brevi — un commit per
+# riga, la cura di «database is locked» — ma vengono UNA DIETRO L'ALTRA,
+# senza un attimo fra l'una e l'altra: e sqlite non fa la fila. Chi
+# aspetta il lucchetto riprova a intervalli (1, 2, 5, 10... ms), e ogni
+# volta che riprova trova il giro gia' dentro la transazione dopo. Misurato
+# su mille prodotti: una scrittura della app morta dopo 0,6 s con le rotte
+# impazienti, e in produzione — dove ogni richiesta autenticata scrive, e
+# l'attesa avviene nel ciclo principale — il server intero fermo finche'
+# non trova un buco, per tutta la fase di scrittura del giro.
+# La cura: dopo ogni riga che ha scritto, il giro lascia il database
+# libero per TANTO TEMPO QUANTO L'HA TENUTO (meta' del tempo suo, meta'
+# di tutti: chi aspetta entra al primo o secondo tentativo, qualunque
+# sia il disco), al piu' RESPIRO_MAX_S. Il giro gira in un thread, quindi
+# rallentarlo non costa niente a nessuno; il conto lo paga lui.
+RESPIRO_MAX_S = 0.1
+
+
+def _respira(secondi: float):
+    """La pausa del giro fra una riga scritta e la successiva. Una
+    funzione e non un `time.sleep` in linea: le prove la contano invece
+    di aspettarla."""
+    if secondi > 0:
+        time.sleep(secondi)
+
 # Quel che si dice al venditore quando il catalogo non ci sta nel
 # tetto di lettura, e la seconda meta' e' quella che prima MANCAVA: la
 # frase di ieri prometteva «il resto arriva ai giri successivi», ed
@@ -110,6 +150,28 @@ def _msg_troncato(tetto: int, totale: int = 0) -> str:
              f"{tetto} per volta" if totale else
              f"il tuo catalogo ha piu' di {tetto} prodotti")
     return testa + MSG_TRONCATO_CODA
+
+
+# IL NEGOZIO LENTO (1 ott 2026, «negozi grandi»): un negozio che
+# risponde piano NON e' un negozio rotto, e il venditore lo legge nel
+# report come legge il tetto — con la meta' che conta, cioe' cosa
+# succede intanto ai suoi prodotti. Due frasi, una per dove la lettura
+# a tempo si e' fermata (vedi `leggi_catalogo_woo`).
+def _msg_lento(letti: int, totale: int = 0) -> str:
+    """Fermi fra le pagine del catalogo: la lettura e' parziale, e la
+    coda e' quella del tetto, parola per parola."""
+    return (f"il tuo negozio risponde piano: in questo giro abbiamo letto "
+            f"{letti} prodotti" + (f" su {totale}" if totale else "")
+            + MSG_TRONCATO_CODA)
+
+
+def _msg_varianti_al_prossimo(lette: int, tutte: int) -> str:
+    """Fermi fra le variazioni: il catalogo e' intero, i dettagli di
+    qualche prodotto arrivano al giro dopo."""
+    return (f"il tuo negozio risponde piano: in questo giro abbiamo letto "
+            f"le varianti di {lette} prodotti su {tutte}, le altre al "
+            f"prossimo giro — intanto quelle gia' in vetrina restano come "
+            f"sono")
 
 
 # --- IL TESTO CANONICO ------------------------------------------------
@@ -293,6 +355,10 @@ SALTI_WOO = {"variable": "ha piu' varianti e non le ho potute leggere",
              "grouped": "e' un gruppo di prodotti",
              "external": "si compra su un altro sito"}
 MSG_VARIANTI_VUOTE = "nessuna delle sue varianti e' in vendita"
+# (1 ott 2026) il terzo caso del `variable` intero: le variazioni non
+# sono MANCATE, non le abbiamo ancora chieste — la lettura a tempo si
+# e' fermata prima (vedi `leggi_catalogo_woo`)
+MSG_VARIANTI_AL_PROSSIMO = "le sue varianti le leggiamo al prossimo giro"
 
 
 def traduci_woo(p: dict, cambio: dict) -> dict:
@@ -322,6 +388,14 @@ def traduci_woo(p: dict, cambio: dict) -> dict:
                                   if tipo == "variable"
                                   and p.get("_variazioni") == []
                                   else SALTI_WOO[tipo])
+        if tipo == "variable" and p.get("_variazioni_al_prossimo"):
+            # LE FIGLIE RESTANO COME SONO (1 ott 2026): il prodotto c'e',
+            # le sue variazioni non le abbiamo lette in questo giro. Il
+            # segno dice alla riconciliazione di non prendere le sue
+            # righe `pid:vid` per sparite — sono sul negozio, aspettano
+            # solo il loro turno.
+            riga["saltato_perche"] = MSG_VARIANTI_AL_PROSSIMO
+            riga["_figlie_intatte"] = True
         return riga
     # NIENTE DA SPEDIRE (set 2026): WooCommerce lo dice con due
     # spunte, «Virtuale» e «Scaricabile», e basta una delle due — un
@@ -683,7 +757,7 @@ def _prossima_pagina_shopify(intestazioni: dict) -> str:
 
 
 def leggi_catalogo_shopify(dominio: str, credenziali: dict, chiama,
-                           tetto: int = 200) -> tuple[list, str]:
+                           tetto: int = 200, ritmo: dict = None) -> tuple[list, str]:
     """Il catalogo, pagina per pagina. Torna `(prodotti, avviso)`:
     l'avviso non e' un errore ma una cosa da dire al venditore — oggi
     solo «il catalogo e' piu' grande del tetto, il resto al prossimo
@@ -701,8 +775,14 @@ def leggi_catalogo_shopify(dominio: str, credenziali: dict, chiama,
     gli serve. Con `token` nella firma il server avrebbe dovuto sapere
     che forma hanno le credenziali di ogni piattaforma — cioe' la
     stessa cosa che i traduttori esistono per non far sapere a
-    nessuno."""
+    nessuno.
+
+    `ritmo` (1 ott 2026) e' la stessa idea per il TEMPO: un dizionario
+    da cui ogni lettore pesca quel che gli serve. Qui solo `dormi`, chi
+    fa la pausa fra due pagine (di serie `time.sleep`); il gemello Woo
+    ci pesca la scadenza e il segno della rotazione."""
     prodotti = []
+    dormi = (ritmo or {}).get("dormi") or time.sleep
     atteso = str(dominio or "").strip().lower()
     url = (f"https://{dominio}/admin/api/{VERSIONE_API_SHOPIFY}"
            f"/products.json?limit={PER_PAGINA}")
@@ -714,6 +794,10 @@ def leggi_catalogo_shopify(dominio: str, credenziali: dict, chiama,
         if pagine > MAX_PAGINE_CATALOGO:
             raise RuntimeError("il catalogo non finisce mai: oltre "
                                f"{MAX_PAGINE_CATALOGO} pagine")
+        if pagine > 1:
+            # la pausa VERA, fra una pagina e l'altra e mai prima della
+            # prima: il negozio da duecento prodotti non aspetta niente
+            dormi(PAUSA_PAGINE_SHOPIFY)
         stato, corpo, risposta = chiama("GET", url, intestazioni)
         if stato != 200:
             raise RuntimeError(f"Shopify ha risposto {stato}")
@@ -1027,7 +1111,7 @@ def _prodotti_dalla_risposta(corpo) -> list:
 
 
 def leggi_catalogo_woo(url_negozio: str, credenziali: dict, chiama,
-                       tetto: int = 200) -> tuple[list, str]:
+                       tetto: int = 200, ritmo: dict = None) -> tuple[list, str]:
     """Il catalogo di un WooCommerce, pagina per pagina.
 
     ALZA come il gemello Shopify, e per la stessa ragione: le
@@ -1038,11 +1122,45 @@ def leggi_catalogo_woo(url_negozio: str, credenziali: dict, chiama,
     WooCommerce e' la data di pubblicazione, e con quello basta che il
     venditore ritocchi un prodotto mentre stiamo paginando perche' una
     riga scivoli fra due pagine e non la si veda — cioe' un prodotto
-    dichiarato sparito e spento per sbaglio. L'id non si muove."""
+    dichiarato sparito e spento per sbaglio. L'id non si muove.
+
+    LA LETTURA A TEMPO (1 ott 2026, «negozi grandi»). Col tetto a mille
+    un Woo lento non ci stava piu' nel giro: una chiamata per ogni
+    prodotto variabile, e mille variabili a un secondo l'una sono
+    diciassette minuti — oltre la scadenza, cioe' un errore contato a
+    ogni giro, e al quinto il collegamento dichiarato ROTTO, col
+    messaggio al venditore, per un negozio che rispondeva benissimo.
+    `ritmo["entro"]` e' l'ora (dell'orologio `ritmo["orologio"]`, di
+    serie quello monotono) oltre la quale non si bussa piu': il lettore
+    si ferma DA SOLO, prima della scadenza, e quel che ha letto e' un
+    giro buono, non un errore.
+      · fra le VARIAZIONI, che e' il caso vero: i prodotti a cui non si
+        arriva tornano marcati `_variazioni_al_prossimo`, e il catalogo
+        resta COMPLETO — la lista dei prodotti e' intera, mancano solo
+        i dettagli di alcuni. La riconciliazione non spegne le loro
+        figlie (vedi `_figlie_intatte`) e le aggiorna al giro in cui
+        tocca a loro;
+      · fra le PAGINE del catalogo, che e' il caso estremo (un negozio
+        che non serve dieci pagine in otto minuti): ci si ferma e la
+        lettura e' PARZIALE, come al tetto — le sparizioni aspettano.
+    LA ROTAZIONE: `ritmo["segno"]` e' un dizionario che il server tiene
+    da un giro all'altro, e `dopo` e' l'id dell'ultimo prodotto
+    variabile letto. Il giro seguente riparte da li', in cerchio: senza,
+    si rileggerebbero ogni ora gli stessi primi prodotti e la coda non
+    arriverebbe mai. Senza `ritmo` (la prova del collegamento, le prove
+    di ieri) si legge tutto, come prima."""
     base = _base_woo(url_negozio)
     intestazioni = _intestazioni_woo(credenziali)
+    ritmo = ritmo or {}
+    orologio = ritmo.get("orologio") or time.monotonic
+    entro = ritmo.get("entro")
+    segno = ritmo.get("segno")
+
+    def c_e_tempo() -> bool:
+        return entro is None or orologio() < entro
+
     prezzi_finiti_woo(base, intestazioni, chiama)
-    prodotti, pagina, restano = [], 1, False
+    prodotti, pagina, restano, fermato = [], 1, False, False
     totale = 0
     while True:
         url = (f"{base}/wp-json/{VERSIONE_API_WOO}/products"
@@ -1068,6 +1186,11 @@ def leggi_catalogo_woo(url_negozio: str, credenziali: dict, chiama,
         if pagina > MAX_PAGINE_CATALOGO:
             raise RuntimeError("il catalogo non finisce mai: oltre "
                                f"{MAX_PAGINE_CATALOGO} pagine")
+        if not c_e_tempo():
+            # il tempo e' finito fra due pagine: si consegna quel che si
+            # e' letto, e qui sotto la lettura si dichiara PARZIALE
+            fermato = True
+            break
     # NIENTE TETTI IN SILENZIO, ed e' un difetto vero preso provando e
     # non leggendo: con cento prodotti per pagina e un tetto di
     # duecento si atterra ESATTAMENTE sul tetto, quindi il confronto
@@ -1085,6 +1208,13 @@ def leggi_catalogo_woo(url_negozio: str, credenziali: dict, chiama,
     else:
         completo = not restano and len(prodotti) <= tetto
     avviso = "" if completo else _msg_troncato(tetto, totale)
+    if fermato:
+        # IL TEMPO BATTE IL CONTO VERO: `X-WP-Total` direbbe «ci stanno
+        # tutti» (mille contro un tetto di mille), ma le pagine dopo non
+        # le abbiamo lette — e un catalogo letto a meta' preso per
+        # intero spegnerebbe tutto cio' che sta oltre, per sempre
+        completo = False
+        avviso = _msg_lento(len(prodotti), totale)
     prodotti = prodotti[:tetto]
     # LE VARIAZIONI (set 2026), e DOPO il taglio al tetto: su Woo
     # vivono a un indirizzo loro, una chiamata per prodotto variabile,
@@ -1092,6 +1222,7 @@ def leggi_catalogo_woo(url_negozio: str, credenziali: dict, chiama,
     # prova del collegamento legge con tetto 1 e non deve bussare
     # cento volte. L'indirizzo lo componiamo NOI dall'id (un intero),
     # come ogni URL di questo lettore: niente da seguire.
+    variabili = []
     for p in prodotti:
         if str(p.get("type") or "").lower() != "variable":
             continue
@@ -1099,7 +1230,35 @@ def leggi_catalogo_woo(url_negozio: str, credenziali: dict, chiama,
             pid = int(p.get("id"))
         except (TypeError, ValueError):
             continue          # senza un id da comporre resta intero: si salta
+        variabili.append((pid, p))
+    # LA ROTAZIONE (1 ott 2026): prima chi viene DOPO l'ultimo letto al
+    # giro scorso, poi da capo — in cerchio, per id
+    dopo = int((segno or {}).get("dopo") or 0)
+    variabili.sort(key=lambda v: (v[0] <= dopo, v[0]))
+    lette, ultimo, finito = 0, 0, False
+    for pid, p in variabili:
+        finito = finito or not c_e_tempo()
+        if finito:
+            # niente variazioni lette: il prodotto resta intero e lo dice,
+            # e le sue figlie gia' in vetrina aspettano il loro giro
+            p["_variazioni_al_prossimo"] = True
+            continue
         p["_variazioni"] = _variazioni_woo(base, pid, intestazioni, chiama)
+        lette, ultimo = lette + 1, pid
+    rimaste = len(variabili) - lette
+    if segno is not None:
+        # il segno torna a zero quando il giro le ha lette tutte (il
+        # prossimo riparte dal primo, che e' lo stesso cerchio), avanza
+        # se ne ha lette alcune, e RESTA DOV'ERA se il tempo e' finito
+        # prima della prima: tornare a zero rimanderebbe in fondo alla
+        # fila proprio chi stava aspettando il suo turno
+        segno.update(dopo=ultimo if lette and rimaste else
+                     (dopo if rimaste else 0), lette=lette, rimaste=rimaste)
+    if rimaste and not fermato:
+        # (fermi gia' fra le pagine, l'avviso del negozio lento c'e' gia':
+        # una volta basta)
+        avviso = "; ".join(a for a in (
+            avviso, _msg_varianti_al_prossimo(lette, len(variabili))) if a)
     return prodotti, avviso, completo
 
 
@@ -1408,8 +1567,26 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
              # (set 2026) i titoli NATI in questo giro, e quante righe
              # hanno cambiato consegna: il venditore legge COSA e'
              # entrato, non solo quanti
-             "entrati": [], "consegna_corretta": 0}
+             "entrati": [], "consegna_corretta": 0,
+             # (1 ott 2026) i prodotti di cui la lettura a tempo non ha
+             # chiesto le varianti: un conto, non una voce per uno —
+             # cinquecento righe «al prossimo giro» fra i saltati
+             # sarebbero un report da cinquanta KB e un allarme falso
+             "varianti_al_prossimo": 0}
     viste = set()
+    # i padri le cui figlie questo giro non le ha VISTE ne' le ha
+    # cercate: sul negozio ci sono, e non si spengono (vedi sotto)
+    intatte = set()
+    # il tempo passato a SCARICARE si conta a parte: il respiro misura
+    # quello passato dentro il database, non l'attesa di un negozio lento
+    in_foto = [0.0]
+
+    def scarica(*a):
+        dal = time.monotonic()
+        try:
+            return salva_foto(*a)
+        finally:
+            in_foto[0] += time.monotonic() - dal
 
     for r in righe:
         # `viste` SI RIEMPIE SEMPRE, ed e' la riga da non spostare piu'
@@ -1425,13 +1602,18 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
         # l'AI avesse un singhiozzo sul suo testo cambiato — perche'
         # sparisse per sempre.
         viste.add(r["origine_chiave"])
+        if r.get("_figlie_intatte"):
+            intatte.add(r["origine_chiave"])
+            esito["varianti_al_prossimo"] += 1
+            continue
         if r.get("saltato_perche"):
             esito["saltati"].append({"titolo": r.get("titolo", "")[:60],
                                      "perche": r["saltato_perche"]})
             continue
         chiave = r["origine_chiave"]
+        scritte, dal, foto_prima = con.total_changes, time.monotonic(), in_foto[0]
         try:
-            _una_riga(con, connettore, r, salva_foto, revisioni, esito,
+            _una_riga(con, connettore, r, scarica, revisioni, esito,
                       adesso,
                       max_nuovi <= 0 or esito["nuovi"] < max_nuovi)
         except Exception as e:
@@ -1441,6 +1623,12 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
             esito["falliti"].append({"titolo": r.get("titolo", "")[:60],
                                      "perche": str(e)[:120]})
             print(f"    ⚠️ riga saltata ({r.get('titolo', '')[:40]}): {e}")
+        # IL RESPIRO (vedi RESPIRO_MAX_S): solo dopo una riga che ha
+        # scritto, e mai a transazione aperta — li' il lucchetto e' gia'
+        # preso, e una pausa lo terrebbe di piu' invece di lasciarlo
+        if con.total_changes != scritte and not con.in_transaction:
+            _respira(min(time.monotonic() - dal - (in_foto[0] - foto_prima),
+                         RESPIRO_MAX_S))
 
     # --- LE SPARIZIONI ------------------------------------------------
     # Un prodotto che non c'e' piu' nel catalogo COMPLETO si spegne. Il
@@ -1464,18 +1652,31 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
         # scrittura lunga, e le scritture lunghe sono vietate in questo
         # giro — il database e' di tutti, non del connettore. La lista
         # si legge tutta PRIMA (`fetchall`) per non tenere un cursore
-        # aperto sull'annunci mentre si scrive sopra.
+        # aperto sull'annunci mentre si scrive sopra. E fra un lotto e
+        # l'altro il respiro, come fra le righe qui sopra.
+        lotto_dal = time.monotonic()
         for riga in con.execute(
                 "SELECT id, titolo, origine_chiave FROM annunci "
                 "WHERE connettore_id=? AND stato IN ('attivo','revisione')",
                 (cid,)).fetchall():
             if riga["origine_chiave"] in viste:
                 continue
+            # LE FIGLIE DI CHI ASPETTA IL SUO TURNO (1 ott 2026, la
+            # lettura a tempo): le righe `pid:vid` del prodotto di cui
+            # questo giro non ha chiesto le variazioni non sono in
+            # `viste` perche' NESSUNO le ha cercate, non perche' siano
+            # sparite. (La riga `pid` di quando era un prodotto semplice
+            # sta gia' in `viste`, col padre: si spegnera' al giro che
+            # legge le figlie, come ogni cambio di forma.)
+            if str(riga["origine_chiave"] or "").split(":")[0] in intatte:
+                continue
             spegni_annuncio(con, riga["id"], "rimosso")
             esito["spenti"] += 1
             print(f"    🗑 tolto dal negozio: {riga['titolo'][:50]}")
             if esito["spenti"] % LOTTO_SPEGNIMENTI == 0:
                 con.commit()
+                _respira(min(time.monotonic() - lotto_dal, RESPIRO_MAX_S))
+                lotto_dal = time.monotonic()
     else:
         print(f"    ⏸ lettura parziale: le sparizioni non si giudicano")
 
@@ -1483,7 +1684,9 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
     print(f"  🏪 {fonte} #{cid}: {esito['nuovi']} nuovi, "
           f"{esito['aggiornati']} aggiornati, {esito['invariati']} invariati, "
           f"{esito['spenti']} spenti, {esito['rimandati']} rimandati, "
-          f"{len(esito['saltati'])} saltati")
+          f"{len(esito['saltati'])} saltati"
+          + (f", {esito['varianti_al_prossimo']} con le varianti al "
+             f"prossimo giro" if esito["varianti_al_prossimo"] else ""))
     return esito
 
 
@@ -1555,7 +1758,13 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
     # `viste` e non passa per sparita), semplicemente non nasce oggi.
     # Il giro dopo si ritrova per chiave — o nasce, se il tetto la
     # lascia passare.
-    if not puo_creare:
+    # E LA RIGA `rimandata` (1 ott 2026, «negozi grandi») e' lo stesso
+    # tetto visto da prima: il server non l'ha fatta guardare all'AI
+    # perche' stava oltre i posti di questo giro (`_righe_da_giudicare`),
+    # e una riga che nessuno ha guardato NON NASCE — nemmeno quando il
+    # conto dei nuovi lascerebbe un posto libero (una riga giudicata che
+    # esplode lo libera, e non tocca a lei prenderlo).
+    if not puo_creare or r.get("rimandata"):
         esito["rimandati"] += 1
         return
     stato = "revisione" if marchio else ("attivo" if r["attivo"]

@@ -86,7 +86,9 @@ def main():
 
     # Le facce VERE, quelle che il database dice di servire: nessuna
     # dovrebbe essere un _min, ed e' quello che si va a verificare.
-    con = sqlite3.connect(db_path)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(db_path, timeout=15)
     facce = {r[0] for r in con.execute(
         "SELECT avatar FROM utenti WHERE avatar!=''")}
     con.close()

@@ -29076,6 +29076,7 @@ def _censimento(acceso, dopo=None):
                  "CONNETTORI_NEGOZIO_APERTI", "CONNETTORI_NEGOZIO_PER_TUTTI",
                  "MAX_PRODOTTI_CONNETTORE",
                  "MAX_NUOVI_CONNETTORE_GIRO",
+                 "MAX_NUOVI_CONNETTORE_RODAGGIO", "ORE_RODAGGIO_CONNETTORE",
                  "CONNETTORI_ERRORI_MAX", "MAX_CONNETTORI_VENDITORE",
                  "CONNETTORI_SYNC_MANUALE_S", "MAX_TARIFFA_CONNETTORE",
                  "CLASSIFICA_ATTIVA", "CLASSIFICA_TOP", "CLASSIFICA_K",
@@ -46515,6 +46516,26 @@ def prove_collaudi_in_ci():
                        encoding="utf-8", errors="replace", timeout=60)
     prova("un collaudo rosso fa uscire il lanciatore con 1", 1,
           r.returncode)
+    # LA RIGA CHE CADE SI VEDE (1 ott 2026, decisione di Andrea): la coda
+    # di quaranta righe perdeva la «✗» di collaudo_db_contesa sotto le
+    # centinaia di righe del giro. Il giudice si gira su un'uscita fatta
+    # cosi': la rossa in cima, cento righe di rumore dopo, e una rossa
+    # senza atteso/avuto in fondo.
+    rosse_fn = amb.get("righe_rosse")
+    prova("il lanciatore ha il giudice delle righe rosse", True, callable(rosse_fn))
+    uscita = ("  ✓ prima\n  ✗ la rotta impaziente non e' mai morta\n"
+              "      atteso: (0, [])\n      avuto:  (1, [])\n"
+              + "".join(f"    🏪 Maglia {k}\n" for k in range(100))
+              + "  ✓ in mezzo\n  ✗ il giro dura secondi\n  ✓ dopo\n")
+    prova("...che le trova tutte, ovunque stiano, con l'atteso e l'avuto",
+          ["✗ la rotta impaziente non e' mai morta", "    atteso: (0, [])",
+           "    avuto:  (1, [])", "✗ il giro dura secondi"],
+          rosse_fn(uscita) if callable(rosse_fn) else None)
+    lanciatore = open("collaudi_ci.py", encoding="utf-8").read()
+    corpo_main = lanciatore[lanciatore.find("\ndef main("):]
+    prova("...e il lanciatore le stampa, una annotazione ::error:: per riga", True,
+          "rosse = righe_rosse(uscita)" in corpo_main
+          and 'print(f"::error::{nome}: {r.lstrip(' in corpo_main)
 
 
 def prove_servizio_non_root():
@@ -91949,8 +91970,14 @@ def prove_connettori_ingresso():
     uno = codice(pezzo("_un_connettore"))
     prova("il server passa la parzialita' della lettura, non `True`",
           True, "completo=completo," in uno)
+    # EMENDATA (1 ott 2026, «negozi grandi»): il tetto non e' piu' la
+    # leva nuda ma i posti di QUEL giro — il rodaggio o il regime — che
+    # `_nuovi_per_giro` conta una volta e il giro passa a chi giudica e
+    # a chi fa nascere (la prova che sono gli stessi sta in
+    # prove_negozi_grandi)
     prova("...e il tetto viene dalla leva, non da uno zero", True,
-          "max_nuovi=MAX_NUOVI_CONNETTORE_GIRO" in uno)
+          "tetto_nuovi = _nuovi_per_giro(c)" in uno
+          and "max_nuovi=tetto_nuovi" in uno)
     # E LE RIGHE NON AMMESSE SI MARCANO, NON SI TOLGONO: una riga tolta
     # dalla lista non arriva alle sparizioni, che la leggono come «non
     # c'e' piu' sul negozio». Su una riga nuova non cambiava niente, ma
@@ -92058,7 +92085,8 @@ def prove_connettore_interrompibile():
                 _t.sleep(st["ritardo"])
                 return Risposta()
 
-        def lettore(url, cred, chiama, tetto):
+        # (1 ott 2026) il server passa anche il RITMO della lettura a tempo
+        def lettore(url, cred, chiama, tetto, ritmo=None):
             prodotti = []
             for n in range(st["pagine_catalogo"]):
                 try:
@@ -92098,10 +92126,15 @@ def prove_connettore_interrompibile():
                   "_decifra_contenuto": lambda x: "{}",
                   "MAX_PRODOTTI_CONNETTORE": 10**6,
                   "_connettore_in_errore": in_errore,
-                  "_righe_da_giudicare": lambda righe, c: ([], []),
+                  "_righe_da_giudicare": lambda righe, c, tetto=0: ([], []),
                   "db": lambda: Con(),
                   "MSG_RIGA_NON_GIUDICATA": "x",
                   "MAX_NUOVI_CONNETTORE_GIRO": 30,
+                  # «negozi grandi» (1 ott 2026): i posti del giro, la
+                  # lettura a tempo e il segno della rotazione
+                  "_nuovi_per_giro": lambda c: 30,
+                  "CONNETTORI_VARIANTI_MAX_S": 480,
+                  "_segno_varianti": lambda c: 0,
                   "_salva_foto_connettore": lambda *a: None,
                   "_chiudi_giro_connettore": chiudi})
         c = {"id": 7, "fonte": "finto", "credenziali": "",
@@ -118083,13 +118116,20 @@ def prove_negozi_fuori_dal_ciclo():
             raise RuntimeError("il banco si ferma: il lettore non ha un tetto")
         return 200, {"products": []}, {"Link": "<https://x.myshopify.com/admin/api/v/products.json?page_info=zz>; rel=\"next\""}
 
+    # (1 ott 2026, «negozi grandi») la pausa fra le pagine adesso e' VERA:
+    # qui si CONTA invece di aspettarla — quarantanove mezzi secondi
+    # sarebbero venticinque secondi di banco fermo
+    pause = []
     try:
-        ne.leggi_catalogo_shopify("x.myshopify.com", {"token": "t"}, shopify_senza_fine)
+        ne.leggi_catalogo_shopify("x.myshopify.com", {"token": "t"}, shopify_senza_fine,
+                                  ritmo={"dormi": pause.append})
         esito = "finito"
     except RuntimeError as e:
         esito = "alzato: " + str(e)[:40]
     prova("Shopify con un next su una pagina vuota ALZA al tetto", True,
           esito.startswith("alzato") and len(chiamate) == ne.MAX_PAGINE_CATALOGO)
+    prova("...e fra una pagina e l'altra ha fatto la sua pausa, una per pagina dopo la prima",
+          [ne.PAUSA_PAGINE_SHOPIFY] * (ne.MAX_PAGINE_CATALOGO - 1), pause)
     prova("i tetti sono larghi: mille varianti, cinquemila prodotti", True,
           ne.MAX_PAGINE_VARIAZIONI_WOO * ne.PER_PAGINA_WOO >= 1000
           and ne.MAX_PAGINE_CATALOGO * ne.PER_PAGINA_WOO >= 5000)
@@ -118415,9 +118455,12 @@ def prove_db_contesa_negozi():
         except BaseException:
             pass
     con2.rollback()
+    # (1 ott 2026, la tortura dei negozi grandi) senza la riga — le foto
+    # rimesse dentro la transazione — `fetchone()` torna None: la prova
+    # deve dirlo col suo nome, non far ESPLODERE la sezione e le sorelle
+    nata = con2.execute("SELECT foto, stato FROM annunci").fetchone()
     prova("un crash durante le foto lascia la riga COMPLETA, con gli URL del negozio",
-          ('["https://cdn/9.jpg"]', "attivo"),
-          tuple(con2.execute("SELECT foto, stato FROM annunci").fetchone()))
+          ('["https://cdn/9.jpg"]', "attivo"), tuple(nata) if nata else None)
     con2.close()
 
     # --- 2) l'aggiornamento: le foto PRIMA di `rifletti_pendenti` ---------
@@ -118533,6 +118576,717 @@ def prove_db_contesa_negozi():
           < nascita.find("con.commit()", nascita.find("_foto_locali(con, nuovo")))
     prova("...e la riga nasce con gli URL del negozio al posto delle foto", True,
           'connettore["zona"], json.dumps(r["foto"]) if r["foto"] else "",' in una)
+
+
+def prove_negozi_grandi():
+    """I NEGOZI GRANDI (1 ott 2026, seguito di «Database is locked»: le
+    quattro decisioni di Andrea). La moderazione giudica SOLO le righe
+    che entrano nel giro; i lettori leggono fino a mille prodotti —
+    Shopify con la pausa vera fra le pagine, Woo con la lettura a tempo
+    che si ferma da sola invece di scadere, e le figlie di chi aspetta
+    il suo turno che non si spengono; il rodaggio fa entrare un negozio
+    nuovo a cento a giro nelle sue prime ventiquattro ore; gli script a
+    mano aspettano il lucchetto come `db()`.
+
+    QUASI TUTTO SI GIRA: il giudice delle righe su un database su file;
+    il giro intero (`_un_connettore` coi pezzi VERI di server.py e il
+    modulo vero) con un'AI di cartone che annota cosa le si chiede; i
+    due lettori veri con un orologio e un sonno di cartone; la
+    riconciliazione vera. Al testo restano le cose che solo il testo
+    dice: i valori di serie e il censimento degli script."""
+    print("\n🏪 I negozi grandi: si giudica cio' che entra, si legge fino a mille")
+    import asyncio as _aio
+    import ast as _ast
+    import contextlib
+    import importlib
+    import io
+    import re as _re
+    import sqlite3
+    import tempfile
+    import threading as _th
+    import types
+    ne = importlib.import_module("importa_negozio")
+    CAMBIO = {"EUR": 100_000.0}          # 1000 sats = 1 €
+    CONN = {"id": 7, "fonte": "woo", "tg_id": 222, "zona": "Pavia (PV)",
+            "consegna": "spedizione", "spedizione_eur": 0.0,
+            "spedizione_punto_eur": 0.0, "spedizione_punto_dichiarata": 0,
+            "spedizione_extra_eur": 0.0, "credenziali": "",
+            "url_negozio": "https://negozio.example", "ultimo_esito": ""}
+
+    def banco_db():
+        """Un database SU FILE — il giro apre piu' connessioni, una in un
+        thread — con le tabelle che il giro tocca."""
+        percorso = os.path.join(tempfile.mkdtemp(prefix="barattolo-grandi-"), "x.db")
+        con = sqlite3.connect(percorso)
+        con.executescript("""
+            CREATE TABLE annunci(id INTEGER PRIMARY KEY AUTOINCREMENT,
+              venditore_id INT, titolo TEXT, descrizione TEXT,
+              categoria TEXT, prezzo_sats INT, zona TEXT, foto TEXT,
+              valuta TEXT, prezzo_eur REAL, quantita INT, quantita_max INT,
+              consegna TEXT, spedizione_eur REAL, spedizione_punto_eur REAL,
+              spedizione_punto_dichiarata INT, spedizione_extra_eur REAL,
+              spedizione_sats INT, spedizione_punto_sats INT,
+              spedizione_extra_sats INT,
+              fonte TEXT, connettore_id INT, origine_chiave TEXT,
+              origine_foto TEXT, origine_stock_visto INT,
+              famiglia TEXT DEFAULT '', famiglia_titolo TEXT DEFAULT '',
+              opzioni TEXT DEFAULT '',
+              creato INT, modificato INT, stato TEXT);
+            CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+              stato TEXT, aggiornato INT);
+            CREATE TABLE ordine_righe(ordine_id INT, annuncio_id INT);
+            CREATE TABLE connettori_uscite(id INTEGER PRIMARY KEY AUTOINCREMENT,
+              annuncio_id INT, delta INT, stato TEXT, aggiornato INT);
+        """)
+        con.commit()
+        con.close()
+
+        def db():
+            c = sqlite3.connect(percorso)
+            c.row_factory = sqlite3.Row
+            c.execute("PRAGMA synchronous=OFF")     # un banco, non un registro
+            return c
+        return db
+
+    def vietato_finto(titolo, descrizione):
+        """Il filtro parole di cartone: ferma i fucili, e basta."""
+        return "armi" if "fucile" in str(titolo or "").lower() else None
+
+    # --- A) il giudice delle righe: si giudica solo cio' che entra -------
+    db_a = banco_db()
+    con = db_a()
+    for chiave, stato, titolo, descr in (("a", "attivo", "Miele", "Buono"),
+                                         ("b", "attivo", "Pane", "Vecchio"),
+                                         ("c", "revisione", "Olio", "Vecchio")):
+        con.execute("INSERT INTO annunci(connettore_id, origine_chiave, stato, "
+                    "titolo, descrizione) VALUES(7,?,?,?,?)",
+                    (chiave, stato, titolo, descr))
+    # la stessa chiave in un ALTRO negozio: per il 7 resta mai vista
+    con.execute("INSERT INTO annunci(connettore_id, origine_chiave, stato, "
+                "titolo, descrizione) VALUES(8,'n1','attivo','Cosa n1','x')")
+    con.commit()
+    con.close()
+    amb_a = {"db": db_a, "controlla_vietato": vietato_finto}
+    exec(pezzo("_righe_da_giudicare"), amb_a)
+    giudica = amb_a["_righe_da_giudicare"]
+
+    def riga(k, titolo=None, descr="x", **kw):
+        r = {"origine_chiave": k, "titolo": titolo or f"Cosa {k}",
+             "descrizione": descr}
+        r.update(kw)
+        return r
+
+    def righe_a():
+        return [riga("a", "Miele", "Buono"), riga("b", "Pane", "Nuovo"),
+                riga("c", "Olio", "Nuovo"), riga("v1", "Fucile 1"),
+                riga("n1"), riga("n2"), riga("n3"), riga("n4"), riga("n5"),
+                riga("v2", "Fucile 2"),
+                riga("s1", saltato_perche="senza prezzo")]
+
+    def chiavi(lista):
+        return [r["origine_chiave"] for r in lista]
+
+    tutte = righe_a()
+    nuove, note = giudica(tutte, {"id": 7}, 3)
+    prova("A) si guardano il testo cambiato, i fermati dalle parole e le prime tre mai viste",
+          ["b", "v1", "n1", "n2", "n3"], chiavi(nuove))
+    prova("...le gia' viste uguali o non attive restano note", ["a", "c"], chiavi(note))
+    # chiusi i posti non si chiede piu' niente, nemmeno al filtro parole:
+    # il v2 lo fermera' al suo turno (qui gira nel ciclo principale)
+    prova("...le mai viste oltre i posti si marcano «rimandata», senza chiedere niente",
+          ["n4", "n5", "v2"], chiavi([r for r in tutte if r.get("rimandata")]))
+    prova("...e chi va all'AI non porta il segno", [],
+          chiavi([r for r in nuove if r.get("rimandata")]))
+    tutte = righe_a()
+    nuove, _ = giudica(tutte, {"id": 7}, 0)
+    prova("a tetto zero si guardano tutte le mai viste, come ieri",
+          ["v1", "n1", "n2", "n3", "n4", "n5", "v2"],
+          [k for k in chiavi(nuove) if k[0] in "nv"])
+    prova("...e nessuna si marca", [], chiavi([r for r in tutte if r.get("rimandata")]))
+    # IL FILTRO PAROLE NON OCCUPA UN POSTO: trenta respinti in testa al
+    # catalogo si prenderebbero i trenta posti a ogni giro, per sempre
+    tutte = [riga(f"v{i}", f"Fucile {i}") for i in range(5)] + \
+            [riga(f"m{i}") for i in range(4)]
+    nuove, _ = giudica(tutte, {"id": 7}, 2)
+    prova("i fermati dalle parole in testa al catalogo non prendono i posti",
+          ["m0", "m1"], [k for k in chiavi(nuove) if k[0] == "m"])
+    prova("...ma vanno lo stesso al filtro, che li ferma e li registra", 5,
+          len([k for k in chiavi(nuove) if k[0] == "v"]))
+    prova("...e oltre i due posti si aspetta", ["m2", "m3"],
+          chiavi([r for r in tutte if r.get("rimandata")]))
+    # chiusi i posti il filtro non gira piu': mille righe mai viste sono
+    # tre domande, non mille (e' tempo del ciclo principale)
+    domande = []
+
+    def filtro_contato(titolo, descrizione):
+        domande.append(titolo)
+        return vietato_finto(titolo, descrizione)
+    amb_a["controlla_vietato"] = filtro_contato
+    giudica([riga(f"z{i}") for i in range(1000)], {"id": 7}, 3)
+    amb_a["controlla_vietato"] = vietato_finto
+    prova("...e chiusi i posti il filtro non gira piu': tre domande, non mille", 3,
+          len(domande))
+
+    # --- B) il giro intero: l'AI vede solo i posti del giro ---------------
+    i_msg = _SORGENTE.find("MSG_RIGA_NON_GIUDICATA = (")
+    prova("B) il messaggio delle righe non giudicate e' dove il banco lo prende",
+          True, i_msg >= 0)
+    blocco_msg = (_SORGENTE[i_msg:_SORGENTE.find("\n\n\n", i_msg)] if i_msg >= 0
+                  else "MSG_RIGA_NON_GIUDICATA = 'x'")
+
+    def semplice(k, titolo=None, descr="Buono"):
+        return {"id": k, "name": titolo or f"Cosa {k}",
+                "description": f"<p>{descr}</p>", "type": "simple",
+                "status": "publish", "price": "7.50", "manage_stock": True,
+                "stock_quantity": 3, "stock_status": "instock", "images": [],
+                "categories": [{"name": "Casa"}]}
+
+    def banco_giro(catalogo, **leve):
+        """`_un_connettore` coi pezzi veri di server.py e il modulo vero;
+        `catalogo(ritmo)` e' il negozio di cartone, che il lettore finto
+        consegna come una lettura completa."""
+        db_b = banco_db()
+        st = {"voci_ai": [], "esiti": [], "errori": [], "ritmi": [],
+              "registrate": [], "ai_muta": False, "esploso": ""}
+
+        async def lotto(voci):
+            if st["ai_muta"]:
+                raise RuntimeError("l'AI non risponde")
+            st["voci_ai"].extend(t for _, t, _ in voci)
+            return {}
+
+        def lettore(url, cred, chiama, tetto, ritmo=None):
+            r = ritmo or {}
+            st["ritmi"].append({
+                "entro_fra": (r["entro"] - time.monotonic()) if r.get("entro") else None,
+                "dopo": (r.get("segno") or {}).get("dopo"), "tetto": tetto})
+            return catalogo(r), "", True
+
+        async def chiudi(c, esito):
+            st["esiti"].append(esito)
+
+        async def in_errore(c, e):
+            st["errori"].append(e)
+
+        g = {"asyncio": _aio, "json": json, "time": time,
+             "print": lambda *a, **k: None, "db": db_b,
+             "_SI_CHIUDE": _th.Event(), "_CONNETTORI_IN_CORSO": set(),
+             "_decifra_contenuto": lambda x: "{}", "chiama_api_negozio": None,
+             "MAX_PRODOTTI_CONNETTORE": 1000, "CONNETTORI_LETTURA_MAX_S": 600,
+             "CONNETTORI_VARIANTI_MAX_S": 480, "MAX_NUOVI_CONNETTORE_GIRO": 30,
+             "MAX_NUOVI_CONNETTORE_RODAGGIO": 100, "ORE_RODAGGIO_CONNETTORE": 24,
+             "LOTTO_MODERAZIONE": 20, "PARALLELI_MODERAZIONE": 3,
+             "controlla_vietato": vietato_finto,
+             "registra_moderazione": lambda *a: st["registrate"].append(a[-1]),
+             "moderazione_ai_lotto": lotto,
+             "_connettore_in_errore": in_errore,
+             "_chiudi_giro_connettore": chiudi,
+             "_salva_foto_connettore": lambda *a: None}
+        g.update(leve)
+        exec(blocco_msg, g)
+        for nome in ("_righe_da_giudicare", "_nuovi_per_giro", "_segno_varianti"):
+            exec(pezzo(nome), g)
+        for nome in ("_modera_righe_negozio", "_un_connettore"):
+            exec("async " + pezzo(nome), g)
+        mod = types.SimpleNamespace(LETTORI={"woo": lettore}, traduci=ne.traduci,
+                                    riconcilia_connettore=ne.riconcilia_connettore)
+        c = dict(CONN)
+
+        def giro():
+            prima = len(st["esiti"])
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    _aio.run(g["_un_connettore"](c, CAMBIO, mod))
+            except Exception as e:
+                st["esploso"] = f"{type(e).__name__}: {e}"
+            return st["esiti"][-1] if len(st["esiti"]) > prima else {}
+        return g, st, c, db_b, giro, mod
+
+    def numero(titolo):
+        return int(str(titolo).split()[-1])
+
+    CATALOGO = [semplice(k) for k in range(1, 251)]
+    g, st, c, db_b, giro, mod = banco_giro(lambda ritmo: list(CATALOGO))
+    esito = giro()
+    prova("il primo giro di un negozio appena collegato: il rodaggio, ne nascono cento",
+          (100, 150), (esito.get("nuovi"), esito.get("rimandati")))
+    prova("...e l'AI ha guardato SOLO quelle cento (ieri: tutte le 250, a ogni giro)",
+          list(range(1, 101)), sorted(numero(t) for t in st["voci_ai"]))
+    prova("...le rimandate non finiscono fra i saltati «non giudicate»", [],
+          [s for s in esito.get("saltati", []) if "moderazione" in s.get("perche", "")])
+    prova("...nessun errore, niente di esploso", ([], ""), (st["errori"], st["esploso"]))
+    r0 = st["ritmi"][0] if st["ritmi"] else {}
+    prova("il giro passa al lettore la sua scadenza: otto minuti da adesso", True,
+          470 <= (r0.get("entro_fra") or 0) <= 480)
+    prova("...il segno della rotazione (da capo, al primo giro) e il tetto di mille",
+          (0, 1000), (r0.get("dopo"), r0.get("tetto")))
+    # passate le ventiquattro ore dal PRIMO annuncio: il regime
+    con = db_b()
+    con.execute("UPDATE annunci SET creato = creato - ?", (25 * 3600,))
+    con.commit()
+    con.close()
+    st["voci_ai"].clear()
+    esito = giro()
+    prova("dopo il rodaggio il regime: ne nascono trenta, e l'AI ne guarda trenta",
+          (30, 120, list(range(101, 131))),
+          (esito.get("nuovi"), esito.get("rimandati"),
+           sorted(numero(t) for t in st["voci_ai"])))
+    # il testo CAMBIATO di chi e' gia' in vetrina si guarda sempre
+    for k in range(1, 6):
+        CATALOGO[k - 1] = semplice(k, descr="Nuova ricetta")
+    st["voci_ai"].clear()
+    esito = giro()
+    prova("il testo cambiato di chi e' gia' in vetrina si guarda sempre, oltre ai posti",
+          (list(range(1, 6)) + list(range(131, 161)), 30),
+          (sorted(numero(t) for t in st["voci_ai"]), esito.get("nuovi")))
+    # l'AI che tace: le trenta del turno aspettano DICENDOLO, le altre restano in arrivo
+    st["ai_muta"] = True
+    esito = giro()
+    st["ai_muta"] = False
+    non_guardate = [s for s in esito.get("saltati", [])
+                    if s.get("perche") == g.get("MSG_RIGA_NON_GIUDICATA")]
+    prova("se l'AI tace, le trenta del turno aspettano dicendolo, e non ne nasce nessuna",
+          (0, 30), (esito.get("nuovi"), len(non_guardate)))
+    prova("...mentre le altre restano «in arrivo», non «non giudicate»", 60,
+          esito.get("rimandati"))
+    prova("...e nessun annuncio gia' in vetrina si spegne", 0, esito.get("spenti"))
+    # i fermati dalle parole in testa al catalogo, nel giro vero e a regime
+    FUCILI = [semplice(1000 + k, f"Fucile {k}") for k in range(40)] + \
+             [semplice(2000 + k) for k in range(50)]
+    _, st2, _, _, giro2, _ = banco_giro(lambda ritmo: list(FUCILI),
+                                        MAX_NUOVI_CONNETTORE_RODAGGIO=0)
+    esito = giro2()
+    prova("quaranta fermati dalle parole in testa non prendono i trenta posti del giro",
+          (30, 30, 40), (esito.get("nuovi"), len(st2["voci_ai"]), len(st2["registrate"])))
+    # IL SEGNO DELLA ROTAZIONE viaggia nel report e torna al lettore
+
+    def ferma_a(dopo):
+        def catalogo(ritmo):
+            ritmo["segno"]["dopo"] = dopo     # come il lettore Woo fermato dal tempo
+            return [semplice(3000)]
+        return catalogo
+    _, st3, c3, _, giro3, mod3 = banco_giro(ferma_a(42))
+    esito = giro3()
+    prova("il segno della rotazione viaggia nel report del giro", 42,
+          esito.get("varianti_dopo"))
+    c3["ultimo_esito"] = json.dumps(esito)     # quel che scrive _chiudi_giro_connettore
+    giro3()
+    prova("...e il giro dopo lo ridà al lettore", 42,
+          st3["ritmi"][-1].get("dopo") if st3["ritmi"] else None)
+    c3["ultimo_esito"] = "{storto"
+    giro3()
+    prova("...un report illeggibile vale «da capo», non un giro saltato", (0, ""),
+          (st3["ritmi"][-1].get("dopo") if st3["ritmi"] else None, st3["esploso"]))
+
+    def muore(*a, **k):
+        raise RuntimeError("la riconciliazione muore")
+    mod3.riconcilia_connettore = muore
+    prima = len(st3["esiti"])
+    giro3()
+    prova("...e un giro morto prima di chiudersi non scrive il report: il segno resta",
+          prima, len(st3["esiti"]))
+
+    # --- C) il rodaggio: dal primo annuncio entrato -----------------------
+    db_c = banco_db()
+    amb_c = {"db": db_c, "time": time, "MAX_NUOVI_CONNETTORE_GIRO": 30,
+             "MAX_NUOVI_CONNETTORE_RODAGGIO": 100, "ORE_RODAGGIO_CONNETTORE": 24}
+    exec(pezzo("_nuovi_per_giro"), amb_c)
+    posti = amb_c["_nuovi_per_giro"]
+    adesso = int(time.time())
+
+    def primo_annuncio(quando, cid=7):
+        con = db_c()
+        con.execute("DELETE FROM annunci")
+        if quando is not None:
+            con.execute("INSERT INTO annunci(connettore_id, origine_chiave, "
+                        "creato, stato) VALUES(?, 'x', ?, 'attivo')", (cid, quando))
+        con.commit()
+        con.close()
+
+    primo_annuncio(None)
+    prova("C) un negozio senza ancora un annuncio e' in rodaggio", 100, posti({"id": 7}))
+    primo_annuncio(adesso - 3600)
+    prova("...un'ora dopo il primo annuncio, ancora", 100, posti({"id": 7}))
+    primo_annuncio(adesso - 24 * 3600 + 60)
+    prova("...a un minuto dalle ventiquattro ore, ancora", 100, posti({"id": 7}))
+    primo_annuncio(adesso - 24 * 3600 - 60)
+    prova("...passate le ventiquattro ore, il regime", 30, posti({"id": 7}))
+    primo_annuncio(adesso - 30 * 24 * 3600, cid=8)
+    prova("...e conta il primo annuncio di QUEL negozio, non di un altro", 100,
+          posti({"id": 7}))
+    primo_annuncio(adesso - 3600)
+    for leva, valore, atteso, nome in (
+            ("MAX_NUOVI_CONNETTORE_RODAGGIO", 0, 30, "rodaggio a zero: il regime da subito"),
+            ("ORE_RODAGGIO_CONNETTORE", 0, 30, "ore a zero: il regime da subito"),
+            ("MAX_NUOVI_CONNETTORE_RODAGGIO", 10, 30,
+             "il rodaggio non rallenta mai: col regime piu' alto vale lui"),
+            ("MAX_NUOVI_CONNETTORE_GIRO", 0, 0,
+             "regime a zero: nessun tetto, nemmeno nel rodaggio")):
+        prima = amb_c[leva]
+        amb_c[leva] = valore
+        prova("..." + nome, atteso, posti({"id": 7}))
+        amb_c[leva] = prima
+
+    # --- D) la lettura a tempo di Woo: si ferma da sola, e ruota ----------
+    cred = {"consumer_key": "ck", "consumer_secret": "cs"}
+
+    def woo_a_tempo(n_prodotti, variabili, orologio):
+        """Il Woo di cartone: ogni chiamata fa passare un «secondo»."""
+        letture = []
+
+        def chiama(metodo, url, intestazioni):
+            orologio[0] += 1
+            letture.append(url)
+            if "/settings/" in url:
+                return 200, {"lista": [{"id": "woocommerce_calc_taxes",
+                                        "value": "no"}]}, {}
+            m = _re.search(r"/products/(\d+)/variations", url)
+            if m:
+                pid = int(m.group(1))
+                return 200, {"lista": [
+                    {"id": pid * 100 + j, "price": "5.00", "status": "publish",
+                     "attributes": [{"name": "Taglia", "option": t}]}
+                    for j, t in enumerate(("S", "M"))]}, {}
+            pagina = int(_re.search(r"[?&]page=(\d+)", url).group(1))
+            ids = range((pagina - 1) * 100 + 1, min(pagina * 100, n_prodotti) + 1)
+            return 200, {"lista": [
+                {"id": k, "name": f"P{k}", "status": "publish", "price": "5.00",
+                 "type": "variable" if k in variabili else "simple"}
+                for k in ids]}, {"X-WP-Total": str(n_prodotti)}
+        return chiama, letture
+
+    def leggi_a_tempo(n, variabili, entro, segno):
+        t = [0]
+        chiama, letture = woo_a_tempo(n, variabili, t)
+        ritmo = None if entro is None else {"entro": entro, "orologio": lambda: t[0],
+                                            "segno": segno}
+        prodotti, avviso, completo = ne.leggi_catalogo_woo(
+            "https://negozio.it", cred, chiama, 1000, ritmo)
+        lette = [p["id"] for p in prodotti if "_variazioni" in p]
+        dopo = [p["id"] for p in prodotti if p.get("_variazioni_al_prossimo")]
+        return lette, dopo, avviso, completo, letture
+
+    PARI = set(range(2, 21, 2))
+    segno = {"dopo": 0}
+    lette, dopo, avviso, completo, letture = leggi_a_tempo(20, PARI, 7, segno)
+    prova("D) la lettura a tempo si ferma fra le variazioni: le prime cinque lette",
+          [2, 4, 6, 8, 10], lette)
+    prova("...le altre cinque marcate per il prossimo giro", [12, 14, 16, 18, 20], dopo)
+    prova("...e il catalogo resta COMPLETO: la lista dei prodotti e' intera", True, completo)
+    prova("...il venditore lo legge, coi numeri e senza la parola «errore»", True,
+          "5 prodotti su 10" in avviso and "risponde piano" in avviso
+          and "errore" not in avviso)
+    prova("...il segno ricorda dove ci si e' fermati", {"dopo": 10, "lette": 5, "rimaste": 5},
+          segno)
+    prova("...e oltre la scadenza non si e' bussato piu'", 7, len(letture))
+    lette2, dopo2, _, _, _ = leggi_a_tempo(20, PARI, 7, segno)
+    prova("il giro dopo riparte DA LI': prima chi viene dopo il dieci", ([12, 14, 16, 18, 20],
+          [2, 4, 6, 8, 10]), (lette2, dopo2))
+    prova("...e il segno gira in cerchio", 20, segno.get("dopo"))
+    lette3, _, _, _, _ = leggi_a_tempo(20, PARI, 7, segno)
+    prova("...in cerchio davvero: dopo l'ultimo si torna al primo", [2, 4, 6, 8, 10], lette3)
+    lette4, dopo4, avviso4, completo4, _ = leggi_a_tempo(20, PARI, 100, segno)
+    prova("con tempo a sufficienza si leggono tutte, e il segno torna a zero",
+          (10, [], "", True, 0), (len(lette4), dopo4, avviso4, completo4, segno.get("dopo")))
+    lette5, dopo5, avviso5, completo5, _ = leggi_a_tempo(20, PARI, None, None)
+    prova("senza ritmo (la prova del collegamento) si legge tutto, come ieri",
+          (10, [], "", True), (len(lette5), dopo5, avviso5, completo5))
+    # il caso estremo: il tempo finisce fra le PAGINE del catalogo
+    CINQUANTA = set(range(50, 251, 50))
+    segno6 = {"dopo": 150}
+    lette6, dopo6, avviso6, completo6, letture6 = leggi_a_tempo(250, CINQUANTA, 3, segno6)
+    prova("il tempo finito fra le pagine: lettura PARZIALE anche se X-WP-Total dice «ci stanno»",
+          False, completo6)
+    prova("...il venditore legge quanti su quanti, e che le sparizioni aspettano", True,
+          "200 prodotti su 250" in avviso6 and "non spegniamo" in avviso6)
+    prova("...detto UNA volta: niente seconda frase sulle varianti", 1,
+          avviso6.count("risponde piano"))
+    prova("...e nessuna variazione chiesta a tempo scaduto", ([], [50, 100, 150, 200], 3),
+          (lette6, dopo6, len(letture6)))
+    prova("...e il segno resta dov'era: chi aspettava il turno non torna in fondo", 150,
+          segno6.get("dopo"))
+
+    # --- E) le figlie di chi aspetta il suo turno non si spengono ----------
+    db_e = banco_db()
+
+    def woo(pid, tipo="simple", variazioni=None, al_prossimo=False):
+        p = {"id": pid, "name": f"Prodotto {pid}", "description": "x", "type": tipo,
+             "status": "publish", "price": "5.00", "manage_stock": True,
+             "stock_quantity": 2, "stock_status": "instock", "images": [],
+             "categories": []}
+        if variazioni is not None:
+            p["_variazioni"] = [{"id": v, "price": "5.00", "status": "publish",
+                                 "manage_stock": True, "stock_quantity": 2,
+                                 "attributes": [{"name": "Taglia", "option": f"T{v}"}]}
+                                for v in variazioni]
+        if al_prossimo:
+            p["_variazioni_al_prossimo"] = True
+        return p
+
+    def giro_e(prodotti, completo=True):
+        con = db_e()
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                return ne.riconcilia_connettore(
+                    con, CONN, ne.traduci(prodotti, "woo", CAMBIO),
+                    lambda *a: None, {}, completo=completo)
+        finally:
+            con.close()
+
+    def stati_e():
+        con = db_e()
+        try:
+            return {r["origine_chiave"]: r["stato"] for r in con.execute(
+                "SELECT origine_chiave, stato FROM annunci ORDER BY id")}
+        finally:
+            con.close()
+
+    giro_e([woo(1), woo(2, "variable", [21, 22]), woo(3, "variable", [31, 32]), woo(9)])
+    prova("E) il primo giro fa nascere i semplici e le figlie",
+          {"1": "attivo", "2:21": "attivo", "2:22": "attivo", "3:31": "attivo",
+           "3:32": "attivo", "9": "attivo"}, stati_e())
+    # il giro lento: il 2 e il 9 (diventato variabile) aspettano il turno, il
+    # 3 e' letto e ha perso la 32, l'1 e' stato tolto dal negozio
+    esito = giro_e([woo(2, "variable", al_prossimo=True), woo(3, "variable", [31]),
+                    woo(9, "variable", al_prossimo=True)])
+    s = stati_e()
+    prova("le figlie del prodotto che aspetta il suo turno NON si spengono",
+          ("attivo", "attivo"), (s.get("2:21"), s.get("2:22")))
+    prova("...e nemmeno la riga di quando il 9 era un prodotto semplice", "attivo", s.get("9"))
+    prova("...mentre nello stesso giro la variante tolta da chi e' stato letto si spegne",
+          "rimosso", s.get("3:32"))
+    prova("...e il prodotto tolto dal negozio pure: le sparizioni restano vere", "rimosso",
+          s.get("1"))
+    prova("...il report conta chi aspetta, e non riempie i saltati",
+          (2, []), (esito.get("varianti_al_prossimo"), [x["perche"] for x in esito.get("saltati", [])]))
+    esito = giro_e([woo(2, "variable", [21]), woo(3, "variable", [31]), woo(9, "variable", [91])])
+    s = stati_e()
+    prova("al suo turno la figlia sparita si spegne e quella che c'e' resta",
+          ("attivo", "rimosso"), (s.get("2:21"), s.get("2:22")))
+    prova("...e il cambio di forma del 9 si compie: via la riga semplice, dentro la figlia",
+          ("rimosso", "attivo"), (s.get("9"), s.get("9:91")))
+    # «aspetta il turno» vale solo per le figlie del SUO padre: un 2 che
+    # aspetta non protegge le righe del 20 (la chiave «20:..» non e' «2:..»)
+    giro_e([woo(20, "variable", [201])])
+    giro_e([woo(2, "variable", al_prossimo=True), woo(3, "variable", [31]), woo(9, "variable", [91])])
+    prova("...e chi aspetta protegge le SUE figlie, non quelle di un id che gli somiglia",
+          "rimosso", stati_e().get("20:201"))
+    # LA RIMANDATA NON NASCE MAI, nemmeno quando un posto si libera: la
+    # riga giudicata esplode, il conto dei nuovi resta a zero, e quella che
+    # l'AI non ha guardato aspetta lo stesso il suo turno
+    db_r = banco_db()
+    con_r = db_r()
+    righe_r = ne.traduci([semplice(1), semplice(2)], "woo", CAMBIO)
+    righe_r[1]["rimandata"] = True
+    vera_famiglia_r = ne._scrivi_famiglia
+    colpi = []
+
+    def esplode_la_prima(*a):
+        colpi.append(1)
+        if len(colpi) == 1:
+            raise RuntimeError("la prima esplode")
+        return vera_famiglia_r(*a)
+    ne._scrivi_famiglia = esplode_la_prima
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            esito_r = ne.riconcilia_connettore(con_r, CONN, righe_r, lambda *a: None, {},
+                                               completo=False, max_nuovi=1)
+    finally:
+        ne._scrivi_famiglia = vera_famiglia_r
+        con_r.close()
+    prova("la riga rimandata non nasce nemmeno quando la giudicata esplode e libera il posto",
+          (0, 1, 1), (esito_r["nuovi"], esito_r["rimandati"], len(esito_r["falliti"])))
+
+    # --- F) Shopify oltre i 250: la pausa vera fra le pagine --------------
+    eventi = []
+
+    def shopify(pagine):
+        n = {"i": 0}
+
+        def chiama(metodo, url, intestazioni):
+            i = n["i"]
+            n["i"] += 1
+            eventi.append("chiama")
+            testa = ({"Link": f'<https://mio.myshopify.com/x?page_info={i}>; rel="next"'}
+                     if i + 1 < pagine else {})
+            return 200, {"products": [
+                {"id": i * 1000 + k, "title": f"p{k}", "status": "active",
+                 "variants": [{"price": "1.00"}]} for k in range(250)]}, testa
+        return chiama
+
+    P = ne.PAUSA_PAGINE_SHOPIFY
+    letti, avviso, completo = ne.leggi_catalogo_shopify(
+        "mio.myshopify.com", {"token": "t"}, shopify(4), 1000,
+        {"dormi": lambda s: eventi.append(("dormi", s))})
+    prova("F) Shopify a mille prodotti: quattro pagine, tutte lette", (1000, True, ""),
+          (len(letti), completo, avviso))
+    prova("...con la pausa VERA fra una pagina e l'altra, e mai prima della prima",
+          ["chiama", ("dormi", P), "chiama", ("dormi", P), "chiama", ("dormi", P), "chiama"],
+          eventi)
+    prova("...mezzo secondo: il ritmo del limite di Shopify, due richieste al secondo",
+          True, 0.5 <= P <= 1.0)
+    eventi.clear()
+    ne.leggi_catalogo_shopify("mio.myshopify.com", {"token": "t"}, shopify(1), 1000,
+                              {"dormi": lambda s: eventi.append(("dormi", s))})
+    prova("il negozio di una pagina sola non aspetta niente", ["chiama"], eventi)
+    eventi.clear()
+    inizio = time.monotonic()
+    ne.leggi_catalogo_shopify("mio.myshopify.com", {"token": "t"}, shopify(2), 1000)
+    prova("...e senza `ritmo` (la strada del server) la pausa e' un sonno vero", True,
+          time.monotonic() - inizio >= P * 0.9)
+
+    # --- G) i valori di serie --------------------------------------------
+    def costante(nome):
+        i = _SORGENTE.find("\n" + nome + " = ")
+        if i < 0:
+            return None
+        valore = _SORGENTE[i + 1:_SORGENTE.find("\n", i + 1)].split("=", 1)[1]
+        try:
+            return int(valore.strip())
+        except ValueError:
+            return None
+
+    prova("G) si leggono mille prodotti per giro, di serie", True,
+          "    MAX_PRODOTTI_CONNETTORE = 1000\n" in _SORGENTE)
+    prova("...il rodaggio di serie: cento a giro per ventiquattro ore", True,
+          "    MAX_NUOVI_CONNETTORE_RODAGGIO = 100\n" in _SORGENTE
+          and "    ORE_RODAGGIO_CONNETTORE = 24\n" in _SORGENTE)
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    prova("...e il config d'esempio, da cui si copia, dice lo stesso", True,
+          "\nMAX_PRODOTTI_CONNETTORE = 1000\n" in cfg
+          and "\nMAX_NUOVI_CONNETTORE_RODAGGIO = 100\n" in cfg
+          and "\nORE_RODAGGIO_CONNETTORE = 24\n" in cfg)
+    var, lettura = costante("CONNETTORI_VARIANTI_MAX_S"), costante("CONNETTORI_LETTURA_MAX_S")
+    prova("la lettura a tempo si ferma PRIMA della scadenza, con almeno un minuto di scarto",
+          True, bool(var and lettura and var + 60 <= lettura))
+
+    # --- H) gli script a mano aspettano il lucchetto ----------------------
+    # IL CENSIMENTO GUARDA LA CARTELLA (la regola di prove_config_esempio):
+    # lo script che nascera' domani entra nel conto da solo
+    aperti, senza = set(), []
+    for f in sorted(os.listdir(QUI)):
+        if (not f.endswith(".py") or f in ("server.py", "prove.py")
+                or f.startswith("collaudo_")):
+            continue
+        try:
+            albero = _ast.parse(open(os.path.join(QUI, f), encoding="utf-8").read())
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+        for nodo in _ast.walk(albero):
+            if (isinstance(nodo, _ast.Call) and isinstance(nodo.func, _ast.Attribute)
+                    and nodo.func.attr == "connect"
+                    and isinstance(nodo.func.value, _ast.Name)
+                    and nodo.func.value.id == "sqlite3"):
+                aperti.add(f)
+                attesa = [k.value for k in nodo.keywords if k.arg == "timeout"]
+                if not (attesa and isinstance(attesa[0], _ast.Constant)
+                        and isinstance(attesa[0].value, (int, float))
+                        and attesa[0].value >= 15):
+                    senza.append(f)
+    prova("H) ogni script a mano che apre il database aspetta il lucchetto quindici secondi",
+          [], senza)
+    prova("...e il censimento li ha guardati davvero (i diciannove, e importa_nostr)",
+          True, len(aperti) >= 20 and "sposta_a_mano.py" in aperti and "orfani.py" in aperti)
+
+    # --- I) il pannello delle leve dice il rodaggio -----------------------
+    _, voci_on, _ = _censimento(True)
+    _, voci_off, _ = _censimento(False)
+    prova("I) il pannello delle leve mostra il rodaggio, coi valori vivi", (24, 24),
+          (voci_on.get("MAX_NUOVI_CONNETTORE_RODAGGIO", {}).get("valore"),
+           voci_on.get("ORE_RODAGGIO_CONNETTORE", {}).get("valore")))
+    prova("...e spento dice cosa comporta", True,
+          all("regime" in voci_off.get(k, {}).get("nota", "")
+              for k in ("MAX_NUOVI_CONNETTORE_RODAGGIO", "ORE_RODAGGIO_CONNETTORE")))
+
+    # --- J) il respiro del giro: dopo ogni riga scritta, il database libero ---
+    # Il collaudo col traffico l'ha trovato: transazioni brevi ma A RAFFICA,
+    # e chi aspetta il lucchetto (ogni richiesta autenticata scrive) non
+    # trova mai il buco. Qui il respiro si CONTA: quante pause, quando, e
+    # quanto lunghe rispetto al tempo passato dentro il database.
+    pause = []
+    guardata = {"con": None}
+
+    def respiro_finto(secondi):
+        c_ = guardata["con"]
+        pause.append((round(secondi, 4), c_.in_transaction if c_ else None))
+
+    def con_foto(k, n=2):
+        return dict(semplice(k), images=[{"src": f"https://cdn/{k}-{i}.jpg"}
+                                         for i in range(n)])
+
+    def riconcilia_j(con_, prodotti, salva=lambda *a: None, **kw):
+        kw.setdefault("completo", False)
+        with contextlib.redirect_stdout(io.StringIO()):
+            return ne.riconcilia_connettore(con_, CONN, ne.traduci(prodotti, "woo", CAMBIO),
+                                            salva, {}, **kw)
+
+    vero_respira, vera_famiglia = ne._respira, ne._scrivi_famiglia
+    ne._respira = respiro_finto
+    try:
+        db_j = banco_db()
+        con_j = db_j()
+        guardata["con"] = con_j
+        riconcilia_j(con_j, [semplice(k) for k in range(1, 6)], max_nuovi=3)
+        prova("J) dopo ogni riga scritta il giro respira: tre nate, tre respiri, le rimandate no",
+              3, len(pause))
+        prova("...e mai a transazione aperta: mentre respira il lucchetto e' libero",
+              [False, False, False], [t for _, t in pause])
+        # il tempo degli scaricamenti NON e' tempo nel database
+        pause.clear()
+
+        def foto_lenta(annuncio_id, i, u):
+            time.sleep(0.15)
+            return f"a{annuncio_id}_{i}.jpg"
+        riconcilia_j(con_j, [con_foto(50)], foto_lenta)
+        prova("...il respiro misura il tempo DENTRO il database, non gli scaricamenti", True,
+              len(pause) == 1 and pause[0][0] < 0.05)
+        # proporzionale: tanto quanto la riga ha tenuto il lucchetto...
+        pause.clear()
+
+        def famiglia_lenta(*a):
+            time.sleep(0.05)
+            return vera_famiglia(*a)
+        ne._scrivi_famiglia = famiglia_lenta
+        riconcilia_j(con_j, [semplice(60)])
+        ne._scrivi_famiglia = vera_famiglia
+        prova("...tanto quanto la riga ha tenuto il database (qui cinquanta millesimi)", True,
+              len(pause) == 1 and 0.045 <= pause[0][0] < ne.RESPIRO_MAX_S)
+        # ...ma al piu' RESPIRO_MAX_S, anche su un disco lentissimo
+        pause.clear()
+
+        def famiglia_lentissima(*a):
+            time.sleep(0.3)
+            return vera_famiglia(*a)
+        ne._scrivi_famiglia = famiglia_lentissima
+        riconcilia_j(con_j, [semplice(61)])
+        ne._scrivi_famiglia = vera_famiglia
+        prova("...e al piu' RESPIRO_MAX_S, anche quando il disco e' lentissimo",
+              [ne.RESPIRO_MAX_S], [p for p, _ in pause])
+        prova("...un decimo di secondo al massimo: il giro non si trascina", True,
+              0 < ne.RESPIRO_MAX_S <= 0.2)
+        # una riga esplosa a meta' lascia la transazione aperta: li' non si
+        # respira, o il lucchetto resterebbe preso per tutta la pausa
+        pause.clear()
+
+        def famiglia_rotta(*a):
+            raise RuntimeError("famiglia rotta")
+        ne._scrivi_famiglia = famiglia_rotta
+        riconcilia_j(con_j, [semplice(62)])
+        ne._scrivi_famiglia = vera_famiglia
+        prova("...e a transazione aperta (una riga esplosa a meta') non si respira", [], pause)
+        con_j.close()
+        # fra un lotto di sparizioni e l'altro
+        db_s = banco_db()
+        con_s = db_s()
+        guardata["con"] = con_s
+        riconcilia_j(con_s, [semplice(100 + k) for k in range(60)], completo=True)
+        pause.clear()
+        esito_s = riconcilia_j(con_s, [], completo=True)
+        prova("...e fra un lotto di sparizioni e l'altro: sessanta spente, due respiri, fuori transazione",
+              (60, [False, False]), (esito_s.get("spenti"), [t for _, t in pause]))
+        con_s.close()
+    finally:
+        ne._respira, ne._scrivi_famiglia = vero_respira, vera_famiglia
 
 
 def main():
@@ -118762,6 +119516,7 @@ def main():
               prove_rotte_p2p_riverificate,
               prove_negozi_fuori_dal_ciclo,
               prove_db_contesa_negozi,
+              prove_negozi_grandi,
               prove_freni,
               prove_config_esempio):
         try:

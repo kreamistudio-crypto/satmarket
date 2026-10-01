@@ -26237,6 +26237,17 @@ def _leve_stato():
                   MAX_NUOVI_CONNETTORE_GIRO,
                   spento="un catalogo collegato entra tutto insieme, e "
                          "si prende le prime pagine della vetrina"),
+            # il rodaggio (1 ott 2026): le due leve si spengono a zero
+            # l'una o l'altra, e allora vale il regime da subito
+            _leva("Annunci nuovi per giro nel rodaggio",
+                  "MAX_NUOVI_CONNETTORE_RODAGGIO",
+                  MAX_NUOVI_CONNETTORE_RODAGGIO,
+                  spento="un negozio appena collegato entra al ritmo di "
+                         "regime, senza la spinta delle prime ore"),
+            _leva("Ore di rodaggio di un negozio nuovo",
+                  "ORE_RODAGGIO_CONNETTORE", ORE_RODAGGIO_CONNETTORE,
+                  spento="un negozio appena collegato entra al ritmo di "
+                         "regime, senza la spinta delle prime ore"),
             _leva("Giri falliti prima dell'avviso", "CONNETTORI_ERRORI_MAX",
                   CONNETTORI_ERRORI_MAX,
                   spento="il collegamento non si dichiara rotto mai, e il "
@@ -59101,23 +59112,40 @@ except ImportError:
 SECONDI_SYNC_CONNETTORI = 3600
 # la scadenza della LETTURA di un catalogo (1 ott 2026, cura 8): dieci
 # minuti bastano a duecento prodotti con le loro varianti anche da un
-# negozio lento; oltre e' un negozio che non risponde, e si conta cosi'
+# negozio lento; oltre e' un negozio che non risponde, e si conta cosi'.
+# (Dal 1 ott 2026, «negozi grandi», il lettore si ferma da solo prima,
+# qui sotto: questa resta la cintura per chi non risponde affatto.)
 CONNETTORI_LETTURA_MAX_S = 600
+# IL LETTORE SI FERMA PRIMA, DA SOLO (1 ott 2026, «negozi grandi»): coi
+# mille prodotti di MAX_PRODOTTI_CONNETTORE un Woo lento non ci sta piu'
+# nei dieci minuti — mille prodotti variabili a un secondo l'uno sono
+# diciassette minuti, cioe' un errore contato a ogni giro e al quinto il
+# collegamento ROTTO, col messaggio al venditore, per un negozio che
+# risponde. Qui la lettura delle variazioni si ferma a otto minuti, e
+# quel che ha letto e' un giro buono: i prodotti a cui non e' arrivata
+# tengono le righe di ieri e passano in testa al giro dopo (vedi
+# `leggi_catalogo_woo`, «la lettura a tempo»). I due minuti di scarto
+# sono per l'ultima chiamata (15 s di timeout) e per quel che il
+# lettore fa dopo.
+CONNETTORI_VARIANTI_MAX_S = 480
 _prossimo_giro_connettori = 0.0   # 0 = primo giro subito all'avvio
 
-# Quanti prodotti leggere per connettore per giro. Il target
-# dichiarato (200 articoli) passa tutto in un giro; un catalogo enorme
-# si digerisce in piu' tornate invece di tenere in ostaggio l'orologio,
-# e il report lo dice al venditore.
-# ⚠️ Alzandolo oltre PER_PAGINA (250) il catalogo di Shopify si
-# paginerebbe davvero, e li' il limite di richieste al secondo torna a
-# contare: chi lo fa rimetta una pausa VERA dentro il ciclo del
-# lettore — una costante accanto non frena niente (la lezione di
-# PAUSA_PAGINE_SHOPIFY).
+# Quanti prodotti leggere per connettore per giro. Un catalogo piu'
+# grande si legge fino al tetto e il report lo dice al venditore.
+# MILLE DAL 1 OTT 2026 (decisione di Andrea, «negozi grandi»): a
+# duecento un negozio da mille prodotti non entrava MAI per intero — i
+# lettori ripartono da pagina 1 a ogni giro e si fermavano sempre allo
+# stesso punto. Le pagine ci sono (MAX_PAGINE_CATALOGO, cioe' cinquemila
+# prodotti su Woo); le due cose che mille prodotti chiedevano stanno nei
+# lettori: Shopify si pagina davvero (250 a pagina) e fra una pagina e
+# l'altra c'e' la pausa VERA, dentro il ciclo (`PAUSA_PAGINE_SHOPIFY`:
+# una costante accanto non frena niente, e' la lezione di agosto); e un
+# Woo lento si ferma da solo invece di scadere
+# (CONNETTORI_VARIANTI_MAX_S qui sopra).
 try:
     from config import MAX_PRODOTTI_CONNETTORE
 except ImportError:
-    MAX_PRODOTTI_CONNETTORE = 200
+    MAX_PRODOTTI_CONNETTORE = 1000
 
 # Quante righe NUOVE nascono per giro. NON e' un fratello del tetto
 # qui sopra, e' il suo opposto: quello dice quanto si LEGGE — e
@@ -59137,6 +59165,27 @@ try:
     from config import MAX_NUOVI_CONNETTORE_GIRO
 except ImportError:
     MAX_NUOVI_CONNETTORE_GIRO = 30
+
+# IL RODAGGIO (1 ott 2026, decisione di Andrea, «negozi grandi»): nelle
+# prime ORE_RODAGGIO_CONNETTORE ore di un negozio collegato nascono
+# MAX_NUOVI_CONNETTORE_RODAGGIO righe nuove a giro invece del regime qui
+# sopra. Un negozio da mille prodotti a trenta all'ora entra in
+# trentaquattro ore, a cento in dieci: chi ha appena collegato lo vede
+# crescere, e passato il rodaggio torna il ritmo che protegge la home.
+# LE ORE SI CONTANO DAL PRIMO ANNUNCIO ENTRATO, non dalla riga del
+# collegamento: un negozio che aspetta i costi di spedizione non si
+# legge (`tariffe_da_dire`), e contare da `creato` gli farebbe passare
+# il rodaggio in attesa — vedi `_nuovi_per_giro`.
+# Il rodaggio non rallenta mai: se il regime e' piu' alto vale lui.
+# 0 (su una delle due) = niente rodaggio, il regime da subito.
+try:
+    from config import MAX_NUOVI_CONNETTORE_RODAGGIO
+except ImportError:
+    MAX_NUOVI_CONNETTORE_RODAGGIO = 100
+try:
+    from config import ORE_RODAGGIO_CONNETTORE
+except ImportError:
+    ORE_RODAGGIO_CONNETTORE = 24
 
 # Dopo quanti giri falliti di fila il collegamento si dichiara rotto e
 # il venditore riceve UN avviso. Cinque ore di silenzio sono un
@@ -59473,7 +59522,57 @@ MSG_RIGA_NON_GIUDICATA = ("la moderazione non ha potuto guardarlo in "
                           "questo giro: ci riproviamo al prossimo")
 
 
-def _righe_da_giudicare(righe: list, connettore: dict) -> tuple[list, list]:
+def _nuovi_per_giro(c: dict) -> int:
+    """Quante righe NUOVE possono nascere in questo giro per questo
+    collegamento (0 = nessun tetto): MAX_NUOVI_CONNETTORE_RODAGGIO nelle
+    prime ORE_RODAGGIO_CONNETTORE ore, poi MAX_NUOVI_CONNETTORE_GIRO.
+
+    LE ORE PARTONO DAL PRIMO ANNUNCIO ENTRATO, e un negozio che non ne
+    ha ancora nessuno e' in rodaggio. E' la lettura fedele di «dal
+    collegamento» in questa casa: dal set 2026 «la nascita» di un
+    negozio e' quando i costi di spedizione sono detti — prima il
+    catalogo non si legge (`tariffe_da_dire`) — e chi li dice due giorni
+    dopo aver collegato non deve trovarsi il rodaggio gia' finito senza
+    che un solo prodotto sia entrato. Nel caso normale (costi detti
+    subito) il primo annuncio nasce al primo giro, cioe' pochi secondi
+    dopo il collegamento: e' la stessa ora.
+    UNO PER I DUE CHE LO USANO: lo chiede `_un_connettore` una volta per
+    giro e lo passa a chi giudica e a chi fa nascere — due conti
+    separati potrebbero dire numeri diversi, e allora l'AI guarderebbe
+    trenta righe e ne nascerebbero cento."""
+    regime = MAX_NUOVI_CONNETTORE_GIRO
+    if (regime <= 0 or MAX_NUOVI_CONNETTORE_RODAGGIO <= 0
+            or ORE_RODAGGIO_CONNETTORE <= 0):
+        return regime
+    con = db()
+    try:
+        primo = con.execute("SELECT MIN(creato) FROM annunci "
+                            "WHERE connettore_id=?", (c["id"],)).fetchone()[0]
+    finally:
+        con.close()
+    if primo is None or time.time() - primo < ORE_RODAGGIO_CONNETTORE * 3600:
+        return max(regime, MAX_NUOVI_CONNETTORE_RODAGGIO)
+    return regime
+
+
+def _segno_varianti(c: dict) -> int:
+    """Dove si era fermata la lettura a tempo al giro scorso: l'id
+    dell'ultimo prodotto variabile di cui ha letto le variazioni (0 =
+    da capo). VIVE NEL REPORT DI QUEL GIRO (`varianti_dopo` in
+    `ultimo_esito`), che si scrive solo a giro chiuso: un giro morto a
+    meta' — un deploy, un errore — riparte da dove era partito, e un
+    riavvio non rimanda la coda di un negozio lento al fondo della fila.
+    Un report illeggibile vale «da capo»: e' il giro di ieri, non un
+    guasto."""
+    try:
+        return int(json.loads(c.get("ultimo_esito") or "{}")
+                   .get("varianti_dopo") or 0)
+    except (ValueError, TypeError, AttributeError):
+        return 0
+
+
+def _righe_da_giudicare(righe: list, connettore: dict,
+                        tetto_nuove: int = 0) -> tuple[list, list]:
     """Divide le righe tradotte in (da giudicare, gia' viste).
 
     E' `_da_giudicare` con la chiave al posto del tag `d`, e vale la
@@ -59485,9 +59584,33 @@ def _righe_da_giudicare(righe: list, connettore: dict) -> tuple[list, list]:
     Si ri-giudica quando cambia il TESTO e non quando cambia il
     prodotto: un ritocco al prezzo o allo stock non puo' cambiare un
     verdetto. E mai cio' che non e' piu' attivo — in revisione aspetta
-    un umano, rimosso e' stato deciso."""
+    un umano, rimosso e' stato deciso.
+
+    E SI GIUDICA SOLO CIO' CHE ENTRA (1 ott 2026, decisione di Andrea,
+    «negozi grandi»). Delle righe MAI VISTE si giudicano le prime
+    `tetto_nuove` — quante ne possono nascere in questo giro (vedi
+    `_nuovi_per_giro`) — e le altre si marcano `rimandata` senza chiedere
+    niente all'AI: nasceranno, e si giudicheranno, al giro in cui
+    tocchera' a loro. Prima si giudicavano TUTTE a ogni giro e il
+    verdetto delle rimandate si buttava: un negozio da 2.200 righe a
+    trenta per giro costava trentasei volte il necessario. Il testo
+    CAMBIATO di chi e' gia' in vetrina si giudica sempre, tutto: quello
+    non e' un ingresso, e' la tenuta in pari.
+    IL FILTRO PAROLE NON OCCUPA UN POSTO: una riga che lui ferma non
+    nasce comunque. Senza questa regola un negozio con trenta prodotti
+    fermati dalle parole in testa al catalogo non farebbe entrare piu'
+    niente, per sempre — gli stessi trenta respinti a prendersi i trenta
+    posti ogni ora. Quelle righe vanno a `_modera_righe_negozio` come
+    ieri, che le ferma e le registra.
+    E SI CHIEDE SOLO FINCHE' C'E' POSTO: chiusi i posti, ogni mai vista
+    che segue si rimanda senza domande, anche quella che le parole
+    fermerebbero — la fermeranno al suo turno. Questa funzione gira nel
+    ciclo principale, e il filtro su duemila righe a ogni ora sarebbe
+    un'attesa di tutto il server per un verdetto che si butta.
+    0 = nessun tetto: si giudicano tutte, come ieri."""
     con = db()
     nuove, note = [], []
+    posti = 0
     for r in righe:
         if r.get("saltato_perche"):
             continue
@@ -59496,6 +59619,12 @@ def _righe_da_giudicare(righe: list, connettore: dict) -> tuple[list, list]:
             "WHERE connettore_id=? AND origine_chiave=?",
             (connettore["id"], r["origine_chiave"])).fetchone()
         if riga is None:
+            if tetto_nuove > 0:
+                if posti >= tetto_nuove:
+                    r["rimandata"] = True        # entrera' al suo giro
+                    continue
+                if not controlla_vietato(r["titolo"], r["descrizione"]):
+                    posti += 1                   # un posto per chi puo' nascere
             nuove.append(r)                      # mai vista: si giudica
         elif riga["stato"] != "attivo":
             note.append(r)                       # gia' decisa, o in attesa
@@ -59635,6 +59764,13 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
     _CONNETTORI_IN_CORSO.add(c["id"])
     try:
         credenziali = json.loads(_decifra_contenuto(c["credenziali"]) or "{}")
+        # IL RITMO DELLA LETTURA (1 ott 2026, «negozi grandi»): fino a
+        # quando si bussa — il lettore si ferma DA SOLO prima della
+        # scadenza qui sotto, e quel che ha letto e' un giro buono — e da
+        # dove riparte la rotazione delle variazioni. Una busta come le
+        # credenziali: ogni lettore ci pesca quel che gli serve.
+        ritmo = {"entro": time.monotonic() + CONNETTORI_VARIANTI_MAX_S,
+                 "segno": {"dopo": _segno_varianti(c)}}
         try:
             # la BUSTA INTERA delle credenziali e non un campo: Shopify ha
             # un token, Woo una chiave e un segreto, e a sapere che forma
@@ -59647,7 +59783,8 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
             # risultato si butta — era in sola lettura, non scrive niente.
             prodotti, avviso, completo = await asyncio.wait_for(
                 asyncio.to_thread(lettore, c["url_negozio"], credenziali,
-                                  chiama_api_negozio, MAX_PRODOTTI_CONNETTORE),
+                                  chiama_api_negozio, MAX_PRODOTTI_CONNETTORE,
+                                  ritmo),
                 timeout=CONNETTORI_LETTURA_MAX_S)
         except asyncio.TimeoutError:
             await _connettore_in_errore(
@@ -59671,8 +59808,12 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
             # a scrivere adesso, il giro dopo rilegge e riconcilia
             return
         righe = importa_negozio.traduci(prodotti, c["fonte"], cambio)
-        # la moderazione sulle sole righe nuove o col testo cambiato
-        nuove, note = _righe_da_giudicare(righe, c)
+        # I POSTI DI QUESTO GIRO, un conto solo per chi giudica e per chi
+        # fa nascere (1 ott 2026): il rodaggio o il regime
+        tetto_nuovi = _nuovi_per_giro(c)
+        # la moderazione sulle sole righe che ENTRANO: il testo cambiato
+        # di chi c'e' gia', e le mai viste fino ai posti del giro
+        nuove, note = _righe_da_giudicare(righe, c, tetto_nuovi)
         marchi = {}
         if nuove:
             try:
@@ -59702,9 +59843,13 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
             # oggi e' vero: marcata, la riga non si scrive ma resta
             # nel catalogo letto — e il venditore la trova fra i
             # saltati del report invece di non trovarla piu'.
+            # LA RIMANDATA NO (1 ott 2026): non e' una riga che l'AI non
+            # ha potuto guardare, e' una a cui non e' ancora il turno —
+            # nel report sta fra i «in arrivo ai prossimi giri», non fra
+            # i saltati.
             for r in righe:
-                if not r.get("saltato_perche") and \
-                        r["origine_chiave"] not in viste:
+                if not r.get("saltato_perche") and not r.get("rimandata") \
+                        and r["origine_chiave"] not in viste:
                     r["saltato_perche"] = MSG_RIGA_NON_GIUDICATA
         # LA RICONCILIAZIONE IN UN THREAD (1 ott 2026, cura 8): dentro ci
         # sono i download delle foto (urllib, 10 s l'uno) e Pillow, e fin
@@ -59718,10 +59863,13 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
                     con, c, righe, _salva_foto_connettore,
                     {k: v[1] for k, v in marchi.items()},
                     completo=completo,
-                    max_nuovi=MAX_NUOVI_CONNETTORE_GIRO)
+                    max_nuovi=tetto_nuovi)
             finally:
                 con.close()
         esito = await asyncio.to_thread(_riconcilia)
+        # il segno della rotazione viaggia nel report e si scrive con
+        # lui, cioe' solo a giro chiuso (vedi `_segno_varianti`)
+        esito["varianti_dopo"] = ritmo["segno"].get("dopo", 0)
         if avviso:
             esito["saltati"].append({"titolo": "", "perche": avviso})
         await _chiudi_giro_connettore(c, esito)

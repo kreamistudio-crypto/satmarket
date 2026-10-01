@@ -981,6 +981,11 @@ def main():
                                       stock=2) for i in range(6)])
     tetto_prima = SRV.MAX_PRODOTTI_CONNETTORE
     nuovi_prima = SRV.MAX_NUOVI_CONNETTORE_GIRO
+    # (1 ott 2026) qui si guarda il REGIME del tetto all'ingresso: il
+    # rodaggio delle prime ventiquattro ore ha il suo collaudo
+    # (collaudo_negozi_grandi), e acceso darebbe cento posti invece di due
+    rodaggio_prima = SRV.MAX_NUOVI_CONNETTORE_RODAGGIO
+    SRV.MAX_NUOVI_CONNETTORE_RODAGGIO = 0
 
     def quanti(prefisso, solo_attivi=True):
         return len([a for a in annunci(wid)
@@ -1036,6 +1041,7 @@ def main():
     finally:
         SRV.MAX_PRODOTTI_CONNETTORE = tetto_prima
         SRV.MAX_NUOVI_CONNETTORE_GIRO = nuovi_prima
+        SRV.MAX_NUOVI_CONNETTORE_RODAGGIO = rodaggio_prima
         CATALOGO_WOO[:] = woo_prima
 
     # ---- 14. il pezzo che NON viene da un negozio --------------------

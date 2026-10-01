@@ -414,7 +414,9 @@ def main() -> int:
           + ("".join(f"; {n} dal config" for n, f in
                      amb["_fonti"].items() if f == "config") or "")
           + ")")
-    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=15)
     con.row_factory = sqlite3.Row
     try:
         controparti, affari, voti, xp, ana = leggi(con)

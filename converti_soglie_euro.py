@@ -90,7 +90,9 @@ def main():
         except ImportError:
             percorso = "satmarket.db"
 
-    con = sqlite3.connect(percorso)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(percorso, timeout=15)
     con.row_factory = sqlite3.Row
     # Chi ha una soglia vecchia piena e la nuova ancora a zero: e'
     # esattamente la popolazione che in questo momento ha una promessa

@@ -140,7 +140,9 @@ def main():
         except ImportError:
             percorso = "satmarket.db"
 
-    con = sqlite3.connect(percorso)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(percorso, timeout=15)
     con.row_factory = sqlite3.Row
     try:
         giorni = giorni_scoperti(con)

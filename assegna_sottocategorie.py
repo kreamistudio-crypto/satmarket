@@ -83,7 +83,9 @@ def main():
     etichette = {sid: nome for voci in amb["SOTTOCATEGORIE"].values()
                  for sid, nome in voci}
 
-    con = sqlite3.connect(db_path)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(db_path, timeout=15)
     con.row_factory = sqlite3.Row
     segna = ",".join("?" * len(STATI))
 

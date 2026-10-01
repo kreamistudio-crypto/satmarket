@@ -60,7 +60,9 @@ def carica():
 def foto_dal_db(percorso: str, amb) -> list:
     """Le foto dei tre piu' venduti della settimana vera. Sola
     lettura, e la stessa query del server."""
-    con = sqlite3.connect(percorso)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(percorso, timeout=15)
     con.row_factory = sqlite3.Row
     amb2 = {"con": con}
     exec(pezzo("_conta_settimana"), amb2)

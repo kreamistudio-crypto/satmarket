@@ -24030,7 +24030,45 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   del giro non c'è nessun lucchetto. Lo prova per esecuzione
   `prove_db_contesa_negozi` (una seconda connessione a timeout 0 che
   scrive durante ogni download) e, col server vero,
-  `collaudo_db_contesa`.
+  `collaudo_db_contesa`. 3) (1 ott 2026, sera, «I negozi grandi»)
+  E NON SCRIVE A RAFFICA: sqlite non fa la fila, e transazioni brevi
+  ma una dietro l'altra affamano chi aspetta — che riprova a
+  intervalli e trova il giro sempre dentro la transazione dopo. Dopo
+  ogni riga che ha scritto, `riconcilia_connettore` RESPIRA: lascia il
+  database libero per tanto tempo quanto l'ha tenuto (esclusi gli
+  scaricamenti, al più `RESPIRO_MAX_S`, mai a transazione aperta), e lo
+  stesso fra i lotti delle sparizioni. Il giro sta in un thread, quindi
+  il prezzo (un giro più lungo) lo paga lui.
+- I NEGOZI GRANDI (1 ott 2026, Cantieri, «I negozi grandi»): mille
+  prodotti per giro di serie (`MAX_PRODOTTI_CONNETTORE`), e le quattro
+  cose che mille prodotti chiedono. 1) L'AI GUARDA SOLO CHI ENTRA:
+  `_righe_da_giudicare(righe, c, tetto)` manda all'AI il testo cambiato
+  di chi è già in vetrina e le prime `tetto` righe mai viste; le altre
+  si marcano `rimandata`, non si giudicano e non nascono (`_una_riga`),
+  nemmeno se un posto si libera. Il filtro parole non occupa un posto e
+  si chiede solo finché ce n'è (gira nel ciclo principale). I posti li
+  conta UNA volta `_nuovi_per_giro(c)`, per chi giudica e per chi fa
+  nascere. 2) IL RODAGGIO: `MAX_NUOVI_CONNETTORE_RODAGGIO` (100) nelle
+  prime `ORE_RODAGGIO_CONNETTORE` (24) ore, contate dal PRIMO ANNUNCIO
+  ENTRATO e non da `connettori.creato` (un negozio che aspetta i costi di
+  spedizione non si legge); poi `MAX_NUOVI_CONNETTORE_GIRO`. Non
+  rallenta mai, 0 lo spegne. 3) IL RITMO DELLA LETTURA: il server passa
+  ai lettori una busta `ritmo` come quella delle credenziali. Shopify ci
+  pesca `dormi` (la pausa VERA fra le pagine, `PAUSA_PAGINE_SHOPIFY`,
+  mezzo secondo, dentro il ciclo); Woo ci pesca `entro` — la LETTURA A
+  TEMPO: si ferma da solo a `CONNETTORI_VARIANTI_MAX_S` (480 s, due
+  minuti prima della scadenza di 600 che resta la cintura), e un negozio
+  lento è un giro buono, non un errore — e `segno`, la ROTAZIONE delle
+  variazioni (riparte dopo l'ultimo id letto, in cerchio; il segno vive
+  nel report del giro, `ultimo_esito.varianti_dopo`, e si scrive solo a
+  giro chiuso). Fermo fra le variazioni il catalogo resta COMPLETO: i
+  prodotti non raggiunti tornano `_variazioni_al_prossimo`, il
+  traduttore ne fa una riga `_figlie_intatte`, e la riconciliazione non
+  spegne le loro figlie `pid:vid` (le sparizioni vere dello stesso giro
+  si fanno). Fermo fra le pagine, la lettura è parziale come al tetto.
+  4) GLI SCRIPT A MANO che aprono il database vivo aspettano il
+  lucchetto quindici secondi come `db()`; un censimento di `prove.py`
+  guarda la cartella.
 - `config.py` — TUTTE le chiavi e impostazioni. NON è nella repo
   (.gitignore) e NON deve MAI entrarci. `config_esempio.py` è il modello.
 - `importa_nostr.py` — importa annunci NIP-99/NIP-15 da Nostr.
@@ -25150,7 +25188,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   la pagina da 250 la seconda pagina quasi non esiste, e ogni giro
   costa comunque un round-trip. Chi un domani alzasse
   `MAX_PRODOTTI_CONNETTORE` fino a paginare davvero rimetta una pausa
-  VERA dentro il ciclo, non una costante accanto.
+  VERA dentro il ciclo, non una costante accanto. (1 ott 2026: è
+  successo — il tetto è salito a mille e la pausa è tornata, col suo
+  nome, DENTRO il ciclo del lettore: Cantieri, «I negozi grandi».)
   LE SEI LEVE STANNO DOVE SI COPIA (ago 2026, chiesto da Andrea:
   «è il file da cui copio quando metto mano al VPS, e senza quelle non
   le trovo»): `CONNETTORI_NEGOZIO_APERTI`, `MAX_PRODOTTI_CONNETTORE`,

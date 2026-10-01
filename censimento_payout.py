@@ -154,7 +154,9 @@ BOCCHE = [
 
 
 def main():
-    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=15)
     con.row_factory = sqlite3.Row
     print("=" * 66)
     print("  CENSIMENTO DEI PAYOUT — sola lettura")

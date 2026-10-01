@@ -2233,6 +2233,23 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Il WAL NON è acceso (pro e contro nel verbale): se un giorno si
   accende, prima la procedura qui (backup e ripristino con `-wal` e
   `-shm`, prova del `-readonly` a server fermo).
+- I NEGOZI GRANDI (1 ott 2026, Cantieri, «I negozi grandi»): i valori
+  nuovi sono i DEFAULT del codice — mille prodotti letti per giro, il
+  rodaggio a cento per ventiquattro ore — e NEL CONFIG DEL VPS NON SI
+  AGGIUNGE NIENTE. Ma il config vince: prima del deploy, in sola
+  lettura, `grep -n "MAX_PRODOTTI_CONNETTORE\|MAX_NUOVI_CONNETTORE\|ORE_RODAGGIO\|DB_BUSY_TIMEOUT" ~/satmarket/config.py`
+  — una riga `MAX_PRODOTTI_CONNETTORE = 200` (copiata dal config
+  d'esempio di prima) terrebbe il tetto a duecento: si porta a 1000 o si
+  cancella, e si riavvia. Le leve si leggono vive nel pannello «⚙️ Stato
+  delle leve», gruppo «🏪 Negozi collegati». AL PRIMO GIRO DOPO IL
+  DEPLOY: `journalctl -u barattolo --since "2h ago" | grep -E "🏪|Connettore|database is locked"`
+  — il riepilogo `🏪 woo #<id>: N nuovi, …` (cento a giro per un negozio
+  nel suo primo giorno, poi trenta), e su un negozio lento la coda «, N
+  con le varianti al prossimo giro» (la lettura a tempo: NON è un
+  errore, il collegamento resta attivo e ruota). Il giro adesso è più
+  LUNGO di prima, apposta: respira dopo ogni riga scritta perché le
+  richieste della app trovino il database libero; un `database is
+  locked` non deve comparire.
 - LE FAMIGLIE DI UN NEGOZIO COLLEGATO (30 set 2026): le scrive il giro
   dell'ora, quindi dopo il deploy compaiono al PRIMO giro e non prima.
   Si guardano, in sola lettura, per collegamento:

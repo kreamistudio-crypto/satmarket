@@ -187,7 +187,9 @@ def main():
     if not ids:
         print(__doc__)
         return 2
-    con = sqlite3.connect(db)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(db, timeout=15)
     con.row_factory = sqlite3.Row
     colonne = {r[1] for r in con.execute("PRAGMA table_info(ordini)")}
     if "prova" not in colonne:

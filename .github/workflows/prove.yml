@@ -107,7 +107,7 @@ jobs:
              collaudo_pionieri.py
              collaudo_contanti_p2p.py schnorr_puro.py
              collaudo_annullo_venditore.py
-             collaudo_db_contesa.py
+             collaudo_db_contesa.py collaudo_negozi_grandi.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
@@ -191,6 +191,7 @@ jobs:
              collaudo_csp
              collaudo_freni
              collaudo_db_contesa
+             collaudo_negozi_grandi
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.

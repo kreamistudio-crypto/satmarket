@@ -94,7 +94,9 @@ def main():
     percorso = next((a for a in sys.argv[1:] if not a.startswith("-")), DB)
     print(f"Database: {percorso}"
           f"{'' if conferma else '   (anteprima: non scrivo niente)'}\n")
-    con = sqlite3.connect(percorso)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(percorso, timeout=15)
     con.row_factory = sqlite3.Row
 
     copie = con.execute(

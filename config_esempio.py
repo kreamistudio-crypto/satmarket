@@ -988,8 +988,9 @@ CONNETTORI_NEGOZIO_APERTI = False
 # rispondeva di no. True = la porta torna per tutti.
 CONNETTORI_NEGOZIO_PER_TUTTI = False
 
-# Quanti prodotti si leggono per collegamento a ogni giro. Il target
-# dichiarato (cataloghi da ~200 articoli) passa tutto in un giro solo.
+# Quanti prodotti si leggono per collegamento a ogni giro. MILLE dal 1
+# ott 2026 (era 200: un negozio da mille prodotti non entrava mai per
+# intero, i lettori si fermavano sempre allo stesso punto).
 # ⚠️ ABBASSARLO NON DISTRIBUISCE NIENTE, ed e' la cosa da sapere prima
 # di toccarlo: quel che non si legge non si puo' distinguere da quel
 # che il venditore ha tolto dal negozio, quindi una lettura corta
@@ -998,10 +999,12 @@ CONNETTORI_NEGOZIO_PER_TUTTI = False
 # tetto semplicemente non entra, e il report lo dice al venditore.
 # Per far entrare un catalogo grande un po' per volta c'e' la leva qui
 # sotto, che e' un'altra cosa.
-# ⚠️ Oltre 250 il catalogo di Shopify comincia a paginarsi davvero, e
-# li' il suo limite di richieste al secondo torna a contare: prima di
-# alzarlo tanto, va rimessa una pausa dentro il ciclo del lettore.
-MAX_PRODOTTI_CONNETTORE = 200
+# Oltre 250 il catalogo di Shopify si pagina davvero: fra una pagina e
+# l'altra il lettore aspetta mezzo secondo (il ritmo del suo limite di
+# richieste). Un WooCommerce lento con tanti prodotti variabili non
+# scade piu': la lettura delle varianti si ferma da sola a otto
+# minuti e riprende da li' al giro dopo.
+MAX_PRODOTTI_CONNETTORE = 1000
 
 # Quanti annunci NUOVI nascono per collegamento a ogni giro (0 =
 # nessun tetto). Il catalogo si legge SEMPRE tutto — quindi le
@@ -1015,6 +1018,17 @@ MAX_PRODOTTI_CONNETTORE = 200
 # duecento entra in una giornata, e la home resta di tutti.
 # Non risolve il monopolio della prima pagina: lo diluisce.
 MAX_NUOVI_CONNETTORE_GIRO = 30
+
+# IL RODAGGIO di un negozio appena collegato (1 ott 2026): nelle prime
+# ORE_RODAGGIO_CONNETTORE ore ne nascono MAX_NUOVI_CONNETTORE_RODAGGIO
+# a giro invece dei trenta qui sopra — un catalogo da mille entra in
+# dieci ore invece che in trentaquattro, poi torna il regime. Le ore
+# si contano dal primo annuncio entrato (un negozio che aspetta i costi
+# di spedizione non si legge, e non deve bruciarsi il rodaggio in
+# attesa). Il rodaggio non rallenta mai: se il regime e' piu' alto vale
+# lui. 0 su una delle due = niente rodaggio.
+MAX_NUOVI_CONNETTORE_RODAGGIO = 100
+ORE_RODAGGIO_CONNETTORE = 24
 
 # Dopo quanti giri falliti di FILA il collegamento si dichiara rotto e
 # il venditore riceve UN avviso (uno solo: alla soglia, poi silenzio —

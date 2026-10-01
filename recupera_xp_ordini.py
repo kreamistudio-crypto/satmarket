@@ -149,7 +149,9 @@ def main():
     except Exception as e:
         print(f"✗ {e} — mi fermo, mai punti a memoria")
         return 1
-    con = sqlite3.connect(db)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(db, timeout=15)
     con.row_factory = sqlite3.Row
     colonne = {r[1] for r in con.execute("PRAGMA table_info(ordini)")}
     if "prova" not in colonne:

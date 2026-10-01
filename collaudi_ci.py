@@ -112,6 +112,27 @@ _so.socket.sendto = sendto
 '''
 
 
+def righe_rosse(uscita):
+    """Le righe «✗» di un collaudo, ognuna con l'atteso e l'avuto che la
+    seguono, ovunque stiano nell'uscita.
+
+    LA CODA NON BASTAVA (1 ott 2026, decisione di Andrea): la CI stampava
+    le ultime quaranta righe, e `collaudo_db_contesa` dopo la riga caduta
+    stampa le centinaia di «🏪» del giro — il registro diceva «23 passate,
+    1 fallite» e nessuno poteva sapere QUALE. Una prova a tempo caduta a
+    caso in CI e mai in locale e' esattamente il caso in cui serve il
+    nome, perche' rifarla non la fa ricadere."""
+    righe = uscita.splitlines()
+    rosse = []
+    for i, r in enumerate(righe):
+        if r.lstrip().startswith("✗"):
+            rosse.append(r.strip())
+            for dopo in righe[i + 1:i + 3]:
+                if dopo.strip().startswith(("atteso:", "avuto:")):
+                    rosse.append("    " + dopo.strip())
+    return rosse
+
+
 def gira(nome, gabbia, segni):
     """Un collaudo, nella gabbia. Torna (ok, secondi, uscita)."""
     percorso = os.path.join(QUI, nome + ".py")
@@ -159,6 +180,16 @@ def main(nomi):
         if not ok:
             rossi.append(nome)
             print("\n".join("    " + r for r in uscita.splitlines()[-40:]))
+            # E QUALI RIGHE SONO CADUTE, sempre, anche se stanno ben prima
+            # della coda — una annotazione per riga, che GitHub mostra in
+            # cima alla corsa senza aprire il registro
+            rosse = righe_rosse(uscita)
+            if rosse:
+                print(f"    --- le righe rosse di {nome} ---")
+                print("\n".join("    " + r for r in rosse))
+                for r in rosse:
+                    if r.startswith("✗"):
+                        print(f"::error::{nome}: {r.lstrip('✗ ').strip()}")
             for b in bussate:
                 print(f"    ⛔ rete: {b}")
                 print(f"::error::{nome}: ha provato a uscire in rete ({b})")

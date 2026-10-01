@@ -103,7 +103,9 @@ if not os.path.exists("satmarket.db"):
           "Lancialo dalla cartella del progetto:  cd satmarket && "
           "python3 censimento_spedizione.py")
     sys.exit(1)
-con = sqlite3.connect("file:satmarket.db?mode=ro", uri=True)
+# il database e' quello VIVO, e il server ci scrive mentre giriamo:
+# quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+con = sqlite3.connect("file:satmarket.db?mode=ro", uri=True, timeout=15)
 con.row_factory = sqlite3.Row
 
 tot = con.execute("SELECT COUNT(*) c FROM annunci WHERE stato='attivo'").fetchone()["c"]

@@ -68,7 +68,9 @@ def main():
         return 1
 
     cat = catalogo()
-    con = sqlite3.connect(db)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(db, timeout=15)
     con.row_factory = sqlite3.Row
     print(f"🗂  Spostamenti a mano — database {db}")
     print("   " + ("SCRIVO le proposte nella coda" if scrivi

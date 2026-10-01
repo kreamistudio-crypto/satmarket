@@ -342,7 +342,9 @@ def main() -> int:
     print(f"Livelli di prova su {db} -- sola lettura.")
     print(f"   (scala e giudici letti da server.py; porta del banner: "
           f"«{amb['BANNER_LIVELLO']}», dal {amb['_fonte_banner']})")
-    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=15)
     con.row_factory = sqlite3.Row
     try:
         per_tipo, righe = leggi(con, amb)

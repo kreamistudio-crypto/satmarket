@@ -101,7 +101,9 @@ def main():
                     help="quanti venditori elencare al punto 1")
     a = ap.parse_args()
     of = carica_ordine_finestra()
-    con = sqlite3.connect(f"file:{a.db}?mode=ro", uri=True)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(f"file:{a.db}?mode=ro", uri=True, timeout=15)
     q = ("SELECT a.id, a.venditore_id, a.creato, a.categoria, a.titolo, "
          "COALESCE(u.nome, '') FROM annunci a "
          "JOIN utenti u ON u.tg_id = a.venditore_id "

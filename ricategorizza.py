@@ -270,7 +270,9 @@ def main():
                    if scrivi else "prova a vuoto: non scrivo niente "
                                   "(--scrivi per riempire la coda)"))
 
-    con = sqlite3.connect(db)
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
+    con = sqlite3.connect(db, timeout=15)
     con.row_factory = sqlite3.Row
     con.execute("""CREATE TABLE IF NOT EXISTS categoria_proposta(
         annuncio_id INTEGER PRIMARY KEY, categoria_ora TEXT DEFAULT '',

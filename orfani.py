@@ -238,8 +238,10 @@ def main(argv) -> int:
         sys.exit(f"⚠️  Database non trovato: {percorso}")
     # In sola lettura, per URI assoluto: un percorso relativo o con
     # caratteri strani dentro un URI e' il modo di aprire un altro file.
+    # il database e' quello VIVO, e il server ci scrive mentre giriamo:
+    # quindici secondi di pazienza sul lucchetto, come `db()` (ott 2026)
     con = sqlite3.connect(pathlib.Path(percorso).resolve().as_uri()
-                          + "?mode=ro", uri=True)
+                          + "?mode=ro", uri=True, timeout=15)
     try:
         righe = righe_db(con)
     finally:
