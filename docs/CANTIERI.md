@@ -33591,3 +33591,102 @@ dove no, nessuno scorrimento laterale.
 
 **DA GUARDARE.** L'ordine 203 dopo il deploy: dai due lati, la spunta e
 la data del 1 ottobre.
+## CSP e le voci aperte degli audit — 3) le foto: la bomba, il tetto dei pixel, il JPEG decodificato già piccolo (1 ott 2026)
+
+Dalla riverifica del 1 ott: le foto arrivano come base64 dentro il
+JSON, e Pillow decodificava per intero qualunque cosa passasse la regex
+e `verify()`. Un PNG da 100 KB che dichiara 30.000×30.000 pixel (900
+megapixel, 2,7 GB di RGB) è una «bomba di decompressione»; un JPEG da
+15 MB passava VERBATIM senza che nessuno ne contasse i pixel, e poi lo
+decodificavano per intero `_foto_vuota` e `miniatura_jpeg` — e lo
+avrebbero decodificato i telefoni di chi sfoglia. Il default di Pillow
+(avviso a 89 MP, errore a 179) non bastava: l'avviso non ferma niente,
+e un telefono di oggi fa 200 MP. Nessuna foto arrivava sul server
+fuori dal ciclo principale? Sì: `salva_foto` e l'anteprima girano già
+in `to_thread`; il problema era la MEMORIA, non il ciclo.
+
+**LA REGOLA DI ANDREA:** nessuna foto VERA da telefono si rifiuta,
+anche da 50-200 megapixel o da 15 MB — quelle si ridimensionano come
+oggi; si rifiutano solo i file ANOMALI.
+
+**LA CURA.** 1) `_foto_anomala(raw)`, un giudice che legge la SOLA
+intestazione (Pillow apre senza decodificare) e dice il motivo: oltre
+`TETTO_PIXEL_FOTO` (250 MP: i 200 MP dei telefoni, con margine) non è
+una foto di nessun telefono; sopra `BOMBA_SOPRA_PIXEL` (30 MP), meno di
+`BOMBA_BYTE_PER_PIXEL` (0,02) byte per pixel è una bomba — una foto
+vera ne porta da 0,04 in su (un HEIC da 48 MP in 2 MB), una bomba
+0,001 (49 MP in 50 KB); sotto i 30 MP la regola non si applica, perché
+decodificare 30 MP non fa male a nessuno e una grafica piatta legittima
+non deve cadere lì. Lo chiamano `converti_in_jpeg`, `miniatura_jpeg`,
+`_foto_vuota` (che resta fail-open: si astiene, a rifiutare è
+`salva_foto`), `salva_foto` sul JPEG verbatim — col motivo che arriva
+all'utente, «la foto 2 non è stata accettata: immagine anomala…» — e
+`/api/foto/anteprima` prima di convertire. 2) Il tetto lo sa anche
+Pillow: `MAX_IMAGE_PIXELS` allo stesso numero e l'avviso di bomba
+trasformato in ERRORE (`warnings.simplefilter`), così OGNI `open` del
+server — avatar, banner, live, documenti della busta — si ferma al
+tetto senza un giudice apposta, e `verify()` risponde «non è una
+foto». 3) Il JPEG si decodifica GIÀ PICCOLO: `img.draft("RGB", …)`
+chiede al decoder la scala DCT ridotta (1/2, 1/4, 1/8), così una foto
+da 200 MP entra in memoria come una da 3 — in `converti_in_jpeg` a
+2400 px (l'ultimo passo resta un LANCZOS di almeno 2x, nitido come
+prima), in `miniatura_jpeg` e in `_foto_vuota` SOLO sopra i 4 MP: il
+file rotto dal campo era da 0,4 MP, e la scala ridotta fonderebbe le
+colonne di un pixel in più colori, cioè nasconderebbe proprio quel che
+si cerca. Solo sul JPEG: HEIC, PNG e WebP non lo sanno fare. 4) Il
+freno: al massimo DUE decodifiche piene alla volta
+(`_FRENO_DECODIFICA`, un semaforo); la terza aspetta qualche secondo
+invece di sommarsi in memoria — cinque HEIC da 200 MP in cinque
+richieste insieme non buttano giù il server.
+
+**LE STRADE SCARTATE.** Un tetto basso «di sicurezza» (89 MP, il
+default di Pillow): rifiuterebbe i telefoni, cioè la regola di Andrea
+rovesciata. Ridimensionare anche il JPEG verbatim: è il patto della
+compressione unica, e un JPEG del telefono è già piccolo. Un tetto al
+corpo delle richieste nel server: cinque foto da 15 MB in base64 sono
+100 MB legittimi, e il posto giusto è Caddy (`request_body
+max_size`), che è di Andrea. Il rate limit sull'anteprima: cura 4. La
+decodifica a scala ridotta anche in `_foto_vuota` sotto i 4 MP: avrebbe
+rotto il giudice del caso dal campo.
+
+**PROVATO.** `prove_foto_anomala` (30): i giudici girano per DAVVERO
+su immagini costruite apposta — le bombe PNG fabbricate a mano
+(intestazione + zlib di zeri: 400 MP in 388 KB, 49 MP in 47 KB) e 40
+MP di rumore vero; una foto normale non è anomala, il vuoto e un file
+che non si apre nemmeno (fail-open); la bomba da 400 MP è «oltre il
+tetto», `converti_in_jpeg` e `miniatura_jpeg` non la decodificano, e
+per Pillow col tetto del server non è nemmeno un'immagine; la bomba da
+49 MP è anomala per i byte per pixel, non si decodifica, la foto vuota
+si astiene; 20 MP piatti in pochi KB passano (sotto i 30 MP non si
+giudica); i 40 MP di rumore pesano come una foto vera, non sono
+anomali, `converti_in_jpeg` li riporta a 1200 px in meno di quattro
+secondi (il draft), la miniatura è il quadrato di sempre, non è vuota;
+il tetto ammette i 200 MP e Pillow lo sa; le sentinelle (converti si
+ferma prima di aprire, il draft solo sul JPEG prima dell'EXIF, il
+freno, la miniatura e la foto vuota sopra i 4 MP, salva_foto col
+motivo, l'anteprima che giudica prima, l'avviso di bomba che è un
+errore). I quattro banchi che ricompongono la filiera e i due di
+`prove_foto_vuota` conoscono il giudice nuovo; la sentinella «senza
+Pillow il giudice si astiene» emendata col perché. Tortura 15 su 15
+sulla copia. DAL VIVO sulla copia in collaudo: `POST /api/foto/anteprima`
+con una foto VERA da 50 MP (8165×6124, ricavata da una foto di Andrea
+da 132 MP, 5,8 MB) → 200 in 0,2 s, JPEG da 113 KB; la bomba da 400 MP
+→ 400 «Foto non accettata: immagine oltre 250 megapixel»; la bomba da
+49 MP → 400 «immagine anomala: troppi pixel per quanto pesa». E le
+funzioni VERE sulle due foto più grandi del PC di Andrea — 192 MP
+(122 MB) e 132 MP (87 MB), JPEG veri —: non anomale, `converti_in_jpeg`
+a 1200 px in 0,8 s, miniatura in 0,6 s, non vuote (prima della cura la
+sola decodifica di 192 MP erano 576 MB di RGB).
+
+**COSA NON HO PROVATO.** Un HEIC da 200 MP vero (non ne ho uno: la
+cura per lui è il tetto e il freno, non il draft); il telefono e
+l'APK (la Mini App ridimensiona nel canvas prima di mandare: per lei
+non cambia niente); la memoria del VPS sotto cinque decodifiche piene
+insieme (il freno le serializza a due: si guarda al primo giro vero,
+`journalctl -u barattolo | grep "📷"`).
+
+**DA GUARDARE.** 1) Su Caddy, `request_body max_size 128MB` sul blocco
+del sito (Andrea): è il tetto al corpo che il server non mette. 2) Il
+giorno di un HEIC da 200 MP nel journal: se la conversione pesa
+troppo, il tetto scende a 150 e si dice.
+

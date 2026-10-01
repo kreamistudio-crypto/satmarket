@@ -264,6 +264,13 @@ andrebbe corretta quando si fa il cantiere.
 
 ## A1 — Il server pubblico gira da root
 
+> ✅ (1 ott 2026, cura 3 del cantiere «CSP e le voci aperte degli audit»)
+> Il «contorno» nominato qui sotto — lo stesso processo decodifica
+> immagini caricate da chiunque — ha ora il tetto dei pixel, il
+> giudice della bomba, il JPEG decodificato a scala ridotta e il freno
+> alle decodifiche in parallelo (vedi `docs/CANTIERI.md`). Il testo che
+> segue resta com'era.
+
 > ✅ **CURATA NEL CODICE il 21 set 2026**, stesso cantiere: utente
 > `barattolo`, il guardiano passa da `sudo -n` con una regola di sudoers
 > che nomina i soli quattro riavvii, e la copia degli script di deploy
