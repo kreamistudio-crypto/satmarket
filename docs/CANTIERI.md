@@ -33040,7 +33040,14 @@ spazza e non hanno fatto male a nessuno), e dal terzo
 (`ANNULLI_VENDITORE_ALLARME`) parte un avviso a parte. La reputazione non
 si tocca; il feedback del compratore sull'ordine rimborsato resta il suo,
 ed è la via «umana» per farlo pesare.
-8) IL FOGLIO STA PRIMA DI `#confermaSheet` NEL DOM. Messo dopo, copriva la
+8) IL TASTO SOTTOTONO (ritocco di Andrea sugli scatti): «Annulla
+l'ordine» era un testuale sottolineato come l'annullo del compratore, e
+Andrea lo voleva dentro un tasto che però si veda poco. Né la velatura
+rossa dell'allarme (quella è l'uscita di sicurezza di chi compra) né il
+bordo nero del ghost: `.btn.piano`, fondo della carta, bordo sottile del
+colore delle righe, testo rosso più piccolo, nessuna ombra. Si trova se lo
+si cerca, non chiama.
+9) IL FOGLIO STA PRIMA DI `#confermaSheet` NEL DOM. Messo dopo, copriva la
 seconda domanda: lo ha detto il giro dal vivo (il tocco vero su «Sì,
 annulla» rispondeva un altro bottone), e il banco col `click()` non lo
 avrebbe mai visto.

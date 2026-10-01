@@ -115491,8 +115491,16 @@ def prove_annullo_venditore():
     bottone = bottone[:bottone.index("\n}\n")]
     prova("il bottone c'e' per chi VENDE, su creato e locked, mai in pagamento",
           True, "o.role==='seller' && ['creato','locked'].includes(s) "
-          "&& !inPagamento(o) ? `<button class=\"btn danger-ghost\" "
+          "&& !inPagamento(o) ? `<button class=\"btn piano\" "
           "onclick=\"apriAnnullaVendita()\">" in bottone)
+    # IL TASTO SOTTOTONO (ritocco di Andrea): dentro un tasto, non un
+    # testuale sottolineato, ma senza la velatura dell'allarme ne' il
+    # bordo nero del ghost — una veste sua, piu' piccola e senza ombra
+    css = mini[mini.index("  .btn.piano{"):mini.index("  .btn.allarme{")]
+    prova("...vestito da tasto sottotono: fondo carta, bordo delle righe, rosso, "
+          "niente ombra, piu' piccolo", [True] * 5,
+          [x in css for x in ("background:var(--card)", "border:1.5px solid var(--line)",
+                              "color:var(--danger)", "box-shadow:none", "font-size:14px")])
     prova("la storia della cassaforte si sostituisce DOPO quella della "
           "disputa, coi suoi tre passi", True,
           "if (annulloVenditore(o)) {" in bottone

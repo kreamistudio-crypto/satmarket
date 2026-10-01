@@ -7578,6 +7578,18 @@
      velato e' la meta' che conta: quel bottone non deve diventare il
      colore piu' forte di una pagina dove il pieno non ce l'ha
      nessuno. */
+  /* IL TASTO SOTTOTONO (1 ott 2026, ritocco di Andrea sull'annullo del
+     venditore): «Annulla l'ordine» era un testuale sottolineato
+     (.danger-ghost) e Andrea lo voleva DENTRO un tasto, ma un tasto che
+     si vede poco e non spicchi. Ne' la velatura rossa dell'allarme qui
+     sotto (quella e' l'uscita di sicurezza di chi compra) ne' il
+     bordo nero del ghost: fondo della carta, bordo sottile del colore
+     delle righe, testo rosso un po' piu' piccolo, nessuna ombra 3D. Si
+     trova se lo si cerca, non chiama. */
+  .btn.piano{background:var(--card);color:var(--danger);
+    border:1.5px solid var(--line);box-shadow:none;font-size:14px;
+    font-weight:700;padding:11px 16px;margin-top:10px}
+  .btn.piano:active{opacity:.7}
   .btn.allarme{background:var(--warn-bg);color:var(--danger);
     border:2px solid var(--danger);box-shadow:0 3px 0 var(--danger);
     margin-top:10px;margin-bottom:10px}
@@ -30193,8 +30205,9 @@ function openOrder(id){
             mai a pagamento in volo. Da 'shipped' in poi il bottone non
             c'e': un pacco in viaggio si chiude con la consegna o con
             una disputa. Foglio del motivo + conferma di casa: due
-            domande, perche' muove sats e non si torna indietro. */''}
-      ${o.role==='seller' && ['creato','locked'].includes(s) && !inPagamento(o) ? `<button class="btn danger-ghost" onclick="apriAnnullaVendita()">✖️ Annulla l'ordine</button>` : ''}
+            domande, perche' muove sats e non si torna indietro.
+            Veste `.btn.piano`: un tasto, ma sottotono (vedi il CSS). */''}
+      ${o.role==='seller' && ['creato','locked'].includes(s) && !inPagamento(o) ? `<button class="btn piano" onclick="apriAnnullaVendita()">✖️ Annulla l'ordine</button>` : ''}
       ${!inPagamento(o) && o.role==='seller' && s==='shipped' ? `<button class="btn ghost" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${notaTrackingSbagliato(o, s)}
       ${o.role==='buyer' && s==='delivered' && !inPagamento(o) ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
