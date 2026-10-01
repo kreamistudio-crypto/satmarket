@@ -3084,9 +3084,9 @@
   .p2p-box{margin-top:8px;background:var(--chip-bg);border-radius:10px;
     padding:8px 10px;font-size:12.5px;color:var(--muted);font-weight:600}
   /* IL CONTANTI DI PERSONA (30 set 2026): il riquadro nella pagina dello
-     scambio — la regola, i consigli, il gesto «Siamo insieme» — e il
-     foglio del codice. I paragrafi respirano poco, i due gesti stanno
-     affiancati con l'area di tocco piena, la riga del fatto e' scura. */
+     scambio — la regola, i consigli, «📍 Sono qui» (1 ott 2026, al posto
+     del QR). I paragrafi respirano poco, i gesti hanno l'area di tocco
+     piena, la riga del fatto e' scura. */
   .contanti-box{color:var(--ink-soft);font-size:13px;line-height:1.45}
   .cauzione-box{color:var(--ink-soft);font-size:13px;line-height:1.45}
   .cauzione-box .contanti-gesti{margin-top:8px}
@@ -3101,8 +3101,8 @@
   .contanti-regola{margin-top:8px}
   /* LA PAGINA DELLO SCAMBIO IN CONTANTI, ALLEGGERITA (1 ott 2026,
      ritocco di Andrea dalla prova dell'ordine 82231748): la regola in
-     una frase scura, il gesto «Siamo insieme» come PASSO 1 in un
-     riquadro col filo verde della garanzia — si vede prima del bottone
+     una frase scura, il gesto dell'incontro (dal 1 ott «📍 Sono qui») come
+     PASSO 1 in un riquadro col filo verde della garanzia — si vede prima del bottone
      arancio senza fargli concorrenza di colore —, i consigli dietro un
      tocco, e a incontro fatto una riga sola. Il passo 2 sta subito
      sopra il bottone del gesto, col numero gemello. */
@@ -3115,9 +3115,6 @@
     flex:none;width:22px;height:22px;border-radius:50%;background:var(--trust);
     color:var(--on-trust);font-size:12.5px;font-weight:800}
   .contanti-quando{font-size:12px;color:var(--muted);font-weight:700}
-  .contanti-incontro .contanti-gesti{margin-top:8px;gap:6px}
-  /* a 320 px «📷 Inquadra il codice» deve stare su una riga: misurato */
-  .contanti-incontro .contanti-gesti .btn{padding:10px 4px;font-size:13px;gap:4px;white-space:nowrap}
   .contanti-consigli{margin-top:6px}
   .contanti-consigli>summary{cursor:pointer;list-style:none;display:flex;
     align-items:center;min-height:36px;font-size:13px;font-weight:800;color:var(--ink)}
@@ -3133,11 +3130,40 @@
   .contanti-ridotto{margin-bottom:10px;font-size:13.5px;font-weight:800;color:var(--trust-text)}
   .contanti-poi{display:flex;align-items:center;gap:8px;margin:12px 0 8px;
     font-size:13.5px;font-weight:800;color:var(--ink)}
-  .presenza-video{display:block;width:100%;max-height:52vh;border-radius:12px;
-    background:#000;object-fit:cover;margin:8px 0}
-  #p2pPresenzaCorpo textarea{width:100%;box-sizing:border-box;margin:8px 0;
-    border:1px solid var(--field-line);border-radius:10px;padding:8px 10px;
-    font:inherit;font-size:13px;background:var(--bg);color:var(--ink)}
+  /* «📍 SONO QUI» (1 ott 2026, al posto del QR di «Siamo insieme»): la
+     frase che lo spiega prima del primo tocco, il bottone pieno largo
+     quanto il riquadro, le due righe delle presenze — la mia e quella
+     dell'altra parte, verdi quando ci sono — e sotto, in una riga, la
+     regola della disputa. */
+  .contanti-spiega{margin-top:6px;font-size:12.5px;color:var(--ink-soft);font-weight:700;line-height:1.4}
+  .contanti-incontro .contanti-qui{width:100%;min-height:44px;margin-top:8px}
+  .contanti-righe{margin-top:8px;display:flex;flex-direction:column;gap:3px}
+  .contanti-riga{font-size:13px;font-weight:700;color:var(--muted);line-height:1.4}
+  .contanti-riga.fatta{color:var(--trust-text)}
+  .contanti-ancora{margin-top:4px;font-size:12.5px}
+  .contanti-disputa{margin-top:8px;font-size:12.5px;font-weight:700;color:var(--ink-soft);line-height:1.4}
+  /* L'APPUNTAMENTO IN CIMA ALLO SCAMBIO (1 ott 2026): il filo verde della
+     garanzia come il passo «Sono qui», il giorno e l'ora per primi, il
+     navigatore largo quanto il dito */
+  .p2p-appuntamento{margin:0 0 10px;padding:10px 12px;border:2px solid var(--trust);
+    border-radius:12px;background:var(--card);color:var(--ink)}
+  .p2p-appuntamento .app-tit{font-size:14.5px;font-weight:700;line-height:1.35}
+  .p2p-appuntamento .app-luogo{margin-top:4px;font-size:13.5px;font-weight:700;
+    color:var(--ink-soft);line-height:1.4;overflow-wrap:anywhere}
+  .p2p-appuntamento .app-naviga{width:100%;min-height:44px;margin-top:8px}
+  .p2p-appuntamento .app-mano,.p2p-appuntamento .app-cambia{margin-top:6px}
+  /* i suggerimenti degli indirizzi e la riga del punto, nel foglio di
+     chi vende: una scelta per riga, il nome sopra e l'indirizzo sotto */
+  .luoghi-lista{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+  .luogo-sugg{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
+    box-sizing:border-box;text-align:left;padding:8px 10px;border:1px solid var(--field-line);
+    border-radius:10px;background:var(--card);color:var(--ink);font:inherit;font-size:13.5px;cursor:pointer}
+  .luogo-sugg small{font-size:12px;color:var(--muted);font-weight:600}
+  .luoghi-fonte{font-size:11px;color:var(--muted);text-align:right}
+  .luogo-punto{margin-top:6px;font-size:12.5px;font-weight:700;color:var(--trust-text);line-height:1.4}
+  .luogo-punto .luogo-mano{color:var(--sats-text)}
+  .luogo-punto .luogo-scegli{color:var(--ink-soft)}
+  .luogo-qui{margin-top:8px}
   /* La lista dei metodi e' testo di sconosciuti e puo' essere lunga
      quanto vuole: cede coi puntini, e a cedere e' SEMPRE lei — premio e
      scadenza sono le due cose che fanno decidere.
@@ -10342,9 +10368,10 @@ document.getElementById('cartello')?.remove();</script>
       <p class="sicu-nota">Prendi un ordine Barattozon solo se fai in tempo ad andare al tabacchino: quando mancano meno di sei ore, il dettaglio te lo ricorda prima di prenderlo.</p>
 
       <!-- IL CONTANTI DI PERSONA (30 set 2026, decisione di Andrea:
-           tutti i punti dello studio attivi dal 10 ottobre). Le frasi
-           della regola sono le stesse costanti del client
-           (REGOLA_CONTANTI_*, CONSIGLI_CONTANTI): una prova le confronta.
+           tutti i punti dello studio attivi dal 10 ottobre; dal 1 ott
+           2026 «📍 Sono qui» e l'appuntamento). Le frasi della regola
+           sono le stesse costanti del client (REGOLA_CONTANTI_*,
+           CONSIGLI_CONTANTI, REGOLA_DISPUTA_CONTANTI): una prova le confronta.
            Il tetto e' VIVO (la leva del server) e lo scrive
            `renderP2PInfo` in #p2pInfoContantiTetto. -->
       <h3 id="p2pinfo-contanti">Contanti di persona</h3>
@@ -10355,8 +10382,9 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>Il rilascio sul posto.</b> A chi compra: <i>Consegna i contanti solo quando chi vende preme «Libera i sats» davanti a te, e controlla che lo scambio risulti concluso prima di andare via.</i> A chi vende: <i>Conta i contanti davanti a chi ti paga, poi premi «Libera i sats» lì, davanti a lui: chi compra deve vedere lo scambio concluso prima di andare via.</i> Mai prima di vedersi, mai dopo essersi salutati.</li>
         <li><b>L'incontro.</b> Vedetevi in un posto pubblico e di giorno — un bar, un incontro bitcoin —, contate le banconote insieme, e mai grosse cifre da soli.</li>
       </ol>
-      <p><b>🤝 «Siamo insieme», la prova d'incontro.</b> Nella pagina dello scambio, quando vi vedete — dopo aver contato le banconote e prima che i sats siano liberati —, un telefono mostra un codice e l'altro lo inquadra. Ne resta una <b>prova firmata da tutti e due</b> con le chiavi usa-e-getta dello scambio: l'ora e, se lo permettete (è facoltativo, e consigliato), la posizione dei due telefoni e la distanza fra loro. La guarda solo un moderatore, in caso di disputa. <b>Il GPS si può falsificare:</b> la posizione è una conferma, non una prova assoluta. A pesare è l'ora, con due firme nello stesso minuto che non si fabbricano dopo.</p>
-      <p><b>In disputa, sul contanti.</b> Senza prova d'incontro i sats <b>tornano a chi li ha bloccati</b>: chi compra sats accetta di vedersi con l'app in mano, o non compra in contanti. Con la prova d'incontro e nessun rilascio, i sats <b>vanno a chi compra</b>: la firma di chi vende dice che l'incontro c'è stato, e il gesto si fa dopo aver contato. Lo scriviamo adesso, prima dello scambio, e non il giorno della disputa.</p>
+      <p><b>🕒 L'appuntamento.</b> Chi vende indica <b>dove e quando</b> vedervi: il giorno e l'ora col selettore del telefono, e il luogo come <b>indirizzo vero</b> — mentre lo scrive gli proponiamo indirizzi esistenti, o usa la sua posizione. Chi compra lo trova in cima alla pagina dello scambio, con <b>«🧭 Apri nel navigatore»</b>. Se l'appuntamento cambia, l'altra persona riceve l'avviso.</p>
+      <p><b>📍 «Sono qui», la prova d'incontro.</b> Quando arrivate, ognuno tocca «Sono qui» dal suo telefono, senza aspettare l'altro: si registrano l'<b>ora esatta</b> e, se il telefono la dà, la <b>posizione</b>, firmate con la chiave usa-e-getta dello scambio. È <b>facoltativo</b>, per la privacy, ma aiuta a risolvere le dispute. L'altra persona vede l'ora in cui l'hai segnato, <b>mai la tua posizione</b>; un moderatore, solo in caso di disputa, vede se eravate lì insieme, all'ora e vicino al luogo dell'appuntamento. <b>Il GPS si può falsificare:</b> la posizione è una conferma, non una prova assoluta.</p>
+      <p><b>In disputa, sul contanti.</b> Se chi vende dice di non aver ricevuto i contanti e non c'è la prova d'incontro, in disputa si dà ragione a chi vende. Lo scriviamo adesso, prima dello scambio, e non il giorno della disputa.</p>
 
       <h3>I tempi</h3>
       <!-- gli stessi segnaposto, per la stessa ragione: le finestre
@@ -10371,7 +10399,7 @@ document.getElementById('cartello')?.remove();</script>
       <p>Ad app aperta la pagina dello scambio <b>si muove da sola</b>: la richiesta da pagare, il foglio dove indicare i sats e il passo dopo compaiono appena arrivano — via Tor ci vogliono di solito dieci-venti secondi. Ad app chiusa ti avvisiamo su Telegram o su Nostr, secondo le tue impostazioni.</p>
       <ul class="sicu-lista">
         <li><b>Un avviso per ogni passo che ti riguarda, e dice quale:</b> il tuo ordine è stato <b>preso</b>, c'è la <b>garanzia da pagare</b>, i sats <b>sono in garanzia</b> e tocca a te indicare dove riceverli, l'altra persona <b>ha indicato dove ricevere i sats</b>, <b>dice di aver inviato gli euro</b>, chiede di <b>annullare</b>, ha aperto una <b>disputa</b>, il pagamento dei sats <b>non è passato</b>. E alla fine: <b>concluso</b> (con quanto hai ricevuto o pagato, commissione compresa), <b>annullato</b>, <b>tornato nel libro</b> o <b>scaduto</b>.</li>
-        <li><b>«Ti ha indicato dove inviare gli euro: tocca a te»</b>, quando chi vende ti lascia il recapito. Il recapito <b>non è nell'avviso</b>: lo leggi qui dentro, cifrato — e prima di inviare gli euro guarda che la pagina dica <b>«Sats in garanzia»</b>.</li>
+        <li><b>«Ti ha indicato dove inviare gli euro: tocca a te»</b>, quando chi vende ti lascia il recapito. Il recapito <b>non è nell'avviso</b>: lo leggi qui dentro, cifrato — e prima di inviare gli euro guarda che la pagina dica <b>«Sats in garanzia»</b>. Col contanti di persona è <b>«dove e quando vedervi»</b>, e se l'appuntamento cambia te lo diciamo.</li>
         <li><b>Niente</b>, per un gesto che hai <b>fatto tu</b>: l'hai già davanti. L'avviso va a chi deve fare il passo dopo, o deve saperlo.</li>
       </ul>
       <p><b>Da dove vengono.</b> A raccontarci i passi è il <b>coordinatore</b> — che facciamo girare noi — nel momento in cui succedono. Ci dice <b>quale ordine, quale passo, e fra quali due chiavi usa-e-getta</b>; degli importi ci dice solo quelli della <b>chiusura</b>. <b>Non ci manda</b> fatture, recapiti né messaggi: quelli restano cifrati fra voi due, e non li vediamo. Se un suo avviso si perde per strada, i passi pubblici — preso, concluso, annullato, scaduto — li leggiamo dal libro, e te li diciamo un minuto dopo.</p>
@@ -10919,7 +10947,7 @@ document.getElementById('cartello')?.remove();</script>
       <p>Dal <b>17 settembre 2026</b>, quando un ordine viene <b>preso</b>, le due parti si vedono: chi ha pubblicato e chi ha preso vedono il <b>profilo</b> l'uno dell'altra — lo stesso che sta già sotto ogni annuncio del mercatino: nome, foto, stelline, livello e titolo — e i <b>bottoni per scriversi</b> su Telegram o su Nostr, ma solo dove quei canali esistono davvero (la npub soltanto se ne hai dimostrato il possesso). <b>Prima della presa non si vede niente</b>, e non c'è nessun altro modo di chiederlo: a questa domanda il server risponde solo a una delle due parti di quello scambio. Il perché è che dall'altra parte c'è una persona a cui stai per mandare dei soldi veri, e un volto con una reputazione è quello che rende <i>pesabile</i> la fiducia — la stessa ragione per cui nel mercatino chi vende ha un nome. Te lo diciamo <b>prima</b>: nel foglio dove pubblichi e in quello dove prendi. Al posto dei campi dove prima ci si scriveva il proprio contatto a mano, che non erano verificati da nessuno.</p>
       <p><b>Chi entra con una chiave Nostr resta anonimo quando prende</b>: quella presa non viene annotata, chi ha pubblicato non saprà chi è, e nella pagina dello scambio legge che l'altra persona non si conosce. <b>A meno che non lo decida lui</b>: l'interruttore «Fatti riconoscere negli scambi» nel cassetto «🔔 Avvisi» — <b>spento di serie</b> — fa annotare la presa, mostra il suo profilo all'altra parte e apre le <b>recensioni</b> su quello scambio; lasciandolo spento resta invisibile, e su quegli scambi recensioni non ce ne sono. Vale da quando lo accende: gli scambi già presi restano come erano, e a cancellare il pregresso c'è «dimentica il profilo». Chi entra con una chiave e <b>pubblica</b>, invece, si mostra — col profilo che ha qui, cioè il nome e la foto della sua chiave: è così da quando le card del libro hanno un volto, e il foglio dove si pubblica lo dice prima.</p>
       <p>Le <b>conversazioni fuori da Barattolo</b> non sono nostre: se vi scrivete su Telegram o su Nostr quella chat è vostra e di chi la trasporta — non la leggiamo, non ce l'abbiamo, e <b>in una disputa non possiamo usarla</b>. A decidere sono i fatti dello scambio: chi ha bloccato i sats, chi ha detto di aver mandato gli euro, chi li ha liberati.</p>
-      <p>Dal <b>10 ottobre 2026</b>, negli scambi <b>in contanti di persona</b>, c'è il gesto «🤝 Siamo insieme»: un telefono mostra un codice e l'altro lo inquadra, e il server riceve <b>due note firmate</b> con le chiavi usa-e-getta dei due lati — l'<b>ora</b> e, solo se la allegate voi, la <b>posizione</b> dei due telefoni (è facoltativa: il browser ve la chiede, e si può dire di no; se la date, ne ricaviamo la distanza fra i due). <b>Chi la legge:</b> voi due nella pagina dello scambio, e un moderatore se si apre una disputa. <b>Per quanto:</b> le posizioni restano solo finché una disputa sui contanti è possibile — si cancellano quando i sats vengono liberati o lo scambio si chiude (annullato, scaduto, tornato nel libro), e in ogni caso entro <b>quindici giorni</b>; restano l'ora e la distanza, che se ne vanno con la cronaca dopo quaranta giorni. Il GPS si può falsificare: per noi è una conferma, non una prova assoluta.</p>
+      <p>Dal <b>10 ottobre 2026</b>, negli scambi <b>in contanti di persona</b>, ci sono «📍 Sono qui» e l'appuntamento. <b>«Sono qui»</b> lo tocchi tu, se e quando vuoi: il server riceve una nota firmata con la tua chiave usa-e-getta, con l'<b>ora</b> e — solo se il telefono la dà — la <b>posizione</b> (il telefono te la chiede, e si può dire di no); se la dai, ne ricaviamo subito la distanza dall'altra persona e dal luogo dell'appuntamento. <b>L'appuntamento</b> lo scrive chi vende nel recapito, che viaggia cifrato fra voi due: al server arrivano solo l'<b>ora</b> e le <b>coordinate</b> del punto, se l'indirizzo è stato riconosciuto — mai il testo. Mentre chi vende scrive l'indirizzo, i suggerimenti li chiediamo noi a <b>Photon</b>, che usa i dati di OpenStreetMap, mandando <b>solo il testo cercato</b>: né chi sei né dove sei; «Usa la mia posizione» non esce dal nostro server. <b>Chi legge:</b> l'altra persona vede l'ora delle tue presenze, mai la tua posizione; un moderatore vede il confronto se si apre una disputa. Posizioni e testi cercati non li scriviamo nei registri del server. <b>Per quanto:</b> le posizioni e il punto restano solo finché una disputa sui contanti è possibile — si cancellano quando i sats vengono liberati o lo scambio si chiude (annullato, scaduto, tornato nel libro), e in ogni caso entro <b>quindici giorni</b>; restano le ore e le distanze, che se ne vanno con la cronaca dopo quaranta giorni. Con «dimentica il profilo» se ne vanno anche le tue presenze e i tuoi appuntamenti; su uno scambio ancora aperto resta solo l'ora, perché l'altra persona l'ha già vista. Il GPS si può falsificare: per noi è una conferma, non una prova assoluta.</p>
       <button class="btn ghost" onclick="apriProfiloP2P()">👤 Il tuo profilo di scambio</button>
       <p>Gli <b>ordini di scambio</b> sono pubblici per come è fatto il coordinatore: vivono sui relay e li legge chiunque, e da settembre 2026 <b>una copia sta anche sul nostro relay</b> — serve a far vedere il libro degli scambi anche quando i relay del coordinatore non rispondono. Non c'è scritto chi sei: un ordine porta l'importo, il metodo di pagamento e una <b>chiave usa-e-getta</b>, diversa a ogni scambio. Dei <b>messaggi che il coordinatore ti manda</b> durante lo scambio — buste cifrate, che si aprono solo dal tuo telefono — sul nostro relay <b>non teniamo copia</b>: per un giorno, fra il 17 e il 18 settembre 2026, l'abbiamo tenuta per avvisarti più in fretta, e da quando gli avvisi li racconta il coordinatore non serve più. Le <b>conversazioni</b> fra te e l'altra persona invece non passano di lì: sono cifrate e viaggiano sui relay del coordinatore, e sul nostro non ne teniamo copia.</p>
 
@@ -12304,15 +12332,6 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="p2pCauzioneTit">⚖️ Incassa la cauzione</h3>
     <div id="p2pCauzioneCorpo"></div>
-  </div>
-
-  <!-- LA PROVA D'INCONTRO DEL CONTANTI (30 set 2026): un telefono mostra
-       il codice, l'altro lo inquadra — o lo incolla, dove la fotocamera
-       non legge. Vedi «IL CONTANTI DI PERSONA: LA PROVA D'INCONTRO». -->
-  <div class="sheet" id="p2pPresenzaSheet" role="dialog" aria-modal="true" aria-labelledby="p2pPresenzaTit">
-    <div class="grab"></div>
-    <h3 id="p2pPresenzaTit">🤝 Siamo insieme</h3>
-    <div id="p2pPresenzaCorpo"></div>
   </div>
 
   <div class="sheet" id="p2pIncassoSheet" role="dialog" aria-modal="true" aria-labelledby="p2pIncassoTit">
@@ -20168,6 +20187,8 @@ setInterval(() => {
   battitoControlloTabP2P();
   battitoPagamentiP2P();
   battitoScambiP2P();
+  /* «📍 Sono qui» dell'altra parte, a pagina del contanti aperta (1 ott 2026) */
+  try { battitoContantiP2P(); } catch(e) {}
   document.querySelectorAll('.lampo-count').forEach(n => {
     const fine = +n.dataset.fine || 0;
     n.textContent = lampoResta(fine);
@@ -51461,6 +51482,8 @@ function evidenziaPassoP2P(){
 }
 const P2P_TOAST_FATTURA = '⚡ Tocca a te: indica dove ricevere i sats';
 const P2P_TOAST_RECAPITO = 'ti ha indicato dove inviare gli euro: tocca a te';
+/* col contanti di persona il recapito e' l'appuntamento (1 ott 2026) */
+const P2P_TOAST_APPUNTAMENTO = 'ti ha indicato dove e quando vedervi';
 /* Da quali stati si puo' chiedere di annullare — e sono DUE cose
    diverse col nome uguale: da 'pubblicato' l'ordine e' ancora di
    nessuno e sparisce, da uno scambio gia' preso l'annullo e' una
@@ -51737,7 +51760,8 @@ function attesaAltraParteP2P(o){
   const contanti = typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o);
   if (s === 'attesa_hold_venditore') cosa = 'sta bloccando i sats in garanzia';
   else if (s === 'attesa_fattura_compratore') cosa = 'sta indicando dove ricevere i sats';
-  else if (s === 'attivo') cosa = compro ? 'deve indicarti dove inviare gli euro'
+  else if (s === 'attivo') cosa = compro
+    ? (contanti ? 'deve indicarti dove e quando vedervi' : 'deve indicarti dove inviare gli euro')
     : contanti ? 'deve consegnarti i contanti' : 'deve inviarti gli euro';
   else if (s === 'euro_inviati') cosa = contanti
     ? 'deve contare i contanti e liberare i sats' : 'deve controllare gli euro e liberare i sats';
@@ -51789,12 +51813,21 @@ function statoTestoP2P(o){
      giro): finche' chi vende non ha detto dove mandare gli euro, chi
      compra ASPETTA — e a chi vende tocca dirlo. Le due frasi di
      `attivo` tornano vere appena il recapito e' partito. */
+  /* col contanti di persona il recapito e' l'appuntamento (1 ott 2026):
+     le due frasi dicono dove e quando vedersi, come il bottone */
+  const appuntamento = typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o);
   if (aspettaRecapitoP2P(o))
-    return {t: s.t, d: 'I sats sono al sicuro in garanzia. Aspetta che '
+    return {t: s.t, d: appuntamento
+      ? 'I sats sono al sicuro in garanzia. Aspetta che ' + nomeControparteP2P(o, 'chi vende')
+        + ' ti indichi dove e quando vedervi: appena arriva lo leggi in cima, il bottone si accende e ti avvisiamo.'
+      : 'I sats sono al sicuro in garanzia. Aspetta che '
       + nomeControparteP2P(o, 'chi vende') + ' ti indichi dove inviare gli euro: '
       + 'appena arriva lo leggi qui, il bottone si accende e ti avvisiamo.'};
   if (o && o.stato === 'attivo' && o.lato === 'vendo' && o.peer && !(o.campiMiei || {}).euro)
-    return {t: s.t, d: 'I tuoi sats sono bloccati. Ora indica a '
+    return {t: s.t, d: appuntamento
+      ? 'I tuoi sats sono bloccati. Ora indica a ' + nomeControparteP2P(o, 'chi compra')
+        + ' dove e quando vedervi: senza, non sa dove trovarti.'
+      : 'I tuoi sats sono bloccati. Ora indica a '
       + nomeControparteP2P(o, 'chi compra') + ' dove mandarti gli euro: senza, non può pagarti.'};
   /* LA FATTURA SCADUTA SI DICE, QUANDO E' UN FATTO (21 set 2026): la
      frase di `fattura_nuova` elenca due cause perche' il coordinatore
@@ -53746,10 +53779,15 @@ function recapitoCompratoreP2P(o){
   if (tabacchinoP2P(o.metodi) && payCodeDaTestoP2P(loro.euro.testo))
     return riquadroPayCodeP2P(o);
   /* col contanti di persona il recapito e' il posto dell'incontro, e
-     il titolo lo dice (1 ott 2026): gli euro non si «mandano» */
-  return riquadroRecapitoP2P(loro.euro.testo,
-                             typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o)
-                               ? '📍 Dove vedervi' : '')
+     il titolo lo dice (1 ott 2026): gli euro non si «mandano». E DAL
+     GIORNO STESSO E' L'APPUNTAMENTO, che sta IN CIMA alla pagina per
+     tutti e due (`riquadroAppuntamentoP2P`): qui sotto resterebbe una
+     seconda copia, e resta solo l'avviso di non muoversi troppo presto */
+  const contanti = typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o);
+  if (contanti && riquadroAppuntamentoP2P(o))
+    return (P2P_PROGRESSO[o.stato] || 0) < P2P_PROGRESSO.attivo && P2P_FINALI.indexOf(o.stato) < 0
+      ? '<div class="hint">⚠️ <b>Non consegnare ancora niente:</b> aspetta che questa pagina dica «Sats in garanzia».</div>' : '';
+  return riquadroRecapitoP2P(loro.euro.testo, contanti ? '📍 Dove vedervi' : '')
     /* IL RECAPITO PUO' ARRIVARE PRIMA DELLA GARANZIA (i dati del
        tabacchino partono alla presa, e un'app di ieri — o un altro
        client — manda ancora il recapito ricordato): finche' la pagina non
@@ -54129,6 +54167,11 @@ function renderOrdineP2P(){
      recapito non era partito, parte adesso (le condizioni le guarda
      lui, e non ripete) */
   if (typeof avvisaRecapitoP2P === 'function') avvisaRecapitoP2P(o.id);
+  /* ...e se il recapito e' un appuntamento del contanti, l'ora e il punto
+     vanno al server per il confronto del moderatore (1 ott 2026): una
+     volta per recapito, e solo se non sono gia' partiti dal foglio */
+  if (typeof registraAppuntamentoP2P === 'function') registraAppuntamentoP2P(o.id);
+  const contantiQui = typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o) && !tabOrd;
   const bottoni = {
     fattura: '<button class="btn orange" onclick="apriIncassoP2P()">💸 Dove ricevere i sats</button>',
     'fattura-nuova': '<button class="btn orange" onclick="apriIncassoP2P()">⚡ Dai una fattura nuova</button>',
@@ -54146,6 +54189,9 @@ function renderOrdineP2P(){
     rilascia: tabOrd ? riquadroControlloTabP2P(o)
       : '<button class="btn orange" onclick="rilasciaP2P()">🔓 Libera i sats</button>'
   };
+  /* col contanti di persona il recapito E' l'appuntamento (1 ott 2026):
+     lo stesso foglio, col suo verbo */
+  if (contantiQui) bottoni.recapito = '<button class="btn orange" onclick="apriCampiP2P()">📍 Indica dove e quando vedervi</button>';
   /* LA DOMANDA PARTE DA QUI, una sola volta per scambio: «c'e' un
      posto per la recensione, e l'ho gia' lasciata?». Non blocca il
      render — la pagina si disegna e il gesto compare quando la
@@ -54182,6 +54228,10 @@ function renderOrdineP2P(){
        il foglio dei recapiti, che e' dove serve davvero. Ripetuti
        qui, in grigio piccolo sotto un conto, erano due etichette che
        non decidevano niente. */
+    /* L'APPUNTAMENTO DEL CONTANTI IN CIMA, per tutti e due (1 ott 2026,
+       richiesta di Andrea): il giorno dell'incontro e' la prima cosa che
+       si cerca aprendo lo scambio — l'ora, il luogo, il navigatore */
+    riquadroAppuntamentoP2P(o) +
     /* il conto veste il lato della RIGA, non del tab del libro (24
        set 2026): vedi il CSS di `.p2p-ord.lato-vendo` */
     '<div class="p2p-ord lato-' + (o.lato === 'vendo' ? 'vendo' : 'compro') + '">' + conto + '</div>' +
@@ -54214,8 +54264,9 @@ function renderOrdineP2P(){
     /* A DISPUTA APERTA: il moderatore, e il canale per scrivergli (28 set 2026) */
     (typeof bloccoModeratoreP2P === 'function' ? bloccoModeratoreP2P(o) : '') +
     /* IL CONTANTI DI PERSONA (30 set 2026): la regola dal proprio lato e
-       il gesto «Siamo insieme», SOPRA il bottone del passo — si legge
-       prima di liberare o di consegnare */
+       «📍 Sono qui» (1 ott 2026, al posto del QR di «Siamo insieme»),
+       SOPRA il bottone del passo — si legge prima di liberare o di
+       consegnare */
     riquadroContantiP2P(o, azione) +
     passoDueContantiP2P(o, azione) +
     (bottoni[azione] || '') +
@@ -55096,15 +55147,25 @@ function euroInviatiP2P(){
      incontro fatto il riquadro e' una riga, e questo e' il momento in
      cui la regola conta */
   const contanti = !tab && typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o);
+  /* SENZA «📍 SONO QUI» UN AVVISO BREVE (1 ott 2026, richiesta di
+     Andrea): la presenza resta facoltativa e si puo' proseguire, ma
+     prima di consegnare chi compra legge la regola della disputa — e
+     torna indietro a segnarla, se vuole. Nella STESSA conferma: niente
+     foglio in piu' */
+  const senzaPresenza = contanti && !(o.presenze && o.presenze.mia);
   chiediConferma({
     titolo: tab ? 'Hai pagato il PayCode al tabacchino?'
       : contanti ? 'Hai consegnato i contanti?' : 'Hai inviato gli euro?',
     corpo: tab
       ? 'Dillo solo dopo aver pagato davvero ' + fmtEur(o.euro) + ' € in contanti alla cassa. Tieni lo scontrino: chi vende controlla su Amazon che l\'ordine risulti saldato e libera i sats.'
       : contanti
-      ? 'Dillo quando consegni ' + fmtEur(o.euro) + ' € a chi vende, lì di persona. ' + REGOLA_CONTANTI_COMPRA
+      ? (senzaPresenza ? '📍 Non hai segnato «Sono qui». ' + REGOLA_DISPUTA_CONTANTI
+                         + ' Puoi tornare indietro e segnarlo adesso, o proseguire.\n\n' : '')
+        + 'Dillo quando consegni ' + fmtEur(o.euro) + ' € a chi vende, lì di persona. ' + REGOLA_CONTANTI_COMPRA
       : 'Dillo solo dopo aver davvero mandato ' + fmtEur(o.euro) + ' € con il metodo concordato. Chi vende lo vedrà e libererà i sats.',
     etichetta: tab ? 'Sì, ho pagato' : contanti ? 'Sì, li ho consegnati' : 'Sì, li ho inviati',
+    /* il ripensamento ha il nome che la frase gli da' */
+    indietro: senzaPresenza ? 'Indietro' : '',
     /* ⚠️ LA PROMESSA SI RESTITUISCE, e non e' stile: `eseguiConferma`
        ASPETTA `poi()` e nel suo `finally` rimette giu' il velo. Col
        corpo a blocco e nessun `return` qui tornava `undefined`, quindi
@@ -55599,16 +55660,23 @@ const CONSIGLI_CONTANTI = 'Vedetevi in un posto pubblico e di giorno — un bar,
    se una delle due cambia senza l'altra, la CI lo dice. */
 const REGOLA_BREVE_CONTANTI_COMPRA = 'Consegna i contanti solo quando chi vende preme «Libera i sats» davanti a te.';
 const REGOLA_BREVE_CONTANTI_VENDE = 'Conta i contanti davanti a chi ti paga, poi premi «Libera i sats» lì, davanti a lui.';
+/* «📍 SONO QUI» (1 ott 2026, decisione di Andrea dopo la prova vera: il
+   QR di «Siamo insieme» si inquadra anche da una foto). La frase che lo
+   spiega PRIMA del primo tocco, e la regola della disputa in UNA frase:
+   la ripetono il riquadro della pagina, la conferma di «Ho consegnato i
+   contanti» e «Info P2P» — una prova le confronta parola per parola. */
+const SPIEGA_SONO_QUI = 'Registra ora e posizione: facoltativo, ma aiuta a risolvere le dispute.';
+const REGOLA_DISPUTA_CONTANTI = 'Se chi vende dice di non aver ricevuto i contanti e non c\'è la prova d\'incontro, in disputa si dà ragione a chi vende.';
 /* i consigli dietro «Consigli per l'incontro ›», dal proprio lato: la
-   coda della regola per prima, poi quel che diceva il riquadro di prima
-   — il posto, la prova d'incontro, la cautela sul GPS */
+   coda della regola per prima, poi il posto, la prova d'incontro, la
+   cautela sul GPS */
 function consigliIncontroP2P(lato){
   return [lato === 'vendo'
       ? 'Chi compra deve vedere lo scambio concluso prima di andare via.'
       : 'Prima di andare via controlla che lo scambio risulti concluso.',
     CONSIGLI_CONTANTI,
-    '«Siamo insieme» lascia una prova firmata da tutti e due, con l\'ora e, se la allegate, la posizione: la guarda un moderatore, solo in caso di disputa.',
-    'La posizione è facoltativa e consigliata. Il GPS si può falsificare: è una conferma, non una prova assoluta.'];
+    '«📍 Sono qui» lo preme ognuno dal suo telefono, quando arriva: lascia l\'ora esatta e, se il telefono la dà, la posizione. Le guarda un moderatore, solo in caso di disputa; l\'altra persona vede l\'ora, mai la tua posizione.',
+    'Il GPS si può falsificare: la posizione è una conferma, non una prova assoluta.'];
 }
 /* LE PAROLE DEL GESTO SONO PIU' STRETTE DEL RIQUADRO (1 ott 2026): «Ho
    consegnato i contanti», il passo e gli avvisi cambiano solo quando il
@@ -55661,8 +55729,9 @@ function testoTettoContantiP2P(tetto){
     ? '<b>Il tetto:</b> al massimo <b>' + fmt(t) + ' €</b> per scambio in contanti, sia per chi pubblica sia per chi prende. Sopra, si divide in più scambi: il rischio di ogni incontro si ferma lì.'
     : '<b>Il tetto:</b> in questo momento non c\'è un tetto per il contanti di persona; vale solo quello generale, se acceso. Sopra qualche centinaio di euro conviene dividere in più scambi.';
 }
-/* l'ora dell'incontro e la distanza, come si dicono nella pagina dello
-   scambio e al moderatore: «alle 17:42 del 3 ott», «a 12 m di distanza» */
+/* l'ora e la distanza della prova COL QR (di prima del 1 ott 2026), come
+   le dice ancora la card del moderatore: «alle 17:42 del 3 ott», «a 12 m
+   di distanza». Le prove nuove hanno le loro parole, qui sotto. */
 function quandoIncontroP2P(ts){
   const n = Number(ts) || 0;
   if (!n) return '';
@@ -55677,20 +55746,69 @@ function distanzaIncontroP2P(p){
       + (p.precisione > 0 ? ' (precisione ±' + fmt(Number(p.precisione)) + ' m)' : '');
   return Number(p.posizioni) === 1 ? ', con la posizione di un solo telefono' : ', senza posizioni';
 }
+/* ---- «📍 SONO QUI»: LE RIGHE CHE LE PARTI VEDONO (1 ott 2026) ----
+   PURE. Il server manda a ciascuno la SUA ultima presenza (l'ora, se il
+   telefono ha dato la posizione, quante volte) e l'ORA dell'ultima
+   dell'altra parte: mai la sua posizione, mai una distanza — quelle sono
+   del moderatore. L'ora e' quella del server, coi secondi. */
+function oraPresenzaP2P(ts, adesso){
+  const n = Number(ts) || 0;
+  if (!(n > 0)) return '';
+  const d = new Date(n * 1000);
+  const oggi = new Date(Number(adesso) > 0 ? Number(adesso) * 1000 : Date.now());
+  const due = x => (x < 10 ? '0' : '') + x;
+  const ora = 'alle ' + due(d.getHours()) + ':' + due(d.getMinutes()) + ':' + due(d.getSeconds());
+  return d.toDateString() === oggi.toDateString() ? ora : ora + ' del ' + dataBreveP2P(n);
+}
+/* LE PRESENZE SONO DEL GIRO (la cura della riverifica di sicurezza, anche
+   qui): un ordine tornato nel libro e ripreso da un altro tiene lo stesso
+   id, e la riga di chi l'ha pubblicato non deve mostrare al nuovo giro le
+   presenze del vecchio. `giro` viaggia con loro. */
+function presenzeDaServerP2P(p, giro){
+  if (!p || typeof p !== 'object') return null;
+  const mia = p.mia && Number(p.mia.ora) > 0
+    ? {ora: Math.floor(Number(p.mia.ora)), posizione: !!p.mia.posizione,
+       volte: Math.max(1, Math.floor(Number(p.mia.volte) || 1))} : null;
+  const altra = p.altra && Number(p.altra.ora) > 0 ? {ora: Math.floor(Number(p.altra.ora))} : null;
+  return (mia || altra) ? {giro: Math.max(0, Math.floor(Number(giro) || 0)), mia: mia, altra: altra} : null;
+}
+/* due fotografie delle presenze, la piu' nuova riga per riga: quella del
+   server partita PRIMA del tocco non cancella la presenza appena fatta.
+   Di due giri diversi vale la seconda, intera. */
+function uniscePresenzeP2P(a, b){
+  if (a && b && (a.giro || 0) !== (b.giro || 0)) return b;
+  const piu = (x, y) => !x ? (y || null) : !y ? x
+    : (y.ora > x.ora || (y.ora === x.ora && (y.volte || 0) > (x.volte || 0))) ? y : x;
+  const mia = piu(a && a.mia, b && b.mia), altra = piu(a && a.altra, b && b.altra);
+  return (mia || altra) ? {giro: ((b || a).giro || 0), mia: mia, altra: altra} : null;
+}
+function righePresenzeP2P(o, adesso){
+  const pr = (o && o.presenze) || {};
+  const altro = o && o.lato === 'vendo' ? 'Chi compra' : 'Chi vende';
+  const mia = pr.mia
+    ? '✓ Hai segnato la presenza ' + oraPresenzaP2P(pr.mia.ora, adesso)
+      + (pr.mia.posizione ? ' · con la posizione' : ' · senza posizione: il telefono non l\'ha data')
+    : 'Non hai ancora segnato la presenza';
+  const sua = pr.altra
+    ? '✓ ' + altro + ' ha segnato la presenza ' + oraPresenzaP2P(pr.altra.ora, adesso)
+    : altro + ' non ha ancora segnato la presenza';
+  return '<div class="contanti-riga' + (pr.mia ? ' fatta' : '') + '">' + esc(mia) + '</div>'
+    + '<div class="contanti-riga' + (pr.altra ? ' fatta' : '') + '">' + esc(sua) + '</div>';
+}
 /* IL RIQUADRO DEL CONTANTI NELLA PAGINA DELLO SCAMBIO finche' i sats
-   sono in garanzia: la regola dal proprio lato in UNA frase, il gesto
-   «Siamo insieme» come primo passo dell'incontro, i consigli dietro un
-   tocco. A incontro fatto, e a disputa aperta, il riquadro e' una riga.
+   sono in garanzia: la regola dal proprio lato in UNA frase, «📍 Sono
+   qui» come primo passo dell'incontro, la regola della disputa in una
+   riga, i consigli dietro un tocco. A disputa aperta e' le due righe
+   delle presenze, senza gesti.
    ⚠️ ALLEGGERITO IL 1 OTT 2026 (ritocco di Andrea, dalla prova
-   dell'ordine 82231748 da 5 € con la cauzione): era quattro paragrafi
-   — regola intera, consigli, la spiegazione di «Siamo insieme», la
-   cautela sul GPS — e nella pagina spiccava solo il bottone arancio.
-   Niente e' sparito: la coda della regola, i consigli, la prova e il
-   GPS stanno dietro «Consigli per l'incontro ›»; la regola intera la
-   ripetono la conferma di chi consegna e quella di chi libera, cioe'
-   il momento in cui conta. E LA RIGA DELL'INCONTRO FATTO NON PORTA PIU'
-   LA REGOLA: quella torna nelle due conferme, che sono proprio il
-   passo dopo «Siamo insieme».
+   dell'ordine 82231748 da 5 € con la cauzione), e lo stesso giorno «🤝
+   Siamo insieme» — mostra e inquadra un QR, due bottoni e una casella —
+   e' diventato UN bottone, «📍 Sono qui», che ognuno preme dal suo
+   telefono quando arriva (il QR si inquadrava anche da una foto: non
+   provava che i telefoni fossero vicini). Prima del primo tocco la frase
+   che lo spiega; dopo, la riga con l'ora e un «Segna di nuovo» piccolo.
+   La regola intera la ripetono le due conferme, cioe' il momento in cui
+   conta.
    IL CASSETTO DEI CONSIGLI SI RICORDA APERTO (`p2pConsigliAperti`): la
    pagina si ridisegna a ogni giro del libro, e `posaPezziP2P` confronta
    l'outerHTML — un <details> aperto a mano ha `open`, quello nuovo no,
@@ -55701,24 +55819,21 @@ function riquadroContantiP2P(o, azione){
   const vivo = P2P_DISPUTABILI.indexOf(o.stato) >= 0;
   const disputa = o.stato === 'in_disputa';
   if (!vivo && !disputa) return '';
-  if (o.presenza && o.presenza.ora > 0)
-    return '<div class="p2p-box contanti-box contanti-ridotto">✓ Incontro confermato '
-      + esc(quandoIncontroP2P(o.presenza.ora)) + '</div>';
   if (disputa)
-    return '<div class="p2p-box contanti-box contanti-ridotto">Nessuna prova d\'incontro per questo scambio.</div>';
+    return '<div class="p2p-box contanti-box contanti-ridotto">' + righePresenzeP2P(o) + '</div>';
   const vendo = o.lato === 'vendo';
+  const mia = !!(o.presenze && o.presenze.mia);
   let h = '<div class="p2p-box contanti-box">' +
-    '<div class="contanti-regola-forte">💶 ' + esc(vendo ? REGOLA_BREVE_CONTANTI_VENDE : REGOLA_BREVE_CONTANTI_COMPRA) + '</div>';
-  if (!o.soloVista)
-    h += '<div class="contanti-incontro">' +
-        '<div class="contanti-passo">' + (passoDueContantiP2P(o, azione) ? '<span class="contanti-num">1</span>' : '') +
-          '<b>🤝 Siamo insieme</b><span class="contanti-quando">appena vi vedete · consigliato</span></div>' +
-        '<div class="contanti-gesti">' +
-          '<button type="button" class="btn primary" onclick="presenzaMostraP2P()">📱 Mostra il codice</button>' +
-          '<button type="button" class="btn primary" onclick="presenzaLeggiP2P()">📷 Inquadra il codice</button>' +
-        '</div>' +
-        '<label class="contanti-gps"><input type="checkbox" id="p2pPresenzaGps" checked><span>📍 Allega la posizione (facoltativa)</span></label>' +
-      '</div>';
+    '<div class="contanti-regola-forte">💶 ' + esc(vendo ? REGOLA_BREVE_CONTANTI_VENDE : REGOLA_BREVE_CONTANTI_COMPRA) + '</div>' +
+    '<div class="contanti-incontro">' +
+      '<div class="contanti-passo">' + (passoDueContantiP2P(o, azione) ? '<span class="contanti-num">1</span>' : '') +
+        '<b>📍 Sono qui</b><span class="contanti-quando">quando arrivi · facoltativo</span></div>' +
+      (mia ? '' : '<div class="contanti-spiega">' + esc(SPIEGA_SONO_QUI) + '</div>') +
+      (o.soloVista || mia ? '' : '<button type="button" class="btn primary contanti-qui" onclick="sonoQuiP2P()">📍 Sono qui</button>') +
+      '<div class="contanti-righe">' + righePresenzeP2P(o) + '</div>' +
+      (o.soloVista || !mia ? '' : '<button type="button" class="scopri-link contanti-ancora" onclick="sonoQuiP2P()">📍 Segna di nuovo</button>') +
+    '</div>' +
+    '<div class="contanti-disputa">⚖️ ' + esc(REGOLA_DISPUTA_CONTANTI) + '</div>';
   h += '<details class="contanti-consigli" data-o="' + esc(o.id) + '"'
     + (p2pConsigliAperti[o.id] ? ' open' : '')
     + ' ontoggle="p2pConsigliAperti[this.dataset.o] = this.open">'
@@ -55728,19 +55843,172 @@ function riquadroContantiP2P(o, azione){
   return h + '</div>';
 }
 /* IL PASSO 2, SUBITO SOPRA IL BOTTONE DEL GESTO (1 ott 2026): c'e' solo
-   quando il riquadro mostra ancora «Siamo insieme» E il bottone pieno
-   e' quello del pagamento — «Ho consegnato i contanti» per chi compra,
-   «Libera i sats» per chi vende. Con un altro bottone (chi vende indica
-   dove vedersi, PRIMA dell'incontro) i numeri mentirebbero sull'ordine,
-   e allora non ci sono: ne' qui ne' l'«1» del riquadro. `a` e' il
-   bottone pieno della pagina (`azioniDisponibili`, che il chiamante ha
-   gia'). Torna la riga, o ''. */
+   quando il bottone pieno e' quello del pagamento — «Ho consegnato i
+   contanti» per chi compra, «Libera i sats» per chi vende. Con un altro
+   bottone (chi vende indica dove vedersi, PRIMA dell'incontro) i numeri
+   mentirebbero sull'ordine, e allora non ci sono: ne' qui ne' l'«1» del
+   riquadro. Con «📍 Sono qui» gia' segnato i numeri restano: l'«1» e'
+   fatto, il «2» e' quel che viene. `a` e' il bottone pieno della pagina
+   (`azioniDisponibili`, che il chiamante ha gia'). Torna la riga, o ''. */
 function passoDueContantiP2P(o, a){
   if (!o || !scambioInContantiP2P(o) || o.soloVista) return '';
-  if (P2P_DISPUTABILI.indexOf(o.stato) < 0 || (o.presenza && o.presenza.ora > 0)) return '';
+  if (P2P_DISPUTABILI.indexOf(o.stato) < 0) return '';
   if (a !== 'euro-inviati' && a !== 'rilascia') return '';
   return '<div class="contanti-poi"><span class="contanti-num">2</span>'
     + (a === 'rilascia' ? 'Poi, contati i contanti' : 'Poi, al momento di pagare') + '</div>';
+}
+/* ---- L'APPUNTAMENTO DEL CONTANTI (1 ott 2026, richiesta di Andrea) ----
+   PURE. Viaggia DENTRO il recapito «📍 Dove vedervi», cifrato fra i due
+   telefoni, e sul filo resta TESTO COMPOSTO (la regola 2 dell'identita'
+   di pagamento: chi riceve mostra quel che legge, qualunque versione
+   abbia): la riga del luogo di sempre, poi «Quando: 04/10/2026 alle
+   18:30» — la forma della scadenza del tabacchino, con le sue due
+   gemelle — e, se l'indirizzo e' stato riconosciuto, «Coordinate:
+   45.07085, 7.68583». Un client di ieri legge tre righe vere; questo le
+   rilegge con `appuntamentoDaTestoP2P`, gemella di `testoAppuntamentoP2P`
+   (c'e' la prova di andata e ritorno). ⚠️ ORA LOCALE di chi scrive, letta
+   come ora locale di chi legge: per due persone che si vedono di persona
+   e' lo stesso fuso. */
+const P2P_APPUNTAMENTO_TESTA = 'Contanti alla mano — propongo di vederci: ';
+function testoAppuntamentoP2P(luogo, quando, punto){
+  return P2P_APPUNTAMENTO_TESTA + String(luogo || '').replace(/\s+/g, ' ').trim()
+    + (Number(quando) > 0 ? '\nQuando: ' + dataTabacchinoP2P(quando) : '')
+    + (punto ? '\nCoordinate: ' + punto.lat + ', ' + punto.lon : '');
+}
+function appuntamentoDaTestoP2P(testo){
+  const t = String(testo || '').replace(/\r/g, '');
+  const prima = t.split('\n').map(r => r.trim()).filter(Boolean)[0] || '';
+  if (!prima) return null;
+  const m = /vederci:\s*(.+)$/i.exec(prima);
+  const q = /(?:^|\n)Quando:\s*([^\n]+)/.exec(t);
+  const c = /(?:^|\n)Coordinate:\s*(-?\d{1,2}(?:\.\d{1,7})?)\s*,\s*(-?\d{1,3}(?:\.\d{1,7})?)\s*(?:\n|$)/.exec(t);
+  return {luogo: (m ? m[1] : prima).trim(), quando: q ? leggiDataTabacchinoP2P(q[1]) : 0,
+          punto: c ? puntoDaLuogoP2P({lat: c[1], lon: c[2]}) : null};
+}
+/* il valore del selettore «🕒 Quando» (`datetime-local`, ORA LOCALE:
+   «2026-10-04T18:30»), andata e ritorno; 0 e '' su tutto il resto — un
+   30 febbraio che JS «correggerebbe» si rilegge e si confronta */
+function quandoDaCampoP2P(v){
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(v || ''));
+  if (!m) return 0;
+  const a = +m[1], me = +m[2], g = +m[3], h = +m[4], mi = +m[5];
+  const d = new Date(a, me - 1, g, h, mi, 0, 0);
+  if (d.getFullYear() !== a || d.getMonth() !== me - 1 || d.getDate() !== g
+      || d.getHours() !== h || d.getMinutes() !== mi) return 0;
+  return Math.floor(d.getTime() / 1000);
+}
+function valoreQuandoP2P(ts){
+  const n = Number(ts) || 0;
+  if (!(n > 0)) return '';
+  const d = new Date(n * 1000);
+  const due = x => (x < 10 ? '0' : '') + x;
+  return d.getFullYear() + '-' + due(d.getMonth() + 1) + '-' + due(d.getDate())
+    + 'T' + due(d.getHours()) + ':' + due(d.getMinutes());
+}
+/* il giudice dell'ora dell'incontro: '' se va, se no la frase. Il server
+   tiene la sua misura (un'ora indietro, sette giorni avanti): qui si e'
+   piu' stretti all'indietro, che una svista si vede subito */
+const P2P_APPUNTAMENTO_FUTURO_S = 7 * 86400;
+function giudiceQuandoP2P(quando, adesso){
+  if (!(quando > 0)) return 'Scegli giorno e ora dell\'incontro';
+  if (quando < adesso - 600) return 'L\'ora dell\'incontro è già passata: scegline una nuova';
+  if (quando > adesso + P2P_APPUNTAMENTO_FUTURO_S) return 'Fissa l\'incontro entro una settimana';
+  return '';
+}
+/* «sab 4 ott alle 18:30»: il giorno della settimana dice piu' della data
+   a chi si deve vedere fra due giorni */
+const P2P_GIORNI_BREVI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+const P2P_MESI_BREVI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+function quandoAppuntamentoP2P(ts){
+  const n = Number(ts) || 0;
+  if (!(n > 0)) return '';
+  const d = new Date(n * 1000);
+  const due = x => (x < 10 ? '0' : '') + x;
+  return P2P_GIORNI_BREVI[d.getDay()] + ' ' + d.getDate() + ' ' + P2P_MESI_BREVI[d.getMonth()]
+    + ' alle ' + due(d.getHours()) + ':' + due(d.getMinutes());
+}
+/* IL RIQUADRO DELL'APPUNTAMENTO, IN CIMA ALLO SCAMBIO e per tutti e due:
+   l'ora, il luogo e — se l'indirizzo e' stato riconosciuto — «🧭 Apri nel
+   navigatore»; a chi vende anche «Cambia», finche' l'incontro non e'
+   fatto. Si legge dal recapito: il mio a chi vende, quello arrivato a
+   chi compra. A scambio finito, o a sats liberati, non serve piu'. */
+function riquadroAppuntamentoP2P(o){
+  if (!o || !pagaInContantiP2P(o) || tabacchinoP2P(o.metodi)) return '';
+  if (P2P_FINALI.indexOf(o.stato) >= 0 || o.stato === 'rilasciato') return '';
+  const vendo = o.lato === 'vendo';
+  const campo = ((vendo ? o.campiMiei : o.campiLoro) || {}).euro;
+  const a = campo && appuntamentoDaTestoP2P(campo.testo);
+  if (!a || !a.luogo) return '';
+  const cambia = vendo && !o.soloVista && ['euro_inviati', 'in_disputa'].indexOf(o.stato) < 0;
+  return '<div class="p2p-appuntamento">'
+    + (a.quando > 0
+       ? '<div class="app-tit">🕒 Appuntamento: <b>' + esc(quandoAppuntamentoP2P(a.quando)) + '</b></div>'
+       : '<div class="app-tit">📍 <b>Dove vedervi</b></div>')
+    + '<div class="app-luogo">📍 ' + esc(a.luogo) + '</div>'
+    + (a.punto
+       ? '<button type="button" class="btn ghost app-naviga" data-lat="' + esc(a.punto.lat) + '" data-lon="'
+         + esc(a.punto.lon) + '" data-nome="' + esc(a.luogo) + '" '
+         + 'onclick="apriNavigatoreP2P(this.dataset.lat, this.dataset.lon, this.dataset.nome)">🧭 Apri nel navigatore</button>'
+       : '<div class="hint app-mano">' + esc(vendo
+           ? 'Indirizzo scritto a mano: chi compra lo legge così com\'è, senza il link al navigatore.'
+           : 'Indirizzo scritto a mano: niente link al navigatore. Se non lo trovi, chiedi a chi vende.') + '</div>')
+    + (cambia ? '<button type="button" class="scopri-link app-cambia" onclick="apriCampiP2P()">✏️ Cambia l\'appuntamento</button>' : '')
+    + '</div>';
+}
+/* il punto di un suggerimento (o di una riga «Coordinate:») nella forma
+   che viaggia, cinque decimali; null se storto o fuori misura */
+function puntoDaLuogoP2P(l){
+  const la = Number(l && l.lat), lo = Number(l && l.lon);
+  if (!Number.isFinite(la) || !Number.isFinite(lo) || Math.abs(la) > 90 || Math.abs(lo) > 180) return null;
+  return {lat: la.toFixed(5), lon: lo.toFixed(5)};
+}
+/* il campo nascosto del punto nel foglio: «i:45.07085,7.68583» da un
+   indirizzo scelto fra i suggerimenti, «p:…» dalla mia posizione */
+function puntoDaCampoP2P(v){
+  const m = /^([ip]):(-?\d{1,2}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)$/.exec(String(v || '').trim());
+  const p = m && puntoDaLuogoP2P({lat: m[2], lon: m[3]});
+  return p ? Object.assign(p, {fonte: m[1]}) : null;
+}
+/* la riga sotto il campo del luogo: il punto riconosciuto; coi
+   suggerimenti davanti l'invito a sceglierne uno; senza, L'AVVISO
+   GENTILE per l'indirizzo scritto a mano — che resta possibile */
+function rigaPuntoLuogoP2P(p, testo, suggerimenti){
+  if (p) return '<span>🧭 ' + (p.fonte === 'p' ? 'Il punto è la tua posizione di adesso' : 'Indirizzo riconosciuto')
+    + ': chi compra avrà «Apri nel navigatore».</span> '
+    + '<button type="button" class="scopri-link" onclick="togliPuntoLuogoP2P()">Togli</button>';
+  if (suggerimenti > 0)
+    return '<span class="luogo-scegli">👆 Scegline uno per dare a chi compra «Apri nel navigatore». '
+      + 'Scritto a mano va bene lo stesso, ma senza link.</span>';
+  if (String(testo || '').trim().length >= 3)
+    return '<span class="luogo-mano">✋ Questo indirizzo non l\'abbiamo riconosciuto: chi compra lo leggerà così com\'è, '
+      + 'senza il link al navigatore. Per il link, scegline uno fra i suggerimenti o usa la tua posizione.</span>';
+  return '';
+}
+function nomeMiaPosizioneP2P(vicino){
+  return vicino ? 'Punto segnato sulla mappa, vicino a ' + vicino : 'Punto segnato sulla mappa';
+}
+/* l'elenco dei suggerimenti sotto il campo, col nome dei dati sotto */
+function sceltaLuoghiP2P(lista, perche){
+  if (!lista || !lista.length)
+    return perche === 'muti' ? '<div class="hint">I suggerimenti non rispondono: puoi scrivere l\'indirizzo a mano.</div>'
+      : perche === 'pausa' ? '<div class="hint">Un attimo di pausa per i suggerimenti: riprova fra qualche secondo.</div>' : '';
+  return lista.map((l, i) => '<button type="button" class="luogo-sugg" data-i="' + i + '" '
+      + 'onclick="scegliLuogoP2P(+this.dataset.i)"><b>' + esc(l.nome || l.indirizzo || l.etichetta) + '</b>'
+      + (l.nome && l.indirizzo ? '<small>' + esc(l.indirizzo) + '</small>' : '') + '</button>').join('')
+    + '<div class="luoghi-fonte">Indirizzi da © OpenStreetMap</div>';
+}
+/* L'INDIRIZZO DELL'APP DI MAPPE su quel punto: Apple Mappe su iPhone, il
+   `geo:` che apre la predefinita su Android fuori da Telegram, Google
+   Maps altrove (dentro Telegram `openLink` vuole un indirizzo web, e sul
+   telefono Google Maps passa alla sua app). Il nome e' un'etichetta. */
+function urlNavigatoreP2P(lat, lon, nome, piattaforma){
+  const p = puntoDaLuogoP2P({lat: lat, lon: lon});
+  if (!p) return '';
+  const ll = p.lat + ',' + p.lon;
+  const q = encodeURIComponent(String(nome || '').replace(/\s+/g, ' ').trim().slice(0, 120));
+  if (piattaforma === 'ios') return 'https://maps.apple.com/?ll=' + ll + '&q=' + (q || ll);
+  if (piattaforma === 'android') return 'geo:' + ll + '?q=' + ll + (q ? '(' + q + ')' : '');
+  return 'https://www.google.com/maps/search/?api=1&query=' + ll;
 }
 /* IL VESTITO DEI METODI (16 set 2026, decisione di Andrea): «Contanti
    al tabacchino» si presenta come BARATTOZON — il marchio al posto del
@@ -58855,7 +59123,9 @@ function campoScrivi(o, tipo, campo, mio){
      se'). Una correzione non ri-suona qui: la porta il server. */
   if (primoEuro && o.lato === 'compro' && o.stato === 'attivo') {
     haptic();
-    toast('💶 ' + nomeControparteP2P(o, 'Chi vende') + ' ' + P2P_TOAST_RECAPITO, 6000);
+    toast(typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o)
+      ? '📍 ' + nomeControparteP2P(o, 'Chi vende') + ' ' + P2P_TOAST_APPUNTAMENTO
+      : '💶 ' + nomeControparteP2P(o, 'Chi vende') + ' ' + P2P_TOAST_RECAPITO, 6000);
   }
   if (mio && tipo === 'euro' && typeof avvisaRecapitoP2P === 'function') avvisaRecapitoP2P(o.id);
   if (p2pCampiOrdine === o.id) renderCampiP2P();
@@ -59144,10 +59414,44 @@ const P2P_FORME_RECAPITO = [
            {k: 'scade', et: 'Scade il (data e ora)', ph: '17/09/2026 alle 14:30'}],
    componi: c => 'Contanti al tabacchino\nPayCode: ' + c.ordine
      + '\nImporto: ' + c.importo + ' €\nScade: ' + c.scade},
-  {forma: 'contanti', riconosce: /contant|di persona|a mano|cash/i,
-   campi: [{k: 'luogo', et: 'Dove proponi di vedervi', ph: 'Bar Sport, piazza Garibaldi…'}],
-   componi: c => 'Contanti alla mano — propongo di vederci: ' + c.luogo}
+  /* IL CONTANTI DI PERSONA E' UN APPUNTAMENTO (1 ott 2026, richiesta di
+     Andrea): il luogo come INDIRIZZO VALIDO — i suggerimenti mentre si
+     scrive, o «📍 Usa la mia posizione», col punto nel campo nascosto —
+     e «🕒 Quando», col selettore del telefono. Il testo che viaggia lo
+     compone `testoAppuntamentoP2P`, gemella di chi legge; il ricordo
+     tiene il luogo e il punto, MAI l'ora: al prossimo scambio sarebbe
+     gia' passata. */
+  {forma: 'contanti', riconosce: /contant|di persona|a mano|cash/i, appuntamento: true,
+   campi: [{k: 'luogo', et: '📍 Dove proponi di vedervi', ph: 'Bar Sport, piazza Garibaldi…', luogo: true},
+           {k: 'quando', et: '🕒 Quando', tipo: 'datetime-local', nonRicordato: true},
+           {k: 'punto', tipo: 'hidden', facoltativo: true}],
+   componi: c => testoAppuntamentoP2P(c.luogo, quandoDaCampoP2P(c.quando), puntoDaCampoP2P(c.punto))}
 ];
+/* un campo del form del recapito: testo, di serie; il selettore di data
+   e ora; il nascosto del punto; il luogo coi suggerimenti sotto, la riga
+   del punto e «📍 Usa la mia posizione» (1 ott 2026). I valori entrano
+   col .value, dopo: mai interpolati — il patto del codice segreto */
+function campoRecapitoP2P(c){
+  const id = 'p2pCampoEuro_' + c.k;
+  if (c.tipo === 'hidden') return '<input type="hidden" id="' + id + '">';
+  if (c.tipo === 'datetime-local') {
+    const adesso = Math.floor(Date.now() / 1000);
+    return '<div class="field"><label for="' + id + '">' + esc(c.et) + '</label>'
+      + '<input type="datetime-local" id="' + id + '" min="' + valoreQuandoP2P(adesso)
+      + '" max="' + valoreQuandoP2P(adesso + P2P_APPUNTAMENTO_FUTURO_S) + '"></div>';
+  }
+  return '<div class="field"><label for="' + id + '">' + esc(c.et) + '</label>'
+    + '<input type="text" id="' + id + '" maxlength="' + CAMPO_MAX_TESTO + '" '
+    + 'autocomplete="off" autocapitalize="off" spellcheck="false" '
+    + (c.luogo ? 'oninput="luogoScrittoP2P(this.value)" ' : '')
+    + 'placeholder="' + esc(c.ph) + '">'
+    + (c.luogo
+       ? '<div id="p2pLuoghiLista" class="luoghi-lista"></div>'
+         + '<div id="p2pLuogoPunto" class="luogo-punto"></div>'
+         + '<button type="button" class="btn ghost luogo-qui" onclick="usaPosizioneLuogoP2P(this)">📍 Usa la mia posizione</button>'
+       : '')
+    + '</div>';
+}
 /* il metodo e' testo libero (vedi P2P_METODI): quel che nessuna forma
    riconosce ha la sua, generica, col ricordo suo per quel nome */
 function formaRecapito(metodo){
@@ -59567,6 +59871,14 @@ function renderCampiP2P(){
       ? (o.tabacchino ? {campi: {ordine: o.tabacchino.ordine, importo: o.tabacchino.importo,
                                  scade: dataTabacchinoP2P(o.tabacchino.scade)}} : null)
       : (recapitiMiei()[fr.forma] || null);
+    /* L'APPUNTAMENTO SI CAMBIA DA QUELLO MANDATO (1 ott 2026): luogo, ora
+       e punto si rileggono dal recapito gia' partito, non dal ricordo —
+       che l'ora non ce l'ha */
+    if (fr.appuntamento && miei.euro) {
+      const a = appuntamentoDaTestoP2P(miei.euro.testo);
+      if (a) salvato = {campi: {luogo: a.luogo, quando: valoreQuandoP2P(a.quando),
+                                punto: a.punto ? 'i:' + a.punto.lat + ',' + a.punto.lon : ''}};
+    }
     /* ⚠️ CON LA SCELTA DI CHI PRENDE LE PILLOLE NON CI SONO PIU':
        non c'e' niente da scegliere, e offrirlo lo stesso vorrebbe
        dire lasciar mandare un recapito che l'altra persona non puo'
@@ -59583,14 +59895,14 @@ function renderCampiP2P(){
             marchioMetodoP2P(m) + '</button>').join('') + '</div></div>'
         : (scelto ? '<div class="hint">💶 Il metodo dello scambio è <b>'
                     + marchioMetodoP2P(scelto) + '</b>.</div>' : '')) +
-      fr.campi.map(c =>
-        '<div class="field"><label for="p2pCampoEuro_' + c.k + '">' + esc(c.et) + '</label>' +
-        '<input type="text" id="p2pCampoEuro_' + c.k + '" maxlength="' + CAMPO_MAX_TESTO + '" ' +
-        'autocomplete="off" autocapitalize="off" spellcheck="false" ' +
-        'placeholder="' + esc(c.ph) + '"></div>').join('') +
-      '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">💶 ' +
-      (miei.euro ? 'Aggiorna il recapito' : 'Invia a chi compra') + '</button>' +
-      (miei.euro ? '<div class="hint">✓ Inviato: l\'ultimo che mandi è quello che vale.</div>' : '') +
+      fr.campi.map(campoRecapitoP2P).join('') +
+      (fr.appuntamento
+        ? '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">📍 ' +
+          (miei.euro ? 'Aggiorna l\'appuntamento' : 'Invia a chi compra') + '</button>' +
+          (miei.euro ? '<div class="hint">✓ Inviato: l\'ultimo che mandi è quello che vale, e chi compra riceve l\'avviso.</div>' : '')
+        : '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">💶 ' +
+          (miei.euro ? 'Aggiorna il recapito' : 'Invia a chi compra') + '</button>' +
+          (miei.euro ? '<div class="hint">✓ Inviato: l\'ultimo che mandi è quello che vale.</div>' : '')) +
       (fr.ricorda === false
         ? '<div class="hint">🧾 Non resta ricordato: ogni ordine Amazon è nuovo, e questi tre dati valgono solo per questo scambio.</div>'
         : '<div class="hint">📌 Resta ricordato su questo dispositivo: al prossimo scambio con questo metodo lo trovi già scritto qui, e parte solo quando lo invii tu.</div>');
@@ -59626,6 +59938,8 @@ function renderCampiP2P(){
     inp.value = scritti[id] !== undefined ? scritti[id]
               : (salvato && salvato.campi && salvato.campi[c.k]) || '';
   });
+  /* la riga del punto sotto il luogo, coi valori appena rimessi */
+  if (fr && fr.appuntamento && typeof aggiornaPuntoLuogoP2P === 'function') aggiornaPuntoLuogoP2P();
 }
 async function inviaCampoP2P(tipo, btn){
   const o = ordiniP2P()[p2pCampiOrdine];
@@ -59636,18 +59950,29 @@ async function inviaCampoP2P(tipo, btn){
      che ne tornasse un secondo bisogna dirlo qui, invece di
      ritrovarselo acceso per un elenco cambiato altrove. */
   if (!o || tipo !== 'euro') return;
-  let testo = '', daRicordare = null, tabRiga = null;
+  let testo = '', daRicordare = null, tabRiga = null, appuntamento = false;
   if (tipo === 'euro') {
     /* il form del metodo: si raccolgono i campi, si compone il testo
        che l'altra persona legge, e quel che si e' scritto si ricorda */
     const fr = formaRecapito(metodoRecapitoScelto(o));
+    appuntamento = !!fr.appuntamento;
     const campi = {};
     for (const c of fr.campi) {
       const inp = el('p2pCampoEuro_' + c.k);
       let v = String((inp && inp.value) || '').trim();
       if (c.k === 'iban') v = v.replace(/\s+/g, '').toUpperCase();
-      if (!v) { toast('Compila: ' + c.et); if (inp) inp.focus(); return; }
+      /* il punto e' facoltativo, e l'ora la giudica il suo giudice qui sotto */
+      if (!v && !c.facoltativo && c.tipo !== 'datetime-local') {
+        toast('Compila: ' + c.et); if (inp) inp.focus(); return;
+      }
       campi[c.k] = v;
+    }
+    /* L'ORA DELL'INCONTRO (1 ott 2026): scelta, non passata, entro una
+       settimana. L'indirizzo senza punto invece passa: la riga sotto il
+       campo l'ha gia' detto, gentile, che il navigatore non ci sara' */
+    if (appuntamento) {
+      const no = giudiceQuandoP2P(quandoDaCampoP2P(campi.quando), Math.floor(Date.now() / 1000));
+      if (no) { toast(no); el('p2pCampoEuro_quando')?.focus(); return; }
     }
     /* controllo LEGGERO, sulla sagoma e non sul contenuto: due lettere
        di paese, due cifre, e una lunghezza da IBAN */
@@ -59689,12 +60014,23 @@ async function inviaCampoP2P(tipo, btn){
       tabRiga = {ordine: campi.ordine, importo: campi.importo, scade: quando};
     }
     testo = fr.componi(campi).slice(0, CAMPO_MAX_TESTO);
-    daRicordare = fr.ricorda === false ? null : {forma: fr.forma, campi: campi};
+    /* il ricordo non tiene i campi che al prossimo scambio sarebbero
+       falsi: l'ora dell'incontro (1 ott 2026) */
+    const ricordo = Object.assign({}, campi);
+    fr.campi.forEach(c => { if (c.nonRicordato) delete ricordo[c.k]; });
+    daRicordare = fr.ricorda === false ? null : {forma: fr.forma, campi: ricordo};
     if (tabRiga) tabRiga.testo = testo;
   }
   const rip = bottoneInAttesa(btn, 'Invio…');
   try {
     await campoInvia(o, tipo, testo);
+    /* L'APPUNTAMENTO VA ANCHE AL SERVER (1 ott 2026): l'ora e il punto,
+       firmati, per il confronto del moderatore — prima del ridisegno, cosi'
+       la pagina non lo rimanda. Al piu' sei secondi: e' un aiuto, e se non
+       passa lo riprova il disegno della pagina */
+    if (appuntamento && typeof registraAppuntamentoP2P === 'function')
+      await Promise.race([registraAppuntamentoP2P(o.id).catch(() => false),
+                          new Promise(ok => setTimeout(ok, 6000))]);
     if (daRicordare) ricordaRecapito(daRicordare.forma, daRicordare.campi, testo);
     /* la riga segue la correzione: e' da li' che il conto alla
        rovescia di chi vende legge la data */
@@ -59710,7 +60046,7 @@ async function inviaCampoP2P(tipo, btn){
      passo dopo non e' mio (1 ott 2026). Fuori dal `try`: il recapito e'
      partito, e niente di quel che succede dopo puo' dire «non e' partito» */
   if (!(typeof dopoGestoP2P === 'function' && await dopoGestoP2P(o.id)))
-    toast('Recapito inviato a chi compra ✓');
+    toast(appuntamento ? 'Appuntamento inviato a chi compra ✓' : 'Recapito inviato a chi compra ✓');
 }
 
 /* ---- la disputa ----
@@ -60860,16 +61196,6 @@ function indiceDaChiaveP2P(mz, pub, max){
   }
   return 0;
 }
-/* PURA: la prova d'incontro come la dice il server (`incontro` della
-   rotta degli scambi), nella forma che la riga tiene (30 set 2026) */
-function presenzaDaServerP2P(inc){
-  if (!inc || !(Number(inc.ora) > 0)) return null;
-  return {ora: Math.floor(Number(inc.ora)),
-          distanza: (inc.distanza === null || inc.distanza === undefined) ? null : Number(inc.distanza),
-          posizioni: Number(inc.posizioni) || 0,
-          precisione: (inc.precisione === null || inc.precisione === undefined) ? null : Number(inc.precisione),
-          posizioniVia: !!inc.posizioni_via};
-}
 /* PURA: la riga nuova dai dati del server; `tk` e' la trade key
    ritrovata (null = solo da guardare) */
 function rigaDaServerP2P(id, s, tk, stato, adesso){
@@ -60900,8 +61226,10 @@ function rigaDaServerP2P(id, s, tk, stato, adesso){
   if (Number(s.cambio_presa) > 0) o.cambioPresa = Number(s.cambio_presa);
   if (s.preso) o.preso = true;
   if (!tk) o.soloVista = true;
-  /* la prova d'incontro del contanti (30 set 2026), dal server */
-  if (s.incontro && Number(s.incontro.ora) > 0) o.presenza = presenzaDaServerP2P(s.incontro);
+  /* «📍 Sono qui» del contanti (1 ott 2026), dal server: la mia ultima
+     presenza e l'ora di quella dell'altra parte */
+  const pr = presenzeDaServerP2P(s.presenze, s.giro);
+  if (pr) o.presenze = pr;
   if (stato === 'annullato' || stato === 'rifiutato') o.fermoA = fermoDaMomentiP2P(s.momenti);
   if (s.payout_fallito && lato === 'vendo' && stato === 'rilasciato') o.payoutFallito = true;
   return o;
@@ -60970,11 +61298,14 @@ function adottaScambiServerP2P(locali){
       }
       if (!(gia.metodi && gia.metodi.length) && Array.isArray(s.metodi) && s.metodi.length) { gia.metodi = s.metodi.map(String); mosso = true; }
       if (s.preso && !gia.preso) { gia.preso = true; mosso = true; }
-      /* LA PROVA D'INCONTRO ARRIVA DAL SERVER (30 set 2026): l'ha caricata
-         l'altro telefono, o l'altro dispositivo — qui si prende e si tiene */
-      if (s.incontro && Number(s.incontro.ora) > 0 && !(gia.presenza && gia.presenza.ora > 0)) {
-        gia.presenza = presenzaDaServerP2P(s.incontro); mosso = true;
-      }
+      /* «📍 SONO QUI» ARRIVA DAL SERVER (1 ott 2026): l'ha segnato l'altra
+         parte, o io da un altro dispositivo. Si unisce riga per riga, la
+         piu' nuova vince: una fotografia partita prima di un tocco non lo
+         cancella */
+      const giroS = Math.max(0, Math.floor(Number(s.giro) || 0));
+      const prLoc = gia.presenze && (gia.presenze.giro || 0) === giroS ? gia.presenze : null;
+      const pr = uniscePresenzeP2P(prLoc, presenzeDaServerP2P(s.presenze, giroS));
+      if (JSON.stringify(pr) !== JSON.stringify(gia.presenze || null)) { gia.presenze = pr; mosso = true; }
       /* la riga solo da guardare si PROMUOVE appena la chiave si ritrova */
       if (gia.soloVista && tk) {
         gia.pubTrade = tk.pub; gia.indice = tk.indice; delete gia.soloVista; mosso = true;
@@ -62796,7 +63127,7 @@ let P2P_TORNA_MS = 1000;           // la spunta «Fatto»: `let` per il banco
 const P2P_EVIDENZA_MS = 2400;      // quanto resta accesa la card
 /* i fogli che un gesto apre sulla pagina dello scambio: si chiudono col
    ritorno. Ogni altro foglio aperto vuol dire «sta facendo altro». */
-const P2P_FOGLI_GESTO = ['p2pHoldSheet', 'p2pIncassoSheet', 'p2pCampiSheet', 'p2pPresenzaSheet'];
+const P2P_FOGLI_GESTO = ['p2pHoldSheet', 'p2pIncassoSheet', 'p2pCampiSheet'];
 let p2pCardInEvidenza = {id: '', da: 0};
 let p2pRitornoInAttesa = '';       // l'id che aspetta il primo piano
 let p2pPagamentoAperto = '';       // lo scambio di cui si e' aperta la garanzia o la cauzione
@@ -62866,7 +63197,6 @@ async function tornaAdessoP2P(id){
   if (!altroFoglioAperto()) el('sheetBg').classList.remove('open');
   p2pHoldOrdine = ''; p2pIncassoOrdine = '';
   if (typeof p2pCampiOrdine !== 'undefined') p2pCampiOrdine = '';
-  if (typeof fermaOrologioPresenzaP2P === 'function') { fermaOrologioPresenzaP2P(); fermaCameraPresenzaP2P(); }
   p2pCardInEvidenza = {id: id, da: Date.now()};
   diarioP2P('gesto ' + String(id).slice(0, 8) + ': fatto, torno a «I miei scambi» (' + o.stato + ')');
   go('p2pmiei');
@@ -63476,7 +63806,7 @@ function cauzioneModP2P(d, bozze){
     + (spunta ? ' checked' : '')
     + ' onchange="bozzaModP2P(this.dataset.o, \'cauzione\', this.checked ? this.dataset.c : \'\')">'
     + '<span>🔐 <b>Brucia la cauzione di ' + chi + '</b>: metà va a ' + altro + ', metà al servizio. '
-    + 'Solo se non si è presentato all\'incontro (nessuna prova «Siamo insieme»): se no resta a chi l\'ha messa.</span></label>';
+    + 'Solo se non si è presentato all\'incontro (nessun suo «📍 Sono qui» all\'ora e al luogo dell\'appuntamento): se no resta a chi l\'ha messa.</span></label>';
 }
 function cauzioneFraseModP2P(ordine){
   const c = cauzioneModSceltaP2P(ordine);
@@ -63687,18 +64017,95 @@ function scadenzaGaranziaModP2P(d, info){
   const f = finestraGaranziaP2P(info);
   return (d && d.garanzia_il > 0 && f > 0) ? d.garanzia_il + f : 0;
 }
-/* LA PROVA D'INCONTRO DEL CONTANTI, AL MODERATORE (30 set 2026): sugli
-   scambi in contanti di persona si dice SEMPRE — «confermato alle…» o
-   «nessuna prova» —, sugli altri solo quando una prova c'e'. La cautela
-   sul GPS sta scritta accanto, che e' dove la si legge prima di decidere. */
+/* LA PROVA D'INCONTRO DEL CONTANTI, AL MODERATORE (30 set 2026; dal 1
+   ott 2026 i due «📍 Sono qui» e l'appuntamento): sugli scambi in contanti
+   di persona si dice SEMPRE — l'esito del confronto, o «nessuna prova» —,
+   sugli altri solo quando c'e' qualcosa. IL GIUDIZIO E' DEL SERVER
+   (`_confronto_presenze_p2p`: probabile, lontani, ore diverse, solo uno,
+   nessuna) e qui ci sono solo le parole, una riga per l'esito e una per
+   l'appuntamento. La prova COL QR di prima resta leggibile com'era. La
+   cautela sul GPS sta scritta accanto, che e' dove la si legge prima di
+   decidere. */
+const CAUTELA_INCONTRO_MOD = 'Le ore sono quelle del server di Barattolo all\'arrivo di ogni presenza, e le firme sono verificate. La posizione viene dal GPS dei telefoni e si può falsificare: è una conferma, non una prova assoluta.';
+function durataModP2P(s){
+  const min = Math.round(Math.abs(Number(s) || 0) / 60);
+  if (min < 1) return 'meno di un minuto';
+  if (min < 60) return min + ' min';
+  return Math.floor(min / 60) + ' h' + (min % 60 ? ' ' + (min % 60) + ' min' : '');
+}
+function metriModP2P(m){
+  const n = Math.round(Number(m));
+  if (!Number.isFinite(n)) return '';
+  return n >= 1000 ? String(Math.round(n / 100) / 10).replace('.', ',') + ' km' : fmt(n) + ' m';
+}
+/* la riga dell'appuntamento: l'ora fissata, e per ogni presenza se era
+   all'ora (entro la finestra del server) e a quanto dal luogo — rispetto
+   all'appuntamento IN VIGORE quando la presenza e' arrivata */
+function rigaAppuntamentoModP2P(c){
+  const a = c && c.appuntamento;
+  if (!a) return '';
+  let s = '🕒 Appuntamento ' + (a.ora > 0 ? quandoAppuntamentoP2P(a.ora) : 'senza ora')
+    + (a.punto ? '' : ', luogo scritto a mano');
+  const pezzo = (k, nome) => {
+    const r = c[k] && c[k].appuntamento;
+    if (!r) return nome + ' prima che fosse fissato';
+    const t = r.scarto_s === null || r.scarto_s === undefined ? ''
+      : r.all_ora ? 'all\'ora dell\'appuntamento'
+      : durataModP2P(r.scarto_s) + (r.scarto_s < 0 ? ' prima dell\'appuntamento' : ' dopo l\'appuntamento');
+    const d = r.dist_luogo === null || r.dist_luogo === undefined ? '' : 'a ' + metriModP2P(r.dist_luogo) + ' dal luogo';
+    return nome + ' ' + ([t, d].filter(Boolean).join(', ') || 'senza niente da confrontare');
+  };
+  const rc = c.compra && c.compra.appuntamento, rv = c.vende && c.vende.appuntamento;
+  if (rc && rv && rc.all_ora && rv.all_ora) {
+    const dc = rc.dist_luogo, dv = rv.dist_luogo, ha = x => x !== null && x !== undefined;
+    s += ': presenti all\'ora dell\'appuntamento'
+      + (ha(dc) && ha(dv) ? ', chi compra a ' + metriModP2P(dc) + ' e chi vende a ' + metriModP2P(dv) + ' dal luogo'
+         : ha(dc) ? ', chi compra a ' + metriModP2P(dc) + ' dal luogo'
+         : ha(dv) ? ', chi vende a ' + metriModP2P(dv) + ' dal luogo' : '');
+  } else {
+    const pezzi = [['compra', 'chi compra'], ['vende', 'chi vende']].filter(([k]) => c[k]).map(([k, n]) => pezzo(k, n));
+    if (pezzi.length) s += ': ' + pezzi.join('; ');
+  }
+  if (a.cambiato_dopo) s += ' · ⚠️ cambiato dopo la prima presenza';
+  else if (a.versioni > 1) s += ' · cambiato ' + (a.versioni - 1) + (a.versioni === 2 ? ' volta' : ' volte');
+  return s;
+}
+function righeConfrontoModP2P(c){
+  if (!c) return [];
+  const ora = p => oraPresenzaP2P(p && p.ora);
+  const prec = (a, b) => {
+    const x = [a, b].filter(v => v !== null && v !== undefined && v > 0);
+    return x.length ? ' (precisione ±' + metriModP2P(Math.max.apply(null, x)) + ')' : '';
+  };
+  let testa;
+  if (c.compra && c.vende) {
+    const coppia = 'chi compra ' + ora(c.compra) + ', chi vende ' + ora(c.vende);
+    const dist = c.distanza !== null && c.distanza !== undefined
+      ? ' — i telefoni a ' + metriModP2P(c.distanza) + prec(c.compra.acc, c.vende.acc)
+      : ' — ' + (c.compra.posizione || c.vende.posizione ? 'la posizione di un telefono solo' : 'senza posizioni');
+    testa = c.esito === 'ore_diverse'
+      ? '📍 Presenti tutti e due, ma non insieme: ' + coppia + ' (' + durataModP2P(c.scarto_s) + ' fra le due)'
+      : (c.esito === 'lontani' ? '📍 Alla stessa ora, ma lontani: ' : '📍 Incontro probabile: ') + coppia + dist;
+  } else if (c.compra || c.vende) {
+    const k = c.compra ? 'compra' : 'vende';
+    testa = '📍 Presente solo ' + (k === 'compra' ? 'chi compra ' : 'chi vende ') + ora(c[k])
+      + (c[k].posizione ? '' : ', senza posizione');
+  } else testa = '📍 Nessuna prova d\'incontro';
+  const righe = [testa + (c.posizioni_via ? ' · posizioni cancellate' : '')];
+  if (c.appuntamento) righe.push(rigaAppuntamentoModP2P(c));
+  return righe;
+}
 function rigaIncontroModP2P(d, aperta){
   const contanti = contantiAManoP2P(String(d.metodi || '').split(','));
   const p = d.incontro;
   if (p && p.ora > 0)
-    return '<div class="mod-riga mod-incontro">🤝 Incontro confermato ' + esc(quandoIncontroP2P(p.ora))
+    return '<div class="mod-riga mod-incontro">🤝 Incontro confermato col codice (QR) ' + esc(quandoIncontroP2P(p.ora))
       + esc(distanzaIncontroP2P(p)) + (p.posizioni_via ? ' · posizioni cancellate' : '') + '</div>'
       + (aperta ? '<div class="hint">Le due firme sono verificate. La posizione viene dal GPS dei telefoni e si può falsificare: è una conferma, non una prova assoluta.</div>' : '');
-  return contanti ? '<div class="mod-riga mod-incontro">🤝 Nessuna prova d\'incontro</div>' : '';
+  const righe = righeConfrontoModP2P(d.presenze);
+  if (!righe.length) return contanti ? '<div class="mod-riga mod-incontro">📍 Nessuna prova d\'incontro</div>' : '';
+  return righe.map(r => '<div class="mod-riga mod-incontro">' + esc(r) + '</div>').join('')
+    + (aperta ? '<div class="hint">' + esc(CAUTELA_INCONTRO_MOD) + '</div>' : '');
 }
 const MOD_STATI_P2P = {aperta: 'Aperta', presa: 'Presa', chiusa: 'Chiusa'};
 const MOD_CHIUSA_DA_P2P = {moderatore: 'decisa da un moderatore', parti: 'chiusa dalle parti',
@@ -63821,60 +64228,59 @@ function renderModerazioneP2P(){
 }
 /* ============ fine della moderazione delle dispute P2P ============ */
 
-/* ============ IL CONTANTI DI PERSONA: LA PROVA D'INCONTRO (30 set 2026) ============
-   (docs/STUDIO-CONTANTI-A-MANO-2026-09-25.md, §2b; decisione di Andrea:
-   tutto attivo dal 10 ottobre). Una banconota non lascia ricevuta: in
-   una disputa sul contanti il moderatore aveva una parola contro
-   l'altra. Il gesto «Siamo insieme» gli da' UN FATTO: i due telefoni
-   erano insieme alla stessa ora, e lo hanno firmato tutt'e due.
+/* ============ IL CONTANTI DI PERSONA: «📍 SONO QUI» E L'APPUNTAMENTO (1 ott 2026) ============
+   (docs/STUDIO-CONTANTI-A-MANO-2026-09-25.md, §2b; il 30 set 2026 col QR,
+   rifatto il 1 ott 2026 — decisione di Andrea dopo la prova vera). Una
+   banconota non lascia ricevuta: in una disputa sul contanti il
+   moderatore aveva una parola contro l'altra. Il 30 set era nato «🤝
+   Siamo insieme» — un telefono mostrava un QR firmato e l'altro lo
+   inquadrava —, ma alla prova vera il QR non aggiungeva sicurezza: si
+   inquadra anche da lontano, da una foto mandata in chat. Il QR, lo
+   scanner di Telegram e la fotocamera se ne sono andati da qui.
 
-   COME. Chi MOSTRA compone una nota — un evento Nostr di kind
-   P2P_KIND_PRESENZA, tag `d` = ordine e `ruolo` = mostra, nel
-   contenuto un nonce e (se l'ha permessa) la posizione — la firma con
-   la chiave usa-e-getta dello scambio e la fa disegnare come QR, in
-   una riga compatta: prefisso|ordine|chiave|ora|nonce|posizione|firma.
-   Chi LEGGE ricostruisce la nota dalla riga, la VERIFICA (firma vera,
-   ordine mio, chiave dell'altra parte, ora vicina), e la CONTROFIRMA
-   con la propria chiave in una seconda nota (`ruolo` = legge, tag `e`
-   = l'id della prima, la propria posizione se vuole). Le due note
-   partono insieme a `/api/p2p/presenza`, che le verifica daccapo contro
-   le due chiavi che il coordinatore ha detto per l'ordine e scrive la
-   riga; la risposta torna nella pagina come «✅ Incontro confermato».
-   L'altro telefono la ritrova dalla rotta degli scambi (`incontro`).
+   ADESSO LE PRESENZE SONO DUE E INDIPENDENTI. Ognuno, quando arriva,
+   tocca «📍 Sono qui» (`sonoQuiP2P`): il telefono prende la posizione —
+   dentro Telegram col suo LocationManager, fuori dal browser
+   (`posizioneP2P`) —, firma con la chiave usa-e-getta dello scambio una
+   nota (`notaSonoQuiP2P`: kind P2P_KIND_PRESENZA, `ruolo` = qui) e la
+   manda a `/api/p2p/sono-qui`. Il server la verifica contro le chiavi che
+   il coordinatore ha detto, scrive l'ORA DEL SUO OROLOGIO coi secondi e
+   risponde con le due righe che le parti vedono (`presenze`). E'
+   FACOLTATIVO per la privacy, ma quando lo si preme registra SEMPRE ora
+   e posizione: niente casella. Se il telefono la posizione non la da',
+   la presenza parte con la sola ora e la pagina lo dice chiaro.
 
-   IL CONTENUTO SI SCRIVE CON UNA FUNZIONE SOLA (`contenutoPresenzaP2P`):
-   e' la stringa che si firma, e chi legge la deve rifare byte per byte
-   dalla riga del QR — per questo i numeri della posizione viaggiano
-   gia' come STRINGHE (cinque decimali, precisione intera), e non si
-   passa da JSON.stringify di un oggetto, che potrebbe ordinare o
-   arrotondare diversamente su un altro browser.
+   L'APPUNTAMENTO lo fissa chi vende nel recapito «📍 Dove vedervi» — che
+   viaggia cifrato fra i due telefoni, come ogni recapito — con «🕒
+   Quando» e un INDIRIZZO VALIDO: mentre scrive, i suggerimenti di
+   `/api/p2p/luoghi` (Photon, dati OpenStreetMap, passando dal nostro
+   server: fuori esce solo il testo cercato), oppure «📍 Usa la mia
+   posizione». Partito il recapito, l'ora e il punto vanno anche al
+   server in una nota sua (`registraAppuntamentoP2P`): servono al
+   confronto che legge il moderatore, e il testo dell'indirizzo li' non
+   arriva mai. Per l'altra persona il punto diventa «🧭 Apri nel
+   navigatore» (`apriNavigatoreP2P`).
 
-   LEGGERE IL CODICE, tre strade in ordine: lo scanner di Telegram
-   (`showScanQrPopup`, iPhone e Android dentro l'app), la fotocamera del
-   browser dove sa leggere i codici (`BarcodeDetector`, Chrome Android:
-   e' l'APK), e — dove nessuna delle due c'e' — incollare il codice che
-   l'altra persona ha copiato dal suo foglio. Un telefono che non sa
-   leggere non deve restare senza il gesto.
-
-   LA POSIZIONE E' FACOLTATIVA E CONSIGLIATA: la casella nel riquadro e'
-   accesa di serie, e il browser chiede il suo permesso; un no, o un
-   timeout, e' una nota senza posizione, mai un gesto che non parte. Il
-   GPS si puo' falsificare, e la pagina lo dice: e' una conferma. */
+   STA FUORI DAL MOTORE apposta: il motore dello scambio non chiama mai
+   il server di Barattolo (una sentinella conta le sue chiamate e
+   pretende zero), e qui le chiamate sono quattro. Le funzioni PURE che
+   disegnano — le righe delle presenze, il riquadro dell'appuntamento, le
+   gemelle del testo — stanno nel motore accanto al riquadro del
+   contanti, e da li' questo blocco si chiama con `typeof`. */
 const P2P_KIND_PRESENZA = 27383;
-const P2P_PRESENZA_FINESTRA_S = 600;
-const P2P_PRESENZA_PREFISSO = 'BRTL-INCONTRO-1';
-const P2P_PRESENZA_ATTESA_MS = 5000;     /* il foglio di chi mostra chiede al server ogni tanto */
-const P2P_PRESENZA_ATTESA_MAX_MS = 10 * 60 * 1000;
-let p2pPresenzaOrdine = '', p2pPresenzaTesto = '', p2pPresenzaFlusso = null,
-    p2pPresenzaTimer = null, p2pPresenzaOrologio = null, p2pPresenzaInVolo = false;
+let p2pSonoQuiInVolo = false;
+let P2P_POSIZIONE_ATTESA_MS = 10000;    /* `let`: il banco la accorcia */
 
-/* PURO: il contenuto della nota, UNA stesura per chi mostra e chi legge */
+/* PURO: il contenuto della nota di presenza, scritto a mano (mai
+   JSON.stringify di un oggetto: le stringhe dei numeri restano quelle) */
 function contenutoPresenzaP2P(nonce, geo){
   return '{"v":1,"nonce":"' + String(nonce || '') + '","geo":'
     + (geo ? '{"lat":' + geo.lat + ',"lon":' + geo.lon + ',"acc":' + geo.acc + '}' : 'null') + '}';
 }
-/* PURO: la posizione del browser nella forma che viaggia — stringhe con
-   cinque decimali (~1 m), precisione intera — o null */
+/* PURO: la posizione nella forma che viaggia — stringhe con cinque
+   decimali (~1 m), precisione intera — o null. Accetta la forma del
+   browser (`coords.latitude`) e quella del LocationManager di Telegram,
+   gia' riportata a quella dal chiamante. */
 function geoPresenzaP2P(pos){
   if (!pos || !pos.coords) return null;
   const la = Number(pos.coords.latitude), lo = Number(pos.coords.longitude),
@@ -63884,65 +64290,21 @@ function geoPresenzaP2P(pos){
   return {lat: la.toFixed(5), lon: lo.toFixed(5),
           acc: String(Number.isFinite(ac) && ac >= 0 ? Math.round(ac) : 0)};
 }
-/* PURI: le due note, non firmate */
-function notaMostraP2P(ordine, pub, ora, nonce, geo){
+/* PURI: le due note, non firmate. Il RUOLO e' la guardia del server:
+   una presenza non passa per un appuntamento, ne' il contrario */
+function notaSonoQuiP2P(ordine, pub, ora, nonce, geo){
   return {kind: P2P_KIND_PRESENZA, pubkey: pub, created_at: ora,
-          tags: [['d', String(ordine)], ['ruolo', 'mostra']],
+          tags: [['d', String(ordine)], ['ruolo', 'qui']],
           content: contenutoPresenzaP2P(nonce, geo)};
 }
-function notaLeggeP2P(ordine, pub, ora, idMostrata, geo){
+function contenutoAppuntamentoP2P(quando, punto){
+  return '{"v":1,"ora":' + Math.max(0, Math.floor(Number(quando) || 0)) + ',"geo":'
+    + (punto ? '{"lat":' + punto.lat + ',"lon":' + punto.lon + '}' : 'null') + '}';
+}
+function notaAppuntamentoP2P(ordine, pub, ora, quando, punto){
   return {kind: P2P_KIND_PRESENZA, pubkey: pub, created_at: ora,
-          tags: [['d', String(ordine)], ['ruolo', 'legge'], ['e', String(idMostrata)]],
-          content: contenutoPresenzaP2P('', geo)};
-}
-/* PURO: la riga del QR da una nota mostrata firmata. TUTTA MAIUSCOLA e
-   coi due punti come separatore, per la stessa ragione della invoice:
-   cosi' entra nella modalita' ALFANUMERICA del QR (A-Z, 0-9, spazio e
-   `$%*+-./:`), che con 330 caratteri fa un codice piu' rado di un
-   quarto — e in un bar, con poca luce, e' la differenza fra un colpo e
-   tre. L'esadecimale e l'id dell'ordine si rimettono in minuscolo
-   leggendo; la posizione ha solo cifre, punto, barra e meno. */
-function testoQrPresenzaP2P(ev, nonce, geo){
-  return [P2P_PRESENZA_PREFISSO, ev.tags[0][1], ev.pubkey, String(ev.created_at), String(nonce),
-          geo ? geo.lat + '/' + geo.lon + '/' + geo.acc : '-', ev.sig].join(':').toUpperCase();
-}
-/* PURO: dalla riga del QR alla nota di chi mostra, ricostruita e
-   VERIFICATA — e' il codice giusto, di QUESTO scambio, firmato
-   dall'ALTRA parte, di adesso. Torna {ok, nota} o {ok:false, perche} */
-function leggiQrPresenzaP2P(testo, o, adesso){
-  const NT = window.NostrTools;
-  /* la riga viaggia maiuscola (vedi `testoQrPresenzaP2P`): qui si
-     rimette in minuscolo quel che era minuscolo — esadecimale e id */
-  const p = String(testo || '').trim().toUpperCase().split(':');
-  if (p.length !== 7 || p[0] !== P2P_PRESENZA_PREFISSO)
-    return {ok: false, perche: 'Questo non è un codice d\'incontro di Barattolo'};
-  const ordine = p[1].toLowerCase(), pub = p[2].toLowerCase(), oraTxt = p[3],
-        nonce = p[4].toLowerCase(), geoTxt = p[5], sig = p[6].toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(pub) || !/^[0-9a-f]{128}$/.test(sig)
-      || !/^[0-9a-f]{8,64}$/.test(nonce) || !/^[0-9]{1,12}$/.test(oraTxt))
-    return {ok: false, perche: 'Codice illeggibile'};
-  if (!o || ordine !== String(o.id).toLowerCase())
-    return {ok: false, perche: 'Il codice è di un altro scambio'};
-  if (!o.peer || pub !== o.peer)
-    return {ok: false, perche: 'Il codice non è firmato dall\'altra parte di questo scambio'};
-  let geo = null;
-  if (geoTxt !== '-') {
-    const g = geoTxt.split('/');
-    if (g.length !== 3 || g.some(x => !/^-?[0-9]+(\.[0-9]+)?$/.test(x)))
-      return {ok: false, perche: 'Codice illeggibile'};
-    geo = {lat: g[0], lon: g[1], acc: g[2]};
-  }
-  const ora = Number(oraTxt);
-  const ades = Number(adesso) > 0 ? Number(adesso) : Math.floor(Date.now() / 1000);
-  if (Math.abs(ades - ora) > P2P_PRESENZA_FINESTRA_S)
-    return {ok: false, perche: 'Il codice è vecchio: fatelo rifare'};
-  if (!NT || typeof NT.verifyEvent !== 'function')
-    return {ok: false, perche: 'La libreria delle firme non è arrivata'};
-  const ev = notaMostraP2P(ordine, pub, ora, nonce, geo);
-  ev.id = NT.getEventHash(ev);
-  ev.sig = sig;
-  if (!NT.verifyEvent(ev)) return {ok: false, perche: 'La firma del codice non torna'};
-  return {ok: true, nota: ev};
+          tags: [['d', String(ordine)], ['ruolo', 'appuntamento']],
+          content: contenutoAppuntamentoP2P(quando, punto)};
 }
 /* la chiave usa-e-getta di QUESTO scambio, su questo dispositivo, o null */
 function chiaveOrdinePresenzaP2P(o){
@@ -63954,216 +64316,246 @@ function chiaveOrdinePresenzaP2P(o){
     return tk.pub === o.pubTrade ? tk : null;
   } catch(e) { return null; }
 }
-/* la posizione, se la casella e' accesa e il browser la da' entro pochi
-   secondi; un no e' null, mai un errore */
-function posizionePresenzaP2P(){
-  const c = el('p2pPresenzaGps');
-  const vuole = !c || c.checked;
-  if (!vuole || !navigator.geolocation) return Promise.resolve(null);
+/* LA POSIZIONE, entro P2P_POSIZIONE_ATTESA_MS; un no o il silenzio e'
+   null, mai un errore. Dentro Telegram (Bot API 8.0) si chiede al SUO
+   LocationManager: su Android la WebView di Telegram al GPS del browser
+   spesso non arriva, e il permesso lo chiede Telegram con la sua voce.
+   Fuori — l'APK, il sito — al browser. */
+function posizioneP2P(){
   return new Promise(ok => {
     let fatto = false;
-    const fine = pos => { if (!fatto) { fatto = true; ok(geoPresenzaP2P(pos)); } };
+    const fine = g => { if (!fatto) { fatto = true; ok(g || null); } };
+    setTimeout(() => fine(null), P2P_POSIZIONE_ATTESA_MS + 1500);
+    const browser = () => {
+      if (!navigator.geolocation) { fine(null); return; }
+      try {
+        navigator.geolocation.getCurrentPosition(pos => fine(geoPresenzaP2P(pos)), () => fine(null),
+          {enableHighAccuracy: true, timeout: P2P_POSIZIONE_ATTESA_MS, maximumAge: 30000});
+      } catch(e) { fine(null); }
+    };
+    const lm = (tg && tg.initData && typeof tg.isVersionAtLeast === 'function'
+                && tg.isVersionAtLeast('8.0')) ? tg.LocationManager : null;
+    if (!lm || typeof lm.init !== 'function') { browser(); return; }
     try {
-      navigator.geolocation.getCurrentPosition(fine, () => fine(null),
-        {enableHighAccuracy: true, timeout: 8000, maximumAge: 60000});
-    } catch(e) { fine(null); }
-    setTimeout(() => fine(null), 9000);
+      const chiedi = () => {
+        if (!lm.isLocationAvailable) { browser(); return; }
+        lm.getLocation(d => fine(d ? geoPresenzaP2P({coords: {latitude: d.latitude,
+          longitude: d.longitude, accuracy: d.horizontal_accuracy}}) : null));
+      };
+      if (lm.isInited) chiedi(); else lm.init(chiedi);
+    } catch(e) { browser(); }
   });
 }
-/* ---- chi MOSTRA ---- */
-async function presenzaMostraP2P(){
+
+/* ---- «📍 SONO QUI» ----
+   Il tocco: la posizione (se c'e'), la nota firmata, il server. La
+   risposta porta le due righe che la pagina disegna; la riga dello
+   scambio le tiene. Ognuno lo preme quando vuole, senza l'altro, e lo
+   puo' ripremere — la prima non sparisce (vedi il server). */
+async function sonoQuiP2P(){
   const o = ordiniP2P()[p2pOrdineAperto];
-  if (!o || !scambioInContantiP2P(o)) return;
+  if (!o || !scambioInContantiP2P(o) || p2pSonoQuiInVolo) return;
   if (o.soloVista) { toast('I gesti di questo scambio si fanno dal dispositivo dove l\'hai aperto'); return; }
   const NT = window.NostrTools;
   const tk = chiaveOrdinePresenzaP2P(o);
   if (!NT || !tk) { toast('La chiave di questo scambio non è su questo dispositivo'); return; }
   haptic();
-  const geo = await posizionePresenzaP2P();
-  const nonce = NT.utils.bytesToHex(crypto.getRandomValues(new Uint8Array(8)));
-  const ev = NT.finalizeEvent(notaMostraP2P(o.id, tk.pub, Math.floor(Date.now() / 1000), nonce, geo),
-                              NT.utils.hexToBytes(tk.sk));
-  p2pPresenzaOrdine = o.id;
-  p2pPresenzaTesto = testoQrPresenzaP2P(ev, nonce, geo);
-  renderPresenzaP2P('mostra', {geo: !!geo});
-  el('sheetBg').classList.add('open');
-  el('p2pPresenzaSheet').classList.add('open');
-  const ok = await disegnaQr(el('p2pPresenzaQr'), p2pPresenzaTesto, 'Alphanumeric');
-  if (!ok) toast('Non riesco a disegnare il codice: usa «Copia il codice»');
-  avviaOrologioPresenzaP2P(o.id);
-}
-function copiaPresenzaP2P(){
-  if (!p2pPresenzaTesto) return;
-  navigator.clipboard?.writeText(p2pPresenzaTesto);
-  toast('📋 Codice copiato');
-}
-/* il foglio di chi mostra si chiude da solo quando il server ha la prova:
-   la chiede ogni P2P_PRESENZA_ATTESA_MS, per al piu' dieci minuti, e solo
-   finche' il foglio e' aperto */
-function avviaOrologioPresenzaP2P(id){
-  fermaOrologioPresenzaP2P();
-  const da = Date.now();
-  p2pPresenzaOrologio = setInterval(async () => {
-    const f = el('p2pPresenzaSheet');
-    if (!f || !f.classList.contains('open') || Date.now() - da > P2P_PRESENZA_ATTESA_MAX_MS) {
-      fermaOrologioPresenzaP2P(); return;
-    }
-    if (!(await chiediScambiServerP2P())) return;
-    try { adottaScambiServerP2P(ordiniP2P()); } catch(e) {}
-    const o = ordiniP2P()[id];
-    if (o && o.presenza && o.presenza.ora > 0) {
-      fermaOrologioPresenzaP2P();
-      chiudiFoglioP2P('p2pPresenzaSheet');
-      if (p2pOrdineAperto === id) renderOrdineP2P();
-      /* «SIAMO INSIEME» NON RIPORTA AI MIEI SCAMBI (1 ott 2026, ritocco
-         di Andrea a 86a11dd): si e' all'incontro e il passo dopo arriva
-         subito — si resta nella pagina, dai due lati */
-      toast('🤝 Incontro confermato');
-    }
-  }, P2P_PRESENZA_ATTESA_MS);
-}
-function fermaOrologioPresenzaP2P(){
-  if (p2pPresenzaOrologio) clearInterval(p2pPresenzaOrologio);
-  p2pPresenzaOrologio = null;
-}
-/* ---- chi LEGGE ---- */
-function presenzaLeggiP2P(){
-  const o = ordiniP2P()[p2pOrdineAperto];
-  if (!o || !scambioInContantiP2P(o)) return;
-  if (o.soloVista) { toast('I gesti di questo scambio si fanno dal dispositivo dove l\'hai aperto'); return; }
-  if (!o.peer) { toast('Non so ancora chi è l\'altra parte: aspetta che lo scambio sia preso'); return; }
-  if (!chiaveOrdinePresenzaP2P(o)) { toast('La chiave di questo scambio non è su questo dispositivo'); return; }
-  haptic();
-  p2pPresenzaOrdine = o.id;
-  /* 1) dentro Telegram: lo scanner suo, su iPhone e Android */
-  if (tg?.initData && tg.isVersionAtLeast?.('6.4') && typeof tg.showScanQrPopup === 'function') {
-    try {
-      tg.showScanQrPopup({text: 'Inquadra il codice sul telefono dell\'altra persona'}, testo => {
-        if (!presenzaRicevutaP2P(testo, o.id)) return false;
-        try { tg.closeScanQrPopup(); } catch(e) {}
-        return true;
-      });
-      return;
-    } catch(e) {}
-  }
-  /* 2) la fotocamera del browser, dove sa leggere i codici; 3) incollare */
-  const camera = !!(window.BarcodeDetector && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-  renderPresenzaP2P('leggi', {camera: camera});
-  el('sheetBg').classList.add('open');
-  el('p2pPresenzaSheet').classList.add('open');
-  if (camera) avviaCameraPresenzaP2P();
-}
-/* il codice letto (dallo scanner, dalla fotocamera o incollato): si
-   verifica SUBITO, e se regge parte la controfirma. Torna true se e'
-   stato accettato — chi legge in loop smette li' */
-function presenzaRicevutaP2P(testo, id){
-  const o = ordiniP2P()[id];
-  if (!o || p2pPresenzaInVolo) return false;
-  const r = leggiQrPresenzaP2P(testo, o, Math.floor(Date.now() / 1000));
-  if (!r.ok) { toast(r.perche); return false; }
-  firmaEInviaPresenzaP2P(o, r.nota);
-  return true;
-}
-function incollaPresenzaP2P(){
-  const t = el('p2pPresenzaIncolla');
-  if (!t || !t.value.trim()) { toast('Incolla prima il codice'); return; }
-  presenzaRicevutaP2P(t.value, p2pPresenzaOrdine);
-}
-async function firmaEInviaPresenzaP2P(o, mostrata){
-  const NT = window.NostrTools;
-  const tk = chiaveOrdinePresenzaP2P(o);
-  if (!NT || !tk) { toast('La chiave di questo scambio non è su questo dispositivo'); return; }
-  fermaCameraPresenzaP2P();
-  p2pPresenzaInVolo = true;
-  const rip = attesaP2P('Sto registrando l\'incontro…');
+  p2pSonoQuiInVolo = true;
+  const rip = attesaP2P('Registro ora e posizione…');
   try {
-    const geo = await posizionePresenzaP2P();
-    const letta = NT.finalizeEvent(
-      notaLeggeP2P(o.id, tk.pub, Math.floor(Date.now() / 1000), mostrata.id, geo),
-      NT.utils.hexToBytes(tk.sk));
-    const r = await fetch(`${API_BASE}/p2p/presenza`, {method: 'POST',
+    const geo = await posizioneP2P();
+    const nonce = NT.utils.bytesToHex(crypto.getRandomValues(new Uint8Array(8)));
+    const nota = NT.finalizeEvent(notaSonoQuiP2P(o.id, tk.pub, Math.floor(Date.now() / 1000), nonce, geo),
+                                  NT.utils.hexToBytes(tk.sk));
+    const r = await fetch(`${API_BASE}/p2p/sono-qui`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({ordine: o.id, mostrata: mostrata, letta: letta})});
+      body: JSON.stringify({ordine: o.id, nota: nota})});
     let d = null;
     try { d = await r.json(); } catch(e) {}
     if (!r.ok) throw new Error((d && d.detail) || 'Il server ha detto di no');
-    segnaIncontroP2P(o.id, d && d.incontro);
-    chiudiFoglioP2P('p2pPresenzaSheet');
-    /* ...e si resta anche da questo lato: vedi la sonda di chi mostra */
-    toast('🤝 Incontro confermato');
+    const agg = ordiniP2P()[o.id];
+    if (agg) {
+      agg.presenze = uniscePresenzeP2P(agg.presenze, presenzeDaServerP2P(d && d.presenze, d && d.giro));
+      scriviOrdineP2P(agg);
+    }
+    if (p2pOrdineAperto === o.id) renderOrdineP2P();
+    /* LA POSIZIONE NEGATA SI DICE CHIARO: la presenza c'e', con la sola ora */
+    if (d && d.posizione) toast('📍 Presenza registrata ' + oraPresenzaP2P(d.ora));
+    else toast('📍 Presenza registrata ' + oraPresenzaP2P(d && d.ora)
+               + ', SENZA posizione: il telefono non l\'ha data', 6000);
   } catch(e) {
-    toast('Incontro non registrato: ' + String(e && e.message || e));
-  } finally { rip(); p2pPresenzaInVolo = false; }
+    toast('Presenza non registrata: ' + String(e && e.message || e));
+  } finally { rip(); p2pSonoQuiInVolo = false; }
 }
-/* la prova entra nella riga dello scambio, e la pagina si ridisegna */
-function segnaIncontroP2P(id, inc){
+/* LA PRESENZA DELL'ALTRO SI VEDE PRESTO: con la pagina di uno scambio in
+   contanti aperta e i sats in garanzia, ogni P2P_CONTANTI_OGNI_MS si
+   chiede la fotografia degli scambi al server (la stessa del battito
+   dei due minuti) — finche' l'altra parte non ha segnato la sua. Gira
+   nell'unico interval dell'app, e a pagina nascosta tace. */
+let P2P_CONTANTI_OGNI_MS = 20000;
+let p2pContantiBattito = 0;
+function battitoContantiP2P(){
+  const adesso = Date.now();
+  if (adesso - p2pContantiBattito < P2P_CONTANTI_OGNI_MS) return;
+  if (document.visibilityState === 'hidden' || vistaAttivaP2P() !== 'view-p2pordine') return;
+  const o = p2pOrdineAperto && ordiniP2P()[p2pOrdineAperto];
+  if (!o || !scambioInContantiP2P(o) || P2P_DISPUTABILI.indexOf(o.stato) < 0) return;
+  if (o.presenze && o.presenze.altra) return;
+  p2pContantiBattito = adesso;
+  chiediScambiServerP2P().then(ok => {
+    if (!ok) return;
+    try { adottaScambiServerP2P(ordiniP2P()); } catch(e) {}
+    if (p2pOrdineAperto === o.id && vistaAttivaP2P() === 'view-p2pordine') renderOrdineP2P();
+  }).catch(() => {});
+}
+
+/* ---- L'APPUNTAMENTO AL SERVER ----
+   Partito il recapito «📍 Dove vedervi», l'ora e il punto vanno anche
+   qui, firmati da chi vende: una volta per recapito (`appuntamentoDetto`
+   ne tiene l'id: un appuntamento cambiato e' un altro id e riparte), mai
+   due giri insieme, e dopo un fallimento si riprova non prima di un
+   minuto — a ogni disegno della pagina, come l'avviso del recapito. Un
+   no definitivo (forma, chiave, troppi cambi) non si riprova. */
+let p2pAppuntamentoTentati = {};
+async function registraAppuntamentoP2P(id){
+  if (typeof VETRINA !== 'undefined' && VETRINA) return false;
+  if (typeof DEMO !== 'undefined' && DEMO) return false;
+  if (!myTgId) return false;
   const o = ordiniP2P()[id];
-  const p = presenzaDaServerP2P(inc);
-  if (!o || !p) return false;
-  o.presenza = p;
-  scriviOrdineP2P(o);
-  if (p2pOrdineAperto === id) renderOrdineP2P();
-  return true;
-}
-/* ---- la fotocamera del browser (Chrome Android) ---- */
-async function avviaCameraPresenzaP2P(){
-  const video = el('p2pPresenzaVideo');
-  if (!video) return;
+  const campo = o && (o.campiMiei || {}).euro;
+  if (!o || o.lato !== 'vendo' || !campo || !idMostroVero(o.id) || o.appuntamentoDetto === campo.id) return false;
+  if (!pagaInContantiP2P(o) || P2P_FINALI.indexOf(o.stato) >= 0) return false;
+  const a = appuntamentoDaTestoP2P(campo.testo);
+  if (!a || !(a.quando > 0 || a.punto)) return false;
+  const NT = window.NostrTools, tk = chiaveOrdinePresenzaP2P(o);
+  if (!NT || !tk) return false;
+  const adesso = Date.now(), chiave = id + ':' + campo.id;
+  if ((p2pAppuntamentoTentati[chiave] || 0) > adesso - 60000) return false;
+  p2pAppuntamentoTentati[chiave] = adesso;
   try {
-    p2pPresenzaFlusso = await navigator.mediaDevices.getUserMedia(
-      {video: {facingMode: 'environment'}, audio: false});
-    video.srcObject = p2pPresenzaFlusso;
-    await video.play();
-  } catch(e) {
-    fermaCameraPresenzaP2P();
-    toast('La fotocamera non è disponibile: incolla il codice qui sotto');
-    return;
-  }
-  let det = null;
-  try { det = new BarcodeDetector({formats: ['qr_code']}); } catch(e) { det = null; }
-  if (!det) { fermaCameraPresenzaP2P(); return; }
-  const giro = async () => {
-    const f = el('p2pPresenzaSheet');
-    if (!p2pPresenzaFlusso || !f || !f.classList.contains('open')) { fermaCameraPresenzaP2P(); return; }
-    try {
-      const codici = await det.detect(video);
-      for (const c of (codici || []))
-        if (c && c.rawValue && presenzaRicevutaP2P(c.rawValue, p2pPresenzaOrdine)) return;
-    } catch(e) {}
-    p2pPresenzaTimer = setTimeout(giro, 300);
-  };
-  giro();
+    const nota = NT.finalizeEvent(notaAppuntamentoP2P(o.id, tk.pub, Math.floor(adesso / 1000),
+                                                      a.quando, a.punto), NT.utils.hexToBytes(tk.sk));
+    const r = await fetch(`${API_BASE}/p2p/appuntamento`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({ordine: o.id, nota: nota})});
+    /* 409 e' «non ancora» (il coordinatore non ha detto le chiavi) o
+       «chiuso»: si riprova al prossimo disegno, che a scambio chiuso
+       non chiama piu' */
+    if (!r.ok && r.status !== 400 && r.status !== 403 && r.status !== 429) return false;
+    const agg = ordiniP2P()[id];
+    if (agg) { agg.appuntamentoDetto = campo.id; scriviOrdineP2P(agg); }
+    return r.ok;
+  } catch(e) { return false; }
 }
-function fermaCameraPresenzaP2P(){
-  if (p2pPresenzaTimer) clearTimeout(p2pPresenzaTimer);
-  p2pPresenzaTimer = null;
-  if (p2pPresenzaFlusso) {
-    try { p2pPresenzaFlusso.getTracks().forEach(t => t.stop()); } catch(e) {}
-    p2pPresenzaFlusso = null;
-  }
+
+/* ---- I SUGGERIMENTI DEGLI INDIRIZZI, mentre chi vende scrive ----
+   Dopo P2P_LUOGHI_ATTESA_MS di silenzio, e da tre lettere in su, il
+   testo va a `/api/p2p/luoghi`; vince l'ultima domanda (`p2pLuoghiSeq`).
+   Scelto un suggerimento, il campo prende l'indirizzo intero e il punto
+   (`p2pCampoEuro_punto`, nascosto: «i:» = da un indirizzo, «p:» = la mia
+   posizione). Un testo cambiato a mano perde il punto di un indirizzo —
+   apparteneva al testo di prima —, non quello della posizione. */
+let P2P_LUOGHI_ATTESA_MS = 450;          /* `let`: il banco la accorcia */
+let p2pLuoghiSeq = 0, p2pLuoghiTimer = null, p2pLuoghiUltimi = [];
+function luogoScrittoP2P(valore){
+  const punto = el('p2pCampoEuro_punto');
+  if (punto && /^i:/.test(punto.value || '')) punto.value = '';
+  aggiornaPuntoLuogoP2P();
+  clearTimeout(p2pLuoghiTimer);
+  const t = String(valore || '').trim();
+  if (t.length < 3) { p2pLuoghiSeq++; mostraLuoghiP2P([]); return; }
+  p2pLuoghiTimer = setTimeout(() => cercaLuoghiP2P(t), P2P_LUOGHI_ATTESA_MS);
 }
-/* ---- il foglio, nei due versi ---- */
-function renderPresenzaP2P(modo, opz){
-  const box = el('p2pPresenzaCorpo');
+async function cercaLuoghiP2P(t){
+  const mio = ++p2pLuoghiSeq;
+  try {
+    const r = await fetch(`${API_BASE}/p2p/luoghi`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({q: t})});
+    if (mio !== p2pLuoghiSeq) return;
+    if (!r.ok) { mostraLuoghiP2P([], r.status === 429 ? 'pausa' : 'muti'); return; }
+    const d = await r.json();
+    if (mio !== p2pLuoghiSeq) return;
+    mostraLuoghiP2P(Array.isArray(d && d.luoghi) ? d.luoghi : []);
+  } catch(e) { if (mio === p2pLuoghiSeq) mostraLuoghiP2P([], 'muti'); }
+}
+function mostraLuoghiP2P(lista, perche){
+  const box = el('p2pLuoghiLista');
   if (!box) return;
-  fermaCameraPresenzaP2P();
-  if (modo === 'mostra') {
-    box.innerHTML =
-      '<div class="hint">Fai inquadrare questo codice dal telefono dell\'altra persona: dalla sua pagina dello scambio, «📷 Inquadra il codice». Vale '
-        + Math.round(P2P_PRESENZA_FINESTRA_S / 60) + ' minuti'
-        + (opz && opz.geo ? ' e porta la tua posizione.' : ', senza posizione.') + '</div>' +
-      '<div class="qr" id="p2pPresenzaQr"></div>' +
-      '<button class="btn ghost" onclick="copiaPresenzaP2P()">📋 Copia il codice d\'incontro</button>' +
-      '<div class="hint">Se la fotocamera non legge, l\'altra persona può incollare il codice copiato. Quando l\'incontro è registrato questo foglio si chiude da solo.</div>';
-    return;
-  }
-  box.innerHTML =
-    (opz && opz.camera
-      ? '<video id="p2pPresenzaVideo" class="presenza-video" playsinline muted autoplay></video>' +
-        '<div class="hint">Inquadra il codice sul telefono dell\'altra persona.</div>'
-      : '<div class="hint">Su questo dispositivo la fotocamera non legge i codici: fatti mandare il codice copiato dall\'altra persona e incollalo qui.</div>') +
-    '<textarea id="p2pPresenzaIncolla" rows="3" placeholder="Incolla qui il codice…"></textarea>' +
-    '<button class="btn orange" onclick="incollaPresenzaP2P()">✅ Conferma il codice</button>';
+  p2pLuoghiUltimi = (lista || []).slice(0, 5);
+  box.innerHTML = sceltaLuoghiP2P(p2pLuoghiUltimi, perche);
+  /* la riga sotto segue l'elenco: coi suggerimenti davanti invita a
+     sceglierne uno, senza dice gentile che il link non ci sara' */
+  aggiornaPuntoLuogoP2P();
+}
+function scegliLuogoP2P(i){
+  const l = p2pLuoghiUltimi[i];
+  if (!l) return;
+  const inp = el('p2pCampoEuro_luogo'), punto = el('p2pCampoEuro_punto');
+  if (inp) inp.value = l.etichetta;
+  const p = puntoDaLuogoP2P(l);
+  if (punto) punto.value = p ? 'i:' + p.lat + ',' + p.lon : '';
+  p2pLuoghiSeq++;
+  mostraLuoghiP2P([]);
+  aggiornaPuntoLuogoP2P();
+}
+function togliPuntoLuogoP2P(){
+  const punto = el('p2pCampoEuro_punto');
+  if (punto) punto.value = '';
+  aggiornaPuntoLuogoP2P();
+}
+function aggiornaPuntoLuogoP2P(){
+  const box = el('p2pLuogoPunto');
+  if (!box) return;
+  box.innerHTML = rigaPuntoLuogoP2P(puntoDaCampoP2P((el('p2pCampoEuro_punto') || {}).value),
+                                    ((el('p2pCampoEuro_luogo') || {}).value || '').trim(),
+                                    p2pLuoghiUltimi.length);
+}
+/* «📍 USA LA MIA POSIZIONE»: il punto e' la posizione di adesso; il nome,
+   se il campo e' vuoto, lo da' il nostro elenco dei comuni — nessuna
+   chiamata a terzi. Il testo scritto da chi vende, se c'e', resta. */
+async function usaPosizioneLuogoP2P(btn){
+  haptic();
+  const rip = bottoneInAttesa(btn, 'Cerco la posizione…');
+  try {
+    const g = await posizioneP2P();
+    if (!g) { toast('Il telefono non ha dato la posizione: scrivi l\'indirizzo', 5000); return; }
+    const punto = el('p2pCampoEuro_punto'), inp = el('p2pCampoEuro_luogo');
+    if (punto) punto.value = 'p:' + g.lat + ',' + g.lon;
+    if (inp && !inp.value.trim()) {
+      let vicino = '';
+      try {
+        const r = await fetch(`${API_BASE}/p2p/luoghi/vicino`, {method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+          body: JSON.stringify({lat: g.lat, lon: g.lon})});
+        if (r.ok) vicino = String(((await r.json()) || {}).vicino || '');
+      } catch(e) {}
+      inp.value = nomeMiaPosizioneP2P(vicino);
+    }
+    p2pLuoghiSeq++;
+    mostraLuoghiP2P([]);
+    aggiornaPuntoLuogoP2P();
+  } finally { rip(); }
+}
+
+/* ---- «🧭 APRI NEL NAVIGATORE» ----
+   L'app di mappe del telefono su quel punto (`urlNavigatoreP2P`, pura):
+   su iPhone Apple Mappe; su Android fuori da Telegram il `geo:` che apre
+   quella predefinita; altrove — e dentro Telegram, dove `openLink` vuole
+   un indirizzo web — Google Maps, che sul telefono passa alla sua app. */
+function apriNavigatoreP2P(lat, lon, nome){
+  const url = urlNavigatoreP2P(lat, lon, nome, piattaformaMappeP2P());
+  if (!url) return;
+  haptic();
+  if (/^geo:/.test(url)) { window.location.href = url; return; }
+  if (tg?.initData && tg.openLink) { try { tg.openLink(url); return; } catch(e){} }
+  window.open(url, '_blank', 'noopener');
+}
+function piattaformaMappeP2P(){
+  const ua = navigator.userAgent || '';
+  if ((tg && tg.platform === 'ios') || /iPhone|iPad|iPod/.test(ua)) return 'ios';
+  if (/Android/.test(ua) && !(tg && tg.initData)) return 'android';
+  return '';
 }
 /* ============ fine del contanti di persona ============ */
 

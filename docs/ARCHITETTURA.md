@@ -28692,90 +28692,186 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   dello scambio in contanti, alleggerita»). `riquadroContantiP2P(o,
   azione)` porta la TESTA della regola (`REGOLA_BREVE_CONTANTI_COMPRA` /
   `_VENDE`, una prova la tiene uguale all'inizio della frase intera), il
-  passo «🤝 Siamo insieme» (`.contanti-incontro`, filo verde) e i
-  consigli in un `<details>` (`consigliIncontroP2P(lato)`: la coda della
-  regola, `CONSIGLI_CONTANTI`, la prova, il GPS) che si ricorda aperto in
-  `p2pConsigliAperti` (il ridisegno confronta l'outerHTML). A incontro
-  fatto, e a disputa, è una riga. `passoDueContantiP2P(o, azione)` mette
-  il «2» sopra il bottone solo se il bottone pieno è `euro-inviati` o
-  `rilascia` (e allora c'è anche l'«1»). LE PAROLE DEL GESTO col SOLO
+  passo «📍 Sono qui» (`.contanti-incontro`, filo verde: dal 1 ott al
+  posto di «🤝 Siamo insieme»), la regola della disputa in una riga
+  (`.contanti-disputa`, `REGOLA_DISPUTA_CONTANTI`) e i consigli in un
+  `<details>` (`consigliIncontroP2P(lato)`: la coda della regola,
+  `CONSIGLI_CONTANTI`, «Sono qui», il GPS) che si ricorda aperto in
+  `p2pConsigliAperti` (il ridisegno confronta l'outerHTML). A disputa
+  aperta è le due righe delle presenze, senza gesti.
+  `passoDueContantiP2P(o, azione)` mette il «2» sopra il bottone solo se
+  il bottone pieno è `euro-inviati` o `rilascia` (e allora c'è anche
+  l'«1»), anche a presenza già segnata. LE PAROLE DEL GESTO col SOLO
   contanti: `pagaInContantiP2P(o)` (metodo scelto o arrivato con
   `metodoSceltoP2P`, o l'unico dell'ordine — più stretto di
   `scambioInContantiP2P`) le decide per `gestoPagoP2P` («Ho consegnato i
   contanti», acceso e spento), la conferma di `euroInviatiP2P` (con
-  `REGOLA_CONTANTI_COMPRA` intera), `statoContantiP2P(o, t)` (le righe di
+  `REGOLA_CONTANTI_COMPRA` intera e, senza la mia presenza,
+  l'avviso `senzaPresenza` con `REGOLA_DISPUTA_CONTANTI` e «Indietro»:
+  stessa `chiediConferma`), `statoContantiP2P(o, t)` (le righe di
   `STATI_CONTANTI_P2P`, chiamato da `statoTestoP2P`), il terzo passo, la
-  riga «✋ Aspetta», il titolo «📍 Dove vedervi» di
-  `riquadroRecapitoP2P(testo, titolo)` e «Totale da consegnare» nel
-  conto (`contoDettP2P` col segnale `consegna`, che passa la SOLA
-  `renderOrdineP2P`: il libro non lo passa mai). Fuori dal blocco del contanti
-  si chiamano con `typeof`. Sul server `_dati_frase_p2p` dà `contanti`
-  (i metodi del libro sono esattamente `["Contanti"]`) e
+  riga «✋ Aspetta», le due righe di stato prima del recapito («dove e
+  quando vedervi»), il bottone di chi vende («📍 Indica dove e quando
+  vedervi», `contantiQui` in `renderOrdineP2P`, che sostituisce la riga
+  di sempre dopo l'oggetto dei bottoni), l'avviso in app all'arrivo
+  (`P2P_TOAST_APPUNTAMENTO` in `campoScrivi`), il titolo «📍 Dove
+  vedervi» di `riquadroRecapitoP2P(testo, titolo)` e «Totale da
+  consegnare» nel conto (`contoDettP2P` col segnale `consegna`, che passa
+  la SOLA `renderOrdineP2P`: il libro non lo passa mai). Fuori dal blocco
+  del contanti si chiamano con `typeof`. Sul server `_dati_frase_p2p` dà
+  `contanti` (i metodi del libro sono esattamente `["Contanti"]`),
   `_testo_evento_p2p` sul momento `fiat` dice «ti ha consegnato … in
-  contanti», dopo il ramo del PayCode.
-  LA PROVA D'INCONTRO (client, blocco «IL CONTANTI DI PERSONA: LA PROVA
-  D'INCONTRO», dopo la moderazione). Due note firmate con la chiave
-  usa-e-getta dello scambio (`chiaveOrdinePresenzaP2P`): eventi Nostr
-  di kind `P2P_KIND_PRESENZA` (27383, mai su un relay), tag `d` =
-  ordine, `ruolo` = mostra | legge, `e` = id della mostrata (solo su
-  legge), contenuto `contenutoPresenzaP2P(nonce, geo)` scritto A MANO
-  in una funzione sola (`{"v":1,"nonce":…,"geo":{lat,lon,acc}|null}`,
-  numeri già come stringhe a cinque decimali, `geoPresenzaP2P`). Chi
-  MOSTRA (`presenzaMostraP2P`): la posizione se la casella
-  `#p2pPresenzaGps` è accesa (`posizionePresenzaP2P`, timeout 8 s, un no
-  è null), `notaMostraP2P` + `finalizeEvent`, la riga del QR
-  (`testoQrPresenzaP2P`: `BRTL-INCONTRO-1:ordine:chiave:ora:nonce:
-  lat/lon/acc|-:firma`, TUTTA MAIUSCOLA coi due punti, modo alfanumerico
-  del QR), il foglio `#p2pPresenzaSheet` con `disegnaQr` e «Copia il
-  codice d'incontro», e l'orologio (`avviaOrologioPresenzaP2P`: ogni 5 s
-  la rotta degli scambi, per dieci minuti, finché il foglio è aperto —
-  alla prova il foglio si chiude da solo). Chi LEGGE
-  (`presenzaLeggiP2P`), tre strade in ordine: `tg.showScanQrPopup`
-  (Telegram ≥ 6.4), `BarcodeDetector` + `getUserMedia` (Chrome Android,
-  `avviaCameraPresenzaP2P`, si ferma quando il foglio si chiude), il
-  campo «incolla». Il testo letto passa da `presenzaRicevutaP2P` →
-  `leggiQrPresenzaP2P(testo, o, adesso)` (PURA: prefisso, sette pezzi,
-  minuscolo rimesso, ordine mio, chiave = `o.peer`, ora entro
-  `P2P_PRESENZA_FINESTRA_S`, `verifyEvent`) → `firmaEInviaPresenzaP2P`
-  (`notaLeggeP2P` + `finalizeEvent`, `POST /api/p2p/presenza` `{ordine,
-  mostrata, letta}`) → `segnaIncontroP2P` (la riga prende `presenza`:
-  `{ora, distanza, posizioni, precisione, posizioniVia}`). La prova
-  arriva anche dal server: `incontro` nella rotta degli scambi →
-  `presenzaDaServerP2P` in `rigaDaServerP2P` e `adottaScambiServerP2P`.
-  IL SERVER (blocco «LA PROVA D'INCONTRO DEL CONTANTI DI PERSONA», FUORI
-  dal blocco della moderazione — là una sentinella conta sette rotte e
-  vieta «firma(» —, giudici puri sulla connessione che tornano `(codice,
-  corpo)`). `POST /api/p2p/presenza` (`verifica_utente`, P2P acceso,
-  `leggi_json`) → `_registra_presenza_p2p(con, io, d, adesso)`:
-  `_nota_presenza_p2p` su ognuna delle due note (`verifica_firma_nostr`
-  — id ricalcolato, coincurve —, kind, tag `d`, ruolo, contenuto v1,
-  `_geo_presenza_p2p` in misura), poi INSIEME (mostra+legge, `e` =
-  id della mostrata, chiavi diverse, entro `P2P_PRESENZA_FINESTRA_S`
-  600 s fra loro e `P2P_PRESENZA_OROLOGIO_S` 900 s da adesso), poi
-  contro lo SCAMBIO (`p2p_scambi.chiave_compratore/chiave_venditore` =
-  le due chiavi, sennò 409 «non ha ancora detto» o 403; nessun momento
-  di `P2P_PRESENZA_MOMENTI_CHIUSI` nel giro corrente, sennò 409). Una
-  riga per ordine in `p2p_presenze` (chiavi, le due ore, le posizioni,
-  `distanza_m` da `_distanza_metri_p2p`, `posizioni`, `prova` = la
-  copia delle due note, `caricata_da`, `quando`); una seconda torna la
-  prima con `gia`. `_incontro_p2p(con, ordine)` (None senza tabella)
-  entra in `_riga_disputa_p2p` e in `_scambi_p2p` come `incontro` =
-  `_incontro_da_riga_p2p` (`{ora, distanza, posizioni, precisione,
-  posizioni_via}`). Chi carica è irrilevante: a provare sono le firme.
-  LA PRIVACY. `_scorda_posizioni_presenza_p2p` (lat/lon/acc e `prova`
-  a NULL, `posizioni_via` = adesso; ora, distanza e chiavi restano) da
-  `_manda_evento_p2p` quando il momento sta in
-  `P2P_PRESENZA_MOMENTI_CHIUSI` (`rilasciato`, `concluso`, `annullato`,
-  `scaduto`, `tornato`, più i due passaggi del libro della disputa), e
-  `_scopa_presenze_p2p` dall'orologio dei dieci minuti
-  (`pulisci_presenze_p2p`): posizioni oltre `P2P_PRESENZA_POSIZIONI_S`
-  (15 giorni), riga oltre `P2P_LIBRO_MEMORIA_S`. `esegui_fusione`
-  rinomina `caricata_da`. «I tuoi dati» (voce P2P) lo dice.
-  IL MODERATORE: `rigaIncontroModP2P(d, aperta)` nella card
-  (`cardDisputaModP2P`): «Incontro confermato …» con distanza e
-  precisione, «posizioni cancellate» quando lo sono, «Nessuna prova
-  d'incontro» solo sugli scambi in contanti, e a card aperta la cautela
-  sul GPS. LE PROVE: `prove_contanti_a_mano`, `collaudo_contanti_p2p`,
-  e `schnorr_puro.py` (BIP-340 puro, SOLO per i banchi: monta
-  `ChiaveXOnly` al posto di `ChiavePubblicaNostr` dove coincurve non
-  c'è, dentro il giudice vero).
+  contanti», dopo il ramo del PayCode, e `_avviso_recapito_p2p` dice «ti
+  ha indicato dove e quando vedervi» / «ha cambiato l'appuntamento»
+  (mai il giorno e l'ora: l'orologio del server non è quello di chi
+  legge).
+  «📍 SONO QUI» (1 ott 2026, CANTIERI, «Contanti: la prova d'incontro
+  senza QR e l'appuntamento»; dal 30 set era «🤝 Siamo insieme», un QR
+  mostrato e inquadrato, che si inquadrava anche da una foto). Due
+  presenze INDIPENDENTI, una per parte. IL CLIENT (blocco «IL CONTANTI DI
+  PERSONA: «📍 SONO QUI» E L'APPUNTAMENTO», dopo la moderazione e FUORI
+  dal motore, che resta a zero chiamate): `sonoQuiP2P()` prende la
+  posizione con `posizioneP2P()` (dentro Telegram ≥ 8.0 il suo
+  `LocationManager`, altrove `navigator.geolocation`; tetto
+  `P2P_POSIZIONE_ATTESA_MS`, un no è null), firma con la chiave
+  usa-e-getta dello scambio (`chiaveOrdinePresenzaP2P`) la nota
+  `notaSonoQuiP2P` (kind `P2P_KIND_PRESENZA` 27383, mai su un relay, tag
+  `d` = ordine, `ruolo` = qui, contenuto `contenutoPresenzaP2P(nonce,
+  geo)` scritto a mano, numeri in `geoPresenzaP2P` a cinque decimali) e
+  la manda a `POST /api/p2p/sono-qui` `{ordine, nota}`. La risposta
+  (`ora` del server, `posizione`, `giro`, `presenze`) entra nella riga
+  con `uniscePresenzeP2P(locale, presenzeDaServerP2P(p, giro))` (la più
+  nuova riga per riga; di due giri diversi vince la seconda); una
+  posizione negata si dice nel toast e nella riga. Le righe le
+  disegna `righePresenzeP2P(o)` (pure, nel motore): la mia — l'ora coi
+  secondi `oraPresenzaP2P`, con o senza posizione — e l'ORA dell'altra
+  parte, mai la sua posizione. La presenza dell'altra arriva dalla rotta
+  degli scambi (`presenze`, adottata nei due rami dell'archivio) e, a
+  pagina del contanti aperta e in garanzia, da `battitoContantiP2P` ogni
+  `P2P_CONTANTI_OGNI_MS` (20 s) nell'unico interval, finché l'altra non
+  c'è. IL SERVER (blocco «LA PROVA D'INCONTRO DEL CONTANTI DI PERSONA: «📍
+  SONO QUI»», FUORI dal blocco della moderazione — là una sentinella
+  conta sette rotte e vieta «firma(» —, giudici puri sulla connessione
+  che tornano `(codice, corpo)`): `POST /api/p2p/sono-qui`
+  (`verifica_utente`, P2P acceso, `leggi_json`) →
+  `_registra_sono_qui_p2p(con, io, d, adesso)`: `_nota_p2p(ev, ordine,
+  ruolo)` (firma con `verifica_firma_nostr` — id ricalcolato —, kind,
+  `d`, il RUOLO atteso: una nota del QR di ieri o un appuntamento non
+  passano per una presenza; contenuto v1), orologio entro
+  `P2P_SONO_QUI_OROLOGIO_S` (300 s), le due chiavi del GIRO corrente da
+  `_chiavi_giro_p2p` (sennò 409), il lato lo dice la CHIAVE (sennò 403),
+  la parte in contanti di QUEL giro non chiusa (`_contanti_chiuso_p2p`
+  su `P2P_PRESENZA_MOMENTI_CHIUSI`), al più `P2P_SONO_QUI_MAX` (5) tocchi
+  per lato e giro (429). Una riga per tocco in `p2p_sono_qui`: `ora` è
+  il NOSTRO orologio (quella che si mostra), `ora_firmata` quella del
+  telefono; le DISTANZE si calcolano all'ARRIVO e restano —
+  `dist_luogo` dal punto dell'appuntamento in vigore
+  (`_appuntamento_in_vigore_p2p`, il suo id in `appuntamento`) e
+  `vicine` `{id: metri}` verso le presenze dell'altro lato già arrivate
+  con la posizione. Le parti leggono `_presenze_per_parte_p2p(con,
+  ordine, giro, lato)` (`presenze` nella rotta degli scambi, sul giro
+  corrente: la cura della riverifica di sicurezza del 1 ott — un ordine
+  tornato nel libro e ripreso da un altro non vede le presenze di
+  prima). IL MODERATORE legge `presenze` in `_riga_disputa_p2p` =
+  `_confronto_giro_p2p(con, ordine, giro della disputa)` →
+  `_confronto_presenze_p2p(presenze, appuntamenti)` (puro): sceglie UNA
+  coppia — dentro `P2P_SONO_QUI_FINESTRA_S` (15 min) prima i telefoni
+  vicini con la distanza nota, poi senza posizione, poi lontani (oltre
+  `P2P_SONO_QUI_LONTANI_M` 500 m più le due precisioni); fuori, la più
+  vicina nel tempo — e dice `esito` (probabile | lontani | ore_diverse |
+  solo_compra | solo_vende | nessuna), le due presenze scelte (ora,
+  posizione, precisione, quante volte) col loro rapporto con
+  l'appuntamento IN VIGORE QUANDO SONO ARRIVATE (`all_ora` entro
+  `P2P_APPUNTAMENTO_FINESTRA_S` 30 min, `dist_luogo`), e in testa
+  l'appuntamento (ora, punto, versioni, `cambiato_dopo`). Le parole le
+  scrive il client: `righeConfrontoModP2P` e `rigaAppuntamentoModP2P`
+  dentro `rigaIncontroModP2P(d, aperta)` («📍 Incontro probabile: …»,
+  «📍 Presente solo chi compra alle …», «📍 Nessuna prova d'incontro»,
+  «🕒 Appuntamento …: presenti all'ora dell'appuntamento, chi compra a
+  N m e chi vende a M m dal luogo», «cambiato N volte» / «⚠️ cambiato
+  dopo la prima presenza»), e a card aperta `CAUTELA_INCONTRO_MOD`. LA
+  PROVA COL QR DI IERI (`p2p_presenze`) non si scrive più ma si legge:
+  `_incontro_p2p(con, ordine, giro)` sul SUO giro, `incontro` nella card
+  («🤝 Incontro confermato col codice (QR) …»); alle parti non viaggia
+  più.
+  L'APPUNTAMENTO (stesso cantiere). Viaggia DENTRO il recapito «📍 Dove
+  vedervi» di chi vende, cifrato fra i telefoni, come TESTO COMPOSTO
+  (`testoAppuntamentoP2P(luogo, quando, punto)` ↔
+  `appuntamentoDaTestoP2P(testo)`, gemelle con la prova di andata e
+  ritorno): la riga del luogo di sempre, «Quando: GG/MM/AAAA alle HH:MM»
+  (le gemelle della scadenza del tabacchino, ora locale) e «Coordinate:
+  lat, lon». Il form (`P2P_FORME_RECAPITO`, forma `contanti` con
+  `appuntamento: true`, campi disegnati da `campoRecapitoP2P`): il luogo
+  coi suggerimenti (`luogoScrittoP2P` → dopo `P2P_LUOGHI_ATTESA_MS` e da
+  tre lettere `cercaLuoghiP2P` → `POST /api/p2p/luoghi` `{q}`, vince
+  l'ultima domanda; `sceltaLuoghiP2P` disegna, `scegliLuogoP2P` sceglie),
+  «📍 Usa la mia posizione» (`usaPosizioneLuogoP2P`: il punto è la
+  posizione, il nome del comune vicino da `POST /api/p2p/luoghi/vicino`,
+  nostro elenco), il punto nel campo nascosto `p2pCampoEuro_punto` («i:»
+  da un indirizzo — un testo cambiato a mano lo perde —, «p:» dalla mia
+  posizione — resta), la riga sotto (`rigaPuntoLuogoP2P`: riconosciuto;
+  coi suggerimenti davanti l'invito a sceglierne uno; senza, l'avviso
+  gentile dell'indirizzo a mano, che resta possibile), «🕒 Quando» col
+  selettore `datetime-local` (`quandoDaCampoP2P` ↔ `valoreQuandoP2P`,
+  giudicato da `giudiceQuandoP2P`: scelto, non passato da più di dieci
+  minuti, entro `P2P_APPUNTAMENTO_FUTURO_S`). Il ricordo per forma tiene
+  luogo e punto, mai l'ora (`nonRicordato`); un appuntamento si cambia
+  ripartendo da quello mandato. Partito il recapito, `inviaCampoP2P`
+  aspetta (al più 6 s) `registraAppuntamentoP2P(id)`: la nota
+  `notaAppuntamentoP2P` (`ruolo` = appuntamento, contenuto
+  `contenutoAppuntamentoP2P(ora, punto)`) a `POST /api/p2p/appuntamento`
+  — l'ORA e le COORDINATE, mai il testo —, una volta per recapito
+  (`appuntamentoDetto`), ritentata dal disegno della pagina. Sul server
+  `_registra_appuntamento_p2p`: la chiave di CHI VENDE del giro corrente
+  (403 altrimenti), l'ora 0 o fra un'ora fa e
+  `P2P_APPUNTAMENTO_FUTURO_S` (7 giorni), 409 a scambio chiuso o a
+  disputa aperta, una versione uguale all'ultima è `gia`, al più
+  `P2P_APPUNTAMENTO_MAX` (10) versioni; una riga per versione in
+  `p2p_appuntamenti`. In cima alla pagina, per tutti e due,
+  `riquadroAppuntamentoP2P(o)` (pura): «🕒 Appuntamento: sab 4 ott alle
+  18:30» (`quandoAppuntamentoP2P`), il luogo, «🧭 Apri nel navigatore»
+  se c'è il punto (`apriNavigatoreP2P` con `urlNavigatoreP2P`: Apple
+  Mappe su iPhone, `geo:` su Android fuori da Telegram, Google Maps
+  altrove — dentro Telegram `openLink` vuole un indirizzo web), sennò la
+  riga dell'indirizzo a mano; a chi vende «✏️ Cambia l'appuntamento»
+  finché non ha i contanti. Col contanti `recapitoCompratoreP2P` non
+  ripete il riquadro sotto il bottone.
+  I LUOGHI (server, blocco «I LUOGHI DELL'APPUNTAMENTO»): `POST
+  /api/p2p/luoghi` (POST perché il testo non finisca nel registro degli
+  accessi; sessione, P2P acceso) → `_testo_luogo_pulito`, il freno di
+  persona `_freno_luoghi_persona` (`P2P_LUOGHI_PER_PERSONA` 30 al minuto,
+  429), `_cerca_luoghi`: la memoria in RAM (`P2P_LUOGHI_MEMORIA_S` 6 ore,
+  `P2P_LUOGHI_MEMORIA_MAX`), il freno di tutti (`P2P_LUOGHI_PER_TUTTI`
+  120 al minuto), poi Photon (`P2P_LUOGHI_URL`, di serie
+  `https://photon.komoot.io`, dichiarabile nel config) con SOLO `q`,
+  `limit` e `countrycode` (`P2P_LUOGHI_PAESE` = IT), l'intestazione
+  `P2P_LUOGHI_UA`, `follow_redirects=False`, tetto
+  `P2P_LUOGHI_CORPO_MAX`; ogni guasto è `LuoghiMuti` → 503 e una riga
+  «🗺️ Luoghi P2P: i suggerimenti tacciono (perché)» senza il testo.
+  `_luoghi_da_photon` (puro: al più `P2P_LUOGHI_MAX`, doppioni via,
+  coordinate in misura) con `_etichetta_luogo` («Bar Sport» / «Via
+  Emilia 354, 47922 Rimini»). `POST /api/p2p/luoghi/vicino` →
+  `_comune_vicino(lat, lon)` sull'elenco dei comuni in RAM, '' oltre
+  `P2P_LUOGHI_VICINO_KM`. Nominatim scartato: la sua policy vieta
+  l'autocompletamento.
+  LA PRIVACY. Posizioni, punti e copie delle note si scordano alla
+  chiusura (`_scorda_posizioni_presenza_p2p` da `_manda_evento_p2p` sui
+  momenti di `P2P_PRESENZA_MOMENTI_CHIUSI`, nelle tre tabelle; restano
+  ore, distanze, precisioni) e comunque dopo `P2P_PRESENZA_POSIZIONI_S`
+  (15 giorni, `_scopa_presenze_p2p` dall'orologio dei dieci minuti); le
+  righe se ne vanno con la cronaca (`P2P_LIBRO_MEMORIA_S`). Mai nei log:
+  nel blocco una sola riga stampata, senza testo né punti. «Dimentica il
+  profilo» (`dimentica_chiavi_p2p`) chiama `_dimentica_presenze_p2p(con,
+  io, chiavi, adesso)` PRIMA di cancellare le chiavi: presenze e
+  appuntamenti miei (per chiave o per chi ha caricato) se ne vanno; su
+  uno scambio con la parte in contanti ANCORA APERTA della riga restano
+  ora e lato (posizione, punto e nota via subito) — contro chi
+  cancellerebbe con un tocco la presenza che l'altra persona ha visto —;
+  delle prove col QR si scordano le posizioni. `esegui_fusione` porta
+  `caricata_da` nelle tre tabelle. «I tuoi dati» (voce P2P) lo dice.
+  LE PROVE: `prove_contanti_a_mano` (le note del client in node con
+  nostr-tools giudicate dal server in Python, con `schnorr_puro` dove
+  coincurve non c'è), `prove_luoghi_appuntamento`,
+  `prove_contanti_pagina_leggera`, il caso del contanti in
+  `prove_p2p_eventi`, e `collaudo_contanti_p2p` (server vero, Photon di
+  cartone sul loopback, nella gabbia della CI).

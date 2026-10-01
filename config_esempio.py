@@ -736,6 +736,13 @@ P2P_IN_VETRINA = False
 # passo, la voce in «Info P2P» —, e il client crede solo a tutt'e due:
 # la leva E il 38385 del coordinatore. Solo True accende.
 P2P_CAUZIONE = False
+# I SUGGERIMENTI DEGLI INDIRIZZI DELL'APPUNTAMENTO (1 ott 2026): mentre chi
+# vende in contanti scrive dove vedersi, il server chiede indirizzi veri a
+# Photon (dati OpenStreetMap) mandando SOLO il testo cercato, col freno e
+# una memoria in RAM. Qui si puo' puntare un'altra istanza di Photon (una
+# nostra, o quella di cartone dei collaudi). Il default nel codice e'
+# quello pubblico e vale anche senza questa riga.
+P2P_LUOGHI_URL = "https://photon.komoot.io"
 # LA CARD «P2P IN ARRIVO» (30 set 2026): la prima card di «Da scoprire»,
 # per tutti. Fino a questa data (compresa) dice «In arrivo il 10/10/26»;
 # passata la data col P2P ancora chiuso dice «in arrivo a breve»; col P2P
