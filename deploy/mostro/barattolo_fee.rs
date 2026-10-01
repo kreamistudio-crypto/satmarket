@@ -39,7 +39,7 @@ use crate::config::DB_POOL;
 use crate::util::get_dev_fee;
 use mostro_core::prelude::*;
 use sqlx::SqlitePool;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::Duration;
 use tracing::{info, warn};
@@ -56,6 +56,44 @@ const LOOKUP_BUDGET: Duration = Duration::from_secs(12);
 
 /// How often the keep-warm request goes out.
 const HEARTBEAT_EVERY: Duration = Duration::from_secs(60);
+
+/// The circuit breaker (audit of 19 Sep 2026, M4). The lookup runs in the
+/// serial message loop, so with the marketplace server down every take
+/// paid the whole `LOOKUP_BUDGET` — and a burst of takes from throwaway
+/// keys stalled the coordinator for free. After this many failures in a
+/// row the lookup is skipped for `BREAKER_PAUSE` (full fee for both, the
+/// usual fail-closed) and then tried again.
+const BREAKER_FAILS: u32 = 3;
+const BREAKER_PAUSE: Duration = Duration::from_secs(60);
+/// Hard cap on the server's answer (audit of 23 Sep 2026, B6): a
+/// `{"sconti": {<key>: bool}}` for two keys is a few hundred bytes, and
+/// a compromised server must not make the serial loop swallow gigabytes.
+const MAX_ANSWER_BYTES: usize = 65_536;
+
+static FAILS: AtomicU32 = AtomicU32::new(0);
+static PAUSED_UNTIL: AtomicU64 = AtomicU64::new(0);
+
+/// The pure half of the breaker: failures so far, the clock, whether this
+/// lookup succeeded -> failures after, and the unix time until which the
+/// lookup is paused (0 = not paused).
+pub fn breaker_after(fails: u32, now: u64, ok: bool) -> (u32, u64) {
+    if ok {
+        return (0, 0);
+    }
+    let fails = fails + 1;
+    if fails >= BREAKER_FAILS {
+        (0, now + BREAKER_PAUSE.as_secs())
+    } else {
+        (fails, 0)
+    }
+}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
 
 const ENV_RATE: &str = "BARATTOLO_SCONTO_FEE";
 const ENV_URL: &str = "BARATTOLO_SCONTO_URL";
@@ -151,10 +189,24 @@ async fn ask_server(buyer: &str, seller: &str) -> Result<(bool, bool), String> {
     if !response.status().is_success() {
         return Err(format!("HTTP {}", response.status()));
     }
-    let body = response
-        .text()
+    if response.content_length().unwrap_or(0) > MAX_ANSWER_BYTES as u64 {
+        return Err("answer too large".to_string());
+    }
+    // read in chunks with the cap: a body without Content-Length (chunked)
+    // must not be slurped whole into memory inside the serial loop
+    let mut response = response;
+    let mut raw: Vec<u8> = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
         .await
-        .map_err(|e| format!("unreadable body: {e}"))?;
+        .map_err(|e| format!("unreadable body: {e}"))?
+    {
+        if raw.len() + chunk.len() > MAX_ANSWER_BYTES {
+            return Err("answer too large".to_string());
+        }
+        raw.extend_from_slice(&chunk);
+    }
+    let body = String::from_utf8_lossy(&raw);
     Ok(parse_answer(&body, buyer, seller))
 }
 
@@ -163,20 +215,39 @@ async fn lookup(order_id: &str, buyer: &str, seller: &str) -> (bool, bool) {
     if discount_rate() <= 0.0 || endpoint().is_none() {
         return (false, false);
     }
-    match tokio::time::timeout(LOOKUP_BUDGET, ask_server(buyer, seller)).await {
-        Ok(Ok(flags)) => flags,
+    let now = now_secs();
+    let paused_until = PAUSED_UNTIL.load(Ordering::Relaxed);
+    if now < paused_until {
+        info!(
+            "barattolo_fee: order {order_id}: discount lookup paused for {}s more after {BREAKER_FAILS} failures in a row: full fee for both",
+            paused_until - now
+        );
+        return (false, false);
+    }
+    let answer = match tokio::time::timeout(LOOKUP_BUDGET, ask_server(buyer, seller)).await {
+        Ok(Ok(flags)) => Some(flags),
         Ok(Err(reason)) => {
             warn!("barattolo_fee: order {order_id}: discount NOT verified ({reason}): full fee for both");
-            (false, false)
+            None
         }
         Err(_) => {
             warn!(
                 "barattolo_fee: order {order_id}: discount NOT verified (no answer in {}s): full fee for both",
                 LOOKUP_BUDGET.as_secs()
             );
-            (false, false)
+            None
         }
+    };
+    let (fails, until) = breaker_after(FAILS.load(Ordering::Relaxed), now, answer.is_some());
+    FAILS.store(fails, Ordering::Relaxed);
+    if until > 0 {
+        PAUSED_UNTIL.store(until, Ordering::Relaxed);
+        warn!(
+            "barattolo_fee: {BREAKER_FAILS} failures in a row: the discount lookup pauses for {}s",
+            BREAKER_PAUSE.as_secs()
+        );
     }
+    answer.unwrap_or((false, false))
 }
 
 async fn ensure_table(pool: &SqlitePool) -> Result<(), sqlx::Error> {
@@ -374,6 +445,19 @@ mod tests {
             .connect("sqlite::memory:")
             .await
             .unwrap()
+    }
+
+    #[test]
+    fn the_breaker_pauses_after_three_failures_and_resets_on_success() {
+        // two failures: counted, not paused
+        assert_eq!(breaker_after(0, 1_000, false), (1, 0));
+        assert_eq!(breaker_after(1, 1_000, false), (2, 0));
+        // the third in a row: paused for BREAKER_PAUSE, counter back to zero
+        assert_eq!(breaker_after(2, 1_000, false), (0, 1_000 + BREAKER_PAUSE.as_secs()));
+        // a success wipes the count
+        assert_eq!(breaker_after(2, 1_000, true), (0, 0));
+        // and the cap on the answer is well above a real answer
+        assert!(MAX_ANSWER_BYTES >= 4_096);
     }
 
     #[test]

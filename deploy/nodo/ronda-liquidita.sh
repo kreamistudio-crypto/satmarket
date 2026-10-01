@@ -22,20 +22,26 @@ BLOCCHI_THAW=${BLOCCHI_THAW:-1008}  # ~ una settimana
 MODO=${1:-}
 mkdir -p "$(dirname "$NOTI")"
 
-docker exec "$L" lncli listchannels > /tmp/liq-ch.json 2>/dev/null \
-  && docker exec "$L" lncli getinfo > /tmp/liq-info.json 2>/dev/null \
+# una cartella usa-e-getta SUA (1 ott 2026, B5 del secondo audit): un
+# nome fisso in /tmp scritto da root e' un symlink che qualcun altro
+# puo' piazzare prima
+TMPD=$(mktemp -d /tmp/liq.XXXXXX) || exit 1
+trap 'rm -rf "$TMPD"' EXIT
+docker exec "$L" lncli listchannels > "$TMPD/ch.json" 2>/dev/null \
+  && docker exec "$L" lncli getinfo > "$TMPD/info.json" 2>/dev/null \
   || { T='ALLARME LIQUIDITA: lncli non risponde, canali e inbound non misurati'
        echo "$T"; printf '%s\n--- fine ronda liquidita\n' "$T" | /usr/local/bin/ronda-avvisa.sh
-       rm -f /tmp/liq-*.json; exit 1; }
+       exit 1; }
 
-OUT=$(NOTI="$NOTI" LEASE="$LEASE" MODO="$MODO" SOGLIA_IN="$SOGLIA_IN" \
+OUT=$(NOTI="$NOTI" LEASE="$LEASE" MODO="$MODO" SOGLIA_IN="$SOGLIA_IN" TMPD="$TMPD" \
       GIORNI_LEASE="$GIORNI_LEASE" BLOCCHI_THAW="$BLOCCHI_THAW" python3 - <<'PY'
 import json, os, sys, datetime
 noti_f=os.environ['NOTI']; lease_f=os.environ['LEASE']; modo=os.environ['MODO']
 soglia=int(os.environ['SOGLIA_IN']); giorni=int(os.environ['GIORNI_LEASE'])
 blocchi=int(os.environ['BLOCCHI_THAW'])
-ch=json.load(open('/tmp/liq-ch.json')).get('channels',[])
-altezza=int(json.load(open('/tmp/liq-info.json')).get('block_height',0))
+tmpd=os.environ['TMPD']
+ch=json.load(open(tmpd+'/ch.json')).get('channels',[])
+altezza=int(json.load(open(tmpd+'/info.json')).get('block_height',0))
 def riga(c): return f"{c['channel_point']} {c['capacity']} {c['remote_pubkey']}"
 
 if modo=='--impara':
@@ -99,7 +105,6 @@ if modo=='--prova':
 print("liquidita ok  "+quadro)
 PY
 ); RC=$?
-rm -f /tmp/liq-*.json
 echo "$OUT"
 if [ "$RC" = 9 ] || [ "$RC" = 8 ]; then
   printf '%s\n\nSe un canale nuovo o sparito e voluto:  sudo /usr/local/bin/ronda-liquidita.sh --impara\n--- fine ronda liquidita\n' "$OUT" \

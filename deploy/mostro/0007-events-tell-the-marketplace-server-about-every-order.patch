@@ -13,13 +13,13 @@ Subject: [PATCH 7/7] events: tell the marketplace server about every order
  src/app/fiat_sent.rs    |   3 +
  src/app/release.rs      |  13 +
  src/app/take_sell.rs    |   7 +
- src/barattolo_eventi.rs | 830 ++++++++++++++++++++++++++++++++++++++++
+ src/barattolo_eventi.rs | 823 ++++++++++++++++++++++++++++++++++++++++
  src/barattolo_fee.rs    |   3 +-
  src/flow.rs             |  15 +
  src/main.rs             |   3 +
  src/scheduler.rs        |  25 ++
  src/util.rs             |  13 +
- 14 files changed, 973 insertions(+), 1 deletion(-)
+ 14 files changed, 966 insertions(+), 1 deletion(-)
  create mode 100644 src/barattolo_eventi.rs
 
 diff --git a/src/app/add_invoice.rs b/src/app/add_invoice.rs
@@ -260,10 +260,10 @@ index a4d4331..4deeb33 100644
                  Err(_) => Err(MostroInternalErr(ServiceError::UpdateOrderStatusError)),
 diff --git a/src/barattolo_eventi.rs b/src/barattolo_eventi.rs
 new file mode 100644
-index 0000000..841d1b2
+index 0000000..316024b
 --- /dev/null
 +++ b/src/barattolo_eventi.rs
-@@ -0,0 +1,830 @@
+@@ -0,0 +1,823 @@
 +//! Barattolo fork, patch 0007: order events to the marketplace server.
 +//!
 +//! The marketplace used to GUESS what happened in a trade from encrypted gift
@@ -295,9 +295,12 @@ index 0000000..841d1b2
 +use tracing::{info, warn};
 +
 +const ENV_URL: &str = "BARATTOLO_EVENTI_URL";
-+/// A secret of its own, if set; otherwise the one of patch 0005.
++/// A secret of its own, and ONLY its own (audit of 19 Sep 2026, M6). It
++/// used to fall back on the secret of patch 0005: with one variable on
++/// the node the two secrets were the same, and whoever read the discount
++/// one could forge events ("sats in escrow" to a buyer about to send
++/// euros). Now without `BARATTOLO_EVENTI_SEGRETO` the events are OFF.
 +const ENV_SECRET: &str = "BARATTOLO_EVENTI_SEGRETO";
-+const ENV_SECRET_FALLBACK: &str = "BARATTOLO_SCONTO_SEGRETO";
 +
 +/// Budget of the first try. A warm circuit answers in about a second.
 +const FIRST_TRY: Duration = Duration::from_secs(8);
@@ -493,19 +496,11 @@ index 0000000..841d1b2
 +    body
 +}
 +
-+/// Pure half of [`endpoint`]: the URL, and the first non-empty secret.
-+pub fn endpoint_from(
-+    url: Option<&str>,
-+    secret: Option<&str>,
-+    fallback: Option<&str>,
-+) -> Option<(String, String)> {
++/// Pure half of [`endpoint`]: the URL and the secret, both non-empty.
++pub fn endpoint_from(url: Option<&str>, secret: Option<&str>) -> Option<(String, String)> {
 +    let url = url?.trim();
-+    let secret = [secret, fallback]
-+        .into_iter()
-+        .flatten()
-+        .map(|s| s.trim())
-+        .find(|s| !s.is_empty())?;
-+    if url.is_empty() {
++    let secret = secret?.trim();
++    if url.is_empty() || secret.is_empty() {
 +        return None;
 +    }
 +    Some((url.to_string(), secret.to_string()))
@@ -515,7 +510,6 @@ index 0000000..841d1b2
 +    endpoint_from(
 +        std::env::var(ENV_URL).ok().as_deref(),
 +        std::env::var(ENV_SECRET).ok().as_deref(),
-+        std::env::var(ENV_SECRET_FALLBACK).ok().as_deref(),
 +    )
 +}
 +
@@ -778,20 +772,19 @@ index 0000000..841d1b2
 +    #[test]
 +    fn without_a_url_or_a_secret_it_is_inert() {
 +        assert_eq!(endpoint_from(None, Some("s"), Some("f")), None);
-+        assert_eq!(endpoint_from(Some(""), Some("s"), None), None);
-+        assert_eq!(endpoint_from(Some("  "), Some("s"), None), None);
-+        assert_eq!(endpoint_from(Some("http://x"), None, None), None);
-+        assert_eq!(endpoint_from(Some("http://x"), Some(" "), Some("")), None);
++        assert_eq!(endpoint_from(Some(""), Some("s")), None);
++        assert_eq!(endpoint_from(Some("  "), Some("s")), None);
++        assert_eq!(endpoint_from(Some("http://x"), None), None);
++        assert_eq!(endpoint_from(Some("http://x"), Some(" ")), None);
 +    }
 +
 +    #[test]
-+    fn its_own_secret_wins_and_the_0005_one_is_the_fallback() {
-+        let both = endpoint_from(Some(" http://x "), Some("own"), Some("fee"));
-+        assert_eq!(both, Some(("http://x".to_string(), "own".to_string())));
-+        let fallback = endpoint_from(Some("http://x"), None, Some(" fee "));
-+        assert_eq!(fallback, Some(("http://x".to_string(), "fee".to_string())));
-+        let empty_own = endpoint_from(Some("http://x"), Some(""), Some("fee"));
-+        assert_eq!(empty_own, Some(("http://x".to_string(), "fee".to_string())));
++    fn only_its_own_secret_and_no_fallback_on_the_0005_one() {
++        let own = endpoint_from(Some(" http://x "), Some(" own "));
++        assert_eq!(own, Some(("http://x".to_string(), "own".to_string())));
++        // no secret of its own = events OFF, whatever patch 0005 has
++        assert_eq!(endpoint_from(Some("http://x"), None), None);
++        assert_eq!(endpoint_from(Some("http://x"), Some("")), None);
 +    }
 +
 +    #[test]
@@ -1095,10 +1088,10 @@ index 0000000..841d1b2
 +    }
 +}
 diff --git a/src/barattolo_fee.rs b/src/barattolo_fee.rs
-index 9376b42..2379a8c 100644
+index 955e593..9ad9fad 100644
 --- a/src/barattolo_fee.rs
 +++ b/src/barattolo_fee.rs
-@@ -120,7 +120,8 @@ fn is_hex_key(key: &str) -> bool {
+@@ -158,7 +158,8 @@ fn is_hex_key(key: &str) -> bool {
      key.len() == 64 && key.bytes().all(|b| b.is_ascii_hexdigit())
  }
  

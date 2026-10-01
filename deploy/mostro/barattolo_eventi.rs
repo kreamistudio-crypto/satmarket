@@ -29,9 +29,12 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tracing::{info, warn};
 
 const ENV_URL: &str = "BARATTOLO_EVENTI_URL";
-/// A secret of its own, if set; otherwise the one of patch 0005.
+/// A secret of its own, and ONLY its own (audit of 19 Sep 2026, M6). It
+/// used to fall back on the secret of patch 0005: with one variable on
+/// the node the two secrets were the same, and whoever read the discount
+/// one could forge events ("sats in escrow" to a buyer about to send
+/// euros). Now without `BARATTOLO_EVENTI_SEGRETO` the events are OFF.
 const ENV_SECRET: &str = "BARATTOLO_EVENTI_SEGRETO";
-const ENV_SECRET_FALLBACK: &str = "BARATTOLO_SCONTO_SEGRETO";
 
 /// Budget of the first try. A warm circuit answers in about a second.
 const FIRST_TRY: Duration = Duration::from_secs(8);
@@ -227,19 +230,11 @@ pub fn payload(event: &Event) -> serde_json::Value {
     body
 }
 
-/// Pure half of [`endpoint`]: the URL, and the first non-empty secret.
-pub fn endpoint_from(
-    url: Option<&str>,
-    secret: Option<&str>,
-    fallback: Option<&str>,
-) -> Option<(String, String)> {
+/// Pure half of [`endpoint`]: the URL and the secret, both non-empty.
+pub fn endpoint_from(url: Option<&str>, secret: Option<&str>) -> Option<(String, String)> {
     let url = url?.trim();
-    let secret = [secret, fallback]
-        .into_iter()
-        .flatten()
-        .map(|s| s.trim())
-        .find(|s| !s.is_empty())?;
-    if url.is_empty() {
+    let secret = secret?.trim();
+    if url.is_empty() || secret.is_empty() {
         return None;
     }
     Some((url.to_string(), secret.to_string()))
@@ -249,7 +244,6 @@ fn endpoint() -> Option<(String, String)> {
     endpoint_from(
         std::env::var(ENV_URL).ok().as_deref(),
         std::env::var(ENV_SECRET).ok().as_deref(),
-        std::env::var(ENV_SECRET_FALLBACK).ok().as_deref(),
     )
 }
 
@@ -512,20 +506,19 @@ mod tests {
     #[test]
     fn without_a_url_or_a_secret_it_is_inert() {
         assert_eq!(endpoint_from(None, Some("s"), Some("f")), None);
-        assert_eq!(endpoint_from(Some(""), Some("s"), None), None);
-        assert_eq!(endpoint_from(Some("  "), Some("s"), None), None);
-        assert_eq!(endpoint_from(Some("http://x"), None, None), None);
-        assert_eq!(endpoint_from(Some("http://x"), Some(" "), Some("")), None);
+        assert_eq!(endpoint_from(Some(""), Some("s")), None);
+        assert_eq!(endpoint_from(Some("  "), Some("s")), None);
+        assert_eq!(endpoint_from(Some("http://x"), None), None);
+        assert_eq!(endpoint_from(Some("http://x"), Some(" ")), None);
     }
 
     #[test]
-    fn its_own_secret_wins_and_the_0005_one_is_the_fallback() {
-        let both = endpoint_from(Some(" http://x "), Some("own"), Some("fee"));
-        assert_eq!(both, Some(("http://x".to_string(), "own".to_string())));
-        let fallback = endpoint_from(Some("http://x"), None, Some(" fee "));
-        assert_eq!(fallback, Some(("http://x".to_string(), "fee".to_string())));
-        let empty_own = endpoint_from(Some("http://x"), Some(""), Some("fee"));
-        assert_eq!(empty_own, Some(("http://x".to_string(), "fee".to_string())));
+    fn only_its_own_secret_and_no_fallback_on_the_0005_one() {
+        let own = endpoint_from(Some(" http://x "), Some(" own "));
+        assert_eq!(own, Some(("http://x".to_string(), "own".to_string())));
+        // no secret of its own = events OFF, whatever patch 0005 has
+        assert_eq!(endpoint_from(Some("http://x"), None), None);
+        assert_eq!(endpoint_from(Some("http://x"), Some("")), None);
     }
 
     #[test]

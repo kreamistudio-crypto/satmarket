@@ -226,10 +226,10 @@ index 4deeb33..11f2cbe 100644
          let active = crate::app::bond::db::find_active_bonds_for_order(pool, order.id).await?;
          if bond::trade_committed_by_locked_taker_bond(&active) {
 diff --git a/src/barattolo_eventi.rs b/src/barattolo_eventi.rs
-index 841d1b2..6303da7 100644
+index 316024b..7fcc27d 100644
 --- a/src/barattolo_eventi.rs
 +++ b/src/barattolo_eventi.rs
-@@ -47,7 +47,7 @@ const HEARTBEAT_EVERY: Duration = Duration::from_secs(60);
+@@ -50,7 +50,7 @@ const HEARTBEAT_EVERY: Duration = Duration::from_secs(60);
  /// Every action this daemon may send. The patcher checks each hook against
  /// this list, and `event_of` drops anything else: a typo must be loud in the
  /// log, never a new kind of event on the wire.
@@ -238,7 +238,7 @@ index 841d1b2..6303da7 100644
      "taken",
      "hold-invoice-requested",
      "hold-invoice-paid",
-@@ -60,6 +60,8 @@ pub const ACTIONS: [&str; 12] = [
+@@ -63,6 +63,8 @@ pub const ACTIONS: [&str; 12] = [
      "canceled",
      "expired",
      "dispute-opened",
@@ -247,7 +247,7 @@ index 841d1b2..6303da7 100644
  ];
  /// The thirteenth, with its own entry point because it carries a reason.
  pub const PAYOUT_FAILED: &str = "payout-failed";
-@@ -76,6 +78,8 @@ pub const PAYOUT_FAILED: &str = "payout-failed";
+@@ -79,6 +81,8 @@ pub const PAYOUT_FAILED: &str = "payout-failed";
  //   canceled                cooperative | republished | pending | admin
  //   expired                 book | taker-timeout | maker-timeout | escrow-deadline
  //   released                admin (a moderator settled a dispute)
@@ -256,7 +256,7 @@ index 841d1b2..6303da7 100644
  //   payout-failed           LND's failure reason (NO_ROUTE, TIMEOUT, …) when the
  //                           payment was sent; before the claim (upstream #908
  //                           routes every pre-claim failure through one point)
-@@ -218,7 +222,10 @@ pub fn payload(event: &Event) -> serde_json::Value {
+@@ -221,7 +225,10 @@ pub fn payload(event: &Event) -> serde_json::Value {
      if let Some(detail) = &event.detail {
          body["detail"] = serde_json::json!(detail);
      }
@@ -268,7 +268,7 @@ index 841d1b2..6303da7 100644
      if let (true, Some((amount, to_buyer, from_seller))) = (closing, event.sats) {
          body["sats"] = serde_json::json!(amount);
          body["sats_buyer"] = serde_json::json!(to_buyer);
-@@ -410,6 +417,41 @@ pub fn emit_taken(order: &Order, next: &str) {
+@@ -404,6 +411,41 @@ pub fn emit_taken(order: &Order, next: &str) {
      emit_detail("taken", order, taker, next);
  }
  
@@ -310,7 +310,7 @@ index 841d1b2..6303da7 100644
  /// The payout to the buyer failed; `reason_code` is LND's
  /// `payment.failure_reason`, the same number patch 0006 logs.
  pub fn emit_payout_failed(order: &Order, reason_code: i32) {
-@@ -590,7 +632,8 @@ mod tests {
+@@ -583,7 +625,8 @@ mod tests {
              // even if a caller fills them in for the wrong action
              event.sats = Some(closing_sats(15_000, 225, 225));
              let body = payload(&event);

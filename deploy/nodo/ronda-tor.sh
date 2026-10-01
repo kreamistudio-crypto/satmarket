@@ -120,13 +120,16 @@ fi
 # 3) il DROP del FORWARD nel namespace VIVO di tor
 PT=$(pid_di "$T")
 FWD=''; IPF=''
-if docker exec "$T" iptables -S FORWARD >/tmp/ronda-tor-fwd 2>/dev/null; then
-  FWD=$(cat /tmp/ronda-tor-fwd); IPF=$(docker exec "$T" cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)
+# un file usa-e-getta SUO (1 ott 2026, B5 del secondo audit), mai un nome
+# fisso in /tmp scritto da root
+FWDF=$(mktemp /tmp/ronda-tor-fwd.XXXXXX) || FWDF=''
+if [ -n "$FWDF" ] && docker exec "$T" iptables -S FORWARD >"$FWDF" 2>/dev/null; then
+  FWD=$(cat "$FWDF"); IPF=$(docker exec "$T" cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)
 elif [ -n "${PT:-}" ] && command -v nsenter >/dev/null && command -v iptables >/dev/null; then
   FWD=$(nsenter -t "$PT" -n iptables -S FORWARD 2>/dev/null)
   IPF=$(nsenter -t "$PT" -n cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)
 fi
-rm -f /tmp/ronda-tor-fwd
+[ -n "$FWDF" ] && rm -f "$FWDF"
 if [ -n "$IPF" ]; then
   if [ "$IPF" = 1 ] && ! printf '%s' "$FWD" | grep -q -- "-s $IPM/32 -j DROP"; then
     a+=("ip_forward=1 SENZA il DROP -s $IPM nel FORWARD di tor: il buco dell'audit e' riaperto")
