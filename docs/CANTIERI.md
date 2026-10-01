@@ -33815,6 +33815,20 @@ Browser pane a 375 px, da Compratore: «Paga» sul sesto annuncio porta
 il toast «Hai già 5 ordini in attesa di pagamento: paga o annulla uno
 di quelli prima di aprirne un altro», e il POST è un 429.
 
+**LA CI ROSSA AL PRIMO PUSH, e la lezione.** Nella gabbia della CI
+`coincurve` non c'è (pip installa solo fastapi, httpx, anthropic), la
+sfida del login Nostr risponde 503 «login Nostr spento», e il
+collaudo pretendeva 200 per trenta volte: due rosse, mentre in
+locale — con coincurve — era tutto verde, e la copia d'archivio pure,
+perché la gabbia toglie la RETE, non le librerie. Il freno viene
+PRIMA di quel controllo apposta (un login spento non deve far
+lavorare nessuno), quindi quel che il collaudo prova è «mai 429 per
+trenta, 429 al trentunesimo», e il 200 o il 503 lo legge dal modulo
+(`ChiavePubblicaNostr is None`) e lo dice. Provato nei due modi,
+simulando l'assenza con `sys.modules['coincurve'] = None`. La lezione
+è quella di «Collaudi in CI, in gabbia»: un collaudo nuovo si prova
+ANCHE senza le librerie facoltative, non solo senza rete.
+
 **COSA NON HO PROVATO.** L'ETag con eventi veri in memoria (la copia
 ha il relay morto: la differenza per persona la prova `collaudo_freni`
 con eventi inventati); il telefono e l'APK (per chi usa l'app non
