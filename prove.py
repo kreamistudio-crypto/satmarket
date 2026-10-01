@@ -8369,8 +8369,12 @@ def prove_pagamento_incerto():
     # ha premuto niente non merita un allarme — per questo dal ramo mite
     # non parte NESSUNA notifica e ci sono invece questi quattro toast.
     cl = open("miniapp.html", encoding="utf-8").read()
-    prova("client: i quattro gesti sanno leggere il quarto esito",
-          4, cl.count("d.non_chiesto"))
+    # ...E IL QUINTO (1 ott 2026, l'annullo del venditore):
+    # `annullaDaVenditore` passa da `_rimborsa_compratore` e ne eredita
+    # il ramo mite — a chi ha appena annullato si dice che il rimborso
+    # riparte da solo, non che e' fermo per colpa del compratore.
+    prova("client: i cinque gesti sanno leggere il quarto esito",
+          5, cl.count("d.non_chiesto"))
     # IL PEGGIORE ERA IL PRIMO: `confirmReceived` scriveva 'confirmed'
     # in locale su tutto cio' che non era 'released', quindi chi compra
     # vedeva «confermato» su un ordine rimasto dov'era, non riprovava, e
@@ -12554,8 +12558,10 @@ def prove_dettaglio_ordine():
           "'Sats nel deposito di garanzia'" in det)
     prova("la riga sotto resta vera per tutti e due", True,
           "d: 'Il pagamento è custodito dalla piattaforma'" in det)
-    prova("e la dicono ENTRAMBI i rami del riquadro (disputa compresa)",
-          2, det.count("passoDeposito,"))
+    # ...e dal 1 ott 2026 sono TRE: l'annullo del venditore ha la sua
+    # storia (deposito, annullo, rimborso) e parte dallo stesso passo
+    prova("e la dicono TUTTI I RAMI del riquadro (disputa e annullo compresi)",
+          3, det.count("passoDeposito,"))
 
     # ---- IL TRACCIAMENTO NON SPARISCE QUANDO SERVE (ago 2026, dal
     # campo: su un ordine SDA da 9 cifre il codice non lo vedeva piu'
@@ -37952,8 +37958,14 @@ def prove_fogli_di_casa():
     # dispositivo, che smette di funzionare li', o la chiave registrata
     # per quella persona, che questa sostituisce ovunque. Importare la
     # stessa chiave gia' registrata su un telefono vuoto non chiede.
-    prova("i gesti che passano dalla domanda unica sono settantasei",
-          76, solo_codice(mini).count("chiediConferma({"))
+    # SETTANTASETTE (1 ott 2026, l'annullo del venditore): «Annulli
+    # l'ordine e rimborsi l'acquirente?» (`annullaDaVenditore`). A sats
+    # gia' in cassaforte chi vende rinuncia e i sats tornano a chi ha
+    # comprato: e' un pagamento che parte davvero e non si disfa, e la
+    # domanda dice il prezzo per intero — rimborso integrale, vetrina,
+    # e il feedback che chi compra potra' lasciare.
+    prova("i gesti che passano dalla domanda unica sono settantasette",
+          77, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
