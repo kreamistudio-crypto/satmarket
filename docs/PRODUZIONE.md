@@ -2243,13 +2243,17 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   cancella, e si riavvia. Le leve si leggono vive nel pannello «⚙️ Stato
   delle leve», gruppo «🏪 Negozi collegati». AL PRIMO GIRO DOPO IL
   DEPLOY: `journalctl -u barattolo --since "2h ago" | grep -E "🏪|Connettore|database is locked"`
-  — il riepilogo `🏪 woo #<id>: N nuovi, …` (cento a giro per un negozio
-  nel suo primo giorno, poi trenta), e su un negozio lento la coda «, N
-  con le varianti al prossimo giro» (la lettura a tempo: NON è un
-  errore, il collegamento resta attivo e ruota). Il giro adesso è più
-  LUNGO di prima, apposta: respira dopo ogni riga scritta perché le
+  — il riepilogo `🏪 woo #<id>: N nuovi, …` (cento all'ora per un
+  negozio nel suo primo giorno, comunque parta il giro — un «🔄
+  Aggiorna ora» subito dopo dice 0 nuovi, ed è giusto —, poi trenta a
+  giro), e su un negozio lento la coda «, N con le varianti al prossimo
+  giro» (la lettura a tempo: NON è un errore, il collegamento resta
+  attivo e ruota). Il giro respira dopo ogni riga SCRITTA perché le
   richieste della app trovino il database libero; un `database is
-  locked` non deve comparire.
+  locked` non deve comparire. (1 ott 2026 sera) Le righe identiche non
+  si scrivono più: nel riepilogo «N invariati» è il grosso del catalogo,
+  e un giro di regime dura poco. I prodotti in bozza sul negozio non
+  nascono: entrano quando il negoziante li pubblica.
 - LE FAMIGLIE DI UN NEGOZIO COLLEGATO (30 set 2026): le scrive il giro
   dell'ora, quindi dopo il deploy compaiono al PRIMO giro e non prima.
   Si guardano, in sola lettura, per collegamento:

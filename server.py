@@ -26239,7 +26239,7 @@ def _leve_stato():
                          "si prende le prime pagine della vetrina"),
             # il rodaggio (1 ott 2026): le due leve si spengono a zero
             # l'una o l'altra, e allora vale il regime da subito
-            _leva("Annunci nuovi per giro nel rodaggio",
+            _leva("Annunci nuovi all'ora nel rodaggio",
                   "MAX_NUOVI_CONNETTORE_RODAGGIO",
                   MAX_NUOVI_CONNETTORE_RODAGGIO,
                   spento="un negozio appena collegato entra al ritmo di "
@@ -59168,8 +59168,11 @@ except ImportError:
 
 # IL RODAGGIO (1 ott 2026, decisione di Andrea, «negozi grandi»): nelle
 # prime ORE_RODAGGIO_CONNETTORE ore di un negozio collegato nascono
-# MAX_NUOVI_CONNETTORE_RODAGGIO righe nuove a giro invece del regime qui
-# sopra. Un negozio da mille prodotti a trenta all'ora entra in
+# MAX_NUOVI_CONNETTORE_RODAGGIO righe nuove ALL'ORA invece del regime qui
+# sopra — all'ora e non a giro (la sera stessa, Andrea): comunque si
+# avvii il giro, il bottone «🔄 Aggiorna ora» compreso, il conto e' un
+# secchio che si riempie a cento all'ora (vedi `_nuovi_per_giro`).
+# Un negozio da mille prodotti a trenta all'ora entra in
 # trentaquattro ore, a cento in dieci: chi ha appena collegato lo vede
 # crescere, e passato il rodaggio torna il ritmo che protegge la home.
 # LE ORE SI CONTANO DAL PRIMO ANNUNCIO ENTRATO, non dalla riga del
@@ -59522,10 +59525,12 @@ MSG_RIGA_NON_GIUDICATA = ("la moderazione non ha potuto guardarlo in "
                           "questo giro: ci riproviamo al prossimo")
 
 
-def _nuovi_per_giro(c: dict) -> int:
+def _nuovi_per_giro(c: dict) -> int | None:
     """Quante righe NUOVE possono nascere in questo giro per questo
-    collegamento (0 = nessun tetto): MAX_NUOVI_CONNETTORE_RODAGGIO nelle
-    prime ORE_RODAGGIO_CONNETTORE ore, poi MAX_NUOVI_CONNETTORE_GIRO.
+    collegamento: None = nessun tetto (la leva a 0), altrimenti i posti,
+    e ZERO vuol dire zero («quest'ora i posti sono finiti»).
+    MAX_NUOVI_CONNETTORE_RODAGGIO ALL'ORA nelle prime
+    ORE_RODAGGIO_CONNETTORE ore, poi MAX_NUOVI_CONNETTORE_GIRO a giro.
 
     LE ORE PARTONO DAL PRIMO ANNUNCIO ENTRATO, e un negozio che non ne
     ha ancora nessuno e' in rodaggio. E' la lettura fedele di «dal
@@ -59539,20 +59544,61 @@ def _nuovi_per_giro(c: dict) -> int:
     UNO PER I DUE CHE LO USANO: lo chiede `_un_connettore` una volta per
     giro e lo passa a chi giudica e a chi fa nascere — due conti
     separati potrebbero dire numeri diversi, e allora l'AI guarderebbe
-    trenta righe e ne nascerebbero cento."""
+    trenta righe e ne nascerebbero cento.
+
+    IL RODAGGIO SI CONTA ALL'ORA, NON AL GIRO (1 ott 2026 sera, decisione
+    di Andrea: «al massimo 100 righe all'ora nelle prime 24 ore, comunque
+    si avvii il giro»). Contato a giro, il bottone «🔄 Aggiorna ora» — un
+    giro ogni cinque minuti — ne faceva entrare cento a ogni tocco, e
+    ogni deploy ne regalava altre cento. Adesso e' un SECCHIO: cento
+    posti che si riempiono da soli a cento all'ora, e ogni riga nata ne
+    toglie uno. Le nascite si contano dal DATABASE, quindi vale comunque
+    sia partito il giro (l'orologio, il bottone, il primo giro dopo il
+    collegamento, un riavvio). Il giro dell'orologio, un'ora dopo il
+    precedente, lo trova pieno; il bottone cinque minuti dopo ci trova
+    otto posti; in media non si va mai oltre cento all'ora.
+    NON UNA FINESTRA («le nascite dell'ultima ora»), ed e' la strada
+    scartata da capire: il giro dell'orologio parte un'ora dopo l'INIZIO
+    del precedente, e le nascite di quello portano l'ora della sua
+    riconciliazione — secondi o minuti dopo l'inizio. Una finestra di
+    un'ora le conterebbe ancora quasi sempre, e il giro dell'orologio
+    troverebbe l'ora piena una volta si' e una no: il rodaggio
+    dimezzato da solo. Il secchio a quel punto e' pieno al 99%.
+    A regime il tetto resta a giro (MAX_NUOVI_CONNETTORE_GIRO), com'era."""
     regime = MAX_NUOVI_CONNETTORE_GIRO
-    if (regime <= 0 or MAX_NUOVI_CONNETTORE_RODAGGIO <= 0
-            or ORE_RODAGGIO_CONNETTORE <= 0):
+    if regime <= 0:
+        return None                       # la leva a zero: nessun tetto
+    if MAX_NUOVI_CONNETTORE_RODAGGIO <= 0 or ORE_RODAGGIO_CONNETTORE <= 0:
         return regime
+    adesso = time.time()
     con = db()
     try:
         primo = con.execute("SELECT MIN(creato) FROM annunci "
                             "WHERE connettore_id=?", (c["id"],)).fetchone()[0]
+        if primo is not None and \
+                adesso - primo >= ORE_RODAGGIO_CONNETTORE * 3600:
+            return regime
+        # le nascite del rodaggio (al piu' un giorno di righe), a gruppi:
+        # un giro le fa nascere tutte col suo `creato`
+        nascite = con.execute(
+            "SELECT creato, COUNT(*) FROM annunci WHERE connettore_id=? "
+            "GROUP BY creato ORDER BY creato", (c["id"],)).fetchall()
     finally:
         con.close()
-    if primo is None or time.time() - primo < ORE_RODAGGIO_CONNETTORE * 3600:
-        return max(regime, MAX_NUOVI_CONNETTORE_RODAGGIO)
-    return regime
+    tetto = max(regime, MAX_NUOVI_CONNETTORE_RODAGGIO)
+    # IL SECCHIO, ricostruito da TUTTE le nascite del rodaggio: pieno
+    # prima della prima, si riempie a `tetto` all'ora, ogni nascita toglie
+    # un posto. Non dalle sole nascite dell'ultima ora supponendolo pieno
+    # un'ora fa: sotto un bottone continuo il secchio non e' MAI pieno, e
+    # quella supposizione regalava cento posti ogni ora (la prova del
+    # giorno intero, un tocco ogni cinque minuti, l'ha preso: 190 all'ora).
+    al_secondo = tetto / 3600.0
+    posti, dal = float(tetto), (nascite[0][0] if nascite else adesso)
+    for quando, quante in nascite:
+        posti = min(tetto, posti + (quando - dal) * al_secondo) - quante
+        dal = quando
+    posti = min(tetto, posti + (adesso - dal) * al_secondo)
+    return max(0, int(posti))
 
 
 def _segno_varianti(c: dict) -> int:
@@ -59572,7 +59618,7 @@ def _segno_varianti(c: dict) -> int:
 
 
 def _righe_da_giudicare(righe: list, connettore: dict,
-                        tetto_nuove: int = 0) -> tuple[list, list]:
+                        posti: int | None = None) -> tuple[list, list]:
     """Divide le righe tradotte in (da giudicare, gia' viste).
 
     E' `_da_giudicare` con la chiave al posto del tag `d`, e vale la
@@ -59588,7 +59634,7 @@ def _righe_da_giudicare(righe: list, connettore: dict,
 
     E SI GIUDICA SOLO CIO' CHE ENTRA (1 ott 2026, decisione di Andrea,
     «negozi grandi»). Delle righe MAI VISTE si giudicano le prime
-    `tetto_nuove` — quante ne possono nascere in questo giro (vedi
+    `posti` — quante ne possono nascere in questo giro (vedi
     `_nuovi_per_giro`) — e le altre si marcano `rimandata` senza chiedere
     niente all'AI: nasceranno, e si giudicheranno, al giro in cui
     tocchera' a loro. Prima si giudicavano TUTTE a ogni giro e il
@@ -59607,10 +59653,16 @@ def _righe_da_giudicare(righe: list, connettore: dict,
     fermerebbero — la fermeranno al suo turno. Questa funzione gira nel
     ciclo principale, e il filtro su duemila righe a ogni ora sarebbe
     un'attesa di tutto il server per un verdetto che si butta.
-    0 = nessun tetto: si giudicano tutte, come ieri."""
+    None = nessun tetto: si giudicano tutte, come ieri. 0 = l'ora e'
+    piena (il rodaggio contato all'ora): nessuna mai vista va all'AI, e
+    il testo cambiato di chi c'e' gia' si guarda lo stesso.
+    E LA BOZZA NON SI GIUDICA (1 ott 2026 sera, decisione di Andrea): una
+    riga mai vista che il negozio non pubblica non nasce piu' (vedi
+    `_una_riga`), quindi non va all'AI e non prende un posto — sta fra
+    le note, cioe' in `viste`, e nessuno la segna «non giudicata»."""
     con = db()
     nuove, note = [], []
-    posti = 0
+    presi = 0
     for r in righe:
         if r.get("saltato_perche"):
             continue
@@ -59619,12 +59671,15 @@ def _righe_da_giudicare(righe: list, connettore: dict,
             "WHERE connettore_id=? AND origine_chiave=?",
             (connettore["id"], r["origine_chiave"])).fetchone()
         if riga is None:
-            if tetto_nuove > 0:
-                if posti >= tetto_nuove:
+            if not r.get("attivo", True):
+                note.append(r)                   # una bozza: non nasce
+                continue
+            if posti is not None:
+                if presi >= posti:
                     r["rimandata"] = True        # entrera' al suo giro
                     continue
                 if not controlla_vietato(r["titolo"], r["descrizione"]):
-                    posti += 1                   # un posto per chi puo' nascere
+                    presi += 1                   # un posto per chi puo' nascere
             nuove.append(r)                      # mai vista: si giudica
         elif riga["stato"] != "attivo":
             note.append(r)                       # gia' decisa, o in attesa
@@ -59809,7 +59864,8 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
             return
         righe = importa_negozio.traduci(prodotti, c["fonte"], cambio)
         # I POSTI DI QUESTO GIRO, un conto solo per chi giudica e per chi
-        # fa nascere (1 ott 2026): il rodaggio o il regime
+        # fa nascere (1 ott 2026): il secchio del rodaggio o il regime —
+        # None = nessun tetto, 0 = l'ora del rodaggio e' piena
         tetto_nuovi = _nuovi_per_giro(c)
         # la moderazione sulle sole righe che ENTRANO: il testo cambiato
         # di chi c'e' gia', e le mai viste fino ai posti del giro

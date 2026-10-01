@@ -92312,12 +92312,16 @@ def prove_connettori_ingresso():
     # LA PROMESSA CHE ORA E' VERA: «il resto arriva ai giri
     # successivi». Con lo stesso catalogo, al giro dopo entrano le
     # altre — le prime due si ritrovano per chiave e si aggiornano.
+    # EMENDATE (1 ott 2026 sera, «negozi grandi», seconda parte): le righe
+    # gia' create e identiche non si riscrivono piu' — erano «aggiornati»,
+    # adesso sono «invariati» (decisione di Andrea: meno carico, e la data
+    # di modifica resta quella vera)
     esito = gira(con, tutte, completo=True, max_nuovi=2)
     prova("al giro dopo entrano le successive", (2, 2, 1),
-          (esito["nuovi"], esito["aggiornati"], esito["rimandati"]))
+          (esito["nuovi"], esito["invariati"], esito["rimandati"]))
     esito = gira(con, tutte, completo=True, max_nuovi=2)
     prova("...finche' il catalogo non e' tutto dentro", (1, 4, 0),
-          (esito["nuovi"], esito["aggiornati"], esito["rimandati"]))
+          (esito["nuovi"], esito["invariati"], esito["rimandati"]))
     prova("...e allora ci sono tutte", 5, len(stati(con)))
 
     # --- 5-bis) IL CHIAMANTE, che il banco non puo' vedere -------
@@ -92348,11 +92352,19 @@ def prove_connettori_ingresso():
     # --- 6) il tetto tocca l'INGRESSO, mai la tenuta in pari -----
     # Un prezzo che cambia si scrive comunque: chi vende gia' non
     # aspetta il proprio turno per aggiornarsi.
+    # EMENDATA (1 ott 2026 sera): lo zero adesso vuol dire ZERO posti
+    # (l'ora piena del rodaggio contato all'ora); il «nessun tetto» e' None
     con = banco()
     gira(con, [riga("a", prezzo_sats=1000)], completo=True)
     gira(con, [riga("a", prezzo_sats=2000), riga("b")],
-         completo=True, max_nuovi=0)
-    prova("a tetto zero entrano tutte, come ieri", 2, len(stati(con)))
+         completo=True, max_nuovi=None)
+    prova("senza tetto entrano tutte, come ieri", 2, len(stati(con)))
+    con = banco()
+    gira(con, [riga("a")], completo=True)
+    esito = gira(con, [riga("a"), riga("b"), riga("c")], completo=True,
+                 max_nuovi=0)
+    prova("...e a zero posti non ne nasce nessuna: aspettano", (1, 0, 2),
+          (len(stati(con)), esito["nuovi"], esito["rimandati"]))
     # ...E IL CASO SI SCEGLIE IN MODO CHE POSSA FALLIRE SOLO PER QUELLA
     # RAGIONE (la lezione di `_pare_recapito`, ripagata qui dalla
     # tortura): la riga che esiste va messa DOPO le nuove, cosi' quando
@@ -92360,13 +92372,18 @@ def prove_connettori_ingresso():
     # nell'ordine naturale — l'esistente per prima — il tetto non e'
     # ancora pieno, e anche la versione che ferma gli aggiornamenti
     # passerebbe.
+    # EMENDATA (1 ott 2026 sera): il cambio si fa sul PREZZO VERO, quello
+    # in euro. Cambiare i soli sats (lo stesso prezzo in euro) e' il cambio
+    # BTC che si muove, e da oggi non riscrive la riga: `prezzo_sats` di un
+    # listino in euro e' il ripiego della pubblicazione, come per i nativi
     con = banco()
     gira(con, [riga("a", prezzo_sats=1000)], completo=True)
-    gira(con, [riga("b"), riga("c"), riga("a", prezzo_sats=2000)],
+    gira(con, [riga("b"), riga("c"),
+               riga("a", prezzo_sats=2000, prezzo_eur=15.0)],
          completo=True, max_nuovi=2)
-    prova("il tetto non ferma l'aggiornamento di chi c'e' gia'", 2000,
-          con.execute("SELECT prezzo_sats FROM annunci "
-                      "WHERE origine_chiave='a'").fetchone()[0])
+    prova("il tetto non ferma l'aggiornamento di chi c'e' gia'", (15.0, 2000),
+          tuple(con.execute("SELECT prezzo_eur, prezzo_sats FROM annunci "
+                            "WHERE origine_chiave='a'").fetchone()))
 
 
 def prove_connettore_interrompibile():
@@ -93153,8 +93170,13 @@ def prove_famiglie():
 
     # --- la scrittura: la chiave del collegamento davanti ------------
     corpo = pezzo_src(src, "def _scrivi_famiglia(")
+    # EMENDATA (1 ott 2026 sera, «negozi grandi», seconda parte): i valori
+    # si calcolano in `_valori_famiglia`, un posto solo per chi scrive e
+    # per chi confronta — `_aggiorna` non riscrive una famiglia identica
+    valori_fam = pezzo_src(src, "def _valori_famiglia(")
     prova("la famiglia si scrive con il collegamento davanti", True,
-          'f"c{connettore_id}:{fam}"' in corpo)
+          'f"c{connettore_id}:{fam}"' in valori_fam
+          and "_valori_famiglia(connettore_id, r)" in corpo)
     prova("...alla nascita E a ogni aggiornamento", 2,
           src.count("    _scrivi_famiglia(con, "))
     prova("...e non tocca `modificato`", False, "modificato" in corpo.split(
@@ -118847,7 +118869,10 @@ def prove_db_contesa_negozi():
           con.execute("SELECT stato FROM connettori_uscite WHERE annuncio_id=1").fetchone()[0])
     prova("...e la riga porta la foto nuova, locale", ["a1_0.jpg"],
           json.loads(con.execute("SELECT foto FROM annunci WHERE id=1").fetchone()[0]))
-    prova("stesse foto di ieri: nessun download (come sempre)", 5, esito["aggiornati"])
+    # EMENDATA (1 ott 2026 sera): le quattro righe identiche non si
+    # riscrivono piu' («invariati»), la prima con la foto nuova si'
+    prova("stesse foto di ieri: nessun download (come sempre)", (1, 4),
+          (esito["aggiornati"], esito["invariati"]))
 
     # --- 3) le sparizioni a lotti ------------------------------------------
     percorso3, con3 = banco()
@@ -119064,11 +119089,24 @@ def prove_negozi_grandi():
     prova("...e chi va all'AI non porta il segno", [],
           chiavi([r for r in nuove if r.get("rimandata")]))
     tutte = righe_a()
-    nuove, _ = giudica(tutte, {"id": 7}, 0)
-    prova("a tetto zero si guardano tutte le mai viste, come ieri",
+    nuove, _ = giudica(tutte, {"id": 7}, None)
+    prova("senza tetto (None) si guardano tutte le mai viste, come ieri",
           ["v1", "n1", "n2", "n3", "n4", "n5", "v2"],
           [k for k in chiavi(nuove) if k[0] in "nv"])
     prova("...e nessuna si marca", [], chiavi([r for r in tutte if r.get("rimandata")]))
+    # (1 ott 2026 sera) ZERO VUOL DIRE ZERO: l'ora del rodaggio e' piena
+    tutte = righe_a()
+    nuove, _ = giudica(tutte, {"id": 7}, 0)
+    prova("a zero posti all'AI va solo il testo cambiato, e le mai viste aspettano",
+          (["b"], ["v1", "n1", "n2", "n3", "n4", "n5", "v2"]),
+          (chiavi(nuove), chiavi([r for r in tutte if r.get("rimandata")])))
+    # LA BOZZA MAI VISTA non va all'AI e non prende un posto: sta fra le note
+    tutte = [riga("d1", attivo=False), riga("n1"), riga("d2", attivo=False),
+             riga("n2"), riga("n3")]
+    nuove, note = giudica(tutte, {"id": 7}, 2)
+    prova("la bozza mai vista non va all'AI e non prende un posto: sta fra le note",
+          (["n1", "n2"], ["d1", "d2"], ["n3"]),
+          (chiavi(nuove), chiavi(note), chiavi([r for r in tutte if r.get("rimandata")])))
     # IL FILTRO PAROLE NON OCCUPA UN POSTO: trenta respinti in testa al
     # catalogo si prenderebbero i trenta posti a ogni giro, per sempre
     tutte = [riga(f"v{i}", f"Fucile {i}") for i in range(5)] + \
@@ -119186,6 +119224,14 @@ def prove_negozi_grandi():
           470 <= (r0.get("entro_fra") or 0) <= 480)
     prova("...il segno della rotazione (da capo, al primo giro) e il tetto di mille",
           (0, 1000), (r0.get("dopo"), r0.get("tetto")))
+    # IL BOTTONE SUBITO DOPO (1 ott 2026 sera, decisione di Andrea): il
+    # rodaggio e' all'ora, e il secchio e' stato appena svuotato
+    st["voci_ai"].clear()
+    esito = giro()
+    prova("il bottone subito dopo il giro del rodaggio: nessuna nascita, e l'AI non guarda le nuove",
+          (0, 150, []), (esito.get("nuovi"), esito.get("rimandati"), st["voci_ai"]))
+    prova("...e le cento di prima non si riscrivono: sono «invariate»", (0, 100),
+          (esito.get("aggiornati"), esito.get("invariati")))
     # passate le ventiquattro ore dal PRIMO annuncio: il regime
     con = db_b()
     con.execute("UPDATE annunci SET creato = creato - ?", (25 * 3600,))
@@ -119286,8 +119332,8 @@ def prove_negozi_grandi():
             ("ORE_RODAGGIO_CONNETTORE", 0, 30, "ore a zero: il regime da subito"),
             ("MAX_NUOVI_CONNETTORE_RODAGGIO", 10, 30,
              "il rodaggio non rallenta mai: col regime piu' alto vale lui"),
-            ("MAX_NUOVI_CONNETTORE_GIRO", 0, 0,
-             "regime a zero: nessun tetto, nemmeno nel rodaggio")):
+            ("MAX_NUOVI_CONNETTORE_GIRO", 0, None,
+             "regime a zero: nessun tetto (None), nemmeno nel rodaggio")):
         prima = amb_c[leva]
         amb_c[leva] = valore
         prova("..." + nome, atteso, posti({"id": 7}))
@@ -119653,6 +119699,197 @@ def prove_negozi_grandi():
         con_s.close()
     finally:
         ne._respira, ne._scrivi_famiglia = vero_respira, vera_famiglia
+
+    # --- K) il rodaggio all'ora: il secchio (1 ott 2026 sera, Andrea) ------
+    # «al massimo 100 righe all'ora nelle prime 24 ore, comunque si avvii il
+    # giro»: il conto vive nel database, e l'orologio qui e' di cartone
+    db_k = banco_db()
+    ora_k = [1_000_000.0]
+    amb_k = {"db": db_k, "time": types.SimpleNamespace(time=lambda: ora_k[0]),
+             "MAX_NUOVI_CONNETTORE_GIRO": 30, "MAX_NUOVI_CONNETTORE_RODAGGIO": 100,
+             "ORE_RODAGGIO_CONNETTORE": 24}
+    exec(pezzo("_nuovi_per_giro"), amb_k)
+    secchio = amb_k["_nuovi_per_giro"]
+
+    def nascono(n, quando, cid=7):
+        c_ = db_k()
+        c_.executemany("INSERT INTO annunci(connettore_id, origine_chiave, creato, stato) "
+                       "VALUES(?,?,?,'attivo')",
+                       [(cid, f"k{quando}-{i}", int(quando)) for i in range(n)])
+        c_.commit()
+        c_.close()
+
+    def da_capo():
+        c_ = db_k()
+        c_.execute("DELETE FROM annunci")
+        c_.commit()
+        c_.close()
+
+    T = ora_k[0]
+    prova("K) il primo giro di un negozio nuovo trova il secchio pieno: cento", 100,
+          secchio({"id": 7}))
+    nascono(100, T)
+    prova("...subito dopo cento nascite e' vuoto: il bottone non fa nascere niente", 0,
+          secchio({"id": 7}))
+    ora_k[0] = T + 300
+    prova("...cinque minuti dopo ci sono otto posti: cento all'ora, non cento a tocco", 8,
+          secchio({"id": 7}))
+    ora_k[0] = T + 3600
+    prova("...e il giro dell'orologio, un'ora dopo, lo trova pieno", 100, secchio({"id": 7}))
+    ora_k[0] = T + 3570
+    prova("...anche mezzo minuto prima: non si dimezza (una finestra d'un'ora direbbe zero)",
+          99, secchio({"id": 7}))
+    ora_k[0] = T + 60
+    prova("...e un riavvio un minuto dopo non regala un'ora nuova", 1, secchio({"id": 7}))
+    nascono(5, T, cid=8)
+    prova("...le nascite di un ALTRO negozio non toccano il suo secchio", 1,
+          secchio({"id": 7}))
+    # DOPO UNA PAUSA LUNGA IL SECCHIO NON SI GONFIA: e' pieno (cento), non
+    # «dieci ore di posti» — cento nate, e cinque minuti dopo i posti sono
+    # otto. Senza il tetto dentro la ricostruzione sarebbero cento
+    # (la tortura l'ha chiesto: col solo tetto finale la prova taceva)
+    da_capo()
+    nascono(10, T)
+    nascono(100, T + 2 * 3600)
+    ora_k[0] = T + 2 * 3600 + 300
+    prova("...e dopo una pausa lunga non si gonfia: cento nate, cinque minuti dopo otto posti",
+          8, secchio({"id": 7}))
+    # LA PROVA CHE CONTA: «Aggiorna ora» ogni cinque minuti per un giorno
+    # intero (l'orologio e' uno di quei giri ogni dodici), su un catalogo
+    # che non finisce mai
+    da_capo()
+    T = 2_000_000.0
+    nati, giri, t, prima_ora = 0, 0, T, 0
+    while t < T + 23 * 3600 + 3000:            # dentro le ventiquattro ore
+        ora_k[0] = t
+        n = secchio({"id": 7})
+        if n:
+            nascono(n, t)
+        if t < T + 3600:
+            prima_ora += n
+        nati, giri, t = nati + n, giri + 1, t + 300
+    # CENTO ALL'ORA E' UN RITMO, NON UNA FINESTRA: in L ore al piu' cento
+    # per ora piu' il secchio pieno dell'inizio. Un'ora sola puo' arrivare
+    # quasi al doppio (il secchio pieno e quel che si riempie), mai oltre:
+    # una finestra rigida di sessanta minuti dimezzerebbe l'orologio
+    prova(f"...un giorno col bottone ogni cinque minuti ({giri} giri, {nati} nate): "
+          "cento all'ora piu' il secchio dell'inizio, mai di piu'", True,
+          nati <= 100 + 100 * 24)
+    prova(f"...e la prima ora, col secchio pieno, ne prende {prima_ora}: mai il doppio",
+          True, prima_ora < 2 * 100)
+    prova("...e il rodaggio arriva davvero quasi a cento all'ora: non e' avaro", True,
+          nati >= 100 * 23)
+    # a regime il tetto resta a giro, com'era
+    da_capo()
+    ora_k[0] = T
+    nascono(30, T - 25 * 3600)                 # il primo annuncio, 25 ore fa
+    nascono(30, T - 60)                        # trenta appena nati
+    prova("...e a regime il tetto resta a giro, com'era: trenta", 30, secchio({"id": 7}))
+
+    # --- L) le righe identiche non si riscrivono (1 ott 2026 sera, Andrea) -
+    db_l = banco_db()
+    con_l = db_l()
+    felpa = {"id": 300, "name": "Felpa", "description": "x", "type": "variable",
+             "status": "publish", "price": "5.00", "images": [], "categories": [],
+             "_variazioni": [{"id": v, "price": "5.00", "status": "publish",
+                              "manage_stock": True, "stock_quantity": 2,
+                              "attributes": [{"name": "Taglia", "option": t_}]}
+                             for v, t_ in ((301, "S"), (302, "M"))]}
+    cambi_l = {}
+
+    def giro_l(cambio=CAMBIO, **diversi):
+        cambi_l.update({int(k[1:]): v for k, v in diversi.items()})
+        base = {1: semplice(1), 2: semplice(2), 3: con_foto(3, 1)}
+        base.update(cambi_l)
+        with contextlib.redirect_stdout(io.StringIO()):
+            return ne.riconcilia_connettore(
+                con_l, CONN, ne.traduci(list(base.values()) + [felpa], "woo", cambio),
+                lambda a, i, u: f"a{a}_{i}.jpg", {}, completo=True)
+
+    def colonna(chiave, nome):
+        r_ = con_l.execute(f"SELECT {nome} FROM annunci WHERE origine_chiave=?",
+                           (chiave,)).fetchone()
+        return r_[0] if r_ else None
+
+    giro_l()
+    con_l.execute("UPDATE annunci SET modificato=1000")        # una data riconoscibile
+    con_l.commit()
+    prima = con_l.total_changes
+    pause_l = []
+    vero_respira_l = ne._respira
+    ne._respira = pause_l.append
+    try:
+        esito = giro_l()
+    finally:
+        ne._respira = vero_respira_l
+    prova("L) sul catalogo identico il giro non scrive NIENTE: cinque «invariate», zero respiri",
+          (0, 5, 0, []), (esito["aggiornati"], esito["invariati"],
+                          con_l.total_changes - prima, pause_l))
+    prova("...la famiglia della felpa compresa (si confronta, non si riscrive)", "c7:p:300",
+          colonna("300:301", "famiglia"))
+    prova("...e la data di modifica resta quella vera", [1000] * 5,
+          [r_[0] for r_ in con_l.execute("SELECT modificato FROM annunci ORDER BY id")])
+    esito = giro_l(cambio={"EUR": 50_000.0})
+    prova("...il cambio BTC che si muove non e' una modifica: niente riscritto, i sats restano",
+          (5, 7_500), (esito["invariati"], colonna("1", "prezzo_sats")))
+    esito = giro_l(p1=dict(semplice(1), price="9.00"))
+    prova("...un prezzo in euro che cambia si scrive, e solo lui muove la data",
+          (1, 4, 9.0, True, 1000),
+          (esito["aggiornati"], esito["invariati"], colonna("1", "prezzo_eur"),
+           colonna("1", "modificato") > 1000, colonna("2", "modificato")))
+    esito = giro_l(p2=dict(semplice(2), stock_quantity=1))
+    prova("...una giacenza che cambia si scrive senza muovere la data", (1, 1, 1, 1000),
+          (esito["aggiornati"], colonna("2", "quantita"), colonna("2", "origine_stock_visto"),
+           colonna("2", "modificato")))
+    esito = giro_l(p2=dict(semplice(2), stock_quantity=0))
+    prova("...l'esaurito diventa venduto anche col testo uguale, e la data resta",
+          ("venduto", 1000), (colonna("2", "stato"), colonna("2", "modificato")))
+    esito = giro_l(p2=dict(semplice(2), stock_quantity=4))
+    prova("...e torna in vetrina quando la giacenza torna", ("attivo", 1, 1000),
+          (colonna("2", "stato"), esito["riaccesi"], colonna("2", "modificato")))
+    esito = giro_l(p3=dict(con_foto(3, 1), images=[{"src": "https://cdn/3-nuova.jpg"}]))
+    prova("...e una foto nuova si scarica, si scrive e muove la data", (1, True, True),
+          (esito["aggiornati"], colonna("3", "modificato") > 1000,
+           "3-nuova" in (colonna("3", "origine_foto") or "")))
+    con_l.close()
+
+    # --- M) la bozza non nasce, ed entra quando la pubblichi (1 ott sera) --
+    db_m = banco_db()
+    con_m = db_m()
+
+    def bozza(k):
+        return dict(semplice(k), status="draft")
+
+    def giro_m(prodotti, **kw):
+        kw.setdefault("completo", True)
+        with contextlib.redirect_stdout(io.StringIO()):
+            return ne.riconcilia_connettore(con_m, CONN, ne.traduci(prodotti, "woo", CAMBIO),
+                                            lambda *a: None, {}, **kw)
+
+    def stati_m():
+        return {r_[0]: r_[1] for r_ in con_m.execute(
+            "SELECT origine_chiave, stato FROM annunci ORDER BY id")}
+
+    esito = giro_m([bozza(1), semplice(2), bozza(3)])
+    prova("M) la bozza mai vista non nasce piu' «rimossa»: non nasce e basta",
+          ({"2": "attivo"}, 2), (stati_m(), esito["non_pubblicati"]))
+    esito = giro_m([semplice(1), semplice(2), bozza(3)])
+    prova("...e quando il negoziante la pubblica entra, attiva",
+          ({"1": "attivo", "2": "attivo"}, 1, 1),
+          (stati_m(), esito["nuovi"], esito["non_pubblicati"]))
+    con_m.execute("DELETE FROM annunci")
+    con_m.commit()
+    # una bozza in testa E una in coda, dopo che i posti sono finiti: la
+    # seconda e' quella che direbbe se la bozza viene presa per un'attesa
+    esito = giro_m([bozza(5), semplice(6), semplice(8), semplice(9), bozza(7)], max_nuovi=2)
+    prova("...una bozza non prende posti e non e' fra le «in arrivo», nemmeno a posti finiti",
+          (2, 1, 2), (esito["nuovi"], esito["rimandati"], esito["non_pubblicati"]))
+    con_m.close()
+    BOZZE = [bozza(4000 + k) for k in range(5)] + [semplice(5000 + k) for k in range(5)]
+    _, st5, _, _, giro5, _ = banco_giro(lambda ritmo: list(BOZZE))
+    esito = giro5()
+    prova("...e nel giro vero la bozza non va all'AI: cinque guardate, cinque nate, cinque bozze",
+          (5, 5, 5), (len(st5["voci_ai"]), esito.get("nuovi"), esito.get("non_pubblicati")))
 
 
 def main():

@@ -369,10 +369,21 @@ def main():
     prova("il collegamento resta sano", ("attivo", 0, ""),
           (c["stato"], c["errori_di_fila"], c["ultimo_errore"]))
 
+    # IL BOTTONE SUBITO DOPO (1 ott 2026 sera, decisione di Andrea: il
+    # rodaggio e' cento ALL'ORA, comunque si avvii il giro): il secchio e'
+    # appena stato svuotato, e un giro a mano non fa nascere niente
+    VOCI_AI.clear()
+    asyncio.run(SRV._sync_uno(grande))
+    e = connettore(grande)["esito"]
+    prova("il bottone subito dopo il giro del rodaggio: nessuna nascita, l'AI non guarda niente",
+          (0, 0, 2100), (e.get("nuovi"), len(VOCI_AI), e.get("rimandati")))
+    prova("...e le cento di prima non si riscrivono: «invariate»", (0, 100),
+          (e.get("aggiornati"), e.get("invariati")))
+    invecchia(grande, 1)                 # un'ora dopo: il secchio e' pieno
     VOCI_AI.clear()
     asyncio.run(giro(grande))
     e = connettore(grande)["esito"]
-    prova("secondo giro nel rodaggio: altre cento, e l'AI ne guarda cento", (100, 100),
+    prova("un'ora dopo il giro dell'orologio: altre cento, e l'AI ne guarda cento", (100, 100),
           (e.get("nuovi"), len(VOCI_AI)))
 
     invecchia(grande, 25)
@@ -385,11 +396,15 @@ def main():
     e = connettore(grande)["esito"]
     print(f"    giro 3 (fuori dal rodaggio): {secondi:.1f} s, {len(VOCI_AI)} righe "
           f"all'AI, {e.get('nuovi')} nuovi, {e.get('aggiornati')} aggiornati, "
-          f"{e.get('rimandati')} rimandati; home piu' lenta "
-          f"{max(conto['home'] or [0]):.2f} s, ciclo fermo al piu' "
+          f"{e.get('invariati')} invariati, {e.get('rimandati')} rimandati; "
+          f"home piu' lenta {max(conto['home'] or [0]):.2f} s, ciclo fermo al piu' "
           f"{max(conto['fermo']):.2f} s")
     prova("passate le ventiquattro ore dal primo annuncio: il regime, trenta",
           (30, 30, 2200 - 230), (e.get("nuovi"), len(VOCI_AI), e.get("rimandati")))
+    # LE RIGHE IDENTICHE NON SI RISCRIVONO (1 ott 2026 sera, Andrea): le
+    # duecento gia' in vetrina, uguali a ieri, non costano un commit
+    prova("...e le duecento gia' in vetrina, identiche, non si riscrivono", (0, 200),
+          (e.get("aggiornati"), e.get("invariati")))
     prova("...anche col traffico, nessuna rotta morta", (0, [], []),
           (conto["locked"], conto["altro"],
            sorted({s for s in conto["stati"] if s != 200})))
@@ -404,7 +419,29 @@ def main():
     prova("i testi cambiati di chi e' gia' in vetrina si guardano, oltre ai trenta posti",
           (cambiati + 30, 30), (len(VOCI_AI), e.get("nuovi")))
     vivi = [a for a in annunci(grande) if a["stato"] == "attivo"]
-    print(f"    dopo quattro giri: {len(vivi)} annunci in vetrina su 2.200 righe")
+    print(f"    dopo cinque giri: {len(vivi)} annunci in vetrina su 2.200 righe")
+
+    # --- 1-bis) le bozze del negozio (1 ott 2026 sera, Andrea) ---------------
+    print("\n[1-bis. le bozze: non nascono, ed entrano quando le pubblichi]")
+    cat_b = [prodotto_woo(k, f"Vaso {k}") for k in range(1, 11)]
+    for k in (2, 4, 6, 8):
+        cat_b[k - 1]["status"] = "draft"
+    NEGOZI["bozze.esempio"] = {"catalogo": cat_b, "variazioni": {}}
+    bozze = collega("bozze.esempio")
+    VOCI_AI.clear()
+    asyncio.run(giro(bozze))
+    e = connettore(bozze)["esito"]
+    prova("le quattro bozze non nascono (ieri nascevano «rimosse», per sempre), e l'AI non le guarda",
+          ([1, 3, 5, 7, 9, 10], 4, 6),
+          (sorted(int(a["origine_chiave"]) for a in annunci(bozze)),
+           e.get("non_pubblicati"), len(VOCI_AI)))
+    cat_b[1]["status"] = cat_b[3]["status"] = "publish"
+    VOCI_AI.clear()
+    asyncio.run(SRV._sync_uno(bozze))     # il venditore pubblica, e tocca «Aggiorna ora»
+    e = connettore(bozze)["esito"]
+    prova("...e quando il negoziante ne pubblica due, entrano, attive", (2, 2, ["attivo", "attivo"]),
+          (e.get("nuovi"), len(VOCI_AI),
+           [a["stato"] for a in annunci(bozze) if a["origine_chiave"] in ("2", "4")]))
 
     # --- 2) il Woo lento -------------------------------------------------------
     print("\n[2. il Woo lento: la lettura a tempo si ferma da sola]")

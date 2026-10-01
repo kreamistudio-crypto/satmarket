@@ -1430,12 +1430,25 @@ def _riga_locale(con, connettore_id: int, chiave: str):
     il venditore non capisce perche'. Qui la chiave c'e' sempre,
     quindi il caso non deve nemmeno potersi presentare: se esiste gia'
     un annuncio omonimo nato qui, ne nasce uno NUOVO e il report lo
-    dice — «se e' lo stesso oggetto, ritira quello vecchio»."""
+    dice — «se e' lo stesso oggetto, ritira quello vecchio».
+    (1 ott 2026) Porta anche i valori che `_aggiorna` confronta per non
+    riscrivere una riga identica."""
     return con.execute(
-        "SELECT id, stato, foto, origine_foto, quantita, "
-        "origine_stock_visto, consegna FROM annunci "
+        "SELECT id, stato, foto, origine_foto, quantita, quantita_max, "
+        "origine_stock_visto, consegna, titolo, descrizione, prezzo_eur, "
+        "valuta, famiglia, famiglia_titolo, opzioni FROM annunci "
         "WHERE connettore_id=? AND origine_chiave=?",
         (connettore_id, chiave)).fetchone()
+
+
+def _valori_famiglia(connettore_id: int, r: dict) -> tuple:
+    """(famiglia, famiglia_titolo, opzioni) come si scrivono nella riga:
+    UN posto solo, per chi scrive e per chi confronta (`_aggiorna`)."""
+    fam = r.get("famiglia") or ""
+    return (f"c{connettore_id}:{fam}" if fam else "",
+            (r.get("famiglia_titolo") or "")[:MAX_TITOLO] if fam else "",
+            json.dumps(r.get("opzioni") or [], ensure_ascii=False)
+            if fam else "")
 
 
 def _scrivi_famiglia(con, annuncio_id: int, connettore_id: int, r: dict):
@@ -1444,14 +1457,9 @@ def _scrivi_famiglia(con, annuncio_id: int, connettore_id: int, r: dict):
     famiglia che si scioglie torna vuota qui. La chiave porta il
     collegamento davanti, cosi' due negozi non si mescolano mai.
     Niente `modificato`: non e' un cambio del testo dell'annuncio."""
-    fam = r.get("famiglia") or ""
     con.execute(
         "UPDATE annunci SET famiglia=?, famiglia_titolo=?, opzioni=? "
-        "WHERE id=?",
-        (f"c{connettore_id}:{fam}" if fam else "",
-         (r.get("famiglia_titolo") or "")[:MAX_TITOLO] if fam else "",
-         json.dumps(r.get("opzioni") or [], ensure_ascii=False)
-         if fam else "", annuncio_id))
+        "WHERE id=?", (*_valori_famiglia(connettore_id, r), annuncio_id))
 
 
 def consegna_riga(connettore: dict, digitale: bool) -> dict:
@@ -1521,7 +1529,7 @@ def _foto_locali(con, annuncio_id: int, urls: list, salva_foto) -> str:
 
 def riconcilia_connettore(con, connettore: dict, righe: list,
                           salva_foto, revisioni=None, *,
-                          completo: bool, max_nuovi: int = 0) -> dict:
+                          completo: bool, max_nuovi: int | None = None) -> dict:
     """Porta il catalogo tradotto dentro `annunci`, e torna il report.
 
     L'ORDINE DELLE DOMANDE e' quello di `importa_venditore`, che e' il
@@ -1548,7 +1556,7 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
     Senza default apposta: ogni strada futura eredita la domanda, e
     chi la dimentica lo sente da Python invece che da un venditore.
 
-    `max_nuovi` e' quante righe NUOVE nascono in questo giro (0 =
+    `max_nuovi` e' quante righe NUOVE nascono in questo giro (None =
     nessun tetto). Non e' un fratello del tetto di lettura, e' il suo
     opposto: quello TRONCAVA la vista e mutilava il catalogo, questo
     legge tutto — quindi le sparizioni restano vere — e distribuisce
@@ -1556,6 +1564,12 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
     la promessa «il resto arriva ai giri successivi»: al giro dopo le
     righe gia' create si ritrovano per chiave e il tetto tocca alle
     prossime.
+    ZERO VUOL DIRE ZERO (1 ott 2026, «negozi grandi», seconda parte):
+    fino a ieri lo zero era «nessun tetto», e un giro non poteva dire
+    «quest'ora i posti sono finiti» — da quando il rodaggio si conta
+    all'ora (`_nuovi_per_giro` nel server) lo deve poter dire. Il
+    «nessun tetto» e' None; la leva del config resta com'era (0 = nessun
+    tetto), e a tradurla e' il server.
     """
     revisioni = revisioni or {}
     adesso = int(time.time())
@@ -1572,7 +1586,11 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
              # chiesto le varianti: un conto, non una voce per uno —
              # cinquecento righe «al prossimo giro» fra i saltati
              # sarebbero un report da cinquanta KB e un allarme falso
-             "varianti_al_prossimo": 0}
+             "varianti_al_prossimo": 0,
+             # (1 ott 2026, seconda parte) i prodotti in bozza o nascosti
+             # sul negozio che non sono mai entrati: un conto, non una
+             # riga — e non nascono, vedi `_una_riga`
+             "non_pubblicati": 0}
     viste = set()
     # i padri le cui figlie questo giro non le ha VISTE ne' le ha
     # cercate: sul negozio ci sono, e non si spengono (vedi sotto)
@@ -1615,7 +1633,7 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
         try:
             _una_riga(con, connettore, r, scarica, revisioni, esito,
                       adesso,
-                      max_nuovi <= 0 or esito["nuovi"] < max_nuovi)
+                      max_nuovi is None or esito["nuovi"] < max_nuovi)
         except Exception as e:
             # Una riga che esplode e' una voce del report, mai il giro
             # morto: e' il patto di `_crea_riga_con_guardia`
@@ -1764,11 +1782,23 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
     # e una riga che nessuno ha guardato NON NASCE — nemmeno quando il
     # conto dei nuovi lascerebbe un posto libero (una riga giudicata che
     # esplode lo libera, e non tocca a lei prenderlo).
+    # LA BOZZA NON NASCE (1 ott 2026, decisione di Andrea). Un prodotto
+    # che il negozio non mostra — bozza, privato, nascosto dallo scaffale
+    # — e che qui non e' mai entrato nasceva 'rimosso' dalla tappa 2, e
+    # 'rimosso' e' la lapide: il giorno che il negoziante lo pubblicava,
+    # lo scudo qui sopra lo teneva fuori per sempre (l'imperfezione
+    # dichiarata in ARCHITETTURA). Adesso non nasce niente: al giro in
+    # cui il negozio lo pubblica e' una riga mai vista come le altre, e
+    # nasce attiva. Prima del tetto, apposta: una bozza non aspetta un
+    # posto (non lo prende nemmeno: `_righe_da_giudicare` la lascia fuori
+    # dall'AI e dai posti).
+    if not r["attivo"]:
+        esito["non_pubblicati"] += 1
+        return
     if not puo_creare or r.get("rimandata"):
         esito["rimandati"] += 1
         return
-    stato = "revisione" if marchio else ("attivo" if r["attivo"]
-                                         else "rimosso")
+    stato = "revisione" if marchio else "attivo"
     # L'INVARIANTE DI CASA VALE ANCHE ALLA NASCITA, e non solo agli
     # aggiornamenti: venduto <=> quantita = 0. Senza questa riga un
     # prodotto che arriva GIA' esaurito nascerebbe 'attivo' con zero
@@ -1853,21 +1883,50 @@ def _aggiorna(con, gia, r: dict, connettore: dict, foto: str, marchio,
     ieri se gli URL non sono cambiati): la scarica `_una_riga` prima
     di qualunque scrittura, perche' qui dentro la transazione e' gia'
     aperta e un download la terrebbe aperta per tutto il mercatino
-    (1 ott 2026, «database is locked»)."""
+    (1 ott 2026, «database is locked»).
+
+    SI SCRIVE SOLO CIO' CHE E' CAMBIATO (1 ott 2026, decisione di
+    Andrea). Fino a ieri ogni giro riscriveva OGNI riga gia' in vetrina,
+    identica o no: duemiladuecento commit all'ora per un negozio grande,
+    e `modificato` spostato a ogni ora — la sitemap diceva ai motori che
+    tutto il catalogo era cambiato, e la scheda «aggiornato un'ora fa» a
+    chi guardava. Adesso ogni colonna si scrive solo se e' diversa, e
+    `modificato` si muove solo quando cambia quel che il compratore
+    legge — titolo, descrizione, prezzo in euro, foto — come per un
+    annuncio fatto a mano (la giacenza, la famiglia e lo stato si
+    scrivono senza toccarla, la regola gia' scritta in
+    `_scrivi_famiglia`). Il cambio BTC che si muove NON e' un cambio:
+    il prezzo vero di una riga in euro e' `prezzo_eur` al cambio vivo, e
+    `prezzo_sats` e' il ripiego della pubblicazione, come per gli
+    annunci nativi. Una riga identica non scrive niente, non chiude
+    nessuna transazione e non respira: e' un «invariato» nel report."""
     foto_url = json.dumps(r["foto"]) if r["foto"] else ""
-    con.execute(
-        "UPDATE annunci SET titolo=?, descrizione=?, prezzo_sats=?, "
-        "valuta='eur', prezzo_eur=?, foto=?, origine_foto=?, "
-        "origine_stock_visto=?, modificato=? WHERE id=?",
-        (r["titolo"], r["descrizione"], r["prezzo_sats"], r["prezzo_eur"],
-         foto, foto_url,
-         -1 if r.get("quantita") is None else r["quantita"],
-         adesso, gia["id"]))
-    if quantita is not None:
+    visto = -1 if r.get("quantita") is None else r["quantita"]
+    prima = con.total_changes
+    if ((r["titolo"], r["descrizione"], round(float(r["prezzo_eur"] or 0), 2),
+         foto or "", foto_url, "eur")
+            != (gia["titolo"], gia["descrizione"],
+                round(float(gia["prezzo_eur"] or 0), 2), gia["foto"] or "",
+                gia["origine_foto"] or "", gia["valuta"])):
+        con.execute(
+            "UPDATE annunci SET titolo=?, descrizione=?, prezzo_sats=?, "
+            "valuta='eur', prezzo_eur=?, foto=?, origine_foto=?, "
+            "modificato=? WHERE id=?",
+            (r["titolo"], r["descrizione"], r["prezzo_sats"], r["prezzo_eur"],
+             foto, foto_url, adesso, gia["id"]))
+    # la giacenza letta di la' (la usa `rifletti_pendenti` al giro dopo)
+    if visto != gia["origine_stock_visto"]:
+        con.execute("UPDATE annunci SET origine_stock_visto=? WHERE id=?",
+                    (visto, gia["id"]))
+    if quantita is not None and (quantita != gia["quantita"]
+                                 or quantita > (gia["quantita_max"] or 0)):
         con.execute("UPDATE annunci SET quantita=?, "
                     "quantita_max=MAX(quantita_max,?) WHERE id=?",
                     (quantita, quantita, gia["id"]))
-    _scrivi_famiglia(con, gia["id"], connettore["id"], r)
+    if _valori_famiglia(connettore["id"], r) != (
+            gia["famiglia"] or "", gia["famiglia_titolo"] or "",
+            gia["opzioni"] or ""):
+        _scrivi_famiglia(con, gia["id"], connettore["id"], r)
     # --- la consegna (set 2026) ---------------------------------------
     # LA RIGA CHE CORREGGE IL PREGRESSO: un corso online importato
     # ieri con «🚚 Spedizione» e «🤝 Ritiro» torna digitale al primo
@@ -1928,5 +1987,10 @@ def _aggiorna(con, gia, r: dict, connettore: dict, foto: str, marchio,
         # l'invariante di casa: venduto <=> quantita = 0
         con.execute("UPDATE annunci SET stato='venduto' WHERE id=?",
                     (gia["id"],))
-    con.commit()
-    esito["aggiornati"] += 1
+    # IL COMMIT SOLO SE QUALCOSA SI E' MOSSO — anche prima di qui:
+    # `rifletti_pendenti` in `_una_riga` puo' aver aperto la transazione
+    if con.total_changes != prima or con.in_transaction:
+        con.commit()
+        esito["aggiornati"] += 1
+    else:
+        esito["invariati"] += 1

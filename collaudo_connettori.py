@@ -623,8 +623,12 @@ def main():
           birra["quantita"])
     prova("...e si annota che non lo sappiamo", -1,
           birra["origine_stock_visto"])
-    prova("la bozza non entra in vetrina", "rimosso",
-          uno(cid, 5)["stato"])
+    # EMENDATA (1 ott 2026 sera, «negozi grandi», decisione di Andrea): la
+    # bozza nasceva «rimosso», cioe' con la lapide — e il giorno che il
+    # negoziante la pubblicava restava fuori per sempre. Adesso non nasce
+    # proprio, ed entra quando la pubblica (lo prova collaudo_negozi_grandi)
+    prova("la bozza non entra in vetrina: non nasce proprio", None,
+          uno(cid, 5))
     prova("il PADRE multi-variante non e' un annuncio: lo sono le figlie",
           (None, "3:30", 20.0),
           (uno(cid, 3), uno(cid, "3:30")["origine_chiave"],
@@ -647,9 +651,10 @@ def main():
     giro()
     prova("a testo invariato all'AI non si chiede niente", prima,
           len(CHIAMATE_AI))
-    # sette: Miele, Olio, Birra, la bozza rimossa e le TRE varianti della
-    # Maglietta (set 2026); erano quattro quando il multi-variante si saltava
-    prova("...e non nasce nessun doppione", 7, len(annunci(cid)))
+    # sei: Miele, Olio, Birra e le TRE varianti della Maglietta (set 2026);
+    # erano quattro quando il multi-variante si saltava, e sette finche' la
+    # bozza nasceva «rimossa» (fino al 1 ott 2026 sera: adesso non nasce)
+    prova("...e non nasce nessun doppione", 6, len(annunci(cid)))
     prova("...ne' un secondo riepilogo (niente e' successo)", 1,
           len(NOTIFICHE))
 
@@ -846,8 +851,10 @@ def main():
     sapone = uno(wid, 15)
     prova("chi arriva gia' esaurito nasce «venduto», non «attivo»",
           ("venduto", 0), (sapone["stato"], sapone["quantita"]))
+    # EMENDATA (1 ott 2026 sera): come la bozza, il nascosto mai visto non
+    # nasce piu' «rimosso» (la lapide): non nasce, ed entra se lo mostra
     prova("il prodotto nascosto nello scaffale non entra in vetrina",
-          "rimosso", uno(wid, 16)["stato"])
+          None, uno(wid, 16))
     # ...e il rovescio: «su ordinazione» sul suo sito si compra ancora,
     # quindi la giacenza resta IGNOTA e non diventa zero
     prova("«su ordinazione» resta comprabile", ("attivo", 1),

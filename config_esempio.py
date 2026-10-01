@@ -1021,7 +1021,8 @@ MAX_NUOVI_CONNETTORE_GIRO = 30
 
 # IL RODAGGIO di un negozio appena collegato (1 ott 2026): nelle prime
 # ORE_RODAGGIO_CONNETTORE ore ne nascono MAX_NUOVI_CONNETTORE_RODAGGIO
-# a giro invece dei trenta qui sopra — un catalogo da mille entra in
+# ALL'ORA (non a giro: il bottone «🔄 Aggiorna ora» non li moltiplica)
+# invece dei trenta a giro qui sopra — un catalogo da mille entra in
 # dieci ore invece che in trentaquattro, poi torna il regime. Le ore
 # si contano dal primo annuncio entrato (un negozio che aspetta i costi
 # di spedizione non si legge, e non deve bruciarsi il rodaggio in

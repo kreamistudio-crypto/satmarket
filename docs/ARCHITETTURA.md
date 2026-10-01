@@ -24071,11 +24071,26 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   nemmeno se un posto si libera. Il filtro parole non occupa un posto e
   si chiede solo finché ce n'è (gira nel ciclo principale). I posti li
   conta UNA volta `_nuovi_per_giro(c)`, per chi giudica e per chi fa
-  nascere. 2) IL RODAGGIO: `MAX_NUOVI_CONNETTORE_RODAGGIO` (100) nelle
-  prime `ORE_RODAGGIO_CONNETTORE` (24) ore, contate dal PRIMO ANNUNCIO
-  ENTRATO e non da `connettori.creato` (un negozio che aspetta i costi di
-  spedizione non si legge); poi `MAX_NUOVI_CONNETTORE_GIRO`. Non
-  rallenta mai, 0 lo spegne. 3) IL RITMO DELLA LETTURA: il server passa
+  nascere. 2) IL RODAGGIO: `MAX_NUOVI_CONNETTORE_RODAGGIO` (100) ALL'ORA
+  nelle prime `ORE_RODAGGIO_CONNETTORE` (24) ore, contate dal PRIMO
+  ANNUNCIO ENTRATO e non da `connettori.creato` (un negozio che aspetta i
+  costi di spedizione non si legge); poi `MAX_NUOVI_CONNETTORE_GIRO` a
+  giro. Non rallenta mai, 0 lo spegne. ALL'ORA, NON A GIRO (la sera
+  stessa, Andrea): un SECCHIO ricostruito da tutte le nascite del
+  rodaggio (pieno prima della prima, si riempie a cento all'ora, ogni
+  nascita toglie un posto), quindi il bottone «🔄 Aggiorna ora» e i
+  riavvii non lo moltiplicano. Per dire «l'ora è piena» il tetto interno
+  è `None` = nessun tetto e un numero = posti, zero compreso
+  (`riconcilia_connettore(max_nuovi=...)`, `_righe_da_giudicare(posti=...)`);
+  la leva del config resta 0 = nessun tetto, e la traduce
+  `_nuovi_per_giro`. LE RIGHE IDENTICHE NON SI RISCRIVONO: `_aggiorna`
+  scrive solo le colonne cambiate, e `modificato` si muove solo per
+  titolo, descrizione, prezzo in euro e foto (il cambio BTC che si muove
+  non è una modifica: `prezzo_sats` di un listino in euro resta il
+  ripiego della pubblicazione, come per i nativi); una riga uguale è un
+  «invariato», senza commit e senza respiro. LA BOZZA NON NASCE: vedi
+  sotto, «IMPERFEZIONE DICHIARATA», chiusa per la nascita. 3) IL RITMO
+  DELLA LETTURA: il server passa
   ai lettori una busta `ritmo` come quella delle credenziali. Shopify ci
   pesca `dormi` (la pausa VERA fra le pagine, `PAUSA_PAGINE_SHOPIFY`,
   mezzo secondo, dentro il ciclo); Woo ci pesca `entro` — la LETTURA A
@@ -24985,6 +25000,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'aveva tolto da qui. È un quarto caso che la lapide non aveva
   previsto, e per chiuderlo servirebbe distinguere «nato non
   pubblicato» da «tolto»: è una decisione, non una riga.
+  CHIUSA PER LA NASCITA (1 ott 2026 sera, decisione di Andrea; Cantieri,
+  «I negozi grandi, seconda parte»): un prodotto mai visto che il negozio
+  non pubblica NON NASCE — né «rimosso» né altro — e non va all'AI né
+  prende un posto del giro; nasce, attivo, al giro in cui il negoziante
+  lo pubblica. RESTANO APERTI: le bozze già nate «rimosse» prima di
+  quella sera (non si distinguono con certezza dai tolti da un
+  moderatore, e lo scudo non le lascia risorgere), e il prodotto GIÀ in
+  vetrina rimesso in bozza sul negozio, che `_aggiorna` spegne ancora
+  «rimosso» — ripubblicato, resta fuori.
   IL REGISTRO SCRITTO (ago 2026, tappa 4): fino a ieri le pendenti si
   LEGGEVANO (`_saldo_pendente`) e si SPEGNEVANO (`rifletti_pendenti`),
   ma a METTERCI UNA RIGA non c'era nessuno — quindi ogni vendita fatta
