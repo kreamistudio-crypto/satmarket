@@ -346,7 +346,10 @@ risposta su `/` e `/miniapp.html` (gli script sono inline: serve il nonce sui
   `server.py:14017`) è solo per le foto del CSV. Ora che il servizio gira da
   `barattolo`, dalla porta 18080 si arriva alla REST di LND via WireGuard (con
   un macaroon: la GET cieca non lo porta) e a LNbits su `127.0.0.1:5001`.
-- **M5 (chiavi P2P senza firma):** `_registra_chiavi_p2p` (`server.py:37385`)
+- **M5 (chiavi P2P senza firma):** ✅ CURATA il 1 ott 2026 (cura 6 del
+  cantiere «CSP e le voci aperte degli audit»): nota firmata per chiave,
+  `firmata` in tabella, lo sconto la pretende dal 15 ott. Com'era:
+  `_registra_chiavi_p2p` (`server.py:37385`)
   accetta ancora qualunque 64-hex; lo sconto si presta.
 - **M7 (comandi del bot per username):** ✅ CURATA il 1 ott 2026 (cura 5
   del cantiere «CSP e le voci aperte degli audit»): `ADMIN_BOT_USERNAME`

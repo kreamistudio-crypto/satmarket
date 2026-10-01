@@ -33761,3 +33761,91 @@ bot risponde ai comandi di servizio come prima a chi sta in
 dopo questo: si guarda `journalctl -u barattolo-deploy -n 3` al push
 successivo, che deve dire «🚀 … firma richiesta» come sempre).
 
+
+## CSP e le voci aperte degli audit — 6) le chiavi P2P firmate, con la transizione (1 ott 2026)
+
+La M5 dell'audit del 19 set, riverificata aperta il 23 e il 1 ott:
+`chiavi_p2p` accettava qualunque 64-hex, 500 per utente, senza prova
+di possesso. Un pioniere poteva registrare sotto il SUO account la
+trade key di un amico (che usa un altro client) e prestargli lo sconto
+fedeltà, perché `/api/p2p/sconto` risponde «vero» per quella chiave.
+Piccolo (mezzo punto, denaro di Barattolo), ma era il buco dichiarato
+in «Le commissioni per persona».
+
+**LA CURA.** Il telefono PROVA di possedere ogni chiave che registra:
+per ciascuna, una nota firmata con QUELLA chiave (kind
+`KIND_FIRMA_CHIAVE_P2P` = 27384, il tag `t` di casa
+`barattolo/p2p/chiave`, il tag `tg` col proprio tg_id, contenuto
+vuoto), fresca di un'ora al massimo. Il client la costruisce in
+`firmeChiaviP2P` con `finalizeEvent` e la privata del mazzo
+(`skDiPubP2P`: l'identità, o una trade key derivata fino al pavimento
+più due), e la manda nello stesso corpo di sempre (`firme`, accanto a
+`pubkeys`, `identita`, `indice`). Il server (`_firma_chiave_p2p`)
+verifica con `verifica_firma_nostr` — la stessa del login e della
+prova d'incontro, coincurve — più kind, tag, tg_id e orologio, e
+timbra `firmata=1, firmata_il` SOLO sulle righe di quell'account: una
+firma su una chiave registrata da un altro non sposta niente (il «non
+si ruba» di prima resta). Due colonne nuove in `chiavi_p2p`, con la
+migrazione per i database che la tabella ce l'avevano già.
+
+**RETROCOMPATIBILE, ed è la parte chiesta da Andrea.** 1) Una chiave
+SENZA firma si registra ancora — serve agli avvisi, che non sono un
+premio — e resta `firmata=0`; il client di ieri (un corpo senza
+`firme`) riceve la stessa risposta di sempre più `firmate: 0`. 2) Lo
+sconto pretende la firma SOLO da `P2P_FIRMA_CHIAVI_DAL` (15 ott 2026,
+00:00 UTC): fino ad allora `_sconti_per_chiavi_p2p` risponde come
+ieri anche sulla riga nuda. LA TRANSIZIONE: la pagina si carica viva
+(no-store) e il client rimanda le chiavi a ogni avvio, quindi ogni
+telefono che apre Barattolo prima del 15 ottobre si ritrova firmato da
+solo, senza un gesto; chi non la apre mai in due settimane non ha
+scambi in corso, e al primo scambio la firma parte con la presa (la
+registrazione precede la presa e l'ordine, con `await`). Dal 15 ottobre
+una chiave registrata nuda da un client che non è il nostro non prende
+lo sconto — ed è esattamente il buco che si chiude. Un client esterno
+non lo prendeva comunque dal server di Barattolo: lo prendeva
+dall'amico.
+
+**LE STRADE SCARTATE.** Una sfida del server da firmare (come il
+login): un giro di rete in più per ogni chiave nuova, e la finestra
+dell'orologio basta — la nota non apre niente, timbra una riga che
+già c'è. Pretendere la firma da subito: avrebbe tolto lo sconto a tutti
+per i giorni in cui i telefoni si rifirmano. Rifiutare la registrazione
+nuda: gli avvisi («ti ha indicato dove inviare gli euro») hanno bisogno
+di sapere di chi è una chiave anche quando la firma non c'è.
+
+**PROVATO.** `prove_chiavi_p2p_firmate` (30): le funzioni VERE su
+sqlite in memoria con un verificatore di cartone (quello vero ha le
+sue prove, e coincurve in CI non c'è) — lo schema e la migrazione, la
+chiave nuda che si registra e resta non firmata, le note buone che
+timbrano (una registrata, due firmate), la firma ripetuta idempotente,
+i sette no del giudice (firma storta, tg_id altrui, kind, tag, due ore
+indietro, due ore avanti, non un dizionario), la chiave di un altro che
+non si ruba né si timbra, lo sconto prima e dopo la data (la nuda lo
+perde, la firmata no, la mai vista resta False), la data, la rotta che
+passa le firme, il client (finalizeEvent col kind, il tag e il tg_id;
+il kind uguale al server; le firme nel corpo solo se ce ne sono; la
+privata cercata nel mazzo; fail-open senza privata). I banchi di
+`prove_p2p_chiavi` e `prove_p2p_sconto` emendati col perché (il
+`firmate` nella risposta, le cinque colonne, il corpo a quattro
+chiavi). Tortura 11 su 11 sulla copia. DAL VIVO sulla
+copia in collaudo (Browser pane, relay morto, Compratore 111): un
+mazzo generato in pagina con NostrTools, la trade key 1 derivata, e la
+POST VERA a `/api/p2p/chiavi` con tre pubkey (identità, trade key, e
+una `ffff…` di cui la privata non c'è) e le firme → `registrate 3,
+firmate 2`, e nel database `firmata=1` sulle due vere, `0` sulla terza:
+la verifica Schnorr è quella di coincurve, sul server, non un
+cartone.
+
+**COSA NON HO PROVATO.** Il giro con un telefono vero fino alla presa
+(la firma viaggia nella stessa POST di sempre: se la presa partiva
+ieri, parte oggi); lo sconto sul coordinatore vero dopo il 15 ottobre
+(la data è nel futuro: il primo scambio scontato dopo quel giorno dice
+se tutto combacia — `journalctl -u barattolo | grep sconti`).
+
+**DA GUARDARE.** 1) Il 15 ottobre: `sqlite3 -readonly satmarket.db
+"SELECT firmata, COUNT(*) FROM chiavi_p2p GROUP BY 1"` — le righe a 0
+sono chiavi di telefoni che non hanno più aperto l'app, o di client
+esterni. 2) Se un giorno coincurve mancasse sul VPS, nessuna chiave si
+firmerebbe e dal 15 ottobre nessuno avrebbe lo sconto: il login Nostr
+lo direbbe prima (503).
+

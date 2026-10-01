@@ -417,6 +417,13 @@ fonte del verdetto.
 
 ## M5 — `chiavi_p2p`: una pubkey si registra senza provare di possederla
 
+> ✅ **CURATA il 1 ott 2026** (cantiere «CSP e le voci aperte degli
+> audit», cura 6): ogni chiave viaggia con una nota firmata con quella
+> chiave (kind 27384, tg_id nel tag), verificata con Schnorr; la riga
+> nuda resta per gli avvisi, e lo sconto pretende `firmata=1` dal 15
+> ott 2026 (la transizione: i telefoni si rifirmano da soli a ogni
+> avvio). Il testo che segue resta com'era.
+
 `_registra_chiavi_p2p` (`server.py:34616`) è `INSERT OR IGNORE` di
 qualunque stringa di 64 hex, 500 per utente, nessuna firma. Un pioniere può
 registrare la trade key di un amico (che usa un altro client) e
