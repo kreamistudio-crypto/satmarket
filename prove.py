@@ -8512,6 +8512,8 @@ def prove_idor_verifica():
         amb = {"db": Con, "HTTPException": _H, "invoice_pagata": _pagata,
                "_incassa_ordine": _incassa,
                "Header": lambda d="": d, "Cookie": lambda d="": d,
+               # il freno per persona (cura 4): qui non frena nessuno
+               "_frena": lambda *a: None,
                "verifica_utente": lambda h, s: {"id": chi}}
         exec("async " + pezzo("verifica_pagamento"), amb)
         try:
@@ -52583,6 +52585,8 @@ def prove_libro_subito():
     class _Risp:
         def __init__(self, contenuto, headers=None):
             self.contenuto, self.headers = contenuto, headers or {}
+    class _Req:        # la richiesta nuda (cura 4): nessun If-None-Match
+        headers = {}
     class _Con:
         def close(self):
             pass
@@ -52594,9 +52598,10 @@ def prove_libro_subito():
             # (26 set 2026) i cambi di Barattozon, fotografati con i volti
             "cambi": {"abcdef12": 91234.5}}
     mondo = {"_P2P_FOTO": FOTO, "JSONResponse": _Risp, "Header": lambda d="": d,
+             "Request": object, "Response": _Risp,
              "Cookie": lambda d="": d, "db": lambda: _Con(), "time": __import__("time"),
              "FORMA_ORDINE_P2P": _re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
-             "MAX_ORDINI_P2P": 200, "_tag_evento_p2p": amb["_tag_evento_p2p"]}
+             "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400, "_tag_evento_p2p": amb["_tag_evento_p2p"]}
     chieste = []
     mondo["_facce_ordini_p2p"] = lambda con, ids, adesso: (
         chieste.append(list(ids)) or {i: {"nome": "Ada"} for i in ids})
@@ -52609,7 +52614,7 @@ def prove_libro_subito():
     def chiama(attivo, chi):
         mondo["_p2p_leve"] = lambda: {"attivo": attivo}
         mondo["_chi_guarda_p2p"] = lambda i, s: 111 if chi else 0
-        return mondo["libro_fotografato_p2p"]("collaudo:111:A" if chi else "", "")
+        return mondo["libro_fotografato_p2p"](_Req(), "collaudo:111:A" if chi else "", "")
     anon, dentro, spenta = chiama(True, False), chiama(True, True), chiama(False, True)
     # NON PIU' no-store (26 set 2026, la fila «Scambi P2P» in vetrina):
     # una cache privata di 30 s, che la fotografia cambia al piu' al minuto
@@ -53678,7 +53683,7 @@ def prove_ritocchi_prova_alan():
         STAMPE = []
         amb = {"db": _db, "re": re, "time": _time, "sqlite3": _sq,
                "print": lambda *a, **k: STAMPE.append(" ".join(map(str, a)))}
-        for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "P2P_CAMBIO_PUB_SCARTO = "):
+        for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "MAX_ORDINI_MAI_VISTI_P2P = ", "P2P_ORDINI_MAI_VISTI_S = ", "P2P_CAMBIO_PUB_SCARTO = "):
             i = _SORGENTE.index("\n" + riga) + 1
             exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
         for nome in ("_tag_evento_p2p", "_ordini_puliti_p2p", "_parti_mostro_p2p",
@@ -54020,7 +54025,8 @@ def prove_card_p2p_vetrina():
             raise Rifiuto()
         return {"id": 111}
     amb = {"Header": lambda d: d, "Cookie": lambda d: d, "time": time,
-           "hashlib": __import__("hashlib"),
+           "hashlib": __import__("hashlib"), "Request": object,
+           "Response": lambda status_code=200, headers=None: {"stato": status_code, "testa": headers},
            "JSONResponse": lambda c, headers=None: {"corpo": c, "testa": headers},
            "db": db_vietato, "_p2p_leve": lambda: {"attivo": ATTIVO[0]},
            "_utente_da_initdata": initdata_finto,
@@ -54034,7 +54040,9 @@ def prove_card_p2p_vetrina():
     i = _SORGENTE.index("P2P_SESSIONI_VOLTI_S = 300")
     exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", _SORGENTE.index("def _chi_guarda_p2p", i))], amb)
     exec(rot, amb)
-    libro = amb["libro_fotografato_p2p"]
+    class _Req:        # la richiesta nuda (cura 4): nessun If-None-Match
+        headers = {}
+    libro = lambda i, s: amb["libro_fotografato_p2p"](_Req(), i, s)
     anonimo, tg, storto = libro("", ""), libro("INIT-BUONO", ""), libro("INIT-STORTO", "")
     web = [libro("", "COOKIE-BUONO") for _ in range(3)]
     ATTIVO[0] = False
@@ -54082,7 +54090,7 @@ def prove_card_p2p_vetrina():
             k.row_factory = _sq.Row
             return k
         amb2 = {"db": _db, "FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
-                "MAX_ORDINI_P2P": 200,
+                "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400,
                 "_tag_evento_p2p": lambda e, n: next((t[1] for t in e.get("tags", [])
                                                       if t[0] == n), "")}
         exec(pezzo("_autori_foto_p2p"), amb2)
@@ -54140,7 +54148,8 @@ def prove_card_p2p_vetrina():
           "dopo le guardie", True,
           can.index("raise HTTPException(\n            400, \"Amazon")
           < can.index('_foto_subito_p2p(ordine if buono else "")')
-          < can.index("if canale_id():"))
+          # (cura 4) il post si salta anche sul doppione e sulla raffica
+          < can.index("if canale_id() and not doppione and not raffica:"))
     prova("la fotografia dell'orologio tiene fuori gli usciti, e la loro lista invecchia",
           True, "eventi=_senza_i_via_p2p(_vetrina_foto_p2p(ultimi, info, adesso), via))"
           in pezzo("_fotografa_libro_p2p")
@@ -59799,7 +59808,7 @@ def prove_parti_si_vedono():
         "INSERT INTO p2p_ordini VALUES('ordine-ddd',111,1,'',1,0);")
     i_l = _SORGENTE.index('LIVELLI = [(0, 0, "nuovo"')
     amb = {"FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
-           "MAX_ORDINI_P2P": 200,
+           "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400,
            # IL CATALOGO E' UNO STUB DICHIARATO: qui si prova che il
            # titolo passi dal catalogo, non che il catalogo sia giusto
            # — quello ce l'ha `prove_coorti_titoli`.
@@ -62783,7 +62792,7 @@ def prove_volti_libro():
         "INSERT INTO utenti VALUES(222,'Bruno','av_b.jpg',0,0,"
         " 'nessuna','bruno_tg','', 0);")
     amb = {"FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
-           "MAX_ORDINI_P2P": 200,
+           "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400,
            # (A1) il giudice delle parti chiede a `p2p_scambi`, che qui non
            # c'e': nomina sqlite3 per dire «nessuna tabella = nessuno»
            "sqlite3": sqlite3}
@@ -71788,7 +71797,9 @@ def prove_p2p_canale():
 
     # --- 3) FAIL-OPEN: un canale spento o un post fallito non rompono
     prova("canale spento: nessun post, mai un errore", True,
-          "if canale_id():" in rotta and 'return {"ok": True' in rotta)
+          # (cura 4) il post si salta anche sul doppione e sulla raffica
+          "if canale_id() and not doppione and not raffica:" in rotta
+          and 'return {"ok": True' in rotta)
     prova("un post fallito si logga e non esplode", True,
           "except Exception as e:" in rotta
           and "Post P2P nel canale saltato" in rotta)
@@ -78527,7 +78538,7 @@ def prove_premio_barattozon():
 
     # --- 3) IL GIUDICE DEL CAMBIO E L'INTESTAZIONE, sul database vero ---
     amb = {"FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
-           "MAX_ORDINI_P2P": 200, "sqlite3": sqlite3}
+           "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400, "sqlite3": sqlite3}
     exec(next(r for r in src.split("\n") if r.startswith("P2P_CAMBIO_PUB_SCARTO = ")), amb)
     for f in ("_cambio_pub_buono", "_ordini_puliti_p2p", "_parti_mostro_p2p",
               "_registra_ordini_p2p", "_cambi_pub_p2p"):
@@ -81267,7 +81278,7 @@ def _banco_eventi_p2p(eventi_attivi=True):
            "P2P_CAUZIONE": False, "_P2P_FOTO": {"info": None}}
     # le costanti si prendono dal sorgente, non si ricopiano: una
     # ricopiata resterebbe verde il giorno che quella vera cambia
-    for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ",
+    for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "MAX_ORDINI_MAI_VISTI_P2P = ", "P2P_ORDINI_MAI_VISTI_S = ",
                  "P2P_RISERVA_S = ", "P2P_STESSO_MOMENTO_S = ",
                  "P2P_EVENTO_OROLOGIO_S = ", "P2P_SATS_MAX_EVENTO = ",
                  "P2P_RECAPITO_MAX = ", "P2P_RECAPITO_PAUSA_S = ",
@@ -82606,7 +82617,7 @@ def prove_scambi_ovunque():
           and 'ev["compratore_key"], ev["venditore_key"]' in reg)
 
     # --- 2) I GIUDICI PURI ---------------------------------------------
-    amb = {"json": _json, "sqlite3": sqlite3, "MAX_ORDINI_P2P": 200}
+    amb = {"json": _json, "sqlite3": sqlite3, "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400}
     for c in ("P2P_STORICO_GIORNI", "_PESO_MOMENTO_P2P"):
         i = _SORGENTE.index(c + " = ")
         exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
@@ -83647,7 +83658,7 @@ def prove_p2p_avvisi_libro():
     amb = {"html": _html, "json": _json, "print": lambda *a, **k: None,
            "sqlite3": __import__("sqlite3"),
            "FORMA_ORDINE_P2P": _re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
-           "MAX_ORDINI_P2P": 200, "P2P_RISERVA_S": 60,
+           "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400, "P2P_RISERVA_S": 60,
            "eventi_p2p_attivi": lambda: True,
            "_fee_di_p2p": lambda c, chi, fee: fee,
            "STATI_LIBRO_PRESO": ("in-progress", "waiting-buyer-invoice",
@@ -84105,7 +84116,7 @@ def prove_p2p_orologio():
                "eventi_libro_da_relay": _lettore,
                "info_libro_da_relay": lambda relay, mostro: {"fee": 0.02, "ore": 168},
                "FORMA_ORDINE_P2P": _re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
-               "MAX_ORDINI_P2P": 200,
+               "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400,
                # (patch 0007) A PORTA DEGLI EVENTI CHIUSA, com'e' il giorno
                # del deploy: la riserva e' zero e la frase del libro parte
                # nella stessa passata. La riserva vera sta in
@@ -84390,7 +84401,7 @@ def prove_p2p_tutti_i_relay():
            "eventi_libro_da_relay": _lettore,
            "info_libro_da_relay": lambda relay, mostro: {"fee": 0.02, "ore": 168},
            "FORMA_ORDINE_P2P": _re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
-           "MAX_ORDINI_P2P": 200,
+           "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400,
            "STATI_LIBRO_PRESO": ("in-progress", "waiting-buyer-invoice", "waiting-payment"),
            "TIMBRO_LIBRO_P2P": "p2p_libro_visto", "P2P_INFO_OGNI_S": 3600,
            "P2P_LIBRO_MEMORIA_S": 40 * 86400, "P2P_LIBRO_FRESCHI_S": 7200,
@@ -85009,7 +85020,7 @@ def prove_p2p_ascolto():
             "eventi_libro_da_relay": _lettore,
             "info_libro_da_relay": lambda relay, mostro: {"fee": 0.02, "ore": 168},
             "FORMA_ORDINE_P2P": _re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
-            "MAX_ORDINI_P2P": 200,
+            "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400,
             "STATI_LIBRO_PRESO": ("in-progress", "waiting-buyer-invoice", "waiting-payment"),
             "TIMBRO_LIBRO_P2P": "p2p_libro_visto", "P2P_INFO_OGNI_S": 3600,
             "P2P_LIBRO_MEMORIA_S": 40 * 86400, "P2P_LIBRO_FRESCHI_S": 7200,
@@ -86331,7 +86342,7 @@ def _ambiente_libro_p2p(detto):
     return {**amb, "html": _html,
             "print": lambda *a, **k: detto.append(" ".join(str(x) for x in a)),
             "FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
-            "MAX_ORDINI_P2P": 200,
+            "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400,
             "STATI_LIBRO_PRESO": ("in-progress", "waiting-buyer-invoice",
                                   "waiting-payment"),
             "P2P_SCONTO_FEDELTA_PERCENTO": 0.5, "P2P_SCONTO_LIVELLO": 5,
@@ -101522,7 +101533,7 @@ console.log(JSON.stringify(out));
         i = _SORGENTE.index("CREATE TABLE IF NOT EXISTS " + nome + "(")
         return _SORGENTE[i:_SORGENTE.index("\n    );", i) + 7]
     amb = {"re": re}
-    for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "_DOPO_RILASCIO_P2P = ",
+    for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "MAX_ORDINI_MAI_VISTI_P2P = ", "P2P_ORDINI_MAI_VISTI_S = ", "_DOPO_RILASCIO_P2P = ",
                  "STATI_RECENSIONE_P2P = "):
         i = _SORGENTE.index(riga)
         exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
@@ -109721,7 +109732,7 @@ def prove_ritocchi_flusso_p2p():
           '"tocca": _tocca_a_me_p2p(q["stato"], lato, recapito),' in pezzo("_scambi_p2p")
           and '"recapito_detto": bool(recapito),' in pezzo("_scambi_p2p"))
 
-    amb = {"json": _json, "sqlite3": sqlite3, "MAX_ORDINI_P2P": 200}
+    amb = {"json": _json, "sqlite3": sqlite3, "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400}
     for c in ("P2P_STORICO_GIORNI", "_PESO_MOMENTO_P2P"):
         i = _SORGENTE.index(c + " = ")
         exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
@@ -117133,6 +117144,181 @@ def prove_negozi_fuori_dal_ciclo():
           and "await sincronizza_connettori()" not in oro)
 
 
+def prove_freni():
+    """I TETTI E I FRENI (1 ott 2026, cantiere «CSP e le voci aperte degli
+    audit», cura 4, numeri concordati con Andrea). Nessuna rotta che costa
+    aveva un limite di frequenza. Qui il secchio gira per DAVVERO con un
+    orologio di cartone, il giudice dell'IP con richieste di cartone, il
+    tetto agli ordini aperti su sqlite, e le sentinelle dicono dove ogni
+    freno e' appeso — e che sull'onion non ce n'e' uno per IP."""
+    print("\n⏱️ I tetti e i freni")
+    import hashlib
+    import ipaddress
+    import sqlite3
+    import types
+
+    # IP pubblici VERI: 198.51.100.x e 203.0.113.x sono «di documentazione» e
+    # per `ipaddress` contano come privati — il giudice li scarta a ragione
+
+    class _H(Exception):
+        def __init__(self, status_code, detail=""):
+            super().__init__(detail)
+            self.status_code = status_code
+
+    i = _SORGENTE.index("FRENI = {")
+    j = _SORGENTE.index('@app.middleware("http")\nasync def no_iframe(')
+    amb = {"time": time, "ipaddress": ipaddress, "HTTPException": _H}
+    exec(_SORGENTE[i:j], amb)
+    F = amb["FRENI"]
+    prova("i numeri concordati: annunci 60/ora, anteprima 60/ora, pagamento e "
+          "ln-address 30/min, login 30/min, canale 1 ogni 10 min",
+          {"annunci": (60, 3600), "anteprima": (60, 3600), "pagamento": (30, 60),
+           "ln_address": (30, 60), "login": (30, 60), "canale": (1, 600)}, F)
+    prova("...e cinque ordini «creato» vivi per compratore", 5, amb["MAX_ORDINI_CREATO"])
+
+    # --- il secchio, con l'orologio di cartone ----------------------------
+    passa = amb["_secchio_passa"]
+    amb["_SECCHI"].clear()
+    esiti = [passa("x:1", 3, 60, 1000.0 + k) for k in range(5)]
+    prova("tre gettoni passano, il quarto e il quinto no", [True, True, True, False, False], esiti)
+    prova("...un'altra chiave ha il suo secchio", True, passa("x:2", 3, 60, 1002.0))
+    prova("...e a finestra scaduta si riparte", True, passa("x:1", 3, 60, 1061.0))
+    for k in range(20010):
+        passa(f"vecchio:{k}", 1, 10, 500.0)
+    passa("fresco", 1, 10, 2000.0)
+    prova("il dizionario non cresce per sempre: oltre ventimila si sfoltisce", True,
+          len(amb["_SECCHI"]) < 20000)
+    amb["_SECCHI"].clear()
+
+    # --- il freno: 429 al tetto, niente freno senza «chi» ------------------
+    frena = amb["_frena"]
+    esiti = []
+    for k in range(31):
+        try:
+            frena("login", "93.184.216.34")
+            esiti.append(True)
+        except _H as e:
+            esiti.append(e.status_code)
+    prova("login: trenta passano, il trentunesimo e' un 429", [True] * 30 + [429], esiti)
+    try:
+        for k in range(100):
+            frena("login", "")
+        esito = "mai fermato"
+    except _H:
+        esito = "fermato"
+    prova("senza «chi» (onion, IP illeggibile) non c'e' freno", "mai fermato", esito)
+    try:
+        frena("annunci", 111)
+        esito = "passa"
+    except _H:
+        esito = "no"
+    prova("la persona e' una chiave come le altre", "passa", esito)
+    amb["_SECCHI"].clear()
+
+    # --- l'IP di chi chiama -------------------------------------------------
+    ip_di = amb["_ip_di"]
+
+    def richiesta(host, xff=None, client=None):
+        h = {"host": host}
+        if xff is not None:
+            h["x-forwarded-for"] = xff
+        return types.SimpleNamespace(headers=h, client=types.SimpleNamespace(host=client) if client else None)
+
+    prova("in chiaro dietro Caddy: il primo X-Forwarded-For", "93.184.216.34",
+          ip_di(richiesta("barattolo.store", "93.184.216.34, 10.0.0.1", "127.0.0.1")))
+    prova("sull'onion: NESSUN IP, qualunque cosa dica l'header", "",
+          ip_di(richiesta("abcdefghijklmnop.onion", "93.184.216.34")))
+    prova("un X-Forwarded-For privato o loopback vale niente", ["", ""],
+          [ip_di(richiesta("barattolo.store", "10.77.0.2")), ip_di(richiesta("barattolo.store", "127.0.0.1"))])
+    prova("senza header, l'indirizzo del client (se pubblico)", ["8.8.8.8", ""],
+          [ip_di(richiesta("barattolo.store", None, "8.8.8.8")), ip_di(richiesta("barattolo.store", None, "127.0.0.1"))])
+    prova("un IP «di documentazione» (198.51.100.x) per ipaddress e' privato: niente", "",
+          ip_di(richiesta("barattolo.store", "198.51.100.7")))
+    prova("spazzatura nell'header: niente", "", ip_di(richiesta("barattolo.store", "non-un-ip")))
+
+    # --- gli ordini aperti --------------------------------------------------
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, compratore_id INT, stato TEXT)")
+    troppi = amb["_troppi_ordini_aperti"]
+    for k in range(4):
+        con.execute("INSERT INTO ordini(compratore_id, stato) VALUES(111, 'creato')")
+    con.execute("INSERT INTO ordini(compratore_id, stato) VALUES(111, 'locked')")
+    con.execute("INSERT INTO ordini(compratore_id, stato) VALUES(222, 'creato')")
+    prova("con quattro «creato» si compra ancora (i pagati non contano)", False, troppi(con, 111))
+    con.execute("INSERT INTO ordini(compratore_id, stato) VALUES(111, 'creato')")
+    prova("col quinto no", True, troppi(con, 111))
+    prova("...e un altro compratore non c'entra", False, troppi(con, 222))
+
+    # --- dove sono appesi i freni --------------------------------------------
+    for nome, rotta, freno in (("pubblica", "pubblica", '_frena("annunci", user["id"])'),
+                               ("modifica", "modifica_annuncio", '_frena("annunci", user["id"])'),
+                               ("modifica firmata", "modifica_firmata", '_frena("annunci", user["id"])'),
+                               ("anteprima foto", "anteprima_foto", '_frena("anteprima", user["id"])'),
+                               ("verifica-pagamento", "verifica_pagamento", '_frena("pagamento", user["id"])'),
+                               ("ln-address", "salva_ln_address", '_frena("ln_address", user["id"])'),
+                               ("sfida Nostr", "login_nostr_sfida", '_frena("login", _ip_di(req))'),
+                               ("login Nostr", "login_nostr", '_frena("login", _ip_di(req))'),
+                               ("login Telegram", "login_telegram", '_frena("login", _ip_di(req))'),
+                               ("ritorno del login", "login_telegram_ritorno", '_frena("login", _ip_di(req))')):
+        prova(f"il freno di «{nome}» e' appeso alla sua rotta", True, freno in pezzo(rotta))
+    # per PERSONA dove c'e', e il freno sta DOPO la sessione (chi non entra non consuma)
+    for rotta in ("pubblica", "modifica_annuncio", "verifica_pagamento", "salva_ln_address", "anteprima_foto"):
+        p = pezzo(rotta)
+        prova(f"...e in «{rotta}» viene dopo verifica_utente", True,
+              p.index("verifica_utente(") < p.index("_frena("))
+    # gli ordini: il tetto sta PRIMA della fattura, nei due rami
+    for rotta in ("compra", "_compra_set"):
+        p = pezzo(rotta)
+        prova(f"{rotta}: il tetto agli ordini aperti sta PRIMA di coniare la fattura", True,
+              "_troppi_ordini_aperti(con, user[\"id\"])" in p
+              and p.index("_troppi_ordini_aperti(") < p.index("crea_invoice_escrow("))
+    # le sfide: dizionario piu' largo
+    prova("le sfide del login: diecimila posti, non mille", True,
+          "while len(SFIDE_LOGIN) >= 10000:" in pezzo("nuova_sfida_login"))
+    # il canale: un post per ordine, uno ogni dieci minuti, mai un 429
+    c = pezzo("annuncia_ordine_p2p_canale")
+    prova("canale: doppione e raffica saltano il post senza un 429", True,
+          "_CANALE_POSTATI.get(ordine, 0) < 86400" in c
+          and '_secchio_passa(f"canale:{user[\'id\']}", *FRENI["canale"], adesso_canale)' in c
+          and "if canale_id() and not doppione and not raffica:" in c
+          and "429" not in codice(c))
+    prova("...e l'ordine si segna postato solo a post uscito", True,
+          "if postato and buono:" in c and "_CANALE_POSTATI[ordine] = adesso_canale" in c)
+    # p2p_ordini: il tetto e la scopa
+    prova("p2p_ordini: cinquanta righe mai viste per persona, e via dopo un giorno",
+          (50, 86400), (amb2 := {}) or (exec("MAX_ORDINI_MAI_VISTI_P2P = 50\nP2P_ORDINI_MAI_VISTI_S = 86400", amb2) or
+                                       (amb2["MAX_ORDINI_MAI_VISTI_P2P"], amb2["P2P_ORDINI_MAI_VISTI_S"])))
+    prova("...scritti nel sorgente", True,
+          "MAX_ORDINI_MAI_VISTI_P2P = 50" in _SORGENTE and "P2P_ORDINI_MAI_VISTI_S = 86400" in _SORGENTE)
+    r = pezzo("_registra_ordini_p2p")
+    # la SCRITTURA e' la stringa SQL intera: la docstring nomina «INSERT OR
+    # IGNORE» a parole, e `codice()` la prosa dentro le virgolette la tiene
+    prova("...il tetto si guarda PRIMA di scrivere", True,
+          "if int(senza_stato or 0) >= MAX_ORDINI_MAI_VISTI_P2P:" in r
+          and r.index("MAX_ORDINI_MAI_VISTI_P2P") < r.index('"INSERT OR IGNORE INTO p2p_ordini('))
+    prova("...e la scopa toglie le mai viste da un giorno, mai le viste", True,
+          "DELETE FROM p2p_ordini WHERE stato='' AND preso_da=0 " in pezzo("_pulisci_memoria_p2p")
+          and "P2P_ORDINI_MAI_VISTI_S" in pezzo("_pulisci_memoria_p2p"))
+    # la fotografia: ETag e 304, la cache senza clear
+    lb = pezzo("libro_fotografato_p2p")
+    prova("la fotografia porta l'ETag e risponde 304 a impronta uguale", True,
+          '"ETag": etag' in lb and 'req.headers.get("if-none-match") == etag' in lb
+          and "status_code=304" in lb)
+    cg = pezzo("_chi_guarda_p2p")
+    prova("la cache dei cookie non si svuota piu' tutta", True,
+          "_P2P_SESSIONI_VOLTI.clear()" not in cg and "[:2500]" in cg)
+    # e la cache gira: cinquemila voci, la cinquemilaunesima non svuota
+    amb3 = {"time": time, "hashlib": hashlib, "P2P_SESSIONI_VOLTI_S": 300,
+            "_P2P_SESSIONI_VOLTI": {}, "utente_da_sessione": lambda s: {"id": 7},
+            "_utente_da_initdata": lambda s: {"id": 0}}
+    exec(pezzo("_chi_guarda_p2p"), amb3)
+    for k in range(5000):
+        amb3["_chi_guarda_p2p"]("", f"cookie-{k}")
+    amb3["_chi_guarda_p2p"]("", "cookie-nuovo")
+    prova("...cinquemila cookie inventati non svuotano la memoria degli altri", True,
+          2000 <= len(amb3["_P2P_SESSIONI_VOLTI"]) <= 5000)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -117359,6 +117545,7 @@ def main():
               prove_chiavi_p2p_firmate,
               prove_rotte_p2p_riverificate,
               prove_negozi_fuori_dal_ciclo,
+              prove_freni,
               prove_config_esempio):
         try:
             f()

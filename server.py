@@ -1759,6 +1759,97 @@ async def csp_report(req: Request):
     return Response(status_code=204)
 
 
+# ------------------- IL SECCHIO DEI FRENI (1 ott 2026, cura 4) ---------
+# La riverifica del 1 ott: nessun limite di frequenza sulle rotte che
+# costano — un utente autenticato poteva pubblicare mille annunci in un
+# minuto (AI e avviso ai moderatori a ogni colpo), far lavorare il nodo a
+# vuoto su `verifica-pagamento` (la B9 del primo audit), postare mille
+# volte nel canale pubblico col nome di Barattolo (la M3 del secondo), o
+# sfrattare le sfide di login altrui con mille GET anonime (la B3). I
+# NUMERI li ha concordati Andrea: soglie che un utente normale e un
+# moderatore al lavoro non toccano mai.
+# LA CHIAVE E' LA PERSONA (tg_id) dove c'e' una sessione; l'IP SOLO sulle
+# porte del login, dove una persona ancora non c'e', e SOLO sulla rete in
+# chiaro: sull'onion dietro Caddy c'e' sempre 127.0.0.1, e molti
+# telefoni condividono l'IP dell'operatore — un freno per IP li' sarebbe
+# un freno sui vicini di cella. In memoria, mono-processo, come
+# CODICE_QUOTA: niente database per dire di no. La risposta e' un 429
+# con una frase sola; chi la riceve e' qualcuno che sta premendo a
+# raffica, non un utente che sfoglia.
+FRENI = {
+    "annunci": (60, 3600),      # pubblicare o modificare un annuncio, per persona
+    "anteprima": (60, 3600),    # l'anteprima della foto sul server, per persona
+    "pagamento": (30, 60),      # verifica-pagamento (LNbits a ogni colpo), per persona
+    "ln_address": (30, 60),     # il Lightning address (HTTP esterno + LNbits), per persona
+    "login": (30, 60),          # le porte del login, per IP e solo in chiaro
+    "canale": (1, 600),         # il post nel canale P2P, per persona (non un 429: si salta il post)
+}
+MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
+MSG_FRENO = "Troppe richieste in poco tempo: riprova fra qualche minuto"
+MSG_ORDINI_APERTI = (f"Hai già {MAX_ORDINI_CREATO} ordini in attesa di pagamento: "
+                     "paga o annulla uno di quelli prima di aprirne un altro")
+_SECCHI: dict = {}              # "nome:chi" -> [inizio della finestra, gettoni spesi]
+
+
+def _secchio_passa(chiave: str, tetto: int, finestra_s: int, adesso: float) -> bool:
+    """Un gettone dal secchio `chiave`: True se c'era. La finestra parte
+    dal primo gettone e si rinnova quando scade. PURA sul dizionario,
+    cosi' si prova senza l'orologio vero."""
+    if len(_SECCHI) > 20000:
+        for k in [k for k, v in _SECCHI.items() if adesso - v[0] >= finestra_s]:
+            _SECCHI.pop(k, None)
+        if len(_SECCHI) > 20000:
+            _SECCHI.clear()
+    v = _SECCHI.get(chiave)
+    if not v or adesso - v[0] >= finestra_s:
+        _SECCHI[chiave] = [adesso, 1]
+        return True
+    if v[1] >= tetto:
+        return False
+    v[1] += 1
+    return True
+
+
+def _frena(nome: str, chi) -> None:
+    """429 se il secchio `nome` di `chi` e' vuoto. `chi` vuoto = nessun
+    freno: e' il caso dell'onion e di un IP che non si legge."""
+    if not chi:
+        return
+    tetto, finestra = FRENI[nome]
+    if not _secchio_passa(f"{nome}:{chi}", tetto, finestra, time.time()):
+        raise HTTPException(429, MSG_FRENO)
+
+
+def _ip_di(request) -> str:
+    """L'IP di chi chiama, SOLO sulla rete in chiaro: dietro Caddy e' il
+    primo `X-Forwarded-For`. Sull'onion (host `.onion`), o se quel che
+    resta e' loopback/privato/non leggibile, torna '' — nessun freno."""
+    host = (request.headers.get("host") or "").split(":")[0].strip().lower()
+    if host.endswith(".onion"):
+        return ""
+    ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    if not ip and request.client:
+        ip = request.client.host or ""
+    try:
+        a = ipaddress.ip_address(ip)
+    except ValueError:
+        return ""
+    if a.is_loopback or a.is_private or a.is_link_local or a.is_unspecified:
+        return ""
+    return ip
+
+
+def _troppi_ordini_aperti(con, tg_id: int) -> bool:
+    """Vero se il compratore ha gia' MAX_ORDINI_CREATO ordini «creato»
+    vivi: ognuno prenota lo stock per mezz'ora e conia una fattura, e
+    senza questo tetto un account bloccava la vetrina. La ripresa della
+    propria fattura sullo stesso annuncio passa PRIMA di qui, e non
+    conta."""
+    n = con.execute("SELECT COUNT(*) FROM ordini WHERE compratore_id=? AND stato='creato'",
+                    (int(tg_id),)).fetchone()[0]
+    return int(n or 0) >= MAX_ORDINI_CREATO
+
+
 @app.middleware("http")
 async def no_iframe(request, call_next):
     """NESSUNA PAGINA DI BARATTOLO STA DENTRO L'IFRAME DI UN ESTRANEO,
@@ -8748,6 +8839,7 @@ async def login_telegram(req: Request, response: Response,
     perche' il widget vero pretende il dominio registrato su BotFather
     e su localhost non si fa nemmeno vedere."""
     d = await leggi_json(req)
+    _frena("login", _ip_di(req))
     if MODALITA_COLLAUDO and d.get("collaudo"):
         user = {"id": int(d["id"]),
                 "first_name": str(d.get("first_name", "Tester")),
@@ -8796,6 +8888,7 @@ async def login_telegram_ritorno(req: Request,
     prima resta, per il collaudo su localhost dove il widget vero non
     compare."""
     d = dict(req.query_params)
+    _frena("login", _ip_di(req))
     da = _dove_tornare(d.pop("da", ""))
     try:
         user = verifica_login_widget(d)
@@ -8913,11 +9006,13 @@ RE_HEX_128 = re.compile(r"[0-9a-f]{128}")
 
 def nuova_sfida_login() -> str:
     """Emette una sfida monouso e fa pulizia di quelle scadute.
-    Il tetto a 1000 tiene a bada i bot: oltre, via le piu' vecchie."""
+    Il tetto a 10000 (1000 fino al 1 ott 2026) tiene a bada i bot:
+    oltre, via le piu' vecchie; il freno vero e' quello per IP della
+    rotta, che sull'onion non c'e' — di qui la larghezza."""
     adesso = int(time.time())
     for s in [s for s, scade in SFIDE_LOGIN.items() if scade < adesso]:
         SFIDE_LOGIN.pop(s, None)
-    while len(SFIDE_LOGIN) >= 1000:
+    while len(SFIDE_LOGIN) >= 10000:
         SFIDE_LOGIN.pop(next(iter(SFIDE_LOGIN)))
     sfida = secrets.token_hex(16)
     SFIDE_LOGIN[sfida] = adesso + SECONDI_SFIDA_LOGIN
@@ -9019,8 +9114,12 @@ def crea_utente_nostr(pubkey: str, npub: str) -> int:
 
 
 @app.get("/api/login/nostr/sfida")
-def login_nostr_sfida():
-    """Primo passo del login Nostr: una sfida fresca da firmare."""
+def login_nostr_sfida(req: Request):
+    """Primo passo del login Nostr: una sfida fresca da firmare.
+    Col freno per IP sulla rete in chiaro (cura 4): mille GET anonime
+    sfrattavano le sfide altrui dal dizionario (la B3 del secondo
+    audit); sull'onion niente freno, e il dizionario e' piu' largo."""
+    _frena("login", _ip_di(req))
     if ChiavePubblicaNostr is None:
         raise HTTPException(503, "Login Nostr non disponibile: sul "
                                  "server manca il pacchetto coincurve")
@@ -9045,6 +9144,7 @@ async def login_nostr(req: Request, response: Response,
         raise HTTPException(503, "Login Nostr non disponibile: sul "
                                  "server manca il pacchetto coincurve")
     d = await leggi_json(req)
+    _frena("login", _ip_di(req))
     pubkey = verifica_evento_login(d.get("evento"),
                                    req.headers.get("host", ""))
     npub = hex_to_npub(pubkey)
@@ -20857,6 +20957,7 @@ FINESTRA_ANTIDOPPIONE = 30
 async def pubblica(req: Request, x_tg_init_data: str = Header(""),
                                  barattolo_sessione: str = Cookie("")):
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("annunci", user["id"])
     d = await leggi_json(req)
     valuta, prezzo_sats, prezzo_eur = await prezzo_da_payload(d)
     # Qui e non piu' in basso: consegna_da_payload puo' attendere il
@@ -21140,7 +21241,8 @@ async def anteprima_foto(req: Request, x_tg_init_data: str = Header(""),
     alla pubblicazione, che a quel punto viaggia gia' leggero.
     Non scrive NULLA, ne' su disco ne' nel database: prima della
     pubblicazione non deve esistere niente di definitivo."""
-    verifica_utente(x_tg_init_data, barattolo_sessione)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("anteprima", user["id"])
     if not ImmaginePillow:
         raise HTTPException(503, "Conversione non disponibile sul server")
     d = await leggi_json(req)
@@ -22607,6 +22709,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     - foto: se ne arrivano di nuove sostituiscono le vecchie in blocco,
       se il campo manca restano quelle attuali"""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("annunci", user["id"])
     d = await leggi_json(req)
     valuta, prezzo_sats, prezzo_eur = await prezzo_da_payload(d)
     (consegna, sped_sats, sped_eur, punto_sats, punto_eur, punto_dich,
@@ -23158,6 +23261,7 @@ async def modifica_firmata(annuncio_id: int, req: Request,
     {biglietto, pubkey, sig}, si verifica la firma sull'evento
     RICOSTRUITO dal biglietto e si allinea subito la copia locale."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("annunci", user["id"])
     d = await leggi_json(req)
     # Monouso: si brucia SUBITO, anche se il tentativo poi fallisce
     # (chi sbaglia riparte dalla fase 1) — pattern SFIDE_LOGIN.
@@ -32007,6 +32111,10 @@ async def _compra_set(user: dict, d: dict) -> dict:
     prot, totale = conto["protezione"], conto["totale"]
 
     primo = righe[0]["titolo"]
+    # il tetto agli ordini aperti (cura 4), anche sul set
+    if _troppi_ordini_aperti(con, user["id"]):
+        con.close()
+        raise HTTPException(429, MSG_ORDINI_APERTI)
     cf = cassaforte_nuova()
     inv = await crea_invoice_escrow(
         totale, f"Barattolo escrow set: {primo[:25]} +{len(righe) - 1} "
@@ -34039,6 +34147,11 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                 f"{_fmt_sats(TETTO_DIGITALE_NUOVI)} sats non sono disponibili: "
                 f"concludi prima un acquisto qualsiasi")
 
+    # il tetto agli ordini aperti (cura 4), PRIMA di coniare la fattura:
+    # un ordine in piu' sarebbe una prenotazione dello stock in piu'
+    if _troppi_ordini_aperti(con, user["id"]):
+        con.close()
+        raise HTTPException(429, MSG_ORDINI_APERTI)
     cf = cassaforte_nuova()
     inv = await crea_invoice_escrow(
         totale, f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}",
@@ -34255,6 +34368,7 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
     quello che non distingue «non e' tuo» da «stato sbagliato»: chi
     enumera non impara niente."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("pagamento", user["id"])
     con = db()
     o = con.execute("SELECT stato, payment_hash, cassaforte FROM ordini "
                     "WHERE id=? AND compratore_id=?",
@@ -38148,6 +38262,7 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
     Se il venditore ha ordini gia' confermati in attesa, i sats
     partono immediatamente."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("ln_address", user["id"])
     d = await leggi_json(req)
     addr = (d.get("ln_address") or "").strip().lower()
 
@@ -41997,6 +42112,8 @@ FORMA_PUBKEY_P2P = re.compile(r"^[0-9a-f]{64}$")
 # lungo quanto pare (finirebbe in una PK e in una query IN).
 FORMA_ORDINE_P2P = re.compile(r"^[0-9a-zA-Z-]{8,64}$")
 MAX_ORDINI_P2P = 200      # quanti se ne registrano o si chiedono in un giro
+MAX_ORDINI_MAI_VISTI_P2P = 50   # righe senza stato per persona (cura 4)
+P2P_ORDINI_MAI_VISTI_S = 86400  # dopo un giorno mai visto sul libro, via (cura 4)
 
 
 def _pavimento_indice_p2p(con, tg_id: int, identita, indice, adesso: int):
@@ -42322,6 +42439,16 @@ def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int,
     passato niente. Le righe di journal delle rifiutate si stampano
     qui, che la prova non ha bisogno di FastAPI."""
     pulite = _ordini_puliti_p2p(ordini)
+    # IL TETTO ALLE RIGHE MAI VISTE (cura 4): 200 id inventati per
+    # chiamata, mai puliti, facevano crescere la tabella e il filtro
+    # mandato ai relay a ogni giro. Chi ha gia' MAX_ORDINI_MAI_VISTI_P2P
+    # righe senza stato non ne registra altre finche' il libro (o la
+    # scopa a 24 ore) non le smaltisce; un utente vero ne ha una o due.
+    senza_stato = con.execute(
+        "SELECT COUNT(*) FROM p2p_ordini WHERE tg_id=? AND stato=''",
+        (tg_id,)).fetchone()[0]
+    if int(senza_stato or 0) >= MAX_ORDINI_MAI_VISTI_P2P:
+        raise ValueError("Troppi ordini in attesa del libro per questo profilo")
     scritti = confermate = in_attesa = rifiutate = 0
     finali = ("success", "canceled", "expired")
     for o in pulite:
@@ -42687,7 +42814,7 @@ async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
 
 
 @app.get("/api/p2p/libro")
-def libro_fotografato_p2p(x_tg_init_data: str = Header(""),
+def libro_fotografato_p2p(req: Request, x_tg_init_data: str = Header(""),
                           barattolo_sessione: str = Cookie("")):
     """L'ULTIMO LIBRO NOTO, dalla memoria (26 set 2026, «IL LIBRO
     SUBITO»): la fotografia che l'orologio scrive ogni minuto — vedi
@@ -42734,9 +42861,17 @@ def libro_fotografato_p2p(x_tg_init_data: str = Header(""),
     if chi:
         fuori["miei"] = sorted(d for d, t in (F.get("autori") or {}).items()
                                if t == chi)
-    return JSONResponse(fuori, headers={
-        "Cache-Control": "private, max-age=10",
-        "Vary": "X-Tg-Init-Data, Cookie"})
+    # L'ETAG (cura 4): la fila la rilegge ogni 15 s e la fotografia cambia
+    # ogni minuto, quindi tre letture su quattro tornavano identiche —
+    # centinaia di KB riserializzati e rimandati. L'impronta e' il
+    # momento della fotografia piu' chi guarda: a impronta uguale un 304
+    # nudo, e il client tiene la copia che ha.
+    etag = f'W/"{fuori["quando"]}-{chi}-{len(fuori["eventi"])}"'
+    testa = {"Cache-Control": "private, max-age=10",
+             "Vary": "X-Tg-Init-Data, Cookie", "ETag": etag}
+    if req.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=testa)
+    return JSONResponse(fuori, headers=testa)
 
 
 # CHI GUARDA IL LIBRO? Per il cookie del login web serve il database
@@ -42767,7 +42902,14 @@ def _chi_guarda_p2p(init_data: str, sessione: str) -> int:
     u = utente_da_sessione(sessione)
     chi = int(u.get("id") or 0) if u else 0
     if len(_P2P_SESSIONI_VOLTI) >= 5000:
-        _P2P_SESSIONI_VOLTI.clear()
+        # via le scadute, poi la meta' piu' vecchia (cura 4): con
+        # `clear()` cinquemila cookie inventati svuotavano la memoria
+        # di tutti e ogni richiesta tornava a bussare al database
+        for k in [k for k, v in _P2P_SESSIONI_VOLTI.items() if v[0] <= adesso]:
+            _P2P_SESSIONI_VOLTI.pop(k, None)
+        if len(_P2P_SESSIONI_VOLTI) >= 5000:
+            for k in sorted(_P2P_SESSIONI_VOLTI, key=lambda k: _P2P_SESSIONI_VOLTI[k][0])[:2500]:
+                _P2P_SESSIONI_VOLTI.pop(k, None)
     _P2P_SESSIONI_VOLTI[th] = (adesso + P2P_SESSIONI_VOLTI_S, chi)
     return chi
 
@@ -43987,7 +44129,14 @@ async def annuncia_ordine_p2p_canale(req: Request,
                 or abs(premio) > P2P_PREMIO_CANALE_MAX):
             raise HTTPException(400, "Premio storto")
     postato = False
-    if canale_id():
+    # UN POST PER ORDINE, E UNO OGNI DIECI MINUTI PER PERSONA (cura 4, la
+    # M3 del secondo audit): il doppione e il raffica NON sono un 429 —
+    # l'intestazione e la fotografia qui sopra servono lo stesso — si
+    # salta solo il post nel canale, e la risposta lo dice.
+    adesso_canale = time.time()
+    doppione = bool(buono) and adesso_canale - _CANALE_POSTATI.get(ordine, 0) < 86400
+    raffica = not _secchio_passa(f"canale:{user['id']}", *FRENI["canale"], adesso_canale)
+    if canale_id() and not doppione and not raffica:
         try:
             con = db()
             riga = con.execute(
@@ -44004,9 +44153,18 @@ async def annuncia_ordine_p2p_canale(req: Request,
             }
             caption = _caption_canale_p2p(lato, euro, metodo, venditore, premio)
             postato = bool(await _manda_post_canale(canale_id(), caption, []))
+            if postato and buono:
+                if len(_CANALE_POSTATI) > 5000:
+                    _CANALE_POSTATI.clear()
+                _CANALE_POSTATI[ordine] = adesso_canale
         except Exception as e:
             print(f"⚠️ Post P2P nel canale saltato: {e}")
-    return {"ok": True, "postato": postato}
+    return {"ok": True, "postato": postato,
+            **({"saltato": "doppione"} if doppione else {}),
+            **({"saltato": "raffica"} if raffica and not doppione else {})}
+
+
+_CANALE_POSTATI: dict = {}      # ordine -> quando e' uscito il suo post (cura 4)
 
 
 # ---------- GLI AVVISI DELLO SCAMBIO P2P: MOSTRO E' L'UNICA FONTE ------
@@ -44917,6 +45075,13 @@ def _pulisci_memoria_p2p(con, adesso: int) -> int:
                              ("p2p_scambi", "aggiornato")):
         tolte += con.execute(f"DELETE FROM {tabella} WHERE {colonna}<?",
                              (limite,)).rowcount
+    # le righe di p2p_ordini MAI VISTE sul libro da un giorno (cura 4):
+    # id inventati, o un ordine che il coordinatore non ha mai
+    # pubblicato. Le viste restano fino a P2P_LIBRO_MEMORIA_S come prima.
+    tolte += con.execute(
+        "DELETE FROM p2p_ordini WHERE stato='' AND preso_da=0 "
+        "AND preso_dichiarato=0 AND creato<?",
+        (adesso - P2P_ORDINI_MAI_VISTI_S,)).rowcount
     con.commit()
     return tolte
 
