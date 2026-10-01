@@ -1073,37 +1073,6 @@
   concorrenti). Nel client `publish()` passa da `bottoneInAttesa`
   (bottone spento + overlay fino alla risposta): la causa prima era
   il fetch lento (foto base64 + moderazione AI) col dito che ritocca.
-  L'ANNULLO DEL VENDITORE (1 ott 2026): `POST
-  /api/orders/{id}/annulla-venditore` (`annulla_da_venditore`), il
-  gemello di `annulla_ordine` dall'altra parte del pagamento — là non
-  si muove un sat e la riga diventa lapide, qui i sats sono in
-  cassaforte e TORNANO a chi ha comprato, senza passare da un
-  moderatore. L'escrow è custodiale (LNbits), non una hold invoice:
-  annullare è un pagamento in USCITA, e quel pagamento è
-  `_rimborsa_compratore`, la strada della disputa vinta. Solo chi
-  vende, solo da 'locked' (a pacco partito la strada resta la
-  disputa), mai con `payout_stato` non vuoto (409, un'uscita è già in
-  corso); CAS 'locked'→'refund' dentro il lucchetto dell'ordine con
-  `annullato_venditore_il` (timbro, pattern di `busta_il`) e
-  `motivo_annullo` (`MOTIVO_ANNULLO_MAX` 200, spazi collassati), poi
-  `_rimborsa_compratore` FUORI dal lucchetto: Lightning address →
-  'refunded' subito, senza → resta 'refund' e chi compra incolla la
-  fattura da `deposita_invoice` o mette l'address (lo stesso giro di
-  ieri). NIENTE STATO NUOVO e `disputata` resta 0: 'refund' dice già
-  «i sats spettano al compratore», e chiude da sola `segna_spedito` e
-  `conferma_ricezione`. Vetrina e stock tornano a rimborso FATTO, nel
-  ramo riuscito di `_rimborsa_compratore`, come per la disputa. Il
-  rimborso è integrale, protezione compresa. Nelle PAROLE il bivio è
-  `annullato_venditore_il`: in `_rimborsa_compratore` (avvisi e polso,
-  mai «disputa» su un ordine che non l'ha avuta) e nel client
-  `annullatoVenditore`/`motivoAnnullo` (stepper a tre passi col
-  motivo, testa dell'ordine, nota di fiducia, `refundPanel`; la
-  maniglia è un `<details>` chiuso sotto il pannello della consegna,
-  `annullaDaVenditore` con conferma e velo). Il feedback di chi compra
-  si apre a 'refunded' come sempre. Il promemoria automatico al
-  venditore fermo (`sollecita_venditori_fermi`) ora indica questa
-  strada. Collaudo: `collaudo_annullo_venditore.py`, in CI. Il perché
-  e le strade scartate in CANTIERI, «L'annullo del venditore».
   L'ANNULLO VERO E LE LAPIDI (ago 2026, giro urgente dal campo — tre
   problemi riprodotti prima di toccare). 1) IL QR DEL PAYSHEET ERA
   FINTO: un pattern CSS decorativo che non codificava niente
@@ -1158,20 +1127,27 @@
   dichiarato.
   L'ANNULLO DEL VENDITORE (1 ott 2026, caso vero dal campo: un oggetto
   finito senza togliere l'annuncio, più compratori che avevano già
-  pagato, e chi vende che doveva avvisarli a mano uno per uno). Rotta
-  `POST /api/orders/{id}/annulla-vendita` (`annulla_vendita`), SOLO per
-  il venditore e SOLO finché non ha spedito: 'creato' e 'locked', mai da
-  'shipped' in poi (un pacco in viaggio si chiude con la consegna o con
-  una disputa) e mai a pagamento in volo verso chi vende
-  (`_in_pagamento`, 409). Il MOTIVO è una parola del catalogo
+  pagato, e chi vende che doveva avvisarli a mano uno per uno; lo stesso giorno Alan ne aveva pushata una versione sua, e la
+  fusione è a verbale in CANTIERI). Rotta
+  `POST /api/orders/{id}/annulla-vendita` (`annulla_vendita`;
+  `/annulla-venditore`, la rotta di Alan, è un SINONIMO della stessa
+  funzione per i client in cache, e da lì il motivo libero diventa la
+  nota di «altro»), SOLO per il venditore e SOLO finché non ha spedito:
+  'creato' e 'locked', mai da 'shipped' in poi (un pacco in viaggio si
+  chiude con la consegna o con una disputa), mai a pagamento in volo
+  verso chi vende (`_in_pagamento`, 409) e mai con un'uscita qualunque
+  già in corso sulla riga (`payout_stato` non vuoto, 409: la guardia di
+  Alan). Il CAS a 'refund' sta DENTRO il lucchetto dell'ordine, il
+  rimborso parte fuori (anche questo da Alan). Il MOTIVO è una parola del catalogo
   `MOTIVI_ANNULLO_VENDITORE` (esaurito, spedizione, altro — col gemello
   nel client, parità sorvegliata in CI); «altro» vuole la nota (3-200
   caratteri), che viaggia scappata. NESSUNO STATO NUOVO: su 'creato' è la
   liturgia di `annulla_ordine` (pagamento controllato PRIMA, CAS, LAPIDE
   'annullato', mai DELETE) con l'offerta che DECADE invece di restare
   ripagabile; su 'locked' un CAS a 'refund' col timbro
-  (`annullato_dal_venditore_il`, `motivo_annullo`, `nota_annullo`,
-  `esauriti_annullo`, quattro colonne nella migrazione di sempre), poi
+  (`annullato_venditore_il` e `motivo_annullo`, i nomi di Alan già
+  migrati sul VPS, più `nota_annullo` ed `esauriti_annullo`: quattro
+  colonne nella migrazione di sempre), poi
   `_rimborsa_compratore` per la strada dei rimborsi: Lightning address,
   altrimenti la fattura incollata da `deposita_invoice` a 'refund'. LA
   MERCE SI SISTEMA ALL'ANNULLO, NON AL RIMBORSO, ed è la differenza con

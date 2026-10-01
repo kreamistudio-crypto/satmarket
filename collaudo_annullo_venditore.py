@@ -139,7 +139,7 @@ def main():
            len(banco.USCITE)))
     prova("...la riga porta il timbro, il motivo e l'esaurito",
           (True, "esaurito", str(ids[0])),
-          (o["annullato_dal_venditore_il"] > 0, o["motivo_annullo"],
+          (o["annullato_venditore_il"] > 0, o["motivo_annullo"],
            o["esauriti_annullo"]))
     prova("...l'annuncio e' in PAUSA: 0 pezzi, 'venduto', il MAX intatto",
           ("venduto", 0, 5), annuncio(ids[0]))
@@ -255,7 +255,7 @@ def main():
     o = miei[oid]
     prova("chi vende legge il timbro e il motivo nella sua lista",
           (True, "spedizione", "refunded"),
-          (o["annullato_dal_venditore_il"] > 0, o["motivo_annullo"], o["stato"]))
+          (o["annullato_venditore_il"] > 0, o["motivo_annullo"], o["stato"]))
     banco.come(111)
     suoi = {x["id"]: x for x in SRV.miei_ordini(0)}
     prova("...e chi compra pure", ("spedizione", "refunded"),

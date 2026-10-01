@@ -32678,6 +32678,18 @@ non curato.
 
 ## L'annullo del venditore, a sats già in cassaforte (1 ott 2026)
 
+**SUPERATA LO STESSO GIORNO** (1 ott 2026, decisione di Andrea, d'accordo
+Alan): questa versione è stata sostituita poche ore dopo da «Il venditore
+può annullare un ordine», in fondo al file, nata in parallelo da una
+richiesta più larga — la pausa dell'esaurito, i set, il catalogo dei
+motivi con la doppia conferma, l'annullo anche prima del pagamento e il
+conto degli abusi. Di questa sono rimasti i nomi delle colonne
+(`annullato_venditore_il`, `motivo_annullo`, già migrate sul VPS), il CAS
+dentro il lucchetto dell'ordine, la guardia su un'uscita già in corso e
+il promemoria al venditore fermo che rimanda all'annullo; la rotta
+`/annulla-venditore` resta come sinonimo per i client in cache. Il
+verbale resta qui per i suoi perché, che valgono ancora.
+
 Il compito (Andrea): chi compra paga, chi vende non può più spedire —
 si è rotto, l'ha venduto altrove — e annulla l'ordine; chi compra ha
 il rimborso automatico. «Con le hold invoice sarebbe praticamente
@@ -32995,7 +33007,7 @@ sats» è un'altra cosa: il foglio dei rimborsi d'ASTA (`rimborsi_asta`,
 1) NESSUNO STATO NUOVO. L'annullo del venditore usa 'refund'/'refunded'
 (i sats tornano) e la lapide 'annullato' (mai pagato): il frontend, lo
 stepper e le notifiche li conoscono già, e il timbro
-`annullato_dal_venditore_il` + `motivo_annullo` (+ `nota_annullo`,
+`annullato_venditore_il` + `motivo_annullo` (+ `nota_annullo`,
 `esauriti_annullo`) dice CHI ha chiuso l'affare. Nel client il giudice è
 `annulloVenditore(o)`: timbro E stato, perché un ordine riacciuffato da un
 saldo tardivo porta ancora il timbro ma è un ordine normale.
@@ -33051,6 +33063,24 @@ si cerca, non chiama.
 seconda domanda: lo ha detto il giro dal vivo (il tocco vero su «Sì,
 annulla» rispondeva un altro bottone), e il banco col `click()` non lo
 avrebbe mai visto.
+
+**La fusione con la versione di Alan.** Mentre questo cantiere era in
+worktree, Alan ha pushato su main la sua («L'annullo del venditore, a
+sats già in cassaforte», qui sopra), e il VPS l'aveva già tirata. Andrea
+ha scelto questa, perché copre i punti della richiesta (esaurito, set,
+catalogo e doppia conferma, non pagato, abusi), unendo i pezzi buoni
+della sua: il CAS a 'refund' DENTRO il lucchetto dell'ordine, col
+rimborso fuori; la guardia su QUALUNQUE uscita già in corso sulla riga
+(`payout_stato` non vuoto → 409 che nomina i moderatori), accanto a
+quella sul verso; il promemoria al venditore fermo che rimanda
+all'annullo invece che a un messaggio al compratore; i suoi nomi di
+colonna, già migrati in produzione, con le due che mancavano in più. La
+sua rotta `/annulla-venditore` resta come SINONIMO della stessa funzione
+per i client ancora in cache: da lì il motivo arriva in testo libero e
+diventa la nota di «altro» (o «spedizione» se vuoto), mentre dalla rotta
+nuova il catalogo resta la regola. Il suo commit è rientrato con un
+revert, non riscritto: la storia dice cosa è successo. Alan è stato
+avvisato da Andrea.
 
 **Strade scartate.** Un quinto esito del moderatore o uno stato
 'annullato_venditore' (regola 4: niente stati nuovi senza aggiornare

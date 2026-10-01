@@ -115033,6 +115033,33 @@ def prove_annullo_venditore():
     prova("...e mai a pagamento in volo verso chi vende", True,
           "if _in_pagamento(o):" in rotta
           and '_rifiuto_in_pagamento(o, "annullo")' in rotta)
+    # LA FUSIONE CON LA VERSIONE DI ALAN (1 ott 2026, decisione di
+    # Andrea): i suoi nomi di colonna, la guardia su QUALUNQUE uscita in
+    # corso, il CAS dentro il lucchetto dell'ordine, il promemoria che
+    # rimanda all'annullo, e la sua rotta come sinonimo per i client in
+    # cache, col motivo libero che diventa la nota di «altro»
+    prova("fusione: la guardia di Alan su un'uscita gia' in corso, prima "
+          "di toccare la riga", True,
+          'if o["stato"] == "locked" and o["payout_stato"]:' in rotta
+          and rotta.index('o["payout_stato"]:') < rotta.index("_righe_ordine(con, o)"))
+    prova("fusione: il CAS a 'refund' sta nel lucchetto dell'ordine, il "
+          "rimborso fuori", True,
+          "async with _lucchetti_ordine[ordine_id]:" in rotta
+          and rotta.index("async with _lucchetti_ordine") < rotta.index("WHERE id=? AND stato='locked'")
+          and rotta.index("await _rimborsa_compratore(") > rotta.index("_avvisa_piazze_annullo(passaggi, tornati)"))
+    prova("fusione: /annulla-venditore e' un sinonimo della stessa funzione",
+          True, '@app.post("/api/orders/{ordine_id}/annulla-venditore")\n'
+          '@app.post("/api/orders/{ordine_id}/annulla-vendita")\n'
+          'async def annulla_vendita(' in _SORGENTE)
+    prova("fusione: dal sinonimo il motivo libero diventa la nota di «altro»",
+          True, 'endswith("/annulla-venditore")' in rotta
+          and '"motivo": "altro" if len(testo) >= 3 else "spedizione"' in rotta)
+    prova("fusione: il promemoria al venditore fermo rimanda all'annullo",
+          True, "annulla \"\n                      \"l'ordine dalla Mini App: i sats tornano subito" in _SORGENTE
+          and "dillo all'acquirente: potrà farsi rimborsare" not in _SORGENTE)
+    prova("fusione: la colonna e' quella di Alan, gia' migrata sul VPS",
+          (True, False), ("annullato_venditore_il INTEGER DEFAULT 0" in _SORGENTE,
+                          "annullato_dal_venditore_il" in _SORGENTE))
     prova("il motivo e' del catalogo, «altro» vuole la nota", True,
           "if motivo not in MOTIVI_ANNULLO_VENDITORE:" in rotta
           and 'if motivo == "altro" and len(nota) < 3:' in rotta)
@@ -115042,7 +115069,7 @@ def prove_annullo_venditore():
           and "WHERE id=? AND stato='creato'" in rotta
           and "DELETE FROM" not in rotta)
     prova("'locked': CAS a 'refund' col timbro e il motivo", True,
-          "UPDATE ordini SET stato='refund', annullato_dal_venditore_il=?"
+          "UPDATE ordini SET stato='refund', annullato_venditore_il=?"
           in rotta and "WHERE id=? AND stato='locked'" in rotta
           and rotta.count("rowcount == 0") == 2)
     prova("gli esauriti vanno in pausa (quantita 0 e 'venduto'), il "
@@ -115075,13 +115102,13 @@ def prove_annullo_venditore():
     conta = codice(pezzo("_conta_annulli_venditore"))
     prova("si contano gli annulli PAGATI (refund/refunded), non le lapidi",
           True, "stato IN ('refund','refunded')" in conta
-          and "annullato_dal_venditore_il >= ?" in conta)
+          and "annullato_venditore_il >= ?" in conta)
     prova("l'offerta dietro il non pagato DECADE (non resta ripagabile)",
           True, "UPDATE offerte SET ordine_id=0, stato='decaduta'" in rotta)
     rimb = codice(pezzo("_rimborsa_compratore"))
     prova("il rimborso di un ordine annullato dal venditore NON tocca lo "
           "stock (lo ha gia' sistemato l'annullo)", True,
-          '"annullato_dal_venditore_il" in o.keys()' in rimb
+          '"annullato_venditore_il" in o.keys()' in rimb
           and "if not annullo:" in rimb
           and rimb.index("if not annullo:") < rimb.index("UPDATE annunci SET quantita=quantita+?")
           and "for r in (righe if not annullo else []):" in rimb)
@@ -115091,7 +115118,7 @@ def prove_annullo_venditore():
           and "Il rimborso di {_fmt_sats(importo)} sats non è" in rimb)
     prova("le quattro colonne nascono nella migrazione di sempre", [True] * 4,
           [f'"{c}' in _SORGENTE for c in (
-              "annullato_dal_venditore_il INTEGER DEFAULT 0",
+              "annullato_venditore_il INTEGER DEFAULT 0",
               "motivo_annullo TEXT DEFAULT ''",
               "nota_annullo TEXT DEFAULT ''",
               "esauriti_annullo TEXT DEFAULT ''")])
@@ -115152,7 +115179,7 @@ def prove_annullo_venditore():
               payout_ultimo INT DEFAULT 0, disputata INT DEFAULT 0,
               sbloccato_auto_il INT DEFAULT 0, cassaforte TEXT DEFAULT 'saas',
               cambio_eur REAL DEFAULT 0,
-              annullato_dal_venditore_il INT DEFAULT 0,
+              annullato_venditore_il INT DEFAULT 0,
               motivo_annullo TEXT DEFAULT '', nota_annullo TEXT DEFAULT '',
               esauriti_annullo TEXT DEFAULT '', creato INT, aggiornato INT);
             CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
@@ -115286,10 +115313,15 @@ def prove_annullo_venditore():
         m.amb = amb
         return m
 
-    def annulla(m, corpo, chi=222):
+    class Req:
+        """Quel che la rotta legge della richiesta: il percorso."""
+        def __init__(self, percorso):
+            self.url = type("Url", (), {"path": percorso})()
+
+    def annulla(m, corpo, chi=222, percorso="/api/orders/1/annulla-vendita"):
         m.corpo, m.chi = corpo, chi
         try:
-            return gira(m.amb["annulla_vendita"](1, None))
+            return gira(m.amb["annulla_vendita"](1, Req(percorso)))
         except Http as e:
             return e
 
@@ -115318,7 +115350,7 @@ def prove_annullo_venditore():
     o = riga(m)
     prova("...la riga: refunded, il timbro, il motivo, l'esaurito",
           ("refunded", True, "esaurito", "", "7"),
-          (o["stato"], o["annullato_dal_venditore_il"] > 0, o["motivo_annullo"],
+          (o["stato"], o["annullato_venditore_il"] > 0, o["motivo_annullo"],
            o["nota_annullo"], o["esauriti_annullo"]))
     prova("...l'annuncio e' in PAUSA: quantita 0, 'venduto', il MAX intatto",
           ("venduto", 0, 3), annuncio(m, 7))
@@ -115457,6 +115489,26 @@ def prove_annullo_venditore():
     m = mondo(payout_stato="in_volo", payout_verso="venditore")
     prova("pagamento in volo verso chi vende: 409", 409,
           http(annulla(m, {"motivo": "spedizione"})))
+    m = mondo(payout_stato="sospeso", payout_verso="compratore")
+    prova("fusione: QUALUNQUE uscita in corso sulla riga (la guardia di Alan): "
+          "409 che nomina i moderatori, e niente si muove", (409, True, "locked"),
+          (http(annulla(m, {"motivo": "spedizione"})),
+           "moderatori" in str(annulla(m, {"motivo": "spedizione"}).detail),
+           riga(m)["stato"]))
+    # il sinonimo: i client in cache mandano il motivo libero
+    m = mondo()
+    r = annulla(m, {"motivo": "  l'ho   venduto altrove "},
+                percorso="/api/orders/1/annulla-venditore")
+    prova("fusione: dal sinonimo il testo libero diventa «altro» con la nota, "
+          "e l'annullo passa", ("refunded", "altro", "l'ho venduto altrove"),
+          (r.get("stato"), riga(m)["motivo_annullo"], riga(m)["nota_annullo"]))
+    m = mondo()
+    r = annulla(m, {"motivo": ""}, percorso="/api/orders/1/annulla-venditore")
+    prova("...e senza motivo diventa «spedizione»", ("refunded", "spedizione", ""),
+          (r.get("stato"), riga(m)["motivo_annullo"], riga(m)["nota_annullo"]))
+    m = mondo()
+    prova("...ma dalla rotta nuova il testo libero resta un 400", 400,
+          http(annulla(m, {"motivo": "l'ho venduto altrove"})))
     prova("...dopo i rifiuti nessun avviso e' partito", ([], []),
           (m.detto, m.pagati))
     m = mondo(righe=[(9, 1, "Rimosso"), (8, 1, "Cera d'api")])
@@ -115474,7 +115526,7 @@ def prove_annullo_venditore():
                                (5, ora - 3600, "annullato")):
         m.vero.execute("INSERT INTO ordini(id,annuncio_id,compratore_id,"
                        "venditore_id,prezzo_sats,stato,"
-                       "annullato_dal_venditore_il,motivo_annullo,creato,"
+                       "annullato_venditore_il,motivo_annullo,creato,"
                        "aggiornato) VALUES(?,7,111,222,100,?,?,'altro',?,?)",
                        (oid, stato, quando, quando, quando))
     m.vero.commit()
@@ -115521,7 +115573,7 @@ def prove_annullo_venditore():
     prova("`poi` restituisce la promessa (la lezione del velo P2P)", True,
           "poi: () => inviaAnnullaVendita(o.id, r.corpo)" in mini)
     prova("mapOrder porta i tre campi", [True] * 3,
-          [x in mini for x in ("annullatoDalVenditore:o.annullato_dal_venditore_il||0",
+          [x in mini for x in ("annullatoDalVenditore:o.annullato_venditore_il||0",
                                "motivoAnnullo:o.motivo_annullo||''",
                                "notaAnnullo:o.nota_annullo||''")])
 

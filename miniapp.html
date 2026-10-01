@@ -14014,7 +14014,7 @@ function mapOrder(o){
        Si legge SOLO insieme allo stato (annulloVenditore): un ordine
        riacciuffato da un saldo tardivo porta ancora il timbro ma e' un
        ordine normale. */
-    annullatoDalVenditore:o.annullato_dal_venditore_il||0,
+    annullatoDalVenditore:o.annullato_venditore_il||0,
     motivoAnnullo:o.motivo_annullo||'', notaAnnullo:o.nota_annullo||'',
     /* LA PORTA DEL TIMER (ago 2026): quando uno sblocco AUTOMATICO e'
        passato di qui (0 = mai). Su 'confirmed' dice che a chiudere
