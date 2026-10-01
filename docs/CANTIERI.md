@@ -35157,3 +35157,88 @@ storto, backup, ripristino in cartella vuota, errori di rgb-lib puliti);
 giro vero (rgb=True); il resto dal vivo, sopra. Nessuna riga di
 Barattolo toccata: la suite gira per la bussola, il tetto di CLAUDE.md
 e la guardia dei segreti.
+
+## I negozi grandi, seconda parte: il rodaggio all'ora, le righe identiche, la bozza che entra (1 ott 2026, sera)
+
+**LE DECISIONI DI ANDREA** sulle voci in fondo al rapporto di «I negozi
+grandi»: 1) il rodaggio contato dal primo annuncio entrato va bene,
+resta com'è; 2) sì a saltare la riscrittura delle righe identiche (meno
+carico, e la data di modifica resta quella dell'ultima modifica vera);
+3) il rodaggio non si moltiplica col bottone «🔄 Aggiorna ora»: al
+massimo 100 righe all'ora nelle prime 24 ore, comunque si avvii il
+giro; 4) il prodotto in bozza che nasceva «rimosso» e non entrava più
+alla pubblicazione si corregge; 5) la famiglia a edizione che su un Woo
+lento si stacca per un'ora resta com'è. Il codice: 2ba6e52.
+
+**IL RODAGGIO ALL'ORA: UN SECCHIO.** `_nuovi_per_giro` ricostruisce dai
+`creato` delle righe nate un secchio da cento posti che si riempie da
+solo a cento all'ora: ogni nascita toglie un posto, qualunque cosa
+abbia avviato il giro (orologio, bottone, primo giro, riavvio). Il
+giro dell'orologio, un'ora dopo il precedente, lo trova pieno (99 se
+arriva mezzo minuto prima); il bottone cinque minuti dopo ci trova otto
+posti; un riavvio un minuto dopo, uno. CENTO ALL'ORA È UN RITMO, NON
+UNA FINESTRA: in un giorno al più 2.500 righe (cento all'ora più il
+secchio pieno dell'inizio); un'ora sola, se il secchio era pieno, col
+bottone ogni cinque minuti arriva a 191 (198 col bottone ogni minuto),
+mai al doppio. Più stretto di così non si può senza dimezzare
+l'orologio (la strada scartata, sotto). Per poter dire «l'ora è piena»
+il tetto interno è diventato `None` = nessun tetto e un numero = posti,
+ZERO compreso (`riconcilia_connettore(max_nuovi=…)`,
+`_righe_da_giudicare(posti=…)`): a zero posti nessuna mai vista va
+all'AI né nasce, e il testo cambiato di chi c'è già si guarda lo
+stesso. La leva del config resta 0 = nessun tetto, e la traduce
+`_nuovi_per_giro`. A regime resta trenta A GIRO, com'era.
+
+**LE RIGHE IDENTICHE NON SI RISCRIVONO.** `_aggiorna` scrive solo le
+colonne cambiate; `modificato` si muove solo per titolo, descrizione,
+prezzo in euro e foto, come per un annuncio fatto a mano (giacenza,
+famiglia e stato si scrivono senza toccarla). Il cambio BTC che si
+muove NON è una modifica: `prezzo_sats` di un listino in euro resta il
+ripiego della pubblicazione, come per i nativi — per forza, o nessuna
+riga sarebbe mai identica. Una riga uguale è un «invariato» nel report:
+niente scritture, niente commit, niente respiro. Le righe nate prima
+tengono la data dell'ultimo giro prima del deploy.
+
+**LA BOZZA NON NASCE.** Un prodotto mai visto che il negozio non
+pubblica (bozza, privato, nascosto dallo scaffale) non nasce più
+«rimosso» — la lapide che lo teneva fuori per sempre — e non nasce
+affatto: `_righe_da_giudicare` lo mette fra le note (niente AI, niente
+posto), `_una_riga` lo conta in `non_pubblicati`, e al giro in cui il
+negoziante lo pubblica nasce attivo come ogni riga mai vista.
+RESTANO APERTI, e sono scritti in ARCHITETTURA: le bozze già nate
+«rimosse» prima di stasera (non si distinguono con certezza dai tolti
+da un moderatore) e il prodotto GIÀ in vetrina rimesso in bozza sul
+negozio, che si spegne ancora «rimosso».
+
+**LA STRADA SCARTATA, E QUELLA SBAGLIATA.** Una finestra «le nascite
+dell'ultima ora»: il giro dell'orologio parte un'ora dopo l'inizio del
+precedente, le cui nascite portano l'ora della riconciliazione, secondi
+o minuti dopo — una finestra d'un'ora le conterebbe quasi sempre, e il
+rodaggio si dimezzerebbe da solo. E la prima stesura del secchio, che
+lo ricostruiva dalle sole nascite dell'ultima ora supponendolo pieno
+un'ora prima: sotto un bottone continuo il secchio non è mai pieno, e
+quella supposizione regalava cento posti a ogni ora. L'ha presa la
+prova del giorno intero (un tocco ogni cinque minuti per 24 ore: circa
+190 all'ora); adesso il secchio si ricostruisce da TUTTE le nascite del
+rodaggio, al più un giorno di righe.
+
+**PROVATO.** prove_negozi_grandi 112 verdi: la parte K (il secchio:
+primo giro, bottone, orologio, mezzo minuto prima, riavvio, altro
+negozio, pausa lunga, regime; il giorno intero col bottone ogni cinque
+minuti, 286 giri e 2.474 nate dove a giro sarebbero state 28.600, la
+prima ora 191), la L (le righe identiche) e la M (la bozza); emendate
+prove_famiglie, prove_connettori_ingresso e prove_db_contesa_negozi.
+collaudo_negozi_grandi 36: il bottone subito dopo il giro del rodaggio
+dice 0 nuovi e 100 invariati, un'ora dopo cento; a regime 0 aggiornati
+e 200 invariati, il giro in 1,7 s (erano 8-9,6); le bozze 2, 4, 6 e 8
+non nascono, la 2 e la 4 entrano appena pubblicate.
+collaudo_connettori 161 (emendato: bozza e nascosto non nascono).
+Tortura 21 su 21 sulla copia: al primo giro 20, viveva il secchio
+senza tetto DENTRO la ricostruzione (col solo tetto finale le prove
+tacevano) — l'ha presa la prova della pausa lunga. Sull'albero
+ribasato 2ba6e52 (origin/main f07c49e più il codice): suite intera
+severa 18.581 verdi e 0 rosse; i 33 collaudi della CI verdi nella gabbia.
+
+**DA GUARDARE.** Sul VPS: il riepilogo `🏪 woo #<id>` coi suoi
+«invariati» (il grosso del catalogo) e un giro di regime corto; un
+«🔄 Aggiorna ora» subito dopo un giro del rodaggio che dice 0 nuovi.
