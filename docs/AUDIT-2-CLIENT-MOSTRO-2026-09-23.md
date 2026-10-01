@@ -295,6 +295,16 @@ presa chiede una conferma esplicita con la cifra del mercato accanto.
 
 ## M3 — `/api/p2p/canale`: chiunque scrive nel canale pubblico, senza limite e senza un ordine
 
+> ✅ **CURATA il 1 ott 2026** dal cantiere «CSP e le voci aperte degli
+> audit», cura 4 (vedi `docs/CANTIERI.md`): un post per ordine
+> (`_CANALE_POSTATI`, 24 ore, in memoria) e uno ogni dieci minuti per
+> persona — e mai un 429: l'intestazione e la fotografia servono lo
+> stesso, si salta solo il post e la risposta lo dice (`saltato`).
+> La tabella con UNIQUE e la verifica sullo specchio proposte qui sotto
+> NON si sono fatte, col perché in CANTIERI: il post arriva PRIMA che
+> il libro veda l'ordine (il «giro subito»), quindi la verifica direbbe
+> sempre no. Il testo che segue resta com'era.
+
 `annuncia_ordine_p2p_canale` (`server.py:38700`) posta nel canale «Barattolo
 Vetrina» lato, euro e metodo che arrivano dal corpo, con la firma del
 mittente. Nessuna prova che l'ordine esista (dichiarato nel docstring),
@@ -386,7 +396,11 @@ risposta su `/` e `/miniapp.html` (gli script sono inline: serve il nonce sui
   produzione lo username lo scrive Telegram e la npub passa da `RE_NPUB` o
   `hex_to_npub`; ma la difesa vive nei chiamanti e non nella funzione. Cura:
   la regex dentro `pontiContatto`.
-- **B3 — Le sfide del login Nostr si sfrattano a vicenda:** `SFIDE_LOGIN` ha
+- **B3 — Le sfide del login Nostr si sfrattano a vicenda:** ✅ CURATA il 1
+  ott 2026 (cura 4): tetto a 10.000 posti, e le quattro porte del login
+  frenate per IP (30 al minuto) SOLO in chiaro — sull'onion l'IP è sempre
+  127.0.0.1 e il freno non c'è, dichiarato; l'HMAC senza stato resta una
+  strada scritta. Com'era: `SFIDE_LOGIN` ha
   un tetto di 1000 con sfratto FIFO (`server.py:7124`); mille GET anonime a
   `/api/login/nostr/sfida` in cinque minuti fanno fallire il login Nostr a chi
   aveva la sfida in mano. Cura: sfide legate all'IP con un tetto per IP, o un
@@ -713,7 +727,7 @@ Da scrivere, in ordine:
 4. **M2:** un 38383 a prezzo fisso con `amt` al 5% del mercato → la card
    porta l'avviso e la presa chiede conferma.
 5. **M3:** due `/api/p2p/canale` in un minuto dallo stesso account → la
-   seconda non posta.
+   seconda non posta. ✅ Fatta (cura 4): `collaudo_freni.py` e `prove_freni`.
 6. **B1/B2 come prove del client:** il banco che carica `miniapp.html` in un
    DOM finto (c'è già per altre cose) e prova `pontiContatto('a\')…')` e la
    coda pagamenti con un `tipo` storto: nessun `onclick` rotto.

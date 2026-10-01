@@ -33691,6 +33691,145 @@ giorno di un HEIC da 200 MP nel journal: se la conversione pesa
 troppo, il tetto scende a 150 e si dice.
 
 
+## CSP e le voci aperte degli audit — 4) i tetti e i freni (1 ott 2026)
+
+Dalla riverifica del 1 ott: nessuna rotta che COSTA aveva un limite di
+frequenza. La B9 del primo audit (verifica-pagamento e ln-address
+chiamano LNbits a ogni colpo), la M3 del secondo (il canale P2P senza
+freno e senza anti-doppione) e la B3 (le sfide del login Nostr che si
+sfrattano a vicenda: mille GET anonime e chi aveva la sfida in mano non
+entra più); più quel che gli audit non avevano guardato — pubblicare e
+modificare annunci, l'anteprima foto (una decodifica a ogni colpo),
+`compra` che conia una fattura a ogni richiesta, le righe di
+`p2p_ordini` scritte su un id dichiarato dal client e mai viste sul
+libro, la fotografia del libro servita per intero a ogni giro della
+fila, e la cache dei volti che con cinquemila cookie inventati si
+svuotava TUTTA.
+
+**I NUMERI SONO DI ANDREA**, detti prima di applicarli, con la regola
+«un utente normale e un moderatore che lavora non li toccano mai»:
+annunci 60 all'ora per persona (avevo proposto 20: «no, 60» — un
+negozio che carica il catalogo a mano li tocca); anteprima foto 60
+all'ora; verifica-pagamento e ln-address 30 al minuto; le porte del
+login 30 al minuto; cinque ordini «creato» vivi per compratore; il
+canale un post per ordine e uno ogni dieci minuti per persona;
+cinquanta righe mai viste di `p2p_ordini` per persona.
+
+**LA REGOLA SULL'IP, che è la decisione vera del giro.** Chi arriva
+dall'onion ha SEMPRE 127.0.0.1 dietro Caddy, e molti telefoni
+condividono l'IP dell'operatore: un freno per IP sull'onion
+chiuderebbe la porta a tutti insieme, e in chiaro un tetto basso
+chiuderebbe un intero operatore. Quindi: **la persona ovunque c'è una
+sessione**, e l'IP SOLO dove una sessione non c'è ancora — le quattro
+porte del login (sfida e firma Nostr, Login Widget e il suo ritorno) —
+e SOLO in chiaro: `_ip_di` legge il primo `X-Forwarded-For` (lo scrive
+Caddy, che è l'unico davanti) e torna «nessuno» sull'onion (host
+`.onion`) e su un IP loopback, privato, link-local o illeggibile; e
+`_frena` con «nessuno» non frena. Sull'onion le porte del login non
+hanno freno, dichiarato: a tenerle è il tetto delle sfide, salito da
+1.000 a 10.000 posti (un dizionario di stringhe, qualche MB al
+massimo), che da solo rende lo sfratto a vicenda un lavoro da diecimila
+richieste in cinque minuti invece di mille.
+
+**LA CURA.** 1) Il secchio `_secchio_passa(chiave, tetto, finestra)`:
+un dizionario in memoria, mono-processo come `CODICE_QUOTA` — il
+servizio gira in UN processo, e un secchio condiviso sarebbe un pezzo
+in più per un problema che non c'è —, finestra fissa (non scorrevole:
+basta, e si capisce), sfoltito oltre ventimila chiavi. `_frena(nome,
+chi)` → 429 con `MSG_FRENO` («Troppe richieste in poco tempo: riprova
+fra qualche minuto»), appeso SUBITO DOPO `verifica_utente` in
+`pubblica`, `modifica_annuncio`, `modifica_firmata`, `anteprima_foto`,
+`verifica_pagamento`, `salva_ln_address`, e con `_ip_di(req)` nelle
+quattro porte del login. `FRENI` è la tabella dei numeri, in un posto
+solo. 2) Gli ordini «creato» per compratore: `_troppi_ordini_aperti`
+conta i `creato` vivi e `compra` e `_compra_set` lo chiedono PRIMA di
+`cassaforte_nuova()` e di coniare la fattura — il tetto serve a non far
+lavorare LNbits, quindi sta prima di LNbits; la ripresa della propria
+fattura sullo stesso annuncio viene prima e non conta; 429 con
+`MSG_ORDINI_APERTI`, che dice cosa fare («paga o annulla uno di
+quelli»). 3) Il canale: `_CANALE_POSTATI` (ordine → quando, 24 ore,
+scritto solo se il post è USCITO) e il secchio per persona — **mai un
+429**: l'intestazione (`_intesta_dal_canale_p2p`) e la fotografia
+subito servono lo stesso, perché sono quel che fa comparire l'ordine
+nella fila di chi l'ha pubblicato; si salta solo il post, e la
+risposta lo dice (`saltato: doppione|raffica`). 4) `p2p_ordini`:
+`MAX_ORDINI_MAI_VISTI_P2P` (50 righe senza stato per persona) si
+guarda PRIMA dell'INSERT, `ValueError` → 400; e la scopa dell'orologio
+(`_pulisci_memoria_p2p`) toglie le righe mai viste sul libro da un
+giorno (`P2P_ORDINI_MAI_VISTI_S`) — mai le viste, che restano i
+quaranta giorni di sempre. 5) La fotografia del libro porta un ETag
+debole (momento della fotografia, chi guarda, quanti eventi) e
+risponde **304 nudo** a impronta uguale: la fila la rilegge ogni 15 s,
+e quasi sempre non è cambiato niente. 6) La cache dei volti
+(`_P2P_SESSIONI_VOLTI`) sfoltisce le scadute e poi la metà più vecchia
+invece di svuotarsi tutta.
+
+**LE STRADE SCARTATE.** Un freno per IP dappertutto: è l'onion e
+l'operatore, sopra. Una tabella `p2p_canale_post` con UNIQUE (la cura
+proposta nell'audit): un dizionario in memoria basta — un riavvio lo
+azzera, e un doppione dopo un riavvio è un post in più nel canale, non
+un danno. Verificare sullo specchio del libro che l'ordine esista prima
+di postare (l'altra metà della proposta): il post arriva PRIMA che il
+libro veda l'ordine — è il «giro subito» del 26 set, e la fotografia
+lo porta proprio perché il canale gliel'ha detto —, quindi la verifica
+direbbe sempre no; a tenere sono la FORMA dell'id, un post per id e
+uno ogni dieci minuti per persona. Un HMAC senza stato al posto del
+dizionario delle sfide (la cura di B3): resta scritta, non serviva
+oggi. Le presenze dei contanti (presenza per giro, «dimentica» che
+cancella anche le presenze): fuori per decisione di Andrea, le rifà il
+cantiere che sostituisce il QR con «📍 Sono qui».
+
+**PROVATO.** `prove_freni` (45): il secchio con l'orologio di cartone
+(tre gettoni, il quarto no, un'altra chiave, la finestra che scade, lo
+sfoltimento oltre ventimila); il freno (trenta e il trentunesimo 429,
+mai senza «chi»); l'IP (XFF in chiaro, mai sull'onion, privato,
+loopback e spazzatura = niente — e i due IP «di documentazione»
+198.51.100.x e 203.0.113.x, che per `ipaddress` sono PRIVATI e che il
+giudice scarta a ragione: il primo giro delle prove li usava come
+pubblici ed era rosso per quello); il tetto agli ordini su sqlite vero
+(quattro sì, il quinto no, i pagati non contano, un altro compratore
+no); dove ogni freno è appeso e che viene dopo la sessione; il tetto
+prima della fattura nei due rami; le sfide a diecimila; il canale senza
+429; `p2p_ordini` e la scopa; l'ETag e il 304; la cache che non si
+svuota (cinquemila cookie inventati). `collaudo_freni.py` (15, nella
+CI) col server vero: trenta sfide e la trentunesima 429 dallo stesso IP
+pubblico, un altro IP ha il suo secchio, quaranta dall'onion mai un
+429; sessanta anteprime e la sessantunesima 429, un'altra persona
+passa; l'ETag e il 304; il canale che salta il doppione senza 429;
+cinque ordini e il sesto 429 senza fattura coniata, la ripresa della
+propria passa, un altro compratore non c'entra, annullato uno se ne
+apre un altro. Tortura 17 su 17 uccise. Sedici banchi vecchi che
+`exec`-ano `_registra_ordini_p2p`, `_pulisci_memoria_p2p`,
+`verifica_pagamento`, `libro_fotografato_p2p` e la rotta del canale
+hanno imparato i nomi nuovi (il tetto, la scopa, `_frena`, `req` con
+`Request` e `Response`, la riga `if canale_id() and not doppione and
+not raffica:`). DAL VIVO sulla copia in collaudo (relay morto, LNbits
+di cartone), con curl: trenta sfide e la trentunesima 429 con la frase,
+un altro IP passa, quaranta dall'onion mai un 429; sessanta anteprime
+vuote (400) e la sessantunesima 429, un'altra persona passa; sessanta
+`POST /api/listings` vuote (400) e la sessantunesima 429; la
+fotografia con `ETag W/"0-0-0"` e il 304 alla seconda; cinque ordini
+veri e il sesto 429 con la frase; il canale senza `canale_id` risponde
+`postato: false` e alla seconda `saltato: raffica`, mai 429. E nel
+Browser pane a 375 px, da Compratore: «Paga» sul sesto annuncio porta
+il toast «Hai già 5 ordini in attesa di pagamento: paga o annulla uno
+di quelli prima di aprirne un altro», e il POST è un 429.
+
+**COSA NON HO PROVATO.** L'ETag con eventi veri in memoria (la copia
+ha il relay morto: la differenza per persona la prova `collaudo_freni`
+con eventi inventati); il telefono e l'APK (per chi usa l'app non
+cambia niente finché non supera i numeri); un operatore mobile vero
+con migliaia di telefoni dietro lo stesso IP sul login in chiaro: 30
+al minuto per IP sono per sfida, e il giorno che il journal dicesse
+429 sul login da un IP di operatore il numero sale.
+
+**DA GUARDARE.** 1) `journalctl -u barattolo | grep -c " 429 "` dopo
+qualche giorno: zero o quasi è il segno che i numeri sono larghi; una
+raffica da un IP solo è qualcuno che bussa. 2) Il giorno che un
+moderatore o un negozio tocca un 429 nel lavoro normale: il numero di
+`FRENI` sale e si scrive qui.
+
+
 ## CSP e le voci aperte degli audit — 5) le quattro piccole: compare_digest, admin del bot per id, deploy.sh a file assente, le action inchiodate (1 ott 2026)
 
 Quattro voci basse dei due audit, curate insieme perché costano poco e

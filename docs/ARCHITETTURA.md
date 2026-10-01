@@ -5831,6 +5831,19 @@
   sha256 del suo unico script e senza `frame-ancestors`). Le direttive
   coi loro perché, e come si leggono le righe `🛡️ CSP:` del journal,
   stanno in CANTIERI, «CSP e le voci aperte degli audit — 1)».
+  I FRENI (1 ott 2026, stesso cantiere, cura 4): `FRENI` è la tabella
+  dei numeri (annunci e anteprima foto 60 l'ora, verifica-pagamento e
+  ln-address 30 al minuto, login 30 al minuto, canale uno ogni dieci
+  minuti), `_secchio_passa` il secchio in memoria a finestra fissa
+  (mono-processo, come CODICE_QUOTA) e `_frena(nome, chi)` il 429 con
+  la frase, appeso subito dopo `verifica_utente`. LA REGOLA: per
+  PERSONA ovunque c'è una sessione; per IP solo sulle porte del login
+  e solo in chiaro — `_ip_di` legge il primo X-Forwarded-For di Caddy
+  e torna «nessuno» sull'onion (dove c'è sempre 127.0.0.1) e sugli IP
+  privati, e con «nessuno» non si frena. Il tetto agli ordini «creato»
+  per compratore (`MAX_ORDINI_CREATO`, 5) si guarda PRIMA di coniare la
+  fattura; il canale P2P salta il post (doppione, raffica) ma non dice
+  mai 429. I numeri e i perché: CANTIERI, «— 4) i tetti e i freni».
   DOVE SI PRENDE IL CODICE: foglio `#widgetSheet` — «Widget per il
   web» (il nome l'ha scelto Andrea) — aperto dal Profilo e dal
   dettaglio del PROPRIO annuncio. Il campo è `readonly` e non `disabled` — da un disabled il

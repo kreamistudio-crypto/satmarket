@@ -538,7 +538,12 @@ con gli script inline di oggi vuol dire nonce o hash.
 - **B8 — Il tetto dei 250 € del P2P è nel client** (`maxEuro` in
   `_p2p_leve`): un altro client Mostro non lo vede. A tenere è il tetto in
   sats del coordinatore (`max_order_amount`, 500.000).
-- **B9 — Nessun limite di frequenza** sulle rotte che chiamano LNbits a
+- **B9 — Nessun limite di frequenza** ✅ CURATA il 1 ott 2026 (cantiere
+  «CSP e le voci aperte degli audit», cura 4): `_frena` per PERSONA su
+  `verifica-pagamento` e `ln-address` (30 al minuto), cinque ordini
+  «creato» vivi per compratore giudicati PRIMA di coniare la fattura,
+  annunci e anteprima foto a 60 l'ora; i numeri sono di Andrea. Com'era:
+  sulle rotte che chiamano LNbits a
   ogni colpo (`verifica-pagamento`, `ln-address`, `invoice`): un utente
   autenticato può far lavorare il nodo a vuoto.
 - **B10 — `/api/salute` dice a chiunque lo stato del ponte** (`ok`/`giu`):
