@@ -64123,7 +64123,8 @@ function rigaIncontroModP2P(d, aperta){
       + esc(distanzaIncontroP2P(p)) + (p.posizioni_via ? ' · posizioni cancellate' : '') + '</div>'
       + (aperta ? '<div class="hint">Le due firme sono verificate. La posizione viene dal GPS dei telefoni e si può falsificare: è una conferma, non una prova assoluta.</div>' : '');
   const righe = righeConfrontoModP2P(d.presenze);
-  /* la regola si legge dove si decide: a disputa aperta, sul contanti */
+  /* la regola si legge dove si decide: a card aperta, come la cautela, e
+     sul contanti */
   const regola = aperta && contanti ? regolaDisputaModP2P(d.presenze) : '';
   const riga = r => '<div class="mod-riga mod-incontro">' + esc(r) + '</div>';
   if (!righe.length)

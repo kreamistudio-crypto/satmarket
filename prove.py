@@ -112453,7 +112453,7 @@ out.mod = {
   durata: [durataModP2P(20), durataModP2P(162), durataModP2P(-2100), durataModP2P(9780), durataModP2P(7200)],
   metri: [metriModP2P(25), metriModP2P(1234), metriModP2P(5200), metriModP2P(999.6), metriModP2P('x')]};
 /* (1 ott 2026) LA REGOLA PER IL CASO, detta al moderatore: il campo
-   `regola` del server, a disputa aperta e sul contanti */
+   `regola` del server, a card aperta (come la cautela) e sul contanti */
 const SOLO_C = {esito: 'solo_compra', compra: presenza(ORA_V, true, 9, rAll(-120, 40)), vende: null, scarto_s: null,
   distanza: null, posizioni_via: false, appuntamento: APP};
 out.mod.regola = [
@@ -113589,7 +113589,7 @@ def prove_contanti_a_mano():
     prova("LA REGOLA AL MODERATORE, per il caso: con l'incontro niente; chi compra all'appuntamento e chi vende no: decide lui",
           [False, True, True, False],
           ["⚖️" in rgm[0], decide in rgm[1], 0 < rgm[1].find(decide) < rgm[1].find("si può falsificare"), "⚖️" in rgm[2]])
-    prova("...a disputa chiusa non si ripete; senza prova la regola di sempre, anche quando il server non ha dati",
+    prova("...a card chiusa non si ripete; senza prova la regola di sempre, anche quando il server non ha dati",
           [True, True, True], [senza in rgm[3], "📍 Nessuna prova d'incontro" in rgm[4], senza in rgm[4]])
     prova("...niente sugli altri metodi (anche coi dati), e niente se il server il campo non lo manda", ["", False, False],
           [rgm[5], "⚖️" in rgm[7], "⚖️" in rgm[6]])
