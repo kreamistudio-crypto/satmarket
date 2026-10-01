@@ -113523,7 +113523,116 @@ def prove_contanti_a_mano():
     prova("la distanza della prova col QR: senza posizioni, con una sola, coi metri, niente su null",
           [", senza posizioni", ", con la posizione di un solo telefono", ", a 1.200 m di distanza", ""], o["distanza"])
     prova("l'ora della prova col QR si dice «alle HH:MM del …»", True, bool(re.fullmatch(r"alle \d\d:\d\d del 3 ott", o["quando"])))
+
+    # --- 6) IL FOGLIO DI CHI VENDE E L'ADOZIONE, ESEGUITI ----------------
+    # (1 ott 2026, dalla tortura: due mutazioni passavano le sentinelle sul
+    # TESTO — un `if (false)` davanti all'invio dell'appuntamento al server,
+    # e l'adozione che teneva le presenze del giro vecchio — perche' il
+    # testo della chiamata restava intero. Qui il codice vero si ESEGUE.)
+    i_ad = mini.index("const giroS = ", mini.index("function adottaScambiServerP2P(locali){"))
+    fetta = mini[i_ad:mini.index("\n      /* la riga solo da guardare si PROMUOVE", i_ad)]
+    prova("la fetta dell'adozione e' quella delle presenze legate al giro", True,
+          "const prLoc = " in fetta and "uniscePresenzeP2P(prLoc, presenzeDaServerP2P(s.presenze, giroS))" in fetta
+          and fetta.count("\n") == 3)
+    foglio = "\n".join([
+        riga_js("const CAMPO_MAX_TESTO = "), fn("async function inviaCampoP2P(tipo, btn){"),
+        fn("function presenzeDaServerP2P(p, giro){"), fn("function uniscePresenzeP2P(a, b){"),
+        "function adottaPresenze(gia, s){\n  let mosso = false;\n" + fetta
+        + "\n  return [gia.presenze || null, mosso];\n}"])
+    cart_f = _tf.mkdtemp(prefix="foglio_")
+    pf = _os.path.join(cart_f, "foglio.js")
+    open(pf, "w", encoding="utf-8").write(BANCO_FOGLIO_CONTANTI.replace("__PEZZI__", foglio))
+    rf = _sp.run([node, pf], capture_output=True, text=True, timeout=60, encoding="utf-8")
+    _sh.rmtree(cart_f, ignore_errors=True)
+    prova("il banco del foglio gira", "", (rf.stderr or "")[-900:])
+    if not rf.returncode and rf.stdout.strip():
+        f = _json.loads(rf.stdout)
+        ok_contanti = ["recapito", "appuntamento:ORD-1", "ricordo", "toast:Appuntamento inviato a chi compra ✓"]
+        prova("IL FOGLIO DI CHI VENDE, eseguito: il recapito parte, e DOPO l'appuntamento va al server", ok_contanti,
+              f["contanti"])
+        prova("...con un metodo senza appuntamento al server non va niente",
+              ["recapito", "ricordo", "toast:Recapito inviato a chi compra ✓"], f["sepa"])
+        prova("...se il recapito non parte non parte nemmeno l'appuntamento, e il foglio lo dice",
+              ["recapito", "toast:Non è partito: relay giù"], f["fallito"])
+        prova("...e un server che non risponde non ferma il foglio (il tetto dei sei secondi)", ok_contanti, f["muto"])
+        prova("...e il form del contanti e' quello che porta l'appuntamento", True,
+              "{forma: 'contanti', riconosce: /contant|di persona|a mano|cash/i, appuntamento: true," in mini)
+        ad = f["adozione"]
+        mia = {"ora": 100, "posizione": True, "volte": 1}
+        prova("L'ADOZIONE, eseguita: le presenze del giro vecchio se ne vanno anche quando il giro nuovo non ne ha",
+              [None, True], ad["vecchio"])
+        prova("...quelle dello stesso giro restano e si uniscono a quelle del server; del giro nuovo valgono le sue",
+              [[{"giro": 2, "mia": mia, "altra": {"ora": 150}}, True],
+               [{"giro": 2, "mia": {"ora": 300, "posizione": False, "volte": 1}, "altra": None}, True],
+               [None, False]],
+              [ad["stesso"], ad["nuovo"], ad["niente"]])
     con.close()
+
+
+BANCO_FOGLIO_CONTANTI = r"""
+/* IL FOGLIO DI CHI VENDE E L'ADOZIONE, ESEGUITI (1 ott 2026): la funzione
+   VERA `inviaCampoP2P` coi finti attorno, e le righe VERE dell'adozione
+   che legano le presenze al giro. Ogni gesto lascia una riga nel registro. */
+const registro = [];
+const ORDINI = {'ORD-1': {id: 'ORD-1', lato: 'vendo', metodi: ['Contanti']}};
+let p2pCampiOrdine = 'ORD-1';
+function ordiniP2P(){ return ORDINI; }
+function metodoRecapitoScelto(o){ return 'Contanti'; }
+let FORMA = null;
+function formaRecapito(m){ return FORMA; }
+const CAMPI = {};
+function el(id){
+  const k = String(id).replace('p2pCampoEuro_', '');
+  return k in CAMPI ? {value: CAMPI[k], focus(){}} : null;
+}
+function toast(t){ registro.push('toast:' + t); }
+/* i giudici dell'ora hanno le loro prove: qui l'ora e' sempre buona */
+function giudiceQuandoP2P(){ return ''; }
+function quandoDaCampoP2P(v){ return 1790000000; }
+function bottoneInAttesa(){ return () => {}; }
+let inviaFallisce = false, serverMuto = false;
+async function campoInvia(o, tipo, testo){
+  registro.push('recapito');
+  if (inviaFallisce) throw new Error('relay giù');
+}
+function registraAppuntamentoP2P(id){
+  registro.push('appuntamento:' + id);
+  return serverMuto ? new Promise(() => {}) : Promise.resolve(true);
+}
+function ricordaRecapito(){ registro.push('ricordo'); }
+function scriviOrdineP2P(){}
+function renderCampiP2P(){}
+/* il tetto dei sei secondi senza aspettarli: il timer scatta subito */
+const setTimeout = f => f();
+__PEZZI__
+const CONTANTI = {forma: 'contanti', appuntamento: true, componi: c => c.luogo + '\nQuando: ' + c.quando,
+  campi: [{k: 'luogo', et: 'Dove'}, {k: 'punto', et: 'Punto', facoltativo: true},
+          {k: 'quando', et: 'Quando', tipo: 'datetime-local', nonRicordato: true}]};
+const SEPA = {forma: 'sepa', componi: c => 'IBAN: ' + c.iban, campi: [{k: 'iban', et: 'IBAN'}]};
+Object.assign(CAMPI, {luogo: 'Piazza Castello, Torino', punto: 'i:45.07095,7.68591',
+                      quando: '2026-10-04T18:30', iban: 'IT60 X054 2811 1010 0000 0123 456'});
+async function giro(forma, opz){
+  FORMA = forma; inviaFallisce = !!opz.fallisce; serverMuto = !!opz.muto; registro.length = 0;
+  await inviaCampoP2P('euro', null);
+  return registro.slice();
+}
+(async () => {
+  const out = {};
+  out.contanti = await giro(CONTANTI, {});
+  out.sepa = await giro(SEPA, {});
+  out.fallito = await giro(CONTANTI, {fallisce: true});
+  out.muto = await giro(CONTANTI, {muto: true});
+  const P = (g, mia, altra) => ({giro: g, mia: mia, altra: altra});
+  const mia = {ora: 100, posizione: true, volte: 1};
+  out.adozione = {
+    vecchio: adottaPresenze({presenze: P(1, mia, null)}, {giro: 2, presenze: null}),
+    stesso: adottaPresenze({presenze: P(2, mia, null)}, {giro: 2, presenze: {mia: null, altra: {ora: 150}}}),
+    nuovo: adottaPresenze({presenze: P(1, mia, null)},
+                          {giro: 2, presenze: {mia: {ora: 300, posizione: 0, volte: 1}, altra: null}}),
+    niente: adottaPresenze({}, {giro: 2, presenze: null})};
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
+"""
 
 
 BANCO_LUOGHI = r"""
