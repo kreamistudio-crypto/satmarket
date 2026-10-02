@@ -7619,6 +7619,22 @@
   turno per un guasto ha comunque il suo annuncio in vetrina, che è
   dove si compra. L'AGGREGATO non consuma il turno di nessuno: non
   nomina nessuno.
+  LA CODA DEL CANALE (ott 2026, decisione di Andrea; il verbale in
+  CANTIERI, «La coda del canale»): chi il freno lascia fuori NON si
+  perde più. `_drena_promo` passa gli esclusi da
+  `_un_post_per_venditore` a `rimanda_in_coda` → tabella
+  `coda_vetrina(annuncio_id, accodato)`; l'orologio dei dieci minuti
+  chiama `richiama_coda_vetrina`, che col giudice PURO
+  `_chi_esce_dalla_coda` rimette in fila (`accoda_promo`) per ogni
+  venditore col turno libero e il negozio aperto il suo PIÙ VECCHIO in
+  coda (`creato`, poi id) — a freno spento tutti — e toglie per sempre
+  gli annunci spariti, venduti, rimossi (`STATI_FUORI_CODA`) o
+  importati; in revisione o in ferie aspettano. La riga si toglie prima
+  di riaccodare: se il drenatore la lascia di nuovo fuori ci rientra
+  da sola, col suo posto (l'ordine è il `creato` dell'annuncio, non
+  l'ingresso in coda). Il primo annuncio della settimana esce SUBITO
+  come prima: la strada scartata qui sopra resta scartata. Collaudo:
+  `collaudo_coda_vetrina`.
   ANDIAMO OSPITI IN UN CANALE DELLA COMUNITÀ (ago 2026, decisione di
   Andrea): gli annunci nuovi escono ANCHE in un canale di TERZI —
   @subito_crypto_vetrina, 700 membri — per farci conoscere. Giudice

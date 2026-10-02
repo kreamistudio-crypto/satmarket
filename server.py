@@ -5072,6 +5072,16 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_feedback_per
         ON feedback(per_tg_id, creato DESC);
+    CREATE TABLE IF NOT EXISTS coda_vetrina(
+        -- LA CODA DEL CANALE (ott 2026, decisione di Andrea): gli
+        -- annunci che il freno «uno per venditore» ha lasciato fuori
+        -- dal canale aspettano qui il prossimo turno del loro
+        -- venditore, invece di perdersi. Solo l'id e quando e' entrato:
+        -- il venditore, lo stato e l'ordine si rileggono dall'annuncio
+        -- (una fusione o una vendita non lasciano righe bugiarde).
+        annuncio_id INTEGER PRIMARY KEY,
+        accodato INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS badge_utente(
         -- i distintivi guadagnati; le definizioni (nome, emoji,
         -- criterio) vivono nel codice, in DISTINTIVI: qui solo
@@ -15648,8 +15658,10 @@ async def comando_canale(mittente: dict, testo: str):
 # catalogo dei numeri e si tortura in CI senza prosa intorno.
 SPIEGA_RITMO = {
     "tutto": "ogni annuncio nuovo è un post",
-    "giorno": "al massimo un annuncio al giorno per venditore",
-    "settimana": "al massimo un annuncio a settimana per venditore",
+    "giorno": "un annuncio al giorno per venditore, gli altri in coda "
+              "per i giorni dopo",
+    "settimana": "un annuncio a settimana per venditore, gli altri in coda "
+                 "per le settimane dopo",
 }
 
 
@@ -52021,6 +52033,110 @@ def accoda_promo(annuncio_id: int):
         asyncio.create_task(_drena_promo())
 
 
+# ---------- LA CODA DEL CANALE (ott 2026, decisione di Andrea) -------
+# «Un articolo a settimana per persona, ma se pubblica altri articoli
+# entrano in una coda schedulata per la settimana dopo, in automatico.»
+# Fino a ieri il freno `_un_post_per_venditore` li SCARTAVA: chi
+# pubblicava tre annunci in una settimana ne vedeva uno in canale, e
+# gli altri due non ci arrivavano mai. Adesso chi resta fuori entra in
+# `coda_vetrina`, e l'orologio dei dieci minuti lo rimette in fila
+# (`accoda_promo`) appena il turno del SUO venditore si libera: uno per
+# turno, il piu' vecchio per primo. Il primo annuncio esce SUBITO come
+# sempre — la strada scartata ad agosto era far ASPETTARE quello
+# («un annuncio puo' restare invisibile in canale per sette giorni»), e
+# resta scartata: in coda va solo cio' che ieri si perdeva.
+# A ritmo «tutto» (nessun freno) la coda si svuota da sola al primo
+# battito. In collaudo il giro e' lo stesso: a non uscire e' bot_api.
+
+# stati da cui un annuncio non torna in vetrina: la riga si toglie
+STATI_FUORI_CODA = ("venduto", "rimosso")
+
+
+def rimanda_in_coda(ids: list[int]):
+    """Gli annunci lasciati fuori dal freno entrano in coda. Una riga
+    gia' in coda resta col suo `accodato`: rientrarci non la fa
+    scivolare in fondo."""
+    if not ids:
+        return
+    con = db()
+    try:
+        adesso = int(time.time())
+        con.executemany("INSERT OR IGNORE INTO coda_vetrina(annuncio_id, "
+                        "accodato) VALUES(?,?)", [(i, adesso) for i in ids])
+        con.commit()
+    finally:
+        con.close()
+
+
+def _chi_esce_dalla_coda(righe: list[dict], giorni: int,
+                         adesso: int) -> tuple[list[int], list[int]]:
+    """PURA, il giudice della coda: dalle righe in coda (annuncio_id,
+    venditore_id, stato, creato, promo_canale_il, ferie_fino, origine)
+    a (chi richiamare adesso, chi togliere per sempre).
+    - Tolte: l'annuncio che non c'e' piu', venduto o rimosso, e quello
+      arrivato da fuori (il canale non li ha mai raccontati).
+    - Richiamato: per ogni venditore col turno LIBERO e il negozio
+      aperto, il suo piu' vecchio in coda (`creato`, poi l'id) fra
+      quelli in vetrina; a freno spento (`giorni` <= 0) tutti.
+    - Gli altri aspettano: in revisione, in ferie, turno gia' preso."""
+    via, pronti = [], {}
+    soglia = adesso - giorni * 86400
+    for r in righe:
+        if (r.get("stato") is None or r["stato"] in STATI_FUORI_CODA
+                or r.get("origine")):
+            via.append(r["annuncio_id"])
+            continue
+        if r["stato"] != "attivo" or in_ferie(r.get("ferie_fino") or 0,
+                                              adesso):
+            continue
+        if giorni > 0 and (r.get("promo_canale_il") or 0) > soglia:
+            continue
+        pronti.setdefault(r["venditore_id"], []).append(r)
+    esce = []
+    for suoi in pronti.values():
+        suoi.sort(key=lambda r: (r.get("creato") or 0, r["annuncio_id"]))
+        esce += [r["annuncio_id"] for r in (suoi if giorni <= 0
+                                             else suoi[:1])]
+    return sorted(esce), via
+
+
+async def richiama_coda_vetrina():
+    """Dall'orologio: chi in coda ha di nuovo il turno torna nella fila
+    del drenatore, e chi non tornera' mai esce dalla coda. La riga si
+    toglie PRIMA di accodare: se il drenatore la lasciasse di nuovo
+    fuori (un annuncio fresco dello stesso venditore gli ha preso il
+    turno nella stessa finestra), ci rientra da sola."""
+    if not POST_AUTOMATICI:
+        return
+    con = db()
+    try:
+        righe = []
+        for r in con.execute(
+                "SELECT c.annuncio_id, a.venditore_id, a.stato, a.creato, "
+                "a.contatto_nostr, a.fonte, u.promo_canale_il, "
+                "u.ferie_fino FROM coda_vetrina c "
+                "LEFT JOIN annunci a ON a.id=c.annuncio_id "
+                "LEFT JOIN utenti u ON u.tg_id=a.venditore_id"):
+            r = dict(r)
+            r["origine"] = origine_annuncio(r) if r["stato"] else ""
+            righe.append(r)
+        if not righe:
+            return
+        giorni = ritmo_vetrina()[0]
+        esce, via = _chi_esce_dalla_coda(righe, giorni, int(time.time()))
+        if esce or via:
+            con.executemany("DELETE FROM coda_vetrina WHERE annuncio_id=?",
+                            [(i,) for i in esce + via])
+            con.commit()
+    finally:
+        con.close()
+    for i in esce:
+        accoda_promo(i)
+    if esce:
+        print(f"📣 Coda del canale: {len(esce)} annunci tornano in fila, "
+              f"{len(righe) - len(esce) - len(via)} aspettano", flush=True)
+
+
 async def _drena_promo():
     """Il drenatore: dorme la finestra di raggruppamento, prende TUTTO
     quel che si e' accumulato e applica la regola unica — post singoli
@@ -52058,7 +52174,12 @@ async def _drena_promo():
                 annunci.append(dict(a))
         con.close()
         giorni, max_ora, soglia_aggrega = ritmo_vetrina()
+        tutti = annunci
         annunci = _un_post_per_venditore(annunci, giorni)
+        # chi il freno lascia fuori non si perde: aspetta il suo turno
+        # in coda (vedi «LA CODA DEL CANALE»)
+        presi = {a["id"] for a in annunci}
+        rimanda_in_coda([a["id"] for a in tutti if a["id"] not in presi])
         if not annunci:
             return
         adesso = time.time()
@@ -61544,6 +61665,12 @@ async def orologio():
             await sollecita_firme_nostr()
         except Exception as e:
             print(f"⚠️ Solleciti firme Nostr saltati: {e}")
+        try:
+            # gli annunci rimasti fuori dal canale per il freno «uno a
+            # settimana» tornano in fila quando il turno si libera
+            await richiama_coda_vetrina()
+        except Exception as e:
+            print(f"⚠️ Coda del canale saltata: {e}")
         try:
             # il sostituto dell'auto-sblocco disarmato: gira solo a
             # leva spenta, e non muove mai un sat

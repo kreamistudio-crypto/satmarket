@@ -35334,3 +35334,68 @@ riga «🌸 Blossom: … non caricata», e la miniatura si apre. Se primal
 rifiuta l'upload (401/413), il motivo sta in `x-reason` nella stessa
 riga. Le foto NON passano da una moderazione automatica: la valvola è
 il «rimuovi» del moderatore, che le toglie anche da Blossom.
+
+## La coda del canale: gli annunci in più aspettano la settimana dopo (2 ott 2026)
+
+Richiesta di Andrea: «è giusto un articolo a settimana per persona, ma
+se pubblica altri articoli entrano in una coda schedulata per la
+settimana dopo, in automatico».
+
+**IL PRIMA.** Col ritmo «settimana» il drenatore del canale
+(`_drena_promo`) passava gli annunci dal freno `_un_post_per_venditore`:
+in una finestra di 90 secondi uno solo per venditore, e nessuno per chi
+aveva già avuto il turno negli ultimi sette giorni. Gli esclusi si
+PERDEVANO: chi pubblicava tre annunci in una settimana ne vedeva uno in
+canale, mai gli altri due.
+
+**IL DOPO.** Gli esclusi entrano in `coda_vetrina` (`rimanda_in_coda`);
+l'orologio dei dieci minuti (`richiama_coda_vetrina`) rimette in fila
+del drenatore, per ogni venditore il cui turno si è liberato, il suo
+annuncio PIÙ VECCHIO in coda. Il drenatore lo posta come un annuncio
+appena pubblicato e scrive il timbro del turno, quindi il successivo
+aspetta un'altra settimana: uno a settimana, in ordine di
+pubblicazione. Escono dalla coda per sempre gli annunci venduti,
+rimossi, spariti o importati da fuori; quelli in revisione e i negozi
+in ferie aspettano. A ritmo «giorno» la coda va di giorno in giorno, a
+ritmo «tutto» si svuota al primo battito. La spiegazione di `/vetrina`
+lo dice: «un annuncio a settimana per venditore, gli altri in coda per
+le settimane dopo».
+
+**I PERCHÉ.** La coda sta nel database e non in RAM: una settimana di
+attesa attraversa per forza dei riavvii. Dentro si tiene solo l'id: lo
+stato, il venditore e l'ordine si rileggono dall'annuncio, così una
+vendita o una fusione di account non lascia righe bugiarde. L'ordine è
+il `creato` dell'annuncio, non l'ingresso in coda: un annuncio che
+rientra (il drenatore lo lascia fuori di nuovo perché nella stessa
+finestra un annuncio fresco dello stesso venditore gli ha preso il
+turno) non perde il posto.
+
+**LA DECISIONE DI AGOSTO RESTA.** Ad agosto era stata scartata «la coda
+fino a fine settimana» perché faceva ASPETTARE il primo annuncio. Qui
+il primo esce subito come prima; in coda va solo quel che prima si
+perdeva.
+
+**IMPERFEZIONE DICHIARATA.** Un annuncio fresco pubblicato proprio
+nella finestra in cui il turno si libera, prima del battito
+dell'orologio (al più dieci minuti), passa davanti a quelli in coda: è
+la regola «il primo esce subito», e quelli in coda aspettano il turno
+dopo. Nessun tetto alla coda per venditore: un import da cento righe fa
+una coda di cento settimane (gli annunci venduti nel frattempo se ne
+vanno da soli).
+
+**PROVATO.** `collaudo_coda_vetrina` 31 verdi (drenatore e orologio
+veri, Telegram di cartone, il tempo spostato nel database): tre annunci
+insieme → un post subito e due in coda; il battito a turno preso non
+richiama nessuno; passata la settimana esce il più vecchio e il terzo
+aspetta la settimana dopo; l'annuncio nuovo a turno preso va in coda;
+il venduto esce dalla coda, le ferie aspettano; due venditori non si
+rubano il turno; a ritmo «tutto» la coda si svuota; il giudice puro sui
+casi di bordo. Nella gabbia della CI e aggiunto ai suoi due elenchi.
+Suite intera severa sull'albero da origin/main 395296a: 18.578 verdi e
+le 4 rosse note dell'AVIF in locale; 34 collaudi della CI verdi nella
+gabbia (`collaudo_freni` non compila col Python 3.10 locale, in CI c'è
+la 3.12).
+
+**DA GUARDARE.** Nel journal del VPS la riga «📣 Coda del canale: N
+annunci tornano in fila, M aspettano» quando si libera un turno, e nel
+canale il post dell'annuncio rimandato una settimana dopo il primo.
