@@ -9566,6 +9566,35 @@
   reputazione sola», e la media è la stessa. Tutto quel che segue vale
   per gli affari del mercatino; per gli scambi vedi «LE RECENSIONI
   DEGLI SCAMBI».
+  LE FOTO DELLE RECENSIONI, SU BLOSSOM (ott 2026, richiesta di Andrea;
+  il verbale in CANTIERI, «Le foto nelle recensioni, su Blossom»): il
+  feedback del MERCATINO porta fino a `MAX_FOTO_RECENSIONE` = 3 foto
+  (`foto` nel corpo, data URL), e le recensioni P2P no. Le carica il
+  SERVER su `BLOSSOM_SERVER` (default `https://blossom.primal.net`, leva
+  del config) con `PUT /upload` e l'autorizzazione BUD-01 kind 24242
+  firmata dalla chiave della piattaforma (`_auth_blossom` →
+  `firma_evento`): chi entra solo da Telegram le mette come gli altri, e
+  nessun segreto altrui entra in gioco. Prima di Blossom ogni foto passa
+  da `prepara_foto_recensione`, la filiera di `salva_foto` senza il
+  disco (metadati via: su Blossom il file è pubblico e non si ritira
+  davvero). Prima di Blossom anche i controlli dell'ordine, senza lock:
+  le foto partono solo per un feedback che nascerà, e se la transazione
+  cambia idea quelle caricate si tolgono. Blossom giù = 502
+  `MSG_BLOSSOM_GIU`, il feedback non nasce. Colonna `feedback.foto`
+  (JSON degli URL, '' = nessuna); escono nel profilo del negozio
+  (`foto`) e in `/api/orders` (`mio_foto`, `suo_foto`) SOLO da
+  `foto_recensione` → `url_blob_ammesso` (stesso schema e host di
+  `BLOSSOM_SERVER`, percorso = sha256 con estensione facoltativa,
+  niente query): è la forma che entra in un <img>. Il «rimuovi» del
+  moderatore le toglie anche da Blossom (`togli_da_blossom`, DELETE
+  firmato, al meglio). In collaudo verso un Blossom non di casa non si
+  esce («🌸 [blossom simulato]», il criterio di `relay_di_casa`). Freno
+  `foto_recensione` (20/ora per persona). Client: `fbFoto` (le scelte,
+  per ordine), `fbScelteHTML`, `fotoRecensioneHTML` (miniature, un
+  tocco apre `apriLightbox(i, lista)`). ⚠️ L'OGGETTO COMPRATO: il
+  profilo non lo dice mai, ma la foto lo mostra per scelta di chi la
+  mette, e il modulo lo avverte prima dell'invio. Collaudo:
+  `collaudo_foto_recensioni` (Blossom di cartone che verifica la firma).
   `POST /api/orders/{id}/feedback`: solo le due parti, solo su
   `STATI_FEEDBACK = (released, refunded)` — anche gli affari finiti
   male sono affari veri, escluderli gonfierebbe i profili —

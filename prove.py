@@ -12088,6 +12088,9 @@ def prove_nascondi_ordine():
                # il volto dell'altra parte (24 set 2026) ha le sue prove
                # in `prove_card_parte_ordine`: qui nessuno ha una faccia
                "_volti_persone": lambda con, ids, adesso: {},
+               # le foto delle recensioni (ott 2026) hanno le loro prove
+               # in `collaudo_foto_recensioni`: qui nessuna
+               "foto_recensione": lambda v: [],
                "time": __import__("time"),
                "json": __import__("json"), **ambiente_in_pagamento()}
         exec(pezzo("_titolo_ordine"), amb)
@@ -14180,8 +14183,9 @@ def prove_foto_scarti():
     # i tre chiamanti prendono .foto: con la risposta vecchia (una
     # stringa) un oggetto sarebbe stato truthy SEMPRE, e la foto rotta
     # sarebbe entrata dappertutto
-    prova("sentinella: tutti e tre i chiamanti leggono l'esito",
-          (3, 3), (mini.count("await ridimensiona("),
+    # (ott 2026: il quarto e' il modulo del feedback con le foto)
+    prova("sentinella: tutti e quattro i chiamanti leggono l'esito",
+          (4, 4), (mini.count("await ridimensiona("),
                    mini.count("esito = await ridimensiona(")))
 
     # ---- LA MINIATURA NON E' MAI NERA, E L'AVVISO DICE QUALE FOTO ----
@@ -51474,6 +51478,8 @@ def prove_feedback_tre_e_tondi():
             fetta("const FEEDBACK_VISIBILI = ", ";"),
             pezzo_js(mini, "function feedbackNegozioHTML(", "\n}\n") + "\n}",
             pezzo_js(mini, "function toggleFeedbackAltri(", "\n}\n") + "\n}",
+            # le miniature delle foto (ott 2026), che la riga chiama
+            pezzo_js(mini, "function fotoRecensioneHTML(", "\n}\n") + "\n}",
             fetta("const LOGO_TELEGRAM = ", "';"),
             fetta("const LOGO_NOSTR = ", "';"),
             fetta("const ICO_LINK = ", "</svg>';"),
@@ -51948,7 +51954,9 @@ def prove_card_parte_ordine():
                "ab" * 32 if ((u["npub_accesso"] or "")
                              or ((u["npub"] or "") and u["npub_verificata"]))
                else ""),
-           "hex_to_npub": lambda h: "npub1" + h[:8]}
+           "hex_to_npub": lambda h: "npub1" + h[:8],
+           # le foto delle recensioni (ott 2026): il loro collaudo
+           "foto_recensione": lambda v: []}
     exec(_SORGENTE[i_l:_SORGENTE.index("]\n", i_l) + 1], amb)
     for f in ("livello_utente", "_volti_persone", "miei_ordini"):
         exec(pezzo(f), amb)
@@ -89891,6 +89899,14 @@ def prove_feedback_confermato():
         # e su un ordine gia' votato il ramo «Feedback lasciato».
         js_res = (js_giudici + pezzo_js(mini, "function feedbackPanel(o){",
                                         "\n}\n") + "\n}\n"
+                  # le foto del modulo (ott 2026): il suo stato e i due
+                  # disegni che il pannello chiama
+                  + "let fbFoto=[],fbFotoOrdine=0;"
+                  "const MAX_FOTO_RECENSIONE=3;\n"
+                  + pezzo_js(mini, "function fotoRecensioneHTML(", "\n}\n")
+                  + "\n}\n"
+                  + pezzo_js(mini, "function fbScelteHTML(", "\n}\n")
+                  + "\n}\n"
                   + "const esc=s=>s;const o={state:'confirmed',disputata:0,"
                   "sbloccatoAuto:0,role:'buyer',mioVoto:0,suoVoto:0};"
                   "const h=puoiLasciareFeedback(o)?feedbackPanel(o):'';"
@@ -118573,9 +118589,11 @@ def prove_freni():
     exec(_SORGENTE[i:j], amb)
     F = amb["FRENI"]
     prova("i numeri concordati: annunci 60/ora, anteprima 60/ora, pagamento e "
-          "ln-address 30/min, login 30/min, canale 1 ogni 10 min",
+          "ln-address 30/min, login 30/min, canale 1 ogni 10 min, "
+          "feedback con foto 20/ora",
           {"annunci": (60, 3600), "anteprima": (60, 3600), "pagamento": (30, 60),
-           "ln_address": (30, 60), "login": (30, 60), "canale": (1, 600)}, F)
+           "ln_address": (30, 60), "login": (30, 60), "canale": (1, 600),
+           "foto_recensione": (20, 3600)}, F)
     prova("...e cinque ordini «creato» vivi per compratore", 5, amb["MAX_ORDINI_CREATO"])
 
     # --- il secchio, con l'orologio di cartone ----------------------------

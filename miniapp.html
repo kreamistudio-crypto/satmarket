@@ -8225,6 +8225,19 @@
   .payout .fb-commento{min-height:52px}
   .payout .fb-invia{margin-top:10px}
   .payout .fb-dopo{margin-top:8px}
+  /* LE FOTO DELLE RECENSIONI (ott 2026): le miniature sotto il
+     commento — nel profilo e nell'ordine — e quelle scelte nel modulo,
+     con la ✕ per toglierle prima dell'invio */
+  .fb-foto{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 2px}
+  .fb-foto img{width:64px;height:64px;object-fit:cover;border-radius:8px;
+    cursor:zoom-in;background:var(--card)}
+  .fb-scelte{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0 4px}
+  .fb-scelta{position:relative;width:64px;height:64px;border-radius:8px;
+    background:var(--card);display:flex;align-items:center;justify-content:center}
+  .fb-scelta img{width:100%;height:100%;object-fit:cover;border-radius:8px}
+  .fb-scelta button{position:absolute;top:-8px;right:-8px;width:28px;height:28px;
+    border-radius:50%;border:0;padding:0;background:var(--danger);color:#fff;
+    font-size:13px;line-height:28px;cursor:pointer}
   /* I campi dell'indirizzo dentro l'ordine (ago 2026): dentro .payout
      le label non sono vestite da nessuno — sono nate INLINE, coi
      campi sfasati a meta' riga (visto a schermo, non leggendo il
@@ -14289,6 +14302,10 @@ function mapOrder(o){
     /* il feedback che ho lasciato io e quello che ho ricevuto */
     mioVoto:o.mio_voto||0, mioCommento:o.mio_commento||'',
     suoVoto:o.suo_voto||0, suoCommento:o.suo_commento||'',
+    /* e le loro foto su Blossom (ott 2026): URL gia' passati dalla
+       forma ammessa del server */
+    mioFoto:Array.isArray(o.mio_foto)?o.mio_foto:[],
+    suoFoto:Array.isArray(o.suo_foto)?o.suo_foto:[],
     /* stesso filtro-alfabeto di mapListing: vanno negli onclick */
     usernameCompratore:(o.compratore_username||'').replace(/[^A-Za-z0-9_]/g,''),
     usernameVenditore:(o.venditore_username||'').replace(/[^A-Za-z0-9_]/g,''),
@@ -19701,6 +19718,7 @@ function feedbackNegozioHTML(feedback, nFeedback){
         <span class="stars">${'★'.repeat(f.voto)}</span>
         <span>${nome} ${faccia}<br>
           ${f.commento?`${esc(f.commento)}<br>`:''}
+          ${fotoRecensioneHTML(f.foto)}
           <small style="opacity:.65">${f.ruolo==='acquirente'?'ha comprato qui':f.ruolo==='venditore'?'ha venduto qui':f.ruolo==='scambio'?'da uno scambio P2P':'utente'} · ${new Date(f.creato*1000).toLocaleDateString('it-IT')}</small>
           ${isAdmin?` <a href="#" onclick="rimuoviFeedback(${f.id});return false" style="color:var(--danger);font-size:12px">rimuovi</a>`:''}
         </span>
@@ -26201,11 +26219,13 @@ function lbMisura(){
            cx: r.left + r.width/2, cy: r.top + r.height/2};
 }
 
-function apriLightbox(i){
-  const l = currentListing;
-  if (!l || !l.photos || !l.photos.length) return;
+/* `foto` facoltativa (ott 2026): le foto di una recensione si aprono
+   nello stesso visore, senza un annuncio aperto dietro */
+function apriLightbox(i, foto){
+  const lista = foto || currentListing?.photos;
+  if (!lista || !lista.length) return;
   haptic();
-  lbFoto = l.photos;
+  lbFoto = lista;
   el('lightbox').classList.add('open');
   /* con una foto sola le frecce non hanno dove portare */
   el('lightbox').classList.toggle('sola', lbFoto.length < 2);
@@ -30468,11 +30488,14 @@ let stellaScelta = 0;   // il voto scelto ma non ancora inviato
    «IL MODULO DEL VOTO, UNO PER DUE POSTI»). Stessi valori, al pixel. */
 function feedbackPanel(o){
   const chi = o.role==='buyer' ? 'il venditore' : "l'acquirente";
+  /* le foto scelte sono di QUESTO ordine: aprendone un altro si riparte */
+  if (fbFotoOrdine !== o.id) { fbFoto = []; fbFotoOrdine = o.id; }
   if (o.mioVoto) return `
     <div class="payout">
       <h4>⭐ Feedback lasciato</h4>
       <div class="hint"><span class="stars">${'★'.repeat(o.mioVoto)}</span>${o.mioCommento?` — ${esc(o.mioCommento)}`:''}</div>
-      ${o.suoVoto?`<div class="hint fb-dopo"><b>Feedback ricevuto:</b> <span class="stars">${'★'.repeat(o.suoVoto)}</span>${o.suoCommento?` — ${esc(o.suoCommento)}`:''}</div>`:''}
+      ${fotoRecensioneHTML(o.mioFoto)}
+      ${o.suoVoto?`<div class="hint fb-dopo"><b>Feedback ricevuto:</b> <span class="stars">${'★'.repeat(o.suoVoto)}</span>${o.suoCommento?` — ${esc(o.suoCommento)}`:''}</div>${fotoRecensioneHTML(o.suoFoto)}`:''}
     </div>`;
   return `
     <div class="payout">
@@ -30482,9 +30505,79 @@ function feedbackPanel(o){
         ${[1,2,3,4,5].map(n=>`<span id="fbStella${n}" onclick="setStella(${n})">☆</span>`).join('')}
       </div>
       <textarea id="fbCommento" class="fb-commento" maxlength="200" placeholder="Commento (facoltativo, max 200 caratteri)"></textarea>
+      <input type="file" id="fbFotoFile" accept="image/*" multiple hidden onchange="fbFotoScelte(this)">
+      <div class="fb-scelte" id="fbScelte">${fbScelteHTML()}</div>
+      <div class="hint">Chi apre il profilo di ${chi} vedrà le foto accanto al voto: se mostrano l'oggetto, si saprà cosa ${o.role==='buyer'?'hai comprato':'hai venduto'}.</div>
       <button class="btn primary fb-invia" onclick="inviaFeedback(this)">⭐ Invia il feedback</button>
-      ${o.suoVoto?`<div class="hint fb-dopo"><b>Feedback ricevuto:</b> <span class="stars">${'★'.repeat(o.suoVoto)}</span>${o.suoCommento?` — ${esc(o.suoCommento)}`:''}</div>`:''}
+      ${o.suoVoto?`<div class="hint fb-dopo"><b>Feedback ricevuto:</b> <span class="stars">${'★'.repeat(o.suoVoto)}</span>${o.suoCommento?` — ${esc(o.suoCommento)}`:''}</div>${fotoRecensioneHTML(o.suoFoto)}`:''}
     </div>`;
+}
+
+/* ---- LE FOTO DELLE RECENSIONI (ott 2026) ----
+   Fino a MAX_FOTO_RECENSIONE foto nel feedback del mercatino. Si
+   preparano come quelle degli annunci (`ridimensiona`: un JPEG da
+   1200px, o il motivo per cui no) e partono col feedback; e' il server
+   a caricarle su Blossom, dopo averle spogliate dei metadati. Il tetto
+   e' anche del server: questo e' solo per non far scegliere invano. */
+const MAX_FOTO_RECENSIONE = 3;
+let fbFoto = [], fbFotoOrdine = 0;  // data URL scelti, o 'caricando:…'
+
+/* Le miniature di una recensione (profilo e ordine): un tocco le apre
+   nel visore delle foto. Gli URL li ha gia' filtrati il server; la
+   lista viaggia nell'attributo, cosi' l'onclick porta un numero e basta. */
+function fotoRecensioneHTML(lista){
+  if (!Array.isArray(lista) || !lista.length) return '';
+  return `<div class="fb-foto" data-foto="${esc(JSON.stringify(lista))}">${
+    lista.map((u, j)=>`<img src="${esc(u)}" alt="Foto ${j+1} della recensione" loading="lazy" onclick="apriFotoRecensione(this, ${j})" onerror="this.remove()">`).join('')}</div>`;
+}
+function apriFotoRecensione(img, j){
+  let lista = [];
+  try { lista = JSON.parse(img.closest('.fb-foto').dataset.foto); } catch(e){}
+  if (lista.length) apriLightbox(j, lista);
+}
+
+function fbScelteHTML(){
+  const scelte = fbFoto.map((f, j)=> f.startsWith('caricando:')
+    ? `<div class="fb-scelta" aria-label="Preparo la foto">⏳</div>`
+    : `<div class="fb-scelta"><img src="${esc(f)}" alt="Foto ${j+1}"><button type="button" aria-label="Togli la foto ${j+1}" onclick="fbTogliFoto(${j})">✕</button></div>`).join('');
+  return scelte + (fbFoto.length < MAX_FOTO_RECENSIONE
+    ? `<button type="button" class="btn ghost mini" onclick="el('fbFotoFile').click()">📷 ${fbFoto.length?'Un\'altra foto':`Aggiungi foto (facoltative, max ${MAX_FOTO_RECENSIONE})`}</button>`
+    : '');
+}
+function fbRidisegnaFoto(){
+  const box = el('fbScelte');
+  if (box) box.innerHTML = fbScelteHTML();
+}
+function fbTogliFoto(j){
+  haptic();
+  fbFoto.splice(j, 1);
+  fbRidisegnaFoto();
+}
+async function fbFotoScelte(input){
+  const files = [...(input.files || [])];
+  input.value = '';            // cosi' si puo' riscegliere lo stesso file
+  if (!files.length) {
+    /* il chooser che torna a mani vuote: se non si dice niente, il
+       bottone «non fa niente» (la lezione di `aggiungiFoto`) */
+    toast(tg?.initData
+      ? 'Non ho ricevuto nessuna foto: controlla che Telegram possa accedere alla galleria'
+      : 'Non ho ricevuto nessuna foto: controlla i permessi della galleria', 8000);
+    return;
+  }
+  for (const file of files){
+    if (fbFoto.length >= MAX_FOTO_RECENSIONE) { toast(`Massimo ${MAX_FOTO_RECENSIONE} foto`); break; }
+    const segn = 'caricando:' + Math.random();
+    fbFoto.push(segn);
+    fbRidisegnaFoto();
+    const esito = await ridimensiona(file) || {};
+    const j = fbFoto.indexOf(segn);   // puo' essersi spostato (✕ su altre)
+    if (j >= 0) {
+      if (esito.foto) fbFoto[j] = esito.foto; else fbFoto.splice(j, 1);
+    }
+    if (!esito.foto)
+      toast(esito.motivo || `«${file.name}» non è entrata: riprova con un'altra foto`, 7000);
+    fbRidisegnaFoto();
+  }
 }
 
 function setStella(n){
@@ -30496,24 +30589,33 @@ function setStella(n){
 async function inviaFeedback(btn){
   haptic();
   if (!stellaScelta) { toast('Scegli da 1 a 5 stelle'); return; }
+  if (fbFoto.some(f => f.startsWith('caricando:'))) {
+    toast('Un attimo: sto ancora preparando le foto'); return;
+  }
   const commento = (el('fbCommento').value||'').trim();
+  const foto = fbFoto.slice();
   chiediConferma({
     titolo: 'Invii questo feedback?',
-    corpo: 'È definitivo: non potrà essere modificato.',
+    corpo: foto.length
+      ? `È definitivo: non potrà essere modificato, e ${foto.length===1?'la foto sarà pubblica':`le ${foto.length} foto saranno pubbliche`}.`
+      : 'È definitivo: non potrà essere modificato.',
     etichetta: '⭐ Invia',
     poi: async () => {
   if (DEMO) {
     currentOrder.mioVoto = stellaScelta; currentOrder.mioCommento = commento;
+    currentOrder.mioFoto = foto; fbFoto = [];
     stellaScelta = 0; toast('⭐ Feedback inviato!'); openOrder(currentOrder.id); return;
   }
-  const ripristina = bottoneInAttesa(btn, '⭐ Invio il feedback…');
+  const ripristina = bottoneInAttesa(btn, foto.length ? '⭐ Carico le foto…' : '⭐ Invio il feedback…');
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/feedback`, {
     method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({voto: stellaScelta, commento})});
+    body: JSON.stringify({voto: stellaScelta, commento, foto})});
   const d = await r.json().catch(()=>({}));
   ripristina();
-  if (!r.ok) { toast(d.detail || 'Operazione non riuscita, riprova'); return; }
+  if (!r.ok) { toast(d.detail || 'Operazione non riuscita, riprova', 7000); return; }
   currentOrder.mioVoto = stellaScelta; currentOrder.mioCommento = commento;
+  currentOrder.mioFoto = Array.isArray(d.foto) ? d.foto : [];
+  fbFoto = [];
   stellaScelta = 0;
   toast('⭐ Grazie per il feedback!');
   openOrder(currentOrder.id);

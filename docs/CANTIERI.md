@@ -35242,3 +35242,95 @@ severa 18.581 verdi e 0 rosse; i 33 collaudi della CI verdi nella gabbia.
 **DA GUARDARE.** Sul VPS: il riepilogo `🏪 woo #<id>` coi suoi
 «invariati» (il grosso del catalogo) e un giro di regime corto; un
 «🔄 Aggiorna ora» subito dopo un giro del rodaggio che dice 0 nuovi.
+
+## Le foto nelle recensioni, su Blossom (2 ott 2026)
+
+Richiesta di Andrea: «aggiungi la possibilità di aggiungere foto su
+Blossom nelle recensioni». Le quattro scelte sono sue, fatte prima di
+scrivere una riga: SOLO il feedback degli affari del MERCATINO (le
+recensioni degli scambi P2P restano come sono); a caricare è il SERVER
+con la chiave della piattaforma; il Blossom è `blossom.primal.net`;
+fino a TRE foto per recensione.
+
+**COM'È FATTO.** Il modulo «⭐ Lascia un feedback» ha sotto il commento
+il bottone «📷 Aggiungi foto (facoltative, max 3)»: le foto si preparano
+con `ridimensiona`, la stessa strada degli annunci (JPEG da 1200 px, coi
+suoi ripieghi), restano in pagina come miniature con la ✕ e partono
+INSIEME al voto. Una riga dice prima dell'invio che chi apre il profilo
+le vedrà accanto al voto, «se mostrano l'oggetto, si saprà cosa hai
+comprato», e la conferma dice «le 2 foto saranno pubbliche». Sul server
+`lascia_feedback` prende `foto` (lista di data URL): ogni foto passa da
+`prepara_foto_recensione`, che è la filiera di `salva_foto` senza il
+disco (byte veri, foto anomala, metadati via con `spoglia_metadati` o
+ridisegno, foto vuota), poi `carica_su_blossom` fa `PUT /upload` con
+l'autorizzazione BUD-01 (kind 24242, `t=upload`, `x`=sha256, scadenza a
+cinque minuti) firmata da `firma_evento`. Gli URL stanno nella colonna
+nuova `feedback.foto` (JSON, '' = nessuna) ed escono nel profilo del
+negozio (`foto` di ogni feedback) e nella lista degli ordini
+(`mio_foto`, `suo_foto`), sempre filtrati da `foto_recensione` →
+`url_blob_ammesso`: stesso schema e host di `BLOSSOM_SERVER`, percorso
+fatto del solo sha256, niente query. Un tocco sulla miniatura apre il
+visore delle foto degli annunci (`apriLightbox` ha preso una lista
+facoltativa). Il moderatore che rimuove la recensione toglie anche le
+foto da Blossom (`togli_da_blossom`, DELETE firmato, al meglio).
+
+**I PERCHÉ.** Il server e non il browser: così le foto le mette anche
+chi entra solo da Telegram, e la firma è nostra — il gradino dei DM
+NIP-17 della scala Nostr, nessun segreto altrui. I metadati si tolgono
+PRIMA di Blossom perché lì il file è pubblico e non si ritira davvero
+(il DELETE vale per un server solo, e chiunque può averlo già copiato).
+I controlli dell'ordine (parte, affare concluso, feedback non ancora
+lasciato) si fanno PRIMA del caricamento, senza lock, e la transazione
+resta il giudice vero: se cambia idea, le foto appena caricate si
+tolgono. Blossom che non risponde = il feedback NON nasce, 502 «Non
+riesco a caricare le foto adesso: riprova fra poco, o invia il feedback
+senza foto» — una foto non sparisce in silenzio, la regola delle foto
+degli annunci. Il server Blossom può ricomprimere: l'URL buono è quello
+che risponde lui, se ha la forma ammessa; altrimenti quello costruito
+dal nostro sha256, solo se lo sha256 combacia. In collaudo, verso un
+Blossom che non è di casa, non si esce dal computer («🌸 [blossom
+simulato]»), come per i relay. Freno nuovo `foto_recensione`: 20
+feedback con foto all'ora per persona.
+
+**IN TENSIONE CON UNA DECISIONE DI AGOSTO, DETTO.** Il profilo non dice
+MAI che cosa ha comprato chi recensisce (il commento dei feedback del
+negozio). Con la foto lo mostra lui, per scelta sua, e il modulo glielo
+dice prima: la regola resta per tutto il resto.
+
+**SCARTATE.** La firma nel browser con la chiave dell'utente (solo chi
+ha Nostr avrebbe potuto, e l'EXIF andava tolto nel client); un Blossom
+nostro su barattolo.store; le foto anche nelle recensioni P2P (non
+chieste); un caricamento separato prima dell'invio (foto orfane su un
+server pubblico per ogni modulo abbandonato).
+
+**PROVATO.** `collaudo_foto_recensioni` 43 verdi, nella gabbia della CI
+e aggiunto ai suoi due elenchi: un Blossom di cartone su 127.0.0.1 che
+verifica davvero firma (con `schnorr_puro`), kind, verbo, sha256 e
+scadenza; due foto con GPS arrivano senza EXIF; profilo e ordini; i
+rifiuti che non bussano a Blossom; Blossom a 500 alla seconda foto (il
+feedback non nasce e la prima si toglie); il feedback senza foto di
+sempre; la rimozione del moderatore; il collaudo verso primal che non
+esce; la forma degli URL. Dal vivo con Playwright e Chrome (server in
+collaudo, relay morti, Blossom di cartone) a 375 px, temi chiaro e
+scuro: scelta di due foto da 1600x1200 con GPS, conferma, «Feedback
+lasciato» con le miniature, profilo del venditore, visore sulla seconda
+foto; nessuno scorrimento laterale, file su Blossom a 1200x900 con EXIF
+vuoto.
+Emendati in prove.py i banchi che estraggono il codice e non
+conoscevano i pezzi nuovi (`prove_nascondi_ordine`,
+`prove_card_parte_ordine`, `prove_feedback_tre_e_tondi`, il pannello in
+`prove_feedback_confermato`), la sentinella dei chiamanti di
+`ridimensiona` (da tre a quattro) e i numeri di `prove_freni`; la prima
+stesura aveva un «);» dentro un commento del DDL di `feedback`, e
+`prove_recensione_p2p` (che lo estrae fino al primo «);») l'ha preso.
+Suite intera severa sull'albero da origin/main 2604bed: 18.578 verdi e
+4 rosse, le quattro note dell'AVIF (manca il plugin di Pillow in
+locale); i 34 collaudi della CI verdi nella gabbia tranne
+`collaudo_freni`, che in locale non compila col Python 3.10 (f-string
+con la barra, da 3.12 in su va: la CI usa la 3.12).
+
+**DA GUARDARE.** Il primo feedback con foto vero: nel journal nessuna
+riga «🌸 Blossom: … non caricata», e la miniatura si apre. Se primal
+rifiuta l'upload (401/413), il motivo sta in `x-reason` nella stessa
+riga. Le foto NON passano da una moderazione automatica: la valvola è
+il «rimuovi» del moderatore, che le toglie anche da Blossom.

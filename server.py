@@ -1790,6 +1790,7 @@ FRENI = {
     "ln_address": (30, 60),     # il Lightning address (HTTP esterno + LNbits), per persona
     "login": (30, 60),          # le porte del login, per IP e solo in chiaro
     "canale": (1, 600),         # il post nel canale P2P, per persona (non un 429: si salta il post)
+    "foto_recensione": (20, 3600),  # un feedback con foto (caricate su Blossom), per persona
 }
 MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
 MSG_FRENO = "Troppe richieste in poco tempo: riprova fra qualche minuto"
@@ -5063,6 +5064,10 @@ def init_db():
         -- («chi e' onesto con gli oggetti e' onesto anche sul P2P»):
         -- `_ricalcola_rating` non guarda questa colonna, e non deve.
         scambio TEXT DEFAULT '',
+        -- LE FOTO (ott 2026): JSON degli URL su Blossom, '' = nessuna.
+        -- Solo gli affari del mercatino ne hanno (vedi «LE FOTO DELLE
+        -- RECENSIONI», e chi le legge passa da `foto_recensione`).
+        foto TEXT DEFAULT '',
         UNIQUE(ordine_id, da_tg_id)  -- uno per ordine per parte
     );
     CREATE INDEX IF NOT EXISTS idx_feedback_per
@@ -7516,6 +7521,11 @@ def init_db():
     # continuano a pesare identiche nella media.
     try:
         con.execute("ALTER TABLE feedback ADD COLUMN scambio TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    # LE FOTO DELLE RECENSIONI (ott 2026): additiva, '' = nessuna foto
+    try:
+        con.execute("ALTER TABLE feedback ADD COLUMN foto TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
     try:
@@ -22240,7 +22250,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     # piu' qui sarebbe una seconda porta da tenere allineata.
     # f.id e' un numero opaco: serve solo al bottone rimuovi dell'admin.
     feedback = [] if cursore else [dict(r) for r in con.execute(
-        "SELECT f.id, f.voto, f.commento, f.creato, "
+        "SELECT f.id, f.voto, f.commento, f.creato, f.foto, "
         # LA PROVENIENZA SI VEDE, IL CONTEGGIO NO (set 2026, le
         # recensioni degli scambi P2P): una recensione nata da uno
         # scambio di sats lo dice nella sua riga — «una reputazione
@@ -22261,6 +22271,8 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
         "LEFT JOIN utenti au ON au.tg_id=f.da_tg_id "
         "WHERE f.per_tg_id=? ORDER BY f.creato DESC LIMIT ?",
         (v["tg_id"], TETTO_FEEDBACK_NEGOZIO))]
+    for f in feedback:
+        f["foto"] = foto_recensione(f["foto"])
     # Sul profilo pubblico TUTTI i distintivi guadagnati (lug 2026,
     # bacheca stile Vinted): sono aggregati senza segreti, e il
     # foglietto del negozio li racconta uno a uno. L'ordine del
@@ -55032,14 +55044,19 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
          "(SELECT voto FROM feedback WHERE ordine_id=o.id "
          " AND per_tg_id=?) AS suo_voto, "
          "(SELECT commento FROM feedback WHERE ordine_id=o.id "
-         " AND per_tg_id=?) AS suo_commento FROM ordini o "
+         " AND per_tg_id=?) AS suo_commento, "
+         # e le loro foto (ott 2026), JSON che diventa lista qui sotto
+         "(SELECT foto FROM feedback WHERE ordine_id=o.id "
+         " AND da_tg_id=?) AS mio_foto, "
+         "(SELECT foto FROM feedback WHERE ordine_id=o.id "
+         " AND per_tg_id=?) AS suo_foto FROM ordini o "
          # LEFT: i SET hanno annuncio_id=0 e con l'INNER sparirebbero
          # dalla lista (il compratore pagherebbe senza vedere l'ordine)
          "LEFT JOIN annunci a ON a.id=o.annuncio_id "
          "JOIN utenti uc ON uc.tg_id=o.compratore_id "
          "JOIN utenti uv ON uv.tg_id=o.venditore_id "
          "WHERE o.compratore_id=? OR o.venditore_id=?")
-    par = [user["id"]] * 4 + [user["id"], user["id"]]
+    par = [user["id"]] * 6 + [user["id"], user["id"]]
     if e_admin(user["id"]):
         # I moderatori vedono dispute e resi in corso
         q += (" OR o.stato IN ('dispute','return_pending',"
@@ -55062,6 +55079,9 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
     # prove) altrimenti si scambierebbero di posto a ogni richiesta.
     righe = [dict(r) for r in con.execute(
         q + " ORDER BY o.creato DESC, o.id DESC", par)]
+    for r in righe:
+        r["mio_foto"] = foto_recensione(r["mio_foto"])
+        r["suo_foto"] = foto_recensione(r["suo_foto"])
     # I SET escono col titolo sintetizzato e l'elenco delle righe
     # (UNA query per tutti); i mono non portano la chiave 'righe' e
     # restano identici a ieri — il client vecchio in cache legge il
@@ -56179,6 +56199,189 @@ def _ricalcola_rating(con, tg_id: int):
                 (round(r["media"] or 0, 1), r["n"], r["persone"], tg_id))
 
 
+# ------------- LE FOTO DELLE RECENSIONI, SU BLOSSOM (ott 2026) -------------
+# Richiesta di Andrea: nel feedback degli affari del MERCATINO (non degli
+# scambi P2P) si possono mettere fino a MAX_FOTO_RECENSIONE foto — l'oggetto
+# arrivato, il pacco. Non vivono sul nostro disco ma su un server Blossom
+# (BUD-01/02: il file si chiama col suo sha256, chiunque lo riscarica e lo
+# verifica). A CARICARLE E' IL SERVER, firmando l'autorizzazione kind 24242
+# con la chiave della PIATTAFORMA: cosi' vale per tutti, anche per chi entra
+# solo da Telegram e una chiave Nostr non ce l'ha, e nessun segreto altrui
+# entra in gioco (regola ferrea 2: e' il gradino dei DM NIP-17, la firma e'
+# la nostra). La foto passa PRIMA dalla stessa porta delle foto degli
+# annunci — byte veri, foto anomala, metadati via, foto vuota — perche' su
+# Blossom e' pubblica e non si ritira davvero: il GPS di casa di chi
+# recensisce non deve partire mai.
+# ⚠️ L'OGGETTO COMPRATO NON ESCE DAL PROFILO (decisione di ago 2026, vedi
+# il commento dei feedback del negozio): con la foto lo mostra chi la
+# mette, per scelta sua, e il modulo glielo dice prima dell'invio.
+# IN COLLAUDO non si esce dal computer, come coi relay: verso un Blossom
+# che non e' di casa il caricamento si stampa e l'URL e' quello che sarebbe.
+try:
+    from config import BLOSSOM_SERVER
+except ImportError:
+    BLOSSOM_SERVER = "https://blossom.primal.net"
+MAX_FOTO_RECENSIONE = 3
+MSG_BLOSSOM_GIU = ("Non riesco a caricare le foto adesso: riprova fra poco, "
+                   "o invia il feedback senza foto")
+# Il nome di un blob: sha256 e, facoltativa, l'estensione (BUD-01)
+FORMA_BLOB = re.compile(r"/([0-9a-f]{64})(\.[a-z0-9]{1,5})?")
+
+
+def prepara_foto_recensione(dataurl) -> tuple[bytes | None, str, str]:
+    """Dal data URL del client ai byte da caricare: (byte, tipo, motivo).
+    La filiera e' quella di `salva_foto` — gli stessi giudici nello
+    stesso ordine — senza la scrittura su disco. Il motivo e' gia' la
+    frase per l'utente; byte None = foto rifiutata."""
+    m = re.match(r"data:image/(jpeg|jpg|png|webp|heic|heif);base64,(.+)",
+                 dataurl if isinstance(dataurl, str) else "", re.S)
+    if not m:
+        return None, "", "formato non riconosciuto"
+    try:
+        raw = base64.b64decode(m.group(2))
+    except Exception:
+        return None, "", "foto illeggibile"
+    if len(raw) > 15_000_000:
+        return None, "", "troppo grande (oltre 15MB)"
+    if m.group(1) in ("heic", "heif"):
+        if not (ImmaginePillow and pillow_heif):
+            return None, "", "foto HEIC: questo server non sa convertirla"
+        raw = converti_in_jpeg(raw)
+        if not raw:
+            return None, "", "non riesco a leggere questa foto"
+    elif not _e_immagine(raw):
+        return None, "", "non è una foto"
+    elif m.group(1) not in ("jpeg", "jpg") and ImmaginePillow:
+        raw = converti_in_jpeg(raw) or raw
+    motivo = _foto_anomala(raw)
+    if motivo:
+        return None, "", motivo
+    pulito = spoglia_metadati(raw) or converti_in_jpeg(raw)
+    if pulito is None:
+        return None, "", "foto con dati nascosti che non riesco a togliere"
+    if _foto_vuota(pulito):
+        return None, "", MSG_FOTO_VUOTA
+    # il tipo lo dicono i BYTE: e' quello che viaggia come Content-Type
+    if pulito[:8] == b"\x89PNG\r\n\x1a\n":
+        tipo = "image/png"
+    elif pulito[:4] == b"RIFF" and pulito[8:12] == b"WEBP":
+        tipo = "image/webp"
+    else:
+        tipo = "image/jpeg"
+    return pulito, tipo, ""
+
+
+def url_blob_ammesso(url: str) -> bool:
+    """PURA: questo URL e' un blob del NOSTRO server Blossom? Stesso
+    schema, stesso host, il percorso fatto del solo sha256 (con
+    l'estensione facoltativa), niente query. E' la cintura di cio' che
+    finisce in un <img> del profilo: il server Blossom risponde quel che
+    vuole, qui entra solo la forma che conosciamo."""
+    try:
+        u, base = urlparse(str(url or "")), urlparse(BLOSSOM_SERVER)
+    except ValueError:
+        return False
+    return (u.scheme == base.scheme and u.scheme in ("https", "http")
+            and (u.scheme == "https" or relay_di_casa(BLOSSOM_SERVER))
+            and u.netloc == base.netloc and not u.query and not u.fragment
+            and bool(FORMA_BLOB.fullmatch(u.path)))
+
+
+def foto_recensione(valore) -> list:
+    """Dalla colonna `feedback.foto` (JSON) alla lista che esce: solo gli
+    URL nella forma ammessa, mai piu' di MAX_FOTO_RECENSIONE. Una riga
+    rotta o vuota e' una recensione senza foto, non un errore."""
+    try:
+        lista = json.loads(valore or "[]")
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(lista, list):
+        return []
+    return [u for u in lista if isinstance(u, str)
+            and url_blob_ammesso(u)][:MAX_FOTO_RECENSIONE]
+
+
+def _auth_blossom(verbo: str, sha: str, cosa: str) -> str:
+    """L'intestazione Authorization di BUD-01: un evento kind 24242
+    firmato dalla piattaforma, valido cinque minuti e per QUEL file."""
+    ev = firma_evento(24242, [["t", verbo], ["x", sha],
+                              ["expiration", str(int(time.time()) + 300)]],
+                      cosa)
+    return "Nostr " + base64.b64encode(
+        json.dumps(ev, separators=(",", ":")).encode()).decode()
+
+
+async def carica_su_blossom(raw: bytes, tipo: str) -> str:
+    """Carica i byte (PUT /upload) e torna l'URL del blob. Solleva
+    RuntimeError se non e' andata: chi chiama lo dice all'utente, una
+    foto non sparisce mai in silenzio."""
+    sha = hashlib.sha256(raw).hexdigest()
+    base = BLOSSOM_SERVER.rstrip("/")
+    est = {"image/png": ".png", "image/webp": ".webp"}.get(tipo, ".jpg")
+    nostro = f"{base}/{sha}{est}"
+    if MODALITA_COLLAUDO and not relay_di_casa(base):
+        print(f"🌸 [blossom simulato] {len(raw) // 1024} KB verso {base}: "
+              "in collaudo non esce dal computer", flush=True)
+        return nostro
+    if not _NOSTR:
+        raise RuntimeError("manca la chiave Nostr della piattaforma")
+    try:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.put(f"{base}/upload", content=raw, headers={
+                "Authorization": _auth_blossom(
+                    "upload", sha, "Foto di una recensione su Barattolo"),
+                "Content-Type": tipo, "X-SHA-256": sha})
+    except httpx.HTTPError as e:
+        raise RuntimeError(f"rete: {type(e).__name__}")
+    if r.status_code >= 300:
+        raise RuntimeError(f"HTTP {r.status_code} "
+                           f"{r.headers.get('x-reason', '')[:120]}")
+    try:
+        d = r.json()
+    except ValueError:
+        d = {}
+    # Il blob che conta e' quello che il server dice di avere: se lo ha
+    # ricompresso lo sha256 e' un altro, e l'URL costruito da noi
+    # porterebbe a un 404. Si prende il SUO, se ha la forma ammessa.
+    url = str(d.get("url") or "") if isinstance(d, dict) else ""
+    if url_blob_ammesso(url):
+        return url
+    if isinstance(d, dict) and d.get("sha256") == sha:
+        return nostro
+    raise RuntimeError("risposta senza un blob riconoscibile")
+
+
+async def togli_da_blossom(urls: list) -> None:
+    """Il moderatore rimuove una recensione: le sue foto si chiedono
+    via anche a Blossom (DELETE /<sha256>, BUD-02). Le abbiamo caricate
+    noi, quindi la firma che le toglie e' la nostra. Al meglio: un
+    server che non risponde lascia una riga nel journal, e la foto non
+    e' piu' raggiungibile da Barattolo comunque (la riga non c'e' piu')."""
+    base = BLOSSOM_SERVER.rstrip("/")
+    for url in urls:
+        m = FORMA_BLOB.fullmatch(urlparse(url).path)
+        if not m:
+            continue
+        sha = m.group(1)
+        if MODALITA_COLLAUDO and not relay_di_casa(base):
+            print(f"🌸 [blossom simulato] via {sha[:12]}… da {base}",
+                  flush=True)
+            continue
+        if not _NOSTR:
+            return
+        try:
+            async with httpx.AsyncClient(timeout=15) as c:
+                r = await c.delete(f"{base}/{sha}", headers={
+                    "Authorization": _auth_blossom(
+                        "delete", sha, "Recensione rimossa su Barattolo")})
+            if r.status_code >= 300:
+                print(f"🌸 Blossom: foto {sha[:12]}… non tolta "
+                      f"(HTTP {r.status_code})", flush=True)
+        except httpx.HTTPError as e:
+            print(f"🌸 Blossom: foto {sha[:12]}… non tolta "
+                  f"({type(e).__name__})", flush=True)
+
+
 @app.post("/api/orders/{ordine_id}/feedback")
 async def lascia_feedback(ordine_id: int, req: Request,
                           x_tg_init_data: str = Header(""),
@@ -56206,6 +56409,56 @@ async def lascia_feedback(ordine_id: int, req: Request,
                 f"{user['first_name']} (id {user['id']})")
             raise HTTPException(400, "Il commento contiene termini non "
                                      "ammessi sul mercatino")
+    foto = d.get("foto") or []
+    if not isinstance(foto, list):
+        raise HTTPException(400, "Richiesta malformata")
+    if len(foto) > MAX_FOTO_RECENSIONE:
+        raise HTTPException(400, f"Al massimo {MAX_FOTO_RECENSIONE} foto "
+                                 "per recensione")
+    urls = []
+    if foto:
+        _frena("foto_recensione", user["id"])
+        # PRIMA I CONTROLLI, POI BLOSSOM: un caricamento non si ritira
+        # davvero, quindi le foto partono solo per un feedback che il
+        # database accettera'. Sono gli stessi della transazione qui
+        # sotto, letti senza lock: quella resta il giudice vero, e il
+        # caso raro che li' cambi idea toglie le foto appena caricate.
+        con = db()
+        try:
+            o = con.execute("SELECT * FROM ordini WHERE id=?",
+                            (ordine_id,)).fetchone()
+            gia = o and con.execute(
+                "SELECT 1 FROM feedback WHERE ordine_id=? AND da_tg_id=?",
+                (ordine_id, user["id"])).fetchone()
+        finally:
+            con.close()
+        if not o:
+            raise HTTPException(404, "Ordine non trovato")
+        if user["id"] not in (o["compratore_id"], o["venditore_id"]):
+            raise HTTPException(403, "Operazione non permessa")
+        if not _ammette_feedback(o["stato"], o["disputata"],
+                                 o["sbloccato_auto_il"]):
+            raise HTTPException(400, "Il feedback si lascia a affare concluso")
+        if gia:
+            raise HTTPException(400, "Hai già lasciato il feedback "
+                                     "per questo ordine")
+        pronte = []
+        for i, f in enumerate(foto):
+            raw, tipo, motivo = await asyncio.to_thread(
+                prepara_foto_recensione, f)
+            if raw is None:
+                raise HTTPException(400, f"La foto {i + 1} non è stata "
+                                         f"accettata: {motivo}")
+            pronte.append((raw, tipo))
+        for raw, tipo in pronte:
+            try:
+                urls.append(await carica_su_blossom(raw, tipo))
+            except RuntimeError as e:
+                print(f"🌸 Blossom: foto della recensione dell'ordine "
+                      f"#{ordine_id} non caricata ({e})", flush=True)
+                if urls:
+                    asyncio.create_task(togli_da_blossom(urls))
+                raise HTTPException(502, MSG_BLOSSOM_GIU)
 
     con = db()
     try:
@@ -56232,10 +56485,10 @@ async def lascia_feedback(ordine_id: int, req: Request,
             raise HTTPException(400, "Operazione non permessa")
         try:
             con.execute("INSERT INTO feedback(ordine_id, da_tg_id, "
-                        "per_tg_id, voto, commento, creato) "
-                        "VALUES(?,?,?,?,?,?)",
+                        "per_tg_id, voto, commento, creato, foto) "
+                        "VALUES(?,?,?,?,?,?,?)",
                         (ordine_id, user["id"], per, voto, commento,
-                         int(time.time())))
+                         int(time.time()), json.dumps(urls) if urls else ""))
         except sqlite3.IntegrityError:
             con.rollback()
             raise HTTPException(400, "Hai già lasciato il feedback "
@@ -56244,6 +56497,9 @@ async def lascia_feedback(ordine_id: int, req: Request,
         con.commit()
     except Exception:
         con.rollback()
+        # le foto gia' su Blossom di un feedback che non e' nato
+        if urls:
+            asyncio.create_task(togli_da_blossom(urls))
         raise
     finally:
         con.close()
@@ -56256,7 +56512,7 @@ async def lascia_feedback(ordine_id: int, req: Request,
     # e chi lo riceve (stimato)
     await premia_distintivi(user["id"])
     await premia_distintivi(per)
-    return {"ok": True, "voto": voto}
+    return {"ok": True, "voto": voto, "foto": urls}
 
 
 @app.post("/api/admin/feedback/{feedback_id}/rimuovi")
@@ -56284,6 +56540,9 @@ async def rimuovi_feedback_admin(feedback_id: int,
         raise
     finally:
         con.close()
+    # le sue foto se ne vanno anche da Blossom, in sottofondo
+    if f["foto"]:
+        asyncio.create_task(togli_da_blossom(foto_recensione(f["foto"])))
     # DUE PROVENIENZE, DUE FRASI (set 2026): su una recensione di
     # scambio il numero dell'affare non esiste — `ordine_id` e' la
     # firma dello scambio, un negativo che non dice niente a nessuno.

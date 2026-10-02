@@ -872,6 +872,14 @@ NOSTR_NSEC_PIATTAFORMA = "INCOLLA_QUI_LA_NSEC_DELLA_PIATTAFORMA"
 SOLLECITO_FIRME_GIORNI = 7   # ogni quanto si ribussa (0 = spento)
 SOLLECITO_FIRME_MAX = 3      # quante volte in tutto, poi silenzio
 
+# --- Le foto delle recensioni (ott 2026) -------------------------------
+# Nel feedback di un affare si mettono fino a 3 foto: il server toglie i
+# metadati (GPS compreso) e le carica su questo server Blossom, firmando
+# con NOSTR_NSEC_PIATTAFORMA qui sopra (senza quella chiave le recensioni
+# con foto rispondono «riprova, o invia senza foto»). Il default e' gia'
+# questo: la riga serve solo per cambiarlo.
+BLOSSOM_SERVER = "https://blossom.primal.net"
+
 # --- Import aperto da Nostr -------------------------------------------
 # Barattolo mostra gli annunci NIP-99 che stanno su Nostr: chiunque
 # pubblichi in italiano si ritrova in vetrina, e chi non ci vuole
