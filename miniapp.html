@@ -5673,12 +5673,39 @@
   .ctrl-mini{position:relative;flex:0 0 auto;width:52px;height:52px;
     border-radius:12px;overflow:hidden;
     display:flex;align-items:center;justify-content:center;font-size:24px;
-    background:repeating-linear-gradient(45deg,var(--ph-a) 0 8px,var(--ph-b) 8px 16px)}
-  .ctrl-mini img{width:100%;height:100%;object-fit:cover}
+    background:repeating-linear-gradient(45deg,var(--ph-a) 0 8px,var(--ph-b) 8px 16px);
+    /* LA SBIRCIATA (5 ott 2026): tenendo premuto il francobollo la foto
+       si apre in grande, e il tocco lungo e' NOSTRO — niente callout di
+       iOS, niente selezione. La foto non riceve il dito
+       (pointer-events:none): per il telefono sotto il dito c'e' un
+       riquadro, non un'immagine, quindi nessun «Salva immagine». */
+    -webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+  .ctrl-mini img{width:100%;height:100%;object-fit:cover;pointer-events:none;
+    -webkit-user-drag:none}
   /* il ×N sul francobollo: un conteggio, parla il mono come tutti */
   .ctrl-mini-n{position:absolute;right:2px;bottom:2px;font-size:10.5px;
     background:var(--ink);color:var(--on-ink);border-radius:999px;
     padding:1px 5px;font-weight:800;font-family:'JetBrains Mono',monospace}
+  /* LA SBIRCIATA, il velo: sopra la pagina e sotto il dito, senza mai
+     prenderlo (pointer-events:none) — il gesto resta del francobollo,
+     e il rilascio arriva a lui. Il velo e' lo stesso grigio dei fogli,
+     un poco piu' fitto perche' qui la foto deve staccare in tutti e due
+     i temi; la foto ha l'angolo e l'ombra delle card. Niente salto di
+     pagina: e' `fixed`, e il documento sotto non cambia di un pixel. */
+  #sbirciata{position:fixed;inset:0;z-index:72;pointer-events:none;
+    display:flex;align-items:center;justify-content:center;padding:16px;
+    background:rgba(20,20,22,.62);opacity:0;visibility:hidden}
+  #sbirciata.open{opacity:1;visibility:visible}
+  #sbirciata img{max-width:min(100%,520px);max-height:72vh;
+    border-radius:18px;object-fit:contain;background:var(--card);
+    box-shadow:0 18px 50px rgba(0,0,0,.45);transform:scale(.94);
+    -webkit-touch-callout:none;-webkit-user-drag:none;user-select:none}
+  #sbirciata.open img{transform:none}
+  @media (prefers-reduced-motion: no-preference){
+    #sbirciata{transition:opacity .12s ease,visibility 0s linear .12s}
+    #sbirciata.open{transition:opacity .12s ease}
+    #sbirciata img{transition:transform .14s ease}
+  }
   .ctrl-corpo .section-label{margin-top:16px}
   /* IL TITOLO DEL CONTO PESA UN GRADINO IN PIU' (ago 2026, decisione
      di Andrea): 13px invece degli 11 di serie — e non e' una misura
@@ -11963,6 +11990,11 @@ document.getElementById('cartello')?.remove();</script>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     <div id="lbDots"></div>
   </div>
+  <!-- LA SBIRCIATA DI «CONTROLLA E PAGA» (5 ott 2026): la foto in grande
+       finche' il dito resta sul francobollo. NON e' uno strato della
+       cronologia (navPila non la vede): vive quanto il dito, e un
+       «indietro» non ha niente da chiudere. Vedi sbirciaFoto. -->
+  <div id="sbirciata" aria-hidden="true"><img alt="" draggable="false"></div>
 
   <!-- LA FOTOCAMERA DENTRO LA PAGINA (1 ott 2026, dal telefono di Andrea):
        nella Mini App di Telegram Android «📷 Scatta foto» apriva la
@@ -14440,6 +14472,39 @@ function inCatalogo(arr){
 let mieiPos = null;         // {y, n} — dove si era, e con quante righe
 let mieiRipristina = false; // il RITORNO l'ha chiesto: lo consuma il render
 
+/* LE LISTE SORELLE DELLA VETRINA (5 ott 2026, richiesta di Andrea: «nel
+   negozio scorro, apro un oggetto, torno, e riparto dall'alto»). Lo
+   stesso meccanismo della vetrina, pari pari: la posizione si segna in
+   cima a go() PRIMA del display:none, si rilegge in
+   posizioneDaRendere SOLO al ritorno (`navApplicando`), e la cintura
+   e' una FIRMA — quante righe, e di chi — che al ritorno dev'essere la
+   stessa, o si riparte dalla cima.
+   Valgono le pagine il cui markup SOPRAVVIVE al ritorno, che e' la
+   condizione scritta su posizioneDaRendere:
+   · il NEGOZIO: aprire un annuncio non tocca #negozioGrid, e
+     navRendiVista non lo ridisegna piu' quando la firma dice che e'
+     ancora lui (con le pagine dello scroll infinito, il racconto e i
+     feedback aperti com'erano); se e' cambiato, ridisegno e cima, come
+     prima. La firma porta il negozio: due negozi da 30 sono due liste;
+   · il CARRELLO: navRendiVista lo ridisegna da paccoDati in modo
+     SINCRONO prima di go(), quindi le celle ci sono gia' quando si
+     scorre; la firma porta l'annuncio di provenienza;
+   · la CLASSIFICA (col filtro delle stelle) e i CONSIGLIATI: al ritorno
+     si riaccendono coi dati di prima.
+   Una firma vuota vuol dire «non si ricorda»: e' il negozio aperto in
+   anteprima dal moderatore, che al ritorno torna a mostrare quel che
+   vedono tutti (il patto di `anteprima` in apriNegozio). */
+const LISTE_RITORNO = {
+  negozio: () => negozioPag.chi && !negozioBozzaMod
+    ? `${el('negozioGrid').children.length}|${negozioPag.chi}` : '',
+  pacco: () => paccoDati
+    ? `${el('paccoGrid').children.length}|${paccoDati.origineId}` : '',
+  classifica: () => `${el('classificaCorpo').children.length}|${classificaFiltro}`,
+  consigliati: () => `${el('consigliatiLista').children.length}`,
+};
+let listePos = {};          // {vista: {y, firma}}
+let negozioBozzaMod = false; // il negozio a schermo e' l'anteprima del moderatore
+
 /* Ordinamento e filtro prezzo della vetrina: vivono per la sessione
    (niente localStorage) e sopravvivono al cambio di categoria, come
    nelle app di mercatino note; "Azzera" pulisce il filtro. Il filtro
@@ -14709,6 +14774,11 @@ async function loadListings(anonimo){
      cambio categoria, i filtri, la ricerca e l'ordinamento: sono giri
      nuovi, non ritorni, e devono ripartire dalla cima. */
   vetrinaPos = null;
+  /* ...e il negozio lasciato aperto sotto (LISTE_RITORNO): un catalogo
+     riletto puo' aver cambiato le sue card (l'annuncio modificato dal
+     dettaglio, la pausa, il rifornimento), e allora al ritorno si
+     ridisegna dal server come prima, dalla cima */
+  delete listePos.negozio;
   /* E IL FILTRO DEL BARATTOLO SI SPEGNE QUI, in un posto solo: chi
      ricarica la vetrina dal server sta chiedendo LA VETRINA, non dieci
      annunci messi da parte. Cosi' lo spegnimento lo ereditano per
@@ -15183,6 +15253,15 @@ function go(view){
   if (document.querySelector('.view.active')?.id === 'view-profilo')
     mieiPos = {y: Math.round(window.scrollY),
                n: el('myListings').children.length};
+  /* ...e per le liste che al ritorno restano quelle (LISTE_RITORNO):
+     negozio, carrello, classifica, Consigliati. Una firma vuota vuol
+     dire «questa pagina non si ricorda» (l'anteprima del moderatore) */
+  {
+    const via = (document.querySelector('.view.active')?.id || '').replace('view-', '');
+    const firma = LISTE_RITORNO[via]?.();
+    if (firma) listePos[via] = {y: Math.round(window.scrollY), firma};
+    else delete listePos[via];
+  }
   /* il bottone di «Pubblica annuncio» si misura PRIMA che la vista se ne
      vada: e' da li' che il ritorno lo riporta nel + (lasciaMorfoVendi) */
   const daVendi = view !== 'vendi' ? misuraRitornoVendi() : null;
@@ -15332,15 +15411,21 @@ function go(view){
    sparito) si riparte dalla cima invece di atterrare nel vuoto —
    ripristinare una posizione senza i contenuti sotto sarebbe peggio
    che non ripristinarla.
-   Le altre viste non sono qui, e non per dimenticanza: negozio,
-   Ordini e Profilo si RIFANNO quando ci si torna (un fetch, e i dati
-   arrivano dopo), quindi al momento dello scorrimento la pagina non e'
-   ancora alta come sara' — la posizione cadrebbe nel vuoto per
-   davvero. Chi vorra' aggiungerne una deve prima garantire che il suo
-   markup sopravviva al ritorno, com'e' per la vetrina. */
+   Le altre viste non sono qui, e non per dimenticanza: Ordini e
+   Profilo si RIFANNO quando ci si torna (un fetch, e i dati arrivano
+   dopo), quindi al momento dello scorrimento la pagina non e' ancora
+   alta come sara' — la posizione cadrebbe nel vuoto per davvero. Chi
+   vorra' aggiungerne una deve prima garantire che il suo markup
+   sopravviva al ritorno, com'e' per la vetrina: e' quel che hanno
+   fatto le sorelle di LISTE_RITORNO (5 ott 2026), negozio compreso. */
 function posizioneDaRendere(view){
   if (view === 'esplora' && navApplicando && vetrinaPos
       && vetrinaPos.n === el('grid').children.length) return vetrinaPos.y;
+  /* le liste sorelle (LISTE_RITORNO): stesso giudice, stessa cintura
+     — la firma di adesso dev'essere quella di quando si e' usciti */
+  const p = listePos[view];
+  if (navApplicando && p && LISTE_RITORNO[view]
+      && p.firma === LISTE_RITORNO[view]()) return p.y;
   return 0;
 }
 
@@ -15733,6 +15818,14 @@ function navRendiVista(b){
     /* senza codice (il negozio finto della DEMO) il markup e' ancora
        quello giusto: basta riaccendere la vista */
     if (!b.k) return negozioCorrente ? go('negozio') : go('esplora');
+    /* IL NEGOZIO E' ANCORA LUI (5 ott 2026): stesso codice e stessa
+       firma di quando lo si e' lasciato, quindi il markup e' quello —
+       si riaccende e basta, e go() lo rimette dov'era (LISTE_RITORNO).
+       Un ridisegno qui tornerebbe alla prima pagina e ai cassetti
+       chiusi: la posizione cadrebbe nel vuoto. */
+    if (negozioPag.chi === b.k && listePos.negozio
+        && listePos.negozio.firma === LISTE_RITORNO.negozio())
+      return go('negozio');
     return ridisegnaNegozio(b.k).then(() => {
       if (!el('view-negozio').classList.contains('active')) go('esplora');
     });
@@ -18927,6 +19020,9 @@ async function apriNegozio(chi, aperto, anteprima, da, ridisegno){
     const d = await r.json();
     const annunci = (d.annunci||[]).map(mapListing);
     negozioPag = {chi, cursore: d.cursore||null, caricando:false};
+    /* l'anteprima chiesta dal moderatore vale per QUESTO disegno: al
+       ritorno non si riaccende, si ridisegna (vedi LISTE_RITORNO) */
+    negozioBozzaMod = !!anteprima;
     /* Gli annunci del negozio entrano anche nel catalogo in memoria:
        cosi' openDetail li trova pure arrivando dal link diretto */
     inCatalogo(annunci);
@@ -23250,7 +23346,10 @@ function toggleValuta(){
    ritocco. */
 function facciaMini(x, qta){
   const t = x && ((x.thumbs && x.thumbs[0]) || (x.photos && x.photos[0]) || '');
-  return `<div class="ctrl-mini"${x ? ` title="${esc(x.title)}"` : ''}>${
+  /* `data-sbircia` solo dove c'e' una foto da aprire (vedi LA SBIRCIATA):
+     l'emoji resta un francobollo e basta */
+  return `<div class="ctrl-mini"${x ? ` title="${esc(x.title)}"` : ''}${
+    t ? ` data-sbircia="${Number(x.id)}"` : ''}>${
     t ? `<img src="${esc(t)}" alt="">` : `<span>${x ? x.emoji : '📦'}</span>`}${
     (qta||0) > 1 ? `<b class="ctrl-mini-n">×${fmt(qta)}</b>` : ''}</div>`;
 }
@@ -23263,6 +23362,154 @@ function strisciaSet(){
     if (x) facce.push(facciaMini(x, qta));
   }
   return facce.join('');
+}
+
+/* LA SBIRCIATA (5 ott 2026, richiesta di Andrea): in «Controlla e paga»
+   tenendo il dito su un francobollo la sua foto si apre in grande, sopra
+   la pagina col velo; staccato il dito torna francobollo, e ritoccando
+   si riapre. Un tocco breve non fa NIENTE — ne' pagamento, ne' salto.
+   IL TOCCO E' NOSTRO DAL PRIMO ISTANTE, ed e' la riga che decide tutto:
+   `preventDefault` sul touchstart. E' la lezione del tocco lungo sulle
+   card dei reparti (vedi PREMUTA_MS): sotto il nostro gesto ce n'e' uno
+   del SISTEMA, che su Android scatta a 500ms, si prende il tocco con un
+   cancel e dentro Telegram non manda nemmeno il `contextmenu`. La' il
+   gesto finiva allo scatto, quindi bastava arrivare prima; qui la foto
+   deve restare aperta FINCHE' il dito sta giu', cioe' oltre i 500ms, e
+   l'unico modo di non perdere il rilascio e' che il sistema il tocco
+   lungo non lo veda mai. Un touchstart consumato toglie al browser
+   tutto quel che nasce da quel tocco: il tocco lungo, il menu
+   dell'immagine, il click, lo scorrimento. Il callout di iOS lo spegne
+   in piu' il CSS, e il `contextmenu` qui sotto e' la cintura.
+   IL PREZZO E' LO SCORRIMENTO, e si paga a mano: un dito che parte da
+   un francobollo e si muove oltre la soglia (la stessa dei reparti)
+   SCORRE — la striscia di lato, la pagina in verticale — seguito da
+   noi, senza l'inerzia del sistema. Il francobollo occupa 52px in cima
+   alla pagina: chi scorre parte quasi sempre da un'altra parte.
+   A FOTO APERTA LA PAGINA STA FERMA: ogni touchmove si consuma e il
+   tremolio del dito non sposta niente.
+   GLI ASCOLTATORI DEL GESTO STANNO SUL BERSAGLIO, non sul corpo: se a
+   meta' del gesto arriva il preventivo, renderAcquisto riscrive
+   #acqCorpo e il francobollo esce dal documento — gli eventi del dito
+   continuano ad andare a LUI, ma non salgono piu' a nessuno. Sul corpo
+   il rilascio si perderebbe, e la foto resterebbe aperta.
+   La foto: la miniatura subito (e' gia' in pagina), la grande appena
+   c'e' — la si chiede al primo contatto, e di solito e' gia' in cache
+   dalla scheda dell'annuncio. NON e' uno strato della cronologia: vive
+   quanto il dito. */
+const SBIRCIA_MS = 220;     // ms di dito fermo: sotto, era un tocco
+const SBIRCIA_SCARTO = 8;   // px: oltre, era uno scorrimento (PREMUTA_SCARTO)
+let sbirciaDa = null;       // il gesto in corso, uno alla volta
+
+function sbirciaFoto(mini, x, y, tocco, bersaglio){
+  const id = Number(mini.dataset.sbircia);
+  const l = listings.find(t=>t.id===id) || myListings.find(t=>t.id===id);
+  const piccola = l && ((l.thumbs && l.thumbs[0]) || (l.photos && l.photos[0]));
+  if (!piccola) return false;
+  const grande = (l.photos && l.photos[0]) || piccola;
+  const pre = new Image();
+  pre.src = grande;
+  const fila = mini.closest('.ctrl-strip');
+  sbirciaDa = {x, y, tocco, bersaglio, piccola, grande, pre, fila,
+               sl: fila ? fila.scrollLeft : 0, sy: window.scrollY,
+               scorre: false, aperta: false,
+               timer: setTimeout(apriSbirciata, SBIRCIA_MS)};
+  return true;
+}
+function apriSbirciata(){
+  const s = sbirciaDa;
+  if (!s || s.aperta || s.scorre) return;
+  /* la cassa se n'e' andata mentre il dito era giu': niente da aprire */
+  if (!el('view-acquisto').classList.contains('active')) return chiudiSbirciata();
+  s.aperta = true;
+  const img = el('sbirciata').querySelector('img');
+  img.src = (s.pre.complete && s.pre.naturalWidth) ? s.grande : s.piccola;
+  if (img.getAttribute('src') !== s.grande)
+    s.pre.onload = () => { if (sbirciaDa === s) img.src = s.grande; };
+  el('sbirciata').classList.add('open');
+  haptic();
+}
+function chiudiSbirciata(){
+  const s = sbirciaDa;
+  sbirciaDa = null;
+  if (s) {
+    clearTimeout(s.timer);
+    s.pre.onload = null;
+    if (s.bersaglio) for (const [ev, fn] of SBIRCIA_ASCOLTI)
+      s.bersaglio.removeEventListener(ev, fn, {passive: false});
+  }
+  el('sbirciata').classList.remove('open');
+}
+/* il dito si muove: prima della foto e' uno scorrimento (fatto a mano,
+   vedi IL PREZZO), a foto aperta non e' niente */
+function sbirciaMuove(dx, dy){
+  const s = sbirciaDa;
+  if (!s || s.aperta) return;
+  if (!s.scorre && (Math.abs(dx) > SBIRCIA_SCARTO || Math.abs(dy) > SBIRCIA_SCARTO)) {
+    s.scorre = true;
+    clearTimeout(s.timer);
+  }
+  if (!s.scorre) return;
+  if (s.fila) s.fila.scrollLeft = s.sl - dx;
+  window.scrollTo(0, Math.max(0, s.sy - dy));
+}
+const sbirciaDito = e => sbirciaDa
+  && [...e.changedTouches].find(t => t.identifier === sbirciaDa.tocco);
+const SBIRCIA_ASCOLTI = [
+  ['touchmove', e => {
+    const t = sbirciaDito(e);
+    if (!t) return;
+    if (e.cancelable) e.preventDefault();
+    sbirciaMuove(t.clientX - sbirciaDa.x, t.clientY - sbirciaDa.y);
+  }],
+  ['touchend', e => {
+    if (!sbirciaDito(e)) return;
+    if (e.cancelable) e.preventDefault();
+    chiudiSbirciata();
+  }],
+  ['touchcancel', e => { if (sbirciaDito(e)) chiudiSbirciata(); }],
+];
+{
+  const corpo = el('acqCorpo');
+  corpo.addEventListener('touchstart', e => {
+    const mini = e.target.closest?.('.ctrl-mini[data-sbircia]');
+    if (!mini || sbirciaDa || e.touches.length !== 1) return;
+    const t = e.changedTouches[0];
+    if (!sbirciaFoto(mini, t.clientX, t.clientY, t.identifier, e.target)) return;
+    if (e.cancelable) e.preventDefault();
+    for (const [ev, fn] of SBIRCIA_ASCOLTI)
+      e.target.addEventListener(ev, fn, {passive: false});
+  }, {passive: false});
+  /* col MOUSE (il computer): stesso gesto, il rilascio si ascolta sulla
+     finestra — il velo non prende il puntatore, ma il cursore puo'
+     uscire dal francobollo prima di staccare */
+  corpo.addEventListener('mousedown', e => {
+    const mini = e.button === 0 && e.target.closest?.('.ctrl-mini[data-sbircia]');
+    if (!mini || sbirciaDa) return;
+    if (!sbirciaFoto(mini, e.clientX, e.clientY, null, null)) return;
+    e.preventDefault();      // niente trascino della foto, niente selezione
+  });
+  addEventListener('mousemove', e => {
+    if (sbirciaDa && sbirciaDa.tocco === null && !sbirciaDa.aperta
+        && (Math.abs(e.clientX - sbirciaDa.x) > SBIRCIA_SCARTO
+            || Math.abs(e.clientY - sbirciaDa.y) > SBIRCIA_SCARTO))
+      chiudiSbirciata();
+  });
+  addEventListener('mouseup', () => {
+    if (sbirciaDa && sbirciaDa.tocco === null) chiudiSbirciata();
+  });
+  /* la cintura: se un telefono il menu lo chiedesse lo stesso */
+  corpo.addEventListener('contextmenu', e => {
+    if (e.target.closest?.('.ctrl-mini[data-sbircia]')) e.preventDefault();
+  });
+  /* l'app che va in fondo col dito giu' non riceve il rilascio */
+  addEventListener('blur', () => { if (sbirciaDa) chiudiSbirciata(); });
+  /* con un nome e non una freccia: altri banchi cercano per testo la
+     freccia del visibilitychange della fotocamera, e la prima del file
+     sarebbe stata questa */
+  document.addEventListener('visibilitychange', sbirciaNascosta);
+}
+function sbirciaNascosta(){
+  if (document.hidden && sbirciaDa) chiudiSbirciata();
 }
 /* Tutto si disegna da acqDati, MAI un fetch qui dentro: il toggle
    valuta e il cambio di pillola ridisegnano dal preventivo in cache. */

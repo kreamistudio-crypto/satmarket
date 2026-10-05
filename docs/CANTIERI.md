@@ -35597,3 +35597,69 @@ gli avvisi alle parti che partono lo stesso.
 avviso vero ai moderatori: se arriva per carrelli abbandonati e non per
 la liquidità, la soglia si alza a tre. Non provati dal vivo: Telegram
 vero, `payinvoice --allow_self_payment` sul nostro LND.
+
+## Ritocchi al mercatino: la posizione al ritorno e la sbirciata della foto (5 ott 2026)
+
+Due richieste di Andrea. 1) Nel negozio di un venditore (e nel
+carrello che si compone lì) si scorre, si apre un oggetto, si torna e
+si ripartiva dall'alto; la home invece tornava dov'era. 2) In
+«Controlla e paga» le miniature in alto: dito premuto = foto in
+grande sopra la pagina, dito staccato = torna miniatura.
+
+**DECISO.** 1) Lo STESSO meccanismo della vetrina, non uno nuovo:
+`LISTE_RITORNO` (negozio, carrello, classifica, Consigliati) con una
+firma per lista, salvata in cima a `go()` prima del `display:none` e
+riletta da `posizioneDaRendere` solo con `navApplicando` — quindi
+valgono insieme il tasto di Telegram, il gesto di sistema e la freccia,
+come in home. Il negozio era escluso per scritto («si rifà al ritorno»):
+adesso al ritorno sullo stesso negozio con la stessa firma NON si
+ridisegna più, si riaccende (era il ridisegno a riportare alla prima
+pagina e a chiudere racconto e feedback); `loadListings` butta la sua
+posizione, e allora si torna al ridisegno dalla cima come prima;
+l'anteprima del moderatore non si ricorda (il suo patto: «il tasto
+indietro torna a mostrare quel che vedono tutti»). Ricerca e categoria
+vivono nella griglia della home e tornavano già dov'erano: verificato,
+non toccate. 2) `#sbirciata`, velo fisso che non prende il dito; il
+touchstart sul francobollo si consuma (sotto c'è il tocco lungo del
+sistema a 500ms, che dentro Telegram Android si prende il gesto: la
+lezione delle card dei reparti), apertura dopo 220ms di dito fermo,
+chiusura al rilascio, al cancel, al blur; ascoltatori sul bersaglio
+perché il preventivo che arriva riscrive la pagina col dito giù.
+
+**SCARTATI.** Ricaricare dal server le pagine del negozio fino al
+conto di prima (un fetch per pagina al ritorno, e racconto e feedback
+richiusi spostavano comunque la posizione); l'ancora sulla card invece
+della `y` (non è il meccanismo della home); la sbirciata con un timer
+sotto i 500ms senza consumare il tocco (il sistema si prenderebbe il
+rilascio e la foto resterebbe aperta); lo strato nella cronologia (un
+«indietro» col dito giù non ha senso).
+
+**PROVATO.** `prove_liste_ritorno` (16) e `prove_sbirciata` (24), coi
+pezzi veri eseguiti in node; tortura 12 su 12 sulla copia (al primo
+giro 11: il secondo dito era provato col gesto già in corso, corretto).
+La suite al primo giro intero ne ha date cinque rosse, tutte mie:
+quattro dalla sentinella della copia col dito
+(`prove_dati_spedizione_copia`), che tiene l'elenco chiuso di chi
+spegne selezione e menu e di chi ascolta il tocco — allargata a
+`.ctrl-mini`, `#sbirciata img` e ai due ascoltatori della cassa, con
+due prove in più che li vogliono solo sul francobollo con la foto
+(sono foto, non dati); una da `prove_fotocamera_pagina`, che ritaglia
+per testo la PRIMA freccia del `visibilitychange` del file: la mia
+stava prima, e il ritaglio si prendeva mezzo file («nome troppo lungo»
+a `node -e`). Il mio ascoltatore ora ha un nome.
+Dal vivo a 375 px su una copia in collaudo (relay al relay morto, 45
+annunci di cartone): negozio a due pagine, ritorno su «Oggetto 37» a
+y=5111 senza nuova richiesta, coi tre ritorni e col clic vero sulla
+freccia; apertura nuova dalla cima; catalogo riletto → ridisegno e
+cima; carrello con la cella allo stesso pixel nei tre ritorni;
+classifica (dati di cartone in pagina); ricerca e categoria. Sbirciata
+col dito emulato: breve muto, aperta a 320ms e ancora a 820, pagina
+ferma a foto aperta, ritocco, scorrimento della fila, ridisegno col
+dito giù, cancel, blur, clic breve del mouse; scatti nei due temi.
+
+**DA GUARDARE.** Sul telefono vero (il CDP non sveglia il tocco lungo
+nativo): Telegram Android, iPhone e APK — niente menu «Salva
+immagine», niente lente di iOS, la foto che resta aperta oltre il
+mezzo secondo. I Consigliati non provati dal vivo (in collaudo ce n'è
+uno). Non toccati, e restano a ripartire dall'alto: Ordini e «Altri
+oggetti del venditore» dentro una scheda.

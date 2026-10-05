@@ -31771,10 +31771,13 @@ def prove_posizione_vetrina():
           "navApplicando" in giudice)
     prova("e solo se la griglia e' ancora quella", True,
           "vetrinaPos.n === el('grid').children.length" in giudice)
-    prova("solo la vetrina ha una posizione da ritrovare", True,
-          "'esplora'" in giudice
+    # Dal 5 ott 2026 le liste sorelle passano dallo stesso giudice
+    # (LISTE_RITORNO, provate in prove_liste_ritorno): restano fuori le
+    # pagine che si RIFANNO al ritorno, Ordini e Profilo.
+    prova("solo la vetrina e le liste sorelle hanno una posizione", True,
+          "'esplora'" in giudice and "LISTE_RITORNO[view]" in giudice
           and not any(v in giudice for v in
-                      ("'negozio'", "'affari'", "'profilo'", "'miei'")))
+                      ("'affari'", "'profilo'", "'miei'")))
 
     # --- 4) LA CINTURA DEL GIRO NUOVO ------------------------------
     # Il conto delle card da solo non basta: due vetrine diverse
@@ -31805,6 +31808,323 @@ def prove_posizione_vetrina():
           mini.count("pickerTrigger.focus();"))
     prova("...e sono due, entrambi con preventScroll", 2,
           mini.count("pickerTrigger.focus({preventScroll:true})"))
+
+
+def _node_banco(js):
+    """Gira un banco JS in node e legge l'ultima riga come JSON. None
+    se node non c'e' (chi chiama SALTA contando) o se il banco esplode
+    (si stampa la coda dello stderr: una prova muta e' peggio)."""
+    import shutil as _sh, subprocess as _sp, tempfile as _tf
+    node = _sh.which("node")
+    if not node:
+        return None
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as fh:
+        fh.write(js)
+        percorso = fh.name
+    try:
+        r = _sp.run([node, percorso], capture_output=True, text=True,
+                    encoding="utf-8", errors="replace", timeout=60)
+    finally:
+        os.unlink(percorso)
+    try:
+        return json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        print(r.stderr[-800:])
+        return {}
+
+
+def prove_liste_ritorno():
+    """LE LISTE SORELLE DELLA VETRINA (5 ott 2026, richiesta di Andrea:
+    «nel negozio scorro, apro un oggetto, torno, e riparto dall'alto»).
+    Negozio, carrello, classifica e Consigliati tornano dov'erano col
+    meccanismo della vetrina: si segna in go() prima del display:none,
+    si rilegge in posizioneDaRendere solo al RITORNO, e la cintura e'
+    una firma che dev'essere la stessa.
+    Il banco ESEGUE i pezzi veri — il blocco di go() che salva, la
+    mappa delle firme, il giudice — su un DOM di cartone che dice solo
+    quante righe ha ogni lista. Le sentinelle guardano le due righe che
+    un riordino toglierebbe senza rompere niente di visibile: il
+    negozio che al ritorno NON si ridisegna, e la cintura del catalogo
+    riletto."""
+    print("\n[le liste sorelle tornano dov'erano]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    go = pezzo_js(mini, "function go(view){", "\n}\n")
+
+    # --- 1) LA FORMA ---------------------------------------------------
+    i_salva = go.index("LISTE_RITORNO[via]?.()")
+    prova("le liste si salvano PRIMA del display:none", True,
+          i_salva < go.index("classList.remove('active')"))
+    chiavi = re.findall(r"^  (\w+): \(\) =>",
+                        pezzo_js(mini, "const LISTE_RITORNO = {", "\n};\n"),
+                        re.M)
+    prova("le liste sorelle sono quattro, e Ordini e Profilo no",
+          ["negozio", "pacco", "classifica", "consigliati"], chiavi)
+    rendi = pezzo_js(mini, "function navRendiVista(b){", "\n}\n")
+    ramo = rendi[rendi.index("if (b.v === 'negozio')"):]
+    prova("il negozio ancora lui si riaccende SENZA ridisegno", True,
+          "listePos.negozio.firma === LISTE_RITORNO.negozio()" in ramo
+          and ramo.index("return go('negozio');",
+                         ramo.index("listePos.negozio"))
+          < ramo.index("ridisegnaNegozio(b.k)"))
+    carica = pezzo_js(mini, "async function loadListings(anonimo){", "\n}\n")
+    prova("un catalogo riletto fa ridisegnare il negozio al ritorno", True,
+          "delete listePos.negozio" in carica
+          and carica.index("delete listePos.negozio")
+          < carica.index("await fetch"))
+    apri = pezzo_js(mini, "async function apriNegozio(", "\n}\n")
+    prova("l'anteprima del moderatore si segna a ogni disegno", True,
+          "negozioBozzaMod = !!anteprima;" in apri
+          and apri.index("negozioBozzaMod = !!anteprima;")
+          < apri.index("anteprima = await bozzaDelVenditore"))
+
+    # --- 2) IL BANCO -----------------------------------------------------
+    blocco = go[go.index("  {\n    const via = "):
+                go.index("else delete listePos[via];\n  }")
+                + len("else delete listePos[via];\n  }")]
+    js = (
+        "let vetrinaPos = null, navApplicando = false, attiva = 'negozio';\n"
+        "let negozioPag = {chi: 'neg1'}, negozioBozzaMod = false;\n"
+        "let paccoDati = {origineId: 7}, classificaFiltro = 0;\n"
+        "const righe = {grid: 30, negozioGrid: 45, paccoGrid: 12,"
+        " classificaCorpo: 43, consigliatiLista: 4};\n"
+        "const el = id => ({children: {length: righe[id]}});\n"
+        "const window = {scrollY: 0};\n"
+        "const document = {querySelector: () => ({id: 'view-' + attiva})};\n"
+        + pezzo_js(mini, "const LISTE_RITORNO = {", "\n};\n") + "\n};\n"
+        + "let listePos = {};\n"
+        + "function salva(){\n" + blocco + "\n}\n"
+        + pezzo_js(mini, "function posizioneDaRendere(view){", "\n}\n")
+        + "\n}\n" + r"""
+const esci = (vista, y) => { attiva = vista; window.scrollY = y; salva(); };
+const torna = (vista, ritorno = true) => {
+  navApplicando = ritorno; const y = posizioneDaRendere(vista);
+  navApplicando = false; return y; };
+const out = {};
+esci('negozio', 5111);
+out.negozio = torna('negozio');
+out.nuovo = torna('negozio', false);
+righe.negozioGrid = 30; out.menoCard = torna('negozio');
+righe.negozioGrid = 45; negozioPag.chi = 'neg2'; out.altroNegozio = torna('negozio');
+negozioPag.chi = 'neg1'; negozioBozzaMod = true; esci('negozio', 900);
+out.bozzaSalvata = 'negozio' in listePos; out.bozza = torna('negozio');
+negozioBozzaMod = false;
+esci('pacco', 2600); out.pacco = torna('pacco');
+paccoDati = {origineId: 9}; out.altroPacco = torna('pacco');
+paccoDati = null; out.paccoVuoto = torna('pacco');
+esci('classifica', 1500); out.classifica = torna('classifica');
+classificaFiltro = 4.5; out.altroFiltro = torna('classifica');
+esci('consigliati', 300); out.consigliati = torna('consigliati');
+esci('affari', 800); out.affari = torna('affari');
+esci('profilo', 800); out.profilo = torna('profilo');
+vetrinaPos = {y: 1234, n: 30}; out.vetrina = torna('esplora');
+console.log(JSON.stringify(out));
+""")
+    out = _node_banco(js)
+    if out is None:
+        salta("il banco delle liste sorelle", "node non c'e'")
+        return
+    prova("negozio: al ritorno si torna dov'eri", 5111, out.get("negozio"))
+    prova("...ma entrandoci di nuovo si parte dalla cima", 0, out.get("nuovo"))
+    prova("...e con le card cambiate (30 invece di 45) dalla cima", 0,
+          out.get("menoCard"))
+    prova("...e un altro negozio con lo stesso conto non eredita", 0,
+          out.get("altroNegozio"))
+    prova("l'anteprima del moderatore non si ricorda", [False, 0],
+          [out.get("bozzaSalvata"), out.get("bozza")])
+    prova("carrello: al ritorno si torna dov'eri", 2600, out.get("pacco"))
+    prova("...un carrello da un altro annuncio, o svuotato, no", [0, 0],
+          [out.get("altroPacco"), out.get("paccoVuoto")])
+    prova("classifica: dov'eri, e col filtro cambiato dalla cima", [1500, 0],
+          [out.get("classifica"), out.get("altroFiltro")])
+    prova("Consigliati: dov'eri", 300, out.get("consigliati"))
+    prova("Ordini e Profilo restano fuori (si rifanno al ritorno)", [0, 0],
+          [out.get("affari"), out.get("profilo")])
+    prova("la vetrina risponde come prima", 1234, out.get("vetrina"))
+
+
+def prove_sbirciata():
+    """LA SBIRCIATA DI «CONTROLLA E PAGA» (5 ott 2026, richiesta di
+    Andrea): tenendo il dito sul francobollo la foto si apre in grande,
+    al rilascio si richiude, ritoccando si riapre; un tocco breve non fa
+    niente.
+    Il banco ESEGUE il codice vero (le funzioni e il blocco degli
+    ascoltatori) su un DOM di cartone che sa solo registrare ascoltatori
+    ed emettere eventi. Le domande che contano sono quelle che un
+    telefono non perdona: il touchstart consumato (o il tocco lungo
+    del sistema si prende il gesto a 500ms), la foto che REGGE oltre i
+    500ms, il rilascio che arriva al francobollo anche se il preventivo
+    l'ha tolto dal documento (gli ascoltatori sul BERSAGLIO), la pagina
+    ferma a foto aperta, lo scorrimento a mano prima. Quel che il banco
+    non puo' vedere — il menu «Salva immagine», il callout di iOS — lo
+    dicono le righe del CSS, e lo prova il telefono."""
+    print("\n[la sbirciata in «Controlla e paga»]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) LA FORMA ---------------------------------------------------
+    m = re.search(r"\.ctrl-mini\{[^}]*\}", mini)
+    prova("il francobollo spegne callout e selezione", True,
+          bool(m) and "-webkit-touch-callout:none" in m.group(0)
+          and "user-select:none" in m.group(0))
+    prova("la foto del francobollo non prende il dito", True,
+          bool(re.search(r"\.ctrl-mini img\{[^}]*pointer-events:none", mini)))
+    m = re.search(r"#sbirciata\{[^}]*\}", mini)
+    prova("il velo non prende il dito e sta fisso sopra la pagina", True,
+          bool(m) and "pointer-events:none" in m.group(0)
+          and "position:fixed" in m.group(0))
+    prova("il velo esiste una volta sola", 1, mini.count('id="sbirciata"'))
+    prova("la sbirciata non e' uno strato della cronologia", True,
+          "sbirciata" not in pezzo_js(mini, "function navPila(){", "\n}\n"))
+    faccia = pezzo_js(mini, "function facciaMini(x, qta){", "\n}\n")
+    prova("data-sbircia solo dove c'e' una foto", True,
+          "t ? ` data-sbircia=" in faccia)
+
+    # --- 2) IL BANCO -----------------------------------------------------
+    codice = pezzo_js(mini, "const SBIRCIA_MS = ",
+                      "\n  document.addEventListener('visibilitychange'")
+    js = r"""
+class Nodo {
+  constructor(id){ this.id = id; this.ev = {}; this.classi = new Set();
+    this.dataset = {}; this.scrollLeft = 0; this.padri = [];
+    const c = this.classi;
+    this.classList = {add: x => c.add(x), remove: x => c.delete(x),
+                      contains: x => c.has(x)}; }
+  addEventListener(t, f){ (this.ev[t] = this.ev[t] || []).push(f); }
+  removeEventListener(t, f){ this.ev[t] = (this.ev[t] || []).filter(g => g !== f); }
+  emetti(t, e){ e.type = t; e.cancelable = true; e.defaultPrevented = false;
+    e.preventDefault = () => { e.defaultPrevented = true; };
+    (this.ev[t] || []).slice().forEach(f => f(e)); return e; }
+  closest(sel){ return this.padri.find(p => p.sel === sel)?.n || null; }
+  querySelector(){ return img; }
+  getAttribute(a){ return a === 'src' ? this.src : null; }
+  conta(){ return Object.values(this.ev).reduce((a, l) => a + l.length, 0); }
+}
+const img = new Nodo('img');
+const nodi = {acqCorpo: new Nodo('acqCorpo'), sbirciata: new Nodo('sbirciata'),
+              'view-acquisto': new Nodo('view-acquisto')};
+nodi['view-acquisto'].classList.add('active');
+const el = id => nodi[id];
+const finestra = new Nodo('window');
+const addEventListener = (t, f) => finestra.addEventListener(t, f);
+const document = {addEventListener(){}, hidden: false};
+let scorsa = [];
+const window = {scrollY: 300, scrollTo: (x, y) => { scorsa.push(y); }};
+let vibrate = 0; function haptic(){ vibrate++; }
+class Image { constructor(){ this.complete = false; this.naturalWidth = 0; } }
+const listings = [{id: 3, thumbs: ['/foto/a3_0_min.jpg'], photos: ['/foto/a3_0.jpg']},
+                  {id: 4, thumbs: [], photos: []}];
+const myListings = [];
+const fila = new Nodo('fila');
+const mini = new Nodo('mini'); mini.dataset.sbircia = '3';
+mini.padri = [{sel: '.ctrl-mini[data-sbircia]', n: mini}, {sel: '.ctrl-strip', n: fila}];
+const muto = new Nodo('muto'); muto.dataset.sbircia = '4';
+muto.padri = [{sel: '.ctrl-mini[data-sbircia]', n: muto}];
+const emoji = new Nodo('emoji');            // francobollo senza foto
+""" + codice + r"""
+}
+const dorme = ms => new Promise(r => setTimeout(r, ms));
+const T = (x, y, id = 1) => ({changedTouches: [{identifier: id, clientX: x, clientY: y}]});
+const giu = (n, x = 10, y = 10, id = 1) =>
+  nodi.acqCorpo.emetti('touchstart', Object.assign({target: n, touches: [{}]}, T(x, y, id)));
+const aperta = () => nodi.sbirciata.classList.contains('open');
+(async () => {
+  const out = {};
+  // 1) il tocco breve: consumato, e non apre niente
+  out.breveConsumato = giu(mini).defaultPrevented;
+  await dorme(60); mini.emetti('touchend', T(10, 10)); await dorme(300);
+  out.breveAperta = aperta();
+  out.ascoltiDopoBreve = mini.conta();
+  // 2) la tenuta: apre dopo ~220ms e regge oltre i 500 del sistema
+  giu(mini); await dorme(120); out.a120 = aperta();
+  await dorme(200); out.a320 = aperta(); out.foto = img.src;
+  await dorme(500); out.a820 = aperta();
+  // a foto aperta il dito trema e si trascina: la pagina sta ferma
+  scorsa = [];
+  out.mossaConsumata = mini.emetti('touchmove', T(40, 150)).defaultPrevented;
+  out.scorsaAperta = scorsa.length; out.apertaDopoMossa = aperta();
+  // il rilascio arriva al francobollo anche se e' fuori dal documento:
+  // qui il corpo non riceve niente, come nel DOM vero
+  mini.emetti('touchend', T(40, 150));
+  out.chiusa = !aperta(); out.ascoltiDopo = mini.conta();
+  out.vibrate = vibrate;
+  // 3) il ritocco riapre
+  giu(mini); await dorme(300); out.ritocco = aperta();
+  mini.emetti('touchcancel', T(10, 10)); out.chiusaDalCancel = !aperta();
+  // 4) lo scorrimento a mano prima della foto: la fila segue il dito
+  fila.scrollLeft = 0; scorsa = [];
+  giu(mini, 100, 100); mini.emetti('touchmove', T(95, 101));
+  out.sottoSoglia = fila.scrollLeft;
+  mini.emetti('touchmove', T(30, 104)); await dorme(300);
+  out.fila = fila.scrollLeft; out.pagina = scorsa.slice(-1)[0];
+  out.scorsaAperta2 = aperta(); mini.emetti('touchend', T(30, 104));
+  // 5) un dito che arriva sul francobollo mentre un altro e' gia' giu'
+  //    altrove (un pizzico, un pollice appoggiato): non e' una sbirciata
+  const secondo = nodi.acqCorpo.emetti('touchstart',
+    Object.assign({target: mini, touches: [{}, {}]}, T(50, 50, 6)));
+  await dorme(300);
+  out.secondoDito = [secondo.defaultPrevented, aperta()];
+  // 6) senza foto: niente gesto, e il tocco resta del sistema
+  out.mutoConsumato = giu(muto).defaultPrevented;
+  out.emojiConsumato = giu(emoji).defaultPrevented;
+  await dorme(300); out.mutoAperta = aperta();
+  // 7) la cassa che se ne va col dito giu': il timer non apre niente
+  giu(mini); nodi['view-acquisto'].classList.remove('active');
+  await dorme(300); out.cassaVia = aperta(); out.statoPulito = sbirciaDa === null;
+  nodi['view-acquisto'].classList.add('active');
+  // 8) il mouse: tenuta, rilascio sulla finestra; e il trascino che annulla
+  nodi.acqCorpo.emetti('mousedown', {target: mini, button: 0, clientX: 5, clientY: 5});
+  await dorme(300); out.mouseAperta = aperta();
+  finestra.emetti('mouseup', {}); out.mouseChiusa = !aperta();
+  nodi.acqCorpo.emetti('mousedown', {target: mini, button: 0, clientX: 5, clientY: 5});
+  finestra.emetti('mousemove', {clientX: 40, clientY: 5}); await dorme(300);
+  out.mouseTrascino = aperta();
+  // 9) l'app in fondo col dito giu'
+  giu(mini); await dorme(300); finestra.emetti('blur', {}); out.blur = aperta();
+  out.menu = nodi.acqCorpo.emetti('contextmenu', {target: mini}).defaultPrevented;
+  console.log(JSON.stringify(out));
+})();
+"""
+    out = _node_banco(js)
+    if out is None:
+        salta("il banco della sbirciata", "node non c'e'")
+        return
+    prova("il tocco sul francobollo e' NOSTRO dal touchstart", True,
+          out.get("breveConsumato"))
+    prova("un tocco breve non apre niente, e non lascia ascoltatori",
+          [False, 0], [out.get("breveAperta"), out.get("ascoltiDopoBreve")])
+    prova("tenendo premuto: chiusa a 120ms, aperta a 320ms", [False, True],
+          [out.get("a120"), out.get("a320")])
+    prova("...e regge oltre i 500ms del tocco lungo di sistema", True,
+          out.get("a820"))
+    prova("si apre con la foto dell'annuncio (la miniatura, intanto)",
+          "/foto/a3_0_min.jpg", out.get("foto"))
+    prova("a foto aperta il dito che si muove non scorre la pagina",
+          [True, 0, True], [out.get("mossaConsumata"),
+                            out.get("scorsaAperta"),
+                            out.get("apertaDopoMossa")])
+    prova("il rilascio chiude anche col francobollo fuori dal documento",
+          [True, 0], [out.get("chiusa"), out.get("ascoltiDopo")])
+    prova("una vibrazione all'apertura", 1, out.get("vibrate"))
+    prova("ritoccando si riapre, e il cancel del sistema chiude",
+          [True, True], [out.get("ritocco"), out.get("chiusaDalCancel")])
+    prova("sotto la soglia la fila non si muove", 0, out.get("sottoSoglia"))
+    prova("oltre la soglia la fila segue il dito, e la foto non si apre",
+          [70, 296, False], [out.get("fila"), out.get("pagina"),
+                             out.get("scorsaAperta2")])
+    prova("un secondo dito (il primo gia' giu' altrove) non apre", [False, False],
+          out.get("secondoDito"))
+    prova("senza foto il tocco resta del sistema", [False, False, False],
+          [out.get("mutoConsumato"), out.get("emojiConsumato"),
+           out.get("mutoAperta")])
+    prova("la cassa che se ne va col dito giu' non apre niente",
+          [False, True], [out.get("cassaVia"), out.get("statoPulito")])
+    prova("col mouse: tenuta e rilascio sulla finestra", [True, True],
+          [out.get("mouseAperta"), out.get("mouseChiusa")])
+    prova("col mouse: il trascino prima della foto annulla", False,
+          out.get("mouseTrascino"))
+    prova("l'app che va in fondo chiude la foto", False, out.get("blur"))
+    prova("il menu del telefono sul francobollo si ferma", True,
+          out.get("menu"))
 
 
 # ====================================================================
@@ -103343,17 +103663,28 @@ def prove_dati_spedizione_copia():
                 for s in m.group(1).split(","):
                     out.add(re.sub(r"\s+", " ", s).strip())
         return sorted(out)
+    # (5 ott 2026) i francobolli di «Controlla e paga» e la loro
+    # sbirciata: FOTO, non dati — il tocco lungo li' apre la foto in
+    # grande (prove_sbirciata), e un menu «Salva immagine» lo coprirebbe
     prova("user-select:none solo su bottoni, stelle, foto e card: mai sopra un dato",
-          [".cat-cella", ".fb-stelle", ".lb-slide img", ".p2p-recapito-copia",
+          ["#sbirciata img", ".cat-cella", ".ctrl-mini", ".fb-stelle",
+           ".lb-slide img", ".p2p-recapito-copia",
            ".qta-mini .qm-btn"], censo(r"user-select\s*:\s*none"))
-    prova("...il richiamo del tocco lungo spento solo sulla card del reparto",
-          [".cat-cella"], censo(r"touch-callout\s*:\s*none"))
+    prova("...il richiamo del tocco lungo spento solo sulla card del reparto "
+          "e sui francobolli della cassa",
+          ["#sbirciata img", ".cat-cella", ".ctrl-mini"],
+          censo(r"touch-callout\s*:\s*none"))
     prova("...nessuno script spegne la selezione o il menu del tocco lungo",
           [0, 0, 0, 0], [mini.count("userSelect"), mini.count("selectstart"),
                          mini.count("oncontextmenu"), mini.count("onselectstart")])
-    prova("...il menu del tocco lungo lo ascolta solo la fila dei reparti", (["fila"], 1),
+    # (`corpo` e' #acqCorpo, la cassa: lo ferma solo sui francobolli)
+    prova("...il menu del tocco lungo lo ascoltano solo la fila dei reparti "
+          "e la cassa", (["fila", "corpo"], 2),
           (re.findall(r"(\w+)\.addEventListener\('contextmenu'", mini),
            mini.count("addEventListener('contextmenu'")))
+    _cm = mini[mini.find("corpo.addEventListener('contextmenu'"):]
+    prova("...e la cassa lo ferma solo sul francobollo con la foto", True,
+          ".ctrl-mini[data-sbircia]" in _cm[:_cm.find("});")])
     # il solo `touchstart` di tutto il client e' quello del «tira per
     # aggiornare»: passivo, e le pagine di un ordine non sono sue — la
     # sua `touchmove` bloccante non nasce nemmeno, li'
@@ -103364,11 +103695,22 @@ def prove_dati_spedizione_copia():
     _ts = mini[_i_ts:mini.find("\n", _f_ts + 1)] if _f_ts >= 0 else ""
     _vp = re.search(r"const VISTE_PTR = new Set\(\[([^\]]*)\]\);", mini)
     _viste = re.findall(r"'(\w+)'", _vp.group(1)) if _vp else ["?"]
-    prova("...e l'unico ascoltatore del tocco sulla pagina e' passivo, e non guarda gli ordini",
-          (1, True, [], ["ordine", "p2pordine"]),
-          (mini.count("addEventListener('touchstart'"), "{passive:true}" in _ts,
+    prova("...e l'ascoltatore del tocco sulla pagina e' passivo, e non guarda gli ordini",
+          (True, [], ["ordine", "p2pordine"]),
+          ("{passive:true}" in _ts,
            [v for v in ("ordine", "p2pordine") if v in _viste],
            [v for v in ("ordine", "p2pordine") if v not in _viste]))
+    # IL SECONDO (5 ott 2026), ed e' l'unico che consuma: la sbirciata,
+    # appesa a #acqCorpo (la cassa, che non ha dati da copiare) e che
+    # agisce SOLO quando il dito parte da un francobollo con la foto
+    _i_sb = mini.find("corpo.addEventListener('touchstart'")
+    _sb = mini[_i_sb:mini.find("}, {passive: false});", _i_sb)] if _i_sb >= 0 else ""
+    prova("...i touchstart sono due: quello della pagina e quello della cassa",
+          (2, ["corpo"]), (mini.count("addEventListener('touchstart'"),
+                           re.findall(r"(\w+)\.addEventListener\('touchstart'", mini)))
+    prova("...e quello della cassa consuma solo sul francobollo con la foto", True,
+          bool(_sb) and _sb.index(".ctrl-mini[data-sbircia]")
+          < _sb.index("if (!mini ") < _sb.index("e.preventDefault()"))
 
     # --- 3) IL BANCO: le funzioni VERE, ogni caso da solo ---------------
     node = _sh.which("node")
@@ -120487,7 +120829,8 @@ def main():
               prove_punti_pubblici,
               prove_punti_salvati,
               prove_pagina_acquisto,
-              prove_posizione_vetrina, prove_anteprime, prove_seo,
+              prove_posizione_vetrina, prove_liste_ritorno,
+              prove_sbirciata, prove_anteprime, prove_seo,
               prove_onion,
               prove_impersonazione, prove_avviso_spedizione,
               prove_tracciamento_nei_messaggi,

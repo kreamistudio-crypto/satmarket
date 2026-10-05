@@ -16700,6 +16700,17 @@
   IL TITOLO LO SCRIVE IL RENDER (`#acqTit`): «Controlla il carrello»
   sul carrello — è quel che il bottone della barra promette, e la
   pagina fa davvero tutte e due le cose — «Acquista» sul singolo.
+  LA SBIRCIATA (5 ott 2026): tenendo il dito su un francobollo
+  (`facciaMini` con `data-sbircia`, solo dove c'è una foto) la foto
+  piena si apre sopra la pagina in `#sbirciata`, velo `fixed` che non
+  prende il dito; al rilascio si richiude. Il touchstart si CONSUMA
+  (la lezione del tocco lungo sulle card: sotto c'è quello del sistema
+  a 500ms, che col dito ancora giù si prenderebbe il gesto e il
+  rilascio), quindi lo scorrimento che parte da un francobollo lo fa
+  la pagina a mano; gli ascoltatori del gesto stanno sul BERSAGLIO,
+  perché il preventivo che arriva riscrive `#acqCorpo` e il
+  francobollo esce dal documento col dito giù. Non è uno strato della
+  cronologia.
   IL CONTO NON SI RIFÀ A OGNI CAMBIO DI STRADA, e non nasce un
   secondo posto che calcola: NE MUORE UNO. Il preventivo risponde con
   TUTTE le strade in una chiamata (`strade[]`, ognuna col suo
@@ -17229,13 +17240,26 @@
   COSA COPRE: la vetrina, da ogni strada che la lascia — dettaglio,
   negozio, carrello e riepilogo, pagina d'acquisto, ordine — e dentro
   qualunque ramo (Esplora, una categoria aperta da Sfoglia, il filtro
-  delle Aste), salti multipli compresi. COSA NO, ed è dichiarato:
-  negozio, Ordini, Profilo e «I tuoi annunci» si RIFANNO quando ci si
-  torna (un fetch, e i dati arrivano dopo), quindi al momento dello
-  scorrimento la pagina non è ancora alta come sarà e la posizione
-  cadrebbe nel vuoto per davvero — chi vorrà aggiungerne una deve prima
-  garantire che il suo markup sopravviva al ritorno, com'è per la
-  vetrina. In DEMO da `file://` il motore è spento, quindi
+  delle Aste), salti multipli compresi. LE LISTE SORELLE (5 ott 2026):
+  negozio, carrello, classifica e Consigliati passano dallo stesso
+  giudice con `LISTE_RITORNO` — per ognuna una FIRMA (quante righe, e di
+  chi: il codice del negozio, l'annuncio di provenienza del carrello, il
+  filtro della classifica) salvata in cima a `go()` in `listePos` e
+  confrontata al ritorno. Il negozio ha pagato la condizione scritta
+  qui sotto: `navRendiVista`, se codice e firma sono quelli, lo
+  RIACCENDE senza ridisegnarlo (pagine dello scroll infinito, racconto
+  e feedback aperti com'erano), e `loadListings` butta la sua posizione
+  (un catalogo riletto può aver cambiato le card: allora ridisegno e
+  cima, come prima); l'anteprima del moderatore (`negozioBozzaMod`) non
+  si ricorda. Il carrello si ridisegna SINCRONO da `paccoDati` prima di
+  `go()`, classifica e Consigliati si riaccendono coi dati di prima.
+  COSA NO, ed è dichiarato: Ordini, Profilo e «I tuoi annunci» si
+  RIFANNO quando ci si torna (un fetch, e i dati arrivano dopo; «I tuoi
+  annunci» ha il suo `mieiPos`, rimesso dopo il render), quindi al
+  momento dello scorrimento la pagina non è ancora alta come sarà e la
+  posizione cadrebbe nel vuoto per davvero — chi vorrà aggiungerne una
+  deve prima garantire che il suo markup sopravviva al ritorno, com'è
+  per la vetrina. In DEMO da `file://` il motore è spento, quindi
   `navApplicando` non si accende mai e vale il comportamento di ieri.
   E NEMMENO IL FOCUS DEVE TRASCINARE LA PAGINA (trovato di striscia,
   ed era lì da sempre): chiudendo il picker, `pickerTrigger.focus()`
