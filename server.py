@@ -56855,9 +56855,10 @@ async def sollecita_firme_nostr():
             # succedeva niente, e la settimana dopo il messaggio
             # tornava uguale.
             f"Se hai collegato un bunker o hai un'estensione Nostr, "
-            f"apri Barattolo da lì: la firma parte da sola. Se sei "
-            f"entrato con la nsec, vai nel Profilo e tocca «✍️ Firma i "
-            f"tuoi annunci»: la incolli, firma, e non viene conservata.\n\n"
+            f"apri Barattolo da lì: la firma parte da sola. Se usi la "
+            f"nsec, vai nel Profilo e tocca «✍️ Firma i tuoi annunci»: "
+            f"la incolli una volta, resta solo sul tuo dispositivo, e "
+            f"da lì firma da sola.\n\n"
             f"Finché non succede l'annuncio vive qui e si vende "
             f"normalmente — gli manca solo la piazza.")
     if da_avvisare:

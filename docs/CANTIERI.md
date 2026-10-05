@@ -35472,3 +35472,60 @@ gira la funzione vera con fetch e NostrTools di cartone.
 ingresso con la nsec (o dal Profilo) i 25 annunci passano a nome suo
 e il promemoria smette. Nel journal sparisce «🟣 Solleciti firme
 Nostr» per lui.
+
+
+## La nsec sul dispositivo: la firma degli annunci è automatica per tutti (5 ott 2026, seguito)
+
+**LA DECISIONE.** Il cantiere del mattino lasciava a chi entra con la
+nsec un passo a mano (reincollarla dal Profilo per ogni annuncio nuovo).
+Andrea: «la firma degli annunci deve essere automatica, mai nulla di
+manuale». Messo davanti al nodo — firmare domani vuol dire avere la
+chiave domani — ha scelto «nsec solo nel telefono»: si conserva nel
+browser dell'utente, mai sul server. Le alternative scartate:
+spingere al bunker (automatico solo per chi lo collega) e «la nsec non
+basta» (gli annunci su Nostr solo con bunker o estensione).
+
+**COME.** `ricorda()` sul firmatario nsec scrive in localStorage
+`barattolo_nsec` una MAPPA pubkey → chiave (più account sullo stesso
+browser: ognuno firma con la sua, scelta dalla npub dell'account
+aperto con `pubAccount()`, mai «l'ultima incollata»). Si scrive solo a
+chiave PROVATA: dopo che il server ha accettato la firma
+(`entraConNostr`, `eseguiCollegamentoFirmato`), o con la pubkey uguale
+a quella dell'account (`firmaEConsegna`, `firmaCodaAMano`). Si legge
+con `firmatarioNsecSalvata()`, primo gradino di
+`firmatarioAutomatico()` (locale, niente rete: prima del bunker) e
+della modifica firmata. Si cancella con «Esci» (`esciWeb`) e con
+«Rimuovi la npub» (prima di azzerare la npub, che è lei a dire quale).
+Il server non cambia: non c'è rotta né colonna che la veda.
+
+**LA REGOLA FERREA 2** in CLAUDE.md passa a «mai custodia sul SERVER»,
+in un commit a parte; la scala in ARCHITETTURA ha il gradino nuovo col
+suo prezzo dichiarato (uno script ostile nella pagina potrebbe
+leggerla: la CSP è la cintura, il bunker resta consigliato). I testi
+che dicevano «mai salvata» ora dicono «resta solo su questo
+dispositivo».
+
+**IMPERFEZIONE DICHIARATA.** Chi è entrato con la nsec PRIMA di questo
+deploy non ha la copia: deve rientrare con la nsec o incollarla una
+volta dal Profilo («✍️ Firma i tuoi annunci», che compare solo se la
+coda è ferma). Da lì è automatico. Il localStorage della webview di
+Telegram può essere svuotato dal client: in quel caso, come sopra, una
+volta.
+
+**PROVATO.** `prove_firme_nsec` 21 verdi: le 12 del mattino più la nsec
+prima del bunker in `firmatarioAutomatico`, il `ricorda` solo dopo
+l'ok del server, «Esci» e «Rimuovi» che cancellano, la modifica
+firmata senza foglio, il server che non la nomina mai, e un banco node
+con localStorage di cartone: due account sullo stesso browser firmano
+ognuno con la sua, un terzo senza nsec non prende quella altrui,
+«Esci» cancella solo quella di chi esce.
+Suite intera severa sull'albero da origin/main 53d193f: 18.599 verdi e
+le 4 rosse note dell'AVIF in locale; 34 collaudi della CI verdi nella
+gabbia (`collaudo_freni` non compila col Python 3.10 locale). Il giro
+dal vivo nel browser NON è stato fatto.
+
+**DA GUARDARE.** Dopo il deploy, chi entra con la nsec: in DevTools →
+Application → localStorage compare `barattolo_nsec`, e un annuncio
+nuovo arriva sul suo profilo Nostr senza nessun gesto. Il venditore del
+caso dal campo deve rientrare con la nsec UNA volta.
+

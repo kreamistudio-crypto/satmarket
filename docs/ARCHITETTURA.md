@@ -6412,7 +6412,8 @@
   dell'utente, mai sul server. La nsec incollata resta il rito di
   sempre (mai conservata, by design; il foglio suggerisce il bunker).
   I passi comuni vivono in `firmaEConsegna`: pubkey controllata PRIMA
-  di firmare (la nsec si azzera a fine GESTO, `chiudi()`), id ricontrollato in
+  di firmare (la nsec in pagina si azzera a fine GESTO, `chiudi()`; la
+  copia sul dispositivo e' `firmatarioNsecSalvata`), id ricontrollato in
   pagina (firmatario che altera = stop), pubblicazione dal browser
   (`pubblicaEventoSuRelay`, serve ≥1 OK, relay = quelli dell'IMPORT
   col relay personale del venditore, non RELAYS_VERIFICA) e SOLO poi
@@ -28533,9 +28534,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    conservata (lug 2026: URI + chiave del CLIENT in localStorage del
    dispositivo, pari grado del secret NWC — chiede firme al bunker,
    che può negarle o revocare; NON contiene né può derivare la chiave
-   dell'utente, mai sul server) →
-   mai custodia di segreti altrui, mai firme che richiedano di
-   consegnare chiavi al server.
+   dell'utente, mai sul server) → nsec conservata SUL DISPOSITIVO
+   (ott 2026, decisione di Andrea: «la firma degli annunci deve essere
+   automatica, mai nulla di manuale». Chi entra con la nsec la ritrova
+   in localStorage del SUO browser, mappa pubkey → chiave, scritta solo
+   dopo che il server ha accettato la sua firma o la pubkey coincide
+   con l'account; «Esci» e «Rimuovi la npub» la cancellano. È il primo
+   gradino che tiene nel browser una chiave dell'UTENTE e non una
+   credenziale derivata: il prezzo dichiarato è che uno script ostile
+   nella pagina potrebbe leggerla, e la CSP è la cintura; il bunker
+   resta la strada consigliata. MAI sul server, MAI inviata: per il
+   server la regola non cambia — vedi CANTIERI, «La nsec sul
+   dispositivo») →
+   mai custodia di segreti altrui SUL SERVER, mai firme che richiedano
+   di consegnare chiavi al server.
 - LE LETTURE DAI RELAY IN COLLAUDO (23 set 2026, regola di Andrea: nei
   collaudi e nei giri dal vivo non ci si collega MAI a un relay vero, e
   non si pubblica niente). Le PUBBLICAZIONI erano a posto da sempre —

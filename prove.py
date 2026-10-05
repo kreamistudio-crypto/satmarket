@@ -18531,6 +18531,89 @@ console.log = (() => { const v = console.log; return (...a) => {
     prova("...e dopo chiudi() non firma piu' niente", True, esito["morta"])
     prova("...e il Profilo sa che non resta niente", 0, esito["attesa"])
 
+    # 6. LA NSEC SUL DISPOSITIVO (ott 2026, Andrea: «la firma deve
+    #    essere automatica, mai nulla di manuale»). Si conserva SOLO nel
+    #    browser, per pubkey, e firma da sola per l'account giusto.
+    fa = pezzo_js(mini, "async function firmatarioAutomatico(){", "\n}")
+    prova("la strada automatica prova PRIMA la nsec del dispositivo",
+          True, fa.index("firmatarioNsecSalvata()") < fa.index("bunkerSalvato()"))
+    ec = pezzo_js(mini, "async function entraConNostr(firmatario){", "\n}")
+    prova("il login la ricorda solo DOPO che il server ha accettato la "
+          "firma", True,
+          ec.index("if (!r.ok)") < ec.index("firmatario.ricorda()")
+          < ec.index("if (d.collega)"))
+    prova("«Esci» la cancella", True,
+          "scordaNsecAccount()" in pezzo_js(mini, "async function esciWeb(){", "\n}"))
+    prova("«Rimuovi la npub» la cancella PRIMA di azzerare la npub", True,
+          0 < mini.index("await scordaNsecAccount();   // PRIMA")
+          < mini.index("myNpub = ''; myNpubVerified = false;\n  if (d.accesso_revocato)"))
+    prova("la modifica firmata usa la nsec del dispositivo senza foglio",
+          True, "firmaEConsegna(d, id, fNsec, 'nsec')" in mini)
+    prova("il server non la vede mai: nessuna rotta ne' colonna nsec",
+          (False, False), ("nsec_salvata" in _SORGENTE,
+                           "barattolo_nsec" in _SORGENTE))
+
+    blocco = mini[mini.index("const NSEC_CHIAVE = 'barattolo_nsec';"):
+                  mini.index("/* Ricorda la nsec solo se e' QUELLA")]
+    js2 = r"""
+const mem = {};
+const localStorage = {getItem: k => (k in mem ? mem[k] : null),
+  setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; }};
+const window = {};
+async function caricaNostrTools(){}
+const hex = b => Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+const unhex = h => Uint8Array.from(h.match(/../g), x => parseInt(x, 16));
+window.NostrTools = {
+  nip19: {decode: s => s.startsWith('npub1') ? {type: 'npub', data: s.slice(5)}
+                                             : {type: 'nsec', data: unhex(s.slice(5))},
+          nsecEncode: b => 'nsec1' + hex(b)},
+  utils: {bytesToHex: hex, hexToBytes: unhex},
+  getPublicKey: sk => 'pub' + hex(sk).slice(0, 4),
+  finalizeEvent: (ev, sk) => ({...ev, sig: hex(sk).slice(0, 4)}),
+};
+let myNpubAccesso = '', myNpub = '', myNpubVerified = false;
+""" + pezzo_js(mini, "async function firmatarioNsec(nsec){", "\n}") + "\n}\n" + blocco + r"""
+(async () => {
+  const a = await firmatarioNsec('nsec1' + 'aa'.repeat(32));
+  const b = await firmatarioNsec('nsec1' + 'bb'.repeat(32));
+  a.ricorda(); b.ricorda(); a.chiudi(); b.chiudi();
+  myNpubAccesso = 'npub1pubaaaa';
+  const fa = await firmatarioNsecSalvata();
+  const sa = fa ? (await fa.firma({})).sig : null;
+  myNpubAccesso = 'npub1pubbbbb';
+  const fb = await firmatarioNsecSalvata();
+  const sb = fb ? (await fb.firma({})).sig : null;
+  myNpubAccesso = 'npub1pubcccc';
+  const fc = await firmatarioNsecSalvata();
+  myNpubAccesso = 'npub1pubaaaa';
+  await scordaNsecAccount();
+  const dopo = await firmatarioNsecSalvata();
+  myNpubAccesso = 'npub1pubbbbb';
+  const restaB = !!(await firmatarioNsecSalvata());
+  console.log(JSON.stringify({sa, sb, fc: !!fc, dopo: !!dopo, restaB,
+    chiaro: JSON.stringify(mem).includes('aaaa')}));
+})();
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js2)
+        p = f.name
+    try:
+        r = subprocess.run(["node", p], capture_output=True, text=True,
+                           encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(p)
+    if r.returncode != 0:
+        prova("il banco della nsec sul dispositivo gira", "", r.stderr[-300:])
+        return
+    e2 = json.loads(r.stdout.strip().splitlines()[-1])
+    prova("due account sullo stesso browser: ognuno firma con la SUA "
+          "nsec", ("aaaa", "bbbb"), (e2["sa"], e2["sb"]))
+    prova("...un account senza nsec salvata non ne prende una altrui",
+          False, e2["fc"])
+    prova("...«Esci» cancella solo quella dell'account che esce",
+          (False, True, False), (e2["dopo"], e2["restaB"], e2["chiaro"]))
+
 def prove_trasloco_nostr():
     """IL TRASLOCO (ago 2026, decisione di Andrea): gli annunci finiti
     in piazza a nome di Barattolo passano sull'account del venditore
