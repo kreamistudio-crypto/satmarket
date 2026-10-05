@@ -51,7 +51,9 @@ partito, e dopo un paio di payout nessun altro — `MOTIVO_SALDO`, «non
 per colpa tua… ci riproviamo noi», nessun sats perso.
 
 **Il gesto.** 265.000 = 247.707 + 17.293 di margine (la riserva di
-LNbits è `max(1%, 2000)` a payout, più le commissioni dei sette payout).
+LNbits è `max(1%, 10 sats)` a payout, più le commissioni dei sette payout;
+il pavimento è 10.000 msat dal 5 ott 2026 — allora era 2.000 msat, cioè
+2 sats — e vive nel pannello admin di LNbits, `LNBITS_ADMIN_UI=true`).
 Fattura dalla Cassaforte nodo (pannello col tunnel ssh), memo
 `Sweep SaaS verso nodo (#152) N/3` — mai «Barattolo escrow…», o
 `orfani.py` la leggerebbe come l'incasso di un ordine — pagata dal

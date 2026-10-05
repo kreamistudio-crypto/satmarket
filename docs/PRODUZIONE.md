@@ -1186,7 +1186,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   ⚠️ I SATS ESCONO DAL SALDO DELL'ALTRA CASSAFORTE, dove ci sono i
   depositi di ALTRI ordini. Prima di premere: nella cassaforte di
   destinazione deve esserci capitale NOSTRO pari all'importo (più la
-  riserva fee di LNbits, `max(1%, 2000 sats)`), e sul nodo liquidità in
+  riserva fee di LNbits, `max(1%, 10 sats)`), e sul nodo liquidità in
   USCITA sufficiente. Si guarda col polso 23 di
   `query_libro_mastro.sql` e con `python3 capitale_cassa.py`; se non
   basta si versa PRIMA capitale nostro in quel wallet, e lo si dichiara
@@ -1264,7 +1264,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,stato,payout_stato,payout_verso,cassaforte,cassaforte_payout,prezzo_sats FROM ordini WHERE cassaforte='saas' AND stato NOT IN ('creato','annullato','released','refunded');"`
   1) IL #152 (P3dr0, 247.707 sats, «pending» dal 20 set). Prima: sul
   nodo devono esserci 247.707 sats nostri piu' la riserva fee di LNbits
-  (max(1%, 2000) = 2.477): spostali a mano. Poi 🧊 Pagamenti da
+  (max(1%, 10 sats) = 2.477): spostali a mano. Poi 🧊 Pagamenti da
   verificare → ordine #152 → «💀 Dichiara morto il pagamento appeso» (e'
   acceso: la fattura e' scaduta da giorni). Motivo suggerito: «pending
   dal 20 set, nessuna preimage, saldo Spark riallineato: il SaaS
@@ -1330,7 +1330,19 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `capitale_nostro_sats` vale da ripiego per il solo SaaS).
   BACKUP: `/opt/lnbits` (db con backup atomico, `.env`, compose, cert,
   superuser, unit del ponte) e `onion_auth` viaggiano nell'archivio
-  age; la riserva fee di LNbits e' `max(1%, 2000 sats)` per payout.
+  age; la riserva fee di LNbits e' `max(1%, 10 sats)` per payout, ed
+  e' anche il `fee_limit` che LNbits passa a LND: il TETTO delle
+  commissioni di instradamento dei payout del mercatino (Barattolo
+  non ne passa uno suo). Il pavimento e' 10.000 msat dal 5 ott 2026;
+  prima era il default di LNbits, 2.000 msat — 2 sats, non 2000:
+  troppo pochi per due salti su un payout piccolo, e LND a tetto
+  stretto risponde NO_ROUTE (la trappola del payout verso WoS).
+  ⚠️ IL VALORE VIVE NEL PANNELLO ADMIN DI LNbits, non nel `.env`:
+  con `LNBITS_ADMIN_UI=true` le impostazioni del server stanno nel
+  database di LNbits e vincono sul file, quindi un
+  `LNBITS_RESERVE_FEE_MIN` letto nel `.env` non e' il valore vero.
+  Si legge e si cambia dal pannello (superuser), nelle impostazioni
+  del server.
 - IL FIREWALL (`ufw`, acceso il 16 set 2026): `deny incoming`, `allow
   outgoing`, e in entrata SOLO la porta SSH (letta dal sistema con
   `ss -tlnp | grep sshd`, non ricordata), 80/tcp, 443/tcp e 443/udp
