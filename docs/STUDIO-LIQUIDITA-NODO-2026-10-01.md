@@ -88,8 +88,9 @@ CALCOLATI dopo: **noi 620.298, loro 777.114** — utili, tolte le riserve,
 **I sats che non sono della Cassaforte:** nei canali 620.298 − 349.538
 = 270.760 (256.760 spendibili, 14.000 sono riserve); on-chain 149.848
 (129.848 spendibili). In tutto **420.608, di cui 386.608 spendibili**.
-Di chi sono lo dice un documento solo per una parte: ~50.000 sono il
-cuscinetto prestato da Alan (set 2026). Il resto (~370.000, fra
+Di chi sono lo dice un documento solo per una parte: 40.452 sono il
+cuscinetto prestato da Alan (set 2026: la cifra è di Andrea, 5 ott; il
+verbale di set diceva ~50.000). Il resto (~380.000, fra
 commissioni del P2P, resto dell'apertura dei canali e capitale versato)
 NON È ATTRIBUITO: lo dicono Andrea e Alan, non un comando.
 
@@ -125,7 +126,7 @@ payout.
   largo: superficie nuova su una macchina con l'audit chiuso. Riserva.
 - **Il lease comprato** resta scartato con prova (Magma, set 2026).
 
-## 7. Il piano del canale da 5M
+## 7. Il piano del canale da 5M (1 ott; com'è andato davvero: §9)
 
 **Verso chi: LNBiG [Hub-2]**, `033e9ce4e8f0e68f7db49ffb6b9eecc10605f3f3fcb3c630545887749ab515b9c7`,
 onion `xbi6bipfby6prt6wddufgv5mq4mx2ihxsy4u4hycd73qfgc3oslonuid.onion:9735`
@@ -159,7 +160,9 @@ riserva del canale nuovo). Sopra i 2,5M del lancio, con aria.
 
 ## 8. Cosa resta aperto
 
-- Di chi sono i ~370.000 non attribuiti (§4): lo scrivono Andrea e Alan.
+- Di chi sono i ~380.000 non attribuiti (§4): lo scrivono Andrea e Alan.
+- Ad Alan restano da avere **40.452** (il cuscinetto di set 2026): tutto
+  il resto gli è tornato il 5 ott (§9).
 - L'«Admin credit» del #152 sul SaaS è di 247.231, non 247.707: 476 sats
   di differenza da capire alla disdetta.
 - Il credito del #152 resta aperto finché il SaaS non marca fallito il
@@ -167,7 +170,102 @@ riserva del canale nuovo). Sopra i 2,5M del lancio, con aria.
   SAAS»).
 - Il SaaS chiude (fase 5) quando i cinque ordini si chiudono: allora lo
   sweep dei ~84.000 di Barattolo.
-- Dopo l'apertura, l'SCB nuovo entra nel backup delle 03:30 del nodo.
+- Dopo l'apertura, l'SCB nuovo entra nel backup delle 03:30 del nodo: da
+  guardare che l'archivio del 6 ott lo contenga.
+- In `feereport` compare ancora il vecchio canale Magma (`0271b15e…:0`) a
+  1 ppm: avanzo in memoria, `updatechanpolicy` risponde «channel not
+  found», nessun sats. Non si tocca.
+
+## 9. L'esecuzione (5 ott 2026)
+
+Comandi dati uno alla volta, eseguiti da Andrea sul nodo; ogni gesto che
+spostava soldi col suo avviso. Gli hash e i txid si scrivono qui solo
+per le prime otto cifre (un esadecimale da 64 fa rossa la CI).
+
+**Il canale.** Alan manda 10.000 di prova e poi 5.000.000 a due indirizzi
+del nodo, verificati a voce e con `lncli wallet addresses list | grep -c`
+(1 = nostro). `openchannel` verso LNBiG [Hub-2] a 2 sat/vB (la stima
+diceva 1): funding `aa5904be…`, 423 di commissione, attivo come
+`970048x2363x1` (scid 1066579055655714817), dal nostro lato 4.998.974
+(1.026 sono la commitment e gli anchor). La ronda della liquidità ha
+imparato i tre canali.
+
+**Gli swap con SATS Routing** (destinatario SatsRouting2, `02b06bf3…`,
+letto dal loro `/v2/nodes` e da 1ml: non il `0317…` del README):
+
+| Swap | Mandati in Lightning | Tornati on-chain | Commissione | Instradamento | Da |
+|---|---|---|---|---|---|
+| prova | 10.000 | 9.410 | 590 | 11,49 | LNBiG |
+| 1-4 | 4 × 1.000.000 | 3.974.670 | 25.330 | 1.226,5 | LNBiG |
+| 5 | 435.000 | 432.071 | 2.929 | 146,8 | LNBiG |
+| 6a + 6b | 2 × 294.848 | 585.040 | 4.656 | 416,2 | ACINQ 1M |
+| **totale** | **5.034.696** | **5.001.191** | **33.505** | **1.801** | |
+
+Il quinto era il tetto del canale LNBiG (riserva 50.000): nel frattempo
+15 inoltri a 1 sat avevano portato 483.853 da LNBiG ad ACINQ. Il sesto
+serve a quello: Phoenix paga solo passando da ACINQ, e un acquisto da
+56.459 era fallito con 28.898 di entrata ACINQ. Un sesto da 588.920 in
+un pezzo solo è FALLITO (`MPP_TIMEOUT`: due parti arrivate, la terza
+senza strada verso SatsRouting2): nessun sats perso, la fattura non
+pagata non blocca niente on-chain e non si paga mai più. In due pezzi è
+passato.
+
+**La restituzione ad Alan** (decisione di Andrea: le commissioni sono sue,
+Alan riceve tutto quello che ha messo più le sue commissioni on-chain):
+
+| | sats |
+|---|---|
+| Alan ha mandato (prova + 5M) | 5.010.000 |
+| più le sue commissioni on-chain di quegli invii (316 + 452) | 768 |
+| **Restituito on-chain**: prova `c9085b12…` 10.000 + resto `13f1ece1…` 5.000.768 | **5.010.768** |
+| **Gli resta da avere**: il cuscinetto di set 2026 | **40.452** |
+
+Il resto è partito al secondo tentativo: il primo `sendcoins` è stato
+rifiutato con «macaroon has expired» perché `lncli` aggiunge a ogni
+chiamata un vincolo di 60 secondi (`--macaroontimeout`) e la conferma
+«yes/no» era durata di più. Rifiutato prima di costruire la transazione;
+con `--macaroontimeout 300` è passato. Nessun macaroon nuovo.
+
+**Le commissioni a carico di Andrea, al sats:**
+
+| Voce | sats |
+|---|---|
+| Apertura del canale | 423 |
+| Commitment e anchor del canale LNBiG (parcheggiati: in buona parte rientrano a una chiusura cooperativa) | 1.026 |
+| Respiro della commitment osservato su LNBiG | 7 |
+| Swap SATS Routing (servizio + on-chain) | 33.505 |
+| Instradamento degli otto pagamenti riusciti | 1.801 |
+| Invii on-chain ad Alan (prova 286 + resto 1.094) | 1.380 |
+| Commissioni on-chain di Alan rimborsate | 768 |
+| **Totale** | **38.910** |
+| meno gli inoltri guadagnati (15 × 1 sat) | −15 |
+| **Costo netto per il nodo** | **38.895** |
+
+**La catena on-chain torna al sats:** 149.848 del nodo + 5.010.000 di
+Alan − 5.000.000 nel canale − 423 = 159.425; + 5.001.191 dagli swap =
+5.160.616; − 5.010.768 ad Alan − 1.380 di invio = **148.468** (letto:
+confermati 79.482 + in conferma 68.986).
+
+**I canali dopo** (calcolati, non misurati): LNBiG noi ~68.700, loro
+~4,93M; ACINQ 400k noi 394.777, loro 4.000; ACINQ 1M noi ~380.000, loro
+~618.600. Dal nostro lato ~843.500: tolte le riserve (64.000) e i 40.452
+di Alan restano ~739.000 contro la Cassaforte a 609.880 (5 ott). Entrata
+utile ~5,5M; da ACINQ (Phoenix) ~608.000.
+
+**Quel che si è imparato:**
+- Phoenix entra solo da ACINQ: l'entrata ACINQ va tenuta sopra
+  l'ordine più grosso, e gli inoltri la spostano. Tariffa portata da
+  1 sat + 1 ppm a **1 sat + 500 ppm**, `time_lock_delta` 80, sui tre
+  canali.
+- Verso SatsRouting2 da ACINQ passano pezzi da ~300.000, non da ~590.000.
+- `listchaintxns` lascia a 0 conferme le transazioni che non toccano i
+  nostri indirizzi (la chiusura Magma `a815d949…`): fa fede
+  `closedchannels`.
+- Bitdefender ha segnalato `api.satsrouting.exchange` letto con
+  `curl.exe` dal PC: dominio registrato l'8 ago 2026 (Namecheap,
+  Cloudflare), predefinito di Zeus in `stores/SettingsStore.ts`. Il sito
+  si apre scritto a mano; letture dal PC solo avvisando prima.
+- La ronda dei pagamenti ha imparato ogni swap (81 noti).
 
 Fonti: [Zeus PR #4620](https://github.com/ZeusLN/zeus/pull/4620),
 [massmux su SATS Routing](https://massmux.org/p/a-new-boltzs-fork-is-running-sats),
