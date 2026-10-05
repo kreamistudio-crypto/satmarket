@@ -2096,6 +2096,8 @@ def prove_abbandonati():
           and "adesso - INVOICE_EXPIRY" in _SORGENTE)
 
     # --- Il giro VERO: i tre esiti su un database vero --------------
+    segnalate = []
+
     def mondo(muto=False):
         vero = sqlite3.connect(":memory:")
         vero.row_factory = sqlite3.Row
@@ -2164,9 +2166,15 @@ def prove_abbandonati():
         async def _rimborso(rid):
             rimborsati.append(rid)
 
+        async def _segnala(fonte, rifs):
+            # I PAGAMENTI CHE NON ARRIVANO (5 ott 2026): il suo banco e'
+            # prove_pagamenti_non_arrivati, qui conta solo CHI ci va
+            segnalate.append((fonte, list(rifs)))
+
         amb = {"db": Con, "time": _t, "invoice_pagata": _pagata,
                "_incassa_ordine": _incassa, "notifica": _notifica,
                "_paga_rimborso": _rimborso,
+               "segnala_fatture_scadute": _segnala,
                "print": lambda *a, **k: None,
                "INVOICE_EXPIRY": 900, "RILANCIO_EXPIRY": 600}
         exec(pezzo_async("controlla_abbandonati"), amb)
@@ -2198,6 +2206,10 @@ def prove_abbandonati():
     #    chi sta per pagare
     prova("ordine con la fattura ancora VIVA: non si guarda nemmeno",
           "creato", stato("ordini", 3))
+    # la lapide, e SOLO lei, va al registro dei pagamenti non arrivati:
+    # il pagato riacciuffato e la fattura viva no
+    prova("la lapide va ai pagamenti non arrivati, una chiamata per giro",
+          [("mercatino", [2])], segnalate)
 
     prova("rilancio pagato fuori tempo: 'tardivo', i sats al registro",
           ("tardivo", 1, "tardivo"),
@@ -2213,8 +2225,10 @@ def prove_abbandonati():
     # --- FAIL-OPEN NEL VERSO GIUSTO --------------------------------
     # LNbits muto: meglio una riga che si attarda che un pagamento
     # buttato via. Nessuno la cancella piu' alle sue spalle.
+    segnalate.clear()
     corri, vero, incassati, _, _ = mondo(muto=True)
     gira(corri())
+    prova("LNbits muto: nessuna fattura si dichiara morta", [], segnalate)
     prova("LNbits muto: nessuna riga si muove, si riprova al giro dopo",
           (["creato"] * 3, ["creato"] * 3, []),
           ([r["stato"] for r in vero.execute("SELECT stato FROM ordini "
@@ -2222,6 +2236,294 @@ def prove_abbandonati():
            [r["stato"] for r in vero.execute("SELECT stato FROM rilanci "
                                              "ORDER BY id")],
            incassati))
+
+
+def prove_pagamenti_non_arrivati():
+    """I PAGAMENTI CHE NON ARRIVANO (5 ott 2026). Un acquisto da Phoenix
+    da 56.459 sats e' fallito con ~29.000 di entrata sui canali ACINQ, e
+    nessuno se n'e' accorto: il pagamento muore PRIMA del nostro nodo.
+    Due banchi: Barattolo (due fatture di checkout morte non pagate
+    nella stessa ora → un avviso ai moderatori, poi la pausa) sui pezzi
+    VERI e un sqlite vero con lo schema vero; e la ronda della
+    liquidita' del nodo, il suo Python VERO estratto dallo script e
+    fatto girare su canali di cartone."""
+    print("\n[i pagamenti che non arrivano]")
+    import asyncio
+    import sqlite3
+    import subprocess
+    import tempfile
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    # --- lo schema vero delle due tabelle, dal sorgente ----------------
+    def schema(nome):
+        m = re.search(r"CREATE TABLE IF NOT EXISTS " + nome + r"\(.*?\n    \);",
+                      _SORGENTE, re.S)
+        return m.group(0)
+
+    i = _SORGENTE.index("FATTURE_SCADUTE_SOGLIA = ")
+    costanti = _SORGENTE[i:_SORGENTE.index("\n", _SORGENTE.index(
+        "TIMBRO_FATTURE_SCADUTE = ", i))]
+
+    def mondo():
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.executescript(schema("fatture_scadute") + schema("timbri"))
+        vero.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
+                     "prezzo_sats INTEGER)")
+        vero.execute("CREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, "
+                     "sats INTEGER DEFAULT 0)")
+        vero.executemany("INSERT INTO ordini VALUES(?,?)",
+                         [(196, 56459), (197, 25000), (198, 0), (199, 1000),
+                          (200, 2000), (201, 3000)])
+        vero.execute("INSERT INTO p2p_ordini VALUES('5a1e0000-aaaa', 7300)")
+        amb = {"_fmt_sats": reale("_fmt_sats")}
+        exec(costanti, amb)
+        for nome in ("_sats_fattura_scaduta", "_testo_fatture_scadute",
+                     "_avviso_fatture_scadute"):
+            exec(pezzo(nome), amb)
+        return vero, amb
+
+    prova("le costanti dette: due nella stessa ora, poi sei ore di pausa",
+          (2, 3600, 6 * 3600), (lambda a: (a["FATTURE_SCADUTE_SOGLIA"],
+                                           a["FATTURE_SCADUTE_FINESTRA_S"],
+                                           a["FATTURE_SCADUTE_PAUSA_S"]))(
+              mondo()[1]))
+
+    vero, amb = mondo()
+    avviso = amb["_avviso_fatture_scadute"]
+    T = 1_800_000_000
+    prova("UNA fattura morta e' un carrello abbandonato: niente avviso",
+          "", avviso(vero, "mercatino", [196], T))
+    prova("...ma resta scritta, coi suoi sats", [("mercatino", "196", 56459, T)],
+          [tuple(r) for r in vero.execute("SELECT * FROM fatture_scadute")])
+    prova("la STESSA fattura rivista (due giri dell'orologio) non conta due "
+          "volte", "", avviso(vero, "mercatino", [196], T + 60))
+    testo = avviso(vero, "p2p", ["5a1e0000-aaaa:1"], T + 1800)
+    prova("la SECONDA nella stessa ora fa l'avviso, anche da un'altra fonte",
+          True, testo.startswith("⚠️ <b>Pagamenti non arrivati, controllare "
+                                 "la liquidità.</b>"))
+    prova("...con le due fatture riconoscibili, i sats all'italiana", True,
+          "• ordine #196, 56.459 sats" in testo
+          and "• scambio P2P 5a1e0000 (garanzia), 7.300 sats" in testo
+          and "2 fatture di checkout" in testo)
+    prova("...dice dove guardare: l'entrata ACINQ e la ronda del nodo", True,
+          "ACINQ" in testo and "ronda-liquidita.sh --prova" in testo
+          and "non si ripete prima di 6 ore" in testo)
+    prova("...e il timbro e' scritto, nella stessa connessione",
+          T + 1800, vero.execute("SELECT quando FROM timbri WHERE nome="
+                                 "'avviso_fatture_scadute'").fetchone()[0])
+    prova("dentro la pausa una terza non ripete l'avviso", "",
+          avviso(vero, "mercatino", [197], T + 2000))
+    prova("passata la pausa, una sola nuova nella sua ora non basta", "",
+          avviso(vero, "mercatino", [198], T + 1800 + 6 * 3600))
+    t2 = avviso(vero, "mercatino", [199], T + 1800 + 6 * 3600 + 60)
+    prova("passata la pausa, due nuove nella stessa ora: l'avviso torna",
+          (True, False), ("• ordine #199, 1.000 sats" in t2,
+                          "#196" in t2))
+    prova("un ordine da 0 sats si dice senza cifra", True,
+          "• ordine #198\n" in t2)
+    prova("due morte a piu' di un'ora l'una dall'altra non fanno un avviso",
+          ("", ""), (avviso(vero, "mercatino", [200], T + 20 * 3600),
+                     avviso(vero, "mercatino", [201], T + 21 * 3600 + 1)))
+    avviso(vero, "mercatino", [], T + 3 * 86400)
+    prova("il registro si scorda dopo un giorno", 0,
+          vero.execute("SELECT COUNT(*) FROM fatture_scadute").fetchone()[0])
+    vero2, amb2 = mondo()
+    prova("due nella stessa chiamata bastano", True,
+          amb2["_avviso_fatture_scadute"](vero2, "mercatino", [196, 197], T)
+          .startswith("⚠️"))
+    # la pausa finisce mentre la finestra e' ancora piena di morte VECCHIE:
+    # una fattura gia' contata, rivista, non fa suonare — solo una nuova
+    vero3, amb3 = mondo()
+    av3 = amb3["_avviso_fatture_scadute"]
+    av3(vero3, "mercatino", [196, 197], T)
+    av3(vero3, "mercatino", [198, 199], T + 6 * 3600 - 100)
+    prova("pausa finita, finestra piena, nessuna morta nuova: tace", "",
+          av3(vero3, "mercatino", [199], T + 6 * 3600 + 10))
+    prova("...la prima nuova invece suona", True,
+          av3(vero3, "mercatino", [200], T + 6 * 3600 + 20).startswith("⚠️"))
+    prova("una riga che non si trova vale 0 sats, mai un'eccezione",
+          (0, 0), (amb2["_sats_fattura_scaduta"](vero2, "mercatino", "999"),
+                   amb2["_sats_fattura_scaduta"](vero2, "p2p", "nessuno:1")))
+
+    # --- il gesto async: avvisa una volta, non alza mai ----------------
+    class Con:
+        def __init__(self, v):
+            self.v = v
+
+        def execute(self, *a):
+            return self.v.execute(*a)
+
+        def commit(self):
+            self.v.commit()
+
+        def close(self):
+            pass
+
+    def con_gesto(rotto=False):
+        v, a = mondo()
+        if rotto:
+            v.execute("DROP TABLE fatture_scadute")
+        detti, journal = [], []
+
+        async def _admin(t):
+            detti.append(t)
+        a.update({"db": lambda: Con(v), "time": __import__("time"),
+                  "notifica_admin": _admin,
+                  "print": lambda *x, **k: journal.append(" ".join(map(str, x)))})
+        exec("async " + pezzo("segnala_fatture_scadute"), a)
+        return a["segnala_fatture_scadute"], detti, journal
+
+    segnala, detti, journal = con_gesto()
+    gira(segnala("mercatino", [196]))
+    gira(segnala("mercatino", [197]))
+    gira(segnala("mercatino", [198]))
+    prova("il gesto: un avviso solo per tre morte di fila", 1, len(detti))
+    prova("...e una riga nel journal quando parte", True,
+          any("Pagamenti non arrivati" in r for r in journal))
+    segnala, detti, journal = con_gesto(rotto=True)
+    gira(segnala("mercatino", [196]))
+    prova("tabella rotta: il gesto non alza, lo dice e tace", (0, True),
+          (len(detti), any("saltato" in r for r in journal)))
+
+    # --- il P2P: la garanzia chiesta e mai pagata, nello stesso giro ---
+    v = sqlite3.connect(":memory:")
+    v.row_factory = sqlite3.Row
+    v.executescript(schema("p2p_momenti"))
+    a = {}
+    exec(pezzo("_garanzia_mai_pagata_p2p"), a)
+    mai = a["_garanzia_mai_pagata_p2p"]
+
+    def momento(ordine, m, quando, giro, fonte="mostro"):
+        v.execute("INSERT INTO p2p_momenti(ordine, momento, quando, fonte, "
+                  "giro) VALUES(?,?,?,?,?)", (ordine, m, quando, fonte, giro))
+    momento("A", "preso", 1, 1)
+    momento("A", "garanzia_chiesta", 2, 1)
+    momento("B", "preso", 1, 1)
+    momento("B", "garanzia_chiesta", 2, 1)
+    momento("B", "garanzia_pagata", 3, 1)
+    momento("C", "preso", 1, 1)
+    momento("D", "garanzia_chiesta", 2, 1, fonte="libro")
+    prova("garanzia chiesta e mai pagata: e' una fattura morta", True,
+          mai(v, "A", 1))
+    prova("garanzia pagata (poi scaduta la finestra): no", False, mai(v, "B", 1))
+    prova("nessuna garanzia chiesta (manca la fattura di chi compra): no",
+          False, mai(v, "C", 1))
+    prova("la garanzia di un ALTRO giro non conta", False, mai(v, "A", 2))
+    prova("parla solo mostrod, non il libro", False, mai(v, "D", 1))
+
+    # --- le sentinelle sugli agganci -----------------------------------
+    abb = codice(pezzo("controlla_abbandonati"))
+    prova("reaper: la lapide si conta DOPO il commit, solo se il CAS ha preso",
+          True, abb.index("con.commit()") < abb.index("scadute.append(o[\"id\"])")
+          and "if cur.rowcount:\n                scadute.append" in abb)
+    prova("reaper: il gesto parte una volta, dopo il giro degli ordini", True,
+          "await segnala_fatture_scadute(\"mercatino\", scadute)" in abb
+          and abb.index("segnala_fatture_scadute") < abb.index("for ril in rilanci"))
+    ev = codice(pezzo("evento_p2p"))
+    prova("evento: solo un expired NUOVO guarda la garanzia", True,
+          'if fatto is not None and ev["azione"] == "expired":' in ev
+          and "_garanzia_mai_pagata_p2p(" in ev)
+    prova("evento: il controllo non puo' fare un 500 (try suo)", True,
+          ev.index("garanzia_morta = False") < ev.index("try:\n                garanzia_morta"))
+    prova("evento: l'avviso parte in un task, la risposta non lo aspetta",
+          True, "asyncio.create_task(segnala_fatture_scadute(" in ev
+          and "_TASK_EVENTI_P2P.add(t)" in ev.split("garanzia_morta:")[-1])
+    prova("evento: la chiave P2P porta il giro (una ripresa e' un'altra "
+          "fattura)", True, "f\"{ev['ordine']}:{fatto['giro']}\"" in ev)
+
+    # --- la ronda della liquidita' del nodo -----------------------------
+    sh = open(os.path.join(QUI, "deploy", "nodo", "ronda-liquidita.sh"),
+              encoding="utf-8").read()
+    prova("ronda: nessun esadecimale da 64 nello script (la CI)", None,
+          re.search(r"[0-9a-fA-F]{64}", sh))
+    pref = re.search(r"PREFISSO_ACINQ=\$\{PREFISSO_ACINQ:-([0-9a-f]+)\}", sh)
+    prova("ronda: ACINQ per prefisso, la soglia a 150.000", ("03864ef025fde8fb",
+          True), (pref and pref.group(1),
+                  "SOGLIA_ACINQ=${SOGLIA_ACINQ:-150000}" in sh))
+    prova("ronda: le tre leve arrivano al Python", True,
+          'PREFISSO_ACINQ="$PREFISSO_ACINQ" SOGLIA_ACINQ="$SOGLIA_ACINQ" '
+          'PEZZO_MAX="$PEZZO_MAX"' in sh)
+    py = sh[sh.index("<<'PY'\n") + 7:sh.index("\nPY\n")]
+    PK_ACINQ = "03864ef025fde8fb" + "a1" * 25
+    PK_LNBIG = "02" + "b2" * 32
+
+    def canale(cp, pk, cap, loc, rem, ris, attivo=True, cid="0"):
+        return {"channel_point": cp, "remote_pubkey": pk, "capacity": str(cap),
+                "local_balance": str(loc), "remote_balance": str(rem),
+                "active": attivo, "chan_id": cid, "thaw_height": 0,
+                "local_constraints": {"chan_reserve_sat": str(ris)},
+                "remote_constraints": {"chan_reserve_sat": str(ris)}}
+
+    def ronda(canali, modo="", **leve):
+        d = tempfile.mkdtemp(prefix="liq-")
+        with open(os.path.join(d, "ch.json"), "w") as f:
+            json.dump({"channels": canali}, f)
+        with open(os.path.join(d, "info.json"), "w") as f:
+            json.dump({"block_height": 900000}, f)
+        noti = os.path.join(d, "noti")
+        with open(noti, "w") as f:
+            for c in canali:
+                f.write(f"{c['channel_point']} {c['capacity']} {c['remote_pubkey']}\n")
+        env = dict(os.environ, NOTI=noti, LEASE=os.path.join(d, "manca"),
+                   MODO=modo, SOGLIA_IN="500000", TMPD=d, GIORNI_LEASE="14",
+                   BLOCCHI_THAW="1008", PREFISSO_ACINQ=pref.group(1),
+                   SOGLIA_ACINQ="150000", PEZZO_MAX="300000",
+                   PYTHONIOENCODING="utf-8")
+        env.update(leve)
+        r = subprocess.run([sys.executable, "-"], input=py, env=env,
+                           capture_output=True, text=True, encoding="utf-8")
+        return r.returncode, r.stdout + r.stderr
+
+    sani = [canale("c1:0", PK_ACINQ, 400000, 390777, 8000, 4000, cid="101"),
+            canale("c2:0", PK_ACINQ, 1000000, 371400, 618600, 10000, cid="102"),
+            canale("c3:0", PK_LNBIG, 5000000, 68700, 4930000, 50000, cid="103")]
+    rc, out = ronda(sani)
+    prova("ronda sana: tace, e il quadro dice l'entrata ACINQ UTILE",
+          (0, True), (rc, "liquidita ok" in out and "acinq_in=612600" in out))
+    rc, out = ronda(sani, "--prova")
+    prova("ronda --prova: parla col quadro", (8, True),
+          (rc, out.startswith("PROVA liquidita:") and "acinq_in=612600" in out))
+    rc, out = ronda(sani, SOGLIA_ACINQ="700000")
+    prova("ronda: la soglia ACINQ si cambia da fuori", (9, True),
+          (rc, "entrata ACINQ a 612600 sat utili (soglia 700000" in out))
+
+    # il 5 ott: 28.898 utili su ACINQ, milioni da LNBiG
+    cinque = [canale("c1:0", PK_ACINQ, 400000, 394777, 4000, 4000, cid="101"),
+              canale("c2:0", PK_ACINQ, 1000000, 951102, 38898, 10000, cid="102"),
+              sani[2]]
+    rc, out = ronda(cinque)
+    prova("il 5 ott: ALLARME, con l'entrata ACINQ al netto delle riserve",
+          (9, True), (rc, "entrata ACINQ a 28898 sat utili (soglia 150000, "
+                          "2 canali attivi)" in out))
+    prova("...l'entrata totale invece non allarma (ed e' il punto)", False,
+          "inbound a" in out)
+    prova("...il ribilancio: fuori dal canale ACINQ con piu' uscita, dentro "
+          "da LNBiG, fino a due volte la soglia", True,
+          "addinvoice --amt 271000 --memo ribilancio-acinq" in out
+          and f"--outgoing_chan_id 102 --last_hop {PK_LNBIG} --fee_limit 813" in out
+          and "--allow_self_payment" in out and "--macaroontimeout 300" in out)
+    prova("...e dice come farlo imparare alla ronda dei pagamenti", True,
+          "ronda-nodo.sh --impara" in out)
+    grossi = [dict(c) for c in cinque]
+    grossi[1]["remote_balance"] = "10000"
+    rc, out = ronda(grossi, SOGLIA_ACINQ="400000")
+    prova("ribilancio a pezzi da 300.000 al massimo", True,
+          "addinvoice --amt 300000 " in out)
+    spenti = [dict(c) for c in sani]
+    spenti[1]["active"] = False
+    rc, out = ronda(spenti)
+    prova("un canale ACINQ INATTIVO non conta come entrata", (9, True, True),
+          (rc, "entrata ACINQ a 4000 sat utili (soglia 150000, 1 canali attivi)" in out,
+           "canale INATTIVO" in out))
+    stretti = [cinque[0], cinque[1],
+               canale("c3:0", PK_LNBIG, 5000000, 4940000, 55000, 50000, cid="103")]
+    rc, out = ronda(stretti)
+    prova("senza spazio per il giro su noi stessi: lo swap dal canale ACINQ",
+          (9, True, False), (rc, "il giro su noi stessi non ha spazio" in out,
+                             "addinvoice" in out))
 
 
 def prove_ritiro():
@@ -120131,7 +120433,7 @@ def main():
               prove_ricategorizza, prove_collaudo_ricategorizza,
               prove_asta, prove_proxy_asta,
               prove_annullo, prove_annullo_venditore, prove_spunta_rimborso,
-              prove_abbandonati,
+              prove_abbandonati, prove_pagamenti_non_arrivati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
               prove_initdata, prove_portachiavi,
               prove_foto, prove_foto_scarti, prove_fotocamera_pagina,

@@ -6266,6 +6266,18 @@ def init_db():
         valore TEXT DEFAULT '',       -- il giorno, o quel che il chiamante timbra
         quando INTEGER DEFAULT 0      -- quando l'abbiamo scritto (unix)
     );
+    CREATE TABLE IF NOT EXISTS fatture_scadute(
+        -- LE FATTURE DI CHECKOUT SCADUTE SENZA PAGAMENTO (5 ott 2026):
+        -- il registro dell'avviso «pagamenti non arrivati» ai
+        -- moderatori (vedi I PAGAMENTI CHE NON ARRIVANO). In tabella e
+        -- non in un globale perche' il deploy arriva anche tre volte in
+        -- un'ora; si scorda dopo un giorno. Nessun conto ci poggia.
+        fonte TEXT NOT NULL,          -- 'mercatino' | 'p2p'
+        rif TEXT NOT NULL,            -- id dell'ordine, o l'ordine di mostro
+        sats INTEGER DEFAULT 0,       -- quanto valeva, 0 = non lo sappiamo
+        quando INTEGER NOT NULL,      -- quando l'abbiamo vista morire (unix)
+        PRIMARY KEY(fonte, rif)
+    );
     CREATE TABLE IF NOT EXISTS connettori(
         -- IL PONTE COL NEGOZIO DEL VENDITORE (ago 2026): chi ha gia' un
         -- e-commerce collega il catalogo e i prodotti compaiono qui,
@@ -46824,6 +46836,19 @@ def _registra_evento_p2p(con, ev: dict, adesso: int, cambio: float = 0.0):
             "preso_dal": preso_dal}
 
 
+def _garanzia_mai_pagata_p2p(con, ordine: str, giro: int) -> bool:
+    """PURA SULLA CONNESSIONE: in questo giro mostrod ha chiesto la
+    garanzia e non l'ha mai vista pagata? E' la fattura di checkout del
+    P2P, e chi la chiama lo fa su un `expired`: insieme dicono «la
+    garanzia e' morta non pagata» (I PAGAMENTI CHE NON ARRIVANO)."""
+    def visto(momento):
+        return con.execute(
+            "SELECT 1 FROM p2p_momenti WHERE ordine=? AND giro=? "
+            "AND fonte='mostro' AND momento=?",
+            (ordine, giro, momento)).fetchone() is not None
+    return visto("garanzia_chiesta") and not visto("garanzia_pagata")
+
+
 def _cauzione_dal_38385_p2p(info) -> dict:
     """PURA: la politica della cauzione come la annuncia il 38385 del
     coordinatore, dai suoi tag `bond_*` — il calco di `cauzioneDaInfoP2P`
@@ -48253,6 +48278,17 @@ async def evento_p2p(req: Request):
         # col cambio di adesso, dalla cache: a una presa diventa il suo
         # metro (27 set 2026)
         fatto = _registra_evento_p2p(con, ev, adesso, cambio_noto_ora())
+        # la garanzia morta non pagata: I PAGAMENTI CHE NON ARRIVANO. Mai
+        # un 500 per lei: l'evento e' gia' registrato, e il retry di
+        # mostrod troverebbe «ripetuto» e non avviserebbe le parti
+        garanzia_morta = False
+        if fatto is not None and ev["azione"] == "expired":
+            try:
+                garanzia_morta = _garanzia_mai_pagata_p2p(
+                    con, ev["ordine"], fatto["giro"])
+            except Exception as e:
+                print(f"⚠️ Garanzia scaduta di {ev['ordine'][:8]} non "
+                      f"guardata ({type(e).__name__}: {e})", flush=True)
     except ValueError as e:
         print(f"⚠️ Evento P2P rifiutato: {e}", flush=True)
         raise HTTPException(400, str(e))
@@ -48267,6 +48303,11 @@ async def evento_p2p(req: Request):
         t.add_done_callback(_TASK_EVENTI_P2P.discard)
         # ...e la fotografia del libro si rifa' subito (LA FOTOGRAFIA SUBITO)
         _foto_dopo_evento_p2p(ev)
+        if garanzia_morta:
+            t = asyncio.create_task(segnala_fatture_scadute(
+                "p2p", [f"{ev['ordine']}:{fatto['giro']}"]))
+            _TASK_EVENTI_P2P.add(t)
+            t.add_done_callback(_TASK_EVENTI_P2P.discard)
     return JSONResponse({"ok": True, "nuovo": fatto is not None},
                         headers={"Cache-Control": "no-store"})
 
@@ -54477,6 +54518,129 @@ def _incasso_del_motivo(motivo: str):
             "negozio_slug": _incassa_slug_negozio}.get(motivo)
 
 
+# ---------- I PAGAMENTI CHE NON ARRIVANO (5 ott 2026) ------------------
+# Il caso vero: un acquisto da Phoenix da 56.459 sats e' fallito perche'
+# l'entrata dei canali ACINQ era scesa a ~29.000 (gli inoltri l'avevano
+# spostata), e nessuno se n'e' accorto. Phoenix paga SOLO passando da
+# ACINQ, e il pagamento muore PRIMA del nostro nodo: niente log, niente
+# HTLC, solo una fattura che scade. Il nodo non lo puo' vedere; noi si'.
+# UNA fattura scaduta e' un carrello abbandonato, il pane quotidiano di
+# ogni negozio; DUE NELLA STESSA ORA sono un indizio, e ai moderatori
+# arriva «pagamenti non arrivati, controllare la liquidita'». Il nodo
+# ha il suo gemello (`ronda-liquidita.sh`, l'entrata ACINQ sotto
+# soglia), ma gira una volta al giorno e gli inoltri la spostano in ore.
+# CONTANO LE FATTURE DI CHECKOUT, e solo quando sono morte non pagate:
+# • l'ordine del mercatino che `controlla_abbandonati` mette a lapide —
+#   scaduta, e LNbits dice non pagata. L'annullo del compratore NON
+#   conta: e' un gesto, non un pagamento che non arriva;
+# • la GARANZIA P2P chiesta da mostrod e mai pagata fino allo scadere:
+#   `expired` dopo `hold-invoice-requested` senza `hold-invoice-paid`,
+#   nello stesso giro (`_garanzia_mai_pagata_p2p`). Il ritiro di una
+#   parte (`canceled`) no, per la stessa ragione dell'annullo.
+# Rilanci d'asta e pagamenti del banner restano fuori: non sono checkout.
+# IL REGISTRO STA IN TABELLA (`fatture_scadute`) e la pausa nel timbro:
+# tutt'e due sopravvivono al deploy. Il timbro si scrive PRIMA di
+# mandare, nella stessa connessione e senza await in mezzo: due morti
+# arrivate insieme (l'orologio e un evento di mostrod) non fanno due
+# avvisi. FAIL-OPEN NEL VERSO DEL FLUSSO: un avviso di servizio non
+# ferma mai il reaper ne' la rotta degli eventi, un errore e' una riga.
+FATTURE_SCADUTE_SOGLIA = 2            # quante nella finestra fanno l'avviso
+FATTURE_SCADUTE_FINESTRA_S = 3600     # «nella stessa ora»
+FATTURE_SCADUTE_PAUSA_S = 6 * 3600    # l'avviso non si ripete prima di cosi'
+FATTURE_SCADUTE_MEMORIA_S = 86400     # il registro si scorda dopo un giorno
+TIMBRO_FATTURE_SCADUTE = "avviso_fatture_scadute"
+
+
+def _sats_fattura_scaduta(con, fonte: str, rif: str) -> int:
+    """Quanto valeva la fattura morta, 0 se non si sa: il totale
+    dell'ordine del mercatino, i sats del libro per il P2P (a prezzo di
+    mercato fino alla presa sono 0, e si dice «non lo sappiamo»)."""
+    try:
+        if fonte == "mercatino":
+            r = con.execute("SELECT prezzo_sats AS s FROM ordini WHERE id=?",
+                            (int(rif),)).fetchone()
+        else:
+            r = con.execute("SELECT sats AS s FROM p2p_ordini WHERE ordine=?",
+                            (rif.split(":")[0],)).fetchone()
+        return int((r["s"] if r else 0) or 0)
+    except Exception:
+        return 0
+
+
+def _testo_fatture_scadute(righe: list, pausa_s: int) -> str:
+    """PURA: l'avviso ai moderatori dalle righe della finestra (dict con
+    fonte, rif, sats). Il riferimento basta a ritrovarle: l'ordine col
+    suo numero, lo scambio P2P con le prime otto cifre del suo id."""
+    voci = []
+    for r in righe:
+        nome = (f"ordine #{r['rif']}" if r["fonte"] == "mercatino"
+                else f"scambio P2P {str(r['rif']).split(':')[0][:8]} (garanzia)")
+        sats = int(r.get("sats") or 0)
+        voci.append(f"• {nome}" + (f", {_fmt_sats(sats)} sats" if sats else ""))
+    return ("⚠️ <b>Pagamenti non arrivati, controllare la liquidità.</b>\n\n"
+            f"{len(righe)} fatture di checkout sono scadute senza pagamento "
+            "nell'ultima ora:\n" + "\n".join(voci) + "\n\n"
+            "Una sola è un carrello abbandonato; più d'una nella stessa ora "
+            "può voler dire che i pagamenti si fermano PRIMA del nostro nodo. "
+            "Il primo indiziato è l'entrata dei canali ACINQ, l'unica strada "
+            "di Phoenix: sul nodo <code>sudo /usr/local/bin/ronda-liquidita.sh "
+            "--prova</code> la dice (acinq_in).\n\n"
+            f"<i>Questo avviso non si ripete prima di {pausa_s // 3600} ore.</i>")
+
+
+def _avviso_fatture_scadute(con, fonte: str, rifs: list, adesso: int) -> str:
+    """PURA SULLA CONNESSIONE: registra le fatture morte e, se nella
+    finestra ce ne sono abbastanza e la pausa e' passata, TIMBRA e torna
+    il testo da mandare ('' = niente). La stessa fattura due volte (il
+    retry di mostrod, due giri dell'orologio) conta una: la chiave e'
+    fonte + rif. Una chiamata senza fatture nuove non avvisa — solo una
+    morta di adesso puo' far suonare."""
+    con.execute("DELETE FROM fatture_scadute WHERE quando < ?",
+                (adesso - FATTURE_SCADUTE_MEMORIA_S,))
+    nuove = 0
+    for rif in rifs:
+        rif = str(rif)
+        nuove += con.execute(
+            "INSERT OR IGNORE INTO fatture_scadute(fonte, rif, sats, quando) "
+            "VALUES(?,?,?,?)",
+            (fonte, rif, _sats_fattura_scaduta(con, fonte, rif), adesso)).rowcount
+    if not nuove:
+        return ""
+    righe = [dict(r) for r in con.execute(
+        "SELECT fonte, rif, sats FROM fatture_scadute WHERE quando >= ? "
+        "ORDER BY quando, fonte, rif",
+        (adesso - FATTURE_SCADUTE_FINESTRA_S,))]
+    if len(righe) < FATTURE_SCADUTE_SOGLIA:
+        return ""
+    t = con.execute("SELECT quando FROM timbri WHERE nome=?",
+                    (TIMBRO_FATTURE_SCADUTE,)).fetchone()
+    if t and adesso - int(t["quando"] or 0) < FATTURE_SCADUTE_PAUSA_S:
+        return ""
+    con.execute("INSERT OR REPLACE INTO timbri(nome, valore, quando) "
+                "VALUES(?,?,?)", (TIMBRO_FATTURE_SCADUTE, str(len(righe)), adesso))
+    return _testo_fatture_scadute(righe, FATTURE_SCADUTE_PAUSA_S)
+
+
+async def segnala_fatture_scadute(fonte: str, rifs: list):
+    """Le fatture di checkout appena morte non pagate: al registro, e ai
+    moderatori se e' il caso (`_avviso_fatture_scadute`). Non alza mai."""
+    try:
+        con = db()
+        try:
+            testo = _avviso_fatture_scadute(con, fonte, list(rifs),
+                                            int(time.time()))
+            con.commit()
+        finally:
+            con.close()
+        if testo:
+            print(f"⚠️ Pagamenti non arrivati: avvisati i moderatori "
+                  f"(ultima: {fonte} {rifs})", flush=True)
+            await notifica_admin(testo)
+    except Exception as e:
+        print(f"⚠️ Avviso delle fatture scadute saltato "
+              f"({type(e).__name__}: {e})", flush=True)
+
+
 async def controlla_annullati():
     """Il riacciuffo (ago 2026): un pagamento arrivato su una fattura
     ANNULLATA. Succede nella corsa annulla-vs-saldo (finestra di
@@ -54646,6 +54810,7 @@ async def controlla_abbandonati():
         "AND payment_hash != '' AND creato < ?",
         (adesso - INVOICE_EXPIRY,))]
     con.close()
+    scadute = []    # le lapidi di questo giro: I PAGAMENTI CHE NON ARRIVANO
     for o in ordini:
         try:
             if await invoice_pagata(o["payment_hash"], o["cassaforte"]):
@@ -54677,8 +54842,12 @@ async def controlla_abbandonati():
                             (o["id"],))
             con.commit()
             con.close()
+            if cur.rowcount:
+                scadute.append(o["id"])
         except Exception as e:
             print(f"⚠️ Ultimo sguardo sull'ordine #{o['id']} saltato: {e}")
+    if scadute:
+        await segnala_fatture_scadute("mercatino", scadute)
     for ril in rilanci:
         try:
             ora = int(time.time())

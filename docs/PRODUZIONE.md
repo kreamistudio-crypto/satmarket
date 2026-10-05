@@ -439,6 +439,34 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `uid=101 gid=102`. Da allora `docker compose restart tor` e' un gesto
   sicuro: le regole ripartono con lui, e `authorized_clients/vps.auth`
   resta di chi era.
+- LA RONDA DELLA LIQUIDITÀ E L'ENTRATA ACINQ (5 ott 2026):
+  `ronda-liquidita.sh` (timer `nodo-liquidita`, una volta al giorno)
+  allarma anche quando l'entrata UTILE dei canali ACINQ scende sotto
+  150.000: Phoenix paga solo da lì. L'allarme scrive il ribilancio da
+  fare, un comando alla volta da `~/nodo`: `addinvoice`, poi `payinvoice
+  --allow_self_payment` sul `payment_request` appena avuto (chiede
+  conferma: si risponde `yes`), poi `sudo /usr/local/bin/ronda-nodo.sh
+  --impara <prime 8 cifre del r_hash>`. Leve da fuori, come le altre:
+  `SOGLIA_ACINQ`, `PREFISSO_ACINQ`, `PEZZO_MAX`. INSTALLAZIONE (le unit
+  non cambiano), dal PC in PowerShell:
+  `git -C C:\Users\Andrea\Documents\GitHub\satmarket fetch origin`
+  `cmd /c "git -C C:\Users\Andrea\Documents\GitHub\satmarket show origin/main:deploy/nodo/ronda-liquidita.sh > %TEMP%\ronda-liquidita.sh"`
+  `(Get-FileHash $env:TEMP\ronda-liquidita.sh).Hash.ToLower()`
+  `scp -i $env:USERPROFILE\.ssh\lnvps $env:TEMP\ronda-liquidita.sh debian@vm-1937.lnvps.cloud:/tmp/`
+  Poi SUL NODO: `sed -i 's/\r$//' /tmp/ronda-liquidita.sh && sha256sum /tmp/ronda-liquidita.sh`
+  (stesse cifre del PC), `bash -n /tmp/ronda-liquidita.sh && echo sintassi ok`,
+  `diff /usr/local/bin/ronda-liquidita.sh /tmp/ronda-liquidita.sh`
+  (devono comparire solo le righe di ACINQ, più il `mktemp` di B5 se
+  non era ancora stato ricopiato), `sudo cp /usr/local/bin/ronda-liquidita.sh /root/ronda-liquidita.sh.prima-5ott`,
+  `sudo install -m 755 /tmp/ronda-liquidita.sh /usr/local/bin/` e
+  `sudo /usr/local/bin/ronda-liquidita.sh --prova`: `PROVA liquidita:
+  canali 3/3 attivi ... acinq_in=<numero>` anche su Telegram. Poi senza
+  `--prova`: `liquidita ok ...` e Telegram muto (se `acinq_in` è sopra
+  150.000). Ritorno indietro:
+  `sudo install -m 755 /root/ronda-liquidita.sh.prima-5ott /usr/local/bin/ronda-liquidita.sh`.
+  Il gemello su Barattolo («Pagamenti non arrivati» ai moderatori, due
+  fatture di checkout scadute nella stessa ora) non vuole leve: parte
+  col deploy.
 - LA QUINTA DOMANDA DELLA RONDA, OGNI GIORNO: `ronda-tor.sh` +
   `nodo-tor.timer` (09:20 UTC, Persistent), copie in `deploy/nodo/`.
   Tre giudici dal namespace di mostro: la curl a check.torproject.org

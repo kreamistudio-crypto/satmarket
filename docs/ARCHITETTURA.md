@@ -1300,6 +1300,18 @@
   lasciava verde con la funzione mai chiamata. Ora chiede la RIGA
   intera. È la lezione da portarsi dietro: una sentinella si scrive
   rompendo il codice, non rileggendola.
+  I PAGAMENTI CHE NON ARRIVANO (5 ott 2026): la lapide del reaper è
+  anche un SEGNALE. Un pagamento da Phoenix che non trova entrata sui
+  canali ACINQ muore PRIMA del nostro nodo, e da qui si vede solo la
+  fattura che scade: `controlla_abbandonati` passa le sue lapidi a
+  `segnala_fatture_scadute`, e lo stesso fa `evento_p2p` per la
+  garanzia chiesta e mai pagata fino all'`expired`
+  (`_garanzia_mai_pagata_p2p`, stesso giro, solo mostrod). Il registro
+  `fatture_scadute` (chiave fonte + rif, il P2P col giro) e il timbro
+  della pausa stanno nel database; due morte nella stessa ora fanno un
+  avviso ai moderatori, poi sei ore di silenzio. Il giudice è
+  `_avviso_fatture_scadute`, puro sulla connessione; un errore è una
+  riga nel journal e mai un 500 o una lapide mancata.
   LA RICEVUTA DEL COMPRATORE (ago 2026): chi paga riceve una notifica
   SEMPRE, appena i sats sono in cassaforte. Prima non gli arrivava
   niente dal server — al venditore «Hai venduto», ai moderatori il

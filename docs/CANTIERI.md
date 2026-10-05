@@ -35529,3 +35529,71 @@ Application → localStorage compare `barattolo_nsec`, e un annuncio
 nuovo arriva sul suo profilo Nostr senza nessun gesto. Il venditore del
 caso dal campo deve rientrare con la nsec UNA volta.
 
+
+## Avvisi sui pagamenti che non arrivano (5 ott 2026)
+
+**IL FATTO.** Un acquisto da Phoenix da 56.459 sats è fallito: sui
+canali ACINQ l'entrata era scesa a ~29.000 (gli inoltri l'avevano
+spostata verso LNBiG). Nessuno se n'è accorto: Phoenix paga solo
+passando da ACINQ e il pagamento muore PRIMA del nostro nodo, senza
+log né HTLC. La ronda della liquidità guardava solo l'entrata TOTALE,
+che era di milioni.
+
+**DUE GUARDIE, UNA PER LATO.**
+1) Sul nodo, `ronda-liquidita.sh` ha una terza domanda: l'entrata UTILE
+dei canali ACINQ attivi (quel che hanno loro meno la riserva che devono
+tenere, `remote_constraints.chan_reserve_sat`) sotto `SOGLIA_ACINQ`,
+150.000 (quasi tre volte l'acquisto fallito; leva da fuori come le
+altre). ACINQ si riconosce dal PREFISSO della pubkey (16 caratteri): un
+esadecimale da 64 nel repo fa rossa la CI. L'allarme porta il
+ribilancio coi numeri del giorno: un giro su noi stessi
+(`addinvoice` + `payinvoice --allow_self_payment --outgoing_chan_id
+<canale ACINQ con più uscita> --last_hop <peer con più entrata>`),
+fino a due volte la soglia, a pezzi da 300.000 al massimo (da ACINQ
+passano quelli, la lezione degli swap), commissione massima al 3 per
+mille, `--macaroontimeout 300` (la lezione del `sendcoins`), e il
+`--impara` per la ronda dei pagamenti, che il giro lo vedrà uscire.
+Senza spazio per il giro, dice lo swap in uscita dal canale ACINQ. Il
+quadro della ronda ha `acinq_in=`. Va RICOPIATA sul nodo (PRODUZIONE,
+«LA RONDA DELLA LIQUIDITÀ E L'ENTRATA ACINQ»).
+2) Su Barattolo, quel che il nodo non vede: due fatture di checkout
+scadute non pagate nella stessa ora → ai moderatori «Pagamenti non
+arrivati, controllare la liquidità», coi riferimenti e i sats, poi sei
+ore di pausa. Contano la lapide dell'ordine del mercatino
+(`controlla_abbandonati`: scaduta e LNbits dice non pagata) e la
+garanzia P2P chiesta da mostrod e mai pagata fino all'`expired`, nello
+stesso giro. NON contano l'annullo del compratore e il ritiro P2P
+(gesti, non pagamenti mancati), la garanzia pagata e poi arrivata a
+scadenza, rilanci d'asta e pagamenti del banner (non sono checkout).
+Registro in tabella e pausa nel timbro, per il deploy; il timbro si
+scrive nella stessa connessione e senza await in mezzo.
+
+**SCARTATI.** Contare in memoria (il deploy arriva anche tre volte in
+un'ora); contare le lapidi dalla tabella `ordini` (l'annullo del
+compratore scrive la stessa lapide, e la purga le spazza in un'ora);
+la ronda della liquidità ogni ora (ripeterebbe lo stesso allarme
+ventiquattro volte: il lato veloce è Barattolo); la pubkey intera nello
+script.
+
+**PROVATO.** `prove_pagamenti_non_arrivati` (45, più due nuove in
+`prove_abbandonati`): i pezzi veri su sqlite con lo schema vero —
+una morta tace, la seconda nella stessa ora suona, la stessa fattura
+non conta due volte, la pausa, la pausa finita a finestra piena senza
+morte nuove tace, il registro che si scorda, la tabella rotta che non
+alza; la garanzia (chiesta sì, pagata no, altro giro no, solo
+mostrod); le sentinelle sugli agganci; e il Python VERO della ronda
+estratto dallo script su canali di cartone (sana, `--prova`, leva da
+fuori, il 5 ott con l'entrata netta e il ribilancio esatto, il tetto
+dei 300.000, il canale inattivo, senza spazio → swap). Tortura 15 su
+15 sulla copia (al primo giro 14: mancava il caso della guardia «solo
+una morta nuova fa suonare», aggiunto). `collaudo_pagamenti_non_arrivati`
+(22, nella CI) col server vero: l'orologio vero, la rotta vera degli
+eventi col segreto, il retry di mostrod, la ripresa che è un'altra
+fattura, mercatino + P2P insieme, il registro rotto con le lapidi e
+gli avvisi alle parti che partono lo stesso.
+
+**DA GUARDARE.** La ronda ricopiata sul nodo e il suo primo `--prova`
+(deve dire `acinq_in=`, ~600.000 dopo gli swap del 5 ott). Il primo
+avviso vero ai moderatori: se arriva per carrelli abbandonati e non per
+la liquidità, la soglia si alza a tre. Non provati dal vivo: Telegram
+vero, `payinvoice --allow_self_payment` sul nostro LND.
