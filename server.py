@@ -40604,6 +40604,11 @@ async def firme_nostr_da_fare(x_tg_init_data: str = Header(""),
         "JOIN annunci a ON a.id=f.annuncio_id "
         "WHERE f.tg_id=? ORDER BY f.creato LIMIT 20",
         (user["id"],)).fetchall()
+    # IL TOTALE, oltre ai 20 di questo giro (ott 2026): il client rigira
+    # finche' la coda si svuota, e il Profilo dice «Firma i tuoi N
+    # annunci» col numero vero, non col tetto del LIMIT.
+    totale = con.execute("SELECT COUNT(*) FROM firme_nostr WHERE tg_id=?",
+                         (user["id"],)).fetchone()[0]
     con.close()
 
     adesso = time.time()
@@ -40651,7 +40656,7 @@ async def firme_nostr_da_fare(x_tg_init_data: str = Header(""),
         fuori.append({"biglietto": biglietto, "annuncio_id": a["id"],
                       "titolo": a["titolo"], "azione": a["azione"],
                       "evento": evento})
-    return {"firme": fuori, "relays": _relays_import(),
+    return {"firme": fuori, "totale": totale, "relays": _relays_import(),
             "collaudo": MODALITA_COLLAUDO}
 
 
@@ -56844,8 +56849,15 @@ async def sollecita_firme_nostr():
             f"Per finire su Nostr a nome TUO — con la tua reputazione, "
             f"non la nostra — l'annuncio va firmato con la tua chiave, "
             f"e la chiave ce l'hai solo tu.\n\n"
-            f"Apri Barattolo con la tua estensione Nostr o col bunker "
-            f"collegato: la firma parte da sola, non devi fare altro. "
+            # IL TESTO DICE LA STRADA VERA (ott 2026): prima prometteva
+            # «la firma parte da sola» anche a chi era entrato con la
+            # nsec, che non si conserva — e quello apriva, non
+            # succedeva niente, e la settimana dopo il messaggio
+            # tornava uguale.
+            f"Se hai collegato un bunker o hai un'estensione Nostr, "
+            f"apri Barattolo da lì: la firma parte da sola. Se sei "
+            f"entrato con la nsec, vai nel Profilo e tocca «✍️ Firma i "
+            f"tuoi annunci»: la incolli, firma, e non viene conservata.\n\n"
             f"Finché non succede l'annuncio vive qui e si vende "
             f"normalmente — gli manca solo la piazza.")
     if da_avvisare:

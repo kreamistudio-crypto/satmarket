@@ -6412,7 +6412,7 @@
   dell'utente, mai sul server. La nsec incollata resta il rito di
   sempre (mai conservata, by design; il foglio suggerisce il bunker).
   I passi comuni vivono in `firmaEConsegna`: pubkey controllata PRIMA
-  di firmare (la nsec si azzera dopo UNA firma), id ricontrollato in
+  di firmare (la nsec si azzera a fine GESTO, `chiudi()`), id ricontrollato in
   pagina (firmatario che altera = stop), pubblicazione dal browser
   (`pubblicaEventoSuRelay`, serve ≥1 OK, relay = quelli dell'IMPORT
   col relay personale del venditore, non RELAYS_VERIFICA) e SOLO poi
@@ -17300,7 +17300,8 @@
   — estensione NIP-07 (zero librerie), bunker NIP-46 (client fatto in
   casa coi mattoni del bundle: richieste kind-24133 cifrate NIP-44 su
   relay, `auth_url` in popup), nsec incollata che firma SOLO in pagina
-  (chiave nella closure, azzerata dopo la firma: mai inviata, mai
+  (chiave nella closure, azzerata da `chiudi()` a fine gesto — dall'ott
+  2026, prima alla prima firma, e il resto del gesto firmava a vuoto: mai inviata, mai
   salvata, UI che la sconsiglia). Il bundle si carica pigro da
   IL BUNKER NON PUO' PIU' RESTARE MUTO (ago 2026, caso dal campo: da
   onion «Chiamo il bunker…» e poi silenzio PER SEMPRE). La causa non

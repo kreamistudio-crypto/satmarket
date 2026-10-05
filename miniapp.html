@@ -32294,6 +32294,14 @@ function renderIdentita(){
   const btnFirma =
     `<button class="btn ghost" style="margin:0 0 8px" onclick="collegaNostrFirmato()">🔑 Entra anche con Nostr</button>` +
     sub(`Firmi con bunker, estensione o nsec (mai inviata, mai salvata): badge, verifica e accesso arrivano insieme, e i tuoi annunci passano a nome tuo.`);
+  /* LA PORTA A MANO DELLA CODA (ott 2026): compare solo quando ci sono
+     annunci fermi e l'avvio non e' riuscito a firmarli da solo — cioe'
+     senza bunker ne' estensione, tipicamente dopo un ingresso con la
+     nsec, che non si conserva. */
+  const btnCoda = (myNpubVerified && firmeInAttesa > 0)
+    ? `<button class="btn" style="margin:0 0 8px" onclick="firmaCodaAMano()">✍️ Firma ${firmeInAttesa === 1 ? 'il tuo annuncio' : `i tuoi ${firmeInAttesa} annunci`} per Nostr</button>` +
+      sub(`Finché non li firmi restano solo qui, non sul tuo profilo Nostr. Con bunker o estensione partono da soli; con la nsec la incolli qui: firma e sparisce.`)
+    : '';
   let nsRiga;
   if (!myNpub) {
     nsRiga = riga('🟣','Nostr','Nessuna npub nel profilo.', btnFirma);
@@ -32303,10 +32311,10 @@ function renderIdentita(){
       btnFirma + btnRimuovi);
   } else if (!myNpubAccesso) {
     nsRiga = riga('🟣','Nostr',`${npubBreve} — badge 🟣 attivo, ma non firmata.`,
-      btnFirma + btnRimuovi);
+      btnCoda + btnFirma + btnRimuovi);
   } else {
     nsRiga = riga('🟣','Nostr',`${npubBreve} — verificata 🔑 puoi entrare dal web con Nostr.`,
-      (myTgId > 0
+      btnCoda + (myTgId > 0
         ? `<button class="btn ghost" style="margin:0 0 8px" onclick="disabilitaAccessoNostr()">Disabilita l'accesso con Nostr</button>
            ${sub(`Chiude solo l'ingresso via Nostr: la npub nel profilo resta.`)}`
         : sub(`È il tuo unico ingresso: per rimuoverla collega prima Telegram.`)) + btnRimuovi);
@@ -43806,65 +43814,121 @@ async function firmatarioAutomatico(){
   return null;
 }
 
-async function svuotaFirmeNostr(fPronto){
+/* Quante firme aspettano ancora, dall'ultimo giro: la riga «Firma i
+   tuoi annunci» del Profilo legge questo. -1 = non ancora chiesto. */
+let firmeInAttesa = -1;
+
+async function svuotaFirmeNostr(fPronto, alLogin){
   /* fPronto: un firmatario gia' in mano (appena usato per collegare la
-     chiave), cosi' non deve ritrovarlo da solo e la coda si svuota nello
-     STESSO gesto invece di aspettare il prossimo giro opportunistico. */
-  if (DEMO || VETRINA || !(myNpubAccesso || myNpubVerified)) return;
-  let d;
+     chiave o per entrare), cosi' non deve ritrovarlo da solo e la coda
+     si svuota nello STESSO gesto invece di aspettare il prossimo giro.
+     alLogin: siamo DENTRO entraConNostr, prima del reload — la pagina
+     e' ancora la vetrina e non sa chi siamo, ma il cookie c'e'.
+     TORNA quante firme restano (0 = tutto in piazza). */
+  if (DEMO) return 0;
+  if (!alLogin && (VETRINA || !(myNpubAccesso || myNpubVerified))) return 0;
+  let auto = null, pub = '', resto = 0;
   try {
-    const r = await fetch(`${API_BASE}/me/firme-nostr`,
-      {headers:{'X-Tg-Init-Data':authHdr()}});
-    if (!r.ok) return;
-    d = await r.json();
-  } catch(e){ return; }
-  if (!d.firme || !d.firme.length) return;
-  const auto = fPronto ? {f: fPronto, chiudi: false} : await firmatarioAutomatico();
-  if (!auto) {
-    console.log(`🟪 [coda] ${d.firme.length} firme in attesa, nessuna `
-      + `strada automatica: restano in coda`);
-    return;
-  }
-  try {
-    await caricaNostrTools();
-    const NT = window.NostrTools;
-    let pub;
-    try { pub = String(await auto.f.pubkey() || '').toLowerCase(); }
-    catch(e){ return; }
-    for (const voce of d.firme){
-      /* Stessa cintura della modifica firmata: l'id si ricontrolla in
-         pagina, cosi' un firmatario che altera l'evento si ferma qui */
-      let firmato;
-      try { firmato = await auto.f.firma(voce.evento); }
-      catch(e){
-        console.log(`🟪 [coda] firma rifiutata su #${voce.annuncio_id}`);
-        break;      // ha detto no: non si insiste sulle altre
-      }
-      if (!firmato || firmato.id !== NT.getEventHash({...voce.evento, pubkey: pub})){
-        console.log('🟪 [coda] evento alterato dal firmatario: fermo');
-        break;
-      }
-      /* Prima i relay: zero OK = non e' successo niente, e il server
-         non deve credere che l'evento sia in piazza */
-      const ok = d.collaudo ? 1
-        : await pubblicaEventoSuRelay(d.relays, firmato);
-      if (!ok){
-        console.log(`🟪 [coda] nessun relay ha preso #${voce.annuncio_id}`);
-        continue;
-      }
+    /* TUTTI I GIRI, non uno (ott 2026): il server ne prepara 20 alla
+       volta, e chi ne ha 25 restava con 5 in coda fino all'apertura
+       dopo. Si rigira finche' la coda si accorcia; il tetto e' la
+       cintura contro un giro che non avanza mai. */
+    for (let giro = 0; giro < 10; giro++){
+      let d;
       try {
-        await fetch(`${API_BASE}/me/firme-nostr`,
-          {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),
-                                   'Content-Type':'application/json'},
-           body: JSON.stringify({biglietto: voce.biglietto,
-                                 pubkey: pub, sig: firmato.sig})});
-        console.log(`🟪 [coda] #${voce.annuncio_id} (${voce.azione}) `
-          + `firmato e in piazza`);
-      } catch(e){ /* i relay ce l'hanno: il server si allinea al giro dopo */ }
+        const r = await fetch(`${API_BASE}/me/firme-nostr`,
+          {headers:{'X-Tg-Init-Data':authHdr()}});
+        if (!r.ok) return resto;
+        d = await r.json();
+      } catch(e){ return resto; }
+      resto = d.totale ?? (d.firme || []).length;
+      if (!d.firme || !d.firme.length) { resto = 0; break; }
+      if (!auto) {
+        auto = fPronto ? {f: fPronto, chiudi: false} : await firmatarioAutomatico();
+        if (!auto) {
+          console.log(`🟪 [coda] ${resto} firme in attesa, nessuna `
+            + `strada automatica: restano in coda`);
+          break;
+        }
+        await caricaNostrTools();
+        try { pub = String(await auto.f.pubkey() || '').toLowerCase(); }
+        catch(e){ break; }
+        if (alLogin) toast(`🟣 Metto su Nostr i tuoi annunci (${resto})…`, 4000);
+      }
+      const NT = window.NostrTools;
+      let fatte = 0, rifiutata = false;
+      for (const voce of d.firme){
+        /* Stessa cintura della modifica firmata: l'id si ricontrolla in
+           pagina, cosi' un firmatario che altera l'evento si ferma qui */
+        let firmato;
+        try { firmato = await auto.f.firma(voce.evento); }
+        catch(e){
+          console.log(`🟪 [coda] firma rifiutata su #${voce.annuncio_id}`);
+          rifiutata = true;
+          break;      // ha detto no: non si insiste sulle altre
+        }
+        if (!firmato || firmato.id !== NT.getEventHash({...voce.evento, pubkey: pub})){
+          console.log('🟪 [coda] evento alterato dal firmatario: fermo');
+          rifiutata = true;
+          break;
+        }
+        /* Prima i relay: zero OK = non e' successo niente, e il server
+           non deve credere che l'evento sia in piazza */
+        const ok = d.collaudo ? 1
+          : await pubblicaEventoSuRelay(d.relays, firmato);
+        if (!ok){
+          console.log(`🟪 [coda] nessun relay ha preso #${voce.annuncio_id}`);
+          continue;
+        }
+        try {
+          const r = await fetch(`${API_BASE}/me/firme-nostr`,
+            {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),
+                                     'Content-Type':'application/json'},
+             body: JSON.stringify({biglietto: voce.biglietto,
+                                   pubkey: pub, sig: firmato.sig})});
+          if (r.ok) { fatte++; resto = Math.max(0, resto - 1); }
+          console.log(`🟪 [coda] #${voce.annuncio_id} (${voce.azione}) `
+            + `firmato e in piazza`);
+        } catch(e){ /* i relay ce l'hanno: il server si allinea al giro dopo */ }
+      }
+      if (rifiutata || !fatte) break;   // il giro non avanza: ci si ferma qui
     }
   } finally {
-    if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} }
+    if (auto && auto.chiudi) { try { auto.f.chiudi(); } catch(e){} }
+    if (!alLogin && firmeInAttesa !== resto) {
+      firmeInAttesa = resto;
+      if (typeof renderIdentita === 'function') { try { renderIdentita(); } catch(e){} }
+    }
   }
+  return resto;
+}
+
+/* «Firma i tuoi annunci» dal Profilo (ott 2026): la porta A MANO per
+   chi non ha una strada automatica — tipicamente chi e' entrato con la
+   nsec, che non si conserva (regola ferrea 2). La si incolla qui, firma
+   tutta la coda nello stesso gesto e se ne va. Un gesto dell'utente,
+   mai all'avvio: aprire il foglio da solo sarebbe l'imboscata. */
+async function firmaCodaAMano(){
+  haptic();
+  if (DEMO) { toast('In demo non c\'è niente da firmare 🙂'); return; }
+  const finito = (resto) => toast(resto
+    ? `🟣 Ne restano ${resto} da firmare: riprova fra poco`
+    : '🟣 Fatto: i tuoi annunci sono su Nostr a nome tuo', 6000);
+  const auto = await firmatarioAutomatico();
+  if (auto) {
+    try { finito(await svuotaFirmeNostr(auto.f)); }
+    finally { if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} } }
+    return;
+  }
+  apriNostrSheet(async (f) => {
+    closeSheet();
+    finito(await svuotaFirmeNostr(f));
+  });
+  el('nostrSheetSub').innerHTML =
+    'I tuoi annunci vanno su Nostr a nome tuo: serve la firma della tua '
+    + 'chiave. La chiave privata <b>non viene mai inviata</b> né '
+    + 'conservata. Col bunker la connessione si ricorda, e le prossime '
+    + 'firme partono da sole.';
 }
 
 async function pubblicaEventoSuRelay(relays, evento){
@@ -45226,21 +45290,28 @@ function apriAutorizzazioneBunker(url){
 }
 
 /* 3) nsec incollata: firma IN QUESTA PAGINA e basta. La chiave vive
-   nella closure, firma UNA volta e si azzera subito dopo: mai inviata,
-   mai in localStorage, mai in un cookie. */
+   nella closure: mai inviata, mai in localStorage, mai in un cookie.
+   VIVE QUANTO IL GESTO, NON QUANTO UNA FIRMA (ott 2026): prima si
+   azzerava alla prima firma, e il resto dello stesso gesto — la coda
+   delle firme, la dichiarazione NIP-85 di «Entra anche con Nostr» —
+   firmava con una chiave a zero e falliva in silenzio. Chi entrava con
+   la nsec si ritrovava gli annunci fermi in coda e il promemoria ogni
+   settimana (decisione di Andrea: «se uno ha inserito la nsec, i suoi
+   prodotti devono finire sul suo profilo Nostr»). Ora la azzera
+   `chiudi()`, che loginNostrNsec chiama nel finally: finito il gesto,
+   la chiave non c'e' piu' — stessa forma del firmatario bunker. */
 async function firmatarioNsec(nsec){
   await caricaNostrTools();
   const NT = window.NostrTools;
   const dec = NT.nip19.decode(nsec.trim());
   if (dec.type !== 'nsec') throw new Error('non è una nsec');
   const sk = dec.data;
+  let chiusa = false;
+  const viva = () => { if (chiusa) throw new Error('chiave già richiusa'); };
   return {
-    pubkey: async () => NT.getPublicKey(sk),
-    firma:  async (evento) => {
-      const firmato = NT.finalizeEvent(evento, sk);
-      sk.fill(0);                     // la chiave ha già finito il suo lavoro
-      return firmato;
-    },
+    pubkey: async () => { viva(); return NT.getPublicKey(sk); },
+    firma:  async (evento) => { viva(); return NT.finalizeEvent(evento, sk); },
+    chiudi: () => { chiusa = true; sk.fill(0); },
   };
 }
 
@@ -45260,6 +45331,13 @@ async function entraConNostr(firmatario){
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail || 'Accesso non riuscito, riprova', 6000); return; }
   if (d.collega) { apriCollega(d.collega); return; }
+  /* LA CODA SI FIRMA QUI, prima del reload (ott 2026): e' l'unico
+     momento in cui il firmatario e' in mano — dopo il reload la nsec
+     non esiste piu', e chi e' entrato con lei avrebbe gli annunci
+     fermi in coda per sempre. Il cookie e' appena nato: fuori da
+     Telegram l'identita' viaggia li', quindi WEB va acceso prima. */
+  if (!tg?.initData) WEB = true;
+  try { await svuotaFirmeNostr(firmatario, true); } catch(e){}
   location.reload();
 }
 
@@ -45343,8 +45421,10 @@ async function loginNostrNsec(){
     toast('Serve la chiave privata (inizia con nsec1)', 5000);
     return;
   }
-  try { await consegnaFirmatario(await firmatarioNsec(nsec)); }
+  let f = null;
+  try { f = await firmatarioNsec(nsec); await consegnaFirmatario(f); }
   catch(e){ toast(`Accesso non riuscito: ${e.message || 'riprova'}`, 6000); }
+  finally { if (f) f.chiudi(); }      // finito il gesto, la chiave non c'e' piu'
 }
 
 /* La npub è già verificata (badge 🟣) su un account Telegram: la firma
@@ -66086,6 +66166,13 @@ async function avvia(){
     myListings = [];          // la lista "i tuoi annunci" della vecchia identità non vale più
     if (editandoId) annullaModifica();   // una modifica a metà non segue l'identità nuova
     renderOrders();
+    /* LA CODA DELLE FIRME ALL'AVVIO (ott 2026): il promemoria dice
+       «apri Barattolo col bunker o l'estensione e la firma parte da
+       sola», ma la coda girava solo tirando giu' l'Esplora o dopo una
+       pubblicazione — aprire e basta non firmava niente. In sottofondo
+       e in silenzio: senza strada automatica non fa niente (e il
+       Profilo mostra «Firma i tuoi annunci»). */
+    svuotaFirmeNostr().catch(()=>{});
     /* Se eri dentro un ordine o una scheda annuncio (es. cambiando
        identità nel collaudo), la pagina si aggiorna con i dati freschi
        invece di restare quella di prima */

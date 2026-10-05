@@ -35399,3 +35399,76 @@ la 3.12).
 **DA GUARDARE.** Nel journal del VPS la riga «📣 Coda del canale: N
 annunci tornano in fila, M aspettano» quando si libera un turno, e nel
 canale il post dell'annuncio rimandato una settimana dopo il primo.
+
+
+## Chi entra con la nsec firma i suoi annunci: la coda all'avvio, al login e dal Profilo (5 ott 2026)
+
+**IL CASO DAL CAMPO.** Un venditore con 25 annunci riceveva ogni
+settimana «🟣 25 tuoi annunci aspettano la tua firma… apri Barattolo
+col bunker o l'estensione: la firma parte da sola», e scriveva «eppure
+il login Nostr l'ho fatto». Andrea: «se uno ha inserito nsec o bunker
+i suoi prodotti devono finire tutti sul suo profilo Nostr» — e, sopra
+tutto, «noi non dobbiamo conservare nessuna chiave».
+
+**TRE FALLE, UNA SOPRA L'ALTRA.**
+1. La nsec si azzerava alla PRIMA firma (`firmatarioNsec`). Il login e
+   «Entra anche con Nostr» firmano la sfida e poi, nello STESSO gesto,
+   dovrebbero firmare coda e NIP-85: con la chiave già a zero falliva
+   tutto, in silenzio («firma rifiutata» nel log e basta).
+2. La coda non girava all'avvio: `svuotaFirmeNostr` stava solo nel
+   tirare giù l'Esplora (`aggiornaVista`), dopo una pubblicazione e
+   dopo «Entra anche con Nostr». Il promemoria prometteva il contrario
+   (e il commento in prove.py diceva «gira in avvia()»: lo era stato).
+3. Un giro solo: il GET ne prepara 20 (`LIMIT 20`), e 25 lasciavano 5
+   annunci all'apertura dopo.
+
+**LA CURA, senza conservare niente.**
+- La nsec vive quanto il GESTO: firma quante volte serve e la azzera
+  `chiudi()`, che `loginNostrNsec` chiama nel finally — stessa forma
+  del firmatario bunker. Mai in storage, mai inviata: la regola ferrea
+  2 è intatta, cambia solo QUANDO la closure si azzera (fine gesto
+  invece che prima firma).
+- `entraConNostr` svuota la coda col firmatario in mano PRIMA del
+  `location.reload()` (dopo, la nsec non esiste più). Fuori da
+  Telegram si accende `WEB` prima, che il cookie è appena nato e
+  `authHdr()` altrimenti manderebbe l'header del collaudo.
+- `avvia()` richiama `svuotaFirmeNostr()`: bunker salvato o estensione
+  firmano da soli all'apertura, come il promemoria dice.
+- `svuotaFirmeNostr` rigira finché la coda si accorcia (tetto 10
+  giri), torna quante firme restano e le scrive in `firmeInAttesa`.
+  Il GET manda anche `totale`.
+- Nel Profilo, riga Nostr, «✍️ Firma i tuoi N annunci per Nostr»
+  (`firmaCodaAMano`) quando ne restano: con una strada automatica
+  firma subito, altrimenti apre il foglio della chiave — la nsec si
+  incolla, firma tutta la coda e sparisce. Un gesto dell'utente, mai
+  all'avvio (l'imboscata scartata ad agosto resta scartata).
+- Il promemoria dice la strada vera: bunker/estensione → apri da lì;
+  nsec → Profilo, «Firma i tuoi annunci».
+
+**SCARTATO.** Conservare la nsec nel browser (localStorage o
+sessionStorage) perché firmi da sola: Andrea l'ha escluso in partenza,
+ed è la regola 2. Aprire il foglio della chiave dopo ogni pubblicazione:
+il Profilo basta, e il promemoria ci porta.
+
+**IMPERFEZIONE DICHIARATA.** Chi entra con la nsec e poi pubblica un
+annuncio nuovo deve ripassare dal Profilo per firmarlo: senza chiave
+conservata non c'è altra strada. Il ramo `apriCollega` del login (npub
+già legata a un account Telegram) ricarica dopo la conferma, a
+firmatario già chiuso: lì la coda la prende il Profilo.
+
+**PROVATO.** `prove_firme_nsec`, 12 verdi: la nsec non si azzera in
+`firma()` ma in `chiudi()`, il finally di `loginNostrNsec`, la coda
+prima del reload, la chiamata in `avvia()`, il `totale`, il testo del
+promemoria, e il banco node: 25 annunci, una nsec finta che rifiuta di
+firmare a chiave zero → 25 firmati in più giri, un secondo giro nello
+stesso gesto regge, dopo `chiudi()` non firma più, `firmeInAttesa` a 0.
+Suite intera severa sull'albero da origin/main eb88c4b: 18.590 verdi
+e le 4 rosse note dell'AVIF in locale; 34 collaudi della CI verdi nella
+gabbia (`collaudo_freni` non compila col Python 3.10 locale, in CI c'è
+la 3.12). Il giro dal vivo nel browser NON è stato fatto: il banco node
+gira la funzione vera con fetch e NostrTools di cartone.
+
+**DA GUARDARE.** Il venditore del caso: dopo il deploy, al prossimo
+ingresso con la nsec (o dal Profilo) i 25 annunci passano a nome suo
+e il promemoria smette. Nel journal sparisce «🟣 Solleciti firme
+Nostr» per lui.

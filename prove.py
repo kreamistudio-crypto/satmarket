@@ -18408,6 +18408,129 @@ def prove_firme_nostr():
           "notifica_admin" in soll)
 
 
+
+def prove_firme_nsec():
+    """Chi entra con la nsec deve ritrovarsi gli annunci sul SUO profilo
+    Nostr (ott 2026, decisione di Andrea: «se uno ha inserito nsec o
+    bunker i suoi prodotti devono finire tutti sul suo profilo»). Tre
+    falle chiuse insieme, e ognuna ha qui la sua guardia: la nsec si
+    azzerava alla PRIMA firma (il resto del gesto firmava a vuoto), la
+    coda non girava all'avvio (il promemoria prometteva il contrario),
+    e un giro solo ne firmava 20 su 25."""
+    print("\n[le firme di chi entra con la nsec]")
+    import subprocess
+    import tempfile
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "miniapp.html"), encoding="utf-8").read()
+
+    # 1. la chiave vive quanto il GESTO, e il gesto la richiude
+    fn = pezzo_js(mini, "async function firmatarioNsec(nsec){", "\n}")
+    prova("la nsec non si azzera piu' dentro firma()", False,
+          "sk.fill(0)" in fn[fn.index("firma:"):fn.index("chiudi:")])
+    prova("...la azzera chiudi()", True,
+          "sk.fill(0)" in fn[fn.index("chiudi:"):])
+    ln = pezzo_js(mini, "async function loginNostrNsec(){", "\n}")
+    prova("...e loginNostrNsec la richiude nel finally, comunque vada",
+          True, "finally { if (f) f.chiudi(); }" in ln)
+
+    # 2. il login firma la coda PRIMA del reload
+    ec = pezzo_js(mini, "async function entraConNostr(firmatario){", "\n}")
+    i = ec.find("svuotaFirmeNostr(firmatario, true)")
+    j = ec.rfind("location.reload()")
+    prova("il login svuota la coda col firmatario in mano, prima del "
+          "reload", True, 0 < i < j)
+
+    # 3. all'avvio
+    av = pezzo_js(mini, "async function avvia(){", "\n}\n")
+    prova("la coda gira all'avvio (il promemoria lo promette)", True,
+          "svuotaFirmeNostr().catch(" in av)
+
+    # 4. il server dice il totale, e il promemoria dice la strada vera
+    prova("il GET dice il totale della coda, non solo i 20 del giro",
+          True, '"totale": totale' in pezzo("firme_nostr_da_fare"))
+    soll = pezzo("sollecita_firme_nostr")
+    prova("il promemoria indica la strada per chi e' entrato con la nsec",
+          True, "nsec" in soll and "Firma i " in soll)
+    prova("...e la porta del Profilo esiste davvero", True,
+          'onclick="firmaCodaAMano()"' in mini)
+
+    # 5. IL BANCO: 25 annunci in coda, una nsec finta. Tutti e 25 devono
+    #    arrivare al POST, in piu' giri, e la chiave deve reggere tutte
+    #    le firme e morire a chiudi().
+    js = r"""
+const window = {};
+let DEMO = false, VETRINA = false, myNpubAccesso = 'npub1x', myNpubVerified = true;
+const API_BASE = '/api';
+function authHdr(){ return ''; }
+function toast(){}
+function console_log(){}
+async function caricaNostrTools(){}
+async function firmatarioAutomatico(){ return null; }
+let resi = 0;
+function renderIdentita(){ resi++; }
+async function pubblicaEventoSuRelay(){ return 1; }
+window.NostrTools = {
+  nip19: {decode: () => ({type: 'nsec', data: new Uint8Array(32).fill(7)})},
+  getPublicKey: (sk) => { if (sk.every(b => b === 0)) throw new Error('zero'); return 'bb'; },
+  finalizeEvent: (ev, sk) => {
+    if (sk.every(b => b === 0)) throw new Error('chiave a zero');
+    return {...ev, id: 'id-' + ev.n, sig: 'ss'};
+  },
+  getEventHash: (ev) => 'id-' + ev.n,
+};
+let coda = Array.from({length: 25}, (_, k) => k + 1);
+const firmati = [];
+async function fetch(url, opt){
+  if (opt && opt.method === 'POST') {
+    const b = JSON.parse(opt.body);
+    firmati.push(b.biglietto);
+    coda = coda.filter(n => 'b' + n !== b.biglietto);
+    return {ok: true, json: async () => ({ok: true})};
+  }
+  const giro = coda.slice(0, 20).map(n => ({biglietto: 'b' + n,
+    annuncio_id: n, azione: 'pubblica', evento: {n}}));
+  return {ok: true, json: async () => ({firme: giro, totale: coda.length,
+    relays: [], collaudo: true})};
+}
+console.log = (() => { const v = console.log; return (...a) => {
+  if (String(a[0]).startsWith('{')) v(...a); }; })();
+""" + pezzo_js(mini, "async function firmatarioNsec(nsec){", "\n}") + "\n}\n" \
+       + pezzo_js(mini, "let firmeInAttesa = -1;", "\n}\n") + "\n}\n" + r"""
+(async () => {
+  const f = await firmatarioNsec('nsec1finta');
+  const resto = await svuotaFirmeNostr(f);
+  const dopo = await svuotaFirmeNostr(f);   // la chiave regge ancora
+  f.chiudi();
+  let morta = false;
+  try { await f.firma({n: 99}); } catch(e){ morta = true; }
+  console.log(JSON.stringify({resto, dopo, firmati: firmati.length,
+    unici: new Set(firmati).size, morta, attesa: firmeInAttesa}));
+})();
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js)
+        p = f.name
+    try:
+        r = subprocess.run(["node", p], capture_output=True, text=True,
+                           encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        os.unlink(p)
+        print("  (node assente: il banco della coda salta)")
+        return
+    os.unlink(p)
+    if r.returncode != 0:
+        prova("il banco della coda gira", "", r.stderr[-300:])
+        return
+    esito = json.loads(r.stdout.strip().splitlines()[-1])
+    prova("25 annunci in coda: firmati TUTTI, in piu' giri, con la "
+          "stessa nsec", (25, 25, 0), (esito["firmati"], esito["unici"],
+                                       esito["resto"]))
+    prova("...la chiave regge un secondo giro nello stesso gesto", 0,
+          esito["dopo"])
+    prova("...e dopo chiudi() non firma piu' niente", True, esito["morta"])
+    prova("...e il Profilo sa che non resta niente", 0, esito["attesa"])
+
 def prove_trasloco_nostr():
     """IL TRASLOCO (ago 2026, decisione di Andrea): gli annunci finiti
     in piazza a nome di Barattolo passano sull'account del venditore
@@ -119955,7 +120078,7 @@ def main():
               prove_barattolo_filtra, prove_barattolo_condiviso,
               prove_notifica_fail_open,
               prove_messaggio_admin, prove_avviso_contatto,
-              prove_forma_tracking, prove_bip353, prove_firme_nostr,
+              prove_forma_tracking, prove_bip353, prove_firme_nostr, prove_firme_nsec,
               prove_trasloco_nostr, prove_collega_npub_firma,
               prove_conta_feedback,
               prove_classifica, prove_classifica_nascosta,
