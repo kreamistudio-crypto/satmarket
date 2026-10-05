@@ -172,12 +172,13 @@ in ogni sessione:
 
 1. MAI committare `config.py`, `*.db`, `foto/`, chiavi, token, npub private.
    Se una chiave viene esposta ovunque (chat, log, commit): va RUOTATA.
-2. MAI chiedere o gestire nsec (chiave privata Nostr) degli utenti.
-   Decisione permanente: mai custodia di segreti altrui, mai firme che
-   richiedano di consegnare chiavi al server. La scala di quel che è
-   APPROVATO — badge npub auto-dichiarato, verifica con nota pubblica,
-   login con firma di sfida, wallet NWC solo-nel-browser, DM NIP-17,
-   sessione bunker NIP-46 conservata — col perché di ognuna e quel che
+2. MAI nsec (chiave privata Nostr) degli utenti SUL SERVER.
+   Decisione permanente: mai custodia di segreti altrui sul server, mai
+   firme che richiedano di consegnare chiavi al server. La scala di quel
+   che è APPROVATO — badge npub auto-dichiarato, verifica con nota
+   pubblica, login con firma di sfida, wallet NWC solo-nel-browser, DM
+   NIP-17, sessione bunker NIP-46 conservata, nsec conservata SOLO nel
+   browser dell'utente (ott 2026) — col perché di ognuna e quel che
    è stato RESPINTO (il secret NWC salvato sul server, anche cifrato)
    sta in `docs/ARCHITETTURA.md`, alla voce «LA SCALA NOSTR APPROVATA».
 3. Il server pubblico non monta MAI StaticFiles su una directory
