@@ -151,6 +151,17 @@ acinq=[c for c in att if c['remote_pubkey'].startswith(pref)]
 in_ac=sum(utile_in(c) for c in acinq)
 out_ac=sum(utile_out(c) for c in acinq)
 def commissione(x): return max(50, x*3//1000)
+# LO SCID, NON IL chan_id (6 ott 2026): su questo LND `listchannels`
+# da' in `chan_id` il channel_id di BOLT 2 (32 byte in esadecimale) e lo
+# short channel id numerico in `scid`, che e' quello che `payinvoice
+# --outgoing_chan_id` vuole. Il primo giro suggerito portava l'esadecimale.
+# Un chan_id numerico (gli LND di prima) vale da ripiego; niente dei due
+# = niente comando, mai un numero tirato a indovinare.
+def scid(c):
+    for k in ('scid','chan_id'):
+        v=str(c.get(k) or '')
+        if v.isdigit(): return v
+    return None
 # LA COPERTURA (6 ott 2026): il giro piu' la sua commissione escono
 # dall'uscita ACINQ, e dopo deve restarne almeno USCITA_ACINQ_MIN.
 # Vuota = non si sa quanto deve la Cassaforte, e allora nessun importo.
@@ -182,16 +193,20 @@ if acinq_basso:
                  f"USCITA_ACINQ_MIN {uscita_min}): un giro o uno swap dal canale ACINQ "
                  "scoprirebbero i venditori. L'entrata torna coi payout; se non basta, "
                  "un canale ACINQ nuovo con sats freschi")
+    elif amt>=10000 and scid(da) is None:
+        a.append(f"ribilancio: {amt} sat fuori dal canale ACINQ {da['channel_point'][:8]}, "
+                 "ma listchannels non da' lo scid numerico (ne' in scid ne' in chan_id): "
+                 "il comando non si scrive, si legge lo scid a mano")
     elif amt>=10000:
         fee=commissione(amt)
-        a.append(f"ribilancio suggerito: {amt} sat fuori dal canale ACINQ {da['chan_id']} "
+        a.append(f"ribilancio suggerito: {amt} sat fuori dal canale ACINQ {scid(da)} "
                  f"e dentro da {verso['remote_pubkey'][:16]} (commissione massima {fee}; "
                  f"dopo, l'uscita ACINQ resta sopra USCITA_ACINQ_MIN {uscita_min}: "
                  "se la Cassaforte e' cresciuta, prima si aggiorna la leva), "
                  "un comando alla volta, da ~/nodo:\n"
                  f"  docker compose exec lnd lncli addinvoice --amt {amt} --memo ribilancio-acinq\n"
                  "  docker compose exec lnd lncli --macaroontimeout 300 payinvoice --allow_self_payment "
-                 f"--outgoing_chan_id {da['chan_id']} --last_hop {verso['remote_pubkey']} "
+                 f"--outgoing_chan_id {scid(da)} --last_hop {verso['remote_pubkey']} "
                  f"--fee_limit {fee} <payment_request di sopra>\n"
                  "  poi la ronda dei pagamenti lo vedra' uscire: sudo /usr/local/bin/ronda-nodo.sh "
                  "--impara <prime 8 cifre del r_hash>")

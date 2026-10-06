@@ -2451,9 +2451,13 @@ def prove_pagamenti_non_arrivati():
     PK_LNBIG = "02" + "b2" * 32
 
     def canale(cp, pk, cap, loc, rem, ris, attivo=True, cid="0"):
+        # la forma VERA del nostro LND (6 ott 2026): `chan_id` e' il
+        # channel_id di BOLT 2 in esadecimale, lo scid numerico sta in
+        # `scid`. Il primo giro suggerito sul nodo portava l'esadecimale.
         return {"channel_point": cp, "remote_pubkey": pk, "capacity": str(cap),
                 "local_balance": str(loc), "remote_balance": str(rem),
-                "active": attivo, "chan_id": cid, "thaw_height": 0,
+                "active": attivo, "chan_id": "ac" * 31 + "%02x" % (int(cid) % 256),
+                "scid": cid, "thaw_height": 0,
                 "local_constraints": {"chan_reserve_sat": str(ris)},
                 "remote_constraints": {"chan_reserve_sat": str(ris)}}
 
@@ -2575,6 +2579,25 @@ def prove_pagamenti_non_arrivati():
                     if usc - int(m.group(1)) - int(m.group(2)) < minimo:
                         rotte.append((loc1, loc2, minimo, m.groups()))
     prova("l'invariante della copertura regge su 60 stati", [], rotte)
+    prova("il comando porta lo SCID numerico, mai il chan_id esadecimale",
+          (True, None), ("--outgoing_chan_id 102 --last_hop" in
+                         ronda(sei, SOGLIA_ACINQ="300000", USCITA_ACINQ_MIN="1094701")[1],
+                         re.search(r"--outgoing_chan_id [0-9a-f]*[a-f][0-9a-f]* ",
+                                   ronda(sei, SOGLIA_ACINQ="300000",
+                                         USCITA_ACINQ_MIN="1094701")[1])))
+    vecchi = [dict(c) for c in sei]
+    for c in vecchi:
+        c["chan_id"] = c.pop("scid")       # un LND di prima: chan_id numerico
+    rc, out = ronda(vecchi, SOGLIA_ACINQ="300000", USCITA_ACINQ_MIN="1094701")
+    prova("...ripiego: un chan_id numerico senza scid vale", True,
+          "--outgoing_chan_id 102 --last_hop" in out)
+    muti = [dict(c) for c in sei]
+    for c in muti:
+        c.pop("scid")                      # esadecimale e basta
+    rc, out = ronda(muti, SOGLIA_ACINQ="300000", USCITA_ACINQ_MIN="1094701")
+    prova("...senza scid numerico da nessuna parte: niente comando, e lo dice",
+          (9, False, True), (rc, "--outgoing_chan_id" in out,
+                             "non da' lo scid numerico" in out))
     # AL BORDO conta il minimo dei 50 sats: con 10.030 di margine un giro
     # da 10.000 (+50) scoprirebbe i venditori di 20, quindi niente giro
     rc, out = ronda(sei, SOGLIA_ACINQ="300000", USCITA_ACINQ_MIN=str(1165235 - 10030))

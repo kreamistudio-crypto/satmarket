@@ -502,6 +502,10 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `acinq_out` e `copertura=`, anche su Telegram); poi le unit:
   `sudo install -m 644 /tmp/nodo-liquidita-acinq.service /tmp/nodo-liquidita-acinq.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now nodo-liquidita-acinq.timer`,
   e la guardia a mano: `sudo /usr/local/bin/ronda-liquidita.sh --acinq; echo rc=$?`.
+  ⚠️ SU QUESTO LND `listchannels` DÀ IN `chan_id` IL CHANNEL_ID
+  ESADECIMALE (BOLT 2, 64 cifre) e lo scid numerico in `scid`: ogni
+  comando che vuole un canale per numero (`--outgoing_chan_id`,
+  `getchaninfo`) prende `scid`. Il `feereport` usa i numeri.
   Ritorno indietro: `sudo systemctl disable --now nodo-liquidita-acinq.timer`
   e `sudo install -m 755 /root/ronda-liquidita.sh.prima-6ott /usr/local/bin/ronda-liquidita.sh`
   (il file delle leve si può lasciare: la versione vecchia non lo legge).

@@ -36078,6 +36078,21 @@ ripristino completa. Un errore mio strada facendo: `lncli` stampa i
 `funding_txid_bytes` in esadecimale e io li decodificavo in base64
 (i prefissi giusti si ottengono con `bytes.fromhex(x)[::-1].hex()`).
 
+**Corretto all'installazione: lo scid, non il `chan_id`.** La prima
+`--prova` sul nodo ha suggerito `--outgoing_chan_id aca66000…`: su
+questo LND `listchannels` mette in `chan_id` il channel_id di BOLT 2
+(il txid a byte rovesciati, l'ultimo in XOR con l'uscita, 64 cifre
+esadecimali) e lo short channel id numerico in `scid` (più `scid_str`,
+`blocco x tx x uscita`); `payinvoice` vuole il numero, e il `feereport`
+usa i numeri. L'ha visto Andrea. Lo script prende `scid`, ripiega su un
+`chan_id` numerico (gli LND di prima) e, se nessuno dei due è un numero,
+non scrive il comando. Le prove avevano lo stesso difetto delle mie
+ipotesi: il canale di cartone aveva `chan_id` numerico; adesso ha la
+forma vera. Prove +3 (68 verdi); tortura 16 su 17, e la sopravvissuta
+(«`chan_id` provato prima di `scid`») è equivalente: qui `chan_id` non è
+mai di sole cifre. Nessun'altra ronda né script del nodo nel repo legge
+`chan_id`.
+
 **Da guardare.** L'installazione e la prova a vuoto sul nodo (verbale
 nello studio). La prova dell'avviso «Pagamenti non arrivati» su
 Telegram vero (la ricetta sta in PRODUZIONE). `USCITA_ACINQ_MIN` va

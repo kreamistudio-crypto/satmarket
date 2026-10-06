@@ -327,12 +327,14 @@ ripristino completa.
 
 ## Appendice: i comandi per rimisurare
 
-Tutti di sola lettura, da `~/nodo` sul nodo. `N` è la mappa dei canali:
+Tutti di sola lettura, da `~/nodo` sul nodo. In `listchannels` lo scid
+numerico sta in `scid`: `chan_id` lì è il channel_id esadecimale (§9).
+`N` è la mappa dei canali:
 `{"1066579055655714817":"LNBiG","1063354188044304385":"ACINQ 1M","1061107885743538177":"ACINQ 400k"}`.
 
 **1, i canali:**
 ```bash
-cd ~/nodo && docker compose exec -T lnd lncli listchannels | python3 -c 'import json,sys; [print(c["chan_id"], c["remote_pubkey"][:8], "cap", c["capacity"], "noi", c["local_balance"], "loro", c["remote_balance"], "inviati", c["total_satoshis_sent"], "ricevuti", c["total_satoshis_received"]) for c in json.load(sys.stdin)["channels"]]'
+cd ~/nodo && docker compose exec -T lnd lncli listchannels | python3 -c 'import json,sys; [print(c.get("scid") or c["chan_id"], c["remote_pubkey"][:8], "cap", c["capacity"], "noi", c["local_balance"], "loro", c["remote_balance"], "inviati", c["total_satoshis_sent"], "ricevuti", c["total_satoshis_received"]) for c in json.load(sys.stdin)["channels"]]'
 ```
 
 **2, destinazioni e primo salto dei riusciti:**
