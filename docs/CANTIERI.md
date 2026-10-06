@@ -35883,3 +35883,99 @@ sezione LND con un nodo vero (in collaudo LND non c'è, e la pagina dice
 **Da guardare al primo giro vero.** Se il macaroon di sola lettura
 basta per `/v1/channels` con gli alias; se `/v1/payments` a pagine da
 1000 regge il numero di pagamenti del nodo.
+
+## Bottoni più eleganti nel mercatino: il vestito A (2-6 ott 2026)
+
+Il compito (Andrea): bottoni più eleganti nel mercatino, prima la prova
+e poi l'applicazione; il P2P in un secondo giro.
+
+**L'inventario (2 ott).** Sette ruoli sotto `.btn` — principale
+`.orange` (107), conferma `.primary` (15), `.asta`, secondario
+`.ghost` (162), `.mini`, pericolo `.allarme`, sottotono `.piano`, più i
+testuali `.link`/`.danger-ghost` — e fuori dalla famiglia `.back`, le
+scelte delle foto, le celle del carrello, i bottoni della fotocamera,
+i tondi sulla foto. Misurato sull'app vera: il bianco sull'arancio
+faceva **2,3:1** (sotto il 4,5 della lettura: il bottone più
+importante era il meno leggibile), il verde 4,3, la disputa 4,4;
+«Trova punto» alto 37 px, «← Torna» 35, i link 42, il condividi 38;
+spento e «in corso» identici (un velo al 50% che sull'arancio faceva
+un beige sporco), due regole dello spento con due numeri (.55 e .5),
+premuto assente su asta, rosso e bz; nessun fuoco da tastiera; la
+conferma di «Annulla l'ordine» del venditore vestita da CTA arancio.
+
+**La prova.** Tre stili scritti come SOLE variabili e iniettati
+sull'app vera in collaudo (copia nello scratchpad, relay morto, LNbits
+finto), fotografati via CDP a 375 px nei due temi: scheda annuncio,
+cassa, pubblicazione e un campionario con altezza e contrasto MISURATI
+sotto ogni bottone. A «pieno morbido», B «vetro», C «essenziale».
+Andrea ha scelto **A così com'è** (6 ott, «scritte scure sui bottoni
+pieni»), la conferma dell'annullo come pericolo e il condividi a 44.
+
+**Com'è fatto.** Un cuore solo: le `--b-…` accanto a `--radius-btn`
+(e i valori di sera nel blocco scuro) — ARCHITETTURA, «IL VESTITO DEI
+BOTTONI». Ogni classe di ruolo dice soltanto QUALE ruolo è (copia le
+sue leve nelle variabili correnti `--b-bg`, `--b-sh`…), una regola sola
+dipinge; premuto, spento, «in corso» e il battito di `in-evidenza`
+leggono le correnti, quindi valgono per ogni ruolo senza ripetere un
+colore. Testo scuro #2A1600 sui pieni arancio (7,2:1), verde di
+conferma più profondo (#1B8150→#16703F, 4,9:1 su ogni fermata del
+gradiente: il #1E8A56 della prova, da solo in cima, faceva 4,35 — il
+campionario lo dava 4,7 perché campionava il centro), Baloo 2 sulle
+scritte, 14px di curva, 44 px minimi. Lo spento è un fondo neutro
+pieno; l'«in corso» (`aria-busy`, che ora mette e toglie
+`bottoneInAttesa` — l'unica riga di JS) svuota le leve dello spento,
+tiene il colore del ruolo e ci fa passare una luce, ferma a metà con
+meno movimento (posizione di riposo nella regola base: basta
+`animation:none`, e per gli effetti ridotti a mano la regola universale
+— nessun gemello sparso, come vuole `prove_effetti_ridotti`). Il
+barrato del banner dentro l'arancio passa da bianco fisso a «il colore
+del bottone, velato». Vestiti anche fuori da `.btn`: `.back`, le
+scelte delle foto, le celle del carrello, il pieno e il ripiego della
+fotocamera, il recinto della barra (la sua curva segue `--b-r`).
+
+**Il P2P tiene il vestito di prima** con un blocco di sole variabili
+su `:where([id^="view-p2p"], .sheet[id^="p2p"])` — :where() non pesa,
+quindi nessuna regola del P2P cambia chi vince. Il secondo giro lo
+cancella e basta. Misurato nel browser vero, nei due temi, dentro
+`#view-p2p` e `#p2pNuovoSheet`: arancio pieno, bianco, gradino di 3px,
+ghost a bordo d'inchiostro, 12px, Nunito, spento al 50% — uguale a
+prima. Restano col bianco sull'arancio, perché non sono bottoni-oggetto
+(ARCHITETTURA, «RESTANO TONDI DI PROPOSITO»): il «+» della barra, il
+«Avanti» del tour, le pillole e le etichette.
+
+**Strade scartate.** `:not(<vista P2P> .btn)` nei selettori: complesso,
+e un WebView vecchio butterebbe via la regola intera; il blocco P2P che
+riscrive le PROPRIETÀ invece delle variabili: a pari peso avrebbe
+battuto regole del P2P scritte prima (`:where` + variabili non tocca la
+cascata). `backdrop-filter` per il vetro (B): bande sui gradienti, già
+pagate a settembre. Il campionamento al centro per i contrasti: la
+prova guarda OGNI fermata del gradiente.
+
+**Provato.** `prove_vestito_bottoni` (27): i contrasti calcolati dai
+token veri nei due temi su ogni fermata; la cascata vera di sette
+ruoli a riposo (fondo, testo, bordo, ombra, curva, 44, voce); la barra
+d'acquisto resta piatta; nessuna regola di ruolo si ridipinge da sé;
+il blocco P2P rimette ogni leva che il P2P usa, coi valori di prima;
+spento, «in corso», la luce ferma, `bottoneInAttesa`; carrello,
+fotocamera, annullo, condividi, barrato. Tortura 14 su 14 sulla copia.
+Emendate quattro sentinelle che leggevano il CSS di prima (battito,
+sottotono, barrato, il gemello in `fx-ridotti`) e il bottone di
+cartone di `prove_velo_p2p` (ora sa `setAttribute`, come ogni
+`<button>`). **Dal vivo** (copia in collaudo, relay morto, LNbits di
+cartone che paga solo a comando), coi tocchi veri a 375 px nei due
+temi: dettaglio → «Aggiungi al carrello» → cella «Aggiungi» →
+«Controlla e paga» → cassa → «Paga» → fattura → «Ho pagato» → ordine
+`locked` (ordini 2 e 3), nessun errore JS, ogni bottone toccato alto
+≥ 44; l'«in corso» su «L'ho ritirato» col `bottoneInAttesa` vero. Suite
+intera severa e collaudi della CI: nel messaggio del commit.
+
+**Da guardare** (sul telefono, Andrea): Telegram Android e iPhone nei
+due temi — le scritte scure sull'arancio, la Baloo 2 sui bottoni,
+l'affondo al tocco; «← Torna», il condividi e l'indietro sulla foto a
+44; le celle del carrello; la fotocamera della pubblicazione (il pieno
+«Usa questa foto»); un pagamento piccolo vero con «L'ho ritirato» per
+vedere la luce dell'«in corso» sotto il velo; il P2P identico a prima;
+l'APK. Notato e NON toccato: «Ho pagato» è vivo mentre la fattura si
+sta ancora creando (un tocco lì chiede la verifica dell'ordine `null`,
+422 — dal vero la finestra è breve); «Salva la nota» e «L'ho ritirato»
+sono due principali arancio nella stessa pagina dell'ordine.

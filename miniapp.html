@@ -121,6 +121,51 @@
     /* la curva dei bottoni-oggetto: quella di «Acquista» (vedi
        l'elenco dei contesti accanto a .btn) */
     --radius-btn:12px;
+    /* ══ IL VESTITO DEI BOTTONI (ott 2026, stile A «pieno morbido»,
+       scelto da Andrea fra tre provati sull'app vera) ══
+       UN CUORE SOLO: qui i valori, e le regole dei bottoni (accanto a
+       .btn) li leggono per RUOLO — principale (.orange), conferma
+       (.primary), asta, secondario (.ghost, .mini, .back, le scelte
+       delle foto), pericolo (.allarme) e pericolo sottotono (.piano).
+       Chi vuole cambiare il vestito tocca queste righe e cambia tutto
+       il mercatino; il P2P per ora porta il vestito di prima (vedi «IL
+       P2P TIENE IL VESTITO DI PRIMA», dopo le regole).
+       Le misure che lo reggono (campionario a 375 px, nei due temi):
+       - TESTO SCURO SUI PIENI: il bianco sul #F7931A faceva 2,3:1, sotto
+         il 4,5 della lettura; l'inchiostro caldo #2A1600 fa 7,2:1. Il
+         verde di conferma scende a #1B8150→#16703F (4,9:1; il #1B8B54
+         col bianco era 4,3) e il petrolio dell'asta a 5,2:1.
+       - IL DITO: ogni bottone e' alto almeno 44 px (--b-min).
+       - SPENTO NON E' «IN CORSO»: lo spento e' un fondo neutro pieno,
+         il bottone che lavora tiene il suo colore e una luce gli passa
+         sopra (aria-busy, lo mette bottoneInAttesa); con meno movimento
+     la luce sta ferma a meta' bottone.
+       Le scritte dei bottoni sono in Baloo 2, la voce del logo. */
+    --b-r:14px; --b-min:44px; --b-font:'Baloo 2','Nunito',sans-serif;
+    --b-on-move:translateY(1px); --b-focus:#F7931A;
+    --b-pieno-bw:1px; --b-pri-fs:16.5px;
+    --b-pri-bg:linear-gradient(180deg,#FFAE4F 0%,#F7931A 58%,#EF880E 100%);
+    --b-pri-fg:#2A1600; --b-pri-line:rgba(170,90,0,.38);
+    --b-pri-sh:inset 0 1px 0 rgba(255,255,255,.5),0 1px 2px rgba(120,60,0,.22),0 7px 16px -7px rgba(232,128,10,.75);
+    --b-pri-sh-on:inset 0 2px 4px rgba(120,60,0,.28),0 1px 1px rgba(120,60,0,.12);
+    --b-ok-bg:linear-gradient(180deg,#1B8150 0%,#16703F 100%);
+    --b-ok-fg:#FFFFFF; --b-ok-line:rgba(8,60,34,.45);
+    --b-ok-sh:inset 0 1px 0 rgba(255,255,255,.22),0 1px 2px rgba(10,60,35,.22),0 7px 16px -8px rgba(23,122,73,.7);
+    --b-ok-sh-on:inset 0 2px 4px rgba(8,60,34,.35);
+    --b-asta-bg:linear-gradient(180deg,#137D9C 0%,#0D6380 100%);
+    --b-asta-fg:#FFFFFF; --b-asta-line:rgba(5,50,66,.45);
+    --b-asta-sh:inset 0 1px 0 rgba(255,255,255,.2),0 1px 2px rgba(5,50,66,.25),0 7px 16px -8px rgba(15,109,140,.7);
+    --b-asta-sh-on:inset 0 2px 4px rgba(5,50,66,.35);
+    --b-sec-bg:#FFFFFF; --b-sec-fg:#23282C; --b-sec-line:rgba(35,40,44,.16); --b-sec-bw:1px;
+    --b-sec-sh:0 1px 2px rgba(35,40,44,.08),0 5px 12px -7px rgba(35,40,44,.28);
+    --b-sec-bg-on:#F4EEE2; --b-sec-sh-on:inset 0 1px 3px rgba(35,40,44,.14);
+    --b-mini-sh:var(--b-sec-sh); --b-mini-sh-on:var(--b-sec-sh-on);
+    --b-dan-bg:#FFF1EC; --b-dan-fg:#A8360A; --b-dan-line:rgba(194,65,12,.34); --b-dan-bw:1px;
+    --b-dan-sh:0 1px 2px rgba(194,65,12,.12),0 5px 12px -7px rgba(194,65,12,.35);
+    --b-dan-sh-on:inset 0 1px 3px rgba(194,65,12,.18);
+    --b-piano-bg:#FFFFFF; --b-piano-fg:#A8360A; --b-piano-line:#E8DFC8;
+    --b-off-bg:#EFE9DA; --b-off-fg:#7D7564; --b-off-line:transparent; --b-off-sh:none; --b-off-op:1;
+    --b-busy-op:1; --b-busy-luce:block; --b-luce:rgba(255,255,255,.42);
     /* i toni "profondi" fanno l'ombra piena dei bottoni, i "text"
        sono leggibili sui fondi tenui */
     --sats-deep:#D97706; --sats-text:#B45309;
@@ -316,6 +361,26 @@
      un solo blocco di token, niente doppioni sotto media query. */
   html[data-tema="scuro"]{
     color-scheme:dark;
+    /* il vestito dei bottoni di sera (i valori di giorno e il perche'
+       accanto a --radius-btn): i pieni restano gli stessi, cambiano
+       le ombre e i secondari, che si accendono un tono sopra la carta */
+    --b-pri-sh:inset 0 1px 0 rgba(255,255,255,.4),0 1px 2px rgba(0,0,0,.45),0 8px 20px -8px rgba(247,147,26,.5);
+    --b-pri-sh-on:inset 0 2px 4px rgba(90,40,0,.4);
+    --b-ok-bg:linear-gradient(180deg,#3CBE82 0%,#2C9E69 100%); --b-ok-fg:#0B2417; --b-ok-line:rgba(0,0,0,.35);
+    --b-ok-sh:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(0,0,0,.45),0 8px 18px -9px rgba(52,180,122,.45);
+    --b-ok-sh-on:inset 0 2px 4px rgba(0,40,20,.4);
+    --b-asta-bg:linear-gradient(180deg,#1B7FA0 0%,#156A88 100%);
+    --b-asta-sh:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.45);
+    --b-asta-sh-on:inset 0 2px 4px rgba(0,0,0,.4);
+    --b-sec-bg:#3A3122; --b-sec-fg:#F1E8D5; --b-sec-line:rgba(241,232,213,.14);
+    --b-sec-sh:inset 0 1px 0 rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.4),0 6px 14px -8px rgba(0,0,0,.7);
+    --b-sec-bg-on:#332B1D; --b-sec-sh-on:inset 0 2px 4px rgba(0,0,0,.4);
+    --b-dan-bg:#40241A; --b-dan-fg:#FF9E74; --b-dan-line:rgba(240,122,71,.38);
+    --b-dan-sh:inset 0 1px 0 rgba(255,255,255,.05),0 1px 2px rgba(0,0,0,.4);
+    --b-dan-sh-on:inset 0 2px 4px rgba(0,0,0,.4);
+    --b-piano-bg:#2C2517; --b-piano-fg:#F58A5C; --b-piano-line:#3E3623;
+    --b-off-bg:#363126; --b-off-fg:#968C75;
+    --b-luce:rgba(255,255,255,.3);
     --bg:#211A10; --card:#2C2517; --ink:#F1E8D5; --muted:#A99F87;
     --line:#3E3623; --sats-soft:#3E2B12;
     --trust:#34B47A; --trust-soft:#1B2C20;
@@ -1644,8 +1709,10 @@
   /* Il bottone condividi sulla foto del dettaglio: cerchietto di
      carta chiara con l'icona a inchiostro, uguale in entrambi i temi
      (vive sulla foto, come i pallini) */
+  /* 44 e non 38 (ott 2026, Andrea): la misura del dito, come ogni
+     bottone; il gemello «indietro» porta la stessa classe e cresce con lui */
   .share-btn{position:absolute;top:10px;right:10px;z-index:2;
-    width:38px;height:38px;border-radius:50%;border:0;
+    width:44px;height:44px;border-radius:50%;border:0;
     background:rgba(255,248,234,.94);color:#23282C;cursor:pointer;
     display:flex;align-items:center;justify-content:center;
     box-shadow:0 2px 6px rgba(0,0,0,.25)}
@@ -5379,7 +5446,7 @@
      lo spazio del gap se lo tolgono in parti uguali, e i due tasti
      restano gemelli. */
   .bc-recinto{position:relative;flex:1 1 50%;min-width:0;display:flex;
-    border-radius:12px;                          /* lo stesso del bottone dentro */
+    border-radius:var(--b-r);                    /* lo stesso del bottone dentro */
     outline:2px dashed var(--trust);outline-offset:3px}
   .bc-recinto .btn{flex:1;min-width:0}
   /* Sul vertice del tratteggio, che ora corre 5px fuori dal bottone
@@ -5489,8 +5556,9 @@
      stanno piu' in basso nel foglio e a pari peso vincerebbero loro —
      la stessa lezione di .acquista-cta nel recinto */
   .pacco-cella .btn.pacco-btn{margin-top:8px;padding:7px 8px 8px;
-    font-size:14px;border-radius:var(--radius-btn);box-shadow:0 2px 0 var(--ink)}
-  .pacco-cella .btn.pacco-btn:active{transform:translateY(1px);box-shadow:none}
+    font-size:14px;border-radius:var(--b-r);box-shadow:var(--b-sh)}
+  .pacco-cella .btn.pacco-btn:active{transform:var(--b-on-move);
+    background:var(--b-bg-on);box-shadow:var(--b-sh-on)}
   /* LO STATO-STEPPER (ago 2026): stesso guscio, dentro il chip − N +
      al posto della parola. Non si abbassa al tocco — a rispondere
      sono i due comandi dentro, non il guscio — e il chip si veste di
@@ -5502,7 +5570,7 @@
      pixel proprio nel momento in cui la si tocca */
   .pacco-cella .btn.pacco-btn.dentro{padding:3px 8px 4px;cursor:default}
   .pacco-cella .btn.pacco-btn.dentro:active{transform:none;
-    box-shadow:0 2px 0 var(--ink)}
+    background:var(--b-bg);box-shadow:var(--b-sh)}
   /* Lo stesso vestito serve i fogli del rifornimento e dell'offerta —
      e dal 12 ago 2026 la card articoli della pagina Paga: fuori
      dall'arancio il traslucido bianco sparirebbe sulla carta. */
@@ -5535,8 +5603,10 @@
      cassetto di domani mette la classe e ha finito; a cassetto APERTO
      i margini COLLASSANO col `.field`, quindi non si somma a niente. */
   .cassetto-cassa + .cassetto-cassa{margin-top:10px}
-  /* spento col motivo scritto sotto: il perche' non sta mai nel bottone */
-  .pacco-cella .btn.pacco-btn[disabled]{opacity:.45;box-shadow:none}
+  /* spento col motivo scritto sotto: il perche' non sta mai nel bottone.
+     Il fondo neutro e' quello di ogni bottone spento (il vestito, ott
+     2026): il velo al 45% di prima ci si sommerebbe sopra. */
+  .pacco-cella .btn.pacco-btn[disabled]{box-shadow:none}
   .pacco-motivo{font-size:11.5px;color:var(--muted);font-weight:600;
     margin-top:4px;line-height:1.3}
   /* IL TOTALE HA LA PRIORITA' (ago 2026, regressione dal campo: coi
@@ -6198,11 +6268,11 @@
   #confTestata .acq-barrato .unit,
   #bannerBlocco .acq-barrato .unit{display:inline-block}
   /* DENTRO IL BOTTONE ARANCIO il barrato non puo' essere
-     `--muted`: sull'arancio pieno sparirebbe. Prende il BIANCO
-     VELATO, che e' la lingua che quel bottone ha gia' (il chip
-     traslucido dello stepper dentro «Acquista»), e vince per
+     `--muted`: sull'arancio pieno sparirebbe. Prende il COLORE DEL
+     BOTTONE, VELATO (dall'ott 2026 il testo sui pieni e' scuro: il
+     bianco fisso di prima sarebbe sparito lui), e vince per
      SPECIFICITA' sulla riga qui sopra, non per ordine. */
-  #bannerBlocco .btn.orange .acq-barrato{color:rgba(255,255,255,.72)}
+  #bannerBlocco .btn.orange .acq-barrato{color:inherit;opacity:.72}
   /* IL CHIP E' UN CARTELLINO, e non prende un colore SUO: sono i
      due valori di `.tag-price` — crema #FFF8EA e inchiostro
      #23282C — gia' in casa e gia' FISSI nei due temi per la
@@ -7338,8 +7408,9 @@
      cosa fisica appoggiata sul banco. Su :active si abbassa. */
   .btn{
     display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
-    border:0;border-radius:var(--radius-btn);padding:14px 20px;font:inherit;font-weight:800;font-size:15.5px;
-    cursor:pointer;transition:transform .1s,box-shadow .1s;
+    border:0;border-radius:var(--b-r);padding:14px 20px;font:inherit;font-family:var(--b-font);
+    font-weight:800;font-size:var(--b-fs,15.5px);min-height:var(--b-min);
+    cursor:pointer;transition:transform .1s,box-shadow .1s,background-color .1s;
   }
   /* ---- LA FORMA DI «ACQUISTA» E' LA FORMA DI TUTTI (ago 2026) ----
      `.btn` nasceva pillola (999px) e la forma rettangolare era una
@@ -7350,12 +7421,12 @@
      schermata convivevano due forme per la stessa famiglia di
      bottoni. Adesso il verso e' rovesciato — la regola sta nella
      base, le deroghe non ci sono — ed e' un cuore solo davvero: chi
-     vuole un'altra curva tocca --radius-btn e tocca tutta l'app.
+     vuole un'altra curva tocca --b-r (dall'ott 2026, il vestito dei
+     bottoni accanto a --radius-btn) e tocca tutti i bottoni.
      I testuali (.btn.link, .danger-ghost) non hanno fondo, quindi la
      curva non li riguarda; le PILLOLE vere dell'app (.pill,
      .tema-pill, .consegna-pill, .chip) sono classi loro e restano
      tonde: quelle non sono bottoni-oggetto, sono etichette. */
-  .btn:disabled{opacity:.55;pointer-events:none}
   /* overlay di attesa: blocca tutto mentre i sats viaggiano */
   /* ⚠️ NIENTE `backdrop-filter` (16 set 2026, dal campo: «lo sfondo e'
      sgranato, il gradiente si vede a bande»). La sfocatura di un
@@ -7410,15 +7481,17 @@
      ripetuta in ogni riga: `.btn.orange` sta piu' sotto con lo stesso
      peso e la sua `box-shadow` vinceva — a «meno movimento» l'alone
      fermo non si dipingeva proprio (visto dal vivo, non a banco), e
-     col battito il bottone perdeva il suo gradino per 4 secondi. */
+     col battito il bottone perdeva il suo gradino per 4 secondi.
+     DALL'OTT 2026 l'ombra ripetuta e' `var(--b-sh)`, quella del suo
+     vestito: nel mercatino lo stile A, nel P2P il gradino di prima. */
   .btn.orange.in-evidenza{animation:passo-batte 1.4s ease-in-out 3}
   @keyframes passo-batte{
-    0%,100%{box-shadow:0 3px 0 var(--sats-deep),0 0 0 0 rgba(247,147,26,0)}
-    50%{box-shadow:0 3px 0 var(--sats-deep),0 0 0 8px rgba(247,147,26,.35)}
+    0%,100%{box-shadow:var(--b-sh),0 0 0 0 rgba(247,147,26,0)}
+    50%{box-shadow:var(--b-sh),0 0 0 8px rgba(247,147,26,.35)}
   }
   @media (prefers-reduced-motion:reduce){
     .btn.orange.in-evidenza{animation:none;
-      box-shadow:0 3px 0 var(--sats-deep),0 0 0 4px rgba(247,147,26,.35)}
+      box-shadow:var(--b-sh),0 0 0 4px rgba(247,147,26,.35)}
   }
   .attesa-spunta{display:none;width:26px;height:26px;flex:none;border-radius:50%;
     background:var(--sats);color:#fff;font-size:16px;font-weight:900;line-height:26px;
@@ -7540,10 +7613,29 @@
      variabile valgono 0px, cioe' il guscio di prima. */
   html.app-android #guscio img{position:relative;top:calc(-1 * var(--guscio-su, 0px))}
   html.app-android #guscio .attesa-anello{margin-top:calc(-1 * var(--guscio-su, 0px))}
-  .btn.primary{background:var(--trust);color:var(--on-trust);box-shadow:0 3px 0 var(--trust-deep)}
-  .btn.orange{background:var(--sats);color:#fff;box-shadow:0 3px 0 var(--sats-deep)}
+  /* I RUOLI LEGGONO IL VESTITO (ott 2026): ogni classe dice soltanto
+     QUALE ruolo e' (le --b-*-… del vestito, accanto a --radius-btn) e
+     una regola sola li dipinge. Le variabili correnti (--b-bg, --b-sh…)
+     servono a chi viene dopo — premuto, spento, in corso, il passo in
+     evidenza — per leggere il colore del SUO ruolo senza ripeterlo. */
+  .btn.orange{--b-bg:var(--b-pri-bg);--b-fg:var(--b-pri-fg);--b-line:var(--b-pri-line);
+    --b-bw:var(--b-pieno-bw);--b-sh:var(--b-pri-sh);--b-bg-on:var(--b-pri-bg);
+    --b-sh-on:var(--b-pri-sh-on);--b-fs:var(--b-pri-fs)}
+  .btn.primary{--b-bg:var(--b-ok-bg);--b-fg:var(--b-ok-fg);--b-line:var(--b-ok-line);
+    --b-bw:var(--b-pieno-bw);--b-sh:var(--b-ok-sh);--b-bg-on:var(--b-ok-bg);--b-sh-on:var(--b-ok-sh-on)}
   /* il pieno dell'asta: stessa forma dell'orange, colore suo */
-  .btn.asta{background:var(--asta);color:var(--asta-on);box-shadow:0 3px 0 var(--asta-deep)}
+  .btn.asta{--b-bg:var(--b-asta-bg);--b-fg:var(--b-asta-fg);--b-line:var(--b-asta-line);
+    --b-bw:var(--b-pieno-bw);--b-sh:var(--b-asta-sh);--b-bg-on:var(--b-asta-bg);--b-sh-on:var(--b-asta-sh-on)}
+  .btn.ghost{--b-bg:var(--b-sec-bg);--b-fg:var(--b-sec-fg);--b-line:var(--b-sec-line);
+    --b-bw:var(--b-sec-bw);--b-sh:var(--b-sec-sh);--b-bg-on:var(--b-sec-bg-on);--b-sh-on:var(--b-sec-sh-on)}
+  .btn.allarme{--b-bg:var(--b-dan-bg);--b-fg:var(--b-dan-fg);--b-line:var(--b-dan-line);
+    --b-bw:var(--b-dan-bw);--b-sh:var(--b-dan-sh);--b-bg-on:var(--b-dan-bg);--b-sh-on:var(--b-dan-sh-on)}
+  .btn.piano{--b-bg:var(--b-piano-bg);--b-fg:var(--b-piano-fg);--b-line:var(--b-piano-line);
+    --b-bw:var(--b-sec-bw);--b-sh:none;--b-bg-on:var(--b-sec-bg-on);--b-sh-on:none}
+  .btn.mini{--b-bg:var(--b-sec-bg);--b-fg:var(--b-sec-fg);--b-line:var(--b-sec-line);
+    --b-bw:var(--b-sec-bw);--b-sh:var(--b-mini-sh);--b-bg-on:var(--b-sec-bg-on);--b-sh-on:var(--b-mini-sh-on)}
+  .btn.orange,.btn.primary,.btn.asta,.btn.ghost,.btn.allarme,.btn.piano,.btn.mini{
+    background:var(--b-bg);color:var(--b-fg);border:var(--b-bw) solid var(--b-line);box-shadow:var(--b-sh)}
   /* IL BOTTONE CHE PUBBLICA NEL P2P VESTE IL + CHE SI E' APERTO (24 set
      2026, richieste di Andrea): verde a «Compra BTC» (il .primary di
      casa), ROSSO a «Vendi BTC», e col percorso Barattozon il BLU della
@@ -7553,8 +7645,7 @@
   .btn.rosso{background:var(--danger);color:var(--on-danger);box-shadow:0 3px 0 var(--danger-deep)}
   .btn.bz{background:#191D29;color:#fff;box-shadow:0 3px 0 #0C0E15}
   .btn .logo-bz{width:21px;height:20px;flex:0 0 auto;display:block}
-  .btn.ghost{background:var(--card);border:2px solid var(--ink);color:var(--ink);
-    box-shadow:0 3px 0 var(--ink);margin-top:10px}
+  .btn.ghost{margin-top:10px}
   /* I DUE PONTI verso l'esterno erano bottoni a tutta larghezza
      (`.btn.ponte`, ago 2026) e non ci sono piu' da nessuna parte: dal
      24 set 2026 sono i TONDI coi loghi veri, qui sotto, anche dentro
@@ -7652,14 +7743,8 @@
      bordo nero del ghost: fondo della carta, bordo sottile del colore
      delle righe, testo rosso un po' piu' piccolo, nessuna ombra 3D. Si
      trova se lo si cerca, non chiama. */
-  .btn.piano{background:var(--card);color:var(--danger);
-    border:1.5px solid var(--line);box-shadow:none;font-size:14px;
-    font-weight:700;padding:11px 16px;margin-top:10px}
-  .btn.piano:active{opacity:.7}
-  .btn.allarme{background:var(--warn-bg);color:var(--danger);
-    border:2px solid var(--danger);box-shadow:0 3px 0 var(--danger);
-    margin-top:10px;margin-bottom:10px}
-  .btn.allarme:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+  .btn.piano{font-size:14px;font-weight:700;padding:11px 16px;margin-top:10px}
+  .btn.allarme{margin-top:10px;margin-bottom:10px}
   /* LO SPAZIO FRA DUE BOTTONI E' DELLA COPPIA, NON DEL BOTTONE (ago
      2026, dal campo: nel dettaglio dell'ordine «È arrivato» e «Ho
      ricevuto» si toccavano — misurati a 0px di distanza). La causa e'
@@ -7704,8 +7789,11 @@
   .btn.carton{background:var(--card);border:2px solid var(--carton);
     color:var(--carton);box-shadow:0 3px 0 var(--carton);margin-top:10px}
   .btn.carton:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
-  .btn.primary:active,.btn.orange:active,.btn.ghost:active{
-    transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+  /* PREMUTO: ogni ruolo affonda di quanto dice il vestito, col fondo
+     e l'ombra «premuti» del SUO ruolo */
+  .btn.orange:active,.btn.primary:active,.btn.asta:active,.btn.ghost:active,
+  .btn.allarme:active,.btn.piano:active,.btn.mini:active{
+    transform:var(--b-on-move);background:var(--b-bg-on);box-shadow:var(--b-sh-on)}
   /* CTA d'acquisto su due righe: azione sopra, cifra intera sotto —
      cosi' i prezzi a 7 cifre non si tagliano mai */
   .btn.compra{flex-direction:column;gap:1px;padding:10px 20px 11px}
@@ -7727,10 +7815,65 @@
      di chi li ospita — mai margini inline sui bottoni, la famiglia
      sorvegliata. */
   .btn.mini{display:inline-flex;width:auto;padding:7px 12px;gap:6px;
-    font-size:13px;background:var(--card);border:2px solid var(--ink);
-    color:var(--ink);box-shadow:0 2px 0 var(--ink);margin-top:0}
-  .btn.mini:active{transform:translateY(2px);box-shadow:none}
-  .btn[disabled]{opacity:.5;pointer-events:none}
+    font-size:13px;margin-top:0}
+  /* SPENTO. Quello di sempre (velo a meta', e il dito non passa) resta
+     per i bottoni senza ruolo; i ruoli del vestito si spengono su un
+     fondo NEUTRO PIENO — sull'arancio il velo faceva un beige sporco,
+     e sembrava uguale al bottone che sta lavorando. */
+  .btn:disabled,.btn[disabled]{opacity:.5;pointer-events:none}
+  .btn.orange:disabled,.btn.primary:disabled,.btn.asta:disabled,.btn.ghost:disabled,
+  .btn.allarme:disabled,.btn.piano:disabled,.btn.mini:disabled{
+    background:var(--b-off-bg,var(--b-bg));color:var(--b-off-fg,var(--b-fg));
+    border-color:var(--b-off-line,var(--b-line));box-shadow:var(--b-off-sh,var(--b-sh));
+    opacity:var(--b-off-op)}
+  /* IN CORSO (aria-busy, da bottoneInAttesa): e' spento per il dito ma
+     NON per l'occhio — tiene il colore del suo ruolo (le --b-off-… si
+     svuotano e vince il ripiego) e una luce gli passa sopra. Ferma a
+     meta' con meno movimento. */
+  .btn[aria-busy="true"]{--b-off-bg:initial;--b-off-fg:initial;--b-off-line:initial;
+    --b-off-sh:initial;--b-off-op:var(--b-busy-op)}
+  .btn.orange[aria-busy="true"],.btn.primary[aria-busy="true"],.btn.asta[aria-busy="true"],
+  .btn.ghost[aria-busy="true"],.btn.allarme[aria-busy="true"]{position:relative}
+  .btn.orange[aria-busy="true"]::after,.btn.primary[aria-busy="true"]::after,
+  .btn.asta[aria-busy="true"]::after,.btn.ghost[aria-busy="true"]::after,
+  .btn.allarme[aria-busy="true"]::after{
+    content:'';display:var(--b-busy-luce);position:absolute;inset:0;
+    border-radius:inherit;pointer-events:none;
+    background:linear-gradient(100deg,transparent 30%,var(--b-luce) 50%,transparent 70%);
+    background-size:250% 100%;background-position:50% 0;
+    animation:btn-luce 1.3s linear infinite}
+  /* ferma, la luce resta a meta' (la posizione di riposo qui sopra):
+     basta spegnere l'animazione, e con gli effetti ridotti a mano la
+     spegne la regola universale in fondo al foglio */
+  @keyframes btn-luce{from{background-position:120% 0}to{background-position:-120% 0}}
+  @media (prefers-reduced-motion:reduce){
+    .btn[aria-busy="true"]::after{animation:none}}
+  /* il fuoco della tastiera si vede, su ogni bottone */
+  .btn:focus-visible,.back:focus-visible,.foto-scelta:focus-visible{
+    outline:2px solid var(--b-focus,var(--sats));outline-offset:2px}
+  /* ══ IL P2P TIENE IL VESTITO DI PRIMA (ott 2026, decisione di
+     Andrea: il P2P si veste in un secondo giro) ══
+     Le sei viste `view-p2p…` e i tredici fogli `p2p…Sheet` ridanno ai
+     bottoni i valori di prima dello stile A: pillola piena col
+     gradino di 3px, testo bianco, ghost a bordo d'inchiostro, velo al
+     50% da spenti, niente luce in corso, Nunito, 12px di curva. Sono
+     solo VARIABILI su chi li contiene (le regole sono le stesse del
+     mercatino), e :where() non pesa: nessuna regola del P2P cambia
+     chi vince. Il secondo giro cancella questo blocco e basta. */
+  :where([id^="view-p2p"], .sheet[id^="p2p"]){
+    --b-r:var(--radius-btn); --b-min:auto; --b-font:'Nunito',system-ui,sans-serif;
+    --b-on-move:translateY(2px); --b-pieno-bw:0px; --b-pri-fs:15.5px;
+    --b-pri-bg:var(--sats); --b-pri-fg:#fff; --b-pri-line:transparent;
+    --b-pri-sh:0 3px 0 var(--sats-deep); --b-pri-sh-on:0 1px 0 rgba(0,0,0,.35);
+    --b-ok-bg:var(--trust); --b-ok-fg:var(--on-trust); --b-ok-line:transparent;
+    --b-ok-sh:0 3px 0 var(--trust-deep); --b-ok-sh-on:0 1px 0 rgba(0,0,0,.35);
+    --b-sec-bg:var(--card); --b-sec-fg:var(--ink); --b-sec-line:var(--ink); --b-sec-bw:2px;
+    --b-sec-sh:0 3px 0 var(--ink); --b-sec-bg-on:var(--card); --b-sec-sh-on:0 1px 0 rgba(0,0,0,.35);
+    --b-mini-sh:0 2px 0 var(--ink); --b-mini-sh-on:none;
+    --b-dan-bg:var(--warn-bg); --b-dan-fg:var(--danger); --b-dan-line:var(--danger); --b-dan-bw:2px;
+    --b-dan-sh:0 3px 0 var(--danger); --b-dan-sh-on:0 1px 0 rgba(0,0,0,.35);
+    --b-off-bg:initial; --b-off-fg:initial; --b-off-line:initial; --b-off-sh:initial;
+    --b-off-op:.5; --b-busy-op:.5; --b-busy-luce:none}
   /* LA RIGA DEL CAMPO FILE (ago 2026, dal campo): il chip col nome e
      il «togli» finivano SOTTO il bottone, e il «togli» centrato —
      MISURATO prima di toccare: tre righe e 152px, col bottone e il
@@ -7956,13 +8099,17 @@
      perche' sul computer `capture` non apre nessuna fotocamera e il
      riquadro di prima basta. Il fondo e' quello delle card e il bordo
      quello dei campi: bottoni di servizio dentro un bersaglio, non
-     azioni che competono con «Pubblica». */
+     azioni che competono con «Pubblica».
+     Dall'ott 2026 vestono il SECONDARIO del vestito dei bottoni (accanto
+     a --radius-btn): servizio si', ma bottoni come gli altri. */
   .photo-drop .foto-scelte{display:flex;gap:8px;margin-top:14px}
-  .photo-drop .foto-scelta{flex:1 1 0;min-width:0;min-height:44px;
-    border:1.5px solid var(--field-line);border-radius:var(--radius-btn);
-    background:var(--bg);color:var(--ink);font:inherit;font-weight:800;
-    font-size:14px;padding:10px 8px;cursor:pointer}
-  .photo-drop .foto-scelta:active{transform:scale(.98)}
+  .photo-drop .foto-scelta{flex:1 1 0;min-width:0;min-height:var(--b-min);
+    border:var(--b-sec-bw) solid var(--b-sec-line);border-radius:var(--b-r);
+    background:var(--b-sec-bg);color:var(--b-sec-fg);box-shadow:var(--b-sec-sh);
+    font:inherit;font-weight:800;
+    font-size:14px;padding:10px 8px;cursor:pointer;transition:transform .1s,box-shadow .1s}
+  .photo-drop .foto-scelta:active{transform:var(--b-on-move);
+    background:var(--b-sec-bg-on);box-shadow:var(--b-sec-sh-on)}
   @media(hover:hover) and (pointer:fine){
     .photo-drop .foto-scelte{display:none}
   }
@@ -7996,19 +8143,22 @@
   #fotocamera .cam-otturatore{width:76px;height:76px;padding:0;border-radius:50%;
     border:5px solid #fff;background:rgba(255,255,255,.22);cursor:pointer}
   #fotocamera .cam-otturatore:active{background:#fff}
-  #fotocamera .cam-btn{flex:1 1 0;min-width:0;min-height:48px;border-radius:var(--radius-btn);
+  #fotocamera .cam-btn{flex:1 1 0;min-width:0;min-height:48px;border-radius:var(--b-r);
     border:1.5px solid rgba(255,255,255,.75);background:rgba(0,0,0,.35);color:#fff;
     font:inherit;font-weight:800;font-size:15px;padding:10px 12px;cursor:pointer}
-  #fotocamera .cam-btn.primario{background:var(--sats);border-color:var(--sats);
-    box-shadow:0 3px 0 var(--sats-deep)}
+  /* il pieno della fotocamera e' il PRINCIPALE del vestito dei
+     bottoni (ott 2026): testo scuro, che il bianco sull'arancio non
+     si legge — e il vestito ha gli stessi pieni nei due temi */
+  #fotocamera .cam-btn.primario{background:var(--b-pri-bg);border-color:var(--b-pri-line);
+    color:var(--b-pri-fg);box-shadow:var(--b-pri-sh)}
   /* l'uscita: un link sottile mentre la fotocamera si apre o e' accesa,
      un bottone vero quando la fotocamera non c'e' — li' e' la strada */
   #fotocamera .cam-ripiego{min-height:44px;border:0;background:none;color:#fff;
     font:inherit;font-size:14px;font-weight:700;text-decoration:underline;cursor:pointer}
   #fotocamera[data-stato="rivedi"] .cam-ripiego{display:none}
   #fotocamera[data-stato="errore"] .cam-ripiego{width:100%;max-width:420px;min-height:48px;
-    border-radius:var(--radius-btn);background:var(--sats);text-decoration:none;
-    font-size:15px;font-weight:800;box-shadow:0 3px 0 var(--sats-deep)}
+    border-radius:var(--b-r);background:var(--b-pri-bg);color:var(--b-pri-fg);
+    text-decoration:none;font-size:15px;font-weight:800;box-shadow:var(--b-pri-sh)}
   /* il riquadro si accende mentre la foto ci passa sopra: il segnale
      che il bersaglio c'e' davvero */
   .photo-drop.sopra{border-color:var(--sats);background:var(--sats-soft);color:var(--sats-text)}
@@ -9022,11 +9172,16 @@
   /* «← Torna» del negozio e della pagina sicurezza: rettangolo come
      tutti gli altri bottoni dall'ago 2026 (era l'ultima pillola
      rimasta su quelle due pagine) */
+  /* il «← Torna» delle pagine: un secondario del vestito dei bottoni
+     (ott 2026), basso di testo ma alto 44 per il dito */
   .back{
-    border:0;background:var(--card);border:1.5px solid var(--field-line);
-    border-radius:var(--radius-btn);
+    display:inline-flex;align-items:center;min-height:var(--b-min);
+    background:var(--b-sec-bg);color:var(--b-sec-fg);
+    border:var(--b-sec-bw) solid var(--b-sec-line);box-shadow:var(--b-sec-sh);
+    border-radius:var(--b-r);
     padding:7px 15px;font:inherit;font-weight:800;font-size:13px;cursor:pointer;margin:14px 0 0 var(--pad);
   }
+  .back:active{transform:var(--b-on-move);background:var(--b-sec-bg-on);box-shadow:var(--b-sec-sh-on)}
   .demo-banner{
     background:var(--sats-soft);color:var(--sats-text);font-size:12px;font-weight:700;
     text-align:center;padding:7px;letter-spacing:.02em;
@@ -9430,7 +9585,7 @@
   html.fx-ridotti.p2p-sfocata #app > .view.active,
   html.fx-ridotti.p2p-sfocata #app > nav{filter:none}
   html.fx-ridotti .btn.orange.in-evidenza{
-    box-shadow:0 3px 0 var(--sats-deep),0 0 0 4px rgba(247,147,26,.35)}
+    box-shadow:var(--b-sh),0 0 0 4px rgba(247,147,26,.35)}
 
   /* ---------- L'ARRIVO SECCO (23 set 2026) ----------
      Quando Chrome ha gia' fatto vedere la pagina d'arrivo con la sua
@@ -12540,7 +12695,7 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="annullaVenditaTit">✖️ Annulli l'ordine?</h3>
     <div id="annullaVenditaCorpo"></div>
-    <button class="btn orange" id="annullaVenditaOk" style="margin-top:12px" onclick="confermaAnnullaVendita(this)">✖️ Annulla l'ordine</button>
+    <button class="btn allarme" id="annullaVenditaOk" style="margin-top:12px" onclick="confermaAnnullaVendita(this)">✖️ Annulla l'ordine</button>
     <button class="btn ghost" onclick="navIndietro()">Indietro</button>
   </div>
 
@@ -36206,10 +36361,13 @@ function bottoneInAttesa(btn, testo){
   el('attesaOverlay').classList.remove('fatto');
   el('attesaOverlay').classList.add('on');    /* blocca tutto: i sats viaggiano */
   const prima = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ ' + (testo || 'Invio in corso…'); }
+  /* aria-busy (ott 2026): il bottone spento-che-lavora tiene il suo
+     colore e la luce che passa — lo spento vero e' un'altra cosa */
+  if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true');
+             btn.innerHTML = '⏳ ' + (testo || 'Invio in corso…'); }
   return ()=>{
     el('attesaOverlay').classList.remove('on');
-    if (btn) { btn.disabled = false; btn.innerHTML = prima; }
+    if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); btn.innerHTML = prima; }
   };
 }
 

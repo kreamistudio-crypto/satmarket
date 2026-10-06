@@ -21763,6 +21763,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   delle categorie), più `.tour-avanti` e `.demo-cta`. Quelle non sono
   bottoni-oggetto, sono etichette e chrome. I testuali (`.btn.link`,
   `.danger-ghost`) non hanno fondo, quindi la curva non li riguarda.
+  IL VESTITO DEI BOTTONI (ott 2026, stile A «pieno morbido», scelto da
+  Andrea fra tre provati sull'app vera; CANTIERI, «Bottoni più eleganti
+  nel mercatino»). Dal vestito la curva dei bottoni è `--b-r` (14px):
+  `--radius-btn` (12px) resta alle cose che non sono bottoni e al P2P.
+  I VALORI stanno nelle `--b-…` di `:root` (e i serali nel blocco
+  scuro), per ruolo: `--b-pri-…` principale (`.orange`), `--b-ok-…`
+  conferma (`.primary`), `--b-asta-…`, `--b-sec-…` secondario (`.ghost`,
+  `.mini`, `.back`, le scelte delle foto, le celle del carrello),
+  `--b-dan-…` pericolo (`.allarme`), `--b-piano-…` sottotono, `--b-off-…`
+  spento, `--b-busy-…` e `--b-luce` per l'«in corso», e le comuni
+  (`--b-r`, `--b-min` 44px, `--b-font` Baloo 2, `--b-on-move`). Ogni
+  classe di ruolo copia le sue leve nelle CORRENTI (`--b-bg`, `--b-fg`,
+  `--b-line`, `--b-bw`, `--b-sh`, `--b-bg-on`, `--b-sh-on`, `--b-fs`) e
+  UNA regola dipinge; premuto, spento (`var(--b-off-bg, var(--b-bg))`),
+  «in corso» (`aria-busy`: le `--b-off-…` a `initial`, vince il
+  ripiego) e il battito di `in-evidenza` leggono le correnti. Chi
+  aggiunge un ruolo scrive le sue leve e la sua riga di correnti; chi
+  cambia il vestito tocca solo i valori. Testo SCURO sui pieni: il
+  bianco sul #F7931A fa 2,3:1. `prove_vestito_bottoni` calcola i
+  contrasti dai token su ogni fermata dei gradienti.
+  IL P2P TIENE IL VESTITO DI PRIMA finché non ha il suo giro: un blocco
+  di sole variabili su `:where([id^="view-p2p"], .sheet[id^="p2p"])`
+  rimette i valori di prima (pieno col gradino di 3px, bianco, ghost a
+  bordo d'inchiostro, velo al 50%, niente luce, Nunito, 12px). Un foglio
+  o una vista nuovi del P2P che non seguono quei nomi vestono A; il
+  secondo giro cancella il blocco.
   E I DUE PONTI SONO BOTTONI, NON LINK (stessa decisione): nel negozio
   erano testo sottolineato («btn link») mentre gli stessi due dentro
   l'ordine erano già ghost — la stessa azione con due vestiti secondo

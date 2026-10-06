@@ -65852,8 +65852,12 @@ def prove_velo_p2p():
              "  let sblocca; risposta = null;\n"
              "  chiamataOrdineP2P = () => new Promise(r => { sblocca = r; });\n"
              "  annullaScambioP2P();\n"
+             # il bottone di cartone sa anche dire «in corso»: dall'ott
+             # 2026 bottoneInAttesa mette e toglie aria-busy, come
+             # ogni <button> vero sa fare
              "  const inVolo = eseguiConferma({innerHTML: 'Sì, ritira',\n"
-             "                                 disabled: false});\n"
+             "                                 disabled: false,\n"
+             "                                 setAttribute(){}, removeAttribute(){}});\n"
              "  await new Promise(r => setTimeout(r, 30));\n"
              "  const acceso = () => reg.filter(x => x === '+on').length >\n"
              "                       reg.filter(x => x === '-on').length;\n"
@@ -88641,8 +88645,8 @@ def prove_p2p_silenzi():
     prova("il battito batte tre volte e si ferma, e chi ha chiesto meno "
           "movimento ha un alone fermo", [True, True],
           [".btn.orange.in-evidenza{animation:passo-batte 1.4s ease-in-out 3}" in _css,
-           ".btn.orange.in-evidenza{animation:none;\n      box-shadow:0 3px 0 "
-           "var(--sats-deep),0 0 0 4px rgba(247,147,26,.35)}" in _css])
+           ".btn.orange.in-evidenza{animation:none;\n      box-shadow:var(--b-sh),"
+           "0 0 0 4px rgba(247,147,26,.35)}" in _css])
     # VISTO DAL VIVO E NON A BANCO: `.btn.orange` sta piu' sotto con lo
     # stesso peso di `.btn.in-evidenza`, e la sua ombra vinceva — l'alone
     # fermo non si dipingeva. Serve una classe in piu', e l'ombra del
@@ -88651,9 +88655,11 @@ def prove_p2p_silenzi():
           "sotto: mai la regola a due classi", 0, _css.count(".btn.in-evidenza"))
     _kf = _css[_css.find("@keyframes passo-batte{"):]
     _kf = _kf[:_kf.find("@media")]
-    prova("...e il gradino del bottone resta in OGNI fotogramma del battito",
+    # dall'ott 2026 l'ombra del bottone e' `var(--b-sh)`, quella del suo
+    # vestito (lo stile A nel mercatino, il gradino di prima nel P2P)
+    prova("...e l'ombra del bottone resta in OGNI fotogramma del battito",
           [2, 2], [_kf.count("box-shadow:"),
-                   _kf.count("box-shadow:0 3px 0 var(--sats-deep),")])
+                   _kf.count("box-shadow:var(--b-sh),")])
     prova("il «tocca a te» scatta all'INGRESSO nello stato, su una richiesta viva",
           True, "if (nuovo.stato === 'attesa_mia_hold' && prima !== 'attesa_mia_hold'\n"
           "      && holdVivaP2P(nuovo)) {" in appl
@@ -91682,12 +91688,13 @@ def prove_banner_negozio():
     # I DUE VALORI SONO QUELLI DEL CARTELLINO, e la prova li lega:
     # chi ne cambia uno solo scopre di aver inventato un colore.
     _chip = mini[mini.index(".pz-chip{"):][:260]
-    # E IL BARRATO DENTRO L'ARANCIO e' bianco velato: `--muted`
-    # li' sparirebbe. La regola vince per SPECIFICITA' su quella
-    # delle quattro case, non per ordine — e nessuna prova la
-    # sorvegliava (la mutazione e' sopravvissuta al primo giro).
-    prova("il barrato nell'arancio e' bianco velato", True,
-          "#bannerBlocco .btn.orange .acq-barrato{color:rgba(255,255,255"
+    # E IL BARRATO DENTRO L'ARANCIO e' il colore del bottone, velato:
+    # `--muted` li' sparirebbe. Era bianco velato finche' il testo dei
+    # pieni era bianco; dall'ott 2026 (stile A) e' scuro, e il bianco
+    # sarebbe sparito lui. La regola vince per SPECIFICITA' su quella
+    # delle quattro case, non per ordine.
+    prova("il barrato nell'arancio e' il colore del bottone, velato", True,
+          "#bannerBlocco .btn.orange .acq-barrato{color:inherit;opacity:.72}"
           in mini)
     prova("il chip veste il cartellino, e non il verde", True,
           "#FFF8EA" in _chip and "#23282C" in _chip
@@ -118741,11 +118748,21 @@ def prove_annullo_venditore():
     # IL TASTO SOTTOTONO (ritocco di Andrea): dentro un tasto, non un
     # testuale sottolineato, ma senza la velatura dell'allarme ne' il
     # bordo nero del ghost — una veste sua, piu' piccola e senza ombra
-    css = mini[mini.index("  .btn.piano{"):mini.index("  .btn.allarme{")]
+    # Dall'ott 2026 (lo stile A dei bottoni) i COLORI stanno nel vestito
+    # — le --b-piano-… accanto a --radius-btn — e la regola del ruolo li
+    # legge; la regola di .btn.piano tiene le sole misure.
+    _ruolo = re.search(r"  \.btn\.piano\{(--b-[^}]*)\}", mini)
+    _misure = re.search(r"  \.btn\.piano\{(font-size[^}]*)\}", mini)
+    _tok = mini[mini.index(":root{"):mini.index("</style>")]
     prova("...vestito da tasto sottotono: fondo carta, bordo delle righe, rosso, "
-          "niente ombra, piu' piccolo", [True] * 5,
-          [x in css for x in ("background:var(--card)", "border:1.5px solid var(--line)",
-                              "color:var(--danger)", "box-shadow:none", "font-size:14px")])
+          "niente ombra, piu' piccolo", [True] * 6,
+          [bool(_ruolo) and "--b-bg:var(--b-piano-bg)" in _ruolo.group(1)
+           and "--b-line:var(--b-piano-line)" in _ruolo.group(1),
+           bool(_ruolo) and "--b-fg:var(--b-piano-fg)" in _ruolo.group(1),
+           bool(_ruolo) and "--b-sh:none" in _ruolo.group(1),
+           "--b-piano-bg:#FFFFFF; --b-piano-fg:#A8360A; --b-piano-line:#E8DFC8;" in _tok,
+           "--b-piano-bg:#2C2517; --b-piano-fg:#F58A5C; --b-piano-line:#3E3623;" in _tok,
+           bool(_misure) and "font-size:14px" in _misure.group(1)])
     prova("la storia della cassaforte si sostituisce DOPO quella della "
           "disputa, coi suoi tre passi", True,
           "if (annulloVenditore(o)) {" in bottone
@@ -119017,6 +119034,191 @@ def prove_spunta_rimborso():
           "e senza", [x[2] for x in prima],
           [next((p[1] for p in passi if p[0] == "now"), None) for passi in avuti2]
           if isinstance(avuti2, list) else avuti2)
+
+
+def prove_vestito_bottoni():
+    """IL VESTITO DEI BOTTONI (ott 2026, stile A «pieno morbido», scelto
+    da Andrea fra tre provati sull'app vera). Un cuore solo: i valori
+    stanno nelle --b-… accanto a --radius-btn (e nel blocco scuro), le
+    regole dei ruoli li leggono, il P2P si rimette i valori di prima con
+    un blocco di sole variabili. Qui si prova che:
+      1. ogni pieno e ogni secondario si LEGGE (4,5:1) nei due temi, su
+         OGNI fermata del gradiente — calcolato dai token veri;
+      2. la cascata vera da' a ogni ruolo il fondo, il testo, il bordo e
+         l'ombra del vestito, e la curva e i 44 px della base;
+      3. nessun ruolo si ridipinge per conto suo;
+      4. il blocco del P2P rimette TUTTE le leve che il P2P usa (chi
+         aggiunge una leva al vestito e la scorda li', se ne accorge);
+      5. lo spento e' un fondo pieno, l'«in corso» tiene il colore, e
+         bottoneInAttesa lo dice (aria-busy messo E tolto);
+      6. le decisioni di Andrea: la conferma di «Annulla l'ordine» del
+         venditore e' un pericolo, il condividi e' a 44 px."""
+    print("\n🎨 Il vestito dei bottoni (stile A)")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i0 = mini.index("<style>")
+    stile = mini[i0 + 7:mini.find("</style>", i0)]
+    reg, squilibrio = _regole_css(stile)
+    prova("il foglio di stile si chiude", 0, squilibrio)
+
+    def variabili(selettore):
+        out = {}
+        for lista, corpo, gruppi in reg:
+            if lista.strip() == selettore and not gruppi:
+                for d in corpo.split(";"):
+                    k, due, v = d.partition(":")
+                    if due and k.strip().startswith("--"):
+                        out[k.strip()] = " ".join(v.split())
+        return out
+
+    chiaro = variabili(":root")
+    scuro = dict(chiaro, **variabili('html[data-tema="scuro"]'))
+    p2p = variabili(':where([id^="view-p2p"], .sheet[id^="p2p"])')
+
+    # --- 1) i contrasti, dai token ------------------------------------
+    def risolvi(v, tok, giri=0):
+        while "var(--" in v and giri < 8:
+            v = re.sub(r"var\((--[\w-]+)(?:,[^()]*)?\)",
+                       lambda m: tok.get(m.group(1), "#000"), v)
+            giri += 1
+        return v
+
+    def colori(v):
+        out = []
+        for c in re.findall(r"#[0-9A-Fa-f]{6}\b|rgba?\([^)]*\)", v):
+            if c.startswith("#"):
+                out.append((int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), 1.0))
+            else:
+                n = [float(x) for x in c[c.index("(") + 1:-1].split(",")]
+                out.append((n[0], n[1], n[2], n[3] if len(n) > 3 else 1.0))
+        return out
+
+    def sopra(c, sotto):
+        a = c[3]
+        return tuple(c[i] * a + sotto[i] * (1 - a) for i in range(3)) + (1.0,)
+
+    def lum(c):
+        def f(x):
+            x /= 255
+            return x / 12.92 if x <= .03928 else ((x + .055) / 1.055) ** 2.4
+        return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2])
+
+    def contrasto(a, b):
+        x, y = lum(a), lum(b)
+        return (max(x, y) + .05) / (min(x, y) + .05)
+
+    peggio = {}
+    for tema, tok in (("chiaro", chiaro), ("scuro", scuro)):
+        pagina = colori(risolvi(tok["--bg"], tok))[0]
+        for ruolo in ("pri", "ok", "asta", "sec", "dan", "piano"):
+            fondi = [sopra(c, pagina) for c in colori(risolvi(tok[f"--b-{ruolo}-bg"], tok))]
+            testo = colori(risolvi(tok[f"--b-{ruolo}-fg"], tok))[0]
+            peggio[(tema, ruolo)] = min(contrasto(sopra(testo, f), f) for f in fondi)
+    sotto = sorted(f"{t} {r} {v:.2f}" for (t, r), v in peggio.items() if v < 4.5)
+    prova("ogni ruolo si legge a 4,5:1 nei due temi, su ogni fermata del gradiente",
+          [], sotto)
+    prova("...e il principale col testo scuro sta largo (oltre 6:1)", True,
+          min(peggio[("chiaro", "pri")], peggio[("scuro", "pri")]) > 6)
+    prova("...che e' il guasto curato: il bianco sull'arancio di casa faceva 2,3",
+          True, contrasto((255, 255, 255, 1), (0xF7, 0x93, 0x1A, 1)) < 2.5)
+
+    # --- 2) la cascata vera -------------------------------------------
+    # Il banco della cascata non sa in che STATO e' un bottone (un
+    # `:disabled` o un `:active` per lui combaciano sempre): la domanda
+    # qui e' sul bottone A RIPOSO, quindi i selettori di stato escono.
+    STATI = (":active", ":disabled", "[disabled]", "aria-busy", ":focus", ":hover")
+    quieto = []
+    for lista, corpo, gruppi in reg:
+        sel = [x for x in _dividi_css(lista) if not any(t in x for t in STATI)]
+        if sel:
+            quieto.append((",".join(sel), corpo, gruppi))
+
+    def catena(classi, vista="view-dettaglio"):
+        return [{"tag": "html", "attr": {}, "classi": set()},
+                {"tag": "body", "attr": {}, "classi": set()},
+                {"tag": "div", "attr": {"id": vista, "class": "view"},
+                 "classi": {"view"}},
+                {"tag": "button", "attr": {"class": " ".join(classi)},
+                 "classi": set(classi)}]
+
+    props = ["background", "color", "border", "box-shadow", "border-radius",
+             "min-height", "font-family"]
+    attese = {"background": "var(--b-bg)", "color": "var(--b-fg)",
+              "border": "var(--b-bw) solid var(--b-line)",
+              "box-shadow": "var(--b-sh)", "border-radius": "var(--b-r)",
+              "min-height": "var(--b-min)", "font-family": "var(--b-font)"}
+    for ruolo in ("orange", "primary", "asta", "ghost", "allarme", "piano", "mini"):
+        v = _vince_css(quieto, catena(["btn", ruolo]), props)
+        prova(f"la cascata veste .btn.{ruolo} dal vestito", attese,
+              {p: (v.get(p) or ("?",))[0] for p in props})
+    prova("...e la base dice 44 px, la curva di 14 e la voce del logo", True,
+          chiaro.get("--b-min") == "44px" and chiaro.get("--b-r") == "14px"
+          and chiaro.get("--b-font", "").startswith("'Baloo 2'"))
+    _bc = _vince_css(quieto, [{"tag": "html", "attr": {}, "classi": set()},
+                           {"tag": "div", "attr": {"id": "barraCompra"}, "classi": set()},
+                           {"tag": "button", "attr": {"id": "bcCompra"},
+                            "classi": {"btn", "orange"}}], ["box-shadow"])
+    prova("la barra d'acquisto resta PIATTA (la sua decisione, prima del vestito)",
+          "none", _bc["box-shadow"][0])
+
+    # --- 3) nessun ruolo si ridipinge da se' --------------------------
+    prova("nessuna regola di ruolo porta un fondo, un colore o un'ombra suoi", [],
+          re.findall(r"(?m)^\s*\.btn\.(?:orange|primary|asta|ghost|allarme|piano|mini)"
+                     r"\{[^}]*\b(?:background|color|box-shadow):", stile))
+
+    # --- 4) il P2P tiene il vestito di prima --------------------------
+    usate_p2p = [k for k in chiaro if k.startswith("--b-") and not re.match(
+        r"--b-(asta|piano)-|--b-(focus|luce)$", k)]
+    prova("il blocco del P2P rimette tutte le leve del vestito che il P2P usa",
+          [], sorted(k for k in usate_p2p if k not in p2p))
+    prova("...coi valori di prima: arancio pieno, testo bianco, gradino di 3px, "
+          "ghost a bordo d'inchiostro, velo al 50%, niente luce", True,
+          p2p.get("--b-pri-bg") == "var(--sats)" and p2p.get("--b-pri-fg") == "#fff"
+          and p2p.get("--b-pri-sh") == "0 3px 0 var(--sats-deep)"
+          and p2p.get("--b-sec-line") == "var(--ink)" and p2p.get("--b-sec-bw") == "2px"
+          and p2p.get("--b-off-op") == ".5" and p2p.get("--b-off-bg") == "initial"
+          and p2p.get("--b-busy-luce") == "none"
+          and p2p.get("--b-r") == "var(--radius-btn)")
+    viste = sorted(set(re.findall(r'<div class="view[^"]*" id="(view-p2p\w*)"', mini)))
+    prova("...e le viste del P2P sono quelle che il blocco prende (view-p2p…)",
+          True, len(viste) >= 6 and all(v.startswith("view-p2p") for v in viste))
+    fogli_p2p = re.findall(r'<div class="sheet[^"]*" id="(p2p\w+)"', mini)
+    prova("...come i fogli del P2P (p2p…Sheet)", True, len(fogli_p2p) >= 13)
+
+    # --- 5) spento, in corso, premuto ---------------------------------
+    prova("lo spento di un ruolo e' un fondo pieno, col ripiego sul suo colore",
+          True, "background:var(--b-off-bg,var(--b-bg));color:var(--b-off-fg,var(--b-fg));"
+          in stile.replace("\n    ", ""))
+    prova("...l'«in corso» svuota le leve dello spento e tiene il colore", True,
+          '.btn[aria-busy="true"]{--b-off-bg:initial;--b-off-fg:initial;--b-off-line:initial;'
+          in stile)
+    # ferma, la luce sta a meta': la posizione di riposo e' nella regola
+    # base, e a spegnerla bastano il blocco reduced-motion e la regola
+    # universale di fx-ridotti (che copre anche ::after) — nessun gemello
+    prova("...la luce si ferma a meta' con meno movimento, anche a mano", [True, True],
+          [re.search(r'\.btn\.allarme\[aria-busy="true"\]::after\{[^}]*'
+                     r'background-position:50% 0;', stile) is not None,
+           '.btn[aria-busy="true"]::after{animation:none}' in stile])
+    bia = pezzo_js(mini, "function bottoneInAttesa(btn, testo){", "\n}\n")
+    prova("bottoneInAttesa dice «in corso» e alla fine lo toglie", [1, 1],
+          [bia.count("btn.setAttribute('aria-busy', 'true');"),
+           bia.count("btn.removeAttribute('aria-busy');")])
+    _pc = _vince_css(quieto, [{"tag": "div", "attr": {}, "classi": {"pacco-cella"}},
+                           {"tag": "button", "attr": {},
+                            "classi": {"btn", "ghost", "pacco-btn"}}],
+                     ["box-shadow", "border-radius"])
+    prova("le celle del carrello vestono il loro ruolo, non il gradino di prima",
+          ["var(--b-sh)", "var(--b-r)"],
+          [_pc["box-shadow"][0], _pc["border-radius"][0]])
+    prova("il pieno della fotocamera e' il principale del vestito", True,
+          "#fotocamera .cam-btn.primario{background:var(--b-pri-bg);" in stile)
+
+    # --- 6) le decisioni ----------------------------------------------
+    prova("la conferma di «Annulla l'ordine» del venditore e' un pericolo",
+          True, '<button class="btn allarme" id="annullaVenditaOk"' in mini)
+    prova("il condividi (e il suo gemello indietro) e' a 44 px", True,
+          re.search(r"\.share-btn\{[^}]*width:44px;height:44px", stile) is not None)
+    prova("il barrato nel banner prende il colore del bottone", True,
+          "#bannerBlocco .btn.orange .acq-barrato{color:inherit;opacity:.72}" in stile)
 
 
 def prove_csp_prova():
@@ -121445,6 +121647,7 @@ def main():
               prove_db_contesa_negozi,
               prove_negozi_grandi,
               prove_freni,
+              prove_vestito_bottoni,
               prove_config_esempio):
         try:
             f()
