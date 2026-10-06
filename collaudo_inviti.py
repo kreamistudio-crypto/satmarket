@@ -336,8 +336,10 @@ def main():
     me = profilo(222)
     inv = me.get("inviti") or {}
     prova("il cassetto ha il codice", c222, inv.get("codice"))
-    prova("...e il link del bot con lo start", f"{SRV.LINK_BOT}?start={c222}",
-          inv.get("link"))
+    prova("...e il link di casa col codice (vale per Telegram e per Nostr)",
+          f"{SRV.URL_PUBBLICO}/?invito={c222}", inv.get("link"))
+    prova("...e quello del bot con lo start, a parte",
+          f"{SRV.LINK_BOT}?start={c222}", inv.get("link_telegram"))
     prova("...e QUANTE persone (Zefirina, Quintiliana, Anselma, Cesira, "
           "Elio)", 5, inv.get("persone"))
     prova("...e la percentuale viene dal server", 5, inv.get("percento"))

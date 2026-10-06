@@ -28453,6 +28453,7 @@ def prove_inviti():
     exec(_SORGENTE[j:_SORGENTE.index("# ---------------------- I LIVELLI",
                                      j)], amb)
     amb["LINK_BOT"] = "https://t.me/bot_di_cartone"
+    amb["URL_PUBBLICO"] = "https://casa.di.cartone"
     zitto = lambda: contextlib.redirect_stdout(io.StringIO())
 
     def ddl(nome):
@@ -28651,6 +28652,33 @@ def prove_inviti():
           "c'e'", (True, True),
           ("el('nostrInvitoCodice')" in _ecn,
            "invito ? {evento, invito} : {evento}" in _ecn))
+    # --- IL LINK DI CASA (ott 2026): un codice per tutte le strade ----
+    _mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client giudica la forma con lo STESSO alfabeto del server",
+          amb["INVITO_ALFABETO"],
+          (re.search(r"const INVITO_ALFABETO_CLIENT = '([^']+)'", _mini)
+           or [None, ""])[1] if re.search(
+               r"const INVITO_ALFABETO_CLIENT = '([^']+)'", _mini) else "")
+    prova("chi arriva dal link in vetrina trova il foglio d'invito",
+          True, "apriInvitoDaUrl();" in pezzo_js(
+              _mini, "async function avviaVetrina(){", "\n}"))
+    _it = pezzo_js(_mini, "function invitoTelegram(testo, chiave){", "\n}")
+    prova("...la cui porta Telegram porta il codice al bot", True,
+          "?start=${codInv}" in _it)
+    _ans = pezzo_js(_mini, "function apriNostrSheet(scopo){", "\n}")
+    prova("...e il login Nostr lo trova compilato, ma non la firma",
+          (True, True), ("campoInv.value = codInv" in _ans,
+                         "firma ? '' : invitoInAttesa()" in _ans))
+    _ri = pezzo_js(_mini, "function renderInviti(){", "\n}")
+    prova("...e chi entra con Telegram lo ritrova applicato dal Profilo",
+          True, "if (aperto) applicaInvitoInAttesa(codInv); else "
+                "scordaInvito();" in _ri)
+    _ai = pezzo_js(_mini, "async function applicaInvitoInAttesa(codice){",
+                   "\n}")
+    prova("...una volta sola, e si scorda comunque vada", True,
+          "invitoAutoTentato = true;" in _ai
+          and _ai.index("scordaInvito();") < _ai.index("await fetch("))
+
     # il banco e' di tutta la sezione: chi segue conta gli invitati di 1
     con.execute("DELETE FROM inviti WHERE invitato IN (-501, -502)")
     con.execute("DELETE FROM utenti WHERE tg_id IN (-501, -502)")
@@ -28694,10 +28722,15 @@ def prove_inviti():
     # attivi invece non c'e', e nemmeno quanti punti aspettano: e' quel
     # che qui si guarda
     prova("il cassetto porta i CONTI e nient'altro: mai chi",
-          {"codice", "link", "persone", "xp", "in_attesa", "attivi_min",
-           "invitato", "campo_fino", "percento", "giorni"}, set(st))
-    prova("...il link e' quello del bot col codice",
-          f"https://t.me/bot_di_cartone?start={c1}", st["link"])
+          {"codice", "link", "link_telegram", "persone", "xp", "in_attesa",
+           "attivi_min", "invitato", "campo_fino", "percento", "giorni"},
+          set(st))
+    # EMENDATA (ott 2026): il link e' DI CASA, non del bot — vale anche
+    # per chi entra con Nostr. Quello del bot resta, a parte.
+    prova("...il link e' quello di casa col codice",
+          f"https://casa.di.cartone/?invito={c1}", st["link"])
+    prova("...e quello del bot resta, col suo start",
+          f"https://t.me/bot_di_cartone?start={c1}", st["link_telegram"])
     prova("...e le persone sono quelle collegate al suo codice", 2,
           st["persone"])
     prova("a chi e' gia' collegato il campo non si apre", 0,
@@ -34916,6 +34949,7 @@ function el(id){
 }
 let ONION = false;
 function suOnion(){ return ONION; }
+function invitoInAttesa(){ return ''; }
 """ + cat + "\n" + _giudice_nostr(mini) + "\n" + fn + """
 const fuori = [];
 ONION = false;

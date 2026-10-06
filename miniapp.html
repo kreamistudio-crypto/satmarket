@@ -27888,6 +27888,10 @@ function invitoTelegram(testo, chiave){
   /* La porta di Telegram non si nasconde soltanto: su onion non
      deve esistere per il dito ne' per la tastiera. */
   el('invitoTg').style.display = onion ? 'none' : 'block';
+  /* col codice d'invito in attesa la porta del bot lo porta con se'
+     (`?start=`, la porta che il bot sa gia' leggere) */
+  const codInv = invitoInAttesa();
+  el('invitoTg').href = 'https://t.me/ilbarattolobot' + (codInv ? `?start=${codInv}` : '');
   const nos = el('invitoNostr');
   /* IL PIENO SEGUE LA PORTA VERA: lasciare Nostr in ghost sotto un
      bottone sparito lo vestirebbe da ripiego proprio dove e' l'unica
@@ -31913,6 +31917,11 @@ function renderInviti(){
   const adesso = Date.now() / 1000;
   const aperto = !inv.invitato && (inv.campo_fino || 0) > adesso;
   const giorni = Math.max(1, Math.ceil(((inv.campo_fino || 0) - adesso) / 86400));
+  /* il codice lasciato dal link d'invito: a campo aperto si applica da
+     solo (una volta), a campo chiuso — gia' collegato, o fuori tempo —
+     non serve piu' */
+  const codInv = invitoInAttesa();
+  if (codInv) { if (aperto) applicaInvitoInAttesa(codInv); else scordaInvito(); }
   const campo = aperto ? `
     <div class="field" style="margin-top:16px"><label>Ti ha invitato qualcuno? Scrivi il suo codice</label>
       <input id="invitoCodice" maxlength="12" autocomplete="off" autocapitalize="characters"
@@ -31984,6 +31993,28 @@ function copiaInvito(){
    riscrive dalla risposta, mai dedotto. Il rifiuto arriva con la sua
    frase gentile — codice storto, il proprio, fuori tempo, gia'
    collegato, un giro in tondo — e si mostra cosi' com'e'. */
+/* Il codice del link, applicato da solo: UNA volta per pagina, e si
+   scorda comunque vada — un no del giudice (il proprio codice, un giro
+   in tondo) non deve tornare a ogni Profilo. Il no si dice, come al
+   campo a mano. */
+let invitoAutoTentato = false;
+async function applicaInvitoInAttesa(codice){
+  if (invitoAutoTentato || DEMO) return;
+  invitoAutoTentato = true;
+  scordaInvito();
+  try {
+    const r = await fetch(`${API_BASE}/me/invito`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({codice})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Il codice d\'invito non si è collegato', 6000); return; }
+    myInviti = d.inviti || myInviti;
+    renderInviti();
+    toast('🎟 Fatto: sei collegato a chi ti ha invitato');
+  } catch(e){}
+}
+
 async function inserisciInvito(btn){
   haptic();
   const codice = (el('invitoCodice')?.value || '').trim();
@@ -45737,6 +45768,7 @@ async function entraConNostr(firmatario){
   /* L'ESITO DEL CODICE SI LEGGE PRIMA DEL RELOAD, che si mangerebbe il
      toast: si aspetta il suo tempo di lettura, e poi si entra. */
   if (typeof d.invito === 'string') {
+    scordaInvito();                    // giudicato: non si ripropone
     const frase = d.invito || '🎟 Fatto: sei collegato a chi ti ha invitato';
     const t = d.invito ? tempoLettura(frase) : 2500;
     toast(frase, t);
@@ -45891,6 +45923,13 @@ function apriNostrSheet(scopo){
      parlare di un foglio che non c'e' piu'. */
   nostrQrGiro++;
   nascondiQrConnessione();
+  /* IL CODICE INVITO e' del login, non della firma: nel foglio della
+     firma la riga non c'e'. Al login, se il link d'invito ha lasciato
+     un codice, il campo nasce compilato e aperto. */
+  const boxInv = el('nostrInvitoBox'), campoInv = el('nostrInvitoCodice');
+  if (boxInv) boxInv.style.display = firma ? 'none' : '';
+  const codInv = firma ? '' : invitoInAttesa();
+  if (codInv && campoInv && !campoInv.value) { campoInv.value = codInv; boxInv.open = true; }
   /* SENZA RELAY IL BOTTONE NON NASCE (server di ieri, DEMO da
      file://): la regola di casa — un bottone che porta a un muro e'
      peggio di un bottone che non c'e'. */
@@ -66224,6 +66263,48 @@ async function apriBarattoloDaUrl(){
    chiunque altro resta sulla home con un avviso. Lo slug passa dalla
    sua FORMA (quella di `FORMA_RACCONTO`) prima di andare da qualche
    parte. */
+/* IL LINK D'INVITO DI CASA (ott 2026, parola di Andrea): il codice era
+   un link del bot, cioe' una porta solo Telegram. Ora il link e'
+   `barattolo.store/?invito=CODICE` (lo compone il server, `stato_inviti`)
+   e il codice vale per TUTTE le strade: la porta di Telegram del foglio
+   d'invito porta al bot col suo `start`, il login Nostr trova il campo
+   gia' compilato, e chi entra col widget di Telegram — che torna sulla
+   pagina SENZA la query — lo ritrova nel cassetto del Profilo, che lo
+   applica da solo. Per questo il codice si ricorda sul dispositivo
+   (localStorage, sette giorni come la finestra del server): e' una
+   comodita' di questo browser, e a decidere resta `collega_invito`.
+   La FORMA e' quella del server (`INVITO_ALFABETO`, sei caratteri): una
+   query storta non si ricorda e non si mostra. */
+const INVITO_CHIAVE = 'barattolo_invito';
+const INVITO_ALFABETO_CLIENT = '23456789BCDFGHJKMNPQRSTVWXYZ';
+const INVITO_URL = (() => {
+  const m = location.search.match(/[?&]invito=([A-Za-z0-9-]{6,8})(?:&|$)/);
+  const c = m ? m[1].replace(/-/g, '').toUpperCase() : '';
+  return (c.length === 6 && [...c].every(x => INVITO_ALFABETO_CLIENT.includes(x))) ? c : '';
+})();
+if (INVITO_URL) {
+  try { localStorage.setItem(INVITO_CHIAVE, JSON.stringify({c: INVITO_URL, t: Date.now()})); } catch(e){}
+}
+function invitoInAttesa(){
+  if (INVITO_URL) return INVITO_URL;
+  try {
+    const d = JSON.parse(localStorage.getItem(INVITO_CHIAVE));
+    if (d && typeof d.c === 'string' && Date.now() - (Number(d.t) || 0) < 7 * 86400000)
+      return d.c;
+  } catch(e){}
+  return '';
+}
+function scordaInvito(){ try { localStorage.removeItem(INVITO_CHIAVE); } catch(e){} }
+/* Chi arriva dal link d'invito senza essere dentro trova SUBITO le due
+   porte, col codice gia' pronto: e' il foglio d'invito di sempre. */
+let invitoDaUrlMostrato = false;
+function apriInvitoDaUrl(){
+  if (!INVITO_URL || invitoDaUrlMostrato) return;
+  invitoDaUrlMostrato = true;
+  invitoTelegram(`Qualcuno ti ha invitato su Barattolo 🎟 Entra con Telegram o `
+    + `con Nostr: il codice ${INVITO_URL} è già pronto, e si collega da solo.`, 'invito');
+}
+
 const BOZZA_URL = (location.search.match(/[?&]bozza=([a-z0-9-]{2,40})(?:&|$)/) || [])[1] || '';
 let bozzaAperta = false;
 function apriBozzaDaUrl(){
@@ -66276,6 +66357,7 @@ async function avviaVetrina(){
     apriOffertaDaUrl();
     apriBarattoloDaUrl();
     apriBozzaDaUrl();
+    apriInvitoDaUrl();
     /* prima il cartello del rodaggio, poi il banner installa: le
        guardie interne decidono comunque se comparire */
     modaleTest(bannerInstallaPwa);

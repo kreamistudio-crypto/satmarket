@@ -35774,3 +35774,36 @@ Telegram già collegato a oauth.telegram.org: per aggiungerne un SECONDO
 bisogna prima uscire da lì. Non provato dal vivo (serve Telegram vero):
 la strada proposta ad Andrea è un login dal bot (link monouso), da
 decidere.
+
+## Il link d'invito vale per Telegram e per Nostr (6 ott 2026)
+
+Il compito (Andrea): «il link di invito è ancora fisso su Telegram,
+vorrei che fosse un codice applicabile in generale anche per Nostr».
+
+**Cosa.** Il link condiviso dal cassetto «💌 I tuoi inviti» è ora
+`barattolo.store/?invito=CODICE`. Chi lo apre dal browser trova la
+vetrina col foglio d'invito già aperto: «Apri @ilbarattolobot» porta il
+codice al bot (`?start=`, la porta che il bot sapeva già leggere), «…o
+entra con Nostr» apre il login col campo «🎟 Hai un codice invito?» già
+compilato. Il codice si ricorda sul dispositivo (localStorage, 7 giorni
+come la finestra del server) perché il widget di Telegram torna senza
+la query: lì lo applica il cassetto del Profilo, da solo, una volta.
+Il link del bot resta nella risposta come `link_telegram`.
+
+**Strade scartate.** Il link `t.me/…?startapp=` della Mini App: apre
+solo dentro Telegram, cioè lo stesso muro di prima per chi ha solo una
+chiave. Un'auto-applicazione silenziosa a ogni Profilo: il codice si
+tenta UNA volta e si scorda comunque vada, e il no si dice.
+
+**Corretto strada facendo** (regressione mia del cantiere di stamattina):
+la riga «Hai un codice invito?» compariva anche nel foglio della FIRMA
+degli annunci; ora solo al login.
+
+**Provato.** `prove_inviti` (link di casa e del bot, alfabeto uguale
+nei due lati, i quattro agganci del client) e `collaudo_inviti`.
+Chromium: con `?invito=k7m-4qx` il codice si normalizza a K7M4QX, il
+foglio d'invito lo dice, il bot ha `?start=K7M4QX`, il login Nostr ha
+il campo compilato e aperto; con `?invito=ciao!!` niente. La vetrina
+vera (anonima) non gira in collaudo: il foglio l'ho aperto chiamando
+`apriInvitoDaUrl`. Non provato: l'applicazione da sola dopo il widget
+di Telegram (serve il widget vero).

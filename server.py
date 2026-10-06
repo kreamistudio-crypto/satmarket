@@ -3756,8 +3756,14 @@ def stato_inviti(con, tg_id: int, registrato) -> dict:
     invitato = con.execute("SELECT 1 FROM inviti WHERE invitato=?",
                            (tg_id,)).fetchone() is not None
     fino = finestra_invito(registrato)
+    # IL LINK E' DI CASA, NON DEL BOT (ott 2026, parola di Andrea): era
+    # `LINK_BOT?start=`, cioe' una porta solo Telegram. Ora apre
+    # barattolo.store col codice, e da li' si entra con Telegram (il bot
+    # col suo start) O con Nostr (il campo del login gia' compilato) —
+    # un codice per tutte e due le strade. Quello del bot resta a parte.
     return {"codice": codice,
-            "link": f"{LINK_BOT}?start={codice}" if codice else "",
+            "link": f"{URL_PUBBLICO}/?invito={codice}" if codice else "",
+            "link_telegram": f"{LINK_BOT}?start={codice}" if codice else "",
             "persone": persone,
             # gli XP che gli inviti gli hanno portato, CONTATI: la stessa
             # cifra che la scomposizione del livello mette nel totale.

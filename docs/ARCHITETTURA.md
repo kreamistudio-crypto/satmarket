@@ -10043,7 +10043,17 @@
   sull'account che c'era sia su quello appena nato, e un no NON fa
   cadere il login: torna come frase in `invito`, che il client mostra
   prima del reload. La strada del collegamento a un account Telegram
-  non ci passa (l'account c'era già: resta il campo del Profilo). La finestra è
+  non ci passa (l'account c'era già: resta il campo del Profilo).
+  IL LINK È DI CASA (ott 2026): `stato_inviti` manda `link` =
+  `URL_PUBBLICO/?invito=<codice>` (e `link_telegram`, il vecchio
+  `LINK_BOT?start=`). Il client legge `?invito=` con lo stesso alfabeto
+  del server (`INVITO_ALFABETO_CLIENT`, una prova li tiene uguali), lo
+  ricorda in localStorage per 7 giorni (`invitoInAttesa`), e in vetrina
+  apre il foglio d'invito (`apriInvitoDaUrl`): la porta del bot porta
+  `?start=<codice>`, quella Nostr trova il campo compilato. Chi entra
+  col widget di Telegram — che torna senza query — lo ritrova in
+  `renderInviti`, che a campo aperto lo applica da solo UNA volta
+  (`applicaInvitoInAttesa`) e a campo chiuso lo scorda. La finestra è
   `registrato` + `INVITO_GIORNI` (7) per tutt'e due le porte, zero per
   chi c'era prima del timbro; il giro in tondo, anche lungo, lo dice
   una CTE ricorsiva (`invito_circolare`), con UNION perché finisca
