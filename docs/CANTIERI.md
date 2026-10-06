@@ -37878,3 +37878,14 @@ prende la nuova alla prima pagina. La seconda foto, come la prima, non
 **PROVATO.** prove_carrello_salvato (80: i quattro file, le misure, il
 tetto dei KB) e le sezioni della fila; scatti della fila a 375 e 320 px,
 chiaro e scuro, mandati ad Andrea.
+
+**LO ZOOM, DECISO DA ANDREA** (8915a28 era già su main): «deve essere
+meno zoomata». Il ritaglio da 1500 px faceva riempire la card al
+carrello come le illustrazioni delle sorelle, ed era troppo vicino.
+Quattro livelli messi a confronto alla misura vera della card, chiaro e
+scuro, col pallino — 1500 (quello di prima), 1700, 1850, la foto intera
+—, e Andrea ha scelto il 1850: quadrato 31,150 → 1881,2000, cioè fino al
+bordo basso della foto, con l'alone arancio attorno al carrello. I file
+scendono a 1, 4, 7 e 11 KB. La regola che resta: per un disegno con il
+suo fondo, quanto stringere lo decide chi guarda la card, non il
+riempimento delle sorelle — si mostra il confronto prima di scegliere.

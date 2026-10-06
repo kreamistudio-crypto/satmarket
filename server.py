@@ -66745,8 +66745,9 @@ def asset_scoprire(nome: str, if_none_match: str = Header("")):
 # l'1x, il 2x e il 3x della card da 84px — e 320, il 2x della card da
 # 160 del sito da computer (chiesta da Andrea dopo gli scatti),
 # ritagliato attorno al carrello dal 2000 di Andrea (la SECONDA foto,
-# scelta la sera stessa al posto della prima) e WebP a qualita' 82:
-# 2, 5, 10 e 15 KB. Fondo PIENO (il
+# scelta la sera stessa al posto della prima, ritagliata LARGA — 1850
+# px, l'alone arancio attorno, scelta di Andrea fra quattro zoom) e
+# WebP a qualita' 82: 1, 4, 7 e 11 KB. Fondo PIENO (il
 # bruno con l'alone arancio del disegno), quindi cartella SUA e mai
 # assets/categorie/: ritaglia_categorie.py fa il glob di quella e un
 # fondo pieno le sposterebbe la mediana dell'inchiostro (la ragione di
