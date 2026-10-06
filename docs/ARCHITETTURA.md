@@ -7313,6 +7313,15 @@
   del libro) veste solo quel che parla del tab: logo, nav, il + e il
   foglio «Pubblica». Verbale: CANTIERI, «I colori del dettaglio aperto
   dalla vetrina».
+  L'INTERVALLO IN DUE COLONNE (6 ott 2026): su un ordine «da 5 a 15 €»
+  il conto (`contoDettP2P`, libro e pagina dello scambio) e' una tabella
+  — intestazione coi due importi, una cella per capo col suo ≈ e il suo
+  segno, la scatola `conto-due` con `--n` (i caratteri della cella piu'
+  lunga) che il CSS fa diventare pixel uguali per ogni riga. A importo
+  fisso resta su una colonna. Nelle righe di testo (card del libro, «I
+  miei scambi», l'avviso di Barattozon) i capi li dice `capiP2P`: «da …
+  a …», mai un trattino fra due numeri. Verbale: CANTIERI, «Il conto a
+  intervallo in due colonne».
   «È IL TUO ORDINE», UN GIUDICE SOLO (28 set 2026): `ordineTuoP2P(id,
   o)` e' mio se lo sa il dispositivo (`ordineMioP2P`), se lo dice il
   server (`miei` della fotografia, che ora legge anche il libro) o se e'
@@ -16936,7 +16945,11 @@
   separano con lo spazio stretto unificatore U+202F in `fmt`
   (l'escape, mai il carattere: nel sorgente sarebbe invisibile): con
   lo spazio normale il mono di casa spezzava «905 000» in due blocchi
-  lontani, e questo per giunta non va mai a capo a metà numero.
+  lontani, e questo per giunta non va mai a capo a metà numero. Dal 6
+  ott 2026 separa anche a quattro cifre («6 534», non «6534»: l'it-IT
+  raggruppa solo da 10.000, e due capi dello stesso conto uscivano in
+  due modi) — decisione di Andrea: lo spazio stretto resta, in tutta
+  l'app. `fmt` sta su UNA riga: i banchi la ritagliano per testo.
   `cambioVivo` (il cambio arriva dal nostro server, vedi sotto);
   form Vendi col suffisso-bottone sats/€
   (`sellValuta`, virgola decimale tradotta); paySheet e conferma NWC

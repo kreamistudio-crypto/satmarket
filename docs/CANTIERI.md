@@ -36593,3 +36593,95 @@ con una rete lenta); l'APK. Notato e NON toccato: le pillole e le
 etichette arancio col bianco (`.p2p-esempio-tag`, `.tema-pill.active`,
 `.titolo-pill.active`, `.demo-banner.demo-vera`…) non sono bottoni e
 restano come sono.
+
+## Il conto a intervallo in due colonne (6 ott 2026)
+
+Ritocco chiesto da Andrea: sugli ordini P2P con un intervallo («da 5 a
+15 €») il riquadro del conto — nel dettaglio dal libro e nella pagina
+«Nel dettaglio» di uno scambio proprio — si leggeva male. I due capi
+stavano nella stessa cella: «≈ 6534–19 601 sats» sembrava una
+sottrazione, «≈ −196–588» peggio (un meno che vale per il primo numero e
+non per il secondo), e le migliaia uscivano in due modi.
+
+**LA DOMANDA FATTA PRIMA.** La richiesta diceva «punto, come nel resto
+dell'app»: ma nel client i sats NON hanno il punto. `fmt` usa lo spazio
+stretto U+202F (decisione di agosto, ARCHITETTURA: accanto agli euro con
+la virgola il punto si legge come un decimale; il server invece usa i
+puntini, divergenza dichiarata). Il doppio modo veniva dall'it-IT, che
+raggruppa solo da 10.000. Chiesto ad Andrea con quattro strade: ha
+scelto **lo spazio stretto in tutta l'app**, anche a quattro cifre.
+
+**DECISO.**
+- `fmt` raggruppa anche a quattro cifre: un secondo `replace` mette lo
+  spazio stretto nell'unico caso che l'it-IT lascia nudo, una parte
+  intera di quattro cifre («6 534», «−6 534», «1 234,5»). Vale per tutto
+  il client. Resta su UNA riga: una decina di banchi di prove.py la
+  ritaglia per testo fino all'a-capo.
+- `contoDettP2P` su un intervallo (`due`, cioe' due capi) diventa una
+  tabella: in cima la riga `capi` con «cifre in sats» a sinistra e i due
+  importi in euro («5,00 €», «15,00 €», col solo segno della moneta,
+  senza bandierina); poi Controvalore (che non ripete gli euro
+  nell'etichetta), premio o sconto con la sua nota, Subtotale, Fee P2P
+  con la pillola, e nella scatola Ricevi/Invia e il Totale in euro. Ogni
+  cella e' un `.num` col SUO ≈ e il SUO segno (−/+ tipografici, come
+  prima). A importo fisso il conto resta su una colonna, identico.
+- Le colonne hanno UNA larghezza per tutto il conto: la scatola porta
+  `--n` (i caratteri della cella piu' lunga; lo spazio stretto vale
+  mezzo) e il CSS la fa `--n × 9,9px`, il carattere del mono a 16,5px.
+  In pixel e non in `ch` perche' le righe in scatola sono piu' grandi
+  (16,5 contro 14): con `ch` la colonna sinistra della scatola cadeva
+  fuori filo. Ogni riga e' una griglia `minmax(0,1fr) auto`: cede
+  l'etichetta, che va a capo a parole; la nota del premio occupa tutta
+  la riga. Nella pagina dello scambio il conto non ha il suo dentro e
+  la scatola si': le righe di sopra rientrano a destra di 10px piu' il
+  bordo, cosi' le colonne restano in filo.
+- Nelle righe di TESTO, dove una tabella non ci sta, i capi li dice
+  `capiP2P`: «da 5,00 a 15,00», con «da» e «a» attaccati al loro numero
+  (spazio unificatore). Usata dalla card del libro (euro e sats), da
+  `euroTestoP2P` e `satsScambioP2P` («I miei scambi»), dall'etichetta
+  del Controvalore a una colonna e dall'avviso di Barattozon nel foglio
+  Pubblica. «scegli tu» va a capo intero.
+- La card del libro nel tab «Vendi BTC» ha l'euro in SECONDA riga, e
+  col «da … a …» finiva sotto la faccia dell'anello (alto 44px, in
+  assoluto): la riga dell'euro sotto la testa lascia gli stessi 52px
+  della testa (`.p2p-ord>.p2p-grande`). Prima ci stava per caso.
+
+**SCARTATO.** Il punto delle migliaia (vedi sopra: scelta di Andrea).
+Il `ch` per le colonne (fuori filo nella scatola). `subgrid` (Telegram
+su telefoni vecchi). Un solo ≈ nell'intestazione invece che in ogni
+cella: la regola di casa vuole il ≈ su ogni stima, e le colonne ci
+stanno lo stesso. La card della vetrina in home («5–15 €» nel
+cartellino stretto): non nominata nella richiesta, resta com'era.
+
+**DUE TRAPPOLE PRESE STRADA FACENDO.** Il primo commento sopra `fmt`
+citava la sua dichiarazione per intero, e i banchi che la cercano per
+testo ritagliavano il COMMENTO: dieci banchi rossi in un colpo
+(riscritto senza le tre parole). E la regola nuova della card,
+scritta prima di `.p2p-grande{`, rubava il ritaglio alla sentinella
+della taglia: spostata dopo. L'intestazione «cifre in sats» era in
+`--muted` a 12,5px, che la regola delle note piccole riserva a
+controlli e titoli: e' passata a `--ink-soft`.
+
+**PROVATO.** `prove_conto_due_colonne` nuova (sentinelle sui sei posti e
+sul CSS; `fmt` e `capiP2P` veri in node: tredici numeri, segni,
+decimali, i capi). In `prove_p2p_dettaglio` il conto vero gira su
+cinque intervalli (compra, vendi con lo sconto, cambio muto, fee
+ignota, valuta fuori catalogo) e le prove dicono la forma nuova: la
+larghezza sulla scatola, l'intestazione, una cella per capo col suo ≈ e
+il suo segno, l'euro senza bandierina, nessun trattino, il fisso su una
+colonna. Emendate le prove che fissavano la forma vecchia: i capi
+«20,00–100,00» in libro, card di uno scambio, macchina a stati e
+Pubblica, e due cifre a quattro cifre senza separatore; cinque banchi si
+portano `capiP2P`. Tortura 17 su 17 sulla copia. Suite e collaudi: nel
+verbale del push.
+Dal vivo (copia in collaudo nello scratchpad, relay morto, Chrome
+headless via CDP a 375 e 320 px, chiaro e scuro, ordini seminati dalla
+pagina): libro nei due tab, dettaglio a intervallo dalle due parti, a
+importo fisso (uguale a prima), 20–100 €, la pagina di uno scambio mio
+e «I miei scambi». Il meno resta U+2212: nel mono e' lungo quanto la
+barra del +, il trattino in mezzo non c'e' piu'.
+
+**DA GUARDARE.** Sul telefono vero, Telegram Android e iPhone: le
+colonne in filo e la pillola «🌱 Pioniere» che va a capo sotto «Fee P2P».
+A 320 px le etichette vanno su due righe (non richiesto, regge). La
+card della vetrina in home ha ancora «5–15 €».

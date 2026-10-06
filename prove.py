@@ -58867,6 +58867,8 @@ def prove_p2p_libro():
         "function affareP2P(o){",
         "function badgePremioP2P(o){",
         "function rigaOrdineP2P(o){",
+        # (6 ott 2026) i capi dell'intervallo a parole, «da … a …»
+        "function capiP2P(da, a){",
         # il lettore puro e le lapidi (set 2026, il morto che risorge):
         # il primo gira sui casi della resurrezione, le seconde su un
         # localStorage di cartone
@@ -59377,12 +59379,15 @@ console.log(JSON.stringify(out));
           True, len(out["rangeDedup"]) == 1
           and out["rangeDedup"][0]["euro"] == 60
           and out["rangeDedup"][0]["euroMax"] == 120)
+    # (6 ott 2026) i capi a parole, mai un trattino fra due numeri, e
+    # «da», «a» e «scegli tu» attaccati a quel che segue
     prova("la card del range dice i due capi e «scegli tu»", True,
-          "50,00–100,00 €, scegli tu" in out["rigaRange"]
-          and ">al prezzo di mercato<" in out["rigaRange"])
+          "da\u00a050,00 a\u00a0100,00 €, scegli\u00a0tu" in out["rigaRange"]
+          and ">al prezzo di mercato<" in out["rigaRange"]
+          and "–" not in out["rigaRange"])
     prova("...e col premio il range porta il badge, e sceglie lo stesso",
           True, "4%</b> più conveniente" in out["rigaRangePremio"]
-          and "50,00–100,00 €, scegli tu" in out["rigaRangePremio"])
+          and "da\u00a050,00 a\u00a0100,00 €, scegli\u00a0tu" in out["rigaRangePremio"])
     prova("lo scaduto e' escluso", None, out["scaduto"])
     prova("senza id non e' un ordine", None, out["senzaD"])
     prova("un lato sconosciuto non e' un ordine", None, out["latoStorto"])
@@ -60300,6 +60305,9 @@ def prove_p2p_dettaglio():
         # (27 set 2026) la convenienza vera dei prezzi fissi, e la sua riga
         "function convenienzaFissaP2P(o, metro){", "function metroFissoP2P(o){",
         "function contoDettP2P(o){",
+        # (6 ott 2026) i due capi a parole, «da … a …»: l'etichetta del
+        # Controvalore a una colonna li dice cosi'
+        "function capiP2P(da, a){",
         # (27 set 2026) la riga «Premio scelto · Al prezzo di adesso»
         "function rigaConvenienzaFissaP2P(o, conv){",
         # (28 set 2026) l'etichetta del premio: l'effetto per chi guarda,
@@ -60500,8 +60508,21 @@ out.contoPresoSenza = contoDettP2P(Object.assign(ordine({sats: 11400, metodi: TA
 out.contoFissoAdesso = contoDettP2P(ordine({sats: 11400, metodi: ['Revolut']}));
 out.contoMercatoIntatto = contoDettP2P(ordine({premium: 4}));
 eurPerSat = 0.0005;
-/* l'intervallo: ogni riga porta i due capi */
+/* l'intervallo: DUE COLONNE, una per capo (6 ott 2026) */
 out.contoRange = contoDettP2P(ordine({euro: 20, euroMax: 100}));
+/* ...dal lato di chi vende, con uno sconto: ogni cella porta il SUO segno */
+out.contoRangeVendi = contoDettP2P(ordine({lato: 'buy', euro: 5, euroMax: 15, premium: -3}));
+/* ...a cambio muto: trattini in tutt'e due le colonne, gli euro restano */
+cambioVivo = false;
+out.contoRangeMuto = contoDettP2P(ordine({euro: 20, euroMax: 100}));
+cambioVivo = true;
+/* ...con la fee che non si sa ancora: un trattino per colonna */
+const infoPrima = p2pInfo;
+p2pInfo = null;
+out.contoRangeSenzaFee = contoDettP2P(ordine({euro: 20, euroMax: 100}));
+p2pInfo = infoPrima;
+/* ...in una valuta fuori dal catalogo: la sigla nelle intestazioni */
+out.contoRangeAltra = contoDettP2P(ordine({euro: 20, euroMax: 100, fiat: 'USD'}));
 /* (27 set 2026) un annullato senza la cifra in euro: niente «0» */
 out.contoSenzaEuro = contoDettP2P(ordine({euro: 0}));
 out.contoSenzaEuroFisso = contoDettP2P(ordine({euro: 0, sats: 100000}));
@@ -60827,10 +60848,11 @@ console.log(JSON.stringify(out));
           True,
           '<span>Controvalore di <b>6,00 €</b></span>' in cm
           and "≈ 12000 sats" in cm)
-    # ...e l'intervallo porta i due capi anche nell'etichetta
-    prova("...e con l'intervallo la base sono i due capi", True,
-          '<span>Controvalore di <b>20,00–100,00 €</b></span>'
-          in o["contoRange"])
+    # ...e l'intervallo NO (6 ott 2026, le due colonne): i suoi capi
+    # sono le intestazioni, e l'etichetta torna a dire «Controvalore»
+    prova("...e con l'intervallo gli euro salgono nell'intestazione", [True, False],
+          ['<span>Controvalore</span>' in o["contoRange"],
+           "Controvalore di" in o["contoRange"]])
     # ⚠️ E UNA VALUTA FUORI DAL CATALOGO PORTA LA SIGLA, qui come in
     # fondo: `segnoMonetaP2P` ricalca la regola di `monetaP2P` invece
     # di inventarsi un segno che non esiste.
@@ -61106,10 +61128,45 @@ console.log(JSON.stringify(out));
     prova("...e l'ordine a MERCATO resta com'era: nessuna frase, il suo premio",
           True, "ctrl-conv" not in o["contoMercatoIntatto"]
           and 'p2p-avviso">4%<' in o["contoMercatoIntatto"])
-    prova("un intervallo porta i due capi su ogni riga", True,
-          "≈ 40000–200000 sats" in o["contoRange"]
-          and "≈ 39600–198000 sats" in o["contoRange"]
-          and "20,00–100,00 € 🇪🇺" in o["contoRange"])
+    # ⚠️ LE DUE COLONNE (6 ott 2026, ritocco di Andrea): fino a ieri qui
+    # si provava «≈ 40000–200000 sats» in una cella sola — si leggeva
+    # come una sottrazione, e col segno davanti («≈ −400–2000») il meno
+    # valeva per un capo solo. Adesso ogni capo ha la sua cella.
+    cr = o["contoRange"]
+    cella = lambda *t: '<span class="mono">' + "".join(t) + "</span>"
+    prova("un intervallo va in due colonne, con la larghezza scritta sulla scatola",
+          True, ' conto-due" style="--n:8">' in cr)
+    prova("...l'intestazione: i due importi, e a sinistra l'unita' delle celle",
+          True, '<div class="ctrl-riga capi"><span>cifre in sats</span>'
+          + cella('<span class="num">20,00 €</span>', '<span class="num">100,00 €</span>')
+          in cr)
+    prova("...ogni riga una cella per capo, col SUO ≈", [True, True],
+          [cella('<span class="num">≈ 40000</span>', '<span class="num">≈ 200000</span>') in cr,
+           cella('<span class="num">≈ 39600</span>', '<span class="num">≈ 198000</span>') in cr])
+    prova("...e col SUO segno: il meno vale per tutt'e due i capi", True,
+          cella('<span class="num meno">≈ −400</span>',
+                '<span class="num meno">≈ −2000</span>') in cr)
+    prova("...l'euro in fondo, cella per cella, col segno e senza bandierina",
+          [True, False], [cella('<span class="num">20,00 €</span>',
+                                '<span class="num">100,00 €</span>') in cr.split("ctrl-chiusa")[1],
+                          "🇪🇺" in cr])
+    prova("...e fra due numeri nessun trattino", [False, False, False],
+          ["–" in cr, "–" in o["contoRangeVendi"], "40000 sats" in cr])
+    rv = o["contoRangeVendi"]
+    prova("dal lato di chi vende con lo sconto: il premio si aggiunge, la fee pure, in ogni colonna",
+          [4, 0, True], [rv.count('class="num piu">≈ +'),
+                         rv.count('class="num meno"'), "lato-vendo conto-due" in rv])
+    prova("a cambio muto: un trattino per colonna, gli euro restano in testa", [True, True],
+          [cella('<span class="num">—</span>', '<span class="num">—</span>') in o["contoRangeMuto"],
+           '<span class="num">100,00 €</span>' in o["contoRangeMuto"]])
+    prova("con la fee ignota: un trattino per colonna nella sua riga", True,
+          cella('<span class="num">—</span>', '<span class="num">—</span>')
+          in o["contoRangeSenzaFee"].split("Fee P2P")[1])
+    prova("una valuta fuori dal catalogo: la sigla nelle intestazioni", True,
+          cella('<span class="num">20,00 USD</span>', '<span class="num">100,00 USD</span>')
+          in o["contoRangeAltra"])
+    prova("a importo fisso il conto resta su una colonna", [False, True],
+          ["conto-due" in o["contoMercato"], "≈ 12000 sats" in o["contoMercato"]])
     # (27 set 2026, dal campo: «Invia 0 · Ricevi 0» su un annullato) UN
     # EURO CHE NON SI SA NON E' ZERO: niente «0,00 €» ne' «≈ 0 sats», e
     # dove i sats sono fissati quelli restano, perche' sono un fatto
@@ -61206,12 +61263,14 @@ console.log(JSON.stringify(out));
           ">Invia<" in o["mioVendo"] and "Totale da inviare" not in o["mioVendo"])
     # ⚠️ UN INTERVALLO ANCORA APERTO NON SI FA FISSARE DA UNA CIFRA
     # SOLA: il coordinatore collassa i due capi insieme all'importo, e
-    # finche' l'euro e' una fascia («20,00–100,00 €») un numero solo di
-    # sats non le corrisponde. Restano le due stime.
+    # finche' l'euro e' una fascia («da 20,00 a 100,00 €») un numero
+    # solo di sats non le corrisponde. Restano le due stime — dal 6 ott
+    # 2026 in due colonne, una per capo, e senza trattini.
     prova("su un intervallo aperto la cifra detta non si usa", True,
-          "20,00–100,00 €" in o["mioRange"]
+          "conto-due" in o["mioRange"]
+          and '<span class="num">100,00 €</span>' in o["mioRange"]
           and "7301" not in o["mioRange"]
-          and "–" in o["mioRange"])
+          and "–" not in o["mioRange"])
     # ...e questa e' la ragione per cui il ramo esiste: a cambio muto
     # la stima non c'e', e senza la cifra del coordinatore la pagina
     # di uno scambio PRESO sarebbe tutta trattini
@@ -68923,6 +68982,8 @@ def prove_p2p_stati():
         "const fmtEur = e => e.toLocaleString('it-IT', "
         "{minimumFractionDigits: 2, maximumFractionDigits: 2});",
         fn("function euroTestoP2P(o){"),
+        # (6 ott 2026) ...che i due capi li dice a parole, «da … a …»
+        fn("function capiP2P(da, a){"),
         avanza, azioni, "const FATT_VERA = " + json.dumps(BOLT11_VERA_7468) + ";"]) + r"""
 const out = {};
 /* uno scambio si «cammina»: si parte da com'e' nato e gli si danno i
@@ -69306,12 +69367,13 @@ process.stdout.write(JSON.stringify(out));
     # sceglie chi prende — e dalla risposta del coordinatore in poi
     # ce n'e' una sola. Il giudice e' UNO (`euroTestoP2P`), che le due
     # viste dello scambio non possano dire due cose.
+    # (6 ott 2026) i due capi a parole, mai un trattino fra due numeri
     prova("un intervallo pubblicato mostra i due capi",
-          "20,00–100,00 €", out["rangePrima"])
+          "da\u00a020,00 a\u00a0100,00 €", out["rangePrima"])
     prova("...e appena qualcuno lo prende ne mostra uno",
           ["45,00 €", 0], out["rangeDopo"])
     prova("...ma una risposta senza cifre non lo cancella",
-          "20,00–100,00 €", out["rangeIntatto"])
+          "da\u00a020,00 a\u00a0100,00 €", out["rangeIntatto"])
     prova("da 'pubblicato' si RITIRA e basta", ["ritira"], out["secRitira"])
     # ...E POI, IN FONDO, L'USCITA (set 2026): a scambio in corso i
     # sats sono gia' in custodia, quindi la disputa vuol dire
@@ -77215,6 +77277,8 @@ def prove_p2p_card_scambio():
         "function cauzioneVivaP2P(o, adesso){",
         "function p2pTogliibile(o, adesso){",
         "function euroTestoP2P(o){",
+        # (6 ott 2026) i capi dell'intervallo a parole, «da … a …»
+        "function capiP2P(da, a){",
         "function metodoSceltoP2P(o){",
         "function comeLibroP2P(o){",
         # le tre di «✋ Aspetta» (24 set 2026): la casella dello stato le chiama
@@ -77514,8 +77578,8 @@ console.log(JSON.stringify(out));
     prova("...e la quarta il metodo", True,
           '<div class="p2p-box p2p-paga" title="SEPA">💳 SEPA</div>'
           in o["compro"])
-    prova("l'intervallo porta i due capi in euro", True,
-          "50,00–100,00 €" in o["range"])
+    prova("l'intervallo porta i due capi in euro, a parole", [True, False],
+          ["da\u00a050,00 a\u00a0100,00 €" in o["range"], "–" in o["range"]])
 
     # ⚠️ IL PREMIO E' SECCO: il segno e basta. Il giudizio lo dice la
     # tinta, e il rovesciamento e' lo stesso del libro — un +4% pesa su
@@ -77792,14 +77856,16 @@ console.log(JSON.stringify(out));
     # ce l'ha il coordinatore. Prima diceva 9999 secchi, cioe' un
     # numero diverso da quello che la pagina dello scambio mostra per
     # la stessa riga.
+    # (6 ott 2026) `fmt` separa anche a quattro cifre: «9 899»
     prova("...e quel che ha detto il coordinatore vince, al netto della meta'",
-          "≈ 9899 sats", o["satsDetto"])
+          "≈ 9\u202F899 sats", o["satsDetto"])
     # ...ma quando il coordinatore ha detto il MIO lato (dal 16 set 2026:
     # `add-invoice`, `buyer-took-order`, la hold), quello si ripete secco
     prova("...e il mio lato detto dal coordinatore si ripete senza conti ne' ≈",
-          "7543 sats", o["satsMiei"])
-    prova("l'intervallo porta i due capi anche in sats", True,
-          o["satsRange"].count("–") == 1)
+          "7\u202F543 sats", o["satsMiei"])
+    prova("l'intervallo porta i due capi anche in sats, a parole", [True, True, False],
+          [o["satsRange"].startswith("≈ da\u00a0"), " a\u00a0" in o["satsRange"],
+           "–" in o["satsRange"]])
     # ⚠️ A CAMBIO MUTO NESSUN NUMERO, mai uno inventato — e la card
     # resta in piedi lo stesso, con l'euro e il premio.
     prova("a cambio muto niente cifra, e la card regge", True,
@@ -82206,6 +82272,8 @@ def prove_pubblica_metodo_prima():
         "function giudiceImportoPayCodeP2P(euro){", "function campiNuovoP2P(){",
         "function nomeMetodiP2P(lato){", "function rigaEuroViaP2P(){",
         "function importoDopoMetodoP2P(v, prima, dopo){",
+        # (6 ott 2026) l'avviso dice i capi a parole, «da … a …»
+        "function capiP2P(da, a){",
         "function titoloNuovoP2P(tit, compro, tab){",
         "function renderNuovoOrdineP2P(){", "function scegliMetodoP2P(m){",
         "function cambiaCampoNuovoP2P(){", "function apriNuovoOrdineP2P(metodo){",
@@ -82403,7 +82471,7 @@ console.log(JSON.stringify(R));
     prova("1500 con SEPA, poi Barattozon: oltre il tetto di Amazon, con la frase del suo giudice, sotto il campo del passo 2",
           ["", _OLTRE, [_OLTRE], True], out["oltre"])
     prova("20–50 con SEPA, poi Barattozon: un intervallo li' non esiste, e si svuotano tutt'e due",
-          ["", "", "20–50 → con Barattozon l'importo è uno solo, senza intervallo", 1],
+          ["", "", "da\u00a020 a\u00a050 → con Barattozon l'importo è uno solo, senza intervallo", 1],
           out["intervallo"])
     prova("fra due metodi normali l'importo resta e nessuno dice niente",
           ["SEPA,Revolut", "25", "", []], out["normali"])
@@ -117306,6 +117374,107 @@ const R = (id, lato, stato, piu) => Object.assign({id, lato, stato, peer: 'P'}, 
           [[], ["Ordine annullato ✓"]], o["ritira"])
 
 
+def prove_conto_due_colonne():
+    """IL CONTO A INTERVALLO IN DUE COLONNE (6 ott 2026, ritocco di
+    Andrea). Su un ordine «da 5 a 15 €» il riquadro del dettaglio
+    scriveva i due capi nella stessa cella: «≈ 6534–19 601 sats» si
+    leggeva come una sottrazione, «≈ −196–588» peggio (un meno che vale
+    per il primo numero e non per il secondo), e le migliaia uscivano in
+    due modi perche' l'it-IT raggruppa solo da 10.000. Adesso: il conto a
+    intervallo va in due colonne con l'intestazione dei due importi, ogni
+    cella col suo ≈ e il suo segno; nelle righe di testo (libro, «I miei
+    scambi», l'avviso di Barattozon) i capi si dicono «da … a …»; e `fmt`
+    separa anche a quattro cifre, con lo spazio stretto di sempre
+    (decisione di Andrea: resta la scelta di agosto, in tutta l'app).
+    I casi del conto vero girano nel banco di `prove_p2p_dettaglio`;
+    qui i giudici puri in node e le sentinelle sui posti."""
+    print("\n[il conto a intervallo in due colonne]")
+    import shutil
+    import subprocess
+    import tempfile
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) DOVE PASSA ---------------------------------------------------
+    riga_fmt = pezzo_js(mini, "const fmt = n =>", "\n")
+    prova("fmt resta su UNA riga (una decina di banchi la ritaglia fino all'a-capo)",
+          True, riga_fmt.endswith(";") and "\u202F" not in riga_fmt
+          and ".replace(/^(-?\\d)(\\d{3})(?!\\d)/,'$1\\u202F$2')" in riga_fmt)
+    cd = pezzo_js(mini, "function contoDettP2P(o){", "\n}\n")
+    prova("il conto non unisce piu' i capi col trattino", False,
+          "join('–')" in cd or "'–'" in cd)
+    prova("...decide le due colonne dal numero dei capi, e le celle passano da `cella`",
+          True, "const due = conti.length === 2;" in cd
+          and "conti.map(c => num(cella(c, campo, segno), segno)).join('')" in cd)
+    prova("...l'intestazione sta in cima, prima del Controvalore", True,
+          "+ (due ? r('cifre in sats', cifreEuro, 'capi') : '')" in cd
+          and cd.index("r('cifre in sats', cifreEuro, 'capi')")
+          < cd.index("+ r(etichettaCtrl, cifra('ctrl'))"))
+    prova("...la scatola porta `conto-due` e la larghezza delle colonne", True,
+          "' conto-due\" style=\"--n:' + larga + '\">'" in cd)
+    prova("...e a due colonne il Controvalore non ripete gli euro nell'etichetta",
+          True, "const etichettaCtrl = (euroNoto && !due) ?" in cd)
+    for firma, dove in (("function rigaOrdineP2P(o){", "la card del libro"),
+                        ("function euroTestoP2P(o){", "l'euro di uno scambio"),
+                        ("function satsScambioP2P(o){", "i sats di uno scambio"),
+                        ("function importoDopoMetodoP2P(", "l'avviso di Barattozon")):
+        corpo = pezzo_js(mini, firma, "\n}\n")
+        prova(f"niente trattino fra due numeri: {dove}", [False, True],
+              ["'–'" in corpo or "join('–')" in corpo, "capiP2P(" in corpo])
+    prova("«scegli tu» va a capo intero", True,
+          "(o.euroMax ? ', scegli\\u00a0tu' : '')" in mini)
+    # il CSS: la riga-griglia, la larghezza in pixel (mai `ch`: le righe
+    # in scatola hanno un altro corpo), la nota del premio a tutta riga,
+    # e la riga dell'euro della card che lascia il posto all'anello
+    for regola in (".conto-due{--col:calc(var(--n, 9) * 9.9px)}",
+                   ".conto-due .ctrl-riga{display:grid;grid-template-columns:minmax(0,1fr) auto;",
+                   ".conto-due .ctrl-riga .mono{display:grid;grid-template-columns:var(--col) var(--col);",
+                   ".conto-due .ctrl-riga .premio-nota{grid-column:1 / -1;",
+                   ".p2p-ord>.conto-due>.ctrl-riga{padding-right:calc(10px + var(--chiusa-bordo))}",
+                   ".p2p-ord>.p2p-grande{display:block;padding-right:52px}"):
+        prova("CSS: " + regola[:60], True, regola in mini)
+
+    # --- 2) I GIUDICI PURI, VERI, IN NODE -----------------------------------
+    node = shutil.which("node")
+    if not node:
+        salta("fmt e capiP2P girano in node", "node non c'e'")
+        return
+    banco = "\n".join([
+        riga_fmt,
+        pezzo_js(mini, "function capiP2P(da, a){", "\n}\n") + "\n}",
+    ]) + r"""
+const out = {};
+out.fmt = [0, 7, 999, 1000, 6534, 9999, 10000, 19601, 123456, 1234567,
+           -6534, 1234.5, 12.75].map(fmt);
+out.capi = [capiP2P('5,00', '15,00'), capiP2P('6\u202F534', '19\u202F601'),
+            capiP2P('5,00', ''), capiP2P('5,00', 0), capiP2P('5,00')];
+process.stdout.write(JSON.stringify(out));
+"""
+    d = tempfile.mkdtemp()
+    try:
+        fn = os.path.join(d, "due_colonne.js")
+        with open(fn, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = subprocess.run([node, fn], capture_output=True, encoding="utf-8", timeout=60)
+        prova("il banco di fmt e capiP2P gira in node", "", (r.stderr or "")[-700:])
+        o = json.loads(r.stdout) if r.stdout.strip() else None
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if not o:
+        return
+    s = "\u202F"
+    prova("fmt: lo spazio stretto da mille in su, quattro cifre comprese",
+          ["0", "7", "999", "1" + s + "000", "6" + s + "534", "9" + s + "999",
+           "10" + s + "000", "19" + s + "601", "123" + s + "456",
+           "1" + s + "234" + s + "567"], o["fmt"][:10])
+    prova("...anche col segno e coi decimali, che restano con la virgola",
+          ["-6" + s + "534", "1" + s + "234,5", "12,75"], o["fmt"][10:])
+    nb = "\u00a0"
+    prova("capiP2P: «da … a …», le parole attaccate al loro numero",
+          ["da" + nb + "5,00 a" + nb + "15,00",
+           "da" + nb + "6" + s + "534 a" + nb + "19" + s + "601"], o["capi"][:2])
+    prova("...e senza secondo capo il primo e basta", ["5,00"] * 3, o["capi"][2:])
+
+
 def prove_apri_wallet_p2p():
     """«⚡ APRI NEL WALLET» ANCHE NEL P2P (6 ott 2026, richiesta di
     Andrea). Nel mercatino il foglio del pagamento ha, dal 24 set, la
@@ -122170,7 +122339,7 @@ def main():
               prove_casa_vuota_gratis,
               prove_spedizione_standard,
               prove_cambio_converte,
-              prove_paga_ora, prove_apri_wallet_p2p,
+              prove_paga_ora, prove_apri_wallet_p2p, prove_conto_due_colonne,
               prove_catalogo_esterno,
               prove_modulo_negozio,
               prove_script_nel_workflow, prove_deploy,
