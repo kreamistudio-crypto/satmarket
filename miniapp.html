@@ -170,25 +170,34 @@
        il suo colore pieno e la scritta bianca (decisione di Andrea: sui
        pieni che non sono arancio, verde o rosso lo stile A cambia solo
        forma, ombra, misure e carattere). Il rosso
-       e' lo stesso di giorno e di sera, come l'arancio: col bianco fa
-       4,8:1 in cima e 6,0 in fondo (il #F07A47 di sera ci faceva 2,8).
+       e' lo stesso di giorno e di sera, come l'arancio, e porta la
+       scritta SCURA come lui (ritocco di Andrea dopo b248080): per
+       reggerla si e' schiarito da #C8460F→#B23A0A (3,6 e 2,9:1 con lo
+       scuro) al «rosso vivo» #F5503A→#F0402E, scelto da Andrea fra tre
+       (6-7°, ben lontano dai 33° dell'arancio di «Compra»): 5,0:1 in
+       cima e 4,5 in fondo. Piu' rosso di cosi' lo scuro non regge: il
+       rosso puro #FF0000 ci fa 4,3.
        Il suo alone sta a parte perche' il + che scende sul logo lo
        spegne da solo (IL + CHE DIVENTA BLU SCENDENDO). */
-    --b-rosso-bg:linear-gradient(180deg,#C8460F 0%,#B23A0A 100%);
-    --b-rosso-fg:#FFFFFF; --b-rosso-line:rgba(110,30,0,.45);
+    --b-rosso-bg:linear-gradient(180deg,#F5503A 0%,#F0402E 100%);
+    --b-rosso-fg:#2A1600; --b-rosso-line:rgba(150,45,0,.4);
     --b-rosso-rilievo:inset 0 1px 0 rgba(255,255,255,.22),0 1px 2px rgba(110,30,0,.22);
-    --b-rosso-alone:0 7px 16px -8px rgba(194,65,12,.7);
+    --b-rosso-alone:0 7px 16px -8px rgba(240,64,46,.7);
     --b-rosso-sh:var(--b-rosso-rilievo),var(--b-rosso-alone);
     --b-rosso-sh-on:inset 0 2px 4px rgba(110,30,0,.35);
     --b-bz-bg:#191D29;
     --b-bz-fg:#FFFFFF; --b-bz-line:rgba(0,0,0,.5);
-    --b-bz-sh:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(0,0,0,.3),0 7px 16px -8px rgba(25,29,41,.75);
+    /* niente riga chiara interna sul blu (ritocco di Andrea: «il bordo
+       sembra scentrato»): sul #191D29 il filo scuro non si vede, e la riga
+       chiara in cima faceva un bordo doppio SOLO sopra. Il filo resta
+       uguale sui quattro lati; l'ombra sta fuori. */
+    --b-bz-sh:0 1px 2px rgba(0,0,0,.3),0 7px 16px -8px rgba(25,29,41,.75);
     --b-bz-sh-on:inset 0 2px 4px rgba(0,0,0,.45);
     /* le TINTE PIENE dei tre ruoli, per chi deve far SFUMARE il colore
        (la pillola del + da desktop: un gradiente non sfuma, scatta).
        Sono una fermata del loro gradiente, e reggono l'inchiostro del
        ruolo: 7,2 / 4,9 / 5,2:1. */
-    --b-pri-tinta:#F7931A; --b-ok-tinta:#1B8150; --b-rosso-tinta:#C2410C;
+    --b-pri-tinta:#F7931A; --b-ok-tinta:#1B8150; --b-rosso-tinta:#F0402E;
     --b-off-bg:#EFE9DA; --b-off-fg:#7D7564; --b-off-line:transparent; --b-off-sh:none; --b-off-op:1;
     --b-busy-op:1; --b-busy-luce:block; --b-luce:rgba(255,255,255,.42);
     /* i toni "profondi" fanno l'ombra piena dei bottoni, i "text"
@@ -405,10 +414,10 @@
     --b-dan-sh-on:inset 0 2px 4px rgba(0,0,0,.4);
     --b-piano-bg:#2C2517; --b-piano-fg:#F58A5C; --b-piano-line:#3E3623;
     --b-rosso-rilievo:inset 0 1px 0 rgba(255,255,255,.2),0 1px 2px rgba(0,0,0,.45);
-    --b-rosso-alone:0 8px 18px -9px rgba(194,65,12,.5);
+    --b-rosso-alone:0 8px 18px -9px rgba(240,64,46,.5);
     --b-rosso-sh-on:inset 0 2px 4px rgba(0,0,0,.4);
     --b-bz-line:rgba(241,232,213,.16);
-    --b-bz-sh:inset 0 1px 0 rgba(255,255,255,.12),0 1px 2px rgba(0,0,0,.5);
+    --b-bz-sh:0 1px 2px rgba(0,0,0,.5);
     --b-ok-tinta:#34AE76;
     --b-off-bg:#363126; --b-off-fg:#968C75;
     --b-luce:rgba(255,255,255,.3);
@@ -3845,8 +3854,10 @@
   /* la scritta ha l'inchiostro del bottone d'arrivo, o all'ultimo
      fotogramma cambierebbe di colpo; il logo copiato ha la misura sua */
   body.p2p-vendo #p2pMorfo:not(.bz) .morfo-eti,
-  body.p2p-vendo #p2pMorfo .morfo-glifo{color:var(--b-rosso-fg)}
-  #p2pMorfo.bz .morfo-eti{color:var(--b-bz-fg)}
+  body.p2p-vendo #p2pMorfo:not(.bz) .morfo-glifo{color:var(--b-rosso-fg)}
+  /* col blu la croce e' gia' bianca: il + che scende sul logo ci arriva
+     bianco (IL + CHE DIVENTA BLU SCENDENDO) */
+  #p2pMorfo.bz .morfo-eti,#p2pMorfo.bz .morfo-glifo{color:var(--b-bz-fg)}
   #p2pMorfo .morfo-eti .logo-bz{width:21px;height:20px;flex:0 0 auto;display:block}
   /* ====== LA MORFOSI DAL + IN FONDO (quinto giro, 24 set 2026, richiesta
      di Andrea) ======
@@ -4967,10 +4978,16 @@
      passare la banda a meta' strada (vedi LA PELLE DEL +). A spegnersi al
      contrario e' il solo suo BAGLIORE, che sta fuori dal cerchio e che il
      blu non coprirebbe: in fondo il + e' blu pieno, ombra compresa.
-     LA CROCE RESTA BIANCA: almeno 4,8:1 sul rosso e 16,8 sul blu, e il
-     contrasto sale lungo tutta la strada. Di sera il rosso del + era
-     #F07A47, col bianco a 2,77:1: dal vestito A (ott 2026) e' il rosso
-     dei bottoni, lo stesso nei due temi, e la domanda e' chiusa. */
+     LA CROCE SI FA BIANCA COL BLU (ritocco di Andrea dopo b248080): sul
+     rosso e' SCURA, come sui pieni dello stile A (5,0:1), e sul blu
+     bianca (16,8). Non corre niente di nuovo: la croce scura e' della
+     pelle rossa, quella bianca della pelle blu (il suo ::after), e
+     l'opacita' della blu — la discesa — le mescola insieme ai fondi.
+     ⚠️ A META' STRADA IL CONTRASTO CROLLA, ed e' detto: croce e fondo
+     passano insieme dal chiaro allo scuro opposto, e verso meta' della
+     discesa stanno a 1,0:1 — la croce sparisce per un attimo, col dito
+     sopra (la croce bianca pesa d×d: vedi la regola del suo ::after).
+     Agli estremi, dove il + si ferma, reggono. */
   nav button.sell .pelle-bz{background:var(--b-bz-bg);
     box-shadow:inset 0 0 0 1px var(--b-bz-line),var(--b-bz-sh);--pelle-fg:var(--b-bz-fg);
     z-index:-1;opacity:var(--discesa-p2p,0);
@@ -4993,6 +5010,13 @@
      Niente bagliore dentro, che schiarirebbe il fondo della croce. */
   nav button.sell .pelle-bz::before{content:'';position:absolute;inset:0;
     border-radius:inherit;box-shadow:inset 0 0 0 2.5px #FFFFFF,0 0 5px rgba(255,255,255,.65)}
+  /* ...E LA SUA CROCE BIANCA SI ACCENDE PIU' TARDI DEL BLU (ritocco di
+     Andrea: la croce deve farsi bianca MENTRE il + scende, e mescolata in
+     parti uguali a meta' corsa sembrava gia' bianca). La sua opacita' e'
+     ancora la discesa, che si moltiplica per quella della pelle: il bianco
+     pesa d×d — a meta' corsa un quarto, la croce ancora scura; il bianco
+     pieno solo in fondo. Nessuna corsa sua: segue il dito con la pelle. */
+  nav button.sell .pelle-bz::after{opacity:var(--discesa-p2p,0)}
   nav button.sell{color:var(--ink-soft)}
   nav button.sell.active{color:var(--sats-deep)}
   /* Lo SPAZIATORE della barra NON ESISTE PIU' (ago 2026, e una
@@ -7746,8 +7770,9 @@
      capsula (#191D29) col logo in piccolo al posto dell'icona. Dal
      secondo giro del vestito (ott 2026) sono due RUOLI come gli altri,
      con le loro leve (--b-rosso-…, --b-bz-…): premuto, spento e «in
-     corso» li prendono dalle stesse regole. Il bianco regge l'AA nei
-     due temi: 4,8:1 sul rosso, 16,8 sul blu. */
+     corso» li prendono dalle stesse regole. Le scritte reggono l'AA nei
+     due temi: lo scuro sul rosso 4,5:1 (in fondo), il bianco sul blu
+     16,8. */
   .btn.rosso{--b-bg:var(--b-rosso-bg);--b-fg:var(--b-rosso-fg);--b-line:var(--b-rosso-line);
     --b-bw:var(--b-pieno-bw);--b-sh:var(--b-rosso-sh);--b-bg-on:var(--b-rosso-bg);--b-sh-on:var(--b-rosso-sh-on)}
   .btn.bz{--b-bg:var(--b-bz-bg);--b-fg:var(--b-bz-fg);--b-line:var(--b-bz-line);

@@ -21842,8 +21842,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `.contanti-gesti` resta a 13,5px) — lo sorveglia
   `prove_vestito_bottoni`, che chiede a OGNI regola che nomina il P2P.
   I suoi due pieni sono ruoli come gli altri: `.rosso` («Vendi BTC», le
-  leve `--b-rosso-…`, lo stesso rosso di giorno e di sera col bianco a
-  4,8:1) e `.bz` (Barattozon, `--b-bz-…`: il #191D29 pieno della
+  leve `--b-rosso-…`, lo stesso rosso di giorno e di sera: dal ritocco
+  dopo b248080 il «rosso vivo» #F5503A→#F0402E, scelto da Andrea fra
+  tre, con la scritta SCURA come i pieni dello stile A, 5,0 e 4,5:1 —
+  più rosso di così lo scuro non regge, il rosso puro ci fa 4,3) e `.bz` (Barattozon, `--b-bz-…`: il #191D29 pieno della
   tendina con la scritta bianca — sui pieni che non sono arancio, verde
   o rosso lo stile A cambia solo forma, ombra, misure e carattere,
   decisione di Andrea), in tutte le liste di stato.
@@ -26676,10 +26678,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   con la corsa del + al tocco e al ritorno (che la toglie) e ferma col
   dito; il bagliore rosso sta su `.pelle-rossa::after` e si spegne al
   contrario. Il fantasma parte dal rosso che resta (`--morfo-rosso`,
-  scritta da `vestiMorfoP2P`): dal + in fondo nasce blu. La croce resta
-  bianca (almeno 4,8:1 sul rosso, 16,8 sul blu; il rosso di sera era
-  #F07A47 col bianco a 2,77 — chiuso dal vestito A, ott 2026, col rosso
-  dei bottoni uguale nei due temi). E SI ACCENDE UN CONTORNO BIANCO (ottavo giro, bianco dal
+  scritta da `vestiMorfoP2P`): dal + in fondo nasce blu. LA CROCE SI FA
+  BIANCA COL BLU (ritocco di Andrea dopo b248080): scura sul rosso (5,0:1),
+  bianca sul blu (16,8), e in mezzo le mescola l'opacità della pelle blu
+  — la scura è della pelle rossa, la bianca della blu, nessuna corsa
+  nuova; la bianca pesa d×d (l'opacità del `::after` è di nuovo la
+  discesa), così resta scura nella prima metà della corsa. Detto e
+  misurato: verso metà della discesa croce e fondo stanno a 1,0:1, la
+  croce sparisce per un attimo col dito sopra. Il
+  fantasma di Barattozon ha croce e scritta bianche. E SI ACCENDE UN CONTORNO BIANCO (ottavo giro, bianco dal
   nono): blu sulla banda scura il + si perdeva, e la pelle blu porta nel
   suo `::before` un filo di 2,5px dentro il cerchio e un bagliore corto
   fuori (5px: a 320 la prima voce sta a 6,9px dal + posato), nel bianco

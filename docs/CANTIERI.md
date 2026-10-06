@@ -36820,3 +36820,89 @@ verbale del push.
 **DA GUARDARE.** Sul telefono: il ₿ nel mono di casa su Android e
 iPhone (se il font non arriva, il ripiego del sistema lo disegna più
 largo e la colonna lo tiene lo stesso, allineata a destra).
+
+## La croce scura e il rosso vivo (6 ott 2026, ritocco dopo b248080)
+
+Il compito (Andrea): 1) a «Vendi BTC» la croce del + era bianca, deve
+essere scura come nel resto dello stile A; trascinando il + giù su
+Barattozon deve farsi bianca in modo progressivo, insieme al tondo che
+diventa blu — stessa animazione di oggi, cambia solo il colore della
+croce che segue la trasformazione. 2) «Pubblica ordine» di un ordine di
+vendita con la scritta scura; se lo scuro sul rosso non regge 4,5:1 nei
+due temi si schiarisce il rosso quanto serve, restando un rosso pieno, e
+prima di applicare si mandano gli scatti. Nessun'altra modifica a forme
+e animazioni.
+
+**Il rosso.** Quello di b248080 (#C8460F→#B23A0A) con lo scuro faceva
+3,58 e 2,89:1. Prima proposta: #EE6730→#E35A22 (stessa tinta, 17°; 5,46
+e 4,74) — Andrea l'ha voluto «leggermente più rosso, meno corallo, ben
+distinto dall'arancione dei Compra». Tre varianti mostrate affiancate
+nei due temi, coi loro contrasti: A «rosso vivo» #F5503A→#F0402E (6-7°,
+5,02 e 4,52), B #F3473A→#EA4430 (4,76 e 4,42), C #EE3B2B→#E43A28 (4,37
+e 4,07). **Scelta di Andrea: A.** Il limite è fisico e va saputo: lo
+scuro vuole un rosso CHIARO, e persino il rosso puro #FF0000 ci fa 4,33
+— più rosso e più profondo di così regge solo il bianco. La tinta della
+pillola da desktop segue (#F0402E, 4,52) e l'alone prende il suo colore.
+
+**La croce.** Nessun pezzo nuovo: il rosso porta l'inchiostro scuro
+(`--b-rosso-fg:#2A1600`), quindi la croce della pelle rossa è scura; la
+pelle blu ha già la sua croce bianca nel `::after`, e la sua opacità è la
+discesa (`--discesa-p2p`, scritta dal dito). Le due croci si mescolano
+con la stessa opacity che mescola i fondi: il passaggio è progressivo
+per costruzione. Il fantasma di Barattozon (`#p2pMorfo.bz`) ha glifo e
+scritta bianchi — prima il glifo prendeva l'inchiostro del rosso anche
+col blu, ed era bianco solo perché il rosso lo era. LA CROCE BIANCA PESA
+d×d (seconda richiesta di Andrea, vedendo gli scatti: «sembra che si
+colori di bianco subito appena lo tocchi»). Due cose insieme: gli scatti
+mandati avevano il colore a metà col + FERMO a casa — sembrava bianco al
+tocco —, e a pesi uguali la croce mescolata a metà corsa era già un
+grigio chiaro, cioè bianca per l'occhio. Cura: il `::after` della pelle
+blu ha opacità `var(--discesa-p2p)`, che si moltiplica per quella della
+pelle: il bianco pesa d×d, a metà corsa un quarto (la croce ancora
+scura), pieno solo sul logo. Nessuna corsa sua. Rifatti gli scatti col +
+mosso davvero da `guidaCursoreP2P` (Chrome headless via CDP: il pane
+s'era incastrato su un fotogramma ingrandito), a 0-25-50-75-100% nei due
+temi. ⚠️ DETTO E MISURATO: croce e fondo vanno in versi opposti (lei
+dallo scuro al bianco, lui dal rosso chiaro al blu scuro), e verso metà
+della discesa stanno a 1,0:1 — la croce sparisce per un attimo, col dito
+sopra (coi pesi uguali succedeva a un terzo). Agli estremi
+reggono (5,0 sul rosso, 16,8 sul blu). Lo dicono il commento del CSS e
+una sentinella che tiene il numero.
+
+**Il bordo di «Rileggi e pubblica».** Terza richiesta strada facendo:
+il bordo del bottone blu di Barattozon «sembra scentrato». Misurato:
+bottone e contenuto centrati (16 px a sinistra, 15,7 a destra, il
+gruppo logo+scritta in asse), il filo uguale sui quattro lati. Il
+difetto era dell'ombra: la riga chiara interna in cima (`inset 0 1px 0`)
+si sommava al filo SOLO sopra, e sul #191D29 il filo scuro non si vede —
+un bordo doppio in alto e niente altrove. Tolta da `--b-bz-sh` nei due
+temi; l'ombra fuori resta. Primo piano a densità 3 via CDP, prima e
+dopo, nei due temi; una sentinella vuole l'ombra del blu senza righe
+interne.
+
+**Strade scartate.** Un rosso più profondo con lo scuro (sotto 4,5 di
+molto: C era già a 4,07); la croce che cambia colore con una sua curva
+(sarebbe stata una corsa nuova, e Andrea l'ha esclusa); il bianco sul
+rosso (era la cosa da cambiare).
+
+**Provato.** Sentinelle emendate in `prove_tasto_barattozon`: la croce
+scura sul rosso e bianca sul blu, 4,5 su ogni fermata agli estremi; le
+due croci nelle due pelli e l'opacità della blu che è la discesa; la
+croce bianca con la sua opacità (d×d) e senza corsa; il crollo a metà
+strada calcolato col d×d e uguale al numero detto nel CSS; lo
+scuro su «Pubblica ordine»; il fantasma bianco col blu. Le altre
+(`prove_vestito_bottoni`: contrasti di ogni ruolo e delle tinte nei due
+temi, dai token) reggono da sé. Tortura 10 su 10 sulla copia. Dal vivo
+sulla copia in collaudo (relay morto), 375 px nei due temi: la croce
+scura del + a «Vendi BTC» (rgb 42,22,0 sul gradiente nuovo); la discesa
+a 0, ⅓, ⅔ e 1 con la stessa variabile del dito, la croce che passa da
+scura a bianca col tondo; il trascino VERO col dito dal + al logo (la
+discesa scritta 0,45 → 0,91, il foglio di Barattozon aperto col blu a
+scritta bianca); «Pubblica ordine» rosso vivo a scritta scura, 52 px,
+nei due temi. Suite e collaudi della CI: nel messaggio del commit.
+
+**Da guardare** (sul telefono, Andrea): il + a «Vendi BTC» nei due temi,
+e il trascino lento verso il logo — il punto in cui la croce si perde è
+breve ma c'è; il rosso vivo su Telegram Android e iPhone accanto
+all'arancio; il ⚡ arancio dentro «Pubblica ordine», che sul rosso più
+chiaro si vede meno di prima (notato, NON toccato).

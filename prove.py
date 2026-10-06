@@ -63734,12 +63734,13 @@ def prove_tasto_barattozon():
           ["#FFFFFF", (255, 255, 255), (255, 255, 255), False],
           [_col_ic, _rgb_an, tuple(int(x) for x in _rgba_an.groups()) if _rgba_an else None,
            "FE8400" in _anello.upper() or "254,132,0" in _anello])
-    # LA CROCE RESTA BIANCA E LEGGIBILE: bianco (l'inchiostro del rosso e del
-    # blu) sul blu e sul rosso, sopra il 4,5; e lungo la strada il contrasto
-    # non scende mai sotto quello del rosso da cui parte (la mescola e'
-    # quella dell'opacita', nello spazio dei byte). Ogni fermata dei due
-    # gradienti. (ott 2026, il vestito A: il rosso del + e' quello dei
-    # bottoni, lo stesso nei due temi — il #F07A47 di sera faceva 2,77)
+    # LA CROCE SI FA BIANCA COL BLU (ritocco di Andrea dopo b248080): sul
+    # rosso e' SCURA (l'inchiostro del rosso, come sui pieni dello stile A),
+    # sul blu BIANCA, e nel mezzo le mescola l'opacita' della pelle blu,
+    # cioe' la discesa: nessuna corsa nuova. Agli estremi, dove il + si
+    # ferma, reggono il 4,5 su ogni fermata. ⚠️ Nel mezzo il contrasto
+    # CROLLA (fondo e croce vanno in versi opposti): lo si misura e lo si
+    # dice, senza pretendere che regga — e' la scelta fatta.
     def _lum(esa):
         c_ = [int(esa[i:i + 2], 16) / 255 for i in (1, 3, 5)]
         c_ = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c_]
@@ -63750,22 +63751,48 @@ def prove_tasto_barattozon():
     def _mescola(a_, b_, p_):
         return "#%02X%02X%02X" % tuple(round(int(a_[i:i + 2], 16) * (1 - p_)
                                              + int(b_[i:i + 2], 16) * p_) for i in (1, 3, 5))
-    _croce = "#FFFFFF" if re.search(r"--b-rosso-fg:#FFFFFF;", mini) and re.search(
-        r"--b-bz-fg:#FFFFFF;", mini) else None
+    _ink = lambda nome: (re.search(r"--" + nome + r":(#[0-9A-Fa-f]{6});", mini) or [None, None])[1]
+    _scura, _bianca = _ink("b-rosso-fg"), _ink("b-bz-fg")
     _ferm = lambda nome: re.findall(r"#[0-9A-Fa-f]{6}", (re.search(
         r"--" + nome + r":([^;]*);", mini) or [None, ""])[1])
     _blu = (_ferm("b-bz-bg") or ["#FFFFFF"])[0]
     _rossi = _ferm("b-rosso-bg")
-    prova("la croce del + resta bianca e leggibile: sul blu e sul rosso di giorno "
-          "almeno 4,5:1, e lungo la strada mai sotto il rosso da cui parte, nei "
-          "due temi", [True, True, True, [], 2],
-          [_croce == "#FFFFFF",
-           _contra("#FFFFFF", _blu or "#FFFFFF") >= 4.5,
-           bool(_rossi) and _contra("#FFFFFF", _rossi[0]) >= 4.5,
-           [(r_, p_ / 10) for r_ in _rossi for p_ in range(11)
-            if _contra("#FFFFFF", _mescola(r_, _blu or "#FFFFFF", p_ / 10))
-            < _contra("#FFFFFF", r_) - 1e-9],
-           len(_rossi)])
+    prova("la croce del + e' scura sul rosso e bianca sul blu, e agli estremi "
+          "regge 4,5:1 su ogni fermata (la sera non cambia ne' il rosso ne' il blu)",
+          [True, True, [], 2, True],
+          [bool(_scura) and _lum(_scura) < 0.05, (_bianca or "").upper() == "#FFFFFF",
+           [r_ for r_ in _rossi if _contra(_scura or "#FFFFFF", r_) < 4.5],
+           len(_rossi), _contra(_bianca or "#000000", _blu) >= 4.5])
+    # le due croci: quella scura e' della pelle rossa, quella bianca della
+    # pelle blu, che la discesa accende sopra — il passaggio e' progressivo
+    # per costruzione (lo stesso opacity della pelle)
+    prova("...e lungo la discesa la croce passa da scura a bianca insieme al "
+          "fondo: la scura nella pelle rossa, la bianca nella blu che si accende",
+          ["var(--b-rosso-fg)", "var(--b-bz-fg)", "var(--discesa-p2p,0)"],
+          [(re.search(r"--pelle-fg:([^;}]*)", _regola(css, "  nav button.sell .pelle-rossa{", "}"))
+            or [None, None])[1],
+           (re.search(r"--pelle-fg:([^;}]*)", _regola(css, "  nav button.sell .pelle-bz{", "}"))
+            or [None, None])[1],
+           _vbz(_reg, _VB, "opacity")])
+    # ...E LA CROCE BIANCA SI ACCENDE PIU' TARDI DEL BLU (ritocco di Andrea:
+    # deve farsi bianca MENTRE il + scende — a pesi uguali, a meta' corsa
+    # sembrava gia' bianca). La sua opacita' e' di nuovo la discesa, che si
+    # moltiplica per quella della pelle: il bianco pesa d×d
+    _croce_bz = _regola(css, "  nav button.sell .pelle-bz::after{opacity:", "}")
+    prova("...e la croce bianca pesa d×d: la sua opacita' e' la discesa, sopra "
+          "quella della pelle, e non ha una corsa sua",
+          ["var(--discesa-p2p,0)", None],
+          [(re.search(r"opacity:([^;}]*)", _croce_bz) or [None, None])[1],
+           (re.search(r"transition:([^;}]*)", _croce_bz) or [None, None])[1]])
+    # ...e nel mezzo crolla: si dice QUANTO, e la sentinella tiene il numero
+    # dichiarato nel commento del CSS onesto (se il rosso cambia, cambia lui)
+    _minimo = min((_contra(_mescola(r_, _blu, p_ / 100), _mescola(_scura or "#000000",
+                                                                  _bianca or "#FFFFFF", (p_ / 100) ** 2)), p_)
+                  for r_ in _rossi[:1] for p_ in range(101)) if _rossi else (0, 0)
+    prova("...e il crollo a meta' strada e' quello dichiarato nel CSS (1,0:1 verso meta')",
+          [True, True],
+          [round(_minimo[0], 1) == 1.0 and 40 <= _minimo[1] <= 60,
+           "discesa stanno a 1,0:1" in css])
     prova("durante il gesto il telaio non ha opacita' (lo dice la cascata); sceso "
           "il + sul logo, quel che resta della tendina sfuma via con lui",
           [None, None, "0"],
@@ -63843,16 +63870,25 @@ def prove_tasto_barattozon():
     _sera = css[_i_sera:css.index("}", _i_sera)] if _i_sera >= 0 else ""
     _on = lambda b, n: "#FFFFFF" if _tok(b, n) in ("#fff", "#FFF", "#ffffff") else _tok(b, n)
     # il rosso e il blu sono gli stessi nei due temi (la sera cambia solo
-    # le ombre): ogni fermata dei gradienti, col bianco dei due ruoli
+    # le ombre): ogni fermata dei gradienti, ognuno col suo inchiostro — lo
+    # SCURO sul rosso (ritocco di Andrea dopo b248080, il «rosso vivo»), il
+    # bianco sul blu di Barattozon
     _fermate = lambda nome: re.findall(r"#[0-9A-Fa-f]{6}", (re.search(
         r"--" + nome + r":([^;]*);", _giorno) or [None, ""])[1])
+    _sc = _tok(_giorno, "b-rosso-fg")
     prova("...e il testo dei bottoni rosso e blu regge l'AA nei due temi",
           [True, True, True, [], []],
-          [_tok(_giorno, "b-rosso-fg") == "#FFFFFF" and _tok(_giorno, "b-bz-fg") == "#FFFFFF",
+          [_sc == "#2A1600" and _tok(_giorno, "b-bz-fg") == "#FFFFFF",
            len(_fermate("b-rosso-bg")) == 2 and _fermate("b-bz-bg") == ["#191D29"],
            not re.search(r"--b-(rosso|bz)-(bg|fg):", _sera),
-           [f for f in _fermate("b-rosso-bg") if _contrasto("#FFFFFF", f) < 4.5],
+           [f for f in _fermate("b-rosso-bg") if _contrasto(_sc, f) < 4.5],
            [f for f in _fermate("b-bz-bg") if _contrasto("#FFFFFF", f) < 4.5]])
+    # ...e il fantasma: col blu la croce e la scritta tornano bianche (il +
+    # che scende sul logo ci arriva bianco), a vendere senza blu sono scure
+    prova("...e la croce del fantasma: scura a vendere, bianca col blu di Barattozon",
+          [True, True],
+          ["body.p2p-vendo #p2pMorfo:not(.bz) .morfo-glifo{color:var(--b-rosso-fg)}" in css,
+           "#p2pMorfo.bz .morfo-eti,#p2pMorfo.bz .morfo-glifo{color:var(--b-bz-fg)}" in css])
     prova("...il logo in piccolo e' lo stesso file della tendina, e scappa niente",
           True, "const LOGO_BZ_HTML = '<img class=\"logo-bz\" "
           "src=\"/assets/barattozon-tasto.webp\" width=\"21\" height=\"20\" alt=\"\">';"
@@ -119915,6 +119951,13 @@ def prove_vestito_bottoni():
                          '  .btn.bz[aria-busy="true"]::after{'}
     prova("il rosso e il blu del P2P stanno in ogni stato dei ruoli", [],
           [k for k, v in _stati.items() if v not in stile])
+    # IL BORDO DEL BLU E' UGUALE SUI QUATTRO LATI (ritocco di Andrea: «il
+    # bordo di Rileggi e pubblica sembra scentrato»): sul #191D29 il filo
+    # scuro non si vede, e una riga chiara interna in cima faceva un bordo
+    # doppio solo sopra. L'ombra del blu sta tutta fuori, nei due temi
+    prova("...e l'ombra del blu non ha righe interne: il bordo e' pari sui quattro lati",
+          [False, False], ["inset" in chiaro.get("--b-bz-sh", "inset"),
+                           "inset" in scuro.get("--b-bz-sh", "inset")])
 
     # --- 4) il P2P veste come il mercatino (ott 2026, secondo giro) -----
     # Il blocco di sole variabili che gli ridava il vestito di prima e'
