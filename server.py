@@ -1156,6 +1156,15 @@ except ImportError:
 # fino a ieri non doveva raccontarla nessuno.
 GIORNI_DEDUP_AVVISI = 30
 
+# IL CARRELLO SALVATO (6 ott 2026, richiesta di un utente e decisione di
+# Andrea: «quando uno rientra in app se lo ritrova»): sette giorni
+# dall'ULTIMO TOCCO, poi la riga se ne va da sola — anche se chi l'ha
+# lasciato non torna piu' (la scopa dell'orologio, pulisci_carrelli).
+# Oltre la settimana prezzi e merce cambiano troppo perche' un carrello
+# ritrovato dica ancora qualcosa. E' una durata che la pagina «I tuoi
+# dati» racconta, quindi ha un nome e la pagina lo legge da qui.
+GIORNI_CARRELLO_SALVATO = 7
+
 # LA CODA DEI FERMI (ago 2026): la soglia oltre la quale un ordine coi
 # sats in cassaforte, e su cui nessuno si muove, entra nella sezione
 # «Ordini fermi» del pannello admin.
@@ -1791,6 +1800,7 @@ FRENI = {
     "login": (30, 60),          # le porte del login, per IP e solo in chiaro
     "canale": (1, 600),         # il post nel canale P2P, per persona (non un 429: si salta il post)
     "foto_recensione": (20, 3600),  # un feedback con foto (caricate su Blossom), per persona
+    "carrello": (120, 60),      # il carrello salvato a ogni tocco, per persona (un dito non ci arriva)
 }
 MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
 MSG_FRENO = "Troppe richieste in poco tempo: riprova fra qualche minuto"
@@ -5383,6 +5393,23 @@ def init_db():
     -- — sarebbe una scansione della tabella intera.
     CREATE INDEX IF NOT EXISTS idx_preferiti_annuncio
       ON preferiti(annuncio_id);
+    CREATE TABLE IF NOT EXISTS carrello_salvato(
+        -- il carrello che si ritrova rientrando (6 ott 2026). UNO per
+        -- persona per costruzione: la chiave e' il tg_id, quindi due
+        -- carrelli non possono esistere — i carrelli multi-venditore
+        -- tolti il 24 set 2026 restano tolti (CANTIERI, «I carrelli
+        -- sono stati tolti»). Dentro solo QUALI annunci e QUANTI, col
+        -- prezzo visto all'ultimo tocco: mai l'indirizzo ne' la
+        -- consegna, che nascono nella cassa e vivono nell'ordine.
+        -- `righe` e' JSON: [{"id", "q", "v" (valuta), "p" (prezzo)}].
+        -- Chi vende non lo vede. Vive GIORNI_CARRELLO_SALVATO giorni
+        -- da `aggiornato`, e si cancella prima col pagamento di un
+        -- ordine dello STESSO venditore (_incassa_ordine).
+        tg_id INTEGER PRIMARY KEY,
+        venditore_id INTEGER NOT NULL,
+        righe TEXT NOT NULL,
+        aggiornato INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS barattoli_condivisi(
         -- il barattolo condiviso col link (ago 2026): la FOTOGRAFIA
         -- del barattolo che il proprietario ha scelto di pubblicare.
@@ -14838,6 +14865,15 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE preferiti SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM preferiti WHERE tg_id=?", (id_nostr,))
+        # Il carrello salvato (ott 2026) segue l'utente, ma qui la PK E'
+        # il tg_id: uno solo per persona. Se tutt'e due le meta' ne
+        # avevano uno resta quello dell'account Telegram (l'OR IGNORE
+        # non lo scavalca) e quello della meta' che muore se ne va —
+        # due carrelli di due venditori non si fondono, per regola.
+        con.execute("UPDATE OR IGNORE carrello_salvato SET tg_id=? "
+                    "WHERE tg_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM carrello_salvato WHERE tg_id=?",
+                    (id_nostr,))
         # I like sulle funzioni in arrivo seguono l'utente, e in
         # UNIONE come i preferiti: la PK contiene il tg_id, quindi le
         # due meta' possono aver votato tutt'e due la stessa funzione
@@ -21109,6 +21145,7 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
             "sessione": GIORNI_SESSIONE_WEB,   # giorni: il cookie del web
             "initdata": ORE_INITDATA,          # ore: l'accesso da Telegram
             "avvisi": GIORNI_DEDUP_AVVISI,     # giorni: la memoria degli avvisi
+            "carrello": GIORNI_CARRELLO_SALVATO,  # giorni: il carrello salvato
         }
         # La leva delle aste anche agli ANONIMI (ago 2026): il tasto
         # 🔨 in nav ora c'e' sempre, e a leva spenta apre il «coming
@@ -21899,6 +21936,195 @@ def miei_preferiti(x_tg_init_data: str = Header(""),
         (user["id"],))]
     con.close()
     return arricchisci_righe_vetrina(righe)
+
+
+# ------------------ IL CARRELLO SALVATO (6 ott 2026) ------------------
+# La richiesta di un utente: «salvare il carrello cosi' quando uno
+# rientra in app se lo ritrova». Il carrello resta quello di sempre —
+# UNO, di un venditore alla volta, composto dalla pagina dell'articolo
+# e pagato dalla cassa — e qui ha solo una memoria: una riga per
+# persona (`carrello_salvato`), scritta dal client a ogni tocco e riletta
+# all'apertura. NON SONO I CARRELLI TOLTI IL 24 SET 2026 (CANTIERI, «I
+# carrelli sono stati tolti»): niente carrelli da parte, niente nuvola di
+# Telegram ne' localStorage, niente fotografie da mettere d'accordo —
+# un posto solo, il server, e una riga sola.
+# Il server non giudica il carrello: lo GUARDA. Il giudice dei soldi
+# resta _compra_set (e il mono), che rilegge tutto al pagamento; qui si
+# dice soltanto, al rientro, cosa e' cambiato mentre il carrello
+# aspettava — l'annuncio sparito, i pezzi scesi, il prezzo ritoccato.
+MSG_CARRELLO_ALTRO_CONTO = "Il carrello è di un altro conto"
+MSG_CARRELLO_RIGHE = "Righe del carrello non leggibili"
+# Un tetto di buon senso sui pezzi di una riga, perche' il JSON non ne
+# ha: il numero vero lo giudica lo stock, al rientro e alla cassa.
+QTA_MAX_CARRELLO = 9999
+
+
+def _prezzo_carrello(a) -> tuple:
+    """Il prezzo di un annuncio nella SUA valuta, come lo dichiara chi
+    vende: (valuta, prezzo). In euro si confrontano gli euro, non i sats
+    — il cambio si muove ogni minuto, e un «il prezzo e' cambiato» a
+    ogni rientro su un annuncio mai toccato sarebbe una bugia."""
+    if (a["valuta"] or "sats") == "eur":
+        return ("eur", round(float(a["prezzo_eur"] or 0), 2))
+    return ("sats", int(a["prezzo_sats"] or 0))
+
+
+def _righe_carrello(testo) -> list:
+    """Le righe salvate, lette con prudenza: una colonna storta vale un
+    carrello vuoto, mai un 500 all'apertura dell'app."""
+    try:
+        righe = json.loads(testo or "[]")
+        return [{"id": int(r["id"]), "q": max(1, int(r["q"])),
+                 "v": "eur" if r.get("v") == "eur" else "sats",
+                 "p": r.get("p") or 0}
+                for r in righe if isinstance(r, dict)][:MAX_RIGHE_SET]
+    except (TypeError, ValueError, KeyError):
+        return []
+
+
+@app.get("/api/me/carrello")
+def mio_carrello(x_tg_init_data: str = Header(""),
+                 barattolo_sessione: str = Cookie("")):
+    """Il carrello salvato, con quel che gli e' successo intanto. Ogni
+    riga porta l'annuncio di ADESSO in forma di card (solo se e' ancora
+    attivo: venduto, rimosso o in revisione non si comprano), il titolo
+    per poterne parlare anche quando la card non c'e', e `prezzo_prima`
+    se il prezzo dichiarato e' cambiato dall'ultimo tocco. Le quantita'
+    restano quelle salvate: i pezzi rimasti stanno nella card, e il
+    confronto lo fa chi deve dirlo a schermo.
+    SCADUTO = NON C'E': oltre GIORNI_CARRELLO_SALVATO dall'ultimo tocco
+    la riga si cancella qui, senza aspettare la scopa."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        r = con.execute("SELECT venditore_id, righe, aggiornato "
+                        "FROM carrello_salvato WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        if not r:
+            return {"carrello": None}
+        if r["aggiornato"] < int(time.time()) - GIORNI_CARRELLO_SALVATO * 86400:
+            # l'`aggiornato` nella WHERE: un tocco arrivato nel frattempo
+            # da un altro dispositivo non si cancella per sbaglio
+            con.execute("DELETE FROM carrello_salvato WHERE tg_id=? "
+                        "AND aggiornato=?", (user["id"], r["aggiornato"]))
+            con.commit()
+            return {"carrello": None}
+        salvate = _righe_carrello(r["righe"])
+        ids = [x["id"] for x in salvate]
+        trovati = [dict(a) for a in con.execute(
+            f"SELECT {CAMPI_VETRINA}, a.stato, a.venditore_id "
+            "FROM annunci a JOIN utenti u ON u.tg_id = a.venditore_id "
+            f"WHERE a.id IN ({','.join('?' * len(ids))})", ids)] if ids else []
+        v = con.execute("SELECT nome FROM utenti WHERE tg_id=?",
+                        (r["venditore_id"],)).fetchone()
+    finally:
+        con.close()
+    per_id = {a["id"]: a for a in arricchisci_righe_vetrina(trovati)}
+    righe = []
+    for x in salvate:
+        a = per_id.get(x["id"])
+        attivo = bool(a) and a["stato"] == "attivo"
+        prima = None
+        if attivo and _prezzo_carrello(a) != (x["v"], x["p"]):
+            prima = {"valuta": x["v"], "prezzo": x["p"]}
+        righe.append({"annuncio_id": x["id"], "quantita": x["q"],
+                      "titolo": a["titolo"] if a else "",
+                      "annuncio": a if attivo else None,
+                      "prezzo_prima": prima})
+    return {"carrello": {
+        "venditore_id": r["venditore_id"],
+        "venditore": (v["nome"] if v else "") or "",
+        "aggiornato": r["aggiornato"],
+        "scade": r["aggiornato"] + GIORNI_CARRELLO_SALVATO * 86400,
+        "righe": righe}}
+
+
+@app.post("/api/me/carrello")
+async def salva_carrello(req: Request, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """Il client scrive qui il carrello com'e' adesso, a ogni tocco:
+    righe vuote = svuotato (la riga se ne va). Si riscrive INTERO, ed
+    e' una scelta: un carrello sta in otto righe, e una fotografia
+    intera non ha l'ordine dei pezzi da rimettere in fila.
+    IL CARRELLO E' DI CHI L'HA COMPOSTO: il corpo porta il `tg_id` di
+    chi ce l'aveva in memoria, e se non e' quello di chi chiama non si
+    scrive niente (409). E' la cintura del cambio di conto sullo stesso
+    browser — il cookie gia' nuovo, la pagina ancora vecchia: senza, il
+    carrello di uno finirebbe salvato sotto il nome dell'altro.
+    Il prezzo visto lo legge il SERVER dall'annuncio, mai dal corpo: e'
+    quello che c'era all'ultimo tocco, cioe' quello che si e' visto."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("carrello", user["id"])
+    d = await leggi_json(req)
+    chi = d.get("tg_id")
+    if isinstance(chi, bool) or chi != user["id"]:
+        raise HTTPException(409, MSG_CARRELLO_ALTRO_CONTO)
+    righe_in = d.get("righe")
+    if not isinstance(righe_in, list) or len(righe_in) > MAX_RIGHE_SET:
+        raise HTTPException(400, MSG_CARRELLO_RIGHE)
+    richieste = {}      # annuncio_id -> pezzi, nell'ordine di arrivo
+    for x in righe_in:
+        try:
+            aid = int(x["annuncio_id"])
+            qta = int(x.get("quantita") or 1)
+        except (TypeError, ValueError, KeyError, AttributeError):
+            raise HTTPException(400, MSG_CARRELLO_RIGHE)
+        if aid <= 0 or aid in richieste:
+            raise HTTPException(400, MSG_CARRELLO_RIGHE)
+        richieste[aid] = max(1, min(qta, QTA_MAX_CARRELLO))
+    adesso = int(time.time())
+    con = db()
+    try:
+        trovati = {}
+        if richieste:
+            trovati = {a["id"]: a for a in con.execute(
+                "SELECT id, venditore_id, valuta, prezzo_sats, prezzo_eur "
+                f"FROM annunci WHERE id IN ({','.join('?' * len(richieste))})",
+                list(richieste))}
+        if not trovati:
+            # vuoto (o fatto solo di annunci che non esistono piu'):
+            # il carrello non c'e', e non resta una riga a dirlo
+            con.execute("DELETE FROM carrello_salvato WHERE tg_id=?",
+                        (user["id"],))
+            con.commit()
+            return {"ok": True, "salvato": False}
+        venditori = {a["venditore_id"] for a in trovati.values()}
+        if len(venditori) > 1:
+            raise HTTPException(400, "Il carrello è di un venditore alla volta")
+        venditore_id = venditori.pop()
+        if venditore_id == user["id"]:
+            raise HTTPException(400, "Non puoi comprare i tuoi stessi annunci")
+        righe = []
+        for aid, qta in richieste.items():
+            if aid in trovati:
+                valuta, prezzo = _prezzo_carrello(trovati[aid])
+                righe.append({"id": aid, "q": qta, "v": valuta, "p": prezzo})
+        con.execute(
+            "INSERT INTO carrello_salvato(tg_id, venditore_id, righe, "
+            "aggiornato) VALUES(?,?,?,?) ON CONFLICT(tg_id) DO UPDATE SET "
+            "venditore_id=excluded.venditore_id, righe=excluded.righe, "
+            "aggiornato=excluded.aggiornato",
+            (user["id"], venditore_id,
+             json.dumps(righe, separators=(",", ":")), adesso))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True, "salvato": True,
+            "scade": adesso + GIORNI_CARRELLO_SALVATO * 86400}
+
+
+def pulisci_carrelli():
+    """La scopa dei carrelli salvati, chiamata dall'orologio: via quelli
+    non toccati da GIORNI_CARRELLO_SALVATO giorni — anche di chi non e'
+    piu' tornato, la meta' che la scadenza al rientro (mio_carrello) non
+    vede. E' la durata che la pagina «I tuoi dati» promette."""
+    con = db()
+    try:
+        con.execute("DELETE FROM carrello_salvato WHERE aggiornato < ?",
+                    (int(time.time()) - GIORNI_CARRELLO_SALVATO * 86400,))
+        con.commit()
+    finally:
+        con.close()
 
 
 # Il barattolo condiviso (ago 2026): la forma del token e la fotografia.
@@ -35314,6 +35540,17 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     # avvenuta). Le righe che non vengono da un negozio non producono
     # niente: il giudice dell'origine risponde per loro.
     magazzino = registra_uscita_negozio(con, ordine_id, righe, "vendita")
+    # IL CARRELLO SALVATO DI CHI HA PAGATO (6 ott 2026, decisione di
+    # Andrea): si svuota quando si paga un ordine dello STESSO venditore
+    # — dal carrello o da una scheda sola, e' uguale: lo stock di quel
+    # negozio e' appena cambiato e il carrello direbbe una cosa vecchia.
+    # Un acquisto da un ALTRO venditore non lo tocca: era la meta' che
+    # mancava, e la ragione per cui la riga sta qui e non nel client —
+    # il pagamento puo' arrivare con l'app chiusa (l'orologio), e al
+    # rientro il carrello non deve risorgere. Stessa transazione dello
+    # stock: sono lo stesso fatto.
+    con.execute("DELETE FROM carrello_salvato WHERE tg_id=? "
+                "AND venditore_id=?", (o["compratore_id"], o["venditore_id"]))
     con.commit()
     for e in esauriti:
         # Anche la piazza Nostr deve sapere che l'oggetto e' andato
@@ -62486,6 +62723,12 @@ async def orologio():
             pulisci_avvisi()
         except Exception as e:
             print(f"⚠️ Pulizia avvisi saltata: {e}")
+        try:
+            # i carrelli salvati non toccati da una settimana: la durata
+            # della pagina «I tuoi dati», anche per chi non torna piu'
+            pulisci_carrelli()
+        except Exception as e:
+            print(f"⚠️ Pulizia carrelli saltata: {e}")
         try:
             # la promessa mantenuta: l'indirizzo di casa non
             # sopravvive all'ordine — legge e cancella, mai un sat

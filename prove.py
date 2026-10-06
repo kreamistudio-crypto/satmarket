@@ -17100,6 +17100,10 @@ def prove_notifica_fail_open():
                  "aggiornato INT)")
     vero.execute("CREATE TABLE offerte_righe(offerta_id INT, "
                  "annuncio_id INT)")
+    # (ott 2026) l'incasso svuota il carrello salvato di chi paga, se
+    # e' dello stesso venditore
+    vero.execute("CREATE TABLE carrello_salvato(tg_id INTEGER PRIMARY KEY, "
+                 "venditore_id INT, righe TEXT, aggiornato INT)")
     # utenti: la legge notifica() per sapere su che canale parlare.
     # Nessuna riga per il 999, che e' il moderatore mai registrato —
     # il caso che il `try` del database copriva gia'.
@@ -33858,6 +33862,10 @@ def prove_ricevuta_compratore():
               ordine_id INT, delta INT, tipo TEXT,
               stato TEXT DEFAULT 'pendente', creato INT, aggiornato INT,
               UNIQUE(ordine_id, annuncio_id, tipo));
+            -- (ott 2026) l'incasso svuota il carrello salvato di chi
+            -- paga, se e' dello stesso venditore
+            CREATE TABLE carrello_salvato(tg_id INTEGER PRIMARY KEY,
+              venditore_id INT, righe TEXT, aggiornato INT);
         """)
         con.execute("INSERT INTO annunci(id,titolo,quantita,stato) "
                     "VALUES(3,?,1,'attivo')", (titolo,))
@@ -40041,8 +40049,14 @@ def prove_fogli_di_casa():
     # SETTANTASETTE (1 ott 2026, l'annullo del venditore): «Confermi
     # l'annullo?» (`confermaAnnullaVendita`), la seconda domanda dopo il
     # foglio del motivo — muove sats e non si torna indietro.
-    prova("i gesti che passano dalla domanda unica sono settantasette",
-          77, solo_codice(mini).count("chiediConferma({"))
+    # SETTANTOTTO-SETTANTANOVE (6 ott 2026, il carrello salvato):
+    # «Hai già un carrello da Anna: vuoi sostituirlo?» (`apriPacco`, da
+    # un articolo di un altro venditore: da quando il carrello si
+    # ritrova, ricominciarlo butta via una cosa attesa — decisione di
+    # Andrea) e «Svuotare il carrello da Anna?» dalla riga in home
+    # (`chiediSvuotaCarrello`), la stessa domanda della ✕.
+    prova("i gesti che passano dalla domanda unica sono settantanove",
+          79, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -52447,7 +52461,8 @@ def prove_pagina_dati():
     # --- 2) nessuna durata battuta a mano: solo segnaposto
     prova("dati: i giorni dell'indirizzo vengono dal server", 2,
           vista.count("data-giorni-ind"))
-    prova("dati: le tre durate nuove vengono dal server", 3,
+    # (la quarta e' del carrello salvato, 6 ott 2026)
+    prova("dati: le quattro durate nuove vengono dal server", 4,
           vista.count("data-durata="))
     prova("dati: la vita della invoice viene da TEMPI", True,
           'data-tempo="invoice"' in vista)
@@ -52456,8 +52471,8 @@ def prove_pagina_dati():
     # posto di un numero non lo vede nessuno finche' non apre la pagina
     chiavi = set(re.findall(r'data-durata="([a-z]+)"', vista))
     prova("dati: le chiavi combaciano con quelle della busta",
-          {"sessione", "initdata", "avvisi"}, chiavi)
-    for k in ("sessione", "initdata", "avvisi"):
+          {"sessione", "initdata", "avvisi", "carrello"}, chiavi)
+    for k in ("sessione", "initdata", "avvisi", "carrello"):
         prova(f'dati: il server manda «{k}»', True,
               f'"{k}": ' in _SORGENTE)
 
@@ -121749,10 +121764,10 @@ def prove_freni():
     F = amb["FRENI"]
     prova("i numeri concordati: annunci 60/ora, anteprima 60/ora, pagamento e "
           "ln-address 30/min, login 30/min, canale 1 ogni 10 min, "
-          "feedback con foto 20/ora",
+          "feedback con foto 20/ora, carrello salvato 120/min",
           {"annunci": (60, 3600), "anteprima": (60, 3600), "pagamento": (30, 60),
            "ln_address": (30, 60), "login": (30, 60), "canale": (1, 600),
-           "foto_recensione": (20, 3600)}, F)
+           "foto_recensione": (20, 3600), "carrello": (120, 60)}, F)
     prova("...e cinque ordini «creato» vivi per compratore", 5, amb["MAX_ORDINI_CREATO"])
 
     # --- il secchio, con l'orologio di cartone ----------------------------
@@ -123069,6 +123084,408 @@ def prove_negozi_grandi():
           (5, 5, 5), (len(st5["voci_ai"]), esito.get("nuovi"), esito.get("non_pubblicati")))
 
 
+def prove_carrello_salvato():
+    """IL CARRELLO SALVATO (6 ott 2026, la richiesta di un utente e le
+    quattro decisioni di Andrea). Il carrello di sempre — UNO, di un
+    venditore alla volta — ha una copia sul server, una riga per
+    persona, scritta a ogni tocco e riletta all'apertura; in home una
+    riga «Riprendi · Svuota». NON sono i carrelli tolti il 24 set 2026:
+    niente localStorage ne' nuvola di Telegram, niente carrelli da parte.
+    Il server VERO lo gira `collaudo_carrello_salvato.py` (nella CI),
+    compreso l'annuncio venduto mentre il carrello aspettava. Qui le
+    sentinelle sul testo — prendono chi cancella una riga che nessun
+    giro vedrebbe — e il banco node, che ESEGUE le funzioni vere del
+    client contro un fetch di cartone: la ripresa con le note, la
+    domanda prima di sostituire, la penna una alla volta, il dopo
+    pagamento, l'accordo che non si salva, il cambio d'identita'."""
+    print("\n[il carrello salvato]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL SERVER: la tabella, una riga per persona -----------------
+    i = src.index("CREATE TABLE IF NOT EXISTS carrello_salvato(")
+    tab = src[i:src.index("\n    );", i)]
+    prova("la chiave e' il tg_id: UN carrello per persona, per costruzione",
+          True, "tg_id INTEGER PRIMARY KEY" in tab)
+    prova("...e le colonne sono quattro: chi, di chi, cosa, quando (niente "
+          "indirizzo, niente consegna)",
+          ["tg_id", "venditore_id", "righe", "aggiornato"],
+          re.findall(r"^\s*(\w+) (?:INTEGER|TEXT)", tab, re.M))
+    prova("sette giorni, con un nome (la pagina «I tuoi dati» lo legge)",
+          True, "\nGIORNI_CARRELLO_SALVATO = 7\n" in src)
+
+    # --- 2) L'INCASSO svuota solo il carrello dello STESSO venditore ----
+    inc = pezzo("_incassa_ordine")
+    j = inc.find("DELETE FROM carrello_salvato")
+    prova("l'incasso cancella il carrello salvato di chi paga...", True,
+          j > 0 and 'o["compratore_id"]' in inc[j:j + 200])
+    prova("...solo se e' dello STESSO venditore (decisione 3; un altro "
+          "negozio non lo tocca, decisione 2)", True,
+          "AND venditore_id=?" in inc[j:j + 200]
+          and 'o["venditore_id"]' in inc[j:j + 200])
+    _m = inc.find("magazzino = registra_uscita_negozio")
+    prova("...nella stessa transazione dello stock, dopo il CAS", True,
+          0 < inc.find("cur.rowcount == 0") < _m < j
+          < inc.find("con.commit()", _m))
+
+    # --- 3) LE ROTTE ----------------------------------------------------
+    sal = pezzo("salva_carrello")
+    prova("salva: il freno prima di leggere il corpo", True,
+          0 <= sal.find('_frena("carrello"') < sal.find("leggi_json"))
+    prova("salva: il carrello di un altro conto non si scrive (409), e "
+          "lo si sa prima di aprire il database", True,
+          0 <= sal.find("MSG_CARRELLO_ALTRO_CONTO") < sal.find("db()"))
+    prova("...e un booleano non passa per un id", True,
+          "isinstance(chi, bool)" in sal)
+    prova("salva: il prezzo lo legge il server dall'annuncio, mai dal corpo",
+          True, "_prezzo_carrello(trovati[aid])" in sal
+          and "get(\"prezzo" not in sal and "get('prezzo" not in sal)
+    prova("salva: al massimo MAX_RIGHE_SET righe, un venditore alla volta",
+          True, "len(righe_in) > MAX_RIGHE_SET" in sal
+          and "len(venditori) > 1" in sal)
+    mio = pezzo("mio_carrello")
+    prova("leggi: lo scaduto si cancella li', con `aggiornato` nella WHERE",
+          True, "GIORNI_CARRELLO_SALVATO * 86400" in mio
+          and "AND aggiornato=?" in mio)
+    prova("leggi: la card solo se l'annuncio e' ATTIVO", True,
+          '"annuncio": a if attivo else None' in mio)
+    prova("leggi: il prezzo cambiato si giudica nella valuta dell'annuncio",
+          True, '_prezzo_carrello(a) != (x["v"], x["p"])' in mio
+          and '"eur"' in pezzo("_prezzo_carrello")
+          and "prezzo_eur" in pezzo("_prezzo_carrello"))
+
+    # --- 4) LA SCOPA, LA FUSIONE, LA DURATA ------------------------------
+    prova("la scopa dell'orologio gira (chi non torna non resta li')", True,
+          "\n            pulisci_carrelli()\n" in src)
+    fus = pezzo("esegui_fusione")
+    prova("la fusione: il carrello segue l'utente, e ne resta uno", True,
+          "UPDATE OR IGNORE carrello_salvato SET tg_id=?" in fus
+          and "DELETE FROM carrello_salvato WHERE tg_id=?" in fus)
+    prova("«I tuoi dati» riceve la durata dal server", True,
+          '"carrello": GIORNI_CARRELLO_SALVATO' in src)
+
+    # --- 5) IL CLIENT ---------------------------------------------------
+    blocco = mini[mini.index("/* ═══ IL CARRELLO SALVATO (6 ott 2026)"):
+                  mini.index("/* Gli annunci della pagina: i soli ATTIVI")]
+    prova("niente telefono ne' nuvola: il carrello vive sul server (la "
+          "decisione del 24 set resta)", [],
+          [p for p in ("localStorage", "CloudStorage", "barattolo_carrelli",
+                       "cloudScrivi", "cloudLeggi")
+           if p in _senza_commenti_js(blocco)])
+    for firma, cosa in (("function aggiungiAlPacco(id){", "«Aggiungi»"),
+                        ("function setQtaPacco(id, d){", "il − e il +"),
+                        ("function svuotaPacco(){", "lo svuota della ✕"),
+                        ("async function apriPacco(){", "l'apertura dall'articolo"),
+                        ("async function rileggiVenditore(l){", "la potatura")):
+        prova(f"{cosa} salva il carrello", True,
+              "salvaCarrello();" in pezzo_js(mini, firma, "\n}\n"))
+    prova("...anche il − che toglie la riga intera", 2,
+          pezzo_js(mini, "function setQtaPacco(id, d){", "\n}\n")
+          .count("salvaCarrello();"))
+    ap = pezzo_js(mini, "async function apriPacco(){", "\n}\n")
+    prova("apriPacco aspetta il carrello in arrivo PRIMA di decidere", True,
+          0 <= ap.find("await carrelloInArrivo")
+          < ap.find("paccoDati.sellerId !== l.sellerId"))
+    prova("un altro venditore: prima la domanda, poi (forse) il carrello "
+          "nuovo (decisione 1)", True,
+          0 <= ap.find("Hai già un carrello da") < ap.find("setScelte = new Map();"))
+    prova("...e il toast di ieri non c'e' piu'", False,
+          "Carrello nuovo: è di un venditore alla volta" in mini)
+    ver = pezzo_js(mini, "async function verificaOrdine(oid){", "\n}\n")
+    prova("il pagamento non azzera piu' il carrello alla cieca", False,
+          "paccoDati = null; setScelte = new Map();" in ver)
+    prova("...decide carrelloDopoPagamento, con l'ordine riletto", True,
+          0 <= ver.find("await loadOrders()")
+          < ver.find("carrelloDopoPagamento(oid, venditoreCassa)"))
+    prova("l'ordine sa di che negozio e' (mapOrder)", True,
+          "sellerId:o.venditore_id," in mini)
+    av = pezzo_js(mini, "async function avvia(){", "\n}\n")
+    prova("all'apertura si rilegge DOPO la prima pagina (il seme della "
+          "demo ha gli stessi id)", True,
+          0 <= av.find("await loadListings();") < av.find("caricaCarrelloSalvato();"))
+    prova("la riga in home ha le due strade", True,
+          'onclick="riprendiCarrello()"' in mini
+          and 'onclick="chiediSvuotaCarrello()"' in mini)
+    prova("...e il nome del venditore passa da esc()", True,
+          "esc(nomeVenditoreCarrello(c))" in
+          pezzo_js(mini, "function aggiornaRigaCarrello(){", "\n}\n"))
+    poc = pezzo_js(mini, "async function pagaOffertaCarrello(id){", "\n}\n")
+    prova("l'accordo mette da parte il carrello vero PRIMA di scrivergli "
+          "sopra", True, 0 <= poc.find("carrelloPrimaAccordo = {scelte")
+          < poc.find("setScelte = new Map(righe.map"))
+    prova("la pagina del carrello dalla cronologia rimette il carrello vero",
+          True, "rimettiCarrelloPrimaAccordo();\n    if (paccoDati" in mini)
+    gofn = pezzo_js(mini, "function go(view){", "\n}\n")
+    prova("uscendo dal carrello (e solo allora) le note si considerano lette",
+          True, "if (carrelloNote.length && view !== 'pacco'\n      && "
+          "document.querySelector('.view.active')?.id === 'view-pacco') {\n"
+          "    carrelloNote = [];" in gofn)
+    prova("«I tuoi dati» dice il carrello e la sua durata", True,
+          'data-durata="carrello"' in mini and "carrello: 7}" in mini)
+
+    # --- 6) IL BANCO: le funzioni vere in node ---------------------------
+    # Girano VERE: il blocco intero del carrello salvato, apriPacco,
+    # rileggiVenditore (la potatura che si salva) e pagaOffertaCarrello
+    # (l'accordo che mette da parte il carrello vero). Di cartone ci sono
+    # il fetch — che registra le scritture e sa sospenderne una — e il
+    # contorno che disegna.
+    apri = pezzo_js(mini, "async function apriPacco(){", "\n}\n") + "\n}\n"
+    rilegg = pezzo_js(mini, "async function rileggiVenditore(l){", "\n}\n") + "\n}\n"
+    accordo = pezzo_js(mini, "async function pagaOffertaCarrello(id){",
+                       "\n}\n") + "\n}\n"
+    js = r"""
+let DEMO = false, VETRINA = false, myTgId = 111;
+const API_BASE = '/api';
+let setScelte = new Map(), paccoDati = null, consegnaSetScelta = 'spedizione';
+let acqDati = null, currentListing = null, qtaScelta = 1, listings = [], orders = [];
+let offerteMie = [];
+const MAX_PACCO = 8;
+const authHdr = () => 'collaudo:' + myTgId;
+const haptic = () => {};
+const toasts = []; const toast = t => toasts.push(t);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmt = n => String(n);
+const fmtEur = e => e.toFixed(2).replace('.', ',');
+const mapListing = a => ({id: a.id, title: a.titolo, sellerId: a.venditore_id,
+  seller: a.venditore, stato: a.stato, quantita: a.quantita,
+  valuta: a.valuta || 'sats', price: a.prezzo_sats, priceEur: a.prezzo_eur || 0,
+  negozio: a.venditore_negozio || '', famiglia: ''});
+const inCatalogo = arr => arr.forEach(a => {
+  const i = listings.findIndex(x => x.id === a.id);
+  if (i >= 0) listings[i] = a; else listings.push(a); });
+const motivoEsclusione = x => '';
+const els = {};
+const el = id => els[id] || (els[id] = {style: {}, innerHTML: '', textContent: '',
+  classList: {contains: () => false, add() {}, remove() {}}});
+const viste = []; const go = v => viste.push(v);
+const renderPacco = () => {};
+const conferme = []; const chiediConferma = c => conferme.push(c);
+const invitoTelegram = () => {};
+const pezziSet = () => 0, firmaSet = () => '', indirizzoVuoto = () => ({});
+const notaApertaDefault = () => false, renderAcquisto = () => {}, caricaPreventivo = () => {};
+const scritte = []; let rispostaGet = null, negozio = []; const sospese = []; let sospendi = false;
+globalThis.fetch = (url, opt = {}) => {
+  if ((opt.method || 'GET') === 'POST') {
+    scritte.push({corpo: JSON.parse(opt.body), keepalive: !!opt.keepalive});
+    const ok = {ok: true, json: async () => ({ok: true})};
+    if (sospendi) return new Promise(r => sospese.push(() => r(ok)));
+    return Promise.resolve(ok);
+  }
+  if (url.includes('/negozio/'))
+    return Promise.resolve({ok: true, json: async () => ({annunci: negozio})});
+  return Promise.resolve({ok: true, json: async () => ({carrello: rispostaGet})});
+};
+const attesa = () => new Promise(r => setTimeout(r, 0));
+const ultima = () => (scritte[scritte.length - 1] || {}).corpo;
+"""
+    js += blocco + "\n" + apri + rilegg + accordo + r"""
+const carta = (id, titolo, extra) => Object.assign({id, titolo, venditore_id: 222,
+  venditore: 'Anna', venditore_negozio: 'anna', stato: 'attivo', quantita: 3,
+  valuta: 'sats', prezzo_sats: 5000, prezzo_eur: 0}, extra || {});
+const out = {};
+// UNA SCENA CHE ESPLODE NON ZITTISCE LE ALTRE: quel che e' stato scritto
+// in `out` esce comunque, e l'eccezione ha la sua prova (la lezione del
+// banco che esplode: senza, una mutazione qualunque fa rosse TUTTE le
+// righe e la prima rossa non dice piu' quale scena e' caduta)
+(async () => { try {
+  // A) la ripresa all'apertura, con quel che e' successo intanto
+  rispostaGet = {venditore_id: 222, venditore: 'Anna', righe: [
+    {annuncio_id: 1, quantita: 1, titolo: 'Lampada', annuncio: null, prezzo_prima: null},
+    {annuncio_id: 2, quantita: 2, titolo: 'Tazza',
+     annuncio: carta(2, 'Tazza', {quantita: 1, prezzo_sats: 6000}),
+     prezzo_prima: {valuta: 'sats', prezzo: 5000}},
+    {annuncio_id: 3, quantita: 1, titolo: 'Vaso <b>',
+     annuncio: carta(3, 'Vaso <b>', {valuta: 'eur', prezzo_eur: 12.5, quantita: 2}),
+     prezzo_prima: {valuta: 'eur', prezzo: 10}}]};
+  await caricaCarrelloSalvato(); await attesa();
+  out.ripresa = [[...setScelte], paccoDati, scritte.length];
+  out.note = carrelloNote.slice();
+  out.riga = [el('carrelloRiga').style.display, el('carrelloRigaTesto').innerHTML];
+  renderNoteCarrello();
+  out.noteHtml = el('paccoNote').innerHTML;
+  // B) da un articolo di un ALTRO venditore: prima la domanda
+  inCatalogo([mapListing(carta(9, 'Libro', {venditore_id: 444, venditore: 'Bruno',
+                                           venditore_negozio: ''})),
+              mapListing(carta(10, 'Penna', {venditore_id: 444, venditore: 'Bruno',
+                                            venditore_negozio: ''}))]);
+  currentListing = listings.find(x => x.id === 9);
+  await apriPacco(); await attesa();
+  out.domanda = [conferme.map(c => [c.titolo, c.etichetta]), [...setScelte].length,
+                 scritte.length, viste.length];
+  await conferme[0].poi(); await attesa();
+  out.sostituito = [[...setScelte], paccoDati.sellerId, ultima(), viste[viste.length - 1]];
+  // C) un acquisto al volo da un altro negozio non tocca il carrello
+  orders = [{id: 50, sellerId: 777}];
+  let n = scritte.length;
+  carrelloDopoPagamento(50, 0); await attesa();
+  out.altroNegozio = [[...setScelte], scritte.length - n];
+  // D) un ordine dello stesso venditore lo svuota (anche senza l'ordine
+  //    riletto: decide quello della cassa)
+  orders = [];
+  carrelloDopoPagamento(51, 444); await attesa();
+  out.stessoNegozio = [[...setScelte], paccoDati, ultima()];
+  // E) la penna: una scrittura alla volta, l'ultima vince
+  setScelte = new Map([[2, 1]]); paccoDati = {sellerId: 222, origineId: 2};
+  sospendi = true; n = scritte.length;
+  salvaCarrello(); setScelte.set(2, 2); salvaCarrello(); setScelte.set(2, 3); salvaCarrello();
+  out.inVolo = scritte.length - n;
+  sospendi = false; sospese.shift()(); await attesa(); await attesa();
+  out.dopoVolo = [scritte.length - n, ultima(), scritte[scritte.length - 1].keepalive];
+  // F) l'accordo VERO (pagaOffertaCarrello): la composizione pattuita
+  //    non si salva e non sta in home; pagato, il carrello vero torna
+  offerteMie = [{id: 5, righe: [{annuncio_id: 9, quantita: 1},
+                                {annuncio_id: 10, quantita: 1}]}];
+  await pagaOffertaCarrello(5); await attesa();
+  out.inCassa = [[...setScelte], paccoDati.sellerId, acqDati.accordoId,
+                 viste[viste.length - 1]];
+  salvaCarrello(); await attesa();
+  out.accordo = [ultima().righe, el('carrelloRigaTesto').innerHTML.includes('Anna')];
+  orders = [{id: 52, sellerId: 444}];
+  carrelloDopoPagamento(52, 444); await attesa();
+  out.dopoAccordo = [[...setScelte], paccoDati.sellerId, carrelloPrimaAccordo, acqDati];
+  // G) un carrello di un altro conto in memoria non si scrive, e
+  //    all'apertura il carrello segue l'identita'
+  n = scritte.length; myTgId = 222; salvaCarrello(); await attesa();
+  out.altroConto = scritte.length - n;
+  rispostaGet = null; await caricaCarrelloSalvato(); await attesa();
+  out.identita = [[...setScelte], paccoDati, carrelloDi, scritte.length - n];
+  // H) tutto sparito: lo si dice una volta e la riga sul server se ne va
+  myTgId = 111; carrelloDi = null;
+  rispostaGet = {venditore_id: 222, venditore: 'Anna', righe: [
+    {annuncio_id: 1, quantita: 1, titolo: 'Lampada', annuncio: null, prezzo_prima: null}]};
+  n = scritte.length;
+  await caricaCarrelloSalvato(); await attesa();
+  out.sparito = [toasts[toasts.length - 1], scritte.length - n, ultima(),
+                 el('carrelloRiga').style.display];
+  // I) la domanda ASPETTA la lettura in volo (il tocco nel primo istante)
+  azzeraCarrello(); carrelloDi = null; conferme.length = 0;
+  rispostaGet = {venditore_id: 222, venditore: 'Anna', righe: [
+    {annuncio_id: 2, quantita: 1, titolo: 'Tazza', annuncio: carta(2, 'Tazza'),
+     prezzo_prima: null}]};
+  caricaCarrelloSalvato();
+  currentListing = listings.find(x => x.id === 9);
+  await apriPacco(); await attesa();
+  out.aspetta = conferme.map(c => c.titolo);
+  // L) ...ma una lettura che arriva DOPO un carrello composto in questa
+  //    apertura non gli scrive sopra (ha vinto il tocco)
+  setScelte = new Map([[2, 2]]); paccoDati = {sellerId: 222, origineId: 2};
+  rispostaGet = {venditore_id: 444, venditore: 'Bruno', righe: [
+    {annuncio_id: 9, quantita: 1, titolo: 'Libro',
+     annuncio: carta(9, 'Libro', {venditore_id: 444}), prezzo_prima: null}]};
+  await caricaCarrelloSalvato(); await attesa();
+  out.vinceIlTocco = [[...setScelte], paccoDati.sellerId];
+  // M) la potatura vera (rileggiVenditore): il negozio non ha piu' il
+  //    vaso e ha una tazza sola — il carrello potato si salva potato
+  inCatalogo([mapListing(carta(3, 'Vaso'))]);
+  setScelte = new Map([[2, 3], [3, 1]]); paccoDati = {sellerId: 222, origineId: 2};
+  negozio = [carta(2, 'Tazza', {quantita: 1})];
+  n = scritte.length;
+  await rileggiVenditore(listings.find(x => x.id === 2)); await attesa();
+  out.potatura = [[...setScelte], scritte.length - n, ultima()];
+  // N) «Riprendi» dalla home: la pagina del carrello, e aprirlo e' un tocco
+  n = scritte.length; const v0 = viste.length; negozio = [carta(2, 'Tazza', {quantita: 1})];
+  riprendiCarrello(); await attesa();
+  out.riprendi = [viste.slice(v0)[0], currentListing.id, scritte.length - n, ultima()];
+  // J) «Svuota» dalla home, con la cassa di un accordo ancora aperta:
+  //    si svuota il carrello VERO, e la cassa dell'accordo si chiude
+  await pagaOffertaCarrello(5); await attesa();
+  conferme.length = 0;
+  chiediSvuotaCarrello();
+  out.svuotaTit = conferme[0].titolo;
+  await conferme[0].poi(); await attesa();
+  out.svuotato = [[...setScelte], ultima().righe, toasts[toasts.length - 1],
+                  el('carrelloRiga').style.display, carrelloPrimaAccordo, acqDati];
+  // K) in DEMO niente scritture e niente riga
+  DEMO = true; n = scritte.length;
+  setScelte = new Map([[2, 1]]); paccoDati = {sellerId: 222, origineId: 2};
+  salvaCarrello(); await attesa();
+  out.demo = [scritte.length - n, el('carrelloRiga').style.display];
+} catch (e) { out.esploso = String((e && e.stack) || e).slice(0, 300); }
+  console.log(JSON.stringify(out));
+})();
+"""
+    out = _node_banco(js)
+    if out is None:
+        salta("il banco del carrello salvato in node", "node assente")
+        return
+    prova("il banco gira fino in fondo, senza eccezioni", None,
+          out.get("esploso"))
+    prova("ripresa: le righe vive tornano, la venduta no, i pezzi scendono "
+          "allo stock; nessuna scrittura (rientrare non e' un tocco)",
+          [[[2, 1], [3, 1]], {"sellerId": 222, "origineId": 2}, 0],
+          out.get("ripresa"))
+    prova("...e le note dicono cosa e' successo, col prima e il dopo nella "
+          "valuta dell'annuncio",
+          ["«Lampada» non è più disponibile: fuori dal carrello",
+           "«Tazza»: ne resta solo 1, la quantità è scesa a 1",
+           "«Tazza» ora costa 6000 sats (prima 5000 sats)",
+           "«Vaso <b>» ora costa 12,50 € (prima 10,00 €)"], out.get("note"))
+    riga = out.get("riga") or ["", ""]
+    prova("la riga in home si accende: il venditore, i pezzi, «qualcosa e' "
+          "cambiato»", ["", True, True, True],
+          [riga[0], "<b>Anna</b>" in riga[1], "2 pezzi" in riga[1],
+           "qualcosa è cambiato" in riga[1]])
+    prova("...e nelle note un titolo col markup arriva scappato", True,
+          "«Vaso &lt;b&gt;»" in out.get("noteHtml", "")
+          and "<b>»" not in out.get("noteHtml", ""))
+    prova("un altro venditore: la domanda, e niente si muove prima del sì",
+          [[["Hai già un carrello da Anna: vuoi sostituirlo?",
+             "Sì, sostituiscilo"]], 2, 0, 0], out.get("domanda"))
+    prova("...sul sì il carrello nuovo prende il posto del vecchio, e si salva",
+          [[[9, 1]], 444, {"tg_id": 111, "righe": [{"annuncio_id": 9,
+                                                    "quantita": 1}]}, "pacco"],
+          out.get("sostituito"))
+    prova("pagare in un altro negozio non tocca il carrello (decisione 2)",
+          [[[9, 1]], 0], out.get("altroNegozio"))
+    prova("pagare nello stesso negozio lo svuota, e lo dice al server "
+          "(decisione 3)", [[], None, {"tg_id": 111, "righe": []}],
+          out.get("stessoNegozio"))
+    prova("la penna: una sola in volo, poi UNA con l'ultimo stato, keepalive",
+          1, out.get("inVolo"))
+    prova("...e al ritorno ne parte UNA sola con l'ultimo stato, keepalive "
+          "(sopravvive alla pagina che si chiude)",
+          [2, {"tg_id": 111, "righe": [{"annuncio_id": 2, "quantita": 3}]},
+           True], out.get("dopoVolo"))
+    prova("l'accordo vero: in memoria la composizione pattuita, la cassa "
+          "nella sua modalita'", [[[9, 1], [10, 1]], 444, 5, "acquisto"],
+          out.get("inCassa"))
+    prova("...ma si salva il carrello VERO, e in home c'e' lui",
+          [[{"annuncio_id": 2, "quantita": 3}], True], out.get("accordo"))
+    prova("...pagato l'accordo di un altro negozio, il carrello vero torna "
+          "intero e la cassa dell'accordo si chiude",
+          [[[2, 3]], 222, None, None], out.get("dopoAccordo"))
+    prova("un carrello di un altro conto in memoria non si scrive", 0,
+          out.get("altroConto"))
+    prova("...e all'apertura segue l'identita' (si azzera, senza scrivere)",
+          [[], None, 222, 0], out.get("identita"))
+    prova("tutto sparito: lo si dice una volta, e la riga sul server se ne va",
+          ["Il carrello da Anna si è svuotato: gli oggetti non sono più "
+           "disponibili", 1, {"tg_id": 111, "righe": []}, "none"],
+          out.get("sparito"))
+    prova("la domanda aspetta la lettura in volo: anche nel primo istante "
+          "si chiede", ["Hai già un carrello da Anna: vuoi sostituirlo?"],
+          out.get("aspetta"))
+    prova("...e una lettura che arriva dopo un carrello composto adesso non "
+          "gli scrive sopra", [[[2, 2]], 222], out.get("vinceIlTocco"))
+    prova("la potatura vera: il pezzo sparito esce, i pezzi scendono allo "
+          "stock, e il carrello potato si salva",
+          [[[2, 1]], 1, {"tg_id": 111, "righe": [{"annuncio_id": 2,
+                                                  "quantita": 1}]}],
+          out.get("potatura"))
+    prova("«Riprendi»: la pagina del carrello, sull'annuncio di provenienza, "
+          "e aprirlo e' un tocco che si salva",
+          ["pacco", 2, 1, {"tg_id": 111, "righe": [{"annuncio_id": 2,
+                                                    "quantita": 1}]}],
+          out.get("riprendi"))
+    prova("«Svuota» dalla home chiede col nome; con la cassa di un accordo "
+          "aperta svuota il carrello VERO e la chiude",
+          ["Svuotare il carrello da Anna?",
+           [[], [], "Carrello svuotato", "none", None, None]],
+          [out.get("svuotaTit"), out.get("svuotato")])
+    prova("in DEMO niente scritture e niente riga", [0, "none"], out.get("demo"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -123306,6 +123723,7 @@ def main():
               prove_vestito_bottoni,
               prove_p2p_schermi_larghi,
               prove_pc_tema_e_ricerca,
+              prove_carrello_salvato,
               prove_config_esempio):
         try:
             f()

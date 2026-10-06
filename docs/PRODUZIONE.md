@@ -2404,6 +2404,18 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   vale «LA CATENA DEL DEPLOY» — il ref si sposta a mano, senza
   --force, col via di Andrea.
 
+- IL CARRELLO SALVATO (6 ott 2026): niente leva e niente config. La
+  tabella `carrello_salvato` nasce da sola al primo avvio del codice
+  nuovo (`init_db`, `CREATE TABLE IF NOT EXISTS`), e la scopa dei sette
+  giorni gira nell'orologio. Per guardare, in sola lettura — quanti
+  carrelli ci sono e il più vecchio:
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT COUNT(*), datetime(MIN(aggiornato),'unixepoch','localtime') FROM carrello_salvato;"`
+  Il più vecchio non deve superare i sette giorni (più il giro
+  dell'orologio). TORNARE INDIETRO col codice di prima non chiede
+  niente: quel codice la tabella non la legge né la scrive, e resta lì
+  innocua; niente DROP. Il perché per intero: CANTIERI, «Il carrello
+  salvato».
+
 - IL BANNER DELLE COMMISSIONI P2P (25 set 2026): la capsula in cima al
   libro ordini («Fee P2P 2%» barrato, «BETA 1,5%», «Pionieri o Lv.5
   −0,5%») è UN FILE, `assets/p2p-banner-fee.webp`, e le sue cifre sono

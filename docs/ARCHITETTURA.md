@@ -16810,6 +16810,34 @@
   qualunque stato («pagamento con un motivo che nessuno sa
   incassare»). Per questo, prima del deploy, la domanda al database
   (PRODUZIONE, «I CARRELLI TOLTI»).
+  IL CARRELLO SALVATO (6 ott 2026, richiesta di un utente; CANTIERI,
+  «Il carrello salvato»): quel carrello — uno, di un venditore alla
+  volta — dal 6 ott ha anche una COPIA SUL SERVER, e al rientro si
+  ritrova. Non riapre i carrelli tolti: niente telefono né nuvola,
+  niente carrelli da parte; un posto solo e una riga sola. La tabella
+  `carrello_salvato` ha il `tg_id` come chiave (uno per persona per
+  costruzione), `venditore_id`, `righe` JSON — id, pezzi, valuta e
+  prezzo VISTI, letti dal server dall'annuncio — e `aggiornato`.
+  `POST /api/me/carrello` la riscrive intera a ogni tocco (vuoto =
+  via la riga; il `tg_id` nel corpo dev'essere chi chiama, o 409;
+  freno `carrello`); `GET /api/me/carrello` la rende con la card
+  viva dei soli attivi, il titolo e `prezzo_prima` nella valuta
+  dell'annuncio, e cancella lo scaduto (`GIORNI_CARRELLO_SALVATO`,
+  7). Si svuota in tre modi: lo «Svuota» (o la ✕) dell'utente, il
+  pagamento di un ordine dello STESSO venditore (`_incassa_ordine`,
+  nella transazione dello stock; un altro venditore non lo tocca), la
+  scopa dell'orologio (`pulisci_carrelli`). Nel client `salvaCarrello`
+  è la penna (subito, una alla volta, `keepalive`, col `tg_id` di chi
+  ce l'ha in memoria), `caricaCarrelloSalvato` la lettura dell'apertura
+  (dopo la prima pagina, segue l'identità, non scrive, non scavalca un
+  carrello composto adesso), la riga in home «Riprendi · Svuota», le
+  note in cima alla pagina del carrello. Cambiare venditore CHIEDE
+  («Hai già un carrello da…: vuoi sostituirlo?», `apriPacco`, che
+  aspetta la lettura in volo); dopo un pagamento decide
+  `carrelloDopoPagamento` col venditore dell'ordine; l'accordo sul
+  carrello mette da parte il carrello vero (`carrelloPrimaAccordo`),
+  che torna al primo gesto sul carrello o al pagamento. Il carrello
+  salvato non prenota la merce: il giudice resta la cassa.
   IL CARRELLO SI PAGA DOVE SI CONTROLLA (ago 2026, decisione di
   Andrea): la pagina del RIEPILOGO non esiste più — né il foglio
   `#setSheet` che l'aveva preceduta, né la vista

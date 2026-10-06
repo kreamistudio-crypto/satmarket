@@ -742,6 +742,29 @@
     font-weight:700;font-size:13.5px}
   .ospite-riga span{flex:1 1 auto;min-width:0}
   .ospite-riga .btn.mini{flex:0 0 auto;margin:0}
+  /* IL CARRELLO RITROVATO in home (6 ott 2026): i colori della riga
+     dell'ospite qui sopra, che e' gia' «una riga che dice una cosa e
+     da' la strada». Il testo prende tutta la larghezza e le due strade
+     stanno INSIEME sotto, a destra — misurato a 375px: col testo e i
+     bottoni nella stessa fila «Riprendi» restava accanto alla frase e
+     «Svuota» andava a capo da solo. La riga piccola c'e' solo se
+     qualcosa e' cambiato mentre il carrello aspettava. */
+  .carrello-riga{display:flex;flex-direction:column;gap:8px;
+    margin:10px var(--pad) 0;padding:10px 12px;
+    background:var(--sats-soft);border:1.5px solid var(--sats);
+    border-radius:var(--radius);color:var(--sats-text);
+    font-weight:700;font-size:13.5px}
+  .carrello-riga span{min-width:0;overflow-wrap:anywhere}
+  .carrello-riga small{display:block;font-weight:600;font-size:12.5px;margin-top:2px}
+  .carrello-riga-strade{display:flex;gap:8px;justify-content:flex-end}
+  .carrello-riga .btn.mini{flex:0 0 auto;margin:0}
+  /* ...e in cima alla pagina del carrello, cosa e' cambiato */
+  .pacco-note{margin:10px var(--pad) 0;padding:10px 12px;
+    background:var(--sats-soft);border:1.5px solid var(--sats);
+    border-radius:var(--radius);color:var(--sats-text);font-size:13px;
+    line-height:1.45}
+  .pacco-note ul{margin:4px 0 0;padding-left:18px}
+  .pacco-note li{font-weight:600;overflow-wrap:anywhere}
   /* in nav vive solo da desktop (come il tappo): su mobile la nav e'
      la tab bar in basso e la levetta sta gia' in testata */
   nav .tema-btn{display:none}
@@ -10140,6 +10163,17 @@ document.getElementById('cartello')?.remove();</script>
          bannerInstallaPwa() solo su web mobile fuori da Telegram.
          Dentro la Mini App non compare mai. -->
     <div id="installBanner" style="display:none"></div>
+    <!-- IL CARRELLO RITROVATO (6 ott 2026): una riga finche' c'e' un
+         carrello, con le due strade. Nasce spenta: la accende
+         aggiornaRigaCarrello, mai in DEMO ne' in vetrina anonima. Il
+         nome del venditore passa da esc(). -->
+    <div id="carrelloRiga" class="carrello-riga" style="display:none">
+      <span id="carrelloRigaTesto"></span>
+      <div class="carrello-riga-strade">
+        <button type="button" class="btn mini" onclick="chiediSvuotaCarrello()">Svuota</button>
+        <button type="button" class="btn mini" onclick="riprendiCarrello()">Riprendi</button>
+      </div>
+    </div>
     <!-- La hero vive solo da desktop in su (CSS): dentro Telegram non esiste -->
     <div class="hero" aria-hidden="true">
       <div>
@@ -10998,6 +11032,11 @@ document.getElementById('cartello')?.remove();</script>
       <span id="paccoSconto"></span>
     </div>
     </div><!-- /.pacco-appiccicato -->
+    <!-- IL CARRELLO RITROVATO (6 ott 2026): cosa e' cambiato mentre
+         aspettava — l'annuncio che non c'e' piu', i pezzi scesi, il
+         prezzo ritoccato. Nasce spenta: la riempie renderNoteCarrello,
+         e uscendo dalla pagina le note si considerano lette (go()). -->
+    <div id="paccoNote" class="pacco-note" role="status" style="display:none"></div>
     <div class="grid" id="paccoGrid" style="margin-top:10px"></div>
   </div>
 
@@ -11261,6 +11300,10 @@ document.getElementById('cartello')?.remove();</script>
         <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo. Se non vuoi comparire, nel Profilo («Livello e titolo») c'è <b>Non mostrarmi in classifica</b>: il tuo livello resta sul profilo, perché a chi scambia con te serve per fidarsi. E se la tua reputazione la pubblichiamo su Nostr (vedi sotto), smettiamo e chiediamo ai relay di ritirarla.</li>
         <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.</li>
         <li>I tuoi <b>avvisi di ricerca</b>, se ne crei: cosa cerchi, dove, entro che prezzo.</li>
+        <!-- IL CARRELLO SALVATO (6 ott 2026): un dato nuovo che resta da
+             noi, quindi si dice — cosa c'e' dentro, cosa NON c'e', chi
+             non lo vede. La durata sta qui sotto, fra le altre. -->
+        <li>Il tuo <b>carrello</b>, se ne componi uno: quali oggetti e quanti, di un venditore solo, così lo ritrovi quando rientri. Dentro non c'è l'indirizzo né la consegna — quelli nascono nella cassa — e <b>chi vende non lo vede</b>.</li>
       </ul>
 
       <h3 id="priv-barattolo">Il barattolo condiviso</h3>
@@ -11329,6 +11372,7 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>La sessione del browser</b>, se entri dal web: <b><span data-durata="sessione"></span> giorni</b>, poi si rientra. Nel database non c'è il tuo accesso ma solo la sua impronta.</li>
         <li><b>L'accesso da dentro Telegram</b> vale <b><span data-durata="initdata"></span> ore</b>: dopo, riaprendo l'app, se ne fa uno nuovo.</li>
         <li><b>La memoria di quali avvisi ti abbiamo già mandato</b>: <b><span data-durata="avvisi"></span> giorni</b>, così lo stesso annuncio non ti risuona addosso.</li>
+        <li><b>Il carrello</b>: <b><span data-durata="carrello"></span> giorni</b> dall'ultima volta che lo tocchi, poi se ne va da solo. Prima, se lo svuoti tu o se paghi un ordine dello stesso venditore.</li>
         <li><b>La fattura di un pagamento</b> vive <b><span data-tempo="invoice"></span> minuti</b>. Se non la paghi, l'ordine non è mai esistito.</li>
         <!-- L'unica voce di questa lista che l'utente ci ha messo LUI, e
              l'unica senza scadenza: per questo la strada per toglierla
@@ -14526,6 +14570,9 @@ function mapOrder(o){
              : o.venditore_id===myTgId ? 'seller' : 'admin';
   return {id:o.id, listing:{emoji:'📦', title:o.titolo, price:o.prezzo_sats},
     state:o.stato, role,
+    /* di chi e' il negozio (ott 2026): il carrello salvato si svuota
+       solo pagando un ordine dello STESSO venditore (carrelloDopoPagamento) */
+    sellerId:o.venditore_id,
     /* la miniatura della riga (ago 2026): il server manda SOLO il
        primo nome ('' = niente foto, e resta il 📦); per i set e' la
        foto del primo pezzo, quello che il titolo nomina */
@@ -15616,6 +15663,13 @@ function go(view){
       view);
     return;
   }
+  /* IL CARRELLO SALVATO (6 ott 2026): uscendo dalla pagina del carrello
+     le note del rientro si considerano lette */
+  if (carrelloNote.length && view !== 'pacco'
+      && document.querySelector('.view.active')?.id === 'view-pacco') {
+    carrelloNote = [];
+    aggiornaRigaCarrello();
+  }
   /* Si segna dove si era in vetrina PRIMA di spegnerla: un istante
      dopo il display:none accorcia il documento e il browser clampa lo
      scorrimento a zero — la posizione sarebbe gia' persa. Insieme alla
@@ -16170,7 +16224,10 @@ function navRendiVista(b){
     /* il pacco si ricostruisce solo se lo stato in memoria e' ancora
        il suo (stesso annuncio di provenienza): svuotato da un acquisto
        o da un reload, si ripiega sulla vetrina — mai un pacco vuoto
-       spacciato per quello di prima */
+       spacciato per quello di prima. Dopo la cassa di un accordo, in
+       memoria c'e' la composizione pattuita: torna prima il carrello
+       vero (6 ott 2026) */
+    rimettiCarrelloPrimaAccordo();
     if (paccoDati && paccoDati.origineId===b.k
         && listings.some(x=>x.id===b.k)) { renderPacco(); return go('pacco'); }
     return go('esplora');
@@ -20952,7 +21009,7 @@ let GIORNI_IND = 30;
    SERVER nella busta di prima pagina (chiave `durate`), per la stessa
    ragione di GIORNI_IND qui sopra; questi sono i ripieghi per un
    server di ieri, e combaciano coi default del codice. */
-let DURATE = {sessione: 30, initdata: 24, avvisi: 30};
+let DURATE = {sessione: 30, initdata: 24, avvisi: 30, carrello: 7};
 /* I segnaposto dei campi indirizzo: esempi, non istruzioni — il
    formato vero lo conosce il corriere, non noi. */
 const SEGNAPOSTO_IND = {nome:'Mario Rossi', via:'Via Roma 1',
@@ -22610,7 +22667,10 @@ const MAX_PACCO = 8;
 /* La pagina del pacco (ago 2026): a chi appartiene il pacco in
    composizione. Sopravvive alla navigazione (si torna e lo si ritrova)
    ed e' per un venditore solo: aprirlo da un altro venditore lo
-   ricomincia da capo. Si azzera a pagamento riuscito. */
+   ricomincia da capo, dal 6 ott 2026 dopo la domanda. Da quel giorno
+   sopravvive anche alla chiusura dell'app: si salva sul server a ogni
+   tocco e si ritrova al rientro (IL CARRELLO SALVATO, salvaCarrello).
+   Si azzera col pagamento di un ordine dello STESSO venditore. */
 let paccoDati = null;               // {sellerId, origineId}
 
 function stradeFisiche(x){
@@ -25508,7 +25568,7 @@ function ctaAcquisto(){
    venditore AGGIUNGE, non ricomincia. Il pull-to-refresh qui non
    esiste di proposito (la vista non e' in VISTE_PTR): un gesto di
    ricarica non deve costare un pacco composto. */
-function apriPacco(){
+async function apriPacco(){
   haptic();
   const l = currentListing;
   if (!l) return;
@@ -25518,15 +25578,30 @@ function apriPacco(){
     return;
   }
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  /* il carrello salvato che sta ancora arrivando all'apertura si
+     aspetta: la domanda qui sotto deve sapere se ce n'e' uno */
+  if (carrelloInArrivo) await carrelloInArrivo;
+  rimettiCarrelloPrimaAccordo();     /* dopo un accordo, il carrello vero */
   if (!paccoDati || paccoDati.sellerId !== l.sellerId) {
     /* venditore nuovo = carrello nuovo; lo stesso venditore ritrova
        il suo carrello com'era, con l'annuncio di provenienza in piu'.
-       Se c'era una spesa in corso da un ALTRO venditore, il ricambio
-       si DICE (ago 2026): e' il modello — un venditore alla volta,
-       cosi' la spedizione e' una sola — non un errore, e in silenzio
-       sembrerebbe roba sparita. */
-    if (paccoDati && setScelte.size)
-      toast('Carrello nuovo: è di un venditore alla volta, così la spedizione è una sola');
+       Se c'e' una spesa in corso da un ALTRO venditore, PRIMA LA
+       DOMANDA (6 ott 2026, decisione di Andrea; prima era un toast):
+       da quando il carrello si salva e si ritrova, il ricambio butta
+       via una cosa che l'utente si aspetta di ritrovare. E' il modello
+       — un venditore alla volta, cosi' la spedizione e' una sola — e
+       la domanda lo dice; solo il «sì» svuota, «Annulla» lascia tutto
+       com'era e si resta sull'articolo. */
+    if (paccoDati && setScelte.size) {
+      chiediConferma({
+        titolo: `Hai già un carrello da ${nomeVenditoreCarrello()}: vuoi sostituirlo?`,
+        corpo: 'Il carrello è di un venditore alla volta, così la spedizione '
+          + 'è una sola. Se lo sostituisci, quello di prima si svuota e non '
+          + 'si può recuperare.',
+        etichetta: 'Sì, sostituiscilo',
+        poi: () => { azzeraCarrello(); return apriPacco(); }});
+      return;
+    }
     setScelte = new Map();
     consegnaSetScelta = 'spedizione';
     paccoDati = {sellerId: l.sellerId, origineId: l.id};
@@ -25537,6 +25612,9 @@ function apriPacco(){
   if (!setScelte.has(l.id) && !motivoEsclusione(l)
       && setScelte.size < MAX_PACCO)
     setScelte.set(l.id, qtaScelta);
+  /* aprirlo e' gia' un tocco: il venditore nuovo, il pezzo di
+     partenza appena entrato, o l'ultimo tocco che si sposta */
+  salvaCarrello();
   renderPacco();
   go('pacco');
   /* la griglia parte da cio' che il catalogo gia' sa (la striscia ha
@@ -25576,9 +25654,8 @@ function chiudiPagPacco(){
    nuovo, anche dallo stesso venditore). */
 function svuotaPacco(){
   haptic();
-  setScelte = new Map();
-  consegnaSetScelta = 'spedizione';
-  paccoDati = null;
+  azzeraCarrello();
+  salvaCarrello();            /* vuoto: la riga sul server se ne va */
   /* si chiude il foglio e si esce dalla pagina in un colpo solo: due
      navIndietro di fila si mangerebbero anche il gradino sotto (la
      serratura dei 350ms), e comunque la pagina del pacco senza
@@ -25590,6 +25667,233 @@ function svuotaPacco(){
     el('sheetBg').classList.remove('open');
   navIndietro();
   toast('Carrello svuotato');
+}
+/* ═══ IL CARRELLO SALVATO (6 ott 2026) ═══════════════════════════════
+   La richiesta di un utente: «salvare il carrello cosi' quando uno
+   rientra in app se lo ritrova». Il carrello resta quello di sempre —
+   UNO, di un venditore alla volta, in memoria (setScelte + paccoDati) —
+   e in piu' ha una copia sul SERVER, una riga per persona: si scrive a
+   ogni tocco, si rilegge all'apertura (caricaCarrelloSalvato) e in home
+   una riga lo dice, «Riprendi · Svuota». Sette giorni dall'ultimo tocco
+   (GIORNI_CARRELLO_SALVATO), poi se ne va da solo.
+   NON SONO I CARRELLI TOLTI IL 24 SET 2026 (CANTIERI, «I carrelli sono
+   stati tolti»), e la differenza e' il punto: niente carrelli da parte,
+   niente localStorage ne' nuvola di Telegram, niente fotografie da
+   mettere d'accordo. Un posto solo, il server, e una riga sola.
+   IL SERVER NON SI FIDA E NON GIUDICA: rilegge i prezzi dall'annuncio
+   (quelli visti all'ultimo tocco sono i suoi) e al rientro dice cosa e'
+   cambiato; i soldi li giudica la cassa come sempre. */
+let carrelloNote = [];           // cos'e' cambiato mentre aspettava: le dice la pagina del carrello
+let carrelloPrimaAccordo = null; // {scelte, dati}: il carrello vero, finche' la cassa di un accordo e' aperta
+let carrelloDi = null;           // il tg_id di chi ha il carrello in memoria
+let carrelloInArrivo = null;     // la lettura dell'apertura, finche' e' in volo
+const carrelloPenna = {inVolo: false, ancora: false};
+
+/* Svuota la MEMORIA (il server lo sa dalla prossima salvaCarrello) */
+function azzeraCarrello(){
+  setScelte = new Map();
+  consegnaSetScelta = 'spedizione';
+  paccoDati = null;
+  carrelloNote = [];
+}
+/* Il carrello VERO: mentre la cassa di un accordo e' aperta, in
+   memoria c'e' la composizione pattuita — che non e' un carrello e non
+   si salva — e quello vero aspetta da parte (pagaOffertaCarrello). */
+function carrelloVero(){
+  return carrelloPrimaAccordo || {scelte: setScelte, dati: paccoDati};
+}
+function nomeVenditoreCarrello(c){
+  c = c || carrelloVero();
+  if (!c.dati) return '';
+  const x = [...c.scelte.keys()].map(id => listings.find(t => t.id === id))
+              .find(Boolean)
+         || listings.find(t => t.sellerId === c.dati.sellerId);
+  return (x && x.seller && x.seller !== '—') ? x.seller : 'un altro venditore';
+}
+/* LA PENNA: a ogni tocco si scrive il carrello INTERO, subito — niente
+   attesa di un secondo di calma, perche' Telegram chiude la Mini App
+   senza dire niente alla pagina e un tocco in attesa andrebbe perso.
+   Una scrittura alla volta: chi tocca mentre una e' in volo lascia il
+   segno (`ancora`) e al ritorno ne parte una sola con l'ultimo stato —
+   due in volo insieme potrebbero arrivare al contrario. `keepalive`:
+   la richiesta sopravvive alla pagina che si chiude.
+   Il corpo dice di CHI e' il carrello (tg_id): il server non scrive se
+   non e' chi chiama (il cambio di conto sullo stesso browser), e qui
+   non si scrive un carrello rimasto in memoria da un'identita' di
+   prima — lo azzera caricaCarrelloSalvato. */
+function salvaCarrello(){
+  aggiornaRigaCarrello();
+  if (DEMO || VETRINA || !myTgId) return;
+  if (carrelloDi === null) carrelloDi = myTgId;
+  if (carrelloDi !== myTgId) return;
+  if (carrelloPenna.inVolo) { carrelloPenna.ancora = true; return; }
+  carrelloPenna.inVolo = true;
+  const c = carrelloVero();
+  const righe = c.dati
+    ? [...c.scelte].map(([id, q]) => ({annuncio_id: id, quantita: q})) : [];
+  fetch(`${API_BASE}/me/carrello`, {method: 'POST', keepalive: true,
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify({tg_id: myTgId, righe})})
+    .catch(() => {})
+    .finally(() => {
+      carrelloPenna.inVolo = false;
+      if (carrelloPenna.ancora) { carrelloPenna.ancora = false; salvaCarrello(); }
+    });
+}
+/* Un prezzo nella valuta in cui il venditore l'ha scritto */
+function prezzoNotaCarrello(valuta, n){
+  return valuta === 'eur' ? `${fmtEur(Number(n) || 0)} €` : `${fmt(Number(n) || 0)} sats`;
+}
+/* LA LETTURA DELL'APERTURA, dopo la prima pagina della vetrina (il
+   catalogo prima e' il seme della demo, con gli stessi id: le card del
+   carrello ci finirebbero dentro e sparirebbero). Il carrello segue
+   l'identita' come il barattolo: se in memoria c'e' quello di un altro
+   conto (il cambio nel collaudo) si azzera prima. CHI HA GIA' COMINCIATO
+   UN CARRELLO IN QUESTA APERTURA HA VINTO (apriPacco aspetta questa
+   lettura, quindi succede solo se arriva dopo un tocco vero).
+   Le righe si rimettono com'erano, con quel che e' successo intanto
+   detto in chiaro: l'annuncio che non c'e' piu' esce, i pezzi oltre lo
+   stock scendono, il prezzo ritoccato si nomina col prima e il dopo. */
+function caricaCarrelloSalvato(){
+  if (DEMO || VETRINA || !myTgId) return Promise.resolve();
+  if (carrelloDi !== myTgId) {
+    azzeraCarrello(); carrelloPrimaAccordo = null; carrelloDi = myTgId;
+  }
+  const conto = myTgId;
+  /* MAI UN RIFIUTO: apriPacco la aspetta, e una lettura andata storta
+     non deve rompere il tocco su «Aggiungi al carrello» */
+  const giro = (async () => { try {
+    const r = await fetch(`${API_BASE}/me/carrello`,
+      {headers: {'X-Tg-Init-Data': authHdr()}});
+    if (!r.ok) return;
+    const c = (await r.json()).carrello;
+    if (!c || conto !== myTgId || paccoDati) return;
+    const note = [], scelte = new Map();
+    for (const x of (c.righe || [])) {
+      const nome = x.titolo ? `«${x.titolo}»` : 'Un oggetto';
+      if (!x.annuncio) { note.push(`${nome} non è più disponibile: fuori dal carrello`); continue; }
+      const l = mapListing(x.annuncio);
+      inCatalogo([l]);
+      const voluti = Math.max(1, x.quantita || 1), restano = l.quantita || 1;
+      const q = Math.min(voluti, restano);
+      if (q < voluti)
+        note.push(`${nome}: ${restano === 1 ? 'ne resta solo 1' : `ne restano solo ${fmt(restano)}`}, la quantità è scesa a ${fmt(q)}`);
+      if (x.prezzo_prima)
+        note.push(`${nome} ora costa ${prezzoNotaCarrello(l.valuta, l.valuta === 'eur' ? l.priceEur : l.price)} `
+          + `(prima ${prezzoNotaCarrello(x.prezzo_prima.valuta, x.prezzo_prima.prezzo)})`);
+      scelte.set(l.id, q);
+    }
+    if (!scelte.size) {
+      /* niente da riprendere: lo si dice una volta, e la riga sul
+         server se ne va (salvaCarrello col carrello vuoto) */
+      if (note.length)
+        toast(`Il carrello da ${c.venditore || 'un venditore'} si è svuotato: `
+          + 'gli oggetti non sono più disponibili', 5000);
+      salvaCarrello();
+      return;
+    }
+    setScelte = scelte;
+    paccoDati = {sellerId: c.venditore_id, origineId: scelte.keys().next().value};
+    carrelloNote = note;
+  } catch(e) {} })();
+  carrelloInArrivo = giro;
+  giro.then(() => {
+    if (carrelloInArrivo === giro) carrelloInArrivo = null;
+    aggiornaRigaCarrello();
+  });
+  return giro;
+}
+/* LA RIGA IN HOME: c'e' finche' c'e' un carrello, e porta le due
+   strade. Il nome del venditore e' testo utente: passa da esc(). */
+function aggiornaRigaCarrello(){
+  const r = el('carrelloRiga');
+  if (!r) return;
+  const c = carrelloVero();
+  if (DEMO || VETRINA || !c.dati || !c.scelte.size) { r.style.display = 'none'; return; }
+  let pezzi = 0; for (const q of c.scelte.values()) pezzi += q;
+  el('carrelloRigaTesto').innerHTML =
+    `🛒 Hai un carrello da <b>${esc(nomeVenditoreCarrello(c))}</b> · `
+    + `${fmt(pezzi)} pezz${pezzi === 1 ? 'o' : 'i'}`
+    + (carrelloNote.length
+      ? '<small>Nel frattempo qualcosa è cambiato: te lo diciamo dentro.</small>' : '');
+  r.style.display = '';
+}
+/* «Riprendi»: la pagina del carrello, come ci si arriva da un articolo
+   dello stesso venditore. Aprirlo e' averlo visto: si salva, e con
+   l'ultimo tocco si spostano i prezzi visti (le note restano a schermo
+   finche' non si esce dalla pagina: go()). */
+function riprendiCarrello(){
+  haptic();
+  rimettiCarrelloPrimaAccordo();
+  if (!paccoDati || !setScelte.size) { aggiornaRigaCarrello(); return; }
+  const l = listings.find(x => x.id === paccoDati.origineId)
+         || listings.find(x => setScelte.has(x.id));
+  if (!l) return;
+  paccoDati.origineId = l.id;
+  currentListing = l;
+  salvaCarrello();
+  renderPacco();
+  go('pacco');
+  rileggiVenditore(l).then(() => {
+    if (el('view-pacco').classList.contains('active')) renderPacco();
+  });
+}
+/* «Svuota» dalla home: la stessa domanda della ✕, col nome di chi */
+function chiediSvuotaCarrello(){
+  chiediConferma({
+    titolo: `Svuotare il carrello da ${nomeVenditoreCarrello()}?`,
+    corpo: 'Non potrai annullare questa azione: il carrello si svuota e '
+      + 'si ricomincia da capo.',
+    etichetta: 'Sì, svuota il carrello',
+    poi: () => {
+      rimettiCarrelloPrimaAccordo();   /* si svuota quello VERO */
+      azzeraCarrello(); salvaCarrello(); toast('Carrello svuotato');
+    }});
+}
+/* Le note del rientro in cima alla pagina del carrello (renderPacco).
+   Testo nostro coi titoli degli annunci dentro: passa da esc(). */
+function renderNoteCarrello(){
+  const box = el('paccoNote');
+  if (!box) return;
+  box.innerHTML = carrelloNote.length
+    ? '<b>Mentre il carrello aspettava:</b><ul>'
+      + carrelloNote.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>'
+    : '';
+  box.style.display = carrelloNote.length ? '' : 'none';
+}
+/* IL CARRELLO VERO TORNA AL SUO POSTO dopo la cassa di un accordo:
+   al primo gesto sul carrello (apriPacco, «Riprendi», «Svuota», la
+   pagina del carrello dalla cronologia) o al pagamento. Mai all'uscita
+   dalla cassa: da li' si va e si torna (la pagina «I tuoi dati» dal
+   cassetto dell'indirizzo), e la cassa si ricostruisce dalla memoria.
+   La cassa dell'accordo, a quel punto, e' abbandonata: si chiude anche
+   lei, o la cronologia la riaprirebbe sopra il carrello vero — si
+   riapre da «Paga ora», come sempre. */
+function rimettiCarrelloPrimaAccordo(){
+  const c = carrelloPrimaAccordo;
+  carrelloPrimaAccordo = null;
+  if (!c) return;
+  setScelte = c.scelte; paccoDati = c.dati;
+  if (acqDati && acqDati.accordoId) acqDati = null;
+  aggiornaRigaCarrello();
+}
+/* DOPO UN PAGAMENTO (decisione di Andrea): il carrello si svuota SOLO
+   se l'ordine pagato e' dello STESSO venditore — dal carrello o da una
+   scheda sola. Un acquisto al volo da un altro negozio non lo tocca.
+   Lo stesso giudizio lo fa il server sulla riga salvata, dentro
+   _incassa_ordine (che vale anche ad app chiusa): qui si allinea la
+   memoria. Il venditore lo dice l'ordine appena riletto, e se la
+   rilettura non e' arrivata quello della cassa; se non lo sa nessuno
+   il carrello resta — al rientro decide il server. */
+function carrelloDopoPagamento(oid, venditoreCassa){
+  const o = orders.find(x => x.id === oid);
+  const chi = (o && o.sellerId) || venditoreCassa || 0;
+  if (carrelloPrimaAccordo) rimettiCarrelloPrimaAccordo();
+  if (chi && paccoDati && paccoDati.sellerId === chi) {
+    azzeraCarrello();
+    salvaCarrello();
+  }
+  aggiornaRigaCarrello();
 }
 /* Gli annunci della pagina: i soli ATTIVI del venditore del pacco,
    provenienza in testa, poi i componibili prima degli esclusi.
@@ -25693,6 +25997,7 @@ function renderPacco(){
      carrello di QUEL negozio, non del mercatino intero. La spedizione
      unica la racconta gia' il riepilogo, dove c'e' la sua riga. */
   el('paccoSub').textContent = 'articoli dello stesso venditore';
+  renderNoteCarrello();
   aggiornaBarraPacco();
 }
 /* Il totale della barra: i SOLI articoli, in valuta dello spettatore.
@@ -26103,6 +26408,7 @@ function aggiungiAlPacco(id){
   const acc = offertaAccettataPer(id);
   setScelte.set(id, (acc && acc.quantita > 0)
     ? Math.min(acc.quantita, x.quantita||1) : 1);
+  salvaCarrello();
   haptic();
   /* si ridisegna TUTTA la griglia, non la sola cella: l'intersezione
      delle strade puo' aver spento (o riacceso) altri candidati */
@@ -26123,9 +26429,10 @@ function setQtaPacco(id, d){
   if (!x || !setScelte.has(id)) return;
   const q = (setScelte.get(id)||1) + d;
   haptic();
-  if (q < 1) { setScelte.delete(id); rinfrescaViste(); return; }  /* il − a zero toglie */
+  if (q < 1) { setScelte.delete(id); salvaCarrello(); rinfrescaViste(); return; }  /* il − a zero toglie */
   if (q > (x.quantita||1)) return;      /* cintura: il + era gia' spento */
   setScelte.set(id, q);
+  salvaCarrello();
   aggiornaPezziCella(id, x);
   aggiornaBarraPacco();
 }
@@ -26190,11 +26497,14 @@ async function rileggiVenditore(l){
       }
     }
   } catch(e) {}
+  let potato = false;
   for (const [id, qta] of [...setScelte]){
     const x = listings.find(t=>t.id===id);
-    if (!x || x.stato!=='attivo') setScelte.delete(id);
-    else if (qta > (x.quantita||1)) setScelte.set(id, x.quantita||1);
+    if (!x || x.stato!=='attivo') { setScelte.delete(id); potato = true; }
+    else if (qta > (x.quantita||1)) { setScelte.set(id, x.quantita||1); potato = true; }
   }
+  /* il carrello potato e' quello vero: si salva cosi' (6 ott 2026) */
+  if (potato) salvaCarrello();
 }
 /* Dopo un 409/404 che nomina il pezzo: catalogo riletto, pacco potato,
    e la vista attiva si ridisegna — l'utente vede il buco, non un
@@ -27623,10 +27933,15 @@ async function verificaOrdine(oid){
          poll su LNbits a decretare il successo, mai il wallet */
       if (nwcRipristina) { nwcRipristina(); nwcRipristina = null; }
       closeSheet();
-      /* qualunque pagamento riuscito azzera il pacco in composizione:
-         lo stock e' appena cambiato, e un pacco stantio mentirebbe —
-         e con lui il conto della cassa, per la stessa ragione */
-      paccoDati = null; setScelte = new Map();
+      /* il pagamento riuscito azzera il conto della cassa: lo stock e'
+         appena cambiato, e un conto stantio mentirebbe. IL CARRELLO NO,
+         non sempre (6 ott 2026, decisione di Andrea): da quando si salva
+         e si ritrova si svuota solo se l'ordine e' dello STESSO
+         venditore — lo decide carrelloDopoPagamento, qui sotto, con
+         l'ordine riletto; quello della cassa e' la cintura */
+      const venditoreCassa = acqDati?.tipo === 'set'
+        ? paccoDati?.sellerId
+        : (listings.find(t => t.id === acqDati?.annuncioId) || {}).sellerId;
       acqDati = null;
       /* niente toast (ago 2026): durava tre secondi e non lasciava
          niente da ritrovare. Adesso la ricevuta la manda il SERVER da
@@ -27634,6 +27949,7 @@ async function verificaOrdine(oid){
          dell'orologio — e qui sotto si apre comunque l'ordine. In DEMO
          il toast resta: li' non c'e' nessun server che notifichi. */
       await loadOrders(); renderOrders();
+      carrelloDopoPagamento(oid, venditoreCassa);
       setTimeout(()=>openOrder(oid), 400);
     }
     /* lo stato torna a chi chiama (24 set 2026): il poll lo ignora, il
@@ -29410,6 +29726,14 @@ async function pagaOffertaCarrello(id){
       } catch(e) {}
     }
   }
+  /* IL CARRELLO VERO SI METTE DA PARTE (6 ott 2026): da quando si salva
+     e si ritrova, la composizione pattuita non puo' scrivergli sopra.
+     Resta in memoria finche' serve alla cassa (che si ricostruisce
+     dalla cronologia come sempre), e il carrello vero torna al primo
+     gesto sul carrello o al pagamento (rimettiCarrelloPrimaAccordo) */
+  if (!carrelloPrimaAccordo)
+    carrelloPrimaAccordo = {scelte: new Map(setScelte),
+                            dati: paccoDati ? {...paccoDati} : null};
   setScelte = new Map(righe.map(f=>[f.annuncio_id,
                                     Math.max(1, f.quantita||1)]));
   const primo = listings.find(x=>x.id===righe[0].annuncio_id);
@@ -67539,6 +67863,13 @@ async function avvia(){
     armaFila('catStrip'); armaFila('scoprireStrip'); armaFila('p2pVetrinaFila');
     await fasciaPrima();
     renderGrid();
+    /* IL CARRELLO SALVATO (6 ott 2026) parte qui, in volo insieme a
+       ordini e barattolo: dopo la prima pagina, cioe' su un catalogo
+       gia' vero (il seme della demo ha gli stessi id), e segue
+       l'identita' come il barattolo. Nessuno lo aspetta tranne
+       apriPacco, che deve sapere se c'e' un carrello prima di
+       chiedere «vuoi sostituirlo?» */
+    caricaCarrelloSalvato();
     await loadOrders();
     /* il barattolo dei preferiti segue l'identita': si azzera e si
        rilegge (fail-open: senza risposta resta vuoto) */

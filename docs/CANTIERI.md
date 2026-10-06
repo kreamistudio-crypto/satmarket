@@ -37238,3 +37238,178 @@ codice del locker, che aspetta il sì su A o B. Notati e NON toccati: per
 un locker InPost il corriere chiede anche nome e telefono del
 destinatario, e oggi l'ordine via punto raccoglie solo l'email
 (facoltativa); il tracciamento del reso non ha il suo 📋.
+
+## Il carrello salvato (6 ott 2026, richiesta di un utente)
+
+**LA RICHIESTA E IL PERIMETRO.** Un utente: «salvare il carrello così
+quando uno rientra in app se lo ritrova». Prima del codice lo studio,
+mandato ad Andrea: il carrello viveva SOLO nella memoria della pagina
+(`setScelte` + `paccoDati`), quindi chiudere la Mini App, l'APK o la
+scheda del sito lo perdeva sempre; il tasto indietro no. Il giudice dei
+soldi era (ed è) il server: il client manda annunci e pezzi, mai prezzi.
+Lo studio ha detto anche la cosa scomoda: il 24 set, con i carrelli per
+venditore, se n'era andata pure «la persistenza sul telefono e nella
+nuvola di Telegram» (qui sopra, «I carrelli sono stati tolti»), quindi
+la richiesta ne riapriva un pezzo. **Il sì di Andrea è arrivato sapendolo,
+con un patto: resta piccolo — un carrello, un posto, sul server.**
+
+**LE QUATTRO DECISIONI DI ANDREA.** 1) Comporre un carrello con un ALTRO
+venditore chiede prima «Hai già un carrello da Anna: vuoi
+sostituirlo?»; solo il sì svuota. 2) Comprare al volo un oggetto di un
+altro venditore NON tocca il carrello salvato. 3) Pagare un ordine dello
+STESSO venditore lo svuota — dal carrello o da una scheda sola. 4) Sette
+giorni dall'ultimo tocco, poi se ne va. Push entro l'8 ottobre, prima del
+lancio del P2P del 10.
+
+**IL SERVER.** La tabella `carrello_salvato`: la chiave è il `tg_id`,
+quindi **uno per persona per costruzione**; `venditore_id`, le `righe` in
+JSON (id, pezzi, valuta e prezzo VISTI all'ultimo tocco) e `aggiornato`.
+Niente indirizzo né consegna: nascono nella cassa e vivono nell'ordine.
+`GET /api/me/carrello` lo rende con quel che gli è successo intanto: per
+ogni riga la card di adesso SOLO se l'annuncio è attivo, il titolo per
+poterne parlare anche senza card, e `prezzo_prima` se il prezzo
+dichiarato è cambiato — confrontato **nella valuta dell'annuncio**
+(`_prezzo_carrello`: in euro gli euro, perché il cambio si muove ogni
+minuto e un «il prezzo è cambiato» a ogni rientro su un annuncio mai
+toccato sarebbe una bugia). Lo scaduto si cancella lì, con `aggiornato`
+nella WHERE. `POST /api/me/carrello` lo riscrive INTERO a ogni tocco
+(righe vuote = via la riga): il corpo porta il `tg_id` di chi aveva il
+carrello in memoria, e se non è chi chiama → 409 senza scrivere (il
+cambio di conto sullo stesso browser: cookie già nuovo, pagina ancora
+vecchia); un venditore alla volta, niente annunci propri, al massimo
+`MAX_RIGHE_SET` righe, pezzi fino a `QTA_MAX_CARRELLO`; il prezzo lo legge
+il server dall'annuncio, mai dal corpo; freno `carrello` a 120 al minuto
+per persona. `_incassa_ordine` cancella la riga del compratore SE il
+venditore è lo stesso (decisioni 2 e 3), nella stessa transazione dello
+stock: vale anche col pagamento arrivato ad app chiusa, dall'orologio.
+`pulisci_carrelli` nell'orologio: chi non torna più non lascia il
+carrello lì (decisione 4, anche per lui). La fusione dei due account lo
+porta con `UPDATE OR IGNORE` + `DELETE` — ne resta uno, quello di
+Telegram se c'erano tutti e due. La durata va alla pagina «I tuoi dati»
+dal server (`durate.carrello`), con due voci nuove: cosa c'è dentro e chi
+non lo vede, e quanto dura.
+
+**IL CLIENT.** `salvaCarrello` a ogni tocco (aprirlo dall'articolo,
+Aggiungi, − e +, la ✕ che svuota, «Riprendi», la potatura di
+`rileggiVenditore`): SUBITO, una scrittura alla volta — chi tocca mentre
+una è in volo lascia il segno e al ritorno ne parte una sola con l'ultimo
+stato — e `keepalive`. `caricaCarrelloSalvato` all'apertura, dopo la
+prima pagina della vetrina (il seme della demo ha gli stessi id), in
+volo insieme a ordini e barattolo: segue l'identità come il barattolo,
+non scrive niente (rientrare non è un tocco), non scavalca un carrello
+composto in questa apertura, e rimette le righe dicendo cosa è
+cambiato — l'annuncio che non c'è più esce, i pezzi oltre lo stock
+scendono, il prezzo ritoccato col prima e il dopo. Se non resta niente,
+un toast e la riga sul server se ne va. In home la riga «🛒 Hai un
+carrello da Anna · 2 pezzi», con «Nel frattempo qualcosa è cambiato: te
+lo diciamo dentro» se serve, e le due strade «Svuota · Riprendi» (lo
+svuota chiede, come la ✕). In cima alla pagina del carrello le note;
+uscendo dalla pagina si considerano lette. `apriPacco` aspetta la
+lettura in volo e poi, se il carrello è di un altro venditore, chiede
+(`chiediConferma`, decisione 1): «Annulla» lascia tutto com'era e si
+resta sull'articolo. Dopo un pagamento `carrelloDopoPagamento` svuota la
+memoria solo se l'ordine riletto è dello stesso venditore (`sellerId` in
+`mapOrder`; se l'ordine non si è riletto, quello della cassa; se non lo
+sa nessuno, resta e al rientro decide il server). L'ACCORDO SUL CARRELLO
+scriveva la composizione pattuita sopra il carrello: adesso il carrello
+vero si mette da parte (`carrelloPrimaAccordo`), si salva e si mostra
+quello, e torna al primo gesto sul carrello o al pagamento; a quel punto
+la cassa dell'accordo, abbandonata, si chiude (si riapre da «Paga ora»).
+
+**STRADE SCARTATE.**
+- Il telefono o la nuvola di Telegram: la decisione del 24 set resta, e
+  con un posto solo non c'è niente da mettere d'accordo.
+- Il secondo di calma prima di scrivere, proposto nello studio: Telegram
+  chiude la Mini App senza dire niente alla pagina, e un tocco in attesa
+  andava perso. Scrittura subito, una alla volta: il carico è lo stesso.
+- Rimettere il carrello vero all'USCITA dalla cassa dell'accordo, come
+  facevano i carrelli tolti: dalla cassa si va e si torna (la pagina «I
+  tuoi dati» dal cassetto dell'indirizzo), e la cassa non si sarebbe più
+  ricostruita. Si rimette al primo gesto sul carrello.
+- Svuotare per QUALUNQUE pagamento riuscito, la regola di prima: è
+  quella che la decisione 2 rovescia.
+- Tenere da parte la merce: il carrello salvato non prenota niente, lo
+  dicono le note; i soldi li giudica la cassa come sempre.
+- Il toast «Carrello nuovo» al cambio di venditore: con un carrello che
+  si ritrova, ricominciarlo in silenzio butta via una cosa attesa.
+- `carrelli_salvati` come nome della tabella: è il nome della funzione
+  tolta il 24 set, e il singolare dice la regola.
+
+**PROVATO.**
+- `collaudo_carrello_salvato.py` (53, nella CI, verde nella gabbia e
+  senza coincurve): il server VERO per HTTP con l'identità di collaudo.
+  Si salva e si ritrova; chi vende non lo vede; nove rifiuti senza
+  scritture (altro conto, tg_id assente o booleano, due venditori,
+  annuncio proprio, nove righe, riga doppia, righe storte, id non
+  numerico) e il carrello intatto al byte; un prezzo nel corpo ignorato;
+  401 senza identità. **L'ANNUNCIO VENDUTO MENTRE IL CARRELLO
+  ASPETTAVA**: un altro compratore compra e paga l'ultima lampada coi
+  percorsi veri (ordine, verifica, `_incassa_ordine`), il mio carrello
+  resta, e al rientro la lampada c'è come riga SENZA card, la tazza dice
+  2 voluti e 1 rimasto col prezzo di prima, il vaso in euro non segnala
+  il cambio che si muove ma segnala gli euro ritoccati; risalvato dopo
+  averlo visto, niente più «prima». Decisione 2 (il libro di un altro
+  venditore, pagato: il carrello resta), un ordine NON pagato che non
+  svuota, decisione 3 due volte (la sedia al volo, poi il carrello intero
+  dalla cassa), uno per persona, righe vuote e annunci inesistenti che
+  cancellano, sette giorni meno e più due minuti, la scopa, la durata
+  nella busta, la fusione nei due versi, il freno al 121°.
+- `prove_carrello_salvato` (60): sentinelle su tabella, incasso, rotte,
+  scopa, fusione, client; e il banco node che ESEGUE il blocco intero,
+  `apriPacco`, `rileggiVenditore` e `pagaOffertaCarrello` veri contro un
+  fetch di cartone, in ventidue scene (ripresa con le note scappate,
+  domanda e sostituzione, i due pagamenti, la penna una alla volta,
+  l'accordo vero, l'altro conto, l'identità, tutto sparito, la domanda
+  che aspetta la lettura, la lettura che non scavalca, la potatura,
+  «Riprendi», «Svuota» con l'accordo aperto, DEMO); una scena che
+  esplode non zittisce le altre.
+- Banchi e censimenti emendati: la tabella nel cartone di
+  `_incassa_ordine` (`prove_notifica_fail_open`,
+  `prove_ricevuta_compratore`), la domanda unica da 77 a 79, le durate
+  della pagina dati da tre a quattro, i freni concordati col carrello.
+- Tortura su una copia rifatta a ogni giro, giudici la sezione e il
+  collaudo: **46 su 46 uccise** (17 sul server, 29 sul client). Al primo
+  giro due ancore erano ambigue e diverse mutazioni facevano ESPLODERE
+  il banco intero (la prima rossa non diceva più quale scena era
+  caduta): ancore ristrette, banco che tiene le scene già scritte e una
+  prova sua per l'eccezione, e prima del secondo giro il banco ha
+  imparato a eseguire davvero `rileggiVenditore`, `pagaOffertaCarrello`
+  e «Riprendi», che una sentinella sul testo non avrebbe difeso.
+  Equivalente e scartata: togliere il controllo del `tg_id` booleano
+  (`True` vale 1, e nessun id vero è 1).
+- Dal vivo nel Browser pane (copia nello scratchpad in collaudo, relay
+  morto, LNbits di cartone, 375 px, clic veri): dall'articolo il
+  carrello si apre e il server lo ha già; Aggiungi e + salvano; la
+  lampada venduta, la tazza scesa e rincarata, il vaso ritoccato in euro
+  mentre il carrello aspettava → ricaricata l'app, la riga in home con
+  «qualcosa è cambiato» e «Riprendi» con le quattro note giuste; dal
+  libro di un altro venditore la domanda, «Annulla» che lascia tutto
+  (anche sul server), il sì che lo sostituisce; il tasto indietro di
+  Telegram fino a casa; «Svuota» dalla home; il cambio d'identità del
+  collaudo (333 non eredita niente, 111 lo ritrova); il sito col login
+  web a redirect (il cookie, la guardia CSRF di stessa origine); la
+  pagina «I tuoi dati» con le due voci; il tema scuro. La riga in home
+  al primo giro aveva «Riprendi» accanto alla frase e «Svuota» a capo da
+  solo: rifatta col testo su tutta la riga e le due strade insieme sotto.
+- Il deploy in piccolo: il codice di produzione (origin/main) crea il
+  database e semina; il server nuovo parte sopra lo stesso file, crea la
+  tabella da solo, lascia intatti gli annunci, risponde su lettura e
+  scrittura.
+- Suite intera severa e collaudi della CI: nel messaggio del commit.
+
+**NON PROVATO.** Il telefono vero: Telegram Android e iOS, l'APK. Il
+pagamento dal vivo (LNbits di cartone nel giro): lo svuotamento dopo il
+pagamento lo provano il collaudo col server vero e il banco. Telegram che
+chiude la Mini App a metà di una scrittura (`keepalive`, non osservato).
+
+**LE FINESTRE DICHIARATE.** Due dispositivi aperti insieme: vince
+l'ultima scrittura, e uno rimasto indietro, al suo prossimo tocco,
+riscrive il carrello che aveva in memoria — anche dopo un pagamento fatto
+sull'altro; al rientro seguente la lettura toglie il venduto. Il carrello
+non prenota la merce.
+
+**DA GUARDARE.** Sul telefono, dentro Telegram e nell'APK: comporre un
+carrello, chiudere l'app DAVVERO (non indietro), riaprirla e trovare la
+riga in home; «Riprendi»; da un altro venditore la domanda; «Svuota»;
+comprare al volo da un altro venditore e ritrovare il carrello; pagare
+dallo stesso e vederlo sparire.
