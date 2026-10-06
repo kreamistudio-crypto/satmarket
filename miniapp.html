@@ -166,7 +166,10 @@
     --b-dan-sh-on:inset 0 1px 3px rgba(194,65,12,.18);
     --b-piano-bg:#FFFFFF; --b-piano-fg:#A8360A; --b-piano-line:#E8DFC8;
     /* i due pieni del P2P (ott 2026, il secondo giro): il ROSSO di
-       «Vendi BTC» e del + che vende, e il BLU di Barattozon. Il rosso
+       «Vendi BTC» e del + che vende, e il BLU di Barattozon, che tiene
+       il suo colore pieno e la scritta bianca (decisione di Andrea: sui
+       pieni che non sono arancio, verde o rosso lo stile A cambia solo
+       forma, ombra, misure e carattere). Il rosso
        e' lo stesso di giorno e di sera, come l'arancio: col bianco fa
        4,8:1 in cima e 6,0 in fondo (il #F07A47 di sera ci faceva 2,8).
        Il suo alone sta a parte perche' il + che scende sul logo lo
@@ -177,7 +180,7 @@
     --b-rosso-alone:0 7px 16px -8px rgba(194,65,12,.7);
     --b-rosso-sh:var(--b-rosso-rilievo),var(--b-rosso-alone);
     --b-rosso-sh-on:inset 0 2px 4px rgba(110,30,0,.35);
-    --b-bz-bg:linear-gradient(180deg,#2A3042 0%,#191D29 100%);
+    --b-bz-bg:#191D29;
     --b-bz-fg:#FFFFFF; --b-bz-line:rgba(0,0,0,.5);
     --b-bz-sh:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(0,0,0,.3),0 7px 16px -8px rgba(25,29,41,.75);
     --b-bz-sh-on:inset 0 2px 4px rgba(0,0,0,.45);
@@ -4956,7 +4959,7 @@
      passare la banda a meta' strada (vedi LA PELLE DEL +). A spegnersi al
      contrario e' il solo suo BAGLIORE, che sta fuori dal cerchio e che il
      blu non coprirebbe: in fondo il + e' blu pieno, ombra compresa.
-     LA CROCE RESTA BIANCA: almeno 4,8:1 sul rosso e 13 sul blu, e il
+     LA CROCE RESTA BIANCA: almeno 4,8:1 sul rosso e 16,8 sul blu, e il
      contrasto sale lungo tutta la strada. Di sera il rosso del + era
      #F07A47, col bianco a 2,77:1: dal vestito A (ott 2026) e' il rosso
      dei bottoni, lo stesso nei due temi, e la domanda e' chiusa. */
@@ -7701,7 +7704,7 @@
      secondo giro del vestito (ott 2026) sono due RUOLI come gli altri,
      con le loro leve (--b-rosso-…, --b-bz-…): premuto, spento e «in
      corso» li prendono dalle stesse regole. Il bianco regge l'AA nei
-     due temi: 4,8:1 sul rosso, 13 sul blu. */
+     due temi: 4,8:1 sul rosso, 16,8 sul blu. */
   .btn.rosso{--b-bg:var(--b-rosso-bg);--b-fg:var(--b-rosso-fg);--b-line:var(--b-rosso-line);
     --b-bw:var(--b-pieno-bw);--b-sh:var(--b-rosso-sh);--b-bg-on:var(--b-rosso-bg);--b-sh-on:var(--b-rosso-sh-on)}
   .btn.bz{--b-bg:var(--b-bz-bg);--b-fg:var(--b-bz-fg);--b-line:var(--b-bz-line);

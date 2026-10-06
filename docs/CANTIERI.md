@@ -36505,8 +36505,13 @@ dipinge e in tutte le liste di stato (premuto, spento, «in corso» e la
 sua luce). IL ROSSO È LO STESSO DI GIORNO E DI SERA, come l'arancio:
 #C8460F→#B23A0A col bianco, 4,8:1 in cima e 6,0 in fondo — e chiude la
 domanda lasciata aperta al settimo giro del +, dove di sera il rosso
-#F07A47 col bianco faceva 2,77. Il blu va da #2A3042 al #191D29 della
-tendina. Le pelli del + prendono fondo, filo (un `inset` da 1px) e
+#F07A47 col bianco faceva 2,77. Il blu resta il #191D29 pieno della
+tendina con la scritta bianca: a lavoro quasi chiuso Andrea ha precisato
+che sui pieni che non sono arancio, verde o rosso lo stile A cambia solo
+forma, ombra, misure e carattere (il primo giro gli aveva dato un
+gradiente da #2A3042, tolto). Controllato anche il mercatino dopo
+305033a: nessun pieno di quel tipo era passato alla scritta scura
+(`.bz` era ancora bianco, l'asta ha `--b-asta-fg` bianco). Le pelli del + prendono fondo, filo (un `inset` da 1px) e
 ombra del loro ruolo; la rossa tiene il solo `--b-rosso-rilievo` e il
 suo bagliore diventa `--b-rosso-alone`, sullo strato che la discesa
 spegne come prima. LA CROCE È DELLA PELLE: il ＋ vero resta nel tondo

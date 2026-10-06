@@ -21824,8 +21824,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `prove_vestito_bottoni`, che chiede a OGNI regola che nomina il P2P.
   I suoi due pieni sono ruoli come gli altri: `.rosso` («Vendi BTC», le
   leve `--b-rosso-…`, lo stesso rosso di giorno e di sera col bianco a
-  4,8:1) e `.bz` (Barattozon, `--b-bz-…`, il gradiente finisce nel
-  #191D29 della tendina), in tutte le liste di stato.
+  4,8:1) e `.bz` (Barattozon, `--b-bz-…`: il #191D29 pieno della
+  tendina con la scritta bianca — sui pieni che non sono arancio, verde
+  o rosso lo stile A cambia solo forma, ombra, misure e carattere,
+  decisione di Andrea), in tutte le liste di stato.
   I + DELLA BARRA E IL LORO FANTASMA VESTONO A SENZA CAMBIARE NIENTE
   ALTRO (decisione di Andrea): forma, misura, strati e corse sono quelli
   di prima; le pelli prendono fondo, filo e ombra del ruolo (arancio del
@@ -26656,7 +26658,7 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   dito; il bagliore rosso sta su `.pelle-rossa::after` e si spegne al
   contrario. Il fantasma parte dal rosso che resta (`--morfo-rosso`,
   scritta da `vestiMorfoP2P`): dal + in fondo nasce blu. La croce resta
-  bianca (almeno 4,8:1 sul rosso, 13 sul blu; il rosso di sera era
+  bianca (almeno 4,8:1 sul rosso, 16,8 sul blu; il rosso di sera era
   #F07A47 col bianco a 2,77 — chiuso dal vestito A, ott 2026, col rosso
   dei bottoni uguale nei due temi). E SI ACCENDE UN CONTORNO BIANCO (ottavo giro, bianco dal
   nono): blu sulla banda scura il + si perdeva, e la pelle blu porta nel

@@ -63598,15 +63598,14 @@ def prove_tasto_barattozon():
                                                                 [prop]).get(prop) or [None])[0])
     _tend_r = _regola(css, "  #navBarattozon{position:absolute;", "}")
     # (ott 2026, il vestito A) il blu e' quello dei bottoni di Barattozon,
-    # e il suo gradiente finisce nel blu della tendina (l'ultima fermata e'
-    # il #191D29 che la tendina dichiara, letto dalla sua regola)
+    # che e' il blu PIENO della tendina (letto dalla sua regola): sui pieni
+    # che non sono arancio, verde o rosso il vestito non tocca il colore
     _bz_bg = re.search(r"--b-bz-bg:([^;]*);", mini)
-    prova("la pelle blu del + e' il blu di Barattozon (che finisce nel blu della "
-          "tendina), sopra la rossa, e la sua opacita' e' la discesa",
+    prova("la pelle blu del + e' il blu di Barattozon (il blu della tendina), "
+          "sopra la rossa, e la sua opacita' e' la discesa",
           [True, "var(--b-bz-bg)", "inset 0 0 0 1px var(--b-bz-line),var(--b-bz-sh)",
            "-1", "var(--discesa-p2p,0)"],
-          [bool(_bz_bg) and _bz_bg.group(1).rstrip().endswith(
-               (_dichiarazione(_tend_r, "background") or "?") + " 100%)"),
+          [bool(_bz_bg) and _bz_bg.group(1).strip() == _dichiarazione(_tend_r, "background"),
            _vbz(_reg, _VB, "background"), _vbz(_reg, _VB, "box-shadow"),
            _vbz(_reg, _VB, "z-index"), _vbz(_reg, _VB, "opacity")])
     prova("...il suo colore corre col +: fermo col dito, la corsa della barra al "
@@ -63780,7 +63779,7 @@ def prove_tasto_barattozon():
     prova("...e il testo dei bottoni rosso e blu regge l'AA nei due temi",
           [True, True, True, [], []],
           [_tok(_giorno, "b-rosso-fg") == "#FFFFFF" and _tok(_giorno, "b-bz-fg") == "#FFFFFF",
-           len(_fermate("b-rosso-bg")) == 2 and len(_fermate("b-bz-bg")) == 2,
+           len(_fermate("b-rosso-bg")) == 2 and _fermate("b-bz-bg") == ["#191D29"],
            not re.search(r"--b-(rosso|bz)-(bg|fg):", _sera),
            [f for f in _fermate("b-rosso-bg") if _contrasto("#FFFFFF", f) < 4.5],
            [f for f in _fermate("b-bz-bg") if _contrasto("#FFFFFF", f) < 4.5]])
