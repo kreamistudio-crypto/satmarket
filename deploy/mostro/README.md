@@ -1,5 +1,12 @@
 # IL FORK DI MOSTRO — otto patch sopra il tag v0.19.0
 
+**Dal 6 ottobre 2026 c'è una patch PROPOSTA, non applicata**: la 0009,
+in `proposte/` col suo README — la fee per parte letta per coppia di
+chiavi, e via la seconda domanda al server della 0008 al blocco della
+cauzione. Non è nella serie e la ricostruzione qui sotto non la prende;
+entra solo col sì di Andrea. Lo studio sta in CANTIERI, «La cauzione e
+la fee per parte».
+
 **Dal 1 ottobre 2026 (sera) i due moduli `.rs` sono cambiati** — cantiere
 «CSP e le voci aperte degli audit», cura 9: in `barattolo_fee.rs`
 l'interruttore della domanda dello sconto (3 fallimenti di fila → 60 s

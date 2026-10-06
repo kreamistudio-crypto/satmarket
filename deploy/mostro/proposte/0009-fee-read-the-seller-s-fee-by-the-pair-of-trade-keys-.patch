@@ -1,0 +1,350 @@
+From dc529d33597138fcd0d7719bf0f1009ff2c4dc93 Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@barattolo.store>
+Date: Tue, 6 Oct 2026 14:26:55 +0200
+Subject: [PATCH] fee: read the seller's fee by the pair of trade keys, and
+ stop asking again at bond lock
+
+Patch 0005 keeps one side row per order, rewritten at every take attempt;
+under the anti-abuse bond several attempts race on one order, and patch
+0008 re-ran the discount lookup at lock to put the winner's row back. Two
+holes: a lookup that fails at lock (server restarting, breaker open)
+writes a full-fee row while order.fee keeps the discounted snapshot from
+the bond, so the seller's fee falls back to the buyer's; and a rival take
+whose lookup was still in flight writes its row after the winner's lock.
+
+Every attempt now writes its fees under its pair of trade keys
+(barattolo_fees_takes) and the seller's fee is read by the pair the order
+carries (seller_fee_of; show_hold_invoice passes the keys, the order does
+not carry them yet there). At lock nothing is asked again and nothing is
+written: one journal line with the numbers the trade runs on.
+---
+ src/app/bond/flow.rs |  17 ++--
+ src/barattolo_fee.rs | 224 +++++++++++++++++++++++++++++++++++++++++--
+ src/util.rs          |  10 +-
+ 3 files changed, 232 insertions(+), 19 deletions(-)
+
+diff --git a/src/app/bond/flow.rs b/src/app/bond/flow.rs
+index 9888544..81f848a 100644
+--- a/src/app/bond/flow.rs
++++ b/src/app/bond/flow.rs
+@@ -1140,17 +1140,12 @@ async fn on_bond_invoice_accepted(
+     // touch these fields (so racing takers couldn't clobber each
+     // other); now that we know the winner, copy their snapshot.
+     let order = promote_taker_context_to_order(pool, order, &current).await?;
+-    // Barattolo fork (patch 0008): re-apply the per-party fees for the
+-    // WINNER. Patch 0005 writes one side row per order at every take
+-    // attempt; with concurrent bonds the last attempt's row overwrites the
+-    // winner's. The order keeps the numbers of its bond row (the buyer's
+-    // invoice was validated against them): only the side row is refreshed.
+-    {
+-        let mut ricalcolo = order.clone();
+-        let buyer = order.buyer_pubkey.clone().unwrap_or_default();
+-        let seller = order.seller_pubkey.clone().unwrap_or_default();
+-        crate::barattolo_fee::apply_party_fees(pool, &mut ricalcolo, &buyer, &seller).await;
+-    }
++    // Barattolo fork (patch 0009, in place of 0008's re-apply): the winner's
++    // fees are the row of their own take attempt, keyed by the two trade
++    // keys the order now carries. No second question to the server — an
++    // answer that changed, or no answer, would split the seller's fee from
++    // the buyer's snapshot above — and no write a losing attempt could undo.
++    crate::barattolo_fee::log_winner(pool, &order).await;
+ 
+     let my_keys = get_keys()?;
+     resume_take_after_bond(pool, order, my_keys, request_id).await
+diff --git a/src/barattolo_fee.rs b/src/barattolo_fee.rs
+index 9ad9fad..7f4833e 100644
+--- a/src/barattolo_fee.rs
++++ b/src/barattolo_fee.rs
+@@ -30,9 +30,17 @@
+ //! unverified discount is never applied. Each failure logs one line with the
+ //! reason, because a silent fallback is a fee nobody can explain later.
+ //!
+-//! Not covered: the anti-abuse bond path stashes `order.fee` in the taker
+-//! context and may race several takers on one order; this coordinator runs
+-//! with bonds disabled. Revisit before enabling them.
++//! The anti-abuse bond (patch 0009; bonds on since 1 Oct 2026, for the
++//! "Contanti" method): several takers may race on one order, each with its
++//! own take attempt. Every attempt writes its fees under its PAIR of trade
++//! keys (`barattolo_fees_takes`) and the seller's fee is read back by the
++//! pair the order carries, so a losing attempt — even one whose write lands
++//! after the winner's bond locked — never reaches the winner's numbers. At
++//! lock nothing is asked of the server again: `order.fee` is the winner's
++//! snapshot from the bond row and must stay paired with the row written
++//! from the same answer. `barattolo_fees`, one row per order, is still
++//! written at every attempt: it is the "ever discounted" marker of
++//! [`apply_party_fees`] and what orders taken before this patch read.
+ 
+ use crate::config::settings::Settings;
+ use crate::config::DB_POOL;
+@@ -264,6 +272,25 @@ async fn ensure_table(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+         )",
+     )
+     .execute(pool)
++    .await?;
++    // Barattolo fork (patch 0009): one row per take ATTEMPT, keyed by the
++    // two trade keys, so racing takers under the anti-abuse bond cannot
++    // overwrite each other's fees.
++    sqlx::query(
++        "CREATE TABLE IF NOT EXISTS barattolo_fees_takes (
++            order_id TEXT NOT NULL,
++            buyer TEXT NOT NULL,
++            seller TEXT NOT NULL,
++            amount INTEGER NOT NULL,
++            fee_buyer INTEGER NOT NULL,
++            fee_seller INTEGER NOT NULL,
++            discount_buyer INTEGER NOT NULL DEFAULT 0,
++            discount_seller INTEGER NOT NULL DEFAULT 0,
++            created_at INTEGER NOT NULL,
++            PRIMARY KEY (order_id, buyer, seller)
++        )",
++    )
++    .execute(pool)
+     .await
+     .map(|_| ())
+ }
+@@ -303,6 +330,50 @@ async fn has_row(pool: &SqlitePool, order_id: &str) -> bool {
+         .unwrap_or(false)
+ }
+ 
++/// Trade keys are compared as lowercase hex without blanks (patch 0009):
++/// the take handlers pass `to_hex()`, the order carries `to_string()` — the
++/// same hex for nostr 0.45 — and this keeps a change of either from
++/// silently missing the row.
++fn key_of(key: &str) -> String {
++    key.trim().to_ascii_lowercase()
++}
++
++/// Barattolo fork (patch 0009): the row of THIS take attempt under its two
++/// trade keys, then the per-order row as before (the "ever discounted"
++/// marker of [`has_row`] and what orders taken before this patch read).
++/// Under the anti-abuse bond several attempts write here; the winner's row
++/// is the one keyed by the pair its order ends up carrying.
++#[allow(clippy::too_many_arguments)]
++async fn store_take(
++    pool: &SqlitePool,
++    order_id: &str,
++    buyer: &str,
++    seller: &str,
++    amount: i64,
++    fee_buyer: i64,
++    fee_seller: i64,
++    flags: (bool, bool),
++) -> Result<(), sqlx::Error> {
++    ensure_table(pool).await?;
++    sqlx::query(
++        "INSERT OR REPLACE INTO barattolo_fees_takes
++            (order_id, buyer, seller, amount, fee_buyer, fee_seller,
++             discount_buyer, discount_seller, created_at)
++         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, strftime('%s','now'))",
++    )
++    .bind(order_id)
++    .bind(key_of(buyer))
++    .bind(key_of(seller))
++    .bind(amount)
++    .bind(fee_buyer)
++    .bind(fee_seller)
++    .bind(flags.0 as i64)
++    .bind(flags.1 as i64)
++    .execute(pool)
++    .await?;
++    store(pool, order_id, amount, fee_buyer, fee_seller, flags).await
++}
++
+ /// The pure half of [`apply_party_fees`]: given the flags, what each party
+ /// pays. Returns `(fee_buyer, fee_seller)`.
+ pub fn fees_for(amount: i64, base_fee: f64, discount: f64, flags: (bool, bool)) -> (i64, i64) {
+@@ -338,7 +409,19 @@ pub async fn apply_party_fees(pool: &SqlitePool, order: &mut Order, buyer: &str,
+     }
+     let (mut fee_buyer, mut fee_seller) = fees_for(order.amount, base_fee, discount_rate(), flags);
+ 
+-    if let Err(e) = store(pool, &order_id, order.amount, fee_buyer, fee_seller, flags).await {
++    // Barattolo fork (patch 0009): under this take's pair of trade keys too.
++    if let Err(e) = store_take(
++        pool,
++        &order_id,
++        buyer,
++        seller,
++        order.amount,
++        fee_buyer,
++        fee_seller,
++        flags,
++    )
++    .await
++    {
+         warn!("barattolo_fee: order {order_id}: could not record the fees ({e}): full fee for both");
+         let full = party_fee(order.amount, base_fee, 0.0);
+         fee_buyer = full;
+@@ -378,14 +461,96 @@ pub async fn seller_fee_with(pool: &SqlitePool, order_id: &str, amount: i64, ord
+     }
+ }
+ 
+-/// [`seller_fee_with`] on the global pool, for call sites that have none.
+-pub async fn seller_fee(order: &Order) -> i64 {
++/// Barattolo fork (patch 0009): the seller's fee of the take made by THIS
++/// pair of trade keys. The pair's row is trusted under the rule of
++/// [`seller_fee_with`] (same amount, same buyer fee as the order now). A
++/// pair with no row on an order that has rows of other attempts → those
++/// are not ours, `order.fee` (a take with no discount writes nothing). No
++/// row for any pair → an order taken before this patch: the old reader.
++pub async fn seller_fee_of(
++    pool: &SqlitePool,
++    order_id: &str,
++    buyer: &str,
++    seller: &str,
++    amount: i64,
++    order_fee: i64,
++) -> i64 {
++    let row = sqlx::query_as::<_, (i64, i64, i64)>(
++        "SELECT amount, fee_buyer, fee_seller FROM barattolo_fees_takes
++         WHERE order_id = ?1 AND buyer = ?2 AND seller = ?3",
++    )
++    .bind(order_id)
++    .bind(key_of(buyer))
++    .bind(key_of(seller))
++    .fetch_optional(pool)
++    .await;
++    match row {
++        Ok(Some((row_amount, row_fee_buyer, fee_seller))) => {
++            if row_amount == amount && row_fee_buyer == order_fee && fee_seller >= 0 {
++                fee_seller
++            } else {
++                order_fee
++            }
++        }
++        Ok(None) => {
++            let others = sqlx::query_as::<_, (i64,)>(
++                "SELECT 1 FROM barattolo_fees_takes WHERE order_id = ?1 LIMIT 1",
++            )
++            .bind(order_id)
++            .fetch_optional(pool)
++            .await;
++            match others {
++                Ok(None) => seller_fee_with(pool, order_id, amount, order_fee).await,
++                _ => order_fee,
++            }
++        }
++        // no table (its creation failed at start): the reader of before
++        Err(_) => seller_fee_with(pool, order_id, amount, order_fee).await,
++    }
++}
++
++/// [`seller_fee_of`] on the global pool, with the trade keys given by the
++/// caller: `show_hold_invoice` reads the fee BEFORE it writes them on the
++/// order (patch 0009).
++pub async fn seller_fee_for(order: &Order, buyer: &str, seller: &str) -> i64 {
+     match DB_POOL.get() {
+-        Some(pool) => seller_fee_with(pool.as_ref(), &order.id.to_string(), order.amount, order.fee).await,
++        Some(pool) => {
++            seller_fee_of(
++                pool.as_ref(),
++                &order.id.to_string(),
++                buyer,
++                seller,
++                order.amount,
++                order.fee,
++            )
++            .await
++        }
+         None => order.fee,
+     }
+ }
+ 
++/// [`seller_fee_for`] with the trade keys the order carries.
++pub async fn seller_fee(order: &Order) -> i64 {
++    let buyer = order.buyer_pubkey.clone().unwrap_or_default();
++    let seller = order.seller_pubkey.clone().unwrap_or_default();
++    seller_fee_for(order, &buyer, &seller).await
++}
++
++/// Barattolo fork (patch 0009): a taker bond has just locked and the order
++/// carries the winner's snapshot. Nothing is asked again and nothing is
++/// written — the winner's fees are the row of their own take attempt. One
++/// journal line says which numbers the trade runs on.
++pub async fn log_winner(pool: &SqlitePool, order: &Order) {
++    let buyer = order.buyer_pubkey.clone().unwrap_or_default();
++    let seller = order.seller_pubkey.clone().unwrap_or_default();
++    let order_id = order.id.to_string();
++    let fee_seller = seller_fee_of(pool, &order_id, &buyer, &seller, order.amount, order.fee).await;
++    info!(
++        "barattolo_fee: order {order_id}: bond locked, the trade runs on its winning take: amount {} fee buyer {} fee seller {fee_seller}",
++        order.amount, order.fee
++    );
++}
++
+ async fn heartbeat(url: reqwest::Url) {
+     // Log on CHANGE only: one line a minute would bury the journal, which is
+     // how the dev-fee retry loop made this node's logs unreadable.
+@@ -589,4 +754,49 @@ mod tests {
+         store(&pool, id, 100_000, 1_500, 1_500, (false, false)).await.unwrap();
+         assert_eq!(seller_fee_with(&pool, id, 100_000, 1_500).await, 1_500);
+     }
++
++    // patch 0009: a buy order, two sellers race under the bond; A
++    // (discounted) wins, B (full fee) writes AFTER A's bond locked
++    #[tokio::test]
++    async fn a_late_losing_take_never_reaches_the_winner() {
++        let pool = pool().await;
++        let id = "33333333-3333-3333-3333-333333333333";
++        let (m, a, b) = (key('1'), key('2'), key('3'));
++        store_take(&pool, id, &m, &a, 100_000, 1_500, 1_000, (false, true)).await.unwrap();
++        store_take(&pool, id, &m, &b, 100_000, 1_500, 1_500, (false, false)).await.unwrap();
++        // the per-order row is B's now: the reader of before says 1_500
++        assert_eq!(seller_fee_with(&pool, id, 100_000, 1_500).await, 1_500);
++        // the pair reader says A's own number
++        assert_eq!(seller_fee_of(&pool, id, &m, &a, 100_000, 1_500).await, 1_000);
++        // keys compare without case or blanks
++        let a_loud = format!(" {} ", a.to_uppercase());
++        assert_eq!(seller_fee_of(&pool, id, &m, &a_loud, 100_000, 1_500).await, 1_000);
++    }
++
++    #[tokio::test]
++    async fn the_pair_row_is_trusted_only_for_this_take() {
++        let pool = pool().await;
++        let id = "44444444-4444-4444-4444-444444444444";
++        let (s, c, d) = (key('4'), key('5'), key('6'));
++        store_take(&pool, id, &c, &s, 100_000, 1_000, 1_000, (true, true)).await.unwrap();
++        assert_eq!(seller_fee_of(&pool, id, &c, &s, 100_000, 1_000).await, 1_000);
++        // the order carries another buyer fee: fall back to it
++        assert_eq!(seller_fee_of(&pool, id, &c, &s, 100_000, 1_500).await, 1_500);
++        // another amount: fall back
++        assert_eq!(seller_fee_of(&pool, id, &c, &s, 90_000, 1_350).await, 1_350);
++        // a pair with no row of its own, on an order with rows of other
++        // attempts: those are not ours
++        assert_eq!(seller_fee_of(&pool, id, &d, &s, 100_000, 1_500).await, 1_500);
++    }
++
++    #[tokio::test]
++    async fn an_order_taken_before_0009_reads_the_old_row() {
++        let pool = pool().await;
++        let id = "55555555-5555-5555-5555-555555555555";
++        let (c, s) = (key('7'), key('8'));
++        store(&pool, id, 100_000, 1_500, 1_000, (false, true)).await.unwrap();
++        assert_eq!(seller_fee_of(&pool, id, &c, &s, 100_000, 1_500).await, 1_000);
++        // and with no row anywhere, upstream
++        assert_eq!(seller_fee_of(&pool, "other", &c, &s, 100_000, 1_500).await, 1_500);
++    }
+ }
+diff --git a/src/util.rs b/src/util.rs
+index 3e94bdc..90a0055 100644
+--- a/src/util.rs
++++ b/src/util.rs
+@@ -1574,7 +1574,15 @@ pub async fn show_hold_invoice(
+     // Seller pays only the order amount and their Mostro fee
+     // Dev fee is NOT charged to seller - it's paid by mostrod from its earnings
+     // Barattolo fork (patch 0005): the SELLER's fee, not `order.fee`.
+-    let new_amount = order.amount + crate::barattolo_fee::seller_fee(&order).await;
++    // Barattolo fork (patch 0009): by the two trade keys of THIS take; the
++    // order does not carry them yet (they are written further down).
++    let barattolo_fee_seller = crate::barattolo_fee::seller_fee_for(
++        &order,
++        &buyer_pubkey.to_hex(),
++        &seller_pubkey.to_hex(),
++    )
++    .await;
++    let new_amount = order.amount + barattolo_fee_seller;
+ 
+     // Now we generate the hold invoice that seller should pay
+     let (invoice_response, preimage, hash) = ln_client
+-- 
+2.55.0.windows.3
+

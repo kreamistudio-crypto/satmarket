@@ -36213,3 +36213,208 @@ foto tenuta oltre il mezzo secondo su Telegram Android, iPhone e APK
 (niente menu, niente chiusura da sola). Se si chiude a mezzo secondo,
 il tocco lungo di sistema se l'è presa: si torna a consumare il
 touchstart e si sceglie fra foto stabile e slancio.
+
+## La cauzione e la fee per parte (6 ott 2026, studio prima del lancio del 10)
+
+LA DOMANDA DI ANDREA: la nota in `deploy/mostro/barattolo_fee.rs`
+(«Not covered: the anti-abuse bond path stashes `order.fee` … this
+coordinator runs with bonds disabled. Revisit before enabling them») è
+ancora lì, e dalla `-bar6` la cauzione è ACCESA per il Contanti. Con la
+cauzione la quota per parte si calcola e si incassa giusta? `order.fee`
+si può sovrascrivere? Più persone possono correre sullo stesso ordine, e
+le commissioni in quel caso? Confronto con lo scambio vero del 1 ott
+(ordine `82231748`). Solo studio: una correzione si PROPONE per la
+`-bar7`, non si applica.
+
+**DOVE SI È LETTO.** Il tag v0.19.0 (`d53e41d`) clonato sul PC con
+`core.autocrlf=false`, in due versioni: le otto patch della `-bar6`
+(quelle del checkout di `a653320`, cioè quel che gira sul nodo) e le
+otto di origin/main (la `-bar7` in coda, con la cura 9 del 1 ott:
+albero `f9b656a`, lo stesso del verbale di quella cura). Per i casi che
+il ragionamento da solo non chiude, un modello in Python con sqlite vero
+che traduce riga per riga `barattolo_fee.rs`, le due prese,
+`promote_taker_context_to_order`, il blocco B della 0008 e
+`show_hold_invoice`.
+
+**LA NOTA È VECCHIA, IL BUCO NO.** La 0008 (parte B) se n'era già
+accorta: la 0005 scrive UNA riga per ordine in `barattolo_fees` (INSERT
+OR REPLACE) a OGNI tentativo di presa, e con la cauzione l'ultimo
+tentativo copre quello del vincitore. La sua cura: al blocco della
+cauzione rifare `apply_party_fees` per il vincitore, su una copia
+dell'ordine — cioè RIFARE LA DOMANDA AL SERVER e riscrivere la riga. La
+nota in testa al modulo non è stata aggiornata (la 0008 tocca `flow.rs`,
+non il commento).
+
+**LE QUATTRO RISPOSTE, DAL CODICE.**
+1) PIÙ PERSONE SULLO STESSO ORDINE: SÌ, è il disegno upstream
+(«concurrent bonds», `take_sell.rs`/`take_buy.rs` e `bond/flow.rs`).
+Ogni presa crea il suo bond `Requested` con la sua hold invoice e il suo
+contesto (`TakerContext`: chiave, importo, `fee`, `dev_fee`) sulla riga
+del bond, SENZA toccare l'ordine nel db. Vince il primo che PAGA la
+cauzione: un UPDATE atomico `Requested → Locked` con `NOT EXISTS` di un
+altro bond `Locked` di chi prende. Gli altri vengono rilasciati (hold
+cancellata) e avvisati. Due cancelli: una presa DOPO il blocco è
+respinta (`trade_committed_by_locked_taker_bond`), e la stessa chiave
+che riprende riceve la sua fattura di prima (nessun calcolo nuovo).
+2) LE COMMISSIONI DI CHI PERDE: ZERO. Chi perde non ha mai avuto una
+hold invoice dello scambio, solo quella della cauzione, che si cancella.
+Resta di lui una sola traccia: la riga in `barattolo_fees`, se aveva uno
+sconto — ed è questo il punto.
+3) `order.fee` SI SOVRASCRIVE UNA VOLTA, ED È VOLUTO. Alla presa
+`apply_party_fees` cambia `order.fee` solo nella copia in memoria (sotto
+cauzione l'ordine non si scrive) e il valore finisce nel bond come
+`taker_fee`. Al blocco `promote_taker_context_to_order` copia
+sull'ordine `amount`, `fee` e `dev_fee` del VINCITORE, con un
+compare-and-swap. Il blocco B della 0008 lavora su una COPIA: `order.fee`
+non lo tocca. Chi perde non arriva mai a `order.fee`. Dopo il blocco
+nessun percorso lo riscrive (solo il ritorno al libro di upstream, che
+lo azzera per i prezzi a mercato).
+4) CALCOLATA E INCASSATA GIUSTA: SÌ nel caso normale, NO in due casi
+stretti. L'incasso del nodo è hold di chi vende (`amount +
+seller_fee`, letto in `show_hold_invoice`) meno payout a chi compra
+(`amount − order.fee`, validato sulla sua fattura). La quota di CHI
+COMPRA viene sempre dal bond, cioè dalla stessa risposta del server data
+alla presa: è giusta in ogni caso. La quota di CHI VENDE si legge dalla
+riga per ordine, e la riga si può scollare.
+
+**LO SCAMBIO DEL 1 OTT, AL SATOSHI.** `82231748`, vendita da 5 € in
+Contanti, Andrea vende e Alan prende, 6.764 sats, due pionieri:
+`party_fee(6764, 0.03, 0.005) = round(0.02 × 6764 / 2) = round(67,64) =
+68` a testa. Hold di chi vende 6.832, payout 6.696, trattenuti 136,
+~134 netti dopo 1,66 di rete. Cauzione 1.000 (il pavimento: il 3% era
+203), CANCELED al rilascio. Il modello dà gli stessi numeri sulla `-bar6`
+e sulla proposta. Quello scambio prova la STRADA NORMALE: server
+raggiungibile alla presa e al blocco, un solo pretendente, due flag
+uguali. Nessuno dei due buchi qui sotto poteva vedersi.
+
+**PRIMO BUCO: LA SECONDA DOMANDA PUÒ RISPONDERE DIVERSO.** Al blocco la
+0008 richiede lo sconto. Se il server non risponde (un riavvio di
+barattolo per un deploy, il circuito Tor freddo, e dalla `-bar7`
+l'interruttore della cura 9 aperto per 60 s), `lookup` dice (no, no),
+`has_row` è vero (l'ha scritta la presa) e la riga diventa fee PIENA per
+tutt'e due. Ma `order.fee` resta quella SCONTATA del bond. `seller_fee`
+trova `fee_buyer` diversa da `order.fee` e ripiega su `order.fee`:
+CHI VENDE PAGA LA QUOTA DI CHI COMPRA. Su 100.000 sats, dal modello:
+- compratore pioniere, venditore no → il venditore paga 1.000 invece di
+  1.500 (500 regalati, l'incasso scende a 2.000);
+- venditore pioniere, compratore no → la riga piena combacia con
+  `order.fee` piena, e il venditore paga 1.500 invece di 1.000: PERDE lo
+  sconto promesso;
+- tutti e due pionieri → per caso giusto (il ripiego cade su 1.000).
+E il journal dice «discount NOT verified … full fee for both» mentre chi
+compra paga scontato: una riga che racconta il falso.
+
+**SECONDO BUCO: LA PRESA RIVALE CHE SCRIVE TARDI.** Il blocco gira nel
+task del sottoscrittore LND (`bond_invoice_subscribe` fa `tokio::spawn`),
+la presa nel ciclo dei messaggi: sono in parallelo. Una presa rivale B
+passa il cancello PRIMA che A blocchi, parte la sua domanda al server
+(circa un secondo, fino a 12), intanto A paga e la 0008 riscrive la riga
+di A; poi torna la risposta di B e la riga diventa sua. Quando legge la
+quota di chi vende:
+- su un ACQUISTO (chi prende vende) la `fee_buyer` è del maker, uguale
+  per A e B, quindi la riga di B COMBACIA e A paga la quota di B (mezzo
+  punto in più o in meno). La hold di chi vende nasce subito dopo il
+  blocco: la finestra è stretta;
+- su una VENDITA senza fattura (il caso del Contanti, come il 1 ott) la
+  hold nasce minuti dopo, quando chi compra dà la fattura, e la riga di B
+  è già lì. Se B ha un flag diverso da A, la riga non combacia e si
+  ripiega su `order.fee`: chi vende paga la quota del compratore.
+Serve che due persone prendano lo stesso ordine nello stesso secondo.
+
+**QUANTO PESA PER IL 10.** Nessuno dei due rompe uno scambio, ferma un
+pagamento o tocca chi compra. Sbagliano la quota di chi vende di
+±0,5 punti, e solo con flag diversi fra le parti. Il primo vuole un
+blocco della cauzione dentro un riavvio di barattolo; il secondo, due
+prese nello stesso secondo. Con 101 pionieri e il Contanti come unico
+metodo con la cauzione sono RARI, ma non impossibili: i deploy riavviano
+barattolo più volte al giorno. NON È UN MOTIVO PER RIMANDARE IL LANCIO.
+È un motivo per mettere la cura nella `-bar7` INSIEME alla cura 9, che
+col suo interruttore rende il primo buco PIÙ probabile (dopo tre
+fallimenti, 60 secondi di «no» istantanei, anche al blocco).
+
+**LA CURA PROPOSTA: patch 0009, in `deploy/mostro/proposte/`, NON
+APPLICATA.** Tre pezzi:
+A) una riga per TENTATIVO, per coppia di chiavi: `barattolo_fees_takes`
+(order_id, buyer, seller) accanto alla tabella di prima. La presa scrive
+lì e poi nella riga per ordine, che resta come segno «sconto già dato»
+di `has_row` e per gli ordini presi prima della 0009;
+B) la lettura per coppia: `seller_fee_of` legge la riga della coppia che
+l'ordine porta, e quella di un rivale non ci arriva mai, scriva quando
+vuole. Stessa regola di fiducia (stesso importo, stessa fee di chi
+compra). Una coppia senza riga su un ordine che ne ha di altri →
+`order.fee` (una presa senza sconti non scrive niente, le altre righe
+non sono sue). Nessuna riga per coppia → la lettura di prima.
+`show_hold_invoice` legge la fee PRIMA di scrivere le chiavi
+sull'ordine (trovato leggendo: le scrive dopo): le riceve dalla chiamata
+(`seller_fee_for`);
+C) via la rilettura della 0008: al blocco nessuna domanda e nessuna
+scrittura, solo una riga di journal coi numeri dello scambio
+(`log_winner`). `order.fee` e la riga della coppia nascono dalla STESSA
+risposta, quindi non possono più scollarsi. In più il blocco non aspetta
+più fino a 12 s di domanda prima di ripartire.
+Le chiavi si confrontano in minuscolo e senza spazi: la presa passa
+`to_hex()`, l'ordine porta `to_string()`. In nostr 0.45.1 sono lo stesso
+esadecimale (verificato sul crate: `Display` scrive `to_hex()`), e così
+un cambio domani non fa sparire la riga in silenzio. Corretta anche la
+nota in testa al modulo.
+
+**STRADE SCARTATE.**
+- Rifare la rilettura della 0008 senza la domanda, ricalcolando dai flag
+  del bond: il bond conserva solo la fee di chi compra, né i flag né la
+  fee di chi vende. Serve comunque una riga in più per tentativo, e a
+  quel punto basta leggerla.
+- Scrivere la riga per ordine solo al blocco: `apply_party_fees` non sa
+  se c'è la cauzione, e la riga per ordine serve ad `has_row` per gli
+  ordini a prezzo fisso che tornano al libro con la fee scontata.
+- Copiare la riga del vincitore nella tabella per ordine al blocco (un
+  primo disegno): una presa rivale tardiva la ricopre comunque. Serviva
+  solo all'occhio di chi interroga il db, e la riga di journal lo serve
+  meglio.
+- Chiudere la gara al cancello, un tentativo alla volta: rovescia il
+  «vince chi paga per primo» di upstream. Fuori dallo scopo.
+
+**PROVATO (sul PC, niente cargo).**
+- Il modello Python (sqlite vero, sette casi più uno): sulla `-bar6`
+  4 OK e 3 SBAGLIATI (server giù al blocco nei due versi, la rivale
+  tardiva su acquisto e su vendita; il quarto caso «tutti e due
+  pionieri» è giusto per caso ed è dentro il primo OK); con la 0009 8 su
+  8, compreso l'ordine preso sotto la `-bar6` e chiuso sotto la 0009
+  (legge la riga vecchia). Lo scambio del 1 ott esce 68/68/6.832/6.696/136
+  in tutt'e due.
+- Il patcher a secco e per davvero sul clone con le otto di origin/main:
+  8 agganci in 3 file, ancore uniche; rilanciato si ferma; il censimento
+  (nessuno chiama più `apply_party_fees` fuori dalle due prese) passa.
+  Entra a secco anche sulle otto della `-bar6`.
+- `git format-patch` e poi `git am` delle nove su un secondo clone
+  pulito: albero `d1542f5`, identico a quello del patcher. Nessuna riga
+  aggiunta oltre i 100 caratteri, tranne una stringa di log (rustfmt non
+  spezza le stringhe).
+
+**NON PROVATO, ED È LA PARTE ONESTA.** Niente è compilato. I tre test
+Rust nuovi (`a_late_losing_take_never_reaches_the_winner`,
+`the_pair_row_is_trusted_only_for_this_take`,
+`an_order_taken_before_0009_reads_the_old_row`) non sono mai girati.
+`cargo fmt --check`, `cargo build` e `cargo test barattolo_fee` sono del
+nodo, nel giro della `-bar7`. Il modello è una traduzione, non il Rust.
+La gara vera a due telefoni sullo stesso ordine non è mai stata fatta.
+
+**DA GUARDARE (Andrea, sul nodo, in sola lettura), per chiudere il
+confronto col 1 ott:**
+- le righe del 1 ott. Se il journal arriva ancora a quella mattina
+  (il container ricreato le avrebbe perse), il blocco B della 0008
+  lascia una SECONDA riga «barattolo_fee: order 82231748…: amount 6764
+  fee buyer 68 (discount true) fee seller 68 (discount true)» subito
+  dopo «Bond … locked»: `cd ~/nodo && docker compose logs --timestamps
+  --since 2026-10-01T05:45:00Z --until 2026-10-01T06:30:00Z mostro |
+  grep -E "barattolo_fee|Bond .* locked|82231748"`. Due righe = la
+  rilettura è girata e ha avuto la stessa risposta; una sola = guardare
+  perché;
+- la riga e il bond nel db: `sqlite3 -readonly -header -column
+  ~/nodo/mostro/mostro.db "SELECT o.id, o.amount, o.fee, f.fee_buyer,
+  f.fee_seller, f.discount_buyer, f.discount_seller FROM orders o LEFT
+  JOIN barattolo_fees f ON f.order_id = o.id WHERE o.id LIKE
+  '82231748%'; SELECT role, state, amount_sats, taker_amount, taker_fee
+  FROM bonds WHERE order_id LIKE '82231748%';"`. Attesi: 6764 / 68 / 68
+  / 68 / 1 / 1, e un bond `taker` da 1000 con `taker_fee` 68.
+La decisione resta di Andrea: se la 0009 entra nella `-bar7`, e se la
+`-bar7` si fa prima o dopo il 10.
