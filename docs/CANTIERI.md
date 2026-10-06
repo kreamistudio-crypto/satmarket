@@ -35748,3 +35748,29 @@ SEMPRE (delivered, released, dispute, refunded), e i no (non
 venditore, prima della spedizione, consegna a mano, ritiro,
 sentinella, vuoti, doppione). Tre banchi vecchi hanno avuto la
 tabella nuova o il gemello di `filaTracking`. Non provato dal vivo.
+
+## La porta Nostr del foglio account che non apriva niente (6 ott 2026)
+
+Il compito (Andrea, dall'APK di Zapstore): «il login multiaccount non
+funziona, premendo su Telegram o su Nostr non accade nulla».
+
+**La metà Nostr, trovata e provata in Chromium** (server vero in
+collaudo, login di collaudo, Profilo, secondo tocco sul tappo, foglio
+«I tuoi account», «…o entra con Nostr»): a 0,2 s erano chiusi TUTTI E
+DUE i fogli. La porta faceva `navIndietro(); apriNostrSheet()`, e
+navIndietro è un `history.back()` ASINCRONO: il popstate arriva dopo
+che il foglio Nostr è già aperto, e `navApplica` smonta gli strati fino
+alla vista, foglio nuovo compreso. Cura: `closeSheet(); apriNostrSheet()`,
+la strada già usata dalla seconda porta del foglio invito. Rifatto lo
+stesso giro: il foglio Nostr resta aperto (0,2 / 0,8 / 2 s), e sul
+codice di prima, stesso clic, no. Una sentinella in `prove_portachiavi`.
+
+**La metà Telegram NON è curata qui.** Nell'APK (TWA) il Login Widget
+apre un popup verso oauth.telegram.org, e la TWA lo apre fuori
+dall'app: il ritorno non arriva alla pagina. ARCHITETTURA lo dava già
+per «da verificare in produzione, il popup callback è fragile». In
+più, anche in un browser normale, il widget rientra con l'account
+Telegram già collegato a oauth.telegram.org: per aggiungerne un SECONDO
+bisogna prima uscire da lì. Non provato dal vivo (serve Telegram vero):
+la strada proposta ad Andrea è un login dal bot (link monouso), da
+decidere.

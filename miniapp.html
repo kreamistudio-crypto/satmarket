@@ -44816,7 +44816,13 @@ function montaPorteAccount(dai){
   const n = document.createElement('button');
   n.className = 'btn ghost';
   n.innerHTML = etichettaNostr('…o entra con Nostr');
-  n.onclick = () => { navIndietro(); apriNostrSheet(); };
+  /* closeSheet E NON navIndietro (6 ott 2026, dal campo: «premo e non
+     succede nulla»): navIndietro e' un history.back(), cioe' ASINCRONO —
+     il popstate arriva DOPO che apriNostrSheet ha gia' aperto il foglio,
+     e navApplica smonta gli strati fino alla vista, foglio nuovo
+     compreso. Visto in Chromium: a 0,2 s erano gia' chiusi tutti e due.
+     La strada e' quella della seconda porta del foglio invito. */
+  n.onclick = () => { closeSheet(); apriNostrSheet(); };
   porte.appendChild(n);
 }
 

@@ -95674,6 +95674,15 @@ def prove_portachiavi():
     prova("...e si consuma col timbro degli hint", True,
           "hintDismesso('duetocchi')" in acc
           and "timbraVisto('duetocchi');" in acc)
+    # LA PORTA NOSTR DEL FOGLIO (6 ott 2026, dal campo dall'APK: «premo
+    # e non succede nulla»). navIndietro e' un history.back() ASINCRONO:
+    # il popstate arrivava dopo apriNostrSheet e navApplica smontava
+    # anche il foglio nuovo. Visto in Chromium prima e dopo la cura.
+    porte = _fetta(mini, "function montaPorteAccount(dai){", 3200)
+    prova("la porta Nostr del foglio account chiude in modo SINCRONO "
+          "prima di aprire il login", (True, False),
+          ("closeSheet(); apriNostrSheet();" in porte,
+           "navIndietro(); apriNostrSheet();" in porte))
 
 
 def _fetta(testo, ancora, quanti=1400):
