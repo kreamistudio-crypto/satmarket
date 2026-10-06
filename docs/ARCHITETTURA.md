@@ -28837,7 +28837,7 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    `/assets/carrello/{nome}` (l'icona del carrello salvato in
    «Esplora per categorie», 6 ott 2026: un disegno in quattro misure,
    84/168/252 px WebP — l'1x, il 2x e il 3x della card da 84 — e 320,
-   il 2x della card da 160 del sito da computer; 2-14 KB, whitelist a
+   il 2x della card da 160 del sito da computer; 2-15 KB, whitelist a
    tupla `FILE_CARRELLO`,
    cartella sua e mai assets/categorie/ — fondo pieno; gli URL
    letterali li timbra `_timbra_asset_pagina`, quindi max-age di un

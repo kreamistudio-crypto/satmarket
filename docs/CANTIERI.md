@@ -37859,3 +37859,22 @@ disegno a densità 3, il pallino leggibile, il filo di sera. Di sera il
 filo della card somiglia all'anello di «Tutto» acceso accanto: l'anello
 è più spesso e staccato, il filo aderente — da guardare sulla pagina
 vera se confonde.
+
+## La foto nuova dell'icona del carrello (6 ott 2026, sera, Andrea ha cambiato idea)
+
+Dopo il push di 168d06c Andrea ha mandato un'altra foto dello stesso
+carrello — stessi oggetti (la scatola, la tazza blu, la pianta, i libri),
+inquadratura più di tre quarti e l'alone arancio più largo — «migliore
+per me rispetto alla prima». Cambiano SOLO i quattro file: stesso metodo,
+stessi nomi, stesse misure. Ritaglio quadrato di 1500 px attorno al
+carrello (206,326 → 1706,1826 sul 2000×2000: il primo tentativo a
+1450 px centrato a occhio tagliava il cestello a destra e le ruote in
+basso, e si è ricentrato sul riquadro misurato del metallo), WebP a
+qualità 82: 84, 168, 252 e 320 px, 2, 5, 10 e 15 KB. Il timbro `?v=`
+segue il contenuto del file, quindi chi ha in cache la foto di prima
+prende la nuova alla prima pagina. La seconda foto, come la prima, non
+è nel repo.
+
+**PROVATO.** prove_carrello_salvato (80: i quattro file, le misure, il
+tetto dei KB) e le sezioni della fila; scatti della fila a 375 e 320 px,
+chiaro e scuro, mandati ad Andrea.
