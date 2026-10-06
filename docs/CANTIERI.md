@@ -36013,3 +36013,73 @@ del mouse; scatti nei due temi.
 **DA GUARDARE.** Sul telefono: il lampo del tocco breve (se dà
 fastidio, la leva è un'apertura a 60-80ms, non il timer di prima) e lo
 scorrimento della fila senza inerzia.
+
+## La guardia oraria dell'entrata ACINQ e la copertura della Cassaforte (6 ott 2026)
+
+Il compito (Andrea), dallo studio dell'instradamento: la tariffa del
+solo canale LNBiG, un giro su noi stessi da ACINQ a LNBiG, la ronda
+della liquidità con `SOGLIA_ACINQ` a 300.000, la guardia ACINQ ogni
+ora, e come provare l'avviso «Pagamenti non arrivati» senza disturbare.
+
+**Fatto sul nodo da Andrea (comandi miei, eseguiti da lui).** LNBiG a 1
+sat + 2.500 ppm, `cltv` 80, gli altri a 1 sat + 500 ppm: verificato con
+`feereport` e con la politica NOSTRA letta da `getchaninfo`. Il giro
+NON è stato fatto, ed è la decisione: rilette Cassaforte (1.066.724,
+quasi il doppio del 5 ott) e canali, l'uscita ACINQ (1.165.235) copriva
+il debito più Alan con 70.534 di margine, quindi al massimo un giro da
+65.000 invece dei 350.000 dello studio. L'entrata ACINQ torna coi
+payout, sats per sats e senza commissioni; per allargarla davvero ci
+vorrà un canale ACINQ nuovo con sats freschi (da studiare).
+
+**Il conto del debito, e la trappola.** `capitale_cassa.py` dice 277.200
+di capitale sul nodo, ma 265.000 sono lo sweep del 1 ott: il deposito del
+#152 restituito dal SaaS dopo che il nodo aveva già pagato il venditore
+(247.707). Nostro al più 18.493; il margine MISURATO il 1 ott era 12.475,
+e si usa quello: debito ≈ saldo − 12.475.
+
+**La ronda.** Tre cose nuove in `ronda-liquidita.sh`:
+- `SOGLIA_ACINQ` a 300.000 di default;
+- la COPERTURA: `USCITA_ACINQ_MIN`, il giro suggerito più la sua
+  commissione massima non scende mai sotto quel numero, e lo stesso tetto
+  vale per lo swap. Vuota = nessun importo. Prima la ronda avrebbe
+  suggerito 300.000 il giorno in cui il margine era 70.000;
+- `--acinq`, la guardia oraria (timer ai :40), che fa solo la terza
+  domanda e avvisa una volta ogni 6 ore. Il timbro è condiviso con la
+  ronda intera, e si toglie quando l'entrata risale; anche l'allarme
+  «lncli non risponde» della guardia ha la sua pausa.
+Le leve sul nodo in `/etc/default/ronda-liquidita`, lette per nome e
+solo cifre.
+
+**Strade scartate.** `source` del file delle leve (codice eseguito da
+root); `Environment=` nell'unit (varrebbe solo per il timer, e la
+`--prova` a mano mentirebbe); leggere la Cassaforte dal nodo (LNbits sta
+sul VPS, e il ponte va dal VPS al nodo, non al contrario); una leva
+vuota che vale zero (suggerirebbe giri che scoprono i venditori); far
+tacere la ronda intera durante la pausa (è il quadro del giorno);
+`Persistent` sul timer orario.
+
+**Provato.** `prove_pagamenti_non_arrivati`, 65 verdi: il Python vero
+dello script su canali di cartone, coi numeri veri del 6 ott (il giro si
+ferma a 70.000 con commissione 210); la leva vuota; la copertura senza
+spazio; il bordo della commissione minima; l'invariante su 60 stati; la
+guardia oraria (tace, timbra, tace l'ora dopo, riparla dopo sei ore,
+toglie il timbro, il timbro scritto dalla ronda intera); le unit.
+Tortura 14 su 14: al primo giro 13, perché «la commissione dimenticata
+nel margine» sopravviveva, ed è servito il caso al bordo. Il parser delle
+leve provato col bash vero: l'ambiente vince, un `; touch` e un `$(id)`
+non passano, `PATH` si ignora.
+
+**Il punto 6 (il backup del 6 ott).** Lo SCB vivo ha i tre canali
+(LNBiG compreso) ed è del 5 ott alle 16:50 UTC, prima delle 03:30;
+l'archivio è nato («backup ok») ed è sul PC (`storico.log` ok).
+L'impronta dentro l'archivio NON è confrontata: Andrea non mette la
+chiave age del nodo in un file sul PC, si fa alla prossima prova di
+ripristino completa. Un errore mio strada facendo: `lncli` stampa i
+`funding_txid_bytes` in esadecimale e io li decodificavo in base64
+(i prefissi giusti si ottengono con `bytes.fromhex(x)[::-1].hex()`).
+
+**Da guardare.** L'installazione e la prova a vuoto sul nodo (verbale
+nello studio). La prova dell'avviso «Pagamenti non arrivati» su
+Telegram vero (la ricetta sta in PRODUZIONE). `USCITA_ACINQ_MIN` va
+riscritta a mano: se la Cassaforte cresce e la leva resta indietro, il
+giro suggerito torna a mentire. Lo dice il messaggio stesso.

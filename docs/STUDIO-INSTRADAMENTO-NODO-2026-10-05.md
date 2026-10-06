@@ -275,9 +275,55 @@ una strada.
 - Che `030936e7` sia WoS: deduzione. La prova è leggere la destinazione
   di una fattura chiesta a un indirizzo `walletofsatoshi.com`.
 - La Cassaforte a 609.880 è il dato del 5 ott: va riletta prima del
-  ribilanciamento.
-- NON provati: il giro su noi stessi sul nostro LND, la tariffa a
-  2.500 ppm, un `connect` verso Spark da un exit Tor.
+  ribilanciamento. (Riletta il 6 ott: 1.066.724, §9.)
+- NON provati: il giro su noi stessi sul nostro LND, un `connect`
+  verso Spark da un exit Tor. (La tariffa a 2.500 ppm è stata messa il
+  6 ott, §9: resta da misurare se il ponte si ferma.)
+
+## 9. Cosa è stato fatto il 6 ott
+
+I comandi li ho scritti io, uno alla volta; li ha eseguiti Andrea.
+
+**La tariffa: fatta.** `updatechanpolicy` sul solo `chan_point` di
+LNBiG, `failed_updates []`. Riletta: LNBiG 1 sat + **2.500 ppm**, i due
+ACINQ 1 sat + 500 ppm, `cltv` 80 su tutti e tre (la politica NOSTRA,
+da `getchaninfo`). Il residuo del vecchio Magma compare ancora nel
+`feereport` a 1 ppm: è chiuso (`closedchannels`, letto il 5 ott).
+
+**Il giro: NON fatto, per decisione di Andrea.** I numeri del 6 ott:
+
+| Canale | Uscita utile | Entrata utile |
+|---|---|---|
+| LNBiG | 71.703 | 4.827.352 |
+| ACINQ 400k | 391.056 | 0 |
+| ACINQ 1M | 774.179 | 204.876 |
+
+La Cassaforte nodo era a **1.066.724**, non più a 609.880. Il debito
+verso i venditori è il saldo meno il margine nostro misurato il 1 ott
+(12.475), cioè ~1.054.249; più i 40.452 di Alan fa 1.094.701 da coprire
+con l'uscita ACINQ (1.165.235). Margine 70.534: al più un giro da
+65.000, non da 350.000. Il capitale di `capitale_cassa.py` (277.200)
+non allarga il conto: 265.000 sono lo sweep del #152, già uscito col
+suo payout. L'entrata ACINQ torna coi payout degli ordini aperti; per
+allargarla davvero serve un canale ACINQ nuovo con sats freschi (da
+studiare quando servirà). Lezione per il §6: la ricetta dei 350.000
+valeva per la Cassaforte di quel giorno; un giro si calcola sempre sulla
+Cassaforte riletta.
+
+**La ronda: soglia ACINQ a 300.000, copertura, guardia oraria.** Il
+codice e il perché stanno in CANTIERI («La guardia oraria dell'entrata
+ACINQ e la copertura della Cassaforte»), la procedura in PRODUZIONE.
+Installazione e prova a vuoto sul nodo: verbale qui sotto quando fatte.
+
+**Il backup del 6 ott: provato in parte.** Lo SCB vivo
+(`/home/debian/nodo/lnd/data/chain/bitcoin/mainnet/channel.backup`,
+2.027 byte) ha i tre canali, LNBiG compreso, ed è stato scritto il 5 ott
+alle 16:50 UTC, prima del backup delle 03:30. Il journal dice «backup
+ok» alle 03:30:15. `nodo-20261006-0330.tgz.age` (31.003.274 byte) è
+arrivato sul PC alle 05:30 ora italiana; `storico.log` dice ok. NON
+confrontata l'impronta dello SCB dentro l'archivio: Andrea non mette la
+chiave age del nodo in un file sul PC, e si fa alla prossima prova di
+ripristino completa.
 
 ## Appendice: i comandi per rimisurare
 

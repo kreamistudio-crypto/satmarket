@@ -467,6 +467,59 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Il gemello su Barattolo («Pagamenti non arrivati» ai moderatori, due
   fatture di checkout scadute nella stessa ora) non vuole leve: parte
   col deploy.
+- LA GUARDIA ORARIA DELL'ENTRATA ACINQ E LA COPERTURA DELLA CASSAFORTE
+  (6 ott 2026): `ronda-liquidita.sh --acinq`, timer
+  `nodo-liquidita-acinq` ai :40 di ogni ora (copie delle due unit in
+  `deploy/nodo/`). Fa solo la terza domanda; tace se va bene; sotto
+  `SOGLIA_ACINQ` (ora **300.000** di default) avvisa una volta ogni
+  `PAUSA_ACINQ_S` (6 ore), col timbro in `/var/lib/ronda/acinq_avvisato`
+  che scrive anche la ronda intera quando avvisa lei e che si toglie
+  quando l'entrata risale. LE LEVE stanno in `/etc/default/ronda-liquidita`,
+  righe `NOME=numero`, e valgono anche per chi lancia la ronda a mano;
+  lo script NON fa `source` (gira da root): legge solo
+  `SOGLIA_IN SOGLIA_ACINQ PEZZO_MAX USCITA_ACINQ_MIN PAUSA_ACINQ_S`, solo cifre.
+  `USCITA_ACINQ_MIN` = quanto deve restare d'uscita ACINQ dopo un giro:
+  il debito della Cassaforte nodo verso i venditori più i sats di Alan.
+  Il nodo non lo sa leggere (LNbits sta sul VPS): si aggiorna A MANO
+  ogni volta che si legge la Cassaforte, e sempre prima di seguire un
+  ribilancio suggerito. Vuota = nessun importo; sotto i 10.000 di spazio
+  = «la copertura non lascia spazio», niente giro e niente swap.
+  Il debito si conta così (6 ott 2026): saldo della Cassaforte meno il
+  margine nostro misurato il 1 ott (12.475). Il capitale di
+  `capitale_cassa.py` NON si toglie intero: 265.000 sono lo sweep del #152,
+  già uscito col suo payout.
+  INSTALLAZIONE, dal PC in PowerShell, dopo il push:
+  `git -C C:\Users\Andrea\Documents\GitHub\satmarket fetch origin`
+  `foreach ($f in 'ronda-liquidita.sh','nodo-liquidita-acinq.service','nodo-liquidita-acinq.timer') { cmd /c "git -C C:\Users\Andrea\Documents\GitHub\satmarket show origin/main:deploy/nodo/$f > %TEMP%\$f"; "$f " + (Get-FileHash $env:TEMP\$f).Hash.ToLower() }`
+  `scp -i $env:USERPROFILE\.ssh\lnvps $env:TEMP\ronda-liquidita.sh $env:TEMP\nodo-liquidita-acinq.service $env:TEMP\nodo-liquidita-acinq.timer debian@vm-1937.lnvps.cloud:/tmp/`
+  Sul nodo: `cd /tmp && sed -i 's/\r$//' ronda-liquidita.sh nodo-liquidita-acinq.* && sha256sum ronda-liquidita.sh nodo-liquidita-acinq.* && bash -n ronda-liquidita.sh && echo sintassi ok`
+  (stesse cifre del PC); `diff /usr/local/bin/ronda-liquidita.sh /tmp/ronda-liquidita.sh | grep '^<'`
+  (le righe che se ne vanno: soglia, commenti, il ribilancio vecchio);
+  `sudo cp /usr/local/bin/ronda-liquidita.sh /root/ronda-liquidita.sh.prima-6ott`;
+  `printf 'USCITA_ACINQ_MIN=<debito + Alan>\n' | sudo tee /etc/default/ronda-liquidita`;
+  `sudo install -m 755 /tmp/ronda-liquidita.sh /usr/local/bin/`;
+  `sudo /usr/local/bin/ronda-liquidita.sh --prova` (quadro con
+  `acinq_out` e `copertura=`, anche su Telegram); poi le unit:
+  `sudo install -m 644 /tmp/nodo-liquidita-acinq.service /tmp/nodo-liquidita-acinq.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now nodo-liquidita-acinq.timer`,
+  e la guardia a mano: `sudo /usr/local/bin/ronda-liquidita.sh --acinq; echo rc=$?`.
+  Ritorno indietro: `sudo systemctl disable --now nodo-liquidita-acinq.timer`
+  e `sudo install -m 755 /root/ronda-liquidita.sh.prima-6ott /usr/local/bin/ronda-liquidita.sh`
+  (il file delle leve si può lasciare: la versione vecchia non lo legge).
+  LA PROVA DELL'AVVISO «PAGAMENTI NON ARRIVATI» SU TELEGRAM VERO:
+  avvisa SOLO i moderatori (`notifica_admin`); un ordine creato non
+  avvisa nessuno, ma tiene impegnata la quantità per i 15 minuti della
+  fattura. Da un account compratore, su un annuncio NOSTRO con
+  quantità 2 o più (o due annunci nostri), due «🔒 Compra in sicurezza»
+  a pochi minuti l'uno dall'altro, senza pagare e senza annullare:
+  l'annullo non conta. Fra 15 e 25 minuti dopo il secondo (la fattura
+  vive 900 secondi, il giro è ogni ~10 minuti) arriva «⚠️ Pagamenti non
+  arrivati, controllare la liquidità.» con i due ordini, e nel journal
+  la riga «⚠️ Pagamenti non arrivati: avvisati i moderatori». Il costo:
+  la pausa di 6 ore parte da lì, e un avviso vero in quelle ore tace.
+  Si fa con la guardia oraria del nodo già accesa (copre la causa
+  prima), mai il giorno del lancio, e senza toccare il database.
+  Il P2P (garanzia mai pagata) non si usa per la prova: c'è di mezzo
+  una controparte.
 - LA QUINTA DOMANDA DELLA RONDA, OGNI GIORNO: `ronda-tor.sh` +
   `nodo-tor.timer` (09:20 UTC, Persistent), copie in `deploy/nodo/`.
   Tre giudici dal namespace di mostro: la curl a check.torproject.org

@@ -2440,9 +2440,9 @@ def prove_pagamenti_non_arrivati():
     prova("ronda: nessun esadecimale da 64 nello script (la CI)", None,
           re.search(r"[0-9a-fA-F]{64}", sh))
     pref = re.search(r"PREFISSO_ACINQ=\$\{PREFISSO_ACINQ:-([0-9a-f]+)\}", sh)
-    prova("ronda: ACINQ per prefisso, la soglia a 150.000", ("03864ef025fde8fb",
-          True), (pref and pref.group(1),
-                  "SOGLIA_ACINQ=${SOGLIA_ACINQ:-150000}" in sh))
+    prova("ronda: ACINQ per prefisso, la soglia a 300.000 (6 ott 2026)",
+          ("03864ef025fde8fb", True), (pref and pref.group(1),
+                                       "SOGLIA_ACINQ=${SOGLIA_ACINQ:-300000}" in sh))
     prova("ronda: le tre leve arrivano al Python", True,
           'PREFISSO_ACINQ="$PREFISSO_ACINQ" SOGLIA_ACINQ="$SOGLIA_ACINQ" '
           'PEZZO_MAX="$PEZZO_MAX"' in sh)
@@ -2457,8 +2457,8 @@ def prove_pagamenti_non_arrivati():
                 "local_constraints": {"chan_reserve_sat": str(ris)},
                 "remote_constraints": {"chan_reserve_sat": str(ris)}}
 
-    def ronda(canali, modo="", **leve):
-        d = tempfile.mkdtemp(prefix="liq-")
+    def ronda(canali, modo="", cartella=None, **leve):
+        d = cartella or tempfile.mkdtemp(prefix="liq-")
         with open(os.path.join(d, "ch.json"), "w") as f:
             json.dump({"channels": canali}, f)
         with open(os.path.join(d, "info.json"), "w") as f:
@@ -2471,6 +2471,8 @@ def prove_pagamenti_non_arrivati():
                    MODO=modo, SOGLIA_IN="500000", TMPD=d, GIORNI_LEASE="14",
                    BLOCCHI_THAW="1008", PREFISSO_ACINQ=pref.group(1),
                    SOGLIA_ACINQ="150000", PEZZO_MAX="300000",
+                   USCITA_ACINQ_MIN="0", PAUSA_ACINQ_S="21600",
+                   TIMBRO_ACINQ=os.path.join(d, "timbro"),
                    PYTHONIOENCODING="utf-8")
         env.update(leve)
         r = subprocess.run([sys.executable, "-"], input=py, env=env,
@@ -2524,6 +2526,121 @@ def prove_pagamenti_non_arrivati():
     prova("senza spazio per il giro su noi stessi: lo swap dal canale ACINQ",
           (9, True, False), (rc, "il giro su noi stessi non ha spazio" in out,
                              "addinvoice" in out))
+
+
+    # --- 6 ott 2026: la copertura della Cassaforte e la guardia oraria ---
+    prova("leve dal file: niente source (gira da root), solo i nomi "
+          "dell'elenco e solo cifre, l'ambiente vince", (None, True, True, True),
+          (re.search(r"^\s*(\.|source)\s+\"?\$LEVE", sh, re.M),
+           'done < "$LEVE"' in sh,
+           "SOGLIA_IN|SOGLIA_ACINQ|PEZZO_MAX|USCITA_ACINQ_MIN|PAUSA_ACINQ_S)" in sh
+           and "''|*[!0-9]*) continue;;" in sh,
+           '[ -z "${!k:-}" ] && export "$k=$v"' in sh))
+    prova("le tre leve nuove arrivano al Python", True,
+          'USCITA_ACINQ_MIN="$USCITA_ACINQ_MIN" PAUSA_ACINQ_S="$PAUSA_ACINQ_S"' in sh
+          and 'TIMBRO_ACINQ="$TIMBRO_ACINQ"' in sh
+          and "USCITA_ACINQ_MIN=${USCITA_ACINQ_MIN:-}" in sh)
+    # il 6 ott, misurati: Cassaforte 1.066.724 meno i 12.475 nostri, piu'
+    # i 40.452 di Alan = 1.094.701 da coprire con l'uscita ACINQ
+    sei = [canale("c1:0", PK_ACINQ, 400000, 395056, 4000, 4000, cid="101"),
+           canale("c2:0", PK_ACINQ, 1000000, 784179, 214876, 10000, cid="102"),
+           canale("c3:0", PK_LNBIG, 5000000, 121703, 4877352, 50000, cid="103")]
+    rc, out = ronda(sei, SOGLIA_ACINQ="300000", USCITA_ACINQ_MIN="1094701")
+    prova("il 6 ott: il giro si ferma alla copertura (70.000, non 300.000)",
+          (9, True, True, False), (rc, "addinvoice --amt 70000 " in out,
+                                   "--fee_limit 210 " in out,
+                                   "addinvoice --amt 300000" in out))
+    prova("...e il quadro dice uscita ACINQ e copertura", True,
+          "acinq_in=204876  acinq_out=1165235  copertura=1094701" in out)
+    rc, out = ronda(sei, SOGLIA_ACINQ="300000", USCITA_ACINQ_MIN="")
+    prova("copertura NON scritta: allarme sì, importo no", (9, True, False),
+          (rc, "USCITA_ACINQ_MIN non e' scritta" in out, "addinvoice" in out))
+    rc, out = ronda(sei, SOGLIA_ACINQ="300000", USCITA_ACINQ_MIN="1160000")
+    prova("copertura senza spazio: niente giro e niente swap dal canale ACINQ",
+          (9, True, False, False), (rc, "la copertura non lascia spazio" in out,
+                                    "addinvoice" in out, "swap in uscita" in out))
+    # L'INVARIANTE, su una griglia di stati: ogni importo suggerito, piu'
+    # la sua commissione massima, lascia l'uscita ACINQ sopra la leva
+    rotte = []
+    for loc1 in (40000, 200000, 395056):
+        for loc2 in (100000, 500000, 784179, 990000):
+            for minimo in (0, 300000, 700000, 1000000, 1150000):
+                st = [canale("c1:0", PK_ACINQ, 400000, loc1, 400000 - loc1, 4000, cid="101"),
+                      canale("c2:0", PK_ACINQ, 1000000, loc2, 1000000 - loc2, 10000, cid="102"),
+                      sei[2]]
+                rc, out = ronda(st, SOGLIA_ACINQ="900000", USCITA_ACINQ_MIN=str(minimo))
+                m = re.search(r"addinvoice --amt (\d+) .*?--fee_limit (\d+)", out, re.S)
+                if m:
+                    usc = max(0, loc1 - 4000) + max(0, loc2 - 10000)
+                    if usc - int(m.group(1)) - int(m.group(2)) < minimo:
+                        rotte.append((loc1, loc2, minimo, m.groups()))
+    prova("l'invariante della copertura regge su 60 stati", [], rotte)
+    # AL BORDO conta il minimo dei 50 sats: con 10.030 di margine un giro
+    # da 10.000 (+50) scoprirebbe i venditori di 20, quindi niente giro
+    rc, out = ronda(sei, SOGLIA_ACINQ="300000", USCITA_ACINQ_MIN=str(1165235 - 10030))
+    prova("al bordo: la commissione minima esce dal margine", (9, False, True),
+          (rc, "addinvoice" in out, "la copertura non lascia spazio" in out))
+
+    # la guardia oraria: solo la terza domanda, e una volta ogni pausa
+    prova("--acinq: il piede dice la pausa, l'allarme di lncli non si "
+          "ripete ogni ora", True,
+          '[ "$MODO" = --acinq ] && [ "$RC" = 9 ]' in sh
+          and "-mmin -$((PAUSA_ACINQ_S / 60))" in sh
+          and '[ "$MODO" = --acinq ] && touch "$TIMBRO_LNCLI"' in sh)
+    d = tempfile.mkdtemp(prefix="liq-oraria-")
+    timbro = os.path.join(d, "timbro")
+    scaduto = os.path.join(d, "lease")
+    with open(scaduto, "w") as f:
+        f.write(f"{PK_LNBIG} 2020-01-01 vecchio\n")
+    # l'inbound totale sotto soglia lo fa la leva: 5,5M di entrata < 9M
+    rc, out = ronda(sani, "--acinq", cartella=d, NOTI=os.path.join(d, "manca"),
+                    LEASE=scaduto, SOGLIA_IN="9000000")
+    prova("--acinq con ACINQ sano tace, anche senza baseline, con l'inbound "
+          "totale basso e un lease scaduto", (0, True), (rc, out.startswith("acinq ok")))
+    rc, out = ronda(sani, cartella=d, NOTI=os.path.join(d, "manca"), LEASE=scaduto,
+                    SOGLIA_IN="9000000")
+    prova("...che la ronda intera invece dice tutti", (9, True, True, True),
+          (rc, "nessuna baseline" in out, "inbound a" in out, "SCADUTO" in out))
+    rc, out = ronda(sei, "--acinq", cartella=d, SOGLIA_ACINQ="300000",
+                    USCITA_ACINQ_MIN="1094701")
+    prova("--acinq sotto soglia: avvisa, col giro coperto, e timbra",
+          (9, True, True, True), (rc, out.startswith("ALLARME LIQUIDITA (guardia oraria ACINQ)"),
+                                  "addinvoice --amt 70000 " in out, os.path.exists(timbro)))
+    rc, out = ronda(sei, "--acinq", cartella=d, SOGLIA_ACINQ="300000",
+                    USCITA_ACINQ_MIN="1094701")
+    prova("...l'ora dopo tace (gia' avvisato)", (0, True),
+          (rc, out.startswith("acinq ancora sotto soglia, gia' avvisato")))
+    vecchio = time.time() - 7 * 3600
+    os.utime(timbro, (vecchio, vecchio))
+    rc, out = ronda(sei, "--acinq", cartella=d, SOGLIA_ACINQ="300000",
+                    USCITA_ACINQ_MIN="1094701")
+    prova("...passate sei ore riparla", 9, rc)
+    rc, out = ronda(sei, "--acinq", cartella=d, SOGLIA_ACINQ="200000",
+                    USCITA_ACINQ_MIN="1094701")
+    prova("entrata risalita sopra soglia: tace e toglie il timbro",
+          (0, False), (rc, os.path.exists(timbro)))
+    rc, out = ronda(sei, "--acinq", cartella=d, SOGLIA_ACINQ="300000",
+                    USCITA_ACINQ_MIN="1094701")
+    prova("...e il calo dopo parla subito", 9, rc)
+    os.remove(timbro)
+    rc, out = ronda(sei, cartella=d, SOGLIA_ACINQ="300000", USCITA_ACINQ_MIN="1094701")
+    prova("la ronda intera che avvisa dell'ACINQ timbra anche lei", (9, True),
+          (rc, os.path.exists(timbro)))
+    rc, out = ronda(sei, "--acinq", cartella=d, SOGLIA_ACINQ="300000",
+                    USCITA_ACINQ_MIN="1094701")
+    prova("...cosi' la guardia dell'ora dopo non ripete", 0, rc)
+    rc, out = ronda(sei, cartella=d, SOGLIA_ACINQ="300000", USCITA_ACINQ_MIN="1094701")
+    prova("...e la ronda intera parla lo stesso: e' il quadro del giorno", 9, rc)
+
+    # le due unit della guardia oraria, copie in deploy/nodo/
+    srv = open(os.path.join(QUI, "deploy", "nodo", "nodo-liquidita-acinq.service"),
+               encoding="utf-8").read()
+    tim = open(os.path.join(QUI, "deploy", "nodo", "nodo-liquidita-acinq.timer"),
+               encoding="utf-8").read()
+    prova("unit: la guardia oraria lancia --acinq, ogni ora ai :40 (fuori "
+          "dalle 09:10 della ronda e dalle 09:20 di tor)", (True, True, True),
+          ("ExecStart=/usr/local/bin/ronda-liquidita.sh --acinq" in srv,
+           "OnCalendar=*-*-* *:40:00 UTC" in tim, "WantedBy=timers.target" in tim))
 
 
 def prove_ritiro():

@@ -1,0 +1,12 @@
+# nodo-liquidita-acinq.service — il lavoro che nodo-liquidita-acinq.timer
+# lancia: la sola entrata ACINQ, con la pausa fra un avviso e l'altro.
+# Le leve le legge lo script da /etc/default/ronda-liquidita.
+# Copia in deploy/nodo/; sul nodo sta in /etc/systemd/system/.
+[Unit]
+Description=Guardia oraria: Phoenix ci puo' pagare? (entrata ACINQ)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ronda-liquidita.sh --acinq

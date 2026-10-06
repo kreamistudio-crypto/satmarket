@@ -1,0 +1,14 @@
+# nodo-liquidita-acinq.timer — la guardia oraria dell'entrata ACINQ
+# (6 ott 2026): gli inoltri la spostano in ore, la ronda intera guarda
+# una volta al giorno. Ai :40 di ogni ora, lontano dalle 09:10 della
+# liquidita' e dalle 09:20 di tor. Niente Persistent: un'ora persa a
+# macchina spenta non si recupera, arriva la prossima.
+# Copia in deploy/nodo/; sul nodo sta in /etc/systemd/system/.
+[Unit]
+Description=Guardia oraria: entrata ACINQ
+
+[Timer]
+OnCalendar=*-*-* *:40:00 UTC
+
+[Install]
+WantedBy=timers.target
