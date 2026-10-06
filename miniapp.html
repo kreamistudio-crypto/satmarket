@@ -4899,6 +4899,14 @@
   .tema-pill{font:inherit;font-size:12.5px;font-weight:700;border:1px solid var(--line);
     background:transparent;color:var(--muted);border-radius:99px;padding:5px 12px;cursor:pointer}
   .tema-pill.active{border-color:var(--sats);background:var(--sats);color:#fff}
+  /* «Compro» e «Vendo» del filtro di «I miei scambi» (6 ott 2026): la
+     scelta attiva veste le leve dei bottoni «Pubblica ordine», verde e
+     rosso coi loro inchiostri (le scritte reggono l'AA come la'). Dopo
+     `.active` apposta: stessa specificita', vince l'ordine. */
+  .tema-pill.p2p-verso-compro.active{background:var(--b-ok-bg);
+    border-color:var(--b-ok-line);color:var(--b-ok-fg)}
+  .tema-pill.p2p-verso-vendo.active{background:var(--b-rosso-bg);
+    border-color:var(--b-rosso-line);color:var(--b-rosso-fg)}
   /* ══ LA PILLOLA COL MARCHIO (16 set 2026) ══
      Stesso trattamento della scatola dei metodi nella card: la pillola
      si riempie di navy e il marchio ci sta NUDO — il fondo scuro glielo
@@ -49674,7 +49682,7 @@ function renderP2P(){
     + icoOrdinaP2P() + '<span class="cs-val">'
     + esc(etichettaOrdineMieiP2P(ordMiei)) + '</span></button>'
     + '<button type="button" class="p2p-filtro'
-    + (filtroAccesoMieiP2P(p2pMieiFiltro) ? ' acceso' : '')
+    + (filtroAccesoMieiP2P(p2pMieiFiltro, p2pMieiVerso) ? ' acceso' : '')
     + '" onclick="apriFiltroMieiP2P()">'
     + '<span class="p2p-filtro-sx">' + icoFiltroP2P() + '<b>Filtro</b></span>'
     + '<s></s><em>' + mieiVisti + ' scambi' + (mieiVisti === 1 ? 'o' : '')
@@ -49922,6 +49930,7 @@ function applicaFiltroP2P(){
 function apriFiltroMieiP2P(){
   haptic();
   p2pMieiFiltroBozza = (p2pMieiFiltro || []).slice();
+  p2pMieiVersoBozza = p2pMieiVerso;
   renderFiltroMieiP2P();
   el('sheetBg').classList.add('open');
   el('p2pMieiFiltroSheet').classList.add('open');
@@ -49933,6 +49942,15 @@ function scegliGruppoMieiP2P(k){
   if (i >= 0) b.splice(i, 1); else b.push(k);
   renderFiltroMieiP2P();
 }
+/* il verso e' a scelta UNICA: toccare quello gia' scelto non lo spegne
+   (resterebbe un foglio senza nessuna delle tre accesa), si cambia
+   toccandone un altro — «Tutti» e' il modo di toglierlo */
+function scegliVersoMieiP2P(k){
+  if (!p2pMieiFiltroBozza || !P2P_VERSI_MIEI.some(x => x.k === k)) return;
+  haptic();
+  p2pMieiVersoBozza = k;
+  renderFiltroMieiP2P();
+}
 function renderFiltroMieiP2P(){
   const box = el('p2pMieiFiltroCorpo');
   const b = p2pMieiFiltroBozza;
@@ -49942,8 +49960,36 @@ function renderFiltroMieiP2P(){
      che non lascerebbe passare niente. Le stesse pillole del foglio
      del libro — `tema-pill` — che qui non nasce nessun vestito. */
   const righe = mieiRigheP2P();
-  const quanti = k => righe.filter(o => gruppoScambioP2P(o) === k).length;
+  const vb = p2pMieiVersoBozza || 'tutti';
+  /* E I DUE CONTI SI GUARDANO L'UN L'ALTRO (6 ott 2026): il numero
+     accanto a un gruppo conta solo il verso scelto, e quello accanto a
+     un verso solo i gruppi scelti — cioe' ogni cifra e' quel che la
+     lista mostrerebbe toccando li', e la combinazione vuota si vede
+     prima di applicarla */
+  const quanti = k => righe.filter(o => gruppoScambioP2P(o) === k
+                                        && passaVersoMieiP2P(o, vb)).length;
+  const quantiVerso = k => righe.filter(o => passaStatoMieiP2P(o, b)
+                                             && passaVersoMieiP2P(o, k)).length;
+  /* IL FUOCO RESTA SULLA PILLOLA TOCCATA: il foglio si riscrive a ogni
+     tocco, e senza questo il lettore vocale perderebbe il punto e non
+     direbbe «selezionato» sulla scelta appena fatta */
+  const a = document.activeElement;
+  const fuoco = a && box.contains(a) ? a.getAttribute('data-v') : null;
   box.innerHTML =
+    /* LA SCELTA ATTIVA SI TINGE DEL VERSO: verde «Compro», rosso
+       «Vendo», le leve dei bottoni «Pubblica ordine» (`--b-ok-…`,
+       `--b-rosso-…`); «Tutti» resta l'arancio delle sorelle. Solo
+       l'attiva: le spente sono quelle di sempre. Per il lettore e' un
+       gruppo di bottoni d'opzione, e ognuno dice «Filtro: vendo». */
+    '<div class="section-label" id="p2pMieiVersoTit">Da che parte</div>' +
+    '<div class="p2p-metodi" role="radiogroup" aria-labelledby="p2pMieiVersoTit">' +
+    P2P_VERSI_MIEI.map(x =>
+      '<button type="button" role="radio" aria-checked="' + (x.k === vb) + '"' +
+      ' aria-label="Filtro: ' + esc(x.n.toLowerCase()) + '"' +
+      ' class="tema-pill p2p-verso-' + esc(x.k) + (x.k === vb ? ' active' : '') +
+      '" data-v="' + esc(x.k) + '" onclick="scegliVersoMieiP2P(this.dataset.v)">' +
+      esc(x.n) + ' <b>' + quantiVerso(x.k) + '</b></button>').join('') +
+    '</div>' +
     '<div class="section-label">A che punto sono</div>' +
     '<div class="p2p-metodi">' + P2P_GRUPPI.map(g =>
       '<button type="button" class="tema-pill' + (b.indexOf(g.k) >= 0 ? ' active' : '') +
@@ -49956,6 +50002,10 @@ function renderFiltroMieiP2P(){
       '<button type="button" class="btn ghost" onclick="azzeraFiltroMieiP2P()">Cancella</button>' +
       '<button type="button" class="btn orange" onclick="applicaFiltroMieiP2P()">Applica</button>' +
     '</div>';
+  if (fuoco) {
+    const n = box.querySelector('[data-v="' + fuoco + '"]');
+    if (n) n.focus();
+  }
 }
 /* «Cancella» AZZERA E APPLICA in un gesto solo (e chiude), come nel
    libro: un «Cancella» che svuotasse le pillole lasciando la lista
@@ -49965,6 +50015,8 @@ function azzeraFiltroMieiP2P(){
   haptic();
   p2pMieiFiltro = [];
   p2pMieiFiltroBozza = null;
+  p2pMieiVerso = 'tutti';
+  p2pMieiVersoBozza = null;
   if (el('p2pMieiFiltroSheet').classList.contains('open'))
     chiudiFoglioP2P('p2pMieiFiltroSheet');
   renderP2P();
@@ -49972,7 +50024,9 @@ function azzeraFiltroMieiP2P(){
 function applicaFiltroMieiP2P(){
   haptic();
   if (p2pMieiFiltroBozza) p2pMieiFiltro = p2pMieiFiltroBozza.slice();
+  if (p2pMieiVersoBozza) p2pMieiVerso = p2pMieiVersoBozza;
   p2pMieiFiltroBozza = null;
+  p2pMieiVersoBozza = null;
   chiudiFoglioP2P('p2pMieiFiltroSheet');
   renderP2P();
 }
@@ -62808,8 +62862,9 @@ function intestaScambiP2P(righe){
   const ci = !!(righe && righe.length);
   testa.classList.toggle('vuota', !!righe && !ci);
   const f = typeof p2pMieiFiltro !== 'undefined' ? p2pMieiFiltro : [];
+  const v = typeof p2pMieiVerso !== 'undefined' ? p2pMieiVerso : 'tutti';
   conto.innerHTML = !ci ? ''
-    : filtroAccesoMieiP2P(f) ? fraseFiltroScambiP2P(righe, f)
+    : filtroAccesoMieiP2P(f, v) ? fraseFiltroScambiP2P(righe, f, v)
     : fraseContoScambiP2P(contoScambiP2P(righe));
 }
 /* ⚠️ COL FILTRO ACCESO SI DICE COSA SI GUARDA (27 set 2026, dal campo:
@@ -62821,17 +62876,22 @@ function intestaScambiP2P(righe){
    dice QUANTI ne mostra e di che gruppo — «3 annullati» —, poi quanti
    toccano a te fra TUTTI, che e' la cosa da non perdere mai di vista.
    Due gruppi insieme si contano come «scambi»; «Tocca a te» da solo non
-   ripete due volte la stessa cifra. PURA. */
+   ripete due volte la stessa cifra. PURA.
+   COL VERSO ACCESO (6 ott 2026) la cifra conta anche quello, e la
+   testa lo dice in coda — «3 conclusi in vendita» —: senza, «3
+   conclusi» sotto la scelta «Vendo» sembrerebbe il conto di tutti. */
 const P2P_NOMI_FILTRO = {morti: ['annullato', 'annullati'], fatti: ['concluso', 'conclusi'],
   libro: ['nel libro', 'nel libro'], corso: ['in corso', 'in corso']};
-function fraseFiltroScambiP2P(righe, f){
+const P2P_VERSO_FRASE = {compro: ' in acquisto', vendo: ' in vendita'};
+function fraseFiltroScambiP2P(righe, f, v){
   const tutte = righe || [];
-  const n = tutte.filter(o => passaStatoMieiP2P(o, f)).length;
+  const n = tutte.filter(o => passaStatoMieiP2P(o, f) && passaVersoMieiP2P(o, v)).length;
   const fare = quantiToccaAMeP2P(tutte);
   const coda = fare + ' tocca a te';
   const nomi = f.length === 1 ? P2P_NOMI_FILTRO[f[0]] : null;
-  if (f.length === 1 && f[0] === 'fare') return fare > 0 ? '<b>' + coda + '</b>' : coda;
-  const testa = n + ' ' + (nomi ? nomi[n === 1 ? 0 : 1] : (n === 1 ? 'scambio' : 'scambi'));
+  const verso = P2P_VERSO_FRASE[v] || '';
+  if (f.length === 1 && f[0] === 'fare' && !verso) return fare > 0 ? '<b>' + coda + '</b>' : coda;
+  const testa = n + ' ' + (nomi ? nomi[n === 1 ? 0 : 1] : (n === 1 ? 'scambio' : 'scambi')) + verso;
   return testa + ' · ' + (fare > 0 ? '<b>' + coda + '</b>' : coda);
 }
 /* IL FILTRO SPENTO E' UN ARRAY VUOTO e non `null` come quello del
@@ -62841,10 +62901,32 @@ function fraseFiltroScambiP2P(righe, f){
    gia' «nessun filtro» — una cosa sola da controllare, con `.length`. */
 let p2pMieiFiltro = [];
 let p2pMieiFiltroBozza = null;
+/* ---- DA CHE PARTE (6 ott 2026, richiesta di Andrea) ----
+   Nello stesso foglio, sopra i gruppi, la scelta «Tutti · Compro ·
+   Vendo»: UNA sola alla volta (e' un taglio, non un elenco: «Compro» e
+   «Vendo» insieme sono «Tutti»), e si COMBINA coi gruppi — «Vendo» piu'
+   «Conclusi» sono le mie vendite finite. Una variabile sua e non una
+   voce dentro `p2pMieiFiltro`: quello e' un elenco di gruppi, e un
+   gruppo che non e' un gruppo farebbe mentire ogni conto che lo legge.
+   Stessa liturgia: una BOZZA nel foglio, «Applica» la fa viva, e come
+   il filtro non si ricorda fra un'apertura e l'altra della pagina.
+   IL VERSO LO SA GIA' LA RIGA: `o.lato` e' 'compro'/'vendo' dal punto
+   di vista di chi guarda — lo stesso che tinge la cifra dei sats sulla
+   card —, quindi al server non si chiede niente. */
+const P2P_VERSI_MIEI = [
+  {k: 'tutti', n: 'Tutti'},
+  {k: 'compro', n: 'Compro'},
+  {k: 'vendo', n: 'Vendo'}
+];
+let p2pMieiVerso = 'tutti';
+let p2pMieiVersoBozza = null;
 /* PURI, la coppia di sempre: uno dice se il filtro restringe, l'altro
    se uno scambio passa. Il secondo e' l'unico posto dove vive la
-   regola, e si prova senza browser. */
-function filtroAccesoMieiP2P(f){ return !!(f && f.length); }
+   regola, e si prova senza browser. Il verso e' il secondo argomento
+   del primo: chi non lo passa chiede dei soli gruppi, come prima. */
+function filtroAccesoMieiP2P(f, v){
+  return !!(f && f.length) || (!!v && v !== 'tutti');
+}
 /* ⚠️ COL FILTRO SPENTO GLI ANNULLATI NON SI VEDONO (24 set 2026,
    richiesta di Andrea): uno scambio annullato — da chi compra, da chi
    vende, o scaduto — esce da solo dalla lista di tutti i giorni, senza
@@ -62854,6 +62936,13 @@ function filtroAccesoMieiP2P(f){ return !!(f && f.length); }
 function passaStatoMieiP2P(o, f){
   if (!f || !f.length) return gruppoScambioP2P(o) !== 'morti';
   return f.indexOf(gruppoScambioP2P(o)) >= 0;
+}
+/* PURO: lo scambio sta dalla parte scelta? «Tutti» (o niente) passa
+   tutto; un verso che non e' nel catalogo non filtra, invece di
+   svuotare la pagina in silenzio. */
+function passaVersoMieiP2P(o, v){
+  if (!v || v === 'tutti' || !P2P_VERSI_MIEI.some(x => x.k === v)) return true;
+  return !!o && o.lato === v;
 }
 /* I QUATTRO ORDINI DEI PROPRI SCAMBI: il piu' recente (di casa), i
    «da fare» prima, e l'importo nei due versi.
@@ -64026,15 +64115,32 @@ function scambiP2P(){
      un «nessuno passa il filtro» su un filtro che non c'e' sarebbe una
      bugia — per vederli c'e' la pillola «Annullati» del filtro (dal 30
      set 2026 lo stato vuoto non li nomina piu'). */
-  if (!mostrati.length && !filtroAccesoMieiP2P(p2pMieiFiltro)) return '';
+  if (!mostrati.length && !filtroAccesoMieiP2P(p2pMieiFiltro, p2pMieiVerso)) return '';
   if (!mostrati.length)
     return '<div class="empty"><img class="scambi-img scambi-mini" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">'
-      + '<span class="empty-title">Nessuno scambio col tuo filtro</span>'
-      + 'Hai ' + righe.length + ' scambi, ma nessuno passa il filtro. '
+      + vuotoFiltroMieiP2P(righe.length, p2pMieiFiltro, p2pMieiVerso)
       + '<button type="button" class="scopri-link" onclick="azzeraFiltroMieiP2P()">Togli il filtro</button></div>';
   const troppi = mostrati.length - P2P_SCAMBI_MAX;
   return mostrati.slice(0, P2P_SCAMBI_MAX).map(rigaScambioP2P).join('')
     + (troppi > 0 ? '<div class="hint">…e altri ' + troppi + ' più vecchi</div>' : '');
+}
+/* PURA: il titolo e la riga dello stato vuoto col filtro acceso.
+   COL SOLO VERSO (6 ott 2026, richiesta di Andrea) la riga e' gentile
+   e dice la cosa per nome — «Nessun ordine di vendita» — senza la
+   cifra degli scambi: «Hai 3 scambi» contava anche gli annullati, che
+   col solo verso non si vedono, e sotto «Vendo» suonava come «hai 3
+   vendite». Col verso E i gruppi il titolo dice il verso e che c'e' un
+   filtro sopra; coi soli gruppi resta la frase di sempre. Dentro solo
+   cifre e testi fissi: va in innerHTML senza esc(). */
+const P2P_VERSO_VUOTO = {compro: 'Nessun ordine di acquisto', vendo: 'Nessun ordine di vendita'};
+function vuotoFiltroMieiP2P(quanti, f, v){
+  const nome = P2P_VERSO_VUOTO[v];
+  const gruppi = !!(f && f.length);
+  if (nome && !gruppi)
+    return '<span class="empty-title">' + nome + '</span>'
+      + 'Fra i tuoi scambi non ce n\'è nessuno da questa parte. ';
+  return '<span class="empty-title">' + (nome ? nome + ' col tuo filtro' : 'Nessuno scambio col tuo filtro') + '</span>'
+    + 'Hai ' + quanti + ' scambi, ma nessuno passa il filtro. ';
 }
 /* PURA: quali dei propri scambi passano il filtro, e in che ordine.
    La chiamano in DUE — la pillola per il CONTEGGIO e la striscia per
@@ -64042,7 +64148,8 @@ function scambiP2P(){
    modo piu' facile di scrivere un numero che non corrisponde a quel
    che si vede, ed e' la bugia piu' difficile da notare. */
 function mieiMostratiP2P(righe){
-  return ordinaMieiP2P(righe.filter(o => passaStatoMieiP2P(o, p2pMieiFiltro)),
+  return ordinaMieiP2P(righe.filter(o => passaStatoMieiP2P(o, p2pMieiFiltro)
+                                         && passaVersoMieiP2P(o, p2pMieiVerso)),
                        ordineMieiP2P());
 }
 /* le righe dei propri scambi, nude: le stesse che la striscia

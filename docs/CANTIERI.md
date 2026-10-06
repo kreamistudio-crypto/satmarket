@@ -38211,3 +38211,102 @@ sezione verde (47); i 38 collaudi della CI verdi. Contrasti misurati
 sulla pagina: i grigi del cartellino 4,52:1 nei due temi, «sats» nel
 conto 6,46:1 di giorno e 4,54:1 di sera. Giro dal vivo coi tocchi veri
 rifatto: messaggio a Mostro identico a main nei due versi. Base 7a97778.
+
+## «Tutti · Compro · Vendo» nel filtro di «I miei scambi» (6 ott 2026, sera, richiesta di Andrea)
+
+**DA DOVE SI PARTIVA.** Il filtro di «I miei scambi» è la pillola
+«Filtro» al centro della riga di strumenti: apre `#p2pMieiFiltroSheet`
+(disegnato da `renderFiltroMieiP2P`) con una sola sezione, «A che punto
+sono», cinque gruppi a scelta multipla col loro conto (Tocca a te, In
+corso, Nel libro, Conclusi, Annullati), «Cancella» e «Applica»; si
+tocca una BOZZA e la lista si muove con «Applica». La scelta non si
+ricorda: vive in `p2pMieiFiltro`, come l'ordinamento nella sua
+`<select>` nascosta. Il verso dello scambio la riga lo sa già:
+`o.lato` è 'compro'/'vendo' dal punto di vista di chi guarda (lo stesso
+che tinge la cifra dei sats sulla card).
+
+**DECISO.** Nello stesso foglio, SOPRA i gruppi, «Da che parte»:
+`Tutti · Compro · Vendo` (`P2P_VERSI_MIEI`), una scelta sola alla volta
+(«Compro» e «Vendo» insieme sono «Tutti»; toccare la scelta già accesa
+non la spegne, si torna indietro con «Tutti»), default «Tutti», stessa
+liturgia della bozza (`p2pMieiVerso` e `p2pMieiVersoBozza`), nessuna
+memoria fra un'apertura e l'altra, come il resto del filtro. Si COMBINA
+coi gruppi: il giudice è `passaVersoMieiP2P` accanto a
+`passaStatoMieiP2P`, e `mieiMostratiP2P` chiede a tutti e due, quindi
+card, pillola «N scambi» e conto della testata contano la stessa lista.
+`filtroAccesoMieiP2P(f, v)` prende il verso come secondo argomento: la
+pillola «Filtro» si accende anche col solo verso. I DUE CONTI DEL FOGLIO
+SI GUARDANO: il numero accanto a un gruppo conta il verso scelto, quello
+accanto a un verso i gruppi scelti, cioè ogni cifra è quel che la lista
+mostrerebbe, e la combinazione vuota si vede prima di applicarla (prima
+i gruppi contavano tutti gli scambi: col verso acceso avrebbero detto un
+numero che la lista non mostra). La riga in cima col filtro acceso dice
+anche il verso: «3 scambi in vendita», «1 concluso in acquisto»; «tocca
+a te» resta il conto di TUTTI, come prima. Un verso fuori catalogo non
+filtra invece di svuotare la pagina; il server non cambia.
+I COLORI: solo la scelta attiva, con le leve dei bottoni «Pubblica
+ordine» — «Compro» `--b-ok-bg/fg/line` (il verde del `.primary`),
+«Vendo» `--b-rosso-bg/fg/line`; «Tutti» resta l'arancio delle sorelle
+(`.tema-pill.active`), e le regole nuove stanno DOPO quella, a pari
+specificità. Le spente sono le pillole di sempre.
+IL VUOTO: col solo verso, «Nessun ordine di vendita» / «Nessun ordine
+di acquisto» e «Fra i tuoi scambi non ce n'è nessuno da questa parte»,
+SENZA la cifra (il vecchio «Hai N scambi» contava anche gli annullati,
+che col solo verso non si vedono, e sotto «Vendo» suonava «hai N
+vendite»); col verso e i gruppi «Nessun ordine di vendita col tuo
+filtro» e la riga di sempre; coi soli gruppi tutto com'era. Sempre con
+«Togli il filtro», che ora riporta anche il verso a «Tutti». Il giudice
+è `vuotoFiltroMieiP2P`, pura.
+IL LETTORE VOCALE: le tre pillole sono un `radiogroup` col titolo
+«Da che parte», ognuna `role="radio"` con `aria-checked` e il nome
+«Filtro: vendo» — quindi «Filtro: vendo, selezionato». E siccome il
+foglio si riscrive a ogni tocco, il fuoco torna sulla pillola toccata
+(solo se era dentro il foglio): senza, il lettore perdeva il punto e non
+diceva niente. Vale anche per le pillole dei gruppi, che stanno nello
+stesso disegno.
+
+**SCARTATO.** Il verso come voce dentro `p2pMieiFiltro`: è un elenco di
+GRUPPI, e una voce che non è un gruppo farebbe mentire ogni conto che lo
+legge (`fraseFiltroScambiP2P`, il «Tocca a te» da solo). Una riga di
+pillole fuori dal foglio, nella pagina: Andrea l'ha chiesta «nel filtro
+che c'è già». Le tinte anche sulle spente: «solo come accento della
+scelta attiva».
+
+**PROVATO.** prove_scambi_verso (48): le sentinelle (catalogo in ordine,
+default senza memoria, la lista unica, la pillola accesa, il vuoto e la
+testata che sanno del verso, il gruppo d'opzioni e i nomi «Filtro: …»,
+il fuoco, i tre gesti) e la CASCATA chiesta a `_vince_css` nei due temi
+(attiva: verde, rosso, arancio coi loro inchiostri; spenta: trasparente
+e --muted); il banco node con le funzioni VERE, un caso solo per volta:
+il giudice (tutti, compro, vendo, nulla, ignoto, maiuscolo, riga che
+manca), sei combinazioni coi gruppi, l'acceso, la lista di card e
+pillola, sei frasi della testata, i quattro vuoti, e il foglio coi gesti
+veri — apertura dal vivo, bozza non applicata, conti incrociati, scelta
+unica e ignoto toccato per ultimo, tocco senza foglio, «Applica»,
+«Cancella», il fuoco dentro e fuori. Emendati tre banchi che ritagliano
+le funzioni toccate (prove_p2p_vista_miei, prove_intestazione_scambi,
+e quello della corsa e della striscia in prove_p2p_server, che la suite
+intera ha fatto rosso al primo giro: `passaVersoMieiP2P is not
+defined`). Tortura sulla copia: 30 su 32 al primo giro; viva «niente
+guardia del catalogo» (il caso finiva comunque su «Vendo»: ora l'ignoto
+si tocca per ultimo) e «Vendo perde con l'arancio», EQUIVALENTE
+(`.p2p-verso-vendo.active` ha la specificità di `.tema-pill.active` e
+sta dopo: vince lo stesso), sostituita da «Vendo rosso anche spenta»;
+al secondo giro 3 su 3. Suite intera severa senza config nel worktree
+(base 7a97778): 19.219 verdi e 0 rosse. I 38 collaudi della CI nella gabbia verdi.
+Dal vivo (copia in collaudo, relay morto, Chrome headless via CDP, tocchi
+veri con `elementFromPoint`), sette scambi seminati con
+`scriviOrdineP2P` nei due versi e in stati diversi (nel libro, in
+corso, tocca a te, conclusi, un annullato): «Compro» lascia i tre
+acquisti e la testata dice «3 scambi in acquisto», «Vendo» le tre
+vendite; «Vendo» + «Annullati» dà «Nessun ordine di vendita col tuo
+filtro»; tolte le vendite, «Vendo» dà «Nessun ordine di vendita».
+Dopo il tocco il fuoco è sulla pillola, `aria-checked` vero solo lì,
+nome «Filtro: vendo», fondo e inchiostro misurati. Nessuno scorrimento
+orizzontale. Scatti prima/dopo a 375 e 320, chiaro e scuro, mandati ad
+Andrea.
+
+**DA GUARDARE.** Con TalkBack e VoiceOver sul telefono: che dicano
+«selezionato» sulla pillola appena toccata. Notato e lasciato com'era:
+a 320 px la levetta del tema va a capo nella riga di strumenti di «I
+miei scambi» (c'era già prima, si vede negli scatti «prima»).

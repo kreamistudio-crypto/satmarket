@@ -76994,6 +76994,8 @@ console.log(JSON.stringify(out));
                       # stesso
                       "function gruppoScambioP2P(o){",
                       "function passaStatoMieiP2P(o, f){",
+                      # (6 ott 2026) il verso, accanto ai gruppi
+                      "function passaVersoMieiP2P(o, v){",
                       # (27 set 2026) «recente» e' l'ultimo evento, e lo
                       # dice la chiusura: il metro della data sulla card
                       "function chiusuraP2P(o){",
@@ -77016,8 +77018,10 @@ function lapidataP2P(){ return false; }
 /* il filtro spento e l'ordine di casa: qui non si provano le leve, si
    presta la lista intera — i loro casi girano nel banco della card */
 let p2pMieiFiltro = [];
+let p2pMieiVerso = 'tutti';
 const P2P_GRUPPI = [{k: 'fare'}, {k: 'corso'}, {k: 'libro'},
                     {k: 'fatti'}, {k: 'morti'}];
+const P2P_VERSI_MIEI = [{k: 'tutti'}, {k: 'compro'}, {k: 'vendo'}];
 const P2P_ORDINI_MIEI = ['recenti', 'fare', 'imp-giu', 'imp-su'];
 const P2P_ORDINE_MIEI_CASA = 'recenti';
 function ordineMieiP2P(){ return P2P_ORDINE_MIEI_CASA; }
@@ -78750,7 +78754,7 @@ def prove_p2p_vista_miei():
     # «questo comando sta facendo qualcosa»
     prova("...e i due accesi guardano il valore vivo", True,
           "(ordMiei === P2P_ORDINE_MIEI_CASA ? '' : ' acceso')" in rp
-          and "filtroAccesoMieiP2P(p2pMieiFiltro) ? ' acceso' : ''" in rp)
+          and "filtroAccesoMieiP2P(p2pMieiFiltro, p2pMieiVerso) ? ' acceso' : ''" in rp)
     # il titolo se n'e' andato: la nav dice gia' il nome della pagina
     prova("il titolo «I tuoi scambi» non c'e' piu'", False,
           'section-label">I tuoi scambi' in mini)
@@ -78769,15 +78773,20 @@ def prove_p2p_vista_miei():
              mini[mini.index("const P2P_ORDINE_MIEI_CASA = "):
                   mini.index("\n", mini.index("const P2P_ORDINE_MIEI_CASA = "))],
              mini[mini.index("const capoImportoP2P = "):
-                  mini.index(";\n", mini.index("const capoImportoP2P = ")) + 1]]
+                  mini.index(";\n", mini.index("const capoImportoP2P = ")) + 1],
+             # (6 ott 2026) il catalogo dei versi, che il giudice chiede
+             mini[mini.index("const P2P_VERSI_MIEI = ["):
+                  mini.index("\n];", mini.index("const P2P_VERSI_MIEI = [")) + 3]]
     pezzi += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
         "function recapitoEuroArrivatoP2P(o){",
         "function azioniDisponibili(o){",
         # la cauzione (1 ott 2026): azioniDisponibili la chiede
         "function cauzioneVivaP2P(o, adesso){",
         "function gruppoScambioP2P(o){",
-        "function filtroAccesoMieiP2P(f){",
+        "function filtroAccesoMieiP2P(f, v){",
         "function passaStatoMieiP2P(o, f){",
+        # (6 ott 2026) il verso, che mieiMostratiP2P chiede accanto ai gruppi
+        "function passaVersoMieiP2P(o, v){",
         # (27 set 2026) il metro di «Più recenti»
         "function chiusuraP2P(o){",
         "function ordinaMieiP2P(righe, criterio){",
@@ -78788,6 +78797,7 @@ def prove_p2p_vista_miei():
 let CRITERIO = 'recenti';
 function ordineMieiP2P(){ return CRITERIO; }
 let p2pMieiFiltro = [];
+let p2pMieiVerso = 'tutti';
 const out = {};
 /* ⚠️ LA PARTIZIONE: ogni stato in uno e un solo gruppo, e si guardano
    TUTT'E DUE I LATI — «tocca a te» esce da `azioniDisponibili`, che
@@ -79690,12 +79700,18 @@ def prove_intestazione_scambi():
         "function contoScambiP2P(righe){",
         "function fraseContoScambiP2P(c){",
         # (27 set 2026) col filtro acceso la riga dice cosa si guarda
-        "function filtroAccesoMieiP2P(f){",
+        "function filtroAccesoMieiP2P(f, v){",
         "function passaStatoMieiP2P(o, f){",
-        "function fraseFiltroScambiP2P(righe, f){",
+        # (6 ott 2026) il verso: la frase lo conta e lo dice
+        "function passaVersoMieiP2P(o, v){",
+        "function fraseFiltroScambiP2P(righe, f, v){",
         "function intestaScambiP2P(righe){")]
     pezzi_js.append(mini[mini.index("const P2P_NOMI_FILTRO = {"):
                          mini.index("};", mini.index("const P2P_NOMI_FILTRO = {")) + 2])
+    for _testa, _fine in (("const P2P_VERSI_MIEI = [", "\n];"),
+                          ("const P2P_VERSO_FRASE = ", "\n")):
+        _i = mini.index(_testa)
+        pezzi_js.append(mini[_i:mini.index(_fine, _i) + len(_fine)])
     banco = "\n".join(pezzi_js) + r"""
 /* il cartone: le due scatole dell'intestazione */
 const scatola = () => {
@@ -124415,6 +124431,364 @@ console.log(JSON.stringify(out));
           r.get("senzaEvento"))
 
 
+def prove_scambi_verso():
+    """«TUTTI · COMPRO · VENDO» NEL FILTRO DI «I MIEI SCAMBI» (6 ott 2026,
+    richiesta di Andrea). Nel foglio del filtro, sopra i gruppi, la scelta
+    del verso: una sola alla volta, si combina coi gruppi («Vendo» piu'
+    «Conclusi»), «Tutti» di casa. La scelta attiva si tinge del verso coi
+    colori dei «Pubblica ordine», il lettore la dice («Filtro: vendo,
+    selezionato»), e se la combinazione non trova niente una riga gentile
+    («Nessun ordine di vendita») prende il posto della lista. Il verso lo
+    sa gia' la riga (`o.lato`): il server non cambia."""
+    print("\n🔁 Il verso nel filtro di «I miei scambi»")
+    import json as _json, os as _os, subprocess as _sp, shutil as _sh
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) LE SENTINELLE --------------------------------------------
+    i_cat = mini.find("const P2P_VERSI_MIEI = [")
+    cat = mini[i_cat:mini.find("\n];", i_cat) + 3] if i_cat >= 0 else ""
+    prova("il catalogo dei versi: Tutti, Compro, Vendo, in quest'ordine",
+          [("tutti", "Tutti"), ("compro", "Compro"), ("vendo", "Vendo")],
+          re.findall(r"\{k: '([a-z]+)', n: '([A-Za-z]+)'\}", cat))
+    prova("...e il verso vivo nasce «Tutti», senza memoria", True,
+          "let p2pMieiVerso = 'tutti';" in mini
+          and not re.search(r"localStorage[^\n]*p2pMieiVerso", mini))
+    mm = pezzo_js(mini, "function mieiMostratiP2P(righe){", "\n}\n")
+    prova("card e pillola contano dalla stessa lista, verso compreso", True,
+          "passaStatoMieiP2P(o, p2pMieiFiltro)" in mm
+          and "passaVersoMieiP2P(o, p2pMieiVerso)" in mm)
+    rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("la pillola «Filtro» si accende anche col solo verso", True,
+          "filtroAccesoMieiP2P(p2pMieiFiltro, p2pMieiVerso) ? ' acceso' : ''" in rp)
+    sp = pezzo_js(mini, "function scambiP2P(){", "\n}\n")
+    prova("lo stato vuoto sa del verso, e la riga la scrive il giudice", True,
+          "!filtroAccesoMieiP2P(p2pMieiFiltro, p2pMieiVerso)) return '';" in sp
+          and "vuotoFiltroMieiP2P(righe.length, p2pMieiFiltro, p2pMieiVerso)" in sp
+          and "azzeraFiltroMieiP2P()" in sp)
+    it = pezzo_js(mini, "function intestaScambiP2P(righe){", "\n}\n")
+    prova("la riga in cima dice anche il verso", True,
+          "fraseFiltroScambiP2P(righe, f, v)" in it
+          and "filtroAccesoMieiP2P(f, v)" in it)
+    rf = pezzo_js(mini, "function renderFiltroMieiP2P(){", "\n}\n")
+    prova("il foglio: un gruppo d'opzioni col suo titolo", True,
+          'role="radiogroup" aria-labelledby="p2pMieiVersoTit"' in rf
+          and 'id="p2pMieiVersoTit">Da che parte<' in rf)
+    prova("...ogni pillola e' un'opzione che dice «Filtro: <verso>» e se e' scelta",
+          True, "role=\"radio\" aria-checked=\"' + (x.k === vb) + '\"" in rf
+          and "aria-label=\"Filtro: ' + esc(x.n.toLowerCase()) + '\"" in rf)
+    prova("...e il fuoco torna sulla pillola toccata", True,
+          "box.contains(a) ? a.getAttribute('data-v')" in rf
+          and "n.focus()" in rf)
+    prova("i gesti del foglio portano il verso", True,
+          "p2pMieiVersoBozza = p2pMieiVerso;" in
+          pezzo_js(mini, "function apriFiltroMieiP2P(){", "\n}\n")
+          and "if (p2pMieiVersoBozza) p2pMieiVerso = p2pMieiVersoBozza;" in
+          pezzo_js(mini, "function applicaFiltroMieiP2P(){", "\n}\n")
+          and "p2pMieiVerso = 'tutti';" in
+          pezzo_js(mini, "function azzeraFiltroMieiP2P(){", "\n}\n"))
+    # LA TINTA: solo l'attiva, le leve dei «Pubblica ordine», e vince lei
+    # sull'arancio di `.tema-pill.active` — lo chiede alla cascata vera
+    i0 = mini.find("<style>")
+    css = mini[i0 + 7:mini.find("</style>", i0)] if i0 >= 0 else ""
+    regole, _sq = _regole_css(css)
+
+    def pillola(tema, verso, attiva):
+        html = {"tag": "html", "attr": {"lang": "it"}, "classi": set()}
+        if tema == "scuro":
+            html["attr"]["data-tema"] = "scuro"
+        cl = {"tema-pill", "p2p-verso-" + verso} | ({"active"} if attiva else set())
+        return [html, {"tag": "body", "attr": {}, "classi": set()},
+                {"tag": "div", "attr": {"id": "p2pMieiFiltroSheet"}, "classi": {"sheet", "open"}},
+                {"tag": "div", "attr": {"id": "p2pMieiFiltroCorpo"}, "classi": set()},
+                {"tag": "div", "attr": {}, "classi": {"p2p-metodi"}},
+                {"tag": "button", "attr": {"role": "radio"}, "classi": cl}]
+    ATTESE = {"compro": ("var(--b-ok-bg)", "var(--b-ok-fg)"),
+              "tutti": ("var(--sats)", "#fff"),
+              "vendo": ("var(--b-rosso-bg)", "var(--b-rosso-fg)")}
+    for tema in ("chiaro", "scuro"):
+        for verso, (fondo, inch) in ATTESE.items():
+            v = _vince_css(regole, pillola(tema, verso, True), ("background", "color"))
+            prova(f"«{verso}» scelta veste {fondo} ({tema})", (fondo, inch),
+                  (v.get("background", (None,))[0], v.get("color", (None,))[0]))
+            v = _vince_css(regole, pillola(tema, verso, False), ("background", "color"))
+            prova(f"...e spenta resta la pillola di sempre ({verso}, {tema})",
+                  ("transparent", "var(--muted)"),
+                  (v.get("background", (None,))[0], v.get("color", (None,))[0]))
+    prova("le leve verde e rossa esistono nei due temi del foglio", True,
+          all(re.search(r"--b-%s-%s:" % (c, p), css)
+              for c in ("ok", "rosso") for p in ("bg", "fg", "line")))
+    prova("il server non sa niente del verso", False,
+          "p2pMieiVerso" in open("server.py", encoding="utf-8").read())
+
+    # --- 2) IL BANCO: le funzioni vere --------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco del verso", "node non c'e'")
+        return
+
+    def blocco(testa, fine):
+        i = mini.index(testa)
+        return mini[i:mini.index(fine, i) + len(fine)]
+    pezzi = [blocco("const STATI_P2P = {", "\n};"),
+             blocco("const P2P_GRUPPI = [", "\n];"),
+             blocco("const P2P_VERSI_MIEI = [", "\n];"),
+             blocco("const P2P_ORDINI_MIEI = ", "\n"),
+             blocco("const P2P_ORDINE_MIEI_CASA = ", "\n"),
+             blocco("const P2P_FINALI = ", "\n"),
+             blocco("const P2P_PRIMA_DELLA_PRESA = ", "\n"),
+             blocco("const P2P_NOMI_FILTRO = {", "};"),
+             blocco("const P2P_VERSO_FRASE = ", "\n"),
+             blocco("const P2P_VERSO_VUOTO = ", "\n"),
+             blocco("const capoImportoP2P = ", ";\n")]
+    pezzi += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function recapitoEuroArrivatoP2P(o){",
+        "function azioniDisponibili(o){",
+        "function cauzioneVivaP2P(o, adesso){",
+        "function gruppoScambioP2P(o){",
+        "function presoP2P(o){",
+        "function quantiToccaAMeP2P(righe){",
+        "function filtroAccesoMieiP2P(f, v){",
+        "function passaStatoMieiP2P(o, f){",
+        "function passaVersoMieiP2P(o, v){",
+        "function chiusuraP2P(o){",
+        "function ordinaMieiP2P(righe, criterio){",
+        "function mieiMostratiP2P(righe){",
+        "function fraseFiltroScambiP2P(righe, f, v){",
+        "function vuotoFiltroMieiP2P(quanti, f, v){",
+        "function apriFiltroMieiP2P(){",
+        "function scegliGruppoMieiP2P(k){",
+        "function scegliVersoMieiP2P(k){",
+        "function renderFiltroMieiP2P(){",
+        "function azzeraFiltroMieiP2P(){",
+        "function applicaFiltroMieiP2P(){")]
+    banco = "\n".join(pezzi) + r"""
+/* il cartone: il deposito dell'ordine, il filtro vivo, il DOM del foglio */
+function ordineMieiP2P(){ return 'recenti'; }
+let p2pMieiFiltro = [];
+let p2pMieiFiltroBozza = null;
+let p2pMieiVerso = 'tutti';
+let p2pMieiVersoBozza = null;
+let p2pOrdineAperto = '', p2pHoldOrdine = '', p2pIncassoOrdine = '';
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+const haptic = () => {};
+let disegni = 0;
+function renderP2P(){ disegni++; }
+const classi = () => { const c = new Set(); return {add: k => c.add(k), remove: k => c.delete(k),
+  contains: k => c.has(k), toggle: (k, si) => si ? c.add(k) : c.delete(k)}; };
+let fuocoA = null;
+const corpo = {innerHTML: '', contains: n => !!n && n.dentro === true,
+  querySelector: sel => { const m = /data-v="([a-z]+)"/.exec(sel);
+    return m && corpo.innerHTML.indexOf('data-v="' + m[1] + '"') >= 0
+      ? {focus: () => { fuocoA = m[1]; }} : null; }};
+const dom = {p2pMieiFiltroCorpo: corpo, p2pMieiFiltroSheet: {classList: classi()},
+             sheetBg: {classList: classi()}};
+const el = id => dom[id] || null;
+function chiudiFoglioP2P(id){ dom[id].classList.remove('open'); }
+const document = {activeElement: null};
+const ora = 2000000000;
+const r = (id, o) => Object.assign({id: id, lato: 'compro', stato: 'pubblicato',
+  euro: 10, euroMax: 0, creato: ora, quando: ora}, o);
+const RIGHE = [
+  r('a-compro-libro', {quando: ora - 1}),
+  r('b-vendo-libro', {lato: 'vendo', quando: ora - 2}),
+  r('c-compro-corso', {stato: 'attivo', peer: 'p', quando: ora - 3}),
+  r('d-vendo-fare', {lato: 'vendo', stato: 'attesa_mia_hold', peer: 'p', quando: ora - 4}),
+  r('e-compro-fatto', {stato: 'concluso', peer: 'p', quando: ora - 5}),
+  r('f-vendo-fatto', {lato: 'vendo', stato: 'concluso', peer: 'p', quando: ora - 6}),
+  r('g-compro-morto', {stato: 'annullato', quando: ora - 7})
+];
+let righeVive = RIGHE;
+function mieiRigheP2P(){ return righeVive; }
+const ids = l => l.map(o => o.id);
+const solo = (f, v) => ids(RIGHE.filter(o => passaStatoMieiP2P(o, f) && passaVersoMieiP2P(o, v)));
+/* le pillole del foglio, lette dall'HTML: verso -> [checked, attiva, conto, nome] */
+const pillole = () => {
+  const out = {};
+  const re = /<button type="button" role="radio" aria-checked="(true|false)" aria-label="([^"]*)" class="tema-pill p2p-verso-([a-z]+)( active)?" data-v="([a-z]+)"[^>]*>([A-Za-z]+) <b>(\d+)<\/b>/g;
+  let m;
+  while ((m = re.exec(corpo.innerHTML))) out[m[5]] = [m[1], !!m[4], +m[7], m[2], m[3] === m[5]];
+  return out;
+};
+const gruppiFoglio = () => {
+  const out = {};
+  const re = /data-v="(fare|corso|libro|fatti|morti)"[^>]*>[^<]* <b>(\d+)<\/b>/g;
+  let m;
+  while ((m = re.exec(corpo.innerHTML))) out[m[1]] = +m[2];
+  return out;
+};
+function reset(){
+  p2pMieiFiltro = []; p2pMieiFiltroBozza = null; p2pMieiVerso = 'tutti'; p2pMieiVersoBozza = null;
+  disegni = 0; fuocoA = null; document.activeElement = null; corpo.innerHTML = '';
+  righeVive = RIGHE; dom.p2pMieiFiltroSheet.classList.remove('open');
+}
+/* OGNI CASO E' SOLO: il suo reset, il suo try (la lezione della tortura) */
+const CASI = {
+  /* IL GIUDICE: il verso taglia, «tutti» e il nulla no, e uno ignoto non svuota */
+  versi: () => ({tutti: solo([], 'tutti'), compro: solo([], 'compro'), vendo: solo([], 'vendo'),
+                 nulla: solo([], undefined), ignoto: solo([], 'boh'), maiuscolo: solo([], 'Vendo')}),
+  senzaRiga: () => [passaVersoMieiP2P(null, 'vendo'), passaVersoMieiP2P(null, 'tutti'),
+                    passaVersoMieiP2P({lato: 'vendo'}, 'compro')],
+  /* LE COMBINAZIONI coi gruppi */
+  combinati: () => ({vendoConclusi: solo(['fatti'], 'vendo'),
+                     comproConclusi: solo(['fatti'], 'compro'),
+                     comproAnnullati: solo(['morti'], 'compro'),
+                     vendoAnnullati: solo(['morti'], 'vendo'),
+                     vendoLibroFare: solo(['libro', 'fare'], 'vendo'),
+                     tuttiConclusi: solo(['fatti'], 'tutti')}),
+  acceso: () => [filtroAccesoMieiP2P([]), filtroAccesoMieiP2P([], 'tutti'),
+                 filtroAccesoMieiP2P([], 'vendo'), filtroAccesoMieiP2P([], 'compro'),
+                 filtroAccesoMieiP2P(['fatti'], 'tutti'), filtroAccesoMieiP2P(null, null)],
+  /* la lista che vedono card e pillola */
+  mostrati: () => { p2pMieiVerso = 'vendo'; p2pMieiFiltro = ['fatti', 'libro'];
+    const a = ids(mieiMostratiP2P(RIGHE));
+    p2pMieiVerso = 'compro'; p2pMieiFiltro = [];
+    return [a, ids(mieiMostratiP2P(RIGHE))]; },
+  /* la riga in cima: dice il verso, e «tocca a te» resta di tutti */
+  frasi: () => [fraseFiltroScambiP2P(RIGHE, [], 'vendo'),
+                fraseFiltroScambiP2P(RIGHE, ['fatti'], 'compro'),
+                fraseFiltroScambiP2P(RIGHE, ['fare'], 'tutti'),
+                fraseFiltroScambiP2P(RIGHE, ['fare'], 'compro'),
+                fraseFiltroScambiP2P(RIGHE, ['morti'], 'vendo'),
+                fraseFiltroScambiP2P(RIGHE, ['fatti'])],
+  /* IL VUOTO */
+  vuoti: () => [vuotoFiltroMieiP2P(7, [], 'vendo'), vuotoFiltroMieiP2P(7, [], 'compro'),
+                vuotoFiltroMieiP2P(7, ['morti'], 'vendo'), vuotoFiltroMieiP2P(7, ['morti'], 'tutti'),
+                vuotoFiltroMieiP2P(7, ['morti'])],
+  /* IL FOGLIO, coi gesti veri */
+  apertura: () => { p2pMieiVerso = 'vendo'; apriFiltroMieiP2P();
+    return [p2pMieiVersoBozza, dom.p2pMieiFiltroSheet.classList.contains('open'), pillole()]; },
+  sceltaNonApplicata: () => { apriFiltroMieiP2P(); scegliVersoMieiP2P('vendo');
+    return [p2pMieiVerso, p2pMieiVersoBozza, pillole(), disegni]; },
+  contiIncrociati: () => { apriFiltroMieiP2P(); scegliGruppoMieiP2P('fatti');
+    const primaDelVerso = pillole();
+    scegliVersoMieiP2P('vendo');
+    return [primaDelVerso, pillole(), gruppiFoglio()]; },
+  /* l'ignoto si tocca PER ULTIMO: deve lasciare la scelta di prima */
+  ignoto: () => { apriFiltroMieiP2P(); scegliVersoMieiP2P('compro'); scegliVersoMieiP2P('boh');
+    const dopoIgnoto = p2pMieiVersoBozza;
+    scegliVersoMieiP2P('vendo'); scegliVersoMieiP2P('vendo');
+    return [dopoIgnoto, p2pMieiVersoBozza]; },
+  senzaFoglio: () => { scegliVersoMieiP2P('vendo'); return [p2pMieiVersoBozza, p2pMieiVerso, disegni]; },
+  applica: () => { apriFiltroMieiP2P(); scegliVersoMieiP2P('vendo'); scegliGruppoMieiP2P('fatti');
+    applicaFiltroMieiP2P();
+    return [p2pMieiVerso, p2pMieiFiltro, p2pMieiVersoBozza, p2pMieiFiltroBozza, disegni,
+            dom.p2pMieiFiltroSheet.classList.contains('open'), ids(mieiMostratiP2P(RIGHE))]; },
+  azzera: () => { p2pMieiVerso = 'vendo'; p2pMieiFiltro = ['fatti']; apriFiltroMieiP2P();
+    azzeraFiltroMieiP2P();
+    return [p2pMieiVerso, p2pMieiFiltro, p2pMieiVersoBozza, disegni,
+            ids(mieiMostratiP2P(RIGHE))]; },
+  /* IL FUOCO: torna sulla pillola che il dito aveva, e non ruba quello di fuori */
+  fuoco: () => { apriFiltroMieiP2P();
+    document.activeElement = {dentro: true, getAttribute: k => k === 'data-v' ? 'vendo' : null};
+    scegliVersoMieiP2P('vendo');
+    const dentro = fuocoA; fuocoA = null;
+    document.activeElement = {dentro: false, getAttribute: () => 'compro'};
+    scegliVersoMieiP2P('compro');
+    return [dentro, fuocoA]; },
+  /* il solo verso che non trova niente */
+  soloVersoVuoto: () => { righeVive = RIGHE.filter(o => o.lato === 'compro');
+    p2pMieiVerso = 'vendo';
+    return [ids(mieiMostratiP2P(righeVive)), filtroAccesoMieiP2P(p2pMieiFiltro, p2pMieiVerso)]; },
+  nonMuta: () => { const prima = JSON.stringify(RIGHE);
+    p2pMieiVerso = 'vendo'; p2pMieiFiltro = ['fatti']; mieiMostratiP2P(RIGHE);
+    fraseFiltroScambiP2P(RIGHE, ['fatti'], 'vendo');
+    return prima === JSON.stringify(RIGHE); }
+};
+const out = {};
+for (const k of Object.keys(CASI)) {
+  reset();
+  try { out[k] = CASI[k](); } catch (e) { out[k] = 'ESPLOSO: ' + e.message; }
+}
+console.log(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp()
+    p = _os.path.join(cart, "banco.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r2 = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco node del verso gira", "", (r2.stderr or "")[-600:])
+    if r2.returncode:
+        return
+    o = _json.loads(r2.stdout)
+    for k, v in o.items():
+        if isinstance(v, str) and v.startswith("ESPLOSO"):
+            prova(f"il caso «{k}» del banco gira", "", v)
+
+    TUTTI = ["a-compro-libro", "b-vendo-libro", "c-compro-corso", "d-vendo-fare",
+             "e-compro-fatto", "f-vendo-fatto"]
+    prova("«Tutti» e niente lasciano la lista di sempre (annullati fuori)",
+          [TUTTI, TUTTI], [o["versi"]["tutti"], o["versi"]["nulla"]])
+    prova("«Compro» lascia solo i miei acquisti",
+          ["a-compro-libro", "c-compro-corso", "e-compro-fatto"], o["versi"]["compro"])
+    prova("«Vendo» lascia solo le mie vendite",
+          ["b-vendo-libro", "d-vendo-fare", "f-vendo-fatto"], o["versi"]["vendo"])
+    prova("un verso fuori catalogo non svuota la pagina", [TUTTI, TUTTI],
+          [o["versi"]["ignoto"], o["versi"]["maiuscolo"]])
+    prova("una riga che manca non passa un verso, e passa «Tutti»",
+          [False, True, False], o["senzaRiga"])
+    prova("le combinazioni coi gruppi", {
+        "vendoConclusi": ["f-vendo-fatto"], "comproConclusi": ["e-compro-fatto"],
+        "comproAnnullati": ["g-compro-morto"], "vendoAnnullati": [],
+        "vendoLibroFare": ["b-vendo-libro", "d-vendo-fare"],
+        "tuttiConclusi": ["e-compro-fatto", "f-vendo-fatto"]}, o["combinati"])
+    prova("il filtro e' acceso anche dal solo verso, e «Tutti» no",
+          [False, False, True, True, True, False], o["acceso"])
+    prova("card e pillola: la lista col verso e i gruppi insieme, in ordine",
+          [["b-vendo-libro", "f-vendo-fatto"],
+           ["a-compro-libro", "c-compro-corso", "e-compro-fatto"]], o["mostrati"])
+    prova("la riga in cima dice il verso, e «tocca a te» resta di tutti", [
+        "3 scambi in vendita · <b>1 tocca a te</b>",
+        "1 concluso in acquisto · <b>1 tocca a te</b>",
+        "<b>1 tocca a te</b>",
+        "0 scambi in acquisto · <b>1 tocca a te</b>",
+        "0 annullati in vendita · <b>1 tocca a te</b>",
+        "2 conclusi · <b>1 tocca a te</b>"], o["frasi"])
+    v = o["vuoti"]
+    prova("il vuoto del solo verso e' gentile e per nome, senza cifre", True,
+          isinstance(v, list)
+          and "<span class=\"empty-title\">Nessun ordine di vendita</span>" in v[0]
+          and "<span class=\"empty-title\">Nessun ordine di acquisto</span>" in v[1]
+          and "Hai " not in v[0] + v[1])
+    prova("...col verso e i gruppi dice che c'e' un filtro sopra", True,
+          isinstance(v, list)
+          and "Nessun ordine di vendita col tuo filtro" in v[2]
+          and "Hai 7 scambi, ma nessuno passa il filtro." in v[2])
+    prova("...coi soli gruppi resta la frase di sempre", True,
+          isinstance(v, list) and v[3] == v[4]
+          and "Nessuno scambio col tuo filtro" in v[3] and "Hai 7 scambi" in v[3])
+    a = o["apertura"]
+    prova("il foglio si apre col verso vivo, e una sola scelta accesa",
+          ["vendo", True, {"tutti": ["false", False, 6, "Filtro: tutti", True],
+                           "compro": ["false", False, 3, "Filtro: compro", True],
+                           "vendo": ["true", True, 3, "Filtro: vendo", True]}], a)
+    s = o["sceltaNonApplicata"]
+    prova("toccare «Vendo» cambia la bozza, non la lista", True,
+          isinstance(s, list) and s[0] == "tutti" and s[1] == "vendo"
+          and s[2].get("vendo", [None])[0] == "true"
+          and s[2].get("tutti", [None])[0] == "false" and s[3] == 0)
+    c = o["contiIncrociati"]
+    prova("i conti si guardano: il verso conta i gruppi scelti...",
+          [1 + 1, 1, 1], [c[0]["tutti"][2], c[0]["compro"][2], c[0]["vendo"][2]]
+          if isinstance(c, list) else c)
+    prova("...e i gruppi contano il verso scelto",
+          {"fare": 1, "corso": 0, "libro": 1, "fatti": 1, "morti": 0},
+          c[2] if isinstance(c, list) else c)
+    prova("una scelta sola: l'ignoto non passa, «Vendo» due volte resta «Vendo»",
+          ["compro", "vendo"], o["ignoto"])
+    prova("senza foglio aperto il tocco non scrive niente", [None, "tutti", 0],
+          o["senzaFoglio"])
+    prova("«Applica» fa vivo verso e gruppi insieme, chiude e ridisegna",
+          ["vendo", ["fatti"], None, None, 1, False, ["f-vendo-fatto"]], o["applica"])
+    prova("«Cancella» riporta anche il verso a «Tutti»",
+          ["tutti", [], None, 1, TUTTI], o["azzera"])
+    prova("il fuoco torna sulla pillola toccata, e solo se era nel foglio",
+          ["vendo", None], o["fuoco"])
+    prova("il solo verso che non trova niente: lista vuota e filtro acceso",
+          [[], True], o["soloVersoVuoto"])
+    prova("le righe non si toccano", True, o["nonMuta"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -124654,6 +125028,7 @@ def main():
               prove_pc_tema_e_ricerca,
               prove_carrello_salvato,
               prove_bollino_staff,
+              prove_scambi_verso,
               prove_config_esempio):
         try:
             f()
