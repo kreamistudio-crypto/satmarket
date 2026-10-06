@@ -45292,6 +45292,25 @@ async function svuotaFirmeNostr(fPronto, alLogin){
         await caricaNostrTools();
         try { pub = String(await auto.f.pubkey() || '').toLowerCase(); }
         catch(e){ break; }
+        /* LA CHIAVE DEVE ESSERE QUELLA DELL'ACCOUNT APERTO (6 ott 2026,
+           dal campo: la «Granola» di un negozio finita nel catalogo di
+           un ALTRO, col pallino Nostr). `firmatarioAutomatico` ripiega
+           sul bunker e sull'estensione del DISPOSITIVO, che non sono di
+           un account: chi tiene due negozi sullo stesso telefono firmava
+           la coda del secondo con la chiave del primo, i relay la
+           prendevano e l'import Nostr la riportava nel primo. Il server
+           l'avrebbe rifiutata, ma DOPO i relay: qui si guarda PRIMA.
+           Al login il firmatario e' quello con cui si e' appena entrati,
+           e l'account non e' ancora in pagina: li' vale lui. */
+        if (!alLogin) {
+          const mia = await pubAccount();
+          if (!mia || pub !== mia) {
+            console.log('🟪 [coda] il firmatario e\' di un\'altra chiave: non firmo');
+            if (fPronto) toast('Questa chiave non è quella dell\'account aperto: '
+              + 'i suoi annunci restano da firmare', 7000);
+            break;
+          }
+        }
         if (alLogin) toast(`🟣 Metto su Nostr i tuoi annunci (${resto})…`, 4000);
       }
       const NT = window.NostrTools;

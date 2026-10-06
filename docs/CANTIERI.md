@@ -37509,3 +37509,43 @@ al momento dell'annullo.
 
 **Provato.** `prove_p2p_motore`: il bottone nuovo c'è, la vecchia
 etichetta no, il foglio dice ancora che serve il sì dell'altra persona.
+
+## La firma automatica usava la chiave di un altro account (6 ott 2026)
+
+Il caso (Andrea, dal campo): nel catalogo di migliobruno è comparsa la
+«Granola» di Untempoperte, col pallino Nostr. Le due npub sono diverse;
+li gestisce la stessa persona sullo STESSO telefono, dentro Telegram:
+Untempoperte entra con Telegram, migliobruno dalla Mini App con Nostr.
+
+**Il meccanismo.** Dal 5 ott la coda degli annunci da mettere su Nostr
+si firma da sola (`svuotaFirmeNostr`), col firmatario che trova
+`firmatarioAutomatico`: la nsec salvata PER QUELL'ACCOUNT, altrimenti
+il bunker salvato e poi l'estensione — che sono del DISPOSITIVO, non
+di un account. Dentro Telegram la memoria della Mini App è la stessa
+per i due account: il bunker collegato da migliobruno restava lì, e
+aprendo come Untempoperte la sua coda (Granola compresa) veniva firmata
+con la chiave di migliobruno e pubblicata. Il server l'avrebbe
+rifiutata («La firma non è della tua chiave Nostr»), ma DOPO i relay;
+un'ora dopo l'import Nostr trovava un annuncio firmato da migliobruno e
+lo metteva nel suo negozio.
+
+**La cura.** `svuotaFirmeNostr` confronta la chiave del firmatario con
+quella dell'account aperto (`pubAccount`) PRIMA di firmare: se non è
+la sua non firma niente, la coda resta, e a chi l'ha data a mano lo
+dice. Al login vale il firmatario con cui si è appena entrati (la
+pagina non sa ancora chi siamo, e quella chiave È l'account).
+
+**Il WooCommerce non c'entrava**: i «Gocciolotti» di migliobruno
+vengono giustamente dal suo Woo.
+
+**Da pulire a mano** (lo scudo anti-resurrezione dell'import Nostr
+tiene fermo un annuncio tolto, anche se l'evento resta sui relay): la
+Granola e le eventuali altre copie vanno tolte dal negozio di
+migliobruno. Gli eventi rimasti sui relay a nome di migliobruno non
+tornano in vetrina; toglierli dai relay vorrebbe una cancellazione
+firmata da lui.
+
+**Provato.** `prove_firme_nostr`: il banco node che esegue la coda vera,
+con due scene nuove — il firmatario di un altro account non firma
+niente e lascia la coda intera (e il Profilo dice che ne restano), al
+login firma.

@@ -24682,6 +24682,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   firme non arriveranno mai»): senza, `svuotaFirmeNostr` gira a ogni
   apertura e il browser RIFIRMA e RIPUBBLICA quell'evento sui relay
   ogni volta, più il nag di `sollecita_firme_nostr`.
+  LA CHIAVE DELLA CODA È QUELLA DELL'ACCOUNT (6 ott 2026, la Granola
+  finita nel negozio sbagliato): `svuotaFirmeNostr` confronta la
+  pubkey del firmatario con `pubAccount()` PRIMA di firmare, perché
+  `firmatarioAutomatico` ripiega su bunker ed estensione del
+  DISPOSITIVO — dentro Telegram condivisi fra gli account dello stesso
+  telefono — e il browser pubblica sui relay prima che il server possa
+  dire «non è la tua chiave». Al login (`alLogin`) vale il firmatario
+  appena usato per entrare.
   IL «PERCHÉ» DELL'ALLARME DICEVA IL FALSO, e vale più della cura:
   «la deduplica confronterebbe un annuncio con sé stesso» — mentre le
   due liste di `trova_doppioni_nostr` sono DISGIUNTE su

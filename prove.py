@@ -19267,6 +19267,10 @@ function toast(){}
 function console_log(){}
 async function caricaNostrTools(){}
 async function firmatarioAutomatico(){ return null; }
+/* la chiave dell'account APERTO (6 ott 2026): il firmatario finto ha
+   pubkey 'bb', e l'account e' suo finche' la scena non lo cambia */
+let pubConto = 'bb';
+async function pubAccount(){ return pubConto; }
 let resi = 0;
 function renderIdentita(){ resi++; }
 async function pubblicaEventoSuRelay(){ return 1; }
@@ -19304,8 +19308,23 @@ console.log = (() => { const v = console.log; return (...a) => {
   f.chiudi();
   let morta = false;
   try { await f.firma({n: 99}); } catch(e){ morta = true; }
+  /* LA CHIAVE DI UN ALTRO ACCOUNT (6 ott 2026, dal campo): lo stesso
+     telefono, la Mini App aperta come un altro negozio, il firmatario
+     del dispositivo e' di quello di prima. Non deve firmare niente. */
+  const attesaPrima = firmeInAttesa;
+  const primaAltro = firmati.length;
+  coda = Array.from({length: 5}, (_, k) => k + 101);
+  pubConto = 'cc';
+  const f2 = await firmatarioNsec('nsec1finta');
+  const restoAltro = await svuotaFirmeNostr(f2);
+  const firmatiAltro = firmati.length - primaAltro;
+  /* ...e al LOGIN vale il firmatario con cui si e' appena entrati:
+     l'account in pagina non c'e' ancora, e quella chiave E' l'account */
+  const restoLogin = await svuotaFirmeNostr(f2, true);
+  f2.chiudi();
   console.log(JSON.stringify({resto, dopo, firmati: firmati.length,
-    unici: new Set(firmati).size, morta, attesa: firmeInAttesa}));
+    unici: new Set(firmati).size, morta, attesa: attesaPrima,
+    attesaAltro: firmeInAttesa, restoAltro, firmatiAltro, restoLogin}));
 })();
 """
     with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -19325,8 +19344,15 @@ console.log = (() => { const v = console.log; return (...a) => {
         return
     esito = json.loads(r.stdout.strip().splitlines()[-1])
     prova("25 annunci in coda: firmati TUTTI, in piu' giri, con la "
-          "stessa nsec", (25, 25, 0), (esito["firmati"], esito["unici"],
-                                       esito["resto"]))
+          "stessa nsec", (25, 25, 0), (esito["firmati"] - 5,
+                                       esito["unici"] - 5, esito["resto"]))
+    prova("la chiave di un ALTRO account non firma la coda: niente sui "
+          "relay, la coda resta intera", (0, 5),
+          (esito["firmatiAltro"], esito["restoAltro"]))
+    prova("...al login invece firma il firmatario appena entrato", 0,
+          esito["restoLogin"])
+    prova("...e col firmatario sbagliato il Profilo sa che ne restano",
+          5, esito["attesaAltro"])
     prova("...la chiave regge un secondo giro nello stesso gesto", 0,
           esito["dopo"])
     prova("...e dopo chiudi() non firma piu' niente", True, esito["morta"])
