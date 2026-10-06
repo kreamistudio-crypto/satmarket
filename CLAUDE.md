@@ -28,8 +28,9 @@ I documenti in `docs/` NON sono import: si aprono quando servono.
   setup fatto e la scaletta: `docs/HACKATHON-SETUP.md`),
   `docs/STUDIO-LIQUIDITA-NODO-2026-10-01.md` (sweep e canale da 5M),
   `docs/STUDIO-INSTRADAMENTO-NODO-2026-10-05.md` (chi paghiamo, tariffe),
-  `docs/STUDIO-PROFILO-PERSONALIZZATO-2026-10-06.md` (dal 19 ott) e
-  `docs/STUDIO-MERCATINI-BAZAR-2026-10-06.md` (lo stato 🎪, gli eventi).
+  `docs/STUDIO-PROFILO-PERSONALIZZATO-2026-10-06.md` (dal 19 ott),
+  `docs/STUDIO-MERCATINI-BAZAR-2026-10-06.md` (lo stato 🎪, gli eventi) e
+  `docs/STUDIO-REGALO-2026-10-06.md` (il regalo a un iscritto, decisioni).
 
 I DOCUMENTI GRANDI NON SI LEGGONO MAI INTERI: CANTIERI (2 MB),
 ARCHITETTURA (2 MB) e PRODUZIONE sono da migliaia di righe, e una
