@@ -38328,3 +38328,206 @@ quella scelta. Non toccata.
 
 **DA GUARDARE.** Con TalkBack e VoiceOver sul telefono: che dicano
 «selezionato» sulla pillola appena toccata.
+
+## L'ordine fantasma nell'archivio P2P: 973d41de «pubblicato» per diciannove giorni (6 ott 2026, sera; la cura nel codice è DA FARE DOPO IL LANCIO)
+
+**DAL CAMPO.** Andrea apre dal PC un suo ordine P2P di vendita,
+«pubblicato» e mai preso: nella pagina «Nel dettaglio» i numeri dicono
+«—», e sotto c'è il riquadro «📱 I messaggi cifrati di questo scambio
+sono sul dispositivo dove l'hai aperto: qui lo vedi e lo segui, ma i
+gesti — la fattura, i sats, il recapito — si fanno da là.» La domanda:
+«avevamo deciso che il P2P funziona tutto dallo stesso account, su
+qualunque dispositivo».
+
+**LA DECISIONE C'È, ED È RISPETTATA.** È la voce «Il profilo di scambio
+si lega all'account» (set 2026): chi entra da Telegram ha il profilo
+ricavato dal conto, lo stesso dal bot, dal sito e dall'app. Le eccezioni
+sono dichiarate lì e nel giudice del mazzo del 14 set: un profilo nato
+sul dispositivo prima del seme, con una storia, resta («tenuto», col
+gesto «🔁 Usa il profilo del tuo account»), e la chiave Nostr propria è
+di chi la porta. Il riquadro viene dal 24 set («I miei scambi su ogni
+dispositivo»): una riga ricostruita dall'archivio senza una chiave che
+il mazzo sappia rifare nasce `soloVista`. Le tre diagnosi incollate da
+Andrea (telefono, PC, mini app Telegram) dicono lo stesso profilo del
+conto, `bae6b807`, e la restore che risponde ovunque: il problema era
+UNA riga, `973d41de`, uguale sui tre.
+
+**LA DIAGNOSI, IN SOLA LETTURA** (i comandi li ho scritti io, li ha
+lanciati Andrea; da qui nessuna macchina toccata).
+- L'archivio, sul VPS: `973d41de-ce3e-4155-87d7-7bd373e6812c`, `stato`
+  `pending`, `lato` `sell`, `maker` 1, `euro` vuoto, registrato il 17
+  set alle 08:15:20 UTC, ultimo 38383 visto alle 08:15:19, zero momenti,
+  nessuna riga in `p2p_scambi`.
+- mostrod, sul nodo: `canceled`, creato il 17 set alle 08:15:19,
+  `expires_at` il 24 set, 10 €, profilo `bae6b807`. Ritirato, quindi, e
+  fuori dal libro; QUANDO, la lettura fatta non lo dice.
+- I `pending` dell'archivio, per tutti: quattro righe. 973d41de (19
+  giorni, zero eventi), 6288bd28 (di Andrea, 5 giorni, vero: la restore
+  lo conosce), d242d892 e f904185a (di altri, 5 e 0 giorni). Il
+  fantasma è uno solo.
+
+**COME È NATO, passo per passo.**
+1. Il 17 set Mostro pubblica l'ordine; un secondo dopo il server lo
+   registra — è l'intestazione che il client fa con la risposta del
+   coordinatore in mano (`intestaOrdiniP2P([id], true)`) — e il lettore
+   del libro lo vede `pending`. Quello stato lo scrive SOLO lui
+   (`_avvisi_libro_p2p`, e così in tutta la storia del file: guardato
+   con `git log -G`), e le tre letture del libro chiedono solo
+   `authors: [mostro]`. A Mostro l'ordine era arrivato.
+2. Poi il ritiro, e la chiusura non arriva al server da nessuna delle
+   due strade: niente evento di mostrod (la porta degli eventi della
+   0007 è entrata nel server nella notte fra il 18 e il 19 set), e niente 38383
+   `canceled` letto dal lettore del libro, che girava dal 16.
+3. Senza cronaca, per l'archivio `pending` vuol dire «pubblicato»
+   (`_stato_scambio_p2p`), e le righe non finali si servono senza limite
+   d'età (`_scambi_p2p` taglia solo i finali oltre `P2P_STORICO_GIORNI`);
+   il lettore smette di seguirla dopo `P2P_LIBRO_MEMORIA_S`, 40 giorni.
+   «Pubblicato» per sempre.
+4. Ogni dispositivo la ricostruisce (`rigaDaServerP2P`) senza chiave: la
+   restore non elenca un ordine chiuso, e `chiave_mia` per un ordine mai
+   preso non esiste (mostrod la dice dalla presa in poi). Quindi
+   `soloVista`, e «indice 0, chiave vuota, mossa 0» nella diagnosi è la
+   faccia di ogni riga nata senza chiave, non l'indice dell'ordine. Il
+   riquadro dava la colpa a un «altro dispositivo» che non c'era.
+5. I «—»: `euro` vuoto, perché la colonna è nata il 18 set e l'ultimo
+   38383 visto di quell'ordine è del 17. Il conto non inventa una cifra
+   (`contoDettP2P`: un euro che non si sa non è zero).
+
+**L'IPOTESI DI PARTENZA, SMENTITA.** «Una pubblicazione mai arrivata a
+Mostro» quella riga non la può lasciare: il client intesta un ordine
+solo con la risposta del coordinatore in mano (gli id provvisori non si
+dichiarano, `registraOrdiniP2P`), e una pubblicazione senza risposta
+resta sul dispositivo che l'ha mandata come «Nessuna risposta»
+(`senza_risposta`).
+
+**LA CORREZIONE A MANO** (6 ott 2026, sera; comandi scritti da me,
+lanciati da Andrea sul VPS, uno alla volta). Da root la copia,
+`sqlite3 -readonly /srv/barattolo/dati/satmarket.db ".backup
+/root/prima-973d41de.db"`, e la sua rilettura (`pending`); poi, come
+utente `barattolo` sul file vero e con `.timeout 5000`, `UPDATE
+p2p_ordini SET stato='canceled' WHERE
+ordine='973d41de-ce3e-4155-87d7-7bd373e6812c' AND stato='pending';
+SELECT changes();` — deve dire 1, e più di una riga non la può toccare
+per costruzione (`ordine` è la chiave primaria) —; poi la rilettura.
+NIENTE LIBRO FERMO E NIENTE RIAVVIO: `/api/p2p/scambi` legge il database
+a ogni richiesta, il lettore smette da solo di seguire una riga finale,
+e non parte nessun avviso, perché la scrittura non passa dal giudice
+del libro. Sui dispositivi la riga passa ad «annullato» alla prima
+fotografia dell'archivio (la scala «solo in avanti»,
+`P2P_RIPRESA_PASSO`; una fotografia all'apertura e poi ogni due minuti
+a vista aperta) e va sotto «Annullati» (`archiviaRitiratoP2P`); la card
+resta coi «—».
+⚠️ LA FINESTRA, ed è la trappola che vale oltre questo ordine: senza
+cronaca l'archivio serve un finale per trenta giorni contati dalla
+REGISTRAZIONE — qui fino al 17 ott alle 08:15 UTC — e il client non
+toglie mai una riga che il server smette di servire (un «pubblicato»
+non lo toccano né la scopa né la ✕: `p2pTogliibile`). Un dispositivo
+aperto dopo quella data terrebbe «pubblicato» per sempre: telefono, PC
+e mini app vanno aperti prima.
+ESITO: da scrivere qui quando Andrea l'ha lanciata e guardata dal
+telefono — nel Filtro di «I miei scambi» uno in meno in «Nel libro» e
+uno in più in «Annullati»; nella diagnosi `archivio 973d41de: il server
+dice annullato, la riga e' a pubblicato → annullato`.
+
+**LA CURA NEL CODICE — DA FARE DOPO IL LANCIO** (decisione di Andrea,
+6 ott 2026: dopo il 10 ottobre, non prima). Due pezzi, mezza giornata
+ciascuno con prove, giro dal vivo col relay morto e verbale.
+1. IL SERVER SA QUANDO UN ORDINE SCADE. Il 38383 porta la scadenza e il
+   lettore la legge già (`scade`, che oggi serve solo a distinguere lo
+   scaduto dal ritiro) ma non la salva: una colonna `scade` in
+   `p2p_ordini`, con la migrazione. Un `pending` senza cronaca oltre la
+   scadenza, con un margine per il giro dello scheduler di mostrod,
+   diventa «annullato» — DATATO al momento in cui il server se ne
+   accorge e non alla registrazione, o la finestra qui sopra lo farebbe
+   uscire dall'archivio prima di arrivare ai dispositivi. Le righe nate
+   prima della colonna: `visto` più quindici giorni
+   (`max_expiration_days`, il tetto che nessun ordine supera). Il
+   lettore la chiude lui e smette di seguirla, con una riga di journal
+   («📖 Libro P2P: <primi 8> oltre la scadenza senza notizie: chiuso
+   come scaduto»): vuol dire che una chiusura si è persa, ed è un fatto
+   da vedere.
+2. IL RIQUADRO DICE IL PERCHÉ. La riga ricostruita porta il MOTIVO al
+   posto del sì/no di `soloVista` — `chiaveScambioDaServerP2P` sa già
+   quale ramo l'ha fermata — e pagina, card e toast di «📍 Sono qui»
+   dicono la cosa vera. Oggi il testo è uno per cinque cause, ed è
+   giusto solo nella quarta. I testi proposti (pagina; card e toast):
+   1) Il profilo non è ancora pronto qui (il seme in arrivo, o la
+      libreria che non c'è): «⏳ Sto preparando il tuo profilo di
+      scambio su questo dispositivo: tra un attimo lo scambio si governa
+      anche da qui.» — senza libreria «⚠️ Su questo dispositivo non è
+      arrivata la libreria che firma gli scambi: ricarica la pagina.»;
+      «⏳ Un attimo: sto preparando il profilo».
+   2) Il coordinatore non ha ancora risposto (restore non conclusa,
+      ordine mai preso): «📡 Sto chiedendo al coordinatore le chiavi di
+      questo scambio: finché non risponde, da qui lo vedi ma i gesti non
+      partono.», col bottone «↻ Riprova»; «📡 In attesa del
+      coordinatore».
+   3) È del profilo del conto, ma qui c'è un profilo nato sul
+      dispositivo (la restore lo dà a un'altra identità, il ramo
+      «tenuto»): «🔑 Questo scambio è del profilo di scambio del tuo
+      account, ma su questo dispositivo usi un profilo nato qui. Passa a
+      quello del tuo account per fare i gesti anche da qui.», col
+      bottone «🔁 Usa il profilo del tuo account»; «🔑 È del profilo del
+      tuo account».
+   4) Aperto con un altro profilo (la chiave detta dal server non si
+      rifà da questo mazzo): «🔑 Questo scambio l'hai aperto con un altro
+      profilo di scambio, che su questo dispositivo non c'è: da qui lo
+      segui, i gesti si fanno da dove usi quel profilo.»; «🔑 Aperto con
+      un altro profilo: qui lo segui».
+   5) Il coordinatore non lo dà come attivo e nessuno l'ha mai preso —
+      il caso di 973d41de. Se nemmeno il libro pubblico lo ha: «⚠️
+      Questo ordine non è più in vetrina: per il coordinatore non è
+      attivo e nessuno può prenderlo. Probabilmente è scaduto o è stato
+      ritirato e la notizia non ci è arrivata.», col bottone «🧹 Togli
+      dalla lista»; «⚠️ Non più in vetrina». Se il libro lo ha ancora
+      `pending`: «⚠️ È ancora in vetrina, ma l'hai pubblicato con un
+      profilo di scambio che su questo dispositivo non c'è: da qui non
+      si può ritirare. Scade da solo il <data>.»; «⚠️ In vetrina con un
+      altro profilo». Il quinto caso guarda il libro pubblico:
+      `statoPubblicoOrdini` lo legge già, e oggi ignora la risposta
+      `pending`.
+   E il titolo sopra il riquadro, «Ordine pubblicato — È nel libro…»,
+   nel quinto caso è falso: col primo pezzo se ne va da solo.
+
+**LE STRADE SCARTATE.**
+- «Pubblicazione non riuscita» come nome dello stato (la proposta di
+  partenza): la pubblicazione era riuscita, si era persa la CHIUSURA; e
+  una pubblicazione davvero senza risposta ha già il suo stato,
+  «Nessuna risposta», sul dispositivo che l'ha mandata. Il nome è «Non
+  più in vetrina».
+- La trade key di un ordine non preso detta al server già alla
+  pubblicazione, così che `chiave_mia` esista prima della presa:
+  renderebbe governabile subito una riga che oggi aspetta la restore, ma
+  i gesti viaggiano comunque sui relay, e su 973d41de non avrebbe
+  cambiato niente — l'ordine era chiuso.
+- Il passaggio automatico al profilo del conto di un profilo con una
+  storia: scartato il 14 set col suo perché («E SCRIVERE DA DUE NON SI
+  PUÒ»), e qui non c'entrava.
+- La cura sui soli dispositivi: un «pubblicato» la ✕ non lo toglie, e
+  anche potendo l'archivio direbbe la cosa sbagliata a ogni dispositivo
+  nuovo. La verità sta sul server.
+
+**PROVATO.** La lettura del codice su `origin/main` (1e183aa): chi
+scrive `p2p_ordini.stato` (anche nella storia), i tre filtri `authors`,
+`_stato_scambio_p2p`, `_scambi_p2p`, `adottaScambiServerP2P`,
+`p2pTogliibile`, `riallineaScambioP2P`; e i fatti di produzione dai
+quattro comandi in sola lettura lanciati da Andrea.
+
+**NON PROVATO, e resta da guardare.**
+- PERCHÉ il 38383 `canceled` non è arrivato al lettore del libro, che
+  girava dal 16 set: dalla sola lettura del codice non si dice. Il
+  candidato più probabile, non verificato: quella mattina il lettore
+  chiedeva al PRIMO relay che rispondeva, e uno era rimasto indietro
+  («Il primo che risponde non basta», corretto alle 13:47 italiane dello
+  stesso 17 set, tre ore e mezza dopo la pubblicazione; la voce del 18 set
+  «Il campanello che rimanda» gli dà già i silenzi di quel mattino); e
+  il segnalibro del libro, che è uno per tutti gli ordini e intanto era
+  andato avanti, un evento più vecchio del suo margine non lo richiede
+  più. Gli altri candidati: un ritiro mentre il server non leggeva
+  (deploy, riavvio), o una chiusura scritta a mano nel database del
+  nodo, che non ripubblica niente.
+- L'esito della correzione sui tre dispositivi.
+- Le letture di PRODUZIONE puntano a `~/satmarket/satmarket.db`, ma il
+  database vero è `/srv/barattolo/dati/satmarket.db` (Andrea, 6 ott); e
+  sul nodo `sqlite3` non c'è (Andrea ha letto con python3). Due righe di
+  PRODUZIONE da sistemare, a parte.
