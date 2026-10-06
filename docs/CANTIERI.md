@@ -37648,3 +37648,113 @@ e la proposta cade con lei.
 **PROVATO.** Revert senza conflitti (main non aveva toccato quelle righe
 dopo 14a3a4c). Suite e collaudi: nel verbale del push; scatto a 375 px
 nei due temi col ₿ di nuovo al suo posto.
+
+## Il bollino 🛡️ Staff (6 ott 2026, prima del lancio del P2P)
+
+Il compito (Andrea): anticipare il bollino 🛡️ Staff descritto nello
+studio «Nome e foto del profilo a scelta» (§3.8 e §6, decisioni 5 e 8):
+lo dà solo il server, solo ad admin e moderatori, non si compra;
+compare accanto al nome ovunque si vedono nome e foto, con una
+spiegazione al tocco — «Fa parte dello staff di Barattolo: solo chi ha
+questo bollino è un moderatore». Niente filtro sui nomi per ora (resta
+il cantiere del §6, dopo il lancio).
+
+**Il perché.** Chiunque può chiamarsi «Barattolo Assistenza» su
+Telegram o nel suo kind-0, e noi quel nome lo mostriamo. Nel P2P (soldi
+a mano, moderatori che nelle dispute contattano le parti) l'imitazione
+costa di più. Il segno POSITIVO batte qualunque filtro: si impara a
+cercare il bollino, non a diffidare dei nomi.
+
+**Il server: un giudice solo, nessuna colonna.** `e_staff(tg_id)`
+accanto a `e_admin`, e `_ids_staff()`: ESATTAMENTE chi `e_admin`
+riconosce (nel collaudo anche il 999). La prima stesura convertiva in
+intero ogni voce di `ADMIN_IDS`, e la prova l'ha presa: con un id fra
+virgolette nel config `e_admin` dice no e il bollino diceva sì — cioè
+«moderatore» a chi le chiavi della moderazione non le ha. Esce un SÌ
+accanto al nome che accompagna, mai il tg_id:
+- gli annunci, dal collo di bottiglia `arricchisci_righe_vetrina`
+  (`venditore_staff`, via `_segna_staff_venditori`): con `venditore_id`
+  sul tg_id; la vetrina anonima il `venditore_id` non lo riceve, e non
+  deve, quindi lì si giudica sul CODICE del negozio (pubblico, già nella
+  riga) con una query sola sulle chiavi primarie dello staff, e solo se
+  serve;
+- il negozio: `venditore.staff`, scritto prima del `del tg_id`; le
+  recensioni `da_staff`, col `da_tg_id` letto e tolto (`pop`) prima di
+  partire;
+- il volto della card dell'altra parte (`_volti_persone`: ordini del
+  mercatino e controparte P2P) e quello del libro (`_facce_ordini_p2p`,
+  che legge il tg_id come `autore` perché la sentinella di
+  `prove_volti_libro` — mai `"tg_id"` nel corpo — resti com'era): qui la
+  chiave `staff` c'è SOLO quando è vera, e il volto di tutti gli altri
+  resta identico a ieri (i banchi che lo confrontano intero lo dicono);
+- le dispute P2P viste da un moderatore: `compra_staff`,
+  `vende_staff`, `presa_da_staff`.
+
+**Il client: una fabbrica, dentro il volto unico.** `bollinoStaff()` è
+una pillola blu (token `--staff-bg`/`--staff-text` nei due temi, 8,59 e
+8,15 di contrasto) con lo scudo DISEGNATO in SVG e la parola «Staff»:
+disegnato e non 🛡️ per la ragione del 🟣 (il glifo cambia da un
+telefono all'altro) e soprattutto perché un'emoji sta in un nome
+Telegram, una pillola colorata no — e il falso, scritto nel nome, al
+tocco non spiega niente. È un bottone (ruolo, tastiera): `spiegaStaff`
+ferma il tocco (sotto c'è quasi sempre una porta, il negozio o
+l'ordine) e apre la domanda unica come avviso, con la pillola grande in
+testa perché si impari com'è fatta (i gesti della domanda unica passano
+a ottanta). Posti: scheda dell'annuncio (prima del 🟣), testata del
+negozio, recensioni, `cardParte` (ordini e controparte P2P), il
+pannello delle dispute (le parti; «L'ha presa …»).
+DOVE IL NOME NON SI VEDE — il volto sull'anello del libro, la fila
+«Scambi P2P» della home, il riquadro «Chi ha pubblicato» — il bollino
+sta all'angolo della faccia (`bollinoVolto`, `.mini`), FUORI dal tondo
+(che taglia quel che sporge). Vive nel blocco del volto unico perché
+segue la stessa cache: `ricordaVolto` porta `staff` (solo quando è
+vero; una risposta senza la chiave non lo spegne, un no del server sì)
+e `ridisegnaVolti` accende al suo posto il bollino già disegnato quando
+la faccia arriva in ritardo — la fila della home non si ridisegna da
+sola.
+
+**Strade scartate.** Un elenco degli id dello staff mandato al client
+(il tg_id nel P2P non esce, e la regola resta); una colonna o un flag
+in `utenti` (non si compra e non si accende: è il config); l'emoji
+🛡️ nel testo; il bollino DENTRO il tondo del volto (tagliato
+dall'`overflow:hidden`). Non toccati, e detti: la classifica, il
+proprio Profilo, le anteprime Open Graph, i widget, le pagine SEO, il
+pannello admin.
+
+**Visto dal vivo, e curato.** A 375 px uno scudo da 10 px all'angolo
+dell'anello si leggeva come una macchia: ora 20 px con lo scudo 12×14.
+E dentro l'anello `.p2p-anello svg` lo ruotava di −90° insieme al tratto
+del tempo: `.p2p-anello .bollino-staff svg{transform:none}`.
+
+**Provato.** `prove_bollino_staff` (40): i giudici VERI su un database
+in memoria (e_staff contro e_admin su tutta la scala, il config con le
+voci storte, la vetrina anonima dal codice del negozio con UNA lettura,
+nessuna lettura senza bisogno), le sentinelle sulle rotte e sui posti
+del client, i token nei due temi, e il banco node col volto unico
+intero (la pillola senza emoji, la frase parola per parola, l'angolo
+che nasce spento e si accende quando il volto arriva tardi, solo il
+suo; il tondo senza bollino; il tocco che si ferma e spiega).
+`collaudo_bollino_staff.py` (22, nei due elenchi della CI, verde nella
+gabbia) col server vero: vetrina anonima e con sessione, scheda,
+negozio, recensioni senza tg_id, ordine dai due lati, libro e
+controparte P2P, dispute, e il 403 a chi non modera. Emendati sei
+banchi che eseguono le funzioni toccate (`e_staff` di cartone nel loro
+mondo) e il censimento della domanda unica (80). Tortura sulla copia:
+18 su 18 uccise da `prove.py`; sul solo collaudo 8 su 9 delle
+mutazioni del server (la nona, il filtro di `e_admin`, è equivalente
+col config di cartone, che scrive lo staff come numero).
+Dal vivo sulla copia in collaudo (relay morto, porta sua), a 375 px nei
+due temi, nel Browser pane e nel Chrome headless a densità 3: le nove
+scene (scheda, spiegazione, recensioni, negozio dello staff, ordine,
+libro, «Chi ha pubblicato», fila della home, dispute) e cinque tocchi
+veri sul bollino (libro, «Chi ha pubblicato», fila, recensione, ordine)
+— sempre la spiegazione, mai la porta sotto. Nel Browser pane il clic
+per coordinate è atterrato altrove (il pane aveva rimpicciolito la
+vista): i tocchi buoni sono quelli del headless con `elementFromPoint`.
+
+**Da guardare.** Il telefono vero (Android, iPhone, APK): lo scudo
+all'angolo dell'anello è un bersaglio da 20 px. Sul VPS il bollino lo
+porta chi sta in `ADMIN_IDS` del config di là: va guardato che ci siano
+le persone giuste (il pannello «⚙️ Stato delle leve» ne dice il
+numero). La classifica e il proprio Profilo senza bollino: se servono,
+è un ritocco piccolo.

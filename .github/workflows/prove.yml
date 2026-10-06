@@ -112,6 +112,7 @@ jobs:
              collaudo_coda_vetrina.py
              collaudo_pagamenti_non_arrivati.py
              collaudo_carrello_salvato.py
+             collaudo_bollino_staff.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
@@ -200,6 +201,7 @@ jobs:
              collaudo_coda_vetrina
              collaudo_pagamenti_non_arrivati
              collaudo_carrello_salvato
+             collaudo_bollino_staff
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.

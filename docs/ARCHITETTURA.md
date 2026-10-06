@@ -7075,6 +7075,21 @@
   entrano da `prendiFacceP2P(facce, chiesti)`: gli id chiesti e non
   tornati diventano «?», e dalle fotografie del libro solo se la
   risposta porta `miei` (il server ha riconosciuto chi guarda).
+  IL BOLLINO 🛡️ STAFF (6 ott 2026): accanto al nome di chi sta in
+  `ADMIN_IDS` (admin e moderatori sono la stessa lista). Lo decide SOLO
+  il server, `e_staff(tg_id)` (esattamente chi `e_admin` riconosce):
+  niente colonna, niente rotta, non si compra. Esce un si' accanto al
+  nome, mai il tg_id — `venditore_staff` negli annunci (dal collo di
+  bottiglia; la vetrina anonima giudica sul codice del negozio),
+  `staff` nel negozio, `da_staff` nelle recensioni, `staff` nei volti
+  di `_volti_persone` e del libro (chiave presente solo se vera),
+  `compra_staff`/`vende_staff`/`presa_da_staff` nelle dispute P2P. Il
+  client disegna `bollinoStaff()` (pillola blu, scudo in SVG, mai
+  l'emoji: un'emoji sta in un nome) e, dove il nome non si vede,
+  `bollinoVolto(chiave)` all'angolo della faccia, che la cache del volto
+  unico accende anche a faccia arrivata tardi; il tocco (`spiegaStaff`)
+  spiega e non apre la porta sotto. Il perche' in CANTIERI, «Il bollino
+  🛡️ Staff».
   I RELAY SONO UNA LEVA (ago 2026): dove Barattolo scrive e legge su
   Nostr si cambia dal config del VPS, non con un commit. Erano CINQUE
   elenchi scritti a mano — `RELAYS_VERIFICA` nel server, `RELAYS`

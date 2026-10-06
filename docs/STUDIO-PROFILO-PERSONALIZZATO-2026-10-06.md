@@ -295,6 +295,10 @@ rifiutare come si rifiuta una proposta, lo sceglie l'utente fuori da
 qui. Il profilo a pagamento poi riusa il giudice del nome, scritto una
 volta sola.
 
+**Il bollino è FATTO il 6 ott 2026** (prima del lancio, richiesta di
+Andrea): `e_staff` e `bollinoStaff`, voce in CANTIERI «Il bollino 🛡️
+Staff». Del §6 resta da fare il filtro sui nomi gratuiti.
+
 ## 7. Le decisioni di Andrea (6 ott 2026)
 
 1. Prezzo 20.000 con lo STESSO sconto di livello del banner; nessun

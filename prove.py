@@ -40146,8 +40146,10 @@ def prove_fogli_di_casa():
     # ritrova, ricominciarlo butta via una cosa attesa — decisione di
     # Andrea) e «Svuotare il carrello da Anna?» dalla riga in home
     # (`chiediSvuotaCarrello`), la stessa domanda della ✕.
-    prova("i gesti che passano dalla domanda unica sono settantanove",
-          79, solo_codice(mini).count("chiediConferma({"))
+    # OTTANTA (6 ott 2026, il bollino 🛡️ Staff): «Staff di Barattolo»
+    # (`spiegaStaff`), un avviso — il tocco sul bollino spiega cos'e'.
+    prova("i gesti che passano dalla domanda unica sono ottanta",
+          80, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -53634,6 +53636,8 @@ def prove_card_parte_ordine():
            # le foto delle recensioni (ott 2026): il loro collaudo
            "foto_recensione": lambda v: []}
     exec(_SORGENTE[i_l:_SORGENTE.index("]\n", i_l) + 1], amb)
+    # il bollino 🛡️ Staff (6 ott 2026) ha la sua prova (prove_bollino_staff): qui nessuno e' dello staff
+    amb["e_staff"] = lambda tg_id: False
     for f in ("livello_utente", "_volti_persone", "miei_ordini"):
         exec(pezzo(f), amb)
     # la SPIA sul costruttore: chi gli si chiede, a ogni giro
@@ -55845,6 +55849,8 @@ def prove_ritocchi_prova_alan():
         STAMPE = []
         amb = {"db": _db, "re": re, "time": _time, "sqlite3": _sq,
                "print": lambda *a, **k: STAMPE.append(" ".join(map(str, a)))}
+        # il bollino 🛡️ Staff (6 ott 2026) ha la sua prova (prove_bollino_staff): qui nessuno e' dello staff
+        amb["e_staff"] = lambda tg_id: False
         for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "MAX_ORDINI_MAI_VISTI_P2P = ", "P2P_ORDINI_MAI_VISTI_S = ", "P2P_CAMBIO_PUB_SCARTO = "):
             i = _SORGENTE.index("\n" + riga) + 1
             exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
@@ -62072,6 +62078,8 @@ def prove_parti_si_vedono():
                else ""),
            "hex_to_npub": lambda h: "npub1" + h[:8]}
     exec(_SORGENTE[i_l:_SORGENTE.index("]\n", i_l) + 1], amb)
+    # il bollino 🛡️ Staff (6 ott 2026) ha la sua prova (prove_bollino_staff): qui nessuno e' dello staff
+    amb["e_staff"] = lambda tg_id: False
     for f in ("_ordini_puliti_p2p", "livello_utente", "_volti_persone",
               "_controparti_p2p"):
         exec(pezzo(f), amb)
@@ -65133,6 +65141,8 @@ def prove_volti_libro():
            # (A1) il giudice delle parti chiede a `p2p_scambi`, che qui non
            # c'e': nomina sqlite3 per dire «nessuna tabella = nessuno»
            "sqlite3": sqlite3}
+    # il bollino 🛡️ Staff (6 ott 2026) ha la sua prova (prove_bollino_staff): qui nessuno e' dello staff
+    amb["e_staff"] = lambda tg_id: False
     for f in ("_ordini_puliti_p2p", "_registra_ordini_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p",
               "_facce_ordini_p2p"):
         exec(pezzo(f), amb)
@@ -89029,6 +89039,8 @@ def prove_p2p_recapito_passo():
                   "P2P_SATS_MAX_EVENTO = "):
         _i = src.index("\n" + _riga) + 1
         exec(src[_i:src.index("\n", _i)], amb)
+    # il bollino 🛡️ Staff (6 ott 2026) ha la sua prova (prove_bollino_staff): qui nessuno e' dello staff
+    amb["e_staff"] = lambda tg_id: False
     for f in _FUNZIONI_LIBRO_P2P + ("_volti_persone", "_controparti_p2p", "_nome_altro_p2p",
                                     # col contanti l'avviso dice l'appuntamento (1 ott 2026)
                                     "_tabacchino_libro", "_dati_frase_p2p",
@@ -117433,6 +117445,8 @@ def prove_moderazione_p2p():
     for bl, fine in (("P2P_DISPUTA_ESITI = {", "}\n"), ("FORMA_DISPUTA_P2P = re.compile(", ")\n")):
         i = src.index("\n" + bl) + 1
         exec(src[i:src.index(fine, i) + len(fine)], amb)
+    # il bollino 🛡️ Staff (6 ott 2026) ha la sua prova (prove_bollino_staff): qui nessuno e' dello staff
+    amb["e_staff"] = lambda tg_id: False
     for f in ("_moderatori_p2p", "_chiusura_disputa_p2p", "_persona_disputa_p2p",
               "_testo_disputa_aperta_p2p", "_testo_disputa_chiusa_p2p", "_registro_disputa_p2p",
               "_disputa_evento_p2p", "_chiave_moderatore_p2p", "_registra_chiave_moderatore_p2p",
@@ -123633,6 +123647,241 @@ const out = {};
     prova("in DEMO niente scritture e niente riga", [0, "none"], out.get("demo"))
 
 
+def prove_bollino_staff():
+    """IL BOLLINO 🛡️ STAFF (6 ott 2026, prima del lancio del P2P; lo studio
+    «Nome e foto del profilo a scelta», §3.8 e §6). Accanto al nome di un
+    admin o di un moderatore — la stessa lista, `ADMIN_IDS` — ovunque si
+    vedano nome e foto. Lo decide SOLO il server (`e_staff`), non si
+    compra e non ha una colonna; il client disegna dove arriva un si'.
+    Il server VERO lo gira `collaudo_bollino_staff.py` (nella CI): le
+    rotte che portano un nome portano il si' giusto, e il tg_id non esce.
+    Qui i giudici VERI su un database in memoria, le sentinelle sui posti
+    che lo disegnano, e il banco node col volto unico intero: la pillola,
+    il bollino all'angolo della faccia che si accende quando il volto
+    arriva tardi, il tocco che spiega e non apre altro."""
+    print("\n[il bollino 🛡️ Staff]")
+    import sqlite3
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL GIUDICE: e_staff, sul tg_id, dalla lista di e_admin -------
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, "
+                "negozio TEXT DEFAULT '')")
+    con.executemany("INSERT INTO utenti VALUES(?,?)",
+                    [(42, "ab12cd34"), (77, ""), (111, "ee55ff66"),
+                     (999, "99aa99aa")])
+    aperte = []
+
+    class _Con:
+        def __init__(s): aperte.append(1)
+        def execute(s, *a): return con.execute(*a)
+        def close(s): pass
+    amb = {"ADMIN_IDS": [42, "77", "storto"], "MODALITA_COLLAUDO": False,
+           "db": _Con}
+    for f in ("e_admin", "_ids_staff", "e_staff", "_segna_staff_venditori"):
+        exec(pezzo(f), amb)
+    e_staff = amb["e_staff"]
+    prova("lo staff e' ESATTAMENTE chi e_admin riconosce: un numero fra "
+          "virgolette nel config non lo e' (e_admin direbbe no), una voce "
+          "storta si salta", {42}, amb["_ids_staff"]())
+    prova("e_staff: si' al moderatore (anche letto come stringa dal "
+          "database), no a chi non c'e', allo zero, al vuoto e a un tg_id "
+          "illeggibile", [True, True, False, False, False, False, False, False],
+          [e_staff(42), e_staff("42"), e_staff(77), e_staff(111),
+           e_staff(0), e_staff(None), e_staff("abc"), e_staff(999)])
+    amb["MODALITA_COLLAUDO"] = True
+    prova("in collaudo anche il 999, come per e_admin", (True, True),
+          (e_staff(999), amb["e_admin"](999)))
+    amb["MODALITA_COLLAUDO"] = False
+    prova("...e il giudice e' lo stesso di e_admin su tutta la scala",
+          [amb["e_admin"](n) for n in (42, 77, 111, 999)],
+          [e_staff(n) for n in (42, 77, 111, 999)])
+
+    # --- 2) GLI ANNUNCI: col venditore_id, o dal codice del negozio ------
+    segna = amb["_segna_staff_venditori"]
+    righe = [{"venditore_id": 42, "venditore_negozio": "ab12cd34"},
+             {"venditore_id": 111, "venditore_negozio": "ab12cd34"},
+             {"venditore_negozio": "ab12cd34"},
+             {"venditore_negozio": "ee55ff66"},
+             {"venditore_negozio": ""}, {}]
+    aperte.clear()
+    segna(righe)
+    prova("col venditore_id si giudica il tg_id (il codice non conta); "
+          "senza, il codice del negozio; il codice vuoto non e' di nessuno",
+          [True, False, True, False, False, False],
+          [r["venditore_staff"] for r in righe])
+    prova("...con UNA lettura del database", 1, len(aperte))
+    aperte.clear()
+    segna([{"venditore_id": 42}, {"venditore_id": 5}])
+    prova("con tutti i venditore_id il database non si apre", 0, len(aperte))
+    amb["ADMIN_IDS"] = []
+    aperte.clear()
+    r = [{"venditore_negozio": "ab12cd34"}]
+    segna(r)
+    prova("senza staff nel config: nessuno, e il database non si apre",
+          (False, 0), (r[0]["venditore_staff"], len(aperte)))
+    amb["ADMIN_IDS"] = [42, "77", "storto"]
+    arr = pezzo("arricchisci_righe_vetrina")
+    prova("il collo di bottiglia degli annunci segna il bollino, per "
+          "ultimo e prima di tornare", True,
+          0 < arr.find("_segna_staff_venditori(righe)")
+          < arr.rfind("return righe"))
+
+    # --- 3) LE ALTRE ROTTE CHE PORTANO UN NOME ---------------------------
+    neg = pezzo("negozio")
+    prova("il negozio: il si' del venditore, PRIMA di togliere il tg_id",
+          True, 0 < neg.find('venditore["staff"] = e_staff(v["tg_id"])')
+          < neg.find('del venditore["tg_id"]'))
+    prova("le recensioni: il tg_id di chi scrive si legge per il bollino "
+          "e si toglie (pop) prima di partire", True,
+          "f.da_tg_id" in neg
+          and 'f["da_staff"] = e_staff(f.pop("da_tg_id", 0))' in neg)
+    prova("la card dell'altra parte (ordini e P2P): il volto porta il si', "
+          "e la chiave c'e' solo quando e' vera", True,
+          re.search(r'if e_staff\(u\["tg_id"\]\):\s+chi\["staff"\] = True',
+                    pezzo("_volti_persone")) is not None)
+    fac = pezzo("_facce_ordini_p2p")
+    prova("il libro del P2P: il volto di chi pubblica porta il si', e il "
+          "tg_id letto per dirlo non entra nel volto", True,
+          "p.tg_id AS autore" in fac
+          and re.search(r'if e_staff\(r\["autore"\]\):\s+volto\["staff"\] = True',
+                        fac) is not None
+          and '"tg_id":' not in fac)
+    dis = pezzo("_riga_disputa_p2p")
+    prova("le dispute: le due parti e chi l'ha presa", True,
+          all(s in dis for s in ('"compra_staff": e_staff(r["compratore"])',
+                                 '"vende_staff": e_staff(r["venditore"])',
+                                 '"presa_da_staff": e_staff(r["presa_da"])')))
+    prova("NON SI COMPRA: nessuna colonna, nessuna rotta che lo scriva",
+          [], [s for s in ("staff INTEGER", "staff TEXT", "/api/me/staff",
+                           "SET staff", "staff=?")
+               if s in src])
+
+    # --- 4) IL CLIENT: chi lo disegna, e dove ----------------------------
+    prova("la scheda: il si' dal server nel listing...", True,
+          "sellerStaff:!!a.venditore_staff," in mini)
+    prova("...e accanto al nome di chi vende, prima del 🟣", True,
+          "<b>${esc(l.seller)}</b>${\n          l.sellerStaff ? bollinoStaff() : ''}${"
+          in mini.replace("\r\n", "\n"))
+    prova("il negozio, accanto al nome", True,
+          "${esc(v.nome||'—')}${v.staff ? bollinoStaff() : ''}${badge}" in mini)
+    prova("le recensioni, accanto a chi le ha scritte", True,
+          "${nome}${f.da_staff ? bollinoStaff() : ''} ${faccia}" in mini)
+    card = pezzo_js(mini, "function cardParte(c, chi, opz){", "\n}\n")
+    prova("la card dell'altra parte (una per ordini e P2P)", True,
+          "(c.staff ? bollinoStaff() : '')" in card)
+    prova("il libro P2P: all'angolo dell'anello (non sulla card d'esempio "
+          "del giro guidato)", True,
+          "(o.faccia ? '' : bollinoVolto('p2p:' + o.id))" in mini)
+    prova("...nella fila della home", True,
+          "${bollinoVolto('p2p:' + o.id, 'p2p-vt-bollino')}" in mini)
+    prova("...e nel riquadro «Chi ha pubblicato quest'ordine»", True,
+          "bollinoVolto(id ? 'p2p:' + id : '')" in mini)
+    prova("le dispute: le due parti e chi l'ha presa", 3,
+          sum(s in mini for s in ("(d.compra_staff ? bollinoStaff() : '')",
+                                  "(d.vende_staff ? bollinoStaff() : '')",
+                                  "(d.presa_da && d.presa_da_staff ? bollinoStaff() : '')")))
+    m = mini.replace("\r\n", "\n")
+    giorno = m[m.index("  :root{"):m.index("html[data-tema=\"scuro\"]{")]
+    sera = m[m.index("html[data-tema=\"scuro\"]{"):]
+    sera = sera[:sera.index("\n  }\n")]
+    prova("il suo blu nei due temi", (True, True),
+          ("--staff-bg:" in giorno and "--staff-text:" in giorno,
+           "--staff-bg:" in sera and "--staff-text:" in sera))
+
+    # --- 5) IL BANCO: il volto unico intero, coi pezzi veri --------------
+    js = r"""
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const avatarImg = n => n ? '<img class="av-foto">' : '';
+const conferme = []; const chiediConferma = c => conferme.push(c);
+const nodi = [];
+globalThis.document = {querySelectorAll: sel => nodi.filter(n => sel === '[' + n.attr + ']')};
+""" + volto_unico_js(mini) + r"""
+const out = {};
+out.pillola = bollinoStaff();
+out.testo = TESTO_STAFF;
+out.vuoto = bollinoVolto('');
+out.spento = bollinoVolto('p2p:abc');
+ricordaVolto('p2p:abc', {nome: 'Anna', avatar: ''});
+out.cacheNorm = JSON.stringify(cacheVolti['p2p:abc']);
+/* il bollino all'angolo e' gia' disegnato, spento; poi arriva il volto */
+const angolo = {attr: 'data-staff-di', k: 'p2p:abc', hidden: true,
+  getAttribute(){ return this.k; }};
+const altro = {attr: 'data-staff-di', k: 'p2p:zzz', hidden: true,
+  getAttribute(){ return this.k; }};
+nodi.push(angolo, altro);
+ricordaVolto('p2p:abc', {nome: 'Anna', avatar: '', staff: true});
+out.acceso = [angolo.hidden, altro.hidden];
+out.cacheStaff = cacheVolti['p2p:abc'].staff === true;
+out.dopo = bollinoVolto('p2p:abc', 'p2p-vt-bollino');
+ricordaVolto('p2p:abc', {nome: 'Anna'});
+out.restaSenzaChiave = cacheVolti['p2p:abc'].staff === true && !angolo.hidden;
+ricordaVolto('p2p:abc', {nome: 'Anna', staff: false});
+out.spentoDopo = [angolo.hidden, 'staff' in cacheVolti['p2p:abc']];
+/* il volto: lo stesso di prima, il bollino non entra nel tondo */
+ricordaVolto('p2p:abc', {nome: 'Anna', staff: true});
+out.tondo = voltoHTML({nome: 'Anna'}, 'p2p-faccia', {chiave: 'p2p:abc'});
+/* il tocco */
+let fermato = 0, prevenuto = 0;
+spiegaStaff({stopPropagation(){ fermato++; }, preventDefault(){ prevenuto++; }});
+out.tocco = [fermato, prevenuto, conferme.length];
+out.foglio = conferme[0];
+spiegaStaff();
+out.senzaEvento = conferme.length;
+console.log(JSON.stringify(out));
+"""
+    r = _node_banco(js)
+    if r is None:
+        salta("il banco node del bollino", "node non c'e'")
+        return
+    p = r.get("pillola", "")
+    prova("la pillola: la classe, lo scudo DISEGNATO e la parola", True,
+          p.startswith('<span class="bollino-staff"') and "<svg" in p
+          and p.endswith("Staff</span>"))
+    prova("...niente emoji dentro (il glifo cambia da un telefono "
+          "all'altro, e un'emoji sta in un nome)", False, "🛡" in p)
+    prova("...e' un bottone: tocco e tastiera spiegano", True,
+          'role="button"' in p and 'tabindex="0"' in p
+          and 'onclick="spiegaStaff(event)"' in p
+          and "event.key===\\'Enter\\'" not in p
+          and "event.key==='Enter'" in p)
+    prova("la frase di Andrea, parola per parola",
+          "Fa parte dello staff di Barattolo: solo chi ha questo bollino "
+          "è un moderatore.", r.get("testo"))
+    prova("all'angolo di una faccia senza chiave non c'e' niente", "",
+          r.get("vuoto"))
+    prova("...con la chiave nasce spento finche' la cache non dice si'",
+          True, ' hidden ' in r.get("spento", "")
+          and 'data-staff-di="p2p:abc"' in r.get("spento", ""))
+    prova("un volto qualunque nella cache resta com'era: nessuna chiave "
+          "staff", '{"nome":"Anna","avatar":"","ignoto":false}',
+          r.get("cacheNorm"))
+    prova("IL VOLTO ARRIVA TARDI: il bollino gia' disegnato si accende "
+          "da solo, e solo il suo", [False, True], r.get("acceso"))
+    prova("...la cache lo ricorda, e il prossimo disegno nasce acceso, "
+          "con la classe di chi lo posa", True,
+          r.get("cacheStaff") and ' hidden' not in r.get("dopo", "")
+          and "mini p2p-vt-bollino" in r.get("dopo", ""))
+    prova("una risposta senza la chiave non lo spegne", True,
+          r.get("restaSenzaChiave"))
+    prova("...un no del server si'", [True, False], r.get("spentoDopo"))
+    prova("il tondo resta il tondo: il bollino non ci entra (lo "
+          "taglierebbe)", False, "bollino" in r.get("tondo", ""))
+    prova("il tocco si ferma li' (sotto c'e' una porta) e apre la "
+          "spiegazione", [1, 1, 1], r.get("tocco"))
+    f = r.get("foglio") or {}
+    prova("...un avviso con «Ho capito», la frase e la pillola grande in "
+          "testa", (True, "Ho capito", True, True),
+          (f.get("avviso"), f.get("etichetta"),
+           f.get("corpo") == r.get("testo"),
+           "bollino-staff grande" in (f.get("testata") or "")))
+    prova("...e senza evento (dalla tastiera di un banco) non esplode", 2,
+          r.get("senzaEvento"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -123871,6 +124120,7 @@ def main():
               prove_p2p_schermi_larghi,
               prove_pc_tema_e_ricerca,
               prove_carrello_salvato,
+              prove_bollino_staff,
               prove_config_esempio):
         try:
             f()

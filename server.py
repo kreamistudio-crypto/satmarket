@@ -20240,6 +20240,10 @@ def arricchisci_righe_vetrina(righe):
             r["famiglia_n"] = x["n"] if x else 0
             r["famiglia_varia"] = bool(x) and (
                 x["da"] != x["a"] or (x["da_eur"] or 0) != (x["a_eur"] or 0))
+    # 6) IL BOLLINO 🛡️ STAFF (6 ott 2026): accanto al nome di chi vende,
+    # dal giudice unico (`e_staff`). Qui e non in SQL perche' la lista
+    # dello staff vive nel config, non nel database.
+    _segna_staff_venditori(righe)
     return righe
 
 
@@ -22594,7 +22598,10 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     # piu' qui sarebbe una seconda porta da tenere allineata.
     # f.id e' un numero opaco: serve solo al bottone rimuovi dell'admin.
     feedback = [] if cursore else [dict(r) for r in con.execute(
-        "SELECT f.id, f.voto, f.commento, f.creato, f.foto, "
+        # `da_tg_id` serve SOLO al bollino Staff qui sotto, e si toglie
+        # prima di partire: chi ha scritto esce col nome e col codice
+        # del negozio, come sempre, mai col tg_id
+        "SELECT f.id, f.voto, f.commento, f.creato, f.foto, f.da_tg_id, "
         # LA PROVENIENZA SI VEDE, IL CONTEGGIO NO (set 2026, le
         # recensioni degli scambi P2P): una recensione nata da uno
         # scambio di sats lo dice nella sua riga — «una reputazione
@@ -22617,6 +22624,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
         (v["tg_id"], TETTO_FEEDBACK_NEGOZIO))]
     for f in feedback:
         f["foto"] = foto_recensione(f["foto"])
+        f["da_staff"] = e_staff(f.pop("da_tg_id", 0))
     # Sul profilo pubblico TUTTI i distintivi guadagnati (lug 2026,
     # bacheca stile Vinted): sono aggregati senza segreti, e il
     # foglietto del negozio li racconta uno a uno. L'ordine del
@@ -22693,6 +22701,8 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     del venditore["banner_stato"], venditore["banner_foto"]
     del venditore["banner_link"]
     del venditore["xp"], venditore["acquisti_ok"]
+    # il bollino 🛡️ Staff (6 ott 2026): il si' esce, il tg_id no
+    venditore["staff"] = e_staff(v["tg_id"])
     del venditore["tg_id"]         # il profilo che esce e' solo roba pubblica
     risposta = {"venditore": venditore, "annunci": annunci,
                 "esauriti": esauriti, "feedback": feedback}
@@ -37999,6 +38009,71 @@ def e_admin(tg_id: int) -> bool:
     return tg_id in ADMIN_IDS or (MODALITA_COLLAUDO and tg_id == 999)
 
 
+# IL BOLLINO 🛡️ STAFF (6 ott 2026, prima del lancio del P2P; lo studio
+# «Nome e foto del profilo a scelta», §3.8 e §6). Accanto al nome di
+# un admin o di un moderatore — che qui sono la stessa lista,
+# `ADMIN_IDS` — ovunque si vedano nome e foto. E' il segno POSITIVO che
+# batte qualunque filtro: chiunque puo' chiamarsi «Barattolo
+# Assistenza» su Telegram o nel suo kind-0, e noi quel nome lo
+# mostriamo; si impara a cercare il bollino, non a diffidare dei nomi.
+# LO DA' SOLO IL SERVER e non si compra: niente colonna, niente
+# scelta, niente rotta che lo accenda — esce come un booleano calcolato
+# qui, sul tg_id, accanto al nome che accompagna. Il client lo disegna
+# e basta (`bollinoStaff`), e un nome non lo puo' imitare: e' un
+# disegno, non un carattere. Il tg_id non esce per dirlo: esce il si'.
+def _ids_staff() -> set:
+    """Chi porta il bollino, come insieme di interi: ESATTAMENTE chi
+    `e_admin` riconosce (nel collaudo anche l'identita' 999). Una voce
+    del config che `e_admin` non riconoscerebbe — un numero scritto fra
+    virgolette — non da' il bollino: il bollino dice «moderatore», e
+    non lo dice a chi le chiavi della moderazione non le ha."""
+    chi = set()
+    for a in list(ADMIN_IDS) + ([999] if MODALITA_COLLAUDO else []):
+        try:
+            n = int(a)
+        except (TypeError, ValueError):
+            continue
+        if e_admin(n):
+            chi.add(n)
+    return chi
+
+
+def e_staff(tg_id) -> bool:
+    """Il bollino 🛡️ Staff per questa persona? Un tg_id illeggibile, o
+    lo zero di chi non e' dei nostri, dice di no."""
+    try:
+        n = int(tg_id or 0)
+    except (TypeError, ValueError):
+        return False
+    return bool(n) and n in _ids_staff()
+
+
+def _segna_staff_venditori(righe):
+    """`venditore_staff` su ogni riga d'annuncio. Con `venditore_id`
+    (chi guarda ha una sessione) si giudica sul tg_id; senza — la
+    vetrina anonima non lo riceve, e non deve — sul CODICE del negozio,
+    che e' pubblico e sta gia' nella riga: una query sola, sulle chiavi
+    primarie dei pochi dello staff, e solo se serve."""
+    staff = _ids_staff()
+    negozi = set()
+    if staff and any("venditore_id" not in r and r.get("venditore_negozio")
+                     for r in righe):
+        con = db()
+        try:
+            negozi = {r["negozio"] for r in con.execute(
+                "SELECT negozio FROM utenti WHERE tg_id IN "
+                f"({','.join('?' * len(staff))}) AND negozio<>''",
+                sorted(staff))}
+        finally:
+            con.close()
+    for r in righe:
+        if "venditore_id" in r:
+            r["venditore_staff"] = e_staff(r.get("venditore_id"))
+        else:
+            r["venditore_staff"] = bool(r.get("venditore_negozio")) \
+                and r.get("venditore_negozio") in negozi
+
+
 # ---------------------- API: PROFILO / INCASSI ----------------------
 
 # ------------------- DOPPIONI SU NOSTR ------------------------------
@@ -43384,7 +43459,8 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
     pulite = _ordini_puliti_p2p(ordini)
     segni = ",".join("?" * len(pulite))
     righe = con.execute(
-        f"SELECT p.ordine, u.nome, u.rating, u.n_feedback, u.negozio, "
+        f"SELECT p.ordine, p.tg_id AS autore, u.nome, u.rating, u.n_feedback, "
+        f"u.negozio, "
         f"u.username, u.registrato, "
         f"(CASE WHEN u.avatar_scelta='nessuna' THEN '' "
         f"ELSE u.avatar END) AS avatar "
@@ -43400,6 +43476,12 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
             "voti": voti,
             "negozio": r["negozio"] or r["username"] or "",
         }
+        # il bollino 🛡️ Staff (6 ott 2026): il si', mai il tg_id — che la
+        # query legge con un altro nome, `autore`, perche' la sentinella
+        # di prove_volti_libro resti quella di sempre. La chiave c'e' SOLO
+        # quando e' vera: il volto di tutti gli altri resta com'era.
+        if e_staff(r["autore"]):
+            volto["staff"] = True
         iscritto = int(r["registrato"] or 0)
         if iscritto:
             volto["giorni"] = max(0, (adesso - iscritto) // 86400)
@@ -43528,6 +43610,10 @@ def _volti_persone(con, ids, adesso) -> dict:
             "telegram": u["username"] or "",
             "npub": hex_to_npub(hexk) if hexk else "",
         }
+        # il bollino 🛡️ Staff (6 ott 2026), accanto al nome della card: la
+        # chiave c'e' SOLO quando e' vera, come nel volto del libro
+        if e_staff(u["tg_id"]):
+            chi["staff"] = True
         # LA CHIAVE MANCA QUANDO NON SI SA: gli account nati prima che
         # il server timbrasse l'iscrizione hanno `registrato` a zero, e
         # «0 giorni» direbbe «iscritto oggi» — il contrario esatto del
@@ -48455,6 +48541,10 @@ def _riga_disputa_p2p(con, r, io: int) -> dict:
         "compra": nudo(_persona_disputa_p2p(con, r["compratore"])),
         "vende": nudo(_persona_disputa_p2p(con, r["venditore"])),
         "compra_nostro": bool(r["compratore"]), "vende_nostro": bool(r["venditore"]),
+        # il bollino 🛡️ Staff (6 ott 2026) accanto ai nomi delle parti e
+        # di chi ha preso la disputa: lo stesso giudice di ogni altro nome
+        "compra_staff": e_staff(r["compratore"]), "vende_staff": e_staff(r["venditore"]),
+        "presa_da_staff": e_staff(r["presa_da"]),
         "sats": dati["sats"], "euro": nudo(dati["euro"]), "metodi": nudo(dati["metodi"]),
         # CHI HA MESSO LA CAUZIONE (1 ott 2026): chi ha PRESO secondo
         # mostrod (`apply_to = take` sul nodo) — 'compra' | 'vende' | ''.

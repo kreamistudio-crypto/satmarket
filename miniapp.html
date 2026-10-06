@@ -288,6 +288,11 @@
     --tg-soft:#E3F1FB; --tg-soft-on:#1A6699;
     --trust-deep:#10603A; --trust-text:#157347;
     --nostr:#7C3AED; --nostr-soft:#F2EBFE; --nostr-text:#7C3AED;
+    /* il bollino 🛡️ Staff (6 ott 2026): un blu notte suo, che non e'
+       quello di Telegram ne' quello di Barattozon — un segno che si
+       impara a cercare non deve somigliare a un altro. Misurati, testo
+       su fondo: 8,59 di giorno e 8,15 di sera. */
+    --staff-bg:#E4EAF8; --staff-text:#1E3A8A;
     --chip-bg:#F3ECDA;
     --field-line:#E0D7C0; --line-soft:#EEE7D6;
     /* il pezzo di binario del premio DOPO il pallino: piu' scuro di
@@ -466,6 +471,7 @@
        Il gemello Nostr non serve: --nostr-soft e --nostr-text girano
        gia' da soli. */
     --tg-soft:#1B2A38; --tg-soft-on:#8FC4E6;
+    --staff-bg:#24304A; --staff-text:#B9CCF5;
     --chip-bg:#37301F;
     --jar-riflesso:#7FA3B5;   /* il vetro di sera riflette piu' piano */
     --field-line:#4A4029; --line-soft:#362E1E;
@@ -6924,6 +6930,37 @@
      — mai un'immagine rotta, il patto della mascotte */
   .avatar .av-foto,
   .fb-faccia .av-foto{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  /* IL BOLLINO 🛡️ STAFF (6 ott 2026): una pillola col suo blu, lo scudo
+     DISEGNATO e la parola. Disegnato e non un'emoji, per la ragione del
+     🟣: il glifo cambia da un telefono all'altro, e soprattutto un'emoji
+     sta in un nome Telegram — una pillola colorata no. E' un bottone
+     piccolo: il tocco lo spiega (`spiegaStaff`) e non apre altro.
+     `.mini` e' la variante senza parola, all'angolo di una faccia,
+     dove il nome non si vede (il libro del P2P): la porta il genitore,
+     che e' gia' posizionato. */
+  .bollino-staff{display:inline-flex;align-items:center;gap:3px;
+    margin-left:6px;padding:0 7px 0 5px;height:18px;border-radius:999px;
+    background:var(--staff-bg);color:var(--staff-text);
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;
+    line-height:18px;letter-spacing:.2px;vertical-align:2px;
+    white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .bollino-staff svg{width:10px;height:12px;flex:none;fill:currentColor}
+  .bollino-staff[hidden]{display:none}
+  .bollino-staff.mini{position:absolute;right:-4px;bottom:-4px;z-index:3;
+    margin:0;padding:0;width:20px;height:20px;justify-content:center;
+    box-shadow:0 0 0 2px var(--card)}
+  /* a 375 px uno scudo da 10 si leggeva come una macchia (visto dal
+     vivo); e dentro l'anello `.p2p-anello svg` lo ruotava di -90° col
+     tratto del tempo (anche questo visto dal vivo): qui si raddrizza */
+  .bollino-staff.mini svg{width:12px;height:14px}
+  .p2p-anello .bollino-staff svg{transform:none}
+  .bollino-staff.grande{height:26px;padding:0 11px 0 9px;gap:5px;
+    margin:0;font-size:14px;line-height:26px;cursor:default}
+  .bollino-staff.grande svg{width:13px;height:15px}
+  .volto-cornice{position:relative;display:inline-flex;flex:none}
+  /* nella card P2P della home il volto sta in alto a destra sopra la
+     foto: il bollino gli si appoggia all'angolo basso */
+  .bollino-staff.mini.p2p-vt-bollino{top:24px;right:2px;bottom:auto}
   /* LA SAGOMA DEL VOLTO CHE ASPETTA (28 set 2026, «il volto unico»):
      quando il nome non si sa ancora il tondo non resta vuoto e non
      dice «?» — mostra una persona qualunque, testa e spalle, nel colore
@@ -14060,9 +14097,16 @@ function ricordaVolto(chiave, p){
   const nome = nomeVolto(p.nome) || prima.nome;
   const avatar = typeof p.avatar === 'string' ? p.avatar : prima.avatar;
   const ignoto = !nome && (!!p.ignoto || prima.ignoto);
+  /* il bollino 🛡️ Staff: lo dice solo una risposta del server che
+     porta la chiave; un volto senza (il proprio, quello di cartone del
+     giro guidato) non lo toglie e non lo mette. Nella cache c'e' solo
+     quando e' vero, cosi' il volto di tutti gli altri resta com'era. */
+  const staff = typeof p.staff === 'boolean' ? p.staff : !!prima.staff;
   const nuovo = {nome, avatar, ignoto};
+  if (staff) nuovo.staff = true;
   const cambiato = !cacheVolti[k] || nome !== prima.nome
-    || avatar !== prima.avatar || ignoto !== prima.ignoto;
+    || avatar !== prima.avatar || ignoto !== prima.ignoto
+    || staff !== !!prima.staff;
   cacheVolti[k] = nuovo;
   if (cambiato) ridisegnaVolti(k);
   return cambiato;
@@ -14086,6 +14130,11 @@ function ridisegnaVolti(k){
     e.classList.remove('volto-attesa', 'volto-ignoto');
     if (stato) e.classList.add(stato);
   });
+  /* ...e il bollino all'angolo dei volti senza nome (`bollinoVolto`),
+     che sta FUORI dal tondo — il tondo taglia quel che sporge */
+  document.querySelectorAll('[data-staff-di]').forEach(e => {
+    if (e.getAttribute('data-staff-di') === k) e.hidden = !v.staff;
+  });
 }
 /* IL VOLTO, l'unica funzione che lo scrive. `p` e' quel che il chiamante
    sa adesso ({nome, avatar, negozio, ignoto}); `cls` la classe del suo
@@ -14107,6 +14156,61 @@ function voltoHTML(p, cls, opz){
   return '<' + tag + ' class="' + cls + (stato ? ' ' + stato : '') + '"'
     + (k ? ' data-volto="' + esc(k) + '"' : '') + (o.attr || '') + '>'
     + dentroVolto(v) + '</' + tag + '>';
+}
+/* ============ IL BOLLINO 🛡️ STAFF (6 ott 2026) =====================
+   Accanto al nome di un admin o di un moderatore, ovunque si vedano
+   nome e foto: la scheda dell'annuncio, il negozio, le recensioni, la
+   card dell'altra parte (ordini e scambi P2P), il libro del P2P, le
+   dispute. LO DECIDE SOLO IL SERVER (`e_staff`) e non si compra: qui
+   arriva un si' accanto al nome, e qui si disegna e basta — nessun
+   elenco di persone nel client.
+   IL SEGNO POSITIVO BATTE QUALUNQUE FILTRO: chiunque puo' chiamarsi
+   «Barattolo Assistenza» su Telegram, e un nome si mostra com'e'. Si
+   impara a cercare il bollino: una pillola blu con lo scudo DISEGNATO,
+   che dentro un nome non si scrive. Al tocco dice cos'e' — e il
+   falso, scritto nel nome, al tocco non dice niente.
+   Vive dentro il volto unico perche' segue la stessa persona e la
+   stessa cache: dove il nome non si vede (il volto sul libro del P2P)
+   il bollino sta all'angolo della faccia (`bollinoVolto`), e quando la
+   faccia arriva in ritardo `ridisegnaVolti` lo accende al suo posto. */
+const ICO_STAFF = '<svg viewBox="0 0 12 14" aria-hidden="true">'
+  + '<path d="M6 .5 11.3 2.4v4.2c0 3.3-2.2 5.9-5.3 6.9C2.9 12.5.7 9.9.7 6.6V2.4z"/></svg>';
+const TESTO_STAFF = 'Fa parte dello staff di Barattolo: solo chi ha questo bollino è un moderatore.';
+function attrStaff(){
+  return ' role="button" tabindex="0" title="Staff di Barattolo"'
+    + ' aria-label="Staff di Barattolo: tocca per sapere cosa vuol dire"'
+    + ' onclick="spiegaStaff(event)"'
+    + ' onkeydown="if(event.key===\'Enter\'||event.key===\' \')spiegaStaff(event)"';
+}
+/* accanto a un nome: la pillola con la parola */
+function bollinoStaff(){
+  return '<span class="bollino-staff"' + attrStaff() + '>' + ICO_STAFF + 'Staff</span>';
+}
+/* all'angolo di una faccia senza nome: lo scudo da solo, nascosto
+   finche' la cache non dice di si'. `cls` e' la classe in piu' di chi
+   lo posa (la misura e il posto restano suoi, come per il tondo). */
+function bollinoVolto(chiave, cls){
+  const k = chiaveVolto(chiave);
+  if (!k) return '';
+  const v = cacheVolti[k];
+  return '<span class="bollino-staff mini' + (cls ? ' ' + cls : '') + '"'
+    + ' data-staff-di="' + esc(k) + '"' + (v && v.staff ? '' : ' hidden')
+    + attrStaff() + '>' + ICO_STAFF + '</span>';
+}
+/* il tocco: si ferma qui (sotto c'e' quasi sempre una porta — il
+   negozio, l'ordine del libro) e spiega, con la pillola grande in
+   testa perche' chi legge impari com'e' fatta */
+function spiegaStaff(ev){
+  if (ev) {
+    if (ev.stopPropagation) ev.stopPropagation();
+    if (ev.preventDefault) ev.preventDefault();
+  }
+  chiediConferma({
+    titolo: 'Staff di Barattolo',
+    testata: '<span class="bollino-staff grande">' + ICO_STAFF + 'Staff</span>',
+    corpo: TESTO_STAFF,
+    etichetta: 'Ho capito', avviso: true
+  });
 }
 /* ============ fine del volto unico ============ */
 /* Le condizioni dell'oggetto (lug 2026): catalogo id -> {nome, desc}.
@@ -14532,6 +14636,8 @@ function mapListing(a){
     photos, thumbs, username:(a.venditore_username||'').replace(/[^A-Za-z0-9_]/g,''),
     nostr:(a.contatto_nostr||'').replace(/[^a-z0-9]/g,''),
     sellerNpub:a.venditore_npub||'', sellerNpubOk:!!a.venditore_npub_verificata,
+    /* il bollino 🛡️ Staff: il si' lo dice il server (e_staff) */
+    sellerStaff:!!a.venditore_staff,
     negozio:a.venditore_negozio||'',
     /* il francobollo del venditore: nome file, gia' vuoto se la sua
        levetta «Mostra la mia foto» e' spenta (decide il server) */
@@ -20193,7 +20299,7 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
     <div class="seller${tondi ? ' con-tondi' : ''}" style="margin-top:14px">
       ${voltoHTML({nome: v.nome, avatar: v.avatar, negozio: v.negozio,
                    ignoto: true}, 'avatar', {tag: 'div'})}
-      <div class="who"><b>${esc(v.nome||'—')}${badge}${fiducia}</b>
+      <div class="who"><b>${esc(v.nome||'—')}${v.staff ? bollinoStaff() : ''}${badge}${fiducia}</b>
         ${titoloRiga(v.titolo, v.livello_numero)}
         <div class="rep">${rep}</div>
       </div>
@@ -20274,7 +20380,7 @@ function feedbackNegozioHTML(feedback, nFeedback){
     return `
       <div class="trust-note nota-feedback" style="align-items:flex-start">
         <span class="stars">${'★'.repeat(f.voto)}</span>
-        <span>${nome} ${faccia}<br>
+        <span>${nome}${f.da_staff ? bollinoStaff() : ''} ${faccia}<br>
           ${f.commento?`${esc(f.commento)}<br>`:''}
           ${fotoRecensioneHTML(f.foto)}
           <small style="opacity:.65">${f.ruolo==='acquirente'?'ha comprato qui':f.ruolo==='venditore'?'ha venduto qui':f.ruolo==='scambio'?'da uno scambio P2P':'utente'} · ${new Date(f.creato*1000).toLocaleDateString('it-IT')}</small>
@@ -26823,6 +26929,7 @@ function openDetail(id){
         ${voltoHTML({nome: l.seller, avatar: l.avatar, negozio: l.negozio,
                      ignoto: true}, 'avatar', {tag: 'div'})}
         <div class="who"><b>${esc(l.seller)}</b>${
+          l.sellerStaff ? bollinoStaff() : ''}${
           /* il 🟣 in fila coi badge, come nella testata del negozio:
              solo l'icona — la verifica si racconta di la' */
           l.sellerNpubOk?badgeNostr('Venditore verificato su Nostr'):''}${
@@ -48296,7 +48403,9 @@ function anelloScadenzaP2P(o, adesso){
     + '<circle class="resta" cx="12" cy="12" r="' + P2P_ANELLO_R + '"'
     + ' stroke-dasharray="' + P2P_ANELLO_GIRO.toFixed(2) + '"'
     + ' stroke-dashoffset="' + consumato + '"/></svg>'
-    + dentro + '</span>';
+    /* il bollino 🛡️ Staff all'angolo dell'anello: sul libro il nome
+       non si vede, la faccia si' */
+    + dentro + (o.faccia ? '' : bollinoVolto('p2p:' + o.id)) + '</span>';
 }
 
 /* LE STELLINE DEL MERCATINO, in una riga sola (set 2026): «⭐ 4,8 ·
@@ -54818,7 +54927,8 @@ function repRiquadroP2P(f, id){
          non ha bisogno di un'etichetta che dica che e' una faccia.
          La colonna resta senza `<small>`, quindi il volto si centra
          nell'altezza della riga invece di restare appeso in alto. */
-      + '<div class="p2p-rep-col volto">' + volto + '</div>'
+      + '<div class="p2p-rep-col volto"><span class="volto-cornice">' + volto
+      + bollinoVolto(id ? 'p2p:' + id : '') + '</span></div>'
       + '</div>'
   });
 }
@@ -64266,7 +64376,7 @@ function cardVetrinaP2P(o){
       <div class="ph-wrap">
         <div class="ph p2p-vt-fondo">${fondo}</div>
         <span class="p2p-vt-lato ${compro ? 'compra' : 'vendi'}">${lato}</span>
-        ${voltoHTML(f, 'p2p-vt-volto', {chiave: 'p2p:' + o.id})}
+        ${voltoHTML(f, 'p2p-vt-volto', {chiave: 'p2p:' + o.id})}${bollinoVolto('p2p:' + o.id, 'p2p-vt-bollino')}
         <div class="tag-price"><div class="price"><span class="p2p-vt-verbo">${verboEuro}</span>${euroCartello}<span class="unit eur">€</span></div>${sotto ? `<div class="price-sub">${sotto}</div>` : ''}</div>
       </div>
       <div class="info">
@@ -64874,6 +64984,7 @@ function cardParte(c, chi, opz){
     + '<div class="seller-porta"' + porta + '>'
     + voltoHTML(op.volto || Object.assign({ignoto: true}, c), 'avatar', {tag: 'div'})
     + '<div class="who"><b>' + esc(nome) + '</b>'
+    + (c.staff ? bollinoStaff() : '')
     + titoloRiga(c.titolo, c.livello_numero)
     + (rep.length ? '<div class="rep">' + rep.join(' · ') + '</div>' : '')
     + '</div>'
@@ -66426,13 +66537,18 @@ function cardDisputaModP2P(d, ho){
   }
   if (scade) h += '<div class="mod-riga">La garanzia scade circa il ' + esc(dataBreveP2P(scade)) + '</div>';
   if (!aperta) return h + '</div>';
-  h += '<div class="mod-parti"><div>Compra: <b>' + esc(d.compra) + '</b></div>'
-    + '<div>Vende: <b>' + esc(d.vende) + '</b></div></div>';
+  /* il bollino 🛡️ Staff accanto ai nomi, anche qui: una parte puo'
+     essere un moderatore, e chi decide deve vederlo a colpo d'occhio */
+  h += '<div class="mod-parti"><div>Compra: <b>' + esc(d.compra) + '</b>'
+    + (d.compra_staff ? bollinoStaff() : '') + '</div>'
+    + '<div>Vende: <b>' + esc(d.vende) + '</b>'
+    + (d.vende_staff ? bollinoStaff() : '') + '</div></div>';
   if (d.sei_parte)
     return h + '<div class="trust-note" style="background:var(--rosso-p2p-tenue);color:var(--rosso-p2p-testo)"><span>⚠️</span>'
       + '<span>Sei una delle due parti: questa disputa la decide un altro moderatore.</span></div></div>';
   if (d.stato === 'presa' && !d.presa_da_me)
-    return h + '<div class="hint">L\'ha presa ' + esc(d.presa_da || 'un altro moderatore') + '.</div></div>';
+    return h + '<div class="hint">L\'ha presa ' + esc(d.presa_da || 'un altro moderatore')
+      + (d.presa_da && d.presa_da_staff ? bollinoStaff() : '') + '.</div></div>';
   if (d.stato === 'aperta')
     return h + (ho
       ? '<button class="btn orange" onclick="prendiDisputaP2P(this.dataset.o)" data-o="' + esc(d.ordine) + '">Prendi la disputa</button>'
