@@ -12285,6 +12285,8 @@ def prove_nascondi_ordine():
       CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
         annuncio_id INT, quantita INT DEFAULT 1, unitario_sats INT,
         titolo TEXT DEFAULT '');
+      CREATE TABLE tracking_storico(id INTEGER PRIMARY KEY, ordine_id INT,
+        reso INT, corriere TEXT, tracking TEXT, sostituito_il INT, da TEXT);
       INSERT INTO utenti(tg_id, username) VALUES(111, 'compra'),
         (222, 'vende');
       INSERT INTO annunci(id, titolo, foto) VALUES
@@ -16506,6 +16508,145 @@ def prove_tracking_corretto():
           "OR o.id=?" in mo)
     prova("...ma solo lui", True,
           mo.index("e_admin(user") < mo.index("OR o.id=?"))
+
+
+def prove_tracking_venditore():
+    """IL VENDITORE CORREGGE IL SUO TRACCIAMENTO (ott 2026, parola di
+    Andrea, che rovescia quella di ago 2026). Gira l'endpoint VERO su un
+    database di cartone con lo schema VERO della fila: chi puo', quando,
+    cosa resta scritto e chi viene avvisato."""
+    print("\n[il venditore corregge il suo tracciamento]")
+    import asyncio as _aio
+    import sqlite3
+
+    m = re.search(r"CREATE TABLE IF NOT EXISTS tracking_storico\(.*?\n    \);",
+                  _SORGENTE, re.S)
+    prova("lo schema della fila si trova in init_db", True, bool(m))
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+    CREATE TABLE ordini(id INTEGER PRIMARY KEY, compratore_id INTEGER,
+      venditore_id INTEGER, stato TEXT, corriere TEXT DEFAULT '',
+      tracking TEXT DEFAULT '', consegna_scelta TEXT DEFAULT 'spedizione',
+      tracking_corretto_il INTEGER DEFAULT 0, spedito_il INTEGER DEFAULT 0,
+      aggiornato INTEGER DEFAULT 0);
+    """ + m.group(0) + ";")
+
+    class Aperta:
+        def __getattr__(self, n):
+            return getattr(con, n)
+
+        def close(self):
+            pass
+
+    class NoHttp(Exception):
+        def __init__(self, codice, detto=""):
+            super().__init__(detto)
+            self.codice, self.detto = codice, detto
+
+    detti, utente, corpo = [], {"id": 222}, {}
+
+    async def notifica_finta(chi, testo, *a, **k):
+        detti.append((chi, testo))
+
+    async def json_finto(req):
+        return dict(corpo)
+
+    amb = {"time": time, "html": __import__("html"), "db": lambda: Aperta(),
+           "notifica": notifica_finta, "Header": lambda d="": d,
+           "Cookie": lambda d="": d, "Request": object,
+           "leggi_json": json_finto,
+           "verifica_utente": lambda *a: dict(utente),
+           "codice_tracking_bot": lambda t: f"<b>{t}</b>",
+           "HTTPException": NoHttp}
+    i = _SORGENTE.index("CORRIERI_SENTINELLA = (")
+    exec(_SORGENTE[i:_SORGENTE.index(")", i) + 1], amb)
+    i = _SORGENTE.index("STATI_CON_SPEDIZIONE = (")
+    exec(_SORGENTE[i:_SORGENTE.index(")", i) + 1], amb)
+    exec(pezzo("archivia_tracking"), amb)
+    exec("async " + pezzo("correggi_tracking_venditore"), amb)
+
+    def correggi(oid, corriere, tracking, chi=222):
+        corpo.clear()
+        corpo.update(corriere=corriere, tracking=tracking)
+        utente["id"] = chi
+        try:
+            _aio.run(amb["correggi_tracking_venditore"](oid, None, "", ""))
+            return None
+        except NoHttp as e:
+            return e.codice
+
+    def ordine(oid, stato, corriere="Poste Italiane", tracking="VECCHIO",
+               consegna="spedizione"):
+        con.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                    "stato, corriere, tracking, consegna_scelta, spedito_il, "
+                    "aggiornato) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (oid, 111, 222, stato, corriere, tracking, consegna,
+                     1000, 1000))
+
+    def fila(oid):
+        return [tuple(r) for r in con.execute(
+            "SELECT corriere, tracking, da FROM tracking_storico WHERE "
+            "ordine_id=? ORDER BY id", (oid,))]
+
+    ordine(1, "shipped")
+    prova("il venditore corregge: nessun errore", None,
+          correggi(1, "InPost", "NUOVO1"))
+    r1 = con.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("...l'ordine porta il codice nuovo e il timbro", (
+        "InPost", "NUOVO1", True),
+        (r1["corriere"], r1["tracking"], r1["tracking_corretto_il"] > 0))
+    prova("...e NON tocca stato, spedito_il e aggiornato (le ancore dei "
+          "promemoria)", ("shipped", 1000, 1000),
+          (r1["stato"], r1["spedito_il"], r1["aggiornato"]))
+    prova("...il codice di prima resta in fila, col nome di chi l'ha "
+          "cambiato", [("Poste Italiane", "VECCHIO", "venditore")], fila(1))
+    prova("...e il compratore viene avvisato, col codice nuovo E quello "
+          "di prima", (111, True, True),
+          (detti[-1][0], "NUOVO1" in detti[-1][1],
+           "VECCHIO" in detti[-1][1]))
+    prova("una seconda correzione allunga la fila, non la riscrive", 2,
+          (correggi(1, "InPost", "NUOVO2"), len(fila(1)))[1])
+    prova("lo stesso codice di adesso si dice (niente doppioni in fila)",
+          (400, 2), (correggi(1, "InPost", "NUOVO2"), len(fila(1))))
+    prova("chi non e' il venditore no (nemmeno il compratore)",
+          (400, 2), (correggi(1, "InPost", "X", chi=111), len(fila(1))))
+    for n, st in enumerate(("delivered", "released", "dispute",
+                            "refunded"), start=10):
+        ordine(n, st)
+        prova(f"SEMPRE, anche su «{st}»", None, correggi(n, "InPost", "N"))
+    ordine(20, "locked", tracking="")
+    prova("prima della spedizione no: il codice si scrive spedendo",
+          400, correggi(20, "InPost", "N"))
+    ordine(21, "shipped", corriere="Consegna a mano", tracking="")
+    prova("una consegna a mano non diventa una spedizione", 400,
+          correggi(21, "InPost", "N"))
+    ordine(22, "shipped", consegna="ritiro")
+    prova("...ne' un ritiro", 400, correggi(22, "InPost", "N"))
+    prova("e il nuovo corriere non puo' essere una sentinella", 400,
+          correggi(1, "Ritiro in zona", "N"))
+    prova("corriere o codice vuoti no", (400, 400),
+          (correggi(1, "", "N"), correggi(1, "InPost", "  ")))
+
+    # anche il moderatore lascia la fila: due porte, una prova
+    prova("la correzione del moderatore mette in fila il codice di prima",
+          True, "archivia_tracking(con, ordine_id, reso, vecchio_c, "
+          "vecchio_t, ora," in pezzo("correggi_tracking"))
+    mo = pezzo("miei_ordini")
+    prova("la fila esce con gli ordini, in UNA query", True,
+          "FROM tracking_storico WHERE ordine_id IN" in mo
+          and 'r["tracking_storico"] = fila[r["id"]]' in mo)
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client mostra la fila sulla spedizione e sul reso",
+          (True, True), ("filaTracking(o, false)" in mini,
+                         "filaTracking(o, true)" in mini))
+    prova("...e il pannello del venditore chiama la rotta sua", True,
+          "/orders/${currentOrder.id}/tracking`" in pezzo_js(
+              mini, "async function correggiTrackingVenditore(btn){", "\n}"))
+    prova("...e il testo di fuori passa da esc()", True,
+          "esc(x.corriere)" in mini and "esc(x.tracking)" in mini)
+    prova("la riga «chiedi ai moderatori» non c'e' piu'", False,
+          "Il tracciamento non si riscrive da soli" in mini)
 
 
 def prove_notifica_fail_open():
@@ -32968,6 +33109,7 @@ async function tocca(o){
             "CORRIERI_SENTINELLA": ("Consegna a mano", "Ritiro in zona",
                                     "Consegna digitale"),
             "registra_moderazione": lambda *a, **k: None,
+            "archivia_tracking": lambda *a, **k: None,
             "HTTPException": type("HTTPException", (Exception,), {})})
         exec("async " + pezzo("correggi_tracking"), amb)
         _aio.run(amb["correggi_tracking"](9, None, "", ""))
@@ -52776,6 +52918,9 @@ def prove_card_parte_ordine():
         " asta_base_sats INTEGER DEFAULT 0);"
         "CREATE TABLE feedback(ordine_id INTEGER, da_tg_id INTEGER,"
         " per_tg_id INTEGER, voto INTEGER, commento TEXT);"
+        "CREATE TABLE tracking_storico(id INTEGER PRIMARY KEY,"
+        " ordine_id INTEGER, reso INTEGER, corriere TEXT, tracking TEXT,"
+        " sostituito_il INTEGER, da TEXT);"
         "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT,"
         " avatar TEXT DEFAULT '', avatar_scelta TEXT DEFAULT '',"
         " rating REAL DEFAULT 0, n_feedback INTEGER DEFAULT 0,"
@@ -118523,6 +118668,7 @@ def prove_spunta_rimborso():
     js = ("const esc = x => String(x);\n"
           "const codiceTracking = (o, s) => o.tracking;\n"
           "const rigaCorretto = () => '';\n"
+          "const filaTracking = () => '';\n"
           "const inPagamento = () => false;\n"
           "const dataAppuntamento = () => '';\n"
           "const TEMPI = {confermaDig: 72};\n"
@@ -120850,7 +120996,8 @@ def main():
               prove_nascondi_ordine,
               prove_lista_ordini, prove_dettaglio_ordine, prove_card_ordini, prove_righe_ordine,
               prove_ssrf_redirect, prove_niente_ai_nella_ricerca,
-              prove_tracking_corretto, prove_barattolo,
+              prove_tracking_corretto, prove_tracking_venditore,
+              prove_barattolo,
               prove_savers_proprietario, prove_visualizzazioni,
               prove_barattolo_in_striscia,
               prove_interesse,

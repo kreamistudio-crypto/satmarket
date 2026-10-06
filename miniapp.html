@@ -14210,6 +14210,9 @@ function mapOrder(o){
        riscritto in silenzio varrebbe meno, non di piu' */
     trackingCorretto:o.tracking_corretto_il||0,
     trackingResoCorretto:o.tracking_reso_corretto_il||0,
+    /* i tracciamenti SOSTITUITI, dal piu' vecchio (ott 2026): da quando
+       il venditore corregge il suo, e' la fila a tenerlo una prova */
+    trackingStorico:Array.isArray(o.tracking_storico)?o.tracking_storico:[],
     consegnato:o.consegnato||0, speditoIl:o.spedito_il||0,
     /* il PAGAMENTO (ago 2026): su un ordine locked `creato` e'
        immutabile ed e' l'ancora del promemoria a comando — mai
@@ -30188,7 +30191,7 @@ function openOrder(id){
      copie della stessa riga sono due che un giorno divergono, con la
      traccia della correzione del moderatore appresso a una sola. */
   const rigaSpedizione = () =>
-    `${esc(o.corriere)} — tracking ${codiceTracking(o, s)}${rigaCorretto(o.trackingCorretto)}`;
+    `${esc(o.corriere)} — tracking ${codiceTracking(o, s)}${rigaCorretto(o.trackingCorretto)}${filaTracking(o, false)}`;
   let steps, progress;
   if (['dispute','refund','refunded','return_pending','return_shipped'].includes(s)) {
     /* Storia della disputa: la cassaforte racconta il congelamento */
@@ -30565,7 +30568,7 @@ function openOrder(id){
       ${o.role==='seller' && s==='return_shipped' ? `
         <div class="payout">
           <h4>↩️ Reso in arrivo</h4>
-          <div class="hint">${o.trackingReso?`Il reso viaggia con <b>${esc(o.corriereReso)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.trackingReso)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.trackingReso)}" target="_blank" style="color:var(--trust)">segui →</a>.${rigaCorretto(o.trackingResoCorretto)}`:'Il reso è in consegna a mano.'} Quando ricevi l'oggetto e verifichi che è tutto ok, conferma: l'acquirente verrà rimborsato.</div>
+          <div class="hint">${o.trackingReso?`Il reso viaggia con <b>${esc(o.corriereReso)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.trackingReso)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.trackingReso)}" target="_blank" style="color:var(--trust)">segui →</a>.${rigaCorretto(o.trackingResoCorretto)}${filaTracking(o, true)}`:'Il reso è in consegna a mano.'} Quando ricevi l'oggetto e verifichi che è tutto ok, conferma: l'acquirente verrà rimborsato.</div>
           <button class="btn primary" style="margin-top:12px" onclick="resoRicevuto(this)">✓ Ho ricevuto il reso — rimborsa l'acquirente</button>
         </div>`:''}
       ${o.role==='buyer' && s==='return_shipped' ? `<div class="trust-note">↩️ <span>Reso in viaggio. Quando il venditore lo riceve e conferma, il rimborso parte automaticamente.</span></div>`:''}
@@ -30667,7 +30670,7 @@ function openOrder(id){
             Veste `.btn.piano`: un tasto, ma sottotono (vedi il CSS). */''}
       ${o.role==='seller' && ['creato','locked'].includes(s) && !inPagamento(o) ? `<button class="btn piano" onclick="apriAnnullaVendita()">✖️ Annulla l'ordine</button>` : ''}
       ${!inPagamento(o) && o.role==='seller' && s==='shipped' ? `<button class="btn ghost" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
-      ${notaTrackingSbagliato(o, s)}
+      ${pannelloTrackingVenditore(o, s)}
       ${o.role==='buyer' && s==='delivered' && !inPagamento(o) ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
       ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' && !inPagamento(o) ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
       ${/* L'ORDINE DEI BOTTONI del compratore (ago 2026, decisione di
@@ -36542,9 +36545,9 @@ function selettoreCorriere(id, scelto){
    una volta sola — segna_spedito filtra su stato='locked' — quindi il
    compratore restava con un codice che nessun corriere conosce.
    La cura e' su tre gambe: qui la PREVENZIONE (la riga che lo dice
-   prima) e il CONTROLLO DI FORMA (sotto); la CORREZIONE la fa un
-   moderatore, mai il venditore — vedi il commento di
-   correggi_tracking in server.py. */
+   prima) e il CONTROLLO DI FORMA (sotto); la CORREZIONE dall'ott 2026
+   la fa il venditore stesso (pannelloTrackingVenditore), con la fila
+   dei codici di prima nell'ordine — prima era dei soli moderatori. */
 const AVVISO_INTERMEDIARIO = 'Se hai comprato la spedizione da un '
   + 'intermediario (Packlink, Sendcloud…), inserisci il codice del '
   + '<b>corriere</b>, non quello dell\'ordine dell\'intermediario: '
@@ -39053,7 +39056,7 @@ function notaChiusoDalTimer(o, s){
   if (o.role!=='buyer' || !chiusoDalTimer(s, o.sbloccatoAuto)) return '';
   /* il canale del rodaggio e' l'unico contatto che esiste gia': niente
      secondo indirizzo da tenere aggiornato (il pattern di
-     notaTrackingSbagliato), e senza canale nel config si dice
+     del vecchio notaTrackingSbagliato), e senza canale nel config si dice
      comunque la cosa vera invece di fingere un bottone */
   const dove = bannerTest?.link
     ? `scrivi ai moderatori col numero dell'ordine (<b>#${o.id}</b>): <button type="button" class="btn link" style="display:inline;padding:0;margin:0;font-size:inherit" onclick="apriCanaleTest()">apri il canale ›</button>`
@@ -39188,31 +39191,72 @@ async function sollecita(btn){
    La traccia che vedono ENTRAMBE le parti: un tracciamento corretto
    di nascosto varrebbe meno come prova in disputa, non di piu'. */
 function rigaCorretto(ts){
-  return ts ? ` <small style="opacity:.7">(tracciamento corretto da un `
-    + `moderatore il ${new Date(ts*1000).toLocaleDateString('it-IT')})</small>`
+  return ts ? ` <small style="opacity:.7">(tracciamento corretto `
+    + `il ${new Date(ts*1000).toLocaleDateString('it-IT')})</small>`
     : '';
 }
-/* LA STRADA DEL VENDITORE CHE HA SBAGLIATO (ago 2026): non un
-   bottone — quello e' il punto: se il tracciamento si riscrivesse da
-   soli non varrebbe piu' come prova in disputa — ma una riga che
-   spiega perche' e dove chiedere. Sta nell'ORDINE, sotto il
-   tracciamento, che e' il momento in cui uno se ne accorge: cercare
-   un contatto in fondo al Profilo quando hai in mano il codice
-   sbagliato e' la cosa che non si fa.
-   Il contatto e' quello che gia' esiste — il canale del rodaggio del
-   config (`BANNER_TEST_LINK`) —: nessun secondo indirizzo da tenere
-   aggiornato. Senza canale nel config resta la riga, che dice
-   comunque la cosa vera (chiedi a un moderatore), invece di un
-   bottone che non porta da nessuna parte. */
-function notaTrackingSbagliato(o, s){
+/* LA FILA DEI CODICI DI PRIMA (ott 2026): il venditore puo' correggere
+   il suo tracciamento, e quel che lo tiene una PROVA e' che il codice
+   sostituito non sparisce — si legge qui, a tutt'e due le parti e ai
+   moderatori, con chi l'ha cambiato e quando. Testo altrui: esc(). */
+function filaTracking(o, reso){
+  const fila = (o.trackingStorico || []).filter(x => !!x.reso === !!reso);
+  if (!fila.length) return '';
+  return `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:4px">`
+    + `Codici di prima: ` + fila.map(x =>
+        `<span class="mono">${esc(x.corriere)} ${esc(x.tracking)}</span>`
+        + ` (cambiato ${x.da === 'moderatore' ? 'da un moderatore' : 'dal venditore'}`
+        + ` il ${new Date((x.sostituito_il||0)*1000).toLocaleDateString('it-IT')})`)
+      .join(' · ') + `</div>`;
+}
+/* IL VENDITORE CORREGGE IL SUO TRACCIAMENTO (ott 2026, parola di
+   Andrea, che rovescia quella di ago 2026 per cui lo correggeva solo
+   un moderatore): SEMPRE, da quando il pacco e' partito, anche a
+   ordine chiuso o in disputa. Il compratore viene avvisato, e il
+   codice di prima resta nell'ordine (filaTracking): e' questo che lo
+   tiene una prova. Chiuso di serie in un <details>: e' un rimedio, non
+   un gesto di tutti i giorni. Stesso selettore e stesso controllo di
+   forma della spedizione; niente pacco, niente pannello. */
+const STATI_CON_SPEDIZIONE = ['shipped','delivered','confirmed','released',
+  'dispute','return_pending','return_shipped','refund','refunded'];
+function pannelloTrackingVenditore(o, s){
   if (o.role !== 'seller' || !o.tracking) return '';
-  if (!['shipped','delivered'].includes(s)) return '';
-  const dove = bannerTest?.link
-    ? `Scrivi ai moderatori col numero dell'ordine (<b>#${o.id}</b>) e lo correggono loro: <button type="button" class="btn link" style="display:inline;padding:0;margin:0;font-size:inherit" onclick="apriCanaleTest()">apri il canale ›</button>`
-    : `Scrivi ai moderatori col numero dell'ordine (<b>#${o.id}</b>) e lo correggono loro.`;
-  return `<div class="trust-note">🛠 <span>Hai inserito il codice sbagliato? `
-    + `Il tracciamento non si riscrive da soli — è la prova che conta se si `
-    + `apre una disputa. ${dove}</span></div>`;
+  if (!STATI_CON_SPEDIZIONE.includes(s)) return '';
+  if (['Consegna a mano','Ritiro in zona','Consegna digitale'].includes(o.corriere)
+      || ['ritiro','digitale'].includes(o.consegnaScelta)) return '';
+  return `
+    <details class="payout" style="margin-top:10px">
+      <summary style="cursor:pointer;font-weight:700;font-size:14px">✏️ Correggi il tracciamento</summary>
+      <div class="hint">Hai inserito il codice sbagliato? Correggilo qui:
+        avvisiamo chi ha comprato, e il codice di prima resta scritto
+        nell'ordine.</div>
+      ${selettoreCorriere('venCorriere', o.corriere)}
+      <textarea id="venTracking" style="min-height:38px" placeholder="Numero di tracciamento corretto">${esc(o.tracking)}</textarea>
+      <div class="hint avviso-tracking" id="venAvviso" style="display:none"></div>
+      <button class="btn ghost" onclick="correggiTrackingVenditore(this)">✏️ Salva il tracciamento corretto</button>
+    </details>`;
+}
+async function correggiTrackingVenditore(btn){
+  haptic();
+  const corriere = el('venCorriere')?.value || '';
+  const tracking = el('venTracking')?.value.trim() || '';
+  if (!tracking) { toast('Inserisci il tracciamento corretto'); return; }
+  if (!trackingDaControllare(corriere, tracking, 'venAvviso')) return;
+  if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  const ripristina = bottoneInAttesa(btn, '✏️ Correggo il tracciamento…');
+  try {
+    const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/tracking`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({corriere, tracking})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Operazione non riuscita', 3200); return; }
+    trackingForzato = '';
+    const id = currentOrder.id;
+    await loadOrders(id); renderOrders();
+    toast('✏️ Tracciamento corretto: abbiamo avvisato chi ha comprato');
+    openOrder(id);
+  } finally { ripristina(); }
 }
 /* Il pannello del MODERATORE, e solo suo: il venditore non ha nessun
    bottone per riscrivere il proprio tracciamento (decisione di

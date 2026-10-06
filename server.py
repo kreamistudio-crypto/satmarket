@@ -5150,8 +5150,9 @@ def init_db():
         -- CHI HA INVITATO CHI (set 2026), una riga per invitato: la PK E'
         -- la regola «una volta sola», e il CHECK e' «non ci si invita da
         -- soli» scritto dove nessun codice lo puo' scavalcare. `via`
-        -- dice da quale porta e' arrivato: 'link' (il /start del bot) o
-        -- 'codice' (il campo a mano del Profilo).
+        -- dice da quale porta e' arrivato: 'link' (il /start del bot),
+        -- 'codice' (il campo a mano del Profilo) o 'nostr' (il foglio del
+        -- login Nostr, ott 2026).
         -- I NOMI NON ESCONO DA QUI: chi invita vede quante persone e
         -- quanti punti, mai chi (vedi `stato_inviti`).
         -- ⚠️ L'AZZERAMENTO DEGLI XP NON LA TOCCA: il giorno che la
@@ -5167,6 +5168,24 @@ def init_db():
     -- «quante persone hai invitato» si conta per INVITANTE, che nella PK
     -- non c'e': senza indice sarebbe una scansione a ogni Profilo.
     CREATE INDEX IF NOT EXISTS idx_inviti_invitante ON inviti(invitante);
+    CREATE TABLE IF NOT EXISTS tracking_storico(
+        -- I TRACCIAMENTI SOSTITUITI (ott 2026): da quando il venditore
+        -- puo' correggere il proprio (decisione di Andrea, che rovescia
+        -- quella di ago 2026), il codice di prima NON sparisce — e' qui,
+        -- con chi l'ha sostituito e quando, e l'ordine lo mostra a tutte
+        -- e due le parti e ai moderatori. E' questo che tiene il
+        -- tracciamento una PROVA anche se si puo' riscrivere: in disputa
+        -- si legge tutta la fila, non solo l'ultimo.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ordine_id INTEGER NOT NULL,
+        reso INTEGER NOT NULL DEFAULT 0,   -- 1 = il tracciamento del reso
+        corriere TEXT NOT NULL DEFAULT '',
+        tracking TEXT NOT NULL DEFAULT '',
+        sostituito_il INTEGER NOT NULL,
+        da TEXT NOT NULL DEFAULT ''        -- 'venditore' | 'moderatore'
+    );
+    CREATE INDEX IF NOT EXISTS idx_tracking_storico_ordine
+        ON tracking_storico(ordine_id);
     CREATE TABLE IF NOT EXISTS doppioni_ignorati(
         -- «non e' un doppione»: la coppia archiviata non si ripropone
         -- mai piu', su nessun dispositivo (per questo vive nel DB e
@@ -54004,6 +54023,99 @@ CORRIERI_SENTINELLA = ("Consegna a mano", "Ritiro in zona",
                        "Consegna digitale")
 
 
+# GLI STATI IN CUI IL PACCO DEL VENDITORE E' GIA' PARTITO: da qui in poi
+# un tracciamento c'e', e il venditore lo puo' correggere SEMPRE (ott
+# 2026, parola di Andrea) — anche a ordine chiuso o in disputa, dove la
+# fila di `tracking_storico` dice comunque com'era prima.
+STATI_CON_SPEDIZIONE = ("shipped", "delivered", "confirmed", "released",
+                        "dispute", "return_pending", "return_shipped",
+                        "refund", "refunded")
+
+
+def archivia_tracking(con, ordine_id: int, reso: bool, corriere: str,
+                      tracking: str, ora: int, da: str):
+    """Mette in fila il tracciamento che sta per essere sostituito.
+    Niente commit: e' del chiamante, nella STESSA transazione
+    dell'UPDATE — un codice nuovo scritto senza il vecchio in fila
+    sarebbe proprio la riscrittura silenziosa che la fila esiste per
+    impedire."""
+    con.execute("INSERT INTO tracking_storico(ordine_id, reso, corriere, "
+                "tracking, sostituito_il, da) VALUES(?,?,?,?,?,?)",
+                (ordine_id, 1 if reso else 0, corriere or "",
+                 tracking or "", ora, da))
+
+
+@app.post("/api/orders/{ordine_id}/tracking")
+async def correggi_tracking_venditore(ordine_id: int, req: Request,
+                                      x_tg_init_data: str = Header(""),
+                                      barattolo_sessione: str = Cookie("")):
+    """IL VENDITORE CORREGGE IL PROPRIO TRACCIAMENTO (ott 2026).
+
+    ROVESCIA UNA DECISIONE, e lo dice: ad ago 2026 la correzione era
+    dei soli moderatori («un tracciamento riscrivibile a piacere non e'
+    piu' una prova in disputa»). Andrea ha deciso che il venditore lo
+    deve poter correggere SEMPRE — il caso dal campo resta quello
+    dell'intermediario (Packlink, Sendcloud) che manda il codice vero
+    solo dopo — e che il compratore ne sia avvisato. La prova si tiene
+    in un altro modo: il codice di prima NON si cancella, va in
+    `tracking_storico` nella stessa transazione, e l'ordine mostra la
+    fila intera a tutt'e due e ai moderatori.
+
+    Le guardie sono quelle della correzione del moderatore: niente
+    corrieri-sentinella (una consegna a mano non diventa una
+    spedizione, e viceversa), niente ordini senza pacco, e lo `stato`
+    e `spedito_il` non si toccano (l'ancora dei promemoria). In piu'
+    il codice uguale a quello di adesso si dice, invece di riempire la
+    fila di doppioni."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    corriere = (d.get("corriere") or "").strip()[:40]
+    tracking = (d.get("tracking") or "").strip()[:60]
+    if not corriere or not tracking:
+        raise HTTPException(400, "Servono corriere e numero di tracciamento")
+    if corriere in CORRIERI_SENTINELLA:
+        raise HTTPException(400, "«" + corriere + "» non è un corriere: "
+                                 "questa correzione cambierebbe la storia "
+                                 "dell'ordine, non il suo tracciamento")
+    con = db()
+    try:
+        o = con.execute(
+            "SELECT * FROM ordini WHERE id=? AND venditore_id=? AND stato IN "
+            f"({','.join('?' * len(STATI_CON_SPEDIZIONE))})",
+            (ordine_id, user["id"], *STATI_CON_SPEDIZIONE)).fetchone()
+        if not o:
+            raise HTTPException(400, "Questo ordine non ha un tracciamento "
+                                     "che puoi correggere")
+        if o["corriere"] in CORRIERI_SENTINELLA or o["consegna_scelta"] in (
+                "ritiro", "digitale"):
+            raise HTTPException(400, "Questo ordine non è una spedizione: "
+                                     "non c'è un tracciamento da correggere")
+        if corriere == o["corriere"] and tracking == o["tracking"]:
+            raise HTTPException(400, "È già questo il tracciamento "
+                                     "dell'ordine")
+        ora = int(time.time())
+        archivia_tracking(con, ordine_id, False, o["corriere"],
+                          o["tracking"], ora, "venditore")
+        con.execute("UPDATE ordini SET corriere=?, tracking=?, "
+                    "tracking_corretto_il=? WHERE id=?",
+                    (corriere, tracking, ora, ordine_id))
+        con.commit()
+    finally:
+        con.close()
+    # AVVISA CHI ASPETTA IL PACCO, col codice di prima accanto: chi l'ha
+    # gia' messo in un'app di tracciamento deve sapere che e' cambiato.
+    await notifica(
+        o["compratore_id"],
+        f"📦 <b>Il venditore ha corretto il tracciamento</b> dell'ordine "
+        f"#{ordine_id}: ora è <b>{html.escape(corriere)}</b>, "
+        f"tracciamento {codice_tracking_bot(tracking)}. Prima era "
+        f"{html.escape(o['corriere'] or '')} "
+        f"<b>{html.escape(o['tracking'] or '')}</b>: il codice di prima "
+        f"resta scritto nell'ordine.")
+    return {"ok": True, "corriere": corriere, "tracking": tracking,
+            "corretto_il": ora}
+
+
 @app.post("/api/admin/orders/{ordine_id}/tracking")
 async def correggi_tracking(ordine_id: int, req: Request,
                             x_tg_init_data: str = Header(""),
@@ -54068,6 +54180,8 @@ async def correggi_tracking(ordine_id: int, req: Request,
         raise HTTPException(400, "Questo ordine non è una spedizione: "
                                  "non c'è un tracciamento da correggere")
     ora = int(time.time())
+    archivia_tracking(con, ordine_id, reso, vecchio_c, vecchio_t, ora,
+                      "moderatore")
     if reso:
         con.execute("UPDATE ordini SET corriere_reso=?, tracking_reso=?, "
                     "tracking_reso_corretto_il=? WHERE id=?",
@@ -55400,6 +55514,23 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
     for r in righe:
         r["mio_foto"] = foto_recensione(r["mio_foto"])
         r["suo_foto"] = foto_recensione(r["suo_foto"])
+    # LA FILA DEI TRACCIAMENTI SOSTITUITI (ott 2026), UNA query per
+    # tutti, dal piu' vecchio: la chiave esce SOLO sugli ordini che ne
+    # hanno una, gli altri restano byte per byte quelli di ieri.
+    if righe:
+        ids = [r["id"] for r in righe]
+        fila: dict[int, list] = {}
+        for x in con.execute(
+                "SELECT ordine_id, reso, corriere, tracking, sostituito_il, "
+                f"da FROM tracking_storico WHERE ordine_id IN "
+                f"({','.join('?' * len(ids))}) ORDER BY id", ids):
+            fila.setdefault(x["ordine_id"], []).append(
+                {"reso": x["reso"], "corriere": x["corriere"],
+                 "tracking": x["tracking"],
+                 "sostituito_il": x["sostituito_il"], "da": x["da"]})
+        for r in righe:
+            if r["id"] in fila:
+                r["tracking_storico"] = fila[r["id"]]
     # I SET escono col titolo sintetizzato e l'elenco delle righe
     # (UNA query per tutti); i mono non portano la chiave 'righe' e
     # restano identici a ieri — il client vecchio in cache legge il

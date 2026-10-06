@@ -35707,3 +35707,44 @@ più di quella di prima, che stava su una riga). Clave non provato dal
 vivo con un iPhone vero. Il link d'invito resta del bot: un
 `barattolo.store/?invito=CODICE` che precompili il campo per chi entra
 dal web non c'è.
+
+## Il venditore corregge il suo tracciamento (6 ott 2026)
+
+Il compito (Andrea): il venditore deve poter modificare il codice di
+tracciamento se ha sbagliato, SEMPRE, e il compratore deve esserne
+avvisato.
+
+**Rovescia una decisione di ago 2026** («un tracciamento riscrivibile
+a piacere non è più una prova in disputa», per cui correggeva solo un
+moderatore). Detto ad Andrea prima di farlo, e tenuta la ragione di
+allora in un altro modo: il codice di prima NON si cancella, va in fila
+in `tracking_storico` nella stessa transazione, e l'ordine mostra la
+fila a tutt'e due («Codici di prima: …, cambiato dal venditore il …»).
+In disputa si legge tutta la storia, non solo l'ultimo codice.
+
+**Cosa.** `POST /api/orders/{id}/tracking`, solo il venditore di
+quell'ordine, in ogni stato da 'shipped' in poi
+(`STATI_CON_SPEDIZIONE`); le guardie della porta del moderatore
+identiche (niente sentinelle nei due versi, niente ritiro/digitale,
+`spedito_il`, stato e `aggiornato` intoccati — le ancore dei
+promemoria). Lo stesso codice di adesso si rifiuta. Notifica al
+compratore col codice nuovo (link trackbot) e quello di prima. Anche
+la correzione del moderatore ora mette in fila il codice sostituito.
+Nel client il pannello chiuso «✏️ Correggi il tracciamento» al posto
+della riga «scrivi ai moderatori»; la riga del timbro non dice più «da
+un moderatore» (lo dice la fila, per ogni cambio).
+
+**Scartato.** Una finestra di tempo (solo finché 'shipped'): Andrea ha
+detto sempre. Un limite al numero di correzioni: la fila le mostra
+tutte, e il compratore le riceve tutte.
+
+**Il reso** resta del moderatore: il suo tracciamento lo scrive il
+compratore, e la richiesta parlava del venditore.
+
+**Provato.** `prove_tracking_venditore` gira l'endpoint vero su un
+database di cartone con lo schema vero della fila: correzione, timbro,
+ancore intatte, fila che si allunga, avviso col vecchio e il nuovo,
+SEMPRE (delivered, released, dispute, refunded), e i no (non
+venditore, prima della spedizione, consegna a mano, ritiro,
+sentinella, vuoti, doppione). Tre banchi vecchi hanno avuto la
+tabella nuova o il gemello di `filaTracking`. Non provato dal vivo.

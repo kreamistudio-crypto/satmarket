@@ -1594,7 +1594,25 @@
   3) CORREZIONE, `POST /api/admin/orders/{id}/tracking` (`reso=1` per
   quello del reso): SOLO moderatore — decisione di Andrea, un
   tracciamento riscrivibile a piacere non è più una prova in disputa,
-  quindi il venditore NON ha nessun bottone. Stati shipped/delivered
+  quindi il venditore NON ha nessun bottone.
+  ⚠️ ROVESCIATA IL 6 OTT 2026 (parola di Andrea): il venditore corregge
+  il SUO tracciamento SEMPRE, da 'shipped' in poi
+  (`STATI_CON_SPEDIZIONE`, anche a ordine chiuso o in disputa), con
+  `POST /api/orders/{id}/tracking` (`correggi_tracking_venditore`) e il
+  pannello chiuso «✏️ Correggi il tracciamento» nell'ordine
+  (`pannelloTrackingVenditore`, al posto della riga
+  `notaTrackingSbagliato`). La PROVA si tiene in un altro modo: il
+  codice di prima va in `tracking_storico` (ordine, reso, corriere,
+  tracking, sostituito_il, da = venditore|moderatore) nella STESSA
+  transazione dell'UPDATE (`archivia_tracking`, anche dalla porta del
+  moderatore), `/api/orders` la porta come `tracking_storico` (UNA
+  query, la chiave solo dove c'è) e `filaTracking` la mostra a tutt'e
+  due sotto il codice — «Codici di prima: … (cambiato dal venditore
+  il …)». Il compratore riceve la notifica col codice nuovo E quello
+  di prima; lo stesso codice di adesso si rifiuta (niente doppioni in
+  fila). Le guardie qui sotto (sentinelle, `spedito_il`, stato)
+  valgono identiche per la porta del venditore.
+  Stati del moderatore shipped/delivered
   (return_shipped per il reso). NON SI TOCCA `spedito_il`, che è
   l'ANCORA del promemoria di `sollecita_conferme_ferme`: riscriverla
   farebbe ripartire da capo l'attesa del compratore a ogni correzione,
@@ -1608,7 +1626,7 @@
   in cassaforte cambia la STORIA dell'ordine, non un dato di servizio.
   Colonne `tracking_corretto_il` / `tracking_reso_corretto_il`
   (0 = mai), che escono gratis da `/api/orders` col `o.*` e diventano
-  la riga «(tracciamento corretto da un moderatore il …)» visibile a
+  la riga «(tracciamento corretto il …)» visibile a
   ENTRAMBE le parti — in silenzio varrebbe meno, non di più — più
   `registra_moderazione` e la notifica a CHI ASPETTA IL PACCO (il
   compratore sulla spedizione, il VENDITORE sul reso: è lui che
