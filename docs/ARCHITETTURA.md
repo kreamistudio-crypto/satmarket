@@ -16838,26 +16838,36 @@
   freno `carrello`); `GET /api/me/carrello` la rende con la card
   viva dei soli attivi, il titolo e `prezzo_prima` nella valuta
   dell'annuncio, e cancella lo scaduto (`GIORNI_CARRELLO_SALVATO`,
-  7). Si svuota in tre modi: lo «Svuota» (o la ✕) dell'utente, il
+  7). Si svuota in tre modi: «Svuota il carrello» nel foglio della ✕, il
   pagamento di un ordine dello STESSO venditore (`_incassa_ordine`,
   nella transazione dello stock; un altro venditore non lo tocca), la
   scopa dell'orologio (`pulisci_carrelli`). Nel client `salvaCarrello`
   è la penna (subito, una alla volta, `keepalive`, col `tg_id` di chi
   ce l'ha in memoria), `caricaCarrelloSalvato` la lettura dell'apertura
   (dopo la prima pagina, segue l'identità, non scrive, non scavalca un
-  carrello composto adesso), la card «Il mio carrello» in home, le note in
+  carrello composto adesso), la card «Carrello» in home, le note in
   cima alla pagina del carrello. LA CARD (6 ott 2026, sera: al posto
   della riga «Riprendi · Svuota»; CANTIERI, «L'icona del carrello in
   Esplora per categorie») è la PRIMA della fila delle categorie, prima
   di «Tutto», e c'è solo con un carrello: il disegno di Andrea a tutto
-  quadrato (84/168/252/320 px, `/assets/carrello/`), «Il mio carrello»
-  sotto (una riga, larga quanto la card), la
+  quadrato (84/168/252/320 px, `/assets/carrello/`), «Carrello»
+  sotto, la
   voce «Il tuo carrello da Anna, 3 pezzi», il pallino coi pezzi o «!»
   se le note del rientro dicono che qualcosa è cambiato, un filo
   arancio di sera. Giudice `statoIconaCarrello`, fabbrica
   `cardCarrello`, e `aggiornaIconaCarrello` rifà la fila: è la firma
   di `renderStriscia` (pezzi, «!», nome) a decidere se ridisegnare. Il
-  tocco apre il carrello; «Svuota» vive solo dentro, nella ✕. Cambiare venditore CHIEDE
+  tocco apre il carrello. LA ✕ DEL CARRELLO CHIEDE COME USCIRE (6 ott
+  2026, decisione di Andrea; CANTIERI, «La ✕ del carrello: Salva per
+  dopo»): «Vuoi uscire dal carrello?» con tre strade — «Salva per
+  dopo», la principale (`salvaPerDopo`: esce come l'indietro di
+  Telegram, il carrello resta in memoria e sul server), «Svuota il
+  carrello» in `.btn.allarme` (`svuotaPacco`, la ✕ di prima: svuota
+  anche sul server) e «Annulla». Il foglio costa una entry della
+  cronologia, quindi «Salva per dopo» fa due passi: chiude il foglio
+  e, all'approdo vero in `navApplica` (`uscitaDopoSalva`, gemella di
+  `uscitaDopoAnnullo`), chiama di nuovo `navIndietro` — lo stesso
+  dell'indietro. Il foglio resta suo, fuori dalla domanda unica. Cambiare venditore CHIEDE
   («Hai già un carrello da…: vuoi sostituirlo?», `apriPacco`, che
   aspetta la lettura in volo); dopo un pagamento decide
   `carrelloDopoPagamento` col venditore dell'ordine; l'accordo sul

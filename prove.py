@@ -40151,12 +40151,17 @@ def prove_fogli_di_casa():
     # ritrova, ricominciarlo butta via una cosa attesa — decisione di
     # Andrea) e «Svuotare il carrello da Anna?» dalla riga in home
     # (`chiediSvuotaCarrello`), la stessa domanda della ✕ — uscita il
-    # 6 ott 2026 (sera) con la riga: al suo posto la card «Il mio carrello»
+    # 6 ott 2026 (sera) con la riga: al suo posto la card «Carrello»
     # nella fila delle categorie, e «Svuota» resta solo DENTRO il
     # carrello, la ✕ col suo foglio.
     # OTTANTA (6 ott 2026, il bollino 🛡️ Staff): «Staff di Barattolo»
     # (`spiegaStaff`), un avviso — il tocco sul bollino spiega cos'e'.
     # Quindi, con la riga del carrello uscita: settantanove.
+    # E LA ✕ DEL CARRELLO NON ENTRA NEL CONTO, ne' ieri ne' oggi: il suo
+    # foglio (#paccoSvuotaSheet) e' suo, e dal 6 ott 2026 ha TRE strade
+    # — «Salva per dopo», «Svuota il carrello», «Annulla» — che la
+    # domanda unica, fatta per un si' e un ripensamento, non sa dire.
+    # Lo sorveglia prove_carrello_salvato.
     prova("i gesti che passano dalla domanda unica sono settantanove",
           79, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
@@ -83090,7 +83095,9 @@ def prove_indietro_dal_libro():
              "function navMotore(){", "function passoPilaP2P(ora, st, sotto){",
              "function navGiu(){", "function vaiEsplora(){",
              "function navArmaGesto(dentro){", "function navArrivoSecco(){",
-             "function consumaGradinoReparto(){", "function tornaATutto(){")
+             "function consumaGradinoReparto(){", "function tornaATutto(){",
+             # «Salva per dopo» del foglio della ✕ del carrello (6 ott 2026)
+             "function salvaPerDopo(){")
     _prog = (
         _blocco("const RADICI = new Set([", "]);") + "\n"
         + "\n".join(re.search(r"const " + n + r" = [^\n]*;", mini).group(0) for n in (
@@ -83131,6 +83138,9 @@ let tourInCorso = false, tourP2PInCorso = false, testModaleInCorso = false;
 let vistaBarattolo = false, filtroAsta = false, pollTimer = null;
 const DEMO = false, STORIA = true;
 let navSpingi = false, navGradinoReparto = 0, navApplicando = false, uscitaDopoAnnullo = false;
+/* (6 ott 2026) la gemella dell'annullo: «Salva per dopo» del carrello */
+let uscitaDopoSalva = false;
+function haptic(){}
 /* (30 set 2026) la sorella di navSpingi: la scelta di una variante */
 let navSostituisci = false;
 let navUltimo = 0, navGiuInVolo = 0, navGuardiano = null;
@@ -83243,6 +83253,9 @@ function passo(p, via){
   /* una vista e uno strato NATI INSIEME, come il tour del P2P che la
      prima volta si apre sul libro nello stesso tocco in cui ci si torna */
   else if (p.indexOf('+') > 0) { const [v, f] = p.split('+'); APERTI.push(f); go(v); }
+  /* «Salva per dopo» nel foglio della ✕ del carrello: un tocco su un
+     bottone, quindi un gesto fresco (fuori dalla serratura dei 350 ms) */
+  else if (p === 'salva') { navUltimo = 0; salvaPerDopo(); }
   else if (p === 'perso') PERDI = 1;
   else if (p === 'tardi') SPOSTA += 1600;
   else if (p[0] === '+') { APERTI.push(p.slice(1)); osserva(); }
@@ -83436,6 +83449,25 @@ async function aCaso(n, via){
   /* L'AVANTI DEL BROWSER va dove dice la sua entry */
   try { R.avanti = await giro(['p2p', 'ordine', 'p2pmiei', '<', '>'], 'sistema'); }
   catch(e) { R.avanti = 'ESPLOSO: ' + (e && e.message); }
+  /* «SALVA PER DOPO» (6 ott 2026): dal foglio della ✕ del carrello si
+     esce COME con l'indietro dalla pagina del carrello — stessa vista
+     d'arrivo, stessa cronologia —, in tutte e tre le vie; e «Annulla»
+     (l'indietro sul foglio) resta nel carrello. Il carrello aperto da
+     una pagina (il profilo, una radice qualunque) e dalla home. */
+  try {
+    R.salva = {};
+    const fine = g => [g.visti[g.visti.length - 1], g.forme[g.forme.length - 1]];
+    for (const via of ['tg', 'sistema', 'apk']) {
+      const s = await giro(['profilo', 'pacco', '+paccoSvuotaSheet', 'salva'], via);
+      const flag = uscitaDopoSalva;
+      const i = await giro(['profilo', 'pacco', '<'], via);
+      const c = await giro(['pacco', '+paccoSvuotaSheet', 'salva'], via);
+      const ci = await giro(['pacco', '<'], via);
+      const a = await giro(['profilo', 'pacco', '+paccoSvuotaSheet', '<'], via);
+      R.salva[via] = {salva: fine(s), indietro: fine(i), casa: fine(c), casaIndietro: fine(ci),
+                      annulla: fine(a), flag, mosse: s.mosse};
+    }
+  } catch(e) { R.salva = 'ESPLOSO: ' + (e && e.message); }
   const L = [{t:'v', v:'p2p', k:0}], M = [{t:'v', v:'p2pmiei', k:0}], I = [{t:'v', v:'p2pinfo', k:0}];
   const O = [{t:'v', v:'p2pordine', k:'x1'}], E = [{t:'v', v:'esplora', k:'esplora|Tutto'}];
   const P = [{t:'v', v:'profilo', k:0}], F = {t:'f', k:'p2pFoglio'};
@@ -83475,6 +83507,23 @@ async function aCaso(n, via){
         prova("il banco della pila del P2P gira", "", _r.stderr[:600])
         return
     out = _js.loads(_r.stdout.strip())
+
+    # --- «SALVA PER DOPO» (6 ott 2026, il foglio della ✕ del carrello) ---
+    # navApplica, navIndietro e salvaPerDopo VERI: il bottone esce come
+    # l'indietro dalla pagina del carrello, nelle tre vie; Annulla resta
+    _s = out.get("salva")
+    for _via in ("tg", "sistema", "apk"):
+        _x = _s.get(_via, {}) if isinstance(_s, dict) else {}
+        prova("«Salva per dopo» esce dal carrello come l'indietro: stessa "
+              "vista d'arrivo e stessa cronologia, dal profilo e dalla home "
+              "(%s)" % _via,
+              [["profilo", "esplora profilo"], ["profilo", "esplora profilo"],
+               ["esplora", "esplora"], ["esplora", "esplora"]],
+              [_x.get("salva"), _x.get("indietro"), _x.get("casa"),
+               _x.get("casaIndietro")] if _x else _s)
+        prova("...la bandierina si consuma, e «Annulla» resta nel carrello "
+              "(%s)" % _via, [False, ["pacco", "esplora profilo pacco"]],
+              [_x.get("flag"), _x.get("annulla")] if _x else _s)
 
     # --- 2) IL GIUDICE, PURO ---------------------------------------------
     prova("il giudice: spingi dal libro, giu per i gradini di troppo, libro se manca, la radice che lascia il P2P sostituisce il libro, e il resto come sempre",
@@ -123356,7 +123405,7 @@ def prove_carrello_salvato():
     quattro decisioni di Andrea). Il carrello di sempre — UNO, di un
     venditore alla volta — ha una copia sul server, una riga per
     persona, scritta a ogni tocco e riletta all'apertura; in home la
-    card «Il mio carrello», la PRIMA della fila delle categorie (dal 6 ott 2026
+    card «Carrello», la PRIMA della fila delle categorie (dal 6 ott 2026
     sera; prima una riga «Riprendi · Svuota»), col pallino dei pezzi o
     «!». NON sono i carrelli tolti il 24 set 2026:
     niente localStorage ne' nuvola di Telegram, niente carrelli da parte.
@@ -123498,9 +123547,9 @@ def prove_carrello_salvato():
     prova("...un <a> senza href ne' data-cat: fuori dal tocco lungo che "
           "condivide", [False, False, True],
           ["href=" in cc, "data-cat" in cc, 'role="button"' in cc])
-    prova("...l'etichetta «Il mio carrello» e la voce col nome passato "
-          "da esc()",
-          True, '<span class="cat-eti">Il mio carrello</span>' in cc
+    prova("...l'etichetta «Carrello» (di nuovo: «Il mio carrello» e' durata "
+          "un giro) e la voce col nome passato da esc()",
+          True, '<span class="cat-eti">Carrello</span>' in cc
           and 'aria-label="${esc(voce)}"' in cc
           and "const voce = `Il tuo carrello da ${s.nome}, ${pezzi}`" in cc)
     prova("...il pallino e' aria-hidden (lo dice la voce)", True,
@@ -123512,6 +123561,44 @@ def prove_carrello_salvato():
           '/assets/carrello/carrello-252.webp 252w, '
           '/assets/carrello/carrello-320.webp 320w"' in cc
           and 'sizes="(min-width:768px) 160px, 84px"' in cc)
+    # LA ✕ CHIEDE COME USCIRE (6 ott 2026, decisione di Andrea): il
+    # foglio «Vuoi uscire dal carrello?» con tre strade, in quest'ordine
+    i = mini.index('<div class="sheet" id="paccoSvuotaSheet"')
+    fx = mini[i:mini.index("</div>\n", mini.index('<button class="btn ghost" onclick="navIndietro()"', i))]
+    prova("la ✕: «Vuoi uscire dal carrello?», e la domanda di ieri non c'e' piu'",
+          [True, False, False],
+          ['<h3 id="paccoSvuotaTit">Vuoi uscire dal carrello?</h3>' in fx,
+           # nel markup e nel codice, non nei commenti che ne fanno la storia
+           "ignora le modifiche" in re.sub(r"<!--[\s\S]*?-->", "", mini),
+           "Vuoi ignorare" in re.sub(r"<!--[\s\S]*?-->", "", mini)])
+    prova("...tre strade, in quest'ordine: Salva per dopo (la principale), "
+          "Svuota il carrello (distruttiva), Annulla",
+          [("btn orange", "salvaPerDopo()", "Salva per dopo"),
+           ("btn allarme", "svuotaPacco()", "Svuota il carrello"),
+           ("btn ghost", "navIndietro()", "Annulla")],
+          re.findall(r'<button class="([^"]+)" onclick="([^"]+)"\s+aria-label="[^"]*">([^<]+)</button>', fx))
+    prova("...ognuna dice a voce cosa succede, cominciando col testo che si vede",
+          [True, True, True],
+          [l.startswith(t + ":") and len(l) > len(t) + 10 for l, t in
+           re.findall(r'aria-label="([^"]+)">([^<]+)</button>', fx)])
+    prova("...il dialogo ha il titolo e la spiegazione per la voce", True,
+          'aria-labelledby="paccoSvuotaTit" aria-describedby="paccoSvuotaSpiega"' in fx
+          and 'id="paccoSvuotaSpiega"' in fx)
+    spd = pezzo_js(mini, "function salvaPerDopo(){", "\n}\n")
+    prova("«Salva per dopo» non svuota e non scrive: chiude e torna indietro "
+          "(il carrello e' gia' salvato a ogni tocco)", [False, False, False, True],
+          ["azzeraCarrello" in spd, "salvaCarrello" in spd, "setScelte" in spd,
+           "uscitaDopoSalva = true;\n  navIndietro();" in spd])
+    nap = pezzo_js(mini, "function navApplica(s){", "\n}\n")
+    prova("...e il secondo passo e' navIndietro all'approdo sulla pagina del "
+          "carrello, LO STESSO dell'indietro di Telegram", True,
+          "if (uscitaDopoSalva) {\n    uscitaDopoSalva = false;\n"
+          "    if (bersaglio[0]?.t === 'v' && bersaglio[0].v === 'pacco') {\n"
+          "      navUltimo = 0;\n      navIndietro();" in nap
+          and "let uscitaDopoSalva = false;" in mini)
+    svp = pezzo_js(mini, "function svuotaPacco(){", "\n}\n")
+    prova("«Svuota il carrello» e' la ✕ di ieri: svuota la memoria e il server",
+          True, 0 <= svp.find("azzeraCarrello();") < svp.find("salvaCarrello();"))
     prova("aggiornaIconaCarrello rifa' la fila (decide la firma)", True,
           "renderStriscia();" in pezzo_js(
               mini, "function aggiornaIconaCarrello(){", "\n}\n"))
@@ -123572,6 +123659,11 @@ def prove_carrello_salvato():
     rilegg = pezzo_js(mini, "async function rileggiVenditore(l){", "\n}\n") + "\n}\n"
     accordo = pezzo_js(mini, "async function pagaOffertaCarrello(id){",
                        "\n}\n") + "\n}\n"
+    # la ✕ e le sue tre strade (6 ott 2026): chiudiPagPacco, salvaPerDopo
+    # e svuotaPacco VERE
+    ics = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function chiudiPagPacco(){", "function salvaPerDopo(){",
+        "function svuotaPacco(){"))
     js = r"""
 let DEMO = false, VETRINA = false, myTgId = 111;
 const API_BASE = '/api';
@@ -123594,9 +123686,11 @@ const inCatalogo = arr => arr.forEach(a => {
   const i = listings.findIndex(x => x.id === a.id);
   if (i >= 0) listings[i] = a; else listings.push(a); });
 const motivoEsclusione = x => '';
-const els = {};
+const els = {}, aperti = new Set();
 const el = id => els[id] || (els[id] = {style: {}, innerHTML: '', textContent: '',
-  classList: {contains: () => false, add() {}, remove() {}}});
+  classList: {contains: c => c === 'open' && aperti.has(id),
+              add(c){ if (c === 'open') aperti.add(id); },
+              remove(c){ if (c === 'open') aperti.delete(id); }}});
 /* LA FILA DELLE CATEGORIE, di cartone: la riga di renderStriscia che
    mette in testa la card del carrello (le sentinelle la vogliono
    letterale, e il banco dei Consigliati gira la fila vera); qui conta
@@ -123615,6 +123709,14 @@ const icona = () => {
           h.indexOf('cella-carrello') < h.indexOf('href="/"')];
 };
 const viste = []; const go = v => viste.push(v);
+/* la ✕ (6 ott 2026): il motore di navigazione di cartone — conta gli
+   indietro e i fogli aperti; il secondo passo di «Salva per dopo» lo
+   prova il banco della pila (prove_indietro_dal_libro) */
+let STORIA = true, navUltimo = 0, uscitaDopoSalva = false, indietro = 0;
+const navIndietro = () => { indietro++; };
+const chiudiPicker = () => {};
+const document = {querySelector: s => s === '.sheet.open'
+  && [...aperti].some(x => x !== 'sheetBg') ? {} : null};   /* il velo non e' un foglio */
 const renderPacco = () => {};
 const conferme = []; const chiediConferma = c => conferme.push(c);
 const invitoTelegram = () => {};
@@ -123635,7 +123737,7 @@ globalThis.fetch = (url, opt = {}) => {
 const attesa = () => new Promise(r => setTimeout(r, 0));
 const ultima = () => (scritte[scritte.length - 1] || {}).corpo;
 """
-    js += blocco + "\n" + apri + rilegg + accordo + r"""
+    js += blocco + "\n" + apri + rilegg + accordo + ics + r"""
 const carta = (id, titolo, extra) => Object.assign({id, titolo, venditore_id: 222,
   venditore: 'Anna', venditore_negozio: 'anna', stato: 'attivo', quantita: 3,
   valuta: 'sats', prezzo_sats: 5000, prezzo_eur: 0}, extra || {});
@@ -123739,7 +123841,7 @@ const out = {};
   n = scritte.length;
   await rileggiVenditore(listings.find(x => x.id === 2)); await attesa();
   out.potatura = [[...setScelte], scritte.length - n, ultima()];
-  // N) il tocco sulla card «Il mio carrello»: la pagina del carrello, e
+  // N) il tocco sulla card «Carrello»: la pagina del carrello, e
   //    aprirlo e' un tocco. Il gesto e' quello scritto nella card VERA.
   n = scritte.length; const v0 = viste.length; negozio = [carta(2, 'Tazza', {quantita: 1})];
   out.gesto = (el('catStrip').innerHTML.match(/onclick="([^"]*)"/) || [])[1];
@@ -123767,6 +123869,34 @@ const out = {};
   out.nomeScappato = el('catStrip').innerHTML.includes('Anna &quot;&lt;b&gt;')
     && !el('catStrip').innerHTML.includes('"<b>');
   inCatalogo([mapListing(carta(2, 'Tazza'))]);
+  // R) LA ✕ CHIEDE COME USCIRE (6 ott 2026). Il foglio si apre solo
+  //    se c'e' qualcosa da perdere; «Salva per dopo» non svuota e non
+  //    scrive, e torna indietro; «Svuota il carrello» svuota anche sul
+  //    server, e torna indietro.
+  setScelte = new Map([[2, 2]]); paccoDati = {sellerId: 222, origineId: 2};
+  inCatalogo([mapListing(carta(2, 'Tazza'))]);
+  salvaCarrello(); await attesa();
+  indietro = 0; aperti.clear();
+  chiudiPagPacco();
+  out.xApre = [[...aperti].sort(), indietro];
+  n = scritte.length;
+  salvaPerDopo(); await attesa();
+  out.salva = [[...setScelte], paccoDati && paccoDati.sellerId, scritte.length - n,
+               uscitaDopoSalva, indietro, icona() && icona()[1]];
+  // ...e senza cronologia (la DEMO da file) i passi sono due indietro di
+  //    fila, come li farebbe l'indietro: foglio, poi pagina
+  STORIA = false; uscitaDopoSalva = false; indietro = 0;
+  salvaPerDopo();
+  out.salvaSenzaStoria = [indietro, uscitaDopoSalva, [...setScelte]];
+  STORIA = true;
+  uscitaDopoSalva = false; indietro = 0; n = scritte.length;
+  chiudiPagPacco();
+  svuotaPacco(); await attesa();
+  out.svuota = [[...setScelte], paccoDati, scritte.length - n, ultima(),
+                toasts[toasts.length - 1], [...aperti], indietro, icona()];
+  indietro = 0; aperti.clear();
+  chiudiPagPacco();
+  out.xVuoto = [[...aperti], indietro];
   // K) in DEMO niente scritture e niente card
   DEMO = true; n = scritte.length;
   setScelte = new Map([[2, 1]]); paccoDati = {sellerId: 222, origineId: 2};
@@ -123792,7 +123922,7 @@ const out = {};
            "«Tazza»: ne resta solo 1, la quantità è scesa a 1",
            "«Tazza» ora costa 6000 sats (prima 5000 sats)",
            "«Vaso <b>» ora costa 12,50 € (prima 10,00 €)"], out.get("note"))
-    prova("la card «Il mio carrello» nasce, per prima: la voce col venditore e i "
+    prova("la card «Carrello» nasce, per prima: la voce col venditore e i "
           "pezzi, e il pallino dice «!» (qualcosa e' cambiato)",
           ["Il tuo carrello da Anna, 2 pezzi: qualcosa è cambiato",
            [" cambiato", "!"], True], out.get("icona"))
@@ -123867,6 +123997,20 @@ const out = {};
           out.get("unPezzo"))
     prova("un nome col markup arriva scappato nella voce della card", True,
           out.get("nomeScappato"))
+    prova("la ✕ con qualcosa nel carrello apre il foglio, e non esce ancora",
+          [["paccoSvuotaSheet", "sheetBg"], 0], out.get("xApre"))
+    prova("«Salva per dopo»: il carrello resta (memoria e card), nessuna "
+          "scrittura, e si torna indietro col passo in piu' prenotato",
+          [[[2, 2]], 222, 0, True, 1, ["", "2"]], out.get("salva"))
+    prova("«Svuota il carrello»: vuoto in memoria e sul server (POST con le "
+          "righe vuote), il foglio chiuso, un passo indietro, la card se ne va",
+          [[], None, 1, {"tg_id": 111, "righe": []}, "Carrello svuotato", [],
+           1, None], out.get("svuota"))
+    prova("...e senza cronologia (la DEMO da file) due indietro di fila, "
+          "senza bandierina, carrello intatto", [2, False, [[2, 2]]],
+          out.get("salvaSenzaStoria"))
+    prova("a carrello vuoto la ✕ esce e basta, senza domanda",
+          [[], 1], out.get("xVuoto"))
     prova("in DEMO niente scritture e niente card", [0, None], out.get("demo"))
 
 

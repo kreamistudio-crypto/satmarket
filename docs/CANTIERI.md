@@ -37967,3 +37967,104 @@ bottone «C'è un problema», ruolo `.allarme`). Decide Andrea.
 **Da guardare** (sul telefono): «I miei scambi» nei due temi, con uno
 scambio a vendere e uno a comprare; l'avviso del premio sulle card
 tinte di sera.
+
+## La ✕ del carrello: «Salva per dopo» (6 ott 2026, sera, decisione di Andrea)
+
+Da quando il carrello si ritrova — il carrello salvato (adfd112) e la
+card «Carrello» in Esplora (7786cdb e seguenti) — la ✕ della pagina del
+carrello buttava via una cosa attesa senza offrire l'alternativa: il
+suo foglio chiedeva solo «Vuoi ignorare le modifiche?», e l'unico modo
+di uscire tenendo il carrello era l'indietro, che nessuno associa alla
+✕. E, nello stesso giro, l'etichetta della card torna «Carrello» («Il
+mio carrello» è durata un push: richiesta di Andrea).
+
+**COSA FACEVANO PRIMA LA ✕ E L'INDIETRO** (letto nel codice e detto ad
+Andrea prima di scrivere). La ✕ (`chiudiPagPacco`): a carrello vuoto
+esce e basta; sennò apre `#paccoSvuotaSheet`, dove «Sì, ignora le
+modifiche» (`svuotaPacco`) svuota memoria e server, chiude il foglio,
+esce e dice «Carrello svuotato», e «Annulla» chiude il foglio e resta.
+L'indietro di Telegram (e la freccia, e il tasto di sistema: tutti da
+`navIndietro`) non chiede e non svuota: torna alla pagina di prima —
+l'annuncio, o Esplora se si era entrati dalla card — col carrello
+intatto in memoria e sul server (lo scrive già `salvaCarrello` a ogni
+tocco); uscendo, le note del rientro sono lette.
+
+**DECISO.** Il foglio chiede «Vuoi uscire dal carrello?», con una riga
+di spiegazione (salvato: lo ritrovi in Esplora alla voce «Carrello»;
+svuotato: si ricomincia e non si torna indietro), e tre strade in
+quest'ordine: «Salva per dopo» (`.btn.orange`, la principale),
+«Svuota il carrello» (`.btn.allarme`, la vecchia «Sì, ignora le
+modifiche», tale e quale), «Annulla» (`.btn.ghost`, resta). Per la
+voce ogni bottone ha un `aria-label` che COMINCIA col testo visibile e
+dice cosa succede («Salva per dopo: esci, il carrello resta salvato e
+lo ritrovi in Esplora»; «Svuota il carrello: toglie tutti gli oggetti,
+non si può annullare»; «Annulla: resta nel carrello»), e il dialogo ha
+`aria-describedby` sulla spiegazione. L'id del foglio resta
+`paccoSvuotaSheet` (lo chiudono la chiusura mirata e `closeSheet`).
+
+**«SALVA PER DOPO» È L'INDIETRO, E LO SI È MISURATO PRIMA DI SCRIVERLO.**
+Copiare la sequenza di `svuotaPacco` senza svuotare — togliere `open` al
+foglio e chiamare `navIndietro` — dal vivo RIPORTA SUL CARRELLO (`d` da
+2 a 1, vista ancora `view-pacco`): il foglio è uno strato con la sua
+entry, e quel passo consuma solo lei. A `svuotaPacco` va bene per un
+caso: un carrello vuoto non si ricostruisce, e `navRendiVista` ripiega
+su Esplora. Quindi `salvaPerDopo` ricalca il precedente dell'annullo
+della modifica (`uscitaDopoAnnullo`): dichiara l'INTENZIONE
+(`uscitaDopoSalva = true`), fa il primo passo (`navIndietro`, che
+smonta il foglio) e all'approdo vero, in coda a `navApplica`, se la
+entry d'arrivo è la pagina del carrello chiama di nuovo `navIndietro`
+— lo stesso dell'indietro di Telegram, con la sua regola della radice
+madre, e non un `history.back` a parte, perché «Salva per dopo» e
+l'indietro non devono poter divergere. La serratura dei 350 ms si
+riapre apposta (`navUltimo = 0`): è il seguito dello stesso gesto, non
+un secondo canale. La bandierina si spegne al primo approdo qualunque
+sia. Senza cronologia (la DEMO da file) i passi sono due `navIndietro`
+di fila, come li farebbe l'indietro. Niente scritture: il carrello sul
+server è già quello.
+
+**SCARTATO.** La domanda unica (`chiediConferma`): sa dire un sì e un
+ripensamento, non tre strade — il foglio resta suo, e il censimento
+delle domande resta a 79 (detto nella sua prova). `history.go(-2)`: il
+motore lo rifiuta apposta (asincrono e coalescente, il debito di
+contare i gradini). Un toast «Carrello salvato» su «Salva per dopo»:
+l'indietro non lo dice, e il patto era «esattamente come l'indietro»
+(resta nell'elenco delle cose notate).
+
+**PROVATO.** prove_carrello_salvato (92): le sentinelle sul foglio
+(titolo, la domanda di ieri sparita dal markup, i tre bottoni in ordine
+con le classi e i gesti, le voci che cominciano col testo visibile,
+`aria-describedby`), su `salvaPerDopo` (non svuota e non scrive), sul
+secondo passo in `navApplica` e su `svuotaPacco`; il banco node con
+`chiudiPagPacco`, `salvaPerDopo` e `svuotaPacco` VERI: la ✕ apre il
+foglio e il velo senza uscire, «Salva per dopo» tiene il carrello (in
+memoria e nella card) senza scritture e prenota il secondo passo,
+«Svuota il carrello» svuota memoria e server (POST con le righe vuote),
+chiude il foglio e il velo e fa un passo, la card se ne va; senza
+cronologia «Salva per dopo» fa due indietro di fila; a carrello vuoto
+la ✕ esce senza domanda. prove_indietro_dal_libro (il banco della
+pila, col motore VERO): «Salva per dopo» arriva dove arriva l'indietro
+dalla pagina del carrello, con la stessa cronologia, aperto da una
+pagina e dalla home, in tutte e tre le vie (Telegram, browser, app
+Android); la bandierina si consuma; «Annulla» resta nel carrello.
+prove_fogli_di_casa: il censimento resta 79, col perché del foglio
+fuori conto. Tortura sulla copia: al primo giro 16 su 17 — viveva
+«senza cronologia un passo solo», perché il banco girava solo con la
+cronologia accesa: aggiunta la scena della DEMO da file, e con lei 2
+su 2 (quella e la bandierina accesa senza cronologia). Suite intera
+severa senza config nel worktree (base d3a92bc): 19.169 verdi e 0
+rosse, prima della scena senza cronologia (la sua sezione da sola: 92
+verdi); i 38 collaudi della CI nella gabbia verdi.
+Dal vivo nel Browser pane (copia in collaudo, relay morto, 375 px,
+tocchi veri): carrello composto da un annuncio (tazza, poi vaso), ✕ →
+«Salva per dopo» → di nuovo sull'annuncio della tazza, carrello intatto
+in memoria e sul server, card «Carrello» con 2; l'app ricaricata da
+capo, la card c'è, il tocco riapre il carrello con le due righe; ✕ →
+«Svuota il carrello» → Esplora, «Carrello svuotato», niente card, sul
+server null. Il lettore vocale (l'albero di accessibilità) legge i tre
+bottoni con la loro voce. Scatti prima/dopo del foglio a 375 px, chiaro
+e scuro (Chrome headless, densità 3), mandati ad Andrea.
+
+**DA GUARDARE.** Sul telefono vero, dentro Telegram e nella PWA: «Salva
+per dopo» dal carrello aperto da un annuncio e dalla card, e che il
+secondo passo non lampeggi la pagina del carrello. Con TalkBack o
+VoiceOver, i tre bottoni.

@@ -778,7 +778,7 @@
   .ospite-riga span{flex:1 1 auto;min-width:0}
   .ospite-riga .btn.mini{flex:0 0 auto;margin:0}
   /* IL CARRELLO RITROVATO in home: dal 6 ott 2026 (sera) non e' piu'
-     una riga ma la card «Il mio carrello» in testa alla fila delle categorie
+     una riga ma la card «Carrello» in testa alla fila delle categorie
      (vedi .cella-carrello). In cima alla pagina del carrello, cosa e'
      cambiato mentre aspettava: */
   .pacco-note{margin:10px var(--pad) 0;padding:10px 12px;
@@ -1166,7 +1166,7 @@
      esce — nella cascata le transizioni battono le animazioni — e lo
      spegnerebbe in dissolvenza mentre scende. */
   .cella-consigliati .cat-fig{inset:5%}
-  /* LA CARD «IL MIO CARRELLO» (6 ott 2026, al posto della riga in home): il
+  /* LA CARD «CARRELLO» (6 ott 2026, al posto della riga in home): il
      disegno di Andrea riempie TUTTO il quadrato — ha il suo fondo,
      bruno con l'alone arancio — e gli angoli li taglia l'overflow del
      quadrato, come alle sorelle. Nasce solo con un carrello (la
@@ -13002,15 +13002,29 @@ document.getElementById('cartello')?.remove();</script>
     <h3 id="p2pCampiTit">🤝 I vostri recapiti</h3>
     <div id="p2pCampiCorpo"></div>
   </div>
+  <!-- LA ✕ DEL CARRELLO CHIEDE COME USCIRE (6 ott 2026, decisione di
+       Andrea): da quando il carrello si ritrova (il carrello salvato e
+       la card «Carrello» in Esplora) uscire non vuol dire piu' buttare.
+       Tre strade, in quest'ordine: «Salva per dopo» e' la principale e
+       fa quello che fa l'indietro (salvaPerDopo); «Svuota il carrello»
+       e' la vecchia «Sì, ignora le modifiche», vestita da distruttiva;
+       «Annulla» resta nel carrello. L'id resta quello di sempre: lo
+       chiudono la chiusura mirata e closeSheet. Ogni bottone dice a
+       voce cosa succede (aria-label che COMINCIA col testo visibile). -->
   <div class="sheet" id="paccoSvuotaSheet" role="dialog" aria-modal="true"
-       aria-labelledby="paccoSvuotaTit">
+       aria-labelledby="paccoSvuotaTit" aria-describedby="paccoSvuotaSpiega">
     <div class="grab"></div>
-    <h3 id="paccoSvuotaTit">Vuoi ignorare le modifiche?</h3>
-    <div style="font-size:13px;color:var(--muted);font-weight:600;
-      line-height:1.5;margin-bottom:14px">Non potrai annullare questa
-      azione: il carrello si svuota e si ricomincia da capo.</div>
-    <button class="btn orange" onclick="svuotaPacco()">Sì, ignora le modifiche</button>
-    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+    <h3 id="paccoSvuotaTit">Vuoi uscire dal carrello?</h3>
+    <div id="paccoSvuotaSpiega" style="font-size:13px;color:var(--muted);font-weight:600;
+      line-height:1.5;margin-bottom:14px">Se lo salvi per dopo, lo ritrovi
+      in Esplora, alla voce «Carrello». Se lo svuoti, si ricomincia da
+      capo e non si torna indietro.</div>
+    <button class="btn orange" onclick="salvaPerDopo()"
+      aria-label="Salva per dopo: esci, il carrello resta salvato e lo ritrovi in Esplora">Salva per dopo</button>
+    <button class="btn allarme" onclick="svuotaPacco()"
+      aria-label="Svuota il carrello: toglie tutti gli oggetti, non si può annullare">Svuota il carrello</button>
+    <button class="btn ghost" onclick="navIndietro()"
+      aria-label="Annulla: resta nel carrello">Annulla</button>
   </div>
 
   <!-- ============ SHEET ANNULLA L'ORDINE, LATO VENDITORE (1 ott 2026) ============
@@ -16176,6 +16190,10 @@ let navApplicando = false;
    una entry, e uscire dal form ne vuole due — vedi la coda di
    navApplica, dove si consuma. */
 let uscitaDopoAnnullo = false;
+/* ...e la sua gemella, chiesta da «Salva per dopo» nel foglio della ✕
+   del carrello (6 ott 2026): il foglio costa una entry, e uscire dalla
+   pagina del carrello ne vuole due — vedi la coda di navApplica. */
+let uscitaDopoSalva = false;
 /* Su file:// (la DEMO aperta a mano) la storia non si puo' toccare: il
    motore resta spento e tutto si comporta come ieri. Stessa guardia di
    protocollo del service worker. */
@@ -16582,6 +16600,20 @@ function navApplica(s){
   if (uscitaDopoAnnullo) {
     uscitaDopoAnnullo = false;
     if (bersaglio[0]?.t === 'v' && bersaglio[0].v === 'vendi') history.back();
+  }
+  /* «SALVA PER DOPO» (6 ott 2026), lo stesso patto: smontato il foglio,
+     si esce anche dalla pagina del carrello — e il secondo passo e'
+     navIndietro, LO STESSO dell'indietro di Telegram (con la sua regola
+     della radice madre), non un history.back a parte: «Salva per dopo»
+     e l'indietro non devono poter divergere. La serratura dei 350 ms si
+     riapre apposta: il primo passo l'ha chiusa un istante fa, e questo
+     e' il seguito dello stesso gesto, non un secondo canale. */
+  if (uscitaDopoSalva) {
+    uscitaDopoSalva = false;
+    if (bersaglio[0]?.t === 'v' && bersaglio[0].v === 'pacco') {
+      navUltimo = 0;
+      navIndietro();
+    }
   }
 }
 
@@ -25801,6 +25833,12 @@ async function apriPacco(){
   });
 }
 /* ---- LA ✕ CHIUDE E BUTTA VIA (ago 2026, decisione di Andrea) ----
+   ⚠️ DAL 6 OTT 2026 LA ✕ CHIEDE COME USCIRE: il carrello si ritrova
+   (il carrello salvato, la card in Esplora), e il foglio offre prima
+   «Salva per dopo» (salvaPerDopo, quello che fa l'indietro), poi
+   «Svuota il carrello» (svuotaPacco, quello che faceva la ✕ fin qui) e
+   «Annulla». Quel che segue e' la storia del primo giro, e il suo
+   perche' sull'indietro resta vero.
    Il pacco e' STICKY per venditore: uscire e rientrare dal dettaglio
    di un annuncio non svuota niente (lo dice apriPacco: stesso
    venditore = ritrova il suo pacco com'era), e questo non cambia. Ma
@@ -25825,6 +25863,25 @@ function chiudiPagPacco(){
   if (!setScelte.size) { navIndietro(); return; }   /* niente da buttare */
   el('sheetBg').classList.add('open');
   el('paccoSvuotaSheet').classList.add('open');
+}
+/* «SALVA PER DOPO» (6 ott 2026, decisione di Andrea): la strada
+   principale del foglio della ✕. Fa ESATTAMENTE quello che fa
+   l'indietro di Telegram dalla pagina del carrello — si esce, e il
+   carrello resta com'e', in memoria e sul server (lo scrive gia'
+   salvaCarrello a ogni tocco: niente da scrivere qui), e si ritrova
+   dalla card «Carrello» in Esplora per i suoi sette giorni. Due passi
+   e non uno: il primo smonta il foglio, il secondo — consumato
+   all'approdo vero in navApplica (uscitaDopoSalva) — esce dalla
+   pagina. Provato dal vivo: chiudere il foglio a mano e chiamare
+   navIndietro, come fa svuotaPacco, RIPORTA sul carrello — a
+   svuotaPacco va bene solo perche' un carrello vuoto non si ricostruisce.
+   Senza cronologia (la DEMO da file) i passi sono due navIndietro di
+   fila, come li farebbe l'indietro: foglio, poi pagina. */
+function salvaPerDopo(){
+  haptic();
+  if (!STORIA) { navIndietro(); navUltimo = 0; navIndietro(); return; }
+  uscitaDopoSalva = true;
+  navIndietro();
 }
 /* Il pacco si svuota DAVVERO: rientrando si ricomincia da capo
    (paccoDati a null = il prossimo «Aggiungi al pacco» e' un pacco
@@ -25851,7 +25908,7 @@ function svuotaPacco(){
    UNO, di un venditore alla volta, in memoria (setScelte + paccoDati) —
    e in piu' ha una copia sul SERVER, una riga per persona: si scrive a
    ogni tocco, si rilegge all'apertura (caricaCarrelloSalvato) e in home
-   lo dice la card «Il mio carrello», la prima della fila delle categorie (dal
+   lo dice la card «Carrello», la prima della fila delle categorie (dal
    6 ott 2026 sera; prima era una riga «Riprendi · Svuota»). Sette giorni dall'ultimo tocco
    (GIORNI_CARRELLO_SALVATO), poi se ne va da solo.
    NON SONO I CARRELLI TOLTI IL 24 SET 2026 (CANTIERI, «I carrelli sono
@@ -25995,10 +26052,8 @@ function statoIconaCarrello(){
   return {nome: nomeVenditoreCarrello(c), pezzi, cambiato: carrelloNote.length > 0};
 }
 /* La fabbrica della card. La veste e' quella delle sorelle (quadrato,
-   angoli, etichetta sotto: «Il mio carrello», che a 84px sta su una
-   riga sola, larga quanto la card — misurato a 375 e 320; con un
-   carattere piu' largo andrebbe a capo pulita, come «Nel tuo
-   barattolo», che le righe sono due al massimo); il disegno riempie il quadrato in
+   angoli, etichetta sotto: «Carrello» — fu «Il mio carrello» per
+   un giro, e Andrea l'ha riportata alla parola sola); il disegno riempie il quadrato in
    quattro misure, l'1x, il 2x e il 3x della card da 84 e il 2x di
    quella da 160 del sito da computer, fuori da Telegram (`sizes` lo
    dice). E' un <a> SENZA href
@@ -26022,7 +26077,7 @@ function cardCarrello(s){
            onerror="this.remove()"><span class="cat-emoji" aria-hidden="true">🛒</span><span
            class="carrello-pallino${s.cambiato ? ' cambiato' : ''}" aria-hidden="true">${
            s.cambiato ? '!' : (s.pezzi > 99 ? '99+' : fmt(s.pezzi))}</span></span>
-      <span class="cat-eti">Il mio carrello</span>
+      <span class="cat-eti">Carrello</span>
     </a>`;
 }
 /* Ogni cambio del carrello ridisegna la fila: e' la sua firma
@@ -26063,7 +26118,7 @@ function renderNoteCarrello(){
   box.style.display = carrelloNote.length ? '' : 'none';
 }
 /* IL CARRELLO VERO TORNA AL SUO POSTO dopo la cassa di un accordo:
-   al primo gesto sul carrello (apriPacco, la card «Il mio carrello», la
+   al primo gesto sul carrello (apriPacco, la card «Carrello», la
    pagina del carrello dalla cronologia) o al pagamento. Mai all'uscita
    dalla cassa: da li' si va e si torna (la pagina «I tuoi dati» dal
    cassetto dell'indirizzo), e la cassa si ricostruisce dalla memoria.
