@@ -121,6 +121,11 @@
        I bottoni rossi e il + hanno il loro pieno, --b-rosso-… (sotto). */
     --rosso-p2p:#C33A1A; --rosso-p2p-testo:#C5300D;
     --rosso-p2p-banda:#F26E4E; --rosso-p2p-tenue:#FDE8E5;
+    /* l'etichetta «Vende» sulla foto delle card in vetrina: scritta BIANCA
+       (decisione di Andrea) su un fondo FISSO nei due temi, il pieno di
+       giorno — 5,33:1 (sulla tinta piena #D9401D il bianco faceva 4,47).
+       Di sera non si ridichiara: sta sulla foto, che non cambia. */
+    --rosso-p2p-etichetta:#C33A1A;
     /* il "profondo" del rosso: nasce col + della nav trasformata nel
        P2P (set 2026) — l'ombra piena sotto il tondo «Pubblica» quando
        si sta nel tab «Vendi BTC», gemello di --trust-deep */
@@ -2068,12 +2073,11 @@
   .card-p2p .ph .p2p-vt-marchio{position:absolute;left:12%;top:36%;
     width:76%;height:auto;object-fit:contain}
   /* colori FISSI, come il badge della lampo: stanno sulla «foto».
-     Bianco sul verde 4,6:1; sul rosso la scritta nera dei bottoni rossi
-     sulla loro tinta piena, fissa nei due temi: 4,7:1 */
+     Bianco sul verde 4,6:1 e sul rosso dell'etichetta 5,3:1 */
   .p2p-vt-lato{position:absolute;top:8px;left:8px;z-index:2;
     border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:800;
     color:#fff;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-  .p2p-vt-lato.vendi{background:var(--b-rosso-tinta);color:var(--b-rosso-fg)}
+  .p2p-vt-lato.vendi{background:var(--rosso-p2p-etichetta)}
   .p2p-vt-lato.compra{background:#1B8B54}
   .p2p-vt-volto{position:absolute;top:7px;right:7px;z-index:2;
     width:30px;height:30px;border-radius:50%;overflow:hidden;

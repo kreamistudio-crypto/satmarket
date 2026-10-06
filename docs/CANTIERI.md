@@ -37921,7 +37921,8 @@ grafico avrebbe chiesto 3):
 | leva | vivo | prima | metà | finale | contrasti |
 |---|---|---|---|---|---|
 | bottoni e + | #F5503A→#F0402E | #C8460F→#B23A0A | — | #DE4B24→#D73E20 (Andrea) | nero 5,14 / 4,60 |
-| tinta piena (pillola del + da desktop, «Vende» in vetrina) | #F0402E | #C2410C | #D9401D | #D9401D | nero 4,70 |
+| tinta piena (pillola del + da desktop) | #F0402E | #C2410C | #D9401D | #D9401D | nero 4,70 |
+| etichetta «Vende» in vetrina (`--rosso-p2p-etichetta`, fissa) | #F0402E | #C2410C | — | #C33A1A | BIANCO 5,33 (decisione di Andrea; su #D9401D il bianco faceva 4,47) |
 | pieno, giorno | #F0402E | #C2410C | #D9401D | #C33A1A | 4,85 crema, 5,33 card, 4,53 tenue |
 | pieno, sera | #F0402E | #F07A47 | #F26E4E | #F26E4E | 5,83 / 5,14 / 5,02 |
 | testo, giorno | #C8200E | #C2410C | #C5300D | #C5300D | 5,03 / 5,52 / 4,69 (il tab attivo) |
@@ -37935,7 +37936,8 @@ La croce del + scende sul logo come prima (bianca d×d): nel mezzo della
 discesa croce e fondo vanno in versi opposti e toccano 1,0:1 verso il
 53%, per un attimo col dito sopra; agli estremi 5,14 (sul rosso) e 16,8
 (sul blu). L'etichetta «Vende» in vetrina ha la scritta nera dei bottoni
-rossi sulla loro tinta piena (4,70). **Per chi lavora sul rosso fuori
+rossi sulla loro tinta piena (4,70) — CORRETTO prima del push: Andrea
+la vuole BIANCA, su un fondo suo fisso nei due temi, #C33A1A (5,33). **Per chi lavora sul rosso fuori
 dal P2P** (il conto del mercatino e gli errori, che restano --danger):
 il rosso di riferimento del P2P non è più il rosso vivo — è questa via
 di mezzo; nessun'altra sessione lo stava toccando il 6 ott.

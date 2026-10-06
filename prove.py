@@ -56476,10 +56476,14 @@ def prove_card_p2p_vetrina():
           [True, True], [os.path.exists(os.path.join("assets", "scambi-intestazione.webp")),
                          os.path.exists(os.path.join("assets", "barattozon.webp"))])
     css = mini[mini.index("<style"):mini.index("</style>")]
-    prova("la pastiglia sta sulla «foto»: colori FISSI, nero sulla tinta piena dei bottoni rossi "
-          "e bianco sul verde",
-          [True, True], [".p2p-vt-lato.vendi{background:var(--b-rosso-tinta);color:var(--b-rosso-fg)}" in css,
-                         ".p2p-vt-lato.compra{background:#1B8B54}" in css])
+    # (6 ott 2026, decisione di Andrea) l'etichetta rossa e' BIANCA, su un
+    # fondo suo fisso nei due temi che col bianco regge il 4,5
+    _et = re.findall(r"--rosso-p2p-etichetta:(#[0-9A-Fa-f]{6});", mini)
+    prova("la pastiglia sta sulla «foto»: colori FISSI, bianco sul rosso dell'etichetta "
+          "(dichiarato una volta sola, regge 4,5) e sul verde",
+          [True, True, ["#C33A1A"]], [".p2p-vt-lato.vendi{background:var(--rosso-p2p-etichetta)}" in css
+                         and "color:#fff;" in pezzo_js(css, ".p2p-vt-lato{", "}"),
+                         ".p2p-vt-lato.compra{background:#1B8B54}" in css, _et])
 
     node = shutil.which("node")
     if not node:
@@ -120851,6 +120855,9 @@ def prove_vestito_bottoni():
         for fondo in ("--bg", "--card", "--rosso-p2p-tenue"):
             if _c(tok, "--rosso-p2p-testo", fondo) < 4.5:
                 deboli_r.append((tema, "testo", fondo, round(_c(tok, "--rosso-p2p-testo", fondo), 2)))
+        # l'etichetta «Vende» della vetrina: bianco sul suo fondo fisso
+        if contrasto((255, 255, 255, 1), colori(risolvi(tok["--rosso-p2p-etichetta"], tok))[0]) < 4.5:
+            deboli_r.append((tema, "etichetta bianca"))
         if _c(tok, "--rosso-p2p-banda", "--nav-bg-p2p") < 4.5:
             deboli_r.append((tema, "banda", round(_c(tok, "--rosso-p2p-banda", "--nav-bg-p2p"), 2)))
         # (6 ott 2026, decisione di Andrea: soglia 4,5 OVUNQUE, nessuna
