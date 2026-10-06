@@ -63497,7 +63497,25 @@ function cardVetrinaP2P(o){
   const fondo = tab
     ? '<img class="p2p-vt-marchio" src="/assets/barattozon.webp" width="305" height="96" alt="" onerror="this.remove()">'
     : '<img class="p2p-vt-monete" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">';
-  const euro = euroCartaP2P(o.euro) + (o.euroMax ? '–' + euroCartaP2P(o.euroMax) : '');
+  /* I DUE CAPI A PAROLE, «da 5 a 15 €» (6 ott 2026, ritocco di Andrea):
+     il trattino fra due numeri si leggeva come una sottrazione, come nel
+     libro (vedi `capiP2P`). Nel cartellino lo spazio e' poco, quindi
+     «da» e «a» vestono come il verbo — Nunito piccolo e grigio — e le
+     cifre restano nel mono grande: le parole pesano meno dei numeri.
+     `euro` resta il testo piano, per l'etichetta che si legge ad alta
+     voce; `euroCartello` e' il markup del cartellino.
+     ⚠️ PRIMA DELL'«a» C'E' UNO SPAZIO VERO, ed e' il posto dove la riga
+     va a capo: a 320 px «da 100 a 500 €» non ci sta, e coi soli margini
+     fra le parole il cartellino non aveva dove spezzarsi — usciva dalla
+     card e il «500 €» spariva (visto negli scatti). Col trattino di
+     prima si spezzava li'; adesso scende «a 500 €», intero. Lo spazio
+     sta DENTRO la parolina, nel suo corpo piccolo: uno spazio del mono
+     grande staccava la «a» dal primo numero piu' che dal secondo. */
+  const euro = capiP2P(euroCartaP2P(o.euro), o.euroMax ? euroCartaP2P(o.euroMax) : '');
+  const euroCartello = o.euroMax
+    ? '<span class="p2p-vt-verbo">da</span>' + euroCartaP2P(o.euro)
+      + '<span class="p2p-vt-verbo"> a</span>' + euroCartaP2P(o.euroMax)
+    : euroCartaP2P(o.euro);
   const lordo = o.sats > 0 ? o.sats : satsMercatoP2P(o);
   const sats = nettoLatoP2P(o, lordo);
   const verboEuro = compro ? 'Invia' : 'Ricevi';
@@ -63517,7 +63535,7 @@ function cardVetrinaP2P(o){
         <div class="ph p2p-vt-fondo">${fondo}</div>
         <span class="p2p-vt-lato ${compro ? 'compra' : 'vendi'}">${lato}</span>
         ${voltoHTML(f, 'p2p-vt-volto', {chiave: 'p2p:' + o.id})}
-        <div class="tag-price"><div class="price"><span class="p2p-vt-verbo">${verboEuro}</span>${euro}<span class="unit eur">€</span></div>${sotto ? `<div class="price-sub">${sotto}</div>` : ''}</div>
+        <div class="tag-price"><div class="price"><span class="p2p-vt-verbo">${verboEuro}</span>${euroCartello}<span class="unit eur">€</span></div>${sotto ? `<div class="price-sub">${sotto}</div>` : ''}</div>
       </div>
       <div class="info">
         <div class="title">${metodi || 'Scambio P2P'}</div>

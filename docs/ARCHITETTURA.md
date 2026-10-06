@@ -7331,9 +7331,13 @@
   uguali per ogni riga; le celle scendono su una riga loro quando
   l'etichetta non ci sta per la sua parola piu' lunga. A importo
   fisso resta su una colonna. Nelle righe di testo (card del libro, «I
-  miei scambi», l'avviso di Barattozon) i capi li dice `capiP2P`: «da …
-  a …», mai un trattino fra due numeri. Verbale: CANTIERI, «Il conto a
-  intervallo in due colonne».
+  miei scambi», l'avviso di Barattozon, e dal 6 ott 2026 anche la card
+  P2P della home) i capi li dice `capiP2P`: «da … a …», mai un trattino
+  fra due numeri. Nel cartellino della card della home «da» e «a» vestono
+  come il verbo (`.p2p-vt-verbo`), e lo spazio prima della «a» sta dentro
+  la parolina: e' il posto dove a 320 px il cartellino va a capo.
+  Verbale: CANTIERI, «Il conto a intervallo in due colonne» e «La card
+  della home "da … a …"».
   «È IL TUO ORDINE», UN GIUDICE SOLO (28 set 2026): `ordineTuoP2P(id,
   o)` e' mio se lo sa il dispositivo (`ordineMioP2P`), se lo dice il
   server (`miei` della fotografia, che ora legge anche il libro) o se e'

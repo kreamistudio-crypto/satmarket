@@ -36990,3 +36990,52 @@ dietro `fuori-telegram`, e a 375/360 la geometria e' identica);
 Telegram Desktop largo: li' le frecce non ci sono, come sulle altre due
 strisce (il giudice e' `FUORI_TG`), mentre levetta e ricerca seguono il
 blocco desktop.
+
+## La card della home «da … a …», e il salta di prove_codice_a_valore (6 ott 2026)
+
+Due voci lasciate aperte dai verbali del conto in due colonne, chieste
+da Andrea (il ₿ del conto resta com'è: coerente col toggle €/₿).
+
+**1) LA CARD P2P DELLA HOME.** Il cartellino diceva «Invia 5–15 €»: un
+trattino fra due numeri, come quello tolto dal libro. Adesso «Invia da
+5 a 15 €», con `capiP2P` per l'etichetta letta ad alta voce («invia da 5
+a 15 euro») e un markup suo per il cartellino (`euroCartello`): «da» e
+«a» vestono come il verbo (Nunito piccolo e grigio, `.p2p-vt-verbo`), le
+cifre restano nel mono grande. Le parole pesano meno dei numeri, ed è
+quello che fa starci la riga.
+CI STA? A 375 px sì, su una riga, nei casi veri: «da 5 a 15», «da 100 a
+500», «da 50 a 380». Il caso a quattro cifre («da 1000 a 5000») esce dal
+bordo della card, ma nella fila non può esistere: il coordinatore accetta
+ordini fino a `max_order_amount` 500.000 sats (NODO-MOSTRO), cioè circa
+380 € al cambio di oggi, e la fila mostra solo il suo libro.
+⚠️ A 320 PX IL PRIMO GIRO TAGLIAVA IL «500 €»: fra «da 100» e «a 500»
+c'erano solo margini, e il cartellino non aveva dove andare a capo — col
+trattino di prima si spezzava lì. Adesso prima della «a» c'è uno spazio
+vero, DENTRO la parolina (nel suo corpo piccolo: uno spazio del mono
+grande staccava la «a» dal primo numero più che dal secondo), e a 320 il
+cartellino va a capo intero, «Ricevi da 100» / «a 500 €», come faceva
+prima.
+
+**2) prove_codice_a_valore.** Il ramo del banco in node chiamava
+`salta()` con UN argomento (la funzione ne vuole due: nome e perché), e
+copriva due casi diversi: node assente e banco esploso. Il secondo è
+successo davvero stamattina (un commento che citava la dichiarazione di
+`fmt` rubava il ritaglio): il banco non partiva, finiva nel ramo, e il
+`salta` sbagliato faceva esplodere la prova intera. Adesso: node assente
+→ SALTATA col suo perché («node non c'e'»); banco rotto → ROSSA, con lo
+stderr, come gli altri banchi del file.
+
+**PROVATO.** `prove_card_p2p_vetrina`: il banco si porta `capiP2P`, la
+card del 20–150 dice «da 20 a 150» col markup nuovo e lo spazio dentro la
+«a», nessun trattino, l'etichetta «invia da 20 a 150 euro». Tortura 4 su
+4 sulla copia: il trattino rimesso, lo spazio fuori dalla «a», l'etichetta
+col trattino, e il banco del codice rotto apposta (esito: ROSSA, zero
+saltate, zero esplose). Il ramo senza node provato togliendo node dal
+PATH: una SALTATA col suo perché, zero rosse. Scatti prima/dopo a 375 e
+320 px, chiaro e scuro (Chrome headless, copia in collaudo, relay morto,
+quattro card seminate nella fotografia della fila). Suite e collaudi: nel
+verbale del push.
+
+**DA GUARDARE.** Sul telefono: il cartellino a 320 che va a capo (Android
+piccoli). Se un giorno `max_order_amount` sale oltre il milione di sats,
+il caso a quattro cifre torna possibile e va riguardato.

@@ -27000,15 +27000,27 @@ def prove_codice_a_valore():
               "cifraCodice('valore', 0, 0, 10, 'eur'),"
               "cifraCodice('valore', 0, 5000, 0, 'sats'),"
               "cifraCodice('', 10, 0, 0, '')]));")
-    try:
-        _r = _json.loads(_sp.run(["node", "-e", _banco], text=True,
-                                 capture_output=True,
-                                 timeout=30).stdout.strip())
-    except (FileNotFoundError, ValueError):
-        _r = None
-    if _r is None:
-        salta("la cifra del codice si legge giusta (manca node)")
+    # ⚠️ DUE CASI, DUE ESITI (6 ott 2026): prima un ramo solo copriva sia
+    # «node non c'e'» sia «il banco e' esploso», con un `salta()` a UN
+    # argomento che a sua volta esplodeva (TypeError). E il secondo caso
+    # e' successo davvero: un commento che citava la dichiarazione di
+    # `fmt` rubava il ritaglio qui sopra, il banco non partiva e la
+    # prova spariva. Adesso node assente = SALTATA, col suo perche';
+    # banco rotto = ROSSA, con lo stderr — come gli altri banchi del file.
+    import shutil as _sh
+    _r = None
+    if not _sh.which("node"):
+        salta("la cifra del codice si legge giusta", "node non c'e'")
     else:
+        _gira = _sp.run(["node", "-e", _banco], text=True, encoding="utf-8",
+                        capture_output=True, timeout=30)
+        try:
+            _r = _json.loads(_gira.stdout.strip())
+        except ValueError:
+            _r = None
+        prova("il banco della cifra del codice gira", "",
+              "" if _r is not None else ((_gira.stderr or "")[-400:] or "nessuna uscita"))
+    if _r is not None:
         prova("la percentuale si dice in percentuale", "\u2212" + "10%",
               _r[0])
         prova("...anche al tetto nuovo", "\u2212" + "100%", _r[1])
@@ -56240,6 +56252,7 @@ function aggiornaFrecce(id){ FRECCE.push(id); }
         + pezzo_js(mini, "function euroFiloTabacchinoP2P(esatto, fisso){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function ordineDaEvento(ev, adesso){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function libroDaEventi(eventi, adesso){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function capiP2P(da, a){", "\n}\n") + "\n}\n" \
         + blocco + r"""
 const ADESSO = Math.floor(Date.now() / 1000);
 const O = (id, lato, euro, extra) => Object.assign({id, lato, euro, euroMax: 0, sats: 0,
@@ -56570,9 +56583,17 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
                        "P2P_VETRINA_MIEI_S =", "o.mio") if s in blocco])
     prova("BARATTOZON (chi pubblica vende sats): a chi guarda «Compra BTC»", True,
           'p2p-vt-lato compra">Compra BTC<' in c("bz"))
-    prova("l'INTERVALLO: «Invia 20–150 €» e «scegli tu» al posto dei sats", [True, True],
-          ['<span class="p2p-vt-verbo">Invia</span>20–150<span' in c("super"),
-           '<div class="price-sub"><span class="p2p-vt-cifra">scegli tu</span></div>' in c("super")])
+    # (6 ott 2026, ritocco di Andrea) i capi a parole, «da 20 a 150 €»:
+    # «da» e «a» nel corpo piccolo del verbo, e lo spazio vero DENTRO la
+    # «a», che e' il posto dove a 320 px il cartellino va a capo
+    prova("l'INTERVALLO: «Invia da 20 a 150 €» e «scegli tu» al posto dei sats",
+          [True, True, False],
+          ['<span class="p2p-vt-verbo">Invia</span><span class="p2p-vt-verbo">da</span>20'
+           '<span class="p2p-vt-verbo"> a</span>150<span class="unit eur">' in c("super"),
+           '<div class="price-sub"><span class="p2p-vt-cifra">scegli tu</span></div>' in c("super"),
+           "–" in c("super")])
+    prova("...e l'etichetta letta ad alta voce dice «da 20 a 150 euro»", True,
+          "invia da\u00a020 a\u00a0150 euro" in c("super"))
     prova("il SUPER AFFARE e l'OTTIMO sul verso favorevole a chi guarda",
           [True, True], ["⚡⚡ Super affare" in c("super"), "⚡ Ottimo affare" in c("ottimo")
                          and "Super" not in c("ottimo")])
