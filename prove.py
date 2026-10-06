@@ -60741,7 +60741,10 @@ def prove_p2p_dettaglio():
         "function vesteMetodoP2P(m){",
         "function marchioMetodoP2P(m, conTesto){",
         "function metodiDettP2P(o){",
-        "function apriNegozioDettP2P(ev, chi){",
+        # (6 ott 2026) e' ASINCRONA: aspetta il negozio dalla rete per
+        # lasciare in pari la cronologia — senza `async` nel ritaglio,
+        # l'await dentro fa esplodere il banco
+        "async function apriNegozioDettP2P(ev, chi){",
         "function scegliMetodoDettP2P(m){",
         "function rigaLibroP2P(id){",
         # ⚠️ IL CAPPELLO STA IN UNA FUNZIONE SUA dal set 2026 (la dice
@@ -83206,7 +83209,11 @@ def prove_indietro_dal_libro():
              "function navArmaGesto(dentro){", "function navArrivoSecco(){",
              "function consumaGradinoReparto(){", "function tornaATutto(){",
              # «Salva per dopo» del foglio della ✕ del carrello (6 ott 2026)
-             "function salvaPerDopo(){")
+             "function salvaPerDopo(){",
+             # l'indietro dal negozio riapre il dettaglio del libro (6 ott 2026)
+             "async function apriNegozioDettP2P(ev, chi){", "function riapriDettaglioP2P(id){",
+             "function apriDettaglioP2P(id){", "function navRiapriStrato(s){",
+             "function chiudiFoglioP2P(idFoglio){", "function altroFoglioAperto(){")
     _prog = (
         _blocco("const RADICI = new Set([", "]);") + "\n"
         + "\n".join(re.search(r"const " + n + r" = [^\n]*;", mini).group(0) for n in (
@@ -83249,7 +83256,16 @@ const DEMO = false, STORIA = true;
 let navSpingi = false, navGradinoReparto = 0, navApplicando = false, uscitaDopoAnnullo = false;
 /* (6 ott 2026) la gemella dell'annullo: «Salva per dopo» del carrello */
 let uscitaDopoSalva = false;
-function haptic(){} function toast(){}
+/* (6 ott 2026) il dettaglio del libro: l'ordine, il metodo e la cifra
+   scelti, il libro di cartone (un intervallo con due metodi, un ordine
+   fisso con uno), i disegni e i toast contati */
+let navLasciaFoglio = null, p2pDettOrdine = '', p2pDettMetodo = '', p2pDettImporto = 0;
+let p2pLibro = null, DISEGNI = 0, TOAST = [];
+function rigaLibroP2P(id){ return ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id) || null; }
+function renderDettaglioP2P(){ DISEGNI++; }
+const listePos = {}, LISTE_RITORNO = {negozio: () => ''};
+function ridisegnaNegozio(chi){ return apriNegozio(chi); }
+function haptic(){} function toast(t){ TOAST.push(t); }
 /* (30 set 2026) la sorella di navSpingi: la scelta di una variante */
 let navSostituisci = false;
 let navUltimo = 0, navGiuInVolo = 0, navGuardiano = null;
@@ -83273,14 +83289,22 @@ const document = {
   querySelectorAll(s){ return s === '.sheet.open' ? APERTI.map(id => ({id})) : []; }
 };
 function el(id){
-  return {children: [], classList: {contains: () => false, add(){},
+  return {children: [], classList: {
+    /* (6 ott 2026) si leggono la vista accesa e i fogli aperti, e un
+       foglio si APRE davvero: il dettaglio si riapre dalla cronologia */
+    contains: c => c === 'active' ? id === 'view-' + CUR : c === 'open' ? APERTI.includes(id) : false,
+    add(c){ if (c === 'open' && id !== 'sheetBg' && !APERTI.includes(id)) { APERTI.push(id); osserva(); } },
     remove(c){ if (c === 'open' && APERTI.includes(id)) { APERTI = APERTI.filter(x => x !== id); osserva(); } }}};
 }
 function go(v){ if (CLASSI.has('arrivo-secco')) SECCHI_VISTI++; CUR = v; osserva(); }
 function setCat(c){ activeCat = c; }
 function ordiniP2P(){ return {x1: {}}; }
 function apriOrdineP2P(id){ p2pOrdineAperto = id; go('p2pordine'); }
-function apriNegozio(){ go('negozio'); return Promise.resolve(); }
+/* il negozio arriva DALLA RETE, qualche giro dopo il tocco — e quello
+   «sparito» non arriva (il toast «Negozio non trovato») */
+async function apriNegozio(chi){ await pausa(); await pausa();
+  if (chi === 'sparito') { toast('Negozio non trovato'); return; }
+  negozioPag.chi = chi; go('negozio'); }
 function chiudiPicker(){} function chiudiLightbox(){} function chiudiTour(){}
 function chiudiTourP2P(){} function chiudiModaleTest(){}
 function aggiornaPicker(){} function renderGrid(){} function alternaBarattolo(){}
@@ -83332,6 +83356,10 @@ function azzera(){
   CUR = 'esplora'; APERTI = []; CHIUSO = 0; USCITO = 0; CODA = []; LOG = []; p2pOrdineAperto = ''; PERDI = 0;
   history.voci = []; history.i = -1; navGiuInVolo = 0; navUltimo = 0; activeCat = 'Tutto';
   ASCOLTI.popstate = []; GUARDIANI = []; navGuardiano = null; CLASSI.clear();
+  navLasciaFoglio = null; p2pDettOrdine = ''; p2pDettMetodo = ''; p2pDettImporto = 0;
+  DISEGNI = 0; TOAST = []; negozioPag = {chi: ''};
+  p2pLibro = {ordini: [{id: 'o1', euro: 5, euroMax: 15, metodi: ['SEPA', 'Satispay']},
+                       {id: 'o2', euro: 10, metodi: ['SEPA']}]};
   navMotore();
 }
 /* l'indietro nelle sue due strade: il tasto di Telegram (e la freccia
@@ -83345,6 +83373,19 @@ function indietro(via){
 }
 function passo(p, via){
   if (p === '<') indietro(via);
+  /* (6 ott 2026) il dettaglio del libro: aprirlo, sceglierci metodo e
+     cifra, toccare «Chi ha pubblicato», far sparire un ordine dal libro */
+  else if (p.indexOf(':') > 0) { const [c, x] = p.split(':');
+    if (c === 'dett') apriDettaglioP2P(x);
+    else if (c === 'metodo') { p2pDettMetodo = x; renderDettaglioP2P(); }
+    else if (c === 'importo') { p2pDettImporto = Number(x); renderDettaglioP2P(); }
+    /* «chi:X~V»: il tocco, e un altro tocco su V mentre il negozio e' in viaggio */
+    else if (c === 'chi') { const [neg, dopo] = x.split('~');
+      apriNegozioDettP2P({stopPropagation(){}}, neg);
+      if (dopo) Promise.resolve().then(() => passo(dopo, via)); }
+    else if (c === 'sparisce') p2pLibro.ordini = p2pLibro.ordini.filter(o => o.id !== x); }
+  /* la memoria del dettaglio persa, come dopo un ricaricamento della pagina */
+  else if (p === 'dimentica') { p2pDettOrdine = ''; p2pDettImporto = 0; p2pDettMetodo = ''; }
   else if (p === '>') history.forward();
   else if (p === 'mercatino') { navUltimo = 0; vaiEsplora(); }
   else if (p === 'ordine') apriOrdineP2P('x1');
@@ -83374,13 +83415,18 @@ function passo(p, via){
 async function giro(passi, via){
   MODO = via; azzera(); await scorri();
   SECCHI = 0; SECCHI_VISTI = 0; UA = 0; ARMATI = 0;
-  const visti = [], forme = [], mosse = [], chiavi = [];
+  const visti = [], forme = [], mosse = [], chiavi = [], stati = [], disegni = [];
   let massimo = history.voci.length, registro = true, guardia = true;
   for (const p of passi) {
     const l0 = LOG.length;
     passo(p, via); await scorri();
     visti.push(vista()); forme.push(forma().join(' '));
     chiavi.push(history.voci.slice(0, history.i + 1).map(v => String(v.pila[0].k)).join(' '));
+    /* il dettaglio in memoria (ordine|cifra|metodo) e l'ordine che dice
+       la entry corrente, se e' quella di un dettaglio */
+    stati.push([p2pDettOrdine, p2pDettImporto, p2pDettMetodo,
+                (history.state && history.state.pila[1] && history.state.pila[1].o) || ''].join('|'));
+    disegni.push(DISEGNI);
     /* durante un indietro: solo l'indietro, nessuna mossa del codice */
     if (p === '<') mosse.push(LOG.slice(l0).filter(x => x !== 'back').length);
     massimo = Math.max(massimo, history.voci.length);
@@ -83388,7 +83434,7 @@ async function giro(passi, via){
     /* il guardiano c'e' esattamente quando c'e' dove tornare, e solo nell'app */
     guardia = guardia && GUARDIANI.length === ((MODO === 'apk' && dentroOra()) ? 1 : 0);
   }
-  return {visti, forme, chiavi, mosse: mosse.reduce((a, b) => a + b, 0), massimo,
+  return {visti, forme, chiavi, stati, disegni, toast: TOAST.slice(), mosse: mosse.reduce((a, b) => a + b, 0), massimo,
           fondo: history.i, chiuso: CHIUSO, uscito: USCITO, registro, guardia,
           secchi: SECCHI, secchiVisti: SECCHI_VISTI, ua: UA, armati: ARMATI,
           classe: CLASSI.has('arrivo-secco')};
@@ -83555,6 +83601,31 @@ async function aCaso(n, via){
     PERDI = 1; indietro('apk'); await scorri();
     R.perso = {guardiani: GUARDIANI.length, vista: vista()};
   } catch(e) { R.perso = 'ESPLOSO: ' + (e && e.message); }
+  /* L'INDIETRO DAL NEGOZIO RIAPRE IL DETTAGLIO (6 ott 2026): la porta
+     VERA (`apriNegozioDettP2P`), il negozio che arriva dalla rete qualche
+     giro dopo, e il foglio riaperto com'era — nelle tre vie */
+  try {
+    R.dettNegozio = {};
+    const DN = {
+      senza: ['p2p', 'dett:o2', 'chi:bob', '<', '<', '<'],
+      con: ['p2p', 'dett:o1', 'metodo:Satispay', 'importo:12', 'chi:bob', '<', '<'],
+      nonArriva: ['p2p', 'dett:o1', 'importo:12', 'chi:sparito', '<'],
+      sparito: ['p2p', 'dett:o1', 'chi:bob', 'sparisce:o1', '<', '<'],
+      libroDallaNav: ['p2p', 'dett:o1', 'importo:12', 'chi:bob', 'p2p', '<'],
+      altroOrdine: ['p2p', 'dett:o1', 'importo:12', 'chi:bob', '<', '<', 'dett:o2', 'chi:bob', '<'],
+      dimenticato: ['p2p', 'dett:o1', 'metodo:Satispay', 'importo:12', 'chi:bob', 'dimentica', '<'],
+      altrove: ['p2p', 'dett:o1', 'importo:12', 'chi:sparito~p2pinfo', '<']
+    };
+    for (const via of ['tg', 'sistema', 'apk']) {
+      R.dettNegozio[via] = {};
+      for (const k of Object.keys(DN)) {
+        try { R.dettNegozio[via][k] = await giro(DN[k], via); }
+        catch(e) { R.dettNegozio[via][k] = 'ESPLOSO: ' + (e && e.message); }
+      }
+    }
+    /* l'avanti del browser rifa' il negozio, e l'indietro dopo il foglio */
+    R.dettNegozio.avanti = await giro(['p2p', 'dett:o1', 'importo:12', 'chi:bob', '<', '>', '<'], 'sistema');
+  } catch(e) { R.dettNegozio = 'ESPLOSO: ' + (e && e.message); }
   /* L'AVANTI DEL BROWSER va dove dice la sua entry */
   try { R.avanti = await giro(['p2p', 'ordine', 'p2pmiei', '<', '>'], 'sistema'); }
   catch(e) { R.avanti = 'ESPLOSO: ' + (e && e.message); }
@@ -83772,6 +83843,76 @@ async function aCaso(n, via){
     prova("l'avanti del browser va dove dice la sua entry",
           ["p2p", "p2pordine", "p2pmiei", "p2p", "p2pmiei"],
           out["avanti"]["visti"] if isinstance(out["avanti"], dict) else out["avanti"])
+
+    # --- 4) L'INDIETRO DAL NEGOZIO RIAPRE IL DETTAGLIO (6 ott 2026) -------
+    # la porta VERA «Chi ha pubblicato quest'ordine», il negozio che arriva
+    # dalla rete qualche giro dopo, e navApplica che riapre il foglio
+    # com'era: lo stesso ordine, la cifra e il metodo scelti
+    _dn = out.get("dettNegozio")
+    _D = "p2p+p2pDettSheet"
+    for _via in ("tg", "sistema", "apk"):
+        _v = _VIE[_via]
+        _x = _dn.get(_via, {}) if isinstance(_dn, dict) else {}
+        def _g(k, _x=_x):
+            r = _x.get(k)
+            return r if isinstance(r, dict) else {"visti": r, "forme": [], "stati": [],
+                                                   "toast": [], "mosse": None, "registro": None}
+        _r = _g("senza")
+        prova("dal negozio aperto dal dettaglio, l'indietro riapre il foglio dello STESSO "
+              "ordine, poi il libro, poi la home (%s)" % _v,
+              [["p2p", _D, "negozio", _D, "p2p", "esplora"],
+               "esplora p2p p2p+p2pDettSheet negozio", "o2|0|SEPA|o2"],
+              [_r["visti"], (_r["forme"] or [""] * 3)[2], (_r["stati"] or [""] * 4)[3]])
+        _r = _g("con")
+        prova("...e su un intervallo con la cifra e il metodo gia' scelti, li ritrova scelti (%s)" % _v,
+              [["p2p", _D, _D, _D, "negozio", _D, "p2p"],
+               "esplora p2p p2p+p2pDettSheet negozio", "o1|12|Satispay|o1"],
+              [_r["visti"], (_r["forme"] or [""] * 5)[4], (_r["stati"] or [""] * 6)[5]])
+        _dd = _r.get("disegni") or [0] * 6
+        prova("...e il foglio riaperto si ridisegna sul libro di adesso, una volta (%s)" % _v,
+              1, _dd[5] - _dd[4])
+        _r = _g("nonArriva")
+        prova("...il negozio che non arriva lascia il foglio aperto com'era, sulla sua entry (%s)" % _v,
+              [["p2p", _D, _D, _D, "p2p"], "esplora p2p p2p+p2pDettSheet", "o1|12||o1",
+               ["Negozio non trovato"]],
+              [_r["visti"], (_r["forme"] or [""] * 4)[3], (_r["stati"] or [""] * 4)[3], _r["toast"]])
+        _r = _g("sparito")
+        prova("...l'ordine sparito dal libro nel frattempo: si resta sul libro col toast, il "
+              "gradino del foglio si consuma (un passo nostro) e l'indietro dopo esce (%s)" % _v,
+              [["p2p", _D, "negozio", "negozio", "p2p", "esplora"], "esplora p2p",
+               ["Quest'ordine non c'è più: aggiorna il libro"], 1],
+              [_r["visti"], (_r["forme"] or [""] * 5)[4], _r["toast"], _r["mosse"]])
+        _r = _g("libroDallaNav")
+        prova("...il tasto «P2P» dal negozio torna al libro nudo, e l'indietro alla home: "
+              "il foglio NON si riapre scendendo (%s)" % _v,
+              [["p2p", _D, _D, "negozio", "p2p", "esplora"], "esplora p2p"],
+              [_r["visti"], (_r["forme"] or [""] * 5)[4]])
+        _r = _g("altroOrdine")
+        prova("...un altro ordine aperto dopo riparte da capo: niente cifra del primo (%s)" % _v,
+              [["p2p", _D, _D, "negozio", _D, "p2p", _D, "negozio", _D], "o2|0|SEPA|o2"],
+              [_r["visti"], (_r["stati"] or [""] * 9)[8]])
+        _r = _g("dimenticato")
+        prova("...con la memoria persa (la pagina ricaricata) la entry basta: si riapre "
+              "QUELL'ordine, da capo (%s)" % _v,
+              [[_D, "negozio", "negozio", _D], "o1|0||o1"],
+              [_r["visti"][3:] if isinstance(_r["visti"], list) else _r["visti"],
+               (_r["stati"] or [""] * 7)[6]])
+        _r = _g("altrove")
+        prova("...un altro tocco mentre il negozio e' in viaggio vince: il foglio non si "
+              "riapre sopra «Info P2P», e l'indietro va al libro (%s)" % _v,
+              [["p2p", _D, _D, "p2pinfo", "p2p"], "esplora p2p p2pinfo"],
+              [_r["visti"], (_r["forme"] or [""] * 4)[3]])
+        _tutti = [_g(k) for k in ("senza", "con", "nonArriva", "libroDallaNav", "altroOrdine",
+                                  "dimenticato", "altrove")]
+        prova("...e in queste strade un indietro non fa muovere il codice, e il registro di "
+              "sotto dice il vero (%s)" % _v, [0, True],
+              [sum((r["mosse"] or 0) for r in _tutti) if all(isinstance(r["mosse"], int) for r in _tutti)
+               else [r["visti"] for r in _tutti],
+               all(r["registro"] is True for r in _tutti)])
+    _av = _dn.get("avanti") if isinstance(_dn, dict) else _dn
+    prova("...l'avanti del browser rifa' il negozio, e l'indietro dopo il foglio con la cifra",
+          [["p2p", _D, _D, "negozio", _D, "negozio", _D], "o1|12||o1"],
+          [_av["visti"], _av["stati"][6]] if isinstance(_av, dict) else _av)
 
 
 def prove_indietro_app_android():

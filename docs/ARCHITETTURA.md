@@ -17365,6 +17365,20 @@
   mai disegnato, quindi la sua istantanea sarebbe la pagina di prima.
   Perché e prove: CANTIERI, «L'indietro del P2P: la pila giusta da
   subito».
+  UN SOLO STRATO SI RIAPRE DALLA CRONOLOGIA (6 ott 2026): il dettaglio
+  di un ordine del libro (`p2pDettSheet`). La sua voce nella pila dice
+  QUALE ordine (`o`, fuori dai confronti di `navStesso`), e quando un
+  indietro o un avanti atterra su una entry che lo porta, `navApplica`
+  lo riapre con `navRiapriStrato` → `riapriDettaglioP2P`: com'era se
+  in memoria c'è ancora lui (metodo e cifra scelti), da capo se no; un
+  ordine sparito dal libro non si riapre, e la entry si rimette in pari
+  subito (o il prossimo indietro sarebbe a vuoto). Gli altri strati in
+  difetto restano chiusi, come sempre. Ci si arriva dal negozio aperto
+  da «Chi ha pubblicato quest'ordine»: la porta (`apriNegozioDettP2P`)
+  chiude il foglio e aspetta il negozio dalla rete, e `navLasciaFoglio`
+  dice a `navRiflette` di non consumare la entry del foglio in
+  quell'attimo e di spingere il negozio sopra di lei.
+  Perché e prove: CANTIERI, «L'indietro dal negozio riapre il dettaglio».
   Telegram: `navFreccia` mostra il `BackButton` (Bot API 6.1) solo
   quando c'è dove tornare — ed è la STESSA domanda di `navIndietro`,
   quindi un giudice solo, o la freccia e il gesto divergono. Resta

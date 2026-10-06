@@ -38531,3 +38531,88 @@ quattro comandi in sola lettura lanciati da Andrea.
   database vero è `/srv/barattolo/dati/satmarket.db` (Andrea, 6 ott); e
   sul nodo `sqlite3` non c'è (Andrea ha letto con python3). Due righe di
   PRODUZIONE da sistemare, a parte.
+
+## L'indietro dal negozio riapre il dettaglio (6 ott 2026, difetto segnalato da Andrea)
+
+**IL DIFETTO.** Nel P2P, dal dettaglio di un ordine del libro, il
+riquadro «Chi ha pubblicato quest'ordine» apre il negozio di chi l'ha
+pubblicato — giusto. Ma l'indietro dal negozio (la freccia dell'app,
+quello di Telegram, lo swipe) portava al libro nudo, e l'ordine che si
+stava guardando — con la cifra già scelta, su un intervallo — andava
+ricercato a mano.
+
+**PERCHÉ SUCCEDEVA, due cause.** 1) `apriNegozioDettP2P` chiude il
+foglio PRIMA che il negozio arrivi dalla rete (`apriNegozio` è una
+fetch): in quell'attimo l'osservatore vede il libro senza foglio, cioè
+la entry di sotto, e per `passoPilaP2P` è «un foglio chiuso a mano»
+('giu'): la entry del foglio si consumava, e il negozio si spingeva
+sopra il libro nudo. 2) Anche con la entry al suo posto, `navApplica`
+non riapre gli strati «in difetto», e quella entry non diceva QUALE
+ordine. Lo stesso difetto altrove: no — le recensioni stanno nella
+vista del negozio, la card dell'altra parte nelle viste `ordine` e
+`p2pordine`, la classifica è una vista; da una vista il negozio si
+spinge sopra e l'indietro torna già. L'unico altro passaggio
+foglio→vista è «📖 Come funziona» del tabacchino (dettaglio → Info
+P2P), che non apre un negozio e non è stato toccato.
+
+**LA CURA.** La voce del dettaglio nella pila porta l'ordine
+(`{t:'f', k:'p2pDettSheet', o}`; `navStesso` non la guarda, quindi
+nessun confronto cambia). La porta alza `navLasciaFoglio`, chiude il
+foglio e ASPETTA il negozio: finché si vede il libro nudo sotto quel
+foglio `navRiflette` lascia la entry com'è, arrivato il negozio gli
+spinge sopra; qualunque altra cosa consuma la bandierina e si scrive
+con le regole di sempre. Se il negozio non arriva (il toast «Negozio
+non trovato») si torna sul foglio; se nel frattempo si è toccato
+altro, no. Tornando sulla entry del foglio, `navApplica` lo riapre
+(`navRiapriStrato` → `riapriDettaglioP2P`): com'era se in memoria c'è
+ancora lui — metodo, cifra e perfino lo scorrimento —, ridisegnato sul
+libro di adesso; da capo se la memoria è persa (pagina ricaricata);
+e un ordine sparito dal libro non si riapre: toast (solo a libro
+arrivato), e la entry si rimette in pari subito con le regole di
+sempre, o il prossimo indietro atterrerebbe sul libro già a schermo.
+Una strada sola per tutti gli indietro — la freccia, il tasto di
+Telegram, lo swipe del browser, il guardiano dell'app Android — perché
+tutti passano dal popstate.
+
+**STRADE SCARTATE.** Chiudere il foglio solo all'arrivo del negozio,
+nello stesso giro di `go('negozio')`: l'osservatore vedrebbe per un
+microtask «negozio + foglio» (stessa lunghezza, ultimo uno strato) e
+sostituirebbe la entry — serviva comunque una bandierina, e in più un
+gancio dentro `renderNegozio`. Riaprire TUTTI gli strati in difetto:
+lightbox e tour vogliono dati che nella entry non ci sono, e il patto
+«sistema auto-guarente» regge per loro com'era.
+
+**PROVATO.** Nel banco della pila del P2P (`prove_indietro_dal_libro`)
+la porta VERA, `apriDettaglioP2P`, `riapriDettaglioP2P`,
+`navRiapriStrato`, `chiudiFoglioP2P` e `altroFoglioAperto` girano col
+motore vero e un negozio che arriva dalla rete qualche giro dopo, nelle
+tre vie (Telegram, swipe del browser, guardiano dell'app): senza
+importo, con metodo e cifra scelti, il negozio che non arriva, l'ordine
+sparito, il tasto «P2P» dal negozio (il foglio NON si riapre
+scendendo), un altro ordine aperto dopo, la memoria persa, un tocco
+altrove mentre il negozio viaggia, l'avanti del browser, il ridisegno;
+più il registro di `sotto` fedele e nessuna mossa del codice durante
+gli indietro. Tortura sulla copia: 14 su 15 al primo giro (viva «il
+foglio riaperto non si ridisegna»: il banco non contava i disegni, ora
+sì), 15 su 15 al secondo, baseline verde in testa e in coda. Dal vivo
+nel Browser pane (copia in collaudo, relay morto, libro seminato in
+pagina, Compratore 111 dentro il finto Telegram, 375 px, tocchi veri):
+intervallo 20–150 €, Satispay e 75 € scelti dai loro bottoni, tocco su
+«Chi ha pubblicato», negozio del Venditore; indietro di Telegram,
+«← Torna» dell'app e indietro del browser riportano tutti e tre al
+foglio con Satispay acceso e «Importo scelto: 75,00 €»; poi «Annulla»
+al libro e l'indietro di Telegram alla home; l'ordine a prezzo fisso
+torna col suo SEPA. Nessun errore nostro in console. Emendato il
+banco del dettaglio (`prove_p2p_dettaglio`), che ritagliava la porta
+senza `async` ed è esploso al primo giro della suite intera (`await is
+only valid in async functions`). Suite intera severa senza config nel
+worktree (base 1e183aa): 19.263 verdi e 0 rosse; i 38 collaudi della
+CI verdi.
+
+**DA GUARDARE.** Sul telefono: lo swipe di iOS e l'indietro predittivo
+di Android mostrano, mentre il dito scorre, l'istantanea della entry
+del foglio — scattata col foglio già chiuso (il browser la prende
+quando si lascia la entry). Nel guardiano dell'app non scorre niente;
+nel browser e in Telegram iOS si potrebbe vedere il libro sotto il dito
+e poi il foglio all'arrivo. Da guardare a occhio, non è un difetto
+della pila.

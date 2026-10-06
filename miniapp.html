@@ -16208,6 +16208,17 @@ const RADICE_MADRE = 'esplora';
    apriCategoria e consumata al primo giro di navRiflette. */
 let navSpingi = false;
 let navSostituisci = false;   // un giro solo: la scelta di una variante (set 2026)
+/* IL FOGLIO LASCIATO PER UN NEGOZIO (6 ott 2026, dal campo di Andrea):
+   dal dettaglio di un ordine del libro, «Chi ha pubblicato quest'ordine»
+   apre il negozio di chi l'ha pubblicato — e l'indietro dal negozio deve
+   riaprire QUEL foglio, non il libro nudo. Il negozio arriva dalla rete,
+   quindi fra il foglio chiuso e la vista nuova c'e' un attimo in cui si
+   vede il libro: per le regole di sempre e' «un foglio chiuso a mano», e
+   la sua entry si consumerebbe (`passoPilaP2P`, 'giu'). Questa dice a
+   `navRiflette` di lasciarla stare, e di spingere il negozio SOPRA di lei.
+   Vale un giro solo: la consuma il primo DOM che non e' il libro nudo
+   sotto quel foglio — il negozio, o qualunque altra cosa. */
+let navLasciaFoglio = null;
 /* La profondita' del gradino del REPARTO spinto dalla home (0 = non
    c'e'): sotto quel gradino c'e' gia' `esplora|Tutto`. Serve a chi
    torna a «Tutto» (ritocco della card, pillola, tab Esplora, ricerca)
@@ -16377,7 +16388,11 @@ function navPila(){
   const p = [navVista()];
   [...document.querySelectorAll('.sheet.open')].map(s => s.id)
     .sort((a,b) => (a==='pickerSheet') - (b==='pickerSheet'))
-    .forEach(id => p.push({t:'f', k:id}));
+    /* il dettaglio di un ordine del libro dice QUALE (6 ott 2026): e' l'unico
+       strato che l'indietro sa riaprire (`navRiapriStrato`). Non entra nei
+       confronti — `navStesso` guarda t, v e k —: un foglio resta lui. */
+    .forEach(id => p.push(id === 'p2pDettSheet' ? {t:'f', k:id, o: p2pDettOrdine}
+                                                : {t:'f', k:id}));
   if (el('lightbox')?.classList.contains('open')) p.push({t:'lb', k:''});
   if (el('fotocamera')?.classList.contains('open')) p.push({t:'cam', k:''});
   if (tourInCorso)       p.push({t:'tour', k:''});
@@ -16404,6 +16419,14 @@ function navChiudiStrato(s){
   el(s.k)?.classList.remove('open');
   if (!document.querySelector('.sheet.open')) el('sheetBg').classList.remove('open');
   if (s.k==='paySheet' && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+/* ...e la sua rovescia, per i soli strati che la entry sa rifare: 'si'
+   riaperto, 'mancato' doveva e non ha potuto, '' non e' di quelli. */
+function navRiapriStrato(s){
+  if (s && s.t === 'f' && s.k === 'p2pDettSheet')
+    return riapriDettaglioP2P(s.o) ? 'si' : 'mancato';
+  return '';
 }
 
 /* Ricostruire una vista: il contenuto di dettaglio, ordine e negozio lo
@@ -16535,6 +16558,22 @@ function navRiflette(){
     try { history[come]({app:'brt', pila, d, sotto: sottoNuovo}, '', location.href); } catch(e){}
   };
   const sopra = extra => sotto ? sotto.concat(extra) : null;
+  /* IL FOGLIO LASCIATO PER UN NEGOZIO (vedi `navLasciaFoglio`): finche'
+     si vede il libro nudo sotto di lui la sua entry resta com'e'; arrivato
+     il negozio, gli si spinge sopra. Qualunque altra cosa consuma la
+     bandierina, e si scrive con le regole di sempre. */
+  if (navLasciaFoglio) {
+    const f = navLasciaFoglio;
+    const dalFoglio = Array.isArray(st) && st.length === 2 && st[1].t === 'f'
+                   && st[1].k === f.k && st[1].o === f.o;
+    if (dalFoglio && ora.length === 1 && navStesso(ora[0], st[0])) return;
+    navLasciaFoglio = null;
+    if (dalFoglio && ora.length === 1 && ora[0].t === 'v' && ora[0].v === 'negozio') {
+      scrivi('pushState', giu + 1, ora, sopra([st]));
+      navFreccia(ora);
+      return;
+    }
+  }
   if (sostituisci && st && ora.length === st.length) {
     scrivi('replaceState', giu, ora, sotto);
     navFreccia(ora);
@@ -16606,6 +16645,9 @@ function navApplica(s){
   const bersaglio = (s && s.app==='brt' && s.pila)
                   ? s.pila : [{t:'v', v:'esplora', k:'esplora|Tutto'}];
   navApplicando = true;
+  /* uno strato che sapeva rifarsi e non ha potuto (l'ordine e' sparito
+     dal libro): la entry dice un foglio che non c'e' piu' */
+  let mancato = false;
   try {
     let ora = navPila(), giri = 0;
     while (ora.length > 1 && !navUguali(ora, bersaglio.slice(0, ora.length)) && giri++ < 8) {
@@ -16613,11 +16655,23 @@ function navApplica(s){
       ora = navPila();
     }
     if (!navStesso(ora[0], bersaglio[0])) navRendiVista(bersaglio[0]);
+    /* GLI STRATI IN DIFETTO CHE SANNO RIFARSI (6 ott 2026): uno solo, il
+       dettaglio di un ordine del libro — la sua entry dice quale, e in
+       memoria c'e' ancora com'era. Gli altri restano chiusi, come sempre. */
+    if (navStesso(navPila()[0], bersaglio[0]))
+      for (let i = navPila().length; i < bersaglio.length; i++) {
+        const r = navRiapriStrato(bersaglio[i]);
+        if (r === 'mancato') mancato = true;
+        if (r !== 'si') break;
+      }
   } finally {
     /* si spegne DOPO il microtask dell'osservatore, che e' stato messo
        in coda dalle classi cambiate qui dentro: e' l'ultimo giro di
-       ricostruzione, e nemmeno lui deve scrivere */
-    queueMicrotask(() => { navApplicando = false; });
+       ricostruzione, e nemmeno lui deve scrivere. Se un foglio non si e'
+       potuto riaprire, la entry si rimette in pari SUBITO, con le regole
+       di sempre (che consumano il gradino del foglio): senza, il prossimo
+       indietro atterrerebbe sul libro gia' a schermo — un indietro a vuoto. */
+    queueMicrotask(() => { navApplicando = false; if (mancato) navRiflette(); });
   }
   navFreccia(bersaglio);
   /* L'USCITA DALL'ANNULLO COSTA DUE GRADINI, non uno: il foglio della
@@ -55162,12 +55216,27 @@ function repRiquadroP2P(f, id){
    FOGLIO SI CHIUDE PRIMA. Il negozio e' una VISTA, non un foglio:
    aperto da sotto una pagina a pieno schermo ancora `open` si
    ritroverebbe coperto da lei, e da fuori sembrerebbe che il tocco
-   non abbia fatto niente. */
-function apriNegozioDettP2P(ev, chi){
+   non abbia fatto niente.
+   ⚠️ E L'INDIETRO DAL NEGOZIO RIAPRE QUESTO FOGLIO (6 ott 2026, dal campo
+   di Andrea): prima riportava al libro nudo, e l'ordine che si stava
+   guardando — con la cifra gia' scelta — andava ricercato a mano. Il
+   foglio chiuso qui non consuma la sua entry (`navLasciaFoglio`), il
+   negozio le si spinge sopra, e tornandoci `navApplica` lo riapre com'era
+   (`riapriDettaglioP2P`). Una strada sola per tutti gli indietro: la
+   freccia, il tasto di Telegram, lo swipe del browser, il gesto nell'app.
+   Se il negozio non arriva (il toast lo dice), si torna sul foglio. */
+async function apriNegozioDettP2P(ev, chi){
   if (ev && ev.stopPropagation) ev.stopPropagation();
   haptic();
+  const lasciato = {k: 'p2pDettSheet', o: p2pDettOrdine};
+  if (STORIA) navLasciaFoglio = lasciato;
   chiudiFoglioP2P('p2pDettSheet');
-  apriNegozio(chi);
+  await apriNegozio(chi);
+  if (el('view-negozio')?.classList.contains('active')) return;
+  /* nel frattempo e' successo altro (un tocco altrove): li' non si torna */
+  if (STORIA && navLasciaFoglio !== lasciato) return;
+  navLasciaFoglio = null;
+  riapriDettaglioP2P(lasciato.o);
 }
 
 /* ---- LA MONETA DELL'ORDINE ----
@@ -55744,6 +55813,24 @@ function apriDettaglioP2P(id){
   renderDettaglioP2P();
   el('sheetBg').classList.add('open');
   el('p2pDettSheet').classList.add('open');
+}
+/* IL DETTAGLIO RIAPERTO DALLA CRONOLOGIA (6 ott 2026): l'indietro dal
+   negozio di chi ha pubblicato. Se in memoria c'e' ancora lui, si riapre
+   COM'ERA — il metodo e la cifra scelti restano, e il conto si rifa' sul
+   libro di adesso —; se nel frattempo se n'e' aperto un altro, si riparte
+   da capo come a un tocco sulla card. Un ordine sparito dal libro non si
+   riapre: si resta sul libro, e lo si dice — ma solo a libro arrivato,
+   che prima «non c'e' piu'» sarebbe una bugia. */
+function riapriDettaglioP2P(id){
+  if (!id || !rigaLibroP2P(id)) {
+    if (id && p2pLibro) toast('Quest\'ordine non c\'è più: aggiorna il libro');
+    return false;
+  }
+  if (p2pDettOrdine !== id) { apriDettaglioP2P(id); return true; }
+  renderDettaglioP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pDettSheet').classList.add('open');
+  return true;
 }
 function renderDettaglioP2P(){
   const box = el('p2pDettCorpo');
