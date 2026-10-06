@@ -1271,6 +1271,10 @@
   nel foglio (`orologioPay`/`battitoPay`, accesi da `mostraQr` per ogni
   flusso: «⏱ Scade tra», la porta `lightning:` del wallet, e a fattura
   morta il velo, la nota spenta e «Generane una nuova» se è un ordine).
+  La riga è un pezzo solo, `vestiScadenzaFattura` + `portaWallet`, e dal
+  6 ott 2026 veste anche il foglio del P2P (`p2pHoldSheet`, garanzia e
+  cauzione: `orologioHoldP2P`, l'ora da `scadenzaFoglioP2P`); CANTIERI,
+  «Apri nel wallet anche sulle fatture del P2P».
   In lista lo stesso ordine è «Da pagare» PIENO (`dapagare`) a chi
   compra e «In attesa del pagamento» NEUTRO (`attesa`) a chi vende, dal
   giudice `badgeOrdine`.

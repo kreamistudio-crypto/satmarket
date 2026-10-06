@@ -36083,3 +36083,76 @@ nello studio). La prova dell'avviso «Pagamenti non arrivati» su
 Telegram vero (la ricetta sta in PRODUZIONE). `USCITA_ACINQ_MIN` va
 riscritta a mano: se la Cassaforte cresce e la leva resta indietro, il
 giro suggerito torna a mentire. Lo dice il messaggio stesso.
+
+## «⚡ Apri nel wallet» anche sulle fatture del P2P (6 ott 2026)
+
+**DA DOVE SI PARTIVA.** Nel mercatino il foglio del pagamento ha, dal
+24 set («Paga ora: la fattura che si riapre»), la riga della scadenza
+con «⏱ Scade tra» e il bottoncino «⚡ Apri nel wallet»: un link
+`lightning:` con la stessa bolt11 del QR, che il sistema passa al
+wallet installato. Il foglio del P2P — uno per due richieste, la
+garanzia di chi vende (la hold invoice del coordinatore) e la cauzione
+dei contanti — aveva il QR e «📋 Copia la richiesta» e basta: sul
+telefono, dove il QR non si inquadra da sé, restava solo copiare e
+cambiare app. Richiesta di Andrea: lo stesso bottone, con lo stesso
+aspetto e lo stesso comportamento, ovunque nel P2P ci sia una fattura
+da pagare. Altre fatture da pagare nel P2P non ce ne sono: la metà
+della cauzione e l'incasso dello scambio sono fatture che si DANNO, non
+che si pagano.
+
+**COSA SI È FATTO.** Il pezzo della riga è uscito da `battitoPay` e
+vive una volta sola: `vestiScadenzaFattura(foglio, riga, scadeEl,
+walletEl, scadeIl)` — senza scadenza la riga non c'è; a fattura viva il
+conto alla rovescia e la porta; a fattura morta «⌛ Fattura scaduta», il
+velo (`fattura-scaduta`, la cui CSS ora vale per ogni `.sheet` e non
+per il solo `#paySheet`) e la porta che sparisce — e `portaWallet(a,
+inv)`, l'unico posto che scrive `lightning:`. Il mercatino la chiama
+come prima; il foglio del P2P ha la riga nelle due vesti
+(`renderHoldP2P`, `renderCauzioneP2P`) sotto la stringa e sopra
+«Copia», e un orologio suo (`orologioHoldP2P`/`battitoHoldP2P`) che si
+ferma col foglio chiuso o con la fattura morta. L'ora la dice
+`scadenzaFoglioP2P(o, modo)`, pura, con le regole dei due giudici «è
+viva?» che già c'erano: per la garanzia la nascita della bolt11 più
+`expiration_seconds` del 38385 (mai la voce morta
+`hold_invoice_expiration_window`, come `holdVivaP2P`); per la cauzione
+la `x` della bolt11 o l'arrivo più la finestra (come
+`cauzioneVivaP2P`); e il ripiego del mercatino quando la bolt11 non si
+legge: l'arrivo più la finestra. Nessun pagamento parte da solo: è un
+link, il wallet chiede conferma a modo suo. Dentro il foglio P2P il
+bottoncino veste il vestito A del P2P (bordo 2px di inchiostro), com'è
+giusto: è la stessa classe `.btn.mini`, sono le variabili del foglio a
+cambiare.
+
+**SCARTATO.** Un secondo `onclick` che chiamasse il wallet NWC collegato
+(«paga dal wallet dell'app»): sarebbe un pagamento che parte da un
+tocco, e qui il patto è che non parta niente da solo. Rendere
+`holdVivaP2P`/`cauzioneVivaP2P` lettori di `scadenzaFoglioP2P`: quattro
+banchi li estraggono da soli, e il guadagno era una riga; i gemelli si
+provano invece a confronto. Il `typeof vestiScadenzaFattura` in testa a
+`orologioHoldP2P` è il pattern del pallino: i due pezzi comuni vivono
+col foglio del mercatino, fuori dal motore, e il banco del motore fa
+girare `apriCauzioneP2P` davvero.
+
+**PROVATO.** `prove_apri_wallet_p2p` (27): le sentinelle (la riga nelle
+due vesti, lo stesso pezzo e la stessa porta nei due fogli, il velo per
+ogni foglio, niente `pay_invoice`, `scadenzaFoglioP2P` pura) e il banco
+node coi due render fatti girare davvero — riga fra la stringa e
+«Copia», `href` con la stessa bolt11, conto alla rovescia, il battito
+che alla scadenza toglie la porta, vela e ferma l'orologio, una hold
+vecchia che nasce morta senza orologio, la riga senza richiesta, i
+gemelli con `holdVivaP2P` e `cauzioneVivaP2P`, il pezzo comune sul
+foglio del mercatino. Il banco di «Paga ora» porta i due pezzi
+estratti. Suite intera severa senza config nel worktree da origin/main
+(0873e11): 18.819 verdi e 0 rosse; i 36 collaudi della CI nella
+gabbia: 36 verdi, 0 rossi. Dal vivo nel Browser pane a 375 px (copia in
+collaudo, relay morto, riga seminata dalla pagina): garanzia e cauzione
+coi loro conti (13:35 su 900 s, 3:49 sulla `x` della bolt11), `href`
+uguale alla bolt11 del QR, il tocco vero sul link che non fa partire
+nessuna chiamata e lascia il foglio aperto, la scadenza forzata con
+lapide, velo a 0,3 e porta sparita; i due temi; il foglio del
+mercatino com'era.
+
+**DA GUARDARE SUL TELEFONO** (lo stesso punto aperto del 24 set, mai
+chiuso): lo schema `lightning:` dentro la WebView di Telegram — Android
+e iPhone — e nell'APK: se il link non apre nulla, la strada è
+`tg.openLink` o un copia-e-avvisa, da decidere con quel che si vede.

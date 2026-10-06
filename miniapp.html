@@ -9113,7 +9113,7 @@
     gap:10px;margin:-4px 0 12px;font-size:12.5px;font-weight:700;
     color:var(--ink-soft)}
   .pay-scade .btn.mini{text-decoration:none;flex:0 0 auto}
-  #paySheet.fattura-scaduta .qr,#paySheet.fattura-scaduta .invoice{opacity:.3}
+  .sheet.fattura-scaduta .qr,.sheet.fattura-scaduta .invoice{opacity:.3}
   /* ---------- festa: le monete ₿ quando i sats si sbloccano ---------- */
   .festa-box{position:fixed;inset:0;pointer-events:none;z-index:70;overflow:hidden}
   .festa-coin{position:absolute;left:0;top:0;width:22px;height:22px;border-radius:50%;
@@ -27628,10 +27628,7 @@ function orologioPay(invoice, ripiego){
   const inv = String(invoice || '').trim();
   const b = (!DEMO && inv) ? leggiBolt11(inv) : null;
   payScadeIl = (DEMO || !inv) ? 0 : ((b && b.scade) || ripiego || 0);
-  const w = el('payWallet');
-  /* la porta del wallet: lo schema `lightning:` lo apre il sistema,
-     che lo passa al wallet installato (la stessa stringa del QR) */
-  if (w) w.href = inv ? 'lightning:' + inv : '#';
+  portaWallet(el('payWallet'), inv);
   if (payOrologio) { clearInterval(payOrologio); payOrologio = null; }
   battitoPay();
   if (payScadeIl) payOrologio = setInterval(() => {
@@ -27641,23 +27638,42 @@ function orologioPay(invoice, ripiego){
     battitoPay();
   }, 1000);
 }
-function battitoPay(){
-  const riga = el('payScadeRiga'), foglio = el('paySheet');
-  if (!riga || !foglio) return;
-  if (!payScadeIl) {
+/* LA PORTA DEL WALLET: lo schema `lightning:` lo apre il sistema, che
+   lo passa al wallet installato (la stessa stringa del QR). Niente
+   parte da solo: e' un link, e il wallet chiede conferma a modo suo. */
+function portaWallet(a, inv){
+  const s = String(inv || '').trim();
+  if (a) a.href = s ? 'lightning:' + s : '#';
+}
+/* LA RIGA DELLA SCADENZA, VESTITA (6 ott 2026): il pezzo comune al
+   foglio del mercatino (battitoPay) e a quello del P2P
+   (battitoHoldP2P). Senza una scadenza la riga non c'e'; a fattura
+   viva il conto alla rovescia e la porta del wallet; a fattura morta la
+   lapide, il velo sul foglio (`fattura-scaduta`) e la porta sparisce.
+   Dice se la fattura vive. */
+function vestiScadenzaFattura(foglio, riga, scadeEl, walletEl, scadeIl){
+  if (!riga || !foglio) return false;
+  if (!scadeIl) {
     riga.style.display = 'none';
     foglio.classList.remove('fattura-scaduta');
-    return;
+    return false;
   }
-  const resta = payScadeIl - Date.now() / 1000;
+  const resta = scadeIl - Date.now() / 1000;
   const viva = resta > 0;
   riga.style.display = '';
   foglio.classList.toggle('fattura-scaduta', !viva);
   /* corta apposta: a 375 accanto al bottoncino «Questa fattura è
      scaduta» andava a capo (visto a schermo) */
-  el('payScade').textContent = viva ? '⏱ Scade tra ' + minutiSecondi(resta)
-                                    : '⌛ Fattura scaduta';
-  el('payWallet').style.display = viva ? '' : 'none';
+  if (scadeEl) scadeEl.textContent = viva ? '⏱ Scade tra ' + minutiSecondi(resta)
+                                          : '⌛ Fattura scaduta';
+  if (walletEl) walletEl.style.display = viva ? '' : 'none';
+  return viva;
+}
+function battitoPay(){
+  const riga = el('payScadeRiga'), foglio = el('paySheet');
+  if (!riga || !foglio) return;
+  const viva = vestiScadenzaFattura(foglio, riga, el('payScade'), el('payWallet'), payScadeIl);
+  if (!payScadeIl) return;
   /* la nota sotto il titolo parla della fattura VIVA («e' la stessa di
      prima: pagala prima che scada», «convertito ora in sats: vale 15
      minuti»): a fattura morta direbbe il contrario della riga qui, e
@@ -55650,9 +55666,13 @@ function renderCauzioneP2P(o){
       (min ? ' Hai circa ' + min + (min === 1 ? ' minuto' : ' minuti') + ': scaduta, l\'ordine resta nel libro e va ripreso.' : '') + '</div>' +
     '<div class="qr" id="p2pHoldQr"></div>' +
     '<div class="invoice" id="p2pHoldInvoice"></div>' +
+    '<div class="pay-scade" id="p2pHoldScadeRiga" style="display:none">' +
+      '<span id="p2pHoldScade"></span>' +
+      '<a class="btn mini" id="p2pHoldWallet" href="#">⚡ Apri nel wallet</a></div>' +
     '<button class="btn ghost" onclick="copiaHoldP2P()">📋 Copia la richiesta</button>' +
     '<div class="hint">Quando la cauzione è bloccata questo foglio si chiude da solo e lo scambio va avanti: non c\'è niente da confermare.</div>';
   el('p2pHoldInvoice').textContent = c.bolt11;
+  orologioHoldP2P(o);
 }
 function renderHoldP2P(){
   const box = el('p2pHoldCorpo');
@@ -55678,9 +55698,69 @@ function renderHoldP2P(){
       (min ? ' Hai circa ' + min + ' minuti.' : '') + '</div>' +
     '<div class="qr" id="p2pHoldQr"></div>' +
     '<div class="invoice" id="p2pHoldInvoice"></div>' +
+    '<div class="pay-scade" id="p2pHoldScadeRiga" style="display:none">' +
+      '<span id="p2pHoldScade"></span>' +
+      '<a class="btn mini" id="p2pHoldWallet" href="#">⚡ Apri nel wallet</a></div>' +
     '<button class="btn ghost" onclick="copiaHoldP2P()">📋 Copia la richiesta</button>' +
     '<div class="hint">Quando i sats sono in garanzia questo foglio si chiude da solo: non c\'è niente da confermare.</div>';
   el('p2pHoldInvoice').textContent = o.hold.bolt11;
+  orologioHoldP2P(o);
+}
+/* ⚡ APRI NEL WALLET ANCHE QUI (6 ott 2026, richiesta di Andrea): la
+   riga della scadenza del mercatino («Paga ora», 24 set), con lo
+   stesso pezzo (`vestiScadenzaFattura`) e la stessa porta
+   (`portaWallet`), sotto la stringa e sopra «Copia la richiesta». La
+   fattura la dice `richiestaFoglioP2P` (garanzia o cauzione, secondo
+   `p2pHoldModo`), l'ora `scadenzaFoglioP2P`. A richiesta morta la porta
+   sparisce, QR e stringa si velano, e la frase sopra dice gia' cosa
+   fare (riprendere l'ordine). Il battito si ferma col foglio chiuso o
+   con la fattura morta, come nel mercatino. */
+/* PURA: QUANDO scade la richiesta del foglio, in secondi (0 = non si
+   sa). Le stesse regole dei due giudici «e' viva?» — `holdVivaP2P`:
+   la nascita della bolt11 piu' `expiration_seconds` del 38385;
+   `cauzioneVivaP2P`: la `x` della bolt11, o l'arrivo piu' la finestra —
+   piu' il ripiego di chi apre il foglio quando la bolt11 non si legge:
+   l'arrivo piu' la finestra, come fa il mercatino con la nascita
+   dell'ordine. */
+function scadenzaFoglioP2P(o, modo){
+  if (modo === 'cauzione') {
+    const c = o && o.cauzione;
+    if (!c || !c.bolt11) return 0;
+    if (c.scade > 0) return c.scade;
+    const finestra = (p2pInfo && p2pInfo.holdFinestra > 0) ? p2pInfo.holdFinestra : 300;
+    return c.quando > 0 ? c.quando + finestra : 0;
+  }
+  const h = o && o.hold;
+  if (!h || !h.bolt11) return 0;
+  const b = leggiBolt11(h.bolt11);
+  const finestra = (p2pInfo && p2pInfo.scadenzaSec > 0) ? p2pInfo.scadenzaSec : 900;
+  if (b) return b.quando + finestra;
+  return h.quando > 0 ? h.quando + finestra : 0;
+}
+let p2pHoldScadeIl = 0, p2pHoldOrologio = null;
+function orologioHoldP2P(o){
+  /* i due pezzi comuni vivono col foglio del mercatino, fuori dal
+     motore: nel banco del motore non ci sono (il typeof, come per il
+     pallino in scriviOrdineP2P) */
+  if (typeof vestiScadenzaFattura !== 'function') return;
+  const r = richiestaFoglioP2P(o);
+  p2pHoldScadeIl = scadenzaFoglioP2P(o, p2pHoldModo);
+  portaWallet(el('p2pHoldWallet'), r ? r.bolt11 : '');
+  if (p2pHoldOrologio) { clearInterval(p2pHoldOrologio); p2pHoldOrologio = null; }
+  /* una richiesta gia' morta all'apertura non accende nessun battito */
+  if (!battitoHoldP2P()) return;
+  p2pHoldOrologio = setInterval(() => {
+    if (!el('p2pHoldSheet').classList.contains('open')) {
+      clearInterval(p2pHoldOrologio); p2pHoldOrologio = null; return;
+    }
+    battitoHoldP2P();
+  }, 1000);
+}
+function battitoHoldP2P(){
+  const viva = vestiScadenzaFattura(el('p2pHoldSheet'), el('p2pHoldScadeRiga'),
+                                    el('p2pHoldScade'), el('p2pHoldWallet'), p2pHoldScadeIl);
+  if (!viva && p2pHoldOrologio) { clearInterval(p2pHoldOrologio); p2pHoldOrologio = null; }
+  return viva;
 }
 /* la fattura si legge dall'ordine e non da un onclick: e' lunga
    duecento caratteri e non va interpolata in un attributo */

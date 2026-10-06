@@ -111412,6 +111412,8 @@ console.log(JSON.stringify(esiti));
     # 4b) il foglio: il conto alla rovescia e il bottoncino che cambia
     #     mestiere, sui flussi veri che lo aprono
     banco = base + "\n" + "\n".join([
+        fetta("function portaWallet(a, inv){"),
+        fetta("function vestiScadenzaFattura(foglio, riga, scadeEl, walletEl, scadeIl){"),
         fetta("function orologioPay(invoice, ripiego){"),
         fetta("function battitoPay(){")]) + """
 let payScadeIl = 0, payOrologio = null, DEMO = false;
@@ -117104,6 +117106,212 @@ const R = (id, lato, stato, piu) => Object.assign({id, lato, stato, peer: 'P'}, 
           [[], ["Ordine annullato ✓"]], o["ritira"])
 
 
+def prove_apri_wallet_p2p():
+    """«⚡ APRI NEL WALLET» ANCHE NEL P2P (6 ott 2026, richiesta di
+    Andrea). Nel mercatino il foglio del pagamento ha, dal 24 set, la
+    riga della scadenza col link `lightning:` (la stessa bolt11 del QR,
+    che il sistema passa al wallet del telefono). Il foglio del P2P —
+    uno per due richieste, la garanzia di chi vende e la cauzione dei
+    contanti — aveva QR e «Copia» e basta. Qui:
+    1) le SENTINELLE: il pezzo comune (`vestiScadenzaFattura`,
+       `portaWallet`) usato da tutt'e due i fogli, la riga in tutt'e due
+       le vesti del foglio P2P, il velo che vale per ogni foglio;
+    2) il BANCO node: `scadenzaFoglioP2P` dice la stessa cosa dei due
+       giudici «e' viva?»; i due render fatti girare DAVVERO mettono la
+       riga fra la stringa e «Copia» e accendono la porta; il battito a
+       fattura viva, morta, senza richiesta; e la riga del mercatino
+       vestita dallo stesso pezzo, come prima."""
+    print("\n[«Apri nel wallet» anche sulle fatture del P2P]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    # --- 1) LE SENTINELLE --------------------------------------------
+    RIGA = ("'<div class=\"pay-scade\" id=\"p2pHoldScadeRiga\" style=\"display:none\">' +\n"
+            "      '<span id=\"p2pHoldScade\"></span>' +\n"
+            "      '<a class=\"btn mini\" id=\"p2pHoldWallet\" href=\"#\">⚡ Apri nel wallet</a></div>' +\n"
+            "    '<button class=\"btn ghost\" onclick=\"copiaHoldP2P()\">📋 Copia la richiesta</button>'")
+    rh, rc = fn("function renderHoldP2P(){"), fn("function renderCauzioneP2P(o){")
+    prova("la riga sta in tutt'e due le vesti del foglio P2P, dopo la stringa e prima di «Copia»",
+          [True, True, 2],
+          [RIGA in rh and rh.find('id="p2pHoldInvoice"') < rh.find(RIGA),
+           RIGA in rc and rc.find('id="p2pHoldInvoice"') < rc.find(RIGA),
+           mini.count(RIGA)])
+    prova("...e tutt'e due accendono l'orologio dopo aver scritto la stringa",
+          [True, True],
+          [rh.rstrip().endswith("el('p2pHoldInvoice').textContent = o.hold.bolt11;\n  orologioHoldP2P(o);\n}"),
+           rc.rstrip().endswith("el('p2pHoldInvoice').textContent = c.bolt11;\n  orologioHoldP2P(o);\n}")])
+    prova("il foglio della hold conta ancora i minuti da expiration_seconds, mai dalla voce morta",
+          [True, False], ["p2pInfo.scadenzaSec" in rh, "holdFinestra" in rh])
+    bp, bh = nudo(fn("function battitoPay(){")), nudo(fn("function battitoHoldP2P(){"))
+    prova("LO STESSO PEZZO veste la riga del mercatino e quella del P2P",
+          [True, True],
+          ["vestiScadenzaFattura(foglio, riga, el('payScade'), el('payWallet'), payScadeIl)" in bp,
+           "vestiScadenzaFattura(el('p2pHoldSheet'), el('p2pHoldScadeRiga')," in bh])
+    prova("...e la stessa porta: `lightning:` si scrive in un posto solo",
+          [1, True, True],
+          [mini.count("'lightning:' + s"),
+           "portaWallet(el('payWallet'), inv);" in fn("function orologioPay(invoice, ripiego){"),
+           "portaWallet(el('p2pHoldWallet'), r ? r.bolt11 : '');" in fn("function orologioHoldP2P(o){")])
+    prova("il velo della fattura morta vale per ogni foglio, non per il solo paySheet", True,
+          "  .sheet.fattura-scaduta .qr,.sheet.fattura-scaduta .invoice{opacity:.3}\n" in mini
+          and "#paySheet.fattura-scaduta" not in mini)
+    prova("la riga del mercatino e' ancora al suo posto, col suo bottone", True,
+          '<a class="btn mini" id="payWallet" href="#">⚡ Apri nel wallet</a>' in mini)
+    prova("nessun pagamento parte da solo: la porta e' un link, niente `pay_invoice` nel foglio P2P",
+          False, "pay_invoice" in rh + rc + fn("function orologioHoldP2P(o){") + bh)
+    for spia in ("el(", "document", "localStorage", "Date.now", "toast("):
+        prova(f"`scadenzaFoglioP2P` e' pura: nessun `{spia}`", False,
+              spia in nudo(fn("function scadenzaFoglioP2P(o, modo){")))
+
+    # --- 2) IL BANCO -------------------------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco di «Apri nel wallet» nel P2P", "node non c'e'")
+        return
+    T = 1_790_000_000
+    HOLD = bolt11_finta(25_000, 3600, T - 60, phash=11)       # nata un minuto fa
+    HOLD_VECCHIA = bolt11_finta(25_000, 3600, T - 1000, phash=12)
+    CAUZ = bolt11_finta(1_000, 300, T - 30, phash=13)         # scade fra 270 s
+    pezzi = "\n".join([
+        fn("function importoBolt11(pr){"), fn("function leggiBolt11(pr){"),
+        fn("function minutiSecondi(sec){"),
+        fn("function holdVivaP2P(o){"), fn("function cauzioneVivaP2P(o, adesso){"),
+        fn("function richiestaFoglioP2P(o){"),
+        fn("function portaWallet(a, inv){"),
+        fn("function vestiScadenzaFattura(foglio, riga, scadeEl, walletEl, scadeIl){"),
+        fn("function scadenzaFoglioP2P(o, modo){"),
+        "let p2pHoldScadeIl = 0, p2pHoldOrologio = null;",
+        fn("function orologioHoldP2P(o){"), fn("function battitoHoldP2P(){"),
+        fn("function renderCauzioneP2P(o){"), fn("function renderHoldP2P(){"),
+        "const esc = s => String(s ?? '').replace(/[&<>\"']/g, c => "
+        "({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));",
+        "const fmt = n => n.toLocaleString('it-IT');",
+        "const nodi = {};",
+        "const nodo = id => nodi[id] || (nodi[id] = {id, innerHTML: '', "
+        "textContent: '', href: '', style: {display: ''}, "
+        "_cl: new Set(), get classList(){ const s = this._cl; return {"
+        "add: c => s.add(c), remove: c => s.delete(c), contains: c => "
+        "s.has(c), toggle: (c, v) => (v === undefined ? !s.has(c) : v) "
+        "? s.add(c) : s.delete(c)}; }});",
+        "const el = id => nodo(id);",
+        "const V = " + _json.dumps({"hold": HOLD, "vecchia": HOLD_VECCHIA, "cauz": CAUZ, "T": T}) + ";",
+    ]) + r"""
+let p2pInfo = {scadenzaSec: 900, holdFinestra: 300};
+let p2pHoldModo = 'hold', p2pHoldOrdine = 'o1';
+const righe = {};
+const ordiniP2P = () => righe;
+let battiti = 0, intervalli = 0, fermati = 0;
+globalThis.setInterval = f => { battiti++; intervalli++; return intervalli; };
+globalThis.clearInterval = () => { fermati++; };
+const vero = Date.now;
+Date.now = () => V.T * 1000;
+const out = {};
+/* 1) la scadenza dice la stessa cosa dei due giudici */
+const h = b => ({hold: {bolt11: b, sats: 25000, quando: V.T - 5}});
+const c = (b, scade, quando) => ({cauzione: {bolt11: b, sats: 1000, quando: quando === undefined ? V.T - 30 : quando, scade: scade === undefined ? V.T + 270 : scade}});
+out.hold = [scadenzaFoglioP2P(h(V.hold), 'hold') === (V.T - 60) + 900, scadenzaFoglioP2P(h(V.vecchia), 'hold') === (V.T - 1000) + 900,
+  scadenzaFoglioP2P(h('robaccia'), 'hold') === (V.T - 5) + 900, scadenzaFoglioP2P({hold: {bolt11: 'robaccia'}}, 'hold'),
+  scadenzaFoglioP2P({}, 'hold'), scadenzaFoglioP2P(null, 'hold')];
+out.gemelliHold = [holdVivaP2P(h(V.hold)) === (scadenzaFoglioP2P(h(V.hold), 'hold') > V.T),
+  holdVivaP2P(h(V.vecchia)) === (scadenzaFoglioP2P(h(V.vecchia), 'hold') > V.T)];
+out.cauz = [scadenzaFoglioP2P(c(V.cauz), 'cauzione') === V.T + 270, scadenzaFoglioP2P(c(V.cauz, 0, V.T - 30), 'cauzione') === V.T - 30 + 300,
+  scadenzaFoglioP2P(c(V.cauz, 0, 0), 'cauzione'), scadenzaFoglioP2P({cauzione: {sats: 1}}, 'cauzione'), scadenzaFoglioP2P(null, 'cauzione')];
+p2pInfo = {scadenzaSec: 0, holdFinestra: 0};
+out.senzaInfo = [scadenzaFoglioP2P(h(V.hold), 'hold') === (V.T - 60) + 900, scadenzaFoglioP2P(c(V.cauz, 0, V.T - 30), 'cauzione') === V.T - 30 + 300];
+p2pInfo = {scadenzaSec: 900, holdFinestra: 300};
+for (const [x, m] of [[c(V.cauz), 'cauzione'], [c(V.cauz, V.T - 1), 'cauzione'], [c(V.cauz, 0, V.T - 400), 'cauzione']])
+  (out.gemelliCauz = out.gemelliCauz || []).push(cauzioneVivaP2P(x, V.T) === (scadenzaFoglioP2P(x, m) > V.T));
+/* 2) i render veri: la riga fra la stringa e «Copia», la porta accesa */
+const foto = () => ({riga: nodi.p2pHoldScadeRiga.style.display, testo: nodi.p2pHoldScade.textContent,
+  wallet: nodi.p2pHoldWallet.style.display, href: nodi.p2pHoldWallet.href,
+  velo: nodi.p2pHoldSheet.classList.contains('fattura-scaduta'), orologio: p2pHoldOrologio});
+righe.o1 = Object.assign({id: 'o1'}, h(V.hold), c(V.cauz));
+p2pHoldModo = 'hold';
+renderHoldP2P();
+const html = nodi.p2pHoldCorpo.innerHTML;
+out.renderHold = [html.indexOf('id="p2pHoldInvoice"') < html.indexOf('id="p2pHoldScadeRiga"'),
+  html.indexOf('id="p2pHoldScadeRiga"') < html.indexOf('copiaHoldP2P()'), html.indexOf('⚡ Apri nel wallet') > 0,
+  nodi.p2pHoldInvoice.textContent === V.hold, nodi.p2pHoldTit.textContent];
+out.holdViva = foto();
+p2pHoldModo = 'cauzione';
+renderHoldP2P();
+const html2 = nodi.p2pHoldCorpo.innerHTML;
+out.renderCauz = [html2.indexOf('id="p2pHoldInvoice"') < html2.indexOf('id="p2pHoldScadeRiga"'),
+  html2.indexOf('id="p2pHoldScadeRiga"') < html2.indexOf('copiaHoldP2P()'),
+  nodi.p2pHoldInvoice.textContent === V.cauz, nodi.p2pHoldTit.textContent];
+out.cauzViva = foto();
+/* 3) il battito: viva → morta, il bottone sparisce e l'orologio si ferma */
+const primaFermati = fermati;
+Date.now = () => (V.T + 271) * 1000;
+battitoHoldP2P();
+out.cauzMorta = foto();
+out.fermato = fermati > primaFermati;
+/* ...e una riga rimasta senza richiesta: niente riga, niente velo */
+Date.now = () => V.T * 1000;
+righe.o1 = {id: 'o1'};
+p2pHoldModo = 'hold';
+orologioHoldP2P(righe.o1);
+out.senzaRichiesta = foto();
+/* 4) la hold vecchia aperta adesso: nasce gia' morta */
+righe.o1 = Object.assign({id: 'o1'}, h(V.vecchia));
+renderHoldP2P();
+out.holdMorta = foto();
+/* 5) il pezzo comune sul foglio del mercatino, come prima */
+const f = nodo('paySheet'), r = nodo('payScadeRiga'), t = nodo('payScade'), w = nodo('payWallet');
+out.mercatino = [vestiScadenzaFattura(f, r, t, w, V.T + 61), t.textContent, w.style.display, f.classList.contains('fattura-scaduta'),
+  vestiScadenzaFattura(f, r, t, w, V.T - 1), t.textContent, w.style.display, f.classList.contains('fattura-scaduta'),
+  vestiScadenzaFattura(f, r, t, w, 0), r.style.display, f.classList.contains('fattura-scaduta')];
+console.log(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp(prefix="apri_wallet_")
+    pb = os.path.join(cart, "banco.js")
+    open(pb, "w", encoding="utf-8").write(pezzi)
+    rr = _sp.run([node, pb], capture_output=True, text=True, timeout=120, encoding="utf-8")
+    prova("il banco gira", "", (rr.stderr or "")[-900:])
+    if rr.returncode != 0:
+        return
+    o = _json.loads(rr.stdout)
+    prova("la scadenza della hold: nascita della bolt11 + expiration_seconds; illeggibile = arrivo + finestra; senza niente 0",
+          [True, True, True, 0, 0, 0], o["hold"])
+    prova("...e dice viva/morta come `holdVivaP2P`", [True, True], o["gemelliHold"])
+    prova("la scadenza della cauzione: la `x` della bolt11, o l'arrivo + finestra; senza arrivo 0",
+          [True, True, 0, 0, 0], o["cauz"])
+    prova("...e dice viva/morta come `cauzioneVivaP2P`", [True, True, True], o["gemelliCauz"])
+    prova("senza il 38385 valgono le finestre di serie (900 e 300)", [True, True], o["senzaInfo"])
+    prova("renderHoldP2P: la riga fra la stringa e «Copia», il bottone, la stringa giusta, il titolo",
+          [True, True, True, True, "🔒 Blocca i sats"], o["renderHold"])
+    v = o["holdViva"]
+    prova("...hold viva: riga accesa, conto alla rovescia, porta `lightning:` con la stessa bolt11, niente velo, orologio vivo",
+          ["", "⏱ Scade tra 14:00", "", "lightning:" + HOLD, False, True],
+          [v["riga"], v["testo"], v["wallet"], v["href"], v["velo"], v["orologio"] is not None])
+    prova("renderCauzioneP2P: la stessa riga, la cauzione nella stringa, il titolo",
+          [True, True, True, "🔐 Blocca la cauzione"], o["renderCauz"])
+    v = o["cauzViva"]
+    prova("...cauzione viva: la porta porta la cauzione, e il conto e' il suo",
+          ["", "⏱ Scade tra 4:30", "", "lightning:" + CAUZ, False],
+          [v["riga"], v["testo"], v["wallet"], v["href"], v["velo"]])
+    v = o["cauzMorta"]
+    prova("al battito dopo la scadenza: lapide, porta sparita, velo sul foglio, orologio fermato",
+          ["", "⌛ Fattura scaduta", "none", True, None, True],
+          [v["riga"], v["testo"], v["wallet"], v["velo"], v["orologio"], o["fermato"]])
+    v = o["senzaRichiesta"]
+    prova("senza richiesta: niente riga, niente velo, porta a `#`", ["none", False, "#", None],
+          [v["riga"], v["velo"], v["href"], v["orologio"]])
+    v = o["holdMorta"]
+    prova("una hold vecchia aperta adesso nasce gia' morta: lapide, porta sparita, nessun orologio",
+          ["⌛ Fattura scaduta", "none", True, None], [v["testo"], v["wallet"], v["velo"], v["orologio"]])
+    prova("il pezzo comune sul foglio del mercatino: viva, morta, senza scadenza",
+          [True, "⏱ Scade tra 1:01", "", False, False, "⌛ Fattura scaduta", "none", True, False, "none", False],
+          o["mercatino"])
+
+
 def prove_cauzione_p2p():
     """LA CAUZIONE DI CHI PRENDE, SOLO NEL CONTANTI DI PERSONA (1 ott 2026,
     cantiere B, decisione di Andrea).
@@ -121660,7 +121868,7 @@ def main():
               prove_casa_vuota_gratis,
               prove_spedizione_standard,
               prove_cambio_converte,
-              prove_paga_ora,
+              prove_paga_ora, prove_apri_wallet_p2p,
               prove_catalogo_esterno,
               prove_modulo_negozio,
               prove_script_nel_workflow, prove_deploy,
