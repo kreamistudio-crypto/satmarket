@@ -7318,9 +7318,12 @@
   dalla vetrina».
   L'INTERVALLO IN DUE COLONNE (6 ott 2026): su un ordine «da 5 a 15 €»
   il conto (`contoDettP2P`, libro e pagina dello scambio) e' una tabella
-  — intestazione coi due importi, una cella per capo col suo ≈ e il suo
-  segno, la scatola `conto-due` con `--n` (i caratteri della cella piu'
-  lunga) che il CSS fa diventare pixel uguali per ogni riga. A importo
+  — intestazione coi due importi, una cella per capo col suo ≈, il suo
+  segno e il ₿ dopo ogni cifra in sats (`conBtc`, il simbolo del toggle
+  €/₿: mai la parola «sats»), la scatola `conto-due` con `--n` (i
+  caratteri della cella piu' lunga) che il CSS fa diventare pixel
+  uguali per ogni riga; le celle scendono su una riga loro quando
+  l'etichetta non ci sta per la sua parola piu' lunga. A importo
   fisso resta su una colonna. Nelle righe di testo (card del libro, «I
   miei scambi», l'avviso di Barattozon) i capi li dice `capiP2P`: «da …
   a …», mai un trattino fra due numeri. Verbale: CANTIERI, «Il conto a

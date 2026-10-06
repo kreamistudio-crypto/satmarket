@@ -36771,3 +36771,52 @@ toccato.
 **NON PROVATO.** Il telefono vero e l'APK (la regola è dietro
 `min-width:768px`, e a 375/360 la geometria è identica); Telegram
 Desktop largo (stessa regola della `.grid`, non guardato a schermo).
+
+## Il ₿ su ogni cifra del conto in due colonne (6 ott 2026, seguito)
+
+Ritocco di Andrea al conto in due colonne di ce6ca66: accanto a ogni
+cifra in sats il simbolino dei sats che usa il resto dell'app, nessuna
+scritta «sats», su ogni riga — così nessun numero resta senza
+significato. Nel primo giro l'unità la diceva una volta l'intestazione
+(«cifre in sats»), e sotto le celle in sats erano numeri nudi accanto a
+celle in € che il loro segno ce l'avevano.
+
+**DECISO.** Il simbolo è il **₿** del toggle €/₿ (il bottone
+`data-cur="sats"`): è l'unico segno che l'app usa già per dire «in
+sats»; altrove i sats si scrivono a parole. Sta DOPO la cifra, come il €
+nelle celle in euro («≈ 6 536 ₿», «5,00 €»), e lo mette `conBtc` su
+ogni cella in sats — Controvalore, premio o sconto, Subtotale, Fee P2P,
+Ricevi/Invia, e la fee a zero («0 ₿»). Un trattino resta un trattino,
+senza unità. L'intestazione a sinistra ora è vuota. Il conto a importo
+fisso, su una colonna, resta com'era («sats» a parole): il ritocco era
+del conto in due colonne.
+
+**IL PREZZO DEL ₿ E LA CURA.** Due caratteri in più per cella: a 320 px
+la griglia `minmax(0,1fr) auto` del primo giro avrebbe schiacciato
+l'etichetta sotto la sua parola più lunga. La riga torna un flex che va
+a capo, con l'etichetta `flex:1 1 0` e `min-width:min-content`: il flex
+decide la riga sulla base clampata, cioè la parola più lunga. Le celle
+restano accanto finché l'etichetta ci sta, e quando non ci sta (a 320,
+o con cifre da sei-sette posti) scendono su una riga loro, a destra e
+sempre in colonna; la nota del premio torna a tutta riga col suo
+`flex:0 0 100%`. `--n` conta anche il « ₿».
+
+**SCARTATO.** La parola «sats» in ogni cella (vietata dalla richiesta, e
+lunga). Il ₿ prima della cifra («₿ 6 536»): il € delle celle sta dopo.
+Togliere il ≈ dalle celle per fare posto: la regola di casa lo vuole su
+ogni stima, e con le celle che scendono non serve.
+
+**PROVATO.** `prove_conto_due_colonne` e `prove_p2p_dettaglio`
+aggiornate: `--n` a 10 sul 20–100, intestazione vuota, ogni cella col
+suo ≈, il suo segno e il suo ₿ (6 celle da chi compra, 10 da chi vende
+con lo sconto), nessuna «\d sats» nel conto in due colonne, trattini
+senza ₿ a cambio muto, la fee a zero col ₿, il CSS flex e non più
+griglia. Tortura 22 su 22. Scatti prima/dopo a 375 e 320 px nei due
+temi (Chrome headless, copia in collaudo, relay morto): dettaglio dalle
+due parti, 20–100 €, pagina dello scambio; il ₿ si disegna nel mono di
+casa (sottoinsieme latin-ext di JetBrains Mono). Suite e collaudi: nel
+verbale del push.
+
+**DA GUARDARE.** Sul telefono: il ₿ nel mono di casa su Android e
+iPhone (se il font non arriva, il ripiego del sistema lo disegna più
+largo e la colonna lo tiene lo stesso, allineata a destra).

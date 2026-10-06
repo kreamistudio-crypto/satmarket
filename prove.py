@@ -61134,18 +61134,27 @@ console.log(JSON.stringify(out));
     # valeva per un capo solo. Adesso ogni capo ha la sua cella.
     cr = o["contoRange"]
     cella = lambda *t: '<span class="mono">' + "".join(t) + "</span>"
+    # (6 ott 2026, secondo ritocco) OGNI CIFRA IN SATS PORTA IL ₿, il
+    # simbolo del toggle €/₿: la larghezza conta anche « ₿», e
+    # l'intestazione non dice piu' «cifre in sats»
     prova("un intervallo va in due colonne, con la larghezza scritta sulla scatola",
-          True, ' conto-due" style="--n:8">' in cr)
-    prova("...l'intestazione: i due importi, e a sinistra l'unita' delle celle",
-          True, '<div class="ctrl-riga capi"><span>cifre in sats</span>'
+          True, ' conto-due" style="--n:10">' in cr)
+    prova("...l'intestazione: i due importi, e a sinistra niente", True,
+          '<div class="ctrl-riga capi"><span></span>'
           + cella('<span class="num">20,00 €</span>', '<span class="num">100,00 €</span>')
           in cr)
-    prova("...ogni riga una cella per capo, col SUO ≈", [True, True],
-          [cella('<span class="num">≈ 40000</span>', '<span class="num">≈ 200000</span>') in cr,
-           cella('<span class="num">≈ 39600</span>', '<span class="num">≈ 198000</span>') in cr])
+    prova("...ogni riga una cella per capo, col SUO ≈ e il SUO ₿", [True, True],
+          [cella('<span class="num">≈ 40000 ₿</span>', '<span class="num">≈ 200000 ₿</span>') in cr,
+           cella('<span class="num">≈ 39600 ₿</span>', '<span class="num">≈ 198000 ₿</span>') in cr])
     prova("...e col SUO segno: il meno vale per tutt'e due i capi", True,
-          cella('<span class="num meno">≈ −400</span>',
-                '<span class="num meno">≈ −2000</span>') in cr)
+          cella('<span class="num meno">≈ −400 ₿</span>',
+                '<span class="num meno">≈ −2000 ₿</span>') in cr)
+    prova("...nessuna cifra in sats senza il suo ₿, e mai la parola «sats»",
+          [6, False, False], [cr.count(' ₿</span>'), "cifre in sats" in cr,
+                              bool(re.search(r"\d sats", cr))])
+    prova("...e il ₿ anche dalla parte di chi vende, su ogni cella (premio e Subtotale compresi)", [10, False],
+          [o["contoRangeVendi"].count(' ₿</span>'),
+           bool(re.search(r"\d sats", o["contoRangeVendi"]))])
     prova("...l'euro in fondo, cella per cella, col segno e senza bandierina",
           [True, False], [cella('<span class="num">20,00 €</span>',
                                 '<span class="num">100,00 €</span>') in cr.split("ctrl-chiusa")[1],
@@ -61156,9 +61165,11 @@ console.log(JSON.stringify(out));
     prova("dal lato di chi vende con lo sconto: il premio si aggiunge, la fee pure, in ogni colonna",
           [4, 0, True], [rv.count('class="num piu">≈ +'),
                          rv.count('class="num meno"'), "lato-vendo conto-due" in rv])
-    prova("a cambio muto: un trattino per colonna, gli euro restano in testa", [True, True],
+    prova("a cambio muto: un trattino per colonna, senza ₿, gli euro restano in testa",
+          [True, True, False],
           [cella('<span class="num">—</span>', '<span class="num">—</span>') in o["contoRangeMuto"],
-           '<span class="num">100,00 €</span>' in o["contoRangeMuto"]])
+           '<span class="num">100,00 €</span>' in o["contoRangeMuto"],
+           "₿" in o["contoRangeMuto"]])
     prova("con la fee ignota: un trattino per colonna nella sua riga", True,
           cella('<span class="num">—</span>', '<span class="num">—</span>')
           in o["contoRangeSenzaFee"].split("Fee P2P")[1])
@@ -117404,11 +117415,20 @@ def prove_conto_due_colonne():
           "join('–')" in cd or "'–'" in cd)
     prova("...decide le due colonne dal numero dei capi, e le celle passano da `cella`",
           True, "const due = conti.length === 2;" in cd
-          and "conti.map(c => num(cella(c, campo, segno), segno)).join('')" in cd)
-    prova("...l'intestazione sta in cima, prima del Controvalore", True,
-          "+ (due ? r('cifre in sats', cifreEuro, 'capi') : '')" in cd
-          and cd.index("r('cifre in sats', cifreEuro, 'capi')")
-          < cd.index("+ r(etichettaCtrl, cifra('ctrl'))"))
+          and "conti.map(c => num(conBtc(cella(c, campo, segno)), segno)).join('')" in cd)
+    # (6 ott 2026, secondo ritocco) il ₿ su ogni cifra in sats, mai su
+    # un trattino; e la fee a zero lo porta anche lei
+    prova("...ogni cella in sats porta il ₿ (un trattino no), anche la fee a zero", True,
+          "const conBtc = t => t === '—' ? t : t + ' ₿';" in cd
+          and "num(conBtc('0')) + num(conBtc('0'))" in cd)
+    prova("...l'intestazione sta in cima, prima del Controvalore, e non dice «sats»",
+          True, "+ (due ? r('', cifreEuro, 'capi') : '')" in cd
+          and cd.index("r('', cifreEuro, 'capi')")
+          < cd.index("+ r(etichettaCtrl, cifra('ctrl'))")
+          and "'cifre in sats'" not in mini)
+    prova("...e la larghezza conta il « ₿»", True,
+          "lungo(fmt(Math.max(c.ctrl, c.merc, c.netto))) + 4" in cd
+          and "lungo(fmt(Math.max(c.premio, c.meta))) + 5" in cd)
     prova("...la scatola porta `conto-due` e la larghezza delle colonne", True,
           "' conto-due\" style=\"--n:' + larga + '\">'" in cd)
     prova("...e a due colonne il Controvalore non ripete gli euro nell'etichetta",
@@ -117422,13 +117442,17 @@ def prove_conto_due_colonne():
               ["'–'" in corpo or "join('–')" in corpo, "capiP2P(" in corpo])
     prova("«scegli tu» va a capo intero", True,
           "(o.euroMax ? ', scegli\\u00a0tu' : '')" in mini)
-    # il CSS: la riga-griglia, la larghezza in pixel (mai `ch`: le righe
-    # in scatola hanno un altro corpo), la nota del premio a tutta riga,
-    # e la riga dell'euro della card che lascia il posto all'anello
+    # il CSS: la larghezza in pixel (mai `ch`: le righe in scatola hanno
+    # un altro corpo), l'etichetta che a capo ci va per la sua parola
+    # piu' lunga (cosi' a 320 le celle scendono invece di schiacciarla),
+    # le celle in colonna, e la riga dell'euro della card che lascia il
+    # posto all'anello
+    prova("CSS: la riga del conto a due colonne non e' piu' una griglia", False,
+          ".conto-due .ctrl-riga{display:grid" in mini)
     for regola in (".conto-due{--col:calc(var(--n, 9) * 9.9px)}",
-                   ".conto-due .ctrl-riga{display:grid;grid-template-columns:minmax(0,1fr) auto;",
-                   ".conto-due .ctrl-riga .mono{display:grid;grid-template-columns:var(--col) var(--col);",
-                   ".conto-due .ctrl-riga .premio-nota{grid-column:1 / -1;",
+                   ".conto-due .ctrl-riga>span:first-child{flex:1 1 0;min-width:min-content}",
+                   ".conto-due .ctrl-riga .mono{flex:0 0 auto;display:grid;\n"
+                   "    grid-template-columns:var(--col) var(--col);column-gap:10px;justify-items:end}",
                    ".p2p-ord>.conto-due>.ctrl-riga{padding-right:calc(10px + var(--chiusa-bordo))}",
                    ".p2p-ord>.p2p-grande{display:block;padding-right:52px}"):
         prova("CSS: " + regola[:60], True, regola in mini)
