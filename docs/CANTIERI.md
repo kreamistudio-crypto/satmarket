@@ -38963,3 +38963,97 @@ ott; si apre dopo il lancio).**
 
 **DA GUARDARE PRIMA DI APRIRLO.** Cosa porta la 1.6 oltre all'icona;
 il README di zsp del giorno; e la decisione sulla finestra del guscio.
+
+## Il foglio che non scivola: dal dettaglio al negozio e ritorno, fermo (7 ott 2026, difetto visivo segnalato da Andrea)
+
+**IL DIFETTO.** Dopo la cura dell'indietro (51267ef, 1308686), dal
+dettaglio di un ordine del libro il tocco su «Chi ha pubblicato
+quest'ordine» faceva SCENDERE il foglio (la sua corsa di chiusura), poi
+compariva il negozio — dopo la rete; tornando indietro il foglio
+RISALIVA dal basso. Lo stesso con «📖 Come funziona» del tabacchino.
+Sembrava un guasto.
+
+**DA DOVE VENIVANO.** Il foglio chiuso sta fuori schermo,
+`translateY(100%)`, e `.sheet` ha `transition: transform .22s` (da
+768 px in su: opacità e transform del modale): la porta lo chiudeva
+togliendo `open`, quindi scivolava giù; tornando, `navApplica` →
+`riapriDettaglioP2P` rimetteva `open`, quindi risaliva — e il velo
+rifaceva il suo `fadein`. In più il negozio si accendeva solo a dati
+arrivati (`apriNegozio` → `renderNegozio` → `go`), e nel frattempo si
+vedeva il libro.
+
+**LA CURA.** `fermaCorse(n)`: le corse del CSS dell'elemento si lasciano
+nascere e si portano SUBITO alla fine (`getAnimations().finish()`, nello
+stesso giro: il primo fotogramma dipinto è già quello d'arrivo).
+`chiudiFoglioFermoP2P` chiude così il foglio nella porta del negozio e
+in quella del tabacchino; la vista d'arrivo (negozio, Info) entra ferma
+anche lei; `riapriDettaglioP2P` — che serve solo al ritorno dalla
+cronologia — ferma foglio, velo e la vista sotto. Le aperture dal libro,
+«Annulla», la ✕ e il velo non ci passano e scivolano come sempre; con
+«riduci movimento» le corse non ci sono e `fermaCorse` non fa niente.
+IL NEGOZIO SUBITO: `negozioInAttesa(chi)` svuota la pagina di quello di
+prima, scrive `negozioPag.chi` (la chiave della entry che si sta per
+spingere: cambiandola all'arrivo se ne spingerebbe un'altra), nasconde
+l'etichetta della vetrina e mette l'anello di casa (`.attesa-anello`,
+mostrato da `.negozio-attesa`); `apriNegozio` prende un sesto argomento,
+`ancora`, e all'arrivo butta la risposta (e il toast) se la persona non
+è più lì; il primo disegno vero azzera `negozioInArrivo` e rimette
+l'etichetta. Un negozio che non arriva torna al foglio con un passo
+indietro vero (`navIndietro`, con la serratura dei 350 ms riaperta: è il
+seguito del tocco), e il foglio ricompare fermo. `LISTE_RITORNO` non
+ricorda un negozio ancora in arrivo: tornandoci con l'avanti si
+ridisegna invece di riaccendere un anello che girerebbe per sempre. Il
+ramo d'attesa di `navRiflette` (la entry del foglio tenuta ferma mentre
+si vedeva il libro) non aveva più chiamanti ed è uscito.
+
+**STRADE SCARTATE.** Spegnere la transizione con
+`style.transition='none'` + reflow (il calco di `vestiFoglioMorfoP2P`):
+copre la scivolata ma non il `fadein` del velo e della vista, che sono
+ANIMAZIONI e non transizioni: servivano due ricette per la stessa cosa,
+`finish()` le copre tutt'e due. Lasciare il foglio
+aperto sotto il negozio: il negozio è una vista e il foglio a pieno
+schermo la coprirebbe (il perché scritto nella porta).
+
+**PROVATO.** Banco della pila del P2P (`prove_indietro_dal_libro`) con la
+porta vera, `negozioInAttesa`, `fermaCorse`, `chiudiFoglioFermoP2P` e
+`apriNegozio` VERO su una rete di cartone, nelle tre vie: le corse
+fermate contate per elemento (nessuna nell'apertura dal libro e
+nell'«Annulla»; foglio e negozio all'andata; velo, foglio e libro al
+ritorno; lo stesso col tabacchino), il negozio che non arriva, indietro
+col negozio in viaggio (la risposta tardiva non lo riapre né dice
+niente), un tocco altrove con la risposta che arriva, il negozio che non
+arriva subito dopo un indietro (la serratura), e `LISTE_RITORNO` vero
+in una scatola sua. Emendata la sentinella di `prove_p2p_dettaglio`
+sulla porta (chiusa ferma prima di `go('negozio')`, prima della rete).
+E la firma nuova di `apriNegozio` (il sesto argomento) ha fatto esplodere
+al primo giro della suite intera cinque sezioni che la ritagliano per
+nome — `prove_sponsor`, `prove_numeri_negozio`, `prove_storia_dal_link`,
+`prove_racconti_bozza` (le ancore, una spezzata su due righe) e
+`prove_liste_ritorno` (`negozioInArrivo` non dichiarato): ancore
+aggiornate e i banchi con quel che serve (`negozioInArrivo`, un `el`
+con `style`).
+Tortura sulla copia: 18 su 20 al primo giro (una mutazione scritta
+storta, e viva «il ritorno automatico resta nella serratura»: mancava
+il caso), 20 su 20 al secondo. Dal vivo: Chrome headless via CDP sulla
+copia in collaudo col relay morto, 375 px, «riduci movimento» SPENTO
+(il Browser pane e l'headless lo emulano acceso, e lì le corse non si
+vedono), tocchi veri con `Input.dispatchMouseEvent` dopo
+`elementFromPoint`, la rete del negozio rallentata di 900 ms in pagina
+per vedere l'anello, un campionatore per fotogramma e lo screencast:
+apertura dal libro e «Annulla» scorrono (14 posizioni del foglio fra 0
+e 667); all'andata dal primo fotogramma il negozio con l'anello, zero
+corse, i dati a ~930 ms; al ritorno (Telegram, «← Torna», browser) il
+foglio a 0 dal primo fotogramma con Satispay e 75 €; il tabacchino
+uguale. Rifatto con «riduci movimento» acceso: tutto secco come oggi,
+stessi stati d'arrivo. Nessun errore in pagina. Suite intera severa
+senza config nel worktree (base 1308686): 19.291 verdi e 0 rosse; i 38
+collaudi della CI verdi. Ribasato su 7feb1ce (arrivati «Come funziona»
+coi passi dello scambio nel dettaglio e il barattolo rifatto: nessun
+simbolo in comune), rigirati sull'albero ribasato: 19.332 verdi e 0
+rosse, 38 collaudi verdi.
+
+**DA GUARDARE.** Sul telefono vero (Telegram Android e iOS, l'APK).
+Restano due movimenti che non sono del foglio: la barra del P2P che si
+trasforma in quella del mercatino andando al negozio (`nav-p2p`, di
+sempre per ogni negozio aperto dal P2P) e lo swipe di iOS con
+l'istantanea della entry.

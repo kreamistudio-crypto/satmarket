@@ -17381,6 +17381,17 @@
   Lo stesso da «📖 Come funziona» del tabacchino (`apriInfoTabacchinoP2P`,
   verso Info P2P, nello stesso giro): Info sta sopra il foglio, e da lì
   una figlia o il libro tornano sopra il libro come sempre.
+  E IN QUESTO PASSAGGIO NIENTE SCIVOLA (7 ott 2026): andando (foglio →
+  negozio, foglio → Info) e tornando, il foglio, il velo e la vista
+  d'arrivo si accendono e si spengono con le corse del CSS portate
+  subito alla fine (`fermaCorse`: `getAnimations().finish()` nello
+  stesso giro, prima del primo fotogramma). Le aperture e chiusure
+  normali non ci passano. Il negozio si apre SUBITO con l'anello dentro
+  (`negozioInAttesa`, che scrive `negozioPag.chi` prima della spinta) e
+  si riempie all'arrivo; `apriNegozio` prende una domanda `ancora` e
+  butta la risposta se la persona se n'è andata; un negozio che non
+  arriva torna al foglio con un passo indietro vero; `LISTE_RITORNO`
+  non ricorda un negozio ancora in arrivo.
   Perché e prove: CANTIERI, «L'indietro dal negozio riapre il dettaglio».
   Telegram: `navFreccia` mostra il `BackButton` (Bot API 6.1) solo
   quando c'è dove tornare — ed è la STESSA domanda di `navIndietro`,

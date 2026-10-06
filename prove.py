@@ -32677,6 +32677,8 @@ def prove_liste_ritorno():
     js = (
         "let vetrinaPos = null, navApplicando = false, attiva = 'negozio';\n"
         "let negozioPag = {chi: 'neg1'}, negozioBozzaMod = false;\n"
+        # (7 ott 2026) il negozio ancora in arrivo non si ricorda: qui no
+        "let negozioInArrivo = '';\n"
         "let paccoDati = {origineId: 7}, classificaFiltro = 0;\n"
         "const righe = {grid: 30, negozioGrid: 45, paccoGrid: 12,"
         " classificaCorpo: 43, consigliatiLista: 4};\n"
@@ -46565,7 +46567,7 @@ def prove_sponsor():
     # delle pagine in bozza, vedi prove_racconti_bozza — e l'ancora
     # la segue: e' la stessa funzione; il quinto, `ridisegno`, e' del 24
     # set 2026 — le visite al negozio, vedi prove_numeri_negozio)
-    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da, ridisegno){")
+    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da, ridisegno, ancora){")
     prova("apriNegozio scrive l'apertura che riceve", True,
           "raccontoAperto = !!aperto;" in _an)
     # ⚠️ IL GIUDIZIO VIVE IN `raccontoDi` (ago 2026): il renderer non
@@ -46600,12 +46602,15 @@ let negozioPag = {}, negozioCorrente = null;
 const API_BASE = '/api', LIMITE_PAGINA = 12, url = [];
 const authHdr = () => 'x', toast = () => {}, mapListing = x => x;
 const inCatalogo = () => {}, renderNegozio = () => {}, armaViste = () => {};
-const cardHTML = () => '', el = () => ({insertAdjacentHTML(){}});
+/* (7 ott 2026) `style`: all'arrivo apriNegozio rimette l'etichetta della
+   vetrina, nascosta dall'anello del negozio in arrivo */
+const cardHTML = () => '', el = () => ({insertAdjacentHTML(){}, style: {}});
+let negozioInArrivo = '';
 async function bozzaDelVenditore(){ return null; }
 async function fetch(u){ url.push(u);
   return {ok: true, json: async () => ({annunci: [1], cursore: 'c2',
                                         venditore: {negozio: 'ab'}})}; }
-""" + pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da, ridisegno){")
+""" + pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da, ridisegno, ancora){")
         + "\n" + pezzo_js(mini, "async function caricaAltriNegozio(){") + """
 (async () => {
   await apriNegozio('ab12cd34', true, undefined, 'sponsor:un-tempo-per-te');
@@ -47056,7 +47061,7 @@ async function fetch(u){ chiesti.push(u);
         mini, "async function renderNumeriNegozio(){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function tabellaNumeriNegozio(d, perModeratore){",
                    "\n}\n") + "\n}\n" \
-        + pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da, ridisegno){") \
+        + pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da, ridisegno, ancora){") \
         + "\n" + pezzo_js(mini, "function ridisegnaNegozio(chi){", "\n}\n") \
         + "\n}\n" + pezzo_js(mini, "async function caricaAltriNegozio(){") \
         + """
@@ -47685,7 +47690,7 @@ def prove_racconti_bozza():
     # SUL SUO NEGOZIO la bozza la vede sempre: se il negozio aperto e'
     # il suo, prima di disegnare si chiede alla porta sua — e solo le
     # BOZZE, che una pubblicata la porta gia' il negozio a tutti
-    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da, ridisegno){")
+    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da, ridisegno, ancora){")
     prova("sul suo negozio il venditore chiede la sua bozza", True,
           "d.venditore.negozio === myNegozio" in _an
           and "anteprima = await bozzaDelVenditore(myNegozio);" in _an)
@@ -61972,9 +61977,11 @@ console.log(JSON.stringify(out));
     # IL FOGLIO SI CHIUDE PRIMA: il negozio e' una VISTA, e aperta da
     # sotto una pagina a pieno schermo ancora `open` resterebbe coperta
     an = pezzo_js(mini, "function apriNegozioDettP2P(ev, chi){", "\n}\n")
+    # (7 ott 2026) chiusa SENZA corsa, e il negozio si accende subito dopo,
+    # nello stesso giro, prima ancora che la rete risponda
     prova("la porta chiude la pagina prima di aprire il negozio", True,
-          0 < an.find("chiudiFoglioP2P('p2pDettSheet')")
-          < an.find("apriNegozio(chi)"))
+          0 < an.find("chiudiFoglioFermoP2P('p2pDettSheet')")
+          < an.find("go('negozio')") < an.find("await apriNegozio(chi,"))
     # e i giorni escono col loro glifo: una funzione senza chiamanti
     # non resta in giro (il precedente dello spaziatore)
     prova("il calendario dei giorni e' morto col suo chiamante", False,
@@ -83353,7 +83360,12 @@ def prove_indietro_dal_libro():
              "function apriDettaglioP2P(id){", "function navRiapriStrato(s){",
              "function chiudiFoglioP2P(idFoglio){", "function altroFoglioAperto(){",
              # ...e «📖 Come funziona» del tabacchino, dallo stesso foglio a Info
-             "function apriInfoTabacchinoP2P(){")
+             "function apriInfoTabacchinoP2P(){",
+             # (7 ott 2026) il negozio subito con l'anello, la porta vera del
+             # negozio con la sua domanda «ci si e' ancora?», e le corse fermate
+             "function negozioInAttesa(chi){", "function fermaCorse(n){",
+             "function chiudiFoglioFermoP2P(idFoglio){",
+             "async function apriNegozio(chi, aperto, anteprima, da, ridisegno, ancora){")
     _prog = (
         _blocco("const RADICI = new Set([", "]);") + "\n"
         + "\n".join(re.search(r"const " + n + r" = [^\n]*;", mini).group(0) for n in (
@@ -83361,6 +83373,8 @@ def prove_indietro_dal_libro():
             "navStesso", "mqApp")) + "\n"
         + _blocco("const navUguali = ", "));") + "\n"
         + "".join(_intera(f) for f in _funz)
+        # (7 ott 2026) il LISTE_RITORNO vero, come testo: lo valuta una scatola sua
+        + "const __LR_TESTO = " + _js.dumps(_blocco("const LISTE_RITORNO = {", "\n};")) + ";\n"
         + r"""
 let CUR = 'esplora', APERTI = [], CHIUSO = 0, USCITO = 0, CODA = [], LOG = [];
 /* PERDI: il popstate del prossimo indietro non arriva mai; SPOSTA: di
@@ -83401,6 +83415,23 @@ let uscitaDopoSalva = false;
    fisso con uno), i disegni e i toast contati */
 let navLasciaFoglio = null, p2pDettOrdine = '', p2pDettMetodo = '', p2pDettImporto = 0;
 let p2pLibro = null, DISEGNI = 0, TOAST = [];
+/* (7 ott 2026) il negozio vero: la rete di cartone (un giro; «lento…» ne
+   vuole quindici, «…sparito» risponde 404), e le corse fermate contate
+   per elemento */
+let negozioInArrivo = '', negozioBozzaMod = false, raccontoAperto = false, myNegozio = '';
+const VETRINA = false, API_BASE = '/api', LIMITE_PAGINA = 30, DAL_LINK = 'link';
+let FERMI = [];
+function authHdr(){ return ''; }
+function mapListing(x){ return x; } function inCatalogo(){}
+async function bozzaDelVenditore(){ return null; }
+async function fetch(url){
+  const chi = decodeURIComponent(url.split('/negozio/')[1].split('?')[0]);
+  await pausa();
+  if (chi.indexOf('lento') === 0) for (let i = 0; i < 15; i++) await pausa();
+  if (/sparito$/.test(chi)) return {ok: false};
+  return {ok: true, json: async () => ({venditore: {negozio: chi}, annunci: [], feedback: [], esauriti: []})};
+}
+function renderNegozio(v){ negozioCorrente = v; go('negozio'); }
 function rigaLibroP2P(id){ return ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id) || null; }
 function renderDettaglioP2P(){ DISEGNI++; }
 const listePos = {}, LISTE_RITORNO = {negozio: () => ''};
@@ -83424,12 +83455,15 @@ function osserva(){ queueMicrotask(() => navRiflette()); }
 const document = {
   documentElement: {classList: {add: c => CLASSI.add(c), remove: c => CLASSI.delete(c),
                                 contains: c => CLASSI.has(c)}},
-  querySelector(s){ if (s === '.view.active') return {id: 'view-' + CUR};
+  querySelector(s){ if (s === '.view.active') return el('view-' + CUR);
     if (s === '.sheet.open') return APERTI.length ? {id: APERTI[0]} : null; return null; },
   querySelectorAll(s){ return s === '.sheet.open' ? APERTI.map(id => ({id})) : []; }
 };
 function el(id){
-  return {children: [], classList: {
+  return {id, children: [], style: {}, innerHTML: '',
+    /* (7 ott 2026) le corse del CSS: chi le ferma lascia il segno */
+    getAnimations(){ return [{finish(){ FERMI.push(id); }}]; },
+    classList: {
     /* (6 ott 2026) si leggono la vista accesa e i fogli aperti, e un
        foglio si APRE davvero: il dettaglio si riapre dalla cronologia */
     contains: c => c === 'active' ? id === 'view-' + CUR : c === 'open' ? APERTI.includes(id) : false,
@@ -83440,11 +83474,6 @@ function go(v){ if (CLASSI.has('arrivo-secco')) SECCHI_VISTI++; CUR = v; osserva
 function setCat(c){ activeCat = c; }
 function ordiniP2P(){ return {x1: {}}; }
 function apriOrdineP2P(id){ p2pOrdineAperto = id; go('p2pordine'); }
-/* il negozio arriva DALLA RETE, qualche giro dopo il tocco — e quello
-   «sparito» non arriva (il toast «Negozio non trovato») */
-async function apriNegozio(chi){ await pausa(); await pausa();
-  if (chi === 'sparito') { toast('Negozio non trovato'); return; }
-  negozioPag.chi = chi; go('negozio'); }
 function chiudiPicker(){} function chiudiLightbox(){} function chiudiTour(){}
 function chiudiTourP2P(){} function chiudiModaleTest(){}
 function aggiornaPicker(){} function renderGrid(){} function alternaBarattolo(){}
@@ -83497,7 +83526,7 @@ function azzera(){
   history.voci = []; history.i = -1; navGiuInVolo = 0; navUltimo = 0; activeCat = 'Tutto';
   ASCOLTI.popstate = []; GUARDIANI = []; navGuardiano = null; CLASSI.clear();
   navLasciaFoglio = null; p2pDettOrdine = ''; p2pDettMetodo = ''; p2pDettImporto = 0;
-  DISEGNI = 0; TOAST = []; negozioPag = {chi: ''};
+  DISEGNI = 0; TOAST = []; negozioPag = {chi: ''}; negozioInArrivo = ''; FERMI = [];
   p2pLibro = {ordini: [{id: 'o1', euro: 5, euroMax: 15, metodi: ['SEPA', 'Satispay']},
                        {id: 'o2', euro: 10, metodi: ['SEPA']}]};
   navMotore();
@@ -83526,6 +83555,8 @@ function passo(p, via){
     else if (c === 'sparisce') p2pLibro.ordini = p2pLibro.ordini.filter(o => o.id !== x); }
   /* «📖 Come funziona» del tabacchino, dal foglio del dettaglio a Info P2P */
   else if (p === 'tabacchino') apriInfoTabacchinoP2P();
+  /* il tempo che passa e basta (la rete lenta che finisce): lo fa giro() */
+  else if (p === 'aspetta') {}
   /* la memoria del dettaglio persa, come dopo un ricaricamento della pagina */
   else if (p === 'dimentica') { p2pDettOrdine = ''; p2pDettImporto = 0; p2pDettMetodo = ''; }
   else if (p === '>') history.forward();
@@ -83557,11 +83588,15 @@ function passo(p, via){
 async function giro(passi, via){
   MODO = via; azzera(); await scorri();
   SECCHI = 0; SECCHI_VISTI = 0; UA = 0; ARMATI = 0;
-  const visti = [], forme = [], mosse = [], chiavi = [], stati = [], disegni = [];
+  const visti = [], forme = [], mosse = [], chiavi = [], stati = [], disegni = [], fermi = [];
   let massimo = history.voci.length, registro = true, guardia = true;
   for (const p of passi) {
     const l0 = LOG.length;
-    passo(p, via); await scorri();
+    FERMI = [];
+    passo(p, via);
+    if (p === 'aspetta') for (let i = 0; i < 30; i++) await pausa();
+    await scorri();
+    fermi.push(FERMI.join(','));
     visti.push(vista()); forme.push(forma().join(' '));
     chiavi.push(history.voci.slice(0, history.i + 1).map(v => String(v.pila[0].k)).join(' '));
     /* il dettaglio in memoria (ordine|cifra|metodo) e l'ordine che dice
@@ -83576,7 +83611,7 @@ async function giro(passi, via){
     /* il guardiano c'e' esattamente quando c'e' dove tornare, e solo nell'app */
     guardia = guardia && GUARDIANI.length === ((MODO === 'apk' && dentroOra()) ? 1 : 0);
   }
-  return {visti, forme, chiavi, stati, disegni, toast: TOAST.slice(), mosse: mosse.reduce((a, b) => a + b, 0), massimo,
+  return {visti, forme, chiavi, stati, disegni, fermi, toast: TOAST.slice(), mosse: mosse.reduce((a, b) => a + b, 0), massimo,
           fondo: history.i, chiuso: CHIUSO, uscito: USCITO, registro, guardia,
           secchi: SECCHI, secchiVisti: SECCHI_VISTI, ua: UA, armati: ARMATI,
           classe: CLASSI.has('arrivo-secco')};
@@ -83760,7 +83795,15 @@ async function aCaso(n, via){
       /* (6 ott 2026) «📖 Come funziona» del tabacchino: lo stesso ritorno */
       tabacchino: ['p2p', 'dett:o1', 'metodo:Satispay', 'importo:12', 'tabacchino', '<', '<', '<'],
       tabacchinoMiei: ['p2p', 'dett:o1', 'tabacchino', 'p2pmiei', '<', '<'],
-      tabacchinoLibro: ['p2p', 'dett:o1', 'tabacchino', 'p2p', '<']
+      tabacchinoLibro: ['p2p', 'dett:o1', 'tabacchino', 'p2p', '<'],
+      /* (7 ott 2026) indietro mentre il negozio e' ancora in viaggio: la
+         risposta arriva dopo, e il negozio NON salta addosso */
+      inViaggio: ['p2p', 'dett:o1', 'importo:12', 'chi:lento~<', 'aspetta'],
+      /* ...e altrove, con un negozio che arriva davvero */
+      altroveArriva: ['p2p', 'dett:o1', 'chi:lento~p2pinfo', 'aspetta', '<'],
+      /* ...e un negozio che non arriva subito dopo un indietro: dentro i
+         350 ms della serratura di navIndietro */
+      presto: ['p2p', 'dett:o1', 'chi:bob', '<', 'chi:sparito']
     };
     for (const via of ['tg', 'sistema', 'apk']) {
       R.dettNegozio[via] = {};
@@ -83769,6 +83812,12 @@ async function aCaso(n, via){
         catch(e) { R.dettNegozio[via][k] = 'ESPLOSO: ' + (e && e.message); }
       }
     }
+    /* (7 ott 2026) il negozio IN ARRIVO non si ricorda: LISTE_RITORNO vero */
+    R.dettNegozio.firme = new Function(
+      "const negozioPag = {chi: 'bob'}, negozioBozzaMod = false; let negozioInArrivo = 'bob';"
+      + "const el = () => ({children: {length: 0}});" + __LR_TESTO
+      + "; const prima = LISTE_RITORNO.negozio(); negozioInArrivo = '';"
+      + " return [prima, LISTE_RITORNO.negozio()];")();
     /* l'avanti del browser rifa' il negozio, e l'indietro dopo il foglio */
     R.dettNegozio.avanti = await giro(['p2p', 'dett:o1', 'importo:12', 'chi:bob', '<', '>', '<'], 'sistema');
   } catch(e) { R.dettNegozio = 'ESPLOSO: ' + (e && e.message); }
@@ -84063,14 +84112,52 @@ async function aCaso(n, via){
         prova("...e il tasto «P2P» da Info torna al libro nudo, e l'indietro alla home (%s)" % _v,
               [["p2p", _D, "p2pinfo", "p2p", "esplora"], "esplora p2p"],
               [_r["visti"], (_r["forme"] or [""] * 4)[3]])
+        # --- (7 ott 2026) IL FOGLIO CHE NON SCIVOLA -----------------------
+        # le corse del CSS si fermano SOLO nel passaggio foglio → negozio /
+        # Info e nel ritorno; l'apertura dal libro e l'indietro dal foglio
+        # (l'«Annulla») scivolano come sempre
+        _r = _g("con")
+        prova("il tocco su «Chi ha pubblicato» chiude il foglio senza corsa e il negozio "
+              "compare subito; il ritorno riapre foglio e velo senza corsa; l'apertura dal "
+              "libro e l'indietro dal foglio scivolano come sempre (%s)" % _v,
+              ["", "", "", "", "p2pDettSheet,view-negozio", "sheetBg,p2pDettSheet,view-p2p", ""],
+              _r.get("fermi"))
+        _r = _g("tabacchino")
+        prova("...e lo stesso da «📖 Come funziona» del tabacchino a Info P2P e ritorno (%s)" % _v,
+              ["", "", "", "", "p2pDettSheet,view-p2pinfo", "sheetBg,p2pDettSheet,view-p2p", "", ""],
+              _r.get("fermi"))
+        _r = _g("nonArriva")
+        prova("...il negozio che non arriva torna al foglio con un passo vero, e il foglio "
+              "ricompare fermo (%s)" % _v,
+              "p2pDettSheet,view-negozio,sheetBg,p2pDettSheet,view-p2p",
+              (_r.get("fermi") or [""] * 4)[3])
+        _r = _g("inViaggio")
+        prova("...indietro col negozio ancora in viaggio: si torna al foglio com'era, e la "
+              "risposta che arriva dopo NON riapre il negozio, ne' dice niente (%s)" % _v,
+              [["p2p", _D, _D, _D, _D], "o1|12||o1", "esplora p2p p2p+p2pDettSheet", []],
+              [_r["visti"], (_r["stati"] or [""] * 5)[4], (_r["forme"] or [""] * 5)[4],
+               _r["toast"]])
+        _r = _g("altroveArriva")
+        prova("...e un altro tocco col negozio in viaggio vince anche quando la risposta "
+              "arriva (%s)" % _v,
+              [["p2p", _D, "p2pinfo", "p2pinfo", "p2p"], "esplora p2p p2pinfo"],
+              [_r["visti"], (_r["forme"] or [""] * 4)[3]])
+        _r = _g("presto")
+        prova("...e se non arriva subito dopo un indietro, il ritorno al foglio non resta "
+              "chiuso nella serratura dei 350 ms (%s)" % _v,
+              [["p2p", _D, "negozio", _D, _D], "esplora p2p p2p+p2pDettSheet"],
+              [_r["visti"], (_r["forme"] or [""] * 5)[4]])
         _tutti = [_g(k) for k in ("senza", "con", "nonArriva", "libroDallaNav", "altroOrdine",
                                   "dimenticato", "altrove", "tabacchino", "tabacchinoMiei",
-                                  "tabacchinoLibro")]
+                                  "tabacchinoLibro", "inViaggio", "altroveArriva", "presto")]
         prova("...e in queste strade un indietro non fa muovere il codice, e il registro di "
               "sotto dice il vero (%s)" % _v, [0, True],
               [sum((r["mosse"] or 0) for r in _tutti) if all(isinstance(r["mosse"], int) for r in _tutti)
                else [r["visti"] for r in _tutti],
                all(r["registro"] is True for r in _tutti)])
+    prova("il negozio IN ARRIVO non si ricorda (LISTE_RITORNO vero): tornandoci si "
+          "ridisegna, invece di riaccendere l'anello", ["", "0|bob"],
+          _dn.get("firme") if isinstance(_dn, dict) else _dn)
     _av = _dn.get("avanti") if isinstance(_dn, dict) else _dn
     prova("...l'avanti del browser rifa' il negozio, e l'indietro dopo il foglio con la cifra",
           [["p2p", _D, _D, "negozio", _D, "negozio", _D], "o1|12||o1"],
@@ -110971,6 +111058,10 @@ def prove_storia_dal_link():
             return mini[i:mini.index(fine, i) + len(fine)]
         _js = ("""
 let VETRINA = true, DEMO = false, myNegozio = '', negozioPag = {};
+/* (7 ott 2026) all'arrivo apriNegozio azzera il negozio «in arrivo» e
+   rimette l'etichetta della vetrina: qui basta che l'etichetta ci sia */
+let negozioInArrivo = '';
+const el = () => ({style: {}});
 const API_BASE = '/api', LIMITE_PAGINA = 12;
 const authHdr = () => 'x', toast = m => { disegni.push('toast:' + m); };
 const mapListing = x => x, inCatalogo = () => {};
@@ -110993,7 +111084,7 @@ let location = {pathname: '/negozio/casa-to-the-mooon'};
             # l'avviso della bozza: il renderer lo chiama in anteprima
             + _fetta("function avvisoBozzaRacconto(r){", "\n}") + "\n"
             + pezzo_js(mini, "async function apriNegozio(chi, aperto, "
-                             "anteprima, da, ridisegno){") + "\n"
+                             "anteprima, da, ridisegno, ancora){") + "\n"
             + _fetta("const NEGOZIO_URL = ", ";") + "\n"
             + _fetta("let negozioAperto = false;", ";") + "\n"
             + _fetta("function apriNegozioDaUrl(){", "\n}") + """

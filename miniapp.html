@@ -7776,6 +7776,10 @@
     border-radius:50%;border:2px solid var(--line);
     border-top-color:var(--sats);animation:gira .8s linear infinite}
   #attesaOverlay.anello .attesa-anello{display:block}
+  /* ...e lo stesso anello DENTRO la pagina del negozio che sta arrivando
+     (7 ott 2026, `negozioInAttesa`): non un velo, la pagina stessa */
+  .negozio-attesa{display:flex;justify-content:center;padding:56px 0}
+  .negozio-attesa .attesa-anello{display:block}
   @media (prefers-reduced-motion:reduce){
     .attesa-anello{animation:none}
   }
@@ -15121,7 +15125,10 @@ let mieiRipristina = false; // il RITORNO l'ha chiesto: lo consuma il render
    anteprima dal moderatore, che al ritorno torna a mostrare quel che
    vedono tutti (il patto di `anteprima` in apriNegozio). */
 const LISTE_RITORNO = {
-  negozio: () => negozioPag.chi && !negozioBozzaMod
+  /* il negozio ancora IN ARRIVO non si ricorda (7 ott 2026): la sua
+     griglia vuota con l'anello non e' «il negozio di prima», e
+     riaccenderlo tornandoci lo lascerebbe a girare per sempre */
+  negozio: () => negozioPag.chi && !negozioBozzaMod && !negozioInArrivo
     ? `${el('negozioGrid').children.length}|${negozioPag.chi}` : '',
   pacco: () => paccoDati
     ? `${el('paccoGrid').children.length}|${paccoDati.origineId}` : '',
@@ -16211,16 +16218,19 @@ let navSostituisci = false;   // un giro solo: la scelta di una variante (set 20
 /* IL FOGLIO LASCIATO PER UN NEGOZIO (6 ott 2026, dal campo di Andrea):
    dal dettaglio di un ordine del libro, «Chi ha pubblicato quest'ordine»
    apre il negozio di chi l'ha pubblicato — e l'indietro dal negozio deve
-   riaprire QUEL foglio, non il libro nudo. Il negozio arriva dalla rete,
-   quindi fra il foglio chiuso e la vista nuova c'e' un attimo in cui si
-   vede il libro: per le regole di sempre e' «un foglio chiuso a mano», e
-   la sua entry si consumerebbe (`passoPilaP2P`, 'giu'). Questa dice a
-   `navRiflette` di lasciarla stare, e di spingere la vista d'arrivo
-   (`verso`) SOPRA di lei. Vale un giro solo: la consuma il primo DOM che
-   non e' il libro nudo sotto quel foglio — la vista d'arrivo, o
-   qualunque altra cosa. E vale anche per «📖 Come funziona» del
+   riaprire QUEL foglio, non il libro nudo. Il foglio si chiude e la vista
+   d'arrivo (`verso`) si accende nello stesso giro: per le regole di
+   sempre una vista che non e' una radice, piu' corta della entry del
+   foglio, la SOSTITUIREBBE. Questa dice a `navRiflette` di spingerla
+   SOPRA la entry del foglio. Vale un giro solo: la consuma il primo DOM
+   che arriva, qualunque sia. E vale anche per «📖 Come funziona» del
    tabacchino, che dallo stesso foglio porta a Info P2P (stesso giorno,
-   richiesta di Andrea): li' la vista arriva nello stesso giro. */
+   richiesta di Andrea).
+   ⚠️ IL NEGOZIO NON SI ASPETTA PIU' (7 ott 2026, ritocco di Andrea):
+   fino a ieri la porta chiudeva il foglio e aspettava la rete, e qui
+   c'era un ramo che teneva ferma la entry del foglio mentre si vedeva il
+   libro. Adesso il negozio si apre subito con l'anello dentro
+   (`negozioInAttesa`), e quel ramo non aveva piu' chiamanti. */
 let navLasciaFoglio = null;
 /* La profondita' del gradino del REPARTO spinto dalla home (0 = non
    c'e'): sotto quel gradino c'e' gia' `esplora|Tutto`. Serve a chi
@@ -16561,15 +16571,13 @@ function navRiflette(){
     try { history[come]({app:'brt', pila, d, sotto: sottoNuovo}, '', location.href); } catch(e){}
   };
   const sopra = extra => sotto ? sotto.concat(extra) : null;
-  /* IL FOGLIO LASCIATO PER UN NEGOZIO (vedi `navLasciaFoglio`): finche'
-     si vede il libro nudo sotto di lui la sua entry resta com'e'; arrivato
-     il negozio, gli si spinge sopra. Qualunque altra cosa consuma la
-     bandierina, e si scrive con le regole di sempre. */
+  /* IL FOGLIO LASCIATO PER UN NEGOZIO (vedi `navLasciaFoglio`): la vista
+     d'arrivo si spinge sopra la entry del foglio. Qualunque altra cosa
+     consuma la bandierina, e si scrive con le regole di sempre. */
   if (navLasciaFoglio) {
     const f = navLasciaFoglio;
     const dalFoglio = Array.isArray(st) && st.length === 2 && st[1].t === 'f'
                    && st[1].k === f.k && st[1].o === f.o;
-    if (dalFoglio && ora.length === 1 && navStesso(ora[0], st[0])) return;
     navLasciaFoglio = null;
     if (dalFoglio && ora.length === 1 && ora[0].t === 'v' && ora[0].v === f.verso) {
       scrivi('pushState', giu + 1, ora, sopra([st]));
@@ -19742,7 +19750,11 @@ const DAL_LINK = 'link';
    quel negozio (mai per chi guarda, e mai sul negozio proprio).
    Nemmeno l'anteprima di una bozza conta: e' il moderatore che
    controlla, non qualcuno che visita. */
-async function apriNegozio(chi, aperto, anteprima, da, ridisegno){
+/* `ancora` (7 ott 2026): chi ha gia' acceso la pagina col suo anello
+   (`negozioInAttesa`) chiede, ad arrivo avvenuto, se la persona e'
+   ancora li'. Se nel frattempo e' tornata indietro, il negozio NON le
+   salta addosso: si butta la risposta, e anche il toast d'errore. */
+async function apriNegozio(chi, aperto, anteprima, da, ridisegno, ancora){
   if (!chi) { toast('Questo venditore non ha ancora un negozio'); return; }
   raccontoAperto = !!aperto;
   try {
@@ -19753,6 +19765,11 @@ async function apriNegozio(chi, aperto, anteprima, da, ridisegno){
       + (ridisegno || anteprima ? '' : '&vista=1'), opz);
     if (!r.ok) throw new Error('negozio non trovato');
     const d = await r.json();
+    if (ancora && !ancora()) return;
+    /* arrivato: l'anello, se c'era, se ne va col primo disegno vero */
+    negozioInArrivo = '';
+    const tit = el('negozioVetrinaTit');
+    if (tit) tit.style.display = '';
     const annunci = (d.annunci||[]).map(mapListing);
     negozioPag = {chi, cursore: d.cursore||null, caricando:false};
     /* l'anteprima chiesta dal moderatore vale per QUESTO disegno: al
@@ -19770,7 +19787,29 @@ async function apriNegozio(chi, aperto, anteprima, da, ridisegno){
        per chi naviga */
     if (anteprima && aperto === DAL_LINK) raccontoAperto = false;
     renderNegozio(d.venditore, annunci, d.feedback||[], d.esauriti||[]);
-  } catch(e) { toast('Negozio non trovato'); }
+  } catch(e) { if (!ancora || ancora()) toast('Negozio non trovato'); }
+}
+
+/* IL NEGOZIO SUBITO, CON L'ANELLO DENTRO (7 ott 2026, ritocco di
+   Andrea): dal dettaglio di un ordine del libro il negozio si apre nello
+   stesso istante del tocco, e i suoi dati arrivano dopo. Si svuota la
+   pagina di quello di prima — mai il negozio di un altro sotto il nome
+   giusto — e al suo posto gira l'anello di casa (`.attesa-anello`, lo
+   stesso del velo). `negozioPag.chi` si scrive SUBITO: e' la chiave della
+   entry che `navRiflette` sta per spingere, e all'arrivo non deve
+   cambiare (cambiando, spingerebbe un secondo gradino). Il primo disegno
+   vero di `apriNegozio` azzera `negozioInArrivo`. */
+let negozioInArrivo = '';
+function negozioInAttesa(chi){
+  negozioInArrivo = chi;
+  negozioPag = {chi, cursore: null, caricando: false};
+  negozioBozzaMod = false;
+  el('negozioHeader').innerHTML = '<div class="negozio-attesa" role="status"'
+    + ' aria-label="Carico il negozio"><span class="attesa-anello"></span></div>';
+  ['negozioFeedback', 'negozioPromesse', 'negozioGrid', 'negozioEsauriti']
+    .forEach(id => { const n = el(id); if (n) n.innerHTML = ''; });
+  const tit = el('negozioVetrinaTit');
+  if (tit) tit.style.display = 'none';
 }
 
 /* LA PAGINA DEL NEGOZIO RIDISEGNATA, non aperta: stessa strada di
@@ -54789,6 +54828,27 @@ function chiudiFoglioP2P(idFoglio){
   if (f) f.classList.remove('open');
   if (!altroFoglioAperto()) el('sheetBg').classList.remove('open');
 }
+/* IL FOGLIO CHE NON SCIVOLA (7 ott 2026, dal campo di Andrea): dal
+   dettaglio del libro al negozio di chi ha pubblicato (o a Info P2P) il
+   foglio scendeva con la sua corsa di chiusura, e tornando indietro
+   risaliva dal basso — sembrava un guasto. In QUESTO passaggio il foglio
+   non va da nessuna parte: la pagina d'arrivo gli compare sopra, e al
+   ritorno lui e' gia' li'. Le corse sono quelle del CSS (la scivolata
+   di `.sheet`, la dissolvenza del velo e l'entrata della vista): si
+   lasciano nascere e si portano SUBITO alla fine, nello stesso giro —
+   il primo fotogramma dipinto e' gia' quello d'arrivo. Le aperture e
+   chiusure normali (dal libro, «Annulla», la ✕) non passano di qui e
+   scivolano come sempre; con «riduci movimento» le corse non ci sono e
+   questa non fa niente. */
+function fermaCorse(n){
+  let corse = [];
+  try { corse = (n && n.getAnimations) ? n.getAnimations() : []; } catch(e){}
+  corse.forEach(a => { try { a.finish(); } catch(e){} });
+}
+function chiudiFoglioFermoP2P(idFoglio){
+  chiudiFoglioP2P(idFoglio);
+  fermaCorse(el(idFoglio));
+}
 
 /* la cifra in euro di uno scambio: un INTERVALLO finche' nessuno
    l'ha preso, una cifra sola appena il coordinatore la fissa. Un
@@ -55227,19 +55287,33 @@ function repRiquadroP2P(f, id){
    negozio le si spinge sopra, e tornandoci `navApplica` lo riapre com'era
    (`riapriDettaglioP2P`). Una strada sola per tutti gli indietro: la
    freccia, il tasto di Telegram, lo swipe del browser, il gesto nell'app.
-   Se il negozio non arriva (il toast lo dice), si torna sul foglio. */
+   ⚠️ E NIENTE SI MUOVE (7 ott 2026, ritocco di Andrea): il foglio si
+   chiude senza la sua corsa (`chiudiFoglioFermoP2P`) e il negozio si
+   apre nello STESSO giro, con l'anello dentro finche' i dati non
+   arrivano (`negozioInAttesa`). Se il negozio non arriva (il toast lo
+   dice) si torna sul foglio con un passo indietro vero — la sua entry e'
+   li' sotto, e `navApplica` lo riapre fermo. Se nel frattempo si e'
+   tornati indietro o si e' andati altrove, la risposta si butta. */
 async function apriNegozioDettP2P(ev, chi){
   if (ev && ev.stopPropagation) ev.stopPropagation();
   haptic();
-  const lasciato = {k: 'p2pDettSheet', o: p2pDettOrdine, verso: 'negozio'};
-  if (STORIA) navLasciaFoglio = lasciato;
-  chiudiFoglioP2P('p2pDettSheet');
-  await apriNegozio(chi);
-  if (el('view-negozio')?.classList.contains('active')) return;
-  /* nel frattempo e' successo altro (un tocco altrove): li' non si torna */
-  if (STORIA && navLasciaFoglio !== lasciato) return;
-  navLasciaFoglio = null;
-  riapriDettaglioP2P(lasciato.o);
+  const o = p2pDettOrdine;
+  if (STORIA) navLasciaFoglio = {k: 'p2pDettSheet', o, verso: 'negozio'};
+  chiudiFoglioFermoP2P('p2pDettSheet');
+  negozioInAttesa(chi);
+  go('negozio');
+  fermaCorse(el('view-negozio'));
+  const qui = () => negozioInArrivo === chi
+                 && !!el('view-negozio')?.classList.contains('active');
+  await apriNegozio(chi, undefined, undefined, undefined, undefined, qui);
+  /* arrivato (l'anello e' gia' andato via) o lasciato: finito qui */
+  if (!qui()) return;
+  negozioInArrivo = '';
+  /* la serratura dei 350 ms si riapre: e' il seguito del tocco, non un
+     secondo canale (lo stesso patto di «Salva per dopo») */
+  navUltimo = 0;
+  if (STORIA) navIndietro();
+  else { go('p2p'); riapriDettaglioP2P(o); }
 }
 
 /* ---- LA MONETA DELL'ORDINE ----
@@ -55795,8 +55869,10 @@ function apriInfoTabacchinoP2P(){
      resta sotto, e `navApplica` lo riapre com'era (`navLasciaFoglio`).
      Qui la vista arriva nello stesso giro, quindi niente attesa. */
   if (STORIA) navLasciaFoglio = {k: 'p2pDettSheet', o: p2pDettOrdine, verso: 'p2pinfo'};
-  chiudiFoglioP2P('p2pDettSheet');
+  /* ...e senza corse, come la porta del negozio (7 ott 2026) */
+  chiudiFoglioFermoP2P('p2pDettSheet');
   go('p2pinfo');
+  fermaCorse(el('view-p2pinfo'));
   setTimeout(() => {
     try { el('p2pinfo-tabacchino').scrollIntoView({block: 'start', behavior: 'auto'}); } catch(e) {}
   }, 80);
@@ -55828,16 +55904,24 @@ function apriDettaglioP2P(id){
    libro di adesso —; se nel frattempo se n'e' aperto un altro, si riparte
    da capo come a un tocco sulla card. Un ordine sparito dal libro non si
    riapre: si resta sul libro, e lo si dice — ma solo a libro arrivato,
-   che prima «non c'e' piu'» sarebbe una bugia. */
+   che prima «non c'e' piu'» sarebbe una bugia.
+   ⚠️ SENZA RISALIRE DAL BASSO (7 ott 2026, ritocco di Andrea): e' un
+   ritorno, non un'apertura — il foglio, il velo e la pagina sotto sono
+   gia' dove stavano (`fermaCorse`). */
 function riapriDettaglioP2P(id){
   if (!id || !rigaLibroP2P(id)) {
     if (id && p2pLibro) toast('Quest\'ordine non c\'è più: aggiorna il libro');
     return false;
   }
-  if (p2pDettOrdine !== id) { apriDettaglioP2P(id); return true; }
-  renderDettaglioP2P();
-  el('sheetBg').classList.add('open');
-  el('p2pDettSheet').classList.add('open');
+  if (p2pDettOrdine !== id) apriDettaglioP2P(id);
+  else {
+    renderDettaglioP2P();
+    el('sheetBg').classList.add('open');
+    el('p2pDettSheet').classList.add('open');
+  }
+  fermaCorse(el('sheetBg'));
+  fermaCorse(el('p2pDettSheet'));
+  fermaCorse(document.querySelector('.view.active'));
   return true;
 }
 function renderDettaglioP2P(){
