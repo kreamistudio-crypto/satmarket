@@ -99820,6 +99820,105 @@ def prove_punti_pubblici():
     prova("...e non lo da' a chi ha tutto il resto ma non ospita nulla",
           False, bool(_crit["punto_ritiro"](_tutto)))
 
+def prove_vantaggi_livelli():
+    """I VANTAGGI DI OGNI LIVELLO (ott 2026, parola di Andrea). La scala
+    la scrive il server dalle leve VIVE (`scala_livelli`) e il client la
+    mette in righe: qui girano tutt'e due, con le leve accese e spente —
+    un vantaggio a leva spenta non deve comparire, o diventa una promessa
+    su una porta chiusa."""
+    import json as _js, shutil as _sh, subprocess as _sp
+    print("\n[i vantaggi di ogni livello]")
+    amb = {"LIVELLI": _livelli_dal_sorgente()}
+    i = _SORGENTE.index("COORTI = [")
+    exec(_SORGENTE[i:_SORGENTE.index("]\n", i) + 1], amb)
+    i = _SORGENTE.index("TITOLI = (")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\nNOMI_TITOLI", i)], amb)
+    exec(pezzo("_gradino_livello"), amb)
+    exec(pezzo("scala_livelli"), amb)
+
+    def leve(**k):
+        amb.update(dict(BANNER_NEGOZIO_ATTIVO=True, BANNER_PREZZO_SATS=20000,
+                        BANNER_SCONTI_LIVELLO={"nuovo": 0, "avviato": 10,
+                                               "pratico": 20, "esperto": 35,
+                                               "maestro": 50},
+                        SLUG_NEGOZIO_LIVELLO="avviato",
+                        SLUG_NEGOZIO_PREZZO_SATS=5000, P2P_ATTIVO=True,
+                        P2P_SCONTO_FEDELTA_PERCENTO=0.5,
+                        P2P_SCONTO_LIVELLO=5))
+        amb.update(k)
+        return amb["scala_livelli"]()
+
+    sc = leve()
+    prova("un gradino per livello, coi numeri della scala vera",
+          [(g[0], g[1], g[3]) for g in amb["LIVELLI"]],
+          [(x["xp"], x["affari"], x["nome"]) for x in sc])
+    prova("tutte le leve accese: banner, link, titolo e P2P al loro gradino",
+          [(0, False, "", 0), (10, True, "", 0),
+           (20, True, "🧺 Mercante pratico", 0),
+           (35, True, "🏆 Mercante esperto", 0),
+           (50, True, "👑 Maestro del banco", 0.5)],
+          [(x["banner_sconto"], x["link_negozio"], x["titolo"],
+            x["p2p_sconto"]) for x in sc])
+    prova("banner spento: lo sconto del banner non si promette", [0] * 5,
+          [x["banner_sconto"] for x in leve(BANNER_NEGOZIO_ATTIVO=False)])
+    prova("...ne' a prezzo zero (il freno d'emergenza)", [0] * 5,
+          [x["banner_sconto"] for x in leve(BANNER_PREZZO_SATS=0)])
+    prova("link a scelta spento: nessuno", [False] * 5,
+          [x["link_negozio"] for x in leve(SLUG_NEGOZIO_PREZZO_SATS=0)])
+    prova("P2P spento, o sconto a zero: nessuno", ([0] * 5, [0] * 5),
+          ([x["p2p_sconto"] for x in leve(P2P_ATTIVO=False)],
+           [x["p2p_sconto"] for x in leve(P2P_SCONTO_FEDELTA_PERCENTO=0)]))
+    prova("uno sconto del banner scritto storto non passa il 99", 99,
+          leve(BANNER_SCONTI_LIVELLO={"maestro": 150})[4]["banner_sconto"])
+    me = pezzo("mio_profilo")
+    prova("/api/me porta la scala", True,
+          'profilo["livelli_scala"] = scala_livelli()' in me)
+
+    mini = open("miniapp.html", encoding="utf-8").read()
+    rl = pezzo_js(mini, "function renderLivello(){", "\n}\n")
+    prova("il cassetto del livello disegna la scala", True,
+          "scalaLivelliHTML(myScalaLivelli, numLiv)" in rl)
+    node = _sh.which("node")
+    if not node:
+        salta("la scala dei vantaggi gira", "node non installato")
+        return
+    banco = "\n".join([
+        pezzo_js(mini, "const esc = s =>", "));") + "));",
+        pezzo_js(mini, "function articoloPercentoP2P(", "\n}\n") + "\n}",
+        pezzo_js(mini, "function scontoFedeltaTestoP2P(", "\n}\n") + "\n}",
+        pezzo_js(mini, "function vantaggiLivello(g){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function scalaLivelliHTML(scala, mio){", "\n}\n")
+        + "\n}"]) + """
+const fmt = n => Number(n).toLocaleString('it-IT');
+const sc = %s;
+console.log(JSON.stringify({
+  righe: sc.map(vantaggiLivello),
+  html: scalaLivelliHTML(sc, 3),
+  vuota: scalaLivelliHTML([], 1) + scalaLivelliHTML(undefined, 1)}));
+""" % _js.dumps(sc)
+    import tempfile as _tfm
+    cart = _tfm.mkdtemp(prefix="scala_")
+    pf = os.path.join(cart, "scala.js")
+    open(pf, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, pf], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco della scala gira", "", (r.stderr or "")[-600:])
+    if r.returncode:
+        return
+    o = _js.loads(r.stdout)
+    prova("le righe dicono i vantaggi di ogni gradino",
+          [[], ["−10% sul banner del negozio", "il link del negozio a scelta"],
+           ["−20% sul banner del negozio", "il link del negozio a scelta",
+            "il titolo «🧺 Mercante pratico»"]],
+          o["righe"][:3])
+    prova("...il quinto anche lo sconto P2P, detto come sconto", True,
+          "sconto dello 0,5% sulle commissioni P2P" in " · ".join(o["righe"][4]))
+    prova("il primo gradino si dice punto di partenza, e il mio si "
+          "riconosce", (True, 1),
+          ("da subito: il punto di partenza" in o["html"],
+           o["html"].count("sei qui")))
+    prova("una scala che non c'e' non disegna niente", "", o["vuota"])
+
+
 def prove_livello_accanto_al_titolo():
     """IL NUMERO DEL LIVELLO ACCANTO AL TITOLO (25 set 2026, ritocco di
     Andrea), e LO SCONTO P2P DETTO COME SCONTO.
@@ -121040,6 +121139,7 @@ def main():
               prove_lista_ordini, prove_dettaglio_ordine, prove_card_ordini, prove_righe_ordine,
               prove_ssrf_redirect, prove_niente_ai_nella_ricerca,
               prove_tracking_corretto, prove_tracking_venditore,
+              prove_vantaggi_livelli,
               prove_barattolo,
               prove_savers_proprietario, prove_visualizzazioni,
               prove_barattolo_in_striscia,

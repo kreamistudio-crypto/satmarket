@@ -4195,6 +4195,42 @@ def _gradino_livello(id_livello: str) -> int:
     return len(LIVELLI) + 1
 
 
+def scala_livelli() -> list:
+    """I VANTAGGI DI OGNI LIVELLO (ott 2026, parola di Andrea: «una riga
+    che mi dica tutti i benefit ad ogni livello»). Un gradino per riga,
+    con le sue due soglie e quel che apre OGGI — letto dalle leve VIVE,
+    cosi' una porta spenta (banner, link a scelta, P2P) non diventa una
+    promessa: il vantaggio esce solo se la leva lo da' davvero.
+    ESCONO I NUMERI E MAI LA PROSA, il patto di `xp_ruoli`: la riga la
+    scrive il client. I cinque vantaggi sono quelli che il codice fa
+    girare sul livello — lo sconto del banner (`_sconto_banner_livello`,
+    mai oltre il 99), il link del negozio a scelta
+    (`SLUG_NEGOZIO_LIVELLO`), il titolo del gradino (`TITOLI`), lo
+    sconto sulle commissioni P2P (`P2P_SCONTO_LIVELLO`) — e chi ne
+    aggiunge un sesto lo aggiunge QUI, o la scala dice meno del vero."""
+    banner = bool(BANNER_NEGOZIO_ATTIVO) and int(BANNER_PREZZO_SATS or 0) > 0
+    slug_da = (_gradino_livello(SLUG_NEGOZIO_LIVELLO)
+               if int(SLUG_NEGOZIO_PREZZO_SATS or 0) > 0 else 0)
+    p2p = float(P2P_SCONTO_FEDELTA_PERCENTO or 0) if P2P_ATTIVO else 0.0
+    titoli = {t["serve"][1]: t["nome"] for t in TITOLI
+              if t["serve"][0] == "livello"}
+    scala = []
+    for n, (xp, affari, lid, nome) in enumerate(LIVELLI, 1):
+        try:
+            sconto = max(0, min(99, int(BANNER_SCONTI_LIVELLO.get(lid, 0))))
+        except Exception:
+            sconto = 0
+        scala.append({
+            "numero": n, "id": lid, "nome": nome, "xp": xp,
+            "affari": affari,
+            "banner_sconto": sconto if banner else 0,
+            "link_negozio": bool(slug_da) and n >= slug_da,
+            "titolo": titoli.get(lid, ""),
+            "p2p_sconto": p2p if (p2p > 0 and n >= P2P_SCONTO_LIVELLO)
+                          else 0})
+    return scala
+
+
 def banner_porta_aperta(sbloccato_il: int) -> bool:
     """Chi puo' CHIEDERE un banner: chi ha PAGATO, punto (set 2026).
 
@@ -38341,6 +38377,8 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["livello"] = livello_utente(
         u["xp"] if u else 0,
         ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)) if u else 0)
+    # ...e la scala intera coi vantaggi di ogni gradino (ott 2026)
+    profilo["livelli_scala"] = scala_livelli()
     # ...e da che lato vengono quegli XP, che e' la meta' che il numero
     # da solo non dice. None quando i conti non tornano (vedi
     # `xp_per_ruolo`): chiave vuota = il cassetto dice la frase di

@@ -31446,6 +31446,7 @@ let myXp = 0, myAffari = 0;      // punti e affari conclusi (vendite+acquisti)
 let myXpRuoli = null;            // {vendite, acquisti}, o null se i conti non tornano
 let myInviti = null;             // il cassetto «I tuoi inviti» dal server (null = niente)
 let myLivello = null;            // il grado DERIVATO dal server
+let myScalaLivelli = [];         // i gradini coi loro vantaggi (ott 2026)
 let myClassifica = false;        // la leva della classifica, dal server
 let myClassificaNascosta = false; // «Non mostrarmi in classifica», dal server
 let myTitoli = [], myTitolo = '';  // catalogo dei titoli + quello indossato
@@ -31701,6 +31702,7 @@ function renderLivello(){
     <div class="barra-xp"><i style="width:${q}%"></i></div>
     <div class="hint">${manca}</div>
     ${vantaggio ? `<div class="hint" style="margin-top:6px">${vantaggio}</div>` : ''}
+    ${scalaLivelliHTML(myScalaLivelli, numLiv)}
     <div style="margin-top:16px"><b>Il tuo titolo</b></div>
     <div class="hint">Compare sotto il tuo nome, dove ti vedono gli altri.</div>
     <div class="titoli">
@@ -31713,6 +31715,39 @@ function renderLivello(){
       ).join('')}
     </div>
     ${rigaClassificaNascosta()}`;
+}
+
+/* I VANTAGGI DI OGNI LIVELLO (ott 2026, parola di Andrea): una riga
+   per gradino, con le due soglie e quel che apre. I NUMERI SONO DEL
+   SERVER (`scala_livelli`, dalle leve vive): qui si scrivono soltanto,
+   e un vantaggio a leva spenta non arriva — quindi non si promette.
+   Il gradino di chi legge si riconosce, quelli gia' passati restano
+   in elenco: si sa cosa si ha, non solo cosa manca. Un server di ieri
+   non manda la scala, e il blocco non c'e'. */
+function vantaggiLivello(g){
+  const v = [];
+  if (g.banner_sconto > 0) v.push(`−${fmt(g.banner_sconto)}% sul banner del negozio`);
+  if (g.link_negozio) v.push('il link del negozio a scelta');
+  if (g.titolo) v.push(`il titolo «${esc(g.titolo)}»`);
+  const p2p = scontoFedeltaTestoP2P(g.p2p_sconto);
+  if (p2p) v.push(`${p2p} sulle commissioni P2P`);
+  return v;
+}
+function scalaLivelliHTML(scala, mio){
+  if (!Array.isArray(scala) || !scala.length) return '';
+  const righe = scala.map(g => {
+    const n = Math.floor(Number(g.numero)) || 0;
+    const soglia = n <= 1 ? 'da subito'
+      : `da ${fmt(g.xp)} XP e ${fmt(g.affari)} ${g.affari === 1 ? 'affare' : 'affari'}`;
+    const v = vantaggiLivello(g);
+    const qui = n === mio;
+    return `<div style="padding:6px 0;border-top:1px solid var(--line);${qui ? 'font-weight:800' : ''}">`
+      + `<b>Lv.&nbsp;${n} · ${esc(g.nome)}</b>${qui ? ' · <span style="color:var(--sats)">sei qui</span>' : ''}`
+      + `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">${soglia}: `
+      + (v.length ? v.join(' · ') : 'il punto di partenza') + `</div></div>`;
+  }).join('');
+  return `<div style="margin-top:16px"><b>I vantaggi di ogni livello</b></div>`
+    + `<div style="margin-top:6px">${righe}</div>`;
 }
 
 /* «🏆 Non mostrarmi in classifica» (set 2026, ritocchi piccoli,
@@ -66538,6 +66573,7 @@ async function avvia(){
     myNRecensori = me.n_recensori || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
     myXp = me.xp || 0; myLivello = me.livello || null;
+    myScalaLivelli = Array.isArray(me.livelli_scala) ? me.livelli_scala : [];
     myXpRuoli = me.xp_ruoli || null;
     /* il cassetto degli inviti: un server di ieri non manda la chiave,
        e il cassetto resta spento invece di mostrare un codice vuoto */

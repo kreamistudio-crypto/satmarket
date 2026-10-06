@@ -10021,6 +10021,17 @@
   banco estrae `esc` VERO dal client invece di darsene uno di cartone:
   quello proverebbe sé stesso, e la mutazione che lascia il nome del
   gradino nudo passerebbe liscia (l'ha chiesta la tortura).
+  I VANTAGGI DI OGNI LIVELLO (ott 2026, parola di Andrea): `/api/me`
+  porta `livelli_scala` (`scala_livelli`): un gradino per livello con
+  soglie XP/affari e i vantaggi che apre OGGI, letti dalle leve vive —
+  sconto del banner (solo a `BANNER_NEGOZIO_ATTIVO` e prezzo > 0, mai
+  oltre il 99), link del negozio a scelta (da `SLUG_NEGOZIO_LIVELLO`,
+  se ha un prezzo), il titolo del gradino (`TITOLI` con `serve`
+  livello), lo sconto P2P (da `P2P_SCONTO_LIVELLO`, solo a P2P acceso).
+  Escono numeri, la prosa la scrive il client (`vantaggiLivello`,
+  `scalaLivelliHTML`, nel cassetto «Livello e titolo»). Un vantaggio
+  nuovo legato al livello si aggiunge LÌ, o la scala dice meno del
+  vero.
   I CODICI INVITO (set 2026; il perché in Cantieri, «I codici invito
   con gli XP»). Ognuno ha UN codice — sei caratteri da
   `INVITO_ALFABETO`, niente 0/O/1/I/L e niente vocali — nato la prima

@@ -35807,3 +35807,31 @@ il campo compilato e aperto; con `?invito=ciao!!` niente. La vetrina
 vera (anonima) non gira in collaudo: il foglio l'ho aperto chiamando
 `apriInvitoDaUrl`. Non provato: l'applicazione da sola dopo il widget
 di Telegram (serve il widget vero).
+
+## I vantaggi di ogni livello, in una riga per gradino (6 ott 2026)
+
+Il compito (Andrea): «la pagina dei livelli mi deve dare una linea con
+cui mi dica tutti i benefit ad ogni livello».
+
+**Cosa.** Nel cassetto «🎖 Livello e titolo», sotto la barra, «I
+vantaggi di ogni livello»: cinque righe, «Lv. 3 · Mercante pratico — da
+200 XP e 5 affari: −20% sul banner del negozio · il link del negozio a
+scelta · il titolo «🧺 Mercante pratico»», col proprio gradino segnato
+«sei qui». I numeri li manda il server (`scala_livelli`, in `/api/me`),
+letti dalle leve VIVE: con il banner spento lo sconto del banner non
+compare, col P2P spento nemmeno lo sconto P2P — una riga su una porta
+chiusa sarebbe una promessa falsa (la regola di `rigaVantaggioLivello`).
+
+**I vantaggi censiti** sono quelli che il codice fa davvero girare sul
+livello: sconto del banner (`BANNER_SCONTI_LIVELLO`), link del negozio
+a scelta (`SLUG_NEGOZIO_LIVELLO`), i titoli di livello (`TITOLI`), lo
+sconto sulle commissioni P2P (`P2P_SCONTO_LIVELLO`). Lo sconto della
+fee dinamica per il livello più alto (`FEE_DINAMICA_SCONTO_LIVELLO_MAX`)
+NON c'è: la fee dinamica è un'anteprima, non si paga.
+
+**Provato.** `prove_vantaggi_livelli`: il giudice vero con le leve
+accese e spente una per una, il tetto del 99, e il client nel banco
+node. Chromium a 320px: le cinque righe si leggono, «sei qui» al
+gradino giusto (in collaudo il P2P è spento, e la riga P2P giustamente
+non c'è). Misurato anche il bottone «📱 Entra con nostrconnect» a
+320px: 50px, una riga.
