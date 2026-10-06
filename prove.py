@@ -77156,6 +77156,8 @@ function intestaOrdiniP2P(){ return Promise.resolve(false); }
 let relayChiesto = 0;
 async function mostroConnetti(){ relayChiesto++; throw new Error('banco: niente relay'); }
 function pulisciScambiP2P(){ return 0; }
+// (7 ott 2026) i tolti con la ✕ altrove: la stessa pulizia, provata in prove_tolti_ovunque
+function applicaToltiP2P(){ return 0; }
 let ordiniFinti = {};
 function ordiniP2P(){ return ordiniFinti; }
 const P2P_FINALI = ['concluso', 'annullato', 'rifiutato'];
@@ -79141,10 +79143,14 @@ def prove_pallino_scambi():
     # (ogni annullato sta sotto «Annullati»), e l'archivio non lo scrive.
     prova("l'archivio degli scambi si scrive in quattro posti", 4,
           mini.count("localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE)"))
+    # EMENDATA (7 ott 2026, «la ✕ su ogni dispositivo»): la scrittura
+    # della ✕ e' passata in `cancellaRigaP2P`, che la ✕ chiama dopo la
+    # sua lapide e che serve anche ai tolti degli altri dispositivi —
+    # sempre quattro posti, e il gancio si guarda li'
     for firma in ("function rinominaOrdineP2P(o, nuovoId){",
                   "function scriviOrdineP2P(o){",
                   "function pulisciScambiP2P(){",
-                  "function togliScambioP2P(id, ev){"):
+                  "function cancellaRigaP2P(id){"):
         corpo = nudo(pezzo_js(mini, firma, "\n}\n"))
         nome = firma[len("function "):firma.index("(")]
         prova(f"...{nome} ricalcola il pallino subito dopo aver scritto", True,
@@ -84230,7 +84236,9 @@ def _banco_eventi_p2p(eventi_attivi=True):
                           ("p2p_ordini", "ON p2p_ordini(tg_id);"),
                           ("p2p_momenti", "\n    );"), ("p2p_scambi", "\n    );"),
                           ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
-                          ("p2p_attese", "ON p2p_attese(scade);")):
+                          ("p2p_attese", "ON p2p_attese(scade);"),
+                          # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
+                          ("p2p_tolti", "\n    );")):
         i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
         schema += src[i:src.index(fine, i) + len(fine)] + "\n"
     schema += ("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, "
@@ -86078,6 +86086,437 @@ console.log(JSON.stringify(out));
           [5, 0, 0, 0, 0, 0], o.get("cercatore"))
 
 
+def prove_tolti_ovunque():
+    """LA ✕ SU OGNI DISPOSITIVO (7 ott 2026, richiesta di Andrea: in «I
+    miei scambi» la ✕ toglieva lo scambio dal solo dispositivo dove la
+    si premeva — sugli altri dello stesso account restava, e l'archivio
+    del server gliela rifaceva nascere).
+
+    Adesso la ✕ chiede al server (`/api/p2p/scambi/togli`, giudice
+    `_togli_scambio_p2p`) di ricordarlo per l'ACCOUNT in `p2p_tolti` —
+    l'id e l'ora, nient'altro — e l'archivio ne manda l'elenco
+    (`tolti`): ogni dispositivo toglie le sue righe alla prossima
+    lettura (`applicaToltiP2P`) e non le fa piu' nascere
+    (`toltoAltroveP2P` nell'adozione). Solo uno scambio FINITO, e lo
+    dicono in due: il telefono e il server.
+    Qui le sentinelle, i giudici del server che girano davvero su un
+    database con lo schema vero, e quelli del client in node, caso per
+    caso; il giro col server vero e due dispositivi sta in
+    `collaudo_tolti_ovunque.py`."""
+    print("\n[la ✕ su ogni dispositivo]")
+    import json as _json
+    import shutil as _sh
+    import sqlite3
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+
+    # --- 1) IL SERVER: lo schema, la rotta, l'archivio -----------------
+    i_t = src.find("CREATE TABLE IF NOT EXISTS p2p_tolti(")
+    prova("la tabella dei tolti c'e'", True, i_t >= 0)
+    corpo_t = src[i_t:src.find("\n    );", i_t)] if i_t >= 0 else ""
+    colonne = [r.strip().split()[0] for r in corpo_t.split("\n")[1:]
+               if r.strip() and not r.strip().startswith("--")
+               and not r.strip().startswith("PRIMARY KEY")]
+    prova("...e ricorda SOLO l'account, l'id dell'ordine e l'ora del gesto",
+          ["tg_id", "ordine", "quando"], colonne)
+    prova("...una riga per account e ordine", True,
+          "PRIMARY KEY(tg_id, ordine)" in corpo_t)
+    prova("la rotta della ✕ c'e'", True,
+          '@app.post("/api/p2p/scambi/togli")' in src)
+    rot = codice(_senza_prosa(pezzo("togli_scambio_p2p")))
+    prova("...chiede la sessione e passa chi chiede al giudice", True,
+          "verifica_utente(x_tg_init_data, barattolo_sessione)" in rot
+          and '_togli_scambio_p2p(con, user["id"], ordine, int(time.time()))' in rot)
+    prova("...nel corpo SOLO l'id, e nella forma di un ordine", [1, True],
+          [rot.count(".get("), "FORMA_ORDINE_P2P.fullmatch(ordine)" in rot])
+    prova("...404 se non c'e' niente da ricordare, 409 sullo scambio in corso",
+          [True, True], ["HTTPException(404" in rot, "HTTPException(409" in rot])
+    prova("...nessun gate sulla leva", [False, False],
+          ["_p2p_per(" in rot, "_p2p_leve(" in rot])
+    prova("...e la guardia CSRF non la esenta", False,
+          "/scambi/togli" in pezzo("guardia_csrf"))
+    arch = codice(_senza_prosa(pezzo("scambi_p2p")))
+    prova("l'archivio manda l'elenco dei tolti, finche' la ✕ vale", True,
+          '_tolti_p2p(con, user["id"], int(time.time()))' in arch
+          and "_tolto_vale_p2p(esiti.get(o), q)" in arch
+          and '{"scambi": esiti, "tolti": tolti}' in arch)
+    prova("...e lo scambio tolto RESTA fra gli scambi: chi e' rimasto indietro lo porta alla fine",
+          False, "p2p_tolti" in pezzo("_scambi_p2p"))
+    prova("la pulizia li porta via con la cronaca", True,
+          '("p2p_tolti", "quando")' in pezzo("_pulisci_memoria_p2p"))
+    prova("«Dimentica il profilo» li porta via subito", True,
+          "DELETE FROM p2p_tolti WHERE tg_id=?" in codice(pezzo("dimentica_chiavi_p2p")))
+    fus = codice(pezzo("esegui_fusione"))
+    prova("...e la fusione dei conti se li porta dietro", [True, True],
+          ["UPDATE OR IGNORE p2p_tolti SET tg_id=? WHERE tg_id=?" in fus,
+           "DELETE FROM p2p_tolti WHERE tg_id=?" in fus])
+
+    # --- 2) I GIUDICI DEL SERVER, SUL DATABASE COLLO SCHEMA VERO --------
+    con, amb = _banco_eventi_p2p()
+    amb["sqlite3"] = sqlite3
+    amb["MAX_ORDINI_P2P"] = 200
+    for c in ("P2P_STORICO_GIORNI = ", "_PESO_MOMENTO_P2P = "):
+        i = src.index("\n" + c) + 1
+        exec(src[i:src.index("\n\n", i)], amb)
+    for riga in ("P2P_STATI_TOGLIBILI = ", "P2P_ORDINI_MAI_VISTI_S = "):
+        i = src.index("\n" + riga) + 1
+        exec(src[i:src.index("\n", i)].split("  #")[0], amb)
+    for f in ("_euro_numero_p2p", "_euri_numero_p2p", "_metodi_lista_p2p",
+              "_stato_scambio_p2p", "_tocca_a_me_p2p", "_tabella_p2p",
+              "_presenze_per_parte_p2p", "_scambi_p2p",
+              "_tolti_p2p", "_tolto_vale_p2p", "_togli_scambio_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    togli, tolti, vale = amb["_togli_scambio_p2p"], amb["_tolti_p2p"], amb["_tolto_vale_p2p"]
+    ORA = 1_800_000_000
+    CONC, ANN, APERTO = "a1-conc-0001", "b2-ann-00002", "c3-aperto-03"
+    VECCHIO, MUTO, AVANTI = "d4-vecchio-4", "e5-muto-0005", "f6-avanti-06"
+    KA, KB = "a1" * 32, "b2" * 32
+    con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,111,0),(?,222,0)", (KA, KB))
+
+    def scambio(o, pubblica, lato, stato, momenti, compra=111, vende=222):
+        con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, euro) "
+                    "VALUES(?,?,?,?,?,1,'20,00 €')", (o, pubblica, ORA - 90000, stato, lato))
+        con.execute("INSERT INTO p2p_scambi(ordine, compratore, venditore, preso_dal, giro, "
+                    "chiave_compratore, chiave_venditore, aggiornato) VALUES(?,?,?,'buyer',1,?,?,?)",
+                    (o, compra, vende, KA, KB, ORA - 80000))
+        for m, q in momenti:
+            con.execute("INSERT INTO p2p_momenti(ordine, momento, quando, fonte, giro, attore, "
+                        "arrivato) VALUES(?,?,?,'mostro',1,'buyer',?)", (o, m, q, q))
+
+    # 111 compra da 222 ed e' finito ieri; un suo «compra» annullato; uno
+    # attivo; uno finito due mesi fa; uno di cui il server non sa lo stato;
+    # uno finito con l'orologio del coordinatore un filo avanti
+    scambio(CONC, 222, "sell", "success", [("preso", ORA - 86400), ("concluso", ORA - 80000)])
+    scambio(ANN, 111, "buy", "canceled", [("preso", ORA - 7200), ("annullato", ORA - 7000)])
+    scambio(APERTO, 222, "sell", "in-progress", [("preso", ORA - 600), ("garanzia_pagata", ORA - 500)])
+    scambio(VECCHIO, 222, "sell", "success", [("preso", ORA - 61 * 86400), ("concluso", ORA - 60 * 86400)])
+    scambio(MUTO, 222, "sell", "in-progress", [])
+    scambio(AVANTI, 222, "sell", "success", [("preso", ORA - 100), ("concluso", ORA + 30)])
+    con.commit()
+    righe = lambda: sorted(tuple(r) for r in con.execute(
+        "SELECT tg_id, ordine, quando FROM p2p_tolti"))
+    prova("il concluso e l'annullato si tolgono, e lo stato e' quello del server",
+          [{"esito": "tolto", "stato": "concluso"}, {"esito": "tolto", "stato": "annullato"}],
+          [togli(con, 111, CONC, ORA), togli(con, 111, ANN, ORA)])
+    prova("...ricordati con l'id e l'ora del gesto", sorted([(111, ANN, ORA), (111, CONC, ORA)]), righe())
+    prova("lo scambio in corso NON si toglie, e non si scrive niente",
+          [{"esito": "aperto", "stato": "attivo"}, 2],
+          [togli(con, 111, APERTO, ORA), len(righe())])
+    prova("ignoto: oltre lo storico, stato che il server non sa dire, inesistente",
+          ["ignoto", "ignoto", "ignoto"],
+          [togli(con, 111, o, ORA)["esito"] for o in (VECCHIO, MUTO, "zz-non-esiste")])
+    prova("...e lo scambio di un altro: lo stesso no, e niente scritto", ["ignoto", 2],
+          [togli(con, 333, CONC, ORA)["esito"], len(righe())])
+    prova("l'orologio del coordinatore avanti: si ricorda l'ora dell'ultimo passo, e la ✕ vale",
+          [ORA + 30, True],
+          [(togli(con, 111, AVANTI, ORA) and dict((r[1], r[2]) for r in righe()).get(AVANTI)),
+           vale(amb["_scambi_p2p"](con, 111, ORA).get(AVANTI), ORA + 30)])
+    togli(con, 111, CONC, ORA + 100)
+    prova("una seconda ✕ (da un altro dispositivo) rinfresca l'ora, e la riga resta una",
+          [(111, CONC, ORA + 100)], [r for r in righe() if r[1] == CONC])
+    prova("i tolti sono dell'account: l'altra parte dello stesso scambio non ne ha",
+          [sorted([ANN, AVANTI, CONC]), {}], [sorted(tolti(con, 111, ORA)), tolti(con, 222, ORA)])
+    prova("...e oltre la memoria della cronaca non si leggono piu'", {},
+          tolti(con, 111, ORA + amb["P2P_LIBRO_MEMORIA_S"] + 200))
+    # LA ✕ VALE FINCHE' LO SCAMBIO E' FERMO
+    prova("vale: finito e fermo, non piu' servito, annullato dal libro senza ora", [True, True, True],
+          [vale({"stato": "concluso", "quando": 100}, 100), vale(None, 5),
+           vale({"stato": "annullato", "quando": 0}, 0)])
+    prova("non vale: mosso dopo la ✕, in corso, senza stato", [False, False, False],
+          [vale({"stato": "concluso", "quando": 101}, 100), vale({"stato": "attivo", "quando": 50}, 100),
+           vale({"stato": "", "quando": 0}, 100)])
+    # un giro NUOVO dopo la ✕: lo scambio torna a vedersi, e la ✕ non lo tocca
+    con.execute("INSERT INTO p2p_momenti(ordine, momento, quando, fonte, giro, attore, arrivato) "
+                "VALUES(?, 'preso', ?, 'mostro', 2, 'seller', ?)", (ANN, ORA + 500, ORA + 500))
+    servito = amb["_scambi_p2p"](con, 111, ORA + 600).get(ANN) or {}
+    prova("un giro nuovo dopo la ✕: servito in corso, e la ✕ di allora non vale piu'",
+          [True, False], [servito.get("stato") not in ("concluso", "annullato", ""),
+                          vale(servito, tolti(con, 111, ORA + 600).get(ANN))])
+    prova("la pulizia li porta via con la cronaca", [True, []],
+          [amb["_pulisci_memoria_p2p"](con, ORA + amb["P2P_LIBRO_MEMORIA_S"] + 5000) > 0, righe()])
+    con.close()
+
+    # --- 3) IL CLIENT: le sentinelle -----------------------------------
+    tg = pezzo_js(mini, "function togliScambioP2P(id, ev){", "\n}\n")
+    prova("la ✕ chiede al server col nome VERO dell'ordine, e col typeof", True,
+          "const suo = String(o.idVero || id);" in tg
+          and "typeof togliScambioServerP2P === 'function'" in tg
+          and "await togliScambioServerP2P(suo)" in tg)
+    prova("...la rete giu' e lo scambio in corso non tolgono niente", True,
+          0 < tg.find("if (esito === 'rete') {") < tg.find("cancellaRigaP2P(id);")
+          and 0 < tg.find("if (esito === 'aperto' && !o.idVero) {") < tg.find("cancellaRigaP2P(id);"))
+    prova("...la conferma dice «da tutti i tuoi dispositivi»", [True, False],
+          ["da tutti i tuoi dispositivi" in tg, "da questo dispositivo" in tg])
+    ad = pezzo_js(mini, "function adottaScambiServerP2P(locali){", "\n}\n")
+    prova("l'adozione non fa nascere un tolto, dopo la lapide", True,
+          0 < ad.find("if (lapidataP2P(id)) continue;")
+          < ad.find("if (typeof toltoAltroveP2P === 'function' && toltoAltroveP2P(id)) continue;")
+          < ad.find("const o = rigaDaServerP2P("))
+    sc = pezzo_js(mini, "function scambiP2P(){", "\n}\n")
+    prova("la striscia toglie i tolti DOPO l'adozione e prima di leggere", True,
+          0 < sc.find("adottaScambiServerP2P(ordiniP2P());") < sc.find("applicaToltiP2P();")
+          < sc.find("mieiRigheP2P()"))
+    ap = re.sub(r"/\*[\s\S]*?\*/", "", pezzo_js(mini, "function applicaToltiP2P(){", "\n}\n"))
+    prova("i tolti degli altri non scrivono lapidi, e passano dal giudice della ✕", [False, True],
+          ["lapideP2P(" in ap, "if (!p2pTogliibile(o).si) continue;" in ap])
+    cs = pezzo_js(mini, "async function chiediScambiServerP2P(){", "\n}\n")
+    prova("l'archivio posa l'elenco: solo stringhe nella forma di un ordine, [] da un server di ieri",
+          True, "p2pToltiServer = Array.isArray(d.tolti)" in cs
+          and "typeof x === 'string' && P2P_FORMA_ORDINE.test(x)" in cs)
+    i_b = mini.find("/* ============ LA ✕ SU OGNI DISPOSITIVO (7 ott 2026)")
+    i_fb = mini.find("/* ============ fine della ✕ su ogni dispositivo")
+    prova("il blocco della domanda sta fuori dal motore, dopo l'archivio", True,
+          i_b > mini.find("/* ============ fine dell'archivio del server")
+          > mini.find("/* ============ fine del motore dello scambio") > 0 and i_fb > i_b)
+    blocco = re.sub(r"/\*[\s\S]*?\*/", "", mini[i_b:i_fb]) if i_b > 0 else ""
+    prova("...UNA fetch, in POST, col corpo SOLO dell'ordine, col cancello dell'anonimo",
+          [1, 1, 1, True],
+          [blocco.count("fetch("), blocco.count("method: 'POST'"),
+           blocco.count("body: JSON.stringify({ordine: ordine})"),
+           "if (DEMO || VETRINA || !myTgId || !API_BASE) return 'ignoto';" in blocco])
+    f_cli = re.search(r"const P2P_FORMA_ORDINE = /(.*?)/;", mini)
+    f_srv = re.search(r'FORMA_ORDINE_P2P = re\.compile\(r"(.*?)"\)', src)
+    prova("la forma dell'ordine e' la stessa del server", True,
+          bool(f_cli and f_srv) and f_cli.group(1) == f_srv.group(1))
+    m_t = re.search(r"const TETTO_TOGLI_P2P_MS = (\d+);", mini)
+    prova("...e la domanda ha un tetto di tempo ragionevole (5-30 s)", True,
+          bool(m_t) and 5000 <= int(m_t.group(1)) <= 30000)
+    motore = re.sub(r"/\*[\s\S]*?\*/", "",
+                    mini[mini.index("const MOSTRO_ORDINI_CHIAVE"):
+                         mini.index("/* ============ fine del motore dello scambio")])
+    prova("il motore resta a zero fetch", 0, motore.count("fetch("))
+    dati = mini[mini.index('<h3 id="priv-p2p">'):]
+    dati = dati[:dati.index('<h3 id="priv-tor">')]
+    prova("«I tuoi dati» lo dice: cosa si ricorda, perche', per quanto", True,
+          "Se togli uno scambio chiuso con la ✕, il server ricorda <b>il numero dell'ordine e quando "
+          "l'hai tolto</b>, così sparisce anche dagli altri tuoi dispositivi. Si cancella da solo "
+          "dopo quaranta giorni, e subito se dimentichi il profilo." in dati)
+
+    # --- 4) IL BANCO NODE: le funzioni vere, caso per caso --------------
+    node = _sh.which("node")
+    if not node:
+        salta("la ✕ del client gira", "node non c'e'")
+        return
+
+    def _cost(nome, fine=";\n"):
+        i = mini.index("const " + nome + " = ")
+        return mini[i:mini.index(fine, i) + len(fine)]
+
+    def _fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+
+    banco = ("\n".join(_cost(n) for n in (
+                 "P2P_FINALI", "P2P_ORIZZONTE_S", "P2P_LAPIDE_TOLTO_S", "P2P_LIBRO_FINESTRA_S",
+                 "MOSTRO_LAPIDI_CHIAVE", "P2P_FORMA_ORDINE", "P2P_DA_RESTORE", "P2P_RESTORE_FERMI",
+                 "P2P_RIPRESA_PASSO", "P2P_INDICE_CERCA_MAX", "P2P_INDICE_CERCA_MIN", "P2P_GIRO_APERTO"))
+             + "\n" + _cost("STATI_P2P", "\n};\n") + _cost("P2P_PROGRESSO", "\n};\n")
+             + "".join(_fn(f) for f in (
+                 "function ordiniP2P(){", "function scriviOrdineP2P(o){", "function p2pTogliibile(o, adesso){",
+                 "function recensioneInSospesoP2P(o){", "function lapidiP2P(){", "function lapideP2P(o){",
+                 "function lapidataP2P(id){", "function togliScambioP2P(id, ev){", "function cancellaRigaP2P(id){",
+                 "function toltoAltroveP2P(id){", "function applicaToltiP2P(){",
+                 "async function togliScambioServerP2P(ordine){", "async function chiediScambiServerP2P(){",
+                 "function statoDaRestoreP2P(o, statoMostro){", "function fermoDaMomentiP2P(momenti){",
+                 "function indiceDaChiaveP2P(mz, pub, max){", "function presenzeDaServerP2P(p, giro){",
+                 "function uniscePresenzeP2P(a, b){", "function rigaDaServerP2P(id, s, tk, stato, adesso){",
+                 "function chiaveScambioDaServerP2P(mz, id, s){", "function adottaScambiServerP2P(locali){"))
+             + mini[mini.index("function tempoLettura(testo){"):
+                    mini.index("}\n", mini.index("function tempoLettura(testo){")) + 2]
+             + pezzo_js(mini, "function p2pRitirato(o){", "\n}") + "\n}\n" + r"""
+const _box = {};
+const localStorage = {getItem: k => (k in _box ? _box[k] : null), setItem: (k, v) => { _box[k] = String(v); }};
+function chiaveP2P(k){ return k; }
+const MOSTRO_ORDINI_CHIAVE = 'o';
+// il tetto vero e' di secondi: qui basta un battito (la sentinella guarda quello vero)
+const TETTO_TOGLI_P2P_MS = 60;
+let DEMO = false, VETRINA = false, myTgId = 111;
+const API_BASE = 'http://banco/api';
+function authHdr(){ return 'collaudo:111:Io'; }
+let p2pOrdineAperto = '', p2pMieiOrdini = null, p2pScambiServer = null, p2pScambiGiro = null, p2pToltiServer = null;
+let detti = [], disegni = 0, pallini = 0, diario = [], conferma = null, chiamate = [], risposta = null;
+function toast(m){ detti.push(m); }
+function renderP2P(){ disegni++; }
+function aggiornaPallinoScambiP2P(){ pallini++; }
+function diarioP2P(r){ diario.push(r); }
+function chiediConferma(c){ conferma = c; }
+function prendiCambiPubP2P(){}
+function mazzoMostro(){ return null; }
+function chiaveScambio(){ throw new Error('senza mazzo'); }
+async function fetch(url, opz){ chiamate.push({url: url, opz: opz}); return risposta(url, opz); }
+const window = {NostrTools: {}};
+const log0 = console.log; console.log = () => {};
+const ORA = Math.floor(Date.now() / 1000);
+const X = '5a1e0000-7777-4a2b-9c3d-0000000000a1', Y = '5a1e0000-7777-4a2b-9c3d-0000000000b2';
+const Z = '5a1e0000-7777-4a2b-9c3d-0000000000c3', W = '5a1e0000-7777-4a2b-9c3d-0000000000d4';
+const R = (id, extra) => Object.assign({id: id, lato: 'compro', stato: 'concluso', mio: false, preso: true,
+  euro: 20, metodi: ['SEPA'], creato: ORA - 90000, aggiornato: ORA - 86000, quando: ORA - 86000,
+  recensione: 'fatta'}, extra);
+const S = (extra) => Object.assign({lato: 'compro', mio: false, preso: true, euro: 20, sats: 30000,
+  metodi: ['SEPA'], stato: 'concluso', stato_libro: 'success', creato: ORA - 90000, quando: ORA - 80000,
+  giro: 1, chiave_mia: '', chiave_peer: 'peer', sats_ordine: 30000, sats_miei: 29700,
+  payout_fallito: false, momenti: []}, extra);
+const dice = (status, corpo) => () => Promise.resolve({ok: status >= 200 && status < 300, status: status,
+  json: async () => (corpo || {})});
+function semina(righe){ const t = {}; for (const r of righe) t[r.id] = r; localStorage.setItem('o', JSON.stringify(t)); }
+const chiavi = () => Object.keys(ordiniP2P()).sort();
+async function togli(id){ togliScambioP2P(id, null); if (!conferma) return 'senza conferma'; await conferma.poi(); return 'ok'; }
+const out = {};
+async function caso(nome, fn){
+  for (const k of Object.keys(_box)) delete _box[k];
+  detti = []; disegni = 0; pallini = 0; diario = []; conferma = null; chiamate = [];
+  p2pToltiServer = null; p2pScambiServer = null; p2pOrdineAperto = ''; DEMO = false; VETRINA = false;
+  risposta = dice(200, {ok: true});
+  try { out[nome] = await fn(); } catch(e) { out[nome] = 'ESPLOSO: ' + (e && e.stack || e); }
+}
+(async () => {
+await caso('tolto', async () => {
+  semina([R(X)]); p2pOrdineAperto = X;
+  const g = await togli(X);
+  const c = chiamate[0] || {opz: {headers: {}}};
+  return [g, chiavi(), lapidataP2P(X), p2pToltiServer, detti, disegni, p2pOrdineAperto,
+          chiamate.length, c.url, c.opz.method, c.opz.body, c.opz.headers['X-Tg-Init-Data']];
+});
+for (const [nome, st] of [['ignoto404', 404], ['ignoto400', 400]])
+  await caso(nome, async () => {
+    semina([R(X)]); risposta = dice(st);
+    const g = await togli(X);
+    return [g, chiavi(), lapidataP2P(X), p2pToltiServer, detti];
+  });
+await caso('aperto', async () => {
+  semina([R(X)]); risposta = dice(409);
+  const g = await togli(X);
+  return [g, chiavi(), lapidataP2P(X), p2pToltiServer, detti.length, /ancora in corso/.test(detti[0] || ''), disegni];
+});
+for (const [nome, st] of [['apertoGiro', 409], ['toltoGiro', 200]])
+  await caso(nome, async () => {
+    semina([R(X + '~123', {idVero: X, stato: 'annullato', giroCaduto: 1})]); risposta = dice(st);
+    const g = await togli(X + '~123');
+    return [g, chiavi(), JSON.parse((chiamate[0] || {opz: {body: '{}'}}).opz.body).ordine === X, p2pToltiServer, detti];
+  });
+for (const [nome, r] of [['reteGiu', () => Promise.reject(new TypeError('Failed to fetch'))],
+                         ['rete500', dice(500)], ['rete401', dice(401)]])
+  await caso(nome, async () => {
+    semina([R(X)]); risposta = r;
+    const g = await togli(X);
+    return [g, chiavi(), lapidataP2P(X), p2pToltiServer, /controlla la connessione/.test(detti[0] || '')];
+  });
+await caso('appesa', async () => {
+  semina([R(X)]); let abortita = false;
+  risposta = (u, o) => new Promise(() => { o.signal.addEventListener('abort', () => { abortita = true; }); });
+  const t0 = Date.now();
+  const g = await togli(X);
+  return [g, chiavi(), abortita, /controlla la connessione/.test(detti[0] || ''), Date.now() - t0 < 2000];
+});
+await caso('provvisoria', async () => {
+  semina([R('nuovo:3', {stato: 'rifiutato', mio: true, preso: false})]);
+  const g = await togli('nuovo:3');
+  return [g, chiavi(), chiamate.length, detti];
+});
+await caso('demo', async () => {
+  semina([R(X)]); DEMO = true;
+  const g = await togli(X);
+  return [g, chiavi(), chiamate.length];
+});
+await caso('aperta', async () => {
+  semina([R(X, {stato: 'attivo'})]);
+  const g = await togli(X);
+  return [g, chiavi(), chiamate.length, detti];
+});
+await caso('conferma', async () => {
+  semina([R(X)]);
+  togliScambioP2P(X, null);
+  return [conferma && conferma.etichetta, /da tutti i tuoi dispositivi/.test(conferma && conferma.corpo),
+          /da questo dispositivo/.test(conferma && conferma.corpo)];
+});
+await caso('applica', async () => {
+  semina([R(X), R(Y, {stato: 'attivo'}), R(Z), R(W + '~5', {idVero: W, stato: 'annullato'})]);
+  p2pToltiServer = [X, Y, W];
+  const n = applicaToltiP2P();
+  return [n, chiavi(), Object.keys(lapidiP2P()), pallini, diario.filter(r => /altro dispositivo/.test(r)).length];
+});
+await caso('applicaVuoto', async () => {
+  semina([R(X)]);
+  const a = applicaToltiP2P(); p2pToltiServer = []; const b = applicaToltiP2P();
+  return [a, b, chiavi()];
+});
+await caso('nonNasce', async () => {
+  p2pScambiServer = {[X]: S(), [Z]: S()}; p2pToltiServer = [X];
+  adottaScambiServerP2P(ordiniP2P());
+  return chiavi();
+});
+await caso('indietroPoiVia', async () => {
+  semina([R(X, {stato: 'attivo', ultimaMossa: ORA - 89000, aggiornato: ORA - 89000})]);
+  p2pScambiServer = {[X]: S({quando: ORA - 80000})}; p2pToltiServer = [X];
+  const prima = applicaToltiP2P();
+  adottaScambiServerP2P(ordiniP2P());
+  const portata = (ordiniP2P()[X] || {}).stato;
+  const dopo = applicaToltiP2P();
+  return [prima, portata, dopo, chiavi()];
+});
+await caso('archivio', async () => {
+  risposta = dice(200, {scambi: {[X]: S()}, tolti: [X, 'ha spazi dentro', 42, 'nuovo:3', 'corto']});
+  const ok = await chiediScambiServerP2P();
+  const c = chiamate[0] || {opz: {}};
+  return [ok, p2pToltiServer, Object.keys(p2pScambiServer || {}), c.opz.method, 'body' in c.opz];
+});
+await caso('archivioDiIeri', async () => {
+  risposta = dice(200, {scambi: {}});
+  const ok = await chiediScambiServerP2P();
+  return [ok, p2pToltiServer];
+});
+console.log = log0;
+console.log(JSON.stringify(out));
+})();
+""")
+    with _tf.TemporaryDirectory() as d:
+        f = os.path.join(d, "tolti.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = _sp.run([node, f], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    if r.returncode or not (r.stdout or "").strip():
+        prova("il banco della ✕ gira", "", (r.stdout or "") + (r.stderr or "")[-800:])
+        return
+    o = _json.loads(r.stdout.strip().splitlines()[-1])
+    X = "5a1e0000-7777-4a2b-9c3d-0000000000a1"
+    Y, Z = "5a1e0000-7777-4a2b-9c3d-0000000000b2", "5a1e0000-7777-4a2b-9c3d-0000000000c3"
+    W = "5a1e0000-7777-4a2b-9c3d-0000000000d4"
+    prova("tolto: via da qui con la lapide, ricordato in memoria, «Scambio tolto», la pagina chiusa",
+          ["ok", [], True, [X], ["Scambio tolto"], 1, "",
+           1, "http://banco/api/p2p/scambi/togli", "POST", _json.dumps({"ordine": X}, separators=(",", ":")),
+           "collaudo:111:Io"], o.get("tolto"))
+    for nome in ("ignoto404", "ignoto400"):
+        prova(f"{nome[6:]}: il server non ha niente da ricordare — via da qui soltanto, come prima",
+              ["ok", [], True, None, ["Scambio tolto"]], o.get(nome))
+    prova("409: per il server e' in corso — la riga RESTA, nessuna lapide, e si dice perche'",
+          ["ok", [X], False, None, 1, True, 0], o.get("aperto"))
+    prova("...la presa caduta messa da parte chiede col nome vero, e col 409 se ne va da qui",
+          ["ok", [], True, None, ["Scambio tolto"]], o.get("apertoGiro"))
+    prova("...e col 200 il nome vero entra fra i tolti in memoria",
+          ["ok", [], True, [X], ["Scambio tolto"]], o.get("toltoGiro"))
+    for nome in ("reteGiu", "rete500", "rete401"):
+        prova(f"{nome}: la riga RESTA, niente lapide, «controlla la connessione»",
+              ["ok", [X], False, None, True], o.get(nome))
+    prova("la domanda appesa: il tetto la chiude, la abortisce, e la riga resta",
+          ["ok", [X], True, True, True], o.get("appesa"))
+    prova("la riga provvisoria non si chiede nemmeno: via da qui", ["ok", [], 0, ["Scambio tolto"]],
+          o.get("provvisoria"))
+    prova("in vetrina (DEMO) nessuna domanda", ["ok", [], 0], o.get("demo"))
+    prova("lo scambio aperto non arriva nemmeno alla conferma, e non chiede niente",
+          ["senza conferma", [X], 0, ["Questo scambio è ancora aperto"]], o.get("aperta"))
+    prova("la conferma dice «da tutti i tuoi dispositivi»", ["Togli", True, False], o.get("conferma"))
+    prova("i tolti altrove: via il finito e la presa caduta col nome vero; resta l'aperto e chi non c'e'; nessuna lapide",
+          [2, sorted([Y, Z]), [], 2, 2], o.get("applica"))
+    prova("...senza elenco non succede niente", [0, 0, [X]], o.get("applicaVuoto"))
+    prova("l'adozione non fa nascere il tolto, e l'altro si'", [Z], o.get("nonNasce"))
+    prova("la riga rimasta indietro: prima l'archivio la porta alla fine, poi se ne va",
+          [0, "concluso", 1, []], o.get("indietroPoiVia"))
+    prova("l'archivio posa l'elenco: solo gli id nella forma di un ordine",
+          [True, [X], [X], "POST", False], o.get("archivio"))
+    prova("...e un server di ieri senza elenco vale un elenco vuoto", [True, []], o.get("archivioDiIeri"))
+
+
 def prove_p2p_avvisi_in_ordine():
     """GLI AVVISI P2P NELL'ORDINE DEI FATTI, MAI UNO SUPERATO, E IL
     LIBRO CREDUTO SOLO CON LA FIRMA (24 set 2026, dai due messaggi al
@@ -87069,7 +87508,9 @@ def prove_p2p_orologio():
     # (patch 0007) le tre tabelle delle attese: il libro ci mette le
     # frasi, il giro delle attese le fa partire
     for _tab, _fine in (("p2p_momenti", "\n    );"), ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
-                        ("p2p_attese", "ON p2p_attese(scade);"), ("p2p_scambi", "\n    );")):
+                        ("p2p_attese", "ON p2p_attese(scade);"), ("p2p_scambi", "\n    );"),
+                        # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
+                        ("p2p_tolti", "\n    );")):
         _i = src.index(f"CREATE TABLE IF NOT EXISTS {_tab}(")
         schema += "\n" + src[_i:src.index(_fine, _i) + len(_fine)]
     con0 = sqlite3.connect(percorso)
@@ -87352,7 +87793,9 @@ def prove_p2p_tutti_i_relay():
                         ("p2p_ordini", "ON p2p_ordini(tg_id);"),
                         ("p2p_momenti", "\n    );"), ("p2p_scambi", "\n    );"),
                         ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
-                        ("p2p_attese", "ON p2p_attese(scade);")):
+                        ("p2p_attese", "ON p2p_attese(scade);"),
+                        # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
+                        ("p2p_tolti", "\n    );")):
         _i = src.index(f"CREATE TABLE IF NOT EXISTS {_tab}(")
         schema += src[_i:src.index(_fine, _i) + len(_fine)] + "\n"
     schema += "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, avvisi_p2p INTEGER DEFAULT 1);"
@@ -87980,7 +88423,9 @@ def prove_p2p_ascolto():
                         ("p2p_ordini", "ON p2p_ordini(tg_id);"),
                         ("p2p_momenti", "\n    );"), ("p2p_scambi", "\n    );"),
                         ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
-                        ("p2p_attese", "ON p2p_attese(scade);")):
+                        ("p2p_attese", "ON p2p_attese(scade);"),
+                        # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
+                        ("p2p_tolti", "\n    );")):
         _i = src.index(f"CREATE TABLE IF NOT EXISTS {_tab}(")
         schema += src[_i:src.index(_fine, _i) + len(_fine)] + "\n"
     schema += "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, avvisi_p2p INTEGER DEFAULT 1);"
@@ -89306,7 +89751,9 @@ def _schema_p2p_pieno(src):
                           ("p2p_ordini", "ON p2p_ordini(tg_id);"),
                           ("p2p_momenti", "\n    );"), ("p2p_scambi", "\n    );"),
                           ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
-                          ("p2p_attese", "ON p2p_attese(scade);")):
+                          ("p2p_attese", "ON p2p_attese(scade);"),
+                          # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
+                          ("p2p_tolti", "\n    );")):
         i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
         schema += src[i:src.index(fine, i) + len(fine)] + "\n"
     return schema + (
@@ -125639,6 +126086,7 @@ def main():
               prove_bollino_staff,
               prove_scambi_verso,
               prove_passi_libro_p2p,
+              prove_tolti_ovunque,
               prove_config_esempio):
         try:
             f()

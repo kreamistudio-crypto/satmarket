@@ -27480,6 +27480,31 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   pillola del filtro: dal 30 set 2026 lo stato vuoto è solo «Nessuno
   scambio in corso» e «Vai al libro ordini»); la scopa lampo è del
   solo `rifiutato`; la ✕ lascia una lapide di `P2P_LAPIDE_TOLTO_S`.
+  LA ✕ VALE PER L'ACCOUNT (7 ott 2026): prima di togliere,
+  `togliScambioP2P` chiede `POST /api/p2p/scambi/togli`
+  (`togliScambioServerP2P`, blocco suo fuori dal motore: sessione, nel
+  corpo SOLO `{ordine}` nella forma `P2P_FORMA_ORDINE` = quella del
+  server, tetto `TETTO_TOGLI_P2P_MS`, nessun gate sulla leva). Il giudice
+  `_togli_scambio_p2p` ricorda in `p2p_tolti` (tg_id, ordine, quando —
+  nient'altro) solo uno scambio che l'archivio serve a chi chiede E dà
+  finito (`P2P_STATI_TOGLIBILI`): 200 tolto; 404 niente da ricordare
+  (non è suo, non esiste, oltre lo storico, stato ignoto: via solo da
+  qui); 409 in corso (la riga resta, «Lo scambio risulta ancora in
+  corso…», e una riga nel journal `✕ P2P:`); rete, 5xx, 401 o tetto =
+  la riga resta. La presa caduta messa da parte chiede col nome vero
+  (`idVero`), e col 409 se ne va da qui. L'archivio manda `tolti`
+  (`_tolti_p2p` filtrato da `_tolto_vale_p2p`: vale finché lo scambio è
+  finito e FERMO dalla ✕ — un giro che si muove dopo torna a vedersi) e
+  TIENE lo scambio fra gli `scambi`, perché un dispositivo rimasto
+  indietro lo porti prima alla fine. Nel client `p2pToltiServer`:
+  l'adozione non fa nascere un tolto (`toltoAltroveP2P`), e
+  `applicaToltiP2P` — in `scambiP2P`, DOPO l'adozione — toglie le righe
+  (anche la presa caduta col nome vero) solo se `p2pTogliibile` le dà
+  finite, SENZA lapide (lo fa l'elenco; una lapide nasconderebbe anche
+  dal libro). La scrittura è una, `cancellaRigaP2P`. Pulizia con la
+  cronaca (`P2P_LIBRO_MEMORIA_S`), via subito con «dimentica il
+  profilo», segue la fusione dei conti. Verbale: CANTIERI, «La ✕ su
+  ogni dispositivo».
   Le fatture di chi compra: il blocco
   resta la sola finestra del coordinatore (`finestraFatturaP2P`, dal
   38385); le 23 ore (`vitaMinimaFatturaP2P`) sono un consiglio, la

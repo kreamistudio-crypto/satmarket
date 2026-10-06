@@ -5675,6 +5675,23 @@ def init_db():
         -- questo metro); 0 = non si sa, e la convenienza tace.
         cambio_presa REAL DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS p2p_tolti(
+        -- GLI SCAMBI TOLTI CON LA ✕ (7 ott 2026, richiesta di Andrea:
+        -- tolto su un dispositivo, sparisca anche dagli altri dello
+        -- stesso account). Fin qui la ✕ toglieva la riga dal solo
+        -- localStorage, e l'archivio del server la rifaceva nascere
+        -- altrove. Si scrive SOLO su uno scambio che e' mio e che per
+        -- il server e' FINITO (`_togli_scambio_p2p`); l'archivio ne
+        -- manda l'elenco e ogni dispositivo toglie le sue righe.
+        -- L'ID DELL'ORDINE E L'ORA DEL GESTO, e niente altro. L'ora
+        -- serve a due cose: la riga se ne va da sola dopo
+        -- P2P_LIBRO_MEMORIA_S (`_pulisci_memoria_p2p`), e un giro che
+        -- si muove DOPO la ✕ torna a vedersi (`_tolto_vale_p2p`).
+        tg_id INTEGER NOT NULL,
+        ordine TEXT NOT NULL,
+        quando INTEGER NOT NULL,
+        PRIMARY KEY(tg_id, ordine)
+    );
     CREATE TABLE IF NOT EXISTS p2p_avvisi(
         -- L'ANTI-DOPPIONE, ed e' UNO per tutte le strade (patch 0007):
         -- stesso ordine + stesso momento + stessa persona (+ stesso
@@ -14925,6 +14942,13 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("DELETE FROM p2p_avvisi WHERE tg_id=?", (id_nostr,))
         con.execute("UPDATE p2p_attese SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
+        # ...e gli SCAMBI TOLTI CON LA ✕ (7 ott 2026): la PK ha il tg_id,
+        # e le due meta' possono aver tolto lo stesso scambio — `OR
+        # IGNORE` + `DELETE`, come per gli avvisi: una riga basta, perche'
+        # dice «tolto», che e' vero per la persona intera.
+        con.execute("UPDATE OR IGNORE p2p_tolti SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("DELETE FROM p2p_tolti WHERE tg_id=?", (id_nostr,))
         # ...e le DISPUTE P2P (28 set 2026): le due parti e chi l'ha
         # presa seguono l'utente come in `p2p_scambi`; nel registro
         # cambia il NOME di chi ha fatto il gesto, non il gesto — la
@@ -44318,6 +44342,9 @@ def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
                 (user["id"],))
     con.execute("DELETE FROM p2p_avvisi WHERE tg_id=?", (user["id"],))
     con.execute("DELETE FROM p2p_attese WHERE tg_id=?", (user["id"],))
+    # ...e gli scambi tolti con la ✕ (7 ott 2026): «I tuoi dati» promette
+    # che se ne vanno subito con il profilo
+    con.execute("DELETE FROM p2p_tolti WHERE tg_id=?", (user["id"],))
     con.commit()
     con.close()
     return {"ok": True, "tolte": tolte, "volti": volti}
@@ -45990,12 +46017,16 @@ def _pulisci_memoria_p2p(con, adesso: int) -> int:
     """La cronaca non e' un archivio: oltre `P2P_LIBRO_MEMORIA_S` — la
     vita piu' lunga che un ordine possa avere, scambio compreso — le
     righe di momenti, avvisi e parti se ne vanno. Pura sulla
-    connessione; torna quante ne ha tolte."""
+    connessione; torna quante ne ha tolte.
+    E GLI SCAMBI TOLTI CON LA ✕ (7 ott 2026): oltre lo stesso tetto
+    l'archivio non li servirebbe comunque (lo storico e' di
+    P2P_STORICO_GIORNI), quindi non c'e' piu' niente da ricordare."""
     limite = adesso - P2P_LIBRO_MEMORIA_S
     tolte = 0
     for tabella, colonna in (("p2p_momenti", "arrivato"),
                              ("p2p_avvisi", "quando"),
-                             ("p2p_scambi", "aggiornato")):
+                             ("p2p_scambi", "aggiornato"),
+                             ("p2p_tolti", "quando")):
         tolte += con.execute(f"DELETE FROM {tabella} WHERE {colonna}<?",
                              (limite,)).rowcount
     # le righe di p2p_ordini MAI VISTE sul libro da un giorno (cura 4):
@@ -50314,6 +50345,106 @@ def _quanti_tocca_p2p(con, io, adesso: int) -> int:
         return 0
 
 
+# ---- LA ✕ SU OGNI DISPOSITIVO (7 ott 2026, richiesta di Andrea) ----
+# La ✕ di «I miei scambi» toglieva la riga dal localStorage di UN
+# dispositivo; gli altri dello stesso account la tenevano, e l'archivio
+# qui sopra gliela rifaceva nascere. Adesso il gesto si ricorda per
+# ACCOUNT in `p2p_tolti` (l'id e l'ora, nient'altro), e l'archivio ne
+# manda l'elenco: ogni dispositivo toglie da se' le sue righe, anche
+# quelle che vivono solo li', alla prossima lettura.
+# SOLO UNO SCAMBIO FINITO, e lo giudicano in DUE: il telefono prima di
+# chiedere (`p2pTogliibile`) e il server qui, con il suo stato. Uno
+# scambio in corso non si ricorda mai, nemmeno se il telefono si
+# sbaglia: la sua chiave serve ancora a muovere dei sats.
+P2P_STATI_TOGLIBILI = ("concluso", "annullato")
+
+
+def _tolti_p2p(con, io, adesso: int) -> dict:
+    """PURA sulla connessione: `{ordine: quando}` degli scambi che `io`
+    ha tolto con la ✕, piu' giovani di P2P_LIBRO_MEMORIA_S (oltre, la
+    pulizia li porta via comunque)."""
+    return {r[0]: int(r[1] or 0) for r in con.execute(
+        "SELECT ordine, quando FROM p2p_tolti WHERE tg_id=? AND quando>=?",
+        (int(io or 0), int(adesso) - P2P_LIBRO_MEMORIA_S))}
+
+
+def _tolto_vale_p2p(servito, quando_tolto: int) -> bool:
+    """PURA: la ✕ di allora vale ancora? `servito` e' la riga che
+    l'archivio serve per quell'ordine (None se non la serve piu').
+    Vale se l'archivio non lo serve — non c'e' niente da far rinascere —
+    o lo serve FINITO e fermo dalla ✕ in poi. UNO SCAMBIO CHE SI MUOVE
+    DOPO IL GESTO torna a vedersi: la ✕ ha tolto quello scambio, non
+    l'ordine per sempre, e un dispositivo non deve mai togliere da solo
+    una riga che nessuno ha tolto."""
+    if not servito:
+        return True
+    return (servito.get("stato") in P2P_STATI_TOGLIBILI
+            and int(servito.get("quando") or 0) <= int(quando_tolto or 0))
+
+
+def _togli_scambio_p2p(con, io, ordine: str, adesso: int) -> dict:
+    """PURA sulla connessione: la ✕ di `io` sullo scambio `ordine`.
+    Torna `{esito, stato}`, con lo stato che il server sa:
+    · 'tolto'  — e' mio e per il server e' finito: si ricorda, con l'ora
+      del gesto o quella dell'ultimo passo se e' piu' avanti (un
+      orologio del coordinatore un filo avanti non deve far sembrare lo
+      scambio mosso DOPO la ✕). Una seconda ✕ da un altro dispositivo
+      la rinfresca e basta;
+    · 'aperto' — e' mio ma per il server non e' finito: non si scrive
+      niente, e il telefono non toglie;
+    · 'ignoto' — l'archivio non lo serve (non e' mio, non esiste, e'
+      oltre lo storico) o non ne sa dire lo stato: niente da ricordare,
+      e il telefono lo toglie solo da se'. Lo stesso no per «non e'
+      tuo» e «non esiste»: la domanda non dice niente degli altri.
+    IL GIUDICE DI «MIO» E DELLO STATO E' L'ARCHIVIO (`_scambi_p2p`), cioe'
+    la stessa risposta che ha fatto nascere la riga sui dispositivi."""
+    s = _scambi_p2p(con, io, adesso).get(ordine)
+    stato = str((s or {}).get("stato") or "")
+    if not stato:
+        return {"esito": "ignoto", "stato": ""}
+    if stato not in P2P_STATI_TOGLIBILI:
+        return {"esito": "aperto", "stato": stato}
+    con.execute("INSERT INTO p2p_tolti(tg_id, ordine, quando) VALUES(?,?,?) "
+                "ON CONFLICT(tg_id, ordine) DO UPDATE SET quando=excluded.quando",
+                (int(io), ordine, max(int(adesso), int(s.get("quando") or 0))))
+    con.commit()
+    return {"esito": "tolto", "stato": stato}
+
+
+@app.post("/api/p2p/scambi/togli")
+async def togli_scambio_p2p(req: Request, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """La ✕ di «I miei scambi», per l'account e non per il dispositivo.
+    Il giudice e' `_togli_scambio_p2p`. Le regole delle sorelle: la
+    SESSIONE serve, l'id dell'ordine sta nel POST e mai nell'indirizzo
+    (nel corpo SOLO quello), e NESSUN GATE SULLA LEVA — togliere una
+    propria riga non dipende da un interruttore, come «dimentica».
+    LE RISPOSTE: 200 tolto, 404 il server non ha niente da ricordare (il
+    telefono toglie da se'), 409 per il server lo scambio e' ancora in
+    corso (il telefono non toglie). Nel journal solo il 409, che e' il
+    caso da guardare: un telefono e un server che non sono d'accordo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    ordine = str(d.get("ordine") or "").strip() if isinstance(d, dict) else ""
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        raise HTTPException(400, "Ordine non valido")
+    con = db()
+    try:
+        esito = _togli_scambio_p2p(con, user["id"], ordine, int(time.time()))
+    finally:
+        con.close()
+    if esito["esito"] == "ignoto":
+        raise HTTPException(404, "Scambio non trovato")
+    if esito["esito"] == "aperto":
+        print(f"✕ P2P: {ordine[:8]} per {user['id']}: il telefono lo dice finito, "
+              f"il server «{esito['stato']}» — resta", flush=True)
+        raise HTTPException(409, "Lo scambio risulta ancora in corso")
+    return {"ok": True, "stato": esito["stato"]}
+
+
 @app.post("/api/p2p/scambi")
 async def scambi_p2p(x_tg_init_data: str = Header(""),
                      barattolo_sessione: str = Cookie("")):
@@ -50324,14 +50455,23 @@ async def scambi_p2p(x_tg_init_data: str = Header(""),
     CORPO e niente nell'indirizzo (non si puo' chiedere degli scambi di
     un altro: non esiste la sintassi), NESSUN GATE SULLA LEVA (qui non si
     scrive niente, e un 409 toglierebbe i propri scambi a chi ne ha uno a
-    meta' il giorno che la leva si spegne), e `no-store`."""
+    meta' il giorno che la leva si spegne), e `no-store`.
+    E I TOLTI CON LA ✕ (7 ott 2026): `tolti` e' l'elenco degli id che lo
+    stesso account ha tolto da un altro dispositivo, finche' la ✕ vale
+    (`_tolto_vale_p2p`). Lo scambio tolto RESTA in `scambi`, ed e'
+    voluto: un dispositivo rimasto indietro lo porta prima avanti fino
+    alla fine (l'adozione), e solo allora lo toglie — senza quella riga
+    resterebbe «in corso» per sempre, perche' nessuno gli direbbe piu'
+    che e' finito. Quel che non deve fare e' NASCERE, e lo dice l'elenco."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     try:
         esiti = _scambi_p2p(con, user["id"], int(time.time()))
+        tolti = sorted(o for o, q in _tolti_p2p(con, user["id"], int(time.time())).items()
+                       if _tolto_vale_p2p(esiti.get(o), q))[:MAX_ORDINI_P2P]
     finally:
         con.close()
-    return JSONResponse({"scambi": esiti},
+    return JSONResponse({"scambi": esiti, "tolti": tolti},
                         headers={"Cache-Control": "no-store"})
 
 

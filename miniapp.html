@@ -11574,6 +11574,7 @@ document.getElementById('cartello')?.remove();</script>
       <p>In tutti e tre i casi il server conosce la <b>parte pubblica</b> del profilo e le <b>chiavi usa-e-getta</b> di ogni scambio, per poterti avvisare quando c'è una novità, e da settembre 2026 anche <b>a che numero di scambio sei arrivato</b>: serve a non riusare due volte la stessa chiave usa-e-getta quando apri Barattolo da un dispositivo nuovo, ed è un dato che dai conti che teneva già si sarebbe comunque ricavato. Dal foglio qui sotto il <b>codice segreto</b> lo vedi e lo copi, e il profilo lo <b>dimentichi</b>; dimenticandolo si cancella anche la parte pubblica che il server teneva.</p>
       <p>Dal 16 settembre 2026 il server annota anche <b>quali ordini pubblichi e quali prendi</b>, per avvisarti con i numeri quando lo scambio si muove (preso, concluso, annullato, tornato in vetrina): sono i passaggi <b>pubblici</b> del libro, e la cifratura dei messaggi non si tocca. Chi entra <b>da Nostr</b> non viene annotato quando prende un ordine, perché quell'ingresso esiste per chi non vuole lasciare tracce: gli avvisi sui suoi scambi gli arrivano lo stesso, ma il suo nome non compare negli avvisi dell'altra persona. Dal <b>17 settembre 2026</b> però <b>può deciderlo lui</b>: nel cassetto «🔔 Avvisi» c'è «<b>Fatti riconoscere negli scambi</b>», spento di serie — accendendolo la presa viene annotata, chi ha pubblicato vede il suo profilo e le due parti possono <b>recensirsi</b>. Gli avvisi si spengono tutti dal cassetto «🔔 Avvisi» del profilo.</p>
       <p>Dal <b>18 settembre 2026</b> gli avvisi sugli scambi nascono dal <b>coordinatore</b>, che facciamo girare noi: a ogni passo di uno scambio dice al server di Barattolo <b>quale ordine, quale passo, fra quali due chiavi usa-e-getta, e chi dei due ha fatto il gesto</b> — e da lì il server avvisa l'altra persona, con una frase che dice cosa è successo. Il prezzo lo diciamo per intero: <b>il server ora sa a che punto è ogni scambio</b>, e per chi usa Barattolo sa fra quali due account (le chiavi usa-e-getta le conosceva già). <b>Non riceve gli importi</b>, tranne i tre della chiusura — quanto valeva lo scambio, quanto è andato a chi compra e quanto ha bloccato chi vende, che servono alla frase «scambio concluso» — e <b>non riceve mai</b> fatture, recapiti né messaggi: quelli restano cifrati fra voi due. Questa cronaca si cancella da sola dopo quaranta giorni, e subito se dimentichi il profilo. Con questo è <b>sparito</b> l'avviso generico «Novità in un tuo scambio», e con lui due cose che esistevano solo per farlo funzionare: il server <b>non guarda più</b> sui relay le buste cifrate che il coordinatore ti manda, e il tuo telefono <b>non gli dice più</b> «sto facendo un gesto». Una cosa il telefono continua a dirla, solo se <b>vendi</b>: «<b>ho indicato all'altra persona dove ricevere gli euro</b>», col numero dell'ordine — serve ad avvisarla che tocca a lei, perché quel passo il coordinatore non lo vede. Il <b>recapito non passa da noi</b>: l'IBAN, il RevTag o il numero viaggiano cifrati fra i vostri due telefoni, e nell'avviso non ci sono. E dallo stesso giorno il recapito che hai ricordato <b>non parte più da solo</b>: lo trovi già scritto, e parte quando lo invii tu.</p>
+      <p>Se togli uno scambio chiuso con la ✕, il server ricorda <b>il numero dell'ordine e quando l'hai tolto</b>, così sparisce anche dagli altri tuoi dispositivi. Si cancella da solo dopo quaranta giorni, e subito se dimentichi il profilo.</p>
       <p>Dal <b>17 settembre 2026</b>, quando un ordine viene <b>preso</b>, le due parti si vedono: chi ha pubblicato e chi ha preso vedono il <b>profilo</b> l'uno dell'altra — lo stesso che sta già sotto ogni annuncio del mercatino: nome, foto, stelline, livello e titolo — e i <b>bottoni per scriversi</b> su Telegram o su Nostr, ma solo dove quei canali esistono davvero (la npub soltanto se ne hai dimostrato il possesso). <b>Prima della presa non si vede niente</b>, e non c'è nessun altro modo di chiederlo: a questa domanda il server risponde solo a una delle due parti di quello scambio. Il perché è che dall'altra parte c'è una persona a cui stai per mandare dei soldi veri, e un volto con una reputazione è quello che rende <i>pesabile</i> la fiducia — la stessa ragione per cui nel mercatino chi vende ha un nome. Te lo diciamo <b>prima</b>: nel foglio dove pubblichi e in quello dove prendi. Al posto dei campi dove prima ci si scriveva il proprio contatto a mano, che non erano verificati da nessuno.</p>
       <p><b>Chi entra con una chiave Nostr resta anonimo quando prende</b>: quella presa non viene annotata, chi ha pubblicato non saprà chi è, e nella pagina dello scambio legge che l'altra persona non si conosce. <b>A meno che non lo decida lui</b>: l'interruttore «Fatti riconoscere negli scambi» nel cassetto «🔔 Avvisi» — <b>spento di serie</b> — fa annotare la presa, mostra il suo profilo all'altra parte e apre le <b>recensioni</b> su quello scambio; lasciandolo spento resta invisibile, e su quegli scambi recensioni non ce ne sono. Vale da quando lo accende: gli scambi già presi restano come erano, e a cancellare il pregresso c'è «dimentica il profilo». Chi entra con una chiave e <b>pubblica</b>, invece, si mostra — col profilo che ha qui, cioè il nome e la foto della sua chiave: è così da quando le card del libro hanno un volto, e il foglio dove si pubblica lo dice prima.</p>
       <p>Le <b>conversazioni fuori da Barattolo</b> non sono nostre: se vi scrivete su Telegram o su Nostr quella chat è vostra e di chi la trasporta — non la leggiamo, non ce l'abbiamo, e <b>in una disputa non possiamo usarla</b>. A decidere sono i fatti dello scambio: chi ha bloccato i sats, chi ha detto di aver mandato gli euro, chi li ha liberati.</p>
@@ -52271,7 +52272,23 @@ function pulisciScambiP2P(){
 /* LA ✕ DELLA RIGA: si toglie una cosa alla volta, e si chiede prima.
    L'id arriva dal DOM, e il DOM non e' la verita': il giudice si
    RICHIEDE qui dentro — e' la stessa ragione per cui sul server la
-   guardia di proprieta' sta dentro la WHERE e non nel client. */
+   guardia di proprieta' sta dentro la WHERE e non nel client.
+   E DAL 7 OTT 2026 VALE PER L'ACCOUNT (richiesta di Andrea: tolto su un
+   dispositivo, sparisca anche dagli altri). Prima di togliere si chiede
+   al server (`togliScambioServerP2P`, fuori dal motore: e' una fetch),
+   che lo ricorda e lo dice agli altri dispositivi alla loro prossima
+   lettura dell'archivio. Le quattro risposte:
+   • 'tolto'  — ricordato: via da qui, e l'archivio che questa pagina
+     tiene in memoria non lo fa rinascere (`p2pToltiServer`);
+   • 'ignoto' — il server non ha niente da ricordare (una riga che vive
+     solo qui, uno scambio oltre lo storico): via da qui, come prima;
+   • 'aperto' — per il server lo scambio e' ancora in corso: la riga
+     RESTA, e si dice perche'. Tranne la presa caduta messa da parte
+     (`idVero`): il giro ancora aperto e' un altro, quello sotto il nome
+     vero, e questa riga e' storia di un giro finito — via da qui;
+   • 'rete'   — la domanda non e' arrivata, o la risposta no: la riga
+     RESTA, e si riprova. Toglierla qui senza il server la lascerebbe
+     sugli altri dispositivi, cioe' il difetto da cui si e' partiti. */
 function togliScambioP2P(id, ev){
   if (ev) ev.stopPropagation();
   const o = ordiniP2P()[id];
@@ -52284,28 +52301,92 @@ function togliScambioP2P(id, ev){
     return;
   }
   const votoAperto = recensioneInSospesoP2P(o);
-  const perde = 'La riga e la sua chiave se ne vanno da questo dispositivo, e non tornano.';
+  /* «DA TUTTI I TUOI DISPOSITIVI» (7 ott 2026): prima diceva «da questo
+     dispositivo», ed era vero; con la ✕ ricordata dal server non lo e'
+     piu' */
+  const perde = 'La riga e la sua chiave se ne vanno da tutti i tuoi dispositivi, e non tornano.';
   chiediConferma({
     titolo: 'Togliere questo scambio?',
     corpo: votoAperto
       ? 'Su questo scambio puoi ancora dare il voto: togliendolo lo perdi.\n\n' + perde
       : perde + '\n\nLo scambio è chiuso, quindi non c\'è più niente da fare.',
     etichetta: 'Togli',
-    poi: () => {
-      const tutti = ordiniP2P();
+    poi: async () => {
+      const suo = String(o.idVero || id);
+      const esito = typeof togliScambioServerP2P === 'function'
+        ? await togliScambioServerP2P(suo) : 'ignoto';
+      if (esito === 'rete') {
+        const t = 'Non riesco a toglierlo adesso: controlla la connessione e riprova';
+        toast(t, tempoLettura(t));
+        return;
+      }
+      if (esito === 'aperto' && !o.idVero) {
+        const t = 'Lo scambio risulta ancora in corso: lo potrai togliere quando sarà chiuso';
+        toast(t, tempoLettura(t));
+        return;
+      }
+      if (esito === 'tolto') p2pToltiServer = (p2pToltiServer || []).concat([suo]);
       /* LA LAPIDE ANCHE QUI (24 set 2026): l'archivio del server lo
          ricorda per trenta giorni, e senza una lapide la riga tolta a
          mano rinascerebbe al render dopo. Vive quanto lo storico del
          server, con un margine. */
       lapideP2P(Object.assign({}, o, {scade: Math.floor(Date.now() / 1000) + P2P_LAPIDE_TOLTO_S}));
-      delete tutti[id];
-      try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
-      if (typeof aggiornaPallinoScambiP2P === 'function') aggiornaPallinoScambiP2P();
+      cancellaRigaP2P(id);
       if (p2pOrdineAperto === id) p2pOrdineAperto = '';
       toast('Scambio tolto');
       renderP2P();
     }
   });
+}
+/* LA RIGA SE NE VA DA QUESTO DISPOSITIVO, e basta: la scrittura sola,
+   per i due posti che tolgono — la ✕ (che prima scrive la sua lapide)
+   e i tolti degli altri dispositivi (che la lapide non la vogliono:
+   vedi `applicaToltiP2P`). Torna se c'era. */
+function cancellaRigaP2P(id){
+  const tutti = ordiniP2P();
+  if (!tutti[id]) return false;
+  delete tutti[id];
+  try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
+  if (typeof aggiornaPallinoScambiP2P === 'function') aggiornaPallinoScambiP2P();
+  return true;
+}
+/* PURA: questo ordine e' fra i tolti con la ✕ dello stesso account? Lo
+   chiede l'adozione prima di far NASCERE una riga dall'archivio. Col
+   typeof: i banchi di casa estraggono l'adozione da sola. */
+function toltoAltroveP2P(id){
+  return typeof p2pToltiServer !== 'undefined' && Array.isArray(p2pToltiServer)
+    && p2pToltiServer.indexOf(String(id)) >= 0;
+}
+/* I TOLTI DEGLI ALTRI DISPOSITIVI (7 ott 2026): le righe di questo
+   dispositivo che lo stesso account ha tolto altrove se ne vanno anche
+   qui — quella con l'id dell'ordine e la presa caduta messa da parte
+   sotto il suo nome vero (`idVero`). Gira in `scambiP2P` DOPO
+   l'adozione, ed e' l'ordine che conta: una riga rimasta indietro
+   l'archivio la porta prima alla fine, e qui la si toglie finita.
+   SOLO SE QUESTO DISPOSITIVO LA GIUDICA FINITA, con lo stesso giudice
+   della ✕: il server l'ha gia' detta finita, e se qui non lo e' due
+   giudici non sono d'accordo — la riga resta, e se ne riparla alla
+   lettura dopo. Una riga aperta porta una chiave che puo' ancora
+   muovere dei sats.
+   NIENTE LAPIDE: a non far rinascere la riga ci pensa l'elenco
+   (`toltoAltroveP2P`), che il server smette di mandare se lo scambio
+   si muove di nuovo. Una lapide qui nasconderebbe anche dal LIBRO
+   l'ordine di un altro tornato in vetrina, per quaranta giorni. */
+function applicaToltiP2P(){
+  if (typeof p2pToltiServer === 'undefined' || !Array.isArray(p2pToltiServer)
+      || !p2pToltiServer.length) return 0;
+  const tutti = ordiniP2P();
+  let n = 0;
+  for (const k of Object.keys(tutti)) {
+    const o = tutti[k];
+    if (!o || !(toltoAltroveP2P(k) || (o.idVero && toltoAltroveP2P(o.idVero)))) continue;
+    if (!p2pTogliibile(o).si) continue;
+    if (cancellaRigaP2P(k)) {
+      n++;
+      diarioP2P('archivio ' + String(k).slice(0, 8) + ': tolto con la ✕ su un altro dispositivo, via anche da qui');
+    }
+  }
+  return n;
 }
 
 function mostroHexP2P(){
@@ -52836,6 +52917,12 @@ let p2pMieiChiesto = false;
    mai arrivato. Lo riempie `chiediScambiServerP2P`, che vive FUORI dal
    motore (e' una fetch); qui lo legge la sola adozione. */
 let p2pScambiServer = null;
+/* ...E GLI SCAMBI TOLTI CON LA ✕ (7 ott 2026, «la ✕ su ogni
+   dispositivo»): gli id che lo stesso account ha tolto, da qui o da un
+   altro dispositivo, come li dice l'archivio — null = mai arrivato. Li
+   leggono l'adozione (che non li fa nascere) e `applicaToltiP2P` (che
+   toglie le righe che ci sono). */
+let p2pToltiServer = null;
 /* IL GIUDICE E' UNO SOLO, e lo chiamano la card, la porta del gesto e
    la cintura della presa: tre posti che devono dire la stessa cosa. */
 /* ⚠️ UNA PRESA CADUTA NON E' «MIO» (25 set 2026, dal vivo: presa e
@@ -64290,6 +64377,10 @@ function adottaScambiServerP2P(locali){
     }
     /* LA NASCITA: mai su una lapide, mai un mio ritiro, mai senza stato */
     if (lapidataP2P(id)) continue;
+    /* ...e mai su uno scambio tolto con la ✕, qui o su un altro
+       dispositivo dello stesso account (7 ott 2026). Col typeof: i
+       banchi di casa estraggono l'adozione da sola */
+    if (typeof toltoAltroveP2P === 'function' && toltoAltroveP2P(id)) continue;
     /* un giro caduto messo da parte non rinasce sotto il nome vero
        (25 set 2026): sta gia' sotto «Annullati» col suo.
        ⚠️ TRANNE IL MIO ORDINE (28 set 2026): la presa caduta messa da
@@ -64326,6 +64417,9 @@ function scambiP2P(){
   adottaOrdiniAltroveP2P(ordiniP2P());
   /* ...e poi l'ARCHIVIO DEL SERVER, che sa anche degli scambi presi */
   adottaScambiServerP2P(ordiniP2P());
+  /* ...e i TOLTI CON LA ✕ altrove (7 ott 2026): DOPO l'adozione, che
+     una riga rimasta indietro la porta prima alla fine */
+  applicaToltiP2P();
   /* L'ORDINE NON E' PIU' CABLATO QUI (set 2026): lo dice la pillola
      «Ordina», e il «piu' recenti» di sempre e' rimasto il suo
      predefinito — chi non tocca niente vede quel che vedeva ieri. */
@@ -65761,6 +65855,11 @@ async function chiediScambiServerP2P(){
         ? d.scambi : null;
       if (!lista) return false;
       p2pScambiServer = lista;
+      /* GLI SCAMBI TOLTI CON LA ✕ (7 ott 2026): solo stringhe nella
+         forma di un ordine, e un server di ieri senza l'elenco vale un
+         elenco vuoto. A toglierli e' `applicaToltiP2P`, al render */
+      p2pToltiServer = Array.isArray(d.tolti)
+        ? d.tolti.filter(x => typeof x === 'string' && P2P_FORMA_ORDINE.test(x)) : [];
       /* il cambio di Barattozon di ogni scambio (26 set 2026): su un
          dispositivo che la riga non l'ha scritta, e' da qui che il
          premio scelto si rilegge */
@@ -66217,6 +66316,49 @@ function portaAVistaCardP2P(id){
   }, P2P_EVIDENZA_MS + 50);
 }
 /* ============ fine dell'archivio del server ============ */
+
+/* ============ LA ✕ SU OGNI DISPOSITIVO (7 ott 2026) =========
+   La domanda che la ✕ di «I miei scambi» fa prima di togliere: «questo
+   scambio e' finito, ricordatelo per il mio account». Il giudice di la'
+   e' `_togli_scambio_p2p`; la risposta torna come una parola sola, e la
+   decide `togliScambioP2P` (nel motore) cosa farne.
+   UN BLOCCO SUO, fuori dal motore e fuori dall'archivio, per la ragione
+   delle sorelle: il motore non ha dentro nessuna fetch, e l'archivio ne
+   ha una sola, senza corpo (ci sono le sentinelle). Le regole sono le
+   loro: il cancello dell'anonimo, POST, l'id nel corpo e mai
+   nell'indirizzo, e nel corpo SOLO l'id dell'ordine.
+   LE PAROLE: 'tolto' (200), 'ignoto' (404 o 400: il server non ha niente
+   da ricordare, e anche un id che non ha la forma di un ordine — una
+   riga provvisoria, `nuovo:3` — non si chiede nemmeno), 'aperto' (409),
+   'rete' per TUTTO il resto: niente rete, un 5xx, la sessione scaduta,
+   il tetto di tempo. Nel dubbio la riga resta, che e' il verso giusto in
+   cui sbagliare: si riprova con un tocco. */
+/* la forma di un id del coordinatore, la stessa di FORMA_ORDINE_P2P sul
+   server (una sentinella le confronta) */
+const P2P_FORMA_ORDINE = /^[0-9a-zA-Z-]{8,64}$/;
+const TETTO_TOGLI_P2P_MS = 12000;
+async function togliScambioServerP2P(ordine){
+  if (DEMO || VETRINA || !myTgId || !API_BASE) return 'ignoto';
+  if (typeof ordine !== 'string' || !P2P_FORMA_ORDINE.test(ordine)) return 'ignoto';
+  const ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+  let sveglia = 0;
+  const tetto = new Promise(ok => { sveglia = setTimeout(() => {
+    if (ctl) ctl.abort();
+    ok('rete');
+  }, TETTO_TOGLI_P2P_MS); });
+  const domanda = fetch(`${API_BASE}/p2p/scambi/togli`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({ordine: ordine}),
+      signal: ctl ? ctl.signal : undefined})
+    .then(r => r.ok ? 'tolto'
+               : (r.status === 404 || r.status === 400) ? 'ignoto'
+               : r.status === 409 ? 'aperto' : 'rete')
+    .catch(() => 'rete');
+  const esito = await Promise.race([domanda, tetto]);
+  clearTimeout(sveglia);
+  return esito;
+}
+/* ============ fine della ✕ su ogni dispositivo ============ */
 
 /* ============ LA MODERAZIONE DELLE DISPUTE P2P (28 set 2026) ============
    La sezione «⚖️ Moderazione P2P»: la vede SOLO un moderatore — una
