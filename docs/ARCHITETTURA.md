@@ -7290,7 +7290,10 @@
   avvisi 0007 di presa, annullo, scadenza e ritorno, e a
   `/api/p2p/canale` per gli ordini nuovi di Barattolo (LA FOTOGRAFIA
   SUBITO). La fila c'e' solo nella vetrina nuda (`vetrinaNudaP2P`) e
-  non entra mai nella griglia. Mostra solo quel che chi guarda puo'
+  non entra mai nella griglia — ma da desktop ne SEGUE le colonne (6
+  ott 2026): la card e' larga una colonna della `.grid` dello stesso
+  blocco, tre da 768 e quattro da 1024, stesso gap. Mostra solo quel
+  che chi guarda puo'
   prendere (dal 27 set 2026): fuori i MIEI ordini (`mioInVetrinaP2P`:
   l'archivio del dispositivo, e `miei` che la rotta da' a chi ha la
   sessione, dagli `autori` che l'orologio fotografa e che non escono mai
@@ -28919,6 +28922,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   non tagli l'alone del picco (la prova lo confronta coi numeri del
   keyframe), e il file e' 1000×259: il 3x della misura nuova su un
   telefono da 400.
+  Da 768px in su (6 ott 2026, CANTIERI «Il P2P sugli schermi larghi»)
+  e' largo 360 (`.p2p-fee-banner{width:360px}` nel blocco desktop):
+  i cinque sesti della colonna da 608 facevano 507x132.
 - LE DISPUTE P2P (28 set 2026, perché in CANTIERI, «Le dispute P2P per
   i moderatori»). DUE META', e la terza da fare.
   L'ANNULLO INSIEME A DISPUTA APERTA (client). mostrod accetta

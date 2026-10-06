@@ -120035,6 +120035,100 @@ def prove_vestito_bottoni():
               else r.stderr[-400:])
 
 
+def prove_p2p_schermi_larghi():
+    """IL P2P SUGLI SCHERMI LARGHI (6 ott 2026, ritocco di Andrea dal
+    web su PC). Due pezzi uscivano fuori misura da 768px in su:
+    1) la fila «Scambi P2P» della home teneva ogni card a META' RIGA, la
+       regola del telefono: a 1280 card da 558x660 accanto agli annunci
+       da 270x372. Da desktop la card e' larga quanto una colonna della
+       .grid — stesso numero di colonne, stesso gap, stessa divisione —
+       a 3 colonne da 768 e a 4 da 1024;
+    2) il banner delle commissioni restava ai cinque sesti della colonna
+       del P2P, 507x132 con le cifre a ~50px: da desktop e' largo 360
+       (scelta di Andrea fra tre), la misura di un telefono grande.
+    SOTTO I 768 NON CAMBIA NIENTE: le regole nuove vivono SOLO dentro i
+    blocchi desktop. La prova dal vivo (le colonne della fila e della
+    griglia combaciano al pixel a 900, 1280 e 1920; geometria identica a
+    375 e 360) sta nel verbale in CANTIERI; qui le sentinelle che la
+    tengono ferma: la divisione della fila si RICAVA da quella della
+    .grid dello stesso blocco, quindi chi cambia le colonne della griglia
+    e dimentica la fila lo sente qui."""
+    print("\n[il P2P sugli schermi larghi]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+
+    def blocco_media(testa):
+        """il corpo di un @media dalla sua testa alla graffa che lo chiude"""
+        i = css.find(testa)
+        if i < 0:
+            return ""
+        j, fondo = css.index("{", i) + 1, 1
+        while fondo and j < len(css):
+            fondo += {"{": 1, "}": -1}.get(css[j], 0)
+            j += 1
+        return css[i:j]
+
+    # i due blocchi desktop di sempre, presi dalla loro prima riga
+    d768 = blocco_media("@media (min-width:768px){\n    #app{max-width:960px")
+    d1024 = blocco_media("@media (min-width:1024px){\n    #app{max-width:1160px}")
+    prova("i due blocchi desktop ci sono", [True, True], [bool(d768), bool(d1024)])
+
+    def griglia(blocco):
+        m = re.search(r"\n\s*\.grid\{grid-template-columns:repeat\((\d+),1fr\);"
+                      r"gap:(\d+)px\}", blocco)
+        return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+
+    def fila(blocco):
+        g = re.search(r"\n\s*\.p2p-vt-fila\{gap:(\d+)px\}", blocco)
+        c = re.search(r"\n\s*\.p2p-vt-fila \.card\{flex:0 0 calc\(\(100% - "
+                      r"(\d+) \* (\d+)px\) / (\d+)\)\}", blocco)
+        return ((int(g.group(1)) if g else None),
+                (tuple(int(x) for x in c.groups()) if c else None))
+
+    for nome, blocco, attese in (("768", d768, (3, 14)), ("1024", d1024, (4, 16))):
+        n, gap = griglia(blocco)
+        prova(f"da {nome}px la griglia degli annunci e' quella di sempre",
+              attese, (n, gap))
+        g, c = fila(blocco)
+        # la fila si giudica CONTRO la griglia dello stesso blocco: n-1 gap
+        # da togliere, diviso n — la colonna esatta degli annunci
+        prova(f"...e la fila P2P ha il suo stesso gap", gap, g)
+        prova(f"...e card larghe una colonna: (100% - {n - 1} x {gap}) / {n}",
+              (n - 1, gap, n), c)
+
+    # la larghezza che ne viene, col contenuto di #app a 1160 e a 960 (il
+    # --pad di 16 per lato): la card della fila e' quella della griglia
+    def larga(utile, n, gap):
+        return (utile - (n - 1) * gap) / n
+    prova("a 1920 (contenuto 1128) la card P2P e' larga 270 come l'annuncio",
+          270.0, larga(1160 - 32, *griglia(d1024)))
+
+    # SOTTO I 768 NIENTE: la regola del telefono e' intatta, e le nuove
+    # non escono dai blocchi desktop
+    prova("a mobile la card della fila resta meta' riga, col gap di 12", True,
+          "  .p2p-vt-fila .card{flex:0 0 calc((100% - 12px) / 2)}" in css
+          and ".p2p-vt-fila{display:flex;gap:12px;" in css)
+    fuori = css.replace(d768, "").replace(d1024, "")
+    prova("...e le regole nuove della fila vivono SOLO nei blocchi desktop",
+          [0, 1], [fuori.count(".p2p-vt-fila{gap:"),
+                   fuori.count(".p2p-vt-fila .card{flex:")])
+
+    # IL BANNER DELLE COMMISSIONI
+    prova("da desktop il banner delle commissioni e' largo 360", True,
+          "\n    .p2p-fee-banner{width:360px}" in d768)
+    prova("...una volta sola, e mai fuori dal blocco desktop", [1, 0],
+          [css.count(".p2p-fee-banner{width:360px}"),
+           fuori.count(".p2p-fee-banner{width:360px}")])
+    prova("...e a mobile resta ai cinque sesti, prima nel foglio (la "
+          "regola desktop la batte per ordine, a pari specificita')", True,
+          0 <= css.find(".p2p-fee-banner{display:block;width:calc(500% / 6)")
+          < css.find(d768))
+    # nessuna larghezza massima che lo rimetta a cinque sesti piu' in giu'
+    dopo = css[css.find(d768) + len(d768):]
+    prova("...e nessuna regola piu' in basso gli ridà un'altra larghezza",
+          False, bool(re.search(r"\.p2p-fee-banner\{[^}]*width:", dopo)))
+
+
 def prove_csp_prova():
     """LE CINTURE HTTP, LA CSP IN PROVA E IL LOGIN WEB A REDIRECT (1 ott
     2026, cantiere «CSP e le voci aperte degli audit»).
@@ -122463,6 +122557,7 @@ def main():
               prove_negozi_grandi,
               prove_freni,
               prove_vestito_bottoni,
+              prove_p2p_schermi_larghi,
               prove_config_esempio):
         try:
             f()

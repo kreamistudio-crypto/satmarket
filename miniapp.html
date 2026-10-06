@@ -9453,6 +9453,23 @@
 
     /* griglia a 3 colonne: vale per home, vetrina e negozio */
     .grid{grid-template-columns:repeat(3,1fr);gap:14px}
+    /* LA FILA «SCAMBI P2P» SEGUE LA GRIGLIA (6 ott 2026, ritocco di
+       Andrea): a mobile la card della fila e' larga quanto una colonna
+       della griglia (meta' riga meno il gap), e qui deve restarlo — la
+       meta' fissa di sotto ne faceva card da 558x660 a 1280, il doppio
+       delle sorelle (270x372). Stesso gap e stessa divisione della
+       .grid qui sopra; il padding laterale e' gia' lo stesso (--pad),
+       quindi le colonne combaciano al pixel con quelle degli annunci.
+       Le card che non ci stanno restano di lato, come a mobile. */
+    .p2p-vt-fila{gap:14px}
+    .p2p-vt-fila .card{flex:0 0 calc((100% - 2 * 14px) / 3)}
+    /* IL BANNER DELLE COMMISSIONI A MISURA DI TELEFONO GRANDE (6 ott
+       2026, scelta di Andrea fra tre): i cinque sesti della colonna
+       del P2P (608) facevano 507x132, con le cifre a ~50px contro i
+       15-17 del testo intorno. 360 e' la misura che ha su un telefono
+       grande, e le cifre tornano in scala con la pagina (~35px). Il
+       file e' largo 1000: a 360 resta nitido anche a 2x. */
+    .p2p-fee-banner{width:360px}
 
     /* la topbar e' fissa in cima e alta 60: il bottone sticky degli
        «altri oggetti» si ferma sotto di lei, non sotto il bordo dello
@@ -9623,6 +9640,9 @@
   @media (min-width:1024px){
     #app{max-width:1160px}
     .grid{grid-template-columns:repeat(4,1fr);gap:16px}
+    /* la fila P2P sulle quattro colonne, col gap di qui */
+    .p2p-vt-fila{gap:16px}
+    .p2p-vt-fila .card{flex:0 0 calc((100% - 3 * 16px) / 4)}
     nav{padding:0 max(var(--pad), calc((100% - 1160px)/2))}
   }
 

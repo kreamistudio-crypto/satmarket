@@ -36688,3 +36688,86 @@ barra del +, il trattino in mezzo non c'e' piu'.
 colonne in filo e la pillola «🌱 Pioniere» che va a capo sotto «Fee P2P».
 A 320 px le etichette vanno su due righe (non richiesto, regge). La
 card della vetrina in home ha ancora «5–15 €».
+
+## Il P2P sugli schermi larghi (6 ott 2026, ritocco del web su PC)
+
+**LA DOMANDA DI ANDREA.** Dal browser del PC, nella home le card del P2P
+erano enormi, e il banner delle commissioni del P2P usciva gigante. Da
+1024 a 1920 px: card della fila della stessa misura e della stessa
+griglia degli annunci, testi e icone in proporzione, il banner come gli
+altri banner; guardare il resto di home e P2P; a 375 px niente deve
+cambiare.
+
+**MISURATO PRIMA** (Chrome headless via CDP, copia nello scratchpad in
+collaudo, relay morto, fila riempita dalla pagina con sei ordini finti e
+`chiediFotoVetrinaP2P` di cartone):
+- la fila «Scambi P2P» teneva a desktop la regola del telefono,
+  `flex:0 0 calc((100% - 12px) / 2)`: mezza riga. A 1280 e a 1920 card
+  da **558x660** accanto agli annunci da **270x372**, due sole in vista
+  su sei;
+- il banner delle commissioni era **507x132 a ogni larghezza** da 768 a
+  1920 (cinque sesti della colonna del P2P, larga 608), 286x75 a 375.
+  Già largo quanto il «Da scoprire» della home (520x248) e più basso:
+  il «gigante» erano le cifre, ~50 px contro i 15-17 del testo intorno.
+  Messe le misure davanti ad Andrea con tre strade (360 px, come il
+  telefono, l'altezza dei banner della home cioè ~960 di larghezza), ha
+  scelto **360**.
+
+**LA CURA, SOLO CSS, SOLO NEI BLOCCHI DESKTOP.**
+- Nel blocco `@media (min-width:768px)`, accanto alla `.grid` a tre
+  colonne: `.p2p-vt-fila{gap:14px}` e `.p2p-vt-fila .card{flex:0 0
+  calc((100% - 2 * 14px) / 3)}`; nel blocco `(min-width:1024px)`, accanto
+  alla griglia a quattro: gap 16 e `(100% - 3 * 16px) / 4`. La fila ha
+  lo stesso padding laterale della griglia (`--pad`), quindi le colonne
+  combaciano al pixel. Le card che non ci stanno restano di lato, come a
+  mobile. Niente `fuori-telegram`: la regola è quella della `.grid`, che
+  vale anche dentro Telegram Desktop largo.
+- Nel blocco 768: `.p2p-fee-banner{width:360px}` (360x94). Batte i
+  cinque sesti per ordine nel foglio, a pari specificità. Il file è
+  largo 1000: a 360 resta nitido anche a 2x. Le pillole grigie del banner
+  personale sono ritagli in percentuale, quindi seguono da sole.
+
+**LE ALTRE PARTI GUARDATE A 1280 E 1920, NEI DUE TEMI:** la home
+(testata, ricerca, hero, categorie, «Da scoprire», griglia) e il P2P
+(libro, «I miei scambi», «Info P2P») stanno già nella colonna da 1160 e
+in quella del P2P da 608: nessun'altra misura fuori scala, nient'altro
+toccato.
+
+**STRADE SCARTATE.**
+- La fila che a desktop va a capo in una griglia vera: sei card su
+  quattro colonne lasciano due orfane, e la fila sopra gli annunci
+  diventerebbe alta il doppio. Resta una striscia, con la card larga una
+  colonna.
+- Il banner all'altezza dei banner della home (248): con le proporzioni
+  del disegno (3,9:1) sarebbe largo ~960, più grande di prima.
+- Il banner largo quanto il «Da scoprire» (520): è già la misura di
+  partenza, e non scioglie le cifre a 50 px.
+
+**PROVATO.**
+- Dal vivo, «dopo» contro «prima» (due server su due copie, 8137 e
+  8138): la card P2P è **270x372 come l'annuncio** a 1280 e a 1920; le
+  quattro colonne della fila e della griglia combaciano al pixel a 1280
+  (76/362/648/934, larghe 270) e a 1920 (396/682/968/1254), le tre a
+  900 (16/310/604, larghe 280); nessuno scorrimento orizzontale della
+  pagina; banner **360x94**.
+- **A 375 E A 360 NON CAMBIA NIENTE**: la geometria di venti pezzi della
+  home e del P2P (app, griglia e card, fila e card coi loro badge, banner
+  e immagine, card del libro, «Da scoprire», categorie, hero, ricerca,
+  nav: posizione, misura, corpo, gap, flex-basis) è IDENTICA byte per
+  byte fra prima e dopo. Gli scatti a 375 differiscono solo nelle cifre
+  dei sats e degli euro, che seguono il cambio vivo fra i due giri.
+- Scatti prima/dopo a 1280 e 1920 nei due temi, e a 375 (home e P2P).
+- `prove_p2p_schermi_larghi` (14): la divisione della fila si RICAVA da
+  quella della `.grid` dello stesso blocco (chi cambia le colonne della
+  griglia e dimentica la fila lo sente), la regola del telefono intatta,
+  le regole nuove solo nei blocchi desktop, il banner a 360 una volta
+  sola e senza nessuna regola più in basso che lo rilarghi. Tortura 6 su
+  6 (fila del 1024 tolta, griglia a 5, gap della fila diverso, banner
+  tolto o a 400, regola mobile toccata).
+- Suite intera severa (`PROVE_SEVERE=1`) nel worktree senza config, da
+  origin/main `07002a5`, e i collaudi della CI nella gabbia: i numeri
+  nel messaggio del commit.
+
+**NON PROVATO.** Il telefono vero e l'APK (la regola è dietro
+`min-width:768px`, e a 375/360 la geometria è identica); Telegram
+Desktop largo (stessa regola della `.grid`, non guardato a schermo).
