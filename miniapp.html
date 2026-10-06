@@ -55801,11 +55801,14 @@ const SECONDARI_P2P = {
      e' lo stesso di sempre (`cancel` al coordinatore) e la parola
      cambia perche' «ritirare» un ordine dal libro e' il vocabolario
      di chi lo ha messo li', mentre chi guarda pensa a uno scambio da
-     annullare. La sorella qui sotto resta «Chiedi di annullare», e le
-     due non si confondono: quella e' una PROPOSTA che vuole anche il
-     si' dell'altra persona, questa sparisce e basta. */
+     annullare. La sorella qui sotto era «Chiedi di annullare»: dal
+     6 ott 2026 (parola di Andrea, «solo questione di etichette») dice
+     «✕ Annulla» anche lei. Il GESTO non cambia — a scambio preso e'
+     ancora una PROPOSTA che vuole il si' dell'altra persona, perche'
+     cosi' vuole Mostro — e a dirlo e' il foglio di conferma che si
+     apre al tocco, non piu' il bottone. */
   ritira: '<button class="btn ghost" onclick="annullaScambioP2P()">✕ Annulla l\'ordine</button>',
-  annulla: '<button class="btn ghost" onclick="annullaScambioP2P()">✕ Chiedi di annullare</button>',
+  annulla: '<button class="btn ghost" onclick="annullaScambioP2P()">✕ Annulla</button>',
   'accetta-annullo': '<button class="btn ghost" onclick="accettaAnnulloP2P()">🤝 Accetta di annullare</button>',
   'non-arrivano': '<button class="btn ghost" onclick="apriIncassoP2P()">⚡ I sats non arrivano? Dai una fattura nuova</button>',
   /* A SCAMBIO CONCLUSO I GESTI SONO DUE E SI ESCLUDONO (set 2026, le
@@ -55833,7 +55836,7 @@ const SECONDARI_P2P = {
    Nessun gesto automatico (decisione di Andrea): chi compra
    potrebbe aver pagato in tempo, e il bottone del passo resta. */
 const SECONDARI_EVIDENZA_P2P = {
-  annulla: '<button class="btn orange" onclick="annullaScambioP2P()">🤝 Chiedi di annullare d\'accordo</button>',
+  annulla: '<button class="btn orange" onclick="annullaScambioP2P()">✕ Annulla</button>',
   'accetta-annullo': '<button class="btn orange" onclick="accettaAnnulloP2P()">🤝 Accetta di annullare</button>'
 };
 
@@ -60944,7 +60947,7 @@ function annullaScambioP2P(){
   haptic();
   const subito = P2P_ANNULLA_SUBITO.indexOf(o.stato) >= 0;
   chiediConferma({
-    titolo: subito ? 'Annulli l\'ordine?' : 'Chiedi di annullare?',
+    titolo: subito ? 'Annulli l\'ordine?' : 'Annulli lo scambio?',
     corpo: subito
       ? 'L\'ordine esce dal libro. Nessuno ha ancora scambiato niente con te.'
       : o.stato === 'in_disputa' ? corpoAnnulloDisputaP2P(o, 'chiedi')
@@ -60952,7 +60955,7 @@ function annullaScambioP2P(){
     /* «ANNULLA» COME IL BOTTONE (27 set 2026): «✕ Annulla l'ordine»,
        «Sto annullando l'ordine…», «Ordine annullato ✓» — e il foglio in
        mezzo diceva «ritira» */
-    etichetta: subito ? 'Sì, annulla' : 'Sì, chiedilo',
+    etichetta: 'Sì, annulla',
     indietro: 'Indietro',
     /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
     poi: () => inviaAnnulloP2P(subito ? 'ritira' : 'chiedi')
@@ -61747,7 +61750,7 @@ function statoTabacchinoP2P(o, adesso){
   if (!f) return null;
   const compro = o.lato === 'compro';
   if (f === 'scaduta') return {t: 'Il PayCode è scaduto', d: compro
-    ? 'Non si può più pagare al tabacchino. Se non l\'hai pagato in tempo, chiedi di annullare: i sats tornano a chi li ha bloccati. Se l\'hai pagato prima della scadenza, tieni lo scontrino: chi vende lo vede pagato su Amazon e libera.'
+    ? 'Non si può più pagare al tabacchino. Se non l\'hai pagato in tempo, tocca «✕ Annulla»: i sats tornano a chi li ha bloccati. Se l\'hai pagato prima della scadenza, tieni lo scontrino: chi vende lo vede pagato su Amazon e libera.'
     : 'Chi compra non può più pagarlo. Guarda su Amazon: se l\'ordine risulta pagato, libera i sats; se no, annullate d\'accordo e i sats tornano a te.'};
   if (f === 'ultima') return {t: 'Il PayCode scade fra meno di un\'ora', d: compro
     ? 'Se non hai ancora pagato al tabacchino, è adesso: scaduto il PayCode non si paga più.'

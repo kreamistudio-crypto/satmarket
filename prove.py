@@ -66977,14 +66977,21 @@ def prove_p2p_motore():
           [False, False, False],
           ['class="p2p-meta"' in _ren_nudo.split("box.innerHTML")[1],
            "Vendi sats" in _ren_nudo, "metodoSceltoP2P" in _ren_nudo])
-    # «ANNULLA» E NON «RITIRA»: il gesto e' lo stesso (`cancel`), e la
-    # sorella resta «Chiedi di annullare» — quella e' una PROPOSTA che
-    # vuole anche il si' dell'altra persona, questa sparisce e basta.
+    # «ANNULLA» E NON «RITIRA»: il gesto e' lo stesso (`cancel`).
+    # EMENDATA (6 ott 2026, «solo questione di etichette»): anche la
+    # sorella a scambio preso dice «✕ Annulla» e non piu' «Chiedi di
+    # annullare». Il gesto resta una PROPOSTA (Mostro vuole il si'
+    # dell'altra persona), e a dirlo e' il foglio di conferma.
     prova("dal libro l'ordine proprio si ANNULLA, non si ritira",
-          [True, True, False],
+          [True, True, False, False],
           ["✕ Annulla l\\'ordine</button>" in mini,
-           "✕ Chiedi di annullare</button>" in mini,
+           'onclick="annullaScambioP2P()">✕ Annulla</button>' in mini,
+           "Chiedi di annullare</button>" in mini,
            "Ritira l\\'ordine</button>" in mini])
+    _asc = pezzo_js(mini, "function annullaScambioP2P(){", "\n}")
+    prova("...e il foglio di conferma dice ancora che serve il si' "
+          "dell'altra persona", True,
+          "solo se anche l\\'altra persona è d\\'accordo" in _asc)
     # ⚠️ LA TESTATA E' IL CAPPELLO DI CASA (set 2026, richiesta di
     # Andrea), e ha avuto tre stesure in due giorni: l'etichetta di
     # sezione «Lo scambio», poi il solo marchio, e adesso il titolo

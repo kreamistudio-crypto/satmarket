@@ -37486,3 +37486,26 @@ CI: nel messaggio del commit.
 temi — il tab, le cifre, l'anello che scade, «Libro ordini» acceso in
 basso; una card di disputa in «I miei scambi»; la card «Vende» in
 vetrina con la scritta scura.
+
+## P2P: «✕ Annulla» invece di «Chiedi di annullare» (6 ott 2026)
+
+Il compito (Andrea): «nel P2P non mettere "chiedi di annullare", metti
+direttamente "Annulla"». Spiegato che a scambio preso Mostro vuole il sì
+di tutte e due le parti (un annullo da soli dopo «ho inviato gli euro»
+sarebbe una truffa facile), Andrea ha scelto: «solo questione di
+etichette».
+
+**Cosa.** Il bottone a scambio preso dice «✕ Annulla» (anche nella
+versione arancio del tabacchino scaduto, che diceva «🤝 Chiedi di
+annullare d'accordo»); il foglio di conferma si intitola «Annulli lo
+scambio?» col bottone «Sì, annulla». IL GESTO NON CAMBIA: parte la
+stessa proposta al coordinatore, e il corpo del foglio continua a dire
+che lo scambio si annulla solo se l'altra persona è d'accordo — la
+verità si è spostata dal bottone al foglio, non è sparita. La frase del
+tabacchino che citava il bottone lo cita col nome nuovo.
+
+**Non fatto (non chiesto in questo giro):** la nota all'altra persona
+al momento dell'annullo.
+
+**Provato.** `prove_p2p_motore`: il bottone nuovo c'è, la vecchia
+etichetta no, il foglio dice ancora che serve il sì dell'altra persona.
