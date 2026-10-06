@@ -66739,6 +66739,33 @@ def asset_scoprire(nome: str, if_none_match: str = Header("")):
                           if_none_match)
 
 
+# L'ICONA DEL CARRELLO SALVATO (6 ott 2026, disegnata da Andrea): la
+# card «Carrello» in testa alla fila delle categorie, al posto della
+# riga in home. Un disegno solo in TRE MISURE, 84/168/252 — l'1x, il 2x
+# e il 3x della card da 84px —, ritagliato attorno al carrello dal
+# 2048 di Andrea e WebP a qualita' 82: 2, 5 e 10 KB. Fondo PIENO (il
+# bruno con l'alone arancio del disegno), quindi cartella SUA e mai
+# assets/categorie/: ritaglia_categorie.py fa il glob di quella e un
+# fondo pieno le sposterebbe la mediana dell'inchiostro (la ragione di
+# assets/scoprire/). Il nome arriva dal client (lo `srcset`), quindi
+# whitelist a tupla, il patto di FILE_SCOPRIRE. Gli URL nel client
+# sono letterali, e _timbra_asset_pagina li timbra col ?v=: il max-age
+# e' innocuo, come per il logo grande del P2P.
+FILE_CARRELLO = ("carrello-84.webp", "carrello-168.webp",
+                 "carrello-252.webp")
+
+
+@app.get("/assets/carrello/{nome}")
+def asset_carrello(nome: str):
+    if nome not in FILE_CARRELLO:
+        raise HTTPException(404, "immagine non trovata")
+    percorso = os.path.join("assets", "carrello", nome)
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "immagine non trovata")
+    return FileResponse(percorso, media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 # Le sei illustrazioni del tour di benvenuto del P2P (set 2026): si
 # vedono una volta sola per conto, al primo ingresso nel libro, e
 # poi solo a richiesta dalla voce «Come funziona».

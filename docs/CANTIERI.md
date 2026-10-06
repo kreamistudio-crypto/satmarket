@@ -37758,3 +37758,94 @@ porta chi sta in `ADMIN_IDS` del config di là: va guardato che ci siano
 le persone giuste (il pannello «⚙️ Stato delle leve» ne dice il
 numero). La classifica e il proprio Profilo senza bollino: se servono,
 è un ritocco piccolo.
+
+## L'icona del carrello in «Esplora per categorie» (6 ott 2026, sera, richiesta di Andrea)
+
+Seguito del carrello salvato (adfd112, già online): la riga in home
+«🛒 Hai un carrello da Anna · 2 pezzi» con «Svuota · Riprendi» diventa
+una CARD nella fila delle categorie, col disegno di Andrea (il carrello
+di metallo con la tazza, la scatola, la pianta e i libri, su un fondo
+bruno con l'alone arancio).
+
+**DECISO.** La card «Carrello» è la PRIMA della fila, prima di «Tutto»,
+e c'è solo finché c'è un carrello. Stessa misura (84 px, 160 da desktop
+fuori da Telegram), stesso quadrato con gli angoli a 14 px, etichetta
+sotto «Carrello». Per la voce: «Il tuo carrello da Anna, 3 pezzi» (al
+singolare «1 pezzo»). Nell'angolo in alto a destra un pallino col numero
+dei pezzi; se mentre il carrello aspettava qualcosa è cambiato (le note
+del rientro: venduto, meno pezzi, prezzo diverso) il pallino dice «!», e
+la voce aggiunge «: qualcosa è cambiato» — il «!» è visivo, e chi legge
+con la voce deve saperlo lo stesso. Il tocco è il vecchio «Riprendi»:
+apre il carrello con le note in cima; uscendo le note sono lette e il
+pallino torna il numero. «Svuota» resta solo dentro il carrello (la ✕
+col suo foglio): `chiediSvuotaCarrello` è uscita con la riga, e le
+domande della domanda unica scendono a 78. Di sera un filo arancio
+sottile (`box-shadow` 1,5 px `--sats`) attorno al quadrato, perché il
+disegno scuro non si sciolga nel fondo. Server, sette giorni, le quattro
+decisioni del carrello salvato: non toccati.
+
+**COME È FATTO.** `statoIconaCarrello` è il giudice (null senza carrello,
+in DEMO, in vetrina; guarda il carrello VERO, anche con la cassa di un
+accordo aperta), `cardCarrello` la fabbrica, `aggiornaIconaCarrello`
+(ex `aggiornaRigaCarrello`) rifà la fila, e la firma di `renderStriscia`
+porta pezzi, «!» e nome: la fila si ridisegna solo quando la card nasce,
+muore o cambia. È il secondo chiamante di `renderStriscia` dopo
+`renderChips`: non un secondo elenco, un'altra ragione per rifare la
+stessa fila (la sentinella di prove_seo l'ha imparato). La card è un
+`<a>` senza href né data-cat col `role="button"`, il patto della card del
+barattolo: fuori dal tocco lungo che condivide. Il pallino sta DENTRO il
+quadrato (la fila scorre di lato e ritaglia anche in verticale), colori
+fissi sul disegno a colori fissi: numero scuro sull'arancio (7,6:1), «!»
+bianco sul rosso del giorno (5,2:1).
+
+**L'IMMAGINE.** Dal 2000×2000 di Andrea, ritagliata attorno al carrello
+(quadrato di 1660 px centrato sul disegno, il carrello prende l'84%), in
+tre misure WebP a qualità 82: 84, 168 e 252 px — l'1x, il 2x e il 3x
+della card —, 2, 5 e 10 KB. `srcset` con `sizes="(min-width:768px)
+160px, 84px"`: a densità 3 il telefono prende il 252, il pane a densità 2
+il 168. Servite dal nostro dominio, rotta esplicita
+`/assets/carrello/{nome}` con la whitelist a tupla `FILE_CARRELLO` (il
+patto di FILE_SCOPRIRE; regola 3), cartella SUA e mai assets/categorie/
+(fondo pieno: sposterebbe la mediana di ritaglia_categorie.py). Gli URL
+sono letterali, quindi `_timbra_asset_pagina` li timbra col `?v=` e il
+max-age di un giorno è innocuo. Da Tor e da Telegram Web vale quel che
+vale per le sorelle: stesso dominio, nessuna terza parte. Il 2000×2000
+non è nel repo.
+
+**SCARTATO.** Il pallino fuori dal quadrato, a cavallo dell'angolo: la
+fila lo taglierebbe. Il filo con `outline`: è l'anello «sei qui» delle
+card accese, e la card del carrello non si accende mai. Un 4x per il
+desktop da 160 a densità 2 (servirebbe un 320): non chiesto, e il 252
+ingrandito di 1,27 lì regge.
+
+**PROVATO.** prove_carrello_salvato (80) riscritta sul client (le
+sentinelle: la riga e «Svuota» spariti, la card in testa, giudice e
+firma, DEMO, tocco da dito e tastiera, niente href né data-cat,
+etichetta e voce con esc(), pallino aria-hidden, srcset e sizes, il filo
+di sera, la rotta con la whitelist, i tre file e le loro misure) e il
+suo banco node con le scene nuove: la card con «!» dopo la ripresa, la
+card del carrello vero durante un accordo e il tocco che lo rimette, un
+pezzo in più nel pallino, svuotato e la card se ne va, «1 pezzo», un
+nome col markup scappato, in DEMO niente card. Il banco dei Consigliati
+gira la fila VERA con la card: nasce per prima e il resto non si muove,
+il pallino 2 → 3 → «!» sentito dalla firma senza azzerarla, la voce,
+svuotato la fila torna quella di prima. prove_seo (due chiamanti di
+renderStriscia), prove_fogli_di_casa (78). Tortura sulla copia: 30 su 30 uccise (a codice intatto zero rosse).
+Suite intera severa senza config nel worktree (base 14a3a4c): 19.114
+verdi e 0 rosse; la sentinella dell'uscita dal carrello, scritta
+mentre la suite girava, verde nelle sue sezioni (80 · 184 · 409 · 45). I 37 collaudi della CI
+nella gabbia: verdi.
+Dal vivo nel Browser pane (copia in collaudo, relay morto, 375 px, tocchi
+veri): la card per prima col pallino 3 e il file da 168; il prezzo della
+tazza ritoccato sul server e al rientro il «!» con la voce; il tocco
+apre il carrello con la nota in cima, il tasto indietro di Telegram
+riporta in home col pallino a 3; la ✕ col suo «Sì, ignora le modifiche»
+svuota e la card sparisce, sul server il carrello è null. Scatti in
+Chrome headless a densità 3, 375 e 320 px, chiaro e scuro, nei tre stati
+(carrello, «!», senza), mandati ad Andrea prima del push.
+
+**DA GUARDARE.** Sul telefono, Android e iPhone, dentro Telegram: il
+disegno a densità 3, il pallino leggibile, il filo di sera. Di sera il
+filo della card somiglia all'anello di «Tutto» acceso accanto: l'anello
+è più spesso e staccato, il filo aderente — da guardare sulla pagina
+vera se confonde.

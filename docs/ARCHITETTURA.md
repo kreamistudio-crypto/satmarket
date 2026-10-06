@@ -16845,8 +16845,18 @@
   è la penna (subito, una alla volta, `keepalive`, col `tg_id` di chi
   ce l'ha in memoria), `caricaCarrelloSalvato` la lettura dell'apertura
   (dopo la prima pagina, segue l'identità, non scrive, non scavalca un
-  carrello composto adesso), la riga in home «Riprendi · Svuota», le
-  note in cima alla pagina del carrello. Cambiare venditore CHIEDE
+  carrello composto adesso), la card «Carrello» in home, le note in
+  cima alla pagina del carrello. LA CARD (6 ott 2026, sera: al posto
+  della riga «Riprendi · Svuota»; CANTIERI, «L'icona del carrello in
+  Esplora per categorie») è la PRIMA della fila delle categorie, prima
+  di «Tutto», e c'è solo con un carrello: il disegno di Andrea a tutto
+  quadrato (84/168/252 px, `/assets/carrello/`), «Carrello» sotto, la
+  voce «Il tuo carrello da Anna, 3 pezzi», il pallino coi pezzi o «!»
+  se le note del rientro dicono che qualcosa è cambiato, un filo
+  arancio di sera. Giudice `statoIconaCarrello`, fabbrica
+  `cardCarrello`, e `aggiornaIconaCarrello` rifà la fila: è la firma
+  di `renderStriscia` (pezzi, «!», nome) a decidere se ridisegnare. Il
+  tocco apre il carrello; «Svuota» vive solo dentro, nella ✕. Cambiare venditore CHIEDE
   («Hai già un carrello da…: vuoi sostituirlo?», `apriPacco`, che
   aspetta la lettura in volo); dopo un pagamento decide
   `carrelloDopoPagamento` col venditore dell'ordine; l'accordo sul
@@ -28823,6 +28833,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    `FILE_TOUR_P2P_FINE`: 480x480 WebP scontornate su trasparenza, 83
    KB tutt'e tre — vedi CANTIERI, «La slide finale personale del tour
    P2P»),
+   `/assets/carrello/{nome}` (l'icona del carrello salvato in
+   «Esplora per categorie», 6 ott 2026: un disegno in tre misure,
+   84/168/252 px WebP, 2-10 KB, whitelist a tupla `FILE_CARRELLO`,
+   cartella sua e mai assets/categorie/ — fondo pieno; gli URL
+   letterali li timbra `_timbra_asset_pagina`, quindi max-age di un
+   giorno; vedi CANTIERI, «L'icona del carrello in Esplora per
+   categorie»),
    `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
    `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
    `/assets/icona-192-maskable.png`, `/assets/icona-512-maskable.png`,

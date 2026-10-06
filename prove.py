@@ -36927,14 +36927,19 @@ def prove_seo():
           "if (!(DEMO || datiVivi || conteggiServer)) return;" in st)
     prova("...e intanto lo spazio resta riservato", True,
           "min-height:115px" in testo_mini)
-    # un chiamante solo, ed e' renderChips: cosi' i cinque posti che
-    # gia' rifanno le pillole valgono per tutte e due le file, e non
-    # nasce un secondo elenco da tenere allineato
-    prova("la striscia ha un chiamante solo", 1,
+    # un chiamante per i DATI, ed e' renderChips: cosi' i cinque posti
+    # che gia' rifanno le pillole valgono per tutte e due le file, e non
+    # nasce un secondo elenco da tenere allineato. Dal 6 ott 2026 (sera)
+    # ce n'e' un secondo, ed e' il CARRELLO (aggiornaIconaCarrello): la
+    # sua card cambia coi tocchi sul carrello, che le pillole non sentono
+    prova("la striscia ha due chiamanti, i dati e il carrello", 2,
           testo_mini.count("renderStriscia();"))
-    prova("...ed e' renderChips", True,
+    prova("...renderChips", True,
           "renderStriscia();" in pezzo_js(
               testo_mini, "function renderChips(){", "\n}\n"))
+    prova("...e aggiornaIconaCarrello", True,
+          "renderStriscia();" in pezzo_js(
+              testo_mini, "function aggiornaIconaCarrello(){", "\n}\n"))
     # LE PILLOLE SONO L'ALTRA PORTA DEL REPARTO (ago 2026, difetto dal
     # campo): chiamavano `setCat` diretto, che su una radice
     # SOSTITUISCE — il reparto si mangiava la home e l'indietro usciva
@@ -40145,11 +40150,15 @@ def prove_fogli_di_casa():
     # un articolo di un altro venditore: da quando il carrello si
     # ritrova, ricominciarlo butta via una cosa attesa — decisione di
     # Andrea) e «Svuotare il carrello da Anna?» dalla riga in home
-    # (`chiediSvuotaCarrello`), la stessa domanda della ✕.
+    # (`chiediSvuotaCarrello`), la stessa domanda della ✕ — uscita il
+    # 6 ott 2026 (sera) con la riga: al suo posto la card «Carrello»
+    # nella fila delle categorie, e «Svuota» resta solo DENTRO il
+    # carrello, la ✕ col suo foglio.
     # OTTANTA (6 ott 2026, il bollino 🛡️ Staff): «Staff di Barattolo»
     # (`spiegaStaff`), un avviso — il tocco sul bollino spiega cos'e'.
-    prova("i gesti che passano dalla domanda unica sono ottanta",
-          80, solo_codice(mini).count("chiediConferma({"))
+    # Quindi, con la riga del carrello uscita: settantanove.
+    prova("i gesti che passano dalla domanda unica sono settantanove",
+          79, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -110848,7 +110857,9 @@ def _consigliati_porte(src, mini, _pz):
     # la card subito dopo «Tutto», adesso la vuole dopo il barattolo — che
     # torna accanto a «Tutto» — e prima dello scambio. L'ordine VERO lo
     # dice il banco, che legge la fila disegnata; questa guarda il template
-    st_tpl = st[st.find("el('catStrip').innerHTML = `"):]
+    # (dal 6 ott 2026, sera, la fila apre con la card del carrello, se
+    # c'e': l'ancora e' la riga che la mette in testa)
+    st_tpl = st[st.find("el('catStrip').innerHTML = (carr ? cardCarrello(carr) : '') + `"):]
     prova("la card sta dopo il barattolo e prima dello scambio", True,
           0 <= st_tpl.find("urlIllustrazione('Tutto')")
           < st_tpl.find("cella-barattolo") < st_tpl.find("cardConsigliati(cons)")
@@ -110865,7 +110876,7 @@ def _consigliati_porte(src, mini, _pz):
           "+ '#' + cons.map(v => v.slug + ':' + giuLogoConsigliato(v.giu))"
           ".join(',')" in st)
     prova("...e il giro si riarma DOPO il disegno", True,
-          0 <= st.find("el('catStrip').innerHTML = `")
+          0 <= st.find("el('catStrip').innerHTML = (carr ? cardCarrello(carr) : '') + `")
           < st.find("armaGiroConsigliati(cons.length);"))
     # ...E LO SPAZIO IN VETRINA NON C'ENTRA (set 2026, decisione di
     # Andrea): il giudice della lista e quello della storia non lo leggono
@@ -111216,7 +111227,8 @@ def _consigliati_banco(src, mini, _pz):
             "\n  aggiornaFrecce('catStrip');\n}", dentro=True),
         _pz(mini, "function consigliatiPubblicati(){",
             "\n/* LE DUE STRISCE SI SCORRONO COL MOUSE"),
-        _pz(mini, "function condividiCategoria(c){", "\n}", dentro=True)]
+        _pz(mini, "function condividiCategoria(c){", "\n}", dentro=True),
+        _pz(mini, "function cardCarrello(s){", "\n}\n", dentro=True)]
     if not all(pezzi):
         prova("il banco dei Consigliati trova i suoi pezzi", True, False)
         return
@@ -111253,6 +111265,14 @@ const nodo = id => nodi[id] || (nodi[id] = {id, innerHTML: '',
 let homeAttiva = true;
 nodo('view-esplora').classList.contains = c => c === 'active' && homeAttiva;
 const el = id => nodo(id);
+/* LA CARD DEL CARRELLO (6 ott 2026, sera): il giudice qui e' di
+   cartone — lo stato lo decide il caso, e quello vero gira nel banco di
+   prove_carrello_salvato — ma la fabbrica (cardCarrello) e la fila
+   (renderStriscia) sono le VERE. Senza carrello la fila e' quella di
+   sempre: e' il punto di partenza di ogni caso. */
+let carrelloFinto = null;
+const statoIconaCarrello = () => carrelloFinto;
+const fmt = n => String(n);
 /* LA CARD, per l'osservatore: un oggetto NUOVO a ogni ridisegno della
    fila, come il nodo vero (un innerHTML nuovo = nodi nuovi). E l'header
    appiccicato della home, alto quanto il caso decide. */
@@ -111372,7 +111392,7 @@ function caso(nome, f){
   sponsorizzati = []; consigliatiServer = []; ridotti = false;
   RACCONTI['to-the-moon'] = JSON.parse(TTM0);
   homeAttiva = true; document.hidden = false; DEMO = false; myTgId = 111;
-  premutaFatta = false; richieste = []; scritte = [];
+  premutaFatta = false; richieste = []; scritte = []; carrelloFinto = null;
   timer.clear(); htmlVisto = null;
   occhi = []; quotaVista = 1; testaAlta = 0;
   window.IntersectionObserver = IntersectionObserver;
@@ -111388,8 +111408,8 @@ function caso(nome, f){
 }
 const rifai = () => { strisciaFirma = ''; renderStriscia(); };
 const ordine = () => [...nodi['catStrip'].innerHTML
-  .matchAll(/href="([^"]*)"|cella-barattolo/g)]
-  .map(m => m[1] !== undefined ? m[1] : 'barattolo');
+  .matchAll(/href="([^"]*)"|cella-(barattolo|carrello)/g)]
+  .map(m => m[1] !== undefined ? m[1] : m[2]);
 const accesi = () => immaginiCard().map(x => x.classList.contains('attivo'));
 /* le classi di ogni logo, lette per quel che dicono: acceso, che entra,
    che esce, o fermo e spento ('-') */
@@ -111471,6 +111491,39 @@ caso('senza il barattolo', () => {
    diventa un percento del riquadro del logo (75,6px), scritto sulla SUA
    immagine. I valori si fissano qui e non si leggono dal catalogo: la
    taratura di To The Mooon puo' cambiare, la regola no. */
+/* LA CARD DEL CARRELLO (6 ott 2026, sera): la PRIMA della fila, prima
+   di «Tutto», e solo finche' c'e' un carrello. E' la FIRMA a sentirlo —
+   qui la fila si ridisegna senza azzerarla, come succede in casa quando
+   il carrello cambia (aggiornaIconaCarrello) —, e il pallino dice i pezzi
+   o «!». */
+caso('la card del carrello', () => {
+  rifai();
+  const senza = ordine();
+  carrelloFinto = {nome: 'Anna', pezzi: 2, cambiato: false};
+  renderStriscia();
+  dice('col carrello la sua card nasce PER PRIMA, e il resto non si muove',
+       ['carrello', ...senza], ordine());
+  const pallino = () => (nodi['catStrip'].innerHTML
+    .match(/class="carrello-pallino([^"]*)" aria-hidden="true">([^<]*)</) || [])
+    .slice(1);
+  dice('...il pallino dice i pezzi', ['', '2'], pallino());
+  carrelloFinto = {nome: 'Anna', pezzi: 3, cambiato: false};
+  renderStriscia();
+  dice("...un pezzo in piu' e il pallino lo sa (la firma lo sente)",
+       ['', '3'], pallino());
+  carrelloFinto = {nome: 'Anna', pezzi: 3, cambiato: true};
+  renderStriscia();
+  dice("...qualcosa e' cambiato: il pallino dice «!»", [' cambiato', '!'],
+       pallino());
+  dice("...e l'aria-label lo dice a voce",
+       'Il tuo carrello da Anna, 3 pezzi: qualcosa è cambiato',
+       (nodi['catStrip'].innerHTML.match(/aria-label="([^"]*)"/) || [])[1]);
+  carrelloFinto = null;
+  renderStriscia();
+  dice('carrello svuotato: la card se ne va, e la fila torna quella di prima',
+       senza, ordine());
+});
+
 caso('il logo scende', () => {
   RACCONTI['to-the-moon'].logo_giu = 4;
   consigliatiServer = [Object.assign({}, BOTTEGA, {logo_giu: -3}),
@@ -123249,8 +123302,10 @@ def prove_carrello_salvato():
     """IL CARRELLO SALVATO (6 ott 2026, la richiesta di un utente e le
     quattro decisioni di Andrea). Il carrello di sempre — UNO, di un
     venditore alla volta — ha una copia sul server, una riga per
-    persona, scritta a ogni tocco e riletta all'apertura; in home una
-    riga «Riprendi · Svuota». NON sono i carrelli tolti il 24 set 2026:
+    persona, scritta a ogni tocco e riletta all'apertura; in home la
+    card «Carrello», la PRIMA della fila delle categorie (dal 6 ott 2026
+    sera; prima una riga «Riprendi · Svuota»), col pallino dei pezzi o
+    «!». NON sono i carrelli tolti il 24 set 2026:
     niente localStorage ne' nuvola di Telegram, niente carrelli da parte.
     Il server VERO lo gira `collaudo_carrello_salvato.py` (nella CI),
     compreso l'annuncio venduto mentre il carrello aspettava. Qui le
@@ -123364,12 +123419,75 @@ def prove_carrello_salvato():
     prova("all'apertura si rilegge DOPO la prima pagina (il seme della "
           "demo ha gli stessi id)", True,
           0 <= av.find("await loadListings();") < av.find("caricaCarrelloSalvato();"))
-    prova("la riga in home ha le due strade", True,
-          'onclick="riprendiCarrello()"' in mini
-          and 'onclick="chiediSvuotaCarrello()"' in mini)
-    prova("...e il nome del venditore passa da esc()", True,
-          "esc(nomeVenditoreCarrello(c))" in
-          pezzo_js(mini, "function aggiornaRigaCarrello(){", "\n}\n"))
+    # LA CARD «CARRELLO» (6 ott 2026, sera, richiesta di Andrea): al posto
+    # della riga in home, la prima card della fila delle categorie
+    prova("la riga in home non c'e' piu', ne' il suo «Svuota»", [],
+          [p for p in ('id="carrelloRiga"', "carrelloRigaTesto",
+                       "aggiornaRigaCarrello", "chiediSvuotaCarrello",
+                       "Hai un carrello da <b>", ".carrello-riga{")
+           if p in mini])
+    st = pezzo_js(mini, "function renderStriscia(){", "\n}\n")
+    prova("la fila apre con la card del carrello, PRIMA di «Tutto»", True,
+          "el('catStrip').innerHTML = (carr ? cardCarrello(carr) : '') + `\n"
+          "    <a class=\"cat-cella${activeCat === 'Tutto'" in st)
+    prova("...il giudice e' uno, statoIconaCarrello, e la firma lo sente "
+          "(pezzi, «!», nome)", True,
+          "const carr = statoIconaCarrello();" in st
+          and "+ '#' + (carr ? `C${carr.pezzi}${carr.cambiato ? '!' : ''}"
+              ":${carr.nome}` : '');" in st)
+    sic = pezzo_js(mini, "function statoIconaCarrello(){", "\n}\n")
+    prova("...mai in DEMO ne' in vetrina, e solo con un carrello vero", True,
+          "if (DEMO || VETRINA || !c.dati || !c.scelte.size) return null;"
+          in sic and "const c = carrelloVero();" in sic)
+    cc = pezzo_js(mini, "function cardCarrello(s){", "\n}\n")
+    prova("la card: il tocco e' il vecchio «Riprendi», da dito e tastiera",
+          2, cc.count("riprendiCarrello()"))
+    prova("...un <a> senza href ne' data-cat: fuori dal tocco lungo che "
+          "condivide", [False, False, True],
+          ["href=" in cc, "data-cat" in cc, 'role="button"' in cc])
+    prova("...l'etichetta «Carrello» e la voce col nome passato da esc()",
+          True, '<span class="cat-eti">Carrello</span>' in cc
+          and 'aria-label="${esc(voce)}"' in cc
+          and "const voce = `Il tuo carrello da ${s.nome}, ${pezzi}`" in cc)
+    prova("...il pallino e' aria-hidden (lo dice la voce)", True,
+          'class="carrello-pallino${s.cambiato ? \' cambiato\' : \'\'}" '
+          'aria-hidden="true"' in cc)
+    prova("...il disegno in tre misure, dal nostro dominio", True,
+          'srcset="/assets/carrello/carrello-84.webp 84w, '
+          '/assets/carrello/carrello-168.webp 168w, '
+          '/assets/carrello/carrello-252.webp 252w"' in cc
+          and 'sizes="(min-width:768px) 160px, 84px"' in cc)
+    prova("aggiornaIconaCarrello rifa' la fila (decide la firma)", True,
+          "renderStriscia();" in pezzo_js(
+              mini, "function aggiornaIconaCarrello(){", "\n}\n"))
+    prova("di sera un filo arancio attorno al quadrato", True,
+          'html[data-tema="scuro"] .cella-carrello .cat-quad{\n'
+          '    box-shadow:0 0 0 1.5px var(--sats)}' in mini)
+    prova("...il disegno riempie il quadrato, il pallino sta nell'angolo",
+          True, ".cella-carrello .cat-quad img{object-fit:cover}" in mini
+          and ".carrello-pallino{position:absolute;top:4px;right:4px;" in mini)
+    # IL SERVER: tre file, una whitelist a tupla, e i file ci sono
+    ra = pezzo("asset_carrello")
+    prova("la rotta dell'icona: whitelist a tupla, prima di toccare il disco",
+          True, 0 <= ra.find("if nome not in FILE_CARRELLO:")
+          < ra.find("os.path.join"))
+    _t = re.search(r"FILE_CARRELLO = \(([^)]*)\)", src, re.S)
+    _nomi = re.findall(r'"([^"]+)"', _t.group(1)) if _t else []
+    prova("...tre misure, l'1x il 2x e il 3x della card da 84",
+          ["carrello-84.webp", "carrello-168.webp", "carrello-252.webp"],
+          _nomi)
+    prova("...e i file esistono, quadrati e leggeri (pochi KB)", [],
+          [f for f in _nomi
+           if not os.path.exists(os.path.join("assets", "carrello", f))
+           or os.path.getsize(os.path.join("assets", "carrello", f)) > 16000])
+    try:
+        from PIL import Image as _Im
+        _misure = [_Im.open(os.path.join("assets", "carrello", f)).size
+                   for f in _nomi]
+        prova("...ognuno della sua misura", [(84, 84), (168, 168),
+                                             (252, 252)], _misure)
+    except ImportError:
+        salta("le misure dei file dell'icona", "Pillow assente")
     poc = pezzo_js(mini, "async function pagaOffertaCarrello(id){", "\n}\n")
     prova("l'accordo mette da parte il carrello vero PRIMA di scrivergli "
           "sopra", True, 0 <= poc.find("carrelloPrimaAccordo = {scelte")
@@ -123381,6 +123499,9 @@ def prove_carrello_salvato():
           True, "if (carrelloNote.length && view !== 'pacco'\n      && "
           "document.querySelector('.view.active')?.id === 'view-pacco') {\n"
           "    carrelloNote = [];" in gofn)
+    prova("...e la fila si rifa': il «!» della card torna il numero dei pezzi",
+          True, "    carrelloNote = [];\n    aggiornaIconaCarrello();\n  }"
+          in gofn)
     prova("«I tuoi dati» dice il carrello e la sua durata", True,
           'data-durata="carrello"' in mini and "carrello: 7}" in mini)
 
@@ -123419,6 +123540,23 @@ const motivoEsclusione = x => '';
 const els = {};
 const el = id => els[id] || (els[id] = {style: {}, innerHTML: '', textContent: '',
   classList: {contains: () => false, add() {}, remove() {}}});
+/* LA FILA DELLE CATEGORIE, di cartone: la riga di renderStriscia che
+   mette in testa la card del carrello (le sentinelle la vogliono
+   letterale, e il banco dei Consigliati gira la fila vera); qui conta
+   cosa ci finisce, fatto dal giudice e dalla fabbrica VERI */
+let strisce = 0;
+const renderStriscia = () => {
+  strisce++;
+  const carr = statoIconaCarrello();
+  el('catStrip').innerHTML = (carr ? cardCarrello(carr) : '') + '<a href="/">Tutto</a>';
+};
+const icona = () => {
+  const h = el('catStrip').innerHTML;
+  if (!h.includes('cella-carrello')) return null;
+  return [(h.match(/aria-label="([^"]*)"/) || [])[1],
+          (h.match(/class="carrello-pallino([^"]*)" aria-hidden="true">([^<]*)</) || []).slice(1),
+          h.indexOf('cella-carrello') < h.indexOf('href="/"')];
+};
 const viste = []; const go = v => viste.push(v);
 const renderPacco = () => {};
 const conferme = []; const chiediConferma = c => conferme.push(c);
@@ -123462,7 +123600,7 @@ const out = {};
   await caricaCarrelloSalvato(); await attesa();
   out.ripresa = [[...setScelte], paccoDati, scritte.length];
   out.note = carrelloNote.slice();
-  out.riga = [el('carrelloRiga').style.display, el('carrelloRigaTesto').innerHTML];
+  out.icona = icona();
   renderNoteCarrello();
   out.noteHtml = el('paccoNote').innerHTML;
   // B) da un articolo di un ALTRO venditore: prima la domanda
@@ -123501,7 +123639,7 @@ const out = {};
   out.inCassa = [[...setScelte], paccoDati.sellerId, acqDati.accordoId,
                  viste[viste.length - 1]];
   salvaCarrello(); await attesa();
-  out.accordo = [ultima().righe, el('carrelloRigaTesto').innerHTML.includes('Anna')];
+  out.accordo = [ultima().righe, (icona() || [''])[0]];
   orders = [{id: 52, sellerId: 444}];
   carrelloDopoPagamento(52, 444); await attesa();
   out.dopoAccordo = [[...setScelte], paccoDati.sellerId, carrelloPrimaAccordo, acqDati];
@@ -123518,7 +123656,7 @@ const out = {};
   n = scritte.length;
   await caricaCarrelloSalvato(); await attesa();
   out.sparito = [toasts[toasts.length - 1], scritte.length - n, ultima(),
-                 el('carrelloRiga').style.display];
+                 icona()];
   // I) la domanda ASPETTA la lettura in volo (il tocco nel primo istante)
   azzeraCarrello(); carrelloDi = null; conferme.length = 0;
   rispostaGet = {venditore_id: 222, venditore: 'Anna', righe: [
@@ -123544,24 +123682,39 @@ const out = {};
   n = scritte.length;
   await rileggiVenditore(listings.find(x => x.id === 2)); await attesa();
   out.potatura = [[...setScelte], scritte.length - n, ultima()];
-  // N) «Riprendi» dalla home: la pagina del carrello, e aprirlo e' un tocco
+  // N) il tocco sulla card «Carrello»: la pagina del carrello, e
+  //    aprirlo e' un tocco. Il gesto e' quello scritto nella card VERA.
   n = scritte.length; const v0 = viste.length; negozio = [carta(2, 'Tazza', {quantita: 1})];
+  out.gesto = (el('catStrip').innerHTML.match(/onclick="([^"]*)"/) || [])[1];
   riprendiCarrello(); await attesa();
   out.riprendi = [viste.slice(v0)[0], currentListing.id, scritte.length - n, ultima()];
-  // J) «Svuota» dalla home, con la cassa di un accordo ancora aperta:
-  //    si svuota il carrello VERO, e la cassa dell'accordo si chiude
+  // J) la card con la cassa di un accordo aperta e' quella del carrello
+  //    VERO, e toccarla lo rimette al suo posto e chiude la cassa
   await pagaOffertaCarrello(5); await attesa();
-  conferme.length = 0;
-  chiediSvuotaCarrello();
-  out.svuotaTit = conferme[0].titolo;
-  await conferme[0].poi(); await attesa();
-  out.svuotato = [[...setScelte], ultima().righe, toasts[toasts.length - 1],
-                  el('carrelloRiga').style.display, carrelloPrimaAccordo, acqDati];
-  // K) in DEMO niente scritture e niente riga
+  out.cardAccordo = icona();
+  riprendiCarrello(); await attesa();
+  out.dopoTocco = [[...setScelte], paccoDati.sellerId, carrelloPrimaAccordo, acqDati];
+  // O) un pezzo in piu' e il pallino lo sa; svuotato (la ✕, il solo
+  //    «Svuota» rimasto) la card se ne va
+  setScelte.set(2, 2); salvaCarrello(); await attesa();
+  out.piuUno = icona();
+  azzeraCarrello(); salvaCarrello(); await attesa();
+  out.svuotato = [[...setScelte], ultima().righe, icona()];
+  // P) un pezzo solo: «1 pezzo», al singolare
+  setScelte = new Map([[2, 1]]); paccoDati = {sellerId: 222, origineId: 2};
+  salvaCarrello(); await attesa();
+  out.unPezzo = icona();
+  // Q) un nome che porta markup arriva scappato nell'aria-label
+  inCatalogo([mapListing(carta(2, 'Tazza', {venditore: 'Anna "<b>'}))]);
+  salvaCarrello(); await attesa();
+  out.nomeScappato = el('catStrip').innerHTML.includes('Anna &quot;&lt;b&gt;')
+    && !el('catStrip').innerHTML.includes('"<b>');
+  inCatalogo([mapListing(carta(2, 'Tazza'))]);
+  // K) in DEMO niente scritture e niente card
   DEMO = true; n = scritte.length;
   setScelte = new Map([[2, 1]]); paccoDati = {sellerId: 222, origineId: 2};
   salvaCarrello(); await attesa();
-  out.demo = [scritte.length - n, el('carrelloRiga').style.display];
+  out.demo = [scritte.length - n, icona()];
 } catch (e) { out.esploso = String((e && e.stack) || e).slice(0, 300); }
   console.log(JSON.stringify(out));
 })();
@@ -123582,11 +123735,10 @@ const out = {};
            "«Tazza»: ne resta solo 1, la quantità è scesa a 1",
            "«Tazza» ora costa 6000 sats (prima 5000 sats)",
            "«Vaso <b>» ora costa 12,50 € (prima 10,00 €)"], out.get("note"))
-    riga = out.get("riga") or ["", ""]
-    prova("la riga in home si accende: il venditore, i pezzi, «qualcosa e' "
-          "cambiato»", ["", True, True, True],
-          [riga[0], "<b>Anna</b>" in riga[1], "2 pezzi" in riga[1],
-           "qualcosa è cambiato" in riga[1]])
+    prova("la card «Carrello» nasce, per prima: la voce col venditore e i "
+          "pezzi, e il pallino dice «!» (qualcosa e' cambiato)",
+          ["Il tuo carrello da Anna, 2 pezzi: qualcosa è cambiato",
+           [" cambiato", "!"], True], out.get("icona"))
     prova("...e nelle note un titolo col markup arriva scappato", True,
           "«Vaso &lt;b&gt;»" in out.get("noteHtml", "")
           and "<b>»" not in out.get("noteHtml", ""))
@@ -123612,7 +123764,8 @@ const out = {};
           "nella sua modalita'", [[[9, 1], [10, 1]], 444, 5, "acquisto"],
           out.get("inCassa"))
     prova("...ma si salva il carrello VERO, e in home c'e' lui",
-          [[{"annuncio_id": 2, "quantita": 3}], True], out.get("accordo"))
+          [[{"annuncio_id": 2, "quantita": 3}],
+           "Il tuo carrello da Anna, 3 pezzi"], out.get("accordo"))
     prova("...pagato l'accordo di un altro negozio, il carrello vero torna "
           "intero e la cassa dell'accordo si chiude",
           [[[2, 3]], 222, None, None], out.get("dopoAccordo"))
@@ -123620,9 +123773,10 @@ const out = {};
           out.get("altroConto"))
     prova("...e all'apertura segue l'identita' (si azzera, senza scrivere)",
           [[], None, 222, 0], out.get("identita"))
-    prova("tutto sparito: lo si dice una volta, e la riga sul server se ne va",
+    prova("tutto sparito: lo si dice una volta, la riga sul server se ne "
+          "va, e la card non nasce",
           ["Il carrello da Anna si è svuotato: gli oggetti non sono più "
-           "disponibili", 1, {"tg_id": 111, "righe": []}, "none"],
+           "disponibili", 1, {"tg_id": 111, "righe": []}, None],
           out.get("sparito"))
     prova("la domanda aspetta la lettura in volo: anche nel primo istante "
           "si chiede", ["Hai già un carrello da Anna: vuoi sostituirlo?"],
@@ -123634,17 +123788,29 @@ const out = {};
           [[[2, 1]], 1, {"tg_id": 111, "righe": [{"annuncio_id": 2,
                                                   "quantita": 1}]}],
           out.get("potatura"))
-    prova("«Riprendi»: la pagina del carrello, sull'annuncio di provenienza, "
-          "e aprirlo e' un tocco che si salva",
-          ["pacco", 2, 1, {"tg_id": 111, "righe": [{"annuncio_id": 2,
-                                                    "quantita": 1}]}],
-          out.get("riprendi"))
-    prova("«Svuota» dalla home chiede col nome; con la cassa di un accordo "
-          "aperta svuota il carrello VERO e la chiude",
-          ["Svuotare il carrello da Anna?",
-           [[], [], "Carrello svuotato", "none", None, None]],
-          [out.get("svuotaTit"), out.get("svuotato")])
-    prova("in DEMO niente scritture e niente riga", [0, "none"], out.get("demo"))
+    prova("il tocco sulla card: la pagina del carrello, sull'annuncio di "
+          "provenienza, e aprirlo e' un tocco che si salva",
+          ["riprendiCarrello()",
+           ["pacco", 2, 1, {"tg_id": 111, "righe": [{"annuncio_id": 2,
+                                                     "quantita": 1}]}]],
+          [out.get("gesto"), out.get("riprendi")])
+    prova("con la cassa di un accordo aperta la card e' del carrello VERO "
+          "(1 pezzo, al singolare)...",
+          ["Il tuo carrello da Anna, 1 pezzo", ["", "1"], True],
+          out.get("cardAccordo"))
+    prova("...e toccarla lo rimette al suo posto e chiude la cassa",
+          [[[2, 1]], 222, None, None], out.get("dopoTocco"))
+    prova("un pezzo in piu': il pallino lo sa (le note lette, niente «!»)",
+          ["Il tuo carrello da Anna, 2 pezzi", ["", "2"], True],
+          out.get("piuUno"))
+    prova("svuotato il carrello, la card se ne va", [[], [], None],
+          out.get("svuotato"))
+    prova("un pezzo solo: «1 pezzo»",
+          ["Il tuo carrello da Anna, 1 pezzo", ["", "1"], True],
+          out.get("unPezzo"))
+    prova("un nome col markup arriva scappato nella voce della card", True,
+          out.get("nomeScappato"))
+    prova("in DEMO niente scritture e niente card", [0, None], out.get("demo"))
 
 
 def prove_bollino_staff():

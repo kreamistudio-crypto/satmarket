@@ -767,23 +767,10 @@
     font-weight:700;font-size:13.5px}
   .ospite-riga span{flex:1 1 auto;min-width:0}
   .ospite-riga .btn.mini{flex:0 0 auto;margin:0}
-  /* IL CARRELLO RITROVATO in home (6 ott 2026): i colori della riga
-     dell'ospite qui sopra, che e' gia' «una riga che dice una cosa e
-     da' la strada». Il testo prende tutta la larghezza e le due strade
-     stanno INSIEME sotto, a destra — misurato a 375px: col testo e i
-     bottoni nella stessa fila «Riprendi» restava accanto alla frase e
-     «Svuota» andava a capo da solo. La riga piccola c'e' solo se
-     qualcosa e' cambiato mentre il carrello aspettava. */
-  .carrello-riga{display:flex;flex-direction:column;gap:8px;
-    margin:10px var(--pad) 0;padding:10px 12px;
-    background:var(--sats-soft);border:1.5px solid var(--sats);
-    border-radius:var(--radius);color:var(--sats-text);
-    font-weight:700;font-size:13.5px}
-  .carrello-riga span{min-width:0;overflow-wrap:anywhere}
-  .carrello-riga small{display:block;font-weight:600;font-size:12.5px;margin-top:2px}
-  .carrello-riga-strade{display:flex;gap:8px;justify-content:flex-end}
-  .carrello-riga .btn.mini{flex:0 0 auto;margin:0}
-  /* ...e in cima alla pagina del carrello, cosa e' cambiato */
+  /* IL CARRELLO RITROVATO in home: dal 6 ott 2026 (sera) non e' piu'
+     una riga ma la card «Carrello» in testa alla fila delle categorie
+     (vedi .cella-carrello). In cima alla pagina del carrello, cosa e'
+     cambiato mentre aspettava: */
   .pacco-note{margin:10px var(--pad) 0;padding:10px 12px;
     background:var(--sats-soft);border:1.5px solid var(--sats);
     border-radius:var(--radius);color:var(--sats-text);font-size:13px;
@@ -1169,6 +1156,33 @@
      esce — nella cascata le transizioni battono le animazioni — e lo
      spegnerebbe in dissolvenza mentre scende. */
   .cella-consigliati .cat-fig{inset:5%}
+  /* LA CARD DEL CARRELLO (6 ott 2026, al posto della riga in home): il
+     disegno di Andrea riempie TUTTO il quadrato — ha il suo fondo,
+     bruno con l'alone arancio — e gli angoli li taglia l'overflow del
+     quadrato, come alle sorelle. Nasce solo con un carrello (la
+     fabbrica e' cardCarrello).
+     IL PALLINO sta DENTRO il quadrato, nell'angolo in alto a destra:
+     fuori lo taglierebbe la fila stessa, che scorre di lato e quindi
+     ritaglia anche in verticale. I colori sono FISSI nei due temi,
+     come tutto cio' che posa su un disegno a colori fissi: il numero
+     scuro sull'arancio di casa (7,6:1), il «!» bianco sul rosso del
+     giorno (5,2:1) — un altro colore perche' dice un'altra cosa,
+     «guarda dentro», e non «quanti». Il pallino e' aria-hidden: lo
+     dice l'aria-label della card. */
+  .cella-carrello .cat-quad img{object-fit:cover}
+  .carrello-pallino{position:absolute;top:4px;right:4px;min-width:20px;
+    height:20px;padding:0 5px;box-sizing:border-box;border-radius:999px;
+    background:#F7931A;color:#1E1408;font-size:11.5px;font-weight:800;
+    line-height:20px;text-align:center;
+    box-shadow:0 1px 3px rgba(0,0,0,.45)}
+  .carrello-pallino.cambiato{background:#C2410C;color:#fff}
+  /* DI SERA IL DISEGNO, SCURO, SI SCIOGLIEREBBE NEL FONDO della pagina
+     (richiesta di Andrea): un filo arancio sottile attorno al quadrato.
+     `box-shadow` e non `border` ne' `outline`: il bordo ruberebbe un
+     pixel al disegno, e l'outline e' l'anello di «sei qui» delle card
+     accese — questa non si accende mai. */
+  html[data-tema="scuro"] .cella-carrello .cat-quad{
+    box-shadow:0 0 0 1.5px var(--sats)}
   .cons-logo{opacity:0}
   .cons-logo.attivo{opacity:1}
   /* IL CENTRO OTTICO DI OGNI LOGO (set 2026): un marchio centrato a
@@ -9753,6 +9767,10 @@
        darebbe 56,28 invece di 56, e «nemmeno di un byte» vuol dire
        nemmeno quello. */
     html.fuori-telegram .cella-barattolo .cat-quad svg{width:67%;height:67%}
+    /* il pallino del carrello cresce col quadrato, come il nome: 20px
+       su una card da 160 si perderebbe nell'angolo */
+    html.fuori-telegram .carrello-pallino{top:7px;right:7px;min-width:28px;
+      height:28px;line-height:28px;padding:0 7px;font-size:15px}
     /* LE FRECCE, e le tre righe che le rendono innocue. 1) Sono di
        CARTA coi colori FISSI nei due temi, la ricetta di `.share-btn`:
        stanno SOPRA le card, che hanno un fondo bruno fisso, e un
@@ -10227,17 +10245,6 @@ document.getElementById('cartello')?.remove();</script>
          bannerInstallaPwa() solo su web mobile fuori da Telegram.
          Dentro la Mini App non compare mai. -->
     <div id="installBanner" style="display:none"></div>
-    <!-- IL CARRELLO RITROVATO (6 ott 2026): una riga finche' c'e' un
-         carrello, con le due strade. Nasce spenta: la accende
-         aggiornaRigaCarrello, mai in DEMO ne' in vetrina anonima. Il
-         nome del venditore passa da esc(). -->
-    <div id="carrelloRiga" class="carrello-riga" style="display:none">
-      <span id="carrelloRigaTesto"></span>
-      <div class="carrello-riga-strade">
-        <button type="button" class="btn mini" onclick="chiediSvuotaCarrello()">Svuota</button>
-        <button type="button" class="btn mini" onclick="riprendiCarrello()">Riprendi</button>
-      </div>
-    </div>
     <!-- La hero vive solo da desktop in su (CSS): dentro Telegram non esiste -->
     <div class="hero" aria-hidden="true">
       <div>
@@ -15801,7 +15808,7 @@ function go(view){
   if (carrelloNote.length && view !== 'pacco'
       && document.querySelector('.view.active')?.id === 'view-pacco') {
     carrelloNote = [];
-    aggiornaRigaCarrello();
+    aggiornaIconaCarrello();
   }
   /* Si segna dove si era in vetrina PRIMA di spegnerla: un istante
      dopo il display:none accorcia il documento e il browser clampa lo
@@ -17140,6 +17147,10 @@ function renderChips(){
      elenco da tenere allineato. In TESTA per storia: quando il ramo
      del barattolo usciva col return, da qui sotto la striscia non la
      rifaceva nessuno — oggi non esce piu', ma l'ordine resta.
+     IL SECONDO CHIAMANTE E' IL CARRELLO (6 ott 2026, sera:
+     aggiornaIconaCarrello), e non e' un secondo elenco — e' un'altra
+     ragione per rifare la STESSA fila: la card del carrello cambia coi
+     tocchi sul carrello, che le pillole non li sentono.
   */
   renderStriscia();
   renderScoprire();
@@ -17388,9 +17399,16 @@ function renderStriscia(){
      template, che fra un giro e l'altro non cambia — quando la card si
      e' spostata dopo il barattolo, la firma ha dovuto imparare il logo,
      non la posizione. */
+  /* ...e dice LA CARD DEL CARRELLO (6 ott 2026, sera): se c'e', i pezzi
+     del pallino, il «!» e il nome del venditore che legge l'aria-label.
+     Senza, il carrello ritrovato all'apertura — che arriva DOPO la
+     prima pagina — non farebbe nascere la card fino al primo cambio di
+     reparto. */
+  const carr = statoIconaCarrello();
   const firma = voci.join('|') + '#' + activeCat
     + '#' + (jarCard ? 'J' : '') + (vistaBarattolo ? 'B' : '')
-    + '#' + cons.map(v => v.slug + ':' + giuLogoConsigliato(v.giu)).join(',');
+    + '#' + cons.map(v => v.slug + ':' + giuLogoConsigliato(v.giu)).join(',')
+    + '#' + (carr ? `C${carr.pezzi}${carr.cambiato ? '!' : ''}:${carr.nome}` : '');
   if (firma === strisciaFirma) return;
   strisciaFirma = firma;
   /* La card accesa si porta in vista, che illuminata fuori schermo
@@ -17466,7 +17484,12 @@ function renderStriscia(){
      porta a una pagina, come lo scambio — e la sua fabbrica e'
      cardConsigliati. Il giro dei loghi si riarma a ogni ridisegno: la
      card e' nuova, e il primo logo si deve vedere per il suo tempo. */
-  el('catStrip').innerHTML = `
+  /* E PRIMA DI TUTTE, PERFINO DI «TUTTO», LA CARD DEL CARRELLO (6 ott
+     2026, sera, decisione di Andrea: l'icona al posto della riga in
+     home). C'e' solo con un carrello — la fabbrica e' cardCarrello,
+     il giudice statoIconaCarrello — e non si accende mai: porta alla
+     pagina del carrello, come il vecchio «Riprendi». */
+  el('catStrip').innerHTML = (carr ? cardCarrello(carr) : '') + `
     <a class="cat-cella${activeCat === 'Tutto' && !vistaBarattolo ? ' attiva' : ''}" href="/"
        onclick="tornaATuttoDaTocco(event)">
       <span class="cat-quad"><span class="cat-fig"><img src="${urlIllustrazione('Tutto')}"
@@ -25807,7 +25830,8 @@ function svuotaPacco(){
    UNO, di un venditore alla volta, in memoria (setScelte + paccoDati) —
    e in piu' ha una copia sul SERVER, una riga per persona: si scrive a
    ogni tocco, si rilegge all'apertura (caricaCarrelloSalvato) e in home
-   una riga lo dice, «Riprendi · Svuota». Sette giorni dall'ultimo tocco
+   lo dice la card «Carrello», la prima della fila delle categorie (dal
+   6 ott 2026 sera; prima era una riga «Riprendi · Svuota»). Sette giorni dall'ultimo tocco
    (GIORNI_CARRELLO_SALVATO), poi se ne va da solo.
    NON SONO I CARRELLI TOLTI IL 24 SET 2026 (CANTIERI, «I carrelli sono
    stati tolti»), e la differenza e' il punto: niente carrelli da parte,
@@ -25855,7 +25879,7 @@ function nomeVenditoreCarrello(c){
    non si scrive un carrello rimasto in memoria da un'identita' di
    prima — lo azzera caricaCarrelloSalvato. */
 function salvaCarrello(){
-  aggiornaRigaCarrello();
+  aggiornaIconaCarrello();
   if (DEMO || VETRINA || !myTgId) return;
   if (carrelloDi === null) carrelloDi = myTgId;
   if (carrelloDi !== myTgId) return;
@@ -25932,33 +25956,64 @@ function caricaCarrelloSalvato(){
   carrelloInArrivo = giro;
   giro.then(() => {
     if (carrelloInArrivo === giro) carrelloInArrivo = null;
-    aggiornaRigaCarrello();
+    aggiornaIconaCarrello();
   });
   return giro;
 }
-/* LA RIGA IN HOME: c'e' finche' c'e' un carrello, e porta le due
-   strade. Il nome del venditore e' testo utente: passa da esc(). */
-function aggiornaRigaCarrello(){
-  const r = el('carrelloRiga');
-  if (!r) return;
+/* LA CARD «CARRELLO» IN HOME (6 ott 2026, sera, richiesta di Andrea:
+   l'icona al posto della riga «🛒 Hai un carrello da…»). E' la PRIMA
+   della fila delle categorie, e c'e' solo finche' c'e' un carrello:
+   senza, la fila e' quella di sempre. Cosa dice, o null se non c'e':
+   il venditore, i pezzi, e se qualcosa e' cambiato mentre aspettava
+   (le note del rientro, che si considerano lette uscendo dalla pagina
+   del carrello: go()). Mai in DEMO ne' in vetrina anonima. */
+function statoIconaCarrello(){
   const c = carrelloVero();
-  if (DEMO || VETRINA || !c.dati || !c.scelte.size) { r.style.display = 'none'; return; }
+  if (DEMO || VETRINA || !c.dati || !c.scelte.size) return null;
   let pezzi = 0; for (const q of c.scelte.values()) pezzi += q;
-  el('carrelloRigaTesto').innerHTML =
-    `🛒 Hai un carrello da <b>${esc(nomeVenditoreCarrello(c))}</b> · `
-    + `${fmt(pezzi)} pezz${pezzi === 1 ? 'o' : 'i'}`
-    + (carrelloNote.length
-      ? '<small>Nel frattempo qualcosa è cambiato: te lo diciamo dentro.</small>' : '');
-  r.style.display = '';
+  return {nome: nomeVenditoreCarrello(c), pezzi, cambiato: carrelloNote.length > 0};
 }
-/* «Riprendi»: la pagina del carrello, come ci si arriva da un articolo
-   dello stesso venditore. Aprirlo e' averlo visto: si salva, e con
-   l'ultimo tocco si spostano i prezzi visti (le note restano a schermo
-   finche' non si esce dalla pagina: go()). */
+/* La fabbrica della card. La veste e' quella delle sorelle (quadrato,
+   angoli, etichetta sotto); il disegno riempie il quadrato in tre
+   misure, l'1x, il 2x e il 3x della card da 84 (da desktop fuori da
+   Telegram la card e' da 160, e `sizes` lo dice). E' un <a> SENZA href
+   e SENZA data-cat, il patto della card del barattolo: porta a una
+   pagina dell'app e non a un URL, e resta fuori dal tocco lungo di
+   condivisione per costruzione. Il tocco e' quello del vecchio
+   «Riprendi». Il pallino dice i pezzi, o «!» se qualcosa e' cambiato;
+   e' aria-hidden, perche' lo dice l'aria-label — e il nome del
+   venditore, testo utente, passa da esc(). */
+function cardCarrello(s){
+  const pezzi = `${fmt(s.pezzi)} pezz${s.pezzi === 1 ? 'o' : 'i'}`;
+  const voce = `Il tuo carrello da ${s.nome}, ${pezzi}`
+    + (s.cambiato ? ': qualcosa è cambiato' : '');
+  return `
+    <a class="cat-cella cella-carrello" role="button" tabindex="0"
+       title="${esc(voce)}" aria-label="${esc(voce)}" onclick="riprendiCarrello()"
+       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();riprendiCarrello()}">
+      <span class="cat-quad"><img src="/assets/carrello/carrello-84.webp"
+           srcset="/assets/carrello/carrello-84.webp 84w, /assets/carrello/carrello-168.webp 168w, /assets/carrello/carrello-252.webp 252w"
+           sizes="(min-width:768px) 160px, 84px" alt="" decoding="async"
+           onerror="this.remove()"><span class="cat-emoji" aria-hidden="true">🛒</span><span
+           class="carrello-pallino${s.cambiato ? ' cambiato' : ''}" aria-hidden="true">${
+           s.cambiato ? '!' : (s.pezzi > 99 ? '99+' : fmt(s.pezzi))}</span></span>
+      <span class="cat-eti">Carrello</span>
+    </a>`;
+}
+/* Ogni cambio del carrello ridisegna la fila: e' la sua firma
+   (renderStriscia) a dire se la card e' nata, morta o cambiata — e
+   solo allora la fila si rifa', senza far lampeggiare le figure. */
+function aggiornaIconaCarrello(){
+  renderStriscia();
+}
+/* Il tocco sulla card: la pagina del carrello, come ci si arriva da
+   un articolo dello stesso venditore. Aprirlo e' averlo visto: si
+   salva, e con l'ultimo tocco si spostano i prezzi visti (le note
+   restano a schermo finche' non si esce dalla pagina: go()). */
 function riprendiCarrello(){
   haptic();
   rimettiCarrelloPrimaAccordo();
-  if (!paccoDati || !setScelte.size) { aggiornaRigaCarrello(); return; }
+  if (!paccoDati || !setScelte.size) { aggiornaIconaCarrello(); return; }
   const l = listings.find(x => x.id === paccoDati.origineId)
          || listings.find(x => setScelte.has(x.id));
   if (!l) return;
@@ -25970,18 +26025,6 @@ function riprendiCarrello(){
   rileggiVenditore(l).then(() => {
     if (el('view-pacco').classList.contains('active')) renderPacco();
   });
-}
-/* «Svuota» dalla home: la stessa domanda della ✕, col nome di chi */
-function chiediSvuotaCarrello(){
-  chiediConferma({
-    titolo: `Svuotare il carrello da ${nomeVenditoreCarrello()}?`,
-    corpo: 'Non potrai annullare questa azione: il carrello si svuota e '
-      + 'si ricomincia da capo.',
-    etichetta: 'Sì, svuota il carrello',
-    poi: () => {
-      rimettiCarrelloPrimaAccordo();   /* si svuota quello VERO */
-      azzeraCarrello(); salvaCarrello(); toast('Carrello svuotato');
-    }});
 }
 /* Le note del rientro in cima alla pagina del carrello (renderPacco).
    Testo nostro coi titoli degli annunci dentro: passa da esc(). */
@@ -25995,7 +26038,7 @@ function renderNoteCarrello(){
   box.style.display = carrelloNote.length ? '' : 'none';
 }
 /* IL CARRELLO VERO TORNA AL SUO POSTO dopo la cassa di un accordo:
-   al primo gesto sul carrello (apriPacco, «Riprendi», «Svuota», la
+   al primo gesto sul carrello (apriPacco, la card «Carrello», la
    pagina del carrello dalla cronologia) o al pagamento. Mai all'uscita
    dalla cassa: da li' si va e si torna (la pagina «I tuoi dati» dal
    cassetto dell'indirizzo), e la cassa si ricostruisce dalla memoria.
@@ -26008,7 +26051,7 @@ function rimettiCarrelloPrimaAccordo(){
   if (!c) return;
   setScelte = c.scelte; paccoDati = c.dati;
   if (acqDati && acqDati.accordoId) acqDati = null;
-  aggiornaRigaCarrello();
+  aggiornaIconaCarrello();
 }
 /* DOPO UN PAGAMENTO (decisione di Andrea): il carrello si svuota SOLO
    se l'ordine pagato e' dello STESSO venditore — dal carrello o da una
@@ -26026,7 +26069,7 @@ function carrelloDopoPagamento(oid, venditoreCassa){
     azzeraCarrello();
     salvaCarrello();
   }
-  aggiornaRigaCarrello();
+  aggiornaIconaCarrello();
 }
 /* Gli annunci della pagina: i soli ATTIVI del venditore del pacco,
    provenienza in testa, poi i componibili prima degli esclusi.
