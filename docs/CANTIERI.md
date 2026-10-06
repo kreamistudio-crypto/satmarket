@@ -39057,3 +39057,175 @@ Restano due movimenti che non sono del foglio: la barra del P2P che si
 trasforma in quella del mercatino andando al negozio (`nav-p2p`, di
 sempre per ogni negozio aperto dal P2P) e lo swipe di iOS con
 l'istantanea della entry.
+
+## La ✕ su ogni dispositivo (7 ott 2026, richiesta di Andrea)
+
+**DA DOVE SI PARTIVA.** In «I miei scambi» la ✕ di una card c'è solo
+sugli scambi finiti (`p2pTogliibile`: concluso, annullato, rifiutato, e
+il «senza risposta» oltre le 168 ore), chiede conferma e toglie la riga
+dal `localStorage` di QUEL dispositivo, con una lapide di 40 giorni
+perché l'archivio del server non la rifaccia nascere lì. Il server della
+✕ non sapeva niente: sugli altri dispositivi dello stesso account la
+riga restava, e un dispositivo nuovo la faceva nascere dall'archivio.
+La strada della lista sul server era stata scartata nel cantiere della
+scopa lampo («gli insegnerebbe quali ordini sono di chi»); dal cantiere
+«I miei scambi su ogni dispositivo» il server quegli scambi li sa già
+tutti, e non c'è privacy nuova da pagare.
+
+**DECISO, con la proposta approvata da Andrea prima del codice.**
+- `p2p_tolti` (tg_id, ordine, quando; PK sui primi due): l'id e l'ora
+  del gesto, nient'altro. L'ora serve alla pulizia dei quaranta giorni
+  (con la cronaca, in `_pulisci_memoria_p2p`) e a `_tolto_vale_p2p`.
+  Via subito con «dimentica il profilo», e segue la fusione dei conti
+  (`UPDATE OR IGNORE` + `DELETE`, come gli avvisi). La pulizia è quella
+  della cronaca, quindi gira con l'orologio del P2P (a leva accesa),
+  come la promessa dei quaranta giorni che «I tuoi dati» fa già per la
+  cronaca; e la lettura (`_tolti_p2p`) ignora comunque le righe più
+  vecchie di quaranta giorni, pulizia o no.
+- `POST /api/p2p/scambi/togli`, giudice `_togli_scambio_p2p`: sessione,
+  nel corpo SOLO `{ordine}` nella forma di `FORMA_ORDINE_P2P`, nessun
+  gate sulla leva. Si ricorda solo uno scambio che l'archivio serve a chi
+  chiede E dà FINITO (`P2P_STATI_TOGLIBILI` = concluso, annullato). 200
+  tolto; 404 niente da ricordare — non è suo, non esiste, oltre lo
+  storico, o il server non ne sa dire lo stato: lo stesso no per tutti,
+  la domanda non dice niente degli altri; 409 per il server è in corso,
+  con una riga nel journal (`✕ P2P: … il telefono lo dice finito, il
+  server «attivo» — resta`), che è il caso da guardare. L'ora ricordata
+  è `max(adesso, ultimo passo)`: un orologio del coordinatore un filo
+  avanti non deve far sembrare lo scambio mosso DOPO la ✕. Una seconda ✕
+  da un altro dispositivo la rinfresca.
+- L'archivio manda `tolti`: i ricordati finché la ✕ vale
+  (`_tolto_vale_p2p`: l'archivio non serve più lo scambio, o lo serve
+  finito e FERMO dalla ✕ — un giro che si muove dopo torna a vedersi, la
+  ✕ ha tolto quello scambio e non l'ordine per sempre).
+- Nel client: la ✕ chiede prima (`togliScambioServerP2P`, blocco suo
+  fuori dal motore, una fetch, tetto `TETTO_TOGLI_P2P_MS` = 12 s) e
+  decide su quattro parole — 'tolto' via da qui e in memoria
+  (`p2pToltiServer`), 'ignoto' via solo da qui come prima, 'aperto' la
+  riga resta col perché («Lo scambio risulta ancora in corso: lo potrai
+  togliere quando sarà chiuso»), 'rete' la riga resta («Non riesco a
+  toglierlo adesso: controlla la connessione e riprova»); 'rete' è
+  tutto quel che non è 200/400/404/409, cioè anche un 5xx, la sessione
+  scaduta, il tetto. Una riga provvisoria (`nuovo:3`) e la vetrina non
+  chiedono nemmeno. L'archivio posa l'elenco (`chiediScambiServerP2P`,
+  solo stringhe nella forma di un ordine; un server di ieri senza
+  l'elenco vale []); l'adozione non fa nascere un tolto
+  (`toltoAltroveP2P`, dopo la lapide); `applicaToltiP2P` toglie le righe
+  in `scambiP2P`. La scrittura dell'archivio è una, `cancellaRigaP2P`,
+  per la ✕ e per i tolti degli altri.
+- «I tuoi dati», la frase approvata: «Se togli uno scambio chiuso con la
+  ✕, il server ricorda il numero dell'ordine e quando l'hai tolto, così
+  sparisce anche dagli altri tuoi dispositivi. Si cancella da solo dopo
+  quaranta giorni, e subito se dimentichi il profilo.»
+- Rimettere uno scambio tolto per sbaglio: NO (Andrea): basta la
+  conferma che c'è già.
+
+**DECISO STRADA FACENDO, e detto qui perché la proposta diceva altro.**
+- L'archivio TIENE lo scambio tolto fra gli `scambi` (la proposta diceva
+  «non lo serve più»). Il perché: un dispositivo rimasto indietro — la
+  riga ancora «in corso» perché la fine non gli è arrivata — dal server
+  impara la fine SOLO da lì. Escluso, resterebbe in corso per sempre, e
+  il giudice del telefono (giustamente) non toglierebbe una riga aperta.
+  Così l'adozione la porta prima alla fine e `applicaToltiP2P`, che gira
+  DOPO, la toglie: il banco ha il caso («la riga rimasta indietro»), e
+  una mutazione che rovescia l'ordine è uccisa. A non far nascere il
+  tolto sui dispositivi nuovi è l'elenco, non l'assenza.
+- I tolti degli altri si tolgono SOLO se il dispositivo li giudica finiti
+  (`p2pTogliibile`): due giudici che non concordano non tolgono niente,
+  e una riga aperta porta una chiave che può ancora muovere dei sats.
+- SENZA LAPIDE sugli altri dispositivi: a non farla rinascere basta
+  l'elenco (che il server smette di mandare se lo scambio si muove), e
+  una lapide nasconderebbe anche dal LIBRO, per quaranta giorni,
+  l'ordine di un altro tornato in vetrina dopo una presa caduta. Sul
+  dispositivo della ✕ la lapide resta com'era.
+- La presa caduta messa da parte (`X~ora`, `idVero`): la ✕ chiede col
+  nome vero; col 409 la riga se ne va solo da qui (il giro aperto è un
+  altro, quello sotto il nome vero), col 200 il nome vero entra fra i
+  tolti; e i tolti altrove la tolgono anche per `idVero`.
+- La conferma diceva «La riga e la sua chiave se ne vanno da questo
+  dispositivo»: con la ✕ ricordata non è più vero, e dice «da tutti i
+  tuoi dispositivi». (Per uno scambio che il server non conosce — righe
+  di prima del 18 set, o mai arrivate al server — se ne va solo da qui:
+  gli altri dispositivi una copia di solito non ce l'hanno.)
+
+**SCARTATO.** «Annulla» nel toast (Andrea: basta la conferma). Togliere
+in locale a rete giù e riprovare dopo con una coda: la riga resterebbe
+sugli altri senza che nessuno lo veda, cioè il difetto di partenza
+nascosto. La lapide anche sugli altri dispositivi (vedi sopra). Uvicorn
+in un thread per il collaudo: in CI non c'è (si installano solo
+`fastapi httpx anthropic`) e allargare il workflow era una decisione da
+non prendere di straforo — il server vero lo serve un ponte di libreria
+standard (`http.server` → `TestClient` dell'app, middleware compresi,
+senza lifespan: nessun compito d'avvio, nessuna rete).
+
+**PROVATO.** `prove_tolti_ovunque` (60): le sentinelle (lo schema con
+SOLO le tre colonne, la rotta, la CSRF che non la esenta, l'archivio,
+pulizia, «dimentica», fusione, il blocco fuori dal motore con UNA fetch
+e il corpo del solo ordine, la forma uguale al server, il tetto, «I tuoi
+dati»), i giudici del server che girano DAVVERO su un database collo
+schema vero (`_banco_eventi_p2p`: concluso e annullato tolti, in corso
+no, ignoti, l'estraneo, l'orologio avanti, la seconda ✕, l'account e non
+lo scambio, l'età, il giro nuovo, la pulizia) e il banco node con le
+funzioni vere del client, un caso alla volta (200, 404, 400, 409, la
+presa caduta col 409 e col 200, rete giù, 500, 401, la domanda appesa e
+abortita, la provvisoria, la vetrina, l'aperto che non arriva alla
+conferma, il testo, `applicaToltiP2P`, l'adozione, la riga indietro,
+l'elenco filtrato, il server di ieri). Emendate con la loro riga: il
+gancio del pallino si guarda in `cancellaRigaP2P` (sempre quattro posti
+che scrivono l'archivio), lo stub di `applicaToltiP2P` nel banco della
+corsa, `p2p_tolti` nei cinque banchi che costruiscono lo schema e fanno
+girare la pulizia. `collaudo_tolti_ovunque.py` (35, nella CI) col server
+vero e quattro dispositivi dello stesso account fatti dal client vero in
+node con `fetch` vere: A mini app, B sito col cookie e l'Origin (pagina
+aperta), C sito chiuso durante la ✕ e riaperto, D nuovo — A toglie e il
+server lo ricorda con l'ora, l'altra parte non ne sa niente, B lo perde
+alla lettura dopo senza lapide, C alla prima lettura, D non lo fa
+nascere, A in una sessione nuova pure; il 409 (con la riga nel
+journal), la rete giù e poi su, la riga solo di lì (404), l'estraneo, id
+storto e corpo non oggetto (400), senza sessione (401), la CSRF da
+un'altra origine (403) e dalla sua (200), la leva spenta, il giro nuovo
+che torna a vedersi su B, «dimentica», la pulizia prima e dopo i
+quaranta giorni. Verde nella gabbia (`collaudi_ci.py`) e con le sole
+librerie della CI (senza uvicorn né coincurve). TORTURA su una copia:
+48 mutazioni sulle righe nuove (20 sul server, 28 sul client), 48
+uccise, 0 vive, 0 inciampate — per ognuna le cinque sezioni toccate
+(397 prove a codice intatto) e il collaudo (35); 47 sulla copia di
+12357e2, e quella del 404, rifatta con l'ancora stretta perché la
+stessa riga sta anche in un'altra rotta, sulla copia di 0f38224. SUITE
+intera severa, senza config nel worktree: su 12357e2 (base da9273e)
+19.238 verdi e 2 rosse — le due collaterali qui sopra, curate —; dopo
+il rebase su 7feb1ce, sull'albero di 0f38224, 19.373 verdi e 0 rosse.
+I 39 COLLAUDI della CI nella gabbia: verdi su 12357e2 e su 0f38224. I
+due passi dei SEGRETI della CI rifatti in locale con la controprova:
+puliti (la cronologia locale trova 8 righe esadecimali di un commit
+del 2 set che vive solo sotto `refs/salvataggi/main-prima-del-rebase`,
+un riferimento locale mai spinto che la CI non vede; i commit di
+questo cantiere: zero). IL REBASE: base da9273e, arrivati nel frattempo
+cinque commit di altre sessioni (51267ef, 1308686, 715f147, 649f256,
+7feb1ce); un solo conflitto, l'elenco di `main()` in prove.py, tenute
+tutt'e due le sezioni; cercate per nome le funzioni toccate qui, nessuna
+nei loro diff. DAL VIVO, sulla copia in collaudo col relay morto (P2P,
+RELAY_NOSTR e lo specchio a `ws://127.0.0.1:9`, nsec segnaposto) e tre
+Chrome headless con profili separati — A la mini app (initData di
+collaudo), B e C il sito col login web firmato col token di cartone —
+prima sul codice di `origin/main` e poi su questo: PRIMA A toglie e B e
+C lo tengono, DOPO B (pagina aperta, battito) e C (riaperto) lo perdono;
+409, rete giù e riga solo di lì come nel collaudo. Nel registro della
+copia 200, 409, 404, la riga `✕ P2P:`, nessuna violazione CSP, il P2P
+solo verso il relay morto. Scatti prima/dopo in due tavole, guardati
+da Andrea prima del push (la regola del cantiere: niente push senza il
+suo ok sugli scatti).
+
+**NON PROVATO, resta da guardare.**
+- Il telefono vero e l'APK: la ✕ dalla mini app vera e il sito/APK che
+  la perdono alla lettura dopo.
+- Sul dispositivo della ✕ la lapide (di prima) blocca per quaranta
+  giorni anche un giro NUOVO dello stesso ordine, che sugli altri torna a
+  vedersi. Col coordinatore di oggi un giro nuovo dopo una fine non
+  dovrebbe esistere (un concluso o un annullato non tornano in vetrina,
+  e la presa caduta non lascia chi aveva preso fra le parti): è una
+  cintura, provata solo a database.
+- I dodici secondi del tetto sono a occhio.
+- La lapide della ✕ su una presa caduta nasconde dal libro, per
+  quaranta giorni, l'ordine di un altro tornato in vetrina: è di prima
+  (la ✕ la scriveva già), segnalato a parte, non toccato.
