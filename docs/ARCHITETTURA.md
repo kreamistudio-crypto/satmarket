@@ -4802,7 +4802,7 @@
   ⚠️ E IL NOME È `interesse` E MAI `attesa`, verificato prima di
   scrivere una riga: nel client «attesa» significa già un'altra cosa —
   il velo che blocca l'app mentre una richiesta viaggia
-  (`attesaOverlay`, `.attesa-jar`, `bottoneInAttesa`, `attesaOre`) — e
+  (`attesaOverlay`, `.attesa-anello`, `bottoneInAttesa`, `attesaOre`) — e
   chiamarlo così sarebbe la trappola del doppio significato già pagata
   con «lampo» e con «nota» dentro `renderAcquisto`.
   LA FUSIONE LO MIGRA in UNIONE (`UPDATE OR IGNORE` + `DELETE`) e NON

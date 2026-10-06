@@ -1931,7 +1931,7 @@
     line-height:1}
   .jar-btn .jar-conta{font-size:13px}
   /* La scossellina di festa quando un annuncio ENTRA nel barattolo:
-     riusa i keyframe scuoti dello spinner (-8/+8), due giri in 0.4s.
+     riusa i keyframe scuoti (-8/+8), due giri in 0.4s.
      Solo all'aggiunta, mai alla rimozione; il cerchietto del dettaglio
      ha gia' la SUA festa (jarPop sul bottone intero: due scosse
      sovrapposte sarebbero troppe, quindi li' non si somma). */
@@ -7756,26 +7756,21 @@
   #attesaOverlay.on{display:flex}
   .attesa-card{background:var(--bg);border-radius:16px;padding:20px 26px;font-weight:800;font-size:15.5px;
     display:flex;align-items:center;gap:10px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
-  /* Lo spinner di casa: il barattolino che ondeggia, come scosso per
-     far entrare le monete. La clessidra resta come ripiego se
-     l'immagine non arriva (onerror la toglie e il sibling appare). */
-  .attesa-jar{width:34px;height:34px;border-radius:10px;flex:none;
-    animation:scuoti 1.1s ease-in-out infinite}
-  .attesa-jar + .attesa-clessidra{display:none}
   /* ══ L'ANELLO SOTTILE (16 set 2026, richiesta di Andrea) ══
-     Il barattolino e' il segno di casa e resta dov'e': qui serviva un
-     giro PIU' FINE, e in casa un anello non c'era — questo e' il
-     primo. Due pixel di filo, il quarto acceso in arancio, e gira col
-     `gira` che c'e' gia' (quello della clessidra): un keyframe nuovo
-     per la stessa cosa sarebbe il secondo da tenere in pari.
-     Lo accende chi chiama l'attesa, una classe sull'overlay: cosi' il
-     velo resta UNO e non nasce un secondo velo che gli somiglia. */
-  #attesaOverlay.anello .attesa-jar,
-  #attesaOverlay.anello .attesa-clessidra{display:none}
-  .attesa-anello{display:none;width:24px;height:24px;flex:none;
+     Due pixel di filo, il quarto acceso in arancio, e gira col `gira`
+     che c'e' gia': un keyframe nuovo per la stessa cosa sarebbe il
+     secondo da tenere in pari. Nato per il P2P come opzione del velo
+     (una classe `anello` accanto al barattolino che ondeggiava).
+     ⚠️ DAL 7 OTT 2026 E' L'UNICO GIRO DEL VELO (richiesta di Andrea:
+     «deve essere uguale ovunque»): mercatino, P2P, letture e guscio
+     d'apertura girano con questo, e il barattolino resta il segno di
+     casa in testata e sulle card, non piu' un'attesa. Nessuna classe
+     lo accende: una scelta che non c'e' non si dimentica addosso al
+     velo dopo — la trappola del 17 set, quando una lettura del libro
+     lasciava l'anello a ogni velo successivo. */
+  .attesa-anello{display:block;width:24px;height:24px;flex:none;
     border-radius:50%;border:2px solid var(--line);
     border-top-color:var(--sats);animation:gira .8s linear infinite}
-  #attesaOverlay.anello .attesa-anello{display:block}
   /* ...e lo stesso anello DENTRO la pagina del negozio che sta arrivando
      (7 ott 2026, `negozioInAttesa`): non un velo, la pagina stessa */
   .negozio-attesa{display:flex;justify-content:center;padding:56px 0}
@@ -7813,10 +7808,7 @@
     background:var(--sats);color:#fff;font-size:16px;font-weight:900;line-height:26px;
     text-align:center}
   #attesaOverlay.fatto .attesa-spunta{display:block}
-  #attesaOverlay.fatto .attesa-jar,
-  #attesaOverlay.fatto .attesa-clessidra,
   #attesaOverlay.fatto .attesa-anello{display:none}
-  .attesa-clessidra{font-size:22px;animation:gira 1.6s linear infinite}
   @keyframes gira{to{transform:rotate(360deg)}}
   @keyframes scuoti{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
   /* ══ IL GUSCIO DI APERTURA (set 2026) ═══════════════════════════
@@ -9878,7 +9870,7 @@
   /* Chi preferisce meno movimento non vede fluttuare nulla,
      e i fogli compaiono senza scivolare */
   @media (prefers-reduced-motion: reduce){
-    .empty-mascotte,.hero img,.attesa-jar,.attesa-clessidra,
+    .empty-mascotte,.hero img,
     .sicu-hero img{animation:none}
     .sheet{transition:none}
     .sheet-bg.open{animation:none}
@@ -13638,7 +13630,7 @@ document.getElementById('cartello')?.remove();</script>
   <div class="toast" id="toast"></div>
   <!-- «Un attimo, riprovo…»: il server che si riavvia (vedi fetchCheRiprova) -->
   <div class="riprovo" id="riprovo" role="status">Un attimo, riprovo…</div>
-  <div id="attesaOverlay"><div class="attesa-card"><img class="attesa-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="attesa-clessidra">⏳</span><span class="attesa-anello"></span><span class="attesa-spunta" aria-hidden="true">✓</span> <span id="attesaTesto">Invio sats in corso…</span></div></div>
+  <div id="attesaOverlay"><div class="attesa-card"><span class="attesa-anello"></span><span class="attesa-spunta" aria-hidden="true">✓</span> <span id="attesaTesto">Invio sats in corso…</span></div></div>
 </div>
 
 <script>
@@ -37374,18 +37366,9 @@ function refundPanel(o){
    sfocato, e li' non lo legge nessuno. */
 function bottoneInAttesa(btn, testo){
   el('attesaTesto').textContent = testo || 'Invio sats in corso…';
-  /* IL VELO SI VESTE SEMPRE, e non si limita ad accendersi (17 set
-     2026): `attesaRitardata` sceglie fra barattolino e anello con una
-     classe, ma alla chiusura non la toglie — quindi bastava una
-     lettura del libro P2P (che l'anello lo chiede) perche' da li' in
-     poi OGNI velo dell'app girasse con l'anello al posto del
-     barattolino. Non si legge come un guasto, si legge come «il
-     barattolino ogni tanto non c'e'», ed e' il modo in cui una cosa
-     del genere resta in piedi per mesi. Qui il barattolino si
-     RIVENDICA: chi vuole l'anello passa da `attesaP2P`. */
-  el('attesaOverlay').classList.remove('anello');
-  /* ...e per la stessa ragione si toglie la SPUNTA (18 set 2026): una
-     `fatto` rimasta addosso farebbe nascere ogni velo gia' «riuscito» */
+  /* IL VELO NASCE SENZA LA SPUNTA (18 set 2026): una `fatto` rimasta
+     addosso farebbe nascere ogni velo gia' «riuscito». Il giro e' uno
+     solo, l'anello, dal 7 ott 2026: non c'e' piu' niente da scegliere. */
   el('attesaOverlay').classList.remove('fatto');
   el('attesaOverlay').classList.add('on');    /* blocca tutto: i sats viaggiano */
   const prima = btn ? btn.innerHTML : '';
@@ -37401,9 +37384,9 @@ function bottoneInAttesa(btn, testo){
 
 /* ══ IL VELO DEI GESTI CHE PARLANO COL COORDINATORE (17 set 2026,
    richiesta di Andrea) ══
-   Non e' un terzo velo: e' il velo immediato di casa vestito
-   dell'anello sottile, che nel P2P e' il giro di casa (lo porta gia'
-   l'attesa del libro). Immediato e NON ritardato, ed e' la regola
+   Non e' un terzo velo: e' il velo immediato di casa, col suo anello
+   sottile (dal 7 ott 2026 il giro di tutta l'app). Immediato e NON
+   ritardato, ed e' la regola
    scritta in `attesaRitardata`: qui si MUOVONO i sats — si ritira un
    ordine, si dice «ho pagato», si liberano i sats — quindi il velo
    non e' cortesia ma la guardia contro il secondo tocco su una cosa
@@ -37417,8 +37400,7 @@ function bottoneInAttesa(btn, testo){
 function attesaP2P(testo, btn){
   const rip = bottoneInAttesa(btn, testo);
   el('attesaOverlay').classList.remove('fatto');
-  el('attesaOverlay').classList.add('anello');
-  return () => { rip(); el('attesaOverlay').classList.remove('anello', 'fatto'); };
+  return () => { rip(); el('attesaOverlay').classList.remove('fatto'); };
 }
 /* LA SPUNTA DEL FATTO (18 set 2026): dentro un velo GIA' ALZATO da
    `attesaP2P`, l'anello diventa una spunta arancione ferma e la frase
@@ -37472,14 +37454,11 @@ function ragioneGestoP2P(e){
    quella lettura E' la ricevuta, e non torna indietro — quindi resta
    col velo immediato, che li' e' proprio la guardia. */
 const RITARDO_ATTESA = 180;
-/* `anello` scambia il barattolino con l'anello sottile, per chi vuole
-   un giro piu' discreto (il P2P). Il velo resta lo stesso. */
-function attesaRitardata(btn, testo, anello){
+function attesaRitardata(btn, testo){
   let acceso = false, prima = '';
   const t = setTimeout(()=>{
     acceso = true;
     el('attesaTesto').textContent = testo || 'Un attimo…';
-    el('attesaOverlay').classList.toggle('anello', !!anello);
     el('attesaOverlay').classList.add('on');
     if (btn) { prima = btn.innerHTML; btn.disabled = true; btn.innerHTML = '⏳ ' + (testo || 'Un attimo…'); }
   }, RITARDO_ATTESA);

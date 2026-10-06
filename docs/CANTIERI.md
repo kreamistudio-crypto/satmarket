@@ -39271,3 +39271,94 @@ caduta, la ✕ proprio su quella riga, l'ordine dell'altro ancora in
 vetrina —, è raro, e non tocca dei sats: l'ordine resta visibile dagli
 altri dispositivi e da tutti gli altri utenti, e si può prendere di
 nuovo da lì.
+
+## L'anello ovunque: il velo d'attesa gira con l'anello del P2P anche nel mercatino (7 ott 2026, richiesta di Andrea)
+
+**DA DOVE SI PARTIVA.** Il velo d'attesa (`#attesaOverlay`) è uno solo
+in tutta l'app, ma aveva due giri: il barattolino che ondeggiava (il
+keyframe `scuoti`, con la clessidra ⏳ di ripiego se l'immagine non
+arrivava) e l'anello sottile del 16 set (`.attesa-anello`), acceso dalla
+classe `anello` che metteva chi chiamava. Il barattolino girava nei 44
+`bottoneInAttesa` del mercatino (pagamenti, invoice, dispute,
+feedback...) e nelle 10 letture di `attesaRitardata`, compresa una del
+P2P, «Controllo i tuoi scambi…» (`passaAlContoDalFoglioP2P`), che
+l'anello non lo chiedeva. L'anello girava nei gesti P2P (`attesaP2P`) e
+nel guscio d'apertura. Andrea: lo stesso anello anche nel mercatino,
+identico, «deve essere uguale ovunque» — anche quel punto del P2P —, il
+⏳ fermo dentro i bottoni resta.
+
+**LA DECISIONE.** L'anello è l'UNICO giro del velo, e nessuna classe lo
+sceglie più: `.attesa-anello` nasce `display:block` (la regola di
+prima, con `none` diventato `block`: misura, filo, colore, passo e riga
+del «riduci movimento» sono quelli del P2P, nessuno stile nuovo), il
+markup del velo ha solo l'anello, la spunta e la frase; via
+`.attesa-jar`, `.attesa-clessidra` e le loro righe (anche nella lista
+del «riduci movimento»), via la classe `anello` dalle tre porte del velo
+(`bottoneInAttesa` non se la toglie più, `attesaP2P` non se la mette più,
+`attesaRitardata` perde il terzo argomento). Il P2P si vede com'era: la
+sua funzione cambia solo perché non tocca più una classe che nessuno
+legge. Il keyframe `scuoti` resta: lo usa la scossellina del barattolo
+dei preferiti. Il barattolino resta il segno di casa (testata, card,
+guscio), non più un'attesa.
+- IL LETTORE VOCALE dice quel che diceva: il barattolo aveva `alt=""`,
+  l'anello è uno `<span>` vuoto, e la frase è sempre `#attesaTesto`.
+- LA TRAPPOLA DEL 17 SET (una lettura del libro lasciava l'anello
+  addosso a ogni velo dopo) si chiude alla radice: una scelta che non
+  c'è non si dimentica addosso.
+
+**LE STRADE SCARTATE.**
+- Tenere la classe e accenderla sempre (`add('anello')` in ogni porta):
+  meno righe toccate, ma una classe accesa sempre è un interruttore che
+  non interrompe niente, e il giorno che una porta nuova se la scorda
+  il velo nasce senza giro.
+- Tenere il barattolino in «Controllo i tuoi scambi…» perché è P2P:
+  scartato da Andrea («deve essere uguale ovunque»), e avrebbe voluto
+  codice apposta solo per conservarlo.
+
+**PROVATO.** `prove_anello_ovunque` (25): il markup del velo (un anello,
+niente img/jar/clessidra, anello muto, la frase di sempre), la cascata
+VERA sul markup vero nei due temi (blocco, 24 px, filo 2 px `--line`,
+quarto `--sats`, `gira .8s linear infinite`; con la spunta l'anello
+sparisce), la riga del «riduci movimento» nel suo gruppo, nessuna regola
+`#attesaOverlay.anello`, il guscio con lo stesso anello; il banco node
+con le tre porte vere (mercatino, gesto P2P con la spunta, ritardata
+«Controllo i tuoi scambi…», il velo del mercatino dopo un gesto P2P) e
+le classi che il banco ha visto chieste alla cascata. Emendate (col
+loro perché nel commento) le sentinelle e i quattro banchi che leggevano
+`anello` nel registro del velo: la busta di ritiro, il velo dei gesti
+P2P (le tre uscite e «dal dito»), la pubblicazione con la spunta, il
+caricamento del Barattozon. Tortura 16 su 16 sulla copia (barattolino
+rimesso, anello nascosto/più grande/più lento/d'altro colore/filo
+spesso, riduci movimento tolto, la classe tornata in JS o in CSS, la
+spunta dimenticata in due porte, la ritardata muta, l'anello con un
+testo, la frase cambiata). Suite intera severa nel worktree senza
+config su origin/main da9273e: 19.256 verdi, 0 rosse; i 38 collaudi
+della CI verdi nella gabbia. Scatti prima/dopo a 375 px, densità 3,
+chiaro e scuro, Chrome headless via CDP sulle due copie servite in
+locale (l'app in demo, il velo alzato chiamando le funzioni vere della
+pagina): il riferimento P2P (`attesaP2P`), il mercatino «Invio sats in
+corso…», l'annuncio «Apro le istruzioni…», il P2P «Controllo i tuoi
+scambi…» — prima il barattolino, dopo l'anello identico al riferimento.
+
+Scatti approvati da Andrea.
+
+**AL REBASE (7 ott 2026, su 337b698 «Il foglio che non scivola»).**
+Quel cantiere mette lo STESSO anello dentro la pagina del negozio che
+sta arrivando (`negozioInAttesa`, `.negozio-attesa`), con una sua riga
+`.negozio-attesa .attesa-anello{display:block}` che serviva finché
+l'anello nasceva spento. Unito senza perdere niente: la sua riga resta
+(adesso è un doppione innocuo, e l'anello lì deve girare comunque), via
+solo `#attesaOverlay.anello .attesa-anello{display:block}`, che era di
+questo cantiere toglierla. Due prove in più in `prove_anello_ovunque`:
+`negozioInAttesa` scrive lo stesso anello, e la cascata lo veste come
+quello del velo. Prima del push main è corso ancora (d3273b5..b0a5658,
+«La ✕ su ogni dispositivo», di un'altra sessione: nessuna riga del
+velo), secondo rebase con i soli conflitti in `main()` di prove.py e in
+fondo a CANTIERI, tenute le due parti. Sull'albero finale, sopra
+b0a5658: le 21 sezioni toccate dai tre cantieri (1.687 verdi, 0 rosse)
+e i 39 collaudi della CI nella gabbia, verdi. La suite intera severa è
+girata su da9273e (19.256 verdi), non sull'albero finale.
+
+**NON PROVATO.** Il telefono e l'APK (nessuna rotta nuova né permesso:
+è CSS e markup del velo), e un gesto vero col server (il velo l'hanno
+alzato le funzioni chiamate a mano, non un pagamento).

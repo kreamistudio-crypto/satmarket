@@ -9419,12 +9419,13 @@ def prove_busta_ritiro():
     # Paga. Sotto la soglia non compare mai, oltre compare una volta.
     prova("la lettura non alza piu' il velo immediato", False,
           "bottoneInAttesa" in mb)
-    # ⚠️ LA FIRMA HA UN TERZO ARGOMENTO dal 16 set 2026 (l'anello
-    # sottile del P2P): questa ancora e' la sola cosa che tiene il
-    # censimento del velo agganciato alla funzione vera, e quando la
-    # firma e' cambiata la prova e' ESPLOSA invece di diventare rossa.
-    # A dirlo e' stata la suite intera.
-    _ar = pezzo_js(mini, "function attesaRitardata(btn, testo, anello){")
+    # ⚠️ LA FIRMA E' CAMBIATA DUE VOLTE: un terzo argomento dal 16 set
+    # 2026 (l'anello sottile del P2P), tolto il 7 ott 2026 (l'anello e'
+    # diventato l'unico giro del velo). Questa ancora e' la sola cosa che
+    # tiene il censimento del velo agganciato alla funzione vera, e quando
+    # la firma cambia la prova ESPLODE invece di diventare rossa. A dirlo
+    # e' stata la suite intera, tutt'e due le volte.
+    _ar = pezzo_js(mini, "function attesaRitardata(btn, testo){")
     prova("l'attesa ritardata arma un timer e non tocca subito il DOM",
           True, "setTimeout(" in _ar
           and _ar.index("setTimeout(") < _ar.index("classList.add('on')"))
@@ -9549,13 +9550,11 @@ def prove_busta_ritiro():
               "volta sola se e' lenta, e il bottone torna com'era",
               [{"velo": "", "etichetta": "👁 Mostra il codice",
                 "spento": False},
-               # ⚠️ IL REGISTRO DICE ANCHE QUALE GIRO (16 set 2026): la
-               # ritardata sceglie fra il barattolino di casa e l'anello
-               # sottile, e questa lettura — che non chiede l'anello —
-               # deve prendere il barattolino. «senza anello» e' quella
-               # scelta, e sta PRIMA dell'accensione perche' il velo si
-               # veste prima di farsi vedere.
-               {"velo": "senza anello+acceso+spento",
+               # (16 set 2026) il registro diceva anche QUALE GIRO:
+               # «senza anello», il barattolino. EMENDATA (7 ott 2026,
+               # «l'anello ovunque»): il giro e' uno solo e nessuna
+               # classe lo sceglie, quindi il velo si accende e basta.
+               {"velo": "acceso+spento",
                 "etichetta": "👁 Mostra il codice",
                 "spento": False}],
               _js4.loads(_r4.stdout.strip()) if _r4.returncode == 0
@@ -66764,23 +66763,26 @@ def prove_velo_p2p():
             _sordi.append(" ".join(_corpo.split())[:64])
     prova("nessun `poi` butta via la promessa del gesto", [], _sordi)
 
-    # --- 3) IL BARATTOLINO TORNA IL BARATTOLINO ---------------------
-    # `attesaRitardata` VESTE il velo con una classe e alla chiusura
-    # non la toglie: bastava una lettura del libro P2P perche' da li'
-    # in poi OGNI velo dell'app girasse con l'anello. Non si legge
-    # come un guasto — si legge come «il barattolino ogni tanto non
-    # c'e'» — ed e' il modo in cui una cosa del genere resta in piedi.
+    # --- 3) UN GIRO SOLO, E NESSUNA CLASSE CHE LO SCEGLIE ------------
+    # Fino al 7 ott 2026 `attesaRitardata` VESTIVA il velo con la classe
+    # `anello` e alla chiusura non la toglieva: bastava una lettura del
+    # libro P2P perche' da li' in poi OGNI velo dell'app girasse con
+    # l'anello. La cura di allora era il barattolino che si RIVENDICAVA;
+    # dal 7 ott l'anello e' l'unico giro (richiesta di Andrea: «uguale
+    # ovunque»), e la trappola si chiude alla radice: nessuna classe da
+    # dimenticare addosso, in nessuna delle tre porte del velo.
+    # EMENDATA (7 ott 2026, «l'anello ovunque»).
     _bia = pezzo_js(mini, "function bottoneInAttesa(btn, testo){", "\n}\n")
-    prova("il velo immediato si rivendica il barattolino", True,
-          "el('attesaOverlay').classList.remove('anello');" in _bia)
     _ap = pezzo_js(mini, "function attesaP2P(testo, btn){", "\n}\n")
-    prova("...e il velo dei gesti P2P si veste dell'anello", True,
-          "classList.add('anello')" in _ap)
-    # (18 set 2026, la spunta del fatto) chiudendo si toglie l'anello E
-    # la spunta: una `fatto` rimasta addosso farebbe nascere il velo dopo
-    # gia' «riuscito» — la stessa trappola dell'anello, un piano piu' su
-    prova("...e se lo toglie chiudendo, insieme alla spunta", True,
-          "rip(); el('attesaOverlay').classList.remove('anello', 'fatto');" in _ap)
+    _ar3 = pezzo_js(mini, "function attesaRitardata(btn, testo){", "\n}\n")
+    prova("nessuna delle tre porte del velo sceglie il giro con una classe",
+          [False, False, False],
+          ["'anello'" in _bia, "'anello'" in _ap, "'anello'" in _ar3])
+    # (18 set 2026, la spunta del fatto) chiudendo si toglie la spunta:
+    # una `fatto` rimasta addosso farebbe nascere il velo dopo gia'
+    # «riuscito» — la stessa trappola dell'anello, un piano piu' su
+    prova("...e il velo dei gesti P2P la spunta se la toglie chiudendo", True,
+          "rip(); el('attesaOverlay').classList.remove('fatto');" in _ap)
     prova("...e il velo immediato la spunta se la toglie pure, nascendo", True,
           "el('attesaOverlay').classList.remove('fatto');" in _bia)
 
@@ -66901,15 +66903,16 @@ def prove_velo_p2p():
     _out = (_js.loads(_r.stdout.strip()) if _r.returncode == 0
             else {"ERRORE": {"velo": _r.stderr[:300]}})
     # IL VELO SI ALZA E SI CHIUDE IN TUTTI E SEI I GIRI, ed e' la
-    # riga che regge tutto: `-anello +on` e' il velo immediato che si
-    # rivendica il barattolino e si accende, `+anello` e' l'anello che
-    # i gesti P2P gli mettono addosso, `-on -anello` e' la chiusura
-    # che rimette il velo com'era per il resto dell'app.
+    # riga che regge tutto: `+on` e' il velo immediato che si accende,
+    # `-on` la chiusura. EMENDATA (7 ott 2026, «l'anello ovunque»): fino
+    # a ieri c'erano anche `-anello`/`+anello`, il barattolino che il
+    # velo si rivendicava e l'anello che i gesti P2P gli mettevano
+    # addosso; adesso il giro e' uno solo e nessuna classe lo sceglie.
     # (18 set 2026) i `-fatto` sono la spunta del fatto che si toglie:
     # nascendo (due volte: il velo immediato e quello dei gesti) e
     # chiudendo. Nessun gesto di qui la ACCENDE: quella e' la
     # pubblicazione, che ha la sua prova.
-    VELO = "-anello -fatto +on -fatto +anello -on -anello -fatto"
+    VELO = "-fatto +on -fatto -on -fatto"
     _sei0 = {k: v for k, v in _out.items() if not k.startswith("dal dito")}
     prova("il velo si alza e si richiude su tutte e tre le uscite",
           {k: VELO for k in _sei0},
@@ -66938,11 +66941,13 @@ def prove_velo_p2p():
     # fuori il gesto sembrava non fare niente.
     prova("dal dito: il velo e' ancora acceso mentre si aspetta",
           True, _out.get("dal dito/mentre aspetta", {}).get("acceso"))
-    # ...e l'anello ce l'ha addosso: e' il giro dei gesti P2P, non
-    # il barattolino di `eseguiConferma` rimasto sotto
-    prova("...vestito dell'anello", True,
-          str(_out.get("dal dito/mentre aspetta", {}).get("velo", ""))
-          .endswith("+anello"))
+    # ...ed e' il velo di sempre: fino al 7 ott 2026 qui si guardava
+    # che avesse addosso l'anello e non il barattolino rimasto sotto da
+    # `eseguiConferma`; adesso il giro e' uno solo, e il velo non porta
+    # nessuna classe che lo scelga (EMENDATA, «l'anello ovunque»)
+    prova("...col giro di sempre, senza classi che lo scelgano", True,
+          {x[1:] for x in str(_out.get("dal dito/mentre aspetta", {})
+                              .get("velo", "")).split()} <= {"on", "fatto"})
     prova("...col verbo del gesto, gia' da li'",
           "Sto annullando l'ordine…",
           _out.get("dal dito/mentre aspetta", {}).get("detto"))
@@ -73667,10 +73672,10 @@ def prove_p2p_velo_pubblica():
           [".attesa-spunta{display:none;" in css and "background:var(--sats)" in
            css[css.index(".attesa-spunta{"):css.index(".attesa-spunta{") + 260],
            "animation" in css[css.index(".attesa-spunta{"):css.index(".attesa-spunta{") + 260]])
-    prova("...e quando c'e' lei l'anello, il barattolino e la clessidra non ci sono",
+    # (7 ott 2026) il barattolino e la clessidra non ci sono piu': resta l'anello
+    prova("...e quando c'e' lei l'anello non c'e'",
           True, "#attesaOverlay.fatto .attesa-spunta{display:block}" in css
-          and "#attesaOverlay.fatto .attesa-anello{display:none}" in css.replace(
-              "#attesaOverlay.fatto .attesa-jar,\n  #attesaOverlay.fatto .attesa-clessidra,\n  ", ""))
+          and "#attesaOverlay.fatto .attesa-anello{display:none}" in css)
     prova("l'overlay porta la spunta, fuori dalla lettura dello schermo", True,
           '<span class="attesa-spunta" aria-hidden="true">✓</span>' in mini)
 
@@ -73787,8 +73792,10 @@ async function giro(modo){
           True, ok["ms"] >= 50)
     prova("...e poi il velo si CHIUDE, e la spunta se ne va con lui", [True, True],
           [ok["chiuso"], ok["spuntaTolta"]])
-    prova("la sequenza intera: si veste, si alza, prende l'anello, la spunta, e si sveste",
-          "-anello -fatto +on -fatto +anello +fatto -on -anello -fatto", ok["velo"])
+    # EMENDATA (7 ott 2026, «l'anello ovunque»): niente piu' `anello`
+    # da mettere e togliere, il giro del velo e' uno solo
+    prova("la sequenza intera: si alza, la spunta, e si sveste",
+          "-fatto +on -fatto +fatto -on -fatto", ok["velo"])
     prova("sotto il velo la pagina e' quella dell'ordine pubblicato", "pubblicato", ok["stato"])
 
     # --- 3) LE USCITE STORTE: il velo si chiude, e la spunta NON c'e' ----
@@ -74236,18 +74243,18 @@ def prove_p2p_barattozon():
           mini.count("Leggo il libro"))
     prova("...ne' della chiusura del velo dell'ingresso", [0, 0],
           [mini.count("chiudiAttesaP2P"), mini.count("p2pAttesa ")])
-    # ⚠️ L'ANELLO E' UN'OPZIONE DEL VELO DI CASA, non un secondo velo:
-    # il barattolino resta il segno dell'app e vive dov'e' sempre
-    # stato; qui serviva un giro piu' fine, e lo accende chi chiama.
+    # ⚠️ L'ANELLO E' IL GIRO DEL VELO DI CASA, non un secondo velo.
+    # EMENDATA (7 ott 2026, «l'anello ovunque»): fino a ieri era
+    # un'opzione accesa da chi chiamava, accanto al barattolino; adesso
+    # e' l'unico giro, e nessuno lo accende — c'e' e basta.
     _an = pezzo_js(css, ".attesa-anello{", "}")
     prova("l'anello e' sottile e gira col keyframe che c'e' gia'", True,
           "border:2px solid" in _an and "animation:gira" in _an)
-    # EMENDATA (26 set 2026): l'ingresso del libro non lo chiama piu';
-    # l'opzione resta sul velo di casa, e l'anello resta dei gesti P2P
-    prova("...e lo accende chi chiama l'attesa, sul velo di casa", True,
-          "function attesaRitardata(btn, testo, anello){" in mini
-          and "classList.toggle('anello', !!anello)" in mini
-          and "el('attesaOverlay').classList.add('anello');" in mini)
+    prova("...e c'e' sempre, senza una classe che lo accenda", True,
+          "function attesaRitardata(btn, testo){" in mini
+          and "display:block" in _an
+          and "classList.toggle('anello'" not in mini
+          and "classList.add('anello')" not in mini)
     prova("...e col moto ridotto sta fermo, come il resto", True,
           ".attesa-anello{animation:none}" in css.replace("\r\n", "").replace("  ", ""))
     # ⚠️ IL VELO NON HA PIU' LA SFOCATURA (dal campo: «lo sfondo e'
@@ -125844,6 +125851,171 @@ console.log(JSON.stringify(out));
     prova("le righe non si toccano", True, o["nonMuta"])
 
 
+def prove_anello_ovunque():
+    """L'ANELLO OVUNQUE (7 ott 2026, richiesta di Andrea). Nel mercatino,
+    durante le attese, il velo girava col barattolino che ondeggiava; nel
+    P2P con l'anello sottile. Adesso il giro e' UNO, l'anello del P2P,
+    identico: stesso componente (`.attesa-anello`), stessa misura, colore
+    e velocita', nessuno stile nuovo, fermo col «riduci movimento». Il
+    lettore vocale dice quel che diceva: l'anello e' muto come lo era il
+    barattolo (alt vuoto), e la frase dell'attesa resta `#attesaTesto`.
+    La classe `anello` che lo sceglieva non c'e' piu': una scelta che non
+    esiste non si dimentica addosso al velo dopo."""
+    print("\n⭕ L'anello ovunque, il giro del velo d'attesa")
+    import json as _json, os as _os, subprocess as _sp, shutil as _sh
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL MARKUP DEL VELO: l'anello, la spunta, la frase -------------
+    i_ov = mini.find('<div id="attesaOverlay">')
+    ov = mini[i_ov:mini.find("\n", i_ov)] if i_ov >= 0 else ""
+    prova("il velo d'attesa c'e', una volta sola", 1, mini.count('id="attesaOverlay"'))
+    prova("...e gira con l'anello e basta: niente barattolino, niente clessidra",
+          [1, False, False, False],
+          [ov.count('class="attesa-anello"'), "<img" in ov, "attesa-jar" in ov,
+           "attesa-clessidra" in ov])
+    prova("...l'anello e' muto (nessun testo da leggere a voce), come il barattolo",
+          True, '<span class="attesa-anello"></span>' in ov)
+    prova("...e la frase che il lettore vocale legge e' quella di sempre", True,
+          '<span id="attesaTesto">Invio sats in corso…</span>' in ov)
+    prova("del barattolino che girava non resta niente nella pagina", [0, 0],
+          [mini.count("attesa-jar"), mini.count("attesa-clessidra")])
+
+    # --- 2) LA CASCATA, sul markup vero del velo ---------------------------
+    i0 = mini.find("<style>")
+    css = mini[i0 + 7:mini.find("</style>", i0)] if i0 >= 0 else ""
+    regole, _sq = _regole_css(css)
+    # chi si muove: le regole fuori dal «riduci movimento» (la cascata
+    # qui non sceglie fra le @media: le si toglie, e il fermo lo si
+    # guarda a parte, nel suo gruppo)
+    mosse = [r for r in regole
+             if not any("prefers-reduced-motion" in g for g in r[2])]
+    cat = _catene_html(mini[mini.find("<body"):],
+                       lambda p: "attesa-anello" in p[-1]["classi"]
+                       and any(n["attr"].get("id") == "attesaOverlay" for n in p))
+    prova("l'anello del velo si trova nel markup, una volta", 1, len(cat))
+    if len(cat) != 1:
+        return
+
+    def anello(tema, classi_velo, prop):
+        html = {"tag": "html", "attr": {"lang": "it"}, "classi": set()}
+        if tema == "scuro":
+            html["attr"]["data-tema"] = "scuro"
+        catena = [dict(n) for n in cat[0]]
+        for n in catena:
+            if n["attr"].get("id") == "attesaOverlay":
+                n["classi"] = set(classi_velo)
+        if catena[0]["tag"] != "html":
+            catena = [html] + catena
+        else:
+            catena[0] = html
+        return {p: x[0] for p, x in _vince_css(mosse, catena, prop).items()}
+    ATTESO = {"display": "block", "width": "24px", "height": "24px",
+              "border-radius": "50%", "border": "2px solid var(--line)",
+              "border-top-color": "var(--sats)", "animation": "gira .8s linear infinite"}
+    for tema in ("chiaro", "scuro"):
+        prova(f"il velo acceso gira con l'anello del P2P, misura colore e passo ({tema})",
+              ATTESO, anello(tema, {"on"}, tuple(ATTESO)))
+        prova(f"...e con la spunta del fatto l'anello si fa da parte ({tema})",
+              "none", anello(tema, {"on", "fatto"}, ("display",)).get("display"))
+    # il «riduci movimento»: la riga dell'anello, nel suo gruppo
+    fermi = [corpo for lista, corpo, gruppi in regole
+             if ".attesa-anello" in [s.strip() for s in _dividi_css(lista)]
+             and any("prefers-reduced-motion" in g and "reduce" in g for g in gruppi)]
+    prova("col «riduci movimento» l'anello sta fermo, con la riga che aveva nel P2P",
+          ["animation:none"], [f.strip().rstrip(";") for f in fermi])
+    prova("...e nessuna regola piu' sceglie il giro con una classe del velo", [], [
+        s for lista, _c, _g in regole for s in _dividi_css(lista)
+        if re.search(r"#attesaOverlay\.anello\b", s)])
+    prova("il guscio d'apertura gira con lo stesso anello", True,
+          'class="attesa-anello"' in mini[mini.find('<div id="guscio"'):
+                                          mini.find("\n", mini.find('<div id="guscio"'))])
+    # (7 ott 2026, al rebase su 337b698) il negozio in arrivo mette lo
+    # STESSO anello dentro la pagina (`negozioInAttesa`): con l'anello che
+    # nasce acceso la sua riga `display:block` diventa un doppione
+    # innocuo, e si tiene — l'anello li' deve girare comunque
+    _ni = pezzo_js(mini, "function negozioInAttesa(chi){", "\n}\n")
+    prova("il negozio in arrivo gira con lo stesso anello, dentro la pagina", True,
+          '<span class="attesa-anello"></span>' in _ni)
+    _neg = [{"tag": "html", "attr": {"lang": "it"}, "classi": set()},
+            {"tag": "body", "attr": {}, "classi": set()},
+            {"tag": "div", "attr": {"id": "negozioHeader"}, "classi": set()},
+            {"tag": "div", "attr": {"role": "status"}, "classi": {"negozio-attesa"}},
+            {"tag": "span", "attr": {}, "classi": {"attesa-anello"}}]
+    prova("...e la cascata lo veste come quello del velo", ATTESO,
+          {p: x[0] for p, x in _vince_css(mosse, _neg, tuple(ATTESO)).items()})
+
+    # --- 3) IL BANCO: le tre porte vere del velo ----------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco dell'anello", "node non c'e'")
+        return
+    pezzi = ["const RITARDO_ATTESA = 180;", "let P2P_SPUNTA_MS = 2500;"]
+    pezzi += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function bottoneInAttesa(btn, testo){",
+        "function attesaP2P(testo, btn){",
+        "function spuntaAttesaP2P(testo, ms){",
+        "function attesaRitardata(btn, testo){")]
+    banco = "\n".join(pezzi) + r"""
+/* il cartone: il velo con le sue classi, la frase, il timer a mano */
+const classi = () => { const c = new Set(); return {add: (...k) => k.forEach(x => c.add(x)),
+  remove: (...k) => k.forEach(x => c.delete(x)), contains: k => c.has(k),
+  toggle: (k, si) => si ? c.add(k) : c.delete(k), elenco: () => [...c].sort()}; };
+const dom = {attesaOverlay: {classList: classi()}, attesaTesto: {textContent: ''}};
+const el = id => dom[id];
+let timer = null;
+const setTimeout = (f, ms) => { timer = f; return 1; };
+const clearTimeout = () => { timer = null; };
+const btn = () => ({innerHTML: 'Paga', disabled: false,
+  setAttribute(){}, removeAttribute(){}});
+const foto = () => [dom.attesaOverlay.classList.elenco(), dom.attesaTesto.textContent];
+const out = {};
+/* il mercatino: il velo immediato dei sats */
+let rip = bottoneInAttesa(btn(), 'Invio sats in corso…');
+out.mercatino = foto(); rip(); out.mercatinoChiuso = foto()[0];
+/* il P2P: il velo dei gesti, la spunta, la chiusura */
+rip = attesaP2P('Pubblico l\'ordine…', btn());
+out.p2p = foto();
+spuntaAttesaP2P('Ordine pubblicato', 0);
+out.p2pFatto = foto();
+rip(); out.p2pChiuso = foto()[0];
+/* la lettura ritardata, anche «Controllo i tuoi scambi…» del P2P */
+rip = attesaRitardata(btn(), 'Controllo i tuoi scambi…');
+out.ritardataPrima = foto()[0];
+timer(); out.ritardata = foto(); rip(); out.ritardataChiusa = foto()[0];
+/* dopo un gesto P2P, il velo del mercatino nasce uguale */
+rip = attesaP2P('Ritiro l\'ordine…'); rip();
+rip = bottoneInAttesa(null, 'Salvo il feedback…'); out.dopoP2P = foto(); rip();
+console.log(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp()
+    p = _os.path.join(cart, "banco.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r2 = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco node dell'anello gira", "", (r2.stderr or "")[-600:])
+    if r2.returncode:
+        return
+    o = _json.loads(r2.stdout)
+    prova("il velo del mercatino si accende con la frase di sempre e nessuna classe di giro",
+          [["on"], "Invio sats in corso…"], o["mercatino"])
+    prova("il velo dei gesti P2P e' lo stesso velo", [["on"], "Pubblico l'ordine…"], o["p2p"])
+    prova("...la spunta arriva sul velo acceso", [["fatto", "on"], "Ordine pubblicato"],
+          o["p2pFatto"])
+    prova("«Controllo i tuoi scambi…»: niente prima del ritardo, poi lo stesso velo",
+          [[], [["on"], "Controllo i tuoi scambi…"]], [o["ritardataPrima"], o["ritardata"]])
+    prova("chiudendo, il velo non tiene niente addosso", [[], [], []],
+          [o["mercatinoChiuso"], o["p2pChiuso"], o["ritardataChiusa"]])
+    prova("...e dopo un gesto P2P il velo del mercatino nasce identico",
+          [["on"], "Salvo il feedback…"], o["dopoP2P"])
+    # le classi che il banco ha visto, una per una, chieste alla cascata:
+    # in ogni stato acceso senza spunta si vede l'anello, con la spunta no
+    for nome in ("mercatino", "p2p", "ritardata", "dopoP2P"):
+        prova(f"nello stato «{nome}» la cascata mostra l'anello", "block",
+              anello("chiaro", set(o[nome][0]), ("display",)).get("display"))
+    prova("nello stato con la spunta la cascata lo toglie", "none",
+          anello("chiaro", set(o["p2pFatto"][0]), ("display",)).get("display"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -126087,6 +126259,7 @@ def main():
               prove_scambi_verso,
               prove_passi_libro_p2p,
               prove_tolti_ovunque,
+              prove_anello_ovunque,
               prove_config_esempio):
         try:
             f()
