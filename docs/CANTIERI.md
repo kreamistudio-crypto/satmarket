@@ -38774,7 +38774,8 @@ sostituisce tenendo il nome, quindi cambiano insieme, e non c'è altro
 posto che lo chiami (cercato in tutto l'albero fuori da `docs/`).
 
 **DECISO.** Si rifà SOLO la tessera; le icone (PWA, APK, Zapstore)
-restano quelle di oggi finché Andrea non dà l'ok al piano B.
+restano quelle di oggi: il loro piano è la voce qui sotto, da fare
+dopo il lancio con la prossima versione dell'app.
 - IL RITAGLIO, perché la misura resti quella: nella foto nuova il
   barattolo occupa il 55,7% dell'altezza, nella vecchia il 69,6%.
   Rimpicciolita e basta, nella tessera il barattolo calava di un
@@ -38801,34 +38802,10 @@ restano quelle di oggi finché Andrea non dà l'ok al piano B.
   di tolleranza, 5 px su 256). Controprova: con la foto solo
   rimpicciolita l'ultima riga è rossa.
 
-**LA PARTE B, SOLO LETTA (il piano aspetta l'ok di Andrea).** Da dove
-prendono l'icona oggi:
-- l'APK (v1.5, versionCode 7): l'icona del launcher è COTTA NEL
-  PACCHETTO — `genera_icone_apk.py` scrive foreground, monochrome,
-  splash e icona dello splash di sistema da
-  `assets/barattolo-icona-sorgente.jpeg`, e Bubblewrap scarica in più
-  `iconUrl`/`maskableIconUrl` (`icona-512*.png`) dal sito VIVO al
-  momento dell'`update`. Cambiarla vuole una 1.6: build, firma col
-  keystore, release su `barattolo-releases`, `zsp publish` con la
-  chiave fredda;
-- Zapstore: la scheda `zapstore.yaml` di `barattolo-releases` dice
-  `icon: https://barattolo.store/assets/icona-512.png`, letta da `zsp`
-  al momento del publish e messa nell'evento firmato: cambiare il file
-  sul sito non basta, serve un publish nuovo;
-- il profilo Nostr della chiave delle release ha `picture` sullo stesso
-  URL: quello segue il file da solo (i client lo rileggono quando
-  vogliono).
-UN INTOPPO TROVATO PROVANDO LE RICETTE: `genera_icone.py` e
-`scontorna` misurano la distanza da un fondo PIATTO, e l'alone della
-foto nuova lo inganna — sulle icone PWA esce un rettangolo più chiaro
-attorno al barattolo, nel foreground dell'APK un alone sporco, nella
-monochrome un pulviscolo. Una variante provata nello scratchpad
-(`icone_intere.py`) ritaglia le icone PWA come QUADRATI dalla foto
-intera (nessuna giuntura possibile) e scontorna il barattolo per l'APK
-dal suo CONTORNO SCURO, allagando l'esterno: pulita. Due differenze da
-dire: niente ombra sotto il barattolo nell'icona adattiva e nello
-splash, e la monochrome diventa una sagoma piena senza le monete
-disegnate dentro. Le ricette nel repo NON sono state toccate.
+**L'ICONA DELL'APP (APK, Zapstore, PWA)** l'ho letta e provata, non
+toccata: da dove la prendono oggi, l'intoppo dell'alone della foto
+nuova, la ricetta del ritaglio e il piano in sei passi stanno nella
+voce qui sotto.
 
 **LE STRADE SCARTATE.**
 - La foto solo rimpicciolita a 256: barattolo più piccolo di un quinto
@@ -38839,16 +38816,150 @@ disegnate dentro. Le ricette nel repo NON sono state toccate.
 - Alzare VERSIONE di `sw.js` (vedi sopra).
 - Toccare le icone PWA in questo commit: cambierebbero l'icona dell'app
   installata da browser e quella che Zapstore leggerà al prossimo
-  publish, cioè metà del piano B senza il suo ok.
+  publish, cioè metà del piano dell'icona, rimandato dopo il
+  lancio.
 
 **PROVATO.** Due copie dell'albero nello scratchpad (tessera vecchia e
 nuova), `MODALITA_COLLAUDO`, relay morto, server su 127.0.0.1:8731 e
 8732; Chrome headless via CDP a 375×812, densità 3, chiaro e scuro: la
 tessera della testata caricata (`naturalWidth` 256) dal file timbrato
 giusto in tutt'e quattro gli scatti, barattolo alla stessa misura e
-posizione, il resto della testata identico. Nel worktree su origin/main (da9273e), senza config: `PROVE_SEVERE=1 python prove.py` 19.237 passate e 0 fallite (19.232 di prima più le cinque della sentinella); i 38 collaudi della CI nella gabbia, 38 verdi.
+posizione, il resto della testata identico. Nel worktree su
+origin/main (da9273e), senza config: `PROVE_SEVERE=1 python prove.py` 19.237 passate e 0 fallite (19.232 di prima più le cinque della sentinella); i 38 collaudi della CI nella gabbia, 38 verdi.
 
 **DA GUARDARE.** Sul telefono, dopo il deploy: la tessera in testata
 nella Mini App e nel sito, e la favicon (i browser la tengono in una
-cache loro, può tardare). Il piano B aspetta l'ok di Andrea; prima di
-toccare le ricette si chiede la foto originale da 2048.
+cache loro, può tardare). L'icona dell'app: voce qui sotto, dopo il lancio.
+
+## L'icona nuova dell'app (APK e Zapstore) col barattolo rifatto: il piano, DA FARE DOPO IL LANCIO con la prossima versione dell'app (7 ott 2026, decisione di Andrea)
+
+**PERCHÉ ASPETTA.** Il 7 ott la tessera della testata è passata al
+barattolo rifatto (voce qui sopra); l'icona dell'app no. Andrea: «non
+ora» — si fa DOPO il lancio del 10 ottobre e si unisce alla prossima
+versione dell'app (la 1.6, versionCode 8), che uscirà comunque per
+qualcos'altro: niente release solo per l'icona.
+
+**DA DOVE PRENDONO L'ICONA OGGI (letto il 7 ott, in sola lettura).**
+- L'APK (v1.5, versionCode 7): l'icona del launcher è COTTA NEL
+  PACCHETTO. `genera_icone_apk.py` scrive foreground, monochrome,
+  `splash.png` e l'icona dello splash di sistema da
+  `assets/barattolo-icona-sorgente.jpeg`, e il colore `iconBackground`
+  (più `backgroundColor` del twa-manifest e la sua copia in
+  `app/build.gradle`) dagli angoli della stessa foto; Bubblewrap in più
+  scarica `iconUrl`/`maskableIconUrl` (`icona-512*.png`) dal sito VIVO
+  al momento dell'`update` (`store_icon.png` e le icone piatte). Si
+  cambia solo con una versione nuova: build, firma col keystore,
+  release.
+- Zapstore: `zapstore.yaml` nella root di `barattolo-releases` dice
+  `icon: https://barattolo.store/assets/icona-512.png`. Per il README di
+  zsp (letto il 7 ott) il campo `icon` del yaml vince sull'icona
+  estratta dall'APK, e zsp CARICA l'icona su Blossom
+  (`https://cdn.zapstore.dev`, l'evento 32267 punta lì per hash):
+  cambiare il file sul sito non basta, serve un `zsp publish` firmato
+  con la chiave fredda. Un aggiornamento della sola scheda il README non
+  lo documenta; `--overwrite-release` («re-publish unchanged release»)
+  non dice se rifirma anche la scheda con l'icona nuova — non provato,
+  e qui non serve: si pubblica con la 1.6. zsp: ultimo tag v0.5.7 del
+  1 ott 2026, ultima release CON i binari v0.4.17 del 2 ago: prima del
+  publish si riguarda il README (PRODUZIONE lo dice già).
+- Il profilo Nostr della chiave delle release (`profilo_release.py`):
+  `picture` sullo stesso URL di `icona-512.png`, segue il file da solo.
+- Le icone PWA (`icona-192/512`, le due maskable, `apple-touch-icon`):
+  stanno sul sito, cambiano col deploy.
+
+**L'INTOPPO DELL'ALONE.** La foto nuova ha un alone più chiaro dietro
+il vetro, il fondo non è piatto. Le due ricette di oggi misurano la
+distanza da UN colore di fondo (gli angoli) — `genera_icone.py` col
+riquadro a soglia 20, `scontorna` con la rampa 12–40 e il floodfill —
+e l'alone le inganna: provate sulla foto nuova (copia da 2000 px), le
+icone PWA escono con un RETTANGOLO più chiaro attorno al barattolo (il
+ritaglio a soglia prende l'alone, e incollato sul fondo piatto si vede
+la giuntura), il foreground dell'APK con un alone sporco attorno al
+vaso, la monochrome con un pulviscolo bianco ai lati.
+
+**LA RICETTA DEL RITAGLIO (provata nello scratchpad il 7 ott, pulita).
+Da rifare così: la cartella di allora non c'è più.**
+- Sorgente: la foto ORIGINALE da 2048 di Andrea (da chiedergli: in chat
+  è arrivata a 2000×2000, con un profilo ICC sRGB che si butta). Il
+  fondo si campiona con `colore_fondo` di `genera_icone.py` (sulla
+  copia da 2000: #FB8907).
+- IL BARATTOLO DAL SUO CONTORNO SCURO, non dal colore del fondo: `L =
+  img.convert("L")`; contorno = pixel con L < 90, ingrossato con
+  `ImageFilter.MaxFilter(5)`; si riduce a 1/4 (BILINEAR, muro dove >
+  40: il floodfill di Pillow è Python puro); si allaga l'esterno con
+  `ImageDraw.floodfill` partendo da OGNI pixel del bordo che non è muro;
+  quel che l'acqua non raggiunge è il barattolo. Si riporta a misura
+  piena (BILINEAR), si ammorbidisce con `GaussianBlur(2)` e si richiude
+  col contorno vero (`ImageChops.lighter` con la maschera L < 90):
+  quella è l'alpha. Il riquadro è dove l'alpha > 128: sulla copia da
+  2000 (636, 396, 1364, 1520), 728×1124. Il contorno del barattolo è
+  chiuso (coperchio compreso), ed è questo che rende la ricetta sicura;
+  l'ombra sotto il vaso resta fuori.
+- ICONE PWA E STORE: un QUADRATO ritagliato dalla foto INTERA, centrato
+  sul centro del riquadro, di lato = altezza del riquadro / quota (0,90
+  per `icona-*` e `apple-touch-icon`, 0,67 per le maskable, le stesse
+  quote di `ICONE`), portato a misura con LANCZOS; il quadrato deve
+  stare tutto dentro la foto (sulla copia da 2000 ci sta anche a 0,67).
+  Nessuna giuntura possibile: tutto quel che si vede è la foto, alone
+  compreso.
+- APK: `componi`, `genera_splash` e `genera_icona_avvio` di
+  `genera_icone_apk.py` INVARIATE, col barattolo della ricetta qui sopra
+  al posto di quello di `scontorna`; la monochrome viene dalla stessa
+  alpha, quindi è una SAGOMA PIENA (oggi ha le monete disegnate dentro,
+  perché la vecchia alpha bucava il vetro chiaro).
+- Due differenze da far vedere ad Andrea prima di decidere: niente ombra
+  sotto il barattolo nell'icona adattiva e negli splash, e la
+  monochrome a sagoma piena. E un difetto da rifinire: il bordo in basso
+  del vaso nell'adattiva esce un filo morbido (il gradino della mappa a
+  1/4 più il blur 2): provare la mappa a 1/2 o il blur a 1, e guardarla
+  alla resa sul cerchio di 72/108.
+- Le ricette nel repo NON sono state toccate: nel cantiere la ricetta
+  nuova entra in `genera_icone.py` (e `genera_icone_apk.py` la importa,
+  come oggi importa `colore_fondo`, mai duplicata), con un banco che
+  rifà la prova del rettangolo: l'icona PWA ritagliata non ha un bordo
+  interno dove l'alone incontra il fondo.
+
+**IL COLORE DELLO SPLASH, E IL GUSCIO CHE GLI VA DIETRO.** Il fondo
+della foto nuova è #FB8907 contro #F78F19, un filo più acceso. Lo
+campiona la stessa ricetta, quindi con la sorgente nuova cambiano
+INSIEME: `iconBackground`, il `backgroundColor` del twa-manifest e la
+sua copia in `app/build.gradle`, il fondo di `splash.png` e quello
+dello splash di sistema. MA IL COLORE VIVE ANCHE NELLA PAGINA: il
+guscio di apertura (`#copertura` in miniapp.html, `background:#F78F19`,
+il `metaTema` messo a '#F78F19' e il barattolo dello splash in data
+URI, 3x) è fatto apposta per combaciare con lo splash nativo, e
+`prove_guscio_apertura` lo ricalcola dalla foto sorgente: cambiata la
+sorgente, è rossa finché guscio, colore e data URI non sono rifatti
+nello stesso commit. ⚠️ LA FINESTRA: il guscio del sito cambia al
+deploy, l'APK di chi non ha aggiornato resta alla 1.5 col barattolo e
+l'arancio di prima — per loro, alla consegna fra splash e guscio, un
+salto di colore e di disegno (piccolo: stesso vaso, sei punti di
+arancio). Da decidere nel cantiere se si accetta (dura finché non
+aggiornano) o se il guscio passa al nuovo solo quando la 1.6 è uscita.
+
+**IL PIANO, UN PASSO ALLA VOLTA (proposto e accettato come piano il 7
+ott; si apre dopo il lancio).**
+1. Andrea manda la foto originale da 2048.
+2. Cantiere nel repo: la sorgente nuova in
+   `assets/barattolo-icona-sorgente.jpeg`, la ricetta del ritaglio in
+   `genera_icone.py`, le icone PWA rifatte, il guscio rifatto (vedi
+   sopra), prove e scatti; push, il deploy parte da solo. Si annulla con
+   un commit nuovo. Da lì cambiano l'icona della PWA installata e la
+   foto del profilo delle release.
+3. Andrea, sul PC, in `barattolo-twa`: `bubblewrap update` (alza la
+   versione a 1.6 / 8 e scarica le icone dal sito VIVO: quindi DOPO il
+   deploy del passo 2), `python genera_icone_apk.py` dalla cartella del
+   repo, `bubblewrap build` con le password del keystore. Locale, si
+   rifà.
+4. Andrea installa la 1.6 sul telefono: icona del launcher, icona a
+   tema (Android 13+), splash di sistema, splash della libreria e
+   consegna al guscio senza salti.
+5. ⚠️ IRREVERSIBILE: `gh release create v1.6` su `barattolo-releases`
+   (pubblico; Obtainium la prende da lì), con le note e l'hash come
+   per la 1.5.
+6. ⚠️ IRREVERSIBILE: in WSL, `zsp publish` con la chiave fredda (la
+   liturgia di PRODUZIONE, «L'APP ANDROID»): l'evento firmato va sui
+   relay e su Blossom e non si ritira davvero.
+
+**DA GUARDARE PRIMA DI APRIRLO.** Cosa porta la 1.6 oltre all'icona;
+il README di zsp del giorno; e la decisione sulla finestra del guscio.
