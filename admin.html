@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Cruscotto Barattolo</title>
+<!-- IL CRUSCOTTO DEGLI ADMIN (ott 2026). Questa pagina NON porta dati:
+     li chiede a /api/admin/cruscotto, che controlla chi e' admin.
+     Dentro Telegram si apre nella stessa webview della Mini App, e lo
+     SDK ritrova l'initData; dal browser vale il cookie di sessione. -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  @font-face{font-family:'Baloo 2';font-weight:800;font-display:swap;src:url(/vendor/font/baloo2-latin.woff2) format('woff2')}
+  @font-face{font-family:'Nunito';font-weight:400 800;font-display:swap;src:url(/vendor/font/nunito-latin.woff2) format('woff2')}
+  :root{
+    --bg:#FAF4E4; --card:#FFFFFF; --ink:#23282C; --muted:#8A8271; --soft:#5d574b;
+    --line:#ECE3CC; --grid:#EFE8D6; --sats:#F7931A;
+    --s-tg:#2a78d6; --s-nostr:#eb6834; --s-vol:#2a78d6;
+    --ok:#1B8B54; --err:#C2410C;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#211A10; --card:#2C2517; --ink:#F1E8D5; --muted:#A99F87; --soft:#cfc5ad;
+      --line:#3d3424; --grid:#3a3121; --s-tg:#3987e5; --s-nostr:#d95926; --s-vol:#3987e5;
+      --ok:#34B47A; --err:#F28B5B;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#211A10; --card:#2C2517; --ink:#F1E8D5; --muted:#A99F87; --soft:#cfc5ad;
+    --line:#3d3424; --grid:#3a3121; --s-tg:#3987e5; --s-nostr:#d95926; --s-vol:#3987e5;
+    --ok:#34B47A; --err:#F28B5B;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Nunito',system-ui,sans-serif;font-size:15px;line-height:1.45}
+  main{max-width:1080px;margin:0 auto;padding:16px 16px 48px}
+  h1{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:26px;margin:4px 0 2px}
+  h2{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:19px;margin:0 0 4px}
+  .sub{color:var(--muted);font-weight:600;font-size:13px}
+  .filtri{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 6px}
+  .filtri button{font:inherit;font-weight:800;font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:6px 14px;cursor:pointer}
+  .filtri button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:12px 0}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+  .tile .k{color:var(--muted);font-weight:700;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
+  .tile .v{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:28px;line-height:1.15;margin-top:4px;font-variant-numeric:tabular-nums}
+  .tile .d{color:var(--soft);font-weight:600;font-size:13px;margin-top:2px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
+  .legenda{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;font-weight:700;color:var(--soft);margin:6px 0 4px}
+  .legenda i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .grafico{position:relative;width:100%}
+  .grafico svg{display:block;width:100%;height:auto;overflow:visible}
+  .grafico text{fill:var(--muted);font:600 11px 'Nunito',system-ui,sans-serif}
+  .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);border-radius:10px;padding:7px 10px;font-size:12.5px;font-weight:700;white-space:nowrap;transform:translate(-50%,-100%);opacity:0;transition:opacity .1s;z-index:2}
+  .tip.on{opacity:1}
+  details{margin-top:8px} summary{cursor:pointer;color:var(--soft);font-weight:700;font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  td.n,th.n{text-align:right}
+  .tab{overflow-x:auto}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+  .nota{color:var(--soft);font-weight:600;font-size:13px;margin-top:6px}
+  .simu{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0}
+  .simu input[type=range]{flex:1;min-width:180px;accent-color:var(--sats)}
+  .simu output{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:22px;min-width:64px}
+  .simu select{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:6px 8px}
+  .stato{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;margin-top:20px;font-weight:700}
+  .barra{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--grid);min-width:90px;gap:2px}
+  .barra b{display:block;background:var(--s-tg)} .barra s{display:block;background:var(--s-nostr);text-decoration:none}
+  a{color:var(--s-tg)}
+  @media (max-width:520px){ h1{font-size:22px} .tile .v{font-size:24px} }
+</style>
+</head>
+<body>
+<main>
+  <h1>📊 Cruscotto di Barattolo</h1>
+  <div class="sub" id="sub">Carico i numeri…</div>
+  <div id="corpo"></div>
+</main>
+<script>
+const tg = window.Telegram && window.Telegram.WebApp;
+try { if (tg && tg.colorScheme) document.documentElement.dataset.theme = tg.colorScheme; } catch(e){}
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => Number(n || 0).toLocaleString('it-IT');
+const fmtd = (n, d) => Number(n || 0).toLocaleString('it-IT', {maximumFractionDigits: d});
+const el = id => document.getElementById(id);
+let D = null, giorni = 90;
+
+/* L'identita': dentro Telegram l'initData, fuori il cookie. In collaudo
+   (`?collaudo=999`) l'identita' finta che il server accetta SOLO in
+   modalita' collaudo. */
+function intestazione(){
+  if (tg && tg.initData) return tg.initData;
+  const c = new URLSearchParams(location.search).get('collaudo');
+  return /^\d{1,6}$/.test(c || '') ? `collaudo:${c}:Admin` : '';
+}
+
+async function carica(){
+  let r;
+  try {
+    r = await fetch('/api/admin/cruscotto', {credentials:'same-origin',
+      headers:{'X-Tg-Init-Data': intestazione()}});
+  } catch(e) { return stato('Non riesco a raggiungere Barattolo: riprova fra poco.'); }
+  if (r.status === 401) return stato('Entra prima su Barattolo (da questo browser o dall\'app), poi riapri questa pagina.');
+  if (r.status === 403) return stato('Questa pagina è riservata agli admin.');
+  if (!r.ok) return stato(`Il server ha risposto ${r.status}.`);
+  D = await r.json();
+  el('sub').textContent = 'Aggiornato alle ' + new Date(D.generato * 1000)
+    .toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
+  disegna();
+}
+function stato(t){ el('sub').textContent = ''; el('corpo').innerHTML = `<div class="stato">${esc(t)}</div>`; }
+
+/* ---- il tempo: i giorni del server diventano secchi ---- */
+const GIORNO = 86400000;
+const gran = () => giorni && giorni <= 31 ? 'giorno' : (giorni && giorni <= 180 ? 'settimana' : 'mese');
+function chiave(g, modo){
+  if (modo === 'giorno') return g;
+  if (modo === 'mese') return g.slice(0, 7);
+  const d = new Date(g + 'T00:00:00Z');
+  const lun = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * GIORNO);
+  return lun.toISOString().slice(0, 10);
+}
+function etichetta(k, modo){
+  if (modo === 'mese') { const [a, m] = k.split('-'); return new Date(Date.UTC(+a, +m - 1, 1)).toLocaleDateString('it-IT', {month:'short', year:'2-digit'}); }
+  return new Date(k + 'T00:00:00Z').toLocaleDateString('it-IT', {day:'numeric', month:'short'});
+}
+function inizio(){
+  if (!giorni) {
+    const prime = [D.iscritti[0]?.[0], D.volume[0]?.[0]].filter(Boolean).sort();
+    return prime[0] || new Date().toISOString().slice(0, 10);
+  }
+  return new Date(Date.now() - (giorni - 1) * GIORNO).toISOString().slice(0, 10);
+}
+/* tutti i secchi del periodo, anche quelli vuoti: un buco nel tempo e'
+   uno zero, non un salto */
+function secchi(){
+  const modo = gran(), out = [], visti = new Set();
+  for (let t = new Date(inizio() + 'T00:00:00Z').getTime(); t <= Date.now(); t += GIORNO) {
+    const k = chiave(new Date(t).toISOString().slice(0, 10), modo);
+    if (!visti.has(k)) { visti.add(k); out.push(k); }
+  }
+  return out;
+}
+function somma(righe, colonne){
+  const modo = gran(), da = inizio(), m = {};
+  for (const r of righe) {
+    if (r[0] < da) continue;
+    const k = chiave(r[0], modo);
+    const v = m[k] || (m[k] = colonne.map(() => 0));
+    colonne.forEach((c, i) => v[i] += r[c]);
+  }
+  return m;
+}
+
+/* ---- i grafici: SVG a mano, una scala sola, marchi sottili ---- */
+/* LA LARGHEZZA E' QUELLA VERA del riquadro, non una fissa scalata: su
+   un telefono un viewBox da 720 rimpicciolirebbe le scritte a 6px */
+let W = 720;
+const H = 240, SX = 44, DX = 8, ALTO = 12, BASSO = 26;
+const misura = box => { W = Math.max(280, Math.round(box.clientWidth || 720)); };
+function tacche(max){
+  if (max <= 0) return [0];
+  const passo = Math.pow(10, Math.floor(Math.log10(max)));
+  const p = [1, 2, 5, 10].map(x => x * passo).find(x => max / x <= 5) || passo * 10;
+  const out = []; for (let v = 0; v <= max + 1e-9; v += p) out.push(v);
+  if (out[out.length - 1] < max) out.push(out[out.length - 1] + p);
+  return out;
+}
+const breve = n => n >= 1e6 ? fmtd(n / 1e6, 1) + ' M' : n >= 1e4 ? fmtd(n / 1e3, 0) + 'k' : fmt(n);
+function asse(t, y){
+  return t.map(v => `<line x1="${SX}" x2="${W - DX}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/>`
+    + `<text x="${SX - 6}" y="${y(v) + 4}" text-anchor="end">${breve(v)}</text>`).join('');
+}
+function assex(ks, x, larg){
+  const ogni = Math.max(1, Math.ceil(ks.length / Math.max(2, Math.floor(W / 90))));
+  return ks.map((k, i) => i % ogni ? '' :
+    `<text x="${x(i) + larg / 2}" y="${H - 8}" text-anchor="middle">${esc(etichetta(k, gran()))}</text>`).join('');
+}
+/* barre impilate (o una serie sola): 2px di aria fra i pezzi, la cima
+   arrotondata, il tooltip su tutta la colonna */
+function barre(box, ks, serie, valori, testoTip){
+  misura(box);
+  const n = ks.length, larg = (W - SX - DX) / Math.max(1, n);
+  const tot = ks.map(k => (valori[k] || []).reduce((a, b) => a + b, 0));
+  const t = tacche(Math.max(1, ...tot)), max = t[t.length - 1];
+  const y = v => ALTO + (H - ALTO - BASSO) * (1 - v / max);
+  const x = i => SX + i * larg;
+  const b = Math.max(2, Math.min(28, larg - 4));
+  let svg = asse(t, y);
+  ks.forEach((k, i) => {
+    let base = 0;
+    const v = valori[k] || serie.map(() => 0);
+    serie.forEach((s, j) => {
+      if (!v[j]) return;
+      const y0 = y(base), y1 = y(base + v[j]); base += v[j];
+      const cima = j === serie.length - 1 || !v.slice(j + 1).some(Boolean);
+      const h = Math.max(1, y0 - y1 - (base > v[j] ? 2 : 0));
+      const r = cima ? Math.min(4, b / 2, h) : 0;
+      const xx = x(i) + (larg - b) / 2, yy = y1;
+      svg += r
+        ? `<path d="M${xx},${yy + h} V${yy + r} Q${xx},${yy} ${xx + r},${yy} H${xx + b - r} Q${xx + b},${yy} ${xx + b},${yy + r} V${yy + h} Z" fill="${s.colore}"/>`
+        : `<rect x="${xx}" y="${yy}" width="${b}" height="${h}" fill="${s.colore}"/>`;
+    });
+    svg += `<rect class="hit" data-i="${i}" x="${x(i)}" y="${ALTO}" width="${larg}" height="${H - ALTO - BASSO}" fill="transparent"/>`;
+  });
+  svg += assex(ks, x, larg);
+  monta(box, svg, i => ({x: x(i) + larg / 2, y: y(tot[i]), testo: testoTip(ks[i], valori[ks[i]] || serie.map(() => 0))}));
+}
+/* linee cumulate: 2px, l'etichetta diretta in coda, crosshair */
+function linee(box, ks, serie, punti, testoTip){
+  misura(box);
+  const n = ks.length, passo = (W - SX - DX) / Math.max(1, n - 1);
+  const t = tacche(Math.max(1, ...serie.flatMap((s, j) => ks.map(k => punti[k][j])))), max = t[t.length - 1];
+  const y = v => ALTO + (H - ALTO - BASSO) * (1 - v / max);
+  const x = i => SX + (n === 1 ? (W - SX - DX) / 2 : i * passo);
+  let svg = asse(t, y);
+  serie.forEach((s, j) => {
+    svg += `<polyline fill="none" stroke="${s.colore}" stroke-width="2" stroke-linejoin="round" points="${ks.map((k, i) => `${x(i)},${y(punti[k][j])}`).join(' ')}"/>`;
+    const ult = punti[ks[n - 1]][j];
+    svg += `<text x="${x(n - 1) - 4}" y="${y(ult) - 6}" text-anchor="end" style="fill:var(--soft);font-weight:800">${esc(s.nome)} ${fmt(ult)}</text>`;
+  });
+  svg += `<line class="croce" x1="0" x2="0" y1="${ALTO}" y2="${H - BASSO}" stroke="var(--muted)" stroke-width="1" style="display:none"/>`;
+  ks.forEach((k, i) => svg += `<rect class="hit" data-i="${i}" x="${x(i) - passo / 2}" y="${ALTO}" width="${Math.max(passo, 6)}" height="${H - ALTO - BASSO}" fill="transparent"/>`);
+  svg += assex(ks, i => x(i) - 0, 0);
+  monta(box, svg, i => ({x: x(i), y: y(Math.max(...punti[ks[i]])), testo: testoTip(ks[i], punti[ks[i]]), croce: x(i)}));
+}
+function monta(box, svg, info){
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img">${svg}</svg><div class="tip"></div>`;
+  const s = box.querySelector('svg'), tip = box.querySelector('.tip'), croce = s.querySelector('.croce');
+  const mostra = e => {
+    const r = e.target.closest('.hit'); if (!r) return;
+    const d = info(+r.dataset.i), k = s.getBoundingClientRect().width / W;
+    tip.innerHTML = d.testo; tip.style.left = (d.x * k) + 'px'; tip.style.top = (d.y * k - 8) + 'px';
+    tip.classList.add('on');
+    if (croce) { croce.style.display = ''; croce.setAttribute('x1', d.croce); croce.setAttribute('x2', d.croce); }
+  };
+  s.addEventListener('pointermove', mostra); s.addEventListener('pointerdown', mostra);
+  s.addEventListener('pointerleave', () => { tip.classList.remove('on'); if (croce) croce.style.display = 'none'; });
+}
+const legenda = serie => `<div class="legenda">${serie.map(s => `<span><i style="background:${s.colore}"></i>${esc(s.nome)}</span>`).join('')}</div>`;
+const colore = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+function disegna(){
+  const it = D.iscritti_totali, vt = D.volume_totale, ks = secchi(), modo = gran();
+  const nuovi = somma(D.iscritti, [1, 2]), vend = somma(D.volume, [1, 2, 3]);
+  const nuoviPer = Object.values(nuovi).reduce((a, v) => [a[0] + v[0], a[1] + v[1]], [0, 0]);
+  const vendPer = Object.values(vend).reduce((a, v) => [a[0] + v[0], a[1] + v[1], a[2] + v[2]], [0, 0, 0]);
+  const eur = D.eur_per_btc > 0 ? s => ` ≈ € ${fmtd(s / 1e8 * D.eur_per_btc, 0)}` : () => '';
+  const L = D.lnd || {}, rt = L.totale || {};
+  const periodo = giorni ? `negli ultimi ${giorni} giorni` : 'da sempre';
+  el('corpo').innerHTML = `
+  <div class="filtri" role="group" aria-label="Periodo">
+    ${[[30,'30 giorni'],[90,'90 giorni'],[365,'Un anno'],[0,'Da sempre']].map(([g, t]) =>
+      `<button aria-pressed="${g === giorni}" onclick="giorni=${g};disegna()">${t}</button>`).join('')}
+  </div>
+  <div class="tiles">
+    <div class="tile"><div class="k">Iscritti totali</div><div class="v">${fmt(it.totale)}</div>
+      <div class="d">${fmt(it.telegram)} Telegram · ${fmt(it.nostr)} Nostr${it.entrambi ? ` · ${fmt(it.entrambi)} con tutte e due` : ''}</div></div>
+    <div class="tile"><div class="k">Nuovi ${esc(periodo)}</div><div class="v">${fmt(nuoviPer[0] + nuoviPer[1])}</div>
+      <div class="d">${fmt(nuoviPer[0])} Telegram · ${fmt(nuoviPer[1])} Nostr</div></div>
+    <div class="tile"><div class="k">Sats venduti in totale</div><div class="v">${fmt(vt.sats)}</div>
+      <div class="d">${fmt(vt.ordini)} ordini conclusi${eur(vt.sats)}</div></div>
+    <div class="tile"><div class="k">Sats venduti ${esc(periodo)}</div><div class="v">${fmt(vendPer[1])}</div>
+      <div class="d">${fmt(vendPer[0])} ordini${eur(vendPer[1])}</div></div>
+  </div>
+
+  <div class="card"><h2>Nuovi iscritti per ${modo}</h2>
+    ${legenda([{nome:'Telegram', colore:colore('--s-tg')}, {nome:'Nostr', colore:colore('--s-nostr')}])}
+    <div class="grafico" id="gNuovi"></div>
+    <details><summary>Vedi i numeri</summary><div class="tab">${tabella(['Periodo','Telegram','Nostr'], ks.filter(k => nuovi[k]).map(k => [etichetta(k, modo), fmt(nuovi[k][0]), fmt(nuovi[k][1])]))}</div></details>
+  </div>
+
+  <div class="card"><h2>Iscritti totali nel tempo</h2>
+    ${legenda([{nome:'Telegram', colore:colore('--s-tg')}, {nome:'Nostr', colore:colore('--s-nostr')}])}
+    <div class="grafico" id="gTotali"></div>
+    ${it.senza_data ? `<div class="nota">${fmt(it.senza_data)} iscritti sono arrivati prima che la data d'iscrizione si scrivesse: sono nel totale, ma non nella linea.</div>` : ''}
+  </div>
+
+  <div class="card"><h2>Sats venduti per ${modo}</h2>
+    <div class="nota" style="margin:0 0 6px">Ordini conclusi (sats arrivati a chi vende), per data dell'ordine. Collaudi esclusi.</div>
+    <div class="grafico" id="gVolume"></div>
+    <details><summary>Vedi i numeri</summary><div class="tab">${tabella(['Periodo','Ordini','Sats','Merce'], ks.filter(k => vend[k]).map(k => [etichetta(k, modo), fmt(vend[k][0]), fmt(vend[k][1]), fmt(vend[k][2])]))}</div></details>
+  </div>
+
+  <div class="card"><h2>Quanto avremmo guadagnato con una fee</h2>
+    <div class="simu">
+      <label for="fee" style="font-weight:700">Fee</label>
+      <input type="range" id="fee" min="0" max="10" step="0.25" value="2" oninput="simula()">
+      <output id="feeV">2%</output>
+      <select id="base" onchange="simula()"><option value="merce">sulla merce</option><option value="sats">sul totale pagato</option></select>
+    </div>
+    <div class="tiles" id="simuOut"></div>
+    <div class="nota">«Merce» è il prezzo senza spedizione e protezione: è la base su cui una commissione del mercatino si calcola davvero.</div>
+  </div>
+
+  <div class="card"><h2>Fee di routing</h2>
+    ${L.stato === 'ok' ? `
+    <div class="tiles">
+      <div class="tile"><div class="k">Spesa in routing</div><div class="v">${fmtd((rt.fee_msat || 0) / 1000, 0)} sats</div><div class="d">${eur((rt.fee_msat || 0) / 1000)}</div></div>
+      <div class="tile"><div class="k">Sul volume pagato</div><div class="v">${fmtd(rt.percento, 2)}%</div><div class="d">${fmt(Math.round((rt.percento || 0) * 1e4))} ppm in media</div></div>
+      <div class="tile"><div class="k">Pagamenti in uscita</div><div class="v">${fmt(rt.pagamenti)}</div><div class="d">${fmt(rt.sats)} sats pagati</div></div>
+    </div>
+    <div class="nota">Solo i pagamenti del mercatino (incassi a chi vende, rimborsi): dallo stesso nodo pagano anche il P2P e le manovre a mano, che qui non entrano.</div>
+    <h2 style="margin-top:14px">I nodi che abbiamo pagato</h2>
+    <div class="tab">${tabella(['Nodo','Pagamenti','Sats','Fee','ppm'], (L.nodi || []).map(n => [nodo(n.nodo, ''), fmt(n.pagamenti), fmt(n.sats), fmtd(n.fee_msat / 1000, 0), n.sats ? fmt(Math.round(n.fee_msat / 1000 / n.sats * 1e6)) : '—']), [1,2,3,4])}</div>
+    <div class="nota">Il nodo è l'ultimo salto della rotta, cioè chi ha incassato: dietro un wallet custodial è il nodo del wallet.</div>`
+    : `<div class="nota">Non disponibile: ${esc(L.motivo || 'nessuna risposta dal nodo')}.</div>`}
+  </div>
+
+  <div class="card"><h2>I wallet dei venditori</h2>
+    <div class="tab">${tabella(['Wallet','Venditori','Incassi conclusi'], (D.wallet || []).map(w => [esc(w.nome) + (w.nome !== w.dominio ? ` <span class="sub">${esc(w.dominio)}</span>` : ''), fmt(w.venditori), fmt(w.incassi)]), [1,2])}</div>
+    <div class="nota">Dal dominio dell'indirizzo Lightning di oggi: chi l'ha cambiato conta tutto sul wallet nuovo.</div>
+  </div>
+
+  <div class="card"><h2>I canali del nodo</h2>
+    ${(L.canali || []).length ? `<div class="tab">${tabella(['Con chi','Capacità','Nostri / loro',''], L.canali.map(c => [nodo(c.nodo, c.alias), fmt(c.capacita), `<div class="barra" title="${fmt(c.nostri)} nostri · ${fmt(c.loro)} loro"><b style="width:${c.capacita ? c.nostri / c.capacita * 100 : 0}%"></b><s style="width:${c.capacita ? c.loro / c.capacita * 100 : 0}%"></s></div><div class="sub">${fmt(c.nostri)} · ${fmt(c.loro)}</div>`, c.attivo ? '🟢' : '⚪️ spento']), [1])}</div>`
+      : `<div class="nota">Non disponibili${L.canali_motivo ? ': ' + esc(L.canali_motivo) : ''}.</div>`}
+  </div>`;
+
+  barre(el('gNuovi'), ks, [{colore:colore('--s-tg')}, {colore:colore('--s-nostr')}], nuovi,
+    (k, v) => `${esc(etichetta(k, modo))} · Telegram ${fmt(v[0])} · Nostr ${fmt(v[1])}`);
+  /* il cumulato parte da chi c'era PRIMA del periodo */
+  const da = inizio(); let base = [0, 0];
+  for (const r of D.iscritti) if (r[0] < da) { base[0] += r[1]; base[1] += r[2]; }
+  const cum = {}; ks.forEach(k => { const v = nuovi[k] || [0, 0]; base = [base[0] + v[0], base[1] + v[1]]; cum[k] = base.slice(); });
+  linee(el('gTotali'), ks, [{nome:'Telegram', colore:colore('--s-tg')}, {nome:'Nostr', colore:colore('--s-nostr')}], cum,
+    (k, v) => `${esc(etichetta(k, modo))} · Telegram ${fmt(v[0])} · Nostr ${fmt(v[1])} · totale ${fmt(v[0] + v[1])}`);
+  const vSats = {}; Object.keys(vend).forEach(k => vSats[k] = [vend[k][1]]);
+  barre(el('gVolume'), ks, [{colore:colore('--s-vol')}], vSats,
+    k => `${esc(etichetta(k, modo))} · ${fmt((vend[k] || [0, 0])[1])} sats · ${fmt((vend[k] || [0])[0])} ordini`);
+  simula();
+}
+
+function simula(){
+  const f = Number(el('fee').value) / 100, base = el('base').value === 'sats' ? 1 : 2;
+  el('feeV').textContent = fmtd(f * 100, 2) + '%';
+  const vend = somma(D.volume, [1, 2, 3]);
+  const per = Object.values(vend).reduce((a, v) => a + v[base], 0);
+  const sempre = base === 1 ? D.volume_totale.sats : D.volume_totale.merce;
+  const tre = D.volume.filter(r => r[0] >= new Date(Date.now() - 89 * GIORNO).toISOString().slice(0, 10)).reduce((a, r) => a + r[base + 1], 0);
+  const eur = s => D.eur_per_btc > 0 ? `≈ € ${fmtd(s / 1e8 * D.eur_per_btc, 0)}` : '';
+  const t = (k, s) => `<div class="tile"><div class="k">${k}</div><div class="v">${fmt(Math.floor(s * f))} sats</div><div class="d">${eur(s * f)}</div></div>`;
+  el('simuOut').innerHTML = t('Da sempre', sempre)
+    + t(giorni ? `Negli ultimi ${giorni} giorni` : 'Nel periodo', per)
+    + t('Al mese (media ultimi 90 giorni)', tre / 3);
+}
+
+function tabella(testa, righe, numeriche){
+  const num = new Set(numeriche || righe.length && testa.map((_, i) => i).filter(i => i > 0));
+  if (!righe.length) return '<div class="nota">Ancora niente.</div>';
+  return `<table><thead><tr>${testa.map((h, i) => `<th class="${num.has(i) ? 'n' : ''}">${esc(h)}</th>`).join('')}</tr></thead><tbody>`
+    + righe.map(r => `<tr>${r.map((c, i) => `<td class="${num.has(i) ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('') + '</tbody></table>';
+}
+/* un nodo: l'alias se c'e', la chiave accorciata, e il link per guardarlo */
+function nodo(pub, alias){
+  const p = String(pub || '');
+  if (!/^[0-9a-f]{66}$/i.test(p)) return esc(alias || p || '—');
+  const corto = p.slice(0, 8) + '…' + p.slice(-4);
+  return (alias ? `<b>${esc(alias)}</b><br>` : '')
+    + `<a class="mono" href="https://amboss.space/node/${p}" target="_blank" rel="noopener">${corto}</a>`;
+}
+let ridisegno = 0;
+addEventListener('resize', () => { if (!D) return; clearTimeout(ridisegno); ridisegno = setTimeout(disegna, 150); });
+carica();
+</script>
+</body>
+</html>

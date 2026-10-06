@@ -10021,6 +10021,28 @@
   banco estrae `esc` VERO dal client invece di darsene uno di cartone:
   quello proverebbe sé stesso, e la mutazione che lascia il nome del
   gradino nudo passerebbe liscia (l'ha chiesta la tortura).
+  IL CRUSCOTTO DEGLI ADMIN (ott 2026, parola di Andrea): `/admin` è
+  una pagina A PARTE (`admin.html`, rotta sua, noindex, no-store) che
+  non porta dati; li chiede a `GET /api/admin/cruscotto`, admin come
+  primo gesto. Dentro Telegram si apre nella stessa webview (il bottone
+  «📊 Apri il cruscotto» in cima al pannello admin) e lo SDK ritrova
+  l'initData; dal browser vale il cookie; in collaudo `?collaudo=999`.
+  I NUMERI: `dati_cruscotto` (iscritti per giorno Telegram/Nostr dal
+  segno del tg_id, il totale, i doppi cittadini, chi non ha data;
+  volume degli ordini 'released' non di collaudo per data dell'ORDINE,
+  lordo e «merce» = prezzo − spedizione − protezione; i wallet dal
+  dominio dell'indirizzo Lightning di oggi, nome da
+  `WALLET_DA_DOMINIO`). Le fee di routing e i nodi vengono da LND
+  (`dati_lnd_cruscotto`: `/v1/payments` a pagine da 1000 e
+  `/v1/channels`, GET col macaroon di SOLA LETTURA del ponte, cache 5
+  minuti) e si contano SOLO sui pagamenti nostri (`hash_nostri`:
+  `payout_tentati` + le colonne `payout_hash`): dallo stesso LND pagano
+  mostrod e le manovre a mano. Il nodo di un pagamento è l'ultimo salto
+  della rotta riuscita (`conti_instradamento`). LND spento o muto: la
+  sezione dice perché, la pagina resta in piedi. Il simulatore delle
+  fee è nel client (percentuale × merce o lordo). Colori dei grafici
+  validati per daltonismo in chiaro e scuro: Telegram blu, Nostr
+  arancio (il viola di Nostr col blu falliva la prova).
   I VANTAGGI DI OGNI LIVELLO (ott 2026, parola di Andrea): `/api/me`
   porta `livelli_scala` (`scala_livelli`): un gradino per livello con
   soglie XP/affari e i vantaggi che apre OGGI, letti dalle leve vive —
@@ -28502,6 +28524,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    e la testa non legge il database), `/barattolo/{token}` (la
    fotografia del barattolo condiviso, ago 2026: noindex, e la rotta
    NON legge mai il database — la garanzia della revoca),
+   `/admin` (il cruscotto degli admin, ott 2026: il file
+   `admin.html` letto dalla SUA rotta, senza dati dentro — i numeri li
+   dà `/api/admin/cruscotto` solo agli admin —, noindex e no-store;
+   vedi «IL CRUSCOTTO DEGLI ADMIN»),
    `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
    trovare»: la prima è una costante PURA che non tocca il database e
    non può sollevare — un 5xx lì sospende la scansione di tutto il sito

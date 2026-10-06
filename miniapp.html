@@ -40553,7 +40553,12 @@ async function loadAdminStats(){
         <div class="mono" style="font-size:20px;font-weight:800;color:var(--sats-deep)">${fmt(valore)}</div>
         <div style="font-size:12px;color:var(--muted);font-weight:700">${nome}</div>
       </div>`;
+    /* IL CRUSCOTTO (ott 2026): una pagina A PARTE, `/admin`, aperta
+       nella STESSA finestra — dentro Telegram lo SDK ritrova l'initData
+       e l'indietro riporta qui. Una riga in cima, sottotono: le code
+       qui sotto restano le cose urgenti. */
     box.innerHTML = `
+      <button class="btn ghost" style="margin-top:14px" onclick="location.href='/admin'">📊 Apri il cruscotto (iscritti, vendite, fee)</button>
       ${incerti.length ? `
       <div class="section-label" style="padding:26px 0 0">🧊 Pagamenti da verificare (${incerti.length})</div>
       <div class="sub" style="margin-top:6px">Il nodo non ha risposto: <b>non sappiamo</b> se questi sats sono usciti. Cerca il payment_hash su LNbits e dì com'è andata — finché non lo fai, nessun pagamento riparte da solo.</div>

@@ -99820,6 +99820,119 @@ def prove_punti_pubblici():
     prova("...e non lo da' a chi ha tutto il resto ma non ospita nulla",
           False, bool(_crit["punto_ritiro"](_tutto)))
 
+def prove_cruscotto_admin():
+    """IL CRUSCOTTO DEGLI ADMIN (ott 2026). I tre giudici PURI girano su
+    un database e su risposte di LND di cartone: gli iscritti divisi
+    Telegram/Nostr col totale, il volume dei soli ordini rilasciati e
+    non di collaudo, i wallet dal dominio, e le fee di routing dei SOLI
+    pagamenti nostri — dallo stesso LND pagano anche mostrod e le
+    manovre a mano, e mescolarli gonfierebbe la spesa del mercatino.
+    Poi le guardie: admin PRIMA di tutto, la pagina senza dati."""
+    import sqlite3
+    print("\n[il cruscotto degli admin]")
+    amb = {"time": time, "sqlite3": sqlite3}
+    i = _SORGENTE.index("WALLET_DA_DOMINIO = {")
+    exec(_SORGENTE[i:_SORGENTE.index("}\n", i) + 2], amb)
+    for f in ("_giorno", "dati_cruscotto", "hash_nostri",
+              "conti_instradamento"):
+        exec(pezzo(f), amb)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+    CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, registrato INTEGER,
+      npub_accesso TEXT DEFAULT '', ln_address TEXT DEFAULT '');
+    CREATE TABLE ordini(id INTEGER PRIMARY KEY, venditore_id INTEGER,
+      creato INTEGER, prezzo_sats INTEGER, spedizione_sats INTEGER DEFAULT 0,
+      protezione_sats INTEGER DEFAULT 0, stato TEXT, prova INTEGER DEFAULT 0,
+      payout_hash TEXT DEFAULT '');
+    CREATE TABLE payout_tentati(tabella TEXT, riga_id INTEGER, hash TEXT);
+    """)
+    G1, G2 = 1759276800, 1759363200          # due giorni di fila, UTC
+    con.executemany("INSERT INTO utenti VALUES(?,?,?,?)", [
+        (11, G1, "", "a@WalletOfSatoshi.com"), (12, G1, "npub1x", ""),
+        (13, G2, "", "b@getalby.com"), (-21, G2, "npub1y", ""),
+        (-22, G2, "npub1z", "c@sconosciuto.example"), (14, 0, "", "")])
+    con.executemany("INSERT INTO ordini(venditore_id, creato, prezzo_sats, "
+                    "spedizione_sats, protezione_sats, stato, prova, "
+                    "payout_hash) VALUES(?,?,?,?,?,?,?,?)", [
+        (11, G1, 10000, 2000, 100, "released", 0, "aa"),
+        (11, G2, 5000, 0, 0, "released", 0, ""),
+        (13, G2, 7000, 0, 0, "released", 1, ""),      # collaudo: fuori
+        (13, G2, 9000, 0, 0, "refunded", 0, ""),      # rimborsato: fuori
+        (-22, G2, 3000, 0, 0, "released", 0, "")])
+    con.execute("INSERT INTO payout_tentati VALUES('ordini', 1, 'BB')")
+    d = amb["dati_cruscotto"](con)
+    prova("iscritti: Telegram e Nostr dal segno dell'id, il totale, i "
+          "doppi cittadini e chi non ha la data",
+          {"telegram": 4, "nostr": 2, "entrambi": 1, "senza_data": 1,
+           "totale": 6}, d["iscritti_totali"])
+    prova("...e la serie per giorno, senza chi non ha la data",
+          [[amb["_giorno"](G1), 2, 0], [amb["_giorno"](G2), 1, 2]],
+          d["iscritti"])
+    prova("volume: i soli rilasciati, fuori i collaudi; la merce senza "
+          "spedizione e protezione",
+          {"ordini": 3, "sats": 18000, "merce": 15900}, d["volume_totale"])
+    prova("...per giorno: [ordini, sats, merce]",
+          [[amb["_giorno"](G1), 1, 10000, 7900],
+           [amb["_giorno"](G2), 2, 8000, 8000]], d["volume"])
+    prova("wallet: dal dominio (in minuscolo), col nome leggibile o "
+          "nudo, prima chi ha piu' incassi",
+          [("Wallet of Satoshi", 1, 2), ("sconosciuto.example", 1, 1),
+           ("Alby", 1, 0)],
+          [(w["nome"], w["venditori"], w["incassi"]) for w in d["wallet"]])
+    nostri = amb["hash_nostri"](con)
+    prova("gli hash nostri: il diario dei tentativi e la colonna, in "
+          "minuscolo", {"aa", "bb"}, nostri)
+    # nodi di cartone COSTRUITI qui: un esadecimale da 64 scritto per
+    # intero nel sorgente fa rossa la CI
+    n1, n2 = "02" + "ab" * 32, "03" + "cd" * 32
+
+    def pag(h, sats, fee_msat, dest, stato="SUCCEEDED"):
+        return {"payment_hash": h, "status": stato, "value_sat": str(sats),
+                "fee_msat": str(fee_msat),
+                "htlcs": [{"status": "FAILED", "route": {"hops": [
+                              {"pub_key": "sbagliato"}]}},
+                          {"status": "SUCCEEDED", "route": {"hops": [
+                              {"pub_key": "primo"}, {"pub_key": dest}]}}]}
+    lnd = [pag("AA", 10000, 25000, n1), pag("bb", 5000, 4000, n2),
+           pag("cc", 900000, 300000, n1),                 # mostrod: fuori
+           pag("aa", 1, 1, n1, stato="FAILED"),           # fallito: fuori
+           "spazzatura", {"payment_hash": "bb", "status": "SUCCEEDED",
+                          "value_sat": "x"}]               # illeggibile
+    c = amb["conti_instradamento"](lnd, nostri)
+    prova("routing: i SOLI nostri riusciti — fuori mostrod, i falliti e "
+          "le righe storte", {"pagamenti": 2, "sats": 15000,
+                              "fee_msat": 29000, "percento": 0.193},
+          c["totale"])
+    prova("...per nodo di destinazione: l'ultimo salto della rotta "
+          "RIUSCITA", [(n1, 1, 10000, 25000), (n2, 1, 5000, 4000)],
+          [(x["nodo"], x["pagamenti"], x["sats"], x["fee_msat"])
+           for x in c["nodi"]])
+    prova("...e senza pagamenti nessuna divisione per zero", 0,
+          amb["conti_instradamento"]([], set())["totale"]["percento"])
+
+    cr = pezzo("cruscotto_admin")
+    prova("la rotta dei numeri chiede l'admin PRIMA di aprire il "
+          "database o chiamare il nodo", True,
+          cr.index("e_admin(") < cr.index("db()")
+          < cr.index("dati_lnd_cruscotto("))
+    pa = pezzo("pagina_admin")
+    prova("la pagina /admin ha la sua rotta e non porta dati", (True, False),
+          ('@app.get("/admin")' in _SORGENTE, "db()" in pa))
+    prova("...e non si indicizza ne' si tiene in cache", True,
+          '"no-store"' in pa and "noindex" in pa)
+    lnd_src = pezzo("_lnd_leggi")
+    prova("LND si legge col macaroon di SOLA LETTURA e una GET", True,
+          "LND_PONTE_MACAROON_LETTURA" in lnd_src and "c.get(" in lnd_src
+          and "c.post(" not in lnd_src)
+    pagina = open("admin.html", encoding="utf-8").read()
+    prova("la pagina scrive il testo altrui passando da esc()", True,
+          "esc(w.nome)" in pagina and "esc(alias)" in pagina)
+    prova("...e la pagina carica solo da casa e da telegram.org", [],
+          [u for u in re.findall(r'src="(https?://[^"]+)"', pagina)
+           if not u.startswith("https://telegram.org/")])
+
+
 def prove_vantaggi_livelli():
     """I VANTAGGI DI OGNI LIVELLO (ott 2026, parola di Andrea). La scala
     la scrive il server dalle leve VIVE (`scala_livelli`) e il client la
@@ -121139,7 +121252,7 @@ def main():
               prove_lista_ordini, prove_dettaglio_ordine, prove_card_ordini, prove_righe_ordine,
               prove_ssrf_redirect, prove_niente_ai_nella_ricerca,
               prove_tracking_corretto, prove_tracking_venditore,
-              prove_vantaggi_livelli,
+              prove_vantaggi_livelli, prove_cruscotto_admin,
               prove_barattolo,
               prove_savers_proprietario, prove_visualizzazioni,
               prove_barattolo_in_striscia,

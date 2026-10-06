@@ -25669,6 +25669,260 @@ async def decidi_categorie(req: Request, x_tg_init_data: str = Header(""),
             "quanti": len(spostati) if esito == "applica" else len(righe)}
 
 
+# ---------------- IL CRUSCOTTO DEGLI ADMIN (ott 2026) -----------------
+# Parola di Andrea: «una pagina completa a parte, solo agli admin, dove
+# vedere gli iscritti nel tempo (Telegram e Nostr) col totale, i sats
+# venduti nel tempo e in totale, il guadagno potenziale con una fee, la
+# spesa in routing fee e la sua percentuale sul volume, i wallet e i
+# nodi con cui interagiamo». La pagina e' `/admin` (admin.html, senza
+# dati dentro); i numeri escono SOLO da qui, a chi e' admin.
+#
+# LE FONTI SONO DUE E SI DICONO. Il database sa iscritti, ordini e gli
+# indirizzi Lightning dei venditori. Le fee di routing e i nodi li sa
+# SOLO il nodo: si chiedono a LND dallo stesso ponte e con lo stesso
+# macaroon di SOLA LETTURA della verita' dei pagamenti (`offchain:read`),
+# e di quel che LND risponde si tengono i soli pagamenti NOSTRI — gli
+# hash di `payout_tentati` e `payout_hash` —, perche' dallo stesso LND
+# pagano anche mostrod e le manovre a mano (swap, riequilibri), che non
+# sono costi del mercatino (lo studio del 5 ott: sette decimi di quel
+# che esce). LND spento o muto non fa cadere la pagina: la sezione dice
+# perche' manca, come fa il pannello delle leve.
+CRUSCOTTO_LND_TTL_S = 300          # LND si richiede al piu' ogni 5 minuti
+_cruscotto_lnd = {"quando": 0.0, "dati": None}
+
+# I DOMINI DEGLI INDIRIZZI LIGHTNING, con un nome leggibile. Un dominio
+# che non e' qui esce col suo nome nudo: e' comunque la verita'.
+WALLET_DA_DOMINIO = {
+    "walletofsatoshi.com": "Wallet of Satoshi", "getalby.com": "Alby",
+    "phoenixwallet.me": "Phoenix", "blink.sv": "Blink", "strike.me": "Strike",
+    "coinos.io": "coinos", "sbpc.ch": "Swiss Bitcoin Pay",
+    "primal.net": "Primal", "minibits.cash": "Minibits",
+    "npub.cash": "npub.cash", "zeuspay.com": "Zeus", "rizful.com": "Rizful",
+    "speed.app": "Speed", "tryspeed.com": "Speed", "fountain.fm": "Fountain",
+    "stacker.news": "Stacker News", "breez.fun": "Breez",
+}
+
+
+def _giorno(ts) -> str:
+    return time.strftime("%Y-%m-%d", time.gmtime(int(ts)))
+
+
+def dati_cruscotto(con) -> dict:
+    """I numeri del database, PURI sulla connessione: iscritti, volume e
+    wallet. Serie GIORNALIERE e totali: a raggruppare per settimana o
+    mese ci pensa la pagina, che sceglie la finestra.
+    ISCRITTI: Telegram = tg_id positivo, Nostr = negativo (l'id nativo
+    Nostr e' sempre negativo, `tg_id_da_pubkey`); i doppi cittadini
+    (Telegram con una chiave d'accesso) si contano fra i Telegram e si
+    dicono a parte. Chi c'era prima del timbro (`registrato` = 0) e'
+    nel totale ma non in una data: si dice quanti sono.
+    VOLUME: gli ordini 'released' (i sats arrivati a chi vende), per
+    data dell'ORDINE — un timbro del rilascio non esiste — e fuori i
+    collaudi (`prova`). `merce` = prezzo meno spedizione e protezione:
+    e' la base su cui una fee del mercatino si calcolerebbe."""
+    iscritti, tot = {}, {"telegram": 0, "nostr": 0, "entrambi": 0,
+                         "senza_data": 0}
+    for u in con.execute("SELECT tg_id, registrato, "
+                         "COALESCE(npub_accesso,'') AS acc FROM utenti"):
+        lato = "nostr" if u["tg_id"] < 0 else "telegram"
+        tot[lato] += 1
+        if lato == "telegram" and u["acc"]:
+            tot["entrambi"] += 1
+        if not u["registrato"]:
+            tot["senza_data"] += 1
+            continue
+        g = iscritti.setdefault(_giorno(u["registrato"]), [0, 0])
+        g[0 if lato == "telegram" else 1] += 1
+    tot["totale"] = tot["telegram"] + tot["nostr"]
+    volume, vtot = {}, {"ordini": 0, "sats": 0, "merce": 0}
+    for o in con.execute(
+            "SELECT creato, prezzo_sats, COALESCE(spedizione_sats,0) AS sp, "
+            "COALESCE(protezione_sats,0) AS pr FROM ordini "
+            "WHERE stato='released' AND COALESCE(prova,0)=0"):
+        sats = int(o["prezzo_sats"] or 0)
+        merce = max(0, sats - int(o["sp"]) - int(o["pr"]))
+        g = volume.setdefault(_giorno(o["creato"] or 0), [0, 0, 0])
+        g[0] += 1
+        g[1] += sats
+        g[2] += merce
+        vtot["ordini"] += 1
+        vtot["sats"] += sats
+        vtot["merce"] += merce
+    # I WALLET dei venditori, dal dominio dell'indirizzo Lightning:
+    # quanti venditori lo hanno, e quanti incassi conclusi ci sono
+    # arrivati (l'indirizzo e' quello di OGGI: chi l'ha cambiato conta
+    # tutto sul nuovo, ed e' detto nella pagina).
+    dominio = {}
+    for u in con.execute("SELECT tg_id, LOWER(TRIM(ln_address)) AS ln "
+                         "FROM utenti WHERE INSTR(COALESCE(ln_address,''),"
+                         "'@')>1"):
+        dominio[u["tg_id"]] = u["ln"].split("@", 1)[1]
+    wallet = {}
+    for tg, dom in dominio.items():
+        w = wallet.setdefault(dom, {"dominio": dom,
+                                    "nome": WALLET_DA_DOMINIO.get(dom, dom),
+                                    "venditori": 0, "incassi": 0})
+        w["venditori"] += 1
+    for o in con.execute("SELECT venditore_id FROM ordini WHERE "
+                         "stato='released' AND COALESCE(prova,0)=0"):
+        dom = dominio.get(o["venditore_id"])
+        if dom:
+            wallet[dom]["incassi"] += 1
+    return {"iscritti": sorted([g, v[0], v[1]] for g, v in iscritti.items()),
+            "iscritti_totali": tot,
+            "volume": sorted([g, *v] for g, v in volume.items()),
+            "volume_totale": vtot,
+            "wallet": sorted(wallet.values(),
+                             key=lambda w: (-w["incassi"], -w["venditori"]))}
+
+
+def hash_nostri(con) -> set:
+    """Gli hash dei pagamenti in USCITA del mercatino: ogni tentativo
+    scritto in `payout_tentati`, piu' gli `payout_hash` delle righe (che
+    c'erano prima del diario). E' il filtro che separa i nostri costi da
+    quelli di mostrod e delle manovre a mano, che pagano dallo stesso
+    LND."""
+    nostri = {str(r[0]).lower() for r in con.execute(
+        "SELECT hash FROM payout_tentati WHERE hash!=''")}
+    for tab in ("ordini", "rilanci", "pagamenti", "rimborsi_asta"):
+        try:
+            nostri |= {str(r[0]).lower() for r in con.execute(
+                f"SELECT payout_hash FROM {tab} "
+                f"WHERE COALESCE(payout_hash,'')!=''")}
+        except sqlite3.OperationalError:
+            pass        # una tabella senza la colonna: niente da aggiungere
+    return nostri
+
+
+def conti_instradamento(pagamenti: list, nostri: set) -> dict:
+    """I pagamenti di LND (`/v1/payments`) ridotti ai NOSTRI riusciti:
+    quanti, quanti sats, quante fee (in msat, per non perdere il
+    sottomultiplo), e per NODO DI DESTINAZIONE — l'ultimo salto della
+    rotta riuscita, cioe' il nodo che ha incassato: dietro un wallet
+    custodial e' il nodo del wallet, dietro un nodo privato e' lui.
+    PURA: la rete sta fuori, e cosi' si prova con risposte di cartone."""
+    tot = {"pagamenti": 0, "sats": 0, "fee_msat": 0}
+    per_nodo = {}
+    for p in pagamenti or []:
+        if not isinstance(p, dict):
+            continue
+        if str(p.get("status") or "").upper() != "SUCCEEDED":
+            continue
+        if str(p.get("payment_hash") or "").lower() not in nostri:
+            continue
+        try:
+            sats = int(p.get("value_sat") or 0)
+            fee = int(p.get("fee_msat") or 0)
+        except (TypeError, ValueError):
+            continue
+        dest = ""
+        for h in p.get("htlcs") or []:
+            if str((h or {}).get("status") or "").upper() == "SUCCEEDED":
+                salti = ((h.get("route") or {}).get("hops") or [])
+                if salti:
+                    dest = str(salti[-1].get("pub_key") or "")
+                break
+        tot["pagamenti"] += 1
+        tot["sats"] += sats
+        tot["fee_msat"] += fee
+        n = per_nodo.setdefault(dest, {"nodo": dest, "pagamenti": 0,
+                                       "sats": 0, "fee_msat": 0})
+        n["pagamenti"] += 1
+        n["sats"] += sats
+        n["fee_msat"] += fee
+    tot["percento"] = (round(tot["fee_msat"] / 1000 / tot["sats"] * 100, 3)
+                       if tot["sats"] else 0)
+    return {"totale": tot,
+            "nodi": sorted(per_nodo.values(), key=lambda n: -n["sats"])}
+
+
+async def _lnd_leggi(percorso: str, params: dict | None = None):
+    """Una GET di SOLA LETTURA a LND, dal ponte della verita' dei
+    pagamenti. Torna (json, '') o (None, perche'). NON ALZA MAI, e del
+    guasto dice il TIPO e basta (mai l'URL coi suoi header)."""
+    if not _lnd_configurato():
+        return None, "LND non configurato su questo server"
+    try:
+        tls = ssl.create_default_context(cafile=LND_PONTE_CERT)
+        async with httpx.AsyncClient(timeout=20, verify=tls) as c:
+            r = await c.get(f"{LND_PONTE_URL}{percorso}", params=params or {},
+                            headers={"Grpc-Metadata-macaroon":
+                                     str(LND_PONTE_MACAROON_LETTURA).strip()})
+    except Exception as e:
+        return None, f"LND non risponde ({type(e).__name__})"
+    if r.status_code != 200:
+        return None, f"LND ha risposto {r.status_code}"
+    try:
+        return r.json(), ""
+    except ValueError:
+        return None, "risposta di LND illeggibile"
+
+
+async def dati_lnd_cruscotto(nostri: set) -> dict:
+    """Fee di routing e nodi, da LND, con la cache di 5 minuti: la
+    pagina si ricarica, il nodo non deve sentirlo. I pagamenti si
+    leggono a pagine da 1000, dal piu' recente, fino a dieci pagine."""
+    adesso = time.time()
+    if (_cruscotto_lnd["dati"] is not None
+            and adesso - _cruscotto_lnd["quando"] < CRUSCOTTO_LND_TTL_S):
+        return _cruscotto_lnd["dati"]
+    pagamenti, offset, motivo = [], None, ""
+    for _ in range(10):
+        par = {"include_incomplete": "false", "max_payments": "1000",
+               "reversed": "true"}
+        if offset is not None:
+            par["index_offset"] = str(offset)
+        d, motivo = await _lnd_leggi("/v1/payments", par)
+        if d is None:
+            break
+        pagina = d.get("payments") or []
+        pagamenti += pagina
+        if len(pagina) < 1000:
+            break
+        offset = d.get("first_index_offset")
+    if not pagamenti and motivo:
+        dati = {"stato": "assente", "motivo": motivo}
+    else:
+        dati = {"stato": "ok", "motivo": "",
+                **conti_instradamento(pagamenti, nostri)}
+    canali, m2 = await _lnd_leggi("/v1/channels",
+                                  {"peer_alias_lookup": "true"})
+    dati["canali"] = [
+        {"nodo": str(c.get("remote_pubkey") or ""),
+         "alias": str(c.get("peer_alias") or ""),
+         "capacita": int(c.get("capacity") or 0),
+         "nostri": int(c.get("local_balance") or 0),
+         "loro": int(c.get("remote_balance") or 0),
+         "attivo": bool(c.get("active"))}
+        for c in ((canali or {}).get("channels") or [])]
+    dati["canali_motivo"] = m2
+    _cruscotto_lnd.update(quando=adesso, dati=dati)
+    return dati
+
+
+@app.get("/api/admin/cruscotto")
+async def cruscotto_admin(x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: i numeri della pagina `/admin`. Il controllo e' il
+    PRIMO gesto, prima di aprire il database o di chiamare il nodo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato agli admin")
+    con = db()
+    try:
+        dati = dati_cruscotto(con)
+        nostri = hash_nostri(con)
+    finally:
+        con.close()
+    dati["lnd"] = await dati_lnd_cruscotto(nostri)
+    try:
+        dati["eur_per_btc"] = await cambio_btc_eur()
+    except Exception:
+        dati["eur_per_btc"] = 0
+    dati["generato"] = int(time.time())
+    return dati
+
+
 @app.get("/api/admin/stats")
 def statistiche_admin(x_tg_init_data: str = Header(""),
                       barattolo_sessione: str = Cookie("")):
@@ -65467,6 +65721,21 @@ def pagina_categoria(slug: str):
     ATTENZIONE all'ordine delle rotte, come per le due gemelle."""
     titolo, testa, corpo = _seo_o_generici(_seo_categoria, slug)
     return _pagina_con_meta(testa, titolo, corpo)
+
+
+@app.get("/admin")
+def pagina_admin():
+    """IL CRUSCOTTO DEGLI ADMIN (ott 2026): una pagina A PARTE, con la
+    sua rotta e il suo file — la regola 3, nessun mount. Il file non
+    porta NESSUN dato: i numeri li chiede a `/api/admin/cruscotto`, che
+    controlla chi e' admin. Quindi la pagina in se' puo' essere vista da
+    chiunque digiti l'indirizzo, e a chi non e' admin dice soltanto che
+    e' riservata. Mai indicizzata, mai in cache."""
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "admin.html"), encoding="utf-8") as f:
+        corpo = f.read()
+    return HTMLResponse(corpo, headers={
+        "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"})
 
 
 @app.get("/sicurezza")

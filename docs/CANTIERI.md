@@ -35835,3 +35835,51 @@ node. Chromium a 320px: le cinque righe si leggono, «sei qui» al
 gradino giusto (in collaudo il P2P è spento, e la riga P2P giustamente
 non c'è). Misurato anche il bottone «📱 Entra con nostrconnect» a
 320px: 50px, una riga.
+
+## Il cruscotto degli admin (6 ott 2026)
+
+Il compito (Andrea): «una dashboard solo per gli admin, una pagina
+completa a parte: gli iscritti nel tempo (chi da Telegram chi da
+Nostr) col totale, i sats venduti nel tempo e in totale, il guadagno
+potenziale con delle fee, la spesa in routing fee totale e in
+percentuale sul volume, i wallet usati e i nodi con cui interagiamo».
+
+**La forma.** Una pagina vera, `/admin`, col suo file e la sua rotta
+(regola 3), e non una vista dentro la miniapp: è un attrezzo per due
+persone, e dentro un file da 66.000 righe sarebbe stata una vista in
+più nel motore di navigazione. La pagina non porta dati: li dà
+`/api/admin/cruscotto`, che chiede l'admin prima di tutto. Grafici in
+SVG disegnati a mano (la CSP non ammette librerie da fuori), disegnati
+alla larghezza vera del riquadro (a 390px un viewBox fisso faceva le
+scritte da 6px — visto e corretto), tooltip al passaggio, «Vedi i
+numeri» sotto ogni grafico, periodo 30/90/365 giorni o da sempre.
+
+**Dove stanno i numeri.** Iscritti, ordini e indirizzi Lightning nel
+database. Fee di routing e nodi SOLO nel nodo: si chiedono a LND con lo
+stesso ponte e lo stesso macaroon di sola lettura della verità dei
+pagamenti, e si contano i soli pagamenti NOSTRI (gli hash dei payout) —
+lo studio del 5 ott ha mostrato che sette decimi di quel che esce dal
+nodo sono manovre nostre e mostrod, che gonfierebbero la spesa del
+mercatino. I nodi sono l'ultimo salto della rotta riuscita, coi canali
+del nodo (alias quando LND lo sa) e il link ad Amboss. I «wallet» sono
+quelli dei venditori, dal dominio dell'indirizzo Lightning: i wallet
+dei compratori non li vediamo (pagano una fattura e basta).
+
+**Scartato.** Le vendite per data di rilascio: un timbro del rilascio
+non esiste, e si usa la data dell'ordine, detto nella pagina. Il viola
+di Nostr nei grafici: col blu di Telegram falliva la prova del
+daltonismo, quindi Nostr è arancio.
+
+**Provato.** `prove_cruscotto_admin`: i tre giudici puri su un database
+e su risposte di LND di cartone (iscritti col segno dell'id, collaudi e
+rimborsati fuori dal volume, la merce, i wallet in minuscolo, i SOLI
+pagamenti nostri riusciti, il nodo dell'htlc riuscito, niente
+divisione per zero), admin prima del database, la pagina senza dati,
+LND solo in GET. Chromium a 1100px chiaro e 390px scuro con dati di
+cartone; un non admin legge «riservata agli admin». NON provato: la
+sezione LND con un nodo vero (in collaudo LND non c'è, e la pagina dice
+«non disponibile»), e il passaggio dentro Telegram dalla Mini App.
+
+**Da guardare al primo giro vero.** Se il macaroon di sola lettura
+basta per `/v1/channels` con gli alias; se `/v1/payments` a pagine da
+1000 regge il numero di pagamenti del nodo.
