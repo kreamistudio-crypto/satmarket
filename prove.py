@@ -26593,6 +26593,111 @@ def prove_divisione_a_ritroso():
 
 
 # ====================================================================
+def prove_buoni_cumulabili():
+    """I BUONI SCONTO CUMULABILI O NO (ott 2026, parola di Andrea). Il
+    giudice VERO, `_sconto_vincente`, con le sue pure accanto:
+    cumulabile = si somma a lampo, accordo e sconto del negozio, col
+    tetto della leva e mai gratis; non cumulabile = vince il maggiore
+    fra il buono (sul LISTINO) e tutti gli altri insieme, e se vince si
+    paga il listino meno il buono. Una regola di cinque elementi (i
+    banchi di ieri, e nessun listino) e' il confronto di sempre."""
+    print("\n[i buoni sconto cumulabili o no]")
+    src = open("server.py", encoding="utf-8").read()
+    amb = {"CODICI_SCONTO_ATTIVI": True, "CODICI_SCONTO_MAX_PERCENTO": 100,
+           "CODICI_SCONTO_MAX_VALORE_EUR": 10_000,
+           "CODICI_SCONTO_MAX_VALORE_SATS": 100_000_000,
+           "VALUTE_SOGLIA": ("eur", "sats")}
+    for f in ("_sped_in_sats", "_sconto_percento", "_sconto_valore",
+              "_valuta_soglia", "_tipo_codice", "_sconto_codice",
+              "_eur_interi", "_sconto_pacco", "_sconto_regole",
+              "_codice_cumulabile", "_unitario_listino", "_sconto_vincente"):
+        exec(pezzo(f), amb)
+    vinc = amb["_sconto_vincente"]
+    REG = [("pezzi", 2, 10, "")]          # «da 2 pezzi, −10%»
+    C20 = ("percento", 20, 0, 0, "", 1)    # buono −20%, cumulabile
+    N20 = ("percento", 20, 0, 0, "", 0)    # lo stesso, non cumulabile
+    N15 = ("percento", 15, 0, 0, "", 0)
+    V5 = ("valore", 0, 5_000, 0, "sats", 1)
+
+    # --- CUMULABILE: si somma -----------------------------------------
+    prova("cumulabile senza altri sconti: il buono da solo, con la sua "
+          "percentuale", (20_000, 20, "codice"),
+          vinc(100_000, None, 1, [], C20, 0.0, 100_000))
+    prova("cumulabile con lo sconto del negozio: il buono toglie su "
+          "quel che resta (10.000 + 20% di 90.000), e una somma una "
+          "percentuale sola non ce l'ha", (28_000, 0, "codice"),
+          vinc(100_000, None, 2, REG, C20, 0.0, 100_000))
+    prova("...e sopra la lampo: l'articolo e' gia' scontato, il buono "
+          "toglie su quello", (18_000, 20, "codice"),
+          vinc(90_000, None, 1, [], C20, 0.0, 100_000))
+    amb["CODICI_SCONTO_MAX_PERCENTO"] = 25
+    prova("il TETTO resta: la somma non passa la leva (25% di 100.000)",
+          (25_000, 0, "codice"),
+          vinc(100_000, None, 2, REG, C20, 0.0, 100_000))
+    amb["CODICI_SCONTO_MAX_PERCENTO"] = 100
+    prova("...e mai gratis: un buono a cifra piu' grande del resto "
+          "lascia 1 sat", 3_999,
+          vinc(4_000, None, 1, [], V5, 0.0, 4_000)[0])
+
+    # --- NON CUMULABILE: vince il maggiore fra il buono e TUTTI -------
+    prova("non cumulabile da solo: come prima", (20_000, 20, "codice"),
+          vinc(100_000, None, 1, [], N20, 0.0, 100_000))
+    prova("non cumulabile contro lampo + negozio (10.000 + 9.000): il "
+          "−20% del listino vince, e si paga il listino meno il buono — "
+          "lo sconto e' la differenza sopra la lampo",
+          (10_000, 0, "codice"),
+          vinc(90_000, None, 2, REG, N20, 0.0, 100_000))
+    prova("...ma se gli altri insieme danno di piu' (19.000 contro "
+          "15.000) vince il negozio, e il buono non consuma un uso",
+          (9_000, 10, ""), vinc(90_000, None, 2, REG, N15, 0.0, 100_000))
+    prova("a pari merito vince chi NON e' il buono", (10_000, 10, ""),
+          vinc(100_000, None, 2, REG, ("percento", 10, 0, 0, "", 0), 0.0,
+               100_000))
+    prova("la regola di ieri (cinque elementi, senza listino) e' il "
+          "confronto di sempre: il maggiore fra buono e negozio",
+          [(20_000, 20, "codice"), (10_000, 10, "")],
+          [vinc(100_000, None, 2, REG, ("percento", 20, 0, 0, ""), 0.0),
+           vinc(100_000, None, 2, REG, ("percento", 5, 0, 0, ""), 0.0)])
+    prova("niente buono: lo sconto del negozio e basta", (10_000, 10, ""),
+          vinc(100_000, None, 2, REG, (), 0.0, 100_000))
+    ul = amb["_unitario_listino"]
+    prova("il listino e' prima della lampo: sats nudi, euro convertiti",
+          (5_000, 100_000), (ul({"valuta": "sats", "prezzo_eur": 0,
+                                 "prezzo_sats": 5_000}, 0.0),
+                             ul({"valuta": "eur", "prezzo_eur": 100,
+                                 "prezzo_sats": 0}, 100_000_000.0 / 1000)))
+
+    # --- I FILI ---------------------------------------------------------
+    prova("i quattro percorsi del conto passano il listino", 4,
+          len(re.findall(r"= _sconto_vincente\([^)]*listino\)", src)))
+    prova("...e il listino lo fa una funzione sola", 4,
+          src.count("_unitario_listino(a, ")
+          - src.count("def _unitario_listino(a, "))
+    prova("la regola del buono porta «cumulabile» in coda, dalla colonna",
+          True, 'reg = reg + (1 if r["cumulabile"] else 0,)'
+          in pezzo("_codice_sconto"))
+    prova("col buono cumulabile l'invito allo sconto del negozio resta "
+          "vivo (si somma, non lo copre)", 2,
+          src.count("cod_pct = (cod_reg[1] if cod_reg and not "
+                    "_codice_cumulabile(cod_reg)"))
+    prova("i codici gia' in giro nascono cumulabili (DDL e migrazione)",
+          (True, True),
+          ("cumulabile INTEGER NOT NULL DEFAULT 1," in src,
+           '"codici_sconto ADD COLUMN cumulabile INTEGER "' in src))
+    sv = pezzo("salva_codice_sconto")
+    prova("il salvataggio: assente si CONSERVA (client di ieri), alla "
+          "creazione vale si'", (True, True),
+          ("cumulabile=COALESCE(?, cumulabile)" in sv,
+           "1 if cum is None else cum" in sv))
+    prova("...e il venditore lo rilegge", True,
+          '"cumulabile": bool(r["cumulabile"])' in pezzo("_codice_pubblico"))
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il cassetto ha le due pillole e le manda", (True, True, True),
+          ("pill('1', 'Si somma', 'cum')" in mini,
+           "pill('0', 'Vince il più alto', 'cum')" in mini,
+           "cumulabile: b.cum !== '0'," in mini))
+
+
 def prove_codice_a_valore():
     """IL CODICE SCONTO A CIFRA FISSA (ago 2026): «−10 €» invece di
     «−10%», e la percentuale che sale fino a 100. Le due meta' del
@@ -26612,7 +26717,7 @@ def prove_codice_a_valore():
     for f in ("_sped_in_sats", "_sconto_percento", "_sconto_valore",
               "_valuta_soglia", "_tipo_codice", "_codice_vale",
               "_sconto_codice", "_eur_interi", "_sconto_pacco",
-              "_sconto_regole", "_sconto_vincente",
+              "_sconto_regole", "_codice_cumulabile", "_sconto_vincente",
               "_codice_vuole_cambio"):
         exec(pezzo(f), amb)
     # MILLE SATS = UN EURO, come nelle prove del carrello: ogni cifra
@@ -121838,6 +121943,7 @@ def main():
               prove_ssrf_redirect, prove_niente_ai_nella_ricerca,
               prove_tracking_corretto, prove_tracking_venditore,
               prove_vantaggi_livelli, prove_cruscotto_admin,
+              prove_buoni_cumulabili,
               prove_barattolo,
               prove_savers_proprietario, prove_visualizzazioni,
               prove_barattolo_in_striscia,

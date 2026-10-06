@@ -34183,6 +34183,10 @@ function bozzaCod(){
                    valSats: (codiciLeve && codiciLeve.valori_sats
                              || [10000])[0],
                    valuta: 'eur',
+                   /* cumulabile: '1' si somma, '0' vince il maggiore
+                      (ott 2026). Una STRINGA come 'tipo', perche'
+                      arriva dal data-v della pillola */
+                   cum: '1',
                    giorni: (codiciLeve && codiciLeve.durate || [0])[0],
                    usi: 0};
   return bozzaCodice;
@@ -34257,6 +34261,7 @@ async function renderCodici(){
         ${c.attivo ? '' : '⏸ '}<b class="mono">${esc(c.codice)}</b> · ${cifraCodice(c.tipo, c.percento, c.valore_sats, c.valore_eur, c.valore_valuta)}
         · ${c.usi_max ? `${fmt(c.usi)}/${fmt(c.usi_max)} usi` : `${fmt(c.usi)} usi`}
         · ${c.scadenza ? 'scade il ' + new Date(c.scadenza*1000).toLocaleDateString('it-IT') : 'senza scadenza'}
+        · ${c.cumulabile === false ? 'non si somma' : 'si somma'}
         ${morto ? `<span style="color:var(--danger);font-weight:800"> · ${perche}</span>` : ''}
       </div>
       <button style="${azCod}" title="Modifica" onclick="modificaCodice(${c.id})">✏️</button>
@@ -34268,9 +34273,11 @@ async function renderCodici(){
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-bottom:2px">
       Un codice lo dai a chi vuoi: chi lo scrive alla cassa ha lo
-      sconto. Vale sugli articoli, mai sulla spedizione.
-      <b style="color:var(--ink)">Se il tuo sconto del negozio è più
-      alto vince quello</b> — e il codice non consuma un uso.</div>
+      sconto. Vale sugli articoli, mai sulla spedizione. Per ogni codice
+      scegli se <b style="color:var(--ink)">si somma</b> agli altri
+      sconti (lampo, offerte accettate, sconto del negozio) o se
+      <b style="color:var(--ink)">vince il più alto</b> — e quando non
+      scatta, non consuma un uso.</div>
     <div id="codiciErrore"></div>
     ${myCodici.map(riga).join('') || '<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin:10px 0">Nessun codice, per ora.</div>'}
     ${pieno ? `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-top:12px">Hai già ${tetto} codici: eliminane uno per farne di nuovi.</div>` : `
@@ -34318,6 +34325,18 @@ async function renderCodici(){
         ${(codiciLeve.sconti||[]).map(p => pill(p, `−${p}%`, 'pct')).join('')}</div>
       ${campoPctLibera('codici', b.pct, codiciLeve.sconti||[])}
     `}
+    ${/* CUMULABILE (ott 2026, parola di Andrea): si' = si somma a lampo,
+          offerta accettata e sconto del negozio, e toglie sul totale che
+          resta; no = vince il piu' alto fra il codice (misurato sul
+          prezzo pieno) e tutti gli altri insieme. Il giudice e' il
+          server (`_sconto_vincente`): qui si sceglie e basta. */''}
+    <div class="section-label" style="margin-top:12px">Con gli altri sconti</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      ${pill('1', 'Si somma', 'cum')}
+      ${pill('0', 'Vince il più alto', 'cum')}</div>
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:6px">${b.cum === '0'
+      ? 'Chi compra ha il più alto fra il codice (sul prezzo pieno) e gli altri sconti insieme: mai tutti e due.'
+      : 'Il codice toglie sul totale che resta dopo lampo, offerte e sconto del negozio.'}</div>
     <div class="section-label" style="margin-top:12px">Per quanto vale</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       ${(codiciLeve.durate||[]).map(g => pill(g, durata(g), 'giorni')).join('')}</div>
@@ -34373,6 +34392,7 @@ function modificaCodice(id){
   bozzaCodice = {codice: c.codice, pct: c.percento, usi: c.usi_max,
                  tipo: c.tipo || 'percento',
                  valuta: c.valore_valuta || 'eur',
+                 cum: c.cumulabile === false ? '0' : '1',
                  valEur: c.valore_eur
                          || (codiciLeve && codiciLeve.valori_eur || [10])[0],
                  valSats: c.valore_sats
@@ -34398,6 +34418,7 @@ async function salvaCodice(btn){
      salvataggio una cifra che il venditore non sta guardando. */
   const corpo = {codice: el('codCodice')?.value || '',
                  tipo: b.tipo, percento: b.pct, giorni: b.giorni,
+                 cumulabile: b.cum !== '0',
                  usi_max: parseInt(el('codUsi')?.value || '0', 10) || 0};
   if (b.tipo === 'valore'){
     corpo.valuta = b.valuta;

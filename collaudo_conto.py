@@ -178,23 +178,27 @@ def semina(criterio, soglia, valore_eur, pct, prezzo=30_000, quantita=9,
 
 def semina_codice(codice="SATOSHI10", pct=20, giorni=0, usi_max=0,
                   attivo=1, di_chi=222, tipo="percento", val_sats=0,
-                  val_eur=0, valuta="eur"):
+                  val_eur=0, valuta="eur", cumulabile=0):
     """Un codice sconto in tabella. Torna il suo id.
 
     Dall'ago 2026 semina anche il tipo a CIFRA FISSA: i default lo
     lasciano 'percento', quindi ogni chiamata di ieri semina lo stesso
     codice di ieri — e' la regressione a costo zero, e se il tipo nuovo
     avesse spostato di un sat il mondo di prima le prove della sezione
-    [6] diventerebbero rosse tutte insieme."""
+    [6] diventerebbero rosse tutte insieme.
+    ⚠️ `cumulabile` (ott 2026) nasce 0 QUI, mentre nella tabella il
+    default e' 1: le sezioni [6] e [7] provano il «vince il maggiore», e
+    quello e' ora il codice NON cumulabile. Il cumulabile ha la sua
+    sezione, [6b], che lo chiede per nome."""
     con = SRV.db()
     con.execute("DELETE FROM codici_sconto")
     scad = (int(time.time()) + giorni * 86400) if giorni else 0
     cur = con.execute(
         "INSERT INTO codici_sconto(venditore_id,codice,percento,scadenza,"
-        "usi_max,attivo,creato,tipo,valore_sats,valore_eur,valore_valuta) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        "usi_max,attivo,creato,tipo,valore_sats,valore_eur,valore_valuta,"
+        "cumulabile) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
         (di_chi, codice, pct, scad, usi_max, attivo, int(time.time()),
-         tipo, val_sats, val_eur, valuta))
+         tipo, val_sats, val_eur, valuta, cumulabile))
     con.commit()
     cid = cur.lastrowid
     con.close()
@@ -521,6 +525,60 @@ def prove_codice_sconto():
 
 
 
+def prove_codice_cumulabile():
+    """I BUONI CUMULABILI O NO (ott 2026, parola di Andrea), col server
+    vero: preventivo == compra al sat sui due percorsi, la somma con lo
+    sconto del negozio, e il non cumulabile che contro una lampo misura
+    il buono sul LISTINO."""
+    print("\n[6b] I BUONI — cumulabili o no")
+    # CUMULABILE + negozio: 3 x 30.000 = 90.000; il negozio -10% toglie
+    # 9.000, il buono -20% toglie il 20% di 81.000 = 16.200: 25.200
+    a, b = semina("pezzi", 3, 0, 10)
+    cid = semina_codice("SOMMA20", 20, cumulabile=1)
+    p = confronta("cumulabile sul mono",
+                  {"annuncio_id": a, "quantita": 3,
+                   "codice_sconto": "SOMMA20"})
+    prova("...si SOMMA allo sconto del negozio (9.000 + 16.200)", 25_200,
+          p["sconto_sats"])
+    prova("...a scontare c'e' il buono", "codice", p["sconto_origine"])
+    prova("...e l'uso si brucia (il buono ha dato qualcosa)", 1, usi_di(cid))
+    a, b = semina("pezzi", 3, 0, 10)
+    semina_codice("SOMMA20", 20, cumulabile=1)
+    p = confronta("cumulabile sul carrello",
+                  {"righe": [{"annuncio_id": a, "quantita": 2},
+                             {"annuncio_id": b, "quantita": 1}],
+                   "codice_sconto": "SOMMA20"})
+    prova("...stessa somma sul carrello", 25_200, p["sconto_sats"])
+
+    # NON CUMULABILE contro una LAMPO: listino 30.000, lampo -10%
+    # (27.000), buono -20% sul listino = 6.000 contro i 3.000 della
+    # lampo: vince il buono, e si paga il listino meno il buono (24.000)
+    def con_lampo(aid):
+        con = SRV.db()
+        con.execute("UPDATE annunci SET lampo_percento=10, lampo_scadenza=? "
+                    "WHERE id=?", (int(time.time()) + 3600, aid))
+        con.commit()
+        con.close()
+    a, _ = semina("pezzi", 3, 0, 10)
+    con_lampo(a)
+    semina_codice("SOLO20", 20, cumulabile=0)
+    p = confronta("non cumulabile contro la lampo",
+                  {"annuncio_id": a, "quantita": 1, "codice_sconto": "SOLO20"})
+    prova("...lo sconto e' la DIFFERENZA sopra la lampo (6.000 - 3.000)",
+          3_000, p["sconto_sats"])
+    prova("...cioe' la merce costa il listino meno il buono (27.000 della "
+          "lampo - 3.000)", (27_000, 24_000),
+          (p["articolo_unitario_sats"],
+           p["articolo_unitario_sats"] - p["sconto_sats"]))
+    a, _ = semina("pezzi", 3, 0, 10)
+    con_lampo(a)
+    cid = semina_codice("SOLO5", 5, cumulabile=0)
+    p = confronta("non cumulabile piu' piccolo della lampo",
+                  {"annuncio_id": a, "quantita": 1, "codice_sconto": "SOLO5"})
+    prova("...vince la lampo: niente sconto in piu', e l'uso resta", (0, 0),
+          (p["sconto_sats"], usi_di(cid)))
+
+
 def prove_codice_valore():
     """IL CODICE A CIFRA FISSA (ago 2026): «−10 €» invece di «−10%».
 
@@ -837,6 +895,7 @@ def main():
     prove_invito()
     prove_regressione()
     prove_codice_sconto()
+    prove_codice_cumulabile()
     prove_codice_valore()
     prove_due_promesse()
     prove_ronda()

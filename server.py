@@ -5337,6 +5337,13 @@ def init_db():
         -- un soft delete, cioe' un secondo significato per `attivo`.
         attivo INTEGER NOT NULL DEFAULT 1,
         creato INTEGER,
+        -- CUMULABILE (ott 2026, parola di Andrea): 1 = il buono si
+        -- SOMMA a ogni altro sconto (lampo, accordo, sconto carrello) e
+        -- toglie sul totale che resta; 0 = vince il MAGGIORE fra il
+        -- buono e tutti gli altri sconti insieme. Il DEFAULT 1 E' LA
+        -- MIGRAZIONE: i codici gia' in giro restano cumulabili (Andrea,
+        -- 6 ott). Il giudice e' `_sconto_vincente`.
+        cumulabile INTEGER NOT NULL DEFAULT 1,
         -- La UNIQUE e' (venditore, codice) e NON (codice): un
         -- namespace globale farebbe accaparrare «SCONTO10» al primo
         -- arrivato, e non c'e' niente da difendere — un codice si
@@ -7674,7 +7681,10 @@ def init_db():
                     "codici_sconto ADD COLUMN valore_sats INTEGER DEFAULT 0",
                     "codici_sconto ADD COLUMN valore_eur INTEGER DEFAULT 0",
                     "codici_sconto ADD COLUMN valore_valuta TEXT "
-                    "DEFAULT 'eur'"):
+                    "DEFAULT 'eur'",
+                    # i codici gia' in giro restano CUMULABILI (ott 2026)
+                    "codici_sconto ADD COLUMN cumulabile INTEGER "
+                    "NOT NULL DEFAULT 1"):
         try:
             con.execute(f"ALTER TABLE {tab_col}")
         except sqlite3.OperationalError:
@@ -28584,7 +28594,8 @@ def _sconto_codice(articolo: int, regola, cambio: float) -> tuple:
     codice»: nessun chiamante deve ricordarsi un caso."""
     if not regola:
         return 0, 0
-    tipo, pct, val_sats, val_eur, valuta = regola
+    # i primi CINQUE: il sesto, se c'e', e' «cumulabile» (ott 2026)
+    tipo, pct, val_sats, val_eur, valuta = regola[:5]
     if tipo == "percento":
         return _sconto_percento(articolo, pct), pct
     if tipo == "valore":
@@ -28593,8 +28604,25 @@ def _sconto_codice(articolo: int, regola, cambio: float) -> tuple:
     return 0, 0
 
 
+def _codice_cumulabile(regola) -> bool:
+    """Il buono si SOMMA agli altri sconti? Il sesto elemento della
+    regola (`_codice_sconto`); una regola senza (cinque elementi, i
+    banchi di ieri) NON e' cumulabile — il confronto di sempre."""
+    return bool(regola) and len(regola) > 5 and bool(regola[5])
+
+
+def _unitario_listino(a, cambio: float) -> int:
+    """L'unitario di LISTINO, prima di lampo e accordo: la base su cui
+    un buono NON cumulabile si confronta con gli altri sconti. Stessa
+    conversione e stesso arrotondamento di `_unitario_effettivo`."""
+    if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
+        return max(1, round(a["prezzo_eur"] / cambio * 100_000_000))
+    return a["prezzo_sats"]
+
+
 def _sconto_vincente(articolo: int, articolo_eur, pezzi: int, regole,
-                     codice_regola, cambio: float = 0.0) -> tuple:
+                     codice_regola, cambio: float = 0.0,
+                     listino: int | None = None) -> tuple:
     """VINCE IL MAGGIORE fra il codice sconto e la regola del negozio.
 
     Torna `(sconto_sats, percento, chi)`, dove `chi` e' 'codice' quando
@@ -28641,12 +28669,46 @@ def _sconto_vincente(articolo: int, articolo_eur, pezzi: int, regole,
     ne' che tipo fosse ne' in che valuta era scritto. Il `cambio`
     passa di qui SOLO per arrivare a lui — un codice in euro va
     convertito, uno in sats no — ed e' l'unico argomento di questa
-    funzione che non serve a decidere chi vince."""
+    funzione che non serve a decidere chi vince.
+
+    ⚠️ DALL'OTT 2026 IL CODICE HA DUE MODI (`cumulabile`, parola di
+    Andrea), e il «mai la somma» qui sopra vale solo per il secondo:
+    - CUMULABILE: il buono si SOMMA. Toglie sul totale che resta dopo
+      lampo e accordo (gia' dentro `articolo`) e dopo lo sconto
+      carrello: «alla fine del carrello si sconta tutto». La somma ha
+      il suo TETTO, `CODICI_SCONTO_MAX_PERCENTO` dell'articolo (Andrea:
+      il tetto resta), e mai gratis. La percentuale esce solo se a
+      scontare e' il buono da solo; con la regola sotto e' una SOMMA, e
+      una somma una percentuale sola non ce l'ha (il 19,99% vietato).
+    - NON CUMULABILE: vince il MAGGIORE fra il buono e TUTTI gli altri
+      sconti insieme. Il buono si misura sul LISTINO (`listino`, prima
+      di lampo e accordo) e si confronta con quel che lampo, accordo e
+      regola tolgono gia'; se vince, lo sconto e' la DIFFERENZA, cosi'
+      che si paghi il listino meno il buono e mai il buono sopra la
+      lampo. Senza `listino` (i banchi di ieri) il listino e'
+      l'articolo, cioe' il confronto di sempre con la sola regola.
+    A PARI MERITO VINCE SEMPRE CHI NON E' IL CODICE: un uso non si
+    brucia per dare quel che era gia' dato."""
     da_regola = _sconto_regole(articolo, articolo_eur, pezzi, regole)
-    da_codice, cod_pct = _sconto_codice(articolo, codice_regola, cambio)
-    if da_codice > da_regola:
-        return da_codice, cod_pct, "codice"
-    return da_regola, (regole[0][2] if regole and da_regola else 0), ""
+    pct_regola = regole[0][2] if regole and da_regola else 0
+    if not codice_regola:
+        return da_regola, pct_regola, ""
+    if _codice_cumulabile(codice_regola):
+        da_codice, cod_pct = _sconto_codice(articolo - da_regola,
+                                            codice_regola, cambio)
+        if da_codice <= 0:
+            return da_regola, pct_regola, ""
+        tetto = max(da_regola, articolo * CODICI_SCONTO_MAX_PERCENTO // 100)
+        totale = min(da_regola + da_codice, tetto, max(0, articolo - 1))
+        if totale <= da_regola:
+            return da_regola, pct_regola, ""
+        return totale, (cod_pct if not da_regola else 0), "codice"
+    base = max(int(listino or 0), articolo)
+    gia = base - articolo              # lampo e accordo, gia' nell'articolo
+    da_codice, cod_pct = _sconto_codice(base, codice_regola, cambio)
+    if da_codice > gia + da_regola:
+        return da_codice - gia, (cod_pct if not gia else 0), "codice"
+    return da_regola, pct_regola, ""
 
 
 
@@ -31898,8 +31960,8 @@ def _codice_sconto(con, venditore_id: int, codice: str,
     if not CODICI_SCONTO_ATTIVI or not codice:
         return (), 0
     r = con.execute("SELECT id, venditore_id, percento, scadenza, usi_max, "
-                    "attivo, tipo, valore_sats, valore_eur, valore_valuta "
-                    "FROM codici_sconto "
+                    "attivo, tipo, valore_sats, valore_eur, valore_valuta, "
+                    "cumulabile FROM codici_sconto "
                     "WHERE venditore_id=? AND codice=?",
                     (venditore_id, codice)).fetchone()
     if not r:
@@ -31909,6 +31971,12 @@ def _codice_sconto(con, venditore_id: int, codice: str,
                        r["valore_eur"], r["valore_valuta"], r["scadenza"],
                        r["usi_max"], r["attivo"], r["venditore_id"],
                        venditore_id, adesso, usi)
+    # IL SESTO ELEMENTO E' «CUMULABILE» (ott 2026): sta IN CODA perche'
+    # chi legge la regola lo fa per indice ([0], [1], [4]) e una tupla di
+    # cinque — quella dei banchi — resta valida e vale NON cumulabile
+    # (`_codice_cumulabile`), cioe' il conto di ieri sul confronto.
+    if reg:
+        reg = reg + (1 if r["cumulabile"] else 0,)
     return (reg, r["id"]) if reg else ((), 0)
 
 
@@ -32499,6 +32567,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # supplemento di ogni pezzo oltre il primo.
     adesso = int(time.time())
     righe, articolo, pezzi = [], 0, 0
+    listino = 0       # prima di lampo e accordo: il buono NON cumulabile
     for aid, qta in richieste.items():
         a = tutti[aid]
         # La matematica e' quella delle pure del conto (il patto del
@@ -32506,6 +32575,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
         # PRIMA di moltiplicare.
         unitario = _unitario_effettivo(a, offerte.get(aid), adesso,
                                        cambio_ordine)
+        listino += _unitario_listino(a, cambio_ordine) * qta
         if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
             # Il tetto di rodaggio con +20% di tolleranza, sull'unitario
             # della riga (e' un vincolo del listino, come nel mono)
@@ -32575,7 +32645,8 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # mai la somma: la percentuale del vincitore esce di qui, e `pct`
     # non si assegna piu' al momento della lettura delle regole.
     sconto, pct, chi_sc = _sconto_vincente(misura_art, misura_eur, pezzi,
-                                           regole_sc, cod_reg, cambio_misura)
+                                           regole_sc, cod_reg, cambio_misura,
+                                           listino)
     # La spedizione gratis sopra soglia, sullo STESSO lordo dello
     # sconto: le due promesse sono indipendenti apposta, e
     # l'ordine fra queste due righe non conta — nessuna delle due
@@ -33098,7 +33169,8 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # giusto: uno sconto fisso non cresce col carrello, quindi «il
     # codice copre gia'» non si puo' affermare (la regola dell'invito
     # non raggiungibile, dall'altro lato).
-    cod_pct = cod_reg[1] if cod_reg else 0
+    cod_pct = (cod_reg[1] if cod_reg and not _codice_cumulabile(cod_reg)
+               else 0)
     # il cassetto della cassa compare solo se c'e' qualcosa da
     # scriverci: il solo si'/no, mai un dato del codice
     codici_vivi = _codici_vivi(con, a["venditore_id"], int(time.time()))
@@ -33137,6 +33209,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
                                  "l'annuncio è stato pubblicato: il "
                                  "venditore deve ritoccare il prezzo")
     articolo = unitario * richiesti
+    listino = _unitario_listino(a, cambio) * richiesti
     # l'euro NATIVO dell'articolo (0 = nato in sats): il giudice del ≈
     # del client mostra LUI in vista €, esatto, invece della doppia
     # conversione col suo falso ≈
@@ -33166,7 +33239,8 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # lui. La cintura di _strade_preventivo (`sconto == 0 or
     # sconto_eur > 0`) regge e ne esce rafforzata.
     sconto, pct, chi_sc = _sconto_vincente(articolo, misura_eur, richiesti,
-                                           regole_sc, cod_reg, cambio)
+                                           regole_sc, cod_reg, cambio,
+                                           listino)
     sconto_eur = _sconto_pacco_eur(articolo_eur, pct) if sconto else 0.0
     conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
                           COMMISSIONE_PERCENTO, sconto)
@@ -33637,7 +33711,8 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # giusto: uno sconto fisso non cresce col carrello, quindi «il
     # codice copre gia'» non si puo' affermare (la regola dell'invito
     # non raggiungibile, dall'altro lato).
-    cod_pct = cod_reg[1] if cod_reg else 0
+    cod_pct = (cod_reg[1] if cod_reg and not _codice_cumulabile(cod_reg)
+               else 0)
     # il gemello del mono: il solo si'/no che gata il cassetto
     codici_vivi = _codici_vivi(con, venditore_id, int(time.time()))
     if accordo_carrello:
@@ -33671,9 +33746,11 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     adesso = int(time.time())
     righe, articolo = [], 0
     pezzi = 0
+    listino = 0       # prima di lampo e accordo: il buono NON cumulabile
     for aid, qta in richieste.items():
         a = tutti[aid]
         unitario = _unitario_effettivo(a, offerte.get(aid), adesso, cambio)
+        listino += _unitario_listino(a, cambio) * qta
         if (a["valuta"] == "eur" and a["prezzo_eur"] > 0
                 and TETTO_SATS_ANNUNCIO
                 and unitario > TETTO_SATS_ANNUNCIO * 1.2):
@@ -33725,7 +33802,8 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # esce di qui e la porta con se' anche l'euro nativo, due righe
     # piu' giu'.
     sconto, pct, chi_sc = _sconto_vincente(misura_art, misura_eur, pezzi,
-                                           regole_sc, cod_reg, cambio)
+                                           regole_sc, cod_reg, cambio,
+                                           listino)
     # LA GAMBA PIU' VICINA, e qui fra TUTTE: nel set la raggiungibilita'
     # non si afferma (la composizione puo' sempre crescere di un altro
     # articolo del negozio), quindi non c'e' niente da filtrare prima.
@@ -34566,6 +34644,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                                      "venditore deve ritoccare il prezzo")
 
     articolo = unitario * richiesti
+    listino = _unitario_listino(a, cambio_ordine) * richiesti
     # La protezione acquisti: percentuale sul SOLO articolo, per
     # difetto (mai un sat piu' del promesso), anche sul ritiro in zona
     # (copre il deposito di garanzia, non il trasporto). Oggi la leva
@@ -34601,7 +34680,8 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # del vincitore esce di qui — `pct` non si assegna piu' al momento
     # della lettura delle regole — e finisce in ordini.sconto_percento.
     sconto, pct, chi_sc = _sconto_vincente(articolo, misura_eur, richiesti,
-                                           regole_sc, cod_reg, cambio_misura)
+                                           regole_sc, cod_reg, cambio_misura,
+                                           listino)
     sped_gratis_sats, supplemento = 0, sp["supplemento"]
     if sped and _sped_gratis(articolo, misura_eur, sog_gratis, val_sg,
                              zona):
@@ -41473,6 +41553,8 @@ def _codice_pubblico(r, usi: int, adesso: int) -> dict:
             "tipo": _tipo_codice(r["tipo"]) or "percento",
             "valore_sats": r["valore_sats"], "valore_eur": r["valore_eur"],
             "valore_valuta": _valuta_soglia(r["valore_valuta"]) or "eur",
+            # si somma agli altri sconti, o vince il maggiore (ott 2026)
+            "cumulabile": bool(r["cumulabile"]),
             "vale": bool(_codice_vale(r["tipo"], r["percento"],
                                       r["valore_sats"], r["valore_eur"],
                                       r["valore_valuta"], r["scadenza"],
@@ -41598,6 +41680,12 @@ async def salva_codice_sconto(req: Request,
     if giorni not in CODICI_SCONTO_DURATE_GIORNI:
         raise HTTPException(400, "Durata non prevista per un codice sconto")
     scadenza = (int(time.time()) + giorni * 86400) if giorni else 0
+    # CUMULABILE (ott 2026): un si'/no. ASSENTE non vale «no»: e' il
+    # client di ieri, che non lo conosce — alla creazione vale il default
+    # della colonna (si', come i codici gia' in giro), all'aggiornamento
+    # si CONSERVA (COALESCE), il patto di `giorni` e `usi_max` qui sopra.
+    cum = d.get("cumulabile")
+    cum = None if cum is None else (1 if cum is True or cum == 1 else 0)
 
     con = db()
     if cid:
@@ -41627,10 +41715,11 @@ async def salva_codice_sconto(req: Request,
                             "valore_eur=COALESCE(?, valore_eur), "
                             "valore_valuta=COALESCE(?, valore_valuta), "
                             "scadenza=COALESCE(?, scadenza), "
-                            "usi_max=COALESCE(?, usi_max) "
+                            "usi_max=COALESCE(?, usi_max), "
+                            "cumulabile=COALESCE(?, cumulabile) "
                             "WHERE id=? AND venditore_id=?",
-                            (codice, percento, tipo, vs, ve, vv, sc, um, cid,
-                             user["id"])).rowcount
+                            (codice, percento, tipo, vs, ve, vv, sc, um, cum,
+                             cid, user["id"])).rowcount
         except sqlite3.IntegrityError:
             con.close()
             raise HTTPException(400, "Hai già un codice che si scrive così")
@@ -41653,15 +41742,16 @@ async def salva_codice_sconto(req: Request,
         try:
             con.execute("INSERT INTO codici_sconto(venditore_id, codice, "
                         "percento, tipo, valore_sats, valore_eur, "
-                        "valore_valuta, scadenza, usi_max, attivo, creato) "
-                        "VALUES(?,?,?,?,?,?,?,?,?,1,?)",
+                        "valore_valuta, scadenza, usi_max, attivo, creato, "
+                        "cumulabile) "
+                        "VALUES(?,?,?,?,?,?,?,?,?,1,?,?)",
                         (user["id"], codice, percento, tipo,
                          valore if (tipo == "valore"
                                     and valuta == "sats") else 0,
                          valore if (tipo == "valore"
                                     and valuta == "eur") else 0,
                          valuta or "eur", scadenza, usi_max,
-                         int(time.time())))
+                         int(time.time()), 1 if cum is None else cum))
         except sqlite3.IntegrityError:
             con.close()
             raise HTTPException(400, "Hai già un codice che si scrive così")

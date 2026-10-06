@@ -15385,6 +15385,25 @@
   della valuta i numeri da tenere in pari sono due (la soglia e la sua
   unità), cioè lo stesso mezzo secondo con una regola a metà che nello
   sconto è il motivo del bottone unico.
+  I BUONI CUMULABILI O NO (ott 2026, parola di Andrea): ogni codice ha
+  `cumulabile` (colonna, DEFAULT 1 — i codici già in giro restano
+  cumulabili; il venditore lo sceglie nel cassetto, «Si somma» / «Vince
+  il più alto»). La regola alla cassa porta il flag come SESTO elemento
+  in coda (`_codice_sconto`; chi legge per indice non cambia, e una
+  tupla di cinque vale NON cumulabile — `_codice_cumulabile`). Il
+  giudice resta `_sconto_vincente`: CUMULABILE = il buono toglie sul
+  totale che resta dopo lampo e accordo (già nell'articolo) e dopo lo
+  sconto del negozio, col tetto `CODICI_SCONTO_MAX_PERCENTO`
+  dell'articolo e mai gratis; NON CUMULABILE = il buono si misura sul
+  LISTINO (`_unitario_listino`, prima di lampo e accordo, passato dai
+  quattro percorsi del conto come `listino`) e si confronta con TUTTI
+  gli altri sconti insieme; se vince, lo sconto è la DIFFERENZA sopra
+  quel che l'articolo ha già tolto, cioè si paga il listino meno il
+  buono. A pari merito non vince il buono (un uso non si brucia). La
+  percentuale esce solo se a scontare è il buono da solo: una somma, o
+  una differenza sopra la lampo, una percentuale sola non ce l'hanno.
+  Con un buono cumulabile l'invito alle gambe dello sconto del negozio
+  resta vivo (`cod_pct` = 0): si sommano, il buono non le «copre».
   I CODICI SCONTO DEL VENDITORE 🎟 (ago 2026, chiesto da Andrea): il
   venditore crea un codice (SATOSHI10) e lo distribuisce a chi vuole —
   nel suo canale, di persona, a un cliente affezionato; chi lo scrive

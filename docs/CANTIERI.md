@@ -36422,3 +36422,54 @@ confronto col 1 ott:**
   / 68 / 1 / 1, e un bond `taker` da 1000 con `taker_fee` 68.
 La decisione resta di Andrea: se la 0009 entra nella `-bar7`, e se la
 `-bar7` si fa prima o dopo il 10.
+
+## I buoni sconto cumulabili o no (6 ott 2026)
+
+Il compito (Andrea): «i codici sconto, intesi come buono sconto, si
+devono poter decidere cumulabili o no. Se lo sono, alla fine del
+carrello si sconta tutto. Se non lo sono, si prende lo sconto maggiore
+fra quello dell'articolo e quello del buono»; e poi «qualunque sconto
+potenzialmente si può cumulare col buono». Sui due dubbi aperti
+Andrea ha detto sì: i codici già in giro diventano cumulabili, e il
+tetto resta.
+
+**Cosa cambia per i codici di ieri.** Prima un codice si sommava già a
+lampo e accordo, ma con lo sconto del negozio vinceva il maggiore.
+Diventando cumulabili, ora si sommano anche allo sconto del negozio:
+un compratore paga un po' meno di ieri sullo stesso carrello. È la
+scelta di Andrea («per non cambiare cosa promettono» era la
+motivazione, ed è vera per lampo e accordo; per lo sconto del negozio
+il buono adesso dà di più, e va detto).
+
+**Come.** Il giudice resta uno, `_sconto_vincente`. Cumulabile: il
+buono toglie su quel che resta dopo tutti gli altri sconti, con il
+tetto `CODICI_SCONTO_MAX_PERCENTO` dell'articolo sulla somma, e mai
+gratis. Non cumulabile: il buono si misura sul prezzo PIENO e si
+confronta con lampo + accordo + negozio insieme; se vince, si paga il
+listino meno il buono (lo sconto in colonna è la differenza sopra la
+lampo, così la divisione a ritroso dell'unitario resta quella di
+sempre). Il flag viaggia come sesto elemento della regola, in coda, e
+una regola di cinque vale non cumulabile: i banchi di ieri provano lo
+stesso conto di ieri.
+
+**Scartato.** Una colonna in più sull'ordine per dire «somma»: lo
+sconto atterra ancora tutto in `ordini.sconto_sats`, la colonna di
+sempre, e la ricevuta lo dice come cifra (percentuale 0, come i codici
+a valore). Un tetto nuovo: Andrea ha detto «resta», e il tetto che
+c'è è quello del codice.
+
+**Trovato strada facendo.** `_sconto_codice` spacchettava la regola a
+cinque: col sesto elemento sarebbe esploso alla cassa. L'ha preso la
+prova nuova prima di ogni altra cosa.
+
+**Provato.** `prove_buoni_cumulabili`: il giudice vero nei due modi
+(somma col negozio e sopra la lampo, tetto, mai gratis; il maggiore sul
+listino, la differenza, il pari merito, la regola di ieri), i fili dei
+quattro percorsi, la migrazione, il salvataggio che conserva, il
+cassetto. `collaudo_conto` col server vero: nuova sezione [6b] (somma
+sul mono e sul carrello, preventivo == compra al sat, l'uso bruciato;
+il non cumulabile contro una lampo vera, e quello più piccolo della
+lampo che non consuma l'uso); le sezioni [6] e [7] seminano ora i
+codici NON cumulabili, perché provano il «vince il maggiore».
+`collaudo_conto` non è nell'elenco che la CI esegue (solo in quello che
+compila): l'ho girato a mano, 232 verdi.
