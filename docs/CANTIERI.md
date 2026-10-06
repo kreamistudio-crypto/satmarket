@@ -38758,3 +38758,97 @@ da Andrea.
 
 **DA GUARDARE.** Con VoiceOver e TalkBack sul telefono: «elenco, quattro
 elementi» sul riquadro, e che il numero nascosto non si legga due volte.
+
+## Il barattolo rifatto nella tessera della testata (7 ott 2026, richiesta di Andrea)
+
+**DA DOVE SI PARTIVA.** Andrea ha mandato il barattolo rifatto: un JPEG
+quadrato (arrivato in chat a 2000 px, il suo è da 2048), lo stesso
+disegno di prima con un alone più chiaro dietro il vetro e il fondo
+arancio un filo più acceso (#FB8907 campionato agli angoli, contro
+#F78F19). La tessera della testata è `assets/barattolo.jpeg`: 256×256,
+JPEG 4:2:0 senza profilo colore, 11,7 KB, mostrata a 42 px (il 3x è
+126: un file solo basta, e varianti 1x/2x/3x non ce ne sono mai state).
+Lo stesso file fa da favicon (`<link rel="icon">`), da barattolo
+dell'attesa (`#attesaOverlay`) e da riserva di `barattolo-hero.png`: si
+sostituisce tenendo il nome, quindi cambiano insieme, e non c'è altro
+posto che lo chiami (cercato in tutto l'albero fuori da `docs/`).
+
+**DECISO.** Si rifà SOLO la tessera; le icone (PWA, APK, Zapstore)
+restano quelle di oggi finché Andrea non dà l'ok al piano B.
+- IL RITAGLIO, perché la misura resti quella: nella foto nuova il
+  barattolo occupa il 55,7% dell'altezza, nella vecchia il 69,6%.
+  Rimpicciolita e basta, nella tessera il barattolo calava di un
+  quinto. Si ritaglia il quadrato (198, 149, 1801, 1752) — lato 1603,
+  centrato sul barattolo, cima del contorno al 15,6% come prima — e si
+  porta a 256 con LANCZOS. Il contorno scuro nella tessera nuova sta da
+  0,273 a 0,727 in larghezza e da 0,156 a 0,852 in altezza: quella di
+  prima diceva 0,277–0,723 e 0,156–0,852.
+- IL PESO: qualità 86, 4:2:0, `optimize` → 11.748 byte (prima 11.676).
+  Il profilo ICC della foto (sRGB) non si porta: la tessera di prima
+  non l'aveva e i browser assumono sRGB.
+- LA CACHE SI RINFRESCA DA SOLA: la pagina timbra ogni `/assets/...`
+  letterale con lo sha1 del file (`?v=6fcb32d9d8` → `?v=890b6f23ab`,
+  letto dalle due copie servite). VERSIONE di `sw.js` NON sale: la voce
+  nuda `/assets/barattolo.jpeg` del precache resterà vecchia nelle
+  dispense, ma nessuno la chiede più nuda (le sei chiamate di
+  miniapp.html escono tutte timbrate, offline.html non la usa), cioè è
+  la stessa voce morta che il 17 set ha fatto togliere `nostr.js`
+  dall'elenco; alzarla avrebbe solo fatto riscaricare a tutti l'intera
+  dispensa.
+- UNA SENTINELLA, `prove_tessera_testata`: la testata la chiede ancora
+  per nome, è un JPEG, sotto i 16 KB, 256×256, e il barattolo misurato
+  sul contorno scuro sta alla misura e al posto di prima (due centesimi
+  di tolleranza, 5 px su 256). Controprova: con la foto solo
+  rimpicciolita l'ultima riga è rossa.
+
+**LA PARTE B, SOLO LETTA (il piano aspetta l'ok di Andrea).** Da dove
+prendono l'icona oggi:
+- l'APK (v1.5, versionCode 7): l'icona del launcher è COTTA NEL
+  PACCHETTO — `genera_icone_apk.py` scrive foreground, monochrome,
+  splash e icona dello splash di sistema da
+  `assets/barattolo-icona-sorgente.jpeg`, e Bubblewrap scarica in più
+  `iconUrl`/`maskableIconUrl` (`icona-512*.png`) dal sito VIVO al
+  momento dell'`update`. Cambiarla vuole una 1.6: build, firma col
+  keystore, release su `barattolo-releases`, `zsp publish` con la
+  chiave fredda;
+- Zapstore: la scheda `zapstore.yaml` di `barattolo-releases` dice
+  `icon: https://barattolo.store/assets/icona-512.png`, letta da `zsp`
+  al momento del publish e messa nell'evento firmato: cambiare il file
+  sul sito non basta, serve un publish nuovo;
+- il profilo Nostr della chiave delle release ha `picture` sullo stesso
+  URL: quello segue il file da solo (i client lo rileggono quando
+  vogliono).
+UN INTOPPO TROVATO PROVANDO LE RICETTE: `genera_icone.py` e
+`scontorna` misurano la distanza da un fondo PIATTO, e l'alone della
+foto nuova lo inganna — sulle icone PWA esce un rettangolo più chiaro
+attorno al barattolo, nel foreground dell'APK un alone sporco, nella
+monochrome un pulviscolo. Una variante provata nello scratchpad
+(`icone_intere.py`) ritaglia le icone PWA come QUADRATI dalla foto
+intera (nessuna giuntura possibile) e scontorna il barattolo per l'APK
+dal suo CONTORNO SCURO, allagando l'esterno: pulita. Due differenze da
+dire: niente ombra sotto il barattolo nell'icona adattiva e nello
+splash, e la monochrome diventa una sagoma piena senza le monete
+disegnate dentro. Le ricette nel repo NON sono state toccate.
+
+**LE STRADE SCARTATE.**
+- La foto solo rimpicciolita a 256: barattolo più piccolo di un quinto
+  nella tessera, e Andrea aveva chiesto misure simili.
+- Un file nuovo solo per la testata, lasciando favicon e attesa al
+  barattolo vecchio: due barattoli diversi nella stessa pagina, e una
+  rotta in più.
+- Alzare VERSIONE di `sw.js` (vedi sopra).
+- Toccare le icone PWA in questo commit: cambierebbero l'icona dell'app
+  installata da browser e quella che Zapstore leggerà al prossimo
+  publish, cioè metà del piano B senza il suo ok.
+
+**PROVATO.** Due copie dell'albero nello scratchpad (tessera vecchia e
+nuova), `MODALITA_COLLAUDO`, relay morto, server su 127.0.0.1:8731 e
+8732; Chrome headless via CDP a 375×812, densità 3, chiaro e scuro: la
+tessera della testata caricata (`naturalWidth` 256) dal file timbrato
+giusto in tutt'e quattro gli scatti, barattolo alla stessa misura e
+posizione, il resto della testata identico. Nel worktree su origin/main (da9273e), senza config: `PROVE_SEVERE=1 python prove.py` 19.237 passate e 0 fallite (19.232 di prima più le cinque della sentinella); i 38 collaudi della CI nella gabbia, 38 verdi.
+
+**DA GUARDARE.** Sul telefono, dopo il deploy: la tessera in testata
+nella Mini App e nel sito, e la favicon (i browser la tengono in una
+cache loro, può tardare). Il piano B aspetta l'ok di Andrea; prima di
+toccare le ricette si chiede la foto originale da 2048.

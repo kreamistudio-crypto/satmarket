@@ -80395,6 +80395,46 @@ console.log(JSON.stringify(out));
           o["esploso"])
 
 
+def prove_tessera_testata():
+    """LA TESSERA DELLA TESTATA (7 ott 2026, il barattolo rifatto da
+    Andrea). `assets/barattolo.jpeg` e' il barattolo nella tessera
+    arancio accanto a «Barattolo⚡» (42px), e lo stesso file fa da
+    favicon e da barattolo dell'attesa. Si sostituisce tenendo il nome:
+    il timbro ?v= lo rinfresca da solo (prove_timbro_asset).
+
+    ⚠️ LA SORGENTE NUOVA HA IL BARATTOLO PIU' PICCOLO NEL QUADRO (55%
+    dell'altezza contro il 70% di prima): rimpicciolita e basta, nella
+    tessera il barattolo calava di un quinto. Si e' ritagliata perche'
+    il barattolo stesse alla misura e al posto di prima, e qui lo si
+    misura sul suo contorno scuro — chi rifa' la tessera da una foto
+    inquadrata diversa se ne accorge qui, non a occhio sul telefono."""
+    print("\n[la tessera della testata]")
+    import os as _os
+    mini = open("miniapp.html", encoding="utf-8").read()
+    raw = open("assets/barattolo.jpeg", "rb").read()
+    prova("la testata la chiede ancora per nome", True,
+          '<img class="brand-jar" src="/assets/barattolo.jpeg"' in mini)
+    prova("...ed e' un JPEG davvero", b"\xff\xd8\xff", raw[:3])
+    prova("...leggero come la tessera di prima (sotto i 16 KB)", True,
+          _os.path.getsize("assets/barattolo.jpeg") < 16000)
+    try:
+        from PIL import Image as _Im
+    except ImportError:
+        salta("la misura e l'inquadratura della tessera",
+              "Pillow non c'e'")
+        return
+    with _Im.open("assets/barattolo.jpeg") as im:
+        prova("...256x256, oltre il 3x dei 42px", (256, 256), im.size)
+        scuro = im.convert("L").point(lambda p: 255 if p < 90 else 0)
+        bb = scuro.getbbox()
+    # la tessera di prima: contorno da 0,277 a 0,723 in larghezza e da
+    # 0,156 a 0,852 in altezza. Due centesimi di tolleranza: 5px su 256
+    q = [round(v / 256, 3) for v in bb]
+    prova("il barattolo sta alla misura e al posto di prima", True,
+          abs(q[1] - 0.156) < 0.02 and abs(q[3] - 0.852) < 0.02
+          and abs((q[0] + q[2]) / 2 - 0.5) < 0.02)
+
+
 def prove_logo_p2p_nitido():
     """IL LOGO DEL P2P PIU' GRANDE E NITIDO (22 set 2026, richieste di
     Andrea). Fra i due tab del libro il logo cresce fino a 120px senza
@@ -125416,6 +125456,7 @@ def main():
     prove_intestazione_scambi,
     prove_banner_fee_p2p,
     prove_logo_p2p_nitido,
+    prove_tessera_testata,
     prove_card_tinte_stato,
     prove_p2p_campanello,
     prove_p2p_eventi, prove_p2p_riserva_libro, prove_p2p_avvisi_in_ordine,
