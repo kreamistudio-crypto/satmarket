@@ -64130,7 +64130,9 @@ function scambiP2P(){
    cifra degli scambi: «Hai 3 scambi» contava anche gli annullati, che
    col solo verso non si vedono, e sotto «Vendo» suonava come «hai 3
    vendite». Col verso E i gruppi il titolo dice il verso e che c'e' un
-   filtro sopra; coi soli gruppi resta la frase di sempre. Dentro solo
+   filtro sopra; coi soli gruppi resta la frase di sempre. UNO SCAMBIO
+   SOLO SI DICE AL SINGOLARE (6 ott 2026, ritocco di Andrea): «Hai 1
+   scambio, ma non passa il filtro» e non «Hai 1 scambi». Dentro solo
    cifre e testi fissi: va in innerHTML senza esc(). */
 const P2P_VERSO_VUOTO = {compro: 'Nessun ordine di acquisto', vendo: 'Nessun ordine di vendita'};
 function vuotoFiltroMieiP2P(quanti, f, v){
@@ -64140,7 +64142,8 @@ function vuotoFiltroMieiP2P(quanti, f, v){
     return '<span class="empty-title">' + nome + '</span>'
       + 'Fra i tuoi scambi non ce n\'è nessuno da questa parte. ';
   return '<span class="empty-title">' + (nome ? nome + ' col tuo filtro' : 'Nessuno scambio col tuo filtro') + '</span>'
-    + 'Hai ' + quanti + ' scambi, ma nessuno passa il filtro. ';
+    + (quanti === 1 ? 'Hai 1 scambio, ma non passa il filtro. '
+       : 'Hai ' + quanti + ' scambi, ma nessuno passa il filtro. ');
 }
 /* PURA: quali dei propri scambi passano il filtro, e in che ordine.
    La chiamano in DUE — la pillola per il CONTEGGIO e la striscia per

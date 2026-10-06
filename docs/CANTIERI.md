@@ -38272,7 +38272,7 @@ pillole fuori dal foglio, nella pagina: Andrea l'ha chiesta «nel filtro
 che c'è già». Le tinte anche sulle spente: «solo come accento della
 scelta attiva».
 
-**PROVATO.** prove_scambi_verso (48): le sentinelle (catalogo in ordine,
+**PROVATO.** prove_scambi_verso (49 col singolare): le sentinelle (catalogo in ordine,
 default senza memoria, la lista unica, la pillola accesa, il vuoto e la
 testata che sanno del verso, il gruppo d'opzioni e i nomi «Filtro: …»,
 il fuoco, i tre gesti) e la CASCATA chiesta a `_vince_css` nei due temi
@@ -38306,7 +38306,25 @@ nome «Filtro: vendo», fondo e inchiostro misurati. Nessuno scorrimento
 orizzontale. Scatti prima/dopo a 375 e 320, chiaro e scuro, mandati ad
 Andrea.
 
+**IL SINGOLARE, DOPO GLI SCATTI (ritocco di Andrea).** Lo stato vuoto
+coi gruppi diceva «Hai 1 scambi, ma nessuno passa il filtro»: con uno
+scambio solo adesso dice «Hai 1 scambio, ma non passa il filtro», da
+due in su come prima. Provato nel banco (uno coi gruppi, uno col verso
+e i gruppi, due al plurale; la sentinella cerca «Hai 1 scambi,» CON la
+virgola, perché «Hai 1 scambi» sta dentro «Hai 1 scambio» e la prova
+sarebbe rossa sul codice giusto); tortura 2 su 2 (mai singolare,
+singolare anche a due).
+
+**LA LEVETTA DEL TEMA A 320 PX: LASCIATA, E NON È UN DIFETTO.** Andrea
+ha chiesto di sistemarla solo se il ritocco era piccolo. È una scelta
+SCRITTA nel CSS di `.p2p-testa-riga` («a 320 è la LEVETTA a scendere
+sulla seconda riga… Cede l'ospite e non i due comandi»), e la misura
+dal vivo dice perché non si accorcia con poco: in «I miei scambi» la
+riga è larga 272 px e i tre pezzi ne vogliono 290 (96 «Recenti», 149
+«Filtro | N scambi», 34 la levetta, più due spazi da 6); nel libro la
+riga è 288 e manca qualche pixel. Diciotto pixel non vengono dagli
+spazi: andrebbero tolti al respiro delle due pillole, cioè rovesciando
+quella scelta. Non toccata.
+
 **DA GUARDARE.** Con TalkBack e VoiceOver sul telefono: che dicano
-«selezionato» sulla pillola appena toccata. Notato e lasciato com'era:
-a 320 px la levetta del tema va a capo nella riga di strumenti di «I
-miei scambi» (c'era già prima, si vede negli scatti «prima»).
+«selezionato» sulla pillola appena toccata.

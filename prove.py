@@ -124655,7 +124655,10 @@ const CASI = {
   /* IL VUOTO */
   vuoti: () => [vuotoFiltroMieiP2P(7, [], 'vendo'), vuotoFiltroMieiP2P(7, [], 'compro'),
                 vuotoFiltroMieiP2P(7, ['morti'], 'vendo'), vuotoFiltroMieiP2P(7, ['morti'], 'tutti'),
-                vuotoFiltroMieiP2P(7, ['morti'])],
+                vuotoFiltroMieiP2P(7, ['morti']),
+                /* uno solo: al singolare, coi gruppi e col verso */
+                vuotoFiltroMieiP2P(1, ['morti']), vuotoFiltroMieiP2P(1, ['morti'], 'vendo'),
+                vuotoFiltroMieiP2P(2, ['morti'])],
   /* IL FOGLIO, coi gesti veri */
   apertura: () => { p2pMieiVerso = 'vendo'; apriFiltroMieiP2P();
     return [p2pMieiVersoBozza, dom.p2pMieiFiltroSheet.classList.contains('open'), pillole()]; },
@@ -124757,6 +124760,12 @@ console.log(JSON.stringify(out));
     prova("...coi soli gruppi resta la frase di sempre", True,
           isinstance(v, list) and v[3] == v[4]
           and "Nessuno scambio col tuo filtro" in v[3] and "Hai 7 scambi" in v[3])
+    prova("uno scambio solo si dice al singolare, due al plurale", True,
+          isinstance(v, list)
+          and "Hai 1 scambio, ma non passa il filtro." in v[5]
+          and "Hai 1 scambio, ma non passa il filtro." in v[6]
+          and "Hai 1 scambi," not in v[5] + v[6]
+          and "Hai 2 scambi, ma nessuno passa il filtro." in v[7])
     a = o["apertura"]
     prova("il foglio si apre col verso vivo, e una sola scelta accesa",
           ["vendo", True, {"tutti": ["false", False, 6, "Filtro: tutti", True],
