@@ -83213,7 +83213,9 @@ def prove_indietro_dal_libro():
              # l'indietro dal negozio riapre il dettaglio del libro (6 ott 2026)
              "async function apriNegozioDettP2P(ev, chi){", "function riapriDettaglioP2P(id){",
              "function apriDettaglioP2P(id){", "function navRiapriStrato(s){",
-             "function chiudiFoglioP2P(idFoglio){", "function altroFoglioAperto(){")
+             "function chiudiFoglioP2P(idFoglio){", "function altroFoglioAperto(){",
+             # ...e «📖 Come funziona» del tabacchino, dallo stesso foglio a Info
+             "function apriInfoTabacchinoP2P(){")
     _prog = (
         _blocco("const RADICI = new Set([", "]);") + "\n"
         + "\n".join(re.search(r"const " + n + r" = [^\n]*;", mini).group(0) for n in (
@@ -83384,6 +83386,8 @@ function passo(p, via){
       apriNegozioDettP2P({stopPropagation(){}}, neg);
       if (dopo) Promise.resolve().then(() => passo(dopo, via)); }
     else if (c === 'sparisce') p2pLibro.ordini = p2pLibro.ordini.filter(o => o.id !== x); }
+  /* «📖 Come funziona» del tabacchino, dal foglio del dettaglio a Info P2P */
+  else if (p === 'tabacchino') apriInfoTabacchinoP2P();
   /* la memoria del dettaglio persa, come dopo un ricaricamento della pagina */
   else if (p === 'dimentica') { p2pDettOrdine = ''; p2pDettImporto = 0; p2pDettMetodo = ''; }
   else if (p === '>') history.forward();
@@ -83614,7 +83618,11 @@ async function aCaso(n, via){
       libroDallaNav: ['p2p', 'dett:o1', 'importo:12', 'chi:bob', 'p2p', '<'],
       altroOrdine: ['p2p', 'dett:o1', 'importo:12', 'chi:bob', '<', '<', 'dett:o2', 'chi:bob', '<'],
       dimenticato: ['p2p', 'dett:o1', 'metodo:Satispay', 'importo:12', 'chi:bob', 'dimentica', '<'],
-      altrove: ['p2p', 'dett:o1', 'importo:12', 'chi:sparito~p2pinfo', '<']
+      altrove: ['p2p', 'dett:o1', 'importo:12', 'chi:sparito~p2pinfo', '<'],
+      /* (6 ott 2026) «📖 Come funziona» del tabacchino: lo stesso ritorno */
+      tabacchino: ['p2p', 'dett:o1', 'metodo:Satispay', 'importo:12', 'tabacchino', '<', '<', '<'],
+      tabacchinoMiei: ['p2p', 'dett:o1', 'tabacchino', 'p2pmiei', '<', '<'],
+      tabacchinoLibro: ['p2p', 'dett:o1', 'tabacchino', 'p2p', '<']
     };
     for (const via of ['tg', 'sistema', 'apk']) {
       R.dettNegozio[via] = {};
@@ -83902,8 +83910,24 @@ async function aCaso(n, via){
               "riapre sopra «Info P2P», e l'indietro va al libro (%s)" % _v,
               [["p2p", _D, _D, "p2pinfo", "p2p"], "esplora p2p p2pinfo"],
               [_r["visti"], (_r["forme"] or [""] * 4)[3]])
+        _r = _g("tabacchino")
+        prova("«📖 Come funziona» del tabacchino: Info P2P sta sopra il foglio, e l'indietro "
+              "lo riapre com'era, poi il libro, poi la home (%s)" % _v,
+              [["p2p", _D, _D, _D, "p2pinfo", _D, "p2p", "esplora"],
+               "esplora p2p p2p+p2pDettSheet p2pinfo", "o1|12|Satispay|o1"],
+              [_r["visti"], (_r["forme"] or [""] * 5)[4], (_r["stati"] or [""] * 6)[5]])
+        _r = _g("tabacchinoMiei")
+        prova("...e da Info a «I miei scambi» la figlia torna sopra il libro: il foglio "
+              "non resta sotto (%s)" % _v,
+              [["p2p", _D, "p2pinfo", "p2pmiei", "p2p", "esplora"], "esplora p2p p2pmiei"],
+              [_r["visti"], (_r["forme"] or [""] * 4)[3]])
+        _r = _g("tabacchinoLibro")
+        prova("...e il tasto «P2P» da Info torna al libro nudo, e l'indietro alla home (%s)" % _v,
+              [["p2p", _D, "p2pinfo", "p2p", "esplora"], "esplora p2p"],
+              [_r["visti"], (_r["forme"] or [""] * 4)[3]])
         _tutti = [_g(k) for k in ("senza", "con", "nonArriva", "libroDallaNav", "altroOrdine",
-                                  "dimenticato", "altrove")]
+                                  "dimenticato", "altrove", "tabacchino", "tabacchinoMiei",
+                                  "tabacchinoLibro")]
         prova("...e in queste strade un indietro non fa muovere il codice, e il registro di "
               "sotto dice il vero (%s)" % _v, [0, True],
               [sum((r["mosse"] or 0) for r in _tutti) if all(isinstance(r["mosse"], int) for r in _tutti)

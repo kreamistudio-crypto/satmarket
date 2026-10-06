@@ -16215,9 +16215,12 @@ let navSostituisci = false;   // un giro solo: la scelta di una variante (set 20
    quindi fra il foglio chiuso e la vista nuova c'e' un attimo in cui si
    vede il libro: per le regole di sempre e' «un foglio chiuso a mano», e
    la sua entry si consumerebbe (`passoPilaP2P`, 'giu'). Questa dice a
-   `navRiflette` di lasciarla stare, e di spingere il negozio SOPRA di lei.
-   Vale un giro solo: la consuma il primo DOM che non e' il libro nudo
-   sotto quel foglio — il negozio, o qualunque altra cosa. */
+   `navRiflette` di lasciarla stare, e di spingere la vista d'arrivo
+   (`verso`) SOPRA di lei. Vale un giro solo: la consuma il primo DOM che
+   non e' il libro nudo sotto quel foglio — la vista d'arrivo, o
+   qualunque altra cosa. E vale anche per «📖 Come funziona» del
+   tabacchino, che dallo stesso foglio porta a Info P2P (stesso giorno,
+   richiesta di Andrea): li' la vista arriva nello stesso giro. */
 let navLasciaFoglio = null;
 /* La profondita' del gradino del REPARTO spinto dalla home (0 = non
    c'e'): sotto quel gradino c'e' gia' `esplora|Tutto`. Serve a chi
@@ -16568,7 +16571,7 @@ function navRiflette(){
                    && st[1].k === f.k && st[1].o === f.o;
     if (dalFoglio && ora.length === 1 && navStesso(ora[0], st[0])) return;
     navLasciaFoglio = null;
-    if (dalFoglio && ora.length === 1 && ora[0].t === 'v' && ora[0].v === 'negozio') {
+    if (dalFoglio && ora.length === 1 && ora[0].t === 'v' && ora[0].v === f.verso) {
       scrivi('pushState', giu + 1, ora, sopra([st]));
       navFreccia(ora);
       return;
@@ -55228,7 +55231,7 @@ function repRiquadroP2P(f, id){
 async function apriNegozioDettP2P(ev, chi){
   if (ev && ev.stopPropagation) ev.stopPropagation();
   haptic();
-  const lasciato = {k: 'p2pDettSheet', o: p2pDettOrdine};
+  const lasciato = {k: 'p2pDettSheet', o: p2pDettOrdine, verso: 'negozio'};
   if (STORIA) navLasciaFoglio = lasciato;
   chiudiFoglioP2P('p2pDettSheet');
   await apriNegozio(chi);
@@ -55787,6 +55790,11 @@ function notaTabacchinoDettP2P(o){
 }
 function apriInfoTabacchinoP2P(){
   haptic();
+  /* ⚠️ L'INDIETRO DA INFO RIPORTA A QUESTO FOGLIO (6 ott 2026, richiesta di
+     Andrea), come dal negozio di chi ha pubblicato: la entry del foglio
+     resta sotto, e `navApplica` lo riapre com'era (`navLasciaFoglio`).
+     Qui la vista arriva nello stesso giro, quindi niente attesa. */
+  if (STORIA) navLasciaFoglio = {k: 'p2pDettSheet', o: p2pDettOrdine, verso: 'p2pinfo'};
   chiudiFoglioP2P('p2pDettSheet');
   go('p2pinfo');
   setTimeout(() => {

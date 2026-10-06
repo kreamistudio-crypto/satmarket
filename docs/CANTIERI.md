@@ -38553,7 +38553,7 @@ vista del negozio, la card dell'altra parte nelle viste `ordine` e
 `p2pordine`, la classifica è una vista; da una vista il negozio si
 spinge sopra e l'indietro torna già. L'unico altro passaggio
 foglio→vista è «📖 Come funziona» del tabacchino (dettaglio → Info
-P2P), che non apre un negozio e non è stato toccato.
+P2P): curato subito dopo, vedi in fondo a questa voce.
 
 **LA CURA.** La voce del dettaglio nella pila porta l'ordine
 (`{t:'f', k:'p2pDettSheet', o}`; `navStesso` non la guarda, quindi
@@ -38608,6 +38608,23 @@ senza `async` ed è esploso al primo giro della suite intera (`await is
 only valid in async functions`). Suite intera severa senza config nel
 worktree (base 1e183aa): 19.263 verdi e 0 rosse; i 38 collaudi della
 CI verdi.
+
+**E «📖 COME FUNZIONA» DEL TABACCHINO, STESSO GIORNO (richiesta di
+Andrea dopo gli scatti).** Era l'unico altro passaggio foglio→vista: dal
+dettaglio di un ordine Barattozon a Info P2P, e l'indietro tornava al
+libro. Ora `apriInfoTabacchinoP2P` alza la stessa bandierina con
+`verso: 'p2pinfo'` (la bandierina ha preso la vista d'arrivo: prima
+spingeva solo il negozio), e la vista arriva nello stesso giro, senza
+attesa. Info sta sopra il foglio: l'indietro lo riapre com'era, poi il
+libro, poi la home. Da Info a «I miei scambi» la figlia torna sopra il
+libro (il gradino del foglio si consuma con `passoPilaP2P`, come
+sempre), e il tasto «P2P» torna al libro nudo. Provato nel banco della
+pila nelle tre vie (tre strade nuove: indietro con metodo e cifra, Info →
+miei, Info → libro); tortura sulla copia 5 su 5 (il tabacchino senza
+bandierina, con la vista sbagliata, `navRiflette` che spinge solo il
+negozio o qualunque vista, la porta del negozio senza `verso`). Non
+rifatto dal vivo: è la stessa strada del negozio, già provata coi
+tocchi veri.
 
 **DA GUARDARE.** Sul telefono: lo swipe di iOS e l'indietro predittivo
 di Android mostrano, mentre il dito scorre, l'istantanea della entry

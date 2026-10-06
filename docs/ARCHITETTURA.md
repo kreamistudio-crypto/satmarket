@@ -17377,7 +17377,10 @@
   da «Chi ha pubblicato quest'ordine»: la porta (`apriNegozioDettP2P`)
   chiude il foglio e aspetta il negozio dalla rete, e `navLasciaFoglio`
   dice a `navRiflette` di non consumare la entry del foglio in
-  quell'attimo e di spingere il negozio sopra di lei.
+  quell'attimo e di spingere la vista d'arrivo (`verso`) sopra di lei.
+  Lo stesso da «📖 Come funziona» del tabacchino (`apriInfoTabacchinoP2P`,
+  verso Info P2P, nello stesso giro): Info sta sopra il foglio, e da lì
+  una figlia o il libro tornano sopra il libro come sempre.
   Perché e prove: CANTIERI, «L'indietro dal negozio riapre il dettaglio».
   Telegram: `navFreccia` mostra il `BackButton` (Bot API 6.1) solo
   quando c'è dove tornare — ed è la STESSA domanda di `navIndietro`,
