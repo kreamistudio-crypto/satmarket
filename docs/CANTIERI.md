@@ -36420,8 +36420,11 @@ confronto col 1 ott:**
   '82231748%'; SELECT role, state, amount_sats, taker_amount, taker_fee
   FROM bonds WHERE order_id LIKE '82231748%';"`. Attesi: 6764 / 68 / 68
   / 68 / 1 / 1, e un bond `taker` da 1000 con `taker_fee` 68.
-La decisione resta di Andrea: se la 0009 entra nella `-bar7`, e se la
-`-bar7` si fa prima o dopo il 10.
+**DECISO (Andrea, 6 ott 2026).** La 0009 entra nella `-bar7` INSIEME
+alla cura 9, e la `-bar7` si fa DOPO il lancio, indicativamente dopo il
+18 ottobre. In quel giro i due file passano da `proposte/` a
+`deploy/mostro/` (e il README del fork dice «nove»), e si fanno anche
+i due controlli in sola lettura sul 1 ott qui sopra.
 
 ## I buoni sconto cumulabili o no (6 ott 2026)
 
