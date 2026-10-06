@@ -32166,9 +32166,10 @@ console.log(JSON.stringify(out));
 
 def prove_sbirciata():
     """LA SBIRCIATA DI «CONTROLLA E PAGA» (5 ott 2026, richiesta di
-    Andrea): tenendo il dito sul francobollo la foto si apre in grande,
-    al rilascio si richiude, ritoccando si riapre; un tocco breve non fa
-    niente.
+    Andrea): il dito sul francobollo apre la foto in grande, al rilascio
+    si richiude, ritoccando si riapre; SUBITO nei due versi dal 6 ott
+    2026 (la prima stesura aspettava 220ms), e il dito che scorre la
+    fila la chiude. Un tocco breve non avvia nient'altro.
     Il banco ESEGUE il codice vero (le funzioni e il blocco degli
     ascoltatori) su un DOM di cartone che sa solo registrare ascoltatori
     ed emettere eventi. Le domande che contano sono quelle che un
@@ -32176,7 +32177,7 @@ def prove_sbirciata():
     del sistema si prende il gesto a 500ms), la foto che REGGE oltre i
     500ms, il rilascio che arriva al francobollo anche se il preventivo
     l'ha tolto dal documento (gli ascoltatori sul BERSAGLIO), la pagina
-    ferma a foto aperta, lo scorrimento a mano prima. Quel che il banco
+    ferma sotto la soglia, lo scorrimento a mano oltre. Quel che il banco
     non puo' vedere — il menu «Salva immagine», il callout di iOS — lo
     dicono le righe del CSS, e lo prova il telefono."""
     print("\n[la sbirciata in «Controlla e paga»]")
@@ -32200,8 +32201,19 @@ def prove_sbirciata():
     prova("data-sbircia solo dove c'e' una foto", True,
           "t ? ` data-sbircia=" in faccia)
 
+    # SUBITO nei due versi (6 ott 2026): la chiusura non sfuma — nessuna
+    # transizione sullo stato base del velo — e l'apertura e' una
+    # sfumatura di al massimo un decimo di secondo
+    prova("la chiusura del velo non sfuma", False,
+          bool(re.search(r"#sbirciata\{[^}]*transition", mini)))
+    _ap = re.search(r"#sbirciata\.open\{transition:opacity (\.\d+)s", mini)
+    prova("l'apertura si posa in un decimo di secondo al massimo", True,
+          bool(_ap) and float(_ap.group(1)) <= 0.1)
+    prova("nessun timer fra il dito e la foto", [0, 0],
+          [mini.count("SBIRCIA_MS"), mini.count("setTimeout(apriSbirciata")])
+
     # --- 2) IL BANCO -----------------------------------------------------
-    codice = pezzo_js(mini, "const SBIRCIA_MS = ",
+    codice = pezzo_js(mini, "const SBIRCIA_SCARTO = ",
                       "\n  document.addEventListener('visibilitychange'")
     js = r"""
 class Nodo {
@@ -32250,57 +32262,59 @@ const giu = (n, x = 10, y = 10, id = 1) =>
 const aperta = () => nodi.sbirciata.classList.contains('open');
 (async () => {
   const out = {};
-  // 1) il tocco breve: consumato, e non apre niente
-  out.breveConsumato = giu(mini).defaultPrevented;
-  await dorme(60); mini.emetti('touchend', T(10, 10)); await dorme(300);
-  out.breveAperta = aperta();
-  out.ascoltiDopoBreve = mini.conta();
-  // 2) la tenuta: apre dopo ~220ms e regge oltre i 500 del sistema
-  giu(mini); await dorme(120); out.a120 = aperta();
-  await dorme(200); out.a320 = aperta(); out.foto = img.src;
-  await dorme(500); out.a820 = aperta();
-  // a foto aperta il dito trema e si trascina: la pagina sta ferma
+  // 1) il tocco: consumato, e la foto e' aperta GIA' all'uscita del
+  //    touchstart — nessun «dopo», nessun timer
+  out.consumato = giu(mini).defaultPrevented;
+  out.subito = aperta(); out.foto = img.src;
+  // il tocco breve: al rilascio si chiude NELLO STESSO evento
+  mini.emetti('touchend', T(10, 10));
+  out.chiusaSubito = !aperta(); out.ascoltiDopoBreve = mini.conta();
+  await dorme(300); out.restaChiusa = !aperta();
+  // 2) la tenuta regge oltre i 500ms del tocco lungo di sistema
+  giu(mini); await dorme(800); out.a800 = aperta();
+  // il tremolio sotto la soglia: consumato, pagina ferma, foto aperta
   scorsa = [];
-  out.mossaConsumata = mini.emetti('touchmove', T(40, 150)).defaultPrevented;
-  out.scorsaAperta = scorsa.length; out.apertaDopoMossa = aperta();
+  out.tremolioConsumato = mini.emetti('touchmove', T(15, 14)).defaultPrevented;
+  out.tremolio = [scorsa.length, fila.scrollLeft, aperta()];
   // il rilascio arriva al francobollo anche se e' fuori dal documento:
   // qui il corpo non riceve niente, come nel DOM vero
-  mini.emetti('touchend', T(40, 150));
+  mini.emetti('touchend', T(15, 14));
   out.chiusa = !aperta(); out.ascoltiDopo = mini.conta();
   out.vibrate = vibrate;
-  // 3) il ritocco riapre
-  giu(mini); await dorme(300); out.ritocco = aperta();
+  // 3) il ritocco riapre, il cancel del sistema chiude
+  giu(mini); out.ritocco = aperta();
   mini.emetti('touchcancel', T(10, 10)); out.chiusaDalCancel = !aperta();
-  // 4) lo scorrimento a mano prima della foto: la fila segue il dito
+  // 4) il dito che scorre la fila: oltre la soglia la foto si chiude e
+  //    la fila segue il dito; e non si riapre a dito fermo
   fila.scrollLeft = 0; scorsa = [];
-  giu(mini, 100, 100); mini.emetti('touchmove', T(95, 101));
-  out.sottoSoglia = fila.scrollLeft;
-  mini.emetti('touchmove', T(30, 104)); await dorme(300);
+  giu(mini, 100, 100); out.primaDiScorrere = aperta();
+  mini.emetti('touchmove', T(95, 101));
+  out.sottoSoglia = [fila.scrollLeft, aperta()];
+  out.scorreConsumato = mini.emetti('touchmove', T(30, 104)).defaultPrevented;
   out.fila = fila.scrollLeft; out.pagina = scorsa.slice(-1)[0];
-  out.scorsaAperta2 = aperta(); mini.emetti('touchend', T(30, 104));
+  out.apertaScorrendo = aperta();
+  mini.emetti('touchmove', T(31, 104)); await dorme(300);
+  out.riapertaFerma = aperta();
+  mini.emetti('touchend', T(31, 104)); out.ascoltiDopoScorrere = mini.conta();
   // 5) un dito che arriva sul francobollo mentre un altro e' gia' giu'
   //    altrove (un pizzico, un pollice appoggiato): non e' una sbirciata
   const secondo = nodi.acqCorpo.emetti('touchstart',
     Object.assign({target: mini, touches: [{}, {}]}, T(50, 50, 6)));
-  await dorme(300);
   out.secondoDito = [secondo.defaultPrevented, aperta()];
   // 6) senza foto: niente gesto, e il tocco resta del sistema
   out.mutoConsumato = giu(muto).defaultPrevented;
   out.emojiConsumato = giu(emoji).defaultPrevented;
-  await dorme(300); out.mutoAperta = aperta();
-  // 7) la cassa che se ne va col dito giu': il timer non apre niente
-  giu(mini); nodi['view-acquisto'].classList.remove('active');
-  await dorme(300); out.cassaVia = aperta(); out.statoPulito = sbirciaDa === null;
-  nodi['view-acquisto'].classList.add('active');
-  // 8) il mouse: tenuta, rilascio sulla finestra; e il trascino che annulla
+  out.mutoAperta = aperta();
+  // 7) il mouse: aperta al mousedown, chiusa al rilascio sulla finestra;
+  //    e il trascino la chiude
   nodi.acqCorpo.emetti('mousedown', {target: mini, button: 0, clientX: 5, clientY: 5});
-  await dorme(300); out.mouseAperta = aperta();
+  out.mouseAperta = aperta();
   finestra.emetti('mouseup', {}); out.mouseChiusa = !aperta();
   nodi.acqCorpo.emetti('mousedown', {target: mini, button: 0, clientX: 5, clientY: 5});
-  finestra.emetti('mousemove', {clientX: 40, clientY: 5}); await dorme(300);
-  out.mouseTrascino = aperta();
-  // 9) l'app in fondo col dito giu'
-  giu(mini); await dorme(300); finestra.emetti('blur', {}); out.blur = aperta();
+  finestra.emetti('mousemove', {clientX: 40, clientY: 5});
+  out.mouseTrascino = [aperta(), sbirciaDa === null];
+  // 8) l'app in fondo col dito giu'
+  giu(mini); finestra.emetti('blur', {}); out.blur = aperta();
   out.menu = nodi.acqCorpo.emetti('contextmenu', {target: mini}).defaultPrevented;
   console.log(JSON.stringify(out));
 })();
@@ -32310,38 +32324,43 @@ const aperta = () => nodi.sbirciata.classList.contains('open');
         salta("il banco della sbirciata", "node non c'e'")
         return
     prova("il tocco sul francobollo e' NOSTRO dal touchstart", True,
-          out.get("breveConsumato"))
-    prova("un tocco breve non apre niente, e non lascia ascoltatori",
-          [False, 0], [out.get("breveAperta"), out.get("ascoltiDopoBreve")])
-    prova("tenendo premuto: chiusa a 120ms, aperta a 320ms", [False, True],
-          [out.get("a120"), out.get("a320")])
-    prova("...e regge oltre i 500ms del tocco lungo di sistema", True,
-          out.get("a820"))
+          out.get("consumato"))
+    prova("la foto e' aperta gia' all'uscita del touchstart", True,
+          out.get("subito"))
     prova("si apre con la foto dell'annuncio (la miniatura, intanto)",
           "/foto/a3_0_min.jpg", out.get("foto"))
-    prova("a foto aperta il dito che si muove non scorre la pagina",
-          [True, 0, True], [out.get("mossaConsumata"),
-                            out.get("scorsaAperta"),
-                            out.get("apertaDopoMossa")])
+    prova("un tocco breve: chiusa nel touchend stesso, e resta chiusa",
+          [True, True], [out.get("chiusaSubito"), out.get("restaChiusa")])
+    prova("...e non lascia ascoltatori", 0, out.get("ascoltiDopoBreve"))
+    prova("tenendo premuto regge oltre i 500ms del tocco lungo di sistema",
+          True, out.get("a800"))
+    prova("il tremolio sotto la soglia: consumato, pagina e fila ferme, "
+          "foto aperta", [True, [0, 0, True]],
+          [out.get("tremolioConsumato"), out.get("tremolio")])
     prova("il rilascio chiude anche col francobollo fuori dal documento",
           [True, 0], [out.get("chiusa"), out.get("ascoltiDopo")])
-    prova("una vibrazione all'apertura", 1, out.get("vibrate"))
+    prova("nessuna vibrazione (aprirebbe a ogni scorrimento)", 0,
+          out.get("vibrate"))
     prova("ritoccando si riapre, e il cancel del sistema chiude",
           [True, True], [out.get("ritocco"), out.get("chiusaDalCancel")])
-    prova("sotto la soglia la fila non si muove", 0, out.get("sottoSoglia"))
-    prova("oltre la soglia la fila segue il dito, e la foto non si apre",
-          [70, 296, False], [out.get("fila"), out.get("pagina"),
-                             out.get("scorsaAperta2")])
+    prova("il dito che parte per scorrere trova la foto aperta", True,
+          out.get("primaDiScorrere"))
+    prova("sotto la soglia la fila non si muove e la foto resta", [0, True],
+          out.get("sottoSoglia"))
+    prova("oltre la soglia la foto si chiude e la fila segue il dito",
+          [True, 70, 296, False],
+          [out.get("scorreConsumato"), out.get("fila"), out.get("pagina"),
+           out.get("apertaScorrendo")])
+    prova("...e a dito fermo non si riapre, e al rilascio non resta niente",
+          [False, 0], [out.get("riapertaFerma"), out.get("ascoltiDopoScorrere")])
     prova("un secondo dito (il primo gia' giu' altrove) non apre", [False, False],
           out.get("secondoDito"))
     prova("senza foto il tocco resta del sistema", [False, False, False],
           [out.get("mutoConsumato"), out.get("emojiConsumato"),
            out.get("mutoAperta")])
-    prova("la cassa che se ne va col dito giu' non apre niente",
-          [False, True], [out.get("cassaVia"), out.get("statoPulito")])
-    prova("col mouse: tenuta e rilascio sulla finestra", [True, True],
+    prova("col mouse: aperta alla pressione, chiusa al rilascio", [True, True],
           [out.get("mouseAperta"), out.get("mouseChiusa")])
-    prova("col mouse: il trascino prima della foto annulla", False,
+    prova("col mouse: il trascino la chiude e chiude il gesto", [False, True],
           out.get("mouseTrascino"))
     prova("l'app che va in fondo chiude la foto", False, out.get("blur"))
     prova("il menu del telefono sul francobollo si ferma", True,

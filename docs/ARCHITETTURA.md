@@ -16772,10 +16772,15 @@
   IL TITOLO LO SCRIVE IL RENDER (`#acqTit`): «Controlla il carrello»
   sul carrello — è quel che il bottone della barra promette, e la
   pagina fa davvero tutte e due le cose — «Acquista» sul singolo.
-  LA SBIRCIATA (5 ott 2026): tenendo il dito su un francobollo
-  (`facciaMini` con `data-sbircia`, solo dove c'è una foto) la foto
-  piena si apre sopra la pagina in `#sbirciata`, velo `fixed` che non
-  prende il dito; al rilascio si richiude. Il touchstart si CONSUMA
+  LA SBIRCIATA (5 ott 2026): il dito su un francobollo (`facciaMini`
+  con `data-sbircia`, solo dove c'è una foto) apre la foto piena sopra
+  la pagina in `#sbirciata`, velo `fixed` che non prende il dito; al
+  rilascio si richiude. SUBITO nei due versi dal 6 ott 2026: si apre
+  nel touchstart stesso (nessun timer; sfumatura di 80ms) e si chiude
+  nel touchend senza sfumare; il dito che si muove oltre gli 8px chiude
+  la foto e scorre la fila, sotto è tremolio e la foto resta. Nessuna
+  vibrazione: aprendo al primo contatto, vibrerebbe a ogni
+  scorrimento. Il touchstart si CONSUMA
   (la lezione del tocco lungo sulle card: sotto c'è quello del sistema
   a 500ms, che col dito ancora giù si prenderebbe il gesto e il
   rilascio), quindi lo scorrimento che parte da un francobollo lo fa

@@ -35979,3 +35979,37 @@ l'APK. Notato e NON toccato: «Ho pagato» è vivo mentre la fattura si
 sta ancora creando (un tocco lì chiede la verifica dell'ordine `null`,
 422 — dal vero la finestra è breve); «Salva la nota» e «L'ho ritirato»
 sono due principali arancio nella stessa pagina dell'ordine.
+
+## La sbirciata subito (6 ott 2026, seguito di «Ritocchi al mercatino»)
+
+Ritocco di Andrea dopo la prova sul telefono: la foto in «Controlla e
+paga» deve aprirsi SUBITO al tocco sulla miniatura e chiudersi subito
+allo stacco; il dito che si muove per scorrere la fila la chiude e la
+fila scorre.
+
+**DECISO.** Niente più timer: `sbirciaFoto` apre nel touchstart stesso.
+Oltre la soglia degli 8px (`SBIRCIA_SCARTO`, quella dei reparti) il
+velo scende (`veloGiuSbirciata`) ma il gesto resta, ed è lo scorrimento
+a mano di prima; sotto la soglia è il tremolio di chi guarda, consumato
+e senza effetti. Il CSS sfuma solo l'apertura (80ms, sullo stato
+`.open`) e chiude secco. Tolta la vibrazione: con l'apertura al primo
+contatto avrebbe vibrato a ogni scorrimento della fila. Tolta la
+guardia «la cassa se n'è andata», che serviva al timer: il rilascio
+arriva comunque al francobollo (ascoltatori sul bersaglio). Restano il
+touchstart consumato (nessun menu, nessun click), la pagina ferma, il
+mouse, il cancel, il blur. Un tocco breve è una foto che lampeggia, e
+basta.
+
+**PROVATO.** `prove_sbirciata` riscritta (29): aperta e visibile
+all'uscita del touchstart, chiusa nel touchend, nessun timer, nessuna
+vibrazione, chiusura senza transizione e apertura entro un decimo di
+secondo, tremolio che non chiude, scorrimento che chiude e non riapre
+a dito fermo. Tortura 13 su 13. Dal vivo a 375 px (copia in collaudo,
+relay morti): aperta in 0,7 ms dal touchstart, invisibile nel touchend,
+nessun click, nessun gradino in cronologia, pagina ferma; fila a 40 e
+120 px con la foto chiusa; ritocco su un altro francobollo; clic breve
+del mouse; scatti nei due temi.
+
+**DA GUARDARE.** Sul telefono: il lampo del tocco breve (se dà
+fastidio, la leva è un'apertura a 60-80ms, non il timer di prima) e lo
+scorrimento della fila senza inerzia.

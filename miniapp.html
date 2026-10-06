@@ -5771,10 +5771,14 @@
     box-shadow:0 18px 50px rgba(0,0,0,.45);transform:scale(.94);
     -webkit-touch-callout:none;-webkit-user-drag:none;user-select:none}
   #sbirciata.open img{transform:none}
+  /* SUBITO (6 ott 2026, ritocco di Andrea): l'apertura parte nello
+     stesso fotogramma del tocco e si posa in 80ms — e' una sfumatura,
+     non un'attesa; la CHIUSURA non sfuma affatto, perche' staccato il
+     dito la pagina deve tornare in quel momento. La transizione sta solo
+     sullo stato .open: tornando allo stato base non ce n'e' nessuna. */
   @media (prefers-reduced-motion: no-preference){
-    #sbirciata{transition:opacity .12s ease,visibility 0s linear .12s}
-    #sbirciata.open{transition:opacity .12s ease}
-    #sbirciata img{transition:transform .14s ease}
+    #sbirciata.open{transition:opacity .08s ease-out}
+    #sbirciata.open img{transition:transform .1s ease-out}
   }
   .ctrl-corpo .section-label{margin-top:16px}
   /* IL TITOLO DEL CONTO PESA UN GRADINO IN PIU' (ago 2026, decisione
@@ -23538,9 +23542,12 @@ function strisciaSet(){
 }
 
 /* LA SBIRCIATA (5 ott 2026, richiesta di Andrea): in «Controlla e paga»
-   tenendo il dito su un francobollo la sua foto si apre in grande, sopra
-   la pagina col velo; staccato il dito torna francobollo, e ritoccando
-   si riapre. Un tocco breve non fa NIENTE — ne' pagamento, ne' salto.
+   il dito sul francobollo apre la sua foto in grande, sopra la pagina
+   col velo; staccato il dito torna francobollo, e ritoccando si riapre.
+   SUBITO, nei due versi (6 ott 2026, ritocco di Andrea: la prima stesura
+   aspettava 220ms di dito fermo): si apre nel touchstart stesso e si
+   chiude nel touchend. Un tocco breve e' quindi una foto che lampeggia,
+   e NIENT'ALTRO — ne' pagamento, ne' salto, ne' click.
    IL TOCCO E' NOSTRO DAL PRIMO ISTANTE, ed e' la riga che decide tutto:
    `preventDefault` sul touchstart. E' la lezione del tocco lungo sulle
    card dei reparti (vedi PREMUTA_MS): sotto il nostro gesto ce n'e' uno
@@ -23555,11 +23562,11 @@ function strisciaSet(){
    in piu' il CSS, e il `contextmenu` qui sotto e' la cintura.
    IL PREZZO E' LO SCORRIMENTO, e si paga a mano: un dito che parte da
    un francobollo e si muove oltre la soglia (la stessa dei reparti)
-   SCORRE — la striscia di lato, la pagina in verticale — seguito da
-   noi, senza l'inerzia del sistema. Il francobollo occupa 52px in cima
-   alla pagina: chi scorre parte quasi sempre da un'altra parte.
-   A FOTO APERTA LA PAGINA STA FERMA: ogni touchmove si consuma e il
-   tremolio del dito non sposta niente.
+   CHIUDE LA FOTO e SCORRE — la striscia di lato, la pagina in verticale
+   — seguito da noi, senza l'inerzia del sistema. Il francobollo occupa
+   52px in cima alla pagina.
+   SOTTO LA SOGLIA LA PAGINA STA FERMA: ogni touchmove si consuma, e il
+   tremolio di chi guarda la foto non sposta niente e non la chiude.
    GLI ASCOLTATORI DEL GESTO STANNO SUL BERSAGLIO, non sul corpo: se a
    meta' del gesto arriva il preventivo, renderAcquisto riscrive
    #acqCorpo e il francobollo esce dal documento — gli eventi del dito
@@ -23569,10 +23576,11 @@ function strisciaSet(){
    c'e' — la si chiede al primo contatto, e di solito e' gia' in cache
    dalla scheda dell'annuncio. NON e' uno strato della cronologia: vive
    quanto il dito. */
-const SBIRCIA_MS = 220;     // ms di dito fermo: sotto, era un tocco
 const SBIRCIA_SCARTO = 8;   // px: oltre, era uno scorrimento (PREMUTA_SCARTO)
 let sbirciaDa = null;       // il gesto in corso, uno alla volta
 
+/* il dito tocca il francobollo: la foto si apre ADESSO, nello stesso
+   evento (6 ott 2026, ritocco di Andrea: «subito, senza attesa») */
 function sbirciaFoto(mini, x, y, tocco, bersaglio){
   const id = Number(mini.dataset.sbircia);
   const l = listings.find(t=>t.id===id) || myListings.find(t=>t.id===id);
@@ -23584,42 +23592,45 @@ function sbirciaFoto(mini, x, y, tocco, bersaglio){
   const fila = mini.closest('.ctrl-strip');
   sbirciaDa = {x, y, tocco, bersaglio, piccola, grande, pre, fila,
                sl: fila ? fila.scrollLeft : 0, sy: window.scrollY,
-               scorre: false, aperta: false,
-               timer: setTimeout(apriSbirciata, SBIRCIA_MS)};
+               scorre: false, aperta: false};
+  apriSbirciata();
   return true;
 }
+/* SENZA VIBRAZIONE (6 ott 2026): con la foto che si apre al primo
+   contatto, vibrerebbe anche a ogni scorrimento della fila che parte da
+   un francobollo — e una vibrazione che arriva sempre non dice niente */
 function apriSbirciata(){
   const s = sbirciaDa;
   if (!s || s.aperta || s.scorre) return;
-  /* la cassa se n'e' andata mentre il dito era giu': niente da aprire */
-  if (!el('view-acquisto').classList.contains('active')) return chiudiSbirciata();
   s.aperta = true;
   const img = el('sbirciata').querySelector('img');
   img.src = (s.pre.complete && s.pre.naturalWidth) ? s.grande : s.piccola;
   if (img.getAttribute('src') !== s.grande)
-    s.pre.onload = () => { if (sbirciaDa === s) img.src = s.grande; };
+    s.pre.onload = () => { if (sbirciaDa === s && s.aperta) img.src = s.grande; };
   el('sbirciata').classList.add('open');
-  haptic();
+}
+/* giu' il velo, ma il gesto resta: e' lo scorrimento che comincia */
+function veloGiuSbirciata(){
+  const s = sbirciaDa;
+  if (s) { s.aperta = false; s.pre.onload = null; }
+  el('sbirciata').classList.remove('open');
 }
 function chiudiSbirciata(){
   const s = sbirciaDa;
+  veloGiuSbirciata();
   sbirciaDa = null;
-  if (s) {
-    clearTimeout(s.timer);
-    s.pre.onload = null;
-    if (s.bersaglio) for (const [ev, fn] of SBIRCIA_ASCOLTI)
-      s.bersaglio.removeEventListener(ev, fn, {passive: false});
-  }
-  el('sbirciata').classList.remove('open');
+  if (s && s.bersaglio) for (const [ev, fn] of SBIRCIA_ASCOLTI)
+    s.bersaglio.removeEventListener(ev, fn, {passive: false});
 }
-/* il dito si muove: prima della foto e' uno scorrimento (fatto a mano,
-   vedi IL PREZZO), a foto aperta non e' niente */
+/* il dito si muove: sotto la soglia e' il tremolio di chi guarda, e la
+   foto resta; oltre e' uno scorrimento — la foto si chiude e la fila (o
+   la pagina) segue il dito, fatto a mano (vedi IL PREZZO) */
 function sbirciaMuove(dx, dy){
   const s = sbirciaDa;
-  if (!s || s.aperta) return;
+  if (!s) return;
   if (!s.scorre && (Math.abs(dx) > SBIRCIA_SCARTO || Math.abs(dy) > SBIRCIA_SCARTO)) {
     s.scorre = true;
-    clearTimeout(s.timer);
+    veloGiuSbirciata();
   }
   if (!s.scorre) return;
   if (s.fila) s.fila.scrollLeft = s.sl - dx;
@@ -23662,7 +23673,7 @@ const SBIRCIA_ASCOLTI = [
     e.preventDefault();      // niente trascino della foto, niente selezione
   });
   addEventListener('mousemove', e => {
-    if (sbirciaDa && sbirciaDa.tocco === null && !sbirciaDa.aperta
+    if (sbirciaDa && sbirciaDa.tocco === null
         && (Math.abs(e.clientX - sbirciaDa.x) > SBIRCIA_SCARTO
             || Math.abs(e.clientY - sbirciaDa.y) > SBIRCIA_SCARTO))
       chiudiSbirciata();
