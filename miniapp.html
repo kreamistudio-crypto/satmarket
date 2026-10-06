@@ -9477,7 +9477,17 @@
     #navTendina,nav::after{display:none}
     header{top:60px}
     header .brand{display:none}   /* il logo ora sta nella topbar */
-    .searchbar{max-width:640px}
+    /* LA RICERCA AL CENTRO (6 ott 2026, ritocco di Andrea): larga 640
+       dentro una colonna da 960 o 1160 stava appoggiata a sinistra,
+       mentre la riga della garanzia sotto di lei e' centrata. */
+    .searchbar{max-width:640px;margin-left:auto;margin-right:auto}
+    /* LA LEVETTA DEL TEMA NELLA RIGA DEGLI STRUMENTI DEL P2P NON C'E'
+       (6 ott 2026, ritocco di Andrea): da qui in su il tema sta nella
+       topbar, e la seconda sarebbe un doppione a mezzo palmo dalla
+       prima. Vale per il libro e per «I miei scambi», che hanno la
+       stessa riga. Il Filtro resta a meta' fra «Ordina» e il bordo:
+       e' il margine auto di sempre, senza piu' la levetta a destra. */
+    .p2p-testa-riga .tema-btn{display:none}
     .toast{bottom:40px}           /* niente più bottom bar da scavalcare */
 
     /* griglia a 3 colonne: vale per home, vetrina e negozio */
@@ -10169,7 +10179,19 @@ document.getElementById('cartello')?.remove();</script>
         <div class="section-label riga-conta">Scambi P2P <span class="conta" id="p2pVetrinaConta"></span></div>
         <button type="button" class="p2p-vt-tutti" onclick="vaiP2P()">Vedi tutti →</button>
       </div>
-      <div class="p2p-vt-fila" id="p2pVetrinaFila"></div>
+      <!-- LE FRECCE ANCHE QUI (6 ott 2026, ritocco di Andrea): dal PC la
+           fila mostra quattro card e le altre restano di lato, e col
+           mouse non c'era modo di arrivarci. Lo stesso guscio, le stesse
+           frecce e la stessa rotellina delle due strisce di sopra (vedi
+           LE FRECCE DELLE DUE STRISCE): nascono spente, sul telefono non
+           esistono, e le accende il solo blocco del web. -->
+      <div class="strip-wrap">
+        <div class="p2p-vt-fila" id="p2pVetrinaFila"></div>
+        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
+          onclick="scorriFila('p2pVetrinaFila',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
+          onclick="scorriFila('p2pVetrinaFila',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
     </div>
     <!-- Strumenti di navigazione: ordinamento discreto + filtro
          prezzo. Sono un'altra cosa dalla ricerca per parole, e si
@@ -63511,6 +63533,9 @@ function filaCardP2P(html){
   if (!sez || !fila) return;
   sez.style.display = html.length ? '' : 'none';
   fila.innerHTML = html.join('');
+  /* le frecce seguono il contenuto, come nelle due strisce: sei card
+     o due cambiano quanto c'e' da scorrere, e la riga riporta all'inizio */
+  aggiornaFrecce('p2pVetrinaFila');
   const n = el('p2pVetrinaConta');
   if (n) n.textContent = html.length ? String(html.length) : '';
 }
@@ -66881,7 +66906,7 @@ async function avviaVetrina(){
        destinatario del gesto — e SOPRA la coppia fascia+griglia, che
        una prova vuole adiacenti (la fascia si disegna prima delle
        card, o le card scendono di 56px quando arriva). */
-    armaFila('catStrip'); armaFila('scoprireStrip');
+    armaFila('catStrip'); armaFila('scoprireStrip'); armaFila('p2pVetrinaFila');
     await fasciaPrima();
     renderGrid();
     apriNegozioDaUrl();
@@ -67179,7 +67204,7 @@ async function avvia(){
        destinatario del gesto — e SOPRA la coppia fascia+griglia, che
        una prova vuole adiacenti (la fascia si disegna prima delle
        card, o le card scendono di 56px quando arriva). */
-    armaFila('catStrip'); armaFila('scoprireStrip');
+    armaFila('catStrip'); armaFila('scoprireStrip'); armaFila('p2pVetrinaFila');
     await fasciaPrima();
     renderGrid();
     await loadOrders();

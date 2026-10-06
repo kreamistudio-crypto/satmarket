@@ -2877,6 +2877,11 @@
   leggendo il foglio — quindi e' un `<svg>` col chevron, nella
   grammatica delle icone di casa (viewBox 0 0 24 24, `currentColor`,
   capi tondi). C'e' la prova che i quattro bottoni portino un disegno.
+  DAL 6 OTT 2026 LE STRISCE CON LE FRECCE SONO TRE (CANTIERI, «Frecce,
+  tema e ricerca sul PC»): anche la fila «Scambi P2P»
+  (`p2pVetrinaFila`), nello stesso guscio, con le stesse frecce e la
+  stessa rotellina — `armaFila` nei due avvii, `aggiornaFrecce` a ogni
+  `filaCardP2P`. I bottoni col disegno sono sei.
   IL CERCHIETTO E' DI CARTA, la lingua di cio' che fluttua SULLA foto
   (`share-btn`, `back-float`): crema fissa e inchiostro scuro nei due
   temi, perche' sta sopra i banner e sopra i quadrati bruni delle
@@ -7292,7 +7297,8 @@
   SUBITO). La fila c'e' solo nella vetrina nuda (`vetrinaNudaP2P`) e
   non entra mai nella griglia — ma da desktop ne SEGUE le colonne (6
   ott 2026): la card e' larga una colonna della `.grid` dello stesso
-  blocco, tre da 768 e quattro da 1024, stesso gap. Mostra solo quel
+  blocco, tre da 768 e quattro da 1024, stesso gap; e dal web ha le
+  frecce e la rotellina delle strisce (6 ott 2026). Mostra solo quel
   che chi guarda puo'
   prendere (dal 27 set 2026): fuori i MIEI ordini (`mioInVetrinaP2P`:
   l'archivio del dispositivo, e `miei` che la rotta da' a chi ha la
@@ -17992,6 +17998,11 @@
   pillole); giratina dell'icona solo con prefers-reduced-motion
   assente. C'è SEMPRE, anche in VETRINA anonima (il tema è di chi
   guarda): il vecchio «in vetrina vale auto e basta» non è più vero.
+  La TERZA istanza, nella riga degli strumenti del P2P (libro e «I miei
+  scambi», `.p2p-testa-riga .tema-btn`), vive solo sotto i 768px: da
+  lì in su il tema sta nella topbar e lei sarebbe un doppione (6 ott
+  2026). Nello stesso blocco desktop la `.searchbar` della home, larga
+  640, sta centrata come la riga della garanzia sotto di lei.
   Scudo anti-XSS: helper `esc()` (vicino a `fmt`) — OGNI testo scritto
   da un utente che entra in un template `innerHTML` DEVE passarci
   (titoli, descrizioni, zone, nomi, corrieri, tracking…); username e

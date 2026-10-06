@@ -36906,3 +36906,87 @@ e il trascino lento verso il logo — il punto in cui la croce si perde è
 breve ma c'è; il rosso vivo su Telegram Android e iPhone accanto
 all'arancio; il ⚡ arancio dentro «Pubblica ordine», che sul rosso più
 chiaro si vede meno di prima (notato, NON toccato).
+
+## Frecce, tema e ricerca sul PC (6 ott 2026, seguito di «Il P2P sugli schermi larghi»)
+
+**LA DOMANDA DI ANDREA.** Le tre voci notate a fine del cantiere di
+prima (84a3297): 1) la fila «Scambi P2P» della home mostra quattro card
+su sei e col mouse le altre non si raggiungono — le frecce come le
+altre strisce; 2) nel P2P, a destra di «Filtro», un secondo bottone del
+tema oltre a quello della barra in alto — via; 3) la barra di ricerca
+della home sul PC appoggiata a sinistra — al centro. Sul telefono niente.
+
+**LA CURA.**
+- LA FILA NEL GUSCIO DELLE FRECCE: `#p2pVetrinaFila` dentro un
+  `.strip-wrap` con le due `.strip-frec` che chiamano
+  `scorriFila('p2pVetrinaFila', ±1)`, nate `.off` — il markup delle due
+  strisce di sopra, riga per riga. `armaFila('p2pVetrinaFila')` nei DUE
+  avvii accanto alle sorelle (rotellina, e solo fuori da Telegram come
+  loro), `aggiornaFrecce('p2pVetrinaFila')` in `filaCardP2P` dopo ogni
+  disegno. Niente CSS nuovo: le frecce di casa sono generiche, nascoste
+  nella base e accese dal solo blocco `html.fuori-telegram` (≥768).
+- LA LEVETTA: `.p2p-testa-riga .tema-btn{display:none}` nel blocco
+  desktop. Vale per il libro E per «I miei scambi», che hanno la stessa
+  riga (ed era lo stesso doppione). Il markup resta: sotto i 768 e' la
+  sola levetta a portata di pollice nel P2P. Il Filtro col suo margine
+  auto ora sta a meta' fra «Ordina» e il bordo destro (prima: fra
+  «Ordina» e la levetta), cioe' ~20 px piu' a destra.
+- LA RICERCA: `.searchbar{max-width:640px;margin-left:auto;margin-right:auto}`
+  nel blocco desktop.
+
+**STRADE SCARTATE.**
+- Frecce proprie per la fila P2P (altro passo, altro disegno): sarebbe
+  una seconda grammatica per lo stesso gesto. `scorriFila` scorre l'80%
+  della finestra, e con le card a una colonna vuol dire tre card a
+  colpo — giusto anche qui.
+- La levetta tenuta come segnaposto invisibile (`visibility:hidden`)
+  per non spostare il Filtro: un buco cliccabile per nessuno, e un
+  domani un riordino che lo «ripulisce» sposterebbe comunque il Filtro.
+- Togliere la levetta dal markup: sul telefono e' l'unica nel P2P.
+
+**PROVATO.**
+- Dal vivo, due server su due copie in collaudo (8137 = 84a3297, 8138 =
+  il cantiere), relay morto, Chrome headless via CDP:
+  - GESTI VERI dal CDP (`Input.dispatchMouseEvent`, e prima
+    `elementFromPoint` sul centro: la freccia e' il bersaglio del dito):
+    all'inizio solo la destra accesa (scroll 0 su 572); clic → in fondo,
+    destra spenta e sinistra accesa; clic sulla sinistra → di nuovo a 0;
+    rotellina verticale sopra la fila → 400 di lato; a fine fila la
+    rotellina lascia scorrere la PAGINA (726 → 926);
+  - frecce a 900, 1280 e 1920: sinistra spenta, destra accesa;
+  - ricerca: prima 16 px dal bordo sinistro dell'header e 244/504 dal
+    destro; dopo 130/130 a 900 e 260/260 a 1280 e 1920, col centro
+    IDENTICO a quello della riga della garanzia (450, 640, 960);
+  - levette: prima `flex` nelle due righe (libro e «I miei scambi»),
+    dopo `none` in tutt'e due; quella della topbar `flex` sempre.
+- A 375 E A 360 NON CAMBIA NIENTE: la geometria di 27 gruppi di pezzi
+  (anche quelli nascosti, col loro display e i margini) e' uguale fra
+  prima e dopo, salvo i due che il cantiere aggiunge — il guscio della
+  fila (stessa posizione e misura della fila) e le due frecce nuove
+  (`display:none`, misura zero). Un primo giro a 360 nel P2P dava le
+  card del libro 32 px piu' in alto nel «dopo»: rimisurato, il corpo
+  del libro parte a 255 su tutt'e due — era l'avviso del relay morto
+  arrivato in un altro momento, non il CSS.
+- Scatti prima/dopo a 1280 e 1920 nei due temi, e la fila all'inizio e
+  dopo un clic.
+- `prove_strisce_web` EMENDATA da due strisce a tre (il guscio si cerca
+  risalendo dalla striscia, non piu' come «l'ultimo»: col terzo
+  l'ultimo era diventato il suo; sei frecce spente, sei disegni, tre
+  `armaFila` nei due avvii, `filaCardP2P` che riallinea);
+  `prove_card_p2p_vetrina`: il banco node ha lo stub di
+  `aggiornaFrecce` che registra, e la prova che ogni disegno della fila
+  riallinea le SUE frecce; `prove_pc_tema_e_ricerca` nuova (levetta via
+  solo da desktop, topbar accesa, markup delle due righe intatto, base
+  intatta, ricerca centrata solo da desktop). Tortura 10 su 10 (frecce
+  non riallineate o della fila sbagliata, rotellina in un avvio solo,
+  guscio tolto, frecce nate accese, levetta spenta anche a mobile o
+  lasciata sul PC, topbar spenta, ricerca non centrata o centrata anche
+  a mobile).
+- Suite intera severa e collaudi della CI: i numeri e gli alberi nel
+  messaggio del commit.
+
+**NON PROVATO.** Il telefono vero e l'APK (tutto e' dietro i 768 o
+dietro `fuori-telegram`, e a 375/360 la geometria e' identica);
+Telegram Desktop largo: li' le frecce non ci sono, come sulle altre due
+strisce (il giudice e' `FUORI_TG`), mentre levetta e ricerca seguono il
+blocco desktop.

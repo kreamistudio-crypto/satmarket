@@ -49287,13 +49287,16 @@ def prove_strisce_web():
     # Il difetto qui non fallisce mai: una freccia che non scorre, o
     # una rotellina che pianta la pagina, non alzano niente — si vedono
     # solo col mouse in mano, e solo sul web.
-    for _id in ("catStrip", "scoprireStrip"):
+    # EMENDATA (6 ott 2026, cantiere «Frecce, tema e ricerca sul PC»): le
+    # strisce con le frecce sono TRE, c'e' anche la fila «Scambi P2P».
+    # Il guscio si cerca risalendo dalla striscia, non piu' come «il
+    # primo» e «l'ultimo»: col terzo l'ultimo era diventato il suo.
+    for _id in ("catStrip", "scoprireStrip", "p2pVetrinaFila"):
         # la striscia sta DENTRO il wrapper, o le frecce non avrebbero
         # niente rispetto a cui posizionarsi (`position:relative` e'
         # suo) e finirebbero ancorate alla pagina
-        _i_w = (mini.index('<div class="strip-wrap">')
-                if _id == "catStrip"
-                else mini.rindex('<div class="strip-wrap">'))
+        _i_w = mini.rindex('<div class="strip-wrap">', 0,
+                           mini.index('id="%s"' % _id))
         _w = mini[_i_w:]
         _w = _w[:_w.index("</div>")]
         prova("la striscia %s vive nel wrapper delle frecce" % _id, True,
@@ -49306,7 +49309,7 @@ def prove_strisce_web():
     # tenerle via e' `.off`, che il render poi toglie se c'e' davvero
     # da scorrere. Nate accese, la prima cosa che si vedrebbe
     # all'apertura sono due frecce inerti.
-    prova("le quattro frecce nascono spente", 4,
+    prova("le sei frecce nascono spente", 6,
           mini.count('class="strip-frec sx off"')
           + mini.count('class="strip-frec dx off"'))
     # ...e sul telefono non esistono affatto: `display:none` nella base
@@ -49330,7 +49333,7 @@ def prove_strisce_web():
     # «semplifica» rimetterebbe un trattino al posto di una freccia.
     _bott = [_r for _r in mini.split(chr(10))
              if "onclick" in _r and "scorriFila(" in _r]
-    prova("...e la freccia e' un disegno, mai un carattere", (4, 4),
+    prova("...e la freccia e' un disegno, mai un carattere", (6, 6),
           (len(_bott), sum(1 for _r in _bott if "<svg" in _r)))
     # LA ROTELLINA SI ARMA SOLO FUORI DA TELEGRAM, e col giudice GIA'
     # deciso: `FUORI_TG` LEGGE la classe che l'anti-flash ha messo, mai
@@ -49366,15 +49369,17 @@ def prove_strisce_web():
     # lasciate il render di prima — accese su una fila che non scorre
     # piu', o spente su una che e' appena cresciuta.
     for _f, _id in (("renderStriscia", "catStrip"),
-                    ("renderScoprire", "scoprireStrip")):
+                    ("renderScoprire", "scoprireStrip"),
+                    ("filaCardP2P", "p2pVetrinaFila")):
         prova("%s riallinea le sue frecce" % _f, True,
               "aggiornaFrecce('%s')" % _id in pezzo_js(mini, "function " + _f))
     # e si armano nei DUE avvii: chi arriva dal browser passa dal
     # secondo, ed e' proprio lui il destinatario del gesto (la
     # trappola gia' pagata da apriCategoriaDaUrl)
-    prova("le strisce si armano nei due avvii", (2, 2),
+    prova("le strisce si armano nei due avvii", (2, 2, 2),
           (mini.count("armaFila('catStrip')"),
-           mini.count("armaFila('scoprireStrip')")))
+           mini.count("armaFila('scoprireStrip')"),
+           mini.count("armaFila('p2pVetrinaFila')")))
     # LA SCIVOLATA E' MORBIDA, SECCA CON REDUCED-MOTION, e passa dal
     # giudice di casa di quella preferenza invece di rifarne uno.
     prova("la freccia rispetta chi non vuole animazioni", True,
@@ -56210,6 +56215,9 @@ function haptic(){}
 function closeSheet(){ LOG.push('chiudi'); }
 function invitoTelegram(){ LOG.push('telegram'); }
 const INVITO_ONION = {p2p: ''};
+/* le frecce della fila (6 ott 2026): chi le riallinea, e per quale fila */
+const FRECCE = [];
+function aggiornaFrecce(id){ FRECCE.push(id); }
 """ + pezzo_js(mini, "function metodoBaseP2P(m){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function tabacchinoP2P(metodi){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function satsMercatoP2P(o){", "\n}\n") + "\n}\n" \
@@ -56510,6 +56518,7 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   out.anonimoLeva = el('filaP2PRiga').innerHTML.includes('questo dispositivo');
   myTgId = 111;
   out.relay = LOG.filter(x => x.startsWith('RELAY')).concat(ALLOG.filter(x => x.startsWith('RELAY')));
+  out.frecce = [FRECCE.length, [...new Set(FRECCE)]];
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
 """
@@ -56528,6 +56537,11 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
 
     def c(k):
         return o[k]
+    # LE FRECCE DELLA FILA (6 ott 2026): ogni disegno della fila riallinea
+    # le SUE frecce — sei card o due cambiano quanto c'e' da scorrere, e
+    # senza questa riga resterebbero come le ha lasciate il disegno prima
+    prova("ogni disegno della fila riallinea le sue frecce, e solo le sue",
+          [True, ["p2pVetrinaFila"]], [o["frecce"][0] > 0, o["frecce"][1]])
     # ⚠️ LA CARD PARLA A CHI GUARDA (27 set 2026, ritocco di Andrea che
     # rovescia la prima stesura): chi ha pubblicato VENDE → «Compra BTC»
     # verde, «Invia € · Ricevi sats»; chi ha pubblicato COMPRA → «Vendi BTC»
@@ -120196,6 +120210,68 @@ def prove_p2p_schermi_larghi():
           False, bool(re.search(r"\.p2p-fee-banner\{[^}]*width:", dopo)))
 
 
+def prove_pc_tema_e_ricerca():
+    """LA LEVETTA DEL TEMA E LA RICERCA SUL PC (6 ott 2026, cantiere
+    «Frecce, tema e ricerca sul PC», ritocco di Andrea dopo 84a3297).
+    Da 768px in su: 1) nella riga degli strumenti del P2P — libro e «I
+    miei scambi» — la levetta del tema non c'e', perche' la topbar ha
+    gia' la sua; 2) la barra di ricerca della home sta al centro, come la
+    riga della garanzia sotto di lei. Le frecce della fila P2P le
+    sorveglia prove_strisce_web (tre strisce) e il banco di
+    prove_card_p2p_vetrina. SOTTO I 768 NON CAMBIA NIENTE: tutto vive
+    nel blocco desktop, e il markup della levetta resta (sul telefono e'
+    l'unica a portata di pollice nel P2P). La prova dal vivo — centri
+    della ricerca e della garanzia uguali a 900, 1280 e 1920, levette
+    `none` nelle due righe e `flex` in topbar, geometria identica a 375
+    e 360 — sta nel verbale in CANTIERI."""
+    print("\n[la levetta del tema e la ricerca sul PC]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+
+    def blocco_media(testa):
+        """il corpo di un @media dalla sua testa alla graffa che lo chiude"""
+        i = css.find(testa)
+        if i < 0:
+            return ""
+        j, fondo = css.index("{", i) + 1, 1
+        while fondo and j < len(css):
+            fondo += {"{": 1, "}": -1}.get(css[j], 0)
+            j += 1
+        return css[i:j]
+
+    d768 = blocco_media("@media (min-width:768px){\n    #app{max-width:960px")
+    prova("il blocco desktop c'e'", True, bool(d768))
+    fuori = css.replace(d768, "")
+    dopo = css[css.find(d768) + len(d768):]
+
+    # LA LEVETTA NELLA RIGA DEGLI STRUMENTI
+    prova("da desktop la levetta della riga degli strumenti non c'e'", True,
+          "\n    .p2p-testa-riga .tema-btn{display:none}" in d768)
+    prova("...una volta sola, e mai fuori dal blocco desktop", [1, 0],
+          [css.count(".p2p-testa-riga .tema-btn{display:none}"),
+           fuori.count(".p2p-testa-riga .tema-btn{display:none}")])
+    prova("...e nessuna regola piu' in basso la riaccende", False,
+          bool(re.search(r"\.p2p-testa-riga \.tema-btn\{[^}]*display:", dopo)))
+    # quella della topbar RESTA: e' lei a fare il lavoro da qui in su
+    prova("...mentre quella della topbar resta accesa", True,
+          "\n    nav .tema-btn{display:inline-flex;" in d768)
+    # sul telefono la levetta c'e' ancora, nelle due righe: il markup non
+    # si tocca, e la regola di base non la spegne
+    prova("a mobile le due righe (libro e «I miei scambi») la disegnano ancora",
+          2, mini.count("+ '<button type=\"button\" class=\"tema-btn\" onclick=\"alternaTema()\">'"))
+    prova("...e la regola di base la lascia com'era", True,
+          "  .p2p-testa-riga .tema-btn{margin:0;flex:none}" in css
+          and not re.search(r"\.p2p-testa-riga \.tema-btn\{[^}]*display:none",
+                            css[:css.find(d768)]))
+
+    # LA RICERCA AL CENTRO
+    prova("da desktop la ricerca e' larga 640 e centrata", True,
+          "\n    .searchbar{max-width:640px;margin-left:auto;margin-right:auto}" in d768)
+    prova("...e a mobile resta quella di sempre, senza margini", True,
+          "  .searchbar{display:flex;gap:8px}" in css
+          and not re.search(r"\.searchbar\{[^}]*margin", fuori))
+
+
 def prove_csp_prova():
     """LE CINTURE HTTP, LA CSP IN PROVA E IL LOGIN WEB A REDIRECT (1 ott
     2026, cantiere «CSP e le voci aperte degli audit»).
@@ -122625,6 +122701,7 @@ def main():
               prove_freni,
               prove_vestito_bottoni,
               prove_p2p_schermi_larghi,
+              prove_pc_tema_e_ricerca,
               prove_config_esempio):
         try:
             f()
