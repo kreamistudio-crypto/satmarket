@@ -40151,7 +40151,7 @@ def prove_fogli_di_casa():
     # ritrova, ricominciarlo butta via una cosa attesa — decisione di
     # Andrea) e «Svuotare il carrello da Anna?» dalla riga in home
     # (`chiediSvuotaCarrello`), la stessa domanda della ✕ — uscita il
-    # 6 ott 2026 (sera) con la riga: al suo posto la card «Carrello»
+    # 6 ott 2026 (sera) con la riga: al suo posto la card «Il mio carrello»
     # nella fila delle categorie, e «Svuota» resta solo DENTRO il
     # carrello, la ✕ col suo foglio.
     # OTTANTA (6 ott 2026, il bollino 🛡️ Staff): «Staff di Barattolo»
@@ -123303,7 +123303,7 @@ def prove_carrello_salvato():
     quattro decisioni di Andrea). Il carrello di sempre — UNO, di un
     venditore alla volta — ha una copia sul server, una riga per
     persona, scritta a ogni tocco e riletta all'apertura; in home la
-    card «Carrello», la PRIMA della fila delle categorie (dal 6 ott 2026
+    card «Il mio carrello», la PRIMA della fila delle categorie (dal 6 ott 2026
     sera; prima una riga «Riprendi · Svuota»), col pallino dei pezzi o
     «!». NON sono i carrelli tolti il 24 set 2026:
     niente localStorage ne' nuvola di Telegram, niente carrelli da parte.
@@ -123445,17 +123445,19 @@ def prove_carrello_salvato():
     prova("...un <a> senza href ne' data-cat: fuori dal tocco lungo che "
           "condivide", [False, False, True],
           ["href=" in cc, "data-cat" in cc, 'role="button"' in cc])
-    prova("...l'etichetta «Carrello» e la voce col nome passato da esc()",
-          True, '<span class="cat-eti">Carrello</span>' in cc
+    prova("...l'etichetta «Il mio carrello» e la voce col nome passato "
+          "da esc()",
+          True, '<span class="cat-eti">Il mio carrello</span>' in cc
           and 'aria-label="${esc(voce)}"' in cc
           and "const voce = `Il tuo carrello da ${s.nome}, ${pezzi}`" in cc)
     prova("...il pallino e' aria-hidden (lo dice la voce)", True,
           'class="carrello-pallino${s.cambiato ? \' cambiato\' : \'\'}" '
           'aria-hidden="true"' in cc)
-    prova("...il disegno in tre misure, dal nostro dominio", True,
+    prova("...il disegno in quattro misure, dal nostro dominio", True,
           'srcset="/assets/carrello/carrello-84.webp 84w, '
           '/assets/carrello/carrello-168.webp 168w, '
-          '/assets/carrello/carrello-252.webp 252w"' in cc
+          '/assets/carrello/carrello-252.webp 252w, '
+          '/assets/carrello/carrello-320.webp 320w"' in cc
           and 'sizes="(min-width:768px) 160px, 84px"' in cc)
     prova("aggiornaIconaCarrello rifa' la fila (decide la firma)", True,
           "renderStriscia();" in pezzo_js(
@@ -123473,9 +123475,10 @@ def prove_carrello_salvato():
           < ra.find("os.path.join"))
     _t = re.search(r"FILE_CARRELLO = \(([^)]*)\)", src, re.S)
     _nomi = re.findall(r'"([^"]+)"', _t.group(1)) if _t else []
-    prova("...tre misure, l'1x il 2x e il 3x della card da 84",
-          ["carrello-84.webp", "carrello-168.webp", "carrello-252.webp"],
-          _nomi)
+    prova("...quattro misure: l'1x il 2x e il 3x della card da 84, e il 2x "
+          "di quella da 160 del sito da computer",
+          ["carrello-84.webp", "carrello-168.webp", "carrello-252.webp",
+           "carrello-320.webp"], _nomi)
     prova("...e i file esistono, quadrati e leggeri (pochi KB)", [],
           [f for f in _nomi
            if not os.path.exists(os.path.join("assets", "carrello", f))
@@ -123485,7 +123488,8 @@ def prove_carrello_salvato():
         _misure = [_Im.open(os.path.join("assets", "carrello", f)).size
                    for f in _nomi]
         prova("...ognuno della sua misura", [(84, 84), (168, 168),
-                                             (252, 252)], _misure)
+                                             (252, 252), (320, 320)],
+              _misure)
     except ImportError:
         salta("le misure dei file dell'icona", "Pillow assente")
     poc = pezzo_js(mini, "async function pagaOffertaCarrello(id){", "\n}\n")
@@ -123682,7 +123686,7 @@ const out = {};
   n = scritte.length;
   await rileggiVenditore(listings.find(x => x.id === 2)); await attesa();
   out.potatura = [[...setScelte], scritte.length - n, ultima()];
-  // N) il tocco sulla card «Carrello»: la pagina del carrello, e
+  // N) il tocco sulla card «Il mio carrello»: la pagina del carrello, e
   //    aprirlo e' un tocco. Il gesto e' quello scritto nella card VERA.
   n = scritte.length; const v0 = viste.length; negozio = [carta(2, 'Tazza', {quantita: 1})];
   out.gesto = (el('catStrip').innerHTML.match(/onclick="([^"]*)"/) || [])[1];
@@ -123735,7 +123739,7 @@ const out = {};
            "«Tazza»: ne resta solo 1, la quantità è scesa a 1",
            "«Tazza» ora costa 6000 sats (prima 5000 sats)",
            "«Vaso <b>» ora costa 12,50 € (prima 10,00 €)"], out.get("note"))
-    prova("la card «Carrello» nasce, per prima: la voce col venditore e i "
+    prova("la card «Il mio carrello» nasce, per prima: la voce col venditore e i "
           "pezzi, e il pallino dice «!» (qualcosa e' cambiato)",
           ["Il tuo carrello da Anna, 2 pezzi: qualcosa è cambiato",
            [" cambiato", "!"], True], out.get("icona"))

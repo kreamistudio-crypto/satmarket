@@ -37767,10 +37767,14 @@ una CARD nella fila delle categorie, col disegno di Andrea (il carrello
 di metallo con la tazza, la scatola, la pianta e i libri, su un fondo
 bruno con l'alone arancio).
 
-**DECISO.** La card «Carrello» è la PRIMA della fila, prima di «Tutto»,
+**DECISO.** La card «Il mio carrello» è la PRIMA della fila, prima di «Tutto»,
 e c'è solo finché c'è un carrello. Stessa misura (84 px, 160 da desktop
 fuori da Telegram), stesso quadrato con gli angoli a 14 px, etichetta
-sotto «Carrello». Per la voce: «Il tuo carrello da Anna, 3 pezzi» (al
+sotto «Il mio carrello» — al primo giro era «Carrello», e Andrea l'ha
+cambiata guardando gli scatti; misurata a 375 e 320 px sta su UNA
+riga, larga esattamente quanto la card (84 px), senza tagli — con un
+carattere più largo andrebbe a capo pulita su due, come «Nel tuo
+barattolo», che `.cat-eti` ne tiene due. Per la voce: «Il tuo carrello da Anna, 3 pezzi» (al
 singolare «1 pezzo»). Nell'angolo in alto a destra un pallino col numero
 dei pezzi; se mentre il carrello aspettava qualcosa è cambiato (le note
 del rientro: venduto, meno pezzi, prezzo diverso) il pallino dice «!», e
@@ -37800,10 +37804,12 @@ bianco sul rosso del giorno (5,2:1).
 
 **L'IMMAGINE.** Dal 2000×2000 di Andrea, ritagliata attorno al carrello
 (quadrato di 1660 px centrato sul disegno, il carrello prende l'84%), in
-tre misure WebP a qualità 82: 84, 168 e 252 px — l'1x, il 2x e il 3x
-della card —, 2, 5 e 10 KB. `srcset` con `sizes="(min-width:768px)
-160px, 84px"`: a densità 3 il telefono prende il 252, il pane a densità 2
-il 168. Servite dal nostro dominio, rotta esplicita
+quattro misure WebP a qualità 82: 84, 168 e 252 px — l'1x, il 2x e il 3x
+della card —, 2, 5 e 10 KB, e 320 px (14 KB), il 2x della card da 160
+del sito da computer, aggiunto dopo gli scatti su richiesta di Andrea
+(senza, lì il 252 si ingrandiva di 1,27). `srcset` con
+`sizes="(min-width:768px) 160px, 84px"`: a densità 3 il telefono prende
+il 252, il pane a densità 2 il 168. Servite dal nostro dominio, rotta esplicita
 `/assets/carrello/{nome}` con la whitelist a tupla `FILE_CARRELLO` (il
 patto di FILE_SCOPRIRE; regola 3), cartella SUA e mai assets/categorie/
 (fondo pieno: sposterebbe la mediana di ritaglia_categorie.py). Gli URL
@@ -37814,9 +37820,7 @@ non è nel repo.
 
 **SCARTATO.** Il pallino fuori dal quadrato, a cavallo dell'angolo: la
 fila lo taglierebbe. Il filo con `outline`: è l'anello «sei qui» delle
-card accese, e la card del carrello non si accende mai. Un 4x per il
-desktop da 160 a densità 2 (servirebbe un 320): non chiesto, e il 252
-ingrandito di 1,27 lì regge.
+card accese, e la card del carrello non si accende mai.
 
 **PROVATO.** prove_carrello_salvato (80) riscritta sul client (le
 sentinelle: la riga e «Svuota» spariti, la card in testa, giudice e
@@ -37830,7 +37834,8 @@ nome col markup scappato, in DEMO niente card. Il banco dei Consigliati
 gira la fila VERA con la card: nasce per prima e il resto non si muove,
 il pallino 2 → 3 → «!» sentito dalla firma senza azzerarla, la voce,
 svuotato la fila torna quella di prima. prove_seo (due chiamanti di
-renderStriscia), prove_fogli_di_casa (78). Tortura sulla copia: 30 su 30 uccise (a codice intatto zero rosse).
+renderStriscia), prove_fogli_di_casa (78). Tortura sulla copia: 30 su 30 uccise (a codice intatto zero rosse);
+dopo il ritocco (etichetta e 320) altre 4 su 4.
 Suite intera severa senza config nel worktree (base 14a3a4c): 19.114
 verdi e 0 rosse; la sentinella dell'uscita dal carrello, scritta
 mentre la suite girava, verde nelle sue sezioni (80 · 184 · 409 · 45). I 37 collaudi della CI
@@ -37842,7 +37847,12 @@ apre il carrello con la nota in cima, il tasto indietro di Telegram
 riporta in home col pallino a 3; la ✕ col suo «Sì, ignora le modifiche»
 svuota e la card sparisce, sul server il carrello è null. Scatti in
 Chrome headless a densità 3, 375 e 320 px, chiaro e scuro, nei tre stati
-(carrello, «!», senza), mandati ad Andrea prima del push.
+(carrello, «!», senza), mandati ad Andrea prima del push; dopo il
+suo ok, col nome nuovo e il 320, di nuovo i quattro scatti
+(l'etichetta su una riga, misurata dalla pagina: una riga, nessun
+taglio) e il sito da computer a 1280 px e densità 2 — la veste «fuori
+da Telegram» messa a mano su una pagina in collaudo: card da 160, il
+browser sceglie il 320.
 
 **DA GUARDARE.** Sul telefono, Android e iPhone, dentro Telegram: il
 disegno a densità 3, il pallino leggibile, il filo di sera. Di sera il

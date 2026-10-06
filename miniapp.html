@@ -768,7 +768,7 @@
   .ospite-riga span{flex:1 1 auto;min-width:0}
   .ospite-riga .btn.mini{flex:0 0 auto;margin:0}
   /* IL CARRELLO RITROVATO in home: dal 6 ott 2026 (sera) non e' piu'
-     una riga ma la card «Carrello» in testa alla fila delle categorie
+     una riga ma la card «Il mio carrello» in testa alla fila delle categorie
      (vedi .cella-carrello). In cima alla pagina del carrello, cosa e'
      cambiato mentre aspettava: */
   .pacco-note{margin:10px var(--pad) 0;padding:10px 12px;
@@ -1156,7 +1156,7 @@
      esce — nella cascata le transizioni battono le animazioni — e lo
      spegnerebbe in dissolvenza mentre scende. */
   .cella-consigliati .cat-fig{inset:5%}
-  /* LA CARD DEL CARRELLO (6 ott 2026, al posto della riga in home): il
+  /* LA CARD «IL MIO CARRELLO» (6 ott 2026, al posto della riga in home): il
      disegno di Andrea riempie TUTTO il quadrato — ha il suo fondo,
      bruno con l'alone arancio — e gli angoli li taglia l'overflow del
      quadrato, come alle sorelle. Nasce solo con un carrello (la
@@ -25830,7 +25830,7 @@ function svuotaPacco(){
    UNO, di un venditore alla volta, in memoria (setScelte + paccoDati) —
    e in piu' ha una copia sul SERVER, una riga per persona: si scrive a
    ogni tocco, si rilegge all'apertura (caricaCarrelloSalvato) e in home
-   lo dice la card «Carrello», la prima della fila delle categorie (dal
+   lo dice la card «Il mio carrello», la prima della fila delle categorie (dal
    6 ott 2026 sera; prima era una riga «Riprendi · Svuota»). Sette giorni dall'ultimo tocco
    (GIORNI_CARRELLO_SALVATO), poi se ne va da solo.
    NON SONO I CARRELLI TOLTI IL 24 SET 2026 (CANTIERI, «I carrelli sono
@@ -25974,9 +25974,13 @@ function statoIconaCarrello(){
   return {nome: nomeVenditoreCarrello(c), pezzi, cambiato: carrelloNote.length > 0};
 }
 /* La fabbrica della card. La veste e' quella delle sorelle (quadrato,
-   angoli, etichetta sotto); il disegno riempie il quadrato in tre
-   misure, l'1x, il 2x e il 3x della card da 84 (da desktop fuori da
-   Telegram la card e' da 160, e `sizes` lo dice). E' un <a> SENZA href
+   angoli, etichetta sotto: «Il mio carrello», che a 84px sta su una
+   riga sola, larga quanto la card — misurato a 375 e 320; con un
+   carattere piu' largo andrebbe a capo pulita, come «Nel tuo
+   barattolo», che le righe sono due al massimo); il disegno riempie il quadrato in
+   quattro misure, l'1x, il 2x e il 3x della card da 84 e il 2x di
+   quella da 160 del sito da computer, fuori da Telegram (`sizes` lo
+   dice). E' un <a> SENZA href
    e SENZA data-cat, il patto della card del barattolo: porta a una
    pagina dell'app e non a un URL, e resta fuori dal tocco lungo di
    condivisione per costruzione. Il tocco e' quello del vecchio
@@ -25992,12 +25996,12 @@ function cardCarrello(s){
        title="${esc(voce)}" aria-label="${esc(voce)}" onclick="riprendiCarrello()"
        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();riprendiCarrello()}">
       <span class="cat-quad"><img src="/assets/carrello/carrello-84.webp"
-           srcset="/assets/carrello/carrello-84.webp 84w, /assets/carrello/carrello-168.webp 168w, /assets/carrello/carrello-252.webp 252w"
+           srcset="/assets/carrello/carrello-84.webp 84w, /assets/carrello/carrello-168.webp 168w, /assets/carrello/carrello-252.webp 252w, /assets/carrello/carrello-320.webp 320w"
            sizes="(min-width:768px) 160px, 84px" alt="" decoding="async"
            onerror="this.remove()"><span class="cat-emoji" aria-hidden="true">🛒</span><span
            class="carrello-pallino${s.cambiato ? ' cambiato' : ''}" aria-hidden="true">${
            s.cambiato ? '!' : (s.pezzi > 99 ? '99+' : fmt(s.pezzi))}</span></span>
-      <span class="cat-eti">Carrello</span>
+      <span class="cat-eti">Il mio carrello</span>
     </a>`;
 }
 /* Ogni cambio del carrello ridisegna la fila: e' la sua firma
@@ -26038,7 +26042,7 @@ function renderNoteCarrello(){
   box.style.display = carrelloNote.length ? '' : 'none';
 }
 /* IL CARRELLO VERO TORNA AL SUO POSTO dopo la cassa di un accordo:
-   al primo gesto sul carrello (apriPacco, la card «Carrello», la
+   al primo gesto sul carrello (apriPacco, la card «Il mio carrello», la
    pagina del carrello dalla cronologia) o al pagamento. Mai all'uscita
    dalla cassa: da li' si va e si torna (la pagina «I tuoi dati» dal
    cassetto dell'indirizzo), e la cassa si ricostruisce dalla memoria.

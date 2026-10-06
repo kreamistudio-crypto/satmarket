@@ -16845,12 +16845,13 @@
   è la penna (subito, una alla volta, `keepalive`, col `tg_id` di chi
   ce l'ha in memoria), `caricaCarrelloSalvato` la lettura dell'apertura
   (dopo la prima pagina, segue l'identità, non scrive, non scavalca un
-  carrello composto adesso), la card «Carrello» in home, le note in
+  carrello composto adesso), la card «Il mio carrello» in home, le note in
   cima alla pagina del carrello. LA CARD (6 ott 2026, sera: al posto
   della riga «Riprendi · Svuota»; CANTIERI, «L'icona del carrello in
   Esplora per categorie») è la PRIMA della fila delle categorie, prima
   di «Tutto», e c'è solo con un carrello: il disegno di Andrea a tutto
-  quadrato (84/168/252 px, `/assets/carrello/`), «Carrello» sotto, la
+  quadrato (84/168/252/320 px, `/assets/carrello/`), «Il mio carrello»
+  sotto (una riga, larga quanto la card), la
   voce «Il tuo carrello da Anna, 3 pezzi», il pallino coi pezzi o «!»
   se le note del rientro dicono che qualcosa è cambiato, un filo
   arancio di sera. Giudice `statoIconaCarrello`, fabbrica
@@ -28834,8 +28835,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    KB tutt'e tre — vedi CANTIERI, «La slide finale personale del tour
    P2P»),
    `/assets/carrello/{nome}` (l'icona del carrello salvato in
-   «Esplora per categorie», 6 ott 2026: un disegno in tre misure,
-   84/168/252 px WebP, 2-10 KB, whitelist a tupla `FILE_CARRELLO`,
+   «Esplora per categorie», 6 ott 2026: un disegno in quattro misure,
+   84/168/252 px WebP — l'1x, il 2x e il 3x della card da 84 — e 320,
+   il 2x della card da 160 del sito da computer; 2-14 KB, whitelist a
+   tupla `FILE_CARRELLO`,
    cartella sua e mai assets/categorie/ — fondo pieno; gli URL
    letterali li timbra `_timbra_asset_pagina`, quindi max-age di un
    giorno; vedi CANTIERI, «L'icona del carrello in Esplora per

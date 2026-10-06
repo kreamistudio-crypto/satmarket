@@ -66740,10 +66740,12 @@ def asset_scoprire(nome: str, if_none_match: str = Header("")):
 
 
 # L'ICONA DEL CARRELLO SALVATO (6 ott 2026, disegnata da Andrea): la
-# card «Carrello» in testa alla fila delle categorie, al posto della
-# riga in home. Un disegno solo in TRE MISURE, 84/168/252 — l'1x, il 2x
-# e il 3x della card da 84px —, ritagliato attorno al carrello dal
-# 2048 di Andrea e WebP a qualita' 82: 2, 5 e 10 KB. Fondo PIENO (il
+# card «Il mio carrello» in testa alla fila delle categorie, al posto
+# della riga in home. Un disegno solo in QUATTRO MISURE, 84/168/252 —
+# l'1x, il 2x e il 3x della card da 84px — e 320, il 2x della card da
+# 160 del sito da computer (chiesta da Andrea dopo gli scatti),
+# ritagliato attorno al carrello dal 2000 di Andrea e WebP a qualita'
+# 82: 2, 5, 10 e 14 KB. Fondo PIENO (il
 # bruno con l'alone arancio del disegno), quindi cartella SUA e mai
 # assets/categorie/: ritaglia_categorie.py fa il glob di quella e un
 # fondo pieno le sposterebbe la mediana dell'inchiostro (la ragione di
@@ -66752,7 +66754,7 @@ def asset_scoprire(nome: str, if_none_match: str = Header("")):
 # sono letterali, e _timbra_asset_pagina li timbra col ?v=: il max-age
 # e' innocuo, come per il logo grande del P2P.
 FILE_CARRELLO = ("carrello-84.webp", "carrello-168.webp",
-                 "carrello-252.webp")
+                 "carrello-252.webp", "carrello-320.webp")
 
 
 @app.get("/assets/carrello/{nome}")
