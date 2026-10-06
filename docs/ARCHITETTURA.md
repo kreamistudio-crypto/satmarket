@@ -6804,6 +6804,24 @@
   SCARTO DI `salva_foto` DICE QUALE FOTO: «la foto 2 non è stata
   accettata: …», già intera sul server, così il client non tiene una
   regola gemella.
+  E LA TELA BUGIARDA (6 ott 2026, dal campo: foto entrate come
+  quadrati di un colore solo dal sito .onion con Tor Browser, e da
+  Telegram Web). Firefox con `resistFingerprinting` (Tor Browser,
+  Mullvad Browser, LibreWolf) non nega la tela: MENTE — `toDataURL`
+  consegna un'immagine di UN colore a caso, `getImageData` rumore a
+  caso, alfa compresa, e quindi `telaPiatta` (che misura con
+  `getImageData`) vede migliaia di colori e dice «foto vera». Prima di
+  ogni tela, `ridimensiona` chiede a `telaBugiarda` — una PROVA A
+  RISPOSTA NOTA: due colori noti (`TELA_PROVA`) su un 8x8, riletti con
+  `getImageData` e poi passando da `toDataURL('image/png')` e da un
+  decode; sincera = almeno 56 pixel su 64 entro 24 per canale e opachi
+  (il margine lascia passare chi sporca poco, Brave e la protezione
+  leggera di Firefox). Bugiarda (o lettura negata) = la foto va INTERA
+  a `fotoDalServer`, coi suoi 15MB, senza decode in piccolo; il dubbio
+  (decode che non risponde in 3 s) vale «sincera», cioè la strada di
+  prima. Lo scatto della fotocamera della pagina (`scattaDalVivo`)
+  nasce dalla tela e un file vero dietro non ce l'ha: con la tela
+  bugiarda non si fa, si dice, e resta «Scegli una foto dal telefono».
   E IL SERVER NON LASCIA MAI UN ANNUNCIO SENZA LE FOTO CHE AVEVA:
   pubblicare con foto scelte e tutte scartate = 400 col motivo di
   ognuna, la riga ritirata con la cancellazione morbida ('rimosso',

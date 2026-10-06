@@ -43862,7 +43862,80 @@ async function ripiegoFoto(file, larg, alt){
   return await fotoDalServer(file);
 }
 
-function ridimensiona(file){
+/* LA TELA BUGIARDA (6 ott 2026, dal campo: foto scelte su «Metti in
+   vendita» dal sito .onion con Tor Browser, e da Telegram Web, entrate
+   come quadrati di UN colore, verde o viola). Firefox con
+   resistFingerprinting — quello di Tor Browser, e di Mullvad Browser e
+   LibreWolf — non si rifiuta di leggere la tela: MENTE. toDataURL
+   consegna un'immagine di un colore solo, a caso a ogni lettura (il
+   quadrato in anteprima), e getImageData consegna RUMORE a caso, alfa
+   compresa. Il giudice della tela nera misura con getImageData: vede
+   migliaia di colori e dice «foto vera». Lo strumento che mente misurava
+   se stesso. Misurato il 6 ott 2026 con Firefox 157 in quella modalita',
+   sulla pagina e dentro un iframe di terzi (la Mini App in Telegram
+   Web); lo stesso Firefox senza la modalita' rende la foto giusta.
+   LA CURA E' UNA PROVA A RISPOSTA NOTA: due colori noti su una tela 8x8,
+   riletti due volte — con getImageData, e passando da toDataURL e da un
+   decode, che e' la strada delle foto. La tela sincera li rende; quella
+   bugiarda no (la possibilita' che il rumore a caso li indovini e' zero
+   per ogni scopo pratico). Il margine non e' un regalo: Brave e la
+   protezione di Firefox normale sporcano qualche pixel di poche unita',
+   che e' una bugia che non rovina una foto, e chi oggi funziona deve
+   continuare per la sua strada. Vero = bugiarda: la foto va al server
+   INTERA (il ripiego di sempre, coi suoi 15MB) e la tela, per lei, non
+   si usa piu'. Il dubbio — un decode che non risponde — vale «sincera»:
+   non devia nessuno dalla strada di oggi, dove restano i giudici di
+   sempre. */
+const TELA_PROVA = [[30, 180, 60], [200, 40, 90]];
+function telaDipinta(){
+  const c = document.createElement('canvas');
+  c.width = 8; c.height = 8;
+  const cx = c.getContext('2d');
+  TELA_PROVA.forEach(([r, g, b], k) => {
+    cx.fillStyle = `rgb(${r},${g},${b})`;
+    cx.fillRect(k * 4, 0, 4, 8);
+  });
+  return c;
+}
+/* La tela rende i due colori? Almeno 56 pixel su 64 entro 24 unita' per
+   canale, e opachi. */
+function telaRende(c){
+  const px = c.getContext('2d').getImageData(0, 0, 8, 8).data;
+  let giusti = 0;
+  for (let q = 0; q < px.length; q += 4){
+    const atteso = TELA_PROVA[(q / 4) % 8 < 4 ? 0 : 1];
+    if (px[q + 3] >= 240 && atteso.every((v, k) => Math.abs(px[q + k] - v) <= 24))
+      giusti++;
+  }
+  return giusti >= 56;
+}
+function telaBugiarda(){
+  return new Promise(res=>{
+    let c, uri;
+    try {
+      c = telaDipinta();
+      if (!telaRende(c)) { res(true); return; }
+      uri = c.toDataURL('image/png');
+    } catch(e){ res(true); return; }   // la lettura negata e' la stessa bugia, detta meglio
+    const img = new Image();
+    const basta = setTimeout(()=>res(false), 3000);
+    img.onload = ()=>{
+      clearTimeout(basta);
+      try {
+        const d = document.createElement('canvas');
+        d.width = 8; d.height = 8;
+        const dx = d.getContext('2d');
+        dx.imageSmoothingEnabled = false;
+        dx.drawImage(img, 0, 0, 8, 8);
+        res(!telaRende(d));
+      } catch(e){ res(true); }
+    };
+    img.onerror = ()=>{ clearTimeout(basta); res(true); };
+    img.src = uri;
+  });
+}
+
+async function ridimensiona(file){
   /* Riduce la foto a max 1200px lato lungo, JPEG di qualita': questa
      e' l'UNICA compressione della filiera (il server salva il JPEG
      cosi' com'e', mai riconvertito), quindi si fa bene una volta —
@@ -43875,8 +43948,12 @@ function ridimensiona(file){
      ricordarsi di parlare, e bastava uno che tacesse.
      Ogni strada che non porta a un JPEG VERO — anche uno nero —
      finisce in `ripiegoFoto`: il decode in piccolo, poi il server,
-     che ha gli stessi byte, Pillow e non la WebView di un telefono. */
-  return new Promise(res=>{
+     che ha gli stessi byte, Pillow e non la WebView di un telefono.
+     E una tela che MENTE (Tor Browser) non si interroga nemmeno:
+     ogni sua strada — anche il decode in piccolo, che finisce su una
+     tela — consegnerebbe il suo quadrato a caso. */
+  if (await telaBugiarda()) return await fotoDalServer(file);
+  return await new Promise(res=>{
     const img = new Image();
     /* IL WATCHDOG DEL DECODE (ago 2026, dal campo: su un Android
        vecchio dentro Telegram il decode di una foto da 48+ MP puo'
@@ -44130,6 +44207,14 @@ async function scattaDalVivo(){
     try { c.toBlob(r, 'image/jpeg', 0.92); } catch(e){ r(null); }
   });
   if (!blob) { camStato('vivo', 'Lo scatto non è riuscito: riprova'); return; }
+  /* LA TELA BUGIARDA anche qui (6 ott 2026), e qui senza ripiego: lo
+     scatto NASCE dalla tela, un file vero dietro non c'e', e il server
+     riceverebbe il quadrato di un colore a caso. Si dice, e resta la
+     strada del selettore, che consegna il file intero. */
+  if (await telaBugiarda()) {
+    camStato('errore', 'Questo browser protegge la privacy e falsa le foto scattate da qui: tocca «Scegli una foto dal telefono» per caricarla intera.');
+    return;
+  }
   camScatto = new File([blob], 'scatto-' + Date.now() + '.jpg', {type: 'image/jpeg'});
   if (camScattoUrl) URL.revokeObjectURL(camScattoUrl);
   camScattoUrl = URL.createObjectURL(blob);

@@ -37039,3 +37039,115 @@ verbale del push.
 **DA GUARDARE.** Sul telefono: il cartellino a 320 che va a capo (Android
 piccoli). Se un giorno `max_order_amount` sale oltre il milione di sats,
 il caso a quattro cifre torna possibile e va riguardato.
+
+## La tela bugiarda: Tor Browser e Telegram Web (6 ott 2026)
+
+Bug segnalato da un utente: dal sito .onion con Tor Browser, e anche da
+Telegram Web, le foto scelte in «Metti in vendita» entravano come
+quadrati di un colore solo (verde, viola). L'ipotesi era giusta a metà:
+Tor Browser non BLOCCA la lettura della tela, la FALSA — ed è peggio,
+perché nessuno se ne accorge.
+
+**LA CAUSA, MISURATA.** Firefox 157 di questo PC, headless, in un
+profilo usa-e-getta con `privacy.resistFingerprinting` (la modalità di
+Tor Browser), sulle funzioni VERE di `miniapp.html` e una foto vera da
+1600x1200: `toDataURL` consegna un JPEG di UN colore a caso, diverso a
+ogni lettura (8 colori di artefatti, tutti uguali a occhio: il quadrato);
+`getImageData` consegna rumore a caso su ogni byte, alfa compresa. E il
+giudice della tela nera del 28 set misura proprio con `getImageData`:
+vede migliaia di colori e dice «foto vera». Lo strumento che mente
+misurava se stesso, e il quadrato entrava in `sellFoto`; alla
+pubblicazione il server lo avrebbe scartato come «immagine vuota». Uguale
+dentro un iframe di terze parti (localhost che incornicia 127.0.0.1: la
+forma della Mini App dentro Telegram Web). Lo stesso Firefox senza la
+modalità, diretto e in iframe, e Chrome nel pannello: foto giusta. Quindi
+**Telegram Web non ha un motivo suo**: l'ipotesi forte è che l'utente lo
+aprisse in Tor Browser o in un browser della stessa famiglia (Mullvad,
+LibreWolf, Firefox con quella modalità accesa). Non verificato su
+web.telegram.org vero: da chiedere all'utente.
+
+**DECISO.** Una prova a risposta nota, `telaBugiarda`, PRIMA di ogni
+tela in `ridimensiona`: due colori noti (`TELA_PROVA`) su un 8x8, riletti
+due volte — con `getImageData`, e passando da `toDataURL('image/png')` e
+da un decode, che è la strada delle foto (un browser che mentisse solo
+in uscita la prima lettura non lo vedrebbe). Sincera = almeno 56 pixel su
+64 entro 24 unità per canale, e opachi. Bugiarda, o lettura negata con
+un'eccezione = la foto va INTERA a `fotoDalServer`, il ripiego che esiste
+dal 14 set, coi suoi 15MB (oltre, il motivo col tetto, come sempre); il
+decode in piccolo si salta, perché finisce su una tela anche lui. Il
+dubbio — il decode della prova che non risponde in 3 s — vale «sincera»:
+nessuno viene deviato dalla strada di oggi, dove restano i giudici di
+sempre. L'anteprima mostra il JPEG che torna dal server, cioè la foto
+vera, ed è lo stesso che verrà salvato.
+Lo scatto della fotocamera nella pagina (`scattaDalVivo`) nasce DALLA
+tela con `toBlob`: dietro non c'è un file vero, e il server riceverebbe
+il quadrato. Con la tela bugiarda non si fa: stato «errore», la frase
+«Questo browser protegge la privacy e falsa le foto scattate da qui:
+tocca «Scegli una foto dal telefono» per caricarla intera», e il bottone
+di sempre apre il selettore.
+
+**LE ALTRE FOTO (punto 3 della richiesta).** Passano tutte da
+`ridimensiona`, quindi la cura le copre senza altro codice: le foto delle
+recensioni (`fbFotoScelte`), il banner del negozio (`scegliFotoBanner`),
+l'immagine dei badge live dell'admin (`caricaImmagineBadgeLive`), e il
+trascinamento in «Metti in vendita». La busta e il contenuto digitale
+(`scegliDocBusta`, `scegliFotoContenuto`) leggono il file con
+`FileReader` e non toccano la tela: non avevano il problema. La foto
+profilo non si carica: viene da Telegram o da Nostr. Nel P2P non c'è
+nessun caricamento di immagini. Le tele che si DISEGNANO soltanto (il QR)
+non si leggono, e Tor le mostra giuste.
+
+**SCARTATO.** Riconoscere il quadrato DOPO, dal risultato (un colore
+solo): il giudice dovrebbe misurare con lo stesso `getImageData` che
+mente — è esattamente il buco. Riconoscere Tor dallo user agent: Tor
+Browser si traveste da Firefox apposta, e la famiglia è più larga di Tor.
+Il controllo esatto dei colori senza margine: Brave e la protezione
+leggera di Firefox sporcano qualche pixel di poche unità, e li avrebbe
+mandati tutti al server (più lenti, e fuori oltre i 15MB) senza motivo.
+Ricordarsi l'esito per tutta la sessione: in Tor l'utente può concedere
+la tela dal suo avviso, e la foto dopo deve poterne approfittare; la
+prova costa un 8x8. Il controllo sulla forma del PNG (`data:image/png`):
+la tortura l'ha trovato equivalente — un `data:,` non si decodifica e il
+giudizio arriva lo stesso — ed è stato tolto.
+
+**PROVATO.** `prove_tela_bugiarda` (nuova, 16): le funzioni VERE su una
+tela di cartone a 8x8 pixel veri — onesta, sporcata alla Brave, Tor
+(rumore e un colore), solo rumore, solo un colore in uscita, lettura e
+uscita che gettano, `data:,`, decode in errore, decode muto, pixel
+trasparenti, otto e nove pixel storti (il bordo del margine), la tela
+dipinta, il PNG; e la sentinella che in `ridimensiona` la prova sta prima
+del `new Promise`. `prove_foto_scarti` emendata (la firma ora è
+`async function ridimensiona`): la tela bugiarda va al server intera, con
+zero decode in piccolo e una chiamata; oltre i 15MB il tetto detto e
+nessun quadrato; il no del server arriva a chi ha scelto; i tre aiutanti
+nuovi «non parlano, rispondono». `prove_fotocamera_pagina`: lo scatto
+bugiardo non diventa un file, dice il perché, e «Scegli una foto dal
+telefono» apre il selettore; sentinella sull'ordine. Tortura 13 su 13
+(al primo giro 12 su 14: un banco che esplodeva invece di diventare rosso,
+reso robusto, e la mutazione equivalente qui sopra).
+In Firefox 157 vero (headless, profilo usa-e-getta, server di cartone che
+converte con Pillow): con `resistFingerprinting` sulla pagina e
+nell'iframe di terzi la prova dice «bugiarda» due volte su due e
+`ridimensiona` consegna la foto vera dal server (11.900 colori, 1200x900);
+senza la modalità, diretto e in iframe, e con la sola randomizzazione
+leggera del canvas, «sincera» e zero chiamate al server; Chrome nel
+pannello uguale. Dal vivo sull'app (copia in collaudo nello scratchpad,
+relay morti, config a segnaposto) a 375 px, con la tela di Tor simulata
+nella pagina (rumore in lettura, un colore a caso in `toDataURL` e
+`toBlob`): «Metti in vendita», una foto da 1600x1200 → nel journal
+«📷 Anteprima convertita dal server: jpeg, 57 KB → 47 KB», e nel riquadro
+la foto vera; controprova ricaricata senza la simulazione: la foto passa
+dalla tela in 36 ms e il server non si chiama. Suite intera severa e
+collaudi della CI: nel verbale del push.
+
+**DA GUARDARE.** Andrea con Tor Browser sul .onion e con Telegram Web
+(dicendo in quale browser): l'anteprima dev'essere la foto vera, e la
+pubblicazione deve passare. In Tor l'avviso «questo sito ha cercato di
+estrarre dati dal canvas» può comparire: con «Blocca» o senza risposta
+la foto passa dal server; con «Consenti» dalla tela, come in un browser
+normale. Su Tor una foto grossa sale intera e lenta (fino a 15MB): oltre
+quel tetto il motivo detto è quello di sempre. Safari e iPhone non sono
+stati provati con la protezione avanzata dell'impronta: il margine è
+largo, ma se una tela vera sporcasse oltre 24 unità quel telefono
+andrebbe al server senza bisogno — lo direbbero le righe «📷 Anteprima
+convertita dal server» nel journal, se si moltiplicassero.

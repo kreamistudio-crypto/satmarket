@@ -14295,7 +14295,7 @@ def prove_foto_scarti():
             "function telaPiatta(sorgente){", "function jpegVuoto(uri){",
             "async function jpegDaBitmap(file, larg, alt){",
             "async function ripiegoFoto(file, larg, alt){",
-            "function ridimensiona(file){", "async function aggiungiFoto(files, daFotocamera){",
+            "async function ridimensiona(file){", "async function aggiungiFoto(files, daFotocamera){",
             "async function fotoScelte(ev){"))
         _banco = """
           // il banco: un telefono finto, con la tela, il decode in
@@ -14323,6 +14323,10 @@ def prove_foto_scarti():
           function toast(t){ toasts.push(String(t)); }
           function renderFotoPreview(){}
           function haptic(){}
+          // la prova a risposta nota ha il suo banco (prove_tela_bugiarda):
+          // qui risponde come dice CASO, e CONTA le volte che la tela si
+          // tocca dopo, per vedere che la bugiarda non si interroga piu'
+          async function telaBugiarda(){ return !!CASO.bugiarda; }
           globalThis.URL = {createObjectURL:()=>'blob:finto',
                             revokeObjectURL:()=>{}};
           // LA TELA: toDataURL consegna quel che dice CASO per la strada
@@ -14445,6 +14449,13 @@ def prove_foto_scarti():
             out.rumore = await giro({bitmap:'ok', rumore:true}, 'rumore');
             out.bitmapNeraTelaBuona = await giro({bitmap:'ok',
               telaBitmap:BITMAP_NERA}, 'bitmapNeraTelaBuona');
+            // --- LA TELA BUGIARDA (6 ott 2026, Tor Browser): la tela qui
+            // «riesce» sempre, e proprio per questo non si deve usare
+            out.bugiarda = await giro({bugiarda:true, bitmap:'ok'}, 'bugiarda');
+            out.bugiardaPesante = await giro({bugiarda:true, bitmap:'ok',
+              peso: 20000000}, 'bugiardaPesante');
+            out.bugiardaServerNo = await giro({bugiarda:true, server:'no'},
+              'bugiardaServerNo');
             // --- «📷 SCATTA FOTO» (1 ott 2026): fotoScelte VERA coi due
             // input. La foto scattata entra dalla stessa strada (stesso
             // CASO della buona, stessa fonte), e a mani vuote ognuno dei
@@ -14579,6 +14590,25 @@ def prove_foto_scarti():
             prova("...con le misure ignote chiede la larghezza di serie",
                   {"resizeQuality": "high", "imageOrientation": "from-image", "resizeWidth": 1200},
                   _dett["grande"]["opz"])
+            # 9) LA TELA BUGIARDA (6 ott 2026, dal campo: Tor Browser sul
+            # .onion e Telegram Web, foto entrate come quadrati di un
+            # colore). Quando la prova a risposta nota dice «mente», la
+            # foto va al server INTERA: niente decode in piccolo, che
+            # finisce su una tela anche lui, e niente tela intera
+            prova("la tela bugiarda: la foto la prepara il server, intera",
+                  ([1, 0, ""], "server", 0, 1),
+                  (v["bugiarda"], _dett["bugiarda"]["fonte"],
+                   _dett["bugiarda"]["bitmap"], _dett["bugiarda"]["server"]))
+            # gli stessi limiti di sempre: oltre i 15MB il server non
+            # arriva, e lo si dice col suo tetto (il decode in piccolo che
+            # qui la salverebbe consegnerebbe il quadrato a caso)
+            prova("...oltre i 15MB: il tetto detto, e nessun quadrato a caso",
+                  (0, True, 0, 0),
+                  (v["bugiardaPesante"][0], "15MB" in v["bugiardaPesante"][2],
+                   _dett["bugiardaPesante"]["bitmap"],
+                   _dett["bugiardaPesante"]["server"]))
+            prova("...e il no del server arriva a chi ha scelto la foto",
+                  [0, 1, "Non riesco a leggere questa foto"], v["bugiardaServerNo"])
             # LA REGOLA NUOVA: un JPEG nero non entra MAI fra le foto
             prova("REGOLA: nessuna foto nera fra quelle da inviare", 0,
                   _tutto["NERE_ENTRATE"])
@@ -14618,7 +14648,8 @@ def prove_foto_scarti():
     for f in ("function ridimensiona(", "function fotoDalServer(",
               "function jpegDalCanvas(", "function telaPiatta(",
               "function jpegVuoto(", "async function jpegDaBitmap(",
-              "async function ripiegoFoto("):
+              "async function ripiegoFoto(", "function telaBugiarda(",
+              "function telaRende(", "function telaDipinta("):
         prova(f"sentinella: {f.split()[-1][:-1]} non parla, risponde",
               False, "toast(" in pezzo_js(mini, f, "\n}\n"))
     _agg = pezzo_js(mini, "async function aggiungiFoto(files, daFotocamera){", "\n}\n")
@@ -15362,6 +15393,7 @@ def prove_fotocamera_pagina():
       function renderFotoPreview(){}
       async function aggiungiFoto(files, daFotocamera){ aggiunte.push([files, daFotocamera]); }
       function telaPiatta(){ return !!CASO.nera; }
+      async function telaBugiarda(){ return !!CASO.bugiarda; }
       // ASINCRONO come il vero: navIndietro chiede history.back(), e lo
       // strato lo chiude il popstate, piu' tardi. Un banco che chiudesse
       // subito non vedrebbe mai il doppio tocco su «Usa questa foto».
@@ -15523,6 +15555,15 @@ def prove_fotocamera_pagina():
         await scattaDalVivo();
         O.blobNullo = [stato(), NODI.camAvviso.textContent, camScatto];
         navIndietro();
+        // 18) LA TELA BUGIARDA (6 ott 2026): lo scatto nasce dalla tela,
+        // e in Tor Browser la tela consegna un quadrato a caso. Niente
+        // scatto, si dice, e resta il selettore
+        await daCapo({bugiarda: true}); scattaFoto(); await pausa(); await pausa();
+        NODI.camVideo.videoWidth = 1920; NODI.camVideo.videoHeight = 1440;
+        await scattaDalVivo();
+        O.bugiarda = [stato(), NODI.camAvviso.textContent, camScatto, NODI.camFoto.src];
+        LOG = []; camRipiego(); await pausa();
+        O.bugiardaRipiego = [LOG, aperta()];
         console.log(JSON.stringify(O));
       })().catch(e => console.log(JSON.stringify({rotto: String(e && e.stack || e)})));
     """
@@ -15596,6 +15637,177 @@ def prove_fotocamera_pagina():
           [["input", "indietro"], False], v["ripiego"])
     prova("lo scatto che il telefono non sa fare: lo si dice, si resta a inquadrare",
           ["vivo", "Lo scatto non è riuscito: riprova", None], v["blobNullo"])
+    prova("la tela bugiarda: nessuno scatto finto, il perche' e la strada",
+          ["errore", "Questo browser protegge la privacy e falsa le foto "
+           "scattate da qui: tocca «Scegli una foto dal telefono» per "
+           "caricarla intera.", None, ""], v["bugiarda"])
+    prova("...e «Scegli una foto dal telefono» apre il selettore",
+          [["input", "indietro"], False], v["bugiardaRipiego"])
+    # la sentinella: la prova sta PRIMA che lo scatto diventi un file
+    _sdv = pezzo_js(mini, "async function scattaDalVivo(){", "\n}\n")
+    _pos = _sdv.find("if (await telaBugiarda())")
+    prova("sentinella: lo scatto chiede alla tela PRIMA di farsi file",
+          True, 0 <= _pos < _sdv.find("camScatto = new File("))
+
+def prove_tela_bugiarda():
+    """LA TELA BUGIARDA (6 ott 2026, dal campo: le foto di «Metti in
+    vendita» dal sito .onion con Tor Browser, e da Telegram Web, entrate
+    come quadrati di un colore solo, verde o viola).
+
+    Firefox con resistFingerprinting (Tor Browser, Mullvad Browser,
+    LibreWolf) non nega la lettura della tela: MENTE. toDataURL consegna
+    un'immagine di UN colore a caso, getImageData RUMORE a caso, alfa
+    compresa — misurato con Firefox 157 sulla pagina e in un iframe di
+    terzi. Il giudice della tela nera misurava col getImageData che
+    mente, vedeva migliaia di colori e diceva «foto vera».
+    La cura e' una prova a risposta nota (telaBugiarda): due colori noti
+    su un 8x8, riletti col getImageData e passando da toDataURL e da un
+    decode. Qui le funzioni VERE girano su una tela di cartone che si
+    comporta come le tele vere misurate: onesta (Chrome, Firefox),
+    sporcata di poco (Brave, la protezione leggera di Firefox), bugiarda
+    (Tor), muta, che getta."""
+    import shutil, subprocess, json
+    print("\n🖼️  La tela bugiarda (Tor Browser, Telegram Web)")
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "miniapp.html"), encoding="utf-8").read()
+    mini = mini.replace("\r\n", "\n")
+    _pz = pezzo_js(mini, "const TELA_PROVA = ", "\n") + "\n"
+    for f in ("function telaDipinta(){", "function telaRende(c){",
+              "function telaBugiarda(){"):
+        _pz += pezzo_js(mini, f, "\n}\n") + "\n}\n"
+    # la sentinella di struttura: in ridimensiona la prova sta PRIMA di
+    # ogni tela — prima del decode, del bitmap e del ripiego
+    _rid = pezzo_js(mini, "async function ridimensiona(file){", "\n}\n")
+    _pos = _rid.find("if (await telaBugiarda()) return await fotoDalServer(file);")
+    prova("sentinella: ridimensiona chiede alla tela PRIMA di usarla",
+          True, 0 <= _pos < _rid.find("new Promise("))
+    if not shutil.which("node"):
+        salta("la tela bugiarda, girata per davvero", "node non installato")
+        return
+    _banco = r"""
+      // LA TELA DI CARTONE: un 8x8 di pixel veri. fillRect e drawImage
+      // scrivono, getImageData legge come dice CASO.lettura, toDataURL
+      // esce come dice CASO.uscita, e l'Image decodifica come CASO.decode
+      let CASO = {};
+      const _st = setTimeout;
+      globalThis.setTimeout = (fn, ms, ...a) => _st(fn, ms === 3000 ? 5 : ms, ...a);
+      const caso = n => Math.floor(Math.random() * n);
+      function tela(){
+        const px = new Uint8ClampedArray(8 * 8 * 4);
+        const c = {width: 0, height: 0, _px: px,
+          getContext(){ let colore = [0, 0, 0]; return {
+            set fillStyle(v){ colore = v.match(/\d+/g).map(Number); },
+            set imageSmoothingEnabled(v){},
+            fillRect(x, y, w, h){
+              for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++){
+                const q = (j * 8 + i) * 4;
+                px[q] = colore[0]; px[q + 1] = colore[1]; px[q + 2] = colore[2]; px[q + 3] = 255;
+              }},
+            drawImage(img){ px.set(img._px); },
+            getImageData(){
+              if (CASO.lettura === 'getta') throw new Error('SecurityError');
+              const d = new Uint8ClampedArray(px);
+              const n = d.length / 4;
+              for (let p = 0; p < n; p++){
+                const q = p * 4;
+                if (CASO.lettura === 'rumore')
+                  for (let k = 0; k < 4; k++) d[q + k] = caso(256);
+                else if (CASO.lettura === 'sporca' && p % 4 === 0)
+                  for (let k = 0; k < 3; k++) d[q + k] += caso(7) - 3;
+                else if (CASO.lettura === 'storti' && p < CASO.quanti)
+                  d[q] = (d[q] + 128) % 256;
+                else if (CASO.lettura === 'trasparente') d[q + 3] = 0;
+              }
+              return {data: d};
+            }}; },
+          toDataURL(tipo){
+            if (CASO.uscita === 'getta') throw new Error('SecurityError');
+            if (CASO.uscita === 'vuota') return 'data:,';
+            let fuori = px;
+            if (CASO.uscita === 'unColore'){
+              const r = caso(256), g = caso(256), b = caso(256);
+              fuori = new Uint8ClampedArray(px.length);
+              for (let q = 0; q < fuori.length; q += 4){
+                fuori[q] = r; fuori[q + 1] = g; fuori[q + 2] = b; fuori[q + 3] = 255; }
+            }
+            CASO.tipo = tipo;
+            return 'data:image/png;base64,' + Buffer.from(fuori).toString('base64');
+          }};
+        return c;
+      }
+      globalThis.document = {createElement: tela};
+      function Image(){}
+      Object.defineProperty(Image.prototype, 'src', {
+        set(v){ const io = this;
+          if (CASO.decode === 'muto') return;
+          setTimeout(()=>{
+            if (CASO.decode === 'errore') { io.onerror(); return; }
+            io._px = new Uint8ClampedArray(Buffer.from(v.split(',')[1], 'base64'));
+            io.onload(); }, 0); }});
+      globalThis.Image = Image;
+    """ + _pz + r"""
+      (async ()=>{
+        const O = {};
+        const giro = async (nome, c) => { CASO = c; O[nome] = await telaBugiarda(); };
+        await giro('onesta', {});
+        await giro('sporca', {lettura: 'sporca'});
+        await giro('tor', {lettura: 'rumore', uscita: 'unColore'});
+        await giro('rumoreSolo', {lettura: 'rumore'});
+        await giro('unColoreSolo', {uscita: 'unColore'});
+        await giro('getta', {lettura: 'getta'});
+        await giro('uscitaGetta', {uscita: 'getta'});
+        await giro('uscitaVuota', {uscita: 'vuota'});
+        await giro('decodeErrore', {decode: 'errore'});
+        await giro('decodeMuto', {decode: 'muto'});
+        await giro('trasparente', {lettura: 'trasparente'});
+        await giro('otto', {lettura: 'storti', quanti: 8});
+        await giro('nove', {lettura: 'storti', quanti: 9});
+        CASO = {}; await telaBugiarda(); O.tipo = CASO.tipo;
+        // la tela dipinta: le due meta' coi due colori noti
+        const d = telaDipinta()._px;
+        O.dipinta = [Array.from(d.slice(0, 4)), Array.from(d.slice(16, 20)),
+                     Array.from(d.slice(28, 32)), Array.from(d.slice(252, 256))];
+        console.log(JSON.stringify(O));
+      })().catch(e => console.log(JSON.stringify({rotto: String(e && e.stack || e)})));
+    """
+    _r = subprocess.run(["node", "-e", _banco], capture_output=True, text=True,
+                        encoding="utf-8", timeout=60)
+    try:
+        v = json.loads((_r.stdout or "").strip().splitlines()[-1])
+    except Exception:
+        v = None
+    if not v or "rotto" in v:
+        prova("il banco della tela bugiarda gira", True,
+              f"node ha detto: {((v or {}).get('rotto') or _r.stderr or '')[:400]}")
+        return
+    prova("la tela dipinta: a sinistra il verde, a destra il rosso, opachi",
+          [[30, 180, 60, 255], [200, 40, 90, 255], [200, 40, 90, 255],
+           [200, 40, 90, 255]], v["dipinta"])
+    # NESSUN CAMBIAMENTO PER CHI OGGI FUNZIONA
+    prova("la tela onesta (Chrome, Firefox, il telefono) non e' bugiarda",
+          False, v["onesta"])
+    prova("...e nemmeno quella sporcata di poco (Brave, la protezione "
+          "leggera di Firefox): non rovina una foto", False, v["sporca"])
+    prova("...e il decode che non risponde: nel dubbio la strada di oggi",
+          False, v["decodeMuto"])
+    prova("...otto pixel storti su 64 sono ancora il margine", False, v["otto"])
+    # LA TELA CHE MENTE, in ogni modo misurato o possibile
+    prova("Tor Browser (rumore e un colore a caso): bugiarda", True, v["tor"])
+    prova("...anche col solo getImageData che mente", True, v["rumoreSolo"])
+    prova("...e col solo toDataURL di un colore a caso — la strada delle "
+          "foto, che il getImageData da solo non vedrebbe", True,
+          v["unColoreSolo"])
+    prova("la lettura negata e' la stessa bugia, detta meglio", True, v["getta"])
+    prova("...anche quella di toDataURL", True, v["uscitaGetta"])
+    prova("...e la tela che esce 'data:,'", True, v["uscitaVuota"])
+    prova("il PNG appena fatto che non si decodifica: non ci si fida",
+          True, v["decodeErrore"])
+    prova("i pixel trasparenti su una tela dipinta opaca: bugiarda", True,
+          v["trasparente"])
+    prova("nove pixel storti su 64: oltre il margine", True, v["nove"])
+    prova("la seconda lettura passa da un PNG, che non perde niente",
+          "image/png", v.get("tipo"))
+
 
 def prove_foto_spenta():
     """«NESSUNA» VUOL DIRE OVUNQUE, ANCHE A LUI (ago 2026, dal campo:
@@ -122506,6 +122718,7 @@ def main():
               prove_ritiro, prove_disarmo, prove_importo_uscita,
               prove_initdata, prove_portachiavi,
               prove_foto, prove_foto_scarti, prove_fotocamera_pagina,
+              prove_tela_bugiarda,
               prove_duplica_annuncio, prove_avatar,
               prove_foto_spenta, prove_foto_telegram_fallita,
               prove_nome_da_nostr, prove_foto_nostr_relay_muti,
