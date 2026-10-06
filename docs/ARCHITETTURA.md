@@ -7343,8 +7343,11 @@
   L'INTERVALLO IN DUE COLONNE (6 ott 2026): su un ordine «da 5 a 15 €»
   il conto (`contoDettP2P`, libro e pagina dello scambio) e' una tabella
   — intestazione coi due importi, una cella per capo col suo ≈, il suo
-  segno e il ₿ dopo ogni cifra in sats (`conBtc`, il simbolo del toggle
-  €/₿: mai la parola «sats»), la scatola `conto-due` con `--n` (i
+  segno e dopo ogni cifra in sats il SIMBOLO DEI SATOSHI (`conSat`: un
+  SVG nostro, `SAT`, dentro `contoDettP2P` — la versione inclinata del
+  «Sat Symbol», largo una cifra del mono, col colore della cifra, detto
+  «sats» alla voce; vestito in `.sat-sym`; mai la parola «sats», e dal
+  terzo ritocco del 6 ott 2026 nemmeno il ₿), la scatola `conto-due` con `--n` (i
   caratteri della cella piu' lunga) che il CSS fa diventare pixel
   uguali per ogni riga; le celle scendono su una riga loro quando
   l'etichetta non ci sta per la sua parola piu' lunga. A importo

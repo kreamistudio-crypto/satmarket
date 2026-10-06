@@ -37572,3 +37572,59 @@ padrone — non si butta, e se non è dell'account aperto non firma.
 ieri non firma per l'altro account e si archivia al suo padrone, ogni
 account ritrova il suo sullo stesso telefono, scordarne uno lascia
 l'altro. Non provato su un telefono vero.
+
+## Il simbolo dei satoshi nel conto in due colonne (6 ott 2026, terzo ritocco)
+
+Richiesta di Andrea su 55633cc: nel conto a intervallo del P2P, al posto
+del ₿ accanto alle cifre in sats, il simbolo dei satoshi — tre tratti
+orizzontali con un trattino verticale sopra e uno sotto, nella versione
+inclinata del «Sat Symbol» della comunità. Il ₿ dice bitcoin: «6 536 ₿»
+si poteva leggere come seimila bitcoin.
+
+**DECISO.** È un SVG nostro in linea (nessun font ha quel segno), in un
+punto solo: `SAT` dentro `contoDettP2P`, messo da `conSat` (ex `conBtc`)
+su ogni cella in sats — Controvalore, premio o sconto, Subtotale, Fee
+P2P, Ricevi/Invia, la fee a zero —, mai su un trattino. Quadro 12×20:
+tre tratti a y 4 · 9,5 · 15 e i due trattini dal centro, tutto inclinato
+di un quinto come un corsivo. Il vestito sta in `.sat-sym`: largo 0,6 em
+(una cifra del mono: `--n` e le colonne non cambiano), alto 1 em,
+abbassato di 0,2 em; `stroke:currentColor`, quindi verde, rosso o grigio
+insieme alla cifra; spessore 2, e 2,4 nelle righe in scatola che sono
+in neretto. Per chi legge con la voce è `role="img"` con l'etichetta
+«sats». Il conto a importo fisso, su una colonna, resta com'era.
+
+**MISURATO, NON SCELTO A OCCHIO.** Al primo disegno i tratti stavano a y
+5,5 · 10 · 14,5 con spessore 1,7: nelle righe da 14 px il segno era alto
+metà cifra e sottile, e pareva un apice. Allargato all'altezza delle
+cifre del mono e ispessito, regge accanto ai numeri in tutti e quattro i
+colori del conto (inchiostro, grigio del Subtotale, rosso e verde), nei
+due temi, a 375 e a 320 px.
+
+**SCARTATO.** Un carattere Unicode: non esiste un punto di codice per il
+Sat Symbol, e i font della comunità andrebbero caricati apposta per un
+segno solo. Un'immagine o un file .svg: non seguirebbe il colore della
+cifra. Il segno su una costante globale: oggi vive in un posto solo, e
+portarlo fuori ha senso solo il giorno che lo usano altri (vedi sotto).
+
+**PROVATO.** `prove_p2p_dettaglio`: il simbolo preso dal conto vero è UN
+SVG solo, uguale in ogni cella, con `role="img" aria-label="sats"` e il
+suo `viewBox`; ogni cella in sats lo porta (6 da chi compra, 10 da chi
+vende con lo sconto), nessuna «\d sats», il ₿ sparito, i trattini senza
+simbolo. `prove_conto_due_colonne`: le sentinelle su `SAT`, `conSat`, la
+fee a zero e il CSS. Tortura 7 su 7 sulla copia (torna il ₿, simbolo sul
+trattino, niente nome per la voce, colore fisso, largo un em, fee a zero
+nuda, niente spessore in neretto). Scatti prima/dopo a 375 e 320 px nei
+due temi (Chrome headless, copia in collaudo, relay morto). Suite e
+collaudi: nel verbale del push.
+
+**IL CENSIMENTO CHIESTO (niente cambiato, aspetta il sì di Andrea).**
+Altrove le cifre in sats si scrivono con la parola «sats» (16 `.unit`
+del mercatino: prezzi della vetrina, dettaglio, conto «Paga», ordini;
+una trentina di `fmt(…) + ' sats'` fra P2P — card del libro, card della
+home, «I miei scambi», conto a una colonna, garanzia, cauzione, incasso,
+foglio Pubblica — e mercatino — offerte, rimborsi, payout, sblocchi), e
+col ₿ solo sugli 8 bottoni del toggle €/₿. Le notifiche Telegram, le note
+Nostr e i memo delle fatture sono testo puro: lì un SVG non può andare.
+
+**DA GUARDARE.** Sul telefono, Android e iPhone: il segno accanto alle
+cifre a 14 px su schermi a densità 2 e 3.
