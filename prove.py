@@ -56370,8 +56370,8 @@ def prove_card_p2p_vetrina():
           [True, True], [os.path.exists(os.path.join("assets", "scambi-intestazione.webp")),
                          os.path.exists(os.path.join("assets", "barattozon.webp"))])
     css = mini[mini.index("<style"):mini.index("</style>")]
-    prova("la pastiglia sta sulla «foto»: colori FISSI, bianco su rosso e su verde",
-          [True, True], [".p2p-vt-lato.vendi{background:#C2410C}" in css,
+    prova("la pastiglia sta sulla «foto»: colori FISSI, scuro sul rosso del P2P e bianco sul verde",
+          [True, True], [".p2p-vt-lato.vendi{background:var(--rosso-p2p);color:var(--b-rosso-fg)}" in css,
                          ".p2p-vt-lato.compra{background:#1B8B54}" in css])
 
     node = shutil.which("node")
@@ -58268,7 +58268,7 @@ def prove_p2p_libro():
           and "tema-pill" not in senza_commenti)
     prova("...e l'attivo veste il suo colore: compra verde, vendi rosso",
           True, ".p2p-lati .p2p-lato.compra.attiva{color:var(--trust);" in mini
-          and ".p2p-lati .p2p-lato.vendi.attiva{color:var(--danger);" in mini)
+          and ".p2p-lati .p2p-lato.vendi.attiva{color:var(--rosso-p2p-testo);" in mini)
     prova("view-p2p sta DOPO il coming soon e PRIMA del pacco", True,
           mini.index('id="view-p2ppresto"') < j
           < mini.index("VISTA: LA PAGINA DEL PACCO"))
@@ -58374,7 +58374,7 @@ def prove_p2p_libro():
     # prezzo di ieri non resta nemmeno il CSS.
     prova("...e il badge e' muto, con la tinta sul solo numero", True,
           "color:var(--muted)" in pezzo_js(mini, "  .p2p-badge{", "}")
-          and ".p2p-badge .p2p-avviso{color:var(--danger)}" in mini
+          and ".p2p-badge .p2p-avviso{color:var(--rosso-p2p-testo)}" in mini
           and ".p2p-badge .p2p-affare{color:var(--trust)}" in mini
           # i due fondi tinti della pillola di ieri sono usciti
           and ".p2p-badge.affare" not in mini
@@ -59767,7 +59767,7 @@ console.log(JSON.stringify(out));
           ".p2p-sats .p2p-verbo{color:var(--ink)}" in mini
           # e la tinta del LATO resta dov'era, sulla riga intera
           and ".p2p-ord .p2p-sats{color:var(--trust)" in mini
-          and ".p2p-ord.lato-vendo .p2p-sats{color:var(--danger)}" in mini)
+          and ".p2p-ord.lato-vendo .p2p-sats{color:var(--rosso-p2p-testo)}" in mini)
     # ⚠️ LA CIFRA VESTE L'ORDINE, MAI IL TAB (28 set 2026, dal difetto del
     # dettaglio aperto dalla vetrina): si chiede alla CASCATA, sul markup
     # vero delle due card, col body di ciascun tab — il libro filtra per
@@ -59786,7 +59786,7 @@ console.log(JSON.stringify(out));
     _TAB_L = ([], ["p2p-vendo"], ["nav-p2p"], ["nav-p2p", "p2p-vendo"])
     prova("LA CIFRA DELLA CARD DEL LIBRO VESTE L'ORDINE: verde su un «Compra BTC» e "
           "rossa su un «Vendi BTC», qualunque tab sia rimasto (lo dice la cascata)",
-          [["var(--trust)"] * 4, ["var(--danger)"] * 4],
+          [["var(--trust)"] * 4, ["var(--rosso-p2p-testo)"] * 4],
           [[_tinta_card(out["rigaCompra"], t) for t in _TAB_L],
            [_tinta_card(out["rigaVendi"], t) for t in _TAB_L]])
     prova("...e la card la porta scritta: lato-compro sul k=sell, lato-vendo sul k=buy",
@@ -60460,7 +60460,7 @@ def prove_p2p_dettaglio():
     prova("...e i tre stati vestono le tacche accese", True,
           all(s in mini for s in (".p2p-anellone .tacca.on{stroke:var(--ink-soft)}",
                                   ".p2p-anellone.vicina .tacca.on{stroke:var(--sats)}",
-                                  ".p2p-anellone.ultimo-giorno .tacca.on{stroke:var(--danger);")))
+                                  ".p2p-anellone.ultimo-giorno .tacca.on{stroke:var(--rosso-p2p);")))
     prova("...e l'ultimo giorno non pulsa a chi ha chiesto di non muoversi",
           True, ".p2p-anellone.ultimo-giorno .tacca.on{animation:none}" in mini)
     prova("le cifre del conto non ballano", True,
@@ -61051,12 +61051,12 @@ console.log(JSON.stringify(out));
     prova("DAL DETTAGLIO (libro o vetrina, dopo il tab Compra e dopo il tab Vendi): "
           "«Ricevi X sats» verde su un «Compra BTC», «Invia X sats» rosso su un "
           "«Vendi BTC» (lo dice la cascata)",
-          [["var(--trust)"] * 4, ["var(--danger)"] * 4],
+          [["var(--trust)"] * 4, ["var(--rosso-p2p-testo)"] * 4],
           [[_tinta_sats(o["pagina"], t, _FOGLIO) for t in _TAB_D],
            [_tinta_sats(o["paginaVendi"], t, _FOGLIO) for t in _TAB_D]])
     prova("DA «I MIEI SCAMBI» (e da un link o una notifica, stessa pagina): verde "
           "se compro, rosso se vendo, qualunque tab",
-          [["var(--trust)"] * 4, ["var(--danger)"] * 4],
+          [["var(--trust)"] * 4, ["var(--rosso-p2p-testo)"] * 4],
           [[_tinta_sats(_scat("compro", o["mioStima"]), t, _PAGINA) for t in _TAB_D],
            [_tinta_sats(_scat("vendo", o["mioVendo"]), t, _PAGINA) for t in _TAB_D]])
     prova("...il conto porta scritto il lato di chi legge, dal suo o.lato",
@@ -61219,14 +61219,14 @@ console.log(JSON.stringify(out));
     # il GIUDIZIO, e vive nelle due classi di casa.
     prova("...ma le percentuali a sinistra restano in tinta", True,
           '<b class="p2p-avviso">1%</b>' in cm
-          and ".ctrl-riga .p2p-avviso{color:var(--danger)}" in mini
+          and ".ctrl-riga .p2p-avviso{color:var(--rosso-p2p-testo)}" in mini
           and ".ctrl-riga .p2p-affare{color:var(--trust)}" in mini)
     # (28 set 2026) il lato sta sulla scatola del conto, mai sul body
     prova("...e l'unica riga accesa porta il colore del lato",
           True,
           ".conto-p2p.lato-compro .ctrl-riga.tot.sats .mono{color:var(--trust)}" in mini
           and ".conto-p2p.lato-vendo .ctrl-riga.tot.sats .mono"
-              "{color:var(--danger)}" in mini
+              "{color:var(--rosso-p2p-testo)}" in mini
           # ...e l'arancio «dei sats in astratto» e' uscito di qui
           and ".conto-p2p .ctrl-riga.tot.sats .mono{color:var(--sats-text)}"
               not in mini)
@@ -62367,7 +62367,7 @@ def prove_nav_p2p():
            "body.nav-p2p:not(.p2p-vendo) nav #nav-p2plibro.active .tinta-verde," in mini,
            "body.nav-p2p.p2p-vendo nav #nav-p2plibro.active .tinta-rossa{" in mini,
            "nav .tinta-arancio{color:#FFB25C}\n  nav .tinta-verde{color:#34B47A}\n"
-           "  nav .tinta-rossa{color:#F07A47}" in mini,
+           "  nav .tinta-rossa{color:var(--rosso-p2p-banda)}" in mini,
            bool(_tinte) and "'nav-p2plibro': ['verde', 'rossa']" in _tinte.group(1)
            and "'nav-p2pmiei': ['arancio']" in _tinte.group(1)
            and "'nav-p2pinfo': ['arancio']" in _tinte.group(1)])
@@ -62413,7 +62413,7 @@ def prove_nav_p2p():
            in mini,
            "body.nav-p2p nav #nav-p2plibro.active{background:rgba(52,180,122,.14)}"
            in mini,
-           "body.nav-p2p.p2p-vendo nav #nav-p2plibro.active{background:rgba(240,122,71,.15)}"
+           "body.nav-p2p.p2p-vendo nav #nav-p2plibro.active{background:rgba(240,64,46,.08)}"
            in mini,
            "body.nav-p2p.p2p-vendo nav button.active{background:" in mini])
     prova("...con la dissolvenza anche sul fondo", True,
@@ -62424,7 +62424,7 @@ def prove_nav_p2p():
           "color:var(--trust)" in _ps
           and "transition:color .3s ease" in _ps
           # (28 set 2026) il rosso lo porta la card del lato, non il tab
-          and ".p2p-ord.lato-vendo .p2p-sats{color:var(--danger)}"
+          and ".p2p-ord.lato-vendo .p2p-sats{color:var(--rosso-p2p-testo)}"
           in mini)
     # ⚠️ QUESTA SENTINELLA HA CAMBIATO DUE VOLTE IN UN GIORNO, e la
     # storia vale piu' della riga. Contava DUE regole
@@ -71642,7 +71642,7 @@ def prove_p2p_pubblica():
           out["fascia"][1])
     prova("...a sinistra (vendo) e' rossa e va dal capo al centro",
           {"da": "calc(0 * (100% - 20px) + 10px)", "a": _C,
-           "tinta": "var(--danger)", "giudizio": "avviso"}, out["fascia"][0])
+           "tinta": "var(--rosso-p2p)", "giudizio": "avviso"}, out["fascia"][0])
     prova("...a destra (vendo) e' verde e va dal centro al capo",
           {"da": _C, "a": "calc(1 * (100% - 20px) + 10px)",
            "tinta": "var(--trust)", "giudizio": "affare"}, out["fascia"][2])
@@ -71650,7 +71650,7 @@ def prove_p2p_pubblica():
     # SINISTRA e il centro resta l'altro capo — la fascia non scavalca
     prova("...e a meta' strada il centro resta un capo",
           {"da": "calc(0.25 * (100% - 20px) + 10px)", "a": _C,
-           "tinta": "var(--danger)", "giudizio": "avviso"}, out["fascia"][3])
+           "tinta": "var(--rosso-p2p)", "giudizio": "avviso"}, out["fascia"][3])
     prova("...e i numeri fuori fascia si tosano ai due capi",
           [out["fascia"][0], out["fascia"][2]],
           [out["fascia"][4], out["fascia"][5]])
@@ -71664,7 +71664,7 @@ def prove_p2p_pubblica():
            "tinta": "var(--trust)", "giudizio": "affare"}, out["fasciaCompro"][0])
     prova("...e il capo destro e' rosso: meno sats a chi compra",
           {"da": _C, "a": "calc(1 * (100% - 20px) + 10px)",
-           "tinta": "var(--danger)", "giudizio": "avviso"}, out["fasciaCompro"][1])
+           "tinta": "var(--rosso-p2p)", "giudizio": "avviso"}, out["fasciaCompro"][1])
     prova("...e a zero non c'e' giudizio nemmeno di la'",
           out["fascia"][1], out["fasciaCompro"][2])
     prova("la riga torna payload sui byte: mercato, intervallo, prezzo fisso",
@@ -72005,7 +72005,7 @@ def prove_p2p_pubblica():
           "padding:7px 12px;border:0;border-radius:999px;background:var(--card);"
           in stile
           and ".p2p-premio-cifra.affare{color:var(--trust)}" in stile
-          and ".p2p-premio-cifra.avviso{color:var(--danger)}" in stile
+          and ".p2p-premio-cifra.avviso{color:var(--rosso-p2p-testo)}" in stile
           and ".p2p-premio-cifra.su{" not in stile)
     # ⚠️ IL BLOCCO SI RITAGLIA, e la tortura ha spiegato perche': la
     # riga `border-radius:999px;background:#fff;` sta ANCHE nel pomello
@@ -72733,7 +72733,7 @@ def prove_p2p_pubblica():
           "setTimeout(() => q.classList.remove('p2p-manca'), 1300);" in avvisa
           and ".p2p-manca{animation:p2pManca 1.2s ease}" in stile)
     prova("...e in reduced-motion l'anello si vede fermo", True,
-          ".p2p-manca{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.55)}"
+          ".p2p-manca{animation:none;box-shadow:0 0 0 3px rgba(240,64,46,.55)}"
           in stile)
 
     # G) IL FANTASMA. Tre strati, e NON e' un foglio: la pila della
@@ -80304,14 +80304,14 @@ def prove_card_tinte_stato():
           and "border-color:color-mix(in srgb,var(--tinta) var(--tinta-bordo),"
               "var(--card))" in sup)
     INCHIOSTRO = dict(re.findall(
-        r"\.p2p-scambio\.tono-([a-z]+)\{--tinta:var\((--[a-z-]+)\)\}", sup))
+        r"\.p2p-scambio\.tono-([a-z]+)\{--tinta:var\((--[a-z0-9-]+)\)\}", sup))
     # I COLORI NON SONO NUOVI: ogni tono prende l'INCHIOSTRO del suo
     # riquadro — l'arancio dei sats, il viola, il blu, il verde, il
     # rosso, il grigio — e lo stempera nella carta
     prova("i sei toni prendono l'inchiostro del loro riquadro",
           {"locked": "--sats-text", "confirmed": "--nostr-text",
            "shipped": "--ship-text", "released": "--trust-text",
-           "dispute": "--danger", "annullato": "--muted"}, INCHIOSTRO)
+           "dispute": "--rosso-p2p-testo", "annullato": "--muted"}, INCHIOSTRO)
     prova("...e il riquadro resta staccato dalla card, con un filo suo",
           True, ".p2p-scambio.tinta .p2p-scambio-stato.badge{" in sup
           and "border-color:color-mix(in srgb,currentColor 30%,transparent)"
@@ -80339,7 +80339,7 @@ def prove_card_tinte_stato():
               "var(--sats-text))}" in sup
           and ".p2p-scambio.tinta .p2p-badge .p2p-avviso{" in sup
           and "color:color-mix(in srgb,var(--ink) var(--tinta-testo),"
-              "var(--danger))}" in sup)
+              "var(--rosso-p2p-testo))}" in sup)
     # «EFFETTI RIDOTTI» NON HA NIENTE DA TOGLIERE: e' un colore fermo,
     # senza animazioni, sfocature o filtri — e il censimento conta le
     # regole, cosi' una regola nuova entra nel conto e nel controllo
@@ -80427,7 +80427,7 @@ def prove_card_tinte_stato():
           and ".p2p-sats{font-family:'JetBrains Mono',monospace;"
               "font-weight:700;font-size:14px;\n    color:var(--sats-text)"
           in css
-          and ".p2p-badge .p2p-avviso{color:var(--danger)}" in css)
+          and ".p2p-badge .p2p-avviso{color:var(--rosso-p2p-testo)}" in css)
     # ⚠️ E LA TINTA SI DEVE VEDERE: una velatura a zero passerebbe ogni
     # contrasto senza tingere niente, e la prova qui sopra tacerebbe
     prova("...e ogni tinta si stacca davvero dalla carta", [], spente)
@@ -80514,7 +80514,7 @@ console.log(JSON.stringify(out));
     # riquadro — cioe' la catena intera, letta dal codice
     prova("le quattro tinte chieste per nome arrivano fino al colore",
           {"concluso": "--trust-text", "attesa_mia_hold": "--sats-text",
-           "annullato": "--muted", "in_disputa": "--danger"},
+           "annullato": "--muted", "in_disputa": "--rosso-p2p-testo"},
           {"concluso": colore(o["concluso"][0]),
            "attesa_mia_hold": colore(o["attesa_mia_hold"][1]),
            "annullato": colore(o["annullato"][0]),
@@ -81055,7 +81055,7 @@ def prove_convenienza_vera():
     # `.ctrl-riga` e sui badge, e la frase — che non e' una riga — usciva
     # coi numeri bianchi
     prova("...e i suoi numeri prendono la tinta del giudizio", [True, True],
-          [".conto-p2p .ctrl-conv .p2p-avviso{color:var(--danger)}" in mini,
+          [".conto-p2p .ctrl-conv .p2p-avviso{color:var(--rosso-p2p-testo)}" in mini,
            ".conto-p2p .ctrl-conv .p2p-affare{color:var(--trust)}" in mini])
     prova("«Info P2P» dice che la convenienza si muove col prezzo, senza limiti", True,
           "la convenienza vera si muove col prezzo</b>, e il numero la segue, senza limiti" in mini)
@@ -112606,7 +112606,7 @@ def prove_ritocchi_flusso_p2p():
     prova("...e il CSS la veste: verde a comprare, rosso a vendere, e il tab del libro "
           "non c'entra", True,
           ".conto-p2p.lato-compro .ctrl-riga.tot.sats .mono{color:var(--trust)}" in css
-          and ".conto-p2p.lato-vendo .ctrl-riga.tot.sats .mono{color:var(--danger)}" in css
+          and ".conto-p2p.lato-vendo .ctrl-riga.tot.sats .mono{color:var(--rosso-p2p-testo)}" in css
           and "body.p2p-vendo .conto-p2p" not in css)
     prova("...senza una seconda regola sui sats delle card (la sentinella del libro conta una)", 1,
           mini.count(".p2p-ord .p2p-sats{color"))
@@ -120633,6 +120633,55 @@ def prove_vestito_bottoni():
           [(_av.get(p) or (None,))[0] for p in ("background", "color", "box-shadow", "border",
                                                  "border-radius", "min-height", "font-family",
                                                  "transition")])
+    # --- IL ROSSO DEL P2P (6 ott 2026, richiesta di Andrea) ----------
+    # Il «rosso vivo» di «Pubblica ordine» per tutto il lato «vendi» e
+    # gli avvisi del P2P: UNA tinta e le sue varianti, ognuna misurata
+    # sul fondo dove sta. Il corallo (--danger) resta al mercatino.
+    leve_r = ("--rosso-p2p", "--rosso-p2p-testo", "--rosso-p2p-banda", "--rosso-p2p-tenue")
+    prova("il rosso del P2P ha le sue quattro leve, di giorno; di sera cambiano "
+          "testo e tenue", [[], True],
+          [[k for k in leve_r if k not in chiaro],
+           all(k in variabili('html[data-tema="scuro"]') for k in ("--rosso-p2p-testo", "--rosso-p2p-tenue"))])
+    _c = lambda tok, a, b: contrasto(colori(risolvi(tok[a], tok))[0], colori(risolvi(tok[b], tok))[0])
+    deboli_r = []
+    for tema, tok in (("chiaro", chiaro), ("scuro", scuro)):
+        for fondo in ("--bg", "--card", "--rosso-p2p-tenue"):
+            if _c(tok, "--rosso-p2p-testo", fondo) < 4.5:
+                deboli_r.append((tema, "testo", fondo, round(_c(tok, "--rosso-p2p-testo", fondo), 2)))
+        if _c(tok, "--rosso-p2p-banda", "--nav-bg-p2p") < 4.5:
+            deboli_r.append((tema, "banda", round(_c(tok, "--rosso-p2p-banda", "--nav-bg-p2p"), 2)))
+        for fondo in ("--bg", "--card"):
+            if _c(tok, "--rosso-p2p", fondo) < 3:
+                deboli_r.append((tema, "pieno", fondo, round(_c(tok, "--rosso-p2p", fondo), 2)))
+    prova("...e ognuna regge il suo fondo nei due temi: il testo 4,5 su pagina, "
+          "card e tenue, le icone 4,5 sulla banda, il pieno 3 da segno", [], deboli_r)
+    prova("...e il pieno e' il rosso vivo di «Pubblica ordine», la sua tinta da desktop",
+          [True, "var(--rosso-p2p)"],
+          [chiaro.get("--rosso-p2p", "").upper() == "#F0402E"
+           and "#F0402E" in chiaro.get("--b-rosso-bg", "").upper(), chiaro.get("--b-rosso-tinta")])
+    # NESSUN CORALLO NEL P2P: ne' nelle regole che lo nominano ne' nel JS
+    # delle sue funzioni. Il corallo si riconosce in tutte le sue forme.
+    _corallo = r"var\(--danger\)|var\(--warn-bg\)|#C2410C|#F07A47|194,\s*65,\s*12|240,\s*122,\s*71"
+    def _del_p2p_r(lista):
+        return re.search(r"p2p|P2P|mod-striscia|tinta-rossa|contanti|conto-p2p", lista) is not None
+    coralli = [lista.strip()[:70] for lista, corpo, gruppi in reg
+               if _del_p2p_r(lista) and re.search(_corallo, corpo, re.I)]
+    prova("nessuna regola del P2P parla ancora corallo", [], coralli)
+    js_corallo = []
+    _fn = None
+    for riga in mini.split(chr(10))[mini[:mini.index("</style>")].count(chr(10)):]:
+        m_ = re.match(r"\s*(?:async\s+)?function\s+(\w+)", riga)
+        if m_:
+            _fn = m_.group(1)
+        if _fn and "P2P" in _fn and re.search(_corallo, riga, re.I):
+            js_corallo.append(_fn)
+    prova("...ne' il JS delle funzioni del P2P", [], js_corallo)
+    prova("...e i rossi del mercatino restano il --danger degli errori", [True, True, True],
+          [".ctrl-riga .ctrl-costo{color:var(--danger);font-weight:800}" in stile,
+           ".badge.dispute{background:var(--warn-bg);color:var(--danger)}" in stile,
+           ".btn.danger-ghost{color:var(--danger)}" in stile])
+    prova("...e il conto del P2P ha il costo nel rosso del P2P", True,
+          ".conto-p2p .ctrl-riga .ctrl-costo{color:var(--rosso-p2p-testo)}" in stile)
     prova("...e premuto affonda come i bottoni", True,
           ".tour-avanti:active{transform:var(--b-on-move);box-shadow:var(--b-pri-sh-on)}"
           in stile)

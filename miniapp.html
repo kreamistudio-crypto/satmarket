@@ -98,6 +98,24 @@
     --trust:#1B8B54; --trust-soft:#E7F5EC;
     --barra-da:#DCEEE4; --barra-a:#8FCBAB;
     --danger:#C2410C;
+    /* IL ROSSO DEL P2P (6 ott 2026, richiesta di Andrea): il «rosso vivo»
+       di «Pubblica ordine» (eea8d6e, #F5503A→#F0402E) per TUTTO il lato
+       «vendi» del P2P — tab, numeri in sats, etichette, pillole, bordi,
+       icone della barra — e per gli avvisi del P2P, al posto del corallo
+       di --danger, che resta agli errori e ai pericoli del mercatino.
+       UNA tinta (5,6°) e le sue varianti, ognuna per il suo fondo:
+       --rosso-p2p        il PIENO: fondi, bordi, anelli (sul crema 4,5:1,
+                          sulla card 4,0 — da segno grafico basta 3)
+       --rosso-p2p-testo  i TESTI sulla pagina: piu' scuro di giorno
+                          (#C8200E: 5,2 sul crema, 5,7 sulla card, 4,9
+                          sul tenue), piu' chiaro di sera (#F36254: 5,5
+                          sul bruno, 4,8 sulla card, 4,7 sul tenue)
+       --rosso-p2p-banda  le ICONE della barra in basso, che e' scura nei
+                          due temi (#F36254: 5,0 di giorno, 6,3 di sera)
+       --rosso-p2p-tenue  il fondo tenue (tab attivo, strisce, avvisi)
+       La scritta SUL pieno e' quella dei bottoni rossi, --b-rosso-fg. */
+    --rosso-p2p:#F0402E; --rosso-p2p-testo:#C8200E;
+    --rosso-p2p-banda:#F36254; --rosso-p2p-tenue:#FDE8E6;
     /* il "profondo" del rosso: nasce col + della nav trasformata nel
        P2P (set 2026) — l'ombra piena sotto il tondo «Pubblica» quando
        si sta nel tab «Vendi BTC», gemello di --trust-deep */
@@ -197,7 +215,7 @@
        (la pillola del + da desktop: un gradiente non sfuma, scatta).
        Sono una fermata del loro gradiente, e reggono l'inchiostro del
        ruolo: 7,2 / 4,9 / 5,2:1. */
-    --b-pri-tinta:#F7931A; --b-ok-tinta:#1B8150; --b-rosso-tinta:#F0402E;
+    --b-pri-tinta:#F7931A; --b-ok-tinta:#1B8150; --b-rosso-tinta:var(--rosso-p2p);
     --b-off-bg:#EFE9DA; --b-off-fg:#7D7564; --b-off-line:transparent; --b-off-sh:none; --b-off-op:1;
     --b-busy-op:1; --b-busy-luce:block; --b-luce:rgba(255,255,255,.42);
     /* i toni "profondi" fanno l'ombra piena dei bottoni, i "text"
@@ -427,6 +445,7 @@
     --barra-da:#243B2C; --barra-a:#35684A;
     --danger:#F07A47;
     --danger-deep:#A33A0E;
+    --rosso-p2p-testo:#F36254; --rosso-p2p-tenue:#3E1F14;
     --sats-text:#FFB25C;
     /* l'asta di sera: si alza la LUCE, non si cambia il segno —
        misurati: --asta vs bruno 3,77 (component ok) col bianco sopra
@@ -2024,11 +2043,12 @@
   .card-p2p .ph .p2p-vt-marchio{position:absolute;left:12%;top:36%;
     width:76%;height:auto;object-fit:contain}
   /* colori FISSI, come il badge della lampo: stanno sulla «foto».
-     Bianco sul rosso 5,2:1 e sul verde 4,6:1 */
+     Bianco sul verde 4,6:1; sul rosso vivo del P2P (ott 2026) la scritta
+     e' quella scura dei bottoni rossi, 4,5:1 */
   .p2p-vt-lato{position:absolute;top:8px;left:8px;z-index:2;
     border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:800;
     color:#fff;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-  .p2p-vt-lato.vendi{background:#C2410C}
+  .p2p-vt-lato.vendi{background:var(--rosso-p2p);color:var(--b-rosso-fg)}
   .p2p-vt-lato.compra{background:#1B8B54}
   .p2p-vt-volto{position:absolute;top:7px;right:7px;z-index:2;
     width:30px;height:30px;border-radius:50%;overflow:hidden;
@@ -2563,8 +2583,8 @@
     line-height:1.1;color:var(--muted);border-radius:10px 10px 0 0}
   .p2p-lati .p2p-lato.compra.attiva{color:var(--trust);
     border-bottom-color:var(--trust);background:var(--trust-soft)}
-  .p2p-lati .p2p-lato.vendi.attiva{color:var(--danger);
-    border-bottom-color:var(--danger);background:var(--warn-bg)}
+  .p2p-lati .p2p-lato.vendi.attiva{color:var(--rosso-p2p-testo);
+    border-bottom-color:var(--rosso-p2p);background:var(--rosso-p2p-tenue)}
   /* ---- LA PILLOLA DEL FILTRO (set 2026, richiesta di Andrea) ----
      Ha preso il posto della riga «N offerte di chi vende sats»: quella
      diceva un numero e basta, questa dice lo stesso numero E che si
@@ -2822,7 +2842,7 @@
   .p2p-anello.vicina .resta{stroke:var(--sats)}
   /* l'ultimo giorno non e' piu' un'informazione ma un avviso: rosso e
      PULSA */
-  .p2p-anello.ultimo-giorno .resta{stroke:var(--danger);
+  .p2p-anello.ultimo-giorno .resta{stroke:var(--rosso-p2p);
     animation:p2pPulsa 1.5s ease-in-out infinite}
   @keyframes p2pPulsa{0%,100%{opacity:1}50%{opacity:.3}}
   @media (prefers-reduced-motion:reduce){
@@ -2848,7 +2868,7 @@
      porta `lato-compro` / `lato-vendo` dal suo `o.lato`
      (`rigaOrdineP2P`), lo stesso vocabolario del conto. */
   .p2p-ord .p2p-sats{color:var(--trust);transition:color .3s ease}
-  .p2p-ord.lato-vendo .p2p-sats{color:var(--danger)}
+  .p2p-ord.lato-vendo .p2p-sats{color:var(--rosso-p2p-testo)}
   @media (prefers-reduced-motion:reduce){
     .p2p-ord .p2p-sats{transition:none}
   }
@@ -2892,7 +2912,7 @@
   .p2p-badge{display:block;margin-top:3px;font-size:13px;
     font-weight:600;color:var(--muted)}
   .p2p-badge b{font-weight:800}
-  .p2p-badge .p2p-avviso{color:var(--danger)}
+  .p2p-badge .p2p-avviso{color:var(--rosso-p2p-testo)}
   .p2p-badge .p2p-affare{color:var(--trust)}
   /* ══ LA RIGA DEL PREMIO (set 2026, coi badge dell'affare) ══
      due pezzi sulla stessa riga: a sinistra quanto pende, a destra il
@@ -3055,6 +3075,10 @@
   .p2p-scambio-stato.badge{font-size:13px;font-weight:700;
     padding:6px 10px;border-radius:10px;white-space:normal;
     border-color:transparent}
+  /* il riquadro della disputa parla il rosso del P2P (ott 2026): la
+     classe `.badge.dispute` e' quella del mercatino, che resta col suo */
+  .p2p-scambio .p2p-scambio-stato.badge.dispute{background:var(--rosso-p2p-tenue);
+    color:var(--rosso-p2p-testo)}
   /* ---- LA CARD PRENDE LA TINTA DEL SUO STATO (22 set 2026, richiesta
      di Andrea) ----
      Il riquadro tiene il colore PIENO, la card ne prende un velo: a
@@ -3099,7 +3123,7 @@
     .p2p-scambio.tono-confirmed{--tinta:var(--nostr-text)}
     .p2p-scambio.tono-shipped{--tinta:var(--ship-text)}
     .p2p-scambio.tono-released{--tinta:var(--trust-text)}
-    .p2p-scambio.tono-dispute{--tinta:var(--danger)}
+    .p2p-scambio.tono-dispute{--tinta:var(--rosso-p2p-testo)}
     /* LA MODERAZIONE P2P (28 set 2026): la striscia, le card delle
        dispute e la chat col moderatore. Nessun colore nuovo: il rosso e'
        quello della disputa, il resto sono i token delle card. */
@@ -3107,7 +3131,7 @@
       width:100%;margin:0 0 12px;padding:12px 14px;border-radius:16px;
       border:1px solid var(--field-line);background:var(--card);color:var(--ink);
       font:inherit;text-align:left;cursor:pointer;min-height:44px}
-    .mod-striscia.viva{border-color:var(--danger);background:var(--warn-bg)}
+    .mod-striscia.viva{border-color:var(--rosso-p2p);background:var(--rosso-p2p-tenue)}
     .mod-striscia small{display:block;font-size:13px;color:var(--ink-soft);font-weight:600}
     .mod-card{margin:10px 0;padding:12px 14px;border-radius:16px;
       border:1px solid var(--field-line);background:var(--card)}
@@ -3154,7 +3178,7 @@
     .p2p-scambio.tinta .p2p-sats{
       color:color-mix(in srgb,var(--ink) var(--tinta-testo),var(--sats-text))}
     .p2p-scambio.tinta .p2p-badge .p2p-avviso{
-      color:color-mix(in srgb,var(--ink) var(--tinta-testo),var(--danger))}
+      color:color-mix(in srgb,var(--ink) var(--tinta-testo),var(--rosso-p2p-testo))}
   }
   /* IL TESTO DELLA CARD PASSA L'AA SU OGNI TINTA (22 set 2026): la riga
      di servizio, il premio e la scatola del metodo erano `--muted`, che
@@ -3984,11 +4008,11 @@
      spenga, o si legge il contrario di quel che succede. */
   .p2p-manca{animation:p2pManca 1.2s ease}
   @keyframes p2pManca{
-    0%,100%{box-shadow:0 0 0 0 rgba(194,65,12,0)}
-    12%,55%{box-shadow:0 0 0 3px rgba(194,65,12,.55)}
+    0%,100%{box-shadow:0 0 0 0 rgba(240,64,46,0)}
+    12%,55%{box-shadow:0 0 0 3px rgba(240,64,46,.55)}
   }
   @media (prefers-reduced-motion:reduce){
-    .p2p-manca{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.55)}
+    .p2p-manca{animation:none;box-shadow:0 0 0 3px rgba(240,64,46,.55)}
   }
 
   /* ---- LA BARRA SI APRE (set 2026, richiesta di Andrea) ----
@@ -4225,7 +4249,7 @@
   .p2p-anellone .tacca{stroke:var(--line);stroke-width:5;stroke-linecap:round}
   .p2p-anellone .tacca.on{stroke:var(--ink-soft)}
   .p2p-anellone.vicina .tacca.on{stroke:var(--sats)}
-  .p2p-anellone.ultimo-giorno .tacca.on{stroke:var(--danger);
+  .p2p-anellone.ultimo-giorno .tacca.on{stroke:var(--rosso-p2p);
     animation:p2pPulsa 1.5s ease-in-out infinite}
   @media (prefers-reduced-motion:reduce){
     .p2p-anellone.ultimo-giorno .tacca.on{animation:none}
@@ -4269,8 +4293,8 @@
   .p2p-paycode-riga b{color:var(--ink)}
   .p2p-paycode-resta{font-size:13px;font-weight:700;color:var(--sats-text);
     background:var(--sats-soft);border-radius:10px;padding:8px 10px;margin:8px 0}
-  .p2p-paycode-resta.ultima{color:var(--danger);background:var(--warn-bg)}
-  .p2p-paycode-resta.scaduto{color:var(--danger);background:var(--warn-bg)}
+  .p2p-paycode-resta.ultima{color:var(--rosso-p2p-testo);background:var(--rosso-p2p-tenue)}
+  .p2p-paycode-resta.scaduto{color:var(--rosso-p2p-testo);background:var(--rosso-p2p-tenue)}
   .p2p-paycode-passi{margin:8px 0 6px 18px;padding:0;font-size:13.5px;line-height:1.45}
   .p2p-paycode-passi li{margin:4px 0}
   .p2p-controllo .btn{margin-top:10px}
@@ -4460,7 +4484,7 @@
     padding:7px 12px;border:0;border-radius:999px;background:var(--card);
     font:inherit;font-weight:800;font-size:15px;color:var(--ink);cursor:pointer}
   .p2p-premio-cifra.affare{color:var(--trust)}
-  .p2p-premio-cifra.avviso{color:var(--danger)}
+  .p2p-premio-cifra.avviso{color:var(--rosso-p2p-testo)}
   /* IL TONDINO E' BIANCO NEI DUE TEMI (scelta di Andrea) e la matita
      scura: un tondino che seguisse il tema sparirebbe dentro la
      pillola di giorno, che e' bianca anche lei. A staccarlo dal fondo
@@ -5216,7 +5240,7 @@
   html[data-tema="scuro"] nav .tinta-acceso{color:var(--sats-text)}
   nav .tinta-arancio{color:#FFB25C}
   nav .tinta-verde{color:#34B47A}
-  nav .tinta-rossa{color:#F07A47}
+  nav .tinta-rossa{color:var(--rosso-p2p-banda)}
   body:not(.nav-p2p) nav #nav-esplora:not(.active) .tinta-mercato,
   body:not(.nav-p2p) nav #nav-esplora.active .tinta-acceso,
   body.nav-p2p nav #nav-p2pmiei.active .tinta-arancio,
@@ -5966,6 +5990,9 @@
      quello del P2P (dove la coppia affare/avviso fa lo stesso
      mestiere sulla riga del premio). */
   .ctrl-riga .ctrl-costo{color:var(--danger);font-weight:800}
+  /* ...e nel conto del P2P parla il rosso del P2P (ott 2026): quello
+     del mercatino resta il --danger degli errori */
+  .conto-p2p .ctrl-riga .ctrl-costo{color:var(--rosso-p2p-testo)}
   /* ...e la pillola «in promo» che SEGUE il nome invece di precedere
      una cifra vuole l'aria dall'altra parte: senza, si incolla alla
      parola. */
@@ -5977,7 +6004,7 @@
      specificita' vincerebbe l'ultima, spegnendo il numero in grigio
      senza che niente fallisca. Dopo la nota vale in tutti e due i
      casi. */
-  .ctrl-riga .p2p-avviso{color:var(--danger)}
+  .ctrl-riga .p2p-avviso{color:var(--rosso-p2p-testo)}
   .ctrl-riga .p2p-affare{color:var(--trust)}
   /* ══ IL CONTO DEL P2P CEDE DALLA DESTRA (11 set 2026, decisione di
      Andrea) ══ e rovescia, SOLO QUI, la regola di casa «a cedere e'
@@ -6059,7 +6086,7 @@
   .conto-p2p .ctrl-conv b{font-weight:800;white-space:nowrap}
   /* ...e la tinta del giudizio, come nelle righe del conto (le regole di
      `.ctrl-riga` qui non arrivano: la frase non e' una riga) */
-  .conto-p2p .ctrl-conv .p2p-avviso{color:var(--danger)}
+  .conto-p2p .ctrl-conv .p2p-avviso{color:var(--rosso-p2p-testo)}
   .conto-p2p .ctrl-conv .p2p-affare{color:var(--trust)}
   /* ⚠️ LE CIFRE DEL CALCOLO NON SONO PIU' COLORATE (12 set 2026,
      ritocco di Andrea che rovescia il verde/rosso «direzione» del
@@ -6164,7 +6191,7 @@
      libro), dal suo `o.lato` gia' tradotto per chi legge, e nessuna
      regola del conto guarda piu' il body. */
   .conto-p2p.lato-compro .ctrl-riga.tot.sats .mono{color:var(--trust)}
-  .conto-p2p.lato-vendo .ctrl-riga.tot.sats .mono{color:var(--danger)}
+  .conto-p2p.lato-vendo .ctrl-riga.tot.sats .mono{color:var(--rosso-p2p-testo)}
   .conto-p2p .ctrl-riga.tot.euro .mono{color:var(--ink)}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
   .ctrl-riga.tot .mono{color:var(--sats-text)}
@@ -9517,7 +9544,7 @@
        verde o rosso per il solo libro (vedi la voce attiva, sopra) */
     body.nav-p2p nav button.active{background:rgba(255,178,92,.16)}
     body.nav-p2p nav #nav-p2plibro.active{background:rgba(52,180,122,.14)}
-    body.nav-p2p.p2p-vendo nav #nav-p2plibro.active{background:rgba(240,122,71,.15)}
+    body.nav-p2p.p2p-vendo nav #nav-p2plibro.active{background:rgba(240,64,46,.08)}
     /* il tasto Barattozon e' la tendina che prosegue il tondo del + in
        una capsula, e da desktop il tondo non c'e': sotto la pillola della
        topbar penderebbe sulla pagina. Il tabacchino resta a un tocco nel
@@ -9785,7 +9812,7 @@
   html.fx-ridotti #testModale{background:rgba(15,12,6,.82)}
   /* 2) gli aloni che battevano restano FERMI: gli stessi due ripieghi
         dei blocchi reduced-motion, dichiarazione per dichiarazione */
-  html.fx-ridotti .p2p-manca{box-shadow:0 0 0 3px rgba(194,65,12,.55)}
+  html.fx-ridotti .p2p-manca{box-shadow:0 0 0 3px rgba(240,64,46,.55)}
   /* 3) dietro il tour del P2P niente sfocatura (26 set 2026): il fondo
         pieno di casa, e alla chiusura la pagina c'e' nitida */
   html.fx-ridotti #tourP2P{background:var(--bg)}
@@ -49420,7 +49447,7 @@ function doppioP2P(o){
     '" max="' + o.max + '" step="' + o.passo + '" value="' + valore +
     '" oninput="muoviDoppioP2P(\'' + o.nome + '\')" aria-label="' +
     esc(o.aria + ' ' + (quale === 'Da' ? 'minimo' : 'massimo')) + '">';
-  return '<div class="p2p-capi"><span id="p2pF' + o.nome + 'Sx" style="color:var(--danger)">' + capi.sx +
+  return '<div class="p2p-capi"><span id="p2pF' + o.nome + 'Sx" style="color:var(--rosso-p2p-testo)">' + capi.sx +
       '</span><span id="p2pF' + o.nome + 'Dx" style="color:var(--trust)">' + capi.dx + '</span></div>' +
     '<div class="p2p-doppio" id="p2pF' + o.nome + '" style="--da:' + f.da +
       ';--a:' + f.a + ';--tinta:' + o.tinta + '">' +
@@ -55434,7 +55461,7 @@ function renderDettaglioP2P(){
     (myTgId < 0 && !myRiconosciP2P
       ? '<div class="hint">🕶️ Tu resti anonimo: sei entrato con un profilo senza nome, e chi ha pubblicato non saprà chi sei. Il suo profilo invece lo vedi qui sopra. Se vuoi farti riconoscere — e potervi recensire — c\'è l\'interruttore nel cassetto «🔔 Avvisi».</div>'
       : '') +
-    '<div class="hint" id="p2pDettManca" style="color:var(--danger);font-weight:800'
+    '<div class="hint" id="p2pDettManca" style="color:var(--rosso-p2p-testo);font-weight:800'
       + (manca ? '' : ';display:none') + '">' + esc(manca) + '</div>' +
     (tuo
       ? '<div class="foglio-piede sola" id="p2pDettTuoPiede">' +
@@ -57078,7 +57105,7 @@ function renderIncassoP2P(){
     : 'valida più di ' + vale + '. <b>Meglio se dura almeno un giorno</b>: i sats ti arrivano quando chi vende li libera, e possono passare ore. Una più corta va bene lo stesso, ma se scade prima te ne chiediamo una nuova';
   box.innerHTML =
     (fallito
-      ? '<div class="hint" style="color:var(--danger);font-weight:800">⚠️ Il pagamento dei tuoi sats non è riuscito.</div>'
+      ? '<div class="hint" style="color:var(--rosso-p2p-testo);font-weight:800">⚠️ Il pagamento dei tuoi sats non è riuscito.</div>'
         + '<div class="hint">Chi vende li ha liberati, ma il pagamento verso la richiesta che avevi dato non è andato a buon fine: '
         + causa
         + 'I sats non sono persi — sono fermi al sicuro e restano tuoi: dai qui una richiesta nuova e ripartono. '
@@ -60509,7 +60536,7 @@ function fasciaPremioP2P(premio, lato){
     a: bordoPremioP2P(Math.max(0.5, dove)),
     /* a zero la fascia e' larga zero, quindi la tinta non si vede: si
        tiene lo spento, che e' anche il colore del pallino fermo */
-    tinta: affare === null ? 'var(--muted)' : affare ? 'var(--trust)' : 'var(--danger)',
+    tinta: affare === null ? 'var(--muted)' : affare ? 'var(--trust)' : 'var(--rosso-p2p)',
     giudizio: affare === null ? '' : affare ? 'affare' : 'avviso'
   };
 }
@@ -66335,7 +66362,7 @@ function cardDisputaModP2P(d, ho){
   h += '<div class="mod-parti"><div>Compra: <b>' + esc(d.compra) + '</b></div>'
     + '<div>Vende: <b>' + esc(d.vende) + '</b></div></div>';
   if (d.sei_parte)
-    return h + '<div class="trust-note" style="background:var(--warn-bg);color:var(--danger)"><span>⚠️</span>'
+    return h + '<div class="trust-note" style="background:var(--rosso-p2p-tenue);color:var(--rosso-p2p-testo)"><span>⚠️</span>'
       + '<span>Sei una delle due parti: questa disputa la decide un altro moderatore.</span></div></div>';
   if (d.stato === 'presa' && !d.presa_da_me)
     return h + '<div class="hint">L\'ha presa ' + esc(d.presa_da || 'un altro moderatore') + '.</div></div>';

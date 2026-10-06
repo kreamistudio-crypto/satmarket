@@ -37413,3 +37413,76 @@ carrello, chiudere l'app DAVVERO (non indietro), riaprirla e trovare la
 riga in home; «Riprendi»; da un altro venditore la domanda; «Svuota»;
 comprare al volo da un altro venditore e ritrovare il carrello; pagare
 dallo stesso e vederlo sparire.
+
+## Il rosso del P2P è il rosso vivo (6 ott 2026, seguito di eea8d6e)
+
+Il compito (Andrea): il rosso del P2P uniformato al «rosso vivo» di
+«Pubblica ordine» (#F5503A→#F0402E) — il tab «Vendi BTC», e ogni
+elemento del P2P che usava il corallo: numeri in sats, etichette,
+pillole, bordi, icone del lato «vendi», comprese le icone della barra
+in basso (seconda precisazione). Una sola variabile per tutto il P2P;
+per i testi 4,5:1 nei due temi, con una variante più scura di giorno o
+più chiara di sera della stessa tinta dove il pieno non basta. I rossi
+di errori, pericolo e importi negativi FUORI dal P2P non si toccano: se
+sono lo stesso corallo, si elencano e si chiede.
+
+**DECISO.** Una tinta (5,6°, quella del rosso vivo) e quattro leve:
+`--rosso-p2p` #F0402E, il PIENO (fondi, bordi, anelli, la fascia del
+premio; sul crema 4,5 e sulla card 4,0: da segno grafico basta 3);
+`--rosso-p2p-testo`, i TESTI sulla pagina — #C8200E di giorno (5,2 sul
+crema, 5,7 sulla card, 4,9 sul tenue), #F36254 di sera (5,5 sul bruno,
+4,8 sulla card, 4,7 sul tenue); `--rosso-p2p-banda` #F36254, le icone
+della barra in basso, che è scura nei due temi (5,0 di giorno, 6,3 di
+sera); `--rosso-p2p-tenue`, il fondo tenue (#FDE8E6 / #3E1F14). Il pieno
+da solo NON regge il testo normale (4,49 sul crema, 3,96 sulla card),
+ed è per questo che le varianti esistono. `--b-rosso-tinta` (la pillola
+del + da desktop) legge `--rosso-p2p`. Spostati sulle leve: il tab
+«Vendi BTC» (testo, filo, fondo), le cifre in sats delle card del libro,
+l'avviso del premio («3% meno conveniente»), l'anello e l'anellone
+dell'ultimo giorno, il premio nel foglio Pubblica e la sua fascia, il
+costo e gli avvisi del conto del P2P e il totale «Invia» nel conto in
+due colonne, il PayCode che scade, la striscia dei moderatori e la card
+della disputa, il riquadro e il tono «disputa» delle card degli scambi
+(la classe `.badge.dispute` è del mercatino: nel P2P ha una regola sua),
+il campo che manca (`.p2p-manca`), l'icona «Libro ordini» a «Vendi» e
+il suo velo da desktop (portato a .08 perché la scritta regga 4,6 sulla
+banda), l'etichetta «Vende» sulla foto delle card in vetrina (fondo
+pieno con la scritta scura dei bottoni rossi, 4,5: il bianco sul rosso
+vivo faceva 3,8), e i rossi scritti dal JS del P2P (`doppioP2P`,
+`renderDettaglioP2P`, `renderIncassoP2P`, `fasciaPremioP2P`,
+`cardDisputaModP2P`). Le leve si chiamano `--rosso-p2p…` e non
+`--p2p-rosso…`: una sentinella vieta quella parola, che era la classe di
+un viraggio tolto a settembre.
+
+**Non toccato, ed elencato ad Andrea** (lo stesso corallo `--danger`,
+fuori dal P2P): il costo nel conto del mercatino (`.ctrl-costo`; nel
+conto del P2P ha una regola sua), il badge «disputa» degli ordini del
+mercatino, i testuali di pericolo (`.btn.danger-ghost`), l'errore della
+spedizione standard, le leve in allarme del pannello admin, la «x» delle
+foto del feedback, e i rossi scritti dal JS fuori dal P2P (32 punti:
+avvisi del wallet, codici sconto fuori misura, connettori rotti, il
+recinto della disputa nell'ordine…). Il bottone di pericolo `.allarme`
+(«⚠️ C'è un problema» anche nel P2P) è un ruolo del vestito A condiviso
+con tutta la casa: resta col suo `--b-dan-…`. Il logo del barattolo con
+la freccia rossa è un'immagine, e resta com'è.
+
+**Provato.** In `prove_vestito_bottoni`: le quattro leve nei due temi;
+ogni leva misurata sul suo fondo vero nei due temi (testo 4,5 su
+pagina, card e tenue; icone 4,5 sulla banda; pieno 3 da segno); il
+pieno uguale al fondo di «Pubblica ordine» e la tinta da desktop che lo
+legge; NESSUNA regola che nomina il P2P e nessuna funzione JS del P2P
+con il corallo in qualunque forma (`--danger`, `--warn-bg`, gli esadecimali
+e gli rgba); i rossi del mercatino ancora su `--danger`. Emendate le
+sentinelle che leggevano il corallo del lato «vendi» (le regole esatte,
+le attese della cascata, i toni delle card, la fascia del premio, il
+lettore dei nomi dei token, che non accettava le cifre). Scatti
+prima/dopo a 375 px nei due temi via Chrome headless (il pane non
+compone): libro a «Vendi BTC» con un ordine che scade oggi e uno a
+intervallo, e il dettaglio di quello a intervallo col conto in due
+colonne. Tortura 9 su 9 sulla copia. Suite intera severa e collaudi della
+CI: nel messaggio del commit.
+
+**Da guardare** (sul telefono, Andrea): il P2P a «Vendi BTC» nei due
+temi — il tab, le cifre, l'anello che scade, «Libro ordini» acceso in
+basso; una card di disputa in «I miei scambi»; la card «Vende» in
+vetrina con la scritta scura.
