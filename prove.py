@@ -83140,7 +83140,7 @@ const DEMO = false, STORIA = true;
 let navSpingi = false, navGradinoReparto = 0, navApplicando = false, uscitaDopoAnnullo = false;
 /* (6 ott 2026) la gemella dell'annullo: «Salva per dopo» del carrello */
 let uscitaDopoSalva = false;
-function haptic(){}
+function haptic(){} function toast(){}
 /* (30 set 2026) la sorella di navSpingi: la scelta di una variante */
 let navSostituisci = false;
 let navUltimo = 0, navGiuInVolo = 0, navGuardiano = null;
@@ -123589,6 +123589,10 @@ def prove_carrello_salvato():
           "(il carrello e' gia' salvato a ogni tocco)", [False, False, False, True],
           ["azzeraCarrello" in spd, "salvaCarrello" in spd, "setScelte" in spd,
            "uscitaDopoSalva = true;\n  navIndietro();" in spd])
+    prova("...e lo dice, al tocco e in tutti e due i rami: «Carrello salvato: "
+          "lo ritrovi in Esplora» (decisione di Andrea)", True,
+          0 <= spd.find("toast('Carrello salvato: lo ritrovi in Esplora');")
+          < spd.find("if (!STORIA)"))
     nap = pezzo_js(mini, "function navApplica(s){", "\n}\n")
     prova("...e il secondo passo e' navIndietro all'approdo sulla pagina del "
           "carrello, LO STESSO dell'indietro di Telegram", True,
@@ -123882,12 +123886,14 @@ const out = {};
   n = scritte.length;
   salvaPerDopo(); await attesa();
   out.salva = [[...setScelte], paccoDati && paccoDati.sellerId, scritte.length - n,
-               uscitaDopoSalva, indietro, icona() && icona()[1]];
+               uscitaDopoSalva, indietro, icona() && icona()[1],
+               toasts[toasts.length - 1]];
   // ...e senza cronologia (la DEMO da file) i passi sono due indietro di
   //    fila, come li farebbe l'indietro: foglio, poi pagina
   STORIA = false; uscitaDopoSalva = false; indietro = 0;
   salvaPerDopo();
-  out.salvaSenzaStoria = [indietro, uscitaDopoSalva, [...setScelte]];
+  out.salvaSenzaStoria = [indietro, uscitaDopoSalva, [...setScelte],
+                          toasts[toasts.length - 1]];
   STORIA = true;
   uscitaDopoSalva = false; indietro = 0; n = scritte.length;
   chiudiPagPacco();
@@ -124000,14 +124006,17 @@ const out = {};
     prova("la ✕ con qualcosa nel carrello apre il foglio, e non esce ancora",
           [["paccoSvuotaSheet", "sheetBg"], 0], out.get("xApre"))
     prova("«Salva per dopo»: il carrello resta (memoria e card), nessuna "
-          "scrittura, e si torna indietro col passo in piu' prenotato",
-          [[[2, 2]], 222, 0, True, 1, ["", "2"]], out.get("salva"))
+          "scrittura, si torna indietro col passo in piu' prenotato, e il "
+          "messaggio dice dove ritrovarlo",
+          [[[2, 2]], 222, 0, True, 1, ["", "2"],
+           "Carrello salvato: lo ritrovi in Esplora"], out.get("salva"))
     prova("«Svuota il carrello»: vuoto in memoria e sul server (POST con le "
           "righe vuote), il foglio chiuso, un passo indietro, la card se ne va",
           [[], None, 1, {"tg_id": 111, "righe": []}, "Carrello svuotato", [],
            1, None], out.get("svuota"))
     prova("...e senza cronologia (la DEMO da file) due indietro di fila, "
-          "senza bandierina, carrello intatto", [2, False, [[2, 2]]],
+          "senza bandierina, carrello intatto, lo stesso messaggio",
+          [2, False, [[2, 2]], "Carrello salvato: lo ritrovi in Esplora"],
           out.get("salvaSenzaStoria"))
     prova("a carrello vuoto la ✕ esce e basta, senza domanda",
           [[], 1], out.get("xVuoto"))

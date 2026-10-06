@@ -38026,9 +38026,18 @@ server è già quello.
 ripensamento, non tre strade — il foglio resta suo, e il censimento
 delle domande resta a 79 (detto nella sua prova). `history.go(-2)`: il
 motore lo rifiuta apposta (asincrono e coalescente, il debito di
-contare i gradini). Un toast «Carrello salvato» su «Salva per dopo»:
-l'indietro non lo dice, e il patto era «esattamente come l'indietro»
-(resta nell'elenco delle cose notate).
+contare i gradini).
+
+**IL MESSAGGIO, DOPO GLI SCATTI.** Al primo giro «Salva per dopo» usciva
+in silenzio come l'indietro (il patto era «esattamente come
+l'indietro»), e il messaggio era nell'elenco delle cose notate. Andrea
+l'ha voluto: al tocco, in tutti e due i rami, «Carrello salvato: lo
+ritrovi in Esplora». Il passo in più nella cronologia dopo «Svuota il
+carrello» (c'era già prima) resta com'è, decisione sua. Provato: le
+sentinelle (il messaggio al tocco, prima del ramo senza cronologia) e il
+banco (lo dicono tutti e due i rami); tortura 3 su 3 (niente messaggio,
+messaggio solo con la cronologia, testo cambiato); dal vivo, ✕ →
+«Salva per dopo» → Esplora col messaggio, carrello e card intatti.
 
 **PROVATO.** prove_carrello_salvato (92): le sentinelle sul foglio
 (titolo, la domanda di ieri sparita dal markup, i tre bottoni in ordine

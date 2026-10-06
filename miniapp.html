@@ -25876,9 +25876,13 @@ function chiudiPagPacco(){
    navIndietro, come fa svuotaPacco, RIPORTA sul carrello — a
    svuotaPacco va bene solo perche' un carrello vuoto non si ricostruisce.
    Senza cronologia (la DEMO da file) i passi sono due navIndietro di
-   fila, come li farebbe l'indietro: foglio, poi pagina. */
+   fila, come li farebbe l'indietro: foglio, poi pagina.
+   E LO DICE, a differenza dell'indietro (decisione di Andrea dopo gli
+   scatti): un tocco su «Salva per dopo» che esce in silenzio lascia il
+   dubbio, e il messaggio dice dove ritrovarlo. */
 function salvaPerDopo(){
   haptic();
+  toast('Carrello salvato: lo ritrovi in Esplora');
   if (!STORIA) { navIndietro(); navUltimo = 0; navIndietro(); return; }
   uscitaDopoSalva = true;
   navIndietro();
