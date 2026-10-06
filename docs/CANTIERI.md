@@ -37628,3 +37628,23 @@ Nostr e i memo delle fatture sono testo puro: lì un SVG non può andare.
 
 **DA GUARDARE.** Sul telefono, Android e iPhone: il segno accanto alle
 cifre a 14 px su schermi a densità 2 e 3.
+
+## Torna il ₿ nel conto in due colonne (6 ott 2026, decisione di Andrea)
+
+Guardati gli scatti di 14a3a4c, Andrea: «troppo confusionario, rimettiamo
+il simbolo di prima e va bene così». Il simbolo dei satoshi accanto a ogni
+cifra (tre tratti con due trattini, un SVG nostro) era un segno in più da
+imparare in un conto che ne porta già parecchi — ≈, −, +, €.
+
+**DECISO.** Revert di 14a3a4c sul codice, sulle prove e su ARCHITETTURA:
+il conto torna com'era a 55633cc, col ₿ del toggle €/₿ dopo ogni cifra in
+sats (`conBtc`), largo una cifra, nel colore del testo. La voce
+precedente («Il simbolo dei satoshi nel conto in due colonne») resta qui
+sopra come verbale di una strada provata e scartata: il disegno, le misure
+e il censimento delle altre cifre in sats servono se un giorno se ne
+riparla. Niente è stato cambiato altrove: il censimento era una proposta,
+e la proposta cade con lei.
+
+**PROVATO.** Revert senza conflitti (main non aveva toccato quelle righe
+dopo 14a3a4c). Suite e collaudi: nel verbale del push; scatto a 375 px
+nei due temi col ₿ di nuovo al suo posto.

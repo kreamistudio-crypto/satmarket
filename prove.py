@@ -61497,34 +61497,26 @@ console.log(JSON.stringify(out));
     # valeva per un capo solo. Adesso ogni capo ha la sua cella.
     cr = o["contoRange"]
     cella = lambda *t: '<span class="mono">' + "".join(t) + "</span>"
-    # (6 ott 2026, secondo ritocco) OGNI CIFRA IN SATS PORTA IL SUO
-    # SIMBOLO: la larghezza lo conta, e l'intestazione non dice piu'
-    # «cifre in sats». (Terzo ritocco, stesso giorno) il simbolo non e'
-    # piu' il ₿ ma quello dei satoshi, un SVG nostro: lo si prende dal
-    # conto stesso, e si guarda che sia UNO, uguale in ogni cella.
-    _m_sat = re.search(r'<svg class="sat-sym"[^>]*>.*?</svg>', cr)
-    sat = _m_sat.group(0) if _m_sat else "SIMBOLO MANCANTE"
-    prova("il simbolo dei sats: un SVG solo, detto «sats» a chi legge con la voce, e il ₿ sparito",
-          [True, True, 1, False],
-          ['role="img" aria-label="sats"' in sat, 'viewBox="0 0 12 20"' in sat,
-           len(set(re.findall(r'<svg class="sat-sym".*?</svg>', cr))), "₿" in cr])
+    # (6 ott 2026, secondo ritocco) OGNI CIFRA IN SATS PORTA IL ₿, il
+    # simbolo del toggle €/₿: la larghezza conta anche « ₿», e
+    # l'intestazione non dice piu' «cifre in sats»
     prova("un intervallo va in due colonne, con la larghezza scritta sulla scatola",
           True, ' conto-due" style="--n:10">' in cr)
     prova("...l'intestazione: i due importi, e a sinistra niente", True,
           '<div class="ctrl-riga capi"><span></span>'
           + cella('<span class="num">20,00 €</span>', '<span class="num">100,00 €</span>')
           in cr)
-    prova("...ogni riga una cella per capo, col SUO ≈ e il SUO simbolo", [True, True],
-          [cella('<span class="num">≈ 40000 ' + sat + '</span>', '<span class="num">≈ 200000 ' + sat + '</span>') in cr,
-           cella('<span class="num">≈ 39600 ' + sat + '</span>', '<span class="num">≈ 198000 ' + sat + '</span>') in cr])
+    prova("...ogni riga una cella per capo, col SUO ≈ e il SUO ₿", [True, True],
+          [cella('<span class="num">≈ 40000 ₿</span>', '<span class="num">≈ 200000 ₿</span>') in cr,
+           cella('<span class="num">≈ 39600 ₿</span>', '<span class="num">≈ 198000 ₿</span>') in cr])
     prova("...e col SUO segno: il meno vale per tutt'e due i capi", True,
-          cella('<span class="num meno">≈ −400 ' + sat + '</span>',
-                '<span class="num meno">≈ −2000 ' + sat + '</span>') in cr)
-    prova("...nessuna cifra in sats senza il suo simbolo, e mai la parola «sats»",
-          [6, False, False], [cr.count(' ' + sat + '</span>'), "cifre in sats" in cr,
+          cella('<span class="num meno">≈ −400 ₿</span>',
+                '<span class="num meno">≈ −2000 ₿</span>') in cr)
+    prova("...nessuna cifra in sats senza il suo ₿, e mai la parola «sats»",
+          [6, False, False], [cr.count(' ₿</span>'), "cifre in sats" in cr,
                               bool(re.search(r"\d sats", cr))])
-    prova("...e il simbolo anche dalla parte di chi vende, su ogni cella (premio e Subtotale compresi)", [10, False],
-          [o["contoRangeVendi"].count(' ' + sat + '</span>'),
+    prova("...e il ₿ anche dalla parte di chi vende, su ogni cella (premio e Subtotale compresi)", [10, False],
+          [o["contoRangeVendi"].count(' ₿</span>'),
            bool(re.search(r"\d sats", o["contoRangeVendi"]))])
     prova("...l'euro in fondo, cella per cella, col segno e senza bandierina",
           [True, False], [cella('<span class="num">20,00 €</span>',
@@ -61536,11 +61528,11 @@ console.log(JSON.stringify(out));
     prova("dal lato di chi vende con lo sconto: il premio si aggiunge, la fee pure, in ogni colonna",
           [4, 0, True], [rv.count('class="num piu">≈ +'),
                          rv.count('class="num meno"'), "lato-vendo conto-due" in rv])
-    prova("a cambio muto: un trattino per colonna, senza simbolo, gli euro restano in testa",
+    prova("a cambio muto: un trattino per colonna, senza ₿, gli euro restano in testa",
           [True, True, False],
           [cella('<span class="num">—</span>', '<span class="num">—</span>') in o["contoRangeMuto"],
            '<span class="num">100,00 €</span>' in o["contoRangeMuto"],
-           "sat-sym" in o["contoRangeMuto"]])
+           "₿" in o["contoRangeMuto"]])
     prova("con la fee ignota: un trattino per colonna nella sua riga", True,
           cella('<span class="num">—</span>', '<span class="num">—</span>')
           in o["contoRangeSenzaFee"].split("Fee P2P")[1])
@@ -118188,24 +118180,18 @@ def prove_conto_due_colonne():
           "join('–')" in cd or "'–'" in cd)
     prova("...decide le due colonne dal numero dei capi, e le celle passano da `cella`",
           True, "const due = conti.length === 2;" in cd
-          and "conti.map(c => num(conSat(cella(c, campo, segno)), segno)).join('')" in cd)
-    # (6 ott 2026, secondo e terzo ritocco) il simbolo dei sats su ogni
-    # cifra, mai su un trattino; la fee a zero lo porta anche lei. Il
-    # disegno vive in UN posto (`SAT`), e il ₿ non torna
-    prova("...ogni cella in sats porta il simbolo (un trattino no), anche la fee a zero", True,
-          "const conSat = t => t === '—' ? t : t + ' ' + SAT;" in cd
-          and "num(conSat('0')) + num(conSat('0'))" in cd)
-    prova("...il simbolo e' un SVG solo, col nome per la voce, e il ₿ non c'e' piu'",
-          [1, True, False],
-          [cd.count("const SAT = '<svg class=\"sat-sym\""),
-           "viewBox=\"0 0 12 20\" role=\"img\" aria-label=\"sats\"'" in cd,
-           "' ₿'" in cd])
+          and "conti.map(c => num(conBtc(cella(c, campo, segno)), segno)).join('')" in cd)
+    # (6 ott 2026, secondo ritocco) il ₿ su ogni cifra in sats, mai su
+    # un trattino; e la fee a zero lo porta anche lei
+    prova("...ogni cella in sats porta il ₿ (un trattino no), anche la fee a zero", True,
+          "const conBtc = t => t === '—' ? t : t + ' ₿';" in cd
+          and "num(conBtc('0')) + num(conBtc('0'))" in cd)
     prova("...l'intestazione sta in cima, prima del Controvalore, e non dice «sats»",
           True, "+ (due ? r('', cifreEuro, 'capi') : '')" in cd
           and cd.index("r('', cifreEuro, 'capi')")
           < cd.index("+ r(etichettaCtrl, cifra('ctrl'))")
           and "'cifre in sats'" not in mini)
-    prova("...e la larghezza conta il simbolo (spazio piu' una cifra)", True,
+    prova("...e la larghezza conta il « ₿»", True,
           "lungo(fmt(Math.max(c.ctrl, c.merc, c.netto))) + 4" in cd
           and "lungo(fmt(Math.max(c.premio, c.meta))) + 5" in cd)
     prova("...la scatola porta `conto-due` e la larghezza delle colonne", True,
@@ -118233,12 +118219,7 @@ def prove_conto_due_colonne():
                    ".conto-due .ctrl-riga .mono{flex:0 0 auto;display:grid;\n"
                    "    grid-template-columns:var(--col) var(--col);column-gap:10px;justify-items:end}",
                    ".p2p-ord>.conto-due>.ctrl-riga{padding-right:calc(10px + var(--chiusa-bordo))}",
-                   ".p2p-ord>.p2p-grande{display:block;padding-right:52px}",
-                   # il simbolo dei sats: largo una cifra, alto la riga, il
-                   # colore della cifra, piu' spesso nelle righe in neretto
-                   ".sat-sym{display:inline-block;width:.6em;height:1em;vertical-align:-.2em;",
-                   "fill:none;stroke:currentColor;stroke-width:2;overflow:visible}",
-                   ".ctrl-riga.tot .sat-sym{stroke-width:2.4}"):
+                   ".p2p-ord>.p2p-grande{display:block;padding-right:52px}"):
         prova("CSS: " + regola[:60], True, regola in mini)
 
     # --- 2) I GIUDICI PURI, VERI, IN NODE -----------------------------------

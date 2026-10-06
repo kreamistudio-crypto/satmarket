@@ -6069,25 +6069,9 @@
   .conto-due .ctrl-riga .mono{flex:0 0 auto;display:grid;
     grid-template-columns:var(--col) var(--col);column-gap:10px;justify-items:end}
   /* l'intestazione: i due importi in inchiostro pieno, e a sinistra
-     niente — l'unita' la porta ogni cella, il simbolo dei sats (6 ott
-     2026, vedi `.sat-sym`) */
+     niente — l'unita' la porta ogni cella, il ₿ (6 ott 2026) */
   .conto-due .ctrl-riga.capi{padding:6px 0 7px}
   .conto-due .ctrl-riga.capi .mono{font-weight:800;color:var(--ink)}
-  /* ══ IL SIMBOLO DEI SATOSHI (6 ott 2026, richiesta di Andrea) ══ tre
-     tratti orizzontali con un trattino verticale sopra e uno sotto, nella
-     versione inclinata del «Sat Symbol» della comunita'. E' un SVG in
-     linea, nostro (lo scrive `conSat` in `contoDettP2P`), e non un
-     carattere: nessun font lo ha.
-     LARGO 0,6 EM, cioe' una cifra del mono di casa: `--n` del conto in
-     due colonne lo conta come un carattere e le colonne restano in filo.
-     ALTO 1 EM e abbassato di 0,2 em: i tre tratti stanno nell'altezza
-     delle cifre, i due trattini sporgono sopra e sotto come le aste.
-     Il colore e' `currentColor`: verde, rosso o grigio insieme al numero
-     che accompagna. Lo spessore cresce nelle righe in scatola, che sono
-     in neretto. */
-  .sat-sym{display:inline-block;width:.6em;height:1em;vertical-align:-.2em;
-    fill:none;stroke:currentColor;stroke-width:2;overflow:visible}
-  .ctrl-riga.tot .sat-sym{stroke-width:2.4}
   /* ...e nella pagina di uno scambio il conto non ha il suo dentro (vedi
      `.p2p-ord>.ctrl-conto`) mentre la scatola in fondo si', di 10px piu'
      il bordo: le righe di sopra rientrano dello stesso tanto a destra,
@@ -55019,7 +55003,7 @@ function contoDettP2P(o){
     || (campo === 'netto' && conti[0].meta > 0)
     || (ricavato && campo !== 'merc');
   /* una cella e' un capo solo, senza unita': su una colonna «sats» lo
-     aggiunge `cifraNuda`, in due colonne il simbolo lo aggiunge `cifra` */
+     aggiunge `cifraNuda`, in due colonne il ₿ lo aggiunge `cifra` */
   const cella = (c, campo, segno) => vivo
     ? (circaDi(campo) ? '≈ ' : '') + (segno || '') + fmt(c[campo]) : '—';
   const cifraNuda = (campo, segno) => vivo
@@ -55037,33 +55021,20 @@ function contoDettP2P(o){
   const num = (t, segno) => '<span class="num'
     + (segno === '+' ? ' piu' : segno === '−' ? ' meno' : '')
     + '">' + t + '</span>';
-  /* ⚠️ IN DUE COLONNE OGNI CIFRA IN SATS PORTA IL SUO SIMBOLO (6 ott
-     2026, ritocco di Andrea): «nessun numero resta senza significato».
-     Il primo giro diceva «cifre in sats» una volta, nell'intestazione, e
-     sotto le celle erano numeri nudi; il secondo ci metteva il ₿ del
-     toggle €/₿. Il terzo (stesso giorno, richiesta di Andrea) mette il
-     SIMBOLO DEI SATOSHI, la versione inclinata del «Sat Symbol» della
-     comunita': il ₿ dice bitcoin, e «6 536 ₿» si poteva leggere come
-     seimila bitcoin.
-     UN PUNTO SOLO: il disegno sta in `SAT` e lo mette `conSat`. E' un
-     SVG nostro — nessun font ha quel segno — con `currentColor`, quindi
-     prende il colore della cifra (verde, rosso, grigio del Subtotale);
-     misure e spessore stanno in `.sat-sym`. Per chi legge con la voce
-     dice «sats» (`role="img"` con l'etichetta). Sta DOPO la cifra come
-     il € nelle celle in euro; un trattino resta un trattino.
-     IL DISEGNO, in un quadro 12×20: tre tratti a y 4 · 9,5 · 15 — cioe'
-     l'altezza delle cifre del mono, misurata: al primo giro, a 5,5 · 10
-     · 14,5, il segno era mezza cifra e pareva un apice — e i
-     due trattini sopra e sotto dal centro, tutto inclinato di un quinto
-     (x + 0,2 per ogni unita' sopra il centro), come un corsivo. */
-  const SAT = '<svg class="sat-sym" viewBox="0 0 12 20" role="img" aria-label="sats"'
-    + ' focusable="false"><path d="M2.6 4H11.6M1.5 9.5H10.5M0.4 15H9.4'
-    + 'M7.8 0.5L7.1 4M4.9 15L4.1 19"/></svg>';
-  const conSat = t => t === '—' ? t : t + ' ' + SAT;
+  /* ⚠️ IN DUE COLONNE OGNI CIFRA IN SATS PORTA IL ₿ (6 ott 2026,
+     ritocco di Andrea): «nessun numero resta senza significato». Il
+     primo giro diceva «cifre in sats» una volta, nell'intestazione, e
+     sotto le celle erano numeri nudi — accanto a celle in € che il loro
+     segno ce l'avevano. Il ₿ e' il simbolo che l'app usa gia' per dire
+     «in sats»: e' il bottone del toggle €/₿ (`data-cur="sats"`). Sta
+     DOPO la cifra come il € nelle celle in euro, e mai la parola
+     «sats». Un trattino resta un trattino: niente unita' su un numero
+     che non c'e'. */
+  const conBtc = t => t === '—' ? t : t + ' ₿';
   /* in due colonne la voce e' fatta di due `.num`, uno per capo: il
      CSS di `.conto-due` li mette in colonna */
   const cifra = (campo, segno) => due
-    ? conti.map(c => num(conSat(cella(c, campo, segno)), segno)).join('')
+    ? conti.map(c => num(conBtc(cella(c, campo, segno)), segno)).join('')
     : num(cifraNuda(campo, segno), segno);
   /* ⚠️ L'IMPORTO IN EURO COMPARE DUE VOLTE, E NON E' UN DOPPIONE
      (12 set 2026, ritocco di Andrea): in fondo, a destra, e' quel che
@@ -55127,7 +55098,7 @@ function contoDettP2P(o){
     + promo;
   const commissione = fee === null ? (due ? num('—') + num('—') : num('—'))
     : fee > 0 ? cifra('meta', compro ? '−' : '+')
-    : (due ? num(conSat('0')) + num(conSat('0')) : num('0 sats'));
+    : (due ? num(conBtc('0')) + num(conBtc('0')) : num('0 sats'));
   /* il premio c'e' solo quando pende: una riga a zero direbbe «niente
      premio», che non e' un'informazione (la regola dello sconto).
      ⚠️ E IL GIUDIZIO NON SI RIBATTE QUI: era la TERZA copia della
@@ -55231,8 +55202,7 @@ function contoDettP2P(o){
      da `compro` e mai dal tab del libro (vedi il CSS di `.conto-p2p`) */
   /* LA LARGHEZZA DELLE DUE COLONNE la decide la cella piu' lunga, in
      caratteri: la cifra piu' grande fra i sats (un numero piu' grande
-     non si scrive mai piu' corto) col suo ≈ e il suo simbolo (spazio
-     piu' `.sat-sym`, largo una cifra: due caratteri) — e col
+     non si scrive mai piu' corto) col suo ≈ e il suo « ₿» — e col
      segno, per le due voci che lo portano —, o un capo in euro col suo
      segno. Lo spazio
      stretto delle migliaia vale MEZZO carattere: contato intero, a 320
@@ -55247,8 +55217,7 @@ function contoDettP2P(o){
     + (due ? ' conto-due" style="--n:' + larga + '">' : '">')
     + rigaConvenienzaFissaP2P(o, convFissa)
     /* l'intestazione delle due colonne: i capi in euro, e a sinistra
-       niente — dal 6 ott 2026 l'unita' la porta ogni cella, col simbolo
-       dei sats */
+       niente — dal 6 ott 2026 l'unita' la porta ogni cella, il ₿ */
     + (due ? r('', cifreEuro, 'capi') : '')
     + r(etichettaCtrl, cifra('ctrl'))
     + premio
