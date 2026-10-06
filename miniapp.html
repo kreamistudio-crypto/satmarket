@@ -55918,11 +55918,15 @@ function renderDettaglioP2P(){
         + contoDettP2P(scelto ? Object.assign({}, o, {euro: scelto, euroMax: 0}) : o)) +
     /* LA SPIEGAZIONE CHE STAVA NEL FOGLIO DI CONFERMA: non si perde
        col foglio, si sposta sopra i due bottoni — dove la legge chi
-       sta per premerli. */
-    '<div class="trust-note nota-scambio"><span>' + (compro
-      ? 'Chi vende blocca i sats in garanzia, tu mandi gli euro col metodo scelto e i sats arrivano a te.'
-      : 'Tu blocchi i sats in garanzia, ricevi gli euro col metodo scelto e i sats vanno al compratore.') +
-    '</span></div>' +
+       sta per premerli.
+       E DA FRASE E' DIVENTATA UN ELENCO (6 ott 2026, idea di Andrea):
+       «Come funziona», quattro passi corti col pallino di Barattozon,
+       al posto del riquadro grigio — vedi `passiScambioP2P`. */
+    passiDettP2P(passiScambioP2P({
+      compro: compro, tuo: !!tuo,
+      metodo: p2pDettMetodo || ((o.metodi || []).length === 1 ? o.metodi[0] : ''),
+      cauzione: !tuo && cauzioneServeP2P(Object.assign({}, o, {mio: false}), p2pInfo, cauzioneAccesaP2P())
+    })) +
     /* ⚠️ L'AVVISO «APPENA LO PRENDI VI VEDETE» NON C'E' PIU', NE' QUI
        NE' IN NESSUN ALTRO FOGLIO DEL P2P (17 set 2026, decisione di
        Andrea). Era nato la mattina stessa con «Le parti si vedono» e
@@ -55972,6 +55976,75 @@ function renderDettaglioP2P(){
         ' onclick="confermaDettaglioP2P()">' +
         (daScegliere ? 'Scegli' : (compro ? 'Compra' : 'Vendi')) + '</button>' +
     '</div>');
+}
+/* «COME FUNZIONA», I QUATTRO PASSI DELLO SCAMBIO (6 ott 2026, idea e
+   testi di Andrea). Era una frase sola, «Chi vende blocca i sats in
+   garanzia, tu mandi gli euro…», uguale per ogni metodo: adesso e' un
+   elenco corto, una riga per passo, scritto a chi guarda, nell'ordine
+   della linea del tempo dello scambio (Ordine preso → Sats bloccati →
+   Euro inviati → Scambio concluso) — chi lo legge qui ritrova gli
+   stessi passi dopo la presa. I nomi dei passi non si ripetono:
+   Andrea li ha voluti corti, il gesto e basta.
+   Cambia col LATO e col METODO — quello scelto nel foglio, o l'unico
+   dell'ordine; con piu' metodi e nessuna scelta vale il generico, e
+   la scelta ridisegna il foglio. CON LA CAUZIONE cambia solo il
+   primo passo, come nella linea del tempo. SUL MIO ORDINE il primo
+   passo e' l'attesa, e i tre dopo sono quelli del mio lato stretti
+   a tre (chi ha pubblicato non mette la cauzione qui: se tocca a lui
+   l'ha gia' messa alla pubblicazione).
+   PURA: {compro, tuo, metodo, cauzione} → quattro frasi. */
+function passiScambioP2P(q){
+  const compro = !!q.compro;
+  const m = String(q.metodo || '').trim();
+  const contanti = m === P2P_CONTANTI;
+  const tab = !contanti && tabacchinoP2P([m]);
+  if (q.tuo) return ['Aspetti che qualcuno lo prenda'].concat(compro ? [
+    'Chi vende mette i sats in garanzia',
+    contanti ? 'Consegni i contanti di persona'
+      : tab ? 'Paghi il PayCode al tabacchino' : 'Invii gli euro col metodo scelto',
+    'I sats arrivano a te'
+  ] : [
+    'Metti i sats in garanzia',
+    contanti ? 'Ricevi i contanti e li conti'
+      : tab ? 'Controlli su Amazon' : 'Ricevi e controlli gli euro',
+    contanti ? 'Liberi i sats sul posto' : 'Liberi i sats a chi compra'
+  ]);
+  if (compro) return [
+    q.cauzione ? 'Blocchi la cauzione e indichi dove ricevere i sats' : 'Indichi dove ricevere i sats',
+    'Chi vende li mette in garanzia',
+    contanti ? 'Consegni i contanti di persona'
+      : tab ? 'Paghi il PayCode al tabacchino' : 'Invii gli euro col metodo scelto',
+    'I sats arrivano a te'
+  ];
+  const primo = q.cauzione ? 'Blocchi la cauzione e metti i sats in garanzia' : 'Metti i sats in garanzia';
+  if (contanti) return [primo, 'Ricevi i contanti di persona', 'Li conti', 'Liberi i sats sul posto'];
+  /* chi vende con Barattozon e' chi pubblica: dal libro, a chi prende,
+     il tabacchino da questo lato non arriva, e vale il generico */
+  return [primo, 'Ricevi gli euro col metodo scelto', 'Controlli che siano arrivati',
+    'Liberi i sats a chi compra'];
+}
+/* PURA: l'elenco, nel riquadro delle sezioni del foglio, col titolo
+   «Come funziona». IL TONDO E' QUELLO DELLE TAPPE DEL PERCORSO
+   BARATTOZON (correzione di Andrea, lo stesso giorno: identico in
+   misura, colore, forma, numero e allineamento), LA FRASE E' IL TESTO
+   DEL FOGLIO (seconda correzione: non il titolo grigio della tappa).
+   - Il tondo e' `.p2p-tappa-n`, ma la classe da sola non basta: nella
+     tappa il numero pesa 900 perche' il suo `<b>` sta dentro un titolo
+     gia' a 700 (`bolder` su 700), e in una riga a peso normale
+     uscirebbe a 700. Il `<b>` muto che lo avvolge fa da quel titolo:
+     `bolder` su `bolder`, 400 → 700 → 900, senza una regola nuova.
+   - La frase e' una `.hint` dentro la sezione: 15px, peso normale,
+     l'inchiostro del foglio — lo stesso vestito del testo d'aiuto
+     delle tappe («Nove cifre, coi trattini o senza…») — e i 6px fra
+     un passo e l'altro sono quelli di `.p2p-sez .hint`.
+   Fuori da `.p2p-tappa` il tondo non diventa mai la ✓ del passo
+   fatto. Il numero e' nascosto alla voce come nella tappa: l'elenco
+   (`role="list"`, divs senza marcatori) lo conta da se', «1 di 4». */
+function passiDettP2P(passi){
+  return sezioneNuovoP2P({titolo: 'Come funziona',
+    corpo: '<div role="list">' + passi.map((p, i) =>
+      '<div class="hint" role="listitem"><b aria-hidden="true"><b class="p2p-tappa-n">'
+        + (i + 1) + '</b></b>' + esc(p) + '</div>').join('') + '</div>'});
 }
 /* LA FRASE DI CHI HA PUBBLICATO UN INTERVALLO (7 ott 2026, decisione di
    Andrea): nella pagina del mio scambio, e sul mio ordine visto dal

@@ -38633,3 +38633,128 @@ quando si lascia la entry). Nel guardiano dell'app non scorre niente;
 nel browser e in Telegram iOS si potrebbe vedere il libro sotto il dito
 e poi il foglio all'arrivo. Da guardare a occhio, non è un difetto
 della pila.
+
+## «Come funziona»: i passi dello scambio nel dettaglio dell'ordine P2P (6-7 ott 2026, idea e testi di Andrea)
+
+**DA DOVE SI PARTIVA.** Nel foglio del dettaglio di un ordine del libro,
+sopra «Compra»/«Vendi»/«Scegli», c'era una frase sola in un riquadro
+grigio (`trust-note nota-scambio`), nata come la spiegazione del
+vecchio foglio di conferma: «Chi vende blocca i sats in garanzia, tu
+mandi gli euro col metodo scelto e i sats arrivano a te» (e il suo
+rovescio per chi vende). Cambiava col lato e MAI col metodo: ai
+contanti di persona diceva «mandi gli euro», a Barattozon pure. Il
+metodo lo spiegavano gia' altre righe piu' su (la regola dei contanti,
+la riga 🔐 della cauzione, la 🧾 di Barattozon).
+
+**I TESTI.** Al primo giro ho proposto quattro passi coi nomi della
+linea del tempo in grassetto («Ordine preso: dici dove ricevere i
+sats»); Andrea li ha voluti MOLTO piu' corti e senza i nomi, col titolo
+«Come funziona», e ha scritto lui le cinque varianti e le due della
+cauzione. L'ordine resta quello della linea del tempo (Ordine preso →
+Sats bloccati → Euro inviati → Scambio concluso), il nome no.
+- Compro, bonifico e altri metodi: Indichi dove ricevere i sats · Chi
+  vende li mette in garanzia · Invii gli euro col metodo scelto · I
+  sats arrivano a te. Coi contanti di persona il terzo e' «Consegni i
+  contanti di persona», con Barattozon «Paghi il PayCode al tabacchino».
+- Vendo, bonifico e altri: Metti i sats in garanzia · Ricevi gli euro
+  col metodo scelto · Controlli che siano arrivati · Liberi i sats a
+  chi compra. Vendo, contanti: Metti i sats in garanzia · Ricevi i
+  contanti di persona · Li conti · Liberi i sats sul posto.
+- Con la cauzione cambia SOLO il primo: «Blocchi la cauzione e indichi
+  dove ricevere i sats» / «Blocchi la cauzione e metti i sats in
+  garanzia». Sono le sole due righe che vanno a capo anche a 375 px:
+  testi di Andrea, segnalato e lasciato.
+- Sul MIO ordine aperto dal libro (adattati da me, mostrati negli
+  scatti): «Aspetti che qualcuno lo prenda», poi tre passi del mio
+  lato. Comprando: Chi vende mette i sats in garanzia · Invii gli euro
+  col metodo scelto (o «Consegni i contanti di persona») · I sats
+  arrivano a te. Vendendo: Metti i sats in garanzia · Ricevi e
+  controlli gli euro (o «Ricevi i contanti e li conti», o «Controlli su
+  Amazon» con Barattozon) · Liberi i sats a chi compra (o «sul posto»).
+  «Controlli su Amazon che risulti pagato», poi «Controlli il pagamento
+  su Amazon», andavano a capo a 320 px: accorciata. Sul mio ordine
+  d'acquisto «Indichi dove ricevere i sats» non entra in tre posti —
+  nel flusso vero viene dopo il blocco di chi vende — detto ad Andrea.
+
+**IL VESTITO, IN TRE GIRI.** Primo: i pallini arancio pieni di «Barattozon,
+passo per passo» della pagina Info (`.sicu-passi`), allargando i due
+selettori di `.sicu`. Andrea ha corretto: i pallini da copiare sono
+quelli delle TAPPE della pubblicazione Barattozon (`.p2p-tappa-n`: 22px,
+`--sats-soft` col numero `--sats-text`, 12px), identici in misura,
+colore, forma, numero e allineamento — e i selettori di `.sicu` sono
+tornati com'erano. Secondo: il passo come la riga della tappa (il tondo
+nello `<span>` di un `.p2p-sez-tit`), che rendeva il tondo identico ma
+vestiva anche la frase da titolo grigio (12,5px, 700, `--muted`).
+Andrea: la frase resta testo normale del foglio. Terzo, quello buono:
+- LA FRASE e' una `.hint` dentro la sezione — nella sezione `.hint` non
+  ha regole di testo, solo i 6px di `.p2p-sez .hint` — quindi 15px, peso
+  400, l'inchiostro del foglio: lo stesso vestito del testo d'aiuto
+  delle tappe («Nove cifre, coi trattini o senza…»). Contrasto misurato
+  sul fondo della sezione: 12,63:1 di giorno, 10,74:1 di sera.
+- IL TONDO e' `.p2p-tappa-n`, ma la classe da sola non basta: nella tappa
+  il numero pesa 900 perche' il suo `<b>` sta in un titolo gia' a 700
+  (`bolder`), e in una riga a peso normale uscirebbe a 700. Un `<b>`
+  muto lo avvolge e fa da titolo: 400 → 700 → 900, nessuna regola
+  nuova. Misurato nel pane, nei due temi, contro il tondo della
+  pubblicazione: lato, fondo, colore, corpo, peso 900, carattere, forma,
+  interlinea e margine identici. Fuori da `.p2p-tappa` il tondo non
+  diventa mai la ✓ del passo fatto.
+- `role="list"` e `role="listitem"` su dei div (niente marcatori del
+  browser da spegnere), il numero `aria-hidden` come nella tappa: a voce
+  «elenco, 4 elementi» e «1 di 4».
+
+**COME E' FATTO.** `passiScambioP2P({compro, tuo, metodo, cauzione})`,
+pura, torna le quattro frasi; `passiDettP2P(passi)` le mette nel
+riquadro delle sezioni (`sezioneNuovoP2P`, senza icona). Il METODO che
+conta e' quello scelto nel foglio o l'unico dell'ordine (con piu' metodi
+e nessuna scelta vale il generico; la scelta ridisegna il foglio). La
+CAUZIONE la decidono i giudici veri della riga 🔐 (`cauzioneServeP2P`
+con la leva e il 38385), quindi segue i metodi dell'ORDINE come il
+coordinatore: SEPA scelto su un ordine che ha anche i contanti la chiede
+lo stesso, e l'elenco lo dice. Sul mio ordine mai.
+
+**STRADE SCARTATE.** Lo stile A, l'`<ol>` del riquadro PayCode coi numeri
+del browser; i pallini di Info (vedi sopra); il passo vestito da titolo
+della tappa (vedi sopra); un'interlinea o un margine su misura per
+l'ultima voce (regola nuova). Una variante «vendo + Barattozon» per chi
+PRENDE: scritta e tolta, perche' non era chiesta e dal nostro client non
+ci si arriva (chi vende con Barattozon e' chi pubblica); quel caso, se un
+altro client lo producesse, cade nel generico.
+
+**PROVATO.** `prove_passi_libro_p2p` (sezione nuova, sulle funzioni
+vere): i testi di Andrea parola per parola in ogni variante (compro e
+vendo, generico, nessun metodo, contanti anche con gli spazi attorno,
+Barattozon, con e senza cauzione, il mio ordine dai due lati), sempre
+quattro passi e mai un nome di passo in testa; la CASCATA chiesta a
+`_vince_css`: il tondo di «Come funziona» ha lo stesso vestito di quello
+della tappa proprieta' per proprieta', nessuna regola gli da' un peso
+(ne' al `<b>` muto), la ✓ vive solo dentro `.p2p-tappa`, la frase non
+ha misura, peso o colore suoi come l'aiuto delle tappe, i selettori di
+`.sicu` come prima; il markup (titolo, list/listitem, numero muto, voci
+escapate). In `prove_p2p_dettaglio` il cablaggio nella pagina vera:
+metodo scelto o unico, due metodi senza scelta, contanti scelto fra due,
+Barattozon, la cauzione con la leva e il 38385 (dai due lati, che segue
+i metodi dell'ordine, mai sul mio ordine, mai a leva spenta), il mio
+ordine, l'intervallo prima della cifra, il posto (dopo il conto, prima
+della riga rossa e dei bottoni; il riquadro grigio e la frase di prima
+spariti); il banco ha preso anche i due giudici della riga della
+cauzione accesa, che non aveva mai disegnato. Tortura sulla copia:
+26 su 26 al primo disegno (al primo giro tre ancore multi-riga non
+trovate per il CRLF e tre `index` che facevano esplodere la sezione,
+curati con `find` e la guardia), 33 su 33 sul disegno finale, prima e
+dopo il rebase; due mutazioni le tiene la sola sentinella perche'
+EQUIVALENTI (il metodo unico lo sceglie gia' `apriDettaglioP2P`, il ramo
+del mio ordine ignora la cauzione). Suite intera severa senza config nel
+worktree, ribasato su 1308686: 19.308 verdi e 0 rosse; i 38 collaudi
+della CI nella gabbia verdi; le FORME dei segreti sulle righe aggiunte:
+nessuna. Dal vivo (copia in collaudo, relay morto, Chrome headless via
+CDP a densita' 2 e 3): dodici varianti prima/dopo a 375 e 320, chiaro e
+scuro, con un dato misurato per scatto (passi, altezza delle voci, la
+frase vecchia sparita, nessuno scorrimento orizzontale); nel pane i due
+tondi misurati uno contro l'altro nei due temi, la frase a 15px, 400,
+inchiostro del foglio, 6px fra i passi, contrasto 12,63:1 e 10,74:1.
+Scatto affiancato pubblicazione Barattozon / «Come funziona» approvato
+da Andrea.
+
+**DA GUARDARE.** Con VoiceOver e TalkBack sul telefono: «elenco, quattro
+elementi» sul riquadro, e che il numero nascosto non si legga due volte.

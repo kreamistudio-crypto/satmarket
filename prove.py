@@ -60768,6 +60768,14 @@ def prove_p2p_dettaglio():
         "function cauzioneSpentaP2P(){",
         "function metodoInCauzioneP2P(metodi, lista){",
         "function cauzioneAccesaP2P(){",
+        # (6 ott 2026) la riga della cauzione ACCESA, che i passi con la
+        # cauzione disegnano accanto: la stima e la sua base
+        "function importoCauzioneP2P(sats, info){",
+        "function satsBaseCauzioneP2P(o){",
+        # «Come funziona», i quattro passi (6 ott 2026): le prove dei
+        # testi stanno in `prove_passi_libro_p2p`
+        "function passiScambioP2P(q){",
+        "function passiDettP2P(passi){",
         "function renderDettaglioP2P(){",
         "function apriDettaglioP2P(id){",
         "function confermaDettaglioP2P(){",
@@ -61150,6 +61158,51 @@ out.paginaTua = el('p2pDettCorpo').innerHTML;
 out.titoloTuo = el('p2pDettTit').textContent;
 TUOI.clear();
 
+/* ---- «COME FUNZIONA» NELLA PAGINA VERA (6 ott 2026) ----
+   I testi si guardano in `prove_passi_libro_p2p`; qui il CABLAGGIO:
+   il metodo che conta (scelto, o l'unico), la cauzione detta dai
+   giudici veri con la leva e il 38385, il mio ordine, e il posto. */
+const passiDi = h => {
+  const i = h.indexOf('<div role="list">');
+  if (i < 0) return null;
+  return h.slice(i).split('role="listitem">').slice(1)
+    .map(s => s.slice(s.indexOf('</b></b>') + 8, s.indexOf('</div>')));
+};
+out.passi = {};
+out.passi.dueMetodi = passiDi(out.pagina);
+out.passi.sceltoRevolut = passiDi(out.pagina2);
+out.passi.vendi = passiDi(out.paginaVendi);
+out.passi.tuo = passiDi(out.paginaTua);
+out.passi.rangeAttesa = passiDi(out.rangeAttesa);
+p2pLibro = {ordini: [ordine({id: 'ord-6', metodi: ['Contanti']}),
+                     ordine({id: 'ord-7', lato: 'buy', metodi: ['Contanti']}),
+                     ordine({id: 'ord-8', metodi: ['Contanti', 'SEPA']}),
+                     ordine({id: 'ord-9', sats: 11400, metodi: TAB})]};
+apriDettaglioP2P('ord-6'); out.passi.contanti = passiDi(el('p2pDettCorpo').innerHTML);
+apriDettaglioP2P('ord-7'); out.passi.contantiVendi = passiDi(el('p2pDettCorpo').innerHTML);
+apriDettaglioP2P('ord-8'); out.passi.contantiNonScelto = passiDi(el('p2pDettCorpo').innerHTML);
+scegliMetodoDettP2P('Contanti'); out.passi.contantiScelto = passiDi(el('p2pDettCorpo').innerHTML);
+apriDettaglioP2P('ord-9'); out.passi.tab = passiDi(el('p2pDettCorpo').innerHTML);
+/* la cauzione: leva accesa E 38385 che la chiede a chi prende sui contanti */
+const levaPrima = p2pLevaPubblica, infoPrimaC = p2pInfo;
+p2pLevaPubblica = {mostro: 'm', commissione: 2, cauzione: true};
+p2pInfo = {fee: 0.02, cauzione: {accesa: true, pct: 0.01, base: 1000, applyTo: 'take',
+                                 metodi: ['contanti']}};
+apriDettaglioP2P('ord-6'); out.passi.cauzione = passiDi(el('p2pDettCorpo').innerHTML);
+apriDettaglioP2P('ord-7'); out.passi.cauzioneVendi = passiDi(el('p2pDettCorpo').innerHTML);
+/* ...che segue i metodi dell'ORDINE, come il coordinatore: SEPA scelto
+   su un ordine che ha anche i contanti la chiede lo stesso */
+apriDettaglioP2P('ord-8'); scegliMetodoDettP2P('SEPA');
+out.passi.cauzioneSepa = passiDi(el('p2pDettCorpo').innerHTML);
+/* ...e sul mio ordine no: io non prendo */
+TUOI.add('ord-6'); apriDettaglioP2P('ord-6');
+out.passi.cauzioneTuo = passiDi(el('p2pDettCorpo').innerHTML);
+TUOI.clear();
+/* ...a leva spenta niente cauzione nel primo passo */
+p2pLevaPubblica = {mostro: 'm', commissione: 2, cauzione: false};
+apriDettaglioP2P('ord-6'); out.passi.cauzioneSpenta = passiDi(el('p2pDettCorpo').innerHTML);
+p2pLevaPubblica = levaPrima; p2pInfo = infoPrimaC;
+
 /* ---- il lettore del metodo scelto, coi due lati ---- */
 out.metodoMio = metodoSceltoP2P({metodi: ['SEPA', 'Revolut'],
                                  metodoScelto: 'Revolut'});
@@ -61177,6 +61230,51 @@ console.log(JSON.stringify(out));
     # markup vero di «sats» lo guardano le prove che leggono `crudo`
     crudo = dict(o)
     o = {k: (_piatto_sats(v) if isinstance(v, str) else v) for k, v in o.items()}
+
+    # --- (6 ott 2026) «COME FUNZIONA» NELLA PAGINA VERA ---------------
+    # I testi esatti li tiene `prove_passi_libro_p2p` sulla funzione
+    # pura; qui si guarda che la PAGINA la chiami coi fatti giusti.
+    _ps = crudo["passi"]
+    _c_gen = ["Indichi dove ricevere i sats", "Chi vende li mette in garanzia",
+              "Invii gli euro col metodo scelto", "I sats arrivano a te"]
+    _v_gen = ["Metti i sats in garanzia", "Ricevi gli euro col metodo scelto",
+              "Controlli che siano arrivati", "Liberi i sats a chi compra"]
+    _c_con = _c_gen[:2] + ["Consegni i contanti di persona", _c_gen[3]]
+    _v_con = ["Metti i sats in garanzia", "Ricevi i contanti di persona",
+              "Li conti", "Liberi i sats sul posto"]
+    prova("passi: due metodi e nessuna scelta, poi Revolut scelto — il generico di chi compra",
+          [_c_gen, _c_gen], [_ps["dueMetodi"], _ps["sceltoRevolut"]])
+    prova("passi: chi vende col metodo unico", _v_gen, _ps["vendi"])
+    prova("passi: anche su un intervallo prima della cifra", _c_gen, _ps["rangeAttesa"])
+    prova("passi: il mio ordine (d'acquisto) dal libro comincia dall'attesa",
+          ["Aspetti che qualcuno lo prenda", "Chi vende mette i sats in garanzia",
+           "Invii gli euro col metodo scelto", "I sats arrivano a te"], _ps["tuo"])
+    prova("passi: contanti unico metodo, dai due lati", [_c_con, _v_con],
+          [_ps["contanti"], _ps["contantiVendi"]])
+    prova("passi: contanti fra due metodi non scelto e' il generico, scelto diventa contanti",
+          [_c_gen, _c_con], [_ps["contantiNonScelto"], _ps["contantiScelto"]])
+    prova("passi: Barattozon al terzo passo", _c_gen[:2] + ["Paghi il PayCode al tabacchino", _c_gen[3]],
+          _ps["tab"])
+    prova("passi: con la cauzione cambia solo il primo, dai due lati",
+          [["Blocchi la cauzione e indichi dove ricevere i sats"] + _c_con[1:],
+           ["Blocchi la cauzione e metti i sats in garanzia"] + _v_con[1:]],
+          [_ps["cauzione"], _ps["cauzioneVendi"]])
+    prova("...la cauzione segue i metodi dell'ORDINE (SEPA scelto accanto ai contanti)",
+          ["Blocchi la cauzione e indichi dove ricevere i sats"] + _c_gen[1:], _ps["cauzioneSepa"])
+    prova("...mai sul mio ordine, e mai a leva spenta",
+          ["Aspetti che qualcuno lo prenda", _c_con],
+          [(_ps["cauzioneTuo"] or [None])[0], _ps["cauzioneSpenta"]])
+    _pg = crudo["pagina"]
+    prova("passi: dopo il conto e sopra i bottoni, al posto del riquadro grigio",
+          [True, False, False],
+          [(lambda ix: min(ix) > 0 and ix == sorted(ix))(
+              [_pg.find(a) for a in ('class="ctrl-conto', 'Come funziona',
+                                     'id="p2pDettManca"', 'class="foglio-piede"')]),
+           "trust-note nota-scambio" in _pg,
+           "tu mandi gli euro col metodo scelto" in _pg])
+    _pt = crudo["paginaTua"]
+    prova("...e sul mio ordine sopra il suo «Indietro»", True,
+          0 < _pt.find('Come funziona') < _pt.find('id="p2pDettTuoPiede"'))
 
     # --- (7 ott 2026) L'INTERVALLO SI SCEGLIE PRIMA DEL CONTO ----------
     ra = o["rangeAttesa"]
@@ -98607,6 +98705,211 @@ console.log(JSON.stringify({
           "«N pionieri»" in src)
 
 
+def prove_passi_libro_p2p():
+    """«COME FUNZIONA» NEL DETTAGLIO DELL'ORDINE P2P (6 ott 2026, idea e
+    testi di Andrea). La frase che spiegava lo scambio sopra i bottoni
+    («Chi vende blocca i sats in garanzia, tu mandi…») e' diventata un
+    elenco di quattro passi corti, col titolo «Come funziona» e i
+    pallini arancio di «Barattozon, passo per passo», nell'ordine della
+    linea del tempo dello scambio. Cambia col lato (compro/vendo), col
+    metodo (generico, contanti di persona, Barattozon), con la cauzione
+    (solo il primo passo) e sul mio ordine (il primo passo e' l'attesa).
+    Qui i TESTI di ogni variante, sulla funzione pura vera, il markup per
+    il lettore vocale e la cascata dei pallini fuori da `.sicu`; il
+    cablaggio nella pagina vera lo guarda `prove_p2p_dettaglio`."""
+    print("\n🔢 «Come funziona» nel dettaglio dell'ordine P2P")
+    import json as _json, os as _os, subprocess as _sp, shutil as _sh
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) LE SENTINELLE --------------------------------------------
+    dett = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
+    prova("il dettaglio chiama i passi coi fatti del foglio", True,
+          "passiDettP2P(passiScambioP2P({" in dett
+          and "compro: compro, tuo: !!tuo," in dett
+          and "metodo: p2pDettMetodo || ((o.metodi || []).length === 1 ? o.metodi[0] : '')," in dett
+          and "cauzione: !tuo && cauzioneServeP2P(Object.assign({}, o, {mio: false}), p2pInfo, cauzioneAccesaP2P())" in dett)
+    prova("...e la frase di prima non c'e' piu', ne' il suo riquadro", [False, False, False],
+          ["tu mandi gli euro col metodo scelto" in mini,
+           "Tu blocchi i sats in garanzia, ricevi gli euro" in mini,
+           "trust-note nota-scambio" in dett])
+    _posti = [dett.find(a) for a in ("contoDettP2P(scelto ?", "passiDettP2P(", 'id="p2pDettManca"')]
+    prova("...e i passi stanno dopo il conto e prima della riga rossa", True,
+          min(_posti) > 0 and _posti == sorted(_posti))
+    i0 = mini.find("<style>")
+    css = mini[i0 + 7:mini.find("</style>", i0)] if i0 >= 0 else ""
+    regole, _squilibrio = _regole_css(css)
+    # IL TONDO E' QUELLO DELLE TAPPE DI BARATTOZON (correzione di Andrea,
+    # 6 ott 2026): non «somigliante» ma lo stesso. Si chiede alla cascata
+    # chi vince sul tondo nelle due catene vere — la tappa del percorso
+    # (passo non ancora fatto) e un passo di «Come funziona» — e i due
+    # vestiti devono coincidere proprieta' per proprieta'.
+    base = [{"tag": "html", "attr": {"lang": "it"}, "classi": set()},
+            {"tag": "body", "attr": {}, "classi": set()}]
+    nn = {"tag": "b", "attr": {}, "classi": {"p2p-tappa-n"}}
+    tappa = base + [
+        {"tag": "div", "attr": {"id": "p2pNuovoSheet"}, "classi": {"sheet", "pieno"}},
+        {"tag": "div", "attr": {}, "classi": {"p2p-percorso"}},
+        {"tag": "div", "attr": {"data-tappa": "1", "data-fatto": "0"}, "classi": {"p2p-sez", "p2p-tappa"}}]
+    nella_tappa = tappa + [{"tag": "div", "attr": {}, "classi": {"p2p-sez-tit"}},
+                           {"tag": "span", "attr": {}, "classi": set()}, dict(nn, attr={"aria-hidden": "true"})]
+    sez_passi = base + [
+        {"tag": "div", "attr": {"id": "p2pDettSheet"}, "classi": {"sheet", "pieno"}},
+        {"tag": "div", "attr": {"id": "p2pDettCorpo"}, "classi": {"foglio-corpo"}},
+        {"tag": "div", "attr": {}, "classi": {"p2p-sez"}},
+        {"tag": "div", "attr": {}, "classi": {"p2p-sez-riga"}},
+        {"tag": "div", "attr": {}, "classi": {"p2p-sez-corpo"}},
+        {"tag": "div", "attr": {"role": "list"}, "classi": set()}]
+    voce = sez_passi + [{"tag": "div", "attr": {"role": "listitem"}, "classi": {"hint"}}]
+    nei_passi = voce + [{"tag": "b", "attr": {"aria-hidden": "true"}, "classi": set()}, nn]
+    PROP = ("display", "width", "height", "border-radius", "background", "color",
+            "font-size", "font-weight", "margin-right", "align-items", "justify-content", "content")
+    vt = _vince_css(regole, nella_tappa, PROP)
+    vp = _vince_css(regole, nei_passi, PROP)
+    prova("il tondo della tappa: 22px, tondo, arancio tenue col numero arancio, 12px",
+          ("22px", "22px", "50%", "var(--sats-soft)", "var(--sats-text)", "12px"),
+          tuple(vt.get(k, (None,))[0] for k in ("width", "height", "border-radius",
+                                                 "background", "color", "font-size")))
+    prova("...e il tondo di «Come funziona» ha lo STESSO vestito, proprieta' per proprieta'",
+          {k: v[0] for k, v in vt.items()}, {k: v[0] for k, v in vp.items()})
+    # IL PESO DEL NUMERO non lo scrive nessuna regola: e' il `bolder` dei
+    # `<b>`. Nella tappa il tondo sta in un titolo a 700 (900); qui il
+    # `<b>` muto fa da titolo (400 → 700 → 900). Misurato dal vivo nei
+    # due temi: 900 tutt'e due. Se un giorno una regola desse un peso al
+    # tondo o a un `<b>` nudo, la catena cambierebbe: lo si sorveglia.
+    prova("...col numero a 900 dalla catena dei `<b>`: nessuna regola gli da' un peso",
+          [None, "700"],
+          [vp.get("font-weight", (None,))[0],
+           _vince_css(regole, tappa + [{"tag": "div", "attr": {}, "classi": {"p2p-sez-tit"}}],
+                      ("font-weight",)).get("font-weight", (None,))[0]])
+    prova("...e il `<b>` muto che fa da titolo non ha un peso suo (resta il bolder)", None,
+          _vince_css(regole, voce + [{"tag": "b", "attr": {"aria-hidden": "true"}, "classi": set()}],
+                     ("font-weight",)).get("font-weight", (None,))[0])
+    _spunta = [r for r in regole if "p2p-tappa-n" in r[0]
+               and ("::before" in r[0] or "font-size:0" in r[1].replace(" ", ""))]
+    prova("...e mai la ✓ del passo fatto: quella vive solo dentro `.p2p-tappa`", (True, True),
+          (len(_spunta) >= 2, all(".p2p-tappa[" in r[0] for r in _spunta)))
+    # LA FRASE E' IL TESTO DEL FOGLIO (seconda correzione di Andrea): lo
+    # stesso vestito del testo d'aiuto di una tappa — nessuna regola sulla
+    # misura, il peso o il colore, quindi quelli del foglio — e MAI quello
+    # del titolo grigio della tappa. (Il margine fra i passi, 6px, non si
+    # chiede qui: il giudice dice «si'» nel dubbio a un `.btn+:not(.btn)`
+    # del foglio, che dal vivo non c'entra. Misurato nel pane: 6px.)
+    FR = ("font-size", "font-weight", "color", "line-height")
+    aiuto = tappa + [{"tag": "div", "attr": {}, "classi": {"p2p-sez-riga"}},
+                     {"tag": "div", "attr": {}, "classi": {"p2p-sez-corpo"}},
+                     {"tag": "div", "attr": {}, "classi": {"hint"}}]
+    prova("la frase veste come l'aiuto delle tappe: nessuna misura, peso o colore suoi",
+          ({}, {}),
+          ({k: v[0] for k, v in _vince_css(regole, aiuto, FR).items()},
+           {k: v[0] for k, v in _vince_css(regole, voce, FR).items()}))
+    prova("...e il titolo grigio della tappa resta fuori dalla frase", (True, False),
+          ("12.5px" == _vince_css(regole, tappa + [{"tag": "div", "attr": {}, "classi": {"p2p-sez-tit"}}],
+                                  ("font-size",)).get("font-size", (None,))[0],
+           any("p2p-sez-tit" in c["classi"] for c in voce)))
+    prova("il markup del tondo, e nessuno stile nuovo (i pallini di Info come prima)",
+          [True, True, 1, 1, 0],
+          ["'<div class=\"p2p-sez-tit\"><span><b class=\"p2p-tappa-n\" aria-hidden=\"true\">' + n + '</b>'"
+             in pezzo_js(mini, "function percorsoTabacchinoP2P(val){", "\n}\n"),
+           "'<div class=\"hint\" role=\"listitem\"><b aria-hidden=\"true\"><b class=\"p2p-tappa-n\">'"
+             in pezzo_js(mini, "function passiDettP2P(passi){", "\n}\n"),
+           css.count(".sicu ol,.sicu ul{margin:0;padding-left:0;list-style:none}"),
+           css.count(".sicu li{font-size:15px;"),
+           len(re.findall(r",\s*ol\.sicu-passi|,\s*\.sicu-passi\s+li|passi-scambio", css))])
+
+    # --- 2) IL BANCO: le funzioni vere --------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco dei passi", "node non c'e'")
+        return
+    pezzi = [mini[mini.index(r):mini.index("\n", mini.index(r))] for r in (
+        "const P2P_CONTANTI = ", "const P2P_TABACCHINO = ", "const P2P_TABACCHINO_PM = ")]
+    pezzi += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function metodoBaseP2P(m){", "function tabacchinoP2P(metodi){",
+        "function passiScambioP2P(q){", "function passiDettP2P(passi){",
+        "function sezioneNuovoP2P(o){")]
+    banco = "\n".join(pezzi) + r"""
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const out = {};
+const TAB = 'Contanti al tabacchino 23.47';
+for (const compro of [true, false])
+  for (const tuo of [false, true])
+    for (const cauzione of [false, true])
+      for (const [nome, metodo] of [['generico', 'SEPA'], ['nessuno', ''], ['contanti', 'Contanti'],
+                                    ['contantiSpazi', ' Contanti '], ['tab', TAB]])
+        out[[compro ? 'compro' : 'vendo', tuo ? 'tuo' : 'libro', cauzione ? 'cauz' : 'senza', nome].join('/')] =
+          passiScambioP2P({compro, tuo, metodo, cauzione});
+out.html = passiDettP2P(['Uno <b>', 'Due & tre']);
+console.log(JSON.stringify(out));
+"""
+    d = _tf.mkdtemp()
+    try:
+        p = _os.path.join(d, "banco.js")
+        open(p, "w", encoding="utf-8").write(banco)
+        r = _sp.run([node, p], capture_output=True, encoding="utf-8", timeout=60)
+        if r.returncode != 0:
+            prova("il banco dei passi gira", "", (r.stderr or "")[-600:])
+            return
+        o = _json.loads(r.stdout.strip().splitlines()[-1])
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+
+    # I TESTI DI ANDREA, parola per parola (6 ott 2026)
+    C = ["Indichi dove ricevere i sats", "Chi vende li mette in garanzia",
+         "Invii gli euro col metodo scelto", "I sats arrivano a te"]
+    C_CON = C[:2] + ["Consegni i contanti di persona", C[3]]
+    C_TAB = C[:2] + ["Paghi il PayCode al tabacchino", C[3]]
+    V = ["Metti i sats in garanzia", "Ricevi gli euro col metodo scelto",
+         "Controlli che siano arrivati", "Liberi i sats a chi compra"]
+    V_CON = ["Metti i sats in garanzia", "Ricevi i contanti di persona",
+             "Li conti", "Liberi i sats sul posto"]
+    CAUZ_C = "Blocchi la cauzione e indichi dove ricevere i sats"
+    CAUZ_V = "Blocchi la cauzione e metti i sats in garanzia"
+    prova("compro, bonifico e altri metodi", C, o["compro/libro/senza/generico"])
+    prova("compro, contanti di persona", C_CON, o["compro/libro/senza/contanti"])
+    prova("compro, Barattozon", C_TAB, o["compro/libro/senza/tab"])
+    prova("vendo, bonifico e altri metodi", V, o["vendo/libro/senza/generico"])
+    prova("vendo, contanti di persona", V_CON, o["vendo/libro/senza/contanti"])
+    prova("con la cauzione cambia SOLO il primo, in ogni metodo e dai due lati",
+          [[CAUZ_C] + C[1:], [CAUZ_C] + C_CON[1:], [CAUZ_C] + C_TAB[1:],
+           [CAUZ_V] + V[1:], [CAUZ_V] + V_CON[1:]],
+          [o["compro/libro/cauz/generico"], o["compro/libro/cauz/contanti"],
+           o["compro/libro/cauz/tab"], o["vendo/libro/cauz/generico"],
+           o["vendo/libro/cauz/contanti"]])
+    prova("nessun metodo noto vale il generico", [C, V],
+          [o["compro/libro/senza/nessuno"], o["vendo/libro/senza/nessuno"]])
+    prova("il metodo si legge senza gli spazi attorno", [C_CON, V_CON],
+          [o["compro/libro/senza/contantiSpazi"], o["vendo/libro/senza/contantiSpazi"]])
+    # IL MIO ORDINE: l'attesa, poi tre passi del mio lato (adattati da me,
+    # mostrati ad Andrea negli scatti)
+    ATT = "Aspetti che qualcuno lo prenda"
+    prova("il mio ordine d'acquisto: l'attesa e tre passi", [
+        [ATT, "Chi vende mette i sats in garanzia", "Invii gli euro col metodo scelto", "I sats arrivano a te"],
+        [ATT, "Chi vende mette i sats in garanzia", "Consegni i contanti di persona", "I sats arrivano a te"]],
+        [o["compro/tuo/senza/generico"], o["compro/tuo/senza/contanti"]])
+    prova("il mio ordine di vendita: l'attesa e tre passi, Barattozon compreso", [
+        [ATT, "Metti i sats in garanzia", "Ricevi e controlli gli euro", "Liberi i sats a chi compra"],
+        [ATT, "Metti i sats in garanzia", "Ricevi i contanti e li conti", "Liberi i sats sul posto"],
+        [ATT, "Metti i sats in garanzia", "Controlli su Amazon", "Liberi i sats a chi compra"]],
+        [o["vendo/tuo/senza/generico"], o["vendo/tuo/senza/contanti"], o["vendo/tuo/senza/tab"]])
+    prova("...e sul mio ordine la cauzione non entra mai", True,
+          all(o[k.replace("/senza/", "/cauz/")] == o[k] for k in o if "/tuo/senza/" in k))
+    prova("sempre quattro passi, nessuno vuoto, nessun nome di passo in testa", (True, True),
+          (all(len(v) == 4 and all(v) for k, v in o.items() if k != "html"),
+           not any(re.match(r"(Ordine preso|Sats bloccati|Euro inviati|Scambio concluso)", s)
+                   for k, v in o.items() if k != "html" for s in v)))
+    h = o["html"]
+    prova("l'elenco: titolo «Come funziona», role=list e listitem, numeri muti alla voce, voci escapate", True,
+          '<div class="p2p-sez-tit"><span>Come funziona</span>' in h
+          and ('<div role="list"><div class="hint" role="listitem">'
+               '<b aria-hidden="true"><b class="p2p-tappa-n">1</b></b>Uno &lt;b&gt;</div>'
+               '<div class="hint" role="listitem">'
+               '<b aria-hidden="true"><b class="p2p-tappa-n">2</b></b>Due &amp; tre</div></div>') in h
+          and "p2p-sez-ico" not in h and 'role="button"' not in h)
+
+
 def prove_config_esempio():
     """`config_esempio.py` E' IL FILE DA CUI SI COPIA (ago 2026, dal
     campo: le sei leve dei connettori erano cablate, funzionavano col
@@ -125203,6 +125506,7 @@ def main():
               prove_carrello_salvato,
               prove_bollino_staff,
               prove_scambi_verso,
+              prove_passi_libro_p2p,
               prove_config_esempio):
         try:
             f()
