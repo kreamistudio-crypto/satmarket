@@ -37889,3 +37889,79 @@ bordo basso della foto, con l'alone arancio attorno al carrello. I file
 scendono a 1, 4, 7 e 11 KB. La regola che resta: per un disegno con il
 suo fondo, quanto stringere lo decide chi guarda la card, non il
 riempimento delle sorelle — si mostra il confronto prima di scegliere.
+
+## Il rosso del P2P a metà strada, e i sats di «I miei scambi» dicono il verso (6 ott 2026)
+
+Il compito (Andrea): nelle card di «I miei scambi» i numeri in sats
+erano arancio; vanno colorati come nel conto — verde (la variante
+leggibile del verde di «Ricevi») quando l'utente riceve sats, il rosso
+nuovo (le `--rosso-p2p…`) quando li manda; gli altri numeri restano
+come sono. Contrasto nei due temi, scatti prima/dopo.
+
+**DECISO.** La card sa già da che parte stanno i sats (`ricevoSats`:
+`sell` nel vocabolario del libro vuol dire che chi legge li riceve), e
+ora la cifra porta la classe `riceve` o `invia`. `--trust-text` per chi
+riceve, `--rosso-p2p-testo` per chi manda; sulle card tinte dallo stato
+le due cifre si scuriscono come l'arancio di prima (lo stesso
+`color-mix` con l'inchiostro, che di sera vale zero); sulla card spenta
+vince il grigio di tutte (la sua regola ha guadagnato `body .p2p-ord`,
+che la nuova l'avrebbe battuta). L'arancio resta alla cifra senza verso.
+
+**IL ROSSO DEL P2P È UNA VIA DI MEZZO (decisione di Andrea, lo stesso
+giorno).** Il «rosso vivo» di eea8d6e e f7b2b0f (#F5503A→#F0402E) era
+troppo acceso, e dava fastidio; il rosso di prima (#C8460F→#B23A0A, il
+--danger #C2410C / #F07A47) con la scritta nera non reggeva (3,6 e 2,9).
+Andrea ha calcolato i bottoni: **#DE4B24→#D73E20 con scritta e croce
+nere** — il nero PURO, 5,14 in cima e 4,60 in fondo: col nero caldo dei
+pieni arancio (#2A1600) lo stesso rosso faceva 4,23 e 3,79. Le altre
+leve sono la metà fra le due, aggiustate il minimo per il 4,5 su ogni
+loro fondo nei due temi, senza eccezioni (anche il pieno, che da segno
+grafico avrebbe chiesto 3):
+
+| leva | vivo | prima | metà | finale | contrasti |
+|---|---|---|---|---|---|
+| bottoni e + | #F5503A→#F0402E | #C8460F→#B23A0A | — | #DE4B24→#D73E20 (Andrea) | nero 5,14 / 4,60 |
+| tinta piena (pillola del + da desktop, «Vende» in vetrina) | #F0402E | #C2410C | #D9401D | #D9401D | nero 4,70 |
+| pieno, giorno | #F0402E | #C2410C | #D9401D | #C33A1A | 4,85 crema, 5,33 card, 4,53 tenue |
+| pieno, sera | #F0402E | #F07A47 | #F26E4E | #F26E4E | 5,83 / 5,14 / 5,02 |
+| testo, giorno | #C8200E | #C2410C | #C5300D | #C5300D | 5,03 / 5,52 / 4,69 (il tab attivo) |
+| testo, sera | #F36254 | #F07A47 | #F26E4E | #F37456 | 6,10 / 5,38 / 5,25, e ≥4,5 sulle card tinte (la metà faceva 4,34-4,49) |
+| icona «Libro ordini» | #F36254 | #F07A47 | #F26E4E | #F26E4E | 5,30 / 6,68 sulla banda |
+| tenue | #FDE8E6 / #3E1F14 | #FDE8E4 / #3C221A | #FDE8E5 / #3D2017 | uguale | — |
+| velo «Libro ordini» da desktop | rgba(240,64,46,.08) | rgba(240,122,71,.15) | .115 | rgba(242,110,78,.1) | testo 4,57 (a .115 faceva 4,47) |
+| alone e campo che manca | rgba(240,64,46) | rgba(194,65,12) | rgba(217,64,29) | uguale | — |
+
+La croce del + scende sul logo come prima (bianca d×d): nel mezzo della
+discesa croce e fondo vanno in versi opposti e toccano 1,0:1 verso il
+53%, per un attimo col dito sopra; agli estremi 5,14 (sul rosso) e 16,8
+(sul blu). L'etichetta «Vende» in vetrina ha la scritta nera dei bottoni
+rossi sulla loro tinta piena (4,70). **Per chi lavora sul rosso fuori
+dal P2P** (il conto del mercatino e gli errori, che restano --danger):
+il rosso di riferimento del P2P non è più il rosso vivo — è questa via
+di mezzo; nessun'altra sessione lo stava toccando il 6 ott.
+
+**Provato.** In `prove_card_tinte_stato`: la cifra porta il suo verso
+(il pezzo vero di `rigaScambioP2P`); la cascata la veste — verde, rosso,
+scuriti sulla tinta, grigi sulla spenta; i testi misurati su ogni tinta
+nei due temi ora contano il rosso del P2P (pieno e scurito) e il verde
+da testo due volte (l'affare del premio pieno, la cifra scurita); le
+regole della tinta sono dodici. In `prove_vestito_bottoni` la soglia
+del P2P è 4,5 ovunque, pieno compreso, e i bottoni rossi sono quelli
+scelti da Andrea col nero puro. Tortura 5 su 5 sulla copia (sul
+colore delle cifre). Scatti
+prima/dopo a 375 px nei due temi via Chrome headless, con cinque scambi
+seminati dalla pagina (riceve e manda; attivo, euro inviati, concluso,
+annullato). Suite intera severa e collaudi della CI: nel messaggio del
+commit.
+
+**Il conto del mercatino (chiesto da Andrea strada facendo, NON
+applicato).** Scatti prima/dopo di «Controlla e paga» e della pagina
+dell'ordine, nella copia con la commissione al 2%: l'unico corallo del
+conto del mercatino è il «2%» di «Fee Barattolo», e solo sopra zero
+(oggi è 0, «in promo»); il totale da pagare è arancio. Nella pagina
+dell'ordine nessuna riga di conto è corallo (c'è il solo filo del
+bottone «C'è un problema», ruolo `.allarme`). Decide Andrea.
+
+**Da guardare** (sul telefono): «I miei scambi» nei due temi, con uno
+scambio a vendere e uno a comprare; l'avviso del premio sulle card
+tinte di sera.

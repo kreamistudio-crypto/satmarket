@@ -98,24 +98,29 @@
     --trust:#1B8B54; --trust-soft:#E7F5EC;
     --barra-da:#DCEEE4; --barra-a:#8FCBAB;
     --danger:#C2410C;
-    /* IL ROSSO DEL P2P (6 ott 2026, richiesta di Andrea): il «rosso vivo»
-       di «Pubblica ordine» (eea8d6e, #F5503A→#F0402E) per TUTTO il lato
-       «vendi» del P2P — tab, numeri in sats, etichette, pillole, bordi,
-       icone della barra — e per gli avvisi del P2P, al posto del corallo
-       di --danger, che resta agli errori e ai pericoli del mercatino.
-       UNA tinta (5,6°) e le sue varianti, ognuna per il suo fondo:
-       --rosso-p2p        il PIENO: fondi, bordi, anelli (sul crema 4,5:1,
-                          sulla card 4,0 — da segno grafico basta 3)
-       --rosso-p2p-testo  i TESTI sulla pagina: piu' scuro di giorno
-                          (#C8200E: 5,2 sul crema, 5,7 sulla card, 4,9
-                          sul tenue), piu' chiaro di sera (#F36254: 5,5
-                          sul bruno, 4,8 sulla card, 4,7 sul tenue)
-       --rosso-p2p-banda  le ICONE della barra in basso, che e' scura nei
-                          due temi (#F36254: 5,0 di giorno, 6,3 di sera)
-       --rosso-p2p-tenue  il fondo tenue (tab attivo, strisce, avvisi)
-       La scritta SUL pieno e' quella dei bottoni rossi, --b-rosso-fg. */
-    --rosso-p2p:#F0402E; --rosso-p2p-testo:#C8200E;
-    --rosso-p2p-banda:#F36254; --rosso-p2p-tenue:#FDE8E6;
+    /* IL ROSSO DEL P2P (6 ott 2026): tutto il lato «vendi» del P2P — tab,
+       numeri in sats, etichette, bordi, icone della barra, avvisi — legge
+       queste leve, mai un codice sparso. LA STORIA DI UN GIORNO, perche'
+       non si rifaccia: il «rosso vivo» #F5503A→#F0402E (eea8d6e, f7b2b0f)
+       era troppo acceso; il rosso di prima (#C8460F→#B23A0A, --danger)
+       con la scritta nera non reggeva; Andrea ha scelto una VIA DI MEZZO.
+       Ogni leva e' la meta' fra le due, spostata solo di quanto serve per
+       il 4,5:1 su ogni suo fondo, nei due temi (nessuna eccezione):
+       --rosso-p2p        il PIENO (fondi, bordi, anelli): di giorno #C33A1A
+                          (la meta' #D9401D faceva 4,1 sul crema: scurito
+                          fino a 4,9 sul crema, 5,3 sulla card, 4,5 sul
+                          tenue); di sera #F26E4E (5,8 / 5,1 / 5,0)
+       --rosso-p2p-testo  i TESTI: di giorno #C5300D, la meta' esatta (5,0
+                          sul crema, 5,5 sulla card, 4,7 sul tenue: il tab
+                          «Vendi BTC» attivo); di sera #F37456, appena piu'
+                          chiaro della meta' #F26E4E, che sulle card tinte
+                          di «I miei scambi» faceva 4,3-4,5
+       --rosso-p2p-banda  le ICONE della barra scura: #F26E4E, la meta'
+                          (5,3 di giorno, 6,7 di sera)
+       --rosso-p2p-tenue  il fondo tenue: #FDE8E5 / #3D2017, le meta'
+       I bottoni rossi e il + hanno il loro pieno, --b-rosso-… (sotto). */
+    --rosso-p2p:#C33A1A; --rosso-p2p-testo:#C5300D;
+    --rosso-p2p-banda:#F26E4E; --rosso-p2p-tenue:#FDE8E5;
     /* il "profondo" del rosso: nasce col + della nav trasformata nel
        P2P (set 2026) — l'ombra piena sotto il tondo «Pubblica» quando
        si sta nel tab «Vendi BTC», gemello di --trust-deep */
@@ -187,20 +192,20 @@
        «Vendi BTC» e del + che vende, e il BLU di Barattozon, che tiene
        il suo colore pieno e la scritta bianca (decisione di Andrea: sui
        pieni che non sono arancio, verde o rosso lo stile A cambia solo
-       forma, ombra, misure e carattere). Il rosso
-       e' lo stesso di giorno e di sera, come l'arancio, e porta la
-       scritta SCURA come lui (ritocco di Andrea dopo b248080): per
-       reggerla si e' schiarito da #C8460F→#B23A0A (3,6 e 2,9:1 con lo
-       scuro) al «rosso vivo» #F5503A→#F0402E, scelto da Andrea fra tre
-       (6-7°, ben lontano dai 33° dell'arancio di «Compra»): 5,0:1 in
-       cima e 4,5 in fondo. Piu' rosso di cosi' lo scuro non regge: il
-       rosso puro #FF0000 ci fa 4,3.
+       forma, ombra, misure e carattere). Il rosso e' la VIA DI MEZZO
+       scelta da Andrea il 6 ott 2026 fra il rosso vivo (#F5503A→#F0402E,
+       troppo acceso) e quello di prima (#C8460F→#B23A0A, che col nero non
+       reggeva): #DE4B24→#D73E20, lo stesso di giorno e di sera. La
+       scritta e la croce sono NERE, il nero PURO: 5,14 in cima e 4,60 in
+       fondo — col nero caldo dei pieni arancio (#2A1600) lo stesso rosso
+       faceva 4,23 e 3,79. La tinta piena (la pillola del + da desktop e
+       l'etichetta «Vende» in vetrina) e' la meta' #D9401D, 4,70 col nero.
        Il suo alone sta a parte perche' il + che scende sul logo lo
        spegne da solo (IL + CHE DIVENTA BLU SCENDENDO). */
-    --b-rosso-bg:linear-gradient(180deg,#F5503A 0%,#F0402E 100%);
-    --b-rosso-fg:#2A1600; --b-rosso-line:rgba(150,45,0,.4);
+    --b-rosso-bg:linear-gradient(180deg,#DE4B24 0%,#D73E20 100%);
+    --b-rosso-fg:#000000; --b-rosso-line:rgba(110,30,0,.45);
     --b-rosso-rilievo:inset 0 1px 0 rgba(255,255,255,.22),0 1px 2px rgba(110,30,0,.22);
-    --b-rosso-alone:0 7px 16px -8px rgba(240,64,46,.7);
+    --b-rosso-alone:0 7px 16px -8px rgba(217,64,29,.7);
     --b-rosso-sh:var(--b-rosso-rilievo),var(--b-rosso-alone);
     --b-rosso-sh-on:inset 0 2px 4px rgba(110,30,0,.35);
     --b-bz-bg:#191D29;
@@ -215,7 +220,7 @@
        (la pillola del + da desktop: un gradiente non sfuma, scatta).
        Sono una fermata del loro gradiente, e reggono l'inchiostro del
        ruolo: 7,2 / 4,9 / 5,2:1. */
-    --b-pri-tinta:#F7931A; --b-ok-tinta:#1B8150; --b-rosso-tinta:var(--rosso-p2p);
+    --b-pri-tinta:#F7931A; --b-ok-tinta:#1B8150; --b-rosso-tinta:#D9401D;
     --b-off-bg:#EFE9DA; --b-off-fg:#7D7564; --b-off-line:transparent; --b-off-sh:none; --b-off-op:1;
     --b-busy-op:1; --b-busy-luce:block; --b-luce:rgba(255,255,255,.42);
     /* i toni "profondi" fanno l'ombra piena dei bottoni, i "text"
@@ -437,7 +442,7 @@
     --b-dan-sh-on:inset 0 2px 4px rgba(0,0,0,.4);
     --b-piano-bg:#2C2517; --b-piano-fg:#F58A5C; --b-piano-line:#3E3623;
     --b-rosso-rilievo:inset 0 1px 0 rgba(255,255,255,.2),0 1px 2px rgba(0,0,0,.45);
-    --b-rosso-alone:0 8px 18px -9px rgba(240,64,46,.5);
+    --b-rosso-alone:0 8px 18px -9px rgba(217,64,29,.5);
     --b-rosso-sh-on:inset 0 2px 4px rgba(0,0,0,.4);
     --b-bz-line:rgba(241,232,213,.16);
     --b-bz-sh:0 1px 2px rgba(0,0,0,.5);
@@ -450,7 +455,7 @@
     --barra-da:#243B2C; --barra-a:#35684A;
     --danger:#F07A47;
     --danger-deep:#A33A0E;
-    --rosso-p2p-testo:#F36254; --rosso-p2p-tenue:#3E1F14;
+    --rosso-p2p:#F26E4E; --rosso-p2p-testo:#F37456; --rosso-p2p-tenue:#3D2017;
     --sats-text:#FFB25C;
     /* l'asta di sera: si alza la LUCE, non si cambia il segno —
        misurati: --asta vs bruno 3,77 (component ok) col bianco sopra
@@ -2063,12 +2068,12 @@
   .card-p2p .ph .p2p-vt-marchio{position:absolute;left:12%;top:36%;
     width:76%;height:auto;object-fit:contain}
   /* colori FISSI, come il badge della lampo: stanno sulla «foto».
-     Bianco sul verde 4,6:1; sul rosso vivo del P2P (ott 2026) la scritta
-     e' quella scura dei bottoni rossi, 4,5:1 */
+     Bianco sul verde 4,6:1; sul rosso la scritta nera dei bottoni rossi
+     sulla loro tinta piena, fissa nei due temi: 4,7:1 */
   .p2p-vt-lato{position:absolute;top:8px;left:8px;z-index:2;
     border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:800;
     color:#fff;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-  .p2p-vt-lato.vendi{background:var(--rosso-p2p);color:var(--b-rosso-fg)}
+  .p2p-vt-lato.vendi{background:var(--b-rosso-tinta);color:var(--b-rosso-fg)}
   .p2p-vt-lato.compra{background:#1B8B54}
   .p2p-vt-volto{position:absolute;top:7px;right:7px;z-index:2;
     width:30px;height:30px;border-radius:50%;overflow:hidden;
@@ -3197,6 +3202,10 @@
        cioe' li' non succede niente. */
     .p2p-scambio.tinta .p2p-sats{
       color:color-mix(in srgb,var(--ink) var(--tinta-testo),var(--sats-text))}
+    body .p2p-ord.p2p-scambio.tinta .p2p-sats.riceve{
+      color:color-mix(in srgb,var(--ink) var(--tinta-testo),var(--trust-text))}
+    body .p2p-ord.p2p-scambio.tinta .p2p-sats.invia{
+      color:color-mix(in srgb,var(--ink) var(--tinta-testo),var(--rosso-p2p-testo))}
     .p2p-scambio.tinta .p2p-badge .p2p-avviso{
       color:color-mix(in srgb,var(--ink) var(--tinta-testo),var(--rosso-p2p-testo))}
   }
@@ -3227,7 +3236,7 @@
      riga di servizio: 6,6:1 sulla tinta piu' chiara, AA. I selettori
      pesano QUANTO quelli della tinta (quattro classi) e stanno dopo, quindi
      vincono senza `!important`. */
-  .p2p-scambio.spenta .p2p-sats.p2p-sats,
+  body .p2p-ord.p2p-scambio.spenta .p2p-sats.p2p-sats,
   .p2p-scambio.spenta .p2p-euro.p2p-euro,
   .p2p-scambio.spenta .p2p-badge .p2p-avviso,
   .p2p-scambio.spenta .p2p-badge .p2p-affare{color:var(--ink-soft)}
@@ -3254,6 +3263,14 @@
      allargherebbe la PAGINA invece di andare a capo. */
   body .p2p-ord.p2p-scambio .p2p-sats{color:var(--sats-text);
     white-space:normal}
+  /* I SATS DI UNO SCAMBIO DICONO IL VERSO (6 ott 2026, richiesta di
+     Andrea): come nel conto, VERDI quando li ricevi — la variante da
+     testo del verde di «Ricevi», --trust-text — e ROSSI quando li mandi,
+     il rosso del P2P per i testi. L'arancio resta alla cifra senza verso.
+     Sulle card tinte la cifra si scurisce come prima (sotto, nel blocco
+     delle tinte), e sulla card spenta vince il grigio di tutte. */
+  body .p2p-ord.p2p-scambio .p2p-sats.riceve{color:var(--trust-text)}
+  body .p2p-ord.p2p-scambio .p2p-sats.invia{color:var(--rosso-p2p-testo)}
   /* la coppia gemella nel conto scorporato vive nel CSS del conto,
      dopo `.ctrl-nota`: la percentuale del premio sta DENTRO quella
      nota, e a parita' di specificita' vince chi e' scritto dopo —
@@ -4028,11 +4045,11 @@
      spenga, o si legge il contrario di quel che succede. */
   .p2p-manca{animation:p2pManca 1.2s ease}
   @keyframes p2pManca{
-    0%,100%{box-shadow:0 0 0 0 rgba(240,64,46,0)}
-    12%,55%{box-shadow:0 0 0 3px rgba(240,64,46,.55)}
+    0%,100%{box-shadow:0 0 0 0 rgba(217,64,29,0)}
+    12%,55%{box-shadow:0 0 0 3px rgba(217,64,29,.55)}
   }
   @media (prefers-reduced-motion:reduce){
-    .p2p-manca{animation:none;box-shadow:0 0 0 3px rgba(240,64,46,.55)}
+    .p2p-manca{animation:none;box-shadow:0 0 0 3px rgba(217,64,29,.55)}
   }
 
   /* ---- LA BARRA SI APRE (set 2026, richiesta di Andrea) ----
@@ -9595,7 +9612,7 @@
        verde o rosso per il solo libro (vedi la voce attiva, sopra) */
     body.nav-p2p nav button.active{background:rgba(255,178,92,.16)}
     body.nav-p2p nav #nav-p2plibro.active{background:rgba(52,180,122,.14)}
-    body.nav-p2p.p2p-vendo nav #nav-p2plibro.active{background:rgba(240,64,46,.08)}
+    body.nav-p2p.p2p-vendo nav #nav-p2plibro.active{background:rgba(242,110,78,.1)}
     /* il tasto Barattozon e' la tendina che prosegue il tondo del + in
        una capsula, e da desktop il tondo non c'e': sotto la pillola della
        topbar penderebbe sulla pagina. Il tabacchino resta a un tocco nel
@@ -9867,7 +9884,7 @@
   html.fx-ridotti #testModale{background:rgba(15,12,6,.82)}
   /* 2) gli aloni che battevano restano FERMI: gli stessi due ripieghi
         dei blocchi reduced-motion, dichiarazione per dichiarazione */
-  html.fx-ridotti .p2p-manca{box-shadow:0 0 0 3px rgba(240,64,46,.55)}
+  html.fx-ridotti .p2p-manca{box-shadow:0 0 0 3px rgba(217,64,29,.55)}
   /* 3) dietro il tour del P2P niente sfocatura (26 set 2026): il fondo
         pieno di casa, e alla chiusura la pagina c'e' nitida */
   html.fx-ridotti #tourP2P{background:var(--bg)}
@@ -62940,8 +62957,10 @@ function rigaScambioP2P(o){
      vocabolario del libro vuol dire che chi legge riceve sats */
   const ricevoSats = l.lato === 'sell';
   const cifraEuro = '<span class="p2p-euro">' + esc(euroTestoP2P(o)) + '</span>';
+  /* la cifra dice anche il VERSO (6 ott 2026, richiesta di Andrea): verde
+     quando i sats arrivano a te, rosso quando li mandi — come nel conto */
   const cifraSats = sats
-    ? '<span class="p2p-sats">' + esc(sats) + '</span>' : 'sats';
+    ? '<span class="p2p-sats ' + (ricevoSats ? 'riceve' : 'invia') + '">' + esc(sats) + '</span>' : 'sats';
   /* ⚠️ «TOCCA A TE» STA DENTRO LA CASELLA DELLO STATO (set 2026,
      richiesta di Andrea), e non piu' in una riga sua in fondo: quella
      casella e' gia' tinta dallo stato — arancio quando c'e' un gesto

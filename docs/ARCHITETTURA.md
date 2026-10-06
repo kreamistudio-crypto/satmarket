@@ -21930,12 +21930,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `prove_vestito_bottoni`, che chiede a OGNI regola che nomina il P2P.
   IL ROSSO DEL P2P È UNO (6 ott 2026; CANTIERI, «Il rosso del P2P è il
   rosso vivo»): tutto il lato «vendi» e gli avvisi del P2P leggono le
-  `--rosso-p2p…` — il pieno #F0402E (fondi, bordi, anelli), la variante
-  `-testo` per i testi (#C8200E di giorno, #F36254 di sera), `-banda`
-  per le icone della barra scura, `-tenue` per i fondi tenui —, mai
+  `--rosso-p2p…` — il pieno (#C33A1A / #F26E4E: fondi, bordi, anelli),
+  la variante `-testo` per i testi (#C5300D / #F37456), `-banda` per le
+  icone della barra scura (#F26E4E), `-tenue` per i fondi tenui —, mai
   `--danger`, che resta il corallo degli errori del mercatino. Lo
   sorveglia `prove_vestito_bottoni` su ogni regola che nomina il P2P e
-  su ogni funzione JS del P2P.
+  su ogni funzione JS del P2P, con la soglia 4,5 su ogni fondo. È LA
+  VIA DI MEZZO scelta da Andrea il 6 ott 2026 fra il «rosso vivo» di
+  eea8d6e (troppo acceso) e il rosso di prima (che col nero non
+  reggeva): i bottoni rossi e il + sono #DE4B24→#D73E20 con la scritta
+  e la croce in nero PURO (5,14 / 4,60), la tinta piena #D9401D; i
+  numeri e i perché in CANTIERI, «Il rosso del P2P a metà strada».
   I suoi due pieni sono ruoli come gli altri: `.rosso` («Vendi BTC», le
   leve `--b-rosso-…`, lo stesso rosso di giorno e di sera: dal ritocco
   dopo b248080 il «rosso vivo» #F5503A→#F0402E, scelto da Andrea fra

@@ -56476,8 +56476,9 @@ def prove_card_p2p_vetrina():
           [True, True], [os.path.exists(os.path.join("assets", "scambi-intestazione.webp")),
                          os.path.exists(os.path.join("assets", "barattozon.webp"))])
     css = mini[mini.index("<style"):mini.index("</style>")]
-    prova("la pastiglia sta sulla «foto»: colori FISSI, scuro sul rosso del P2P e bianco sul verde",
-          [True, True], [".p2p-vt-lato.vendi{background:var(--rosso-p2p);color:var(--b-rosso-fg)}" in css,
+    prova("la pastiglia sta sulla «foto»: colori FISSI, nero sulla tinta piena dei bottoni rossi "
+          "e bianco sul verde",
+          [True, True], [".p2p-vt-lato.vendi{background:var(--b-rosso-tinta);color:var(--b-rosso-fg)}" in css,
                          ".p2p-vt-lato.compra{background:#1B8B54}" in css])
 
     node = shutil.which("node")
@@ -62521,7 +62522,7 @@ def prove_nav_p2p():
            in mini,
            "body.nav-p2p nav #nav-p2plibro.active{background:rgba(52,180,122,.14)}"
            in mini,
-           "body.nav-p2p.p2p-vendo nav #nav-p2plibro.active{background:rgba(240,64,46,.08)}"
+           "body.nav-p2p.p2p-vendo nav #nav-p2plibro.active{background:rgba(242,110,78,.1)}"
            in mini,
            "body.nav-p2p.p2p-vendo nav button.active{background:" in mini])
     prova("...con la dissolvenza anche sul fondo", True,
@@ -64258,7 +64259,7 @@ def prove_tasto_barattozon():
     _sc = _tok(_giorno, "b-rosso-fg")
     prova("...e il testo dei bottoni rosso e blu regge l'AA nei due temi",
           [True, True, True, [], []],
-          [_sc == "#2A1600" and _tok(_giorno, "b-bz-fg") == "#FFFFFF",
+          [_sc == "#000000" and _tok(_giorno, "b-bz-fg") == "#FFFFFF",
            len(_fermate("b-rosso-bg")) == 2 and _fermate("b-bz-bg") == ["#191D29"],
            not re.search(r"--b-(rosso|bz)-(bg|fg):", _sera),
            [f for f in _fermate("b-rosso-bg") if _contrasto(_sc, f) < 4.5],
@@ -72850,7 +72851,7 @@ def prove_p2p_pubblica():
           "setTimeout(() => q.classList.remove('p2p-manca'), 1300);" in avvisa
           and ".p2p-manca{animation:p2pManca 1.2s ease}" in stile)
     prova("...e in reduced-motion l'anello si vede fermo", True,
-          ".p2p-manca{animation:none;box-shadow:0 0 0 3px rgba(240,64,46,.55)}"
+          ".p2p-manca{animation:none;box-shadow:0 0 0 3px rgba(217,64,29,.55)}"
           in stile)
 
     # G) IL FANTASMA. Tre strati, e NON e' un foglio: la pila della
@@ -77425,7 +77426,7 @@ def prove_p2p_card_scambio():
           and "(ricevoSats ? cifraEuro : cifraSats)" in rs)
     prova("...e la classe sta sulla MONETA, non sulla riga", True,
           "const cifraEuro = '<span class=\"p2p-euro\">" in rs
-          and "'<span class=\"p2p-sats\">' + esc(sats) + '</span>'" in rs)
+          and "'<span class=\"p2p-sats ' + (ricevoSats ? 'riceve' : 'invia') + '\">' + esc(sats) + '</span>'" in rs)
     # ⚠️ E SENZA CIFRA LA FRASE RESTA IN PIEDI: a cambio muto si legge
     # «Vuoi ricevere sats» / «pagando sats», che e' la frase senza la
     # cifra — un ripiego che non sembra un ripiego. Mai un numero
@@ -77937,11 +77938,11 @@ console.log(JSON.stringify(out));
     # card mettono in cima due monete diverse e la stessa frase.
     prova("in testa va quel che si riceve: i sats a chi compra",
           [True, True],
-          ['Vuoi ricevere <span class="p2p-sats">' in o["compro"],
+          ['Vuoi ricevere <span class="p2p-sats riceve">' in o["compro"],
            'inviando <span class="p2p-euro">5,00 €</span>' in o["compro"]])
     prova("...e gli euro a chi vende", [True, True],
           ['Vuoi ricevere <span class="p2p-euro">5,00 €</span>' in o["vendo"],
-           'inviando <span class="p2p-sats">' in o["vendo"]])
+           'inviando <span class="p2p-sats invia">' in o["vendo"]])
     # ...e le stesure vecchie non sono rimaste da nessuna parte
     prova("...e le frasi dei due giri prima se ne sono andate",
           [False, False, False, False],
@@ -78168,18 +78169,18 @@ console.log(JSON.stringify(out));
           [True, True, False],
           ['Hai ricevuto <span class="p2p-euro">5,00 €</span>'
            in o["conclusoVendo"],
-           'inviando <span class="p2p-sats">' in o["conclusoVendo"],
+           'inviando <span class="p2p-sats invia">' in o["conclusoVendo"],
            "Vuoi ricevere" in o["conclusoVendo"]])
     prova("chi ha COMPRATO sats: le due cifre si scambiano di posto",
           [True, True],
-          ['Hai ricevuto <span class="p2p-sats">' in o["conclusoCompro"],
+          ['Hai ricevuto <span class="p2p-sats riceve">' in o["conclusoCompro"],
            'inviando <span class="p2p-euro">5,00 €</span>'
            in o["conclusoCompro"]])
     # ⚠️ IL TABACCHINO E' L'UNICO METODO IN CUI LE DUE PARTI FANNO COSE
     # DIVERSE: chi paga il PayCode alla cassa, e chi si vede pagare la
     # spesa su Amazon. Due frasi, non una con un pezzo appiccicato.
     prova("col tabacchino, chi ha pagato il PayCode dice dove", True,
-          'Hai ricevuto <span class="p2p-sats">' in o["conclusoTabCompro"]
+          'Hai ricevuto <span class="p2p-sats riceve">' in o["conclusoTabCompro"]
           and re.search(r'pagando <span class="p2p-euro">[^<]*</span>'
                         r' al tabacchino</div>',
                         o["conclusoTabCompro"]) is not None)
@@ -78192,7 +78193,7 @@ console.log(JSON.stringify(out));
     prova("...e chi l'ha fatto pagare lo dice in due parole", True,
           'Amazon pagato: <span class="p2p-euro">5,00 €</span>'
           in o["conclusoTabVendo"]
-          and 'per <span class="p2p-sats">' in o["conclusoTabVendo"])
+          and 'per <span class="p2p-sats invia">' in o["conclusoTabVendo"])
     # ⚠️ E I COMMENTI SI TOLGONO PRIMA DI GUARDARE: il verbale accanto
     # alla frase nuova NOMINA quella vecchia per dire cos'era, e una
     # spia sul testo nudo sarebbe rossa per colpa della spiegazione
@@ -80463,7 +80464,9 @@ def prove_card_tinte_stato():
     _nudo = re.sub(r"/\*[\s\S]*?\*/", "", css)
     regole = [(m.group(1).strip(), m.group(2)) for m in re.finditer(
         r"([^{}]*\.p2p-scambio\.(?:tinta|tono-)[^{}]*)\{([^}]*)\}", _nudo)]
-    prova("le regole della tinta sono dieci", 10, len(regole))
+    # (6 ott 2026) piu' due: la cifra dei sats che si ricevono e quella che
+    # si mandano, scurite come le altre
+    prova("le regole della tinta sono dodici", 12, len(regole))
     prova("...e nessuna anima, sfuma o filtra", [],
           [(sel, d) for sel, c in regole
            for d in ("animation", "transition", "filter", "box-shadow",
@@ -80496,7 +80499,10 @@ def prove_card_tinte_stato():
     # i testi che stanno SUL FONDO DELLA CARD: il titolo, la riga di
     # servizio e la scatola del metodo (`--ink-soft` dal ritocco), la
     # cifra dei sats, e i due versi del premio
-    TESTI = ("--ink", "--ink-soft", "--sats-text", "--trust-text", "--danger")
+    # (6 ott 2026) il premio in avviso e la cifra dei sats che si MANDANO
+    # parlano il rosso del P2P, e quella che si RICEVE il verde da testo:
+    # tutte e due si misurano anche scurite, come le dipinge la tinta
+    TESTI = ("--ink", "--ink-soft", "--sats-text", "--trust-text", "--rosso-p2p-testo")
     prova("i token della tinta sono dichiarati due volte, uno per tema", [],
           [n for n in TESTI + tuple(INCHIOSTRO.values()) + ("--card",)
            if len(tok(n)) != 2])
@@ -80510,8 +80516,11 @@ def prove_card_tinte_stato():
         # che nessuno usa piu' — e al contrario, con la leva a zero
         # (tema scuro) qui torna esattamente il token di sempre
         vestiti = {t: tok(t)[k] for t in TESTI}
-        for t in ("--sats-text", "--danger"):
+        for t in ("--sats-text", "--rosso-p2p-testo"):
             vestiti[t] = mescola(inchiostro, tok(t)[k], pt)
+        # il verde da testo vale DUE volte: pieno (l'affare del premio) e
+        # scurito (la cifra dei sats che arrivano)
+        vestiti["--trust-text scurito"] = mescola(inchiostro, tok("--trust-text")[k], pt)
         for t, ink in sorted(INCHIOSTRO.items()):
             tinta = mescola(tok(ink)[k], carta, p)
             scarto = max(abs(x - y) for x, y in zip(rgb(tinta), rgb(carta)))
@@ -80525,12 +80534,41 @@ def prove_card_tinte_stato():
             # 21) e sopra ogni tinta che si perde sulla carta bianca.
             if tema == "chiaro" and scarto < 18:
                 pallide.append((t, scarto))
-            for testo in TESTI:
+            for testo in TESTI + ("--trust-text scurito",):
                 c = contrasto(vestiti[testo], tinta)
                 if c < 4.5:
                     deboli.append((tema, t, testo, round(c, 2)))
     prova("ogni testo della card passa l'AA su ogni tinta, nei due temi",
           [], deboli)
+    # I SATS DI UNO SCAMBIO DICONO IL VERSO (6 ott 2026, richiesta di
+    # Andrea): la classe la mette la card dal suo `ricevoSats` (il lato
+    # del libro, `sell` = chi legge riceve), e la cascata la veste —
+    # verde da testo a riceverli, il rosso del P2P a mandarli, scuriti
+    # sulla card tinta, grigi sulla card spenta, arancio senza verso
+    _rs = pezzo_js(mini, "function rigaScambioP2P(o){", chr(10) + "}" + chr(10))
+    prova("la cifra dei sats della card porta il suo verso", True,
+          "'<span class=\"p2p-sats ' + (ricevoSats ? 'riceve' : 'invia') + '\">' + esc(sats) + '</span>'"
+          in _rs and "const ricevoSats = l.lato === 'sell';" in _rs)
+    _reg_v, _sq_v = _regole_css(css)
+    def _cifra(classi_card, verso):
+        cat = [{"tag": "html", "attr": {}, "classi": set()},
+               {"tag": "body", "attr": {}, "classi": set()},
+               {"tag": "div", "attr": {"class": " ".join(classi_card)}, "classi": set(classi_card)},
+               {"tag": "span", "attr": {"class": "p2p-sats " + verso}, "classi": {"p2p-sats", verso}}]
+        v = _vince_css(_reg_v, cat, ["color"]).get("color")
+        return v[0] if v else None
+    _card = ["p2p-ord", "p2p-scambio"]
+    prova("...e la cascata la veste: verde a riceverli, rosso a mandarli, scuriti "
+          "sulla card tinta, grigi sulla card spenta",
+          ["var(--trust-text)", "var(--rosso-p2p-testo)",
+           "color-mix(in srgb,var(--ink) var(--tinta-testo),var(--trust-text))",
+           "color-mix(in srgb,var(--ink) var(--tinta-testo),var(--rosso-p2p-testo))",
+           "var(--ink-soft)", "var(--ink-soft)"],
+          [_cifra(_card, "riceve"), _cifra(_card, "invia"),
+           _cifra(_card + ["tinta", "tono-locked"], "riceve"),
+           _cifra(_card + ["tinta", "tono-locked"], "invia"),
+           _cifra(_card + ["tinta", "tono-annullato", "spenta"], "riceve"),
+           _cifra(_card + ["spenta"], "invia")])
     # ⚠️ E IL CONTO QUI SOPRA MISURA DEI TOKEN: se domani la riga di
     # servizio tornasse `--muted` — che su carta bianca sta gia' a
     # 3,8:1 — il conto resterebbe verde misurando un token che non
@@ -120815,15 +120853,23 @@ def prove_vestito_bottoni():
                 deboli_r.append((tema, "testo", fondo, round(_c(tok, "--rosso-p2p-testo", fondo), 2)))
         if _c(tok, "--rosso-p2p-banda", "--nav-bg-p2p") < 4.5:
             deboli_r.append((tema, "banda", round(_c(tok, "--rosso-p2p-banda", "--nav-bg-p2p"), 2)))
-        for fondo in ("--bg", "--card"):
-            if _c(tok, "--rosso-p2p", fondo) < 3:
+        # (6 ott 2026, decisione di Andrea: soglia 4,5 OVUNQUE, nessuna
+        # eccezione) anche il pieno, che da segno grafico chiedeva 3
+        for fondo in ("--bg", "--card", "--rosso-p2p-tenue"):
+            if _c(tok, "--rosso-p2p", fondo) < 4.5:
                 deboli_r.append((tema, "pieno", fondo, round(_c(tok, "--rosso-p2p", fondo), 2)))
-    prova("...e ognuna regge il suo fondo nei due temi: il testo 4,5 su pagina, "
-          "card e tenue, le icone 4,5 sulla banda, il pieno 3 da segno", [], deboli_r)
-    prova("...e il pieno e' il rosso vivo di «Pubblica ordine», la sua tinta da desktop",
-          [True, "var(--rosso-p2p)"],
-          [chiaro.get("--rosso-p2p", "").upper() == "#F0402E"
-           and "#F0402E" in chiaro.get("--b-rosso-bg", "").upper(), chiaro.get("--b-rosso-tinta")])
+    prova("...e ognuna regge il suo fondo nei due temi a 4,5: il testo e il pieno "
+          "su pagina, card e tenue, le icone sulla banda", [], deboli_r)
+    # LA VIA DI MEZZO (6 ott 2026, decisione di Andrea, dopo il rosso vivo
+    # troppo acceso e il rosso di prima che col nero non reggeva): i due
+    # rossi dei bottoni sono quelli scelti da lui, la scritta e' il nero
+    # PURO (col nero caldo dei pieni arancio il fondo faceva 3,8), la tinta
+    # piena la meta' fra i due rossi
+    _fermate_r = re.findall(r"#[0-9A-Fa-f]{6}", chiaro.get("--b-rosso-bg", ""))
+    prova("...e i bottoni rossi sono la via di mezzo, #DE4B24→#D73E20 col nero, la "
+          "tinta piena #D9401D", [["#DE4B24", "#D73E20"], "#000000", "#D9401D"],
+          [[f.upper() for f in _fermate_r], chiaro.get("--b-rosso-fg", "").upper(),
+           chiaro.get("--b-rosso-tinta", "").upper()])
     # NESSUN CORALLO NEL P2P: ne' nelle regole che lo nominano ne' nel JS
     # delle sue funzioni. Il corallo si riconosce in tutte le sue forme.
     _corallo = r"var\(--danger\)|var\(--warn-bg\)|#C2410C|#F07A47|194,\s*65,\s*12|240,\s*122,\s*71"
