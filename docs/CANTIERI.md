@@ -36093,8 +36093,12 @@ forma vera. Prove +3 (68 verdi); tortura 16 su 17, e la sopravvissuta
 mai di sole cifre. Nessun'altra ronda né script del nodo nel repo legge
 `chan_id`.
 
-**Da guardare.** L'installazione e la prova a vuoto sul nodo (verbale
-nello studio). La prova dell'avviso «Pagamenti non arrivati» su
+**Installata il 6 ott** da Andrea, verbale nello studio (§9): la
+`--prova` buona, il timer orario acceso, la pausa vista funzionare.
+Sul nodo girava ancora la ronda di PRIMA del 5 ott, quindi sono arrivate
+anche la guardia del 5 ott e la cura B5.
+
+**Da guardare.** Il primo avviso vero della guardia oraria. La prova dell'avviso «Pagamenti non arrivati» su
 Telegram vero (la ricetta sta in PRODUZIONE). `USCITA_ACINQ_MIN` va
 riscritta a mano: se la Cassaforte cresce e la leva resta indietro, il
 giro suggerito torna a mentire. Lo dice il messaggio stesso.

@@ -313,7 +313,37 @@ Cassaforte riletta.
 **La ronda: soglia ACINQ a 300.000, copertura, guardia oraria.** Il
 codice e il perché stanno in CANTIERI («La guardia oraria dell'entrata
 ACINQ e la copertura della Cassaforte»), la procedura in PRODUZIONE.
-Installazione e prova a vuoto sul nodo: verbale qui sotto quando fatte.
+
+**L'installazione sul nodo (6 ott, verso le 12:35 UTC).** Le impronte
+dei tre file combaciavano fra `origin/main`, il PC e il nodo. La ronda
+installata era quella di PRIMA del 5 ott: niente guardia ACINQ, e i
+file fissi `/tmp/liq-*.json` (B5 del secondo audit). Sono arrivate
+insieme la guardia del 5 ott, la cura B5 e le novità di oggi. La copia
+di prima sta in `/root/ronda-liquidita.sh.prima-6ott` (4.965 byte). Il
+file delle leve `/etc/default/ronda-liquidita` è `root 644` e ha una
+riga sola, `USCITA_ACINQ_MIN=1100000` (il debito 1.094.701 arrotondato
+per le commissioni dal 1 ott, che non sono misurate).
+La prima `--prova` ha trovato un difetto: il comando suggerito portava
+`--outgoing_chan_id aca66000…`, perché su questo LND `chan_id` è il
+channel_id esadecimale e lo scid numerico sta in `scid`. L'ha visto
+Andrea; la correzione è il commit dopo (CANTIERI), reinstallata con
+l'impronta controllata da `sha256sum -c`.
+La `--prova` buona: «entrata ACINQ a 204876 sat utili (soglia 300000,
+2 canali attivi)», ribilancio suggerito 65.000 con `--outgoing_chan_id
+1063354188044304385 --last_hop 033e9ce4… --fee_limit 195`, quadro
+`canali 3/3 attivi in=5096228 out=1300938 acinq_in=204876
+acinq_out=1165235 copertura=1100000 lease=nessuno`. Nessuna riga di
+canale nuovo o sparito. Il messaggio è arrivato sul canale Telegram del
+nodo e finiva con `--- fine ronda liquidita`. Il giro suggerito NON è
+stato eseguito, per la decisione di sopra.
+Il timer `nodo-liquidita-acinq` è acceso: primo giro alle 12:40 UTC,
+mentre la ronda intera resta alle 09:10. La guardia lanciata a mano ha
+taciuto, «acinq ancora sotto soglia, gia' avvisato 3 minuti fa», `rc=0`:
+la pausa funziona.
+Non ancora visto: il primo avviso della guardia oraria vera, atteso
+circa sei ore dopo la `--prova`, se l'entrata resta sotto 300.000; e la
+prova dell'avviso «Pagamenti non arrivati» su Telegram vero (la ricetta
+sta in PRODUZIONE).
 
 **Il backup del 6 ott: provato in parte.** Lo SCB vivo
 (`/home/debian/nodo/lnd/data/chain/bitcoin/mainnet/channel.backup`,
