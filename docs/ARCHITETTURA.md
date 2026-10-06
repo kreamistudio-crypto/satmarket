@@ -21791,13 +21791,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `.chip`, `.badge`, `.escrow-flag`, i badge lampo/asta
   in card, il toggle €/₿, la nav col tondo del Vendi, le pillole
   «Ordina»/«Filtri» sopra la griglia (sono chip di filtro, famiglia
-  delle categorie), più `.tour-avanti` e `.demo-cta`. Quelle non sono
-  bottoni-oggetto, sono etichette e chrome. I testuali (`.btn.link`,
+  delle categorie), più `.demo-cta`. Quelle non sono
+  bottoni-oggetto, sono etichette e chrome (`.tour-avanti` ne è uscito
+  nell'ott 2026: veste il principale del vestito qui sotto, curva e
+  44 px compresi). I testuali (`.btn.link`,
   `.danger-ghost`) non hanno fondo, quindi la curva non li riguarda.
   IL VESTITO DEI BOTTONI (ott 2026, stile A «pieno morbido», scelto da
   Andrea fra tre provati sull'app vera; CANTIERI, «Bottoni più eleganti
   nel mercatino»). Dal vestito la curva dei bottoni è `--b-r` (14px):
-  `--radius-btn` (12px) resta alle cose che non sono bottoni e al P2P.
+  `--radius-btn` (12px) resta alle cose che non sono bottoni.
   I VALORI stanno nelle `--b-…` di `:root` (e i serali nel blocco
   scuro), per ruolo: `--b-pri-…` principale (`.orange`), `--b-ok-…`
   conferma (`.primary`), `--b-asta-…`, `--b-sec-…` secondario (`.ghost`,
@@ -21814,12 +21816,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   cambia il vestito tocca solo i valori. Testo SCURO sui pieni: il
   bianco sul #F7931A fa 2,3:1. `prove_vestito_bottoni` calcola i
   contrasti dai token su ogni fermata dei gradienti.
-  IL P2P TIENE IL VESTITO DI PRIMA finché non ha il suo giro: un blocco
-  di sole variabili su `:where([id^="view-p2p"], .sheet[id^="p2p"])`
-  rimette i valori di prima (pieno col gradino di 3px, bianco, ghost a
-  bordo d'inchiostro, velo al 50%, niente luce, Nunito, 12px). Un foglio
-  o una vista nuovi del P2P che non seguono quei nomi vestono A; il
-  secondo giro cancella il blocco.
+  IL P2P VESTE COME IL MERCATINO (secondo giro, ott 2026; CANTIERI,
+  «Bottoni P2P nello stile A»): il blocco di sole variabili che gli
+  ridava il vestito di prima non c'è più, e nessuna regola del P2P
+  riscrive una leva o ridipinge un bottone (le misure sì: la coppia di
+  `.contanti-gesti` resta a 13,5px) — lo sorveglia
+  `prove_vestito_bottoni`, che chiede a OGNI regola che nomina il P2P.
+  I suoi due pieni sono ruoli come gli altri: `.rosso` («Vendi BTC», le
+  leve `--b-rosso-…`, lo stesso rosso di giorno e di sera col bianco a
+  4,8:1) e `.bz` (Barattozon, `--b-bz-…`, il gradiente finisce nel
+  #191D29 della tendina), in tutte le liste di stato.
+  I + DELLA BARRA E IL LORO FANTASMA VESTONO A SENZA CAMBIARE NIENTE
+  ALTRO (decisione di Andrea): forma, misura, strati e corse sono quelli
+  di prima; le pelli prendono fondo, filo e ombra del ruolo (arancio del
+  principale, verde della conferma, rosso, blu), la rossa tiene il solo
+  `--b-rosso-rilievo` e il suo bagliore (`--b-rosso-alone`) resta sullo
+  strato che la discesa spegne. LA CROCE È DELLA PELLE: il ＋ vero del
+  tondo è trasparente (misura e voce), e ogni pelle disegna la sua col
+  suo inchiostro (`--pelle-fg`, nel `::before`; nel `::after` la blu,
+  che il `::before` lo dà al contorno) — così la croce cambia colore con
+  la stessa opacity che cambia la pelle, senza una transizione nuova.
+  Il fantasma della morfosi parte dalla pelle e arriva al bottone
+  d'arrivo (curva `--b-r`, filo, scritta in Baloo 2 col suo inchiostro).
+  Da desktop la pillola del + usa le TINTE piene dei ruoli
+  (`--b-pri-tinta`, `--b-ok-tinta`, `--b-rosso-tinta`): lì il colore
+  sfuma col `background-color`, e un gradiente scatterebbe; l'inchiostro
+  corre insieme al fondo.
   E I DUE PONTI SONO BOTTONI, NON LINK (stessa decisione): nel negozio
   erano testo sottolineato («btn link») mentre gli stessi due dentro
   l'ordine erano già ghost — la stessa azione con due vestiti secondo
@@ -26626,16 +26648,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   se ne va con lui (`capsula-via`) e torna a casa di colpo sotto il foglio
   pieno (`posaFondoP2P` → `capsulaAPostoP2P`, cioe' `senzaCorsaP2P` sui
   soli pezzi). IL + DIVENTA BLU SCENDENDO (settimo giro): una quinta pelle
-  (`.pelle-bz`, il blu e il gradino della tendina) sta sopra la rossa con
+  (`.pelle-bz`, il blu della tendina; dall'ott 2026 il blu dei bottoni
+  `.bz` del vestito A) sta sopra la rossa con
   l'opacita' presa da `--discesa-p2p`, la discesa d su fondo che la guida
   scrive sul tondo — a meta' corsa a meta' strada, in fondo blu pieno —,
   con la corsa del + al tocco e al ritorno (che la toglie) e ferma col
   dito; il bagliore rosso sta su `.pelle-rossa::after` e si spegne al
   contrario. Il fantasma parte dal rosso che resta (`--morfo-rosso`,
   scritta da `vestiMorfoP2P`): dal + in fondo nasce blu. La croce resta
-  bianca (5,18:1 sul rosso di giorno, 16,81:1 sul blu); di sera, sul rosso
-  a riposo (#F07A47), il bianco sta a 2,77:1 — il + di sempre, da
-  decidere. E SI ACCENDE UN CONTORNO BIANCO (ottavo giro, bianco dal
+  bianca (almeno 4,8:1 sul rosso, 13 sul blu; il rosso di sera era
+  #F07A47 col bianco a 2,77 — chiuso dal vestito A, ott 2026, col rosso
+  dei bottoni uguale nei due temi). E SI ACCENDE UN CONTORNO BIANCO (ottavo giro, bianco dal
   nono): blu sulla banda scura il + si perdeva, e la pelle blu porta nel
   suo `::before` un filo di 2,5px dentro il cerchio e un bagliore corto
   fuori (5px: a 320 la prima voce sta a 6,9px dal + posato), nel bianco

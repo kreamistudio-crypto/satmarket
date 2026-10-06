@@ -36473,3 +36473,118 @@ lampo che non consuma l'uso); le sezioni [6] e [7] seminano ora i
 codici NON cumulabili, perché provano il «vince il maggiore».
 `collaudo_conto` non è nell'elenco che la CI esegue (solo in quello che
 compila): l'ho girato a mano, 232 verdi.
+
+## Bottoni P2P nello stile A (6 ott 2026, seguito di «Bottoni più eleganti»)
+
+Il compito (Andrea): 1) il P2P allo stile A, compresi i casi suoi — i
+pericoli (`.rosso`, annulla, disputa), «📍 Sono qui», «Ho consegnato i
+contanti», «🧭 Apri nel navigatore», le conferme dei moderatori, fogli e
+viste —, nessun testo e nessun comportamento cambiato; 2) anche il «+»
+della barra e l'«Avanti» del giro guidato; 3) «Ho pagato» spento o in
+attesa finché la fattura non c'è (niente verifica di un ordine che non
+esiste, 422); 4) nella pagina dell'ordine «Salva la nota» secondario. A
+lavoro iniziato due precisazioni sui «+»: forma, misura e animazioni
+restano esattamente quelle di oggi (il + del mercatino resta quadrato),
+cambiano solo colori, scritta scura, ombra; e nessun'altra animazione
+si tocca.
+
+**L'inventario.** Quasi tutti i bottoni del P2P erano già ruoli
+(`.primary` «Sono qui», `.orange` «Ho consegnato i contanti», `.ghost`
+«Apri nel navigatore», `.allarme` la disputa, i fogli dei moderatori):
+li teneva vecchi solo il blocco `:where([id^="view-p2p"],
+.sheet[id^="p2p"])`. Fuori dai ruoli restavano `.btn.rosso` e `.btn.bz`
+(pittura propria col gradino di 3px), le cinque pelli del +, il
+fantasma della morfosi (anche quello del mercatino, `.merc`, che dal
+primo giro arrivava su un «⚡ Pubblica annuncio» già A e partiva ancora
+bianco col gradino), la pillola del + da desktop e `.tour-avanti`.
+L'«Avanti» del giro del P2P era già un `.btn.orange`.
+
+**DECISO.** Il blocco è cancellato. `.rosso` e `.bz` diventano ruoli
+con le loro leve (`--b-rosso-…`, `--b-bz-…`), dentro la regola che
+dipinge e in tutte le liste di stato (premuto, spento, «in corso» e la
+sua luce). IL ROSSO È LO STESSO DI GIORNO E DI SERA, come l'arancio:
+#C8460F→#B23A0A col bianco, 4,8:1 in cima e 6,0 in fondo — e chiude la
+domanda lasciata aperta al settimo giro del +, dove di sera il rosso
+#F07A47 col bianco faceva 2,77. Il blu va da #2A3042 al #191D29 della
+tendina. Le pelli del + prendono fondo, filo (un `inset` da 1px) e
+ombra del loro ruolo; la rossa tiene il solo `--b-rosso-rilievo` e il
+suo bagliore diventa `--b-rosso-alone`, sullo strato che la discesa
+spegne come prima. LA CROCE È DELLA PELLE: il ＋ vero resta nel tondo
+per la misura e per chi legge con la voce, trasparente; ogni pelle ne
+disegna una col suo inchiostro (`--pelle-fg`: scuro sull'arancio, il
+bianco o lo scuro del verde secondo il tema, bianco su rosso e blu),
+nel `::before` — nel `::after` per la blu, che il `::before` lo usa per
+il contorno bianco. Così la croce cambia colore con la stessa opacity
+che cambia la pelle. Verificato nel pane che le due croci combaciano
+(la vera, colorata apposta, copre esatta quella della pelle). Il
+fantasma: la forma veste la pelle, la meta il bottone d'arrivo (curva
+`--b-r`, filo, ombra), glifo e scritta l'inchiostro del ruolo, la
+scritta in Baloo 2 come il bottone; tempi, strati e corse intatti. Da
+desktop la pillola del + usa tre TINTE piene nuove (`--b-pri-tinta`,
+`--b-ok-tinta`, `--b-rosso-tinta`, ognuna una fermata del suo gradiente
+e col suo inchiostro sopra il 4,5): lì il colore sfuma col
+`background-color`, e un gradiente sarebbe scattato. L'«Avanti» del
+giro veste il principale per intero (curva 14, 44 px, Baloo 2, premuto
+come i bottoni), senza nessuna corsa nuova. «Ho pagato» ha un id
+(`payHoPagato`) e lo governa `mostraQr`, il collo di bottiglia di tutti
+i flussi del foglio: senza fattura `disabled` + `aria-busy` (l'«in
+corso» del vestito, tiene il verde con la luce che passa, senza il velo
+di `bottoneInAttesa`), con la fattura vivo; la demo, che ha fattura e
+pagamento finti, sempre vivo. «Salva la nota» passa a `.ghost`.
+
+**Strade scartate.** Una `transition: color` sulla croce del +: era
+un'animazione nuova, e senza transizione il glifo cambiato di colpo
+sarebbe rimasto un attimo bianco sull'arancio (o scuro sul verde)
+durante la dissolvenza delle pelli. Un `color-mix()` con la discesa:
+su un WebView vecchio butta via la regola intera. Il rosso di sera
+schiarito con la scritta scura (come il verde): la croce del + scende
+sul blu, che vuole il bianco, e a metà discesa nessun inchiostro
+reggeva. I gradienti anche nella pillola da desktop: la sua corsa di
+colore sarebbe diventata uno scatto. Un controllo «nessun pieno arancio
+col bianco» su tutto il foglio: prendeva pillole ed etichette, che non
+sono bottoni (scritto, visto rosso sulle cose sbagliate, tolto).
+
+**Provato.** `prove_vestito_bottoni` (39): contrasti di rosso e blu
+calcolati su ogni fermata nei due temi, la cascata vera dei nove ruoli,
+nessuna regola che nomini il P2P riscrive una leva o ridipinge un
+bottone, la cascata nelle viste `view-p2p`, `view-p2pordine`,
+`view-p2pmod`, l'«Avanti», la pillola da desktop con le tinte e i loro
+contrasti, «Salva la nota», e «Ho pagato» col pezzo VERO di `mostraQr`
+girato in node su un bottone di cartone (senza fattura, con, stringa
+vuota, `undefined`, demo). Emendate le sentinelle del + e del fantasma
+che leggevano il vestito di prima (`prove_nav_p2p`,
+`prove_tasto_barattozon`, `prove_p2p_pubblica`, `prove_morfosi_vendi`):
+ora dicono le leve del vestito, e la pelle blu si giudica contro il blu
+della tendina letto dalla sua regola. Tortura 24 su 24 sulla copia (al
+primo giro 22: le due dell'«Avanti» avevano un'ancora doppia, rifatte
+con un'ancora univoca). **Dal vivo** sulla copia in collaudo (relay
+morto, Photon morto, LNbits di cartone che paga solo a comando e conia
+lento a comando), a 375 px, coi tocchi veri: due scambi P2P in contanti
+completi, uno per tema — offerta nel libro, «Compra», la fattura nel
+foglio «Dove ricevere i sats», sats in garanzia, «📍 Sono qui»
+registrato dal server vero con la posizione (le due chiavi del giro
+seminate nel db della copia: senza, il server risponde giusto «il
+coordinatore non ha ancora detto le due chiavi»), «Ho consegnato i
+contanti» con la sua conferma, scambio concluso; le risposte di
+mostrod dal coordinatore di cartone nella pagina (`mostroChiama`,
+`chiamataOrdineP2P`). Due pagamenti del mercatino (chiaro e scuro):
+«Ho pagato» in attesa per i 4 secondi del conio, un tocco lì non fa
+partire niente (il dito passa al foglio), poi vivo, pagato, `locked`;
+nella pagina dell'ordine un solo principale. Ogni bottone toccato alto
+almeno 44 (52-53); nessun errore JS oltre ai previsti (relay morto, il
+409 del seme). Scatti di confronto prima/dopo (la stessa copia con la
+`miniapp.html` di origin/main e poi questa): libro chiaro e scuro col +,
+foglio Pubblica rosso e Barattozon, scambio in contanti chiaro e scuro.
+Suite intera severa e collaudi della CI: nel messaggio del commit.
+
+**Da guardare** (sul telefono, Andrea): il P2P nei due temi su Telegram
+Android e iPhone — le scritte scure sull'arancio, il rosso di «Vendi
+BTC» uguale di sera, il blu di Barattozon; il + che cambia lato (la
+croce che cambia colore insieme alla pelle, senza lampi), che scende
+sul logo e diventa blu, la morfosi fino al bottone (le animazioni non
+girano nel pane: lì gli effetti sono ridotti); l'«Avanti» del giro;
+«Ho pagato» su un pagamento vero (la finestra è breve: si vede solo
+con una rete lenta); l'APK. Notato e NON toccato: le pillole e le
+etichette arancio col bianco (`.p2p-esempio-tag`, `.tema-pill.active`,
+`.titolo-pill.active`, `.demo-banner.demo-vera`…) non sono bottoni e
+restano come sono.

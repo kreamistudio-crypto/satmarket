@@ -126,10 +126,11 @@
        UN CUORE SOLO: qui i valori, e le regole dei bottoni (accanto a
        .btn) li leggono per RUOLO — principale (.orange), conferma
        (.primary), asta, secondario (.ghost, .mini, .back, le scelte
-       delle foto), pericolo (.allarme) e pericolo sottotono (.piano).
-       Chi vuole cambiare il vestito tocca queste righe e cambia tutto
-       il mercatino; il P2P per ora porta il vestito di prima (vedi «IL
-       P2P TIENE IL VESTITO DI PRIMA», dopo le regole).
+       delle foto), pericolo (.allarme), pericolo sottotono (.piano) e
+       i due pieni del P2P (.rosso, .bz). Chi vuole cambiare il vestito
+       tocca queste righe e cambia tutta la casa, P2P compreso (dal
+       secondo giro, ott 2026: il blocco che gli ridava il vestito di
+       prima non c'e' piu'), e i + della barra coi loro fantasmi.
        Le misure che lo reggono (campionario a 375 px, nei due temi):
        - TESTO SCURO SUI PIENI: il bianco sul #F7931A faceva 2,3:1, sotto
          il 4,5 della lettura; l'inchiostro caldo #2A1600 fa 7,2:1. Il
@@ -164,6 +165,27 @@
     --b-dan-sh:0 1px 2px rgba(194,65,12,.12),0 5px 12px -7px rgba(194,65,12,.35);
     --b-dan-sh-on:inset 0 1px 3px rgba(194,65,12,.18);
     --b-piano-bg:#FFFFFF; --b-piano-fg:#A8360A; --b-piano-line:#E8DFC8;
+    /* i due pieni del P2P (ott 2026, il secondo giro): il ROSSO di
+       «Vendi BTC» e del + che vende, e il BLU di Barattozon. Il rosso
+       e' lo stesso di giorno e di sera, come l'arancio: col bianco fa
+       4,8:1 in cima e 6,0 in fondo (il #F07A47 di sera ci faceva 2,8).
+       Il suo alone sta a parte perche' il + che scende sul logo lo
+       spegne da solo (IL + CHE DIVENTA BLU SCENDENDO). */
+    --b-rosso-bg:linear-gradient(180deg,#C8460F 0%,#B23A0A 100%);
+    --b-rosso-fg:#FFFFFF; --b-rosso-line:rgba(110,30,0,.45);
+    --b-rosso-rilievo:inset 0 1px 0 rgba(255,255,255,.22),0 1px 2px rgba(110,30,0,.22);
+    --b-rosso-alone:0 7px 16px -8px rgba(194,65,12,.7);
+    --b-rosso-sh:var(--b-rosso-rilievo),var(--b-rosso-alone);
+    --b-rosso-sh-on:inset 0 2px 4px rgba(110,30,0,.35);
+    --b-bz-bg:linear-gradient(180deg,#2A3042 0%,#191D29 100%);
+    --b-bz-fg:#FFFFFF; --b-bz-line:rgba(0,0,0,.5);
+    --b-bz-sh:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(0,0,0,.3),0 7px 16px -8px rgba(25,29,41,.75);
+    --b-bz-sh-on:inset 0 2px 4px rgba(0,0,0,.45);
+    /* le TINTE PIENE dei tre ruoli, per chi deve far SFUMARE il colore
+       (la pillola del + da desktop: un gradiente non sfuma, scatta).
+       Sono una fermata del loro gradiente, e reggono l'inchiostro del
+       ruolo: 7,2 / 4,9 / 5,2:1. */
+    --b-pri-tinta:#F7931A; --b-ok-tinta:#1B8150; --b-rosso-tinta:#C2410C;
     --b-off-bg:#EFE9DA; --b-off-fg:#7D7564; --b-off-line:transparent; --b-off-sh:none; --b-off-op:1;
     --b-busy-op:1; --b-busy-luce:block; --b-luce:rgba(255,255,255,.42);
     /* i toni "profondi" fanno l'ombra piena dei bottoni, i "text"
@@ -379,6 +401,12 @@
     --b-dan-sh:inset 0 1px 0 rgba(255,255,255,.05),0 1px 2px rgba(0,0,0,.4);
     --b-dan-sh-on:inset 0 2px 4px rgba(0,0,0,.4);
     --b-piano-bg:#2C2517; --b-piano-fg:#F58A5C; --b-piano-line:#3E3623;
+    --b-rosso-rilievo:inset 0 1px 0 rgba(255,255,255,.2),0 1px 2px rgba(0,0,0,.45);
+    --b-rosso-alone:0 8px 18px -9px rgba(194,65,12,.5);
+    --b-rosso-sh-on:inset 0 2px 4px rgba(0,0,0,.4);
+    --b-bz-line:rgba(241,232,213,.16);
+    --b-bz-sh:inset 0 1px 0 rgba(255,255,255,.12),0 1px 2px rgba(0,0,0,.5);
+    --b-ok-tinta:#34AE76;
     --b-off-bg:#363126; --b-off-fg:#968C75;
     --b-luce:rgba(255,255,255,.3);
     --bg:#211A10; --card:#2C2517; --ink:#F1E8D5; --muted:#A99F87;
@@ -3757,15 +3785,21 @@
      la meta svanisce e sotto c'e' gia' il tondo. */
   #p2pMorfo .morfo-blu,#p2pMorfo .morfo-forma,#p2pMorfo .morfo-meta{will-change:transform;
     transition:transform var(--morfo-corsa) var(--morfo-curva)}
-  #p2pMorfo .morfo-forma{border-radius:50%;background:var(--trust);
-    box-shadow:0 4px 0 var(--trust-deep);opacity:0;
+  /* I VESTITI DEL FANTASMA SONO QUELLI DEI DUE VERI (ott 2026, il
+     vestito A): la forma porta la pelle del + (fondo, filo e ombra del
+     ruolo), la meta il bottone d'arrivo, curva --b-r e filo compresi.
+     Cambiano solo i colori: strati, corse e tempi sono quelli di prima. */
+  #p2pMorfo .morfo-forma{border-radius:50%;background:var(--b-ok-bg);
+    box-shadow:inset 0 0 0 1px var(--b-ok-line),var(--b-ok-sh);opacity:0;
     transition:transform var(--morfo-corsa) var(--morfo-curva),
       opacity var(--morfo-velo) ease var(--morfo-attesa)}
   /* ...e nell'ultimo tratto dell'andata la forma SVANISCE sotto la meta
      (gia' quasi piena): il suo gradino e' da 4px come quello del + e
      quello del bottone da 3, e all'arrivo ne sporgeva un pixel a pancia,
      che spariva di colpo col fantasma — visto nei fotogrammi fermi. Al
-     ritorno ricompare subito, sotto la meta che ancora la copre. */
+     ritorno ricompare subito, sotto la meta che ancora la copre.
+     (Dal vestito A, ott 2026, i gradini non ci sono piu', ma l'ombra della
+     pelle e quella del bottone restano diverse: la dissolvenza resta.) */
   #p2pMorfo.parte .morfo-forma{opacity:1;transition-delay:0s,0s}
   /* ⚠️ IL ROSSO DEL LATO NON TOCCA BARATTOZON (24 set 2026): le regole
      rosse della meta e della scritta escludono il vestito blu col :not(),
@@ -3777,29 +3811,31 @@
      chiede alla cascata chi vince. La FORMA invece e' la pelle del +, e
      resta rossa: col vestito blu sfuma finche' e' tonda (vedi LA MORFOSI
      DAL + IN FONDO). */
-  body.p2p-vendo #p2pMorfo .morfo-forma{background:var(--danger);
-    box-shadow:0 4px 0 var(--danger-deep)}
-  #p2pMorfo .morfo-meta{border-radius:var(--radius-btn);
-    background:var(--trust);box-shadow:0 3px 0 var(--trust-deep);
+  body.p2p-vendo #p2pMorfo .morfo-forma{background:var(--b-rosso-bg);
+    box-shadow:inset 0 0 0 1px var(--b-rosso-line),var(--b-rosso-sh)}
+  #p2pMorfo .morfo-meta{border-radius:var(--b-r);background:var(--b-ok-bg);
+    border:var(--b-pieno-bw) solid var(--b-ok-line);box-shadow:var(--b-ok-sh);
     transition:transform var(--morfo-corsa) var(--morfo-curva),
       opacity var(--morfo-corsa) var(--morfo-curva)}
-  body.p2p-vendo #p2pMorfo:not(.bz) .morfo-meta{background:var(--danger);
-    box-shadow:0 3px 0 var(--danger-deep)}
-  #p2pMorfo.bz .morfo-meta{background:#191D29;box-shadow:0 3px 0 #0C0E15}
+  body.p2p-vendo #p2pMorfo:not(.bz) .morfo-meta{background:var(--b-rosso-bg);
+    border-color:var(--b-rosso-line);box-shadow:var(--b-rosso-sh)}
+  #p2pMorfo.bz .morfo-meta{background:var(--b-bz-bg);border-color:var(--b-bz-line);
+    box-shadow:var(--b-bz-sh)}
   #p2pMorfo .morfo-glifo,#p2pMorfo .morfo-eti{
     display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:800;
+    color:var(--b-ok-fg);font-weight:800;
     transition:transform var(--morfo-corsa) var(--morfo-curva),
       opacity var(--morfo-velo) ease}
   /* il glifo e' quello della barra, stesso carattere e stessa misura */
   #p2pMorfo .morfo-glifo{font-family:'Baloo 2',sans-serif;font-size:26px;
     opacity:0;transition-delay:0s,0s}
-  #p2pMorfo .morfo-eti{font-size:15.5px;opacity:1;gap:8px;
-    color:var(--on-trust);transition-delay:0s,var(--morfo-attesa)}
+  #p2pMorfo .morfo-eti{font-family:var(--b-font);font-size:15.5px;opacity:1;gap:8px;
+    transition-delay:0s,var(--morfo-attesa)}
   /* la scritta ha l'inchiostro del bottone d'arrivo, o all'ultimo
      fotogramma cambierebbe di colpo; il logo copiato ha la misura sua */
-  body.p2p-vendo #p2pMorfo:not(.bz) .morfo-eti{color:var(--on-danger)}
-  #p2pMorfo.bz .morfo-eti{color:#fff}
+  body.p2p-vendo #p2pMorfo:not(.bz) .morfo-eti,
+  body.p2p-vendo #p2pMorfo .morfo-glifo{color:var(--b-rosso-fg)}
+  #p2pMorfo.bz .morfo-eti{color:var(--b-bz-fg)}
   #p2pMorfo .morfo-eti .logo-bz{width:21px;height:20px;flex:0 0 auto;display:block}
   /* ====== LA MORFOSI DAL + IN FONDO (quinto giro, 24 set 2026, richiesta
      di Andrea) ======
@@ -3834,7 +3870,7 @@
      piu' — vedi CANTIERI, «Il + che si ferma sul logo». */
   #p2pMorfo .morfo-blu{display:none}
   #p2pMorfo.bz .morfo-blu{display:block;border-radius:50%;
-    background:#191D29;box-shadow:0 3px 0 #0C0E15}
+    background:var(--b-bz-bg);box-shadow:inset 0 0 0 1px var(--b-bz-line),var(--b-bz-sh)}
   #p2pMorfo.bz .morfo-forma{transition-delay:0s,0s;
     transition-duration:var(--morfo-corsa),calc(var(--morfo-velo) / 2)}
   #p2pMorfo.bz.parte .morfo-forma{opacity:var(--morfo-rosso)}
@@ -3974,10 +4010,11 @@
      `body.con-vendi`, 6960a29): nel ritorno la pagina se n'e' gia' andata,
      e il fantasma sarebbe rientrato nel + col vestito del lato. */
   html body #p2pMorfo.merc:not(.bz) .morfo-forma{border-radius:calc(100% / 3);
-    background:var(--sats);box-shadow:0 4px 0 var(--sats-deep)}
-  html body #p2pMorfo.merc:not(.bz) .morfo-meta{background:var(--sats);
-    box-shadow:0 3px 0 var(--sats-deep)}
-  html body #p2pMorfo.merc:not(.bz) .morfo-eti{color:#fff}
+    background:var(--b-pri-bg);box-shadow:inset 0 0 0 1px var(--b-pri-line),var(--b-pri-sh)}
+  html body #p2pMorfo.merc:not(.bz) .morfo-meta{background:var(--b-pri-bg);
+    border-color:var(--b-pri-line);box-shadow:var(--b-pri-sh)}
+  html body #p2pMorfo.merc:not(.bz) .morfo-eti{color:var(--b-pri-fg);font-size:var(--b-pri-fs)}
+  html body #p2pMorfo.merc:not(.bz) .morfo-glifo{color:var(--b-pri-fg)}
   /* ...e la scritta «Vendi» sotto il + esce con le voci: nel libro la sua
      gemella e' gia' scesa via, qui restava sotto il bottone che si
      allarga e ne spuntava a meta' corsa (visto nei fotogrammi fermi).
@@ -4844,7 +4881,7 @@
   nav .strato-p2p .off-dot{box-shadow:0 0 0 2px var(--nav-bg-p2p)}
   /* Il "+" di Vendi: bottone-oggetto rialzato sopra la barra */
   nav button.sell .ic{
-    width:54px;height:54px;color:#fff;
+    width:54px;height:54px;color:transparent;
     display:flex;align-items:center;justify-content:center;font-size:26px;padding:0;
     font-family:'Baloo 2',sans-serif;font-weight:800;margin-top:-30px;
     position:relative;z-index:0;
@@ -4869,14 +4906,32 @@
   nav button.sell .pelle{position:absolute;inset:0;z-index:-2;opacity:0;
     border-radius:50%;pointer-events:none;
     transition:opacity 120ms ease var(--p2p-corsa)}
-  nav button.sell .pelle-casa{border-radius:18px;background:var(--sats);
-    box-shadow:0 4px 0 var(--sats-deep),0 8px 20px rgba(247,147,26,.35)}
-  nav button.sell .pelle-verde{background:var(--trust);
-    box-shadow:0 4px 0 var(--trust-deep),0 8px 20px rgba(27,139,84,.35)}
-  nav button.sell .pelle-rossa{background:var(--danger);
-    box-shadow:0 4px 0 var(--danger-deep)}
-  nav button.sell .pelle-arancio{background:var(--sats);
-    box-shadow:0 4px 0 var(--sats-deep),0 8px 20px rgba(247,147,26,.35)}
+  /* IL VESTITO DELLE PELLI E' QUELLO DEI BOTTONI (ott 2026, secondo
+     giro del vestito A): fondo, filo e ombra del ruolo — l'arancio del
+     principale, il verde della conferma, il rosso e il blu dei pieni del
+     P2P —, mai un colore scritto qui. Cambiano SOLO i colori: forma,
+     misura, strati e corse sono quelli di prima (decisione di Andrea).
+     E LA CROCE E' DELLA PELLE: il ＋ vero resta nel tondo per la misura e
+     per chi legge con la voce, ma trasparente; quello che si vede lo
+     disegna ogni pelle col SUO inchiostro (scuro sull'arancio, quello
+     del ruolo sugli altri). Cosi' la croce cambia colore con la stessa
+     opacity che cambia la pelle — una transizione di colore sul glifo
+     sarebbe stata un'animazione nuova, e il glifo cambiato di colpo
+     sarebbe rimasto per un attimo scuro sul verde o bianco
+     sull'arancio. */
+  nav button.sell .pelle-casa{border-radius:18px;background:var(--b-pri-bg);
+    box-shadow:inset 0 0 0 1px var(--b-pri-line),var(--b-pri-sh);--pelle-fg:var(--b-pri-fg)}
+  nav button.sell .pelle-verde{background:var(--b-ok-bg);
+    box-shadow:inset 0 0 0 1px var(--b-ok-line),var(--b-ok-sh);--pelle-fg:var(--b-ok-fg)}
+  nav button.sell .pelle-rossa{background:var(--b-rosso-bg);
+    box-shadow:inset 0 0 0 1px var(--b-rosso-line),var(--b-rosso-rilievo);--pelle-fg:var(--b-rosso-fg)}
+  nav button.sell .pelle-arancio{background:var(--b-pri-bg);
+    box-shadow:inset 0 0 0 1px var(--b-pri-line),var(--b-pri-sh);--pelle-fg:var(--b-pri-fg)}
+  nav button.sell .pelle-casa::before,nav button.sell .pelle-verde::before,
+  nav button.sell .pelle-rossa::before,nav button.sell .pelle-arancio::before,
+  nav button.sell .pelle-bz::after{content:'＋';position:absolute;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    font-style:normal;color:var(--pelle-fg)}
   /* quale pelle e' accesa lo dicono le classi di sempre, e a pari catena:
      il neutro (fuori dal libro) vince sul lato */
   body:not(.nav-p2p) nav button.sell .pelle-casa,
@@ -4891,7 +4946,7 @@
      fondo del logo (#191D29), in proporzione alla discesa — a casa rosso
      pieno, in fondo blu pieno, a meta' corsa a meta' strada —, e tornando
      su torna rosso con la stessa corsa. NESSUN COLORE CHE CORRE: e' una
-     QUINTA PELLE blu col gradino della tendina (#0C0E15), SOPRA la rossa,
+     QUINTA PELLE blu (dal vestito A, ott 2026: il blu dei bottoni bz), SOPRA la rossa,
      la cui opacita' e' la discesa — una variabile che il dito scrive sul
      tondo (`--discesa-p2p`, da 0 a 1: guidaCursoreP2P), cioe' uno strato
      che si accende, sul compositor. Al tocco sulla tendina la variabile
@@ -4901,15 +4956,16 @@
      passare la banda a meta' strada (vedi LA PELLE DEL +). A spegnersi al
      contrario e' il solo suo BAGLIORE, che sta fuori dal cerchio e che il
      blu non coprirebbe: in fondo il + e' blu pieno, ombra compresa.
-     LA CROCE RESTA BIANCA: 5,18:1 sul rosso di giorno e 16,81:1 sul blu,
-     e il contrasto sale lungo tutta la strada. ⚠️ Di sera il rosso del +
-     e' #F07A47 e il bianco ci sta a 2,77:1: e' il + a riposo di sempre,
-     non di questo giro, e resta da decidere. */
-  nav button.sell .pelle-bz{background:#191D29;box-shadow:0 4px 0 #0C0E15;
+     LA CROCE RESTA BIANCA: almeno 4,8:1 sul rosso e 13 sul blu, e il
+     contrasto sale lungo tutta la strada. Di sera il rosso del + era
+     #F07A47, col bianco a 2,77:1: dal vestito A (ott 2026) e' il rosso
+     dei bottoni, lo stesso nei due temi, e la domanda e' chiusa. */
+  nav button.sell .pelle-bz{background:var(--b-bz-bg);
+    box-shadow:inset 0 0 0 1px var(--b-bz-line),var(--b-bz-sh);--pelle-fg:var(--b-bz-fg);
     z-index:-1;opacity:var(--discesa-p2p,0);
     transition:opacity var(--p2p-corsa) var(--p2p-curva)}
   nav button.sell .pelle-rossa::after{content:'';position:absolute;inset:0;
-    border-radius:inherit;box-shadow:0 8px 20px rgba(194,65,12,.35);
+    border-radius:inherit;box-shadow:var(--b-rosso-alone);
     opacity:calc(1 - var(--discesa-p2p,0));
     transition:opacity var(--p2p-corsa) var(--p2p-curva)}
   /* IL CONTORNO BIANCO DEL + CHE DIVENTA BLU (ottavo giro, 24 set 2026,
@@ -7638,16 +7694,21 @@
     --b-bw:var(--b-sec-bw);--b-sh:none;--b-bg-on:var(--b-sec-bg-on);--b-sh-on:none}
   .btn.mini{--b-bg:var(--b-sec-bg);--b-fg:var(--b-sec-fg);--b-line:var(--b-sec-line);
     --b-bw:var(--b-sec-bw);--b-sh:var(--b-mini-sh);--b-bg-on:var(--b-sec-bg-on);--b-sh-on:var(--b-mini-sh-on)}
-  .btn.orange,.btn.primary,.btn.asta,.btn.ghost,.btn.allarme,.btn.piano,.btn.mini{
-    background:var(--b-bg);color:var(--b-fg);border:var(--b-bw) solid var(--b-line);box-shadow:var(--b-sh)}
   /* IL BOTTONE CHE PUBBLICA NEL P2P VESTE IL + CHE SI E' APERTO (24 set
      2026, richieste di Andrea): verde a «Compra BTC» (il .primary di
      casa), ROSSO a «Vendi BTC», e col percorso Barattozon il BLU della
-     capsula (#191D29) col logo in piccolo al posto dell'icona. Stessa
-     forma dell'orange, cambia la tinta; il testo regge l'AA nei due temi
-     (il bianco sul blu fa 16,8:1; sul rosso lo decide --on-danger). */
-  .btn.rosso{background:var(--danger);color:var(--on-danger);box-shadow:0 3px 0 var(--danger-deep)}
-  .btn.bz{background:#191D29;color:#fff;box-shadow:0 3px 0 #0C0E15}
+     capsula (#191D29) col logo in piccolo al posto dell'icona. Dal
+     secondo giro del vestito (ott 2026) sono due RUOLI come gli altri,
+     con le loro leve (--b-rosso-…, --b-bz-…): premuto, spento e «in
+     corso» li prendono dalle stesse regole. Il bianco regge l'AA nei
+     due temi: 4,8:1 sul rosso, 13 sul blu. */
+  .btn.rosso{--b-bg:var(--b-rosso-bg);--b-fg:var(--b-rosso-fg);--b-line:var(--b-rosso-line);
+    --b-bw:var(--b-pieno-bw);--b-sh:var(--b-rosso-sh);--b-bg-on:var(--b-rosso-bg);--b-sh-on:var(--b-rosso-sh-on)}
+  .btn.bz{--b-bg:var(--b-bz-bg);--b-fg:var(--b-bz-fg);--b-line:var(--b-bz-line);
+    --b-bw:var(--b-pieno-bw);--b-sh:var(--b-bz-sh);--b-bg-on:var(--b-bz-bg);--b-sh-on:var(--b-bz-sh-on)}
+  .btn.orange,.btn.primary,.btn.asta,.btn.ghost,.btn.allarme,.btn.piano,.btn.mini,
+  .btn.rosso,.btn.bz{
+    background:var(--b-bg);color:var(--b-fg);border:var(--b-bw) solid var(--b-line);box-shadow:var(--b-sh)}
   .btn .logo-bz{width:21px;height:20px;flex:0 0 auto;display:block}
   .btn.ghost{margin-top:10px}
   /* I DUE PONTI verso l'esterno erano bottoni a tutta larghezza
@@ -7796,7 +7857,7 @@
   /* PREMUTO: ogni ruolo affonda di quanto dice il vestito, col fondo
      e l'ombra «premuti» del SUO ruolo */
   .btn.orange:active,.btn.primary:active,.btn.asta:active,.btn.ghost:active,
-  .btn.allarme:active,.btn.piano:active,.btn.mini:active{
+  .btn.allarme:active,.btn.piano:active,.btn.mini:active,.btn.rosso:active,.btn.bz:active{
     transform:var(--b-on-move);background:var(--b-bg-on);box-shadow:var(--b-sh-on)}
   /* CTA d'acquisto su due righe: azione sopra, cifra intera sotto —
      cosi' i prezzi a 7 cifre non si tagliano mai */
@@ -7826,7 +7887,8 @@
      e sembrava uguale al bottone che sta lavorando. */
   .btn:disabled,.btn[disabled]{opacity:.5;pointer-events:none}
   .btn.orange:disabled,.btn.primary:disabled,.btn.asta:disabled,.btn.ghost:disabled,
-  .btn.allarme:disabled,.btn.piano:disabled,.btn.mini:disabled{
+  .btn.allarme:disabled,.btn.piano:disabled,.btn.mini:disabled,
+  .btn.rosso:disabled,.btn.bz:disabled{
     background:var(--b-off-bg,var(--b-bg));color:var(--b-off-fg,var(--b-fg));
     border-color:var(--b-off-line,var(--b-line));box-shadow:var(--b-off-sh,var(--b-sh));
     opacity:var(--b-off-op)}
@@ -7837,10 +7899,12 @@
   .btn[aria-busy="true"]{--b-off-bg:initial;--b-off-fg:initial;--b-off-line:initial;
     --b-off-sh:initial;--b-off-op:var(--b-busy-op)}
   .btn.orange[aria-busy="true"],.btn.primary[aria-busy="true"],.btn.asta[aria-busy="true"],
-  .btn.ghost[aria-busy="true"],.btn.allarme[aria-busy="true"]{position:relative}
+  .btn.ghost[aria-busy="true"],.btn.allarme[aria-busy="true"],
+  .btn.rosso[aria-busy="true"],.btn.bz[aria-busy="true"]{position:relative}
   .btn.orange[aria-busy="true"]::after,.btn.primary[aria-busy="true"]::after,
   .btn.asta[aria-busy="true"]::after,.btn.ghost[aria-busy="true"]::after,
-  .btn.allarme[aria-busy="true"]::after{
+  .btn.allarme[aria-busy="true"]::after,.btn.rosso[aria-busy="true"]::after,
+  .btn.bz[aria-busy="true"]::after{
     content:'';display:var(--b-busy-luce);position:absolute;inset:0;
     border-radius:inherit;pointer-events:none;
     background:linear-gradient(100deg,transparent 30%,var(--b-luce) 50%,transparent 70%);
@@ -7855,29 +7919,6 @@
   /* il fuoco della tastiera si vede, su ogni bottone */
   .btn:focus-visible,.back:focus-visible,.foto-scelta:focus-visible{
     outline:2px solid var(--b-focus,var(--sats));outline-offset:2px}
-  /* ══ IL P2P TIENE IL VESTITO DI PRIMA (ott 2026, decisione di
-     Andrea: il P2P si veste in un secondo giro) ══
-     Le sei viste `view-p2p…` e i tredici fogli `p2p…Sheet` ridanno ai
-     bottoni i valori di prima dello stile A: pillola piena col
-     gradino di 3px, testo bianco, ghost a bordo d'inchiostro, velo al
-     50% da spenti, niente luce in corso, Nunito, 12px di curva. Sono
-     solo VARIABILI su chi li contiene (le regole sono le stesse del
-     mercatino), e :where() non pesa: nessuna regola del P2P cambia
-     chi vince. Il secondo giro cancella questo blocco e basta. */
-  :where([id^="view-p2p"], .sheet[id^="p2p"]){
-    --b-r:var(--radius-btn); --b-min:auto; --b-font:'Nunito',system-ui,sans-serif;
-    --b-on-move:translateY(2px); --b-pieno-bw:0px; --b-pri-fs:15.5px;
-    --b-pri-bg:var(--sats); --b-pri-fg:#fff; --b-pri-line:transparent;
-    --b-pri-sh:0 3px 0 var(--sats-deep); --b-pri-sh-on:0 1px 0 rgba(0,0,0,.35);
-    --b-ok-bg:var(--trust); --b-ok-fg:var(--on-trust); --b-ok-line:transparent;
-    --b-ok-sh:0 3px 0 var(--trust-deep); --b-ok-sh-on:0 1px 0 rgba(0,0,0,.35);
-    --b-sec-bg:var(--card); --b-sec-fg:var(--ink); --b-sec-line:var(--ink); --b-sec-bw:2px;
-    --b-sec-sh:0 3px 0 var(--ink); --b-sec-bg-on:var(--card); --b-sec-sh-on:0 1px 0 rgba(0,0,0,.35);
-    --b-mini-sh:0 2px 0 var(--ink); --b-mini-sh-on:none;
-    --b-dan-bg:var(--warn-bg); --b-dan-fg:var(--danger); --b-dan-line:var(--danger); --b-dan-bw:2px;
-    --b-dan-sh:0 3px 0 var(--danger); --b-dan-sh-on:0 1px 0 rgba(0,0,0,.35);
-    --b-off-bg:initial; --b-off-fg:initial; --b-off-line:initial; --b-off-sh:initial;
-    --b-off-op:.5; --b-busy-op:.5; --b-busy-luce:none}
   /* LA RIGA DEL CAMPO FILE (ago 2026, dal campo): il chip col nome e
      il «togli» finivano SOTTO il bottone, e il «togli» centrato —
      MISURATO prima di toccare: tre righe e 152px, col bottone e il
@@ -8586,10 +8627,16 @@
   .tour-passo{font-size:11.5px;font-weight:800;color:var(--muted);letter-spacing:.02em}
   .tour-salta{margin-left:auto;border:0;background:none;font:inherit;cursor:pointer;
     color:var(--muted);font-weight:800;font-size:12.5px;text-decoration:underline}
-  .tour-avanti{border:0;border-radius:999px;padding:9px 22px;font:inherit;
-    font-weight:800;font-size:13.5px;cursor:pointer;background:var(--sats);
-    color:#fff;box-shadow:0 3px 0 var(--sats-deep)}
-  .tour-avanti:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+  /* «Avanti» del giro veste il principale del vestito A (ott 2026,
+     richiesta di Andrea: era l'ultimo pieno arancio col bianco):
+     fondo, filo, ombra e inchiostro scuro del ruolo, la curva e i 44 px
+     dei bottoni, la Baloo 2; premuto e fuoco come loro. */
+  .tour-avanti{border:var(--b-pieno-bw) solid var(--b-pri-line);border-radius:var(--b-r);
+    padding:9px 22px;min-height:var(--b-min);font:inherit;font-family:var(--b-font);
+    font-weight:800;font-size:13.5px;cursor:pointer;background:var(--b-pri-bg);
+    color:var(--b-pri-fg);box-shadow:var(--b-pri-sh)}
+  .tour-avanti:active{transform:var(--b-on-move);box-shadow:var(--b-pri-sh-on)}
+  .tour-avanti:focus-visible{outline:2px solid var(--b-focus,var(--sats));outline-offset:2px}
   /* la prima comparsa non scivola dall'angolo: .subito spegne le
      transizioni per il primo posizionamento */
   #tour.subito #tourLuce,#tour.subito #tourFumetto{transition:none}
@@ -9294,10 +9341,13 @@
        idioma */
     nav button .nav-ico{width:22px;height:22px}
     nav button.active{background:var(--sats-soft)}
-    nav button.sell{background:var(--sats);color:#fff;border-radius:999px;
-      box-shadow:0 3px 0 var(--sats-deep);margin-left:8px}
-    nav button.sell.active{color:#fff}
-    nav button.sell .ic,nav button.sell.active .ic{
+    /* il vestito A (ott 2026): le tinte piene dei ruoli e non i loro
+       gradienti, perche' qui il colore SFUMA (la transizione qui sotto)
+       e un gradiente scatterebbe; forma e corsa quelle di prima */
+    nav button.sell{background:var(--b-pri-tinta);color:var(--b-pri-fg);border-radius:999px;
+      box-shadow:inset 0 0 0 1px var(--b-pri-line),var(--b-pri-sh);margin-left:8px}
+    nav button.sell.active{color:var(--b-pri-fg)}
+    nav button.sell .ic,nav button.sell.active .ic{color:inherit;
       width:auto;height:auto;border-radius:0;background:none;
       font-size:17px;margin-top:0;box-shadow:none;font-family:inherit;
     }
@@ -9313,15 +9363,19 @@
     nav .nav-cella>button{justify-content:center}
     /* la pillola del + non scappa in alto ne' diventa tonda: cambia
        COLORE (il fondo del bottone, non l'.ic che qui e' solo il
-       glifo) e la scritta fa il crossfade «Vendi» → «Pubblica» */
+       glifo) e la scritta fa il crossfade «Vendi» → «Pubblica».
+       Dal vestito A anche l'INCHIOSTRO cambia (scuro sull'arancio, quello
+       del ruolo sul verde e sul rosso), e corre insieme al fondo con la
+       stessa corsa: cambiato di colpo, per un attimo sarebbe stato
+       bianco sull'arancio */
     nav button.sell{transition:background-color var(--p2p-corsa) var(--p2p-curva),
-      box-shadow var(--p2p-corsa) var(--p2p-curva)}
+      box-shadow var(--p2p-corsa) var(--p2p-curva),color var(--p2p-corsa) var(--p2p-curva)}
     body.nav-p2p nav button.sell .ic{transform:none;border-radius:0;
       background:none;box-shadow:none}
-    body.nav-p2p nav button.sell{background:var(--trust);
-      box-shadow:0 3px 0 var(--trust-deep)}
-    body.nav-p2p.p2p-vendo nav button.sell{background:var(--danger);
-      box-shadow:0 3px 0 var(--danger-deep)}
+    body.nav-p2p nav button.sell{background:var(--b-ok-tinta);color:var(--b-ok-fg);
+      box-shadow:inset 0 0 0 1px var(--b-ok-line),var(--b-ok-sh)}
+    body.nav-p2p.p2p-vendo nav button.sell{background:var(--b-rosso-tinta);color:var(--b-rosso-fg);
+      box-shadow:inset 0 0 0 1px var(--b-rosso-line),var(--b-rosso-sh)}
     /* le etichette: da desktop «Vendi» sfuma senza scivolare (dentro
        una pillola la corsa verticale si vedrebbe tagliata male) e
        «Pubblica» prende il suo posto */
@@ -12433,7 +12487,7 @@ document.getElementById('cartello')?.remove();</script>
       <button type="button" class="btn mini" id="payRinnova" style="display:none"
         onclick="nuovaFatturaOrdine(this, currentOrderId)">⚡ Generane una nuova</button>
     </div>
-    <button class="btn primary" onclick="sheetPaid()">✓ Ho pagato</button>
+    <button class="btn primary" id="payHoPagato" onclick="sheetPaid()">✓ Ho pagato</button>
     <button class="btn ghost" onclick="annullaPagamento()">Annulla</button>
     <div id="payHint"></div>
   </div>
@@ -27867,6 +27921,19 @@ async function mostraQr(invoice, scade){
      puntata, sblocco), quindi il flusso nuovo di domani eredita il
      vestito giusto senza doverselo ricordare. */
   vestiPaySheet(pagamentoCorrente ? 'tassa' : 'escrow');
+  /* «HO PAGATO» ASPETTA LA FATTURA (ott 2026): finche' la fattura si
+     sta creando non c'e' niente da verificare — un tocco li' chiedeva
+     la verifica dell'ordine che non esiste ancora (422). In attesa e
+     non spento: tiene il suo colore e la luce che passa (aria-busy,
+     lo stesso «in corso» di bottoneInAttesa, senza velo). La demo ha
+     la sua fattura finta e il suo pagamento finto: li' e' sempre vivo. */
+  const hoPagato = el('payHoPagato');
+  if (hoPagato) {
+    const pronta = DEMO || !!(invoice || '').trim();
+    hoPagato.disabled = !pronta;
+    if (pronta) hoPagato.removeAttribute('aria-busy');
+    else hoPagato.setAttribute('aria-busy', 'true');
+  }
   const box = el('payQr'), giro = ++qrGiro;
   /* si disegna solo una bolt11 vera: in demo (stringa finta) e negli
      stati d'attesa il riquadro resta nascosto, mai un QR bugiardo */
@@ -38675,7 +38742,7 @@ function pannelloNota(o){
             spazi: l'HTML mangia un solo \n iniziale e l'indentazione
             finirebbe DENTRO la nota. */''}
       <textarea id="notaOrdineInp" style="min-height:38px" maxlength="${MAX_NOTA}" placeholder="${esc(segnaposNota(!!(o.righe && o.righe.length), o.consegnaScelta==='servizio'))}">${esc(scritta)}</textarea>
-      <button class="btn orange" onclick="salvaNota()">${scritta ? 'Aggiorna la nota' : 'Salva la nota'}</button>
+      <button class="btn ghost" onclick="salvaNota()">${scritta ? 'Aggiorna la nota' : 'Salva la nota'}</button>
       ${scritta ? `<button class="btn ghost" onclick="togliNota()">🗑 Togli la nota</button>` : ''}</div>`;
   }
   /* venditore e moderatore: la leggono e basta. Al moderatore si

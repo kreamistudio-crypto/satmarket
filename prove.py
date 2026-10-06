@@ -62474,10 +62474,21 @@ def prove_nav_p2p():
     _pelle = ('<span class="ic"><i class="pelle pelle-casa"></i><i class="pelle pelle-verde"></i>'
               '<i class="pelle pelle-rossa"></i><i class="pelle pelle-arancio"></i>'
               '<i class="pelle pelle-bz"></i>＋</span>')
-    prova("...cinque strati sotto il glifo, nel tondo e solo li', il blu per ultimo",
-          [1, True],
-          [mini.count(_pelle), "nav button.sell .ic{\n    width:54px;height:54px;color:#fff;" in mini
-           and "position:relative;z-index:0;\n  }" in mini])
+    # (ott 2026, il vestito A) il ＋ vero resta per la misura e per la voce,
+    # ma trasparente: quello che si vede lo disegna OGNI PELLE col suo
+    # inchiostro, e cambia colore con l'opacity della pelle — nessuna
+    # transizione di colore nuova sul glifo (decisione di Andrea: le corse
+    # del + restano quelle di prima)
+    prova("...cinque strati sotto il glifo, nel tondo e solo li', il blu per ultimo; "
+          "la croce che si vede la porta ogni pelle, col suo inchiostro",
+          [1, True, True],
+          [mini.count(_pelle), "nav button.sell .ic{\n    width:54px;height:54px;color:transparent;" in mini
+           and "position:relative;z-index:0;\n  }" in mini,
+           "  nav button.sell .pelle-casa::before,nav button.sell .pelle-verde::before,\n"
+           "  nav button.sell .pelle-rossa::before,nav button.sell .pelle-arancio::before,\n"
+           "  nav button.sell .pelle-bz::after{content:'＋';position:absolute;inset:0;\n"
+           "    display:flex;align-items:center;justify-content:center;\n"
+           "    font-style:normal;color:var(--pelle-fg)}" in mini])
     # CHI ARRIVA SI ACCENDE SOPRA, chi va via resta pieno sotto e sfuma
     # solo dopo: due strati che sfumano insieme lascerebbero passare la
     # banda a meta' corsa. Solo la CASA esce subito, che e' piu' larga
@@ -62515,10 +62526,11 @@ def prove_nav_p2p():
     def _regola_pelle(nome):
         i = mini.find("  nav button.sell .pelle-%s{" % nome)
         return mini[i:mini.index("}", i)] if i >= 0 else ""
+    # (ott 2026) col vestito A: il fondo, il filo e l'ombra del principale
     prova("...arancio come il + del mercatino, alla sua altezza, col suo "
           "rilievo", [True, True, True],
-          ["transform:none" == _gs, "background:var(--sats);" in _regola_pelle("arancio"),
-           "box-shadow:0 4px 0 var(--sats-deep),0 8px 20px rgba(247,147,26,.35)"
+          ["transform:none" == _gs, "background:var(--b-pri-bg);" in _regola_pelle("arancio"),
+           "box-shadow:inset 0 0 0 1px var(--b-pri-line),var(--b-pri-sh);"
            in _regola_pelle("arancio")])
     # l'altezza e il rilievo del mercatino si leggono dalla SUA pelle,
     # non da un numero ricopiato: il + di casa non si sposta (margine,
@@ -62559,11 +62571,29 @@ def prove_nav_p2p():
     # (settimo giro) la rossa porta il gradino, e il suo BAGLIORE sta su uno
     # strato suo, che si spegne quanto il + si fa blu; la blu il solo
     # gradino, come la tendina
-    prova("...ogni pelle porta le due ombre del +, e nessuna corre — la rossa col "
-          "bagliore su uno strato suo, la blu col solo gradino, come la tendina",
-          [2, 2, 2, 1, 1, 1],
-          [_ombre(_regola_pelle(n)) for n in ("casa", "verde", "arancio", "rossa",
-                                               "rossa::after", "bz")])
+    # (ott 2026, il vestito A) il gradino e l'alone di prima sono diventati
+    # il FILO e l'OMBRA del ruolo — due voci per pelle, lette dalle leve del
+    # vestito e mai scritte qui —; la rossa tiene il solo rilievo e il suo
+    # bagliore (l'alone del rosso) resta sullo strato suo, che la discesa
+    # spegne
+    def _ombra_di(regola):
+        m = re.search(r"box-shadow:([^;}]*)", regola)
+        return m.group(1).strip() if m else None
+    prova("...ogni pelle porta il filo e l'ombra del suo ruolo, e nessuna corre — la "
+          "rossa col bagliore su uno strato suo",
+          ["inset 0 0 0 1px var(--b-pri-line),var(--b-pri-sh)",
+           "inset 0 0 0 1px var(--b-ok-line),var(--b-ok-sh)",
+           "inset 0 0 0 1px var(--b-pri-line),var(--b-pri-sh)",
+           "inset 0 0 0 1px var(--b-rosso-line),var(--b-rosso-rilievo)",
+           "var(--b-rosso-alone)",
+           "inset 0 0 0 1px var(--b-bz-line),var(--b-bz-sh)"],
+          [_ombra_di(_regola_pelle(n)) for n in ("casa", "verde", "arancio", "rossa",
+                                                  "rossa::after", "bz")])
+    prova("...e la croce di ogni pelle ha l'inchiostro del suo ruolo: scuro "
+          "sull'arancio", ["var(--b-pri-fg)", "var(--b-ok-fg)", "var(--b-pri-fg)",
+                           "var(--b-rosso-fg)", "var(--b-bz-fg)"],
+          [(re.search(r"--pelle-fg:([^;}]*)", _regola_pelle(n)) or [None, None])[1]
+           for n in ("casa", "verde", "arancio", "rossa", "bz")])
     prova("...e le sorelle del tondo non portano piu' ne' fondo ne' ombre", [0, 0],
           [_ombre(pezzo_js(mini, f, "}") if f in mini else "") for f in _sorelle])
 
@@ -62830,9 +62860,11 @@ def prove_morfosi_vendi():
     for corpo in (["con-vendi"], ["con-vendi", "p2p-vendo"], ["morfosi"],
                   ["morfosi", "p2p-vendo"]):
         f, m, e = _vince(corpo, _F, _pr), _vince(corpo, _M, _pr), _vince(corpo, _E, _pr)
+        # (ott 2026, il vestito A) la forma e' la pelle del + di casa, la
+        # meta il «⚡ Pubblica annuncio» arancio, la scritta il suo scuro
         prova(f"il fantasma veste l'arancio di casa (body {' '.join(corpo)})",
-              ["var(--sats)", "0 4px 0 var(--sats-deep)", "calc(100% / 3)",
-               "var(--sats)", "0 3px 0 var(--sats-deep)", "#fff"],
+              ["var(--b-pri-bg)", "inset 0 0 0 1px var(--b-pri-line),var(--b-pri-sh)",
+               "calc(100% / 3)", "var(--b-pri-bg)", "var(--b-pri-sh)", "var(--b-pri-fg)"],
               [f.get("background"), f.get("box-shadow"), f.get("border-radius"),
                m.get("background"), m.get("box-shadow"), e.get("color")])
     # IL RAGGIO DI UN TERZO: schiacciata alla misura del +, l'ellisse di un
@@ -63565,11 +63597,17 @@ def prove_tasto_barattozon():
     _vbz = lambda regole, corpo, prop, ultimo=_BZ: ((_vince_css(regole, _cat_bz(corpo, ultimo),
                                                                 [prop]).get(prop) or [None])[0])
     _tend_r = _regola(css, "  #navBarattozon{position:absolute;", "}")
-    prova("la pelle blu del + e' la tendina: il suo blu e il suo gradino (letti "
-          "dalla sua regola), sopra la rossa, e la sua opacita' e' la discesa",
-          [_dichiarazione(_tend_r, "background"), _dichiarazione(_tend_r, "box-shadow"),
+    # (ott 2026, il vestito A) il blu e' quello dei bottoni di Barattozon,
+    # e il suo gradiente finisce nel blu della tendina (l'ultima fermata e'
+    # il #191D29 che la tendina dichiara, letto dalla sua regola)
+    _bz_bg = re.search(r"--b-bz-bg:([^;]*);", mini)
+    prova("la pelle blu del + e' il blu di Barattozon (che finisce nel blu della "
+          "tendina), sopra la rossa, e la sua opacita' e' la discesa",
+          [True, "var(--b-bz-bg)", "inset 0 0 0 1px var(--b-bz-line),var(--b-bz-sh)",
            "-1", "var(--discesa-p2p,0)"],
-          [_vbz(_reg, _VB, "background"), _vbz(_reg, _VB, "box-shadow"),
+          [bool(_bz_bg) and _bz_bg.group(1).rstrip().endswith(
+               (_dichiarazione(_tend_r, "background") or "?") + " 100%)"),
+           _vbz(_reg, _VB, "background"), _vbz(_reg, _VB, "box-shadow"),
            _vbz(_reg, _VB, "z-index"), _vbz(_reg, _VB, "opacity")])
     prova("...il suo colore corre col +: fermo col dito, la corsa della barra al "
           "tocco e al ritorno, e negli effetti ridotti niente (lo dice la cascata)",
@@ -63612,7 +63650,11 @@ def prove_tasto_barattozon():
     # freccia del logo, e Andrea li ha voluti bianchi): il colore del tondo,
     # letto dalla sua regola, uguale nel filo e nel bagliore — e di
     # arancio, sul + che diventa blu, non ne resta
-    _col_ic = _dichiarazione(_regola(css, "  nav button.sell .ic{\n", "}"), "color") or ""
+    # (ott 2026) il ＋ del tondo e' trasparente: la croce sulla pelle blu
+    # la disegna il suo ::after, col bianco del ruolo
+    _col_ic = ("#FFFFFF" if re.search(r"--b-bz-fg:#FFFFFF;", mini)
+               and "--pelle-fg:var(--b-bz-fg)" in _regola(css, "  nav button.sell .pelle-bz{", "}")
+               else "?")
     _col_ic = ("#" + "".join(c * 2 for c in _col_ic[1:]) if re.fullmatch(r"#[0-9A-Fa-f]{3}", _col_ic)
                else _col_ic).upper()
     _hex_an = re.search(r"inset 0 0 0 2\.5px #([0-9A-Fa-f]{6})", _ombra_an)
@@ -63623,12 +63665,12 @@ def prove_tasto_barattozon():
           ["#FFFFFF", (255, 255, 255), (255, 255, 255), False],
           [_col_ic, _rgb_an, tuple(int(x) for x in _rgba_an.groups()) if _rgba_an else None,
            "FE8400" in _anello.upper() or "254,132,0" in _anello])
-    # LA CROCE RESTA BIANCA E LEGGIBILE: bianco (il colore del tondo) sul
-    # blu, e sul rosso di giorno, sopra il 4,5; e lungo la strada il
-    # contrasto non scende mai sotto quello del rosso da cui parte, nei due
-    # temi (la mescola e' quella dell'opacita', nello spazio dei byte).
-    # ⚠️ Di sera il rosso del + (#F07A47) col bianco sta a 2,77:1: e' il +
-    # a riposo di sempre, e resta da decidere — non lo si prova qui
+    # LA CROCE RESTA BIANCA E LEGGIBILE: bianco (l'inchiostro del rosso e del
+    # blu) sul blu e sul rosso, sopra il 4,5; e lungo la strada il contrasto
+    # non scende mai sotto quello del rosso da cui parte (la mescola e'
+    # quella dell'opacita', nello spazio dei byte). Ogni fermata dei due
+    # gradienti. (ott 2026, il vestito A: il rosso del + e' quello dei
+    # bottoni, lo stesso nei due temi — il #F07A47 di sera faceva 2,77)
     def _lum(esa):
         c_ = [int(esa[i:i + 2], 16) / 255 for i in (1, 3, 5)]
         c_ = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c_]
@@ -63639,10 +63681,12 @@ def prove_tasto_barattozon():
     def _mescola(a_, b_, p_):
         return "#%02X%02X%02X" % tuple(round(int(a_[i:i + 2], 16) * (1 - p_)
                                              + int(b_[i:i + 2], 16) * p_) for i in (1, 3, 5))
-    _croce = "#FFFFFF" if "width:54px;height:54px;color:#fff;" in _regola(
-        css, "  nav button.sell .ic{\n", "}") else None
-    _blu = _dichiarazione(_tend_r, "background")
-    _rossi = re.findall(r"--danger:(#[0-9A-Fa-f]{6});", mini)
+    _croce = "#FFFFFF" if re.search(r"--b-rosso-fg:#FFFFFF;", mini) and re.search(
+        r"--b-bz-fg:#FFFFFF;", mini) else None
+    _ferm = lambda nome: re.findall(r"#[0-9A-Fa-f]{6}", (re.search(
+        r"--" + nome + r":([^;]*);", mini) or [None, ""])[1])
+    _blu = (_ferm("b-bz-bg") or ["#FFFFFF"])[0]
+    _rossi = _ferm("b-rosso-bg")
     prova("la croce del + resta bianca e leggibile: sul blu e sul rosso di giorno "
           "almeno 4,5:1, e lungo la strada mai sotto il rosso da cui parte, nei "
           "due temi", [True, True, True, [], 2],
@@ -63696,13 +63740,15 @@ def prove_tasto_barattozon():
           "return tab ? 'bz' : (p2pLato === 'vendo' ? 'rosso' : 'primary');" in _ves
           and "'<button type=\"button\" class=\"btn ' + vestitoInvioP2P(tab) + '\" "
               "id=\"p2pNuovoInvia\" ' +" in mini)
-    prova("...il rosso e il blu sono forme di casa, col testo che regge l'AA",
-          [True, True, True, 2],
-          [".btn.rosso{background:var(--danger);color:var(--on-danger);"
-           "box-shadow:0 3px 0 var(--danger-deep)}" in css,
-           ".btn.bz{background:#191D29;color:#fff;box-shadow:0 3px 0 #0C0E15}" in css,
+    # (ott 2026, il secondo giro del vestito A) il rosso e il blu sono due
+    # RUOLI: copiano le loro leve nelle correnti e la regola comune dipinge
+    prova("...il rosso e il blu sono ruoli del vestito, col testo che regge l'AA",
+          [True, True, True, True],
+          [".btn.rosso{--b-bg:var(--b-rosso-bg);--b-fg:var(--b-rosso-fg);" in css,
+           ".btn.bz{--b-bg:var(--b-bz-bg);--b-fg:var(--b-bz-fg);" in css,
            ".btn .logo-bz{width:21px;height:20px;flex:0 0 auto;display:block}" in css,
-           mini.count("--on-danger:")])
+           ".btn.orange,.btn.primary,.btn.asta,.btn.ghost,.btn.allarme,.btn.piano,.btn.mini,\n"
+           "  .btn.rosso,.btn.bz{\n    background:var(--b-bg);color:var(--b-fg);" in css])
     # IL CONTRASTO SI CALCOLA DAI TOKEN, nei due temi: bianco sul rosso di
     # giorno, l'inchiostro scuro sul rosso che di sera schiarisce, bianco
     # sul blu — sotto il 4,5 il bottone non regge l'AA per il testo
@@ -63727,11 +63773,17 @@ def prove_tasto_barattozon():
     _i_sera = css.find('html[data-tema="scuro"]{')
     _sera = css[_i_sera:css.index("}", _i_sera)] if _i_sera >= 0 else ""
     _on = lambda b, n: "#FFFFFF" if _tok(b, n) in ("#fff", "#FFF", "#ffffff") else _tok(b, n)
+    # il rosso e il blu sono gli stessi nei due temi (la sera cambia solo
+    # le ombre): ogni fermata dei gradienti, col bianco dei due ruoli
+    _fermate = lambda nome: re.findall(r"#[0-9A-Fa-f]{6}", (re.search(
+        r"--" + nome + r":([^;]*);", _giorno) or [None, ""])[1])
     prova("...e il testo dei bottoni rosso e blu regge l'AA nei due temi",
-          [True, True, True],
-          [_contrasto(_on(_giorno, "on-danger"), _tok(_giorno, "danger")) >= 4.5,
-           _contrasto(_on(_sera, "on-danger"), _tok(_sera, "danger")) >= 4.5,
-           _contrasto("#FFFFFF", "#191D29") >= 4.5])
+          [True, True, True, [], []],
+          [_tok(_giorno, "b-rosso-fg") == "#FFFFFF" and _tok(_giorno, "b-bz-fg") == "#FFFFFF",
+           len(_fermate("b-rosso-bg")) == 2 and len(_fermate("b-bz-bg")) == 2,
+           not re.search(r"--b-(rosso|bz)-(bg|fg):", _sera),
+           [f for f in _fermate("b-rosso-bg") if _contrasto("#FFFFFF", f) < 4.5],
+           [f for f in _fermate("b-bz-bg") if _contrasto("#FFFFFF", f) < 4.5]])
     prova("...il logo in piccolo e' lo stesso file della tendina, e scappa niente",
           True, "const LOGO_BZ_HTML = '<img class=\"logo-bz\" "
           "src=\"/assets/barattozon-tasto.webp\" width=\"21\" height=\"20\" alt=\"\">';"
@@ -71983,9 +72035,10 @@ def prove_p2p_pubblica():
     prova("solo le pelli scalano — la forma, il gemello blu e la meta —, con una "
           "regola; glifo e scritta traslano",
           (1, 3), (_mf.count("scale("), _mf.count("translate(")))
+    # (ott 2026) il raggio del bottone, dal vestito A, e' --b-r
     prova("...e la forma e' un cerchio col 50%, la meta ha il raggio del bottone",
           True, "#p2pMorfo .morfo-forma{border-radius:50%;" in stile
-          and "#p2pMorfo .morfo-meta{border-radius:var(--radius-btn);" in stile)
+          and "#p2pMorfo .morfo-meta{border-radius:var(--b-r);" in stile)
     # il colore di partenza e' quello del LATO, e lo dice la classe sul
     # body — la stessa che veste il + e il logo, mai una tinta letta a
     # mano da JS
@@ -72013,7 +72066,7 @@ def prove_p2p_pubblica():
     prova("...e la tinta della forma e' quella del + da cui parte (lo dice la "
           "cascata): verde a comprare, rosso a vendere — anche verso il bottone "
           "blu di Barattozon, dove sfuma finche' e' tonda",
-          ["var(--trust)", "var(--danger)", "var(--danger)"],
+          ["var(--b-ok-bg)", "var(--b-rosso-bg)", "var(--b-rosso-bg)"],
           [_fantasma([], ["acceso"], _FORMA).get("background"),
            _fantasma(_V, ["acceso"], _FORMA).get("background"),
            _fantasma(_V, ["acceso", "bz"], _FORMA).get("background")])
@@ -72036,8 +72089,11 @@ def prove_p2p_pubblica():
     # il suo gradino e' da 4px e quello del bottone da 3, e all'arrivo ne
     # sporgeva un pixel a pancia che spariva di colpo col fantasma (visto
     # nei fotogrammi fermi); al ritorno ricompare subito
+    # (ott 2026, il vestito A) il gradino non c'e' piu', ma l'ombra della
+    # forma (quella del +) e quella del bottone restano diverse: la ragione
+    # della dissolvenza resta, e la corsa e' la stessa
     prova("...e la forma svanisce sotto la meta all'arrivo, e torna subito al ritorno",
-          True, "box-shadow:0 4px 0 var(--trust-deep);opacity:0;\n"
+          True, "box-shadow:inset 0 0 0 1px var(--b-ok-line),var(--b-ok-sh);opacity:0;\n"
           "    transition:transform var(--morfo-corsa) var(--morfo-curva),\n"
           "      opacity var(--morfo-velo) ease var(--morfo-attesa)}" in stile
           and "#p2pMorfo.parte .morfo-forma{opacity:1;transition-delay:0s,0s}" in stile)
@@ -72050,13 +72106,14 @@ def prove_p2p_pubblica():
     # cambierebbe di colpo
     prova("...e la meta veste il bottone, e VINCE: verde, rosso col lato, blu "
           "col tabacchino anche a «Vendi BTC»",
-          ["var(--trust)", "var(--danger)", "#191D29"],
+          ["var(--b-ok-bg)", "var(--b-rosso-bg)", "var(--b-bz-bg)"],
           [_fantasma([], ["acceso"], _META).get("background"),
            _fantasma(_V, ["acceso"], _META).get("background"),
            _fantasma(_V, ["acceso", "bz"], _META).get("background")])
-    prova("...e la scritta ha l'inchiostro del bottone d'arrivo, e VINCE (di "
-          "sera il rosso vuole l'inchiostro scuro, il blu il bianco)",
-          ["var(--on-trust)", "var(--on-danger)", "#fff"],
+    # (ott 2026) gli inchiostri sono quelli dei ruoli del vestito: il rosso
+    # dei bottoni e' lo stesso nei due temi, col bianco
+    prova("...e la scritta ha l'inchiostro del bottone d'arrivo, e VINCE",
+          ["var(--b-ok-fg)", "var(--b-rosso-fg)", "var(--b-bz-fg)"],
           [_fantasma([], ["acceso"], _ETI).get("color"),
            _fantasma(_V, ["acceso"], _ETI).get("color"),
            _fantasma(_V, ["acceso", "bz"], _ETI).get("color")])
@@ -72480,9 +72537,9 @@ console.log(JSON.stringify(out));
     _BZ = ["acceso", "bz"]
     prova("col vestito blu la forma e' la pelle rossa del +, ma sfuma dal primo "
           "fotogramma e in meta' della dissolvenza breve; sotto c'e' il gemello "
-          "blu, tondo, col gradino del bottone (che senza vestito blu non c'e')",
-          [["var(--danger)", "0s,0s", "var(--morfo-corsa),calc(var(--morfo-velo) / 2)"],
-           ["block", "#191D29", "0 3px 0 #0C0E15", "50%"],
+          "blu, tondo, con la pelle blu del + (che senza vestito blu non c'e')",
+          [["var(--b-rosso-bg)", "0s,0s", "var(--morfo-corsa),calc(var(--morfo-velo) / 2)"],
+           ["block", "var(--b-bz-bg)", "inset 0 0 0 1px var(--b-bz-line),var(--b-bz-sh)", "50%"],
            [None, "none"]],
           [[_fantasma(_V, _BZ, _FORMA).get("background"),
             _fantasma(_V, _BZ, _FORMA, props=["transition-delay"]).get("transition-delay"),
@@ -119528,19 +119585,23 @@ def prove_vestito_bottoni():
     """IL VESTITO DEI BOTTONI (ott 2026, stile A «pieno morbido», scelto
     da Andrea fra tre provati sull'app vera). Un cuore solo: i valori
     stanno nelle --b-… accanto a --radius-btn (e nel blocco scuro), le
-    regole dei ruoli li leggono, il P2P si rimette i valori di prima con
-    un blocco di sole variabili. Qui si prova che:
+    regole dei ruoli li leggono. Dal secondo giro (ott 2026) il P2P veste
+    come il mercatino: il blocco che gli ridava i valori di prima non c'e'
+    piu', e i suoi due pieni (.rosso, .bz) sono ruoli. Qui si prova che:
       1. ogni pieno e ogni secondario si LEGGE (4,5:1) nei due temi, su
          OGNI fermata del gradiente — calcolato dai token veri;
       2. la cascata vera da' a ogni ruolo il fondo, il testo, il bordo e
          l'ombra del vestito, e la curva e i 44 px della base;
       3. nessun ruolo si ridipinge per conto suo;
-      4. il blocco del P2P rimette TUTTE le leve che il P2P usa (chi
-         aggiunge una leva al vestito e la scorda li', se ne accorge);
+      4. il P2P non ha piu' un vestito suo: nessuna regola delle sue viste
+         o dei suoi fogli riscrive una leva o ridipinge un bottone, e la
+         cascata dentro le sue viste da' le regole di casa; il «Avanti»
+         del giro guidato veste il principale;
       5. lo spento e' un fondo pieno, l'«in corso» tiene il colore, e
          bottoneInAttesa lo dice (aria-busy messo E tolto);
       6. le decisioni di Andrea: la conferma di «Annulla l'ordine» del
-         venditore e' un pericolo, il condividi e' a 44 px."""
+         venditore e' un pericolo, il condividi e' a 44 px, «Ho pagato»
+         aspetta la fattura, «Salva la nota» e' un secondario."""
     print("\n🎨 Il vestito dei bottoni (stile A)")
     mini = open("miniapp.html", encoding="utf-8").read()
     i0 = mini.index("<style>")
@@ -119560,7 +119621,6 @@ def prove_vestito_bottoni():
 
     chiaro = variabili(":root")
     scuro = dict(chiaro, **variabili('html[data-tema="scuro"]'))
-    p2p = variabili(':where([id^="view-p2p"], .sheet[id^="p2p"])')
 
     # --- 1) i contrasti, dai token ------------------------------------
     def risolvi(v, tok, giri=0):
@@ -119597,7 +119657,7 @@ def prove_vestito_bottoni():
     peggio = {}
     for tema, tok in (("chiaro", chiaro), ("scuro", scuro)):
         pagina = colori(risolvi(tok["--bg"], tok))[0]
-        for ruolo in ("pri", "ok", "asta", "sec", "dan", "piano"):
+        for ruolo in ("pri", "ok", "asta", "sec", "dan", "piano", "rosso", "bz"):
             fondi = [sopra(c, pagina) for c in colori(risolvi(tok[f"--b-{ruolo}-bg"], tok))]
             testo = colori(risolvi(tok[f"--b-{ruolo}-fg"], tok))[0]
             peggio[(tema, ruolo)] = min(contrasto(sopra(testo, f), f) for f in fondi)
@@ -119634,7 +119694,9 @@ def prove_vestito_bottoni():
               "border": "var(--b-bw) solid var(--b-line)",
               "box-shadow": "var(--b-sh)", "border-radius": "var(--b-r)",
               "min-height": "var(--b-min)", "font-family": "var(--b-font)"}
-    for ruolo in ("orange", "primary", "asta", "ghost", "allarme", "piano", "mini"):
+    RUOLI = ("orange", "primary", "asta", "ghost", "allarme", "piano", "mini",
+             "rosso", "bz")
+    for ruolo in RUOLI:
         v = _vince_css(quieto, catena(["btn", ruolo]), props)
         prova(f"la cascata veste .btn.{ruolo} dal vestito", attese,
               {p: (v.get(p) or ("?",))[0] for p in props})
@@ -119650,27 +119712,81 @@ def prove_vestito_bottoni():
 
     # --- 3) nessun ruolo si ridipinge da se' --------------------------
     prova("nessuna regola di ruolo porta un fondo, un colore o un'ombra suoi", [],
-          re.findall(r"(?m)^\s*\.btn\.(?:orange|primary|asta|ghost|allarme|piano|mini)"
+          re.findall(r"(?m)^\s*\.btn\.(?:orange|primary|asta|ghost|allarme|piano|mini|rosso|bz)"
                      r"\{[^}]*\b(?:background|color|box-shadow):", stile))
+    # ...e i due ruoli nuovi stanno in TUTTE le liste di stato: premuto,
+    # spento, «in corso» e la sua luce
+    _stati = {"premuto": ".btn.rosso:active,.btn.bz:active{",
+              "spento": ".btn.rosso:disabled,.btn.bz:disabled{",
+              "in corso": '.btn.rosso[aria-busy="true"],.btn.bz[aria-busy="true"]{position:relative}',
+              "la luce": '.btn.allarme[aria-busy="true"]::after,.btn.rosso[aria-busy="true"]::after,\n'
+                         '  .btn.bz[aria-busy="true"]::after{'}
+    prova("il rosso e il blu del P2P stanno in ogni stato dei ruoli", [],
+          [k for k, v in _stati.items() if v not in stile])
 
-    # --- 4) il P2P tiene il vestito di prima --------------------------
-    usate_p2p = [k for k in chiaro if k.startswith("--b-") and not re.match(
-        r"--b-(asta|piano)-|--b-(focus|luce)$", k)]
-    prova("il blocco del P2P rimette tutte le leve del vestito che il P2P usa",
-          [], sorted(k for k in usate_p2p if k not in p2p))
-    prova("...coi valori di prima: arancio pieno, testo bianco, gradino di 3px, "
-          "ghost a bordo d'inchiostro, velo al 50%, niente luce", True,
-          p2p.get("--b-pri-bg") == "var(--sats)" and p2p.get("--b-pri-fg") == "#fff"
-          and p2p.get("--b-pri-sh") == "0 3px 0 var(--sats-deep)"
-          and p2p.get("--b-sec-line") == "var(--ink)" and p2p.get("--b-sec-bw") == "2px"
-          and p2p.get("--b-off-op") == ".5" and p2p.get("--b-off-bg") == "initial"
-          and p2p.get("--b-busy-luce") == "none"
-          and p2p.get("--b-r") == "var(--radius-btn)")
+    # --- 4) il P2P veste come il mercatino (ott 2026, secondo giro) -----
+    # Il blocco di sole variabili che gli ridava il vestito di prima e'
+    # cancellato. La prova non cerca il suo testo (un blocco gemello con
+    # un altro selettore passerebbe): chiede a OGNI regola che nomina il
+    # P2P — le sue viste, i suoi fogli, i suoi pezzi — se riscrive una
+    # leva del vestito o se ridipinge un bottone.
+    def _del_p2p(lista):
+        return re.search(r"p2p|P2P|contanti|app-naviga|luogo-qui", lista) is not None
+    leve = [lista.strip() for lista, corpo, gruppi in reg
+            if _del_p2p(lista) and re.search(r"(?:^|;)\s*--b-", corpo)]
+    prova("nessuna regola del P2P riscrive una leva del vestito", [], leve)
+    ridipinti = [lista.strip() for lista, corpo, gruppi in reg
+                 if _del_p2p(lista) and ".btn" in lista and re.search(
+                     r"(?:^|;)\s*(?:background|color|box-shadow|border|border-radius"
+                     r"|font-family|border-color)\s*:", corpo)]
+    prova("...e nessuna ridipinge un bottone (le misure si', i colori no)", [], ridipinti)
     viste = sorted(set(re.findall(r'<div class="view[^"]*" id="(view-p2p\w*)"', mini)))
-    prova("...e le viste del P2P sono quelle che il blocco prende (view-p2p…)",
-          True, len(viste) >= 6 and all(v.startswith("view-p2p") for v in viste))
-    fogli_p2p = re.findall(r'<div class="sheet[^"]*" id="(p2p\w+)"', mini)
-    prova("...come i fogli del P2P (p2p…Sheet)", True, len(fogli_p2p) >= 13)
+    prova("le viste del P2P ci sono tutte (view-p2p…)", True, len(viste) >= 6)
+    for vista in ("view-p2p", "view-p2pordine", "view-p2pmod"):
+        for ruolo in ("primary", "ghost", "allarme", "orange", "rosso"):
+            v = _vince_css(quieto, catena(["btn", ruolo], vista), props)
+            if {p: (v.get(p) or ("?",))[0] for p in props} != attese:
+                prova(f"in #{vista} .btn.{ruolo} veste come a casa", attese,
+                      {p: (v.get(p) or ("?",))[0] for p in props})
+                break
+        else:
+            prova(f"in #{vista} i bottoni vestono come a casa", True, True)
+    # IL «AVANTI» DEL GIRO GUIDATO (ott 2026, richiesta di Andrea): era
+    # l'ultimo pieno arancio col bianco. Veste il principale, premuto
+    # compreso; nessuna corsa nuova (le animazioni restano quelle di prima)
+    _av = _vince_css(quieto, [{"tag": "div", "attr": {"id": "tourFumetto"}, "classi": set()},
+                              {"tag": "button", "attr": {}, "classi": {"tour-avanti"}}],
+                     ["background", "color", "box-shadow", "border", "border-radius",
+                      "min-height", "font-family", "transition"])
+    prova("il «Avanti» del giro veste il principale: fondo, scuro, ombra, filo, "
+          "curva, 44 px, Baloo 2, e nessuna corsa nuova",
+          ["var(--b-pri-bg)", "var(--b-pri-fg)", "var(--b-pri-sh)",
+           "var(--b-pieno-bw) solid var(--b-pri-line)", "var(--b-r)", "var(--b-min)",
+           "var(--b-font)", None],
+          [(_av.get(p) or (None,))[0] for p in ("background", "color", "box-shadow", "border",
+                                                 "border-radius", "min-height", "font-family",
+                                                 "transition")])
+    prova("...e premuto affonda come i bottoni", True,
+          ".tour-avanti:active{transform:var(--b-on-move);box-shadow:var(--b-pri-sh-on)}"
+          in stile)
+    # LA PILLOLA DEL + DA DESKTOP: le TINTE piene dei ruoli e non i
+    # gradienti (li' il colore sfuma, e un gradiente scatterebbe), col loro
+    # inchiostro; e l'inchiostro corre insieme al fondo, con la stessa corsa
+    prova("la pillola del + da desktop: tinte piene e inchiostro dei ruoli, e "
+          "l'inchiostro sfuma col fondo", [True, True, True, True],
+          ["nav button.sell{background:var(--b-pri-tinta);color:var(--b-pri-fg);" in stile,
+           "body.nav-p2p nav button.sell{background:var(--b-ok-tinta);color:var(--b-ok-fg);"
+           in stile,
+           "body.nav-p2p.p2p-vendo nav button.sell{background:var(--b-rosso-tinta);"
+           "color:var(--b-rosso-fg);" in stile,
+           "box-shadow var(--p2p-corsa) var(--p2p-curva),color var(--p2p-corsa) "
+           "var(--p2p-curva)}" in stile])
+    # ...e le tinte reggono l'inchiostro del loro ruolo nei due temi
+    _tinte = [(t, r) for t, tok in (("chiaro", chiaro), ("scuro", scuro))
+              for r in ("pri", "ok", "rosso")
+              if contrasto(colori(risolvi(tok[f"--b-{r}-fg"], tok))[0],
+                           colori(risolvi(tok[f"--b-{r}-tinta"], tok))[0]) < 4.5]
+    prova("...e ogni tinta regge il suo inchiostro a 4,5:1 nei due temi", [], _tinte)
 
     # --- 5) spento, in corso, premuto ---------------------------------
     prova("lo spento di un ruolo e' un fondo pieno, col ripiego sul suo colore",
@@ -119683,7 +119799,7 @@ def prove_vestito_bottoni():
     # base, e a spegnerla bastano il blocco reduced-motion e la regola
     # universale di fx-ridotti (che copre anche ::after) — nessun gemello
     prova("...la luce si ferma a meta' con meno movimento, anche a mano", [True, True],
-          [re.search(r'\.btn\.allarme\[aria-busy="true"\]::after\{[^}]*'
+          [re.search(r'\.btn\.bz\[aria-busy="true"\]::after\{[^}]*'
                      r'background-position:50% 0;', stile) is not None,
            '.btn[aria-busy="true"]::after{animation:none}' in stile])
     bia = pezzo_js(mini, "function bottoneInAttesa(btn, testo){", "\n}\n")
@@ -119707,6 +119823,48 @@ def prove_vestito_bottoni():
           re.search(r"\.share-btn\{[^}]*width:44px;height:44px", stile) is not None)
     prova("il barrato nel banner prende il colore del bottone", True,
           "#bannerBlocco .btn.orange .acq-barrato{color:inherit;opacity:.72}" in stile)
+    # «SALVA LA NOTA» E' UN SECONDARIO (ott 2026, decisione di Andrea): nella
+    # pagina dell'ordine il principale e' uno, «L'ho ritirato»
+    _nota = pezzo_js(mini, "function pannelloNota(o){", "\n}\n")
+    prova("«Salva la nota» e' un secondario, e il pannello non ha pieni", [True, 0],
+          ['<button class="btn ghost" onclick="salvaNota()">' in _nota,
+           _nota.count("btn orange") + _nota.count("btn primary")])
+    # «HO PAGATO» ASPETTA LA FATTURA (ott 2026): mostraQr, il collo di
+    # bottiglia di tutti i flussi del foglio, lo mette in attesa senza
+    # fattura e lo riaccende con la fattura; la demo e' sempre viva. Il
+    # pezzo VERO di mostraQr gira in node con un bottone di cartone.
+    prova("«Ho pagato» ha un nome, e il foglio non ne ha un secondo", [1, 1],
+          [mini.count('id="payHoPagato"'), mini.count('onclick="sheetPaid()"')])
+    _mq = pezzo_js(mini, "async function mostraQr(invoice, scade){", "\n}\n")
+    _pz = _mq[_mq.index("  const hoPagato = el('payHoPagato');"):
+              _mq.index("  const box = el('payQr'), giro = ++qrGiro;")] if (
+        "  const hoPagato = el('payHoPagato');" in _mq) else ""
+    import shutil
+    import subprocess
+    import tempfile
+    node = shutil.which("node")
+    if not node or not _pz:
+        prova("il pezzo di mostraQr che governa «Ho pagato» c'e'", True, bool(_pz))
+    else:
+        banco = ("const b = {disabled: false, a: {}, setAttribute(k, v){ this.a[k] = v; },"
+                 " removeAttribute(k){ delete this.a[k]; }};\n"
+                 "const el = () => b; let DEMO = false; const out = [];\n"
+                 "function giro(invoice){\n" + _pz + "\n"
+                 "  out.push([b.disabled, b.a['aria-busy'] || null]); }\n"
+                 "giro(''); giro('lnbc10n1pfinta'); giro('   '); giro(undefined);"
+                 " DEMO = true; giro('');\n"
+                 "console.log(JSON.stringify(out));\n")
+        f = tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+        f.write(banco)
+        f.close()
+        r = subprocess.run([node, f.name], capture_output=True, text=True, timeout=60,
+                           encoding="utf-8")
+        os.unlink(f.name)
+        prova("«Ho pagato» aspetta la fattura: in attesa senza, vivo con, e in demo "
+              "sempre vivo",
+              [[True, "true"], [False, None], [True, "true"], [True, "true"], [False, None]],
+              json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0
+              else r.stderr[-400:])
 
 
 def prove_csp_prova():
