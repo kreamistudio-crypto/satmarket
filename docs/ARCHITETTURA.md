@@ -16779,16 +16779,19 @@
   LA SBIRCIATA (5 ott 2026): il dito su un francobollo (`facciaMini`
   con `data-sbircia`, solo dove c'è una foto) apre la foto piena sopra
   la pagina in `#sbirciata`, velo `fixed` che non prende il dito; al
-  rilascio si richiude. SUBITO nei due versi dal 6 ott 2026: si apre
-  nel touchstart stesso (nessun timer; sfumatura di 80ms) e si chiude
-  nel touchend senza sfumare; il dito che si muove oltre gli 8px chiude
-  la foto e scorre la fila, sotto è tremolio e la foto resta. Nessuna
-  vibrazione: aprendo al primo contatto, vibrerebbe a ogni
-  scorrimento. Il touchstart si CONSUMA
-  (la lezione del tocco lungo sulle card: sotto c'è quello del sistema
-  a 500ms, che col dito ancora giù si prenderebbe il gesto e il
-  rilascio), quindi lo scorrimento che parte da un francobollo lo fa
-  la pagina a mano; gli ascoltatori del gesto stanno sul BERSAGLIO,
+  rilascio si richiude subito, senza sfumare. Si apre solo dopo
+  `SBIRCIA_ATTESA_MS` (120ms, la leva) di dito fermo entro 8px: un dito
+  che si muove prima non apre niente (anche un evento `scroll` prima
+  della foto la annulla). IL TOUCHSTART È PASSIVO (6 ott 2026, terzo
+  giro): lo scorrimento della fila è del sistema, col suo slancio —
+  il primo giro lo consumava e scorreva a mano, il secondo apriva al
+  primo contatto e la foto compariva a chi scorreva. Il prezzo è il
+  tocco lungo di sistema a 500ms (la lezione delle card dei reparti):
+  sotto il dito c'è un riquadro senza link, senza immagine
+  (`pointer-events:none` sulla foto) e senza testo selezionabile, e il
+  `contextmenu` si ferma; un cancel chiude. A foto aperta i touchmove
+  si consumano (pagina ferma) e il touchend pure (niente click).
+  Nessuna vibrazione. Gli ascoltatori del gesto stanno sul BERSAGLIO,
   perché il preventivo che arriva riscrive `#acqCorpo` e il
   francobollo esce dal documento col dito giù. Non è uno strato della
   cronologia.

@@ -23542,45 +23542,48 @@ function strisciaSet(){
 }
 
 /* LA SBIRCIATA (5 ott 2026, richiesta di Andrea): in «Controlla e paga»
-   il dito sul francobollo apre la sua foto in grande, sopra la pagina
-   col velo; staccato il dito torna francobollo, e ritoccando si riapre.
-   SUBITO, nei due versi (6 ott 2026, ritocco di Andrea: la prima stesura
-   aspettava 220ms di dito fermo): si apre nel touchstart stesso e si
-   chiude nel touchend. Un tocco breve e' quindi una foto che lampeggia,
-   e NIENT'ALTRO — ne' pagamento, ne' salto, ne' click.
-   IL TOCCO E' NOSTRO DAL PRIMO ISTANTE, ed e' la riga che decide tutto:
-   `preventDefault` sul touchstart. E' la lezione del tocco lungo sulle
-   card dei reparti (vedi PREMUTA_MS): sotto il nostro gesto ce n'e' uno
-   del SISTEMA, che su Android scatta a 500ms, si prende il tocco con un
-   cancel e dentro Telegram non manda nemmeno il `contextmenu`. La' il
-   gesto finiva allo scatto, quindi bastava arrivare prima; qui la foto
-   deve restare aperta FINCHE' il dito sta giu', cioe' oltre i 500ms, e
-   l'unico modo di non perdere il rilascio e' che il sistema il tocco
-   lungo non lo veda mai. Un touchstart consumato toglie al browser
-   tutto quel che nasce da quel tocco: il tocco lungo, il menu
-   dell'immagine, il click, lo scorrimento. Il callout di iOS lo spegne
-   in piu' il CSS, e il `contextmenu` qui sotto e' la cintura.
-   IL PREZZO E' LO SCORRIMENTO, e si paga a mano: un dito che parte da
-   un francobollo e si muove oltre la soglia (la stessa dei reparti)
-   CHIUDE LA FOTO e SCORRE — la striscia di lato, la pagina in verticale
-   — seguito da noi, senza l'inerzia del sistema. Il francobollo occupa
-   52px in cima alla pagina.
-   SOTTO LA SOGLIA LA PAGINA STA FERMA: ogni touchmove si consuma, e il
-   tremolio di chi guarda la foto non sposta niente e non la chiude.
+   il dito fermo su un francobollo apre la sua foto in grande, sopra la
+   pagina col velo; staccato il dito torna francobollo, e ritoccando si
+   riapre. Un tocco breve non fa NIENTE — ne' pagamento, ne' salto.
+   LA STORIA IN TRE GIRI, perche' ognuno ha insegnato qualcosa:
+   · 5 ott: attesa di 220ms e touchstart CONSUMATO (cosi' il tocco lungo
+     del sistema non vedeva mai il gesto) — ma lo scorrimento della fila
+     lo facevamo noi a mano, senza slancio;
+   · 6 ott, mattina: apertura istantanea al primo contatto — e allora la
+     foto si apriva anche a chi voleva solo SCORRERE la fila
+     (Andrea: «sembra un bug»);
+   · 6 ott, sera: L'ATTESA BREVE E IL TOCCO RESTITUITO. La foto si apre
+     solo dopo SBIRCIA_ATTESA_MS di dito fermo entro SBIRCIA_SCARTO; un
+     dito che si muove prima non apre niente, e la fila scorre col suo
+     slancio NORMALE, perche' il touchstart non si consuma piu' (e'
+     passivo): lo scorrimento e' del sistema, non nostro.
+   IL PREZZO DEL TOCCO RESTITUITO E' IL TOCCO LUNGO DI SISTEMA (la lezione
+   di PREMUTA_MS: su Android a 500ms la WebView puo' prendersi il gesto).
+   Lo si toglie dal tavolo cosi': sotto il dito non c'e' niente su cui il
+   telefono abbia un menu da offrire — la foto del francobollo ha
+   pointer-events:none (si tocca un riquadro, non un'immagine), non c'e'
+   un link, e la selezione e' spenta dal CSS insieme al callout di iOS; e
+   il `contextmenu`, se arriva, si ferma. Se un telefono si prendesse il
+   gesto lo stesso, arriva un touchcancel e la foto si chiude: mai
+   bloccata aperta. E' la riga da guardare sul telefono vero.
+   A FOTO APERTA LA PAGINA STA FERMA: da li' ogni touchmove si consuma
+   (il dito era fermo, quindi lo scorrimento del sistema non e' ancora
+   partito e si puo' ancora impedire). La chiusura e' nel touchend
+   stesso, e solo dopo una foto aperta il touchend si consuma: niente
+   click dietro.
    GLI ASCOLTATORI DEL GESTO STANNO SUL BERSAGLIO, non sul corpo: se a
    meta' del gesto arriva il preventivo, renderAcquisto riscrive
    #acqCorpo e il francobollo esce dal documento — gli eventi del dito
-   continuano ad andare a LUI, ma non salgono piu' a nessuno. Sul corpo
-   il rilascio si perderebbe, e la foto resterebbe aperta.
+   continuano ad andare a LUI, ma non salgono piu' a nessuno.
+   SENZA VIBRAZIONE (decisione di Andrea).
    La foto: la miniatura subito (e' gia' in pagina), la grande appena
    c'e' — la si chiede al primo contatto, e di solito e' gia' in cache
    dalla scheda dell'annuncio. NON e' uno strato della cronologia: vive
    quanto il dito. */
-const SBIRCIA_SCARTO = 8;   // px: oltre, era uno scorrimento (PREMUTA_SCARTO)
-let sbirciaDa = null;       // il gesto in corso, uno alla volta
+const SBIRCIA_ATTESA_MS = 120;  // ms di dito fermo prima della foto: LA LEVA da regolare
+const SBIRCIA_SCARTO = 8;       // px: oltre, era uno scorrimento (PREMUTA_SCARTO)
+let sbirciaDa = null;           // il gesto in corso, uno alla volta
 
-/* il dito tocca il francobollo: la foto si apre ADESSO, nello stesso
-   evento (6 ott 2026, ritocco di Andrea: «subito, senza attesa») */
 function sbirciaFoto(mini, x, y, tocco, bersaglio){
   const id = Number(mini.dataset.sbircia);
   const l = listings.find(t=>t.id===id) || myListings.find(t=>t.id===id);
@@ -23589,52 +23592,40 @@ function sbirciaFoto(mini, x, y, tocco, bersaglio){
   const grande = (l.photos && l.photos[0]) || piccola;
   const pre = new Image();
   pre.src = grande;
-  const fila = mini.closest('.ctrl-strip');
-  sbirciaDa = {x, y, tocco, bersaglio, piccola, grande, pre, fila,
-               sl: fila ? fila.scrollLeft : 0, sy: window.scrollY,
-               scorre: false, aperta: false};
-  apriSbirciata();
+  sbirciaDa = {x, y, tocco, bersaglio, piccola, grande, pre, aperta: false,
+               timer: setTimeout(apriSbirciata, SBIRCIA_ATTESA_MS)};
   return true;
 }
-/* SENZA VIBRAZIONE (6 ott 2026): con la foto che si apre al primo
-   contatto, vibrerebbe anche a ogni scorrimento della fila che parte da
-   un francobollo — e una vibrazione che arriva sempre non dice niente */
 function apriSbirciata(){
   const s = sbirciaDa;
-  if (!s || s.aperta || s.scorre) return;
+  if (!s || s.aperta) return;
   s.aperta = true;
   const img = el('sbirciata').querySelector('img');
   img.src = (s.pre.complete && s.pre.naturalWidth) ? s.grande : s.piccola;
   if (img.getAttribute('src') !== s.grande)
-    s.pre.onload = () => { if (sbirciaDa === s && s.aperta) img.src = s.grande; };
+    s.pre.onload = () => { if (sbirciaDa === s) img.src = s.grande; };
   el('sbirciata').classList.add('open');
-}
-/* giu' il velo, ma il gesto resta: e' lo scorrimento che comincia */
-function veloGiuSbirciata(){
-  const s = sbirciaDa;
-  if (s) { s.aperta = false; s.pre.onload = null; }
-  el('sbirciata').classList.remove('open');
 }
 function chiudiSbirciata(){
   const s = sbirciaDa;
-  veloGiuSbirciata();
   sbirciaDa = null;
-  if (s && s.bersaglio) for (const [ev, fn] of SBIRCIA_ASCOLTI)
-    s.bersaglio.removeEventListener(ev, fn, {passive: false});
-}
-/* il dito si muove: sotto la soglia e' il tremolio di chi guarda, e la
-   foto resta; oltre e' uno scorrimento — la foto si chiude e la fila (o
-   la pagina) segue il dito, fatto a mano (vedi IL PREZZO) */
-function sbirciaMuove(dx, dy){
-  const s = sbirciaDa;
-  if (!s) return;
-  if (!s.scorre && (Math.abs(dx) > SBIRCIA_SCARTO || Math.abs(dy) > SBIRCIA_SCARTO)) {
-    s.scorre = true;
-    veloGiuSbirciata();
+  if (s) {
+    clearTimeout(s.timer);
+    s.pre.onload = null;
+    if (s.bersaglio) for (const [ev, fn] of SBIRCIA_ASCOLTI)
+      s.bersaglio.removeEventListener(ev, fn, {passive: false});
   }
-  if (!s.scorre) return;
-  if (s.fila) s.fila.scrollLeft = s.sl - dx;
-  window.scrollTo(0, Math.max(0, s.sy - dy));
+  el('sbirciata').classList.remove('open');
+}
+/* il dito si muove prima della foto, oltre la soglia: era uno
+   scorrimento — il gesto muore senza aprire niente e il resto e' del
+   sistema. Torna `true` se il gesto e' finito qui. */
+function sbirciaScorre(dx, dy){
+  const s = sbirciaDa;
+  if (!s || s.aperta) return false;
+  if (Math.abs(dx) <= SBIRCIA_SCARTO && Math.abs(dy) <= SBIRCIA_SCARTO) return false;
+  chiudiSbirciata();
+  return true;
 }
 const sbirciaDito = e => sbirciaDa
   && [...e.changedTouches].find(t => t.identifier === sbirciaDa.tocco);
@@ -23642,30 +23633,38 @@ const SBIRCIA_ASCOLTI = [
   ['touchmove', e => {
     const t = sbirciaDito(e);
     if (!t) return;
-    if (e.cancelable) e.preventDefault();
-    sbirciaMuove(t.clientX - sbirciaDa.x, t.clientY - sbirciaDa.y);
+    /* a foto aperta la pagina sta ferma; prima, il touchmove resta del
+       sistema (e' il suo slancio) */
+    if (sbirciaDa.aperta) { if (e.cancelable) e.preventDefault(); return; }
+    sbirciaScorre(t.clientX - sbirciaDa.x, t.clientY - sbirciaDa.y);
   }],
   ['touchend', e => {
     if (!sbirciaDito(e)) return;
-    if (e.cancelable) e.preventDefault();
+    if (sbirciaDa.aperta && e.cancelable) e.preventDefault();
     chiudiSbirciata();
   }],
   ['touchcancel', e => { if (sbirciaDito(e)) chiudiSbirciata(); }],
 ];
 {
   const corpo = el('acqCorpo');
+  /* PASSIVO: il tocco resta del sistema (vedi L'ATTESA BREVE) */
   corpo.addEventListener('touchstart', e => {
     const mini = e.target.closest?.('.ctrl-mini[data-sbircia]');
     if (!mini || sbirciaDa || e.touches.length !== 1) return;
     const t = e.changedTouches[0];
     if (!sbirciaFoto(mini, t.clientX, t.clientY, t.identifier, e.target)) return;
-    if (e.cancelable) e.preventDefault();
     for (const [ev, fn] of SBIRCIA_ASCOLTI)
       e.target.addEventListener(ev, fn, {passive: false});
-  }, {passive: false});
-  /* col MOUSE (il computer): stesso gesto, il rilascio si ascolta sulla
-     finestra — il velo non prende il puntatore, ma il cursore puo'
-     uscire dal francobollo prima di staccare */
+  }, {passive: true});
+  /* la cintura dello slancio: se la fila o la pagina si muovono prima
+     della foto (uno scorrimento che il touchmove non ha ancora detto),
+     la foto non si apre */
+  addEventListener('scroll', () => {
+    if (sbirciaDa && !sbirciaDa.aperta) chiudiSbirciata();
+  }, {capture: true, passive: true});
+  /* col MOUSE (il computer): stesso gesto e stessa attesa, il rilascio
+     si ascolta sulla finestra — il velo non prende il puntatore, ma il
+     cursore puo' uscire dal francobollo prima di staccare */
   corpo.addEventListener('mousedown', e => {
     const mini = e.button === 0 && e.target.closest?.('.ctrl-mini[data-sbircia]');
     if (!mini || sbirciaDa) return;
@@ -23673,15 +23672,13 @@ const SBIRCIA_ASCOLTI = [
     e.preventDefault();      // niente trascino della foto, niente selezione
   });
   addEventListener('mousemove', e => {
-    if (sbirciaDa && sbirciaDa.tocco === null
-        && (Math.abs(e.clientX - sbirciaDa.x) > SBIRCIA_SCARTO
-            || Math.abs(e.clientY - sbirciaDa.y) > SBIRCIA_SCARTO))
-      chiudiSbirciata();
+    if (sbirciaDa && sbirciaDa.tocco === null)
+      sbirciaScorre(e.clientX - sbirciaDa.x, e.clientY - sbirciaDa.y);
   });
   addEventListener('mouseup', () => {
     if (sbirciaDa && sbirciaDa.tocco === null) chiudiSbirciata();
   });
-  /* la cintura: se un telefono il menu lo chiedesse lo stesso */
+  /* il menu del telefono sul francobollo si ferma, se arriva */
   corpo.addEventListener('contextmenu', e => {
     if (e.target.closest?.('.ctrl-mini[data-sbircia]')) e.preventDefault();
   });

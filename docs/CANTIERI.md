@@ -36156,3 +36156,45 @@ mercatino com'era.
 chiuso): lo schema `lightning:` dentro la WebView di Telegram — Android
 e iPhone — e nell'APK: se il link non apre nulla, la strada è
 `tg.openLink` o un copia-e-avvisa, da decidere con quel che si vede.
+
+## La sbirciata con l'attesa breve (6 ott 2026, sera: terzo giro)
+
+Andrea dopo la prova sul telefono di 0873e11: l'apertura istantanea
+apriva la foto anche a chi voleva solo scorrere la fila, e sembrava un
+bug. Si torna a un'attesa breve.
+
+**DECISO.** La foto si apre dopo `SBIRCIA_ATTESA_MS` (120ms, la costante
+da regolare) di dito fermo entro 8px; un dito che si muove prima non
+apre niente, e anche un evento `scroll` arrivato prima della foto la
+annulla. Il touchstart diventa PASSIVO: lo scorrimento della fila è del
+sistema, col suo slancio (il primo giro lo consumava e scorreva a mano,
+senza inerzia). A foto aperta touchmove e touchend si consumano: pagina
+ferma, niente click dietro; la chiusura è nel touchend e non sfuma.
+Niente vibrazione. Tolto lo scorrimento a mano (`sbirciaMuove` →
+`sbirciaScorre`, che chiude e basta).
+
+**IL PREZZO, DICHIARATO.** Con il tocco restituito, il tocco lungo del
+sistema a 500ms può tornare a vedere il gesto (la lezione di
+PREMUTA_MS). Sotto il dito c'è un riquadro senza link, senza immagine
+(`pointer-events:none` sulla foto) e senza testo selezionabile, e il
+`contextmenu` si ferma: il telefono non ha un menu da offrire. Se se
+lo prende lo stesso arriva un touchcancel e la foto si chiude, mai
+bloccata aperta.
+
+**PROVATO.** `prove_sbirciata` riscritta (29) e la sentinella della
+copia col dito aggiornata (il touchstart della cassa ora è passivo e
+non consuma); tortura 17 su 17. Dal vivo a 375 px (copia in collaudo,
+relay morti): tocco breve di 60ms senza foto e senza nulla consumato;
+foto aperta a 128ms, ancora a 1,2s, tremolio fermo, chiusa nel
+touchend; dito che scorre subito: nessuna foto e nessun touchmove
+consumato; `scroll` prima della foto la annulla, a foto aperta no;
+clic breve del mouse senza foto; velo 375×812 e foto da 343px
+centrata. Gli scatti del pane escono tagliati (cattura a densità 2 in
+una cornice da 1,5): la geometria si è misurata dal DOM, l'aspetto è
+quello degli scatti di 0873e11 (CSS invariato).
+
+**DA GUARDARE.** Sul telefono: lo slancio della fila, e soprattutto la
+foto tenuta oltre il mezzo secondo su Telegram Android, iPhone e APK
+(niente menu, niente chiusura da sola). Se si chiude a mezzo secondo,
+il tocco lungo di sistema se l'è presa: si torna a consumare il
+touchstart e si sceglie fra foto stabile e slancio.
