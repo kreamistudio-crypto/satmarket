@@ -9282,7 +9282,7 @@ async def login_nostr(req: Request, response: Response,
         con.close()
         apri_sessione(response, r["tg_id"], barattolo_portachiavi,
                       barattolo_sessione)
-        return {"ok": True}
+        return {"ok": True, **_invito_al_login(r["tg_id"], d.get("invito"))}
     righe = con.execute(
         "SELECT tg_id, nome, username FROM utenti "
         "WHERE npub=? AND npub_verificata=1 AND npub_accesso=''",
@@ -9304,7 +9304,30 @@ async def login_nostr(req: Request, response: Response,
     # Il nativo nasce gia' verificato (la firma dimostra il possesso):
     # Nostrano e Pioniere possono scattare subito, avvisati via DM
     await premia_distintivi(tg_id)
-    return {"ok": True, "nuovo": True}
+    return {"ok": True, "nuovo": True,
+            **_invito_al_login(tg_id, d.get("invito"))}
+
+
+def _invito_al_login(tg_id: int, codice) -> dict:
+    """IL CODICE INVITO DI CHI ENTRA CON NOSTR (ott 2026): il link del
+    bot e' una porta solo Telegram, e chi arriva con una chiave il codice
+    lo scrive nel foglio del login. E' la TERZA PORTA dello stesso
+    giudice (`collega_invito`), con le sue regole intere: una volta
+    sola, entro la finestra, mai da soli, mai in tondo.
+    Il login NON cade per un codice storto — la chiave e' gia' provata,
+    la sessione e' aperta — quindi il rifiuto torna come frase in
+    `invito`, e il client la mostra. Niente codice = niente chiave.
+    La strada del collegamento a un account Telegram non passa da qui:
+    quello e' un account che c'era gia', e il campo del Profilo resta."""
+    if not str(codice or "").strip():
+        return {}
+    con = db()
+    try:
+        no = collega_invito(con, tg_id, codice, "nostr")
+        con.commit()
+    finally:
+        con.close()
+    return {"invito": no or ""}
 
 
 @app.post("/api/login/nostr/collega")

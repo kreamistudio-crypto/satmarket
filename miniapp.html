@@ -12965,7 +12965,7 @@ document.getElementById('cartello')?.remove();</script>
          non puo' imboccare. La parola e' caduta da tutti e due: a
          dire qual e' la propria e' il dispositivo che si ha in mano.
          Il bottone si spegne senza i relay (vedi apriNostrSheet). -->
-    <button class="btn primary" id="nostrQrBtn" style="margin-top:14px" onclick="loginNostrQr()">📱 Col telefono (Amber)</button>
+    <button class="btn primary" id="nostrQrBtn" style="margin-top:14px" onclick="loginNostrQr()">📱 Entra con nostrconnect</button>
     <!-- I TESTI SI VESTONO IN LINEA come i loro vicini di foglio, e
          non con `.hint`: quella classe non ha una regola BASE — vive
          solo dentro `.payout` e `.campo-file` — quindi qui dentro non
@@ -13002,6 +13002,19 @@ document.getElementById('cartello')?.remove();</script>
          cos'e'. Il link e' discreto (la lingua di «+ Aggiungi una
          nota») perche' non e' un'azione di questo foglio: e' la
          strada per tornarci fra cinque minuti. -->
+    <!-- IL CODICE INVITO DI CHI ENTRA CON UNA CHIAVE (ott 2026): il
+         link d'invito apre il bot, quindi a chi entra da qui il codice
+         non arriva da solo. Facoltativo e chiuso di serie: e' una riga
+         in piu' per chi ce l'ha, non un passo per tutti. Lo legge
+         entraConNostr, lo giudica il server (`_invito_al_login`). -->
+    <details id="nostrInvitoBox" style="margin-top:10px">
+      <summary style="cursor:pointer;font-weight:700;font-size:14px;padding:6px 0">🎟 Hai un codice invito?</summary>
+      <div class="field" style="margin-top:8px">
+        <input id="nostrInvitoCodice" maxlength="12" autocomplete="off" autocapitalize="characters"
+               spellcheck="false" placeholder="Il codice di chi ti ha invitato">
+      </div>
+      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5">Scrivilo prima di entrare, in qualunque modo entri: si collega da solo.</div>
+    </details>
     <div style="font-size:13px;color:var(--muted);font-weight:600;margin-top:12px">
       Non hai ancora un profilo Nostr?
       <button class="scopri-link" onclick="apriGuidaNostr()">Creane uno</button>
@@ -13025,16 +13038,18 @@ document.getElementById('cartello')?.remove();</script>
       tuo telefono o il tuo browser, e qui arriva già firmata.
     </div>
 
-    <div style="font-weight:800;font-size:14px;margin-top:16px">📱 Dal telefono (Android)</div>
+    <div style="font-weight:800;font-size:14px;margin-top:16px">📱 Dal telefono</div>
     <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.6">
-      <b>Amber</b> custodisce la chiave sul telefono e firma per te: è
-      la strada più comoda se entri da qui, perché poi ti basta
-      inquadrare il codice.
-      <br>1. Installa Amber.
+      Un <b>firmatario</b> custodisce la chiave sul telefono e firma per
+      te: è la strada più comoda se entri da qui, perché poi ti basta
+      inquadrare il codice. Su <b>Android</b> c'è <b>Amber</b>, su
+      <b>iPhone</b> c'è <b>Clave</b>.
+      <br>1. Installa Amber (Android) o Clave (iPhone).
       <br>2. Aprilo e scegli di <b>creare una chiave nuova</b>.
-      <br>3. Torna qui, tocca <b>«Col telefono»</b> e inquadra il codice.
+      <br>3. Torna qui, tocca <b>«Entra con nostrconnect»</b> e inquadra il codice.
     </div>
-    <button class="btn ghost" style="margin-top:8px" onclick="apriLinkGuida('amber')">📥 Scarica Amber</button>
+    <button class="btn ghost" style="margin-top:8px" onclick="apriLinkGuida('amber')">🤖 Scarica Amber (Android)</button>
+    <button class="btn ghost" style="margin-top:8px" onclick="apriLinkGuida('clave')">🍎 Scarica Clave (iPhone)</button>
 
     <div style="font-weight:800;font-size:14px;margin-top:16px">💻 Dal browser</div>
     <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.6">
@@ -13050,7 +13065,7 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn ghost" style="margin-top:8px" onclick="apriLinkGuida('nstart')">🌐 Apri nstart.me</button>
 
     <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:14px">
-      Amber e nstart.me non sono di Barattolo: sono strumenti liberi
+      Amber, Clave e nstart.me non sono di Barattolo: sono strumenti liberi
       del mondo Nostr, e la chiave che creano è tua e funziona con
       qualsiasi app, non solo qui.
     </div>
@@ -45470,7 +45485,8 @@ async function mostraQrConnessione(uri){
   box.style.display = '';
   const fatto = await disegnaQr(el('nostrQr'), uri, 'Byte');
   bunkerDice(fatto
-    ? "Inquadra il codice col tuo firmatario (Amber, nsec.app…) e "
+    ? "Inquadra il codice col tuo firmatario (Amber su Android, Clave "
+    + "su iPhone, nsec.app…) e "
     + "approva: resto in ascolto."
     : "Il codice non si e' potuto disegnare: copia il link qui sotto e "
     + "incollalo nel tuo firmatario. Resto in ascolto.");
@@ -45660,11 +45676,22 @@ async function entraConNostr(firmatario){
   const evento = await firmatario.firma({
     kind: 22242, created_at: Math.floor(Date.now()/1000), content: '',
     tags: [['relay', location.origin], ['challenge', ds.sfida]]});
+  /* il codice invito viaggia COL LOGIN: il server lo collega appena
+     sa chi sei, e un codice storto non ferma l'ingresso */
+  const invito = (el('nostrInvitoCodice')?.value || '').trim();
   const r = await fetch(`${API_BASE}/login/nostr`, {method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({evento})});
+    body: JSON.stringify(invito ? {evento, invito} : {evento})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail || 'Accesso non riuscito, riprova', 6000); return; }
+  /* L'ESITO DEL CODICE SI LEGGE PRIMA DEL RELOAD, che si mangerebbe il
+     toast: si aspetta il suo tempo di lettura, e poi si entra. */
+  if (typeof d.invito === 'string') {
+    const frase = d.invito || '🎟 Fatto: sei collegato a chi ti ha invitato';
+    const t = d.invito ? tempoLettura(frase) : 2500;
+    toast(frase, t);
+    await new Promise(ok => setTimeout(ok, t));
+  }
   /* il server ha verificato la firma: e' la chiave di quella npub, e
      sul dispositivo resta per firmare da sola (solo la nsec ha ricorda) */
   if (firmatario.ricorda) firmatario.ricorda();
@@ -45840,6 +45867,7 @@ function apriGuidaNostr(){
    il browser del client, fuori una scheda nuova con noopener. */
 const LINK_GUIDA = {
   amber:  'https://github.com/greenart7c3/Amber',
+  clave:  'https://apps.apple.com/app/clave-nostr-signer/id6762104155',
   nstart: 'https://nstart.me',
 };
 function apriLinkGuida(quale){

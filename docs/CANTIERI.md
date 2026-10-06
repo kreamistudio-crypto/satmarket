@@ -35663,3 +35663,47 @@ immagine», niente lente di iOS, la foto che resta aperta oltre il
 mezzo secondo. I Consigliati non provati dal vivo (in collaudo ce n'è
 uno). Non toccati, e restano a ripartire dall'alto: Ordini e «Altri
 oggetti del venditore» dentro una scheda.
+
+## «Entra con nostrconnect», Clave per iPhone e il codice invito al login Nostr (6 ott 2026)
+
+Il compito (Andrea): il bottone del login col QR non dica più Amber ma
+«Entra con nostrconnect», e le descrizioni suggeriscano Amber per
+Android e Clave per iOS; e il codice invito, che oggi è un link del
+bot, deve servire anche a chi entra con Nostr, nel momento stesso
+dell'ingresso.
+
+**L'etichetta.** «📱 Col telefono (Amber)» → «📱 Entra con
+nostrconnect»: nomina il protocollo, che è quello che il QR parla
+davvero, e non un'app che su iPhone non esiste. La guida «Crea il tuo
+profilo» passa da «Dal telefono (Android)» a «Dal telefono» con due
+bottoni, 🤖 Amber (Android, GitHub) e 🍎 Clave (iPhone, la scheda
+dell'App Store `id6762104155`: firmatario NIP-46 puro, parla
+`nostrconnect://`). Il passo 3 cita la nuova etichetta, e la prova che
+la ESTRAE dal markup è rimasta verde senza ritocchi; il messaggio
+sotto il QR dice «Amber su Android, Clave su iPhone, nsec.app…».
+
+**Il codice invito al login.** Una terza porta dello stesso giudice
+`collega_invito`, con le regole intere (una volta, entro 7 giorni, non
+da soli, non in tondo). Nel foglio del login una riga chiusa di serie
+«🎟 Hai un codice invito?»; il codice viaggia DENTRO
+`/api/login/nostr` e il server lo collega appena sa chi sei
+(`_invito_al_login`, via `nostr`). Scartato il giro «login, reload e
+poi `POST /api/me/invito`»: il codice andrebbe parcheggiato in
+`sessionStorage` attraverso il reload, e un parcheggio è un posto in
+più dove si perde. Un codice storto NON fa cadere il login — la
+chiave è provata, la sessione aperta — e la frase del giudice torna in
+`invito`; il client la fa leggere (tempoLettura) PRIMA del reload, che
+se no si mangerebbe il toast. La strada «chiave già verificata su un
+account Telegram» non passa dal codice: quell'account c'era già.
+
+**Provato.** `prove_inviti` gira `_invito_al_login` vero sul banco:
+senza codice nessuna chiave, col codice buono collegato via `nostr`,
+col codice storto la frase e il login in piedi; sentinelle sulle due
+chiamate in `login_nostr` e sul client. `prove_login_qr` con la riga
+nuova su Clave.
+
+**Da guardare.** L'etichetta nuova non misurata a 320px (due caratteri
+più di quella di prima, che stava su una riga). Clave non provato dal
+vivo con un iPhone vero. Il link d'invito resta del bot: un
+`barattolo.store/?invito=CODICE` che precompili il campo per chi entra
+dal web non c'è.

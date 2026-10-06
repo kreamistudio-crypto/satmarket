@@ -28467,6 +28467,53 @@ def prove_inviti():
     persona(con, 14, registrato=0)
     prova("...e per chi c'era prima del timbro non si apre mai", True,
           "7 giorni" in (colleg(con, 14, c1, "codice") or ""))
+    # --- LA TERZA PORTA: il foglio del login Nostr (ott 2026) ---------
+    # Il link d'invito apre il bot, quindi chi entra con una chiave il
+    # codice lo scrive nel foglio del login. Gira il pezzo VERO, col
+    # database del banco al posto di db() (la sua chiusura e' finta:
+    # il banco serve ancora dopo).
+    class _ConAperta:
+        def __init__(self, c):
+            self.c = c
+
+        def __getattr__(self, n):
+            return getattr(self.c, n)
+
+        def close(self):
+            pass
+    amb["db"] = lambda: _ConAperta(con)
+    exec(pezzo("_invito_al_login"), amb)
+    al_login = amb["_invito_al_login"]
+    persona(con, -501, 0.1)
+    prova("login Nostr senza codice: nessuna chiave in risposta, niente "
+          "scritto", ({}, {}, None),
+          (al_login(-501, None), al_login(-501, "  "), invitante(con, -501)))
+    prova("...col codice buono: collegato, e la porta si chiama nostr",
+          ({"invito": ""}, (1, "nostr")),
+          (al_login(-501, c1.lower()), tuple(con.execute(
+              "SELECT invitante, via FROM inviti WHERE invitato=-501"
+          ).fetchone())))
+    persona(con, -502, 0.1)
+    prova("...col codice storto il login NON cade: torna la frase del "
+          "giudice", True,
+          "caratteri" in al_login(-502, "ciao!").get("invito", ""))
+    prova("...e passa dallo STESSO giudice delle altre due porte", True,
+          'collega_invito(con, tg_id, codice, "nostr")'
+          in codice(pezzo("_invito_al_login")))
+    _ln = codice(pezzo("login_nostr"))
+    prova("login_nostr lo chiama sull'account che c'era e su quello "
+          "appena nato", 2, _ln.count('_invito_al_login('))
+    _ecn = pezzo_js(open("miniapp.html", encoding="utf-8").read(),
+                    "async function entraConNostr(firmatario){",
+                    "\n}")
+    prova("il client manda il codice del foglio col login, e solo se "
+          "c'e'", (True, True),
+          ("el('nostrInvitoCodice')" in _ecn,
+           "invito ? {evento, invito} : {evento}" in _ecn))
+    # il banco e' di tutta la sezione: chi segue conta gli invitati di 1
+    con.execute("DELETE FROM inviti WHERE invitato IN (-501, -502)")
+    con.execute("DELETE FROM utenti WHERE tg_id IN (-501, -502)")
+
     for t in (20, 21, 22):
         persona(con, t, 1)
     prova("B entra col codice di A", None,
@@ -86889,7 +86936,7 @@ def prove_introduzioni_leggibili():
     # e quelle del secondo giro ci sono, in --ink-soft
     for testo in ("Chiaro o scuro?", "Quanto grande si legge",
                   "Se il firmatario ce l'hai", "La chiave resta SOLO",
-                  "Amber e nstart.me non sono", "codici: eliminane uno",
+                  "Amber, Clave e nstart.me non sono", "codici: eliminane uno",
                   "negozi collegati: scollegane", "Il prezzo qui sotto è già",
                   "Si sblocca dal livello", "La pagina non fa il tuo nome",
                   "La fotografia è del", "L'anteprima vale 15 minuti"):
@@ -98572,9 +98619,14 @@ def prove_login_qr():
     prova("...e nomina tutte e due le strade, col loro passo finale",
           (True, True, True),
           ("Amber" in _guida, "nstart.me" in _guida,
-           "Col telefono" in _guida))
+           "Entra con nostrconnect" in _guida))
+    prova("...e per il telefono nomina un firmatario per sistema: "
+          "Amber su Android, Clave su iPhone, ognuno col suo link",
+          (True, True, True),
+          ("Clave" in _guida, "apriLinkGuida('clave')" in _guida,
+           "clave:  'https://apps.apple.com/" in mini))
     # LA CITAZIONE SI LEGA AL BOTTONE VERO, e non e' pignoleria: la
-    # riga qui sopra cerca «Col telefono» DENTRO LA GUIDA, quindi
+    # riga qui sopra cerca l'etichetta DENTRO LA GUIDA, quindi
     # resterebbe verde anche rinominando il bottone — la guida
     # manderebbe a cercare un'etichetta che non c'e' piu'. E' successo
     # davvero il giorno che il bottone e' passato da «Col telefono

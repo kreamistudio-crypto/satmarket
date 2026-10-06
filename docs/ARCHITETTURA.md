@@ -8900,8 +8900,11 @@
   strada è «📋 Copia il link» e incollare nell'app.
   ⚠️ E L'ETICHETTA DEL BOTTONE È MISURATA: «📱 Col telefono (Amber,
   nsec.app…)» andava a capo a 320px e faceva un bottone alto 130px —
-  ora è «📱 Col telefono (Amber)», una riga a tutte e tre le
-  larghezze. La guida CITA quell'etichetta, quindi la prova la ESTRAE
+  poi «📱 Col telefono (Amber)», una riga a tutte e tre le
+  larghezze; da ott 2026 è «📱 Entra con nostrconnect» (parola di
+  Andrea: il bottone dice il protocollo, non un'app sola), e la guida
+  propone un firmatario per sistema — Amber su Android, Clave su
+  iPhone (`LINK_GUIDA.clave`, la scheda dell'App Store). La guida CITA quell'etichetta, quindi la prova la ESTRAE
   dal markup invece di ribatterla: rinominare il bottone senza toccare
   la guida fa rossa una riga (è successo davvero in questo cantiere, e
   nessuna prova se n'era accorta).
@@ -10014,7 +10017,15 @@
   <codice>` del bot (`gestisci_update` separa l'invito dalla fusione
   per FORMA — il lasciapassare è un esadecimale da 32 — e
   `riga_invito_bot` accoda la riga al benvenuto, che resta uno) e il
-  campo a mano del Profilo (`POST /api/me/invito`). La finestra è
+  campo a mano del Profilo (`POST /api/me/invito`). LA TERZA PORTA (ott
+  2026) è il foglio del login Nostr: il link apre il bot, quindi chi
+  entra con una chiave scrive il codice in «🎟 Hai un codice invito?»
+  e viaggia col login (`invito` nel corpo di `/api/login/nostr`);
+  `_invito_al_login` lo passa allo stesso giudice (via `nostr`) sia
+  sull'account che c'era sia su quello appena nato, e un no NON fa
+  cadere il login: torna come frase in `invito`, che il client mostra
+  prima del reload. La strada del collegamento a un account Telegram
+  non ci passa (l'account c'era già: resta il campo del Profilo). La finestra è
   `registrato` + `INVITO_GIORNI` (7) per tutt'e due le porte, zero per
   chi c'era prima del timbro; il giro in tondo, anche lungo, lo dice
   una CTE ricorsiva (`invito_circolare`), con UNION perché finisca
