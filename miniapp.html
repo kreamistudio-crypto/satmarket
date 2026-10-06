@@ -45240,14 +45240,22 @@ async function firmatarioAutomatico(){
      rete — quindi prima del bunker */
   const nsec = await firmatarioNsecSalvata();
   if (nsec) return {f: nsec, chiudi: true};
-  const salvata = bunkerSalvato();
+  const mia = await pubAccount();
+  const salvata = bunkerSalvato(mia);
   if (salvata) {
-    try { return {f: await firmatarioBunker(salvata.uri, salvata.sk),
-                  chiudi: true}; }
+    let f;
+    try { f = await firmatarioBunker(salvata.uri, salvata.sk); }
     catch(e){
       console.log(`🟪 [coda] bunker muto (${e.message||e}): si riprovera'`);
       return null;   // NON si scorda: puo' essere solo offline adesso
     }
+    /* la sessione si archivia sotto la chiave che ha risposto; se non e'
+       quella dell'account aperto non si usa (e resta al suo padrone) */
+    let pub = '';
+    try { pub = String(await f.pubkey() || '').toLowerCase(); } catch(e){}
+    ricordaBunker(salvata, pub);
+    if (!mia || pub === mia) return {f, chiudi: true};
+    try { f.chiudi(); } catch(e){}
   }
   if (window.nostr) return {f: firmatarioEstensione(), chiudi: false};
   return null;
@@ -45588,7 +45596,7 @@ async function salvaModificaFirmata(t, p){
     finally { fNsec.chiudi(); }
     return;
   }
-  const salvata = bunkerSalvato();
+  const salvata = bunkerSalvato(await pubAccount());
   if (salvata) {
     let f = null;
     try {
@@ -45596,7 +45604,7 @@ async function salvaModificaFirmata(t, p){
       f = await firmatarioBunker(salvata.uri, salvata.sk);
     } catch(e){
       console.log(`🟪 [firma] sessione bunker morta (${e.message||e}): si ripassa dal rituale`);
-      scordaBunker();
+      scordaBunker(await pubAccount());
       toast('La connessione col bunker non risponde più: ricollegalo', 5000);
       apriNostrSheet((f2)=>firmaEConsegna(d, id, f2, null));
       return;
@@ -45638,7 +45646,9 @@ async function firmaEConsegna(d, id, f, auto){
       if (auto) {
         console.log(`🟪 [firma] ${auto} con un'altra chiave `
           + `(${pub.slice(0,8)}…): si ripassa dal foglio`);
-        if (auto === 'bunker') scordaBunker();
+        /* la sessione e' di un'ALTRA chiave: non si butta, si
+           archivia sotto il suo padrone (resta sua) */
+        if (auto === 'bunker') ricordaBunker(bunkerSalvato(attesa), pub);
         apriNostrSheet((f2)=>firmaEConsegna(d, id, f2, null));
         return;
       }
@@ -46703,19 +46713,54 @@ function copiaUriConnessione(){
    dentro e' quella del CLIENT NIP-46 — pari grado del secret NWC gia'
    conservato: puo' chiedere firme al bunker (che puo' sempre negarle),
    MAI derivare la chiave dell'utente. */
+/* UNA SESSIONE PER CHIAVE, NON PER DISPOSITIVO (6 ott 2026, parola di
+   Andrea: «l'account di Untempoperte usa la chiave di Untempoperte,
+   quello di migliobruno la sua»). Dentro Telegram la memoria della Mini
+   App e' la STESSA per gli account dello stesso telefono, e una sessione
+   sola voleva dire che il secondo account trovava il bunker del primo.
+   Ora e' un archivio {pubkey hex: {uri, sk}}, il patto di `nsecSalvate`:
+   ognuno ritrova il SUO.
+   IL FORMATO DI IERI ({uri, sk} nudo) non dice di chi sia: si legge come
+   la voce '' («padrone sconosciuto»), si prova come ripiego, e alla
+   prima connessione — che dice la pubkey — si ARCHIVIA sotto il suo
+   padrone (`ricordaBunker`). Non si butta: e' la sessione di qualcuno. */
 const BUNKER_CHIAVE = 'barattolo_bunker';
-function bunkerSalvato(){
+function bunkerTutti(){
   try {
-    const d = JSON.parse(localStorage.getItem(BUNKER_CHIAVE)) || null;
-    return (d && d.uri && d.sk) ? d : null;
-  } catch(e){ return null; }         // dato corrotto = nessuna sessione
+    const d = JSON.parse(localStorage.getItem(BUNKER_CHIAVE));
+    if (!d || typeof d !== 'object' || Array.isArray(d)) return {};
+    return (d.uri && d.sk) ? {'': d} : d;      // il formato di ieri
+  } catch(e){ return {}; }           // dato corrotto = nessuna sessione
 }
-function ricordaBunker(sessione){
-  try { localStorage.setItem(BUNKER_CHIAVE, JSON.stringify(sessione)); }
-  catch(e){}
+function scriviBunkerTutti(t){
+  try {
+    if (Object.keys(t).length) localStorage.setItem(BUNKER_CHIAVE, JSON.stringify(t));
+    else localStorage.removeItem(BUNKER_CHIAVE);
+  } catch(e){}
 }
-function scordaBunker(){
-  try { localStorage.removeItem(BUNKER_CHIAVE); } catch(e){}
+const sessioneBunker = s => (s && s.uri && s.sk) ? s : null;
+/* La sessione di QUESTA chiave; se non c'e', quella di padrone ignoto
+   (il formato di ieri), che chi la usa controlla e archivia. */
+function bunkerSalvato(pub){
+  const t = bunkerTutti();
+  return sessioneBunker(t[String(pub || '').toLowerCase()]) || sessioneBunker(t['']);
+}
+/* La si archivia sotto la chiave che ha RISPOSTO: e' l'unica che si sa
+   davvero. Se era la voce di padrone ignoto, lascia quel posto. */
+function ricordaBunker(sessione, pub){
+  const k = String(pub || '').toLowerCase();
+  if (!sessioneBunker(sessione) || !k) return;
+  const t = bunkerTutti();
+  if (t[''] && t[''].uri === sessione.uri && t[''].sk === sessione.sk) delete t[''];
+  t[k] = sessione;
+  scriviBunkerTutti(t);
+}
+/* Si scorda la sessione di UNA chiave; senza chiave quella di padrone
+   ignoto. Le altre restano: sono di altri account. */
+function scordaBunker(pub){
+  const t = bunkerTutti();
+  delete t[String(pub || '').toLowerCase()];
+  scriviBunkerTutti(t);
 }
 
 /* LA SALA D'ATTESA DEL BUNKER. Il toast dura due secondi e se ne
@@ -46937,7 +46982,7 @@ async function loginNostrQr(){
     /* il foglio e' stato chiuso e riaperto mentre aspettavamo: questa
        connessione parla di un giro che non c'e' piu' */
     if (giro !== nostrQrGiro) return;
-    ricordaBunker(f.sessione);
+    ricordaBunker(f.sessione, await Promise.resolve(f.pubkey()).catch(() => ''));
     nascondiQrConnessione();
     bunkerDice('Collegato: entro…');
     await consegnaFirmatario(f);
@@ -46961,7 +47006,7 @@ async function loginNostrBunker(){
     f = await firmatarioBunker(el('bunkerUri').value);
     /* connessione riuscita: la sessione si conserva sul dispositivo,
        le prossime firme non rifaranno il rituale */
-    ricordaBunker(f.sessione);
+    ricordaBunker(f.sessione, await Promise.resolve(f.pubkey()).catch(() => ''));
     bunkerDice('Bunker collegato: entro…');
     await consegnaFirmatario(f);
   } catch(e){

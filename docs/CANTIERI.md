@@ -37549,3 +37549,26 @@ firmata da lui.
 con due scene nuove — il firmatario di un altro account non firma
 niente e lascia la coda intera (e il Profilo dice che ne restano), al
 login firma.
+
+## Ogni account ricorda il suo collegamento Nostr (6 ott 2026, seguito)
+
+Il compito (Andrea): «Telegram e la Mini App devono essere
+indipendenti: l'account di Untempoperte usa la chiave di Untempoperte,
+quello di migliobruno la sua, è semplice». Il cantiere di prima
+impediva di firmare con la chiave sbagliata, ma il telefono ricordava
+UN SOLO collegamento Nostr (bunker o nostrconnect): il secondo account
+restava con gli annunci in attesa finché non ricollegava il suo.
+
+**Cosa.** `barattolo_bunker` diventa un archivio {pubkey: sessione}, il
+patto di `nsecSalvate`: ogni login archivia la sessione sotto la chiave
+che ha risposto, `firmatarioAutomatico` e la modifica firmata prendono
+quella dell'account aperto, e scordarne una lascia le altre. Il formato
+di ieri (una sessione nuda, di padrone ignoto) si legge come ripiego:
+alla prima connessione dice di chi è, e si archivia sotto il suo
+padrone — non si butta, e se non è dell'account aperto non firma.
+
+**Provato.** `prove_firme_nostr`, banco node con l'archivio vero e
+`firmatarioAutomatico` vero su un localStorage di cartone: il bunker di
+ieri non firma per l'altro account e si archivia al suo padrone, ogni
+account ritrova il suo sullo stesso telefono, scordarne uno lascia
+l'altro. Non provato su un telefono vero.

@@ -19363,7 +19363,72 @@ console.log = (() => { const v = console.log; return (...a) => {
     #    browser, per pubkey, e firma da sola per l'account giusto.
     fa = pezzo_js(mini, "async function firmatarioAutomatico(){", "\n}")
     prova("la strada automatica prova PRIMA la nsec del dispositivo",
-          True, fa.index("firmatarioNsecSalvata()") < fa.index("bunkerSalvato()"))
+          True, fa.index("firmatarioNsecSalvata()") < fa.index("bunkerSalvato(mia)"))
+
+    # 6b. IL BUNKER PER CHIAVE (6 ott 2026, parola di Andrea: «l'account
+    #     di Untempoperte usa la chiave di Untempoperte, quello di
+    #     migliobruno la sua»). Gira l'archivio VERO e firmatarioAutomatico
+    #     VERO su un localStorage di cartone: due account sullo stesso
+    #     telefono, ognuno col suo bunker, e il formato di ieri.
+    banco = r"""
+const mem = {};
+const localStorage = {getItem: k => (k in mem ? mem[k] : null),
+                      setItem: (k, v) => { mem[k] = String(v); },
+                      removeItem: k => { delete mem[k]; }};
+const window = {};
+let conto = '';
+async function pubAccount(){ return conto; }
+async function firmatarioNsecSalvata(){ return null; }
+const chiusi = [];
+async function firmatarioBunker(uri, sk){
+  return {uri, pubkey: async () => uri.slice(-2), chiudi(){ chiusi.push(uri); }};
+}
+function firmatarioEstensione(){ return null; }
+""" + pezzo_js(mini, "const BUNKER_CHIAVE = 'barattolo_bunker';",
+                "\n\n/* LA SALA")
+    banco = banco + "\n" + fa + "\n}\n" + r"""
+(async () => {
+  const out = {};
+  // il formato di IERI: una sessione nuda, di padrone ignoto (era di 'aa')
+  mem.barattolo_bunker = JSON.stringify({uri: 'bunker://aa', sk: 's1'});
+  conto = 'bb';                       // si apre come l'ALTRO account
+  const a1 = await firmatarioAutomatico();
+  out.altroNonFirma = a1 === null;
+  out.archiviataAlPadrone = Object.keys(JSON.parse(mem.barattolo_bunker));
+  // ora 'bb' collega il SUO bunker: si archivia sotto la sua chiave
+  ricordaBunker({uri: 'bunker://bb', sk: 's2'}, 'bb');
+  conto = 'aa';
+  const a2 = await firmatarioAutomatico();
+  out.aaUsaIlSuo = a2 && a2.f.uri;
+  conto = 'bb';
+  const a3 = await firmatarioAutomatico();
+  out.bbUsaIlSuo = a3 && a3.f.uri;
+  scordaBunker('bb');
+  out.scordaSoloIlSuo = Object.keys(JSON.parse(mem.barattolo_bunker));
+  out.chiusi = chiusi;
+  console.log(JSON.stringify(out));
+})();
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(banco)
+        pb = f.name
+    rb = subprocess.run(["node", pb], capture_output=True, text=True,
+                        encoding="utf-8", timeout=60)
+    os.unlink(pb)
+    prova("il banco del bunker per chiave gira", "", rb.stderr[-400:])
+    if rb.returncode == 0:
+        ob = json.loads(rb.stdout.strip().splitlines()[-1])
+        prova("il bunker di IERI non firma per un altro account, e si "
+              "archivia sotto il suo padrone", (True, ["aa"]),
+              (ob["altroNonFirma"], ob["archiviataAlPadrone"]))
+        prova("...ogni account ritrova il SUO, sullo stesso telefono",
+              ("bunker://aa", "bunker://bb"), (ob["aaUsaIlSuo"],
+                                               ob["bbUsaIlSuo"]))
+        prova("...scordarne uno lascia l'altro", ["aa"],
+              ob["scordaSoloIlSuo"])
+        prova("...e il bunker dell'altro, provato, si chiude", ["bunker://aa"],
+              ob["chiusi"])
     ec = pezzo_js(mini, "async function entraConNostr(firmatario){", "\n}")
     prova("il login la ricorda solo DOPO che il server ha accettato la "
           "firma", True,

@@ -24690,6 +24690,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   telefono — e il browser pubblica sui relay prima che il server possa
   dire «non è la tua chiave». Al login (`alLogin`) vale il firmatario
   appena usato per entrare.
+  E IL BUNKER SI RICORDA PER CHIAVE (stesso giorno): `barattolo_bunker`
+  è un archivio {pubkey hex: {uri, sk}} (`bunkerTutti`, `bunkerSalvato
+  (pub)`, `ricordaBunker(sessione, pub)`, `scordaBunker(pub)`); il
+  formato di ieri vale come voce di padrone ignoto, provata come
+  ripiego e archiviata sotto la chiave che risponde.
   IL «PERCHÉ» DELL'ALLARME DICEVA IL FALSO, e vale più della cura:
   «la deduplica confronterebbe un annuncio con sé stesso» — mentre le
   due liste di `trova_doppioni_nostr` sono DISGIUNTE su
