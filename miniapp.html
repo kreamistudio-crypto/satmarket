@@ -4283,6 +4283,31 @@
      pressione lunga, e nessun bottone per riga — e stacca la prima
      riga dal testo sopra. */
   .dati-copia{margin-top:8px;user-select:text;-webkit-user-select:text}
+  /* IL 📋 PICCOLO (6 ott 2026, «📦 Spedisci a», feedback dei
+     venditori): ROVESCIA il secondo giro del 23 set, dove i «📋 Copia»
+     per riga se n'erano andati perche' sette bottoni uguali in colonna
+     facevano confusione. Chi vende ha chiesto di nuovo un tocco per
+     dato — il codice del locker e l'email si sbagliano a trascriverli,
+     e la pressione lunga nella WebView di Telegram prende anche quel
+     che c'e' attorno. La forma e' diversa da quella bocciata: solo
+     l'icona, un quadrato da 40 px (il dito ci sta, la colonna non
+     grida), e la conferma SUL bottone (✓ verde per un secondo e mezzo)
+     oltre al toast, cosi' si vede QUALE riga e' finita negli appunti.
+     Il testo resta selezionabile come prima. */
+  .p2p-recapito-copia.icona{min-width:40px;min-height:40px;padding:0 8px;
+    font-size:16px;line-height:1;display:inline-flex;align-items:center;
+    justify-content:center}
+  .p2p-recapito-copia.icona.fatto{background:var(--trust-soft);color:var(--trust-text)}
+  /* il gemello DENTRO una frase: il numero di tracciamento nel passo
+     «Oggetto spedito» di chi compra */
+  .p2p-recapito-copia.in-riga{min-width:34px;min-height:34px;font-size:14px;
+    vertical-align:middle;margin-left:6px}
+  /* «📦 SPEDISCI A» in cima alla pagina dell'ordine: il bordo arancio
+     lo stacca dalle buste qui sotto, che sono carta su carta */
+  .payout.spedisci-a{border:2px solid var(--sats);margin-top:6px}
+  .spedisci-a h4{font-size:16px}
+  .spedisci-a .sped-tipo{font-size:14px;font-weight:800;color:var(--ink);margin:2px 0 2px}
+  .spedisci-a .sped-tutto{margin-top:10px}
   .p2p-sez-tit{display:flex;align-items:center;gap:8px;font-size:12.5px;
     font-weight:700;color:var(--muted);line-height:1.35;margin-bottom:10px}
   .p2p-sez-tit span{flex:1;min-width:0}
@@ -30562,7 +30587,7 @@ function openOrder(id){
      copie della stessa riga sono due che un giorno divergono, con la
      traccia della correzione del moderatore appresso a una sola. */
   const rigaSpedizione = () =>
-    `${esc(o.corriere)} — tracking ${codiceTracking(o, s)}${rigaCorretto(o.trackingCorretto)}${filaTracking(o, false)}`;
+    `${esc(o.corriere)} — tracking ${codiceTracking(o, s)}${copiaTracking(o)}${rigaCorretto(o.trackingCorretto)}${filaTracking(o, false)}`;
   let steps, progress;
   if (['dispute','refund','refunded','return_pending','return_shipped'].includes(s)) {
     /* Storia della disputa: la cassaforte racconta il congelamento */
@@ -30812,6 +30837,7 @@ function openOrder(id){
            deve tornare al LORDO del listino — e' la copia n.3 della
            divisione, in pari con _righe_ordine per il censimento */
         (o.qta>1 && !o.righe.length) ? `<div class="eur-hint" style="margin-top:-6px">${fmt(o.qta)} pezzi × ${cifraOrdine(o, (o.listing.price-(o.spedSats||0)-(o.protSats||0)+(o.scontoSats||0))/o.qta)}</div>` : ''}
+      ${riquadroSpedisciA(o)}
       ${/* IL PUNTO NON SI DICE DUE VOLTE (ago 2026): qui sotto il
             prezzo c'era anche il punto GIA' scelto, che pero' vive
             gia' dov'e' utile — nel campo del compratore, dove finche'
@@ -30900,7 +30926,7 @@ function openOrder(id){
             trovarlo sulla mappa. Il «Copia» del primo giro e' uscito —
             un bottone per ogni dato faceva confusione — e la frase del
             banner si seleziona con la pressione lunga, come un testo. */''}
-      ${(['shipped','delivered'].includes(s) && o.puntoRitiro) ? `<div class="trust-note nota-punto">📍 <span>${puntoBanner(o)}</span></div>`:''}
+      ${(['shipped','delivered'].includes(s) && o.puntoRitiro && !serveSpedisciA(o)) ? `<div class="trust-note nota-punto">📍 <span>${puntoBanner(o)}</span></div>`:''}
       ${bottoneNotifichePacco(o, s)}
       ${pannelloTrackingAdmin(o, s)}
       ${/* IL CASO INCAGLIATO (ago 2026): quando lo sblocco o il
@@ -30987,13 +31013,13 @@ function openOrder(id){
                 punto dopo — cosi' la prima parola dice gia' che tipo di
                 spedizione comprare. Gli ordini di ieri non hanno il
                 tipo e ricadono sulla forma di prima.
-                IL PUNTO E' UNA RIGA SUA (23 set 2026, «Dati di
-                spedizione che si copiano»): va incollato nel sito del
-                corriere, e dentro la frase la selezione si prendeva
-                anche le parole attorno. Da solo su una riga si prende
-                con la pressione lunga, senza bottone. */''}
-          ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto <b>${esc(nomePunto(o.tipoPunto, o.retePunto))}</b>${o.tipoPunto ? '' : ' <span class="eur-hint">(tipo non indicato)</span>'}:</div>
-          <div class="dati-copia">${rigaDato('', o.puntoRitiro)}</div>` : ''}
+                IL PUNTO SALE IN CIMA (6 ott 2026, «📦 Spedisci a»):
+                dal 23 set era una riga sua qui sotto la frase, e chi
+                vende lo cercava in mezzo agli altri testi. Adesso vive
+                nel riquadro in cima col suo 📋, e qui resta la frase
+                col cartello — il dato in due posti e' il peccato che
+                questo punto ha gia' commesso una volta. */''}
+          ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto <b>${esc(nomePunto(o.tipoPunto, o.retePunto))}</b>${o.tipoPunto ? '' : ' <span class="eur-hint">(tipo non indicato)</span>'}: il punto e i recapiti sono in cima, in <b>«📦 Spedisci a»</b>.</div>` : ''}
           ${obiezioneVenditore(o)}
           ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker/punto di ritiro</b>${o.retePunto ? ` <b>${esc(o.retePunto)}</b>` : ''} ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione${o.retePunto ? '.' : ' — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
           ${o.viaPunto ? `<div class="hint">📮 ${RIGA_CODICE_CORRIERE}</div>` : ''}
@@ -31005,13 +31031,13 @@ function openOrder(id){
                 busta, che il sollecito stesso nomina. */''}
           ${o.viaPunto ? `<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:700;margin-top:6px;cursor:pointer">
             <input type="checkbox" id="shipBustaDiretta" style="margin-top:2px"> <span>Ho messo i recapiti dell'acquirente come destinatario: il codice di ritiro arriva direttamente a lui</span></label>` : ''}
-          ${(!o.viaPunto && o.indirizzoIl) ? `<div class="hint">🏠 L'acquirente ha scelto la <b>spedizione a casa</b>: trovi l'indirizzo nel riquadro qui sotto.</div>` : ''}
+          ${(!o.viaPunto && o.indirizzoIl) ? `<div class="hint">🏠 L'acquirente ha scelto la <b>spedizione a casa</b>: trovi l'indirizzo in cima, in <b>«📦 Spedisci a»</b>.</div>` : ''}
           ${/* IL CARTELLO, MAI IL DATO: la nota si legge nel suo
                 riquadro qui sotto, e ripeterla qui sarebbe il dato
                 accanto al posto in cui si tocca — il peccato che il
                 punto ha gia' commesso e per cui e' stato corretto.
                 Stessa forma della riga dell'indirizzo, due sopra. */''}
-          ${(o.viaPunto && o.emailCorriereIl && !o.emailCorrierePurgataIl) ? `<div class="hint">📧 L'acquirente ha lasciato un'<b>email per il corriere</b>: la leggi nel riquadro qui sotto, e mettendola come destinatario il codice di ritiro arriva direttamente a lui.</div>` : ''}
+          ${(o.viaPunto && o.emailCorriereIl && !o.emailCorrierePurgataIl) ? `<div class="hint">📧 L'acquirente ha lasciato un'<b>email per il corriere</b>: ${serveSpedisciA(o) ? 'la trovi in cima, in <b>«📦 Spedisci a»</b>' : 'la leggi nel riquadro qui sotto'}, e mettendola come destinatario il codice di ritiro arriva direttamente a lui.</div>` : ''}
           ${o.notaCompratore ? `<div class="hint">📝 L'acquirente ha lasciato una <b>nota</b>: la leggi nel riquadro qui sotto.</div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
           ${/* IL CORRIERE ARRIVA GIA' SCELTO quando chi compra ha detto
@@ -31099,6 +31125,8 @@ function openOrder(id){
      nasce nascosta e si accende solo dove serve (e va DOPO go(), che
      e' quello che rende attiva la vista) */
   aggiornaCifreOrdine();
+  /* i dati di «📦 Spedisci a» arrivano dalle loro rotte, dopo il disegno */
+  caricaDatiSpedisci(o);
   /* il varco del vincitore d'asta: le strade offerte arrivano dal
      server (fail-open: senza rete la scritta invita a riaprire) */
   if (o.role==='buyer' && s==='locked' && o.asta && !o.consegnaScelta)
@@ -32670,10 +32698,36 @@ function testoColLink(testo, link){
    rimasti, ed e' stata RIPRODOTTA e non dedotta: zero toast e zero
    errori JS, cioe' un bottone che non fa niente e non lo dice. */
 function copiaLink(link, fatto){
+  const dice = ok => { if (ok) toast(fatto); else toast(link, 5000); return ok; };
   if (navigator.clipboard) return navigator.clipboard.writeText(link)
-    .then(()=>toast(fatto))
-    .catch(()=>toast(link, 5000));
-  toast(link, 5000);
+    .then(() => dice(true), () => dice(copiaAllAntica(link)));
+  return Promise.resolve(dice(copiaAllAntica(link)));
+}
+/* IL GRADINO ALL'ANTICA (6 ott 2026, «📦 Spedisci a»): prima di
+   arrendersi al toast si prova `execCommand('copy')` su un campo
+   invisibile. E' il gesto che le WebView sanno fare da sempre, anche
+   dove `navigator.clipboard` non c'e' (http nudo, WebView vecchie) o
+   dice di no — certe WebView Android rifiutano la scrittura con un
+   NotAllowedError dentro i client. Il campo e' `readonly`, cosi' sul
+   telefono non sale la tastiera, e `position:fixed` in alto, cosi' la
+   pagina non scorre a cercarlo. Torna vero SOLO se il browser dice di
+   aver copiato: altrimenti il toast col testo, come prima. */
+function copiaAllAntica(testo){
+  try {
+    if (typeof document === 'undefined' || !document.execCommand) return false;
+    const a = document.createElement('textarea');
+    a.value = testo;
+    a.setAttribute('readonly', '');
+    a.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;'
+      + 'opacity:0;pointer-events:none;font-size:16px';
+    document.body.appendChild(a);
+    /* il campo se ne va anche se il browser alza */
+    try {
+      a.select();
+      a.setSelectionRange(0, testo.length);
+      return !!document.execCommand('copy');
+    } finally { a.remove(); }
+  } catch(e) { return false; }
 }
 
 /* ---- UN DATO IN UNA RIGA (23 set 2026) ----
@@ -32700,7 +32754,8 @@ function rigaDato(et, v, op){
   return '<div class="p2p-recapito-riga"><div class="p2p-recapito-dato">'
     + (et ? '<span>' + esc(et) + '</span>' : '')
     + '<b' + (o.mono ? ' class="mono"' : '') + '>' + esc(o.vista || v) + '</b></div>'
-    + (o.copia ? bottoneCopia(v, 'Copia ' + (et || v)) : '') + '</div>';
+    + (o.copia ? (o.icona ? bottoneCopiaPiccolo(v, 'Copia ' + (et || v), o.icona)
+                          : bottoneCopia(v, 'Copia ' + (et || v))) : '') + '</div>';
 }
 /* il «📋 Copia»: prende il VALORE senza l'etichetta e passa
    dall'ultimo gradino qui sopra — «Copiato 📋», o il valore scritto
@@ -32713,6 +32768,29 @@ function bottoneCopia(v, aria){
   return '<button type="button" class="p2p-recapito-copia" data-v="' + esc(v) + '" '
     + 'onclick="copiaLink(this.dataset.v, \'Copiato 📋\')" '
     + 'aria-label="' + esc(aria) + '">📋 Copia</button>';
+}
+/* IL 📋 PICCOLO (6 ott 2026, «📦 Spedisci a»): solo l'icona, che passa
+   da `copiaDato` — gli appunti e il ✓ sul bottone stesso. `classe` e'
+   'icona' nelle righe, 'icona in-riga' dentro una frase. Il valore nel
+   `data-v`, mai nell'onclick: la regola del fratello qui sopra. */
+function bottoneCopiaPiccolo(v, aria, classe){
+  return '<button type="button" class="p2p-recapito-copia ' + classe + '" '
+    + 'data-v="' + esc(v) + '" onclick="copiaDato(this)" '
+    + 'aria-label="' + esc(aria) + '" title="Copia">📋</button>';
+}
+/* il tocco sul 📋 piccolo: l'ultimo gradino qui sopra, e quando gli
+   appunti dicono si' il bottone stesso diventa ✓ per un momento —
+   in una colonna di righe uguali e' la sola cosa che dice QUALE dato
+   si e' preso. Se il bottone non c'e' piu' (la busta si e' ridisegnata
+   nel frattempo) non si tocca niente. */
+function copiaDato(b){
+  haptic();
+  return copiaLink(b.dataset.v, 'Copiato 📋').then(ok => {
+    if (!ok || b.isConnected === false) return;
+    b.textContent = '✓';
+    b.classList.add('fatto');
+    setTimeout(() => { b.textContent = '📋'; b.classList.remove('fatto'); }, 1500);
+  });
 }
 
 /* IL PREZZO DEL TESTO CONDIVISO (24 set 2026): quello che trova chi
@@ -37216,6 +37294,17 @@ function codiceTracking(o, s){
     : `<b class="mono">${esc(o.tracking)}</b>`;
 }
 
+/* IL 📋 DEL TRACCIAMENTO (6 ott 2026, feedback dei venditori): chi
+   compra lo incolla nel sito del corriere. Accanto al codice e non al
+   suo posto — il codice stesso, dove c'e' la porta, apre @trackbot.
+   Si copia com'e' scritto, spazi compresi: il sito del corriere e'
+   meno severo di @trackbot (che prende il nudo, `attivaNotifichePacco`).
+   Solo a chi compra: chi vende il codice l'ha scritto lui. */
+function copiaTracking(o){
+  if (o.role !== 'buyer' || !(o.tracking || '').trim()) return '';
+  return bottoneCopiaPiccolo(o.tracking.trim(), 'Copia il numero di tracciamento', 'icona in-riga');
+}
+
 function bottoneNotifichePacco(o, s){
   if (!trackbotPossibile(o, s)) return '';
   /* LA DIDASCALIA PORTA LO SPAZIO DELLA COPPIA (ago 2026, misurato):
@@ -38584,12 +38673,14 @@ function pannelloEmailCorriere(o){
      sito del corriere. */
   if (o.role==='seller' && ['locked','shipped'].includes(o.state)){
     if (!o.emailCorriereIl || o.emailCorrierePurgataIl) return '';
+    /* col punto gia' indicato l'email sta in «📦 Spedisci a», in cima */
+    if (serveSpedisciA(o)) return '';
     const mail = emailLetta[o.id] || '';
     return `<div class="payout" id="emailPannello">
       <h4>📧 Email dell'acquirente per il corriere</h4>
       <div class="hint">L'acquirente ha lasciato un'email perché il <b>codice di ritiro</b> gli arrivi direttamente dal corriere. Se la metti come destinatario sull'etichetta, il codice non passa da qui — e nel pannello della spedizione spunta «il codice arriva direttamente a lui».</div>
       ${mail
-        ? `<div class="dati-copia">${rigaDato('Email', mail, {mono: true})}</div>`
+        ? `<div class="dati-copia">${rigaDato('Email', mail, Object.assign({mono: true}, COPIA_PICCOLA))}</div>`
         : `<button class="btn ghost" style="margin-top:10px" onclick="mostraEmailCorriere(this)">👁 Mostra l'email</button>`}
     </div>`;
   }
@@ -39013,6 +39104,9 @@ function pannelloIndirizzoCasa(o){
      che si prende con la pressione lunga (il «Copia» per riga del
      primo giro faceva confusione, ed e' uscito); per l'etichetta
      scritta a mano, o la casella unica, c'e' «Copia tutto». */
+  /* dove c'e' il riquadro in cima l'indirizzo vive li', e una seconda
+     copia qui sotto sarebbe il dato in due posti */
+  if (serveSpedisciA(o)) return '';
   if (!o.indirizzoIl) return `
     <div class="trust-note">🏠 <span><b>In attesa dell'indirizzo.</b> L'acquirente ha scelto la spedizione a casa e lo scriverà qui nell'ordine: ti avviseremo appena lo fa.</span></div>`;
   if (i) return `
@@ -39066,6 +39160,7 @@ function spedEstero(o){
    L'elenco e' scritto a mano e una prova lo tiene in pari col
    catalogo: un campo nuovo in `CAMPI_IND` senza il suo posto qui
    sarebbe un dato che chi vende non vede. */
+const COPIA_PICCOLA = {copia: true, icona: 'icona'};
 function righeIndirizzo(i, estero){
   const ORDINE = ['nome', 'via', 'cap', 'citta', 'provincia',
                   'paese', 'telefono', 'note'];
@@ -39073,18 +39168,25 @@ function righeIndirizzo(i, estero){
     .filter(k => (k !== 'paese' || estero) && String(i[k] || '').trim())
     .map(k => {
       const c = CAMPI_IND.find(x => x.k === k);
-      return rigaDato(c ? c.et.replace(/ \(.*\)$/, '') : k, String(i[k]).trim());
+      return rigaDato(c ? c.et.replace(/ \(.*\)$/, '') : k, String(i[k]).trim(), COPIA_PICCOLA);
     });
   return righe.length ? '<div class="dati-copia">' + righe.join('') + '</div>' : '';
 }
 
 async function caricaIndirizzo(){
-  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/indirizzo`,
-    {headers:{'X-Tg-Init-Data':authHdr()}});
-  const d = await r.json().catch(()=>({}));
-  if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return null; }
-  indirizzoLetto[currentOrder.id] = d.campi || {};
-  return d;
+  /* l'id si fissa ALLA PARTENZA (6 ott 2026): da quando «📦 Spedisci
+     a» carica da solo, chi cambia ordine mentre la risposta viaggia
+     e' un caso vero — e `currentOrder.id` letto all'arrivo metterebbe
+     l'indirizzo di un ordine sotto il numero di un altro */
+  const id = currentOrder.id;
+  try {
+    const r = await fetch(`${API_BASE}/orders/${id}/indirizzo`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return null; }
+    indirizzoLetto[id] = d.campi || {};
+    return d;
+  } catch(e) { toast('Errore di rete'); return null; }
 }
 
 /* nessun confirm: leggere un indirizzo non muove niente — la stessa
@@ -39131,6 +39233,133 @@ function copiaIndirizzo(){
   const i = indirizzoLetto[o?.id];
   if (!i) return;
   copiaLink(indirizzoPerEtichetta(i, spedEstero(o)), 'Indirizzo copiato 📋');
+}
+
+/* ---- «📦 SPEDISCI A» (6 ott 2026, feedback dei venditori) ----
+   L'indirizzo di consegna — nel caso segnalato un locker InPost —
+   stava piccolo in mezzo agli altri testi: il punto in una riga sotto
+   la frase del «Spedisci», l'indirizzo e l'email in due buste in fondo,
+   dietro due «👁 Mostra». Adesso chi vende trova in CIMA alla pagina
+   un riquadro solo, col bordo arancio: il tipo di consegna (Locker
+   InPost, Punto Poste, Indirizzo di casa), poi una riga per dato col
+   suo 📋, e «Copia tutto» sotto.
+   SOLO CHI VENDE, SOLO 'locked' E 'shipped' («Spedito a»): chi compra
+   i suoi dati li scrive nelle sue buste, il moderatore non li legge
+   mai (la regola della busta), e dopo la consegna l'indirizzo torna
+   nella sua busta di sempre finche' la scopa non lo cancella. Solo
+   con un DATO da mostrare: il punto gia' indicato o l'indirizzo gia'
+   scritto — l'attesa la dicono gia' le frasi del «Spedisci» e della
+   busta dell'indirizzo.
+   I DATI SI CARICANO DA SOLI, senza i due «👁 Mostra»: leggere non
+   muove niente (GET puri, nessuna ricevuta — `leggi_indirizzo`), e
+   chi apre il suo ordine da spedire e' li' per quello. Il carico si
+   tenta UNA volta per ordine e pagina: se la rete dice di no resta un
+   «Riprova», mai un giro che si richiama da solo.
+   COSA FARE DELL'EMAIL NON SI DICE QUI: lo dice la frase del «Spedisci»
+   accanto alla spunta della busta diretta — qui sarebbe la stessa
+   frase due volte, il difetto del giro dal vivo. */
+const spedInCorso = new Set();
+const spedProvato = new Set();
+
+function serveSpedisciA(o){
+  if (!o || o.role !== 'seller' || !['locked','shipped'].includes(o.state)) return false;
+  if (o.asta && !o.consegnaScelta) return false;
+  if (['ritiro','digitale','servizio'].includes(o.consegnaScelta)) return false;
+  if (o.viaPunto) return !!o.puntoRitiro;
+  return !!o.indirizzoIl && !o.indirizzoPurgatoIl;
+}
+/* l'email per il corriere: solo verso un punto di un corriere (sulla
+   rete di casa il codice lo conia il server, `pannelloEmailCorriere`) */
+function spedConEmail(o){
+  return !!o.viaPunto && !o.puntoBarattolo
+      && !!o.emailCorriereIl && !o.emailCorrierePurgataIl;
+}
+function spedManca(o){
+  return {indirizzo: !o.viaPunto && !indirizzoLetto[o.id],
+          email: spedConEmail(o) && !emailLetta[o.id]};
+}
+
+function riquadroSpedisciA(o){
+  if (!serveSpedisciA(o)) return '';
+  const manca = spedManca(o);
+  const attesa = spedInCorso.has(o.id) || !spedProvato.has(o.id);
+  const riprova = `<button class="btn ghost" style="margin-top:8px" onclick="riprovaDatiSpedisci(this)">↻ Riprova a caricare i dati</button>`;
+  /* «Copia tutto» solo dove i dati sono piu' d'uno: col solo punto
+     sarebbe il 📋 della sua riga detto due volte */
+  let tipo, corpo = '', tutto = false;
+  if (o.viaPunto){
+    const t = TIPI_PUNTO.find(x => x.id === o.tipoPunto);
+    tipo = `${t ? t.emoji : '📍'} ${esc(nomePunto(o.tipoPunto, o.retePunto))}`;
+    const righe = [rigaDato(t && t.id === 'locker' ? 'Locker' : 'Punto di ritiro',
+                            o.puntoRitiro, COPIA_PICCOLA)];
+    if (spedConEmail(o) && emailLetta[o.id])
+      righe.push(rigaDato('Email', emailLetta[o.id], Object.assign({mono: true}, COPIA_PICCOLA)));
+    corpo = '<div class="dati-copia">' + righe.join('') + '</div>';
+    tutto = righe.length > 1;
+  } else {
+    tipo = '🏠 Indirizzo di casa';
+    const i = indirizzoLetto[o.id];
+    if (i) { corpo = righeIndirizzo(i, spedEstero(o)); tutto = !!corpo; }
+  }
+  const bottoneTutto = tutto
+    ? `<button class="btn ghost sped-tutto" onclick="copiaSpedisciA()">📋 Copia tutto${o.viaPunto ? '' : ' l\'indirizzo'}</button>`
+    : '';
+  const coda = (manca.indirizzo || manca.email)
+    ? (attesa ? `<div class="hint" style="margin-top:6px">⏳ Apro ${manca.indirizzo ? 'l\'indirizzo' : 'l\'email'}…</div>` : riprova)
+    : '';
+  return `<div class="payout spedisci-a" id="spedisciA">
+      <h4>${o.state === 'shipped' ? '📦 Spedito a' : '📦 Spedisci a'}</h4>
+      <div class="sped-tipo">${tipo}</div>
+      ${corpo}
+      ${coda}${bottoneTutto}
+    </div>`;
+}
+
+/* «Copia tutto»: i valori delle righe, uno per riga — l'indirizzo
+   nella forma dell'etichetta, il punto con l'email sotto */
+function testoSpedisciA(o){
+  if (o.viaPunto)
+    return [o.puntoRitiro, spedConEmail(o) ? emailLetta[o.id] : '']
+      .map(x => (x || '').trim()).filter(Boolean).join('\n');
+  const i = indirizzoLetto[o.id];
+  return i ? indirizzoPerEtichetta(i, spedEstero(o)) : '';
+}
+function copiaSpedisciA(){
+  haptic();
+  const o = currentOrder;
+  const t = o && testoSpedisciA(o);
+  if (!t) return;
+  copiaLink(t, o.viaPunto ? 'Copiato 📋' : 'Indirizzo copiato 📋');
+}
+
+/* il ridisegno e' del SOLO riquadro, mai `openOrder`: la lezione del
+   codice di ritiro — riaprire butterebbe via il tracciamento che chi
+   vende sta scrivendo nel «Spedisci» */
+function ridisegnaSpedisciA(){
+  const p = el('spedisciA');
+  if (!p || !currentOrder) return;
+  const html = riquadroSpedisciA(currentOrder);
+  p.outerHTML = html || '';
+}
+
+async function caricaDatiSpedisci(o, forza){
+  if (!serveSpedisciA(o) || spedInCorso.has(o.id)) return;
+  if (spedProvato.has(o.id) && !forza) return;
+  const manca = spedManca(o);
+  spedProvato.add(o.id);
+  if (!manca.indirizzo && !manca.email) return;
+  spedInCorso.add(o.id);
+  ridisegnaSpedisciA();
+  try {
+    if (manca.indirizzo) await caricaIndirizzo();
+    if (manca.email) await caricaEmailCorriere();
+  } finally { spedInCorso.delete(o.id); }
+  if (currentOrder && currentOrder.id === o.id) ridisegnaSpedisciA();
+}
+function riprovaDatiSpedisci(btn){
+  haptic();
+  if (btn) btn.disabled = true;
+  caricaDatiSpedisci(currentOrder, true);
 }
 
 /* ---- il documento di ritiro (ago 2026): un PIN si trascrive, un QR

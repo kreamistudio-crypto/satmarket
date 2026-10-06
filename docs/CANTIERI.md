@@ -37151,3 +37151,90 @@ stati provati con la protezione avanzata dell'impronta: il margine è
 largo, ma se una tela vera sporcasse oltre 24 unità quel telefono
 andrebbe al server senza bisogno — lo direbbero le righe «📷 Anteprima
 convertita dal server» nel journal, se si moltiplicassero.
+
+## «📦 Spedisci a» e il 📋 per dato (6 ott 2026, feedback dei venditori)
+
+Richiesta di Andrea dopo il feedback dei venditori sulla pagina
+dell'ordine: l'indirizzo di consegna (nel caso segnalato un locker
+InPost) stava piccolo in mezzo agli altri testi, e i dati si sbagliavano
+a trascriverli nel sito del corriere. Tre punti: il riquadro in cima, il
+codice del locker, i 📋 per dato. Worktree da `origin/main` (eea8d6e),
+commit firmato.
+
+**COM'ERA.** Il punto stava in una riga sotto la frase del «Spedisci»,
+l'indirizzo e l'email in due buste in fondo, ognuna dietro un «👁
+Mostra». Il testo si prendeva con la pressione lunga; di bottoni c'era
+solo «📋 Copia tutto l'indirizzo» (i «Copia» per riga erano usciti il 23
+set, secondo giro di «Dati di spedizione che si copiano»: sette bottoni
+uguali in colonna confondevano). Il tracciamento di chi compra non aveva
+nessun bottone: toccandolo si apriva @trackbot.
+
+**IL CODICE DEL LOCKER NON SI RACCOGLIE**, ed è la risposta al punto 2:
+chi compra sceglie il tipo (locker o banco) e la rete, poi SCRIVE A MANO
+il punto in una casella libera (`punto_ritiro`, 120 caratteri, esempio
+«Locker InPost — Via Roma 1»), copiandolo dalla mappa ufficiale aperta in
+un'altra scheda. Il codice c'è solo se l'ha scritto lui, mescolato al
+resto. Proposte ad Andrea, IN ATTESA DEL SÌ (il flusso di chi compra non
+è stato toccato): A) una casella sua «Codice del locker» per locker +
+InPost, maiuscola e controllata nella forma, salvata nell'ordine e nei
+punti salvati, mostrata in grande nel riquadro (consigliata, subito); B)
+la mappa ufficiale InPost dentro l'app, che compila codice e indirizzo
+da sola — vuole un token InPost, uno script esterno nella CSP, e la
+posizione va a InPost (dopo il lancio, col backlog della MAPPA dei
+punti). Scartato: indovinare il codice dal testo libero, che sarebbe
+un'ipotesi mostrata in grande come un fatto.
+
+**COSA CAMBIA.** `riquadroSpedisciA` in cima alla pagina, sotto prezzo e
+conto, col bordo arancio: «📦 Spedisci a» («Spedito a» a pacco
+partito), il tipo di consegna («🔒 Locker InPost», «🏪 Punto Poste
+Italiane», «🏠 Indirizzo di casa»), una riga per dato col suo 📋 e
+«Copia tutto» dove i dati sono più d'uno. Solo chi vende, solo 'locked'
+e 'shipped', solo con un dato da mostrare; il moderatore mai. Indirizzo
+ed email si caricano DA SOLI (via i due «👁 Mostra»: sono GET puri, e chi
+apre il suo ordine da spedire è lì per quello), una volta per ordine,
+col «Riprova» se la rete dice di no. Dove c'è il riquadro le buste di
+chi vende e il banner del pacco tacciono, e il «Spedisci» porta i
+cartelli verso l'alto («il punto e i recapiti sono in cima»). Il 📋 è
+PICCOLO — solo l'icona, un quadrato da 40 px, il ✓ verde sul bottone
+oltre al toast «Copiato 📋» — e lo porta anche il tracciamento di chi
+compra, accanto al codice (il codice stesso continua ad aprire
+@trackbot). `copiaLink` guadagna un gradino: `execCommand('copy')` su un
+campo invisibile prima del toast col valore, per le WebView che negano
+`navigator.clipboard`. Rimedio a un rischio che il carico automatico
+rendeva vero: `caricaIndirizzo` fissa l'id alla partenza, o chi cambia
+ordine mentre la risposta viaggia avrebbe l'indirizzo sotto il numero
+sbagliato.
+
+**ROVESCIA** il secondo giro del 23 set (niente «Copia» per riga), su
+richiesta di Andrea; la forma è diversa da quella bocciata (icona sola,
+✓ sulla riga) ma il conto dei bottoni in colonna sull'indirizzo di casa
+è lo stesso: sette. Da guardare sul telefono.
+
+**PROVATO.** `prove_dati_spedizione_copia` col terzo giro (84 prove: il
+riquadro del locker, della casa e del banco Poste; chi NON lo vede, 15
+casi; il carico una volta sola, il «Riprova» che forza, nessuna rotta
+per chi non vede; «Copia tutto»; il ✓ e il suo contrario; il gradino
+all'antica con un DOM di cartone; il tracciamento; il cambio d'ordine a
+metà carico; il byte dei bottoni con l'`esc` nel `data-v`), emendate
+col perché `prove_dettaglio_ordine` (banner, traccia del moderatore),
+`prove_seo` (l'ultimo gradino) e il banco di `prove_spunta_rimborso`.
+Tortura 20 su 20 sulla copia (al primo giro 19: il cambio d'ordine a
+metà non aveva prova, aggiunta). Dal vivo sulla copia in collaudo
+(config iniettato, relay morto, fatture finte, il server parla solo con
+127.0.0.1), 375 px nei due temi, «dentro Telegram» Android e iOS e sul
+sito: il riquadro del locker con l'email caricata da sola, della casa
+con le sette righe; il tocco VERO sul 📋 (✓, «Copiato 📋», il valore
+giusto negli appunti); con `navigator.clipboard` negato il gradino
+all'antica copia lo stesso, senza lasciare campi né far scorrere la
+pagina; il tracciamento copiato da chi compra senza aprire @trackbot;
+nessun riquadro né dato in più a chi compra. Scatti prima/dopo inviati
+ad Andrea. Il giro ha trovato UN difetto mio, curato: la frase dell'email
+nel «Spedisci» diceva ancora «la leggi nel riquadro qui sotto».
+
+**DA GUARDARE** (sul telefono, Andrea): il 📋 su Telegram Android,
+iPhone e nell'app Android (la copia vera negli appunti, non il banco);
+i sette 📋 dell'indirizzo di casa, se confondono come il 23 set; il
+codice del locker, che aspetta il sì su A o B. Notati e NON toccati: per
+un locker InPost il corriere chiede anche nome e telefono del
+destinatario, e oggi l'ordine via punto raccoglie solo l'email
+(facoltativa); il tracciamento del reso non ha il suo 📋.

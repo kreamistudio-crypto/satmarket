@@ -28480,6 +28480,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   del pannello dell'email, l'invito «+ Ricevi il codice…» e il
   «Cambia», hanno l'inchiostro del pannello (`email-link`): col grigio
   di `nota-aggiungi` facevano 3,81:1 di giorno.
+  ⚠️ EMENDATA (6 ott 2026, «📦 Spedisci a», feedback dei venditori,
+  richiesta di Andrea): il 📋 per riga TORNA, in un'altra forma — solo
+  l'icona in un quadrato da 40 px (`bottoneCopiaPiccolo`, opzione
+  `{copia: true, icona}` di `rigaDato`, la costante `COPIA_PICCOLA`),
+  il ✓ verde sul bottone per un secondo e mezzo (`copiaDato`) oltre al
+  toast. Lo portano le righe di chi vende (indirizzo, punto, email) e il
+  tracciamento di chi compra (`copiaTracking`, accanto al codice nel
+  passo «Oggetto spedito»); il «📋 Copia» grande resta del solo IBAN.
+  Il testo resta selezionabile come prima. I DATI DI CHI VENDE SALGONO
+  IN CIMA: `riquadroSpedisciA` (giudice `serveSpedisciA`: solo chi
+  vende, solo 'locked' e 'shipped', solo col punto indicato o
+  l'indirizzo scritto e non cancellato) sotto prezzo e conto, prima del
+  recinto — il tipo di consegna dal giudice unico `nomePunto`, una
+  riga per dato, «Copia tutto» dove i dati sono più d'uno. Indirizzo ed
+  email si caricano DA SOLI dopo il disegno (`caricaDatiSpedisci`: GET
+  puri, una volta per ordine, «Riprova» se la rete dice di no, il
+  ridisegno del solo riquadro); dove c'è il riquadro le due buste di
+  chi vende tacciono, il banner del pacco pure, e il «Spedisci» porta
+  i cartelli verso l'alto. `copiaLink` prova `copiaAllAntica`
+  (`execCommand('copy')` su un campo `readonly` fisso in alto) prima di
+  arrendersi al toast col valore: le WebView che negano
+  `navigator.clipboard` copiano lo stesso.
 - SATS IN PAGAMENTO, DETTO A CHI VENDE (23 set 2026, «Ritocchi allo
   scambio P2P»): a chi vende, «Scambio concluso» arriva solo a
   pagamento RIUSCITO verso chi compra. Il messaggio con cui mostrod

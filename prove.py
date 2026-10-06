@@ -12931,8 +12931,10 @@ def prove_dettaglio_ordine():
     # X — tracciamento Y», parola per parola il passo «Oggetto spedito»
     # del recinto due dita piu' su. Il codice resta LI', dove ora si
     # tocca; qui resta il punto, e senza punto il banner non nasce.
+    # (6 ott 2026) e tace a chi vende quando il punto sta gia' in
+    # «📦 Spedisci a», in cima: lo stesso dato due volte no
     prova("il banner e' del punto, e di nient'altro", True,
-          "(['shipped','delivered'].includes(s) && o.puntoRitiro)" in det)
+          "(['shipped','delivered'].includes(s) && o.puntoRitiro && !serveSpedisciA(o))" in det)
     prova("...quindi il tracciamento non si ripete sotto il recinto",
           False, "Spedito con <b>" in det)
     # e il «segui il pacco» di 17track e' uscito dall'ordine: la strada
@@ -20051,8 +20053,9 @@ def prove_forma_tracking():
           "tracking ${codiceTracking(o, s)}" in src)
     # la traccia della correzione del moderatore ha seguito il codice:
     # stava nel banner sparito, e la vedono ENTRAMBE le parti come prima
+    # (6 ott 2026: col 📋 di chi compra in mezzo, `copiaTracking`)
     prova("...e si porta dietro la traccia del moderatore", True,
-          "${codiceTracking(o, s)}${rigaCorretto(o.trackingCorretto)}"
+          "${codiceTracking(o, s)}${copiaTracking(o)}${rigaCorretto(o.trackingCorretto)}"
           in src)
     prova("trackbot: il deep link e' uno e vive nell'helper", 1,
           src.count("https://t.me/trackbot?start="))
@@ -23683,7 +23686,9 @@ def prove_reti_corriere():
     # TRE dall'ago 2026: la riga compatta della pagina Paga, la frase
     # del pannello venditore, e il cassetto «📍 I tuoi punti di ritiro»
     # nel Profilo — che quel nome lo scrive per ogni punto salvato.
-    prova("...e lo chiamano le superfici che lo scrivono", 3,
+    # QUATTRO dal 6 ott 2026: il tipo di consegna in testa a «📦
+    # Spedisci a», in cima alla pagina dell'ordine di chi vende.
+    prova("...e lo chiamano le superfici che lo scrivono", 4,
           mini.count("nomePunto(") - mini.count("function nomePunto("))
     # E SI FA GIRARE, non si guarda soltanto: le sentinelle qui sopra
     # dicono che il giudice ESISTE ed e' uno, mai che risponda giusto
@@ -37283,8 +37288,13 @@ def prove_seo():
     # rilettura.
     cp = pezzo_js(testo_mini, "function copiaLink(", "\n}\n")
     prova("l'ultimo gradino sa copiare", True, "navigator.clipboard" in cp)
-    prova("...e se non puo' scrive il link, mai il silenzio", 2,
-          cp.count("toast(link, 5000)"))
+    # (6 ott 2026) i due rami — appunti negati e appunti assenti —
+    # passano dal gradino all'antica e poi da UN `dice`: il toast col
+    # link e' scritto una volta, e lo raggiungono tutti e due
+    prova("...e se non puo' scrive il link, mai il silenzio", (1, 2),
+          (cp.count("toast(link, 5000)"), cp.count("dice(copiaAllAntica(link))")))
+    prova("...dopo aver provato la copia all'antica", True,
+          "document.execCommand('copy')" in pezzo_js(testo_mini, "function copiaAllAntica(", "\n}\n"))
     prova("...e ce n'e' uno solo", 1,
           testo_mini.count("function copiaLink("))
     for chi in ("condividiNegozio", "condividiMioNegozio"):
@@ -104696,7 +104706,15 @@ def prove_dati_spedizione_copia():
     lo censiscono). Restano «📋 Copia tutto l'indirizzo» e, nel recapito
     P2P, il «Copia» della sola riga dell'IBAN. La riga e' una sola,
     `rigaDato`, condivisa col recapito P2P. I dati restano nelle loro
-    buste: nel pannello «Spedisci» solo i cartelli."""
+    buste: nel pannello «Spedisci» solo i cartelli.
+    TERZO GIRO (6 ott 2026, feedback dei venditori, richiesta di
+    Andrea): «📦 Spedisci a» in cima alla pagina dell'ordine — il tipo
+    di consegna e una riga per dato, ognuna col suo 📋 PICCOLO (solo
+    l'icona, ✓ sul bottone per un momento), «Copia tutto» sotto; i dati
+    si caricano da soli. Solo chi vende, solo 'locked' e 'shipped'; le
+    buste di prima lasciano il posto al riquadro. Il 📋 piccolo anche
+    sul tracciamento di chi compra, e l'ultimo gradino della copia
+    prova `execCommand` prima di arrendersi al toast."""
     print("\n[dati di spedizione che si copiano]")
     import json as _js
     import shutil as _sh
@@ -104717,7 +104735,15 @@ def prove_dati_spedizione_copia():
              "function righeIndirizzo(i, estero){", "function spedEstero(o){",
              "function indirizzoPerEtichetta(i, estero){",
              "function copiaIndirizzo(){", "function pannelloIndirizzoCasa(o){",
-             "function pannelloEmailCorriere(o){", "function copiaLink(link, fatto){"]
+             "function pannelloEmailCorriere(o){", "function copiaLink(link, fatto){",
+             # il terzo giro
+             "function bottoneCopiaPiccolo(v, aria, classe){", "function copiaDato(b){",
+             "function copiaAllAntica(testo){", "function serveSpedisciA(o){",
+             "function spedConEmail(o){", "function spedManca(o){",
+             "function riquadroSpedisciA(o){", "function testoSpedisciA(o){",
+             "function copiaSpedisciA(){", "function ridisegnaSpedisciA(){",
+             "async function caricaDatiSpedisci(o, forza){",
+             "function nomePunto(tipo, rete){", "function copiaTracking(o){"]
     prova("le funzioni del cantiere ci sono, una volta sola", [1] * len(FIRME),
           [mini.count(f) for f in FIRME])
     prova("...e la riga del primo giro, col «Copia» dentro, non c'e' piu'", 0,
@@ -104736,8 +104762,9 @@ def prove_dati_spedizione_copia():
           ("copiaLink(indirizzoPerEtichetta(i, spedEstero(o)), 'Indirizzo copiato 📋')" in ci,
            "navigator.clipboard" in ci))
     pem = nudo(fn("function pannelloEmailCorriere(o){"))
-    prova("chi vende legge l'email in una riga di testo", (True, False),
-          ("rigaDato('Email', mail, {mono: true})" in pem, "user-select:all" in pem))
+    prova("chi vende legge l'email in una riga di testo, col suo 📋", (True, False),
+          ("rigaDato('Email', mail, Object.assign({mono: true}, COPIA_PICCOLA))" in pem,
+           "user-select:all" in pem))
     prova("chi compra, a email in pagina, la legge in una riga col «Cambia» sotto", True,
           "rigaDato('La tua email', scritta, {mono: true})" in pem
           and "onclick=\"apriEmailCorriere(this)\">✏️ Cambia l'email</button>" in pem)
@@ -104754,19 +104781,54 @@ def prove_dati_spedizione_copia():
                           pem))))
     i_d = mini.find("function openOrder(id){")
     det = mini[i_d:mini.find("\n  go('ordine');", i_d)] if i_d >= 0 else ""
-    prova("nel «Spedisci» il punto e' una riga di testo, sotto la frase", 1,
-          det.count("${rigaDato('', o.puntoRitiro)}"))
+    # TERZO GIRO: il punto sale in «📦 Spedisci a», e nel «Spedisci»
+    # resta la frase col cartello che porta lassu'
+    prova("nel «Spedisci» il punto non e' piu' una riga: la frase porta in cima",
+          (0, 1),
+          (det.count("rigaDato('', o.puntoRitiro)"),
+           det.count("il punto e i recapiti sono in cima, in <b>«📦 Spedisci a»</b>.")))
     prova("...e il banner del pacco e' la sua frase, senza bottone", 1,
           det.count('<div class="trust-note nota-punto">📍 <span>${puntoBanner(o)}</span></div>'))
-    # NIENTE «COPIA» PER RIGA: il bottone lo aggiunge `rigaDato` solo a
-    # chi lo chiede, e lo chiede la sola riga dell'IBAN del recapito P2P
+    # IL RIQUADRO IN CIMA: sotto prezzo e conto, prima del recinto
+    # della cassaforte; i dati si caricano DOPO il disegno
+    _i_rq = det.find("${riquadroSpedisciA(o)}")
+    prova("«📦 Spedisci a» sta in cima: prima del recinto e di ogni busta",
+          (1, True, True),
+          (det.count("${riquadroSpedisciA(o)}"),
+           0 <= _i_rq < det.find('<div class="vault-head">'),
+           0 <= _i_rq < det.find("${obiezioneCompratore(o)}")))
+    _oo = mini[i_d:mini.find("\n/* ---- feedback reciproco", i_d)] if i_d >= 0 else ""
+    prova("...e i dati li va a prendere dopo il disegno, una riga", 1,
+          _oo[_oo.find("\n  go('ordine');"):].count("\n  caricaDatiSpedisci(o);"))
+    prova("le due buste di chi vende cedono il posto al riquadro",
+          (True, True),
+          ("if (serveSpedisciA(o)) return '';" in pic,
+           "if (serveSpedisciA(o)) return '';" in pem))
+    # IL «📋 COPIA» GRANDE RESTA DEL SOLO IBAN; il 📋 PICCOLO e' delle
+    # righe di chi vende (indirizzo, punto, email) e del tracciamento
+    # di chi compra, e passa SOLO da `copiaDato`
     riq = fn("function riquadroRecapitoP2P(testo, titolo){")
-    prova("un solo «Copia» di riga in tutto il client: quello dell'IBAN", (1, 1, True, True),
+    prova("un solo «📋 Copia» grande in tutto il client: quello dell'IBAN", (1, True, True),
           (mini.count("bottoneCopia(") - mini.count("function bottoneCopia("),
-           mini.count("copia: true"),
-           "(o.copia ? bottoneCopia(v, " in fn("function rigaDato(et, v, op){"),
+           "bottoneCopia(v, 'Copia ' + (et || v))" in fn("function rigaDato(et, v, op){"),
            bool(re.search(r"FORMA_IBAN\.test\(nudo\)\s*\?\s*rigaDato\(r\.et, nudo, "
                           r"\{vista: [\s\S]{0,120}?copia: true\}\)", riq))))
+    prova("...il 📋 piccolo lo chiedono le righe di chi vende e il tracciamento, e basta",
+          (["copiaTracking", "rigaDato"], ["pannelloEmailCorriere", "righeIndirizzo",
+                                           "riquadroSpedisciA", "riquadroSpedisciA"]),
+          (sorted(chi for chi in [mini[mini.rfind("function ", 0, m.start()) + 9:
+                                       mini.index("(", mini.rfind("function ", 0, m.start()) + 9)]
+                                  for m in re.finditer(r"bottoneCopiaPiccolo\(", mini)]
+                  if chi != "bottoneCopiaPiccolo"),
+           sorted(mini[mini.rfind("function ", 0, m.start()) + 9:
+                       mini.index("(", mini.rfind("function ", 0, m.start()) + 9)]
+                  for m in re.finditer(r"COPIA_PICCOLA\)", mini))))
+    prova("...e passa SOLO da copiaDato, col valore nel data-v", (True, False),
+          ("onclick=\"copiaDato(this)\" " in fn("function bottoneCopiaPiccolo(v, aria, classe){"),
+           "onclick=\"copiaDato(' +" in mini))
+    prova("il tracciamento si copia solo da chi compra", True,
+          "if (o.role !== 'buyer' || !(o.tracking || '').trim()) return '';"
+          in fn("function copiaTracking(o){"))
     # NESSUN DATO IN CHIARO FUORI DALLE BUSTE: nel «Spedisci» restano i
     # cartelli («trovi l'indirizzo nel riquadro qui sotto»), e i valori
     # letti dalle rotte cifrate li tocca solo la loro busta
@@ -104785,12 +104847,19 @@ def prove_dati_spedizione_copia():
             t = mini.rfind("function ", 0, m.start())
             fuori.add(mini[t + 9:mini.index("(", t + 9)])
         return fuori
+    # (6 ott 2026) piu' le tre del riquadro «📦 Spedisci a», che e' la
+    # loro busta di chi vende in cima alla pagina
     prova("l'indirizzo letto lo toccano solo le funzioni della sua busta",
           {"pannelloIndirizzoCasa", "caricaIndirizzo", "salvaIndirizzo",
-           "copiaIndirizzo"}, chi_nomina("indirizzoLetto["))
+           "copiaIndirizzo", "spedManca", "riquadroSpedisciA", "testoSpedisciA"},
+          chi_nomina("indirizzoLetto["))
     prova("...e l'email letta solo quelle della sua", {
           "pannelloEmailCorriere", "apriEmailCorriere", "caricaEmailCorriere",
-          "mandaEmailCorriere"}, chi_nomina("emailLetta["))
+          "mandaEmailCorriere", "spedManca", "riquadroSpedisciA", "testoSpedisciA"},
+          chi_nomina("emailLetta["))
+    prova("...e il riquadro e' di chi vende, su 'locked' e 'shipped' e basta", True,
+          "if (!o || o.role !== 'seller' || !['locked','shipped'].includes(o.state)) return false;"
+          in fn("function serveSpedisciA(o){"))
     # l'elenco delle righe e' scritto a mano: tutti e soli i campi del
     # catalogo, o un campo nuovo sarebbe un dato che chi vende non vede
     ri = fn("function righeIndirizzo(i, estero){")
@@ -104877,8 +104946,31 @@ def prove_dati_spedizione_copia():
     _ic2 = mini.index("const CAMPI_IND = [")
     campi = mini[_ic2:mini.index("\n];", _ic2) + 3]
     esc_js = mini[mini.index("const esc = s =>"):mini.index("const el = id =>")]
-    js = "\n".join([esc_js, campi] + [fn(f) for f in FIRME]) + r"""
+    _it = mini.index("const TIPI_PUNTO = [")
+    costanti = [mini[_it:mini.index("];", _it) + 2]] + [
+        re.search(r, mini).group(0) for r in (
+            r"const COPIA_PICCOLA = \{[^}]*\};", r"const spedInCorso = new Set\(\);",
+            r"const spedProvato = new Set\(\);")]
+    # la VERA `caricaIndirizzo`, col nome cambiato: il banco ha la sua
+    # di cartone, e questa serve al caso del cambio d'ordine a meta'
+    vera_ci = fn("async function caricaIndirizzo(){").replace(
+        "async function caricaIndirizzo(){", "async function caricaIndirizzoVera(){", 1)
+    js = "\n".join([esc_js, campi] + costanti + [fn(f) for f in FIRME] + [vera_ci]) + r"""
+var API_BASE = '/api';
+function authHdr(){ return 'collaudo'; }
 let toasti = [];
+/* il DOM che serve al riquadro: un posto dove ridisegnarsi, e le due
+   rotte di cartone che `caricaDatiSpedisci` chiama */
+let disegni = [];
+let posto = null;
+function el(id){ return id === 'spedisciA' ? posto : null; }
+let rotte = [];
+let rispondono = true;
+async function caricaIndirizzo(){ rotte.push('indirizzo');
+  if (rispondono) indirizzoLetto[currentOrder.id] = I; return rispondono ? {} : null; }
+async function caricaEmailCorriere(){ rotte.push('email');
+  if (rispondono) emailLetta[currentOrder.id] = 'mario.r0ssi@esempio.it';
+  return rispondono ? 'x' : ''; }
 function toast(m, ms){ toasti.push(ms ? [m, ms] : [m]); }
 function haptic(){}
 let navigator = {};
@@ -104900,7 +104992,14 @@ const valori = h => [...h.matchAll(
   /<div class="p2p-recapito-dato">(?:<span>[^<]*<\/span>)?<b(?: class="mono")?>([^<]*)<\/b>/g)].map(m => m[1]);
 const conta = (h, re) => (h.match(re) || []).length;
 const COPIA = /class="p2p-recapito-copia"/g;
+const PICCOLA = /class="p2p-recapito-copia icona" data-v="[^"]*" onclick="copiaDato\(this\)" /g;
 const RIGA = /class="p2p-recapito-riga"/g;
+/* il bottone come lo vede `copiaDato`: dataset, testo, classi */
+function bottoneFinto(v){
+  const cl = new Set();
+  return {dataset: {v}, textContent: '📋',
+          classList: {add: c => cl.add(c), remove: c => cl.delete(c), has: c => cl.has(c)}};
+}
 const dorme = () => new Promise(r => setTimeout(r, 0));
 const I = {nome: 'Mario Rossi', via: 'Via Roma 1', cap: '27100', citta: 'Pavia',
            provincia: 'PV', telefono: '333 1234567', note: 'Citofono Rossi, scala B',
@@ -104925,9 +105024,11 @@ const CASI = {
   righe(){
     const h = righeIndirizzo(I, false);
     return {etichette: etichette(h), valori: valori(h), copie: conta(h, COPIA),
-            righe: conta(h, RIGA),
+            piccole: conta(h, PICCOLA), righe: conta(h, RIGA),
             contenitore: h.indexOf('<div class="dati-copia"><div class="p2p-recapito-riga">'
-              + '<div class="p2p-recapito-dato"><span>Nome e cognome</span><b>Mario Rossi</b></div></div>') === 0};
+              + '<div class="p2p-recapito-dato"><span>Nome e cognome</span><b>Mario Rossi</b></div>'
+              + '<button type="button" class="p2p-recapito-copia icona" data-v="Mario Rossi" '
+              + 'onclick="copiaDato(this)" aria-label="Copia Nome e cognome" title="Copia">📋</button></div>') === 0};
   },
   paese(){
     return [etichette(righeIndirizzo(LISBONA, true)), valori(righeIndirizzo(LISBONA, true)),
@@ -104956,7 +105057,11 @@ const CASI = {
             nelTesto: h.indexOf('<b>&quot;&gt;&lt;img src=x onerror=alert(1)&gt;</b>') >= 0
                       && h.indexOf('<b>&#39;); alert(1); //</b>') >= 0,
             etichetta: et.indexOf('<span>&quot;&gt;&lt;img src=x onerror=alert(1)&gt;</span>') >= 0,
-            senzaCodice: conta(h, /onclick=|data-v=/g)};
+            /* dal terzo giro ogni riga ha il suo 📋: il valore sta nel
+               data-v, scappato, e l'onclick e' sempre lo stesso */
+            onclick: [...new Set([...h.matchAll(/onclick="([^"]*)"/g)].map(m => m[1]))],
+            dataV: h.indexOf('data-v="&quot;&gt;&lt;img src=x onerror=alert(1)&gt;"') >= 0
+                   && h.indexOf('data-v="&#39;); alert(1); //"') >= 0};
   },
   righeAlByte(){
     return [RIGA_IBAN(), rigaDato('', 'Via Roma 1'),
@@ -104964,15 +105069,21 @@ const CASI = {
             bottoneCopia('Locker "A" & <b>', "Copia l'email")];
   },
   venditore(){
+    /* la busta di sempre, dopo la consegna: su 'locked' e 'shipped'
+       l'indirizzo sta in «📦 Spedisci a» */
+    const DOPO = Object.assign({}, VENDE, {state: 'delivered'});
     indirizzoLetto = {};
-    const chiuso = pannelloIndirizzoCasa(VENDE);
+    const chiuso = pannelloIndirizzoCasa(DOPO);
     indirizzoLetto = {7: I};
-    const aperto = pannelloIndirizzoCasa(VENDE);
+    const aperto = pannelloIndirizzoCasa(DOPO);
+    const cede = [pannelloIndirizzoCasa(VENDE),
+                  pannelloIndirizzoCasa(Object.assign({}, VENDE, {state: 'shipped'}))];
     indirizzoLetto = {7: LISBONA};
-    const fuori = pannelloIndirizzoCasa(Object.assign({}, VENDE, {zonaSped: 'ue'}));
+    const fuori = pannelloIndirizzoCasa(Object.assign({}, DOPO, {zonaSped: 'ue'}));
     return {chiusoMostra: chiuso.indexOf("mostraIndirizzo(this)") >= 0,
             chiusoSenzaDati: chiuso.indexOf('p2p-recapito') < 0,
-            righe: conta(aperto, RIGA), copie: conta(aperto, COPIA),
+            cede,
+            righe: conta(aperto, RIGA), copie: conta(aperto, COPIA), piccole: conta(aperto, PICCOLA),
             tutto: aperto.indexOf('onclick="copiaIndirizzo()">📋 Copia tutto l\'indirizzo</button>') >= 0,
             dopoLeRighe: aperto.indexOf('dati-copia') < aperto.indexOf('Copia tutto'),
             nienteTuttoONiente: aperto.indexOf('user-select:all') < 0,
@@ -105021,6 +105132,7 @@ const CASI = {
     emailLetta = {};
     const chiusa = pannelloEmailCorriere(PUNTO);
     return {etichette: etichette(letta), valori: valori(letta), copie: conta(letta, COPIA),
+            piccole: conta(letta, PICCOLA),
             mono: letta.indexOf('<b class="mono">mario.r0ssi@esempio.it</b>') >= 0,
             nienteTuttoONiente: letta.indexOf('user-select:all') < 0,
             chiusaMostra: chiusa.indexOf('mostraEmailCorriere(this)') >= 0
@@ -105048,6 +105160,177 @@ const CASI = {
                         && senzaEmail.indexOf('nota-aggiungi') < 0
                         && senzaEmail.indexOf('p2p-recapito') < 0,
             aperta: aperta.indexOf('id="emailCorriereInp"') >= 0 && aperta.indexOf('p2p-recapito') < 0};
+  },
+  /* --- il terzo giro: «📦 Spedisci a» --- */
+  riquadroLocker(){
+    const L = {id: 9, role: 'seller', state: 'locked', viaPunto: 1, tipoPunto: 'locker',
+               retePunto: 'InPost', puntoRitiro: 'MIL123M — Via Roma 1, Milano',
+               emailCorriereIl: 1758600000};
+    spedProvato.clear(); spedInCorso.clear();
+    emailLetta = {};
+    const prima = riquadroSpedisciA(L);
+    spedProvato.add(9);
+    const fallito = riquadroSpedisciA(L);
+    emailLetta = {9: 'mario.r0ssi@esempio.it'};
+    const pieno = riquadroSpedisciA(L);
+    const spedito = riquadroSpedisciA(Object.assign({}, L, {state: 'shipped'}));
+    currentOrder = L;
+    const tutto = testoSpedisciA(L);
+    const senzaEmail = riquadroSpedisciA(Object.assign({}, L, {emailCorriereIl: 0}));
+    const posteBanco = riquadroSpedisciA(Object.assign({}, L, {tipoPunto: 'banco',
+                                         retePunto: 'Poste Italiane', emailCorriereIl: 0}));
+    return {attesa: [prima.indexOf('⏳ Apro l\'email…') >= 0, prima.indexOf('Riprova') < 0],
+            riprova: fallito.indexOf('onclick="riprovaDatiSpedisci(this)"') >= 0,
+            titolo: [/<h4>([^<]*)<\/h4>/.exec(pieno)[1], /<h4>([^<]*)<\/h4>/.exec(spedito)[1]],
+            tipo: /<div class="sped-tipo">([^<]*)<\/div>/.exec(pieno)[1],
+            etichette: etichette(pieno), valori: valori(pieno),
+            piccole: conta(pieno, PICCOLA), grandi: conta(pieno, COPIA),
+            dataV: pieno.indexOf('data-v="MIL123M — Via Roma 1, Milano"') >= 0,
+            tutto: [pieno.indexOf('onclick="copiaSpedisciA()">📋 Copia tutto</button>') >= 0, tutto],
+            soloPunto: [etichette(senzaEmail), senzaEmail.indexOf('Copia tutto') < 0,
+                        senzaEmail.indexOf('⏳') < 0],
+            banco: [/<div class="sped-tipo">([^<]*)<\/div>/.exec(posteBanco)[1],
+                    etichette(posteBanco)],
+            id: pieno.indexOf('<div class="payout spedisci-a" id="spedisciA">') === 0};
+  },
+  riquadroCasa(){
+    spedProvato.clear(); spedInCorso.clear();
+    indirizzoLetto = {};
+    const prima = riquadroSpedisciA(VENDE);
+    indirizzoLetto = {7: I};
+    const pieno = riquadroSpedisciA(VENDE);
+    currentOrder = VENDE;
+    indirizzoLetto = {7: LISBONA};
+    const fuori = riquadroSpedisciA(Object.assign({}, VENDE, {zonaSped: 'ue'}));
+    return {attesa: prima.indexOf('⏳ Apro l\'indirizzo…') >= 0,
+            tipo: /<div class="sped-tipo">([^<]*)<\/div>/.exec(pieno)[1],
+            etichette: etichette(pieno), piccole: conta(pieno, PICCOLA),
+            tutto: pieno.indexOf('onclick="copiaSpedisciA()">📋 Copia tutto l\'indirizzo</button>') >= 0,
+            paese: etichette(fuori)};
+  },
+  /* NESSUN DATO A CHI NON DEVE VEDERLO: il riquadro non nasce */
+  chiNonVede(){
+    indirizzoLetto = {7: I}; emailLetta = {9: 'x@y.it'};
+    const L = {id: 9, role: 'seller', state: 'locked', viaPunto: 1, tipoPunto: 'locker',
+               retePunto: 'InPost', puntoRitiro: 'MIL123M', emailCorriereIl: 1};
+    const no = [
+      Object.assign({}, VENDE, {role: 'buyer'}), Object.assign({}, VENDE, {role: 'admin'}),
+      Object.assign({}, L, {role: 'buyer'}), Object.assign({}, L, {role: 'admin'}),
+      Object.assign({}, VENDE, {state: 'creato'}), Object.assign({}, VENDE, {state: 'delivered'}),
+      Object.assign({}, VENDE, {state: 'dispute'}), Object.assign({}, VENDE, {state: 'released'}),
+      Object.assign({}, VENDE, {indirizzoPurgatoIl: 1}), Object.assign({}, VENDE, {indirizzoIl: 0}),
+      Object.assign({}, L, {puntoRitiro: ''}), Object.assign({}, L, {consegnaScelta: 'ritiro'}),
+      Object.assign({}, L, {consegnaScelta: 'digitale'}), Object.assign({}, L, {asta: 1}),
+      null];
+    return {no: no.map(o => riquadroSpedisciA(o)),
+            si: [VENDE, L, Object.assign({}, L, {state: 'shipped'}),
+                 Object.assign({}, L, {asta: 1, consegnaScelta: 'punto'})]
+                .map(o => !!riquadroSpedisciA(o)),
+            /* la rete di casa: niente email, il codice lo conia il server */
+            casaBarattolo: etichette(riquadroSpedisciA(Object.assign({}, L, {puntoBarattolo: 3})))};
+  },
+  async caricaUnaVolta(){
+    const L = {id: 9, role: 'seller', state: 'locked', viaPunto: 1, tipoPunto: 'locker',
+               retePunto: 'InPost', puntoRitiro: 'MIL123M', emailCorriereIl: 1};
+    spedProvato.clear(); spedInCorso.clear(); emailLetta = {}; indirizzoLetto = {};
+    currentOrder = L; rotte = []; rispondono = true;
+    disegni = []; posto = {set outerHTML(h){ disegni.push(h); }};
+    await caricaDatiSpedisci(L);
+    const giro1 = [rotte.slice(), disegni.length, valori(disegni[disegni.length - 1] || '')];
+    rotte = []; await caricaDatiSpedisci(L);
+    const giro2 = rotte.slice();
+    /* la casa: l'indirizzo e non l'email */
+    spedProvato.clear(); currentOrder = VENDE; rotte = [];
+    await caricaDatiSpedisci(VENDE);
+    const casa = rotte.slice();
+    /* la rete che dice di no: un tentativo, poi il «Riprova» che forza */
+    spedProvato.clear(); emailLetta = {}; currentOrder = L; rotte = []; rispondono = false;
+    disegni = [];
+    await caricaDatiSpedisci(L); await caricaDatiSpedisci(L);
+    const no = [rotte.slice(), (disegni[disegni.length - 1] || '').indexOf('riprovaDatiSpedisci') >= 0];
+    rispondono = true; rotte = [];
+    await caricaDatiSpedisci(L, true);
+    const forzato = rotte.slice();
+    /* chi non vede, non carica */
+    rotte = []; spedProvato.clear();
+    await caricaDatiSpedisci(Object.assign({}, L, {role: 'buyer'}));
+    await caricaDatiSpedisci(Object.assign({}, VENDE, {role: 'admin'}));
+    const muti = rotte.slice();
+    posto = null;
+    return {giro1, giro2, casa, no, forzato, muti};
+  },
+  async copiaTuttoRiquadro(){
+    const L = {id: 9, role: 'seller', state: 'locked', viaPunto: 1, tipoPunto: 'locker',
+               retePunto: 'InPost', puntoRitiro: 'MIL123M', emailCorriereIl: 1};
+    emailLetta = {9: 'a@b.it'}; currentOrder = L;
+    toasti = []; appunti = null; navigator = APPUNTI_SI; copiaSpedisciA(); await dorme();
+    const punto = [appunti, toasti];
+    indirizzoLetto = {7: I}; currentOrder = VENDE;
+    toasti = []; appunti = null; copiaSpedisciA(); await dorme();
+    return {punto, casa: [appunti, toasti]};
+  },
+  async copiaDatoTocco(){
+    const r = {};
+    navigator = APPUNTI_SI; appunti = null; toasti = [];
+    const b = bottoneFinto('MIL123M');
+    await copiaDato(b);
+    r.si = [appunti, toasti, b.textContent, b.classList.has('fatto')];
+    navigator = APPUNTI_NO; toasti = [];
+    const n = bottoneFinto('a@b.it');
+    await copiaDato(n);
+    r.no = [toasti, n.textContent, n.classList.has('fatto')];
+    navigator = APPUNTI_SI; toasti = [];
+    const via = bottoneFinto('x'); via.isConnected = false;
+    await copiaDato(via);
+    r.staccato = via.textContent;
+    /* il tocco vero sul bottone disegnato: l'onclick col suo `this` */
+    globalThis.copiaDato = copiaDato;
+    const h = bottoneCopiaPiccolo('Locker "A" & <b>', "Copia l'email", 'icona');
+    appunti = null;
+    const m = /onclick="([^"]*)"/.exec(h);
+    const t = bottoneFinto(/data-v="([^"]*)"/.exec(h)[1]
+      .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
+    await new Function(m[1].replace('copiaDato(this)', 'return copiaDato(this)')).call(t);
+    r.html = h; r.toccato = appunti;
+    return r;
+  },
+  /* il gradino all'antica, con un DOM di cartone */
+  allAntica(){
+    const fatti = [];
+    const finto = esito => ({execCommand: c => { fatti.push(c); if (esito === 'alza') throw new Error('x'); return esito; },
+      createElement: () => ({value: '', style: {}, setAttribute(){}, select(){},
+                             setSelectionRange(){}, remove(){ fatti.push('tolto'); }}),
+      body: {appendChild(a){ fatti.push('messo:' + a.value); }}});
+    globalThis.document = finto(true);
+    const si = copiaAllAntica('MIL123M');
+    globalThis.document = finto(false);
+    const no = copiaAllAntica('MIL123M');
+    globalThis.document = finto('alza');
+    const alza = copiaAllAntica('MIL123M');
+    delete globalThis.document;
+    const senza = copiaAllAntica('MIL123M');
+    return {si, no, alza, senza, fatti};
+  },
+  /* chi cambia ordine mentre l'indirizzo viaggia: arriva sotto il
+     numero dell'ordine che l'ha CHIESTO, mai di quello aperto adesso */
+  async cambioAMeta(){
+    indirizzoLetto = {}; currentOrder = {id: 5};
+    const chieste = [];
+    globalThis.fetch = async url => { chieste.push(url); currentOrder = {id: 99};
+      return {ok: true, json: async () => ({campi: {nome: 'A'}})}; };
+    await caricaIndirizzoVera();
+    globalThis.fetch = async () => { throw new TypeError('rete giu'); };
+    toasti = []; currentOrder = {id: 6};
+    const giu = await caricaIndirizzoVera();
+    delete globalThis.fetch;
+    return {chiavi: Object.keys(indirizzoLetto), chieste, giu, toasti};
+  },
+  tracciamento(){
+    const O = {role: 'buyer', tracking: ' 123456789012345678901234 '};
+    return [copiaTracking(O), copiaTracking(Object.assign({}, O, {role: 'seller'})),
+            copiaTracking(Object.assign({}, O, {role: 'admin'})),
+            copiaTracking(Object.assign({}, O, {tracking: '   '})),
+            copiaTracking(Object.assign({}, O, {tracking: '"><img src=x>'}))];
   },
 };
 (async () => {
@@ -105087,9 +105370,9 @@ const CASI = {
     prova("...e ogni riga mostra il VALORE, senza l'etichetta dentro",
           ["Mario Rossi", "Via Roma 1", "27100", "Pavia", "PV", "333 1234567",
            "Citofono Rossi, scala B"], g("righe").get("valori"))
-    prova("...sette righe di testo, NESSUN «Copia», nel loro contenitore",
-          [7, 0, True], [g("righe").get("righe"), g("righe").get("copie"),
-                         g("righe").get("contenitore")])
+    prova("...sette righe di testo, ognuna col suo 📋 piccolo, nel loro contenitore",
+          [7, 0, 7, True], [g("righe").get("righe"), g("righe").get("copie"),
+                            g("righe").get("piccole"), g("righe").get("contenitore")])
     prova("il paese solo fuori dai confini, sotto la citta'",
           [["Nome e cognome", "Via e civico", "CAP", "Città", "Paese"],
            ["Ana Silva", "Rua Augusta 10", "1100-053", "Lisboa", "Portogallo"],
@@ -105104,7 +105387,8 @@ const CASI = {
     prova("fuori dai confini lo dice la zona dell'ordine, '' vale casa",
           [True, False, False, False, False], g("estero"))
     prova("il testo di chi compra non diventa markup ne' codice, etichetta compresa",
-          {"senzaTag": True, "nelTesto": True, "etichetta": True, "senzaCodice": 0},
+          {"senzaTag": True, "nelTesto": True, "etichetta": True,
+           "onclick": ["copiaDato(this)"], "dataV": True},
           g("cattivo"))
     prova("la riga al byte: il «Copia» solo se chiesto (l'IBAN, senza spazi), "
           "senza etichetta niente <span>",
@@ -105125,9 +105409,12 @@ const CASI = {
     ve = g("venditore")
     prova("chi vende: prima «Mostra», e nessun dato finche' non lo chiede",
           [True, True], [ve.get("chiusoMostra"), ve.get("chiusoSenzaDati")])
-    prova("...letto: sette righe senza «Copia», e «Copia tutto» sotto di loro",
-          [7, 0, True, True, True], [ve.get("righe"), ve.get("copie"), ve.get("tutto"),
-                                     ve.get("dopoLeRighe"), ve.get("nienteTuttoONiente")])
+    prova("...letto: sette righe col 📋 piccolo, e «Copia tutto» sotto di loro",
+          [7, 0, 7, True, True, True],
+          [ve.get("righe"), ve.get("copie"), ve.get("piccole"), ve.get("tutto"),
+           ve.get("dopoLeRighe"), ve.get("nienteTuttoONiente")])
+    prova("...e su 'locked' e 'shipped' la busta cede il posto a «📦 Spedisci a»",
+          ["", ""], ve.get("cede"))
     prova("...e su un pacco per Lisbona anche il paese",
           ["Nome e cognome", "Via e civico", "CAP", "Città", "Paese"],
           ve.get("paeseFuori"))
@@ -105153,10 +105440,10 @@ const CASI = {
           [[[IBAN_SENZA_SPAZI, 5000]], [[IBAN_SENZA_SPAZI, 5000]]],
           [ib.get("senza"), ib.get("negati")])
     ev = g("emailVenditore")
-    prova("l'email a chi vende: una riga di testo in monospazio, senza «Copia»",
-          [["Email"], ["mario.r0ssi@esempio.it"], 0, True, True],
-          [ev.get("etichette"), ev.get("valori"), ev.get("copie"), ev.get("mono"),
-           ev.get("nienteTuttoONiente")])
+    prova("l'email a chi vende: una riga di testo in monospazio, col 📋 piccolo",
+          [["Email"], ["mario.r0ssi@esempio.it"], 0, 1, True, True],
+          [ev.get("etichette"), ev.get("valori"), ev.get("copie"), ev.get("piccole"),
+           ev.get("mono"), ev.get("nienteTuttoONiente")])
     prova("...prima «Mostra l'email»; su un punto di casa e al moderatore niente",
           [True, "", ""], [ev.get("chiusaMostra"), ev.get("casa"), ev.get("admin")])
     ec = g("emailCompratore")
@@ -105166,6 +105453,88 @@ const CASI = {
     prova("...senza il valore in pagina la riga compatta, senza email l'invito a "
           "inchiostro pieno, a campo aperto il campo", [True, True, True],
           [ec.get("senzaValore"), ec.get("senzaEmail"), ec.get("aperta")])
+
+    # --- 4) IL TERZO GIRO: «📦 SPEDISCI A» -------------------------------
+    rl = g("riquadroLocker")
+    prova("il locker: «⏳ Apro l'email…» finche' non ha provato, poi il «Riprova»",
+          [[True, True], True], [rl.get("attesa"), rl.get("riprova")])
+    prova("...«Spedisci a» su locked, «Spedito a» a pacco partito, col suo id",
+          [["📦 Spedisci a", "📦 Spedito a"], True], [rl.get("titolo"), rl.get("id")])
+    prova("...il tipo di consegna in testa, dal giudice unico dei nomi",
+          "🔒 Locker InPost", rl.get("tipo"))
+    prova("...il locker e l'email, ognuno col suo 📋 piccolo, nessun «Copia» grande",
+          [["Locker", "Email"], ["MIL123M — Via Roma 1, Milano", "mario.r0ssi@esempio.it"],
+           2, 0, True],
+          [rl.get("etichette"), rl.get("valori"), rl.get("piccole"), rl.get("grandi"),
+           rl.get("dataV")])
+    prova("...«Copia tutto»: il locker e l'email, uno per riga",
+          [True, "MIL123M — Via Roma 1, Milano\nmario.r0ssi@esempio.it"], rl.get("tutto"))
+    prova("...col solo punto niente «Copia tutto» (sarebbe il 📋 detto due volte) "
+          "e niente attesa", [["Locker"], True, True], rl.get("soloPunto"))
+    prova("...un punto al banco di Poste si chiama col suo nome",
+          ["🏪 Punto Poste Italiane", ["Punto di ritiro"]], rl.get("banco"))
+    rc = g("riquadroCasa")
+    prova("la casa: «⏳ Apro l'indirizzo…», poi le sette righe col 📋 e «Copia tutto "
+          "l'indirizzo»", [True, "🏠 Indirizzo di casa", 7, True],
+          [rc.get("attesa"), rc.get("tipo"), rc.get("piccole"), rc.get("tutto")])
+    prova("...e su un pacco per Lisbona anche il paese",
+          ["Nome e cognome", "Via e civico", "CAP", "Città", "Paese"], rc.get("paese"))
+    cn = g("chiNonVede")
+    prova("NESSUN DATO A CHI NON DEVE VEDERLO: chi compra, il moderatore, prima del "
+          "pagamento, dopo la consegna, in disputa, a indirizzo cancellato o non "
+          "scritto, senza punto, a mano, digitale, asta senza strada: niente riquadro",
+          [""] * 15, cn.get("no"))
+    prova("...e chi vende lo vede: casa, locker, spedito, asta con la strada scelta",
+          [True] * 4, cn.get("si"))
+    prova("...sulla rete di casa il punto si', l'email no", ["Locker"], cn.get("casaBarattolo"))
+    cu = g("caricaUnaVolta")
+    prova("i dati si caricano da soli: l'email del locker, e il riquadro si ridisegna pieno",
+          [["email"], 2, ["MIL123M", "mario.r0ssi@esempio.it"]], cu.get("giro1"))
+    prova("...una volta sola per ordine: il secondo disegno non richiama", [],
+          cu.get("giro2"))
+    prova("...sulla casa l'indirizzo, e l'email no", ["indirizzo"], cu.get("casa"))
+    prova("...se la rete dice di no: un tentativo, poi il «Riprova»; il «Riprova» forza",
+          [[["email"], True], ["email"]], [cu.get("no"), cu.get("forzato")])
+    prova("...e chi non deve vedere non chiama nessuna rotta", [], cu.get("muti"))
+    ctr = g("copiaTuttoRiquadro")
+    prova("«Copia tutto» del riquadro negli appunti, col suo toast",
+          {"punto": ["MIL123M\na@b.it", [["Copiato 📋"]]],
+           "casa": [etich, [["Indirizzo copiato 📋"]]]}, ctr)
+    cd = g("copiaDatoTocco")
+    prova("il 📋 piccolo: negli appunti, «Copiato 📋», e il bottone diventa ✓",
+          ["MIL123M", [["Copiato 📋"]], "✓", True], cd.get("si"))
+    prova("...se gli appunti dicono di no: il toast col valore, e il bottone resta 📋",
+          [[["a@b.it", 5000]], "📋", False], cd.get("no"))
+    prova("...e un bottone gia' staccato dalla pagina non si tocca", "📋", cd.get("staccato"))
+    prova("...al byte, col valore scappato nel data-v e mai nell'onclick",
+          '<button type="button" class="p2p-recapito-copia icona" '
+          'data-v="Locker &quot;A&quot; &amp; &lt;b&gt;" onclick="copiaDato(this)" '
+          'aria-label="Copia l&#39;email" title="Copia">📋</button>', cd.get("html"))
+    prova("...e il tocco sull'onclick disegnato copia il valore vero",
+          'Locker "A" & <b>', cd.get("toccato"))
+    aa = g("allAntica")
+    prova("il gradino all'antica: vero solo se il browser dice di aver copiato, "
+          "e il campo se ne va sempre", {"si": True, "no": False, "alza": False, "senza": False,
+          "fatti": ["messo:MIL123M", "copy", "tolto", "messo:MIL123M", "copy", "tolto",
+                    "messo:MIL123M", "copy", "tolto"]}, aa)
+    prova("il 📋 del tracciamento: a chi compra, col codice senza gli spazi attorno; "
+          "a chi vende, al moderatore e sul vuoto niente; il codice scappato",
+          ['<button type="button" class="p2p-recapito-copia icona in-riga" '
+           'data-v="123456789012345678901234" onclick="copiaDato(this)" '
+           'aria-label="Copia il numero di tracciamento" title="Copia">📋</button>',
+           "", "", "",
+           '<button type="button" class="p2p-recapito-copia icona in-riga" '
+           'data-v="&quot;&gt;&lt;img src=x&gt;" onclick="copiaDato(this)" '
+           'aria-label="Copia il numero di tracciamento" title="Copia">📋</button>'],
+          out.get("tracciamento"))
+    prova("l'indirizzo arriva sotto l'ordine che l'ha chiesto, anche se nel frattempo "
+          "se ne e' aperto un altro; senza rete un toast e niente scritto",
+          {"chiavi": ["5"], "chieste": ["/api/orders/5/indirizzo"], "giu": None,
+           "toasti": [["Errore di rete"]]}, g("cambioAMeta"))
+    prova("il 📋 piccolo: un quadrato da 40 px, e il ✓ verde", (True, True, True),
+          (".p2p-recapito-copia.icona{min-width:40px;min-height:40px;" in css,
+           ".p2p-recapito-copia.icona.fatto{background:var(--trust-soft);color:var(--trust-text)}" in css,
+           ".payout.spedisci-a{border:2px solid var(--sats);" in css))
 
 
 def prove_recensione_p2p():
@@ -119961,6 +120330,7 @@ def prove_spunta_rimborso():
           "const codiceTracking = (o, s) => o.tracking;\n"
           "const rigaCorretto = () => '';\n"
           "const filaTracking = () => '';\n"
+          "const copiaTracking = () => '';\n"
           "const inPagamento = () => false;\n"
           "const dataAppuntamento = () => '';\n"
           "const TEMPI = {confermaDig: 72};\n"
