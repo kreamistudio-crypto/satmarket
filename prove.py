@@ -18736,8 +18736,10 @@ def prove_ferie():
         return mini[i:mini.index("}", i) + 1]
 
     tag = regola(".tag-price.ferie .price")
+    # (7 ott 2026) il grigio fisso e' #797263, 4,52:1 sulla carta: era
+    # #8A8271, 3,6:1 (richiesta di Andrea: i cartellini a 4,5:1)
     prova("il cartellino usa un grigio fisso, non il token", True,
-          "#8A8271" in tag and "--muted" not in tag)
+          "#797263" in tag and "--muted" not in tag)
     # nel dettaglio invece il token e' quello giusto (sta sulla pagina)
     det = regola(".detail-price.ferie")
     prova("il dettaglio segue il tema col token", True,
@@ -61168,6 +61170,10 @@ console.log(JSON.stringify(out));
         o = _json.loads(r.stdout.strip().splitlines()[-1])
     finally:
         _sh.rmtree(d, ignore_errors=True)
+    # (7 ott 2026) il conto si legge come testo da `_piatto_sats`; il
+    # markup vero di «sats» lo guardano le prove che leggono `crudo`
+    crudo = dict(o)
+    o = {k: (_piatto_sats(v) if isinstance(v, str) else v) for k, v in o.items()}
 
     # --- (7 ott 2026) L'INTERVALLO SI SCEGLIE PRIMA DEL CONTO ----------
     ra = o["rangeAttesa"]
@@ -61181,7 +61187,7 @@ console.log(JSON.stringify(out));
           ' onclick="confermaDettaglioP2P()">Scegli</button>' in ra)
     prova("...e «Scegli» apre «Quanto» lasciando il foglio aperto sotto, senza prendere",
           [[1, 0], True], [o["rangeDevia"], o["rangeResta"]])
-    rs = o["rangeScelto"]
+    rs = crudo["rangeScelto"]
     prova("scelta la cifra: la riga della cifra con la fascia e «Cambia», il conto a UNA colonna", [True, True, False, True],
           ['Importo scelto: <b>60,00 €</b> <span class="conto-scelto-fascia">(da\u00a020,00 a\u00a0100,00 €)</span>' in rs,
            'aria-label="Cambia l\'importo scelto" onclick="apriQuantoP2P(p2pDettOrdine)">Cambia</button>' in rs,
@@ -61191,7 +61197,7 @@ console.log(JSON.stringify(out));
            '<button type="button" class="btn primary" id="p2pDettVai" onclick="confermaDettaglioP2P()">Compra</button>' in rs])
     prova("...e la fee a zero, sulla cifra scelta, dice «0 sats» piccolo e a voce", True,
           '<span class="num"><span aria-hidden="true">0<span class="unita-sats"> sats</span></span>'
-          '<span class="solo-voce">0 sats</span></span>' in o["rangeSceltoFeeZero"])
+          '<span class="solo-voce">0 sats</span></span>' in crudo["rangeSceltoFeeZero"])
     prova("...e «Compra» prende con LA STESSA CHIAMATA di prima: (id, cifra scelta, metodo), "
           "a foglio chiuso", [[["ord-3", 60, "SEPA"]], 0, ["p2pDettSheet"]], o["rangePresa"])
     prova("una cifra fuori fascia non prende: lo dice, e torna a chiederla",
@@ -61341,11 +61347,11 @@ console.log(JSON.stringify(out));
           True,
           '<span>Controvalore di <b>6,00 €</b></span>' in cm
           and "≈ 12000 sats" in cm)
-    # ...e l'intervallo NO (6 ott 2026, le due colonne): i suoi capi
-    # sono le intestazioni, e l'etichetta torna a dire «Controvalore»
-    prova("...e con l'intervallo gli euro salgono nell'intestazione", [True, False],
+    # ...e un intervallo arrivato qui lo stesso (7 ott 2026, una colonna
+    # sola) dice il suo minimo nell'etichetta, come un importo fisso
+    prova("...e un intervallo arrivato al conto dice il minimo nell'etichetta", [False, True],
           ['<span>Controvalore</span>' in o["contoRange"],
-           "Controvalore di" in o["contoRange"]])
+           "Controvalore di <b>20,00 €</b>" in o["contoRange"]])
     # ⚠️ E UNA VALUTA FUORI DAL CATALOGO PORTA LA SIGLA, qui come in
     # fondo: `segnoMonetaP2P` ricalca la regola di `monetaP2P` invece
     # di inventarsi un segno che non esiste.
@@ -61621,68 +61627,30 @@ console.log(JSON.stringify(out));
     prova("...e l'ordine a MERCATO resta com'era: nessuna frase, il suo premio",
           True, "ctrl-conv" not in o["contoMercatoIntatto"]
           and 'p2p-avviso">4%<' in o["contoMercatoIntatto"])
-    # ⚠️ LE DUE COLONNE (6 ott 2026, ritocco di Andrea): fino a ieri qui
-    # si provava «≈ 40000–200000 sats» in una cella sola — si leggeva
-    # come una sottrazione, e col segno davanti («≈ −400–2000») il meno
-    # valeva per un capo solo. Adesso ogni capo ha la sua cella.
+    # ⚠️ (7 ott 2026, decisione di Andrea) LE DUE COLONNE SE NE SONO
+    # ANDATE: dal 6 ott qui si provava un intervallo in due colonne.
+    # Adesso nessuna pagina passa un intervallo al conto (il libro chiede
+    # prima la cifra, la pagina del mio scambio aspetta chi prende); se ne
+    # arriva uno lo stesso, si conta sul minimo, a una colonna sola.
     cr = o["contoRange"]
-    cella = lambda *t: '<span class="mono">' + "".join(t) + "</span>"
-    # (6 ott 2026, secondo ritocco) OGNI CIFRA IN SATS PORTA LA SUA
-    # UNITA', e l'intestazione non dice piu' «cifre in sats». (7 ott
-    # 2026, richiesta di Andrea) L'UNITA' E' LA PAROLA «SATS», non piu'
-    # il ₿: piccola e grigia (`unita-sats`), e per il lettore vocale una
-    # copia della cella fuori dalla vista. La larghezza la conta per due
-    # caratteri e mezzo: 10 di prima + mezzo.
-    sats_vista = lambda t, cls="num": ('<span class="' + cls + '"><span aria-hidden="true">' + t
-                                       + '<span class="unita-sats"> sats</span></span>'
-                                       + '<span class="solo-voce">' + t + ' sats</span></span>')
-    vista = lambda h: re.sub(r'<span class="solo-voce">[^<]*</span>', '', h)
-    prova("un intervallo va in due colonne, con la larghezza scritta sulla scatola",
-          True, ' conto-due" style="--n:10.5">' in cr)
-    prova("...l'intestazione: i due importi, e a sinistra niente", True,
-          '<div class="ctrl-riga capi"><span></span>'
-          + cella('<span class="num">20,00 €</span>', '<span class="num">100,00 €</span>')
-          in cr)
-    prova("...ogni riga una cella per capo, col SUO ≈ e il SUO «sats»", [True, True],
-          [cella(sats_vista('≈ 40000'), sats_vista('≈ 200000')) in cr,
-           cella(sats_vista('≈ 39600'), sats_vista('≈ 198000')) in cr])
-    prova("...e col SUO segno: il meno vale per tutt'e due i capi", True,
-          cella(sats_vista('≈ −400', 'num meno'), sats_vista('≈ −2000', 'num meno')) in cr)
-    prova("...nessuna cifra in sats senza il suo «sats», e mai il ₿",
-          [6, 6, False, False], [cr.count('<span class="unita-sats"> sats</span>'),
-                                 cr.count('<span class="solo-voce">'),
-                                 "cifre in sats" in cr, "₿" in cr])
-    prova("...a vista la parola sta SEMPRE nel suo span piccolo, mai attaccata alla cifra", False,
-          bool(re.search(r"\d sats", vista(cr))))
-    prova("...e «sats» anche dalla parte di chi vende, su ogni cella (premio e Subtotale compresi)",
-          [10, 10, False, False],
-          [o["contoRangeVendi"].count('<span class="unita-sats"> sats</span>'),
-           o["contoRangeVendi"].count('<span class="solo-voce">'),
-           "₿" in o["contoRangeVendi"],
-           bool(re.search(r"\d sats", vista(o["contoRangeVendi"])))])
-    prova("...l'euro in fondo, cella per cella, col segno e senza bandierina",
-          [True, False], [cella('<span class="num">20,00 €</span>',
-                                '<span class="num">100,00 €</span>') in cr.split("ctrl-chiusa")[1],
-                          "🇪🇺" in cr])
-    prova("...e fra due numeri nessun trattino", [False, False, False],
-          ["–" in cr, "–" in o["contoRangeVendi"], "40000 sats" in vista(cr)])
-    rv = o["contoRangeVendi"]
-    prova("dal lato di chi vende con lo sconto: il premio si aggiunge, la fee pure, in ogni colonna",
-          [4, 0, True], [rv.count('class="num piu"><span aria-hidden="true">≈ +'),
-                         rv.count('class="num meno"'), "lato-vendo conto-due" in rv])
-    prova("a cambio muto: un trattino per colonna, senza unita', gli euro restano in testa",
-          [True, True, False, False],
-          [cella('<span class="num">—</span>', '<span class="num">—</span>') in o["contoRangeMuto"],
-           '<span class="num">100,00 €</span>' in o["contoRangeMuto"],
-           "unita-sats" in o["contoRangeMuto"], "solo-voce" in o["contoRangeMuto"]])
-    prova("con la fee ignota: un trattino per colonna nella sua riga", True,
-          cella('<span class="num">—</span>', '<span class="num">—</span>')
-          in o["contoRangeSenzaFee"].split("Fee P2P")[1])
-    prova("una valuta fuori dal catalogo: la sigla nelle intestazioni", True,
-          cella('<span class="num">20,00 USD</span>', '<span class="num">100,00 USD</span>')
-          in o["contoRangeAltra"])
-    prova("a importo fisso il conto resta su una colonna", [False, True],
-          ["conto-due" in o["contoMercato"], "≈ 12000 sats" in o["contoMercato"]])
+    prova("un intervallo passato al conto si conta sul minimo, a una colonna",
+          [False, False, True, False, True],
+          ["conto-due" in cr, "--n:" in cr, "≈ 40000 sats" in cr, "200000" in cr,
+           "Controvalore di <b>20,00 €</b>" in cr])
+    prova("...e in nessun conto restano due colonne, ne' il ₿", [False, False],
+          [any("conto-due" in v for v in crudo.values() if isinstance(v, str)),
+           any("₿" in v for v in crudo.values() if isinstance(v, str) and "ctrl-conto" in v)])
+    # (7 ott 2026, decisione di Andrea) «SATS» PICCOLO ANCHE A IMPORTO
+    # FISSO, uguale alla cifra scelta: a vista la parola nel suo span, a
+    # voce la copia, e mai una cifra attaccata alla parola grande
+    cm_ = crudo["contoMercato"]
+    prova("a importo fisso il conto resta su una colonna, con «sats» piccolo e la sua voce",
+          [False, True, True, False],
+          ["conto-due" in cm_,
+           '<span aria-hidden="true">≈ 12000<span class="unita-sats"> sats</span></span>'
+           '<span class="solo-voce">≈ 12000 sats</span>' in cm_,
+           "≈ 12000 sats" in o["contoMercato"],
+           bool(re.search(r"\d sats", re.sub(r'<span class="solo-voce">[^<]*</span>', '', cm_)))])
     # (27 set 2026, dal campo: «Invia 0 · Ricevi 0» su un annullato) UN
     # EURO CHE NON SI SA NON E' ZERO: niente «0,00 €» ne' «≈ 0 sats», e
     # dove i sats sono fissati quelli restano, perche' sono un fatto
@@ -61780,11 +61748,11 @@ console.log(JSON.stringify(out));
     # ⚠️ UN INTERVALLO ANCORA APERTO NON SI FA FISSARE DA UNA CIFRA
     # SOLA: il coordinatore collassa i due capi insieme all'importo, e
     # finche' l'euro e' una fascia («da 20,00 a 100,00 €») un numero
-    # solo di sats non le corrisponde. Restano le due stime — dal 6 ott
-    # 2026 in due colonne, una per capo, e senza trattini.
+    # solo di sats non le corrisponde: la cifra detta non si usa. (7 ott
+    # 2026) La pagina del mio scambio a intervallo il conto non lo mostra
+    # piu' (la frase di chi prende); chiamato lo stesso, conta il minimo.
     prova("su un intervallo aperto la cifra detta non si usa", True,
-          "conto-due" in o["mioRange"]
-          and '<span class="num">100,00 €</span>' in o["mioRange"]
+          "conto-due" not in o["mioRange"]
           and "7301" not in o["mioRange"]
           and "–" not in o["mioRange"])
     # ...e questa e' la ragione per cui il ramo esiste: a cambio muto
@@ -67157,6 +67125,14 @@ def prove_p2p_motore():
           "if (o.mio) passi[0] = {t: 'Ordine pubblicato'," in _ren
           and "'Aspetta chi ti vende i sats' : 'Aspetta chi ti compra i sats'"
           in _ren)
+    # (7 ott 2026) ...e LA META' CHE ACCENDE IL PASSO: la riga che nasce da
+    # «Pubblica» porta `mio: true`. Uno scatto con una riga seminata SENZA
+    # `mio` aveva fatto credere a un «Ordine preso» sul proprio ordine:
+    # il difetto era del banco, e questa e' la prova che il foglio vero
+    # scrive la riga giusta.
+    prova("...e la riga che nasce da «Pubblica» porta `mio: true` e lo stato «pubblico»", True,
+          "    id: '', lato: lato, indice: 0, pubTrade: '', mio: true,\n    stato: 'pubblico',"
+          in pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n"))
     # e il «Riprova» di chi pubblica RIPUBBLICA: la take del proprio
     # ordine si fermava sul cancello dell'id vero, con un avviso che
     # parlava d'altro
@@ -98227,6 +98203,18 @@ def prove_link_descrizione():
           '"LINK_DESCRIZIONE_AMMESSI"' in codice(pezzo("_leve_stato")))
 
 
+def _piatto_sats(h):
+    """«SATS» PICCOLO SU OGNI CONTO P2P (7 ott 2026): una cifra in sats del
+    conto e' `<span aria-hidden="true">≈ 12000<span class="unita-sats">
+    sats</span></span>` piu' la sua copia per il lettore vocale. Le prove
+    che leggono il conto come TESTO («≈ 12000 sats», «>11400 sats<») lo
+    leggono da qui: via la copia per la voce, e la cifra riunita alla sua
+    parola. Il markup vero lo guardano le prove del conto, sul crudo."""
+    h = re.sub(r'<span class="solo-voce">[^<]*</span>', '', h)
+    return re.sub(r'<span aria-hidden="true">([^<]*)<span class="unita-sats"> sats</span></span>',
+                  r'\1 sats', h)
+
+
 def _senza_commenti_js(js):
     """Le sole righe di CODICE di una funzione JS. E' il gemello di
     `codice()`, e serve per la stessa ragione: in un progetto che
@@ -115913,7 +115901,7 @@ def prove_contanti_pagina_leggera():
           ["r(compro ? (o.consegna ? 'Totale da consegnare' : 'Totale da inviare') : 'Ricevi', cifreEuro, 'tot euro')" in cdp,
            "consegna: typeof pagaInContantiP2P === 'function'\n                                              && pagaInContantiP2P(o)}));" in ren,
            mini.count("contoDettP2P(") == 3
-           and "+ contoDettP2P(scelto ? Object.assign({}, o, {euro: scelto, euroMax: 0, unitaPiccola: true}) : o)) +"
+           and "+ contoDettP2P(scelto ? Object.assign({}, o, {euro: scelto, euroMax: 0}) : o)) +"
                in fn("function renderDettaglioP2P(){")])
     prova("il CSS: la regola scura, il passo col filo verde, i numeri, il cassetto senza il triangolo di serie", [True] * 4,
           [".contanti-regola-forte{font-size:14px;font-weight:800;color:var(--ink)" in css,
@@ -118433,8 +118421,13 @@ const R = (id, lato, stato, piu) => Object.assign({id, lato, stato, peer: 'P'}, 
           [[], ["Ordine annullato ✓"]], o["ritira"])
 
 
-def prove_conto_due_colonne():
-    """IL CONTO A INTERVALLO IN DUE COLONNE (6 ott 2026, ritocco di
+def prove_conto_intervallo():
+    """(7 ott 2026, decisioni di Andrea) LE DUE COLONNE SE NE SONO ANDATE:
+    sul libro l'intervallo si sceglie prima del conto, nella pagina del mio
+    scambio si aspetta chi prende, e ogni conto P2P ha una colonna sola con
+    «sats» piccolo e grigio. Restano vere le righe di testo «da … a …» e la
+    `fmt` a quattro cifre. Quel che segue e' la storia del 6 ott.
+    IL CONTO A INTERVALLO IN DUE COLONNE (6 ott 2026, ritocco di
     Andrea). Su un ordine «da 5 a 15 €» il riquadro del dettaglio
     scriveva i due capi nella stessa cella: «≈ 6534–19 601 sats» si
     leggeva come una sottrazione, «≈ −196–588» peggio (un meno che vale
@@ -118447,7 +118440,7 @@ def prove_conto_due_colonne():
     (decisione di Andrea: resta la scelta di agosto, in tutta l'app).
     I casi del conto vero girano nel banco di `prove_p2p_dettaglio`;
     qui i giudici puri in node e le sentinelle sui posti."""
-    print("\n[il conto a intervallo in due colonne]")
+    print("\n[il conto a intervallo: la cifra prima, «sats» piccolo]")
     import shutil
     import subprocess
     import tempfile
@@ -118461,32 +118454,26 @@ def prove_conto_due_colonne():
     cd = pezzo_js(mini, "function contoDettP2P(o){", "\n}\n")
     prova("il conto non unisce piu' i capi col trattino", False,
           "join('–')" in cd or "'–'" in cd)
-    prova("...decide le due colonne dal numero dei capi, e le celle passano da `cella`",
-          True, "const due = conti.length === 2;" in cd
-          and "conti.map(c => num(conSats(cella(c, campo, segno)), segno)).join('')" in cd)
-    # (6 ott 2026, secondo ritocco) l'unita' su ogni cifra in sats, mai
-    # su un trattino; e la fee a zero la porta anche lei. (7 ott 2026,
-    # richiesta di Andrea) l'unita' e' «sats», non piu' il ₿
-    prova("...ogni cella in sats porta «sats» (un trattino no), anche la fee a zero", True,
+    # (7 ott 2026, decisione di Andrea) IL CONTO HA UNA COLONNA SOLA:
+    # niente `due`, niente larghezza delle colonne, niente `conto-due`
+    cdc = _senza_commenti_js(cd)
+    prova("il conto ha una colonna sola: niente `due`, niente `--n`, niente `conto-due`",
+          [True, False, False, False, False],
+          ["const euri = [o.euro];" in cd, "const due" in cdc, "larga" in cdc,
+           "conto-due" in mini, "--n:" in cdc])
+    # ...e ogni cifra in sats passa da `conSats`, la fee a zero compresa
+    # (7 ott 2026: anche a importo fisso, «uguale alla cifra scelta»)
+    prova("...ogni cifra in sats porta «sats» piccolo (un trattino no), anche la fee a zero", True,
           "const conSats = t => t === '—' ? t" in cd
-          and "num(conSats('0')) + num(conSats('0'))" in cd)
+          and "const cifraNuda = (campo, segno) => vivo ? conSats(cella(conti[0], campo, segno)) : '—';" in cd
+          and "const cifra = (campo, segno) => num(cifraNuda(campo, segno), segno);" in cd
+          and "    : num(conSats('0'));" in cd
+          and "unitaPiccola" not in mini)
     prova("...e nel conto non resta nessun ₿, ne' la sua funzione", [False, False],
-          ["₿" in _senza_commenti_js(cd), "conBtc" in mini])
-    prova("...l'intestazione sta in cima, prima del Controvalore, e non dice «sats»",
-          True, "+ (due ? r('', cifreEuro, 'capi') : '')" in cd
-          and cd.index("r('', cifreEuro, 'capi')")
-          < cd.index("+ r(etichettaCtrl, cifra('ctrl'))")
-          and "'cifre in sats'" not in mini)
-    # « sats» nel suo corpo piccolo e' largo 23,9 px, due caratteri del
-    # mono ne fanno 19,8: contato due, la cella del «Ricevi» usciva dalla
-    # sua colonna di tre pixel (misurato a 375 e 320 nel cantiere)
-    prova("...e la larghezza conta « sats» per due caratteri e mezzo", True,
-          "lungo(fmt(Math.max(c.ctrl, c.merc, c.netto))) + 4.5" in cd
-          and "lungo(fmt(Math.max(c.premio, c.meta))) + 5.5" in cd)
-    prova("...la scatola porta `conto-due` e la larghezza delle colonne", True,
-          "' conto-due\" style=\"--n:' + larga + '\">'" in cd)
-    prova("...e a due colonne il Controvalore non ripete gli euro nell'etichetta",
-          True, "const etichettaCtrl = (euroNoto && !due) ?" in cd)
+          ["₿" in cdc, "conBtc" in mini])
+    prova("...e il Controvalore dice i suoi euro nell'etichetta", True,
+          "const etichettaCtrl = euroNoto ? 'Controvalore di <b>'" in cd
+          and "const cifreEuro = euroNoto ? num(euriTesto + ' ' + monetaP2P(o)) : num('—');" in cd)
     # (7 ott 2026, decisione di Andrea) NESSUNA PAGINA CHIEDE PIU' DUE
     # COLONNE: la pagina del MIO scambio a intervallo, prima della presa,
     # mostra la fascia e la frase (la cifra la sceglie chi prende); il
@@ -118511,19 +118498,19 @@ def prove_conto_due_colonne():
     # piu' lunga (cosi' a 320 le celle scendono invece di schiacciarla),
     # le celle in colonna, e la riga dell'euro della card che lascia il
     # posto all'anello
-    prova("CSS: la riga del conto a due colonne non e' piu' una griglia", False,
-          ".conto-due .ctrl-riga{display:grid" in mini)
-    for regola in (".conto-due{--col:calc(var(--n, 9) * 9.9px)}",
-                   ".conto-due .ctrl-riga>span:first-child{flex:1 1 0;min-width:min-content}",
-                   ".conto-due .ctrl-riga .mono{flex:0 0 auto;display:grid;\n"
-                   "    grid-template-columns:var(--col) var(--col);column-gap:10px;justify-items:end}",
-                   ".p2p-ord>.conto-due>.ctrl-riga{padding-right:calc(10px + var(--chiusa-bordo))}",
-                   ".p2p-ord>.p2p-grande{display:block;padding-right:52px}",
+    prova("CSS: nessuna regola delle due colonne", False, ".conto-due" in mini)
+    for regola in (".p2p-ord>.p2p-grande{display:block;padding-right:52px}",
                    # (7 ott 2026) «sats» veste come «da» e «a» delle card
                    # P2P: la STESSA regola, non una copia che si scolla
                    ".card-p2p .p2p-vt-verbo,\n  .conto-p2p .unita-sats{font-family:Nunito,sans-serif;font-size:10.5px;\n"
                    "    font-weight:800;color:#797263;margin-right:4px;letter-spacing:.01em}",
                    ".conto-p2p .unita-sats{margin-right:0;color:var(--unita-sats)}",
+                   # (7 ott 2026) tutti i grigi del cartellino a 4,52:1
+                   # sulla carta, lo stesso di «da»/«a»
+                   ".tag-price .price-sub,.tag-price .price .unit{color:#797263}",
+                   ".tag-price.ferie .price, .tag-price.esaurito .price{color:#797263}",
+                   ".tag-price .price-was{font-size:10.5px;color:#797263;line-height:1.1}",
+                   ".tag-price .price-da{font-size:11px;font-weight:700;color:#797263}",
                    "    --unita-sats:#635E51;\n",
                    "    --unita-sats:#938C7C;\n",
                    ".conto-p2p .solo-voce{position:absolute;width:1px;height:1px;\n"
@@ -124539,7 +124526,7 @@ def main():
               prove_casa_vuota_gratis,
               prove_spedizione_standard,
               prove_cambio_converte,
-              prove_paga_ora, prove_apri_wallet_p2p, prove_conto_due_colonne,
+              prove_paga_ora, prove_apri_wallet_p2p, prove_conto_intervallo,
               prove_catalogo_esterno,
               prove_modulo_negozio,
               prove_script_nel_workflow, prove_deploy,

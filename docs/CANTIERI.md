@@ -38180,3 +38180,34 @@ rifatto nei due versi, messaggio a Mostro di nuovo identico.
 **DA GUARDARE.** Sul telefono: il fuoco dopo «Continua» con TalkBack e
 VoiceOver (letto dal DOM, non ascoltato); l'indietro di Telegram da
 «Quanto» con la tastiera aperta.
+
+**IL SECONDO GIRO, lo stesso giorno (decisioni di Andrea sugli scatti).**
+1) Le due colonne di `contoDettP2P` TOLTE, col loro CSS (`conto-due`,
+`--n`, l'intestazione dei capi, il filo della pagina dello scambio) e
+le loro prove: un intervallo che arrivasse al conto lo stesso si conta
+sul minimo. 2) «sats» piccolo e grigio su OGNI conto P2P, anche a
+importo fisso («uguale alla cifra scelta»): via `unitaPiccola`; le prove
+che leggono il conto come testo («≈ 12000 sats») passano da
+`_piatto_sats`, quelle del markup leggono il crudo. 3) Tutti i grigi del
+cartellino a #797263 (4,52:1 sulla carta, che e' fissa nei due temi): la
+riga dei sats e il suo €, il prezzo barrato, il «da», e il prezzo delle
+ferie e dello scaffale vuoto, che portavano lo stesso #8A8271 per la
+stessa ragione. 4) «Ordine preso» sul mio ordine non preso: NON ERA UN
+DIFETTO DELL'APP ma del mio banco — la riga seminata per lo scatto non
+aveva `mio: true`, e la pubblicazione vera lo scrive (con `stato:
+'pubblico'`), e il primo passo dice gia' «Ordine pubblicato — Aspetta chi
+ti compra i sats» dal 15 set. Rifatto lo scatto con la riga fedele;
+aggiunta la sentinella della meta' mancante (la riga di «Pubblica» porta
+`mio: true`). La lezione e' quella del giro dal vivo che mente: una riga
+seminata a mano va copiata da quella che scrive il codice vero.
+PROVATO (secondo giro): le prove del conto riscritte per la colonna
+sola (un intervallo passato al conto conta il minimo; nessun `conto-due`
+ne' ₿ in nessun conto; «sats» piccolo e la sua voce a importo fisso), la
+sentinella del grigio fisso delle ferie aggiornata al nuovo valore, i
+quattro grigi del cartellino nella lista del CSS. Tortura sulle righe
+nuove 14 su 14. Suite intera severa: 19.182 verdi e 1 rossa (quella
+sentinella delle ferie, che cercava #8A8271), poi corretta e la sua
+sezione verde (47); i 38 collaudi della CI verdi. Contrasti misurati
+sulla pagina: i grigi del cartellino 4,52:1 nei due temi, «sats» nel
+conto 6,46:1 di giorno e 4,54:1 di sera. Giro dal vivo coi tocchi veri
+rifatto: messaggio a Mostro identico a main nei due versi. Base 7a97778.

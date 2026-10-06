@@ -1034,7 +1034,13 @@
      .detail-price .unit). Due dichiarazioni in tutto, e nessuna
      regola di stato deve mai nominare .unit: se ne aggiungi una,
      falla finire sul solo .price. */
-  .tag-price .price-sub,.tag-price .price .unit{color:#8A8271}
+  /* IL GRIGIO DELLA CARTA A 4,5:1 (7 ott 2026, richiesta di Andrea):
+     era #8A8271, 3,6:1 sulla carta del cartellino (#FFF8EA, fissa nei
+     due temi). #797263 e' lo scurimento MINIMO per arrivare a 4,52, ed
+     e' lo stesso grigio di «da»/«a» delle card P2P: tutti i grigi del
+     cartellino — questa riga, il prezzo barrato, il «da», le ferie e lo
+     scaffale vuoto — sono uno solo */
+  .tag-price .price-sub,.tag-price .price .unit{color:#797263}
   .tag-price .price-sub{margin-top:0}
 
   /* ---------- la striscia delle categorie in home (ago 2026) ----
@@ -1655,7 +1661,7 @@
   /* Il prezzo del cartellino in GRIGIO — e il grigio e' un valore
      FISSO, mai var(--muted): .tag-price e' di carta chiara nei due
      temi (il patto dell'etichetta prezzo), e il token di notte
-     diventa chiaro e sparirebbe sulla carta. E' lo stesso #8A8271
+     diventa chiaro e sparirebbe sulla carta. E' lo stesso #797263
      del price-sub e del barrato, che vivono sulla stessa carta.
      MISURATO, e vale la pena averlo scritto: sulla carta #FFF8EA
      questo grigio rende 3,60 — e il prezzo ARANCIO di sempre, li'
@@ -1665,7 +1671,7 @@
      ferie piu' leggibili di un prezzo vero: il contrario di quel che
      deve dire. Chi un giorno alzera' il contrasto del cartellino
      alzi PRIMA quello arancio, e questo dietro di lui. */
-  .tag-price.ferie .price, .tag-price.esaurito .price{color:#8A8271}
+  .tag-price.ferie .price, .tag-price.esaurito .price{color:#797263}
   /* Nel dettaglio invece il token e' quello GIUSTO: li' il prezzo sta
      sulla pagina, e l'inchiostro segue la carta come ovunque. */
   .detail-price.ferie, .detail-price.esaurito{color:var(--muted)}
@@ -1729,7 +1735,7 @@
     box-shadow:0 1px 4px rgba(0,0,0,.18)}
   .card-rifornisci:active{transform:scale(.94)}
   /* Il listino barrato sul cartellino: piccolo, sopra il prezzo vero */
-  .tag-price .price-was{font-size:10.5px;color:#8A8271;line-height:1.1}
+  .tag-price .price-was{font-size:10.5px;color:#797263;line-height:1.1}
   .tag-price .price-was .unit{font-size:10.5px}
   /* Nel dettaglio: barrato + badge sopra il prezzo, riga countdown
      sotto. Il badge e' lo STESSO rosso della card (coerenza). Il
@@ -6101,45 +6107,15 @@
   .conto-p2p .ctrl-riga .premio-nota{flex:0 0 100%;margin-top:-5px;
     font-size:12.5px;font-weight:600;color:var(--ink-soft);white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis}
-  /* ══ IL CONTO A INTERVALLO IN DUE COLONNE (6 ott 2026, ritocco di
-     Andrea) ══ una colonna per capo, sotto l'intestazione del suo
-     importo in euro: l'etichetta a sinistra, che va a capo lei e a
-     parole, e a destra le due celle.
-     ⚠️ LA RIGA RESTA UN FLEX CHE PUO' ANDARE A CAPO, e la regola che
-     conta e' `flex:1 1 0` con `min-width:min-content` sull'etichetta:
-     il flex decide se le celle stanno sulla stessa riga guardando la
-     base CLAMPATA, cioe' la parola piu' lunga dell'etichetta e non la
-     frase intera. Quindi le celle restano accanto finche' «Controvalore»
-     ci sta intero, e quando non ci sta (a 320 px, o un intervallo da
-     sette cifre) scendono su una riga loro, a destra e sempre in
-     colonna — mai sopra l'etichetta. Il primo giro era una griglia
-     `minmax(0,1fr) auto`: con l'unita' in ogni cella, a 320 le celle
-     schiacciavano l'etichetta sotto la sua parola piu' lunga.
-     ⚠️ LE COLONNE HANNO UNA LARGHEZZA SOLA PER TUTTO IL CONTO, e la
-     dice `--n` (i caratteri della cella piu' lunga, scritti da
-     `contoDettP2P`): con `auto` ogni riga misurerebbe le sue cifre, e
-     i capi non starebbero in colonna. IN PIXEL E NON IN `ch`, perche'
-     il `ch` segue il corpo della riga e le due righe in scatola sono
-     piu' grandi (16,5 contro 14): 9,9px e' il carattere del mono a
-     16,5 (0,6 em), quindi ci sta anche il totale, e le celle allineate
-     a destra cadono sullo stesso filo in ogni riga. */
-  .conto-due{--col:calc(var(--n, 9) * 9.9px)}
-  .conto-due .ctrl-riga>span:first-child{flex:1 1 0;min-width:min-content}
-  .conto-due .ctrl-riga .mono{flex:0 0 auto;display:grid;
-    grid-template-columns:var(--col) var(--col);column-gap:10px;justify-items:end}
-  /* l'intestazione: i due importi in inchiostro pieno, e a sinistra
-     niente — l'unita' la porta ogni cella (6 ott 2026) */
-  .conto-due .ctrl-riga.capi{padding:6px 0 7px}
-  .conto-due .ctrl-riga.capi .mono{font-weight:800;color:var(--ink)}
-  /* «SATS» DOPO OGNI CIFRA, PICCOLO E GRIGIO (7 ott 2026, richiesta di
-     Andrea: era il ₿, l'unico rimasto nell'app accanto a una cifra in
-     sats). Lo spazio e' poco, quindi la parola veste come «da» e «a»
+  /* «SATS» DOPO OGNI CIFRA DEL CONTO P2P, PICCOLO E GRIGIO (7 ott 2026,
+     richiesta di Andrea: nel conto a intervallo era il ₿, negli altri
+     la parola nel corpo del numero). La parola veste come «da» e «a»
      nelle card P2P della home — la regola e' quella, condivisa (vedi
      `.card-p2p .p2p-vt-verbo`) — e la cifra resta nel mono del conto:
      la parola pesa meno del numero. Qui niente margine a destra: la
-     parola chiude la cella, e la cella sta sul filo della colonna come
-     il € delle celle in euro. Lo spazio prima sta DENTRO la parolina,
-     nel suo corpo piccolo, come la « a» del cartellino. */
+     parola chiude la riga, sul filo delle cifre in euro. Lo spazio
+     prima sta DENTRO la parolina, nel suo corpo piccolo, come la « a»
+     del cartellino. Il grigio e' del tema (`--unita-sats`). */
   .conto-p2p .unita-sats{margin-right:0;color:var(--unita-sats)}
   /* ...e il lettore vocale non legge la cella che si vede (lo spazio
      stretto delle migliaia si legge male, o cifra per cifra): legge la
@@ -6169,11 +6145,6 @@
   .conto-scelto:focus{outline:none}
   .conto-scelto:focus-visible{outline:2px solid var(--ink-soft);outline-offset:4px;
     border-radius:6px}
-  /* ...e nella pagina di uno scambio il conto non ha il suo dentro (vedi
-     `.p2p-ord>.ctrl-conto`) mentre la scatola in fondo si', di 10px piu'
-     il bordo: le righe di sopra rientrano dello stesso tanto a destra,
-     o le colonne della scatola cadrebbero fuori filo */
-  .p2p-ord>.conto-due>.ctrl-riga{padding-right:calc(10px + var(--chiusa-bordo))}
   /* la riga della convenienza a sats fissi (27 set 2026), in cima al
      conto: una frase, non una voce — corpo piccolo, inchiostro morbido,
      il filo del conto sotto. I due pezzi vanno a capo INTERI («Premio
@@ -7550,7 +7521,7 @@
   .var-chip.on.spento{color:var(--on-ink);text-decoration:none}
   .var-chip:not(.on):active{transform:scale(.95)}
   /* il «da» del cartellino di una famiglia coi prezzi diversi */
-  .tag-price .price-da{font-size:11px;font-weight:700;color:#8A8271}
+  .tag-price .price-da{font-size:11px;font-weight:700;color:#797263}
   /* Le condizioni come pillola colorata: la scala parla col colore —
      verde pieno → verde tenue → ambra → arancio → grigio. Coppie
      dalla palette di casa, contrasto AA nei due temi (dove la coppia
@@ -55265,7 +55236,13 @@ function contoDettP2P(o){
     + '"><span>' + t + '</span><span class="mono">' + v + '</span></div>';
   /* i capi dell'intervallo, un contarello per ciascuno: `premio` e
      `meta` sono POSITIVI, il verso lo mette la riga */
-  const euri = (o.euroMax && !fisso) ? [o.euro, o.euroMax] : [o.euro];
+  /* (7 ott 2026) IL CONTO HA UNA COLONNA SOLA: le due colonne di un
+     intervallo se ne sono andate (decisione di Andrea) — il foglio del
+     libro chiede prima la cifra, la pagina del mio scambio aspetta chi
+     prende. Un intervallo che arrivasse qui lo stesso si conta sul
+     minimo. `conti` resta una lista di un elemento: `cella` lo legge
+     cosi' da sempre. */
+  const euri = [o.euro];
   const conti = euri.map(e => {
     /* ⚠️ `vivo` NON BASTA PIU' PER GUARDARE IL CAMBIO: con la cifra
        detta dal coordinatore e' vero anche a cambio muto, e una
@@ -55300,35 +55277,16 @@ function contoDettP2P(o){
      cifra col suo ≈ e la sua unita' e' un gruppo indivisibile»)
      portata dentro una riga che adesso ha il permesso di andare a
      capo. */
-  /* ⚠️ SU UN INTERVALLO IL CONTO VA IN DUE COLONNE (6 ott 2026,
-     ritocco di Andrea): i due capi stavano nella stessa cella, «≈
-     6534–19 601 sats», e col segno davanti diventavano «≈ −196–588» —
-     una sottrazione, o un meno che vale per il primo numero e non per
-     il secondo. Adesso ogni capo ha la SUA cella, col suo ≈ e il suo
-     segno, sotto l'intestazione del suo importo in euro, e fra due
-     numeri non c'e' piu' nessun trattino. A importo fisso il conto
-     resta su una colonna, com'era. */
-  /* (7 ott 2026) NESSUNA PAGINA CHIEDE PIU' DUE COLONNE: su un
-     intervallo il foglio del libro mostra la frase finche' la cifra non
-     e' scelta, e poi il conto di quella cifra; la pagina del mio
-     scambio mostra la frase finche' qualcuno non prende. Il ramo resta,
-     provato, per chi chiamasse il conto con due capi. */
-  const due = conti.length === 2;
   const circaDi = campo => !esatto || campo === 'meta'
     || (campo === 'netto' && conti[0].meta > 0)
     || (ricavato && campo !== 'merc');
-  /* una cella e' un capo solo, senza unita': su una colonna «sats» lo
-     aggiunge `cifraNuda`, in due colonne lo aggiunge `conSats` */
+  /* una cella e' la cifra senza unita': «sats» lo aggiunge `conSats` */
   const cella = (c, campo, segno) => vivo
     ? (circaDi(campo) ? '≈ ' : '') + (segno || '') + fmt(c[campo]) : '—';
-  /* (7 ott 2026) SUL CONTO DI UNA CIFRA SCELTA «sats» VESTE PICCOLO E
-     GRIGIO, come in due colonne (`conSats`): lo chiede chi lo apre,
-     con `unitaPiccola`. Gli ordini a importo fisso restano com'erano
-     (decisione di Andrea: «quelli a importo fisso restano come sono»). */
-  const piccola = !!o.unitaPiccola;
-  const cifraNuda = (campo, segno) => !vivo ? '—'
-    : piccola ? conSats(cella(conti[0], campo, segno))
-    : cella(conti[0], campo, segno) + ' sats';
+  /* (7 ott 2026, decisioni di Andrea) SU OGNI CONTO P2P «sats» VESTE
+     PICCOLO E GRIGIO (`conSats`): prima sulla cifra scelta di un
+     intervallo, poi anche a importo fisso — «uguale alla cifra scelta» */
+  const cifraNuda = (campo, segno) => vivo ? conSats(cella(conti[0], campo, segno)) : '—';
   /* ⚠️ IL SEGNO DECIDE IL COLORE (set 2026, ritocco di Andrea): nel
      conto il verde e il rosso non sono un GIUDIZIO ma una DIREZIONE —
      verde se quei sats si aggiungono a quel che ti arriva, rosso se
@@ -55342,20 +55300,13 @@ function contoDettP2P(o){
   const num = (t, segno) => '<span class="num'
     + (segno === '+' ? ' piu' : segno === '−' ? ' meno' : '')
     + '">' + t + '</span>';
-  /* ⚠️ IN DUE COLONNE OGNI CIFRA IN SATS PORTA LA SUA UNITA' (6 ott
-     2026, ritocco di Andrea): «nessun numero resta senza significato».
-     Il primo giro diceva «cifre in sats» una volta, nell'intestazione, e
-     sotto le celle erano numeri nudi — accanto a celle in € che il loro
-     segno ce l'avevano. L'unita' sta DOPO la cifra come il € nelle celle
-     in euro. Un trattino resta un trattino: niente unita' su un numero
-     che non c'e'.
-     ⚠️ E L'UNITA' E' LA PAROLA «SATS», NON IL ₿ (7 ott 2026, richiesta
-     di Andrea): qui era rimasto l'unico ₿ dell'app accanto a una cifra
-     in sats, e ogni altro posto dice «sats». La parola veste piccola e
-     grigia (`.unita-sats`, la regola di «da» e «a» nelle card P2P): lo
-     spazio e' poco, e cosi' non ruba la colonna al numero. Il simbolo
-     dei satoshi era stato provato e scartato lo stesso giorno (14a3a4c,
-     «troppo confusionario»).
+  /* ⚠️ OGNI CIFRA IN SATS PORTA LA PAROLA «SATS», PICCOLA E GRIGIA
+     (7 ott 2026, richiesta di Andrea): nel conto a intervallo era il ₿
+     (6 ott 2026), negli altri la parola nel corpo della cifra. Adesso
+     veste come «da» e «a» nelle card P2P (`.unita-sats`): la parola
+     pesa meno del numero. Il simbolo dei satoshi era stato provato e
+     scartato (14a3a4c, «troppo confusionario»). Un trattino resta un
+     trattino: niente unita' su un numero che non c'e'.
      IL LETTORE VOCALE SENTE «≈ 21.000 sats»: la cella che si vede e'
      `aria-hidden`, e la copia per la voce (`.solo-voce`) scrive le
      migliaia col punto — lo spazio stretto di `fmt`, letto ad alta
@@ -55363,11 +55314,7 @@ function contoDettP2P(o){
   const conSats = t => t === '—' ? t
     : '<span aria-hidden="true">' + t + '<span class="unita-sats"> sats</span></span>'
       + '<span class="solo-voce">' + t.replace(/\u202F/g, '.') + ' sats</span>';
-  /* in due colonne la voce e' fatta di due `.num`, uno per capo: il
-     CSS di `.conto-due` li mette in colonna */
-  const cifra = (campo, segno) => due
-    ? conti.map(c => num(conSats(cella(c, campo, segno)), segno)).join('')
-    : num(cifraNuda(campo, segno), segno);
+  const cifra = (campo, segno) => num(cifraNuda(campo, segno), segno);
   /* ⚠️ L'IMPORTO IN EURO COMPARE DUE VOLTE, E NON E' UN DOPPIONE
      (12 set 2026, ritocco di Andrea): in fondo, a destra, e' quel che
      si PAGA; nell'etichetta del Controvalore e' la BASE da cui il
@@ -55379,17 +55326,9 @@ function contoDettP2P(o){
      percentuale del premio: a sinistra il nome della voce con quanto
      vale, a destra le sole cifre in sats. La riga e' una sola regola
      ripetuta tre volte. */
-  const euriTesto = capiP2P(esc(fmtEur(o.euro)), o.euroMax ? esc(fmtEur(o.euroMax)) : '');
-  /* IN DUE COLONNE GLI EURO SONO LE INTESTAZIONI, e il Controvalore
-     torna a chiamarsi e basta: i suoi euro gli stanno sopra la testa.
-     La riga in fondo li ripete cella per cella, col solo SEGNO della
-     moneta — una bandierina in una colonna ruberebbe la larghezza che
-     serve alle cifre (la stessa ragione di `segnoMonetaP2P`). */
-  const cifreEuro = due
-    ? (euroNoto ? euri.map(e => num(esc(fmtEur(e)) + ' ' + segnoMonetaP2P(o))).join('')
-                : num('—') + num('—'))
-    : euroNoto ? num(euriTesto + ' ' + monetaP2P(o)) : num('—');
-  const etichettaCtrl = (euroNoto && !due) ? 'Controvalore di <b>' + euriTesto + ' '
+  const euriTesto = esc(fmtEur(o.euro));
+  const cifreEuro = euroNoto ? num(euriTesto + ' ' + monetaP2P(o)) : num('—');
+  const etichettaCtrl = euroNoto ? 'Controvalore di <b>' + euriTesto + ' '
     + segnoMonetaP2P(o) + '</b>' : 'Controvalore';
   /* la commissione: percentuale di chi legge + la sua cifra; «in
      promo» quando la fee viva sta sotto il listino di Barattolo —
@@ -55428,9 +55367,9 @@ function contoDettP2P(o){
     + (fee > 0 ? ' <b class="p2p-avviso">' + esc(mezzaCommissioneP2P(fee))
                  + '%</b>' : '')
     + promo;
-  const commissione = fee === null ? (due ? num('—') + num('—') : num('—'))
+  const commissione = fee === null ? num('—')
     : fee > 0 ? cifra('meta', compro ? '−' : '+')
-    : (due ? num(conSats('0')) + num(conSats('0')) : num(piccola ? conSats('0') : '0 sats'));
+    : num(conSats('0'));
   /* il premio c'e' solo quando pende: una riga a zero direbbe «niente
      premio», che non e' un'informazione (la regola dello sconto).
      ⚠️ E IL GIUDIZIO NON SI RIBATTE QUI: era la TERZA copia della
@@ -55532,28 +55471,9 @@ function contoDettP2P(o){
   /* IL LATO SULLA SCATOLA (28 set 2026): e' il colore della riga dei
      sats, verde se arrivano a chi legge e rosso se escono, deciso QUI
      da `compro` e mai dal tab del libro (vedi il CSS di `.conto-p2p`) */
-  /* LA LARGHEZZA DELLE DUE COLONNE la decide la cella piu' lunga, in
-     caratteri: la cifra piu' grande fra i sats (un numero piu' grande
-     non si scrive mai piu' corto) col suo ≈ e il suo « sats» — e col
-     segno, per le due voci che lo portano —, o un capo in euro col suo
-     segno. « SATS» VALE DUE CARATTERI E MEZZO (7 ott 2026): nel suo
-     corpo piccolo e' largo 23,9 px, misurato, contro i 19,8 di due
-     caratteri del mono — contato due, nella riga «Ricevi» la cella
-     usciva dalla sua colonna di tre pixel. Lo spazio
-     stretto delle migliaia vale MEZZO carattere: contato intero, a 320
-     px le colonne rubavano all'etichetta una lettera per gruppo. La
-     legge il CSS di `.conto-due` (`--n`). */
-  const lungo = s => s.length - (s.split('\u202F').length - 1) / 2;
-  const larga = due ? Math.max(
-    ...conti.map(c => lungo(fmt(Math.max(c.ctrl, c.merc, c.netto))) + 4.5),
-    ...conti.map(c => lungo(fmt(Math.max(c.premio, c.meta))) + 5.5),
-    ...euri.map(e => fmtEur(e).length + 2)) : 0;
   return '<div class="ctrl-conto conto-p2p ' + (compro ? 'lato-compro' : 'lato-vendo')
-    + (due ? ' conto-due" style="--n:' + larga + '">' : '">')
+    + '">'
     + rigaConvenienzaFissaP2P(o, convFissa)
-    /* l'intestazione delle due colonne: i capi in euro, e a sinistra
-       niente — dal 6 ott 2026 l'unita' la porta ogni cella, il ₿ */
-    + (due ? r('', cifreEuro, 'capi') : '')
     + r(etichettaCtrl, cifra('ctrl'))
     + premio
     /* ⚠️ IL SUBTOTALE STA FRA IL PREMIO E LA FEE, e non e' un vezzo di
@@ -55846,7 +55766,7 @@ function renderDettaglioP2P(){
       ? contoAttesaP2P(o, tuo ? FRASE_INTERVALLO_DOPO_PRESA
                               : 'Scegli quanto vuoi ' + verboEuro + ' per vedere il dettaglio')
       : (scelto ? rigaImportoSceltoP2P(o, scelto) : '')
-        + contoDettP2P(scelto ? Object.assign({}, o, {euro: scelto, euroMax: 0, unitaPiccola: true}) : o)) +
+        + contoDettP2P(scelto ? Object.assign({}, o, {euro: scelto, euroMax: 0}) : o)) +
     /* LA SPIEGAZIONE CHE STAVA NEL FOGLIO DI CONFERMA: non si perde
        col foglio, si sposta sopra i due bottoni — dove la legge chi
        sta per premerli. */

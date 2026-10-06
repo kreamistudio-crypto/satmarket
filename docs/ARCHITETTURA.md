@@ -7368,13 +7368,16 @@
   `eseguiPresaP2P(id, euro scelti, metodo)` — messaggio a Mostro
   identico, confrontato dal vivo. La pagina del MIO scambio a intervallo
   non ancora preso mostra la fascia e `FRASE_INTERVALLO_DOPO_PRESA`;
-  alla presa `euroMax` va a zero e il conto torna. Il ramo a due colonne
-  di `contoDettP2P` (`conto-due`, `--n`) resta, provato, ma nessuno lo
-  chiama piu'. Sul conto di una cifra scelta (e in due colonne) le cifre
-  in sats portano «sats» piccolo e grigio (`conSats`, la veste di
-  `.p2p-vt-verbo`, col grigio `--unita-sats` a 4,5:1 nei due temi) e
-  una copia per il lettore vocale (`.solo-voce`, «≈ 21.000 sats»); gli
-  ordini a importo fisso restano col «sats» di sempre. I bottoni del
+  alla presa `euroMax` va a zero e il conto torna. `contoDettP2P` ha
+  UNA colonna sola (le due colonne, `conto-due` e `--n`, tolte il 7 ott
+  2026; un intervallo che arrivasse lo stesso si conta sul minimo). Su
+  ogni conto P2P, cifra scelta o importo fisso, le cifre in sats portano
+  «sats» piccolo e grigio (`conSats`, la veste di `.p2p-vt-verbo`, col
+  grigio `--unita-sats` a 4,5:1 nei due temi) e una copia per il lettore
+  vocale (`.solo-voce`, «≈ 21.000 sats»); le prove che leggono il conto
+  come testo passano da `_piatto_sats`. I grigi del cartellino (riga dei
+  sats e il suo €, prezzo barrato, «da», ferie ed esaurito) sono uno
+  solo, #797263, 4,52:1 sulla carta fissa dei due temi. I bottoni del
   foglio vestono il lato: «Compra» `primary` verde, «Vendi» `rosso`,
   come i due «Pubblica ordine» (`vestitoInvioP2P`); «Scegli» resta
   arancio. Nelle righe di testo (card del libro, «I
