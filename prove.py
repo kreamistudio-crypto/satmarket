@@ -59099,8 +59099,8 @@ def prove_p2p_libro():
     # bottone della pagina. I suoi casi girano in prove_p2p_dettaglio;
     # qui resta la meta' che riguarda il LIBRO: il range e' prendibile.
     _pr = pezzo_js(mini, "function confermaDettaglioP2P(){", "\n}\n")
-    prova("il range devia sul foglio che chiede quanto", True,
-          "if (o.euroMax) { apriQuantoP2P(id); return; }" in _pr)
+    prova("il range devia sul foglio che chiede quanto (finche' la cifra non c'e')", True,
+          "if (o.euroMax && !p2pDettImporto) { haptic(); apriQuantoP2P(id); return; }" in _pr)
     prova("...e del rifiuto di ieri non resta niente", False,
           "si sceglie l\\'importo" in mini)
     # LA CIFRA SCELTA VIAGGIA COME `Payload::Amount`, che mostrod legge
@@ -60517,18 +60517,33 @@ def prove_p2p_dettaglio():
     # visto l'ordine — e adesso sta nel bottone della pagina.
     cd = pezzo_js(mini, "function confermaDettaglioP2P(){", "\n}\n")
     prova("il range devia sul foglio che chiede quanto, dal bottone",
-          True, "if (o.euroMax) { apriQuantoP2P(id); return; }" in cd
+          True, "if (o.euroMax && !p2pDettImporto) { haptic(); apriQuantoP2P(id); return; }" in cd
           and "apriQuantoP2P" not in po)
     prova("...e senza metodo scelto non si prende niente", True,
           "if ((o.metodi || []).length > 1 && !p2pDettMetodo) {" in cd)
     prova("...e la pagina si chiude PRIMA di agire", True,
           0 < cd.find("chiudiFoglioP2P('p2pDettSheet')")
           < cd.find("eseguiPresaP2P("))
-    # ...e da «Quanto» si rientra DRITTI nella presa: ripassare dalla
-    # porta riaprirebbe la pagina appena chiusa
-    prova("da «Quanto» si va dritti alla presa, non alla porta", True,
-          "eseguiPresaP2P(id, g.euro, p2pDettMetodo);"
-          in pezzo_js(mini, "function confermaQuantoP2P(){", "\n}\n"))
+    # ⚠️ (7 ott 2026, decisione di Andrea) DA «QUANTO» NON SI PRENDE PIU':
+    # la cifra torna al foglio del libro, che disegna il conto a una
+    # colonna; a prendere e' il bottone del foglio, con la STESSA chiamata
+    # che fino a ieri partiva da qui — `(id, euro scelti, metodo)`
+    cq_ = pezzo_js(mini, "function confermaQuantoP2P(){", "\n}\n")
+    prova("da «Quanto» la cifra torna al foglio, e da li' non si prende", [True, True, False],
+          ["p2pDettImporto = g.euro;\n  renderDettaglioP2P();" in cq_,
+           "if (p2pDettOrdine !== id) return;" in cq_
+           and "const r = el('p2pDettScelto');" in cq_ and "r.focus({preventScroll: true});" in cq_,
+           "eseguiPresaP2P(" in _senza_commenti_js(cq_)])
+    prova("...e la presa parte dal foglio con la chiamata di sempre", True,
+          "eseguiPresaP2P(id, g ? g.euro : 0, p2pDettMetodo);" in cd
+          and "const g = o.euroMax ? quantoValeP2P(o, String(p2pDettImporto)) : null;" in cd)
+    prova("...e chi torna a cambiare la cifra ritrova la sua", True,
+          "esc(String((p2pDettOrdine === riga.id && p2pDettImporto) || riga.euro))"
+          in pezzo_js(mini, "function renderQuantoP2P(){", "\n}\n"))
+    prova("...la stima di «Quanto» la sente anche il lettore vocale", True,
+          '<div class="hint" id="p2pQuantoStima" aria-live="polite"></div>' in mini)
+    prova("...e un ordine nuovo riparte senza cifra", True,
+          "p2pDettImporto = 0;" in pezzo_js(mini, "function apriDettaglioP2P(id){", "\n}\n"))
 
     # --- 3) QUEL CHE NON CI DEVE ESSERE (decisione di Andrea) -------
     rd = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
@@ -60584,10 +60599,15 @@ def prove_p2p_dettaglio():
               mini, "  .p2p-tempo b{", "}"))
 
     # --- 6) IL PIEDE: I DUE GEMELLI ---------------------------------
-    prova("in fondo ci sono i due bottoni gemelli, come in «Pubblica»",
-          True, '<div class="foglio-piede">' in rd
-          and 'class="btn ghost" onclick="navIndietro()">Annulla' in rd
-          and 'class="btn orange" id="p2pDettVai"' in rd)
+    # (7 ott 2026, decisione di Andrea) «Compra» verde e «Vendi» rosso, i
+    # vestiti dei due «Pubblica ordine» (`vestitoInvioP2P`), mai l'arancio
+    prova("in fondo ci sono i due bottoni gemelli, come in «Pubblica», col verde e il rosso dei lati",
+          [True, True, True, False, True], ['<div class="foglio-piede">' in rd,
+          'class="btn ghost" onclick="navIndietro()">Annulla' in rd,
+          "'<button type=\"button\" class=\"btn ' + (daScegliere ? 'orange' : compro ? 'primary' : 'rosso')\n"
+          "        + '\" id=\"p2pDettVai\"'" in rd,
+          "'<button type=\"button\" class=\"btn orange\" id=\"p2pDettVai\"'" in rd,
+          "return tab ? 'bz' : (p2pLato === 'vendo' ? 'rosso' : 'primary');" in mini])
     # E IL BOTTONE SPENTO DICE PERCHE': un bottone morto senza una
     # ragione visibile e' il vicolo cieco muto del foglio «Pubblica».
     prova("...e il bottone spento porta la sua ragione", True,
@@ -60746,7 +60766,12 @@ def prove_p2p_dettaglio():
         "function renderDettaglioP2P(){",
         "function apriDettaglioP2P(id){",
         "function confermaDettaglioP2P(){",
-        "function metodoSceltoP2P(o){")]
+        "function metodoSceltoP2P(o){",
+        # (7 ott 2026) l'intervallo si sceglie prima del conto
+        "function contoAttesaP2P(o, frase){",
+        "function rigaImportoSceltoP2P(o, scelto){",
+        "function quantoValeP2P(riga, valore){",
+        "function interoP2P(testo){")]
     # le costanti e le due variabili del foglio: dal client, mai ribattute
     for riga in ("const P2P_VALUTA = ", "const P2P_VALUTE = ",
                  "const P2P_CONTANTI = ", "const REGOLA_CONTANTI_COMPRA = ",
@@ -60760,7 +60785,8 @@ def prove_p2p_dettaglio():
                  # giudice non crede a un metro che la supera
                  "const P2P_PREMIO_TAB_MAX = ",
                  "const p2pCoord = ",
-                 "let p2pDettOrdine = ", "let p2pDettMetodo = "):
+                 "let p2pDettOrdine = ", "let p2pDettMetodo = ",
+                 "let p2pDettImporto = ", "const FRASE_INTERVALLO_DOPO_PRESA = "):
         i_a = mini.index(riga)
         pezzi.append(mini[i_a:mini.index("\n", i_a)])
     i_ic = mini.index("const P2P_ICONE = ")
@@ -61064,9 +61090,50 @@ myTgId = 111;
 p2pLibro = {ordini: [ordine({id: 'ord-3', euro: 20, euroMax: 100,
                              metodi: ['SEPA']})]};
 apriDettaglioP2P('ord-3');
-prese = []; quanti = [];
+/* (7 ott 2026) PRIMA DELLA CIFRA: la fascia e la frase al posto del
+   conto, e il bottone «Scegli» del lato */
+out.rangeAttesa = el('p2pDettCorpo').innerHTML;
+prese = []; quanti = []; chiusi = [];
 confermaDettaglioP2P();
 out.rangeDevia = [quanti.length, prese.length];
+out.rangeResta = chiusi.indexOf('p2pDettSheet') < 0;
+/* ...SCELTA LA CIFRA (quel che fa `confermaQuantoP2P`): il conto a una
+   colonna di quella cifra, e il bottone torna «Compra» */
+p2pDettImporto = 60;
+renderDettaglioP2P();
+out.rangeScelto = el('p2pDettCorpo').innerHTML;
+/* ...e con la fee a zero la sua riga dice «0 sats», piccolo anche lei */
+p2pInfo = {fee: 0}; renderDettaglioP2P();
+out.rangeSceltoFeeZero = el('p2pDettCorpo').innerHTML;
+p2pInfo = {fee: 0.02}; renderDettaglioP2P();
+prese = []; quanti = []; chiusi = [];
+confermaDettaglioP2P();
+out.rangePresa = [prese.slice(), quanti.length, chiusi.slice()];
+/* ...una cifra fuori fascia (arrivata da altrove) non prende: si dice
+   e si torna a chiederla */
+apriDettaglioP2P('ord-3'); p2pDettImporto = 5000; toasts = [];
+prese = [];
+confermaDettaglioP2P();
+out.rangeFuori = [prese.length, toasts.slice(), p2pDettImporto,
+                  el('p2pDettCorpo').innerHTML.indexOf('conto-attesa') >= 0];
+/* ...e aprire un altro ordine riparte senza cifra */
+p2pDettImporto = 300;
+apriDettaglioP2P('ord-3');
+out.rangeRiparte = p2pDettImporto;
+/* DAL LATO DI CHI VENDE: «ricevere», il rosso, e «Vendi» dopo la scelta */
+p2pLibro = {ordini: [ordine({id: 'ord-5', lato: 'buy', euro: 20, euroMax: 100,
+                             metodi: ['SEPA']})]};
+apriDettaglioP2P('ord-5');
+out.rangeVendiAttesa = el('p2pDettCorpo').innerHTML;
+p2pDettImporto = 40; renderDettaglioP2P();
+out.rangeVendiScelto = el('p2pDettCorpo').innerHTML;
+prese = []; confermaDettaglioP2P();
+out.rangeVendiPresa = prese.slice();
+/* IL MIO INTERVALLO DAL LIBRO: nessuno sceglie, la frase dice chi lo fara' */
+TUOI.add('ord-5'); apriDettaglioP2P('ord-5');
+out.rangeTuo = el('p2pDettCorpo').innerHTML;
+TUOI.clear();
+p2pLibro = {ordini: [ordine({id: 'ord-3', euro: 20, euroMax: 100, metodi: ['SEPA']})]};
 
 /* ---- IL MIO ORDINE SI GUARDA SOLTANTO (28 set 2026, dalla prova di
    Alan): la pagina lo chiede al giudice, e al posto di «Compra/Vendi»
@@ -61101,6 +61168,44 @@ console.log(JSON.stringify(out));
         o = _json.loads(r.stdout.strip().splitlines()[-1])
     finally:
         _sh.rmtree(d, ignore_errors=True)
+
+    # --- (7 ott 2026) L'INTERVALLO SI SCEGLIE PRIMA DEL CONTO ----------
+    ra = o["rangeAttesa"]
+    prova("intervallo, prima della cifra: la fascia e la frase, nessun conto", [True, True, False, False],
+          ['<div class="conto-attesa-capi">da\u00a020,00 a\u00a0100,00 €</div>' in ra,
+           '<p class="conto-attesa-frase">Scegli quanto vuoi inviare per vedere il dettaglio</p>' in ra,
+           "ctrl-riga" in ra, "conto-due" in ra])
+    # («Scegli» resta arancio, decisione di Andrea: e' il passo che apre «Quanto»)
+    prova("...il bottone dice «Scegli», arancio, e a voce dice cosa", True,
+          '<button type="button" class="btn orange" id="p2pDettVai" aria-label="Scegli quanto inviare"'
+          ' onclick="confermaDettaglioP2P()">Scegli</button>' in ra)
+    prova("...e «Scegli» apre «Quanto» lasciando il foglio aperto sotto, senza prendere",
+          [[1, 0], True], [o["rangeDevia"], o["rangeResta"]])
+    rs = o["rangeScelto"]
+    prova("scelta la cifra: la riga della cifra con la fascia e «Cambia», il conto a UNA colonna", [True, True, False, True],
+          ['Importo scelto: <b>60,00 €</b> <span class="conto-scelto-fascia">(da\u00a020,00 a\u00a0100,00 €)</span>' in rs,
+           'aria-label="Cambia l\'importo scelto" onclick="apriQuantoP2P(p2pDettOrdine)">Cambia</button>' in rs,
+           "conto-due" in rs, "Controvalore di <b>60,00" in rs])
+    prova("...con «sats» piccolo e la sua copia per la voce, e il bottone torna «Compra» verde", [True, True, True],
+          ['<span class="unita-sats"> sats</span>' in rs, '<span class="solo-voce">≈ 120000 sats</span>' in rs,
+           '<button type="button" class="btn primary" id="p2pDettVai" onclick="confermaDettaglioP2P()">Compra</button>' in rs])
+    prova("...e la fee a zero, sulla cifra scelta, dice «0 sats» piccolo e a voce", True,
+          '<span class="num"><span aria-hidden="true">0<span class="unita-sats"> sats</span></span>'
+          '<span class="solo-voce">0 sats</span></span>' in o["rangeSceltoFeeZero"])
+    prova("...e «Compra» prende con LA STESSA CHIAMATA di prima: (id, cifra scelta, metodo), "
+          "a foglio chiuso", [[["ord-3", 60, "SEPA"]], 0, ["p2pDettSheet"]], o["rangePresa"])
+    prova("una cifra fuori fascia non prende: lo dice, e torna a chiederla",
+          [0, ["Scegli una cifra fra 20,00 e 100,00 €."], 0, True], o["rangeFuori"])
+    prova("...e un altro ordine aperto riparte senza cifra", 0, o["rangeRiparte"])
+    rva, rvs = o["rangeVendiAttesa"], o["rangeVendiScelto"]
+    prova("dal lato di chi vende: «ricevere», «Scegli» arancio, e «Vendi» rosso dopo la scelta", [True, True, True, True],
+          ["Scegli quanto vuoi ricevere per vedere il dettaglio" in rva,
+           'class="btn orange" id="p2pDettVai" aria-label="Scegli quanto ricevere"' in rva,
+           '<button type="button" class="btn rosso" id="p2pDettVai" onclick="confermaDettaglioP2P()">Vendi</button>' in rvs,
+           o["rangeVendiPresa"] == [["ord-5", 40, "SEPA"]]])
+    prova("il mio intervallo visto dal libro: la frase di chi prende, e niente «Scegli»", [True, False],
+          ["importo lo sceglie chi prende: il dettaglio compare dopo la presa" in o["rangeTuo"],
+           "p2pDettVai" in o["rangeTuo"]])
 
     prova("il conto alla rovescia si legge, e i giorni solo se ci sono",
           ["00:00:59", "23:47:17", "6g 23:47:17", "00:00:00"], o["conto"])
@@ -61522,42 +61627,54 @@ console.log(JSON.stringify(out));
     # valeva per un capo solo. Adesso ogni capo ha la sua cella.
     cr = o["contoRange"]
     cella = lambda *t: '<span class="mono">' + "".join(t) + "</span>"
-    # (6 ott 2026, secondo ritocco) OGNI CIFRA IN SATS PORTA IL ₿, il
-    # simbolo del toggle €/₿: la larghezza conta anche « ₿», e
-    # l'intestazione non dice piu' «cifre in sats»
+    # (6 ott 2026, secondo ritocco) OGNI CIFRA IN SATS PORTA LA SUA
+    # UNITA', e l'intestazione non dice piu' «cifre in sats». (7 ott
+    # 2026, richiesta di Andrea) L'UNITA' E' LA PAROLA «SATS», non piu'
+    # il ₿: piccola e grigia (`unita-sats`), e per il lettore vocale una
+    # copia della cella fuori dalla vista. La larghezza la conta per due
+    # caratteri e mezzo: 10 di prima + mezzo.
+    sats_vista = lambda t, cls="num": ('<span class="' + cls + '"><span aria-hidden="true">' + t
+                                       + '<span class="unita-sats"> sats</span></span>'
+                                       + '<span class="solo-voce">' + t + ' sats</span></span>')
+    vista = lambda h: re.sub(r'<span class="solo-voce">[^<]*</span>', '', h)
     prova("un intervallo va in due colonne, con la larghezza scritta sulla scatola",
-          True, ' conto-due" style="--n:10">' in cr)
+          True, ' conto-due" style="--n:10.5">' in cr)
     prova("...l'intestazione: i due importi, e a sinistra niente", True,
           '<div class="ctrl-riga capi"><span></span>'
           + cella('<span class="num">20,00 €</span>', '<span class="num">100,00 €</span>')
           in cr)
-    prova("...ogni riga una cella per capo, col SUO ≈ e il SUO ₿", [True, True],
-          [cella('<span class="num">≈ 40000 ₿</span>', '<span class="num">≈ 200000 ₿</span>') in cr,
-           cella('<span class="num">≈ 39600 ₿</span>', '<span class="num">≈ 198000 ₿</span>') in cr])
+    prova("...ogni riga una cella per capo, col SUO ≈ e il SUO «sats»", [True, True],
+          [cella(sats_vista('≈ 40000'), sats_vista('≈ 200000')) in cr,
+           cella(sats_vista('≈ 39600'), sats_vista('≈ 198000')) in cr])
     prova("...e col SUO segno: il meno vale per tutt'e due i capi", True,
-          cella('<span class="num meno">≈ −400 ₿</span>',
-                '<span class="num meno">≈ −2000 ₿</span>') in cr)
-    prova("...nessuna cifra in sats senza il suo ₿, e mai la parola «sats»",
-          [6, False, False], [cr.count(' ₿</span>'), "cifre in sats" in cr,
-                              bool(re.search(r"\d sats", cr))])
-    prova("...e il ₿ anche dalla parte di chi vende, su ogni cella (premio e Subtotale compresi)", [10, False],
-          [o["contoRangeVendi"].count(' ₿</span>'),
-           bool(re.search(r"\d sats", o["contoRangeVendi"]))])
+          cella(sats_vista('≈ −400', 'num meno'), sats_vista('≈ −2000', 'num meno')) in cr)
+    prova("...nessuna cifra in sats senza il suo «sats», e mai il ₿",
+          [6, 6, False, False], [cr.count('<span class="unita-sats"> sats</span>'),
+                                 cr.count('<span class="solo-voce">'),
+                                 "cifre in sats" in cr, "₿" in cr])
+    prova("...a vista la parola sta SEMPRE nel suo span piccolo, mai attaccata alla cifra", False,
+          bool(re.search(r"\d sats", vista(cr))))
+    prova("...e «sats» anche dalla parte di chi vende, su ogni cella (premio e Subtotale compresi)",
+          [10, 10, False, False],
+          [o["contoRangeVendi"].count('<span class="unita-sats"> sats</span>'),
+           o["contoRangeVendi"].count('<span class="solo-voce">'),
+           "₿" in o["contoRangeVendi"],
+           bool(re.search(r"\d sats", vista(o["contoRangeVendi"])))])
     prova("...l'euro in fondo, cella per cella, col segno e senza bandierina",
           [True, False], [cella('<span class="num">20,00 €</span>',
                                 '<span class="num">100,00 €</span>') in cr.split("ctrl-chiusa")[1],
                           "🇪🇺" in cr])
     prova("...e fra due numeri nessun trattino", [False, False, False],
-          ["–" in cr, "–" in o["contoRangeVendi"], "40000 sats" in cr])
+          ["–" in cr, "–" in o["contoRangeVendi"], "40000 sats" in vista(cr)])
     rv = o["contoRangeVendi"]
     prova("dal lato di chi vende con lo sconto: il premio si aggiunge, la fee pure, in ogni colonna",
-          [4, 0, True], [rv.count('class="num piu">≈ +'),
+          [4, 0, True], [rv.count('class="num piu"><span aria-hidden="true">≈ +'),
                          rv.count('class="num meno"'), "lato-vendo conto-due" in rv])
-    prova("a cambio muto: un trattino per colonna, senza ₿, gli euro restano in testa",
-          [True, True, False],
+    prova("a cambio muto: un trattino per colonna, senza unita', gli euro restano in testa",
+          [True, True, False, False],
           [cella('<span class="num">—</span>', '<span class="num">—</span>') in o["contoRangeMuto"],
            '<span class="num">100,00 €</span>' in o["contoRangeMuto"],
-           "₿" in o["contoRangeMuto"]])
+           "unita-sats" in o["contoRangeMuto"], "solo-voce" in o["contoRangeMuto"]])
     prova("con la fee ignota: un trattino per colonna nella sua riga", True,
           cella('<span class="num">—</span>', '<span class="num">—</span>')
           in o["contoRangeSenzaFee"].split("Fee P2P")[1])
@@ -115795,7 +115912,9 @@ def prove_contanti_pagina_leggera():
           [True, True, True],
           ["r(compro ? (o.consegna ? 'Totale da consegnare' : 'Totale da inviare') : 'Ricevi', cifreEuro, 'tot euro')" in cdp,
            "consegna: typeof pagaInContantiP2P === 'function'\n                                              && pagaInContantiP2P(o)}));" in ren,
-           mini.count("contoDettP2P(") == 3 and "contoDettP2P(o) +" in fn("function renderDettaglioP2P(){")])
+           mini.count("contoDettP2P(") == 3
+           and "+ contoDettP2P(scelto ? Object.assign({}, o, {euro: scelto, euroMax: 0, unitaPiccola: true}) : o)) +"
+               in fn("function renderDettaglioP2P(){")])
     prova("il CSS: la regola scura, il passo col filo verde, i numeri, il cassetto senza il triangolo di serie", [True] * 4,
           [".contanti-regola-forte{font-size:14px;font-weight:800;color:var(--ink)" in css,
            ".contanti-incontro{margin-top:10px;padding:10px 8px;border:2px solid var(--trust);" in css,
@@ -115989,12 +116108,18 @@ def prove_contanti_a_mano():
           "regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo] : (o.metodi || []), maxEuroContantiP2P(),"
           in rd and "compro ? 'compro' : 'vendo') +" in rd)
     cd = nudo(fn("function confermaDettaglioP2P(){"))
-    prova("alla presa il tetto si giudica PRIMA di chiudere il foglio e di aprire «Quanto»", True,
-          0 < cd.find("giudiceContantiP2P(o.euro, metPresa, maxEuroContantiP2P())")
-          < cd.find("chiudiFoglioP2P('p2pDettSheet')") < cd.find("apriQuantoP2P(id)"))
+    # (7 ott 2026) su un intervallo senza cifra il bottone e' «Scegli» e
+    # apre «Quanto» SENZA chiudere il foglio; con la cifra scelta il tetto
+    # cade su di lei, PRIMA di chiudere il foglio e di prendere
+    prova("alla presa il tetto si giudica PRIMA di chiudere il foglio e di prendere, "
+          "sulla cifra scelta se c'e'", True,
+          0 < cd.find("if (o.euroMax && !p2pDettImporto) { haptic(); apriQuantoP2P(id); return; }")
+          < cd.find("giudiceContantiP2P(g ? g.euro : o.euro, metPresa, maxEuroContantiP2P())")
+          < cd.find("chiudiFoglioP2P('p2pDettSheet')")
+          < cd.find("eseguiPresaP2P(id, g ? g.euro : 0, p2pDettMetodo)"))
     cq = nudo(fn("function confermaQuantoP2P(){"))
-    prova("...e su un intervallo sulla cifra scelta, prima della presa", True,
-          0 < cq.find("giudiceContantiP2P(g.euro,") < cq.find("eseguiPresaP2P(id, g.euro, p2pDettMetodo)"))
+    prova("...e in «Quanto» il tetto passa PRIMA che la cifra diventi quella scelta", True,
+          0 < cq.find("giudiceContantiP2P(g.euro,") < cq.find("p2pDettImporto = g.euro;"))
     ren = nudo(fn("function renderOrdineP2P(){"))
     prova("il riquadro del contanti sta nella pagina dello scambio, SOPRA il bottone del passo", True,
           0 < ren.find("riquadroContantiP2P(o, azione) +") < ren.find("(bottoni[azione] || '') +"))
@@ -118338,24 +118463,40 @@ def prove_conto_due_colonne():
           "join('–')" in cd or "'–'" in cd)
     prova("...decide le due colonne dal numero dei capi, e le celle passano da `cella`",
           True, "const due = conti.length === 2;" in cd
-          and "conti.map(c => num(conBtc(cella(c, campo, segno)), segno)).join('')" in cd)
-    # (6 ott 2026, secondo ritocco) il ₿ su ogni cifra in sats, mai su
-    # un trattino; e la fee a zero lo porta anche lei
-    prova("...ogni cella in sats porta il ₿ (un trattino no), anche la fee a zero", True,
-          "const conBtc = t => t === '—' ? t : t + ' ₿';" in cd
-          and "num(conBtc('0')) + num(conBtc('0'))" in cd)
+          and "conti.map(c => num(conSats(cella(c, campo, segno)), segno)).join('')" in cd)
+    # (6 ott 2026, secondo ritocco) l'unita' su ogni cifra in sats, mai
+    # su un trattino; e la fee a zero la porta anche lei. (7 ott 2026,
+    # richiesta di Andrea) l'unita' e' «sats», non piu' il ₿
+    prova("...ogni cella in sats porta «sats» (un trattino no), anche la fee a zero", True,
+          "const conSats = t => t === '—' ? t" in cd
+          and "num(conSats('0')) + num(conSats('0'))" in cd)
+    prova("...e nel conto non resta nessun ₿, ne' la sua funzione", [False, False],
+          ["₿" in _senza_commenti_js(cd), "conBtc" in mini])
     prova("...l'intestazione sta in cima, prima del Controvalore, e non dice «sats»",
           True, "+ (due ? r('', cifreEuro, 'capi') : '')" in cd
           and cd.index("r('', cifreEuro, 'capi')")
           < cd.index("+ r(etichettaCtrl, cifra('ctrl'))")
           and "'cifre in sats'" not in mini)
-    prova("...e la larghezza conta il « ₿»", True,
-          "lungo(fmt(Math.max(c.ctrl, c.merc, c.netto))) + 4" in cd
-          and "lungo(fmt(Math.max(c.premio, c.meta))) + 5" in cd)
+    # « sats» nel suo corpo piccolo e' largo 23,9 px, due caratteri del
+    # mono ne fanno 19,8: contato due, la cella del «Ricevi» usciva dalla
+    # sua colonna di tre pixel (misurato a 375 e 320 nel cantiere)
+    prova("...e la larghezza conta « sats» per due caratteri e mezzo", True,
+          "lungo(fmt(Math.max(c.ctrl, c.merc, c.netto))) + 4.5" in cd
+          and "lungo(fmt(Math.max(c.premio, c.meta))) + 5.5" in cd)
     prova("...la scatola porta `conto-due` e la larghezza delle colonne", True,
           "' conto-due\" style=\"--n:' + larga + '\">'" in cd)
     prova("...e a due colonne il Controvalore non ripete gli euro nell'etichetta",
           True, "const etichettaCtrl = (euroNoto && !due) ?" in cd)
+    # (7 ott 2026, decisione di Andrea) NESSUNA PAGINA CHIEDE PIU' DUE
+    # COLONNE: la pagina del MIO scambio a intervallo, prima della presa,
+    # mostra la fascia e la frase (la cifra la sceglie chi prende); il
+    # foglio del libro le sue prove le ha in `prove_p2p_dettaglio`
+    ren = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
+    prova("la pagina del mio scambio a intervallo: la frase al posto del conto, finche' nessuno prende",
+          [True, True], ["const conto = o.euroMax ? contoAttesaP2P(o, FRASE_INTERVALLO_DOPO_PRESA)\n"
+                         "    : contoDettP2P(Object.assign(comeLibroP2P(o)," in ren,
+                         "const FRASE_INTERVALLO_DOPO_PRESA = 'L\\'importo lo sceglie chi prende: "
+                         "il dettaglio compare dopo la presa';" in mini])
     for firma, dove in (("function rigaOrdineP2P(o){", "la card del libro"),
                         ("function euroTestoP2P(o){", "l'euro di uno scambio"),
                         ("function satsScambioP2P(o){", "i sats di uno scambio"),
@@ -118377,19 +118518,35 @@ def prove_conto_due_colonne():
                    ".conto-due .ctrl-riga .mono{flex:0 0 auto;display:grid;\n"
                    "    grid-template-columns:var(--col) var(--col);column-gap:10px;justify-items:end}",
                    ".p2p-ord>.conto-due>.ctrl-riga{padding-right:calc(10px + var(--chiusa-bordo))}",
-                   ".p2p-ord>.p2p-grande{display:block;padding-right:52px}"):
-        prova("CSS: " + regola[:60], True, regola in mini)
+                   ".p2p-ord>.p2p-grande{display:block;padding-right:52px}",
+                   # (7 ott 2026) «sats» veste come «da» e «a» delle card
+                   # P2P: la STESSA regola, non una copia che si scolla
+                   ".card-p2p .p2p-vt-verbo,\n  .conto-p2p .unita-sats{font-family:Nunito,sans-serif;font-size:10.5px;\n"
+                   "    font-weight:800;color:#797263;margin-right:4px;letter-spacing:.01em}",
+                   ".conto-p2p .unita-sats{margin-right:0;color:var(--unita-sats)}",
+                   "    --unita-sats:#635E51;\n",
+                   "    --unita-sats:#938C7C;\n",
+                   ".conto-p2p .solo-voce{position:absolute;width:1px;height:1px;\n"
+                   "    margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);\n"
+                   "    white-space:nowrap;border:0}"):
+        prova("CSS: " + regola[:60].replace("\n", " "), True, regola in mini)
 
     # --- 2) I GIUDICI PURI, VERI, IN NODE -----------------------------------
     node = shutil.which("node")
     if not node:
         salta("fmt e capiP2P girano in node", "node non c'e'")
         return
+    riga_sats = pezzo_js(mini, "  const conSats = t =>", ";\n")
     banco = "\n".join([
         riga_fmt,
         pezzo_js(mini, "function capiP2P(da, a){", "\n}\n") + "\n}",
+        riga_sats + ";",
     ]) + r"""
 const out = {};
+/* la cella in sats per l'occhio e per la voce: la voce scrive le
+   migliaia col punto, l'occhio le tiene nello spazio stretto */
+out.sats = ['≈ ' + fmt(21000), '≈ −' + fmt(3000), fmt(420), '0', '—',
+            '≈ +' + fmt(1979600)].map(conSats);
 out.fmt = [0, 7, 999, 1000, 6534, 9999, 10000, 19601, 123456, 1234567,
            -6534, 1234.5, 12.75].map(fmt);
 out.capi = [capiP2P('5,00', '15,00'), capiP2P('6\u202F534', '19\u202F601'),
@@ -118420,6 +118577,19 @@ process.stdout.write(JSON.stringify(out));
           ["da" + nb + "5,00 a" + nb + "15,00",
            "da" + nb + "6" + s + "534 a" + nb + "19" + s + "601"], o["capi"][:2])
     prova("...e senza secondo capo il primo e basta", ["5,00"] * 3, o["capi"][2:])
+    # (7 ott 2026) LA CELLA IN SATS, VERA: a vista la cifra di `fmt` con
+    # «sats» nel suo span piccolo; per la voce la stessa cella con le
+    # migliaia col punto — «≈ 21.000 sats» — e il trattino nudo
+    voce = lambda t: '<span class="solo-voce">' + t + ' sats</span>'
+    occhio = lambda t: ('<span aria-hidden="true">' + t
+                        + '<span class="unita-sats"> sats</span></span>')
+    prova("conSats: l'occhio vede «21 000» e la parola piccola, la voce sente «21.000 sats»",
+          [occhio("≈ 21" + s + "000") + voce("≈ 21.000"),
+           occhio("≈ −3" + s + "000") + voce("≈ −3.000"),
+           occhio("420") + voce("420"),
+           occhio("0") + voce("0")], o["sats"][:4])
+    prova("...il trattino resta nudo, e le sette cifre hanno due punti",
+          ["—", occhio("≈ +1" + s + "979" + s + "600") + voce("≈ +1.979.600")], o["sats"][4:])
 
 
 def prove_apri_wallet_p2p():

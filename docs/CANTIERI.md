@@ -38077,3 +38077,106 @@ e scuro (Chrome headless, densità 3), mandati ad Andrea.
 per dopo» dal carrello aperto da un annuncio e dalla card, e che il
 secondo passo non lampeggi la pagina del carrello. Con TalkBack o
 VoiceOver, i tre bottoni.
+
+## L'intervallo si sceglie prima del conto (7 ott 2026, decisioni di Andrea)
+
+Era nato come un cantiere piccolo — al posto del ₿ nel conto in due
+colonne la parola «sats» piccola e grigia, «come "da" e "a" nelle card
+della home» — e a metà strada Andrea l'ha allargato: sugli ordini a
+INTERVALLO il conto in due colonne (minimo e massimo) non si mostra più.
+La riga «Invia» usciva dal riquadro (misurato: nella pagina del mio
+scambio a 320 px, con sette cifre, il ₿ e il € finali tagliati dal bordo,
+già su main), e due conti affiancati chiedevano di leggerne due per
+farne uno.
+
+**DECISO.**
+- Nel FOGLIO DEL LIBRO, su un intervallo: la fascia («da 50,00 a 2000,00
+  €») e la frase «Scegli quanto vuoi inviare/ricevere per vedere il
+  dettaglio» (il verbo dal verso di chi guarda, lo stesso di «Quanto»);
+  il bottone dice «Scegli» e apre il foglio «Quanto» di sempre, SOPRA il
+  dettaglio (che resta aperto: l'indietro da «Quanto» torna lì).
+  «Continua» non prende più: rimette la cifra nel foglio
+  (`p2pDettImporto`), il conto diventa quello a UNA colonna di quella
+  cifra, sopra c'è «Importo scelto: 300,00 € (da … a …)» con «Cambia»
+  (riapre «Quanto» con la cifra scelta dentro), e il bottone torna
+  «Compra»/«Vendi». Il fuoco va sulla riga della cifra scelta.
+- LA PRESA NON CAMBIA: il bottone del foglio chiama
+  `eseguiPresaP2P(id, euro scelti, metodo)`, cioè la chiamata che fino a
+  ieri partiva da `confermaQuantoP2P`. Alla presa la cifra si riguarda
+  col giudice della fascia (`quantoValeP2P`) e il tetto del contanti cade
+  su di lei (il metodo si può cambiare dopo la scelta).
+- Nella PAGINA DEL MIO SCAMBIO a intervallo non ancora preso: la fascia e
+  «L'importo lo sceglie chi prende: il dettaglio compare dopo la presa»
+  (`FRASE_INTERVALLO_DOPO_PRESA`, anche sul mio ordine visto dal libro).
+  Alla presa `fiat_amount` porta `euroMax` a zero e il conto torna da sé.
+- Nel conto della cifra scelta le cifre in sats portano «sats» piccolo e
+  grigio (`conSats`, `unitaPiccola`), con la veste di «da»/«a» delle card
+  (la regola è la stessa, `.card-p2p .p2p-vt-verbo, .conto-p2p
+  .unita-sats`); il lettore vocale sente «≈ 21.000 sats» da una copia
+  fuori vista (`.solo-voce`), perché lo spazio stretto delle migliaia
+  letto ad alta voce può diventare cifra per cifra. Gli ordini a importo
+  fisso restano col «sats» di sempre (decisione di Andrea).
+- IL GRIGIO A 4,5:1 (richiesta di Andrea, anche per «da»/«a»): il
+  #8A8271 faceva 3,6 sulla carta del cartellino, 3,8 sul bianco, 2,7 sul
+  beige della scatola «Ricevi/Invia», 4,0 sulla card bruna di sera.
+  Scurito il minimo: #797263 nelle card (la carta è la stessa nei due
+  temi: 4,52); nel conto un token per tema, `--unita-sats` — #635E51 di
+  giorno (4,51 sul beige, 6,46 sul bianco), #938C7C di sera, dove
+  scurire abbassa il contrasto e quindi si SCHIARISCE il minimo (4,54
+  sulla card, 5,15 sulla scatola). Le card portano lo stesso grigio
+  anche su «Invia»/«Ricevi», che vestono con la stessa regola.
+- «COMPRA» VERDE E «VENDI» ROSSO nel foglio del libro, i vestiti dei due
+  «Pubblica ordine» (`primary` e `rosso`, quelli di `vestitoInvioP2P`);
+  «Scegli» resta arancio (decisione di Andrea: è il passo che apre
+  «Quanto», non ancora il gesto di un lato). Cercati gli altri «Compra» arancio nel
+  P2P: era l'unico (`p2pDettVai`). Gli arancioni che restano sono gesti
+  di un altro genere (Continua, Applica, Blocca i sats, Libera i sats…).
+
+**SCARTATO.** Il conto in due colonne con «sats» al posto del ₿ (il
+primo giro di oggi, fatto e misurato: reggeva fino a sei cifre e a sette
+usciva come prima); un foglio «Quanto» nuovo (si riusa quello di sempre);
+togliere il ramo a due colonne di `contoDettP2P` (resta, provato, ma non
+lo chiama più nessuno: è un taglio da proporre a parte).
+
+**PROVATO.** Sentinelle e banco node del foglio (`prove_p2p_dettaglio`,
+le funzioni VERE: prima della cifra la fascia, la frase e «Scegli» col
+suo aria-label; «Scegli» apre «Quanto» senza chiudere il foglio e senza
+prendere; con la cifra il conto a una colonna, «sats» piccolo e la copia
+per la voce, «Compra» verde; la presa `["ord-3", 60, "SEPA"]` a foglio
+chiuso; fuori fascia niente presa, toast e cifra azzerata; un altro
+ordine riparte senza cifra; il lato di chi vende col rosso e «Vendi»; il
+mio intervallo dal libro con la frase di chi prende; la fee a zero);
+`prove_conto_due_colonne` (conSats in node con la `fmt` vera: «≈ 21 000»
+a vista, «≈ 21.000 sats» a voce; la pagina del mio scambio; il CSS e i
+due token); le sentinelle vecchie che dicevano il flusso di prima
+riscritte (tetto del contanti, «Quanto», bottoni gemelli, il conto acceso
+dalla sola pagina). Tortura sulla copia: 34 su 34 (al primo giro 32: una
+ancora sbagliata nell'elenco e «la fee a zero in colonna sola» viva —
+aggiunto il caso al banco). Suite intera severa senza config nel
+worktree: 19.148 verdi, 0 rosse; i 38 collaudi della CI verdi nella
+gabbia. DAL VIVO, su due copie in collaudo (main e cantiere) col relay
+morto e un `mostroChiama` di cartone nella pagina che trattiene il
+messaggio, coi tocchi veri (`elementFromPoint` + `Input.dispatchMouseEvent`)
+nei due versi: «Scegli» → «Quanto» sopra il foglio → indietro torna al
+foglio → 250 → «Continua» → il fuoco su «Importo scelto» → «Cambia»
+riapre con 250 → 300 → «Compra»/«Vendi». IL MESSAGGIO A MOSTRO È
+IDENTICO a quello di main nei due versi (`take-sell`/`take-buy`,
+`amount: 300`, `trade_index`, `version`; diverso solo il `request_id`,
+nuovo a ogni richiesta), e identica la riga scritta nell'archivio.
+Scatti prima/dopo a 375 e 320, chiaro e scuro, di sette scene: nessuna
+cella fuori dalla sua riga dopo (prima, la pagina del mio scambio a 320
+con sette cifre usciva).
+MAIN È CORSO durante il cantiere (l'icona del carrello, quattro commit,
+anche in server.py; il rosso del P2P a metà strada e l'etichetta «Vende»
+bianca): ribasato su d3a92bc, conflitto solo in coda a CANTIERI (tenute
+tutt'e due le voci). Poi «Scegli» arancio (decisione di Andrea dopo gli
+scatti). SULL'ALBERO FINALE (base d3a92bc): suite intera severa 19.177
+verdi e 0 rosse; i 38 collaudi della CI verdi nella gabbia; tortura sulle
+tre mutazioni del colore del bottone 3 su 3; i due passi del job dei
+segreti puliti sulle righe del cantiere (controprova accesa); scatti
+rifatti col «prima» sul main di adesso e il giro dal vivo coi tocchi veri
+rifatto nei due versi, messaggio a Mostro di nuovo identico.
+
+**DA GUARDARE.** Sul telefono: il fuoco dopo «Continua» con TalkBack e
+VoiceOver (letto dal DOM, non ascoltato); l'indietro di Telegram da
+«Quanto» con la tastiera aperta.

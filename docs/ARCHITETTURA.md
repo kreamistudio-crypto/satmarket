@@ -7355,22 +7355,36 @@
   del libro) veste solo quel che parla del tab: logo, nav, il + e il
   foglio «Pubblica». Verbale: CANTIERI, «I colori del dettaglio aperto
   dalla vetrina».
-  L'INTERVALLO IN DUE COLONNE (6 ott 2026): su un ordine «da 5 a 15 €»
-  il conto (`contoDettP2P`, libro e pagina dello scambio) e' una tabella
-  — intestazione coi due importi, una cella per capo col suo ≈, il suo
-  segno e il ₿ dopo ogni cifra in sats (`conBtc`, il simbolo del toggle
-  €/₿: mai la parola «sats»), la scatola `conto-due` con `--n` (i
-  caratteri della cella piu' lunga) che il CSS fa diventare pixel
-  uguali per ogni riga; le celle scendono su una riga loro quando
-  l'etichetta non ci sta per la sua parola piu' lunga. A importo
-  fisso resta su una colonna. Nelle righe di testo (card del libro, «I
+  L'INTERVALLO SI SCEGLIE PRIMA DEL CONTO (7 ott 2026, rovescia il conto
+  in due colonne del 6 ott): su un ordine «da 50 a 2000 €» nessuna
+  pagina mostra piu' due conti affiancati. Il foglio del libro mostra la
+  fascia e una frase (`contoAttesaP2P`: «Scegli quanto vuoi inviare /
+  ricevere per vedere il dettaglio») e il bottone «Scegli», che apre
+  «Quanto» SOPRA il foglio; «Continua» rimette la cifra nel foglio
+  (`p2pDettImporto`, azzerata da `apriDettaglioP2P`) e il conto diventa
+  quello a una colonna di quella cifra, con la riga «Importo scelto» e
+  «Cambia» (`rigaImportoSceltoP2P`). A prendere e' il bottone del
+  foglio, con la STESSA chiamata che prima partiva da «Quanto»:
+  `eseguiPresaP2P(id, euro scelti, metodo)` — messaggio a Mostro
+  identico, confrontato dal vivo. La pagina del MIO scambio a intervallo
+  non ancora preso mostra la fascia e `FRASE_INTERVALLO_DOPO_PRESA`;
+  alla presa `euroMax` va a zero e il conto torna. Il ramo a due colonne
+  di `contoDettP2P` (`conto-due`, `--n`) resta, provato, ma nessuno lo
+  chiama piu'. Sul conto di una cifra scelta (e in due colonne) le cifre
+  in sats portano «sats» piccolo e grigio (`conSats`, la veste di
+  `.p2p-vt-verbo`, col grigio `--unita-sats` a 4,5:1 nei due temi) e
+  una copia per il lettore vocale (`.solo-voce`, «≈ 21.000 sats»); gli
+  ordini a importo fisso restano col «sats» di sempre. I bottoni del
+  foglio vestono il lato: «Compra» `primary` verde, «Vendi» `rosso`,
+  come i due «Pubblica ordine» (`vestitoInvioP2P`); «Scegli» resta
+  arancio. Nelle righe di testo (card del libro, «I
   miei scambi», l'avviso di Barattozon, e dal 6 ott 2026 anche la card
   P2P della home) i capi li dice `capiP2P`: «da … a …», mai un trattino
   fra due numeri. Nel cartellino della card della home «da» e «a» vestono
   come il verbo (`.p2p-vt-verbo`), e lo spazio prima della «a» sta dentro
   la parolina: e' il posto dove a 320 px il cartellino va a capo.
-  Verbale: CANTIERI, «Il conto a intervallo in due colonne» e «La card
-  della home "da … a …"».
+  Verbale: CANTIERI, «Il conto a intervallo in due colonne», «La card
+  della home "da … a …"» e «L'intervallo si sceglie prima del conto».
   «È IL TUO ORDINE», UN GIUDICE SOLO (28 set 2026): `ordineTuoP2P(id,
   o)` e' mio se lo sa il dispositivo (`ordineMioP2P`), se lo dice il
   server (`miei` della fotografia, che ora legge anche il libro) o se e'

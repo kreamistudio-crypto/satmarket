@@ -411,6 +411,12 @@
        sul loro fondo crema (--chip-bg) il --muted scende a 3,23:1, e
        questo resta sopra il 4,5 (4,70 sul crema, 5,54 sul bianco) */
     --muted-voce:#6F6857;
+    /* «sats» piccolo nel conto del P2P (7 ott 2026, richiesta di Andrea:
+       4,5:1 sul bianco e sul beige): il grigio di «da»/«a» delle card
+       (#8A8271) scurito il MINIMO per tenere 4,5 sul beige della scatola
+       «Ricevi/Invia» (#E0D7C0), che e' il fondo piu' chiaro dei due —
+       4,51 li', 6,46 sul bianco. Di sera l'opposto, vedi sotto. */
+    --unita-sats:#635E51;
     /* on-ink/on-trust: il testo sopra un fondo --ink o --trust pieno
        (in chiaro bianco; al buio quei fondi si schiariscono e il
        testo deve tornare scuro) */
@@ -533,6 +539,10 @@
     --tile-off:#2E2A1E; --toast-bg:#F1E8D5; --toast-text:#23282C;
     --ink-soft:#CFC4AD; --desc:#E2D9C6;
     --muted-voce:#A99F87;   /* di sera il --muted regge gia': 4,98:1 sul fondo della voce */
+    /* ...e di sera il grigio di «sats» SCHIARISCE il minimo, perche' li'
+       scurire abbassa il contrasto: 4,54 sulla card bruna (#2C2517), 5,15
+       sulla scatola (#211A10) */
+    --unita-sats:#938C7C;
     --on-ink:#211A10; --on-trust:#0B2417;
     /* ...e di sera il rosso schiarisce (#F07A47): il bianco li' fa 2,8:1,
        l'inchiostro scuro 6,2 — la stessa scelta di --on-trust */
@@ -2093,9 +2103,17 @@
   /* «Invia / Ricevi» di chi guarda (27 set 2026): la parola in carattere
      di testo, piccola e nel grigio della carta; la cifra resta la stessa.
      La riga dei sats va a capo SOLO se non ci sta (a 320 px, coi sei
-     numeri): il verbo sopra, la cifra sotto, mai tagliata */
-  .card-p2p .p2p-vt-verbo{font-family:Nunito,sans-serif;font-size:10.5px;
-    font-weight:800;color:#8A8271;margin-right:4px;letter-spacing:.01em}
+     numeri): il verbo sopra, la cifra sotto, mai tagliata.
+     La stessa veste la porta il «sats» del conto di un importo scelto
+     (7 ott 2026, vedi `.conto-p2p .unita-sats`): una regola, due posti.
+     IL GRIGIO E' A 4,5:1 (7 ott 2026, richiesta di Andrea): era #8A8271,
+     3,6:1 sulla carta del cartellino; #797263 e' lo scurimento MINIMO
+     per arrivare a 4,52. La carta e' la stessa nei due temi (colori
+     fissi), quindi qui il grigio e' uno. Il conto ha i fondi del tema, e
+     prende il suo da `--unita-sats` */
+  .card-p2p .p2p-vt-verbo,
+  .conto-p2p .unita-sats{font-family:Nunito,sans-serif;font-size:10.5px;
+    font-weight:800;color:#797263;margin-right:4px;letter-spacing:.01em}
   .card-p2p .tag-price .price-sub{display:flex;flex-wrap:wrap;
     align-items:baseline;column-gap:4px}
   .card-p2p .tag-price .price-sub .p2p-vt-verbo{margin-right:0}
@@ -6095,7 +6113,7 @@
      ci sta intero, e quando non ci sta (a 320 px, o un intervallo da
      sette cifre) scendono su una riga loro, a destra e sempre in
      colonna — mai sopra l'etichetta. Il primo giro era una griglia
-     `minmax(0,1fr) auto`: con il ₿ in ogni cella, a 320 le celle
+     `minmax(0,1fr) auto`: con l'unita' in ogni cella, a 320 le celle
      schiacciavano l'etichetta sotto la sua parola piu' lunga.
      ⚠️ LE COLONNE HANNO UNA LARGHEZZA SOLA PER TUTTO IL CONTO, e la
      dice `--n` (i caratteri della cella piu' lunga, scritti da
@@ -6110,9 +6128,47 @@
   .conto-due .ctrl-riga .mono{flex:0 0 auto;display:grid;
     grid-template-columns:var(--col) var(--col);column-gap:10px;justify-items:end}
   /* l'intestazione: i due importi in inchiostro pieno, e a sinistra
-     niente — l'unita' la porta ogni cella, il ₿ (6 ott 2026) */
+     niente — l'unita' la porta ogni cella (6 ott 2026) */
   .conto-due .ctrl-riga.capi{padding:6px 0 7px}
   .conto-due .ctrl-riga.capi .mono{font-weight:800;color:var(--ink)}
+  /* «SATS» DOPO OGNI CIFRA, PICCOLO E GRIGIO (7 ott 2026, richiesta di
+     Andrea: era il ₿, l'unico rimasto nell'app accanto a una cifra in
+     sats). Lo spazio e' poco, quindi la parola veste come «da» e «a»
+     nelle card P2P della home — la regola e' quella, condivisa (vedi
+     `.card-p2p .p2p-vt-verbo`) — e la cifra resta nel mono del conto:
+     la parola pesa meno del numero. Qui niente margine a destra: la
+     parola chiude la cella, e la cella sta sul filo della colonna come
+     il € delle celle in euro. Lo spazio prima sta DENTRO la parolina,
+     nel suo corpo piccolo, come la « a» del cartellino. */
+  .conto-p2p .unita-sats{margin-right:0;color:var(--unita-sats)}
+  /* ...e il lettore vocale non legge la cella che si vede (lo spazio
+     stretto delle migliaia si legge male, o cifra per cifra): legge la
+     sua copia, «21.000 sats», che sta qui fuori dalla vista */
+  .conto-p2p .solo-voce{position:absolute;width:1px;height:1px;
+    margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);
+    white-space:nowrap;border:0}
+  /* ══ L'INTERVALLO SI SCEGLIE PRIMA DEL CONTO (7 ott 2026, decisione
+     di Andrea) ══ al posto del conto in due colonne, finche' nessuno
+     ha scelto una cifra: la fascia in grande e una frase che dice cosa
+     fare. E' lo stesso riquadro del conto (`.ctrl-conto`), cosi' la
+     pagina non salta quando il conto vero arriva al suo posto. */
+  .conto-attesa{padding:14px 12px 12px}
+  .conto-attesa-capi{font-family:'JetBrains Mono',monospace;font-weight:800;
+    font-size:16.5px;color:var(--ink);line-height:1.35}
+  .conto-attesa-frase{margin:6px 0 0;font-size:13.5px;line-height:1.45;
+    color:var(--ink-soft)}
+  /* ...e scelta la cifra, una riga sopra il conto la ripete con la sua
+     fascia, e porta il bottone per cambiarla: si cambia finche' non si
+     conferma. Il fuoco ci arriva dopo «Continua», ed e' li' che il
+     lettore vocale riprende a leggere. */
+  .conto-scelto{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    margin:14px 0 4px;font-size:14px;color:var(--ink)}
+  .conto-scelto>span{flex:1 1 12em;min-width:0}
+  .conto-scelto .conto-scelto-fascia{color:var(--ink-soft);white-space:nowrap}
+  .conto-scelto .btn.mini{flex:0 0 auto;margin:0}
+  .conto-scelto:focus{outline:none}
+  .conto-scelto:focus-visible{outline:2px solid var(--ink-soft);outline-offset:4px;
+    border-radius:6px}
   /* ...e nella pagina di uno scambio il conto non ha il suo dentro (vedi
      `.p2p-ord>.ctrl-conto`) mentre la scatola in fondo si', di 10px piu'
      il bordo: le righe di sopra rientrano dello stesso tanto a destra,
@@ -54824,10 +54880,12 @@ function renderQuantoP2P(){
       (paghiEuro ? 'vuoi inviare' : 'vuoi ricevere') + '.</div>' +
     '<div class="field"><label for="p2pQuantoInp">Quanti euro</label>' +
     '<div class="campo-pre"><span class="pre">\u20ac</span>' +
+    /* chi torna a cambiare la cifra ritrova la sua, non il minimo */
     '<input id="p2pQuantoInp" type="text" inputmode="numeric" value="' +
-      esc(String(riga.euro)) + '" onbeforeinput="soloCifreP2P(event)"' +
+      esc(String((p2pDettOrdine === riga.id && p2pDettImporto) || riga.euro)) +
+      '" onbeforeinput="soloCifreP2P(event)"' +
       ' oninput="stimaQuantoP2P()"></div></div>' +
-    '<div class="hint" id="p2pQuantoStima"></div>' +
+    '<div class="hint" id="p2pQuantoStima" aria-live="polite"></div>' +
     '<button class="btn orange" onclick="confermaQuantoP2P()">Continua</button>';
   stimaQuantoP2P();
 }
@@ -54870,11 +54928,25 @@ function confermaQuantoP2P(){
   const id = p2pQuantoOrdine;
   chiudiFoglioP2P('p2pQuantoSheet');
   p2pQuantoOrdine = '';
-  /* SI VA DRITTI ALLA PRESA (set 2026, col dettaglio-pagina): le
-     guardie le ha gia' passate `prendiOrdineP2P` aprendo la pagina,
-     la conferma l'ha data il bottone, e rientrare dalla porta del
-     gesto riaprirebbe la pagina che si e' appena chiusa. */
-  eseguiPresaP2P(id, g.euro, p2pDettMetodo);
+  /* ⚠️ NON SI PRENDE PIU' DA QUI (7 ott 2026, decisione di Andrea): la
+     cifra scelta torna al foglio del libro, che c'e' ancora sotto, e il
+     conto a una colonna si disegna su QUELLA cifra — e' il bottone
+     «Compra»/«Vendi» del foglio a prendere, con la stessa chiamata di
+     prima (`eseguiPresaP2P(id, euro, metodo)`, vedi
+     `confermaDettaglioP2P`). Il messaggio a Mostro non cambia: cambia
+     solo che chi prende vede il conto della sua cifra prima di premere.
+     Fino a ieri da qui si andava dritti alla presa, e il conto che si
+     era visto era quello dei due capi. */
+  if (p2pDettOrdine !== id) return;
+  p2pDettImporto = g.euro;
+  renderDettaglioP2P();
+  /* il FUOCO va sulla riga della cifra scelta: chi vede ci arriva con
+     lo sguardo, e il lettore vocale riprende da li' — «Importo scelto:
+     300,00 €» e poi il conto, invece di ripartire dal titolo */
+  const r = el('p2pDettScelto');
+  if (r && typeof r.focus === 'function') {
+    try { r.focus({preventScroll: true}); r.scrollIntoView({block: 'start'}); } catch(e){}
+  }
 }
 
 /* ============ IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026) ======
@@ -54903,6 +54975,7 @@ function confermaQuantoP2P(){
    a chi volesse dettarlo al telefono a una persona. */
 let p2pDettOrdine = '';     // l'id dell'ordine aperto nel dettaglio
 let p2pDettMetodo = '';     // il metodo scelto con le pillole, prima della presa
+let p2pDettImporto = 0;     // su un intervallo, la cifra scelta col foglio «Quanto»
 
 /* ---- L'ANELLO GRANDE DEL TEMPO ----
    Quello delle card e' un cerchio da 22px in un angolo; qui il tempo e'
@@ -55235,16 +55308,27 @@ function contoDettP2P(o){
      segno, sotto l'intestazione del suo importo in euro, e fra due
      numeri non c'e' piu' nessun trattino. A importo fisso il conto
      resta su una colonna, com'era. */
+  /* (7 ott 2026) NESSUNA PAGINA CHIEDE PIU' DUE COLONNE: su un
+     intervallo il foglio del libro mostra la frase finche' la cifra non
+     e' scelta, e poi il conto di quella cifra; la pagina del mio
+     scambio mostra la frase finche' qualcuno non prende. Il ramo resta,
+     provato, per chi chiamasse il conto con due capi. */
   const due = conti.length === 2;
   const circaDi = campo => !esatto || campo === 'meta'
     || (campo === 'netto' && conti[0].meta > 0)
     || (ricavato && campo !== 'merc');
   /* una cella e' un capo solo, senza unita': su una colonna «sats» lo
-     aggiunge `cifraNuda`, in due colonne il ₿ lo aggiunge `cifra` */
+     aggiunge `cifraNuda`, in due colonne lo aggiunge `conSats` */
   const cella = (c, campo, segno) => vivo
     ? (circaDi(campo) ? '≈ ' : '') + (segno || '') + fmt(c[campo]) : '—';
-  const cifraNuda = (campo, segno) => vivo
-    ? cella(conti[0], campo, segno) + ' sats' : '—';
+  /* (7 ott 2026) SUL CONTO DI UNA CIFRA SCELTA «sats» VESTE PICCOLO E
+     GRIGIO, come in due colonne (`conSats`): lo chiede chi lo apre,
+     con `unitaPiccola`. Gli ordini a importo fisso restano com'erano
+     (decisione di Andrea: «quelli a importo fisso restano come sono»). */
+  const piccola = !!o.unitaPiccola;
+  const cifraNuda = (campo, segno) => !vivo ? '—'
+    : piccola ? conSats(cella(conti[0], campo, segno))
+    : cella(conti[0], campo, segno) + ' sats';
   /* ⚠️ IL SEGNO DECIDE IL COLORE (set 2026, ritocco di Andrea): nel
      conto il verde e il rosso non sono un GIUDIZIO ma una DIREZIONE —
      verde se quei sats si aggiungono a quel che ti arriva, rosso se
@@ -55258,20 +55342,31 @@ function contoDettP2P(o){
   const num = (t, segno) => '<span class="num'
     + (segno === '+' ? ' piu' : segno === '−' ? ' meno' : '')
     + '">' + t + '</span>';
-  /* ⚠️ IN DUE COLONNE OGNI CIFRA IN SATS PORTA IL ₿ (6 ott 2026,
-     ritocco di Andrea): «nessun numero resta senza significato». Il
-     primo giro diceva «cifre in sats» una volta, nell'intestazione, e
+  /* ⚠️ IN DUE COLONNE OGNI CIFRA IN SATS PORTA LA SUA UNITA' (6 ott
+     2026, ritocco di Andrea): «nessun numero resta senza significato».
+     Il primo giro diceva «cifre in sats» una volta, nell'intestazione, e
      sotto le celle erano numeri nudi — accanto a celle in € che il loro
-     segno ce l'avevano. Il ₿ e' il simbolo che l'app usa gia' per dire
-     «in sats»: e' il bottone del toggle €/₿ (`data-cur="sats"`). Sta
-     DOPO la cifra come il € nelle celle in euro, e mai la parola
-     «sats». Un trattino resta un trattino: niente unita' su un numero
-     che non c'e'. */
-  const conBtc = t => t === '—' ? t : t + ' ₿';
+     segno ce l'avevano. L'unita' sta DOPO la cifra come il € nelle celle
+     in euro. Un trattino resta un trattino: niente unita' su un numero
+     che non c'e'.
+     ⚠️ E L'UNITA' E' LA PAROLA «SATS», NON IL ₿ (7 ott 2026, richiesta
+     di Andrea): qui era rimasto l'unico ₿ dell'app accanto a una cifra
+     in sats, e ogni altro posto dice «sats». La parola veste piccola e
+     grigia (`.unita-sats`, la regola di «da» e «a» nelle card P2P): lo
+     spazio e' poco, e cosi' non ruba la colonna al numero. Il simbolo
+     dei satoshi era stato provato e scartato lo stesso giorno (14a3a4c,
+     «troppo confusionario»).
+     IL LETTORE VOCALE SENTE «≈ 21.000 sats»: la cella che si vede e'
+     `aria-hidden`, e la copia per la voce (`.solo-voce`) scrive le
+     migliaia col punto — lo spazio stretto di `fmt`, letto ad alta
+     voce, puo' diventare «ventuno, zero zero zero». */
+  const conSats = t => t === '—' ? t
+    : '<span aria-hidden="true">' + t + '<span class="unita-sats"> sats</span></span>'
+      + '<span class="solo-voce">' + t.replace(/\u202F/g, '.') + ' sats</span>';
   /* in due colonne la voce e' fatta di due `.num`, uno per capo: il
      CSS di `.conto-due` li mette in colonna */
   const cifra = (campo, segno) => due
-    ? conti.map(c => num(conBtc(cella(c, campo, segno)), segno)).join('')
+    ? conti.map(c => num(conSats(cella(c, campo, segno)), segno)).join('')
     : num(cifraNuda(campo, segno), segno);
   /* ⚠️ L'IMPORTO IN EURO COMPARE DUE VOLTE, E NON E' UN DOPPIONE
      (12 set 2026, ritocco di Andrea): in fondo, a destra, e' quel che
@@ -55335,7 +55430,7 @@ function contoDettP2P(o){
     + promo;
   const commissione = fee === null ? (due ? num('—') + num('—') : num('—'))
     : fee > 0 ? cifra('meta', compro ? '−' : '+')
-    : (due ? num(conBtc('0')) + num(conBtc('0')) : num('0 sats'));
+    : (due ? num(conSats('0')) + num(conSats('0')) : num(piccola ? conSats('0') : '0 sats'));
   /* il premio c'e' solo quando pende: una riga a zero direbbe «niente
      premio», che non e' un'informazione (la regola dello sconto).
      ⚠️ E IL GIUDIZIO NON SI RIBATTE QUI: era la TERZA copia della
@@ -55439,16 +55534,19 @@ function contoDettP2P(o){
      da `compro` e mai dal tab del libro (vedi il CSS di `.conto-p2p`) */
   /* LA LARGHEZZA DELLE DUE COLONNE la decide la cella piu' lunga, in
      caratteri: la cifra piu' grande fra i sats (un numero piu' grande
-     non si scrive mai piu' corto) col suo ≈ e il suo « ₿» — e col
+     non si scrive mai piu' corto) col suo ≈ e il suo « sats» — e col
      segno, per le due voci che lo portano —, o un capo in euro col suo
-     segno. Lo spazio
+     segno. « SATS» VALE DUE CARATTERI E MEZZO (7 ott 2026): nel suo
+     corpo piccolo e' largo 23,9 px, misurato, contro i 19,8 di due
+     caratteri del mono — contato due, nella riga «Ricevi» la cella
+     usciva dalla sua colonna di tre pixel. Lo spazio
      stretto delle migliaia vale MEZZO carattere: contato intero, a 320
      px le colonne rubavano all'etichetta una lettera per gruppo. La
      legge il CSS di `.conto-due` (`--n`). */
   const lungo = s => s.length - (s.split('\u202F').length - 1) / 2;
   const larga = due ? Math.max(
-    ...conti.map(c => lungo(fmt(Math.max(c.ctrl, c.merc, c.netto))) + 4),
-    ...conti.map(c => lungo(fmt(Math.max(c.premio, c.meta))) + 5),
+    ...conti.map(c => lungo(fmt(Math.max(c.ctrl, c.merc, c.netto))) + 4.5),
+    ...conti.map(c => lungo(fmt(Math.max(c.premio, c.meta))) + 5.5),
     ...euri.map(e => fmtEur(e).length + 2)) : 0;
   return '<div class="ctrl-conto conto-p2p ' + (compro ? 'lato-compro' : 'lato-vendo')
     + (due ? ' conto-due" style="--n:' + larga + '">' : '">')
@@ -55662,6 +55760,9 @@ function apriDettaglioP2P(id){
   const riga = rigaLibroP2P(id);
   if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
   p2pDettOrdine = id;
+  /* la cifra scelta e' di QUELL'ordine: aprendone un altro si riparte
+     dalla frase che chiede di sceglierla */
+  p2pDettImporto = 0;
   /* con un metodo solo la scelta e' gia' fatta: non c'e' niente da
      chiedere, e il bottone non deve restare spento per una domanda che
      nessuno ha posto */
@@ -55710,6 +55811,17 @@ function renderDettaglioP2P(){
      un domani qualcuno lo «sistema» al contrario. */
   const manca = (tuo || p2pDettMetodo || !(o.metodi && o.metodi.length > 1))
     ? '' : 'Scegli con quale metodo vuoi ' + (compro ? 'inviare' : 'ricevere') + ' gli euro.';
+  /* ⚠️ SU UN INTERVALLO IL CONTO ASPETTA LA CIFRA (7 ott 2026, decisione
+     di Andrea): il conto in due colonne — minimo e massimo — non ci
+     stava (la riga «Invia» usciva dal riquadro) e chiedeva di leggere
+     due conti per farne uno. Adesso finche' la cifra non c'e' si vede
+     la fascia e una frase, il bottone dice «Scegli» e apre il foglio
+     «Quanto» (lo stesso di sempre); scelta la cifra, il conto e' quello
+     a UNA colonna per quella cifra, e il bottone torna «Compra»/«Vendi».
+     Sul mio ordine nessuno sceglie niente: la frase dice chi lo fara'. */
+  const scelto = (o.euroMax && !tuo) ? p2pDettImporto : 0;
+  const daScegliere = !!o.euroMax && !scelto;
+  const verboEuro = compro ? 'inviare' : 'ricevere';
   /* IL CORPO COMINCIA DAL METODO, e sopra non c'e' piu' niente: il
      prezzo e la quantita' sono scesi nel conto scorporato (dove ogni
      cifra ha il suo nome) e il lato e' salito nel TITOLO. Quel che
@@ -55728,8 +55840,13 @@ function renderDettaglioP2P(){
     anelloneP2P(o) +
     (tuo ? '' : avvisoPresaTabacchinoP2P(o)) +
     /* IL CONTO SCORPORATO sotto l'anello: il calco del foglio «Paga»
-       del mercatino, righe nome/cifra e le due in evidenza. */
-    contoDettP2P(o) +
+       del mercatino, righe nome/cifra e le due in evidenza. Su un
+       intervallo, prima la cifra (vedi `daScegliere` qui sopra). */
+    (daScegliere
+      ? contoAttesaP2P(o, tuo ? FRASE_INTERVALLO_DOPO_PRESA
+                              : 'Scegli quanto vuoi ' + verboEuro + ' per vedere il dettaglio')
+      : (scelto ? rigaImportoSceltoP2P(o, scelto) : '')
+        + contoDettP2P(scelto ? Object.assign({}, o, {euro: scelto, euroMax: 0, unitaPiccola: true}) : o)) +
     /* LA SPIEGAZIONE CHE STAVA NEL FOGLIO DI CONFERMA: non si perde
        col foglio, si sposta sopra i due bottoni — dove la legge chi
        sta per premerli. */
@@ -55770,15 +55887,55 @@ function renderDettaglioP2P(){
         '</div>'
       : '<div class="foglio-piede">' +
       '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>' +
-      '<button type="button" class="btn orange" id="p2pDettVai"' +
-        (manca ? ' disabled' : '') + ' onclick="confermaDettaglioP2P()">' +
-        (compro ? 'Compra' : 'Vendi') + '</button>' +
+      '<button type="button" class="btn ' + (daScegliere ? 'orange' : compro ? 'primary' : 'rosso')
+        + '" id="p2pDettVai"' +
+        /* IL VERDE E IL ROSSO DEI DUE LATI (7 ott 2026, decisione di
+           Andrea): «Compra» verde e «Vendi» rosso, gli stessi vestiti dei
+           due «Pubblica ordine» (`vestitoInvioP2P`: `primary` e `rosso`) —
+           era l'ultimo «Compra» arancio del P2P. «SCEGLI» RESTA ARANCIO
+           (decisione di Andrea, lo stesso giorno): non e' ancora il gesto
+           di un lato, e' il passo che apre «Quanto» — come il suo
+           «Continua».
+           E A VOCE «SCEGLI» DICE COSA: «Scegli quanto inviare» — la
+           parola che si vede sta in testa, e il resto la completa. */
+        (manca ? ' disabled' : '') +
+        (daScegliere ? ' aria-label="Scegli quanto ' + verboEuro + '"' : '') +
+        ' onclick="confermaDettaglioP2P()">' +
+        (daScegliere ? 'Scegli' : (compro ? 'Compra' : 'Vendi')) + '</button>' +
     '</div>');
 }
+/* LA FRASE DI CHI HA PUBBLICATO UN INTERVALLO (7 ott 2026, decisione di
+   Andrea): nella pagina del mio scambio, e sul mio ordine visto dal
+   libro, prima della presa. La cifra la sceglie chi prende, e il
+   coordinatore la scrive nella sua risposta: li' l'intervallo collassa
+   (`fiat_amount`) e il conto a una colonna compare da se'. */
+const FRASE_INTERVALLO_DOPO_PRESA = 'L\'importo lo sceglie chi prende: il dettaglio compare dopo la presa';
+/* PURA: il riquadro al posto del conto, finche' la cifra non c'e' — la
+   fascia, «da 50,00 a 2000,00 €», e la frase. I capi a parole come in
+   ogni riga del P2P (`capiP2P`), col segno della moneta dell'ordine. */
+function contoAttesaP2P(o, frase){
+  return '<div class="ctrl-conto conto-p2p conto-attesa">'
+    + '<div class="conto-attesa-capi">' + capiP2P(esc(fmtEur(o.euro)), esc(fmtEur(o.euroMax)))
+    + ' ' + segnoMonetaP2P(o) + '</div>'
+    + '<p class="conto-attesa-frase">' + esc(frase) + '</p>'
+    + '</div>';
+}
+/* PURA: la riga della cifra scelta, sopra il conto — la cifra, la sua
+   fascia e «Cambia», che riapre «Quanto» con dentro quella cifra */
+function rigaImportoSceltoP2P(o, scelto){
+  const segno = segnoMonetaP2P(o);
+  return '<div class="conto-scelto" id="p2pDettScelto" tabindex="-1">'
+    + '<span>Importo scelto: <b>' + esc(fmtEur(scelto)) + ' ' + segno + '</b> '
+    + '<span class="conto-scelto-fascia">(' + capiP2P(esc(fmtEur(o.euro)), esc(fmtEur(o.euroMax)))
+    + ' ' + segno + ')</span></span>'
+    + '<button type="button" class="btn mini" aria-label="Cambia l\'importo scelto"'
+    + ' onclick="apriQuantoP2P(p2pDettOrdine)">Cambia</button>'
+    + '</div>';
+}
 /* IL «COMPRA» E' LA CONFERMA, e da qui in poi la strada e' quella di
-   sempre: su un intervallo si passa dal foglio «Quanto» (una
-   DEVIAZIONE, non una seconda strada) e da li' si rientra nella presa
-   con la cifra in mano. */
+   sempre. Su un intervallo il primo tocco e' «Scegli»: apre il foglio
+   «Quanto» SOPRA questa pagina (che resta aperta sotto), e scelta la
+   cifra il bottone torna «Compra»/«Vendi» (7 ott 2026). */
 function confermaDettaglioP2P(){
   /* SU UNA COPIA SI ASPETTA IL LIBRO VERO (26 set 2026): il bottone
      gira, la pagina resta libera, e a libro arrivato si riparte da qui
@@ -55799,12 +55956,23 @@ function confermaDettaglioP2P(){
      si sta scegliendo; su un intervallo lo rifa' il foglio «Quanto» sulla
      cifra scelta */
   const metPresa = p2pDettMetodo ? [p2pDettMetodo] : (o.metodi || []);
-  const troppo = o.euroMax ? '' : giudiceContantiP2P(o.euro, metPresa, maxEuroContantiP2P());
+  /* SU UN INTERVALLO SENZA CIFRA il bottone e' «Scegli»: si apre
+     «Quanto» sopra la pagina, che resta dov'e' */
+  if (o.euroMax && !p2pDettImporto) { haptic(); apriQuantoP2P(id); return; }
+  /* ...e con la cifra scelta la si riguarda col giudice della fascia
+     (lo stesso di «Quanto»), e il tetto del contanti cade su di lei:
+     il metodo puo' essere cambiato DOPO la scelta */
+  const g = o.euroMax ? quantoValeP2P(o, String(p2pDettImporto)) : null;
+  if (g && !g.ok) { toast(g.dillo); p2pDettImporto = 0; renderDettaglioP2P(); return; }
+  const troppo = giudiceContantiP2P(g ? g.euro : o.euro, metPresa, maxEuroContantiP2P());
   if (troppo) { toast(troppo); return; }
   haptic();
   chiudiFoglioP2P('p2pDettSheet');
-  if (o.euroMax) { apriQuantoP2P(id); return; }
-  eseguiPresaP2P(id, 0, p2pDettMetodo);
+  /* ⚠️ LA STESSA CHIAMATA DI PRIMA, e quindi lo stesso messaggio a
+     Mostro: su un intervallo `(id, euro scelti, metodo)` — e' quella
+     che fino al 7 ott 2026 partiva da `confermaQuantoP2P` —, sugli
+     altri `(id, 0, metodo)`. */
+  eseguiPresaP2P(id, g ? g.euro : 0, p2pDettMetodo);
 }
 
 /* ---- prendere un ordine del libro ---- */
@@ -56573,7 +56741,13 @@ function renderOrdineP2P(){
      scambio e' quasi sempre gia' preso, e da quel momento il numero
      e' un fatto invece di una stima — vedi il suo avviso dentro
      `contoDettP2P`. */
-  const conto = contoDettP2P(Object.assign(comeLibroP2P(o),
+  /* ⚠️ IL MIO ORDINE A INTERVALLO NON ANCORA PRESO non ha un conto
+     (7 ott 2026, decisione di Andrea): la cifra la sceglie chi prende.
+     Al posto delle due colonne — la riga «Invia» usciva dal riquadro a
+     320 px — la fascia e la frase; alla presa `euroMax` va a zero
+     (vedi «L'INTERVALLO COLLASSA QUI») e il conto torna da se'. */
+  const conto = o.euroMax ? contoAttesaP2P(o, FRASE_INTERVALLO_DOPO_PRESA)
+    : contoDettP2P(Object.assign(comeLibroP2P(o),
                                            {satsDetti: o.satsNetti || 0,
                                             scontoMancato: !!o.scontoMancato,
                                             mio: true,
