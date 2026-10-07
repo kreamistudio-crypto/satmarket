@@ -17427,7 +17427,26 @@
   l'indietro fa scoprire il catalogo invece di buttare fuori). La
   semina della radice in `navMotore` serve perché `history.state`
   SOPRAVVIVE ai `location.reload()` del login e racconterebbe cose
-  della vecchia identità. Su `file://` (la DEMO a mano) `STORIA` è
+  della vecchia identità. LA RICARICA RESTA DOVE SI ERA (7 ott 2026,
+  solo nel sito aperto dal browser — `navSitoBrowser`: né Telegram né
+  l'app installata, decisione di Andrea): se all'avvio la entry è
+  NOSTRA (`paginaRicordata`) la pagina è stata ricaricata o riaperta
+  dalla cronologia, la semina si salta, i link d'arrivo tacciono
+  (`spegniLinkDaUrl`: l'indirizzo è quello dell'arrivo di allora, e un
+  link vero apre una entry nuova con lo stato vuoto), `navRiflette`
+  tace finché `apriPaginaRicordata` — in coda ai due avvii, prima dei
+  link — non ha rifatto la sola pagina sotto con `navRendiVista` (la
+  madre con un avviso se non c'è più; la cassa riparte dall'annuncio o
+  dal carrello; l'annuncio oltre la prima pagina si chiede; il
+  carrello salvato si aspetta; la classifica si richiede). La entry
+  prende il posto della ricordata con `d` e `sotto` di prima — Chrome
+  riattraversa le entry di sotto col popstate nello stesso documento,
+  provato —, o si consuma il gradino se la pagina è quella di sotto.
+  Il filtro di «I miei scambi» viaggia nella entry (`f` del gradino
+  della vista, fuori dai confronti) e si rimette solo qui. I cinque
+  `location.reload()` nostri (uscita, cambio account, login di
+  collaudo, Nostr, collega) chiamano prima `navDaCapo`, che svuota la
+  entry: ripartono dalla home come sempre. Su `file://` (la DEMO a mano) `STORIA` è
   falsa e il motore resta spento: `navIndietro` smonta lo strato in
   cima e, se non ce n'è, torna al mercatino — che è la stessa regola
   della radice madre, detta a mano perché lì la cronologia non c'è.

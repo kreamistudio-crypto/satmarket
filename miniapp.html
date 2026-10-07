@@ -16443,7 +16443,7 @@ function navVista(){
      dentro un reparto ricostruisce la vista ma non il filtro») e con
      la radice madre diventava una bugia: tornando a Esplora ci si
      ritrovava il mercatino intero con la nav accesa su Sfoglia. */
-  return {t:'v', v, k: v==='dettaglio' ? (currentListing?.id || 0)
+  const b = {t:'v', v, k: v==='dettaglio' ? (currentListing?.id || 0)
                     : v==='ordine'    ? (currentOrder?.id || 0)
                     : v==='negozio'   ? (negozioPag.chi || '')
                     : v==='pacco'     ? (paccoDati?.origineId || 0)
@@ -16458,6 +16458,13 @@ function navVista(){
                     : v==='p2pordine' ? (p2pOrdineAperto || '')
                     : v==='esplora'   ? chiaveVetrina()
                     : 0};
+  /* il filtro di «I miei scambi», per la ricarica del sito (LA RICARICA
+     RESTA DOVE SI ERA): fuori dai confronti, come la `o` dei fogli */
+  if (v === 'p2pmiei' && navSitoBrowser()) {
+    const f = filtroMieiDaRicordare();
+    if (f) b.f = f;
+  }
+  return b;
 }
 /* Ramo + categoria in una stringa sola, che e' quanto basta a
    ricostruire la vetrina e a distinguere due entry diverse. */
@@ -16609,8 +16616,10 @@ function navRiflette(){
      (navRendiVista chiama setCat e go, che a loro volta riflettono)
      scriveva a meta' strada — con la vista vecchia ancora attiva — e
      leggeva un cambio di radice che nessuno aveva chiesto: tornando
-     indietro si spingeva un gradino nuovo invece di consumarne uno. */
-  if (!STORIA || navApplicando) return;
+     indietro si spingeva un gradino nuovo invece di consumarne uno.
+     E tace anche mentre l'avvio va verso una pagina ricordata
+     (`navRicordata`): la entry dice dove si sta andando, non dove si e'. */
+  if (!STORIA || navApplicando || navRicordata) return;
   /* UN PASSO NOSTRO E' IN VOLO (`navGiu`): la entry su cui si sta per
      atterrare e' quella di sotto, e scrivere adesso scriverebbe su
      quella che sta per andarsene. Si aspetta l'approdo, dove
@@ -16626,7 +16635,14 @@ function navRiflette(){
      la entry del dettaglio invece di spingerne una nuova */
   const sostituisci = navSostituisci; navSostituisci = false;
   const ora = navPila(), st = history.state?.pila;
-  if (navUguali(ora, st)) { navFreccia(ora); return; }
+  if (navUguali(ora, st)) {
+    /* ...uguali per la navigazione, ma col filtro di «I miei scambi»
+       cambiato (solo nel sito: altrove `f` non c'e'): la entry lo impara
+       sul posto, per la ricarica */
+    if ((ora[0].f || '') !== ((st[0] && st[0].f) || ''))
+      try { history.replaceState(Object.assign({}, history.state, {pila: ora}), '', location.href); } catch(e){}
+    navFreccia(ora); return;
+  }
   /* Quanti gradini ci siamo scavati sotto i piedi: 0 = siamo sulla
      nostra entry di partenza, cioe' sotto non c'e' NIENTE di nostro.
      Serve a navIndietro per sapere se «indietro» ha davvero dove
@@ -16924,11 +16940,154 @@ function navArrivoSecco(){
     r.classList.remove('arrivo-secco')));
 }
 
+/* ---- LA RICARICA RESTA DOVE SI ERA (7 ott 2026, dal campo di Andrea) ----
+   Sul sito aperto dal PC, F5 riportava alla home del mercatino da
+   qualunque pagina: dal P2P, da un negozio, dal carrello. L'indirizzo non
+   cambia mai (vedi «L'URL non si tocca MAI»), quindi dove si era lo sa
+   solo history.state — la pila del motore, che il browser CONSERVA alla
+   ricarica — e navMotore la seminava con la home appena partito. Sul
+   telefono non succedeva perche' la ricarica nativa li' non c'e': il
+   tirare giu' e' nostro, rilegge la vista e ci resta.
+   ADESSO, SOLO NEL SITO APERTO DAL BROWSER (decisione di Andrea:
+   Telegram, Desktop e telefono, e l'app Android/PWA restano come prima):
+   se all'avvio la entry e' NOSTRA, la pagina e' stata ricaricata, e se ne
+   ricostruisce la vista invece di seminare la home. Tre regole, e sono
+   tutto il disegno:
+   1) UN LINK VINCE DA SOLO: un link apre una entry NUOVA, con lo stato
+      vuoto, e da li' tutto va come sempre. Su una entry ricordata invece
+      l'indirizzo e' quello dell'arrivo di allora, il cui link e' gia'
+      stato aperto: i link d'arrivo tacciono (spegniLinkDaUrl);
+   2) SI RICOSTRUISCE SOLO LA PAGINA SOTTO, con navRendiVista — la stessa
+      dell'indietro, che ripiega sulla madre se la pagina non c'e' piu' —
+      e qui con un avviso. I fogli no: basta la pagina sotto;
+   3) `d` E `sotto` RESTANO QUELLI DELLA ENTRY: le entry di sotto ci sono
+      ancora (Chrome le riattraversa col popstate, nello stesso documento:
+      provato), quindi l'indietro dopo la ricarica porta dove portava.
+   I nostri ricarichi (login, uscita, cambio account) ripartono invece
+   dalla home come sempre: navDaCapo svuota la entry prima. E nella entry
+   ci sono solo il nome della pagina e il suo id pubblico (l'annuncio, il
+   codice del negozio, lo scambio), piu' il filtro di «I miei scambi»:
+   niente nell'indirizzo, niente in sessionStorage. */
+const navSitoBrowser = () => STORIA && !tg?.initData && !mqApp.matches;
+/* la entry da ricostruire, finche' l'avvio non arriva in fondo: intanto
+   navRiflette tace, come mentre navApplica ricostruisce */
+let navRicordata = null;
+let navRicordataPresa = false;   /* una volta sola: setCollaudo rilancia avvia() */
+/* La entry ricordata, o null: solo nel sito, solo nostra, e solo se la
+   sua vista esiste ancora (una pagina tolta — «sfoglia», «offertapresto»
+   — ricade sulla semina di sempre, cioe' sulla home). */
+function paginaRicordata(s){
+  if (!navSitoBrowser() || !s || s.app !== 'brt' || !Array.isArray(s.pila)) return null;
+  const b = s.pila[0];
+  if (!b || b.t !== 'v' || typeof b.v !== 'string' || !el('view-' + b.v)) return null;
+  return s;
+}
+/* La pagina sotto, coi dati che la prima pagina della vetrina non porta.
+   Risponde l'avviso da dare, o '' se la pagina c'e'. */
+async function rifaiPaginaRicordata(b){
+  let v = b.v, k = b.k;
+  /* la cassa non ha piu' i suoi dati (acqDati vive in memoria): si
+     riparte dall'annuncio, o dal carrello se era un set */
+  if (v === 'acquisto') {
+    if (String(k).indexOf('set|') === 0) v = 'pacco';
+    else { v = 'dettaglio'; k = Number(k) || 0; }
+  }
+  if (v === 'dettaglio') {
+    const c = () => listings.some(x => x.id === k) || myListings.some(x => x.id === k);
+    /* lo stesso giro di apriAnnuncioDaUrl: l'annuncio puo' stare oltre
+       le pagine caricate */
+    if (k && !c()) {
+      try {
+        const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+        const r = await fetch(`${API_BASE}/listings/${k}`, opz);
+        if (r.ok) inCatalogo([mapListing(await r.json())]);
+      } catch(e) {}
+    }
+    if (!c()) { go('esplora'); return "Questo annuncio non c'è più: ti riporto al mercatino"; }
+    openDetail(k);
+    return '';
+  }
+  if (v === 'pacco') {
+    /* il carrello salvato arriva dal server durante l'avvio */
+    if (carrelloInArrivo) await carrelloInArrivo;
+    if (paccoDati && setScelte.size) riprendiCarrello();
+    if (el('view-pacco').classList.contains('active')) return '';
+    go('esplora');
+    return "Il carrello è vuoto: ti riporto al mercatino";
+  }
+  /* la classifica si chiede al server: la sua porta (in vetrina e in
+     DEMO non c'e', e si resta in Esplora) */
+  if (v === 'classifica') { apriClassifica(); return ''; }
+  if (v === 'p2pmiei') rimettiFiltroMieiP2P(b.f);
+  const manca = v === 'ordine' ? !VETRINA && !orders.some(x => x.id === k)
+              : v === 'p2pordine' ? !ordiniP2P()[k] : false;
+  await navRendiVista({t:'v', v, k});
+  if (!manca) return '';
+  return v === 'ordine' ? "Questo ordine non c'è più fra i tuoi: ecco i tuoi Ordini"
+                        : "Questo scambio non c'è più su questo dispositivo: ecco i tuoi scambi";
+}
+/* In coda ai due avvii, dove si aprono i link d'arrivo, e nei rami della
+   DEMO. Mai un rifiuto: chi la chiama sta dentro il try di avvia(), e un
+   errore qui lo manderebbe in vetrina. */
+async function apriPaginaRicordata(){
+  const s = navRicordata;
+  if (!s || navRicordataPresa) return;
+  navRicordataPresa = true;
+  let avviso = '';
+  /* in DEMO (il server tace) i dati sono finti: niente da ricostruire */
+  if (!DEMO) try { avviso = await rifaiPaginaRicordata(s.pila[0]); } catch(e) {}
+  navRicordata = null;
+  if (DEMO) {
+    try { history.replaceState({app:'brt', pila: navPila(), d:0, sotto: []}, '', location.href); } catch(e){}
+  } else {
+    /* la entry dice la pagina che si vede, AL POSTO di quella ricordata
+       (la cassa che riparte dall'annuncio, la madre di una pagina
+       sparita), coi gradini di sotto di prima: spingerla sopra lascerebbe
+       sotto una entry che nessuno rivedra', e un indietro a vuoto. E se
+       la pagina E' quella di sotto — il foglio che la ricarica ha chiuso,
+       la madre che c'era gia' — si consuma il gradino, per la stessa
+       ragione */
+    const sotto = Array.isArray(s.sotto) ? s.sotto : null;
+    if (sotto && sotto.length && navUguali(navPila(), sotto[sotto.length - 1])) navGiu();
+    else try { history.replaceState({app:'brt', pila: navPila(), d: s.d || 0, sotto}, '', location.href); } catch(e){}
+  }
+  navFreccia(navPila());
+  if (avviso) toast(avviso, 4500);
+}
+/* Il filtro di «I miei scambi» nella entry, per la sola ricarica del
+   sito: 'gruppi|verso' ('morti,fatti|vendo'), '' col filtro spento. E'
+   una scelta dell'interfaccia, non un dato di qualcuno. */
+function filtroMieiDaRicordare(){
+  return (p2pMieiFiltro.length || p2pMieiVerso !== 'tutti')
+    ? p2pMieiFiltro.join(',') + '|' + p2pMieiVerso : '';
+}
+/* ...e la sua rovescia: passa dalle forme che il foglio conosce
+   (P2P_GRUPPI, P2P_VERSI_MIEI), cosi' una entry storta non accende un
+   filtro che non esiste */
+function rimettiFiltroMieiP2P(f){
+  if (typeof f !== 'string' || !f) return;
+  const [g, v] = f.split('|');
+  p2pMieiFiltro = (g ? g.split(',') : []).filter((x, i, a) =>
+    P2P_GRUPPI.some(y => y.k === x) && a.indexOf(x) === i);
+  p2pMieiVerso = P2P_VERSI_MIEI.some(y => y.k === v) ? v : 'tutti';
+}
+/* I NOSTRI RICARICHI RIPARTONO DA CAPO: il login, l'uscita e il cambio
+   d'account ricaricano per far ripartire tutto con l'identita' nuova, e
+   la pagina di prima e' di un altro — uno scambio, un ordine, un
+   carrello. Si svuota la entry subito prima del ricarico, e l'avvio
+   semina la home come sempre. Solo nel sito: altrove la semina e' gia'
+   quella di navMotore. */
+function navDaCapo(){
+  if (navSitoBrowser()) try { history.replaceState(null, '', location.href); } catch(e){}
+}
+
 /* Si accende una volta sola, subito prima di avvia(): prima non si puo'
    (le variabili degli strati sono dichiarate piu' in basso e sarebbero
    in zona morta). La semina della radice serve perche' history.state
    SOPRAVVIVE ai location.reload() del login e racconterebbe cose della
-   vecchia identita'. */
+   vecchia identita'. Nel sito la si salta su una entry nostra (LA
+   RICARICA RESTA DOVE SI ERA, qui sopra), e i ricarichi del login la
+   entry la svuotano prima (navDaCapo). */
 function navMotore(){
   if (!STORIA) return;
   /* Lo scorrimento lo decidiamo noi, in un posto solo (go()). Di serie
@@ -16938,7 +17097,9 @@ function navMotore(){
      dove dice lui invece che dove eravamo — un comportamento diverso
      da un browser all'altro proprio dove serve che sia uguale. */
   try { history.scrollRestoration = 'manual'; } catch(e){}
-  try { history.replaceState({app:'brt', pila: navPila(), d:0, sotto: []}, '', location.href); } catch(e){}
+  navRicordata = paginaRicordata(history.state);
+  if (navRicordata) spegniLinkDaUrl();
+  else try { history.replaceState({app:'brt', pila: navPila(), d:0, sotto: []}, '', location.href); } catch(e){}
   /* Il callback e' un microtask: gira ancora dentro il task del gesto
      dell'utente (l'entry non viene marcata saltabile) e COALESCE i piu'
      cambi dello stesso giro — per questo il passaggio foglio→foglio
@@ -16948,6 +17109,9 @@ function navMotore(){
    el('lightbox'), el('fotocamera'), el('tour'), el('tourP2P'), el('testModale')].forEach(n =>
     n && occhio.observe(n, {attributes:true, attributeFilter:['class']}));
   addEventListener('popstate', e => {
+    /* un indietro mentre l'avvio non e' ancora arrivato alla pagina
+       ricordata: vince il dito, e la ricostruzione non parte piu' */
+    if (navRicordata) { navRicordata = null; navRicordataPresa = true; }
     /* Chrome ha gia' mostrato la pagina d'arrivo: si arriva secchi. In
        Telegram quel segnale non e' mai vero, e la guardia lo dice */
     if (e.hasUAVisualTransition && !tg?.initData) navArrivoSecco();
@@ -16966,7 +17130,8 @@ function navMotore(){
    trascinamento non era di nessuno: dentro Telegram era la presa che
    porta via la Mini App — e chi tirava giu' per rinfrescare si ritrovava
    fuori, cioe' leggeva un torna-indietro —, nel browser il ricarica
-   nativo, che riparte da Esplora e perde dov'eri. Ora e' NOSTRO: a
+   nativo, che rilegge tutta la pagina (e fino al 7 ott 2026 ripartiva
+   da Esplora, perdendo dov'eri). Ora e' NOSTRO: a
    Telegram lo toglie disableVerticalSwipes (navFreccia), al browser lo
    toglie l'overscroll-behavior:none che il body ha da sempre, e qui si
    rilegge soltanto cio' che la vista mostra.
@@ -46215,7 +46380,7 @@ async function esciWeb(){
   /* chi esce lascia il dispositivo: la sua nsec non resta qui */
   try { await scordaNsecAccount(); } catch(e){}
   try { await fetch(`${API_BASE}/logout`, {method:'POST'}); } catch(e){}
-  location.reload();
+  navDaCapo(); location.reload();
 }
 
 /* ---------------- PIU' ACCOUNT SULLO STESSO BROWSER ----------------
@@ -46317,7 +46482,7 @@ async function cambiaAccount(tgId){
       body: JSON.stringify({tg_id: tgId})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error(d.detail || 'switch rifiutato');
-    location.reload();
+    navDaCapo(); location.reload();
   } catch (e) {
     accountInCorso = false;
     toast(e.message || 'Non è riuscito, riprova', 5000);
@@ -46543,7 +46708,7 @@ async function provaLoginWeb(){
   await fetch(`${API_BASE}/login/telegram`, {method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({collaudo:true, id:collaudoId, first_name:collaudoName})});
-  location.reload();
+  navDaCapo(); location.reload();
 }
 
 /* ---------------- login Nostr (estensione, bunker, nsec) ----------------
@@ -47368,7 +47533,7 @@ async function entraConNostr(firmatario){
      Telegram l'identita' viaggia li', quindi WEB va acceso prima. */
   if (!tg?.initData) WEB = true;
   try { await svuotaFirmeNostr(firmatario, true); } catch(e){}
-  location.reload();
+  navDaCapo(); location.reload();
 }
 
 /* Il foglio del firmatario serve a DUE cose: entrare (login, il
@@ -47481,7 +47646,7 @@ async function accettaCollega(){
     closeSheet();
     return;
   }
-  location.reload();
+  navDaCapo(); location.reload();
 }
 
 function apriNostrSheet(scopo){
@@ -50174,6 +50339,9 @@ function azzeraFiltroMieiP2P(){
   if (el('p2pMieiFiltroSheet').classList.contains('open'))
     chiudiFoglioP2P('p2pMieiFiltroSheet');
   renderP2P();
+  /* dallo stato vuoto il foglio non c'e', e nessuna classe cambia: la
+     entry il filtro spento lo impara da qui */
+  if (navSitoBrowser()) navRiflette();
 }
 function applicaFiltroMieiP2P(){
   haptic();
@@ -68520,7 +68688,8 @@ let categoriaAperta = false;
    vetrina intera scaricata per buttarla via — proprio sulla pagina che
    deve essere veloce per chi arriva da un motore di ricerca. */
 function preparaCategoriaDaUrl(){
-  if (!CATEGORIA_DA_URL) return;
+  /* su una pagina ricordata il reparto lo dice la sua entry */
+  if (!CATEGORIA_DA_URL || navRicordata) return;
   activeCat = CATEGORIA_DA_URL;
   /* la nav accende Esplora: il reparto e' la home filtrata */
 }
@@ -68701,6 +68870,20 @@ function apriInvitoDaUrl(){
     + `con Nostr: il codice ${INVITO_URL} è già pronto, e si collega da solo.`, 'invito');
 }
 
+/* LA RICARICA SPEGNE I LINK D'ARRIVO (7 ott 2026): su una entry
+   ricordata (paginaRicordata) l'indirizzo e' quello con cui si era
+   arrivati allora, e il suo link e' gia' stato aperto — rifarlo
+   porterebbe via dalla pagina in cui si era. Si alzano le bandierine
+   one-shot, e le chiamate dei due avvii diventano no-op come al secondo
+   giro di sempre. Un link VERO arriva su una entry nuova, con lo stato
+   vuoto: li' questa non gira. */
+function spegniLinkDaUrl(){
+  negozioAperto = annuncioAperto = sicurezzaAperta = privacyAperta = true;
+  categoriaAperta = p2pApertoDaUrl = consigliatiApertiDaUrl = true;
+  offertaAperta = barattoloAperto = invitoDaUrlMostrato = true;
+  bozzaAperta = true;
+}
+
 const BOZZA_URL = (location.search.match(/[?&]bozza=([a-z0-9-]{2,40})(?:&|$)/) || [])[1] || '';
 let bozzaAperta = false;
 function apriBozzaDaUrl(){
@@ -68743,6 +68926,8 @@ async function avviaVetrina(){
     armaFila('catStrip'); armaFila('scoprireStrip'); armaFila('p2pVetrinaFila');
     await fasciaPrima();
     renderGrid();
+    /* la pagina ricordata PRIMA dei link d'arrivo (che li' tacciono) */
+    await apriPaginaRicordata();
     apriNegozioDaUrl();
     apriAnnuncioDaUrl();
     apriSicurezzaDaUrl();
@@ -68772,6 +68957,7 @@ async function avviaVetrina(){
        cantiere «Da scoprire») */
     renderChips();
     renderGrid(); renderOrders();
+    apriPaginaRicordata();   /* in DEMO: la home di sempre, e navRiflette riparte */
   }
 }
 
@@ -68802,7 +68988,9 @@ async function avvia(){
   preparaCategoriaDaUrl();
   renderChips();
   if (!API_BASE) {                          // nessun backend configurato
-    DEMO = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderPodioTesta(); renderGrid(); renderOrders(); return;
+    DEMO = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderPodioTesta(); renderGrid(); renderOrders();
+    apriPaginaRicordata();   /* in DEMO: la home di sempre, e navRiflette riparte */
+    return;
   }
   /* Il banner del rodaggio parte SUBITO, in parallelo col primo /me:
      quando le card saranno pronte la risposta e' gia' arrivata, e la
@@ -69088,6 +69276,8 @@ async function avvia(){
       renderProfilo(); loadMyListings().then(renderMyListings).catch(()=>{});
       loadAdminStats(); renderWallet();
     }
+    /* la pagina ricordata PRIMA dei link d'arrivo (che li' tacciono) */
+    await apriPaginaRicordata();
     apriNegozioDaUrl();
     apriAnnuncioDaUrl();
     apriSicurezzaDaUrl();

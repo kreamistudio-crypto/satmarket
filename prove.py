@@ -83864,6 +83864,9 @@ def prove_indietro_dal_libro():
              "function chiudiFoglioP2P(idFoglio){", "function altroFoglioAperto(){",
              # ...e «📖 Come funziona» del tabacchino, dallo stesso foglio a Info
              "function apriInfoTabacchinoP2P(){",
+             # (7 ott 2026) la ricarica resta dove si era: navMotore chiede a
+             # paginaRicordata, navVista al filtro dei miei scambi (qui spento)
+             "function paginaRicordata(s){", "function filtroMieiDaRicordare(){",
              # (7 ott 2026) il negozio subito con l'anello, la porta vera del
              # negozio con la sua domanda «ci si e' ancora?», e le corse fermate
              "function negozioInAttesa(chi){", "function fermaCorse(n){",
@@ -83873,7 +83876,7 @@ def prove_indietro_dal_libro():
         _blocco("const RADICI = new Set([", "]);") + "\n"
         + "\n".join(re.search(r"const " + n + r" = [^\n]*;", mini).group(0) for n in (
             "RADICE_MADRE", "VISTE_NAV_P2P", "MADRE_P2P", "FIGLIE_P2P", "chiaveVetrina",
-            "navStesso", "mqApp")) + "\n"
+            "navStesso", "mqApp", "navSitoBrowser")) + "\n"
         + _blocco("const navUguali = ", "));") + "\n"
         + "".join(_intera(f) for f in _funz)
         # (7 ott 2026) il LISTE_RITORNO vero, come testo: lo valuta una scatola sua
@@ -83911,6 +83914,9 @@ let tourInCorso = false, tourP2PInCorso = false, testModaleInCorso = false;
 let vistaBarattolo = false, filtroAsta = false, pollTimer = null;
 const DEMO = false, STORIA = true;
 let navSpingi = false, navGradinoReparto = 0, navApplicando = false, uscitaDopoAnnullo = false;
+/* (7 ott 2026) la ricarica resta dove si era: qui non si ricarica mai, e
+   il filtro di «I miei scambi» resta spento */
+let navRicordata = null, navRicordataPresa = false, p2pMieiFiltro = [], p2pMieiVerso = 'tutti';
 /* (6 ott 2026) la gemella dell'annullo: «Salva per dopo» del carrello */
 let uscitaDopoSalva = false;
 /* (6 ott 2026) il dettaglio del libro: l'ordine, il metodo e la cifra
@@ -84665,6 +84671,775 @@ async function aCaso(n, via){
     prova("...l'avanti del browser rifa' il negozio, e l'indietro dopo il foglio con la cifra",
           [["p2p", _D, _D, "negozio", _D, "negozio", _D], "o1|12||o1"],
           [_av["visti"], _av["stati"][6]] if isinstance(_av, dict) else _av)
+
+
+# ---- LA RICARICA RESTA DOVE SI ERA (7 ott 2026) -------------------------
+# Il banco: un browser di cartone in cui OGNI CARICAMENTO e' un documento
+# nuovo — un contesto `vm` fresco, con le variabili a zero come dopo un F5
+# vero — sopra la STESSA cronologia, che sopravvive come in Chrome: le
+# entry spinte dal documento ricaricato restano sue (riattraversate col
+# popstate, provato nel pane il 7 ott 2026), quelle di un altro indirizzo
+# no (si ricaricano intere). Dentro ogni documento le funzioni VERE del
+# motore e delle porte, estratte da miniapp.html; intorno il cartone.
+_RICARICA_PROG = r"""
+let CUR = 'esplora', APERTI = [], OSSERVATORI = [], inCoda = false;
+const MIO = B.doc, vivo = () => B.doc === MIO;
+const STORIA = true, API_BASE = '/api', DAL_LINK = 'link', CATS = ['Tutto', 'Casa'];
+const slugCat = c => c.toLowerCase();
+let DEMO = false, VETRINA = false;
+let listings = [], myListings = [], orders = [];
+let currentListing = null, currentOrder = null, negozioPag = {chi: ''}, negozioCorrente = null;
+let paccoDati = null, setScelte = new Map(), acqDati = null, carrelloInArrivo = null, carrelloNote = [];
+let p2pOrdineAperto = '', ramoVetrina = 'esplora', activeCat = 'Tutto', filtroAsta = false, vistaBarattolo = false;
+let pollTimer = null, tourInCorso = false, tourP2PInCorso = false, testModaleInCorso = false;
+let p2pMieiFiltro = [], p2pMieiFiltroBozza = null, p2pMieiVerso = 'tutti', p2pMieiVersoBozza = null;
+let navSpingi = false, navSostituisci = false, navLasciaFoglio = null, navGradinoReparto = 0;
+let navApplicando = false, uscitaDopoAnnullo = false, uscitaDopoSalva = false;
+let navUltimo = 0, navGiuInVolo = 0, navGuardiano = null;
+let navRicordata = null, navRicordataPresa = false;
+let classificaDati = null, offertaDaSvelare = 0, barattoloOspite = null, p2pDettOrdine = '';
+const listePos = {}, LISTE_RITORNO = {negozio: () => ''};
+const window = {scrollTo(){}};
+const pausa = () => new Promise(r => setImmediate(r));
+/* il mondo fuori dal documento: Telegram, l'app, il browser */
+const tg = {get initData(){ return B.modo === 'tg' ? 'x' : ''; }, close(){ B.chiuso++; },
+  BackButton: {show(){}, hide(){}}, isVersionAtLeast: () => true,
+  disableVerticalSwipes(){}, onEvent(){}};
+function matchMedia(){ return {get matches(){ return B.modo === 'apk'; }}; }
+const navigator = {get userAgent(){ return B.modo === 'apk'
+  ? 'Mozilla/5.0 (Linux; Android 16) Chrome/153' : 'Mozilla/5.0 (Windows NT 10.0) Chrome/153'; }};
+class CloseWatcher { destroy(){} }
+function requestAnimationFrame(f){ setImmediate(f); }
+/* LA CRONOLOGIA E' DEL BROWSER (B): un documento morto non scrive piu' */
+const history = {
+  scrollRestoration: 'auto',
+  get state(){ const e = B.voci[B.i]; return e && e.s != null ? JSON.parse(e.s) : null; },
+  pushState(s){ if (!vivo()) return; B.voci = B.voci.slice(0, B.i + 1);
+    B.voci.push({s: JSON.stringify(s), url: B.url, doc: MIO}); B.i++; },
+  replaceState(s){ if (!vivo()) return; B.voci[B.i].s = s == null ? null : JSON.stringify(s); },
+  back(){ if (!vivo()) return; B.coda.push(() => { if (B.i > 0) { B.i--; B.attraversa(); } else B.uscito++; }); },
+  forward(){ if (!vivo()) return; B.coda.push(() => { if (B.i < B.voci.length - 1) { B.i++; B.attraversa(); } }); }
+};
+const location = {get href(){ return 'https://barattolo.store' + B.url; },
+  get pathname(){ return B.url.split('?')[0]; },
+  get search(){ const i = B.url.indexOf('?'); return i < 0 ? '' : B.url.slice(i); },
+  hash: '', protocol: 'https:',
+  reload(){ if (vivo()) B.coda.push(() => B.carica(B.i)); }};
+function addEventListener(t, f){
+  if (t === 'popstate' && vivo()) B.popstate = () => f({state: history.state, hasUAVisualTransition: false}); }
+/* l'osservatore delle classi: un microtask, e i cambi dello stesso giro
+   in un colpo solo, come quello vero */
+class MutationObserver { constructor(f){ OSSERVATORI.push(f); } observe(){} }
+function tocca(){ if (inCoda || !vivo()) return; inCoda = true;
+  queueMicrotask(() => { inCoda = false; OSSERVATORI.forEach(f => f()); }); }
+const NODI = {};
+function el(id){
+  if (id.indexOf('view-') === 0 && !B.viste.includes(id.slice(5))) return null;
+  return NODI[id] || (NODI[id] = {id, style: {}, innerHTML: '', textContent: '', children: [],
+    setAttribute(){}, querySelector(){ return null; },
+    classList: {
+      contains: c => c === 'active' ? id === 'view-' + CUR : c === 'open' ? APERTI.includes(id) : false,
+      add(c){ if (c === 'open' && id !== 'sheetBg' && !APERTI.includes(id)) { APERTI.push(id); tocca(); } },
+      remove(c){ if (c === 'open' && APERTI.includes(id)) { APERTI = APERTI.filter(x => x !== id); tocca(); } },
+      toggle(){}}});
+}
+const document = {
+  documentElement: {classList: {add(){}, remove(){}}},
+  querySelector(s){ if (s === '.view.active') return el('view-' + CUR);
+    if (s === '.sheet.open') return APERTI.length ? el(APERTI[0]) : null; return null; },
+  querySelectorAll(s){ return s === '.sheet.open' ? APERTI.map(el) : []; }
+};
+/* go() vera spegne le viste e poi accende la sua: su una vista che non
+   esiste esplode A META', con nessuna vista accesa — la pagina vuota */
+function go(v){ if (!el('view-' + v)) { CUR = ''; throw new TypeError('nessuna vista ' + v); }
+  CUR = v; tocca(); }
+function toast(t){ if (vivo()) B.toast.push(t); }
+function haptic(){} function renderChips(){} function renderP2P(){} function renderPacco(){} function renderGrid(){}
+function rimettiCarrelloPrimaAccordo(){} function salvaCarrello(){} function aggiornaIconaCarrello(){}
+function rileggiVenditore(){ return Promise.resolve(); } function renderClassifica(){}
+function aggiornaPicker(){} function alternaBarattolo(){} function loadListings(){ return Promise.resolve(); }
+function chiudiPicker(){} function chiudiLightbox(){} function chiudiFotocamera(){} function chiudiTour(){}
+function chiudiTourP2P(){} function chiudiModaleTest(){} function pulisciChiaveModP2P(){}
+function riapriDettaglioP2P(){ return false; }
+function invitoTelegram(){} function apriAnteprimaRacconto(){} function ospiteRiga(){}
+async function scordaNsecAccount(){}
+function authHdr(){ return 'x'; } function mapListing(x){ return x; }
+function inCatalogo(a){ a.forEach(l => { if (!listings.some(x => x.id === l.id)) listings.push(l); }); }
+function chiudiFoglioP2P(id){ el(id).classList.remove('open'); }
+function vaiP2P(){ go('p2p'); } function apriSicurezza(){ go('sicurezza'); }
+function apriPrivacy(){ go('privacy'); } function apriConsigliati(){ go('consigliati'); }
+function setCat(c){ activeCat = c; }
+function openDetail(id){
+  const l = listings.find(x => x.id === id) || myListings.find(x => x.id === id);
+  if (!l) { toast('Annuncio non disponibile'); return; }
+  currentListing = l; go('dettaglio'); }
+function openOrder(id){ currentOrder = orders.find(x => x.id === id); go('ordine'); }
+function apriOrdineP2P(id){ p2pOrdineAperto = id; go('p2pordine'); }
+function ordiniP2P(){ return JSON.parse(B.storage.p2p || '{}'); }
+async function apriNegozio(chi){
+  await pausa();
+  if (!B.mondo.negozi.includes(chi)) { toast('Negozio non trovato'); return; }
+  negozioPag.chi = chi; negozioCorrente = {chi}; go('negozio'); }
+function ridisegnaNegozio(chi){ return apriNegozio(chi); }
+/* il server: gli annunci, la classifica, l'uscita */
+async function fetch(url){
+  await pausa();
+  const m = /\/listings\/(\d+)$/.exec(url);
+  if (m) return B.mondo.catalogo.includes(Number(m[1]))
+    ? {ok: true, json: async () => ({id: Number(m[1])})} : {ok: false};
+  return {ok: true, json: async () => ({})};
+}
+/*__CONST__*/
+/*__FUNZIONI__*/
+/* l'avvio di cartone: le sue porte anticipate, i dati, il carrello
+   salvato che arriva da solo, e poi l'ELENCO VERO di avvia() */
+async function avviaCartone(){
+  apriSicurezzaDaUrl(); apriPrivacyDaUrl(); preparaCategoriaDaUrl();
+  if (B.mondo.demo) { DEMO = true; apriPaginaRicordata(); return; }
+  apriOffertaDaUrl();
+  await pausa();
+  listings = B.mondo.prima.filter(id => B.mondo.catalogo.includes(id)).map(id => ({id}));
+  orders = B.mondo.ordini.map(id => ({id}));
+  const giro = (async () => { await pausa(); await pausa();
+    const c = B.mondo.carrello.filter(id => B.mondo.catalogo.includes(id));
+    if (!c.length) return;
+    inCatalogo(c.map(id => ({id})));
+    setScelte = new Map(c.map(id => [id, 1]));
+    paccoDati = {sellerId: 9, origineId: c[0]}; })();
+  carrelloInArrivo = giro;
+  giro.then(() => { if (carrelloInArrivo === giro) carrelloInArrivo = null; });
+  await pausa();
+  /*__LISTA__*/
+}
+function fotoQui(){
+  return {v: CUR + (APERTI.length ? '+' + APERTI.join('+') : ''),
+    k: CUR === 'dettaglio' ? (currentListing ? currentListing.id : 0)
+     : CUR === 'negozio' ? negozioPag.chi : CUR === 'ordine' ? (currentOrder ? currentOrder.id : 0)
+     : CUR === 'p2pordine' ? p2pOrdineAperto : CUR === 'esplora' ? activeCat
+     : CUR === 'classifica' ? (classificaDati ? 'letta' : 'vuota') : '',
+    c: activeCat,
+    f: p2pMieiFiltro.join(',') + '|' + p2pMieiVerso};
+}
+navMotore();
+avviaCartone();
+"""
+
+_RICARICA_GUIDA = r"""
+const vm = require('vm');
+const PROG = require('fs').readFileSync(process.argv[2], 'utf-8');
+const DATI = JSON.parse(require('fs').readFileSync(process.argv[3], 'utf-8'));
+let B = null;
+process.on('unhandledRejection', e => { if (B) B.errori.push('rifiuto: ' + String(e && e.message || e)); });
+function carica(i){
+  const e = B.voci[i], vecchio = e.doc, doc = ++B.n;
+  /* le entry del documento ricaricato restano sue: si riattraversano col popstate */
+  if (vecchio) B.voci.forEach(x => { if (x.doc === vecchio) x.doc = doc; });
+  e.doc = doc; B.doc = doc; B.url = e.url; B.popstate = null; B.caricamenti++;
+  const ctx = {B, setImmediate, setTimeout, queueMicrotask, console};
+  vm.createContext(ctx); B.ctx = ctx;
+  try { vm.runInContext(PROG, ctx); } catch (err) { B.errori.push('carico: ' + String(err && err.message || err)); }
+}
+function attraversa(){
+  const e = B.voci[B.i];
+  B.url = e.url;
+  if (e.doc === B.doc && B.popstate) B.popstate();
+  else carica(B.i);   /* un altro documento: si ricarica intero */
+}
+const pausa = () => new Promise(r => setImmediate(r));
+async function scorri(){ for (let g = 0; g < 300; g++) { await pausa(); if (B.coda.length) B.coda.shift()(); } }
+function passo(p){
+  if (p === 'F5') B.coda.push(() => carica(B.i));
+  /* il tasto indietro premuto mentre la pagina ricaricata sta ancora partendo */
+  else if (p === 'F5+B') B.coda.push(() => { carica(B.i); vm.runInContext('history.back()', B.ctx); });
+  else if (p === 'B') vm.runInContext('history.back()', B.ctx);
+  else if (p === '<') vm.runInContext('navUltimo = 0; navIndietro();', B.ctx);
+  else if (p.indexOf('link:') === 0) {
+    B.voci = B.voci.slice(0, B.i + 1); B.voci.push({s: null, url: p.slice(5), doc: 0}); B.i++;
+    carica(B.i); }
+  else { try { vm.runInContext(p, B.ctx); } catch (err) { B.errori.push(p + ': ' + String(err && err.message || err)); } }
+}
+function forma(){
+  return B.voci.slice(0, B.i + 1).map(e => {
+    if (e.s == null) return '-';
+    const s = JSON.parse(e.s), p = s.pila || [];
+    return p.map(x => x.t === 'v' ? x.v : x.k).join('+') + (p[0] && p[0].f ? '{' + p[0].f + '}' : '');
+  }).join(' ');
+}
+/* il registro di `d` e `sotto` dice il vero? ogni entry porta la sua
+   altezza e le pile di quelle che ha sotto (i filtri a parte) */
+function registro(){
+  const nuda = p => JSON.stringify((p || []).map(x => [x.t, x.v, x.k]));
+  return B.voci.slice(0, B.i + 1).every((e, k) => {
+    if (e.s == null) return false;
+    const s = JSON.parse(e.s);
+    return s.d === k && Array.isArray(s.sotto) && s.sotto.length === k
+      && s.sotto.every((p, j) => nuda(p) === nuda(JSON.parse(B.voci[j].s).pila));
+  });
+}
+function foto(){
+  const f = JSON.parse(vm.runInContext('JSON.stringify(fotoQui())', B.ctx));
+  return [f.v, String(f.k), f.f + ' ' + f.c, forma(), registro(), B.toast.join(' / '), B.uscito + B.chiuso];
+}
+async function giro(modo, passi){
+  B = {voci: [{s: null, url: DATI.url || '/', doc: 0}], i: 0, n: 0, doc: 0, coda: [], toast: [],
+       storage: {p2p: JSON.stringify({x1: {}, x2: {}})}, modo, viste: DATI.viste, uscito: 0,
+       chiuso: 0, caricamenti: 0, errori: [], popstate: null,
+       mondo: {catalogo: [1, 2, 3, 4, 5, 7, 40], prima: [1, 2, 3, 4, 5, 7], ordini: [100, 101],
+               negozi: ['bob', 'eva'], carrello: [3, 5], demo: false}};
+  B.carica = carica; B.attraversa = attraversa;
+  carica(0); await scorri();
+  const out = [];
+  for (const p of passi) { B.toast = []; passo(p); await scorri(); out.push(foto()); }
+  return {passi: out, errori: B.errori, caricamenti: B.caricamenti};
+}
+(async () => {
+  const R = {};
+  for (const [nome, modo, passi] of DATI.scenari) R[nome] = await giro(modo, passi);
+  console.log(JSON.stringify(R));
+})();
+"""
+
+
+def _banco_ricarica_resta(mini, scenari, url="/"):
+    """Costruisce il programma di un documento dalle funzioni VERE di
+    `mini` e fa girare gli scenari [nome, modo, passi] nel browser di
+    cartone. Restituisce (uscita, errore). Tollera le funzioni che il
+    testo non ha — serve a far girare gli stessi scenari sul miniapp.html
+    di PRIMA del cantiere e vedere che Telegram e l'app non cambiano;
+    nel banco vero le sentinelle dicono che le nuove ci sono."""
+    import shutil
+    import subprocess
+    import tempfile
+    import json as _js
+    node = shutil.which("node")
+    if not node:
+        return None, "serve node"
+
+    def _intera(firma):
+        return (pezzo_js(mini, firma, "\n}\n") + "\n}\n") if firma in mini else ""
+
+    def _blocco(inizio, fine):
+        if inizio not in mini:
+            return ""
+        i = mini.index(inizio)
+        return mini[i:mini.index(fine, i) + len(fine)] + "\n"
+
+    def _const(nome):
+        m = re.search(r"\nconst " + nome + r" = [^;]*;", mini)
+        return (m.group(0).strip() + "\n") if m else ""
+
+    porte = ("function apriNegozioDaUrl(){", "async function apriAnnuncioDaUrl(){",
+             "function apriSicurezzaDaUrl(){", "function apriPrivacyDaUrl(){",
+             "function apriCategoriaDaUrl(){", "function apriP2PDaUrl(){",
+             "function apriConsigliatiDaUrl(){", "function apriOffertaDaUrl(){",
+             "async function apriBarattoloDaUrl(){", "function apriBozzaDaUrl(){",
+             "function apriInvitoDaUrl(){")
+    # le bandierine one-shot delle porte, lette dalle loro guardie
+    bandiere = []
+    for f in porte:
+        m = re.search(r"\|\| (\w+)\) return;", _intera(f))
+        if m:
+            bandiere.append(m.group(1))
+    funz = ("function navVista(){", "function navPila(){", "function navChiudiStrato(s){",
+            "function navRiapriStrato(s){", "function navRendiVista(b){",
+            "function navRiflette(){", "function navApplica(s){", "function navIndietro(){",
+            "function navFreccia(pila){", "function navArmaGesto(dentro){",
+            "function navArrivoSecco(){", "function navMotore(){",
+            "function passoPilaP2P(ora, st, sotto){", "function navGiu(){",
+            "function vaiEsplora(){", "function tornaATutto(){",
+            "function consumaGradinoReparto(){",
+            "function paginaRicordata(s){", "async function rifaiPaginaRicordata(b){",
+            "async function apriPaginaRicordata(){", "function filtroMieiDaRicordare(){",
+            "function rimettiFiltroMieiP2P(f){", "function navDaCapo(){",
+            "function spegniLinkDaUrl(){", "function preparaCategoriaDaUrl(){",
+            "function applicaFiltroMieiP2P(){", "function azzeraFiltroMieiP2P(){",
+            "function riprendiCarrello(){", "async function apriClassifica(){",
+            "async function esciWeb(){") + porte
+    costanti = (
+        _blocco("const RADICI = new Set([", "]);")
+        + "".join(_const(n) for n in (
+            "RADICE_MADRE", "VISTE_NAV_P2P", "MADRE_P2P", "FIGLIE_P2P", "chiaveVetrina",
+            "navStesso", "mqApp", "navSitoBrowser", "NEGOZIO_URL", "ANNUNCIO_URL",
+            "SICUREZZA_URL", "PRIVACY_URL", "P2P_URL", "CONSIGLIATI_URL", "CATEGORIA_URL",
+            "CATEGORIA_DA_URL", "OFFERTA_URL", "BARATTOLO_URL", "BOZZA_URL",
+            "INVITO_ALFABETO_CLIENT"))
+        + _blocco("const navUguali = ", "));")
+        + _blocco("const INVITO_URL = (() => {", "})();")
+        + _blocco("const P2P_GRUPPI = [", "];")
+        + _blocco("const P2P_VERSI_MIEI = [", "];")
+        + "".join("let %s = false;\n" % b for b in bandiere))
+    av = pezzo_js(mini, "async function avvia(){", "\n}\n")
+    inizio = ("await apriPaginaRicordata();" if "await apriPaginaRicordata();" in av
+              else "apriNegozioDaUrl();")
+    i = av.index(inizio)
+    lista = av[i:av.index("apriBozzaDaUrl();", i) + len("apriBozzaDaUrl();")]
+    prog = (_RICARICA_PROG.replace("/*__CONST__*/", costanti)
+            .replace("/*__FUNZIONI__*/", "".join(_intera(f) for f in funz))
+            .replace("/*__LISTA__*/", lista))
+    viste = sorted(set(re.findall(r'id="view-([a-z0-9]+)"', mini)))
+    dati = {"scenari": scenari, "viste": viste, "url": url}
+    fp = fg = fd = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+            f.write(prog)
+            fp = f.name
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+            f.write(_RICARICA_GUIDA)
+            fg = f.name
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
+            f.write(_js.dumps(dati))
+            fd = f.name
+        r = subprocess.run([node, fg, fp, fd], capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=300)
+    finally:
+        for x in (fp, fg, fd):
+            if x:
+                os.unlink(x)
+    if r.returncode != 0:
+        return None, r.stderr[:800]
+    try:
+        return _js.loads(r.stdout.strip().splitlines()[-1]), ""
+    except Exception as e:
+        return None, "uscita illeggibile: %s %r" % (e, r.stdout[-400:])
+
+
+# Gli scenari del banco: [nome, modo, passi]. Il modo e' 'sito' (il
+# browser del PC), 'tg' (la Mini App) o 'apk' (l'app Android / la PWA). I
+# passi: 'F5' ricarica, 'F5+B' l'indietro del browser mentre riparte, '<' l'indietro dell'app (navIndietro), 'B' il
+# tasto indietro del browser, 'link:/x' un link che arriva da fuori nella
+# stessa scheda; il resto e' codice che gira nel documento di quel momento.
+_SCENARI_RICARICA = [
+    ["esplora", "sito", ["F5"]],
+    ["reparto", "sito", ["navSpingi = true; activeCat = 'Casa'; go('esplora')", "F5", "<"]],
+    ["dettaglio", "sito", ["openDetail(3)", "F5", "<"]],
+    ["dettaglio oltre la prima pagina", "sito", ["inCatalogo([{id: 40}]); openDetail(40)", "F5"]],
+    ["negozio", "sito", ["apriNegozio('bob')", "F5", "<"]],
+    ["carrello", "sito", ["riprendiCarrello()", "F5", "<"]],
+    ["cassa", "sito", ["acqDati = {tipo: 'mono', annuncioId: 3}; "
+                       "currentListing = listings.find(x => x.id === 3); go('acquisto')", "F5"]],
+    ["cassa del set", "sito", ["riprendiCarrello()", "acqDati = {tipo: 'set'}; go('acquisto')", "F5"]],
+    ["ordine", "sito", ["go('affari')", "openOrder(100)", "F5", "<"]],
+    ["radici", "sito", ["go('affari')", "F5", "go('profilo')", "F5", "go('vendi')", "F5"]],
+    ["classifica", "sito", ["apriClassifica()", "F5"]],
+    ["pagine fisse", "sito", ["go('sicurezza')", "F5", "<", "go('privacy')", "F5", "<",
+                              "go('consigliati')", "F5"]],
+    ["p2p", "sito", ["go('p2p')", "F5", "go('p2pmiei')", "F5", "go('p2pinfo')", "F5", "<", "<"]],
+    ["scambio", "sito", ["go('p2p')", "go('p2pmiei')", "apriOrdineP2P('x1')", "F5", "<", "<", "<"]],
+    ["filtro", "sito", ["go('p2p')", "go('p2pmiei')",
+                        "el('p2pMieiFiltroSheet').classList.add('open')",
+                        "p2pMieiFiltroBozza = ['morti']; p2pMieiVersoBozza = 'vendo'; applicaFiltroMieiP2P()",
+                        "F5", "azzeraFiltroMieiP2P()", "F5"]],
+    ["foglio aperto", "sito", ["go('p2p')", "el('p2pDettSheet').classList.add('open')", "F5", "<"]],
+    ["foglio nel mercatino", "sito", ["openDetail(3)", "el('paySheet').classList.add('open')", "F5", "<"]],
+    ["scambio sparito", "sito", ["go('p2p')", "go('p2pmiei')", "apriOrdineP2P('x1')",
+                                 "B.storage.p2p = JSON.stringify({x2: {}})", "F5", "<"]],
+    ["annuncio sparito", "sito", ["openDetail(3)",
+                                  "B.mondo.catalogo = B.mondo.catalogo.filter(x => x !== 3); "
+                                  "B.mondo.prima = B.mondo.prima.filter(x => x !== 3)", "F5"]],
+    ["ordine sparito", "sito", ["go('affari')", "openOrder(100)", "B.mondo.ordini = [101]", "F5"]],
+    ["negozio sparito", "sito", ["apriNegozio('bob')", "B.mondo.negozi = ['eva']", "F5"]],
+    ["carrello svuotato", "sito", ["riprendiCarrello()", "B.mondo.carrello = []", "F5"]],
+    ["link esterno", "sito", ["go('p2p')", "go('p2pmiei')", "link:/annuncio/7", "F5", "go('p2p')",
+                              "F5", "B", "B"]],
+    ["link al p2p", "sito", ["openDetail(3)", "link:/p2p", "F5", "openDetail(3)", "F5"]],
+    ["link a un reparto", "sito", ["link:/categoria/casa", "go('p2p')", "F5", "<"]],
+    ["vista che non c'e' piu'", "sito", ["history.replaceState({app: 'brt', pila: [{t: 'v', v: 'boh', k: 0}], d: 0, sotto: []}, '', location.href)", "F5", "go('p2p')"]],
+    ["indietro durante l'avvio", "sito", ["go('p2p')", "go('p2pmiei')", "F5+B", "<"]],
+    ["esci", "sito", ["go('p2p')", "go('p2pmiei')", "esciWeb()", "<"]],
+    ["gli altri ricarichi", "sito", ["apriNegozio('bob')", "navDaCapo(); location.reload()"]],
+    ["indietro del browser", "sito", ["apriNegozio('bob')", "openDetail(3)", "F5", "B", "B"]],
+    ["demo", "sito", ["B.mondo.demo = true; go('p2p')", "F5", "go('p2pinfo')"]],
+    ["tg: p2p", "tg", ["go('p2p')", "go('p2pmiei')", "F5", "<"]],
+    ["tg: negozio", "tg", ["apriNegozio('bob')", "F5"]],
+    ["tg: dettaglio", "tg", ["openDetail(3)", "F5"]],
+    ["tg: filtro", "tg", ["go('p2p')", "go('p2pmiei')",
+                          "el('p2pMieiFiltroSheet').classList.add('open')",
+                          "p2pMieiFiltroBozza = ['morti']; p2pMieiVersoBozza = 'vendo'; applicaFiltroMieiP2P()",
+                          "F5", "azzeraFiltroMieiP2P()"]],
+    ["tg: esci", "tg", ["go('p2p')", "esciWeb()"]],
+    ["apk: p2p", "apk", ["go('p2p')", "go('p2pmiei')", "F5", "<"]],
+    ["apk: negozio", "apk", ["apriNegozio('bob')", "F5"]],
+    ["apk: dettaglio", "apk", ["openDetail(3)", "F5"]],
+    ["apk: filtro", "apk", ["go('p2p')", "go('p2pmiei')",
+                            "el('p2pMieiFiltroSheet').classList.add('open')",
+                            "p2pMieiFiltroBozza = ['morti']; p2pMieiVersoBozza = 'vendo'; applicaFiltroMieiP2P()",
+                            "F5", "azzeraFiltroMieiP2P()"]],
+    ["apk: esci", "apk", ["go('p2p')", "esciWeb()"]],
+]
+
+# Quel che si vede dopo ogni passo: la vista (+ i fogli aperti), la sua
+# chiave, il filtro di «I miei scambi», la FORMA della cronologia fino
+# alla entry corrente (con il filtro ricordato fra graffe), il registro di
+# `d` e `sotto` quando e' a meta', il toast, le uscite dall'app.
+# ⚠️ LE RIGHE DI TELEGRAM E DELL'APP sono quelle che gli stessi scenari
+# danno sul miniapp.html di PRIMA del cantiere (origin/main 3458306),
+# confrontate riga per riga quando il banco e' nato: li' non cambia niente,
+# nemmeno la cronologia. E il banco, sul file di prima, riproduceva il
+# difetto: ogni F5 del sito tornava a «esplora».
+_ATTESI_RICARICA = {
+    'esplora': [
+        'esplora Tutto |tutti Tutto [esplora]',
+    ],
+    'reparto': [
+        'esplora Casa |tutti Casa [esplora esplora]',
+        'esplora Casa |tutti Casa [esplora esplora]',
+        'esplora Tutto |tutti Tutto [esplora]',
+    ],
+    'dettaglio': [
+        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
+        'esplora Tutto |tutti Tutto [esplora]',
+    ],
+    'dettaglio oltre la prima pagina': [
+        'dettaglio 40 |tutti Tutto [esplora dettaglio]',
+        'dettaglio 40 |tutti Tutto [esplora dettaglio]',
+    ],
+    'negozio': [
+        'negozio bob |tutti Tutto [esplora negozio]',
+        'negozio bob |tutti Tutto [esplora negozio]',
+        'esplora Tutto |tutti Tutto [esplora]',
+    ],
+    'carrello': [
+        'pacco - |tutti Tutto [esplora pacco]',
+        'pacco - |tutti Tutto [esplora pacco]',
+        'esplora Tutto |tutti Tutto [esplora]',
+    ],
+    'cassa': [
+        'acquisto - |tutti Tutto [esplora acquisto]',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
+    ],
+    'cassa del set': [
+        'pacco - |tutti Tutto [esplora pacco]',
+        'acquisto - |tutti Tutto [esplora pacco acquisto]',
+        'pacco - |tutti Tutto [esplora pacco]',
+    ],
+    'ordine': [
+        'affari - |tutti Tutto [esplora affari]',
+        'ordine 100 |tutti Tutto [esplora affari ordine]',
+        'ordine 100 |tutti Tutto [esplora affari ordine]',
+        'affari - |tutti Tutto [esplora affari]',
+    ],
+    'radici': [
+        'affari - |tutti Tutto [esplora affari]',
+        'affari - |tutti Tutto [esplora affari]',
+        'profilo - |tutti Tutto [esplora profilo]',
+        'profilo - |tutti Tutto [esplora profilo]',
+        'vendi - |tutti Tutto [esplora vendi]',
+        'vendi - |tutti Tutto [esplora vendi]',
+    ],
+    'classifica': [
+        'classifica letta |tutti Tutto [esplora classifica]',
+        'classifica letta |tutti Tutto [esplora classifica]',
+    ],
+    'pagine fisse': [
+        'sicurezza - |tutti Tutto [esplora sicurezza]',
+        'sicurezza - |tutti Tutto [esplora sicurezza]',
+        'esplora Tutto |tutti Tutto [esplora]',
+        'privacy - |tutti Tutto [esplora privacy]',
+        'privacy - |tutti Tutto [esplora privacy]',
+        'esplora Tutto |tutti Tutto [esplora]',
+        'consigliati - |tutti Tutto [esplora consigliati]',
+        'consigliati - |tutti Tutto [esplora consigliati]',
+    ],
+    'p2p': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'p2p - |tutti Tutto [esplora p2p]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'p2pinfo - |tutti Tutto [esplora p2p p2pinfo]',
+        'p2pinfo - |tutti Tutto [esplora p2p p2pinfo]',
+        'p2p - |tutti Tutto [esplora p2p]',
+        'esplora Tutto |tutti Tutto [esplora]',
+    ],
+    'scambio': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine]',
+        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'p2p - |tutti Tutto [esplora p2p]',
+        'esplora Tutto |tutti Tutto [esplora]',
+    ],
+    'filtro': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'p2pmiei+p2pMieiFiltroSheet - |tutti Tutto [esplora p2p p2pmiei p2pmiei+p2pMieiFiltroSheet]',
+        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei{morti|vendo}]',
+        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei{morti|vendo}]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+    ],
+    'foglio aperto': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'p2p+p2pDettSheet - |tutti Tutto [esplora p2p p2p+p2pDettSheet]',
+        'p2p - |tutti Tutto [esplora p2p]',
+        'esplora Tutto |tutti Tutto [esplora]',
+    ],
+    'foglio nel mercatino': [
+        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
+        'dettaglio+paySheet 3 |tutti Tutto [esplora dettaglio dettaglio+paySheet]',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
+        'esplora Tutto |tutti Tutto [esplora]',
+    ],
+    'scambio sparito': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine]',
+        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine]',
+        "p2pmiei - |tutti Tutto [esplora p2p p2pmiei] toast:Questo scambio non c'è più su questo dispositivo: ecco i tuoi scambi",
+        'p2p - |tutti Tutto [esplora p2p]',
+    ],
+    'annuncio sparito': [
+        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
+        "esplora Tutto |tutti Tutto [esplora] toast:Questo annuncio non c'è più: ti riporto al mercatino",
+    ],
+    'ordine sparito': [
+        'affari - |tutti Tutto [esplora affari]',
+        'ordine 100 |tutti Tutto [esplora affari ordine]',
+        'ordine 100 |tutti Tutto [esplora affari ordine]',
+        "affari - |tutti Tutto [esplora affari] toast:Questo ordine non c'è più fra i tuoi: ecco i tuoi Ordini",
+    ],
+    'negozio sparito': [
+        'negozio bob |tutti Tutto [esplora negozio]',
+        'negozio bob |tutti Tutto [esplora negozio]',
+        'esplora Tutto |tutti Tutto [esplora] toast:Negozio non trovato',
+    ],
+    'carrello svuotato': [
+        'pacco - |tutti Tutto [esplora pacco]',
+        'pacco - |tutti Tutto [esplora pacco]',
+        'esplora Tutto |tutti Tutto [esplora] toast:Il carrello è vuoto: ti riporto al mercatino',
+    ],
+    'link esterno': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'dettaglio 7 |tutti Tutto [esplora p2p p2pmiei esplora dettaglio] registro-a-meta',
+        'dettaglio 7 |tutti Tutto [esplora p2p p2pmiei esplora dettaglio] registro-a-meta',
+        'p2p - |tutti Tutto [esplora p2p p2pmiei esplora p2p] registro-a-meta',
+        'p2p - |tutti Tutto [esplora p2p p2pmiei esplora p2p] registro-a-meta',
+        'esplora Tutto |tutti Tutto [esplora p2p p2pmiei esplora] registro-a-meta',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+    ],
+    'link al p2p': [
+        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
+        'p2p - |tutti Tutto [esplora dettaglio esplora p2p] registro-a-meta',
+        'p2p - |tutti Tutto [esplora dettaglio esplora p2p] registro-a-meta',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio esplora p2p dettaglio] registro-a-meta',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio esplora p2p dettaglio] registro-a-meta',
+    ],
+    'link a un reparto': [
+        'esplora Casa |tutti Casa [esplora esplora] registro-a-meta',
+        'p2p - |tutti Casa [esplora esplora p2p] registro-a-meta',
+        'p2p - |tutti Tutto [esplora esplora p2p] registro-a-meta',
+        'esplora Casa |tutti Casa [esplora esplora] registro-a-meta',
+    ],
+    "vista che non c'e' piu'": [
+        'esplora Tutto |tutti Tutto [boh]',
+        'esplora Tutto |tutti Tutto [esplora]',
+        'p2p - |tutti Tutto [esplora p2p]',
+    ],
+    "indietro durante l'avvio": [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'p2p - |tutti Tutto [esplora p2p]',
+        'esplora Tutto |tutti Tutto [esplora]',
+    ],
+    'esci': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
+        'p2p - |tutti Tutto [esplora p2p]',
+    ],
+    'gli altri ricarichi': [
+        'negozio bob |tutti Tutto [esplora negozio]',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+    ],
+    'indietro del browser': [
+        'negozio bob |tutti Tutto [esplora negozio]',
+        'dettaglio 3 |tutti Tutto [esplora negozio dettaglio]',
+        'dettaglio 3 |tutti Tutto [esplora negozio dettaglio]',
+        'negozio bob |tutti Tutto [esplora negozio]',
+        'esplora Tutto |tutti Tutto [esplora]',
+    ],
+    'demo': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+        'p2pinfo - |tutti Tutto [esplora esplora p2p p2pinfo] registro-a-meta',
+    ],
+    'tg: p2p': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta uscito:1',
+    ],
+    'tg: negozio': [
+        'negozio bob |tutti Tutto [esplora negozio]',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+    ],
+    'tg: dettaglio': [
+        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+    ],
+    'tg: filtro': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'p2pmiei+p2pMieiFiltroSheet - |tutti Tutto [esplora p2p p2pmiei p2pmiei+p2pMieiFiltroSheet]',
+        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei]',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
+    ],
+    'tg: esci': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+    ],
+    'apk: p2p': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
+        'p2p - |tutti Tutto [esplora p2p]',
+    ],
+    'apk: negozio': [
+        'negozio bob |tutti Tutto [esplora negozio]',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+    ],
+    'apk: dettaglio': [
+        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+    ],
+    'apk: filtro': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'p2pmiei+p2pMieiFiltroSheet - |tutti Tutto [esplora p2p p2pmiei p2pmiei+p2pMieiFiltroSheet]',
+        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei]',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
+    ],
+    'apk: esci': [
+        'p2p - |tutti Tutto [esplora p2p]',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+    ],
+}
+
+
+def prove_ricarica_resta():
+    """LA RICARICA RESTA DOVE SI ERA (7 ott 2026, difetto segnalato da
+    Andrea): sul sito aperto dal PC, F5 riportava alla home del mercatino
+    da qualunque pagina — il P2P, un negozio, il carrello. L'indirizzo non
+    cambia mai, quindi dove si era lo sapeva solo history.state, che il
+    browser conserva alla ricarica e navMotore seminava con la home. Ora
+    nel SOLO sito (Telegram e l'app Android/PWA come prima, decisione di
+    Andrea) una entry nostra all'avvio e' una pagina ricaricata: se ne
+    ricostruisce la vista in coda all'avvio, coi gradini di sotto di prima.
+    Prima le sentinelle sul testo; poi il banco col browser di cartone, in
+    cui ogni F5 e' un documento NUOVO sopra la stessa cronologia."""
+    print("\n--- LA RICARICA RESTA DOVE SI ERA ---")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def _f(firma):
+        return pezzo_js(mini, firma, "\n}\n") if firma in mini else ""
+
+    mo = _f("function navMotore(){")
+    rf = _f("function navRiflette(){")
+    av = _f("async function avvia(){")
+    avv = _f("async function avviaVetrina(){")
+    apr = _f("async function apriPaginaRicordata(){")
+    pr = _f("function paginaRicordata(s){")
+    nv = _f("function navVista(){")
+
+    # --- 1) LE SENTINELLE ---------------------------------------------
+    prova("il sito e' il browser: ne' Telegram ne' l'app installata", True,
+          "const navSitoBrowser = () => STORIA && !tg?.initData && !mqApp.matches;" in mini)
+    prova("la entry ricordata si chiede SUBITO al sito, poi la forma", True,
+          pr.find("if (!navSitoBrowser() || !s || s.app !== 'brt'") > 0
+          and "!el('view-' + b.v)" in pr)
+    _i = [mo.find(x) for x in ("navRicordata = paginaRicordata(history.state);",
+                               "if (navRicordata) spegniLinkDaUrl();",
+                               "else try { history.replaceState({app:'brt', pila: navPila(), d:0, sotto: []}")]
+    prova("navMotore: la semina di sempre solo se non c'e' una pagina ricordata", True,
+          -1 not in _i and _i == sorted(_i))
+    prova("...e un indietro durante l'avvio vince sulla ricostruzione", True,
+          "if (navRicordata) { navRicordata = null; navRicordataPresa = true; }"
+          in mo[mo.find("addEventListener('popstate'"):])
+    prova("navRiflette tace mentre l'avvio va verso la pagina ricordata", True,
+          "if (!STORIA || navApplicando || navRicordata) return;" in rf)
+    prova("la ricostruzione e' una volta sola, e nella DEMO semina la home", True,
+          "if (!s || navRicordataPresa) return;" in apr and "navRicordataPresa = true;" in apr
+          and "if (DEMO) {" in apr)
+    for _nome, _txt in (("avvia", av), ("avviaVetrina", avv)):
+        _a, _b = _txt.find("await apriPaginaRicordata();"), _txt.find("apriNegozioDaUrl();")
+        prova("%s: la pagina ricordata PRIMA dei link d'arrivo, una volta" % _nome, True,
+              0 < _a < _b and _txt.count("await apriPaginaRicordata();") == 1)
+    prova("...e i rami della DEMO la chiamano anche loro (navRiflette riparte)", [1, 1],
+          [av.count("apriPaginaRicordata();   /* in DEMO"),
+           avv.count("apriPaginaRicordata();   /* in DEMO")])
+    # le porte dei link d'arrivo: tutte quelle che esistono, e ognuna con
+    # la sua bandierina alzata da spegniLinkDaUrl
+    porte = sorted(set(re.findall(r"\nfunction (apri\w+DaUrl)\(\)\{", mini)
+                       + re.findall(r"\nasync function (apri\w+DaUrl)\(\)\{", mini)))
+    sp = _f("function spegniLinkDaUrl(){")
+    bandiere = {}
+    for p in porte:
+        corpo = _f("function %s(){" % p)
+        m = re.search(r"\|\| (\w+)\) return;", corpo)
+        bandiere[p] = m.group(1) if m else ""
+    prova("le porte dei link d'arrivo sono undici, ognuna con la sua bandierina", [11, []],
+          [len(porte), [p for p, b in bandiere.items() if not b]])
+    prova("...e spegniLinkDaUrl le alza tutte", [],
+          [b for b in bandiere.values() if not re.search(r"\b%s = " % b, sp)])
+    prova("...e il reparto dell'indirizzo cede a una pagina ricordata", True,
+          "if (!CATEGORIA_DA_URL || navRicordata) return;" in _f("function preparaCategoriaDaUrl(){"))
+    # i cinque ricarichi nostri: tutti da capo, e nessun altro
+    _ric = [(m.start(), m.group(0)) for m in re.finditer(r"[^\n]*location\.reload\(\)[^\n]*", mini)
+            if not m.group(0).lstrip().startswith(("/*", "*", "//")) and "SOPRAVVIVE" not in m.group(0)]
+    _dove = []
+    for pos, riga in _ric:
+        f = mini.rfind("\nasync function ", 0, pos)
+        _dove.append((mini[f + 16:mini.index("(", f)], riga.strip()))
+    prova("i cinque location.reload() sono i nostri, e ripartono tutti da capo",
+          [("esciWeb", "navDaCapo(); location.reload();"),
+           ("cambiaAccount", "navDaCapo(); location.reload();"),
+           ("provaLoginWeb", "navDaCapo(); location.reload();"),
+           ("entraConNostr", "navDaCapo(); location.reload();"),
+           ("accettaCollega", "navDaCapo(); location.reload();")], _dove)
+    prova("navDaCapo svuota la entry solo nel sito", True,
+          "if (navSitoBrowser()) try { history.replaceState(null, '', location.href); } catch(e){}"
+          in _f("function navDaCapo(){"))
+    # PRIVACY: niente nell'indirizzo, niente in sessionStorage — tutto in
+    # history.state, che c'era gia'
+    _bl = mini[mini.find("/* ---- LA RICARICA RESTA DOVE SI ERA"):mini.find("function navDaCapo(){")]
+    _bl += _f("function navDaCapo(){") + sp
+    # i commenti li dicono, i nomi: si conta il CODICE
+    _bl = re.sub(r"/\*.*?\*/", "", _bl, flags=re.S)
+    prova("privacy: la ricarica non scrive in sessionStorage ne' in localStorage", [0, 0],
+          [_bl.count("sessionStorage"), _bl.count("localStorage")])
+    prova("...e ogni sua scrittura della cronologia lascia l'indirizzo com'e'", True,
+          all(", '', location.href)" in x for x in re.findall(r"history\.replaceState\([^\n]*", _bl))
+          and "pushState" not in _bl)
+    prova("il filtro dei miei scambi entra nella entry solo nel sito, e solo li'", True,
+          "if (v === 'p2pmiei' && navSitoBrowser()) {" in nv and nv.count(".f = ") == 1)
+    prova("...si rilegge solo nelle forme che il foglio conosce", True,
+          "P2P_GRUPPI.some(y => y.k === x)" in _f("function rimettiFiltroMieiP2P(f){")
+          and "P2P_VERSI_MIEI.some(y => y.k === v) ? v : 'tutti'" in _f("function rimettiFiltroMieiP2P(f){"))
+
+    # --- 2) IL BANCO: le funzioni vere, un documento nuovo a ogni F5 ---
+    out, err = _banco_ricarica_resta(mini, _SCENARI_RICARICA)
+    if out is None:
+        if err == "serve node":
+            salta("il banco della ricarica", "serve node")
+        else:
+            prova("il banco della ricarica gira", "", err)
+        return
+
+    def _riga(x):
+        v, k, f, forma, reg, toast, usc = x
+        return (f"{v} {k or '-'} {f} [{forma}]" + ("" if reg else " registro-a-meta")
+                + (f" toast:{toast}" if toast else "") + (f" uscito:{usc}" if usc else ""))
+
+    for nome, modo, passi in _SCENARI_RICARICA:
+        r = out.get(nome) or {"passi": [], "errori": ["manca"]}
+        prova("[%s] %s: %s" % (modo, nome, " → ".join(passi)[:110]),
+              _ATTESI_RICARICA[nome] + [],
+              [_riga(x) for x in r["passi"]] + list(r["errori"]))
 
 
 def prove_indietro_app_android():
@@ -126363,6 +127138,10 @@ def prove_scambi_verso():
         "function applicaFiltroMieiP2P(){")]
     banco = "\n".join(pezzi) + r"""
 /* il cartone: il deposito dell'ordine, il filtro vivo, il DOM del foglio */
+/* (7 ott 2026) «Cancella» lo dice alla entry solo nel sito (LA RICARICA
+   RESTA DOVE SI ERA): qui non c'e' cronologia, e il banco della ricarica
+   e' prove_ricarica_resta */
+const navSitoBrowser = () => false;
 function ordineMieiP2P(){ return 'recenti'; }
 let p2pMieiFiltro = [];
 let p2pMieiFiltroBozza = null;
@@ -126933,6 +127712,7 @@ def main():
     prove_pubblica_metodo_prima,
     prove_libro_vuoto_monete,
     prove_indietro_dal_libro,
+    prove_ricarica_resta,
     prove_indietro_app_android,
     prove_p2p_canale,
     prove_p2p_canonico,

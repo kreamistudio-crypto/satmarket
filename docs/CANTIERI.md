@@ -39668,3 +39668,148 @@ veri su un database di cartone (i soli pagati, collaudi fuori, il
 motivo, prima della spedizione, 10/60/5 ore per la spedizione, 30/70
 per la conclusione, i rimborsi d'asta dentro e i payout a chi vende
 fuori). Chromium con dati di cartone: la sezione si legge.
+
+## La ricarica resta dove si era: F5 sul sito non riporta più alla home (7 ott 2026, difetto segnalato da Andrea)
+
+**DA DOVE SI PARTIVA.** Sul sito aperto dal PC, F5 (o il tasto ricarica)
+dentro il P2P riportava alla home del mercatino; sul telefono no. Il
+perché: l'indirizzo non cambia mai (scelta del motore dell'indietro,
+«L'URL non si tocca MAI»), quindi dove si era lo sapeva solo
+`history.state` — la pila del motore, che il browser CONSERVA alla
+ricarica — e `navMotore` all'avvio la seminava con la home, apposta, per
+i ricarichi del login. Sessionstorage per la navigazione non c'era. Sul
+telefono la ricarica nativa non c'è: il tirare giù è nostro (rilegge la
+vista e ci resta). Il mercatino aveva lo stesso difetto (negozio,
+annuncio, carrello, Ordini); chi era entrato da un link (`/p2p`,
+`/annuncio/7`) tornava invece alla pagina del link d'allora.
+
+**DECISO CON ANDREA (proposta approvata).** SOLO nel sito aperto dal
+browser: Telegram (Desktop e telefono) e l'app Android/PWA restano
+esattamente come prima. Le pagine madre se la pagina non c'è più, con un
+avviso: scambio → I miei scambi, ordine → Ordini, annuncio → Esplora,
+negozio → Esplora, carrello vuoto → Esplora; la cassa riparte
+dall'annuncio (o dal carrello, se era un set). Il filtro di «I miei
+scambi» si ricorda SOLO alla ricarica (resta vero che non si ricorda fra
+un'apertura e l'altra). Un link che arriva da fuori vince sulla pagina
+ricordata. Privacy: niente nell'indirizzo, niente in sessionStorage.
+
+**COM'È FATTO** (Architettura, «IL GESTO INDIETRO», la frase su
+`navMotore`). `navSitoBrowser` = `STORIA && !tg?.initData &&
+!mqApp.matches`. In `navMotore`, se la entry all'avvio è nostra
+(`paginaRicordata`: solo nel sito, `app:'brt'`, e la vista esiste
+ancora) la semina si salta e `spegniLinkDaUrl` alza le bandierine
+one-shot delle undici porte dei link d'arrivo (l'indirizzo è quello
+dell'arrivo di allora; un link VERO apre una entry nuova con lo stato
+vuoto, e lì niente di nuovo gira — è così che il link vince da solo).
+`navRiflette` tace finché c'è `navRicordata`. In coda ai due avvii,
+PRIMA dei link, `apriPaginaRicordata` rifà la sola pagina sotto
+(`rifaiPaginaRicordata` → `navRendiVista`, la stessa dell'indietro, più:
+l'annuncio oltre la prima pagina chiesto al server, il carrello salvato
+aspettato e ripreso con `riprendiCarrello`, la classifica richiesta con
+`apriClassifica`, il filtro dei miei scambi rimesso), poi la entry prende
+il POSTO della ricordata con `d` e `sotto` di prima, o — se la pagina
+rifatta è quella di sotto (un foglio aperto al momento dell'F5, la madre
+di una pagina sparita) — si consuma il gradino con `navGiu`. Nei rami
+della DEMO semina la home e basta. Un indietro premuto durante l'avvio
+vince: il popstate annulla la ricostruzione. Il filtro viaggia nella
+entry come `f` del gradino della vista (`'morti|vendo'`), fuori dai
+confronti come la `o` dei fogli; `navRiflette` lo riscrive sul posto
+quando cambia, e «Cancella» dallo stato vuoto (dove nessuna classe
+cambia) lo dice da sé. I cinque `location.reload()` nostri (`esciWeb`,
+`cambiaAccount`, `provaLoginWeb`, `entraConNostr`, `accettaCollega`)
+chiamano prima `navDaCapo`, che nel sito svuota la entry: ripartono
+dalla home come sempre, niente pagine dell'identità di prima.
+
+**DECISO STRADA FACENDO, E PERCHÉ.** 1) PROVATO NEL PANE che dopo un F5
+Chrome riattraversa le entry spinte prima col `popstate`, nello STESSO
+documento (non le ricarica): per questo `d` e `sotto` restano quelli
+della entry e l'indietro dopo la ricarica porta dove portava, col motore
+di sempre (51267ef, 1308686, 337b698 non toccati). 2) LA ENTRY RIFATTA
+SOSTITUISCE, non passa da `navRiflette`: al primo giro del banco la
+cassa ricaricata spingeva l'annuncio SOPRA la entry della cassa, e il
+primo indietro andava a vuoto su una cassa che si rifaceva in mercatino.
+3) Attraversando all'indietro verso il documento di PRIMA di un link
+(`back_forward`, ricarica intera) la pagina si riapre anche lì: prima
+tornava la home. È la stessa entry nostra, ed è lo stesso giudice.
+4) `preparaCategoriaDaUrl` cede a una pagina ricordata: il reparto lo
+dice la sua entry, non l'indirizzo d'allora.
+
+**STRADE SCARTATE.** Scrivere la pagina nell'URL (`/p2p/miei`, un
+frammento): il server serve solo rotte esplicite (regola ferrea 3) e il
+frammento lo usano già `/sicurezza#…` e `/privacy#…`; e l'URL si
+condivide. SessionStorage: `history.state` c'era già, è per entry (che
+è proprio la regola del link che vince), e non esce dal browser. Il
+`performance.getEntriesByType('navigation')` per distinguere F5 dai
+nostri ricarichi: non li distingue (sono tutti `reload`), da cui
+`navDaCapo`. Accendere anche Telegram Desktop (che ha «Ricarica
+pagina»): scartato da Andrea, il telefono resta identico.
+
+**PROVATO.** `prove_ricarica_resta` (59): sentinelle sul testo (il
+giudice del sito, la semina saltata solo con la entry ricordata,
+`navRiflette` muto, la ricostruzione prima dei link nei due avvii e nei
+rami della DEMO, le undici porte e le loro bandierine lette dalle
+guardie, i cinque ricarichi da capo trovati per nome, privacy: nessuno
+storage, ogni scrittura con `location.href`) e un banco node con un
+BROWSER DI CARTONE in cui ogni F5 è un documento nuovo (un contesto `vm`
+fresco) sopra la stessa cronologia, con le funzioni VERE del motore,
+delle porte, del filtro, del carrello, della classifica e di `esciWeb`,
+e l'elenco vero dei link di `avvia()`: 40 scenari — F5 in ogni pagina
+(esplora, reparto, annuncio, annuncio oltre la prima pagina, negozio,
+carrello, cassa, cassa del set, ordine, Ordini, Profilo, Vendi,
+classifica, le pagine fisse, libro, I miei scambi, Info P2P, scambio, il
+filtro, un foglio aperto nel P2P e nel mercatino), le pagine sparite con
+l'avviso, il link esterno (vince, poi tace alla ricarica, poi
+l'attraversamento all'indietro), il link a un reparto, una vista che non
+esiste più, l'indietro durante l'avvio, l'uscita e gli altri ricarichi,
+l'indietro dell'app e del browser dopo la ricarica, la DEMO, e Telegram
+e l'app (cinque scenari ciascuno). LE RIGHE DI TELEGRAM E DELL'APP sono
+quelle che gli stessi scenari danno sul miniapp.html di prima
+(3458306), confrontate riga per riga; e sul file di prima il banco
+riproduceva il difetto (ogni F5 del sito tornava a «esplora»). Due
+banchi emendati per la firma cambiata: `prove_indietro_dal_libro`
+(navMotore e navVista chiedono a `paginaRicordata` e
+`filtroMieiDaRicordare`) e `prove_scambi_verso` («Cancella» chiede a
+`navSitoBrowser`). Tortura 39 su 41 su una copia intera del repo (la controprova sul file
+intatto verde prima e dopo; al primo giro la copia aveva solo due file e
+`prove.py` legge `server.py` all'import: esplosa anche la controprova, il
+banco e non il codice): le due sfuggite sono equivalenti, sotto. Suite
+intera severa e collaudi della CI: nel messaggio del commit.
+
+**DAL VIVO** (copia in collaudo nello scratchpad, relay morto, Browser
+pane, ricariche vere `location.reload()`: il tasto F5 del pane non
+ricarica, lo dice un segno lasciato nella pagina che sopravviveva):
+libro → I miei scambi → ricarica (`reload`, documento nuovo): I miei
+scambi con la barra del P2P; indietro, indietro: libro, mercatino nello
+stesso documento. Filtro «Annullati · Vendo» dalle funzioni dei bottoni
+del foglio → ricarica: filtro acceso. Uno scambio seminato, aperto,
+ricaricato: la sua pagina; tolto dall'archivio, ricaricato: I miei
+scambi con «Questo scambio non c'è più su questo dispositivo». Annuncio
+→ ricarica: l'annuncio; negozio di Anna → ricarica: le sue quattro
+schede, e indietro annuncio, mercatino. Carrello → ricarica: il
+carrello, ritrovato dal server. Annuncio tolto dal db mentre lo guardo
+→ ricarica: mercatino con l'avviso. Da I miei scambi il link
+`/annuncio/1` nella stessa scheda: l'annuncio; libro → ricarica col
+link ancora nell'indirizzo: il libro; indietro fino al documento di
+prima: I miei scambi (`back_forward`). Login web vero (firmato col
+token di cartone della copia) → Profilo → «Esci»: ricarica e home,
+`d:0`. Dentro Telegram finto (l'hash di collaudo) I miei scambi →
+ricarica: la home con `d:0`, come prima.
+
+**NON PROVATO.** L'app Android e la PWA dal vivo (la `display-mode`
+standalone nel pane non si emula: c'è il banco, cinque scenari uguali a
+prima); Telegram Desktop vero; Safari e Firefox (la riattraversata col
+popstate dopo un F5 è provata su Chrome; se un browser ricaricasse
+quelle entry intere, ogni passo si ricostruirebbe dallo stesso giudice:
+più lento, non sbagliato); il sito vero su barattolo.store col login di
+BotFather.
+
+**DA GUARDARE.** Il filtro dei miei scambi non si rimette quando la
+ricarica arriva su uno scambio sparito e ripiega su I miei scambi (la
+entry di sotto lo aveva, la ricostruzione è dello scambio): voluto
+semplice, si guarda se Andrea lo nota. Due mutazioni equivalenti nella
+tortura, dichiarate: il `go('esplora')` nei ripieghi di annuncio e
+carrello (alla ricostruzione la vista accesa è già quella dell'avvio, e
+i link tacciono: è una cintura, non una strada). «Una volta sola»
+(`navRicordataPresa`) vale solo per un `avvia()` rilanciato mentre la
+prima ricostruzione è in volo: il banco non lo esercita, la sentinella
+sì.
