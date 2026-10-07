@@ -67342,9 +67342,14 @@ def prove_p2p_motore():
            "Chiedi di annullare</button>" in mini,
            "Ritira l\\'ordine</button>" in mini])
     _asc = pezzo_js(mini, "function annullaScambioP2P(){", "\n}")
+    # EMENDATA (7 ott 2026, «testi P2P che confondono»): l'accordo serve
+    # solo coi sats in garanzia; prima il coordinatore annulla SUBITO
+    # (`cancel_not_active_order`, letto sulla v0.19.0), e il foglio lo
+    # dice. Le frasi intere le prova prove_testi_p2p_confondono.
     prova("...e il foglio di conferma dice ancora che serve il si' "
-          "dell'altra persona", True,
-          "solo se anche l\\'altra persona è d\\'accordo" in _asc)
+          "dell'altra persona, ma solo coi sats in garanzia", [True, True],
+          ["solo se anche l\\'altra persona è d\\'accordo" in _asc,
+           "P2P_ANNULLA_DA_SOLO.indexOf(o.stato) >= 0 ? P2P_ANNULLO_DA_SOLO_TESTO" in _asc])
     # ⚠️ LA TESTATA E' IL CAPPELLO DI CASA (set 2026, richiesta di
     # Andrea), e ha avuto tre stesure in due giorni: l'etichetta di
     # sezione «Lo scambio», poi il solo marchio, e adesso il titolo
@@ -82640,15 +82645,20 @@ DOM = null;
     # Un giudice solo per i primi due, che sono markup scritto dal JS;
     # il terzo e' markup FERMO e non puo' chiamare la funzione, quindi a
     # tenerlo in pari c'e' la prova qui sotto, carattere per carattere.
+    # EMENDATA (7 ott 2026, «testi P2P che confondono», approvato da
+    # Andrea): il PayCode parte quando l'ordine e' preso — e' la scelta del
+    # 19 set, «i dati del tabacchino partono alla presa» —, non a garanzia
+    # bloccata come diceva la frase; e si paga solo a «Sats in garanzia».
     _MIO = ("Con Barattozon fai pagare in contanti alla cassa del tabacchino un tuo "
             "ordine Amazon: chi lo paga riceve cifrati codice, importo e scadenza "
-            "appena i sats sono in garanzia, e non vede nome, indirizzo né cosa hai "
-            "comprato. Per pagare non serve alcun documento. Chi paga tiene lo "
-            "scontrino in caso di disputa.")
+            "appena prende l'ordine, e paga solo quando la pagina dice «Sats in "
+            "garanzia». Non vede nome, indirizzo né cosa hai comprato. Per pagare "
+            "non serve alcun documento. Chi paga tiene lo scontrino in caso di disputa.")
     _SUO = ("Paghi in contanti alla cassa del tabacchino un ordine Amazon di chi "
-            "vende: ricevi cifrati codice, importo e scadenza appena i sats sono in "
-            "garanzia, e non vedi nome, indirizzo né cosa ha comprato. Per pagare "
-            "non serve alcun documento. Tieni lo scontrino in caso di disputa.")
+            "vende: ricevi cifrati codice, importo e scadenza appena l'ordine è "
+            "tuo, e paghi solo quando la pagina dice «Sats in garanzia». Non vedi "
+            "nome, indirizzo né cosa ha comprato. Per pagare non serve alcun "
+            "documento. Tieni lo scontrino in caso di disputa.")
     # ⚠️ NEL RIQUADRO LA TERZA FRASE NON C'E' (24 set 2026, decisione di
     # Andrea): lo scontrino lo dice gia' il terzo gesto della lista, due
     # righe piu' su, e dirlo due volte nella stessa scatola e' insistenza.
@@ -127543,7 +127553,8 @@ def prove_recapito_corto():
     rc = pezzo_js(mini, "function renderCampiP2P(", "\n}\n")
     prova("le righe approvate stanno nel foglio, parola per parola",
           [True] * 7,
-          ["✓ Recapito inviato. Se lo cambi, vale l\\'ultimo." in rc,
+          ["✓ Recapito inviato. Se lo cambi, vale l\\'ultimo: cambialo solo se chi "
+           "compra non ha ancora pagato." in rc,
            "✓ Appuntamento inviato. Se lo cambi, vale l\\'ultimo e chi compra viene avvisato." in rc,
            "🔒 Lo vedete solo tu e l\\'altra persona, nemmeno Barattolo.' + salvaQui" in rc,
            "' Resta salvato su questo dispositivo per i prossimi scambi.'" in rc,
@@ -127596,7 +127607,10 @@ console.log(JSON.stringify(out));
         return
     LUCC = "🔒 Lo vedete solo tu e l'altra persona, nemmeno Barattolo."
     AVV = "⚠️ Non scrivere password o codici. Quello che vi dite fuori da Barattolo non conta in caso di disputa."
-    OK = "✓ Recapito inviato. Se lo cambi, vale l'ultimo."
+    # EMENDATA (7 ott 2026, «testi P2P che confondono», approvato da
+    # Andrea): la riga dice anche QUANDO si cambia
+    OK = ("✓ Recapito inviato. Se lo cambi, vale l'ultimo: cambialo solo se chi "
+          "compra non ha ancora pagato.")
     for m in ("Bonifico SEPA", "Revolut", "Satispay", "PayPal", "Lightning in Wero"):
         metodo = f"💶 Il metodo dello scambio è {m}."
         lucc = LUCC + " Resta salvato su questo dispositivo per i prossimi scambi."
@@ -127628,6 +127642,205 @@ console.log(JSON.stringify(out));
               and y[-1].startswith("⚠️") and y[-1].endswith(
                   "fuori da Barattolo non conta in caso di disputa.")
               for x in out.values() for y in x))
+
+
+def prove_testi_p2p_confondono():
+    """I TESTI DEL P2P CHE CONFONDEVANO (7 ott 2026, cantiere «testi P2P
+    che confondono», dalla lista «Notato strada facendo» della guida dei
+    tutorial). Le frasi approvate da Andrea, parola per parola, e i due
+    gesti nuovi: il foglio «Annulli lo scambio?» che prima della
+    garanzia dice che si annulla SUBITO (letto sul sorgente della
+    v0.19.0: `cancel_not_active_order` non chiede il si' a nessuno), e
+    il banner delle commissioni che se ne va quando le sue cifre
+    DISEGNATE non sono piu' quelle vive. Il banco ESEGUE le funzioni
+    vere — l'annullo, il «pagato» nei tre metodi, la disputa, la forma
+    del recapito, il giudice del banner e chi lo applica — e la cascata
+    del CSS dice che `hidden` vince davvero sul `display:block`."""
+    print("\n[i testi del P2P che confondevano]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    m = mini.replace("\r\n", "\n")
+
+    # --- 1) I TESTI FERMI DI «INFO P2P» E DELLE TABELLE ----------------
+    prova("Info P2P: la garanzia dura circa quattro giorni, e non piu' «nessun timer»",
+          [True, False],
+          ["<li>Coi sats in garanzia avete <b>circa quattro giorni</b>. Se chi compra "
+           "non ha ancora detto di aver pagato, allo scadere i sats <b>tornano da soli "
+           "a chi vende</b>; se l'ha detto, si apre una disputa.</li>" in m,
+           "nessun timer li sblocca da solo" in m])
+    tempi = pezzo_js(m, "function renderP2PInfo(){", "\n}\n")
+    prova("Info P2P: il primo passo tocca a chi ha preso, nei due versi", [True, False],
+          ["ogni passo ha ' + mi + ' minuti</b>, e il primo tocca sempre a chi l\\'ha preso: '\n"
+           "        + 'se compri, dici dove vuoi i sats e poi chi vende li blocca; se vendi, "
+           "blocchi i sats e poi chi compra dice dove li vuole. '\n"
+           "        + 'Il cronometro <b>riparte a ogni mossa</b>.</li>'" in tempi,
+           "a chi compra per dire dove vuole i sats" in tempi])
+    prova("Info P2P: i sats arrivano all'indirizzo di chi compra, senza «all'inizio»",
+          [True, False],
+          ["arrivano all'indirizzo Lightning indicato da chi compra.</li>" in m,
+           "indicato da chi compra all'inizio" in m])
+    prova("Info P2P (Barattozon, passo 4): il PayCode arriva quando l'ordine e' suo, "
+          "e si paga in garanzia", [True, False],
+          ["Il PayCode, l'importo e la scadenza gli arrivano <b>qui dentro e cifrati</b> "
+           "appena l'ordine è suo, in un riquadro col tempo che resta: si paga solo "
+           "quando la pagina dice «Sats in garanzia»." in m,
+           "A quel punto il PayCode" in m])
+    stati = pezzo_js(m, "const STATI_P2P = {", "\n};\n")
+    prova("«Dove vuoi i sats?» dice anche la fattura", True,
+          "d: 'Indica il tuo indirizzo Lightning, o incolla una fattura: è lì che "
+          "arriveranno alla fine dello scambio.'}" in stati)
+    tab = pezzo_js(m, "function avvisoPresaTabacchinoP2P(", "\n}\n")
+    prova("«Occhio al tempo» dice a chi compra cosa perde davvero", [True, False],
+          ["Devi fare in tempo ad andare al tabacchino e pagare: se il PayCode scade "
+           "prima, lo scambio va annullato e non ricevi i sats." in tab,
+           "o i sats tornano indietro" in tab])
+    campi = pezzo_js(m, "function renderCampiP2P(", "\n}\n")
+    prova("il foglio dei recapiti: si cambia solo prima del pagato", True,
+          "✓ Recapito inviato. Se lo cambi, vale l\\'ultimo: cambialo solo se chi "
+          "compra non ha ancora pagato.</div>" in campi)
+    prova("...e la riga dell'appuntamento resta com'era (non era nella lista)", True,
+          "✓ Appuntamento inviato. Se lo cambi, vale l\\'ultimo e chi compra viene "
+          "avvisato.</div>" in campi)
+    prova("il recapito composto parte col metodo scelto (SEPA Instant si chiama col suo nome)",
+          True, "testo = fr.componi(campi, metodoRecapitoScelto(o)).slice(0, CAMPO_MAX_TESTO);"
+          in pezzo_js(m, "async function inviaCampoP2P(", "\n}\n"))
+
+    # --- 2) IL BANNER: chi lo giudica, quando, e il CSS -----------------
+    prova("il banner si giudica a ogni disegno del libro e a ogni stato fisso",
+          [True, True],
+          ["if (typeof veritaBannerFeeP2P === 'function') veritaBannerFeeP2P();"
+           in pezzo_js(m, "function renderP2P(){", "\n}\n"),
+           "if (typeof veritaBannerFeeP2P === 'function') veritaBannerFeeP2P();\n  if (feeAnimaP2PTimer) return;"
+           in pezzo_js(m, "function bannerFeeFissoP2P(){", "\n}\n")])
+    _pers = m[m.index("/* ============ IL BANNER PERSONALE DELLE COMMISSIONI (26 set 2026)"):
+              m.index("/* ============ fine del banner personale ============ */")]
+    prova("...e il giudice sta FUORI dal blocco del banner personale, che non legge "
+          "cifre del coordinatore", [0, 0, 1],
+          [_pers.count("function veritaBannerFeeP2P"), _pers.count("P2P_BANNER_DISEGNO"),
+           m.count("function veritaBannerFeeP2P(){")])
+    i0 = m.find("<style>")
+    regole, _sq = _regole_css(m[i0 + 7:m.find("</style>", i0)])
+    def catena(nascosto):
+        b = {"tag": "button", "attr": {"id": "p2pFeeBanner"}, "classi": {"p2p-fee-banner"}}
+        if nascosto:
+            b["attr"]["hidden"] = ""
+        return [{"tag": "html", "attr": {}, "classi": set()},
+                {"tag": "body", "attr": {}, "classi": set()}, b]
+    prova("la cascata: col `hidden` il banner sparisce, senza resta un blocco",
+          ["none", "block"],
+          [_vince_css(regole, catena(True), ("display",)).get("display", (None,))[0],
+           _vince_css(regole, catena(False), ("display",)).get("display", (None,))[0]])
+
+    # --- 3) IL BANCO: le funzioni vere, in node -------------------------
+    js = (
+        "let CONF = null, p2pOrdineAperto = 'x', ORD = {};\n"
+        "const ordiniP2P = () => ({x: ORD});\n"
+        "const haptic = () => {};\n"
+        "const chiediConferma = c => { CONF = c; };\n"
+        "const inviaAnnulloP2P = () => {}, inviaDisputaP2P = () => {}, mossaOrdineP2P = () => {};\n"
+        "const fmtEur = n => String(n).replace('.', ',');\n"
+        "const tabacchinoP2P = metodi => (metodi || []).some(x => /tabacch/i.test(x));\n"
+        "const pagaInContantiP2P = o => (o.metodi || [])[0] === 'Contanti';\n"
+        "const CAMPO_MAX_TESTO = 600;\n"
+        + pezzo_js(m, "const REGOLA_CONTANTI_COMPRA =", "\n") + "\n"
+        + pezzo_js(m, "const REGOLA_DISPUTA_CONTANTI =", "\n") + "\n"
+        + pezzo_js(m, "const P2P_ANNULLA_SUBITO =", "\n") + "\n"
+        + pezzo_js(m, "const P2P_ANNULLA_DA_SOLO =", ";\n") + ";\n"
+        + pezzo_js(m, "const P2P_ANNULLO_DA_SOLO_TESTO =", "\n") + "\n"
+        + pezzo_js(m, "function corpoAnnulloDisputaP2P(", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "function annullaScambioP2P(){", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "function euroInviatiP2P(){", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "function apriDisputaP2P(){", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "const P2P_FORME_RECAPITO = [", "\n];\n") + "\n];\n"
+        + pezzo_js(m, "function formaRecapito(metodo){", "\n}\n") + "\n}\n"
+        # il banner, col DOM e le fonti di cartone
+        + "let VIVA = null, COORD = null, p2pSconto = null;\n"
+          "const BANNER = {hidden: false};\n"
+          "const el = id => id === 'p2pFeeBanner' ? BANNER : null;\n"
+          "const commissioneVivaP2P = () => VIVA;\n"
+          "const p2pCoord = () => COORD;\n"
+        + pezzo_js(m, "const P2P_BANNER_DISEGNO =", "\n") + "\n"
+        + pezzo_js(m, "function bannerFeeVeroP2P(", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "function veritaBannerFeeP2P(){", "\n}\n") + "\n}\n"
+        + r"""
+const out = {annullo: {}, pagato: {}};
+for (const stato of ['pubblicato', 'attesa_mia_fattura', 'attesa_hold_venditore',
+                     'attesa_fattura_compratore', 'attesa_mia_hold', 'attivo',
+                     'pagamento_ritentato']) {
+  ORD = {stato, lato: 'compro'}; CONF = null; annullaScambioP2P();
+  out.annullo[stato] = CONF ? [CONF.titolo, CONF.corpo] : null;
+}
+for (const [k, metodi] of [['banca', ['SEPA']], ['contanti', ['Contanti']],
+                           ['tabacchino', ['Contanti al tabacchino']]]) {
+  ORD = {stato: 'attivo', lato: 'compro', euro: 50, metodi, presenze: {mia: {ora: 1}}};
+  CONF = null; euroInviatiP2P();
+  out.pagato[k] = CONF ? CONF.corpo : null;
+}
+ORD = {stato: 'attivo', lato: 'compro'}; CONF = null; apriDisputaP2P();
+out.disputa = CONF ? CONF.corpo : null;
+const c = {nome: 'Mario Rossi', iban: 'IT00X'};
+out.sepa = [formaRecapito('SEPA').componi(c, 'SEPA'),
+            formaRecapito('SEPA Instant').componi(c, 'SEPA Instant'),
+            formaRecapito('Bonifico SEPA').componi(c)];
+out.vero = [
+  bannerFeeVeroP2P(0.03, 4, 0.5), bannerFeeVeroP2P(null, null, null),
+  bannerFeeVeroP2P(0.03, null, null), bannerFeeVeroP2P(0.04, 4, 0.5),
+  bannerFeeVeroP2P(0.03, 2, 0.5), bannerFeeVeroP2P(0.03, 4, 0),
+  bannerFeeVeroP2P(0.03, 4, 1), bannerFeeVeroP2P(0.03 + 1e-12, 4, 0.5),
+  bannerFeeVeroP2P(0.02, null, null)];
+const applica = (viva, coord, sconto) => {
+  VIVA = viva; COORD = coord; p2pSconto = sconto; veritaBannerFeeP2P(); return BANNER.hidden;
+};
+out.nascosto = [
+  applica(0.03, {commissione: 4}, {punti: 0.5, attivo: false}),
+  applica(null, null, null),
+  applica(0.04, {commissione: 4}, {punti: 0.5}),
+  applica(0.03, {commissione: 2}, null),
+  applica(0.03, {commissione: 4}, {punti: 0}),
+  applica(0.03, {commissione: 4}, {punti: 0.5})];
+console.log(JSON.stringify(out));
+""")
+    out = _node_banco(js)
+    if out is None:
+        salta("i testi del P2P girati in node", "node non c'e'")
+        return
+    SUBITO = ("Lo scambio si annulla subito, senza bisogno del sì dell'altra persona, "
+              "e nessuno perde niente: se i sats erano già bloccati, tornano a chi li ha bloccati.")
+    ACCORDO = ("Lo scambio si annulla solo se anche l'altra persona è d'accordo. "
+               "Se lo è, i sats tornano a chi li ha bloccati.")
+    a = out["annullo"]
+    prova("l'ordine nel libro si annulla come prima", ["Annulli l'ordine?",
+          "L'ordine esce dal libro. Nessuno ha ancora scambiato niente con te."],
+          a["pubblicato"])
+    prova("prima della garanzia, nei quattro stati: «si annulla subito»",
+          [["Annulli lo scambio?", SUBITO]] * 4,
+          [a[s] for s in ("attesa_mia_fattura", "attesa_hold_venditore",
+                          "attesa_fattura_compratore", "attesa_mia_hold")])
+    prova("coi sats in garanzia resta l'accordo dei due", [["Annulli lo scambio?", ACCORDO]] * 2,
+          [a["attivo"], a["pagamento_ritentato"]])
+    DOPO = " Da qui non potrai più annullare: se qualcosa va storto, resta la disputa."
+    p = out["pagato"]
+    prova("«Ho inviato»: nei tre metodi la frase finisce dicendo che non si annulla piu'",
+          [True, True, True],
+          [p["banca"] == "Dillo solo dopo aver davvero mandato 50 € con il metodo "
+                        "concordato. Chi vende lo vedrà e libererà i sats." + DOPO,
+           bool(p["contanti"]) and p["contanti"].endswith(DOPO)
+           and p["contanti"].startswith("Dillo quando consegni 50 € a chi vende"),
+           p["tabacchino"] == "Dillo solo dopo aver pagato davvero 50 € in contanti alla "
+                              "cassa. Tieni lo scontrino: chi vende controlla su Amazon che "
+                              "l'ordine risulti saldato e libera i sats." + DOPO])
+    prova("la disputa non parla piu' del contatto, ma del profilo coi bottoni", [True, False],
+          ["Se qui sopra c'è il suo profilo coi bottoni per scrivergli, provate prima a "
+           "sentirvi." in (out["disputa"] or ""),
+           "un contatto" in (out["disputa"] or "")])
+    prova("il recapito SEPA: Instant col suo nome, il bonifico normale com'era",
+          ["Bonifico SEPA\nIntestatario: Mario Rossi\nIBAN: IT00X",
+           "Bonifico SEPA Instant\nIntestatario: Mario Rossi\nIBAN: IT00X",
+           "Bonifico SEPA\nIntestatario: Mario Rossi\nIBAN: IT00X"], out["sepa"])
+    prova("il giudice del banner: vero sul disegno e su quel che non si sa, "
+          "falso appena UNA cifra nota e' diversa",
+          [True, True, True, False, False, False, False, True, False], out["vero"])
+    prova("...e chi lo applica nasconde il banner solo quando mente",
+          [False, False, True, True, True, False], out["nascosto"])
 
 
 def prove_stellina_card_p2p():
@@ -128622,6 +128835,7 @@ def main():
               prove_spia_passi_barattozon,
               prove_stellina_card_p2p,
               prove_recapito_corto,
+              prove_testi_p2p_confondono,
               prove_config_esempio):
         try:
             f()

@@ -1,7 +1,10 @@
 # Guida P2P passo per passo — i testi esatti, per i tutorial video
 
 Studio in sola lettura del 7 ottobre 2026, chiesto da Andrea per scrivere
-i testi dei tutorial video del P2P. Letto sul codice di `origin/main` a
+i testi dei tutorial video del P2P. **Aggiornata lo stesso giorno** coi
+testi del cantiere «I testi del P2P che confondevano» (i tredici punti di
+«Notato strada facendo», in fondo, sono chiusi) e con gli avvisi
+annullo/recapito dell'altra sessione. Letto sul codice di `origin/main` a
 `566730c` (`miniapp.html`, `server.py`, `config_esempio.py`), non a
 memoria; i valori che vivono FUORI dal codice (config del VPS, settings
 del nodo) sono detti come tali, con la fonte.
@@ -262,7 +265,8 @@ piccoli». C'è anche un «Filtro».
    messi in garanzia», «Euro inviati / Al recapito che ti dà chi vende»,
    «Scambio concluso / I sats sono arrivati a te», e il riquadro dello
    stato: «**Dove vuoi i sats?**» «👉 tocca a te» «Indica il tuo
-   indirizzo Lightning: è lì che arriveranno alla fine dello scambio.»
+   indirizzo Lightning, o incolla una fattura: è lì che arriveranno alla
+   fine dello scambio.»
    Toast: «⚡ Tocca a te: indica dove ricevere i sats». Bottone «💸
    Dove ricevere i sats».
    ✈️ A chi aveva pubblicato: «⚡ **Il tuo ordine è stato preso da
@@ -311,7 +315,8 @@ piccoli». C'è anche un «Filtro».
    inviato gli euro».
    📱 «Hai inviato gli euro?» — «Dillo solo dopo aver davvero mandato
    50,00 € con il metodo concordato. Chi vende lo vedrà e libererà i
-   sats.» — «Sì, li ho inviati» → «Sto avvisando che hai pagato…» →
+   sats. Da qui non potrai più annullare: se qualcosa va storto, resta la
+   disputa.» — «Sì, li ho inviati» → «Sto avvisando che hai pagato…» →
    «Fatto ✅». Stato «**Euro inviati**» «Hai detto di aver mandato gli
    euro: appena chi vende li vede, libera i sats.»
 7. Chi vende libera (§3, passo 5).
@@ -434,7 +439,8 @@ piccoli». C'è anche un «Filtro».
      conta in caso di disputa.»
    🧑 Tocca «💶 Invia a chi compra». 📱 «Invio…» → toast «Recapito inviato
    a chi compra ✓». Il foglio ora dice «💶 Aggiorna il recapito» e sotto
-   «✓ Recapito inviato. Se lo cambi, vale l'ultimo.»
+   «✓ Recapito inviato. Se lo cambi, vale l'ultimo: cambialo solo se chi
+   compra non ha ancora pagato.»
    **Cosa scrivere:** solo dove ricevere gli euro (IBAN e intestatario,
    RevTag, numero Satispay, email PayPal). Niente password, codici,
    messaggi.
@@ -487,8 +493,8 @@ piccoli». C'è anche un «Filtro».
 - Recapito: «Non si sa ancora con chi stai scambiando»; «Compila:
   <campo>»; «Questo IBAN non sembra completo: controllalo»; «Non è
   partito: <motivo>».
-- Chi compra non dice niente per ore: nessun timer libera i sats da
-  solo (vedi §9 e la nota in fondo); si scrive o si apre una disputa.
+- Chi compra non dice niente per ore: per circa quattro giorni non
+  succede niente da solo (vedi §9); si scrive o si apre una disputa.
 
 ---
 
@@ -599,7 +605,7 @@ Cosa chiede il foglio «🤝 I vostri recapiti» a chi vende, per metodo:
 
 | Metodo | Campi (etichetta → esempio nel campo) | Cosa riceve chi compra |
 |---|---|---|
-| SEPA, SEPA Instant | «Intestatario (nome e cognome)» → «Mario Rossi»; «IBAN» → un IBAN italiano d'esempio | «Bonifico SEPA / Intestatario: … / IBAN: …» |
+| SEPA, SEPA Instant | «Intestatario (nome e cognome)» → «Mario Rossi»; «IBAN» → un IBAN italiano d'esempio | «Bonifico SEPA / Intestatario: … / IBAN: …» (con SEPA Instant: «Bonifico SEPA Instant / …») |
 | Revolut | «Il tuo RevTag» → «@mariorossi» | «Revolut: @…» |
 | Satispay | «Numero di telefono Satispay» → «333 1234567» | «Satispay: …» |
 | PayPal | «Email o link paypal.me» → «mario@esempio.it» | «PayPal: …» |
@@ -721,7 +727,8 @@ di pagare» (chi compra) / «2 Poi, contati i contanti» (chi vende).
    «📍 Segna di nuovo». L'altro vede l'ora, mai la posizione.
 2. 🧑 Chi compra consegna e tocca «✅ Ho consegnato i contanti». 📱 «Hai
    consegnato i contanti?» — «Dillo quando consegni 50,00 € a chi vende,
-   lì di persona. <regola>» — «Sì, li ho consegnati». Se non aveva
+   lì di persona. <regola> Da qui non potrai più annullare: se qualcosa va
+   storto, resta la disputa.» — «Sì, li ho consegnati». Se non aveva
    segnato la presenza, prima: «📍 Non hai segnato «Sono qui». Se chi vende
    dice di non aver ricevuto i contanti e non c'è la prova d'incontro, in
    disputa si dà ragione a chi vende. Puoi tornare indietro e segnarlo
@@ -765,9 +772,10 @@ di pagare» (chi compra) / «2 Poi, contati i contanti» (chi vende).
 
 Il metodo in una riga, come lo dice l'app a chi vende: «Con Barattozon
 fai pagare in contanti alla cassa del tabacchino un tuo ordine Amazon:
-chi lo paga riceve cifrati codice, importo e scadenza appena i sats sono
-in garanzia, e non vede nome, indirizzo né cosa hai comprato. Per pagare
-non serve alcun documento. Chi paga tiene lo scontrino in caso di
+chi lo paga riceve cifrati codice, importo e scadenza appena prende
+l'ordine, e paga solo quando la pagina dice «Sats in garanzia». Non vede
+nome, indirizzo né cosa hai comprato. Per pagare non serve alcun
+documento. Chi paga tiene lo scontrino in caso di
 disputa.»
 
 ### 7a. Chi pubblica (vende sats)
@@ -875,7 +883,8 @@ disputa.»
    a «Info P2P») e, se mancano meno di sei ore: «⏳ Occhio al tempo:
    questo ordine esce dal libro fra meno di sei ore (o «…di un'ora»), e il
    PayCode scade circa due ore dopo. Devi fare in tempo ad andare al
-   tabacchino e pagare, o i sats tornano indietro.» Passi: «Indichi dove
+   tabacchino e pagare: se il PayCode scade prima, lo scambio va annullato
+   e non ricevi i sats.» Passi: «Indichi dove
    ricevere i sats» → «Chi vende li mette in garanzia» → «Paghi il PayCode
    al tabacchino» → «I sats arrivano a te».
 2. 🧑 Compra, dà l'indirizzo sats (come §2b). 📱 Il riquadro «🧾 Il PayCode
@@ -895,7 +904,8 @@ disputa.»
    Ho pagato al tabacchino». 📱 «Hai pagato il PayCode al tabacchino?» —
    «Dillo solo dopo aver pagato davvero 25,47 € in contanti alla cassa.
    Tieni lo scontrino: chi vende controlla su Amazon che l'ordine risulti
-   saldato e libera i sats.» — «Sì, ho pagato». Stato «**PayCode pagato**»
+   saldato e libera i sats. Da qui non potrai più annullare: se qualcosa va
+   storto, resta la disputa.» — «Sì, ho pagato». Stato «**PayCode pagato**»
    «Hai detto di aver pagato al tabacchino. Chi vende controlla su Amazon
    che l'ordine risulti saldato e libera i sats: tieni lo scontrino, è la
    tua prova.»
@@ -943,11 +953,12 @@ disputa.»
 ### Dopo la presa, prima della garanzia
 
 🧑 Una delle due parti tocca «**✕ Annulla**». 📱 Il foglio dice «**Annulli
-lo scambio?**» — «Lo scambio si annulla solo se anche l'altra persona è
-d'accordo. Se lo è, i sats tornano a chi li ha bloccati.» — «Sì,
-annulla». Ma in questa fase il coordinatore annulla **subito** (vedi la
-nota in fondo): toast «Scambio annullato ✓», e si torna a «I miei
-scambi».
+lo scambio?**» — «Lo scambio si annulla subito, senza bisogno del sì
+dell'altra persona, e nessuno perde niente: se i sats erano già bloccati,
+tornano a chi li ha bloccati.» — «Sì, annulla». Il coordinatore annulla
+davvero subito: toast «Scambio annullato ✓», e si torna a «I miei
+scambi». (I sats possono essere già bloccati quando chi vende ha preso un
+ordine di acquisto: paga la garanzia prima che chi compra dia la fattura.)
 ✈️ All'altra persona: se ha annullato chi aveva preso, a chi aveva
 pubblicato «🔄 **<nome> ha annullato lo scambio.** Il tuo ordine è tornato
 in vetrina: non devi fare niente.»; se ha annullato chi aveva pubblicato,
@@ -1004,9 +1015,9 @@ tarda: controllo com'è andata…».
 |---|---|---|
 | Un ordine nel libro | 7 giorni (168 h, dal nodo) | «Info P2P»: «Un ordine vive nel libro **7 giorni**. Scaduto quello sparisce da solo, e non è successo niente.» ✈️ a chi l'ha pubblicato: «⏰ **Il tuo ordine è scaduto** senza che la presa fosse completata: vendevi/compravi <N> sats per <cifra> via <metodo>. Puoi ripubblicarlo quando vuoi.» |
 | Un ordine Barattozon | fino a 2 h prima della scadenza del PayCode (mai oltre 72 h) | esce da solo, avviso dedicato (§7) |
-| Ogni passo dopo la presa | 15 minuti | «Preso l'ordine, **ogni passo ha 15 minuti**: 15 a chi compra per dire dove vuole i sats, e da lì altri 15 a chi vende per bloccarli. Il cronometro **riparte a ogni mossa**, quindi in due passi il tempo è il doppio.» Se manca chi ha **preso**, l'ordine torna nel libro; se manca chi ha **pubblicato**, si chiude. Nessuno perde niente. |
+| Ogni passo dopo la presa | 15 minuti | «Preso l'ordine, **ogni passo ha 15 minuti**, e il primo tocca sempre a chi l'ha preso: se compri, dici dove vuoi i sats e poi chi vende li blocca; se vendi, blocchi i sats e poi chi compra dice dove li vuole. Il cronometro **riparte a ogni mossa**.» Se manca chi ha **preso**, l'ordine torna nel libro; se manca chi ha **pubblicato**, si chiude. Nessuno perde niente. |
 | La richiesta della cauzione | qualche minuto (lo dice il foglio) | l'ordine torna nel libro, va ripreso |
-| Sats già in garanzia | nessun timer di Barattolo | «Restano lì finché uno dei due si muove, o finché decide un moderatore.» (ma vedi la nota sulla scadenza della garanzia) |
+| Sats già in garanzia | circa quattro giorni | «Coi sats in garanzia avete **circa quattro giorni**. Se chi compra non ha ancora detto di aver pagato, allo scadere i sats **tornano da soli a chi vende**; se l'ha detto, si apre una disputa.» Dal sorgente della 0.19.0: il coordinatore si muove a ~92 ore; una disputa già aperta e non decisa la chiude LND a ~94 ore, coi sats a chi vende. ✈️ «⏰ **La garanzia è arrivata a scadenza: lo scambio è annullato.** I sats tornano a chi vende.» |
 | Barattozon, dopo «pagato» | 24 ore «a vista» per chi vende | promemoria a 1, 6, 20 ore; poi nulla di automatico |
 | La fattura di chi compra | meglio almeno un giorno | se scade prima del rilascio: «Serve una fattura nuova» |
 | Appuntamento in contanti | entro una settimana | «Fissa l'incontro entro una settimana» |
@@ -1031,7 +1042,8 @@ dettaglio, l'orologio dentro il foglio da pagare.
   né tu né l'altra persona potete più muovere i sats. A decidere è
   Barattolo, e le strade restano due: i sats vanno a chi compra o tornano
   a chi vende. Prima di aprirla, dai tempo all'altra persona: quasi sempre
-  è un ritardo. Se vi siete mandati un contatto, provate a sentirvi.» —
+  è un ritardo. Se qui sopra c'è il suo profilo coi bottoni per
+  scrivergli, provate prima a sentirvi.» —
   «Sì, apri la disputa» → «Apro la disputa…» → «Disputa aperta».
 - 📱 Stato per tutti e due: «**Disputa aperta**» «Un moderatore esaminerà
   lo scambio. I sats restano bloccati fino alla decisione.»
@@ -1155,6 +1167,9 @@ dettaglio, l'orologio dentro il foglio da pagare.
   Finita la beta sarà del **4%** in tutto (2% per parte). Pionieri e
   livello 5 hanno sempre uno **sconto dello 0,5%** sulla propria parte.»
   (+ «**Tu sei fra questi.**» a chi ce l'ha) e «Ho capito».
+- Il banner è disegnato con quelle tre cifre (listino 4%, beta 3%,
+  sconto 0,5): se una delle tre cifre vive è diversa, **il banner non si
+  vede**, finché non si ridisegna. Il foglio, che le legge vive, resta.
 - Nel conto: «Fee P2P **1,5%**» col cartellino «beta», oppure «🌱
   Pioniere» / «Lv. 5» a chi ha lo sconto, o «sconto non verificato» se il
   coordinatore non l'ha applicato.
@@ -1199,69 +1214,45 @@ dettaglio, l'orologio dentro il foglio da pagare.
 
 ---
 
-## Notato strada facendo
+## Notato strada facendo — chiuso il 7 ott 2026
 
-Cose che nel codice sono diverse da come sembrano, o passi che possono
-confondere chi guarda il video. Nessuna è stata toccata.
+I tredici punti trovati scrivendo questa guida. Undici sono stati
+corretti nel cantiere «I testi del P2P che confondevano» (testi approvati
+da Andrea), due restano come sono per sua decisione. I testi nuovi sono
+già nelle sezioni qui sopra.
 
-1. **«Annulli lo scambio?» prima della garanzia dice una cosa falsa.** Il
-   foglio dice «Lo scambio si annulla solo se anche l'altra persona è
-   d'accordo», ma in quella fase il coordinatore annulla subito (lo dice
-   il commento di `ANNULLI_P2P` in `miniapp.html`, e il toast finale è
-   «Scambio annullato ✓»). Il testo è vero solo a sats in garanzia.
-2. **«Nessun timer» contro «la garanzia è arrivata a scadenza».** «Info
-   P2P» dice «Quando invece i sats sono **già in garanzia**, nessun timer
-   li sblocca da solo», ma il server ha l'avviso «⏰ **La garanzia è
-   arrivata a scadenza: lo scambio è annullato.** I sats tornano a chi
-   vende.» (a chi vende: «…I sats che avevi bloccato in garanzia sono
-   tornati a te.»; dettaglio `escrow-deadline`), e la garanzia ha un limite
-   tecnico (circa 92 ore secondo NODO-MOSTRO). Da decidere cosa dire nel
-   video.
-3. **L'ordine dei primi due passi dipende da chi prende.** «Info P2P» («15
-   a chi compra per dire dove vuole i sats, e da lì altri 15 a chi vende
-   per bloccarli») e i cinque passi raccontano solo il caso in cui chi
-   compra prende un ordine di vendita. Quando chi vende prende un ordine
-   di acquisto è il contrario: prima la garanzia, poi l'indirizzo. Gli
-   avvisi Telegram lo dicono giusto.
-4. **La disputa parla di un «contatto» che non c'è più.** «Se vi siete
-   mandati un contatto, provate a sentirvi»: i campi del contatto sono
-   stati tolti (il patto privacy dice «Al posto dei campi dove prima ci si
-   scriveva il proprio contatto a mano»); oggi ci si scrive dai tondi
-   Telegram/Nostr del profilo dell'altra persona.
-5. **Il PayCode parte alla presa, «Info P2P» dice «in garanzia».** Il
-   PayCode parte da solo appena il server riconosce chi ha preso (prima
-   della garanzia), mentre «Info P2P» e il testo di Barattozon dicono che
-   chi paga lo riceve «appena i sats sono in garanzia». A chi compra la
-   pagina dice comunque di non pagare prima («⚠️ **Non inviare ancora
-   niente:** aspetta che questa pagina dica «Sats in garanzia».»).
-6. **«…o i sats tornano indietro» detto a chi compra.** L'avviso «⏳ Occhio
-   al tempo» nel dettaglio Barattozon lo legge chi sta per prendere, che
-   sats non ne ha: i sats che tornano sono quelli di chi vende.
-7. **Il banner della fee è un'immagine fissa.** Dice «2% barrato, in beta
-   1,5% per parte, 1% per pionieri o livello 5» qualunque sia la fee viva;
-   il foglio sotto invece segue il coordinatore. Se la fee cambia, il
-   banner mente finché non si rifà l'immagine.
-8. **Cambiare il recapito dopo che l'altro ha già pagato.** «Se lo cambi,
-   vale l'ultimo»: se chi compra ha già mandato gli euro al recapito
-   vecchio, nessun testo lo avverte né avverte chi vende. Da tenere a mente
-   nel video («cambialo solo prima che l'altro paghi»).
-9. **SEPA Instant si presenta come «Bonifico SEPA».** Il foglio del
-   recapito riconosce «sepa» e scrive «Bonifico SEPA / Intestatario … /
-   IBAN …» anche per SEPA Instant: chi compra non legge «Instant».
-10. **Dopo «Ho inviato gli euro» non si annulla più.** Il bottone «✕
-    Annulla» sparisce (`euro_inviati` non è fra gli stati annullabili) e
-    resta solo «⚠️ C'è un problema»: giusto, ma nessun testo lo dice
-    prima del gesto.
-11. **La ✕ rossa di Barattozon aspetta.** Compare dopo circa 0,7 secondi di
-    pausa nella scrittura o uscendo dal campo: chi scrive «2» per «25,47»
-    e si ferma un attimo vede la ✕ e «Un PayCode Barattozon vale almeno
-    25 €» prima di finire. È voluto, ma nel video conviene scrivere la
-    cifra tutta d'un fiato.
-12. **«Dove vuoi i sats?» dice solo «indirizzo Lightning».** La riga di
-    stato chiede l'indirizzo, ma il foglio accetta anche una fattura (e la
-    fa da solo col wallet collegato). Non è sbagliato, ma nel video vale la
-    pena dire tutte e due.
-13. **Le leve del 10 ottobre.** Card «In arrivo il 10/10/26», fila P2P in
-    home, cauzione: quello che si vede dipende da leve del VPS
-    (`P2P_IN_VETRINA`, `P2P_PROVA_IDS`, `P2P_CAUZIONE`). Prima di girare,
-    conviene guardare il pannello «⚙️ Stato delle leve».
+1. ✅ **«Annulli lo scambio?» prima della garanzia.** Ora: «Lo scambio si
+   annulla subito, senza bisogno del sì dell'altra persona, e nessuno
+   perde niente: se i sats erano già bloccati, tornano a chi li ha
+   bloccati.» (§8). Coi sats in garanzia resta la frase dell'accordo.
+2. ✅ **«Nessun timer» contro la garanzia che scade.** Verificato sul
+   sorgente della 0.19.0 che gira; «Info P2P» ora dice «Coi sats in
+   garanzia avete circa quattro giorni…» (§9). Resta aperto un altro
+   pezzo: la disputa che il coordinatore apre da solo a ~92 ore non
+   avvisa nessuno (cantiere «avviso garanzia lunga»).
+3. ✅ **L'ordine dei primi due passi.** «Info P2P» ora dice che il primo
+   passo tocca a chi ha preso, nei due versi (§9), e il passo 5 non dice
+   più «all'inizio».
+4. ✅ **Il «contatto» della disputa.** Ora: «Se qui sopra c'è il suo
+   profilo coi bottoni per scrivergli, provate prima a sentirvi.» (§10).
+5. ✅ **Il PayCode alla presa.** Ora: «…appena l'ordine è tuo, e paghi
+   solo quando la pagina dice «Sats in garanzia».» (§7), anche nel passo
+   4 della lista di Barattozon in «Info P2P».
+6. ✅ **«…o i sats tornano indietro».** Ora: «…se il PayCode scade prima,
+   lo scambio va annullato e non ricevi i sats.» (§7b).
+7. ✅ **Il banner della fee fisso.** Si nasconde se una qualsiasi delle tre
+   cifre vive (fee, listino, sconto) non è quella disegnata (§12).
+8. ✅ **Cambiare il recapito dopo il pagato.** La riga del foglio ora dice
+   «…cambialo solo se chi compra non ha ancora pagato.» (§3). L'avviso a
+   chi compra l'ha rifatto l'altra sessione; nessun blocco del cambio.
+9. ✅ **SEPA Instant.** Il recapito si compone «Bonifico SEPA Instant /
+   …» quando il metodo è Instant (§5).
+10. ✅ **Dopo «Ho inviato gli euro» non si annulla più.** I tre «pagato»
+    ora finiscono con «Da qui non potrai più annullare: se qualcosa va
+    storto, resta la disputa.» (§2b, §6, §7b).
+11. ➖ **La ✕ rossa di Barattozon aspetta 0,7 secondi.** Nessuna modifica
+    (decisione di Andrea): nel video si scrive la cifra tutta di fila.
+12. ✅ **«Dove vuoi i sats?».** Ora: «Indica il tuo indirizzo Lightning, o
+    incolla una fattura: …» (§2b).
+13. ➖ **Le leve del 10 ottobre.** Nessuna modifica (decisione di Andrea):
+    prima di girare si guarda il pannello «⚙️ Stato delle leve».

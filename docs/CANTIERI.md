@@ -40244,3 +40244,134 @@ PRIMA — chi annulla senza niente, l'aggiornamento «ha aggiornato dove
 inviare» con tre avvisi e uno al minuto, «tornano a chi vende» anche a
 chi aveva bloccato. Riallineati SOLO quei sei passaggi in
 `docs/GUIDA-P2P-PASSI.md`, coi testi di questo cantiere.
+
+## I testi del P2P che confondevano (7 ott 2026, richiesta di Andrea)
+
+Dalla lista «Notato strada facendo» della guida per i tutorial
+(`docs/GUIDA-P2P-PASSI.md`, f6082df): tredici punti, e per ognuno il
+testo proposto prima → dopo. Andrea ha detto sì a otto testi (1, 3, 4,
+5, 6, 9, 10, 12), al banner nascosto (7), a metà del punto 8 e al punto
+2 dopo una verifica sul sorgente; niente sui punti 11 e 13. Solo
+`miniapp.html` e le prove: server, nodo e avvisi Telegram non toccati.
+
+**IL PUNTO 2, LETTO SULLA 0.19.0 CHE GIRA** (clone di `v0.19.0`,
+`d53e41d`, con le otto patch del fork applicate: è `-bar6`).
+`enforce_escrow_deadline_pass` in `src/scheduler.rs` guarda SOLO gli
+ordini `active` e `fiat-sent` (`find_escrow_deadline_orders`), e scatta
+quando l'HTLC della garanzia è a `escrow_deadline_margin_blocks` (24) dal
+suo `cltv_expiry`, che la hold mette a `hold_invoice_cltv_delta` (576)
+blocchi dal pagamento: ~552 blocchi, ~92 ore. In `active` cancella la
+hold (sats a chi vende) e chiude l'ordine — è l'avviso
+`escrow-deadline` della patch 0007; in `fiat-sent` apre la disputa da
+solo e la hold la LASCIA. Una disputa già aperta non la guarda nessuno:
+la hold la cancella LND `invoices.holdexpirydelta` blocchi (12 di
+default) prima della scadenza, ~94 ore, `flow::hold_invoice_canceled`
+lo registra come allarme e i sats tornano a chi vende con l'ordine
+fermo in `dispute`. Confermato quel che i verbali dicevano della 0.18.7
+e della 0.18.8, quindi la frase approvata: «Coi sats in garanzia avete
+circa quattro giorni. Se chi compra non ha ancora detto di aver pagato,
+allo scadere i sats tornano da soli a chi vende; se l'ha detto, si apre
+una disputa.» Al posto di «nessun timer li sblocca da solo», in «Info
+P2P» → «I tempi».
+⚠️ TROVATO NELLA LETTURA, E RESTA APERTO: la disputa che il
+coordinatore apre da solo a ~92 ore NON emette niente verso il server —
+la 0007 aggancia `dispute_action` (la disputa aperta da una persona) e
+non quel ramo — quindi nessun avviso alle parti né ai moderatori, che
+hanno ~12 blocchi, cioe' ~2 ore, prima che LND restituisca i sats a chi vende (`holdexpirydelta` di default: quello del LND del nodo non l'ho letto). La proposta
+(il server che guarda gli scambi in garanzia da più di 90 ore) è ad
+Andrea, e il codice aspetta il suo sì.
+
+**IL PUNTO 1 DETTO GIUSTO, E NON COME L'AVEVO PROPOSTO.** La proposta
+diceva «I sats non sono ancora in garanzia: lo scambio si annulla subito
+e nessuno perde niente». Il sorgente della 0.19.0 dice di più:
+`cancel_action` manda `waiting-payment` e `waiting-buyer-invoice` a
+`cancel_not_active_order`, che annulla da solo (il sì dell'altro serve
+solo da `active` in poi) — ma quando CHI VENDE PRENDE un ordine di
+acquisto paga la garanzia PRIMA che chi compra dia la fattura, e lo
+stato resta `waiting-buyer-invoice` (da noi `attesa_fattura_compratore`
+per lui, `attesa_mia_fattura` per chi compra). Lì i sats SONO bloccati,
+e l'annullo li restituisce. La frase quindi è: «Lo scambio si annulla
+subito, senza bisogno del sì dell'altra persona, e nessuno perde niente:
+se i sats erano già bloccati, tornano a chi li ha bloccati.» — vera in
+tutti e quattro gli stati (`P2P_ANNULLA_DA_SOLO`). Detta ad Andrea
+prima del push. SCARTATO: distinguere i due casi dallo storico degli
+stati della riga — una frase sola vera vale più di due esatte appese a
+una deduzione.
+
+**GLI ALTRI TESTI**, parola per parola come approvati: 3) «I tempi»:
+«…ogni passo ha 15 minuti, e il primo tocca sempre a chi l'ha preso: se
+compri, dici dove vuoi i sats e poi chi vende li blocca; se vendi,
+blocchi i sats e poi chi compra dice dove li vuole. Il cronometro
+riparte a ogni mossa.», e il passo 5 senza «all'inizio»; 4) la disputa:
+«Se qui sopra c'è il suo profilo coi bottoni per scrivergli, provate
+prima a sentirvi.»; 5) Barattozon: il PayCode arriva «appena l'ordine è
+tuo, e paghi solo quando la pagina dice «Sats in garanzia»» — nei due
+versi di `testoBarattozonP2P` (le parole di Andrea del 24 set), nel
+paragrafo fermo di «Info P2P» che le ripete, e nel passo 4 della lista
+di Barattozon, che diceva lo stesso falso con «A quel punto» (allargato
+lì, detto ad Andrea); 6) «Occhio al tempo»: «…se il PayCode scade prima,
+lo scambio va annullato e non ricevi i sats.»; 9) SEPA Instant: la
+forma `sepa` compone «Bonifico SEPA Instant» quando il METODO è Instant
+(`componi(c, m)`, e `inviaCampoP2P` passa `metodoRecapitoScelto(o)`) —
+il recapito ricordato resta uno per i due, come prima; 10) «Ho inviato
+gli euro», «Ho consegnato i contanti», «Ho pagato al tabacchino»: in
+coda «Da qui non potrai più annullare: se qualcosa va storto, resta la
+disputa.»; 12) «Dove vuoi i sats?»: «Indica il tuo indirizzo Lightning,
+o incolla una fattura: è lì che arriveranno alla fine dello scambio.»
+8) Solo la riga del foglio: «✓ Recapito inviato. Se lo cambi, vale
+l'ultimo: cambialo solo se chi compra non ha ancora pagato.» L'avviso
+Telegram «ha aggiornato» NON si tocca (lo sta rifacendo un'altra
+sessione, «avvisi annullo/recapito»), nessun blocco del cambio, e la
+riga dell'appuntamento resta com'era.
+
+**IL BANNER CHE MENTE SE NE VA** (punto 7). Le cifre del banner sono
+disegnate (PRODUZIONE, «IL BANNER DELLE COMMISSIONI P2P»): listino 4%
+in tutto, fee viva 3%, sconto 0,5. `bannerFeeVeroP2P(fee, listino,
+punti)`, pura, confronta le tre vive col disegno (`P2P_BANNER_DISEGNO`);
+`veritaBannerFeeP2P` mette `hidden` sul bottone, e lo chiamano
+`renderP2P` (è lì che arriva il 38385) e `bannerFeeFissoP2P` (a /me
+arrivato). SI GIUDICA SOLO QUEL CHE SI SA: una cifra non ancora letta
+non è «diversa», e il banner resta — nasconderlo in attesa lo farebbe
+comparire secondi dopo a ogni ingresso, spingendo giù le card. Il
+prezzo, detto: se la fee cambia, nei secondi prima del 38385 il banner
+vecchio si vede. La regola `.p2p-fee-banner[hidden]{display:none}`
+serve: `hidden` da solo perde contro il `display:block` della classe.
+⚠️ IL GIUDICE STA FUORI DAL BLOCCO DEL BANNER PERSONALE: la prima
+stesura l'aveva messo dentro, e `prove_banner_fee_personale` è diventata
+rossa al posto giusto — quel blocco per scelta (25 set) non legge cifre
+del coordinatore, e il suo banco non le ha. Spostato subito dopo il
+marcatore di fine, chiamato con `typeof`; la sentinella vecchia resta
+com'era. SCARTATO: giudicare la sola fee viva — il banner dice anche il
+listino barrato e lo sconto, e mente anche se cambia uno di quelli.
+Quando si ridisegna il banner, `P2P_BANNER_DISEGNO` cambia col file.
+
+**PROVATO.** `prove_testi_p2p_confondono` (20): i testi fermi di «Info
+P2P», delle tabelle e del foglio dei recapiti; la chiamata col metodo;
+chi giudica il banner e dove sta (fuori dal blocco personale); la
+cascata vera del CSS (`_vince_css`: col `hidden` `display:none`, senza
+`block`); in node le funzioni VERE — `annullaScambioP2P` in sette stati
+(il libro, i quattro di prima della garanzia, due coi sats in
+garanzia), `euroInviatiP2P` nei tre metodi, `apriDisputaP2P`,
+`formaRecapito(…).componi` per SEPA, SEPA Instant e il bonifico del
+banco vecchio, `bannerFeeVeroP2P` su nove casi e `veritaBannerFeeP2P`
+su sei. Emendate col perché: `prove_p2p_motore` (il foglio dell'annullo:
+l'accordo resta, ma solo in garanzia), `prove_p2p_paycode` (le parole
+di Barattozon nei due versi), `prove_recapito_corto` (la riga ✓ del
+recapito, nel sorgente e nel banco). Suite intera severa senza config
+nel worktree su f6082df: 19.606 verdi, 0 rosse; RIBASATO su 729f12a («Chi annulla lo sente anche lui», l'altra sessione: un solo conflitto, le due voci in fondo a questo file, tenute tutte e due), di nuovo la suite intera severa: 19.663 verdi, 0 rosse, e i 41 collaudi della CI verdi nella gabbia. Tortura 25 su 25 su una copia intera del repo (la copia pulita prima, verde): l'annullo che torna all'accordo, uno stato fuori dall'elenco, la frase che torna a «non sono in garanzia», ognuno dei testi di «Info P2P», della disputa, di «Dove vuoi i sats?», di «Occhio al tempo» e del recapito rimesso com'era, il recapito senza il metodo, SEPA Instant senza nome, ognuno dei tre «pagato» senza la coda, il disegno del banner con un'altra fee, il giudice senza listino, senza sconto, con l'ignoto che diventa «diverso», il giudice rovesciato, la regola [hidden] tolta, le due chiamate tolte una per volta, la frase di Barattozon tornata «in garanzia».
+Scatti prima/dopo a 375 px, densità 3, tema chiaro, Chrome headless
+sull'app VERA in collaudo (due copie nello scratchpad: origin/main e il
+worktree, relay morto, listino 4 e sconto 0,5 come sul VPS, lo stato
+seminato con `scriviOrdineP2P`): l'annullo prima della garanzia, «Ho
+inviato» banca e tabacchino, la disputa, «Dove vuoi i sats?», il foglio
+del recapito, «Info P2P» (i tempi, Barattozon, il passo 4, i cinque
+passi), «Occhio al tempo», e il banner con la fee a 4% (prima visibile,
+dopo sparito) e a 3% (visibile in tutti e due); mandati ad Andrea.
+
+**NON PROVATO.** Il telefono e l'APK; il banner con la fee che cambia
+DAVVERO sul nodo (qui la fee viva l'ho scritta io nella pagina);
+l'annullo subito nello stato `attesa_fattura_compratore` col
+coordinatore vero (letto sul sorgente, non visto); la scadenza delle
+~92 ore, mai provata su nessun nodo (NODO-MOSTRO, «NON provati i 576
+blocchi»). Da aggiornare dopo il push: le voci della guida dei
+tutorial che citano i testi vecchi — proposto ad Andrea, non fatto.
