@@ -1,9 +1,14 @@
 # Hackathon RGB di Torino (17-18 ott 2026): l'infrastruttura preparata prima
 
 Stato al 1 ottobre 2026, **aggiornato il 7 ottobre** con le idee di Alan
-(la demo «Il Cassiere», l'estensione NIP-47 per gli asset RGB,
-l'emittente legato a un'identità Nostr: il perché e il disegno stanno
-nella parte seconda dello studio; qui c'è COSA si fa e quando). È il
+(la demo sui punti fedeltà, **NWC-RGB** — l'estensione NIP-47 per gli
+asset RGB —, l'emittente legato a un'identità Nostr: il perché e il
+disegno stanno nella parte seconda dello studio; qui c'è COSA si fa e
+quando) e **la sera del 7 con le sue quattro decisioni** (studio, parte
+seconda, G: il repo pubblico, il nome NWC-RGB, il NIP-05 anche per gli
+utenti al livello 2, il centro della demo sul negozio che emette e non
+sull'AI; il nome «Cassiere» sparisce — qui dai testi, dagli
+identificatori tecnici col prossimo cantiere). È il
 verbale del cantiere «preparazione infrastruttura hackathon RGB»: SOLO
 setup e prove, su signet, separato da Barattolo. Lo studio che lo precede, coi perché delle scelte, è
 `docs/STUDIO-HACKATHON-RGB-2026-10.md`; il regolamento (sezione F di
@@ -206,7 +211,9 @@ locale che chiami 127.0.0.1:11434 (CORS: `--cors-origin
 http://127.0.0.1:8080`, un'origine esatta).
 
 **Aggiornamento del 7 ott, letto sulla docs della CLI** (le cose che
-cambiano la pagina del Cassiere):
+cambiano la pagina dell'aiutante, quello che la mattina si chiamava
+«Cassiere»: l'alias `cassiere` qui sotto lo rinomina il prossimo
+cantiere col nome di G.4):
 
 - Il modello: Qwen3 1.7B è `QWEN3_1_7B_INST_Q4` (~1 GB), ed è quello che
   la docs usa in TUTTI gli esempi con JSON a schema. In
@@ -221,7 +228,7 @@ cambiano la pagina del Cassiere):
   esista. La pagina della demo vive su `http://127.0.0.1:8080` (il
   collaudo), quindi niente mixed content.
 - **Lo structured output e i `tools` non si combinano** (400
-  `invalid_response_format`): il Cassiere usa `response_format` a
+  `invalid_response_format`): l'aiutante usa `response_format` a
   `json_schema` e il conto già fatto, senza tool — la scelta del 1 ott
   era giusta anche per questo.
 - **Qwen3 pensa**: con `max_tokens` stretto il `content` resta vuoto;
@@ -254,7 +261,16 @@ Da consegnare scritto il 17 mattina, com'è chiesto dal regolamento:
 - QVAC in locale (Qwen3 1.7B) con `consiglio.py` e una pagina locale di
   prova FUORI dal repo che lo chiama con lo schema.
 - Il disegno: la parte seconda dello studio (campi, nomi dei metodi,
-  schermi), scritta il 7 ott. Nessun testo di NIP pubblicato.
+  schermi), scritta il 7 ott; le due bozze in inglese
+  `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` nel repo pubblico
+  dall'8-9 ott, dichiarate come disegno: nessuna issue aperta, nessuna
+  PR, nessuna implementazione.
+- **Il repo pubblico** (studio, parte seconda, G.1): creato l'8 ott,
+  pubblico dal primo commit, firmato; dentro il README con questa
+  dichiarazione in inglese, lo snapshot di `deploy/rgb/`, le due bozze,
+  la licenza; niente del repo privato di Barattolo, nessuna chiave. Il
+  link sta nella risposta alla conferma degli organizzatori. La sua
+  cronologia fino al 16 sera è questa dichiarazione, datata.
 - Nessuna rotta, nessun modulo, nessuna UI in Barattolo: zero righe di
   integrazione (solo la leva `RGB_ATTIVO` spenta su main dall'11-12
   ott, e la rotta statica `/.well-known/nostr.json` se Andrea sceglie
@@ -304,12 +320,19 @@ perdono asset). Catena e indice si riscaricano in un'ora.
 
 ## 7. La scaletta di Torino (cosa si SCRIVE lì, in ordine) — rifatta il 7 ott
 
-La demo è «**Il Cassiere**». Priorità, in quest'ordine e senza
-discussione il sabato: **core** (checkout in USDB + Cassiere che propone
-+ wallet WDK che paga via NWC), poi il **NIP minimo** con l'emittente
-verificato nella schermata, poi **budget e salvadanaio** se avanza, la
-roadmap solo slide. JAR resta fuori. La tabella ora per ora e le slide
-stanno nello studio, parte seconda, D.2; qui l'ordine dei pezzi:
+Il tema è **«Loyalty / punti fedeltà»** (Alan, 7 ott sera): ogni
+esercente emette i propri punti come token RGB, autenticati dal suo
+NIP-05, e QVAC aiuta a spenderli al posto dei satoshi — l'AI è un
+aiuto, il protagonista è il negozio che emette e l'identità che lo
+certifica. Il nome del progetto e quello del bottone/aiutante sono
+proposti nello studio, parte seconda, G.4 (raccomandati «Tessera» e
+«Consiglio»); li applica il prossimo cantiere. Priorità di
+COSTRUZIONE, in quest'ordine e senza discussione il sabato: **core**
+(checkout in USDB + l'aiutante che consiglia + wallet WDK che paga via
+NWC-RGB), poi il **NIP minimo** con l'emittente verificato nella
+schermata, poi **budget e salvadanaio** se avanza, la roadmap solo
+slide. JAR resta fuori. La tabella ora per ora e le slide stanno nello
+studio, parte seconda, D.2; qui l'ordine dei pezzi:
 
 1. **Sabato mattina** — in parallelo: nel wallet (`nwc-wdk.mjs`) i
    quattro metodi `rgb_list_assets`, `rgb_make_invoice`,
@@ -322,8 +345,8 @@ stanno nello studio, parte seconda, D.2; qui l'ordine dei pezzi:
    arrivo» → `rgb.py aggiorna barattolo` → «Pagato in USDB». **Il primo
    pagamento vero su signet entro le 16:30.** Lessico: «pagamento
    diretto, senza deposito di garanzia» (regola 9).
-3. **Sabato tardo pomeriggio** — il Cassiere: la pagina chiama
-   `127.0.0.1:11434` con lo schema, il fumetto con la proposta,
+3. **Sabato tardo pomeriggio** — l'aiutante (il nome in G.4): la pagina
+   chiama `127.0.0.1:11434` con lo schema, il fumetto col consiglio,
    «Approva» fa il passo 2 da solo. Se CORS morde, la chiamata la fa il
    server e si dichiara.
 4. **Sabato sera** — MOON come bonus dopo il pagamento (l'assegnazione
@@ -332,8 +355,11 @@ stanno nello studio, parte seconda, D.2; qui l'ordine dei pezzi:
 5. **Domenica mattina** — il NIP: i due annunci firmati dalle identità
    di prova sul relay locale; in Barattolo la lettura per `#d`, la
    verifica NIP-05 lato server con `url_api_ammesso` (niente redirect),
-   la riga «Emesso da … ✓»; i due testi `docs/NIP-XX-RGB-ASSETS.md` e
-   `docs/NWC-XX-RGB-ASSETS.md` dal disegno; la issue nel repo `nwc`.
+   la riga «Emesso da … ✓» — **il centro del racconto**; i due testi
+   `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` del repo pubblico
+   rifiniti con quel che l'implementazione ha insegnato; la issue nel
+   repo `nwc`; la sera `git format-patch` dei commit del giorno in
+   `barattolo-patches/` del repo pubblico (anche il sabato sera).
 6. **Domenica mezzogiorno** — salvadanaio e budget se avanza; sennò gli
    errori visibili. Tx del pitch confermate entro le 14:00.
 
@@ -341,12 +367,29 @@ Lo stato dell'ordine pagato in USDB (dopo l'ACK o dopo il blocco) è una
 decisione del sabato, scritta nel commit: gli stati della regola 4 non
 cambiano.
 
+**Cosa si RACCONTA, in ordine** (non è l'ordine in cui si costruisce,
+ed è voluto: studio, parte seconda, G.4 e D.2): 1) chi siamo, 30
+secondi; 2) il problema — i punti oggi sono una riga nel database del
+negozio, e un token può chiamarsi come vuole; 3) il negozio che emette:
+MOON su RGB, un punto per euro, firmato dall'identità Nostr di To The
+Mooon verificata via NIP-05 — la card «Emesso da … ✓» accanto
+all'emittente sconosciuto in grigio; 4) il cliente e il suo wallet WDK
+che parla NWC-RGB, e la dichiarazione di venerdì; 5) dal vivo il
+pagamento: l'aiutante consiglia, il cliente approva, il wallet
+conferma, la tx su signet, il bonus dopo — l'AI entra qui; 6)
+l'identità per tutti (il NIP-05 gratuito al livello 2) e la roadmap;
+7) cosa resta. Il rischio che il centro del racconto sia l'ultimo pezzo
+costruito (domenica mattina) è segnato nello studio, D.3 punto 0, DA
+DECIDERE prima del 17.
+
 ## 7-bis. Il wallet WDK che parla NWC: l'opzione di Alan, DECISA il 7 ott
 
-(Studio del 1 ott, confermato il 7: è la strada. I quattro metodi, le
-notifiche e gli errori nella forma da bozza di estensione stanno nello
-studio, parte seconda, B.2; la BASE del servizio si fa prima del 17 e si
-dichiara, i metodi `rgb_*` a Torino.)
+(Studio del 1 ott, confermato il 7: è la strada. L'estensione si chiama
+**NWC-RGB**, «un NWC su WDK» (Alan, 7 ott sera); i quattro metodi, le
+notifiche e gli errori nella forma da bozza stanno nello studio, parte
+seconda, B.2, e in inglese nel repo pubblico come `spec/NWC-RGB.md`
+dall'8-9 ott; la BASE del servizio si fa prima del 17 e si dichiara, i
+metodi `rgb_*` a Torino.)
 
 L'idea: il wallet WDK sul portatile espone NIP-47 (Nostr Wallet
 Connect), così Barattolo, che è GIÀ un client NWC (nel browser usa
@@ -469,6 +512,7 @@ niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
 
 | Quando | Cosa | Fatto |
 |---|---|---|
+| 8 ott, per primo | **Il repo pubblico** (studio, parte seconda, G.1): `<nome di G.4>-rgb` (riserva `barattolo-rgb-torino-2026`) sotto `kreamistudio-crypto`, Alan collaboratore, PUBBLICO dal primo commit firmato: README in inglese con la dichiarazione di §5 allo stato dell'8, `rgb/` = snapshot di `deploy/rgb/`, `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` (le bozze di B in inglese), LICENSE MIT, `.gitignore` (identità, age, stash). Niente del repo privato, nessuna chiave, nessun indirizzo di macchina. Il link nella risposta alla conferma degli organizzatori; poi un commit per ogni riga di questa lista che si chiude | ☐ |
 | 8-9 ott | `rgb.py emetti` con la `precision` come argomento, provato sul PC (la ruota win_amd64 c'è) | ☐ |
 | 8-9 ott | Sulla VM: `rgb.py nuovo usdb`, faucet, `utxo usdb 5`, `emetti usdb USDB "Dollari di prova Barattolo" 100000000` a precisione 2, `backup usdb`; l'asset_id in §2 | ☐ |
 | 8-9 ott | 500 USDB (50.000 unità) al wallet utente: fattura «qualunque asset» (`node punti.mjs fattura - 50000 witness`, primo contatto), `rgb.py invia usdb …`, i due `aggiorna`; un blocco | ☐ |
@@ -501,15 +545,20 @@ ferrea 1).
   locale; su un relay pubblico SOLO se si decide prima (sono chiavi di
   prova, non segreti della piattaforma, ma la regola di casa è «mai
   eventi pubblicati» nei giri di collaudo).
-- **Il NIP-05, DA DECIDERE (Andrea)**: (a) una rotta esplicita
-  `/.well-known/nostr.json` su barattolo.store, sul calco di
-  `assetlinks.json` (regola 3: file statico, nome in whitelist, niente
-  redirect — NIP-05 li vieta — e `Access-Control-Allow-Origin: *`), nel
-  commit dell'11-12 ott: due nomi, zero rischio, e la riga nella
-  schermata legge «tothemooon@barattolo.store ✓»; (b) GitHub Pages con
-  un `.nojekyll` (serve `.well-known` e manda il CORS giusto): niente
-  produzione, ma «github.io» nella schermata. Raccomandazione: (a),
-  dicendo ai giudici che il VERO negozio avrebbe il suo dominio.
+- **Il NIP-05, DECISO il 7 ott sera (Alan, confermato)**: la strada (a),
+  una rotta esplicita `/.well-known/nostr.json` su barattolo.store, sul
+  calco di `assetlinks.json` (regola 3: file statico, nome in
+  whitelist, niente redirect — NIP-05 li vieta — e
+  `Access-Control-Allow-Origin: *`), nel commit dell'11-12 ott: due
+  nomi (`usdb`, `tothemooon`), zero rischio, e la riga nella schermata
+  legge «tothemooon@barattolo.store ✓»; ai giudici si dice che il VERO
+  negozio avrebbe il suo dominio. La strada (b), GitHub Pages, è
+  scartata. **In roadmap (slide, niente codice)**: la stessa rotta, un
+  giorno, legge i nomi degli UTENTI — chi arriva al livello 2 del
+  mercatino («Bottega avviata»: 50 XP e 1 affare) ottiene gratis
+  `<nome>@barattolo.store`, solo su una npub verificata (regola ferrea
+  2 intatta: è una mappa nome → chiave pubblica). Le regole del
+  cantiere futuro stanno nello studio, parte seconda, G.3.
 - **La verifica in Barattolo** (lavoro del weekend): GET del JSON
   attraverso `url_api_ammesso` (solo https, host pubblico, mai
   loopback) con `follow_redirects=False`, confronto `names[<nome>]` ==

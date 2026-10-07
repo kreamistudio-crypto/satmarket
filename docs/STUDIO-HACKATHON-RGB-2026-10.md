@@ -9,9 +9,12 @@ Fatti esterni verificati sulle fonti in fondo, lette il 1 ott 2026;
 quel che NON ho potuto verificare da qui è scritto come tale.
 
 > **Aggiornato il 7 ottobre 2026**: in fondo c'è la **parte seconda**,
-> «le idee di Alan, e cosa reggono» — il Cassiere, l'estensione NIP-47
-> per gli asset RGB, l'emittente legato a un'identità Nostr, il piano
-> rifatto e le domande per il Q&A. La prima parte resta com'era il 1 ott;
+> «le idee di Alan, e cosa reggono» — la demo sui punti fedeltà,
+> **NWC-RGB** (l'estensione NIP-47 per gli asset RGB), l'emittente
+> legato a un'identità Nostr, il piano rifatto, le domande per il Q&A e,
+> in coda (sezione G), le **quattro decisioni di Alan della sera del 7**:
+> il repo pubblico, il nome NWC-RGB, il NIP-05 anche per gli utenti, il
+> centro della demo spostato dall'AI al negozio che emette. La prima parte resta com'era il 1 ott;
 > tre fatti sono cambiati nel frattempo e la parte seconda li corregge:
 > la scadenza della candidatura era il 5 ott alle 12:00 (passata), QVAC è
 > alla 0.21 (CLI 0.15), e il NIP-47 è stato ridotto a un nucleo di cinque
@@ -916,22 +919,42 @@ nuove sono in fondo a questa parte, lette il 7 ott 2026; i tutorial su
 Drive sono video e non li ho visti. La prima parte (1 ott) resta com'è:
 dove questa la corregge, lo dice.
 
-**Le novità, in una riga ciascuna.** 1) La demo diventa «**Il
-Cassiere**»: si paga un ordine in dollari di prova **USDB** su RGB, l'AI
-locale (QVAC) propone e l'utente approva, il wallet WDK è al centro, i
-punti MOON sono il bonus, poi salvadanaio e budget privato se avanza.
-2) Barattolo parla col wallet attraverso un'**estensione di NIP-47** per
-gli asset RGB (`rgb_list_assets`, `rgb_make_invoice`, `rgb_pay_invoice`,
-notifiche), pubblicata come bozza durante l'hackathon. 3) **L'emittente
+> **Aggiornata la sera del 7 ottobre** con le quattro decisioni di Alan
+> (sezione G, in fondo): 1) un **repo pubblico separato** per il lavoro
+> dell'hackathon; 2) l'estensione NIP-47 si chiama **NWC-RGB**, «un NWC
+> su WDK», e la sua proposta tecnica (sezione B) va in quel repo in
+> forma pubblicabile; 3) **NIP-05 confermato**, su barattolo.store, e in
+> roadmap il NIP-05 gratuito a chi arriva al livello 2 del mercatino;
+> 4) **il centro della demo non è l'AI**: è il negozio che emette i
+> suoi punti come token RGB e l'identità che lo certifica; il tema è
+> «Loyalty / punti fedeltà» e il nome «Cassiere» sparisce. Le sezioni
+> qui sotto sono state ritoccate dove quel nome o quel centro
+> comparivano; cosa si COSTRUISCE non cambia, cambia cosa si racconta
+> e in che ordine. Gli identificatori tecnici che portano ancora il
+> nome vecchio (l'alias `cassiere` di QVAC, `cassiere-prova.html`) li
+> rinomina il prossimo cantiere col nome scelto in G.4.
+
+**Le novità, in una riga ciascuna** (com'erano la mattina del 7; la
+sera il centro si è spostato, vedi G.4). 1) La demo: si paga un ordine
+in dollari di prova **USDB** su RGB, i punti fedeltà **MOON** del
+negozio si spendono al posto dei satoshi, l'AI locale (QVAC) consiglia
+e l'utente approva, il wallet WDK è al centro, poi salvadanaio e budget
+privato se avanza.
+2) Barattolo parla col wallet attraverso **NWC-RGB**, un'**estensione
+di NIP-47** per gli asset RGB (`rgb_list_assets`, `rgb_make_invoice`,
+`rgb_pay_invoice`, notifiche): la bozza nel repo pubblico prima del 17,
+l'implementazione e la issue durante l'hackathon. 3) **L'emittente
 legato a un'identità Nostr**: un evento firmato dalla chiave
 dell'emittente dichiara l'asset_id e i metadati, verificabile via
 NIP-05 — un web of trust (MOON da To The Mooon ha senso, «USDT» da uno
 sconosciuto no). 4) Roadmap: Mostro con asset RGB, consegne via relay
 Nostr al posto del proxy, certificati di autenticità per le edizioni
 limitate (le magliette numerate di AGORA), per un grant. 5) Nel pitch,
-nei primi 30 secondi, chi siamo. Priorità: core (checkout in USDB +
-Cassiere + WDK che paga), poi il NIP minimo con l'emittente verificato
-nella schermata, poi budget e salvadanaio, roadmap solo slide. JAR fuori.
+nei primi 30 secondi, chi siamo. Priorità di COSTRUZIONE (invariate la
+sera): core (checkout in USDB + l'aiutante che consiglia + WDK che
+paga), poi il NIP minimo con l'emittente verificato nella schermata, poi
+budget e salvadanaio, roadmap solo slide. JAR fuori. L'ordine del
+RACCONTO è un altro, ed è in G.4.
 
 **La risposta corta.** Regge, e meglio di quanto Alan sapesse:
 **il protocollo RGB 0.11 ha GIÀ il posto per l'identità dell'emittente**
@@ -971,8 +994,9 @@ un assistente AI on-device» su QVAC, Nostr-native e con NWC. Non è un
 problema: è il modo di presentare la nostra estensione — **«WebRGB
 sopra NWC»**, gli stessi nomi e le stesse forme, per il wallet che non
 sta nella stessa pagina (il telefono, il portatile, Rate) — e la
-domanda giusta per il Q&A. Il Cassiere non compete con Rate: Rate è il
-wallet, Barattolo è la cassa.
+domanda giusta per il Q&A. La nostra demo non compete con Rate: Rate è
+il wallet, Barattolo è il negozio che emette i punti e la cassa che li
+accetta.
 
 ## A. Il NIP «asset RGB su Nostr»: regge? E cosa c'è già
 
@@ -1204,7 +1228,18 @@ verificato, non cambia emittente); i metadati dell'evento non
 sostituiscono MAI quelli del genesis; l'annuncio NON autorizza
 niente — non muove asset, non apre canali: è un'etichetta firmata.
 
-### B.2 «NWC-XX: RGB Assets» (repo `nostr-wallet-connect/nwc`, issue prima, poi PR)
+### B.2 «NWC-RGB — un NWC su WDK» (repo `nostr-wallet-connect/nwc`, issue prima, poi PR)
+
+Il nome è deciso (Alan, 7 ott sera): **NWC-RGB**, «un NWC su WDK» —
+il wallet è il WDK, il filo è Nostr Wallet Connect, l'estensione
+aggiunge gli asset RGB. Il numero (`XX.md`) lo assegnano i manutentori
+del repo `nwc` alla issue, non noi (il loro CONTRIBUTING); il nome
+resta il nostro ovunque: nei documenti, nel repo pubblico (G.1), nelle
+slide, nel `get_info` del wallet (`rgb: {…, "extension": "NWC-RGB"}`
+accanto a `network` e `protocol`). La forma pubblicabile — in inglese,
+sul calco di `321.md` — sta nel repo pubblico come `spec/NWC-RGB.md`
+dall'8-9 ottobre, dichiarata come disegno; quel che segue qui è la
+stessa proposta in italiano, con i perché.
 
 Sul calco di `321.md`: Summary, Motivation («WebRGB è il provider nella
 stessa pagina; questa estensione porta gli stessi metodi al wallet che
@@ -1273,11 +1308,16 @@ notifica `rgb_transfer_received` è una comodità, non la prova.
 
 ### B.3 Dove si pubblica, e con quale chiave
 
-- I due testi nel repo di Barattolo (`docs/NIP-XX-RGB-ASSETS.md`,
-  `docs/NWC-XX-RGB-ASSETS.md`) nel commit datato della domenica; la
-  issue nel repo `nwc` («Open an issue first») la domenica stessa; la
+- I due testi NON nel repo di Barattolo (è privato: nessuno li
+  vedrebbe) ma nel **repo pubblico** (G.1), in inglese:
+  `spec/NIP-RGB-ASSETS.md` (B.1) e `spec/NWC-RGB.md` (B.2), scritti
+  l'8-9 ottobre come BOZZE e dichiarati come disegno (il regolamento
+  giudica il lavoro del weekend: l'implementazione, gli annunci firmati,
+  la verifica in Barattolo). La domenica i due testi si RIFINISCONO con
+  quel che l'implementazione ha insegnato (commit datati) e si apre la
+  issue nel repo `nwc` («Open an issue first») con il link al file; la
   PR ai NIP può aspettare la settimana dopo con l'implementazione
-  pulita — la bozza pubblicata è quel che vale per il pitch.
+  pulita.
 - Gli annunci di MOON e USDB firmati dalle **due identità di prova**
   (sezione D), MAI dalla chiave della piattaforma (regola ferrea 1 e
   memoria «Nsec di prova nel config locale»). Dove: sul **relay locale
@@ -1286,12 +1326,15 @@ notifica `rgb_transfer_received` è una comodità, non la prova.
   «pubblicata» anche su un relay pubblico, si pubblicano SOLO i due
   annunci dalle chiavi di prova, e lo si decide prima, non sul palco.
 
-## C. Come si vede nella schermata del Cassiere
+## C. Come si vede nella schermata (il foglio del pagamento)
 
 La schermata è il foglio del pagamento di un ordine, dentro il cassetto
 giusto del conto (la forma del 25 set, «Il profilo più elegante»), con
 la leva `RGB_ATTIVO` accesa e un wallet NWC che dichiara
-`rgb_list_assets`. Dall'alto:
+`rgb_list_assets`. Letta col centro della sera del 7 (G.4): il cuore è
+il punto 2 — la card dell'asset con la riga dell'emittente — e il punto
+3 è un aiuto; il bottone e il fumetto portano il nome scelto in G.4,
+mai «Cassiere». Dall'alto:
 
 1. **Il conto** come oggi (prezzo in sats, eventuale sconto fedeltà) e
    una riga nuova: «**oppure 4,80 USDB**» col cambio dichiarato
@@ -1305,17 +1348,18 @@ la leva `RGB_ATTIVO` accesa e un wallet NWC che dichiara
    - `Dichiarato da <npub abbreviato> · identità non verificata` (firma valida, niente NIP-05 o NIP-05 che non torna)
    - `⚠️ Emittente sconosciuto` (nessun annuncio): l'asset si può
      spendere lo stesso — non è Barattolo a decidere cosa vale — ma la
-     riga resta grigia e il Cassiere non lo propone da solo.
+     riga resta grigia e l'aiutante non lo propone da solo.
    Un tocco sulla riga apre il dettaglio: il ContractId intero
    copiabile, la rete, ticker/name/precision/supply letti dal genesis,
    «confronto con l'annuncio: combacia», il link all'evento (`nevent`),
    la data dell'annuncio, e per il livello 2 la frase «il genesis di
    questo contratto porta `issuer = nostr:…`, la stessa chiave che ha
    firmato l'annuncio».
-3. **La proposta del Cassiere**, in un fumetto: «Paga 4,80 USDB e usa
-   40 MOON (40 sats di sconto): ti restano 495,20 USDB e 20 MOON.
-   Motivo: …» — il JSON di QVAC reso in una frase, con «**Approva**» e
-   «No, pago in sats». La regola («max 20% del prezzo in punti», il
+3. **Il consiglio dell'aiutante**, in un fumetto: «Un consiglio: paga
+   4,80 USDB e usa 40 MOON (40 sats di sconto): ti restano 495,20 USDB
+   e 20 MOON. Motivo: …» — il JSON di QVAC reso in una frase, con
+   «**Approva**» e «No, pago in sats». Il bottone che lo apre e il
+   fumetto si chiamano col nome di G.4 (raccomandato «Consiglio»). La regola («max 20% del prezzo in punti», il
    tetto del budget) la mostra sotto in piccolo: il modello ha scelto
    dentro quella, non l'ha inventata.
 4. **Approva** → `rgb_pay_invoice` al wallet; il wallet WDK chiede la
@@ -1331,7 +1375,7 @@ la leva `RGB_ATTIVO` accesa e un wallet NWC che dichiara
 5. **Il bonus MOON** sotto, dopo il pagamento: «+5 MOON da To The
    Mooon in arrivo» (l'assegnazione del 1 ott, un punto per euro).
 6. **Il salvadanaio e il budget**, se si fanno: «Arrotonda a 5 USDB e
-   metti 0,20 nel salvadanaio» come seconda proposta del Cassiere, e
+   metti 0,20 nel salvadanaio» come secondo consiglio dell'aiutante, e
    «Budget del mese: 42,30 di 60 USDB» come riga grigia — il budget
    vive SOLO nel browser (localStorage, o `DeviceStorage` di Telegram)
    e viaggia verso QVAC, mai verso il server: è il «privato» del filone
@@ -1353,8 +1397,12 @@ ottobre alle 12:00** (chi si è iscritto è iscritto; conferme «by
 Thursday, October 8»); i **quattro filoni** sono «01 Payments and
 checkout», «02 Self-custodial digital dollar apps», «03 Private
 financial intelligence — On-device budgeting and fraud alerts», «04
-Autonomous economic agents — Local AI that proposes, you approve» (il
-Cassiere li tocca tutti e quattro, e lo si dice); **la pagina non nomina
+Autonomous economic agents — Local AI that proposes, you approve» (la
+demo li tocca tutti e quattro e lo si dice: i punti si spendono al
+checkout (01), vivono coi dollari in un wallet self-custodial (02), il
+budget nel browser è il 03, l'aiuto locale che consiglia è il 04;
+«Loyalty» NON è un filone della gara, è il nostro tema, e si dichiara
+dentro il 01); **la pagina non nomina
 nessun Q&A né il 13 ottobre** — la data viene da Andrea (la mail di
 conferma): si verifica su quella.
 
@@ -1369,15 +1417,19 @@ conferma): si verifica su quella.
 | 11-12 ott | **`nwc-wdk.mjs`, la BASE**: apre il wallet WDK (`punti.mjs`), pubblica l'evento info (13194) con `encryption` nip44, risponde a `get_info` e `get_balance`; stampa la connection string da incollare nel Profilo. **I metodi `rgb_*` NO**: si scrivono a Torino (sono l'integrazione, e sono «Execution») | 4-6 h | `@getalby/sdk` `NWCWalletService` fa il grosso; se il tipo non accetta nomi fuori lista, l'evento 23194 si gestisce a mano con nostr-tools (30 righe) |
 | 11-12 ott | **`rgb_http.py` sulla VM**, loopback, dal tunnel (`-L 8787`): `fattura`, `aggiorna`, `saldo`, `lista` del wallet `barattolo` dietro HTTP, così il server di Barattolo sul portatile non fa `ssh` da dentro una rotta | 2 h | è `rgb.py` con una faccia HTTP; il tunnel resta l'unica porta |
 | 11-12 ott | **Il commit su main** (uno): `RGB_ATTIVO = False` e `RGB_PROVA_IDS` in `config_esempio.py`, la riga nel pannello «Stato delle leve», la prova che a leva spenta non risponde nulla; e, se (a), la rotta `/.well-known/nostr.json` | 2 h + prove | niente rotte RGB, niente UI |
-| 11-12 ott | **QVAC**: `npm i -g @qvac/cli@latest` (la CLI è alla 0.15, l'SDK alla 0.21: installata la 0.14), `qvac.config.json` con l'alias `cassiere` → `QWEN3_1_7B_INST_Q4`, `ctx_size 8192`; scaricare (~1 GB); una **pagina locale di prova** FUORI dal repo che chiama `http://127.0.0.1:11434/v1/chat/completions` con `response_format: json_schema` e `reasoning_budget: false` (Qwen3 pensa, e con `max_tokens` stretto lascia `content` vuoto: documentato); il server lanciato con `--cors-origin http://127.0.0.1:8080` ESATTO (niente `*`, e `--cors` da solo non accende niente: documentato) | 2-3 h | structured output e `tools` NON si combinano (400): il Cassiere usa lo schema e il conto già fatto, senza tool |
+| 11-12 ott | **QVAC**: `npm i -g @qvac/cli@latest` (la CLI è alla 0.15, l'SDK alla 0.21: installata la 0.14), `qvac.config.json` con l'alias `cassiere` → `QWEN3_1_7B_INST_Q4`, `ctx_size 8192`; scaricare (~1 GB); una **pagina locale di prova** FUORI dal repo che chiama `http://127.0.0.1:11434/v1/chat/completions` con `response_format: json_schema` e `reasoning_budget: false` (Qwen3 pensa, e con `max_tokens` stretto lascia `content` vuoto: documentato); il server lanciato con `--cors-origin http://127.0.0.1:8080` ESATTO (niente `*`, e `--cors` da solo non accende niente: documentato) | 2-3 h | structured output e `tools` NON si combinano (400): l'aiutante usa lo schema e il conto già fatto, senza tool |
 | 13 ott | **Q&A** (sezione E) | 1-2 h | con le risposte scritte accanto |
-| 14-16 ott | La **dichiarazione** scritta (HACKATHON-SETUP §5 aggiornata), gli schermi del Cassiere su carta, il flusso provato tre volte con la pagina di prova e il wallet; backup della VM; portatile con tutto scaricato | 3-4 h | |
+| 14-16 ott | La **dichiarazione** scritta (HACKATHON-SETUP §5 aggiornata), gli schermi su carta, il flusso provato tre volte con la pagina di prova e il wallet; backup della VM; portatile con tutto scaricato | 3-4 h | |
 
-Cosa NON si fa prima: le rotte `/api/rgb/*` e `/api/cassiere/*`, il
-bottone «Paga in USDB», la card dell'asset, la chiamata a QVAC dalla
-pagina di Barattolo, i metodi `rgb_*` nel servizio NWC, la verifica
-NIP-05 in Barattolo, i due testi del NIP. Si DISEGNANO (questo file è
-il disegno).
+Cosa NON si fa prima: le rotte `/api/rgb/*` e quelle dell'aiutante
+(`/api/<nome di G.4>/*`), il bottone «Paga in USDB», la card
+dell'asset, la chiamata a QVAC dalla pagina di Barattolo, i metodi
+`rgb_*` nel servizio NWC, la verifica NIP-05 in Barattolo,
+l'implementazione dei due testi. Si DISEGNANO (questo file è il
+disegno), e dalla sera del 7 le due bozze in inglese stanno nel repo
+pubblico (G.1), dichiarate. Gli identificatori che portano ancora il
+nome vecchio — l'alias `cassiere` in `qvac.config.json`,
+`cassiere-prova.html` — li rinomina il prossimo cantiere.
 
 ### D.2 I due giorni
 
@@ -1386,31 +1438,56 @@ il disegno).
 | sab 09:00-09:45 | Kickoff; la dichiarazione consegnata; il tavolo: VM su, tunnel su, relay locale su, QVAC su, server in collaudo su `127.0.0.1:8080` col db 111/222/999 | tutti e due | niente codice prima della dichiarazione |
 | sab 09:45-13:00 | **Wallet**: i quattro metodi `rgb_*` in `nwc-wdk.mjs` sopra `punti.mjs` (lista, fattura, paga con conferma a terminale, lookup), provati con un client NWC a riga di comando. **Server** in parallelo: `/api/rgb/fattura` (chiede a `rgb_http.py` la fattura blind di `barattolo` in USDB per l'ordine, importo al cambio), `/api/rgb/stato`, tutto dietro `RGB_ATTIVO` | Alan il wallet, Claude+Andrea il server | commit datati, uno per funzione |
 | sab 13:45-16:30 | **Client**: nel foglio del pagamento la riga «oppure N USDB» e il bottone «Paga in USDB» → fattura → `rgb_pay_invoice` via `clientNwc` → stato «in arrivo» → `rgb.py aggiorna` lato server → «Pagato» | | **primo pagamento VERO in USDB su signet entro le 16:30**: è il core, da qui in poi tutto è aggiunta |
-| sab 16:30-19:30 | **Il Cassiere**: la pagina chiama QVAC (schema `{paga_in_usdb, usdb, usa_punti, punti, sconto_sats, motivo}` col conto già fatto), il fumetto, «Approva» che fa il passo di prima da solo | | se CORS o mixed content mordono: la chiamata la fa il server (`/api/cassiere/proposta` → 127.0.0.1:11434) e si dichiara |
+| sab 16:30-19:30 | **L'aiutante** (il nome in G.4): la pagina chiama QVAC (schema `{paga_in_usdb, usdb, usa_punti, punti, sconto_sats, motivo}` col conto già fatto), il fumetto, «Approva» che fa il passo di prima da solo | | se CORS o mixed content mordono: la chiamata la fa il server (`/api/cassiere/proposta` → 127.0.0.1:11434) e si dichiara |
 | sab sera | **MOON come bonus** dopo il pagamento (l'assegnazione del 1 ott agganciata al «Pagato»); la card dell'asset con ticker/saldo (senza emittente); il giro intero due volte | | |
-| dom 09:00-11:00 | **Il NIP**: i due annunci (MOON e USDB) firmati dalle identità di prova e pubblicati sul relay locale; in Barattolo la lettura dell'annuncio per `#d`, la verifica NIP-05 (lato server con `url_api_ammesso`, senza redirect) e la riga «Emesso da … ✓» nella card; i due testi `docs/NIP-XX…` e `docs/NWC-XX…` dal disegno di B | Alan la pubblicazione e i testi, Claude+Andrea la verifica | la issue nel repo `nwc` aperta a mezzogiorno |
-| dom 11:00-13:00 | **Se avanza**: il salvadanaio (seconda proposta del Cassiere, arrotondamento) e il budget nel browser; sennò: gestione degli errori visibile («wallet non collegato», «proxy irraggiungibile», «conferma in arrivo») — «UX: error handling» è un criterio | | |
+| dom 09:00-11:00 | **Il NIP**: i due annunci (MOON e USDB) firmati dalle identità di prova e pubblicati sul relay locale; in Barattolo la lettura dell'annuncio per `#d`, la verifica NIP-05 (lato server con `url_api_ammesso`, senza redirect) e la riga «Emesso da … ✓» nella card — **è il centro del racconto (G.4)**; i due testi `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` del repo pubblico rifiniti con quel che l'implementazione ha insegnato | Alan la pubblicazione e i testi, Claude+Andrea la verifica | la issue nel repo `nwc` aperta a mezzogiorno |
+| dom 11:00-13:00 | **Se avanza**: il salvadanaio (secondo consiglio dell'aiutante, arrotondamento) e il budget nel browser; sennò: gestione degli errori visibile («wallet non collegato», «proxy irraggiungibile», «conferma in arrivo») — «UX: error handling» è un criterio | | |
 | dom 13:00-14:30 | Le tx del pitch fatte e confermate; le slide (sotto); prova a tempo | | niente codice dopo le 14:00 |
 | dom 15:00 / 16:00 | Consegna / pitch | | portatile, VM in riserva, hotspot |
 
-**Le slide (7)**: 1) chi siamo, 30 secondi (sotto); 2) venerdì sera —
-la dichiarazione; 3) il Cassiere dal vivo (il video di riserva già
-registrato); 4) le tx su mempool.space/signet; 5) il NIP: i due
-livelli, il campo `issuer`, «WebRGB sopra NWC»; 6) la roadmap: Mostro
-con asset RGB, consegne via relay Nostr al posto del proxy, i
-certificati UDA per le magliette numerate di AGORA — per un grant
-dell'RGB Protocol Association (**l'esistenza di un programma di grant
-NON l'ho verificata**: da chiedere il 13); 7) cosa resta.
+**Le slide (7), riscritte la sera del 7 col centro di G.4** (la
+versione del mattino partiva dall'AI: è stata scartata): 1) chi siamo,
+30 secondi (sotto); 2) **il problema**: i punti fedeltà oggi sono una
+riga nel database del negozio — non sono tuoi, non si portano via, e
+un token può chiamarsi come vuole, «USDT» compreso, senza che nessuno
+sappia chi l'ha emesso; 3) **il negozio che emette**: To The Mooon
+emette MOON su RGB, un punto per euro, e firma l'annuncio con la sua
+chiave Nostr, verificata da `tothemooon@barattolo.store` — la card
+«Emesso da To The Mooon ✓» accanto a «⚠️ Emittente sconosciuto»; il
+campo `issuer` del genesis e i due livelli (A.2); la tx di emissione su
+mempool.space/signet; 4) **il cliente e il suo wallet**: WDK,
+self-custodial, con USDB e MOON, che parla **NWC-RGB** («un NWC su
+WDK»); qui la dichiarazione di venerdì, in una riga: cosa c'era prima;
+5) **dal vivo**: il pagamento — l'aiutante locale (QVAC, su questo
+portatile) consiglia «40 punti + 4,80 USDB», l'utente approva, il
+wallet conferma, la tx su signet, e il bonus MOON che arriva dopo (il
+video di riserva già registrato); 6) **l'identità per tutti, e la
+roadmap**: il NIP-05 gratuito a chi arriva al livello 2 del mercatino
+(G.3), NWC-RGB come estensione proposta al repo `nwc`, Mostro con asset
+RGB, consegne via relay Nostr al posto del proxy, i certificati UDA per
+le magliette numerate di AGORA — per un grant dell'RGB Protocol
+Association (**l'esistenza di un programma di grant NON l'ho
+verificata**: da chiedere il 13); 7) cosa resta, e cosa è «mostrato ma
+non in produzione». L'AI compare alla slide 5 come aiuto, non nel
+titolo: è la decisione.
 
-**I 30 secondi**, con la precisione di cui sopra: «Barattolo è un
-mercatino italiano in satoshi, in produzione dal 10 ottobre: si entra
-col P2P comprando sats con euro su Mostro, si compra e si vende con un
-deposito di garanzia Lightning, si esce col P2P. Un'economia circolare
-fra persone, su protocolli aperti — Nostr, Lightning, Mostro, e da
-questo weekend RGB — dove nel P2P e nel suo wallet l'utente è padrone
-dei suoi sats. Oggi vi mostriamo il Cassiere: si paga in dollari su
-Bitcoin, un'AI che gira su questo portatile propone, l'utente approva,
-e il wallet sa chi ha emesso quei dollari.»
+**I 30 secondi**, riscritti: «Barattolo è un mercatino italiano in
+satoshi, in produzione dal 10 ottobre: si entra col P2P comprando sats
+con euro su Mostro, si compra e si vende con un deposito di garanzia
+Lightning, si esce col P2P. Un'economia circolare fra persone, su
+protocolli aperti — Nostr, Lightning, Mostro, e da questo weekend RGB —
+dove nel P2P e nel suo wallet l'utente è padrone dei suoi sats. Oggi vi
+mostriamo i punti fedeltà fatti bene: ogni negozio emette i suoi come
+token RGB, firmati dalla sua identità Nostr verificata; il cliente li
+tiene nel suo wallet e li spende al posto dei satoshi, con un'AI che
+gira su questo portatile che consiglia, e lui che approva.»
+
+**L'ordine del racconto e l'ordine del codice non coincidono, ed è
+voluto.** Il codice parte dal pagamento (sabato: è il pezzo che se
+manca non c'è demo) e arriva all'emittente verificato la domenica
+mattina; il racconto parte dal negozio che emette e dall'identità, e
+arriva al pagamento. Il rischio che il centro del racconto sia l'ultimo
+pezzo costruito è il primo di D.3.
 
 **La roadmap, con una riga di realtà ciascuna** (per non promettere
 cose che il protocollo non fa): Mostro non ha nozione di asset
@@ -1423,10 +1500,24 @@ cresce con la storia e i relay tagliano gli eventi grossi: la forma
 realistica è **il consignment su Blossom (che Barattolo usa già per le
 foto delle recensioni) e un puntatore firmato sul relay**; i certificati
 sono lo schema UDA (esiste: `EmbeddedMedia`, `Attachments`,
-`ProofOfReserves`) — uno per maglietta, con la foto e il numero.
+`ProofOfReserves`) — uno per maglietta, con la foto e il numero; il
+NIP-05 gratuito al livello 2 è la stessa rotta `/.well-known/nostr.json`
+che legge i nomi degli utenti invece di un file statico — un cantiere
+piccolo, dopo il lancio, con le sue regole (G.3), e si dice così.
 
 ### D.3 Rischi nuovi, in ordine
 
+0. **Il centro del racconto è l'ultimo pezzo costruito** (la riga
+   «Emesso da … ✓» è di domenica mattina, il pitch alle 15): se la
+   domenica va storta, la demo mostra un pagamento con l'AI — cioè la
+   storia del mattino del 7, non quella decisa la sera → DA DECIDERE
+   (Andrea e Alan, prima del 17, non il sabato): scambiare il sabato
+   sera (bonus MOON, card senza emittente) con la verifica
+   dell'emittente, così il sabato finisce con la card e la ✓ e il bonus
+   slitta a domenica mattina; oppure tenere l'ordine e preparare per la
+   slide 3 l'annuncio firmato sul relay locale già il venerdì (è
+   infrastruttura dichiarabile: l'evento esiste, la lettura in Barattolo
+   no). Qui non si decide: si segnala.
 1. **Il wallet chiede conferma a terminale** e il pubblico non la vede
    → la finestra del servizio NWC proiettata accanto alla pagina, o un
    `--approva-tutto` SOLO per il pitch e dichiarato.
@@ -1452,8 +1543,8 @@ nuove, le altre restano dalla prima parte (E.3) e da HACKATHON-SETUP §8.
    rgb-lib (`issue_asset_*` e `list_assets`)? Un wallet come Iris lo
    mostra? Se noi emettiamo con `issuer = nostr:<pubkey>` dalla CLI
    `rgb`, i wallet rgb-lib accettano il consignment senza problemi?
-2. **WebRGB sopra NWC**: la nostra estensione NIP-47 ricalca i nomi e
-   le forme di WebRGB (`blindReceive`, `sendAsset`,
+2. **NWC-RGB, «un NWC su WDK»** (WebRGB sopra NWC): la nostra estensione
+   NIP-47 ricalca i nomi e le forme di WebRGB (`blindReceive`, `sendAsset`,
    `getTransferStatus`, `transferReceived`): vi va bene, e cos'è
    `@utexo/webrgb-walletconnect`? Rate potrebbe essere il wallet
    dell'utente in una demo così (RLN, signet, NWC)?
@@ -1463,11 +1554,13 @@ nuove, le altre restano dalla prima parte (E.3) e da HACKATHON-SETUP §8.
 4. **USDB**: un dollaro di prova emesso da noi va bene, o Tether/Utexo
    porteranno un USDT di prova su signet per l'evento (contract id,
    faucet)?
-5. **La bozza di NIP**: la giudicate come lavoro del weekend se il
-   disegno (campi e nomi) esiste già nel nostro repo dal 7 ottobre e il
-   testo e l'implementazione si fanno in sede? E il servizio NWC «base»
-   fatto prima (senza i metodi `rgb_*`): infrastruttura dichiarabile o
-   integrazione?
+5. **Le due bozze** (NIP-RGB-ASSETS e NWC-RGB): stanno in inglese nel
+   nostro repo pubblico dall'8-9 ottobre, dichiarate come disegno;
+   l'implementazione (i metodi nel wallet, gli annunci firmati, la
+   verifica in Barattolo) e la issue nel repo `nwc` si fanno in sede.
+   Vi va bene così, o preferite che il testo nasca il sabato? E il
+   servizio NWC «base» fatto prima (senza i metodi `rgb_*`):
+   infrastruttura dichiarabile o integrazione?
 6. La rete: signet con explorer pubblico vale «working transactions»?
    `min_confirmations = 0` per il palco?
 7. «On device» per il criterio 2 con l'inferenza in `qvac serve` sul
@@ -1480,10 +1573,238 @@ nuove, le altre restano dalla prima parte (E.3) e da HACKATHON-SETUP §8.
 9. Gli endpoint pubblici Utexo il 17-18; la fattura «qualunque asset»
    per il primo contatto (o un contract consignment nell'annuncio
    Nostr, come proponiamo); beta.7/beta.8 insieme.
-10. Consegna: repo pubblico, licenza, durata del pitch, se guardano i
-    commit. CypherTank: finali o semifinali.
+10. Consegna: il nostro **repo pubblico** esiste dall'8 ottobre (G.1) e
+    il link ve lo mandiamo con la conferma: è quella la consegna, o
+    volete un modulo? Licenza, durata del pitch, se guardano i commit;
+    Barattolo è privato: vi basta un `git log` guardato dal vivo, o
+    volete le patch del weekend nel repo pubblico (è quel che
+    prepariamo)? CypherTank: finali o semifinali.
 11. **Il grant dell'RGB Protocol Association**: esiste un programma?
     Per cosa, con che tempi? (NON VERIFICATO da qui.)
+
+## G. Le quattro decisioni di Alan (7 ottobre, sera)
+
+Quattro decisioni, prese da Alan la sera del 7 e scritte qui così come
+sono state applicate nelle sezioni sopra e in HACKATHON-SETUP. Studio,
+non codice: i nomi nuovi li applica il prossimo cantiere.
+
+### G.1 Il repo pubblico separato
+
+**Perché.** Il regolamento giudica solo il lavoro del weekend e chiede
+di dichiarare il pre-esistente; il repo di Barattolo è PRIVATO, quindi
+oggi un giudice non può verificare né l'una cosa né l'altra. Serve un
+repo GitHub che gli organizzatori possano aprire e che mostri due cose:
+cosa esisteva prima del 17 (datato) e che RGB, QVAC e WDK NON erano
+implementati in Barattolo — nessuna rotta, nessun modulo, nessuna UI
+in `server.py` o `miniapp.html`, in nessun ramo; gli unici attrezzi
+erano gli script di `deploy/rgb/` (banco e wallet di prova, fuori
+dall'app) e, dall'11-12 ott, la leva `RGB_ATTIVO` spenta, e si
+dichiarano entrambi.
+
+**Il nome.** Segue il nome del progetto (G.4), minuscolo, con il
+suffisso `-rgb` perché un nome di una parola su GitHub è già preso o
+non dice niente: `tessera-rgb` se vince «Tessera». Se la mattina
+dell'8 il nome non è ancora scelto, si crea lo stesso con il nome di
+riserva `barattolo-rgb-torino-2026` e si rinomina dopo (GitHub tiene i
+redirect). Sotto l'account di Andrea (`kreamistudio-crypto`, lo stesso
+che firma i commit di Barattolo), Alan collaboratore con scrittura;
+**pubblico dal primo commit**, non privato-poi-pubblico: la data di
+creazione e la cronologia dei push sono quello che un giudice può
+verificare, le date dentro i commit le scrive l'autore.
+
+**Cosa ci va dentro.**
+- `README.md` in inglese: cos'è, in cinque righe (il progetto, G.4);
+  **«What existed before October 17»** — la dichiarazione di
+  HACKATHON-SETUP §5 tradotta, datata e firmata; **«What was built at
+  the hackathon»** — vuota fino al 17, poi il diario dei commit; come
+  si avvia (VM su signet, wallet, relay locale, QVAC); i link alle tx
+  su mempool.space/signet e gli asset_id (sono pubblici); la nota «la
+  Barattolo app è un repo privato: le patch del weekend sono in
+  `barattolo-patches/`, e il suo `git log` si guarda dal vivo».
+- `rgb/`: lo snapshot di `deploy/rgb/` — `rgb.py`, `punti.mjs`,
+  `consiglio.py`, `compose.yaml`, `backup-rgb.sh`, service e timer,
+  `qvac.config.json`, e appena esistono `nwc-wdk.mjs` (la base) e
+  `rgb_http.py`. Copiati, non con la loro storia: il README dice
+  «scritti dal 1 al 12 ottobre nel repo privato, portati qui l'8».
+- `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md`: le due bozze di B in
+  inglese, nella forma dei repo di destinazione (B.1 sul calco di
+  `87.md`, B.2 su `321.md`), con in testa «Draft, 8 October 2026,
+  design only; implementation at the hackathon».
+- Dal 17: i metodi `rgb_*` in `nwc-wdk.mjs`, gli annunci firmati (gli
+  eventi in JSON, dal relay locale), e **`barattolo-patches/`**: ogni
+  sera `git format-patch` dei commit del giorno del repo privato,
+  firmati dalla stessa chiave — la copia pubblica e datata del lavoro
+  fatto DENTRO Barattolo. Poi slide, video di riserva, la dichiarazione
+  consegnata.
+- `LICENSE`: MIT per il codice; i due testi nascono per i repo
+  upstream (`nostr-protocol/nips`, `nostr-wallet-connect/nwc`) e
+  seguono le condizioni di quelli — da leggere nel LICENSE di ciascuno
+  prima di aprire la issue (NON verificato da qui).
+- `.gitignore`: `identita/`, `*.age`, `stash/`, `node_modules/`,
+  `*.txt` delle chiavi, `.env`.
+
+**Cosa NON ci va, mai.** Niente del repo privato: né `server.py`, né
+`miniapp.html`, né `CLAUDE.md`, né i documenti di `docs/` (questo studio
+e HACKATHON-SETUP hanno dentro i nomi delle macchine, i tunnel, le
+regole di casa: si traduce il NECESSARIO nel README, non si copiano).
+Nessuna chiave: le nsec delle due identità di prova, la seed del wallet
+WDK, l'archivio age, i macaroon, il `config.py`, le connection string
+NWC col `secret`. Nessun indirizzo della VM né del VPS. Lo scanner dei
+segreti di Barattolo (la regola dei 64-hex) lì non c'è, e i txid SONO
+64-hex: nel repo pubblico non si scrive nessun segreto, e prima di ogni
+push si passa `git diff --cached` con le due forme a mano.
+
+**Quando.** L'8 ottobre, prima di ogni altra cosa della lista: il
+primo commit firmato, con README (la dichiarazione allo stato dell'8),
+`rgb/`, le due bozze, LICENSE. Poi un commit per ogni voce della lista
+di §10 che si chiude (USDB emesso, le identità, la base NWC, QVAC): il
+16 sera la cronologia del repo È la dichiarazione, senza bisogno di
+fidarsi. Il link va **nella risposta alla conferma degli organizzatori
+(«by Thursday, October 8»)**: così la data la timbrano anche loro.
+
+**Come si collega a Barattolo durante la demo.** Il filo è un
+PROTOCOLLO, non del codice condiviso: il wallet è `nwc-wdk.mjs` del
+repo pubblico, che gira nel WSL del portatile; Barattolo (privato, in
+collaudo su `127.0.0.1:8080`) lo raggiunge con la connection string
+incollata nel Profilo, sul relay locale, parlando NWC-RGB; la VM
+risponde da `rgb_http.py` dello stesso repo; QVAC legge
+`qvac.config.json` dello stesso repo. Sul tavolo: la finestra del
+wallet (repo pubblico) accanto alla pagina di Barattolo (privato), e il
+racconto dice «questo wallet potrebbe essere Rate, o Alby Hub: il
+negozio non lo sa e non gli serve». Per il giudice che vuole vedere il
+codice dentro Barattolo: le patch del giorno in `barattolo-patches/` e
+il `git log --since=2026-10-17` del repo privato sul portatile, dal
+vivo; e, per il «prima», `git log -S RGB_ATTIVO` che trova UN commit,
+quello dell'11-12, dichiarato.
+
+### G.2 Il nome dell'estensione: NWC-RGB, «un NWC su WDK»
+
+Il nome è deciso e vale ovunque: nei due documenti (fatto), nel repo
+pubblico (`spec/NWC-RGB.md`), nelle slide, nel `get_info` del wallet.
+«Un NWC su WDK» è la frase che la spiega in una slide: il wallet è il
+WDK (il bonus della gara), il filo è Nostr Wallet Connect (che Barattolo
+parla già), l'estensione aggiunge gli asset RGB con quattro metodi, due
+notifiche e quattro errori (B.2). La proposta tecnica va nel repo
+pubblico in forma pubblicabile: in inglese, nella forma di `321.md` del
+repo `nwc` (Summary, Motivation, Dependencies, Discovery, Methods,
+Notifications, Errors), con il MUST della conferma dell'utente e la nota
+«WebRGB sopra NWC». Il numero `XX` non è nostro: lo mette il repo `nwc`
+alla issue della domenica; fino ad allora il file si chiama col nome.
+
+### G.3 NIP-05: confermato, e il NIP-05 gratuito al livello 2
+
+**Confermato** il NIP-05 degli emittenti, su **barattolo.store**: la
+strada (a) di D.1 e di HACKATHON-SETUP §11 — la rotta esplicita
+`/.well-known/nostr.json` nel commit dell'11-12 ottobre, sul calco di
+`assetlinks.json` (regola 3: file statico, nome in whitelist, niente
+redirect, CORS aperto), con i due nomi `usdb` e `tothemooon`.
+
+**L'idea di Alan per la gamification**: chi arriva al **livello 2 del
+mercatino** ottiene gratis il suo NIP-05 su barattolo.store
+(`<nome>@barattolo.store`). Oggi il livello 2 è «Bottega avviata»
+(`LIVELLI` in server.py: 50 XP, cioè 50 euro di commercio, e 1 affare
+chiuso; `livello_utente` numera da 1). È un'idea da **roadmap — slide,
+niente codice**, né prima del 17 né a Torino; nel pitch è l'esempio di
+«identità verificata» che vale per tutti: lo stesso file
+`.well-known/nostr.json` dice chi è il negozio che emette i punti e chi
+è il cliente che li spende, e qualunque client Nostr lo verifica allo
+stesso modo. Il negozio se lo guadagna essendo un Consigliato, il
+cliente commerciando.
+
+Cosa dovrà rispettare, quando sarà un cantiere (scritto adesso perché la
+slide non prometta cose che le regole di casa vietano):
+- **Regola ferrea 2, intatta**: un NIP-05 è una mappa pubblica
+  nome → chiave PUBBLICA; nessuna chiave privata passa dal server. Ma si
+  dà SOLO a una npub **verificata** (il gradino «verifica con nota
+  pubblica» della SCALA NOSTR approvata), mai a quella auto-dichiarata:
+  altrimenti Barattolo certificherebbe un nome a una chiave che
+  l'utente forse non controlla.
+- La rotta smette di essere un file statico e legge la tabella degli
+  utenti, con `?name=<nome>` come il NIP-05 chiede; il nome lo sceglie
+  l'utente nella forma `[a-z0-9._-]{3,20}`, unico, con i nomi riservati
+  fuori (`_`, `admin`, `barattolo`, i due emittenti, i codici dei
+  negozi Consigliati), revocabile dall'utente; un nome lasciato resta
+  bloccato per un po' (anti-impersonazione).
+- Cosa succede se si scende di livello (oggi gli XP non scendono: il
+  nome resta), e come si dichiara nei Consigliati che il loro nome vale
+  di più del nome di un cliente (il negozio ha anche il codice pubblico).
+- Stima, dopo il lancio: 4-6 ore con le prove. In roadmap si scrive
+  «NIP-05 gratuito al livello 2: la stessa rotta, un cantiere piccolo
+  dopo il lancio» — non «c'è».
+
+### G.4 Il centro della demo: il negozio che emette, l'identità che lo certifica
+
+**La decisione.** Il senso della demo è: **ogni esercente emette i
+propri punti fedeltà come token RGB, autenticati dal suo NIP-05, e QVAC
+aiuta a spenderli al posto dei satoshi**. L'AI è un aiuto, non il
+protagonista; il protagonista è il negozio che emette e l'identità che
+lo certifica. Il tema del progetto è **«Loyalty / punti fedeltà»**. Il
+nome «Cassiere» sparisce del tutto: dai documenti (fatto), dal bottone
+e dal fumetto della schermata (prossimo cantiere), dall'alias di QVAC e
+dalla pagina di prova (prossimo cantiere). Cosa si COSTRUISCE non
+cambia — checkout in USDB + MOON, WDK, NWC-RGB, emittente verificato —
+cambia cosa si racconta e in che ordine (D.2: le slide e i 30 secondi
+sono riscritti; HACKATHON-SETUP §7 ha l'ordine del racconto accanto a
+quello del codice).
+
+**Tre nomi per il progetto** (corti, da slide, tema punti fedeltà; con
+sotto il sottotitolo inglese per la giuria):
+1. **Tessera** — la tessera fedeltà, una parola; e la testata di
+   Barattolo è GIÀ una tessera (il logo: memoria «Logo in testata»),
+   quindi il nome lega la demo alla casa senza spiegare niente.
+   Sottotitolo: «Loyalty points merchants issue on RGB, identities on
+   Nostr». **Raccomandato.**
+2. **Bollini** — la raccolta bollini del supermercato: concreto, ogni
+   italiano capisce al volo che sono punti da spendere; suona
+   simpatico, forse troppo per una giuria di protocollo. Sottotitolo:
+   «Merchant-issued loyalty stamps, as RGB tokens».
+3. **Fedele** — una parola, dice la fedeltà e suona come un marchio;
+   meno immediato sul «punti». Sottotitolo: «Loyalty you own: RGB
+   points, verified issuers».
+
+**Tre nomi per il bottone e l'aiutante** (quello che oggi si chiama
+«Cassiere» nella schermata: il bottone che apre la proposta e il
+fumetto):
+1. **Consiglio** — «💡 Consiglio» sul bottone, «Un consiglio: paga 4,80
+   USDB e usa 40 punti» nel fumetto; e lo script di QVAC si chiama GIÀ
+   `consiglio.py`: l'alias dell'8 ott diventa `consiglio`, la pagina di
+   prova `consiglio-prova.html`, le rotte `/api/consiglio/*`.
+   **Raccomandato.**
+2. **Conviene?** — una domanda come bottone: l'utente chiede, l'aiutante
+   risponde «Sì: 40 punti e 4,80 USDB, perché…». Dice bene il ruolo
+   (si interroga, non decide), ma un punto interrogativo in un alias o
+   in una rotta non si può scrivere: servirebbe un nome tecnico a parte.
+3. **Suggerisci** — il verbo, come «Approva»: coerente con la riga dei
+   bottoni, neutro, meno caldo.
+
+**Il racconto della demo, riscritto** (è l'ordine delle slide di D.2):
+1. Chi siamo, 30 secondi: Barattolo, il mercatino in sats; i punti
+   fedeltà fatti bene.
+2. Il problema: i punti sono una riga nel database del negozio, non
+   sono tuoi, e un token può chiamarsi come vuole.
+3. Il negozio che emette: To The Mooon emette MOON su RGB, un punto per
+   euro, e lo firma con la sua identità Nostr, verificata via NIP-05 —
+   la card «Emesso da To The Mooon ✓», e accanto l'emittente sconosciuto
+   in grigio. Qui il protocollo: il campo `issuer`, i due livelli.
+4. Il cliente: il suo wallet WDK, self-custodial, con USDB e MOON, che
+   parla NWC-RGB; cosa esisteva venerdì.
+5. Dal vivo: il pagamento. L'aiutante (QVAC, sul portatile) consiglia,
+   il cliente approva, il wallet conferma, la tx su signet, il bonus
+   dopo. L'AI entra QUI, come aiuto.
+6. L'identità per tutti: il NIP-05 al livello 2; la roadmap.
+7. Cosa resta; mostrato ma non in produzione.
+
+**La scaletta** (cosa si costruisce e quando) resta quella di D.2 e di
+HACKATHON-SETUP §7: il pagamento sabato, l'aiutante sabato sera,
+l'emittente verificato domenica mattina. Il racconto la percorre al
+contrario, e il rischio che ne nasce è lo 0 di D.3.
+
+**Cosa cambia nei testi per gli utenti, per il prossimo cantiere.** Il
+bottone e il fumetto col nome scelto; nel fumetto l'AI si presenta come
+«un consiglio», mai come «il cassiere» o «l'assistente che decide»; la
+card dell'asset mette la riga dell'emittente PRIMA del saldo (chi
+l'ha emesso, poi quanti ne hai); il lessico della regola 9 resta
+(«pagamento diretto, senza deposito di garanzia»).
 
 ## Fonti della parte seconda
 
