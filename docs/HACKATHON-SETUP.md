@@ -1,8 +1,11 @@
 # Hackathon RGB di Torino (17-18 ott 2026): l'infrastruttura preparata prima
 
-Stato al 1 ottobre 2026. È il verbale del cantiere «preparazione
-infrastruttura hackathon RGB»: SOLO setup e prove, su signet, separato da
-Barattolo. Lo studio che lo precede, coi perché delle scelte, è
+Stato al 1 ottobre 2026, **aggiornato il 7 ottobre** con le idee di Alan
+(la demo «Il Cassiere», l'estensione NIP-47 per gli asset RGB,
+l'emittente legato a un'identità Nostr: il perché e il disegno stanno
+nella parte seconda dello studio; qui c'è COSA si fa e quando). È il
+verbale del cantiere «preparazione infrastruttura hackathon RGB»: SOLO
+setup e prove, su signet, separato da Barattolo. Lo studio che lo precede, coi perché delle scelte, è
 `docs/STUDIO-HACKATHON-RGB-2026-10.md`; il regolamento (sezione F di
 quello studio) dice che si giudica solo ciò che si costruisce durante
 l'evento e che il pre-esistente va DICHIARATO: la sezione 5 di questo
@@ -57,6 +60,7 @@ utente. Chi li vede in chat, li ruota.
 |---|---|---|---|---|
 | **JAR** | Punti Barattolo | barattolo | 21.000.000, precisione 0 | `rgb:YWIEm~Ts-i9zB8Gt-wAWnJAg-YdGNPLI-X92ivqs-H_lxQNM` |
 | **MOON** | Punti To The Mooon | to-the-mooon | 1.000.000, precisione 0 | `rgb:9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM` |
+| **USDB** | Dollari di prova Barattolo | `usdb` (wallet NUOVO: l'emittente dei dollari non è il mercante né il negozio) | 1.000.000,00 cioè 100.000.000 unità, **precisione 2** («2 for USD», docs.rgb.info) | **DA EMETTERE l'8-9 ott** (sezione 10): l'id si scrive qui appena esiste |
 
 Perché questi nomi: «BRT» ricordava Bartolini e «CAFFE-LUCA» non passa
 (il ticker NIA ammette SOLO maiuscole e cifre, da 1 a 8 caratteri:
@@ -74,6 +78,13 @@ milioni per non doverlo riemettere mai.
 ./venv/bin/python rgb.py emetti <negozio> TICKER "Nome lungo" 1000000   # nessuna tx
 ./venv/bin/python rgb.py backup <negozio>         # subito dopo: da qui lo stash vale
 ```
+
+⚠️ `rgb.py emetti` oggi emette a **precisione 0** (giusta per i punti):
+per USDB serve un argomento in più (la `precision` di
+`issue_asset_nia`), da aggiungere a `rgb.py` e provare sul PC prima
+della VM. E il campo `issuer` del genesis resta `ssi:anonymous`: rgb-lib
+non lo espone (studio, parte seconda, A.1) — l'identità dell'emittente
+la dà l'annuncio Nostr firmato, non il genesis.
 
 L'emissione non fa transazioni: il genesis vive su un UTXO colorabile.
 L'`asset_id` che stampa è il nome pubblico dell'asset e si può scrivere
@@ -160,6 +171,8 @@ Lezioni, da non ripagare a Torino:
 ## 4. QVAC sul portatile
 
 In Windows nativo, non nel WSL. `@qvac/cli` 0.14.0 installato globale
+(**il 7 ott la CLI è alla 0.15 e l'SDK alla 0.21**: prima del 17 si
+aggiorna, vedi la lista in sezione 10)
 (`npm i -g @qvac/cli`); `qvac doctor` verde (Node 24, Vulkan sulla 4090,
 ffmpeg). Il progetto: `C:\Users\Andrea\qvac-prova` con `qvac.config.json`
 (copia in `deploy/rgb/qvac.config.json`): un modello solo,
@@ -192,20 +205,60 @@ il conto già fatto (`massimo_usabile`) e lasciargli solo la scelta. Il
 locale che chiami 127.0.0.1:11434 (CORS: `--cors-origin
 http://127.0.0.1:8080`, un'origine esatta).
 
+**Aggiornamento del 7 ott, letto sulla docs della CLI** (le cose che
+cambiano la pagina del Cassiere):
+
+- Il modello: Qwen3 1.7B è `QWEN3_1_7B_INST_Q4` (~1 GB), ed è quello che
+  la docs usa in TUTTI gli esempi con JSON a schema. In
+  `qvac.config.json` ogni voce di `serve.models` è un **alias** che fa da
+  campo `model` nelle richieste («requests for unlisted models return
+  404»): la nostra si chiama `cassiere`, con `"config": {"ctx_size":
+  8192}` (il default è 1.024 token: troppo pochi per saldo + regole +
+  schema).
+- **CORS**: spento finché non si dà un'origine ESATTA con
+  `--cors-origin http://127.0.0.1:8080` (ripetibile); `*` non è ammesso;
+  `--cors` da solo NON accende niente, controlla solo che un'origine
+  esista. La pagina della demo vive su `http://127.0.0.1:8080` (il
+  collaudo), quindi niente mixed content.
+- **Lo structured output e i `tools` non si combinano** (400
+  `invalid_response_format`): il Cassiere usa `response_format` a
+  `json_schema` e il conto già fatto, senza tool — la scelta del 1 ott
+  era giusta anche per questo.
+- **Qwen3 pensa**: con `max_tokens` stretto il `content` resta vuoto;
+  si manda `"reasoning_budget": false` nella richiesta.
+- `qvac serve openai` è un alias deprecato: si scrive `qvac serve
+  --openai`.
+- `GET /v1/models/catalog?role=chat` elenca i modelli con peso e
+  quantizzazione: utile al Q&A per dire «ecco cosa gira».
+
 ## 5. Cosa dichiariamo all'arrivo (pre-esistente, NON da giudicare)
 
 Da consegnare scritto il 17 mattina, com'è chiesto dal regolamento:
 
-- Barattolo: il mercatino in sats con escrow Lightning, in produzione
-  dal 10 ottobre, con XP, livelli e due sconti fedeltà (lo studio, §0).
-- Una VM su signet con bitcoind, electrs, proxy RGB, rgb-lib Python e
-  il banco `rgb.py`.
-- Due asset NIA emessi il 1 ott: JAR e MOON (asset_id sopra).
-- Un wallet utente WDK+RGB (`punti.mjs`) che ha ricevuto 100 MOON e li
-  ha riscattati (tx sopra).
-- QVAC in locale con `consiglio.py` e il JSON a schema.
+- Barattolo: il mercatino in sats con deposito di garanzia Lightning
+  (custodial, LNbits), il P2P non custodial su Mostro, in produzione dal
+  10 ottobre, con XP, livelli, due sconti fedeltà, un client NWC nel
+  browser (`clientNwc`), le foto su Blossom (lo studio, §0 e parte
+  seconda).
+- Una VM su signet con bitcoind, electrs, proxy RGB, rgb-lib Python, il
+  banco `rgb.py` e la sua faccia HTTP `rgb_http.py` sul loopback.
+- Tre asset NIA emessi prima: JAR e MOON (1 ott), USDB (8-9 ott:
+  asset_id sopra appena c'è).
+- Un wallet utente WDK+RGB (`punti.mjs`) con 60 MOON e 500 USDB, che ha
+  già ricevuto e riscattato MOON (tx sopra); il servizio NWC «base»
+  `nwc-wdk.mjs` che lo espone (evento info, `get_info`, `get_balance`:
+  **nessun metodo `rgb_*`**, quelli sono lavoro del weekend).
+- Due identità Nostr di prova (gli «emittenti» di USDB e di MOON) con
+  kind 0 e NIP-05, e un relay locale sul portatile. **Nessun annuncio
+  pubblicato**: gli eventi si firmano e si pubblicano a Torino.
+- QVAC in locale (Qwen3 1.7B) con `consiglio.py` e una pagina locale di
+  prova FUORI dal repo che lo chiama con lo schema.
+- Il disegno: la parte seconda dello studio (campi, nomi dei metodi,
+  schermi), scritta il 7 ott. Nessun testo di NIP pubblicato.
 - Nessuna rotta, nessun modulo, nessuna UI in Barattolo: zero righe di
-  integrazione. Quelle si scrivono a Torino, in commit datati.
+  integrazione (solo la leva `RGB_ATTIVO` spenta su main dall'11-12
+  ott, e la rotta statica `/.well-known/nostr.json` se Andrea sceglie
+  quella strada). Quelle si scrivono a Torino, in commit datati.
 
 ## 6. Come si riavvia tutto (il giorno prima e il giorno stesso)
 
@@ -249,31 +302,51 @@ rgb-prova.key`); lo stash si rimette con `rgb.py ripristina <wallet>
 <file.rgb-backup>` in una cartella VUOTA (sopra uno stash vivo si
 perdono asset). Catena e indice si riscaricano in un'ora.
 
-## 7. La scaletta di Torino (cosa si SCRIVE lì, in ordine)
+## 7. La scaletta di Torino (cosa si SCRIVE lì, in ordine) — rifatta il 7 ott
 
-1. **Sabato mattina** — la leva `RGB_ATTIVO` (già su main spenta dal
-   11-12 ott) e la rotta `/api/rgb/punti/<utente>`: legge il saldo del
-   wallet utente (prima tappa: lato server, un wallet per utente in una
-   cartella per utente, dichiarato «custodial per la demo»; la tappa
-   browser solo se il modulo Darkhorse regge).
-2. **Sabato pomeriggio** — l'assegnazione: dopo un ordine confermato
-   (`released`), il negozio manda i punti (il calco è `invia` di
-   `rgb.py`: fattura dall'utente, invio, refresh). Un punto per euro,
-   come `XP_PER_EURO`.
-3. **Sabato sera** — la UI: il saldo punti nella scheda Ordini o nel
-   Profilo, e la riga «usa X punti» nel conto.
-4. **Domenica mattina** — QVAC nel conto: la pagina chiama 127.0.0.1:
-   11434 (o il server lo fa per lei), mostra la proposta, l'utente
-   approva, lo sconto in sats si applica (il calco è `_fedelta_sconto`).
-5. **Domenica pomeriggio** — il riscatto (punti al negozio) e il pitch:
-   le tx di signet aperte su mempool.space, il wallet WDK che mostra i
-   punti, QVAC che propone. Lo swap P2P: una slide.
+La demo è «**Il Cassiere**». Priorità, in quest'ordine e senza
+discussione il sabato: **core** (checkout in USDB + Cassiere che propone
++ wallet WDK che paga via NWC), poi il **NIP minimo** con l'emittente
+verificato nella schermata, poi **budget e salvadanaio** se avanza, la
+roadmap solo slide. JAR resta fuori. La tabella ora per ora e le slide
+stanno nello studio, parte seconda, D.2; qui l'ordine dei pezzi:
 
-Prima del 17, da fare FUORI dal repo: la pagina locale che chiama QVAC
-(CORS), e il modulo browser Darkhorse provato in Chrome su signet (due
-ore, poi si decide).
+1. **Sabato mattina** — in parallelo: nel wallet (`nwc-wdk.mjs`) i
+   quattro metodi `rgb_list_assets`, `rgb_make_invoice`,
+   `rgb_pay_invoice` (con conferma dell'utente), `rgb_lookup_transfer`
+   sopra `punti.mjs`; nel server, dietro `RGB_ATTIVO`,
+   `/api/rgb/fattura` (la fattura blind in USDB del wallet `barattolo`,
+   via `rgb_http.py`, importo al cambio) e `/api/rgb/stato`.
+2. **Sabato primo pomeriggio** — nel foglio del pagamento «oppure N
+   USDB» e «Paga in USDB» → `rgb_pay_invoice` dal `clientNwc` → «in
+   arrivo» → `rgb.py aggiorna barattolo` → «Pagato in USDB». **Il primo
+   pagamento vero su signet entro le 16:30.** Lessico: «pagamento
+   diretto, senza deposito di garanzia» (regola 9).
+3. **Sabato tardo pomeriggio** — il Cassiere: la pagina chiama
+   `127.0.0.1:11434` con lo schema, il fumetto con la proposta,
+   «Approva» fa il passo 2 da solo. Se CORS morde, la chiamata la fa il
+   server e si dichiara.
+4. **Sabato sera** — MOON come bonus dopo il pagamento (l'assegnazione
+   del 1 ott agganciata al «Pagato»), la card dell'asset senza
+   emittente, il giro intero due volte.
+5. **Domenica mattina** — il NIP: i due annunci firmati dalle identità
+   di prova sul relay locale; in Barattolo la lettura per `#d`, la
+   verifica NIP-05 lato server con `url_api_ammesso` (niente redirect),
+   la riga «Emesso da … ✓»; i due testi `docs/NIP-XX-RGB-ASSETS.md` e
+   `docs/NWC-XX-RGB-ASSETS.md` dal disegno; la issue nel repo `nwc`.
+6. **Domenica mezzogiorno** — salvadanaio e budget se avanza; sennò gli
+   errori visibili. Tx del pitch confermate entro le 14:00.
 
-## 7-bis. L'opzione di Alan: il wallet WDK che parla NWC (solo studio, 1 ott)
+Lo stato dell'ordine pagato in USDB (dopo l'ACK o dopo il blocco) è una
+decisione del sabato, scritta nel commit: gli stati della regola 4 non
+cambiano.
+
+## 7-bis. Il wallet WDK che parla NWC: l'opzione di Alan, DECISA il 7 ott
+
+(Studio del 1 ott, confermato il 7: è la strada. I quattro metodi, le
+notifiche e gli errori nella forma da bozza di estensione stanno nello
+studio, parte seconda, B.2; la BASE del servizio si fa prima del 17 e si
+dichiara, i metodi `rgb_*` a Torino.)
 
 L'idea: il wallet WDK sul portatile espone NIP-47 (Nostr Wallet
 Connect), così Barattolo, che è GIÀ un client NWC (nel browser usa
@@ -332,30 +405,35 @@ VM; l'aggancio nel client NWC di Barattolo e il riscatto nel conto a
 Torino, in commit datati. Il pagamento self-custodial via WDK resta una
 slide, come lo swap. Perché vale: è il bonus WDK più solido che abbiamo
 (il WDK diventa IL wallet dell'utente, non un attrezzo di prova) e
-toglie di mezzo il «custodial per la demo» per i punti. Decide Alan.
+toglie di mezzo il «custodial per la demo» per i punti. **Deciso: si fa**
+(Alan, 7 ott). Due precisazioni dopo la rilettura del NIP-47 del 7 ott:
+il nucleo ha cinque metodi e un tag `extensions`, e i metodi aggiunti
+«SHOULD also appear in content» dell'evento info — `metodiNwc` di
+Barattolo li legge già da `get_info.methods`; e i nomi e le forme
+ricalcano WebRGB di KaleidoSwap (`assetId`, `invoice`, `txid`,
+`transferId`, gli stati di rgb-lib), così la stessa estensione la
+implementa in un pomeriggio chi ha già il provider `window.rgb`.
 
 ## 8. Le cose incerte, da chiedere ai mentor (13 ott e sabato mattina)
 
-- Lo stash lato server per utente è accettabile come demo? Qual è la
-  loro strada per lo stash nel browser/telefono (VSS? il modulo
-  Darkhorse? `rgb-sdk-web`?).
-- Gli endpoint pubblici di Utexo (`46.224.75.237:50001`, il proxy)
-  reggono il 17-18 e si possono usare in sede? Noi abbiamo i nostri
-  sulla VM, ma vorremmo saperlo.
-- `min_confirmations = 0` è ammesso per mostrare un trasferimento in
-  tempo reale sul palco, o si aspetta il blocco (dieci minuti su
-  signet)? Noi prepariamo le tx PRIMA e le mostriamo confermate.
-- Interoperabilità beta.7/beta.8: a noi ha funzionato; c'è una versione
-  che raccomandano per la settimana dell'evento?
-- La fattura «qualunque asset» per il primo contatto è la via giusta, o
-  c'è un modo per far conoscere l'asset al wallet prima (un consignment
-  del solo genesis)?
-- Ticker e nomi: il ticker a 8 maiuscole è un limite dello schema NIA o
-  di rgb-lib? Il nome ammette accenti (noi abbiamo evitato «Caffè»)?
-- La rete del giudizio: signet va bene o vogliono regtest in sede? E il
-  loro faucet, se c'è.
-- WDK in browser con RGB: lo considerano «WDK bonus» anche se il wallet
-  gira in Node sul portatile?
+La lista completa, con l'ordine e lo spazio per le risposte, è nello
+studio, parte seconda, E (undici domande). La pagina della gara NON
+nomina nessun Q&A: la data del 13 viene dalla mail di conferma, e si
+verifica lì. In sintesi: 1) il campo `issuer` del genesis e i piani di
+rgb-lib; 2) «WebRGB sopra NWC» e cos'è `@utexo/webrgb-walletconnect`,
+Rate come wallet; 3) il checkout in asset on-chain conta per «Payments
+and checkout»; 4) un USDT di prova su signet da Tether/Utexo, o il
+nostro USDB; 5) il disegno del NIP fatto prima e il servizio NWC base:
+dichiarabili; 6) signet e `min_confirmations = 0`; 7) «on device» con
+`qvac serve` e la UI nella pagina, Qwen3 1.7B o Llama 1B; 8) il bonus
+WDK col modulo RGB su signet (la docs dice `mainnet|testnet|regtest`);
+9) gli endpoint Utexo, la fattura «qualunque asset» o il consignment
+nell'annuncio, beta.7/beta.8; 10) consegna, licenza, pitch, CypherTank;
+11) il grant dell'RGB Protocol Association, se esiste.
+
+Restano dalla prima lista, ancora aperte: lo stash lato
+browser/telefono (VSS, Darkhorse, `rgb-sdk-web`); ticker e nomi con
+accenti; la rete del giudizio e un faucet loro.
 
 ## 9. Verbale: strade scartate e non provato
 
@@ -373,6 +451,70 @@ toglie di mezzo il «custodial per la demo» per i punti. Decide Alan.
   il proxy pubblico dietro Caddy; un terzo wallet utente sulla VM; il
   ripristino COMPLETO della VM da zero (fatto solo il drill dell'archivio
   e il `ripristina` dello stash su una copia, sul PC).
+- Non provato al 7 ott (si prova prima del 17, sezione 10): l'emissione
+  a precisione 2; `NWCWalletService` di `@getalby/sdk` con metodi fuori
+  lista; la CLI 0.15 e `--cors-origin`; `reasoning_budget: false`;
+  GitHub Pages come NIP-05 di riserva; il modulo WDK RGB su signet è
+  provato (1 ott) ma la docs elenca `mainnet|testnet|regtest`.
+- Scartato il 7 ott: emettere USDB con `issuer = nostr:<pubkey>` dalla
+  CLI `rgb` di rgb-protocol o con una patch a rgb-lib PRIMA del 17 (il
+  campo c'è, ma sono 4-8 ore e un attrezzo nuovo a dieci giorni
+  dall'evento: si dice, con la issue a RGB-Tools, e si fa dopo se il
+  cantiere vive). JAR fuori dalla demo (decisione di Alan).
+
+## 10. Prima del 17: la lista (7 ott), tutto dichiarato
+
+Infrastruttura, lecita dal regolamento; niente al VPS prima del 10,
+niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
+
+| Quando | Cosa | Fatto |
+|---|---|---|
+| 8-9 ott | `rgb.py emetti` con la `precision` come argomento, provato sul PC (la ruota win_amd64 c'è) | ☐ |
+| 8-9 ott | Sulla VM: `rgb.py nuovo usdb`, faucet, `utxo usdb 5`, `emetti usdb USDB "Dollari di prova Barattolo" 100000000` a precisione 2, `backup usdb`; l'asset_id in §2 | ☐ |
+| 8-9 ott | 500 USDB (50.000 unità) al wallet utente: fattura «qualunque asset» (`node punti.mjs fattura - 50000 witness`, primo contatto), `rgb.py invia usdb …`, i due `aggiorna`; un blocco | ☐ |
+| 8-9 ott | UTXO colorabili al wallet `barattolo` (riceverà i pagamenti): `rgb.py utxo barattolo 5` | ☐ |
+| 9-10 ott | Due identità Nostr di prova (sezione 11) | ☐ |
+| 9-10 ott | Relay locale strfry in docker sul portatile, `ws://127.0.0.1:7777` | ☐ |
+| 11-12 ott | `nwc-wdk.mjs` BASE nel WSL: evento info (13194, `encryption` nip44), `get_info`, `get_balance`, la connection string stampata; provato dal Profilo di Barattolo in collaudo (la CSP ammette `ws:`) | ☐ |
+| 11-12 ott | `rgb_http.py` sulla VM, `127.0.0.1:8787` (fattura/aggiorna/saldo/lista del wallet `barattolo`), gamba `-L 8787:127.0.0.1:8787` nel tunnel | ☐ |
+| 11-12 ott | Il commit su main: `RGB_ATTIVO`/`RGB_PROVA_IDS`, la riga nel pannello delle leve, la prova a leva spenta; `/.well-known/nostr.json` se si sceglie (a) in §11 | ☐ |
+| 11-12 ott | QVAC: `npm i -g @qvac/cli@latest`, alias `cassiere` → `QWEN3_1_7B_INST_Q4` con `ctx_size 8192`, scaricato; `cassiere-prova.html` FUORI dal repo con `response_format` json_schema e `reasoning_budget: false`; `qvac serve --openai --cors-origin http://127.0.0.1:8080` | ☐ |
+| 13 ott | Q&A con le undici domande | ☐ |
+| 14-16 ott | §5 riscritta e stampata; gli schermi su carta; il giro provato tre volte; backup della VM; tutto scaricato sul portatile; video di riserva del Cassiere | ☐ |
+
+## 11. Le due identità Nostr di prova (gli «emittenti»)
+
+Servono a firmare gli annunci di USDB e di MOON (studio, parte seconda,
+B.1) e a mostrare «Emesso da … ✓» nella schermata (C). Sono chiavi
+NUOVE, di prova: MAI la chiave della piattaforma, MAI nel repo (regola
+ferrea 1).
+
+- **Generare**: `node -e` con nostr-tools (`generateSecretKey`,
+  `getPublicKey`, `nip19.nsecEncode`) oppure `nak key generate`; due
+  volte. Le private in `~/wdk-prova/identita/usdb.txt` e
+  `~/wdk-prova/identita/tothemooon.txt` (0600, nel WSL), copiate
+  nell'archivio age della gamba `rgb/`. Le pubbliche (hex) si possono
+  scrivere qui quando esistono.
+- **Il kind 0**: `name` «Dollari di prova Barattolo» / «To The Mooon»,
+  `about`, `picture` (il logo del negozio, già in `assets/`), e `nip05`
+  = `usdb@<dominio>` / `tothemooon@<dominio>`. Si pubblica sul relay
+  locale; su un relay pubblico SOLO se si decide prima (sono chiavi di
+  prova, non segreti della piattaforma, ma la regola di casa è «mai
+  eventi pubblicati» nei giri di collaudo).
+- **Il NIP-05, DA DECIDERE (Andrea)**: (a) una rotta esplicita
+  `/.well-known/nostr.json` su barattolo.store, sul calco di
+  `assetlinks.json` (regola 3: file statico, nome in whitelist, niente
+  redirect — NIP-05 li vieta — e `Access-Control-Allow-Origin: *`), nel
+  commit dell'11-12 ott: due nomi, zero rischio, e la riga nella
+  schermata legge «tothemooon@barattolo.store ✓»; (b) GitHub Pages con
+  un `.nojekyll` (serve `.well-known` e manda il CORS giusto): niente
+  produzione, ma «github.io» nella schermata. Raccomandazione: (a),
+  dicendo ai giudici che il VERO negozio avrebbe il suo dominio.
+- **La verifica in Barattolo** (lavoro del weekend): GET del JSON
+  attraverso `url_api_ammesso` (solo https, host pubblico, mai
+  loopback) con `follow_redirects=False`, confronto `names[<nome>]` ==
+  `pubkey` dell'annuncio, cache di 24 ore (se il DNS del portatile
+  manca, la riga dice «verificato il 16 ott»).
 
 Nota a margine, fuori cantiere ma scoperta qui: il pull notturno del
 backup del NODO falliva dal 7 settembre («permission denied» su
