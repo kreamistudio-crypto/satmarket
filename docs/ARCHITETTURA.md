@@ -28960,6 +28960,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    `admin.html` letto dalla SUA rotta, senza dati dentro — i numeri li
    dà `/api/admin/cruscotto` solo agli admin —, noindex e no-store;
    vedi «IL CRUSCOTTO DEGLI ADMIN»),
+   `/.well-known/nostr.json` (ott 2026, il NIP-05 di casa: i nomi di
+   `NIP05_NOMI` del config con le chiavi PUBBLICHE in hex, `?name=`
+   che filtra, CORS aperto, mai un redirect; nato per gli emittenti
+   degli asset RGB dell'hackathon di Torino, non dipende da
+   `RGB_ATTIVO` — vedi HACKATHON-SETUP, §11),
    `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
    trovare»: la prima è una costante PURA che non tocca il database e
    non può sollevare — un 5xx lì sospende la scansione di tutto il sito

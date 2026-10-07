@@ -27197,6 +27197,29 @@ def _leve_stato():
                   spento="il libro si legge solo dai relay del "
                          "coordinator: se cadono loro, cade il libro"),
         ]},
+        {"gruppo": "🪙 Punti e dollari su RGB (hackathon)", "voci": [
+            # IL CANCELLO DELL'HACKATHON (ott 2026): la riga chiede al
+            # giudice `_rgb_leve()` come fa il P2P, cosi' il giorno in
+            # cui `attivo` vorra' anche l'indirizzo del wallet mercante
+            # il pannello dira' il fatto e non la costante.
+            _leva("Punti e dollari su RGB", "RGB_ATTIVO", _rgb_leve()["attivo"],
+                  acceso="le rotte /api/rgb/* rispondono e i fogli RGB "
+                         "compaiono (solo alla fase di prova, se c'e')",
+                  spento="nessuna rotta RGB risponde, nessun foglio "
+                         "compare: e' il mondo di ieri"),
+            _leva("Fase di prova RGB", "RGB_PROVA_IDS",
+                  _elenco(sorted(RGB_PROVA_IDS)),
+                  acceso="le cose RGB le vedono solo questi id",
+                  spento="aperto a tutti: appena RGB_ATTIVO si accende "
+                         "vale per chiunque"),
+            _leva("Nomi NIP-05 di casa", "NIP05_NOMI",
+                  _elenco(sorted(NIP05_NOMI)),
+                  acceso="/.well-known/nostr.json dice a chi chiede che "
+                         "questi nomi su barattolo.store sono queste "
+                         "chiavi",
+                  spento="/.well-known/nostr.json risponde «qui "
+                         "nessuno» ({\"names\": {}})"),
+        ]},
         {"gruppo": "🔔 Avvisi ai moderatori", "voci": [
             _leva("Campanello dei nuovi iscritti", "AVVISI_ISCRITTI",
                   bool(AVVISI_ISCRITTI),
@@ -42371,6 +42394,90 @@ def lettura_simulata(relay: str, cosa: str) -> bool:
         print(f"🟣 [nostr simulato] lettura {cosa} da {relay}: in collaudo "
               "non esce dal computer", flush=True)
     return True
+
+
+# I PUNTI E I DOLLARI SU RGB (ott 2026): LA LEVA, E BASTA. L'hackathon
+# di Torino (17-18 ott 2026) integrera' in Barattolo asset RGB su signet
+# — il Cassiere che paga un ordine in dollari di prova (USDB), i punti
+# del negozio (MOON) come bonus, il wallet dell'utente che parla NIP-47 —
+# e il regolamento della gara vuole che quel codice si scriva LA', in
+# commit datati, dichiarando cio' che esiste gia'. Quindi prima del 17
+# qui c'e' il SOLO cancello, sul calco di P2P_ATTIVO / P2P_PROVA_IDS:
+# nasce spento, si accende con una riga nel config del VPS e mai per
+# effetto di un deploy; a leva spenta nessuna rotta RGB risponde — e
+# oggi nessuna esiste: la prova pretende che ogni rotta `/api/rgb/*` di
+# domani passi da `rgb_ammesso`. Il disegno: docs/STUDIO-HACKATHON-RGB-
+# 2026-10.md (parte seconda) e docs/HACKATHON-SETUP.md.
+try:
+    from config import RGB_ATTIVO
+except ImportError:
+    RGB_ATTIVO = False
+# La fase chiusa, con la stessa guardia del P2P: una stringa iterata
+# darebbe cifre singole senza alzare niente, e sbagliare verso
+# l'apertura e' il verso sbagliato.
+try:
+    from config import RGB_PROVA_IDS
+    if isinstance(RGB_PROVA_IDS, (str, bytes)):
+        raise TypeError("una stringa non e' una lista di id")
+    RGB_PROVA_IDS = {int(i) for i in RGB_PROVA_IDS}
+except ImportError:
+    RGB_PROVA_IDS = set()          # non dichiarata: aperto a tutti
+except (TypeError, ValueError):
+    RGB_PROVA_IDS = {0}            # storta: chiusa a tutti, e si dice
+    print("[rgb] RGB_PROVA_IDS non e' una lista di numeri: la fase di "
+          "prova resta CHIUSA (0 e' un id che non esiste)")
+
+
+def _rgb_leve() -> dict:
+    """Il fatto, per il pannello e per le buste di domani: oggi la leva
+    e' il fatto intero (non c'e' un coordinator da raggiungere); quando
+    a Torino arrivera' l'indirizzo del wallet mercante, `attivo` lo
+    includera', come `_p2p_leve` include la npub."""
+    return {"attivo": bool(RGB_ATTIVO)}
+
+
+def rgb_ammesso(tg_id) -> bool:
+    """Chi vede le cose RGB: la leva accesa E (fase di prova vuota, O
+    questo id dentro). Ogni rotta `/api/rgb/*` di domani comincia da
+    qui; spenta, dice no a chiunque — anche agli admin, apposta: un
+    cancello con una porticina laterale non e' un cancello."""
+    if not RGB_ATTIVO:
+        return False
+    if not RGB_PROVA_IDS:
+        return True
+    try:
+        return int(tg_id) in RGB_PROVA_IDS
+    except (TypeError, ValueError):
+        return False
+
+
+# IL NIP-05 DI CASA (ott 2026): i nomi che /.well-known/nostr.json
+# riconosce. Sono le identita' PUBBLICHE degli emittenti degli asset
+# dell'hackathon (`usdb`, `tothemooon`): un wallet che vede un annuncio
+# firmato da quella chiave chiede qui «e' davvero usdb@barattolo.store?»
+# e la risposta deve essere la chiave in esadecimale minuscolo, mai una
+# npub (lo dice il NIP), mai un redirect (lo vieta il NIP). Una riga
+# storta non abbatte il server: si scarta e si dice, come per le altre
+# leve; e non e' legata a RGB_ATTIVO perche' un'identita' non e' una
+# funzione del mercatino — e' un fatto che si puo' dichiarare anche a
+# cancello chiuso.
+try:
+    from config import NIP05_NOMI
+    NIP05_NOMI = {str(n): str(k).lower() for n, k in dict(NIP05_NOMI).items()}
+except ImportError:
+    NIP05_NOMI = {}
+except (TypeError, ValueError, AttributeError):
+    NIP05_NOMI = {}
+    print("[nip05] NIP05_NOMI non e' un dizionario nome → chiave hex: "
+          "la rotta risponde vuota")
+# il nome ha l'alfabeto del NIP-05 (a-z0-9-_.), la chiave 64 esadecimali
+_nip05_storti = sorted(n for n, k in NIP05_NOMI.items()
+                       if not re.fullmatch(r"[a-z0-9._-]+", n)
+                       or not re.fullmatch(r"[0-9a-f]{64}", k))
+for _n in _nip05_storti:
+    del NIP05_NOMI[_n]
+    print(f"[nip05] «{_n}»: nome o chiave non nella forma del NIP-05, scartato")
+del _nip05_storti
 
 
 # LO SCAMBIO P2P (set 2026): Barattolo diventa un CLIENT del coordinator
@@ -67605,3 +67712,28 @@ def twa_assetlinks():
     return FileResponse(".well-known/assetlinks.json",
                         media_type="application/json",
                         headers={"Cache-Control": "public, max-age=3600"})
+
+
+# --- NIP-05 (ott 2026): i nomi di casa su Nostr ---------------------------
+@app.get("/.well-known/nostr.json")
+@app.head("/.well-known/nostr.json")
+def nip05_nostr_json(name: str = ""):
+    """«Questo nome su barattolo.store e' questa chiave Nostr»: il
+    NIP-05, nella forma che il NIP pretende — `names` con le chiavi in
+    esadecimale minuscolo, la risposta a `?name=` che tiene il solo
+    nome chiesto (o niente: `{"names": {}}` e' il «qui nessuno»), MAI
+    un redirect (il NIP lo vieta a chi serve e a chi legge),
+    `Access-Control-Allow-Origin: *` perche' a chiedere e' il
+    JavaScript di un wallet su un altro dominio. I nomi vengono da
+    `NIP05_NOMI` nel config del VPS, gia' passati al setaccio
+    all'avvio; qui si legge e basta. Nasce per gli emittenti degli
+    asset RGB dell'hackathon (vedi la leva), ma non dipende da
+    RGB_ATTIVO: un'identita' non e' una funzione del mercatino. Stesso
+    patto di `assetlinks.json`: rotta esplicita (regola ferrea 3), HEAD
+    con la sua riga, cache di un'ora."""
+    nomi = NIP05_NOMI
+    if name:
+        nomi = {name: NIP05_NOMI[name]} if name in NIP05_NOMI else {}
+    return JSONResponse({"names": nomi},
+                        headers={"Cache-Control": "public, max-age=3600",
+                                 "Access-Control-Allow-Origin": "*"})

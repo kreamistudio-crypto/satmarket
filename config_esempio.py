@@ -797,6 +797,31 @@ P2P_LOG_PASSATE = True
 
 DB = "satmarket.db"
 
+# --- Punti e dollari su RGB (hackathon di Torino, 17-18 ott 2026) -------
+# Barattolo imparera' a parlare con asset RGB su signet — il Cassiere
+# che paga in dollari di prova (USDB), i punti del negozio (MOON) come
+# bonus — e il regolamento della gara vuole che il codice si scriva LA',
+# in commit datati. Prima dell'evento c'e' SOLO il cancello, sul calco
+# di P2P_ATTIVO / P2P_PROVA_IDS: nasce spento, si accende con un gesto
+# qui dentro, mai per effetto di un deploy. Spento, nessuna rotta RGB
+# risponde e nessun foglio compare. Il disegno sta in
+# docs/STUDIO-HACKATHON-RGB-2026-10.md (parte seconda) e la lista di
+# cosa si prepara prima in docs/HACKATHON-SETUP.md (sezione 10).
+RGB_ATTIVO = False
+# La fase chiusa, come per il P2P: i tg_id che vedono le cose RGB
+# mentre gli altri non vedono niente. Vuota = aperta a chiunque appena
+# RGB_ATTIVO si accende; una riga storta vale «chiusa a tutti» e lo dice.
+RGB_PROVA_IDS = []
+# IL NIP-05 DI CASA: /.well-known/nostr.json dice «questo nome su
+# barattolo.store e' questa chiave Nostr». Serve agli EMITTENTI degli
+# asset dell'hackathon (le due identita' di prova `usdb` e `tothemooon`)
+# perche' un wallet possa scrivere «Emesso da … ✓». Qui vanno SOLO
+# chiavi PUBBLICHE, in esadecimale minuscolo (64 caratteri): mai una
+# nsec, mai una npub (il NIP-05 vuole l'hex). Vuoto o non dichiarato,
+# la rotta risponde {"names": {}}, cioe' «qui nessuno».
+#     NIP05_NOMI = {"usdb": "<hex>", "tothemooon": "<hex>"}
+NIP05_NOMI = {}
+
 # --- I relay Nostr ----------------------------------------------------
 # Dove Barattolo scrive e legge su Nostr. Erano cinque elenchi scritti
 # a mano nel codice, e gia' divergevano fra loro: da qui si cambiano

@@ -30699,6 +30699,11 @@ def _censimento(acceso, dopo=None):
     # quel ramo non lo guarderebbe nessuno.
     amb["P2P_PROVA_IDS"] = {1, 2, 3} if acceso else set()
     amb["MOSTRO_HEX"] = "ab" * 32 if acceso else ""
+    # LA FASE DI PROVA RGB E I NOMI NIP-05 (ott 2026): la stessa forma
+    # della fase P2P — un insieme e un dizionario che il pannello
+    # ITERA con `sorted`, e che a leve spente sono vuoti con un senso.
+    amb["RGB_PROVA_IDS"] = {1, 2, 3} if acceso else set()
+    amb["NIP05_NOMI"] = {"usdb": "a" * 64} if acceso else {}
     # IL SEGRETO DEL PROFILO E' UN DIZIONARIO, non una stringa: il
     # config finto darebbe la stringa di _SEGRETI_FINTI e il
     # server la scarterebbe come leva storta — cioe' il ramo
@@ -30742,7 +30747,7 @@ def _censimento(acceso, dopo=None):
                  "CLASSIFICA_ATTIVA", "CLASSIFICA_TOP", "CLASSIFICA_K",
                  "CLASSIFICA_XP_RIF", "CLASSIFICA_PESO_XP",
                  "CLASSIFICA_KD", "P2P_ATTIVO", "MOSTRO_NPUB",
-                 "GUARDIANO_PONTE"):
+                 "GUARDIANO_PONTE", "RGB_ATTIVO"):
         amb[nome] = acceso and 24
     # IL PIENO DEL BANNER VUOLE UN VALORE SUO, e non il 7 implicito di
     # `__missing__`: il prezzo vale 7 da li', quindi con 7 anche il
@@ -30852,7 +30857,11 @@ def _censimento(acceso, dopo=None):
               # il guardiano del ponte (set 2026): la sua riga CHIAMA
               # questi tre, la stessa trappola di `cassaforte_nuova`
               "_guardiano_ponte_attivo", "_destinatari_ponte",
-              "_chi_avvisa_ponte", "_leve_stato"):
+              "_chi_avvisa_ponte",
+              # la leva RGB dell'hackathon (8 ott 2026): la sesta volta
+              # della trappola, `_rgb_leve()` — tre esplosioni lontane
+              # (prove_leve, prove_guardiano_ponte, prove_p2p_server)
+              "_rgb_leve", "_leve_stato"):
         exec(pezzo(f), amb)
     amb.update(dopo or {})
     gruppi = amb["_leve_stato"]()
@@ -129452,6 +129461,148 @@ console.log(JSON.stringify(out));
           anello("chiaro", set(o["p2pFatto"][0]), ("display",)).get("display"))
 
 
+def prove_leva_rgb():
+    """LA LEVA RGB E IL NIP-05 DI CASA (8 ott 2026): il solo cancello
+    dell'hackathon di Torino, prima dell'evento. Nasce spento, si legge
+    dal config col pattern di casa, la fase di prova ha la guardia del
+    P2P, il pannello chiede al giudice; e la rotta /.well-known/
+    nostr.json risponde nella forma del NIP-05 — chiavi hex, `?name=`
+    che filtra, CORS aperto, niente redirect — con la JSONResponse
+    sostituita da una di cartone, perche' qui fastapi non si importa."""
+    import types
+    print("\n🪙 La leva RGB e il NIP-05 di casa")
+    src = _SORGENTE
+    i = src.index("# I PUNTI E I DOLLARI SU RGB (ott 2026): LA LEVA, E BASTA.")
+    blocco = src[i:src.index(
+        "# LO SCAMBIO P2P (set 2026): Barattolo diventa un CLIENT", i)]
+    cod = codice(blocco)
+
+    # --- 1) le leve nascono spente e si leggono dal config -----------
+    prova("RGB_ATTIVO nasce False nel codice", True,
+          "except ImportError:\n    RGB_ATTIVO = False" in cod)
+    prova("...e si legge dal config col pattern di casa", True,
+          "from config import RGB_ATTIVO" in cod)
+    prova("RGB_PROVA_IDS ha la guardia della stringa, come il P2P", True,
+          "isinstance(RGB_PROVA_IDS, (str, bytes))" in cod
+          and "RGB_PROVA_IDS = {0}" in cod)
+    prova("NIP05_NOMI nasce vuoto", True,
+          "except ImportError:\n    NIP05_NOMI = {}" in cod)
+    cfg = open(os.path.join(QUI, "config_esempio.py"), encoding="utf-8").read()
+    for riga in ("RGB_ATTIVO = False", "RGB_PROVA_IDS = []", "NIP05_NOMI = {}"):
+        prova(f"il config d'esempio dice `{riga}`", True, riga in cfg)
+
+    # --- 2) il blocco ESEGUITO con un config di cartone --------------
+    HEX_A = "a" * 64          # chiave di cartone: 64 volte lo stesso carattere
+    HEX_B = "b" * 64
+
+    def esegui(**config):
+        finto = types.ModuleType("config")
+        for k, v in config.items():
+            setattr(finto, k, v)
+        vero = sys.modules.get("config")
+        sys.modules["config"] = finto
+        stampe = []
+        amb = {"__builtins__": __builtins__, "re": re,
+               "print": lambda *a, **k: stampe.append(" ".join(map(str, a)))}
+        try:
+            exec(cod, amb)
+        finally:
+            if vero is not None:
+                sys.modules["config"] = vero
+            else:
+                del sys.modules["config"]
+        amb["_stampe"] = stampe
+        return amb
+
+    a = esegui()
+    prova("senza config: leva spenta, fase aperta, nessun nome",
+          (False, set(), {}), (a["RGB_ATTIVO"], a["RGB_PROVA_IDS"], a["NIP05_NOMI"]))
+    prova("...e rgb_ammesso dice no a chiunque, anche a 999", False,
+          any(a["rgb_ammesso"](x) for x in (111, 222, 999, "111", None)))
+    prova("...e il giudice del pannello dice spento", {"attivo": False},
+          a["_rgb_leve"]())
+    a = esegui(RGB_ATTIVO=True)
+    prova("leva accesa e fase vuota: ammesso chiunque", True,
+          a["rgb_ammesso"](111) and a["rgb_ammesso"]("222"))
+    a = esegui(RGB_ATTIVO=True, RGB_PROVA_IDS=[111, "222"])
+    prova("fase di prova: dentro si', fuori no, storto no",
+          (True, True, False, False),
+          (a["rgb_ammesso"](111), a["rgb_ammesso"](222),
+           a["rgb_ammesso"](999), a["rgb_ammesso"]("x")))
+    a = esegui(RGB_ATTIVO=True, RGB_PROVA_IDS="111")
+    prova("RGB_PROVA_IDS stringa: chiusa a tutti e lo dice",
+          ({0}, False, True),
+          (a["RGB_PROVA_IDS"], a["rgb_ammesso"](111),
+           any("CHIUSA" in s for s in a["_stampe"])))
+    a = esegui(NIP05_NOMI={"usdb": HEX_A.upper(), "tothemooon": HEX_B})
+    prova("NIP05_NOMI: le chiavi si tengono in minuscolo",
+          {"usdb": HEX_A, "tothemooon": HEX_B}, a["NIP05_NOMI"])
+    a = esegui(NIP05_NOMI={"usdb": HEX_A, "Storto": HEX_B, "corta": "abc",
+                           "npub": "npub1" + "q" * 58})
+    prova("...e scarta nome maiuscolo, chiave corta e npub, dicendolo",
+          ({"usdb": HEX_A}, 3),
+          (a["NIP05_NOMI"], sum("scartato" in s for s in a["_stampe"])))
+    a = esegui(NIP05_NOMI="usdb")
+    prova("...e un NIP05_NOMI che non e' un dizionario vale vuoto, e lo dice",
+          ({}, True), (a["NIP05_NOMI"], any("dizionario" in s for s in a["_stampe"])))
+
+    # --- 3) la rotta, eseguita con una JSONResponse di cartone --------
+    prova("la rotta /.well-known/nostr.json c'e' una volta, GET e HEAD",
+          (1, 1), (src.count('@app.get("/.well-known/nostr.json")'),
+                   src.count('@app.head("/.well-known/nostr.json")')))
+    # La rotta e' l'ULTIMA cosa di server.py: `pezzo` cerca due righe
+    # vuote dopo la funzione, e alla fine del file non le trova.
+    i = src.index("def nip05_nostr_json(")
+    j = src.find("\n\n\n", i)
+    rotta = codice(src[i:j if j > 0 else len(src)])
+    prova("...e non fa redirect ne' legge il database", True,
+          "Redirect" not in rotta and "db()" not in rotta and "con." not in rotta)
+
+    class Cartone:
+        def __init__(self, corpo, headers=None):
+            self.corpo, self.headers = corpo, headers or {}
+    amb = {"__builtins__": __builtins__, "JSONResponse": Cartone,
+           "NIP05_NOMI": {"usdb": HEX_A, "tothemooon": HEX_B},
+           "app": types.SimpleNamespace(get=lambda *_: (lambda f: f),
+                                        head=lambda *_: (lambda f: f))}
+    exec(rotta, amb)
+    r = amb["nip05_nostr_json"]()
+    prova("senza ?name= escono tutti i nomi",
+          {"names": {"usdb": HEX_A, "tothemooon": HEX_B}}, r.corpo)
+    prova("...con CORS aperto e la cache di un'ora",
+          ("*", "public, max-age=3600"),
+          (r.headers.get("Access-Control-Allow-Origin"), r.headers.get("Cache-Control")))
+    prova("?name=usdb tiene il solo usdb", {"names": {"usdb": HEX_A}},
+          amb["nip05_nostr_json"]("usdb").corpo)
+    prova("?name=sconosciuto risponde «qui nessuno», non 404",
+          {"names": {}}, amb["nip05_nostr_json"]("nessuno").corpo)
+    amb["NIP05_NOMI"] = {}
+    prova("config vuoto: {\"names\": {}}", {"names": {}},
+          amb["nip05_nostr_json"]().corpo)
+
+    # --- 4) il pannello chiede al giudice, e il cancello di domani ----
+    ls = codice(pezzo("_leve_stato"))
+    prova("il pannello chiede `_rgb_leve()` e non la costante", True,
+          '_leva("Punti e dollari su RGB", "RGB_ATTIVO", _rgb_leve()["attivo"],' in ls)
+    prova("...e mostra fase di prova e nomi NIP-05", True,
+          '"RGB_PROVA_IDS"' in ls and '"NIP05_NOMI"' in ls)
+    # OGGI nessuna rotta /api/rgb/ esiste; DOMANI (Torino) ognuna comincia
+    # da rgb_ammesso. La prova e' scritta per il domani: cerca le rotte e
+    # pretende la guardia in ciascuna — a zero rotte e' vera e vuota.
+    rotte_rgb = [m.start() for m in re.finditer(r'@app\.\w+\("/api/rgb/', src)]
+    senza = []
+    for pos in rotte_rgb:
+        fine = src.find("\n\n\n", pos)
+        corpo = src[pos:fine if fine > 0 else len(src)]
+        if "rgb_ammesso(" not in corpo:
+            senza.append(corpo.split("\n")[0])
+    prova("ogni rotta /api/rgb/* passa da rgb_ammesso (oggi: nessuna rotta)",
+          [], senza)
+    arch = open(os.path.join(QUI, "docs", "ARCHITETTURA.md"), encoding="utf-8").read()
+    prova("la rotta sta nell'elenco delle rotte pubbliche di ARCHITETTURA",
+          True, "/.well-known/nostr.json" in arch)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -129619,6 +129770,7 @@ def main():
     prove_p2p_velo_pubblica,
     prove_p2p_barattozon,
     prove_p2p_paycode,
+    prove_leva_rgb,
     prove_premio_barattozon,
     prove_convenienza_vera,
     prove_barattozon_mercato,
