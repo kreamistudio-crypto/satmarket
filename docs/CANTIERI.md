@@ -39813,3 +39813,111 @@ i link tacciono: è una cintura, non una strada). «Una volta sola»
 (`navRicordataPresa`) vale solo per un `avvia()` rilanciato mentre la
 prima ricostruzione è in volo: il banco non lo esercita, la sentinella
 sì.
+
+## La ricarica senza il lampo della home (7 ott 2026, difetto segnalato da Andrea dopo 8cf38d6)
+
+**DA DOVE SI PARTIVA.** Dopo «La ricarica resta dove si era», sul sito da
+PC un F5 dentro «I miei scambi» mostrava per un attimo la home del
+mercatino e poi la pagina giusta. Il perché: il velo d'apertura (la
+copertura del sito e di Telegram, il guscio nell'app) scende alla
+VETRINA DISEGNATA — il primo `renderGrid` scioglie `vetrinaDisegnata`,
+che la catena dell'ultima riga del file aspetta insieme ai font e alle
+immagini in vista — e in `avvia()` quel momento viene PRIMA di ordini,
+offerte e puntate; la pagina ricordata si ricostruisce solo dopo, in
+coda, con `apriPaginaRicordata`. In mezzo, a velo sceso, la home.
+Misurato col registratore a fotogrammi sul codice di 8cf38d6: velo
+22–131 ms, esplora a 147 ms, I miei scambi da 182 ms (in locale, dove la
+rete non c'è: in produzione il tratto è lungo quanto quelle chiamate).
+
+**DECISO CON ANDREA (proposta approvata).** Solo durante una
+ricostruzione (il sito, su una entry ricordata): il velo aspetta la
+pagina ricostruita invece della vetrina; apertura normale, link,
+Telegram e app identici. Se la pagina non è pronta in 3 secondi, la
+pagina madre (scambio → I miei scambi, ordine → Ordini, annuncio,
+negozio, carrello, cassa, classifica → Esplora; le altre pagine si
+disegnano da sole all'ingresso e sono madri di se stesse), MAI uno
+schermo vuoto, e NESSUN avviso (è la rete lenta, non una pagina
+sparita).
+
+**COM'È FATTO** (Architettura, la frase su `navMotore` in «IL GESTO
+INDIETRO»). Le due righe che le sentinelle del guscio tengono ferme
+restano com'erano — la catena `Promise.race([guscioVetrina, avvia()])` e
+il tetto `setTimeout(togliGuscio, TETTO_APERTURA)` — e cambia CHI scioglie
+il segnale: in `navMotore`, su una entry ricordata, `armaVeloRicarica`
+mette da parte `vetrinaDisegnata` (al suo posto un no-op: il
+`renderGrid` della home non scopre più niente) in
+`sciogliPaginaRicordata`, che chiama `apriPaginaRicordata` a pagina
+disegnata; `togliGuscio` tace finché c'è `navRicordata`, quindi nemmeno
+il tetto dei due secondi scopre la home; e si arma `ripiegaPaginaRicordata`
+a `TETTO_RICARICA` = 3000: madre (`MADRE_RICARICA`, il filtro dei miei
+scambi compreso), entry (`chiudiPaginaRicordata`, la funzione che ora
+condivide con `apriPaginaRicordata`: sostituire, o consumare il gradino
+se la pagina è quella di sotto), segnale del velo — che scende dalla
+catena di sempre, dopo le immagini in vista. `navRicordataTarda` lo
+leggono i passi in volo (l'annuncio chiesto al server, il carrello
+salvato, il negozio con la sua domanda `ancora` di `apriNegozio`) e la
+ricostruzione arrivata tardi: dopo la madre non si disegna niente. Un
+indietro durante l'avvio scioglie anche lui il segnale. La rete dei
+quattro secondi dell'head resta.
+
+**STRADE SCARTATE.** Cambiare la catena dell'ultima riga per aspettare
+un'altra promessa: le sentinelle del guscio la tengono ferma per buone
+ragioni (la vetrina e non la fine di avvia), e mettere da parte il
+segnale cambia la stessa cosa in un posto solo. Ricostruire la pagina
+PRIMA delle chiamate di avvia: la pagina vuole i dati (ordini, carrello,
+identità). Un velo nuovo: c'è già, ed è quello che si toglie. Nella rete
+dei tre secondi, `navRicordataPresa` e una `togliGuscio()` diretta:
+tolte prima della tortura, facevano lo stesso lavoro di altre righe.
+
+**PROVATO.** Il banco della ricarica (`prove_ricarica_resta`, 80) ha
+imparato il velo VERO — il segnale, `togliGuscio`, il tetto dei due
+secondi, la catena dell'ultima riga, estratti da miniapp.html —, un
+orologio suo (i tetti scattano solo quando il banco manda avanti il
+tempo) e una rete lenta da frenare e liberare (l'avvio, la vetrina,
+l'annuncio, il negozio, il carrello); ogni riga dice anche COSA L'OCCHIO
+HA VISTO da quando il velo è sceso. Su 54 scenari: dopo ogni F5 del sito
+si vede una vista sola, quella giusta (prima: `esplora>…`); con l'avvio
+lento il velo resta oltre i due secondi e a tre compare la pagina (o la
+madre: scambio → I miei scambi, ordine → Ordini, filtro rimesso), e la
+rete che arriva dopo non sposta più niente (annuncio, negozio, carrello);
+l'indietro durante un avvio lento scopre subito la pagina di sotto; la
+rete dei tre secondi che scatta dopo una ricostruzione riuscita non fa
+niente. Gli stessi scenari sul miniapp.html di 8cf38d6: apertura
+normale, apertura lenta, link, link lento, Telegram e app IDENTICI riga
+per riga; nel sito le righe cambiano SOLO in «visto». Otto sentinelle
+nuove (il velo che tace, il segnale messo da parte, i tre secondi e la
+tabella, la catena di sempre, il segnale sciolto dalla pagina, dal
+ripiego e dall'indietro, i tre passi in volo). Emendati due banchi per
+la firma cambiata: i due node di `togliGuscio` (`navRicordata`) e
+`prove_indietro_dal_libro` (`sciogliPaginaRicordata` del popstate).
+Tortura 23 su 23 su una copia intera del repo, controprova verde prima e
+dopo; al primo giro 21 su 23: la guardia `if (!s)` del ripiego non era
+esercitata (aggiunto lo scenario della rete che scatta dopo una
+ricostruzione riuscita) e una sentinella con `.index` faceva ESPLODERE la
+sezione invece di dire rosso (ora un aiutante d'ordine che risponde
+falso). Suite intera severa e collaudi della CI: nel messaggio del
+commit.
+
+**DAL VIVO** (due copie in collaudo nello scratchpad, il codice di
+8cf38d6 e il nuovo, relay morto; Chrome headless via CDP a 1280×800, un
+registratore a `requestAnimationFrame` iniettato in ogni documento nuovo
+— cosa c'è a schermo a ogni fotogramma — e lo screencast di Chrome;
+ricariche vere con `Page.reload`). I miei scambi: prima velo 22–131,
+esplora 147, I miei scambi da 182; ora velo 24–221, I miei scambi da
+236, nessun fotogramma della home (e nei provini, prima, a +236 ms la
+home intera). Negozio di Anna: prima esplora 160–177; ora velo fino a
+167 e il negozio da 184. Scambio con la rete lenta (un secondo a
+richiesta): velo fino a 3.057 ms, poi I miei scambi (la madre) e fino a
+8,5 s non salta più niente. Apertura normale: velo e poi esplora, come
+prima (velo 29–176 / esplora da 244; prima 89–178 / 195).
+
+**NON PROVATO.** Il telefono e l'app (invariati: il banco li confronta
+col codice di prima; dal vivo no); Safari e Firefox; il sito vero con
+la rete vera, dove il tratto risparmiato è più lungo.
+
+**DA GUARDARE.** Durante la ricostruzione la home si disegna SOTTO il
+velo, e la barra di scorrimento della pagina (che un velo
+`position:fixed` non copre) compare sul bordo destro per qualche
+fotogramma prima della pagina giusta: è lo stesso bordo dell'apertura
+normale mentre si aspettano le immagini, non la home; segnalato ad
+Andrea, non toccato.

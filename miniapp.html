@@ -13913,6 +13913,10 @@ let diagnosiTieneGuscio = false;
 function togliGuscio(){
   if (guscioVia) return;            /* il primo che arriva comanda */
   if (diagnosiTieneGuscio) return;  /* ?diagnosi=1: resta per lo scatto */
+  /* una pagina ricordata in ricostruzione (LA RICARICA SENZA IL LAMPO,
+     piu' sotto): qui il tetto dei due secondi non comanda, comanda la
+     rete dei tre — che prima mette a schermo la pagina madre */
+  if (navRicordata) return;
   guscioVia = true;
   document.getElementById('guscio')?.remove();   /* in un colpo, mai in dissolvenza */
   document.getElementById('copertura')?.remove();
@@ -17002,6 +17006,9 @@ async function rifaiPaginaRicordata(b){
         const r = await fetch(`${API_BASE}/listings/${k}`, opz);
         if (r.ok) inCatalogo([mapListing(await r.json())]);
       } catch(e) {}
+      /* la rete dei tre secondi e' scattata mentre si aspettava: la
+         madre e' gia' a schermo, e dopo di lei non si disegna niente */
+      if (navRicordataTarda) return '';
     }
     if (!c()) { go('esplora'); return "Questo annuncio non c'è più: ti riporto al mercatino"; }
     openDetail(k);
@@ -17010,10 +17017,19 @@ async function rifaiPaginaRicordata(b){
   if (v === 'pacco') {
     /* il carrello salvato arriva dal server durante l'avvio */
     if (carrelloInArrivo) await carrelloInArrivo;
+    if (navRicordataTarda) return '';
     if (paccoDati && setScelte.size) riprendiCarrello();
     if (el('view-pacco').classList.contains('active')) return '';
     go('esplora');
     return "Il carrello è vuoto: ti riporto al mercatino";
+  }
+  /* il negozio dalla sua porta, con la sua domanda «ci si e' ancora?»:
+     se la rete dei tre secondi scatta mentre arriva, non si disegna (il
+     ripiego e' quello di navRendiVista: il mercatino) */
+  if (v === 'negozio' && k) {
+    await apriNegozio(k, false, undefined, undefined, true, () => !navRicordataTarda);
+    if (!navRicordataTarda && !el('view-negozio').classList.contains('active')) go('esplora');
+    return '';
   }
   /* la classifica si chiede al server: la sua porta (in vetrina e in
      DEMO non c'e', e si resta in Esplora) */
@@ -17036,23 +17052,82 @@ async function apriPaginaRicordata(){
   let avviso = '';
   /* in DEMO (il server tace) i dati sono finti: niente da ricostruire */
   if (!DEMO) try { avviso = await rifaiPaginaRicordata(s.pila[0]); } catch(e) {}
+  /* arrivata tardi: la rete dei tre secondi ha gia' messo la madre a
+     schermo, scritto la entry e tolto il velo */
+  if (navRicordataTarda) return;
   navRicordata = null;
   if (DEMO) {
     try { history.replaceState({app:'brt', pila: navPila(), d:0, sotto: []}, '', location.href); } catch(e){}
   } else {
-    /* la entry dice la pagina che si vede, AL POSTO di quella ricordata
-       (la cassa che riparte dall'annuncio, la madre di una pagina
-       sparita), coi gradini di sotto di prima: spingerla sopra lascerebbe
-       sotto una entry che nessuno rivedra', e un indietro a vuoto. E se
-       la pagina E' quella di sotto — il foglio che la ricarica ha chiuso,
-       la madre che c'era gia' — si consuma il gradino, per la stessa
-       ragione */
-    const sotto = Array.isArray(s.sotto) ? s.sotto : null;
-    if (sotto && sotto.length && navUguali(navPila(), sotto[sotto.length - 1])) navGiu();
-    else try { history.replaceState({app:'brt', pila: navPila(), d: s.d || 0, sotto}, '', location.href); } catch(e){}
+    chiudiPaginaRicordata(s);
   }
   navFreccia(navPila());
   if (avviso) toast(avviso, 4500);
+  /* la pagina giusta e' disegnata: adesso il velo puo' scendere */
+  sciogliPaginaRicordata();
+}
+/* La entry dice la pagina che si vede, AL POSTO di quella ricordata (la
+   cassa che riparte dall'annuncio, la madre di una pagina sparita o
+   arrivata tardi), coi gradini di sotto di prima: spingerla sopra
+   lascerebbe sotto una entry che nessuno rivedra', e un indietro a vuoto.
+   E se la pagina E' quella di sotto — il foglio che la ricarica ha
+   chiuso, la madre che c'era gia' — si consuma il gradino, per la stessa
+   ragione. */
+function chiudiPaginaRicordata(s){
+  const sotto = Array.isArray(s.sotto) ? s.sotto : null;
+  if (sotto && sotto.length && navUguali(navPila(), sotto[sotto.length - 1])) navGiu();
+  else try { history.replaceState({app:'brt', pila: navPila(), d: s.d || 0, sotto}, '', location.href); } catch(e){}
+}
+/* ---- LA RICARICA SENZA IL LAMPO DELLA HOME (7 ott 2026, dal campo di
+   Andrea) ----
+   Ricaricando dentro «I miei scambi» si vedeva per un attimo la home, e
+   poi la pagina giusta. Il velo d'apertura (la copertura, e nell'app il
+   guscio) scende alla VETRINA DISEGNATA — il primo renderGrid —, e la
+   pagina ricordata si ricostruisce in coda all'avvio, DOPO ordini,
+   offerte e puntate: in mezzo, a velo gia' sceso, c'era la home.
+   SOLO DURANTE UNA RICOSTRUZIONE (cioe' nel sito, su una entry ricordata:
+   all'apertura normale, con un link, in Telegram e nell'app niente
+   cambia) il velo aspetta la PAGINA RICOSTRUITA invece della vetrina: il
+   segnale che il guscio aspetta (`vetrinaDisegnata`) si mette da parte e
+   lo scioglie apriPaginaRicordata a pagina disegnata; il tetto dei due
+   secondi non lo toglie (`togliGuscio` tace finche' c'e' navRicordata).
+   LA RETE DEI TRE SECONDI: se la pagina non e' pronta, si abbandona la
+   ricostruzione, si mette a schermo la sua MADRE (MADRE_RICARICA; le
+   pagine che si disegnano da sole all'ingresso sono madri di se
+   stesse), si scrive la entry e il velo scende. Nessun avviso (decisione
+   di Andrea): e' la rete lenta, non una pagina sparita. I passi ancora in
+   volo — l'annuncio chiesto al server, il carrello salvato, il negozio —
+   guardano `navRicordataTarda` prima di disegnare, e la ricostruzione
+   arrivata tardi non fa niente: dopo la madre non salta piu' nulla. E
+   resta la rete dei quattro secondi dell'head, che il velo lo toglie
+   comunque. */
+let sciogliPaginaRicordata = () => {};
+let navRicordataTarda = false;
+const TETTO_RICARICA = 3000;
+const MADRE_RICARICA = {p2pordine: 'p2pmiei', ordine: 'affari', dettaglio: 'esplora',
+  negozio: 'esplora', pacco: 'esplora', acquisto: 'esplora', classifica: 'esplora'};
+function armaVeloRicarica(){
+  sciogliPaginaRicordata = vetrinaDisegnata;
+  vetrinaDisegnata = () => {};
+  setTimeout(ripiegaPaginaRicordata, TETTO_RICARICA);
+}
+function ripiegaPaginaRicordata(){
+  const s = navRicordata;
+  if (!s) return;                 /* arrivata in tempo, o fermata da un indietro */
+  /* i passi in volo e la ricostruzione arrivata tardi lo leggono: dopo la
+     madre non disegnano niente */
+  navRicordataTarda = true;
+  const b = s.pila[0], m = MADRE_RICARICA[b.v];
+  try {
+    if (b.v === 'p2pmiei') rimettiFiltroMieiP2P(b.f);
+    navRendiVista(m ? {t:'v', v: m, k: m === 'esplora' ? 'esplora|Tutto' : 0} : b);
+  } catch(e) {}
+  navRicordata = null;
+  chiudiPaginaRicordata(s);
+  navFreccia(navPila());
+  /* il velo scende dalla catena di sempre (l'ultima riga del file), dopo
+     le immagini in vista, come all'apertura */
+  sciogliPaginaRicordata();
 }
 /* Il filtro di «I miei scambi» nella entry, per la sola ricarica del
    sito: 'gruppi|verso' ('morti,fatti|vendo'), '' col filtro spento. E'
@@ -17099,6 +17174,7 @@ function navMotore(){
   try { history.scrollRestoration = 'manual'; } catch(e){}
   navRicordata = paginaRicordata(history.state);
   if (navRicordata) spegniLinkDaUrl();
+  if (navRicordata) armaVeloRicarica();
   else try { history.replaceState({app:'brt', pila: navPila(), d:0, sotto: []}, '', location.href); } catch(e){}
   /* Il callback e' un microtask: gira ancora dentro il task del gesto
      dell'utente (l'entry non viene marcata saltabile) e COALESCE i piu'
@@ -17112,6 +17188,7 @@ function navMotore(){
     /* un indietro mentre l'avvio non e' ancora arrivato alla pagina
        ricordata: vince il dito, e la ricostruzione non parte piu' */
     if (navRicordata) { navRicordata = null; navRicordataPresa = true; }
+    sciogliPaginaRicordata();   /* ...e il velo non aspetta piu' lei */
     /* Chrome ha gia' mostrato la pagina d'arrivo: si arriva secchi. In
        Telegram quel segnale non e' mai vero, e la guardia lo dice */
     if (e.hasUAVisualTransition && !tg?.initData) navArrivoSecco();

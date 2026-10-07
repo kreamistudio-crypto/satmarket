@@ -83917,6 +83917,9 @@ let navSpingi = false, navGradinoReparto = 0, navApplicando = false, uscitaDopoA
 /* (7 ott 2026) la ricarica resta dove si era: qui non si ricarica mai, e
    il filtro di «I miei scambi» resta spento */
 let navRicordata = null, navRicordataPresa = false, p2pMieiFiltro = [], p2pMieiVerso = 'tutti';
+/* (7 ott 2026) ...e il popstate scioglie il velo della ricarica, che qui
+   non c'e' (la ricarica senza il lampo: prove_ricarica_resta) */
+let sciogliPaginaRicordata = () => {};
 /* (6 ott 2026) la gemella dell'annullo: «Salva per dopo» del carrello */
 let uscitaDopoSalva = false;
 /* (6 ott 2026) il dettaglio del libro: l'ordine, il metodo e la cifra
@@ -84702,7 +84705,7 @@ const listePos = {}, LISTE_RITORNO = {negozio: () => ''};
 const window = {scrollTo(){}};
 const pausa = () => new Promise(r => setImmediate(r));
 /* il mondo fuori dal documento: Telegram, l'app, il browser */
-const tg = {get initData(){ return B.modo === 'tg' ? 'x' : ''; }, close(){ B.chiuso++; },
+const tg = {get initData(){ return B.modo === 'tg' ? 'x' : ''; }, close(){ B.chiuso++; }, ready(){},
   BackButton: {show(){}, hide(){}}, isVersionAtLeast: () => true,
   disableVerticalSwipes(){}, onEvent(){}};
 function matchMedia(){ return {get matches(){ return B.modo === 'apk'; }}; }
@@ -84710,6 +84713,19 @@ const navigator = {get userAgent(){ return B.modo === 'apk'
   ? 'Mozilla/5.0 (Linux; Android 16) Chrome/153' : 'Mozilla/5.0 (Windows NT 10.0) Chrome/153'; }};
 class CloseWatcher { destroy(){} }
 function requestAnimationFrame(f){ setImmediate(f); }
+/* (7 ott 2026, la ricarica senza il lampo) L'OROLOGIO E' DEL BANCO: i
+   tetti (due secondi del guscio, tre della ricarica) scattano solo
+   quando il banco manda avanti il tempo ('t+3000') */
+function setTimeout(f, ms){ if (vivo()) B.timer.push({doc: MIO, a: B.ora + (ms || 0), f}); return 0; }
+/* IL VELO D'APERTURA: la copertura del sito e di Telegram, il guscio
+   nell'app. Da quando scende si VEDE: `visti` sono le viste che l'occhio
+   ha incontrato in questo documento, nell'ordine */
+let VELO = true;
+B.visti = [];
+function segna(){ const v = CUR + (APERTI.length ? '+' + APERTI.join('+') : '');
+  if (B.visti[B.visti.length - 1] !== v) B.visti.push(v); }
+const NODO_VELO = {remove(){ if (!vivo() || !VELO) return; VELO = false; segna(); }};
+function applicaTema(){} async function immaginiPronte(){}
 /* LA CRONOLOGIA E' DEL BROWSER (B): un documento morto non scrive piu' */
 const history = {
   scrollRestoration: 'auto',
@@ -84745,6 +84761,7 @@ function el(id){
 }
 const document = {
   documentElement: {classList: {add(){}, remove(){}}},
+  getElementById(id){ return id === (B.modo === 'apk' ? 'guscio' : 'copertura') ? NODO_VELO : null; },
   querySelector(s){ if (s === '.view.active') return el('view-' + CUR);
     if (s === '.sheet.open') return APERTI.length ? el(APERTI[0]) : null; return null; },
   querySelectorAll(s){ return s === '.sheet.open' ? APERTI.map(el) : []; }
@@ -84752,9 +84769,11 @@ const document = {
 /* go() vera spegne le viste e poi accende la sua: su una vista che non
    esiste esplode A META', con nessuna vista accesa — la pagina vuota */
 function go(v){ if (!el('view-' + v)) { CUR = ''; throw new TypeError('nessuna vista ' + v); }
-  CUR = v; tocca(); }
+  CUR = v; tocca(); if (!VELO && vivo()) segna(); }
 function toast(t){ if (vivo()) B.toast.push(t); }
-function haptic(){} function renderChips(){} function renderP2P(){} function renderPacco(){} function renderGrid(){}
+function haptic(){} function renderChips(){} function renderP2P(){} function renderPacco(){}
+/* la griglia vera finisce col segnale che il guscio aspetta */
+function renderGrid(){ vetrinaDisegnata(); }
 function rimettiCarrelloPrimaAccordo(){} function salvaCarrello(){} function aggiornaIconaCarrello(){}
 function rileggiVenditore(){ return Promise.resolve(); } function renderClassifica(){}
 function aggiornaPicker(){} function alternaBarattolo(){} function loadListings(){ return Promise.resolve(); }
@@ -84776,31 +84795,40 @@ function openDetail(id){
 function openOrder(id){ currentOrder = orders.find(x => x.id === id); go('ordine'); }
 function apriOrdineP2P(id){ p2pOrdineAperto = id; go('p2pordine'); }
 function ordiniP2P(){ return JSON.parse(B.storage.p2p || '{}'); }
-async function apriNegozio(chi){
+async function apriNegozio(chi, aperto, anteprima, da, ridisegno, ancora){
   await pausa();
-  if (!B.mondo.negozi.includes(chi)) { toast('Negozio non trovato'); return; }
+  if (B.mondo.frenaNegozio) await B.freno;
+  /* la domanda della porta vera: ci si e' ancora? */
+  if (!B.mondo.negozi.includes(chi)) { if (!ancora || ancora()) toast('Negozio non trovato'); return; }
+  if (ancora && !ancora()) return;
   negozioPag.chi = chi; negozioCorrente = {chi}; go('negozio'); }
 function ridisegnaNegozio(chi){ return apriNegozio(chi); }
 /* il server: gli annunci, la classifica, l'uscita */
 async function fetch(url){
   await pausa();
   const m = /\/listings\/(\d+)$/.exec(url);
+  if (m && B.mondo.frenaAnnuncio) await B.freno;
   if (m) return B.mondo.catalogo.includes(Number(m[1]))
     ? {ok: true, json: async () => ({id: Number(m[1])})} : {ok: false};
   return {ok: true, json: async () => ({})};
 }
 /*__CONST__*/
 /*__FUNZIONI__*/
+/*__GUSCIO__*/
 /* l'avvio di cartone: le sue porte anticipate, i dati, il carrello
    salvato che arriva da solo, e poi l'ELENCO VERO di avvia() */
 async function avviaCartone(){
   apriSicurezzaDaUrl(); apriPrivacyDaUrl(); preparaCategoriaDaUrl();
-  if (B.mondo.demo) { DEMO = true; apriPaginaRicordata(); return; }
+  if (B.mondo.demo) { DEMO = true; renderGrid(); apriPaginaRicordata(); return; }
   apriOffertaDaUrl();
   await pausa();
+  /* la rete lenta prima della vetrina: il tetto dei due secondi */
+  if (B.mondo.frenaVetrina) await B.freno;
   listings = B.mondo.prima.filter(id => B.mondo.catalogo.includes(id)).map(id => ({id}));
   orders = B.mondo.ordini.map(id => ({id}));
+  renderGrid();
   const giro = (async () => { await pausa(); await pausa();
+    if (B.mondo.frenaCarrello) await B.freno;
     const c = B.mondo.carrello.filter(id => B.mondo.catalogo.includes(id));
     if (!c.length) return;
     inCatalogo(c.map(id => ({id})));
@@ -84808,7 +84836,10 @@ async function avviaCartone(){
     paccoDati = {sellerId: 9, origineId: c[0]}; })();
   carrelloInArrivo = giro;
   giro.then(() => { if (carrelloInArrivo === giro) carrelloInArrivo = null; });
-  await pausa();
+  /* ordini, offerte e puntate: il tempo in cui la home si vedeva */
+  await pausa(); await pausa(); await pausa();
+  /* ...e la rete lenta prima dell'elenco dei link: la rete dei tre secondi */
+  if (B.mondo.frenaAvvio) await B.freno;
   /*__LISTA__*/
 }
 function fotoQui(){
@@ -84820,8 +84851,9 @@ function fotoQui(){
     c: activeCat,
     f: p2pMieiFiltro.join(',') + '|' + p2pMieiVerso};
 }
+function avvia(){ return avviaCartone(); }
 navMotore();
-avviaCartone();
+/*__CATENA__*/
 """
 
 _RICARICA_GUIDA = r"""
@@ -84835,7 +84867,7 @@ function carica(i){
   /* le entry del documento ricaricato restano sue: si riattraversano col popstate */
   if (vecchio) B.voci.forEach(x => { if (x.doc === vecchio) x.doc = doc; });
   e.doc = doc; B.doc = doc; B.url = e.url; B.popstate = null; B.caricamenti++;
-  const ctx = {B, setImmediate, setTimeout, queueMicrotask, console};
+  const ctx = {B, setImmediate, queueMicrotask, console};
   vm.createContext(ctx); B.ctx = ctx;
   try { vm.runInContext(PROG, ctx); } catch (err) { B.errori.push('carico: ' + String(err && err.message || err)); }
 }
@@ -84846,13 +84878,22 @@ function attraversa(){
   else carica(B.i);   /* un altro documento: si ricarica intero */
 }
 const pausa = () => new Promise(r => setImmediate(r));
-async function scorri(){ for (let g = 0; g < 300; g++) { await pausa(); if (B.coda.length) B.coda.shift()(); } }
+/* i timer scaduti del documento vivo; quelli dei morti non scattano */
+function scadenze(){
+  const ora = B.timer.filter(x => x.a <= B.ora && x.doc === B.doc);
+  B.timer = B.timer.filter(x => x.a > B.ora && x.doc === B.doc);
+  ora.sort((a, b) => a.a - b.a).forEach(x => { try { x.f(); } catch (err) { B.errori.push('timer: ' + err.message); } });
+}
+async function scorri(){ for (let g = 0; g < 300; g++) { await pausa(); scadenze(); if (B.coda.length) B.coda.shift()(); } }
 function passo(p){
   if (p === 'F5') B.coda.push(() => carica(B.i));
   /* il tasto indietro premuto mentre la pagina ricaricata sta ancora partendo */
   else if (p === 'F5+B') B.coda.push(() => { carica(B.i); vm.runInContext('history.back()', B.ctx); });
   else if (p === 'B') vm.runInContext('history.back()', B.ctx);
   else if (p === '<') vm.runInContext('navUltimo = 0; navIndietro();', B.ctx);
+  /* il tempo che passa (i tetti), e la rete lenta che finalmente risponde */
+  else if (p.indexOf('t+') === 0) B.ora += Number(p.slice(2));
+  else if (p === 'libera') B.libera();
   else if (p.indexOf('link:') === 0) {
     B.voci = B.voci.slice(0, B.i + 1); B.voci.push({s: null, url: p.slice(5), doc: 0}); B.i++;
     carica(B.i); }
@@ -84878,15 +84919,18 @@ function registro(){
 }
 function foto(){
   const f = JSON.parse(vm.runInContext('JSON.stringify(fotoQui())', B.ctx));
-  return [f.v, String(f.k), f.f + ' ' + f.c, forma(), registro(), B.toast.join(' / '), B.uscito + B.chiuso];
+  const velo = vm.runInContext('VELO', B.ctx);
+  return [f.v, String(f.k), f.f + ' ' + f.c, forma(), registro(), B.toast.join(' / '), B.uscito + B.chiuso,
+          B.visti.join('>') + (velo ? '|velo' : '')];
 }
 async function giro(modo, passi){
   B = {voci: [{s: null, url: DATI.url || '/', doc: 0}], i: 0, n: 0, doc: 0, coda: [], toast: [],
        storage: {p2p: JSON.stringify({x1: {}, x2: {}})}, modo, viste: DATI.viste, uscito: 0,
-       chiuso: 0, caricamenti: 0, errori: [], popstate: null,
+       chiuso: 0, caricamenti: 0, errori: [], popstate: null, ora: 0, timer: [], visti: [],
        mondo: {catalogo: [1, 2, 3, 4, 5, 7, 40], prima: [1, 2, 3, 4, 5, 7], ordini: [100, 101],
                negozi: ['bob', 'eva'], carrello: [3, 5], demo: false}};
   B.carica = carica; B.attraversa = attraversa;
+  B.freno = new Promise(r => { B.libera = r; });
   carica(0); await scorri();
   const out = [];
   for (const p of passi) { B.toast = []; passo(p); await scorri(); out.push(foto()); }
@@ -84954,7 +84998,10 @@ def _banco_ricarica_resta(mini, scenari, url="/"):
             "function spegniLinkDaUrl(){", "function preparaCategoriaDaUrl(){",
             "function applicaFiltroMieiP2P(){", "function azzeraFiltroMieiP2P(){",
             "function riprendiCarrello(){", "async function apriClassifica(){",
-            "async function esciWeb(){") + porte
+            "async function esciWeb(){",
+            # (7 ott 2026) la ricarica senza il lampo: il velo e la sua rete
+            "function togliGuscio(){", "function chiudiPaginaRicordata(s){",
+            "function armaVeloRicarica(){", "function ripiegaPaginaRicordata(){") + porte
     costanti = (
         _blocco("const RADICI = new Set([", "]);")
         + "".join(_const(n) for n in (
@@ -84973,8 +85020,22 @@ def _banco_ricarica_resta(mini, scenari, url="/"):
               else "apriNegozioDaUrl();")
     i = av.index(inizio)
     lista = av[i:av.index("apriBozzaDaUrl();", i) + len("apriBozzaDaUrl();")]
+    # IL VELO VERO: il segnale e la bandierina del guscio, la diagnosi, il
+    # tetto dei due secondi, le dichiarazioni della ricarica senza il
+    # lampo, e la CATENA dell'ultima riga del file che lo fa scendere
+    guscio = (_blocco("let vetrinaDisegnata;", "let guscioVia = false;")
+              + _blocco("const diagnosiApertura = ", ";")
+              + _blocco("let diagnosiTieneGuscio = ", ";")
+              + _blocco("const TETTO_APERTURA = ", "setTimeout(togliGuscio, TETTO_APERTURA);")
+              + "".join(_blocco(x, ";") for x in (
+                  "let sciogliPaginaRicordata = ", "let navRicordataTarda = ",
+                  "const TETTO_RICARICA = "))
+              + _blocco("const MADRE_RICARICA = {", "};"))
+    catena = _blocco("Promise.allSettled([Promise.race([", "  .finally(() => togliGuscio());")
     prog = (_RICARICA_PROG.replace("/*__CONST__*/", costanti)
             .replace("/*__FUNZIONI__*/", "".join(_intera(f) for f in funz))
+            .replace("/*__GUSCIO__*/", guscio)
+            .replace("/*__CATENA__*/", catena)
             .replace("/*__LISTA__*/", lista))
     viste = sorted(set(re.findall(r'id="view-([a-z0-9]+)"', mini)))
     dati = {"scenari": scenari, "viste": viste, "url": url}
@@ -85049,6 +85110,35 @@ _SCENARI_RICARICA = [
     ["gli altri ricarichi", "sito", ["apriNegozio('bob')", "navDaCapo(); location.reload()"]],
     ["indietro del browser", "sito", ["apriNegozio('bob')", "openDetail(3)", "F5", "B", "B"]],
     ["demo", "sito", ["B.mondo.demo = true; go('p2p')", "F5", "go('p2pinfo')"]],
+    # (7 ott 2026) LA RICARICA SENZA IL LAMPO: la rete lenta ('B.mondo.frena…'
+    # ferma l'avvio, un annuncio, un negozio, il carrello; 'libera' lo fa
+    # arrivare) e il tempo che passa ('t+…'): il velo aspetta la pagina, a
+    # tre secondi la madre, e dopo la madre non si disegna piu' niente
+    ["avvio lento", "sito", ["go('p2p')", "go('p2pmiei')", "B.mondo.frenaAvvio = true", "F5",
+                             "t+2000", "t+1000", "libera"]],
+    ["scambio, avvio lento", "sito", ["go('p2p')", "go('p2pmiei')", "apriOrdineP2P('x1')",
+                                      "B.mondo.frenaAvvio = true", "F5", "t+3000", "libera", "<"]],
+    ["annuncio lento", "sito", ["inCatalogo([{id: 40}]); openDetail(40)",
+                                "B.mondo.frenaAnnuncio = true", "F5", "t+3000", "libera"]],
+    ["negozio lento", "sito", ["apriNegozio('bob')", "B.mondo.frenaNegozio = true", "F5",
+                               "t+3000", "libera"]],
+    ["carrello lento", "sito", ["riprendiCarrello()", "B.mondo.frenaCarrello = true", "F5",
+                                "t+3000", "libera"]],
+    ["ordine, avvio lento", "sito", ["go('affari')", "openOrder(100)", "B.mondo.frenaAvvio = true",
+                                     "F5", "t+3000", "libera"]],
+    ["filtro, avvio lento", "sito", ["go('p2p')", "go('p2pmiei')",
+                                     "el('p2pMieiFiltroSheet').classList.add('open')",
+                                     "p2pMieiFiltroBozza = ['morti']; p2pMieiVersoBozza = 'vendo'; applicaFiltroMieiP2P()",
+                                     "B.mondo.frenaAvvio = true", "F5", "t+3000", "libera"]],
+    ["indietro durante un avvio lento", "sito", ["go('p2p')", "go('p2pmiei')",
+                                                 "B.mondo.frenaAvvio = true", "F5+B", "libera"]],
+    ["pagina in tempo, poi i tre secondi", "sito", ["go('p2p')", "go('p2pmiei')", "F5", "t+3000"]],
+    ["apertura lenta", "sito", ["B.mondo.frenaVetrina = true", "link:/", "t+2000", "libera"]],
+    ["link lento", "sito", ["B.mondo.frenaAvvio = true", "link:/annuncio/7", "t+3000", "libera"]],
+    ["tg: avvio lento", "tg", ["go('p2p')", "go('p2pmiei')", "B.mondo.frenaVetrina = true", "F5",
+                               "t+2000", "libera"]],
+    ["apk: avvio lento", "apk", ["go('p2p')", "go('p2pmiei')", "B.mondo.frenaVetrina = true", "F5",
+                                 "t+2000", "libera"]],
     ["tg: p2p", "tg", ["go('p2p')", "go('p2pmiei')", "F5", "<"]],
     ["tg: negozio", "tg", ["apriNegozio('bob')", "F5"]],
     ["tg: dettaglio", "tg", ["openDetail(3)", "F5"]],
@@ -85078,245 +85168,344 @@ _SCENARI_RICARICA = [
 # difetto: ogni F5 del sito tornava a «esplora».
 _ATTESI_RICARICA = {
     'esplora': [
-        'esplora Tutto |tutti Tutto [esplora]',
+        'esplora Tutto |tutti Tutto [esplora] visto:esplora',
     ],
     'reparto': [
-        'esplora Casa |tutti Casa [esplora esplora]',
-        'esplora Casa |tutti Casa [esplora esplora]',
-        'esplora Tutto |tutti Tutto [esplora]',
+        'esplora Casa |tutti Casa [esplora esplora] visto:esplora',
+        'esplora Casa |tutti Casa [esplora esplora] visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora] visto:esplora',
     ],
     'dettaglio': [
-        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
-        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
-        'esplora Tutto |tutti Tutto [esplora]',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio] visto:esplora>dettaglio',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio] visto:dettaglio',
+        'esplora Tutto |tutti Tutto [esplora] visto:dettaglio>esplora',
     ],
     'dettaglio oltre la prima pagina': [
-        'dettaglio 40 |tutti Tutto [esplora dettaglio]',
-        'dettaglio 40 |tutti Tutto [esplora dettaglio]',
+        'dettaglio 40 |tutti Tutto [esplora dettaglio] visto:esplora>dettaglio',
+        'dettaglio 40 |tutti Tutto [esplora dettaglio] visto:dettaglio',
     ],
     'negozio': [
-        'negozio bob |tutti Tutto [esplora negozio]',
-        'negozio bob |tutti Tutto [esplora negozio]',
-        'esplora Tutto |tutti Tutto [esplora]',
+        'negozio bob |tutti Tutto [esplora negozio] visto:esplora>negozio',
+        'negozio bob |tutti Tutto [esplora negozio] visto:negozio',
+        'esplora Tutto |tutti Tutto [esplora] visto:negozio>esplora',
     ],
     'carrello': [
-        'pacco - |tutti Tutto [esplora pacco]',
-        'pacco - |tutti Tutto [esplora pacco]',
-        'esplora Tutto |tutti Tutto [esplora]',
+        'pacco - |tutti Tutto [esplora pacco] visto:esplora>pacco',
+        'pacco - |tutti Tutto [esplora pacco] visto:pacco',
+        'esplora Tutto |tutti Tutto [esplora] visto:pacco>esplora',
     ],
     'cassa': [
-        'acquisto - |tutti Tutto [esplora acquisto]',
-        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
+        'acquisto - |tutti Tutto [esplora acquisto] visto:esplora>acquisto',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio] visto:dettaglio',
     ],
     'cassa del set': [
-        'pacco - |tutti Tutto [esplora pacco]',
-        'acquisto - |tutti Tutto [esplora pacco acquisto]',
-        'pacco - |tutti Tutto [esplora pacco]',
+        'pacco - |tutti Tutto [esplora pacco] visto:esplora>pacco',
+        'acquisto - |tutti Tutto [esplora pacco acquisto] visto:esplora>pacco>acquisto',
+        'pacco - |tutti Tutto [esplora pacco] visto:pacco',
     ],
     'ordine': [
-        'affari - |tutti Tutto [esplora affari]',
-        'ordine 100 |tutti Tutto [esplora affari ordine]',
-        'ordine 100 |tutti Tutto [esplora affari ordine]',
-        'affari - |tutti Tutto [esplora affari]',
+        'affari - |tutti Tutto [esplora affari] visto:esplora>affari',
+        'ordine 100 |tutti Tutto [esplora affari ordine] visto:esplora>affari>ordine',
+        'ordine 100 |tutti Tutto [esplora affari ordine] visto:ordine',
+        'affari - |tutti Tutto [esplora affari] visto:ordine>affari',
     ],
     'radici': [
-        'affari - |tutti Tutto [esplora affari]',
-        'affari - |tutti Tutto [esplora affari]',
-        'profilo - |tutti Tutto [esplora profilo]',
-        'profilo - |tutti Tutto [esplora profilo]',
-        'vendi - |tutti Tutto [esplora vendi]',
-        'vendi - |tutti Tutto [esplora vendi]',
+        'affari - |tutti Tutto [esplora affari] visto:esplora>affari',
+        'affari - |tutti Tutto [esplora affari] visto:affari',
+        'profilo - |tutti Tutto [esplora profilo] visto:affari>profilo',
+        'profilo - |tutti Tutto [esplora profilo] visto:profilo',
+        'vendi - |tutti Tutto [esplora vendi] visto:profilo>vendi',
+        'vendi - |tutti Tutto [esplora vendi] visto:vendi',
     ],
     'classifica': [
-        'classifica letta |tutti Tutto [esplora classifica]',
-        'classifica letta |tutti Tutto [esplora classifica]',
+        'classifica letta |tutti Tutto [esplora classifica] visto:esplora>classifica',
+        'classifica letta |tutti Tutto [esplora classifica] visto:classifica',
     ],
     'pagine fisse': [
-        'sicurezza - |tutti Tutto [esplora sicurezza]',
-        'sicurezza - |tutti Tutto [esplora sicurezza]',
-        'esplora Tutto |tutti Tutto [esplora]',
-        'privacy - |tutti Tutto [esplora privacy]',
-        'privacy - |tutti Tutto [esplora privacy]',
-        'esplora Tutto |tutti Tutto [esplora]',
-        'consigliati - |tutti Tutto [esplora consigliati]',
-        'consigliati - |tutti Tutto [esplora consigliati]',
+        'sicurezza - |tutti Tutto [esplora sicurezza] visto:esplora>sicurezza',
+        'sicurezza - |tutti Tutto [esplora sicurezza] visto:sicurezza',
+        'esplora Tutto |tutti Tutto [esplora] visto:sicurezza>esplora',
+        'privacy - |tutti Tutto [esplora privacy] visto:sicurezza>esplora>privacy',
+        'privacy - |tutti Tutto [esplora privacy] visto:privacy',
+        'esplora Tutto |tutti Tutto [esplora] visto:privacy>esplora',
+        'consigliati - |tutti Tutto [esplora consigliati] visto:privacy>esplora>consigliati',
+        'consigliati - |tutti Tutto [esplora consigliati] visto:consigliati',
     ],
     'p2p': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'p2p - |tutti Tutto [esplora p2p]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'p2pinfo - |tutti Tutto [esplora p2p p2pinfo]',
-        'p2pinfo - |tutti Tutto [esplora p2p p2pinfo]',
-        'p2p - |tutti Tutto [esplora p2p]',
-        'esplora Tutto |tutti Tutto [esplora]',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2p - |tutti Tutto [esplora p2p] visto:p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:p2p>p2pmiei',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:p2pmiei',
+        'p2pinfo - |tutti Tutto [esplora p2p p2pinfo] visto:p2pmiei>p2pinfo',
+        'p2pinfo - |tutti Tutto [esplora p2p p2pinfo] visto:p2pinfo',
+        'p2p - |tutti Tutto [esplora p2p] visto:p2pinfo>p2p',
+        'esplora Tutto |tutti Tutto [esplora] visto:p2pinfo>p2p>esplora',
     ],
     'scambio': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine]',
-        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'p2p - |tutti Tutto [esplora p2p]',
-        'esplora Tutto |tutti Tutto [esplora]',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine] visto:esplora>p2p>p2pmiei>p2pordine',
+        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine] visto:p2pordine',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:p2pordine>p2pmiei',
+        'p2p - |tutti Tutto [esplora p2p] visto:p2pordine>p2pmiei>p2p',
+        'esplora Tutto |tutti Tutto [esplora] visto:p2pordine>p2pmiei>p2p>esplora',
     ],
     'filtro': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'p2pmiei+p2pMieiFiltroSheet - |tutti Tutto [esplora p2p p2pmiei p2pmiei+p2pMieiFiltroSheet]',
-        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei{morti|vendo}]',
-        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei{morti|vendo}]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2pmiei+p2pMieiFiltroSheet - |tutti Tutto [esplora p2p p2pmiei p2pmiei+p2pMieiFiltroSheet] visto:esplora>p2p>p2pmiei',
+        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei{morti|vendo}] visto:esplora>p2p>p2pmiei',
+        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei{morti|vendo}] visto:p2pmiei',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:p2pmiei',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:p2pmiei',
     ],
     'foglio aperto': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'p2p+p2pDettSheet - |tutti Tutto [esplora p2p p2p+p2pDettSheet]',
-        'p2p - |tutti Tutto [esplora p2p]',
-        'esplora Tutto |tutti Tutto [esplora]',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2p+p2pDettSheet - |tutti Tutto [esplora p2p p2p+p2pDettSheet] visto:esplora>p2p',
+        'p2p - |tutti Tutto [esplora p2p] visto:p2p',
+        'esplora Tutto |tutti Tutto [esplora] visto:p2p>esplora',
     ],
     'foglio nel mercatino': [
-        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
-        'dettaglio+paySheet 3 |tutti Tutto [esplora dettaglio dettaglio+paySheet]',
-        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
-        'esplora Tutto |tutti Tutto [esplora]',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio] visto:esplora>dettaglio',
+        'dettaglio+paySheet 3 |tutti Tutto [esplora dettaglio dettaglio+paySheet] visto:esplora>dettaglio',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio] visto:dettaglio',
+        'esplora Tutto |tutti Tutto [esplora] visto:dettaglio>esplora',
     ],
     'scambio sparito': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine]',
-        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine]',
-        "p2pmiei - |tutti Tutto [esplora p2p p2pmiei] toast:Questo scambio non c'è più su questo dispositivo: ecco i tuoi scambi",
-        'p2p - |tutti Tutto [esplora p2p]',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine] visto:esplora>p2p>p2pmiei>p2pordine',
+        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine] visto:esplora>p2p>p2pmiei>p2pordine',
+        "p2pmiei - |tutti Tutto [esplora p2p p2pmiei] toast:Questo scambio non c'è più su questo dispositivo: ecco i tuoi scambi visto:p2pmiei",
+        'p2p - |tutti Tutto [esplora p2p] visto:p2pmiei>p2p',
     ],
     'annuncio sparito': [
-        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
-        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
-        "esplora Tutto |tutti Tutto [esplora] toast:Questo annuncio non c'è più: ti riporto al mercatino",
+        'dettaglio 3 |tutti Tutto [esplora dettaglio] visto:esplora>dettaglio',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio] visto:esplora>dettaglio',
+        "esplora Tutto |tutti Tutto [esplora] toast:Questo annuncio non c'è più: ti riporto al mercatino visto:esplora",
     ],
     'ordine sparito': [
-        'affari - |tutti Tutto [esplora affari]',
-        'ordine 100 |tutti Tutto [esplora affari ordine]',
-        'ordine 100 |tutti Tutto [esplora affari ordine]',
-        "affari - |tutti Tutto [esplora affari] toast:Questo ordine non c'è più fra i tuoi: ecco i tuoi Ordini",
+        'affari - |tutti Tutto [esplora affari] visto:esplora>affari',
+        'ordine 100 |tutti Tutto [esplora affari ordine] visto:esplora>affari>ordine',
+        'ordine 100 |tutti Tutto [esplora affari ordine] visto:esplora>affari>ordine',
+        "affari - |tutti Tutto [esplora affari] toast:Questo ordine non c'è più fra i tuoi: ecco i tuoi Ordini visto:affari",
     ],
     'negozio sparito': [
-        'negozio bob |tutti Tutto [esplora negozio]',
-        'negozio bob |tutti Tutto [esplora negozio]',
-        'esplora Tutto |tutti Tutto [esplora] toast:Negozio non trovato',
+        'negozio bob |tutti Tutto [esplora negozio] visto:esplora>negozio',
+        'negozio bob |tutti Tutto [esplora negozio] visto:esplora>negozio',
+        'esplora Tutto |tutti Tutto [esplora] toast:Negozio non trovato visto:esplora',
     ],
     'carrello svuotato': [
-        'pacco - |tutti Tutto [esplora pacco]',
-        'pacco - |tutti Tutto [esplora pacco]',
-        'esplora Tutto |tutti Tutto [esplora] toast:Il carrello è vuoto: ti riporto al mercatino',
+        'pacco - |tutti Tutto [esplora pacco] visto:esplora>pacco',
+        'pacco - |tutti Tutto [esplora pacco] visto:esplora>pacco',
+        'esplora Tutto |tutti Tutto [esplora] toast:Il carrello è vuoto: ti riporto al mercatino visto:esplora',
     ],
     'link esterno': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'dettaglio 7 |tutti Tutto [esplora p2p p2pmiei esplora dettaglio] registro-a-meta',
-        'dettaglio 7 |tutti Tutto [esplora p2p p2pmiei esplora dettaglio] registro-a-meta',
-        'p2p - |tutti Tutto [esplora p2p p2pmiei esplora p2p] registro-a-meta',
-        'p2p - |tutti Tutto [esplora p2p p2pmiei esplora p2p] registro-a-meta',
-        'esplora Tutto |tutti Tutto [esplora p2p p2pmiei esplora] registro-a-meta',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'dettaglio 7 |tutti Tutto [esplora p2p p2pmiei esplora dettaglio] registro-a-meta visto:esplora>dettaglio',
+        'dettaglio 7 |tutti Tutto [esplora p2p p2pmiei esplora dettaglio] registro-a-meta visto:dettaglio',
+        'p2p - |tutti Tutto [esplora p2p p2pmiei esplora p2p] registro-a-meta visto:dettaglio>p2p',
+        'p2p - |tutti Tutto [esplora p2p p2pmiei esplora p2p] registro-a-meta visto:p2p',
+        'esplora Tutto |tutti Tutto [esplora p2p p2pmiei esplora] registro-a-meta visto:p2p>esplora',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:p2pmiei',
     ],
     'link al p2p': [
-        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
-        'p2p - |tutti Tutto [esplora dettaglio esplora p2p] registro-a-meta',
-        'p2p - |tutti Tutto [esplora dettaglio esplora p2p] registro-a-meta',
-        'dettaglio 3 |tutti Tutto [esplora dettaglio esplora p2p dettaglio] registro-a-meta',
-        'dettaglio 3 |tutti Tutto [esplora dettaglio esplora p2p dettaglio] registro-a-meta',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio] visto:esplora>dettaglio',
+        'p2p - |tutti Tutto [esplora dettaglio esplora p2p] registro-a-meta visto:esplora>p2p',
+        'p2p - |tutti Tutto [esplora dettaglio esplora p2p] registro-a-meta visto:p2p',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio esplora p2p dettaglio] registro-a-meta visto:p2p>dettaglio',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio esplora p2p dettaglio] registro-a-meta visto:dettaglio',
     ],
     'link a un reparto': [
-        'esplora Casa |tutti Casa [esplora esplora] registro-a-meta',
-        'p2p - |tutti Casa [esplora esplora p2p] registro-a-meta',
-        'p2p - |tutti Tutto [esplora esplora p2p] registro-a-meta',
-        'esplora Casa |tutti Casa [esplora esplora] registro-a-meta',
+        'esplora Casa |tutti Casa [esplora esplora] registro-a-meta visto:esplora',
+        'p2p - |tutti Casa [esplora esplora p2p] registro-a-meta visto:esplora>p2p',
+        'p2p - |tutti Tutto [esplora esplora p2p] registro-a-meta visto:p2p',
+        'esplora Casa |tutti Casa [esplora esplora] registro-a-meta visto:p2p>esplora',
     ],
     "vista che non c'e' piu'": [
-        'esplora Tutto |tutti Tutto [boh]',
-        'esplora Tutto |tutti Tutto [esplora]',
-        'p2p - |tutti Tutto [esplora p2p]',
+        'esplora Tutto |tutti Tutto [boh] visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora] visto:esplora',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
     ],
     "indietro durante l'avvio": [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'p2p - |tutti Tutto [esplora p2p]',
-        'esplora Tutto |tutti Tutto [esplora]',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2p - |tutti Tutto [esplora p2p] visto:p2p',
+        'esplora Tutto |tutti Tutto [esplora] visto:p2p>esplora',
     ],
     'esci': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
-        'p2p - |tutti Tutto [esplora p2p]',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta visto:esplora',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
     ],
     'gli altri ricarichi': [
-        'negozio bob |tutti Tutto [esplora negozio]',
-        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+        'negozio bob |tutti Tutto [esplora negozio] visto:esplora>negozio',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
     ],
     'indietro del browser': [
-        'negozio bob |tutti Tutto [esplora negozio]',
-        'dettaglio 3 |tutti Tutto [esplora negozio dettaglio]',
-        'dettaglio 3 |tutti Tutto [esplora negozio dettaglio]',
-        'negozio bob |tutti Tutto [esplora negozio]',
-        'esplora Tutto |tutti Tutto [esplora]',
+        'negozio bob |tutti Tutto [esplora negozio] visto:esplora>negozio',
+        'dettaglio 3 |tutti Tutto [esplora negozio dettaglio] visto:esplora>negozio>dettaglio',
+        'dettaglio 3 |tutti Tutto [esplora negozio dettaglio] visto:dettaglio',
+        'negozio bob |tutti Tutto [esplora negozio] visto:dettaglio>negozio',
+        'esplora Tutto |tutti Tutto [esplora] visto:dettaglio>negozio>esplora',
     ],
     'demo': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
-        'p2pinfo - |tutti Tutto [esplora esplora p2p p2pinfo] registro-a-meta',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
+        'p2pinfo - |tutti Tutto [esplora esplora p2p p2pinfo] registro-a-meta visto:esplora>p2pinfo',
+    ],
+    'avvio lento': [
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'esplora Tutto |tutti Tutto [esplora p2p p2pmiei] visto:|velo',
+        'esplora Tutto |tutti Tutto [esplora p2p p2pmiei] visto:|velo',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:p2pmiei',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:p2pmiei',
+    ],
+    'scambio, avvio lento': [
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine] visto:esplora>p2p>p2pmiei>p2pordine',
+        'p2pordine x1 |tutti Tutto [esplora p2p p2pmiei p2pordine] visto:esplora>p2p>p2pmiei>p2pordine',
+        'esplora Tutto |tutti Tutto [esplora p2p p2pmiei p2pordine] visto:|velo',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:p2pmiei',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:p2pmiei',
+        'p2p - |tutti Tutto [esplora p2p] visto:p2pmiei>p2p',
+    ],
+    'annuncio lento': [
+        'dettaglio 40 |tutti Tutto [esplora dettaglio] visto:esplora>dettaglio',
+        'dettaglio 40 |tutti Tutto [esplora dettaglio] visto:esplora>dettaglio',
+        'esplora Tutto |tutti Tutto [esplora dettaglio] visto:|velo',
+        'esplora Tutto |tutti Tutto [esplora] visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora] visto:esplora',
+    ],
+    'negozio lento': [
+        'negozio bob |tutti Tutto [esplora negozio] visto:esplora>negozio',
+        'negozio bob |tutti Tutto [esplora negozio] visto:esplora>negozio',
+        'esplora Tutto |tutti Tutto [esplora negozio] visto:|velo',
+        'esplora Tutto |tutti Tutto [esplora] visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora] visto:esplora',
+    ],
+    'carrello lento': [
+        'pacco - |tutti Tutto [esplora pacco] visto:esplora>pacco',
+        'pacco - |tutti Tutto [esplora pacco] visto:esplora>pacco',
+        'esplora Tutto |tutti Tutto [esplora pacco] visto:|velo',
+        'esplora Tutto |tutti Tutto [esplora] visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora] visto:esplora',
+    ],
+    'ordine, avvio lento': [
+        'affari - |tutti Tutto [esplora affari] visto:esplora>affari',
+        'ordine 100 |tutti Tutto [esplora affari ordine] visto:esplora>affari>ordine',
+        'ordine 100 |tutti Tutto [esplora affari ordine] visto:esplora>affari>ordine',
+        'esplora Tutto |tutti Tutto [esplora affari ordine] visto:|velo',
+        'affari - |tutti Tutto [esplora affari] visto:affari',
+        'affari - |tutti Tutto [esplora affari] visto:affari',
+    ],
+    'filtro, avvio lento': [
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2pmiei+p2pMieiFiltroSheet - |tutti Tutto [esplora p2p p2pmiei p2pmiei+p2pMieiFiltroSheet] visto:esplora>p2p>p2pmiei',
+        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei{morti|vendo}] visto:esplora>p2p>p2pmiei',
+        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei{morti|vendo}] visto:esplora>p2p>p2pmiei',
+        'esplora Tutto |tutti Tutto [esplora p2p p2pmiei{morti|vendo}] visto:|velo',
+        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei{morti|vendo}] visto:p2pmiei',
+        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei{morti|vendo}] visto:p2pmiei',
+    ],
+    'indietro durante un avvio lento': [
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2p - |tutti Tutto [esplora p2p] visto:p2p',
+        'p2p - |tutti Tutto [esplora p2p] visto:p2p',
+    ],
+    'pagina in tempo, poi i tre secondi': [
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:p2pmiei',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:p2pmiei',
+    ],
+    'apertura lenta': [
+        'esplora Tutto |tutti Tutto [esplora] visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:|velo',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
+    ],
+    'link lento': [
+        'esplora Tutto |tutti Tutto [esplora] visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
+        'dettaglio 7 |tutti Tutto [esplora esplora dettaglio] registro-a-meta visto:esplora>dettaglio',
+    ],
+    'tg: avvio lento': [
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta visto:|velo',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta visto:esplora',
+    ],
+    'apk: avvio lento': [
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta visto:|velo',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta visto:esplora',
     ],
     'tg: p2p': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
-        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta uscito:1',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta uscito:1 visto:esplora',
     ],
     'tg: negozio': [
-        'negozio bob |tutti Tutto [esplora negozio]',
-        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+        'negozio bob |tutti Tutto [esplora negozio] visto:esplora>negozio',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
     ],
     'tg: dettaglio': [
-        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
-        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio] visto:esplora>dettaglio',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
     ],
     'tg: filtro': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'p2pmiei+p2pMieiFiltroSheet - |tutti Tutto [esplora p2p p2pmiei p2pmiei+p2pMieiFiltroSheet]',
-        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei]',
-        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
-        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2pmiei+p2pMieiFiltroSheet - |tutti Tutto [esplora p2p p2pmiei p2pmiei+p2pMieiFiltroSheet] visto:esplora>p2p>p2pmiei',
+        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta visto:esplora',
     ],
     'tg: esci': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
     ],
     'apk: p2p': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
-        'p2p - |tutti Tutto [esplora p2p]',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta visto:esplora',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
     ],
     'apk: negozio': [
-        'negozio bob |tutti Tutto [esplora negozio]',
-        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+        'negozio bob |tutti Tutto [esplora negozio] visto:esplora>negozio',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
     ],
     'apk: dettaglio': [
-        'dettaglio 3 |tutti Tutto [esplora dettaglio]',
-        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+        'dettaglio 3 |tutti Tutto [esplora dettaglio] visto:esplora>dettaglio',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
     ],
     'apk: filtro': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei]',
-        'p2pmiei+p2pMieiFiltroSheet - |tutti Tutto [esplora p2p p2pmiei p2pmiei+p2pMieiFiltroSheet]',
-        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei]',
-        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
-        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'p2pmiei+p2pMieiFiltroSheet - |tutti Tutto [esplora p2p p2pmiei p2pmiei+p2pMieiFiltroSheet] visto:esplora>p2p>p2pmiei',
+        'p2pmiei - morti|vendo Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora p2p esplora] registro-a-meta visto:esplora',
     ],
     'apk: esci': [
-        'p2p - |tutti Tutto [esplora p2p]',
-        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta',
+        'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
     ],
 }
 
@@ -85421,6 +85610,45 @@ def prove_ricarica_resta():
           "P2P_GRUPPI.some(y => y.k === x)" in _f("function rimettiFiltroMieiP2P(f){")
           and "P2P_VERSI_MIEI.some(y => y.k === v) ? v : 'tutti'" in _f("function rimettiFiltroMieiP2P(f){"))
 
+    # --- 1b) LA RICARICA SENZA IL LAMPO (7 ott 2026) ---------------------
+    tgu = _f("function togliGuscio(){")
+    arma = _f("function armaVeloRicarica(){")
+    rip = _f("function ripiegaPaginaRicordata(){")
+    rif = _f("async function rifaiPaginaRicordata(b){")
+
+    def _in_ordine(testo, *pezzi):
+        """ogni pezzo c'e', e nell'ordine dato (mai un'eccezione: un pezzo
+        tolto e' una rossa, non una sezione che esplode)"""
+        pos = [testo.find(p) for p in pezzi]
+        return -1 not in pos and pos == sorted(pos)
+    prova("il velo non scende col tetto dei due secondi mentre si ricostruisce", True,
+          tgu.split("\n")[2].strip().startswith("if (diagnosiTieneGuscio) return;")
+          and "  if (navRicordata) return;\n" in tgu
+          and _in_ordine(tgu, "if (navRicordata) return;", "guscioVia = true;"))
+    prova("...il segnale del guscio si mette da parte, e la rete dei tre secondi si arma", True,
+          "  sciogliPaginaRicordata = vetrinaDisegnata;\n  vetrinaDisegnata = () => {};\n"
+          "  setTimeout(ripiegaPaginaRicordata, TETTO_RICARICA);" in arma
+          and "if (navRicordata) armaVeloRicarica();" in mo
+          and _in_ordine(mo, "navRicordata = paginaRicordata(", "armaVeloRicarica();"))
+    prova("...tre secondi, e le madri della tabella di Andrea", [1, 1], [
+          mini.count("const TETTO_RICARICA = 3000;"),
+          mini.count("const MADRE_RICARICA = {p2pordine: 'p2pmiei', ordine: 'affari', dettaglio: 'esplora',\n"
+                     "  negozio: 'esplora', pacco: 'esplora', acquisto: 'esplora', classifica: 'esplora'};")])
+    prova("...e la catena dell'ultima riga e' quella di sempre: aspetta lo stesso segnale", 1,
+          mini.count("Promise.allSettled([Promise.race([guscioVetrina, avvia()]),"))
+    prova("la pagina pronta scioglie il velo; arrivata tardi non fa niente", True,
+          apr.rstrip().endswith("sciogliPaginaRicordata();")
+          and _in_ordine(apr, "if (navRicordataTarda) return;", "navRicordata = null;"))
+    prova("...e un indietro durante l'avvio lo scioglie anche lui", True,
+          "    if (navRicordata) { navRicordata = null; navRicordataPresa = true; }\n"
+          "    sciogliPaginaRicordata();" in mo)
+    prova("i passi in volo non disegnano dopo la madre: annuncio, carrello, negozio", [2, True], [
+          rif.count("if (navRicordataTarda) return '';"),
+          "await apriNegozio(k, false, undefined, undefined, true, () => !navRicordataTarda);" in rif])
+    prova("la rete dei tre secondi: madre, entry, e il segnale del velo — in quest'ordine", True,
+          _in_ordine(rip, "if (!s) return;", "navRicordataTarda = true;", "navRendiVista(",
+                     "chiudiPaginaRicordata(s);", "sciogliPaginaRicordata();"))
+
     # --- 2) IL BANCO: le funzioni vere, un documento nuovo a ogni F5 ---
     out, err = _banco_ricarica_resta(mini, _SCENARI_RICARICA)
     if out is None:
@@ -85431,9 +85659,10 @@ def prove_ricarica_resta():
         return
 
     def _riga(x):
-        v, k, f, forma, reg, toast, usc = x
+        v, k, f, forma, reg, toast, usc, visti = x
         return (f"{v} {k or '-'} {f} [{forma}]" + ("" if reg else " registro-a-meta")
-                + (f" toast:{toast}" if toast else "") + (f" uscito:{usc}" if usc else ""))
+                + (f" toast:{toast}" if toast else "") + (f" uscito:{usc}" if usc else "")
+                + f" visto:{visti}")
 
     for nome, modo, passi in _SCENARI_RICARICA:
         r = out.get(nome) or {"passi": [], "errori": ["manca"]}
@@ -109345,6 +109574,9 @@ def prove_guscio_barra_e_scarto():
         # di cartone — dal video, il primo giro la dava subito e la barra
         # diventava scura sopra il guscio ancora arancio
         js = ("let guscioVia = false, diagnosiTieneGuscio = false;\n"
+              # (7 ott 2026) togliGuscio tace durante una ricostruzione
+              # (prove_ricarica_resta): qui non ce n'e' nessuna
+              "let navRicordata = null;\n"
               "const fatti = [];\nlet coda = [];\n"
               "globalThis.requestAnimationFrame = f => coda.push(f);\n"
               "globalThis.applicaTema = () => fatti.push('tema');\n"
@@ -109562,6 +109794,9 @@ def prove_copertura_home():
 
     # --- 3) togliGuscio, VERA sotto node: l'ordine del gesto ----------
     js2 = ("let guscioVia = false, diagnosiTieneGuscio = false;\n"
+              # (7 ott 2026) togliGuscio tace durante una ricostruzione
+              # (prove_ricarica_resta): qui non ce n'e' nessuna
+              "let navRicordata = null;\n"
            "const fatti = [];\nlet coda = [];\n"
            "globalThis.requestAnimationFrame = f => coda.push(f);\n"
            "globalThis.applicaTema = () => fatti.push('tema');\n"

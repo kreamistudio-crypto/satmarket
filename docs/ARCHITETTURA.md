@@ -17446,7 +17446,17 @@
   della vista, fuori dai confronti) e si rimette solo qui. I cinque
   `location.reload()` nostri (uscita, cambio account, login di
   collaudo, Nostr, collega) chiamano prima `navDaCapo`, che svuota la
-  entry: ripartono dalla home come sempre. Su `file://` (la DEMO a mano) `STORIA` è
+  entry: ripartono dalla home come sempre. E LA RICARICA NON MOSTRA LA
+  HOME (7 ott 2026, il lampo segnalato da Andrea): su una entry
+  ricordata `armaVeloRicarica` mette da parte il segnale che il velo
+  d'apertura aspetta (`vetrinaDisegnata`) — lo scioglie
+  `apriPaginaRicordata` a pagina disegnata, e la catena dell'ultima riga
+  resta quella di sempre — e `togliGuscio` tace finché c'è
+  `navRicordata`; a `TETTO_RICARICA` (3 s) `ripiegaPaginaRicordata` mette
+  a schermo la madre (`MADRE_RICARICA`, le altre pagine sono madri di se
+  stesse), scrive la entry (`chiudiPaginaRicordata`) e scioglie il velo,
+  senza avviso; i passi in volo leggono `navRicordataTarda` e non
+  disegnano più. Su `file://` (la DEMO a mano) `STORIA` è
   falsa e il motore resta spento: `navIndietro` smonta lo strato in
   cima e, se non ce n'è, torna al mercatino — che è la stessa regola
   della radice madre, detta a mano perché lì la cronologia non c'è.
