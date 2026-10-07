@@ -27157,9 +27157,18 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   fra i due telefoni e di qui NON passa). `_avviso_recapito_p2p`: chi
   chiama dev'essere chi vende su quell'ordine (`sell` → maker, `buy` →
   `preso_da`), ordine in `STATI_LIBRO_PRESO`, altra parte annotata e
-  con gli avvisi accesi; freno `P2P_RECAPITO_MAX` (3) e
-  `P2P_RECAPITO_PAUSA_S` (60) su `p2p_ordini.recapito_n` /
-  `.recapito_avviso`, timbro prima dell'invio; la cifra e'
+  con gli avvisi accesi; freno `P2P_RECAPITO_MAX` (dal 7 ott 2026: 10,
+  solo anti-abuso, con la riga «⛔ Recapito P2P» nel journal quando
+  scatta; la pausa fra un avviso e l'altro NON c'è più — ogni cambio
+  avvisa chi compra, anche a raffica)
+  nell'anti-doppione `p2p_avvisi` (`recapito1`…`recapitoN` del giro),
+  timbro prima dell'invio. L'AGGIORNAMENTO (7 ott 2026) dice «📮 X ha
+  aggiornato il recapito. Controlla il nuovo prima di inviare gli
+  euro.», e con `fiat` del coordinatore nel giro la frase dei già
+  inviati («…scrivilo nella chat dello scambio: non inviarli una
+  seconda volta.»); il client lo dichiara anche in `euro_inviati`, ma
+  solo per un recapito nato dopo `euroInviatiAt`. Verbale: CANTIERI,
+  «Chi annulla lo sente anche lui», parte C; la cifra e'
   `p2p_ordini.euro`, scritta dal giudice del libro; il nome quello di
   `_controparti_p2p`. Frase precisa, salta il gate e non lo timbra, e
   NON afferma la garanzia («invia solo se la pagina dice "Sats in
@@ -27340,10 +27349,26 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `deploy/mostro/` (`barattolo_eventi.rs`, 24 agganci, fire-and-forget:
   8 s + un retry a 12 s in un task suo, mai bloccante). Il verbale:
   CANTIERI, «Mostro è l'unica fonte degli avvisi P2P».
+  L'ANNULLO LO SENTE ANCHE CHI LO FA (7 ott 2026, richiesta di Andrea):
+  la SECONDA eccezione al «mai a chi ha fatto il gesto», per le tre
+  facce dell'annullo di una persona — chi si ritira dopo aver preso
+  (`republished`), chi annulla dopo la presa il suo ordine (`''`), chi
+  accetta l'annullo d'accordo (`cooperative`); il ritiro di un ordine
+  mai preso (`pending`) resta muto. Frasi: «❌ Hai annullato lo scambio
+  con X.» / «❌ Hai accettato di annullare: lo scambio con X è
+  annullato.». E A CHI VENDE con la garanzia pagata NEL GIRO (la cronaca
+  di mostrod, `garanzia_bloccata` in `_avvisi_evento_p2p`) ogni frase
+  di chiusura — sua, dell'altro, del moderatore, delle scadenze — dice
+  «I sats che avevi bloccato in garanzia sono tornati a te.», al
+  passato: nella v0.19.0 mostrod manda l'annullo solo DOPO che
+  `cancel_hold_invoice` è riuscita. Il censimento di `prove_p2p_eventi`
+  nomina le due eccezioni; il banco è `prove_avviso_chi_annulla`, il
+  collaudo `collaudo_avviso_chi_annulla.py`. Il verbale: CANTIERI,
+  «Chi annulla lo sente anche lui».
   LA GARANZIA PAGATA LA SENTE ANCHE CHI L'HA PAGATA (19 set 2026, dal
-  giro dal vivo): è l'UNICA eccezione al «mai a chi ha fatto il gesto»,
-  e una prova la tiene unica (il censimento di `prove_p2p_eventi` dà
-  `{"garanzia_pagata"}`: una seconda lo fa rosso). Il perché: la
+  giro dal vivo): fino al 7 ott 2026 era l'UNICA eccezione al «mai a
+  chi ha fatto il gesto» (oggi le eccezioni sono due: vedi l'annullo,
+  qui sopra), e il censimento di `prove_p2p_eventi` la nomina. Il perché: la
   garanzia si paga da un wallet ESTERNO, non con l'app in mano — chi
   torna non ha davanti niente che dica com'è andata, e il passo dopo è
   ancora suo. `_destinatari_evento_p2p` dà `["compra", "vende"]`, e

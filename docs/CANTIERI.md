@@ -36426,6 +36426,17 @@ alla cura 9, e la `-bar7` si fa DOPO il lancio, indicativamente dopo il
 `deploy/mostro/` (e il README del fork dice «nove»), e si fanno anche
 i due controlli in sola lettura sul 1 ott qui sopra.
 
+**PER LA `-bar7`, ANCHE (7 ott 2026, Andrea).** Il ritiro di chi ha
+preso quando altri hanno preso lo stesso ordine con la cauzione: nella
+0.19.0 `cancel_order_by_taker` libera la cauzione di chi si ritira e,
+se restano cauzioni di altri, risponde solo a lui e lascia l'ordine
+parcheggiato — SENZA nessun evento della 0007 (l'aggancio sta in
+`cancel_order_by_taker_inner`, che in quel ramo non gira). Il server
+non lo sa, e nessuno riceve un avviso. Serve un aggancio nel ramo
+`others_remain` (un `canceled` col suo dettaglio), e dal lato server la
+riga che lo racconta a chi si è ritirato. La voce: «Chi annulla lo
+sente anche lui», qui in fondo.
+
 ## I buoni sconto cumulabili o no (6 ott 2026)
 
 Il compito (Andrea): «i codici sconto, intesi come buono sconto, si
@@ -40002,3 +40013,234 @@ collaudi: nel messaggio del commit.
 
 **NON PROVATO.** Il telefono e l'APK: i testi sono più corti, quindi
 non c'è un a-capo nuovo da temere, ma non li ho visti lì.
+## Chi annulla lo sente anche lui: l'avviso a chi annulla e i sats tornati (7 ott 2026, richiesta di Andrea)
+
+Il caso (Andrea): «ho preso un ordine di Alan, ho bloccato i sats in
+garanzia, poi ho annullato. Ad Alan è arrivata la notifica Telegram, a
+me NIENTE». Era la regola, scritta: `_destinatari_evento_p2p` manda
+ogni avviso «alla parte che deve agire o sapere, MAI a chi ha fatto il
+gesto» (chi annulla ha l'app in mano), con una sola eccezione, la
+garanzia pagata da un wallet esterno. Il percorso di Andrea: l'ordine
+d'acquisto di Alan preso da chi vende, garanzia pagata, Alan senza
+fattura → `waiting-buyer-invoice`; l'annullo di chi ha preso è un
+ritiro (`cancel_order_by_taker`: sblocco della garanzia, ordine di
+nuovo in vetrina), evento `canceled`/`republished` → momento
+«tornato», ad Alan «🔄 Andrea ha annullato lo scambio. Il tuo ordine è
+tornato in vetrina», a lui niente.
+
+**Deciso (Andrea, sulla proposta).** A) L'annullo fatto da una persona
+lo sente anche lei: la seconda eccezione alla regola, per le sue tre
+facce — chi si ritira dopo aver preso (`republished`), chi annulla dopo
+la presa il suo ordine (`''`), chi accetta l'annullo d'accordo
+(`cooperative`). Il ritiro di un ordine mai preso (`pending`) resta
+muto: niente bloccato, nessun altro. Le frasi:
+«❌ **Hai annullato lo scambio con X.**» e, per chi accetta, «❌ **Hai
+accettato di annullare: lo scambio con X è annullato.**» — più «I sats
+che avevi bloccato in garanzia sono tornati a te.» se ne aveva.
+B) (il 3b della proposta) La stessa frase a chi vende con la garanzia
+pagata anche quando a chiudere è l'ALTRO, il moderatore o una
+scadenza: oggi leggeva «il tuo ordine è tornato in vetrina» e basta,
+«non devi fare niente», o il generico «i sats eventualmente in garanzia
+tornano a chi vende». A chi compra resta la frase di prima.
+
+**Perché «sono tornati», al passato.** Letto sul sorgente della v0.19.0
+(`src/app/cancel.rs`, `admin_cancel.rs`, `scheduler.rs`): in tutti e
+tre gli annulli delle parti, in quello del moderatore e nelle due
+scadenze `cancel_hold_invoice` gira PRIMA dell'evento della 0007, e se
+fallisce l'evento non parte (col `?`, o lo scheduler salta al giro
+dopo; al capolinea un HTLC oltre la CLTV è rimborsato da LND). Quando
+l'avviso esce, lo sblocco è confermato. E chi si ritira: l'evento parte
+prima che le chiavi dell'ordine si azzerino (`edit_pubkeys_order` sta
+dopo), quindi il server sa chi è — la patch 0007 lo dice nel commento.
+
+**Come.** `_destinatari_evento_p2p`: un ramo suo per «annullato» e
+«tornato», che aggiunge chi ha fatto il gesto sulle tre facce (in
+ordine compra, vende). `_testo_evento_p2p`: un argomento in più,
+`mio_gesto`, e `tornati` — la frase dei sats, solo a chi vende con
+`garanzia_bloccata`. `_avvisi_evento_p2p` scrive `garanzia_bloccata`
+dalla cronaca DEL COORDINATORE (`garanzia_pagata`, fonte `mostro`, NEL
+GIRO dell'evento: lo stesso giudice dell'avviso del recapito), e passa
+`mio_gesto` dall'attore dell'evento. Un POST della garanzia perso fa
+uscire la frase senza i sats: incompleta, mai falsa. La cauzione di chi
+si ritira arriva da sola nella coda che c'era (`_coda_cauzione_p2p`:
+nella 0.19.0 il ritiro la libera). Nessun dato nuovo: il nome è quello
+di `_nome_altro_p2p`, cioè quello che la pagina dello scambio mostra.
+Pausa, interruttore «Avvisi P2P», DM a chi entra da Nostr, timbro
+prima dell'invio: la strada è quella di tutti gli avvisi del
+coordinatore.
+
+**I doppioni.** Ogni persona ha il suo timbro in `p2p_avvisi`
+(ordine, momento, giro, persona); il retry di mostrod si ferma su
+`p2p_momenti`; la riserva del libro tace se il coordinatore ha già
+raccontato lo stesso momento, e se ha parlato per prima il suo timbro
+ferma il coordinatore in ritardo. Provati tutti e tre.
+
+**Le strade scartate.** Un'eccezione per il solo ritiro (il caso di
+Andrea): l'annullo dopo la presa e l'accettazione d'accordo restavano
+muti uguali. Il «sono tornati» anche nelle due frasi di chi NON ha
+proseguito in tempo: chi scade così o compra o la garanzia non l'ha
+pagata — sarebbe codice che non si accende mai, e la tortura lo
+dichiarerebbe equivalente. Un «eventualmente» anche per chi vende: la
+garanzia o c'era o no, e il server lo sa.
+
+**Le frasi, tutte** (X è il nome che la pagina mostra; senza, «chi
+compra» / «chi vende»; S = «I sats che avevi bloccato in garanzia sono
+tornati a te.», solo a chi vende con la garanzia pagata nel giro):
+chi annulla «❌ Hai annullato lo scambio con X.» [S]; chi accetta «❌
+Hai accettato di annullare: lo scambio con X è annullato.» [S]; l'altro,
+annullo «❌ X ha annullato lo scambio.» + S oppure «I sats
+eventualmente in garanzia tornano a chi vende.»; l'altro, accettazione
+«❌ X ha accettato di annullare: lo scambio è annullato.» + idem; il
+ritiro, a chi ha pubblicato «🔄 X ha annullato lo scambio. Il tuo
+ordine è tornato in vetrina: non devi fare niente.» [S]; il moderatore
+«⚖️ Un moderatore ha annullato lo scambio.» + S o il generico;
+scadenza di chi ha pubblicato, all'altro «⏰ Chi aveva pubblicato
+l'ordine non ha proseguito in tempo: lo scambio è annullato, non devi
+fare niente.» [S]; scadenza di chi ha preso, a chi ha pubblicato «🔄
+Chi aveva preso il tuo ordine non ha proseguito. È tornato in vetrina:
+non devi fare niente.» [S]; il capolinea «⏰ La garanzia è arrivata a
+scadenza: lo scambio è annullato.» + S oppure «I sats tornano a chi
+vende.». Le frasi di chi non ha proseguito restano quelle di prima.
+
+**Per la `-bar7`** (Andrea: «scrivila tra le cose per la prossima
+versione»): il ritiro di chi ha preso quando altri hanno preso lo
+stesso ordine con la cauzione non manda nessun evento (ramo
+`others_remain` di `cancel_order_by_taker`), e nessuno è avvisato. La
+nota sta anche nella voce della cauzione («PER LA `-bar7`, ANCHE»).
+
+**Provato.** `prove_avviso_chi_annulla` (32): sentinelle sulle frasi
+parola per parola e sui due giudici; il banco coi giudici VERI su tutti
+i casi della tabella nei due versi (ritiro con e senza garanzia, di chi
+vende e di chi compra; annullo dopo la presa di chi vende e di chi
+compra; l'accordo nei due versi; moderatore; le tre scadenze; il ritiro
+dalla vetrina muto), la garanzia del giro di PRIMA che non vale, il
+nome che manca, gli avvisi spenti, l'altra parte di un altro client, i
+doppioni (retry, riserva che scade dopo, riserva che parla prima).
+`prove_p2p_eventi` aggiornata: la tabella dei destinatari e il
+censimento delle eccezioni, che adesso ne nomina due e le tre facce;
+`prove_cauzione_p2p`: l'accordo con la cauzione, letto per destinatario.
+`collaudo_avviso_chi_annulla.py` (22, nella CI) con la rotta vera
+`/api/p2p/evento`, i suoi task e la sua pausa: gli stessi casi, i
+doppioni con `_giro_attese_p2p` vero, gli avvisi spenti, la cauzione di
+chi si ritira. Tortura sulla copia: 22 su 22 uccise («la garanzia
+anche da fonti non del coordinatore» la prende solo la sentinella: oggi
+nessun'altra fonte scrive quel momento).
+
+**C) Il recapito aggiornato (stesso giro, richiesta di Andrea).**
+Quando chi vende AGGIORNA il recapito dopo averlo già mandato, chi
+compra riceve «📮 **X ha aggiornato il recapito.** Controlla il nuovo
+prima di inviare gli euro.»; se gli euro risultano già inviati — lo dice
+mostrod, `fiat` nel giro, mai il telefono — «📮 **X ha aggiornato il
+recapito dopo che hai segnato gli euro come inviati.** Se li hai già
+inviati al recapito precedente, scrivilo nella chat dello scambio: non
+inviarli una seconda volta.» (proposta mia, approvata). Il primo invio
+resta com'era («💶 X ti ha indicato dove inviare N €: tocca a te.» con
+la sua coda), e col contanti di persona resta «🕒 X ha cambiato
+l'appuntamento.». Da dove si partiva: l'aggiornamento c'era già («💶 X
+ha aggiornato dove inviare N €: tocca a te.»), con un tetto di TRE per
+giro (il primo e due correzioni) e un minuto di pausa; e il client
+smetteva di dichiarare dopo «Ho inviato gli euro», quindi un cambio in
+quel momento — il più pericoloso — non arrivava al server.
+Come il server lo sa senza leggerlo: il telefono di chi vende manda a
+`POST /api/p2p/recapito` il solo id dell'ordine e due sì/no; ogni
+recapito ha un id suo sul telefono, e il server conta i suoi avvisi
+(`recapito1`…`recapitoN` in `p2p_avvisi`): dal secondo è un
+aggiornamento. Deciso (Andrea): FINESTRA di cinque minuti
+(`P2P_RECAPITO_PAUSA_S = 300`: dentro la finestra gli aggiornamenti
+tacciono, la pagina mostra sempre l'ultimo); il tetto di tre TOLTO, ne
+resta uno alto anti-abuso (`P2P_RECAPITO_MAX = 10`) che quando scatta
+scrive nel journal «⛔ Recapito P2P: da <id>, sull'ordine <8>: TETTO
+ANTI-ABUSO: …»; il CLIENT (`avvisaRecapitoP2P`) dichiara anche in
+`euro_inviati`, ma solo per un recapito NATO dopo l'ora del pagato
+(`campo.t` > `euroInviatiAt`, secondi tutti e due, e l'ora sconosciuta
+non vale): un recapito di prima è quello che chi compra ha già visto, e
+un secondo telefono che lo ritrova al render non fa suonare niente. In
+disputa niente.
+Strade scartate: l'avviso RIMANDATO alla fine della finestra (l'ultimo
+aggiornamento di una raffica partirebbe sempre) — più sicuro per chi
+paga, ma non è la regola approvata: resta fra le cose da proporre.
+Provato: `prove_recapito_aggiornato` (19: sentinelle sulle frasi, sui
+due numeri, sul giudice del `fiat`, sulla riga ⛔ e sulla guardia del
+client; il giudice VERO: primo invio, raffica muta col perché,
+aggiornamento a finestra passata, i già inviati, un `fiat` del telefono
+o di un altro giro che non vale, il contanti, il tetto a dieci coi suoi
+timbri); `prove_p2p_recapito_passo` (il client in node: dopo il pagato
+parla solo un recapito nato dopo, non della stessa ora, non in disputa,
+non con l'ora a zero; il freno di un minuto e i dieci avvisi del
+giudice); `collaudo_recapito_aggiornato.py` (12, nella CI) con le rotte
+vere e l'orologio spostato: primo invio, aggiornamento dentro e fuori
+finestra col journal, la raffica, il pagato da mostrod e la frase dei
+già inviati, il tetto con la riga ⛔, un recapito messo nel corpo
+apposta che non arriva da nessuna parte.
+
+**Dove è girato cosa.** Tortura della C sulla copia: 14 su 14 uccise
+(le prove E il collaudo col server vero a ogni mutazione; quelle del
+client le prende `prove.py`, sentinella e banco node). Rebase su
+origin/main `7039496` (la ricarica senza il lampo: solo il conflitto
+di coda qui in CANTIERI): suite intera severa senza config 19.634
+verdi e 0 rosse, i 41 collaudi della CI verdi nella gabbia. Main è
+corso ancora (il testo corto del foglio dei recapiti, `d45a065` …
+`566730c`, di un'altra sessione: nessun simbolo in comune, cercato
+per nome): secondo rebase, di nuovo solo la coda di CANTIERI, e
+sull'albero finale suite intera severa 19.645 verdi e 0 rosse, i 41
+collaudi della CI verdi nella gabbia. Il commit tocca `.github/workflows/`: dopo il push si
+guarda che il ref `pronto` segua main. Non provato: il telefono —
+gli avvisi veri su Telegram al primo annullo e al primo recapito
+aggiornato in produzione.
+
+**E POI, LO STESSO GIORNO: OGNI CAMBIO AVVISA (Andrea, sui testi
+finali).** La finestra di cinque minuti lasciava muto un recapito
+cambiato poco dopo l'avviso di prima — chi compra poteva pagare quello
+vecchio — e rendeva falsa la frase del foglio del contanti «Se lo
+cambi, vale l'ultimo e chi compra viene avvisato» (arrivata su main lo
+stesso giorno da un'altra sessione, «Il testo corto del foglio dei
+recapiti»). Deciso: nessuna pausa fra un avviso del recapito e l'altro,
+resta SOLO il tetto anti-abuso dei dieci con la sua riga ⛔.
+`P2P_RECAPITO_PAUSA_S` è TOLTA, non messa a zero (un numero a zero
+sembrerebbe una leva): via la costante, il controllo e il `MAX(quando)`
+che le serviva; via anche lo spegnimento della pausa che
+`collaudo_contanti_p2p.py` faceva a mano per provare il cambio
+dell'appuntamento, che adesso avvisa da solo. I doppioni restano fermati
+dagli altri freni: il recapito ridichiarato uguale (`ripetuto`), il
+telefono che lo segna già detto, il timbro prima dell'invio. Prove
+riscritte: in `prove_recapito_aggiornato` la sentinella vuole la
+costante ASSENTE dal codice e il giudice senza `MAX(quando)`, la raffica
+fa tre avvisi in tre secondi, il tetto si raggiunge a raffica; in
+`prove_p2p_recapito_passo` il cambio un secondo dopo avvisa e i dieci
+arrivano di fila; il contanti cambia l'appuntamento un secondo dopo;
+`collaudo_recapito_aggiornato.py` (10) senza più l'orologio spostabile:
+il cambio subito dopo, la raffica di tre con tre avvisi, la riga del
+journal di un aggiornamento partito, il resto com'era. Tortura della C
+rifatta: al posto della finestra la mutazione che RIMETTE un silenzio
+(un cambio entro un minuto dall'ultimo avviso tace).
+
+**DA GUARDARE, NON TOCCATI (Andrea: «annotali»).**
+1) IL SECONDO TELEFONO DI CHI VENDE. `avvisaRecapitoP2P` segna su
+QUEL dispositivo (`recapitoAvvisato`, `recapitoDetto`) quale recapito ha
+già dichiarato. Un secondo telefono dello stesso venditore, che ritrova
+il recapito già annunciato ma non i due segni, a scambio attivo lo
+dichiara di nuovo SENZA `ripetuto`: il server lo conta come un cambio e
+a chi compra arriva «📮 … ha aggiornato il recapito» per un recapito
+che non è cambiato. C'era già prima (con la frase vecchia); senza la
+pausa può succedere anche a pochi secondi dal primo invio. La cura
+probabile: confrontare l'id del recapito, non il dispositivo — l'id
+viaggia già cifrato fra i telefoni, il server non lo vede e non deve
+vederlo, quindi va pensata.
+2) UN COLLAUDO CHE NON È REALISTICO. `collaudo_avvisi_in_ordine_p2p.py`
+simula il ritiro di chi ha preso (`canceled`/`republished`) con
+`buyer=None`, cioè senza la chiave di chi si ritira; il mostrod vero la
+manda (nella 0.19.0 l'evento parte prima di `edit_pubkeys_order`). Oggi
+le sue prove passano lo stesso — guarda chi ha pubblicato — ma non
+vedono l'avviso a chi si ritira: va riallineato al corpo vero.
+
+Provato dopo il cambio, su `566730c` più il cantiere: tortura della C
+14 su 14 uccise (compresa «torna un silenzio», presa da 12 prove e 7
+controlli del collaudo); suite intera severa senza config 19.643 verdi
+e 0 rosse; i 41 collaudi della CI verdi nella gabbia.
+
+Ultimo rebase su `f6082df` (la «Guida P2P passo per passo» per i
+tutorial video, solo documenti): la guida raccontava gli avvisi di
+PRIMA — chi annulla senza niente, l'aggiornamento «ha aggiornato dove
+inviare» con tre avvisi e uno al minuto, «tornano a chi vende» anche a
+chi aveva bloccato. Riallineati SOLO quei sei passaggi in
+`docs/GUIDA-P2P-PASSI.md`, coi testi di questo cantiere.

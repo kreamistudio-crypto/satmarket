@@ -44541,13 +44541,23 @@ def mio_sconto_p2p(x_tg_init_data: str = Header(""),
 # l'avviso — «non e' una delle due parti» — su uno scambio nato subito
 # dopo un altro: la presa dichiarata dal telefono non era ancora
 # arrivata, e chi vendeva non risultava da nessuna parte.
-# IL FRENO: al piu' `P2P_RECAPITO_MAX` avvisi per scambio (il primo, e
-# due correzioni), mai piu' fitti di `P2P_RECAPITO_PAUSA_S`. Sta
-# nell'anti-doppione di tutti (`p2p_avvisi`: i momenti `recapito1`,
-# `recapito2`, `recapito3` di QUEL giro), quindi un ordine tornato in
-# vetrina e ripreso riparte da zero — con le due colonne di prima no.
-P2P_RECAPITO_MAX = 3
-P2P_RECAPITO_PAUSA_S = 60
+# IL FRENO: al piu' `P2P_RECAPITO_MAX` avvisi per scambio. Sta
+# nell'anti-doppione di tutti
+# (`p2p_avvisi`: i momenti `recapito1`, `recapito2`... di QUEL giro),
+# quindi un ordine tornato in vetrina e ripreso riparte da zero — con le
+# due colonne di prima no.
+# DAL 7 OTT 2026 (Andrea): OGNI CAMBIO AVVISA CHI COMPRA. Non c'e' piu'
+# la pausa fra un avviso e l'altro (era un minuto): un recapito cambiato
+# dentro la pausa restava muto, e chi compra poteva pagare quello di
+# prima — e la frase del foglio del contanti («chi compra viene
+# avvisato») non era vera. Non c'e' piu' nemmeno il tetto di tre (il
+# primo e due correzioni): una correzione vera dopo la terza restava
+# muta. Resta un tetto ALTO, anti-abuso, e quando scatta il journal lo
+# dice con una riga sua («⛔ Recapito P2P»). I doppioni li fermano gli
+# altri freni: lo stesso recapito ridichiarato (`ripetuto`), il
+# telefono che segna il recapito come gia' detto, il timbro prima
+# dell'invio.
+P2P_RECAPITO_MAX = 10
 # i momenti che CHIUDONO un giro dello scambio: da li' in poi non c'e'
 # piu' nessuno a cui dire dove mandare gli euro
 P2P_MOMENTI_FINALI = ("rilasciato", "concluso", "annullato", "tornato", "scaduto")
@@ -44661,17 +44671,18 @@ def _avviso_recapito_p2p(con, ordine, io: int, adesso: int,
     if not garanzia and not attivo:
         return 0, ("registrato: la garanzia non c'e' ancora, a chi compra lo "
                    "dira' l'avviso della garanzia")
-    fatti = con.execute(
-        "SELECT COUNT(*), MAX(quando) FROM p2p_avvisi WHERE ordine=? "
+    n = int(con.execute(
+        "SELECT COUNT(*) FROM p2p_avvisi WHERE ordine=? "
         "AND giro=? AND tg_id=? AND momento LIKE 'recapito%'",
-        (ordine, giro, altro)).fetchone()
-    n, ultimo = int(fatti[0] or 0), int(fatti[1] or 0)
+        (ordine, giro, altro)).fetchone()[0] or 0)
     if ripetuto and n > 0:
         return 0, "gia' detto a chi compra: e' lo stesso recapito, ridichiarato"
     if n >= P2P_RECAPITO_MAX:
-        return 0, f"gia' {n} avvisi su questo scambio"
-    if adesso - ultimo < P2P_RECAPITO_PAUSA_S:
-        return 0, f"l'ultimo avviso e' di {adesso - ultimo}s fa"
+        # il tetto ANTI-ABUSO (7 ott 2026): la rotta lo scrive nel
+        # journal con una riga sua, riconoscibile dal ⛔
+        return 0, (f"⛔ TETTO ANTI-ABUSO: gia' {n} avvisi del recapito su "
+                   f"questo scambio (tetto {P2P_RECAPITO_MAX}), a {altro} non "
+                   "parte piu' niente")
     if not _avvisi_p2p_accesi(con, altro):
         return 0, f"{altro} ha gli avvisi P2P spenti"
     scritto = con.execute(
@@ -44691,7 +44702,6 @@ def _avviso_recapito_p2p(con, ordine, io: int, adesso: int,
     # l'intervallo non ancora scelto («da 20,00 a 100,00 €») non e' una
     # cifra da mandare: si tace
     cifra = euro if euro and not euro.startswith("da ") else "gli euro"
-    verbo = "ha aggiornato" if n > 0 else "ti ha indicato"
     # COL CONTANTI DI PERSONA IL RECAPITO E' L'APPUNTAMENTO (1 ott 2026):
     # gli euro non si inviano, ci si vede — e un recapito che cambia e'
     # l'appuntamento che cambia, che l'altra persona deve sapere. Niente
@@ -44705,8 +44715,26 @@ def _avviso_recapito_p2p(con, ordine, io: int, adesso: int,
             "cifrati fra voi due.\n\n"
             "<i>Vai all'incontro solo se la pagina dello scambio dice «Sats in "
             "garanzia»: lo dice il coordinatore, non chi vende.</i>")
+    # L'AGGIORNAMENTO (7 ott 2026, le parole di Andrea): il primo invio
+    # dice dove inviare, un aggiornamento dice di CONTROLLARE il nuovo.
+    # E se chi compra ha gia' detto di aver inviato gli euro — lo dice
+    # mostrod (`fiat` nel giro), non chi vende — il rischio e' un altro:
+    # che li abbia mandati al recapito di prima. Il contenuto del
+    # recapito non passa di qui: si sa solo che e' cambiato
+    if n > 0:
+        pagato = con.execute(
+            "SELECT 1 FROM p2p_momenti WHERE ordine=? AND giro=? AND "
+            "fonte='mostro' AND momento='fiat' LIMIT 1", (ordine, giro)).fetchone()
+        if pagato:
+            return altro, (
+                f"📮 <b>{chi} ha aggiornato il recapito dopo che hai segnato "
+                "gli euro come inviati.</b> Se li hai già inviati al recapito "
+                "precedente, scrivilo nella chat dello scambio: non inviarli "
+                "una seconda volta.")
+        return altro, (f"📮 <b>{chi} ha aggiornato il recapito.</b> Controlla il "
+                       "nuovo prima di inviare gli euro.")
     return altro, (
-        f"💶 <b>{chi} {verbo} dove inviare {cifra}: tocca a te.</b>\n"
+        f"💶 <b>{chi} ti ha indicato dove inviare {cifra}: tocca a te.</b>\n"
         "Apri Barattolo → P2P → I miei scambi: il recapito è lì, cifrato "
         "fra voi due.\n\n"
         "<i>Invia solo se la pagina dello scambio dice «Sats in garanzia»: "
@@ -44745,8 +44773,14 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
     finally:
         con.close()
     if not a_chi:
-        print(f"· Recapito P2P: da {user['id']}, nessun avviso ({testo})",
-              flush=True)
+        # il tetto anti-abuso ha la sua riga, col ⛔ davanti (7 ott 2026):
+        # dieci avvisi del recapito su uno scambio non sono una correzione
+        if testo.startswith("⛔"):
+            print(f"⛔ Recapito P2P: da {user['id']}, sull'ordine "
+                  f"{str((d or {}).get('ordine'))[:8]}: {testo[2:]}", flush=True)
+        else:
+            print(f"· Recapito P2P: da {user['id']}, nessun avviso ({testo})",
+                  flush=True)
         return {"ok": True}
     try:
         esito = await notifica(a_chi, testo)
@@ -47797,9 +47831,10 @@ def _destinatari_evento_p2p(momento: str, attore: str, dettaglio: str,
       compra — e la FATTURA CHIESTA non parla MAI: o e' la meta' di
       questa coppia, o nasce con una presa fatta proprio da chi compra,
       che ha l'app in mano.
-    LA GARANZIA PAGATA e' l'unica eccezione al «mai a chi ha fatto il
-    gesto»: la si paga da un wallet esterno, e chi vende torna nell'app
-    senza sapere com'e' andata (vedi il ramo, qui sotto).
+    LE ECCEZIONI al «mai a chi ha fatto il gesto» sono due: la GARANZIA
+    PAGATA — la si paga da un wallet esterno, e chi vende torna nell'app
+    senza sapere com'e' andata — e, dal 7 ott 2026, l'ANNULLO fatto da
+    una persona, che lo sente anche lei (vedi i due rami, qui sotto).
     LA CAUZIONE RIAPRE LE DUE META' MUTE (1 ott 2026, l'ordine 82231748:
     Alan prende, paga la cauzione, e su Telegram non gli arriva niente).
     `cauzione_di` e' il lato (`compra` | `vende`) che ha BLOCCATO la
@@ -47849,7 +47884,23 @@ def _destinatari_evento_p2p(momento: str, attore: str, dettaglio: str,
         # la bruciatura e' un gesto del moderatore: la sente chi l'ha
         # persa e chi ne riceve la meta' (che deve INCASSARLA dall'app)
         ruoli = ["compra", "vende"]
-    elif momento in ("annullo_chiesto", "annullato", "tornato", "disputa"):
+    elif momento in ("annullato", "tornato"):
+        # LA SECONDA ECCEZIONE: CHI ANNULLA LO SENTE ANCHE LUI (7 ott 2026,
+        # Andrea: prende l'ordine di Alan, blocca la garanzia, annulla — e
+        # su Telegram ad Alan arriva l'avviso, a lui niente). L'annullo e'
+        # un gesto fatto con l'app in mano, ma la sua conseguenza no: i
+        # sats bloccati tornano quando LND scioglie la garanzia, e mostrod
+        # ce lo racconta solo DOPO (v0.19.0: `cancel_hold_invoice` sta
+        # prima dell'evento in tutti e tre gli annulli). Le tre facce di
+        # un annullo fatto da una persona: chi si ritira dopo aver preso
+        # (`republished`), chi annulla dopo la presa il suo ordine (`''`),
+        # chi ACCETTA l'annullo d'accordo (`cooperative`). Il ritiro di un
+        # ordine mai preso (`pending`) resta muto: niente bloccato,
+        # nessun altro
+        mio = ([chi_ha_fatto] if chi_ha_fatto
+               and dettaglio in ("", "cooperative", "republished") else [])
+        ruoli = [r for r in ("compra", "vende") if r in altri or r in mio]
+    elif momento in ("annullo_chiesto", "disputa"):
         ruoli = altri
     elif momento == "fattura_chiesta":
         ruoli = ["compra"] if cauzione_di == "compra" else []
@@ -47871,10 +47922,12 @@ MOTIVI_PAYOUT_P2P = {
 
 def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
                       nome: str = "", maker: bool = False,
-                      recensibile: bool = False) -> str:
+                      recensibile: bool = False, mio_gesto: bool = False) -> str:
     """PURA: la frase di quel momento per quella parte. Lo stile e'
     quello del libro — cosa e' successo, i numeri, di chi e' il passo —
     e non nomina mai il protocollo.
+    `mio_gesto` (7 ott 2026) dice che chi legge e' chi ha fatto il
+    gesto: serve solo all'annullo, che dal 7 ott lo sente anche lui.
     `ruolo` e' di CHI LEGGE (`compra` | `vende`); `nome` e' dell'ALTRA
     parte come la pagina dello scambio la mostra, gia' scappato, o
     vuoto: allora si dice «chi vende» / «chi compra», mai un nome che
@@ -48014,8 +48067,24 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
         return (f"↩️ <b>{altro} chiede di annullare lo scambio.</b> Se sei "
                 "d'accordo, annulla anche tu dalla pagina dello scambio; se "
                 "no non fare niente, e lo scambio continua.")
+    # I SATS TORNATI, DETTI A CHI LI AVEVA BLOCCATI (7 ott 2026): a chi
+    # vende, se nel giro mostrod ha raccontato la garanzia pagata
+    # (`garanzia_bloccata`, la scrive `_avvisi_evento_p2p`). Al passato e
+    # senza «eventualmente»: mostrod racconta ogni annullo — delle parti,
+    # del moderatore, delle scadenze — solo DOPO che LND ha sciolto la
+    # garanzia (v0.19.0), quindi quando la frase parte e' gia' un fatto.
+    # Le due frasi di chi NON HA PROSEGUITO in tempo non la portano: chi
+    # scade cosi' o compra, o la garanzia non l'ha pagata
+    tornati = (" I sats che avevi bloccato in garanzia sono tornati a te."
+               if vende and dati.get("garanzia_bloccata") else "")
+    if momento in ("annullato", "tornato") and mio_gesto:
+        # CHI HA ANNULLATO (7 ott 2026): le parole sono quelle di Andrea
+        if dettaglio == "cooperative":
+            return (f"❌ <b>Hai accettato di annullare: lo scambio con "
+                    f"{l_altro} è annullato.</b>{tornati}")
+        return f"❌ <b>Hai annullato lo scambio con {l_altro}.</b>{tornati}"
     if momento == "annullato":
-        coda = " I sats eventualmente in garanzia tornano a chi vende."
+        coda = tornati or " I sats eventualmente in garanzia tornano a chi vende."
         if dettaglio == "cooperative":
             return (f"❌ <b>{altro} ha accettato di annullare: lo scambio è "
                     f"annullato.</b>{coda}")
@@ -48026,18 +48095,18 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
                     "stato annullato. Puoi ripubblicarlo quando vuoi.")
         if dettaglio == "maker-timeout":
             return ("⏰ <b>Chi aveva pubblicato l'ordine non ha proseguito in "
-                    "tempo:</b> lo scambio è annullato, non devi fare niente.")
+                    f"tempo:</b> lo scambio è annullato, non devi fare niente.{tornati}")
         if dettaglio == "escrow-deadline":
             return ("⏰ <b>La garanzia è arrivata a scadenza: lo scambio è "
-                    "annullato.</b> I sats tornano a chi vende.")
+                    "annullato.</b>" + (tornati or " I sats tornano a chi vende."))
         return f"❌ <b>{altro} ha annullato lo scambio.</b>{coda}"
     if momento == "tornato":
         if dettaglio == "republished":
             return (f"🔄 <b>{altro} ha annullato lo scambio.</b> Il tuo ordine "
-                    "è tornato in vetrina: non devi fare niente.")
+                    f"è tornato in vetrina: non devi fare niente.{tornati}")
         if maker:
             return ("🔄 <b>Chi aveva preso il tuo ordine non ha proseguito.</b> "
-                    "È tornato in vetrina: non devi fare niente.")
+                    f"È tornato in vetrina: non devi fare niente.{tornati}")
         return ("🔄 <b>Non hai proseguito in tempo:</b> l'ordine è tornato "
                 "in vetrina. Se ti interessa ancora, puoi riprenderlo.")
     if momento == "scaduto" and paycode and vende:
@@ -48184,6 +48253,15 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     if momento == "cauzione_persa":
         dati.update(cauzione=ev["sats"], cauzione_compra=ev["sats_compratore"],
                     cauzione_vende=ev["sats_venditore"])
+    # C'ERANO SATS BLOCCATI? (7 ott 2026) Alla chiusura, chi vende sente
+    # «sono tornati a te» solo se in QUESTO giro mostrod ha raccontato la
+    # garanzia pagata — lo stesso giudice del recapito. Un POST della
+    # garanzia perso fa uscire la frase senza: incompleta, mai falsa
+    if momento in ("annullato", "tornato"):
+        dati["garanzia_bloccata"] = bool(con.execute(
+            "SELECT 1 FROM p2p_momenti WHERE ordine=? AND giro=? AND "
+            "fonte='mostro' AND momento='garanzia_pagata' LIMIT 1",
+            (ordine, giro)).fetchone())
     # DI CHI E' LA CAUZIONE, se c'e' (1 ott 2026): le due chiavi del
     # client — la leva e il 38385 della fotografia — e i metodi del
     # libro; se la cronaca l'ha gia' vista bruciare, la coda «torna nel
@@ -48290,7 +48368,9 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
             momento, ev["dettaglio"], ruolo, dati,
             nome=_nome_altro_p2p(con, ordine, chi, adesso),
             maker=e_maker,
-            recensibile=(momento == "concluso" and recensibile(chi)))
+            recensibile=(momento == "concluso" and recensibile(chi)),
+            mio_gesto=(ruolo == {"buyer": "compra",
+                                 "seller": "vende"}.get(ev["attore"], "")))
         if testo:
             # ...e a chi aveva bloccato la cauzione, alla chiusura, la
             # riga che gli dice che torna (1 ott 2026)

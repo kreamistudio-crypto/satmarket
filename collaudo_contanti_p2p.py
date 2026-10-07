@@ -305,17 +305,14 @@ def main():
 
     print("\n5) l'avviso a chi compra: l'appuntamento detto, e cambiato")
     banco.come(V)
-    pausa = SRV.P2P_RECAPITO_PAUSA_S
-    SRV.P2P_RECAPITO_PAUSA_S = 0
-    try:
-        del banco.DETTO[:]
-        banco.chiama(SRV.recapito_p2p, {"ordine": ORD[0], "attivo": True})
-        primo = list(banco.DETTO)
-        del banco.DETTO[:]
-        banco.chiama(SRV.recapito_p2p, {"ordine": ORD[0], "attivo": True})
-        secondo = list(banco.DETTO)
-    finally:
-        SRV.P2P_RECAPITO_PAUSA_S = pausa
+    # (7 ott 2026) nessuna pausa fra un avviso e l'altro: il cambio
+    # subito dopo avvisa anche lui, senza toccare niente
+    del banco.DETTO[:]
+    banco.chiama(SRV.recapito_p2p, {"ordine": ORD[0], "attivo": True})
+    primo = list(banco.DETTO)
+    del banco.DETTO[:]
+    banco.chiama(SRV.recapito_p2p, {"ordine": ORD[0], "attivo": True})
+    secondo = list(banco.DETTO)
     prova("la prima volta «dove e quando vedervi», poi «ha cambiato l'appuntamento» — a chi compra",
           [[C], True, [C], True],
           [[c for c, _ in primo], bool(primo) and "ti ha indicato dove e quando vedervi" in primo[0][1],

@@ -146,8 +146,11 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   avvisato M` con sotto l'esito di Telegram; e `· Recapito P2P: da N,
   nessun avviso (perche')` — il perche' e' scritto per intero («non e'
   chi vende», «l'ordine sul libro e' …, non preso», «l'altra parte non
-  e' annotata», «M ha gli avvisi P2P spenti», «l'ultimo avviso e' di Ns
-  fa», «gia' 3 avvisi»). ⚠️ I «Ns dopo» dell'eco sono il NUMERO DA
+  e' annotata», «M ha gli avvisi P2P spenti»). Dal 7 ott 2026 il tetto
+  dei dieci avvisi del recapito ha una riga SUA, `⛔ Recapito P2P: da N,
+  sull'ordine …: TETTO ANTI-ABUSO: …` (`journalctl -u barattolo | grep
+  "⛔ Recapito P2P"`), e la pausa fra un avviso e l'altro non c'è più:
+  ogni cambio del recapito avvisa chi compra. ⚠️ I «Ns dopo» dell'eco sono il NUMERO DA
   GUARDARE: se stanno spesso vicino a 30, la finestra (`P2P_ECO_S`) e
   l'attesa del client (`P2P_ATTESA_MS`) si allungano INSIEME — una
   prova le tiene uguali.

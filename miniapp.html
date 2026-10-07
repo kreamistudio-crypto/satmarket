@@ -68290,9 +68290,17 @@ function avvisaRecapitoP2P(id){
   const o = ordiniP2P()[id];
   const campo = o && (o.campiMiei || {}).euro;
   if (!o || o.lato !== 'vendo' || !campo || !idMostroVero(o.id)) return;
-  const attivo = o.stato === 'attivo';
-  /* dopo lo scambio attivo (euro inviati, concluso…) non c'e' piu'
-     niente da dire a nessuno; prima si', ma solo la dichiarazione */
+  /* DOPO «HO INVIATO GLI EURO» (7 ott 2026, Andrea): un recapito
+     CAMBIATO dopo il «pagato» si dice ancora — chi compra potrebbe aver
+     pagato quello vecchio, e il server glielo dice. Solo se il recapito
+     e' NATO dopo l'ora del pagato (`campo.t` ed `euroInviatiAt`, tutti
+     e due in secondi): uno di prima non e' una notizia, e un secondo
+     telefono che lo ritrova al render non deve far suonare niente. */
+  const dopoPagato = o.stato === 'euro_inviati' && Number(o.euroInviatiAt) > 0
+    && Number(campo.t) > Number(o.euroInviatiAt);
+  const attivo = o.stato === 'attivo' || dopoPagato;
+  /* dopo lo scambio attivo (concluso…) non c'e' piu' niente da dire a
+     nessuno; prima si', ma solo la dichiarazione */
   if (!attivo && (P2P_GIRO_APERTO.indexOf(o.stato) < 0)) return;
   if (attivo ? o.recapitoAvvisato === campo.id : o.recapitoDetto === campo.id) return;
   const adesso = Date.now(), chiave = id + (attivo ? '' : ':presto');

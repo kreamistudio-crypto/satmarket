@@ -441,10 +441,14 @@ piccoli». C'è anche un «Filtro».
    **Se lo cambio:** riapri il foglio col bottone «🤝 I vostri recapiti» della pagina dello
    scambio (compare a chi vende dopo il primo invio),
    correggi e tocca «💶 Aggiorna il recapito». Vale l'ultimo: nella pagina
-   di chi compra il riquadro cambia, e gli arriva ✈️ «💶 **<nome> ha
-   aggiornato dove inviare 50,00 €: tocca a te.**» (stessa coda del primo).
-   Al massimo **tre** avvisi per scambio e uno al minuto; lo stesso
-   recapito rimandato uguale non riavvisa.
+   di chi compra il riquadro cambia, e gli arriva ✈️ «📮 **<nome> ha
+   aggiornato il recapito.** Controlla il nuovo prima di inviare gli
+   euro.» — e se chi compra ha già segnato gli euro come inviati: «📮
+   **<nome> ha aggiornato il recapito dopo che hai segnato gli euro come
+   inviati.** Se li hai già inviati al recapito precedente, scrivilo
+   nella chat dello scambio: non inviarli una seconda volta.» Ogni cambio
+   avvisa, fino a **dieci** avvisi per scambio; lo stesso recapito
+   rimandato uguale non riavvisa.
 4. 📱 Stato «**Sats in garanzia**» «I tuoi sats sono bloccati. Aspetta che
    chi compra mandi gli euro.»
    ✈️ Quando chi compra dice di aver pagato: «💶 **<nome> dice di aver
@@ -948,7 +952,12 @@ scambi».
 pubblicato «🔄 **<nome> ha annullato lo scambio.** Il tuo ordine è tornato
 in vetrina: non devi fare niente.»; se ha annullato chi aveva pubblicato,
 a chi aveva preso «❌ **<nome> ha annullato lo scambio.** I sats
-eventualmente in garanzia tornano a chi vende.»
+eventualmente in garanzia tornano a chi vende.» A chi vende e aveva già
+bloccato i sats, al posto di quella frase (o in coda al ritorno in
+vetrina): «I sats che avevi bloccato in garanzia sono tornati a te.»
+✈️ E a chi ha annullato: «❌ **Hai annullato lo scambio con <nome>.**»
+— più «I sats che avevi bloccato in garanzia sono tornati a te.» se li
+aveva bloccati, e la riga della cauzione se l'aveva messa.
 
 ### D'accordo con l'altro, a sats in garanzia
 
@@ -966,6 +975,10 @@ eventualmente in garanzia tornano a chi vende.»
    annulliamo» → «Accetto di annullare…» → «Scambio annullato ✓».
 4. ✈️ A riceve: «❌ **<nome> ha accettato di annullare: lo scambio è
    annullato.** I sats eventualmente in garanzia tornano a chi vende.»
+   (se A vende: «…I sats che avevi bloccato in garanzia sono tornati a
+   te.»). ✈️ B riceve: «❌ **Hai accettato di annullare: lo scambio con
+   <nome> è annullato.**» — più la stessa frase dei sats, se a vendere è
+   B.
    📱 Tutti e due: «**Scambio annullato**» «Nessuno ha perso niente: i sats
    sono tornati a chi li aveva bloccati.» (e la riga della cauzione, se
    c'era).
@@ -1041,7 +1054,8 @@ dettaglio, l'orologio dentro il foglio da pagare.
   sole. ✈️ Esiti: «⚖️ **Un moderatore ha chiuso la disputa: i sats vanno a
   chi compra.**» (poi «✅ Scambio concluso!») oppure «⚖️ **Un moderatore ha
   annullato lo scambio.** I sats eventualmente in garanzia tornano a chi
-  vende.» Se l'avviso del coordinatore si perde, quello dal libro: «⚖️ **La
+  vende.» (a chi vende: «…I sats che avevi bloccato in garanzia sono
+  tornati a te.»). Se l'avviso del coordinatore si perde, quello dal libro: «⚖️ **La
   disputa è stata chiusa: lo scambio è andato in porto.**» / «⚖️ **La
   disputa è stata chiusa: lo scambio è stato annullato.** I sats in
   garanzia tornano a chi vende.»
@@ -1199,7 +1213,8 @@ confondere chi guarda il video. Nessuna è stata toccata.
    P2P» dice «Quando invece i sats sono **già in garanzia**, nessun timer
    li sblocca da solo», ma il server ha l'avviso «⏰ **La garanzia è
    arrivata a scadenza: lo scambio è annullato.** I sats tornano a chi
-   vende.» (dettaglio `escrow-deadline`), e la garanzia ha un limite
+   vende.» (a chi vende: «…I sats che avevi bloccato in garanzia sono
+   tornati a te.»; dettaglio `escrow-deadline`), e la garanzia ha un limite
    tecnico (circa 92 ore secondo NODO-MOSTRO). Da decidere cosa dire nel
    video.
 3. **L'ordine dei primi due passi dipende da chi prende.** «Info P2P» («15

@@ -85772,7 +85772,7 @@ def _banco_eventi_p2p(eventi_attivi=True):
     for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "MAX_ORDINI_MAI_VISTI_P2P = ", "P2P_ORDINI_MAI_VISTI_S = ",
                  "P2P_RISERVA_S = ", "P2P_STESSO_MOMENTO_S = ",
                  "P2P_EVENTO_OROLOGIO_S = ", "P2P_SATS_MAX_EVENTO = ",
-                 "P2P_RECAPITO_MAX = ", "P2P_RECAPITO_PAUSA_S = ",
+                 "P2P_RECAPITO_MAX = ",
                  "P2P_LIBRO_MEMORIA_S = ", "FORMA_DETTAGLIO_P2P = ",
                  # gli stati finali del libro: la riserva superata (24 set)
                  "STATI_LIBRO_FINALI = ",
@@ -86001,10 +86001,19 @@ def prove_p2p_eventi():
         ("concluso", "mostro", "", [A, B]),
         ("annullo_chiesto", "buyer", "", [B]),
         ("annullo_chiesto", "seller", "", [A]),
-        ("annullato", "seller", "cooperative", [A]),
+        # (7 ott 2026) LA SECONDA ECCEZIONE: l'annullo fatto da una
+        # persona lo sente anche lei — tutte e tre le facce, nei due
+        # versi; il ritiro di un ordine mai preso resta muto
+        ("annullato", "seller", "cooperative", [A, B]),
+        ("annullato", "buyer", "cooperative", [A, B]),
+        ("annullato", "seller", "", [A, B]),
+        ("annullato", "buyer", "", [A, B]),
+        ("annullato", "seller", "pending", [A]),
         ("annullato", "mostro", "admin", [A, B]),
         ("annullato", "mostro", "maker-timeout", [A, B]),
-        ("tornato", "buyer", "republished", [B]),
+        ("annullato", "mostro", "escrow-deadline", [A, B]),
+        ("tornato", "buyer", "republished", [A, B]),
+        ("tornato", "seller", "republished", [A, B]),
         ("tornato", "mostro", "taker-timeout", [A, B]),
         ("disputa", "buyer", "", [B]),
         ("disputa", "seller", "", [A]),
@@ -86028,9 +86037,18 @@ def prove_p2p_eventi():
     # passo dopo e' ancora di chi l'ha pagata. La prova resta un
     # censimento: una SECONDA eccezione la farebbe rossa, e chi la vuole
     # viene a scriverla qui col suo perche'.
-    prova("NESSUN momento avvisa chi ha fatto il gesto — tranne UNO, la "
-          "garanzia pagata fuori dall'app", {"garanzia_pagata"},
-          {m for m, _, _ in colpevoli})
+    # (7 ott 2026) LA SECONDA, ANDREA: l'ANNULLO fatto da una persona —
+    # chi si ritira, chi annulla dopo la presa, chi accetta d'accordo.
+    # Il gesto e' con l'app in mano, la sua conseguenza no: i sats della
+    # garanzia tornano quando LND la scioglie, e mostrod lo racconta solo
+    # dopo. Il ritiro di un ordine mai preso (`pending`) NON e' fra loro
+    prova("NESSUN momento avvisa chi ha fatto il gesto — tranne DUE, la "
+          "garanzia pagata fuori dall'app e l'annullo (le sue tre facce)",
+          ({"garanzia_pagata"},
+           {("annullato", "cooperative"), ("annullato", ""),
+            ("tornato", "republished")}),
+          ({m for m, _, _ in colpevoli if m not in ("annullato", "tornato")},
+           {(m, d) for m, _, d in colpevoli if m in ("annullato", "tornato")}))
     prova("...e la tabella copre tutti i momenti che il coordinatore sa dire",
           set(), {mom(a, d) for a in amb["P2P_AZIONI_EVENTO"]
                   for d in ("", "republished", "book", "taker-timeout")}
@@ -86183,8 +86201,10 @@ def prove_p2p_eventi():
           (0, "gia' detto a chi compra: e' lo stesso recapito, ridichiarato"),
           recapito(con, ORDT, B, ORA + 200, attivo=True, ripetuto=True))
     a_chi, testo = recapito(con, ORDT, B, ORA + 400, attivo=True)
-    prova("...mentre un recapito NUOVO e' una correzione, e parte",
-          [A, True], [a_chi, "ha aggiornato dove inviare 10,00 €" in testo])
+    prova("...mentre un recapito NUOVO e' un aggiornamento, e parte (7 ott 2026: "
+          "«controlla il nuovo»)",
+          [A, "📮 <b>Anna ha aggiornato il recapito.</b> Controlla il nuovo prima "
+              "di inviare gli euro."], [a_chi, testo])
     # COL CONTANTI DI PERSONA IL RECAPITO E' L'APPUNTAMENTO (1 ott 2026,
     # «📍 Sono qui e l'appuntamento»): la prima volta «dove e quando
     # vedervi», poi «ha cambiato l'appuntamento» — mai «dove inviare»,
@@ -86198,7 +86218,8 @@ def prove_p2p_eventi():
     arriva("hold-invoice-requested", "mostro", "invoice", ORA + 20, ORDK)
     arriva("hold-invoice-paid", "seller", "active", ORA + 60, ORDK)
     a1, t1 = recapito(con, ORDK, B, ORA + 100, attivo=True)
-    a2, t2 = recapito(con, ORDK, B, ORA + 200, attivo=True)
+    # (7 ott 2026) nessuna pausa: il cambio un attimo dopo avvisa anche lui
+    a2, t2 = recapito(con, ORDK, B, ORA + 101, attivo=True)
     prova("col contanti: «dove e quando vedervi», poi «ha cambiato l'appuntamento», a chi compra, mai «inviare»",
           [A, True, True, A, True, False, False],
           [a1, t1.startswith("📍 <b>Anna ti ha indicato dove e quando vedervi.</b>"),
@@ -86274,8 +86295,11 @@ def prove_p2p_eventi():
     libro(ORD3, B, A, "sell")
     prova("prima presa: suona", 1,
           len(arriva("taken", "buyer", "invoice-next", ORA, ORD3)))
-    prova("chi ha preso si ritira: a chi ha pubblicato si dice che l'ordine e' tornato",
-          [(B, "🔄 Bruno ha annullato lo scambio. Il tuo ordine è tornato in "
+    prova("chi ha preso si ritira: a chi ha pubblicato si dice che l'ordine e' tornato, "
+          "e chi si e' ritirato lo sente anche lui (7 ott 2026; garanzia mai pagata: "
+          "niente sats tornati)",
+          [(A, "❌ Hai annullato lo scambio con Anna."),
+           (B, "🔄 Bruno ha annullato lo scambio. Il tuo ordine è tornato in "
                "vetrina: non devi fare niente.")],
           arriva("canceled", "buyer", "republished", ORA + 40, ORD3))
     prova("SECONDA presa dello stesso ordine, un minuto dopo: suona di nuovo",
@@ -86393,6 +86417,423 @@ def prove_p2p_eventi():
             "UPDATE p2p_scambi SET venditore=? WHERE venditore=?",
             "UPDATE OR IGNORE p2p_avvisi SET tg_id=? WHERE tg_id=?",
             "UPDATE p2p_attese SET tg_id=? WHERE tg_id=?")))
+    con.close()
+
+
+def prove_avviso_chi_annulla():
+    """CHI ANNULLA LO SENTE ANCHE LUI (7 ott 2026, richiesta di Andrea).
+
+    Andrea prende l'ordine d'acquisto di Alan, blocca la garanzia,
+    annulla: ad Alan arriva «Andrea ha annullato lo scambio», a lui
+    NIENTE — la regola «mai a chi ha fatto il gesto» valeva anche qui.
+    Adesso l'annullo fatto da una persona (chi si ritira dopo aver
+    preso, chi annulla dopo la presa il suo ordine, chi accetta
+    l'annullo d'accordo) lo sente anche lei; e chi vende, se nel giro
+    aveva la garanzia pagata, legge «I sats che avevi bloccato in
+    garanzia sono tornati a te» — anche quando a chiudere e' l'altro,
+    il moderatore o una scadenza (3b).
+
+    Quel che si rompe in silenzio: l'avviso che torna muto per chi
+    annulla, la frase dei sats tornati detta a chi non li aveva
+    bloccati (chi compra, o una garanzia del giro di PRIMA), il doppione
+    (retry di mostrod, riserva del libro), il ritiro di un ordine mai
+    preso che comincia a suonare. Il banco e' quello di
+    `prove_p2p_eventi`: i giudici VERI su sqlite in memoria."""
+    print("\n[chi annulla lo sente anche lui, e chi aveva i sats sa che sono tornati]")
+    testo_src = _senza_prosa(pezzo("_testo_evento_p2p"))
+    avvisi_src = _senza_prosa(pezzo("_avvisi_evento_p2p"))
+    dest_src = _senza_prosa(pezzo("_destinatari_evento_p2p"))
+
+    # --- 1) LE SENTINELLE SUI TESTI (le parole di Andrea) ------------
+    TORNATI = "I sats che avevi bloccato in garanzia sono tornati a te."
+    for frase in ('"❌ <b>Hai accettato di annullare: lo scambio con "',
+                  '"❌ <b>Hai annullato lo scambio con {l_altro}.</b>{tornati}"',
+                  '" I sats che avevi bloccato in garanzia sono tornati a te."'):
+        prova(f"la frase c'e', parola per parola: {frase[:48]}…", True,
+              frase in testo_src)
+    prova("i sats tornati SOLO a chi vende con la garanzia del giro", True,
+          'if vende and dati.get("garanzia_bloccata") else ""' in testo_src)
+    prova("...e la garanzia del giro la dice SOLO il coordinatore, nel giro "
+          "dell'evento", True,
+          "fonte='mostro' AND momento='garanzia_pagata'" in avvisi_src
+          and "(ordine, giro)).fetchone())" in avvisi_src)
+    prova("chi annulla e' chi ha fatto il gesto, detto dall'attore dell'evento",
+          True, 'mio_gesto=(ruolo == {"buyer": "compra",' in avvisi_src)
+    prova("le tre facce dell'annullo di una persona, e NON il ritiro dalla vetrina",
+          (True, False), ('dettaglio in ("", "cooperative", "republished")' in dest_src,
+                          '"pending"' in codice(dest_src)))
+
+    # --- 2) IL BANCO -------------------------------------------------
+    con, amb = _banco_eventi_p2p()
+    pulisci = amb["_evento_p2p_pulito"]
+    registra, avvisi = amb["_registra_evento_p2p"], amb["_avvisi_evento_p2p"]
+    ORA = 1_790_000_000
+    A, B = 111, 222              # A compra (Bruno), B vende (Anna)
+    KA, KB = "a" * 64, "b" * 64
+    for chi, pub in ((A, KA), (B, KB)):
+        con.execute("INSERT INTO utenti VALUES(?,1)", (chi,))
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) "
+                    "VALUES(?,?,0)", (pub, chi))
+    # chi legge vede il nome dell'ALTRO: A legge «Anna», B legge «Bruno»
+    amb["_NOMI"].update({A: "Anna", B: "Bruno"})
+    import re as _re3
+    _tag = _re3.compile(r"</?[bi]>")
+
+    def libro(ordine, maker, taker, lato):
+        con.execute(
+            "INSERT OR REPLACE INTO p2p_ordini(ordine, tg_id, creato, stato, "
+            "lato, maker, preso_da, euro, sats, metodi) "
+            "VALUES(?,?,0,'in-progress',?,1,?,'10,00 €',15000,?)",
+            (ordine, maker, lato, taker, '["SEPA"]'))
+
+    def arriva(ordine, azione, attore="mostro", dettaglio="", quando=ORA,
+               buyer=KA, seller=KB):
+        d = {"v": 1, "order": ordine, "action": azione, "ts": quando,
+             "buyer": buyer, "seller": seller, "actor": attore}
+        if dettaglio:
+            d["detail"] = dettaglio
+        fatto = registra(con, pulisci(d, quando), quando)
+        if fatto is None:
+            return None
+        return [(t, _tag.sub("", x))
+                for t, x in avvisi(con, pulisci(d, quando), fatto, quando)]
+
+    def ordine(n):
+        return f"c4a00000-0000-4000-8000-{n:012d}"
+
+    # gli scambi nei due versi, fino a un passo: un BUY di A preso da B
+    # (chi vende ha preso, paga la garanzia) e un SELL di B preso da A
+    def compra_di_a(o, garanzia):
+        libro(o, A, B, "buy")
+        arriva(o, "taken", "seller", "hold-next", ORA)
+        if garanzia:
+            arriva(o, "hold-invoice-paid", "seller", "invoice-next", ORA + 10)
+
+    def vende_di_b(o, garanzia):
+        libro(o, B, A, "sell")
+        arriva(o, "taken", "buyer", "invoice-next", ORA)
+        if garanzia:
+            arriva(o, "hold-invoice-paid", "seller", "active", ORA + 10)
+
+    print("  — i casi della tabella —")
+    o = ordine(1)
+    compra_di_a(o, True)
+    prova("IL CASO DI ANDREA: chi vende ha preso, ha bloccato i sats e si "
+          "ritira — lo sente anche lui, coi sats tornati",
+          [(A, "🔄 Anna ha annullato lo scambio. Il tuo ordine è tornato in "
+               "vetrina: non devi fare niente."),
+           (B, "❌ Hai annullato lo scambio con Bruno. " + TORNATI)],
+          arriva(o, "canceled", "seller", "republished", ORA + 40))
+    o = ordine(2)
+    compra_di_a(o, False)
+    prova("...lo stesso ritiro PRIMA di bloccare la garanzia: senza sats",
+          [(A, "🔄 Anna ha annullato lo scambio. Il tuo ordine è tornato in "
+               "vetrina: non devi fare niente."),
+           (B, "❌ Hai annullato lo scambio con Bruno.")],
+          arriva(o, "canceled", "seller", "republished", ORA + 40))
+    o = ordine(3)
+    vende_di_b(o, False)
+    prova("chi COMPRA ha preso e si ritira: niente sats per lui (non li ha "
+          "mai bloccati), a chi vende il ritorno in vetrina",
+          [(A, "❌ Hai annullato lo scambio con Anna."),
+           (B, "🔄 Bruno ha annullato lo scambio. Il tuo ordine è tornato in "
+               "vetrina: non devi fare niente.")],
+          arriva(o, "canceled", "buyer", "republished", ORA + 40))
+    o = ordine(4)
+    vende_di_b(o, True)
+    prova("3b — chi compra si ritira dopo che chi vende (che ha pubblicato) "
+          "ha bloccato i sats: a chi vende «sono tornati a te»",
+          [(A, "❌ Hai annullato lo scambio con Anna."),
+           (B, "🔄 Bruno ha annullato lo scambio. Il tuo ordine è tornato in "
+               "vetrina: non devi fare niente. " + TORNATI)],
+          arriva(o, "canceled", "buyer", "republished", ORA + 40))
+    o = ordine(5)
+    vende_di_b(o, True)
+    prova("chi ha PUBBLICATO (e vende) annulla dopo la presa: lui coi sats "
+          "tornati, chi compra con la frase di sempre",
+          [(A, "❌ Anna ha annullato lo scambio. I sats eventualmente in "
+               "garanzia tornano a chi vende."),
+           (B, "❌ Hai annullato lo scambio con Bruno. " + TORNATI)],
+          arriva(o, "canceled", "seller", "", ORA + 40))
+    o = ordine(6)
+    compra_di_a(o, True)
+    prova("chi ha pubblicato (e compra) annulla: a chi vende «sono tornati a te»",
+          [(A, "❌ Hai annullato lo scambio con Anna."),
+           (B, "❌ Bruno ha annullato lo scambio. " + TORNATI)],
+          arriva(o, "canceled", "buyer", "", ORA + 40))
+    o = ordine(7)
+    vende_di_b(o, True)
+    prova("l'annullo d'accordo chiesto da chi vende: a chi compra la richiesta",
+          [(A, "↩️ Anna chiede di annullare lo scambio. Se sei d'accordo, "
+               "annulla anche tu dalla pagina dello scambio; se no non fare "
+               "niente, e lo scambio continua.")],
+          arriva(o, "cancel-requested", "seller", "", ORA + 30))
+    prova("...chi compra ACCETTA: lo sente anche lui, con le parole di Andrea",
+          [(A, "❌ Hai accettato di annullare: lo scambio con Anna è annullato."),
+           (B, "❌ Bruno ha accettato di annullare: lo scambio è annullato. "
+               + TORNATI)],
+          arriva(o, "canceled", "buyer", "cooperative", ORA + 40))
+    o = ordine(8)
+    vende_di_b(o, True)
+    arriva(o, "cancel-requested", "buyer", "", ORA + 30)
+    prova("...e nell'altro verso: chi vende accetta, e i sats tornano a lui",
+          [(A, "❌ Anna ha accettato di annullare: lo scambio è annullato. I "
+               "sats eventualmente in garanzia tornano a chi vende."),
+           (B, "❌ Hai accettato di annullare: lo scambio con Bruno è annullato. "
+               + TORNATI)],
+          arriva(o, "canceled", "seller", "cooperative", ORA + 40))
+    o = ordine(9)
+    vende_di_b(o, True)
+    prova("il MODERATORE annulla: tutti e due, e a chi vende «sono tornati a te»",
+          [(A, "⚖️ Un moderatore ha annullato lo scambio. I sats eventualmente "
+               "in garanzia tornano a chi vende."),
+           (B, "⚖️ Un moderatore ha annullato lo scambio. " + TORNATI)],
+          arriva(o, "canceled", "mostro", "admin", ORA + 40))
+    o = ordine(10)
+    compra_di_a(o, True)
+    prova("SCADENZA di chi ha pubblicato (compra, non ha dato la fattura): a "
+          "chi vende, che aveva bloccato, «sono tornati a te»",
+          [(A, "⏰ Non hai proseguito in tempo: il tuo ordine è stato "
+               "annullato. Puoi ripubblicarlo quando vuoi."),
+           (B, "⏰ Chi aveva pubblicato l'ordine non ha proseguito in tempo: "
+               "lo scambio è annullato, non devi fare niente. " + TORNATI)],
+          arriva(o, "expired", "mostro", "maker-timeout", ORA + 1000))
+    o = ordine(11)
+    vende_di_b(o, True)
+    prova("SCADENZA di chi ha preso (compra): a chi vende, che ha pubblicato e "
+          "bloccato, «sono tornati a te»",
+          [(A, "🔄 Non hai proseguito in tempo: l'ordine è tornato in vetrina. "
+               "Se ti interessa ancora, puoi riprenderlo."),
+           (B, "🔄 Chi aveva preso il tuo ordine non ha proseguito. È tornato "
+               "in vetrina: non devi fare niente. " + TORNATI)],
+          arriva(o, "expired", "mostro", "taker-timeout", ORA + 1000))
+    o = ordine(12)
+    vende_di_b(o, True)
+    prova("la GARANZIA AL CAPOLINEA: a chi vende «sono tornati a te» al posto "
+          "di «tornano a chi vende»",
+          [(A, "⏰ La garanzia è arrivata a scadenza: lo scambio è annullato. "
+               "I sats tornano a chi vende."),
+           (B, "⏰ La garanzia è arrivata a scadenza: lo scambio è annullato. "
+               + TORNATI)],
+          arriva(o, "expired", "mostro", "escrow-deadline", ORA + 1000))
+    o = ordine(13)
+    libro(o, B, 0, "sell")
+    con.execute("UPDATE p2p_ordini SET stato='pending' WHERE ordine=?", (o,))
+    prova("il RITIRO di un ordine mai preso resta muto: niente bloccato, nessun altro",
+          [], arriva(o, "canceled", "seller", "pending", ORA + 40, buyer=None))
+
+    print("  — le frasi storte che non devono nascere —")
+    o = ordine(14)
+    compra_di_a(o, True)
+    arriva(o, "canceled", "seller", "republished", ORA + 40)
+    arriva(o, "taken", "seller", "hold-next", ORA + 100)
+    prova("una garanzia del giro di PRIMA non vale: ripreso e ritirato senza "
+          "bloccare, niente «sono tornati»",
+          [(A, "🔄 Anna ha annullato lo scambio. Il tuo ordine è tornato in "
+               "vetrina: non devi fare niente."),
+           (B, "❌ Hai annullato lo scambio con Bruno.")],
+          arriva(o, "canceled", "seller", "republished", ORA + 140))
+    o = ordine(15)
+    compra_di_a(o, True)
+    del amb["_NOMI"][A], amb["_NOMI"][B]
+    try:
+        prova("senza un nome che la pagina mostra: «con chi compra», mai un nome",
+              [(A, "🔄 Chi vende ha annullato lo scambio. Il tuo ordine è "
+                   "tornato in vetrina: non devi fare niente."),
+               (B, "❌ Hai annullato lo scambio con chi compra. " + TORNATI)],
+              arriva(o, "canceled", "seller", "republished", ORA + 40))
+    finally:
+        amb["_NOMI"].update({A: "Anna", B: "Bruno"})
+    o = ordine(16)
+    compra_di_a(o, True)
+    con.execute("UPDATE utenti SET avvisi_p2p=0 WHERE tg_id=?", (B,))
+    try:
+        prova("chi annulla con gli avvisi P2P SPENTI non riceve niente; l'altro si'",
+              [A], [t for t, _ in arriva(o, "canceled", "seller", "republished",
+                                         ORA + 40)])
+    finally:
+        con.execute("UPDATE utenti SET avvisi_p2p=1 WHERE tg_id=?", (B,))
+    o = ordine(17)
+    compra_di_a(o, True)
+    con.execute("UPDATE p2p_scambi SET compratore=0 WHERE ordine=?", (o,))
+    con.execute("DELETE FROM chiavi_p2p WHERE tg_id=?", (A,))
+    try:
+        prova("l'altra parte da un altro client: chi annulla lo sente lo stesso",
+              [B], [t for t, _ in arriva(o, "canceled", "seller", "republished",
+                                         ORA + 40)])
+    finally:
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)",
+                    (KA, A))
+
+    print("  — i doppioni —")
+    o = ordine(18)
+    compra_di_a(o, True)
+    primo = arriva(o, "canceled", "seller", "republished", ORA + 40)
+    prova("il primo annullo: due avvisi, uno a testa", [A, B],
+          [t for t, _ in primo])
+    prova("il RETRY di mostrod (lo stesso corpo): non riparte niente", None,
+          arriva(o, "canceled", "seller", "republished", ORA + 40))
+    prova("...e un timbro solo a testa", [(A,), (B,)],
+          [tuple(r) for r in con.execute(
+              "SELECT tg_id FROM p2p_avvisi WHERE ordine=? AND momento='tornato' "
+              "ORDER BY tg_id", (o,))])
+    # LA RISERVA DEL LIBRO: la sua frase dello stesso annullo, in attesa
+    # per chi l'ha fatto, scade DOPO che il coordinatore ha parlato — tace
+    o = ordine(19)
+    vende_di_b(o, True)
+    con.execute(
+        "INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, quando, "
+        "scade, fonte) VALUES(?,'annullato',1,?,'❌ Lo scambio è stato "
+        "annullato.',?,?,'libro')", (o, B, ORA + 40, ORA + 100))
+    prova("l'annullo dal coordinatore: chi l'ha fatto lo sente una volta",
+          [A, B], [t for t, _ in arriva(o, "canceled", "seller", "", ORA + 40)])
+    prova("...e la riserva del libro, alla sua scadenza, tace", [],
+          amb["_scarica_attese_p2p"](con, ORA + 200)[0])
+    # ...E SE IL LIBRO HA PARLATO PRIMA (il coordinatore in ritardo oltre
+    # la riserva): il suo avviso e' gia' timbrato, e il coordinatore tace
+    o = ordine(20)
+    vende_di_b(o, True)
+    con.execute(
+        "INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, quando, "
+        "scade, fonte) VALUES(?,'annullato',1,?,'❌ Lo scambio è stato "
+        "annullato.',?,?,'libro')", (o, B, ORA + 40, ORA + 100))
+    prova("la riserva parla per prima, a chi ha annullato", [B],
+          [t for t, _, _ in amb["_scarica_attese_p2p"](con, ORA + 120)[0]])
+    prova("...e il coordinatore in ritardo non glielo ripete: solo all'altro",
+          [A], [t for t, _ in arriva(o, "canceled", "seller", "", ORA + 40)])
+    con.close()
+
+
+def prove_recapito_aggiornato():
+    """IL RECAPITO AGGIORNATO (7 ott 2026, richiesta di Andrea).
+
+    Quando chi vende AGGIORNA il recapito dopo averlo gia' mandato, chi
+    compra riceve «📮 X ha aggiornato il recapito. Controlla il nuovo
+    prima di inviare gli euro.»; se gli euro risultano gia' inviati (lo
+    dice mostrod: `fiat` nel giro) la frase gli dice di scriverlo nella
+    chat e di non inviarli una seconda volta. Il recapito non passa dal
+    server: si sa solo che e' cambiato. OGNI CAMBIO AVVISA (Andrea, dopo
+    aver visto la finestra di cinque minuti: un cambio dentro la finestra
+    restava muto), il tetto di tre e' tolto e ne resta uno ALTO, dieci,
+    che scrive una riga sua nel journal. Il primo invio
+    resta com'era, e col contanti di persona resta «ha cambiato
+    l'appuntamento».
+
+    Si rompe in silenzio: la frase di prima che torna, la frase «gia'
+    inviati» detta prima del pagato (o creduta al telefono invece che a
+    mostrod), un cambio che torna muto perche' arriva presto, il tetto
+    che sparisce o che scatta muto. Il banco e' quello degli avvisi P2P: i giudici VERI."""
+    print("\n[il recapito aggiornato: «controlla il nuovo», e dopo gli euro inviati]")
+    src = _SORGENTE
+    giud_src = _senza_prosa(pezzo("_avviso_recapito_p2p"))
+    rotta = src[src.index('@app.post("/api/p2p/recapito")'):]
+    rotta = rotta[:rotta.index("\n\n\n")]
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) LE SENTINELLE ---------------------------------------------
+    prova("nessuna pausa fra un avviso e l'altro, e il tetto anti-abuso e' dieci",
+          (False, False, True),
+          ("P2P_RECAPITO_PAUSA_S" in codice(src), "MAX(quando)" in codice(giud_src),
+           "\nP2P_RECAPITO_MAX = 10\n" in src.replace("\r\n", "\n")))
+    for frase in ('f"📮 <b>{chi} ha aggiornato il recapito.</b> Controlla il "',
+                  '"nuovo prima di inviare gli euro."',
+                  'f"📮 <b>{chi} ha aggiornato il recapito dopo che hai segnato "',
+                  '"precedente, scrivilo nella chat dello scambio: non inviarli "'):
+        prova(f"la frase c'e', parola per parola: {frase[:50]}…", True, frase in giud_src)
+    prova("gli euro inviati li dice il COORDINATORE, nel giro dello scambio", True,
+          "fonte='mostro' AND momento='fiat' LIMIT 1\", (ordine, giro)" in giud_src)
+    prova("il tetto ha la sua riga nel journal, col ⛔", (True, True),
+          ('if testo.startswith("⛔"):' in rotta, 'print(f"⛔ Recapito P2P: da ' in rotta))
+    prova("il client, dopo «Ho inviato gli euro», parla SOLO per un recapito nato dopo",
+          True, "&& Number(campo.t) > Number(o.euroInviatiAt);" in mini
+          and "const attivo = o.stato === 'attivo' || dopoPagato;" in mini)
+
+    # --- 2) IL BANCO ----------------------------------------------------
+    con, amb = _banco_eventi_p2p()
+    pulisci, registra = amb["_evento_p2p_pulito"], amb["_registra_evento_p2p"]
+    avvisi, giud = amb["_avvisi_evento_p2p"], amb["_avviso_recapito_p2p"]
+    TETTO = amb["P2P_RECAPITO_MAX"]
+    ORA = 1_790_000_000
+    A, B = 111, 222              # A compra (legge «Anna»), B vende
+    KA, KB = "a" * 64, "b" * 64
+    for chi, pub in ((A, KA), (B, KB)):
+        con.execute("INSERT INTO utenti VALUES(?,1)", (chi,))
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", (pub, chi))
+    amb["_NOMI"].update({A: "Anna", B: "Bruno"})
+
+    def scambio(o, metodi='["SEPA"]'):
+        """Una vendita di B presa da A, con la garanzia pagata: lo scambio
+        e' attivo, ed e' il momento in cui il recapito si manda."""
+        con.execute(
+            "INSERT OR REPLACE INTO p2p_ordini(ordine, tg_id, creato, stato, lato, "
+            "maker, preso_da, euro, sats, metodi) VALUES(?,?,0,'in-progress','sell',"
+            "1,?,'10,00 €',15000,?)", (o, B, A, metodi))
+        for az, att, det, dt in (("taken", "buyer", "invoice-next", 0),
+                                 ("hold-invoice-paid", "seller", "active", 10)):
+            arriva(o, az, att, det, ORA + dt)
+
+    def arriva(o, azione, attore, dettaglio, quando):
+        d = {"v": 1, "order": o, "action": azione, "ts": quando, "buyer": KA,
+             "seller": KB, "actor": attore}
+        if dettaglio:
+            d["detail"] = dettaglio
+        fatto = registra(con, pulisci(d, quando), quando)
+        return avvisi(con, pulisci(d, quando), fatto, quando) if fatto else None
+
+    AGG = ("📮 <b>Anna ha aggiornato il recapito.</b> Controlla il nuovo prima di "
+           "inviare gli euro.")
+    GIA = ("📮 <b>Anna ha aggiornato il recapito dopo che hai segnato gli euro come "
+           "inviati.</b> Se li hai già inviati al recapito precedente, scrivilo nella "
+           "chat dello scambio: non inviarli una seconda volta.")
+    o = "c4a00000-0000-4000-8000-0000000000c1"
+    scambio(o)
+    primo = giud(con, o, B, ORA + 100)
+    prova("il PRIMO invio resta com'era: «ti ha indicato dove inviare», a chi compra",
+          (A, True), (primo[0], primo[1].startswith(
+              "💶 <b>Anna ti ha indicato dove inviare 10,00 €: tocca a te.</b>")))
+    prova("l'AGGIORNAMENTO un secondo dopo parte, con le parole di Andrea",
+          (A, AGG), giud(con, o, B, ORA + 101))
+    raffica = [giud(con, o, B, ORA + 101 + s) for s in (1, 2, 3)]
+    prova("LA RAFFICA: tre cambi in tre secondi, tre avvisi — ogni cambio avvisa",
+          [(A, AGG)] * 3, raffica)
+    prova("...e non porta il recapito: nessuna cifra, nessun IBAN", (False, False),
+          ("10,00" in AGG, "IBAN" in AGG))
+    arriva(o, "fiat-sent", "buyer", "", ORA + 130)
+    prova("DOPO «HO INVIATO GLI EURO» (detto da mostrod): la frase dei gia' inviati",
+          (A, GIA), giud(con, o, B, ORA + 131))
+    # LA FRASE DEI GIA' INVIATI e' del GIRO: un «fiat» di un altro giro, o
+    # una riga che non e' del coordinatore, non la fa nascere
+    o2 = "c4a00000-0000-4000-8000-0000000000c2"
+    scambio(o2)
+    giud(con, o2, B, ORA + 100)
+    con.execute("INSERT INTO p2p_momenti(ordine, momento, quando, fonte, giro, arrivato) "
+                "VALUES(?,'fiat',?,'telefono',1,?)", (o2, ORA + 120, ORA + 120))
+    con.execute("INSERT INTO p2p_momenti(ordine, momento, quando, fonte, giro, arrivato) "
+                "VALUES(?,'fiat',?,'mostro',7,?)", (o2, ORA + 121, ORA + 121))
+    prova("...un «fiat» non del coordinatore, o di un altro giro, non la fa nascere",
+          (A, AGG), giud(con, o2, B, ORA + 130))
+    # IL CONTANTI DI PERSONA tiene la sua frase anche dopo «ho consegnato»
+    o3 = "c4a00000-0000-4000-8000-0000000000c3"
+    scambio(o3, '["Contanti"]')
+    giud(con, o3, B, ORA + 100)
+    arriva(o3, "fiat-sent", "buyer", "", ORA + 150)
+    a3, t3 = giud(con, o3, B, ORA + 151)
+    prova("col contanti di persona resta «ha cambiato l'appuntamento», anche dopo",
+          (A, True, False), (a3, t3.startswith("🕒 <b>Anna ha cambiato l'appuntamento.</b>"),
+                             "📮" in t3))
+    # IL TETTO ALTO: dieci avvisi, uno per finestra, poi il ⛔
+    o4 = "c4a00000-0000-4000-8000-0000000000c4"
+    scambio(o4)
+    partiti = [giud(con, o4, B, ORA + 100 + k)[0] for k in range(TETTO)]
+    prova("IL TETTO: dieci avvisi partono, uno a cambio anche a raffica (il primo "
+          "e nove aggiornamenti)", [A] * 10, partiti)
+    oltre = giud(con, o4, B, ORA + 100 + TETTO)
+    prova("...l'undicesimo no, e il perche' e' la riga ⛔ del journal",
+          (0, "⛔ TETTO ANTI-ABUSO: gia' 10 avvisi del recapito su questo scambio "
+              "(tetto 10), a 111 non parte piu' niente"), oltre)
+    prova("...i timbri sono dieci, recapito1 … recapito10", 10, con.execute(
+        "SELECT COUNT(*) FROM p2p_avvisi WHERE ordine=? AND momento LIKE 'recapito%'",
+        (o4,)).fetchone()[0])
     con.close()
 
 
@@ -91505,8 +91946,7 @@ def _ambiente_eco_p2p(src, detto):
     o un freno cambiato lo difenderebbe solo una riga. (Il nome e'
     rimasto dall'eco del gesto, che la patch 0007 ha tolto.)"""
     amb = _ambiente_libro_p2p(detto)
-    for nome in ("P2P_RECAPITO_MAX", "P2P_RECAPITO_PAUSA_S",
-                 "P2P_STESSO_MOMENTO_S"):
+    for nome in ("P2P_RECAPITO_MAX", "P2P_STESSO_MOMENTO_S"):
         amb[nome] = int(re.search(rf"^{nome} = (\d+)", src, re.M).group(1))
     amb["re"] = re
     return amb
@@ -91654,12 +92094,19 @@ def prove_p2p_recapito_passo():
           and "non chi vende" in testo and "bloccat" not in testo.lower())
     prova("...e non porta nessun recapito: per pagare bisogna aprire lo scambio", True,
           "il recapito è lì, cifrato" in testo and "IBAN" not in testo)
-    prova("IL FRENO: un secondo avviso entro il minuto non parte", 0, giud(con, O, 222, T + 40)[0])
-    a_chi, testo = giud(con, O, 222, T + 80)
-    prova("...dopo il minuto si', ed e' una CORREZIONE", [111, True],
-          [a_chi, "ha aggiornato dove inviare 10,00 €" in testo])
-    prova("...il terzo e' l'ultimo", [111, 0],
-          [giud(con, O, 222, T + 200)[0], giud(con, O, 222, T + 400)[0]])
+    # (7 ott 2026, Andrea) OGNI CAMBIO AVVISA: niente pausa fra un avviso
+    # e l'altro, e il tetto di tre non c'e' piu' — ne resta uno ALTO,
+    # anti-abuso
+    TETTO = amb["P2P_RECAPITO_MAX"]
+    a_chi, testo = giud(con, O, 222, T + 11)
+    prova("IL CAMBIO UN SECONDO DOPO avvisa: e' un AGGIORNAMENTO, con le parole di Andrea",
+          [111, "📮 <b>Bruno &lt;b&gt;Neri&lt;/b&gt; ha aggiornato il recapito.</b> "
+                "Controlla il nuovo prima di inviare gli euro."], [a_chi, testo])
+    prova("...e ogni cambio dopo, anche a raffica, fino al tetto anti-abuso, che e' dieci",
+          [10, [111] * 8], [TETTO, [giud(con, O, 222, T + 11 + k)[0] for k in range(1, TETTO - 1)]])
+    oltre = giud(con, O, 222, T + 11 + TETTO)
+    prova("...oltre il tetto non parte, e il perche' porta il ⛔ della riga del journal",
+          [0, True], [oltre[0], oltre[1].startswith("⛔ TETTO ANTI-ABUSO: gia' 10 avvisi")])
     # Carla VENDE (ordine sell), Anna lo prende: a vendere e' chi ha PUBBLICATO
     S = "ordine-di-carla-sell"
     reg(con, 333, [S], T - 600, True)
@@ -91922,6 +92369,22 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
   ordini[ID].stato = 'attivo';
   avvisaRecapitoP2P(ID); await pausa(20);
   out.freniSeparati = chiamate.map(c => c.corpo.attivo);
+  /* (7 ott 2026, Andrea) DOPO «HO INVIATO GLI EURO» parte SOLO un
+     recapito NATO dopo l'ora del pagato: uno di prima, o della stessa
+     ora, e' quello che chi compra ha gia' visto; in disputa niente */
+  out.dopoPagato = [
+    await prova({stato: 'euro_inviati', euroInviatiAt: 7, recapitoAvvisato: 'm1',
+                 campiMiei: {euro: {id: 'm2', testo: 'IBAN NUOVO', t: 9}}}),
+    JSON.stringify((chiamate[0] || {}).corpo), ordini[ID].recapitoAvvisato,
+    await prova({stato: 'euro_inviati', euroInviatiAt: 9,
+                 campiMiei: {euro: {id: 'm2', testo: 'IBAN', t: 9}}}),
+    await prova({stato: 'euro_inviati', euroInviatiAt: 12,
+                 campiMiei: {euro: {id: 'm2', testo: 'IBAN', t: 9}}}),
+    await prova({stato: 'in_disputa', euroInviatiAt: 7,
+                 campiMiei: {euro: {id: 'm2', testo: 'IBAN', t: 9}}}),
+    /* l'ora del pagato a zero e' un'ora che non si sa: niente */
+    await prova({stato: 'euro_inviati', euroInviatiAt: 0,
+                 campiMiei: {euro: {id: 'm2', testo: 'IBAN', t: 9}}})];
   out.dopoNo = [await prova({stato: 'euro_inviati'}), await prova({stato: 'concluso'}),
                 await prova({stato: 'pubblicato'})];
   out.soloChiVende = await prova({lato: 'compro'});
@@ -91971,8 +92434,13 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
           o["attivoRidichiara"])
     prova("...e il freno del «presto» non ferma la dichiarazione a scambio "
           "attivo, dieci secondi dopo", [False, True], o.get("freniSeparati"))
-    prova("dopo lo scambio attivo, o a ordine ancora in vetrina, non parte niente",
-          [0, 0, 0], o["dopoNo"])
+    prova("DOPO «HO INVIATO GLI EURO» (7 ott 2026): parte SOLO un recapito nato "
+          "dopo l'ora del pagato, come aggiornamento; uno di prima, o della stessa "
+          "ora, no — e nemmeno in disputa, o con l'ora del pagato a zero",
+          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true}', "m2", 0, 0, 0, 0],
+          o.get("dopoPagato"))
+    prova("a euro inviati senza l'ora del pagato, a scambio concluso, o a ordine "
+          "ancora in vetrina, non parte niente", [0, 0, 0], o["dopoNo"])
     prova("chi compra non avvisa nessuno, e senza recapito non c'e' niente da dire",
           [0, 0], [o["soloChiVende"], o["senzaRecapito"]])
     prova("se il server non risponde non si segna (si riprovera')", [1, True], o["fallitoNonSegna"])
@@ -121753,8 +122221,17 @@ def prove_cauzione_p2p():
           ([A, B], []), ([t for t, _ in arriva(ACQ, "hold-invoice-paid", "seller", "invoice-next", T + 1100)],
                          arriva(ACQ, "buyer-invoice-requested", "mostro", "", T + 1101)))
     ann = arriva(ACQ, "canceled", "buyer", "cooperative", T + 1200)
-    prova("chi compra accetta di annullare: a chi vende l'annullo, con la coda della cauzione", (True, True),
-          ([t for t, _ in ann] == [B], ann[0][1].endswith("🔐 La cauzione che avevi bloccato torna nel tuo wallet.")))
+    # (7 ott 2026) chi accetta lo sente anche lui, e chi vende sente che
+    # i sats della garanzia sono tornati — e, sotto, la cauzione. Le due
+    # frasi si cercano PER DESTINATARIO: un avviso che manca e' una rossa
+    # col suo nome, non un indice che esplode
+    a_chi = dict(ann or [])
+    prova("chi compra accetta di annullare: a chi vende l'annullo coi sats tornati e la "
+          "coda della cauzione, a chi compra il suo «hai accettato»", (True, True, True, True),
+          ([t for t, _ in ann or []] == [A, B],
+           a_chi.get(B, "").endswith("🔐 La cauzione che avevi bloccato torna nel tuo wallet."),
+           "I sats che avevi bloccato in garanzia sono tornati a te." in a_chi.get(B, ""),
+           a_chi.get(A, "").startswith("❌ Hai accettato di annullare: lo scambio con ")))
 
     SENZA = "5a1e0000-c0c0-4a2b-9c3d-0000000000c4"   # la stessa vendita, via Revolut
     libro(SENZA, B, "sell", ["Revolut"])
@@ -128049,6 +128526,8 @@ def main():
     prove_card_tinte_stato,
     prove_p2p_campanello,
     prove_p2p_eventi, prove_p2p_riserva_libro, prove_p2p_avvisi_in_ordine,
+    prove_avviso_chi_annulla,
+    prove_recapito_aggiornato,
     prove_paycode_riconosciuto,
     prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_tutti_i_relay, prove_p2p_ascolto, prove_p2p_esito_notifiche, prove_p2p_silenzi,
     prove_p2p_avvisi_precisi,
