@@ -39389,3 +39389,144 @@ i collaudi di nuovo (nel messaggio del commit). Dal vivo (copia in
 collaudo, relay morto, Chrome headless): bonifico e contanti prima/dopo
 a 375 e 320, chiaro e scuro, cinque voci di una riga ciascuna, nessuno
 scorrimento orizzontale; la tavola a 375 mandata ad Andrea.
+
+## La ✕ rossa nei passi di Barattozon, e il dettaglio senza la riga 🧾 (7 ott 2026, difetto segnalato da Andrea, ritocchi suoi dopo gli scatti)
+
+**IL DIFETTO.** Nel foglio «Pubblica» del percorso Barattozon, un
+PayCode da 10 € portava accanto all'importo la ✓ verde del passo fatto,
+e la testata passava al passo 3; poi il bottone si fermava con «Un
+PayCode Barattozon vale almeno 25 €». La spunta la decideva
+`passoTabacchinoP2P`, che per il passo 2 chiedeva solo «più di zero» e
+per il passo 3 solo «è una data»: il tondo di un passo diventava ✓
+quando il suo numero stava prima del passo a cui si era. Lo stesso
+difetto c'era nella SCADENZA: una data già passata, sotto l'ora, oltre
+le 72 ore o oltre la garanzia prendeva la ✓. Il PayCode (passo 1) e il
+premio (passo 4) no: su un valore storto il loro tondo restava il
+numero.
+
+**LA CURA.** Il tondo ha tre facce: il NUMERO a campo vuoto (nessuna
+icona), ✓ verde a valore buono come prima, ✕ ROSSA a valore storto, con
+la frase sotto il campo e il campo che la dice al lettore vocale
+(`aria-invalid="true"` e `aria-describedby` verso la frase, messi SOLO a
+valore storto: una descrizione collegata si legge anche da nascosta).
+Un giudice puro, `giudizioTappaTabP2P(n, v)` →
+`{stato: 'vuoto'|'buono'|'storto', frase}`, per i passi 2 e 3
+(`P2P_CAMPO_TAPPA_TAB`); `passoTabacchinoP2P` li dà per fatti solo da
+BUONI, quindi la ✓ e la ✕ non stanno mai sullo stesso tondo e la
+testata resta al passo da correggere. Il disegno porta `data-storto` e
+la frase (`fraseTappaTabP2P`, sempre presente nei passi 2 e 3, nascosta
+finché non serve, così la riscrittura in place la trova senza
+ridisegnare: il dito è sul campo); `aggiornaPercorsoTabP2P` la riscrive
+a ogni tasto. LE FRASI SONO QUELLE DEL BOTTONE, nello stesso ordine: le
+parti pure si chiamano (`giudiceImportoPayCodeP2P`,
+`giudiceMinimoPayCodeP2P`), le altre — il tetto beta in euro, i sats
+del coordinatore a prezzo fisso, i cinque casi della scadenza — sono
+ribattute, perché `valeNuovoOrdineP2P` lo estraggono per nome cinque
+banchi; a tenerli d'accordo c'è il banco. Sotto il minimo si legge
+«Un PayCode Barattozon vale almeno 25 €: sotto non si pubblica», la
+frase che il bottone dice già nel toast. NON È STORTO ciò che non si sa
+ancora (senza cambio a prezzo fisso, senza la finestra della garanzia:
+il bottone dice «aspetta» e il passo resta ✓ come prima), né chi sta
+scrivendo i centesimi («25,» è a metà strada: niente icona).
+
+**DOPO GLI SCATTI, DUE RITOCCHI DI ANDREA.** 1) LA REGOLA NON SI LEGGE
+DUE VOLTE: mentre c'è la frase rossa, la riga grigia d'aiuto del passo 2
+(«Quello scritto sulla mail di Amazon… vale almeno 25 €», id
+`p2pTabAiuto2`) si toglie, e torna quando l'errore se ne va; la
+scadenza non ha una riga gemella, e la sua resta. 2) NIENTE ✕ CHE
+LAMPEGGIA: scrivendo «30» si passa da «3». La ✕, la frase, gli
+attributi per il lettore vocale e la riga d'aiuto nascosta aspettano il
+dito fermo per `P2P_SPIA_ATTESA_MS` (700 ms) o l'uscita dal campo
+(`onblur` → `rivelaSpiaTabP2P`); la ✓ compare SUBITO. Una ✕ già a
+schermo resta mentre si continua a scrivere un valore ancora storto (la
+frase si aggiorna), e se ne va al primo valore buono o vuoto. Chi scrive
+lo dice il FUOCO: si aspetta solo sul campo col cursore, e una scadenza
+storta resta rossa mentre si scrive l'importo. In attesa il tondo è il
+numero, mai la ✓ (il passo si ferma comunque sul valore storto). Il
+giudice puro è `spiaDaMostrareTabP2P(g, scrivendo, gia)`, i tempi li
+tiene `vestiSpiaTabP2P` con lo stato in `p2pSpiaTab` (l'attesa in corsa
+e la ✕ già a schermo); il ridisegno passa da `spiaVistaTabP2P`, che non
+anticipa una ✕ in attesa. Se il foglio si chiude durante l'attesa,
+l'attesa torna a zero: appesa, terrebbe nascosta per sempre la ✕ di un
+foglio riaperto con un valore storto.
+
+**IL DETTAGLIO BARATTOZON DAL LIBRO (stesso giro, decisione di Andrea).**
+Via la riga «🧾 Con Barattozon paghi in contanti, alla cassa del
+tabacchino…»: lo dice il riquadro «Come funziona» coi quattro passi
+(715f147). Il bottone «📖 Come funziona, passo per passo» scende subito
+sotto quel riquadro. `notaTabacchinoDettP2P` tiene il suo nome (tre
+banchi la ritagliano) e restituisce il solo bottone; la porta è la
+stessa, `apriInfoTabacchinoP2P`, quindi l'indietro da Info riapre il
+foglio dello stesso ordine fermo, come da 1308686 e 337b698.
+
+**IL ROSSO.** Nessun colore nuovo: il tondo pieno è `--rosso-p2p` col
+glifo di `--on-danger` (bianco di giorno, inchiostro di sera): 5,3:1 e
+5,8:1 sul tondo, e il tondo fa 4,5:1 e 4,4:1 sul fondo della sezione
+(`--chip-bg`). La frase è `--rosso-p2p-testo`, 4,7:1 e 4,6:1 sullo
+stesso fondo. Il `--danger` generico di giorno sul crema fa 4,4: per
+il testo non bastava, ed è il perché della scelta (il banco lo ricorda).
+
+**STRADE SCARTATE.** Ricavare la spia dal giudice del bottone
+(`valeNuovoOrdineP2P`): dice solo il PRIMO errore di tutto il foglio,
+quindi con il PayCode vuoto non direbbe mai niente sull'importo.
+Spezzarlo in pezzi riusabili: cinque banchi lo ritagliano per nome, e
+il diff sarebbe uscito dal cantiere. La ✕ anche su PayCode e premio:
+non avevano il difetto (decisione di Andrea: si lasciano così). Il
+`--danger` per la frase (4,4:1 di giorno). Per l'attesa del dito, un
+giudizio solo all'uscita dal campo: la ✓ subito era chiesta, e chi
+resta col cursore nel campo non vedrebbe mai la ✕.
+
+**PROVATO.** Nuova sezione `prove_spia_passi_barattozon` (40): le
+sentinelle su passo, disegno, attributi, `onblur`, riga d'aiuto,
+aggiornamento in place e CSS; i contrasti letti dai token nei due temi;
+il giudizio VERO sotto, uguale e sopra il minimo (24,99 · 25 · 25,00 ·
+25,01 · 30) e vuoto, più minimo spento, «25,», zero, «,5», oltre
+Amazon, oltre la leva beta, oltre e sotto i sats del coordinatore,
+senza cambio; la scadenza nei suoi nove casi; il passo; LA CONCORDANZA
+col giudice VERO del bottone su 398 combinazioni (23 importi × prezzo
+fisso o a mercato × minimo acceso o spento × tetto acceso o spento ×
+cambio sì o no, e 10 scadenze × 3 garanzie): dove il passo dice storto
+il bottone si ferma sullo stesso campo con la stessa frase, dove dice
+buono pubblica (o aspetta). In place con un DOM di cartone, un
+orologio di cartone e il fuoco: «1» niente ✕ e un'attesa di 700 ms;
+dito fermo → ✕, frase, aria, aiuto via; «12» la ✕ resta senza
+un'attesa nuova; «30» la ✓ subito e tutto torna; «3» si aspetta da
+capo; uscita dal campo → subito; una scadenza storta non aspetta mentre
+si scrive l'importo; il foglio chiuso durante l'attesa non esplode e
+azzera l'attesa; il ridisegno non anticipa. Nel banco del foglio
+«Pubblica» (`prove_pubblica_metodo_prima`) tre casi col disegno vero e
+il minimo dalla busta delle leve (sotto, uguale, vuoto), riga d'aiuto
+compresa. Nel banco del dettaglio (`prove_p2p_dettaglio`) un ordine
+Barattozon disegnato dal vero: niente 🧾, il bottone una volta sola e
+fra l'ultimo dei quattro passi e il bottone solo chiusure di `<div>`.
+Emendati i quattro banchi che ritagliano `passoTabacchinoP2P` e
+`prove_p2p_paycode`, che chiamava il passo senza orologio con una
+scadenza del 2027 (`adesso: ora`). Tortura sulla copia, baseline verde
+e uguale alla repo: primo giro 17 su 17 (14 al primo colpo; il banco si
+era fermato sul «✕» stampato in cp1252, le ultime tre rifatte in
+UTF-8), secondo giro 17 su 17. Suite intera severa senza config nel worktree, su 337b698 più il cantiere: 19.378 verdi e 0 rosse; i 38 collaudi della CI verdi nella gabbia. Main è poi corso a cedff68 (la ✕ su ogni dispositivo, l'anello ovunque): ribasato (un conflitto solo, l'elenco delle sezioni, tenute tutte), nessun simbolo toccato da quei commit tra quelli cambiati qui; su cedff68 rigirate le sezioni toccate e le loro vicine (974 verdi, comprese `prove_tolti_ovunque` e `prove_anello_ovunque`), la pila dell'indietro (`prove_indietro_dal_libro`, 176) e i 39 collaudi della CI, tutti verdi. Prima del push main è corso ancora a 3458306 («Come funziona» sul mio ordine d'acquisto, lo stesso riquadro sopra il bottone): ribasato (conflitto solo qui in CANTIERI, le due voci in coda tenute tutte e due), e su 3458306 rigirate le sezioni toccate e vicine (1150 verdi), `prove_link_descrizione` toccata da quel commit (73), i 39 collaudi della CI e i passi dei segreti, tutti verdi.
+
+Dal vivo su una copia in collaudo (relay morto, nsec segnaposto, le due
+identità dentro la finta Telegram), Chrome headless a 375 px e densità
+3, nei due temi, coi tasti veri (`Input.insertText`) e i tocchi veri:
+PRIMA con 10 € il passo 2 aveva la ✓ e la testata diceva «Passo 3 di
+4»; DOPO, mentre si scrive, il tondo resta «2» senza attributi, e col
+dito fermo arrivano la ✕, la frase e `aria-invalid` /
+`aria-describedby`, la riga grigia sparisce e la testata resta a «Passo
+2 di 4 · L'importo esatto»; con 30 € la ✓. La scadenza a 80 ore: ✕ e
+«Troppo lontana: un PayCode vale al massimo 72 ore». Il dettaglio di un
+ordine Barattozon arrivato al libro da `ordineDaEvento`, aperto dal
+Compratore: niente 🧾, il bottone subito sotto i quattro passi; toccato,
+porta a Info P2P, e l'indietro — del browser e di Telegram
+(`receiveEvent('back_button_pressed')`) — riapre il foglio dello stesso
+ordine fermo (stessa posizione a 30 e a 700 ms). I colori calcolati dal
+browser sono quelli dei token. Andrea ha approvato gli scatti dei due
+giri prima del push.
+
+**DA GUARDARE.** La scadenza si giudica quando si scrive: una data a
+un'ora e cinque minuti diventa «troppo presto» cinque minuti dopo senza
+che la ✓ lo sappia (il bottone lo dice comunque; Andrea: si lascia
+così). Il lettore vocale vero (VoiceOver, TalkBack) non è stato
+provato: gli attributi sono quelli standard. Sul telefono, il selettore
+di data nativo: l'`input` arriva quando si conferma la data, e la ✕
+aspetta i suoi 700 ms o la chiusura del campo.

@@ -4343,6 +4343,16 @@
   .p2p-tappa[data-fatto="1"] .p2p-tappa-n::before{content:'✓'}
   .p2p-tappa[data-fatto="1"] .p2p-tappa-n{font-size:0}
   .p2p-tappa[data-fatto="1"] .p2p-tappa-n::before{font-size:12px}
+  /* LA ✕ ROSSA (7 ott 2026): un valore storto nel passo 2 o 3. Il tondo
+     pieno del rosso del P2P col glifo di --on-danger (bianco di giorno,
+     inchiostro di sera): 5,3:1 e 5,8:1 sul tondo, e il tondo fa 4,5:1 e
+     4,4:1 sul fondo della sezione (--chip-bg). La frase sotto il campo
+     e' --rosso-p2p-testo, 4,7:1 e 4,6:1 sullo stesso fondo. Niente
+     colori nuovi: --danger qui non basta, di giorno sul crema fa 4,4. */
+  .p2p-tappa[data-storto="1"] .p2p-tappa-n{background:var(--rosso-p2p);color:var(--on-danger);font-size:0}
+  .p2p-tappa[data-storto="1"] .p2p-tappa-n::before{content:'✕';font-size:12px}
+  .p2p-tappa-err{font-size:13px;font-weight:700;line-height:1.4;
+    color:var(--rosso-p2p-testo);margin:6px 0 2px}
   /* il cursore del premio dentro una tappa: le classi sono quelle del
      P2P normale (`.p2p-premio*`), qui basta dare aria al campo a mano,
      che col segno e il decimale e' piu' lungo di un intero */
@@ -55913,10 +55923,15 @@ function metodiDettP2P(o){
       + marchioMetodoP2P(m) + '</button>').join('') + '</div>'
   });
 }
-/* la riga del dettaglio che dice cos'e' il tabacchino a chi lo
-   incontra la prima volta, e rimanda a «Info P2P» dove sta il passo
-   per passo: qui c'e' un bottone da premere, e una spiegazione lunga
-   sopra un bottone e' una spiegazione che nessuno legge */
+/* il rimando del dettaglio a «Info P2P», dove sta il passo per passo
+   del tabacchino.
+   ⚠️ LA RIGA 🧾 NON C'E' PIU' (7 ott 2026, sera, decisione di Andrea):
+   «Con Barattozon paghi in contanti, alla cassa del tabacchino…» diceva
+   in prosa quel che adesso dice il riquadro «Come funziona» coi suoi
+   quattro passi (715f147). Resta il BOTTONE, e sta SOTTO quel riquadro:
+   chi ha letto i quattro passi e vuole di piu', lo trova li'. La porta
+   e' la stessa (`apriInfoTabacchinoP2P`), quindi l'indietro riapre
+   questo foglio fermo, come prima. */
 function notaTabacchinoDettP2P(o){
   if (!o || !tabacchinoP2P(o.metodi)) return '';
   /* ⚠️ LA RIGA DELLO SCONTO NON C'E' PIU' (23 set 2026, col premio):
@@ -55925,8 +55940,7 @@ function notaTabacchinoDettP2P(o){
      la tinta e i sats, come per ogni altro ordine — e due copie di un
      numero ricavato si scollano senza rompere niente. La regola e' di
      casa: «il giudizio non si ribatte». */
-  return '<div class="hint">🧾 Con <b>Barattozon</b> paghi in contanti, alla cassa del tabacchino, un ordine Amazon che chi vende ha già fatto: il <b>PayCode</b>, l\'importo e la scadenza ti arrivano cifrati appena i sats sono in garanzia. Tieni lo scontrino.</div>'
-    + '<button type="button" class="btn ghost" onclick="apriInfoTabacchinoP2P()">📖 Come funziona, passo per passo</button>';
+  return '<button type="button" class="btn ghost" onclick="apriInfoTabacchinoP2P()">📖 Come funziona, passo per passo</button>';
 }
 function apriInfoTabacchinoP2P(){
   haptic();
@@ -56049,7 +56063,6 @@ function renderDettaglioP2P(){
   box.innerHTML =
     (tuo ? '<div class="p2p-box p2p-tuo">È il tuo ordine: l\'hai pubblicato tu, e non si può prendere.</div>' : '') +
     metodiDettP2P(o) +
-    notaTabacchinoDettP2P(o) +
     /* la regola e il tetto del contanti, a chi sta per prendere (30 set 2026) */
     regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo] : (o.metodi || []), maxEuroContantiP2P(),
                             compro ? 'compro' : 'vendo') +
@@ -56077,6 +56090,9 @@ function renderDettaglioP2P(){
       metodo: p2pDettMetodo || ((o.metodi || []).length === 1 ? o.metodi[0] : ''),
       cauzione: !tuo && cauzioneServeP2P(Object.assign({}, o, {mio: false}), p2pInfo, cauzioneAccesaP2P())
     })) +
+    /* col tabacchino, il rimando al passo per passo SUBITO SOTTO i quattro
+       passi (7 ott 2026, sera: prima stava sopra, con la riga 🧾) */
+    notaTabacchinoDettP2P(o) +
     /* ⚠️ L'AVVISO «APPENA LO PRENDI VI VEDETE» NON C'E' PIU', NE' QUI
        NE' IN NESSUN ALTRO FOGLIO DEL P2P (17 set 2026, decisione di
        Andrea). Era nato la mattina stessa con «Le parti si vedono» e
@@ -58347,6 +58363,153 @@ function giudiceMinimoPayCodeP2P(euro, minimo){
   if (!(m > 0) || Math.round(n * 100) >= m * 100) return '';
   return 'Un PayCode Barattozon vale almeno ' + m + ' €: sotto non si pubblica';
 }
+/* ---- LA SPIA DEI PASSI 2 E 3 (7 ott 2026, difetto segnalato da
+   Andrea) ----
+   Il tondo di un passo diventava ✓ appena il campo aveva QUALCOSA:
+   all'importo bastava stare sopra lo zero, alla scadenza essere una
+   data — e un PayCode da 10 € portava la spunta verde accanto, per poi
+   farsi fermare dal bottone. Adesso il tondo ha tre facce: il NUMERO a
+   campo vuoto (nessuna icona), ✓ a valore buono, ✕ ROSSA a valore
+   storto, con la frase sotto il campo e il campo che la dice al
+   lettore vocale (aria-invalid + aria-describedby).
+   LE FRASI SONO QUELLE DEL GIUDICE DEL BOTTONE (`valeNuovoOrdineP2P`),
+   nello stesso ordine: le parti pure si chiamano (il tetto di Amazon,
+   il minimo), le altre sono ribattute riga per riga, perche' quel
+   giudice lo estraggono per nome cinque banchi. A tenerli d'accordo e'
+   il banco (`prove_spia_passi_barattozon`), che li confronta su una
+   griglia di valori.
+   NON E' STORTO cio' che non si sa ancora: senza il cambio (a prezzo
+   fisso) o senza la finestra della garanzia il bottone dice «aspetta»,
+   e il passo resta ✓ come prima. E NON E' STORTO chi sta scrivendo i
+   centesimi: «25,» e' a meta' strada, e una ✕ a ogni virgola sarebbe
+   rumore. Il PayCode (passo 1) e il premio (passo 4) la spunta su un
+   valore storto non l'hanno mai presa, e restano come sono. */
+const P2P_CAMPO_TAPPA_TAB = {2: 'p2pNuovoEuro', 3: 'p2pNuovoTabScade'};
+/* PURA: il giudizio del passo n — {stato: 'vuoto' | 'buono' | 'storto', frase} */
+function giudizioTappaTabP2P(n, v){
+  const vuoto = {stato: 'vuoto', frase: ''}, buono = {stato: 'buono', frase: ''};
+  const storto = frase => ({stato: 'storto', frase: frase});
+  if (n === 2) {
+    const testo = String(v.euro == null ? '' : v.euro).trim();
+    if (!testo || /[.,]$/.test(testo)) return vuoto;
+    const euro = centesimiP2P(testo).n;
+    if (!(euro > 0)) return storto('Scrivi l\'importo dell\'ordine Amazon, coi centesimi se servono');
+    const tettoEuro = Math.floor(Number(v.maxEuro)) || 0;
+    if (tettoEuro > 0 && euro > tettoEuro)
+      return storto('Troppi: il massimo è ' + fmt(tettoEuro) + ' €');
+    const fuori = giudiceImportoPayCodeP2P(euro) || giudiceMinimoPayCodeP2P(euro, v.minEuroBz);
+    if (fuori) return storto(fuori);
+    if (v.fisso && v.cambio > 0) {
+      const sats = satsTabacchinoP2P(euro, v.cambio, premioTabacchinoP2P(v.premioTab).n);
+      if (v.maxSats > 0 && sats > v.maxSats)
+        return storto('Troppi: il massimo è ' + fmt(v.maxSats) + ' sats');
+      if (v.minSats > 0 && sats < v.minSats)
+        return storto('Troppo pochi: il minimo è ' + fmt(v.minSats) + ' sats');
+    }
+    return buono;
+  }
+  if (n === 3) {
+    const testo = String((v.tab || {}).scade || '').trim();
+    if (!testo) return vuoto;
+    const quando = scadeDaCampoP2P(testo);
+    if (!quando) return storto('Scrivi quando scade il PayCode: data e ora sono sulla mail di Amazon');
+    const adesso = v.adesso || Math.floor(Date.now() / 1000);
+    if (quando <= adesso) return storto('La scadenza è già passata: serve un PayCode nuovo');
+    if (quando < adesso + P2P_PAYCODE_MIN_S)
+      return storto('Scade troppo presto: serve almeno un\'ora perché qualcuno vada al tabacchino');
+    if (quando > adesso + P2P_PAYCODE_MAX_S)
+      return storto('Troppo lontana: un PayCode vale al massimo 72 ore');
+    if (v.finestra > 0 && quando > adesso + v.finestra)
+      return storto('Troppo lontana: la garanzia copre al massimo '
+                    + Math.floor(v.finestra / 3600) + ' ore da adesso');
+    return buono;
+  }
+  return vuoto;
+}
+/* la frase sotto il campo: nei passi 2 e 3 c'e' SEMPRE, nascosta
+   finche' il valore non e' storto, cosi' la riscrittura in place la
+   trova senza ridisegnare (il dito e' sul campo) */
+function fraseTappaTabP2P(n, g){
+  if (!P2P_CAMPO_TAPPA_TAB[n]) return '';
+  const storto = g.stato === 'storto';
+  return '<div class="p2p-tappa-err" id="p2pTabErr' + n + '"' + (storto ? '' : ' hidden') + '>'
+    + esc(storto ? g.frase : '') + '</div>';
+}
+/* gli attributi del campo per il lettore vocale, SOLO a valore storto:
+   una descrizione collegata si legge anche da nascosta */
+function ariaTappaTabP2P(n, g){
+  return g.stato === 'storto'
+    ? ' aria-invalid="true" aria-describedby="p2pTabErr' + n + '"' : '';
+}
+/* ...e gli stessi tre pezzi in place, mentre si scrive: il tondo, la
+   frase, il campo */
+function spiaTappaTabP2P(t, n, g){
+  const storto = g.stato === 'storto';
+  t.dataset.storto = storto ? '1' : '0';
+  const frase = el('p2pTabErr' + n), campo = el(P2P_CAMPO_TAPPA_TAB[n]);
+  if (frase) { frase.textContent = storto ? g.frase : ''; frase.hidden = !storto; }
+  /* (7 ott 2026, sera) la riga d'aiuto del passo, se ne ha una con la
+     stessa regola, si toglie mentre c'e' la frase: la regola dei 25 €
+     non si legge due volte, in rosso e in grigio */
+  const aiuto = el('p2pTabAiuto' + n);
+  if (aiuto) aiuto.hidden = storto;
+  if (campo) {
+    if (storto) {
+      campo.setAttribute('aria-invalid', 'true');
+      campo.setAttribute('aria-describedby', 'p2pTabErr' + n);
+    } else {
+      campo.removeAttribute('aria-invalid');
+      campo.removeAttribute('aria-describedby');
+    }
+  }
+}
+/* ---- LA ✕ ASPETTA CHE IL DITO SI FERMI (7 ott 2026, sera, richiesta
+   di Andrea dopo gli scatti) ----
+   Scrivendo «30» si passa da «3», che e' sotto il minimo: una ✕ che
+   compare e scompare a ogni tasto e' un lampeggio, non un avviso. La ✕,
+   la frase e gli attributi per il lettore vocale compaiono quando il
+   dito si ferma per P2P_SPIA_ATTESA_MS o quando lascia il campo; la ✓
+   SUBITO, come ogni cosa che va bene. Una ✕ gia' a schermo resta mentre
+   si continua a scrivere un valore ancora storto (la frase si aggiorna),
+   e se ne va al primo valore buono o vuoto. CHI SCRIVE LO DICE IL FUOCO:
+   si aspetta solo sul campo che ha il cursore, e una scadenza storta
+   resta rossa mentre si scrive l'importo. In attesa il tondo e' il
+   numero: la ✓ no, perche' il passo si ferma comunque sul valore storto. */
+const P2P_SPIA_ATTESA_MS = 700;
+const p2pSpiaTab = {attesa: {}, vista: {}};
+/* PURA: cosa mostra la spia ADESSO — il giudizio, o «vuoto» finche' il
+   dito sta scrivendo un valore storto che non e' ancora a schermo */
+function spiaDaMostrareTabP2P(g, scrivendo, gia){
+  return (g.stato === 'storto' && scrivendo && !gia) ? {stato: 'vuoto', frase: ''} : g;
+}
+/* la spia di un passo coi tempi del dito: a ogni tasto, e quando il
+   dito si ferma o lascia il campo (`rivelaSpiaTabP2P`) */
+function vestiSpiaTabP2P(t, n, g, scrivendo){
+  clearTimeout(p2pSpiaTab.attesa[n]);
+  p2pSpiaTab.attesa[n] = 0;
+  const mostra = spiaDaMostrareTabP2P(g, scrivendo, p2pSpiaTab.vista[n]);
+  p2pSpiaTab.vista[n] = mostra.stato === 'storto';
+  spiaTappaTabP2P(t, n, mostra);
+  if (mostra !== g)
+    p2pSpiaTab.attesa[n] = setTimeout(() => rivelaSpiaTabP2P(n), P2P_SPIA_ATTESA_MS);
+}
+/* il dito si e' fermato, o ha lasciato il campo: la spia dice quel che
+   c'e' adesso, rileggendo il foglio (nel frattempo puo' essere cambiato,
+   o chiuso: allora non c'e' niente da vestire) */
+function rivelaSpiaTabP2P(n){
+  const t = document.querySelector('.p2p-tappa[data-tappa="' + n + '"]');
+  if (t) vestiSpiaTabP2P(t, n, giudizioTappaTabP2P(n, campiNuovoP2P()), false);
+  else { clearTimeout(p2pSpiaTab.attesa[n]); p2pSpiaTab.attesa[n] = 0; }
+}
+/* quel che il DISEGNO mette a schermo: il giudizio vero, tranne una ✕
+   che il dito sta ancora scrivendo (la sua attesa e' in corsa, e il
+   ridisegno non la anticipa) */
+function spiaVistaTabP2P(n, campi){
+  const m = spiaDaMostrareTabP2P(giudizioTappaTabP2P(n, campi), !!p2pSpiaTab.attesa[n],
+                                 p2pSpiaTab.vista[n]);
+  p2pSpiaTab.vista[n] = m.stato === 'storto';
+  return m;
+}
 /* PURA: L'INTERO CHE VIAGGIA NEL `fiat_amount` di un PayCode (30 set
    2026, Barattozon a mercato). A PREZZO FISSO l'intero piu' vicino,
    com'e' dal 22 set: i sats sono nostri, e l'intero e' solo l'etichetta
@@ -58538,8 +58701,11 @@ function metroFissoP2P(o){
 function passoTabacchinoP2P(v){
   const t = v.tab || {};
   if (!payCodeP2P(t.ordine)) return 1;
-  if (!(centesimiP2P(v.euro).n > 0)) return 2;
-  if (!(scadeDaCampoP2P(t.scade) > 0)) return 3;
+  /* (7 ott 2026) il 2 e il 3 sono fatti quando il loro giudizio e'
+     BUONO, non appena c'e' qualcosa: un PayCode sotto il minimo non e'
+     un passo fatto (`giudizioTappaTabP2P`) */
+  if (giudizioTappaTabP2P(2, v).stato !== 'buono') return 2;
+  if (giudizioTappaTabP2P(3, v).stato !== 'buono') return 3;
   if (premioTabacchinoP2P(v.premioTab).storto) return 4;
   return 5;
 }
@@ -60942,11 +61108,17 @@ function percorsoTabacchinoP2P(val){
   const maxTab = finestraTab > 0 ? Math.min(P2P_PAYCODE_MAX_S, finestraTab) : P2P_PAYCODE_MAX_S;
   const campi = campiNuovoP2P();
   const passo = passoTabacchinoP2P(campi);
-  const tappa = (n, titolo, corpo, sotto) =>
-    '<div class="p2p-sez p2p-tappa" data-tappa="' + n + '" data-fatto="' + (n < passo ? '1' : '0') + '">' +
+  /* la spia dei passi 2 e 3 (7 ott 2026): ✕ rossa e frase a valore
+     storto, se il dito non la sta ancora scrivendo */
+  const giud = {2: spiaVistaTabP2P(2, campi), 3: spiaVistaTabP2P(3, campi)};
+  const tappa = (n, titolo, corpo, sotto) => {
+    const g = giud[n] || {stato: 'vuoto', frase: ''};
+    return '<div class="p2p-sez p2p-tappa" data-tappa="' + n + '" data-fatto="' + (n < passo ? '1' : '0') + '"' +
+        ' data-storto="' + (g.stato === 'storto' ? '1' : '0') + '">' +
       '<div class="p2p-sez-tit"><span><b class="p2p-tappa-n" aria-hidden="true">' + n + '</b>' + titolo + '</span></div>' +
       '<div class="p2p-sez-riga"><div class="p2p-sez-corpo">' + corpo + '</div></div>' +
-      (sotto || '') + '</div>';
+      fraseTappaTabP2P(n, g) + (sotto || '') + '</div>';
+  };
   return '<div class="p2p-percorso">' +
     '<div class="p2p-percorso-testa" id="p2pTabPasso">' + esc(testataPercorsoTabP2P(passo)) + '</div>' +
     /* ⚠️ IL CAPPELLO DICE COS'E' BARATTOZON, non dove stanno i tre dati
@@ -60970,21 +61142,23 @@ function percorsoTabacchinoP2P(val){
       '<input id="p2pNuovoEuro" type="text" inputmode="decimal" ' +
         'placeholder="23,47" value="' + esc(p2pNuovoEuro) + '" ' +
         'onbeforeinput="soloCentesimiP2P(event)" ' +
-        'oninput="cambiaCampoNuovoP2P()" ' +
-        'aria-label="Importo del PayCode in euro, coi centesimi">',
+        'oninput="cambiaCampoNuovoP2P()" onblur="rivelaSpiaTabP2P(2)" ' +
+        'aria-label="Importo del PayCode in euro, coi centesimi"' + ariaTappaTabP2P(2, giud[2]) + '>',
       rigaEuroViaP2P() +
       (maxTestoP2P() ? '<div class="hint">Fase beta: max ' + maxTestoP2P() + '</div>' : '') +
       /* IL MINIMO E' NOSTRO, NON DI AMAZON (30 set 2026): Amazon non ne ha,
          Barattozon ne vuole uno — il numero e' quello VIVO della leva, e a
          leva spenta la riga torna quella di ieri */
-      '<div class="hint">Quello scritto sulla mail di Amazon, coi centesimi: al tabacchino si paga esattamente quella cifra. Amazon accetta i contanti fino a <b>999 €</b> per ordine, senza commissione'
+      /* (7 ott 2026, sera) con la frase rossa questa riga si toglie
+         (`p2pTabAiuto2`): la regola dei 25 € non si legge due volte */
+      '<div class="hint" id="p2pTabAiuto2"' + (giud[2].stato === 'storto' ? ' hidden' : '') + '>Quello scritto sulla mail di Amazon, coi centesimi: al tabacchino si paga esattamente quella cifra. Amazon accetta i contanti fino a <b>999 €</b> per ordine, senza commissione'
         + (minEuroBzP2P() ? '; un PayCode Barattozon vale almeno <b>' + minEuroBzP2P() + ' €</b>.' : ', senza minimo.') + '</div>') +
     tappa(3, P2P_TAPPE_TAB[2].t,
       '<input id="p2pNuovoTabScade" type="datetime-local" ' +
         'value="' + esc(p2pNuovoTab.scade) + '" ' +
         'min="' + campoDaScadeP2P(adessoTab + P2P_PAYCODE_MIN_S) + '" ' +
         'max="' + campoDaScadeP2P(adessoTab + maxTab) + '" ' +
-        'oninput="cambiaTabP2P()" aria-label="Quando scade il PayCode">',
+        'oninput="cambiaTabP2P()" onblur="rivelaSpiaTabP2P(3)" aria-label="Quando scade il PayCode"' + ariaTappaTabP2P(3, giud[3]) + '>',
       '<div class="hint">⏳ Amazon dà 72 ore dal checkout: copia la scadenza dalla mail. Deve stare fra un\'ora e 72 ore da adesso. Nel libro l\'ordine resta fino a <b>due ore prima</b> di quella scadenza, per lasciare a chi paga il tempo di andare al tabacchino; poi esce da solo.</div>') +
     tappa(4, P2P_TAPPE_TAB[3].t,
       '<div class="p2p-premio">' +
@@ -61071,8 +61245,13 @@ function aggiornaPercorsoTabP2P(){
   const passo = passoTabacchinoP2P(campi);
   const testa = el('p2pTabPasso');
   if (testa) testa.textContent = testataPercorsoTabP2P(passo);
+  /* chi sta scrivendo: la ✕ aspetta solo sul campo col cursore */
+  const dito = (document.activeElement && document.activeElement.id) || '';
   document.querySelectorAll('.p2p-tappa').forEach(t => {
-    t.dataset.fatto = (Number(t.dataset.tappa) < passo) ? '1' : '0';
+    const n = Number(t.dataset.tappa);
+    t.dataset.fatto = (n < passo) ? '1' : '0';
+    if (P2P_CAMPO_TAPPA_TAB[n])
+      vestiSpiaTabP2P(t, n, giudizioTappaTabP2P(n, campi), dito === P2P_CAMPO_TAPPA_TAB[n]);
   });
   rigaVivaTabP2P();
 }

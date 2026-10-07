@@ -61103,6 +61103,13 @@ out.anonimoNienteAvviso = out.paginaAnonima.indexOf('vi vedete') < 0;
 out.anonimoLoDice = out.paginaAnonima.indexOf('Tu resti anonimo') >= 0;
 myTgId = 111;
 
+/* ---- IL DETTAGLIO BARATTOZON DAL LIBRO (7 ott 2026, sera, decisione
+   di Andrea): la riga 🧾 non c'e' piu', e il rimando a «Info P2P» sta
+   SUBITO SOTTO il riquadro «Come funziona» coi quattro passi ---- */
+p2pLibro = {ordini: [ordine({id: 'ord-tab', euro: 6, metodi: ['Contanti al tabacchino 6.00']})]};
+apriDettaglioP2P('ord-tab');
+out.dettTab = el('p2pDettCorpo').innerHTML;
+
 /* ...e su un intervallo il bottone devia sul foglio della cifra */
 p2pLibro = {ordini: [ordine({id: 'ord-3', euro: 20, euroMax: 100,
                              metodi: ['SEPA']})]};
@@ -62095,6 +62102,23 @@ console.log(JSON.stringify(out));
           [True, True], [o["nienteAvviso"], o["anonimoNienteAvviso"]])
     prova("...e la riga di chi resta anonimo la legge solo lui",
           [True, True], [o["anonimoLoDice"], o["notoNonLaVede"]])
+    # (7 ott 2026, sera, decisione di Andrea) IL DETTAGLIO BARATTOZON DAL
+    # LIBRO, disegnato dal vero: la riga 🧾 se n'e' andata (la dice il
+    # riquadro «Come funziona» coi suoi quattro passi), e il bottone che
+    # porta a «Info P2P» sta SUBITO SOTTO quel riquadro — fra l'ultimo
+    # passo e il bottone solo chiusure di <div>, nient'altro
+    _dt = o["dettTab"]
+    prova("il dettaglio Barattozon non ha piu' la riga 🧾", [False, False],
+          ["🧾" in _dt, "paghi in contanti, alla cassa del tabacchino" in _dt])
+    _bt = _dt.find('<button type="button" class="btn ghost" onclick="apriInfoTabacchinoP2P()">'
+                   '📖 Come funziona, passo per passo</button>')
+    _ul = _dt.find("Paghi il PayCode al tabacchino")
+    _fine = _dt.find("</div>", _dt.find("I sats arrivano a te"))
+    prova("...e il bottone «Come funziona, passo per passo» sta subito sotto i quattro passi",
+          [True, True, True],
+          [_bt > 0, 0 < _ul < _bt,
+           _fine > 0 and re.fullmatch(r"(?:</div>)+", _dt[_fine:_bt]) is not None])
+    prova("...una volta sola", 1, _dt.count("apriInfoTabacchinoP2P()"))
     prova("su un intervallo il bottone apre «Quanto» e non prende",
           [1, 0], o["rangeDevia"])
 
@@ -64563,6 +64587,8 @@ def prove_tasto_barattozon():
                  "function metodiPubblicabiliP2P(lato){",
                  "function payCodeP2P(testo){",
                  "function passoTabacchinoP2P(v){",
+                 # (7 ott 2026) il passo 2 e 3 dal giudizio della spia
+                 "function giudizioTappaTabP2P(n, v){",
                  "function apriNuovoOrdineP2P(metodo){",
                  "function apriBarattozonP2P(){"))
              + r"""
@@ -71213,6 +71239,8 @@ def prove_p2p_pubblica():
         + "\n" + _intera("function premioTestoTabP2P(n){")
         + "\n" + _intera("function premioImplicitoTabacchinoP2P(euro, sats, cambio){")
         + "\n" + _intera("function passoTabacchinoP2P(v){")
+        # (7 ott 2026) la spia dei passi 2 e 3: il passo la chiede
+        + "\n" + _intera("function giudizioTappaTabP2P(n, v){")
         # il tetto di Amazon (23 set 2026)
         + "\n" + _intera("function giudiceImportoPayCodeP2P(euro){")
         # il minimo di Barattozon e l'intero del filo (30 set 2026)
@@ -82074,6 +82102,8 @@ def prove_p2p_paycode():
             "function rigaVivaTabP2P(){", "function aggiornaPercorsoTabP2P(){",
             # (30 set 2026) la riga viva e il riepilogo sanno la leva
             "function passoTabacchinoP2P(v){", "function rigaPremioTabP2P(euro, cambio, premio, fisso){",
+            # (7 ott 2026) la spia dei passi 2 e 3
+            "function giudizioTappaTabP2P(n, v){", "function spiaTappaTabP2P(t, n, g){",
             "function giudiceImportoPayCodeP2P(euro){",
             "function giudiceMinimoPayCodeP2P(euro, minimo){",
             "function euroFiloTabacchinoP2P(esatto, fisso){",
@@ -82264,12 +82294,14 @@ DOM = null;
         "              premioImplicitoTabacchinoP2P(20, 41200, 0.0005), premioImplicitoTabacchinoP2P(20, 39900, 0.0005),\n"
         "              premioImplicitoTabacchinoP2P(20, 60000, 0.0005),\n"
         "              premioImplicitoTabacchinoP2P(20, 39000, 0), premioImplicitoTabacchinoP2P(0, 39000, 0.0005)],\n"
+        # (7 ott 2026) l'orologio fermo: il passo 3 adesso GIUDICA la
+        # scadenza (fra un'ora e 72 ore), e senza `adesso` vale il vero
         "  passo: [passoTabacchinoP2P({euro: '', premioTab: '', tab: {ordine: '', scade: ''}}),\n"
         "          passoTabacchinoP2P({euro: '', premioTab: '', tab: {ordine: '479868518', scade: ''}}),\n"
         "          passoTabacchinoP2P({euro: '23,47', premioTab: '', tab: {ordine: '479868518', scade: ''}}),\n"
-        "          passoTabacchinoP2P({euro: '23,47', premioTab: '99', tab: {ordine: '479868518', scade: campoDaScadeP2P(ora + 3600)}}),\n"
-        "          passoTabacchinoP2P({euro: '23,47', premioTab: '-3', tab: {ordine: '479868518', scade: campoDaScadeP2P(ora + 3600)}}),\n"
-        "          passoTabacchinoP2P({euro: '23,47', premioTab: '', tab: {ordine: '123', scade: campoDaScadeP2P(ora + 3600)}})],\n"
+        "          passoTabacchinoP2P({euro: '23,47', premioTab: '99', adesso: ora, tab: {ordine: '479868518', scade: campoDaScadeP2P(ora + 3600)}}),\n"
+        "          passoTabacchinoP2P({euro: '23,47', premioTab: '-3', adesso: ora, tab: {ordine: '479868518', scade: campoDaScadeP2P(ora + 3600)}}),\n"
+        "          passoTabacchinoP2P({euro: '23,47', premioTab: '', adesso: ora, tab: {ordine: '123', scade: campoDaScadeP2P(ora + 3600)}})],\n"
         "  testata: [testataPercorsoTabP2P(1), testataPercorsoTabP2P(4), testataPercorsoTabP2P(5)],\n"
         # (30 set 2026) il quarto argomento e' la leva: qui prezzo fisso
         "  riga: [rigaPremioTabP2P('', 0.0005, '', true), rigaPremioTabP2P('23,47', 0, '', true), rigaPremioTabP2P('23,47', 0.0005, '2,5', true),\n"
@@ -83005,6 +83037,12 @@ def prove_pubblica_metodo_prima():
         "function notaTipoPrezzoTabP2P(fisso){", "function euroFiloTabacchinoP2P(esatto, fisso){",
         "function giudiceMinimoPayCodeP2P(euro, minimo){", "function minEuroBzP2P(){",
         "function testataPercorsoTabP2P(passo){", "function passoTabacchinoP2P(v){",
+        # (7 ott 2026) la spia dei passi 2 e 3: giudizio, frase, aria
+        "function giudizioTappaTabP2P(n, v){", "function fraseTappaTabP2P(n, g){",
+        "function ariaTappaTabP2P(n, g){", "function spiaTappaTabP2P(t, n, g){",
+        # (7 ott 2026, sera) la ✕ aspetta che il dito si fermi
+        "function spiaDaMostrareTabP2P(g, scrivendo, gia){", "function vestiSpiaTabP2P(t, n, g, scrivendo){",
+        "function rivelaSpiaTabP2P(n){", "function spiaVistaTabP2P(n, campi){",
         "function payCodeP2P(testo){", "function scadeDaCampoP2P(s){",
         "function leggiDataTabacchinoP2P(testo){", "function campoDaScadeP2P(epoch){",
         "function finestraGaranziaP2P(info){",
@@ -83043,7 +83081,7 @@ def prove_pubblica_metodo_prima():
             "P2P_CONTANTI", "REGOLA_CONTANTI_COMPRA", "REGOLA_CONTANTI_VENDE", "CONSIGLI_CONTANTI",
             "P2P_PREMIO_MAX", "P2P_POLLICE", "P2P_PREMIO_TAB_MAX", "P2P_PAYCODE_MAX_EURO",
             "P2P_PAYCODE_MIN_S", "P2P_PAYCODE_MAX_S", "P2P_TABACCHINO_VITA_S",
-            "P2P_TABACCHINO_MARGINE_S", "P2P_MARGINE_HOLD_BLOCCHI", "P2P_SEC_PER_BLOCCO",
+            "P2P_TABACCHINO_MARGINE_S", "P2P_MARGINE_HOLD_BLOCCHI", "P2P_SEC_PER_BLOCCO", "P2P_CAMPO_TAPPA_TAB", "P2P_SPIA_ATTESA_MS", "p2pSpiaTab",
             "p2pCoord", "LOGO_BZ_HTML", "MARCHIO_TITOLO_P2P")) + "\n"
         + re.search(r"let p2pTitoloMarchio = [^\n]*;", mini).group(0) + "\n"
         + _blocco("const P2P_VESTE_METODI = {", "\n};") + "\n"
@@ -83143,6 +83181,11 @@ const CASI = {
     return [p2pNuovoEuroVia, riga()]; },
   riapre(){ daTab('vendo', '23,47'); scegliMetodoP2P('SEPA'); apri('vendo');
     return [p2pNuovoEuroVia, riga()]; },
+  /* (7 ott 2026) LA SPIA DEI PASSI nel disegno vero, col minimo di
+     Barattozon acceso dalla busta delle leve e il PayCode gia' buono */
+  spiaSotto(){ return spia('24,99'); },
+  spiaUguale(){ return spia('25'); },
+  spiaVuoto(){ return spia(''); },
   giudice(){ return [
     importoDopoMetodoP2P({euro: '23,', euroMax: ''}, [T], ['SEPA']),
     importoDopoMetodoP2P({euro: '23.47', euroMax: ''}, [T], ['SEPA']),
@@ -83155,6 +83198,24 @@ const CASI = {
     importoDopoMetodoP2P({euro: '', euroMax: '50'}, ['SEPA'], [T]),
     importoDopoMetodoP2P(null, [T], ['SEPA'])]; }
 };
+/* il tondo del passo 2, il campo, la frase, e se la frase sta fra il
+   campo e la riga d'aiuto */
+function spia(cifra){
+  p2pLeve = {mostro: 'm', minEuroBz: 25};
+  try {
+    daTab('vendo', cifra);
+    p2pNuovoTab = {ordine: '479868518', importo: '', scade: ''};
+    renderNuovoOrdineP2P();
+    const tappa = (HTML.match(/<div class="p2p-sez p2p-tappa" data-tappa="2"[^>]*>/) || [''])[0];
+    const campo = (HTML.match(/<input id="p2pNuovoEuro"[^>]*>/) || [''])[0];
+    const frase = (HTML.match(/<div class="p2p-tappa-err" id="p2pTabErr2"[^>]*>[^<]*<\/div>/) || [''])[0];
+    const i = HTML.indexOf('id="p2pTabErr2"');
+    /* (7 ott 2026, sera) la riga d'aiuto dei 25 €: nascosta con la frase */
+    const aiuto = (HTML.match(/<div class="hint" id="p2pTabAiuto2"[^>]*>/) || [''])[0];
+    return [tappa, /aria-invalid="true" aria-describedby="p2pTabErr2"/.test(campo), frase,
+      i > HTML.indexOf('id="p2pNuovoEuro"') && i < HTML.indexOf('Quello scritto sulla mail di Amazon'), aiuto];
+  } finally { p2pLeve = null; }
+}
 const R = {};
 for (const k of Object.keys(CASI)) {
   try { R[k] = CASI[k](); } catch(e) { R[k] = 'ESPLOSO: ' + (e && e.message); }
@@ -83221,6 +83282,24 @@ console.log(JSON.stringify(R));
           out["contanti"])
     prova("25 con SEPA, poi Barattozon: vale anche li' e resta, nel campo coi centesimi",
           ["Contanti al tabacchino", "25", "", [], "25", True], out["entra"])
+    # (7 ott 2026) LA SPIA DEI PASSI 2 E 3 nel disegno vero: sotto il
+    # minimo la ✕ rossa, la frase sotto il campo e il campo invalido;
+    # uguale al minimo la ✓ e nessuna frase; vuoto nessuna icona
+    _T2 = '<div class="p2p-sez p2p-tappa" data-tappa="2" data-fatto="%s" data-storto="%s">'
+    # (7 ott 2026, sera) ...e la riga d'aiuto con la regola dei 25 € si
+    # toglie mentre c'e' la frase: la regola non si legge due volte
+    _A2 = '<div class="hint" id="p2pTabAiuto2"%s>'
+    prova("24,99 con Barattozon: il tondo del passo 2 e' la ✕, la frase sta fra il campo e "
+          "l'aiuto (nascosto), il campo e' invalido per il lettore vocale",
+          [_T2 % ("0", "1"), True,
+           '<div class="p2p-tappa-err" id="p2pTabErr2">Un PayCode Barattozon vale almeno '
+           '25 €: sotto non si pubblica</div>', True, _A2 % " hidden"], out["spiaSotto"])
+    prova("...25 tondi: la ✓, la frase nascosta e vuota, l'aiuto visibile, il campo buono",
+          [_T2 % ("1", "0"), False, '<div class="p2p-tappa-err" id="p2pTabErr2" hidden></div>',
+           True, _A2 % ""], out["spiaUguale"])
+    prova("...e vuoto: il numero, nessuna ✕ e nessuna frase, l'aiuto visibile",
+          [_T2 % ("0", "0"), False, '<div class="p2p-tappa-err" id="p2pTabErr2" hidden></div>',
+           True, _A2 % ""], out["spiaVuoto"])
     _OLTRE = "1500 → Amazon accetta il pagamento in contanti fino a 999 € per ordine"
     prova("1500 con SEPA, poi Barattozon: oltre il tetto di Amazon, con la frase del suo giudice, sotto il campo del passo 2",
           ["", _OLTRE, [_OLTRE], True], out["oltre"])
@@ -83249,6 +83328,416 @@ console.log(JSON.stringify(R));
             "perche": "50 → con Barattozon l'importo è uno solo, senza intervallo"},
            {"euro": "", "euroMax": "", "perche": ""}],
           out["giudice"])
+
+
+def prove_spia_passi_barattozon():
+    """LA SPIA DEI PASSI 2 E 3 DI BARATTOZON (7 ott 2026, difetto
+    segnalato da Andrea): un PayCode sotto i 25 € portava la spunta
+    verde accanto all'importo, e una scadenza gia' passata o oltre le 72
+    ore accanto alla data. Adesso il tondo ha tre facce — il numero a
+    campo vuoto, ✓ a valore buono, ✕ rossa a valore storto — con la
+    frase sotto il campo e il campo che la dice al lettore vocale.
+    Il banco gira il giudizio VERO dei passi accanto al giudice VERO del
+    bottone (`valeNuovoOrdineP2P`) su una griglia di valori: dove il
+    passo dice storto il bottone deve fermarsi sullo STESSO campo con la
+    STESSA frase, e dove dice buono il bottone deve lasciar pubblicare.
+    Il disegno del foglio sta nel banco di «Pubblica»
+    (`prove_pubblica_metodo_prima`)."""
+    print("\n--- LA SPIA DEI PASSI 2 E 3 DI BARATTOZON: ✓ SOLO SE BUONO, ✕ ROSSA SE STORTO ---")
+    import shutil
+    import subprocess
+    import tempfile
+    import json as _js
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def _intera(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+
+    def _riga(nome):
+        return re.search(r"const " + nome + r" = [^\n]*;", mini).group(0)
+
+    # --- 1) LE SENTINELLE: dove si decide, e con cosa ---------------------
+    _passo = _intera("function passoTabacchinoP2P(v){")
+    prova("il passo 2 e il 3 sono fatti solo con un giudizio BUONO, non appena c'e' qualcosa",
+          [True, True, False, False],
+          ["if (giudizioTappaTabP2P(2, v).stato !== 'buono') return 2;" in _passo,
+           "if (giudizioTappaTabP2P(3, v).stato !== 'buono') return 3;" in _passo,
+           "centesimiP2P(v.euro).n > 0" in _passo,
+           "scadeDaCampoP2P(t.scade) > 0" in _passo])
+    _per = pezzo_js(mini, "function percorsoTabacchinoP2P(val){", "\n}\n")
+    prova("il disegno del percorso porta la ✕ nel tondo e la frase sotto la riga del campo",
+          [True, True, True],
+          ["' data-storto=\"' + (g.stato === 'storto' ? '1' : '0') + '\">'" in _per,
+           "fraseTappaTabP2P(n, g) + (sotto || '')" in _per,
+           "const giud = {2: spiaVistaTabP2P(2, campi), 3: spiaVistaTabP2P(3, campi)};" in _per])
+    prova("...e i due campi si dicono storti al lettore vocale, ognuno col suo giudizio",
+          [1, 1],
+          [_per.count("'aria-label=\"Importo del PayCode in euro, coi centesimi\"' + ariaTappaTabP2P(2, giud[2]) + '>'"),
+           _per.count("'oninput=\"cambiaTabP2P()\" onblur=\"rivelaSpiaTabP2P(3)\" aria-label=\"Quando scade il PayCode\"' + ariaTappaTabP2P(3, giud[3]) + '>'")])
+    # (7 ott 2026, sera) LASCIARE IL CAMPO RIVELA SUBITO: i due campi
+    # chiamano `rivelaSpiaTabP2P` all'uscita, ognuno col suo passo
+    prova("...e lasciando il campo la spia dice subito quel che c'e'", [1, 1],
+          [_per.count("'oninput=\"cambiaCampoNuovoP2P()\" onblur=\"rivelaSpiaTabP2P(2)\" ' +"),
+           _per.count("onblur=\"rivelaSpiaTabP2P(3)\"")])
+    prova("...la riga d'aiuto dei 25 € ha il suo id, e nasce nascosta con la frase", 1,
+          _per.count("'<div class=\"hint\" id=\"p2pTabAiuto2\"' + (giud[2].stato === 'storto' ? ' hidden' : '') + '>Quello scritto sulla mail di Amazon"))
+    _agg = _intera("function aggiornaPercorsoTabP2P(){")
+    prova("mentre si scrive la spia si riscrive in place, nei soli passi coi campi, "
+          "e aspetta solo sul campo col cursore",
+          True, "vestiSpiaTabP2P(t, n, giudizioTappaTabP2P(n, campi), dito === P2P_CAMPO_TAPPA_TAB[n]);" in _agg
+          and "if (P2P_CAMPO_TAPPA_TAB[n])" in _agg
+          and "const dito = (document.activeElement && document.activeElement.id) || '';" in _agg
+          and "renderNuovoOrdineP2P" not in _agg)
+    prova("la ✕ aspetta il dito fermo 0,7 secondi", "const P2P_SPIA_ATTESA_MS = 700;",
+          _riga("P2P_SPIA_ATTESA_MS"))
+    prova("i passi con la spia sono il 2 (l'importo) e il 3 (la scadenza)",
+          "const P2P_CAMPO_TAPPA_TAB = {2: 'p2pNuovoEuro', 3: 'p2pNuovoTabScade'};",
+          _riga("P2P_CAMPO_TAPPA_TAB"))
+
+    # --- 2) IL ROSSO: le variabili gia' in uso, e i contrasti nei due temi ---
+    css = mini[:mini.index("</style>")]
+    _tondo = re.search(r'\.p2p-tappa\[data-storto="1"\] \.p2p-tappa-n\{([^}]*)\}', css)
+    _glifo = re.search(r'\.p2p-tappa\[data-storto="1"\] \.p2p-tappa-n::before\{([^}]*)\}', css)
+    _frase = re.search(r'\.p2p-tappa-err\{([^}]*)\}', css)
+    prova("la ✕ e' il tondo pieno del rosso del P2P, col glifo di --on-danger",
+          [True, True, True],
+          [bool(_tondo) and "background:var(--rosso-p2p);" in _tondo.group(1)
+           and "color:var(--on-danger);" in _tondo.group(1),
+           bool(_glifo) and "content:'✕'" in _glifo.group(1),
+           bool(_frase) and "color:var(--rosso-p2p-testo);" in _frase.group(1)])
+    prova("...e nessun colore nuovo: niente esadecimali nelle tre regole",
+          [], [x.group(0) for x in (_tondo, _glifo, _frase)
+               if x and re.search(r"#[0-9A-Fa-f]{3}", x.group(1))])
+
+    def _esa(h):
+        h = h.lstrip("#")
+        return h if len(h) == 6 else "".join(c * 2 for c in h)
+
+    def _lum(h):
+        c = [int(_esa(h)[k:k + 2], 16) / 255 for k in (0, 2, 4)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4
+             for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    def _contrasto(a, b):
+        la, lb = sorted((_lum(a), _lum(b)), reverse=True)
+        return (la + 0.05) / (lb + 0.05)
+
+    def _token(nome):
+        # il primo e' quello di giorno, il secondo quello di sera
+        return re.findall(r"--" + nome + r":(#[0-9A-Fa-f]{6}|#[0-9A-Fa-f]{3})\b", css)[:2]
+    _pieno, _testo = _token("rosso-p2p"), _token("rosso-p2p-testo")
+    _glif, _fondo = _token("on-danger"), _token("chip-bg")
+    prova("i quattro token hanno un valore di giorno e uno di sera",
+          [2, 2, 2, 2], [len(_pieno), len(_testo), len(_glif), len(_fondo)])
+    prova("il glifo ✕ sul tondo rosso passa il 3:1, di giorno e di sera",
+          [True, True], [_contrasto(a, b) >= 3 for a, b in zip(_glif, _pieno)])
+    prova("...il tondo rosso sul fondo della sezione passa il 3:1, nei due temi",
+          [True, True], [_contrasto(a, b) >= 3 for a, b in zip(_pieno, _fondo)])
+    prova("...e la frase sul fondo della sezione passa il 4,5:1, nei due temi",
+          [True, True], [_contrasto(a, b) >= 4.5 for a, b in zip(_testo, _fondo)])
+    # --danger, il rosso generico, di giorno sul crema fa 4,4: e' il perche'
+    # della scelta, e se un giorno cambia la nota del css va riletta
+    _dng = _token("danger")
+    prova("...che col --danger generico di giorno non passerebbe (il perche' della scelta)",
+          False, _contrasto(_dng[0], _fondo[0]) >= 4.5)
+
+    # --- 3) IL BANCO: il giudizio VERO, il passo, il bottone accanto ---
+    node = shutil.which("node")
+    if not node:
+        salta("il banco della spia dei passi", "node non c'e'")
+        return
+    # P2P_TAPPE_TAB sta su piu' righe: si prende intero
+    _i = mini.index("const P2P_TAPPE_TAB = [")
+    _tappe = mini[_i:mini.index("\n];", _i) + 3]
+    _prog = (
+        "const fmt = n => String(n);\n"
+        "const esc = s => String(s).replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\n"
+        + "\n".join(_riga(n) for n in (
+            "P2P_TABACCHINO", "P2P_TABACCHINO_PM", "P2P_CONTANTI",
+            "P2P_PAYCODE_MAX_EURO", "P2P_PAYCODE_MIN_S", "P2P_PAYCODE_MAX_S",
+            "P2P_PREMIO_TAB_MAX", "P2P_CAMPO_TAPPA_TAB", "P2P_SPIA_ATTESA_MS", "p2pSpiaTab"))
+        + "\n" + _tappe + "\n"
+        + "".join(_intera(f) for f in (
+            "function interoP2P(testo){", "function centesimiP2P(testo){",
+            "function tabacchinoP2P(metodi){", "function metodoBaseP2P(m){",
+            "function contantiAManoP2P(metodi){",
+            "function giudiceContantiP2P(euro, metodi, tetto){",
+            "function payCodeP2P(testo){", "function scadeDaCampoP2P(s){",
+            "function campoDaScadeP2P(epoch){", "function leggiDataTabacchinoP2P(testo){",
+            "function premioTabacchinoP2P(testo){",
+            "function satsTabacchinoP2P(importo, cambio, premio){",
+            "function giudiceImportoPayCodeP2P(euro){",
+            "function giudiceMinimoPayCodeP2P(euro, minimo){",
+            "function valeNuovoOrdineP2P(v){",
+            "function giudizioTappaTabP2P(n, v){", "function passoTabacchinoP2P(v){",
+            "function testataPercorsoTabP2P(passo){",
+            "function fraseTappaTabP2P(n, g){", "function ariaTappaTabP2P(n, g){",
+            "function spiaTappaTabP2P(t, n, g){", "function aggiornaPercorsoTabP2P(){",
+            "function spiaDaMostrareTabP2P(g, scrivendo, gia){", "function vestiSpiaTabP2P(t, n, g, scrivendo){",
+            "function rivelaSpiaTabP2P(n){", "function spiaVistaTabP2P(n, campi){"))
+        + r"""
+const T = P2P_TABACCHINO, ORA = 1800000000;
+/* un ordine Barattozon tutto buono: il PayCode, 30 €, tre ore, il premio
+   a zero, il cambio a 50.000 €/BTC, la garanzia di cento ore */
+function base(o){
+  return Object.assign({lato: 'vendo', metodi: [T], euro: '30', euroMax: '', sats: '',
+    fisso: false, premio: 0, premioTab: '', cambio: 0.0005, maxSats: 500000, minSats: 20000,
+    maxEuro: 0, minEuroBz: 25, maxEuroContanti: 0,
+    tab: {ordine: '479868518', scade: campoDaScadeP2P(ORA + 3 * 3600)},
+    finestra: 100 * 3600, adesso: ORA}, o || {});
+}
+const G = (n, o) => giudizioTappaTabP2P(n, base(o));
+const S = (o) => campoDaScadeP2P(ORA + o);
+const R = {};
+/* sotto, uguale e sopra il minimo, e vuoto */
+R.euro = ['', '24,99', '25', '25,00', '25,01', '30'].map(e => G(2, {euro: e}));
+R.altriEuro = [G(2, {euro: '10', minEuroBz: 0}), G(2, {euro: '25,'}), G(2, {euro: '0'}),
+  G(2, {euro: ',5'}), G(2, {euro: '1000'}), G(2, {euro: '999'}),
+  G(2, {euro: '250', maxEuro: 200}), G(2, {euro: '300', fisso: true}),
+  G(2, {euro: '300', fisso: true, cambio: 0}), G(2, {euro: '5', minEuroBz: 0, fisso: true})];
+R.scade = [G(3, {tab: {ordine: '479868518', scade: ''}}),
+  G(3, {tab: {ordine: '479868518', scade: S(-3600)}}),
+  G(3, {tab: {ordine: '479868518', scade: S(30 * 60)}}),
+  G(3, {tab: {ordine: '479868518', scade: S(3600)}}),
+  G(3, {tab: {ordine: '479868518', scade: S(72 * 3600)}}),
+  G(3, {tab: {ordine: '479868518', scade: S(73 * 3600)}}),
+  G(3, {tab: {ordine: '479868518', scade: S(20 * 3600)}, finestra: 10 * 3600}),
+  G(3, {tab: {ordine: '479868518', scade: S(20 * 3600)}, finestra: 0}),
+  G(3, {tab: {ordine: '479868518', scade: 'domani'}})];
+R.altri = [G(1, {}), G(4, {premioTab: '99'})];
+/* il passo: la ✓ va solo fino al primo passo NON buono */
+R.passo = [passoTabacchinoP2P(base({euro: ''})), passoTabacchinoP2P(base({euro: '24,99'})),
+  passoTabacchinoP2P(base({euro: '25'})), passoTabacchinoP2P(base({euro: '25', tab: {ordine: '479868518', scade: S(-60)}})),
+  passoTabacchinoP2P(base({euro: '25,'})), passoTabacchinoP2P(base({euro: '30', premioTab: '99'})),
+  passoTabacchinoP2P(base({euro: '24,99', tab: {ordine: '12', scade: ''}}))];
+/* LA CONCORDANZA COL BOTTONE: dove il passo dice storto, il bottone si
+   ferma sullo stesso campo con la stessa frase; dove dice buono, il
+   bottone pubblica — o aspetta il cambio o la garanzia, che non sono
+   valori storti; dove dice vuoto, il bottone non pubblica */
+function concorda(n, campo, v){
+  const g = giudizioTappaTabP2P(n, v), r = valeNuovoOrdineP2P(v);
+  if (g.stato === 'storto') return !r.ok && r.campo === campo && r.manca === g.frase;
+  if (g.stato === 'buono') return !!r.ok || /^Aspetta un attimo/.test(r.manca);
+  return !r.ok;
+}
+const discordi = [];
+let giri = 0;
+const EURO = ['', '0', '0,00', '5', '10', '24', '24,99', '25', '25,00', '25,01', '30', '25,',
+  ',5', '25,555', '199,99', '200', '200,01', '250', '300', '999', '999,00', '999,01', '1000'];
+for (const e of EURO) for (const fisso of [false, true]) for (const min of [25, 0])
+  for (const tetto of [0, 200]) for (const cambio of [0.0005, 0]) {
+    const v = base({euro: e, fisso, minEuroBz: min, maxEuro: tetto, cambio});
+    giri++;
+    if (!concorda(2, 'p2pNuovoEuro', v)) discordi.push(['euro', e, fisso, min, tetto, cambio,
+      giudizioTappaTabP2P(2, v), valeNuovoOrdineP2P(v)]);
+  }
+const DOPO = [-3600, 0, 30 * 60, 59 * 60, 3600, 2 * 3600, 20 * 3600, 72 * 3600, 72 * 3600 + 60, 80 * 3600];
+for (const d of DOPO) for (const fin of [100 * 3600, 10 * 3600, 0]) {
+  const v = base({tab: {ordine: '479868518', scade: S(d)}, finestra: fin});
+  giri++;
+  if (!concorda(3, 'p2pNuovoTabScade', v)) discordi.push(['scade', d, fin,
+    giudizioTappaTabP2P(3, v), valeNuovoOrdineP2P(v)]);
+}
+R.concordanza = {giri, discordi};
+/* la frase e gli attributi, come li scrive il disegno */
+R.frase = [fraseTappaTabP2P(2, G(2, {euro: '24,99'})), fraseTappaTabP2P(2, G(2, {euro: '25'})),
+  fraseTappaTabP2P(1, G(2, {euro: '24,99'}))];
+R.aria = [ariaTappaTabP2P(2, G(2, {euro: '24,99'})), ariaTappaTabP2P(2, G(2, {euro: '25'})),
+  ariaTappaTabP2P(3, G(3, {tab: {ordine: '479868518', scade: S(-60)}}))];
+/* ---- IN PLACE: un DOM di cartone coi quattro tondi, la frase e i campi ---- */
+function nodo(id){
+  const attr = {};
+  return {id, dataset: {}, textContent: '', hidden: true, attr,
+    setAttribute(k, v){ attr[k] = String(v); }, removeAttribute(k){ delete attr[k]; }};
+}
+let DOM = {};
+const el = id => DOM[id] || null;
+let TAPPE = [];
+/* il fuoco e la querySelector del passo che `rivelaSpiaTabP2P` cerca */
+const document = {activeElement: null, querySelectorAll: s => s === '.p2p-tappa' ? TAPPE : [],
+  querySelector: s => { const m = /data-tappa="(\d)"/.exec(s); return m ? (TAPPE.find(t => t.dataset.tappa === m[1]) || null) : null; }};
+/* L'OROLOGIO DI CARTONE: i timer non partono da soli, li fa scattare il
+   banco (`scorri`), e si legge quanto aspettano */
+let TIMER = {}, NT = 0;
+function setTimeout(f, ms){ NT++; TIMER[NT] = {f, ms}; return NT; }
+function clearTimeout(id){ delete TIMER[id]; }
+function scorri(){ const ids = Object.keys(TIMER); ids.forEach(id => { const x = TIMER[id]; delete TIMER[id]; x.f(); }); return ids.map(id => 'x'); }
+let RIGA = 0;
+function rigaVivaTabP2P(){ RIGA++; }
+let CAMPI = base({euro: '24,99'});
+function campiNuovoP2P(){ return CAMPI; }
+function monta(){
+  DOM = {p2pTabPasso: nodo('p2pTabPasso'), p2pNuovoEuro: nodo('p2pNuovoEuro'),
+    p2pNuovoTabScade: nodo('p2pNuovoTabScade'), p2pTabErr2: nodo('p2pTabErr2'),
+    p2pTabErr3: nodo('p2pTabErr3'), p2pTabAiuto2: nodo('p2pTabAiuto2')};
+  DOM.p2pTabAiuto2.hidden = false;
+  TAPPE = [1, 2, 3, 4].map(n => { const t = nodo('t' + n); t.dataset.tappa = String(n); return t; });
+}
+function foto(){
+  return {fatto: TAPPE.map(t => t.dataset.fatto), storto: TAPPE.map(t => t.dataset.storto),
+    testa: DOM.p2pTabPasso.textContent,
+    frase2: [DOM.p2pTabErr2.textContent, DOM.p2pTabErr2.hidden],
+    frase3: [DOM.p2pTabErr3.textContent, DOM.p2pTabErr3.hidden],
+    euro: Object.assign({}, DOM.p2pNuovoEuro.attr), scade: Object.assign({}, DOM.p2pNuovoTabScade.attr),
+    aiuto: DOM.p2pTabAiuto2.hidden, attese: Object.values(TIMER).map(x => x.ms)};
+}
+monta();
+const scatti = [];
+CAMPI = base({euro: '24,99'}); aggiornaPercorsoTabP2P(); scatti.push(foto());
+CAMPI = base({euro: '25'}); aggiornaPercorsoTabP2P(); scatti.push(foto());
+CAMPI = base({euro: '', tab: {ordine: '479868518', scade: S(80 * 3600)}}); aggiornaPercorsoTabP2P(); scatti.push(foto());
+CAMPI = base({euro: ''}); aggiornaPercorsoTabP2P(); scatti.push(foto());
+R.inPlace = {scatti, riga: RIGA};
+/* ---- IL DITO (7 ott 2026, sera): la ✕ aspetta che si fermi, la ✓ no ---- */
+monta(); TIMER = {}; p2pSpiaTab.attesa = {}; p2pSpiaTab.vista = {};
+const dito = [];
+const scrivi = (euro, scade) => { CAMPI = base({euro, tab: {ordine: '479868518', scade: scade || ''}});
+  aggiornaPercorsoTabP2P(); dito.push(foto()); };
+document.activeElement = DOM.p2pNuovoEuro;
+scrivi('1');                      // 0: si scrive «1» — sotto il minimo, ma il dito e' li'
+scorri(); dito.push(foto());      // 1: il dito si ferma: ✕, frase, aria, aiuto via
+scrivi('12');                     // 2: ancora storto: la ✕ resta, niente attesa nuova
+scrivi('30');                     // 3: buono: la ✓ subito
+scrivi('3');                      // 4: storto di nuovo: si aspetta da capo
+document.activeElement = null;
+rivelaSpiaTabP2P(2); dito.push(foto());   // 5: il dito lascia il campo: subito, e l'attesa e' spenta
+/* una scadenza storta NON aspetta mentre si scrive l'importo */
+document.activeElement = DOM.p2pNuovoEuro; p2pSpiaTab.vista = {};
+scrivi('30', S(80 * 3600));       // 6
+/* ...e un foglio chiuso nel frattempo: niente da vestire, niente che esploda */
+document.activeElement = DOM.p2pNuovoEuro; p2pSpiaTab.vista = {};
+scrivi('5');
+const tappeSalvate = TAPPE; TAPPE = [];
+let chiuso; try { scorri(); chiuso = [Object.keys(TIMER).length, p2pSpiaTab.attesa[2]]; } catch(e) { chiuso = 'ESPLOSO ' + e.message; }
+TAPPE = tappeSalvate;
+/* il ridisegno durante l'attesa non anticipa la ✕; senza attesa la mostra */
+p2pSpiaTab.attesa = {2: 99}; p2pSpiaTab.vista = {2: false};
+const ridisegnoInAttesa = spiaVistaTabP2P(2, base({euro: '10'}));
+p2pSpiaTab.attesa = {}; p2pSpiaTab.vista = {};
+const ridisegnoFermo = spiaVistaTabP2P(2, base({euro: '10'}));
+R.dito = {scatti: dito, chiuso, ridisegnoInAttesa, ridisegnoFermo,
+  puro: [spiaDaMostrareTabP2P({stato: 'storto', frase: 'x'}, true, false),
+         spiaDaMostrareTabP2P({stato: 'storto', frase: 'x'}, true, true),
+         spiaDaMostrareTabP2P({stato: 'storto', frase: 'x'}, false, false),
+         spiaDaMostrareTabP2P({stato: 'buono', frase: ''}, true, false)]};
+console.log(JSON.stringify(R));
+""")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(_prog)
+    try:
+        _r = subprocess.run([node, f.name], capture_output=True, text=True,
+                            encoding="utf-8", errors="replace", timeout=60)
+    finally:
+        os.unlink(f.name)
+    if _r.returncode != 0:
+        prova("il banco della spia dei passi gira", "", _r.stderr[:600])
+        return
+    out = _js.loads(_r.stdout.strip())
+
+    _V = {"stato": "vuoto", "frase": ""}
+    _B = {"stato": "buono", "frase": ""}
+
+    def _S(frase):
+        return {"stato": "storto", "frase": frase}
+    _MIN = "Un PayCode Barattozon vale almeno 25 €: sotto non si pubblica"
+    prova("l'importo: vuoto nessuna icona, 24,99 ✕ col minimo, 25 / 25,00 / 25,01 / 30 ✓",
+          [_V, _S(_MIN), _B, _B, _B, _B], out["euro"])
+    prova("...a minimo spento 10 € e' buono; «25,» si sta scrivendo; 0 e «,5» storti; "
+          "oltre Amazon, oltre la leva beta, oltre i sats del coordinatore storti; "
+          "senza cambio non si giudica",
+          [_B, _V, _S("Scrivi l'importo dell'ordine Amazon, coi centesimi se servono"),
+           _S("Scrivi l'importo dell'ordine Amazon, coi centesimi se servono"),
+           _S("Amazon accetta il pagamento in contanti fino a 999 € per ordine"), _B,
+           _S("Troppi: il massimo è 200 €"), _S("Troppi: il massimo è 500000 sats"), _B,
+           _S("Troppo pochi: il minimo è 20000 sats")], out["altriEuro"])
+    prova("la scadenza: vuota nessuna icona; passata, sotto l'ora, oltre le 72 ore, oltre la "
+          "garanzia storte; un'ora e 72 ore buone; garanzia ignota non si giudica; una data "
+          "che non si legge storta",
+          [_V, _S("La scadenza è già passata: serve un PayCode nuovo"),
+           _S("Scade troppo presto: serve almeno un'ora perché qualcuno vada al tabacchino"),
+           _B, _B, _S("Troppo lontana: un PayCode vale al massimo 72 ore"),
+           _S("Troppo lontana: la garanzia copre al massimo 10 ore da adesso"), _B,
+           _S("Scrivi quando scade il PayCode: data e ora sono sulla mail di Amazon")],
+          out["scade"])
+    prova("il PayCode e il premio non hanno la spia: il loro tondo resta com'era",
+          [_V, _V], out["altri"])
+    prova("il passo si ferma al primo NON buono: 24,99 resta al 2, 25 col resto buono va "
+          "al 5, una scadenza passata al 3, «25,» al 2, il premio storto al 4",
+          [2, 2, 5, 3, 2, 4, 1], out["passo"])
+    _c = out["concordanza"]
+    prova("il passo e il bottone dicono la stessa cosa su %d combinazioni" % _c["giri"],
+          [], _c["discordi"][:4])
+    prova("...e la griglia e' quella che si crede (368 importi, 30 scadenze)", 398, _c["giri"])
+    prova("la frase sotto il campo: col testo a valore storto, nascosta e vuota a valore "
+          "buono, assente fuori dai passi 2 e 3",
+          ['<div class="p2p-tappa-err" id="p2pTabErr2">' + _MIN + "</div>",
+           '<div class="p2p-tappa-err" id="p2pTabErr2" hidden></div>', ""], out["frase"])
+    prova("il campo storto si dice al lettore vocale, quello buono no",
+          [' aria-invalid="true" aria-describedby="p2pTabErr2"', "",
+           ' aria-invalid="true" aria-describedby="p2pTabErr3"'], out["aria"])
+    _s = out["inPlace"]["scatti"]
+    prova("in place, 24,99: il tondo 2 ✕, la frase si vede, il campo e' invalido, "
+          "la testata resta al passo 2",
+          [["1", "0", "0", "0"], [None, "1", "0", None], "Passo 2 di 4 · L'importo esatto",
+           [_MIN, False], ["", True],
+           {"aria-invalid": "true", "aria-describedby": "p2pTabErr2"}, {}],
+          [_s[0]["fatto"], _s[0]["storto"], _s[0]["testa"], _s[0]["frase2"],
+           _s[0]["frase3"], _s[0]["euro"], _s[0]["scade"]])
+    prova("...riscritto 25: il tondo 2 ✓, la frase si nasconde e si svuota, "
+          "il campo torna buono",
+          [["1", "1", "1", "1"], [None, "0", "0", None], ["", True], {}],
+          [_s[1]["fatto"], _s[1]["storto"], _s[1]["frase2"], _s[1]["euro"]])
+    prova("...la scadenza oltre le 72 ore si accende da sola, anche col passo 2 vuoto",
+          [["1", "0", "0", "0"], [None, "0", "1", None],
+           ["Troppo lontana: un PayCode vale al massimo 72 ore", False],
+           {"aria-invalid": "true", "aria-describedby": "p2pTabErr3"}],
+          [_s[2]["fatto"], _s[2]["storto"], _s[2]["frase3"], _s[2]["scade"]])
+    prova("...e tutto vuoto: nessuna ✕ e nessuna frase", [[None, "0", "0", None], ["", True], ["", True], {}, {}],
+          [_s[3]["storto"], _s[3]["frase2"], _s[3]["frase3"], _s[3]["euro"], _s[3]["scade"]])
+    prova("...e la riga viva dei sats si riscrive a ogni giro, come prima", 4,
+          out["inPlace"]["riga"])
+    prova("...e la riga d'aiuto dei 25 € si toglie con la frase e torna senza",
+          [True, False, False, False],
+          [_s[0]["aiuto"], _s[1]["aiuto"], _s[2]["aiuto"], _s[3]["aiuto"]])
+
+    # --- 4) IL DITO (7 ott 2026, sera, richiesta di Andrea): la ✕ e la
+    # frase aspettano 0,7 secondi di dito fermo, o l'uscita dal campo; la
+    # ✓ compare subito; una ✕ gia' a schermo non lampeggia ---
+    _d = out["dito"]
+    _x = _d["scatti"]
+    _NIENTE = [None, "0", "0", None]
+    prova("si scrive «1»: niente ✕, niente frase, niente aria, l'aiuto resta — e un'attesa di 700 ms",
+          [["1", "0", "0", "0"], _NIENTE, ["", True], {}, False, [700]],
+          [_x[0]["fatto"], _x[0]["storto"], _x[0]["frase2"], _x[0]["euro"], _x[0]["aiuto"], _x[0]["attese"]])
+    prova("...il dito si ferma: la ✕, la frase, il campo invalido, l'aiuto via, nessuna attesa",
+          [[None, "1", "0", None], [_MIN, False],
+           {"aria-invalid": "true", "aria-describedby": "p2pTabErr2"}, True, []],
+          [_x[1]["storto"], _x[1]["frase2"], _x[1]["euro"], _x[1]["aiuto"], _x[1]["attese"]])
+    prova("...«12», ancora sotto: la ✕ resta dov'e', senza lampeggiare e senza un'attesa nuova",
+          [[None, "1", "0", None], [_MIN, False], []],
+          [_x[2]["storto"], _x[2]["frase2"], _x[2]["attese"]])
+    prova("...«30»: la ✓ SUBITO, la frase e l'aria se ne vanno, l'aiuto torna",
+          [["1", "1", "0", "0"], _NIENTE, ["", True], {}, False, []],
+          [_x[3]["fatto"], _x[3]["storto"], _x[3]["frase2"], _x[3]["euro"], _x[3]["aiuto"], _x[3]["attese"]])
+    prova("...«3»: di nuovo sotto, e si aspetta da capo", [_NIENTE, [700]],
+          [_x[4]["storto"], _x[4]["attese"]])
+    prova("...lasciando il campo la ✕ arriva subito, e l'attesa si spegne",
+          [[None, "1", "0", None], [_MIN, False], []],
+          [_x[5]["storto"], _x[5]["frase2"], _x[5]["attese"]])
+    prova("una scadenza storta non aspetta mentre si scrive l'importo",
+          [[None, "0", "1", None], ["Troppo lontana: un PayCode vale al massimo 72 ore", False], []],
+          [_x[6]["storto"], _x[6]["frase3"], _x[6]["attese"]])
+    # ...e l'attesa torna a zero: un'attesa rimasta appesa terrebbe nascosta
+    # la ✕ di un foglio riaperto con un valore storto, per sempre
+    prova("...il foglio chiuso durante l'attesa: niente da vestire, niente che esploda, "
+          "e l'attesa torna a zero", [0, 0], _d["chiuso"])
+    prova("il ridisegno durante l'attesa non anticipa la ✕; a dito fermo la mostra",
+          ["vuoto", "storto"], [_d["ridisegnoInAttesa"]["stato"], _d["ridisegnoFermo"]["stato"]])
+    prova("il giudice puro della spia: storto mentre si scrive = niente, gia' a schermo = resta, "
+          "a dito fermo = si', buono = sempre",
+          ["vuoto", "storto", "storto", "buono"], [g["stato"] for g in _d["puro"]])
 
 
 def prove_libro_vuoto_monete():
@@ -126266,6 +126755,7 @@ def main():
               prove_passi_libro_p2p,
               prove_tolti_ovunque,
               prove_anello_ovunque,
+              prove_spia_passi_barattozon,
               prove_config_esempio):
         try:
             f()
