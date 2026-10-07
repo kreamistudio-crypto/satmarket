@@ -125979,6 +125979,212 @@ console.log(JSON.stringify(out));
           r.get("senzaEvento"))
 
 
+def prove_stellina_card_p2p():
+    """LA STELLINA ALL'ANGOLO DELLA CARD P2P DELLA HOME (7 ott 2026,
+    richiesta di Andrea). Nella fila «Scambi P2P», all'angolo del volto
+    di chi ha pubblicato: lo scudo per lo staff (che ha la precedenza),
+    per tutti gli altri la stella del riquadro «Chi ha pubblicato
+    quest'ordine» — `stellaP2P`, la stessa che si riempie per quanto
+    vale —, niente stella senza recensioni. Il dato c'era gia': la
+    fotografia del libro porta `media` e `voti` per ordine, il server
+    non cambia. Il banco gira il volto unico intero, la stella vera e la
+    card vera della fila: staff, cinque stelle, media bassa, nessuna
+    recensione, il volto che arriva in ritardo."""
+    print("\n[la stellina all'angolo della card P2P]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    m = mini.replace("\r\n", "\n")
+
+    # --- 1) LE SENTINELLE ---------------------------------------------
+    card = pezzo_js(m, "function cardVetrinaP2P(o){", "\n}\n")
+    prova("la card della fila: lo scudo e la stellina allo stesso angolo, "
+          "con la stessa classe di posto", True,
+          "${bollinoVolto('p2p:' + o.id, 'p2p-vt-bollino')}"
+          "${stellinaVolto('p2p:' + o.id, 'p2p-vt-bollino')}" in card)
+    prova("SOLO nella fila della home: non nell'anello del libro ne' nel "
+          "riquadro (lo dice Andrea)", 1, m.count("stellinaVolto('"))
+    sv = pezzo_js(m, "function stellinaVolto(chiave, cls){", "\n}\n")
+    prova("il disegno e' `stellaP2P` del riquadro, non uno nuovo", True,
+          "stellaP2P(v.media)" in sv and "<svg" not in sv)
+    rv = pezzo_js(m, "function ridisegnaVolti(k){", "\n}\n")
+    prova("il volto in ritardo la riaccende col disegno e la voce dello "
+          "stesso giudice", True,
+          "querySelectorAll('[data-stella-di]')" in rv
+          and "voceStellinaVolto(v)" in rv and "stellaP2P(v.media)" in rv)
+    rq = pezzo_js(m, "function repRiquadroP2P(f, id){", "\n}\n")
+    prova("...e la cifra si scrive come nel riquadro", True,
+          "toLocaleString('it-IT',\n        {minimumFractionDigits: 1, "
+          "maximumFractionDigits: 1})" in rq
+          and "toLocaleString('it-IT',\n    {minimumFractionDigits: 1, "
+          "maximumFractionDigits: 1})" in
+          pezzo_js(m, "function voceStellinaVolto(v){", "\n}\n"))
+    prova("il CSS: il posto dello scudo nella card, il [hidden] che "
+          "spegne davvero, la stella girata da `--st`", True,
+          ".stellina-volto.p2p-vt-bollino{top:24px;right:2px;bottom:auto}" in m
+          and ".bollino-staff.mini.p2p-vt-bollino{top:24px;right:2px;bottom:auto}" in m
+          and ".stellina-volto[hidden]{display:none}" in m
+          and ".stellina-volto .p2p-rep-stella{--st:14px;" in m
+          and "width:20px;height:20px;border-radius:999px;" in m)
+
+    # --- 2) IL BANCO: i pezzi veri --------------------------------------
+    stella = (pezzo_js(m, "const P2P_STELLA_D = ", ";\n") + ";\n"
+              + pezzo_js(m, "function frazioneStellaP2P(media){", "\n}\n") + "\n}\n"
+              + pezzo_js(m, "function stellaP2P(media){", "\n}\n") + "\n}\n")
+    js = r"""
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const avatarImg = n => n ? '<img class="av-foto">' : '';
+const chiediConferma = () => {};
+const nodi = [];
+globalThis.document = {querySelectorAll: sel => nodi.filter(n => sel === '[' + n.attr + ']')};
+""" + volto_unico_js(m) + stella + r"""
+let p2pFacce = {};
+""" + pezzo_js(m, "function prendiFacceP2P(facce, chiesti){", "\n}\n") + "\n}\n" + r"""
+/* la card vera della fila, coi suoi dintorni di cartone: qui conta
+   l'angolo del volto, non il cartellino */
+const tabacchinoP2P = () => false;
+const capiP2P = (a, b) => b ? a + '-' + b : a;
+const euroCartaP2P = n => String(n);
+const satsMercatoP2P = () => 0;
+const nettoLatoP2P = (o, s) => s;
+const metodoBaseP2P = x => x;
+const affaroneP2P = () => '';
+const badgePremioP2P = () => '';
+const fmt = n => String(n);
+""" + pezzo_js(m, "function cardVetrinaP2P(o){", "\n}\n") + "\n}\n" + r"""
+const O = id => ({id, lato: 'sell', euro: 50, euroMax: 0, sats: 0, metodi: ['Revolut']});
+const nodo = k => ({attr: 'data-stella-di', k, hidden: true, innerHTML: '', aria: null,
+  getAttribute(){ return this.k; },
+  setAttribute(a, x){ if (a === 'aria-label') this.aria = x; },
+  removeAttribute(a){ if (a === 'aria-label') this.aria = null; }});
+const out = {};
+out.riquadro48 = stellaP2P(4.8);
+out.vuota = stellinaVolto('');
+/* le quattro facce, come le porta la fotografia del libro */
+prendiFacceP2P({
+  staff: {nome: 'Mod', avatar: '', media: 4.8, voti: 9, staff: true},
+  cinque: {nome: 'Ada', avatar: '', media: 5, voti: 2},
+  bassa: {nome: 'Bea', avatar: '', media: 1.2, voti: 3},
+  zero: {nome: 'Cleo', avatar: '', media: 0, voti: 0}});
+for (const id of ['staff', 'cinque', 'bassa', 'zero'])
+  out['card_' + id] = cardVetrinaP2P(O(id));
+out.voci = ['staff', 'cinque', 'bassa', 'zero'].map(id => voceStellinaVolto(cacheVolti['p2p:' + id]));
+out.cacheZero = JSON.stringify(cacheVolti['p2p:zero']);
+/* IL VOLTO IN RITARDO: la card e' gia' disegnata, l'angolo spento */
+out.primaTardi = cardVetrinaP2P(O('tardi'));
+const angolo = nodo('p2p:tardi'), altro = nodo('p2p:altro');
+/* la card che lo contiene: la sua etichetta, base e coda */
+const etichetta = h => ((h || '').match(/aria-label="([^"]*)"/) || [])[1];
+const BASE = 'Compra BTC, invia 50 euro, Revolut';
+const cartaVoce = k => ({attr: 'data-voce-di', k, aria: BASE,
+  getAttribute(n){ return n === 'data-voce' ? BASE : this.k; },
+  setAttribute(a, x){ if (a === 'aria-label') this.aria = x; }});
+const voceTardi = cartaVoce('p2p:tardi'), voceAltra = cartaVoce('p2p:altro');
+out.etichette = ['staff', 'cinque', 'bassa', 'zero', 'tardi']
+  .map(id => etichetta(id === 'tardi' ? out.primaTardi : out['card_' + id]));
+out.baseScritta = (out.primaTardi.match(/data-voce="([^"]*)"/) || [])[1];
+out.chiaveScritta = (out.primaTardi.match(/data-voce-di="([^"]*)"/) || [])[1];
+nodi.push(angolo, altro, voceTardi, voceAltra);
+prendiFacceP2P({tardi: {nome: 'Dino', avatar: '', media: 4.8, voti: 12}});
+out.tardi = [angolo.hidden, angolo.aria, angolo.innerHTML, altro.hidden, altro.innerHTML];
+out.voci_tardi = [voceTardi.aria, voceAltra.aria];
+/* una risposta senza i voti (il volto di un'altra strada) non la spegne */
+ricordaVolto('p2p:tardi', {nome: 'Dino'});
+out.restaAccesa = [angolo.hidden, angolo.aria];
+/* la media cambia: si ridisegna */
+prendiFacceP2P({tardi: {nome: 'Dino', avatar: '', media: 2.5, voti: 13}});
+out.cambiata = [angolo.hidden, angolo.aria, angolo.innerHTML];
+/* arriva lo staff: lo scudo vince, la stella si spegne */
+prendiFacceP2P({tardi: {nome: 'Dino', avatar: '', media: 2.5, voti: 13, staff: true}});
+out.stafTardi = [angolo.hidden, angolo.aria, angolo.innerHTML];
+out.voci_tardi.push(voceTardi.aria);
+/* tolto lo staff, e poi i voti a zero */
+prendiFacceP2P({tardi: {nome: 'Dino', avatar: '', media: 2.5, voti: 13, staff: false}});
+out.riaccesa = angolo.hidden;
+prendiFacceP2P({tardi: {nome: 'Dino', avatar: '', media: 0, voti: 0}});
+out.senzaVoti = [angolo.hidden, angolo.aria, angolo.innerHTML, 'media' in cacheVolti['p2p:tardi']];
+out.voci_tardi.push(voceTardi.aria);
+/* una media storta dal server non disegna niente */
+prendiFacceP2P({storta: {nome: 'Eva', avatar: '', media: 'x', voti: 4},
+                infinita: {nome: 'Fede', avatar: '', media: Infinity, voti: 4},
+                senzaVoti: {nome: 'Gio', avatar: '', media: 4, voti: 0},
+                testo: {nome: 'Ivo', avatar: '', media: '4.5', voti: 4}});
+out.storta = ['storta', 'infinita', 'senzaVoti', 'testo']
+  .map(id => voceStellinaVolto(cacheVolti['p2p:' + id]));
+console.log(JSON.stringify(out));
+"""
+    r = _node_banco(js)
+    if r is None:
+        salta("il banco node della stellina", "node non c'e'")
+        return
+    # il primo tag che combacia, o "" (un banco esploso fa rosse, non crolla)
+    tag = lambda pat, html: (re.search(pat, html or "") or [""])[0]
+    STELLINA = r'<span class="stellina-volto p2p-vt-bollino"[^>]*>'
+    SCUDO = r'<span class="bollino-staff mini p2p-vt-bollino"[^>]*>'
+    stx = lambda id: tag(STELLINA, r.get("card_" + id))
+    prova("all'angolo senza chiave non c'e' niente", "", r.get("vuota"))
+    prova("STAFF: lo scudo acceso e la stellina spenta, senza voce", True,
+          'data-staff-di="p2p:staff" role' in r.get("card_staff", "")
+          and ' hidden' not in tag(SCUDO, r.get("card_staff"))
+          and tag(SCUDO, r.get("card_staff")) != ""
+          and stx("staff").endswith(' hidden>') and "aria-label" not in stx("staff"))
+    prova("CINQUE STELLE: la stellina accesa, piena (100%), con la voce", True,
+          "hidden" not in stx("cinque")
+          and 'aria-label="Valutazione 5,0 su 5"' in stx("cinque")
+          and 'role="img"' in stx("cinque")
+          and stx("cinque") + r'<span class="p2p-rep-stella">' in (r.get("card_cinque") or "")
+          and 'style="width:100%"' in (r.get("card_cinque") or ""))
+    prova("...e lo scudo resta spento", True,
+          ' hidden ' in tag(SCUDO, r.get("card_cinque")))
+    prova("MEDIA BASSA: accesa, riempita al 24% (1,2 su 5)", True,
+          'aria-label="Valutazione 1,2 su 5"' in stx("bassa")
+          and 'style="width:24%"' in r.get("card_bassa", ""))
+    prova("NESSUNA RECENSIONE: niente stella, niente voce, e la cache "
+          "resta quella di sempre", (True, False, False,
+                                     '{"nome":"Cleo","avatar":"","ignoto":false}'),
+          (stx("zero").endswith(' hidden>'), "p2p-rep-stella" in r.get("card_zero", ""),
+           "aria-label=\"Valutazione" in r.get("card_zero", ""), r.get("cacheZero")))
+    prova("le quattro voci del giudice", ["", "Valutazione 5,0 su 5",
+                                          "Valutazione 1,2 su 5", ""], r.get("voci"))
+    prova("IL VOLTO IN RITARDO: la card nasce con l'angolo spento...", True,
+          tag(STELLINA, r.get("primaTardi")).endswith(' hidden>'))
+    t = r.get("tardi") or [None] * 5
+    prova("...e la risposta l'accende, con la voce e la STESSA stella del "
+          "riquadro; l'altra card non si muove",
+          [False, "Valutazione 4,8 su 5", r.get("riquadro48"), True, ""], t)
+    prova("una risposta senza i voti non la spegne", [False, "Valutazione 4,8 su 5"],
+          r.get("restaAccesa"))
+    c = r.get("cambiata") or [None] * 3
+    prova("la media cambia, la stella si ridisegna (2,5: piena a meta')",
+          [False, "Valutazione 2,5 su 5", True],
+          [c[0], c[1], 'style="width:50%"' in (c[2] or "")])
+    prova("lo staff arrivato dopo: lo scudo vince, la stella si spegne e "
+          "tace", [True, None, ""], r.get("stafTardi"))
+    prova("...tolto lo staff si riaccende", False, r.get("riaccesa"))
+    prova("i voti a zero la spengono, e la media esce dalla cache",
+          [True, None, "", False], r.get("senzaVoti"))
+    prova("L'ETICHETTA DELLA CARD dice l'angolo: lo staff, la valutazione "
+          "come la stellina, niente senza recensioni (e prima del volto)",
+          ["Compra BTC, invia 50 euro, Revolut, staff di Barattolo",
+           "Compra BTC, invia 50 euro, Revolut, valutazione 5,0 su 5",
+           "Compra BTC, invia 50 euro, Revolut, valutazione 1,2 su 5",
+           "Compra BTC, invia 50 euro, Revolut",
+           "Compra BTC, invia 50 euro, Revolut"], r.get("etichette"))
+    prova("...la base e la chiave scritte sulla card, per il ridisegno",
+          ["Compra BTC, invia 50 euro, Revolut", "p2p:tardi"],
+          [r.get("baseScritta"), r.get("chiaveScritta")])
+    prova("IL VOLTO IN RITARDO riscrive l'etichetta della sua card (e solo "
+          "la sua); lo staff arrivato dopo la cambia, i voti a zero la "
+          "riportano alla base",
+          ["Compra BTC, invia 50 euro, Revolut, valutazione 4,8 su 5",
+           "Compra BTC, invia 50 euro, Revolut",
+           "Compra BTC, invia 50 euro, Revolut, staff di Barattolo",
+           "Compra BTC, invia 50 euro, Revolut"], r.get("voci_tardi"))
+    prova("una media storta o infinita non disegna niente, una media "
+          "senza voti nemmeno (la regola del riquadro), e un numero "
+          "scritto come testo si legge come numero",
+          ["", "", "", "Valutazione 4,5 su 5"], r.get("storta"))
+
+
 def prove_scambi_verso():
     """«TUTTI · COMPRO · VENDO» NEL FILTRO DI «I MIEI SCAMBI» (6 ott 2026,
     richiesta di Andrea). Nel foglio del filtro, sopra i gruppi, la scelta
@@ -126756,6 +126962,7 @@ def main():
               prove_tolti_ovunque,
               prove_anello_ovunque,
               prove_spia_passi_barattozon,
+              prove_stellina_card_p2p,
               prove_config_esempio):
         try:
             f()

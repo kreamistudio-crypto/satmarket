@@ -7041,6 +7041,17 @@
   /* nella card P2P della home il volto sta in alto a destra sopra la
      foto: il bollino gli si appoggia all'angolo basso */
   .bollino-staff.mini.p2p-vt-bollino{top:24px;right:2px;bottom:auto}
+  /* LA STELLINA ALL'ANGOLO (7 ott 2026, `stellinaVolto`): il posto, il
+     tondo da 20 e l'anello della carta dello scudo; dentro, la stella
+     del riquadro sulla sua carta, a 14 — si gira `--st` e mai gli svg
+     (la banda, vedi `.p2p-rep-stella`) */
+  .stellina-volto{position:absolute;right:-4px;bottom:-4px;z-index:3;
+    width:20px;height:20px;border-radius:999px;display:flex;
+    align-items:center;justify-content:center;background:var(--card);
+    box-shadow:0 0 0 2px var(--card)}
+  .stellina-volto[hidden]{display:none}
+  .stellina-volto .p2p-rep-stella{--st:14px;vertical-align:0}
+  .stellina-volto.p2p-vt-bollino{top:24px;right:2px;bottom:auto}
   /* LA SAGOMA DEL VOLTO CHE ASPETTA (28 set 2026, «il volto unico»):
      quando il nome non si sa ancora il tondo non resta vuoto e non
      dice «?» — mostra una persona qualunque, testa e spalle, nel colore
@@ -14186,11 +14197,20 @@ function ricordaVolto(chiave, p){
      giro guidato) non lo toglie e non lo mette. Nella cache c'e' solo
      quando e' vero, cosi' il volto di tutti gli altri resta com'era. */
   const staff = typeof p.staff === 'boolean' ? p.staff : !!prima.staff;
+  /* ...e la MEDIA delle recensioni per la stellina all'angolo
+     (`stellinaVolto`), con la stessa regola: la dice solo una risposta
+     che porta i voti, e nella cache c'e' solo quando qualcuno ha votato
+     — senza voti la stella non nasce (la regola di casa). */
+  const mv = Number(p.media);
+  const media = typeof p.voti === 'number'
+    ? (p.voti > 0 && Number.isFinite(mv) && mv > 0 ? mv : 0)
+    : (prima.media || 0);
   const nuovo = {nome, avatar, ignoto};
   if (staff) nuovo.staff = true;
+  if (media) nuovo.media = media;
   const cambiato = !cacheVolti[k] || nome !== prima.nome
     || avatar !== prima.avatar || ignoto !== prima.ignoto
-    || staff !== !!prima.staff;
+    || staff !== !!prima.staff || media !== (prima.media || 0);
   cacheVolti[k] = nuovo;
   if (cambiato) ridisegnaVolti(k);
   return cambiato;
@@ -14218,6 +14238,21 @@ function ridisegnaVolti(k){
      che sta FUORI dal tondo — il tondo taglia quel che sporge */
   document.querySelectorAll('[data-staff-di]').forEach(e => {
     if (e.getAttribute('data-staff-di') === k) e.hidden = !v.staff;
+  });
+  /* ...e la stellina allo stesso angolo (`stellinaVolto`), che si
+     accende, cambia o si spegne con la stessa risposta */
+  const voce = voceStellinaVolto(v);
+  document.querySelectorAll('[data-stella-di]').forEach(e => {
+    if (e.getAttribute('data-stella-di') !== k) return;
+    e.hidden = !voce;
+    e.innerHTML = voce ? stellaP2P(v.media) : '';
+    if (voce) e.setAttribute('aria-label', voce);
+    else e.removeAttribute('aria-label');
+  });
+  /* ...e l'etichetta di chi la contiene: la sua base, piu' la coda */
+  document.querySelectorAll('[data-voce-di]').forEach(e => {
+    if (e.getAttribute('data-voce-di') !== k) return;
+    e.setAttribute('aria-label', (e.getAttribute('data-voce') || '') + codaVoceVolto(v));
   });
 }
 /* IL VOLTO, l'unica funzione che lo scrive. `p` e' quel che il chiamante
@@ -14280,6 +14315,39 @@ function bollinoVolto(chiave, cls){
   return '<span class="bollino-staff mini' + (cls ? ' ' + cls : '') + '"'
     + ' data-staff-di="' + esc(k) + '"' + (v && v.staff ? '' : ' hidden')
     + attrStaff() + '>' + ICO_STAFF + '</span>';
+}
+/* LA STELLINA ALL'ANGOLO (7 ott 2026, richiesta di Andrea): nella card
+   P2P della home, dove per lo staff c'e' lo scudo, per tutti gli altri
+   la media delle recensioni. Il disegno NON E' NUOVO: e' `stellaP2P`,
+   la stella che si riempie per quanto vale del riquadro «Chi ha
+   pubblicato quest'ordine», e la cifra e' scritta come la scrive lui.
+   LO SCUDO HA LA PRECEDENZA: un moderatore porta lo scudo e basta, due
+   segni sullo stesso angolo si coprirebbero. Senza voti niente stella.
+   Come lo scudo nasce spenta finche' la cache non sa, e `ridisegnaVolti`
+   l'accende quando il volto arriva in ritardo.
+   La voce per il lettore e' il giudice: '' vuol dire «niente stella». */
+function voceStellinaVolto(v){
+  if (!v || v.staff || !(v.media > 0)) return '';
+  return 'Valutazione ' + v.media.toLocaleString('it-IT',
+    {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' su 5';
+}
+/* ...e la CODA dell'etichetta di chi contiene l'angolo (la card della
+   fila, che e' un bottone): quel che l'angolo mostra, detto a parole —
+   lo scudo vince come sull'angolo, e senza niente non si dice niente */
+function codaVoceVolto(v){
+  if (v && v.staff) return ', staff di Barattolo';
+  const s = voceStellinaVolto(v);
+  return s ? ', ' + s.charAt(0).toLowerCase() + s.slice(1) : '';
+}
+function stellinaVolto(chiave, cls){
+  const k = chiaveVolto(chiave);
+  if (!k) return '';
+  const v = cacheVolti[k];
+  const voce = voceStellinaVolto(v);
+  return '<span class="stellina-volto' + (cls ? ' ' + cls : '') + '"'
+    + ' data-stella-di="' + esc(k) + '" role="img"'
+    + (voce ? ' aria-label="' + esc(voce) + '">' + stellaP2P(v.media)
+            : ' hidden>') + '</span>';
 }
 /* il tocco: si ferma qui (sotto c'e' quasi sempre una porta — il
    negozio, l'ordine del libro) e spiega, con la pillola grande in
@@ -65212,14 +65280,23 @@ function cardVetrinaP2P(o){
   const metodi = (o.metodi || []).map(m => esc(metodoBaseP2P(m))).join(', ');
   const premio = affaroneP2P(o) || badgePremioP2P(o);
   const lato = compro ? 'Compra BTC' : 'Vendi BTC';
+  /* L'ETICHETTA DICE ANCHE L'ANGOLO DEL VOLTO (7 ott 2026, richiesta di
+     Andrea): la card e' un bottone, e di un bottone il lettore legge
+     l'etichetta e basta — lo scudo e la stellina, li' dentro, li
+     tacerebbe. La base sta in `data-voce`, la coda la scrive
+     `codaVoceVolto` dalla cache, e `ridisegnaVolti` la riscrive quando
+     il volto arriva in ritardo. */
+  const voce = lato + ', ' + verboEuro.toLowerCase() + ' ' + euro + ' euro'
+    + (metodi ? ', ' + (o.metodi || []).map(metodoBaseP2P).join(', ') : '');
+  const chiave = chiaveVolto('p2p:' + o.id);
   return `<div class="card card-p2p${tab ? ' card-p2p-bz' : ''}" data-p2p="${esc(o.id)}" role="button" tabindex="0"
-      aria-label="${esc(lato + ', ' + verboEuro.toLowerCase() + ' ' + euro + ' euro'
-                        + (metodi ? ', ' + (o.metodi || []).map(metodoBaseP2P).join(', ') : ''))}"
+      data-voce-di="${esc(chiave)}" data-voce="${esc(voce)}"
+      aria-label="${esc(voce + codaVoceVolto(cacheVolti[chiave]))}"
       onclick="apriCardP2P(this.dataset.p2p)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriCardP2P(this.dataset.p2p)}">
       <div class="ph-wrap">
         <div class="ph p2p-vt-fondo">${fondo}</div>
         <span class="p2p-vt-lato ${compro ? 'compra' : 'vendi'}">${lato}</span>
-        ${voltoHTML(f, 'p2p-vt-volto', {chiave: 'p2p:' + o.id})}${bollinoVolto('p2p:' + o.id, 'p2p-vt-bollino')}
+        ${voltoHTML(f, 'p2p-vt-volto', {chiave: 'p2p:' + o.id})}${bollinoVolto('p2p:' + o.id, 'p2p-vt-bollino')}${stellinaVolto('p2p:' + o.id, 'p2p-vt-bollino')}
         <div class="tag-price"><div class="price"><span class="p2p-vt-verbo">${verboEuro}</span>${euroCartello}<span class="unit eur">€</span></div>${sotto ? `<div class="price-sub">${sotto}</div>` : ''}</div>
       </div>
       <div class="info">
