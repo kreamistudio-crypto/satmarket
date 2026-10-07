@@ -31,6 +31,8 @@ I documenti in `docs/` NON sono import: si aprono quando servono.
   `docs/STUDIO-PROFILO-PERSONALIZZATO-2026-10-06.md` (dal 19 ott),
   `docs/STUDIO-MERCATINI-BAZAR-2026-10-06.md` (lo stato 🎪, gli eventi) e
   `docs/STUDIO-REGALO-2026-10-06.md` (il regalo a un iscritto, decisioni).
+- `docs/GUIDA-P2P-PASSI.md` — i percorsi del P2P passo per passo coi
+  testi esatti di bottoni e avvisi, per i tutorial video (7 ott 2026).
 
 I DOCUMENTI GRANDI NON SI LEGGONO MAI INTERI: CANTIERI (2 MB),
 ARCHITETTURA (2 MB) e PRODUZIONE sono da migliaia di righe, e una
