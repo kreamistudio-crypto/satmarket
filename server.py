@@ -26038,12 +26038,82 @@ def dati_cruscotto(con) -> dict:
         dom = dominio.get(o["venditore_id"])
         if dom:
             wallet[dom]["incassi"] += 1
-    return {"iscritti": sorted([g, v[0], v[1]] for g, v in iscritti.items()),
+    return {"annulli": dati_annulli(con),
+            "iscritti": sorted([g, v[0], v[1]] for g, v in iscritti.items()),
             "iscritti_totali": tot,
             "volume": sorted([g, *v] for g, v in volume.items()),
             "volume_totale": vtot,
             "wallet": sorted(wallet.values(),
                              key=lambda w: (-w["incassi"], -w["venditori"]))}
+
+
+ORE_FINESTRA_CRUSCOTTO = 48   # la finestra della domanda di Andrea (7 ott 2026)
+
+
+def dati_annulli(con) -> dict:
+    """ANNULLAMENTI, RIMBORSI E TEMPI (7 ott 2026, parola di Andrea: «queste
+    info sono da aggiungere al cruscotto»). Sono la MISURA per decidere
+    il pagamento in sospeso nelle prime 48 ore: quanti ordini pagati
+    tornano indietro, chi li annulla, se prima della spedizione, e quanti
+    si spediscono o si concludono entro la finestra.
+    LE DATE: il pagamento non ha un timbro suo, ma la fattura vive 15
+    minuti (`creato` + al piu' un quarto d'ora); la spedizione ha
+    `spedito_il`; la conclusione e' il PRIMO tentativo di payout verso
+    chi vende (`payout_tentati`), cioe' quando i sats sono partiti. Fuori
+    i collaudi (`prova`) e gli ordini mai pagati ('creato', 'annullato')."""
+    finestra = ORE_FINESTRA_CRUSCOTTO * 3600
+    pagati = rimb = rimb_sats = da_venditore = prima_sped = 0
+    motivi = {}
+    spediti = sped_entro = conclusi = concl_entro = 0
+    for o in con.execute(
+            "SELECT o.id, o.stato, o.creato, o.prezzo_sats, "
+            "COALESCE(o.spedito_il,0) AS sped, "
+            "COALESCE(o.annullato_venditore_il,0) AS ann, "
+            "COALESCE(o.motivo_annullo,'') AS mot, "
+            "(SELECT MIN(t.quando) FROM payout_tentati t "
+            " WHERE t.tabella='ordini' AND t.riga_id=o.id) AS uscita "
+            "FROM ordini o WHERE o.stato NOT IN ('creato','annullato') "
+            "AND COALESCE(o.prova,0)=0"):
+        pagati += 1
+        if o["sped"]:
+            spediti += 1
+            sped_entro += (o["sped"] - (o["creato"] or 0)) <= finestra
+        if o["stato"] in ("refund", "refunded"):
+            rimb += 1
+            rimb_sats += int(o["prezzo_sats"] or 0)
+            prima_sped += not o["sped"]
+            if o["ann"]:
+                da_venditore += 1
+                motivi[o["mot"] or "altro"] = motivi.get(o["mot"] or "altro", 0) + 1
+        elif o["stato"] == "released" and o["uscita"]:
+            conclusi += 1
+            concl_entro += (o["uscita"] - (o["creato"] or 0)) <= finestra
+    return {"ore_finestra": ORE_FINESTRA_CRUSCOTTO, "pagati": pagati,
+            "rimborsati": rimb, "rimborsati_sats": rimb_sats,
+            "annullati_venditore": da_venditore, "motivi_venditore": motivi,
+            "rimborsati_prima_spedizione": prima_sped,
+            "spediti": spediti, "spediti_entro": sped_entro,
+            "conclusi": conclusi, "conclusi_entro": concl_entro}
+
+
+def hash_rimborsi(con) -> set:
+    """Gli hash dei RIMBORSI: ogni pagamento in uscita di un ordine che e'
+    finito rimborsato (lo diceva `payout_verso`, ma il diario dei
+    tentativi non lo porta: un ordine rimborsato paga solo il compratore)
+    e ogni uscita del registro dei rimborsi d'asta."""
+    out = set()
+    for q in ("SELECT t.hash FROM payout_tentati t JOIN ordini o ON "
+              "o.id=t.riga_id WHERE t.tabella='ordini' AND t.hash!='' AND "
+              "o.stato IN ('refund','refunded')",
+              "SELECT payout_hash FROM ordini WHERE COALESCE(payout_hash,'')"
+              "!='' AND stato IN ('refund','refunded')",
+              "SELECT hash FROM payout_tentati WHERE tabella='rimborsi_asta' "
+              "AND hash!=''"):
+        try:
+            out |= {str(r[0]).lower() for r in con.execute(q)}
+        except sqlite3.OperationalError:
+            pass
+    return out
 
 
 def hash_nostri(con) -> set:
@@ -26128,7 +26198,7 @@ async def _lnd_leggi(percorso: str, params: dict | None = None):
         return None, "risposta di LND illeggibile"
 
 
-async def dati_lnd_cruscotto(nostri: set) -> dict:
+async def dati_lnd_cruscotto(nostri: set, rimborsi: set = frozenset()) -> dict:
     """Fee di routing e nodi, da LND, con la cache di 5 minuti: la
     pagina si ricarica, il nodo non deve sentirlo. I pagamenti si
     leggono a pagine da 1000, dal piu' recente, fino a dieci pagine."""
@@ -26154,7 +26224,10 @@ async def dati_lnd_cruscotto(nostri: set) -> dict:
         dati = {"stato": "assente", "motivo": motivo}
     else:
         dati = {"stato": "ok", "motivo": "",
-                **conti_instradamento(pagamenti, nostri)}
+                **conti_instradamento(pagamenti, nostri),
+                # la stessa misura sui SOLI rimborsi (7 ott 2026): quel che
+                # gli annullamenti ci costano in fee
+                "rimborsi": conti_instradamento(pagamenti, rimborsi)["totale"]}
     canali, m2 = await _lnd_leggi("/v1/channels",
                                   {"peer_alias_lookup": "true"})
     dati["canali"] = [
@@ -26182,9 +26255,10 @@ async def cruscotto_admin(x_tg_init_data: str = Header(""),
     try:
         dati = dati_cruscotto(con)
         nostri = hash_nostri(con)
+        rimborsi = hash_rimborsi(con)
     finally:
         con.close()
-    dati["lnd"] = await dati_lnd_cruscotto(nostri)
+    dati["lnd"] = await dati_lnd_cruscotto(nostri, rimborsi)
     try:
         dati["eur_per_btc"] = await cambio_btc_eur()
     except Exception:

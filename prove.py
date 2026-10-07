@@ -102435,8 +102435,10 @@ def prove_cruscotto_admin():
     amb = {"time": time, "sqlite3": sqlite3}
     i = _SORGENTE.index("WALLET_DA_DOMINIO = {")
     exec(_SORGENTE[i:_SORGENTE.index("}\n", i) + 2], amb)
-    for f in ("_giorno", "dati_cruscotto", "hash_nostri",
-              "conti_instradamento"):
+    i = _SORGENTE.index("ORE_FINESTRA_CRUSCOTTO = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    for f in ("_giorno", "dati_annulli", "dati_cruscotto", "hash_rimborsi",
+              "hash_nostri", "conti_instradamento"):
         exec(pezzo(f), amb)
     con = sqlite3.connect(":memory:")
     con.row_factory = sqlite3.Row
@@ -102446,8 +102448,11 @@ def prove_cruscotto_admin():
     CREATE TABLE ordini(id INTEGER PRIMARY KEY, venditore_id INTEGER,
       creato INTEGER, prezzo_sats INTEGER, spedizione_sats INTEGER DEFAULT 0,
       protezione_sats INTEGER DEFAULT 0, stato TEXT, prova INTEGER DEFAULT 0,
-      payout_hash TEXT DEFAULT '');
-    CREATE TABLE payout_tentati(tabella TEXT, riga_id INTEGER, hash TEXT);
+      payout_hash TEXT DEFAULT '', spedito_il INTEGER DEFAULT 0,
+      annullato_venditore_il INTEGER DEFAULT 0,
+      motivo_annullo TEXT DEFAULT '');
+    CREATE TABLE payout_tentati(tabella TEXT, riga_id INTEGER, hash TEXT,
+      quando INTEGER DEFAULT 0);
     """)
     G1, G2 = 1759276800, 1759363200          # due giorni di fila, UTC
     con.executemany("INSERT INTO utenti VALUES(?,?,?,?)", [
@@ -102462,7 +102467,7 @@ def prove_cruscotto_admin():
         (13, G2, 7000, 0, 0, "released", 1, ""),      # collaudo: fuori
         (13, G2, 9000, 0, 0, "refunded", 0, ""),      # rimborsato: fuori
         (-22, G2, 3000, 0, 0, "released", 0, "")])
-    con.execute("INSERT INTO payout_tentati VALUES('ordini', 1, 'BB')")
+    con.execute("INSERT INTO payout_tentati VALUES('ordini', 1, 'BB', 0)")
     d = amb["dati_cruscotto"](con)
     prova("iscritti: Telegram e Nostr dal segno dell'id, il totale, i "
           "doppi cittadini e chi non ha la data",
@@ -102513,6 +102518,43 @@ def prove_cruscotto_admin():
     prova("...e senza pagamenti nessuna divisione per zero", 0,
           amb["conti_instradamento"]([], set())["totale"]["percento"])
 
+    # --- ANNULLAMENTI, RIMBORSI E TEMPI (7 ott 2026) -------------------
+    con.executescript("""
+    DELETE FROM ordini; DELETE FROM payout_tentati;
+    INSERT INTO ordini(id, venditore_id, creato, prezzo_sats, stato,
+      spedito_il, annullato_venditore_il, motivo_annullo, prova) VALUES
+      (1, 11, 1000, 10000, 'released', 1000 + 10*3600, 0, '', 0),
+      (2, 11, 1000, 20000, 'released', 1000 + 60*3600, 0, '', 0),
+      (3, 11, 1000, 5000, 'refunded', 0, 2000, 'esaurito', 0),
+      (4, 11, 1000, 7000, 'refund', 1000 + 5*3600, 0, '', 0),
+      (5, 11, 1000, 9000, 'creato', 0, 0, '', 0),
+      (6, 11, 1000, 9000, 'annullato', 0, 0, '', 0),
+      (7, 11, 1000, 9000, 'refunded', 0, 3000, 'esaurito', 1);
+    INSERT INTO payout_tentati VALUES
+      ('ordini', 1, 'h1', 1000 + 30*3600), ('ordini', 2, 'h2', 1000 + 70*3600),
+      ('ordini', 3, 'R3', 3000), ('rimborsi_asta', 9, 'ra', 4000);
+    """)
+    an = amb["dati_annulli"](con)
+    prova("annulli: i soli PAGATI e mai i collaudi (mai pagati e prova "
+          "fuori)", (4, 2, 12000), (an["pagati"], an["rimborsati"],
+                                    an["rimborsati_sats"]))
+    prova("...chi vende ha annullato col suo motivo, e quanti rimborsi "
+          "prima della spedizione", (1, {"esaurito": 1}, 1),
+          (an["annullati_venditore"], an["motivi_venditore"],
+           an["rimborsati_prima_spedizione"]))
+    prova("...spediti entro 48 ore (10 h si', 60 h no, 5 h si')", (2, 3),
+          (an["spediti_entro"], an["spediti"]))
+    prova("...conclusi entro 48 ore dal PRIMO payout (30 h si', 70 h no)",
+          (1, 2), (an["conclusi_entro"], an["conclusi"]))
+    prova("gli hash dei rimborsi: le uscite degli ordini rimborsati e i "
+          "rimborsi d'asta, mai i payout a chi vende",
+          {"r3", "ra"}, amb["hash_rimborsi"](con))
+    prova("...e il cruscotto li porta, e chiede al nodo anche la loro fetta",
+          (True, True),
+          ('"annulli": dati_annulli(con)' in pezzo("dati_cruscotto"),
+           '"rimborsi": conti_instradamento(pagamenti, rimborsi)["totale"]'
+           in pezzo("dati_lnd_cruscotto")))
+
     cr = pezzo("cruscotto_admin")
     prova("la rotta dei numeri chiede l'admin PRIMA di aprire il "
           "database o chiamare il nodo", True,
@@ -102530,6 +102572,9 @@ def prove_cruscotto_admin():
     pagina = open("admin.html", encoding="utf-8").read()
     prova("la pagina scrive il testo altrui passando da esc()", True,
           "esc(w.nome)" in pagina and "esc(alias)" in pagina)
+    prova("la pagina disegna la sezione degli annullamenti", True,
+          "${cardAnnulli(D.annulli, L)}" in pagina
+          and "esc(MOTIVI[k] || k)" in pagina)
     prova("...e la pagina carica solo da casa e da telegram.org", [],
           [u for u in re.findall(r'src="(https?://[^"]+)"', pagina)
            if not u.startswith("https://telegram.org/")])

@@ -10122,6 +10122,13 @@
   fee è nel client (percentuale × merce o lordo). Colori dei grafici
   validati per daltonismo in chiaro e scuro: Telegram blu, Nostr
   arancio (il viola di Nostr col blu falliva la prova).
+  ANNULLAMENTI, RIMBORSI E TEMPI (7 ott 2026): `dati_annulli` (chiave
+  `annulli`) conta i pagati, i rimborsati, chi vende che annulla col
+  motivo, i rimborsi prima della spedizione, spediti e conclusi entro
+  `ORE_FINESTRA_CRUSCOTTO` (48); la data del pagamento è `creato` (la
+  fattura vive 15 minuti), la conclusione il primo `payout_tentati`.
+  Le fee dei rimborsi: `lnd.rimborsi`, la stessa `conti_instradamento`
+  sui soli `hash_rimborsi`.
   I VANTAGGI DI OGNI LIVELLO (ott 2026, parola di Andrea): `/api/me`
   porta `livelli_scala` (`scala_livelli`): un gradino per livello con
   soglie XP/affari e i vantaggi che apre OGGI, letti dalle leve vive —

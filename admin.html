@@ -284,6 +284,8 @@ function disegna(){
     <details><summary>Vedi i numeri</summary><div class="tab">${tabella(['Periodo','Ordini','Sats','Merce'], ks.filter(k => vend[k]).map(k => [etichetta(k, modo), fmt(vend[k][0]), fmt(vend[k][1]), fmt(vend[k][2])]))}</div></details>
   </div>
 
+  ${cardAnnulli(D.annulli, L)}
+
   <div class="card"><h2>Quanto avremmo guadagnato con una fee</h2>
     <div class="simu">
       <label for="fee" style="font-weight:700">Fee</label>
@@ -345,6 +347,33 @@ function simula(){
   el('simuOut').innerHTML = t('Da sempre', sempre)
     + t(giorni ? `Negli ultimi ${giorni} giorni` : 'Nel periodo', per)
     + t('Al mese (media ultimi 90 giorni)', tre / 3);
+}
+
+/* ANNULLAMENTI, RIMBORSI E TEMPI (7 ott 2026): la misura per decidere
+   il pagamento in sospeso nelle prime 48 ore. Numeri da sempre, con la
+   loro percentuale; le fee dei rimborsi solo se il nodo risponde. */
+const MOTIVI = {esaurito: 'oggetto esaurito', spedizione: 'non può spedire', altro: 'altro'};
+const perc = (a, b) => b ? ` (${fmtd(a / b * 100, 0)}%)` : '';
+function cardAnnulli(A, L){
+  if (!A) return '';
+  const h = A.ore_finestra || 48;
+  const motivi = Object.entries(A.motivi_venditore || {})
+    .map(([k, n]) => `${fmt(n)} ${esc(MOTIVI[k] || k)}`).join(' · ');
+  const r = (L && L.stato === 'ok' && L.rimborsi) || null;
+  const t = (k, v, d) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+  return `<div class="card"><h2>Annullamenti, rimborsi e tempi</h2>
+    <div class="nota" style="margin:0 0 6px">Da sempre, sugli ordini pagati (collaudi esclusi). Serve a decidere il pagamento in sospeso nelle prime ${h} ore.</div>
+    <div class="tiles">
+      ${t('Ordini pagati', fmt(A.pagati), 'quelli che hanno bloccato dei sats')}
+      ${t('Rimborsati', fmt(A.rimborsati) + perc(A.rimborsati, A.pagati), fmt(A.rimborsati_sats) + ' sats tornati a chi compra')}
+      ${t('Annullati da chi vende', fmt(A.annullati_venditore), motivi || 'nessun motivo registrato')}
+      ${t('Rimborsati prima della spedizione', fmt(A.rimborsati_prima_spedizione) + perc(A.rimborsati_prima_spedizione, A.rimborsati), 'con il pagamento in sospeso sarebbero costati zero fee')}
+      ${t(`Spediti entro ${h} ore`, fmt(A.spediti_entro) + ' su ' + fmt(A.spediti) + perc(A.spediti_entro, A.spediti), 'dal pagamento alla spedizione')}
+      ${t(`Conclusi entro ${h} ore`, fmt(A.conclusi_entro) + ' su ' + fmt(A.conclusi) + perc(A.conclusi_entro, A.conclusi), 'dal pagamento ai sats partiti verso chi vende')}
+      ${r ? t('Fee spese nei rimborsi', fmtd((r.fee_msat || 0) / 1000, 0) + ' sats', fmt(r.pagamenti) + ' rimborsi in uscita · ' + fmtd(r.percento, 2) + '% del rimborsato') : ''}
+    </div>
+    ${r ? '' : '<div class="nota">Le fee dei rimborsi le sa il nodo: compaiono quando risponde.</div>'}
+  </div>`;
 }
 
 function tabella(testa, righe, numeriche){

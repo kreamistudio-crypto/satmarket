@@ -39644,3 +39644,27 @@ collaudi della CI verdi nella gabbia.
 di un volto da 30, soprattutto sotto 2 (quasi vuota, si legge come
 «poca», ed è voluto). Il lettore vero (TalkBack, VoiceOver) sulla
 card: che dica l'etichetta intera, coda compresa.
+
+## Nel cruscotto: annullamenti, rimborsi e tempi (7 ott 2026)
+
+Il compito (Andrea): prima di decidere il pagamento in sospeso nelle
+prime 48 ore (la «hold invoice verso di noi», così un annullo non costa
+fee di routing), «queste info sono da aggiungere al cruscotto».
+
+**Cosa.** Una sezione nuova in `/admin`: ordini pagati, rimborsati (con
+la percentuale e i sats tornati), annullati da chi vende col motivo,
+rimborsati PRIMA della spedizione (quelli che col pagamento in sospeso
+sarebbero costati zero), spediti e conclusi entro 48 ore, e le fee
+spese nei rimborsi (dal nodo, come le altre fee, sui soli pagamenti
+degli ordini rimborsati e dei rimborsi d'asta — `hash_rimborsi`).
+
+**Le date.** Il pagamento non ha un timbro suo: vale `creato`, perché
+la fattura vive 15 minuti (scarto massimo un quarto d'ora). La
+conclusione è il PRIMO tentativo di payout verso chi vende
+(`payout_tentati`). Sono approssimazioni dichiarate nella pagina.
+
+**Provato.** `prove_cruscotto_admin`: `dati_annulli` e `hash_rimborsi`
+veri su un database di cartone (i soli pagati, collaudi fuori, il
+motivo, prima della spedizione, 10/60/5 ore per la spedizione, 30/70
+per la conclusione, i rimborsi d'asta dentro e i payout a chi vende
+fuori). Chromium con dati di cartone: la sezione si legge.
