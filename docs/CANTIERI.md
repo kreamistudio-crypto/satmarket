@@ -39921,51 +39921,81 @@ velo, e la barra di scorrimento della pagina (che un velo
 fotogramma prima della pagina giusta: è lo stesso bordo dell'apertura
 normale mentre si aspettano le immagini, non la home; segnalato ad
 Andrea, non toccato.
-## Il testo corto sotto «Aggiorna il recapito» (7 ott 2026, richiesta di Andrea)
+
+
+## Il testo corto del foglio dei recapiti (7 ott 2026, richiesta di Andrea)
 
 **COSA.** Nel foglio «🤝 I vostri recapiti», sotto il bottone di chi
 vende, c'erano quattro paragrafi («✓ Inviato: l'ultimo che mandi…», «📌
 Resta ricordato…», «I recapiti viaggiano cifrati…», «🔓 Fuori da
 Barattolo è un'altra cosa…»): troppo lunghi e tecnici, parola di
-Andrea. Adesso sono tre righe, il testo l'ha approvato lui: «✓ Recapito
-inviato. Se lo cambi, vale l'ultimo.» (solo dopo l'invio, come prima),
-«🔒 Lo vedete solo tu e l'altra persona, nemmeno Barattolo. Resta
-salvato su questo dispositivo per i prossimi scambi.» e «⚠️ Non
-scrivere password o codici. Quello che vi dite fuori da Barattolo non
-conta in caso di disputa.» (sempre). Stesso `.hint`, stessi colori.
+Andrea. Adesso sono righe corte, coi testi approvati da lui parola per
+parola, in due giri lo stesso giorno: prima i metodi a recapito, poi —
+dalle proposte affiancate vecchio/nuovo — contanti, Barattozon e chi
+compra. Stesso `.hint`, stessi colori.
 
-**DOVE VALE.** Un giudice solo in `renderCampiP2P`: `corto =
-!fr.appuntamento && fr.ricorda !== false`, cioè i metodi a recapito —
-IBAN/SEPA, Revolut, Satispay, PayPal e quelli liberi. Il contanti
-(appuntamento), il tabacchino (Barattozon, che non ricorda niente: la
-riga «resta salvato» lì sarebbe falsa) e chi compra tengono le loro
-righe: Andrea ha chiesto le proposte affiancate prima di toccarli.
+- **Metodi a recapito** (IBAN/SEPA, Revolut, Satispay, PayPal, quelli
+  liberi): «✓ Recapito inviato. Se lo cambi, vale l'ultimo.» (solo
+  dopo l'invio, come prima), «🔒 Lo vedete solo tu e l'altra persona,
+  nemmeno Barattolo. Resta salvato su questo dispositivo per i
+  prossimi scambi.», «⚠️ Non scrivere password o codici. Quello che vi
+  dite fuori da Barattolo non conta in caso di disputa.»
+- **Contanti di persona:** «✓ Appuntamento inviato. Se lo cambi, vale
+  l'ultimo e chi compra viene avvisato.»; il 🔒 finisce con «Il luogo
+  resta salvato su questo dispositivo, l'ora no.» (è il vero: il
+  ricordo tiene luogo e punto, mai l'ora — `nonRicordato`); sotto il
+  campo del luogo «✋ Indirizzo non riconosciuto: chi compra non avrà
+  il link al navigatore. Scegline uno dai suggerimenti o usa la tua
+  posizione.» e «👆 Scegline uno e chi compra avrà «Apri nel
+  navigatore». A mano va bene, ma senza link.»
+- **Barattozon:** «✓ Recapito inviato…»; il 🔒 finisce con «Non resta
+  salvato: ogni PayCode vale una volta sola.» (`ricorda: false`); la
+  conferma «Mandare il PayCode a mano?» dice «Partono cifrati verso chi
+  ha preso, ma usa un'app che non conosciamo e potrebbe non vederli. Se
+  non risponde, scriviglielo in chat.» L'avviso nella pagina «Non
+  sappiamo ancora chi ha preso l'ordine (il coordinatore non ce l'ha
+  confermato)…» RESTA COM'È: è la frase decisa con Alan, Andrea la
+  sente con lui.
+- **Chi compra:** la prima riga («💶 Chi vende non ha ancora detto…»)
+  resta; poi «🔒 Lo vedete solo tu e l'altra persona, nemmeno
+  Barattolo.» e «⚠️ Quello che vi dite fuori da Barattolo non conta in
+  caso di disputa.» — senza «password»: chi compra in quel foglio non
+  scrive niente.
 
-**LA RIGA ONESTA RESTA GEMELLA** (la decisione del 17 set 2026): nel
-testo nuovo «nemmeno Barattolo» e «fuori da Barattolo non conta» stanno
-ancora uno dopo l'altro, nello stesso ordine — la metà che fa comodo
-non resta in piedi da sola.
+**COME.** In `renderCampiP2P` le due righe di sempre sono una coppia
+sola per tutti: il 🔒 con la coda `salvaQui` (scelta dal metodo:
+appuntamento, `ricorda: false`, gli altri), il ⚠️ col «Non scrivere
+password» solo se `vende`. Il primo giro aveva un giudice `corto` che
+separava i metodi a recapito dagli altri: col secondo giro non serve
+più, ed è tolto.
 
-**SCARTATO.** Cambiare anche le righe di sempre per tutti i rami in un
-colpo: chi compra non scrive niente nel foglio (il «non scrivere
-password» per lui non dice niente) e il tabacchino non ricorda; quei
-testi vanno decisi a parte.
+**LA RIGA ONESTA RESTA GEMELLA** (la decisione del 17 set 2026): in ogni
+ramo «nemmeno Barattolo» e «fuori da Barattolo non conta» stanno uno
+dopo l'altro, in coda e nello stesso ordine — la metà che fa comodo non
+resta in piedi da sola.
 
-**PROVATO.** `prove_recapito_corto` (12): le tre righe parola per
-parola e il giudice; il VERO `renderCampiP2P` girato in node con le
-forme vere per SEPA, Revolut, Satispay, PayPal e un metodo libero,
-prima e dopo l'invio (due righe, poi tre), nessuna delle quattro righe
-vecchie rimasta, la riga onesta di fila; contanti, tabacchino e chi
-compra con le righe di prima. Le sentinelle vecchie (prove_p2p_chat:
-«Resta ricordato», «nemmeno Barattolo» prima di «Fuori da Barattolo»)
-restano verdi perché quei rami esistono ancora. Tortura 6 su 6 (corto
-mai, corto sempre, corto anche al tabacchino, ✓ prima dell'invio, 📌
-rimasto, una parola cambiata). Suite intera severa senza config nel
-worktree su 8cf38d6: 19.566 verdi e 0 rosse; i 39 collaudi della CI
-nella gabbia verdi. Scatti prima/dopo a 375 px, densità 3, chiaro e
-scuro (Chrome headless sulla vetrina: CSS e markup veri del foglio,
-corpo scritto dal `renderCampiP2P` di main e del worktree), mandati ad
-Andrea.
+**SCARTATO.** La promessa «parte solo quando lo invii tu» (patch 0007)
+cade col paragrafo che la diceva: il testo approvato non la porta, e il
+comportamento non cambia (il ricordato non parte da solo). La
+sentinella che vieta il contrario — «parte da solo» — resta.
 
-**DA GUARDARE.** Le proposte per gli altri testi (contanti, tabacchino,
-chi compra, la conferma del PayCode a mano) aspettano il sì di Andrea.
+**PROVATO.** `prove_recapito_corto` (12): le righe approvate nel
+sorgente; il VERO `renderCampiP2P` girato in node con le forme vere,
+prima e dopo l'invio, per SEPA, Revolut, Satispay, PayPal, un metodo
+libero, contanti, tabacchino e chi compra (senza e col recapito
+arrivato), riga per riga; nessuna riga vecchia in nessun ramo; la riga
+onesta in coda in ogni ramo. Emendate le sentinelle vecchie, ognuna col
+suo perché: prove_p2p_chat (tre), prove_contanti_a_mano (la riga sotto
+il luogo, il banco che la esegue), prove_paycode_riconosciuto (il corpo
+della conferma). Tortura: primo giro 6 su 6, secondo giro 11 su 11 (le
+code del 🔒 scambiate, «password» a tutti e a nessuno, il 🔒 senza coda,
+il ✓ dell'appuntamento, il ✓ prima dell'invio, una parola cambiata nel
+✋, nel 👆 e nella conferma, il ⚠️ prima del 🔒). Scatti prima/dopo a
+375 px, densità 3, chiaro e scuro (Chrome headless su una vetrina: CSS
+e markup veri dei fogli, corpi scritti dalle funzioni vere di main e
+del worktree): SEPA prima e dopo l'invio, contanti con ✋ e con 👆,
+tabacchino, chi compra, la conferma; mandati ad Andrea. Suite e
+collaudi: nel messaggio del commit.
+
+**NON PROVATO.** Il telefono e l'APK: i testi sono più corti, quindi
+non c'è un a-capo nuovo da temere, ma non li ho visti lì.

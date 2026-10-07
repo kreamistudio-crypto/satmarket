@@ -59416,11 +59416,11 @@ function rigaPuntoLuogoP2P(p, testo, suggerimenti){
     + ': chi compra avrà «Apri nel navigatore».</span> '
     + '<button type="button" class="scopri-link" onclick="togliPuntoLuogoP2P()">Togli</button>';
   if (suggerimenti > 0)
-    return '<span class="luogo-scegli">👆 Scegline uno per dare a chi compra «Apri nel navigatore». '
-      + 'Scritto a mano va bene lo stesso, ma senza link.</span>';
+    return '<span class="luogo-scegli">👆 Scegline uno e chi compra avrà «Apri nel navigatore». '
+      + 'A mano va bene, ma senza link.</span>';
   if (String(testo || '').trim().length >= 3)
-    return '<span class="luogo-mano">✋ Questo indirizzo non l\'abbiamo riconosciuto: chi compra lo leggerà così com\'è, '
-      + 'senza il link al navigatore. Per il link, scegline uno fra i suggerimenti o usa la tua posizione.</span>';
+    return '<span class="luogo-mano">✋ Indirizzo non riconosciuto: chi compra non avrà il link al navigatore. '
+      + 'Scegline uno dai suggerimenti o usa la tua posizione.</span>';
   return '';
 }
 function nomeMiaPosizioneP2P(vicino){
@@ -63270,7 +63270,7 @@ function mandaRecapitoFermoP2P(){
   if (!r || !chiaviChatOrdine(o)) { toast('Non si sa ancora con chi stai scambiando'); return; }
   chiediConferma({
     titolo: 'Mandare il PayCode a mano?',
-    corpo: 'PayCode, importo e scadenza partono cifrati verso la chiave di chi ha preso, che Barattolo non riconosce. La sua app potrebbe non mostrarli: se non risponde, scriviglielo in chat.',
+    corpo: 'Partono cifrati verso chi ha preso, ma usa un\'app che non conosciamo e potrebbe non vederli. Se non risponde, scriviglielo in chat.',
     etichetta: '🧾 Manda',
     poi: async () => {
       try {
@@ -63311,17 +63311,11 @@ function renderCampiP2P(){
   } catch(e) {}
   /* per chi vende il form lo sceglie il METODO dell'ordine: campi
      suoi, e precompilati dal ricordo di questo dispositivo */
-  let parteEuro = '', fr = null, salvato = null, corto = false;
+  let parteEuro = '', fr = null, salvato = null, salvaQui = '';
   if (vende) {
     const metodi = (o.metodi && o.metodi.length) ? o.metodi : [''];
     const scelto = metodoRecapitoScelto(o);
     fr = formaRecapito(scelto);
-    /* IL TESTO CORTO (7 ott 2026, richiesta di Andrea): sotto «Aggiorna
-       il recapito» tre righe invece di quattro paragrafi — la cifratura
-       e il «fuori non conta» restano GEMELLE nella stessa coppia. Vale
-       per i metodi a recapito (IBAN, Revolut, Satispay, PayPal, quelli
-       liberi); l'appuntamento e il tabacchino tengono le loro righe. */
-    corto = !fr.appuntamento && fr.ricorda !== false;
     /* il tabacchino si precompila dalla RIGA, mai dal ricordo (che per
        lui non esiste): su un altro dispositivo la riga adottata non
        li ha, e il form nasce vuoto — si riscrivono dalla ricevuta */
@@ -63357,16 +63351,16 @@ function renderCampiP2P(){
       (fr.appuntamento
         ? '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">📍 ' +
           (miei.euro ? 'Aggiorna l\'appuntamento' : 'Invia a chi compra') + '</button>' +
-          (miei.euro ? '<div class="hint">✓ Inviato: l\'ultimo che mandi è quello che vale, e chi compra riceve l\'avviso.</div>' : '')
+          (miei.euro ? '<div class="hint">✓ Appuntamento inviato. Se lo cambi, vale l\'ultimo e chi compra viene avvisato.</div>' : '')
         : '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">💶 ' +
           (miei.euro ? 'Aggiorna il recapito' : 'Invia a chi compra') + '</button>' +
-          (miei.euro ? '<div class="hint">' + (corto
-            ? '✓ Recapito inviato. Se lo cambi, vale l\'ultimo.'
-            : '✓ Inviato: l\'ultimo che mandi è quello che vale.') + '</div>' : '')) +
-      (fr.ricorda === false
-        ? '<div class="hint">🧾 Non resta ricordato: ogni ordine Amazon è nuovo, e questi tre dati valgono solo per questo scambio.</div>'
-        : corto ? ''
-        : '<div class="hint">📌 Resta ricordato su questo dispositivo: al prossimo scambio con questo metodo lo trovi già scritto qui, e parte solo quando lo invii tu.</div>');
+          (miei.euro ? '<div class="hint">✓ Recapito inviato. Se lo cambi, vale l\'ultimo.</div>' : ''));
+    /* quel che resta su QUESTO dispositivo, in coda alla riga del 🔒:
+       l'appuntamento tiene il luogo e mai l'ora (`nonRicordato`), il
+       tabacchino niente (`ricorda: false`), gli altri il recapito */
+    salvaQui = fr.appuntamento ? ' Il luogo resta salvato su questo dispositivo, l\'ora no.'
+      : fr.ricorda === false ? ' Non resta salvato: ogni PayCode vale una volta sola.'
+      : ' Resta salvato su questo dispositivo per i prossimi scambi.';
   }
   box.innerHTML =
     (o.lato === 'compro'
@@ -63385,16 +63379,16 @@ function renderCampiP2P(){
       ? '<div class="hint">👤 Il contatto che ti ha mandato l\'altra persona: <b>' + esc(loro.contatto.testo) + '</b></div>'
       : '') +
     parteEuro +
-    (corto
-      ? '<div class="hint">🔒 Lo vedete solo tu e l\'altra persona, nemmeno Barattolo. Resta salvato su questo dispositivo per i prossimi scambi.</div>' +
-        '<div class="hint">⚠️ Non scrivere password o codici. Quello che vi dite fuori da Barattolo non conta in caso di disputa.</div>'
-      : '<div class="hint">I recapiti viaggiano cifrati fra te e l\'altra persona: nessun altro li legge, nemmeno Barattolo. Non scrivere qui password o codici di accesso.</div>' +
-    /* LA RIGA ONESTA (17 set 2026, richiesta di Andrea): sta accanto
-       alla sua gemella apposta, che e' li' che il confronto si legge
-       — dentro si', fuori no. Le due frasi dicono la stessa cosa dai
-       due lati, e separarle vorrebbe dire lasciare in piedi la meta'
-       che fa comodo. */
-    '<div class="hint">🔓 Fuori da Barattolo è un\'altra cosa: quello che vi dite in una chat non lo cifriamo noi, non ce l\'abbiamo, e in una disputa non possiamo usarlo — a decidere sono i fatti dello scambio.</div>');
+    /* IL TESTO CORTO (7 ott 2026, richiesta di Andrea: «troppo lungo e
+       tecnico»): due righe di sempre invece di tre paragrafi, per chi
+       vende e per chi compra. LA RIGA ONESTA (17 set 2026) resta
+       accanto alla sua gemella apposta — dentro «nemmeno Barattolo»,
+       fuori «non conta» — che e' li' che il confronto si legge, e
+       separarle vorrebbe dire lasciare in piedi la meta' che fa comodo.
+       «Non scrivere password» solo a chi scrive: chi compra qui legge. */
+    '<div class="hint">🔒 Lo vedete solo tu e l\'altra persona, nemmeno Barattolo.' + salvaQui + '</div>' +
+    '<div class="hint">⚠️ ' + (vende ? 'Non scrivere password o codici. ' : '') +
+    'Quello che vi dite fuori da Barattolo non conta in caso di disputa.</div>';
   if (fr) fr.campi.forEach(c => {
     const inp = el('p2pCampoEuro_' + c.k);
     if (!inp) return;

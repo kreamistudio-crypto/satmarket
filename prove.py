@@ -70587,8 +70587,11 @@ def prove_p2p_chat():
     inviaCampoP2P_ = pezzo_js(mini, "async function inviaCampoP2P(", "\n}\n")
     prova("i recapiti dell'altra persona passano da esc()", True,
           "esc(loro.euro.testo)" in rc and "esc(loro.contatto.testo)" in rc)
+    # ⚠️ EMENDATA (7 ott 2026, il testo corto): «nessun altro li legge»
+    # e' diventato «Lo vedete solo tu e l'altra persona, nemmeno
+    # Barattolo» — le righe intere le prova prove_recapito_corto
     prova("...e il foglio dice che nessun altro li legge", True,
-          "nessun altro li legge, nemmeno Barattolo" in rc)
+          "Lo vedete solo tu e l\\'altra persona, nemmeno Barattolo." in rc)
     # ⚠️ IL CAMPO DEL CONTATTO NON C'E' PIU' (17 set 2026, decisione
     # di Andrea con Alan): la riga di ieri diceva «facoltativo, e
     # rivela chi sei», e l'avvertenza e' caduta con la cosa che
@@ -70605,9 +70608,11 @@ def prove_p2p_chat():
     # che promette la cifratura DENTRO — e' li' che il confronto si
     # legge, e separarle vorrebbe dire lasciare in piedi la sola meta'
     # che fa comodo.
+    # ⚠️ EMENDATA (7 ott 2026, il testo corto): «fuori da Barattolo non
+    # conta in caso di disputa», sempre DOPO la sua gemella
     prova("...e il foglio dice che FUORI non e' cifrato da noi", True,
-          "Fuori da Barattolo" in rc and "non possiamo usarlo" in rc
-          and rc.index("nemmeno Barattolo") < rc.index("Fuori da Barattolo"))
+          "fuori da Barattolo non conta in caso di disputa" in rc
+          and rc.index("nemmeno Barattolo") < rc.index("fuori da Barattolo"))
     prova("il foglio dei recapiti si chiude col velo", True,
           "el('p2pCampiSheet').classList.remove('open');"
           in pezzo_js(mini, "function closeSheet(", "\n}\n"))
@@ -70742,9 +70747,12 @@ def prove_p2p_chat():
           "recapitoDaAutoInvio(o)" in pia and "setTimeout" in pia)
     prova("...e se non parte non si riprova da solo", True,
           "p2pAutoTentati[id]" in pia)
-    prova("il form dice che il recapito resta ricordato, e che parte SOLO quando lo invii tu",
-          True, "Resta ricordato su questo dispositivo" in rc
-          and "parte solo quando lo invii tu" in rc
+    # ⚠️ EMENDATA (7 ott 2026, il testo corto approvato da Andrea): la
+    # riga dice che resta salvato qui e per i prossimi scambi; «parte
+    # solo quando lo invii tu» e' caduto col resto del paragrafo, e la
+    # promessa al contrario («parte da solo») resta vietata
+    prova("il form dice che il recapito resta salvato qui, e mai che parte da solo",
+          True, "Resta salvato su questo dispositivo per i prossimi scambi." in rc
           and "parte da solo" not in re.sub(r"/\*[\s\S]*?\*/", "", rc))
     prova("...e il ricordo PRECOMPILA il form (e' da li' che chi vende lo manda)", True,
           "(recapitiMiei()[fr.forma] || null)" in rc
@@ -86998,9 +87006,11 @@ def prove_paycode_riconosciuto():
           True, 0 < man.find("chiediConferma({") < man.find("poi: async () =>")
           < man.find("await campoInvia(o, 'euro', r.testo)")
           and man.count("campoInvia(") == 1)
+    # (7 ott 2026) il corpo accorciato, approvato da Andrea
     prova("...e la conferma dice cosa esce e verso chi", True,
           "titolo: 'Mandare il PayCode a mano?'" in man
-          and "che Barattolo non riconosce" in man)
+          and "corpo: 'Partono cifrati verso chi ha preso, ma usa un\\'app che non conosciamo "
+              "e potrebbe non vederli. Se non risponde, scriviglielo in chat.'," in man)
     prova("il banco della chat ha il server di cartone che riconosce", True,
           "async function parteRiconosciutaP2P(o){ return 'riconosciuta'; }\n" in BANCO_CHAT)
 
@@ -119456,9 +119466,11 @@ def prove_contanti_a_mano():
           [True, True, True, "", True],
           ["Indirizzo riconosciuto: chi compra avrà «Apri nel navigatore»." in rp[0] and "togliPuntoLuogoP2P()" in rp[0],
            "Il punto è la tua posizione di adesso" in rp[1],
-           "Questo indirizzo non l'abbiamo riconosciuto: chi compra lo leggerà così com'è, senza il link al navigatore." in rp[2],
-           rp[3], "Scegline uno per dare a chi compra «Apri nel navigatore»" in rp[4]
-           and "non l'abbiamo riconosciuto" not in rp[4]])
+           # (7 ott 2026) le due righe accorciate, approvate da Andrea
+           "✋ Indirizzo non riconosciuto: chi compra non avrà il link al navigatore. "
+           "Scegline uno dai suggerimenti o usa la tua posizione." in rp[2],
+           rp[3], "👆 Scegline uno e chi compra avrà «Apri nel navigatore». A mano va bene, ma senza link." in rp[4]
+           and "non riconosciuto" not in rp[4]])
     prova("il nome della mia posizione: col comune vicino, o senza",
           ["Punto segnato sulla mappa, vicino a Torino (TO)", "Punto segnato sulla mappa"], o["mio"])
     sc = o["scelta"]
@@ -127036,28 +127048,30 @@ console.log(JSON.stringify(out));
 
 def prove_recapito_corto():
     """IL TESTO CORTO DEL FOGLIO DEI RECAPITI (7 ott 2026, richiesta di
-    Andrea: «troppo lungo e tecnico»). Sotto «Aggiorna il recapito»,
-    per i metodi a recapito (IBAN, Revolut, Satispay, PayPal, quelli
-    liberi), tre righe invece di quattro paragrafi: «✓ Recapito
-    inviato» solo dopo l'invio, le altre due sempre. Le due metà della
-    RIGA ONESTA restano insieme e nello stesso ordine — dentro cifrato,
-    fuori non conta. L'appuntamento (contanti), il tabacchino
-    (Barattozon) e chi compra tengono le loro righe finché Andrea non
-    dice sì alle proposte.
+    Andrea: «troppo lungo e tecnico»). Sotto il bottone di chi vende
+    e nel foglio di chi compra, righe corte invece di paragrafi, coi
+    testi approvati da Andrea parola per parola: «✓ … inviato» solo
+    dopo l'invio, poi le due righe di sempre — 🔒 (dentro: nemmeno
+    Barattolo, e cosa resta su questo dispositivo) e ⚠️ (fuori non
+    conta). La RIGA ONESTA resta gemella: le due meta' di fila, la
+    cifratura prima del «fuori». La coda del 🔒 dice il vero per
+    metodo: il recapito resta, del contanti il luogo e non l'ora, del
+    tabacchino niente. «Non scrivere password» solo a chi scrive.
     Il banco ESEGUE il vero `renderCampiP2P`, con le forme vere e il
     giudice vero della forma, su un DOM di cartone."""
     print("\n[il testo corto del foglio dei recapiti]")
     mini = open("miniapp.html", encoding="utf-8").read()
     rc = pezzo_js(mini, "function renderCampiP2P(", "\n}\n")
-    OK = "✓ Recapito inviato. Se lo cambi, vale l\\'ultimo."
-    LUCCHETTO = ("🔒 Lo vedete solo tu e l\\'altra persona, nemmeno Barattolo. "
-                 "Resta salvato su questo dispositivo per i prossimi scambi.")
-    AVVISO = ("⚠️ Non scrivere password o codici. Quello che vi dite fuori "
-              "da Barattolo non conta in caso di disputa.")
-    prova("le tre righe approvate stanno nel foglio, parola per parola",
-          [True, True, True], [OK in rc, LUCCHETTO in rc, AVVISO in rc])
-    prova("...e il giudice del corto e' uno: niente appuntamento, si ricorda", True,
-          "corto = !fr.appuntamento && fr.ricorda !== false;" in rc)
+    prova("le righe approvate stanno nel foglio, parola per parola",
+          [True] * 7,
+          ["✓ Recapito inviato. Se lo cambi, vale l\\'ultimo." in rc,
+           "✓ Appuntamento inviato. Se lo cambi, vale l\\'ultimo e chi compra viene avvisato." in rc,
+           "🔒 Lo vedete solo tu e l\\'altra persona, nemmeno Barattolo.' + salvaQui" in rc,
+           "' Resta salvato su questo dispositivo per i prossimi scambi.'" in rc,
+           "' Il luogo resta salvato su questo dispositivo, l\\'ora no.'" in rc,
+           "' Non resta salvato: ogni PayCode vale una volta sola.'" in rc,
+           "⚠️ ' + (vende ? 'Non scrivere password o codici. ' : '') +\n"
+           "    'Quello che vi dite fuori da Barattolo non conta in caso di disputa.</div>'" in rc])
 
     js = (
         "let p2pCampiOrdine = 'x', p2pCampoMetodo = '';\n"
@@ -127084,57 +127098,57 @@ def prove_recapito_corto():
         + rc + "\n}\n" + r"""
 const righe = () => (box.innerHTML.match(/<div class="hint">[^]*?<\/div>/g) || [])
   .map(r => r.replace(/<[^>]+>/g, ''));
-const giro = (lato, metodo, inviato) => {
+const giro = (lato, metodo, inviato, loro) => {
   ORD = {lato, metodi: [metodo], campiMiei: inviato ? {euro: {testo: 'x'}} : {},
-         campiLoro: {}, peer: 'p'};
+         campiLoro: loro ? {euro: {testo: 'IBAN: IT00'}} : {}, peer: 'p'};
   renderCampiP2P();
   return righe();
 };
 const out = {};
-for (const m of ['Bonifico SEPA', 'Revolut', 'Satispay', 'PayPal', 'Lightning in Wero'])
+for (const m of ['Bonifico SEPA', 'Revolut', 'Satispay', 'PayPal', 'Lightning in Wero',
+                 'Contanti di persona', 'Contanti al tabacchino'])
   out[m] = [giro('vendo', m, false), giro('vendo', m, true)];
-out.contanti = giro('vendo', 'Contanti di persona', true);
-out.tabacchino = giro('vendo', 'Contanti al tabacchino', true);
-out.compro = giro('compro', 'Bonifico SEPA', false);
+out.compro = [giro('compro', 'Bonifico SEPA', false, false), giro('compro', 'Bonifico SEPA', false, true)];
 console.log(JSON.stringify(out));
 """)
     out = _node_banco(js)
     if out is None:
         salta("il foglio dei recapiti girato in node", "node non c'e'")
         return
-    ok = OK.replace("\\'", "'")
-    lucc = LUCCHETTO.replace("\\'", "'")
-    prima = ["💶 Il metodo dello scambio è {m}.", lucc, AVVISO]
+    LUCC = "🔒 Lo vedete solo tu e l'altra persona, nemmeno Barattolo."
+    AVV = "⚠️ Non scrivere password o codici. Quello che vi dite fuori da Barattolo non conta in caso di disputa."
+    OK = "✓ Recapito inviato. Se lo cambi, vale l'ultimo."
     for m in ("Bonifico SEPA", "Revolut", "Satispay", "PayPal", "Lightning in Wero"):
-        p = [r.replace(m, "{m}") for r in prima]
+        metodo = f"💶 Il metodo dello scambio è {m}."
+        lucc = LUCC + " Resta salvato su questo dispositivo per i prossimi scambi."
         prova(f"{m}: prima dell'invio le due righe di sempre, dopo anche «✓ Recapito inviato»",
-              [p, [p[0], ok, lucc, AVVISO]],
-              [[r.replace(m, "{m}") for r in x] for x in out.get(m, [[], []])])
+              [[metodo, lucc, AVV], [metodo, OK, lucc, AVV]], out.get(m))
+    m = "Contanti di persona"
+    lucc = LUCC + " Il luogo resta salvato su questo dispositivo, l'ora no."
+    prova("il contanti: il luogo resta e l'ora no; dopo l'invio «✓ Appuntamento inviato»",
+          [[f"💶 Il metodo dello scambio è {m}.", lucc, AVV],
+           [f"💶 Il metodo dello scambio è {m}.",
+            "✓ Appuntamento inviato. Se lo cambi, vale l'ultimo e chi compra viene avvisato.", lucc, AVV]],
+          out.get(m))
+    m = "Contanti al tabacchino"
+    lucc = LUCC + " Non resta salvato: ogni PayCode vale una volta sola."
+    prova("il tabacchino: non resta salvato niente; dopo l'invio «✓ Recapito inviato»",
+          [[f"💶 Il metodo dello scambio è {m}.", lucc, AVV],
+           [f"💶 Il metodo dello scambio è {m}.", OK, lucc, AVV]], out.get(m))
+    prova("chi compra: la prima riga com'era, poi il 🔒 senza coda e il ⚠️ senza «password»",
+          [["💶 Chi vende non ha ancora detto dove ricevere gli euro: appena lo fa lo leggi qui.",
+            LUCC, "⚠️ Quello che vi dite fuori da Barattolo non conta in caso di disputa."],
+           [LUCC, "⚠️ Quello che vi dite fuori da Barattolo non conta in caso di disputa."]],
+          out.get("compro"))
     vecchie = ("I recapiti viaggiano cifrati", "🔓 Fuori da Barattolo", "📌 Resta ricordato",
-               "✓ Inviato: l'ultimo")
-    prova("...e delle quattro righe di prima non ne resta nessuna, coi metodi a recapito", [],
-          [r for m in ("Bonifico SEPA", "PayPal") for x in out.get(m, [])
-           for r in x if r.startswith(vecchie)])
-    # la riga onesta: le due meta' insieme, la cifratura prima del «fuori»
-    sepa = out.get("Bonifico SEPA", [[], []])[1]
-    prova("LA RIGA ONESTA resta gemella: «nemmeno Barattolo» e poi «fuori da Barattolo», di fila",
-          True, len(sepa) == 4 and "nemmeno Barattolo" in sepa[2]
-          and "fuori da Barattolo non conta" in sepa[3])
-    # chi tiene le sue righe finche' Andrea non dice si' alle proposte
-    prova("il contanti (appuntamento) tiene le sue righe, la riga onesta compresa", True,
-          any(r.startswith("✓ Inviato: l'ultimo che mandi è quello che vale, e chi compra")
-              for r in out.get("contanti", []))
-          and any(r.startswith("📌 Resta ricordato") for r in out.get("contanti", []))
-          and any(r.startswith("🔓 Fuori da Barattolo") for r in out.get("contanti", []))
-          and not any(r.startswith("🔒") for r in out.get("contanti", [])))
-    prova("il tabacchino (Barattozon) tiene le sue righe", True,
-          any(r.startswith("🧾 Non resta ricordato") for r in out.get("tabacchino", []))
-          and any(r.startswith("✓ Inviato: l'ultimo che mandi è quello che vale.")
-                  for r in out.get("tabacchino", []))
-          and not any(r.startswith(("🔒", "✓ Recapito inviato")) for r in out.get("tabacchino", [])))
-    prova("chi compra tiene le sue righe", True,
-          any(r.startswith("I recapiti viaggiano cifrati") for r in out.get("compro", []))
-          and not any(r.startswith("🔒") for r in out.get("compro", [])))
+               "🧾 Non resta ricordato", "✓ Inviato: l'ultimo")
+    prova("...e delle righe di prima non ne resta nessuna, in nessun ramo", [],
+          [r for x in out.values() for y in x for r in y if r.startswith(vecchie)])
+    prova("LA RIGA ONESTA resta gemella in ogni ramo: il 🔒 e subito dopo il ⚠️, in coda", True,
+          all(len(y) >= 2 and y[-2].startswith("🔒") and "nemmeno Barattolo" in y[-2]
+              and y[-1].startswith("⚠️") and y[-1].endswith(
+                  "fuori da Barattolo non conta in caso di disputa.")
+              for x in out.values() for y in x))
 
 
 def prove_stellina_card_p2p():
