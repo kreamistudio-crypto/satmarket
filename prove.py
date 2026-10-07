@@ -61250,9 +61250,10 @@ console.log(JSON.stringify(out));
           [_c_gen, _c_gen], [_ps["dueMetodi"], _ps["sceltoRevolut"]])
     prova("passi: chi vende col metodo unico", _v_gen, _ps["vendi"])
     prova("passi: anche su un intervallo prima della cifra", _c_gen, _ps["rangeAttesa"])
-    prova("passi: il mio ordine (d'acquisto) dal libro comincia dall'attesa",
+    prova("passi: il mio ordine (d'acquisto) dal libro comincia dall'attesa, e sono cinque",
           ["Aspetti che qualcuno lo prenda", "Chi vende mette i sats in garanzia",
-           "Invii gli euro col metodo scelto", "I sats arrivano a te"], _ps["tuo"])
+           "Indichi dove ricevere i sats", "Invii gli euro col metodo scelto",
+           "I sats arrivano a te"], _ps["tuo"])
     prova("passi: contanti unico metodo, dai due lati", [_c_con, _v_con],
           [_ps["contanti"], _ps["contantiVendi"]])
     prova("passi: contanti fra due metodi non scelto e' il generico, scelto diventa contanti",
@@ -99463,12 +99464,16 @@ console.log(JSON.stringify(out));
           [o["compro/libro/senza/nessuno"], o["vendo/libro/senza/nessuno"]])
     prova("il metodo si legge senza gli spazi attorno", [C_CON, V_CON],
           [o["compro/libro/senza/contantiSpazi"], o["vendo/libro/senza/contantiSpazi"]])
-    # IL MIO ORDINE: l'attesa, poi tre passi del mio lato (adattati da me,
-    # mostrati ad Andrea negli scatti)
+    # IL MIO ORDINE: l'attesa, poi i passi del mio lato. Vendendo tre
+    # (adattati da me, mostrati ad Andrea negli scatti); comprando
+    # QUATTRO (7 ott 2026, testi di Andrea): «Indichi dove ricevere i
+    # sats» al terzo posto, dopo la garanzia, com'e' nel flusso vero di
+    # un ordine d'acquisto preso da chi vende.
     ATT = "Aspetti che qualcuno lo prenda"
-    prova("il mio ordine d'acquisto: l'attesa e tre passi", [
-        [ATT, "Chi vende mette i sats in garanzia", "Invii gli euro col metodo scelto", "I sats arrivano a te"],
-        [ATT, "Chi vende mette i sats in garanzia", "Consegni i contanti di persona", "I sats arrivano a te"]],
+    MIO_C = [ATT, "Chi vende mette i sats in garanzia", "Indichi dove ricevere i sats"]
+    prova("il mio ordine d'acquisto: l'attesa e quattro passi, dove ricevere al terzo", [
+        MIO_C + ["Invii gli euro col metodo scelto", "I sats arrivano a te"],
+        MIO_C + ["Consegni i contanti di persona", "I sats arrivano a te"]],
         [o["compro/tuo/senza/generico"], o["compro/tuo/senza/contanti"]])
     prova("il mio ordine di vendita: l'attesa e tre passi, Barattozon compreso", [
         [ATT, "Metti i sats in garanzia", "Ricevi e controlli gli euro", "Liberi i sats a chi compra"],
@@ -99477,8 +99482,9 @@ console.log(JSON.stringify(out));
         [o["vendo/tuo/senza/generico"], o["vendo/tuo/senza/contanti"], o["vendo/tuo/senza/tab"]])
     prova("...e sul mio ordine la cauzione non entra mai", True,
           all(o[k.replace("/senza/", "/cauz/")] == o[k] for k in o if "/tuo/senza/" in k))
-    prova("sempre quattro passi, nessuno vuoto, nessun nome di passo in testa", (True, True),
-          (all(len(v) == 4 and all(v) for k, v in o.items() if k != "html"),
+    prova("quattro passi, cinque solo sul mio ordine d'acquisto; nessuno vuoto, nessun nome di passo in testa", (True, True),
+          (all(len(v) == (5 if k.startswith("compro/tuo/") else 4) and all(v)
+               for k, v in o.items() if k != "html"),
            not any(re.match(r"(Ordine preso|Sats bloccati|Euro inviati|Scambio concluso)", s)
                    for k, v in o.items() if k != "html" for s in v)))
     h = o["html"]

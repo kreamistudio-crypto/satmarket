@@ -56139,10 +56139,15 @@ function renderDettaglioP2P(){
    dell'ordine; con piu' metodi e nessuna scelta vale il generico, e
    la scelta ridisegna il foglio. CON LA CAUZIONE cambia solo il
    primo passo, come nella linea del tempo. SUL MIO ORDINE il primo
-   passo e' l'attesa, e i tre dopo sono quelli del mio lato stretti
-   a tre (chi ha pubblicato non mette la cauzione qui: se tocca a lui
-   l'ha gia' messa alla pubblicazione).
-   PURA: {compro, tuo, metodo, cauzione} → quattro frasi. */
+   passo e' l'attesa (chi ha pubblicato non mette la cauzione qui: se
+   tocca a lui l'ha gia' messa alla pubblicazione). Vendendo, i tre
+   dopo sono quelli del mio lato stretti a tre. COMPRANDO SONO CINQUE
+   (7 ott 2026, ritocco di Andrea): «Indichi dove ricevere i sats»
+   torna, al terzo posto — perche' nel flusso vero, su un ordine
+   d'acquisto preso da chi vende, la richiesta di dove ricevere arriva
+   DOPO che i sats sono in garanzia, non prima come quando prendo io.
+   PURA: {compro, tuo, metodo, cauzione} → quattro frasi (cinque sul
+   mio ordine d'acquisto). */
 function passiScambioP2P(q){
   const compro = !!q.compro;
   const m = String(q.metodo || '').trim();
@@ -56150,6 +56155,7 @@ function passiScambioP2P(q){
   const tab = !contanti && tabacchinoP2P([m]);
   if (q.tuo) return ['Aspetti che qualcuno lo prenda'].concat(compro ? [
     'Chi vende mette i sats in garanzia',
+    'Indichi dove ricevere i sats',
     contanti ? 'Consegni i contanti di persona'
       : tab ? 'Paghi il PayCode al tabacchino' : 'Invii gli euro col metodo scelto',
     'I sats arrivano a te'

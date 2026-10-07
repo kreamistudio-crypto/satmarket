@@ -39362,3 +39362,30 @@ girata su da9273e (19.256 verdi), non sull'albero finale.
 **NON PROVATO.** Il telefono e l'APK (nessuna rotta nuova né permesso:
 è CSS e markup del velo), e un gesto vero col server (il velo l'hanno
 alzato le funzioni chiamate a mano, non un pagamento).
+
+## «Come funziona»: cinque passi sul mio ordine d'acquisto (7 ott 2026, ritocco di Andrea)
+
+**COSA.** Sul MIO ordine d'acquisto aperto dal libro i passi erano
+quattro, e «Indichi dove ricevere i sats» mancava (detto ad Andrea nel
+verbale di «Come funziona»: nei tre posti dopo l'attesa non entrava).
+Adesso sono cinque: Aspetti che qualcuno lo prenda · Chi vende mette i
+sats in garanzia · Indichi dove ricevere i sats · Invii gli euro col
+metodo scelto (o «Consegni i contanti di persona») · I sats arrivano a
+te. Il terzo sta DOPO la garanzia perche' e' li' che arriva nel flusso
+vero di un ordine d'acquisto preso da chi vende (quando prendo io,
+invece, dove ricevere viene prima: e' il primo passo di chi compra dal
+libro, e resta com'era). Tutti gli altri elenchi restano a quattro; le
+due frasi della cauzione restano su due righe (decisione di Andrea).
+
+**PROVATO.** `prove_passi_libro_p2p`: le due varianti del mio ordine
+d'acquisto (bonifico, contanti) parola per parola coi cinque passi, e la
+regola «quattro passi, cinque solo sul mio ordine d'acquisto»;
+`prove_p2p_dettaglio`: il mio ordine d'acquisto nella pagina vera, cinque
+passi. Tortura sulla copia 35 su 35 (nuove: la riga tolta, la riga
+spostata prima della garanzia). Suite intera severa senza config nel
+worktree su 337b698: 19.332 verdi e 0 rosse; i 38 collaudi della CI
+nella gabbia verdi; dopo il rebase su main corso, le sezioni toccate e
+i collaudi di nuovo (nel messaggio del commit). Dal vivo (copia in
+collaudo, relay morto, Chrome headless): bonifico e contanti prima/dopo
+a 375 e 320, chiaro e scuro, cinque voci di una riga ciascuna, nessuno
+scorrimento orizzontale; la tavola a 375 mandata ad Andrea.
