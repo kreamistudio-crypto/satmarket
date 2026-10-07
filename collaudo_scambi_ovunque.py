@@ -210,7 +210,7 @@ def client_sulla_risposta(risposta, locali, libro):
         js(mini, "function presenzeDaServerP2P(p, giro){"), js(mini, "function uniscePresenzeP2P(a, b){"),
         mini[mini.index("function p2pRitirato(o){"):mini.index("\n}", mini.index("function p2pRitirato(o){")) + 2],
         js(mini, "function lapidiP2P(){"), js(mini, "function lapideP2P(o){"),
-        js(mini, "function lapidataP2P(id){"), js(mini, "function archiviaRitiratoP2P(id){"),
+        js(mini, "function lapidataP2P(id, giro){"), js(mini, "function archiviaRitiratoP2P(id){"),
         js(mini, "function giroArchiviatoP2P(locali, id){"),
         js(mini, "function gruppoScambioP2P(o){"), js(mini, "function passaStatoMieiP2P(o, f){"),
     ])

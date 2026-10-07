@@ -40467,3 +40467,198 @@ del moderatore. Emendata col perché una sentinella di `prove_p2p_avvisi_libro`:
 (NODO-MOSTRO, i 576 blocchi «NON provati»), quindi la disputa che il
 coordinatore apre da solo e la chiusura di LND restano lette sul
 sorgente; e il telefono, dove gli avvisi arrivano come gli altri.
+
+## Lo stesso id, un giro nuovo (7 ott 2026, dal campo: l'ordine f904185a)
+
+**IL FATTO.** Andrea prende dal telefono l'ordine f904185a di Alan, lo
+annulla, lo riprende. In Mostro chi prende e si ritira PRIMA della
+garanzia rimanda l'ordine nel libro con lo STESSO id (`canceled` con
+`republished`; lo stesso fa lo scaduto `taker-timeout`), e la presa dopo
+è uno scambio nuovo — trade key nuova (indice 115), giro nuovo per il
+server — sotto un nome vecchio. Il telefono lo ha seguito bene: lì la
+riga caduta si mette da parte da sola (`archiviaGiroCadutoP2P`, 25 set)
+e la presa riparte da capo. Il PC, stesso account e stesso profilo
+bae6b807, teneva la riga «annullato» del primo giro e il diario diceva
+«ripresa f904185a: il coordinatore dice fiat-sent, la riga e' a annullato
+→ ferma»: lo scambio vivo stava nascosto fra gli annullati. La riga del
+PC portava GIÀ la chiave nuova (indice 115: l'archivio l'aveva promossa
+dall'indice della restore, che è quello della presa viva) e lo stato del
+primo giro — il caso più stretto.
+
+**PERCHÉ SI FERMAVA.** Tre giudici, tutti con la regola «un finale non si
+muove», che è giusta — il relay ripete a ogni riapertura i messaggi
+dello scambio nell'ordine che vuole lui, e la restore è una fotografia
+d'inizio sessione (l'ordine 8263bce5 del 17 set) — ma non sapeva dei
+nomi riusati: `riprendiDaRestoreP2P` (passo 6, solo in avanti),
+`adottaScambiServerP2P` (`avanti` falso sui finali, prima ancora di
+guardare cosa dice il server) e l'orologio di `applicaMessaggioP2P`
+(PASSATO sotto `ultimaMossa`). Il server invece i giri li distingue da
+sempre: `p2p_momenti.giro` conta le prese raccontate da mostrod,
+`_stato_scambio_p2p` legge SOLO l'ultimo giro, `p2p_scambi` riscrive le
+due trade key a ogni evento, e `/api/p2p/scambi` manda `giro`,
+`chiave_mia`, `chiave_peer`, `quando`. Il client ignorava `giro`.
+
+**COSA DISTINGUE UNA PRESA NUOVA DA UN'ECO VECCHIA.** Un'eco non può mai
+dire «giro più alto», «chiave più nuova» o «mosso DOPO il tuo annullo».
+Si riapre solo su una fonte che descrive l'ADESSO — la riga dell'archivio
+del server — e per uno di tre segni, in quest'ordine (`giroNuovoP2P`,
+puro): 'giro' (giro del server > giro della riga, tutt'e due noti; stesso
+giro o più basso = è lo stesso scambio, fine); 'chiave' (per chi ha
+PRESO: la chiave del server per il mio lato è una MIA derivata di indice
+più alto di quella della riga — `tk` è la derivata, una chiave di un
+altro mazzo non è un segno e la cura del 14 set la raddrizza; un indice
+più alto non può venire da una foto vecchia, gli indici crescono
+soltanto; per chi ha PUBBLICATO: la controparte del server è un'altra
+chiave E la foto è più nuova dell'ultima mossa della riga, perché una
+foto del giro prima applicata a una riga già al giro dopo direbbe «un'altra
+chiave» e la riporterebbe indietro); 'dopo' (solo per una riga FINALE di
+chi ha preso, senza giro né chiave da confrontare — le righe nate prima
+di questa cura, il PC di Andrea —: il server racconta un momento più
+recente dell'ultima mossa; uno scambio annullato non si muove più, se
+mostrod ha raccontato qualcosa dopo l'annullo è un'altra presa; un server
+in ritardo sul mio annullo racconta cose di PRIMA e non passa; l'orologio
+è di mostrod da tutt'e due le parti, salvo l'annullato letto dal libro
+38383, che porta l'ora del dispositivo: dichiarato). Mai su uno stato del
+server finale, «pubblicato», vuoto o ignoto. Un messaggio dal relay da
+solo NON riapre mai un finale: la presa nuova viaggia sulla chiave nuova,
+e `ordiniAscoltoP2P` ascolta solo le chiavi delle righe vive — la chiave
+vecchia non si ascolta più, l'eco del giro morto non arriva nemmeno.
+
+**COSA FA.** La riga porta il `giro` del server: `rigaDaServerP2P` lo
+scrive alla nascita; su una riga che non ce l'ha si scrive solo quando il
+server parla della STESSA presa (`stessaPresaP2P`: la mia chiave per chi
+prende, la controparte per chi ha pubblicato) e la riga non è un finale di
+cui il server racconta uno scambio vivo — una foto vecchia non deve
+timbrare il giro di prima su una riga del giro dopo. In
+`adottaScambiServerP2P` il giudice si chiede in testa, dopo la chiave di
+chi ha pubblicato (`riparaChiaveMakerP2P`): per chi ha PRESO la riga del
+giro morto si chiude se non lo era (`chiudiGiroP2P`: annullata al passo a
+cui si è fermata, senza hold, il momento resta), va da parte col nome
+`id~quando` e `idVero` — la storia della prima presa resta sotto
+«Annullati» con la sua ✕ — e la riga nuova NASCE dal server come su un
+dispositivo nuovo, con la chiave ritrovata dall'indice della restore o
+dalla `chiave_mia`; `oltreArchiviatiP2P` lascia passare la nascita se ogni
+riga messa da parte di quell'ordine è di un giro prima (anche quella del
+telefono, senza giro e con la chiave vecchia). Per chi ha PUBBLICATO la
+riga È l'ordine (chiave unica) e riparte in place: via quel che era della
+presa (`P2P_DELLA_PRESA`, allargata a cauzione, incasso, disputa e
+moderatore, chat, recapiti, scadenza della fattura), dentro stato,
+controparte, giro e momento del server — prima il `peer` non si
+sostituiva mai (`!gia.peer`), e chi aveva perso un giro parlava con la
+chiave del taker di prima. Una foto che parla di UN'ALTRA presa senza
+essere nuova per i tre segni (il giro prima, rimasta in mano a un
+dispositivo già avanti) non muove lo stato — «solo in avanti» l'avrebbe
+portata ad annullato — e non presta cifre: si lascia stare e si dice una
+volta nel diario. In `adottaOrdiniAltroveP2P` la restore con un indice più
+alto di quello della riga di chi prende e uno stato vivo (non pending, non
+«pubblicato», non finale) mette da parte la riga vecchia; la nuova la
+porta l'archivio, che ne sa lato, cifre e controparte («quel che nel
+libro non c'è resta fuori»); mai sul mio ordine, la mia chiave è una. Le
+LAPIDI portano il giro: la voce è `{s: scadenza, g: giro}`, le vecchie
+restano un numero e si leggono come sempre; `lapidataP2P(id, giro)` non
+ferma un giro più alto del suo e senza giro, da una parte o dall'altra,
+ferma come prima (fail-closed); la ✕ su una presa messa da parte col giro
+noto scrive la lapide sul nome vero (ferma la rinascita di QUEL giro, non
+di quelli dopo), senza giro resta sul nome `~` come prima. La diagnosi
+dice `giro=`. La ✕ sincronizzata (7 ott) non cambia: il server dice
+«aperto» alla ✕ sulla riga vecchia finché il giro nuovo vive, e
+`_tolto_vale_p2p` smette di mandare un tolto se lo scambio si muove dopo.
+Il server non cambia: `giro`, le chiavi e `quando` c'erano già.
+
+**GLI ALTRI GIRI.** Lo scaduto di chi aveva preso (`expired`,
+`taker-timeout`, e la cauzione non pagata in tempo) rimette nel libro con
+lo stesso id: stessa cura. Annullo cooperativo, annullo di chi ha
+pubblicato, admin, `expired` del libro: finali veri, l'ordine non torna
+nel libro, ripubblicare è un `new-order` con id nuovo. Un ALTRO taker che
+riprende: per il primo la riga annullata è giusta e resta (le chiavi del
+server non sono le sue); per chi ha pubblicato vale l'in place.
+
+**SCARTATI.** Riaprire la riga finale di chi ha preso in place: la chiave
+è un'altra, la storia della prima presa andrebbe persa, e il telefono fa
+già la messa da parte. Riaprire su un messaggio del relay: è replicabile e
+non descrive l'adesso. Il segno 'dopo' anche sulle righe vive o senza ora:
+una riga viva ha già i segni giro/chiave, e senza ora si ferma
+(fail-closed). Una `lapidataGiroP2P` nuova accanto alla vecchia: la firma
+`lapidataP2P(id, giro)` è cambiata e le cinque ancore dei banchi
+(prove.py ×3, collaudo_scambi_ovunque, collaudo_tolti_ovunque) sono state
+rifatte; la lettura della scadenza sta in riga nelle due funzioni (una
+terza, `scadenzaLapideP2P`, rompeva i banchi che le estraggono da sole).
+Timbrare il giro su ogni riga a ogni foto: una foto del giro prima
+timbrava il giro 1 sulla riga del giro 2 (trovato dalla prova h), e il
+segno 'giro' poi la metteva da parte da viva.
+
+**PROVATO.** `prove_giro_nuovo_stesso_id` (39): le sentinelle sui tre
+giudici, sulla riga nata dal server, sulla restore, su `P2P_DELLA_PRESA`,
+sulla ✕, sulla diagnosi e sull'ascolto; poi il banco node con le funzioni
+VERE (archivista, restore, lapidi, messa da parte, ascolto): il giudice
+puro con i tre segni e i suoi silenzi (indice più basso, server in
+ritardo, senza ora, riga viva, stesso giro, giro indietro, server finale,
+«pubblicato», muto, ignoto, senza riga; per chi ha pubblicato la foto
+vecchia, la stessa controparte, senza controparte, il giro), «stessa
+presa», chiudere il giro; a) il PC di chi ha preso (riga del giro 1 → `~`
++ riga nuova con chiave 7 e giro 2, ascolto sulla sola chiave nuova, la
+stessa foto riapplicata non fa niente), b) senza giro basta la chiave, c)
+il caso del PC di Andrea (chiave nuova già sulla riga: 'dopo'), d) il
+server in ritardo non riapre, e) stesso giro e riga finita ferma, f) la
+riga viva di un giro morto si chiude e va da parte, g) chi ha pubblicato
+riparte in place (controparte, giro, momento, stato; via hold, cauzione,
+cifre; chiave ferma), la foto vecchia non riporta indietro, la stessa
+controparte avanza come sempre e scrive il giro, h) il giro non si timbra
+su un'altra presa e la foto di un'altra presa non muove la riga (detto
+una volta), i) le lapidi col giro e nell'archivista, j) la messa da parte
+ferma il suo giro e lascia nascere la presa dopo (anche quella del
+telefono), k) la restore con l'indice più alto (e il silenzio su pending,
+canceled, stesso indice, cauzione, mio ordine), l) l'ascolto. Emendate col
+perché quattro sentinelle di casa (prove_scambi_ovunque ×2,
+prove_tolti_ovunque, prove_schermo_segue_mostro) e il `const gia` → `let
+gia` in prove_annullo_chiave_maker. `collaudo_giro_nuovo.py` (29, nella
+CI): il SERVER VERO sul database usa-e-getta con gli eventi della 0007 dai
+due giudici della rotta — presa (chiave 1), ritiro `republished`, seconda
+presa (chiave 2 della stessa persona), fattura, garanzia, euro — e il
+CLIENT VERO in node sulle risposte vere: i due giri raccontati dal
+server; il PC di chi ha preso dalla riga annullata del giro 1 alla presa
+nuova; la riga di Andrea (chiave nuova, senza giro); il server in
+ritardo; il dispositivo di chi ha pubblicato che ha perso il giro (in
+place, senza la hold di prima) e quello che ha visto solo il ritorno in
+vetrina (porta ancora la controparte di prima: il ritiro viaggia con
+tutt'e due le chiavi e il server le tiene finché un evento non le
+riscrive); l'eco vecchia sui due lati; la restore; le lapidi e il server
+che alla ✕ sulla riga vecchia dice «aperto»; lo scaduto `taker-timeout`.
+Tortura 32 su 32 sulla copia intera del repo: i tre segni allentati o
+senza ora, il server «pubblicato» o finale come segno, la riga viva non
+chiusa, la hold e il passo non scritti, chi ha preso trattato come chi ha
+pubblicato, quel che era della presa tenuto, il momento non preso, il
+giro timbrato su un'altra presa o su un finale, la foto di un'altra presa
+che muove, «stessa presa» sempre sì, la lapide senza giro / che ferma
+tutto / che lascia lo stesso giro, la nascita che non guarda il giro, la
+riga nata senza giro, «oltre» sempre sì / basta una, la messa da parte che
+ferma la presa dopo, la restore con lo stesso indice / sul mio ordine /
+con «pubblicato» / con un finale / che non mette da parte, la ✕ sul nome
+`~`, la diagnosi muta. Suite intera severa senza config nel worktree su
+dba0f31: 19.738 verdi, 0 rosse; i 43 collaudi della CI verdi nella
+gabbia, il nuovo compreso. DAL VIVO nel Browser pane (copia di cartone,
+collaudo, relay morto, porta degli eventi aperta col segreto di
+collaudo): come Compratore 111 con un mazzo seminato (`assicuraMazzo` nel
+pane non torna: aspetta il cloud di Telegram), gli eventi VERI dalla
+rotta `/api/p2p/evento` — presa con la chiave dell'indice 1, ritiro
+`republished` — e la pagina ha fatto nascere la riga «annullato» al giro
+1 con la chiave 1 (il PC di Andrea, riprodotto); poi la seconda presa con
+la chiave dell'indice 2, fattura, garanzia, euro: alla lettura dopo
+dell'archivio la riga di prima è andata sotto «Annullati» col nome `~`,
+la nuova è nata «Euro inviati ✋ Aspetta» con la chiave 2, «1 scambio
+aperto», l'ascolto sulla sola chiave nuova, il diario con le tre righe e
+la diagnosi con `giro=1` e `giro=3` (la semina ha rimandato anche gli
+eventi del primo giro con un'ora nuova: per il server le prese erano
+tre, e il segno 'giro' ha retto lo stesso).
+
+**NON PROVATO.** Il telefono e il PC veri su barattolo.store (il giro di
+Andrea, dopo il deploy: la riga f904185a del PC deve passare sotto
+«Annullati» e lo scambio vivo comparire, col diario «presa nuova dello
+stesso ordine (dopo: …)»); il dispositivo di chi ha pubblicato nel pane
+(è nel collaudo col server vero); il coordinatore vero.
+
+**DA GUARDARE.** L'annullato letto dal libro 38383 porta l'ora del
+dispositivo: con un orologio del PC molto indietro il segno 'dopo'
+potrebbe tacere (la riga resta ferma, come oggi; i segni giro e chiave
+non dipendono dall'ora). Dopo il deploy le righe nuove portano il giro e
+il segno 'dopo' serve sempre meno.

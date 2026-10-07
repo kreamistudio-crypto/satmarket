@@ -172,7 +172,7 @@ def harness(mini):
         + [cost("STATI_P2P", "\n};\n"), cost("P2P_PROGRESSO", "\n};\n")]
         + [js(f) for f in ("function ordiniP2P(){", "function scriviOrdineP2P(o){",
                            "function p2pTogliibile(o, adesso){", "function recensioneInSospesoP2P(o){",
-                           "function lapidiP2P(){", "function lapideP2P(o){", "function lapidataP2P(id){",
+                           "function lapidiP2P(){", "function lapideP2P(o){", "function lapidataP2P(id, giro){",
                            "function togliScambioP2P(id, ev){", "function cancellaRigaP2P(id){",
                            "function toltoAltroveP2P(id){", "function applicaToltiP2P(){",
                            "async function togliScambioServerP2P(ordine){",

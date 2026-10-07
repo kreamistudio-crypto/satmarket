@@ -27553,6 +27553,42 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   pillola del filtro: dal 30 set 2026 lo stato vuoto è solo «Nessuno
   scambio in corso» e «Vai al libro ordini»); la scopa lampo è del
   solo `rifiutato`; la ✕ lascia una lapide di `P2P_LAPIDE_TOLTO_S`.
+  LO STESSO ID, UN GIRO NUOVO (7 ott 2026): Mostro rimette nel libro con
+  lo STESSO id l'ordine di cui chi aveva preso si è ritirato prima della
+  garanzia (`canceled` + `republished`, e il `taker-timeout`), e la presa
+  dopo è uno scambio nuovo sotto un nome vecchio. La riga porta il
+  `giro` del server (quante prese mostrod ha raccontato: `p2p_momenti`,
+  `/api/p2p/scambi`), scritto alla nascita da `rigaDaServerP2P` e, su una
+  riga che non ce l'ha, solo quando il server parla della STESSA presa
+  (`stessaPresaP2P`: la mia chiave per chi prende, la controparte per chi
+  ha pubblicato). Il giudice puro `giroNuovoP2P(gia, s, tk)` dice se la
+  fotografia del server è una presa nuova, con tre segni in ordine:
+  'giro' (giro del server > giro della riga, tutt'e due noti; stesso
+  giro o più basso = fine), 'chiave' (per chi prende: la mia chiave del
+  server è una derivata di indice più alto; per chi ha pubblicato: la
+  controparte è un'altra E la foto è più nuova dell'ultima mossa),
+  'dopo' (solo su una riga FINALE di chi prende senza giro né chiave da
+  confrontare: il server racconta un momento dopo l'annullo). Mai su uno
+  stato del server finale, «pubblicato», vuoto o ignoto; un messaggio dal
+  relay da solo non riapre mai un finale (la presa nuova viaggia sulla
+  chiave nuova, che `ordiniAscoltoP2P` ascolta solo quando la riga nuova
+  esiste). In `adottaScambiServerP2P`: per chi ha preso la riga vecchia si
+  chiude (`chiudiGiroP2P`: annullata al suo passo, senza hold, momento
+  fermo) e va da parte con `archiviaGiroCadutoP2P` (`id~quando`,
+  `idVero`), e la nuova NASCE dal server (`oltreArchiviatiP2P` lascia
+  passare la nascita se ogni riga messa da parte è di un giro prima); per
+  chi ha pubblicato la riga è l'ordine e riparte in place (via
+  `P2P_DELLA_PRESA`, dentro stato, controparte, giro e momento del
+  server). Una foto che parla di UN'ALTRA presa senza essere nuova (foto
+  del giro prima rimasta in mano a un dispositivo già avanti) non muove
+  lo stato e non presta cifre: si lascia stare e lo si dice una volta.
+  In `adottaOrdiniAltroveP2P` la restore con un indice più alto di quello
+  della riga di chi prende e uno stato vivo mette da parte la riga vecchia
+  (la nuova la porta l'archivio). Le lapidi portano il giro (`{s, g}`;
+  le vecchie restano un numero): `lapidataP2P(id, giro)` non ferma un giro
+  più alto del suo, e la ✕ su una presa messa da parte col giro noto la
+  scrive sul nome vero. La diagnosi dice `giro=`. Verbale: CANTIERI, «Lo
+  stesso id, un giro nuovo».
   LA ✕ VALE PER L'ACCOUNT (7 ott 2026): prima di togliere,
   `togliScambioP2P` chiede `POST /api/p2p/scambi/togli`
   (`togliScambioServerP2P`, blocco suo fuori dal motore: sessione, nel

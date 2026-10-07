@@ -59269,7 +59269,7 @@ def prove_p2p_libro():
         "function libroDaEventi(eventi, adesso){",
         "function lapidiP2P(){",
         "function lapideP2P(o){",
-        "function lapidataP2P(id){",
+        "function lapidataP2P(id, giro){",
         # i due giudici del FILTRO del libro (set 2026): puri apposta,
         # cosi' le quattro leve si provano senza un foglio e senza un
         # relay
@@ -87774,8 +87774,11 @@ def prove_scambi_ovunque():
     # di un mio ordine mai preso NASCE — l'archivio del server e' l'unico
     # posto da cui un dispositivo che non l'ha visto lo puo' sapere — e
     # nascendo passa dall'archivista (la card esce dal libro, la lapide).
+    # EMENDATA (7 ott 2026, «Lo stesso id, un giro nuovo»): la lapide
+    # guarda il giro del server, cosi' quella di una presa finita non
+    # ferma la presa dopo sotto lo stesso id
     prova("...mai su una lapide, mai senza stato — e il mio ritiro nasce", True,
-          "if (lapidataP2P(id)) continue;" in ad
+          "if (lapidataP2P(id, s.giro)) continue;" in ad
           and "if (s.mio && !s.preso" not in ad
           and "if (!stato || !STATI_P2P[stato]) {" in ad
           and "archiviaRitiratoP2P(o.id)" in ad)
@@ -87814,8 +87817,11 @@ def prove_scambi_ovunque():
            "{k: 'morti', n: 'Annullati'}" in mini])
     prova("...e la scopa tiene il lampo al solo rifiutato", True,
           "const lampo = o.stato === 'rifiutato';" in pezzo_js(mini, "function pulisciScambiP2P(){", "\n}"))
+    # EMENDATA (7 ott 2026): sulla presa messa da parte di cui si sa il
+    # giro la lapide va sul nome VERO (`suo`), col giro dentro
     prova("la ✕ lascia una lapide lunga quanto lo storico del server", True,
-          "lapideP2P(Object.assign({}, o, {scade: Math.floor(Date.now() / 1000) + P2P_LAPIDE_TOLTO_S}));"
+          "lapideP2P(Object.assign({}, o, {id: sulVero ? suo : id,\n"
+          "                                      scade: Math.floor(Date.now() / 1000) + P2P_LAPIDE_TOLTO_S}));"
           in pezzo_js(mini, "function togliScambioP2P(id, ev){", "\n}")
           and "const P2P_LAPIDE_TOLTO_S = 40 * 86400;" in mini)
     prova("la card e la pagina dicono «da un altro dispositivo» sulla riga solo da guardare", [True, True],
@@ -88048,6 +88054,362 @@ console.log(JSON.stringify(out));
           [5, 0, 0, 0, 0, 0], o.get("cercatore"))
 
 
+def prove_giro_nuovo_stesso_id():
+    """LO STESSO ID, UN GIRO NUOVO (7 ott 2026, dal campo: l'ordine
+    f904185a di Alan, preso da Andrea, annullato e RIPRESO dal telefono).
+
+    Mostro rimette nel libro con lo STESSO id l'ordine di cui chi aveva
+    preso si e' ritirato prima della garanzia, e la presa dopo e' uno
+    scambio nuovo sotto un nome vecchio. Sul telefono che riprende la
+    riga caduta si mette da parte da sola (25 set); sul PC — stesso
+    account, stesso profilo — la riga restava «annullato» del primo
+    giro, perche' tre giudici (restore, archivista, orologio dei
+    messaggi) tenevano un finale fermo per la regola giusta. Qui:
+    `giroNuovoP2P` coi suoi tre segni ('giro', 'chiave', 'dopo') e le
+    sue cinture; l'archivista che mette da parte la riga di chi ha
+    preso e fa nascere quella nuova, e che fa ripartire in place quella
+    di chi ha pubblicato; la restore che vede l'indice piu' alto; le
+    lapidi col giro; l'ascolto che segue la chiave nuova. Tutto con le
+    FUNZIONI VERE di miniapp.html in node, e le sentinelle."""
+    print("\n[lo stesso id, un giro nuovo]")
+    import json as _json
+    import os as _os
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    fn = lambda firma, fine="\n}\n": pezzo_js(mini, firma, fine) + ("\n}" if fine == "\n}\n" else "")
+    def _cost(nome, fine=";\n"):
+        i = mini.index("const " + nome + " = ")
+        return mini[i:mini.index(fine, i) + len(fine)]
+
+    # --- 1) LE SENTINELLE ------------------------------------------------
+    ad = fn("function adottaScambiServerP2P(locali){")
+    prova("il giudice del giro nuovo c'e', e' puro, e torna i tre segni", [True, True, True, True],
+          ["function giroNuovoP2P(gia, s, tk){" in mini,
+           "return gS > gL ? 'giro' : '';" in mini,
+           "&& (tk.indice | 0) > (gia.indice | 0)) return 'chiave';" in mini,
+           "return (q > 0 && mossa > 0 && q > mossa) ? 'dopo' : '';" in mini])
+    prova("l'archivista lo chiede PRIMA di leggere la riga, dopo la chiave di chi ha pubblicato", True,
+          0 < ad.find("riparaChiaveMakerP2P(id, locali)") < ad.find("let gia = locali[id];")
+          < ad.find("giroNuovoP2P(gia, s, tk) : '';") < ad.find("if (gia) {"))
+    prova("...per chi ha preso: chiude, mette da parte, azzera la riga e passa alla nascita", True,
+          "if (chiudiGiroP2P(gia, adesso)) scriviOrdineP2P(gia);" in ad
+          and "archiviaGiroCadutoP2P(id);\n      delete locali[id];\n      gia = null;" in ad)
+    prova("...per chi ha pubblicato: via quel che era della presa, dentro stato e momento del server", True,
+          "for (const k of P2P_DELLA_PRESA) delete gia[k];\n        gia.stato = s.stato;" in ad
+          and "if (qN > 0) { gia.quando = qN; gia.ultimaMossa = qN; }" in ad)
+    prova("il giro si scrive solo sulla STESSA presa (la chiave lo dice), mai su un finale di cui il server racconta altro", True,
+          "stessaPresaP2P(gia, s)\n                        && (P2P_FINALI.indexOf(gia.stato) < 0 || P2P_FINALI.indexOf(s.stato) >= 0)" in ad)
+    prova("la nascita: la lapide guarda il giro, la messa da parte non ferma una presa dopo", True,
+          "if (lapidataP2P(id, s.giro)) continue;" in ad
+          and "oltreArchiviatiP2P(locali, id, s, tk))) continue;" in ad)
+    prova("la riga nata dal server porta il giro", True,
+          "if (Math.floor(Number(s.giro) || 0) > 0) o.giro = Math.floor(Number(s.giro));"
+          in fn("function rigaDaServerP2P(id, s, tk, stato, adesso){"))
+    ado = fn("function adottaOrdiniAltroveP2P(locali){")
+    prova("la restore: indice piu' alto e stato vivo = presa nuova, mai sul mio ordine, prima della ripresa", True,
+          0 < ado.find("if (!gia.mio && (gia.indice | 0) > 0 && indice > (gia.indice | 0)")
+          < ado.find("const vivo = statoDaRestoreP2P(gia, stV);")
+          < ado.find("if (vivo && vivo !== 'pubblicato' && P2P_FINALI.indexOf(vivo) < 0) {")
+          < ado.find("const ripreso = riprendiDaRestoreP2P(gia, st);"))
+    prova("quel che e' della presa comprende la cauzione, l'incasso, la disputa, la chat e i recapiti", True,
+          all(c in _cost("P2P_DELLA_PRESA", "];\n") for c in
+              ("'cauzione'", "'incasso'", "'moderatore'", "'disputaId'", "'annulloDisputa'",
+               "'chatMod'", "'recapitoFermo'", "'recapitoAltrove'", "'fatturaScade'")))
+    tg = pezzo_js(mini, "function togliScambioP2P(id, ev){", "\n}")
+    prova("la ✕ su una presa messa da parte col giro noto scrive la lapide sul nome vero", True,
+          "const sulVero = !!(o.idVero && Math.floor(Number(o.giro) || 0) > 0);" in tg
+          and "{id: sulVero ? suo : id," in tg)
+    prova("la diagnosi dice il giro", True, "+ ' giro=' + (o.giro | 0)" in mini)
+    prova("i messaggi del coordinatore trovano la riga dalla chiave in ascolto (le chiavi finite non si ascoltano)",
+          [True, True],
+          ["const ord = ordiniAscoltoP2P()[pub];" in fn("async function mostroArriva(ev){"),
+           "if (o && o.pubTrade && P2P_FINALI.indexOf(o.stato) < 0) m[o.pubTrade] = o;"
+           in fn("function ordiniAscoltoP2P(){")])
+
+    # --- 2) IL BANCO NODE: le funzioni vere -------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il giro nuovo gira", "node non c'e'")
+        return
+    banco = "\n".join([
+        "const _box = {}; const localStorage = {getItem: k => (k in _box ? _box[k] : null),"
+        " setItem: (k, v) => { _box[k] = String(v); }};",
+        "const chiaveP2P = k => k; const window = {NostrTools: {schnorr: true}};",
+        "let p2pOrdineAperto = '', p2pHoldOrdine = '', p2pIncassoOrdine = '';",
+        "let p2pMieiOrdini = null, p2pLibro = {ordini: []}, p2pScambiServer = null;",
+        "let p2pDiario = []; function diarioP2P(r){ p2pDiario.push(r); }",
+        "function rigaLibroP2P(){ return null; }",
+        _cost("MOSTRO_ORDINI_CHIAVE"), _cost("P2P_ORIZZONTE_S"), _cost("P2P_LAPIDE_TOLTO_S"),
+        _cost("P2P_LIBRO_FINESTRA_S"), _cost("MOSTRO_LAPIDI_CHIAVE"),
+        _cost("P2P_FINALI"), _cost("P2P_GIRO_APERTO"),
+        _cost("STATI_P2P", "\n};\n"), _cost("P2P_PROGRESSO", "\n};\n"),
+        _cost("P2P_DELLA_PRESA", "];\n"),
+        fn("function ordiniP2P(){"),
+        mini[mini.index("function nomeProvvisorioP2P(indice){"):
+             mini.index("\n}\n", mini.index("function rinominaOrdineP2P(o, nuovoId){")) + 3],
+        fn("function scriviOrdineP2P(o){"),
+        fn("function lapidiP2P(){"), fn("function lapideP2P(o){"), fn("function lapidataP2P(id, giro){"),
+        pezzo_js(mini, "function p2pRitirato(o){", "\n}") + "\n}",
+        fn("function archiviaRitiratoP2P(id){"),
+        mini[mini.index("const P2P_RESTORE_CHIUSI = "):
+             mini.index("\n}\n", mini.index("function giroArchiviatoP2P(locali, id){")) + 3],
+        fn("function ordiniAscoltoP2P(){"),
+        fn("function cauzioneAFineP2P(o){"),
+        mini[mini.index("const P2P_DA_RESTORE = {"):
+             mini.index("\n}\n", mini.index("function riprendiDaRestoreP2P(o, statoMostro){")) + 3],
+        fn("function adottaOrdiniAltroveP2P(locali){"),
+        mini[mini.index("const P2P_INDICE_CERCA_MAX = "):
+             mini.index("\n}\n", mini.index("function adottaScambiServerP2P(locali){")) + 3],
+        fn("function presenzeDaServerP2P(p, giro){"), fn("function uniscePresenzeP2P(a, b){"),
+    ]) + r"""
+function chiaveScambio(sk, i){ if (!sk) throw new Error('senza sk'); return {sk: 'sk:' + i, pub: 'pub:' + i, indice: i}; }
+let mazzo = {sk: 'S'.repeat(64), pub: 'P', indice: 9};
+function mazzoMostro(){ return mazzo; }
+const log0 = console.log; console.log = () => {};
+const out = {};
+const ID = 'f904185a-aaaa-4a2b-9c3d-000000000001';
+const reset = () => { delete _box[MOSTRO_ORDINI_CHIAVE]; delete _box[MOSTRO_LAPIDI_CHIAVE]; p2pDiario = []; p2pMieiOrdini = null; p2pScambiServer = null; };
+const righe = () => ordiniP2P();
+const messaDaParte = () => Object.values(righe()).find(o => o.idVero === ID) || null;
+/* la riga del server: chi ha PRESO (compro) al giro 2 con la chiave 7, euro inviati */
+const S = extra => Object.assign({lato: 'compro', mio: false, preso: true, euro: 10, euro_max: 0, sats: 15000,
+  metodi: ['SEPA'], premium: 0, stato: 'euro_inviati', stato_libro: 'in-progress', creato: 1000, quando: 2000,
+  giro: 2, chiave_mia: 'pub:7', chiave_peer: 'MAKER', sats_ordine: 15000, sats_miei: 14850,
+  payout_fallito: false, momenti: [], presenze: null}, extra);
+/* la riga di chi ha preso al giro 1 (chiave 3), annullata al momento 1500 */
+const R = extra => Object.assign({id: ID, lato: 'compro', stato: 'annullato', indice: 3, pubTrade: 'pub:3',
+  peer: 'MAKER', euro: 10, metodi: ['SEPA'], preso: true, creato: 900, aggiornato: 1500, quando: 1500, satsNetti: 15000, satsMiei: 14850,
+  ultimaMossa: 1500, fermoA: 1, giro: 1}, extra);
+const foto = () => { const n = righe()[ID], v = messaDaParte();
+  return {nuova: n ? [n.stato, n.indice, n.pubTrade, n.giro | 0, n.peer, n.ultimaMossa, !!n.soloVista, n.daServer === true] : null,
+          vecchia: v ? [v.stato, v.indice, v.pubTrade, v.giro | 0, v.giroCaduto, v.id.indexOf(ID + '~') === 0] : null,
+          quante: Object.keys(righe()).length}; };
+const tk7 = {sk: 'sk:7', pub: 'pub:7', indice: 7};
+
+// 0) il giudice puro
+out.puro = {
+  giro: giroNuovoP2P(R(), S(), tk7),
+  chiave: giroNuovoP2P(R({giro: 0}), S({giro: 0}), tk7),
+  chiaveSenzaIndicePiuAlto: giroNuovoP2P(R({giro: 0, indice: 7, pubTrade: 'pub:7', ultimaMossa: 2500}), S({giro: 0, chiave_mia: 'pub:3'}), {sk: 'sk:3', pub: 'pub:3', indice: 3}),
+  dopo: giroNuovoP2P(R({giro: 0, indice: 7, pubTrade: 'pub:7'}), S({giro: 0}), tk7),
+  dopoMaRitardo: giroNuovoP2P(R({giro: 0, indice: 7, pubTrade: 'pub:7', ultimaMossa: 2500}), S({giro: 0}), tk7),
+  dopoSenzaOra: giroNuovoP2P(R({giro: 0, indice: 7, pubTrade: 'pub:7', ultimaMossa: 0, quando: 0}), S({giro: 0}), tk7),
+  dopoNonFinale: giroNuovoP2P(R({giro: 0, indice: 7, pubTrade: 'pub:7', stato: 'attesa_mia_hold'}), S({giro: 0}), tk7),
+  stessoGiro: giroNuovoP2P(R({giro: 2}), S(), tk7),
+  giroIndietro: giroNuovoP2P(R({giro: 3}), S(), tk7),
+  serverFinale: giroNuovoP2P(R(), S({stato: 'annullato'})),
+  serverPubblicato: giroNuovoP2P(R(), S({stato: 'pubblicato'})),
+  serverMuto: giroNuovoP2P(R(), S({stato: ''})),
+  serverIgnoto: giroNuovoP2P(R(), S({stato: 'roba-nuova'})),
+  senzaRiga: giroNuovoP2P(null, S(), tk7),
+  makerChiave: giroNuovoP2P({id: ID, mio: true, stato: 'attesa_fattura_compratore', pubTrade: 'pub:2', indice: 2, peer: 'TAKER1', ultimaMossa: 1200},
+                            S({mio: true, lato: 'vendo', chiave_mia: 'pub:2', chiave_peer: 'TAKER2', giro: 0, stato: 'attesa_fattura_compratore', quando: 3000}), null),
+  makerFotoVecchia: giroNuovoP2P({id: ID, mio: true, stato: 'attesa_fattura_compratore', pubTrade: 'pub:2', indice: 2, peer: 'TAKER2', ultimaMossa: 3000},
+                                 S({mio: true, lato: 'vendo', chiave_mia: 'pub:2', chiave_peer: 'TAKER1', giro: 0, stato: 'attesa_fattura_compratore', quando: 1200}), null),
+  makerStessoPeer: giroNuovoP2P({id: ID, mio: true, stato: 'attesa_fattura_compratore', pubTrade: 'pub:2', peer: 'TAKER1', ultimaMossa: 1200},
+                                S({mio: true, lato: 'vendo', chiave_mia: 'pub:2', chiave_peer: 'TAKER1', giro: 0, quando: 3000}), null),
+  makerSenzaPeer: giroNuovoP2P({id: ID, mio: true, stato: 'pubblicato', pubTrade: 'pub:2', peer: '', ultimaMossa: 1200},
+                               S({mio: true, lato: 'vendo', chiave_mia: 'pub:2', chiave_peer: 'TAKER2', giro: 0, quando: 3000}), null),
+  makerGiro: giroNuovoP2P({id: ID, mio: true, stato: 'attesa_fattura_compratore', pubTrade: 'pub:2', peer: 'TAKER1', giro: 1},
+                          S({mio: true, lato: 'vendo', chiave_mia: 'pub:2', chiave_peer: 'TAKER2', giro: 2}), null)
+};
+out.stessaPresa = [stessaPresaP2P(R(), S({chiave_mia: 'pub:3'})), stessaPresaP2P(R(), S()),
+  stessaPresaP2P({mio: true, peer: 'T1'}, S({chiave_peer: 'T1'})), stessaPresaP2P({mio: true, peer: 'T1'}, S({chiave_peer: 'T2'})),
+  stessaPresaP2P({mio: true, peer: ''}, S({chiave_peer: ''})), stessaPresaP2P(null, S())];
+out.chiudi = (() => { const o = R({stato: 'attesa_mia_hold', hold: {x: 1}, cantDo: 'no'}); const si = chiudiGiroP2P(o, 5000);
+  const gia = R(); const no = chiudiGiroP2P(gia, 5000);
+  return [si, o.stato, o.fermoA, 'hold' in o, o.cantDo, o.aggiornato, o.quando, no, gia.stato, gia.aggiornato]; })();
+
+// a) chi ha PRESO, sul PC: la riga annullata del giro 1 col giro scritto; il server dice il giro 2 vivo
+reset(); scriviOrdineP2P(R()); p2pScambiServer = {[ID]: S()};
+let n = adottaScambiServerP2P(ordiniP2P());
+out.a = Object.assign(foto(), {n, diario: p2pDiario.filter(r => r.includes('presa nuova')).length,
+  segno: (p2pDiario.find(r => r.includes('presa nuova')) || '').includes('(giro:'),
+  ascolto: Object.keys(ordiniAscoltoP2P())});
+// ...la stessa fotografia riapplicata non fa niente di piu'
+n = adottaScambiServerP2P(ordiniP2P());
+out.aFerma = [n, foto().quante, foto().nuova[0]];
+// b) senza giro sulla riga: la chiave del server e' la mia di indice piu' alto
+reset(); scriviOrdineP2P(R({giro: 0})); p2pScambiServer = {[ID]: S()};
+adottaScambiServerP2P(ordiniP2P());
+out.b = Object.assign(foto(), {segno: (p2pDiario.find(r => r.includes('presa nuova')) || '').includes('(chiave:')});
+// c) il caso del PC di Andrea: la riga annullata porta GIA' la chiave nuova (promossa dalla restore), niente giro: il server racconta un momento DOPO l'annullo
+reset(); scriviOrdineP2P(R({giro: 0, indice: 7, pubTrade: 'pub:7'})); p2pScambiServer = {[ID]: S()};
+adottaScambiServerP2P(ordiniP2P());
+out.c = Object.assign(foto(), {segno: (p2pDiario.find(r => r.includes('presa nuova')) || '').includes('(dopo:')});
+// d) il server in ritardo sul mio annullo: racconta cose di PRIMA, e non passa
+reset(); scriviOrdineP2P(R({giro: 0, indice: 7, pubTrade: 'pub:7', ultimaMossa: 2500, quando: 2500})); p2pScambiServer = {[ID]: S()};
+n = adottaScambiServerP2P(ordiniP2P());
+out.d = Object.assign(foto(), {n, diario: p2pDiario.length});
+// e) stesso giro, riga finita: ferma (la regola di sempre)
+reset(); scriviOrdineP2P(R({giro: 2, indice: 7, pubTrade: 'pub:7'})); p2pScambiServer = {[ID]: S()};
+n = adottaScambiServerP2P(ordiniP2P());
+out.e = Object.assign(foto(), {n});
+// f) la riga di chi ha preso NON finita (il PC non ha visto l'annullo): si chiude e si mette da parte, la nuova nasce
+reset(); scriviOrdineP2P(R({stato: 'attesa_mia_hold', hold: {bolt11: 'ln...'}, fermoA: undefined})); p2pScambiServer = {[ID]: S()};
+adottaScambiServerP2P(ordiniP2P());
+out.f = Object.assign(foto(), {fermoA: messaDaParte().fermoA, holdVia: !('hold' in messaDaParte())});
+// g) chi ha PUBBLICATO, sul dispositivo che ha perso il giro: la riga riparte in place
+const M = extra => Object.assign({id: ID, lato: 'vendo', mio: true, stato: 'attesa_fattura_compratore', indice: 2, pubTrade: 'pub:2',
+  peer: 'TAKER1', euro: 10, metodi: ['SEPA'], preso: true, creato: 900, aggiornato: 1200, ultimaMossa: 1200, hold: {bolt11: 'vecchia'},
+  satsNetti: 15000, cauzione: {stato: 'bloccata'}, giro: 1}, extra);
+const SM = extra => Object.assign(S({lato: 'vendo', mio: true, chiave_mia: 'pub:2', chiave_peer: 'TAKER2', quando: 3000, giro: 2,
+  stato: 'attesa_fattura_compratore', sats_ordine: 16000, sats_miei: 0}), extra);
+reset(); scriviOrdineP2P(M()); p2pScambiServer = {[ID]: SM()};
+n = adottaScambiServerP2P(ordiniP2P());
+const g = righe()[ID];
+out.g = [n, Object.keys(righe()).length, g.stato, g.peer, g.giro, g.ultimaMossa, g.quando, 'hold' in g, 'cauzione' in g,
+  g.satsNetti, g.pubTrade, g.indice, g.mio, g.preso, p2pDiario.some(r => r.includes('ripreso') && r.includes('(giro:'))];
+// ...senza giro sulla riga: la controparte diversa con una foto piu' nuova basta
+reset(); scriviOrdineP2P(M({giro: 0})); p2pScambiServer = {[ID]: SM({giro: 0})};
+adottaScambiServerP2P(ordiniP2P());
+out.g2 = [righe()[ID].peer, 'hold' in righe()[ID], p2pDiario.some(r => r.includes('(chiave:'))];
+// ...una foto VECCHIA (giro prima, controparte di prima) su una riga gia' avanti non riporta indietro
+reset(); scriviOrdineP2P(M({giro: 0, peer: 'TAKER2', ultimaMossa: 3000, stato: 'attivo'}));
+p2pScambiServer = {[ID]: SM({giro: 0, chiave_peer: 'TAKER1', quando: 1200})};
+adottaScambiServerP2P(ordiniP2P());
+out.g3 = [righe()[ID].peer, righe()[ID].stato, righe()[ID].giro | 0];
+// ...stessa controparte: niente giro nuovo, e il giro che manca si scrive
+reset(); scriviOrdineP2P(M({giro: 0})); p2pScambiServer = {[ID]: SM({chiave_peer: 'TAKER1', stato: 'attivo'})};
+adottaScambiServerP2P(ordiniP2P());
+out.g4 = [righe()[ID].peer, righe()[ID].stato, righe()[ID].giro, 'hold' in righe()[ID]];
+// h) il giro NON si scrive su una riga di un'altra presa: la riga nuova (chiave 7) con una foto vecchia (giro 1, chiave 3, annullato)
+reset(); scriviOrdineP2P(R({stato: 'attesa_mia_hold', indice: 7, pubTrade: 'pub:7', giro: 0, ultimaMossa: 2000}));
+p2pScambiServer = {[ID]: S({giro: 1, chiave_mia: 'pub:3', stato: 'annullato', quando: 1500})};
+adottaScambiServerP2P(ordiniP2P());
+out.h = [righe()[ID].giro | 0, righe()[ID].stato, p2pDiario.filter(r => r.includes("un'altra presa")).length];
+adottaScambiServerP2P(ordiniP2P()); out.hDettoUnaVolta = p2pDiario.filter(r => r.includes("un'altra presa")).length;
+// ...mentre sulla stessa presa si scrive
+reset(); scriviOrdineP2P(R({stato: 'attesa_mia_hold', indice: 7, pubTrade: 'pub:7', giro: 0, ultimaMossa: 2000}));
+p2pScambiServer = {[ID]: S({stato: 'attivo', quando: 2100})};
+adottaScambiServerP2P(ordiniP2P());
+out.h2 = [righe()[ID].giro, righe()[ID].stato];
+// i) le lapidi col giro
+reset();
+lapideP2P({id: ID, giro: 1, scade: Math.floor(Date.now() / 1000) + 1000});
+out.lapide = [lapidataP2P(ID), lapidataP2P(ID, 0), lapidataP2P(ID, 1), lapidataP2P(ID, 2), lapidataP2P('altro', 2),
+  typeof lapidiP2P()[ID] === 'object' && lapidiP2P()[ID].g === 1];
+_box[MOSTRO_LAPIDI_CHIAVE] = JSON.stringify({[ID]: Math.floor(Date.now() / 1000) + 1000, vecchia: 5});
+out.lapideVecchia = [lapidataP2P(ID), lapidataP2P(ID, 2), lapidataP2P('vecchia', 2)];
+lapideP2P({id: 'x', scade: Math.floor(Date.now() / 1000) + 10});
+out.lapidePotata = !('vecchia' in lapidiP2P()) && typeof lapidiP2P().x === 'number';
+// ...e nell'archivista: la lapide del giro 1 non ferma la nascita del giro 2; quella del giro 2 si'; quella vecchia (senza giro) si'
+reset(); lapideP2P({id: ID, giro: 1, scade: Math.floor(Date.now() / 1000) + 1000}); p2pScambiServer = {[ID]: S()};
+adottaScambiServerP2P(ordiniP2P()); out.nasceOltreLapide = !!righe()[ID] && righe()[ID].giro === 2;
+reset(); lapideP2P({id: ID, giro: 2, scade: Math.floor(Date.now() / 1000) + 1000}); p2pScambiServer = {[ID]: S()};
+adottaScambiServerP2P(ordiniP2P()); out.lapideStessoGiroFerma = !righe()[ID];
+reset(); _box[MOSTRO_LAPIDI_CHIAVE] = JSON.stringify({[ID]: Math.floor(Date.now() / 1000) + 1000}); p2pScambiServer = {[ID]: S()};
+adottaScambiServerP2P(ordiniP2P()); out.lapideVecchiaFerma = !righe()[ID];
+// j) la riga messa da parte ferma la rinascita del SUO giro, non di una presa dopo
+reset(); const parte = R({giro: 1}); scriviOrdineP2P(parte); archiviaGiroCadutoP2P(ID);
+p2pScambiServer = {[ID]: S({giro: 1, chiave_mia: 'pub:3', stato: 'annullato'})};
+adottaScambiServerP2P(ordiniP2P()); out.stessoGiroNonRinasce = !righe()[ID] && Object.keys(righe()).length === 1;
+p2pScambiServer = {[ID]: S()};
+adottaScambiServerP2P(ordiniP2P()); out.giroDopoNasce = !!righe()[ID] && righe()[ID].giro === 2 && Object.keys(righe()).length === 2;
+out.oltre = [oltreArchiviatiP2P(righe(), ID, S(), tk7), oltreArchiviatiP2P(righe(), ID, S({giro: 1, chiave_mia: 'pub:3', stato: 'annullato'}), {pub: 'pub:3', indice: 3}),
+  oltreArchiviatiP2P({}, ID, S(), tk7), oltreArchiviatiP2P(righe(), 'altro', S(), tk7)];
+// ...la messa da parte dal TELEFONO (senza giro, chiave vecchia): la chiave piu' alta del server la supera
+reset(); scriviOrdineP2P(R({giro: 0})); archiviaGiroCadutoP2P(ID); p2pScambiServer = {[ID]: S()};
+adottaScambiServerP2P(ordiniP2P()); out.telefonoOltre = !!righe()[ID] && righe()[ID].pubTrade === 'pub:7';
+// k) la RESTORE: indice piu' alto e stato vivo
+reset(); scriviOrdineP2P(R()); p2pMieiOrdini = {[ID]: {indice: 7, stato: 'fiat-sent', identita: 'P'}};
+n = adottaOrdiniAltroveP2P(ordiniP2P());
+out.k = Object.assign(foto(), {n, diario: p2pDiario.some(r => r.includes('ripresa') && r.includes('presa nuova') && r.includes('7 > 3'))});
+// ...e l'archivio del server, dopo, fa nascere la riga nuova con l'indice della restore
+p2pScambiServer = {[ID]: S({chiave_mia: 'pub:7'})}; adottaScambiServerP2P(ordiniP2P());
+out.kPoi = foto();
+// ...stato pending, canceled, stesso indice, mio ordine: niente
+const casiK = {};
+for (const [nome, voce, riga] of [['pending', {indice: 7, stato: 'pending'}, R()], ['canceled', {indice: 7, stato: 'canceled'}, R()],
+                                   ['stessoIndice', {indice: 3, stato: 'fiat-sent'}, R()], ['cauzione', {indice: 7, stato: 'waiting-taker-bond'}, R()],
+                                   ['mio', {indice: 7, stato: 'active'}, M({indice: 3, pubTrade: 'pub:3', stato: 'annullato'})]]) {
+  reset(); scriviOrdineP2P(riga); p2pMieiOrdini = {[ID]: Object.assign({identita: 'P'}, voce)};
+  adottaOrdiniAltroveP2P(ordiniP2P());
+  casiK[nome] = [!!righe()[ID], !!messaDaParte(), righe()[ID] ? righe()[ID].stato : ''];
+}
+out.casiK = casiK;
+// l) la riga nuova NON ascolta piu' la chiave vecchia, e la messa da parte non e' di mostro
+reset(); scriviOrdineP2P(R()); p2pScambiServer = {[ID]: S()}; adottaScambiServerP2P(ordiniP2P());
+out.l = [Object.keys(ordiniAscoltoP2P()), ordineMioP2P(ID), ordineMioP2P(messaDaParte().id), giroCadutoP2P(messaDaParte())];
+console.log = log0;
+console.log(JSON.stringify(out));
+"""
+    with _tf.TemporaryDirectory() as d:
+        f = _os.path.join(d, "giro.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = _sp.run([node, f], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    if r.returncode or not r.stdout.strip():
+        prova("il banco del giro nuovo gira", "", (r.stdout or "") + (r.stderr or "")[-900:])
+        return
+    o = _json.loads(r.stdout.strip().splitlines()[-1])
+    p = o["puro"]
+    prova("il giudice puro: 'giro' se il server conta una presa in piu'; 'chiave' se la mia chiave del server ha indice piu' alto; 'dopo' se il server racconta un momento dopo il mio annullo",
+          ["giro", "chiave", "dopo"], [p["giro"], p["chiave"], p["dopo"]])
+    prova("...e tace: chiave del server di indice piu' basso, server in ritardo, senza ora, riga non finita senza altri segni",
+          ["", "", "", ""], [p["chiaveSenzaIndicePiuAlto"], p["dopoMaRitardo"], p["dopoSenzaOra"], p["dopoNonFinale"]])
+    prova("...tace sullo stesso giro e su un giro indietro, e su un server finale, «pubblicato», muto o ignoto, e senza riga",
+          ["", "", "", "", "", "", ""],
+          [p["stessoGiro"], p["giroIndietro"], p["serverFinale"], p["serverPubblicato"], p["serverMuto"], p["serverIgnoto"], p["senzaRiga"]])
+    prova("per chi ha pubblicato: controparte diversa con una foto PIU' NUOVA = 'chiave'; foto vecchia, stessa controparte, senza controparte = niente; il giro conta anche per lui",
+          ["chiave", "", "", "", "giro"],
+          [p["makerChiave"], p["makerFotoVecchia"], p["makerStessoPeer"], p["makerSenzaPeer"], p["makerGiro"]])
+    prova("«stessa presa»: la mia chiave per chi prende, la controparte per chi ha pubblicato, mai sul vuoto",
+          [True, False, True, False, False, False], o["stessaPresa"])
+    prova("chiudere il giro: la riga viva va ad annullata col passo e senza hold, il momento resta; una finita non si tocca",
+          [True, "annullato", 1, False, "", 5000, 1500, False, "annullato", 1500], o["chiudi"])
+    a = o["a"]
+    prova("a) sul PC di chi ha preso: la riga del giro 1 va sotto «Annullati» col nome `id~…`, la nuova nasce dal server con la chiave 7 e il giro 2",
+          [["euro_inviati", 7, "pub:7", 2, "MAKER", 2000, False, True],
+           ["annullato", 3, "pub:3", 1, 1, True], 2],
+          [a["nuova"], a["vecchia"], a["quante"]])
+    prova("...il diario lo dice col segno, e l'ascolto segue la chiave nuova", [1, True, ["pub:7"]],
+          [a["diario"], a["segno"], a["ascolto"]])
+    prova("...e la stessa fotografia riapplicata non fa niente di piu'", [0, 2, "euro_inviati"], o["aFerma"])
+    prova("b) senza giro sulla riga basta la chiave: la mia di indice piu' alto",
+          [["euro_inviati", 7, "pub:7", 2], ["annullato", 3, "pub:3"], 2, True],
+          [o["b"]["nuova"][:4], o["b"]["vecchia"][:3], o["b"]["quante"], o["b"]["segno"]])
+    prova("c) il caso del PC: la riga annullata portava GIA' la chiave nuova — il momento del server dopo l'annullo basta",
+          [["euro_inviati", 7, "pub:7", 2], ["annullato", 7, "pub:7"], 2, True],
+          [o["c"]["nuova"][:4], o["c"]["vecchia"][:3], o["c"]["quante"], o["c"]["segno"]])
+    prova("d) il server in ritardo sul mio annullo non riapre niente", [["annullato", 7, "pub:7", 0], None, 1, 0, 0],
+          [o["d"]["nuova"][:4], o["d"]["vecchia"], o["d"]["quante"], o["d"]["n"], o["d"]["diario"]])
+    prova("e) stesso giro e riga finita: ferma, la regola di sempre", [["annullato", 7, "pub:7", 2], None, 1, 0],
+          [o["e"]["nuova"][:4], o["e"]["vecchia"], o["e"]["quante"], o["e"]["n"]])
+    prova("f) la riga viva di un giro morto si chiude (annullata, al passo della hold, senza hold) e si mette da parte; la nuova nasce",
+          [["euro_inviati", 7, "pub:7", 2], ["annullato", 3, "pub:3", 1, 1, True], 2, 1, True],
+          [o["f"]["nuova"][:4], o["f"]["vecchia"], o["f"]["quante"], o["f"]["fermoA"], o["f"]["holdVia"]])
+    prova("g) chi ha pubblicato: la riga riparte in place — controparte, giro, momento e stato nuovi; via hold, cauzione e cifre della presa; chiave e indice fermi",
+          [1, 1, "attesa_fattura_compratore", "TAKER2", 2, 3000, 3000, False, False, 16000, "pub:2", 2, True, True, True], o["g"])
+    prova("...senza giro sulla riga la controparte diversa con la foto piu' nuova basta", ["TAKER2", False, True], o["g2"])
+    prova("...una foto vecchia del giro prima non riporta indietro una riga gia' avanti", ["TAKER2", "attivo", 0], o["g3"])
+    prova("...stessa controparte: niente giro nuovo, lo stato avanza come sempre e il giro che manca si scrive",
+          ["TAKER1", "attivo", 2, True], o["g4"])
+    prova("h) una foto di un'altra presa (chiave mia diversa, non piu' nuova) non muove la riga ne' le timbra il giro, e lo dice una volta; sulla stessa presa il giro si scrive e lo stato avanza",
+          [[0, "attesa_mia_hold", 1], 1, [2, "attivo"]], [o["h"], o["hDettoUnaVolta"], o["h2"]])
+    prova("i) la lapide col giro ferma il suo giro e quelli prima, non quelli dopo; senza giro ferma tutto",
+          [[True, True, True, False, False, True], [True, True, False], True],
+          [o["lapide"], o["lapideVecchia"], o["lapidePotata"]])
+    prova("...nell'archivista: nasce oltre la lapide del giro 1, non su quella del giro 2 ne' su una vecchia",
+          [True, True, True], [o["nasceOltreLapide"], o["lapideStessoGiroFerma"], o["lapideVecchiaFerma"]])
+    prova("j) la messa da parte ferma la rinascita del SUO giro e lascia nascere la presa dopo", [True, True],
+          [o["stessoGiroNonRinasce"], o["giroDopoNasce"]])
+    prova("...`oltreArchiviatiP2P`: si' oltre, no sullo stesso giro, no senza righe messe da parte", [True, False, False, False], o["oltre"])
+    prova("...anche la messa da parte del telefono (senza giro, chiave vecchia) si lascia superare dalla chiave piu' alta", True, o["telefonoOltre"])
+    k = o["k"]
+    prova("k) la restore: indice 7 > 3 e stato vivo = la riga di prima va sotto «Annullati», la nuova la porta poi l'archivio",
+          [None, ["annullato", 3, "pub:3", 1, 1, True], 1, 1, True, ["euro_inviati", 7, "pub:7", 2]],
+          [k["nuova"], k["vecchia"], k["quante"], k["n"], k["diario"], o["kPoi"]["nuova"][:4]])
+    prova("...e tace su pending, canceled, stesso indice, cauzione in pagamento (che e' «pubblicato») e sul mio ordine",
+          {"pending": [True, False, "annullato"], "canceled": [True, False, "annullato"],
+           "stessoIndice": [True, False, "annullato"], "cauzione": [True, False, "annullato"],
+           "mio": [True, False, "annullato"]}, o["casiK"])
+    prova("l) la riga nuova e' mia e ascolta la sola chiave nuova; quella messa da parte e' una presa caduta, non mia",
+          [["pub:7"], True, False, True], o["l"])
+
+
 def prove_tolti_ovunque():
     """LA ✕ SU OGNI DISPOSITIVO (7 ott 2026, richiesta di Andrea: in «I
     miei scambi» la ✕ toglieva lo scambio dal solo dispositivo dove la
@@ -88212,8 +88574,9 @@ def prove_tolti_ovunque():
     prova("...la conferma dice «da tutti i tuoi dispositivi»", [True, False],
           ["da tutti i tuoi dispositivi" in tg, "da questo dispositivo" in tg])
     ad = pezzo_js(mini, "function adottaScambiServerP2P(locali){", "\n}\n")
+    # EMENDATA (7 ott 2026): la lapide guarda il giro del server
     prova("l'adozione non fa nascere un tolto, dopo la lapide", True,
-          0 < ad.find("if (lapidataP2P(id)) continue;")
+          0 < ad.find("if (lapidataP2P(id, s.giro)) continue;")
           < ad.find("if (typeof toltoAltroveP2P === 'function' && toltoAltroveP2P(id)) continue;")
           < ad.find("const o = rigaDaServerP2P("))
     sc = pezzo_js(mini, "function scambiP2P(){", "\n}\n")
@@ -88277,7 +88640,7 @@ def prove_tolti_ovunque():
              + "".join(_fn(f) for f in (
                  "function ordiniP2P(){", "function scriviOrdineP2P(o){", "function p2pTogliibile(o, adesso){",
                  "function recensioneInSospesoP2P(o){", "function lapidiP2P(){", "function lapideP2P(o){",
-                 "function lapidataP2P(id){", "function togliScambioP2P(id, ev){", "function cancellaRigaP2P(id){",
+                 "function lapidataP2P(id, giro){", "function togliScambioP2P(id, ev){", "function cancellaRigaP2P(id){",
                  "function toltoAltroveP2P(id){", "function applicaToltiP2P(){",
                  "async function togliScambioServerP2P(ordine){", "async function chiediScambiServerP2P(){",
                  "function statoDaRestoreP2P(o, statoMostro){", "function fermoDaMomentiP2P(momenti){",
@@ -116977,9 +117340,13 @@ def prove_schermo_segue_mostro():
     # giro messo da parte non rinasce — TRANNE sul mio ordine (`!s.mio`),
     # che nel libro e' vivo e va governato con la chiave di chi l'ha
     # pubblicato. Il caso gira in `prove_annullo_chiave_maker`.
+    # EMENDATA (7 ott 2026, «Lo stesso id, un giro nuovo»): la riga messa
+    # da parte ferma la rinascita del SUO giro, non di una presa dopo
+    # (`oltreArchiviatiP2P`); e la lapide guarda il giro del server
     prova("...e l'archivio del server non fa rinascere il giro messo da parte (se non e' il mio ordine)", True,
-          "if (typeof giroArchiviatoP2P === 'function' && giroArchiviatoP2P(locali, id) && !s.mio) continue;" in ad
-          and ad.index("if (lapidataP2P(id)) continue;") < ad.index("giroArchiviatoP2P(locali, id) && !s.mio) continue;"))
+          "if (typeof giroArchiviatoP2P === 'function' && giroArchiviatoP2P(locali, id) && !s.mio\n"
+          "        && !(typeof oltreArchiviatiP2P === 'function' && oltreArchiviatiP2P(locali, id, s, tk))) continue;" in ad
+          and ad.index("if (lapidataP2P(id, s.giro)) continue;") < ad.index("giroArchiviatoP2P(locali, id) && !s.mio\n"))
 
     # --- A) IL GIA' FATTO RILEGGE, L'APERTURA E IL RISVEGLIO RIALLINEANO --
     inc = nudo(fn("async function inviaIncassoP2P(){"))
@@ -117448,7 +117815,7 @@ const foto = (t0) => ({toasts: toasts.slice(), riallinei: riallinei.slice(), sta
         pezzo_js(mini, "const P2P_LIBRO_FINESTRA_S = ", "\n"),
         pezzo_js(mini, "const MOSTRO_LAPIDI_CHIAVE = ", "\n"),
         pezzo_js(mini, "function p2pRitirato(o){", "\n}") + "\n}",
-        fn("function lapidiP2P(){"), fn("function lapideP2P(o){"), fn("function lapidataP2P(id){"),
+        fn("function lapidiP2P(){"), fn("function lapideP2P(o){"), fn("function lapidataP2P(id, giro){"),
         fn("function archiviaRitiratoP2P(id){"),
         pezzo_js(mini, "const STATI_P2P = {", "\n};") + "\n};",
         pezzo_js(mini, "const P2P_GIRO_MORTO = {", "\n};") + "\n};",
@@ -117547,8 +117914,11 @@ def prove_annullo_chiave_maker():
           "gia.pubTrade = tk.pub;\n      \n      gia.indice = indice;" in ado
           or _re.search(r"gia\.pubTrade = tk\.pub;\s+gia\.indice = indice;", ado) is not None)
     ads = nudo(fn("function adottaScambiServerP2P(locali){"))
+    # (7 ott 2026, «Lo stesso id, un giro nuovo») `gia` e' `let`: la riga
+    # di una presa caduta si mette da parte e la variabile si azzera, per
+    # far nascere quella nuova nello stesso giro di ciclo
     prova("l'adozione dal server raddrizza la chiave prima di leggere la riga", True,
-          0 < ads.find("riparaChiaveMakerP2P(id, locali)") < ads.find("const gia = locali[id];"))
+          0 < ads.find("riparaChiaveMakerP2P(id, locali)") < ads.find("let gia = locali[id];"))
     nt = nudo(fn("async function nonTuoOrdineP2P(e, o, azione, payload, usata){"))
     prova("il «non e' tuo» rilegge TUTTO (anche la restore), dopo il giro gia' in volo", True,
           0 < nt.find("await (p2pRiallineoInVolo[id] || Promise.resolve());")
@@ -128881,7 +129251,7 @@ def main():
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,

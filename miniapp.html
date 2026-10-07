@@ -52516,17 +52516,38 @@ function lapidiP2P(){
     return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
   } catch(e) { return {}; }
 }
+/* LA LAPIDE PORTA IL GIRO (7 ott 2026, «Lo stesso id, un giro nuovo»):
+   Mostro rimette nel libro con lo STESSO id l'ordine di cui chi aveva
+   preso si e' ritirato, e una lapide scritta sul solo id avrebbe
+   impedito per quaranta giorni la nascita della presa DOPO. La voce
+   e' `{s: scadenza, g: giro}`; le voci di prima sono un numero (la
+   sola scadenza, giro ignoto) e si leggono come sempre. La lettura
+   della scadenza sta in riga nelle due funzioni, non in una terza: i
+   banchi di casa le estraggono da sole. */
 function lapideP2P(o){
   if (!o || !o.id) return;
   const tutte = lapidiP2P();
   const adesso = Math.floor(Date.now() / 1000);
-  tutte[o.id] = (o.scade > 0 ? o.scade
-                 : (o.creato || adesso) + P2P_LIBRO_FINESTRA_S);
-  for (const k of Object.keys(tutte)) if (!(tutte[k] > adesso)) delete tutte[k];
+  const scade = (o.scade > 0 ? o.scade : (o.creato || adesso) + P2P_LIBRO_FINESTRA_S);
+  const giro = Math.max(0, Math.floor(Number(o.giro) || 0));
+  tutte[o.id] = giro > 0 ? {s: scade, g: giro} : scade;
+  for (const k of Object.keys(tutte)) {
+    const sc = Number(tutte[k] && typeof tutte[k] === 'object' ? tutte[k].s : tutte[k]) || 0;
+    if (!(sc > adesso)) delete tutte[k];
+  }
   try { localStorage.setItem(chiaveP2P(MOSTRO_LAPIDI_CHIAVE), JSON.stringify(tutte)); } catch(e){}
 }
-function lapidataP2P(id){
-  return (Number(lapidiP2P()[id]) || 0) > Math.floor(Date.now() / 1000);
+/* `giro` e' quello di cui parla chi vuole far nascere la riga (il
+   server): una lapide di un giro PIU' BASSO non lo ferma — e' la storia
+   di una presa finita, non di questa. Senza giro, da una parte o
+   dall'altra, la lapide ferma come sempre (fail-closed). */
+function lapidataP2P(id, giro){
+  const v = lapidiP2P()[id];
+  const sc = Number(v && typeof v === 'object' ? v.s : v) || 0;
+  if (!(sc > Math.floor(Date.now() / 1000))) return false;
+  const g = Number(v && typeof v === 'object' ? v.g : 0) || 0;
+  const mio = Math.floor(Number(giro) || 0);
+  return !(g > 0 && mio > 0 && mio > g);
 }
 /* L'ARCHIVISTA DEL RITIRATO (26 set 2026: fino a ieri era «il
    rimotore», e toglieva la riga). LA RIGA RESTA: sta sotto «Annullati»
@@ -52638,7 +52659,13 @@ function togliScambioP2P(id, ev){
          ricorda per trenta giorni, e senza una lapide la riga tolta a
          mano rinascerebbe al render dopo. Vive quanto lo storico del
          server, con un margine. */
-      lapideP2P(Object.assign({}, o, {scade: Math.floor(Date.now() / 1000) + P2P_LAPIDE_TOLTO_S}));
+      /* ...E SUL NOME VERO quando la riga e' una presa messa da parte
+         di cui si sa il giro (7 ott 2026): cosi' ferma la rinascita di
+         QUEL giro e non di quelli dopo. Senza giro resta sul nome `~`,
+         che non ferma niente, come prima. */
+      const sulVero = !!(o.idVero && Math.floor(Number(o.giro) || 0) > 0);
+      lapideP2P(Object.assign({}, o, {id: sulVero ? suo : id,
+                                      scade: Math.floor(Date.now() / 1000) + P2P_LAPIDE_TOLTO_S}));
       cancellaRigaP2P(id);
       if (p2pOrdineAperto === id) p2pOrdineAperto = '';
       toast('Scambio tolto');
@@ -54925,6 +54952,7 @@ function testoDiagnosiP2P(){
     const v = p2pMieiOrdini && p2pMieiOrdini[id];
     righe.push('- ' + String(id).slice(0, 8) + ' ' + o.lato + (o.mio ? ' mio' : '')
       + ' stato=' + o.stato + ' indice=' + (o.indice | 0)
+      + ' giro=' + (o.giro | 0)
       + ' chiave=' + String(o.pubTrade || '').slice(0, 8)
       + ' mossa=' + (o.ultimaMossa || 0)
       + (o.ultimoMsg ? ' (vecchio orologio ' + o.ultimoMsg + ')' : '')
@@ -64441,7 +64469,12 @@ function indiceMakerP2P(id, mz, o){
 const P2P_DELLA_PRESA = ['peer', 'hold', 'satsMiei', 'satsNetti', 'importoScelto',
   'metodoScelto', 'preso', 'giroMorto', 'giroCaduto', 'statoGrezzo', 'fermoA',
   'cambioPresa', 'ultimaMossa', 'quando', 'inRitardo', 'nonPartito', 'soloVista',
-  'campiMiei', 'campiLoro', 'euroInviatiAt', 'payoutFallito', 'votabile'];
+  'campiMiei', 'campiLoro', 'euroInviatiAt', 'payoutFallito', 'votabile',
+  /* ...e quel che le prese hanno imparato a portare dopo (7 ott 2026, «Lo
+     stesso id, un giro nuovo»): la cauzione, l'incasso, la disputa e il
+     suo moderatore, la chat, i recapiti e la scadenza della fattura */
+  'cauzione', 'incasso', 'moderatore', 'disputaId', 'annulloDisputa', 'chatMod',
+  'chatModNuovi', 'campiNuovi', 'recapitoFermo', 'recapitoAltrove', 'fatturaScade'];
 function riparaChiaveMakerP2P(id, locali){
   const mz = mazzoMostro();
   const tutti = locali || ordiniP2P();
@@ -64585,6 +64618,29 @@ function adottaOrdiniAltroveP2P(locali){
         scriviOrdineP2P(gia);
         nati++;
       }
+      /* LO STESSO ID, UNA PRESA NUOVA, vista dalla restore (7 ott 2026,
+         vedi `giroNuovoP2P`): la restore dice per questo ordine un indice
+         PIU' ALTO di quello della riga di chi ha preso, e uno stato vivo.
+         L'indice di una presa non cambia mai: un indice dopo e' una presa
+         dopo. La riga del giro morto si chiude e si mette da parte; la
+         nuova la fa nascere l'archivio del server, che ne sa lato, cifre
+         e controparte (la restore no: «quel che nel libro non c'e' resta
+         fuori»). Mai sul mio ordine: la mia chiave e' una. */
+      if (!gia.mio && (gia.indice | 0) > 0 && indice > (gia.indice | 0)
+          && typeof chiudiGiroP2P === 'function' && typeof archiviaGiroCadutoP2P === 'function') {
+        const stV = String(voce.stato || '').trim().toLowerCase();
+        const vivo = statoDaRestoreP2P(gia, stV);
+        if (vivo && vivo !== 'pubblicato' && P2P_FINALI.indexOf(vivo) < 0) {
+          if (chiudiGiroP2P(gia, adesso)) scriviOrdineP2P(gia);
+          diarioP2P('ripresa ' + id.slice(0, 8) + ': presa nuova dello stesso ordine (indice '
+                    + indice + ' > ' + (gia.indice | 0) + ', il coordinatore dice ' + stV
+                    + '): la riga di prima va sotto «Annullati», la nuova la porta l\'archivio');
+          archiviaGiroCadutoP2P(id);
+          delete locali[id];
+          nati++;
+          continue;
+        }
+      }
       /* LA RIPRESA: lo stato del coordinatore muove la riga locale, UNA
          volta per fotografia (`ripresa` sulla voce, che vive in memoria
          e rinasce a ogni restore) — la lista resta la stessa per tutta
@@ -64705,6 +64761,108 @@ const P2P_INDICE_CERCA_MAX = 500;
    l'ha alzato, e un dispositivo aperto prima lo legge stantio — costa
    cinquanta derivazioni, cioe' niente */
 const P2P_INDICE_CERCA_MIN = 50;
+/* ═══ LO STESSO ID, UN GIRO NUOVO (7 ott 2026, dal campo: l'ordine
+   f904185a di Alan, preso, annullato e RIPRESO da Andrea) ═══════════════
+   IL FATTO: in Mostro chi prende e si ritira prima della garanzia
+   rimanda l'ordine nel libro con lo STESSO id (`canceled` con
+   `republished`; lo stesso fa il `taker-timeout`), e la presa dopo e'
+   uno scambio nuovo — trade key nuova, giro nuovo per il server — sotto
+   un nome vecchio. Sul telefono che riprende la riga caduta si mette da
+   parte da sola (`archiviaGiroCadutoP2P`, 25 set); su OGNI ALTRO
+   dispositivo la riga restava «annullato» del primo giro, e tre giudici
+   la tenevano li' per la regola giusta — «un finale non si muove» — che
+   pero' non sapeva dei nomi riusati: la restore (passo 6, solo avanti),
+   l'archivista (`avanti` falso sui finali) e l'orologio dei messaggi.
+   Lo scambio vivo stava nascosto fra gli annullati.
+   COSA DISTINGUE UNA PRESA NUOVA DA UN'ECO VECCHIA: un'eco non puo' mai
+   dire «giro piu' alto», «chiave piu' nuova» o «mosso DOPO il tuo
+   annullo». Qui si riapre solo su una fonte che descrive l'ADESSO — la
+   riga dell'archivio del server, che conta le prese (`giro`) e porta le
+   due trade key dell'ultima — e per uno di tre segni, in quest'ordine:
+   · 'giro'   — giro del server > giro della riga (tutt'e due noti; se
+     il server dice lo stesso giro o uno piu' basso, e' lo stesso
+     scambio e il giudizio finisce qui);
+   · 'chiave' — per chi ha PRESO: la chiave del server per il mio lato
+     e' una MIA chiave di indice piu' alto di quella della riga (`tk`
+     e' la derivata: una chiave di un altro mazzo non e' un segno, e la
+     cura del 14 set la raddrizza; un indice piu' alto non puo' venire
+     da una foto vecchia, gli indici crescono soltanto); per chi ha
+     PUBBLICATO: la controparte del server e' un'altra chiave (la mia
+     resta la stessa, cambia chi ha preso) E la foto e' piu' nuova
+     dell'ultima mossa della riga — una foto del giro prima, applicata
+     a una riga gia' passata al giro dopo, direbbe «un'altra chiave» e
+     la riporterebbe indietro;
+   · 'dopo'   — solo per una riga FINALE di chi ha preso, senza giro ne'
+     chiave da confrontare (le righe nate prima di questa cura): il
+     server dice uno stato vivo con un momento piu' recente dell'ultima
+     mossa della riga. Uno scambio annullato non si muove piu': se
+     mostrod ha raccontato qualcosa DOPO l'annullo, e' un'altra presa.
+     Un server in ritardo sul mio annullo racconta cose di PRIMA, e non
+     passa. L'orologio e' quello di mostrod da tutt'e due le parti,
+     salvo l'annullato letto dal libro (ora del dispositivo): dichiarato.
+   Un messaggio dal relay da solo NON riapre mai un finale: la presa
+   nuova viaggia sulla chiave nuova, che si ascolta solo quando la riga
+   nuova esiste — e' il cerchio che si chiude.
+   COSA SUCCEDE: per chi ha preso la riga vecchia si chiude (se non lo
+   era) e si mette da parte col nome `id~quando` — la storia della prima
+   presa resta sotto «Annullati» — e la riga nuova NASCE dal server come
+   su un dispositivo nuovo; per chi ha pubblicato la riga E' l'ordine
+   (chiave unica) e riparte in place: via quel che era della presa
+   (`P2P_DELLA_PRESA`), dentro stato, controparte, giro e momento del
+   server. PURO: torna il segno, o ''. */
+function giroNuovoP2P(gia, s, tk){
+  if (!gia || !s || !s.stato) return '';
+  if (P2P_FINALI.indexOf(s.stato) >= 0 || s.stato === 'pubblicato' || !STATI_P2P[s.stato]) return '';
+  const gS = Math.max(0, Math.floor(Number(s.giro) || 0));
+  const gL = Math.max(0, Math.floor(Number(gia.giro) || 0));
+  if (gS > 0 && gL > 0) return gS > gL ? 'giro' : '';
+  const q = Math.floor(Number(s.quando) || 0);
+  const mossa = Math.max(Number(gia.ultimaMossa) || 0, Number(gia.quando) || 0);
+  if (gia.mio) {
+    return (gia.peer && s.chiave_peer && s.chiave_peer !== gia.peer
+            && s.chiave_peer !== gia.pubTrade && q > 0 && q > mossa) ? 'chiave' : '';
+  }
+  if (gia.pubTrade && tk && tk.pub && tk.pub !== gia.pubTrade
+      && (tk.indice | 0) > (gia.indice | 0)) return 'chiave';
+  if (P2P_FINALI.indexOf(gia.stato) < 0) return '';
+  return (q > 0 && mossa > 0 && q > mossa) ? 'dopo' : '';
+}
+/* PURA: la riga del server parla della STESSA presa della riga locale?
+   Per chi ha preso e' la mia chiave, per chi ha pubblicato la
+   controparte. E' la condizione per scrivere il giro sulla riga: una
+   foto vecchia non deve timbrare il giro di prima su una riga che e'
+   gia' al giro dopo. */
+function stessaPresaP2P(gia, s){
+  if (!gia || !s) return false;
+  if (gia.mio) return !!(gia.peer && s.chiave_peer && s.chiave_peer === gia.peer);
+  return !!(gia.pubTrade && s.chiave_mia && s.chiave_mia === gia.pubTrade);
+}
+/* la riga di una presa il cui giro e' morto si CHIUDE prima di essere
+   messa da parte: annullata, col passo a cui si e' fermata; il momento
+   (`quando`) non si tocca, e' l'ultima cosa che il coordinatore le ha
+   detto. Torna vero se ha chiuso qualcosa. */
+function chiudiGiroP2P(o, adesso){
+  if (!o || P2P_FINALI.indexOf(o.stato) >= 0) return false;
+  o.fermoA = P2P_PROGRESSO[o.stato] || 0;
+  o.stato = 'annullato';
+  delete o.hold;
+  o.cantDo = ''; o.errore = ''; o.nonPartito = false;
+  o.aggiornato = adesso || Math.floor(Date.now() / 1000);
+  return true;
+}
+/* PURA: le righe messe da parte per questo ordine (`idVero`) parlano
+   TUTTE di giri prima di quello che il server racconta? Allora il server
+   parla di una presa nuova, e la riga puo' nascere sotto il nome vero. */
+function oltreArchiviatiP2P(locali, id, s, tk){
+  let viste = 0;
+  for (const k in (locali || {})) {
+    const o = locali[k];
+    if (!o || o.idVero !== id) continue;
+    viste++;
+    if (!giroNuovoP2P(o, s, tk)) return false;
+  }
+  return viste > 0;
+}
 function indiceDaChiaveP2P(mz, pub, max){
   if (!mz || !mz.sk || !pub || !window.NostrTools) return 0;
   const fino = Math.min(Math.max(Number(max) || 0, 0), P2P_INDICE_CERCA_MAX);
@@ -64742,6 +64900,9 @@ function rigaDaServerP2P(id, s, tk, stato, adesso){
      (27 set 2026): la convenienza ferma di uno scambio a sats fissi */
   if (Number(s.cambio_presa) > 0) o.cambioPresa = Number(s.cambio_presa);
   if (s.preso) o.preso = true;
+  /* il giro del server (7 ott 2026): e' con questo che una presa DOPO,
+     sotto lo stesso id, si riconosce */
+  if (Math.floor(Number(s.giro) || 0) > 0) o.giro = Math.floor(Number(s.giro));
   if (!tk) o.soloVista = true;
   /* «📍 Sono qui» del contanti (1 ott 2026), dal server: la mia ultima
      presenza e l'ora di quella dell'altra parte */
@@ -64792,10 +64953,72 @@ function adottaScambiServerP2P(locali){
        `riparaChiaveMakerP2P` */
     if (locali[id] && typeof riparaChiaveMakerP2P === 'function'
         && riparaChiaveMakerP2P(id, locali)) nati++;
-    const gia = locali[id];
+    let gia = locali[id];
     const tk = chiaveScambioDaServerP2P(mz, id, s);
+    /* LO STESSO ID, UN GIRO NUOVO (7 ott 2026): vedi `giroNuovoP2P` */
+    const segno = gia && typeof giroNuovoP2P === 'function' ? giroNuovoP2P(gia, s, tk) : '';
+    if (segno && !gia.mio && typeof archiviaGiroCadutoP2P === 'function') {
+      /* chi ha PRESO: la riga del giro morto si chiude e si mette da
+         parte, e quella nuova nasce qui sotto come su un dispositivo
+         nuovo */
+      if (chiudiGiroP2P(gia, adesso)) scriviOrdineP2P(gia);
+      diarioP2P('archivio ' + String(id).slice(0, 8) + ': presa nuova dello stesso ordine ('
+                + segno + ': il server dice ' + s.stato + ' al giro ' + (Math.floor(Number(s.giro) || 0) || '?')
+                + ', la riga era ' + gia.stato + (gia.giro ? ' del giro ' + gia.giro : '')
+                + '): la riga di prima va sotto «Annullati», ne nasce una nuova');
+      archiviaGiroCadutoP2P(id);
+      delete locali[id];
+      gia = null;
+      nati++;
+    }
     if (gia) {
       let mosso = false;
+      const gS = Math.max(0, Math.floor(Number(s.giro) || 0));
+      /* UNA FOTO DI UN'ALTRA PRESA NON TOCCA QUESTA RIGA (7 ott 2026): la
+         chiave del server non e' quella della riga — la mia per chi ha
+         preso, la controparte per chi ha pubblicato — e non e' una presa
+         nuova per i tre segni: e' una foto del giro prima, rimasta in
+         mano a un dispositivo che intanto e' passato al giro dopo (o la
+         chiave di un'altra identita'). «Solo in avanti» la porterebbe ad
+         annullato, e «quel che manca» le presterebbe le cifre di un
+         altro scambio. Si lascia stare, e lo si dice una volta. */
+      if (!segno && typeof stessaPresaP2P === 'function' && !stessaPresaP2P(gia, s)
+          && (gia.mio ? (gia.peer && s.chiave_peer) : (gia.pubTrade && s.chiave_mia))) {
+        if (!s.altraPresaDetta) {
+          s.altraPresaDetta = true;
+          diarioP2P('archivio ' + String(id).slice(0, 8) + ': il server parla di un\'altra presa ('
+                    + (gia.mio ? 'controparte ' : 'chiave ') + String(gia.mio ? s.chiave_peer : s.chiave_mia).slice(0, 8)
+                    + ' al giro ' + (gS || '?') + ', la riga ha ' + String(gia.mio ? gia.peer : gia.pubTrade).slice(0, 8)
+                    + (gia.giro ? ' al giro ' + gia.giro : '') + '): non si tocca');
+        }
+        continue;
+      }
+      if (segno) {
+        /* chi ha PUBBLICATO: la riga e' l'ordine, e riparte in place col
+           giro nuovo — via quel che era della presa, dentro quel che il
+           server dice adesso */
+        diarioP2P('archivio ' + String(id).slice(0, 8) + ': il mio ordine e\' stato ripreso ('
+                  + segno + ': il server dice ' + s.stato + ' al giro ' + (gS || '?')
+                  + ', la riga era ' + gia.stato + '): riparte da ' + s.stato);
+        for (const k of P2P_DELLA_PRESA) delete gia[k];
+        gia.stato = s.stato;
+        if (s.preso) gia.preso = true;
+        const qN = Math.floor(Number(s.quando) || 0);
+        if (qN > 0) { gia.quando = qN; gia.ultimaMossa = qN; }
+        gia.cantDo = ''; gia.errore = ''; gia.nonPartito = false;
+        gia.aggiornato = adesso;
+        mosso = true;
+      }
+      /* IL GIRO SI SCRIVE quando manca e il server parla della STESSA
+         presa (7 ott 2026, `stessaPresaP2P`: la chiave lo dice); una
+         riga finita di cui il server racconta uno scambio vivo non lo
+         prende — se non e' una presa nuova per i tre segni, non si sa
+         di che giro sia, e non si inventa */
+      if (gS > 0 && Math.floor(Number(gia.giro) || 0) !== gS
+          && (segno || (typeof stessaPresaP2P === 'function' && stessaPresaP2P(gia, s)
+                        && (P2P_FINALI.indexOf(gia.stato) < 0 || P2P_FINALI.indexOf(s.stato) >= 0)))) {
+        gia.giro = gS; mosso = true;
+      }
       /* QUEL CHE MANCA si prende sempre: e' lo stesso ordine */
       if (!gia.peer && s.chiave_peer && s.chiave_peer !== gia.pubTrade) { gia.peer = String(s.chiave_peer); mosso = true; }
       if (!(gia.satsNetti > 0) && Number(s.sats_ordine) > 0) { gia.satsNetti = Math.floor(Number(s.sats_ordine)); mosso = true; }
@@ -64880,8 +65103,10 @@ function adottaScambiServerP2P(locali){
         archiviaRitiratoP2P(id);
       continue;
     }
-    /* LA NASCITA: mai su una lapide, mai un mio ritiro, mai senza stato */
-    if (lapidataP2P(id)) continue;
+    /* LA NASCITA: mai su una lapide, mai un mio ritiro, mai senza stato.
+       La lapide guarda il giro (7 ott 2026): quella di una presa finita
+       non ferma la presa dopo */
+    if (lapidataP2P(id, s.giro)) continue;
     /* ...e mai su uno scambio tolto con la ✕, qui o su un altro
        dispositivo dello stesso account (7 ott 2026). Col typeof: i
        banchi di casa estraggono l'adozione da sola */
@@ -64891,7 +65116,8 @@ function adottaScambiServerP2P(locali){
        ⚠️ TRANNE IL MIO ORDINE (28 set 2026): la presa caduta messa da
        parte era sul MIO ordine, che nel libro e' vivo e va governato —
        nasce, con la chiave di chi l'ha pubblicato */
-    if (typeof giroArchiviatoP2P === 'function' && giroArchiviatoP2P(locali, id) && !s.mio) continue;
+    if (typeof giroArchiviatoP2P === 'function' && giroArchiviatoP2P(locali, id) && !s.mio
+        && !(typeof oltreArchiviatiP2P === 'function' && oltreArchiviatiP2P(locali, id, s, tk))) continue;
     let stato = s.stato || '';
     if (!stato) {
       const voce = p2pMieiOrdini && p2pMieiOrdini[id];

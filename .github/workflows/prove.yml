@@ -78,6 +78,7 @@ jobs:
              collaudo_avvisi_in_ordine_p2p.py
              collaudo_paycode_riconosciuto.py collaudo_scambi_ovunque.py
              collaudo_dispute_p2p.py collaudo_tolti_ovunque.py
+             collaudo_giro_nuovo.py
              collaudo_pausa.py collaudo_due_teste.py
              collaudo_consegna_firmata.py collaudo_ricategorizza.py
              collaudo_ricerca.py collaudo_sblocco_banner.py collaudo_servizio_dove.py
@@ -206,6 +207,7 @@ jobs:
              collaudo_carrello_salvato
              collaudo_bollino_staff
              collaudo_tolti_ovunque
+             collaudo_giro_nuovo
              collaudo_avviso_chi_annulla
              collaudo_recapito_aggiornato
              collaudo_garanzia_lunga
