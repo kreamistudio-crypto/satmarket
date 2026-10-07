@@ -39530,3 +39530,117 @@ così). Il lettore vocale vero (VoiceOver, TalkBack) non è stato
 provato: gli attributi sono quelli standard. Sul telefono, il selettore
 di data nativo: l'`input` arriva quando si conferma la data, e la ✕
 aspetta i suoi 700 ms o la chiusura del campo.
+
+## La stellina all'angolo delle card P2P della home (7 ott 2026, richiesta di Andrea)
+
+**COSA.** Nella fila «Scambi P2P» della home, all'angolo del volto di
+chi ha pubblicato c'era solo lo scudo dello staff. Adesso, nello stesso
+punto e con la stessa misura, chi non è dello staff porta la stella del
+riquadro «Chi ha pubblicato quest'ordine», che si riempie per quanto
+vale (5,0 piena, 2,5 a metà, 1,2 quasi vuota). Le regole di Andrea: lo
+scudo ha la precedenza (un moderatore porta lo scudo e basta), senza
+recensioni niente stella, il lettore dice «Valutazione 4,8 su 5», e si
+accende anche quando il volto arriva dopo il disegno, come lo scudo.
+
+**IL DATO C'ERA GIÀ, IL SERVER NON CAMBIA.** La fotografia del libro
+(`/api/p2p/libro`) porta per ogni ordine i `facce` di
+`_facce_ordini_p2p`, gli stessi del riquadro: `media` (zero se nessuno
+ha votato) e `voti`. Non esce niente in più di quel che il riquadro
+mostrava già.
+
+**COME.** Tre pezzi, tutti nel blocco del volto unico:
+- `ricordaVolto` impara la media come aveva imparato lo staff: la dice
+  solo una risposta che porta i `voti`, e nella cache sta solo quando
+  qualcuno ha votato e il numero è finito e positivo. Una risposta
+  senza voti (il volto di un'altra strada) non la toglie, i voti a zero
+  sì. Un cambio di media ridisegna.
+- `voceStellinaVolto(v)` è il giudice: '' quando la stella non c'è
+  (staff, nessun voto), altrimenti la frase per il lettore, con la
+  cifra scritta come la scrive il riquadro (`toLocaleString` a un
+  decimale). `stellinaVolto(chiave, cls)` posa lo `span` con
+  `data-stella-di`, `role="img"` e la voce, e dentro `stellaP2P(media)`:
+  il disegno è quello del riquadro, nessuno nuovo. Nasce `hidden`
+  finché la cache non sa.
+- `ridisegnaVolti` riaccende, ridisegna o spegne gli angoli con quella
+  chiave, accanto a quel che già faceva per lo scudo.
+Nella card (`cardVetrinaP2P`) la stellina sta subito dopo lo scudo, con
+la stessa classe di posto `p2p-vt-bollino`. Il CSS è il minimo per
+metterla lì: il tondo da 20 con l'anello della carta, come lo scudo, e
+la stella del riquadro girata a 14 da `--st` (mai gli svg: la banda).
+
+**STRADE SCARTATE.** Allargare `bollinoVolto` perché disegni lo scudo
+O la stella: lo usano anche l'anello del libro e il riquadro, e la
+stella sarebbe comparsa anche lì. Leggere la media da `p2pFacce` dentro
+`ridisegnaVolti`: il ridisegno è generico sulla chiave, e la cache unica
+è il posto dove lo scudo aveva già imparato la stessa cosa.
+
+**L'ANELLO DEL LIBRO: NO, PER ORA.** Proposto ad Andrea e non fatto: la
+card del libro porta già sotto il metodo la riga «★ 4,8 · 👤 12»
+(`stellineP2P`). Un'altra stella all'angolo direbbe la stessa cosa due
+volte nella stessa card, e l'anello porta già tempo, volto e scudo.
+
+**IL LETTORE, E L'ETICHETTA DELLA CARD (stesso giorno, sì di Andrea
+dopo gli scatti).** La voce della stella sta sullo `span`
+(`role="img"`). Ma la card intera è un `role="button"` con la sua
+`aria-label`, e di un bottone diversi lettori leggono solo l'etichetta:
+lì dentro scudo e stella tacevano (lo scudo già da prima). Adesso
+l'etichetta porta la coda dell'angolo: «Compra BTC, invia 50 euro,
+Revolut, valutazione 4,8 su 5», e per lo staff «…, staff di Barattolo».
+La coda la scrive `codaVoceVolto(v)` dallo stesso giudice della stella
+(lo scudo vince, senza voti niente coda). La card porta la base in
+`data-voce` e la chiave in `data-voce-di`, e `ridisegnaVolti` riscrive
+l'etichetta quando il volto arriva in ritardo: senza ridisegnare la
+card, che la fila non rifà se gli ordini non cambiano.
+
+**PROVATO.** `prove_stellina_card_p2p` (24): le sentinelle (la chiamata
+nella card subito dopo lo scudo, una sola chiamata in tutta la pagina,
+il disegno che è `stellaP2P`, il ridisegno, la cifra come nel riquadro,
+il CSS) e un banco node col volto unico intero, la stella vera,
+`prendiFacceP2P` vera e la card vera della fila: staff (scudo acceso,
+stella spenta e muta), 5,0 (100%, «Valutazione 5,0 su 5»), 1,2 (24%),
+nessuna recensione (niente stella, e la cache resta quella di sempre),
+il volto in ritardo (l'angolo già disegnato si accende con la STESSA
+stella del riquadro, l'altro no), una risposta senza voti che non la
+spegne, la media che cambia (2,5: a metà), lo staff arrivato dopo che
+la spegne, i voti a zero, una media storta, infinita, senza voti o
+scritta come testo; l'etichetta della card nei quattro casi, la base e
+la chiave scritte sulla card, e l'etichetta riscritta dal volto in
+ritardo (solo la sua), dallo staff arrivato dopo e dai voti a zero. Il
+banco dello scudo (`prove_bollino_staff`) resta verde. Tortura sulla
+copia: 19 su 22 al primo giro. Vive «i voti
+ignorati» e «la media storta passa», perché mancavano i casi con media
+ma voti a zero e con la media infinita o scritta come testo, aggiunti.
+«Stella anche a zero» faceva esplodere il banco invece di farlo
+fallire: le letture del banco ora tornano "" e fanno rosse. Al secondo
+giro 22 su 22, controprova verde; con l'etichetta, nove mutazioni in
+più sulle sue righe, 31 su 31. Dal vivo con Chrome headless (CDP)
+sull'app della copia (collaudo, relay morto, Compratore 111 dentro il
+finto Telegram, fotografia del libro seminata in pagina e giro della
+fila fermo) a 375 e 320 px, chiaro e scuro, prima e dopo: ogni angolo
+letto dal DOM (5,0 al 100%, staff con lo scudo e la stella spenta, 1,2
+al 24%, nessuna recensione spenta, il 3,6 arrivato dopo il disegno
+acceso al 72%) e le cinque etichette lette dal DOM (la quinta con la
+valutazione arrivata dopo). Andrea ha dato l'ok sugli scatti. Suite
+intera severa senza config nel worktree, sull'albero ribasato su
+337b698: 19.356 verdi e 0 rosse, i 38 collaudi della CI verdi nella
+gabbia; e dopo il secondo rebase (main aveva preso «La ✕ su ogni
+dispositivo», un conflitto solo nella lista di main() di prove.py e
+uno in fondo a CANTIERI, tenute le due voci) di nuovo intera su
+b0a5658: 19.416 verdi e 0 rosse, i 39 collaudi della CI verdi; al
+terzo rebase («L'anello ovunque», stessi due conflitti) intera su
+cedff68: 19.442 verdi e 0 rosse, 39 collaudi verdi. Al quarto
+(«Come funziona: cinque passi», 3458306, conflitto solo in fondo a
+CANTIERI) e al quinto («La ✕ rossa nei passi di Barattozon»,
+7859ec5, conflitti in main() di prove.py e in fondo a CANTIERI)
+main non si è inseguito con la suite intera: sull'albero di 7859ec5
+le sezioni toccate dai due commit arrivati (`prove_anello_ovunque`,
+`prove_p2p_dettaglio`, `prove_p2p_paycode`, `prove_p2p_pubblica`,
+`prove_pubblica_metodo_prima`, `prove_tasto_barattozon`,
+`prove_spia_passi_barattozon`, `prove_passi_libro_p2p`), quella di
+questo cantiere e quella dello scudo, 938 verdi e 0 rosse, e i 39
+collaudi della CI verdi nella gabbia.
+
+**DA GUARDARE.** Sul telefono, a occhio: la stellina da 14 all'angolo
+di un volto da 30, soprattutto sotto 2 (quasi vuota, si legge come
+«poca», ed è voluto). Il lettore vero (TalkBack, VoiceOver) sulla
+card: che dica l'etichetta intera, coda compresa.
