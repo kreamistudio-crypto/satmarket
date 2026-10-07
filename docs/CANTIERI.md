@@ -39229,3 +39229,37 @@ suo ok sugli scatti).
 - La lapide della ✕ su una presa caduta nasconde dal libro, per
   quaranta giorni, l'ordine di un altro tornato in vetrina: è di prima
   (la ✕ la scriveva già), segnalato a parte, non toccato.
+
+## La lapide della ✕ che nasconde dal libro l'ordine di un altro (7 ott 2026; DA FARE DOPO IL LANCIO, decisione di Andrea)
+
+**COSA SUCCEDE.** La ✕ di «I miei scambi» scrive una lapide di
+`P2P_LAPIDE_TOLTO_S` (40 giorni) sull'id della riga che toglie
+(`togliScambioP2P`). La lapide fa due mestieri: non fa rinascere la riga
+dall'archivio (`adottaScambiServerP2P`) e TOGLIE L'ORDINE DAL LIBRO in
+pagina (`lapidataP2P(o.id)` nei filtri che leggono il libro). Su una
+presa caduta che porta ancora il nome vero dell'ordine — `mio` falso:
+l'ordine è di un'altra persona, la mia presa è finita «annullata» e
+l'ordine è tornato in vetrina — la ✕ nasconde quell'ordine, vivo e di
+un altro, dal libro di QUEL dispositivo per quaranta giorni. È il
+contrario di quel che dice la voce delle lapidi nel codice («SOLO per gli
+ordini MIEI da maker: un take andato a vuoto riporta nel libro l'ordine
+di un ALTRO, vivo, e nasconderlo sarebbe una bugia»). C'era prima della
+«✕ su ogni dispositivo», che non l'ha allargata (sugli altri dispositivi
+i tolti si tolgono SENZA lapide, apposta) e non l'ha curata.
+
+**LA CURA PROPOSTA, da decidere.** Con la ✕ ricordata dal server la
+lapide della ✕ non serve più a non far rinascere la riga — lo fanno
+l'elenco `tolti` e `toltoAltroveP2P` —: resta utile per il mio ordine
+(`o.mio`), dove togliere la card dal libro è giusto per la ragione di
+sempre (un relay rimasto indietro che serve la copia «pending» del mio
+ordine morto); per le righe che il server non conosce (il 404) è da
+guardare se serva ancora. Quindi la lapide solo se `o.mio`, oppure una
+lapide che non tocca il libro. Le prove: nel banco della ✕ il caso
+«presa caduta sull'ordine di un altro, tornato in vetrina: dopo la ✕
+resta nel libro», e la tortura sulla condizione.
+
+**PERCHÉ DOPO IL LANCIO.** Il caso vuole tre cose insieme — una presa
+caduta, la ✕ proprio su quella riga, l'ordine dell'altro ancora in
+vetrina —, è raro, e non tocca dei sats: l'ordine resta visibile dagli
+altri dispositivi e da tutti gli altri utenti, e si può prendere di
+nuovo da lì.
