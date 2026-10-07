@@ -40375,3 +40375,95 @@ coordinatore vero (letto sul sorgente, non visto); la scadenza delle
 ~92 ore, mai provata su nessun nodo (NODO-MOSTRO, «NON provati i 576
 blocchi»). Da aggiornare dopo il push: le voci della guida dei
 tutorial che citano i testi vecchi — proposto ad Andrea, non fatto.
+
+## La garanzia lunga: gli avvisi a 48, 72 e 88 ore (7 ott 2026, richiesta di Andrea)
+
+Dal cantiere «I testi del P2P che confondevano»: sul sorgente della
+v0.19.0 (-bar6) il coordinatore si muove a ~92 ore dal pagamento della
+garanzia — in `active` annulla e i sats tornano a chi vende, in
+`fiat-sent` apre una disputa DA SOLO, e quella disputa la patch 0007 non
+la racconta (aggancia `dispute_action`, non `enforce_escrow_deadline_pass`)
+—, e una disputa già aperta e non decisa la chiude LND
+`invoices.holdexpirydelta` blocchi prima del `cltv_expiry`. **Letto sul
+nodo da Andrea il 7 ott 2026: `invoices.holdexpirydelta` non è
+impostato né in `lnd.conf` né nel compose, vale il default di 12
+blocchi (~2 ore)**, quindi ~94 ore, coi sats a chi vende anche se chi
+compra aveva ragione. Senza toccare il nodo, il server guarda.
+
+**COSA FA.** `_giro_garanzie_p2p`, un passo del battito pieno
+dell'`orologio_p2p` (dopo le attese, mai nei lampi dell'ascolto),
+guarda gli scambi con un `garanzia_pagata` del coordinatore
+(`p2p_momenti`, fonte 'mostro') fra 48 ore e 7 giorni fa e nessun
+momento finale dopo: a **48 ore** un avviso a ciascuna parte, a **72** e
+a **88** uno a ogni moderatore (`_moderatori_p2p`, cioè ADMIN_IDS).
+Massimo uno per livello e per persona: due ai moderatori, uno alle
+parti. I testi sono quelli approvati da Andrea, parola per parola:
+le cinque varianti alle parti (`_testo_garanzia_parte_p2p`: chi vende
+senza e col «pagato», chi compra col e senza, la disputa aperta a tutti
+e due), col verbo e il bottone giusti per i contanti di persona
+(«Ho consegnato i contanti», «se non vi vedete più», niente ricevuta) e
+per Barattozon («Se su Amazon risulta pagato», «Ho pagato al
+tabacchino», «Tieni pronto lo scontrino»), e i due ai moderatori
+(`_testo_garanzia_mod_p2p`: codice dello scambio, le ore VERE — dopo un
+riavvio tardivo dice «da 90 ore» —, le due persone, l'importo, il
+«pagato» con l'ora o «no», la disputa con l'ora o «no», e chi è una
+delle due parti lo legge in coda).
+
+**L'INTERRUTTORE.** «⚡ Avvisi sugli scambi P2P» vale SOLO per le parti
+(decisione di Andrea): ai moderatori l'avviso arriva sempre, come quello
+delle dispute — quello è di chi scambia, questo è un dovere.
+
+**L'ANTI-DOPPIONE È IL DATABASE.** Il timbro è una riga di `p2p_avvisi`
+(chiave ordine, momento `garanzia48|72|88`, giro, persona), scritta con
+`INSERT OR IGNORE` e committata PRIMA che il giro mandi: il patto delle
+sorelle — un riavvio non ripete niente, perché il giudice non tiene
+niente in memoria; un giro che muore a metà al peggio perde un avviso,
+mai lo ripete. Anche i SALTI sono timbri, e il journal li dice una
+volta sola: alle parti dopo 80 ore («fermo da 2 giorni» non sarebbe
+vero: fonte 'tardi'), a chi ha l'interruttore spento ('spento'), il 72
+quando è già ora dell'88 ('superato': dopo un riavvio tardivo parte solo
+il livello più alto), tutto dopo 100 ore ('tardi': la garanzia non c'è
+più). Un ordine tornato nel libro e ripreso è un altro GIRO: conta da
+capo. Più vecchio di 7 giorni non si guarda nemmeno.
+
+**IL JOURNAL.** Per ogni avviso mandato una riga:
+`⏰ Garanzia lunga P2P: 1a2b3c4d 72h → 999 (moderatore; pagato: no,
+disputa: no): mandato`; per ogni salto una riga `·`/`🔕` col perché; un
+battito che esplode, `⚠️ Garanzie lunghe P2P: battito saltato`.
+
+**I DUE LIMITI, detti ad Andrea e approvati.** Il server conta ore
+d'orologio, il coordinatore blocchi: con blocchi più veloci del solito
+le «92 ore» arrivano prima — il motivo di 72 e 88 invece di 90. E uno
+scambio di cui il coordinatore non ha mai detto «garanzia pagata» qui
+non si vede.
+
+**SCARTATI.** Toccare il nodo (un evento per la disputa automatica nella
+0007): fuori dal perimetro di questo cantiere, e il server basta. Una
+leva nel config per le soglie: i numeri vengono dal sorgente del
+coordinatore e cambiano con lui, non con una riga del VPS. L'avviso
+alle parti oltre le 80 ore con «fermo da N giorni»: due testi in più
+per un caso che vuol dire un server rimasto spento giorni.
+
+**PROVATO.** `prove_garanzia_lunga` (36): le sentinelle (l'aggancio
+all'orologio nel battito pieno, le soglie, il timbro prima dell'invio,
+una sola chiamata all'interruttore, la riga del journal); il passo puro
+ai bordi; i sette testi parola per parola, contanti e Barattozon; poi il
+giudice VERO sul database VERO degli eventi (`_banco_eventi_p2p`) con
+l'orologio spostato a mano: 47, 48, 48+1', 72, 88, 89 e 99 ore; il
+riavvio tardivo a 90 ore (solo l'88, i salti timbrati e detti); il
+«pagato» e la disputa aperta (le varianti giuste, e ai moderatori l'ora);
+lo scambio concluso che tace; l'interruttore spento della parte (non
+riceve, il journal lo dice) e del moderatore (riceve lo stesso); 101
+ore (sei timbri «tardi»); otto giorni (nessun timbro); il moderatore che
+è una delle parti. `collaudo_garanzia_lunga.py` (19, nella CI): il
+SERVER VERO su un database usa-e-getta, lo scambio nato dalla rotta vera
+`/api/p2p/evento`, le lancette del suo `time` spostate e il battito vero
+`_giro_garanzie_p2p`, con le notifiche finte e il journal catturati —
+47/48/72/88/89-101 ore, il «riavvio» (un battito nuovo sul database), il
+riavvio tardivo a 90, il «pagato», l'interruttore spento della parte e
+del moderatore. Emendata col perché una sentinella di `prove_p2p_avvisi_libro`: i `try` dell'orologio sono quattro, non tre. Tortura 28 su 28 su una copia intera del repo (pulita verde prima): le cinque soglie, la finestra dei sette giorni, il livello più basso che vince, il timbro `OR REPLACE` che non ferma i doppioni, il 72 non timbrato «superato», l'interruttore tolto alle parti e dato ai moderatori, lo scambio chiuso che avvisa, la disputa chiusa che vale aperta, il «pagato» che non si legge, vende e compra scambiati, i «tardi» che ricevono lo stesso (parti e moderatori), quattro parole dei testi, il Barattozon di chi vende come il bonifico, i contanti che diventano bonifico, «restano circa» tolto, il moderatore-parte che non lo legge (rifatta da sola: la prima ancora compariva due volte), l'ora del «pagato» tolta, il journal senza lo stato, il giro senza la riga del journal, l'orologio che non chiama il giro. Suite intera severa senza config nel worktree su 5785342: 19.699 verdi, 0 rosse; i 42 collaudi della CI verdi nella gabbia, il nuovo compreso; scanner dei segreti della CI sui file del commit: zero. RIBASATO su 0d4cfd7 (lo studio «Hackathon RGB: le idee di Alan», solo due documenti: nessun conflitto, nessun file in comune): di nuovo prove_bussola, prove_tetto_claude_md, prove_garanzia_lunga e prove_p2p_avvisi_libro (183 verdi) e i collaudi collaudo_garanzia_lunga e collaudo_pagamento_p2p verdi.
+
+**NON PROVATO.** Il nodo vero: nessuna garanzia è mai arrivata a 92 ore
+(NODO-MOSTRO, i 576 blocchi «NON provati»), quindi la disputa che il
+coordinatore apre da solo e la chiusura di LND restano lette sul
+sorgente; e il telefono, dove gli avvisi arrivano come gli altri.

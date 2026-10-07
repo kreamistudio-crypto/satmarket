@@ -108,6 +108,7 @@ jobs:
              collaudo_contanti_p2p.py schnorr_puro.py
              collaudo_avviso_chi_annulla.py
              collaudo_recapito_aggiornato.py
+             collaudo_garanzia_lunga.py
              collaudo_annullo_venditore.py
              collaudo_db_contesa.py collaudo_negozi_grandi.py
              collaudo_foto_recensioni.py
@@ -207,6 +208,7 @@ jobs:
              collaudo_tolti_ovunque
              collaudo_avviso_chi_annulla
              collaudo_recapito_aggiornato
+             collaudo_garanzia_lunga
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.

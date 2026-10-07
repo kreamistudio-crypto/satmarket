@@ -88903,8 +88903,11 @@ def prove_p2p_avvisi_libro():
     # EMENDATA (26 set 2026, «IL LIBRO SUBITO»): i try sono TRE — la
     # fotografia del libro gira nella stessa passata col suo, e una
     # fotografia che cade non deve toccare gli avvisi
-    prova("...e ognuno dei due ha il suo try (un battito storto non ferma l'altro)",
-          3, codice(orologio).count("except Exception as e:"))
+    # EMENDATA (7 ott 2026, «La garanzia lunga»): QUATTRO — il passo delle
+    # garanzie lunghe ha il suo, e un suo guasto non tocca libro, foto e
+    # attese (prove_garanzia_lunga guarda che stia nel battito pieno)
+    prova("...e ognuno ha il suo try (un battito storto non ferma gli altri)",
+          4, codice(orologio).count("except Exception as e:"))
     prova("le righe mai viste si chiedono senza segnalibro", True,
           "for ids, da in ((nuovi, 0), (vecchi, since - P2P_MARGINE_S)):" in giro)
     prova("...e solo per due ore: un id che il libro non mostra smette di farsi cercare",
@@ -127843,6 +127846,294 @@ console.log(JSON.stringify(out));
           [False, False, True, True, True, False], out["nascosto"])
 
 
+def prove_garanzia_lunga():
+    """LA GARANZIA LUNGA (7 ott 2026, cantiere «avviso garanzia lunga»,
+    testi e regole approvati da Andrea). Dall'ora in cui il coordinatore
+    ha detto «garanzia pagata»: a 48 ore un avviso a ciascuna parte
+    (cinque varianti: chi vende senza e col «pagato», chi compra col e
+    senza, la disputa aperta), a 72 e a 88 ore un avviso ai moderatori
+    (sempre, anche con l'interruttore spento). Un timbro in `p2p_avvisi`
+    PRIMA dell'invio: niente doppioni, nemmeno dopo un riavvio; dopo un
+    riavvio tardivo solo il livello piu' alto; fuori tempo niente. Il
+    banco gira il giudice VERO sul database VERO degli eventi
+    (`_banco_eventi_p2p`) con l'orologio spostato a mano."""
+    print("\n[la garanzia lunga]")
+    src = _SORGENTE
+
+    # --- 1) LE SENTINELLE ------------------------------------------------
+    oro = pezzo("orologio_p2p")
+    prova("l'orologio P2P guarda le garanzie lunghe una volta al minuto, nel battito pieno",
+          True, "        if not lampo and not solo_attese:\n            try:\n"
+          "                await asyncio.wait_for(_giro_garanzie_p2p(), P2P_PASSATA_MAX_S)"
+          in oro)
+    soglie = {k: int(eval(re.search(r"\n" + k + r" = ([0-9* ]+)", src).group(1)))
+              for k in ("P2P_GARANZIA_PARTI_S", "P2P_GARANZIA_PARTI_FINO_S",
+                        "P2P_GARANZIA_MOD1_S", "P2P_GARANZIA_MOD2_S", "P2P_GARANZIA_TARDI_S")}
+    prova("le soglie approvate: 48 ore alle parti (fino a 80), 72 e 88 ai moderatori, "
+          "niente oltre 100", [48, 80, 72, 88, 100],
+          [soglie[k] // 3600 for k in ("P2P_GARANZIA_PARTI_S", "P2P_GARANZIA_PARTI_FINO_S",
+                                        "P2P_GARANZIA_MOD1_S", "P2P_GARANZIA_MOD2_S",
+                                        "P2P_GARANZIA_TARDI_S")])
+    giro = pezzo("_giro_garanzie_p2p")
+    prova("ogni avviso mandato lascia una riga nel journal", True,
+          'print(f"{riga}: mandato ({esito})" if esito else f"{riga}: mandato",' in giro
+          and "esito = await notifica(tg_id, testo)" in giro)
+    gl = pezzo("_garanzie_lunghe_p2p")
+    prova("il timbro si scrive PRIMA dell'invio: il giudice lo scrive e fa commit, "
+          "e il giro manda dopo", [True, True],
+          ["INSERT OR IGNORE INTO p2p_avvisi" in pezzo("_timbra_garanzia_p2p"),
+           giro.index("_garanzie_lunghe_p2p(con, adesso)") < giro.index("await notifica(")])
+    prova("i moderatori NON guardano l'interruttore: solo le parti lo guardano", 1,
+          codice(gl).count("_avvisi_p2p_accesi("))
+
+    # --- 2) IL BANCO -------------------------------------------------------
+    con, amb = _banco_eventi_p2p()
+    i = src.index("CREATE TABLE IF NOT EXISTS p2p_dispute(")
+    con.executescript(src[i:src.index("\n    );", i) + len("\n    );")]
+                      + "\nALTER TABLE utenti ADD COLUMN nome TEXT DEFAULT '';"
+                      "ALTER TABLE utenti ADD COLUMN username TEXT DEFAULT '';")
+    amb.update(ADMIN_IDS=[500, 501], MODALITA_COLLAUDO=False)
+    for k in soglie:
+        amb[k] = soglie[k]
+    for riga in ("P2P_GARANZIA_COORD_H = ", "P2P_GARANZIA_LND_H = ", "P2P_GARANZIA_GUARDA_S = "):
+        j = src.index("\n" + riga) + 1
+        exec(src[j:src.index("\n", j)].split("  #")[0], amb)
+    j = src.index("\nGESTO_PAGATO_P2P = {") + 1
+    exec(src[j:src.index("}\n", j) + 2], amb)
+    for f in ("_moderatori_p2p", "_persona_disputa_p2p", "_passo_garanzia_p2p",
+              "_modo_garanzia_p2p", "_testo_garanzia_parte_p2p", "_quando_garanzia_p2p",
+              "_testo_garanzia_mod_p2p", "_timbra_garanzia_p2p", "_garanzie_lunghe_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    righe_journal = []
+    amb["print"] = lambda *a, **k: righe_journal.append(" ".join(str(x) for x in a))
+    H = 3600
+    passo = amb["_passo_garanzia_p2p"]
+    prova("il passo: niente prima di 48 ore, le parti fino a 80, 72 e 88 ai moderatori "
+          "(il piu' alto), tutto «tardi» da 100",
+          [{"parti": "", "mod": 0}, {"parti": "manda", "mod": 0},
+           {"parti": "manda", "mod": 72}, {"parti": "tardi", "mod": 72},
+           {"parti": "tardi", "mod": 88}, {"parti": "tardi", "mod": "tardi"}],
+          [passo(48 * H - 1), passo(48 * H), passo(72 * H), passo(80 * H),
+           passo(88 * H), passo(100 * H)])
+
+    # --- 3) I TESTI, PAROLA PER PAROLA ------------------------------------
+    tp = amb["_testo_garanzia_parte_p2p"]
+    V1 = ("⏳ <b>Il tuo scambio da 50,00 € è fermo da 2 giorni</b> e i sats sono ancora in "
+          "garanzia: chi compra non ha ancora detto di averti inviato gli euro. Se li hai "
+          "ricevuti lo stesso, libera i sats; se no, scrivigli dalla pagina dello scambio o "
+          "annullate d'accordo.\n\n<i>Fra circa due giorni, se nessuno si muove, lo scambio "
+          "si annulla da solo e i sats tornano a te.</i>")
+    V2 = ("⏳ <b>Il tuo scambio da 50,00 € è fermo da 2 giorni:</b> chi compra dice di "
+          "averti inviato gli euro. Se li hai ricevuti, libera i sats; se non sono arrivati, "
+          "apri una disputa dalla pagina dello scambio.\n\n<i>Fra circa due giorni si apre "
+          "una disputa da sola, e decide un moderatore.</i>")
+    V3 = ("⏳ <b>Il tuo scambio da 50,00 € è fermo da 2 giorni:</b> se hai pagato e non "
+          "ricevi i sats, apri una disputa adesso, dalla pagina dello scambio. Tieni pronta "
+          "la ricevuta.")
+    V4 = ("⏳ <b>Il tuo scambio da 50,00 € è fermo da 2 giorni</b> e i sats sono ancora in "
+          "garanzia. Se hai già inviato gli euro, dillo nella pagina dello scambio con «Ho "
+          "inviato gli euro»; se non li invii più, annullate d'accordo.\n\n<i>Fra circa due "
+          "giorni, se nessuno si muove, lo scambio si annulla da solo e i sats tornano a chi "
+          "vende.</i>")
+    V5 = ("⚖️ <b>Il tuo scambio da 50,00 € è in disputa e fermo da 2 giorni:</b> un "
+          "moderatore lo sta guardando. Se vi siete messi d'accordo, potete ancora annullare "
+          "insieme dalla pagina dello scambio.")
+    prova("le cinque varianti alle parti, come approvate",
+          [V1, V2, V3, V4, V5, V5],
+          [tp("vende", False, False, "50,00 €"), tp("vende", True, False, "50,00 €"),
+           tp("compra", True, False, "50,00 €"), tp("compra", False, False, "50,00 €"),
+           tp("vende", True, True, "50,00 €"), tp("compra", False, True, "50,00 €")])
+    prova("senza cifra si dice «Il tuo scambio»", True,
+          tp("compra", True, False).startswith("⏳ <b>Il tuo scambio è fermo da 2 giorni:</b>"))
+    prova("contanti e Barattozon: il verbo e il bottone giusti",
+          [True, True, True, True, True, True],
+          ["di averti consegnato i contanti" in tp("vende", False, False, "", "contanti"),
+           "con «Ho consegnato i contanti»; se non vi vedete più" in tp("compra", False, False, "", "contanti"),
+           "ricevuta" not in tp("compra", True, False, "", "contanti"),
+           "di aver pagato il tuo PayCode. Se su Amazon risulta pagato, libera i sats; se no, apri"
+           in tp("vende", True, False, "", "tabacchino"),
+           "con «Ho pagato al tabacchino»; se non lo paghi più" in tp("compra", False, False, "", "tabacchino"),
+           tp("compra", True, False, "", "tabacchino").endswith("Tieni pronto lo scontrino.")])
+    tm = amb["_testo_garanzia_mod_p2p"]
+    D = {"ordine": "1a2b3c4d-0000", "compra": "Mario", "vende": "Luca", "sats": 72000,
+         "euro": "50,00 €", "metodi": "SEPA", "modo": "", "fiat_il": 0, "disputa_il": 0,
+         "compratore": 111, "venditore": 222}
+    M72 = ("⏰ <b>Scambio P2P in garanzia da 72 ore</b> (ordine <code>1a2b3c4d</code>)\n"
+           "• Compra: Mario · Vende: Luca\n"
+           "• Importo: 72.000 sats per 50,00 € via SEPA\n"
+           "• «Ho inviato gli euro»: <b>no</b>\n"
+           "• Disputa: <b>no</b>\n\n"
+           "Verso le 92 ore il coordinatore annulla lo scambio (se chi compra non ha segnato "
+           "il pagamento) o apre una disputa da solo (se l'ha segnato); verso le 94 i sats "
+           "tornano da soli a chi vende. Se c'è una disputa, va decisa prima.")
+    M88 = ("🚨 <b>Scambio P2P in garanzia da 88 ore: restano circa 4 ore</b> (ordine "
+           "<code>1a2b3c4d</code>)\n"
+           "• Compra: Mario · Vende: Luca\n"
+           "• Importo: 72.000 sats per 50,00 € via SEPA\n"
+           "• «Ho inviato gli euro»: <b>no</b>\n"
+           "• Disputa: <b>no</b>\n\n"
+           "Verso le 92 ore il coordinatore annulla, o apre una disputa da solo che non arriva "
+           "a nessuno su Telegram; verso le 94 i sats tornano da soli a chi vende, anche se chi "
+           "compra aveva ragione. Se c'è una disputa, decidila adesso.")
+    m72, m88 = tm(72, 72, D, 500), tm(88, 88, D, 500)
+    prova("i due avvisi ai moderatori, come approvati (a meno del separatore delle migliaia)",
+          [M72, M88], [m72.replace(amb["_fmt_sats"](72000), "72.000"),
+                       m88.replace(amb["_fmt_sats"](72000), "72.000")])
+    T = 1_790_000_000
+    con_fatti = dict(D, fiat_il=T, disputa_il=T + 600)
+    prova("...col «pagato» e la disputa: sì, con l'ora; e le ore vere dopo un riavvio tardivo",
+          [True, True, True, True],
+          [f"• «Ho inviato gli euro»: <b>sì</b>, segnato {amb['_quando_garanzia_p2p'](T)}"
+           in tm(72, 75, con_fatti), f"• Disputa: <b>aperta</b> {amb['_quando_garanzia_p2p'](T + 600)}"
+           in tm(72, 75, con_fatti), tm(72, 75, D).startswith("⏰ <b>Scambio P2P in garanzia da 75 ore</b>"),
+           tm(88, 93, D).startswith("🚨 <b>Scambio P2P in garanzia da 93 ore</b> (ordine")])
+    prova("il moderatore che e' una delle parti lo legge in coda; gli altri no", [True, False],
+          [tm(72, 72, D, 111).endswith("⚠️ <b>Sei una delle due parti:</b> questa la decide un altro moderatore."),
+           "Sei una delle due parti" in tm(72, 72, D, 500)])
+    prova("Barattozon: il bottone nella riga del «pagato»", True,
+          "• «Ho pagato al tabacchino»: <b>no</b>" in tm(72, 72, dict(D, modo="tabacchino")))
+    modo = amb["_modo_garanzia_p2p"]
+    prova("il metodo per le parole: Barattozon, contanti, tutto il resto",
+          ["tabacchino", "contanti", "", "tabacchino"],
+          [modo({"tabacchino": True}), modo({"contanti": True}), modo({}),
+           modo({"tabacchino": True, "contanti": True})])
+
+    # --- 4) IL GIUDICE SUL DATABASE, con l'orologio spostato ---------------
+    KA, KB = "a" * 64, "b" * 64
+    for tg, nome in ((111, "Bea"), (222, "Alan"), (500, "Mod Uno"), (501, "Mod Due")):
+        con.execute("INSERT INTO utenti(tg_id, nome) VALUES(?,?)", (tg, nome))
+    for k, tg in ((KA, 111), (KB, 222)):
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,?)", (k, tg, T))
+    con.commit()
+
+    def scambio(n, metodi='["SEPA"]'):
+        ordine = f"{n:08x}-7b2d-4c6a-9e11-aa00bb11cc01"
+        con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,sats,euro,metodi) "
+                    "VALUES(?,?,?,'in-progress','sell',1,72000,'50,00 €',?)", (ordine, 222, T, metodi))
+        con.commit()
+        return ordine
+
+    def manda(ordine, azione, ts, attore="mostro", dettaglio=""):
+        d = {"v": 1, "order": ordine, "action": azione, "ts": ts, "buyer": KA, "seller": KB,
+             "actor": attore}
+        if dettaglio:
+            d["detail"] = dettaglio
+        ev = amb["_evento_p2p_pulito"](d, ts)
+        return amb["_registra_evento_p2p"](con, ev, ts)
+
+    def preso(ordine, t0):
+        manda(ordine, "taken", t0 - 600, "buyer", "take")
+        manda(ordine, "hold-invoice-paid", t0, "seller")
+
+    gl = amb["_garanzie_lunghe_p2p"]
+    chi = lambda lista: sorted(t for t, _, _ in lista)
+
+    A = scambio(1)
+    preso(A, T)
+    prova("a 47 ore niente, a nessuno", [], gl(con, T + 47 * H))
+    a48 = gl(con, T + 48 * H)
+    prova("a 48 ore: un avviso a chi compra e uno a chi vende, col testo del loro punto",
+          [(111, V4.replace(" da 50,00 €", " da 50,00 €")), (222, V1)],
+          sorted((t, x) for t, x, _ in a48))
+    prova("...e ripassando subito, o un minuto dopo, niente: il timbro c'e'", [[], []],
+          [gl(con, T + 48 * H), gl(con, T + 48 * H + 60)])
+    a72 = gl(con, T + 72 * H)
+    prova("a 72 ore: un avviso a ognuno dei due moderatori, le parti tacciono",
+          [500, 501], chi(a72))
+    prova("...col testo delle 72 e le righe per il journal", [True, True],
+          [all(x.startswith("⏰ <b>Scambio P2P in garanzia da 72 ore</b>") for _, x, _ in a72),
+           all(j.startswith(f"⏰ Garanzia lunga P2P: {A[:8]} 72h → ") and
+               j.endswith("(moderatore; pagato: no, disputa: no)") for _, _, j in a72)])
+    prova("...e ripassando, niente", [], gl(con, T + 72 * H + 60))
+    a88 = gl(con, T + 88 * H)
+    prova("a 88 ore: il secondo, urgente, ai due moderatori", [[500, 501], True],
+          [chi(a88), all(x.startswith("🚨 <b>Scambio P2P in garanzia da 88 ore: restano circa 4 ore</b>")
+                         for _, x, _ in a88)])
+    prova("...e poi basta: massimo due per scambio", [[], []],
+          [gl(con, T + 89 * H), gl(con, T + 99 * H)])
+
+    # IL RIAVVIO TARDIVO: il server era spento da 70 a 90 ore
+    B = scambio(2)
+    preso(B, T)
+    del righe_journal[:]
+    b90 = gl(con, T + 90 * H)
+    prova("riavvio tardivo (90 ore): ai moderatori solo l'88, alle parti niente",
+          [[500, 501], True], [chi(b90), all("da 90 ore" in x for _, x, _ in b90)])
+    prova("...il 72 e il 48 timbrati saltati, col journal che dice perche'",
+          [[("garanzia48", 111, "tardi"), ("garanzia48", 222, "tardi"),
+            ("garanzia72", 500, "superato"), ("garanzia72", 501, "superato"),
+            ("garanzia88", 500, "garanzia"), ("garanzia88", 501, "garanzia")], True],
+          [[(r["momento"], r["tg_id"], r["fonte"]) for r in con.execute(
+              "SELECT * FROM p2p_avvisi WHERE ordine=? AND momento LIKE 'garanzia%' "
+              "ORDER BY momento, tg_id", (B,))],
+           any("saltato: e' gia' a 90 ore, parte quello delle 88" in r for r in righe_journal)])
+    prova("...e rilanciato, niente di nuovo", [], gl(con, T + 90 * H + 60))
+
+    # IL «PAGATO» SEGNATO, E LA DISPUTA APERTA
+    C = scambio(3)
+    preso(C, T)
+    manda(C, "fiat-sent", T + 5 * H, "buyer")
+    prova("col «pagato»: chi vende e chi compra leggono la variante col pagamento",
+          [(111, V3), (222, V2)], sorted((t, x) for t, x, _ in gl(con, T + 48 * H)))
+    c72 = gl(con, T + 72 * H)
+    prova("...e ai moderatori «sì», con l'ora", True,
+          all(f"«Ho inviato gli euro»: <b>sì</b>, segnato {amb['_quando_garanzia_p2p'](T + 5 * H)}"
+              in x for _, x, _ in c72) and len(c72) == 2)
+    Dp = scambio(4)
+    preso(Dp, T)
+    manda(Dp, "fiat-sent", T + 5 * H, "buyer")
+    con.execute("INSERT INTO p2p_dispute(ordine, giro, aperta_il, aperta_da, compratore, "
+                "venditore, stato) SELECT ?, giro, ?, 'compra', 111, 222, 'aperta' "
+                "FROM p2p_scambi WHERE ordine=?", (Dp, T + 6 * H, Dp))
+    con.commit()
+    prova("con la disputa aperta: tutti e due leggono la variante della disputa",
+          [(111, V5), (222, V5)], sorted((t, x) for t, x, _ in gl(con, T + 48 * H)))
+    prova("...e i moderatori la vedono aperta, con l'ora", True,
+          all(f"• Disputa: <b>aperta</b> {amb['_quando_garanzia_p2p'](T + 6 * H)}" in x
+              for _, x, _ in gl(con, T + 72 * H)))
+
+    # CHIUSO, SPENTO, FUORI TEMPO, TROPPO VECCHIO
+    E = scambio(5)
+    preso(E, T)
+    manda(E, "success", T + 10 * H)
+    prova("uno scambio concluso dopo la garanzia non avvisa nessuno", [[], []],
+          [[x for x in gl(con, T + 48 * H) if x[2].find(E[:8]) >= 0],
+           [x for x in gl(con, T + 72 * H) if x[2].find(E[:8]) >= 0]])
+    F = scambio(6)
+    preso(F, T)
+    con.execute("UPDATE utenti SET avvisi_p2p=0 WHERE tg_id IN (222, 500)")
+    con.commit()
+    del righe_journal[:]
+    f48 = [x for x in gl(con, T + 48 * H) if F[:8] in x[2]]
+    prova("avvisi P2P spenti: la parte che li ha spenti non riceve, l'altra si'",
+          [111], chi(f48))
+    prova("...e il journal lo dice, una volta", 1,
+          sum(1 for r in righe_journal if r.startswith(f"🔕 Garanzia lunga P2P: {F[:8]} 48h a 222")))
+    prova("...ma il moderatore che li ha spenti riceve lo stesso il suo", [500, 501],
+          chi([x for x in gl(con, T + 72 * H) if F[:8] in x[2]]))
+    con.execute("UPDATE utenti SET avvisi_p2p=1")
+    con.commit()
+    G = scambio(7)
+    preso(G, T)
+    prova("a 101 ore: niente a nessuno, tutto timbrato «tardi» (due parti, due moderatori per due livelli)", [[], 6],
+          [[x for x in gl(con, T + 101 * H) if G[:8] in x[2]],
+           con.execute("SELECT COUNT(*) FROM p2p_avvisi WHERE ordine=? AND fonte='tardi'",
+                       (G,)).fetchone()[0]])
+    Hh = scambio(8)
+    preso(Hh, T)
+    prova("piu' vecchio di sette giorni: non si guarda nemmeno (nessun timbro)", [[], 0],
+          [[x for x in gl(con, T + 8 * 86400) if Hh[:8] in x[2]],
+           con.execute("SELECT COUNT(*) FROM p2p_avvisi WHERE ordine=? AND momento LIKE "
+                       "'garanzia%'", (Hh,)).fetchone()[0]])
+    amb["ADMIN_IDS"] = [500, 111]
+    I = scambio(9)
+    preso(I, T)
+    gl(con, T + 48 * H)
+    i72 = {t: x for t, x, j in gl(con, T + 72 * H) if I[:8] in j}
+    prova("il moderatore che e' una delle parti lo legge nel suo avviso", [True, False],
+          ["Sei una delle due parti" in i72.get(111, ""), "Sei una delle due parti" in i72.get(500, "?")])
+
+
 def prove_stellina_card_p2p():
     """LA STELLINA ALL'ANGOLO DELLA CARD P2P DELLA HOME (7 ott 2026,
     richiesta di Andrea). Nella fila «Scambi P2P», all'angolo del volto
@@ -128836,6 +129127,7 @@ def main():
               prove_stellina_card_p2p,
               prove_recapito_corto,
               prove_testi_p2p_confondono,
+              prove_garanzia_lunga,
               prove_config_esempio):
         try:
             f()

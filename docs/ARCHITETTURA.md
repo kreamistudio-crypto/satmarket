@@ -27316,6 +27316,18 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (6) che il libro porti i numeri della presa, e `P2P_RESPIRO_NOME_S`
   (3) il nome di chi ha preso (`_controparti_p2p`: mai un nome che la
   pagina non mostra).
+  LA GARANZIA LUNGA (7 ott 2026, `_giro_garanzie_p2p`, un passo del
+  battito pieno dopo le attese): dall'ora del `garanzia_pagata` del
+  coordinatore (`p2p_momenti`, fonte 'mostro'), su ogni scambio non
+  chiuso, a 48 ore un avviso a ciascuna parte (cinque varianti: pagato
+  segnato o no, disputa aperta; l'interruttore degli avvisi P2P vale), a
+  72 e a 88 ai moderatori (`_moderatori_p2p`, SEMPRE, interruttore o no).
+  Il giudice `_passo_garanzia_p2p` è puro; `_garanzie_lunghe_p2p` timbra
+  in `p2p_avvisi` (`garanzia48|72|88` per giro e persona) PRIMA che il
+  giro mandi, e i salti (tardi, spento, superato) sono timbri anche loro,
+  col journal una volta sola. Le soglie e i perché (92 ore del
+  coordinatore, 94 di LND, `holdexpirydelta` di default) stanno nel
+  commento del blocco e in CANTIERI, «La garanzia lunga».
   IL RECAPITO (`_avviso_recapito_p2p`) riconosce le parti dallo SCAMBIO
   IN CORSO (`_parti_scambio_p2p`: prima `p2p_scambi`, cioè il
   coordinatore; poi, se lui tace, `p2p_ordini` come prima), e `vivo`

@@ -46185,6 +46185,320 @@ async def _giro_attese_p2p():
         _esiti_p2p_dice("📬", esiti)
 
 
+# ═══ LA GARANZIA LUNGA (7 ott 2026, cantiere «avviso garanzia lunga»,
+# testi e regole approvati da Andrea) ═══════════════════════════════════
+# I sats in garanzia non ci restano per sempre: sul sorgente della
+# v0.19.0 (-bar6, letto il 7 ott 2026) il coordinatore si muove a ~92
+# ore dal pagamento della hold (`enforce_escrow_deadline_pass`: in
+# `active` annulla e i sats tornano a chi vende, in `fiat-sent` apre una
+# disputa DA SOLO — e quella disputa la patch 0007 non la racconta a
+# nessuno), e una disputa gia' aperta e non decisa la chiude LND a ~94
+# ore (`invoices.holdexpirydelta`, non impostato sul nodo: il default,
+# 12 blocchi), coi sats a chi vende anche se chi compra aveva ragione.
+# Il server non tocca il nodo: GUARDA. Dall'ora in cui il coordinatore
+# gli ha detto «garanzia pagata» (`p2p_momenti`, fonte 'mostro'):
+#   • a 48 ore, UN avviso a ciascuna delle due parti, col testo giusto
+#     per il punto in cui stanno (pagato segnato o no, disputa aperta);
+#   • a 72 e a 88 ore, un avviso ai moderatori (ADMIN_IDS), il secondo
+#     piu' urgente. Massimo due a moderatore e per scambio.
+# L'ANTI-DOPPIONE E' IL TIMBRO IN `p2p_avvisi` (chiave ordine, momento,
+# giro, persona), scritto PRIMA dell'invio — il patto delle sorelle:
+# un riavvio non ripete niente, un giro che muore a meta' al peggio
+# perde un avviso. Dopo un riavvio tardivo parte solo il livello piu'
+# alto (72 si timbra saltato se e' gia' ora di 88), e fuori tempo non
+# parte niente: alle parti dopo 80 ore («fermo da 2 giorni» non
+# sarebbe piu' vero), a nessuno dopo 100 (la garanzia non c'e' piu').
+# Un ordine ripreso dopo il ritorno in vetrina e' un altro GIRO: conta
+# da capo.
+# IL LIMITE, detto: qui si contano ore d'orologio, il coordinatore
+# conta blocchi. Con blocchi piu' veloci del solito le «92 ore»
+# arrivano prima — e' il motivo di 72 e 88 invece di 90. E uno scambio
+# di cui il coordinatore non ha mai detto «garanzia pagata» qui non si
+# vede.
+P2P_GARANZIA_PARTI_S = 48 * 3600       # l'avviso alle due parti
+P2P_GARANZIA_PARTI_FINO_S = 80 * 3600  # oltre, «fermo da 2 giorni» non e' vero
+P2P_GARANZIA_MOD1_S = 72 * 3600        # il primo avviso ai moderatori
+P2P_GARANZIA_MOD2_S = 88 * 3600        # il secondo, urgente
+P2P_GARANZIA_TARDI_S = 100 * 3600      # oltre, la garanzia non c'e' piu'
+P2P_GARANZIA_COORD_H = 92              # quando si muove il coordinatore
+P2P_GARANZIA_LND_H = 94                # quando la chiude LND (12 blocchi prima)
+P2P_GARANZIA_GUARDA_S = 7 * 86400      # piu' vecchie di cosi' non si guardano
+
+
+def _passo_garanzia_p2p(da_s: int) -> dict:
+    """PURA: cosa tocca a uno scambio con la garanzia pagata da `da_s`
+    secondi. `parti` e' 'manda', 'tardi' o '' (non ancora); `mod` e'
+    88, 72, 'tardi' o 0. UN LIVELLO SOLO PER I MODERATORI, il piu'
+    alto: a 90 ore il 72 non parte piu' (lo si timbra saltato)."""
+    da_s = int(da_s or 0)
+    if da_s >= P2P_GARANZIA_TARDI_S:
+        return {"parti": "tardi", "mod": "tardi"}
+    parti = ("tardi" if da_s >= P2P_GARANZIA_PARTI_FINO_S
+             else "manda" if da_s >= P2P_GARANZIA_PARTI_S else "")
+    mod = (88 if da_s >= P2P_GARANZIA_MOD2_S
+           else 72 if da_s >= P2P_GARANZIA_MOD1_S else 0)
+    return {"parti": parti, "mod": mod}
+
+
+def _modo_garanzia_p2p(dati: dict) -> str:
+    """PURA: il metodo, per le parole: 'tabacchino', 'contanti' o ''."""
+    if dati.get("tabacchino"):
+        return "tabacchino"
+    if dati.get("contanti"):
+        return "contanti"
+    return ""
+
+
+GESTO_PAGATO_P2P = {"": "Ho inviato gli euro", "contanti": "Ho consegnato i contanti",
+                    "tabacchino": "Ho pagato al tabacchino"}
+
+
+def _testo_garanzia_parte_p2p(ruolo: str, pagato: bool, disputa: bool,
+                              cifra: str = "", modo: str = "") -> str:
+    """PURA: l'avviso delle 48 ore a una parte, nelle cinque varianti
+    approvate da Andrea: chi vende senza e col «pagato», chi compra col
+    e senza, e la disputa gia' aperta (a tutti e due). `cifra` e' quella
+    del libro gia' scappata («50,00 €»), o vuota; `modo` cambia il verbo
+    e il nome del bottone per il contanti e per Barattozon."""
+    scambio = "Il tuo scambio" + (f" da {cifra}" if cifra else "")
+    if disputa:
+        return (f"⚖️ <b>{scambio} è in disputa e fermo da 2 giorni:</b> un "
+                "moderatore lo sta guardando. Se vi siete messi d'accordo, "
+                "potete ancora annullare insieme dalla pagina dello scambio.")
+    tab, mano = modo == "tabacchino", modo == "contanti"
+    if ruolo == "vende":
+        detto = ("aver pagato il tuo PayCode" if tab
+                 else "averti consegnato i contanti" if mano
+                 else "averti inviato gli euro")
+        if pagato:
+            arrivati = ("Se su Amazon risulta pagato, libera i sats; se no"
+                        if tab else
+                        "Se li hai ricevuti, libera i sats; se non sono arrivati")
+            return (f"⏳ <b>{scambio} è fermo da 2 giorni:</b> chi compra dice "
+                    f"di {detto}. {arrivati}, apri una disputa dalla pagina "
+                    "dello scambio.\n\n"
+                    "<i>Fra circa due giorni si apre una disputa da sola, e "
+                    "decide un moderatore.</i>")
+        lo_stesso = ("Se su Amazon risulta pagato lo stesso" if tab
+                     else "Se li hai ricevuti lo stesso")
+        return (f"⏳ <b>{scambio} è fermo da 2 giorni</b> e i sats sono ancora "
+                f"in garanzia: chi compra non ha ancora detto di {detto}. "
+                f"{lo_stesso}, libera i sats; se no, scrivigli dalla pagina "
+                "dello scambio o annullate d'accordo.\n\n"
+                "<i>Fra circa due giorni, se nessuno si muove, lo scambio si "
+                "annulla da solo e i sats tornano a te.</i>")
+    gesto = GESTO_PAGATO_P2P.get(modo, GESTO_PAGATO_P2P[""])
+    if pagato:
+        prova = (" Tieni pronto lo scontrino." if tab
+                 else "" if mano else " Tieni pronta la ricevuta.")
+        return (f"⏳ <b>{scambio} è fermo da 2 giorni:</b> se hai pagato e non "
+                "ricevi i sats, apri una disputa adesso, dalla pagina dello "
+                f"scambio.{prova}")
+    fatto, smetti = (("pagato il PayCode", "se non lo paghi più") if tab
+                     else ("consegnato i contanti", "se non vi vedete più") if mano
+                     else ("inviato gli euro", "se non li invii più"))
+    return (f"⏳ <b>{scambio} è fermo da 2 giorni</b> e i sats sono ancora in "
+            f"garanzia. Se hai già {fatto}, dillo nella pagina dello scambio "
+            f"con «{gesto}»; {smetti}, annullate d'accordo.\n\n"
+            "<i>Fra circa due giorni, se nessuno si muove, lo scambio si "
+            "annulla da solo e i sats tornano a chi vende.</i>")
+
+
+def _quando_garanzia_p2p(ts: int) -> str:
+    """L'ora di un fatto, detta a un moderatore: «il 05/10 alle 14:20»."""
+    return time.strftime("il %d/%m alle %H:%M", time.localtime(int(ts)))
+
+
+def _testo_garanzia_mod_p2p(livello: int, ore: int, d: dict, per: int = 0) -> str:
+    """PURA (a parte l'ora locale): l'avviso ai moderatori, a 72 o a 88
+    ore. `d` porta `ordine`, le due persone gia' dette (`compra`,
+    `vende`), i numeri del libro (`sats`, `euro`, `metodi`, scappati),
+    `fiat_il` e `disputa_il` (0 = no), `modo` e i due id. `ore` sono
+    quelle VERE: dopo un riavvio tardivo il testo dice «da 90 ore», non
+    «72». Se il moderatore e' una delle parti lo legge in coda."""
+    corto = html.escape(str(d.get("ordine") or "")[:8])
+    sats = int(d.get("sats") or 0)
+    euro = str(d.get("euro") or "")
+    importo = (f"{_fmt_sats(sats)} sats" if sats > 0 else "")
+    if euro:
+        importo += (" per " if importo else "") + euro
+    if importo and d.get("metodi"):
+        importo += f" via {d['metodi']}"
+    gesto = GESTO_PAGATO_P2P.get(d.get("modo") or "", GESTO_PAGATO_P2P[""])
+    fiat = int(d.get("fiat_il") or 0)
+    disp = int(d.get("disputa_il") or 0)
+    if livello >= 88:
+        resta = P2P_GARANZIA_COORD_H - int(ore)
+        testa = (f"🚨 <b>Scambio P2P in garanzia da {ore} ore"
+                 + (f": restano circa {resta} ore" if resta > 0 else "") + "</b>")
+    else:
+        testa = f"⏰ <b>Scambio P2P in garanzia da {ore} ore</b>"
+    righe = [f"{testa} (ordine <code>{corto}</code>)",
+             f"• Compra: {d.get('compra') or '—'} · Vende: {d.get('vende') or '—'}",
+             f"• Importo: {importo or 'il libro non lo dice'}",
+             f"• «{gesto}»: " + (f"<b>sì</b>, segnato {_quando_garanzia_p2p(fiat)}"
+                                 if fiat else "<b>no</b>"),
+             "• Disputa: " + (f"<b>aperta</b> {_quando_garanzia_p2p(disp)}"
+                              if disp else "<b>no</b>"),
+             ""]
+    if livello >= 88:
+        righe.append(f"Verso le {P2P_GARANZIA_COORD_H} ore il coordinatore annulla, o "
+                     "apre una disputa da solo che non arriva a nessuno su Telegram; "
+                     f"verso le {P2P_GARANZIA_LND_H} i sats tornano da soli a chi "
+                     "vende, anche se chi compra aveva ragione. Se c'è una disputa, "
+                     "decidila adesso.")
+    else:
+        righe.append(f"Verso le {P2P_GARANZIA_COORD_H} ore il coordinatore annulla lo "
+                     "scambio (se chi compra non ha segnato il pagamento) o apre una "
+                     "disputa da solo (se l'ha segnato); verso le "
+                     f"{P2P_GARANZIA_LND_H} i sats tornano da soli a chi vende. Se "
+                     "c'è una disputa, va decisa prima.")
+    if per and per in (int(d.get("compratore") or 0), int(d.get("venditore") or 0)):
+        righe.append("⚠️ <b>Sei una delle due parti:</b> questa la decide un altro "
+                     "moderatore.")
+    return "\n".join(righe)
+
+
+def _timbra_garanzia_p2p(con, ordine: str, momento: str, giro: int, tg_id: int,
+                         adesso: int, fonte: str) -> bool:
+    """IL TIMBRO PRIMA DELL'INVIO: True se la riga e' nata adesso (e
+    allora l'avviso parte), False se c'era gia' (e allora tace)."""
+    return bool(con.execute(
+        "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, tg_id, quando, "
+        "fonte) VALUES(?,?,?,?,?,?)",
+        (ordine, momento, giro, int(tg_id), adesso, fonte)).rowcount)
+
+
+def _garanzie_lunghe_p2p(con, adesso: int) -> list:
+    """Le garanzie lunghe di adesso: chi avvisare e con che frase. Pura
+    sulla connessione; SCRIVE i timbri (e fa commit) prima di tornare,
+    cosi' quel che torna e' gia' «detto». Torna una lista di
+    `(tg_id, testo, riga_del_journal)`. Le righe dei salti (avvisi
+    spenti, fuori tempo, livello superato) le stampa qui, una volta
+    sola: il timbro le spegne ai giri dopo."""
+    fuori = []
+    righe = con.execute(
+        "SELECT s.ordine, s.giro, s.compratore, s.venditore, MIN(m.quando) AS garanzia "
+        "FROM p2p_scambi s JOIN p2p_momenti m ON m.ordine=s.ordine AND m.giro=s.giro "
+        "AND m.momento='garanzia_pagata' AND m.fonte='mostro' "
+        "GROUP BY s.ordine, s.giro "
+        "HAVING MIN(m.quando) <= ? AND MIN(m.quando) >= ?",
+        (adesso - P2P_GARANZIA_PARTI_S, adesso - P2P_GARANZIA_GUARDA_S)).fetchall()
+    finali = ",".join("?" * len(P2P_MOMENTI_FINALI))
+    for r in righe:
+        ordine, giro = r["ordine"], int(r["giro"] or 0)
+        garanzia = int(r["garanzia"] or 0)
+        corto = ordine[:8]
+        if con.execute(
+                f"SELECT 1 FROM p2p_momenti WHERE ordine=? AND giro=? AND quando>=? "
+                f"AND momento IN ({finali}) LIMIT 1",
+                (ordine, giro, garanzia, *P2P_MOMENTI_FINALI)).fetchone():
+            continue                       # chiuso: niente da dire a nessuno
+        da_s = adesso - garanzia
+        ore = da_s // 3600
+        passo = _passo_garanzia_p2p(da_s)
+        f = con.execute(
+            "SELECT MIN(quando) AS q FROM p2p_momenti WHERE ordine=? AND giro=? "
+            "AND momento='fiat' AND quando>=?", (ordine, giro, garanzia)).fetchone()
+        fiat_il = int((f["q"] if f else 0) or 0)
+        dsp = con.execute(
+            "SELECT aperta_il FROM p2p_dispute WHERE ordine=? AND giro=? "
+            "AND stato<>'chiusa'", (ordine, giro)).fetchone()
+        disputa_il = int((dsp["aperta_il"] if dsp else 0) or 0)
+        dati = _dati_frase_p2p(con, ordine)
+        modo = _modo_garanzia_p2p(dati)
+        euro = str(dati.get("euro") or "")
+        cifra = euro if euro and not euro.startswith("da ") else ""
+        stato = (f"pagato: {'sì' if fiat_il else 'no'}, "
+                 f"disputa: {'sì' if disputa_il else 'no'}")
+        compra, vende = int(r["compratore"] or 0), int(r["venditore"] or 0)
+
+        # --- le due parti, a 48 ore -----------------------------------
+        if passo["parti"]:
+            for chi, ruolo in ((vende, "vende"), (compra, "compra")):
+                if not chi:
+                    continue               # non e' dei nostri: un altro client
+                if passo["parti"] == "tardi":
+                    if _timbra_garanzia_p2p(con, ordine, "garanzia48", giro, chi,
+                                            adesso, "tardi"):
+                        print(f"· Garanzia lunga P2P: {corto} 48h a {chi} ({ruolo}) "
+                              f"saltato: e' gia' a {ore} ore, «fermo da 2 giorni» "
+                              "non sarebbe vero", flush=True)
+                    continue
+                if not _avvisi_p2p_accesi(con, chi):
+                    if _timbra_garanzia_p2p(con, ordine, "garanzia48", giro, chi,
+                                            adesso, "spento"):
+                        print(f"🔕 Garanzia lunga P2P: {corto} 48h a {chi} ({ruolo}) "
+                              "non parte: ha gli avvisi P2P spenti", flush=True)
+                    continue
+                if _timbra_garanzia_p2p(con, ordine, "garanzia48", giro, chi,
+                                        adesso, "garanzia"):
+                    fuori.append((chi, _testo_garanzia_parte_p2p(
+                        ruolo, bool(fiat_il), bool(disputa_il), cifra, modo),
+                        f"⏰ Garanzia lunga P2P: {corto} 48h → {chi} ({ruolo}; {stato})"))
+
+        # --- i moderatori, a 72 e a 88 ore ------------------------------
+        # ⚠️ SEMPRE, anche con l'interruttore degli avvisi P2P spento
+        # (decisione di Andrea): quello e' di chi scambia, questo e' un
+        # dovere — la stessa regola degli avvisi delle dispute
+        livello = passo["mod"]
+        if not livello:
+            con.commit()
+            continue
+        d = None
+        for mod in _moderatori_p2p():
+            if livello == "tardi":
+                for m in ("garanzia72", "garanzia88"):
+                    if _timbra_garanzia_p2p(con, ordine, m, giro, mod, adesso, "tardi"):
+                        print(f"· Garanzia lunga P2P: {corto} {m[8:]}h a {mod} "
+                              f"(moderatore) saltato: e' gia' a {ore} ore, la "
+                              "garanzia non c'e' piu'", flush=True)
+                continue
+            if livello == 88 and _timbra_garanzia_p2p(
+                    con, ordine, "garanzia72", giro, mod, adesso, "superato"):
+                print(f"· Garanzia lunga P2P: {corto} 72h a {mod} (moderatore) "
+                      f"saltato: e' gia' a {ore} ore, parte quello delle 88",
+                      flush=True)
+            if not _timbra_garanzia_p2p(con, ordine, f"garanzia{livello}", giro, mod,
+                                        adesso, "garanzia"):
+                continue
+            if d is None:
+                d = {"ordine": ordine, "compratore": compra, "venditore": vende,
+                     "compra": _persona_disputa_p2p(con, compra),
+                     "vende": _persona_disputa_p2p(con, vende),
+                     "sats": dati["sats"], "euro": dati["euro"],
+                     "metodi": dati["metodi"], "modo": modo,
+                     "fiat_il": fiat_il, "disputa_il": disputa_il}
+            fuori.append((mod, _testo_garanzia_mod_p2p(livello, ore, d, mod),
+                          f"⏰ Garanzia lunga P2P: {corto} {livello}h → {mod} "
+                          f"(moderatore; {stato})"))
+        con.commit()
+    con.commit()
+    return fuori
+
+
+async def _giro_garanzie_p2p():
+    """Un battito delle garanzie lunghe: i timbri si scrivono a
+    connessione aperta, gli avvisi partono dopo, e per ognuno una riga
+    nel journal. Fail-open come le sorelle."""
+    if not _p2p_leve()["attivo"]:
+        return
+    adesso = int(time.time())
+    con = db()
+    try:
+        avvisi = _garanzie_lunghe_p2p(con, adesso)
+    finally:
+        con.close()
+    for tg_id, testo, riga in avvisi:
+        try:
+            esito = await notifica(tg_id, testo)
+            print(f"{riga}: mandato ({esito})" if esito else f"{riga}: mandato",
+                  flush=True)
+        except Exception as e:
+            print(f"⚠️ {riga}: SALTATO ({type(e).__name__}: {e})", flush=True)
+        await asyncio.sleep(0.2)
+
+
 async def orologio_p2p():
     """Il giro del P2P, uno al minuto: il LIBRO (la rete di sicurezza
     degli avvisi) e le ATTESE (gli avvisi che aspettano il loro
@@ -46265,6 +46579,15 @@ async def orologio_p2p():
             print(f"⚠️ Attese P2P: battito saltato "
                   f"({type(e).__name__}: {e})", flush=True)
         _P2P_BATTITO["vivo"] = time.time()
+        # LA GARANZIA LUNGA (7 ott 2026): una volta al minuto, nel battito
+        # pieno — i lampi dell'ascolto non c'entrano
+        if not lampo and not solo_attese:
+            try:
+                await asyncio.wait_for(_giro_garanzie_p2p(), P2P_PASSATA_MAX_S)
+            except Exception as e:
+                print(f"⚠️ Garanzie lunghe P2P: battito saltato "
+                      f"({type(e).__name__}: {e})", flush=True)
+            _P2P_BATTITO["vivo"] = time.time()
         # UNA RIGA A PASSATA, ANCHE A VUOTO: e' quella che distingue
         # «gira e non trova niente» da «non gira» — la domanda che il
         # 17 set e' costata un'ora. Si spegne con P2P_LOG_PASSATE=False
