@@ -127034,6 +127034,109 @@ console.log(JSON.stringify(out));
           r.get("senzaEvento"))
 
 
+def prove_recapito_corto():
+    """IL TESTO CORTO DEL FOGLIO DEI RECAPITI (7 ott 2026, richiesta di
+    Andrea: «troppo lungo e tecnico»). Sotto «Aggiorna il recapito»,
+    per i metodi a recapito (IBAN, Revolut, Satispay, PayPal, quelli
+    liberi), tre righe invece di quattro paragrafi: «✓ Recapito
+    inviato» solo dopo l'invio, le altre due sempre. Le due metà della
+    RIGA ONESTA restano insieme e nello stesso ordine — dentro cifrato,
+    fuori non conta. L'appuntamento (contanti), il tabacchino
+    (Barattozon) e chi compra tengono le loro righe finché Andrea non
+    dice sì alle proposte.
+    Il banco ESEGUE il vero `renderCampiP2P`, con le forme vere e il
+    giudice vero della forma, su un DOM di cartone."""
+    print("\n[il testo corto del foglio dei recapiti]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    rc = pezzo_js(mini, "function renderCampiP2P(", "\n}\n")
+    OK = "✓ Recapito inviato. Se lo cambi, vale l\\'ultimo."
+    LUCCHETTO = ("🔒 Lo vedete solo tu e l\\'altra persona, nemmeno Barattolo. "
+                 "Resta salvato su questo dispositivo per i prossimi scambi.")
+    AVVISO = ("⚠️ Non scrivere password o codici. Quello che vi dite fuori "
+              "da Barattolo non conta in caso di disputa.")
+    prova("le tre righe approvate stanno nel foglio, parola per parola",
+          [True, True, True], [OK in rc, LUCCHETTO in rc, AVVISO in rc])
+    prova("...e il giudice del corto e' uno: niente appuntamento, si ricorda", True,
+          "corto = !fr.appuntamento && fr.ricorda !== false;" in rc)
+
+    js = (
+        "let p2pCampiOrdine = 'x', p2pCampoMetodo = '';\n"
+        "const CAMPO_MAX_TESTO = 600;\n"
+        "let ORD = {};\n"
+        "const ordiniP2P = () => ({x: ORD});\n"
+        "const box = {innerHTML: ''};\n"
+        "const el = id => id === 'p2pCampiCorpo' ? box : null;\n"
+        "const document = {querySelectorAll: () => []};\n"
+        "const esc = s => String(s);\n"
+        "const recapitiMiei = () => ({});\n"
+        "const metodoSceltoP2P = o => o.deciso || '';\n"
+        "const vesteMetodoP2P = () => false;\n"
+        "const marchioMetodoP2P = m => m;\n"
+        "const campoRecapitoP2P = c => '<campo ' + c.k + '>';\n"
+        "const appuntamentoDaTestoP2P = () => null;\n"
+        "const valoreQuandoP2P = () => '';\n"
+        "const dataTabacchinoP2P = () => '';\n"
+        "const testoAppuntamentoP2P = () => '';\n"
+        "const quandoDaCampoP2P = () => 0, puntoDaCampoP2P = () => null;\n"
+        + pezzo_js(mini, "const P2P_FORME_RECAPITO = [", "\n];\n") + "\n];\n"
+        + pezzo_js(mini, "function formaRecapito(metodo){", "\n}\n") + "\n}\n"
+        + pezzo_js(mini, "function metodoRecapitoScelto(o){", "\n}\n") + "\n}\n"
+        + rc + "\n}\n" + r"""
+const righe = () => (box.innerHTML.match(/<div class="hint">[^]*?<\/div>/g) || [])
+  .map(r => r.replace(/<[^>]+>/g, ''));
+const giro = (lato, metodo, inviato) => {
+  ORD = {lato, metodi: [metodo], campiMiei: inviato ? {euro: {testo: 'x'}} : {},
+         campiLoro: {}, peer: 'p'};
+  renderCampiP2P();
+  return righe();
+};
+const out = {};
+for (const m of ['Bonifico SEPA', 'Revolut', 'Satispay', 'PayPal', 'Lightning in Wero'])
+  out[m] = [giro('vendo', m, false), giro('vendo', m, true)];
+out.contanti = giro('vendo', 'Contanti di persona', true);
+out.tabacchino = giro('vendo', 'Contanti al tabacchino', true);
+out.compro = giro('compro', 'Bonifico SEPA', false);
+console.log(JSON.stringify(out));
+""")
+    out = _node_banco(js)
+    if out is None:
+        salta("il foglio dei recapiti girato in node", "node non c'e'")
+        return
+    ok = OK.replace("\\'", "'")
+    lucc = LUCCHETTO.replace("\\'", "'")
+    prima = ["💶 Il metodo dello scambio è {m}.", lucc, AVVISO]
+    for m in ("Bonifico SEPA", "Revolut", "Satispay", "PayPal", "Lightning in Wero"):
+        p = [r.replace(m, "{m}") for r in prima]
+        prova(f"{m}: prima dell'invio le due righe di sempre, dopo anche «✓ Recapito inviato»",
+              [p, [p[0], ok, lucc, AVVISO]],
+              [[r.replace(m, "{m}") for r in x] for x in out.get(m, [[], []])])
+    vecchie = ("I recapiti viaggiano cifrati", "🔓 Fuori da Barattolo", "📌 Resta ricordato",
+               "✓ Inviato: l'ultimo")
+    prova("...e delle quattro righe di prima non ne resta nessuna, coi metodi a recapito", [],
+          [r for m in ("Bonifico SEPA", "PayPal") for x in out.get(m, [])
+           for r in x if r.startswith(vecchie)])
+    # la riga onesta: le due meta' insieme, la cifratura prima del «fuori»
+    sepa = out.get("Bonifico SEPA", [[], []])[1]
+    prova("LA RIGA ONESTA resta gemella: «nemmeno Barattolo» e poi «fuori da Barattolo», di fila",
+          True, len(sepa) == 4 and "nemmeno Barattolo" in sepa[2]
+          and "fuori da Barattolo non conta" in sepa[3])
+    # chi tiene le sue righe finche' Andrea non dice si' alle proposte
+    prova("il contanti (appuntamento) tiene le sue righe, la riga onesta compresa", True,
+          any(r.startswith("✓ Inviato: l'ultimo che mandi è quello che vale, e chi compra")
+              for r in out.get("contanti", []))
+          and any(r.startswith("📌 Resta ricordato") for r in out.get("contanti", []))
+          and any(r.startswith("🔓 Fuori da Barattolo") for r in out.get("contanti", []))
+          and not any(r.startswith("🔒") for r in out.get("contanti", [])))
+    prova("il tabacchino (Barattozon) tiene le sue righe", True,
+          any(r.startswith("🧾 Non resta ricordato") for r in out.get("tabacchino", []))
+          and any(r.startswith("✓ Inviato: l'ultimo che mandi è quello che vale.")
+                  for r in out.get("tabacchino", []))
+          and not any(r.startswith(("🔒", "✓ Recapito inviato")) for r in out.get("tabacchino", [])))
+    prova("chi compra tiene le sue righe", True,
+          any(r.startswith("I recapiti viaggiano cifrati") for r in out.get("compro", []))
+          and not any(r.startswith("🔒") for r in out.get("compro", [])))
+
+
 def prove_stellina_card_p2p():
     """LA STELLINA ALL'ANGOLO DELLA CARD P2P DELLA HOME (7 ott 2026,
     richiesta di Andrea). Nella fila «Scambi P2P», all'angolo del volto
@@ -128023,6 +128126,7 @@ def main():
               prove_anello_ovunque,
               prove_spia_passi_barattozon,
               prove_stellina_card_p2p,
+              prove_recapito_corto,
               prove_config_esempio):
         try:
             f()

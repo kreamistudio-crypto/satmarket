@@ -63311,11 +63311,17 @@ function renderCampiP2P(){
   } catch(e) {}
   /* per chi vende il form lo sceglie il METODO dell'ordine: campi
      suoi, e precompilati dal ricordo di questo dispositivo */
-  let parteEuro = '', fr = null, salvato = null;
+  let parteEuro = '', fr = null, salvato = null, corto = false;
   if (vende) {
     const metodi = (o.metodi && o.metodi.length) ? o.metodi : [''];
     const scelto = metodoRecapitoScelto(o);
     fr = formaRecapito(scelto);
+    /* IL TESTO CORTO (7 ott 2026, richiesta di Andrea): sotto «Aggiorna
+       il recapito» tre righe invece di quattro paragrafi — la cifratura
+       e il «fuori non conta» restano GEMELLE nella stessa coppia. Vale
+       per i metodi a recapito (IBAN, Revolut, Satispay, PayPal, quelli
+       liberi); l'appuntamento e il tabacchino tengono le loro righe. */
+    corto = !fr.appuntamento && fr.ricorda !== false;
     /* il tabacchino si precompila dalla RIGA, mai dal ricordo (che per
        lui non esiste): su un altro dispositivo la riga adottata non
        li ha, e il form nasce vuoto — si riscrivono dalla ricevuta */
@@ -63354,9 +63360,12 @@ function renderCampiP2P(){
           (miei.euro ? '<div class="hint">✓ Inviato: l\'ultimo che mandi è quello che vale, e chi compra riceve l\'avviso.</div>' : '')
         : '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">💶 ' +
           (miei.euro ? 'Aggiorna il recapito' : 'Invia a chi compra') + '</button>' +
-          (miei.euro ? '<div class="hint">✓ Inviato: l\'ultimo che mandi è quello che vale.</div>' : '')) +
+          (miei.euro ? '<div class="hint">' + (corto
+            ? '✓ Recapito inviato. Se lo cambi, vale l\'ultimo.'
+            : '✓ Inviato: l\'ultimo che mandi è quello che vale.') + '</div>' : '')) +
       (fr.ricorda === false
         ? '<div class="hint">🧾 Non resta ricordato: ogni ordine Amazon è nuovo, e questi tre dati valgono solo per questo scambio.</div>'
+        : corto ? ''
         : '<div class="hint">📌 Resta ricordato su questo dispositivo: al prossimo scambio con questo metodo lo trovi già scritto qui, e parte solo quando lo invii tu.</div>');
   }
   box.innerHTML =
@@ -63376,13 +63385,16 @@ function renderCampiP2P(){
       ? '<div class="hint">👤 Il contatto che ti ha mandato l\'altra persona: <b>' + esc(loro.contatto.testo) + '</b></div>'
       : '') +
     parteEuro +
-    '<div class="hint">I recapiti viaggiano cifrati fra te e l\'altra persona: nessun altro li legge, nemmeno Barattolo. Non scrivere qui password o codici di accesso.</div>' +
+    (corto
+      ? '<div class="hint">🔒 Lo vedete solo tu e l\'altra persona, nemmeno Barattolo. Resta salvato su questo dispositivo per i prossimi scambi.</div>' +
+        '<div class="hint">⚠️ Non scrivere password o codici. Quello che vi dite fuori da Barattolo non conta in caso di disputa.</div>'
+      : '<div class="hint">I recapiti viaggiano cifrati fra te e l\'altra persona: nessun altro li legge, nemmeno Barattolo. Non scrivere qui password o codici di accesso.</div>' +
     /* LA RIGA ONESTA (17 set 2026, richiesta di Andrea): sta accanto
        alla sua gemella apposta, che e' li' che il confronto si legge
        — dentro si', fuori no. Le due frasi dicono la stessa cosa dai
        due lati, e separarle vorrebbe dire lasciare in piedi la meta'
        che fa comodo. */
-    '<div class="hint">🔓 Fuori da Barattolo è un\'altra cosa: quello che vi dite in una chat non lo cifriamo noi, non ce l\'abbiamo, e in una disputa non possiamo usarlo — a decidere sono i fatti dello scambio.</div>';
+    '<div class="hint">🔓 Fuori da Barattolo è un\'altra cosa: quello che vi dite in una chat non lo cifriamo noi, non ce l\'abbiamo, e in una disputa non possiamo usarlo — a decidere sono i fatti dello scambio.</div>');
   if (fr) fr.campi.forEach(c => {
     const inp = el('p2pCampoEuro_' + c.k);
     if (!inp) return;

@@ -39921,3 +39921,51 @@ velo, e la barra di scorrimento della pagina (che un velo
 fotogramma prima della pagina giusta: è lo stesso bordo dell'apertura
 normale mentre si aspettano le immagini, non la home; segnalato ad
 Andrea, non toccato.
+## Il testo corto sotto «Aggiorna il recapito» (7 ott 2026, richiesta di Andrea)
+
+**COSA.** Nel foglio «🤝 I vostri recapiti», sotto il bottone di chi
+vende, c'erano quattro paragrafi («✓ Inviato: l'ultimo che mandi…», «📌
+Resta ricordato…», «I recapiti viaggiano cifrati…», «🔓 Fuori da
+Barattolo è un'altra cosa…»): troppo lunghi e tecnici, parola di
+Andrea. Adesso sono tre righe, il testo l'ha approvato lui: «✓ Recapito
+inviato. Se lo cambi, vale l'ultimo.» (solo dopo l'invio, come prima),
+«🔒 Lo vedete solo tu e l'altra persona, nemmeno Barattolo. Resta
+salvato su questo dispositivo per i prossimi scambi.» e «⚠️ Non
+scrivere password o codici. Quello che vi dite fuori da Barattolo non
+conta in caso di disputa.» (sempre). Stesso `.hint`, stessi colori.
+
+**DOVE VALE.** Un giudice solo in `renderCampiP2P`: `corto =
+!fr.appuntamento && fr.ricorda !== false`, cioè i metodi a recapito —
+IBAN/SEPA, Revolut, Satispay, PayPal e quelli liberi. Il contanti
+(appuntamento), il tabacchino (Barattozon, che non ricorda niente: la
+riga «resta salvato» lì sarebbe falsa) e chi compra tengono le loro
+righe: Andrea ha chiesto le proposte affiancate prima di toccarli.
+
+**LA RIGA ONESTA RESTA GEMELLA** (la decisione del 17 set 2026): nel
+testo nuovo «nemmeno Barattolo» e «fuori da Barattolo non conta» stanno
+ancora uno dopo l'altro, nello stesso ordine — la metà che fa comodo
+non resta in piedi da sola.
+
+**SCARTATO.** Cambiare anche le righe di sempre per tutti i rami in un
+colpo: chi compra non scrive niente nel foglio (il «non scrivere
+password» per lui non dice niente) e il tabacchino non ricorda; quei
+testi vanno decisi a parte.
+
+**PROVATO.** `prove_recapito_corto` (12): le tre righe parola per
+parola e il giudice; il VERO `renderCampiP2P` girato in node con le
+forme vere per SEPA, Revolut, Satispay, PayPal e un metodo libero,
+prima e dopo l'invio (due righe, poi tre), nessuna delle quattro righe
+vecchie rimasta, la riga onesta di fila; contanti, tabacchino e chi
+compra con le righe di prima. Le sentinelle vecchie (prove_p2p_chat:
+«Resta ricordato», «nemmeno Barattolo» prima di «Fuori da Barattolo»)
+restano verdi perché quei rami esistono ancora. Tortura 6 su 6 (corto
+mai, corto sempre, corto anche al tabacchino, ✓ prima dell'invio, 📌
+rimasto, una parola cambiata). Suite intera severa senza config nel
+worktree su 8cf38d6: 19.566 verdi e 0 rosse; i 39 collaudi della CI
+nella gabbia verdi. Scatti prima/dopo a 375 px, densità 3, chiaro e
+scuro (Chrome headless sulla vetrina: CSS e markup veri del foglio,
+corpo scritto dal `renderCampiP2P` di main e del worktree), mandati ad
+Andrea.
+
+**DA GUARDARE.** Le proposte per gli altri testi (contanti, tabacchino,
+chi compra, la conferma del PayCode a mano) aspettano il sì di Andrea.
