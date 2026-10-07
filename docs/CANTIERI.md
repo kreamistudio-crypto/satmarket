@@ -39216,6 +39216,14 @@ solo verso il relay morto. Scatti prima/dopo in due tavole, guardati
 da Andrea prima del push (la regola del cantiere: niente push senza il
 suo ok sugli scatti).
 
+**IL SECONDO REBASE, prima del push.** Mentre si preparava il push,
+main ha preso 337b698 («Il foglio che non scivola», di un'altra
+sessione): un conflitto solo in fondo a CANTIERI (due voci in coda,
+tenute tutt'e due), nessuna funzione di questo cantiere nel suo diff.
+Sull'albero di fdcbc36 — il codice che parte col push — le 19 sezioni
+toccate o che usano i banchi emendati, 1.448 verdi e 0 rosse, e i 39
+collaudi della CI nella gabbia, verdi.
+
 **NON PROVATO, resta da guardare.**
 - Il telefono vero e l'APK: la ✕ dalla mini app vera e il sito/APK che
   la perdono alla lettura dopo.
