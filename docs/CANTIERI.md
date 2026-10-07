@@ -39986,8 +39986,11 @@ libero, contanti, tabacchino e chi compra (senza e col recapito
 arrivato), riga per riga; nessuna riga vecchia in nessun ramo; la riga
 onesta in coda in ogni ramo. Emendate le sentinelle vecchie, ognuna col
 suo perché: prove_p2p_chat (tre), prove_contanti_a_mano (la riga sotto
-il luogo, il banco che la esegue), prove_paycode_riconosciuto (il corpo
-della conferma). Tortura: primo giro 6 su 6, secondo giro 11 su 11 (le
+il luogo, il banco che la esegue), prove_luoghi_appuntamento (il banco
+del testo cambiato a mano, che cercava «non l'abbiamo»: trovato dalla
+suite intera dopo il rebase, perché la sezione non l'avevo fatta girare
+da sola — una frase si cerca per PEZZI in tutto prove.py, non solo per
+intero), prove_paycode_riconosciuto (il corpo della conferma). Tortura: primo giro 6 su 6, secondo giro 11 su 11 (le
 code del 🔒 scambiate, «password» a tutti e a nessuno, il 🔒 senza coda,
 il ✓ dell'appuntamento, il ✓ prima dell'invio, una parola cambiata nel
 ✋, nel 👆 e nella conferma, il ⚠️ prima del 🔒). Scatti prima/dopo a

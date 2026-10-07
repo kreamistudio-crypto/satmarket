@@ -119677,8 +119677,10 @@ P2P_LUOGHI_ATTESA_MS = 5;
   /* 3) il testo cambiato a mano perde il punto di un indirizzo... */
   nodi.p2pCampoEuro_luogo.value = 'Piazza Castello 5';
   luogoScrittoP2P('Piazza Castello 5');
-  out.cambiato = [nodi.p2pCampoEuro_punto.value, nodi.p2pLuogoPunto.innerHTML.indexOf('non l&#39;abbiamo') >= 0
-                  || nodi.p2pLuogoPunto.innerHTML.indexOf("non l'abbiamo") >= 0];
+  /* (7 ott 2026) la riga accorciata, approvata da Andrea: «✋ Indirizzo
+     non riconosciuto: chi compra non avrà il link al navigatore…» */
+  out.cambiato = [nodi.p2pCampoEuro_punto.value,
+                  nodi.p2pLuogoPunto.innerHTML.indexOf('✋ Indirizzo non riconosciuto: chi compra non avrà il link al navigatore.') >= 0];
   /* ...ma non quello della mia posizione */
   nodi.p2pCampoEuro_punto.value = 'p:45.07000,7.68000';
   luogoScrittoP2P('Bar Sport, qui');
