@@ -208,7 +208,8 @@ Il P2P non ha un wallet suo: serve un **wallet Lightning esterno**.
   fattura al wallet…» → «⚡ Fattura fatta dal wallet e inviata ✅».
 - ⚠️ **Wallet of Satoshi**: il suo indirizzo non passa la verifica.
   📱 «⚠️ Il tuo indirizzo Wallet of Satoshi qui non funziona: incolla una
-  fattura di un altro wallet.»
+  fattura dal tuo wallet.» (La fattura di Wallet of Satoshi passa: non
+  passa solo il suo indirizzo.)
 
 ⚠️ Storto all'ingresso: «Nel demo si guarda soltanto: gli scambi veri
 vivono nell'app 🔁»; «Rete assente: riprova»; «Non ci sono riuscito,
@@ -382,8 +383,13 @@ piccoli». C'è anche un «Filtro».
   «⚡ Dai una fattura nuova», foglio «⚡ Una fattura nuova» con «⚠️ Il
   pagamento dei tuoi sats non è riuscito.» e la causa («**la fattura che
   avevi dato è scaduta**…» oppure «…di solito vuol dire che il pagamento
-  non ha trovato una strada fino al tuo wallet.»). In «Sats liberati»
-  c'è anche «⚡ I sats non arrivano? Dai una fattura nuova».
+  non ha trovato una strada fino al tuo wallet.»), poi «Incolla una
+  fattura dal tuo wallet, senza importo o di <N> sats esatti. La paghiamo
+  subito.» / «⚠️ Wallet of Satoshi: va bene la fattura, non
+  l'indirizzo.» — «📋 Copia la cifra: <N>» — campo — «Invia». In «Sats
+  liberati» c'è anche «⚡ I sats non arrivano? Dai una fattura nuova»:
+  stesso foglio, con in cima «Se i sats non ti sono arrivati, qui puoi
+  dare una richiesta di pagamento nuova.»
 - Pagamento che si ritenta: «**Pagamento non riuscito**» «L'invio dei
   sats si riprova da solo. Se non riesce potrai indicare un altro
   indirizzo.»

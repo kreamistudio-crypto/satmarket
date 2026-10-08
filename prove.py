@@ -68638,9 +68638,13 @@ function reset(){
     out.fallitoIgnotaNonAfferma = ignota.h.indexOf('può essere scaduta, oppure') >= 0
       && ignota.h.indexOf('non è la scadenza') < 0
       && ignota.d.indexOf('può essere scaduta') >= 0;
-    /* ...e DOPO il rilascio il giorno non si chiede: si paga subito */
+    /* ...e DOPO il rilascio il giorno non si chiede: si paga subito.
+       ⚠️ EMENDATA L'8 OTT 2026: il foglio dice il testo corto di Andrea
+       («La paghiamo subito.») e non piu' «valida più di un'ora»; la
+       finestra la dice `inviaIncassoP2P` alla fattura troppo corta */
     out.fallitoNonChiedeUnGiorno = morta.h.indexOf('almeno un giorno') < 0
-      && morta.h.indexOf('valida più di un\'ora') >= 0
+      && morta.h.indexOf('La paghiamo subito.') >= 0
+      && morta.h.indexOf('valida più di') < 0
       && morta.h.indexOf('id="p2pIncassoInp"') >= 0;
   } catch(e) { out.fallitoEsploso = String(e && e.message || e); }
 
@@ -69164,8 +69168,11 @@ function reset(){
   apriIncassoP2P();
   {
     const h = nodi.p2pIncassoCorpo.innerHTML || '';
+    /* ⚠️ EMENDATA L'8 OTT 2026: il foglio «⚡ Una fattura nuova» ha il
+       testo corto di Andrea, che la cifra la dice nella fattura («o di
+       N sats esatti») e non piu' in un «Riceverai» */
     out.fnFoglio = h.indexOf('Il pagamento dei tuoi sats non è riuscito') >= 0
-      && h.indexOf('Riceverai <b>14837 sats</b>') >= 0
+      && h.indexOf('senza importo o di 14837 sats esatti. La paghiamo subito.') >= 0
       && h.indexOf("copiaLink('14837'") >= 0
       && h.indexOf('non ha trovato una strada') >= 0
       && h.toLowerCase().indexOf('stanno arrivando') < 0;
@@ -116458,7 +116465,10 @@ def prove_ritocchi_flusso_p2p():
           "(myLnAddress && walletNonPassaP2P(myLnAddress)" in inc
           and inc.index("walletNonPassaP2P(myLnAddress)") < inc.index("usaIndirizzoSalvatoP2P()"))
     prova("...e al suo posto dice perche' e cosa fare, col nome del wallet", True,
-          "qui non funziona: incolla una fattura di un altro wallet.</div>'" in inc
+          # dall'8 ott 2026 «dal tuo wallet»: la fattura di Wallet of
+          # Satoshi passa, e «un altro wallet» mandava altrove per niente
+          "qui non funziona: incolla una fattura dal tuo wallet.</div>'" in inc
+          and "altro wallet" not in inc
           and "\">⚠️ Il tuo indirizzo ' + esc(walletNonPassaP2P(myLnAddress))" in inc)
     prova("...la scorciatoia non scrive mai un indirizzo che non passa", True,
           "if (!c || !myLnAddress || walletNonPassaP2P(myLnAddress)) return;"
@@ -128234,9 +128244,13 @@ def prove_testo_ricevere_sats():
     guarda (un blocco per riga, gli a capo dei <br>): il foglio intero,
     a cifra ignota, con l'indirizzo salvato, con Wallet of Satoshi
     salvato. Il bottone «Copia la cifra», il campo e «Invia» restano
-    quelli di prima, byte per byte. Il foglio DOPO il rilascio («⚡ Una
-    fattura nuova») non fa parte del cantiere e resta com'era: lo dice
-    l'ultima prova. La guida dei passi dice le stesse parole."""
+    quelli di prima, byte per byte. Nello stesso giro (seconda richiesta
+    di Andrea) il foglio DOPO il rilascio, «⚡ Una fattura nuova»: sotto
+    il perche' (fallito) o la porta di riserva, che restano com'erano,
+    due righe sue — e Wallet of Satoshi detto col suo confine (la
+    fattura si', l'indirizzo no) anche nella riga per chi l'ha salvato
+    negli incassi: «un altro wallet» non c'e' piu' da nessuna parte. La
+    guida dei passi dice le stesse parole."""
     print("\n[il foglio «Dove ricevere i sats» corto]")
     import html as _html
     mini = open("miniapp.html", encoding="utf-8").read()
@@ -128271,6 +128285,10 @@ console.log(JSON.stringify({
   wos: giro({netto: 6645}, 'Io@WalletOfSatoshi.com'),
   fallito: giro({netto: 6645, stato: 'fattura_nuova'}),
   riserva: giro({netto: 6645, stato: 'rilasciato'}),
+  ritentato: giro({netto: 6645, stato: 'pagamento_ritentato'}),
+  fallitoIgnota: giro({netto: 0, stato: 'fattura_nuova'}),
+  riservaSalvato: giro({netto: 6645, stato: 'rilasciato'}, 'io@wallet.com'),
+  riservaWos: giro({netto: 6645, stato: 'rilasciato'}, 'io@walletofsatoshi.com'),
 }));
 """)
     out = _node_banco(js)
@@ -128329,24 +128347,60 @@ console.log(JSON.stringify({
           + ["⚡ Usa l'indirizzo dei tuoi incassi: io@wallet.com",
              "🧾 Oppure una fattura dal tuo wallet"],
           righe(out["salvato"]["h"])[:6])
-    prova("con Wallet of Satoshi salvato: niente scorciatoia, la sua riga di sempre",
-          [False, True],
-          ["usaIndirizzoSalvatoP2P" in out["wos"]["h"],
-           "⚠️ Il tuo indirizzo Wallet of Satoshi qui non funziona: incolla una fattura "
-           "di un altro wallet." in righe(out["wos"]["h"])])
-    prova("DOPO il rilascio («⚡ Una fattura nuova») il foglio resta quello di prima",
-          [["⚡ Una fattura nuova"] * 2, [True] * 2, [True] * 2, [False] * 2],
-          [[out[k]["tit"] for k in ("fallito", "riserva")],
-           ["<b>⚡ Consigliato: il tuo indirizzo Lightning</b> (quello che finisce per "
-            "@qualcosa). Non scade mai, quindi va bene anche se lo scambio dura ore." in out[k]["h"]
-            for k in ("fallito", "riserva")],
-           [", o di 6 645 sats esatti, valida più di un'ora.</div>" in out[k]["h"]
-            for k in ("fallito", "riserva")],
-           ["almeno un giorno" in out[k]["h"] for k in ("fallito", "riserva")]])
+    WOS_SALVATO = ("⚠️ Il tuo indirizzo Wallet of Satoshi qui non funziona: incolla una "
+                   "fattura dal tuo wallet.")
+    prova("con Wallet of Satoshi salvato: niente scorciatoia, e la riga dice «dal tuo wallet»",
+          [False, ["Riceverai 6 645 sats."] + INDIRIZZO
+           + [WOS_SALVATO, "🧾 Oppure una fattura dal tuo wallet"]],
+          ["usaIndirizzoSalvatoP2P" in out["wos"]["h"], righe(out["wos"]["h"])[:6]])
+    # sui fogli VERI, in tutti i casi: nella pagina la parola resta solo
+    # in due commenti (questo cambio, e la garanzia pagata da fuori)
+    prova("«un altro wallet» non lo dice piu' nessun foglio, in nessun caso", [],
+          [k for k, v in out.items() if "altro wallet" in v["h"]])
+
+    # --- IL FOGLIO DOPO IL RILASCIO: «⚡ Una fattura nuova» -------------
+    NUOVA = ["Incolla una fattura dal tuo wallet, senza importo o di 6 645 sats "
+             "esatti. La paghiamo subito.",
+             "⚠️ Wallet of Satoshi: va bene la fattura, non l'indirizzo."]
+    DOPO = ("fallito", "riserva", "ritentato")
+    prova("dopo il rilascio il titolo e' «⚡ Una fattura nuova», nei tre stati",
+          ["⚡ Una fattura nuova"] * 3, [out[k]["tit"] for k in DOPO])
+    prova("...e sotto il perche' il testo di Andrea, parola per parola, con la cifra viva",
+          [NUOVA + CODA] * 3,
+          [righe(out["fallito"]["h"])[2:], righe(out["riserva"]["h"])[1:],
+           righe(out["ritentato"]["h"])[1:]])
+    # intero, parola per parola: «resta com'era» si prova, non si dice
+    # (alla tortura una frase tolta in coda passava con un startswith)
+    prova("...il perche' in cima resta com'era (fallito e porta di riserva)",
+          [["⚠️ Il pagamento dei tuoi sats non è riuscito.",
+            "Chi vende li ha liberati, ma il pagamento verso la richiesta che avevi dato "
+            "non è andato a buon fine: può essere scaduta, oppure il pagamento non ha "
+            "trovato una strada fino al tuo wallet. I sats non sono persi — sono fermi al "
+            "sicuro e restano tuoi: dai qui una richiesta nuova e ripartono. Se con lo "
+            "stesso wallet fallisce ancora, prova con un altro."],
+           "Se i sats non ti sono arrivati, qui puoi dare una richiesta di pagamento nuova. "
+           "Se il pagamento è ancora in corso ti viene risposto di no, e non cambia niente."],
+          [righe(out["fallito"]["h"])[:2], righe(out["riserva"]["h"])[0]])
+    prova("...niente piu' indirizzo consigliato, «valida più di» o «un giorno»",
+          [[False] * 4] * 3,
+          [["Consigliato" in out[k]["h"], "Indirizzo Lightning" in out[k]["h"],
+            "valida più di" in out[k]["h"], "almeno un giorno" in out[k]["h"]] for k in DOPO])
+    prova("...a cifra ignota: «senza importo.» e la riga della cifra che manca",
+          ["Incolla una fattura dal tuo wallet, senza importo. La paghiamo subito.", NUOVA[1],
+           "La cifra esatta qui non la sappiamo: il messaggio che la dice non è arrivato su "
+           "questo dispositivo. Falla senza importo — quella va bene comunque.",
+           "Dove vuoi ricevere i sats", "Invia"],
+          righe(out["fallitoIgnota"]["h"])[2:])
+    prova("...l'indirizzo salvato resta a un tocco, sotto le due righe; Wallet of Satoshi "
+          "salvato dice la sua riga",
+          [NUOVA + ["⚡ Usa l'indirizzo dei tuoi incassi: io@wallet.com"],
+           NUOVA + [WOS_SALVATO]],
+          [righe(out["riservaSalvato"]["h"])[1:4], righe(out["riservaWos"]["h"])[1:4]])
+
     guida = " ".join(open(os.path.join("docs", "GUIDA-P2P-PASSI.md"),
                           encoding="utf-8").read().split())
     prova("la guida dei passi dice le stesse parole, e non piu' quelle lunghe",
-          [True, True, True, False],
+          [True, True, True, True, True, False, False],
           ["«**⚡ Indirizzo Lightning (consigliato)** / Quello che finisce per @qualcosa. "
            "Non scade mai. / ⚠️ Wallet of Satoshi non funziona qui: con quello incolla "
            "una fattura.»" in guida,
@@ -128354,7 +128408,13 @@ console.log(JSON.stringify({
            "esatti. Meglio se dura almeno un giorno: se scade prima te ne chiediamo "
            "un'altra.»" in guida,
            "Foglio «💸 Dove ricevere i sats»: «Riceverai **<N> sats**.»" in guida,
-           "quindi va bene anche se lo scambio dura ore" in guida])
+           "«Incolla una fattura dal tuo wallet, senza importo o di <N> sats esatti. La "
+           "paghiamo subito.» / «⚠️ Wallet of Satoshi: va bene la fattura, non "
+           "l'indirizzo.»" in guida,
+           "«⚠️ Il tuo indirizzo Wallet of Satoshi qui non funziona: incolla una fattura "
+           "dal tuo wallet.»" in guida,
+           "quindi va bene anche se lo scambio dura ore" in guida,
+           "altro wallet" in guida])
 
 
 def prove_garanzia_lunga():

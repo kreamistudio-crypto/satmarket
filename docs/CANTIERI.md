@@ -40662,6 +40662,7 @@ dispositivo: con un orologio del PC molto indietro il segno 'dopo'
 potrebbe tacere (la riga resta ferma, come oggi; i segni giro e chiave
 non dipendono dall'ora). Dopo il deploy le righe nuove portano il giro e
 il segno 'dopo' serve sempre meno.
+
 ## Il foglio «Dove ricevere i sats» corto (8 ott 2026, richiesta di Andrea)
 
 **DA DOVE SI PARTIVA.** Nella pagina dello scambio («Nel dettaglio»),
@@ -40732,9 +40733,51 @@ i 42 collaudi della CI verdi nella gabbia.
 **NON PROVATO.** Il telefono vero (il foglio si apre con la tastiera:
 più corto, il campo si vede prima, ma non l'ho visto lì).
 
-**DA GUARDARE (detto ad Andrea, non fatto).** Il foglio «⚡ Una fattura
-nuova» ha ancora il testo lungo. E due frasi che si contraddicono su
-Wallet of Satoshi: quella nuova dice «con quello incolla una fattura»
-(la fattura di WoS va bene), la riga per chi ha WoS salvato negli
-incassi dice «incolla una fattura di un altro wallet» — e in quel caso
-compaiono tutt'e due.
+**SECONDA PARTE, LO STESSO GIORNO (seconda richiesta di Andrea, prima
+del push).** Dalla prima consegna erano rimasti due punti: il foglio
+«⚡ Una fattura nuova» ancora lungo, e due frasi che si contraddicevano
+su Wallet of Satoshi (la nuova «con quello incolla una fattura», la riga
+per chi l'ha salvato negli incassi «incolla una fattura di un altro
+wallet»). PRIMA di toccare i testi, Andrea ha chiesto di verificare nel
+codice come viene trattato WoS. Risposta: un indirizzo
+@walletofsatoshi.com scritto a mano il client lo manda com'è (toglie
+solo la scorciatoia dell'indirizzo salvato, `walletNonPassaP2P`); lo
+rifiuta il coordinatore Mostro, che verifica l'indirizzo da dietro Tor
+(`invalid-invoice`), e il client dice «Non sono riuscito a verificare
+questo indirizzo: usa una fattura del tuo wallet.»
+(`P2P_INDIRIZZO_RIFIUTATO`). Una fattura emessa da WoS non la distingue
+nessuno: `inviaIncassoP2P` guarda solo importo e scadenza, e il
+coordinatore la paga come le altre. Il server non è nel giro (l'
+`add-invoice` va dal browser al coordinatore; `WALLET_DA_DOMINIO` del
+server è solo l'etichetta del cruscotto). Quindi «indirizzo no, fattura
+sì», confermato, e i due punti fatti:
+1) la riga per chi ha WoS salvato dice «⚠️ Il tuo indirizzo Wallet of
+Satoshi qui non funziona: incolla una fattura dal tuo wallet.» —
+nessun foglio dice più «un altro wallet» (nella pagina la parola resta
+in due commenti, uno è la garanzia pagata da fuori);
+2) il foglio «⚡ Una fattura nuova», testo di Andrea parola per parola,
+con la cifra viva: «Incolla una fattura dal tuo wallet, senza importo o
+di N sats esatti. La paghiamo subito.» / «⚠️ Wallet of Satoshi: va
+bene la fattura, non l'indirizzo.» In `renderIncassoP2P` è il ramo
+`dopo` di `vie` (con `<br>` e lo stacco di 12px), e `fattura` lì è
+vuota; tolte le costanti `minuti`, `vale` e `durata`, rimaste senza
+uso. Scelta mia, detta ad Andrea: il paragrafo in cima — il perché del
+pagamento fallito (scaduta / viva / non si sa, 21 set) o la porta di
+riserva («Se i sats non ti sono arrivati…») — RESTA: è un altro blocco,
+e senza il perché il foglio del fallimento non direbbe cosa è
+successo. La scorciatoia dell'indirizzo salvato resta a un tocco, sotto
+le due righe. Aggiornata la guida (la riga di WoS salvato e il foglio
+del pagamento fallito, con la porta di riserva).
+Prove: `prove_testo_ricevere_sats` passa a 17 — la riga di WoS salvato
+con «dal tuo wallet», nessun foglio che dica «altro wallet» in nessun
+caso, e il foglio dopo il rilascio nei tre stati (fallito, rilasciato,
+pagamento ritentato) parola per parola sotto il perché rimasto com'era,
+senza indirizzo consigliato né «valida più di» né «un giorno», a cifra
+ignota, con l'indirizzo salvato e con WoS salvato, più la guida; emendate
+col perché `fallitoNonChiedeUnGiorno` e `fnFoglio` di
+`prove_p2p_motore` (la cifra ora sta nella fattura, non in un
+«Riceverai») e la sentinella di WoS di `prove_ritocchi_flusso_p2p`.
+Tortura del secondo giro su una copia intera (pulita verde prima): al primo giro 12 su 13 — sfuggiva l'ultima frase del perché tolta in coda («prova con un altro»), perché la prova guardava l'inizio del paragrafo; ora i due paragrafi in cima sono inchiodati interi, e la mutazione rifatta da sola è presa: 13 su 13 (la riga di WoS salvato, «subito», la riga di WoS del foglio, la cifra, l'a capo, il giorno rimesso, l'indirizzo consigliato rimesso, la frase del perché, la riga del primo foglio, `vie` rovesciata, tre parole della guida). Scatti prima/dopo a 375 px, chiaro e scuro, di tre scene in
+più: il pagamento fallito (fattura scaduta), «i sats non arrivano?»,
+WoS salvato. Suite intera severa senza config nel worktree su dba0f31:
+19.716 verdi, 0 rosse; i 42 collaudi della CI verdi nella gabbia. Dopo, toccata solo la prova (i paragrafi interi): rigirata la sua sezione, 17 verdi. RIBASATO su 70acf33 (main era avanzato di tre commit: «Lo stesso id, un giro nuovo» e due studi dell'hackathon; conflitto solo in fondo a CANTIERI, tenute le due voci; nessun simbolo in comune col foglio, cercato per nome): suite intera severa 19.755 verdi, 0 rosse; 43 collaudi della CI verdi nella gabbia, `collaudo_giro_nuovo` compreso.

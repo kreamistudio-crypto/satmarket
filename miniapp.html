@@ -58207,8 +58207,6 @@ function renderIncassoP2P(){
   if (!box || !o) return;
   const netto = satsDaRicevereP2P(o);
   const quanti = netto > 0 ? fmt(netto) + ' sats' : '';
-  const minuti = Math.ceil(finestraFatturaP2P() / 60);
-  const vale = minuti === 60 ? 'un\'ora' : minuti + ' minuti';
   /* IL 17 SET 2026 LA FATTURA ERA PASSATA DAVANTI (dal campo): qui
      c'era scritto che l'indirizzo «è la via più semplice», ed era la
      via che si rompeva — il coordinatore l'indirizzo lo VERIFICA da
@@ -58250,33 +58248,33 @@ function renderIncassoP2P(){
      (fallito/riserva) la fattura si paga appena arriva: li' resta la
      finestra del coordinatore, e «un giorno» non si chiede. */
   const dopo = fallito || riserva;
-  /* DAL 24 SET 2026 «un giorno» E' UN CONSIGLIO: una fattura piu' corta
-     parte, e la frase dice cosa succede se non basta */
-  const durata = 'valida più di ' + vale;
   /* IL FOGLIO CORTO (8 ott 2026, testo di Andrea parola per parola):
      prima del rilascio le due vie erano due paragrafi lunghi, e si
      leggevano male sul telefono. Adesso un titolo e due righe per via.
      Restano le decisioni di prima: la cifra in cima, l'indirizzo
      consigliato PRIMA della fattura col suo avviso accanto (Wallet of
      Satoshi per nome), la fattura senza importo o esatta, «un giorno»
-     come consiglio con cosa succede se non basta. Esce dal foglio la
-     finestra del coordinatore («valida più di un'ora»): la dice ancora
-     `inviaIncassoP2P`, coi minuti, alla fattura troppo corta. Dopo il
-     rilascio (`dopo`, il foglio «⚡ Una fattura nuova») resta il testo
-     di prima: li' «un giorno» non si chiede. */
+     come consiglio (dal 24 set 2026) con cosa succede se non basta.
+     Esce dal foglio la finestra del coordinatore («valida più di
+     un'ora»): la dice ancora `inviaIncassoP2P`, coi minuti, alla
+     fattura troppo corta.
+     DOPO IL RILASCIO (`dopo`, il foglio «⚡ Una fattura nuova», anche
+     questo testo di Andrea parola per parola): due righe sotto il
+     perche' (fallito) o la porta di riserva, che restano com'erano. Li'
+     «un giorno» non si chiede — la fattura si paga appena arriva — e
+     l'indirizzo non si consiglia; Wallet of Satoshi si nomina col suo
+     confine: la fattura si', l'indirizzo no (il coordinatore lo
+     verifica da dietro Tor e con lui non passa). */
   const vie = dopo
-    ? '<div class="hint">' + (quanti ? 'Riceverai <b>' + esc(quanti) + '</b>. ' : '') +
-      '<b>⚡ Consigliato: il tuo indirizzo Lightning</b> (quello che finisce per @qualcosa). Non scade mai, quindi va bene anche se lo scambio dura ore. ' +
-      'Alcuni provider (per esempio Wallet of Satoshi) non rispondono alla verifica dell\'indirizzo: ' +
-      'se il tuo indirizzo viene rifiutato, usa la fattura.</div>'
+    ? '<div class="hint" style="margin-top:12px">Incolla una fattura dal tuo wallet, senza importo' +
+      (quanti ? ' o di ' + esc(quanti) + ' esatti' : '') + '. La paghiamo subito.<br>' +
+      '⚠️ Wallet of Satoshi: va bene la fattura, non l\'indirizzo.</div>'
     : (quanti ? '<div class="hint">Riceverai <b>' + esc(quanti) + '</b>.</div>' : '') +
       '<div class="hint"' + (quanti ? ' style="margin-top:12px"' : '') + '><b>⚡ Indirizzo Lightning (consigliato)</b><br>' +
       'Quello che finisce per @qualcosa. Non scade mai.<br>' +
       '⚠️ Wallet of Satoshi non funziona qui: con quello incolla una fattura.</div>';
   const fattura = dopo
-    ? '<div class="hint" style="margin-top:12px"><b>Oppure una fattura</b> del tuo wallet: <b>senza importo</b>' +
-      (quanti ? ', o di ' + esc(quanti) + ' esatti' : '') +
-      ', ' + durata + '.</div>'
+    ? ''
     : '<div class="hint" style="margin-top:12px"><b>🧾 Oppure una fattura dal tuo wallet</b><br>' +
       'Senza importo' + (quanti ? ', o di ' + esc(quanti) + ' esatti' : '') + '. ' +
       'Meglio se dura almeno un giorno: se scade prima te ne chiediamo un\'altra.</div>';
@@ -58298,10 +58296,12 @@ function renderIncassoP2P(){
     /* L'INDIRIZZO SALVATO SI PROPONE SOLO SE PASSA (24 set 2026, dalla
        prova vera): con Wallet of Satoshi la scorciatoia portava dritto
        al rifiuto del coordinatore. Al suo posto si dice il perche' e
-       cosa fare, e il campo resta vuoto. */
+       cosa fare, e il campo resta vuoto. DALL'8 OTT 2026 «dal tuo
+       wallet» e non piu' «di un altro wallet»: la fattura di Wallet of
+       Satoshi stesso passa, non passa solo il suo indirizzo. */
     (myLnAddress && walletNonPassaP2P(myLnAddress)
       ? '<div class="hint p2p-wallet-no">⚠️ Il tuo indirizzo ' + esc(walletNonPassaP2P(myLnAddress))
-        + ' qui non funziona: incolla una fattura di un altro wallet.</div>'
+        + ' qui non funziona: incolla una fattura dal tuo wallet.</div>'
       : myLnAddress
       ? '<button class="btn ghost" type="button" onclick="usaIndirizzoSalvatoP2P()">⚡ Usa l\'indirizzo dei tuoi incassi: '
         + esc(myLnAddress) + '</button>'
