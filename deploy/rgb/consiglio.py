@@ -73,6 +73,13 @@ def chiedi(prezzo, punti):
                                             "schema": SCHEMA, "strict": True}},
         "temperature": 0,
         "max_tokens": 300,
+        # Qwen3 ragiona prima di rispondere, e il ragionamento si
+        # mangia i token: senza questo una completion nuda torna
+        # content null (8 ott sera, dal vivo). Con lo schema la
+        # grammatica parte subito e non pensa comunque, ma
+        # l'interruttore si manda lo stesso; `enable_thinking` QVAC
+        # lo ignora. E' lo stesso di consigliami-prova.html.
+        "reasoning_budget": False,
     }
     req = urllib.request.Request(QVAC, data=json.dumps(corpo).encode(),
                                  headers={"Content-Type": "application/json"})

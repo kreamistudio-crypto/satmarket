@@ -41241,3 +41241,31 @@ tocca) sono una proposta. Il `nak serve` tiene gli eventi in memoria:
 dopo un riavvio del WSL le due righe `annuncio` si rilanciano (scritto
 in §10 e nella tabella del sabato mattina). Il numero 38180 resta un
 segnaposto finché i maintainer non ne assegnano uno.
+
+**LE CORREZIONI DI ANDREA, la sera stessa, dal vivo sul PC fisso** (prima
+del push, un secondo commit). 1) QVAC non era installato né nel PATH:
+sta in `qvac-prova` come dipendenza locale (`npm install @qvac/sdk
+@qvac/cli`, 0.21.0 e 0.15.0, `npm init -y` prima se manca
+`package.json`), il comando è `npx qvac …`, e il primo avvio col Wi-Fi
+porta `--model consigliami --model qwen3-600m-inst-q4` per scaricare i
+due modelli (doctor verde, serve ok su 11434). 2) Qwen3 ragiona prima
+di rispondere: una completion nuda con `max_tokens` 80 torna `content:
+null` e solo `reasoning_content`. Provate cinque varianti sul 1.7B
+acceso apposta: con `response_format` a schema il modello non pensa in
+nessun caso (la grammatica parte subito); SENZA schema
+`reasoning_budget: false` è l'unico interruttore che QVAC rispetta
+(`enable_thinking: false`, nudo o in `chat_template_kwargs`, è
+ignorato; `/no_think` nel sistema spegne il thinking ma la risposta
+ricopia l'input). `consigliami-prova.html` lo manda già;
+`consiglio.py` no: aggiunto, con la riga nel §4 e nel punto 2 di §10.
+3) Barattolo in collaudo: il `config.py` locale ha in più
+`MOSTRO_RELAY`, `MOSTRO_RELAY_SPECCHIO = ["ws://127.0.0.1:9"]` e
+`NIP05_NOMI` con le due hex (a mano); si lancia da PowerShell con `py
+-3 -m uvicorn server:app --port 8080` (il Python del WSL non ha
+fastapi); i curl verso 8080 e 11434 con `curl.exe` da PowerShell (dal
+WSL `127.0.0.1` è quello di Linux); `git pull` da PowerShell (il git del
+WSL non ha le credenziali). 4) La prova di riavvio completa (§10 punto
+3) è passata tutta verde la sera dell'8: NIP-05 dalla rotta, «wallet
+collegato», `get_info → ok (nip44_v2)`; il riavvio del VPS è fatto.
+Scritte in §10 (riga «14-16», punti 2 e 3, lista del 15 ai punti 4, 5,
+7 e 10) e in §4.

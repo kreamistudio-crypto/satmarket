@@ -272,6 +272,19 @@ frase del «motivo» («hai risparmiato 4800 sats» per 60): i numeri li
 scrive il programma e al modello si chiede una frase senza cifre — da
 fare nel «Consigliami» vero, a Torino.
 
+**Corretto l'8 ott sera, dal vivo sul PC fisso (Andrea)**: QVAC non è
+globale e non è nel PATH — sta in `qvac-prova` come dipendenza locale
+(`npm install @qvac/sdk @qvac/cli`: 0.21.0 e 0.15.0) e si lancia con
+`npx qvac …`; il primo avvio col Wi-Fi porta `--model consigliami
+--model qwen3-600m-inst-q4` e scarica i due modelli. E **Qwen3
+ragiona prima di rispondere**: una chat completion nuda con
+`max_tokens` 80 torna `content: null` e solo `reasoning_content`;
+l'interruttore che QVAC rispetta è `"reasoning_budget": false`
+(`enable_thinking: false` è ignorato, `/no_think` spegne ma sporca la
+risposta: cinque varianti provate la sera stessa), che la pagina manda
+già e `consiglio.py` manda dall'8 sera. I dettagli e i comandi in §10,
+punti 2 e 3.
+
 ## 5. Cosa dichiariamo all'arrivo (pre-esistente, NON da giudicare)
 
 Da consegnare scritto il 17 mattina, com'è chiesto dal regolamento:
@@ -629,7 +642,7 @@ niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
 | 11-12 ott | QVAC: `npm i -g @qvac/cli@latest`, alias `consigliami` → `QWEN3_1_7B_INST_Q4` con `ctx_size 8192`, scaricato; `consigliami-prova.html` FUORI dal repo con `response_format` json_schema e `reasoning_budget: false`; `qvac serve --openai --cors-origin <origine esatta>` | ☑ 8 ott (§4): CLI 0.15.0, 1,06 GB scaricati, pagina provata nel Browser pane col 0.6B e col 1.7B |
 | 13 ott | Q&A con le undici domande | ☐ |
 | 14-16 ott | §5 riscritta e stampata; gli schermi su carta; il giro provato tre volte; video di riserva della demo | ☐ |
-| 14-16 ott | **Backup della VM**, **portatile con tutto scaricato** (modelli QVAC, `nak`, pacchetti del wallet), **prova di riavvio completa** di tutta la catena, nell'ordine di §6 e col tunnel a tre gambe: i comandi qui sotto, uno alla volta | ☐ |
+| 14-16 ott | **Backup della VM**, **portatile con tutto scaricato** (modelli QVAC, `nak`, pacchetti del wallet), **prova di riavvio completa** di tutta la catena, nell'ordine di §6 e col tunnel a tre gambe: i comandi qui sotto, uno alla volta | ☐ backup e portatile. ☑ **8 ott sera, la prova di riavvio completa** (punto 3) tutta verde dal vivo sul PC fisso (Andrea): NIP-05 dalla rotta, «wallet collegato», `get_info → ok (nip44_v2)`; le quattro correzioni ai comandi sono scritte nei punti 2 e 3. Il riavvio del VPS è fatto |
 | 16 ott | I due annunci di MOON e USDB firmati dalle identità di prova e pubblicati sul relay locale, nella forma di `docs/spec/NIP-RGB-ASSETS.md` (evento addressable, kind segnaposto **38180** — 38172/38173 sono di NIP-87, questo sta subito dopo e non è registrato da nessuno —, `d` = ContractId nudo, `i`/`k` di NIP-73, `n` signet, schema, ticker, name, precision, supply, alt; niente `issuer`, il genesis dice `ssi:anonymous`; niente `u`): il comando `annuncio <nome> <asset_id>` in `identita.mjs`, sul calco di `profilo`, e `annuncio --prova <nome> <asset_id>` che stampa l'evento firmato in JSON SENZA pubblicarlo. È infrastruttura dichiarata: l'evento esiste, nessun codice di Barattolo lo legge prima del 17. La cura di D.3 punto 0 | ☑ **8 ott sera, il comando** (cantiere «il comando `annuncio` e la scaletta della demo», copia in `deploy/rgb/`): la tabella `ASSET` coi valori PUBBLICI di §2 (ticker, nome del genesis con gli underscore, precisione, supply) e un contratto → un emittente (`usdb` non annuncia MOON: D.3 punto 4); l'asset_id con o senza `rgb:`; la firma verificata prima di stampare o pubblicare; la privata mai in output. `prove_annuncio_identita` (46): lo script VERO con identità usa-e-getta, la pubblica di `pubblica` è quella dell'evento, la firma Schnorr riverificata in Python puro, il relay morto non tocca `--prova` e senza `--prova` è un errore; in CI nostr-tools arriva da un passo del workflow fuori dal repo. Provato nel WSL su un `nak serve` di prova (porta 7790): pubblicato, riletto con nostr-tools, il secondo invio sostituisce il primo. ☐ **Il 16**: il lancio con le identità vere, i comandi al punto 4) qui sotto e in §11 |
 
 **I comandi della riga «14-16 ott»**, nell'ordine, uno alla volta, dal
@@ -665,17 +678,37 @@ cd ~/wdk-prova && source ~/.nvm/nvm.sh && node -v && npm ls --depth=0 2>/dev/nul
 ```
 
 ```powershell
-qvac --version; qvac doctor; Get-ChildItem $env:USERPROFILE\.qvac\models
+cd C:\Users\Andrea\qvac-prova; npx qvac --version; npx qvac doctor; Get-ChildItem $env:USERPROFILE\.qvac\models
 ```
 
-(il 1.7B da 1,06 GB e il 0.6B devono esserci già). Col Wi-Fi spento:
-`qvac serve --openai --port 11434 --host 127.0.0.1` e una chat
-completion con `"model": "consigliami"` dalla pagina locale
-`consigliami-prova.html` (servita da `python -m http.server 8081`, con
-`--cors-origin http://127.0.0.1:8081`): risponde senza scaricare
-niente. Sul portatile devono stare anche il clone di `fidelity-points`
-e il worktree di Barattolo con le dipendenze pip già installate
-(`python -c "import fastapi, uvicorn, httpx"`).
+**Corretto l'8 ott sera, dal vivo (Andrea)**: QVAC NON è nel PATH —
+sta in `qvac-prova` come dipendenza locale (`npm install @qvac/sdk
+@qvac/cli`, dopo `npm init -y` se manca `package.json`: oggi
+`@qvac/sdk` 0.21.0 e `@qvac/cli` 0.15.0) e il comando è **`npx qvac …`**,
+non `qvac` nudo. Il primo avvio, col Wi-Fi, si fa con **`npx qvac serve
+--openai --port 11434 --host 127.0.0.1 --model consigliami --model
+qwen3-600m-inst-q4`**: così scarica i due modelli subito (doctor tutto
+verde, serve ok su 11434), e il 1.7B da 1,06 GB e il 0.6B da 382 MB
+stanno in `~/.qvac/models`. Col Wi-Fi spento: `npx qvac serve --openai
+--port 11434 --host 127.0.0.1 --cors-origin http://127.0.0.1:8081` e
+una chat completion con `"model": "consigliami"` dalla pagina locale
+`consigliami-prova.html` (servita da `python -m http.server 8081`):
+risponde senza scaricare niente. **Qwen3 ragiona prima di rispondere**
+(8 ott sera, dal vivo): una chat completion nuda con `max_tokens` 80
+torna `content: null` e solo `reasoning_content`. L'interruttore che
+QVAC rispetta è **`"reasoning_budget": false`** nella richiesta
+(provato la sera stessa sul 1.7B, cinque varianti: `enable_thinking:
+false`, anche in `chat_template_kwargs`, è IGNORATO; `/no_think` nel
+sistema spegne il thinking ma la risposta è sporca); con
+`response_format` a `json_schema` la grammatica parte subito e il
+modello non pensa comunque, ma l'interruttore si manda lo stesso.
+`consigliami-prova.html` lo manda già (riga `reasoning_budget: false`);
+`consiglio.py` NON lo mandava, aggiunto l'8 sera. I curl verso 8080 e
+11434 si fanno da PowerShell con `curl.exe`: dal WSL `127.0.0.1` è
+quello di Linux. Sul portatile devono stare anche il clone di
+`fidelity-points` e il worktree di Barattolo con le dipendenze pip già
+installate (`py -3 -c "import fastapi, uvicorn, httpx"` da PowerShell:
+il Python del WSL non ha fastapi).
 
 3) **Prova di riavvio completa**, nell'ordine di §6 — la VM, il tunnel a
 TRE gambe, la faccia HTTP, il relay, il wallet, il servizio NWC, QVAC,
@@ -698,20 +731,30 @@ node nwc-wdk.mjs prova barattolo                                 # get_info ok (
 ```
 
 ```powershell
-cd C:\Users\Andrea\qvac-prova; qvac serve --openai --port 11434 --host 127.0.0.1 --cors-origin http://127.0.0.1:8080
+cd C:\Users\Andrea\qvac-prova; npx qvac serve --openai --port 11434 --host 127.0.0.1 --cors-origin http://127.0.0.1:8080
 ```
 
-Poi Barattolo in collaudo sul worktree, porta 8080, config dal solo
-esempio con `MODALITA_COLLAUDO = True`, `MOSTRO_RELAY` e
-`MOSTRO_RELAY_SPECCHIO` al relay morto (`ws://127.0.0.1:9`) e
-`NIP05_NOMI` con le due hex di sopra (`uvicorn server:app --port 8080`);
-`curl -s "http://127.0.0.1:8080/.well-known/nostr.json?name=usdb"` deve
-dare la hex di `usdb`; nell'app (identità 111 dall'hash) Profilo →
-Incassi e pagamenti → 👛 Wallet NWC → ⚡ Collega con la stringa di
+Poi Barattolo in collaudo, porta 8080, **da PowerShell** (corretto l'8
+ott sera, dal vivo: il Python del WSL non ha fastapi, e il git del WSL
+non ha le credenziali di GitHub — `git pull` da PowerShell). Il
+`config.py` locale, che aveva la sola `MODALITA_COLLAUDO = True`, ha in
+più `MOSTRO_RELAY = "ws://127.0.0.1:9"`, `MOSTRO_RELAY_SPECCHIO =
+["ws://127.0.0.1:9"]` (il relay morto) e `NIP05_NOMI` con le due hex di
+sopra (aggiunte a mano l'8 sera):
+
+```powershell
+cd C:\Users\Andrea\Documents\GitHub\satmarket; git pull; py -3 -m uvicorn server:app --port 8080
+curl.exe -s "http://127.0.0.1:8080/.well-known/nostr.json?name=usdb"   # → {"names": {"usdb": "<hex di usdb>"}}
+```
+
+(`curl.exe` da PowerShell, non dal WSL: lì `127.0.0.1` è quello di
+Linux). Nell'app (identità 111 dall'hash) Profilo → Incassi e pagamenti
+→ 👛 Wallet NWC → ⚡ Collega con la stringa di
 `nwc/connessione-barattolo.txt` → «wallet collegato», e nel log del
 servizio `barattolo: get_info → ok (nip44_v2)`. Il giro è verde quando
 ogni riga qui sopra ha dato quel che dice il commento, senza un
-comando in più. La sera si spegne nell'ordine inverso:
+comando in più. **Passato tutto verde l'8 ott sera** sul PC fisso
+(Andrea): NIP-05, wallet collegato, `get_info ok nip44_v2`. La sera si spegne nell'ordine inverso:
 `pkill -f "[n]wc-wdk.mjs serve"; pkill -f "[n]ak serve"` nel WSL,
 4) **Il 16, gli annunci** (dopo la prova di riavvio: il relay locale
 deve essere su). Dal WSL, uno alla volta. Il comando è `identita.mjs
@@ -793,16 +836,20 @@ mkdir -p ~/bin && curl -L -o ~/bin/nak https://github.com/fiatjaf/nak/releases/d
 ~/bin/nak --version   # → nak version v0.21.0
 ```
 
-4) **QVAC CLI** nel sistema NATIVO (Windows: PowerShell, con Node 24 —
+4) **QVAC** nel sistema NATIVO (Windows: PowerShell, con Node 24 —
 `qvac doctor` lo pretende — installato da nodejs.org o `winget install
 OpenJS.NodeJS`; su Linux lo stesso con `nvm install 24` in una shell a
-parte). Il `qvac.config.json` è quello di `deploy/rgb/` (gli alias
-`consigliami` → Qwen3 1.7B e `qwen3-600m-inst-q4` → Qwen3 0.6B).
+parte), come dipendenza LOCALE della cartella `qvac-prova` e non
+globale (corretto l'8 ott sera: sul PC di Andrea `qvac` nudo non è nel
+PATH, il comando è `npx qvac …`). Il `qvac.config.json` è quello di
+`deploy/rgb/` (gli alias `consigliami` → Qwen3 1.7B e
+`qwen3-600m-inst-q4` → Qwen3 0.6B).
 
 ```powershell
-npm i -g @qvac/cli@0.15.0; qvac --version   # → 0.15.0
-qvac doctor
-New-Item -ItemType Directory -Force $env:USERPROFILE\qvac-prova; Copy-Item <clone>\deploy\rgb\qvac.config.json $env:USERPROFILE\qvac-prova\
+New-Item -ItemType Directory -Force $env:USERPROFILE\qvac-prova; cd $env:USERPROFILE\qvac-prova; npm init -y
+npm install @qvac/sdk@0.21.0 @qvac/cli@0.15.0; npx qvac --version   # → 0.15.0
+npx qvac doctor   # → tutto verde
+Copy-Item <clone>\deploy\rgb\qvac.config.json $env:USERPROFILE\qvac-prova\
 ```
 
 5) **I due modelli, già scaricati.** La strada corta (nessun download:
@@ -810,8 +857,12 @@ New-Item -ItemType Directory -Force $env:USERPROFILE\qvac-prova; Copy-Item <clon
 `C:\Users\Andrea\.qvac\models` (i due file `.gguf`: Qwen3 0.6B Q4_0 da
 382 MB e Qwen3 1.7B Q4_0 da 1,06 GB, coi loro prefissi) in
 `%USERPROFILE%\.qvac\models` del portatile di Alan. L'alternativa, con
-la rete: `qvac serve` e UNA chiamata per alias, che scarica alla prima
-richiesta (la CLI non ha un comando «scarica»).
+la rete (la CLI non ha un comando «scarica»): il primo avvio con i due
+alias, che li scarica subito — provato l'8 ott sera sul PC di Andrea:
+
+```powershell
+cd $env:USERPROFILE\qvac-prova; npx qvac serve --openai --port 11434 --host 127.0.0.1 --model consigliami --model qwen3-600m-inst-q4
+```
 
 ```powershell
 Get-ChildItem $env:USERPROFILE\.qvac\models   # → *_Qwen3-0.6B-Q4_0.gguf e *_Qwen3-1.7B-Q4_0.gguf
@@ -833,7 +884,7 @@ Barattolo con le dipendenze pip, per il server in collaudo di riserva.
 
 ```bash
 cd ~ && gh repo clone kreamistudio-crypto/fidelity-points && git -C ~/fidelity-points log --oneline | head -3   # → af445f7, 06422bf, 1e6fa80
-cd <clone di satmarket> && python3 -m venv .venv && .venv/bin/pip install --quiet fastapi uvicorn httpx websocket-client pillow cryptography && .venv/bin/python -c "import fastapi, uvicorn, httpx; print('server ok')"
+cd <clone di satmarket> && python3 -m venv .venv && .venv/bin/pip install --quiet fastapi uvicorn httpx websocket-client pillow cryptography && .venv/bin/python -c "import fastapi, uvicorn, httpx; print('server ok')"   # su Linux; su Windows il server gira da PowerShell con `py -3` (punto 3 qui sopra), non dal WSL
 ```
 
 8) **Le identità e la pagina dell'aiutante, dal PC di Andrea, su
@@ -875,14 +926,15 @@ node nwc-wdk.mjs info   # → la chiave pubblica del servizio e il relay locale
 ```
 
 ```powershell
-cd $env:USERPROFILE\qvac-prova; qvac serve --openai --port 11434 --host 127.0.0.1 --cors-origin http://127.0.0.1:8081
+cd $env:USERPROFILE\qvac-prova; npx qvac serve --openai --port 11434 --host 127.0.0.1 --cors-origin http://127.0.0.1:8081
 ```
 
-e in un secondo PowerShell `python -m http.server 8081` nella stessa
+e in un secondo PowerShell `py -3 -m http.server 8081` nella stessa
 cartella, poi `http://127.0.0.1:8081/consigliami-prova.html` nel
 browser: «Consigliami» risponde col 1.7B senza scaricare niente (la
 prima chiamata carica il modello: ~20 s; la seconda meno di un
-secondo). Sul portatile di Alan NON stanno: il wallet della demo (seme
+secondo). Un curl di controllo si fa da PowerShell con `curl.exe`, non
+dal WSL (lì `127.0.0.1` è quello di Linux). Sul portatile di Alan NON stanno: il wallet della demo (seme
 e stash), le chiavi SSH della VM, la segreta age, il `.env` della VM, il
 config di Barattolo.
 
