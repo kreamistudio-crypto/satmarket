@@ -41120,3 +41120,124 @@ punto 6, §7-bis, la riga del 16 in §10) restano come scritte: i
 percorsi delle bozze adesso sono `docs/spec/`. Fra §5 (la dichiarazione
 intera da consegnare all'arrivo) e il README minimo c'è una differenza
 voluta: quale dei due si mostra ai giudici lo decidono Andrea e Alan.
+
+
+## Il comando `annuncio` e la scaletta della demo (8 ott 2026, sera, richiesta di Andrea)
+
+**DA DOVE SI PARTIVA.** La riga «16 ott» di HACKATHON-SETUP §10 diceva
+«un comando `annuncio <nome> <asset_id>` in `identita.mjs`, sul calco
+di `profilo`, DA SCRIVERE»: i due annunci di MOON e USDB firmati dalle
+identità di prova, sul relay locale, nella forma di
+`docs/spec/NIP-RGB-ASSETS.md` (la cura di D.3 punto 0: l'annuncio
+esiste dal venerdì, a Torino si scrive solo la lettura). `identita.mjs`
+aveva `nuova`, `pubblica` e `profilo` (kind 0). La demo di domenica
+stava nello studio come tabella di ore (D.2) e sette slide, non
+schermata per schermata; il 15 ott non aveva una lista per il portatile
+di Alan; la roadmap in slide 6 nominava i certificati UDA per le
+magliette di AGORA senza dire chi li emette e con quale identità.
+
+**COSA SI È FATTO.** A) In `deploy/rgb/identita.mjs` il comando
+`annuncio [--prova] <nome> <asset_id>`, sul calco di `profilo`: legge
+l'identità, costruisce l'evento della bozza — addressable, kind
+**38180** come SEGNAPOSTO (38172/38173 sono di NIP-87, questo sta
+subito dopo e non è registrato da nessuno; lo assegnano i maintainer),
+`d` = ContractId senza `rgb:` (in §2 gli asset_id lo portano, la bozza
+vuole `d` nudo: il prefisso si toglie, con o senza passa), `i`
+`rgb:contract:<id>` e `k` `rgb:contract` (NIP-73), `n` `signet`,
+`schema`, `ticker`, `name`, `precision`, `supply`, `alt`, il `content`
+con la descrizione e l'emittente dichiarato — lo firma, verifica la
+firma (`verifyEvent`) e con `--prova` lo stampa in JSON e si ferma PRIMA
+del relay; senza, lo pubblica sul relay locale (`NWC_RELAY`, la guardia
+dei relay pubblici è quella di prima). I valori dei tag vengono da una
+tabella `ASSET` nel file, coi valori PUBBLICI di §2 (il nome di USDB
+con gli underscore del genesis, non quello mostrato: la bozza dice che
+il wallet li confronta col genesis e scarta chi diverge); un contratto
+→ un emittente (`usdb` non annuncia MOON: studio D.3 punto 4, «due
+annunci dello stesso contratto da chiavi diverse si evitano»); niente
+`issuer` (il genesis dei nostri asset porta `ssi:anonymous`: siamo al
+livello 1), niente `u`. Nessun kind 0 nuovo, nessun kind 1, nessuna
+raccomandazione (3xxxx+1): la riga del 16 prevede i due annunci e
+basta (precisazione di Andrea a cantiere aperto). La privata non
+compare in nessun output: si stampano pubkey, id e sig dell'evento.
+B) `prove_annuncio_identita` (46 prove): le sentinelle sul testo (kind
+3xxxx e «SEGNAPOSTO», `--prova` prima di `pubblicaEvento`, i dieci tag,
+niente `issuer`, il prefisso tolto, `verifyEvent` prima di tutto,
+nessuna riga che stampi `.sk`, la tabella coi valori di §2) e poi lo
+script VERO con due identità usa-e-getta nate in una cartella
+temporanea (mai quelle di `~/wdk-prova`): `nuova` → `pubblica` dice la
+stessa hex → `annuncio --prova` esce 0, l'evento ha quella `pubkey`, il
+kind, `d`/`i`/`k`/`n`/`schema`, ticker/name/precision/supply di §2, il
+nip05 nel content, l'id uguale allo sha256 della serializzazione NIP-01
+rifatta in Python, la firma Schnorr riverificata con `schnorr_puro`;
+senza `rgb:` lo stesso `d`; senza `--prova` col relay morto
+(`ws://127.0.0.1:9`) errore e niente «pubblicato»; i rifiuti
+(emittente sbagliato, asset fuori tabella, asset_id mancante, relay
+pubblico nel config); le due private assenti da tutto l'output.
+Lo script importa nostr-tools come ESM (NODE_PATH non vale): la prova
+copia il file sotto una cartella che ha `node_modules/nostr-tools`
+(`IDENTITA_NODE_MODULES`, il repo, `~/wdk-prova`), e su Windows, dove
+nostr-tools sta solo nel WSL, passa da `wsl.exe` con la CASA su
+`/mnt/c` (così Python legge il file dell'identità per sapere cosa NON
+deve comparire). In CI nostr-tools non c'è: un passo nuovo del
+workflow lo installa FUORI dal repo (`npm install --prefix
+$RUNNER_TEMP/nostr-tools nostr-tools@2.25.2`, la versione del
+portatile) e `IDENTITA_NODE_MODULES` lo indica alla prova — senza, la
+prova si salterebbe e PROVE_SEVERE farebbe rosso, giusto. Niente
+`package.json` nel repo. C) HACKATHON-SETUP: la riga del 16 in §10
+chiusa (☑ il comando, ☐ il lancio); il punto 4) «il 16, gli annunci»
+con i comandi uno per riga e la rilettura con nostr-tools; la lista
+«15 ott, portatile di Alan» in dieci punti con le versioni vere (Node
+22.23.3 via nvm 0.40.3, wdk-wallet-rgb 2.0.3, rgb-lib-linux-x64
+0.3.0-beta.8, nostr-tools 2.25.2, bip39 3.1.0, nak v0.21.0, @qvac/cli
+0.15.0 coi due `.gguf` da copiare, rgb-lib 0.3.0b7, il clone di
+`fidelity-points`, le identità su chiavetta, il wallet di PROVA vuoto, la
+prova finale col Wi-Fi spento); in §11 quattro sezioni nuove: 11.1 il
+16 (cosa pubblica ogni identità e con quale kind), 11.2 la demo in
+dieci schermate (cosa si vede, chi tocca cosa, chi parla e cosa dice:
+acquisto, «Consigliami», pagamento via NWC-RGB in USDB più punti, i
+punti che arrivano, «Emesso da ✓» via NIP-05 — con l'ordine delle
+13:30 già confermato per non aspettare il blocco in sala), 11.3 i due
+giorni ora per ora con Andrea e Alan (build chiuso domenica alle 15:00,
+la ✓ al sabato pomeriggio), 11.4 il piano B per QVAC, wallet, rete, la
+✓ e il collaudo, con quel che funziona dall'8 ott, 11.5 la lista di
+controllo della roadmap. D) Lo studio: in D.2 (slide 6 e la riga di
+realtà) i certificati UDA sono «emessi dal negozio con la sua identità
+Nostr», l'annuncio firmato di oggi applicato a un contratto UDA.
+
+**SCARTATI.** Il kind 0 e il kind 1 «di presentazione» nel comando (la
+prima stesura della richiesta li aveva: il documento non li prevede,
+tolti alla precisazione). Un comando di rilettura in `identita.mjs`
+(fuori richiesta: la rilettura è una riga di nostr-tools nel
+documento, provata). Il `nak req` come rilettura: lanciato da
+`wsl.exe` resta muto (lezione 3 di §9, riconfermata stasera). Le
+identità su Alan via la chiave segreta age: apre anche i backup dello
+stash, troppo; va la sola cartella `identita/` su chiavetta, aperta da
+Andrea sul suo PC. Il wallet della demo copiato sul portatile di Alan
+(«never instantiate a wallet in multiple places»): un wallet di PROVA
+vuoto al suo posto. Un `package.json` nel repo per nostr-tools in CI.
+
+**PROVATO.** `prove_annuncio_identita` 46 su 46 per le due strade: da
+Windows via WSL e, come farà la CI, con nostr-tools installato nel
+temp fuori dal repo (`IDENTITA_NODE_MODULES`). Tortura 6 su 6 su una
+copia: `d` col prefisso, l'emittente non controllato, `--prova` che
+pubblica lo stesso, la firma con una chiave a caso, un tag sparito,
+`verifyEvent` tolto — tutte prese. Dal vivo nel WSL con identità
+usa-e-getta su un `nak serve` di prova (porta 7790, mai il 7777 di
+Andrea): annuncio pubblicato, riletto con nostr-tools con la pubkey
+giusta e i quattro tag del genesis, il secondo invio sostituisce il
+primo (un evento solo), la privata assente dal log del relay; la riga
+di rilettura del documento provata com'è scritta (USDB e MOON, i due
+autori). Il workflow: YAML valido. Lo scanner dei segreti: nessun
+64-hex nelle righe aggiunte, nessuna forma. Suite intera severa e
+collaudi della CI: nel verbale del push.
+
+**NON PROVATO, DA GUARDARE.** Il lancio del 16 con le identità vere
+sul relay 7777 (è il 16). La lista del 15 sul portatile di Alan: le
+versioni sono quelle del PC di Andrea, i percorsi del clone di
+Barattolo e della chiavetta sono da sostituire; `winget`/nodejs.org
+per Node 24 e la cartella dei modelli di QVAC su un portatile senza
+GPU Vulkan non si sono provati. I ruoli del pitch (Alan parla, Andrea
+tocca) sono una proposta. Il `nak serve` tiene gli eventi in memoria:
+dopo un riavvio del WSL le due righe `annuncio` si rilanciano (scritto
+in §10 e nella tabella del sabato mattina). Il numero 38180 resta un
+segnaposto finché i maintainer non ne assegnano uno.

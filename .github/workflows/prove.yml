@@ -50,6 +50,20 @@ jobs:
       - name: Installa il minimo indispensabile
         run: pip install --quiet websocket-client pillow cryptography snowballstemmer
 
+      # nostr-tools per `prove_annuncio_identita` (8 ott 2026): lo script
+      # deploy/rgb/identita.mjs — le identita' Nostr di prova
+      # dell'hackathon, il comando `annuncio` — e' ESM e importa
+      # nostr-tools, che il runner non ha. Si installa FUORI dal repo, nel
+      # temp del runner, alla versione del portatile della demo (2.25.2),
+      # e la prova lo trova da IDENTITA_NODE_MODULES; senza, si
+      # salterebbe da sola e PROVE_SEVERE farebbe rosso (giusto). Niente
+      # package.json nel repo: Barattolo non e' un progetto npm, e
+      # deploy/rgb/ e' la copia di ~/wdk-prova, che il suo package.json
+      # ce l'ha la'.
+      - name: nostr-tools per lo script delle identita'
+        run: npm install --silent --no-save --no-package-lock --no-audit --no-fund
+             --prefix "$RUNNER_TEMP/nostr-tools" nostr-tools@2.25.2
+
       # Primo scalino: tutto compila. Banale e imbattibile — becca il
       # refuso prima che arrivi sul VPS, che e' esattamente il modo
       # in cui il mercatino potrebbe restare giu' per una virgola.
@@ -136,6 +150,7 @@ jobs:
       - name: Le prove
         env:
           PROVE_SEVERE: "1"
+          IDENTITA_NODE_MODULES: ${{ runner.temp }}/nostr-tools
         run: python prove.py
 
       # Quarto scalino (22 set 2026): i COLLAUDI, cioe' il server vero

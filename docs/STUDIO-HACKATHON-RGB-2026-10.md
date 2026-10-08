@@ -1473,7 +1473,9 @@ video di riserva già registrato); 6) **l'identità per tutti, e la
 roadmap**: il NIP-05 gratuito a chi arriva al livello 2 del mercatino
 (G.3), NWC-RGB come estensione proposta al repo `nwc`, Mostro con asset
 RGB, consegne via relay Nostr al posto del proxy, i certificati UDA per
-le magliette numerate di AGORA — per un grant dell'RGB Protocol
+le magliette numerate di AGORA, emessi dal negozio con la sua identità
+Nostr (lo stesso annuncio firmato di oggi: «Emesso da AGORA ✓») — per
+un grant dell'RGB Protocol
 Association (**l'esistenza di un programma di grant NON l'ho
 verificata**: da chiedere il 13); 7) cosa resta, e cosa è «mostrato ma
 non in produzione». L'AI compare alla slide 5 come aiuto, non nel
@@ -1508,7 +1510,9 @@ cresce con la storia e i relay tagliano gli eventi grossi: la forma
 realistica è **il consignment su Blossom (che Barattolo usa già per le
 foto delle recensioni) e un puntatore firmato sul relay**; i certificati
 sono lo schema UDA (esiste: `EmbeddedMedia`, `Attachments`,
-`ProofOfReserves`) — uno per maglietta, con la foto e il numero; il
+`ProofOfReserves`) — uno per maglietta, con la foto e il numero,
+emesso dal negozio con la sua identità Nostr, che è l'annuncio
+firmato di questo weekend applicato a un contratto UDA; il
 NIP-05 gratuito al livello 2 è la stessa rotta `/.well-known/nostr.json`
 che legge i nomi degli utenti invece di un file statico — un cantiere
 piccolo, dopo il lancio, con le sue regole (G.3), e si dice così.

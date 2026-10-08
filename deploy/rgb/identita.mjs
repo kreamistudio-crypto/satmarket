@@ -11,19 +11,54 @@
 //   nuova <nome> "<Nome mostrato>" <nip05>     crea la coppia di chiavi e il file; stampa la pubblica
 //   pubblica <nome>                             la chiave pubblica (hex e npub), senza toccare niente
 //   profilo <nome>                              firma e pubblica il kind 0 (name, about, nip05) sul relay LOCALE
+//   annuncio <nome> <asset_id>                  firma e pubblica l'ANNUNCIO dell'asset (docs/spec/NIP-RGB-ASSETS.md,
+//                                               kind segnaposto) sul relay LOCALE: la riga «16 ott» di HACKATHON-SETUP §10
+//   annuncio --prova <nome> <asset_id>          lo stesso evento, firmato e stampato in JSON, NON pubblicato
+//                                               (nessun relay toccato: serve alle prove e a guardarlo prima)
 //
 // Il relay: NWC_RELAY (default ws://127.0.0.1:7777, il `nak serve` locale).
 // Niente relay pubblici in questo giro (NWC_RELAY_PUBBLICO_OK=1 per forzare).
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { finalizeEvent, generateSecretKey, getPublicKey, nip19 } from 'nostr-tools'
+import { finalizeEvent, generateSecretKey, getPublicKey, nip19, verifyEvent } from 'nostr-tools'
 import { Relay } from 'nostr-tools/relay'
 
 const CASA = process.env.IDENTITA_CASA || path.join(os.homedir(), 'wdk-prova', 'identita')
 const RELAY = process.env.NWC_RELAY || 'ws://127.0.0.1:7777'
 const hex = (b) => Buffer.from(b).toString('hex')
 const muori = (msg) => { console.error('✗', msg); process.exit(1) }
+
+// L'ANNUNCIO DELL'ASSET (docs/spec/NIP-RGB-ASSETS.md): un evento
+// ADDRESSABLE (kind 3xxxx) firmato dalla chiave dell'emittente, con `d` =
+// ContractId. Il numero e' un SEGNAPOSTO, lo assegnano i maintainer dei
+// NIP: 38172/38173 sono di NIP-87 (Cashu/Fedimint), questo sta subito
+// dopo e non e' registrato da nessuno. L'evento «raccomandazione»
+// (3xxxx+1, lo pubblica chiunque) NON si fa qui: la riga del 16 ott
+// prevede i due annunci e basta.
+const KIND_ANNUNCIO = 38180
+const RETE = 'signet'
+
+// Gli asset che un'identita' puo' annunciare: i valori PUBBLICI di
+// HACKATHON-SETUP §2 (ticker, nome, precisione e supply sono COPIE del
+// genesis, e il wallet li confronta: devono combaciare con `rgb.py saldo`,
+// quindi il nome di USDB porta gli underscore del genesis, non quello
+// mostrato). Chi lo annuncia e' l'emittente dichiarato in §2: un secondo
+// annuncio dello stesso contratto da un'altra chiave e' una feature
+// della bozza, ma nella demo si evita (studio, D.3 punto 4). JAR resta
+// fuori dalla demo (decisione di Alan) e non ha un'identita'.
+const ASSET = {
+  '9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM': {
+    ticker: 'MOON', name: 'Punti To The Mooon', precision: 0, supply: 1000000, schema: 'nia',
+    emittente: 'tothemooon',
+    descrizione: 'MOON sono i punti fedelta\' di PROVA del negozio To The Mooon, emessi su RGB (signet) per l\'hackathon di Torino (17-18 ott 2026): un punto per euro speso, 1 MOON = 1 sat di sconto nel negozio. Nessun valore reale.'
+  },
+  'H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A': {
+    ticker: 'USDB', name: 'Dollari_di_prova_Barattolo', precision: 2, supply: 100000000, schema: 'nia',
+    emittente: 'usdb',
+    descrizione: 'USDB sono i «Dollari di prova Barattolo», un asset NIA di PROVA su RGB (signet) emesso per l\'hackathon di Torino (17-18 ott 2026): 1,00 USDB vale 1 $ dichiarato, accettato al checkout di Barattolo in collaudo. Nessun valore reale.'
+  }
+}
 
 if (/^wss?:\/\/(?!127\.0\.0\.1|localhost)/i.test(RELAY) && !process.env.NWC_RELAY_PUBBLICO_OK) {
   muori(`il relay ${RELAY} non e' locale: in questo giro niente relay pubblici`)
@@ -41,6 +76,18 @@ function leggi (nome) {
 function stampaPubblica (nome, pub) {
   console.log(`${nome}: hex ${pub}`)
   console.log(`${' '.repeat(nome.length)}  npub ${nip19.npubEncode(pub)}`)
+}
+// Il ContractId nudo: `rgb:` davanti si toglie (in §2 gli asset_id lo
+// portano, la bozza vuole `d` senza), la forma e' quella di rgb-lib
+// (gruppi di base64url con `~` e `-`).
+function contractId (assetId) {
+  const id = String(assetId || '').replace(/^rgb:/, '')
+  if (!/^[A-Za-z0-9_~-]{20,80}$/.test(id)) muori('annuncio <nome> <asset_id>: l\'asset_id e\' quello di `rgb.py saldo` (con o senza `rgb:` davanti)')
+  return id
+}
+async function pubblicaEvento (ev) {
+  const relay = await Relay.connect(RELAY)
+  try { await relay.publish(ev) } finally { relay.close() }
 }
 
 const COMANDI = {
@@ -71,10 +118,51 @@ const COMANDI = {
         about: `Identita' di PROVA dell'hackathon RGB di Torino (17-18 ott 2026): l'emittente dichiarato di un asset su signet. Nessun valore reale.`
       })
     }, sk)
-    const relay = await Relay.connect(RELAY)
-    await relay.publish(ev)
-    relay.close()
+    await pubblicaEvento(ev)
     console.log(`✓ kind 0 di «${nome}» (${i.nip05}) pubblicato su ${RELAY}, id ${ev.id.slice(0, 12)}…`)
+  },
+
+  // Sul calco di `profilo`: legge l'identita', costruisce l'evento della
+  // bozza, lo firma. Con --prova lo stampa e si ferma PRIMA del relay.
+  // Niente `issuer` (il genesis dei nostri asset porta `ssi:anonymous`:
+  // siamo al livello 1, «verificato» via NIP-05, non «impegnato») e
+  // niente `u` (il consignment del contratto non e' servito da nessuna
+  // parte): si aggiungono il giorno che esistono.
+  async annuncio (...args) {
+    const prova = args[0] === '--prova'
+    if (prova) args.shift()
+    const [nome, assetId] = args
+    if (!nome || !assetId) muori('annuncio [--prova] <nome> <asset_id>')
+    const i = leggi(nome)
+    const id = contractId(assetId)
+    const a = ASSET[id]
+    if (!a) muori(`asset ${id} sconosciuto: la tabella ASSET di questo file conosce ${Object.values(ASSET).map(x => x.ticker).join(', ')} (§2); un asset nuovo si aggiunge li' copiando ticker, nome, precisione e supply dal genesis`)
+    if (a.emittente !== nome) muori(`${a.ticker} lo annuncia «${a.emittente}», non «${nome}»: due annunci dello stesso contratto da chiavi diverse nella demo si evitano (studio, D.3 punto 4)`)
+    const sk = Uint8Array.from(Buffer.from(i.sk, 'hex'))
+    const ev = finalizeEvent({
+      kind: KIND_ANNUNCIO, created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ['d', id],
+        ['i', `rgb:contract:${id}`], ['k', 'rgb:contract'],
+        ['n', RETE],
+        ['schema', a.schema],
+        ['ticker', a.ticker],
+        ['name', a.name],
+        ['precision', String(a.precision)],
+        ['supply', String(a.supply)],
+        ['alt', `RGB asset announcement: ${a.ticker}`]
+      ],
+      content: `${a.descrizione} Emittente dichiarato: ${i.display} (${i.nip05}).`
+    }, sk)
+    if (!verifyEvent(ev)) muori('la firma dell\'evento non torna: non si pubblica')
+    if (prova) {
+      console.log(JSON.stringify(ev, null, 2))
+      console.error(`— di PROVA: annuncio di ${a.ticker} firmato da «${nome}» (${i.nip05}), kind ${KIND_ANNUNCIO} (segnaposto), d ${id}, firma valida. NON pubblicato, nessun relay toccato.`)
+      return
+    }
+    await pubblicaEvento(ev)
+    console.log(`✓ annuncio di ${a.ticker} firmato da «${nome}» (${i.nip05}) pubblicato su ${RELAY}: kind ${KIND_ANNUNCIO} (segnaposto), d ${id}, id ${ev.id.slice(0, 12)}…`)
+    console.log(`  per rileggerlo: la riga «rilettura» di HACKATHON-SETUP §10 (nostr-tools, kind ${KIND_ANNUNCIO}, autore ${ev.pubkey}); \`nak req\` lanciato da wsl.exe stampa muto`)
   }
 }
 

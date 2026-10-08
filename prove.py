@@ -129644,6 +129644,234 @@ def prove_leva_rgb():
           "/api/consigliami" in testo)
 
 
+def prove_annuncio_identita():
+    """L'ANNUNCIO DELL'ASSET FIRMATO DALL'IDENTITA' DI PROVA (8 ott 2026):
+    `deploy/rgb/identita.mjs annuncio [--prova] <nome> <asset_id>`, la
+    riga «16 ott» di HACKATHON-SETUP §10 — l'evento della bozza
+    docs/spec/NIP-RGB-ASSETS.md (addressable, kind segnaposto, `d` =
+    ContractId) firmato dalla chiave dell'emittente. Prima le sentinelle
+    sul testo; poi lo script VERO, con identita' usa-e-getta nate in una
+    cartella temporanea (mai quelle di ~/wdk-prova), per ognuna delle due
+    identita' della demo: la pubblica di `pubblica` e' quella dell'evento,
+    la firma Schnorr la verifica `schnorr_puro` sui byte veri, la privata
+    non compare in nessun output, il relay con --prova non si tocca (il
+    relay morto non fa differenza), e senza --prova il relay morto e' un
+    errore senza «pubblicato». Lo script vuole nostr-tools: in CI lo
+    installa il passo del workflow (`IDENTITA_NODE_MODULES`), sul PC di
+    Andrea sta nel WSL (~/wdk-prova) e la prova ci passa da wsl.exe."""
+    import hashlib
+    import json
+    import re
+    import shlex
+    import shutil
+    import subprocess
+    import tempfile
+    import schnorr_puro
+    print("\n📣 L'annuncio dell'asset firmato dall'identita' di prova")
+    percorso = os.path.join(QUI, "deploy", "rgb", "identita.mjs")
+    src = open(percorso, encoding="utf-8").read()
+
+    # --- 1) le sentinelle sul testo ------------------------------------
+    m = re.search(r"const KIND_ANNUNCIO = (\d+)", src)
+    kind = int(m.group(1)) if m else 0
+    prova("il kind dell'annuncio e' addressable (3xxxx), e segnaposto",
+          True, 30000 <= kind < 40000 and "SEGNAPOSTO" in src)
+    prova("il comando `annuncio` c'e', e `--prova` si ferma prima del relay",
+          True, "async annuncio (...args)" in src
+          and "args[0] === '--prova'" in src
+          and "if (prova) {" in src
+          and src.index("if (prova) {") < src.index("await pubblicaEvento(ev)",
+                                                     src.index("async annuncio")))
+    for tag in ("'d', id", "`rgb:contract:${id}`", "'k', 'rgb:contract'",
+                "'n', RETE", "'schema'", "'ticker'", "'name'", "'precision'",
+                "'supply'", "'alt'"):
+        prova(f"il tag {tag} della bozza c'e'", True, tag in src)
+    prova("niente tag `issuer` (livello 1: il genesis dice ssi:anonymous)",
+          True, "['issuer'" not in src)
+    prova("l'asset_id perde il prefisso rgb: per `d`", True,
+          "replace(/^rgb:/, '')" in src)
+    prova("la firma si verifica prima di stampare o pubblicare", True,
+          "if (!verifyEvent(ev)) muori" in src)
+    righe_sk = [r for r in src.splitlines()
+                if ".sk" in r and ("console." in r or "muori(" in r)]
+    prova("nessuna riga stampa la chiave privata", [], righe_sk)
+    prova("la tabella ASSET conosce MOON e USDB coi valori di §2", True,
+          "'9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM'" in src
+          and "'H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A'" in src
+          and "name: 'Dollari_di_prova_Barattolo', precision: 2, supply: 100000000" in src
+          and "name: 'Punti To The Mooon', precision: 0, supply: 1000000" in src)
+
+    # --- 2) lo script VERO: dove gira ----------------------------------
+    # Lo script importa nostr-tools come ESM: NODE_PATH non vale, la
+    # copia dello script deve stare SOTTO una cartella con node_modules.
+    def ha_nostr_tools(cartella):
+        return cartella and os.path.isdir(
+            os.path.join(cartella, "node_modules", "nostr-tools"))
+
+    node = shutil.which("node")
+    base = next((c for c in (os.environ.get("IDENTITA_NODE_MODULES"), QUI,
+                             os.path.expanduser("~/wdk-prova"))
+                 if node and ha_nostr_tools(c)), None)
+    wsl = shutil.which("wsl.exe") if sys.platform == "win32" else None
+    casa = tempfile.mkdtemp(prefix="prove-identita-")
+    esegui = None
+    pulizia = []
+    if base:
+        cartella = tempfile.mkdtemp(prefix=".prove-identita-", dir=base)
+        shutil.copy(percorso, os.path.join(cartella, "identita.mjs"))
+        pulizia.append(lambda: shutil.rmtree(cartella, ignore_errors=True))
+
+        def esegui(args, relay="ws://127.0.0.1:9"):
+            env = dict(os.environ, IDENTITA_CASA=casa, NWC_RELAY=relay)
+            r = subprocess.run([node, "identita.mjs", *args], cwd=cartella,
+                               capture_output=True, text=True,
+                               encoding="utf-8", env=env, timeout=60)
+            return r.returncode, r.stdout, r.stderr
+    elif wsl:
+        # Da Windows lo script gira nel WSL, dove nostr-tools c'e' (il
+        # portatile della demo); la CASA sta su /mnt/c cosi' Python legge
+        # il file dell'identita' (per sapere cosa NON deve comparire).
+        def wslpath(p):
+            p = p.replace("\\", "/")
+            return re.sub(r"^([A-Za-z]):", lambda m: "/mnt/" + m.group(1).lower(), p)
+
+        def nel_wsl(script):
+            return subprocess.run([wsl, "-e", "bash", "-c", script],
+                                  capture_output=True, text=True,
+                                  encoding="utf-8", timeout=90)
+
+        cartella = f"~/wdk-prova/.prove-identita-{os.getpid()}"
+        pronto = nel_wsl(
+            f"test -d ~/wdk-prova/node_modules/nostr-tools && mkdir -p {cartella}"
+            f" && cp {shlex.quote(wslpath(percorso))} {cartella}/identita.mjs && echo si")
+        if "si" in pronto.stdout:
+            pulizia.append(lambda: nel_wsl(f"rm -rf {cartella}"))
+            casa_wsl = wslpath(casa)
+
+            def esegui(args, relay="ws://127.0.0.1:9"):
+                cmd = (f"source ~/.nvm/nvm.sh >/dev/null 2>&1; cd {cartella} && "
+                       f"IDENTITA_CASA={shlex.quote(casa_wsl)} NWC_RELAY={shlex.quote(relay)} "
+                       f"node identita.mjs {' '.join(shlex.quote(a) for a in args)}")
+                r = nel_wsl(cmd)
+                return r.returncode, r.stdout, r.stderr
+    if esegui is None:
+        salta("lo script vero con le due identita'",
+              "nostr-tools non c'e' (ne' IDENTITA_NODE_MODULES, ne' ~/wdk-prova, ne' il WSL)")
+        shutil.rmtree(casa, ignore_errors=True)
+        return
+
+    IDENTITA = [
+        ("usdb", "Dollari di prova Barattolo", "usdb@barattolo.store",
+         "H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A",
+         {"ticker": "USDB", "name": "Dollari_di_prova_Barattolo",
+          "precision": "2", "supply": "100000000"}),
+        ("tothemooon", "To The Mooon", "tothemooon@barattolo.store",
+         "9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM",
+         {"ticker": "MOON", "name": "Punti To The Mooon",
+          "precision": "0", "supply": "1000000"}),
+    ]
+
+    def id_evento(e):
+        s = json.dumps([0, e["pubkey"], e["created_at"], e["kind"],
+                        e["tags"], e["content"]],
+                       separators=(",", ":"), ensure_ascii=False)
+        return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+    try:
+        uscite = []          # tutto cio' che lo script ha stampato, per la privata
+        private = []
+        for nome, display, nip05, cid, attesi in IDENTITA:
+            rc, out, err = esegui(["nuova", nome, display, nip05])
+            uscite += [out, err]
+            m = re.search(r"hex ([0-9a-f]{64})", out)
+            prova(f"[{nome}] `nuova` crea l'identita' e stampa la pubblica",
+                  True, rc == 0 and bool(m))
+            attesa = m.group(1) if m else ""
+            with open(os.path.join(casa, f"{nome}.json"), encoding="utf-8") as f:
+                private.append(json.load(f)["sk"])
+            rc, out, err = esegui(["pubblica", nome])
+            uscite += [out, err]
+            prova(f"[{nome}] `pubblica` dice la stessa hex", True,
+                  rc == 0 and f"hex {attesa}" in out)
+
+            rc, out, err = esegui(["annuncio", "--prova", nome, "rgb:" + cid])
+            uscite += [out, err]
+            prova(f"[{nome}] `annuncio --prova` esce 0 e dice NON pubblicato",
+                  True, rc == 0 and "NON pubblicato" in err)
+            try:
+                e = json.loads(out)
+            except ValueError:
+                e = {}
+            prova(f"[{nome}] l'evento stampato e' firmato dalla pubblica dell'identita'",
+                  attesa, e.get("pubkey"))
+            prova(f"[{nome}] kind segnaposto addressable", kind, e.get("kind"))
+            tags = {t[0]: t[1] for t in e.get("tags", []) if len(t) > 1}
+            prova(f"[{nome}] `d` e' il ContractId nudo, `i`/`k` NIP-73, `n` signet, schema nia",
+                  (cid, f"rgb:contract:{cid}", "rgb:contract", "signet", "nia"),
+                  (tags.get("d"), tags.get("i"), tags.get("k"), tags.get("n"),
+                   tags.get("schema")))
+            prova(f"[{nome}] ticker, name, precision e supply copiano il genesis (§2)",
+                  attesi, {k: tags.get(k) for k in attesi})
+            prova(f"[{nome}] niente `issuer`, `alt` leggibile, il nip05 nel content",
+                  (False, f"RGB asset announcement: {attesi['ticker']}", True),
+                  ("issuer" in tags, tags.get("alt"), nip05 in e.get("content", "")))
+            prova(f"[{nome}] l'id e' lo sha256 della serializzazione NIP-01",
+                  e.get("id"), id_evento(e) if e else None)
+            try:
+                firma_ok = schnorr_puro.verifica(bytes.fromhex(e["pubkey"]),
+                                                 bytes.fromhex(e["id"]),
+                                                 bytes.fromhex(e["sig"]))
+            except Exception:
+                firma_ok = False
+            prova(f"[{nome}] la firma Schnorr torna, verificata in Python puro",
+                  True, firma_ok)
+
+            rc2, out2, err2 = esegui(["annuncio", "--prova", nome, cid])
+            uscite += [out2, err2]
+            try:
+                d2 = {t[0]: t[1] for t in json.loads(out2)["tags"]}.get("d")
+            except (ValueError, KeyError):
+                d2 = None
+            prova(f"[{nome}] senza `rgb:` davanti `d` e' lo stesso", cid, d2)
+
+            rc, out, err = esegui(["annuncio", nome, "rgb:" + cid])
+            uscite += [out, err]
+            prova(f"[{nome}] senza --prova col relay morto: errore, e niente «pubblicato»",
+                  True, rc != 0 and "pubblicato su" not in out)
+
+        # --- 3) i rifiuti ---------------------------------------------
+        rc, out, err = esegui(["annuncio", "--prova", "usdb",
+                               "9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM"])
+        uscite += [out, err]
+        prova("usdb non annuncia MOON (un contratto, un emittente)", True,
+              rc != 0 and "tothemooon" in err and not out.strip())
+        rc, out, err = esegui(["annuncio", "--prova", "usdb",
+                               "rgb:XXXXXXXX-YYYYYYY-ZZZZZZZ-AAAAAAA-BBBBBBB-CCCCCCC"])
+        uscite += [out, err]
+        prova("un asset fuori tabella e' un rifiuto", True,
+              rc != 0 and "sconosciuto" in err and not out.strip())
+        rc, out, err = esegui(["annuncio", "--prova", "usdb"])
+        uscite += [out, err]
+        prova("senza asset_id e' un rifiuto", True, rc != 0 and not out.strip())
+        rc, out, err = esegui(["annuncio", "--prova", "usdb", "rgb:" + IDENTITA[0][3]],
+                              relay="wss://relay.damus.io")
+        uscite += [out, err]
+        prova("un relay pubblico nel config ferma tutto, anche --prova", True,
+              rc != 0 and "non e' locale" in err and not out.strip())
+
+        # --- 4) la privata non e' uscita da nessuna parte ---------------
+        tutto = "\n".join(uscite)
+        prova("le due private non compaiono in nessun output", [],
+              [sk[:6] + "…" for sk in private if sk in tutto])
+    finally:
+        for p in pulizia:
+            try:
+                p()
+            except Exception:
+                pass
+        shutil.rmtree(casa, ignore_errors=True)
+
+
 def prove_titoli_importati():
     """I TITOLI IMPORTATI SENZA HTML (8 ott 2026): in vetrina era
     comparso «Pinuts <h6>Cookies al cacao e arachidi…», il nome di un
@@ -129951,6 +130179,7 @@ def main():
     prove_p2p_barattozon,
     prove_p2p_paycode,
     prove_leva_rgb,
+    prove_annuncio_identita,
     prove_premio_barattozon,
     prove_convenienza_vera,
     prove_barattozon_mercato,

@@ -2,7 +2,12 @@
 
 Stato al 1 ottobre 2026, **aggiornato il 7 ottobre** con le idee di Alan,
 **e l'8** (cantiere «chiusura della preparazione»: la leva su main, il
-repo `fidelity-points`, la scaletta con la ✓ al sabato),
+repo `fidelity-points`, la scaletta con la ✓ al sabato), **e l'8
+sera** (cantiere «il comando `annuncio` e la scaletta della demo»:
+il comando in `identita.mjs` con la sua prova; in §10 il 16 e il 15
+un comando per riga; in §11 la demo schermata per schermata, i due
+giorni ora per ora, il piano B e la lista di controllo della
+roadmap),
 (la demo sui punti fedeltà, **NWC-RGB** — l'estensione NIP-47 per gli
 asset RGB —, l'emittente legato a un'identità Nostr: il perché e il
 disegno stanno nella parte seconda dello studio; qui c'è COSA si fa e
@@ -625,7 +630,7 @@ niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
 | 13 ott | Q&A con le undici domande | ☐ |
 | 14-16 ott | §5 riscritta e stampata; gli schermi su carta; il giro provato tre volte; video di riserva della demo | ☐ |
 | 14-16 ott | **Backup della VM**, **portatile con tutto scaricato** (modelli QVAC, `nak`, pacchetti del wallet), **prova di riavvio completa** di tutta la catena, nell'ordine di §6 e col tunnel a tre gambe: i comandi qui sotto, uno alla volta | ☐ |
-| 16 ott | I due annunci di MOON e USDB firmati dalle identità di prova e pubblicati sul relay locale, nella forma di `docs/spec/NIP-RGB-ASSETS.md` (kind segnaposto): un comando `annuncio <nome> <asset_id>` in `identita.mjs`, sul calco di `profilo`, DA SCRIVERE (è infrastruttura dichiarata: l'evento esiste, nessun codice lo legge). La cura di D.3 punto 0 | ☐ |
+| 16 ott | I due annunci di MOON e USDB firmati dalle identità di prova e pubblicati sul relay locale, nella forma di `docs/spec/NIP-RGB-ASSETS.md` (evento addressable, kind segnaposto **38180** — 38172/38173 sono di NIP-87, questo sta subito dopo e non è registrato da nessuno —, `d` = ContractId nudo, `i`/`k` di NIP-73, `n` signet, schema, ticker, name, precision, supply, alt; niente `issuer`, il genesis dice `ssi:anonymous`; niente `u`): il comando `annuncio <nome> <asset_id>` in `identita.mjs`, sul calco di `profilo`, e `annuncio --prova <nome> <asset_id>` che stampa l'evento firmato in JSON SENZA pubblicarlo. È infrastruttura dichiarata: l'evento esiste, nessun codice di Barattolo lo legge prima del 17. La cura di D.3 punto 0 | ☑ **8 ott sera, il comando** (cantiere «il comando `annuncio` e la scaletta della demo», copia in `deploy/rgb/`): la tabella `ASSET` coi valori PUBBLICI di §2 (ticker, nome del genesis con gli underscore, precisione, supply) e un contratto → un emittente (`usdb` non annuncia MOON: D.3 punto 4); l'asset_id con o senza `rgb:`; la firma verificata prima di stampare o pubblicare; la privata mai in output. `prove_annuncio_identita` (46): lo script VERO con identità usa-e-getta, la pubblica di `pubblica` è quella dell'evento, la firma Schnorr riverificata in Python puro, il relay morto non tocca `--prova` e senza `--prova` è un errore; in CI nostr-tools arriva da un passo del workflow fuori dal repo. Provato nel WSL su un `nak serve` di prova (porta 7790): pubblicato, riletto con nostr-tools, il secondo invio sostituisce il primo. ☐ **Il 16**: il lancio con le identità vere, i comandi al punto 4) qui sotto e in §11 |
 
 **I comandi della riga «14-16 ott»**, nell'ordine, uno alla volta, dal
 WSL e non da PowerShell dove c'è `ssh` (lezione 1 di §9: le virgolette
@@ -708,6 +713,179 @@ servizio `barattolo: get_info → ok (nip44_v2)`. Il giro è verde quando
 ogni riga qui sopra ha dato quel che dice il commento, senza un
 comando in più. La sera si spegne nell'ordine inverso:
 `pkill -f "[n]wc-wdk.mjs serve"; pkill -f "[n]ak serve"` nel WSL,
+4) **Il 16, gli annunci** (dopo la prova di riavvio: il relay locale
+deve essere su). Dal WSL, uno alla volta. Il comando è `identita.mjs
+annuncio` (scritto l'8 ott sera, copia in `deploy/rgb/`: la prima riga
+porta in `~/wdk-prova` la copia aggiornata, quella dell'8 mattina non
+ce l'ha). Con `--prova` si GUARDA l'evento firmato senza pubblicarlo: la
+`pubkey` stampata deve essere la hex di `pubblica <nome>`, il `d` il
+ContractId senza `rgb:`. Senza `--prova` si pubblica sul relay locale
+(`NWC_RELAY`, default `ws://127.0.0.1:7777`); l'evento è addressable:
+rilanciarlo sostituisce il precedente, non lo duplica. L'ultima riga
+rilegge i due annunci dal relay con nostr-tools (`nak req` lanciato da
+`wsl.exe` stampa muto, lezione 3 di §9): deve elencare USDB e MOON con
+le due hex di `pubblica`. Niente relay pubblici: lo script si ferma da
+solo se `NWC_RELAY` non è locale.
+
+```bash
+cp /mnt/c/Users/Andrea/Documents/GitHub/satmarket/deploy/rgb/identita.mjs ~/wdk-prova/identita.mjs
+cd ~/wdk-prova && source ~/.nvm/nvm.sh && (pgrep -fa "[n]ak serve" || (setsid nohup ~/bin/nak serve --port 7777 > ~/wdk-prova/nak.log 2>&1 < /dev/null & disown))
+node identita.mjs pubblica usdb
+node identita.mjs annuncio --prova usdb rgb:H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A
+node identita.mjs annuncio usdb rgb:H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A
+node identita.mjs pubblica tothemooon
+node identita.mjs annuncio --prova tothemooon rgb:9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM
+node identita.mjs annuncio tothemooon rgb:9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM
+node --input-type=module -e "import {Relay} from 'nostr-tools/relay'; const r=await Relay.connect(process.env.NWC_RELAY||'ws://127.0.0.1:7777'); const got=[]; await new Promise(res=>{const s=r.subscribe([{kinds:[38180]}],{onevent:e=>got.push(e),oneose:()=>{s.close();res()}}); setTimeout(res,4000)}); r.close(); for (const e of got) console.log(e.tags.find(t=>t[0]==='ticker')[1], 'd', e.tags.find(t=>t[0]==='d')[1], 'autore', e.pubkey.slice(0,12)+'…', new Date(e.created_at*1000).toISOString())"
+```
+
+Il relay `nak serve` tiene gli eventi in memoria: se il WSL si riavvia
+fra il 16 e il 17, la mattina del 17 si rilanciano le due righe
+`annuncio` (dieci secondi) prima del kickoff — è nella tabella dei due
+giorni (§11). Dopo, l'archivio delle identità non cambia: le chiavi
+sono quelle dell'8, non serve rifare il backup.
+
+**15 ott, portatile di Alan: tutto quello che serve a Torino senza
+rete**, installato da zero e provato col Wi-Fi spento. È la riserva del
+portatile di Andrea (§1) per tutto TRANNE il wallet utente: lo stash di
+rgb-lib vive in UN posto solo («never instantiate a wallet in multiple
+places», §3), quindi il wallet della demo resta sul PC di Andrea e sul
+portatile di Alan nasce un wallet di PROVA vuoto, che serve a scrivere i
+metodi `rgb_*` il sabato mattina senza toccare quello vero. Le versioni
+sono quelle del PC di Andrea l'8 ott (`node -v`, `npm ls`, `nak
+--version`, `qvac --version`, il `package-lock.json` di `~/wdk-prova`).
+Un comando per riga, nell'ordine; dove c'è `# →` c'è quel che deve
+rispondere. Serve la rete fino al punto 9; il punto 10 è col Wi-Fi
+spento.
+
+1) **WSL o Linux, Node 22 via nvm.** Su Windows prima, da PowerShell
+come amministratore, `wsl --install -d Ubuntu` e un riavvio; poi tutto
+da dentro il WSL (su Linux si parte dalla seconda riga). `build-essential`
+serve a node-gyp per il binding nativo del modulo RGB (§3).
+
+```bash
+sudo apt update && sudo apt install -y build-essential python3 python3-venv python3-pip git curl tar
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.nvm/nvm.sh && nvm install 22.23.3 && nvm alias default 22.23.3 && node -v   # → v22.23.3
+```
+
+2) **I pacchetti del wallet e di Nostr**, nella stessa cartella e con le
+stesse versioni del PC di Andrea; il binario `@utexo/rgb-lib-linux-x64`
+NON entra da solo (lezione di §3) e si installa a mano. Gli script
+arrivano da `deploy/rgb/` del repo di Barattolo (Alan lo ha in locale:
+`git pull` prima).
+
+```bash
+mkdir -p ~/wdk-prova && cd ~/wdk-prova && npm init -y > /dev/null
+npm install @utexo/wdk-wallet-rgb@2.0.3 nostr-tools@2.25.2 bip39@3.1.0
+npm install @utexo/rgb-lib-linux-x64@0.3.0-beta.8
+npm ls --depth=0   # → @utexo/wdk-wallet-rgb@2.0.3, @utexo/rgb-lib-linux-x64@0.3.0-beta.8, nostr-tools@2.25.2, bip39@3.1.0
+cp /mnt/c/Users/<alan>/.../satmarket/deploy/rgb/{punti.mjs,nwc-wdk.mjs,identita.mjs} ~/wdk-prova/   # su Linux il percorso del clone
+node -e "import('@utexo/wdk-wallet-rgb').then(()=>console.log('modulo RGB ok'))"   # → modulo RGB ok
+```
+
+3) **`nak`** (il relay locale e l'attrezzo per Nostr), lo stesso binario
+del PC di Andrea: la release v0.21.0 di fiatjaf, `linux-amd64`, in
+`~/bin`.
+
+```bash
+mkdir -p ~/bin && curl -L -o ~/bin/nak https://github.com/fiatjaf/nak/releases/download/v0.21.0/nak-v0.21.0-linux-amd64 && chmod +x ~/bin/nak
+~/bin/nak --version   # → nak version v0.21.0
+```
+
+4) **QVAC CLI** nel sistema NATIVO (Windows: PowerShell, con Node 24 —
+`qvac doctor` lo pretende — installato da nodejs.org o `winget install
+OpenJS.NodeJS`; su Linux lo stesso con `nvm install 24` in una shell a
+parte). Il `qvac.config.json` è quello di `deploy/rgb/` (gli alias
+`consigliami` → Qwen3 1.7B e `qwen3-600m-inst-q4` → Qwen3 0.6B).
+
+```powershell
+npm i -g @qvac/cli@0.15.0; qvac --version   # → 0.15.0
+qvac doctor
+New-Item -ItemType Directory -Force $env:USERPROFILE\qvac-prova; Copy-Item <clone>\deploy\rgb\qvac.config.json $env:USERPROFILE\qvac-prova\
+```
+
+5) **I due modelli, già scaricati.** La strada corta (nessun download:
+1,4 GB da chiavetta) è copiare dal PC di Andrea l'intera cartella
+`C:\Users\Andrea\.qvac\models` (i due file `.gguf`: Qwen3 0.6B Q4_0 da
+382 MB e Qwen3 1.7B Q4_0 da 1,06 GB, coi loro prefissi) in
+`%USERPROFILE%\.qvac\models` del portatile di Alan. L'alternativa, con
+la rete: `qvac serve` e UNA chiamata per alias, che scarica alla prima
+richiesta (la CLI non ha un comando «scarica»).
+
+```powershell
+Get-ChildItem $env:USERPROFILE\.qvac\models   # → *_Qwen3-0.6B-Q4_0.gguf e *_Qwen3-1.7B-Q4_0.gguf
+```
+
+6) **Python rgb-lib**, la stessa ruota della VM (`rgb-lib==0.3.0b7`,
+pronta per Linux x86_64: zero toolchain Rust), in un venv nel WSL.
+Serve a leggere un consignment o una fattura dalla parte del mercante
+senza passare dalla VM, non a tenere un wallet.
+
+```bash
+python3 -m venv ~/rgb-venv && ~/rgb-venv/bin/pip install --quiet rgb-lib==0.3.0b7
+~/rgb-venv/bin/python -c "import rgb_lib; print('rgb-lib ok')"   # → rgb-lib ok
+```
+
+7) **Il clone di `fidelity-points`** (privato: Alan è collaboratore, `gh
+auth login` prima, o la chiave SSH del suo GitHub) e il clone di
+Barattolo con le dipendenze pip, per il server in collaudo di riserva.
+
+```bash
+cd ~ && gh repo clone kreamistudio-crypto/fidelity-points && git -C ~/fidelity-points log --oneline | head -3   # → af445f7, 06422bf, 1e6fa80
+cd <clone di satmarket> && python3 -m venv .venv && .venv/bin/pip install --quiet fastapi uvicorn httpx websocket-client pillow cryptography && .venv/bin/python -c "import fastapi, uvicorn, httpx; print('server ok')"
+```
+
+8) **Le identità e la pagina dell'aiutante, dal PC di Andrea, su
+chiavetta** — mai in chat, mai in un canale Telegram. L'archivio
+`identita-nwc-20261008.tar.age` (§11) si apre SOLO con la chiave
+segreta age della VM, che apre anche i backup dello stash: quella NON
+si copia. Andrea lo apre sul suo PC in una cartella temporanea
+(`age -d -i rgb-prova.key … | tar -x`), mette su chiavetta la sola
+cartella `identita/` (i due `.json`, 0600: sono chiavi di PROVA, non
+della piattaforma) e `consigliami-prova.html` da
+`C:\Users\Andrea\qvac-prova\`, e dopo la copia svuota la cartella e la
+chiavetta. Sul portatile di Alan:
+
+```bash
+mkdir -p ~/wdk-prova/identita && cp /media/<chiavetta>/identita/*.json ~/wdk-prova/identita/ && chmod 700 ~/wdk-prova/identita && chmod 600 ~/wdk-prova/identita/*.json
+cd ~/wdk-prova && node identita.mjs pubblica usdb && node identita.mjs pubblica tothemooon   # → le due npub di §11
+```
+
+```powershell
+Copy-Item <chiavetta>\consigliami-prova.html $env:USERPROFILE\qvac-prova\
+```
+
+9) **Il wallet di PROVA vuoto** (NON quello della demo), per i metodi
+`rgb_*` del sabato: la sua frase nasce lì e resta lì.
+
+```bash
+cd ~/wdk-prova && node punti.mjs nuovo && node punti.mjs indirizzo   # → una frase nuova in utente/seme.txt e un indirizzo signet
+```
+
+10) **La prova finale, col Wi-Fi SPENTO** (e il tunnel verso la VM
+giù, apposta): ogni riga deve rispondere senza scaricare niente. Se una
+riga prova a scaricare, il 17 sull'hotspot non partirebbe.
+
+```bash
+cd ~/wdk-prova && source ~/.nvm/nvm.sh && node -v && npm ls --depth=0   # → v22.23.3 e i quattro pacchetti
+(setsid nohup ~/bin/nak serve --port 7777 > ~/wdk-prova/nak.log 2>&1 < /dev/null & disown) && sleep 2 && node identita.mjs annuncio --prova tothemooon rgb:9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM | head -3   # → l'evento firmato, kind 38180
+node nwc-wdk.mjs info   # → la chiave pubblica del servizio e il relay locale
+~/rgb-venv/bin/python -c "import rgb_lib; print('rgb-lib ok')"
+```
+
+```powershell
+cd $env:USERPROFILE\qvac-prova; qvac serve --openai --port 11434 --host 127.0.0.1 --cors-origin http://127.0.0.1:8081
+```
+
+e in un secondo PowerShell `python -m http.server 8081` nella stessa
+cartella, poi `http://127.0.0.1:8081/consigliami-prova.html` nel
+browser: «Consigliami» risponde col 1.7B senza scaricare niente (la
+prima chiamata carica il modello: ~20 s; la seconda meno di un
+secondo). Sul portatile di Alan NON stanno: il wallet della demo (seme
+e stash), le chiavi SSH della VM, la segreta age, il `.env` della VM, il
+config di Barattolo.
+
 `pkill -f "[r]gb_http.py"` sulla VM (il backup delle 03:30 vuole il
 wallet chiuso); i container restano su.
 
@@ -767,6 +945,139 @@ ferrea 1).
   loopback) con `follow_redirects=False`, confronto `names[<nome>]` ==
   `pubkey` dell'annuncio, cache di 24 ore (se il DNS del portatile
   manca, la riga dice «verificato il 16 ott»).
+
+### 11.1 Il 16 ott: come si lancia (un comando per riga)
+
+I comandi stanno per intero in §10, punto 4), con quel che ogni riga
+deve rispondere. In breve, dal WSL, dopo la prova di riavvio:
+
+```bash
+cp /mnt/c/Users/Andrea/Documents/GitHub/satmarket/deploy/rgb/identita.mjs ~/wdk-prova/identita.mjs
+cd ~/wdk-prova && source ~/.nvm/nvm.sh && (pgrep -fa "[n]ak serve" || (setsid nohup ~/bin/nak serve --port 7777 > ~/wdk-prova/nak.log 2>&1 < /dev/null & disown))
+node identita.mjs annuncio --prova usdb rgb:H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A
+node identita.mjs annuncio usdb rgb:H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A
+node identita.mjs annuncio --prova tothemooon rgb:9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM
+node identita.mjs annuncio tothemooon rgb:9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM
+```
+
+poi la riga di rilettura di §10 (nostr-tools): USDB e MOON, autori le
+due hex di `pubblica`. Cosa pubblica ogni identità, e con quale kind:
+`usdb` UN evento kind 38180 (segnaposto) con `d` =
+`H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A` (USDB, precision 2,
+supply 100000000); `tothemooon` UN evento kind 38180 con `d` =
+`9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM` (MOON, precision 0,
+supply 1000000). Nient'altro: niente kind 0 nuovo (c'è dall'8), niente
+kind 1, niente raccomandazione (3xxxx+1: non è prevista per il 16).
+Sul relay LOCALE, mai su uno pubblico.
+
+### 11.2 La demo di domenica, schermata per schermata
+
+Il pitch è alle 15:00/16:00 di domenica (D.2); il build chiude alle
+15:00. Due persone, due ruoli — **da confermare fra voi**, qui la
+proposta: **Alan parla** (le slide, il racconto di G.4) e **Andrea tocca**
+(il portatile della demo, e dice ad alta voce quel che fa nei passi dal
+vivo). Sul tavolo: il portatile di Andrea proiettato, con TRE finestre
+visibili — il browser su Barattolo in collaudo (`http://127.0.0.1:8080`,
+identità 111 dall'hash, il cliente), il terminale del servizio NWC
+(`nwc-wdk.mjs serve`: è lì che «l'utente firma») e il terminale di
+`qvac serve` (le richieste che arrivano: l'AI è qui, non in rete); in
+una scheda a parte mempool.space/signet con le tx già confermate. Il
+portatile di Alan con le slide e il video di riserva. Il giro dal vivo
+usa un ordine già creato la mattina (`creato`, non pagato); un secondo
+ordine, pagato in USDB alle 13:30 e CONFERMATO dal blocco, serve a
+mostrare «Pagato ✓» e i punti arrivati senza aspettare dieci minuti in
+sala.
+
+| # | Schermata (cosa si vede) | Chi tocca cosa | Chi parla, e cosa dice |
+|---|---|---|---|
+| 1 | Slide 1 (chi siamo) | — | Alan, i 30 secondi di D.2: Barattolo, il mercatino in sats in produzione dal 10 ott; oggi i punti fedeltà fatti bene |
+| 2 | Slide 2 (il problema) e, accanto, la card grigia «⚠️ Emittente sconosciuto» (screenshot) | — | Alan: «i punti oggi sono una riga nel database del negozio: non sono tuoi, non si portano via; e un token su una chain può chiamarsi come vuole, anche USDT, senza che nessuno sappia chi l'ha emesso» |
+| 3 | Barattolo: la vetrina di **To The Mooon** (il negozio di prova) e un suo annuncio; nella scheda di mempool la tx di emissione di MOON | Andrea apre la vetrina e l'annuncio | Alan: «il negozio emette i suoi punti come token RGB su Bitcoin — MOON, un punto per euro — e firma l'annuncio con la sua identità Nostr, verificata da `tothemooon@barattolo.store`». Andrea: «questo è il negozio, questo l'articolo» |
+| 4 | Profilo → Incassi e pagamenti → 👛 Wallet NWC: «wallet collegato», coi metodi `rgb_*` nell'elenco; il terminale del servizio NWC accanto | Andrea apre il Profilo e indica il terminale | Alan: «il cliente ha un wallet SUO, WDK di Tether col modulo RGB, self-custodial, sul portatile: Barattolo gli parla con NWC-RGB, un NWC su WDK, e non tiene nessuna chiave»; qui la **dichiarazione** in una riga: «la VM, gli asset, il wallet e il servizio base esistevano venerdì, dichiarati; tutto il resto è di questo weekend» |
+| 5 | «🔒 Compra in sicurezza» sull'annuncio → **il foglio del pagamento**: il conto in sats, «oppure 4,80 USDB» col cambio dichiarato; la card **USDB · Dollari di prova** con «hai 500,00 USDB» e la riga «✓ Emesso da Dollari di prova (usdb@barattolo.store)»; sotto la card **MOON** con «hai 60 MOON» e «✓ Emesso da To The Mooon (tothemooon@barattolo.store)» | Andrea tocca «Compra», poi la riga dell'emittente di MOON | Andrea: «la riga non è un'etichetta: l'annuncio è firmato dalla chiave del negozio, e il nome lo conferma il suo dominio». Il dettaglio si apre: ContractId intero, «confronto con l'annuncio: combacia», il link all'evento, la data (16 ott). Alan: «dominio intero, mai abbreviato: NIP-05 identifica, il genesis decide» |
+| 6 | Il bottone **«Consigliami»** → il fumetto: «paga 4,80 USDB e usa 40 MOON (40 sats di sconto): ti restano 495,20 USDB e 20 MOON. Motivo: …», con «Approva» e «No, pago in sats», e sotto in piccolo la regola («max 20% in punti»); nel terminale di QVAC la richiesta appena arrivata | Andrea tocca «Consigliami» | Andrea: «l'AI gira su questo portatile, Qwen3 1.7B con QVAC: la pagina le passa i numeri già calcolati e le chiede una scelta dentro la regola; i numeri li scrive il programma, lei la frase». Alan: «propone, non paga: filone 04, "local AI that proposes, you approve"» |
+| 7 | **«Approva»** → nel terminale del servizio NWC la conferma del wallet («pagare 480 unità di USDB a …? s/N», poi i 40 MOON); il foglio passa a «**Pagamento in arrivo · in attesa del blocco**» col link a mempool.space/signet; la riga «pagamento diretto, senza deposito di garanzia» | Andrea tocca «Approva», poi nel terminale scrive `s` (due volte) | Andrea: «il wallet chiede a me, non a Barattolo: è la mia chiave». Alan: «la tx è su signet adesso; il blocco arriva fra qualche minuto, e intanto vi mostro quello di prima» |
+| 8 | L'ordine delle 13:30, già confermato: «**Pagato in USDB ✓**», il txid, e sotto «**+5 MOON da To The Mooon** — arrivati»; la card MOON nel Profilo con il saldo cresciuto | Andrea apre Ordini → l'ordine delle 13:30 | Alan: «qui il ciclo intero: ha pagato in dollari, ha speso 40 punti, ne ha ricevuti 5 nuovi — un punto per euro — e stanno nel SUO wallet, non in un database» |
+| 9 | Slide 6 (l'identità per tutti e la roadmap), slide 7 (cosa resta, «mostrato ma non in produzione») | — | Alan: il NIP-05 gratuito al livello 2; NWC-RGB al repo `nwc`; la roadmap (11.5); «in produzione dal 10 ottobre c'è il mercatino; questo weekend è su signet, dichiarato» |
+| 10 | Se il blocco è arrivato nel frattempo: tornare al foglio del passo 7, «Pagato in USDB ✓» | Andrea | Andrea: «ed ecco il blocco» (se no, niente: il passo 8 l'ha già mostrato) |
+
+Tempi: 1-2 un minuto, 3-4 un minuto e mezzo, 5-7 due minuti, 8-9 un
+minuto, dieci secondi di riserva: sei minuti. I numeri (4,80 USDB, 40
+MOON, +5 MOON) sono quelli dello studio C: se la domenica cambiano,
+cambiano qui e nelle slide insieme.
+
+### 11.3 I due giorni, ora per ora (Andrea / Alan)
+
+Il build chiude **domenica alle 15:00**; «Emesso da ✓» sta al **sabato
+pomeriggio** (D.3 punto 0). «Claude» qui è la sessione sul portatile di
+Andrea. Ogni pezzo è un commit datato nel repo privato, con
+`git format-patch` serale in `fidelity-points` (G.1).
+
+| Ora | Andrea (+ Claude) | Alan | Insieme / nota |
+|---|---|---|---|
+| sab 08:30-09:00 | Accende tutto nell'ordine di §6 (VM, tunnel a tre gambe, `rgb_http.py`, `nak serve`, servizio NWC, QVAC, Barattolo in collaudo); se il WSL è stato riavviato, le due righe `annuncio` di §10 punto 4) | Slide e dichiarazione stampata (§5) sul tavolo; il suo portatile acceso con il wallet di prova vuoto | il tunnel va sull'hotspot, non sul Wi-Fi della sala |
+| sab 09:00-09:45 | Kickoff | Kickoff; consegna la dichiarazione | niente codice prima della dichiarazione |
+| sab 09:45-13:00 | **Server**: `/api/rgb/fattura` (la fattura blind di `barattolo` in USDB via `rgb_http.py`, importo al cambio, la prova del `// 100`: D.3 punto 5 PRIMA della rotta) e `/api/rgb/stato`, dietro `RGB_ATTIVO`; la decisione sullo stato dell'ordine pagato in USDB scritta nel commit | **Wallet**: i quattro metodi `rgb_*` in `nwc-wdk.mjs` sopra `punti.mjs` (lista, fattura, paga con conferma a terminale, lookup), provati col client a riga di comando sul suo wallet vuoto, poi portati sul portatile di Andrea | alle 11 un punto di cinque minuti: i NOMI dei campi fra server e wallet (quelli di `docs/spec/NWC-RGB.md`) |
+| sab 13:00-13:45 | pranzo | pranzo | |
+| sab 13:45-16:30 | **Client**: nel foglio del pagamento «oppure N USDB», «Paga in USDB» → fattura → `rgb_pay_invoice` via `clientNwc` → «in arrivo» → `rgb.py aggiorna barattolo` → «Pagato» | Il wallet sul portatile della demo: `rgb_pay_invoice` risponde alla pagina; poi comincia la lettura dell'annuncio per `#d` (nostr-tools, lato pagina) | **primo pagamento VERO in USDB su signet entro le 16:30**: il core |
+| sab 16:30-18:00 | **«Emesso da … ✓»**: la verifica NIP-05 lato server (`url_api_ammesso`, senza redirect, cache di 24 h, «verificato il 16 ott» se il DNS manca) e la riga nella card, accanto a «⚠️ Emittente sconosciuto» | Rilegge i due annunci sul relay, confronta i tag col genesis (`punti.mjs saldo`), scrive la prima pagina dei due testi | **alle 18 la ✓ c'è**: da qui la demo è quella decisa il 7 sera |
+| sab 18:00-20:30 | **Consigliami**: la pagina chiama QVAC con lo schema, il fumetto, «Approva» che fa il passo delle 13:45 da solo; se CORS o mixed content mordono, `/api/consigliami/proposta` lato server, dichiarato | Il «motivo» senza cifre (§4: il 1.7B sbaglia i numeri nella frase), la frase di riserva se QVAC tace | |
+| sab 20:30-22:00 | **MOON come bonus** dopo «Pagato» (l'assegnazione del 1 ott agganciata); la card dell'asset completa; il giro intero DUE volte | `git format-patch` del giorno in `fidelity-points`; le slide 3, 4 e 5 con gli screenshot veri | la sera: `pkill` di `rgb_http.py` sulla VM (backup delle 03:30), §6 |
+| dom 08:30-09:00 | Riaccende tutto (§6); se serve, le due righe `annuncio` | Slide in ordine | |
+| dom 09:00-11:00 | Gli **errori visibili** («wallet non collegato», «proxy irraggiungibile», «conferma in arrivo»: «UX: error handling» è un criterio) | I **due testi** `docs/spec/NIP-RGB-ASSETS.md` e `NWC-RGB.md` rifiniti con quel che il sabato ha insegnato; la **issue nel repo `nwc`** entro mezzogiorno | |
+| dom 11:00-13:00 | Il giro intero una TERZA volta col portatile sull'hotspot; se avanza, il salvadanaio e il budget (studio C punto 6), sennò niente | Il video di riserva aggiornato (il giro intero registrato, 3 min); la prova a tempo delle slide | |
+| dom 13:00-14:00 | **L'ordine delle 13:30**: creato, pagato in USDB con 40 MOON, il bonus +5 MOON; aspettare il blocco; l'ordine del vivo creato e lasciato in `creato` | Le slide chiuse | **niente codice dopo le 14:00** |
+| dom 14:00-15:00 | Prova generale dei dieci passi di 11.2, a tempo, con le tre finestre sullo schermo; `git format-patch` della domenica | Prova generale | **15:00: il build chiude** — l'ultimo commit datato prima |
+| dom 15:00-16:00 | Consegna; il portatile in standby con tutto su | Pitch | la VM in riserva, l'hotspot acceso, il video sul portatile di Alan |
+
+### 11.4 Il piano B: cosa si mostra se una parte si rompe
+
+Quel che **già funziona dall'8 ott**, e resta vero anche se la domenica
+va storta: la VM con la catena in pari e i tre asset (§2); il wallet
+utente con 60 MOON e 500,00 USDB, che ha già ricevuto e riscattato MOON
+con tx confermate (§3); il servizio NWC base con «wallet collegato» in
+Barattolo (`get_info`, `get_balance`); le due identità con kind 0 e
+NIP-05 sul relay locale, e la rotta `/.well-known/nostr.json` su main;
+QVAC col 1.7B e la pagina `consigliami-prova.html` che fa il giro
+intero fuori da Barattolo (§4); da stasera il comando `annuncio` e, dal
+16, i due annunci sul relay. Il **video di riserva** della domenica
+mattina (11.3) copre tutto. In ordine di probabilità:
+
+| Si rompe | Si mostra | Come si dice |
+|---|---|---|
+| **QVAC** (il modello non carica, la risposta non è JSON, CORS) | Il fumetto con la proposta di RISERVA calcolata dal programma (la regola del 20%: la stessa che oggi boccia il modello in `consiglio.py`), col testo «consiglio senza AI»; e la pagina `consigliami-prova.html` sul 0.6B, servita da `http.server 8081`, che è il giro dell'8 ott | «l'aiutante propone dentro una regola: senza il modello la regola resta, e ve la mostro sulla pagina di prova» — l'AI è un aiuto, non il centro (G.4) |
+| **Il wallet** (i metodi `rgb_*` non rispondono, il servizio muore, la conferma non arriva) | Il pagamento come il 1 ott: dal terminale, `node punti.mjs riscatta <USDB> 480 '<fattura>'` con la fattura presa da `/api/rgb/fattura` (o da `rgb_http.py /fattura`), e `rgb.py aggiorna barattolo`; il foglio passa a «in arrivo» lo stesso perché legge lo stato dal server | «il wallet è self-custodial: lo stesso gesto, dal suo terminale invece che dal bottone; il protocollo NWC-RGB è la bozza che vedete alla slide 4» |
+| **La rete** (hotspot morto, VM irraggiungibile, DNS che non risolve) | Senza VM: il wallet sugli endpoint pubblici (`RGB_INDEXER`/`RGB_PROXY` di §6) e `rgb_http.py` di riserva sul portatile; senza NESSUNA rete: il relay locale e QVAC vanno lo stesso (sono sul portatile), la ✓ dice «verificato il 16 ott» dalla cache (D.3 punto 3), il pagamento NON si fa e si mostra l'ordine delle 13:30 già pagato e il video | «tutto quel che è locale — l'identità, l'annuncio, l'AI — lo vedete dal vivo; la transazione su signet l'abbiamo fatta alle 13:30, eccola su mempool» (screenshot già nelle slide) |
+| **La ✓ non si costruisce il sabato** | La card con «Dichiarato da <npub> · identità non verificata» (la forma 3 di C) e l'evento letto dal relay: l'annuncio firmato esiste dal 16 | «l'annuncio è firmato e pubblicato; la verifica del dominio è la riga che manca, ed è nella roadmap di lunedì» |
+| **Barattolo in collaudo non parte** (db, porta, config) | Il server del worktree con un db nuovo (`MODALITA_COLLAUDO`, le tre identità finte nascono da sole) e il giro rifatto dal catalogo di prova; se nemmeno quello, il video | la demo del 1 ott sul terminale resta (§3) |
+
+La regola per il palco: **si cambia strada senza spiegare il guasto**,
+una frase e avanti; la spiegazione tecnica va nelle Q&A se la chiedono.
+
+### 11.5 La roadmap (slide 6, niente codice): la lista di controllo
+
+Le quattro voci chieste ci sono tutte, in D.2 dello studio (le slide e
+il paragrafo «la roadmap, con una riga di realtà ciascuna») e qui:
+
+- ☑ **Mostro con asset RGB**: un ordine «vendo USDB per euro» con un
+  campo in più nel NIP-69 — una proposta, non un cantiere (Mostro non
+  ha nozione di asset: VERIFICATO il 1 ott).
+- ☑ **Consegne RGB via relay Nostr** al posto del proxy: il consignment
+  su Blossom (che Barattolo usa già per le foto delle recensioni) e un
+  puntatore firmato sul relay — perché un transfer consignment cresce
+  con la storia e i relay tagliano gli eventi grossi.
+- ☑ **Certificati di autenticità RGB per le edizioni limitate** (le
+  magliette numerate di AGORA): lo schema UDA, uno per maglietta con la
+  foto e il numero, **emesso dal negozio con la sua identità Nostr** —
+  lo stesso annuncio firmato di oggi, così la card dice «Emesso da
+  AGORA ✓» e un certificato senza quella firma resta «emittente
+  sconosciuto» (aggiunto l'8 ott sera anche in D.2).
+- ☑ **La proposta all'RGB Protocol Association per un grant**, con la
+  nota di D.2: l'esistenza di un programma di grant NON è verificata,
+  è la domanda 11 del Q&A del 13.
+
+Più le due che stanno già in slide 6: il NIP-05 gratuito al livello 2
+del mercatino (G.3) e NWC-RGB come estensione proposta al repo `nwc`.
 
 Nota a margine, fuori cantiere ma scoperta qui: il pull notturno del
 backup del NODO falliva dal 7 settembre («permission denied» su
