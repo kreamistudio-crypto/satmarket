@@ -348,9 +348,15 @@ un terzo wallet), e il backup del PC riapre lo stash.
 Le tre cose nuove dell'8 ott, sul portatile e sulla VM:
 
 ```bash
-~/bin/nak serve --port 7777                     # WSL: il relay locale (muore col WSL)
-cd ~/wdk-prova && source ~/.nvm/nvm.sh && node nwc-wdk.mjs serve   # WSL: il servizio NWC (tiene aperto il wallet: niente punti.mjs intanto)
+setsid nohup ~/bin/nak serve --port 7777 > ~/wdk-prova/nak.log 2>&1 < /dev/null & disown      # WSL: il relay locale (muore col WSL)
+cd ~/wdk-prova && source ~/.nvm/nvm.sh && setsid nohup node nwc-wdk.mjs serve > nwc/serve.log 2>&1 < /dev/null & disown   # WSL: il servizio NWC (tiene aperto il wallet: niente punti.mjs intanto)
 ```
+
+⚠️ `setsid … & disown`, non il solo `nohup`: lanciato da una chiamata
+`wsl.exe -e bash -lc` il servizio NWC è morto quando la chiamata è
+finita, e Barattolo ha bussato a vuoto (8 ott, «Busso qualche
+secondo… niente conferma»). Per fermarli: `pkill -f "[n]wc-wdk.mjs
+serve"` — con le parentesi, o `pkill` uccide la shell che lo lancia.
 
 ```bash
 ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 &'   # VM: la faccia HTTP del mercante
@@ -589,11 +595,11 @@ niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
 | 8-9 ott | Sulla VM: `rgb.py nuovo usdb`, sats da `to-the-mooon` (niente faucet), `utxo usdb 5`, `emetti usdb USDB Dollari_di_prova_Barattolo 100000000 2`, `backup usdb`; l'asset_id in §2 | ☑ 8 ott, comandi eseguiti da Andrea uno alla volta; 4 UTXO colorabili liberi e 44.347 sats restano al wallet `usdb` |
 | 8-9 ott | 500 USDB (50.000 unità) al wallet utente: fattura «qualunque asset» BLIND (`node punti.mjs fattura - 50000`: il wallet aveva già 3 UTXO colorabili, niente witness), `rgb.py invia usdb …`, i due `aggiorna`; un blocco | ☑ 8 ott, blocco 325472: utente 50.000 settled e spendibili; il wallet utente conosce USDB (precisione 2, 100.000.000 emessi) |
 | 8-9 ott | UTXO colorabili al wallet `barattolo` (riceverà i pagamenti) | ☑ non serve: ne ha 4 liberi (ronda dell'8 ott) |
-| **da fare** | **USDB al wallet mercante `barattolo`** (es. 1,00 USDB = 100 unità da `usdb`), perché lo conosca prima di fare fatture PER asset (lezione 5 di §9): fattura `rgb_http.py /fattura {"quantita": 100}` o `rgb.py fattura barattolo - blind`, poi `rgb.py invia usdb <asset> 100 '<fattura>'`, i due `aggiorna`, un blocco | ☐ aspetta l'ok di Andrea |
+| 8 ott | **1,00 USDB al wallet mercante `barattolo`** (100 unità da `usdb`), perché conosca l'asset prima di fare fatture PER asset (lezione 5 di §9): fattura «qualunque asset» da `rgb_http.py /fattura {"quantita": 100}`, `rgb.py invia usdb …` (Andrea), ACK da `rgb_http.py /aggiorna` (dal tunnel), `rgb.py aggiorna usdb` (Andrea) | ☑ 8 ott, tx `7795d147…` trasmessa (`WAITING_CONFIRMATIONS`); l'emittente resta con 999.499,00 USDB futuri, 4 UTXO colorabili liberi e 44.347 sats; al blocco il mercante vede USDB. Resta aperta la fattura di prova da 480 (idx 2, `WAITING_COUNTERPARTY`): scade da sola in 24 ore |
 | 9-10 ott | Due identità Nostr di prova (sezione 11) | ☑ 8 ott: `identita.mjs nuova` per `usdb` e `tothemooon`, kind 0 sul relay locale; le pubbliche in §11 |
 | 9-10 ott | Relay locale sul portatile, `ws://127.0.0.1:7777` | ☑ 8 ott: **`nak serve`** (decisione di Andrea: Docker non c'è né in Windows né nel WSL), binario `~/bin/nak` v0.21.0 (45 MB dalle release di fiatjaf), provato con nostr-tools: pubblica e rilegge |
 | 11-12 ott | `nwc-wdk.mjs` BASE nel WSL: evento info (13194, `encryption` nip44), `get_info`, `get_balance`, la connection string SU FILE (`nwc/connessione-barattolo.txt`, mai in chat) | ☑ 8 ott, scritto a mano con nostr-tools (copia in `deploy/rgb/`): `connetti barattolo`, `serve`, e il client di prova `prova barattolo` → `get_info` ok, `get_balance` 26.519.000 msat, `rgb_list_assets` → `NOT_IMPLEMENTED`, tutto nip44 |
-| **da fare** | La connection string incollata nel Profilo di Barattolo in collaudo (la CSP ammette `ws:`): tocca ad Andrea, il file sta nel WSL e non si stampa | ☐ |
+| 8 ott | La connection string incollata nel Profilo di Barattolo in collaudo (la CSP ammette `ws:`): Andrea, dal suo browser, sul server di collaudo del worktree (porta 8098, config dal solo esempio, identità 111 dall'hash) | ☑ 8 ott: «Incassi e pagamenti → 👛 Wallet NWC → ⚡ Collega»; il log del servizio dice `barattolo: get_info → ok (nip44_v2)` e l'app «wallet collegato», con la nota che manca `pay_invoice` (giusto: la base non ce l'ha). Al primo tentativo il servizio era morto col `nohup` (§6) |
 | 11-12 ott | `rgb_http.py` sulla VM, `127.0.0.1:8787` (salute/saldo/fattura/aggiorna/trasferimenti del wallet `barattolo`), gamba `-L 8787:127.0.0.1:8787` nel tunnel | ☑ 8 ott: copiato e avviato da Andrea (`nohup`), dal tunnel `/salute`, `/saldo` (JAR, 4 UTXO liberi), `/fattura` «qualunque asset» ok e per USDB «AssetNotFound» (lezione 5), corpo storto 400, rotta ignota 404; banco di cartone sul PC in più. **Da fermare la sera** (backup delle 03:30) |
 | 11-12 ott | Il commit su main: `RGB_ATTIVO`/`RGB_PROVA_IDS`/`NIP05_NOMI`, il gruppo nel pannello delle leve, `rgb_ammesso`, la rotta `/.well-known/nostr.json`, `prove_leva_rgb` | ☑ PRONTO l'8 ott sul ramo locale `cantiere/leva-rgb` (commit f7602c1, firmato, suite severa 19.726 verdi): **push su main l'11-12**, dopo il lancio, coi collaudi della CI rigirati |
 | 11-12 ott | QVAC: `npm i -g @qvac/cli@latest`, alias `consigliami` → `QWEN3_1_7B_INST_Q4` con `ctx_size 8192`, scaricato; `consigliami-prova.html` FUORI dal repo con `response_format` json_schema e `reasoning_budget: false`; `qvac serve --openai --cors-origin <origine esatta>` | ☑ 8 ott (§4): CLI 0.15.0, 1,06 GB scaricati, pagina provata nel Browser pane col 0.6B e col 1.7B |
@@ -609,8 +615,15 @@ ferrea 1).
 
 - **Create l'8 ott** con `identita.mjs` (copia in `deploy/rgb/`): le
   private in `~/wdk-prova/identita/usdb.json` e
-  `~/wdk-prova/identita/tothemooon.json` (0600, nel WSL; DA COPIARE
-  nell'archivio age della gamba `rgb/`, non ancora fatto). Le
+  `~/wdk-prova/identita/tothemooon.json` (0600, nel WSL). **Archiviate
+  l'8 ott** insieme alla chiave del servizio NWC e alle connessioni:
+  `~/wdk-prova/backup/identita-nwc-20261008.tar.age`, cifrato con la sola
+  chiave PUBBLICA age della VM rgb-prova (la stessa dei backup dello
+  stash: la segreta sta sul PC e su Bitwarden), copia in
+  `C:\Users\Andrea\BarattoloBackup\rgb\`; drill fatto (si riapre con
+  `rgb-prova.key`, elenco letto senza scrivere niente in chiaro). `age`
+  nel WSL non c'è: si usa quello di Windows da `/mnt/c/…/WinGet/…/age.exe`.
+  Il wallet utente ha il suo backup a parte (`punti.mjs backup`). Le
   pubbliche, scritte in npub perché 64 esadecimali di fila farebbero
   scattare lo scanner dei segreti della CI (l'hex, che è quel che vuole
   `NIP05_NOMI`, lo dà `node identita.mjs pubblica <nome>`):
