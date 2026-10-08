@@ -70,6 +70,24 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Se la data passa col P2P ancora chiuso dice «In arrivo a breve». Si
   guarda nel pannello «⚙️ Stato delle leve», riga «Card «P2P in
   arrivo», data».
+- LE LEVE RGB E IL NIP-05 DI CASA (8 ott 2026, hackathon di Torino):
+  `RGB_ATTIVO`, `RGB_PROVA_IDS` e `NIP05_NOMI` si AGGIUNGONO al config
+  del VPS come le altre. Nel codice `RGB_ATTIVO` e' `False` e resta
+  spenta FINO A TORINO: a leva spenta nessuna rotta `/api/rgb/*`
+  risponde (oggi non ne esiste nessuna). `NIP05_NOMI` e' l'unica che
+  serve PRIMA del 17: senza, `https://barattolo.store/.well-known/
+  nostr.json` risponde `{"names": {}}` (200, non 404: e' «qui
+  nessuno»). Si aggiunge `NIP05_NOMI = {"usdb": "<hex>", "tothemooon":
+  "<hex>"}` con le chiavi PUBBLICHE in esadecimale minuscolo (le da'
+  `node identita.mjs pubblica <nome>` nel WSL del portatile: MAI una
+  nsec, MAI una npub — il NIP-05 vuole l'hex) e si riavvia; una riga
+  storta si scarta all'avvio e il journal lo dice («[nip05] «nome»:
+  … scartato»). Si verifica con `curl -s
+  "https://barattolo.store/.well-known/nostr.json?name=usdb"` (la hex
+  di usdb, `Access-Control-Allow-Origin: *`, nessun Location) e nel
+  pannello «⚙️ Stato delle leve», gruppo «🪙 Punti e dollari su RGB
+  (hackathon)». Il verbale: CANTIERI, «Hackathon: la chiusura della
+  preparazione»; la lista: HACKATHON-SETUP §10-11.
 - LE NOTIFICHE PRECISE DEL P2P (16 set 2026) non hanno una leva loro:
   girano con `P2P_ATTIVO`, dentro lo stesso orologio del campanello,
   e leggono il libro dai relay del coordinator e poi dallo specchio.

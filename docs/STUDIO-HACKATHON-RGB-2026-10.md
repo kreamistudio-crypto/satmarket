@@ -1414,13 +1414,13 @@ conferma): si verifica su quella.
 
 | Quando | Cosa | STIMA | Note |
 |---|---|---|---|
-| 8-9 ott | **Emettere USDB** sulla VM: wallet nuovo `usdb` (l'emittente dei dollari è un soggetto diverso dal mercante Barattolo e dal negozio), faucet, 5 UTXO, `emetti usdb USDB "Dollari di prova Barattolo" 100000000` con **precision 2** (docs.rgb.info: «2 for USD»; `rgb.py` oggi emette a precisione 0: un argomento in più), backup | 1-2 h | la ricetta è in HACKATHON-SETUP §2; «USDB» passa il ticker ([A-Z0-9]{1,8}) |
+| 8-9 ott | **Emettere USDB** sulla VM: wallet nuovo `usdb` (l'emittente dei dollari è un soggetto diverso dal mercante Barattolo e dal negozio), faucet, 5 UTXO, `emetti usdb USDB "Dollari di prova Barattolo" 100000000` con **precision 2** (docs.rgb.info: «2 for USD»; `rgb.py emetti` ha GIÀ l'argomento opzionale `[precisione]`, default 0 — la frase «un argomento in più» scritta qui il 7 era sbagliata, corretta l'8: HACKATHON-SETUP §2), backup | 1-2 h | la ricetta è in HACKATHON-SETUP §2; «USDB» passa il ticker ([A-Z0-9]{1,8}) |
 | 8-9 ott | **500 USDB al wallet utente** (fattura «qualunque asset» per il primo contatto, come per MOON) e **UTXO colorabili al wallet `barattolo`**, che a Torino sarà chi RICEVE i pagamenti | 1 h, due blocchi | tx fatte e confermate prima: non sono la demo |
 | 9-10 ott | **Due identità Nostr di prova**: due coppie di chiavi nuove (nostr-tools o `nak key generate`), kind 0 con `name`, `about` e `nip05` (`usdb@…` e `tothemooon@…`), le private in `~/wdk-prova/identita/` a 600 e nell'archivio age — MAI nel repo, MAI la chiave della piattaforma | 1 h | **DA DECIDERE il dominio del NIP-05**: (a) `barattolo.store/.well-known/nostr.json` come rotta ESPLICITA (regola 3, sul calco di `assetlinks.json`) nel commit dell'11-12 ott: due nomi, un file statico, zero rischio, e la riga «Emesso da To The Mooon (tothemooon@barattolo.store)» legge benissimo; (b) GitHub Pages con `.nojekyll` (serve `.well-known` e manda `Access-Control-Allow-Origin: *`): zero produzione, ma «github.io» nella schermata. Raccomando (a), con la nota che il VERO To The Mooon avrebbe il suo dominio |
 | 9-10 ott | **Relay locale** strfry in docker sul portatile (`ws://127.0.0.1:7777`): per NWC e per gli annunci | 1 h | in collaudo la CSP ammette `ws:` |
 | 11-12 ott | **`nwc-wdk.mjs`, la BASE**: apre il wallet WDK (`punti.mjs`), pubblica l'evento info (13194) con `encryption` nip44, risponde a `get_info` e `get_balance`; stampa la connection string da incollare nel Profilo. **I metodi `rgb_*` NO**: si scrivono a Torino (sono l'integrazione, e sono «Execution») | 4-6 h | `@getalby/sdk` `NWCWalletService` fa il grosso; se il tipo non accetta nomi fuori lista, l'evento 23194 si gestisce a mano con nostr-tools (30 righe) |
 | 11-12 ott | **`rgb_http.py` sulla VM**, loopback, dal tunnel (`-L 8787`): `fattura`, `aggiorna`, `saldo`, `lista` del wallet `barattolo` dietro HTTP, così il server di Barattolo sul portatile non fa `ssh` da dentro una rotta | 2 h | è `rgb.py` con una faccia HTTP; il tunnel resta l'unica porta |
-| 11-12 ott | **Il commit su main** (uno): `RGB_ATTIVO = False` e `RGB_PROVA_IDS` in `config_esempio.py`, la riga nel pannello «Stato delle leve», la prova che a leva spenta non risponde nulla; e, se (a), la rotta `/.well-known/nostr.json` | 2 h + prove | niente rotte RGB, niente UI |
+| 11-12 ott → FATTO l'8 | **Il commit su main** (uno): `RGB_ATTIVO = False` e `RGB_PROVA_IDS` in `config_esempio.py`, la riga nel pannello «Stato delle leve», la prova che a leva spenta non risponde nulla; e, se (a), la rotta `/.well-known/nostr.json` | 2 h + prove | niente rotte RGB, niente UI; su main l'8 ott prima del lancio (decisione di Andrea: cancello chiuso, rotta vuota senza `NIP05_NOMI` nel config del VPS) |
 | 11-12 ott | **QVAC**: `npm i -g @qvac/cli@latest` (la CLI è alla 0.15, l'SDK alla 0.21: installata la 0.14), `qvac.config.json` con l'alias `consigliami` (il 7 si chiamava `cassiere`) → `QWEN3_1_7B_INST_Q4`, `ctx_size 8192`; scaricare (~1 GB); una **pagina locale di prova** FUORI dal repo che chiama `http://127.0.0.1:11434/v1/chat/completions` con `response_format: json_schema` e `reasoning_budget: false` (Qwen3 pensa, e con `max_tokens` stretto lascia `content` vuoto: documentato); il server lanciato con `--cors-origin http://127.0.0.1:8080` ESATTO (niente `*`, e `--cors` da solo non accende niente: documentato) | 2-3 h | structured output e `tools` NON si combinano (400): l'aiutante usa lo schema e il conto già fatto, senza tool |
 | 13 ott | **Q&A** (sezione E) | 1-2 h | con le risposte scritte accanto |
 | 14-16 ott | La **dichiarazione** scritta (HACKATHON-SETUP §5 aggiornata), gli schermi su carta, il flusso provato tre volte con la pagina di prova e il wallet; backup della VM; portatile con tutto scaricato | 3-4 h | |
@@ -1445,10 +1445,11 @@ il nome vecchio non torni nel codice).
 | sab 09:00-09:45 | Kickoff; la dichiarazione consegnata; il tavolo: VM su, tunnel su, relay locale su, QVAC su, server in collaudo su `127.0.0.1:8080` col db 111/222/999 | tutti e due | niente codice prima della dichiarazione |
 | sab 09:45-13:00 | **Wallet**: i quattro metodi `rgb_*` in `nwc-wdk.mjs` sopra `punti.mjs` (lista, fattura, paga con conferma a terminale, lookup), provati con un client NWC a riga di comando. **Server** in parallelo: `/api/rgb/fattura` (chiede a `rgb_http.py` la fattura blind di `barattolo` in USDB per l'ordine, importo al cambio), `/api/rgb/stato`, tutto dietro `RGB_ATTIVO` | Alan il wallet, Claude+Andrea il server | commit datati, uno per funzione |
 | sab 13:45-16:30 | **Client**: nel foglio del pagamento la riga «oppure N USDB» e il bottone «Paga in USDB» → fattura → `rgb_pay_invoice` via `clientNwc` → stato «in arrivo» → `rgb.py aggiorna` lato server → «Pagato» | | **primo pagamento VERO in USDB su signet entro le 16:30**: è il core, da qui in poi tutto è aggiunta |
-| sab 16:30-19:30 | **Consigliami**: la pagina chiama QVAC (schema `{paga_in_usdb, usdb, usa_punti, punti, sconto_sats, motivo}` col conto già fatto), il fumetto, «Approva» che fa il passo di prima da solo | | se CORS o mixed content mordono: la chiamata la fa il server (`/api/consigliami/proposta` → 127.0.0.1:11434) e si dichiara |
-| sab sera | **MOON come bonus** dopo il pagamento (l'assegnazione del 1 ott agganciata al «Pagato»); la card dell'asset con ticker/saldo (senza emittente); il giro intero due volte | | |
-| dom 09:00-11:00 | **Il NIP**: i due annunci (MOON e USDB) firmati dalle identità di prova e pubblicati sul relay locale; in Barattolo la lettura dell'annuncio per `#d`, la verifica NIP-05 (lato server con `url_api_ammesso`, senza redirect) e la riga «Emesso da … ✓» nella card — **è il centro del racconto (G.4)**; i due testi `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` del repo pubblico rifiniti con quel che l'implementazione ha insegnato | Alan la pubblicazione e i testi, Claude+Andrea la verifica | la issue nel repo `nwc` aperta a mezzogiorno |
-| dom 11:00-13:00 | **Se avanza**: il salvadanaio (secondo consiglio dell'aiutante, arrotondamento) e il budget nel browser; sennò: gestione degli errori visibile («wallet non collegato», «proxy irraggiungibile», «conferma in arrivo») — «UX: error handling» è un criterio | | |
+| sab 16:30-18:00 | **«Emesso da … ✓»** — spostato qui dalla domenica mattina l'8 ott (D.3 punto 0): i due annunci (MOON e USDB) stanno sul relay locale dal venerdì 16, firmati dalle identità di prova e dichiarati; in Barattolo la lettura dell'annuncio per `#d`, la verifica NIP-05 (lato server con `url_api_ammesso`, senza redirect, cache di 24 h) e la riga nella card, accanto a «⚠️ Emittente sconosciuto» — **è il centro del racconto (G.4)** | Alan rilegge gli annunci e comincia i testi, Claude+Andrea la verifica | alle 18 la ✓ c'è: da qui in poi la demo è quella decisa il 7 sera, qualunque cosa faccia la domenica |
+| sab 18:00-20:30 | **Consigliami**: la pagina chiama QVAC (schema `{paga_in_usdb, usdb, usa_punti, punti, sconto_sats, motivo}` col conto già fatto), il fumetto, «Approva» che fa il passo di prima da solo | | se CORS o mixed content mordono: la chiamata la fa il server (`/api/consigliami/proposta` → 127.0.0.1:11434) e si dichiara |
+| sab sera | **MOON come bonus** dopo il pagamento (l'assegnazione del 1 ott agganciata al «Pagato»); la card dell'asset completa (emittente, ticker, saldo); il giro intero due volte; `git format-patch` dei commit del giorno in `barattolo-patches/` | | |
+| dom 09:00-11:00 | **I due testi** `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` del repo pubblico rifiniti con quel che l'implementazione del sabato ha insegnato, e la issue nel repo `nwc`; gli errori visibili («wallet non collegato», «proxy irraggiungibile», «conferma in arrivo») — «UX: error handling» è un criterio | Alan i testi e la issue, Claude+Andrea gli errori | la issue aperta a mezzogiorno |
+| dom 11:00-13:00 | **Se avanza**: il salvadanaio (secondo consiglio dell'aiutante, arrotondamento) e il budget nel browser; sennò il giro intero una terza volta col portatile sull'hotspot | | |
 | dom 13:00-14:30 | Le tx del pitch fatte e confermate; le slide (sotto); prova a tempo | | niente codice dopo le 14:00 |
 | dom 15:00 / 16:00 | Consegna / pitch | | portatile, VM in riserva, hotspot |
 
@@ -1514,17 +1515,18 @@ piccolo, dopo il lancio, con le sue regole (G.3), e si dice così.
 
 ### D.3 Rischi nuovi, in ordine
 
-0. **Il centro del racconto è l'ultimo pezzo costruito** (la riga
-   «Emesso da … ✓» è di domenica mattina, il pitch alle 15): se la
-   domenica va storta, la demo mostra un pagamento con l'AI — cioè la
-   storia del mattino del 7, non quella decisa la sera → DA DECIDERE
-   (Andrea e Alan, prima del 17, non il sabato): scambiare il sabato
-   sera (bonus MOON, card senza emittente) con la verifica
-   dell'emittente, così il sabato finisce con la card e la ✓ e il bonus
-   slitta a domenica mattina; oppure tenere l'ordine e preparare per la
-   slide 3 l'annuncio firmato sul relay locale già il venerdì (è
-   infrastruttura dichiarabile: l'evento esiste, la lettura in Barattolo
-   no). Qui non si decide: si segnala.
+0. **Il centro del racconto era l'ultimo pezzo costruito** (la riga
+   «Emesso da … ✓» stava alla domenica mattina, il pitch alle 15: se la
+   domenica fosse andata storta, la demo avrebbe mostrato un pagamento
+   con l'AI — la storia del mattino del 7, non quella decisa la sera).
+   DECISO l'8 ott (Andrea), con tutt'e due le cure: la riga passa al
+   **sabato pomeriggio, subito dopo il checkout** (HACKATHON-SETUP §7
+   punto 3; D.2), e i due annunci firmati dalle identità di prova stanno
+   sul relay locale **dal venerdì 16**, dichiarati come infrastruttura
+   (l'evento esiste, la lettura in Barattolo no: HACKATHON-SETUP §10,
+   riga del 16 ott). Così a Torino la ✓ costa la sola lettura e
+   verifica, il sabato finisce con la card e la ✓, e il bonus MOON resta
+   al sabato sera. Se la domenica va storta, la demo è quella del 7 sera.
 1. **Il wallet chiede conferma a terminale** e il pubblico non la vede
    → la finestra del servizio NWC proiettata accanto alla pagina, o un
    `--approva-tutto` SOLO per il pitch e dichiarato.
@@ -1605,8 +1607,9 @@ cosa esisteva prima del 17 (datato) e che RGB, QVAC e WDK NON erano
 implementati in Barattolo — nessuna rotta, nessun modulo, nessuna UI
 in `server.py` o `miniapp.html`, in nessun ramo; gli unici attrezzi
 erano gli script di `deploy/rgb/` (banco e wallet di prova, fuori
-dall'app) e, dall'11-12 ott, la leva `RGB_ATTIVO` spenta, e si
-dichiarano entrambi.
+dall'app) e, dall'8 ott (su main lo stesso giorno, non l'11-12 come
+scritto la sera del 7), la leva `RGB_ATTIVO` spenta, e si dichiarano
+entrambi.
 
 **Il nome: `fidelity-points`** (deciso da Andrea l'8 ott pomeriggio, dal
 nome del progetto «Fidelity Points», G.4; la proposta della sera prima

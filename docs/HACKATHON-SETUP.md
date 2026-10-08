@@ -1,6 +1,8 @@
 # Hackathon RGB di Torino (17-18 ott 2026): l'infrastruttura preparata prima
 
-Stato al 1 ottobre 2026, **aggiornato il 7 ottobre** con le idee di Alan
+Stato al 1 ottobre 2026, **aggiornato il 7 ottobre** con le idee di Alan,
+**e l'8** (cantiere «chiusura della preparazione»: la leva su main, il
+repo pubblico `fidelity-points`, la scaletta con la ✓ al sabato),
 (la demo sui punti fedeltà, **NWC-RGB** — l'estensione NIP-47 per gli
 asset RGB —, l'emittente legato a un'identità Nostr: il perché e il
 disegno stanno nella parte seconda dello studio; qui c'è COSA si fa e
@@ -288,8 +290,12 @@ Da consegnare scritto il 17 mattina, com'è chiesto dal regolamento:
   `NOT_IMPLEMENTED`).
 - Due identità Nostr di prova (gli «emittenti» di USDB e di MOON,
   `identita.mjs`) con kind 0 e NIP-05 sul relay locale (`nak serve`
-  sul portatile). **Nessun annuncio di asset pubblicato, nessun relay
-  pubblico toccato**: gli annunci si firmano e si pubblicano a Torino.
+  sul portatile). **Nessun relay pubblico toccato.** I due annunci di
+  asset (MOON e USDB, nella forma della bozza `spec/NIP-RGB-ASSETS.md`,
+  kind segnaposto) si firmano con queste identità e si pubblicano sul
+  relay locale il **16 ott**, dichiarati: esistono come eventi, nessun
+  codice di Barattolo li legge prima del 17 (la cura di D.3 punto 0,
+  decisa l'8 ott: la riga «Emesso da ✓» si costruisce il sabato).
 - QVAC in locale (Qwen3 1.7B, alias `consigliami`) con `consiglio.py` e
   la pagina locale `consigliami-prova.html` FUORI dal repo che lo chiama
   con lo schema: propone, non paga.
@@ -306,9 +312,9 @@ Da consegnare scritto il 17 mattina, com'è chiesto dal regolamento:
   cronologia fino al 16 sera è questa dichiarazione, datata.
 - Nessuna rotta, nessun modulo, nessuna UI in Barattolo: zero righe di
   integrazione (solo la leva `RGB_ATTIVO` spenta e la rotta statica
-  `/.well-known/nostr.json`, pronte dall'8 ott sul ramo
-  `cantiere/leva-rgb` e su main dall'11-12). Quelle si scrivono a
-  Torino, in commit datati.
+  `/.well-known/nostr.json`, su main dall'8 ott — un cancello chiuso e
+  una rotta che risponde vuota finché `NIP05_NOMI` non entra nel
+  config del VPS). Quelle si scrivono a Torino, in commit datati.
 
 ## 6. Come si riavvia tutto (il giorno prima e il giorno stesso)
 
@@ -402,23 +408,34 @@ studio, parte seconda, D.2; qui l'ordine dei pezzi:
    arrivo» → `rgb.py aggiorna barattolo` → «Pagato in USDB». **Il primo
    pagamento vero su signet entro le 16:30.** Lessico: «pagamento
    diretto, senza deposito di garanzia» (regola 9).
-3. **Sabato tardo pomeriggio** — «Consigliami»: la pagina
+3. **Sabato pomeriggio, subito dopo il checkout** — «Emesso da … ✓»,
+   **il centro del racconto**, spostato qui dalla domenica mattina l'8
+   ott (la cura di D.3 punto 0): i due annunci di MOON e USDB stanno
+   GIÀ sul relay locale, firmati dalle identità di prova il venerdì 16
+   e dichiarati (§10); a Torino si scrive solo la lettura in Barattolo
+   per `#d`, la verifica NIP-05 lato server con `url_api_ammesso`
+   (niente redirect, cache di 24 ore) e la riga nella card dell'asset,
+   accanto a «⚠️ Emittente sconosciuto». Alle 18 del sabato la ✓ c'è:
+   se la domenica va storta, la demo è comunque quella decisa il 7 sera.
+4. **Sabato tardo pomeriggio** — «Consigliami»: la pagina
    chiama `127.0.0.1:11434` con lo schema, il fumetto col consiglio,
    «Approva» fa il passo 2 da solo. Se CORS morde, la chiamata la fa il
    server e si dichiara.
-4. **Sabato sera** — MOON come bonus dopo il pagamento (l'assegnazione
-   del 1 ott agganciata al «Pagato»), la card dell'asset senza
-   emittente, il giro intero due volte.
-5. **Domenica mattina** — il NIP: i due annunci firmati dalle identità
-   di prova sul relay locale; in Barattolo la lettura per `#d`, la
-   verifica NIP-05 lato server con `url_api_ammesso` (niente redirect),
-   la riga «Emesso da … ✓» — **il centro del racconto**; i due testi
-   `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` del repo pubblico
-   rifiniti con quel che l'implementazione ha insegnato; la issue nel
-   repo `nwc`; la sera `git format-patch` dei commit del giorno in
-   `barattolo-patches/` del repo pubblico (anche il sabato sera).
-6. **Domenica mezzogiorno** — salvadanaio e budget se avanza; sennò gli
-   errori visibili. Tx del pitch confermate entro le 14:00.
+5. **Sabato sera** — MOON come bonus dopo il pagamento (l'assegnazione
+   del 1 ott agganciata al «Pagato»), la card dell'asset completa
+   (emittente, ticker, saldo), il giro intero due volte; `git
+   format-patch` dei commit del giorno in `barattolo-patches/` del repo
+   pubblico.
+6. **Domenica mattina** — i due testi `spec/NIP-RGB-ASSETS.md` e
+   `spec/NWC-RGB.md` del repo pubblico rifiniti con quel che
+   l'implementazione del sabato ha insegnato, e la issue nel repo `nwc`
+   aperta entro mezzogiorno; gli errori visibili («wallet non
+   collegato», «proxy irraggiungibile», «conferma in arrivo»: «UX:
+   error handling» è un criterio); il giro intero una terza volta col
+   portatile sull'hotspot, non sulla rete di casa.
+7. **Domenica mezzogiorno** — salvadanaio e budget se avanza, e basta.
+   Tx del pitch confermate entro le 14:00, niente codice dopo; la sera
+   `git format-patch` anche dei commit della domenica.
 
 Lo stato dell'ordine pagato in USDB (dopo l'ACK o dopo il blocco) è una
 decisione del sabato, scritta nel commit: gli stati della regola 4 non
@@ -435,9 +452,10 @@ che parla NWC-RGB, e la dichiarazione di venerdì; 5) dal vivo il
 pagamento: l'aiutante consiglia, il cliente approva, il wallet
 conferma, la tx su signet, il bonus dopo — l'AI entra qui; 6)
 l'identità per tutti (il NIP-05 gratuito al livello 2) e la roadmap;
-7) cosa resta. Il rischio che il centro del racconto sia l'ultimo pezzo
-costruito (domenica mattina) è segnato nello studio, D.3 punto 0, DA
-DECIDERE prima del 17.
+7) cosa resta. Il rischio che il centro del racconto fosse l'ultimo
+pezzo costruito (studio, D.3 punto 0) è CHIUSO l'8 ott: la ✓ si
+costruisce il sabato pomeriggio, subito dopo il checkout, sopra due
+annunci che stanno sul relay locale dal venerdì.
 
 ## 7-bis. Il wallet WDK che parla NWC: l'opzione di Alan, DECISA il 7 ott
 
@@ -584,14 +602,14 @@ accenti; la rete del giudizio e un faucet loro.
   dall'evento: si dice, con la issue a RGB-Tools, e si fa dopo se il
   cantiere vive). JAR fuori dalla demo (decisione di Alan).
 
-## 10. Prima del 17: la lista (7 ott), tutto dichiarato
+## 10. Prima del 17: la lista (7 ott, aggiornata l'8), tutto dichiarato
 
 Infrastruttura, lecita dal regolamento; niente al VPS prima del 10,
 niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
 
 | Quando | Cosa | Fatto |
 |---|---|---|
-| 8 ott, per primo | **Il repo pubblico `fidelity-points`** (studio, parte seconda, G.1) sotto `kreamistudio-crypto`, Alan collaboratore, PUBBLICO dal primo commit firmato: README in inglese con la dichiarazione di §5 allo stato dell'8, `rgb/` = snapshot di `deploy/rgb/`, `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` (le bozze di B in inglese), LICENSE MIT, `.gitignore` (identità, age, stash). Niente del repo privato, nessuna chiave, nessun indirizzo di macchina. Il link nella risposta alla conferma degli organizzatori; poi un commit per ogni riga di questa lista che si chiude | ☐ |
+| 8 ott, per primo | **Il repo pubblico `fidelity-points`** (studio, parte seconda, G.1) sotto `kreamistudio-crypto`, Alan collaboratore, PUBBLICO dal primo commit firmato: README in inglese con la dichiarazione di §5 allo stato dell'8, `rgb/` = snapshot di `deploy/rgb/`, `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` (le bozze di B in inglese), LICENSE MIT, `.gitignore` (identità, age, stash). Niente del repo privato, nessuna chiave, nessun indirizzo di macchina. Il link nella risposta alla conferma degli organizzatori; poi un commit per ogni riga di questa lista che si chiude | ☑ 8 ott: la cartella `GitHub\fidelity-points` preparata dal cantiere «chiusura della preparazione» (README con la dichiarazione di §5 in inglese, `rgb/` senza la chiave age né i percorsi della VM, le due bozze, LICENSE MIT, `.gitignore`; le tre regole dello scanner dei segreti passate: zero), repo creato e pushato da Andrea con `gh` lo stesso giorno (primo commit 1e6fa80, Alan invitato; il comando nel verbale del cantiere, CANTIERI) |
 | 8-9 ott | `rgb.py emetti` con la precisione come argomento | ☑ c'era già (`[precisione]`, righe 18 e 152 di rgb.py): la nota del 7 ott era sbagliata |
 | 8-9 ott | Sulla VM: `rgb.py nuovo usdb`, sats da `to-the-mooon` (niente faucet), `utxo usdb 5`, `emetti usdb USDB Dollari_di_prova_Barattolo 100000000 2`, `backup usdb`; l'asset_id in §2 | ☑ 8 ott, comandi eseguiti da Andrea uno alla volta; 4 UTXO colorabili liberi e 44.347 sats restano al wallet `usdb` |
 | 8-9 ott | 500 USDB (50.000 unità) al wallet utente: fattura «qualunque asset» BLIND (`node punti.mjs fattura - 50000`: il wallet aveva già 3 UTXO colorabili, niente witness), `rgb.py invia usdb …`, i due `aggiorna`; un blocco | ☑ 8 ott, blocco 325472: utente 50.000 settled e spendibili; il wallet utente conosce USDB (precisione 2, 100.000.000 emessi) |
@@ -602,10 +620,96 @@ niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
 | 11-12 ott | `nwc-wdk.mjs` BASE nel WSL: evento info (13194, `encryption` nip44), `get_info`, `get_balance`, la connection string SU FILE (`nwc/connessione-barattolo.txt`, mai in chat) | ☑ 8 ott, scritto a mano con nostr-tools (copia in `deploy/rgb/`): `connetti barattolo`, `serve`, e il client di prova `prova barattolo` → `get_info` ok, `get_balance` 26.519.000 msat, `rgb_list_assets` → `NOT_IMPLEMENTED`, tutto nip44 |
 | 8 ott | La connection string incollata nel Profilo di Barattolo in collaudo (la CSP ammette `ws:`): Andrea, dal suo browser, sul server di collaudo del worktree (porta 8098, config dal solo esempio, identità 111 dall'hash) | ☑ 8 ott: «Incassi e pagamenti → 👛 Wallet NWC → ⚡ Collega»; il log del servizio dice `barattolo: get_info → ok (nip44_v2)` e l'app «wallet collegato», con la nota che manca `pay_invoice` (giusto: la base non ce l'ha). Al primo tentativo il servizio era morto col `nohup` (§6) |
 | 11-12 ott | `rgb_http.py` sulla VM, `127.0.0.1:8787` (salute/saldo/fattura/aggiorna/trasferimenti del wallet `barattolo`), gamba `-L 8787:127.0.0.1:8787` nel tunnel | ☑ 8 ott: copiato e avviato da Andrea (`nohup`), dal tunnel `/salute`, `/saldo` (JAR, 4 UTXO liberi), `/fattura` «qualunque asset» ok e per USDB «AssetNotFound» (lezione 5), corpo storto 400, rotta ignota 404; banco di cartone sul PC in più. **Da fermare la sera** (backup delle 03:30) |
-| 11-12 ott | Il commit su main: `RGB_ATTIVO`/`RGB_PROVA_IDS`/`NIP05_NOMI`, il gruppo nel pannello delle leve, `rgb_ammesso`, la rotta `/.well-known/nostr.json`, `prove_leva_rgb` | ☑ PRONTO l'8 ott sul ramo locale `cantiere/leva-rgb` (commit f7602c1, firmato, suite severa 19.726 verdi): **push su main l'11-12**, dopo il lancio, coi collaudi della CI rigirati |
+| 8 ott (era 11-12) | Il commit su main: `RGB_ATTIVO`/`RGB_PROVA_IDS`/`NIP05_NOMI`, il gruppo nel pannello delle leve, `rgb_ammesso`, la rotta `/.well-known/nostr.json`, `prove_leva_rgb` | ☑ 8 ott, su main PRIMA del lancio (decisione di Andrea: è un cancello chiuso e una rotta che risponde `{"names": {}}` finché `NIP05_NOMI` non entra nel config del VPS — le due hex le dà `node identita.mjs pubblica <nome>`); il nome «Cassiere» tolto anche dagli identificatori, con la prova; suite severa e collaudi della CI nel verbale del push (CANTIERI) |
 | 11-12 ott | QVAC: `npm i -g @qvac/cli@latest`, alias `consigliami` → `QWEN3_1_7B_INST_Q4` con `ctx_size 8192`, scaricato; `consigliami-prova.html` FUORI dal repo con `response_format` json_schema e `reasoning_budget: false`; `qvac serve --openai --cors-origin <origine esatta>` | ☑ 8 ott (§4): CLI 0.15.0, 1,06 GB scaricati, pagina provata nel Browser pane col 0.6B e col 1.7B |
 | 13 ott | Q&A con le undici domande | ☐ |
-| 14-16 ott | §5 riscritta e stampata; gli schermi su carta; il giro provato tre volte; backup della VM; tutto scaricato sul portatile; video di riserva del «Consigliami» | ☐ |
+| 14-16 ott | §5 riscritta e stampata; gli schermi su carta; il giro provato tre volte; video di riserva della demo | ☐ |
+| 14-16 ott | **Backup della VM**, **portatile con tutto scaricato** (modelli QVAC, `nak`, pacchetti del wallet), **prova di riavvio completa** di tutta la catena, nell'ordine di §6 e col tunnel a tre gambe: i comandi qui sotto, uno alla volta | ☐ |
+| 16 ott | I due annunci di MOON e USDB firmati dalle identità di prova e pubblicati sul relay locale, nella forma di `spec/NIP-RGB-ASSETS.md` (kind segnaposto): un comando `annuncio <nome> <asset_id>` in `identita.mjs`, sul calco di `profilo`, DA SCRIVERE (è infrastruttura dichiarata: l'evento esiste, nessun codice lo legge). La cura di D.3 punto 0 | ☐ |
+
+**I comandi della riga «14-16 ott»**, nell'ordine, uno alla volta, dal
+WSL e non da PowerShell dove c'è `ssh` (lezione 1 di §9: le virgolette
+dentro l'argomento spariscono). Niente di tutto questo tocca il VPS, il
+nodo o il relay.
+
+1) **Backup della VM** — prima si ferma `rgb_http.py` (apre il wallet
+`barattolo`, e il backup lo vuole chiuso), poi il backup notturno fatto
+a mano, poi il pull dal PC e il drill senza scrivere niente in chiaro:
+
+```bash
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'pkill -f "[r]gb_http.py"; sudo systemctl start rgb-backup.service; sudo journalctl -u rgb-backup.service -n 15 --no-pager; ls -lt /var/backups/rgb | head -3'
+```
+
+Poi dal PC `pull.ps1` (la gamba `rgb/`, come ogni notte) e il drill
+sull'archivio appena arrivato in `C:\Users\Andrea\BarattoloBackup\rgb\`:
+`age -d -i rgb-prova.key <archivio> | tar -t` deve elencare
+`rgb/dati/<wallet>/chiavi.json` per `barattolo`, `to-the-mooon` e
+`usdb`, e una fotografia `.rgb-backup` per ciascuno. Il wallet utente e le
+identità hanno il loro archivio (§11): si rifà solo se è cambiato
+qualcosa dall'8 (`node punti.mjs backup`; per identità e NWC lo stesso
+`tar | age -r <pubblica age della VM>` dell'8 ott, copia in
+`BarattoloBackup\rgb\`).
+
+2) **Portatile con tutto scaricato** — si guarda, non si installa; poi
+la controprova col Wi-Fi SPENTO: se qualcosa parte a scaricare, il 17
+sull'hotspot non partirebbe.
+
+```bash
+cd ~/wdk-prova && source ~/.nvm/nvm.sh && node -v && npm ls --depth=0 2>/dev/null | grep -E 'wdk-wallet-rgb|rgb-lib-linux-x64|nostr-tools|bip39'
+~/bin/nak --version && ls -la ~/wdk-prova/identita ~/wdk-prova/nwc
+```
+
+```powershell
+qvac --version; qvac doctor; Get-ChildItem $env:USERPROFILE\.qvac\models
+```
+
+(il 1.7B da 1,06 GB e il 0.6B devono esserci già). Col Wi-Fi spento:
+`qvac serve --openai --port 11434 --host 127.0.0.1` e una chat
+completion con `"model": "consigliami"` dalla pagina locale
+`consigliami-prova.html` (servita da `python -m http.server 8081`, con
+`--cors-origin http://127.0.0.1:8081`): risponde senza scaricare
+niente. Sul portatile devono stare anche il clone di `fidelity-points`
+e il worktree di Barattolo con le dipendenze pip già installate
+(`python -c "import fastapi, uvicorn, httpx"`).
+
+3) **Prova di riavvio completa**, nell'ordine di §6 — la VM, il tunnel a
+TRE gambe, la faccia HTTP, il relay, il wallet, il servizio NWC, QVAC,
+Barattolo in collaudo — con un controllo dopo ogni passo:
+
+```bash
+# VM: i tre container, la catena in pari, il wallet mercante, la faccia HTTP
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && docker compose up -d && docker compose ps'
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && ./venv/bin/python rgb.py saldo barattolo'
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 &'
+# WSL, finestra 1 (resta aperta): il tunnel a tre gambe
+ssh -i ~/.ssh/lnvps -N -L 50001:127.0.0.1:50001 -L 3000:127.0.0.1:3000 -L 8787:127.0.0.1:8787 debian@vm-2050.lnvps.cloud
+# WSL, finestra 2: la faccia HTTP dal tunnel, il relay, il wallet, le identità, il servizio NWC
+curl -s 127.0.0.1:8787/salute                                   # {"ok": true, "wallet": "barattolo", "rete": "signet"}
+setsid nohup ~/bin/nak serve --port 7777 > ~/wdk-prova/nak.log 2>&1 < /dev/null & disown
+cd ~/wdk-prova && source ~/.nvm/nvm.sh && node punti.mjs saldo   # PRIMA del servizio NWC: USDB 50.000 settled, MOON 60
+node identita.mjs pubblica usdb; node identita.mjs pubblica tothemooon   # le due hex per NIP05_NOMI del config di collaudo
+setsid nohup node nwc-wdk.mjs serve > nwc/serve.log 2>&1 < /dev/null & disown
+node nwc-wdk.mjs prova barattolo                                 # get_info ok (nip44), get_balance, rgb_list_assets → NOT_IMPLEMENTED
+```
+
+```powershell
+cd C:\Users\Andrea\qvac-prova; qvac serve --openai --port 11434 --host 127.0.0.1 --cors-origin http://127.0.0.1:8080
+```
+
+Poi Barattolo in collaudo sul worktree, porta 8080, config dal solo
+esempio con `MODALITA_COLLAUDO = True`, `MOSTRO_RELAY` e
+`MOSTRO_RELAY_SPECCHIO` al relay morto (`ws://127.0.0.1:9`) e
+`NIP05_NOMI` con le due hex di sopra (`uvicorn server:app --port 8080`);
+`curl -s "http://127.0.0.1:8080/.well-known/nostr.json?name=usdb"` deve
+dare la hex di `usdb`; nell'app (identità 111 dall'hash) Profilo →
+Incassi e pagamenti → 👛 Wallet NWC → ⚡ Collega con la stringa di
+`nwc/connessione-barattolo.txt` → «wallet collegato», e nel log del
+servizio `barattolo: get_info → ok (nip44_v2)`. Il giro è verde quando
+ogni riga qui sopra ha dato quel che dice il commento, senza un
+comando in più. La sera si spegne nell'ordine inverso:
+`pkill -f "[n]wc-wdk.mjs serve"; pkill -f "[n]ak serve"` nel WSL,
+`pkill -f "[r]gb_http.py"` sulla VM (il backup delle 03:30 vuole il
+wallet chiuso); i container restano su.
 
 ## 11. Le due identità Nostr di prova (gli «emittenti»)
 
@@ -646,8 +750,10 @@ ferrea 1).
   una rotta esplicita `/.well-known/nostr.json` su barattolo.store, sul
   calco di `assetlinks.json` (regola 3: file statico, nome in
   whitelist, niente redirect — NIP-05 li vieta — e
-  `Access-Control-Allow-Origin: *`), nel commit dell'11-12 ott: due
-  nomi (`usdb`, `tothemooon`), zero rischio, e la riga nella schermata
+  `Access-Control-Allow-Origin: *`), nel commit dell'8 ott, su main lo
+  stesso giorno (la rotta risponde vuota finché `NIP05_NOMI` non entra
+  nel config del VPS): due nomi (`usdb`, `tothemooon`), zero rischio, e
+  la riga nella schermata
   legge «tothemooon@barattolo.store ✓»; ai giudici si dice che il VERO
   negozio avrebbe il suo dominio. La strada (b), GitHub Pages, è
   scartata. **In roadmap (slide, niente codice)**: la stessa rotta, un

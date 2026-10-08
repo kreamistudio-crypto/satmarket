@@ -40801,3 +40801,147 @@ con WoS salvato (il «prima» è l'albero col doppione). RIBASATO su 8bd23a5
 (la lista dell'hackathon: solo `deploy/rgb/` e HACKATHON-SETUP, nessun
 file in comune): suite intera severa senza config nel worktree 19.755
 verdi, 0 rosse; 43 collaudi della CI verdi nella gabbia.
+
+## Hackathon: la chiusura della preparazione (8 ott 2026, richiesta di Andrea)
+
+**DA DOVE SI PARTIVA.** La leva RGB e il NIP-05 di casa (`RGB_ATTIVO`,
+`RGB_PROVA_IDS`, `NIP05_NOMI`, `rgb_ammesso`, il gruppo «🪙 Punti e
+dollari su RGB (hackathon)» nel pannello delle leve, la rotta esplicita
+`/.well-known/nostr.json`, `prove_leva_rgb`) stavano pronti sul ramo
+locale `cantiere/leva-rgb` (f7602c1, firmato, verbale nel suo messaggio
+e in HACKATHON-SETUP §10-11) con l'appuntamento «su main l'11-12, dopo
+il lancio»; i commenti di quel commit chiamavano ancora «Cassiere»
+l'aiutante — nome sparito dai testi la sera del 7 (studio, parte
+seconda, G.4) e sostituito l'8 mattina da «Consigliami», con l'alias di
+QVAC già rinominato; il repo pubblico `fidelity-points` (G.1) era deciso
+e non esisteva; la riga «Emesso da … ✓», il centro del racconto, era
+l'ULTIMO pezzo della scaletta (domenica mattina), col rischio segnato in
+D.3 punto 0 e DA DECIDERE; in D.1 una frase sbagliata su `rgb.py` («un
+argomento in più»: la precisione c'era già), in §10 il «video di
+riserva» intestato al bottone e le caselle di oggi aperte.
+
+**COSA SI È FATTO.** A) La leva su main OGGI (decisione di Andrea:
+prima del lancio, perché è un cancello chiuso e una rotta che risponde
+vuota finché `NIP05_NOMI` non entra nel config del VPS): f7602c1
+ribasato su 213d708 con un cherry-pick senza conflitti (i quattro file
+toccati — server.py, config_esempio.py, prove.py, ARCHITETTURA — non
+erano cambiati sotto), poi il commit della rinomina: nei commenti del
+cancello e del config d'esempio «un ordine pagato in dollari di prova
+(USDB) su consiglio di «Consigliami», l'aiutante locale che propone e
+l'utente approva»; nello studio la rotta di riserva
+`/api/consigliami/proposta` e le tre frasi «li rinomina il prossimo
+cantiere» chiuse; in HACKATHON-SETUP la bussola e §4. La metafora
+«LNbits è il cassiere» del wallet (altra sezione, altro senso) resta.
+B) La cartella `GitHub\fidelity-points`, FUORI dal repo: README in
+inglese con la dichiarazione di §5 allo stato dell'8 (gli asset con gli
+id, le quattro tx signet con l'URL intero di mempool — un giudice deve
+poterle aprire —, le due identità in npub, la base NWC senza `rgb_*`,
+QVAC, il disegno, «zero righe di integrazione in Barattolo» con la leva
+dichiarata e `git log -S RGB_ATTIVO -- server.py` che trova UN commit —
+senza il `-- server.py` ne trova cinque, i documenti che la
+progettavano), «What was
+built at the hackathon» vuota, cosa c'è nella cartella, come si collega
+a Barattolo durante la demo (il protocollo, `barattolo-patches/`), come
+si avvia su signet; `rgb/` = lo snapshot di `deploy/rgb/` preso da git
+con `git show` (LF, non la copia CRLF del checkout: uno script `/bin/sh`
+con CRLF non parte su Linux) con la chiave PUBBLICA age di
+`backup-rgb.sh` sostituita da un segnaposto (è pubblica, ma «nessuna
+chiave» vuol dire nessuna); `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md`
+in inglese dalle bozze B.1 e B.2 della parte seconda (sul calco di
+`87.md` e `321.md`, «Draft, 8 October 2026, design only» in testa, i
+kind segnaposto, i cinque passi della verifica, il MUST della conferma,
+un errore in più `USER_REJECTED`, l'esempio del checkout); LICENSE MIT;
+`.gitignore` (identità, nwc, utente, dati, wallet, backup, `*.age`,
+`*.key`, `*.rgb-backup`, chiavi.json, seme.txt, servizio.txt,
+password-backup.txt, connessione-*.txt, .env, node_modules, venv).
+Niente del repo privato, nessun nome di macchina (`vm-2050`, gli IP,
+`debian@`, `BarattoloBackup`, i percorsi del PC: grep a zero). Il repo
+lo crea Andrea con `gh`, comando in fondo a questa voce. C) La
+scaletta: §7 punto 3 è «Emesso da … ✓» subito dopo il checkout, con la
+cura di D.3 punto 0 applicata TUTTA (le due strade insieme): la ✓ al
+sabato pomeriggio, e i due annunci firmati dalle identità di prova sul
+relay locale dal venerdì 16, dichiarati (riga nuova in §10: un comando
+`annuncio <nome> <asset_id>` in `identita.mjs`, sul calco di `profilo`,
+da scrivere); il sabato sera tiene il bonus MOON con la card completa;
+la domenica riscritta (i due testi rifiniti, la issue nel repo `nwc`
+entro mezzogiorno, gli errori visibili, il giro sull'hotspot,
+salvadanaio e budget solo se avanza, tx del pitch entro le 14, niente
+codice dopo); D.2 e D.3 punto 0 allineati (DECISO l'8), §5 dice degli
+annunci del 16. D) D.1 corretta (la precisione c'era già, HACKATHON-SETUP
+§2); «video di riserva della demo»; le caselle di oggi spuntate (il
+repo pubblico; il commit su main, riga «8 ott (era 11-12)»); la riga
+14-16 con backup della VM, portatile con tutto scaricato (modelli QVAC,
+`nak`, pacchetti del wallet), prova di riavvio completa, e sotto la
+tabella i comandi nell'ordine di §6 col tunnel a TRE gambe, il
+controllo atteso accanto a ogni riga, la controprova col Wi-Fi spento
+e lo spegnimento della sera; §11 e G.1 dicono che la rotta è su main
+dall'8. PRODUZIONE: la voce delle leve RGB e di `NIP05_NOMI` nel config
+del VPS (come si aggiunge, come si verifica).
+
+**DECISO E PERCHÉ.** La leva su main prima del lancio perché non cambia
+niente di visibile: `RGB_ATTIVO` nasce spenta, `NIP05_NOMI` vuota
+risponde `{"names": {}}` (200, «qui nessuno»), e la prova pretende
+`rgb_ammesso` in ogni rotta `/api/rgb/*` futura. Il «Cassiere» via anche
+dai commenti perché un giudice che fa `git log -S RGB_ATTIVO --
+server.py` trova QUEL commit, e il nome vecchio racconterebbe la demo del mattino del 7, non
+quella decisa la sera. I txid interi nel README pubblico: la regola dei
+64-hex è di CASA (nel repo privato un txid si spezza a metà), e nel repo
+pubblico un link che non si apre non serve a nessuno — le tre regole
+dello scanner passate a mano sulla cartella: zero FORME, zero
+AGE-SECRET-KEY, e i soli 64-hex sono i quattro txid dentro URL
+`mempool.space/signet/tx/` (zero fuori). La ✓ al sabato con TUTT'E DUE
+le cure di D.3: la seconda (gli annunci dal venerdì) toglie dal sabato
+la pubblicazione e lascia a Torino la sola lettura e verifica, cioè due
+ore e non quattro.
+
+**SCARTATI.** Rinominare la metafora di LNbits (non c'entra). Copiare lo
+snapshot col CRLF del checkout. Mettere nel README il nome della VM o
+un indirizzo. Riscrivere le frasi storiche dello studio e di
+HACKATHON-SETUP che citano `cassiere` come verbale (restano: dicono
+quando e perché è sparito; la prova guarda il codice, gli attrezzi e le
+rotte disegnate, non la storia). Un commit solo per leva e rinomina (due
+commit: il primo è la leva com'era, così `git log -S RGB_ATTIVO` dice
+la data vera della leva; il secondo la rinomina con la sua prova).
+
+**PROVATO.** `prove_leva_rgb` passa da 27 a 36 prove: la sezione 5
+guarda il SORGENTE coi commenti — non `codice()`, che li toglie: il nome
+vecchio stava proprio in un commento, e la prima stesura con `cod` NON
+vedeva la mutazione (emendata) — sul cancello, la rotta NIP-05, il
+pannello, il config d'esempio, ogni attrezzo di `deploy/rgb/`, l'alias
+di QVAC (`consigliami` → QWEN3_1_7B_INST_Q4, contesto 8192, `cassiere`
+assente), nessuna rotta `/api/cassiere` nei due documenti e
+`/api/consigliami` nello studio. Tortura 3 su 3 (alias rinominato,
+commento del cancello, commento del config: rosse). Suite intera severa
+senza config nel worktree da origin/main (213d708): 19.791 verdi, 0 rosse (circa 11 minuti);
+i 43 collaudi della CI verdi nella gabbia (43 verdi, 0 rossi). Le tre regole dello scanner sulla cartella pubblica: zero
+(sopra). La cartella vista da un processo PowerShell separato: 16 file.
+Nessun 64-hex nei due documenti dell'hackathon (i comandi nuovi non ne
+portano).
+
+**NON PROVATO, DA GUARDARE.** Il repo pubblico è stato CREATO e pushato
+da Andrea col comando qui sotto (primo commit 1e6fa80, Alan invitato),
+prima del push di questo cantiere su main: la casella di §10 è vera.
+RIBASATO su 16d2d71 (lo studio dell'istanza di prova e cinque righe di
+CLAUDE.md: nessun file in comune, i tre commit restano firmati): le
+sezioni toccate (leva RGB, bussola, tetto, leve: 120 verdi, 0 rosse) e
+i 43 collaudi della CI verdi nella gabbia sull'albero ribasato.
+`NIP05_NOMI` NON è nel config del VPS: la rotta in produzione
+risponde vuota finché non la aggiunge (PRODUZIONE); dopo il deploy, `curl
+-sI https://barattolo.store/.well-known/nostr.json` deve dire 200. Il
+comando `annuncio` di `identita.mjs` per il 16 è da scrivere. Il drill
+del backup e la prova di riavvio completa sono comandi scritti, non
+eseguiti: li esegue Andrea il 14-16 e spunta. La riga «Emesso da ✓» al
+sabato è una decisione di scaletta: regge se gli annunci del 16 ci sono.
+
+Il comando per il repo pubblico, da `C:\Users\Andrea\Documents\GitHub\fidelity-points`
+in PowerShell (il commit firma con la config globale; `gh` crea il repo
+PUBBLICO dal primo push, poi Alan collaboratore con scrittura):
+
+```powershell
+git init -b main
+git add README.md LICENSE .gitignore rgb spec
+git commit -S -m "Fidelity Points: declaration of what exists before the hackathon (8 October 2026)"
+git cat-file commit HEAD | Select-String gpgsig
+gh repo create kreamistudio-crypto/fidelity-points --public --source . --remote origin --push --description "Loyalty points as RGB assets issued by a NIP-05-verified Nostr identity, spent from a WDK wallet over NWC-RGB, with a local AI (QVAC) that proposes and the user who approves. Agentic Dollars on Bitcoin hackathon, Turin, 17-18 Oct 2026."
+gh api -X PUT repos/kreamistudio-crypto/fidelity-points/collaborators/alanbimbati -f permission=push
+```
