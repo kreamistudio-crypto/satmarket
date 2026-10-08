@@ -301,15 +301,15 @@ Da consegnare scritto il 17 mattina, com'è chiesto dal regolamento:
   con lo schema: propone, non paga.
 - Il disegno: la parte seconda dello studio (campi, nomi dei metodi,
   schermi), scritta il 7 ott; le due bozze in inglese
-  `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` nel repo pubblico
-  dall'8-9 ott, dichiarate come disegno: nessuna issue aperta, nessuna
+  `docs/spec/NIP-RGB-ASSETS.md` e `docs/spec/NWC-RGB.md` nel repo
+  privato (scritte l'8 per `fidelity-points`, portate qui la sera), dichiarate come disegno: nessuna issue aperta, nessuna
   PR, nessuna implementazione.
-- **Il repo pubblico** (studio, parte seconda, G.1): creato l'8 ott,
-  pubblico dal primo commit, firmato; dentro il README con questa
-  dichiarazione in inglese, lo snapshot di `deploy/rgb/`, le due bozze,
-  la licenza; niente del repo privato di Barattolo, nessuna chiave. Il
-  link sta nella risposta alla conferma degli organizzatori. La sua
-  cronologia fino al 16 sera è questa dichiarazione, datata.
+- **Il repo `fidelity-points`** (§10, prima riga): privato, MINIMO
+  per scelta di Alan (8 ott sera), solo per trasparenza: il suo README
+  dice soltanto «prima: una VM con un nodo Bitcoin signet e un server
+  dedicato» e «durante: tutto il resto, nei commit del 17 e 18».
+  Questa dichiarazione intera NON sta lì: sta qui, in §10 e in
+  `deploy/rgb/`.
 - Nessuna rotta, nessun modulo, nessuna UI in Barattolo: zero righe di
   integrazione (solo la leva `RGB_ATTIVO` spenta e la rotta statica
   `/.well-known/nostr.json`, su main dall'8 ott — un cancello chiuso e
@@ -609,7 +609,7 @@ niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
 
 | Quando | Cosa | Fatto |
 |---|---|---|
-| 8 ott, per primo | **Il repo pubblico `fidelity-points`** (studio, parte seconda, G.1) sotto `kreamistudio-crypto`, Alan collaboratore, PUBBLICO dal primo commit firmato: README in inglese con la dichiarazione di §5 allo stato dell'8, `rgb/` = snapshot di `deploy/rgb/`, `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` (le bozze di B in inglese), LICENSE MIT, `.gitignore` (identità, age, stash). Niente del repo privato, nessuna chiave, nessun indirizzo di macchina. Il link nella risposta alla conferma degli organizzatori; poi un commit per ogni riga di questa lista che si chiude | ☑ 8 ott: la cartella `GitHub\fidelity-points` preparata dal cantiere «chiusura della preparazione» (README con la dichiarazione di §5 in inglese, `rgb/` senza la chiave age né i percorsi della VM, le due bozze, LICENSE MIT, `.gitignore`; le tre regole dello scanner dei segreti passate: zero), repo creato e pushato da Andrea con `gh` lo stesso giorno (primo commit 1e6fa80, Alan invitato; il comando nel verbale del cantiere, CANTIERI) |
+| 8 ott, per primo | **Il repo `fidelity-points`** sotto `kreamistudio-crypto`, Alan collaboratore, PRIVATO, commit firmati. **MINIMO per scelta di Alan (8 ott sera)**: esiste solo per trasparenza. Dentro: README corto in inglese (il nome «Fidelity Points», estensione di Barattolo per l'hackathon «Agentic Dollars on Bitcoin», Torino 17-18 ott, il team Andrea e Alan; «prima dell'hackathon» SOLO una VM con un nodo Bitcoin signet e un server dedicato; «durante» tutto il resto, dichiarato nei commit del 17 e 18), LICENSE MIT, `.gitignore`. Niente spec, niente descrizione dell'idea, niente roadmap, niente codice. Le due bozze stanno qui in `docs/spec/`; **l'inventario vero dell'infrastruttura resta in `deploy/rgb/` e in questa sezione** (e in §5). Il disegno di G.1 dello studio è superato | ☑ 8 ott: la cartella `GitHub\fidelity-points` preparata dal cantiere «chiusura della preparazione» (README con la dichiarazione di §5 in inglese, `rgb/` senza la chiave age né i percorsi della VM, le due bozze, LICENSE MIT, `.gitignore`; le tre regole dello scanner dei segreti passate: zero), repo creato e pushato da Andrea con `gh` lo stesso giorno (primo commit 1e6fa80, Alan invitato; il comando nel verbale del cantiere, CANTIERI). ☑ 8 ott sera, cantiere «fidelity-points minimo»: `rgb/` tolta (06422bf), poi la linea di Alan — README corto e `spec/` tolta (af445f7), le bozze portate in `docs/spec/` (f2c0b7d). La storia dei primi commit resta com'è (decisione di Andrea: niente riscritture); visibilità PRIVATA, non toccata |
 | 8-9 ott | `rgb.py emetti` con la precisione come argomento | ☑ c'era già (`[precisione]`, righe 18 e 152 di rgb.py): la nota del 7 ott era sbagliata |
 | 8-9 ott | Sulla VM: `rgb.py nuovo usdb`, sats da `to-the-mooon` (niente faucet), `utxo usdb 5`, `emetti usdb USDB Dollari_di_prova_Barattolo 100000000 2`, `backup usdb`; l'asset_id in §2 | ☑ 8 ott, comandi eseguiti da Andrea uno alla volta; 4 UTXO colorabili liberi e 44.347 sats restano al wallet `usdb` |
 | 8-9 ott | 500 USDB (50.000 unità) al wallet utente: fattura «qualunque asset» BLIND (`node punti.mjs fattura - 50000`: il wallet aveva già 3 UTXO colorabili, niente witness), `rgb.py invia usdb …`, i due `aggiorna`; un blocco | ☑ 8 ott, blocco 325472: utente 50.000 settled e spendibili; il wallet utente conosce USDB (precisione 2, 100.000.000 emessi) |

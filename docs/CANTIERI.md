@@ -40856,7 +40856,9 @@ un errore in più `USER_REJECTED`, l'esempio del checkout); LICENSE MIT;
 password-backup.txt, connessione-*.txt, .env, node_modules, venv).
 Niente del repo privato, nessun nome di macchina (`vm-2050`, gli IP,
 `debian@`, `BarattoloBackup`, i percorsi del PC: grep a zero). Il repo
-lo crea Andrea con `gh`, comando in fondo a questa voce. C) La
+lo crea Andrea con `gh`, comando in fondo a questa voce (8 ott
+sera: reso MINIMO per scelta di Alan, voce «fidelity-points minimo»
+qui sotto). C) La
 scaletta: §7 punto 3 è «Emesso da … ✓» subito dopo il checkout, con la
 cura di D.3 punto 0 applicata TUTTA (le due strade insieme): la ✓ al
 sabato pomeriggio, e i due annunci firmati dalle identità di prova sul
@@ -41057,3 +41059,64 @@ lettura sta nel rapporto del cantiere: conta i titoli con «<» prima e
 dopo il deploy). Un negozio il cui `name` porta un «<» non-tag («taglia
 < 40 > 38»): la regex `<[^>]+>` lo mangerebbe come la gemella della
 descrizione — caso non visto, si guarda se compare.
+
+## fidelity-points minimo (8 ott 2026, sera: scelta di Alan, richiesta di Andrea)
+
+**DA DOVE SI PARTIVA.** Il repo `fidelity-points` (G.1 dello studio,
+creato da Andrea l'8 col primo commit 1e6fa80) conteneva un README
+lungo con la dichiarazione intera di §5 in inglese, LICENSE,
+`.gitignore`, `spec/` (le due bozze in inglese) e `rgb/`, lo snapshot di
+`deploy/rgb/` (undici file). Su GitHub risultava PRIVATO, mentre
+HACKATHON-SETUP §5 e §10 e G.1 dello studio dicevano «pubblico dal primo
+commit». Una prima richiesta di Andrea la stessa sera (togliere `rgb/`,
+README «solo dichiarazione») ha prodotto 06422bf, pushato senza il suo
+ok: va bene così, ma d'ora in poi ogni push aspetta il suo ok.
+
+**COSA SI È FATTO.** La linea di Alan, che vale più della richiesta
+precedente: il repo è MINIMO ed esiste solo per trasparenza. README
+corto in inglese — «Fidelity Points», estensione di Barattolo per
+l'hackathon «Agentic Dollars on Bitcoin» (Torino, 17-18 ott), il team
+Andrea e Alan; «What exists before the hackathon»: SOLO «A VM with a
+Bitcoin signet node and a dedicated server»; «What is built during the
+hackathon»: «Everything else, declared in the commits of 17 and 18
+October». Niente lista di asset, wallet, servizio NWC, identità, QVAC,
+script; niente descrizione dell'idea, niente roadmap. Via `spec/`.
+Restano README, LICENSE, `.gitignore`. Commit firmato af445f7 nel repo
+`fidelity-points`. Le due bozze, che nel repo privato non c'erano (lo
+studio ha solo B.1 e B.2 in italiano), copiate byte per byte in
+`docs/spec/NIP-RGB-ASSETS.md` e `docs/spec/NWC-RGB.md` col commit a
+parte f2c0b7d. In questi documenti: la prima riga di §10 e la voce del
+repo in §5 di HACKATHON-SETUP (e il rimando alle bozze in §5), una nota
+«SUPERATO» in testa a G.1 dello studio, un rimando nella voce «la
+chiusura della preparazione».
+
+**DECISO E PERCHÉ.** Minimo per scelta di Alan: il repo serve alla
+trasparenza, non a raccontare l'idea. L'inventario vero
+dell'infrastruttura resta dove si lavora: `deploy/rgb/` e
+HACKATHON-SETUP §10 (e §5, la dichiarazione da consegnare all'arrivo).
+Le bozze in `docs/spec/`, sottocartella: sono testi per i repo upstream,
+non documenti di casa, e la bussola di CLAUDE.md conta solo i `.md` in
+cima a `docs/` (nessuna riga in più a CLAUDE.md). Privato: la
+visibilità si cambia solo con Andrea. La storia dei primi due commit di
+`fidelity-points` (con `rgb/` e le spec) resta com'è: niente
+riscritture (decisione di Andrea).
+
+**SCARTATI.** Riscrivere la storia di `fidelity-points`. Le bozze in
+cima a `docs/` con due nomi nuovi nella bussola di CLAUDE.md. Riscrivere
+G.1 frase per frase (basta la nota in testa: il resto è storia
+datata). La versione intermedia di stasera (README «solo
+dichiarazione» con la lista dell'infrastruttura e `spec/`): superata
+prima del push.
+
+**PROVATO.** Nel repo `fidelity-points`: dopo il commit restano
+`LICENSE`, `README.md`, `.gitignore`; firma della punta presente;
+`gh repo view` dice PRIVATE. Le due bozze in `docs/spec/` uguali a
+quelle del commit 06422bf (`cmp`), senza 64-hex né chiavi. In Barattolo
+nessun file di codice toccato; suite e collaudi nel verbale del push.
+
+**NON PROVATO, DA GUARDARE.** Le altre frasi «repo pubblico» e
+`spec/...` sparse nello studio e nella scaletta di HACKATHON-SETUP (§7
+punto 6, §7-bis, la riga del 16 in §10) restano come scritte: i
+percorsi delle bozze adesso sono `docs/spec/`. Fra §5 (la dichiarazione
+intera da consegnare all'arrivo) e il README minimo c'è una differenza
+voluta: quale dei due si mostra ai giudici lo decidono Andrea e Alan.

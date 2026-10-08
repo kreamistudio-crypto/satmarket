@@ -1599,6 +1599,17 @@ non codice: i nomi nuovi li applica il prossimo cantiere.
 
 ### G.1 Il repo pubblico separato
 
+> **SUPERATO l'8 ott sera.** Il repo `fidelity-points` è PRIVATO e
+> MINIMO per scelta di Alan: esiste solo per trasparenza, con un
+> README corto (il nome, l'estensione di Barattolo per l'hackathon,
+> il team; prima SOLO «una VM con un nodo Bitcoin signet e un server
+> dedicato», durante «tutto il resto, nei commit del 17 e 18»),
+> LICENSE e `.gitignore`. Niente `rgb/`, niente `spec/`, niente
+> descrizione dell'idea. Le due bozze stanno in `docs/spec/` del repo
+> privato; l'inventario vero dell'infrastruttura in `deploy/rgb/` e
+> in HACKATHON-SETUP §10. Il disegno qui sotto è la storia della sera
+> del 7 e dell'8 mattina (CANTIERI, «fidelity-points minimo»).
+
 **Perché.** Il regolamento giudica solo il lavoro del weekend e chiede
 di dichiarare il pre-esistente; il repo di Barattolo è PRIVATO, quindi
 oggi un giudice non può verificare né l'una cosa né l'altra. Serve un
