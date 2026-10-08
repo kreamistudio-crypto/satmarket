@@ -3,7 +3,17 @@
     "models": {
       "qwen3-600m-inst-q4": {
         "model": "QWEN3_600M_INST_Q4",
-        "preload": false
+        "preload": false,
+        "config": {
+          "ctx_size": 4096
+        }
+      },
+      "consigliami": {
+        "model": "QWEN3_1_7B_INST_Q4",
+        "preload": false,
+        "config": {
+          "ctx_size": 8192
+        }
       }
     }
   }
