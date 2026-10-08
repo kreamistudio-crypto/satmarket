@@ -29,8 +29,9 @@ I documenti in `docs/` NON sono import: si aprono quando servono.
   `docs/STUDIO-LIQUIDITA-NODO-2026-10-01.md` (sweep e canale da 5M),
   `docs/STUDIO-INSTRADAMENTO-NODO-2026-10-05.md` (chi paghiamo, tariffe),
   `docs/STUDIO-PROFILO-PERSONALIZZATO-2026-10-06.md` (dal 19 ott),
-  `docs/STUDIO-MERCATINI-BAZAR-2026-10-06.md` (lo stato 🎪, gli eventi) e
-  `docs/STUDIO-REGALO-2026-10-06.md` (il regalo a un iscritto, decisioni).
+  `docs/STUDIO-MERCATINI-BAZAR-2026-10-06.md` (lo stato 🎪, gli eventi),
+  `docs/STUDIO-REGALO-2026-10-06.md` (il regalo a un iscritto, decisioni) e
+  `docs/STUDIO-ISTANZA-PROVA-2026-10-08.md` (la prova privata, il gesto).
 - `docs/GUIDA-P2P-PASSI.md` — i percorsi del P2P passo per passo coi
   testi esatti di bottoni e avvisi, per i tutorial video (7 ott 2026).
 
