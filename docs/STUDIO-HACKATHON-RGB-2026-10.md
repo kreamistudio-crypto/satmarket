@@ -933,8 +933,8 @@ dove questa la corregge, lo dice.
 > e in che ordine. Gli identificatori tecnici che portano ancora il
 > nome vecchio (l'alias `cassiere` di QVAC, `cassiere-prova.html`) li
 > rinomina il prossimo cantiere coi nomi decisi da Andrea l'8 ott (G.4):
-> il progetto è **«Barattolo Loyalty»**, l'aiutante **«Consigliami»**,
-> il repo pubblico **`barattolo-loyalty`**.
+> il progetto è **«Fidelity Points»**, l'aiutante **«Consigliami»**,
+> il repo pubblico **`fidelity-points`**.
 
 **Le novità, in una riga ciascuna** (com'erano la mattina del 7; la
 sera il centro si è spostato, vedi G.4). 1) La demo: si paga un ordine
@@ -1604,8 +1604,8 @@ erano gli script di `deploy/rgb/` (banco e wallet di prova, fuori
 dall'app) e, dall'11-12 ott, la leva `RGB_ATTIVO` spenta, e si
 dichiarano entrambi.
 
-**Il nome: `barattolo-loyalty`** (deciso da Andrea l'8 ott, dal nome
-del progetto «Barattolo Loyalty», G.4; la proposta della sera prima
+**Il nome: `fidelity-points`** (deciso da Andrea l'8 ott pomeriggio, dal
+nome del progetto «Fidelity Points», G.4; la proposta della sera prima
 era `<nome>-rgb` con una riserva, superata). Sotto l'account di Andrea (`kreamistudio-crypto`, lo stesso
 che firma i commit di Barattolo), Alan collaboratore con scrittura;
 **pubblico dal primo commit**, non privato-poi-pubblico: la data di
@@ -1613,7 +1613,7 @@ creazione e la cronologia dei push sono quello che un giudice può
 verificare, le date dentro i commit le scrive l'autore.
 
 **Cosa ci va dentro.**
-- `README.md` in inglese: cos'è, in cinque righe («Barattolo Loyalty», G.4);
+- `README.md` in inglese: cos'è, in cinque righe («Fidelity Points», G.4);
   **«What existed before October 17»** — la dichiarazione di
   HACKATHON-SETUP §5 tradotta, datata e firmata; **«What was built at
   the hackathon»** — vuota fino al 17, poi il diario dei commit; come
@@ -1748,12 +1748,13 @@ sono riscritti; HACKATHON-SETUP §7 ha l'ordine del racconto accanto a
 quello del codice).
 
 **I nomi, DECISI da Andrea l'8 ottobre**: il progetto si chiama
-**«Barattolo Loyalty»** (il nome della casa più il tema, leggibile da
-una giuria internazionale senza sottotitolo); l'aiutante — il bottone
+**«Fidelity Points»** (deciso l'8 ott pomeriggio, al posto di «Barattolo
+Loyalty» scelto la mattina: il tema in due parole, leggibile da una
+giuria internazionale, senza il nome della casa); l'aiutante — il bottone
 e il fumetto — si chiama **«Consigliami»** (è il bottone: l'utente
 chiede, l'AI risponde; alias di QVAC `consigliami`, pagina di prova
 `consigliami-prova.html`, rotte `/api/consigliami/*`, da applicare nel
-prossimo cantiere); il repo pubblico si chiama **`barattolo-loyalty`**
+prossimo cantiere); il repo pubblico si chiama **`fidelity-points`**
 (G.1). Le tre proposte per ciascuno restano qui sotto come verbale di
 ciò che è stato scartato.
 

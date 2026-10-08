@@ -249,7 +249,7 @@ prossimo cantiere, G.4):
 `ctx_size 8192`, scaricato alla prima chiamata (1,06 GB in
 `~/.qvac/models`); il 0.6B resta con l'alias di prima. La pagina locale
 `C:\Users\Andrea\qvac-prova\consigliami-prova.html` (FUORI dal repo:
-titolo «Barattolo Loyalty», bottone «Consigliami») fa la catena intera —
+titolo «Fidelity Points», bottone «Consigliami») fa la catena intera —
 numeri già calcolati, `response_format` a `json_schema`,
 `reasoning_budget: false`, il controllo del programma, il fumetto con
 «Approva» — ed è stata provata nel Browser pane servita da `python -m
@@ -379,7 +379,7 @@ Il tema è **«Loyalty / punti fedeltà»** (Alan, 7 ott sera): ogni
 esercente emette i propri punti come token RGB, autenticati dal suo
 NIP-05, e QVAC aiuta a spenderli al posto dei satoshi — l'AI è un
 aiuto, il protagonista è il negozio che emette e l'identità che lo
-certifica. Il progetto si chiama **«Barattolo Loyalty»** e l'aiutante
+certifica. Il progetto si chiama **«Fidelity Points»** e l'aiutante
 — il bottone e il fumetto — **«Consigliami»** (decisi da Andrea l'8
 ott, studio, parte seconda, G.4); nel codice li applica il prossimo
 cantiere. Priorità di
@@ -590,7 +590,7 @@ niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
 
 | Quando | Cosa | Fatto |
 |---|---|---|
-| 8 ott, per primo | **Il repo pubblico `barattolo-loyalty`** (studio, parte seconda, G.1) sotto `kreamistudio-crypto`, Alan collaboratore, PUBBLICO dal primo commit firmato: README in inglese con la dichiarazione di §5 allo stato dell'8, `rgb/` = snapshot di `deploy/rgb/`, `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` (le bozze di B in inglese), LICENSE MIT, `.gitignore` (identità, age, stash). Niente del repo privato, nessuna chiave, nessun indirizzo di macchina. Il link nella risposta alla conferma degli organizzatori; poi un commit per ogni riga di questa lista che si chiude | ☐ |
+| 8 ott, per primo | **Il repo pubblico `fidelity-points`** (studio, parte seconda, G.1) sotto `kreamistudio-crypto`, Alan collaboratore, PUBBLICO dal primo commit firmato: README in inglese con la dichiarazione di §5 allo stato dell'8, `rgb/` = snapshot di `deploy/rgb/`, `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` (le bozze di B in inglese), LICENSE MIT, `.gitignore` (identità, age, stash). Niente del repo privato, nessuna chiave, nessun indirizzo di macchina. Il link nella risposta alla conferma degli organizzatori; poi un commit per ogni riga di questa lista che si chiude | ☐ |
 | 8-9 ott | `rgb.py emetti` con la precisione come argomento | ☑ c'era già (`[precisione]`, righe 18 e 152 di rgb.py): la nota del 7 ott era sbagliata |
 | 8-9 ott | Sulla VM: `rgb.py nuovo usdb`, sats da `to-the-mooon` (niente faucet), `utxo usdb 5`, `emetti usdb USDB Dollari_di_prova_Barattolo 100000000 2`, `backup usdb`; l'asset_id in §2 | ☑ 8 ott, comandi eseguiti da Andrea uno alla volta; 4 UTXO colorabili liberi e 44.347 sats restano al wallet `usdb` |
 | 8-9 ott | 500 USDB (50.000 unità) al wallet utente: fattura «qualunque asset» BLIND (`node punti.mjs fattura - 50000`: il wallet aveva già 3 UTXO colorabili, niente witness), `rgb.py invia usdb …`, i due `aggiorna`; un blocco | ☑ 8 ott, blocco 325472: utente 50.000 settled e spendibili; il wallet utente conosce USDB (precisione 2, 100.000.000 emessi) |
