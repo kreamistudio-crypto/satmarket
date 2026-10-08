@@ -42398,8 +42398,9 @@ def lettura_simulata(relay: str, cosa: str) -> bool:
 
 # I PUNTI E I DOLLARI SU RGB (ott 2026): LA LEVA, E BASTA. L'hackathon
 # di Torino (17-18 ott 2026) integrera' in Barattolo asset RGB su signet
-# — il Cassiere che paga un ordine in dollari di prova (USDB), i punti
-# del negozio (MOON) come bonus, il wallet dell'utente che parla NIP-47 —
+# — un ordine pagato in dollari di prova (USDB) su consiglio di
+# «Consigliami», l'aiutante locale che propone e l'utente approva, i
+# punti del negozio (MOON) come bonus, il wallet che parla NIP-47 —
 # e il regolamento della gara vuole che quel codice si scriva LA', in
 # commit datati, dichiarando cio' che esiste gia'. Quindi prima del 17
 # qui c'e' il SOLO cancello, sul calco di P2P_ATTIVO / P2P_PROVA_IDS:

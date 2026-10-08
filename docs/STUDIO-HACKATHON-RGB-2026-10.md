@@ -932,7 +932,8 @@ dove questa la corregge, lo dice.
 > comparivano; cosa si COSTRUISCE non cambia, cambia cosa si racconta
 > e in che ordine. Gli identificatori tecnici che portano ancora il
 > nome vecchio (l'alias `cassiere` di QVAC, `cassiere-prova.html`) li
-> rinomina il prossimo cantiere coi nomi decisi da Andrea l'8 ott (G.4):
+> ha rinominati l'8 ott il cantiere «chiusura della preparazione», coi
+> nomi decisi da Andrea lo stesso giorno (G.4):
 > il progetto è **«Fidelity Points»**, l'aiutante **«Consigliami»**,
 > il repo pubblico **`fidelity-points`**.
 
@@ -1420,7 +1421,7 @@ conferma): si verifica su quella.
 | 11-12 ott | **`nwc-wdk.mjs`, la BASE**: apre il wallet WDK (`punti.mjs`), pubblica l'evento info (13194) con `encryption` nip44, risponde a `get_info` e `get_balance`; stampa la connection string da incollare nel Profilo. **I metodi `rgb_*` NO**: si scrivono a Torino (sono l'integrazione, e sono «Execution») | 4-6 h | `@getalby/sdk` `NWCWalletService` fa il grosso; se il tipo non accetta nomi fuori lista, l'evento 23194 si gestisce a mano con nostr-tools (30 righe) |
 | 11-12 ott | **`rgb_http.py` sulla VM**, loopback, dal tunnel (`-L 8787`): `fattura`, `aggiorna`, `saldo`, `lista` del wallet `barattolo` dietro HTTP, così il server di Barattolo sul portatile non fa `ssh` da dentro una rotta | 2 h | è `rgb.py` con una faccia HTTP; il tunnel resta l'unica porta |
 | 11-12 ott | **Il commit su main** (uno): `RGB_ATTIVO = False` e `RGB_PROVA_IDS` in `config_esempio.py`, la riga nel pannello «Stato delle leve», la prova che a leva spenta non risponde nulla; e, se (a), la rotta `/.well-known/nostr.json` | 2 h + prove | niente rotte RGB, niente UI |
-| 11-12 ott | **QVAC**: `npm i -g @qvac/cli@latest` (la CLI è alla 0.15, l'SDK alla 0.21: installata la 0.14), `qvac.config.json` con l'alias `cassiere` → `QWEN3_1_7B_INST_Q4`, `ctx_size 8192`; scaricare (~1 GB); una **pagina locale di prova** FUORI dal repo che chiama `http://127.0.0.1:11434/v1/chat/completions` con `response_format: json_schema` e `reasoning_budget: false` (Qwen3 pensa, e con `max_tokens` stretto lascia `content` vuoto: documentato); il server lanciato con `--cors-origin http://127.0.0.1:8080` ESATTO (niente `*`, e `--cors` da solo non accende niente: documentato) | 2-3 h | structured output e `tools` NON si combinano (400): l'aiutante usa lo schema e il conto già fatto, senza tool |
+| 11-12 ott | **QVAC**: `npm i -g @qvac/cli@latest` (la CLI è alla 0.15, l'SDK alla 0.21: installata la 0.14), `qvac.config.json` con l'alias `consigliami` (il 7 si chiamava `cassiere`) → `QWEN3_1_7B_INST_Q4`, `ctx_size 8192`; scaricare (~1 GB); una **pagina locale di prova** FUORI dal repo che chiama `http://127.0.0.1:11434/v1/chat/completions` con `response_format: json_schema` e `reasoning_budget: false` (Qwen3 pensa, e con `max_tokens` stretto lascia `content` vuoto: documentato); il server lanciato con `--cors-origin http://127.0.0.1:8080` ESATTO (niente `*`, e `--cors` da solo non accende niente: documentato) | 2-3 h | structured output e `tools` NON si combinano (400): l'aiutante usa lo schema e il conto già fatto, senza tool |
 | 13 ott | **Q&A** (sezione E) | 1-2 h | con le risposte scritte accanto |
 | 14-16 ott | La **dichiarazione** scritta (HACKATHON-SETUP §5 aggiornata), gli schermi su carta, il flusso provato tre volte con la pagina di prova e il wallet; backup della VM; portatile con tutto scaricato | 3-4 h | |
 
@@ -1432,7 +1433,10 @@ l'implementazione dei due testi. Si DISEGNANO (questo file è il
 disegno), e dalla sera del 7 le due bozze in inglese stanno nel repo
 pubblico (G.1), dichiarate. Gli identificatori che portano ancora il
 nome vecchio — l'alias `cassiere` in `qvac.config.json`,
-`cassiere-prova.html` — li rinomina il prossimo cantiere.
+`cassiere-prova.html` — sono stati rinominati l'8 ott (cantiere
+«chiusura della preparazione»: l'alias è `consigliami`, la pagina
+`consigliami-prova.html`, e una prova in `prove_leva_rgb` pretende che
+il nome vecchio non torni nel codice).
 
 ### D.2 I due giorni
 
@@ -1441,7 +1445,7 @@ nome vecchio — l'alias `cassiere` in `qvac.config.json`,
 | sab 09:00-09:45 | Kickoff; la dichiarazione consegnata; il tavolo: VM su, tunnel su, relay locale su, QVAC su, server in collaudo su `127.0.0.1:8080` col db 111/222/999 | tutti e due | niente codice prima della dichiarazione |
 | sab 09:45-13:00 | **Wallet**: i quattro metodi `rgb_*` in `nwc-wdk.mjs` sopra `punti.mjs` (lista, fattura, paga con conferma a terminale, lookup), provati con un client NWC a riga di comando. **Server** in parallelo: `/api/rgb/fattura` (chiede a `rgb_http.py` la fattura blind di `barattolo` in USDB per l'ordine, importo al cambio), `/api/rgb/stato`, tutto dietro `RGB_ATTIVO` | Alan il wallet, Claude+Andrea il server | commit datati, uno per funzione |
 | sab 13:45-16:30 | **Client**: nel foglio del pagamento la riga «oppure N USDB» e il bottone «Paga in USDB» → fattura → `rgb_pay_invoice` via `clientNwc` → stato «in arrivo» → `rgb.py aggiorna` lato server → «Pagato» | | **primo pagamento VERO in USDB su signet entro le 16:30**: è il core, da qui in poi tutto è aggiunta |
-| sab 16:30-19:30 | **Consigliami**: la pagina chiama QVAC (schema `{paga_in_usdb, usdb, usa_punti, punti, sconto_sats, motivo}` col conto già fatto), il fumetto, «Approva» che fa il passo di prima da solo | | se CORS o mixed content mordono: la chiamata la fa il server (`/api/cassiere/proposta` → 127.0.0.1:11434) e si dichiara |
+| sab 16:30-19:30 | **Consigliami**: la pagina chiama QVAC (schema `{paga_in_usdb, usdb, usa_punti, punti, sconto_sats, motivo}` col conto già fatto), il fumetto, «Approva» che fa il passo di prima da solo | | se CORS o mixed content mordono: la chiamata la fa il server (`/api/consigliami/proposta` → 127.0.0.1:11434) e si dichiara |
 | sab sera | **MOON come bonus** dopo il pagamento (l'assegnazione del 1 ott agganciata al «Pagato»); la card dell'asset con ticker/saldo (senza emittente); il giro intero due volte | | |
 | dom 09:00-11:00 | **Il NIP**: i due annunci (MOON e USDB) firmati dalle identità di prova e pubblicati sul relay locale; in Barattolo la lettura dell'annuncio per `#d`, la verifica NIP-05 (lato server con `url_api_ammesso`, senza redirect) e la riga «Emesso da … ✓» nella card — **è il centro del racconto (G.4)**; i due testi `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` del repo pubblico rifiniti con quel che l'implementazione ha insegnato | Alan la pubblicazione e i testi, Claude+Andrea la verifica | la issue nel repo `nwc` aperta a mezzogiorno |
 | dom 11:00-13:00 | **Se avanza**: il salvadanaio (secondo consiglio dell'aiutante, arrotondamento) e il budget nel browser; sennò: gestione degli errori visibile («wallet non collegato», «proxy irraggiungibile», «conferma in arrivo») — «UX: error handling» è un criterio | | |
@@ -1740,8 +1744,9 @@ aiuta a spenderli al posto dei satoshi**. L'AI è un aiuto, non il
 protagonista; il protagonista è il negozio che emette e l'identità che
 lo certifica. Il tema del progetto è **«Loyalty / punti fedeltà»**. Il
 nome «Cassiere» sparisce del tutto: dai documenti (fatto), dal bottone
-e dal fumetto della schermata (prossimo cantiere), dall'alias di QVAC e
-dalla pagina di prova (prossimo cantiere). Cosa si COSTRUISCE non
+e dal fumetto della schermata (nascono a Torino col nome nuovo),
+dall'alias di QVAC e dalla pagina di prova (fatto l'8 ott). Cosa si
+COSTRUISCE non
 cambia — checkout in USDB + MOON, WDK, NWC-RGB, emittente verificato —
 cambia cosa si racconta e in che ordine (D.2: le slide e i 30 secondi
 sono riscritti; HACKATHON-SETUP §7 ha l'ordine del racconto accanto a

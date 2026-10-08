@@ -129602,6 +129602,47 @@ def prove_leva_rgb():
     prova("la rotta sta nell'elenco delle rotte pubbliche di ARCHITETTURA",
           True, "/.well-known/nostr.json" in arch)
 
+    # --- 5) il nome: «Consigliami», mai «Cassiere» (8 ott 2026) ---------
+    # Il nome del mattino del 7 ott e' sparito dai testi la sera stessa
+    # (studio, parte seconda, G.4) e dagli identificatori l'8, cantiere
+    # «chiusura della preparazione»: il cancello RGB qui sopra, la rotta
+    # NIP-05 e il pannello non lo nominano, il config d'esempio nemmeno,
+    # gli attrezzi di deploy/rgb/ neppure, l'alias di QVAC si chiama
+    # `consigliami` (Qwen3 1.7B, contesto 8192: le due scelte di §4 di
+    # HACKATHON-SETUP) e nessuna rotta disegnata nei due documenti porta
+    # `/api/cassiere`. La metafora «LNbits e' il cassiere» del wallet sta
+    # in un'altra sezione con un altro senso: non c'entra e non si guarda.
+    import glob, json
+    # (si guarda il SORGENTE coi commenti, non `codice()` che li toglie:
+    # il nome vecchio stava proprio in un commento)
+    prova("il cancello RGB, la rotta NIP-05 e il pannello non dicono «cassiere»",
+          False, "cassiere" in (blocco + pezzo("_leve_stato")
+                                + src[src.index("def nip05_nostr_json("):]).lower())
+    prova("...e nemmeno il config d'esempio", False, "cassiere" in cfg.lower())
+    attrezzi = sorted(glob.glob(os.path.join(QUI, "deploy", "rgb", "*")))
+    prova("deploy/rgb/ ha i suoi attrezzi (banco, wallet, servizio NWC, identita')",
+          True, {"rgb.py", "punti.mjs", "nwc-wdk.mjs", "identita.mjs",
+                 "rgb_http.py", "consiglio.py", "qvac.config.json"}
+          <= {os.path.basename(a) for a in attrezzi})
+    col_nome_vecchio = [os.path.basename(a) for a in attrezzi
+                        if "cassiere" in open(a, encoding="utf-8").read().lower()]
+    prova("nessun attrezzo di deploy/rgb/ dice «cassiere»", [], col_nome_vecchio)
+    with open(os.path.join(QUI, "deploy", "rgb", "qvac.config.json"),
+              encoding="utf-8") as f:
+        modelli = json.load(f)["serve"]["models"]
+    prova("l'alias di QVAC e' `consigliami`: Qwen3 1.7B con 8192 di contesto",
+          ("QWEN3_1_7B_INST_Q4", 8192),
+          (modelli.get("consigliami", {}).get("model"),
+           modelli.get("consigliami", {}).get("config", {}).get("ctx_size")))
+    prova("...e l'alias `cassiere` non c'e' piu'", False, "cassiere" in modelli)
+    for doc in ("HACKATHON-SETUP.md", "STUDIO-HACKATHON-RGB-2026-10.md"):
+        with open(os.path.join(QUI, "docs", doc), encoding="utf-8") as f:
+            testo = f.read()
+        prova(f"{doc}: nessuna rotta /api/cassiere disegnata", False,
+              "/api/cassiere" in testo)
+    prova("...e l'aiutante disegnato nello studio e' /api/consigliami", True,
+          "/api/consigliami" in testo)
+
 
 def main():
     print("=" * 58)

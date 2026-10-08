@@ -798,9 +798,10 @@ P2P_LOG_PASSATE = True
 DB = "satmarket.db"
 
 # --- Punti e dollari su RGB (hackathon di Torino, 17-18 ott 2026) -------
-# Barattolo imparera' a parlare con asset RGB su signet — il Cassiere
-# che paga in dollari di prova (USDB), i punti del negozio (MOON) come
-# bonus — e il regolamento della gara vuole che il codice si scriva LA',
+# Barattolo imparera' a parlare con asset RGB su signet — un ordine
+# pagato in dollari di prova (USDB) su consiglio di «Consigliami»,
+# l'aiutante locale che propone e l'utente approva; i punti del negozio
+# (MOON) come bonus — e il regolamento vuole che il codice si scriva LA',
 # in commit datati. Prima dell'evento c'e' SOLO il cancello, sul calco
 # di P2P_ATTIVO / P2P_PROVA_IDS: nasce spento, si accende con un gesto
 # qui dentro, mai per effetto di un deploy. Spento, nessuna rotta RGB

@@ -7,8 +7,9 @@ disegno stanno nella parte seconda dello studio; qui c'è COSA si fa e
 quando) e **la sera del 7 con le sue quattro decisioni** (studio, parte
 seconda, G: il repo pubblico, il nome NWC-RGB, il NIP-05 anche per gli
 utenti al livello 2, il centro della demo sul negozio che emette e non
-sull'AI; il nome «Cassiere» sparisce — qui dai testi, dagli
-identificatori tecnici col prossimo cantiere). È il
+sull'AI; il nome «Cassiere» sparisce — qui dai testi, e dagli
+identificatori tecnici l'8 ott, cantiere «chiusura della
+preparazione»). È il
 verbale del cantiere «preparazione infrastruttura hackathon RGB»: SOLO
 setup e prove, su signet, separato da Barattolo. Lo studio che lo precede, coi perché delle scelte, è
 `docs/STUDIO-HACKATHON-RGB-2026-10.md`; il regolamento (sezione F di
@@ -218,14 +219,14 @@ http://127.0.0.1:8080`, un'origine esatta).
 
 **Aggiornamento del 7 ott, letto sulla docs della CLI** (le cose che
 cambiano la pagina dell'aiutante, quello che la mattina si chiamava
-«Cassiere»: l'alias `cassiere` qui sotto diventa `consigliami` nel
-prossimo cantiere, G.4):
+«Cassiere»: l'alias `cassiere` qui sotto è diventato `consigliami`
+l'8 ott, G.4):
 
 - Il modello: Qwen3 1.7B è `QWEN3_1_7B_INST_Q4` (~1 GB), ed è quello che
   la docs usa in TUTTI gli esempi con JSON a schema. In
   `qvac.config.json` ogni voce di `serve.models` è un **alias** che fa da
   campo `model` nelle richieste («requests for unlisted models return
-  404»): la nostra si chiama `cassiere`, con `"config": {"ctx_size":
+  404»): la nostra si chiamava `cassiere` (oggi `consigliami`), con `"config": {"ctx_size":
   8192}` (il default è 1.024 token: troppo pochi per saldo + regole +
   schema).
 - **CORS**: spento finché non si dà un'origine ESATTA con
