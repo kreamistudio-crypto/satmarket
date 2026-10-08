@@ -2,12 +2,12 @@
 
 Stato al 1 ottobre 2026, **aggiornato il 7 ottobre** con le idee di Alan,
 **e l'8** (cantiere «chiusura della preparazione»: la leva su main, il
-repo pubblico `fidelity-points`, la scaletta con la ✓ al sabato),
+repo `fidelity-points`, la scaletta con la ✓ al sabato),
 (la demo sui punti fedeltà, **NWC-RGB** — l'estensione NIP-47 per gli
 asset RGB —, l'emittente legato a un'identità Nostr: il perché e il
 disegno stanno nella parte seconda dello studio; qui c'è COSA si fa e
 quando) e **la sera del 7 con le sue quattro decisioni** (studio, parte
-seconda, G: il repo pubblico, il nome NWC-RGB, il NIP-05 anche per gli
+seconda, G: il repo separato, il nome NWC-RGB, il NIP-05 anche per gli
 utenti al livello 2, il centro della demo sul negozio che emette e non
 sull'AI; il nome «Cassiere» sparisce — qui dai testi, e dagli
 identificatori tecnici l'8 ott, cantiere «chiusura della
@@ -291,7 +291,7 @@ Da consegnare scritto il 17 mattina, com'è chiesto dal regolamento:
 - Due identità Nostr di prova (gli «emittenti» di USDB e di MOON,
   `identita.mjs`) con kind 0 e NIP-05 sul relay locale (`nak serve`
   sul portatile). **Nessun relay pubblico toccato.** I due annunci di
-  asset (MOON e USDB, nella forma della bozza `spec/NIP-RGB-ASSETS.md`,
+  asset (MOON e USDB, nella forma della bozza `docs/spec/NIP-RGB-ASSETS.md`,
   kind segnaposto) si firmano con queste identità e si pubblicano sul
   relay locale il **16 ott**, dichiarati: esistono come eventi, nessun
   codice di Barattolo li legge prima del 17 (la cura di D.3 punto 0,
@@ -425,9 +425,9 @@ studio, parte seconda, D.2; qui l'ordine dei pezzi:
    del 1 ott agganciata al «Pagato»), la card dell'asset completa
    (emittente, ticker, saldo), il giro intero due volte; `git
    format-patch` dei commit del giorno in `barattolo-patches/` del repo
-   pubblico.
-6. **Domenica mattina** — i due testi `spec/NIP-RGB-ASSETS.md` e
-   `spec/NWC-RGB.md` del repo pubblico rifiniti con quel che
+   `fidelity-points`.
+6. **Domenica mattina** — i due testi `docs/spec/NIP-RGB-ASSETS.md` e
+   `docs/spec/NWC-RGB.md` rifiniti con quel che
    l'implementazione del sabato ha insegnato, e la issue nel repo `nwc`
    aperta entro mezzogiorno; gli errori visibili («wallet non
    collegato», «proxy irraggiungibile», «conferma in arrivo»: «UX:
@@ -462,8 +462,8 @@ annunci che stanno sul relay locale dal venerdì.
 (Studio del 1 ott, confermato il 7: è la strada. L'estensione si chiama
 **NWC-RGB**, «un NWC su WDK» (Alan, 7 ott sera); i quattro metodi, le
 notifiche e gli errori nella forma da bozza stanno nello studio, parte
-seconda, B.2, e in inglese nel repo pubblico come `spec/NWC-RGB.md`
-dall'8-9 ott; la BASE del servizio si fa prima del 17 e si dichiara, i
+seconda, B.2, e in inglese in `docs/spec/NWC-RGB.md` del repo privato
+dall'8 ott; la BASE del servizio si fa prima del 17 e si dichiara, i
 metodi `rgb_*` a Torino.)
 
 L'idea: il wallet WDK sul portatile espone NIP-47 (Nostr Wallet
@@ -625,7 +625,7 @@ niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
 | 13 ott | Q&A con le undici domande | ☐ |
 | 14-16 ott | §5 riscritta e stampata; gli schermi su carta; il giro provato tre volte; video di riserva della demo | ☐ |
 | 14-16 ott | **Backup della VM**, **portatile con tutto scaricato** (modelli QVAC, `nak`, pacchetti del wallet), **prova di riavvio completa** di tutta la catena, nell'ordine di §6 e col tunnel a tre gambe: i comandi qui sotto, uno alla volta | ☐ |
-| 16 ott | I due annunci di MOON e USDB firmati dalle identità di prova e pubblicati sul relay locale, nella forma di `spec/NIP-RGB-ASSETS.md` (kind segnaposto): un comando `annuncio <nome> <asset_id>` in `identita.mjs`, sul calco di `profilo`, DA SCRIVERE (è infrastruttura dichiarata: l'evento esiste, nessun codice lo legge). La cura di D.3 punto 0 | ☐ |
+| 16 ott | I due annunci di MOON e USDB firmati dalle identità di prova e pubblicati sul relay locale, nella forma di `docs/spec/NIP-RGB-ASSETS.md` (kind segnaposto): un comando `annuncio <nome> <asset_id>` in `identita.mjs`, sul calco di `profilo`, DA SCRIVERE (è infrastruttura dichiarata: l'evento esiste, nessun codice lo legge). La cura di D.3 punto 0 | ☐ |
 
 **I comandi della riga «14-16 ott»**, nell'ordine, uno alla volta, dal
 WSL e non da PowerShell dove c'è `ssh` (lezione 1 di §9: le virgolette
