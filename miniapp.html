@@ -58264,15 +58264,20 @@ function renderIncassoP2P(){
      «un giorno» non si chiede — la fattura si paga appena arriva — e
      l'indirizzo non si consiglia; Wallet of Satoshi si nomina col suo
      confine: la fattura si', l'indirizzo no (il coordinatore lo
-     verifica da dietro Tor e con lui non passa). */
+     verifica da dietro Tor e con lui non passa).
+     UN AVVISO WoS SOLO (8 ott 2026, decisione di Andrea): chi ha Wallet
+     of Satoshi salvato negli incassi legge la SUA riga
+     (`.p2p-wallet-no`, qui sotto), e la riga generica dei due fogli
+     non compare — due avvisi uguali uno sotto l'altro erano un doppione. */
+  const wosSalvato = !!(myLnAddress && walletNonPassaP2P(myLnAddress));
   const vie = dopo
     ? '<div class="hint" style="margin-top:12px">Incolla una fattura dal tuo wallet, senza importo' +
-      (quanti ? ' o di ' + esc(quanti) + ' esatti' : '') + '. La paghiamo subito.<br>' +
-      '⚠️ Wallet of Satoshi: va bene la fattura, non l\'indirizzo.</div>'
+      (quanti ? ' o di ' + esc(quanti) + ' esatti' : '') + '. La paghiamo subito.' +
+      (wosSalvato ? '' : '<br>⚠️ Wallet of Satoshi: va bene la fattura, non l\'indirizzo.') + '</div>'
     : (quanti ? '<div class="hint">Riceverai <b>' + esc(quanti) + '</b>.</div>' : '') +
       '<div class="hint"' + (quanti ? ' style="margin-top:12px"' : '') + '><b>⚡ Indirizzo Lightning (consigliato)</b><br>' +
-      'Quello che finisce per @qualcosa. Non scade mai.<br>' +
-      '⚠️ Wallet of Satoshi non funziona qui: con quello incolla una fattura.</div>';
+      'Quello che finisce per @qualcosa. Non scade mai.' +
+      (wosSalvato ? '' : '<br>⚠️ Wallet of Satoshi non funziona qui: con quello incolla una fattura.') + '</div>';
   const fattura = dopo
     ? ''
     : '<div class="hint" style="margin-top:12px"><b>🧾 Oppure una fattura dal tuo wallet</b><br>' +

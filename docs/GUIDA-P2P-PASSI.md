@@ -209,7 +209,8 @@ Il P2P non ha un wallet suo: serve un **wallet Lightning esterno**.
 - ⚠️ **Wallet of Satoshi**: il suo indirizzo non passa la verifica.
   📱 «⚠️ Il tuo indirizzo Wallet of Satoshi qui non funziona: incolla una
   fattura dal tuo wallet.» (La fattura di Wallet of Satoshi passa: non
-  passa solo il suo indirizzo.)
+  passa solo il suo indirizzo.) È l'unico avviso su Wallet of Satoshi
+  che vede: la riga generica dei due fogli, in quel caso, non compare.
 
 ⚠️ Storto all'ingresso: «Nel demo si guarda soltanto: gli scambi veri
 vivono nell'app 🔁»; «Rete assente: riprova»; «Non ci sono riuscito,

@@ -128349,10 +128349,14 @@ console.log(JSON.stringify({
           righe(out["salvato"]["h"])[:6])
     WOS_SALVATO = ("⚠️ Il tuo indirizzo Wallet of Satoshi qui non funziona: incolla una "
                    "fattura dal tuo wallet.")
-    prova("con Wallet of Satoshi salvato: niente scorciatoia, e la riga dice «dal tuo wallet»",
-          [False, ["Riceverai 6 645 sats."] + INDIRIZZO
-           + [WOS_SALVATO, "🧾 Oppure una fattura dal tuo wallet"]],
-          ["usaIndirizzoSalvatoP2P" in out["wos"]["h"], righe(out["wos"]["h"])[:6]])
+    # UN AVVISO WoS SOLO (decisione di Andrea): con WoS salvato resta la
+    # riga PERSONALE, e la generica del blocco dell'indirizzo sparisce
+    prova("con Wallet of Satoshi salvato: niente scorciatoia, un solo avviso WoS (il suo, "
+          "«dal tuo wallet»)",
+          [False, ["Riceverai 6 645 sats."] + INDIRIZZO[:2]
+           + [WOS_SALVATO, "🧾 Oppure una fattura dal tuo wallet"], 1],
+          ["usaIndirizzoSalvatoP2P" in out["wos"]["h"], righe(out["wos"]["h"])[:5],
+           out["wos"]["h"].count("Wallet of Satoshi")])
     # sui fogli VERI, in tutti i casi: nella pagina la parola resta solo
     # in due commenti (questo cambio, e la garanzia pagata da fuori)
     prova("«un altro wallet» non lo dice piu' nessun foglio, in nessun caso", [],
@@ -128391,11 +128395,12 @@ console.log(JSON.stringify({
            "questo dispositivo. Falla senza importo — quella va bene comunque.",
            "Dove vuoi ricevere i sats", "Invia"],
           righe(out["fallitoIgnota"]["h"])[2:])
-    prova("...l'indirizzo salvato resta a un tocco, sotto le due righe; Wallet of Satoshi "
-          "salvato dice la sua riga",
+    prova("...l'indirizzo salvato resta a un tocco, sotto le due righe; con Wallet of "
+          "Satoshi salvato un solo avviso WoS, il suo, al posto della riga generica",
           [NUOVA + ["⚡ Usa l'indirizzo dei tuoi incassi: io@wallet.com"],
-           NUOVA + [WOS_SALVATO]],
-          [righe(out["riservaSalvato"]["h"])[1:4], righe(out["riservaWos"]["h"])[1:4]])
+           [NUOVA[0], WOS_SALVATO], 1],
+          [righe(out["riservaSalvato"]["h"])[1:4], righe(out["riservaWos"]["h"])[1:3],
+           out["riservaWos"]["h"].count("Wallet of Satoshi")])
 
     guida = " ".join(open(os.path.join("docs", "GUIDA-P2P-PASSI.md"),
                           encoding="utf-8").read().split())

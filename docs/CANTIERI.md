@@ -40781,3 +40781,23 @@ Tortura del secondo giro su una copia intera (pulita verde prima): al primo giro
 più: il pagamento fallito (fattura scaduta), «i sats non arrivano?»,
 WoS salvato. Suite intera severa senza config nel worktree su dba0f31:
 19.716 verdi, 0 rosse; i 42 collaudi della CI verdi nella gabbia. Dopo, toccata solo la prova (i paragrafi interi): rigirata la sua sezione, 17 verdi. RIBASATO su 70acf33 (main era avanzato di tre commit: «Lo stesso id, un giro nuovo» e due studi dell'hackathon; conflitto solo in fondo a CANTIERI, tenute le due voci; nessun simbolo in comune col foglio, cercato per nome): suite intera severa 19.755 verdi, 0 rosse; 43 collaudi della CI verdi nella gabbia, `collaudo_giro_nuovo` compreso.
+
+**TERZA PARTE, ANCORA PRIMA DEL PUSH (decisione di Andrea).** Il paragrafo
+in cima al foglio «⚡ Una fattura nuova» resta (ok di Andrea). E il
+doppione: chi ha Wallet of Satoshi salvato negli incassi vedeva due
+avvisi WoS uno sotto l'altro, la riga generica del foglio e la sua.
+Adesso ne vede UNO, il suo («⚠️ Il tuo indirizzo Wallet of Satoshi qui
+non funziona: incolla una fattura dal tuo wallet.»), in tutti e due i
+fogli: `wosSalvato` (lo stesso giudice `walletNonPassaP2P` della
+scorciatoia) toglie la riga generica dal blocco dell'indirizzo e da
+quello della fattura nuova. Chi non ha WoS salvato non vede differenze.
+Guida: una riga accanto all'avviso personale. Prove: le due prove di WoS
+salvato di `prove_testo_ricevere_sats` vogliono ora le righe esatte e
+una sola «Wallet of Satoshi» nel foglio (primo foglio e fattura nuova);
+tortura 4 su 4 su una copia intera (pulita verde prima): il giudice
+spento, il giudice che dice sì a ogni indirizzo salvato, la riga
+generica rimessa nel primo foglio e nella fattura nuova. Scatti prima/dopo a 375 px, chiaro e scuro, dei due fogli
+con WoS salvato (il «prima» è l'albero col doppione). RIBASATO su 8bd23a5
+(la lista dell'hackathon: solo `deploy/rgb/` e HACKATHON-SETUP, nessun
+file in comune): suite intera severa senza config nel worktree 19.755
+verdi, 0 rosse; 43 collaudi della CI verdi nella gabbia.
