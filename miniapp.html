@@ -58252,9 +58252,34 @@ function renderIncassoP2P(){
   const dopo = fallito || riserva;
   /* DAL 24 SET 2026 «un giorno» E' UN CONSIGLIO: una fattura piu' corta
      parte, e la frase dice cosa succede se non basta */
-  const durata = dopo
-    ? 'valida più di ' + vale
-    : 'valida più di ' + vale + '. <b>Meglio se dura almeno un giorno</b>: i sats ti arrivano quando chi vende li libera, e possono passare ore. Una più corta va bene lo stesso, ma se scade prima te ne chiediamo una nuova';
+  const durata = 'valida più di ' + vale;
+  /* IL FOGLIO CORTO (8 ott 2026, testo di Andrea parola per parola):
+     prima del rilascio le due vie erano due paragrafi lunghi, e si
+     leggevano male sul telefono. Adesso un titolo e due righe per via.
+     Restano le decisioni di prima: la cifra in cima, l'indirizzo
+     consigliato PRIMA della fattura col suo avviso accanto (Wallet of
+     Satoshi per nome), la fattura senza importo o esatta, «un giorno»
+     come consiglio con cosa succede se non basta. Esce dal foglio la
+     finestra del coordinatore («valida più di un'ora»): la dice ancora
+     `inviaIncassoP2P`, coi minuti, alla fattura troppo corta. Dopo il
+     rilascio (`dopo`, il foglio «⚡ Una fattura nuova») resta il testo
+     di prima: li' «un giorno» non si chiede. */
+  const vie = dopo
+    ? '<div class="hint">' + (quanti ? 'Riceverai <b>' + esc(quanti) + '</b>. ' : '') +
+      '<b>⚡ Consigliato: il tuo indirizzo Lightning</b> (quello che finisce per @qualcosa). Non scade mai, quindi va bene anche se lo scambio dura ore. ' +
+      'Alcuni provider (per esempio Wallet of Satoshi) non rispondono alla verifica dell\'indirizzo: ' +
+      'se il tuo indirizzo viene rifiutato, usa la fattura.</div>'
+    : (quanti ? '<div class="hint">Riceverai <b>' + esc(quanti) + '</b>.</div>' : '') +
+      '<div class="hint"' + (quanti ? ' style="margin-top:12px"' : '') + '><b>⚡ Indirizzo Lightning (consigliato)</b><br>' +
+      'Quello che finisce per @qualcosa. Non scade mai.<br>' +
+      '⚠️ Wallet of Satoshi non funziona qui: con quello incolla una fattura.</div>';
+  const fattura = dopo
+    ? '<div class="hint" style="margin-top:12px"><b>Oppure una fattura</b> del tuo wallet: <b>senza importo</b>' +
+      (quanti ? ', o di ' + esc(quanti) + ' esatti' : '') +
+      ', ' + durata + '.</div>'
+    : '<div class="hint" style="margin-top:12px"><b>🧾 Oppure una fattura dal tuo wallet</b><br>' +
+      'Senza importo' + (quanti ? ', o di ' + esc(quanti) + ' esatti' : '') + '. ' +
+      'Meglio se dura almeno un giorno: se scade prima te ne chiediamo un\'altra.</div>';
   box.innerHTML =
     (fallito
       ? '<div class="hint" style="color:var(--rosso-p2p-testo);font-weight:800">⚠️ Il pagamento dei tuoi sats non è riuscito.</div>'
@@ -58266,10 +58291,7 @@ function renderIncassoP2P(){
       ? '<div class="hint">Se i sats non ti sono arrivati, qui puoi dare una richiesta di pagamento nuova. '
         + 'Se il pagamento è ancora in corso ti viene risposto di no, e non cambia niente.</div>'
       : '') +
-    '<div class="hint">' + (quanti ? 'Riceverai <b>' + esc(quanti) + '</b>. ' : '') +
-      '<b>⚡ Consigliato: il tuo indirizzo Lightning</b> (quello che finisce per @qualcosa). Non scade mai, quindi va bene anche se lo scambio dura ore. ' +
-      'Alcuni provider (per esempio Wallet of Satoshi) non rispondono alla verifica dell\'indirizzo: ' +
-      'se il tuo indirizzo viene rifiutato, usa la fattura.</div>' +
+    vie +
     /* la scorciatoia sta SOTTO l'avviso, che cosi' vale anche per lei;
        l'indirizzo e' testo dell'utente: a schermo passa da esc(), e
        nell'onclick non ci entra — lo rilegge la funzione */
@@ -58284,9 +58306,7 @@ function renderIncassoP2P(){
       ? '<button class="btn ghost" type="button" onclick="usaIndirizzoSalvatoP2P()">⚡ Usa l\'indirizzo dei tuoi incassi: '
         + esc(myLnAddress) + '</button>'
       : '') +
-    '<div class="hint" style="margin-top:12px"><b>Oppure una fattura</b> del tuo wallet: <b>senza importo</b>' +
-      (quanti ? ', o di ' + esc(quanti) + ' esatti' : '') +
-      ', ' + durata + '.</div>' +
+    fattura +
     /* ⚠️ UN BOTTONE CHE SPARISCE SENZA UN PERCHE' SI LEGGE COME UN
        GUASTO (17 set 2026, dal campo): a cifra ignota — un ordine a
        prezzo di mercato ripreso dalla restore, che la cifra non ce

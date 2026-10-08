@@ -68160,33 +68160,41 @@ function reset(){
     /* la cifra si copia (si ribatte a mano nel wallet), la senza-importo
        si consiglia, e la scadenza si dice PRIMA coi minuti del nodo */
     out.foglioCopiaLaCifra = h.indexOf("copiaLink('7543'") >= 0;
-    out.foglioConsigliaLaLibera = h.indexOf('<b>senza importo</b>') >= 0;
+    /* ⚠️ EMENDATE L'8 OTT 2026 (cantiere «testo dove ricevere i sats»):
+       il foglio dell'inizio ha il testo corto di Andrea, parola per
+       parola, e le frasi lunghe che queste righe inchiodavano non ci
+       sono piu'. Le DECISIONI restano e si guardano qui: la senza-importo
+       consigliata, «un giorno» come consiglio con cosa succede se non
+       basta, l'indirizzo prima della fattura col suo avviso accanto, la
+       cifra esatta. Il testo intero lo prova prove_testo_ricevere_sats. */
+    out.foglioConsigliaLaLibera = h.indexOf('Senza importo') >= 0;
     /* LA DURATA (21 set 2026): prima del rilascio non basta piu' «valida
        più di un'ora» — la fattura si paga al RILASCIO, ore dopo — e la
        frase accanto al campo chiede un giorno */
-    /* dal 24 set 2026 «un giorno» e' un CONSIGLIO: la finestra del
-       coordinatore resta scritta, e la frase dice cosa succede a una
-       fattura piu' corta */
-    out.foglioAvvisaSullaScadenza = h.indexOf('<b>Meglio se dura almeno un giorno</b>') >= 0
-      && h.indexOf('valida più di') >= 0 && h.indexOf('te ne chiediamo una nuova') >= 0;
+    /* dal 24 set 2026 «un giorno» e' un CONSIGLIO, e la frase dice cosa
+       succede a una fattura piu' corta; dall'8 ott la finestra del
+       coordinatore non si scrive piu' nel foglio (la dice
+       `inviaIncassoP2P` alla fattura troppo corta: qui sotto,
+       scadenzaCortaFermata) */
+    out.foglioAvvisaSullaScadenza = h.indexOf('Meglio se dura almeno un giorno: se scade prima te ne chiediamo un\'altra.') >= 0
+      && h.indexOf('valida più di') < 0;
     /* LA PRIORITA' (21 set 2026, rovescia il 17): l'INDIRIZZO prima
        della fattura — non scade — ma col suo avviso ACCANTO; la copia
        della cifra in evidenza e prima del campo — mai piu' «la via più
        semplice» */
-    out.foglioIndirizzoPrima = h.indexOf('<b>⚡ Consigliato: il tuo indirizzo Lightning</b>') >= 0
+    out.foglioIndirizzoPrima = h.indexOf('<b>⚡ Indirizzo Lightning (consigliato)</b>') >= 0
       && h.indexOf('Non scade mai') >= 0
-      && h.indexOf('Consigliato: il tuo indirizzo') < h.indexOf('<b>Oppure una fattura</b>');
-    out.foglioCifraEsatta = h.indexOf(', o di 7543 sats esatti, valida più di') >= 0;
+      && h.indexOf('Indirizzo Lightning (consigliato)') < h.indexOf('<b>🧾 Oppure una fattura dal tuo wallet</b>');
+    out.foglioCifraEsatta = h.indexOf('Senza importo, o di 7543 sats esatti.') >= 0;
     out.foglioCopiaInEvidenza = h.indexOf('<button class="btn primary" type="button" onclick="copiaLink(') >= 0
       && h.indexOf('copiaLink(') < h.indexOf('id="p2pIncassoInp"');
-    /* l'avviso sui provider sta NELLA STESSA FRASE che consiglia
-       l'indirizzo, e PRIMA del campo: chi segue il consiglio l'ha letto */
-    out.foglioAvvisaSuiProvider = h.indexOf('Wallet of Satoshi') >= 0
-      && h.indexOf('non rispondono alla verifica dell\'indirizzo') >= 0
+    /* l'avviso sui provider sta NEL BLOCCO che consiglia l'indirizzo, e
+       PRIMA del campo: chi segue il consiglio l'ha letto (dall'8 ott
+       2026 nomina il solo Wallet of Satoshi, e dice cosa fare) */
+    out.foglioAvvisaSuiProvider = h.indexOf('⚠️ Wallet of Satoshi non funziona qui: con quello incolla una fattura.') >= 0
       && h.toLowerCase().indexOf('coordinatore') < 0
-      && h.indexOf('se il tuo indirizzo viene rifiutato, usa la fattura') >= 0
-      && h.indexOf('Consigliato: il tuo indirizzo') < h.indexOf('non rispondono alla verifica dell\'indirizzo')
-      && h.indexOf('non rispondono alla verifica dell\'indirizzo') < h.indexOf('id="p2pIncassoInp"');
+      && h.indexOf('Indirizzo Lightning (consigliato)') < h.indexOf('Wallet of Satoshi non funziona qui')
+      && h.indexOf('Wallet of Satoshi non funziona qui') < h.indexOf('id="p2pIncassoInp"');
     out.foglioNonDicePiuSemplice = h.indexOf('via più semplice') < 0;
     /* IL CAMPO NASCE VUOTO (17 set 2026): l'indirizzo degli incassi non
        si precompila piu' — sta a un tocco, SOTTO l'avviso sui provider,
@@ -68194,7 +68202,8 @@ function reset(){
     out.foglioCampoVuoto = nodi.p2pIncassoInp.value === '';
     out.foglioScorciatoiaSottoLAvviso =
       h.indexOf('onclick="usaIndirizzoSalvatoP2P()">⚡ Usa l\'indirizzo dei tuoi incassi: io@wallet.com</button>') >= 0
-      && h.indexOf('usa la fattura') < h.indexOf('usaIndirizzoSalvatoP2P()')
+      && h.indexOf('con quello incolla una fattura.') >= 0
+      && h.indexOf('con quello incolla una fattura.') < h.indexOf('usaIndirizzoSalvatoP2P()')
       && h.indexOf("usaIndirizzoSalvatoP2P('") < 0;
     usaIndirizzoSalvatoP2P();
     out.foglioScorciatoiaScrive = nodi.p2pIncassoInp.value === 'io@wallet.com'
@@ -69367,11 +69376,11 @@ function reset(){
         "foglioDiceIlMioLato": "il foglio promette la cifra DETTA dal coordinatore: 7543, non 7468 ne' 7619",
         "foglioCopiaLaCifra": "...con la cifra da copiare",
         "foglioConsigliaLaLibera": "...consiglia la fattura senza importo",
-        "foglioAvvisaSullaScadenza": "...e CONSIGLIA una fattura che duri almeno un giorno, dicendo cosa succede a una piu' corta",
+        "foglioAvvisaSullaScadenza": "...e CONSIGLIA una fattura che duri almeno un giorno, dicendo cosa succede a una piu' corta (la finestra del nodo non si scrive piu')",
         "foglioIndirizzoPrima": "la via consigliata del foglio e' l'INDIRIZZO, che non scade, detto prima della fattura",
         "foglioCifraEsatta": "...senza importo, o della cifra esatta",
         "foglioCopiaInEvidenza": "...con «Copia la cifra» in evidenza, e prima del campo",
-        "foglioAvvisaSuiProvider": "...con l'avviso sui provider nella stessa frase, e prima del campo",
+        "foglioAvvisaSuiProvider": "...con l'avviso su Wallet of Satoshi nel blocco dell'indirizzo, e prima del campo",
         "foglioNonDicePiuSemplice": "...e nessuno dice piu' che l'indirizzo e' la via piu' semplice",
         "foglioCampoVuoto": "...e il campo nasce VUOTO: l'indirizzo degli incassi non si precompila piu'",
         "foglioScorciatoiaSottoLAvviso": "...resta a un tocco, sotto l'avviso sui provider, e mai dentro un onclick",
@@ -128216,6 +128225,138 @@ console.log(JSON.stringify(out));
           [False, False, True, True, True, False], out["nascosto"])
 
 
+def prove_testo_ricevere_sats():
+    """IL FOGLIO «DOVE RICEVERE I SATS» CORTO (8 ott 2026, cantiere «testo
+    dove ricevere i sats», testo di Andrea parola per parola). Prima del
+    rilascio le due vie erano due paragrafi lunghi; adesso un titolo e
+    due righe per via, con la cifra viva. Il banco ESEGUE la
+    `renderIncassoP2P` vera in node e legge il testo come lo legge chi
+    guarda (un blocco per riga, gli a capo dei <br>): il foglio intero,
+    a cifra ignota, con l'indirizzo salvato, con Wallet of Satoshi
+    salvato. Il bottone «Copia la cifra», il campo e «Invia» restano
+    quelli di prima, byte per byte. Il foglio DOPO il rilascio («⚡ Una
+    fattura nuova») non fa parte del cantiere e resta com'era: lo dice
+    l'ultima prova. La guida dei passi dice le stesse parole."""
+    print("\n[il foglio «Dove ricevere i sats» corto]")
+    import html as _html
+    mini = open("miniapp.html", encoding="utf-8").read()
+    m = mini.replace("\r\n", "\n")
+    prova("il titolo del foglio resta «💸 Dove ricevere i sats»", True,
+          '<h3 id="p2pIncassoTit">💸 Dove ricevere i sats</h3>' in m)
+    js = (
+        "const nodi = {p2pIncassoCorpo: {innerHTML: ''}, p2pIncassoTit: {textContent: ''}};\n"
+        "const el = id => nodi[id] || null;\n"
+        "let ORD = {}, myLnAddress = '', p2pIncassoOrdine = 'x';\n"
+        "const ordiniP2P = () => ({x: ORD});\n"
+        "const satsDaRicevereP2P = o => o.netto || 0;\n"
+        "const finestraFatturaP2P = () => 3600;\n"
+        + pezzo_js(m, "const fmt = n =>", "\n") + "\n"
+        + pezzo_js(m, "const esc = s =>", "));\n") + "));\n"
+        + pezzo_js(m, "function percheFallitoP2P(", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "const P2P_WALLET_NON_PASSANO =", "\n") + "\n"
+        + pezzo_js(m, "function walletNonPassaP2P(", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "function renderIncassoP2P(){", "\n}\n") + "\n}\n"
+        + r"""
+const giro = (o, ln) => {
+  ORD = Object.assign({id: 'x', lato: 'compro', stato: 'attesa_mia_fattura'}, o);
+  myLnAddress = ln || '';
+  nodi.p2pIncassoCorpo.innerHTML = ''; nodi.p2pIncassoTit.textContent = '';
+  renderIncassoP2P();
+  return {h: nodi.p2pIncassoCorpo.innerHTML, tit: nodi.p2pIncassoTit.textContent};
+};
+console.log(JSON.stringify({
+  normale: giro({netto: 6645}),
+  ignota: giro({netto: 0}),
+  salvato: giro({netto: 6645}, 'io@wallet.com'),
+  wos: giro({netto: 6645}, 'Io@WalletOfSatoshi.com'),
+  fallito: giro({netto: 6645, stato: 'fattura_nuova'}),
+  riserva: giro({netto: 6645, stato: 'rilasciato'}),
+}));
+""")
+    out = _node_banco(js)
+    if out is None:
+        salta("il foglio «Dove ricevere i sats» girato in node", "node non c'e'")
+        return
+
+    def righe(h):
+        """il testo come lo legge chi guarda: un blocco per riga, i <br>
+        a capo, le entita' sciolte, lo spazio stretto delle migliaia
+        come uno spazio (Andrea scrive «6 645»)"""
+        t = re.sub(r"<br\s*/?>|</div>|</button>|</label>", "\n", h)
+        t = _html.unescape(re.sub(r"<[^>]+>", "", t)).replace(" ", " ")
+        return [r.strip() for r in t.split("\n") if r.strip()]
+
+    INDIRIZZO = ["⚡ Indirizzo Lightning (consigliato)",
+                 "Quello che finisce per @qualcosa. Non scade mai.",
+                 "⚠️ Wallet of Satoshi non funziona qui: con quello incolla una fattura."]
+    FATTURA = "Meglio se dura almeno un giorno: se scade prima te ne chiediamo un'altra."
+    CODA = ["📋 Copia la cifra: 6 645", "Dove vuoi ricevere i sats", "Invia"]
+    prova("il foglio dice il testo di Andrea, parola per parola, con la cifra viva",
+          ["Riceverai 6 645 sats."] + INDIRIZZO
+          + ["🧾 Oppure una fattura dal tuo wallet",
+             "Senza importo, o di 6 645 sats esatti. " + FATTURA] + CODA,
+          righe(out["normale"]["h"]))
+    prova("...in grassetto la cifra e i due titoli, e niente altro",
+          ["6 645 sats", "⚡ Indirizzo Lightning (consigliato)",
+           "🧾 Oppure una fattura dal tuo wallet"],
+          re.findall(r"<b>(.*?)</b>", out["normale"]["h"]))
+    prova("...e il titolo del foglio resta quello", "💸 Dove ricevere i sats",
+          out["normale"]["tit"])
+    h = out["normale"]["h"]
+    prova("le frasi lunghe di prima non ci sono piu'", [False] * 5,
+          ["Consigliato: il tuo indirizzo" in h, "non rispondono alla verifica" in h,
+           "valida più di" in h, "possono passare ore" in h,
+           "va bene anche se lo scambio dura ore" in h])
+    prova("«Copia la cifra», il campo e «Invia» restano quelli di prima, byte per byte",
+          [True, True, True],
+          ["<button class=\"btn primary\" type=\"button\" onclick=\"copiaLink('6645', "
+           "'📋 Cifra copiata')\">📋 Copia la cifra: 6 645</button>" in h,
+           '<div class="field"><label>Dove vuoi ricevere i sats</label><input type="text" '
+           'id="p2pIncassoInp" autocomplete="off" autocapitalize="off" spellcheck="false" '
+           'placeholder="tuonome@wallet.com oppure lnbc…"></div>'
+           '<div class="hint" id="p2pIncassoAvviso" style="display:none"></div>'
+           '<button class="btn orange" id="p2pIncassoBtn" onclick="inviaIncassoP2P()">Invia</button>' in h,
+           h.endswith('onclick="inviaIncassoP2P()">Invia</button>')])
+    prova("a cifra ignota: niente «Riceverai», la fattura senza importo, e il perche' "
+          "della cifra che manca",
+          INDIRIZZO + ["🧾 Oppure una fattura dal tuo wallet", "Senza importo. " + FATTURA,
+                       "La cifra esatta qui non la sappiamo: il messaggio che la dice non è "
+                       "arrivato su questo dispositivo. Falla senza importo — quella va bene "
+                       "comunque.", "Dove vuoi ricevere i sats", "Invia"],
+          righe(out["ignota"]["h"]))
+    prova("con l'indirizzo salvato la scorciatoia sta fra le due vie, sotto l'avviso",
+          ["Riceverai 6 645 sats."] + INDIRIZZO
+          + ["⚡ Usa l'indirizzo dei tuoi incassi: io@wallet.com",
+             "🧾 Oppure una fattura dal tuo wallet"],
+          righe(out["salvato"]["h"])[:6])
+    prova("con Wallet of Satoshi salvato: niente scorciatoia, la sua riga di sempre",
+          [False, True],
+          ["usaIndirizzoSalvatoP2P" in out["wos"]["h"],
+           "⚠️ Il tuo indirizzo Wallet of Satoshi qui non funziona: incolla una fattura "
+           "di un altro wallet." in righe(out["wos"]["h"])])
+    prova("DOPO il rilascio («⚡ Una fattura nuova») il foglio resta quello di prima",
+          [["⚡ Una fattura nuova"] * 2, [True] * 2, [True] * 2, [False] * 2],
+          [[out[k]["tit"] for k in ("fallito", "riserva")],
+           ["<b>⚡ Consigliato: il tuo indirizzo Lightning</b> (quello che finisce per "
+            "@qualcosa). Non scade mai, quindi va bene anche se lo scambio dura ore." in out[k]["h"]
+            for k in ("fallito", "riserva")],
+           [", o di 6 645 sats esatti, valida più di un'ora.</div>" in out[k]["h"]
+            for k in ("fallito", "riserva")],
+           ["almeno un giorno" in out[k]["h"] for k in ("fallito", "riserva")]])
+    guida = " ".join(open(os.path.join("docs", "GUIDA-P2P-PASSI.md"),
+                          encoding="utf-8").read().split())
+    prova("la guida dei passi dice le stesse parole, e non piu' quelle lunghe",
+          [True, True, True, False],
+          ["«**⚡ Indirizzo Lightning (consigliato)** / Quello che finisce per @qualcosa. "
+           "Non scade mai. / ⚠️ Wallet of Satoshi non funziona qui: con quello incolla "
+           "una fattura.»" in guida,
+           "«**🧾 Oppure una fattura dal tuo wallet** / Senza importo, o di <N> sats "
+           "esatti. Meglio se dura almeno un giorno: se scade prima te ne chiediamo "
+           "un'altra.»" in guida,
+           "Foglio «💸 Dove ricevere i sats»: «Riceverai **<N> sats**.»" in guida,
+           "quindi va bene anche se lo scambio dura ore" in guida])
+
+
 def prove_garanzia_lunga():
     """LA GARANZIA LUNGA (7 ott 2026, cantiere «avviso garanzia lunga»,
     testi e regole approvati da Andrea). Dall'ora in cui il coordinatore
@@ -129498,6 +129639,7 @@ def main():
               prove_recapito_corto,
               prove_testi_p2p_confondono,
               prove_garanzia_lunga,
+              prove_testo_ricevere_sats,
               prove_config_esempio):
         try:
             f()

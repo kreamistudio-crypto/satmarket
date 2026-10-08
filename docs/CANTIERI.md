@@ -40662,3 +40662,79 @@ dispositivo: con un orologio del PC molto indietro il segno 'dopo'
 potrebbe tacere (la riga resta ferma, come oggi; i segni giro e chiave
 non dipendono dall'ora). Dopo il deploy le righe nuove portano il giro e
 il segno 'dopo' serve sempre meno.
+## Il foglio «Dove ricevere i sats» corto (8 ott 2026, richiesta di Andrea)
+
+**DA DOVE SI PARTIVA.** Nella pagina dello scambio («Nel dettaglio»),
+quando chi compra deve dire dove vuole i sats, il foglio «💸 Dove
+ricevere i sats» diceva le due vie in due paragrafi lunghi: l'indirizzo
+consigliato con «quindi va bene anche se lo scambio dura ore» e l'avviso
+sui provider che non rispondono alla verifica; la fattura con «valida
+più di un'ora», il giorno consigliato, le ore che possono passare e la
+più corta che «va bene lo stesso». Sul telefono era un muro di testo
+(scatto «prima» a 375 px: undici righe prima di «Copia la cifra»).
+
+**COSA SI È FATTO.** Il testo di Andrea, parola per parola, con la cifra
+viva: «Riceverai N sats.» — «⚡ Indirizzo Lightning (consigliato)» /
+«Quello che finisce per @qualcosa. Non scade mai.» / «⚠️ Wallet of
+Satoshi non funziona qui: con quello incolla una fattura.» — «🧾 Oppure
+una fattura dal tuo wallet» / «Senza importo, o di N sats esatti. Meglio
+se dura almeno un giorno: se scade prima te ne chiediamo un'altra.» I
+due titoli in grassetto, gli a capo con `<br>` dentro il blocco, e fra i
+tre gruppi lo stesso stacco di 12px che la fattura aveva già (le righe
+vuote del testo di Andrea); a cifra ignota «Riceverai» non c'è, la
+fattura dice «Senza importo.» e resta sotto la riga di sempre sulla
+cifra che manca. «Copia la cifra», il campo e «Invia» sono quelli di
+prima, byte per byte, e così la scorciatoia dell'indirizzo salvato (fra
+le due vie, sotto l'avviso) e la riga di Wallet of Satoshi salvato. In
+`renderIncassoP2P` due costanti, `vie` e `fattura`. Il testo vive solo
+in `miniapp.html`, che è la stessa pagina per il PC e per la Mini App;
+aggiornata anche `docs/GUIDA-P2P-PASSI.md` (§ passo 3 di chi compra).
+
+**DECISO E PERCHÉ.** Esce dal foglio la finestra del coordinatore
+(«valida più di un'ora»): il testo di Andrea non la dice, e la regola
+resta dove morde — `inviaIncassoP2P` ferma la fattura troppo corta coi
+minuti che restano e dice come rifarla (sentinella
+`scadenzaCortaFermata`, invariata). Il foglio DOPO il rilascio («⚡ Una
+fattura nuova», pagamento fallito o porta di riserva) NON è stato
+toccato: lì «un giorno» non si chiede (si paga appena arriva) e la frase
+di Andrea («Meglio se dura almeno un giorno») sarebbe sbagliata;
+accorciarlo è una decisione a sé, proposta ad Andrea.
+
+**SCARTATI.** Un testo unico anche per il foglio dopo il rilascio,
+togliendo la sola frase del giorno: sarebbero state parole non
+approvate. Un margine anche sopra «Copia la cifra» (il testo ci sta
+attaccato, ma già prima: non è di questo cantiere).
+
+**PROVATO.** `prove_testo_ricevere_sats` (11): la `renderIncassoP2P`
+vera in node, letta come la legge chi guarda (un blocco per riga, gli a
+capo dei `<br>`, lo spazio stretto delle migliaia come spazio): il
+foglio intero parola per parola, i grassetti, il titolo, le frasi lunghe
+sparite, coda (copia, campo, Invia) byte per byte, cifra ignota,
+indirizzo salvato, Wallet of Satoshi salvato, il foglio dopo il rilascio
+uguale a prima (due stati), la guida con le stesse parole. Emendate col
+perché sei sentinelle di `prove_p2p_motore` che inchiodavano le frasi
+lunghe (`foglioConsigliaLaLibera`, `foglioAvvisaSullaScadenza` — che ora
+vuole anche che «valida più di» NON ci sia —, `foglioIndirizzoPrima`,
+`foglioCifraEsatta`, `foglioAvvisaSuiProvider`,
+`foglioScorciatoiaSottoLAvviso`): le decisioni restano, cambiano le
+parole. Tortura 11 su 11 su una copia intera (pulita verde prima): la
+riga di Wallet of Satoshi, «un'altra», l'a capo dopo il titolo
+dell'indirizzo, «Riceverai» tolto, la cifra esatta tolta, `vie` e
+`fattura` rovesciate sul foglio dopo il rilascio, «Non scade mai» tolto,
+l'emoji della fattura, due parole della guida (lo stacco di 12px è
+arrivato dopo la tortura ed è solo misura: lo dicono gli scatti). Scatti
+prima/dopo a 375 px, densità 3, chiaro e scuro, sull'app vera in
+collaudo col relay morto (due copie: `origin/main` e il worktree): il
+foglio, con l'indirizzo salvato, a cifra ignota. Suite intera severa
+senza config nel worktree su dba0f31: 19.710 verdi, 0 rosse;
+i 42 collaudi della CI verdi nella gabbia.
+
+**NON PROVATO.** Il telefono vero (il foglio si apre con la tastiera:
+più corto, il campo si vede prima, ma non l'ho visto lì).
+
+**DA GUARDARE (detto ad Andrea, non fatto).** Il foglio «⚡ Una fattura
+nuova» ha ancora il testo lungo. E due frasi che si contraddicono su
+Wallet of Satoshi: quella nuova dice «con quello incolla una fattura»
+(la fattura di WoS va bene), la riga per chi ha WoS salvato negli
+incassi dice «incolla una fattura di un altro wallet» — e in quel caso
+compaiono tutt'e due.

@@ -274,16 +274,13 @@ piccoli». C'è anche un «Filtro».
    compra indica dove ricevere i sats, tocca a te bloccare la
    garanzia.»
 3. 🧑 Tocca «💸 Dove ricevere i sats».
-   📱 Foglio «💸 Dove ricevere i sats»: «Riceverai **<N> sats**. **⚡
-   Consigliato: il tuo indirizzo Lightning** (quello che finisce per
-   @qualcosa). Non scade mai, quindi va bene anche se lo scambio dura
-   ore. Alcuni provider (per esempio Wallet of Satoshi) non rispondono
-   alla verifica dell'indirizzo: se il tuo indirizzo viene rifiutato,
-   usa la fattura.» — «**Oppure una fattura** del tuo wallet: **senza
-   importo**, o di <N> sats esatti, valida più di un'ora. **Meglio se dura
-   almeno un giorno**: i sats ti arrivano quando chi vende li libera, e
-   possono passare ore. Una più corta va bene lo stesso, ma se scade
-   prima te ne chiediamo una nuova.» — «📋 Copia la cifra: <N>» — campo
+   📱 Foglio «💸 Dove ricevere i sats»: «Riceverai **<N> sats**.» —
+   «**⚡ Indirizzo Lightning (consigliato)** / Quello che finisce per
+   @qualcosa. Non scade mai. / ⚠️ Wallet of Satoshi non funziona qui:
+   con quello incolla una fattura.» — «**🧾 Oppure una fattura dal tuo
+   wallet** / Senza importo, o di <N> sats esatti. Meglio se dura almeno
+   un giorno: se scade prima te ne chiediamo un'altra.» — «📋 Copia la
+   cifra: <N>» — campo
    «Dove vuoi ricevere i sats» (segnaposto «tuonome@wallet.com oppure
    lnbc…») — bottone «Invia». Hai 15 minuti.
    📱 Dopo: toast «Inviato ✅», stato «**Chi vende sta bloccando i
