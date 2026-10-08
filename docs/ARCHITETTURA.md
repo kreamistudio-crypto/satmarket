@@ -24593,6 +24593,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   per scrivere e il server per capire se un evento è cambiato davvero.
   Se i due divergessero, un annuncio fermo sembrerebbe cambiare a ogni
   giro (o uno cambiato sembrerebbe fermo).
+  IL TITOLO ESCE SPOGLIATO (8 ott 2026): `testo_evento` passa il
+  titolo da `spoglia_titolo` (in `importa_negozio`, il giudice unico
+  dei tre import: negozi, Nostr, CSV) — via i tag HTML, sciolte TUTTE
+  le entità, una riga sola, spogliato PRIMA di troncare. La
+  descrizione Nostr resta com'è (`content`, testo piano). Le righe
+  già salvate sporche le ripulisce `ripulisci_titoli_importati`
+  all'avvio (Cantieri, «Tag HTML nei titoli dei prodotti
+  importati»).
   LEZIONE foto importate (lug 2026): il download è VERBATIM (mai
   ricompresso da noi), ma i relay sono la fonte di verità — quando
   il venditore ripubblica da un client che gli ricomprime le foto
@@ -25333,6 +25341,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'AI per dire la stessa cosa. Fail-CLOSED sui mai giudicati (le
   righe nuove aspettano il giro dopo), fail-open su chi era già
   passato.
+  IL TITOLO SENZA HTML (8 ott 2026, il «Pinuts <h6>Cookies…» visto in
+  vetrina): `testo_negozio` spoglia anche il titolo, con
+  `spoglia_titolo` — tag via, entità sciolte tutte (`html.unescape`),
+  spazi compressi su una riga, a PUNTO FISSO (spogliare due volte dà
+  lo stesso testo), spogliato prima di troncare a 120. È il giudice
+  unico dei tre import (negozi, Nostr, CSV) e della passata all'avvio
+  `ripulisci_titoli_importati` (server.py, in `init_db`): le righe di
+  SQL_ORIGINE_ESTERNA già salvate con un tag o un'entità nel titolo
+  (o in `famiglia_titolo`) tornano pulite PRIMA del primo giro di
+  sync, così il confronto «identica a ieri» combacia e la moderazione
+  non si ripaga; i titoli nati qui non si toccano. La descrizione
+  passa da `_spoglia_html` come prima (tag via, capoversi e «·» dei
+  punti elenco tenuti, la lista corta di entità).
   IL RIEPILOGO AL VENDITORE PARTE SOLO SE È SUCCESSO QUALCOSA: uno
   squillo orario per dire «tutto invariato» è il modo di farsi
   zittire il bot, e col bot zitto si perdono le notifiche degli

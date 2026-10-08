@@ -40,6 +40,10 @@ import urllib.request
 
 from websocket import create_connection
 
+# il giudice del titolo e' uno solo per tutti gli import (8 ott 2026):
+# vive nel modulo dei negozi collegati, che non importa nessuno
+from importa_negozio import spoglia_titolo
+
 # ======================= CONFIGURAZIONE =======================
 # La npub del venditore e l'id a cui intestare gli annunci vivono
 # in config.py (insieme alle chiavi del server), cosi' questo script
@@ -557,7 +561,9 @@ def testo_evento(e):
             return "", ""
         titolo = c.get("name", "") or ""
         desc = c.get("description", "") or ""
-    return titolo.strip()[:120], (desc or "—").strip()[:1500]
+    # il titolo senza HTML ne' entita' (8 ott 2026), come per i negozi
+    # collegati: spogliato PRIMA di troncare
+    return spoglia_titolo(titolo)[:120], (desc or "—").strip()[:1500]
 
 
 def estrai_annuncio(e, valute_stall, cambio):

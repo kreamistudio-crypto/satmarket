@@ -4750,6 +4750,51 @@ def riallinea_titoli_decaduti(con):
     return tolti
 
 
+def ripulisci_titoli_importati(con) -> int:
+    """A OGNI AVVIO, e idempotente: i titoli IMPORTATI che portano un
+    tag HTML o un'entita' tornano testo piano (8 ott 2026: il «Pinuts
+    <h6>Cookies al cacao e arachidi…» visto in vetrina). Sono le righe
+    di un negozio collegato (`fonte`) o dell'import Nostr
+    (`contatto_nostr`), cioe' il perimetro di SQL_ORIGINE_ESTERNA; i
+    titoli nati qui sono parole del venditore e non si toccano — un
+    «<3» scritto a mano e' suo.
+    Lo stesso giudice dell'ingresso (`spoglia_titolo`), e DEVE essere
+    lui: il giro di sync confronta il testo tradotto oggi con quello
+    nel database per decidere se ri-giudicare, e con la riga gia'
+    pulita qui i due combaciano e la moderazione non si ripaga. Senza
+    questa passata ogni titolo sporco sarebbe costato una chiamata
+    all'AI al primo giro dopo il deploy, e sarebbe tornato pulito solo
+    allora. Anche `famiglia_titolo`, che nasce dallo stesso testo.
+    Un titolo che spogliato resterebbe VUOTO si lascia com'e': meglio
+    un tag in vetrina che un annuncio senza nome (al giro dopo il
+    traduttore lo salta come «senza titolo»).
+    Niente `modificato`: non e' un gesto del venditore. L'indice di
+    ricerca si rifa' da solo (il trigger `annunci_ricerca_scaduta`
+    azzera `ricerca_v` a ogni UPDATE del titolo). Tace se non tocca
+    niente, come le gemelle."""
+    import importa_negozio
+    n = 0
+    for r in con.execute(
+            "SELECT id, titolo, famiglia_titolo FROM annunci "
+            "WHERE (contatto_nostr!='' OR fonte!='') "
+            "AND (titolo LIKE '%<%' OR titolo LIKE '%&%;%' "
+            "OR famiglia_titolo LIKE '%<%' "
+            "OR famiglia_titolo LIKE '%&%;%')").fetchall():
+        titolo = importa_negozio.spoglia_titolo(
+            r["titolo"])[:importa_negozio.MAX_TITOLO]
+        famiglia = importa_negozio.spoglia_titolo(r["famiglia_titolo"])
+        if not titolo or (titolo, famiglia) == (r["titolo"],
+                                                 r["famiglia_titolo"] or ""):
+            continue
+        con.execute("UPDATE annunci SET titolo=?, famiglia_titolo=? "
+                    "WHERE id=?", (titolo, famiglia, r["id"]))
+        n += 1
+    if n:
+        print(f"🧹 Titoli importati ripuliti dall'HTML all'avvio: {n}",
+              flush=True)
+    return n
+
+
 def riallinea_spedizionieri(con):
     """Il BACKFILL della rete al plurale: chi aveva dichiarato una
     rete sola la ritrova dentro `spedizionieri`, coi pipe.
@@ -8617,6 +8662,10 @@ def init_db():
     # ritrova dentro la colonna nuova, o al deploy perderebbe mappa e
     # nome della rete nel cassetto senza che nessuno gliel'abbia tolti.
     riallinea_spedizionieri(con)
+    # I titoli importati senza HTML (8 ott 2026): qui, PRIMA del primo
+    # giro di sync, che altrimenti li vedrebbe «cambiati» e
+    # ripagherebbe la moderazione per ognuno.
+    ripulisci_titoli_importati(con)
     # PRIMA gli XP e POI i titoli: il secondo giudica sul numero che
     # il primo ha appena rimesso in pari, e all'incontrario toglierebbe
     # (o lascerebbe) i gradi guardando la cache di ieri.
@@ -57535,8 +57584,12 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
         return riga[i].strip() if i is not None and i < len(riga) else ""
 
     righe, scarti, avvisi = [], [], []
+    import importa_negozio       # lo stesso giudice del titolo dei negozi
     for numero, r in dati:
-        titolo = neutralizza_formula(cella(r, "titolo"))
+        # PRIMA i tag e poi la formula: un «<b>=SUM()</b>» spogliato
+        # dopo sarebbe una formula viva
+        titolo = neutralizza_formula(
+            importa_negozio.spoglia_titolo(cella(r, "titolo")))
         descrizione = neutralizza_formula(cella(r, "descrizione"))
         zona = neutralizza_formula(cella(r, "zona"))
         if not titolo:

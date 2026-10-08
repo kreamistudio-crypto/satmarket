@@ -24,6 +24,7 @@ i traduttori e la riconciliazione restano PURI, cioe' collaudabili in
 """
 import base64
 import hashlib
+import html
 import json
 import re
 import sqlite3
@@ -215,6 +216,42 @@ def _spoglia_html(testo: str) -> str:
     return t.strip()
 
 
+def spoglia_titolo(titolo) -> str:
+    """Il TITOLO come testo piano, su una riga sola (8 ott 2026).
+    Il caso vero: «Pinuts <h6>Cookies al cacao e arachidi…» in vetrina.
+    Il nome di un prodotto su Woo (il `post_title`) o su Shopify puo'
+    portare HTML, e la pagina lo stampa escapato — cioe' col tag in
+    bella vista. Fin qui la descrizione passava da `_spoglia_html` e il
+    titolo da uno `strip()` e basta.
+    Stessa scuola della gemella: i tag inline spariscono senza lasciare
+    spazio (un «Pinu<b>ts</b>» resta «Pinuts»), gli altri diventano uno
+    spazio (un <h6> fra due parole le tiene separate); poi le ENTITA'
+    si sciolgono TUTTE con `html.unescape` — anche &#8211; e &rsquo;,
+    che la lista corta della descrizione non conosce —, gli spazi si
+    comprimono (a capo compresi: un titolo sta su una riga) e si taglia
+    agli estremi.
+    E' A PUNTO FISSO: si ripete finche' non cambia piu' niente, cosi'
+    spoglia_titolo(spoglia_titolo(x)) == spoglia_titolo(x) SEMPRE, anche
+    su un «&amp;lt;b&amp;gt;» che al secondo giro scioglie in un tag.
+    Serve alla passata all'avvio (`ripulisci_titoli_importati` in
+    server.py): un titolo gia' pulito deve restare IDENTICO, o il giro
+    di sync lo vedrebbe «cambiato» a ogni riavvio e ripagherebbe la
+    moderazione per niente. Termina sempre: ogni giro accorcia o lascia
+    uguale, mai allunga.
+    Un «<» da solo (taglia < 40, un «<3») non e' un tag e resta."""
+    t = str(titolo or "")
+    while True:
+        prima = t
+        t = re.sub(r"(?is)<(script|style).*?</\1>", " ", t)
+        t = re.sub(r"(?i)</?(b|strong|i|em|u|s|span|a|small|code|sup|sub)"
+                   r"(\s[^>]*)?>", "", t)
+        t = re.sub(r"<[^>]+>", " ", t)
+        t = html.unescape(t)
+        t = re.sub(r"\s+", " ", t).strip()
+        if t == prima:
+            return t
+
+
 def testo_negozio(prodotto: dict, fonte: str) -> tuple[str, str]:
     """Titolo e descrizione come finiranno nel database, troncati.
 
@@ -232,8 +269,11 @@ def testo_negozio(prodotto: dict, fonte: str) -> tuple[str, str]:
         titolo = prodotto.get("title") or ""
         grezza = prodotto.get("body_html") or ""
     desc = _spoglia_html(grezza)
-    # il trattino e' il ripiego di casa per la descrizione vuota
-    return titolo.strip()[:MAX_TITOLO], (desc or "—")[:MAX_DESCRIZIONE]
+    # il trattino e' il ripiego di casa per la descrizione vuota; il
+    # titolo si spoglia PRIMA di troncare, o un tag lungo mangerebbe
+    # le parole vere
+    return (spoglia_titolo(titolo)[:MAX_TITOLO],
+            (desc or "—")[:MAX_DESCRIZIONE])
 
 
 # --- I TRADUTTORI -----------------------------------------------------

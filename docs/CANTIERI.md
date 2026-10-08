@@ -40945,3 +40945,115 @@ git cat-file commit HEAD | Select-String gpgsig
 gh repo create kreamistudio-crypto/fidelity-points --public --source . --remote origin --push --description "Loyalty points as RGB assets issued by a NIP-05-verified Nostr identity, spent from a WDK wallet over NWC-RGB, with a local AI (QVAC) that proposes and the user who approves. Agentic Dollars on Bitcoin hackathon, Turin, 17-18 Oct 2026."
 gh api -X PUT repos/kreamistudio-crypto/fidelity-points/collaborators/alanbimbati -f permission=push
 ```
+
+## Tag HTML nei titoli dei prodotti importati (8 ott 2026, dal campo: il «Pinuts <h6>Cookies…»)
+
+**DA DOVE SI PARTIVA.** In vetrina, in produzione, un prodotto di un
+venditore di Bassano del Grappa (4,10 € ≈ 5.562 sats) si chiamava
+«Pinuts <h6>Cookies al cacao e arachidi…»: il tag si LEGGEVA, cioè la
+pagina lo escapava (nessuna XSS), ma il titolo era entrato sporco nel
+database. La causa, col file e la funzione: `testo_negozio` in
+`importa_negozio.py` — il cuore condiviso fra chi scrive e chi giudica
+nel sync dei negozi collegati (Shopify e WooCommerce) — spogliava
+dall'HTML la DESCRIZIONE (`_spoglia_html`, dal cantiere dei connettori)
+e passava il TITOLO con un `strip()` e basta; su Woo il `name` di un
+prodotto è il `post_title`, e WordPress non lo ripulisce. Lo stesso
+difetto nell'import Nostr (`testo_evento` in `importa_nostr.py`:
+`titolo.strip()[:120]`) e nell'import CSV/ZIP (`import_prepara` in
+server.py: solo `neutralizza_formula`). Il percorso che ha prodotto il
+caso è il primo: quel venditore ha un negozio collegato (`fonte`
+piena), e il titolo entra da `traduci_woo` → `testo_negozio`.
+
+**COSA SI È FATTO.** 1) Un giudice solo, `spoglia_titolo(titolo)` in
+`importa_negozio.py` accanto alla gemella della descrizione: i tag
+inline spariscono senza lasciare spazio («Pinu<b>ts</b>» → «Pinuts»),
+gli altri diventano uno spazio (un `<h6>` fra due parole le tiene
+separate), script e stili via, poi `html.unescape` su TUTTE le entità
+(anche `&#8211;` e `&rsquo;`, che la lista corta della descrizione non
+conosce), spazi compressi a capo compresi (un titolo sta su una riga),
+taglio agli estremi. È A PUNTO FISSO: si ripete finché non cambia più
+niente, così spogliare due volte dà lo stesso testo anche su un
+«&amp;lt;b&amp;gt;» che al secondo giro scioglie in un tag; termina
+sempre perché ogni giro accorcia o lascia uguale. Un «<» da solo
+(«taglia < 40», «<3») non è un tag e resta. 2) I tre ingressi passano
+di lì: `testo_negozio` (spoglia PRIMA di troncare a `MAX_TITOLO`, o un
+tag lungo mangerebbe le parole vere; un titolo che era solo HTML
+diventa vuoto e il traduttore lo salta come «senza id o senza
+titolo»), `testo_evento` (importa `spoglia_titolo` dal modulo dei
+negozi, che non importa nessuno) e `import_prepara` (spoglia PRIMA di
+`neutralizza_formula`: un «<b>=SUM()</b>» spogliato dopo sarebbe una
+formula viva). 3) Le righe già salvate sporche: `ripulisci_titoli_
+importati(con)` in server.py, chiamata in `init_db` subito dopo
+`riallinea_spedizionieri`, A OGNI AVVIO e idempotente come le gemelle.
+Perimetro: le righe di SQL_ORIGINE_ESTERNA (`fonte!=''` o
+`contatto_nostr!=''`) con un «<» o un «&…;» nel titolo o in
+`famiglia_titolo`; i titoli nati qui sono parole del venditore e non si
+toccano. Il PERCHÉ all'avvio e non al prossimo sync: `_righe_da_
+giudicare` confronta il testo tradotto oggi con quello nel database e
+manda all'AI chi è «cambiato» — senza la passata ogni titolo sporco
+sarebbe costato una chiamata di moderazione al primo giro dopo il
+deploy, e sarebbe tornato pulito solo allora; con la riga già pulita i
+due combaciano e non si paga niente (lo stesso vale per `_da_giudicare`
+dell'import Nostr). Niente `modificato` (non è un gesto del
+venditore); l'indice di ricerca si rifà da solo (il trigger
+`annunci_ricerca_scaduta` azzera `ricerca_v` a ogni UPDATE del titolo e
+`riallinea_ricerca` lo rimette in pari); un titolo che spogliato
+resterebbe vuoto si lascia com'è (meglio un tag in vetrina che un
+annuncio senza nome). Riga nel journal: «🧹 Titoli importati ripuliti
+dall'HTML all'avvio: N», tace se non tocca niente. 4) La pagina:
+verificato che i titoli entrano in innerHTML solo da `esc()` — la card
+(`titoloConCondizione`, `esc(l.title)`), il dettaglio (la stessa
+testata), e nessun `${l.title}` nudo dentro una riga con un tag (il
+solo nudo è il testo della condivisione, che va a `navigator.share` e in
+un URL). Il pulitore è igiene del testo, non una cintura.
+
+**LA DESCRIZIONE, com'è oggi (non toccata, da decidere con Andrea).**
+Negozi collegati: `_spoglia_html` toglie i tag, tiene i capoversi (un
+a capo per `</p>`, `<br>`, `</li>`…), mette «· » ai punti elenco e
+scioglie una lista corta di entità (`&nbsp; &amp; &lt; &gt; &quot;
+&#39; &apos; &euro;`): un `&#8211;` o un `&rsquo;` nella descrizione
+oggi restano scritti così. Nostr: il `content` entra com'è, solo
+`strip()` e troncamento a 1500 — è testo piano o markdown, non HTML.
+CSV: solo `neutralizza_formula`. La proposta, se Andrea dice sì:
+sostituire la lista corta con `html.unescape` dentro `_spoglia_html`
+(stessa formattazione, tutte le entità), con la passata all'avvio
+allargata alla descrizione.
+
+**STRADE SCARTATE.** Pulire SOLO al prossimo sync (costo: una chiamata
+AI per titolo sporco, e la vetrina sporca fino all'ora dopo). Un parser
+HTML vero (una dipendenza in più per il titolo di un prodotto: la
+scuola di `_spoglia_html`). Una migrazione «una volta sola» col timbro
+in `impostazioni` (la passata è idempotente e costa una SELECT con LIKE
+all'avvio: non ha bisogno del timbro, e ripara anche ciò che un domani
+entrasse sporco da una strada nuova). Toccare i titoli nati qui (un
+«<3» scritto a mano è del venditore). Spogliare senza il punto fisso
+(la passata e il confronto del sync vogliono che pulito-di-pulito sia
+identico).
+
+**PROVATO.** `prove_titoli_importati` (32): il giudice girato davvero
+— il caso vero con l'h6, le entità anche numeriche, i tag annidati, un
+titolo pulito che non cambia, inline che non spezza e blocco che
+separa, a capo e spazi, script e stili, il «<3», None e vuoto, tre casi
+a punto fisso; i tre ingressi (Woo, Shopify, troncamento DOPO la
+pulizia, il titolo solo-HTML saltato, NIP-99, NIP-15, la sentinella sul
+CSV con l'ordine giudice→formula); la passata all'avvio su un database
+di prova con cinque righe (negozio sporco con famiglia, Nostr con
+entità, nato qui con «<3» e un `<b>` che resta, pulito, solo-HTML che
+resta; ritorna 2, poi 0; `modificato` fermo) e la sentinella su
+`init_db`; la pagina (card da `esc()`, dettaglio con la stessa testata,
+nessun titolo nudo nell'HTML). Il deploy in piccolo: il server vero in
+collaudo (config di cartone, il banco di `collaudo_lnbits_muto`) su un
+db con le tre righe seminate sporche, poi `init_db` di nuovo come al
+riavvio → la riga del journal «ripuliti: 2», il db con «Pinuts Cookies
+al cacao e arachidi» e la famiglia pulita, il nato qui intatto,
+`ricerca_v` a 0 (il trigger ha parlato), secondo riavvio muto,
+`/api/listings` che serve il titolo pulito. Suite intera severa e
+collaudi della CI: nel verbale del push.
+
+**NON PROVATO / DA GUARDARE.** Il prodotto Pinuts in vetrina sul
+telefono dopo il deploy, e la riga «🧹» nel journal del primo avvio.
+Quanti titoli sporchi ci sono davvero in produzione (la query in sola
+lettura sta nel rapporto del cantiere: conta i titoli con «<» prima e
+dopo il deploy). Un negozio il cui `name` porta un «<» non-tag («taglia
+< 40 > 38»): la regex `<[^>]+>` lo mangerebbe come la gemella della
+descrizione — caso non visto, si guarda se compare.

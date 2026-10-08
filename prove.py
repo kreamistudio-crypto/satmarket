@@ -129644,6 +129644,145 @@ def prove_leva_rgb():
           "/api/consigliami" in testo)
 
 
+def prove_titoli_importati():
+    """I TITOLI IMPORTATI SENZA HTML (8 ott 2026): in vetrina era
+    comparso «Pinuts <h6>Cookies al cacao e arachidi…», il nome di un
+    prodotto arrivato da un negozio collegato col tag dentro. La pagina
+    lo escapava (niente XSS: il tag si LEGGEVA), ma il titolo era
+    entrato sporco: la descrizione passava da `_spoglia_html`, il
+    titolo da uno `strip()` e basta — e l'import Nostr faceva lo
+    stesso. Ora un giudice solo, `spoglia_titolo`, all'ingresso di
+    tutti e tre gli import (negozi, Nostr, CSV) e nella passata
+    all'avvio che ripulisce le righe gia' salvate; e si guarda che la
+    pagina continui a escapare, perche' il pulitore non e' una
+    cintura contro l'iniezione, e' igiene del testo."""
+    print("\n[i titoli importati senza HTML]")
+    import sqlite3
+    import tempfile
+    import importa_negozio as neg
+    import importa_nostr as imp
+    sp = neg.spoglia_titolo
+
+    # --- IL GIUDICE, girato davvero --------------------------------
+    prova("il caso vero: l'h6 se ne va e le parole restano separate",
+          "Pinuts Cookies al cacao e arachidi",
+          sp("Pinuts <h6>Cookies al cacao e arachidi</h6>"))
+    prova("le entita' si sciolgono, anche quelle numeriche",
+          "Tom & Jerry \u2013 vol. 2 \u201990",
+          sp("Tom &amp; Jerry &#8211; vol. 2 &rsquo;90"))
+    prova("i tag annidati spariscono tutti", "Miele di acacia 500 g",
+          sp('<p><b>Miele <i>di</i> acacia</b> <span class="x">500 g'
+             "</span></p>"))
+    prova("un titolo pulito non cambia", "Tastiera meccanica 60% - usata",
+          sp("Tastiera meccanica 60% - usata"))
+    prova("i tag inline non spezzano le parole", "Pinuts",
+          sp("Pinu<b>ts</b>"))
+    prova("...ma un tag di blocco le tiene separate", "Pinuts Cookies",
+          sp("Pinuts<h6>Cookies</h6>"))
+    prova("a capo e spazi doppi si comprimono su una riga",
+          "Cookies al cacao", sp("  Cookies\n\tal   cacao \r\n"))
+    prova("script e stili non entrano", "Cookies",
+          sp("<script>x()</script>Cookies<style>a{}</style>"))
+    prova("un «<» da solo non e' un tag", "Ti amo <3", sp("Ti amo <3"))
+    prova("None e vuoto danno vuoto", ("", ""), (sp(None), sp("")))
+    # A PUNTO FISSO: la passata all'avvio riscrive solo cio' che
+    # cambia, e il giro di sync confronta il testo di oggi con quello
+    # salvato — se spogliare due volte desse un testo diverso, un
+    # titolo si vedrebbe «cambiato» a ogni riavvio e si ripagherebbe
+    # la moderazione per niente.
+    for brutto in ("Pinuts <h6>Cookies</h6>", "Tom &amp;amp; Jerry",
+                   "&amp;lt;b&amp;gt;ciao&amp;lt;/b&amp;gt;"):
+        prova(f"a punto fisso: {brutto!r}", sp(brutto), sp(sp(brutto)))
+
+    # --- I TRE INGRESSI --------------------------------------------
+    woo = {"name": "Pinuts <h6>Cookies al cacao</h6>",
+           "description": "<p>Buoni &amp; sani</p>"}
+    prova("Woo: il titolo entra pulito", "Pinuts Cookies al cacao",
+          neg.testo_negozio(woo, "woo")[0])
+    prova("...e la descrizione come prima", "Buoni & sani",
+          neg.testo_negozio(woo, "woo")[1])
+    prova("Shopify: anche", "Cookies & latte",
+          neg.testo_negozio({"title": "<b>Cookies</b> &amp; latte",
+                             "body_html": ""}, "shopify")[0])
+    prova("si tronca a 120 DOPO la pulizia", "t" * 120,
+          neg.testo_negozio({"name": "<b>" + "t" * 200 + "</b>",
+                             "description": ""}, "woo")[0])
+    prova("un titolo che era solo HTML si salta come «senza titolo»",
+          "senza id o senza titolo",
+          neg.traduci_woo({"id": 5, "name": "<h6></h6>", "status": "publish",
+                           "price": "4.10"}, {"eur": 0.0007})
+          ["saltato_perche"])
+    prova("NIP-99: il titolo dal tag senza HTML", "Tastiera meccanica",
+          imp.testo_evento({"kind": 30402, "content": "",
+                            "tags": [["title", "<h6>Tastiera</h6> "
+                                               "meccanica"]]})[0])
+    prova("NIP-15: idem dentro il JSON", "Miele & co",
+          imp.testo_evento({"kind": 30018, "tags": [],
+                            "content": '{"name":"<b>Miele</b> &amp; co"}'}
+                           )[0])
+    prova("il CSV passa dallo stesso giudice, PRIMA della formula", True,
+          "neutralizza_formula(\n            importa_negozio.spoglia_titolo("
+          in pezzo("import_prepara"))
+
+    # --- LA PASSATA ALL'AVVIO, girata su un database di prova -------
+    db2 = os.path.join(tempfile.mkdtemp(), "titoli.db")
+    con2 = sqlite3.connect(db2)
+    con2.row_factory = sqlite3.Row
+    con2.executescript("""
+    CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
+      famiglia_titolo TEXT DEFAULT '', fonte TEXT DEFAULT '',
+      contatto_nostr TEXT DEFAULT '', modificato INTEGER DEFAULT 0);
+    INSERT INTO annunci(id, titolo, famiglia_titolo, fonte, contatto_nostr)
+    VALUES
+      (1, 'Pinuts <h6>Cookies al cacao</h6>', 'Pinuts <h6>Cookies</h6>',
+          'woo', ''),                       -- il caso vero
+      (2, 'Tom &amp; Jerry', '', '', 'npub1x'),  -- l'import Nostr
+      (3, 'Ti amo <3 <b>tanto</b>', '', '', ''), -- nato qui: parole sue
+      (4, 'Tastiera pulita', '', 'woo', ''),     -- gia' pulito
+      (5, '<h6></h6>', '', 'shopify', '');       -- resterebbe vuoto
+    """)
+    amb = {"print": lambda *a, **k: None}
+    exec(pezzo("ripulisci_titoli_importati"), amb)
+    pulisci = amb["ripulisci_titoli_importati"]
+    prova("la passata ripulisce chi e' sporco E importato", 2, pulisci(con2))
+
+    def riga(i):
+        r = con2.execute("SELECT titolo, famiglia_titolo, modificato "
+                         "FROM annunci WHERE id=?", (i,)).fetchone()
+        return (r["titolo"], r["famiglia_titolo"], r["modificato"])
+
+    prova("...il negozio collegato, famiglia compresa",
+          ("Pinuts Cookies al cacao", "Pinuts Cookies", 0), riga(1))
+    prova("...e l'import Nostr", "Tom & Jerry", riga(2)[0])
+    prova("un titolo nato qui non si tocca",
+          "Ti amo <3 <b>tanto</b>", riga(3)[0])
+    prova("un titolo pulito resta", "Tastiera pulita", riga(4)[0])
+    prova("un titolo che resterebbe vuoto si lascia", "<h6></h6>",
+          riga(5)[0])
+    prova("il secondo giro non tocca niente", 0, pulisci(con2))
+    con2.close()
+    avvio = codice(pezzo("init_db"))
+    prova("la passata si chiama all'avvio", True,
+          "ripulisci_titoli_importati(con)" in avvio)
+    # PRIMA del giro di sync: all'avvio il sync non e' ancora partito
+    # (parte dal suo startup), quindi basta che stia in init_db.
+
+    # --- LA PAGINA CONTINUA A ESCAPARE -----------------------------
+    # Il pulitore e' igiene, non una cintura: se un giorno un titolo
+    # sporco passasse lo stesso, la pagina deve stamparlo come testo.
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("la card passa il titolo da esc()", True,
+          "esc(l.title)" in pezzo_js(mini, "function titoloConCondizione("))
+    prova("...e il dettaglio usa la stessa testata", True,
+          "<h2>${titoloConCondizione(l)}</h2>" in mini)
+    # il solo «${l.title}» nudo della pagina e' il testo della
+    # condivisione (va a navigator.share e in un URL, mai in innerHTML):
+    # si guardano le righe che hanno un tag dentro
+    prova("nessun titolo nudo dentro l'HTML della pagina", [],
+          [r for r in mini.split("\n") if "<" in r and re.search(
+              r"\$\{(?:l\.title|a\.titolo|l\.titolo|x\.title)\}", r)])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -129849,6 +129988,7 @@ def main():
               prove_connettori, prove_connettori_sync,
               prove_connettori_woo, prove_connettori_registro,
               prove_connettori_ingresso,
+              prove_titoli_importati,
               prove_connettori_varianti,
               prove_connettore_interrompibile,
               prove_famiglie,
