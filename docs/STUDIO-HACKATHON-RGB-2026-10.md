@@ -932,7 +932,9 @@ dove questa la corregge, lo dice.
 > comparivano; cosa si COSTRUISCE non cambia, cambia cosa si racconta
 > e in che ordine. Gli identificatori tecnici che portano ancora il
 > nome vecchio (l'alias `cassiere` di QVAC, `cassiere-prova.html`) li
-> rinomina il prossimo cantiere col nome scelto in G.4.
+> rinomina il prossimo cantiere coi nomi decisi da Andrea l'8 ott (G.4):
+> il progetto è **«Barattolo Loyalty»**, l'aiutante **«Consigliami»**,
+> il repo pubblico **`barattolo-loyalty`**.
 
 **Le novità, in una riga ciascuna** (com'erano la mattina del 7; la
 sera il centro si è spostato, vedi G.4). 1) La demo: si paga un ordine
@@ -1333,7 +1335,7 @@ giusto del conto (la forma del 25 set, «Il profilo più elegante»), con
 la leva `RGB_ATTIVO` accesa e un wallet NWC che dichiara
 `rgb_list_assets`. Letta col centro della sera del 7 (G.4): il cuore è
 il punto 2 — la card dell'asset con la riga dell'emittente — e il punto
-3 è un aiuto; il bottone e il fumetto portano il nome scelto in G.4,
+3 è un aiuto; il bottone e il fumetto si chiamano «Consigliami» (G.4),
 mai «Cassiere». Dall'alto:
 
 1. **Il conto** come oggi (prezzo in sats, eventuale sconto fedeltà) e
@@ -1359,7 +1361,8 @@ mai «Cassiere». Dall'alto:
    4,80 USDB e usa 40 MOON (40 sats di sconto): ti restano 495,20 USDB
    e 20 MOON. Motivo: …» — il JSON di QVAC reso in una frase, con
    «**Approva**» e «No, pago in sats». Il bottone che lo apre e il
-   fumetto si chiamano col nome di G.4 (raccomandato «Consiglio»). La regola («max 20% del prezzo in punti», il
+   fumetto si chiamano «Consigliami» (deciso l'8 ott, G.4): l'utente
+   chiede, l'AI risponde. La regola («max 20% del prezzo in punti», il
    tetto del budget) la mostra sotto in piccolo: il modello ha scelto
    dentro quella, non l'ha inventata.
 4. **Approva** → `rgb_pay_invoice` al wallet; il wallet WDK chiede la
@@ -1422,7 +1425,7 @@ conferma): si verifica su quella.
 | 14-16 ott | La **dichiarazione** scritta (HACKATHON-SETUP §5 aggiornata), gli schermi su carta, il flusso provato tre volte con la pagina di prova e il wallet; backup della VM; portatile con tutto scaricato | 3-4 h | |
 
 Cosa NON si fa prima: le rotte `/api/rgb/*` e quelle dell'aiutante
-(`/api/<nome di G.4>/*`), il bottone «Paga in USDB», la card
+(`/api/consigliami/*`), il bottone «Paga in USDB», la card
 dell'asset, la chiamata a QVAC dalla pagina di Barattolo, i metodi
 `rgb_*` nel servizio NWC, la verifica NIP-05 in Barattolo,
 l'implementazione dei due testi. Si DISEGNANO (questo file è il
@@ -1438,7 +1441,7 @@ nome vecchio — l'alias `cassiere` in `qvac.config.json`,
 | sab 09:00-09:45 | Kickoff; la dichiarazione consegnata; il tavolo: VM su, tunnel su, relay locale su, QVAC su, server in collaudo su `127.0.0.1:8080` col db 111/222/999 | tutti e due | niente codice prima della dichiarazione |
 | sab 09:45-13:00 | **Wallet**: i quattro metodi `rgb_*` in `nwc-wdk.mjs` sopra `punti.mjs` (lista, fattura, paga con conferma a terminale, lookup), provati con un client NWC a riga di comando. **Server** in parallelo: `/api/rgb/fattura` (chiede a `rgb_http.py` la fattura blind di `barattolo` in USDB per l'ordine, importo al cambio), `/api/rgb/stato`, tutto dietro `RGB_ATTIVO` | Alan il wallet, Claude+Andrea il server | commit datati, uno per funzione |
 | sab 13:45-16:30 | **Client**: nel foglio del pagamento la riga «oppure N USDB» e il bottone «Paga in USDB» → fattura → `rgb_pay_invoice` via `clientNwc` → stato «in arrivo» → `rgb.py aggiorna` lato server → «Pagato» | | **primo pagamento VERO in USDB su signet entro le 16:30**: è il core, da qui in poi tutto è aggiunta |
-| sab 16:30-19:30 | **L'aiutante** (il nome in G.4): la pagina chiama QVAC (schema `{paga_in_usdb, usdb, usa_punti, punti, sconto_sats, motivo}` col conto già fatto), il fumetto, «Approva» che fa il passo di prima da solo | | se CORS o mixed content mordono: la chiamata la fa il server (`/api/cassiere/proposta` → 127.0.0.1:11434) e si dichiara |
+| sab 16:30-19:30 | **Consigliami**: la pagina chiama QVAC (schema `{paga_in_usdb, usdb, usa_punti, punti, sconto_sats, motivo}` col conto già fatto), il fumetto, «Approva» che fa il passo di prima da solo | | se CORS o mixed content mordono: la chiamata la fa il server (`/api/cassiere/proposta` → 127.0.0.1:11434) e si dichiara |
 | sab sera | **MOON come bonus** dopo il pagamento (l'assegnazione del 1 ott agganciata al «Pagato»); la card dell'asset con ticker/saldo (senza emittente); il giro intero due volte | | |
 | dom 09:00-11:00 | **Il NIP**: i due annunci (MOON e USDB) firmati dalle identità di prova e pubblicati sul relay locale; in Barattolo la lettura dell'annuncio per `#d`, la verifica NIP-05 (lato server con `url_api_ammesso`, senza redirect) e la riga «Emesso da … ✓» nella card — **è il centro del racconto (G.4)**; i due testi `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` del repo pubblico rifiniti con quel che l'implementazione ha insegnato | Alan la pubblicazione e i testi, Claude+Andrea la verifica | la issue nel repo `nwc` aperta a mezzogiorno |
 | dom 11:00-13:00 | **Se avanza**: il salvadanaio (secondo consiglio dell'aiutante, arrotondamento) e il budget nel browser; sennò: gestione degli errori visibile («wallet non collegato», «proxy irraggiungibile», «conferma in arrivo») — «UX: error handling» è un criterio | | |
@@ -1601,19 +1604,16 @@ erano gli script di `deploy/rgb/` (banco e wallet di prova, fuori
 dall'app) e, dall'11-12 ott, la leva `RGB_ATTIVO` spenta, e si
 dichiarano entrambi.
 
-**Il nome.** Segue il nome del progetto (G.4), minuscolo, con il
-suffisso `-rgb` perché un nome di una parola su GitHub è già preso o
-non dice niente: `tessera-rgb` se vince «Tessera». Se la mattina
-dell'8 il nome non è ancora scelto, si crea lo stesso con il nome di
-riserva `barattolo-rgb-torino-2026` e si rinomina dopo (GitHub tiene i
-redirect). Sotto l'account di Andrea (`kreamistudio-crypto`, lo stesso
+**Il nome: `barattolo-loyalty`** (deciso da Andrea l'8 ott, dal nome
+del progetto «Barattolo Loyalty», G.4; la proposta della sera prima
+era `<nome>-rgb` con una riserva, superata). Sotto l'account di Andrea (`kreamistudio-crypto`, lo stesso
 che firma i commit di Barattolo), Alan collaboratore con scrittura;
 **pubblico dal primo commit**, non privato-poi-pubblico: la data di
 creazione e la cronologia dei push sono quello che un giudice può
 verificare, le date dentro i commit le scrive l'autore.
 
 **Cosa ci va dentro.**
-- `README.md` in inglese: cos'è, in cinque righe (il progetto, G.4);
+- `README.md` in inglese: cos'è, in cinque righe («Barattolo Loyalty», G.4);
   **«What existed before October 17»** — la dichiarazione di
   HACKATHON-SETUP §5 tradotta, datata e firmata; **«What was built at
   the hackathon»** — vuota fino al 17, poi il diario dei commit; come
@@ -1747,8 +1747,18 @@ cambia cosa si racconta e in che ordine (D.2: le slide e i 30 secondi
 sono riscritti; HACKATHON-SETUP §7 ha l'ordine del racconto accanto a
 quello del codice).
 
-**Tre nomi per il progetto** (corti, da slide, tema punti fedeltà; con
-sotto il sottotitolo inglese per la giuria):
+**I nomi, DECISI da Andrea l'8 ottobre**: il progetto si chiama
+**«Barattolo Loyalty»** (il nome della casa più il tema, leggibile da
+una giuria internazionale senza sottotitolo); l'aiutante — il bottone
+e il fumetto — si chiama **«Consigliami»** (è il bottone: l'utente
+chiede, l'AI risponde; alias di QVAC `consigliami`, pagina di prova
+`consigliami-prova.html`, rotte `/api/consigliami/*`, da applicare nel
+prossimo cantiere); il repo pubblico si chiama **`barattolo-loyalty`**
+(G.1). Le tre proposte per ciascuno restano qui sotto come verbale di
+ciò che è stato scartato.
+
+**Tre nomi proposti per il progetto** (corti, da slide, tema punti
+fedeltà; con sotto il sottotitolo inglese per la giuria):
 1. **Tessera** — la tessera fedeltà, una parola; e la testata di
    Barattolo è GIÀ una tessera (il logo: memoria «Logo in testata»),
    quindi il nome lega la demo alla casa senza spiegare niente.
@@ -1762,9 +1772,11 @@ sotto il sottotitolo inglese per la giuria):
    meno immediato sul «punti». Sottotitolo: «Loyalty you own: RGB
    points, verified issuers».
 
-**Tre nomi per il bottone e l'aiutante** (quello che oggi si chiama
-«Cassiere» nella schermata: il bottone che apre la proposta e il
-fumetto):
+**Tre nomi proposti per il bottone e l'aiutante** (quello che oggi si
+chiama «Cassiere» nella schermata: il bottone che apre la proposta e
+il fumetto; scelto «Consigliami», che non era fra i tre e tiene il
+meglio del primo e del secondo — il consiglio, e la forma di domanda
+dell'utente):
 1. **Consiglio** — «💡 Consiglio» sul bottone, «Un consiglio: paga 4,80
    USDB e usa 40 punti» nel fumetto; e lo script di QVAC si chiama GIÀ
    `consiglio.py`: l'alias dell'8 ott diventa `consiglio`, la pagina di
@@ -1800,8 +1812,9 @@ l'emittente verificato domenica mattina. Il racconto la percorre al
 contrario, e il rischio che ne nasce è lo 0 di D.3.
 
 **Cosa cambia nei testi per gli utenti, per il prossimo cantiere.** Il
-bottone e il fumetto col nome scelto; nel fumetto l'AI si presenta come
-«un consiglio», mai come «il cassiere» o «l'assistente che decide»; la
+bottone «💡 Consigliami» e il fumetto che risponde; nel fumetto l'AI si
+presenta come «un consiglio», mai come «il cassiere» o «l'assistente
+che decide»; la
 card dell'asset mette la riga dell'emittente PRIMA del saldo (chi
 l'ha emesso, poi quanti ne hai); il lessico della regola 9 resta
 («pagamento diretto, senza deposito di garanzia»).

@@ -212,8 +212,8 @@ http://127.0.0.1:8080`, un'origine esatta).
 
 **Aggiornamento del 7 ott, letto sulla docs della CLI** (le cose che
 cambiano la pagina dell'aiutante, quello che la mattina si chiamava
-«Cassiere»: l'alias `cassiere` qui sotto lo rinomina il prossimo
-cantiere col nome di G.4):
+«Cassiere»: l'alias `cassiere` qui sotto diventa `consigliami` nel
+prossimo cantiere, G.4):
 
 - Il modello: Qwen3 1.7B è `QWEN3_1_7B_INST_Q4` (~1 GB), ed è quello che
   la docs usa in TUTTI gli esempi con JSON a schema. In
@@ -324,9 +324,10 @@ Il tema è **«Loyalty / punti fedeltà»** (Alan, 7 ott sera): ogni
 esercente emette i propri punti come token RGB, autenticati dal suo
 NIP-05, e QVAC aiuta a spenderli al posto dei satoshi — l'AI è un
 aiuto, il protagonista è il negozio che emette e l'identità che lo
-certifica. Il nome del progetto e quello del bottone/aiutante sono
-proposti nello studio, parte seconda, G.4 (raccomandati «Tessera» e
-«Consiglio»); li applica il prossimo cantiere. Priorità di
+certifica. Il progetto si chiama **«Barattolo Loyalty»** e l'aiutante
+— il bottone e il fumetto — **«Consigliami»** (decisi da Andrea l'8
+ott, studio, parte seconda, G.4); nel codice li applica il prossimo
+cantiere. Priorità di
 COSTRUZIONE, in quest'ordine e senza discussione il sabato: **core**
 (checkout in USDB + l'aiutante che consiglia + wallet WDK che paga via
 NWC-RGB), poi il **NIP minimo** con l'emittente verificato nella
@@ -345,7 +346,7 @@ studio, parte seconda, D.2; qui l'ordine dei pezzi:
    arrivo» → `rgb.py aggiorna barattolo` → «Pagato in USDB». **Il primo
    pagamento vero su signet entro le 16:30.** Lessico: «pagamento
    diretto, senza deposito di garanzia» (regola 9).
-3. **Sabato tardo pomeriggio** — l'aiutante (il nome in G.4): la pagina
+3. **Sabato tardo pomeriggio** — «Consigliami»: la pagina
    chiama `127.0.0.1:11434` con lo schema, il fumetto col consiglio,
    «Approva» fa il passo 2 da solo. Se CORS morde, la chiamata la fa il
    server e si dichiara.
@@ -512,7 +513,7 @@ niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
 
 | Quando | Cosa | Fatto |
 |---|---|---|
-| 8 ott, per primo | **Il repo pubblico** (studio, parte seconda, G.1): `<nome di G.4>-rgb` (riserva `barattolo-rgb-torino-2026`) sotto `kreamistudio-crypto`, Alan collaboratore, PUBBLICO dal primo commit firmato: README in inglese con la dichiarazione di §5 allo stato dell'8, `rgb/` = snapshot di `deploy/rgb/`, `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` (le bozze di B in inglese), LICENSE MIT, `.gitignore` (identità, age, stash). Niente del repo privato, nessuna chiave, nessun indirizzo di macchina. Il link nella risposta alla conferma degli organizzatori; poi un commit per ogni riga di questa lista che si chiude | ☐ |
+| 8 ott, per primo | **Il repo pubblico `barattolo-loyalty`** (studio, parte seconda, G.1) sotto `kreamistudio-crypto`, Alan collaboratore, PUBBLICO dal primo commit firmato: README in inglese con la dichiarazione di §5 allo stato dell'8, `rgb/` = snapshot di `deploy/rgb/`, `spec/NIP-RGB-ASSETS.md` e `spec/NWC-RGB.md` (le bozze di B in inglese), LICENSE MIT, `.gitignore` (identità, age, stash). Niente del repo privato, nessuna chiave, nessun indirizzo di macchina. Il link nella risposta alla conferma degli organizzatori; poi un commit per ogni riga di questa lista che si chiude | ☐ |
 | 8-9 ott | `rgb.py emetti` con la `precision` come argomento, provato sul PC (la ruota win_amd64 c'è) | ☐ |
 | 8-9 ott | Sulla VM: `rgb.py nuovo usdb`, faucet, `utxo usdb 5`, `emetti usdb USDB "Dollari di prova Barattolo" 100000000` a precisione 2, `backup usdb`; l'asset_id in §2 | ☐ |
 | 8-9 ott | 500 USDB (50.000 unità) al wallet utente: fattura «qualunque asset» (`node punti.mjs fattura - 50000 witness`, primo contatto), `rgb.py invia usdb …`, i due `aggiorna`; un blocco | ☐ |
