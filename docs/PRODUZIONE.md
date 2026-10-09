@@ -2464,6 +2464,15 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `/assets/p2p-banner-fee.webp` e il markup non cambiano; il timbro
   `?v=` lo rifà `_timbra_asset_pagina`, quindi nessuna cache tiene il
   disegno vecchio);
+  2b) DAL 9 OTT 2026 SI RIFÀ ANCHE IL RITAGLIO DELLA PRIMA VOLTA:
+  `python ritaglia_banner_fee.py` riscrive
+  `assets/p2p-banner-fee-senza-barra.webp` (la prima pillola senza la
+  barra rossa, per la primissima animazione); le misure della barra in
+  testa allo script sono quelle della `.fee-barra` del CSS, e
+  `prove_banner_fee_primo_ingresso` resta rossa finché il ritaglio non
+  torna col banner nuovo. Se il disegno nuovo non ha più un 2% barrato,
+  la primissima va ripensata (CANTIERI, «Il banner delle commissioni, la
+  prima volta»);
   3) nel `<button id="p2pFeeBanner">` di `miniapp.html` si riscrive
   l'`alt` con le cifre del disegno NUOVO (è la descrizione di
   quell'immagine, per chi legge con la voce) e, se le proporzioni sono

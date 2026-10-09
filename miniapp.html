@@ -2480,6 +2480,82 @@
   .p2p-fee-banner.fee-anima.fee-p3 .fee-pz3,
   .p2p-fee-banner.fee-anima.fee-p2 .fee-pz2{animation:p2pFeeBattito .45s ease-in-out 1s 1}
   @keyframes p2pFeeBattito{0%,100%{transform:scale(1)}45%{transform:scale(1.08)}}
+  /* LA PRIMA VOLTA, LENTA (9 ott 2026, richiesta di Andrea: il battito
+     qui sopra era troppo sobrio per capire la sequenza e quanto si paga
+     davvero). SOLO la prima, quella subito dopo il giro guidato — il
+     timbro `banner_p2p` non ancora scritto —; ogni volta dopo resta il
+     battito di sopra. Il JS (`animaBannerFeeP2P`) mette `fee-primo` e poi
+     un PASSO alla volta, e ogni passo resta fino alla fine:
+       1 (0 s)     la prima pillola entra, col «2%» PULITO: nel disegno la
+                   barra c'e' gia', e il pezzo mostra il ritaglio senza
+                   (`/assets/p2p-banner-fee-senza-barra.webp`, fatto da
+                   ritaglia_banner_fee.py: i primi 340 px su 1000, quindi
+                   largo il 34%);
+       2 (1 s)     la barra rossa si disegna dal basso a sinistra — e' la
+                   `.fee-barra` di sempre, che si allunga tenendo ferma la
+                   punta (translateX e scaleX insieme: l'origine resta al
+                   centro, o la rotazione la sposterebbe);
+       3 (1,5 s)   la prima si spegne, e il pezzo torna al disegno vero
+                   (la barra nuova copre esattamente quella del file);
+       4 (1,9 s)   «BETA 1,5%» arriva con un pop e un bagliore arancio;
+       5 (2,7 s)   «Pioniere o Lv.5 1%» arriva per ultima, col pop piu'
+                   forte e un bagliore verde;
+       6 (3,4 s)   si posa: la pillola che non vale per chi guarda si fa
+                   grigia, l'immagine sotto (le frecce, i bordi) torna, e
+                   per chi paga l'1,5% la sua pillola batte una volta;
+       fine (3,85 s) via `fee-primo` e i passi: resta lo stato di sempre,
+                   le stesse classi `fee-p2`/`fee-p3` di ogni ingresso.
+     I bagliori sono il ::before e il ::after del bottone (il pezzo ha un
+     clip-path, e un'ombra sua verrebbe tagliata), sotto i pezzi grazie a
+     `isolation` e z-index −1. Tutto vive dentro `.fee-primo`: tolta la
+     classe, del giro lento non resta niente.
+     EFFETTI RIDOTTI: la regola universale spegne pop, corse e bagliori, e
+     i passi restano — le pillole APPAIONO una alla volta, ferme. */
+  .p2p-fee-banner.fee-primo{isolation:isolate}
+  .p2p-fee-banner.fee-primo img{opacity:0}
+  .p2p-fee-banner.fee-primo.fee-passo6 img{opacity:1;transition:opacity .35s ease}
+  .p2p-fee-banner.fee-primo .fee-pz,.p2p-fee-banner.fee-primo .fee-barra{opacity:0}
+  .p2p-fee-banner.fee-primo.fee-passo1 .fee-pz1,
+  .p2p-fee-banner.fee-primo.fee-passo2 .fee-barra,
+  .p2p-fee-banner.fee-primo.fee-passo4 .fee-pz2,
+  .p2p-fee-banner.fee-primo.fee-passo5 .fee-pz3{opacity:1}
+  .p2p-fee-banner.fee-primo:not(.fee-passo3) .fee-pz1>i{
+    background:url(/assets/p2p-banner-fee-senza-barra.webp) 0 0/34% 100% no-repeat}
+  .p2p-fee-banner.fee-primo .fee-pz>i{transition:filter .35s ease}
+  .p2p-fee-banner.fee-primo:not(.fee-passo3) .fee-pz1>i,
+  .p2p-fee-banner.fee-primo:not(.fee-passo6) .fee-pz2>i,
+  .p2p-fee-banner.fee-primo:not(.fee-passo6) .fee-pz3>i{filter:none}
+  .p2p-fee-banner.fee-primo.fee-passo1 .fee-pz1{animation:p2pFeeEntra .5s ease-out both}
+  .p2p-fee-banner.fee-primo.fee-passo2 .fee-barra{
+    animation:p2pFeeBarra .45s cubic-bezier(.5,0,.3,1) both}
+  .p2p-fee-banner.fee-primo.fee-passo4 .fee-pz2{animation:p2pFeePop .6s ease-out both}
+  .p2p-fee-banner.fee-primo.fee-passo5 .fee-pz3{animation:p2pFeePopForte .75s ease-out both}
+  .p2p-fee-banner.fee-primo.fee-p2.fee-passo6 .fee-pz2{
+    animation:p2pFeePop .6s ease-out both,p2pFeeBattito .45s ease-in-out 1}
+  .p2p-fee-banner.fee-primo::before,.p2p-fee-banner.fee-primo::after{
+    content:"";position:absolute;z-index:-1;pointer-events:none;
+    border-radius:999px;opacity:0}
+  /* l'alone e' PIENO del suo colore e non scala: sta sotto la pillola,
+     quindi fuori si vede solo la luce — un alone vuoto che scalava coi
+     suoi tempi lasciava un anello bianco fra pillola e luce (visto dal
+     vivo, primo giro) */
+  .p2p-fee-banner.fee-primo::before{left:32.08%;right:37%;top:9.46%;bottom:9.95%;
+    background:rgba(255,138,0,.85);box-shadow:0 0 14px 5px rgba(255,138,0,.85)}
+  .p2p-fee-banner.fee-primo::after{left:62.2%;right:2.75%;top:9.46%;bottom:9.91%;
+    background:rgba(67,160,71,.9);box-shadow:0 0 22px 9px rgba(67,160,71,.9)}
+  .p2p-fee-banner.fee-primo.fee-passo4::before{animation:p2pFeeAlone 1.1s ease-out both}
+  .p2p-fee-banner.fee-primo.fee-passo5::after{animation:p2pFeeAlone 1.1s ease-out both}
+  @keyframes p2pFeeEntra{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:scale(1)}}
+  @keyframes p2pFeeBarra{
+    from{transform:rotate(-36.88deg) translateX(-50%) scaleX(0)}
+    to{transform:rotate(-36.88deg) translateX(0) scaleX(1)}}
+  @keyframes p2pFeePop{0%{opacity:0;transform:scale(.5)}
+    45%{opacity:1;transform:scale(1.2)}70%{transform:scale(.96)}
+    100%{opacity:1;transform:scale(1)}}
+  @keyframes p2pFeePopForte{0%{opacity:0;transform:scale(.4)}
+    45%{opacity:1;transform:scale(1.34)}68%{transform:scale(.94)}
+    85%{transform:scale(1.04)}100%{opacity:1;transform:scale(1)}}
+  @keyframes p2pFeeAlone{0%{opacity:0}30%,60%{opacity:1}100%{opacity:0}}
   /* il foglio che il banner apre: paragrafi da leggere, e il respiro
      sopra «Ho capito» quello del foglio di conferma */
   .p2p-fee-corpo{margin-bottom:14px}
@@ -65604,6 +65680,12 @@ function fineGiroP2P(){
    trova il banner gia' personale, fermo. Il «da li'» e' il timbro
    `banner_p2p` sul profilo, che vale su ogni dispositivo. Effetti
    ridotti: niente battiti, si passa subito allo stato finale.
+   LA PRIMISSIMA, quella col timbro non ancora scritto, e' LENTA (9 ott
+   2026, richiesta di Andrea): le pillole entrano una alla volta, il 2%
+   si barra sotto gli occhi, pop per la BETA e piu' forte per l'1% —
+   vedi LA PRIMA VOLTA, LENTA, nel CSS. Le rivedute da «Come funziona»
+   hanno il battito. Coi ridotti anche la primissima ha i suoi passi, ma
+   le pillole APPAIONO soltanto.
    L'ALT DICE IL PREZZO DI CHI GUARDA, con le cifre del disegno — la
    regola del banner: l'alt descrive QUESTA immagine. */
 const FEE_ANIMA_P2P_MS = 1500;
@@ -65643,11 +65725,20 @@ function bannerFeeFissoP2P(){
 function animaBannerFeeP2P(){
   const b = el('p2pFeeBanner'), n = pillolaFeeP2P();
   if (!b || !n) return;
+  /* la primissima: il timbro si legge PRIMA di scriverlo */
+  const prima = !hintDismesso('banner_p2p');
   timbraVisto('banner_p2p');
   clearTimeout(feeAnimaP2PTimer);
   feeAnimaP2PTimer = null;
+  fermaPrimaVoltaFeeP2P(b);
   b.classList.remove('fee-anima');
   vestiBannerFeeP2P(0);
+  if (prima) { primaVoltaFeeP2P(b, n); return; }
+  battitoFeeP2P(b, n);
+}
+/* IL BATTITO di ogni volta dopo la primissima (e il ripiego di quella,
+   se il ritaglio senza barra non arriva) */
+function battitoFeeP2P(b, n){
   if (effettiRidotti()) { vestiBannerFeeP2P(n); return; }
   void b.offsetWidth;
   b.classList.add('fee-anima');
@@ -65657,6 +65748,68 @@ function animaBannerFeeP2P(){
     b.classList.remove('fee-anima');
     feeAnimaP2PTimer = null;
   }, FEE_ANIMA_P2P_MS + 150);
+}
+/* LA PRIMA VOLTA, LENTA (9 ott 2026): quando parte ogni passo del CSS di
+   `.fee-primo` (1..6), e quando tutto torna allo stato di sempre. Somma
+   3,85 s: la richiesta e' 3-4. */
+const FEE_PRIMO_P2P_PASSI = [0, 1000, 1500, 1900, 2700, 3400];
+const FEE_PRIMO_P2P_MS = 3850;
+/* il ritaglio senza barra si aspetta al massimo cosi': poi il battito */
+const FEE_PRIMO_P2P_ATTESA_MS = 1200;
+let feePrimoP2PPassi = [];          // i timer dei passi in corsa
+let feePrimoP2PGiro = 0;            // quale primissima e' ancora quella buona
+let feeSenzaBarraP2P = null;        // la promessa del ritaglio: true se c'e'
+/* Il ritaglio si chiede una volta e si aspetta decodificato, cosi' la
+   prima pillola non entra vuota. Lo stesso indirizzo dell'url() del CSS:
+   il server timbra tutt'e due con lo stesso ?v=, e la cache e' una. Un
+   errore non resta in memoria: la volta dopo si richiede. */
+function senzaBarraFeeP2P(){
+  if (!feeSenzaBarraP2P) {
+    const im = new Image();
+    im.src = '/assets/p2p-banner-fee-senza-barra.webp';
+    const pronta = im.decode ? im.decode()
+      : new Promise((si, no) => { im.onload = si; im.onerror = no; });
+    feeSenzaBarraP2P = pronta.then(() => true,
+      () => { feeSenzaBarraP2P = null; return false; });
+  }
+  return feeSenzaBarraP2P;
+}
+function fermaPrimaVoltaFeeP2P(b){
+  feePrimoP2PGiro++;
+  feePrimoP2PPassi.forEach(clearTimeout);
+  feePrimoP2PPassi = [];
+  b.classList.remove('fee-primo', 'fee-passo1', 'fee-passo2', 'fee-passo3',
+    'fee-passo4', 'fee-passo5', 'fee-passo6');
+}
+/* Il banner si svuota SUBITO (resta la capsula: niente lampo del disegno
+   intero mentre il ritaglio arriva), poi i passi. Niente blocca la
+   pagina: sono classi e timer, il bottone resta toccabile, e un
+   `bannerFeeFissoP2P` nel frattempo trova `feeAnimaP2PTimer` e aspetta. */
+function primaVoltaFeeP2P(b, n){
+  const giro = feePrimoP2PGiro;
+  b.classList.add('fee-primo');
+  vestiBannerFeeP2P(n);
+  const fine = () => {
+    if (giro !== feePrimoP2PGiro) return;
+    fermaPrimaVoltaFeeP2P(b);
+    feeAnimaP2PTimer = null;
+  };
+  feeAnimaP2PTimer = setTimeout(fine, FEE_PRIMO_P2P_ATTESA_MS + FEE_PRIMO_P2P_MS + 150);
+  const attesa = new Promise(ok => setTimeout(() => ok(false), FEE_PRIMO_P2P_ATTESA_MS));
+  Promise.race([senzaBarraFeeP2P(), attesa]).then(pronto => {
+    if (giro !== feePrimoP2PGiro) return;
+    clearTimeout(feeAnimaP2PTimer);
+    feeAnimaP2PTimer = null;
+    if (!pronto) {
+      fermaPrimaVoltaFeeP2P(b);
+      vestiBannerFeeP2P(0);
+      battitoFeeP2P(b, n);
+      return;
+    }
+    feePrimoP2PPassi = FEE_PRIMO_P2P_PASSI.map((ms, i) =>
+      setTimeout(() => b.classList.add('fee-passo' + (i + 1)), ms));
+    feeAnimaP2PTimer = setTimeout(fine, FEE_PRIMO_P2P_MS);
+  });
 }
 /* ============ fine del banner personale ============ */
 

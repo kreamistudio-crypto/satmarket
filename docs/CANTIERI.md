@@ -41458,3 +41458,111 @@ scritto «un sconto di 60 sat» — cifra dentro, riga scartata, riserva al
 suo posto: è esattamente il caso per cui il filtro esiste. La copia di
 `consiglio.py` in `qvac-prova` è stata allineata (era quella dell'8
 mattina, senza `reasoning_budget`).
+
+
+## Il banner delle commissioni, la prima volta (9 ott 2026, richiesta di Andrea)
+
+La richiesta: nel libro P2P il banner delle commissioni («Fee P2P 2%»
+barrato → «BETA 1,5%» → «Pioniere o Lv.5 1%») la PRIMA volta, subito
+dopo il tutorial d'ingresso, deve animarsi lento ed evidente — le pillole
+una alla volta con pause chiare, il 2% che compare e si barra sotto gli
+occhi, la BETA con un pop (scala e bagliore), l'1% per ultimo col pop
+più forte; 3-4 secondi, niente blocchi, effetti ridotti = solo
+apparizione. SOLO quella volta. Lo stato finale identico a oggi, pixel
+per pixel (verde acceso sull'1% per pionieri e livello 5, sull'1,5% per
+gli altri); testi e cifre invariati.
+
+**Il flag c'era già, e non ne è nato un altro**: il timbro `banner_p2p`
+(sul profilo, `timbraVisto`) e il posto unico da cui l'animazione parte,
+`fineGiroP2P` (vedi «Il banner personale»). `animaBannerFeeP2P` ora
+LEGGE il timbro prima di scriverlo: assente → la primissima, lenta
+(`primaVoltaFeeP2P`); presente — le rivedute da «Come funziona» — il
+battito di sempre (`battitoFeeP2P`, il corpo di prima tale e quale).
+Ogni ingresso dopo resta com'era: nessuna animazione delle pillole, lo
+stato fisso di `bannerFeeFissoP2P`.
+
+**La barra rossa è DENTRO il disegno**, e per far vedere il 2% pulito
+serviva la prima pillola senza. Nasce `ritaglia_banner_fee.py` (solo
+Pillow): il ritaglio dei primi 340 px del banner, a tutta altezza, con
+rifatti SOLO i pixel sotto la barra più 3 px di sfumatura —
+`assets/p2p-banner-fee-senza-barra.webp`, 340×258, ~7 KB, con la sua
+rotta esplicita. Come si rifà quel che la barra copre, dopo due strade
+scartate: la media lungo la normale (sbavature: la barra corre quasi
+parallela alla stanghetta del «%») e il ricucito per direzioni su tutto
+(tacche nel cerchietto del «%» e nell'angolo del «2»). Quella che regge:
+il «%» è simmetrico a 180° e il cerchietto in basso è intatto, quindi lo
+si ruota attorno al centro del simbolo (cercato a mezzo decimo di pixel);
+il «2» sotto la barra è fatto di rette — la base, un rettangolo coi lati
+misurati fuori dalla barra, e il bordo destro della diagonale prolungato
+dalle ultime righe visibili —, ridisegnate con l'orlo sfumato di un
+pixel; il fondo per direzioni; e ogni colore rifatto torna sulla riga
+fondo–inchiostro, così del rosso non resta niente. Visto a 4× nearest:
+pulito.
+
+**I passi** (CSS «LA PRIMA VOLTA, LENTA», tutto sotto `.fee-primo`):
+0 s la prima pillola entra col ritaglio; 1 s la `.fee-barra` di sempre si
+disegna dal basso a sinistra (translateX e scaleX insieme: l'origine
+resta al centro, o la rotazione la sposterebbe); 1,5 s la prima si
+spegne e il pezzo torna al disegno vero, che la barra copre esattamente;
+1,9 s pop della BETA (fino a 1,2) con alone arancio; 2,7 s pop dell'1%
+(fino a 1,34) con alone verde più largo; 3,4 s si posa — la pillola che
+non vale si fa grigia, l'immagine sotto torna, e per chi paga l'1,5% la
+sua pillola batte una volta (come nel battito di sempre, l'ultima a
+muoversi è quella di chi guarda); 3,85 s via `fee-primo` e i passi,
+restano `fee-p2`/`fee-p3`. Il banner si svuota SUBITO (resta la capsula)
+mentre il ritaglio si decodifica, così non lampeggia il disegno intero;
+se il ritaglio non arriva in 1,2 s, il battito di sempre. Gli aloni sono
+il ::before e il ::after del bottone (il pezzo ha un clip-path che
+taglierebbe un'ombra sua), sotto i pezzi con `isolation` e z-index −1.
+⚠️ **Primo giro dal vivo: un anello bianco** fra pillola e alone — l'alone
+era vuoto e scalava coi suoi tempi, diversi da quelli del pop. Ora è
+pieno del suo colore e non scala. Effetti ridotti: la regola universale
+spegne pop, corse e aloni, i passi restano — le pillole appaiono.
+Scartato un nome: `p2pFeeLuce` per gli aloni, vietato da una sentinella
+di settembre (la «luce che scorreva» bocciata): si chiamano `p2pFeeAlone`.
+
+**Provato.** `prove_banner_fee_personale`: il banco in node ora fa la
+primissima coi tempi veri (banner vuoto subito col timbro scritto, il
+ritaglio chiesto all'indirizzo del CSS, i sei passi uno alla volta, /me
+che arriva in mezzo e non li ferma, la fine con le sole classi di ogni
+ingresso, pioniere → `fee-p3`, gli altri → `fee-p2`, ridotti coi passi,
+ritaglio che non arriva → battito); i casi di prima del battito girano
+col timbro già scritto. `prove_banner_fee_primo_ingresso`, nuova: il
+WebP, la barra dello script = la `.fee-barra` del CSS, fuori dalla barra
+il ritaglio è il banner (scarto medio < 2, il 99% entro 12) — un banner
+nuovo a fine beta fa rosso qui —, sotto la barra niente rosso, il file è
+quello che lo script fa oggi, la rotta, lo script nel «Tutto compila»,
+ogni regola dei passi sotto `.fee-primo`, i pop, gli aloni pieni e senza
+scala, ogni corsa finita prima dei 3,85 s (un'animazione rinominata in un
+passo dopo conta dal primo: il browser la riconosce per nome e non la
+riavvia). Controprova con tre mutazioni su una copia (fine a 3,6 s, una
+regola fuori da `.fee-primo`, pop forte più debole della BETA): una
+rossa ciascuna.
+**Dal vivo**, copia del worktree nello scratchpad con config da
+`config_esempio.py` (collaudo, P2P acceso, TUTTI i relay al relay morto
+compresi `RELAY_NOSTR` e `RELAY_NOSTR_IMPORT`, sconto 0,5, listino 4 come
+in produzione — col 2 dell'esempio il banner si nasconde da solo, perché
+non dice il vero), Chrome headless via CDP a 390×844 con
+`prefers-reduced-motion: no-preference`, identità NUOVE per ogni giro
+(pioniere scritte nel DB della copia): tour del P2P e giro guidato
+percorsi coi loro bottoni, «Fine 🎉» premuto durante lo screencast.
+Pioniera e normale come da richiesta; effetti ridotti: solo apparizioni.
+Lo stato finale: l'ultimo fotogramma dopo la primissima, quello di un
+ingresso successivo col codice nuovo e quello col `miniapp.html` di
+origin/main — 0 pixel diversi, per tre normali e due pioniere; la
+controprova normale contro pioniera fa 10.666 pixel diversi, sulle
+pillole 2 e 3. GIF e provini in `.claude/giri/banner-fee-primo-ingresso/`
+(fuori da git).
+**Lezioni del banco**: in headless lo scatto singolo coglie la vista a
+metà della sua dissolvenza (le animazioni avanzano solo coi fotogrammi):
+per i colori valgono i fotogrammi dello screencast, che però escono a
+densità 1 anche con `maxWidth`; una navigazione che cambia solo il `#`
+non ricarica (si passa da `about:blank`); la riga di un'identità nuova
+nasce al primo timbro scritto, non all'apertura; e il fumetto
+`#tourFumetto` è anche quello del tour del mercatino — un «Fine 🎉»
+premuto lì non è il giro del P2P.
+
+**Da guardare**: sul telefono vero, la prima volta di un'identità nuova
+(il movimento lo giudica Andrea); a fine beta, col banner nuovo, si rifà
+anche il ritaglio (`python ritaglia_banner_fee.py`) — e se il disegno
+nuovo non ha più un 2% barrato, la primissima va ripensata.

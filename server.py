@@ -67241,6 +67241,22 @@ def asset_p2p_banner_fee():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/assets/p2p-banner-fee-senza-barra.webp")
+def asset_p2p_banner_fee_senza_barra():
+    """LA PRIMA PILLOLA DEL BANNER SENZA LA BARRA ROSSA (9 ott 2026,
+    richiesta di Andrea): la prima volta che il banner delle commissioni
+    si fa personale il «2%» compare pulito e la barra gli si disegna
+    sopra sotto gli occhi — ma nel disegno la barra c'e' gia'. Questo e'
+    il ritaglio dei primi 340 px del banner con la barra tolta, fatto da
+    `ritaglia_banner_fee.py` (si rifa' quando si sostituisce il banner:
+    PRODUZIONE, «IL BANNER DELLE COMMISSIONI P2P»). WebP con
+    trasparenza, 340x258, ~7 KB. Rotta esplicita come le sorelle: mai un
+    mount (regola 3). Il timbro ?v= lo mette _timbra_asset_pagina."""
+    return FileResponse("assets/p2p-banner-fee-senza-barra.webp",
+                        media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/assets/tappo.jpeg")
 def asset_tappo():
     """Il tappo del barattolo (128px, ritagliato sul diametro): e' il

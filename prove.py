@@ -57439,10 +57439,15 @@ let myTgId = 111, p2pSconto = null, RIDOTTI = false, VISTI = {}, TIMBRI = [];
 function effettiRidotti(){ return RIDOTTI; }
 function hintDismesso(id){ return !!VISTI[id]; }
 function timbraVisto(id){ VISTI[id] = 1; TIMBRI.push(id); }
+/* il ritaglio senza barra della primissima: decodifica, o no */
+let IMMAGINE_OK = true; const IMMAGINI = [];
+class Image { constructor(){ IMMAGINI.push(this); }
+  decode(){ return IMMAGINE_OK ? Promise.resolve() : Promise.reject(new Error('404')); } }
 """ + blocco + r"""
-const dorme = ms => new Promise(ok => setTimeout(ok, ms));
+const dorme = ms => new Promise(ok => setTimeout(ok, Math.max(0, ms)));
 const stato = () => ({classi: BANNER.classList.all(), alt: IMG.alt, timbri: TIMBRI.slice()});
 function azzera(sc, tg){
+  fermaPrimaVoltaFeeP2P(BANNER); feeSenzaBarraP2P = null;
   for (const c of BANNER.classList.all()) BANNER.classList.remove(c);
   clearTimeout(feeAnimaP2PTimer); feeAnimaP2PTimer = null;
   p2pSconto = sc; myTgId = tg === undefined ? 111 : tg; RIDOTTI = false; VISTI = {}; TIMBRI = [];
@@ -57455,29 +57460,51 @@ const out = {};
   const NESSUNO = {attivo: false, motivo: '', punti: 0.5};
   /* PRIMA DELLA PRIMA ANIMAZIONE: tutto colorato, anche per chi ha lo sconto */
   azzera(PIONIERE); bannerFeeFissoP2P(); out.primaDelTimbro = stato();
-  /* L'ANIMAZIONE, pioniere: parte colorato, poi la classe del giro e la pillola */
-  azzera(PIONIERE); LOG.length = 0; animaBannerFeeP2P();
+  /* IL BATTITO (dal 9 ott 2026 e' quello delle RIVEDUTE: il timbro c'e'
+     gia', la primissima lenta sta in fondo), pioniere: parte colorato,
+     poi la classe del giro e la pillola */
+  azzera(PIONIERE); VISTI.banner_p2p = 1; LOG.length = 0; animaBannerFeeP2P();
   out.pioniereDurante = Object.assign(stato(), {log: LOG.slice()});
   await dorme(FEE_ANIMA_P2P_MS + 250);
   out.pioniereDopo = stato();
   /* ...lo stato fisso all'ingresso dopo, senza animazione */
   for (const c of BANNER.classList.all()) BANNER.classList.remove(c);
   bannerFeeFissoP2P(); out.pioniereIngresso = stato();
-  azzera(LIVELLO); animaBannerFeeP2P(); await dorme(FEE_ANIMA_P2P_MS + 250);
+  azzera(LIVELLO); VISTI.banner_p2p = 1; animaBannerFeeP2P(); await dorme(FEE_ANIMA_P2P_MS + 250);
   out.livello = stato();
-  azzera(NESSUNO); animaBannerFeeP2P(); out.nessunoDurante = stato();
+  azzera(NESSUNO); VISTI.banner_p2p = 1; animaBannerFeeP2P(); out.nessunoDurante = stato();
   await dorme(FEE_ANIMA_P2P_MS + 250); out.nessuno = stato();
   /* IL SERVER CHE TACE e L'ANONIMO: tutto colorato, niente timbro */
   azzera(null); animaBannerFeeP2P(); out.tace = stato();
   VISTI.banner_p2p = 1; bannerFeeFissoP2P(); out.taceFisso = stato();
   azzera(PIONIERE, 0); animaBannerFeeP2P(); out.anonimo = stato();
   /* EFFETTI RIDOTTI: nessuna corsa, subito lo stato finale */
-  azzera(PIONIERE); RIDOTTI = true; animaBannerFeeP2P(); out.ridotti = stato();
+  azzera(PIONIERE); VISTI.banner_p2p = 1; RIDOTTI = true; animaBannerFeeP2P(); out.ridotti = stato();
   /* RIVISTO DA «COME FUNZIONA»: gia' personale, riparte COLORATO e rifa' la corsa */
   azzera(NESSUNO); VISTI.banner_p2p = 1; bannerFeeFissoP2P(); LOG.length = 0;
   animaBannerFeeP2P(); out.rivisto = {log: LOG.slice(), classi: BANNER.classList.all()};
   /* ...e /me che arriva durante la corsa non la interrompe */
   bannerFeeFissoP2P(); out.meInCorsa = BANNER.classList.all();
+  /* LA PRIMISSIMA, LENTA (9 ott 2026): timbro letto prima di scriverlo,
+     il banner vuoto SUBITO, il ritaglio chiesto, poi i sei passi nei
+     loro tempi, e alla fine lo stato di sempre */
+  azzera(PIONIERE); animaBannerFeeP2P();
+  out.primoSubito = stato(); out.primoImg = IMMAGINI.map(i => i.src);
+  const t0 = Date.now(), campioni = [];
+  for (const ms of [500, 1250, 1700, 2300, 3100, 3650]) {
+    await dorme(ms - (Date.now() - t0)); campioni.push(BANNER.classList.all()); }
+  out.primoPassi = campioni;
+  bannerFeeFissoP2P(); out.primoMeInCorsa = BANNER.classList.all();
+  await dorme(FEE_PRIMO_P2P_MS + 250 - (Date.now() - t0)); out.primoDopo = stato();
+  azzera(NESSUNO); animaBannerFeeP2P(); await dorme(FEE_PRIMO_P2P_MS + 250);
+  out.primoNessuno = stato();
+  /* ...coi ridotti i passi ci sono lo stesso: le pillole APPAIONO */
+  azzera(LIVELLO); RIDOTTI = true; animaBannerFeeP2P(); await dorme(2300);
+  out.primoRidottiMeta = BANNER.classList.all();
+  await dorme(FEE_PRIMO_P2P_MS - 2300 + 250); out.primoRidotti = stato();
+  /* ...e se il ritaglio non arriva: il battito di sempre, timbro scritto */
+  azzera(PIONIERE); IMMAGINE_OK = false; animaBannerFeeP2P(); await dorme(60);
+  out.primoSenzaRitaglio = stato(); IMMAGINE_OK = true;
   process.stdout.write(JSON.stringify(out));
   process.exit(0);
 })().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
@@ -57528,6 +57555,181 @@ const out = {};
           0 <= _pos("-fee-p2") < _pos("+fee-anima") < _pos("+fee-p2"))
     prova("...e /me che arriva a corsa in atto non la ferma", ["fee-anima", "fee-p2"],
           o["meInCorsa"])
+    # LA PRIMISSIMA, LENTA (9 ott 2026, cantiere «banner-fee-primo-ingresso»)
+    prova("LA PRIMISSIMA: banner vuoto SUBITO (fee-primo), la pillola gia' scelta, il timbro scritto",
+          {"classi": ["fee-p3", "fee-primo"], "alt": ALT3, "timbri": ["banner_p2p"]},
+          o["primoSubito"])
+    prova("...e chiede il ritaglio senza barra, quello dell'url() del CSS",
+          ["/assets/p2p-banner-fee-senza-barra.webp"], o["primoImg"])
+    attesi = [sorted(["fee-p3", "fee-primo"] + ["fee-passo%d" % k for k in range(1, n + 1)])
+              for n in range(1, 7)]
+    prova("...poi i sei passi, uno alla volta e nei loro tempi (0 / 1 / 1,5 / 1,9 / 2,7 / 3,4 s)",
+          attesi, o["primoPassi"])
+    prova("...e /me che arriva durante i passi non li ferma", attesi[-1], o["primoMeInCorsa"])
+    prova("...e alla fine resta lo STATO DI SEMPRE: le sole classi di ogni ingresso",
+          [{"classi": ["fee-p3"], "alt": ALT3, "timbri": ["banner_p2p"]}, o["pioniereIngresso"]["classi"]],
+          [o["primoDopo"], o["primoDopo"]["classi"]])
+    prova("...chi paga l'1,5% finisce sulla seconda", {"classi": ["fee-p2"], "alt": ALT2,
+                                                      "timbri": ["banner_p2p"]}, o["primoNessuno"])
+    prova("EFFETTI RIDOTTI alla primissima: i passi ci sono (le pillole APPAIONO), e la fine e' la stessa",
+          [sorted(["fee-p3", "fee-primo", "fee-passo1", "fee-passo2", "fee-passo3", "fee-passo4"]),
+           ["fee-p3"]],
+          [o["primoRidottiMeta"], o["primoRidotti"]["classi"]])
+    prova("...e se il ritaglio non arriva: il battito di sempre, col timbro",
+          {"classi": ["fee-anima", "fee-p3"], "alt": ALT3, "timbri": ["banner_p2p"]},
+          o["primoSenzaRitaglio"])
+    passi_js = [int(x) for x in re.search(r"const FEE_PRIMO_P2P_PASSI = \[([\d, ]+)\];",
+                                          mini).group(1).split(",")]
+    durata_js = int(re.search(r"const FEE_PRIMO_P2P_MS = (\d+);", mini).group(1))
+    prova("...e dura 3-4 secondi, come chiesto", [True, True],
+          [3000 <= durata_js <= 4000, passi_js == sorted(passi_js) and passi_js[-1] < durata_js])
+
+
+def prove_banner_fee_primo_ingresso():
+    """IL BANNER DELLE COMMISSIONI, LA PRIMA VOLTA (9 ott 2026, richiesta
+    di Andrea): la primissima animazione — subito dopo il giro guidato,
+    col timbro `banner_p2p` non ancora scritto — e' lenta ed evidente: le
+    pillole entrano una alla volta, il 2% compare PULITO e si barra sotto
+    gli occhi, la BETA arriva con un pop, l'1% col pop piu' forte. Lo
+    stato finale e' quello di sempre. Il JS gira nel banco del banner
+    personale; qui il ritaglio senza barra (il file, la rotta, lo script
+    che lo fa) e il CSS dei passi: tutto sotto `.fee-primo`, e ogni corsa
+    finita prima che la classe se ne vada."""
+    print("\n[il banner delle commissioni, la prima volta]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = re.sub(r"/\*.*?\*/", "", mini[mini.index("<style>"):mini.index("</style>")],
+                 flags=re.S)
+    sc = re.sub(r"\s+", " ", css)
+    FILE = "assets/p2p-banner-fee-senza-barra.webp"
+    URL = "/assets/p2p-banner-fee-senza-barra.webp"
+
+    # --- 1) IL FILE: WebP con trasparenza, piccolo -----------------------
+    raw = open(FILE, "rb").read()
+    prova("il ritaglio senza barra e' un WebP, sotto i 15 KB", [(b"RIFF", b"WEBP"), True],
+          [(raw[:4], raw[8:12]), len(raw) < 15000])
+    import ritaglia_banner_fee as rb
+    # le misure della barra dello script sono quelle della `.fee-barra` del CSS
+    rbar = re.search(r"\n\s*\.p2p-fee-banner \.fee-barra\{([^}]*)\}", css)
+    rbar = re.sub(r"\s+", "", rbar.group(1)) if rbar else ""
+    num = lambda k: float(re.search(k + r":([\d.]+)%", rbar).group(1)) if re.search(k + r":([\d.]+)%", rbar) else -1
+    prova("la barra che lo script toglie e' quella del CSS (centro, lunghezza, spessore, angolo)",
+          [True, True, True, True, True],
+          [abs((num("left") + num("width") / 2) * 10 - rb.CX) < .2,
+           abs((num("top") + num("height") / 2) * 2.58 - rb.CY) < .2,
+           abs(num("width") * 10 - rb.LUNGA) < .2, abs(num("height") * 2.58 - rb.SPESSA) < .2,
+           ("rotate(%gdeg)" % rb.ANGOLO) in rbar])
+    try:
+        from PIL import Image as _Im
+    except ImportError:
+        salta("i pixel del ritaglio senza barra", "serve Pillow")
+    else:
+        with _Im.open("assets/p2p-banner-fee.webp") as _o:
+            orig = _o.convert("RGBA")
+        with _Im.open(FILE) as _v:
+            nuovo = _v.convert("RGBA")
+        prova("...largo i primi 340 px del banner, a tutta altezza", (rb.LARGO, orig.size[1]),
+              nuovo.size)
+        po, pv = orig.load(), nuovo.load()
+        diff, rossi_o, rossi_v = [], 0, 0
+        for y in range(nuovo.size[1]):
+            for x in range(nuovo.size[0]):
+                a, b = po[x, y], pv[x, y]
+                if rb.sotto_la_barra(x, y, rb.BORDO + 1.5):
+                    rossi_o += a[0] - a[1] > 60 and a[3] > 200
+                    rossi_v += b[0] - b[1] > 60 and b[3] > 200
+                    continue
+                diff.append(max(abs(a[c] - b[c]) for c in range(4)))
+        diff.sort()
+        # FUORI DALLA BARRA E' IL BANNER: un banner nuovo (fine beta) fa
+        # rosso qui, e si rigira ritaglia_banner_fee.py
+        prova("FUORI DALLA BARRA E' IL BANNER (scarto medio < 2, il 99%% entro 12 sui 255)",
+              [True, True], [sum(diff) / len(diff) < 2, diff[int(len(diff) * .99)] <= 12])
+        prova("...e sotto la barra del rosso non resta niente (il banner ne ha)",
+              [True, 0], [rossi_o > 500, rossi_v])
+        # IL FILE E' QUELLO DELLO SCRIPT: rifatto qui, sotto la barra coincide
+        rif = rb.ritaglia(orig).load()
+        e = sorted(max(abs(rif[x, y][c] - pv[x, y][c]) for c in range(4))
+                   for y in range(nuovo.size[1]) for x in range(nuovo.size[0])
+                   if rb.sotto_la_barra(x, y))
+        prova("...ed e' quello che ritaglia_banner_fee.py fa oggi (scarto medio < 4, il 99%% entro 16)",
+              [True, True], [sum(e) / len(e) < 4, e[int(len(e) * .99)] <= 16])
+
+    # --- 2) LA ROTTA: esplicita, come le sorelle; lo script compila in CI ---
+    rotta = pezzo("asset_p2p_banner_fee_senza_barra")
+    prova("la rotta e' esplicita, mai un mount, con la cache delle sorelle", True,
+          ('@app.get("%s")' % URL) in _SORGENTE and ('FileResponse("%s",' % FILE) in rotta
+          and 'media_type="image/webp"' in rotta
+          and '"Cache-Control": "public, max-age=86400"' in rotta)
+    prova("...e ritaglia_banner_fee.py e' nella lista del «Tutto compila»", True,
+          "ritaglia_banner_fee.py" in open(".github/workflows/prove.yml", encoding="utf-8").read())
+
+    # --- 3) IL CSS: i passi, tutti sotto .fee-primo -------------------------
+    prova("il pezzo della prima mostra il ritaglio, largo il 34% (340 su 1000), fino al passo 3",
+          True, ".p2p-fee-banner.fee-primo:not(.fee-passo3) .fee-pz1>i{ background:url(%s) 0 0/34%% 100%% no-repeat}" % URL in sc)
+    selettori = re.findall(r"([^{}]*)\{", css)
+    nuovi = [s.strip() for s in selettori
+             if re.search(r"fee-passo|fee-primo", s)]
+    prova("OGNI regola dei passi vive sotto .fee-primo: tolta la classe, resta lo stato di sempre",
+          [], [s for s in nuovi for parte in s.split(",")
+               if "fee-primo" not in parte and parte.strip()])
+    prova("...e le regole dello stato di sempre non nominano la prima volta", [],
+          [s for s in selettori if ("fee-p2 " in s or "fee-p3 " in s)
+           and "fee-primo" not in s and "fee-passo" in s])
+    prova("le pillole entrano una alla volta: la prima al passo 1, la barra al 2, la BETA al 4, l'1% al 5",
+          True, ".p2p-fee-banner.fee-primo.fee-passo1 .fee-pz1, .p2p-fee-banner.fee-primo.fee-passo2 "
+          ".fee-barra, .p2p-fee-banner.fee-primo.fee-passo4 .fee-pz2, .p2p-fee-banner.fee-primo.fee-passo5 "
+          ".fee-pz3{opacity:1}" in sc)
+    prova("...colorate finche' non si posano: la prima al passo 3, le altre due al 6", True,
+          ".p2p-fee-banner.fee-primo:not(.fee-passo3) .fee-pz1>i, .p2p-fee-banner.fee-primo:not(.fee-passo6) "
+          ".fee-pz2>i, .p2p-fee-banner.fee-primo:not(.fee-passo6) .fee-pz3>i{filter:none}" in sc)
+
+    def chiavi(nome):
+        m = re.search(r"@keyframes " + nome + r"\{(.*?)\}\s*\}", sc)
+        return [float(x) for x in re.findall(r"scale\(([\d.]+)\)", m.group(1))] if m else []
+    pop, forte = chiavi("p2pFeePop"), chiavi("p2pFeePopForte")
+    prova("IL POP: la BETA cresce oltre la sua misura, l'1% ancora di piu' (e tutt'e due tornano a 1)",
+          [True, True, True], [bool(pop) and max(pop) > 1.1, bool(forte) and max(forte) > max(pop or [9]),
+                               bool(pop and forte) and pop[-1] == 1 and forte[-1] == 1])
+    aloni = [re.search(r"\.fee-primo::(?:before|after)\{[^}]*box-shadow:0 0 (\d+)px (\d+)px", sc[i:])
+             for i in (sc.find(".p2p-fee-banner.fee-primo::before{left"),
+                       sc.find(".p2p-fee-banner.fee-primo::after{left"))]
+    prova("...coi bagliori, arancio e verde, il piu' forte (piu' largo) sull'1%", [True, True, True],
+          ["fee-passo4::before{animation:p2pFeeAlone " in sc,
+           "fee-passo5::after{animation:p2pFeeAlone " in sc,
+           all(aloni) and int(aloni[1].group(1)) > int(aloni[0].group(1))
+           and int(aloni[1].group(2)) > int(aloni[0].group(2))])
+    prova("...e l'alone e' PIENO e non scala: niente anello bianco fra pillola e luce", [True, False],
+          [bool(re.search(r"\.fee-primo::before\{left[^}]*background:rgba", sc)),
+           "transform" in (re.search(r"@keyframes p2pFeeAlone\{(.*?)\}\s*\}", sc) or
+                           re.match(r"(transform)", "transform")).group(1)])
+    prova("LA BARRA SI DISEGNA tenendo ferma la punta: translateX e scaleX insieme, origine al centro",
+          True, "from{transform:rotate(-36.88deg) translateX(-50%) scaleX(0)} "
+          "to{transform:rotate(-36.88deg) translateX(0) scaleX(1)}" in sc)
+    # OGNI CORSA FINISCE PRIMA DELLA FINE: passo + ritardo + durata <= FEE_PRIMO_P2P_MS
+    passi = [int(x) for x in re.search(r"const FEE_PRIMO_P2P_PASSI = \[([\d, ]+)\];",
+                                       mini).group(1).split(",")]
+    fine = int(re.search(r"const FEE_PRIMO_P2P_MS = (\d+);", mini).group(1))
+    oltre, partita = [], {}
+    regole = [(int(m.group(2)), m.group(1), m.group(3)) for m in re.finditer(
+        r"([^{}]*fee-passo(\d)[^{}]*)\{([^}]*(?:animation|transition):[^}]*)\}", sc)]
+    # un'animazione RINOMINATA in un passo dopo e' la stessa che corre (il
+    # browser le riconosce per nome e non le riavvia): conta dal primo passo
+    for k, _s, corpo in sorted(regole):
+        for nome in re.findall(r"animation:\s*(\w+)|,\s*(\w+) [\d.]", corpo):
+            nome = nome[0] or nome[1]
+            partita.setdefault(nome, k)
+    for k, sel, corpo in regole:
+        for t in re.findall(r"(?:animation|transition):([^;}]*)", corpo):
+            for corsa in t.split(","):
+                tempi = [float(x) * 1000
+                         for x in re.findall(r"(?<![\w.])(\d*\.?\d+)s\b", corsa)]
+                nome = corsa.split()[0] if corsa.split() else ""
+                if passi[partita.get(nome, k) - 1] + sum(tempi[:2]) > fine:
+                    oltre.append((sel.strip()[-40:], corsa.strip()))
+    prova("...e ogni corsa dei passi e' finita quando la classe se ne va (%d ms)" % fine,
+          [], oltre)
+    prova("EFFETTI RIDOTTI: nessun !important fra le regole della prima volta (vince la regola universale)",
+          0, len(re.findall(r"fee-primo[^{]*\{[^}]*!important", css)))
 
 
 def prove_p2p_invii():
@@ -130535,6 +130737,7 @@ def main():
         prove_tour_p2p, prove_tour_p2p_finale, prove_libro_subito,
         prove_avviso_elenco_parziale,
         prove_giro_guidato_p2p, prove_banner_fee_personale,
+        prove_banner_fee_primo_ingresso,
         prove_card_p2p_vetrina,
         prove_ritocchi_prova_alan,
         prove_p2p_invii,

@@ -7306,6 +7306,18 @@
   e timbra `banner_p2p`; da li' `bannerFeeFissoP2P` (a /me arrivato) lo
   mette personale e fermo. Coi ridotti niente battiti, subito lo stato
   finale. L'alt dice il prezzo di chi guarda, con le cifre del disegno.
+  DAL 9 OTT 2026 LA PRIMISSIMA E' LENTA: `animaBannerFeeP2P` legge il
+  timbro PRIMA di scriverlo, e se manca fa `primaVoltaFeeP2P` — classe
+  `fee-primo` e sei passi `fee-passo1..6` a tempi fissi
+  (`FEE_PRIMO_P2P_PASSI`, fine a `FEE_PRIMO_P2P_MS` = 3,85 s): la prima
+  pillola entra col ritaglio senza barra
+  (`/assets/p2p-banner-fee-senza-barra.webp`), la `.fee-barra` si
+  disegna, pop della BETA e pop piu' forte dell'1% con gli aloni
+  (::before/::after del bottone), poi si posa. Tutte le regole stanno
+  sotto `.fee-primo`, quindi a classe tolta resta lo stato di sempre
+  (provato a 0 pixel diversi). Ritaglio che non arriva in 1,2 s → il
+  battito; coi ridotti i passi restano, senza movimento. Le rivedute da
+  «Come funziona» hanno il battito (`battitoFeeP2P`).
   Il blocco vive dopo il giro guidato: quello del libro non scrive cifre.
   Il verbale: CANTIERI, «Il libro subito», «Il tutorial su pagina
   sfocata, e «Invii» nel P2P», «Il giro guidato del P2P» e «Il banner
@@ -29043,6 +29055,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    del titolo scritto e nello stato vuoto — WebP con trasparenza,
    682x459, 46 KB, servita come file e mai incorporata nella pagina;
    vedi CANTIERI, «L'intestazione di I miei scambi»),
+   `/assets/p2p-banner-fee-senza-barra.webp` (la prima pillola del
+   banner delle commissioni senza la barra rossa, 9 ott 2026: 340x258,
+   ~7 KB, fatta da `ritaglia_banner_fee.py` e mostrata solo nella
+   primissima animazione; vedi CANTIERI, «Il banner delle commissioni,
+   la prima volta»),
    `/assets/tour-p2p/{nome}` (le sei illustrazioni del tour di
    benvenuto del P2P, 17 set 2026: whitelist a tupla
    `FILE_TOUR_P2P`, 756x360 WebP (21:10, la forma della scatola nel

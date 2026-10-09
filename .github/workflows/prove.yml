@@ -114,7 +114,7 @@ jobs:
              collaudo_letture_relay.py
              collaudo_foto_scartate.py
              prepara_logo_consigliato.py
-             prepara_banner_fee.py
+             prepara_banner_fee.py ritaglia_banner_fee.py
              collaudo_spedizione_standard.py
              collaudo_catalogo_esterno.py
              collaudo_nuova_fattura.py
