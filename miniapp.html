@@ -4244,6 +4244,24 @@
   @media (prefers-reduced-motion:reduce){
     .p2p-manca{animation:none;box-shadow:0 0 0 3px rgba(217,64,29,.55)}
   }
+  /* IL METODO DA SCEGLIERE SI FA VEDERE (9 ott 2026, cantiere
+     prendi-metodo, richiesta di Andrea): nel dettaglio di un ordine con
+     piu' metodi «Compra»/«Vendi» e' acceso, e toccato senza metodo
+     scorre fin qui e accende la sezione — la stessa liturgia di
+     `.p2p-manca` qui sopra, ma nell'ARANCIO DI CASA (--sats) e non nel
+     rosso: non e' un errore di chi compila un modulo, e' la domanda
+     che resta da fare. La frase sopra le pillole e' la scritta in
+     evidenza. Con meno movimento niente lampeggio: l'anello sta fermo
+     finche' c'e' la classe. */
+  .p2p-scegli{animation:p2pScegli 1.2s ease}
+  @keyframes p2pScegli{
+    0%,100%{box-shadow:0 0 0 0 rgba(247,147,26,0)}
+    12%,55%{box-shadow:0 0 0 3px rgba(247,147,26,.7)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .p2p-scegli{animation:none;box-shadow:0 0 0 3px rgba(247,147,26,.7)}
+  }
+  .p2p-scegli-metodo{color:var(--sats-text);font-weight:800;font-size:14px;margin:0 0 8px}
 
   /* ---- LA BARRA SI APRE (set 2026, richiesta di Andrea) ----
      Mentre il bottone si allarga, le voci ai due lati del + vengono
@@ -10160,6 +10178,7 @@
   /* 2) gli aloni che battevano restano FERMI: gli stessi due ripieghi
         dei blocchi reduced-motion, dichiarazione per dichiarazione */
   html.fx-ridotti .p2p-manca{box-shadow:0 0 0 3px rgba(217,64,29,.55)}
+  html.fx-ridotti .p2p-scegli{box-shadow:0 0 0 3px rgba(247,147,26,.7)}
   /* 3) dietro il tour del P2P niente sfocatura (26 set 2026): il fondo
         pieno di casa, e alla chiusura la pagina c'e' nitida */
   html.fx-ridotti #tourP2P{background:var(--bg)}
@@ -57047,9 +57066,17 @@ function metodiDettP2P(o){
     return sezioneNuovoP2P({ico: 'metodi', titolo: titolo,
       corpo: '<b class="p2p-dett-uno" title="' + esc(metodi[0]) + '">'
         + marchioMetodoP2P(metodi[0]) + '</b>'});
+  /* LA DOMANDA SOPRA LE PILLOLE (9 ott 2026, cantiere prendi-metodo):
+     la frase che stava in fondo, rossa, accanto al bottone spento, sale
+     qui dove si risponde, e si vede quando serve — al tocco di
+     «Compra»/«Vendi» senza metodo (`chiediMetodoDettP2P`). Sul mio
+     ordine nessuno sceglie niente. */
+  const domanda = (o.mio || p2pDettMetodo) ? ''
+    : '<div class="p2p-scegli-metodo" id="p2pDettScegliMetodo" hidden>'
+      + esc(fraseMetodoDettP2P(o)) + '</div>';
   return sezioneNuovoP2P({
     ico: 'metodi', titolo: titolo,
-    corpo: '<div class="p2p-metodi">' + metodi.map(m =>
+    corpo: domanda + '<div class="p2p-metodi">' + metodi.map(m =>
       '<button type="button" class="tema-pill' + (m === p2pDettMetodo ? ' active' : '')
       + (vesteMetodoP2P(m) ? ' p2p-pill-marchio' : '')
       + '" data-m="' + esc(m) + '" onclick="scegliMetodoDettP2P(this.dataset.m)">'
@@ -57089,6 +57116,37 @@ function apriInfoTabacchinoP2P(){
   setTimeout(() => {
     try { el('p2pinfo-tabacchino').scrollIntoView({block: 'start', behavior: 'auto'}); } catch(e) {}
   }, 80);
+}
+/* la frase della domanda, una sola stesura: il lato viene dall'ordine
+   (`sell` = l'ordine vende sats, chi legge compra e INVIA gli euro) */
+function fraseMetodoDettP2P(o){
+  return 'Scegli con quale metodo vuoi '
+    + (o && o.lato === 'sell' ? 'inviare' : 'ricevere') + ' gli euro.';
+}
+/* «COMPRA»/«VENDI» SENZA METODO (9 ott 2026, cantiere prendi-metodo,
+   richiesta di Andrea): fino a ieri il bottone restava spento finche'
+   non si sceglieva, e sembrava rotto senza motivo — la frase rossa in
+   fondo non la leggeva nessuno. Adesso e' acceso e il tocco non prende
+   niente: la pagina scorre fino ai metodi, la domanda compare sopra le
+   pillole e la sezione si accende un attimo nell'arancio di casa, con
+   una vibrazione leggera. E' la liturgia di `avvisaMancaP2P` del foglio
+   «Pubblica», senza il toast: la frase sta gia' dove si risponde. */
+function chiediMetodoDettP2P(){
+  haptic();
+  const d = el('p2pDettScegliMetodo');
+  const sez = d && d.closest('.p2p-sez');
+  if (!sez) return false;
+  d.hidden = false;
+  try {
+    sez.scrollIntoView({block: 'center',
+                        behavior: tourRidotto() ? 'auto' : 'smooth'});
+  } catch(e) { try { sez.scrollIntoView(); } catch(e2){} }
+  /* si toglie e si rimette, o il secondo tocco non riaccende niente */
+  sez.classList.remove('p2p-scegli');
+  void sez.offsetWidth;
+  sez.classList.add('p2p-scegli');
+  setTimeout(() => sez.classList.remove('p2p-scegli'), 1300);
+  return true;
 }
 function scegliMetodoDettP2P(m){
   haptic();
@@ -57170,13 +57228,11 @@ function renderDettaglioP2P(){
      dice anche la prima riga delle card di «I miei scambi» — e due
      stesure della stessa frase prima o poi dicono due cose. */
   if (tit) tit.textContent = fraseLatoP2P(o);
-  /* la riga che DICE PERCHE' il bottone e' spento: un bottone morto
-     senza una ragione visibile e' il vicolo cieco muto (la lezione del
-     foglio Pubblica). Le parentesi non sono decorazione: `||` lega
-     prima di `?:`, e leggerlo a occhio e' esattamente il modo in cui
-     un domani qualcuno lo «sistema» al contrario. */
-  const manca = (tuo || p2pDettMetodo || !(o.metodi && o.metodi.length > 1))
-    ? '' : 'Scegli con quale metodo vuoi ' + (compro ? 'inviare' : 'ricevere') + ' gli euro.';
+  /* ⚠️ IL BOTTONE NON SI SPEGNE PIU' PER IL METODO (9 ott 2026,
+     cantiere prendi-metodo): qui nasceva `manca`, la frase rossa in
+     fondo accanto a «Compra» spento. Adesso il bottone e' acceso e la
+     frase sta sopra le pillole (`metodiDettP2P`): la fa vedere il tocco,
+     `chiediMetodoDettP2P`. */
   /* ⚠️ SU UN INTERVALLO IL CONTO ASPETTA LA CIFRA (7 ott 2026, decisione
      di Andrea): il conto in due colonne — minimo e massimo — non ci
      stava (la riga «Invia» usciva dal riquadro) e chiedeva di leggere
@@ -57251,8 +57307,6 @@ function renderDettaglioP2P(){
     (myTgId < 0 && !myRiconosciP2P
       ? '<div class="hint">🕶️ Tu resti anonimo: sei entrato con un profilo senza nome, e chi ha pubblicato non saprà chi sei. Il suo profilo invece lo vedi qui sopra. Se vuoi farti riconoscere — e potervi recensire — c\'è l\'interruttore nel cassetto «🔔 Avvisi».</div>'
       : '') +
-    '<div class="hint" id="p2pDettManca" style="color:var(--rosso-p2p-testo);font-weight:800'
-      + (manca ? '' : ';display:none') + '">' + esc(manca) + '</div>' +
     (tuo
       ? '<div class="foglio-piede sola" id="p2pDettTuoPiede">' +
           '<button type="button" class="btn ghost" onclick="navIndietro()">Indietro</button>' +
@@ -57278,7 +57332,6 @@ function renderDettaglioP2P(){
            «Continua».
            E A VOCE «SCEGLI» DICE COSA: «Scegli quanto inviare» — la
            parola che si vede sta in testa, e il resto la completa. */
-        (manca ? ' disabled' : '') +
         (daScegliere ? ' aria-label="Scegli quanto ' + verboEuro + '"' : '') +
         ' onclick="confermaDettaglioP2P()">' +
         (daScegliere ? 'Scegli' : (compro ? 'Compra' : 'Vendi')) + '</button>' +
@@ -57392,6 +57445,17 @@ function rigaImportoSceltoP2P(o, scelto){
    «Quanto» SOPRA questa pagina (che resta aperta sotto), e scelta la
    cifra il bottone torna «Compra»/«Vendi» (7 ott 2026). */
 function confermaDettaglioP2P(){
+  /* PRIMA IL METODO (9 ott 2026, cantiere prendi-metodo): con piu'
+     metodi e nessuna scelta il tocco non parte, chiede — e lo chiede
+     subito, anche su una copia del libro: per dire «scegli» non serve
+     aspettare il coordinatore. Con un metodo solo la scelta e' gia'
+     fatta (`apriDettaglioP2P`), e su un intervallo il metodo viene
+     prima della cifra. Sul mio ordine il bottone non c'e'. */
+  const prima = rigaLibroP2P(p2pDettOrdine);
+  if (prima && (prima.metodi || []).length > 1 && !p2pDettMetodo) {
+    chiediMetodoDettP2P();
+    return;
+  }
   /* SU UNA COPIA SI ASPETTA IL LIBRO VERO (26 set 2026): il bottone
      gira, la pagina resta libera, e a libro arrivato si riparte da qui
      — con l'ordine riguardato sul libro del coordinatore */
@@ -57402,10 +57466,8 @@ function confermaDettaglioP2P(){
   const id = p2pDettOrdine;
   const o = rigaLibroP2P(id);
   if (!o) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
-  if ((o.metodi || []).length > 1 && !p2pDettMetodo) {
-    toast('Scegli con quale metodo vuoi ' + (o.lato === 'sell' ? 'inviare' : 'ricevere') + ' gli euro');
-    return;
-  }
+  /* ...e la cintura resta, sul libro vero: la domanda di sopra */
+  if ((o.metodi || []).length > 1 && !p2pDettMetodo) { chiediMetodoDettP2P(); return; }
   /* IL TETTO DEL CONTANTI ANCHE ALLA PRESA (30 set 2026): la cifra e' gia'
      scritta da chi ha pubblicato, quindi il giudizio cade sul metodo che
      si sta scegliendo; su un intervallo lo rifa' il foglio «Quanto» sulla

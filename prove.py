@@ -58144,10 +58144,13 @@ def prove_p2p_invii():
     prova("il conto dice «Invia» e «Totale da inviare»", [True, True],
           ["'Invia'" in cod("function contoDettP2P(o){"),
            "'Totale da inviare'" in cod("function contoDettP2P(o){")])
+    # (9 ott 2026, cantiere prendi-metodo) la frase ha UNA stesura,
+    # `fraseMetodoDettP2P`: la mostra la domanda sopra le pillole, e la
+    # conferma senza metodo la fa vedere invece del toast
     prova("il metodo da scegliere segue il lato: inviare o ricevere gli euro", [True, True],
-          ["(compro ? 'inviare' : 'ricevere') + ' gli euro.'" in cod("function renderDettaglioP2P(){"),
-           "(o.lato === 'sell' ? 'inviare' : 'ricevere') + ' gli euro'"
-           in cod("function confermaDettaglioP2P(){")])
+          ["(o && o.lato === 'sell' ? 'inviare' : 'ricevere') + ' gli euro.'"
+           in cod("function fraseMetodoDettP2P(o){"),
+           "chiediMetodoDettP2P()" in cod("function confermaDettaglioP2P(){")])
     prova("il foglio Pubblica: «Come vuoi inviare» e «la valuta con cui invierai»", [True, True],
           ["'Come vuoi inviare'" in cod("function nomeMetodiP2P(lato){"),
            "'Seleziona la valuta con cui ' + (compro ? 'invierai' : 'riceverai')" in mini])
@@ -61192,10 +61195,15 @@ def prove_p2p_dettaglio():
           "        + '\" id=\"p2pDettVai\"'" in rd,
           "'<button type=\"button\" class=\"btn orange\" id=\"p2pDettVai\"'" in rd,
           "return tab ? 'bz' : (p2pLato === 'vendo' ? 'rosso' : 'primary');" in mini])
-    # E IL BOTTONE SPENTO DICE PERCHE': un bottone morto senza una
-    # ragione visibile e' il vicolo cieco muto del foglio «Pubblica».
-    prova("...e il bottone spento porta la sua ragione", True,
-          'id="p2pDettManca"' in rd and "Scegli con quale metodo" in rd)
+    # IL BOTTONE NON SI SPEGNE PER IL METODO (9 ott 2026, cantiere
+    # prendi-metodo): prima nasceva spento con la frase rossa in fondo, e
+    # sembrava rotto; adesso e' acceso e la domanda sta sopra le pillole,
+    # nascosta finche' il tocco non la chiede.
+    prova("...e il bottone non si spegne per il metodo: la domanda sta sopra le pillole",
+          [False, False, True],
+          ['id="p2pDettManca"' in rd, "(manca ? ' disabled' : '')" in rd,
+           "'<div class=\"p2p-scegli-metodo\" id=\"p2pDettScegliMetodo\" hidden>'"
+           in pezzo_js(mini, "function metodiDettP2P(o){", "\n}\n")])
 
     # --- 7) IL METODO SCELTO VIAGGIA (verificato sui byte) ----------
     # ⚠️ MOSTRO AL TAKE NON LO TRASMETTE: su take-sell/take-buy legge
@@ -61328,6 +61336,9 @@ def prove_p2p_dettaglio():
         # l'await dentro fa esplodere il banco
         "async function apriNegozioDettP2P(ev, chi){",
         "function scegliMetodoDettP2P(m){",
+        # (9 ott 2026, cantiere prendi-metodo) la domanda del metodo
+        "function fraseMetodoDettP2P(o){",
+        "function chiediMetodoDettP2P(){",
         "function rigaLibroP2P(id){",
         # ⚠️ IL CAPPELLO STA IN UNA FUNZIONE SUA dal set 2026 (la dice
         # anche la prima riga delle card di «I miei scambi»), ed e' la
@@ -61435,9 +61446,19 @@ function apriNegozio(chi){ negoziAperti.push(chi); }
 /* IL DOM DI CARTONE: due nodi, e quel che ci si scrive dentro si
    rilegge. Basta: la pagina non frughi nel documento, scrive e basta. */
 const nodi = {};
+/* LA SEZIONE DEI METODI DI CARTONE (9 ott 2026, cantiere prendi-metodo):
+   `closest` la da' solo se la domanda e' davvero nella pagina scritta,
+   e quel che le si fa — scorrere, accendersi — si annota */
+let chiesti = [];
+const sezFinta = {offsetWidth: 0,
+  scrollIntoView(o){ chiesti.push('scorre:' + (o && o.behavior)); },
+  classList: {add(c){ chiesti.push('+' + c); }, remove(c){ chiesti.push('-' + c); }}};
+function tourRidotto(){ return false; }
 function el(id){
   if (!nodi[id]) nodi[id] = {id: id, innerHTML: '', textContent: '',
-    classList: {add(){}, remove(){}}};
+    classList: {add(){}, remove(){}},
+    closest(){ return (nodi.p2pDettCorpo || {innerHTML: ''}).innerHTML
+      .indexOf('id="' + this.id + '"') >= 0 ? sezFinta : null; }};
   return nodi[id];
 }
 /* i vicini si prestano, e si conta chi e' stato chiamato: e' cosi' che
@@ -61640,14 +61661,26 @@ p2pFacce = {'ord-1': {nome: 'Ada', media: 4.8, voti: 12, giorni: 41}};
 apriDettaglioP2P('ord-1');
 out.titoloCompra = el('p2pDettTit').textContent;
 out.pagina = el('p2pDettCorpo').innerHTML;
-/* col metodo non scelto il bottone e' SPENTO e la ragione si vede */
+/* col metodo non scelto il bottone e' ACCESO (9 ott 2026, cantiere
+   prendi-metodo) e la domanda aspetta, nascosta, sopra le pillole */
 out.bottoneSpento = out.pagina.indexOf('id="p2pDettVai" disabled') >= 0;
-out.dice = out.pagina.indexOf('Scegli con quale metodo vuoi inviare gli euro.') >= 0;
-/* ...e premerlo non prende niente */
+out.dice = out.pagina.indexOf('id="p2pDettScegliMetodo" hidden>'
+  + 'Scegli con quale metodo vuoi inviare gli euro.</div><div class="p2p-metodi">') >= 0;
+/* ...e premerlo non prende niente: nessun toast, la domanda si scopre,
+   la pagina scorre (liscia) e la sezione si riaccende */
 confermaDettaglioP2P();
-out.senzaMetodoNonPrende = prese.length === 0 && toasts.length === 1;
+out.senzaMetodoNonPrende = prese.length === 0 && toasts.length === 0;
+out.chiesto = [el('p2pDettScegliMetodo').hidden, chiesti.slice()];
+/* ...anche su una COPIA del libro: per chiedere il metodo non si
+   aspetta il coordinatore */
+p2pLibro.copia = true; chiesti = [];
+confermaDettaglioP2P();
+out.chiestoSullaCopia = [prese.length, toasts.length, chiesti.slice()];
+delete p2pLibro.copia;
+out.fraseVendi = fraseMetodoDettP2P({lato: 'buy'});
 scegliMetodoDettP2P('Revolut');
 out.pagina2 = el('p2pDettCorpo').innerHTML;
+out.domandaSparita = out.pagina2.indexOf('p2pDettScegliMetodo') < 0;
 out.bottoneAcceso = out.pagina2.indexOf('id="p2pDettVai" disabled') < 0;
 out.pillolaAccesa = out.pagina2.indexOf('tema-pill active" data-m="Revolut"') >= 0;
 confermaDettaglioP2P();
@@ -61859,7 +61892,7 @@ console.log(JSON.stringify(out));
           [True, False, False],
           [(lambda ix: min(ix) > 0 and ix == sorted(ix))(
               [_pg.find(a) for a in ('class="ctrl-conto', 'Come funziona',
-                                     'id="p2pDettManca"', 'class="foglio-piede"')]),
+                                     'class="foglio-piede"')]),
            "trust-note nota-scambio" in _pg,
            "tu mandi gli euro col metodo scelto" in _pg])
     _pt = crudo["paginaTua"]
@@ -62656,9 +62689,19 @@ console.log(JSON.stringify(out));
     # diceva lo dicono le righe del conto, ognuna col suo nome.
     prova("la riga del prezzo non esiste piu', nome compreso", False,
           "prezzoRigaP2P" in mini)
-    prova("senza metodo scelto il bottone e' spento e dice perche'",
-          [True, True], [o["bottoneSpento"], o["dice"]])
-    prova("...e premerlo non prende niente", True, o["senzaMetodoNonPrende"])
+    # (9 ott 2026, cantiere prendi-metodo) il bottone e' acceso, e il
+    # tocco senza metodo chiede invece di prendere
+    prova("senza metodo scelto il bottone e' ACCESO, e la domanda aspetta sopra le pillole",
+          [False, True], [o["bottoneSpento"], o["dice"]])
+    prova("...e premerlo non prende niente: la domanda si scopre, la pagina scorre, "
+          "la sezione si accende",
+          [True, [False, ["scorre:smooth", "-p2p-scegli", "+p2p-scegli"]]],
+          [o["senzaMetodoNonPrende"], o["chiesto"]])
+    prova("...anche su una copia del libro, senza aspettare il coordinatore",
+          [0, 0, ["scorre:smooth", "-p2p-scegli", "+p2p-scegli"]], o["chiestoSullaCopia"])
+    prova("...e chi vende la legge col suo verbo",
+          "Scegli con quale metodo vuoi ricevere gli euro.", o["fraseVendi"])
+    prova("scelto il metodo la domanda se ne va", True, o["domandaSparita"])
     prova("scelto il metodo la pillola si accende e il bottone pure",
           [True, True], [o["pillolaAccesa"], o["bottoneAcceso"]])
     prova("...e la presa parte con l'id, la cifra e il metodo",
@@ -103009,8 +103052,11 @@ def prove_passi_libro_p2p():
           ["tu mandi gli euro col metodo scelto" in mini,
            "Tu blocchi i sats in garanzia, ricevi gli euro" in mini,
            "trust-note nota-scambio" in dett])
-    _posti = [dett.find(a) for a in ("contoDettP2P(scelto ?", "passiDettP2P(", 'id="p2pDettManca"')]
-    prova("...e i passi stanno dopo il conto e prima della riga rossa", True,
+    # (9 ott 2026) la riga rossa non c'e' piu' (cantiere prendi-metodo):
+    # il terzo paletto e' il piede coi bottoni
+    _posti = [dett.find(a) for a in ("contoDettP2P(scelto ?", "passiDettP2P(",
+                                     "'<div class=\"foglio-piede\">' +")]
+    prova("...e i passi stanno dopo il conto e prima dei bottoni", True,
           min(_posti) > 0 and _posti == sorted(_posti))
     i0 = mini.find("<style>")
     css = mini[i0 + 7:mini.find("</style>", i0)] if i0 >= 0 else ""
@@ -103189,6 +103235,118 @@ console.log(JSON.stringify(out));
                '<div class="hint" role="listitem">'
                '<b aria-hidden="true"><b class="p2p-tappa-n">2</b></b>Due &amp; tre</div></div>') in h
           and "p2p-sez-ico" not in h and 'role="button"' not in h)
+
+def prove_prendi_metodo():
+    """«COMPRA»/«VENDI» ACCESO ANCHE SENZA METODO (9 ott 2026, cantiere
+    prendi-metodo, richiesta di Andrea): nel dettaglio di un ordine del
+    libro con piu' metodi il bottone nasceva spento finche' non se ne
+    sceglieva uno, e sembrava rotto senza motivo. Adesso e' acceso; il
+    tocco senza metodo non prende niente, scorre fino ai metodi, scopre
+    la domanda sopra le pillole e accende la sezione nell'arancio di casa
+    con una vibrazione leggera. Con meno movimento l'anello sta fermo.
+    La leva delle prese dalle 10 resta com'era: prima dell'ora il bottone
+    e' spento e dice «Dalle 10:00 di domani».
+    Il banco della pagina (bottone, domanda, presa dopo la scelta) gira in
+    `prove_p2p_dettaglio`; qui il vestito, il gesto e la leva."""
+    print("\n[prendi-metodo: «Compra» acceso, il tocco chiede il metodo]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i0 = mini.find("<style>")
+    css = mini[i0 + 7:mini.find("</style>", i0)] if i0 >= 0 else ""
+    chiedi = pezzo_js(mini, "function chiediMetodoDettP2P(){", "\n}\n") + "\n}\n"
+    rd = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
+    cd = pezzo_js(mini, "function confermaDettaglioP2P(){", "\n}\n")
+
+    # ---- 1. IL VESTITO: l'arancio di casa, e fermo con meno movimento ----
+    prova("--sats e' l'arancio di casa, #F7931A (247,147,26)", True,
+          "--sats:#F7931A;" in css)
+    prova("l'anello lampeggia una volta, nell'arancio e non nel rosso del «manca»",
+          [True, True, False],
+          [".p2p-scegli{animation:p2pScegli 1.2s ease}" in css,
+           "12%,55%{box-shadow:0 0 0 3px rgba(247,147,26,.7)}" in css,
+           "@keyframes p2pScegli{\n    0%,100%{box-shadow:0 0 0 0 rgba(217,64,29" in css])
+    prova("con prefers-reduced-motion niente lampeggio: l'anello sta fermo", True,
+          bool(re.search(r"@media \(prefers-reduced-motion:reduce\)\{\s*"
+                         r"\.p2p-scegli\{animation:none;box-shadow:0 0 0 3px "
+                         r"rgba\(247,147,26,\.7\)\}", css)))
+    prova("...e lo stesso col «meno effetti» di casa (html.fx-ridotti)", True,
+          "html.fx-ridotti .p2p-scegli{box-shadow:0 0 0 3px rgba(247,147,26,.7)}" in css)
+    regole, _sq = _regole_css(css)
+    catena = [{"tag": "html", "attr": {"lang": "it"}, "classi": set()},
+              {"tag": "body", "attr": {}, "classi": set()},
+              {"tag": "div", "attr": {}, "classi": {"p2p-sez"}},
+              {"tag": "div", "attr": {}, "classi": {"p2p-sez-corpo"}},
+              {"tag": "div", "attr": {"id": "p2pDettScegliMetodo", "hidden": ""},
+               "classi": {"p2p-scegli-metodo"}}]
+    v = _vince_css(regole, catena, ["color", "font-weight", "display"])
+    prova("la domanda e' in evidenza: arancio di casa (quello dei testi) e grassetto",
+          ["var(--sats-text)", "800"],
+          [(v.get("color") or ("",))[0], (v.get("font-weight") or ("",))[0]])
+    prova("...e nessuna regola le toglie l'`hidden` (display non lo tocca nessuno)",
+          None, v.get("display"))
+
+    # ---- 2. IL GESTO: vibra, scorre, accende, senza toast ----------------
+    prova("il tocco vibra leggero, scopre la domanda, scorre e accende la sezione",
+          [True, True, True, True, True],
+          ["haptic();" in chiedi, "d.hidden = false;" in chiedi,
+           "sez.scrollIntoView({block: 'center'," in chiedi,
+           "behavior: tourRidotto() ? 'auto' : 'smooth'" in chiedi,
+           "sez.classList.add('p2p-scegli');" in chiedi])
+    prova("...l'anello si toglie e si rimette (il secondo tocco riaccende) e se ne va da solo",
+          [True, True], ["void sez.offsetWidth;" in chiedi,
+                         "setTimeout(() => sez.classList.remove('p2p-scegli'), 1300);" in chiedi])
+    prova("...e niente toast: la frase sta gia' dove si risponde", False,
+          "toast(" in chiedi)
+    prova("la conferma senza metodo chiede, PRIMA di aspettare il libro vero", True,
+          0 <= cd.find("chiediMetodoDettP2P();") < cd.find("aspettaLibroVeroP2P("))
+    prova("il bottone non nasce piu' spento per il metodo, e la riga rossa e' andata",
+          [False, False, False],
+          ["(manca ? ' disabled' : '')" in rd, 'id="p2pDettManca"' in mini,
+           "const manca = " in rd])
+
+    # ---- 3. LA LEVA DELLE 10 RESTA COM'ERA -------------------------------
+    _ch = rd.find("preseChiuseP2P())")
+    prova("prima dell'ora il bottone e' spento e dice «Dalle 10:00 di domani», PRIMA del ramo acceso",
+          True, 0 < _ch < rd.find(
+              "'<button type=\"button\" class=\"btn ghost\" id=\"p2pDettVai\" disabled>' + P2P_PRESE_DOMANI")
+          < rd.find("' onclick=\"confermaDettaglioP2P()\">'"))
+    prova("...la frase e' la stessa di ieri", True,
+          "const P2P_PRESE_DOMANI = 'Dalle 10:00 di domani';" in mini)
+
+    # ---- 4. IN NODE: con meno movimento lo scorrimento e' secco ---------
+    js = r"""
+let chiesti = [], vibra = 0, ridotto = true;
+function haptic(){ vibra++; }
+function tourRidotto(){ return ridotto; }
+const sez = {offsetWidth: 0,
+  scrollIntoView(o){ chiesti.push('scorre:' + o.behavior); },
+  classList: {add(c){ chiesti.push('+' + c); }, remove(c){ chiesti.push('-' + c); }}};
+const domanda = {hidden: true, closest(s){ return s === '.p2p-sez' ? sez : null; }};
+let presente = true;
+function el(id){ return id === 'p2pDettScegliMetodo' && presente ? domanda : null; }
+const setTimeout = (f, ms) => chiesti.push('dopo:' + ms);
+""" + chiedi + r"""
+const out = {};
+out.ridotto = [chiediMetodoDettP2P(), domanda.hidden, vibra, chiesti.slice()];
+ridotto = false; chiesti = [];
+out.liscio = [chiediMetodoDettP2P(), chiesti.slice()];
+/* senza la domanda nella pagina (un metodo solo, o il mio ordine) non
+   si fa niente e non si esplode */
+presente = false; chiesti = []; vibra = 0;
+out.senza = [chiediMetodoDettP2P(), chiesti.length];
+console.log(JSON.stringify(out));
+"""
+    out = _node_banco(js)
+    if out is None:
+        salta("il banco del gesto prendi-metodo", "node non c'e'")
+        return
+    prova("in node, con meno movimento: vibra, scopre, scorre SECCO, riaccende, poi si spegne",
+          [True, False, 1, ["scorre:auto", "-p2p-scegli", "+p2p-scegli", "dopo:1300"]],
+          out.get("ridotto"))
+    prova("...senza movimento ridotto lo scorrimento e' liscio",
+          [True, ["scorre:smooth", "-p2p-scegli", "+p2p-scegli", "dopo:1300"]],
+          out.get("liscio"))
+    prova("...e senza la domanda nella pagina non fa niente", [False, 0], out.get("senza"))
+
 
 def prove_prese_dalle_10():
     """LE PRESE DALLE 10 (9 ott 2026, richiesta di Andrea): la vigilia
@@ -114164,8 +114322,11 @@ def prove_effetti_ridotti():
                     ripieghi[uno] = ";".join(resto)
     # (26 set 2026: lo svelamento dopo il tour, che era il terzo, e'
     # uscito con la pagina sfocata — si torna a due)
-    prova("i ripieghi fermi dei blocchi reduced-motion sono due",
-          [".btn.orange.in-evidenza", ".p2p-manca"], sorted(ripieghi))
+    # (9 ott 2026, cantiere prendi-metodo: il terzo e' `.p2p-scegli`,
+    # l'anello arancio della sezione dei metodi nel dettaglio P2P,
+    # gemello di `.p2p-manca` e gemellato nella classe come lui)
+    prova("i ripieghi fermi dei blocchi reduced-motion sono tre",
+          [".btn.orange.in-evidenza", ".p2p-manca", ".p2p-scegli"], sorted(ripieghi))
     prova("...e la classe li gemella tutti, con le stesse dichiarazioni",
           [], [s for s, d in ripieghi.items()
                if "html.fx-ridotti %s{%s}" % (s, d) not in blocco])
@@ -133586,6 +133747,7 @@ def main():
               prove_avvisi_mercatino,
               prove_testo_ricevere_sats,
               prove_prese_dalle_10,
+              prove_prendi_metodo,
               prove_banner_ingresso,
               prove_config_esempio):
         try:

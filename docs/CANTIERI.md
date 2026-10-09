@@ -43090,3 +43090,90 @@ virgola dal tasto vero non entra; 450 000 → confermato: la riga «450 000
 sats», il `value` «450000», l'ordine `amount` 450 000, `fiat_amount` 250,
 `premium` 0, identico byte per byte a quello coi valori dei campi di ieri;
 `valeNuovoOrdineP2P` ok. Scatti in `scatti-sats/` nello scratchpad.
+
+## «Compra» acceso anche senza metodo: il tocco chiede (9 ott 2026, notte, richiesta di Andrea, cantiere prendi-metodo)
+
+**IL DIFETTO.** Nel dettaglio di un ordine del libro con più metodi,
+finché non se ne sceglieva uno «Compra»/«Vendi» nasceva spento
+(`disabled`), con sotto in rosso «Scegli con quale metodo vuoi inviare
+gli euro.». Sembrava rotto senza motivo: la riga rossa stava in fondo,
+lontana dalle pillole, e nessuno la leggeva.
+
+**COSA SI È FATTO.** Il bottone è acceso. Il tocco senza metodo non
+prende niente (`confermaDettaglioP2P` → `chiediMetodoDettP2P`): la
+pagina scorre fino alla sezione dei metodi, sopra le pillole compare la
+domanda — la stessa frase di prima, «Scegli con quale metodo vuoi
+inviare gli euro.» / «… ricevere gli euro.», da una stesura sola,
+`fraseMetodoDettP2P` — in arancio di casa (`--sats-text`, grassetto), la
+sezione si accende per 1,2 s con un anello nell'arancio `--sats`
+(`.p2p-scegli`) e il telefono vibra leggero (`haptic()`). Scelto il
+metodo, la domanda sparisce col ridisegno e il bottone fa quel che
+faceva. La riga rossa in fondo (`#p2pDettManca`) non c'è più.
+
+**I PERCHÉ.** È la liturgia di `avvisaMancaP2P` del foglio «Pubblica»
+(bottone sempre acceso, a dire cosa manca è il tocco; l'anello si toglie
+e si rimette perché il secondo tocco riaccenda, e se ne va da solo),
+con due differenze volute: L'ARANCIO E NON IL ROSSO, perché non è un
+errore di chi compila ma la domanda che resta da fare (e Andrea ha
+chiesto il colore di casa); NIENTE TOAST, perché la frase compare già
+dove si risponde. La domanda nasce `hidden` e la scopre il tocco: una
+frase arancio sempre accesa sopra le pillole sarebbe tornata il
+rimprovero preventivo della riga rossa. LA DOMANDA VIENE PRIMA DEL
+LIBRO VERO: la conferma chiede il metodo anche su una copia del libro,
+senza aspettare il coordinatore (`aspettaLibroVeroP2P` arriva dopo); la
+cintura sul libro vero resta. Su un intervallo il metodo viene prima
+della cifra («Scegli» senza metodo chiede il metodo). Con un metodo solo
+non cambia niente: la scelta è già fatta in `apriDettaglioP2P`. Sul mio
+ordine la domanda non nasce. CON MENO MOVIMENTO (`prefers-reduced-motion`
+e il «meno effetti» di casa, `html.fx-ridotti`) niente lampeggio:
+l'anello sta fermo finché c'è la classe, e lo scorrimento è secco
+(`tourRidotto()`).
+
+**LA LEVA DELLE 10 È INTATTA.** Prima di `P2P_PRESE_DA`, per chi non è
+moderatore, il ramo del bottone spento «Dalle 10:00 di domani» viene
+prima del ramo acceso, com'era; il toast di `prendiOrdineP2P` non è
+toccato. Unica differenza visibile: la riga rossa del metodo, che prima
+compariva anche sopra quel bottone spento, non c'è più.
+
+**PROVE.** `prove_prendi_metodo` (nuova): il colore di casa e l'anello
+arancio e non rosso, il fermo col movimento ridotto e col fx-ridotti, la
+domanda in `--sats-text`/800 chiesta alla cascata e nessuna regola che
+le tolga l'`hidden`; il gesto (vibra, scopre, scorre, accende, si
+spegne a 1300 ms, niente toast), la domanda prima del libro vero, il
+bottone senza `disabled` del metodo; la leva delle 10 al suo posto; in
+node lo scorrimento secco col movimento ridotto e liscio senza, e niente
+se la domanda non è nella pagina. `prove_p2p_dettaglio` rovesciata dove
+diceva «spento»: nel banco il bottone nasce acceso, il tocco non prende,
+nessun toast, la domanda si scopre e la sezione si accende, anche su una
+copia del libro; il lato «vende» col suo verbo; scelto il metodo la
+domanda se ne va e la presa parte con id, cifra e metodo. Allineate
+`prove_p2p_invii` e `prove_passi_libro_p2p` (la frase e l'ordine dei
+pezzi senza la riga rossa), e in `prove_effetti_ridotti` i ripieghi
+fermi dei blocchi reduced-motion passano da due a tre (`.p2p-scegli`,
+gemellato nella classe come chiede la sentinella). Controprova su quattro mutazioni (la domanda
+dopo il libro, l'anello che balla col movimento ridotto, niente
+vibrazione, il bottone di nuovo spento): tutte rosse.
+
+**DAL VIVO** (copia del worktree nello scratchpad, server di collaudo
+sulla 8137, relay morto per Mostro e Nostr, `eseguiPresaP2P` sostituita
+nella pagina da una che annota e basta; un ordine a due metodi SEPA e
+Revolut, uno a un metodo, uno di vendita SEPA e Satispay), pane a 390:
+- utente normale (111) con `P2P_PRESE_DA = "2026-10-10 10:00"`: il
+  bottone spento «Dalle 10:00 di domani», com'era;
+- moderatore (999) prima della soglia: «Compra» verde e acceso; a 390×667
+  la sezione dei metodi fuori schermo, il tocco vero su «Compra»: la
+  pagina risale (scrollTop 156 → 0), la domanda compare in arancio sopra
+  le pillole, l'anello arancio (fermo: il pane emula il movimento
+  ridotto) se ne va dopo 1,3 s, la spia registra `impactOccurred('light')`,
+  nessuna presa e nessun toast; scelto Revolut la domanda sparisce e
+  «Compra» prende `ord-due`, 0, Revolut, col foglio che si chiude;
+  l'ordine a un metodo prende subito; «Vendi» rosso col «… ricevere gli
+  euro.»;
+- leva a un'ora passata, server riavviato: utente normale con «Compra»
+  acceso, il tocco chiede, SEPA scelto → presa con SEPA; moderatore lo
+  stesso.
+Scatti in `.claude/giri/prendi-metodo/` (gitignored).
+
+**DA GUARDARE.** Sul telefono vero: la vibrazione (nel pane si vede solo
+la chiamata) e il lampeggio arancio a movimento pieno (il pane emula il
+movimento ridotto: lì si è visto solo l'anello fermo).

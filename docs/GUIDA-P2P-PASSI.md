@@ -258,8 +258,13 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
 1. 🧑 Chi compra tocca la card.
    📱 Foglio «**Stai comprando sats**» con, in ordine:
    - «Metodo di pagamento — come invii gli euro»: le pillole dei metodi.
-     Con più metodi, finché non ne scegli uno, in rosso «Scegli con
-     quale metodo vuoi inviare gli euro.» e il bottone spento;
+     Con più metodi «Compra» è acceso anche senza scelta: toccato
+     senza metodo non parte niente, la pagina risale fin qui, sopra le
+     pillole compare in arancio «Scegli con quale metodo vuoi inviare
+     gli euro.» (chi vende: «… ricevere gli euro.») e la sezione si
+     accende un attimo, con una vibrazione leggera. Scelto il metodo,
+     «Compra» fa il suo. Prima delle 10:00 del 10 ott (chi non è
+     moderatore) il bottone resta spento e dice «Dalle 10:00 di domani»;
    - (solo contanti) la regola e il tetto, vedi §6;
    - «Chi ha pubblicato quest'ordine»: media, recensioni, volto (il
      tocco porta al suo negozio);
