@@ -132969,11 +132969,31 @@ def prove_annuncio_identita():
     righe_sk = [r for r in src.splitlines()
                 if ".sk" in r and ("console." in r or "muori(" in r)]
     prova("nessuna riga stampa la chiave privata", [], righe_sk)
-    prova("la tabella ASSET conosce MOON e USDB coi valori di §2", True,
-          "'9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM'" in src
-          and "'H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A'" in src
-          and "name: 'Dollari_di_prova_Barattolo', precision: 2, supply: 100000000" in src
+    # Dal 9 ott (studio Mutinynet) la tabella e' UNA PER CATENA: le schede
+    # (ticker, nome del genesis, precisione, supply) stanno in SCHEDE una
+    # volta sola, gli id di signet sono quelli di §2, quelli di Mutinynet
+    # sono segnaposto finche' domenica 11 non si riemette.
+    prova("le SCHEDE di MOON e USDB portano i valori di §2", True,
+          "name: 'Dollari_di_prova_Barattolo', precision: 2, supply: 100000000" in src
           and "name: 'Punti To The Mooon', precision: 0, supply: 1000000" in src)
+    m_sig = re.search(r"signet: \{(.*?)\n  \}", src, re.S)
+    m_mut = re.search(r"mutinynet: \{(.*?)\n  \}", src, re.S)
+    prova("la tabella di signet conosce gli id di MOON e USDB (§2)", True,
+          bool(m_sig)
+          and "'9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM': SCHEDE.MOON" in m_sig.group(1)
+          and "'H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A': SCHEDE.USDB" in m_sig.group(1))
+    # fino a domenica 11 i due segnaposto; dopo, due ContractId veri (la
+    # forma di rgb-lib, senza `rgb:`), uno per scheda, mai quelli di signet
+    forma = r"'(INCOLLA_QUI_ID_%s_MUTINYNET|[A-Za-z0-9_~-]{20,80})': SCHEDE\.%s"
+    prova("la tabella di mutinynet ha una voce per scheda (segnaposto, o l'id vero dopo l'11)",
+          True, bool(m_mut)
+          and bool(re.search(forma % ("MOON", "MOON"), m_mut.group(1)))
+          and bool(re.search(forma % ("USDB", "USDB"), m_mut.group(1)))
+          and "9N5NpOdN" not in m_mut.group(1) and "H1951SnR" not in m_mut.group(1))
+    prova("la catena la sceglie RGB_CATENA, default signet, e il tag `n` resta 'signet'",
+          True, "process.env.RGB_CATENA || 'signet'" in src
+          and "const ASSET = ASSET_PER_CATENA[CATENA]" in src
+          and "const RETE = 'signet'" in src)
 
     # --- 2) lo script VERO: dove gira ----------------------------------
     # Lo script importa nostr-tools come ESM: NODE_PATH non vale, la
@@ -132995,8 +133015,11 @@ def prove_annuncio_identita():
         shutil.copy(percorso, os.path.join(cartella, "identita.mjs"))
         pulizia.append(lambda: shutil.rmtree(cartella, ignore_errors=True))
 
-        def esegui(args, relay="ws://127.0.0.1:9"):
+        def esegui(args, relay="ws://127.0.0.1:9", catena=None):
             env = dict(os.environ, IDENTITA_CASA=casa, NWC_RELAY=relay)
+            env.pop("RGB_CATENA", None)
+            if catena:
+                env["RGB_CATENA"] = catena
             r = subprocess.run([node, "identita.mjs", *args], cwd=cartella,
                                capture_output=True, text=True,
                                encoding="utf-8", env=env, timeout=60)
@@ -133022,9 +133045,10 @@ def prove_annuncio_identita():
             pulizia.append(lambda: nel_wsl(f"rm -rf {cartella}"))
             casa_wsl = wslpath(casa)
 
-            def esegui(args, relay="ws://127.0.0.1:9"):
+            def esegui(args, relay="ws://127.0.0.1:9", catena=None):
+                cat = f"RGB_CATENA={shlex.quote(catena)} " if catena else "RGB_CATENA= "
                 cmd = (f"source ~/.nvm/nvm.sh >/dev/null 2>&1; cd {cartella} && "
-                       f"IDENTITA_CASA={shlex.quote(casa_wsl)} NWC_RELAY={shlex.quote(relay)} "
+                       f"IDENTITA_CASA={shlex.quote(casa_wsl)} NWC_RELAY={shlex.quote(relay)} {cat}"
                        f"node identita.mjs {' '.join(shlex.quote(a) for a in args)}")
                 r = nel_wsl(cmd)
                 return r.returncode, r.stdout, r.stderr
@@ -133133,6 +133157,32 @@ def prove_annuncio_identita():
         prova("un relay pubblico nel config ferma tutto, anche --prova", True,
               rc != 0 and "non e' locale" in err and not out.strip())
 
+        # --- 3-bis) la catena (9 ott): su mutinynet gli id di signet non
+        #     valgono, i segnaposto si dichiarano, una catena ignota ferma
+        rc, out, err = esegui(["annuncio", "--prova", "usdb", "rgb:" + IDENTITA[0][3]],
+                              catena="mutinynet")
+        uscite += [out, err]
+        prova("su RGB_CATENA=mutinynet l'id di signet e' sconosciuto (e si nominano i segnaposto, finche' ci sono)",
+              True, rc != 0 and ("segnaposto" in err or "conosce" in err)
+              and "mutinynet" in err and not out.strip())
+        rc, out, err = esegui(["pubblica", "usdb"], catena="mutinynet")
+        uscite += [out, err]
+        prova("su mutinynet `pubblica` da' la stessa hex: le identita' non cambiano con la catena",
+              True, rc == 0 and "hex " in out)
+        rc, out, err = esegui(["pubblica", "usdb"], catena="pippo")
+        uscite += [out, err]
+        prova("una catena sconosciuta ferma lo script, e dice quali conosce",
+              True, rc != 0 and "conosco" in err and "mutinynet" in err)
+        rc, out, err = esegui(["annuncio", "--prova", "usdb", "rgb:" + IDENTITA[0][3]],
+                              catena="signet")
+        uscite += [out, err]
+        try:
+            contenuto = json.loads(out).get("content", "")
+        except ValueError:
+            contenuto = ""
+        prova("su signet esplicito il content dice «RGB (signet)», come prima del 9 ott",
+              True, rc == 0 and "RGB (signet)" in contenuto)
+
         # --- 4) la privata non e' uscita da nessuna parte ---------------
         tutto = "\n".join(uscite)
         prova("le due private non compaiono in nessun output", [],
@@ -133144,6 +133194,359 @@ def prove_annuncio_identita():
             except Exception:
                 pass
         shutil.rmtree(casa, ignore_errors=True)
+
+
+def prove_mutinynet_prep():
+    """MUTINYNET COI SERVIZI DEGLI ORGANIZZATORI (9 ott 2026, cantiere
+    «mutinynet-prep», deciso con Alan): la catena la sceglie RGB_CATENA
+    (signet | mutinynet) in rgb.py, punti.mjs, nwc-wdk.mjs e
+    identita.mjs — stessa etichetta SIGNET per rgb-lib, cartelle, link
+    e backup diversi — con la guardia che un wallet nato su una catena
+    non si apre sull'altra; i due .env pronti; backup-rgb.sh che
+    fotografa tutt'e due le cartelle; la chiavetta per i portatili di
+    Alan (chiavetta-prepara.sh, install-offline.sh). Qui: i .env letti
+    da bash, rgb.py ESEGUITO con un rgb_lib di cartone su tre catene e
+    la guardia di chiavi.json, backup-rgb.sh FATTO GIRARE in una casa
+    finta con runuser/age/install di cartone (due catene, poi una sola,
+    poi una fotografia che manca), install-offline.sh --prova su una
+    chiavetta finta, e le sentinelle su script e documenti."""
+    import contextlib
+    import importlib.util
+    import io
+    import json
+    import shutil
+    import stat
+    import subprocess
+    import tempfile
+    import types
+    print("\n🟪 Mutinynet coi servizi degli organizzatori: la preparazione")
+    rgb_dir = os.path.join(QUI, "deploy", "rgb")
+    leggi = lambda f: open(os.path.join(rgb_dir, f), encoding="utf-8").read()
+    bash = shutil.which("bash")
+    sh = shutil.which("sh")
+
+    def posix(p):
+        """Un percorso che la bash di Git (Windows) o di Linux capisce."""
+        if sys.platform != "win32":
+            return p
+        cyg = shutil.which("cygpath")
+        if cyg:
+            return subprocess.run([cyg, "-u", p], capture_output=True, text=True).stdout.strip()
+        p = p.replace("\\", "/")
+        return re.sub(r"^([A-Za-z]):", lambda m: "/" + m.group(1).lower(), p)
+
+    # --- 1) i due .env ----------------------------------------------------
+    ENDPOINT = {"RGB_INDEXER": "https://esplora.signet.kaleidoswap.com",
+                "RGB_PROXY": "rpcs://proxy.kaleidoswap.com/json-rpc"}
+    RISERVE = ("# export RGB_INDEXER=https://mutinynet.com/api",
+               "# export RGB_PROXY=rpcs://proxy.iriswallet.com/0.2/json-rpc")
+    for nome, propri in (("mutinynet-vm.env", {"RGB_BASE": "$HOME/rgb/mutinynet",
+                                              "RGB_BACKUP": "$HOME/rgb/backup-mutinynet"}),
+                         ("mutinynet-wsl.env", {"PUNTI_CASA": "$HOME/wdk-prova/mutinynet/utente"})):
+        src = leggi(nome)
+        attivi = dict(re.findall(r"^export ([A-Z_]+)=(\S+)", src, re.M))
+        prova(f"[{nome}] RGB_CATENA=mutinynet e gli endpoint degli organizzatori",
+              dict(RGB_CATENA="mutinynet", **ENDPOINT, **propri), attivi)
+        prova(f"[{nome}] le due riserve ci sono, commentate", True,
+              all(r in src for r in RISERVE))
+        prova(f"[{nome}] niente che somigli a una chiave", False,
+              bool(re.search(r"[0-9a-f]{64}", src)))
+        if bash:
+            r = subprocess.run([bash, "-c", f"source {posix(os.path.join(rgb_dir, nome))} && "
+                                "echo \"$RGB_CATENA|$RGB_INDEXER|${RGB_BASE:-}${PUNTI_CASA:-}\""],
+                               capture_output=True, text=True, encoding="utf-8",
+                               env=dict(os.environ, HOME="/casa"))
+            atteso = ("mutinynet|https://esplora.signet.kaleidoswap.com|"
+                      + ("/casa/rgb/mutinynet" if "vm" in nome else "/casa/wdk-prova/mutinynet/utente"))
+            prova(f"[{nome}] fatto `source` da bash, le variabili sono quelle (con $HOME espanso)",
+                  atteso, r.stdout.strip())
+        else:
+            salta(f"[{nome}] il source da bash", "bash non c'e'")
+
+    # --- 2) rgb.py: la catena ESEGUITA con un rgb_lib di cartone -----------
+    cartone = types.ModuleType("rgb_lib")
+    cartone.BitcoinNetwork = types.SimpleNamespace(SIGNET="SIGNET")
+    cartone.AssetSchema = types.SimpleNamespace(NIA="NIA")
+    cartone.RgbLibError = type("RgbLibError", (Exception,), {})
+    vero = sys.modules.get("rgb_lib")
+    sys.modules["rgb_lib"] = cartone
+    tmp = tempfile.mkdtemp(prefix="prove-mutinynet-")
+
+    def carica(**env):
+        """Esegue deploy/rgb/rgb.py con quell'ambiente: (modulo | None, exit code, stderr)."""
+        salvato = {k: os.environ.get(k) for k in ("RGB_CATENA", "RGB_BASE", "RGB_BACKUP")}
+        for k in salvato:
+            os.environ.pop(k, None)
+        os.environ.update(env)
+        err = io.StringIO()
+        # niente .pyc: una cartella __pycache__ dentro deploy/rgb/ fa
+        # esplodere prove_leva_rgb, che apre OGNI voce di quella cartella
+        # (successo il 9 ott con quella lasciata da un py_compile a mano)
+        bytecode = sys.dont_write_bytecode
+        sys.dont_write_bytecode = True
+        try:
+            spec = importlib.util.spec_from_file_location("rgb_prova_mutinynet",
+                                                          os.path.join(rgb_dir, "rgb.py"))
+            m = importlib.util.module_from_spec(spec)
+            with contextlib.redirect_stderr(err):
+                spec.loader.exec_module(m)
+            return m, 0, err.getvalue()
+        except SystemExit as e:
+            return None, e.code, err.getvalue()
+        finally:
+            sys.dont_write_bytecode = bytecode
+            for k, v in salvato.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+    try:
+        m, rc, _ = carica()
+        prova("senza RGB_CATENA e' signet: link mempool.space/signet, ~/rgb/dati, ~/rgb/backup",
+              ("signet", "https://mempool.space/signet/tx/",
+               os.path.expanduser("~/rgb/dati"), os.path.expanduser("~/rgb/backup"), "SIGNET"),
+              (m.CATENA, m.ESPLORA, m.BASE, m.BACKUP, m.RETE) if m else rc)
+        m, rc, _ = carica(RGB_CATENA="mutinynet")
+        prova("RGB_CATENA=mutinynet: link mutinynet.com/tx, ~/rgb/mutinynet, ~/rgb/backup-mutinynet, e per rgb-lib resta SIGNET",
+              ("mutinynet", "https://mutinynet.com/tx/",
+               os.path.expanduser("~/rgb/mutinynet"), os.path.expanduser("~/rgb/backup-mutinynet"), "SIGNET"),
+              (m.CATENA, m.ESPLORA, m.BASE, m.BACKUP, m.RETE) if m else rc)
+        m, rc, _ = carica(RGB_CATENA="mutinynet", RGB_BASE=tmp, RGB_BACKUP=os.path.join(tmp, "b"))
+        prova("RGB_BASE e RGB_BACKUP espliciti vincono sul default della catena",
+              (tmp, os.path.join(tmp, "b")), (m.BASE, m.BACKUP) if m else rc)
+        m, rc, err = carica(RGB_CATENA="pippo")
+        prova("una catena sconosciuta ferma rgb.py (exit 2) e dice quali conosce",
+              (None, 2, True), (m, rc, "signet, mutinynet" in err))
+        # la guardia: un wallet nato su signet non si apre con l'ambiente mutinynet
+        os.makedirs(os.path.join(tmp, "w"), exist_ok=True)
+        with open(os.path.join(tmp, "w", "chiavi.json"), "w") as f:
+            json.dump({"rete": "signet", "mnemonic": "x"}, f)
+        m, rc, _ = carica(RGB_CATENA="mutinynet", RGB_BASE=tmp)
+        err = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(err):
+                m._chiavi("w")
+            esito = "aperto"
+        except SystemExit as e:
+            esito = (e.code, "nato su signet" in err.getvalue(), "mutinynet" in err.getvalue())
+        prova("un chiavi.json nato su signet NON si apre con RGB_CATENA=mutinynet, e dice perche'",
+              (1, True, True), esito)
+        m, rc, _ = carica(RGB_CATENA="signet", RGB_BASE=tmp)
+        prova("...e si apre con la sua catena", "x", m._chiavi("w").get("mnemonic") if m else rc)
+        with open(os.path.join(tmp, "w", "chiavi.json"), "w") as f:
+            json.dump({"mnemonic": "vecchio"}, f)     # i chiavi.json di prima del 9 ott: senza «rete»
+        m, rc, _ = carica(RGB_CATENA="signet", RGB_BASE=tmp)
+        prova("un chiavi.json senza «rete» (prima del 9 ott) vale signet", "vecchio",
+              m._chiavi("w").get("mnemonic") if m else rc)
+    finally:
+        if vero is not None:
+            sys.modules["rgb_lib"] = vero
+        else:
+            sys.modules.pop("rgb_lib", None)
+    src_rgb = leggi("rgb.py")
+    prova("`nuovo` scrive la catena in chiavi.json", True, '"rete": CATENA,' in src_rgb)
+    prova("rgb_http /salute dice la catena dell'ambiente", True,
+          '"rete": rgb.CATENA' in leggi("rgb_http.py"))
+
+    # --- 3) punti.mjs, nwc-wdk.mjs: le stesse regole, lette e (se node c'e') controllate
+    src_p = leggi("punti.mjs")
+    src_n = leggi("nwc-wdk.mjs")
+    prova("punti.mjs: catena da RGB_CATENA (default signet), link e casa per catena",
+          True, "process.env.RGB_CATENA || 'signet'" in src_p
+          and "esplora: 'https://mutinynet.com/tx/'" in src_p
+          and "casa: ['wdk-prova', 'mutinynet', 'utente']" in src_p
+          and "const ESPLORA = CATENE[CATENA].esplora" in src_p)
+    prova("punti.mjs: `nuovo` marca la casa (catena.txt) e `apri` si ferma sull'altra catena",
+          True, "fs.writeFileSync(MARCA, CATENA + '\\n')" in src_p
+          and "if (nato !== CATENA) muori(" in src_p
+          and src_p.index("if (nato !== CATENA) muori(") < src_p.index("new WalletManagerRgb(frase"))
+    prova("nwc-wdk.mjs: stessa casa per catena, stessa guardia, chiave e connection string invariate",
+          True, "const CATENA = process.env.RGB_CATENA || 'signet'" in src_n
+          and "mutinynet: ['wdk-prova', 'mutinynet', 'utente']" in src_n
+          and "if (nato !== CATENA) throw new Error(" in src_n
+          and "const RETE = 'signet'" in src_n
+          and "RGB_CATENA" not in src_n[src_n.index("function chiaveServizio"):src_n.index("// ----------------------------------------------------------------- cifratura")])
+    prova("il modulo RGB resta `network: 'signet'` su tutt'e due le catene (stesso genesis)",
+          True, "network: 'signet'" in src_p and "network: RETE" in src_n)
+    node = shutil.which("node")
+    if node:
+        for f in ("punti.mjs", "nwc-wdk.mjs", "identita.mjs"):
+            r = subprocess.run([node, "--check", os.path.join(rgb_dir, f)],
+                               capture_output=True, text=True)
+            prova(f"node --check {f}", 0, r.returncode)
+    else:
+        salta("node --check dei tre .mjs", "node non c'e'")
+
+    # --- 4) backup-rgb.sh FATTO GIRARE in una casa finta ----------------------
+    src_b = leggi("backup-rgb.sh")
+    prova("backup-rgb.sh fotografa le due catene, ognuna col suo ambiente", True,
+          "fotografa signet dati backup" in src_b
+          and "fotografa mutinynet mutinynet backup-mutinynet" in src_b
+          and 'env RGB_CATENA="$1" RGB_BASE="$CASA/$2" RGB_BACKUP="$CASA/$3"' in src_b
+          and '-C "$HOME_DEBIAN" $DENTRO rgb/.env' in src_b)
+    if sh:
+        r = subprocess.run([sh, "-n", os.path.join(rgb_dir, "backup-rgb.sh")],
+                           capture_output=True, text=True)
+        prova("sh -n backup-rgb.sh", 0, r.returncode)
+
+        def casa_finta(con_mutinynet=True):
+            casa = tempfile.mkdtemp(prefix="prove-backup-")
+            home = os.path.join(casa, "home")
+            rgb = os.path.join(home, "rgb")
+            for d in ("dati/barattolo", "dati/usdb", "venv/bin") + (("mutinynet/barattolo",) if con_mutinynet else ()):
+                os.makedirs(os.path.join(rgb, d))
+            for w in ("dati/barattolo", "dati/usdb") + (("mutinynet/barattolo",) if con_mutinynet else ()):
+                with open(os.path.join(rgb, w, "chiavi.json"), "w") as f:
+                    f.write('{"rete": "%s"}' % ("mutinynet" if w.startswith("mutinynet") else "signet"))
+            for f in (".env", "compose.yaml", "rgb.py"):
+                open(os.path.join(rgb, f), "w").write("# finto\n")
+            unit = os.path.join(casa, "unit"); sbin = os.path.join(casa, "sbin"); fake = os.path.join(casa, "bin")
+            os.makedirs(unit); os.makedirs(sbin); os.makedirs(fake)
+            for f in ("rgb-backup.service", "rgb-backup.timer"):
+                open(os.path.join(unit, f), "w").write("[Unit]\n")
+            shutil.copy(os.path.join(rgb_dir, "backup-rgb.sh"), os.path.join(sbin, "backup-rgb.sh"))
+            log = os.path.join(casa, "python.log")
+            # il python del venv, di cartone: scrive la fotografia dove dice RGB_BACKUP
+            # e annota l'ambiente con cui e' stato chiamato (salta se FINTO_SALTA dice la sua catena)
+            scrivi = lambda p, testo: (open(p, "w", newline="\n").write(testo), os.chmod(p, 0o755))
+            scrivi(os.path.join(rgb, "venv", "bin", "python"),
+                   "#!/bin/sh\n"
+                   f"echo \"$RGB_CATENA $RGB_BASE $RGB_BACKUP $3\" >> '{posix(log)}'\n"
+                   "[ \"${FINTO_SALTA:-}\" = \"$RGB_CATENA\" ] && exit 0\n"
+                   "mkdir -p \"$RGB_BACKUP\" && echo foto > \"$RGB_BACKUP/$3-$(date +%Y%m%d-%H%M%S)-$$.rgb-backup\"\n")
+            scrivi(os.path.join(fake, "runuser"),
+                   "#!/bin/sh\nwhile [ \"$1\" != \"--\" ]; do shift; done; shift; exec \"$@\"\n")
+            scrivi(os.path.join(fake, "age"),
+                   "#!/bin/sh\nwhile [ \"$1\" != \"-o\" ]; do shift; done; cp \"$3\" \"$2\"\n")
+            scrivi(os.path.join(fake, "install"), "#!/bin/sh\nfor u; do :; done; mkdir -p \"$u\"\n")
+            scrivi(os.path.join(fake, "chgrp"), "#!/bin/sh\nexit 0\n")
+            return casa, home, unit, sbin, fake, log
+
+        def gira(casa, home, unit, sbin, fake, extra=None):
+            env = dict(os.environ, BACKUP_RGB_HOME=posix(home), BACKUP_RGB_DEST=posix(os.path.join(casa, "dest")),
+                       BACKUP_RGB_UNIT_DIR=posix(unit), BACKUP_RGB_SBIN_DIR=posix(sbin),
+                       PATH=posix(fake) + os.pathsep + os.environ.get("PATH", ""))
+            if sys.platform == "win32":
+                env["PATH"] = posix(fake) + ":" + env["PATH"]
+            env.update(extra or {})
+            return subprocess.run([sh, os.path.join(sbin, "backup-rgb.sh")], capture_output=True,
+                                  text=True, encoding="utf-8", errors="replace", env=env, timeout=120)
+
+        # a) due catene
+        casa, home, unit, sbin, fake, log = casa_finta(True)
+        try:
+            r = gira(casa, home, unit, sbin, fake)
+            dentro = r.stdout
+            prova("[due catene] il backup finisce bene", 0, r.returncode)
+            prova("[due catene] nell'archivio: chiavi e fotografia di signet E di mutinynet", True,
+                  r.returncode == 0 and "rgb/dati/barattolo/chiavi.json" in dentro
+                  and "rgb/mutinynet/barattolo/chiavi.json" in dentro
+                  and re.search(r"rgb/backup/barattolo-.*\.rgb-backup", dentro) is not None
+                  and re.search(r"rgb/backup-mutinynet/barattolo-.*\.rgb-backup", dentro) is not None)
+            prova("[due catene] la riga finale nomina i wallet con la catena",
+                  True, "wallet: signet/barattolo signet/usdb mutinynet/barattolo" in dentro)
+            righe = open(log, encoding="utf-8").read().splitlines() if os.path.exists(log) else []
+            prova("[due catene] rgb.py backup e' stato chiamato con l'ambiente della catena giusta",
+                  True, any(l.startswith("signet ") and "/rgb/dati " in l and "/rgb/backup barattolo" in l for l in righe)
+                  and any(l.startswith("mutinynet ") and "/rgb/mutinynet " in l and "/rgb/backup-mutinynet barattolo" in l for l in righe))
+            prova("[due catene] un archivio .tar.age e' nato nella destinazione", True,
+                  any(f.endswith(".tar.age") for f in os.listdir(os.path.join(casa, "dest"))))
+        finally:
+            shutil.rmtree(casa, ignore_errors=True)
+        # b) solo signet (la VM di oggi, prima di domenica 11)
+        casa, home, unit, sbin, fake, log = casa_finta(False)
+        try:
+            r = gira(casa, home, unit, sbin, fake)
+            prova("[solo signet] senza la cartella mutinynet il backup va come prima", True,
+                  r.returncode == 0 and "mutinynet" not in r.stdout
+                  and "rgb/dati/barattolo/chiavi.json" in r.stdout)
+        finally:
+            shutil.rmtree(casa, ignore_errors=True)
+        # c) una fotografia che manca su mutinynet: la guardia si ferma
+        casa, home, unit, sbin, fake, log = casa_finta(True)
+        try:
+            r = gira(casa, home, unit, sbin, fake, {"FINTO_SALTA": "mutinynet"})
+            prova("[fotografia mancante] exit 1 e il nome del wallet con la catena", True,
+                  r.returncode == 1 and "manca la fotografia di mutinynet/barattolo" in r.stderr)
+        finally:
+            shutil.rmtree(casa, ignore_errors=True)
+    else:
+        salta("backup-rgb.sh nella casa finta", "sh non c'e'")
+
+    # --- 5) la chiavetta: chiavetta-prepara.sh e install-offline.sh ----------
+    src_c = leggi("chiavetta-prepara.sh")
+    src_i = leggi("install-offline.sh")
+    setup = open(os.path.join(QUI, "docs", "HACKATHON-SETUP.md"), encoding="utf-8").read()
+    for v in ("@utexo/wdk-wallet-rgb@2.0.3", "nostr-tools@2.25.2", "bip39@3.1.0",
+              "@utexo/rgb-lib-linux-x64@0.3.0-beta.8", "@qvac/sdk@0.21.0", "@qvac/cli@0.15.0",
+              "v22.23.3", "0.3.0b7", "v0.21.0"):
+        prova(f"la chiavetta porta {v}, la versione del PC di Andrea (§10)", True,
+              v in src_c and v in setup)
+    prova("chiavetta-prepara.sh sceglie la variante del wallet dalla glibc: originale >= 2.38, override rgb-sdk 1.0.6 + beta.13 >= 2.34",
+          True, ">= (2, 38)" in src_c and ">= (2, 34)" in src_c
+          and 'OVERRIDE=\'{"@utexo/rgb-sdk":"1.0.6"}\'' in src_c
+          and 'WDK_BIN="@utexo/rgb-lib-linux-x64@0.3.0-beta.13"' in src_c
+          and "p.overrides=$OVERRIDE" in src_c)
+    prova("install-offline.sh confronta la glibc col manifesto e installa SOLO sotto $HOME (sudo solo con --con-deb)",
+          True, "GLIBC_CHIAVETTA=" in src_i and "max(b, (2, 34))" in src_i
+          and len(re.findall(r"^\s*sudo ", src_i, re.M)) == 1     # il solo dpkg dei .deb
+          and src_i.count("sudo dpkg") == 1 and 'CON_DEB" = 1' in src_i)
+    prova("niente curl/wget/npm install/pip install in install-offline.sh: e' offline", False,
+          bool(re.search(r"\b(curl|wget|npm install|pip install|apt-get install|nvm)\b", src_i)))
+    prova("install-offline.sh: `node22` mette LD_LIBRARY_PATH sulla .so (il RUNPATH del binding e' di chi l'ha compilato)",
+          True, "find \"$HOME/wdk-prova/node_modules\" -name librgblibcffi.so" in src_i
+          and 'export LD_LIBRARY_PATH="$d${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"' in src_i
+          and 'case ":${LD_LIBRARY_PATH:-}:" in *":$d:"*)' in src_i)   # e non si ripete
+    if bash:
+        for f in ("chiavetta-prepara.sh", "install-offline.sh"):
+            r = subprocess.run([bash, "-n", os.path.join(rgb_dir, f)], capture_output=True, text=True)
+            prova(f"bash -n {f}", 0, r.returncode)
+        chiavetta = tempfile.mkdtemp(prefix="prove-chiavetta-")
+        try:
+            T = os.path.join(chiavetta, "torino")
+            voci = ["node/node-v22.23.3-linux-x64.tar.xz", "node/node-v24.21.0-linux-x64.tar.xz",
+                    "wdk-prova/node_modules.tar.gz", "qvac-prova/node_modules.tar.gz",
+                    "modelli/Qwen3-0.6B-Q4_0.gguf", "modelli/Qwen3-1.7B-Q4_0.gguf",
+                    "wheels/rgb_lib-0.3.0b7-py3-none-manylinux_2_34_x86_64.whl",
+                    "wheels/pip-26.2.1-py3-none-any.whl", "nak/nak", "MANIFEST.txt",
+                    "script/punti.mjs", "script/nwc-wdk.mjs", "script/identita.mjs",
+                    "script/consiglio.py", "script/qvac.config.json", "script/mutinynet-wsl.env"]
+            for v in voci:
+                os.makedirs(os.path.dirname(os.path.join(T, v)), exist_ok=True)
+                open(os.path.join(T, v), "w").write("finto\n")
+
+            def prova_chiavetta(*argv):
+                r = subprocess.run([bash, os.path.join(rgb_dir, "install-offline.sh"), "--prova", posix(T), *argv],
+                                   capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
+                return r.returncode, r.stdout, r.stderr
+            rc, out, err = prova_chiavetta()
+            # 15 spunte: node22, node_modules del wallet, nak, le due ruote, i sei
+            # script, node24, node_modules di QVAC, i modelli, il manifesto
+            prova("install-offline.sh --prova su una chiavetta completa: exit 0, «completa», 15 spunte",
+                  (0, True, 15), (rc, "la chiavetta e' completa" in out, out.count("✓ chiavetta:")))
+            os.remove(os.path.join(T, "nak", "nak"))
+            rc, out, err = prova_chiavetta()
+            prova("...senza nak/nak: exit 1 e lo nomina", (1, True), (rc, "manca nak/nak" in err))
+            shutil.rmtree(os.path.join(T, "modelli")); shutil.rmtree(os.path.join(T, "qvac-prova"))
+            rc, out, err = prova_chiavetta("--senza-qvac", "--senza-modelli")
+            prova("...senza modelli e QVAC, con le due leve: solo nak manca", (1, False, False, True),
+                  (rc, "modelli" in err, "qvac" in err, "manca nak/nak" in err))
+            prova("--prova non ha toccato la casa: niente ~/.local/node/usa.sh creato ora", True,
+                  not os.path.exists(os.path.join(chiavetta, ".local")))
+        finally:
+            shutil.rmtree(chiavetta, ignore_errors=True)
+    else:
+        salta("install-offline.sh --prova sulla chiavetta finta", "bash non c'e'")
+
+    # --- 6) i documenti dicono le stesse cose -------------------------------
+    nwc = open(os.path.join(QUI, "docs", "spec", "NWC-RGB.md"), encoding="utf-8").read()
+    for s in ("mutinynet-vm.env", "mutinynet-wsl.env", "install-offline.sh", "chiavetta-prepara.sh",
+              "https://esplora.signet.kaleidoswap.com", "rpcs://proxy.kaleidoswap.com/json-rpc",
+              "soglia 3 USDB", "2,50 USDB", "25 MOON", "8-bis", "glibc"):
+        prova(f"HACKATHON-SETUP parla di «{s}»", True, s in setup)
+    for s in ("rgb_get_budget", "registerPolicy", "USER_REJECTED", "`asset_id`"):
+        prova(f"NWC-RGB.md parla di «{s}»", True, s in nwc)
+    shutil.rmtree(tmp, ignore_errors=True)
 
 
 def prove_semina_demo():
@@ -133847,6 +134250,7 @@ def main():
     prove_p2p_paycode,
     prove_leva_rgb,
     prove_annuncio_identita,
+    prove_mutinynet_prep,
     prove_semina_demo,
     prove_premio_barattozon,
     prove_convenienza_vera,

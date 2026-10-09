@@ -14,7 +14,7 @@ in multiple places») — e alle 03:30 il backup lo apre da solo: in
 quell'ora il servizio si ferma.
 
 Rotte (JSON):
-  GET  /salute                      {"ok": true, "wallet": "barattolo", "rete": "signet"}
+  GET  /salute                      {"ok": true, "wallet": "barattolo", "rete": "signet"|"mutinynet"}
   GET  /saldo                       sats e asset del wallet
   POST /fattura                     {"asset_id": "rgb:…"|null, "quantita": 480|null, "witness": false}
                                     → {"invoice", "recipient_id", "expires_at", "witness"}
@@ -120,7 +120,9 @@ class Rotte(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
         if u.path == "/salute":
-            return self._json(200, {"ok": True, "wallet": WALLET, "rete": "signet"})
+            # «rete» e' la CATENA dell'ambiente (signet | mutinynet), non
+            # l'etichetta di rgb-lib, che e' SIGNET per tutt'e due.
+            return self._json(200, {"ok": True, "wallet": WALLET, "rete": rgb.CATENA})
         if u.path == "/saldo":
             return self._esegui(_saldo)
         if u.path == "/trasferimenti":
@@ -145,5 +147,5 @@ class Rotte(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     rgb._chiavi(WALLET)   # muore subito se il wallet non esiste
-    print(f"🟪 rgb_http su 127.0.0.1:{PORTA}, wallet «{WALLET}» — Ctrl-C per fermare")
+    print(f"🟪 rgb_http su 127.0.0.1:{PORTA}, wallet «{WALLET}» su {rgb.CATENA} — Ctrl-C per fermare")
     HTTPServer(("127.0.0.1", PORTA), Rotte).serve_forever()

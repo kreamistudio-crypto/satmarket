@@ -37,7 +37,20 @@ const muori = (msg) => { console.error('✗', msg); process.exit(1) }
 // (3xxxx+1, lo pubblica chiunque) NON si fa qui: la riga del 16 ott
 // prevede i due annunci e basta.
 const KIND_ANNUNCIO = 38180
+// Il tag `n` resta 'signet' su TUTT'E DUE le catene: Mutinynet E' un
+// signet (stesso blocco 0, stessa etichetta per rgb-lib), la bozza non
+// distingue i signet fra loro, e il ContractId identifica gia' il
+// contratto e con lui la catena su cui vive.
 const RETE = 'signet'
+
+// LA CATENA (9 ott 2026, studio Mutinynet): RGB_CATENA = signet (default) |
+// mutinynet, come in punti.mjs. Gli asset esistono UNA volta per catena
+// (riemessi su Mutinynet domenica 11 ott: id nuovi), e la tabella sotto
+// e' una per catena. Le stesse identita' (stesse chiavi, stesso NIP-05)
+// firmano gli annunci su tutt'e due.
+const CATENA = process.env.RGB_CATENA || 'signet'
+const RETE_NOME = { signet: 'signet', mutinynet: 'Mutinynet, il signet dell\'hackathon' }
+if (!RETE_NOME[CATENA]) muori(`RGB_CATENA=${CATENA}: conosco ${Object.keys(RETE_NOME).join(', ')}`)
 
 // Gli asset che un'identita' puo' annunciare: i valori PUBBLICI di
 // HACKATHON-SETUP §2 (ticker, nome, precisione e supply sono COPIE del
@@ -47,18 +60,35 @@ const RETE = 'signet'
 // annuncio dello stesso contratto da un'altra chiave e' una feature
 // della bozza, ma nella demo si evita (studio, D.3 punto 4). JAR resta
 // fuori dalla demo (decisione di Alan) e non ha un'identita'.
-const ASSET = {
-  '9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM': {
+// La descrizione la compone `descrizione()` dal ticker, cosi' le due
+// tabelle portano solo quel che cambia: gli id.
+const SCHEDE = {
+  MOON: {
     ticker: 'MOON', name: 'Punti To The Mooon', precision: 0, supply: 1000000, schema: 'nia',
     emittente: 'tothemooon',
-    descrizione: 'MOON sono i punti fedelta\' di PROVA del negozio To The Mooon, emessi su RGB (signet) per l\'hackathon di Torino (17-18 ott 2026): un punto per euro speso, 1 MOON = 1 sat di sconto nel negozio. Nessun valore reale.'
+    descrizione: (rete) => `MOON sono i punti fedelta' di PROVA del negozio To The Mooon, emessi su RGB (${rete}) per l'hackathon di Torino (17-18 ott 2026): un punto per euro speso, 1 MOON = 1 sat di sconto nel negozio. Nessun valore reale.`
   },
-  'H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A': {
+  USDB: {
     ticker: 'USDB', name: 'Dollari_di_prova_Barattolo', precision: 2, supply: 100000000, schema: 'nia',
     emittente: 'usdb',
-    descrizione: 'USDB sono i «Dollari di prova Barattolo», un asset NIA di PROVA su RGB (signet) emesso per l\'hackathon di Torino (17-18 ott 2026): 1,00 USDB vale 1 $ dichiarato, accettato al checkout di Barattolo in collaudo. Nessun valore reale.'
+    descrizione: (rete) => `USDB sono i «Dollari di prova Barattolo», un asset NIA di PROVA su RGB (${rete}) emesso per l'hackathon di Torino (17-18 ott 2026): 1,00 USDB vale 1 $ dichiarato, accettato al checkout di Barattolo in collaudo. Nessun valore reale.`
   }
 }
+// ContractId (senza `rgb:`) → scheda, per catena. Quelli di Mutinynet si
+// incollano domenica 11 ott dopo `rgb.py emetti` (HACKATHON-SETUP §10,
+// la lista di domenica): finche' dicono INCOLLA_QUI nessun id li trova,
+// e `annuncio` lo dice chiaro.
+const ASSET_PER_CATENA = {
+  signet: {
+    '9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM': SCHEDE.MOON,
+    'H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A': SCHEDE.USDB
+  },
+  mutinynet: {
+    'INCOLLA_QUI_ID_MOON_MUTINYNET': SCHEDE.MOON,
+    'INCOLLA_QUI_ID_USDB_MUTINYNET': SCHEDE.USDB
+  }
+}
+const ASSET = ASSET_PER_CATENA[CATENA]
 
 if (/^wss?:\/\/(?!127\.0\.0\.1|localhost)/i.test(RELAY) && !process.env.NWC_RELAY_PUBBLICO_OK) {
   muori(`il relay ${RELAY} non e' locale: in questo giro niente relay pubblici`)
@@ -143,7 +173,11 @@ const COMANDI = {
     const i = leggi(nome)
     const id = contractId(assetId)
     const a = ASSET[id]
-    if (!a) muori(`asset ${id} sconosciuto: la tabella ASSET di questo file conosce ${Object.values(ASSET).map(x => x.ticker).join(', ')} (§2); un asset nuovo si aggiunge li' copiando ticker, nome, precisione e supply dal genesis`)
+    if (!a) {
+      const vuoti = Object.keys(ASSET).filter(k => k.startsWith('INCOLLA_QUI'))
+      if (vuoti.length) muori(`asset ${id} sconosciuto: la tabella di ${CATENA} ha ancora ${vuoti.length} segnaposto (${vuoti.join(', ')}): dopo \`rgb.py emetti\` su ${CATENA} si incollano gli id al loro posto (HACKATHON-SETUP §10, domenica 11)`)
+      muori(`asset ${id} sconosciuto: la tabella ASSET di questo file per ${CATENA} conosce ${Object.values(ASSET).map(x => x.ticker).join(', ')} (§2); un asset nuovo si aggiunge li' copiando ticker, nome, precisione e supply dal genesis`)
+    }
     if (a.emittente !== nome) muori(`${a.ticker} lo annuncia «${a.emittente}», non «${nome}»: due annunci dello stesso contratto da chiavi diverse nella demo si evitano (studio, D.3 punto 4)`)
     const sk = Uint8Array.from(Buffer.from(i.sk, 'hex'))
     const ev = finalizeEvent({
@@ -159,16 +193,16 @@ const COMANDI = {
         ['supply', String(a.supply)],
         ['alt', `RGB asset announcement: ${a.ticker}`]
       ],
-      content: `${a.descrizione} Emittente dichiarato: ${i.display} (${i.nip05}).`
+      content: `${a.descrizione(RETE_NOME[CATENA])} Emittente dichiarato: ${i.display} (${i.nip05}).`
     }, sk)
     if (!verifyEvent(ev)) muori('la firma dell\'evento non torna: non si pubblica')
     if (prova) {
       console.log(JSON.stringify(ev, null, 2))
-      console.error(`— di PROVA: annuncio di ${a.ticker} firmato da «${nome}» (${i.nip05}), kind ${KIND_ANNUNCIO} (segnaposto), d ${id}, firma valida. NON pubblicato, nessun relay toccato.`)
+      console.error(`— di PROVA: annuncio di ${a.ticker} (${CATENA}) firmato da «${nome}» (${i.nip05}), kind ${KIND_ANNUNCIO} (segnaposto), d ${id}, firma valida. NON pubblicato, nessun relay toccato.`)
       return
     }
     await pubblicaEvento(ev)
-    console.log(`✓ annuncio di ${a.ticker} firmato da «${nome}» (${i.nip05}) pubblicato su ${RELAY}: kind ${KIND_ANNUNCIO} (segnaposto), d ${id}, id ${ev.id.slice(0, 12)}…`)
+    console.log(`✓ annuncio di ${a.ticker} (${CATENA}) firmato da «${nome}» (${i.nip05}) pubblicato su ${RELAY}: kind ${KIND_ANNUNCIO} (segnaposto), d ${id}, id ${ev.id.slice(0, 12)}…`)
     console.log(`  per rileggerlo: la riga «rilettura» di HACKATHON-SETUP §10 (nostr-tools, kind ${KIND_ANNUNCIO}, autore ${ev.pubkey}); \`nak req\` lanciato da wsl.exe stampa muto`)
   }
 }

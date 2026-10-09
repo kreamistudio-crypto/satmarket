@@ -43367,3 +43367,126 @@ barattolo del mercatino, si scrive a @WebpageBot
 `https://barattolo.store/p2p` e lui la rilegge (risponde con la scheda
 aggiornata); i messaggi già arrivati restano come sono, cambia dal
 messaggio dopo.
+## Mutinynet coi servizi degli organizzatori: la preparazione (9 ott 2026, sera)
+
+**Cosa si è deciso (con Alan, dopo lo studio del 9).** L'hackathon di
+Torino userà Mutinynet, il signet degli organizzatori (blocchi da 30 s,
+faucet BTC `faucet.mutinynet.com`, faucet RGB di KaleidoSwap con USDT e
+XAUT). Noi ci spostiamo coi SERVIZI degli organizzatori — Esplora
+`https://esplora.signet.kaleidoswap.com` (su Mutinynet non esiste un
+Electrum pubblico; riserva `https://mutinynet.com/api`, che ha dato 429
+alla CI di KaleidoSwap) e proxy `rpcs://proxy.kaleidoswap.com/json-rpc`
+(protocollo 0.2, versione 0.3.0, la stessa del nostro container; riserva
+il proxy di Iris) — senza un nostro bitcoind; il signet della VM resta
+intatto come piano B. Questo cantiere prepara TUTTO quel che è testo e
+codice; la VM e i wallet li tocca Andrea domenica 11 con la lista di
+HACKATHON-SETUP §10.
+
+**Il fatto che decide il disegno.** Il blocco 0 di Mutinynet È quello del
+signet (verificato: stesso hash via le due API), quindi per rgb-lib la
+rete resta `SIGNET` e cambiano solo indexer, proxy, link e CARTELLE.
+Non si introduce una rete nuova: si introduce una CATENA, `RGB_CATENA`
+(`signet` default, `mutinynet`), letta da rgb.py, rgb_http.py (il campo
+`rete` di `/salute`), punti.mjs, nwc-wdk.mjs e identita.mjs. Ogni catena
+ha le sue cartelle (`~/rgb/mutinynet`, `~/rgb/backup-mutinynet`,
+`~/wdk-prova/mutinynet/utente`) perché uno stash non deve mai vedere due
+catene con la stessa etichetta — il controllo di coerenza di rgb-lib
+esploderebbe dopo, nel modo peggiore — e il wallet RICORDA dove è nato
+(`"rete"` in chiavi.json, `catena.txt` nella casa del wallet utente):
+`rgb.py`, `punti.mjs` e `nwc-wdk.mjs` si rifiutano di aprirlo con
+l'ambiente dell'altra. I chiavi.json di prima del 9 non hanno il campo e
+valgono signet. Si accende con `source` di due file,
+`deploy/rgb/mutinynet-vm.env` e `mutinynet-wsl.env`, con le riserve
+commentate; senza `source` tutto fa quel che faceva ieri: il piano B è
+non fare niente. Il tag `n` degli annunci resta `signet` (la bozza non
+distingue i signet, il ContractId identifica già il contratto).
+
+**Strade scartate.** Una rete `SignetCustom` come fanno i wallet di
+KaleidoSwap: la ruota Python la ha, ma l'SDK Utexo del wallet utente
+mappa solo mainnet/testnet/testnet4/signet/regtest (letto nel dist di
+`@utexo/rgb-sdk` 1.0.3 e 1.0.6), quindi il nostro cliente non può; fra
+noi restiamo `signet`, e il prezzo è che l'USDT del faucet (emesso da un
+nodo `signetcustom`) probabilmente non entra nel wallet del cliente — la
+domanda per KaleidoSwap il 13, e la prova da dieci minuti con un wallet
+Python `SIGNET_CUSTOM` sulla VM. Un bitcoind Mutinynet nostro
+(`kaleidoswap/mutinynet-bitcoind`, signetchallenge noto): lecito, 3,49
+milioni di blocchi da scaricare, non cambia la demo — piano C scritto e
+non fatto. IFA per USDB e MOON: la ruota Python emette e gonfia, ma il
+wallet Utexo apre con `supportedSchemas [Cfa, Nia, Uda]` e
+`issueAssetIfa` lancia «not fully supported»; restano NIA, IFA va in
+slide 6.
+
+**Il backup a due catene.** `backup-rgb.sh` fotografa `rgb/dati` con
+l'ambiente signet e `rgb/mutinynet` con l'ambiente mutinynet (le
+fotografie in `rgb/backup-mutinynet`), le guardie controllano chiavi e
+fotografia per `catena/nome`, e finché la seconda cartella non esiste
+fa quel che faceva. Le cartelle della VM sono diventate variabili
+(`BACKUP_RGB_HOME`, `_DEST`, `_UNIT_DIR`, `_SBIN_DIR`) SOLO perché la
+prova possa farlo girare in una casa finta con `runuser`, `age`,
+`install` e `chgrp` di cartone: tre scenari (due catene, solo signet,
+una fotografia che manca → exit 1 col nome `mutinynet/barattolo`).
+
+**La chiavetta e i portatili di Alan: la lezione della glibc.** Alan
+porta DUE Linux a base Ubuntu (Pop!_OS 32 GB con Intel Arc, Zorin 16 GB)
+il 15 a casa di Andrea, e si installano con la rete nell'utente Linux
+`hackathon` (cambio del 9: niente installazione in sala); la chiavetta
+(`chiavetta-prepara.sh` con la rete, `install-offline.sh` senza) è la
+riserva. A provarla in un container Ubuntu 22.04 è saltato fuori che il
+binario Utexo `librgblibcffi.so` della beta.8 — quella che
+`wdk-wallet-rgb 2.0.3` pretende via `@utexo/rgb-sdk 1.0.3` — vuole
+**glibc ≥ 2.38**: su 22.04 (2.35) l'import muore con «GLIBC_2.38 not
+found». Letto nei tre .so: beta.8 → 2.38, beta.13 e beta.18 → 2.34. E
+`@utexo/rgb-sdk 1.0.6` pinna la beta.13: con `"overrides":
+{"@utexo/rgb-sdk": "1.0.6"}` in package.json `wdk-wallet-rgb 2.0.3` ci
+gira sopra — PROVATO nel container jammy: import, `nuovo`, `indirizzo`,
+`saldo` via l'Esplora di KaleidoSwap (che è anche la prova che Esplora
+via https funziona con lo stack Utexo su Mutinynet). Il rovescio: la
+1.0.6 deriva con `vanillaKeychain` 0 e non 1, quindi un wallet nato con
+l'una NON è lo stesso con l'altra — bene per il wallet di PROVA di Alan,
+mai per quello della demo, che resta sul PC di Andrea (WSL 26.04) con la
+variante originale. `chiavetta-prepara.sh` sceglie la variante dalla
+glibc della macchina che prepara e la scrive nel manifesto;
+`install-offline.sh` confronta la glibc del portatile con quella del
+manifesto. La prima stesura del prepara ha detto ✓ sopra un import
+fallito: dentro `( … ) && ok || no` bash ignora `set -e` — ogni riga ha
+il suo `|| return 1` adesso. QVAC su Linux: Vulkan ≥ 1.4 per la GPU
+(Mesa ANV dalla 24.3: una base 24.04 sì, 22.04 no) e CPU altrimenti, che
+per noi basta: le stime dei tempi stanno in §10, e sono stime.
+
+**I numeri della demo, fissati.** 4,80 USDB il gioco; soglia 3 USDB per
+pagamento e 20 al giorno (livello 1 della bozza NWC-RGB, «Authorization
+levels», nei termini di `registerPolicy` del WDK, con `rgb_get_budget`);
+ordine delle 13:30 da 2,50 USDB (pagato da solo, +2 MOON); premio «☕
+Caffè gratis» da 25 MOON (livello 0, riscatto automatico); la sequenza
+dei MOON 60 → 62 → 22 → 27 → 2, col premio che scatta QUANDO ARRIVA IL
+BONUS (22 < 25 ≤ 27) e che perciò si arma in scena, al passo 7, non la
+mattina (con 62 scatterebbe subito). Scena 8-bis, tre livelli senza
+scene in più, sei minuti: §11.2; i due giorni con i punti 11, 12 e 13
+dello studio: §11.3; i piani B con Esplora, proxy e Mutinynet ferma:
+§11.4.
+
+**Provato.** `prove_mutinynet_prep` in prove.py: i due .env letti da
+bash con `$HOME` espanso, rgb.py ESEGUITO con un rgb_lib di cartone su
+tre catene (default, mutinynet, sconosciuta → exit 2) e la guardia di
+chiavi.json nei tre casi (nato su signet aperto come mutinynet → exit 1
+col perché; stessa catena → si apre; senza `rete` → signet),
+backup-rgb.sh fatto girare nella casa finta (tre scenari),
+install-offline.sh `--prova` su una chiavetta finta (completa, senza
+nak, con le due leve), le versioni della chiavetta uguali a quelle di
+§10, bash -n / sh -n / node --check, le frasi dei documenti.
+`prove_annuncio_identita` allargata alla catena: su mutinynet l'id di
+signet è sconosciuto e si nominano i segnaposto (o, dopo l'11, la
+tabella), `pubblica` non cambia con la catena, una catena ignota ferma
+lo script, su signet il content dice ancora «RGB (signet)». La chiavetta
+VERA: preparata in due distro WSL importate apposta (Ubuntu 22.04 →
+variante override, 24.04 → originale: 2,5 GB ciascuna, modelli compresi)
+e installata in due distro PULITE con la rete staccata (`unshare -n`):
+il verbale del giro sta nel rapporto del push. VM, wallet e relay non
+toccati; nessun commit degli id di Mutinynet, che non esistono ancora.
+
+**Resta da guardare.** Domenica 11, la lista di §10 (i dieci passi, con
+le risposte attese); gli id nuovi nei file (la sessione, con Andrea che
+li incolla); il 13 la domanda a KaleidoSwap su `signet` contro
+`signetcustom` e lo schema di USDT; il 15 i due portatili (la glibc per
+prima cosa: `ldd --version`); la riga «Il tunnel ha la terza gamba» dei
+cantieri vecchi vale solo per il piano B.

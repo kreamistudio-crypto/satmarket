@@ -37,8 +37,15 @@ const CASA = process.env.NWC_CASA || path.join(os.homedir(), 'wdk-prova', 'nwc')
 const RELAY = process.env.NWC_RELAY || 'ws://127.0.0.1:7777'
 const FILE_SERVIZIO = path.join(CASA, 'servizio.txt')
 const FILE_CONNESSIONI = path.join(CASA, 'connessioni.json')
-const ALIAS = 'WDK Barattolo (prova, signet)'
-const RETE = 'signet'
+// LA CATENA (9 ott 2026): signet | mutinynet, le stesse regole di punti.mjs
+// (stessa `network: 'signet'` per il modulo, casa e indexer diversi). Il
+// servizio NON cambia chiave ne' connection string cambiando catena: il
+// Profilo di Barattolo resta collegato. Cambia solo il wallet che apre.
+const CATENA = process.env.RGB_CATENA || 'signet'
+if (!['signet', 'mutinynet'].includes(CATENA)) { console.error(`✗ RGB_CATENA=${CATENA}: conosco signet, mutinynet`); process.exit(2) }
+const CASE_UTENTE = { signet: ['wdk-prova', 'utente'], mutinynet: ['wdk-prova', 'mutinynet', 'utente'] }
+const ALIAS = `WDK Barattolo (prova, ${CATENA})`
+const RETE = 'signet'   // l'etichetta NIP-47 e del modulo RGB: vale anche per mutinynet (stesso genesis)
 const KIND_INFO = 13194, KIND_RICHIESTA = 23194, KIND_RISPOSTA = 23195
 
 const hex = (b) => Buffer.from(b).toString('hex')   // SOLO per le chiavi private (Uint8Array): getPublicKey torna gia' hex
@@ -89,9 +96,15 @@ let wdk = null
 async function wallet () {
   if (wdk) return wdk
   const { default: WalletManagerRgb } = await import('@utexo/wdk-wallet-rgb')
-  const casaUtente = process.env.PUNTI_CASA || path.join(os.homedir(), 'wdk-prova', 'utente')
+  const casaUtente = process.env.PUNTI_CASA || path.join(os.homedir(), ...CASE_UTENTE[CATENA])
   const seme = path.join(casaUtente, 'seme.txt')
   if (!fs.existsSync(seme)) throw new Error('il wallet utente non esiste (punti.mjs nuovo)')
+  // La casa ricorda la catena (catena.txt, scritto da punti.mjs nuovo;
+  // assente = signet): un wallet nato su una catena non si apre con
+  // l'indexer dell'altra.
+  const marca = path.join(casaUtente, 'catena.txt')
+  const nato = fs.existsSync(marca) ? fs.readFileSync(marca, 'utf8').trim() : 'signet'
+  if (nato !== CATENA) throw new Error(`il wallet in ${casaUtente} e' nato su ${nato}, ma RGB_CATENA dice ${CATENA}`)
   const manager = new WalletManagerRgb(fs.readFileSync(seme, 'utf8').trim(), {
     network: RETE,
     indexerUrl: process.env.RGB_INDEXER || 'tcp://127.0.0.1:50001',

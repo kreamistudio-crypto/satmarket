@@ -24,7 +24,18 @@ Uso:  rgb.py <comando> <nome> [argomenti]
   backup        <nome>                          backup cifrato di rgb-lib in ~/rgb/backup
   ripristina    <nome> <file.backup>            ripristina lo stash (chiavi.json gia' al suo posto)
 
-Variabili d'ambiente (facoltative): RGB_INDEXER, RGB_PROXY, RGB_FEE, RGB_BASE.
+Variabili d'ambiente (facoltative): RGB_INDEXER, RGB_PROXY, RGB_FEE, RGB_BASE,
+RGB_BACKUP, RGB_CATENA.
+
+LA CATENA (9 ott 2026, studio Mutinynet): `RGB_CATENA` vale `signet` (default:
+il signet pubblico, bitcoind+electrs della VM) o `mutinynet` (il signet degli
+organizzatori dell'hackathon, blocchi da 30 s, Esplora e proxy pubblici). Per
+rgb-lib sono TUTT'E DUE `BitcoinNetwork.SIGNET`: il blocco 0 di Mutinynet e'
+quello del signet normale, e la libreria guarda quello. Cambiano l'indexer,
+il proxy, i link e — soprattutto — LA CARTELLA: uno stash non deve mai vedere
+due catene, quindi `RGB_BASE` punta a una cartella per catena e chiavi.json
+ricorda su quale catena il wallet e' nato (si rifiuta di aprirsi sull'altra).
+I file pronti: deploy/rgb/mutinynet-vm.env (`source` prima dei comandi).
 """
 import json
 import os
@@ -35,9 +46,19 @@ import time
 
 import rgb_lib
 
-BASE = os.path.expanduser(os.environ.get("RGB_BASE", "~/rgb/dati"))
-BACKUP = os.path.join(os.path.dirname(BASE), "backup")
-RETE = rgb_lib.BitcoinNetwork.SIGNET
+CATENE = {
+    # catena: (link alla transazione, cartella di default dei wallet, cartella dei backup)
+    "signet": ("https://mempool.space/signet/tx/", "~/rgb/dati", "~/rgb/backup"),
+    "mutinynet": ("https://mutinynet.com/tx/", "~/rgb/mutinynet", "~/rgb/backup-mutinynet"),
+}
+CATENA = os.environ.get("RGB_CATENA", "signet")
+if CATENA not in CATENE:
+    print(f"✗ RGB_CATENA={CATENA!r}: conosco {', '.join(CATENE)}", file=sys.stderr)
+    sys.exit(2)
+ESPLORA, _BASE_DEFAULT, _BACKUP_DEFAULT = CATENE[CATENA]
+BASE = os.path.expanduser(os.environ.get("RGB_BASE", _BASE_DEFAULT))
+BACKUP = os.path.expanduser(os.environ.get("RGB_BACKUP", _BACKUP_DEFAULT))
+RETE = rgb_lib.BitcoinNetwork.SIGNET               # anche per mutinynet: stesso genesis
 INDEXER = os.environ.get("RGB_INDEXER", "tcp://127.0.0.1:50001")
 PROXY = os.environ.get("RGB_PROXY", "rpc://127.0.0.1:3000/json-rpc")
 FEE = int(os.environ.get("RGB_FEE", "2"))          # sat/vB: su signet basta
@@ -45,7 +66,6 @@ SCHEMI = [rgb_lib.AssetSchema.NIA]
 SCADENZA = 24 * 3600                                # le fatture valgono un giorno
 CONFERME = 1
 SATS_WITNESS = 1000                                 # l'uscita che paga chi manda
-ESPLORA = "https://mempool.space/signet/tx/"
 
 
 def _die(msg):
@@ -64,7 +84,17 @@ def _chiavi(nome):
     if not os.path.exists(percorso):
         _die(f"il wallet «{nome}» non esiste: prima `rgb.py nuovo {nome}`")
     with open(percorso) as f:
-        return json.load(f)
+        c = json.load(f)
+    # Il wallet ricorda la catena su cui e' nato (i chiavi.json di prima
+    # del 9 ott dicono «signet», ed e' giusto). Aprirlo con l'indexer
+    # dell'altra catena non e' un errore di rete: e' uno stash che vede
+    # UTXO di un altro mondo, e il controllo di coerenza di rgb-lib
+    # esplode dopo, nel modo peggiore. Qui ci si ferma prima.
+    nato = c.get("rete", "signet")
+    if nato != CATENA:
+        _die(f"il wallet «{nome}» e' nato su {nato}, ma RGB_CATENA dice {CATENA}: "
+             f"cartella o .env sbagliati (RGB_BASE={BASE})")
+    return c
 
 
 def _wallet(nome, online=True):
@@ -104,7 +134,7 @@ def nuovo(nome):
     percorso = os.path.join(cartella, "chiavi.json")
     with open(os.open(percorso, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as f:
         json.dump({
-            "rete": "signet",
+            "rete": CATENA,
             "mnemonic": k.mnemonic,
             "xpub": k.xpub,
             "account_xpub_vanilla": k.account_xpub_vanilla,
@@ -113,7 +143,7 @@ def nuovo(nome):
             "password_backup": secrets.token_urlsafe(24),
             "creato": time.strftime("%Y-%m-%d %H:%M:%S"),
         }, f, indent=2)
-    print(f"✓ wallet «{nome}» creato in {cartella}")
+    print(f"✓ wallet «{nome}» creato in {cartella} (catena {CATENA})")
     print(f"  impronta {k.master_fingerprint}, xpub colorato {k.account_xpub_colored[:16]}…")
     print("  la frase segreta sta SOLO in chiavi.json: non incollarla da nessuna parte")
 
@@ -146,7 +176,7 @@ def saldo(nome):
 def utxo(nome, quanti="5"):
     w, on = _wallet(nome)
     n = w.create_utxos(on, True, int(quanti), None, FEE, False)
-    print(f"✓ creati {n} UTXO colorabili (una transazione signet, aspetta una conferma)")
+    print(f"✓ creati {n} UTXO colorabili (una transazione {CATENA}, aspetta una conferma)")
 
 
 def emetti(nome, ticker, nome_asset, quantita, precisione="0"):
