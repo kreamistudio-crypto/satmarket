@@ -755,6 +755,21 @@ P2P_AVVISI_NUOVI_ORDINI = True
 # mezzo escono insieme nel prossimo (quanti per tipo, il piu' conveniente
 # per lei). Un intero da 1 in su; storto o sotto 1 vale 15.
 P2P_AVVISI_NUOVI_MINUTI = 15
+# GLI AVVISI DEL MERCATINO (9 ott 2026): chi lo chiede dal cassetto Avvisi
+# del Profilo riceve un messaggio quando nel mercatino compaiono annunci
+# nuovi — TUTTI i nuovi, con un filtro facoltativo di categorie e prezzo
+# massimo, oppure quelli di un venditore che segue («🔔 Segui» sulla sua
+# pagina). Per persona e' SPENTO di serie; questa e' la leva GLOBALE,
+# accesa di serie: a False nessuno riceve niente, il blocco del cassetto e
+# il bottone spariscono. Solo un booleano conta; un valore storto resta True.
+MERCATINO_AVVISI_NUOVI = True
+# ...e le due finestre del raggruppamento, in minuti: a una persona non
+# arriva piu' di un messaggio «nuovi annunci» ogni tanti minuti (gli
+# annunci nati nel mezzo escono insieme: quanti e i primi titoli), e per
+# ogni venditore seguito non piu' di uno ogni tanti minuti. Interi da 1 in
+# su; storti o sotto 1 valgono 60 e 15.
+MERCATINO_AVVISI_NUOVI_MINUTI = 60
+MERCATINO_AVVISI_SEGUI_MINUTI = 15
 # I SUGGERIMENTI DEGLI INDIRIZZI DELL'APPUNTAMENTO (1 ott 2026): mentre chi
 # vende in contanti scrive dove vedersi, il server chiede indirizzi veri a
 # Photon (dati OpenStreetMap) mandando SOLO il testo cercato, col freno e

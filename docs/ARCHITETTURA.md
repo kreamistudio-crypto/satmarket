@@ -9720,6 +9720,59 @@
   #gridEmpty dopo una ricerca a vuoto (mai in DEMO/VETRINA;
   passamano `ricercaPrecompila` con query e categoria attiva,
   consumato da renderRicerche, pattern hintPubblicazione).
+  GLI AVVISI DEL MERCATINO (9 ott 2026, Cantieri «Gli avvisi del
+  mercatino: i nuovi annunci e i venditori seguiti»): due modi di
+  sapere che un annuncio è entrato in vetrina senza averlo cercato.
+  «🆕 Avvisami dei nuovi annunci» (`utenti.avvisi_mercatino`, 0 di
+  serie; `avvisi_mercatino_categorie` coi pipe, '' = tutte;
+  `avvisi_mercatino_prezzo` nella `avvisi_mercatino_valuta`, 0 = nessun
+  tetto; rotta `POST /api/me/avvisi-mercatino`, giudice
+  `_pref_avvisi_mercatino` per `/api/me`) e «🔔 Segui» sulla pagina del
+  venditore (`venditori_seguiti(tg_id, venditore_id)`, rotta `POST
+  /api/negozio/{chi}/segui` che trova il venditore come `/api/negozio`
+  — slug, username, codice, mai col tg_id — mai se stessi,
+  `TETTO_VENDITORI_SEGUITI` 100; `/api/negozio` dice `seguito` a chi
+  guarda e mai quanti lo seguono; l'elenco in `/api/me.seguiti` senza
+  tg_id). LA FONTE È QUESTO STESSO DRENATORE: `_drena_match`, DOPO il
+  dedup degli avvisi di ricerca, passa ogni annuncio a
+  `_accoda_avvisi_mercatino` — chi segue il venditore ('segui'), chi ha
+  l'interruttore coi filtri che passano (`_passa_avviso_mercatino`:
+  categoria fra le scelte, prezzo in sats o in euro col cambio, cambio
+  assente = niente, come `_match_avviso`), UNA volta per persona (chi
+  segue E ha «tutti» lo riceve da chi segue), mai per chi l'ha
+  pubblicato — e il «mai due volte» È `avvisi_notificati`, scritto al
+  momento della coda: un annuncio già annunciato da «Avvisami se
+  arriva» non torna da qui, e viceversa. La coda è
+  `mercatino_avvisi_coda(tg_id, annuncio_id, motivo, venditore_id,
+  titolo, accodato, mandato)` con la chiave (persona, annuncio) e il
+  `mandato` a tre valori (0 in coda, 1 consumata senza messaggio, >1
+  l'ora del messaggio), gemella di `p2p_avvisi_nuovi`.
+  `_scarica_avvisi_mercatino` compone UN messaggio per persona sui
+  'tutti' quando dall'ultimo sono passati `MERCATINO_AVVISI_NUOVI_MINUTI`
+  (60) e UNO per (persona, venditore) sui 'segui' dopo
+  `MERCATINO_AVVISI_SEGUI_MINUTI` (15), con le sole righe i cui annunci
+  sono ANCORA in vetrina (stato attivo, negozio non in ferie),
+  timbrando PRIMA dell'invio; chi ha spento o smesso non riceve
+  l'arretrato. I testi: `_testo_avviso_mercatino_tutti` (quanti, «Il
+  tuo filtro: …», i primi `TITOLI_AVVISO_MERCATINO` titoli, «…e altri
+  N», il tocco di `_link_esplora_avvisi`: `/categoria/{slug}` con una
+  categoria sola, la vetrina altrimenti, `?max=…&valuta=…` che il
+  client legge in `preparaFiltriDaUrl` prima del primo fetch) e
+  `_testo_avviso_mercatino_segui` (il nome, i titoli, l'annuncio con
+  uno solo, il negozio con più d'uno). Il primo messaggio lo manda il
+  drenatore subito (`_giro_avvisi_mercatino`), i successivi
+  `orologio_avvisi_mercatino` ogni minuto (l'orologio grande batte
+  ogni dieci). Il canale lo sceglie `notifica()`. Leva globale
+  `MERCATINO_AVVISI_NUOVI` (True, patto delle leve: spenta, 409 sulle
+  rotte, niente blocco né bottone), le tre nel pannello «🆕 Avvisi del
+  mercatino» e in busta `/api/me.avvisi_mercatino_leve`. La fusione
+  porta i seguiti nei due versi e la coda. Frontend: il blocco «🛒
+  Mercatino» ACCODATO nel cassetto Avvisi dopo le righe del P2P
+  (`rigaAvvisiMercatino`, `insertAdjacentHTML`: la riga delle sorelle
+  non si tocca), `bottoneSegui` sotto la riga delle vendite nel
+  riquadro di `renderNegozio` (vuoto / pieno «🔔 Seguito ✓», mai sul
+  proprio, mai in vetrina anonima), `chiediSegui` che aggiorna il
+  bottone e l'elenco dalla stessa risposta.
   Feedback e stelle (lug 2026): tabella `feedback(ordine_id, da_tg_id,
   per_tg_id, voto 1-5, commento ≤200, creato)` con
   `UNIQUE(ordine_id, da_tg_id)` come giudice dei doppioni.

@@ -5419,6 +5419,45 @@ def init_db():
         creato INTEGER,
         PRIMARY KEY(tg_id, annuncio_id)
     );
+    CREATE TABLE IF NOT EXISTS venditori_seguiti(
+        -- «🔔 Segui» sulla pagina di un venditore (9 ott 2026,
+        -- richiesta di Andrea): chi segue chi, una riga per coppia e
+        -- la chiave e' la coppia. CHI segue non esce MAI in pubblico:
+        -- il venditore non vede l'elenco, e nemmeno quanti sono.
+        tg_id INTEGER NOT NULL,
+        venditore_id INTEGER NOT NULL,
+        creato INTEGER DEFAULT 0,
+        PRIMARY KEY(tg_id, venditore_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_venditori_seguiti_venditore
+        ON venditori_seguiti(venditore_id);
+    CREATE TABLE IF NOT EXISTS mercatino_avvisi_coda(
+        -- LA CODA DEGLI AVVISI DEL MERCATINO (9 ott 2026): un annuncio
+        -- nuovo che qualcuno vuole sapere aspetta qui il suo messaggio
+        -- raggruppato. La chiave (persona, annuncio) e' l'anti-doppione
+        -- sul database, gemella di `p2p_avvisi_nuovi`, e sopra c'e'
+        -- `avvisi_notificati`, lo stesso «mai due volte» degli avvisi
+        -- di ricerca. `motivo` dice perche' lei lo vuole: 'tutti' =
+        -- l'interruttore dei nuovi annunci coi suoi filtri, 'segui' =
+        -- segue quel venditore. `mandato` dice a che punto e':
+        --   0  in coda, aspetta il messaggio;
+        --   1  consumata senza messaggio (annuncio sparito dalla
+        --      vetrina, interruttore spento, venditore non piu' seguito);
+        --   >1 l'ora del messaggio in cui e' uscita.
+        -- La finestra del raggruppamento si misura sul MAX dei
+        -- `mandato` > 1: per persona sui 'tutti', per (persona,
+        -- venditore) sui 'segui'. Se ne vanno da sole dopo un mese.
+        tg_id INTEGER NOT NULL,
+        annuncio_id INTEGER NOT NULL,
+        motivo TEXT DEFAULT 'tutti',
+        venditore_id INTEGER DEFAULT 0,
+        titolo TEXT DEFAULT '',
+        accodato INTEGER DEFAULT 0,
+        mandato INTEGER DEFAULT 0,
+        PRIMARY KEY(tg_id, annuncio_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_mercatino_avvisi_coda
+        ON mercatino_avvisi_coda(tg_id, mandato);
     CREATE TABLE IF NOT EXISTS preferiti(
         -- «nel tuo barattolo»: gli annunci messi da parte col 🫙.
         -- CHI ha salvato non esce MAI (i preferiti restano privati);
@@ -7086,6 +7125,17 @@ def init_db():
                     "avvisi_nuovi_p2p INTEGER DEFAULT 0",
                     "avvisi_nuovi_tipi TEXT DEFAULT ''",
                     "avvisi_nuovi_soglia TEXT DEFAULT ''",
+                    # GLI AVVISI DEL MERCATINO (9 ott 2026, richiesta di
+                    # Andrea): «🆕 Avvisami dei nuovi annunci», 0 = SPENTO
+                    # di serie, con le categorie volute coi pipe ai bordi
+                    # come `avvisi_ricerca.categorie` ('' = tutte) e il
+                    # prezzo massimo nella SUA valuta ('sats' o 'eur', 0 =
+                    # nessun tetto). Le legge un giudice solo,
+                    # `_pref_avvisi_mercatino`, per /api/me e per la coda.
+                    "avvisi_mercatino INTEGER DEFAULT 0",
+                    "avvisi_mercatino_categorie TEXT DEFAULT ''",
+                    "avvisi_mercatino_prezzo REAL DEFAULT 0",
+                    "avvisi_mercatino_valuta TEXT DEFAULT ''",
                     "spedizione_standard TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
@@ -14973,6 +15023,22 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM p2p_avvisi_nuovi WHERE tg_id=?",
                     (id_nostr,))
+        # ...e gli avvisi del mercatino (9 ott 2026): i venditori che la
+        # meta' Nostr seguiva passano alla meta' Telegram, in unione; chi
+        # seguiva la meta' Nostr COME VENDITORE segue ora quella Telegram
+        # (stessa persona, un negozio solo); la coda in unione come il
+        # dedup, una riga per annuncio basta. Seguire se stessi non si
+        # puo': una riga che dopo la fusione lo direbbe se ne va.
+        con.execute("UPDATE OR IGNORE venditori_seguiti SET tg_id=? "
+                    "WHERE tg_id=?", (id_telegram, id_nostr))
+        con.execute("UPDATE OR IGNORE venditori_seguiti SET venditore_id=? "
+                    "WHERE venditore_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM venditori_seguiti WHERE tg_id=? OR venditore_id=? "
+                    "OR tg_id=venditore_id", (id_nostr, id_nostr))
+        con.execute("UPDATE OR IGNORE mercatino_avvisi_coda SET tg_id=? "
+                    "WHERE tg_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM mercatino_avvisi_coda WHERE tg_id=?",
+                    (id_nostr,))
         # Il barattolo dei preferiti segue l'utente, in unione come i
         # distintivi (stesso annuncio salvato da entrambe le meta':
         # una riga basta)
@@ -22752,8 +22818,15 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     # catalogo mette i fiducia per primi.
     presi = {r["badge_id"] for r in con.execute(
         "SELECT badge_id FROM badge_utente WHERE tg_id=?", (v["tg_id"],))}
+    # «🔔 Segui» (9 ott 2026): se CHI GUARDA segue questo venditore. Solo
+    # a chi e' entrato; agli anonimi e sulla propria pagina vale falso.
+    # Quanti lo seguono NON esce: chi segue resta un fatto privato.
+    seguito = bool(user and int(user["id"]) != int(v["tg_id"]) and con.execute(
+        "SELECT 1 FROM venditori_seguiti WHERE tg_id=? AND venditore_id=?",
+        (user["id"], v["tg_id"])).fetchone())
     con.close()
     venditore = dict(v)
+    venditore["seguito"] = seguito
     venditore["distintivi"] = [
         dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
              descrizione=d["descrizione"])
@@ -27361,6 +27434,31 @@ def _leve_stato():
             _leva("Termometro: sotto questi vuoti tace",
                   "TERMOMETRO_SOTTOCATEGORIE_MINIMO",
                   TERMOMETRO_SOTTOCATEGORIE_MINIMO),
+        ]},
+        {"gruppo": "🆕 Avvisi del mercatino", "voci": [
+            # GLI AVVISI DEI NUOVI ANNUNCI E DEI VENDITORI SEGUITI (9 ott
+            # 2026): la leva globale e le due finestre del raggruppamento;
+            # la preferenza resta per persona, spenta di serie
+            _leva("Avvisi dei nuovi annunci e dei venditori seguiti",
+                  "MERCATINO_AVVISI_NUOVI", MERCATINO_AVVISI_NUOVI,
+                  acceso="chi lo chiede (spento di serie, per persona) "
+                         "riceve un messaggio quando nel mercatino compaiono "
+                         "annunci nuovi — tutti coi suoi filtri, o di un "
+                         "venditore che segue; raggruppati, mai per i suoi",
+                  spento="nessun avviso per nessuno: il blocco del cassetto "
+                         "Avvisi e il bottone «🔔 Segui» spariscono"),
+            _leva("Nuovi annunci — finestra (minuti)",
+                  "MERCATINO_AVVISI_NUOVI_MINUTI", MERCATINO_AVVISI_NUOVI_MINUTI,
+                  acceso="fra un messaggio «nuovi annunci» e il successivo "
+                         "alla stessa persona passano almeno questi minuti; "
+                         "gli annunci nati nel mezzo escono insieme",
+                  spento="(non si spegne: sotto il minuto vale 60)"),
+            _leva("Venditore seguito — finestra (minuti)",
+                  "MERCATINO_AVVISI_SEGUI_MINUTI", MERCATINO_AVVISI_SEGUI_MINUTI,
+                  acceso="per ogni venditore seguito, fra un messaggio e il "
+                         "successivo alla stessa persona passano almeno "
+                         "questi minuti",
+                  spento="(non si spegne: sotto il minuto vale 15)"),
         ]},
         {"gruppo": "💡 Suggerimenti ai venditori", "voci": [
             _leva("Accesi di serie", "SUGGERIMENTI_DI_SERIE",
@@ -39267,6 +39365,12 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # giudice e non dalle colonne grezze: '' nei tipi vale «tutti», e il
     # client non deve saperlo
     profilo["avvisi_nuovi_p2p"] = _pref_avvisi_nuovi_p2p(u)
+    # ...e gli avvisi del mercatino (9 ott 2026): le preferenze dal
+    # giudice, i venditori seguiti, e le leve con le due finestre per la
+    # riga «al massimo uno ogni N minuti» del cassetto
+    profilo["avvisi_mercatino"] = _pref_avvisi_mercatino(u)
+    profilo["seguiti"] = _seguiti_di(user["id"])
+    profilo["avvisi_mercatino_leve"] = _leve_avvisi_mercatino()
     # ...e quanti dei miei scambi aspettano un mio gesto: il pallino
     # all'apertura lo legge da qui, senza aprire i relay
     profilo["p2p_tocca"] = p2p_tocca
@@ -42145,6 +42249,92 @@ async def elimina_avviso_ricerca(avviso_id: int,
     con.commit()
     con.close()
     return {"ok": True}
+
+
+@app.post("/api/me/avvisi-mercatino")
+async def scegli_avvisi_mercatino(req: Request, x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """«🆕 Avvisami dei nuovi annunci» (9 ott 2026, richiesta di Andrea):
+    le preferenze in una rotta sola — l'interruttore, le categorie che
+    vuole (nessuna = tutte) e il prezzo massimo nella sua valuta (0 =
+    nessun tetto). Le salva il blocco «Mercatino» del cassetto Avvisi e
+    tornano come le legge /api/me (`_pref_avvisi_mercatino`): una vista,
+    uno stato. A differenza di «Avvisami se arriva» qui l'avviso vuoto e'
+    LEGITTIMO: «tutti i nuovi annunci» e' proprio quel che chiede, ed e'
+    il raggruppamento a tenerlo gentile. Il canale (Telegram, DM Nostr)
+    resta quello di `canale_notifiche`: questa dice SE e QUALI, quella
+    dice DOVE. Solo con la leva globale accesa (409 altrimenti)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not MERCATINO_AVVISI_NUOVI:
+        raise HTTPException(409, "Gli avvisi del mercatino sono spenti")
+    d = await leggi_json(req)
+    attivo = 1 if d.get("attivo") else 0
+    grezze = d.get("categorie") or []
+    if not isinstance(grezze, list):
+        raise HTTPException(400, "Categorie in formato sbagliato")
+    scelte = [c for c in CATEGORIE if c in grezze]
+    valuta = "eur" if d.get("valuta") == "eur" else "sats"
+    try:
+        prezzo = float(str(d.get("prezzo_max") or 0).replace(",", "."))
+    except ValueError:
+        raise HTTPException(400, "Prezzo massimo non valido")
+    if prezzo < 0 or prezzo != prezzo or prezzo == float("inf"):
+        raise HTTPException(400, "Prezzo massimo non valido")
+    prezzo = int(prezzo) if valuta == "sats" else round(prezzo, 2)
+    colonne = {"avvisi_mercatino": attivo,
+               "avvisi_mercatino_categorie": ("|" + "|".join(scelte) + "|") if scelte else "",
+               "avvisi_mercatino_prezzo": prezzo,
+               "avvisi_mercatino_valuta": valuta}
+    con = db()
+    con.execute("UPDATE utenti SET avvisi_mercatino=?, avvisi_mercatino_categorie=?, "
+                "avvisi_mercatino_prezzo=?, avvisi_mercatino_valuta=? WHERE tg_id=?",
+                (attivo, colonne["avvisi_mercatino_categorie"], prezzo, valuta, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "avvisi_mercatino": _pref_avvisi_mercatino(colonne)}
+
+
+@app.post("/api/negozio/{chi}/segui")
+async def segui_venditore(chi: str, req: Request, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """«🔔 Segui» sulla pagina di un venditore (9 ott 2026, richiesta di
+    Andrea): {segui: true} segue, {segui: false} smette — dal bottone del
+    negozio e dall'elenco «Venditori che segui» del cassetto Avvisi. Il
+    venditore si trova come lo trova /api/negozio (slug, username,
+    codice: mai col tg_id, che in pubblico non esce), mai se stessi, con
+    un tetto di buon senso. Risponde con lo stato e con l'elenco intero,
+    cosi' il cassetto si ridisegna senza una seconda domanda. Solo con
+    la leva globale accesa (409)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not MERCATINO_AVVISI_NUOVI:
+        raise HTTPException(409, "Gli avvisi del mercatino sono spenti")
+    d = await leggi_json(req)
+    con = db()
+    try:
+        v = _venditore_da_chi(con, chi)
+        if not v:
+            raise HTTPException(404, "Negozio non trovato")
+        if int(v["tg_id"]) == int(user["id"]):
+            raise HTTPException(400, "Il tuo negozio lo conosci gia': non puoi seguirti")
+        if d.get("segui"):
+            quanti = con.execute("SELECT COUNT(*) AS n FROM venditori_seguiti WHERE tg_id=?",
+                                 (user["id"],)).fetchone()["n"]
+            gia = con.execute("SELECT 1 FROM venditori_seguiti WHERE tg_id=? AND venditore_id=?",
+                              (user["id"], v["tg_id"])).fetchone()
+            if not gia and quanti >= TETTO_VENDITORI_SEGUITI:
+                raise HTTPException(400, f"Segui gia' {TETTO_VENDITORI_SEGUITI} venditori: "
+                                         "smetti di seguirne uno per seguirne altri")
+            con.execute("INSERT OR IGNORE INTO venditori_seguiti(tg_id, venditore_id, creato) "
+                        "VALUES(?,?,?)", (user["id"], v["tg_id"], int(time.time())))
+            seguito = True
+        else:
+            con.execute("DELETE FROM venditori_seguiti WHERE tg_id=? AND venditore_id=?",
+                        (user["id"], v["tg_id"]))
+            seguito = False
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True, "seguito": seguito, "seguiti": _seguiti_di(user["id"])}
 
 
 # --- I codici sconto del venditore -----------------------------------
@@ -54884,6 +55074,7 @@ async def _drena_match():
     try:
         cambio = await cambio_btc_eur()
         per_utente: dict[int, list] = {}
+        in_vetrina: list = []   # gli stessi annunci, per gli avvisi del mercatino
         con = db()
         adesso_f = int(time.time())
         for i in ids:
@@ -54897,6 +55088,7 @@ async def _drena_match():
                     or in_ferie(a["ferie_fino"], adesso_f):
                 continue
             a = dict(a)
+            in_vetrina.append(a)
             token = normalizza(f"{a['titolo']} {a['descrizione']}").split()
             candidati = con.execute(
                 "SELECT * FROM avvisi_ricerca WHERE attivo=1 "
@@ -54926,11 +55118,20 @@ async def _drena_match():
                     nuovi.append(a)
             if nuovi:
                 da_avvisare[tg_id] = nuovi
+        # GLI AVVISI DEL MERCATINO (9 ott 2026): gli stessi annunci, in
+        # coda per chi segue il venditore o vuole tutti i nuovi — DOPO il
+        # dedup qui sopra, cosi' chi riceve «fa per te» non li riceve due
+        # volte (vedi `_accoda_avvisi_mercatino`)
+        accodati = 0
+        for a in in_vetrina:
+            accodati += _accoda_avvisi_mercatino(con, a, cambio, adesso)
         con.commit()
         con.close()
         for tg_id, annunci in da_avvisare.items():
             await _notifica_match(tg_id, annunci, cambio)
             await asyncio.sleep(0.2)   # mai raffiche sull'API Telegram
+        if accodati:
+            await _giro_avvisi_mercatino()   # il primo messaggio parte subito
     except Exception as e:
         print(f"⚠️ Matching avvisi saltato: {e}")
 
@@ -54962,6 +55163,390 @@ async def _notifica_match(tg_id: int, annunci: list, cambio: float):
         testo += ("\n\n(per oggi mi fermo qui 🤫: il resto lo "
                   "trovi nel mercatino)")
     await notifica(tg_id, testo)
+
+
+# ═══ GLI AVVISI DEL MERCATINO: I NUOVI ANNUNCI E I VENDITORI SEGUITI ═══
+# (9 ott 2026, richiesta di Andrea.) Chi lo chiede sa quando nel mercatino
+# compare un annuncio nuovo, senza tenere l'app aperta, in DUE modi:
+#  · «🆕 Avvisami dei nuovi annunci»: TUTTI i nuovi, con un filtro
+#    facoltativo di categorie e di prezzo massimo — raggruppati, al piu'
+#    un messaggio ogni MERCATINO_AVVISI_NUOVI_MINUTI per persona, con
+#    quanti sono e i primi titoli, e il tocco che apre Esplora coi suoi
+#    filtri;
+#  · «🔔 Segui» sulla pagina di un venditore: quando LUI pubblica, un
+#    messaggio — raggruppato se ne pubblica piu' d'uno in poco tempo, al
+#    piu' uno ogni MERCATINO_AVVISI_SEGUI_MINUTI per venditore.
+# LA FONTE E' IL DRENATORE DEGLI AVVISI DI RICERCA (`_drena_match`): chi
+# pubblica accoda e basta, e l'annuncio arriva qui DOPO il suo dedup —
+# cosi' chi ha gia' ricevuto «Un annuncio fa per te!» non lo riceve una
+# seconda volta da qui, e viceversa. Gli annunci in moderazione passano
+# di li' solo quando un moderatore li approva (e' la loro prima uscita),
+# le aste restano fuori dai canali come sempre, e un annuncio nascosto,
+# tolto o venduto prima del suo minuto non si annuncia.
+# LE REGOLE, e ognuna ha il suo posto nel codice:
+# 1) SPENTO DI SERIE, per persona (`utenti.avvisi_mercatino`; seguire e'
+#    un gesto, quindi e' acceso per costruzione), sotto la leva globale.
+# 2) RAGGRUPPATI: ogni annuncio che qualcuno vuole va in CODA
+#    (`mercatino_avvisi_coda`), e il messaggio parte quando dall'ultimo
+#    sono passati i minuti della finestra. Il primo parte subito.
+# 3) MAI PER I PROPRI ANNUNCI, MAI DUE VOLTE LO STESSO: la chiave della
+#    coda e' persona+annuncio, e sopra c'e' `avvisi_notificati`.
+# 4) LA LEVA GLOBALE MERCATINO_AVVISI_NUOVI, nel pannello delle leve.
+# IL CANALE LO SCEGLIE `notifica()`: bot Telegram a chi entra da
+# Telegram, DM Nostr a chi entra con Nostr, o la scelta del cassetto.
+try:
+    from config import MERCATINO_AVVISI_NUOVI
+    if not isinstance(MERCATINO_AVVISI_NUOVI, bool):
+        print("[mercatino] MERCATINO_AVVISI_NUOVI non e' True/False: gli avvisi "
+              "del mercatino restano ACCESI")
+        MERCATINO_AVVISI_NUOVI = True
+except ImportError:
+    MERCATINO_AVVISI_NUOVI = True
+# ...e le due finestre del raggruppamento, in minuti: 60 per «tutti i
+# nuovi annunci», 15 per ogni venditore seguito. Interi da 1 in su.
+try:
+    from config import MERCATINO_AVVISI_NUOVI_MINUTI
+    MERCATINO_AVVISI_NUOVI_MINUTI = int(MERCATINO_AVVISI_NUOVI_MINUTI)
+    if MERCATINO_AVVISI_NUOVI_MINUTI < 1:
+        raise ValueError("una finestra sotto il minuto non raggruppa niente")
+except ImportError:
+    MERCATINO_AVVISI_NUOVI_MINUTI = 60
+except (TypeError, ValueError):
+    MERCATINO_AVVISI_NUOVI_MINUTI = 60
+    print("[mercatino] MERCATINO_AVVISI_NUOVI_MINUTI non e' un numero intero: vale "
+          "la finestra di serie, 60 minuti")
+try:
+    from config import MERCATINO_AVVISI_SEGUI_MINUTI
+    MERCATINO_AVVISI_SEGUI_MINUTI = int(MERCATINO_AVVISI_SEGUI_MINUTI)
+    if MERCATINO_AVVISI_SEGUI_MINUTI < 1:
+        raise ValueError("una finestra sotto il minuto non raggruppa niente")
+except ImportError:
+    MERCATINO_AVVISI_SEGUI_MINUTI = 15
+except (TypeError, ValueError):
+    MERCATINO_AVVISI_SEGUI_MINUTI = 15
+    print("[mercatino] MERCATINO_AVVISI_SEGUI_MINUTI non e' un numero intero: vale "
+          "la finestra di serie, 15 minuti")
+TETTO_VENDITORI_SEGUITI = 100   # per persona: un tetto di buon senso, non una leva
+TITOLI_AVVISO_MERCATINO = 3     # i primi titoli nel messaggio raggruppato
+
+
+def _leve_avvisi_mercatino() -> dict:
+    """La busta delle leve per il client: la riga del cassetto compare
+    solo se gli avvisi esistono, e dice «al massimo uno ogni N minuti»
+    coi numeri veri."""
+    return {"attivi": bool(MERCATINO_AVVISI_NUOVI),
+            "minuti": int(MERCATINO_AVVISI_NUOVI_MINUTI),
+            "seguiMinuti": int(MERCATINO_AVVISI_SEGUI_MINUTI)}
+
+
+def _pref_avvisi_mercatino(riga) -> dict:
+    """PURA: le quattro colonne di `utenti` come le legge il client —
+    {attivo, categorie, prezzo_max, valuta}. Una riga assente, o di ieri
+    senza le colonne, vale SPENTO senza filtri: lo spento di serie e' una
+    regola, non un default del database. Le categorie escono nell'ordine
+    del catalogo e solo se esistono; un prezzo storto vale «nessuno»."""
+    if not riga:
+        return {"attivo": False, "categorie": [], "prezzo_max": 0, "valuta": "sats"}
+    try:
+        attivo = bool(int(_campo_riga(riga, "avvisi_mercatino", 0) or 0))
+    except (TypeError, ValueError):
+        attivo = False
+    cat_txt = str(_campo_riga(riga, "avvisi_mercatino_categorie", "") or "")
+    categorie = [c for c in CATEGORIE if f"|{c}|" in cat_txt]
+    valuta = str(_campo_riga(riga, "avvisi_mercatino_valuta", "") or "")
+    if valuta not in ("sats", "eur"):
+        valuta = "sats"
+    try:
+        prezzo = float(_campo_riga(riga, "avvisi_mercatino_prezzo", 0) or 0)
+    except (TypeError, ValueError):
+        prezzo = 0.0
+    if prezzo < 0 or prezzo != prezzo or prezzo == float("inf"):
+        prezzo = 0.0
+    prezzo = int(prezzo) if valuta == "sats" else round(prezzo, 2)
+    return {"attivo": attivo, "categorie": categorie, "prezzo_max": prezzo, "valuta": valuta}
+
+
+def _passa_avviso_mercatino(pref: dict, a: dict, cambio: float) -> bool:
+    """PURA: queste preferenze vogliono quest'annuncio? Acceso; la
+    categoria fra le scelte (nessuna scelta = tutte); e sotto il prezzo
+    massimo, se c'e' — in sats contro il listino in sats, in euro contro
+    il listino in euro com'e' o col cambio di adesso. Cambio mai arrivato
+    = criterio non valutabile = niente avviso: meglio un avviso perso che
+    uno sbagliato, il patto di `_match_avviso`."""
+    if not pref.get("attivo"):
+        return False
+    cats = pref.get("categorie") or []
+    if cats and a.get("categoria") not in cats:
+        return False
+    tetto = pref.get("prezzo_max") or 0
+    if not tetto:
+        return True
+    if pref.get("valuta") == "eur":
+        if a.get("valuta") == "eur" and a.get("prezzo_eur"):
+            eur = float(a["prezzo_eur"])
+        elif cambio and cambio > 0:
+            eur = float(a.get("prezzo_sats") or 0) / 100_000_000 * cambio
+        else:
+            return False
+        return eur <= float(tetto)
+    return int(a.get("prezzo_sats") or 0) <= int(tetto)
+
+
+def _titoli_avviso_mercatino(righe: list) -> str:
+    """PURA: i primi titoli, uno per riga col puntino, e «…e altri N»."""
+    testo = "".join(f"\n• {html.escape(str(r.get('titolo') or '')[:60])}"
+                    for r in righe[:TITOLI_AVVISO_MERCATINO])
+    resto = len(righe) - TITOLI_AVVISO_MERCATINO
+    if resto > 0:
+        testo += "\n…e " + ("un altro" if resto == 1 else f"altri {resto}")
+    return testo
+
+
+def _link_esplora_avvisi(pref: dict) -> str:
+    """PURA: il tocco che apre Esplora coi filtri della persona — il
+    reparto se la categoria e' una sola (/categoria/{slug}, la pagina
+    vera del reparto), la vetrina intera altrimenti, e il prezzo massimo
+    in coda (?max=…&valuta=…), che la pagina legge all'arrivo."""
+    cats = pref.get("categorie") or []
+    url = (f"{URL_PUBBLICO}/categoria/{slug_categoria(cats[0])}" if len(cats) == 1
+           else f"{URL_PUBBLICO}/")
+    tetto = pref.get("prezzo_max") or 0
+    if tetto:
+        url += f"?max={tetto}&valuta={'eur' if pref.get('valuta') == 'eur' else 'sats'}"
+    return url
+
+
+def _frase_filtro_avvisi_mercatino(pref: dict) -> str:
+    """PURA: «Elettronica · Motori, fino a 50,00 €» — il filtro della
+    persona in una riga, '' senza filtri."""
+    pezzi = []
+    cats = pref.get("categorie") or []
+    if cats:
+        pezzi.append(" · ".join(html.escape(c) for c in cats))
+    tetto = pref.get("prezzo_max") or 0
+    if tetto:
+        pezzi.append("fino a " + (f"{_fmt_eur(tetto)} €" if pref.get("valuta") == "eur"
+                                  else f"{_fmt_sats(int(tetto))} sats"))
+    return ", ".join(pezzi)
+
+
+def _testo_avviso_mercatino_tutti(righe: list, pref: dict) -> str:
+    """PURA: il messaggio raggruppato dei nuovi annunci — quanti, il
+    filtro della persona se ce l'ha, i primi titoli e il tocco che apre
+    Esplora coi suoi filtri. Nessun nome di chi vende: la vetrina e' la
+    pagina dove si guarda."""
+    n = len(righe)
+    testo = f"🆕 <b>{n} {'nuovo annuncio' if n == 1 else 'nuovi annunci'} nel mercatino</b>"
+    filtro = _frase_filtro_avvisi_mercatino(pref)
+    if filtro:
+        testo += f"\nIl tuo filtro: {filtro}"
+    testo += _titoli_avviso_mercatino(righe)
+    testo += f"\n\n<a href=\"{_link_esplora_avvisi(pref)}\">🫙 Apri Esplora</a>"
+    return testo
+
+
+def _testo_avviso_mercatino_segui(righe: list, nome: str, negozio: str) -> str:
+    """PURA: il messaggio di un venditore seguito — chi, quanti annunci
+    nuovi, i primi titoli; con uno solo il tocco apre l'annuncio, con
+    piu' d'uno il suo negozio."""
+    n = len(righe)
+    chi = html.escape(str(nome or "")) or "Un venditore che segui"
+    testo = f"🔔 <b>{chi}</b> ha pubblicato {n} {'nuovo annuncio' if n == 1 else 'nuovi annunci'}"
+    testo += _titoli_avviso_mercatino(righe)
+    cod = re.sub(r"[^A-Za-z0-9_]", "", str(negozio or ""))
+    if n == 1 and righe[0].get("annuncio_id"):
+        testo += f"\n\n<a href=\"{URL_PUBBLICO}/annuncio/{int(righe[0]['annuncio_id'])}\">🫙 Apri l'annuncio</a>"
+    elif cod:
+        testo += f"\n\n<a href=\"{URL_PUBBLICO}/negozio/{cod}\">🫙 Apri il suo negozio</a>"
+    else:
+        testo += f"\n\n<a href=\"{URL_PUBBLICO}/\">🫙 Apri Esplora</a>"
+    return testo
+
+
+def _venditore_da_chi(con, chi: str):
+    """Il venditore come lo trova /api/negozio — lo slug sulla stringa
+    intera, poi username e codice sul pezzo prima del trattino
+    (`_chi_da_percorso`) — ma col solo profilo che serve a «Segui»:
+    tg_id, nome, codice. None se non c'e'."""
+    campi = "SELECT tg_id, nome, negozio FROM utenti "
+    v = con.execute(campi + "WHERE negozio_slug=? COLLATE NOCASE AND negozio_slug!='' "
+                    "LIMIT 1", (chi,)).fetchone()
+    if not v:
+        corto = _chi_da_percorso(chi)
+        v = con.execute(campi + "WHERE username=? COLLATE NOCASE AND username!='' "
+                        "LIMIT 1", (corto,)).fetchone()
+        if not v:
+            v = con.execute(campi + "WHERE negozio=? LIMIT 1", (corto,)).fetchone()
+    return v
+
+
+def _seguiti_di(tg_id) -> list:
+    """I venditori che questa persona segue, come li legge il cassetto:
+    codice del negozio, nome e foto — mai il tg_id, mai niente d'altro.
+    Dal piu' recente. Fail-open: un elenco che non si legge e' vuoto,
+    non un /api/me rotto."""
+    try:
+        con = db()
+        righe = con.execute(
+            "SELECT u.nome, u.negozio, u.username, "
+            "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) AS avatar, "
+            "s.creato FROM venditori_seguiti s JOIN utenti u ON u.tg_id=s.venditore_id "
+            "WHERE s.tg_id=? ORDER BY s.creato DESC, u.nome", (tg_id,)).fetchall()
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Venditori seguiti di {tg_id} illeggibili ({e}): elenco vuoto")
+        return []
+    return [{"nome": r["nome"] or "", "negozio": r["negozio"] or "",
+             "username": r["username"] or "", "avatar": r["avatar"] or "",
+             "creato": r["creato"] or 0} for r in righe]
+
+
+def _accoda_avvisi_mercatino(con, a: dict, cambio: float, adesso: int) -> int:
+    """Per un annuncio appena in vetrina, le persone che lo vogliono: in
+    CODA, una riga per (persona, annuncio). Qui stanno le regole 1 e 3 —
+    la leva globale, mai per chi l'ha pubblicato, chi lo SEGUE
+    ('segui'), chi ha acceso «tutti i nuovi annunci» coi filtri che lo
+    passano ('tutti'; chi segue il venditore E ha l'interruttore acceso
+    lo riceve UNA volta, dal venditore). L'anti-doppione e' doppio: la
+    chiave della coda, e `avvisi_notificati` — lo stesso «mai due volte»
+    degli avvisi di ricerca, scritto QUI al momento della coda, cosi' un
+    annuncio gia' annunciato da «Avvisami se arriva» non torna da qui e
+    viceversa. Torna quante righe nuove ha scritto. NON committa: lo fa
+    chi chiama, insieme al resto."""
+    if not MERCATINO_AVVISI_NUOVI or not a or a.get("stato") != "attivo":
+        return 0
+    venditore = int(a.get("venditore_id") or 0)
+    voluti = {}   # tg_id -> motivo
+    for r in con.execute("SELECT tg_id FROM venditori_seguiti WHERE venditore_id=?",
+                         (venditore,)).fetchall():
+        voluti[int(r["tg_id"])] = "segui"
+    for p in con.execute(
+            "SELECT tg_id, avvisi_mercatino, avvisi_mercatino_categorie, "
+            "avvisi_mercatino_prezzo, avvisi_mercatino_valuta FROM utenti "
+            "WHERE avvisi_mercatino=1").fetchall():
+        tg = int(p["tg_id"])
+        if tg in voluti:
+            continue
+        if _passa_avviso_mercatino(_pref_avvisi_mercatino(p), a, cambio):
+            voluti[tg] = "tutti"
+    scritte = 0
+    for tg, motivo in voluti.items():
+        if tg == venditore:
+            continue                      # mai per i suoi
+        gia = con.execute(
+            "INSERT OR IGNORE INTO avvisi_notificati(tg_id, annuncio_id, creato) "
+            "VALUES(?,?,?)", (tg, a["id"], adesso))
+        if not gia.rowcount:
+            continue                      # gia' annunciato: da qui o da «Avvisami se arriva»
+        cur = con.execute(
+            "INSERT OR IGNORE INTO mercatino_avvisi_coda(tg_id, annuncio_id, motivo, "
+            "venditore_id, titolo, accodato, mandato) VALUES(?,?,?,?,?,?,0)",
+            (tg, a["id"], motivo, venditore, str(a.get("titolo") or "")[:80], adesso))
+        scritte += cur.rowcount
+    return scritte
+
+
+def _scarica_avvisi_mercatino(con, adesso: int) -> list:
+    """La regola 2: per ogni persona con righe in coda, UN messaggio per
+    i 'tutti' quando dall'ultimo sono passati MERCATINO_AVVISI_NUOVI_MINUTI
+    (o non ce n'e' mai stato uno), e UNO per venditore seguito quando
+    sono passati MERCATINO_AVVISI_SEGUI_MINUTI — con le righe i cui
+    annunci sono ANCORA in vetrina (attivi, e il negozio non in ferie);
+    le righe si timbrano PRIMA dell'invio col patto di sempre. Si
+    consumano senza messaggio le righe di chi ha spento l'interruttore,
+    di chi ha smesso di seguire, e degli annunci spariti (nascosti dalle
+    ferie, tolti, venduti, rimessi in moderazione). Torna [(tg_id,
+    testo, riga di journal)]. Committa."""
+    con.execute("UPDATE mercatino_avvisi_coda SET mandato=1 WHERE mandato=0 AND motivo='tutti' "
+                "AND tg_id NOT IN (SELECT tg_id FROM utenti WHERE avvisi_mercatino=1)")
+    con.execute("UPDATE mercatino_avvisi_coda SET mandato=1 WHERE mandato=0 AND motivo='segui' "
+                "AND NOT EXISTS (SELECT 1 FROM venditori_seguiti s "
+                "WHERE s.tg_id=mercatino_avvisi_coda.tg_id "
+                "AND s.venditore_id=mercatino_avvisi_coda.venditore_id)")
+    finestre = {"tutti": int(MERCATINO_AVVISI_NUOVI_MINUTI) * 60,
+                "segui": int(MERCATINO_AVVISI_SEGUI_MINUTI) * 60}
+    gruppi = con.execute(
+        "SELECT tg_id, motivo, "
+        "(CASE WHEN motivo='segui' THEN venditore_id ELSE 0 END) AS chi, "
+        "MAX(CASE WHEN mandato > 1 THEN mandato ELSE 0 END) AS ultimo, "
+        "SUM(CASE WHEN mandato = 0 THEN 1 ELSE 0 END) AS in_coda "
+        "FROM mercatino_avvisi_coda GROUP BY tg_id, motivo, chi").fetchall()
+    fuori = []
+    for g in gruppi:
+        if not g["in_coda"]:
+            continue
+        tg, motivo, chi = int(g["tg_id"]), str(g["motivo"] or "tutti"), int(g["chi"] or 0)
+        if adesso - int(g["ultimo"] or 0) < finestre.get(motivo, finestre["tutti"]):
+            continue
+        righe = con.execute(
+            "SELECT c.annuncio_id, c.titolo, a.stato, a.titolo AS titolo_vivo, u.ferie_fino "
+            "FROM mercatino_avvisi_coda c LEFT JOIN annunci a ON a.id=c.annuncio_id "
+            "LEFT JOIN utenti u ON u.tg_id=a.venditore_id "
+            "WHERE c.tg_id=? AND c.mandato=0 AND c.motivo=? AND (?=0 OR c.venditore_id=?) "
+            "ORDER BY c.accodato, c.annuncio_id", (tg, motivo, chi, chi)).fetchall()
+        vive = [{"annuncio_id": r["annuncio_id"], "titolo": r["titolo_vivo"] or r["titolo"]}
+                for r in righe
+                if r["stato"] == "attivo" and not in_ferie(r["ferie_fino"] or 0, adesso)]
+        if not vive:
+            con.execute("UPDATE mercatino_avvisi_coda SET mandato=1 WHERE tg_id=? AND mandato=0 "
+                        "AND motivo=? AND (?=0 OR venditore_id=?)", (tg, motivo, chi, chi))
+            continue
+        con.execute("UPDATE mercatino_avvisi_coda SET mandato=? WHERE tg_id=? AND mandato=0 "
+                    "AND motivo=? AND (?=0 OR venditore_id=?)", (adesso, tg, motivo, chi, chi))
+        if motivo == "segui":
+            v = con.execute("SELECT nome, negozio FROM utenti WHERE tg_id=?", (chi,)).fetchone()
+            testo = _testo_avviso_mercatino_segui(vive, v["nome"] if v else "",
+                                                  v["negozio"] if v else "")
+            riga = f"🔔 Venditore seguito: {len(vive)} annunci di {chi} a {tg}"
+        else:
+            p = con.execute("SELECT avvisi_mercatino, avvisi_mercatino_categorie, "
+                            "avvisi_mercatino_prezzo, avvisi_mercatino_valuta FROM utenti "
+                            "WHERE tg_id=?", (tg,)).fetchone()
+            testo = _testo_avviso_mercatino_tutti(vive, _pref_avvisi_mercatino(p))
+            riga = f"🆕 Nuovi annunci: {len(vive)} a {tg}"
+        fuori.append((tg, testo, riga))
+    con.execute("DELETE FROM mercatino_avvisi_coda WHERE accodato < ?",
+                (adesso - GIORNI_DEDUP_AVVISI * 86400,))
+    con.commit()
+    return fuori
+
+
+async def _giro_avvisi_mercatino():
+    """Un battito: a chi tocca il messaggio, e via. Lo chiamano il
+    drenatore (subito dopo la coda: il primo messaggio parte subito) e
+    l'orologio al minuto (le righe che aspettano la loro finestra). Esce
+    a leva spenta. Fail-open come le sorelle: ogni invio ha il suo try e
+    la sua riga nel journal."""
+    if not MERCATINO_AVVISI_NUOVI:
+        return
+    adesso = int(time.time())
+    con = db()
+    try:
+        avvisi = _scarica_avvisi_mercatino(con, adesso)
+    finally:
+        con.close()
+    for tg_id, testo, riga in avvisi:
+        try:
+            esito = await notifica(tg_id, testo)
+            print(f"{riga}: mandato ({esito})" if esito else f"{riga}: mandato",
+                  flush=True)
+        except Exception as e:
+            print(f"⚠️ {riga}: SALTATO ({type(e).__name__}: {e})", flush=True)
+        await asyncio.sleep(0.2)
+
+
+async def orologio_avvisi_mercatino():
+    """Il giro al minuto degli avvisi del mercatino: le righe in coda che
+    hanno aspettato la loro finestra escono da qui. L'orologio grande
+    batte ogni dieci minuti, troppo rado per una finestra da quindici:
+    un giro suo, come il cambio."""
+    while True:
+        await asyncio.sleep(60)
+        try:
+            await _giro_avvisi_mercatino()
+        except Exception as e:
+            print(f"⚠️ Avvisi del mercatino: battito saltato "
+                  f"({type(e).__name__}: {e})", flush=True)
 
 
 def pulisci_indirizzi():
@@ -65796,11 +66381,20 @@ async def avvisa_saas_senza_doveri():
         "ripete: se un dovere ricompare e poi torna a zero, suona di nuovo.")
 
 
+_TASK_AVVISI_MERCATINO = None
+
+
 @app.on_event("startup")
 async def avvia_orologio():
     asyncio.create_task(orologio())
     global _TASK_PAGAMENTI
     _TASK_PAGAMENTI = asyncio.create_task(orologio_pagamenti())
+    # Gli avvisi del mercatino (9 ott 2026) hanno un giro loro da un
+    # minuto, per la stessa ragione del campanello P2P qui sotto: le
+    # finestre sono di quindici e sessanta minuti, e l'orologio grande
+    # batte ogni dieci. Parte sempre: a leva spenta esce da solo.
+    global _TASK_AVVISI_MERCATINO
+    _TASK_AVVISI_MERCATINO = asyncio.create_task(orologio_avvisi_mercatino())
     # Il campanello dello scambio P2P ha un giro SUO da un minuto (la
     # finestra del taker e' 900 secondi: dieci minuti li' dentro
     # sarebbero un ottavo del tempo che ha per rispondere). Si avvia

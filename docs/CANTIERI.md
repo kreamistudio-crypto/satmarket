@@ -42662,3 +42662,168 @@ appunti» (iOS può chiedere il permesso con la sua bolla «Incolla», e il
 WebView di Telegram può negarlo: allora c'è la frase e il campo col
 fuoco), e la tastiera dei numeri sopra il foglio del PayCode (la cura
 dei fogli dal basso del 19 set lo regge, in prova solo simulato).
+
+## Gli avvisi del mercatino: i nuovi annunci e i venditori seguiti (9 ott 2026, richiesta di Andrea)
+
+**La richiesta.** Gli utenti devono poter ricevere un avviso quando nel
+mercatino viene pubblicato un annuncio, in due modi. 1) *Tutti i nuovi
+annunci*: interruttore spento di serie, con filtri facoltativi per
+categoria e prezzo massimo; raggruppati, al più un messaggio ogni 60
+minuti per persona (leva nel config), con quanti annunci nuovi e i primi
+tre titoli, e il tocco che apre Esplora con quei filtri. 2) *Segui un
+venditore*: sulla pagina del negozio un bottone «🔔 Segui» (pieno se
+attivo); quando quel venditore pubblica arriva un avviso, raggruppato se
+ne pubblica più d'uno in poco tempo (al più uno ogni 15 minuti per
+venditore); l'elenco dei venditori seguiti, con «Smetti», nel cassetto
+Avvisi del Profilo, in un blocco «Mercatino» subito dopo le righe del P2P
+e con lo stesso stile. Il canale lo sceglie `notifica()` col freno che
+c'è già. Regole: spento di serie, mai per i propri annunci, mai due volte
+lo stesso annuncio, annunci nascosti / in moderazione / tolti non
+avvisano, leva globale `MERCATINO_AVVISI_NUOVI` nel pannello delle leve.
+
+**Cosa c'era già, e cosa si è esteso.** Prima di scrivere si è guardato:
+i preferiti (il barattolo 🫙: annunci messi da parte, nessun «segui»),
+gli avvisi di ricerca («Avvisami se arriva»: criteri salvati, un motore
+con coda + drenatore alla pubblicazione, il dedup `avvisi_notificati`),
+nessun «segui» né negozi preferiti, e il cassetto Avvisi col blocco P2P
+di 38d068e. Non è nato un secondo motore: *la fonte è il drenatore degli
+avvisi di ricerca* (`_drena_match`), che già riceve ogni annuncio al
+momento in cui entra in vetrina — dalla pubblicazione, dalla modifica
+approvata, dall'import CSV e dal dopo-import Nostr — e già salta chi è
+sparito o in ferie. Gli stessi annunci, dopo il dedup degli avvisi di
+ricerca, passano a `_accoda_avvisi_mercatino`. E *il «mai due volte» è
+quello di casa*: `avvisi_notificati`, scritto al momento della coda —
+così un annuncio già annunciato da «Avvisami se arriva» non torna da qui,
+e viceversa. Il resto ricalca il cantiere dei nuovi ordini P2P: le
+preferenze su colonne di `utenti` lette da un giudice solo, una coda sul
+database con la chiave (persona, annuncio) e il `mandato` a tre valori,
+il raggruppamento lato server sul MAX dei `mandato`, le righe timbrate
+PRIMA dell'invio, la busta delle leve per il client, le leve col patto
+delle altre.
+
+**Cosa si è deciso, e perché.**
+- *Seguire vince sul filtro.* Chi segue un venditore riceve TUTTO quel
+  che pubblica (è un gesto suo, non ha filtri); chi in più ha acceso
+  «tutti i nuovi annunci» lo riceve UNA volta sola, dal venditore (la
+  regola «mai due volte» sta sopra ai due interruttori). Nel giro dal
+  vivo Compra, che segue Vende e ha il filtro, ha ricevuto il solo
+  messaggio di chi segue coi tre annunci; il filtro si vede su Terzo, che
+  non segue: due annunci su tre.
+- *Due finestre, due leve*: 60 minuti per «tutti» (`MERCATINO_AVVISI_NUOVI_MINUTI`),
+  15 per ogni venditore seguito (`MERCATINO_AVVISI_SEGUI_MINUTI`). La
+  finestra di chi segue si misura per (persona, venditore): due venditori
+  seguiti che pubblicano nella stessa ora fanno due messaggi, uno a testa.
+  Il primo messaggio parte subito, dal drenatore; i successivi li manda
+  `orologio_avvisi_mercatino`, un giro suo da un minuto — l'orologio
+  grande batte ogni dieci, troppo rado per una finestra da quindici (la
+  stessa ragione del campanello P2P).
+- *«Tutti» senza filtri è legittimo*, a differenza degli avvisi di ricerca
+  (che vogliono almeno un criterio): è proprio quel che la persona
+  chiede, e a tenerlo gentile è il raggruppamento. Il prezzo massimo
+  nella SUA valuta: in sats contro il listino in sats, in euro contro
+  il listino in euro com'è o col cambio di adesso — cambio assente =
+  criterio non valutabile = niente avviso, il patto di `_match_avviso`.
+- *Il tocco che apre Esplora coi filtri*: con una categoria sola il link
+  è `/categoria/{slug}` (la pagina vera del reparto), altrimenti la
+  vetrina; il prezzo massimo viaggia in coda (`?max=…&valuta=…`) e la
+  pagina lo legge all'arrivo (`preparaFiltriDaUrl`, PRIMA del primo
+  fetch, dopo il reparto) accendendo il bottone Filtro. Con due
+  categorie Esplora non sa filtrare: il link apre la vetrina e il
+  messaggio dice il filtro per esteso («Il tuo filtro: …»).
+- *Il messaggio di chi segue* porta nome e titoli; con un annuncio solo
+  il tocco apre l'annuncio, con più d'uno il negozio. Nessun messaggio
+  dice nostr, relay, npub o tg_id (c'è la prova).
+- *Chi segue resta un fatto privato*: `/api/negozio` dice a CHI GUARDA se
+  lo segue (`seguito`, falso agli anonimi e sulla propria pagina), mai
+  quanti lo seguono né chi; l'elenco del cassetto esce senza tg_id. Il
+  venditore non lo sa, e «I tuoi dati» lo dice.
+- *Annunci nascosti, in moderazione, tolti*: un annuncio nato in
+  'revisione' non passa dal drenatore finché un moderatore non lo
+  approva (ed è la sua prima uscita, come già per promo e avvisi di
+  ricerca); un annuncio tolto, venduto o nascosto dalle ferie del
+  negozio PRIMA del suo minuto si consuma senza messaggio (`mandato=1`).
+  Le aste restano fuori, come dai tre canali di sempre.
+- *Chi spegne o smette non riceve l'arretrato*: la coda si consuma. La
+  fusione dei conti porta i seguiti nei due versi (chi seguiva la metà
+  Nostr come venditore segue ora quella Telegram) e la coda; una riga
+  che dopo la fusione direbbe «segue se stesso» se ne va.
+- *Un tetto di buon senso*, non una leva: 100 venditori seguiti per
+  persona (`TETTO_VENDITORI_SEGUITI`).
+- *Il blocco nel cassetto è ACCODATO* con `insertAdjacentHTML` dopo la
+  riga `${rigaSuggerimenti()}…${rigaAvvisiNuoviP2P()}`, senza toccarla:
+  quella riga ha la sua sentinella intera nel cantiere P2P.
+
+**Strade scartate.** Un secondo lettore degli annunci (un orologio che
+cerca `creato > timbro`): il drenatore c'era già, con le sue esclusioni e
+la sua coda, e un secondo lettore avrebbe avuto una seconda idea di «nuovo».
+Un dedup separato per questi avvisi: due tabelle che dicono «già
+annunciato» avrebbero fatto arrivare lo stesso annuncio due volte, una
+per motore. Seguire col tg_id del venditore nella rotta: il tg_id non
+esce in pubblico, si segue con slug/username/codice come apre
+`/api/negozio`. Un bottone «Segui» anche nel riquadro del venditore
+dentro il dettaglio annuncio: la richiesta dice la pagina del negozio, e
+un secondo posto sarebbe un secondo stato da tenere in pari.
+
+**Com'è fatto.** Server: tabelle `venditori_seguiti(tg_id, venditore_id,
+creato)` e `mercatino_avvisi_coda(tg_id, annuncio_id, motivo, venditore_id,
+titolo, accodato, mandato)`; colonne `utenti.avvisi_mercatino` (0),
+`avvisi_mercatino_categorie` (pipe), `avvisi_mercatino_prezzo`,
+`avvisi_mercatino_valuta`; giudici puri `_pref_avvisi_mercatino`,
+`_passa_avviso_mercatino`, `_link_esplora_avvisi`,
+`_testo_avviso_mercatino_tutti`, `_testo_avviso_mercatino_segui`;
+`_accoda_avvisi_mercatino` e `_scarica_avvisi_mercatino`,
+`_giro_avvisi_mercatino`, `orologio_avvisi_mercatino`; rotte `POST
+/api/me/avvisi-mercatino` e `POST /api/negozio/{chi}/segui`; `/api/me`
+con `avvisi_mercatino`, `seguiti`, `avvisi_mercatino_leve`; le tre leve
+in `config_esempio.py`, nel pannello delle leve (gruppo «🆕 Avvisi del
+mercatino»). Client: `contenutoAvvisiMercatino` / `rigaAvvisiMercatino`
+(interruttore, chip delle categorie da CATS senza «Tutto», prezzo massimo
+con sats/€, la riga «dove arriva» col giudice del cassetto, l'elenco dei
+seguiti con «Smetti»), `bottoneSegui` nel riquadro del venditore di
+`renderNegozio`, `chiediSegui` che aggiorna le due viste, `preparaFiltriDaUrl`;
+«I tuoi dati» dice cosa conserva il server.
+
+**Provato.** `prove_avvisi_mercatino` (61): le sentinelle (leve, colonne,
+tabelle, rotte, /api/me, l'ordine nel drenatore, l'orologio, il pannello,
+la fusione, il config d'esempio, il collaudo nella CI, i testi senza
+spie, le ancore del client e di «I tuoi dati»), i giudici puri (spento di
+serie, le preferenze rilette, il prezzo nelle due valute con e senza
+cambio, il link coi filtri, i messaggi parola per parola), il banco
+sqlite con la coda VERA (segui/tutti/entrambi, mai i propri, niente
+doppioni, il dedup comune con gli avvisi di ricerca, la leva spenta, il
+primo messaggio subito, le due finestre, tolto e ferie, chi spegne e chi
+smette, la scopa), il giro con `notifica()` vera e i due trasporti di
+cartone (Telegram, DM Nostr al nativo e a chi l'ha scelto), il client in
+node (spento di serie, acceso, i seguiti, il bottone nei quattro casi,
+vetrina/demo/anonimi, il nativo). Tre sentinelle di prima emendate per
+costruzione: il censimento dei volti (undici posti), il censimento del
+12,5px grigio (`.segui-btn` è un controllo), la fila dei tondi (il bottone
+sta dentro `.who`). `collaudo_avvisi_mercatino.py` (29, nella CI in
+gabbia): il server VERO con le rotte vere e il drenatore vero — Compra
+segue Vende e accende «tutti» con la categoria, Terzo «tutti» con la
+categoria senza seguire, Nativa entra con Nostr e segue; Vende pubblica
+tre annunci (due nella categoria, uno no): UN messaggio a Compra coi tre,
+UNO a Terzo coi due e il reparto, il DM a Nativa, niente a Vende; il
+ripasso non rimanda; le finestre a 14/16/61 minuti spostando l'orologio;
+'revisione' e 'rimosso'; smetti e spegni; la leva spenta (409 e silenzio).
+Suite intera nel worktree (PROVE_SEVERE=1): 20213 passate e 3 fallite al
+primo giro (le tre sentinelle emendate), poi tutta verde — il conto nel
+rapporto del push. **Giro dal vivo** con Playwright (Chrome 390×844, il
+server di collaudo su una copia nello scratchpad, porta 8137, relay
+morto): Compra apre il negozio di Vende, «🔔 Segui» vuoto → pieno
+«🔔 Seguito ✓»; nel Profilo → Avvisi il blocco «🛒 Mercatino», «Spenti» →
+«Attivi», la chip «Alimenti e bevande» accesa, la riga «al massimo uno
+ogni 60 minuti», «Venditori che segui: Vende · Smetti»; Terzo acceso
+dalla rotta; Vende pubblica tre annunci dalla rotta vera; nel journal del
+server UN messaggio a Compra coi tre titoli e il link al negozio, UNO a
+Terzo coi due della categoria e il link al reparto. Screenshot in
+`.claude/giri/avvisi-mercatino/` (gitignored): il bottone vuoto e pieno,
+il cassetto in due scatti, i due messaggi resi come bolle del bot
+(`05-messaggi-bot.png`, i testi veri del journal in `messaggi.txt`).
+
+**Resta da guardare.** Dal vivo sul VPS: il primo messaggio di un
+venditore seguito, e che le tre leve nuove compaiano nel pannello
+(default accesi, niente da aggiungere al config se vanno bene 60 e 15).
+Non provato dal vivo il DM Nostr (coperto dalla prova su `notifica()` e
+dal collaudo). Il tocco `?max=…` da Telegram passa dal bot come link
+esterno: da verificare sul telefono che la vetrina si apra già filtrata.

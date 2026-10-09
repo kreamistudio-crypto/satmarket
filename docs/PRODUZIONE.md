@@ -56,6 +56,18 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Barattolo (lo annuncia `/api/p2p/canale`, e il server rifa' la
   fotografia subito), entro un minuto e un quarto se nasce da un altro
   client di Mostro (il giro dell'orologio piu' quello della fila).
+- GLI AVVISI DEL MERCATINO (9 ott 2026): tre leve, tutte col
+  DEFAULT GIUSTO nel codice — `MERCATINO_AVVISI_NUOVI = True`,
+  `MERCATINO_AVVISI_NUOVI_MINUTI = 60`, `MERCATINO_AVVISI_SEGUI_MINUTI
+  = 15` — quindi sul VPS non c'è niente da aggiungere se vanno bene
+  così; si AGGIUNGONO al config solo per cambiarle (riavvio: si leggono
+  all'import). Il pannello «⚙️ Stato delle leve», gruppo «🆕 Avvisi del
+  mercatino», le mostra vive. Nel journal un messaggio partito lascia
+  «🆕 Nuovi annunci: N a <id>: mandato (…)» o «🔔 Venditore seguito: N
+  annunci di <venditore> a <id>: mandato (…)»; a leva spenta non parte
+  niente e le due rotte rispondono 409. La coda sta in
+  `mercatino_avvisi_coda` (si pulisce da sola dopo un mese), i seguiti
+  in `venditori_seguiti`.
 - LA CARD «P2P IN ARRIVO» (30 set 2026): la prima card di «Da scoprire»
   dice a tutti «In arrivo il 10/10/26». La data e' la leva
   `P2P_IN_ARRIVO_FINO`, che vale «2026-10-10» NEL CODICE: col deploy la

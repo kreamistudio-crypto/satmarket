@@ -2818,6 +2818,24 @@
      12,5px (il censimento del grigio piccolo, prove.py) */
   .avn-dove{margin-top:12px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
   .avn-soglie{margin-top:-2px}
+  /* IL BOTTONE «🔔 SEGUI» DELLA PAGINA DEL VENDITORE (9 ott 2026, richiesta
+     di Andrea): VUOTO se non lo segui, PIENO e arancio se lo segui — la
+     stessa grammatica delle pillole «Attivi/Spenti» del cassetto. Sta
+     sotto la riga delle vendite, nel riquadro del venditore. */
+  .segui-btn{margin-top:8px;font:inherit;font-size:12.5px;font-weight:800;
+    border:1px solid var(--line);background:transparent;color:var(--muted);
+    border-radius:99px;padding:5px 12px;cursor:pointer}
+  .segui-btn.attivo{border-color:var(--sats);background:var(--sats);color:#fff}
+  /* ...e il blocco «Mercatino» del cassetto Avvisi: il campo del prezzo
+     massimo con le due valute accanto, e l'elenco dei venditori seguiti
+     con la faccia, il nome (che apre il negozio) e «Smetti» */
+  .avm-prezzo{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .avm-prezzo input{font:inherit;font-size:13px;width:110px;padding:6px 10px;
+    border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+  .avm-seguiti{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+  .avm-seguito{display:flex;align-items:center;gap:8px}
+  .avm-seguito .avm-nome{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-size:13px;cursor:pointer}
   /* il gruppo dei due cerchietti (9 ott 2026 sera): vedi la testata */
   .p2p-testa-cerchi{display:flex;align-items:center;gap:8px;flex:none}
   /* ⚠️ SOTTO I 400 LE PILLOLE SI STRINGONO DI PIU' (9 ott 2026 sera,
@@ -11633,6 +11651,10 @@ document.getElementById('cartello')?.remove();</script>
         <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo. Se non vuoi comparire, nel Profilo («Livello e titolo») c'è <b>Non mostrarmi in classifica</b>: il tuo livello resta sul profilo, perché a chi scambia con te serve per fidarsi. E se la tua reputazione la pubblichiamo su Nostr (vedi sotto), smettiamo e chiediamo ai relay di ritirarla.</li>
         <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.</li>
         <li>I tuoi <b>avvisi di ricerca</b>, se ne crei: cosa cerchi, dove, entro che prezzo.</li>
+        <!-- GLI AVVISI DEL MERCATINO (9 ott 2026): le preferenze e i
+             venditori seguiti restano da noi, quindi si dice — e si dice
+             anche cosa il venditore NON vede. -->
+        <li>Gli <b>avvisi del mercatino</b>, se li accendi (sono spenti di serie): le categorie e il prezzo massimo che hai scelto per «<b>🆕 Avvisami dei nuovi annunci</b>», e i <b>venditori che segui</b> — che <b>non lo sanno</b>: nessuno vede chi lo segue, né quanti. E per ogni annuncio di cui ti abbiamo avvisato, il suo numero accanto al tuo, per non avvisarti due volte: se ne va da solo dopo un mese.</li>
         <!-- IL CARRELLO SALVATO (6 ott 2026): un dato nuovo che resta da
              noi, quindi si dice — cosa c'e' dentro, cosa NON c'e', chi
              non lo vede. La durata sta qui sotto, fra le altre. -->
@@ -11830,6 +11852,7 @@ document.getElementById('cartello')?.remove();</script>
         <li>Scegliere quale foto mostrare, o non mostrarne nessuna.</li>
         <li>Scegliere dove ricevere gli avvisi, o spegnerli.</li>
         <li>Mettere in pausa o cancellare i tuoi avvisi di ricerca.</li>
+        <li>Spegnere gli avvisi dei nuovi annunci, e smettere di seguire un venditore.</li>
         <li>Togliere un punto di ritiro che avevi salvato.</li>
         <li>Chiudere il negozio per ferie, e nascondere gli ordini conclusi.</li>
         <li>Scaricare i tuoi affari in un file, dal Profilo.</li>
@@ -21084,6 +21107,7 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
       <div class="who"><b>${esc(v.nome||'—')}${v.staff ? bollinoStaff() : ''}${badge}${fiducia}</b>
         ${titoloRiga(v.titolo, v.livello_numero)}
         <div class="rep">${rep}</div>
+        ${bottoneSegui(v, mio)}
       </div>
       ${tondi}
     </div>`;
@@ -34588,6 +34612,10 @@ function renderAvvisi(){
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">${stato}</div>${dentro}
     ${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaRiconosciP2P()}${rigaAvvisiNuoviP2P()}`;
+  /* ...e il blocco «Mercatino» (9 ott 2026), ACCODATO e non infilato
+     nella riga delle sorelle qui sopra: quella riga ha la sua
+     sentinella intera e non si tocca */
+  box.insertAdjacentHTML('beforeend', rigaAvvisiMercatino());
 }
 
 /* «💡 Suggerimenti sui miei annunci»: l'interruttore dei consigli che
@@ -34891,6 +34919,190 @@ function scegliTipoAvvisiNuoviP2P(t){
 function scegliSogliaAvvisiNuoviP2P(s){
   if (!myAvvisiNuoviP2P.attivo) return;
   setAvvisiNuoviP2P({soglia: String(s == null ? '' : s)});
+}
+
+/* ---- 🆕 GLI AVVISI DEL MERCATINO: i nuovi annunci e i venditori seguiti
+   (9 ott 2026, richiesta di Andrea) ----
+   Chi lo chiede riceve un messaggio quando nel mercatino compare un
+   annuncio nuovo, in DUE modi: «🆕 Avvisami dei nuovi annunci» — TUTTI
+   i nuovi, con un filtro facoltativo di categorie e di prezzo massimo,
+   raggruppati al massimo uno ogni N minuti (il numero lo dice il
+   server) con quanti sono e i primi titoli, e il tocco che apre Esplora
+   coi suoi filtri — e «🔔 Segui» sulla pagina di un venditore: quando
+   lui pubblica arriva un avviso, raggruppato se ne pubblica piu' d'uno
+   in poco tempo (al massimo uno ogni M minuti per venditore). L'elenco
+   dei venditori seguiti, con «Smetti», sta qui nel cassetto.
+   SPENTO DI SERIE l'interruttore; seguire e' un gesto, quindi acceso
+   per costruzione. Mai per i propri annunci, mai due volte lo stesso.
+   LO STATO E' DEL SERVER: `myAvvisiMercatino` e `mySeguiti` cambiano
+   solo con la sua risposta (/api/me/avvisi-mercatino, /api/negozio/
+   {chi}/segui), e il bottone del negozio e l'elenco del cassetto sono
+   due viste della stessa riga. COMPARE SOLO A CHI PUO' AVERLO
+   (`avvisiMercatinoInCasa`): leva globale accesa (`avvisi_mercatino_leve`
+   di /api/me), un account vero — in demo e in vetrina anonima niente.
+   DOVE ARRIVA lo dice la riga in fondo, con lo stesso giudice del
+   cassetto (`doveArrivanoAvvisi`). Le categorie sono quelle di CATS,
+   senza «Tutto»: nessuna scelta = tutte. */
+/* PURA: le preferenze come arrivano dal server, rimesse in forma — le
+   categorie nell'ordine del catalogo, la valuta una delle due, il prezzo
+   un numero positivo o 0; spento se manca tutto (un server di ieri) */
+function normalizzaAvvisiMercatino(p){
+  const cats = (p && Array.isArray(p.categorie))
+    ? CATS.filter(c => c !== 'Tutto' && p.categorie.indexOf(c) >= 0) : [];
+  let prezzo = Number(p && p.prezzo_max) || 0;
+  if (!(prezzo > 0)) prezzo = 0;
+  return {attivo: !!(p && p.attivo), categorie: cats, prezzo_max: prezzo,
+          valuta: (p && p.valuta === 'eur') ? 'eur' : 'sats'};
+}
+let myAvvisiMercatino = normalizzaAvvisiMercatino(null);   // spento di serie
+let mySeguiti = [];                 // [{nome, negozio, username, avatar, creato}]
+let avvisiMercatinoLeve = null;     // {attivi, minuti, seguiMinuti} da /api/me
+function avvisiMercatinoInCasa(){
+  return !!(avvisiMercatinoLeve && avvisiMercatinoLeve.attivi) && !DEMO && !!myTgId;
+}
+const pillAvm = (testo, scelto, gesto, dati) =>
+  '<button type="button" class="tema-pill' + (scelto ? ' active' : '')
+  + '" aria-pressed="' + (scelto ? 'true' : 'false') + '"' + (dati || '')
+  + ' onclick="' + gesto + '">' + esc(testo) + '</button>';
+const interruttoreAvm = (on, gesto) =>
+  '<button type="button" onclick="' + gesto + '" aria-pressed="' + (on ? 'true' : 'false') + '"'
+  + ' style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid '
+  + (on ? 'var(--sats)' : 'var(--line)') + ';background:' + (on ? 'var(--sats)' : 'transparent')
+  + ';color:' + (on ? '#fff' : 'var(--muted)') + ';border-radius:99px;padding:6px 14px;cursor:pointer">'
+  + (on ? 'Attivi' : 'Spenti') + '</button>';
+function contenutoAvvisiMercatino(){
+  const p = myAvvisiMercatino, on = !!p.attivo;
+  const L = avvisiMercatinoLeve || {};
+  let h = '<div class="avn-testa">'
+    + '<div style="min-width:0;flex:1">'
+    + '<div style="font-size:13.5px;font-weight:800">🆕 Avvisami dei nuovi annunci</div>'
+    + '<div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">'
+    + 'Quando nel mercatino compare un annuncio nuovo, di chiunque.</div></div>'
+    + interruttoreAvm(on, 'setAvvisiMercatino({attivo:' + (on ? 'false' : 'true') + '})') + '</div>'
+    + '<div class="avn-corpo' + (on ? '' : ' avn-spento') + '">'
+    + '<div class="section-label">Categorie</div>'
+    + '<div class="p2p-metodi">'
+    + pillAvm('Tutte', !p.categorie.length, "scegliCategoriaAvvisiMercatino('')")
+    + CATS.filter(c => c !== 'Tutto').map(c =>
+        pillAvm(c, p.categorie.indexOf(c) >= 0, 'scegliCategoriaAvvisiMercatino(this.dataset.c)',
+                ' data-c="' + esc(c) + '"')).join('')
+    + '</div>'
+    + '<div class="section-label">Prezzo massimo</div>'
+    + '<div class="avm-prezzo"><input id="avmPrezzo" type="text" inputmode="decimal" placeholder="nessuno"'
+    + ' aria-label="Prezzo massimo" value="' + (p.prezzo_max ? esc(String(p.prezzo_max)) : '') + '"'
+    + ' onchange="salvaPrezzoAvvisiMercatino(this.value)">'
+    + pillAvm('sats', p.valuta === 'sats', "scegliValutaAvvisiMercatino('sats')")
+    + pillAvm('€', p.valuta === 'eur', "scegliValutaAvvisiMercatino('eur')")
+    + '</div></div>'
+    + '<div class="hint">📬 Arriva ' + doveArrivanoAvvisi()
+    + (L.minuti ? ', al massimo uno ogni <b>' + L.minuti + ' minuti</b>' : '')
+    + ': quanti annunci nuovi e i primi titoli, col tocco che apre Esplora coi tuoi filtri. '
+    + 'Mai per i tuoi annunci.</div>';
+  /* ...e i venditori seguiti: il gesto sta nella loro pagina, qui
+     l'elenco e lo «Smetti» */
+  h += '<div class="avn-testa" style="margin-top:12px"><div style="min-width:0;flex:1">'
+    + '<div style="font-size:13.5px;font-weight:800">🔔 Venditori che segui</div>'
+    + '<div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">'
+    + 'Un avviso quando pubblicano'
+    + (L.seguiMinuti ? ', al massimo uno ogni <b>' + L.seguiMinuti + ' minuti</b> per venditore' : '')
+    + '.</div></div></div>';
+  if (!mySeguiti.length)
+    h += '<div class="hint">Nessuno ancora: il bottone «🔔 Segui» è nella pagina di ogni venditore.</div>';
+  else
+    h += '<div class="avm-seguiti">' + mySeguiti.map(s => {
+      const cod = String(s.negozio || '').replace(/[^A-Za-z0-9_]/g, '');
+      return '<div class="avm-seguito">'
+        + voltoHTML({nome: s.nome, avatar: s.avatar, negozio: cod, ignoto: true}, 'fb-faccia')
+        + '<b class="avm-nome"' + (cod ? ' onclick="apriNegozio(\'' + cod + '\')"' : '') + '>'
+        + esc(s.nome || 'Un venditore') + '</b>'
+        + '<button type="button" class="tema-pill" onclick="smettiSegui(\'' + cod + '\')">Smetti</button>'
+        + '</div>';
+    }).join('') + '</div>';
+  return h;
+}
+/* la riga del cassetto Avvisi: il blocco «Mercatino», dentro la cornice
+   delle righe vicine */
+const rigaAvvisiMercatino = () => !avvisiMercatinoInCasa() ? '' :
+  '<div id="avvisiMercatinoCassetto" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">'
+  + '<div class="section-label" style="padding-top:0">🛒 Mercatino</div>'
+  + contenutoAvvisiMercatino() + '</div>';
+async function setAvvisiMercatino(patch){
+  haptic();
+  if (DEMO) { toast('In demo non ci sono avvisi veri 🙂'); return; }
+  const voluto = Object.assign({}, myAvvisiMercatino, patch);
+  try {
+    const r = await fetch(`${API_BASE}/me/avvisi-mercatino`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({attivo: !!voluto.attivo, categorie: voluto.categorie,
+                             prezzo_max: voluto.prezzo_max, valuta: voluto.valuta})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    myAvvisiMercatino = normalizzaAvvisiMercatino(d.avvisi_mercatino);
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  renderAvvisi();
+  if ('attivo' in patch)
+    toast(myAvvisiMercatino.attivo ? '🆕 Ti avviso dei nuovi annunci'
+                                   : 'Avvisi dei nuovi annunci spenti');
+}
+function scegliCategoriaAvvisiMercatino(c){
+  if (!c) { setAvvisiMercatino({categorie: []}); return; }   // «Tutte»
+  const cats = myAvvisiMercatino.categorie.slice();
+  const i = cats.indexOf(c);
+  if (i >= 0) cats.splice(i, 1); else cats.push(c);
+  setAvvisiMercatino({categorie: cats});
+}
+/* il prezzo si salva quando si lascia il campo: vuoto o storto = nessun
+   tetto (numeroFiltro, lo stesso dei filtri della vetrina) */
+function salvaPrezzoAvvisiMercatino(v){
+  setAvvisiMercatino({prezzo_max: numeroFiltro(v) || 0});
+}
+function scegliValutaAvvisiMercatino(v){
+  const inp = el('avmPrezzo');
+  setAvvisiMercatino({valuta: v === 'eur' ? 'eur' : 'sats',
+                      prezzo_max: inp ? (numeroFiltro(inp.value) || 0) : myAvvisiMercatino.prezzo_max});
+}
+/* IL BOTTONE «🔔 SEGUI» nel riquadro del venditore: pieno se lo segui.
+   Mai sul proprio negozio, mai in vetrina anonima, mai senza un codice
+   di negozio da seguire. `v.seguito` lo dice /api/negozio a chi e'
+   entrato. */
+function bottoneSegui(v, mio){
+  if (!avvisiMercatinoInCasa() || VETRINA || mio || !v || !v.negozio) return '';
+  const cod = String(v.negozio).replace(/[^A-Za-z0-9_]/g, '');
+  const on = !!v.seguito;
+  return '<button type="button" class="segui-btn' + (on ? ' attivo' : '') + '" id="seguiBtn"'
+    + ' aria-pressed="' + (on ? 'true' : 'false') + '" onclick="toggleSegui(\'' + cod + '\')">'
+    + (on ? '🔔 Seguito ✓' : '🔔 Segui') + '</button>';
+}
+async function chiediSegui(cod, segui){
+  try {
+    const r = await fetch(`${API_BASE}/negozio/${encodeURIComponent(cod)}/segui`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({segui: !!segui})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return null; }
+    mySeguiti = Array.isArray(d.seguiti) ? d.seguiti : mySeguiti;
+    /* le due viste della stessa riga: il bottone del negozio aperto e
+       l'elenco del cassetto */
+    if (negozioCorrente && negozioCorrente.negozio === cod) {
+      negozioCorrente.seguito = !!d.seguito;
+      const b = el('seguiBtn');
+      if (b) b.outerHTML = bottoneSegui(negozioCorrente, false);
+    }
+    if (el('avvisiBlocco')) renderAvvisi();
+    return d;
+  } catch(e) { toast('Rete assente: riprova'); return null; }
+}
+async function toggleSegui(cod){
+  haptic();
+  if (DEMO) { toast('In demo non ci sono avvisi veri 🙂'); return; }
+  const v = negozioCorrente;
+  const d = await chiediSegui(cod, !(v && v.negozio === cod && v.seguito));
+  if (d) toast(d.seguito ? '🔔 Ti avviso quando pubblica' : 'Non segui più questo venditore');
+}
+async function smettiSegui(cod){
+  haptic();
+  const d = await chiediSegui(cod, false);
+  if (d) toast('Non segui più questo venditore');
 }
 
 async function setCanale(canale){
@@ -70410,6 +70622,20 @@ function preparaCategoriaDaUrl(){
   activeCat = CATEGORIA_DA_URL;
   /* la nav accende Esplora: il reparto e' la home filtrata */
 }
+/* ?max=…&valuta=… — il prezzo massimo che arriva col tocco di un avviso
+   del mercatino (9 ott 2026): la vetrina parte gia' filtrata, come il
+   reparto qui sopra, e il bottone Filtro si accende. Un numero storto o
+   assente = niente; su una pagina ricordata comanda la sua entry. */
+function preparaFiltriDaUrl(){
+  if (navRicordata) return;
+  let q;
+  try { q = new URLSearchParams(location.search); } catch(e) { return; }
+  const max = numeroFiltro(q.get('max') || '');
+  if (!max) return;
+  filtroPrezzo = {min: '', max, valuta: q.get('valuta') === 'eur' ? 'eur' : 'sats'};
+  const b = el('filtriBtn');
+  if (b) b.classList.add('attivo');
+}
 
 /* ATTERRARE SU UN REPARTO NON E' UNA DISCESA, ed e' la distinzione che
    conta: toccare una card della striscia viene dalla HOME (e alza
@@ -70703,6 +70929,7 @@ async function avvia(){
      pagina dev'essere gia' quella del reparto — una richiesta sola
      invece di una vetrina intera scaricata per buttarla via. */
   preparaCategoriaDaUrl();
+  preparaFiltriDaUrl();
   renderChips();
   if (!API_BASE) {                          // nessun backend configurato
     DEMO = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderPodioTesta(); renderGrid(); renderOrders();
@@ -70759,6 +70986,12 @@ async function avvia(){
     /* gli avvisi dei nuovi ordini (9 ott 2026): dal giudice del server;
        la chiave assente (un server di ieri) vale SPENTO, lo spento di serie */
     myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(me.avvisi_nuovi_p2p);
+    /* gli avvisi del mercatino (9 ott 2026): preferenze, venditori
+       seguiti e leve; chiavi assenti (un server di ieri) = spento,
+       nessuno, niente in casa */
+    myAvvisiMercatino = normalizzaAvvisiMercatino(me.avvisi_mercatino);
+    mySeguiti = Array.isArray(me.seguiti) ? me.seguiti : [];
+    avvisiMercatinoLeve = me.avvisi_mercatino_leve || null;
     suggerimentiOgni = me.suggerimenti_ogni_giorni || 0;
     adottaFont(me);   // la misura scelta sull'altro telefono
     adottaVisti(me);  // i timbri «una volta sola»: tour visto, «Non ora»

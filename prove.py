@@ -53415,7 +53415,8 @@ def prove_feedback_tre_e_tondi():
     prova("tondi: nel negozio sono la fila in fondo alla card", True,
           bool(re.search(
               r'<div class="seller\$\{tondi \? \' con-tondi\' : \'\'\}"[^>]*>'
-              r'[\s\S]*?<div class="rep">\$\{rep\}</div>\s*</div>\s*'
+              r'[\s\S]*?<div class="rep">\$\{rep\}</div>\s*'
+              r'(\$\{bottoneSegui\(v, mio\)\}\s*)?</div>\s*'
               r'\$\{tondi\}\s*</div>`;', rn)))
     prova("tondi: ...con le stesse condizioni dei bottoni di prima", True,
           "mio ? '' : v.username," in rn
@@ -92396,6 +92397,7 @@ def prove_introduzioni_leggibili():
     RESTANO_CSS = sorted([
         ".strumenti select,.strumenti button",   # controlli
         ".p2p-leva", ".tema-pill", ".tour-salta",  # controlli
+        ".segui-btn",                             # «🔔 Segui» nel negozio (9 ott 2026)
         ".giro-porta",                            # il link che riapre il tour
         ".p2p-sez-tit",                           # titoli di sezione
         ".acc-h .conta",                          # il conteggio del cassetto
@@ -103713,6 +103715,481 @@ console.log(JSON.stringify(out));
           {"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": ""}, out["normalizza"])
     prova("a leva globale spenta, in demo e da anonimi: niente campana e niente riga",
           [["", ""], ["", ""], ["", ""]], [out["fuoriCasa"], out["demo"], out["anonimo"]])
+
+
+def prove_avvisi_mercatino():
+    """GLI AVVISI DEL MERCATINO: I NUOVI ANNUNCI E I VENDITORI SEGUITI (9
+    ott 2026, richiesta di Andrea). Chi lo chiede riceve un messaggio
+    quando nel mercatino compaiono annunci nuovi, in due modi: «🆕
+    Avvisami dei nuovi annunci» — tutti, con un filtro facoltativo di
+    categorie e prezzo massimo, raggruppati al piu' uno ogni
+    MERCATINO_AVVISI_NUOVI_MINUTI con quanti sono e i primi tre titoli, e
+    il tocco che apre Esplora coi suoi filtri — e «🔔 Segui» sulla pagina
+    di un venditore, raggruppato al piu' uno ogni
+    MERCATINO_AVVISI_SEGUI_MINUTI per venditore. Spento di serie, mai per
+    i propri annunci, mai due volte lo stesso (la chiave della coda e
+    `avvisi_notificati`), annunci in moderazione o tolti esclusi, sotto
+    la leva globale MERCATINO_AVVISI_NUOVI; il canale lo sceglie
+    notifica(). Qui: le sentinelle, i giudici puri, il banco sqlite con
+    la coda VERA, il giro con notifica() vera e i due trasporti di
+    cartone, e il client in node. Il giro sul server vero e' in
+    `collaudo_avvisi_mercatino.py` (nella CI)."""
+    print("\n[gli avvisi del mercatino: nuovi annunci e venditori seguiti]")
+    import asyncio
+    import html
+    import sqlite3
+    import types
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    m = mini.replace("\r\n", "\n")
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    wf = open(os.path.join(".github", "workflows", "prove.yml"), encoding="utf-8").read()
+
+    # --- 1) LE SENTINELLE -------------------------------------------------------
+    prova("la leva globale: accesa di serie, solo un booleano conta, storta resta accesa", True,
+          "except ImportError:\n    MERCATINO_AVVISI_NUOVI = True\n" in src
+          and "    if not isinstance(MERCATINO_AVVISI_NUOVI, bool):\n" in src
+          and "        MERCATINO_AVVISI_NUOVI = True\nexcept ImportError:" in src)
+    prova("le due finestre: interi da 1 in su, 60 e 15 di serie, lo stesso sul valore storto", True,
+          src.count("    MERCATINO_AVVISI_NUOVI_MINUTI = 60\n") == 2
+          and src.count("    MERCATINO_AVVISI_SEGUI_MINUTI = 15\n") == 2
+          and "    if MERCATINO_AVVISI_NUOVI_MINUTI < 1:\n        raise ValueError" in src
+          and "    if MERCATINO_AVVISI_SEGUI_MINUTI < 1:\n        raise ValueError" in src)
+    prova("le quattro colonne di utenti, SPENTO di serie", True,
+          '"avvisi_mercatino INTEGER DEFAULT 0",\n'
+          '                    "avvisi_mercatino_categorie TEXT DEFAULT \'\'",\n'
+          '                    "avvisi_mercatino_prezzo REAL DEFAULT 0",\n'
+          '                    "avvisi_mercatino_valuta TEXT DEFAULT \'\'",' in src)
+    prova("le due tabelle: chi segue chi (chiave la coppia) e la coda con la chiave (persona, annuncio)", True,
+          "CREATE TABLE IF NOT EXISTS venditori_seguiti(" in src
+          and "        PRIMARY KEY(tg_id, venditore_id)\n    );\n    CREATE INDEX IF NOT EXISTS idx_venditori_seguiti_venditore" in src
+          and "CREATE TABLE IF NOT EXISTS mercatino_avvisi_coda(" in src
+          and "        mandato INTEGER DEFAULT 0,\n        PRIMARY KEY(tg_id, annuncio_id)\n    );\n"
+              "    CREATE INDEX IF NOT EXISTS idx_mercatino_avvisi_coda" in src)
+    rotta = pezzo("scegli_avvisi_mercatino")
+    prova("la rotta delle preferenze esiste, dietro la leva, e risponde col giudice", True,
+          '@app.post("/api/me/avvisi-mercatino")' in src
+          and "if not MERCATINO_AVVISI_NUOVI:\n        raise HTTPException(409" in rotta
+          and 'raise HTTPException(400, "Prezzo massimo non valido")' in rotta
+          and 'return {"ok": True, "avvisi_mercatino": _pref_avvisi_mercatino(colonne)}' in rotta)
+    segui = pezzo("segui_venditore")
+    prova("la rotta «Segui» esiste: dietro la leva, mai se stessi, col tetto, e risponde con l'elenco", True,
+          '@app.post("/api/negozio/{chi}/segui")' in src
+          and "if not MERCATINO_AVVISI_NUOVI:\n        raise HTTPException(409" in segui
+          and 'raise HTTPException(400, "Il tuo negozio lo conosci gia\': non puoi seguirti")' in segui
+          and "quanti >= TETTO_VENDITORI_SEGUITI" in segui
+          and 'return {"ok": True, "seguito": seguito, "seguiti": _seguiti_di(user["id"])}' in segui)
+    negozio_src = codice(_senza_prosa(pezzo("negozio")))
+    prova("/api/negozio dice `seguito` a chi guarda, senza il tg_id e senza quanti lo seguono", True,
+          'venditore["seguito"] = seguito' in negozio_src
+          and "SELECT 1 FROM venditori_seguiti WHERE tg_id=? AND venditore_id=?" in negozio_src
+          and 'del venditore["tg_id"]' in negozio_src and negozio_src.count("venditori_seguiti") == 1)
+    prova("/api/me porta preferenze (dal giudice), seguiti e leve", True,
+          '    profilo["avvisi_mercatino"] = _pref_avvisi_mercatino(u)\n'
+          '    profilo["seguiti"] = _seguiti_di(user["id"])\n'
+          '    profilo["avvisi_mercatino_leve"] = _leve_avvisi_mercatino()\n' in src)
+    seg_src = codice(_senza_prosa(pezzo("_seguiti_di")))
+    prova("l'elenco dei seguiti esce senza tg_id", False, '"tg_id"' in seg_src.split("return [")[-1])
+    dren = codice(_senza_prosa(pezzo("_drena_match")))
+    prova("il drenatore accoda DOPO il dedup degli avvisi di ricerca, e il primo messaggio parte subito", True,
+          dren.index("INSERT OR IGNORE INTO avvisi_notificati")
+          < dren.index("_accoda_avvisi_mercatino(con, a, cambio, adesso)")
+          < dren.index("await _notifica_match(tg_id, annunci, cambio)")
+          < dren.index("await _giro_avvisi_mercatino()"))
+    prova("l'orologio al minuto parte all'avvio, e dorme PRIMA di battere", True,
+          "_TASK_AVVISI_MERCATINO = asyncio.create_task(orologio_avvisi_mercatino())" in src
+          and "    while True:\n        await asyncio.sleep(60)\n        try:\n            await _giro_avvisi_mercatino()"
+              in pezzo("orologio_avvisi_mercatino"))
+    prova("il pannello «Stato delle leve» ha le tre righe, col nome delle leve", True,
+          '"MERCATINO_AVVISI_NUOVI", MERCATINO_AVVISI_NUOVI,' in src
+          and '"MERCATINO_AVVISI_NUOVI_MINUTI", MERCATINO_AVVISI_NUOVI_MINUTI,' in src
+          and '"MERCATINO_AVVISI_SEGUI_MINUTI", MERCATINO_AVVISI_SEGUI_MINUTI,' in src)
+    fus = pezzo("esegui_fusione")
+    prova("la fusione dei conti porta i seguiti (nei due versi) e la coda, e toglie chi seguirebbe se stesso", True,
+          'con.execute("UPDATE OR IGNORE venditori_seguiti SET tg_id=? "' in fus
+          and 'con.execute("UPDATE OR IGNORE venditori_seguiti SET venditore_id=? "' in fus
+          and '"OR tg_id=venditore_id", (id_nostr, id_nostr))' in fus
+          and 'con.execute("UPDATE OR IGNORE mercatino_avvisi_coda SET tg_id=? "' in fus)
+    scarica_src = codice(_senza_prosa(pezzo("_scarica_avvisi_mercatino")))
+    prova("la coda si timbra con l'ora PRIMA di comporre il messaggio", True,
+          scarica_src.index("SET mandato=? WHERE tg_id=? AND mandato=0")
+          < scarica_src.index("_testo_avviso_mercatino_segui(vive,"))
+    accoda_src = codice(_senza_prosa(pezzo("_accoda_avvisi_mercatino")))
+    prova("l'accodamento scrive PRIMA in avvisi_notificati (il «mai due volte» comune) e salta se c'era gia'", True,
+          accoda_src.index("INSERT OR IGNORE INTO avvisi_notificati")
+          < accoda_src.index("INSERT OR IGNORE INTO mercatino_avvisi_coda")
+          and "if not gia.rowcount:\n            continue" in accoda_src
+          and "if tg == venditore:\n            continue" in accoda_src)
+    prova("il config d'esempio dichiara le tre leve", True,
+          "\nMERCATINO_AVVISI_NUOVI = True\n" in cfg and "\nMERCATINO_AVVISI_NUOVI_MINUTI = 60\n" in cfg
+          and "\nMERCATINO_AVVISI_SEGUI_MINUTI = 15\n" in cfg)
+    prova("il collaudo sul server vero sta nella CI, compilato e in gabbia", True,
+          "collaudo_avvisi_mercatino.py" in wf and "\n             collaudo_avvisi_mercatino\n" in wf)
+    frasi = _senza_prosa(pezzo("_testo_avviso_mercatino_tutti")) + _senza_prosa(pezzo("_testo_avviso_mercatino_segui"))
+    for spia in ("nostr", "relay", "npub", "tg_id"):
+        prova(f"i messaggi non dicono «{spia}»", False, spia in frasi.lower())
+    # il client
+    prova("il cassetto Avvisi accoda il blocco DOPO le righe del P2P senza toccare la loro riga", True,
+          "${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaRiconosciP2P()}${rigaAvvisiNuoviP2P()}`;\n" in m
+          and "  box.insertAdjacentHTML('beforeend', rigaAvvisiMercatino());\n}\n" in m)
+    prova("il riquadro del venditore porta il bottone sotto la riga delle vendite", True,
+          '        <div class="rep">${rep}</div>\n        ${bottoneSegui(v, mio)}\n' in m)
+    prova("il carico da /api/me passa dal normalizzatore (chiavi assenti = spento, nessuno, fuori casa)", True,
+          "myAvvisiMercatino = normalizzaAvvisiMercatino(me.avvisi_mercatino);\n"
+          "    mySeguiti = Array.isArray(me.seguiti) ? me.seguiti : [];\n"
+          "    avvisiMercatinoLeve = me.avvisi_mercatino_leve || null;" in m)
+    prova("i gesti parlano con le due rotte e prendono lo stato dalla risposta del server", True,
+          "/me/avvisi-mercatino`" in m and "myAvvisiMercatino = normalizzaAvvisiMercatino(d.avvisi_mercatino);" in m
+          and "/negozio/${encodeURIComponent(cod)}/segui`" in m
+          and "mySeguiti = Array.isArray(d.seguiti) ? d.seguiti : mySeguiti;" in m)
+    prova("?max=…&valuta=… si legge all'arrivo, PRIMA del primo fetch, dopo il reparto", True,
+          "  preparaCategoriaDaUrl();\n  preparaFiltriDaUrl();\n  renderChips();\n" in m
+          and "filtroPrezzo = {min: '', max, valuta: q.get('valuta') === 'eur' ? 'eur' : 'sats'};" in m)
+    prova("la pagina «I tuoi dati» dice cosa conserva il server, che e' spento di serie, e che il venditore non lo sa", True,
+          "Gli <b>avvisi del mercatino</b>, se li accendi (sono spenti di serie)" in m
+          and "i <b>venditori che segui</b> — che <b>non lo sanno</b>" in m
+          and "<li>Spegnere gli avvisi dei nuovi annunci, e smettere di seguire un venditore.</li>" in m)
+
+    # --- 2) I GIUDICI PURI ------------------------------------------------------
+    amb = {"html": html, "re": re, "URL_PUBBLICO": "https://barattolo.store", "time": time,
+           "TITOLI_AVVISO_MERCATINO": 3}
+    i = src.index("CATEGORIE = (")
+    exec(src[i:src.index(")", i) + 1], amb)
+    for f in ("_campo_riga", "_fmt_eur", "_fmt_sats", "slug_categoria", "in_ferie",
+              "_leve_avvisi_mercatino", "_pref_avvisi_mercatino", "_passa_avviso_mercatino",
+              "_titoli_avviso_mercatino", "_link_esplora_avvisi", "_frase_filtro_avvisi_mercatino",
+              "_testo_avviso_mercatino_tutti", "_testo_avviso_mercatino_segui"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    amb.update(MERCATINO_AVVISI_NUOVI=True, MERCATINO_AVVISI_NUOVI_MINUTI=60,
+               MERCATINO_AVVISI_SEGUI_MINUTI=15, GIORNI_DEDUP_AVVISI=30)
+    pref = amb["_pref_avvisi_mercatino"]
+    SPENTO = {"attivo": False, "categorie": [], "prezzo_max": 0, "valuta": "sats"}
+    prova("SPENTO DI SERIE: riga assente, riga di ieri senza le colonne, riga coi default",
+          [SPENTO, SPENTO, SPENTO],
+          [pref(None), pref({"tg_id": 1}),
+           pref({"avvisi_mercatino": 0, "avvisi_mercatino_categorie": "", "avvisi_mercatino_prezzo": 0,
+                 "avvisi_mercatino_valuta": ""})])
+    prova("le preferenze scritte si rileggono: categorie nell'ordine del catalogo e solo se esistono, "
+          "sats interi, euro a due decimali, valuta sconosciuta = sats, prezzo storto = nessuno",
+          [{"attivo": True, "categorie": ["Elettronica", "Motori"], "prezzo_max": 50000, "valuta": "sats"},
+           {"attivo": True, "categorie": [], "prezzo_max": 12.5, "valuta": "eur"},
+           {"attivo": False, "categorie": [], "prezzo_max": 0, "valuta": "sats"}],
+          [pref({"avvisi_mercatino": 1, "avvisi_mercatino_categorie": "|Motori|Elettronica|Boh|",
+                 "avvisi_mercatino_prezzo": 50000.7, "avvisi_mercatino_valuta": "sats"}),
+           pref({"avvisi_mercatino": "1", "avvisi_mercatino_categorie": "", "avvisi_mercatino_prezzo": 12.499,
+                 "avvisi_mercatino_valuta": "eur"}),
+           pref({"avvisi_mercatino": "x", "avvisi_mercatino_categorie": "", "avvisi_mercatino_prezzo": -3,
+                 "avvisi_mercatino_valuta": "lire"})])
+    prova("la busta delle leve: attivi, 60, 15", {"attivi": True, "minuti": 60, "seguiMinuti": 15},
+          amb["_leve_avvisi_mercatino"]())
+    passa = amb["_passa_avviso_mercatino"]
+    P = lambda a, c, p, v: {"attivo": a, "categorie": c, "prezzo_max": p, "valuta": v}
+    A = lambda cat, sats, eur=0, val="sats": {"categoria": cat, "prezzo_sats": sats, "prezzo_eur": eur, "valuta": val}
+    prova("spento non passa niente; acceso senza filtri passa tutto; la categoria fra le scelte, non le altre",
+          [False, True, True, False],
+          [passa(P(False, [], 0, "sats"), A("Motori", 1), 0), passa(P(True, [], 0, "sats"), A("Motori", 1), 0),
+           passa(P(True, ["Motori", "Bitcoin"], 0, "sats"), A("Motori", 1), 0),
+           passa(P(True, ["Bitcoin"], 0, "sats"), A("Motori", 1), 0)])
+    prova("IL PREZZO MASSIMO in sats: sotto o uguale passa, sopra no; in euro: il listino in euro com'e', "
+          "quello in sats col cambio (30.000 sats a 100.000 €/BTC = 30 €), e senza cambio NON si valuta",
+          [True, True, False, True, False, True, False, False],
+          [passa(P(True, [], 50000, "sats"), A("Motori", 30000), 0), passa(P(True, [], 50000, "sats"), A("Motori", 50000), 0),
+           passa(P(True, [], 50000, "sats"), A("Motori", 50001), 0),
+           passa(P(True, [], 20, "eur"), A("Motori", 99999, 15.0, "eur"), 0),
+           passa(P(True, [], 20, "eur"), A("Motori", 1, 25.0, "eur"), 0),
+           passa(P(True, [], 30, "eur"), A("Motori", 30000), 100000.0),
+           passa(P(True, [], 29, "eur"), A("Motori", 30000), 100000.0),
+           passa(P(True, [], 30, "eur"), A("Motori", 30000), 0)])
+    link = amb["_link_esplora_avvisi"]
+    prova("IL TOCCO CHE APRE ESPLORA COI FILTRI: una categoria = il reparto, zero o due = la vetrina, "
+          "il prezzo massimo in coda nella sua valuta",
+          ["https://barattolo.store/categoria/audio-e-video", "https://barattolo.store/",
+           "https://barattolo.store/", "https://barattolo.store/categoria/motori?max=50000&valuta=sats",
+           "https://barattolo.store/?max=12.5&valuta=eur"],
+          [link(P(True, ["Audio e video"], 0, "sats")), link(P(True, [], 0, "sats")),
+           link(P(True, ["Motori", "Bitcoin"], 0, "sats")), link(P(True, ["Motori"], 50000, "sats")),
+           link(P(True, [], 12.5, "eur"))])
+    testo = amb["_testo_avviso_mercatino_tutti"]
+    R = lambda *t: [{"annuncio_id": i + 1, "titolo": x} for i, x in enumerate(t)]
+    prova("il messaggio «nuovi annunci»: quanti, il filtro della persona, i PRIMI TRE titoli, «…e altri», il tocco",
+          "🆕 <b>5 nuovi annunci nel mercatino</b>\nIl tuo filtro: Elettronica · Motori, fino a 50.000 sats"
+          "\n• Uno\n• Due &lt;b&gt;\n• Tre\n…e altri 2"
+          "\n\n<a href=\"https://barattolo.store/?max=50000&valuta=sats\">🫙 Apri Esplora</a>",
+          testo(R("Uno", "Due <b>", "Tre", "Quattro", "Cinque"), P(True, ["Elettronica", "Motori"], 50000, "sats")))
+    prova("uno solo, senza filtri: al singolare, niente riga del filtro, niente «…e altri»",
+          "🆕 <b>1 nuovo annuncio nel mercatino</b>\n• Uno\n\n<a href=\"https://barattolo.store/\">🫙 Apri Esplora</a>",
+          testo(R("Uno"), P(True, [], 0, "sats")))
+    prova("quattro: «…e un altro»; il filtro in euro con la virgola", True,
+          "\n…e un altro\n" in testo(R("a", "b", "c", "d"), P(True, [], 0, "sats"))
+          and "Il tuo filtro: fino a 12,50 €" in testo(R("a"), P(True, [], 12.5, "eur")))
+    segui_t = amb["_testo_avviso_mercatino_segui"]
+    prova("il messaggio di chi segue: il nome (scappato), quanti, i titoli, il negozio con piu' d'uno",
+          "🔔 <b>Anna &amp; C.</b> ha pubblicato 2 nuovi annunci\n• Uno\n• Due"
+          "\n\n<a href=\"https://barattolo.store/negozio/ab12cd34\">🫙 Apri il suo negozio</a>",
+          segui_t(R("Uno", "Due"), "Anna & C.", "ab12cd34"))
+    prova("...con uno solo il tocco apre l'annuncio; senza nome ne' codice, un ripiego onesto",
+          ("🔔 <b>Anna</b> ha pubblicato 1 nuovo annuncio\n• Uno\n\n<a href=\"https://barattolo.store/annuncio/1\">🫙 Apri l'annuncio</a>",
+           "🔔 <b>Un venditore che segui</b> ha pubblicato 2 nuovi annunci\n• Uno\n• Due\n\n<a href=\"https://barattolo.store/\">🫙 Apri Esplora</a>"),
+          (segui_t(R("Uno"), "Anna", "ab12cd34"), segui_t(R("Uno", "Due"), "", "")))
+
+    # --- 3) IL BANCO: la coda vera, su sqlite -----------------------------------
+    schema = ""
+    for tabella, fine in (("venditori_seguiti", "ON venditori_seguiti(venditore_id);"),
+                          ("mercatino_avvisi_coda", "ON mercatino_avvisi_coda(tg_id, mandato);"),
+                          ("avvisi_notificati", "PRIMARY KEY(tg_id, annuncio_id)\n    );")):
+        i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
+        schema += src[i:src.index(fine, i) + len(fine)] + "\n"
+    schema += ("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT DEFAULT '', negozio TEXT DEFAULT '', "
+               "avvisi_mercatino INTEGER DEFAULT 0, avvisi_mercatino_categorie TEXT DEFAULT '', "
+               "avvisi_mercatino_prezzo REAL DEFAULT 0, avvisi_mercatino_valuta TEXT DEFAULT '', "
+               "ferie_fino INTEGER DEFAULT 0, canale_notifiche TEXT DEFAULT '', npub TEXT DEFAULT '', "
+               "npub_verificata INTEGER DEFAULT 0, npub_accesso TEXT DEFAULT '');"
+               "CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INTEGER, titolo TEXT, categoria TEXT, "
+               "prezzo_sats INTEGER DEFAULT 0, prezzo_eur REAL DEFAULT 0, valuta TEXT DEFAULT 'sats', "
+               "stato TEXT DEFAULT 'attivo');")
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(schema)
+    for f in ("_accoda_avvisi_mercatino", "_scarica_avvisi_mercatino"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    accoda, scarica = amb["_accoda_avvisi_mercatino"], amb["_scarica_avvisi_mercatino"]
+    # 111 segue 999; 222 «tutti» solo Elettronica fino a 50.000 sats; 333
+    # «tutti» fino a 20 €; 444 spento; 555 segue 999 E ha «tutti»; 999 e
+    # 888 vendono (999 con «tutti» acceso); -5 entra con Nostr e segue 999
+    for tg, nome, neg, on, cats, prezzo, val, npub in (
+            (111, "Compra", "neg111", 0, "", 0, "", ""), (222, "Due", "neg222", 1, "|Elettronica|", 50000, "sats", ""),
+            (333, "Tre", "neg333", 1, "", 20, "eur", ""), (444, "Quattro", "neg444", 0, "", 0, "", ""),
+            (555, "Cinque", "neg555", 1, "", 0, "sats", ""), (999, "Anna", "ab12cd34", 1, "", 0, "sats", ""),
+            (888, "Bruno", "neg888", 0, "", 0, "", ""), (-5, "Nativa", "neg5", 0, "", 0, "", "npub1nativo")):
+        con.execute("INSERT INTO utenti(tg_id, nome, negozio, avvisi_mercatino, avvisi_mercatino_categorie, "
+                    "avvisi_mercatino_prezzo, avvisi_mercatino_valuta, npub_accesso) VALUES(?,?,?,?,?,?,?,?)",
+                    (tg, nome, neg, on, cats, prezzo, val, npub))
+    for tg in (111, 555, -5):
+        con.execute("INSERT INTO venditori_seguiti VALUES(?,?,?)", (tg, 999, 1))
+    T = 2_000_000_000
+    CAMBIO = 100_000.0
+
+    def annuncio(aid, chi, titolo, cat, sats, eur=0, val="sats", stato="attivo"):
+        con.execute("INSERT INTO annunci VALUES(?,?,?,?,?,?,?,?)", (aid, chi, titolo, cat, sats, eur, val, stato))
+        return {"id": aid, "venditore_id": chi, "titolo": titolo, "categoria": cat, "prezzo_sats": sats,
+                "prezzo_eur": eur, "valuta": val, "stato": stato}
+    A1 = annuncio(1, 999, "Cuffie", "Elettronica", 30000)
+    A2 = annuncio(2, 999, "Casco", "Motori", 10000)
+    A3 = annuncio(3, 999, "Telecamera", "Elettronica", 80000)
+    A4 = annuncio(4, 888, "Radio", "Elettronica", 30000)
+    A5 = annuncio(5, 999, "In revisione", "Elettronica", 1000, stato="revisione")
+    A6 = annuncio(6, 999, "Cavo", "Elettronica", 15000, 15.0, "eur")
+    n = sum(accoda(con, a, CAMBIO, T) for a in (A1, A2, A3, A4, A5, A6))
+    con.commit()
+
+    def coda(tg):
+        return [tuple(r) for r in con.execute(
+            "SELECT annuncio_id, motivo FROM mercatino_avvisi_coda WHERE tg_id=? AND mandato=0 "
+            "ORDER BY annuncio_id", (tg,))]
+    prova("IN CODA: chi segue ha tutto di Anna (filtro o no); «tutti» coi filtri prende i suoi; chi segue E ha "
+          "«tutti» riceve UNA volta, da chi segue; Anna non riceve i SUOI ma quello di Bruno si'; "
+          "il 'revisione' non entra; l'euro valuta l'euro com'e' e i sats col cambio",
+          (19, [(1, "segui"), (2, "segui"), (3, "segui"), (6, "segui")],
+           [(1, "tutti"), (4, "tutti"), (6, "tutti")], [(2, "tutti"), (6, "tutti")], [],
+           [(1, "segui"), (2, "segui"), (3, "segui"), (4, "tutti"), (6, "segui")], [(4, "tutti")],
+           [(1, "segui"), (2, "segui"), (3, "segui"), (6, "segui")]),
+          (n, coda(111), coda(222), coda(333), coda(444), coda(555), coda(999), coda(-5)))
+    prova("NIENTE DOPPIONI: la stessa passata una seconda volta non scrive nulla", 0,
+          sum(accoda(con, a, CAMBIO, T) for a in (A1, A2, A3, A4, A6)))
+    A7 = annuncio(7, 888, "Gomme", "Motori", 10000)
+    prova("senza cambio il tetto in euro non si valuta (333 non lo riceve), gli altri si'",
+          ([(4, "tutti"), (7, "tutti")], [(2, "tutti"), (6, "tutti")]),
+          (accoda(con, A7, 0.0, T) and coda(999), coda(333)))
+    con.execute("INSERT INTO avvisi_notificati VALUES(222, 8, ?)", (T,))
+    A8 = annuncio(8, 999, "Mouse", "Elettronica", 1000)
+    accoda(con, A8, CAMBIO, T)
+    prova("MAI DUE VOLTE CON GLI AVVISI DI RICERCA: l'annuncio gia' annunciato a 222 da «Avvisami se arriva» "
+          "non torna da qui; a chi segue arriva",
+          ([(1, "tutti"), (4, "tutti"), (6, "tutti")], True),
+          (coda(222), (8, "segui") in coda(111)))
+    amb["MERCATINO_AVVISI_NUOVI"] = False
+    prova("a leva spenta non si accoda niente", 0, accoda(con, annuncio(9, 999, "Spento", "Motori", 1), CAMBIO, T))
+    amb["MERCATINO_AVVISI_NUOVI"] = True
+    con.execute("DELETE FROM annunci WHERE id=9")
+    con.commit()
+    LINK_ANNA = "\n\n<a href=\"https://barattolo.store/negozio/ab12cd34\">🫙 Apri il suo negozio</a>"
+    avvisi = scarica(con, T)
+    prova("IL PRIMO MESSAGGIO PARTE SUBITO, uno per persona e per venditore seguito: a 111 i cinque di Anna "
+          "coi primi tre titoli, a 222 i suoi tre col filtro e il reparto; a 555 DUE (chi segue e «tutti»)",
+          {111: ["🔔 <b>Anna</b> ha pubblicato 5 nuovi annunci\n• Cuffie\n• Casco\n• Telecamera\n…e altri 2" + LINK_ANNA],
+           222: ["🆕 <b>3 nuovi annunci nel mercatino</b>\nIl tuo filtro: Elettronica, fino a 50.000 sats"
+                 "\n• Cuffie\n• Radio\n• Cavo\n\n<a href=\"https://barattolo.store/categoria/elettronica?max=50000&valuta=sats\">🫙 Apri Esplora</a>"],
+           333: 1, 555: 2, 999: 1, -5: 1},
+          {tg: ([t for x, t, _ in avvisi if x == tg] if tg in (111, 222) else len([1 for x, _, _ in avvisi if x == tg]))
+           for tg in (111, 222, 333, 555, 999, -5)})
+    prova("...e le righe restano timbrate con l'ora del messaggio", [(T, 5)],
+          [tuple(r) for r in con.execute("SELECT mandato, COUNT(*) FROM mercatino_avvisi_coda WHERE tg_id=111 GROUP BY mandato")])
+    # RAGGRUPPATI: dentro la finestra si aspetta, alla finestra si esce insieme
+    accoda(con, annuncio(10, 999, "Tastiera", "Elettronica", 2000), CAMBIO, T + 60)
+    presto = scarica(con, T + 60)
+    accoda(con, annuncio(11, 999, "Monitor", "Elettronica", 3000), CAMBIO, T + 5 * 60)
+    meta = scarica(con, T + 14 * 60)
+    sedici = scarica(con, T + 16 * 60)
+    sessantuno = scarica(con, T + 61 * 60)
+    prova("RAGGRUPPATI: a un minuto e a quattordici niente; a sedici esce chi segue (finestra 15) con TUTT'E DUE; "
+          "a sessantuno esce «tutti» (finestra 60) con tutt'e due — anche a 333 (2 e 3 € stanno sotto i 20)",
+          ([], [], {111: "🔔 <b>Anna</b> ha pubblicato 2 nuovi annunci\n• Tastiera\n• Monitor" + LINK_ANNA, 555: 2, -5: 2},
+           {222: "🆕 <b>2 nuovi annunci nel mercatino</b>", 333: 1, 999: 0}),
+          ([x for x, _, _ in presto], [x for x, _, _ in meta],
+           {111: [t for x, t, _ in sedici if x == 111][0], 555: [t for x, t, _ in sedici if x == 555][0].count("•"),
+            -5: [t for x, t, _ in sedici if x == -5][0].count("•")},
+           {222: [t for x, t, _ in sessantuno if x == 222][0].split("\n")[0],
+            333: len([1 for x, _, _ in sessantuno if x == 333]), 999: len([1 for x, _, _ in sessantuno if x == 999])}))
+    prova("...e nel messaggio di «tutti» a sedici minuti non c'era niente per 222", 0,
+          len([1 for x, _, _ in sedici if x == 222]))
+    # SPARITI prima del loro minuto: tolto, nascosto dalle ferie
+    accoda(con, annuncio(12, 999, "Tolto", "Elettronica", 1000), CAMBIO, T + 100 * 60)
+    con.execute("UPDATE annunci SET stato='rimosso' WHERE id=12")
+    accoda(con, annuncio(13, 888, "In ferie", "Elettronica", 1000), CAMBIO, T + 100 * 60)
+    con.execute("UPDATE utenti SET ferie_fino=? WHERE tg_id=888", (T + 999 * 60,))
+    con.commit()
+    spariti = scarica(con, T + 200 * 60)
+    prova("un annuncio tolto, e uno nascosto dalle ferie del negozio, non si annunciano: le righe si consumano (mandato=1 e basta)",
+          ([], [(1,)]),
+          ([x for x, _, _ in spariti],
+           [tuple(r) for r in con.execute("SELECT DISTINCT mandato FROM mercatino_avvisi_coda WHERE annuncio_id IN (12, 13) ORDER BY annuncio_id")]))
+    # CHI SPEGNE e CHI SMETTE nel frattempo
+    accoda(con, annuncio(14, 999, "Arretrato", "Elettronica", 1000), CAMBIO, T + 300 * 60)
+    con.execute("UPDATE utenti SET avvisi_mercatino=0 WHERE tg_id=222")
+    con.execute("DELETE FROM venditori_seguiti WHERE tg_id=111")
+    con.commit()
+    dopo = scarica(con, T + 400 * 60)
+    prova("chi ha spento e chi ha smesso non ricevono l'arretrato (righe consumate); chi segue ancora si', e 333 con «tutti»",
+          ([555, 333, -5], [(1,)]),
+          (sorted([x for x, _, _ in dopo], reverse=True),
+           [tuple(r) for r in con.execute("SELECT DISTINCT mandato FROM mercatino_avvisi_coda WHERE annuncio_id=14 AND tg_id IN (111, 222)")]))
+    prova("la scopa: le righe piu' vecchie di un mese se ne vanno da sole", 0,
+          len(scarica(con, T + 40 * 86400)) + con.execute(
+              "SELECT COUNT(*) FROM mercatino_avvisi_coda WHERE accodato < ?", (T + 40 * 86400 - 30 * 86400,)).fetchone()[0])
+
+    # --- 4) IL GIRO CON notifica() VERA, trasporti di cartone -------------------
+    con4 = sqlite3.connect(":memory:")
+    con4.row_factory = sqlite3.Row
+    con4.executescript(schema)
+    con4.execute("INSERT INTO utenti(tg_id, nome, negozio) VALUES(111, 'Compra', 'neg111')")
+    con4.execute("INSERT INTO utenti(tg_id, nome, negozio, npub_accesso) VALUES(-5, 'Nativa', 'neg5', 'npub1nativo')")
+    con4.execute("INSERT INTO utenti(tg_id, nome, negozio, canale_notifiche, npub, npub_verificata) "
+                 "VALUES(222, 'Due', 'neg222', 'nostr', 'npub1badge', 1)")
+    con4.execute("INSERT INTO utenti(tg_id, nome, negozio) VALUES(999, 'Anna', 'ab12cd34')")
+    con4.execute("INSERT INTO annunci VALUES(1, 999, 'Cuffie', 'Elettronica', 1000, 0, 'sats', 'attivo')")
+    for tg in (111, -5, 222):
+        con4.execute("INSERT INTO venditori_seguiti VALUES(?, 999, 1)", (tg,))
+    con4.commit()
+
+    class _Con:
+        def execute(self, *a):
+            return con4.execute(*a)
+
+        def commit(self):
+            con4.commit()
+
+        def close(self):
+            pass
+    VIA = []
+
+    async def _tg(tg, testo):
+        VIA.append(("telegram", tg, testo.split("\n")[0]))
+        return "ok"
+
+    async def _dm(npub, testo, ripiego):
+        VIA.append(("nostr", npub, testo.split("\n")[0]))
+    amb4 = dict(amb, db=_Con, MODALITA_COLLAUDO=False, asyncio=asyncio, _manda_telegram=_tg,
+                _dm_nostr_con_ripiego=_dm, print=lambda *a, **k: None,
+                time=types.SimpleNamespace(time=lambda: T))
+    # `pezzo` cerca «def notifica(» e perde l'«async » davanti: si rimette
+    exec("async " + _senza_prosa(pezzo("notifica")), amb4)
+    exec("async " + _senza_prosa(pezzo("_giro_avvisi_mercatino")), amb4)
+    accoda(con4, {"id": 1, "venditore_id": 999, "titolo": "Cuffie", "categoria": "Elettronica",
+                  "prezzo_sats": 1000, "prezzo_eur": 0, "valuta": "sats", "stato": "attivo"}, CAMBIO, T)
+    con4.commit()
+    asyncio.run(amb4["_giro_avvisi_mercatino"]())
+    prova("IL CANALE LO SCEGLIE notifica(): bot Telegram a chi entra da Telegram, DM Nostr a chi entra "
+          "con Nostr, e la scelta del cassetto a chi l'ha fatta — col messaggio di chi segue",
+          [("telegram", 111, "🔔 <b>Anna</b> ha pubblicato 1 nuovo annuncio"),
+           ("nostr", "npub1badge", "🔔 <b>Anna</b> ha pubblicato 1 nuovo annuncio"),
+           ("nostr", "npub1nativo", "🔔 <b>Anna</b> ha pubblicato 1 nuovo annuncio")],
+          sorted(VIA, key=lambda v: str(v[1])))
+    VIA.clear()
+    asyncio.run(amb4["_giro_avvisi_mercatino"]())
+    prova("...e un secondo giro non rimanda niente", [], VIA)
+
+    # --- 5) IL CLIENT, in node --------------------------------------------------
+    blocco = m[m.index("function normalizzaAvvisiMercatino("):m.index("async function setCanale(canale){")]
+    dove = m[m.index("function doveArrivanoAvvisi(){"):m.index("function contenutoAvvisiNuoviP2P(){")]
+    js = (
+        "let DEMO = false, myTgId = 222, myCanaleNotifiche = '', myNpubAccesso = '', myNpub = '', myNpubVerified = false;\n"
+        "let VETRINA = false, negozioCorrente = null;\n"
+        "const CATS = ['Tutto', 'Elettronica', 'Motori', 'Bitcoin'];\n"
+        "const voltoHTML = (p, cls) => '<i class=\"' + cls + '\" data-nome=\"' + p.nome + '\"></i>';\n"
+        "const el = () => null, toast = () => {}, haptic = () => {};\n"
+        "const numeroFiltro = v => { const n = parseFloat(String(v).trim().replace(',', '.')); return (isFinite(n) && n > 0) ? n : ''; };\n"
+        + pezzo_js(m, "const esc = s => String(s ?? '').replace(", ";\n") + ";\n"
+        + dove + blocco
+        + r"""
+const out = {};
+const attive = h => (h.match(/class="tema-pill active" aria-pressed="true"( data-c="[^"]*")? onclick="([^"]+)"/g) || [])
+  .map(x => x.replace(/.*onclick="/, '').replace(/"$/, ''));
+const dati = h => (h.match(/class="tema-pill active" aria-pressed="true" data-c="([^"]*)"/g) || [])
+  .map(x => x.replace(/.*data-c="/, '').replace(/"$/, ''));
+out.fuoriCasa = [rigaAvvisiMercatino(), bottoneSegui({negozio: 'neg333', seguito: false}, false)];
+avvisiMercatinoLeve = {attivi: true, minuti: 60, seguiMinuti: 15};
+const spento = contenutoAvvisiMercatino();
+out.spento = [spento.indexOf('avn-spento') >= 0, /aria-pressed="false"[^>]*>Spenti</.test(spento),
+              attive(spento), spento.indexOf('value=""') >= 0, spento.indexOf('ogni <b>60 minuti</b>') >= 0,
+              spento.indexOf('ogni <b>15 minuti</b> per venditore') >= 0, spento.indexOf('Nessuno ancora') >= 0,
+              spento.indexOf('nella chat del bot ✈️ Telegram') >= 0];
+out.riga = [rigaAvvisiMercatino().indexOf('id="avvisiMercatinoCassetto"') >= 0,
+            rigaAvvisiMercatino().indexOf('🛒 Mercatino') >= 0, rigaAvvisiMercatino().indexOf(spento) >= 0];
+myAvvisiMercatino = normalizzaAvvisiMercatino({attivo: 1, categorie: ['Motori', 'Elettronica', 'x', 'Tutto'], prezzo_max: '50', valuta: 'eur'});
+out.normalizza = myAvvisiMercatino;
+const acceso = contenutoAvvisiMercatino();
+out.acceso = [acceso.indexOf('avn-spento') < 0, /aria-pressed="true"[^>]*>Attivi</.test(acceso), dati(acceso),
+              attive(acceso).filter(a => a.indexOf('Valuta') >= 0), acceso.indexOf('value="50"') >= 0];
+mySeguiti = [{nome: 'Anna & C.', negozio: 'ab12cd34', avatar: ''}, {nome: 'Bruno', negozio: 'neg<888>', avatar: ''}];
+const lista = contenutoAvvisiMercatino();
+out.seguiti = [lista.indexOf('Nessuno ancora') < 0, (lista.match(/class="avm-seguito"/g) || []).length,
+               lista.indexOf('Anna &amp; C.') >= 0, lista.indexOf("onclick=\"apriNegozio('ab12cd34')\"") >= 0,
+               lista.indexOf("onclick=\"smettiSegui('neg888')\"") >= 0, lista.indexOf('data-nome="Bruno"') >= 0];
+out.bottone = [bottoneSegui({negozio: 'neg333', seguito: false}, false), bottoneSegui({negozio: 'neg333', seguito: true}, false),
+               bottoneSegui({negozio: 'neg333', seguito: false}, true), bottoneSegui({negozio: '', seguito: false}, false)];
+VETRINA = true; out.vetrina = bottoneSegui({negozio: 'neg333', seguito: false}, false); VETRINA = false;
+DEMO = true; out.demo = [rigaAvvisiMercatino(), bottoneSegui({negozio: 'neg333'}, false)]; DEMO = false;
+myTgId = null; out.anonimo = [rigaAvvisiMercatino(), bottoneSegui({negozio: 'neg333'}, false)]; myTgId = -3;
+out.nativo = contenutoAvvisiMercatino().indexOf('come 🟣 DM Nostr cifrato') >= 0;
+console.log(JSON.stringify(out));
+""")
+    out = _node_banco(js)
+    if out is None:
+        salta("il client degli avvisi del mercatino in node", "node non c'e'")
+        return
+    prova("a leve spente niente riga e niente bottone", ["", ""], out["fuoriCasa"])
+    prova("SPENTO DI SERIE: il corpo si spegne a vista, «Spenti», «Tutte» accesa e sats, prezzo vuoto, le due "
+          "finestre coi numeri del server, «Nessuno ancora», e dove arriva",
+          [True, True, ["scegliCategoriaAvvisiMercatino('')", "scegliValutaAvvisiMercatino('sats')"], True, True, True, True, True],
+          out["spento"])
+    prova("la riga del cassetto: l'id, il titolo «Mercatino», e dentro il contenuto", [True, True, True], out["riga"])
+    prova("il normalizzatore: categorie nell'ordine del catalogo senza «Tutto» ne' sconosciute, euro, 50",
+          {"attivo": True, "categorie": ["Elettronica", "Motori"], "prezzo_max": 50, "valuta": "eur"}, out["normalizza"])
+    prova("acceso: «Attivi», le due chip delle categorie accese, «€» accesa, il prezzo nel campo",
+          [True, True, ["Elettronica", "Motori"], ["scegliValutaAvvisiMercatino('eur')"], True], out["acceso"])
+    prova("l'elenco dei seguiti: due righe, il nome scappato, il nome apre il negozio, «Smetti» col codice "
+          "passato dal filtro-alfabeto, la faccia", [True, 2, True, True, True, True], out["seguiti"])
+    prova("IL BOTTONE «🔔 SEGUI»: vuoto se non lo segui, PIENO («Seguito ✓», aria-pressed) se lo segui, "
+          "mai sul proprio negozio, mai senza codice",
+          [True, True, "", ""],
+          [out["bottone"][0].startswith('<button type="button" class="segui-btn" id="seguiBtn" aria-pressed="false"')
+           and out["bottone"][0].endswith(">🔔 Segui</button>"),
+           'class="segui-btn attivo"' in out["bottone"][1] and 'aria-pressed="true"' in out["bottone"][1]
+           and out["bottone"][1].endswith(">🔔 Seguito ✓</button>"),
+           out["bottone"][2], out["bottone"][3]])
+    prova("in vetrina anonima, in demo e da anonimi: niente bottone e niente riga",
+          ["", ["", ""], ["", ""]], [out["vetrina"], out["demo"], out["anonimo"]])
+    prova("al nativo Nostr la riga dice il DM cifrato", True, out["nativo"])
 
 
 def prove_config_esempio():
@@ -118892,9 +119369,12 @@ def prove_volto_unico():
         "fila in vetrina": ("voltoHTML(f, 'p2p-vt-volto'", "function cardVetrinaP2P(o){"),
         "card dell'altra parte": ("voltoHTML(op.volto || Object.assign",
                                   "function cardParte(c, chi, opz){"),
+        # i venditori seguiti nel cassetto Avvisi (9 ott 2026)
+        "venditori seguiti": ("voltoHTML({nome: s.nome, avatar: s.avatar, negozio: cod",
+                              "function contenutoAvvisiMercatino(){"),
     }
-    prova("il volto si disegna da dieci posti, ognuno col suo nome nel censimento",
-          [10, [1] * 10], [fuori.count("voltoHTML("),
+    prova("il volto si disegna da undici posti, ognuno col suo nome nel censimento",
+          [11, [1] * 11], [fuori.count("voltoHTML("),
                            [fuori.count(v[0]) for v in POSTI.values()]])
     prova("...e ogni chiamata sta nella funzione del suo posto", [],
           [k for k, (pref, fn) in POSTI.items()
@@ -132727,6 +133207,7 @@ def main():
               prove_testi_p2p_confondono,
               prove_garanzia_lunga,
               prove_avvisi_nuovi_ordini,
+              prove_avvisi_mercatino,
               prove_testo_ricevere_sats,
               prove_prese_dalle_10,
               prove_config_esempio):
