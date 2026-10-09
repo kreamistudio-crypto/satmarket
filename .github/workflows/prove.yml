@@ -125,6 +125,7 @@ jobs:
              collaudo_avviso_chi_annulla.py
              collaudo_recapito_aggiornato.py
              collaudo_garanzia_lunga.py
+             collaudo_x_risonanza.py
              collaudo_annullo_venditore.py
              collaudo_db_contesa.py collaudo_negozi_grandi.py
              collaudo_foto_recensioni.py
@@ -230,6 +231,7 @@ jobs:
              collaudo_avviso_chi_annulla
              collaudo_recapito_aggiornato
              collaudo_garanzia_lunga
+             collaudo_x_risonanza
              collaudo_semina_demo
              collaudo_campagna_p2p_tutti
 
@@ -277,11 +279,15 @@ jobs:
       # il token del bot: meglio un falso allarme da guardare che un
       # segreto vero che passa perche' il formato e' cambiato di un
       # carattere.
+      # E LE QUATTRO CHIAVI DI X (9 ott 2026, la cassa di risonanza):
+      # OAuth 1.0a, senza una forma loro, quindi ancorate al NOME come
+      # le chiavi LNbits. I banchi le posano col setattr o in un
+      # dizionario, mai `NOME = "valore"`.
       # E la chiave age dei backup (AGE-SECRET-KEY-1...): la meta'
       # segreta vive su carta + Bitwarden e non deve mai entrare nel
       # repo — nel repo sta solo la PUBBLICA, che sa cifrare e basta.
       FORME: >-
-        nsec1[0-9a-z]{50,}|[0-9]{8,12}:[A-Za-z0-9_-]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|nostr\+walletconnect://[A-Za-z0-9._~:/?#@!$&*+,;=%-]{20,}|(LNBITS_INVOICE_KEY|LNBITS_ADMIN_KEY|LNBITS_NODO_INVOICE_KEY|LNBITS_NODO_ADMIN_KEY|TELEGRAM_WEBHOOK_SEGRETO|CHIAVE_CONTENUTI_DIGITALI|P2P_SCONTO_SEGRETO|LND_PONTE_MACAROON_LETTURA|SEGRETI_PROFILO_P2P)[[:space:]]*=[[:space:]]*['"][^'"]|\b(ck|cs)_[0-9a-f]{40,}|\bshp(at|ca|pa|ss)_[0-9a-f]{32,}|AGE-SECRET-KEY-1[0-9A-Z]{40,}
+        nsec1[0-9a-z]{50,}|[0-9]{8,12}:[A-Za-z0-9_-]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|nostr\+walletconnect://[A-Za-z0-9._~:/?#@!$&*+,;=%-]{20,}|(LNBITS_INVOICE_KEY|LNBITS_ADMIN_KEY|LNBITS_NODO_INVOICE_KEY|LNBITS_NODO_ADMIN_KEY|TELEGRAM_WEBHOOK_SEGRETO|CHIAVE_CONTENUTI_DIGITALI|P2P_SCONTO_SEGRETO|LND_PONTE_MACAROON_LETTURA|X_API_KEY|X_API_SECRET|X_ACCESS_TOKEN|X_ACCESS_SECRET|SEGRETI_PROFILO_P2P)[[:space:]]*=[[:space:]]*['"][^'"]|\b(ck|cs)_[0-9a-f]{40,}|\bshp(at|ca|pa|ss)_[0-9a-f]{32,}|AGE-SECRET-KEY-1[0-9A-Z]{40,}
       # E la chiave Nostr in esadecimale nudo, che ha una regola sua
       # perche' ha un'eccezione sua: vendor/nostr.bundle.js ne contiene
       # per mestiere. Sta qui, accanto a FORME, per la stessa ragione

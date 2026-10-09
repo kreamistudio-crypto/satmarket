@@ -29847,3 +29847,65 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `prove_contanti_pagina_leggera`, il caso del contanti in
   `prove_p2p_eventi`, e `collaudo_contanti_p2p` (server vero, Photon di
   cartone sul loopback, nella gabbia della CI).
+- LA CASSA DI RISONANZA SU X (9 ott 2026). I post di Barattolo su Nostr
+  escono anche su X, dal server: un orologio in sottofondo
+  (`orologio_x`, `X_GIRO_S` 5 minuti, parte da `avvia_x` SOLO se
+  `x_ripubblica_viva()` o `x_riepilogo_vivo()`, cioè leva accesa E
+  chiavi presenti, oppure la prova), ogni giro `giro_x`: legge le note
+  kind 1 della npub ufficiale (`X_NPUB`, nel codice quella vera;
+  `x_npub_hex`) da `RELAYS_VERIFICA` con una REQ sincrona per relay in
+  thread (`_x_note_da_relay`, filtro `kinds [1] / authors / since`,
+  fino all'EOSE, passa da `lettura_simulata`: in collaudo mai un relay
+  che non è di casa), senza doppioni fra relay (`_x_leggi_note`). Ogni
+  nota passa TRE porte: `x_originale` (kind 1, pubkey nostra, nessun
+  tag `e` né `q`, contenuto non vuoto), `_x_firma_valida` (id NIP-01
+  rifatto e Schnorr: coincurve, o `schnorr_puro` dove non c'è — il
+  filtro `authors` è una domanda al relay, la firma è la prova), e la
+  chiave primaria di `x_post` (`_x_accoda`, INSERT OR IGNORE). LE NOTE
+  DI CASA: ogni kind 1 che il server stesso firma (le promo di
+  `_posta_promo_singolo`, l'aggregato) passa da `_spedisci_ai_relay`,
+  che lo timbra `di_casa` in `x_post` PRIMA di spedirlo
+  (`_x_segna_di_casa`, fail-open): così i prodotti uno per uno non
+  escono mai su X. LA LANCETTA `x_dal` vive in `impostazioni`: nasce ad
+  «adesso» al primo giro (nessuna ripubblicazione del passato) e avanza
+  all'ultima nota vista, con un minuto di sovrapposizione. LA CODA si
+  lavora una riga alla volta (`_x_elabora`, pausa `X_PAUSA_S` 60 s):
+  `x_prepara` (puro) toglie dal testo gli URL dei media raccolti da
+  `_x_media_di` (tag `imeta` NIP-92 e URL con estensione), taglia col
+  peso di X (`x_pesa`: URL 23, emoji 2; `x_taglia` su parola intera,
+  coda «… continua su Nostr»), lascia spazio al link njump
+  (`x_link_nota`, `note1` bech32 via `_x_bech32`) solo con
+  `X_CON_LINK`, e stima il costo (`x_costo`: 0,200 $ con un URL nel
+  testo, 0,015 $ senza). I media si scaricano (`_x_scarica`, tetti
+  `X_IMG_MAX` 5 MB, `X_GIF_MAX` 15 MB, `X_VIDEO_MAX` 256 MB) e si
+  caricano con l'API media v2 a pezzi (`_x_carica_media`: initialize →
+  append da `X_PEZZO` 4 MB → finalize → STATUS finché «succeeded»; un
+  video esclude le foto), poi `_x_posta` (POST /2/tweets con
+  `media_ids`). Ogni chiamata la firma `_x_oauth1` (OAuth 1.0a
+  HMAC-SHA1: query e form entrano nella firma, JSON e multipart no;
+  provata sul vettore di docs.x.com) dentro `_x_chiama` (httpx; il
+  corpo torna come dict, l'intestazione non si stampa mai). GLI ESITI
+  in `x_post`: `pubblicato` (con `post_x_id`, `testo_x`, `costo_usd`,
+  `pubblicato_il`), `prova` (modalità prova: solo il journal, e non
+  torna quando si accende), `riprova` (429, 5xx o rete: `tentativi` e
+  `riprova_il` a 5/15/45 minuti, `_x_fallita`), `rifiutato` (401, 403,
+  duplicato, o il quarto no), `di_casa`. Il journal dice ogni post con
+  la stima e il totale del mese (`_x_spesa_mese`, somma dei pubblicati
+  dal primo del mese). IL RIEPILOGO DEL GIORNO (`X_RIEPILOGO_GIORNO`):
+  `_x_giro_riepilogo` dalle `X_RIEPILOGO_ORA` (18, Europe/Rome o UTC+1
+  senza tzdata) timbra `x_riepilogo_il` PRIMA e accoda una nota
+  sintetica (`_x_riepilogo_di_oggi`: id `riepilogo-AAAA-MM-GG`, il conto
+  degli annunci attivi nati oggi, le prime foto come `imeta`) che passa
+  dalla stessa coda, sempre senza link; a zero annunci niente post. LE
+  CHIAVI (`X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`,
+  `X_ACCESS_SECRET`) si leggono SOLO in `x_configurato` e `_x_oauth1`;
+  nel pannello delle leve (`_x_leve`, gruppo «🐦») esce il FATTO, con
+  l'allarme se la leva è accesa senza di loro, e la spesa del mese. IN
+  COLLAUDO verso un X che non è di casa vale la prova (`x_in_prova`,
+  come Blossom): da qui non esce niente; `X_API_BASE` esiste per i
+  collaudi. LE PROVE: `prove_x_risonanza` (i pezzi puri, il registro
+  su un db usa-e-getta, la prova, i tentativi, il riepilogo, il
+  pannello, i segreti fuori dai log) e `collaudo_x_risonanza` (server
+  vero, relay di cartone, un X di cartone sul loopback che RIFÀ la firma
+  OAuth, nella gabbia della CI). La procedura: PRODUZIONE, «LA CASSA DI
+  RISONANZA SU X».

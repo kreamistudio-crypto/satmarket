@@ -954,6 +954,43 @@ SOLLECITO_FIRME_MAX = 3      # quante volte in tutto, poi silenzio
 # questo: la riga serve solo per cambiarlo.
 BLOSSOM_SERVER = "https://blossom.primal.net"
 
+# --- La cassa di risonanza su X (ott 2026) ----------------------------
+# I post di Barattolo su Nostr — le note kind 1 ORIGINALI della npub
+# ufficiale (niente risposte, niente repost) — escono anche su X,
+# ripubblicati dal server con l'API ufficiale (v2, contesto utente).
+# Niente note di casa (le promo degli annunci che firma il server) e
+# niente prodotti uno per uno: per quelli c'e' solo il riepilogo del
+# giorno, qui sotto. NASCE SPENTA, il patto delle altre: si accende
+# con un gesto, mai per effetto di un deploy. La procedura passo per
+# passo (l'app su developer.x.com, il credito, le quattro chiavi) sta
+# in docs/PRODUZIONE.md, «LA CASSA DI RISONANZA SU X».
+X_RIPUBBLICA = False
+# Il link njump alla nota, in coda a ogni post. X fa pagare 0,200 $ un
+# post con un URL contro 0,015 $ senza (settembre 2026, pay-per-use):
+# di serie i post escono SENZA link. I link che la persona scrive nel
+# testo della nota restano suoi, e il journal dice la tariffa piena.
+X_CON_LINK = False
+# UN post al giorno «Nuovi arrivi di oggi nel mercatino: N annunci»,
+# con fino a 4 foto e senza link, alle 18 ora italiana. Spento di serie.
+X_RIEPILOGO_GIORNO = False
+# La modalita' prova: il journal dice cosa AVREBBE pubblicato, X non
+# viene chiamato e niente si paga. Si prova con questa a True (le
+# chiavi possono anche mancare), poi si rimette False.
+X_PROVA = False
+# Le quattro chiavi dell'app su X (OAuth 1.0a, «Read and Write»). SOLO
+# nel config del VPS, a mano: mai in chat, mai su GitHub, mai nei log.
+X_API_KEY = "INCOLLA_QUI_LA_API_KEY_DI_X"
+X_API_SECRET = "INCOLLA_QUI_LA_API_SECRET_DI_X"
+X_ACCESS_TOKEN = "INCOLLA_QUI_L_ACCESS_TOKEN_DI_X"
+X_ACCESS_SECRET = "INCOLLA_QUI_L_ACCESS_SECRET_DI_X"
+# La npub ufficiale di Barattolo, quella ascoltata. E' gia' nel codice:
+# la riga serve solo per cambiarla (un giro di prova con una chiave
+# usa-e-getta).
+X_NPUB = "npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy"
+# La base dell'API di X. Si cambia SOLO nei collaudi (un X di cartone
+# sul loopback): in produzione resta questa.
+X_API_BASE = "https://api.x.com"
+
 # --- Import aperto da Nostr -------------------------------------------
 # Barattolo mostra gli annunci NIP-99 che stanno su Nostr: chiunque
 # pubblichi in italiano si ritrova in vetrina, e chi non ci vuole

@@ -141,6 +141,89 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   pannello «⚙️ Stato delle leve», gruppo «🪙 Punti e dollari su RGB
   (hackathon)». Il verbale: CANTIERI, «Hackathon: la chiusura della
   preparazione»; la lista: HACKATHON-SETUP §10-11.
+- LA CASSA DI RISONANZA SU X (9 ott 2026): i post di Barattolo su Nostr
+  — le note kind 1 ORIGINALI della npub ufficiale, niente risposte né
+  repost, mai le promo degli annunci che firma il server, mai i
+  prodotti uno per uno — escono anche su X, ripubblicati dal server
+  con l'API ufficiale (v2, contesto utente OAuth 1.0a). Le leve si
+  AGGIUNGONO al config del VPS come le altre; nel codice nascono tutte
+  spente. Il verbale: CANTIERI, «La cassa di risonanza su X».
+  **I PREZZI E I LIMITI DI X**, letti su docs.x.com il 9 ott 2026
+  (`x-api/getting-started/pricing`, `x-api/fundamentals/rate-limits`,
+  `x-api/media/introduction`): niente piano gratuito, si comprano
+  CREDITI nella Developer Console e ogni richiesta li scala;
+  «Post: Create» 0,015 $ a richiesta, «Post: Create (with URL)» 0,200 $
+  (tredici volte tanto: per questo i post escono SENZA link), le
+  letture non ci servono; il caricamento dei media non è nel listino
+  («Media Metadata» 0,005 $ è un'altra chiamata, che non facciamo). I
+  limiti: POST /2/tweets 100 ogni 15 minuti per utente e 10.000 al
+  giorno per app; i media 1.875 ogni 15 minuti per passo
+  (initialize/append/finalize). Le foto fino a 5 MB (JPG, PNG, WEBP;
+  GIF 15 MB), al più 4 per post; i video con l'upload a pezzi (pezzi
+  da 4 MB, X ne accetta fino a 5), fino a 20 minuti e 8 GB per un
+  account senza Premium (125 minuti e 16 GB con Premium), uno per post
+  e mai insieme alle foto; qui il nostro tetto è 256 MB. Oltre i
+  limiti X risponde 429 (`x-rate-limit-reset` dice quando): il server
+  riprova dopo 5, 15 e 45 minuti, poi lascia la nota e va avanti.
+  Prezzi «soggetti a cambiare»: si riguardano nella console
+  (`console.x.com`, Billing) e nel pannello, che dice la spesa stimata
+  del mese.
+  **1) L'APP SU X** (console.x.com, l'ex developer.x.com): si entra con
+  l'account X di Barattolo, si accetta il Developer Agreement, «Create
+  App» con nome, descrizione e caso d'uso («ripubblicare i post del
+  nostro progetto»). Nelle impostazioni dell'app, «User authentication
+  settings»: App permissions = **Read and Write** (non serve «Direct
+  Messages»), Type of App = Web App / Automated App or bot, callback
+  `https://barattolo.store` e website `https://barattolo.store` (il
+  callback non si usa, ma il modulo lo vuole). ⚠️ I token generati
+  PRIMA di mettere Read and Write restano in sola lettura: si cambia
+  il permesso e POI si generano (o rigenerano) i token.
+  **2) IL CREDITO**: Billing → Payments → «Add payment method» (una
+  carta), poi Billing → Credits e si compra il minimo (5 $: a 0,015 $
+  a post sono trecento post). L'auto-ricarica si lascia SPENTA, e si
+  mette uno **Spending limit** mensile basso (10 $): a un bug che
+  pubblicasse in loop si vuole trovare la porta chiusa. Il 9 ott 2026
+  la console promette un credito regalo di 20 $ alla prima carta
+  salvata, «in rollout»: si guarda, non ci si conta.
+  **3) LE QUATTRO CHIAVI**, da «Keys and tokens» dell'app: **API Key** e
+  **API Key Secret** (la coppia «Consumer Keys») e **Access Token** e
+  **Access Token Secret** (sotto «Authentication Tokens», generati per
+  l'account che pubblicherà: Barattolo). Si mostrano UNA volta sola:
+  si copiano subito nel config del VPS, a mano, mai in chat. Il Bearer
+  Token e la coppia OAuth 2.0 (Client ID/Secret) NON servono. Nel
+  `config.py` del VPS si aggiungono:
+  `X_API_KEY = "INCOLLA_QUI…"`, `X_API_SECRET = "INCOLLA_QUI…"`,
+  `X_ACCESS_TOKEN = "INCOLLA_QUI…"`, `X_ACCESS_SECRET = "INCOLLA_QUI…"`
+  (coi valori veri al posto del segnaposto; `chmod 600` del config è
+  già così). Una chiave finita in chat o in un log si RIGENERA dalla
+  console (le vecchie muoiono all'istante).
+  **4) PRIMA IN PROVA**: `X_RIPUBBLICA = True` e `X_PROVA = True`, `sudo
+  systemctl restart barattolo`. Il journal dice «🐦 X: cassa di
+  risonanza ACCESA in PROVA (X non viene chiamato)» e, al primo giro,
+  «si parte da adesso — le note di prima non si ripubblicano». Si
+  pubblica una nota da un client Nostr con la npub ufficiale, e entro
+  cinque minuti (`X_GIRO_S`) il journal dice «🐦 [X prova] per la nota
+  … avrei pubblicato (N foto, stima 0,015 $): «testo»». Si guarda il
+  testo (il taglio a 280, gli URL delle foto tolti) e il pannello «⚙️
+  Stato delle leve», gruppo «🐦 Cassa di risonanza su X». Una nota
+  raccontata in prova resta segnata e NON esce quando si accende.
+  **5) POI SI ACCENDE**: `X_PROVA = False` (o la riga via), riavvio. Il
+  journal dice «ACCESA — note — senza link», e per ogni post «🐦 X:
+  pubblicato il post <id> per la nota … — stima 0,015 $, totale del
+  mese 0,030 $». Un no di X è una riga «🐦 X: … riprovo fra 5 min» o
+  «resta su Nostr e basta: si va avanti», mai un server fermo. Per
+  vedere il post: `https://x.com/i/status/<id>`.
+  **LE ALTRE DUE LEVE**: `X_CON_LINK = True` aggiunge a ogni post il link
+  njump alla nota (0,200 $ invece di 0,015 $: si accende sapendolo);
+  `X_RIEPILOGO_GIORNO = True` manda alle 18 (ora italiana) UN post
+  «🫙 Nuovi arrivi di oggi nel mercatino: N annunci» con fino a 4 foto
+  e senza link — i prodotti non escono in nessun'altra forma. **PER
+  SPEGNERE TUTTO**: `X_RIPUBBLICA = False` (e il riepilogo) e riavvio;
+  le righe di `x_post` restano, nessun doppione quando si riaccende.
+  La prima accensione non ripubblica mai il passato: la lancetta
+  `x_dal` sta in `impostazioni` e per ripartire «da adesso» dopo un
+  lungo spegnimento la si cancella (`DELETE FROM impostazioni WHERE
+  chiave='x_dal'`) prima del riavvio.
 - LE NOTIFICHE PRECISE DEL P2P (16 set 2026) non hanno una leva loro:
   girano con `P2P_ATTIVO`, dentro lo stesso orologio del campanello,
   e leggono il libro dai relay del coordinator e poi dallo specchio.

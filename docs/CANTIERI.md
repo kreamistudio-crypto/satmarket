@@ -43594,3 +43594,175 @@ finché non compare «finita». Dopo: la riga si toglie con comodo. Dopo il
 push: `pronto` allineato a main (il commit tocca il workflow). Il DM Nostr parte in
 sottofondo e vale «inviato» anche quando poi non arriva: il conto dei
 saltati riguarda solo Telegram.
+
+## La cassa di risonanza su X (9 ott 2026, richiesta di Andrea)
+
+**LA RICHIESTA.** I post di Barattolo su Nostr ripubblicati in automatico
+su X, come cassa di risonanza: un compito nel server che ascolta le note
+kind 1 della npub ufficiale
+(`npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy`),
+solo gli originali, e per ognuna un post su X con l'API ufficiale (v2,
+contesto utente); testo fino a 280, tagliato pulito con «… continua su
+Nostr»; foto (fino a 4) e video caricati; niente doppioni e niente
+ripubblicazione del passato alla prima accensione; ritmo prudente, 429
+riprovati a distanza, un rifiuto di X una riga nel journal e avanti; di
+serie senza link (0,200 $ contro 0,015 $) con la leva `X_CON_LINK`; i
+prodotti NON uno per uno ma, spento di serie, un riepilogo al giorno;
+leve col patto delle altre, le quattro chiavi mai nel repo né nei log,
+una modalità prova; la procedura per Andrea in PRODUZIONE coi prezzi e
+i limiti verificati sulla documentazione ufficiale; prove e collaudo.
+
+**COM'È FATTO PRIMA (letto, non supposto).** Il server firma su Nostr
+con `NOSTR_NSEC_PIATTAFORMA` (`_NOSTR`, `firma_evento`) e pubblica
+30402 (annunci), 31990 (handler), 30009/8 (badge), 30382 (reputazione),
+5 (ritiri), 24242 (Blossom) e — il punto che decide il disegno — **anche
+kind 1**: la promo di ogni annuncio nuovo (`_posta_promo_singolo`,
+`_nota_promo`) e l'aggregato «N nuovi annunci» (`_posta_promo_aggregato`),
+sui relay di `RELAYS_VERIFICA` (damus, nos.lol, primal, nostr.mom di
+serie, `RELAY_NOSTR` nel config). Le letture dai relay sono REQ sincrone
+in thread (`create_connection`), con `lettura_simulata` che in collaudo
+ferma ogni relay che non è di casa. La npub ufficiale sta nel codice solo
+nel testo di benvenuto dell'import: NON è detto che sia la chiave con cui
+il server firma (in collaudo non lo è), quindi è una leva a sé (`X_NPUB`,
+nel codice quella vera).
+
+**LE DECISIONI.** 1) **Le note di casa non escono su X.** Se il lettore
+prendesse «tutti i kind 1 della npub», le promo che il server firma per
+ogni annuncio uscirebbero una per una: esattamente lo spam che Andrea
+non vuole. Ogni kind 1 che passa da `_spedisci_ai_relay` si timbra
+`di_casa` in `x_post` PRIMA di partire (`_x_segna_di_casa`, fail-open:
+una promo non deve mai cadere per via di X) e il lettore lo salta; vale
+anche dopo un riavvio perché sta nel database. Restano le note scritte da
+una persona con un client. 2) **La firma si verifica** (`_x_firma_valida`):
+il filtro `authors` è una domanda al relay, non una prova; un relay
+bucato potrebbe servire una nota «di Barattolo» e farla uscire su X a
+nome nostro. Coincurve dove c'è, `schnorr_puro` dove non c'è (la CI):
+fail-closed. 3) **Una lettura ogni 5 minuti, non un filo aperto**: il
+ritmo prudente che Andrea chiede non ha bisogno dell'ascolto persistente
+del P2P (`_ascolto_p2p_filo`, col suo guardiano); una REQ con `since`
+per relay, fino all'EOSE, e la lancetta `x_dal` in `impostazioni` che
+nasce ad «adesso». 4) **Un post alla volta con 60 secondi di pausa**, e
+i no di X distanziati (5, 15, 45 minuti) poi `rifiutato`: il limite di X
+è 100 post per 15 minuti per utente, qui non ci si avvicina. 5) **I
+link che la persona ha scritto nella nota restano nel testo** e il
+costo stimato dice la tariffa piena: toglierli per risparmiare
+riscriverebbe il post di Andrea («guarda qui:» senza il qui); gli URL
+dei media invece spariscono perché le foto si caricano, e lasciarli
+costerebbe 0,200 $ per niente. 6) **Il peso di X, non la lunghezza**:
+un URL vale 23, emoji e ideogrammi 2 (la «weighted length» del loro
+twitter-text), e il taglio cade su una parola intera. 7) **Un video
+esclude le foto**: X vuole o 4 foto o 1 video, mai insieme; con un
+video le foto restano su Nostr e il journal dice «0 foto, 1 video».
+8) **Il caricamento è SEMPRE quello a pezzi** (initialize/append/
+finalize dell'API media v2, pezzi da 4 MB sotto il tetto di 5) anche per
+le foto: una strada sola da provare, e la documentazione stessa dice di
+preferirla. 9) **OAuth 1.0a fatto in casa** (`_x_oauth1`, HMAC-SHA1):
+nessuna libreria nuova sul VPS; query e form entrano nella firma, JSON e
+multipart no, com'è nello standard; provato sul vettore pubblicato da
+docs.x.com (`Ls93hJiZbQ3akF3HF3x1Bz8/zU4=` — la pagina gemella
+«authorizing a request» porta ancora la firma del vecchio host
+api.twitter.com, che non torna con nessuno dei due: la base string vale
+quella di «creating a signature»). 10) **In collaudo verso un X che non
+è di casa vale la prova** (`x_in_prova`, come Blossom e i relay): da un
+server di prova non deve partire mai un post vero; `X_API_BASE` esiste
+per i collaudi, che mettono un X di cartone sul loopback. 11) **La leva
+accesa senza le chiavi vale spenta** e il journal e il pannello lo
+dicono (il patto di `cassaforte_nuova`); in prova le chiavi possono
+mancare. 12) **Una nota raccontata in prova resta segnata** (`prova`) e
+non esce quando si accende: la prova si fa su note vere, e ripubblicarle
+dopo sarebbe un doppione di fatto. 13) **Il riepilogo del giorno** è una
+nota sintetica (`riepilogo-AAAA-MM-GG`) che passa dalla STESSA coda:
+niente seconda strada per i media e il registro; alle 18 ora italiana
+(Europe/Rome se il sistema ha tzdata, altrimenti UTC+1 detto una volta),
+timbro `x_riepilogo_il` scritto PRIMA dell'invio (il patto delle
+campagne), a zero annunci niente post. 14) **Le quattro chiavi si
+leggono in due funzioni sole** (`x_configurato`, `_x_oauth1`), mai in
+una f-string: la prova toglie le stringhe dal codice e guarda chi le
+nomina; il collaudo cattura il journal intero e cerca i valori.
+
+**I PREZZI E I LIMITI, verificati su docs.x.com il 9 ott 2026**
+(`x-api/getting-started/pricing`, `fundamentals/rate-limits`,
+`media/introduction`, `media/quickstart/media-upload-chunked`,
+`posts/manage-tweets/*`): pay-per-use senza piano gratuito, crediti
+comprati nella Developer Console; «Post: Create» 0,015 $, «Post: Create
+(with URL)» 0,200 $ (i numeri di Andrea tornano); il caricamento media
+non è a listino; 100 post ogni 15 minuti per utente, 10.000 al giorno
+per app; foto 5 MB (GIF 15), 4 per post; video a pezzi fino a 20 minuti
+e 8 GB senza Premium (125 min / 16 GB con), 1 per post; `data.id` è
+l'id del media e `{"data":{"id","text"}}` con 201 la risposta del post;
+il 429 porta `x-rate-limit-reset`. Un credito regalo di 20 $ alla prima
+carta è «in rollout»: scritto, non contato. Scritto tutto in PRODUZIONE.
+
+**SCARTATI.** L'ascolto persistente come il P2P (un filo e un guardiano
+per cinque note al giorno). Lo strip di OGNI URL dal testo per pagare
+sempre 0,015 $ (riscrive il post di chi l'ha scritto). Una leva per
+ogni numero (ritmo, pause, tetti): sono costanti nel codice, le leve
+sono le otto chieste più `X_NPUB` e `X_API_BASE`. Il caricamento
+«semplice» di `POST /2/media/upload` per le foto (due strade da
+provare). Una rotta admin per «ripubblica adesso» (non chiesta). Un
+relay WebSocket di cartone scritto a mano per il collaudo in CI: il
+relay di cartone è un oggetto al posto di `create_connection` (la via
+di `collaudo_letture_relay`), e il relay vero del giro dal vivo è `nak
+serve`. `oauthlib`: una dipendenza in più sul VPS per trenta righe.
+
+**PROVATO.** `prove_x_risonanza`, 97 righe: peso e taglio (URL 23,
+emoji 2, parola intera, muro di caratteri, limite 280), il filtro
+(risposta, citazione, altra chiave, 30402, vuota), la firma con
+`schnorr_puro` (buona / manomessa), i media (imeta + testo, 4 al
+massimo, URL tolti, video senza foto), il link di serie assente e con
+`X_CON_LINK` presente e dentro i 280 (`note1` bech32 gemello di
+`hex_to_npub`), la firma OAuth sul vettore ufficiale e i nonce diversi,
+i segreti (letti in due funzioni, nessuna f-string, l'intestazione mai
+stampata, i segnaposto del config, le forme nello scanner, le leve
+spente nel codice e nel file da cui si copia), i giudici vivi (accesa
+senza chiavi = spenta, la prova, il collaudo fuori casa = prova), il
+registro su un db usa-e-getta (doppione, nota di casa, costo del mese,
+fail-open), la modalità prova (racconta, non chiama, timbra), il flusso
+vero con un `_x_chiama` finto (initialize/append/finalize/post), il
+429 tre volte poi rifiutata, il 403 subito, il riepilogo (conto, foto,
+id del giorno, ora, timbro), il pannello (gruppo 🐦, le righe, il
+FATTO delle chiavi, l'allarme), l'avvio. `collaudo_x_risonanza`, 40
+righe col server VERO: relay di cartone al posto di `create_connection`
+con note firmate per davvero, un X di cartone sul loopback
+(`http.server`) che RIFÀ la firma OAuth 1.0a con le quattro chiavi di
+prova e risponde 401 se non torna — nove chiamate firmate, nessuna
+sbagliata —; la prima accensione («si parte da adesso», la nota di ieri
+non esce), tre originali su otto note (risposta, citazione, altra chiave,
+30402, la promo di casa timbrata da `_spedisci_ai_relay`, la firma rotta
+«buttata»), le foto a pezzi, il testo lungo tagliato, un video da 6 MB in
+due pezzi come `tweet_video` con lo STATUS dopo il finalize, il 429 in
+«riprova» (non esce finché non è ora, poi esce), il 403 rifiutato e la
+nota dopo che esce lo stesso, la lancetta riportata indietro senza
+doppioni, la prova senza chiamate, il riepilogo spento/acceso/una volta
+sola, il pannello con la spesa, nessuna chiave nel journal né
+nell'intestazione. Verde nella gabbia (11 s) e verde anche con
+coincurve assente (`sys.modules['coincurve']=None`: il fallback puro).
+**DAL VIVO**, nel worktree: `nak serve` nel WSL (porta 7790, raggiunto da
+Windows), l'X di cartone su 8787 (`x_finto_vivo.py`), il server da
+PowerShell su 8081 con un config che punta a loro e a una chiave
+usa-e-getta come `X_NPUB`; all'avvio «ACCESA — note — senza link» e «si
+parte da adesso»; quattro note con `nak event` (dallo stdin chiuso, o
+nak aspetta un evento in piedi): al giro dopo tre post sull'X di cartone
+in ordine — il saluto intero (0,015 $), la nota con foto+video+link
+uscita con UN media (il video, due pezzi) e il link di Andrea nel testo
+a «tariffa piena, 0,200 $», il testo lungo tagliato a «parola29 …
+continua su Nostr» — e la risposta mai uscita; il journal col totale del
+mese che cresce (0,015 → 0,215 → 0,230 $). Lo scanner dei segreti in
+locale sui file toccati: pulito, col controllo positivo che una riga
+con una delle quattro chiavi e un valore vero la prende (e proprio
+questa frase, scritta prima nella forma di config, ha fatto scattare lo
+scanner della cronologia sul commit: riscritta e il commit rifatto
+prima del push) e il segnaposto no. Suite
+intera severa e tutti i collaudi della CI: nel verbale del push.
+
+**NON PROVATO, DA GUARDARE.** L'API vera di X: nessuna chiamata è
+partita (non ci sono chiavi; il primo giro vero lo fa Andrea in prova,
+poi acceso, con la procedura di PRODUZIONE). La forma esatta delle
+risposte di X viene dalla documentazione, non da una chiamata: se
+`data.id` o il 201 fossero diversi dal vivo, il journal lo dirà come
+«rifiutata» col motivo. Il fuso: sul VPS Ubuntu `Europe/Rome` c'è; sul
+PC di Andrea manca tzdata e il riepilogo userebbe UTC+1 (detto nel
+journal). I prezzi «soggetti a cambiare»: si riguardano nella console.
+Il peso dei caratteri segue le fasce di twitter-text: un testo con
+molti segni rari potrebbe essere contato diverso da X di qualche unità
+(il taglio lascia margine solo per la coda).

@@ -30941,6 +30941,12 @@ _SEGRETI_FINTI = {
     "P2P_EVENTI_SEGRETO": "SEGRETO-porta-degli-eventi-p2p",
     # la porta da cui la ronda del nodo chiede i payout (28 set 2026)
     "RONDA_NODO_SEGRETO": "SEGRETO-porta-della-ronda-del-nodo",
+    # le quattro chiavi dell'app su X (9 ott 2026, la cassa di
+    # risonanza): nel pannello esce il FATTO che ci sono
+    "X_API_KEY": "SEGRETO-x-api-key",
+    "X_API_SECRET": "SEGRETO-x-api-secret",
+    "X_ACCESS_TOKEN": "SEGRETO-x-access-token",
+    "X_ACCESS_SECRET": "SEGRETO-x-access-secret",
     "DB": "SEGRETO-percorso-database",
 }
 
@@ -31047,7 +31053,8 @@ def _censimento(acceso, dopo=None):
                  "CLASSIFICA_ATTIVA", "CLASSIFICA_TOP", "CLASSIFICA_K",
                  "CLASSIFICA_XP_RIF", "CLASSIFICA_PESO_XP",
                  "CLASSIFICA_KD", "P2P_ATTIVO", "MOSTRO_NPUB",
-                 "GUARDIANO_PONTE", "RGB_ATTIVO"):
+                 "GUARDIANO_PONTE", "RGB_ATTIVO", "X_RIPUBBLICA",
+                 "X_CON_LINK", "X_RIEPILOGO_GIORNO", "X_PROVA"):
         amb[nome] = acceso and 24
     # IL PIENO DEL BANNER VUOLE UN VALORE SUO, e non il 7 implicito di
     # `__missing__`: il prezzo vale 7 da li', quindi con 7 anche il
@@ -31125,6 +31132,9 @@ def _censimento(acceso, dopo=None):
         amb["CHIAVE_CONTENUTI_DIGITALI"] = ""
         amb["RELAY_CHIAVI_TOKEN"] = ""
         amb["P2P_EVENTI_SEGRETO"] = ""
+        for nome in ("X_API_KEY", "X_API_SECRET", "X_ACCESS_TOKEN",
+                     "X_ACCESS_SECRET"):
+            amb[nome] = ""
         amb["ADMIN_IDS"] = []
     # ⚠️ `_prezzo_banner` va exec'ato PRIMA di `_leve_stato`, che lo
     # chiama: senza, `__missing__` lo risolve a 7 e la prova non
@@ -31155,6 +31165,14 @@ def _censimento(acceso, dopo=None):
     # («int object is not callable»), tutt'e due lontane dal P2P.
     # E la porta della ronda del nodo (28 set 2026): la quinta volta,
     # col suo `ronda_nodo_attiva()` — stesse tre esplosioni lontane.
+    # LA CASSA DI RISONANZA SU X (9 ott 2026): i suoi giudici chiedono
+    # a `relay_di_casa` (urlparse, ipaddress) e alla npub, che il
+    # config finto darebbe 7: si posano i veri, e la riga della
+    # npub esce «non valida» senza esplodere.
+    amb["urlparse"] = __import__("urllib.parse").parse.urlparse
+    amb["ipaddress"] = __import__("ipaddress")
+    amb["re"] = re
+    amb["X_API_BASE"] = "https://api.x.com"
     for f in ("webhook_attivo", "relay_chiavi_attivo", "sconto_p2p_attivo",
               "eventi_p2p_attivi", "ronda_nodo_attiva", "_leva", "_elenco",
               "_prezzo_banner", "_p2p_leve", "_segreto_p2p_vivo",
@@ -31169,7 +31187,12 @@ def _censimento(acceso, dopo=None):
               "_rgb_leve",
               # le prese dalle 10 (9 ott 2026): la settima volta, la riga
               # del pannello CHIAMA `_p2p_prese_da(0)`, orologio alla mano
-              "_p2p_prese_da", "_leve_stato"):
+              "_p2p_prese_da",
+              # la cassa di risonanza su X (9 ott 2026): l'ottava
+              # volta della trappola, `_x_leve()` e i suoi giudici
+              "x_configurato", "_x_base_di_casa", "x_in_prova",
+              "x_ripubblica_viva", "x_riepilogo_vivo", "x_npub_hex",
+              "_x_spesa_mese", "relay_di_casa", "_x_leve", "_leve_stato"):
         exec(pezzo(f), amb)
     # la campagna a tutti (9 ott 2026): l'ottava volta, la riga del
     # pannello CHIAMA `timbro_letto` — che aprirebbe il database — e
@@ -31619,7 +31642,11 @@ def prove_canale_bot():
                # il giorno da cui si contano le visite ai negozi (24 set
                # 2026, «📊 Il tuo negozio»): una data scritta una volta
                # all'avvio, non un segreto e non una leva del denaro
-               "negozio_visite_dal"}
+               "negozio_visite_dal",
+               # la cassa di risonanza su X (9 ott 2026): la lancetta
+               # delle note gia' guardate e il giorno dell'ultimo
+               # riepilogo — timbri, non segreti e non denaro
+               "x_dal", "x_riepilogo_il"}
     chiavi = set(re.findall(r'\bimpostazione\("([a-z_]+)"', _SORGENTE))
     chiavi |= set(re.findall(r'\bscrivi_impostazione\("([a-z_]+)"',
                              _SORGENTE))
@@ -105129,6 +105156,435 @@ console.log(JSON.stringify(out));
     prova("da spento le scelte non partono nemmeno chiamate a mano; da acceso si'", [0, 1], out["guardie"])
 
 
+def _banco_x(extra=None):
+    """L'ambiente della cassa di risonanza su X: le costanti e i pezzi
+    VERI di server.py (mai stub, la lezione di `reale`), con le
+    dipendenze che nominano. Le quattro chiavi stanno in un DIZIONARIO
+    (due punti, non uguale): la forma che lo scanner dei segreti della
+    CI non prende, apposta."""
+    import base64
+    import hashlib
+    import hmac
+    import ipaddress
+    import secrets as _secrets
+    from urllib.parse import urlparse
+    amb = {"re": re, "json": json, "time": time, "secrets": _secrets,
+           "base64": base64, "hmac": hmac, "hashlib": hashlib,
+           "ipaddress": ipaddress, "urlparse": urlparse, "asyncio": __import__("asyncio"),
+           "ChiavePubblicaNostr": None, "create_connection": None,
+           "MODALITA_COLLAUDO": False, "httpx": None, "ssl": None,
+           "X_API_KEY": "collaudo-usa-e-getta-xk",
+           "X_API_SECRET": "collaudo-usa-e-getta-xs",
+           "X_ACCESS_TOKEN": "collaudo-usa-e-getta-xt",
+           "X_ACCESS_SECRET": "collaudo-usa-e-getta-xa",
+           "X_NPUB": "npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy",
+           "X_API_BASE": "https://api.x.com", "X_RIPUBBLICA": True,
+           "X_CON_LINK": False, "X_RIEPILOGO_GIORNO": False, "X_PROVA": False,
+           "URL_PUBBLICO": "https://barattolo.store"}
+    src = _SORGENTE
+    amb["CHARSET_BECH32"] = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+    i = src.index("X_LIMITE = 280")
+    exec(src[i:src.index("def x_configurato(", i)], amb)
+    i = src.index('_X_STATO = {"giri": 0')
+    exec(src[i:src.index("async def giro_x(", i)], amb)
+    exec(src[src.index("class XRifiuta(Exception):"):
+             src.index("async def _x_chiama(")], amb)
+    for f in ("_bech32_polymod", "evento_non_firmato", "npub_to_hex",
+              "hex_to_npub", "relay_di_casa", "_foto_url_nostr",
+              "x_configurato", "_x_base_di_casa", "x_in_prova",
+              "x_ripubblica_viva", "x_riepilogo_vivo", "x_npub_hex",
+              "x_pesa", "x_taglia", "x_originale", "_x_firma_valida",
+              "_x_bech32", "x_link_nota", "_x_media_di", "x_costo",
+              "x_prepara", "_x_percent", "_x_oauth1", "_x_perche",
+              "_x_prepara_tabella", "_x_segna_di_casa", "_x_accoda",
+              "_x_spesa_mese", "_x_dollari", "_x_elabora", "_x_timbra",
+              "_x_fallita", "_x_riepilogo_di_oggi", "_x_giro_riepilogo",
+              "_x_carica_media", "_x_posta", "_x_leve", "_leva"):
+        # i quattro asincroni vogliono l'`async` che `pezzo` taglia via
+        asincrona = f in ("_x_elabora", "_x_giro_riepilogo",
+                          "_x_carica_media", "_x_posta")
+        exec(("async " if asincrona else "") + pezzo(f), amb)
+    amb.update(extra or {})
+    return amb
+
+
+def prove_x_risonanza():
+    """LA CASSA DI RISONANZA SU X (9 ott 2026): i post di Barattolo su
+    Nostr ripubblicati su X. Si provano i pezzi PURI — il peso e il
+    taglio a 280, il filtro degli originali, i media, il link che di
+    serie non c'e', la firma OAuth 1.0a sul vettore pubblicato da
+    docs.x.com — e con un database usa-e-getta il registro dei
+    doppioni, la modalita' prova, i tentativi distanziati e il
+    riepilogo del giorno. Il server vero, con un X di cartone sul
+    loopback, sta in `collaudo_x_risonanza`."""
+    print("\n[la cassa di risonanza su X]")
+    import asyncio as _aio
+    import contextlib
+    import io
+    import sqlite3
+    import tempfile
+    import schnorr_puro
+    amb = _banco_x()
+    pesa, taglia = amb["x_pesa"], amb["x_taglia"]
+    CODA = amb["X_CODA"]
+
+    # --- 1) il peso e il taglio ------------------------------------
+    prova("il peso di un testo latino e' la sua lunghezza", 4, pesa("ciao"))
+    prova("un URL pesa 23, qualunque lunghezza", 4 + 1 + 23,
+          pesa("ciao https://barattolo.store/annuncio/12345/una-pagina-lunga"))
+    prova("un emoji pesa 2", 2, pesa(chr(0x1FAD9)))
+    prova("un testo corto non si tocca", "Ciao a tutti", taglia("Ciao a tutti"))
+    lungo = " ".join(f"parola{i}" for i in range(60))   # ~540 caratteri
+    tagliato = taglia(lungo)
+    prova("un testo lungo rientra nel peso di X", True, pesa(tagliato) <= 280)
+    prova("...e chiude con «continua su Nostr»", True, tagliato.endswith(CODA))
+    corpo = tagliato[:-len(CODA)].split()
+    prova("...tagliato su una PAROLA intera", True,
+          all(p in lungo.split() for p in corpo) and len(corpo) > 20)
+    muro = "a" * 400
+    prova("un muro senza spazi si taglia a caratteri", True,
+          pesa(taglia(muro)) <= 280 and taglia(muro).endswith(CODA))
+    emoji = (chr(0x1FAD9) + " ") * 150
+    prova("il taglio conta gli emoji per 2", True, pesa(taglia(emoji)) <= 280)
+    prova("il limite e' 280", 280, amb["X_LIMITE"])
+
+    # --- 2) il filtro degli originali --------------------------------
+    nostra = amb["x_npub_hex"]()
+    prova("la npub ufficiale si legge in esadecimale", 64, len(nostra))
+    prova("...ed e' la gemella di hex_to_npub", amb["X_NPUB"],
+          amb["hex_to_npub"](nostra))
+    orig = amb["x_originale"]
+
+    def nota(**k):
+        ev = {"kind": 1, "pubkey": nostra, "content": "Ciao Nostr",
+              "tags": [], "id": "ab" * 32, "created_at": 1}
+        ev.update(k)
+        return ev
+    prova("un originale della npub passa", True, orig(nota(), nostra))
+    prova("una risposta (tag e) no", False,
+          orig(nota(tags=[["e", "cd" * 32, "", "reply"]]), nostra))
+    prova("una citazione (tag q) no", False,
+          orig(nota(tags=[["q", "cd" * 32]]), nostra))
+    prova("una nota di un'altra chiave no", False,
+          orig(nota(pubkey="cd" * 32), nostra))
+    prova("un annuncio NIP-99 (30402) no", False, orig(nota(kind=30402), nostra))
+    prova("una nota vuota no", False, orig(nota(content="  "), nostra))
+    prova("la lettura chiede SOLO kind 1 della chiave", True,
+          '"kinds": [1], "authors": [hexkey]' in codice(pezzo("_x_note_da_relay")))
+    prova("...e passa dal giudice delle letture (mai un relay vero in collaudo)",
+          True, "lettura_simulata(" in codice(pezzo("_x_note_da_relay")))
+
+    # --- 3) la firma della nota: la prova, non la domanda al relay ---
+    sk = bytes.fromhex("11" * 31 + "07")
+    pub = schnorr_puro.pubblica(sk).hex()
+    ev = amb["evento_non_firmato"](pub, 1, [["t", "x"]], "firmata", 1700000000)
+    ev["sig"] = schnorr_puro.firma(sk, bytes.fromhex(ev["id"])).hex()
+    prova("una nota firmata bene si crede (schnorr_puro senza coincurve)",
+          True, amb["_x_firma_valida"](ev))
+    manomessa = dict(ev, content="firmata?")
+    prova("...e una col contenuto cambiato no", False,
+          amb["_x_firma_valida"](manomessa))
+    prova("...e il giro la butta prima di accodarla", True,
+          "_x_firma_valida(ev)" in codice(pezzo("giro_x")))
+
+    # --- 4) i media e il testo del post ------------------------------
+    prep = amb["x_prepara"]
+    foto = [f"https://img.example/{i}.jpg" for i in range(5)]
+    ev = nota(content="Guardate qui " + " ".join(foto[:3]) + "\n\nche bello",
+              tags=[["imeta", f"url {foto[3]}", "m image/jpeg"],
+                    ["imeta", f"url {foto[4]}", "m image/png"]])
+    p = prep(ev)
+    prova("le foto del testo e dei tag imeta si raccolgono in ordine",
+          foto[3:5] + foto[:2], p["immagini"])
+    prova("...al piu' 4", 4, len(p["immagini"]))
+    prova("...e gli URL dei media SPARISCONO dal testo",
+          "Guardate qui\n\nche bello", p["testo"])
+    prova("...quindi il post costa la tariffa semplice", 0.015, p["costo"])
+    prova("di serie NESSUN link njump", False, "njump" in p["testo"])
+    ev_v = nota(content="Un video https://v.example/clip.mp4 e una foto https://img.example/1.jpg")
+    pv = prep(ev_v)
+    prova("con un video le foto restano su Nostr", ([], ["https://v.example/clip.mp4"]),
+          (pv["immagini"], pv["video"]))
+    ev_l = nota(content="Vieni su https://barattolo.store/annuncio/7")
+    pl = prep(ev_l)
+    prova("un link scritto dalla persona resta nel testo", True,
+          "https://barattolo.store/annuncio/7" in pl["testo"])
+    prova("...e si stima la tariffa piena", 0.2, pl["costo"])
+    pc = prep(nota(content=lungo), con_link=True)
+    prova("con X_CON_LINK il post chiude col link njump", True,
+          pc["testo"].split("\n")[-1].startswith("https://njump.me/note1"))
+    prova("...e rientra nel peso col link compreso", True, pesa(pc["testo"]) <= 280)
+    prova("...al costo di un post con URL", 0.2, pc["costo"])
+    nid = "ab" * 32
+    prova("il note1 e' bech32 vero (la stessa macchina di npub)",
+          amb["hex_to_npub"](nid), amb["_x_bech32"]("npub", nid))
+    prova("la leva del link passa dal giro, non e' cablata", True,
+          "con_link=bool(X_CON_LINK)" in codice(pezzo("_x_elabora")))
+
+    # --- 5) la firma OAuth 1.0a sul vettore di docs.x.com ------------
+    # (docs.x.com/resources/fundamentals/authentication/oauth-1-0a/
+    # creating-a-signature, letto il 9 ott 2026: chiavi pubblicate
+    # dalla documentazione e dichiarate non valide, firma attesa
+    # Ls93hJiZbQ3akF3HF3x1Bz8/zU4=)
+    testa = amb["_x_oauth1"](
+        "POST", "https://api.x.com/1.1/statuses/update.json",
+        {"status": "Hello Ladies + Gentlemen, a signed OAuth request!",
+         "include_entities": "true"},
+        chiavi=("xvz1evFS4wEEPTGEFPHBog",
+                "kAcSOqF21Fu85e7zjz7ZN2U4ZRhfV3WpwPAoE3Z7kBw",
+                "370773112-GmHxMAgYyLbNEtIKZeRNFsMKPR9EyMZeS9weJAEb",
+                "LswwdoUaIvS8ltyTt5jkRh4J50vUPVVHtR2YPi5kE"),
+        nonce="kYjzVBB8Y0ZFabxSWbWovY3uYSQ2pTgmZeNu2VS4cg", quando=1318622958)
+    prova("la firma HMAC-SHA1 e' quella della documentazione", True,
+          'oauth_signature="Ls93hJiZbQ3akF3HF3x1Bz8%2FzU4%3D"' in testa)
+    prova("...nell'intestazione OAuth coi sette campi", True,
+          testa.startswith("OAuth oauth_consumer_key=") and
+          testa.count("=") == 7 and 'oauth_version="1.0"' in testa)
+    due = amb["_x_oauth1"]("GET", "https://api.x.com/2/media/upload", {"a": "1"})
+    prova("due firme vere hanno nonce diversi", False,
+          due == amb["_x_oauth1"]("GET", "https://api.x.com/2/media/upload", {"a": "1"}))
+    prova("il corpo JSON non entra nella firma, i params si", True,
+          "if form and not files:" in codice(pezzo("_x_chiama")))
+
+    # --- 6) i segreti: mai nei log ------------------------------------
+    src = _SORGENTE
+    sez = codice(src[src.index("# ============ LA CASSA DI RISONANZA SU X"):
+                     src.index("# ---------- IL CAMPANELLO DEI NUOVI ISCRITTI")])
+    chiavi = ("X_API_KEY", "X_API_SECRET", "X_ACCESS_TOKEN", "X_ACCESS_SECRET")
+    # UNA CHIAVE SI LEGGE DAL CODICE, non da un testo: il NOME puo'
+    # stare in una frase per il moderatore («mancano X_API_KEY…»), il
+    # VALORE no. Quindi si tolgono le stringhe e si guarda chi resta a
+    # nominarle; e a parte si pretende che nessuna f-string le interpoli.
+    senza_stringhe = lambda s: re.sub(r"\"[^\"\n]*\"|'[^'\n]*'", "''", s)
+    funzioni = re.findall(r"^(?:async )?def (\w+)\(", sez, re.M)
+    legge = [n for n in funzioni
+             if any(c in senza_stringhe(codice(pezzo(n))) for c in chiavi)]
+    prova("le chiavi si leggono SOLO in x_configurato e _x_oauth1",
+          ["x_configurato", "_x_oauth1"], legge)
+    prova("nessuna f-string e nessuna somma mette una chiave in un testo", None,
+          re.search(r"(\{\s*|\+\s*|%\s*)(X_API_KEY|X_API_SECRET|X_ACCESS_TOKEN"
+                    r"|X_ACCESS_SECRET)\b", sez))
+    stampe = [r for r in sez.split("\n") if "print(" in r]
+    prova("l'intestazione Authorization non si stampa", False,
+          "intestazioni" in " ".join(stampe) or "Authorization" in " ".join(stampe))
+    prova("il config d'esempio ha i segnaposto per le quattro chiavi", True,
+          all(f'{c} = "INCOLLA_QUI' in open("config_esempio.py", encoding="utf-8").read()
+              for c in chiavi))
+    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
+    prova("lo scanner dei segreti della CI conosce le quattro forme", True,
+          all(c in wf[wf.index("FORME: >-"):wf.index("SEGNAPOSTI:", wf.index("FORME: >-"))]
+              for c in chiavi))
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    prova("le leve nascono spente nel config d'esempio", True,
+          all(f"{l} = False" in cfg for l in
+              ("X_RIPUBBLICA", "X_CON_LINK", "X_RIEPILOGO_GIORNO", "X_PROVA")))
+    prova("...e nel codice il ripiego di ogni leva e' False", 4, len(re.findall(
+        r"except ImportError:\n    X_(?:RIPUBBLICA|CON_LINK|RIEPILOGO_GIORNO|PROVA) = False", src)))
+    prova("la leva accesa senza chiavi vale SPENTA (il giudice vivo)", False,
+          _banco_x({"X_API_KEY": "INCOLLA_QUI"})["x_ripubblica_viva"]())
+    prova("...ma in prova si accende anche senza chiavi", True,
+          _banco_x({"X_API_KEY": "", "X_PROVA": True})["x_ripubblica_viva"]())
+    prova("in collaudo un X che non e' di casa vale prova", True,
+          _banco_x({"MODALITA_COLLAUDO": True})["x_in_prova"]())
+    prova("...e uno sul loopback no", False,
+          _banco_x({"MODALITA_COLLAUDO": True,
+                    "X_API_BASE": "http://127.0.0.1:8099"})["x_in_prova"]())
+
+    # --- 7) il registro: niente doppioni, le note di casa, i costi ---
+    percorso = os.path.join(tempfile.mkdtemp(prefix="x-prove-"), "x.db")
+
+    def db():
+        con = sqlite3.connect(percorso)
+        con.row_factory = sqlite3.Row
+        return con
+    amb["db"] = db
+    con = db()
+    amb["_x_prepara_tabella"](con)
+    ev = nota(id="11" * 32, created_at=1700000000)
+    prova("una nota nuova si accoda", True, amb["_x_accoda"](con, ev))
+    prova("...la stessa una seconda volta NO (la chiave decide)", False,
+          amb["_x_accoda"](con, ev))
+    con.commit()
+    amb["_x_segna_di_casa"]("22" * 32)
+    prova("una nota di casa timbrata prima non si accoda piu'", False,
+          amb["_x_accoda"](con, nota(id="22" * 32)))
+    prova("...e sta nel registro come di_casa", "di_casa", con.execute(
+        "SELECT esito FROM x_post WHERE evento_id=?", ("22" * 32,)).fetchone()[0])
+    con.commit()
+    con.close()
+    prova("il gancio sta in _spedisci_ai_relay, PRIMA del ramo collaudo", True,
+          codice(pezzo("_spedisci_ai_relay")).index("_x_segna_di_casa(")
+          < codice(pezzo("_spedisci_ai_relay")).index("if MODALITA_COLLAUDO:"))
+    prova("la tabella ha l'id Nostr come chiave e quello di X accanto", True,
+          "evento_id TEXT PRIMARY KEY" in pezzo("_x_prepara_tabella")
+          and "post_x_id TEXT" in pezzo("_x_prepara_tabella"))
+    prova("la prima accensione parte da adesso", True,
+          'scrivi_impostazione("x_dal", str(adesso))' in codice(pezzo("giro_x"))
+          and "le note di prima non si" in pezzo("giro_x"))
+    amb["_x_timbra"]("11" * 32, "pubblicato", post_id="9", testo="t", costo=0.015)
+    prova("la spesa del mese somma i post pubblicati", 0.015, amb["_x_spesa_mese"]())
+    prova("...e senza tabella vale 0 (fail-open)", 0.0,
+          _banco_x({"db": lambda: 1 / 0})["_x_spesa_mese"]())
+
+    # --- 8) la modalita' prova e i tentativi distanziati -------------
+    chiamate = []
+
+    async def x_finto(metodo, percorso, **k):
+        chiamate.append((metodo, percorso))
+        return x_finto.risposta
+    x_finto.risposta = (201, {"data": {"id": "555"}})
+
+    async def scarica_finto(url, tetto):
+        return b"\xff\xd8jpeg", "image/jpeg"
+    amb["_x_chiama"] = x_finto
+    amb["_x_scarica"] = scarica_finto
+    con = db()
+    ev = nota(id="33" * 32, content="In prova " + foto[0], created_at=1700000001)
+    amb["_x_accoda"](con, ev)
+    con.commit()
+
+    def riga(evento_id):
+        c = db()
+        r = dict(c.execute("SELECT * FROM x_post WHERE evento_id=?",
+                           (evento_id,)).fetchone())
+        c.close()
+        return r
+    amb["X_PROVA"] = True
+    uscita = io.StringIO()
+    with contextlib.redirect_stdout(uscita):
+        esito = _aio.run(amb["_x_elabora"](riga("33" * 32)))
+    prova("in prova la nota si racconta e non si manda", ("prova", []),
+          (esito, chiamate))
+    prova("...col testo, i media e la stima nel journal", True,
+          "[X prova]" in uscita.getvalue() and "1 foto" in uscita.getvalue()
+          and "0,015 $" in uscita.getvalue() and "In prova" in uscita.getvalue())
+    prova("...e il registro la segna, cosi' non torna quando si accende",
+          "prova", riga("33" * 32)["esito"])
+    amb["X_PROVA"] = False
+    ev = nota(id="44" * 32, content="Per davvero " + foto[0], created_at=1700000002)
+    con = db()
+    amb["_x_accoda"](con, ev)
+    con.commit()
+    con.close()
+    x_finto.risposta = (201, {"data": {"id": "777"}})
+    chiamate.clear()
+    with contextlib.redirect_stdout(uscita):
+        esito = _aio.run(amb["_x_elabora"](riga("44" * 32)))
+    prova("per davvero: initialize, append, finalize, poi il post",
+          [("POST", "/2/media/upload/initialize"),
+           ("POST", "/2/media/upload/777/append"),
+           ("POST", "/2/media/upload/777/finalize"),
+           ("POST", "/2/tweets")], chiamate)
+    r = riga("44" * 32)
+    prova("...e il registro ha l'id del post di X e il costo",
+          ("pubblicato", "777", 0.015), (r["esito"], r["post_x_id"], r["costo_usd"]))
+    prova("...e il journal dice il totale del mese", True,
+          "totale del mese 0,030 $" in uscita.getvalue())
+    # il 429: si riprova a distanza, tre volte, poi basta
+    ev = nota(id="55" * 32, content="Troppi", created_at=1700000003)
+    con = db()
+    amb["_x_accoda"](con, ev)
+    con.commit()
+    con.close()
+    x_finto.risposta = (429, {"errors": [{"code": 88, "message": "Rate limit exceeded"}]})
+    attese = []
+    with contextlib.redirect_stdout(uscita):
+        for _ in range(3):
+            esito = _aio.run(amb["_x_elabora"](riga("55" * 32)))
+            attese.append((esito, riga("55" * 32)["tentativi"]))
+        esito = _aio.run(amb["_x_elabora"](riga("55" * 32)))
+    prova("un 429 si riprova, con le attese che crescono",
+          [("riprova", 1), ("riprova", 2), ("riprova", 3)], attese)
+    prova("...e al quarto no la nota si lascia", ("rifiutato", 4),
+          (esito, riga("55" * 32)["tentativi"]))
+    prova("...dicendolo nel journal, senza fermare niente", True,
+          "riprovo fra 5 min" in uscita.getvalue()
+          and "si va avanti" in uscita.getvalue())
+    prova("le attese sono 5, 15 e 45 minuti", (5, 15, 45), amb["X_RIPROVA_MIN"])
+    ev = nota(id="66" * 32, content="Vietato", created_at=1700000004)
+    con = db()
+    amb["_x_accoda"](con, ev)
+    con.commit()
+    con.close()
+    x_finto.risposta = (403, {"detail": "Forbidden"})
+    with contextlib.redirect_stdout(uscita):
+        esito = _aio.run(amb["_x_elabora"](riga("66" * 32)))
+    prova("un 403 non si riprova: rifiutata subito", ("rifiutato", 1),
+          (esito, riga("66" * 32)["tentativi"]))
+    prova("la coda si lavora una nota alla volta, con la pausa", True,
+          "await asyncio.sleep(X_PAUSA_S)" in codice(pezzo("giro_x"))
+          and amb["X_PAUSA_S"] >= 30 and amb["X_GIRO_S"] >= 120)
+
+    # --- 9) il riepilogo del giorno ---------------------------------
+    from datetime import datetime, timezone, timedelta
+    con = db()
+    con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, foto TEXT, "
+                "stato TEXT, creato INTEGER)")
+    fuso = timezone(timedelta(hours=1))
+    adesso = datetime(2026, 10, 9, 19, 0, tzinfo=fuso)
+    prova("senza annunci nuovi niente riepilogo", None,
+          amb["_x_riepilogo_di_oggi"](con, adesso))
+    inizio = int(adesso.replace(hour=0, minute=0).timestamp())
+    con.executemany("INSERT INTO annunci(foto, stato, creato) VALUES(?,?,?)", [
+        ('["a.jpg"]', "attivo", inizio + 100), ('["b.jpg","c.jpg"]', "attivo", inizio + 200),
+        ("[]", "attivo", inizio + 300), ('["z.jpg"]', "attivo", inizio - 10),
+        ('["v.jpg"]', "venduto", inizio + 400)])
+    con.commit()
+    rie = amb["_x_riepilogo_di_oggi"](con, adesso)
+    prova("il riepilogo conta gli annunci attivi nati oggi", True,
+          rie["content"].endswith("Nuovi arrivi di oggi nel mercatino: 3 annunci"))
+    prova("...con la prima foto di chi ce l'ha (al piu' 4)",
+          ["https://barattolo.store/foto/b.jpg", "https://barattolo.store/foto/a.jpg"],
+          [t[1][4:] for t in rie["tags"]])
+    prova("...e un id che e' il giorno: due riepiloghi lo stesso giorno non nascono",
+          "riepilogo-2026-10-09", rie["id"])
+    pr = prep(rie)
+    prova("...senza link e con le foto caricate, non nel testo", True,
+          "http" not in pr["testo"] and len(pr["immagini"]) == 2 and pr["costo"] == 0.015)
+    impostazioni = {}
+    amb["impostazione"] = lambda k, r="": impostazioni.get(k, r)
+    amb["scrivi_impostazione"] = lambda k, v: impostazioni.__setitem__(k, v)
+    amb["_x_oggi_italiano"] = lambda: adesso
+    prova("alle 19 il riepilogo si accoda", True,
+          _aio.run(amb["_x_giro_riepilogo"](con)))
+    prova("...e il timbro del giorno e' scritto", "2026-10-09", impostazioni["x_riepilogo_il"])
+    prova("...quindi un secondo giro lo stesso giorno non lo rifa'", False,
+          _aio.run(amb["_x_giro_riepilogo"](con)))
+    impostazioni.clear()
+    amb["_x_oggi_italiano"] = lambda: adesso.replace(hour=10)
+    prova("alle 10 non e' ancora ora, e niente timbro", (False, {}),
+          (_aio.run(amb["_x_giro_riepilogo"](con)), impostazioni))
+    con.close()
+    prova("il riepilogo non porta mai il link njump", True,
+          'not evento_id.startswith("riepilogo-")' in codice(pezzo("_x_elabora")))
+
+    # --- 10) il pannello delle leve e l'avvio ----------------------
+    gruppi, voci, testo = _censimento(True)
+    prova("il pannello ha il gruppo della cassa di risonanza", True,
+          any(g["gruppo"].startswith("🐦") for g in gruppi))
+    for chiave in ("X_RIPUBBLICA", "X_PROVA", "X_CON_LINK", "X_RIEPILOGO_GIORNO",
+                   "X_NPUB", "X_API_KEY…"):
+        prova(f"...con la riga {chiave}", True, chiave in voci)
+    prova("...e le chiavi escono come FATTO", True, voci["X_API_KEY…"]["valore"] is True)
+    prova("...e la spesa del mese porta la sua casa davanti", True,
+          "db: x_post" in voci)
+    _, voci_senza, testo_senza = _censimento(
+        True, dopo={"X_API_KEY": "", "X_PROVA": False, "MODALITA_COLLAUDO": False})
+    prova("accesa senza le chiavi il pannello dice SPENTA, con l'allarme",
+          (False, True), (voci_senza["X_RIPUBBLICA"]["valore"],
+                          voci_senza["X_RIPUBBLICA"].get("allarme", False)))
+    prova("...e spiega la tariffa del link", True,
+          "0,200 $" in voci["X_CON_LINK"].get("nota", ""))
+    prova("il pannello chiede a _x_leve", True, "_x_leve()" in codice(pezzo("_leve_stato")))
+    prova("l'orologio parte all'avvio, in sottofondo", True,
+          "@app.on_event(\"startup\")\nasync def avvia_x" in src
+          and "asyncio.create_task(orologio_x())" in codice(pezzo("avvia_x")))
+    prova("...e ogni giro che cade lascia partire il prossimo", True,
+          "except Exception" in codice(pezzo("orologio_x")))
+    prova("il collaudo del server vero sta nella CI", True,
+          "collaudo_x_risonanza" in wf[wf.index("python collaudi_ci.py"):])
+
+
 def prove_config_esempio():
     """`config_esempio.py` E' IL FILE DA CUI SI COPIA (ago 2026, dal
     campo: le sei leve dei connettori erano cablate, funzionavano col
@@ -134559,6 +135015,7 @@ def main():
               prove_prese_dalle_10, prove_campagna_p2p_tutti,
               prove_prendi_metodo,
               prove_banner_ingresso,
+              prove_x_risonanza,
               prove_config_esempio):
         try:
             f()

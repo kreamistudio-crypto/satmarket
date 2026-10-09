@@ -27446,6 +27446,10 @@ def _leve_stato():
                   spento="/.well-known/nostr.json risponde «qui "
                          "nessuno» ({\"names\": {}})"),
         ]},
+        # LA CASSA DI RISONANZA SU X (ott 2026): le voci le da' `_x_leve`,
+        # che chiede ai giudici vivi (una leva accesa senza le chiavi
+        # vale spenta) e non dice mai una chiave.
+        {"gruppo": "🐦 Cassa di risonanza su X", "voci": _x_leve()},
         {"gruppo": "🔔 Avvisi ai moderatori", "voci": [
             _leva("Campanello dei nuovi iscritti", "AVVISI_ISCRITTI",
                   bool(AVVISI_ISCRITTI),
@@ -52756,6 +52760,11 @@ async def _spedisci_ai_relay(evento: dict, relays: list = None) -> int:
     serie e' la nostra; la modifica firmata passa quella dell'import
     (che include il relay personale del venditore)."""
     relays = relays or RELAYS_VERIFICA
+    # LE NOTE DI CASA (ott 2026): un kind 1 firmato da QUI si timbra
+    # PRIMA di partire, cosi' la cassa di risonanza su X non lo
+    # ripubblica (vedi «LA CASSA DI RISONANZA SU X», `_x_segna_di_casa`).
+    if isinstance(evento, dict) and evento.get("kind") == 1 and evento.get("id"):
+        _x_segna_di_casa(evento["id"])
     if MODALITA_COLLAUDO:
         print(f"🟣 [nostr simulato] "
               f"{json.dumps(evento, ensure_ascii=False)[:400]}…")
@@ -55038,6 +55047,917 @@ async def _posta_promo_aggregato(n: int):
     if canale_id():
         await bot_api("sendMessage",
                       {"chat_id": canale_id(), "text": testo})
+
+
+# ============ LA CASSA DI RISONANZA SU X (9 ott 2026) ===============
+# I post che Barattolo scrive su Nostr — le note kind 1 della npub
+# ufficiale, scritte da una persona con un client — escono anche su X,
+# ripubblicate da QUI con l'API ufficiale (v2, contesto utente, firma
+# OAuth 1.0a con le quattro chiavi dell'app). X e' la cassa di
+# risonanza: chi sta la' legge quel che e' nato qua, e Nostr resta la
+# casa.
+#
+# COSA ESCE E COSA NO (richiesta di Andrea):
+#  · SOLO GLI ORIGINALI della npub ufficiale: niente risposte (tag `e`),
+#    niente citazioni e repost (tag `q`, kind 6/16 che qui nemmeno si
+#    chiedono), niente note di altre chiavi anche se un relay le
+#    servisse (il filtro `authors` e' una domanda al relay, la firma e'
+#    la prova: `_x_firma_valida`);
+#  · NIENTE NOTE DI CASA: le note kind 1 che il SERVER stesso firma —
+#    la promo di ogni annuncio (`_posta_promo_singolo`), l'aggregato
+#    («N nuovi annunci nel barattolo») — sono prodotti del mercatino
+#    uno per uno, cioe' lo spam che questa cassa non deve fare. Ogni
+#    kind 1 che esce da `_spedisci_ai_relay` si timbra prima in
+#    `x_post` con esito `di_casa`, e il lettore lo salta;
+#  · i PRODOTTI (NIP-99, kind 30402) non si ripubblicano mai uno per
+#    uno: al loro posto, spento di serie, UN post al giorno «Nuovi
+#    arrivi di oggi nel mercatino: N annunci» con fino a 4 foto e
+#    senza link (`X_RIEPILOGO_GIORNO`);
+#  · DI SERIE SENZA LINK: X fa pagare 0,200 $ un post con un URL e
+#    0,015 $ uno senza (docs.x.com/x-api/getting-started/pricing, letto
+#    il 9 ott 2026). `X_CON_LINK` aggiunge il link njump alla nota; i
+#    link che la persona ha scritto NEL testo restano suoi, e il costo
+#    stimato li conta (il journal lo dice).
+#
+# IL TESTO: fino a 280 (il peso di X: URL = 23, emoji e ideogrammi = 2);
+# oltre si taglia su una parola intera e si chiude con «… continua su
+# Nostr». Le immagini della nota (tag `imeta` NIP-92, o URL con
+# estensione nel testo) si CARICANO su X — fino a 4 — e si tolgono dal
+# testo, o varrebbero come URL e costerebbero 0,200 $; i video pure
+# (il caricamento a pezzi di /2/media/upload: initialize, append,
+# finalize, poi lo stato finche' «succeeded»). X vuole o foto o UN
+# video: con un video le foto restano su Nostr.
+#
+# NIENTE DOPPIONI: `x_post` tiene l'id dell'evento Nostr (chiave) e l'id
+# del post X. ALLA PRIMA ACCENSIONE NON SI RIPUBBLICA NIENTE: la
+# lancetta `x_dal` (in `impostazioni`) nasce ad «adesso», e le note di
+# prima non si guardano.
+#
+# IL RITMO E' PRUDENTE: una lettura dei relay ogni X_GIRO_S, un post
+# alla volta con X_PAUSA_S fra uno e l'altro (il limite di X e' 100 per
+# 15 minuti per utente: qui non ci si avvicina nemmeno). Un 429 o un
+# 5xx si riprova a distanza (5, 15, 45 minuti), poi la nota si segna
+# `rifiutata` e si va avanti: un rifiuto di X e' una riga nel journal,
+# mai un compito che si ferma. Il resto del server non sa che X
+# esiste: e' un orologio in sottofondo, fail-open come tutti.
+#
+# LE LEVE si AGGIUNGONO al config del VPS col patto delle altre
+# (nascono spente; le chiavi mai nel repo, mai nei log — il journal
+# dice i FATTI: «chiavi presenti», mai un valore): X_RIPUBBLICA,
+# X_CON_LINK, X_RIEPILOGO_GIORNO, X_PROVA (scrive nel journal cosa
+# avrebbe pubblicato, X non viene chiamato), le quattro chiavi, X_NPUB
+# e X_API_BASE (solo per i collaudi: un X di cartone sul loopback). Il
+# pannello «⚙️ Stato delle leve» le mostra; la procedura per Andrea sta
+# in PRODUZIONE, «LA CASSA DI RISONANZA SU X»; il verbale in CANTIERI.
+try:
+    from config import X_RIPUBBLICA
+except ImportError:
+    X_RIPUBBLICA = False
+try:
+    from config import X_CON_LINK
+except ImportError:
+    X_CON_LINK = False
+try:
+    from config import X_RIEPILOGO_GIORNO
+except ImportError:
+    X_RIEPILOGO_GIORNO = False
+try:
+    from config import X_PROVA
+except ImportError:
+    X_PROVA = False
+# Le quattro chiavi dell'app su X (OAuth 1.0a, contesto utente). SOLO
+# nel config del VPS: segnaposto in config_esempio, forme nello scanner
+# dei segreti della CI. Qui dentro si leggono in DUE posti soltanto:
+# `x_configurato` (c'e' / non c'e') e `_x_oauth1` (la firma).
+try:
+    from config import (X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN,
+                        X_ACCESS_SECRET)
+except ImportError:
+    X_API_KEY = X_API_SECRET = X_ACCESS_TOKEN = X_ACCESS_SECRET = ""
+# La npub ufficiale di Barattolo: e' quella che Andrea usa dal client,
+# NON la chiave con cui il server firma gli annunci (che puo' essere
+# un'altra, e in collaudo lo e'). Dichiarabile nel config per i giri di
+# prova con una chiave usa-e-getta.
+try:
+    from config import X_NPUB
+except ImportError:
+    X_NPUB = "npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy"
+# La base dell'API: cambia SOLO nei collaudi (un X di cartone su
+# 127.0.0.1). In collaudo verso un X che non e' di casa non esce
+# niente, come per i relay e per Blossom.
+try:
+    from config import X_API_BASE
+except ImportError:
+    X_API_BASE = "https://api.x.com"
+
+X_LIMITE = 280                      # il peso massimo di un post
+X_CODA = "… continua su Nostr"      # la chiusura di un testo tagliato
+X_PESO_URL = 23                     # un URL pesa 23, qualunque lunghezza
+X_COSTO_POST = 0.015                # $ a post semplice (pay-per-use)
+X_COSTO_LINK = 0.200                # $ a post con un URL
+X_GIRO_S = 300                      # ogni quanto si leggono i relay
+X_PAUSA_S = 60                      # fra un post e l'altro
+X_RIPROVA_MIN = (5, 15, 45)         # le attese dopo un 429 o un 5xx
+X_PEZZO = 4 * 1024 * 1024           # un pezzo dell'upload (X: max 5 MB)
+X_IMG_MAX = 5 * 1024 * 1024         # X: 5 MB per foto
+X_GIF_MAX = 15 * 1024 * 1024        # X: 15 MB per GIF
+X_VIDEO_MAX = 256 * 1024 * 1024     # il nostro tetto (X ne accetta 8 GB)
+X_RIEPILOGO_ORA = 18                # l'ora italiana del post del giorno
+X_RIEPILOGO_TESTO = "🫙 Nuovi arrivi di oggi nel mercatino: {conto}"
+X_EST_IMMAGINI = (".jpg", ".jpeg", ".png", ".gif", ".webp")
+X_EST_VIDEO = (".mp4", ".mov", ".webm", ".m4v")
+X_URL_RE = re.compile(r"https?://[^\s<>\"']+")
+X_PAGINA_NJUMP = "https://njump.me/"
+
+
+def x_configurato() -> bool:
+    """Le quattro chiavi ci sono e non sono il segnaposto. E' il FATTO
+    che esce nel pannello e nel journal: mai un valore."""
+    chiavi = (X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET)
+    return all(isinstance(c, str) and c.strip() and "INCOLLA_QUI" not in c
+               for c in chiavi)
+
+
+def _x_base_di_casa() -> bool:
+    """L'API di X sta su questa macchina? Solo nei collaudi."""
+    return relay_di_casa(str(X_API_BASE or "").replace("http", "ws", 1))
+
+
+def x_in_prova() -> bool:
+    """IL GIUDICE della modalita' prova: la leva, oppure il collaudo
+    verso un X che non e' di casa (da qui non esce niente, mai)."""
+    return bool(X_PROVA) or (bool(MODALITA_COLLAUDO) and not _x_base_di_casa())
+
+
+def x_ripubblica_viva() -> bool:
+    """La leva LETTA VIVA, come `cassaforte_nuova`: accesa senza le
+    chiavi e senza la prova vale SPENTA."""
+    return bool(X_RIPUBBLICA) and (x_configurato() or x_in_prova())
+
+
+def x_riepilogo_vivo() -> bool:
+    return bool(X_RIEPILOGO_GIORNO) and (x_configurato() or x_in_prova())
+
+
+def x_npub_hex() -> str:
+    """La chiave ufficiale in esadecimale, '' se la riga e' storta."""
+    try:
+        chiave = str(X_NPUB or "").strip()
+        if re.fullmatch(r"[0-9a-fA-F]{64}", chiave):
+            return chiave.lower()
+        return npub_to_hex(chiave).lower()
+    except Exception:
+        return ""
+
+
+def x_pesa(testo: str) -> int:
+    """Il peso di un testo come lo conta X: ogni URL vale 23, i
+    caratteri latini (e la punteggiatura comune) 1, emoji e ideogrammi
+    2. E' il conto della «weighted length» del loro twitter-text."""
+    peso = 0
+    resto = X_URL_RE.sub("", testo)
+    peso += X_PESO_URL * len(X_URL_RE.findall(testo))
+    for c in resto:
+        o = ord(c)
+        if (o <= 4351 or 8192 <= o <= 8205 or 8208 <= o <= 8223
+                or 8242 <= o <= 8247):
+            peso += 1
+        else:
+            peso += 2
+    return peso
+
+
+def x_taglia(testo: str, limite: int = X_LIMITE, coda: str = X_CODA) -> str:
+    """Il testo entro il limite: intero se ci sta, sennò tagliato su una
+    PAROLA intera e chiuso con la coda. Un taglio a meta' parola e' il
+    segno di un robot, e questa cassa deve sembrare scritta da chi ha
+    scritto la nota."""
+    testo = testo.strip()
+    if x_pesa(testo) <= limite:
+        return testo
+    budget = limite - x_pesa(" " + coda)
+    parole = testo.split()
+    tenuto = ""
+    for p in parole:
+        candidato = (tenuto + " " + p).strip()
+        if x_pesa(candidato) > budget:
+            break
+        tenuto = candidato
+    if not tenuto:
+        # una sola parola piu' lunga del budget (un muro di caratteri):
+        # si taglia a caratteri, e' l'unico caso
+        tenuto = parole[0] if parole else ""
+        while tenuto and x_pesa(tenuto) > budget:
+            tenuto = tenuto[:-1]
+    tenuto = tenuto.rstrip(" ,;:.-—–")
+    return f"{tenuto} {coda}".strip()
+
+
+def x_originale(ev, nostra_hex: str) -> bool:
+    """PURA: la nota e' un originale della npub ufficiale? Kind 1,
+    pubkey nostra, nessun tag `e` (risposta) ne' `q` (citazione), un
+    contenuto non vuoto."""
+    if not isinstance(ev, dict) or ev.get("kind") != 1:
+        return False
+    if not nostra_hex or str(ev.get("pubkey", "")).lower() != nostra_hex:
+        return False
+    for t in ev.get("tags") or []:
+        if isinstance(t, list) and t and t[0] in ("e", "q"):
+            return False
+    return bool(str(ev.get("content") or "").strip())
+
+
+def _x_firma_valida(ev) -> bool:
+    """L'id rifatto dalla serializzazione NIP-01 e la firma Schnorr su
+    quell'id: con coincurve dov'e' (il VPS), con `schnorr_puro` dove non
+    c'e' (la CI). Senza nessuno dei due nessuna nota si crede."""
+    try:
+        pubkey, sig, ev_id = ev["pubkey"], ev["sig"], ev["id"]
+        rifatto = evento_non_firmato(pubkey, int(ev["kind"]), ev["tags"],
+                                     ev["content"], int(ev["created_at"]))
+        if rifatto["id"] != ev_id:
+            return False
+        if ChiavePubblicaNostr is not None:
+            return bool(ChiavePubblicaNostr(bytes.fromhex(pubkey)).verify(
+                bytes.fromhex(sig), bytes.fromhex(ev_id)))
+        import schnorr_puro
+        return bool(schnorr_puro.verifica(bytes.fromhex(pubkey),
+                                          bytes.fromhex(ev_id),
+                                          bytes.fromhex(sig)))
+    except Exception:
+        return False
+
+
+def _x_bech32(hrp: str, hexdati: str) -> str:
+    """Un id in bech32 (`note1…`) per il link njump: lo stesso
+    `_bech32_polymod` di hex_to_npub, con l'hrp che serve."""
+    alfabeto = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+    dati, bits, val = [], 0, 0
+    for byte in bytes.fromhex(hexdati):
+        val = (val << 8) | byte
+        bits += 8
+        while bits >= 5:
+            bits -= 5
+            dati.append((val >> bits) & 31)
+    if bits:
+        dati.append((val << (5 - bits)) & 31)
+    espansa = [ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp]
+    polymod = _bech32_polymod(espansa + dati + [0] * 6) ^ 1
+    checksum = [(polymod >> 5 * (5 - i)) & 31 for i in range(6)]
+    return hrp + "1" + "".join(alfabeto[d] for d in dati + checksum)
+
+
+def x_link_nota(ev_id: str) -> str:
+    return X_PAGINA_NJUMP + _x_bech32("note", ev_id)
+
+
+def _x_media_di(ev) -> tuple:
+    """(immagini, video): gli URL dei media della nota, dai tag `imeta`
+    (NIP-92: «url …», «m …») e dagli URL con estensione nel testo. In
+    ordine, senza doppioni."""
+    immagini, video, visti = [], [], set()
+
+    def metti(url, mime=""):
+        url = str(url or "").strip()
+        if not url.startswith("http") or url in visti:
+            return
+        basso = url.split("?", 1)[0].lower()
+        if mime.startswith("video/") or basso.endswith(X_EST_VIDEO):
+            video.append(url)
+            visti.add(url)
+        elif mime.startswith("image/") or basso.endswith(X_EST_IMMAGINI):
+            immagini.append(url)
+            visti.add(url)
+
+    for t in ev.get("tags") or []:
+        if isinstance(t, list) and t and t[0] == "imeta":
+            campi = {}
+            for voce in t[1:]:
+                k, _, v = str(voce).partition(" ")
+                campi.setdefault(k, v)
+            metti(campi.get("url", ""), campi.get("m", ""))
+    for url in X_URL_RE.findall(str(ev.get("content") or "")):
+        metti(url)
+    return immagini, video
+
+
+def x_costo(testo: str) -> float:
+    """La stima di X: con un URL nel testo il post costa 0,200 $, sennò
+    0,015 $. I media caricati non si pagano a parte (il listino non li
+    elenca); «Media Metadata» e' un'altra chiamata, che non facciamo."""
+    return X_COSTO_LINK if X_URL_RE.search(testo) else X_COSTO_POST
+
+
+def x_prepara(ev, con_link: bool = False) -> dict:
+    """Dalla nota al post: il testo senza gli URL dei media caricati,
+    tagliato al peso di X (con lo spazio per il link njump, se chiesto),
+    le foto (al piu' 4) e il video (al piu' 1, e allora niente foto).
+    PURA: niente rete, niente database."""
+    immagini, video = _x_media_di(ev)
+    testo = str(ev.get("content") or "")
+    for url in immagini + video:
+        testo = testo.replace(url, " ")
+    righe = [" ".join(r.split()) for r in testo.split("\n")]
+    testo = "\n".join(righe)
+    testo = re.sub(r"\n{3,}", "\n\n", testo).strip()
+    link = x_link_nota(ev["id"]) if con_link and ev.get("id") else ""
+    limite = X_LIMITE - (X_PESO_URL + 1 if link else 0)
+    testo = x_taglia(testo, limite)
+    if link:
+        testo = f"{testo}\n{link}" if testo else link
+    if video:
+        immagini = []
+    return {"testo": testo, "immagini": immagini[:4], "video": video[:1],
+            "costo": x_costo(testo)}
+
+
+# --- La firma OAuth 1.0a e le chiamate -------------------------------
+
+def _x_percent(s) -> str:
+    from urllib.parse import quote
+    return quote(str(s), safe="-._~")
+
+
+def _x_oauth1(metodo: str, url: str, parametri: dict = None,
+              chiavi: tuple = None, nonce: str = "", quando: int = 0) -> str:
+    """L'intestazione `Authorization: OAuth …` (HMAC-SHA1) per UNA
+    richiesta. `parametri` sono query e corpo form-urlencoded (un corpo
+    JSON o multipart non si firma: e' la regola di OAuth 1.0a).
+    `chiavi`, `nonce` e `quando` si passano solo nelle prove, col
+    vettore pubblicato da docs.x.com."""
+    ck, cs, tk, ts = chiavi or (X_API_KEY, X_API_SECRET,
+                                X_ACCESS_TOKEN, X_ACCESS_SECRET)
+    oauth = {
+        "oauth_consumer_key": ck,
+        "oauth_nonce": nonce or secrets.token_hex(16),
+        "oauth_signature_method": "HMAC-SHA1",
+        "oauth_timestamp": str(quando or int(time.time())),
+        "oauth_token": tk,
+        "oauth_version": "1.0",
+    }
+    tutti = dict(parametri or {})
+    tutti.update(oauth)
+    coppie = sorted((_x_percent(k), _x_percent(v)) for k, v in tutti.items())
+    stringa = "&".join(f"{k}={v}" for k, v in coppie)
+    base = f"{metodo.upper()}&{_x_percent(url)}&{_x_percent(stringa)}"
+    chiave = f"{_x_percent(cs)}&{_x_percent(ts)}"
+    firma = base64.b64encode(hmac.new(chiave.encode(), base.encode(),
+                                      hashlib.sha1).digest()).decode()
+    oauth["oauth_signature"] = firma
+    return "OAuth " + ", ".join(
+        f'{_x_percent(k)}="{_x_percent(v)}"' for k, v in sorted(oauth.items()))
+
+
+class XRifiuta(Exception):
+    """X ha risposto, e ha detto di no. `status` dice se si riprova (429
+    e 5xx) o se la nota si lascia li' (il resto)."""
+
+    def __init__(self, status: int, perche: str):
+        super().__init__(f"HTTP {status} {perche}".strip())
+        self.status = status
+
+
+async def _x_chiama(metodo: str, percorso: str, *, params: dict = None,
+                    json_corpo=None, form: dict = None, files: dict = None,
+                    timeout: float = 30):
+    """UNA chiamata a X, firmata. Torna (status, corpo-dict). L'URL per
+    la firma e' senza query; i `params` e il `form` (se non c'e' un
+    file) entrano nella firma. L'intestazione non si stampa MAI."""
+    url = f"{str(X_API_BASE).rstrip('/')}{percorso}"
+    da_firmare = dict(params or {})
+    if form and not files:
+        da_firmare.update(form)
+    intestazioni = {"Authorization": _x_oauth1(metodo, url, da_firmare),
+                    "User-Agent": "Barattolo/1.0 (+https://barattolo.store)"}
+    async with httpx.AsyncClient(timeout=timeout) as c:
+        r = await c.request(metodo, url, params=params, json=json_corpo,
+                            data=form, files=files, headers=intestazioni)
+    try:
+        corpo = r.json()
+    except ValueError:
+        corpo = {}
+    return r.status_code, (corpo if isinstance(corpo, dict) else {})
+
+
+def _x_perche(status: int, corpo: dict) -> str:
+    """Il motivo di X in una riga corta, senza il corpo intero."""
+    voci = []
+    for e in (corpo.get("errors") or [])[:2]:
+        if isinstance(e, dict):
+            voci.append(str(e.get("message") or e.get("detail") or "")[:80])
+    if not voci and corpo.get("detail"):
+        voci.append(str(corpo["detail"])[:80])
+    if not voci and corpo.get("title"):
+        voci.append(str(corpo["title"])[:80])
+    return "; ".join(v for v in voci if v)
+
+
+async def _x_scarica(url: str, tetto: int) -> tuple:
+    """(byte, mime) di un media della nota, entro il tetto. Oltre, o se
+    non e' un'immagine/un video, si torna (b'', '') e il post esce
+    senza."""
+    try:
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as c:
+            async with c.stream("GET", url) as r:
+                if r.status_code != 200:
+                    return b"", ""
+                mime = (r.headers.get("content-type") or "").split(";")[0].strip()
+                pezzi, totale = [], 0
+                async for pezzo in r.aiter_bytes():
+                    totale += len(pezzo)
+                    if totale > tetto:
+                        return b"", ""
+                    pezzi.append(pezzo)
+        raw = b"".join(pezzi)
+    except Exception:
+        return b"", ""
+    if not mime.startswith(("image/", "video/")):
+        basso = url.split("?", 1)[0].lower()
+        if basso.endswith(X_EST_VIDEO):
+            mime = "video/mp4"
+        elif basso.endswith(".png"):
+            mime = "image/png"
+        elif basso.endswith(".gif"):
+            mime = "image/gif"
+        elif basso.endswith(".webp"):
+            mime = "image/webp"
+        else:
+            mime = "image/jpeg"
+    return raw, mime
+
+
+async def _x_carica_media(raw: bytes, mime: str) -> str:
+    """Il caricamento a pezzi dell'API media v2 di X — initialize,
+    append (pezzi da X_PEZZO), finalize, e lo stato finche' il video e'
+    «succeeded». Torna l'id del media (`data.id`). Un no di X e' un
+    XRifiuta."""
+    if mime.startswith("video/"):
+        categoria = "tweet_video"
+    elif mime == "image/gif":
+        categoria = "tweet_gif"
+    else:
+        categoria = "tweet_image"
+    status, corpo = await _x_chiama("POST", "/2/media/upload/initialize",
+                                    json_corpo={"media_type": mime,
+                                                "total_bytes": len(raw),
+                                                "media_category": categoria})
+    media_id = str((corpo.get("data") or {}).get("id") or "")
+    if status >= 300 or not media_id:
+        raise XRifiuta(status, "initialize: " + _x_perche(status, corpo))
+    for i in range(0, max(1, (len(raw) + X_PEZZO - 1) // X_PEZZO)):
+        pezzo = raw[i * X_PEZZO:(i + 1) * X_PEZZO]
+        status, corpo = await _x_chiama(
+            "POST", f"/2/media/upload/{media_id}/append",
+            form={"segment_index": str(i)},
+            files={"media": ("pezzo", pezzo, "application/octet-stream")},
+            timeout=120)
+        if status >= 300:
+            raise XRifiuta(status, f"append {i}: " + _x_perche(status, corpo))
+    status, corpo = await _x_chiama("POST", f"/2/media/upload/{media_id}/finalize")
+    if status >= 300:
+        raise XRifiuta(status, "finalize: " + _x_perche(status, corpo))
+    info = (corpo.get("data") or {}).get("processing_info") or {}
+    giri = 0
+    while info and info.get("state") not in ("succeeded", "failed"):
+        giri += 1
+        if giri > 30:
+            raise XRifiuta(0, "il media non e' pronto dopo 30 controlli")
+        await asyncio.sleep(min(10, max(1, int(info.get("check_after_secs") or 2))))
+        status, corpo = await _x_chiama("GET", "/2/media/upload",
+                                        params={"command": "STATUS",
+                                                "media_id": media_id})
+        if status >= 300:
+            raise XRifiuta(status, "status: " + _x_perche(status, corpo))
+        info = (corpo.get("data") or {}).get("processing_info") or {}
+    if info.get("state") == "failed":
+        raise XRifiuta(0, "X non ha digerito il media")
+    return media_id
+
+
+async def _x_posta(testo: str, media_ids: list) -> str:
+    """POST /2/tweets: torna l'id del post. Un no di X e' un XRifiuta."""
+    corpo = {"text": testo}
+    if media_ids:
+        corpo["media"] = {"media_ids": [str(m) for m in media_ids]}
+    status, risposta = await _x_chiama("POST", "/2/tweets", json_corpo=corpo)
+    post_id = str((risposta.get("data") or {}).get("id") or "")
+    if status >= 300 or not post_id:
+        raise XRifiuta(status, _x_perche(status, risposta))
+    return post_id
+
+
+# --- Il registro, la lancetta e le note di casa ----------------------
+
+def _x_prepara_tabella(con):
+    """`x_post`: una riga per nota, l'id dell'evento Nostr e' la chiave
+    — e' cosi' che un doppione non puo' nascere. `evento` e' la nota
+    intera (JSON): i tentativi dopo il primo ripartono da li', non dai
+    relay."""
+    con.execute("""CREATE TABLE IF NOT EXISTS x_post(
+        evento_id TEXT PRIMARY KEY,
+        creato_nota INTEGER DEFAULT 0,
+        evento TEXT DEFAULT '',
+        esito TEXT DEFAULT 'in_coda',
+        -- in_coda | riprova | pubblicato | prova | rifiutato | di_casa
+        post_x_id TEXT DEFAULT '',
+        testo_x TEXT DEFAULT '',
+        costo_usd REAL DEFAULT 0,
+        tentativi INTEGER DEFAULT 0,
+        riprova_il INTEGER DEFAULT 0,
+        ultimo_errore TEXT DEFAULT '',
+        creato INTEGER DEFAULT 0,
+        pubblicato_il INTEGER DEFAULT 0)""")
+
+
+def _x_segna_di_casa(evento_id: str):
+    """Una nota kind 1 firmata dal SERVER: si timbra prima che parta,
+    cosi' il lettore la riconosce anche dopo un riavvio. Fail-open:
+    questo gancio sta sulla strada delle promo, e una promo non deve
+    mai cadere per via di X."""
+    try:
+        con = db()
+        _x_prepara_tabella(con)
+        con.execute("INSERT OR IGNORE INTO x_post(evento_id, esito, creato) "
+                    "VALUES(?,?,?)", (evento_id, "di_casa", int(time.time())))
+        con.commit()
+        con.close()
+    except Exception:
+        pass
+
+
+def _x_accoda(con, ev) -> bool:
+    """Mette in coda una nota. False se c'era gia' (doppione, o nota di
+    casa): la chiave primaria decide, non chi chiama."""
+    cur = con.execute(
+        "INSERT OR IGNORE INTO x_post(evento_id, creato_nota, evento, esito, "
+        "creato) VALUES(?,?,?,?,?)",
+        (ev["id"], int(ev.get("created_at") or 0),
+         json.dumps(ev, ensure_ascii=False), "in_coda", int(time.time())))
+    return cur.rowcount == 1
+
+
+def _x_spesa_mese() -> float:
+    """La stima dei dollari spesi dal primo del mese (UTC), per il
+    journal e per il pannello. Fail-open a 0 (il pannello non deve
+    cadere per una tabella che ancora non c'e')."""
+    try:
+        from datetime import datetime, timezone
+        oggi = datetime.now(timezone.utc)
+        primo = int(datetime(oggi.year, oggi.month, 1,
+                             tzinfo=timezone.utc).timestamp())
+        con = db()
+        r = con.execute("SELECT COALESCE(SUM(costo_usd), 0) AS s FROM x_post "
+                        "WHERE esito='pubblicato' AND pubblicato_il>=?",
+                        (primo,)).fetchone()
+        con.close()
+        return round(float(r["s"] or 0), 3)
+    except Exception:
+        return 0.0
+
+
+def _x_dollari(v: float) -> str:
+    return f"{v:.3f} $".replace(".", ",")
+
+
+# --- La lettura dei relay --------------------------------------------
+
+def _x_note_da_relay(relay: str, hexkey: str, dal: int) -> list:
+    """Le note kind 1 della chiave da UN relay, da `dal` in poi, fino
+    all'EOSE. SINCRONA (websocket-client): in asyncio.to_thread. None =
+    non ho potuto chiedere (relay muto, o collaudo verso un relay che
+    non e' di casa)."""
+    if not create_connection:
+        return None
+    if lettura_simulata(relay, f"delle note di {hexkey[:12]}… per X"):
+        return None
+    try:
+        ws = create_connection(relay, timeout=5,
+                               sslopt={"cert_reqs": ssl.CERT_NONE})
+        ws.send(json.dumps(["REQ", "x", {"kinds": [1], "authors": [hexkey],
+                                         "since": int(dal), "limit": 100}]))
+        inizio, fuori = time.time(), []
+        while time.time() - inizio < 8:
+            msg = json.loads(ws.recv())
+            if msg[0] == "EVENT" and msg[1] == "x" and isinstance(msg[2], dict):
+                fuori.append(msg[2])
+            elif msg[0] == "EOSE":
+                break
+        ws.close()
+        return fuori
+    except Exception:
+        return None
+
+
+async def _x_leggi_note(hexkey: str, dal: int) -> list:
+    """Le note nuove da tutti i relay di casa nostra, senza doppioni,
+    dalla piu' vecchia. Un relay muto non ferma gli altri."""
+    async def uno(relay):
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(_x_note_da_relay, relay, hexkey, dal), 15)
+        except Exception:
+            return None
+    esiti = await asyncio.gather(*[uno(r) for r in RELAYS_VERIFICA])
+    visti, note = set(), []
+    for lista in esiti:
+        for ev in lista or []:
+            if isinstance(ev, dict) and ev.get("id") and ev["id"] not in visti:
+                visti.add(ev["id"])
+                note.append(ev)
+    note.sort(key=lambda e: int(e.get("created_at") or 0))
+    return note
+
+
+# --- L'elaborazione di una riga --------------------------------------
+
+async def _x_elabora(riga) -> str:
+    """UNA nota verso X: prepara, (in prova: racconta e basta), carica i
+    media, pubblica, timbra. Torna l'esito scritto. Un no di X si
+    scrive qui, con la riga nel journal, e non esce come eccezione: il
+    giro va avanti con la nota dopo."""
+    evento_id = riga["evento_id"]
+    try:
+        ev = json.loads(riga["evento"] or "{}")
+    except ValueError:
+        ev = {}
+    if not ev.get("content") and not evento_id.startswith("riepilogo-"):
+        return _x_timbra(evento_id, "rifiutato", errore="nota senza contenuto")
+    post = x_prepara(ev, con_link=bool(X_CON_LINK)
+                     and not evento_id.startswith("riepilogo-"))
+    corto = evento_id[:12]
+    media = (f"{len(post['immagini'])} foto"
+             + (", 1 video" if post["video"] else ""))
+    if x_in_prova():
+        print(f"🐦 [X prova] per la nota {corto}… avrei pubblicato "
+              f"({media}, stima {_x_dollari(post['costo'])}): "
+              f"«{post['testo'][:200]}»", flush=True)
+        return _x_timbra(evento_id, "prova", testo=post["testo"])
+    try:
+        media_ids = []
+        for url in post["video"] or post["immagini"]:
+            tetto = X_VIDEO_MAX if post["video"] else X_GIF_MAX
+            raw, mime = await _x_scarica(url, tetto)
+            if not raw:
+                print(f"🐦 X: media saltato per la nota {corto}… "
+                      f"(non scaricabile o oltre il tetto)", flush=True)
+                continue
+            if mime.startswith("image/") and mime != "image/gif" \
+                    and len(raw) > X_IMG_MAX:
+                print(f"🐦 X: foto saltata per la nota {corto}… "
+                      f"({len(raw) // 1024} KB > 5 MB)", flush=True)
+                continue
+            media_ids.append(await _x_carica_media(raw, mime))
+        if not post["testo"] and not media_ids:
+            return _x_timbra(evento_id, "rifiutato",
+                             errore="niente da pubblicare")
+        post_id = await _x_posta(post["testo"], media_ids)
+    except XRifiuta as e:
+        return _x_fallita(riga, e.status, str(e))
+    except Exception as e:
+        return _x_fallita(riga, 0, f"{type(e).__name__}: {str(e)[:100]}")
+    esito = _x_timbra(evento_id, "pubblicato", post_id=post_id,
+                      testo=post["testo"], costo=post["costo"])
+    tariffa = (" (c'è un URL nel testo: tariffa piena)"
+               if post["costo"] >= X_COSTO_LINK else "")
+    print(f"🐦 X: pubblicato il post {post_id} per la nota {corto}… "
+          f"({media}) — stima {_x_dollari(post['costo'])}{tariffa}, "
+          f"totale del mese {_x_dollari(_x_spesa_mese())}", flush=True)
+    return esito
+
+
+def _x_timbra(evento_id: str, esito: str, post_id: str = "", testo: str = "",
+              costo: float = 0.0, errore: str = "") -> str:
+    con = db()
+    con.execute("UPDATE x_post SET esito=?, post_x_id=?, testo_x=?, costo_usd=?, "
+                "ultimo_errore=?, pubblicato_il=? WHERE evento_id=?",
+                (esito, post_id, testo, costo, errore[:200],
+                 int(time.time()) if esito == "pubblicato" else 0, evento_id))
+    con.commit()
+    con.close()
+    return esito
+
+
+def _x_fallita(riga, status: int, perche: str) -> str:
+    """Un no di X: un 429 o un 5xx (o la rete) si riprova a distanza,
+    finche' ci sono attese; il resto (401, 403, un duplicato…) si
+    lascia subito. In tutti i casi una riga nel journal, e avanti."""
+    corto = riga["evento_id"][:12]
+    tentativi = int(riga["tentativi"] or 0) + 1
+    riprovabile = status == 429 or status >= 500 or status == 0
+    if riprovabile and tentativi <= len(X_RIPROVA_MIN):
+        attesa = X_RIPROVA_MIN[tentativi - 1]
+        con = db()
+        con.execute("UPDATE x_post SET esito='riprova', tentativi=?, "
+                    "riprova_il=?, ultimo_errore=? WHERE evento_id=?",
+                    (tentativi, int(time.time()) + attesa * 60, perche[:200],
+                     riga["evento_id"]))
+        con.commit()
+        con.close()
+        print(f"🐦 X: {perche} per la nota {corto}…: riprovo fra {attesa} min "
+              f"(tentativo {tentativi}/{len(X_RIPROVA_MIN)})", flush=True)
+        return "riprova"
+    con = db()
+    con.execute("UPDATE x_post SET esito='rifiutato', tentativi=?, "
+                "ultimo_errore=? WHERE evento_id=?",
+                (tentativi, perche[:200], riga["evento_id"]))
+    con.commit()
+    con.close()
+    print(f"🐦 X: la nota {corto}… resta su Nostr e basta ({perche}): "
+          "si va avanti", flush=True)
+    return "rifiutato"
+
+
+# --- Il riepilogo del giorno -----------------------------------------
+
+def _x_oggi_italiano():
+    """La data di oggi e l'ora in Italia. Senza il fuso nel sistema
+    (Windows senza tzdata) si cade su UTC+1, e si dice una volta."""
+    from datetime import datetime, timezone, timedelta
+    try:
+        from zoneinfo import ZoneInfo
+        fuso = ZoneInfo("Europe/Rome")
+    except Exception:
+        fuso = timezone(timedelta(hours=1))
+        if not _X_STATO.get("fuso_detto"):
+            _X_STATO["fuso_detto"] = True
+            print("🐦 X: il fuso Europe/Rome non c'e' nel sistema: "
+                  "il riepilogo usa UTC+1", flush=True)
+    return datetime.now(fuso)
+
+
+def _x_riepilogo_di_oggi(con, adesso) -> dict:
+    """La nota «sintetica» del riepilogo: il conto degli annunci nati
+    oggi (ora italiana) e le prime foto, nella forma di un evento
+    cosi' che `x_prepara` la tratti come tutte le altre. None se oggi
+    non e' nato niente: un post «0 annunci» non e' una notizia."""
+    inizio = int(adesso.replace(hour=0, minute=0, second=0,
+                                microsecond=0).timestamp())
+    righe = con.execute(
+        "SELECT foto FROM annunci WHERE stato='attivo' AND creato>=? "
+        "ORDER BY creato DESC", (inizio,)).fetchall()
+    if not righe:
+        return None
+    foto = []
+    for r in righe:
+        for url in _foto_url_nostr(r["foto"] or "")[:1]:
+            if url not in foto:
+                foto.append(url)
+        if len(foto) >= 4:
+            break
+    conto = "1 annuncio" if len(righe) == 1 else f"{len(righe)} annunci"
+    return {"id": "riepilogo-" + adesso.strftime("%Y-%m-%d"),
+            "kind": 1, "created_at": int(time.time()),
+            "content": X_RIEPILOGO_TESTO.format(conto=conto),
+            "tags": [["imeta", f"url {u}", "m image/jpeg"] for u in foto]}
+
+
+async def _x_giro_riepilogo(con) -> bool:
+    """Una volta al giorno, dall'ora X_RIEPILOGO_ORA in poi: mette in
+    coda il riepilogo se oggi non e' ancora uscito. Il timbro del giorno
+    (`x_riepilogo_il`) si scrive PRIMA dell'invio, il patto delle
+    campagne: un guasto puo' far perdere un riepilogo, mai raddoppiarlo."""
+    adesso = _x_oggi_italiano()
+    if adesso.hour < X_RIEPILOGO_ORA:
+        return False
+    giorno = adesso.strftime("%Y-%m-%d")
+    if impostazione("x_riepilogo_il") == giorno:
+        return False
+    scrivi_impostazione("x_riepilogo_il", giorno)
+    ev = _x_riepilogo_di_oggi(con, adesso)
+    if not ev:
+        print("🐦 X: oggi nessun annuncio nuovo, niente riepilogo", flush=True)
+        return False
+    _x_accoda(con, ev)
+    con.commit()
+    return True
+
+
+# --- L'orologio ------------------------------------------------------
+
+_X_STATO = {"giri": 0, "ultimo": 0.0, "fuso_detto": False}
+_TASK_X = None
+
+
+async def giro_x():
+    """UN giro: le note nuove dai relay in coda, poi la coda verso X
+    una riga alla volta. La lancetta `x_dal` avanza all'ultima nota
+    vista (con un minuto di sovrapposizione: i relay non sono in orario
+    fra loro, e un doppione lo ferma la chiave)."""
+    con = db()
+    _x_prepara_tabella(con)
+    adesso = int(time.time())
+    dal = int(impostazione("x_dal", "0") or 0)
+    if not dal:
+        scrivi_impostazione("x_dal", str(adesso))
+        dal = adesso
+        print("🐦 X: si parte da adesso — le note di prima non si "
+              "ripubblicano", flush=True)
+    nuove = 0
+    if x_ripubblica_viva():
+        nostra = x_npub_hex()
+        if not nostra:
+            print("⚠️ X: X_NPUB non e' una npub valida: nessuna lettura",
+                  flush=True)
+        else:
+            ultimo = dal
+            for ev in await _x_leggi_note(nostra, max(0, dal - 60)):
+                ultimo = max(ultimo, int(ev.get("created_at") or 0))
+                if not x_originale(ev, nostra):
+                    continue
+                if not _x_firma_valida(ev):
+                    print(f"⛔ X: una nota «di Barattolo» da un relay non ha "
+                          f"una firma valida: buttata", flush=True)
+                    continue
+                if int(ev.get("created_at") or 0) < dal:
+                    continue
+                if _x_accoda(con, ev):
+                    nuove += 1
+            con.commit()
+            if ultimo > dal:
+                scrivi_impostazione("x_dal", str(ultimo))
+    if x_riepilogo_vivo():
+        await _x_giro_riepilogo(con)
+    righe = con.execute(
+        "SELECT * FROM x_post WHERE esito='in_coda' OR (esito='riprova' AND "
+        "riprova_il<=?) ORDER BY creato_nota, creato", (adesso,)).fetchall()
+    con.close()
+    fatti = 0
+    for riga in righe:
+        if fatti:
+            await asyncio.sleep(X_PAUSA_S)
+        await _x_elabora(dict(riga))
+        fatti += 1
+    _X_STATO["giri"] += 1
+    _X_STATO["ultimo"] = time.time()
+    return nuove, fatti
+
+
+async def orologio_x():
+    while True:
+        try:
+            await giro_x()
+        except Exception as e:
+            print(f"⚠️ X: giro saltato ({type(e).__name__}: {str(e)[:120]}): "
+                  "il prossimo riparte da solo", flush=True)
+        await asyncio.sleep(X_GIRO_S)
+
+
+@app.on_event("startup")
+async def avvia_x():
+    """La riga all'avvio dice lo stato VIVO, come per le cassaforti:
+    una leva accesa senza le chiavi vale spenta, e qui lo si legge."""
+    global _TASK_X
+    if (X_RIPUBBLICA or X_RIEPILOGO_GIORNO) and not x_configurato() \
+            and not x_in_prova():
+        print("⚠️ X_RIPUBBLICA / X_RIEPILOGO_GIORNO accese ma mancano le "
+              "quattro chiavi (X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, "
+              "X_ACCESS_SECRET) o sono il segnaposto: la cassa di "
+              "risonanza vale SPENTA (o accendi X_PROVA per provare senza "
+              "chiavi)", flush=True)
+    if not (x_ripubblica_viva() or x_riepilogo_vivo()):
+        print("🐦 X: cassa di risonanza spenta "
+              "(X_RIPUBBLICA / X_RIEPILOGO_GIORNO)", flush=True)
+        return
+    print("🐦 X: cassa di risonanza ACCESA"
+          + (" in PROVA (X non viene chiamato)" if x_in_prova() else "")
+          + (" — note" if x_ripubblica_viva() else "")
+          + (" — riepilogo del giorno" if x_riepilogo_vivo() else "")
+          + (" — con link njump" if X_CON_LINK else " — senza link")
+          + f", npub {str(X_NPUB)[:16]}…", flush=True)
+    _TASK_X = asyncio.create_task(orologio_x())
+
+
+def _x_leve() -> list:
+    """Le voci del pannello «Stato delle leve»: i fatti, mai le chiavi."""
+    return [
+        _leva("Cassa di risonanza: le note su X", "X_RIPUBBLICA",
+              x_ripubblica_viva(),
+              allarme=bool(X_RIPUBBLICA) and not x_ripubblica_viva(),
+              acceso="le note kind 1 originali della npub ufficiale "
+                     "escono su X (un post alla volta, mai le promo del "
+                     "server, mai i prodotti)",
+              spento="nessuna nota esce su X; se la leva è True nel "
+                     "config, mancano le quattro chiavi"),
+        _leva("Modalità prova", "X_PROVA", x_in_prova(),
+              acceso="il journal dice cosa AVREBBE pubblicato, X non "
+                     "viene chiamato e niente si paga"),
+        _leva("Il link njump in coda", "X_CON_LINK", bool(X_CON_LINK),
+              acceso="ogni post porta il link alla nota: X lo fa pagare "
+                     "0,200 $ invece di 0,015 $",
+              spento="i post escono senza link (0,015 $); restano i link "
+                     "che la persona ha scritto nella nota"),
+        _leva("Riepilogo del giorno (prodotti)", "X_RIEPILOGO_GIORNO",
+              x_riepilogo_vivo(),
+              acceso="alle 18 un post «Nuovi arrivi di oggi: N annunci» "
+                     "con fino a 4 foto, senza link",
+              spento="i prodotti non escono su X in nessuna forma"),
+        _leva("Le quattro chiavi di X", "X_API_KEY…", x_configurato(),
+              spento="senza, le due leve qui sopra valgono spente"),
+        _leva("Npub ufficiale ascoltata", "X_NPUB",
+              (str(X_NPUB)[:20] + "…") if x_npub_hex() else "non valida",
+              allarme=not x_npub_hex()),
+        _leva("Spesa stimata del mese ($)", "db: x_post", _x_spesa_mese()),
+    ]
 
 
 # ---------- IL CAMPANELLO DEI NUOVI ISCRITTI (solo moderatori) -------
