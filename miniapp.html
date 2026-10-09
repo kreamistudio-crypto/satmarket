@@ -11660,7 +11660,7 @@ document.getElementById('cartello')?.remove();</script>
         <!-- GLI AVVISI DEL MERCATINO (9 ott 2026): le preferenze e i
              venditori seguiti restano da noi, quindi si dice — e si dice
              anche cosa il venditore NON vede. -->
-        <li>Gli <b>avvisi del mercatino</b>, se li accendi (sono spenti di serie): le categorie e il prezzo massimo che hai scelto per «<b>🆕 Avvisami dei nuovi annunci</b>», e i <b>venditori che segui</b> — che <b>non lo sanno</b>: nessuno vede chi lo segue, né quanti. E per ogni annuncio di cui ti abbiamo avvisato, il suo numero accanto al tuo, per non avvisarti due volte: se ne va da solo dopo un mese.</li>
+        <li>Gli <b>avvisi del mercatino</b>, se li accendi (sono spenti di serie): le categorie e il prezzo massimo che hai scelto per «<b>🛒 Avvisami dei nuovi annunci</b>», e i <b>venditori che segui</b> — che <b>non lo sanno</b>: nessuno vede chi lo segue, né quanti. E per ogni annuncio di cui ti abbiamo avvisato, il suo numero accanto al tuo, per non avvisarti due volte: se ne va da solo dopo un mese.</li>
         <!-- IL CARRELLO SALVATO (6 ott 2026): un dato nuovo che resta da
              noi, quindi si dice — cosa c'e' dentro, cosa NON c'e', chi
              non lo vede. La durata sta qui sotto, fra le altre. -->
@@ -34985,7 +34985,9 @@ const interruttoreAvm = (on, gesto) =>
 function contenutoAvvisiMercatino(){
   const p = myAvvisiMercatino, on = !!p.attivo, off = !on;
   let h = '<div class="avn-testa">'
-    + '<div class="avn-titolo">Avvisami dei nuovi annunci</div>'
+    /* L'ICONA DAVANTI (9 ott 2026, sera, Andrea): «🛒» come la «🔔» del
+       blocco P2P qui sopra e le righe sorelle del cassetto */
+    + '<div class="avn-titolo">🛒 Avvisami dei nuovi annunci</div>'
     + interruttoreAvm(on, 'setAvvisiMercatino({attivo:' + (on ? 'false' : 'true') + '})') + '</div>'
     + '<div class="avn-corpo' + (on ? '' : ' avn-spento') + '"' + (on ? '' : ' aria-disabled="true"') + '>'
     + '<div class="section-label">Categorie</div>'

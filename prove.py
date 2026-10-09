@@ -103956,6 +103956,7 @@ def prove_avvisi_mercatino():
           and "filtroPrezzo = {min: '', max, valuta: q.get('valuta') === 'eur' ? 'eur' : 'sats'};" in m)
     prova("la pagina «I tuoi dati» dice cosa conserva il server, che e' spento di serie, e che il venditore non lo sa", True,
           "Gli <b>avvisi del mercatino</b>, se li accendi (sono spenti di serie)" in m
+          and "che hai scelto per «<b>🛒 Avvisami dei nuovi annunci</b>»" in m
           and "i <b>venditori che segui</b> — che <b>non lo sanno</b>" in m
           and "<li>Spegnere gli avvisi dei nuovi annunci, e smettere di seguire un venditore.</li>" in m)
 
@@ -104262,7 +104263,7 @@ out.spento = [spento.indexOf('avn-spento') >= 0, spento.indexOf('aria-disabled="
               attive(spento), spento.indexOf('value=""') >= 0,
               chipCorpo(spento).length > 3 && chipCorpo(spento).every(b => / disabled>$/.test(b)),
               /<input id="avmPrezzo"[^>]* disabled>/.test(spento),
-              spento.indexOf('<div class="avn-titolo">Avvisami dei nuovi annunci</div>') >= 0,
+              /<div class="avn-testa"><div class="avn-titolo">🛒 Avvisami dei nuovi annunci<\/div><button /.test(spento),
               spento.indexOf('minuti') < 0,
               spento.indexOf('Nessuno: «🔔 Segui» è nella pagina di ogni venditore.') >= 0,
               /<div class="avn-dove">Arriva nella chat del bot Telegram<\/div>$/.test(spento)];
@@ -104305,7 +104306,8 @@ console.log(JSON.stringify(out));
         return
     prova("a leve spente niente riga e niente bottone", ["", ""], out["fuoriCasa"])
     prova("SPENTO DI SERIE, ALLEGGERITO: il corpo grigio e aria-disabled, «Spenti», «Tutte» e sats accese, prezzo "
-          "vuoto, OGNI chip del corpo e il campo `disabled`, il titolo senza spiegazione, nessuna frequenza, "
+          "vuoto, OGNI chip del corpo e il campo `disabled`, il titolo «🛒 Avvisami dei nuovi annunci» senza "
+          "spiegazione, nessuna frequenza, "
           "l'invito breve a seguire, e in fondo la riga sola di dove arriva",
           [True, True, True, ["scegliCategoriaAvvisiMercatino('')", "scegliValutaAvvisiMercatino('sats')"],
            True, True, True, True, True, True, True],

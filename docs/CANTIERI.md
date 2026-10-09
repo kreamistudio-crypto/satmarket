@@ -42938,3 +42938,33 @@ in gabbia 44 verdi, 0 rossi. Dal vivo a 375 (relay morto): il titolo con
 l'icona nel foglio e nel cassetto (letto dal DOM: lo scatto del Profilo
 esce ingrandito nel pane, le misure della pagina sono normali); scatto in
 `.claude/giri/avvisi-p2p-icona/375-foglio-con-icona.jpg`.
+
+## Le icone davanti agli interruttori degli avvisi (9 ott 2026, sera, richiesta di Andrea)
+
+**La richiesta.** Nel cassetto Avvisi del Profilo e nel foglio della
+campanella del libro P2P (53447f0 e 36f84f0) l'icona torna davanti agli
+interruttori: «🔔 Avvisami dei nuovi ordini P2P» e «🛒 Avvisami dei
+nuovi annunci». Nient'altro cambia.
+
+**La metà P2P c'era già.** Un'altra sessione l'aveva fatta, provata e
+committata nel ramo locale `cantiere/avvisi-p2p-icona` (5c2145f, la voce
+qui sopra), senza pusharla e lasciando scritto che la 🛒 toccava al
+cantiere del mercatino. Non si è rifatta: è entrata qui con un
+cherry-pick (63aa5f2, CANTIERI unito in coda), e qui sopra si aggiunge
+la sola 🛒. Il ramo dell'altra sessione resta suo: dopo questo push il
+suo commit è già su main.
+
+**Cosa cambia.** Il titolo dell'interruttore del blocco «Mercatino»
+diventa «🛒 Avvisami dei nuovi annunci», nella stessa `.avn-titolo`; la
+frase di «I tuoi dati» che cita quell'interruttore lo chiama col suo
+nome vero (diceva «🆕», un nome che a schermo non c'è mai stato). Nient'altro:
+il toast, i messaggi del bot (🆕) e i commenti restano com'erano.
+
+**Provato.** `prove_avvisi_mercatino`: il titolo con la 🛒 dentro la
+testa dell'interruttore, e «I tuoi dati» col nome nuovo;
+`prove_avvisi_nuovi_ordini` è quella dell'altra sessione (la 🔔). Suite
+intera e collaudi della CI: nel rapporto del push. Dal vivo con
+Playwright su una copia (relay morto, P2P acceso con la npub del config
+d'esempio): il cassetto Avvisi con i due titoli uno sopra l'altro, e il
+foglio della campanella; scatti in `.claude/giri/avvisi-icone/`
+(gitignored).
