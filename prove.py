@@ -55213,8 +55213,13 @@ def prove_libro_subito():
           [1, 1, True, True],
           [mini.count(".classList.add('p2p-sfocata')"), mini.count(".classList.add('p2p-a-fuoco')"),
            # EMENDATA (26 set 2026, il giro guidato del P2P): la chiusura
-           # passa anche il `poi`, che il giro aspetta a pagina a fuoco
-           "sfocaPaginaTourP2P(false, typeof poi === 'function' ? poi : null);" in _cc,
+           # passa anche il `poi`, che il giro aspetta a pagina a fuoco.
+           # EMENDATA ANCORA (9 ott 2026 sera, cantiere banner-ingresso): il
+           # `poi` passa avvolto — dopo il giro, se non e' partito, si
+           # scioglie il banner che aspettava il «Fine» — ma e' sempre lui,
+           # e a pagina a fuoco
+           "const giro = typeof poi === 'function' ? poi : null;" in _cc
+           and "sfocaPaginaTourP2P(false, giro ? () => { giro(); if (!tourInCorso) libera(); } : null);" in _cc,
            "if (!tourRidotto()) h.classList.add('p2p-sfocata');" in _sf])
     _d = _re.search(r"transition:filter \.(\d)s", css)
     prova("...e la messa a fuoco dura 0,8 s, la stessa cifra del CSS e del JS", [True, 800],
