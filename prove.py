@@ -104120,7 +104120,12 @@ def prove_avvisi_mercatino():
 
     # --- 5) IL CLIENT, in node --------------------------------------------------
     blocco = m[m.index("function normalizzaAvvisiMercatino("):m.index("async function setCanale(canale){")]
-    dove = m[m.index("function doveArrivanoAvvisi(){"):m.index("function contenutoAvvisiNuoviP2P(){")]
+    prova("IL BLOCCO NON LEGGE `doveArrivanoAvvisi`: ha la sua frase (il ritocco P2P ne cambia la forma, "
+          "e il blocco non deve dire «Arriva Arriva…» nel frattempo)", (False, True),
+          ("doveArrivanoAvvisi(" in re.sub(r"/\*[\s\S]*?\*/", "", blocco),
+           "function fraseDoveAvvisiMercatino(){" in blocco))
+    prova("ALLEGGERITO: nessuna riga di spiegazione sotto l'interruttore, nessuna frequenza nel cassetto", False,
+          any(x in blocco for x in ("Quando nel mercatino compare", "al massimo uno ogni", "L.minuti", "L.seguiMinuti")))
     js = (
         "let DEMO = false, myTgId = 222, myCanaleNotifiche = '', myNpubAccesso = '', myNpub = '', myNpubVerified = false;\n"
         "let VETRINA = false, negozioCorrente = null;\n"
@@ -104129,7 +104134,7 @@ def prove_avvisi_mercatino():
         "const el = () => null, toast = () => {}, haptic = () => {};\n"
         "const numeroFiltro = v => { const n = parseFloat(String(v).trim().replace(',', '.')); return (isFinite(n) && n > 0) ? n : ''; };\n"
         + pezzo_js(m, "const esc = s => String(s ?? '').replace(", ";\n") + ";\n"
-        + dove + blocco
+        + blocco
         + r"""
 const out = {};
 const attive = h => (h.match(/class="tema-pill active" aria-pressed="true"( data-c="[^"]*")? onclick="([^"]+)"/g) || [])
@@ -104139,20 +104144,28 @@ const dati = h => (h.match(/class="tema-pill active" aria-pressed="true" data-c=
 out.fuoriCasa = [rigaAvvisiMercatino(), bottoneSegui({negozio: 'neg333', seguito: false}, false)];
 avvisiMercatinoLeve = {attivi: true, minuti: 60, seguiMinuti: 15};
 const spento = contenutoAvvisiMercatino();
-out.spento = [spento.indexOf('avn-spento') >= 0, /aria-pressed="false"[^>]*>Spenti</.test(spento),
-              attive(spento), spento.indexOf('value=""') >= 0, spento.indexOf('ogni <b>60 minuti</b>') >= 0,
-              spento.indexOf('ogni <b>15 minuti</b> per venditore') >= 0, spento.indexOf('Nessuno ancora') >= 0,
-              spento.indexOf('nella chat del bot ✈️ Telegram') >= 0];
+const chipCorpo = h => (h.split('<div class="section-label">Venditori che segui</div>')[0]
+  .match(/<button type="button" class="tema-pill[^>]*>/g) || []);
+out.spento = [spento.indexOf('avn-spento') >= 0, spento.indexOf('aria-disabled="true"') >= 0,
+              /aria-pressed="false"[^>]*>Spenti</.test(spento),
+              attive(spento), spento.indexOf('value=""') >= 0,
+              chipCorpo(spento).length > 3 && chipCorpo(spento).every(b => / disabled>$/.test(b)),
+              /<input id="avmPrezzo"[^>]* disabled>/.test(spento),
+              spento.indexOf('<div class="avm-titolo">Avvisami dei nuovi annunci</div>') >= 0,
+              spento.indexOf('minuti') < 0,
+              spento.indexOf('Nessuno: «🔔 Segui» è nella pagina di ogni venditore.') >= 0,
+              /<div class="avm-dove">Arriva nella chat del bot Telegram<\/div>$/.test(spento)];
 out.riga = [rigaAvvisiMercatino().indexOf('id="avvisiMercatinoCassetto"') >= 0,
-            rigaAvvisiMercatino().indexOf('🛒 Mercatino') >= 0, rigaAvvisiMercatino().indexOf(spento) >= 0];
+            rigaAvvisiMercatino().indexOf('>Mercatino</div>') >= 0, rigaAvvisiMercatino().indexOf(spento) >= 0];
 myAvvisiMercatino = normalizzaAvvisiMercatino({attivo: 1, categorie: ['Motori', 'Elettronica', 'x', 'Tutto'], prezzo_max: '50', valuta: 'eur'});
 out.normalizza = myAvvisiMercatino;
 const acceso = contenutoAvvisiMercatino();
 out.acceso = [acceso.indexOf('avn-spento') < 0, /aria-pressed="true"[^>]*>Attivi</.test(acceso), dati(acceso),
-              attive(acceso).filter(a => a.indexOf('Valuta') >= 0), acceso.indexOf('value="50"') >= 0];
+              attive(acceso).filter(a => a.indexOf('Valuta') >= 0), acceso.indexOf('value="50"') >= 0,
+              acceso.indexOf(' disabled') < 0];
 mySeguiti = [{nome: 'Anna & C.', negozio: 'ab12cd34', avatar: ''}, {nome: 'Bruno', negozio: 'neg<888>', avatar: ''}];
 const lista = contenutoAvvisiMercatino();
-out.seguiti = [lista.indexOf('Nessuno ancora') < 0, (lista.match(/class="avm-seguito"/g) || []).length,
+out.seguiti = [lista.indexOf('Nessuno:') < 0, (lista.match(/class="avm-seguito"/g) || []).length,
                lista.indexOf('Anna &amp; C.') >= 0, lista.indexOf("onclick=\"apriNegozio('ab12cd34')\"") >= 0,
                lista.indexOf("onclick=\"smettiSegui('neg888')\"") >= 0, lista.indexOf('data-nome="Bruno"') >= 0];
 out.bottone = [bottoneSegui({negozio: 'neg333', seguito: false}, false), bottoneSegui({negozio: 'neg333', seguito: true}, false),
@@ -104160,7 +104173,18 @@ out.bottone = [bottoneSegui({negozio: 'neg333', seguito: false}, false), bottone
 VETRINA = true; out.vetrina = bottoneSegui({negozio: 'neg333', seguito: false}, false); VETRINA = false;
 DEMO = true; out.demo = [rigaAvvisiMercatino(), bottoneSegui({negozio: 'neg333'}, false)]; DEMO = false;
 myTgId = null; out.anonimo = [rigaAvvisiMercatino(), bottoneSegui({negozio: 'neg333'}, false)]; myTgId = -3;
-out.nativo = contenutoAvvisiMercatino().indexOf('come 🟣 DM Nostr cifrato') >= 0;
+out.nativo = [fraseDoveAvvisiMercatino()];
+myCanaleNotifiche = 'entrambi'; out.nativo.push(fraseDoveAvvisiMercatino());
+myTgId = 222; myCanaleNotifiche = 'nostr'; out.nativo.push(fraseDoveAvvisiMercatino()); myCanaleNotifiche = '';
+// da spento le scelte non partono nemmeno chiamate a mano
+let chiesto = 0;
+setAvvisiMercatino = async () => { chiesto++; };
+myAvvisiMercatino = normalizzaAvvisiMercatino(null);
+scegliCategoriaAvvisiMercatino('Motori'); scegliValutaAvvisiMercatino('eur'); salvaPrezzoAvvisiMercatino('10');
+out.guardie = [chiesto];
+myAvvisiMercatino = normalizzaAvvisiMercatino({attivo: true});
+scegliCategoriaAvvisiMercatino('Motori');
+out.guardie.push(chiesto);
 console.log(JSON.stringify(out));
 """)
     out = _node_banco(js)
@@ -104168,15 +104192,17 @@ console.log(JSON.stringify(out));
         salta("il client degli avvisi del mercatino in node", "node non c'e'")
         return
     prova("a leve spente niente riga e niente bottone", ["", ""], out["fuoriCasa"])
-    prova("SPENTO DI SERIE: il corpo si spegne a vista, «Spenti», «Tutte» accesa e sats, prezzo vuoto, le due "
-          "finestre coi numeri del server, «Nessuno ancora», e dove arriva",
-          [True, True, ["scegliCategoriaAvvisiMercatino('')", "scegliValutaAvvisiMercatino('sats')"], True, True, True, True, True],
+    prova("SPENTO DI SERIE, ALLEGGERITO: il corpo grigio e aria-disabled, «Spenti», «Tutte» e sats accese, prezzo "
+          "vuoto, OGNI chip del corpo e il campo `disabled`, il titolo senza spiegazione, nessuna frequenza, "
+          "l'invito breve a seguire, e in fondo la riga sola di dove arriva",
+          [True, True, True, ["scegliCategoriaAvvisiMercatino('')", "scegliValutaAvvisiMercatino('sats')"],
+           True, True, True, True, True, True, True],
           out["spento"])
     prova("la riga del cassetto: l'id, il titolo «Mercatino», e dentro il contenuto", [True, True, True], out["riga"])
     prova("il normalizzatore: categorie nell'ordine del catalogo senza «Tutto» ne' sconosciute, euro, 50",
           {"attivo": True, "categorie": ["Elettronica", "Motori"], "prezzo_max": 50, "valuta": "eur"}, out["normalizza"])
-    prova("acceso: «Attivi», le due chip delle categorie accese, «€» accesa, il prezzo nel campo",
-          [True, True, ["Elettronica", "Motori"], ["scegliValutaAvvisiMercatino('eur')"], True], out["acceso"])
+    prova("acceso: «Attivi», le due chip delle categorie accese, «€» accesa, il prezzo nel campo, niente `disabled`",
+          [True, True, ["Elettronica", "Motori"], ["scegliValutaAvvisiMercatino('eur')"], True, True], out["acceso"])
     prova("l'elenco dei seguiti: due righe, il nome scappato, il nome apre il negozio, «Smetti» col codice "
           "passato dal filtro-alfabeto, la faccia", [True, 2, True, True, True, True], out["seguiti"])
     prova("IL BOTTONE «🔔 SEGUI»: vuoto se non lo segui, PIENO («Seguito ✓», aria-pressed) se lo segui, "
@@ -104189,7 +104215,11 @@ console.log(JSON.stringify(out));
            out["bottone"][2], out["bottone"][3]])
     prova("in vetrina anonima, in demo e da anonimi: niente bottone e niente riga",
           ["", ["", ""], ["", ""]], [out["vetrina"], out["demo"], out["anonimo"]])
-    prova("al nativo Nostr la riga dice il DM cifrato", True, out["nativo"])
+    prova("LA RIGA IN FONDO: al nativo Nostr «Arriva come messaggio Nostr», a chi ha scelto entrambi le due, "
+          "e la scelta del cassetto vince sul tipo di login",
+          ["Arriva come messaggio Nostr", "Arriva nella chat del bot Telegram e come messaggio Nostr",
+           "Arriva come messaggio Nostr"], out["nativo"])
+    prova("da spento le scelte non partono nemmeno chiamate a mano; da acceso si'", [0, 1], out["guardie"])
 
 
 def prove_config_esempio():

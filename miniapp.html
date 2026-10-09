@@ -2828,7 +2828,18 @@
   .segui-btn.attivo{border-color:var(--sats);background:var(--sats);color:#fff}
   /* ...e il blocco «Mercatino» del cassetto Avvisi: il campo del prezzo
      massimo con le due valute accanto, e l'elenco dei venditori seguiti
-     con la faccia, il nome (che apre il negozio) e «Smetti» */
+     con la faccia, il nome (che apre il negozio) e «Smetti».
+     ALLEGGERITO (9 ott 2026 sera, ritocco di Andrea, per uniformarlo al
+     blocco P2P): in testa il solo interruttore con la sua scritta
+     (`.avm-titolo`), da spento le scelte grigie (`.avn-corpo.avn-spento`,
+     la stessa del P2P) e `disabled`, in fondo una riga sola
+     (`.avm-dove`, una frase: --ink-soft come le altre a 12,5px).
+     ⚠️ GEMELLE di `.avn-titolo` e `.avn-dove` del ritocco P2P
+     (cantiere avvisi-p2p-ritocco), che quando si scrivono qui non sono
+     ancora su main: il giorno che ci arrivano si fondono in quelle. */
+  .avm-titolo{min-width:0;flex:1;font-size:13.5px;font-weight:800}
+  .avm-dove{margin-top:12px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
+  .avn-corpo.avn-spento .tema-pill[disabled],.avn-corpo.avn-spento input[disabled]{cursor:default}
   .avm-prezzo{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
   .avm-prezzo input{font:inherit;font-size:13px;width:110px;padding:6px 10px;
     border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
@@ -34960,10 +34971,30 @@ let avvisiMercatinoLeve = null;     // {attivi, minuti, seguiMinuti} da /api/me
 function avvisiMercatinoInCasa(){
   return !!(avvisiMercatinoLeve && avvisiMercatinoLeve.attivi) && !DEMO && !!myTgId;
 }
-const pillAvm = (testo, scelto, gesto, dati) =>
+/* LA RIGA IN FONDO (9 ott 2026 sera, ritocco di Andrea): «Arriva nella
+   chat del bot Telegram» o «Arriva come messaggio Nostr», niente
+   frequenza. La regola e' quella del cassetto (la scelta di
+   `canale_notifiche`, o senza scelta il tipo di login), perche' la riga
+   dica dove arriva DAVVERO; «entrambi» dice le due.
+   ⚠️ E' la frase che il ritocco P2P (avvisi-p2p-ritocco) mette in
+   `doveArrivanoAvvisi()`, che su main oggi torna ancora la forma lunga
+   («nella chat del bot ✈️ Telegram») letta dal blocco P2P: toccarla da
+   qui gli farebbe dire «Arriva Arriva…». Quando quel ritocco arriva, le
+   due si fondono e questa se ne va. */
+function fraseDoveAvvisiMercatino(){
+  const tgOk = myTgId != null && myTgId > 0;
+  const attivo = myCanaleNotifiche || (tgOk ? 'telegram' : 'nostr');
+  return {telegram: 'Arriva nella chat del bot Telegram',
+          nostr: 'Arriva come messaggio Nostr',
+          entrambi: 'Arriva nella chat del bot Telegram e come messaggio Nostr'}[attivo]
+    || 'Arriva nella chat del bot Telegram';
+}
+/* le chip: da spento `disabled`, e il gesto non parte nemmeno se
+   qualcuno lo chiama a mano (le guardie nei `scegli…`) */
+const pillAvm = (testo, scelto, gesto, dati, spento) =>
   '<button type="button" class="tema-pill' + (scelto ? ' active' : '')
   + '" aria-pressed="' + (scelto ? 'true' : 'false') + '"' + (dati || '')
-  + ' onclick="' + gesto + '">' + esc(testo) + '</button>';
+  + ' onclick="' + gesto + '"' + (spento ? ' disabled' : '') + '>' + esc(testo) + '</button>';
 const interruttoreAvm = (on, gesto) =>
   '<button type="button" onclick="' + gesto + '" aria-pressed="' + (on ? 'true' : 'false') + '"'
   + ' style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid '
@@ -34971,43 +35002,31 @@ const interruttoreAvm = (on, gesto) =>
   + ';color:' + (on ? '#fff' : 'var(--muted)') + ';border-radius:99px;padding:6px 14px;cursor:pointer">'
   + (on ? 'Attivi' : 'Spenti') + '</button>';
 function contenutoAvvisiMercatino(){
-  const p = myAvvisiMercatino, on = !!p.attivo;
-  const L = avvisiMercatinoLeve || {};
+  const p = myAvvisiMercatino, on = !!p.attivo, off = !on;
   let h = '<div class="avn-testa">'
-    + '<div style="min-width:0;flex:1">'
-    + '<div style="font-size:13.5px;font-weight:800">🆕 Avvisami dei nuovi annunci</div>'
-    + '<div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">'
-    + 'Quando nel mercatino compare un annuncio nuovo, di chiunque.</div></div>'
+    + '<div class="avm-titolo">Avvisami dei nuovi annunci</div>'
     + interruttoreAvm(on, 'setAvvisiMercatino({attivo:' + (on ? 'false' : 'true') + '})') + '</div>'
-    + '<div class="avn-corpo' + (on ? '' : ' avn-spento') + '">'
+    + '<div class="avn-corpo' + (on ? '' : ' avn-spento') + '"' + (on ? '' : ' aria-disabled="true"') + '>'
     + '<div class="section-label">Categorie</div>'
     + '<div class="p2p-metodi">'
-    + pillAvm('Tutte', !p.categorie.length, "scegliCategoriaAvvisiMercatino('')")
+    + pillAvm('Tutte', !p.categorie.length, "scegliCategoriaAvvisiMercatino('')", '', off)
     + CATS.filter(c => c !== 'Tutto').map(c =>
         pillAvm(c, p.categorie.indexOf(c) >= 0, 'scegliCategoriaAvvisiMercatino(this.dataset.c)',
-                ' data-c="' + esc(c) + '"')).join('')
+                ' data-c="' + esc(c) + '"', off)).join('')
     + '</div>'
     + '<div class="section-label">Prezzo massimo</div>'
     + '<div class="avm-prezzo"><input id="avmPrezzo" type="text" inputmode="decimal" placeholder="nessuno"'
     + ' aria-label="Prezzo massimo" value="' + (p.prezzo_max ? esc(String(p.prezzo_max)) : '') + '"'
-    + ' onchange="salvaPrezzoAvvisiMercatino(this.value)">'
-    + pillAvm('sats', p.valuta === 'sats', "scegliValutaAvvisiMercatino('sats')")
-    + pillAvm('€', p.valuta === 'eur', "scegliValutaAvvisiMercatino('eur')")
-    + '</div></div>'
-    + '<div class="hint">📬 Arriva ' + doveArrivanoAvvisi()
-    + (L.minuti ? ', al massimo uno ogni <b>' + L.minuti + ' minuti</b>' : '')
-    + ': quanti annunci nuovi e i primi titoli, col tocco che apre Esplora coi tuoi filtri. '
-    + 'Mai per i tuoi annunci.</div>';
-  /* ...e i venditori seguiti: il gesto sta nella loro pagina, qui
-     l'elenco e lo «Smetti» */
-  h += '<div class="avn-testa" style="margin-top:12px"><div style="min-width:0;flex:1">'
-    + '<div style="font-size:13.5px;font-weight:800">🔔 Venditori che segui</div>'
-    + '<div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">'
-    + 'Un avviso quando pubblicano'
-    + (L.seguiMinuti ? ', al massimo uno ogni <b>' + L.seguiMinuti + ' minuti</b> per venditore' : '')
-    + '.</div></div></div>';
+    + ' onchange="salvaPrezzoAvvisiMercatino(this.value)"' + (off ? ' disabled' : '') + '>'
+    + pillAvm('sats', p.valuta === 'sats', "scegliValutaAvvisiMercatino('sats')", '', off)
+    + pillAvm('€', p.valuta === 'eur', "scegliValutaAvvisiMercatino('eur')", '', off)
+    + '</div></div>';
+  /* ...e i venditori seguiti: NON dipendono dall'interruttore (seguire e'
+     un gesto a se'), quindi stanno fuori dal corpo grigio. Il gesto sta
+     nella loro pagina, qui l'elenco e lo «Smetti» */
+  h += '<div class="section-label">Venditori che segui</div>';
   if (!mySeguiti.length)
-    h += '<div class="hint">Nessuno ancora: il bottone «🔔 Segui» è nella pagina di ogni venditore.</div>';
+    h += '<div class="hint">Nessuno: «🔔 Segui» è nella pagina di ogni venditore.</div>';
   else
     h += '<div class="avm-seguiti">' + mySeguiti.map(s => {
       const cod = String(s.negozio || '').replace(/[^A-Za-z0-9_]/g, '');
@@ -35018,13 +35037,13 @@ function contenutoAvvisiMercatino(){
         + '<button type="button" class="tema-pill" onclick="smettiSegui(\'' + cod + '\')">Smetti</button>'
         + '</div>';
     }).join('') + '</div>';
-  return h;
+  return h + '<div class="avm-dove">' + esc(fraseDoveAvvisiMercatino()) + '</div>';
 }
 /* la riga del cassetto Avvisi: il blocco «Mercatino», dentro la cornice
    delle righe vicine */
 const rigaAvvisiMercatino = () => !avvisiMercatinoInCasa() ? '' :
   '<div id="avvisiMercatinoCassetto" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">'
-  + '<div class="section-label" style="padding-top:0">🛒 Mercatino</div>'
+  + '<div class="section-label" style="padding-top:0">Mercatino</div>'
   + contenutoAvvisiMercatino() + '</div>';
 async function setAvvisiMercatino(patch){
   haptic();
@@ -35045,6 +35064,7 @@ async function setAvvisiMercatino(patch){
                                    : 'Avvisi dei nuovi annunci spenti');
 }
 function scegliCategoriaAvvisiMercatino(c){
+  if (!myAvvisiMercatino.attivo) return;   // spento: le chip sono `disabled`
   if (!c) { setAvvisiMercatino({categorie: []}); return; }   // «Tutte»
   const cats = myAvvisiMercatino.categorie.slice();
   const i = cats.indexOf(c);
@@ -35054,9 +35074,11 @@ function scegliCategoriaAvvisiMercatino(c){
 /* il prezzo si salva quando si lascia il campo: vuoto o storto = nessun
    tetto (numeroFiltro, lo stesso dei filtri della vetrina) */
 function salvaPrezzoAvvisiMercatino(v){
+  if (!myAvvisiMercatino.attivo) return;
   setAvvisiMercatino({prezzo_max: numeroFiltro(v) || 0});
 }
 function scegliValutaAvvisiMercatino(v){
+  if (!myAvvisiMercatino.attivo) return;
   const inp = el('avmPrezzo');
   setAvvisiMercatino({valuta: v === 'eur' ? 'eur' : 'sats',
                       prezzo_max: inp ? (numeroFiltro(inp.value) || 0) : myAvvisiMercatino.prezzo_max});

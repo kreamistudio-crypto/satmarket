@@ -42827,3 +42827,36 @@ venditore seguito, e che le tre leve nuove compaiano nel pannello
 Non provato dal vivo il DM Nostr (coperto dalla prova su `notifica()` e
 dal collaudo). Il tocco `?max=…` da Telegram passa dal bot come link
 esterno: da verificare sul telefono che la vetrina si apra già filtrata.
+
+**Il ritocco prima del push (9 ott 2026, sera, Andrea): il blocco
+alleggerito come quello del P2P.** Nel blocco «Mercatino» del cassetto
+Avvisi i testi si fanno leggeri: in testa il SOLO interruttore
+«Avvisami dei nuovi annunci», senza riga di spiegazione né emoji; da
+spento categorie e prezzo massimo restano grigi (`.avn-corpo.avn-spento`,
+la stessa classe del blocco P2P, con `aria-disabled`) e NON si toccano —
+ogni chip e il campo del prezzo `disabled`, e le tre funzioni dei gesti
+escono subito a interruttore spento; in fondo una riga sola, «Arriva
+nella chat del bot Telegram» o «Arriva come messaggio Nostr» (le due a
+chi ha scelto «entrambi»), senza la frequenza; i «Venditori che segui»
+restano fuori dal corpo grigio (seguire non dipende dall'interruttore),
+con l'etichetta e l'elenco, e senza la riga dei 15 minuti. Il titolo del
+blocco è «Mercatino», senza 🛒. Le regole che le frasi tolte dicevano
+(al più uno ogni 60 e 15 minuti, mai per i propri annunci) restano
+tutte nel server: si è tolto il testo, non il comportamento.
+*Il ritocco P2P non era ancora su main* al rebase: esiste solo sul ramo
+locale `cantiere/avvisi-p2p-ritocco` di un'altra sessione. Quindi le sue
+classi non si sono ricalcate: `.avm-titolo` e `.avm-dove` sono le
+GEMELLE di `.avn-titolo` e `.avn-dove` (stesse regole), e la frase sta in
+`fraseDoveAvvisiMercatino()` e non in `doveArrivanoAvvisi()` — quella su
+main torna ancora la forma lunga letta dal blocco P2P, e cambiarla da qui
+gli avrebbe fatto dire «Arriva Arriva…». Il giorno che il ritocco P2P
+arriva, le gemelle si fondono nelle sue (una prova dice già che il blocco
+non chiama `doveArrivanoAvvisi`). *Provato*: `prove_avvisi_mercatino` (64,
+la parte client riscritta: spento grigio e `disabled` su ogni chip e sul
+campo, nessuna frequenza né spiegazione, la riga nei tre canali, le
+guardie dei gesti); dal vivo con Playwright sulla copia (8137): spento 32
+chip su 32 e il campo `disabled`, opacità 0,55, un tocco su una chip
+grigia non cambia niente sul server; acceso nessuna `disabled`, la chip
+«Alimenti e bevande» si accende; la riga in fondo dice «Arriva nella chat
+del bot Telegram». Scatti `06-ritocco-spento-*.png` e
+`07-ritocco-acceso-*.png` in `.claude/giri/avvisi-mercatino/`.
