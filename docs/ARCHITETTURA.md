@@ -9769,14 +9769,22 @@
   porta i seguiti nei due versi e la coda. Frontend: il blocco
   «Mercatino» ACCODATO nel cassetto Avvisi dopo le righe del P2P
   (`rigaAvvisiMercatino`, `insertAdjacentHTML`: la riga delle sorelle
-  non si tocca), alleggerito coi PEZZI del blocco P2P — il solo
-  interruttore in `.avn-titolo`, da spento categorie e prezzo grigi
-  (`.avn-corpo.avn-spento`) e `disabled`, in fondo la riga sola
-  `.avn-dove` con `doveArrivanoAvvisi()`, senza frequenza; nessuna
-  classe gemella —, `bottoneSegui` sotto la riga delle vendite nel
-  riquadro di `renderNegozio` (vuoto / pieno «🔔 Seguito ✓», mai sul
-  proprio, mai in vetrina anonima), `chiediSegui` che aggiorna il
-  bottone e l'elenco dalla stessa risposta.
+  non si tocca). In CIMA al blocco i VENDITORI CHE SEGUI
+  (`seguitiAvvisiMercatino`, dal 9 ott sera): faccia, nome che apre il
+  negozio e la campanella accesa che smette, o la riga «Tocca la 🔔
+  sulla pagina di un venditore per seguirlo»; SOTTO, staccato da un
+  filo (`.avm-tutti`) e indipendente, l'interruttore di tutti gli
+  annunci, alleggerito coi PEZZI del blocco P2P — il solo interruttore
+  in `.avn-titolo`, da spento categorie e prezzo grigi
+  (`.avn-corpo.avn-spento`) e `disabled` —; in fondo, per le due cose,
+  la riga sola `.avn-dove` con `doveArrivanoAvvisi()`, senza
+  frequenza; nessuna classe gemella. LA CAMPANELLA «SEGUI» è un
+  `.tondo` (`tondoSegui`, una fabbrica per i due posti): in
+  `renderNegozio` apre la fila dei tondi di Telegram e Nostr, della
+  loro misura, VUOTA (filo --muted) o PIENA nel colore di casa, con
+  la campana di `iconaCampanellaP2P`; `tondiVenditore` non cambia per
+  lei. Mai sul proprio, mai in vetrina anonima; `chiediSegui`
+  aggiorna la campanella e l'elenco dalla stessa risposta.
   Feedback e stelle (lug 2026): tabella `feedback(ordine_id, da_tg_id,
   per_tg_id, voto 1-5, commento ≤200, creato)` con
   `UNIQUE(ordine_id, da_tg_id)` come giudice dei doppioni.

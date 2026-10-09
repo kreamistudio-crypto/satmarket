@@ -2818,17 +2818,24 @@
      12,5px (il censimento del grigio piccolo, prove.py) */
   .avn-dove{margin-top:12px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
   .avn-soglie{margin-top:-2px}
-  /* IL BOTTONE «🔔 SEGUI» DELLA PAGINA DEL VENDITORE (9 ott 2026, richiesta
-     di Andrea): VUOTO se non lo segui, PIENO e arancio se lo segui — la
-     stessa grammatica delle pillole «Attivi/Spenti» del cassetto. Sta
-     sotto la riga delle vendite, nel riquadro del venditore. */
-  .segui-btn{margin-top:8px;font:inherit;font-size:12.5px;font-weight:800;
-    border:1px solid var(--line);background:transparent;color:var(--muted);
-    border-radius:99px;padding:5px 12px;cursor:pointer}
-  .segui-btn.attivo{border-color:var(--sats);background:var(--sats);color:#fff}
+  /* LA CAMPANELLA «SEGUI» DELLA PAGINA DEL VENDITORE (9 ott 2026, sera,
+     ritocco di Andrea su 82dae8a): non piu' una pillola sotto la riga
+     delle vendite ma un TONDO della fila di Telegram e Nostr, della loro
+     misura (40px, area 44 dal ::after di `.tondo`), con la loro ombra.
+     VUOTA se non lo segui — il tratto della campana in --ink e il filo
+     --muted dentro il cerchio, come il tondo del link —; PIENA e accesa
+     nel colore di casa, campana bianca piena, se lo segui. La campana e'
+     il tracciato del libro P2P (`iconaCampanellaP2P`): un'emoji
+     «campana vuota» non esiste. Lo STESSO tondo, sempre acceso, sta
+     accanto a ogni negozio seguito nel cassetto Avvisi: toccarlo smette. */
+  .tondo.segui{background:var(--card);color:var(--ink);
+    box-shadow:inset 0 0 0 1px var(--muted),0 1px 3px rgba(0,0,0,.22)}
+  .tondo.segui.acceso{background:var(--sats);color:#fff;
+    box-shadow:0 1px 3px rgba(0,0,0,.22)}
+  .tondo.segui svg{width:21px;height:21px}
   /* ...e il blocco «Mercatino» del cassetto Avvisi: il campo del prezzo
      massimo con le due valute accanto, e l'elenco dei venditori seguiti
-     con la faccia, il nome (che apre il negozio) e «Smetti».
+     con la faccia, il nome (che apre il negozio) e la campanella accesa.
      ALLEGGERITO (9 ott 2026 sera, ritocco di Andrea, per uniformarlo al
      blocco P2P): la testa, il corpo grigio da spento e la riga in fondo
      sono i PEZZI DEL BLOCCO P2P (`.avn-titolo`, `.avn-corpo.avn-spento`,
@@ -2838,8 +2845,11 @@
   .avm-prezzo{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
   .avm-prezzo input{font:inherit;font-size:13px;width:110px;padding:6px 10px;
     border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
-  .avm-seguiti{display:flex;flex-direction:column;gap:6px;margin-top:8px}
-  .avm-seguito{display:flex;align-items:center;gap:8px}
+  .avm-seguiti{display:flex;flex-direction:column;gap:8px}
+  .avm-seguito{display:flex;align-items:center;gap:10px}
+  /* l'interruttore di TUTTI gli annunci, sotto i seguiti e staccato da
+     loro dal filo delle righe vicine: due cose indipendenti */
+  .avm-tutti{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
   .avm-seguito .avm-nome{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
     white-space:nowrap;font-size:13px;cursor:pointer}
   /* il gruppo dei due cerchietti (9 ott 2026 sera): vedi la testata */
@@ -21124,11 +21134,19 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
   /* I PONTI E IL LINK SONO TONDI DENTRO IL RIQUADRO (24 set 2026): i due
      ponti mai sul PROPRIO negozio, il link del negozio anche li'. Il
      perche', e il filtro-alfabeto, stanno su `tondiVenditore`. */
-  const tondi = tondiVenditore(
+  const ponti = tondiVenditore(
     mio ? '' : v.username,
     mio ? '' : (v.npub_verificata && v.npub ? v.npub : ''),
     chi ? `a ${esc(chi)}` : 'al venditore',
     (v.username||v.negozio) ? 'negozio' : '');
+  /* LA CAMPANELLA «SEGUI» APRE LA FILA DEI TONDI (9 ott 2026, sera,
+     ritocco di Andrea): accanto a Telegram e Nostr e della loro misura,
+     non piu' una pillola sotto le vendite. I ponti e il link restano
+     nell'ordine di `tondiVenditore`, che non cambia per lei. */
+  const segui = bottoneSegui(v, mio);
+  const tondi = !segui ? ponti
+    : ponti ? ponti.replace('<div class="tondi">', '<div class="tondi">' + segui)
+    : `<div class="tondi">${segui}</div>`;
   el('negozioHeader').innerHTML = `
     ${bannerNegozio(v)}
     ${raccontoNegozio(v)}
@@ -21138,7 +21156,6 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
       <div class="who"><b>${esc(v.nome||'—')}${v.staff ? bollinoStaff() : ''}${badge}${fiducia}</b>
         ${titoloRiga(v.titolo, v.livello_numero)}
         <div class="rep">${rep}</div>
-        ${bottoneSegui(v, mio)}
       </div>
       ${tondi}
     </div>`;
@@ -34963,10 +34980,10 @@ function scegliSogliaAvvisiNuoviP2P(s){
    i nuovi, con un filtro facoltativo di categorie e di prezzo massimo,
    raggruppati al massimo uno ogni N minuti (il numero lo dice il
    server) con quanti sono e i primi titoli, e il tocco che apre Esplora
-   coi suoi filtri — e «🔔 Segui» sulla pagina di un venditore: quando
+   coi suoi filtri — e la 🔔 sulla pagina di un venditore: quando
    lui pubblica arriva un avviso, raggruppato se ne pubblica piu' d'uno
    in poco tempo (al massimo uno ogni M minuti per venditore). L'elenco
-   dei venditori seguiti, con «Smetti», sta qui nel cassetto.
+   dei venditori seguiti, ognuno con la sua 🔔 accesa, sta qui in cima.
    SPENTO DI SERIE l'interruttore; seguire e' un gesto, quindi acceso
    per costruzione. Mai per i propri annunci, mai due volte lo stesso.
    LO STATO E' DEL SERVER: `myAvvisiMercatino` e `mySeguiti` cambiano
@@ -35029,25 +35046,35 @@ function contenutoAvvisiMercatino(){
     + pillAvm('sats', p.valuta === 'sats', "scegliValutaAvvisiMercatino('sats')", '', off)
     + pillAvm('€', p.valuta === 'eur', "scegliValutaAvvisiMercatino('eur')", '', off)
     + '</div></div>';
-  /* ...e i venditori seguiti: NON dipendono dall'interruttore (seguire e'
-     un gesto a se'), quindi stanno fuori dal corpo grigio. Il gesto sta
-     nella loro pagina, qui l'elenco e lo «Smetti» */
-  h += '<div class="section-label">Venditori che segui</div>';
-  if (!mySeguiti.length)
-    h += '<div class="hint">Nessuno: «🔔 Segui» è nella pagina di ogni venditore.</div>';
-  else
-    h += '<div class="avm-seguiti">' + mySeguiti.map(s => {
-      const cod = String(s.negozio || '').replace(/[^A-Za-z0-9_]/g, '');
-      return '<div class="avm-seguito">'
-        + voltoHTML({nome: s.nome, avatar: s.avatar, negozio: cod, ignoto: true}, 'fb-faccia')
-        + '<b class="avm-nome"' + (cod ? ' onclick="apriNegozio(\'' + cod + '\')"' : '') + '>'
-        + esc(s.nome || 'Un venditore') + '</b>'
-        + '<button type="button" class="tema-pill" onclick="smettiSegui(\'' + cod + '\')">Smetti</button>'
-        + '</div>';
-    }).join('') + '</div>';
   /* in fondo la riga sola, la STESSA del blocco P2P: «Arriva nella chat
-     del bot Telegram» o «Arriva come messaggio Nostr», senza frequenza */
-  return h + '<div class="avn-dove">' + esc(doveArrivanoAvvisi()) + '</div>';
+     del bot Telegram» o «Arriva come messaggio Nostr», senza frequenza.
+     Vale per le due cose del blocco, quindi sta fuori da tutt'e due */
+  return seguitiAvvisiMercatino() + '<div class="avm-tutti">' + h + '</div>'
+    + '<div class="avn-dove">' + esc(doveArrivanoAvvisi()) + '</div>';
+}
+/* I VENDITORI CHE SEGUI, IN CIMA AL BLOCCO (9 ott 2026, sera, ritocco di
+   Andrea): stavano in fondo, sotto l'interruttore di TUTTI gli annunci,
+   e chi aveva appena toccato la 🔔 di un venditore apriva il cassetto,
+   leggeva «Spenti» in testa e credeva di non essere avvisato di niente.
+   Ora sono la prima cosa, sempre visibili: la faccia, il nome (che apre
+   il negozio) e la SUA campanella accesa — lo stesso tondo della pagina
+   del venditore — da toccare per smettere. Non dipendono
+   dall'interruttore qui sotto, che resta separato: seguire e' un gesto
+   a se'. */
+function seguitiAvvisiMercatino(){
+  const h = '<div class="section-label">Venditori che segui</div>';
+  if (!mySeguiti.length)
+    return h + '<div class="hint">Tocca la 🔔 sulla pagina di un venditore per seguirlo</div>';
+  return h + '<div class="avm-seguiti">' + mySeguiti.map(s => {
+    const cod = String(s.negozio || '').replace(/[^A-Za-z0-9_]/g, '');
+    const nome = s.nome || 'Un venditore';
+    return '<div class="avm-seguito">'
+      + voltoHTML({nome: s.nome, avatar: s.avatar, negozio: cod, ignoto: true}, 'fb-faccia')
+      + '<b class="avm-nome"' + (cod ? ' onclick="apriNegozio(\'' + cod + '\')"' : '') + '>'
+      + esc(nome) + '</b>'
+      + tondoSegui(true, 'smettiSegui(\'' + cod + '\')', 'Smetti di seguire ' + nome)
+      + '</div>';
+  }).join('') + '</div>';
 }
 /* la riga del cassetto Avvisi: il blocco «Mercatino», dentro la cornice
    delle righe vicine */
@@ -35093,17 +35120,27 @@ function scegliValutaAvvisiMercatino(v){
   setAvvisiMercatino({valuta: v === 'eur' ? 'eur' : 'sats',
                       prezzo_max: inp ? (numeroFiltro(inp.value) || 0) : myAvvisiMercatino.prezzo_max});
 }
-/* IL BOTTONE «🔔 SEGUI» nel riquadro del venditore: pieno se lo segui.
-   Mai sul proprio negozio, mai in vetrina anonima, mai senza un codice
-   di negozio da seguire. `v.seguito` lo dice /api/negozio a chi e'
-   entrato. */
+/* LA CAMPANELLA TONDA, una fabbrica per i due posti (la fila dei tondi
+   del venditore e l'elenco del cassetto): la pelle di `.tondo`, VUOTA o
+   PIENA, il nome dell'azione in aria-label e title come gli altri tondi.
+   Il gesto arriva gia' passato dal filtro-alfabeto. */
+function tondoSegui(on, gesto, nome, id){
+  return '<button type="button" class="tondo segui' + (on ? ' acceso' : '') + '"'
+    + (id ? ' id="' + id + '"' : '') + ' aria-pressed="' + (on ? 'true' : 'false') + '"'
+    + ' onclick="' + gesto + '" aria-label="' + esc(nome) + '" title="' + esc(nome) + '">'
+    + iconaCampanellaP2P(on) + '</button>';
+}
+/* LA CAMPANELLA «SEGUI» nella fila dei tondi del venditore: piena se lo
+   segui. Mai sul proprio negozio, mai in vetrina anonima, mai senza un
+   codice di negozio da seguire. `v.seguito` lo dice /api/negozio a chi
+   e' entrato. */
 function bottoneSegui(v, mio){
   if (!avvisiMercatinoInCasa() || VETRINA || mio || !v || !v.negozio) return '';
   const cod = String(v.negozio).replace(/[^A-Za-z0-9_]/g, '');
   const on = !!v.seguito;
-  return '<button type="button" class="segui-btn' + (on ? ' attivo' : '') + '" id="seguiBtn"'
-    + ' aria-pressed="' + (on ? 'true' : 'false') + '" onclick="toggleSegui(\'' + cod + '\')">'
-    + (on ? '🔔 Seguito ✓' : '🔔 Segui') + '</button>';
+  return tondoSegui(on, 'toggleSegui(\'' + cod + '\')',
+    on ? 'Lo segui: tocca per non ricevere più avvisi' : 'Seguilo: ti avviso quando pubblica',
+    'seguiBtn');
 }
 async function chiediSegui(cod, segui){
   try {
@@ -35129,12 +35166,12 @@ async function toggleSegui(cod){
   if (DEMO) { toast('In demo non ci sono avvisi veri 🙂'); return; }
   const v = negozioCorrente;
   const d = await chiediSegui(cod, !(v && v.negozio === cod && v.seguito));
-  if (d) toast(d.seguito ? '🔔 Ti avviso quando pubblica' : 'Non segui più questo venditore');
+  if (d) toast(d.seguito ? 'Ti avviso quando pubblica' : 'Non ti avviso più');
 }
 async function smettiSegui(cod){
   haptic();
   const d = await chiediSegui(cod, false);
-  if (d) toast('Non segui più questo venditore');
+  if (d) toast('Non ti avviso più');
 }
 
 async function setCanale(canale){

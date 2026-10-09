@@ -27446,7 +27446,7 @@ def _leve_stato():
                          "annunci nuovi — tutti coi suoi filtri, o di un "
                          "venditore che segue; raggruppati, mai per i suoi",
                   spento="nessun avviso per nessuno: il blocco del cassetto "
-                         "Avvisi e il bottone «🔔 Segui» spariscono"),
+                         "Avvisi e la 🔔 dei venditori spariscono"),
             _leva("Nuovi annunci — finestra (minuti)",
                   "MERCATINO_AVVISI_NUOVI_MINUTI", MERCATINO_AVVISI_NUOVI_MINUTI,
                   acceso="fra un messaggio «nuovi annunci» e il successivo "

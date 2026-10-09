@@ -43177,3 +43177,83 @@ Scatti in `.claude/giri/prendi-metodo/` (gitignored).
 **DA GUARDARE.** Sul telefono vero: la vibrazione (nel pane si vede solo
 la chiamata) e il lampeggio arancio a movimento pieno (il pane emula il
 movimento ridotto: lì si è visto solo l'anello fermo).
+## La campanella «Segui» tonda, e i seguiti in cima al cassetto (9 ott 2026, sera)
+
+**Cantiere avvisi-segui-ritocco**, richiesta di Andrea dopo averlo visto
+dal vivo su 36f84f0 e 53447f0. Due ritocchi a «Gli avvisi del
+mercatino» (82dae8a e i due commit dopo), il server non cambia.
+
+**1) LA CAMPANELLA.** Il «🔔 Segui» era una pillola sotto la riga delle
+vendite, «🔔 Seguito ✓» da pieno. Ora è un TONDO della fila di Telegram
+e Nostr del venditore: stessa misura (40 px, area 44 dal `::after` di
+`.tondo`), stessa ombra, stessa riga, e la APRE (campanella, Telegram,
+Nostr, link). Vuota se non lo segui — campana di solo tratto in --ink,
+il filo --muted dentro il cerchio come il tondo del link —, piena se lo
+segui: cerchio nel colore di casa (--sats) e campana bianca piena. La
+campana è il tracciato del libro P2P (`iconaCampanellaP2P`, a 21 px):
+un'emoji «campana vuota» non esiste e 🔕 direbbe «zittito». Una
+fabbrica sola, `tondoSegui`, per i due posti; `bottoneSegui` la chiama
+con l'id `seguiBtn`, che `chiediSegui` usa ancora per ridisegnarla.
+Al tocco il toast breve (2,2 s) dice «Ti avviso quando pubblica» o
+«Non ti avviso più». Il nome dell'azione sta in aria-label e title
+(«Seguilo: ti avviso quando pubblica» / «Lo segui: tocca per non
+ricevere più avvisi»), aria-pressed dice lo stato. STRADA SCARTATA:
+un sesto argomento a `tondiVenditore` — la firma la ritagliano per nome
+più banchi di prove.py, e gli altri tre chiamanti (il Profilo e la card
+della controparte P2P) la campanella non la vogliono; la campanella si mette davanti alla sua fila in
+`renderNegozio`, e la fila nasce da lei sola se i ponti mancano (oggi
+non succede: chi ha un codice di negozio ha sempre il tondo del link).
+
+**2) IL CASSETTO.** Il difetto visto da Andrea: tocchi la 🔔, «ti
+avviso», apri Profilo → Avvisi e in testa al blocco Mercatino leggi
+«Avvisami dei nuovi annunci — Spenti», coi seguiti in fondo sotto le
+categorie grigie: sembra tutto spento. Ora `seguitiAvvisiMercatino`
+mette in CIMA «Venditori che segui», sempre visibili, ognuno con la
+faccia, il nome (apre il negozio) e la SUA campanella accesa — lo
+stesso tondo della pagina — da toccare per smettere («Non ti avviso
+più»); nessuno seguito = la riga «Tocca la 🔔 sulla pagina di un
+venditore per seguirlo». Sotto, staccato dal filo delle righe vicine
+(`.avm-tutti`), l'interruttore di tutti gli annunci con categorie e
+prezzo, indipendente; in fondo la riga di dove arriva, che vale per
+tutt'e due. Via il «Smetti» scritto. `.segui-btn` non c'è più (tolto
+anche dal censimento del grigio piccolo); testo del pannello leve e
+commenti allineati («la 🔔 dei venditori»).
+
+**Provato.** `prove_avvisi_mercatino`: il banco node si porta
+`CAMPANA_P2P` e `iconaCampanellaP2P`; la campanella vuota e piena (classi,
+aria-pressed, aria-label, campana di tratto o piena, nessuna scritta),
+mai sul proprio né senza codice; i seguiti PRIMA di `.avm-tutti`, due
+campanelle accese che smettono col codice passato dal filtro-alfabeto e
+il nome scappato nell'aria-label; il cassetto vuoto che comincia con la
+riga nuova; le chip grigie contate dentro `.avm-tutti`; i due toast; la
+campanella nella fila e non in `.who`. `prove_feedback_tre_e_tondi`: la
+fila del negozio senza il bottone in `.who`, e la campanella davanti ai
+ponti. `prove_volto_unico`: il censimento dei volti mette il volto dei
+seguiti nella sua funzione nuova — l'unica rossa della suite al primo
+giro, vera e curata. **Giro dal vivo** con Playwright e Chrome vero (390×844, tocchi
+veri `tap`), server di collaudo su una copia nello scratchpad (porta
+8141, relay e LNbits morti, nsec segnaposto), Compra 222, Vende 333
+(Telegram e npub verificata: la fila completa), Bruno 444: i quattro
+tondi 40×40 sulla stessa riga (top 151), la campanella vuota bianca →
+piena rgb(247,147,26) con «Ti avviso quando pubblica»; SUBITO dopo il
+tocco il server dice `seguito: true` su /api/negozio e /api/me ha
+«Vende»; nel cassetto l'ordine è «Mercatino · Venditori che segui ·
+Bruno 🔔 · Vende 🔔 · Avvisami dei nuovi annunci (Spenti) · Categorie ·
+Prezzo massimo · Arriva nella chat del bot Telegram», campanelle 40×40
+accese; il tocco su quella di Bruno → «Non ti avviso più», la riga
+sparisce, il server dice falso, e la pagina di Bruno torna vuota mentre
+quella di Vende è piena (lo stesso stato dai due posti); smesso anche
+Vende dalla sua pagina, il cassetto dice «Tocca la 🔔…». **L'avviso di
+prova**: seguito di nuovo col tocco, Vende pubblica «Barattolo di miele
+del giro» dalla rotta vera POST /api/listings, e nel journal del server
+parte «🔔 Vende ha pubblicato 1 nuovo annuncio» a 222 («Venditore
+seguito: 1 annunci di 333 a 222: mandato»). Nessun errore in pagina.
+Scatti in `.claude/giri/avvisi-segui-ritocco/` (gitignored), con
+`esiti.json`.
+
+**Resta da guardare.** Sul telefono vero la campanella accanto ai loghi
+di Telegram e Nostr, e il cassetto in tema scuro. Al rebase su 3346e96 (la «🛒» davanti
+al titolo dello stesso blocco, dall'altra sessione) git ha fuso da solo
+miniapp.html e prove.py: in conflitto solo questa coda. Lo stesso al
+rebase su 43846c5 (il foglio dell'importo per gli ordini P2P normali)
+e su f67c1e1 («Compra» acceso anche senza metodo).

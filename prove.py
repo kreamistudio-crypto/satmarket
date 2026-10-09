@@ -53415,9 +53415,13 @@ def prove_feedback_tre_e_tondi():
     prova("tondi: nel negozio sono la fila in fondo alla card", True,
           bool(re.search(
               r'<div class="seller\$\{tondi \? \' con-tondi\' : \'\'\}"[^>]*>'
-              r'[\s\S]*?<div class="rep">\$\{rep\}</div>\s*'
-              r'(\$\{bottoneSegui\(v, mio\)\}\s*)?</div>\s*'
+              r'[\s\S]*?<div class="rep">\$\{rep\}</div>\s*</div>\s*'
               r'\$\{tondi\}\s*</div>`;', rn)))
+    # LA CAMPANELLA «SEGUI» (9 ott 2026, sera) apre la fila: e' un tondo
+    # anche lei, e i ponti restano quelli di `tondiVenditore`
+    prova("tondi: la campanella «Segui» apre la fila, davanti ai ponti", True,
+          "const segui = bottoneSegui(v, mio);" in rn
+          and "ponti.replace('<div class=\"tondi\">', '<div class=\"tondi\">' + segui)" in rn)
     prova("tondi: ...con le stesse condizioni dei bottoni di prima", True,
           "mio ? '' : v.username," in rn
           and "mio ? '' : (v.npub_verificata && v.npub ? v.npub : '')," in rn
@@ -92676,7 +92680,6 @@ def prove_introduzioni_leggibili():
     RESTANO_CSS = sorted([
         ".strumenti select,.strumenti button",   # controlli
         ".p2p-leva", ".tema-pill", ".tour-salta",  # controlli
-        ".segui-btn",                             # «🔔 Segui» nel negozio (9 ott 2026)
         ".giro-porta",                            # il link che riapre il tour
         ".p2p-sez-tit",                           # titoli di sezione
         ".acc-h .conta",                          # il conteggio del cassetto
@@ -104330,8 +104333,18 @@ def prove_avvisi_mercatino():
     prova("il cassetto Avvisi accoda il blocco DOPO le righe del P2P senza toccare la loro riga", True,
           "${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaRiconosciP2P()}${rigaAvvisiNuoviP2P()}`;\n" in m
           and "  box.insertAdjacentHTML('beforeend', rigaAvvisiMercatino());\n}\n" in m)
-    prova("il riquadro del venditore porta il bottone sotto la riga delle vendite", True,
-          '        <div class="rep">${rep}</div>\n        ${bottoneSegui(v, mio)}\n' in m)
+    # LA CAMPANELLA TONDA (9 ott 2026, sera, ritocco di Andrea): non piu'
+    # una pillola sotto la riga delle vendite, ma il primo tondo della fila
+    prova("il riquadro del venditore porta la campanella nella fila dei tondi, non sotto le vendite", (True, False),
+          ("  const segui = bottoneSegui(v, mio);\n  const tondi = !segui ? ponti\n" in m,
+           "${bottoneSegui(" in m))
+    prova("la campanella e' un tondo della pelle di Telegram e Nostr: vuota con il filo, accesa nel colore di casa", True,
+          ".tondo.segui{background:var(--card);color:var(--ink);" in m
+          and ".tondo.segui.acceso{background:var(--sats);color:#fff;" in m
+          and "segui-btn" not in m)
+    prova("i due avvisi brevi al tocco, dalla pagina e dal cassetto", (True, True),
+          ("toast(d.seguito ? 'Ti avviso quando pubblica' : 'Non ti avviso più');" in m,
+           "  const d = await chiediSegui(cod, false);\n  if (d) toast('Non ti avviso più');" in m))
     prova("il carico da /api/me passa dal normalizzatore (chiavi assenti = spento, nessuno, fuori casa)", True,
           "myAvvisiMercatino = normalizzaAvvisiMercatino(me.avvisi_mercatino);\n"
           "    mySeguiti = Array.isArray(me.seguiti) ? me.seguiti : [];\n"
@@ -104635,6 +104648,8 @@ def prove_avvisi_mercatino():
         "const numeroFiltro = v => { const n = parseFloat(String(v).trim().replace(',', '.')); return (isFinite(n) && n > 0) ? n : ''; };\n"
         + pezzo_js(m, "const esc = s => String(s ?? '').replace(", ";\n") + ";\n"
         + pezzo_js(m, "function doveArrivanoAvvisi(){", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "const CAMPANA_P2P = ", ";\n") + ";\n"
+        + pezzo_js(m, "function iconaCampanellaP2P(piena){", "\n}\n") + "\n}\n"
         + blocco
         + r"""
 const out = {};
@@ -104645,7 +104660,7 @@ const dati = h => (h.match(/class="tema-pill active" aria-pressed="true" data-c=
 out.fuoriCasa = [rigaAvvisiMercatino(), bottoneSegui({negozio: 'neg333', seguito: false}, false)];
 avvisiMercatinoLeve = {attivi: true, minuti: 60, seguiMinuti: 15};
 const spento = contenutoAvvisiMercatino();
-const chipCorpo = h => (h.split('<div class="section-label">Venditori che segui</div>')[0]
+const chipCorpo = h => (h.split('<div class="avm-tutti">')[1]
   .match(/<button type="button" class="tema-pill[^>]*>/g) || []);
 out.spento = [spento.indexOf('avn-spento') >= 0, spento.indexOf('aria-disabled="true"') >= 0,
               /aria-pressed="false"[^>]*>Spenti</.test(spento),
@@ -104654,7 +104669,9 @@ out.spento = [spento.indexOf('avn-spento') >= 0, spento.indexOf('aria-disabled="
               /<input id="avmPrezzo"[^>]* disabled>/.test(spento),
               /<div class="avn-testa"><div class="avn-titolo">🛒 Avvisami dei nuovi annunci<\/div><button /.test(spento),
               spento.indexOf('minuti') < 0,
-              spento.indexOf('Nessuno: «🔔 Segui» è nella pagina di ogni venditore.') >= 0,
+              spento.startsWith('<div class="section-label">Venditori che segui</div>'
+                + '<div class="hint">Tocca la 🔔 sulla pagina di un venditore per seguirlo</div>'
+                + '<div class="avm-tutti"><div class="avn-testa">'),
               /<div class="avn-dove">Arriva nella chat del bot Telegram<\/div>$/.test(spento)];
 out.riga = [rigaAvvisiMercatino().indexOf('id="avvisiMercatinoCassetto"') >= 0,
             rigaAvvisiMercatino().indexOf('>Mercatino</div>') >= 0, rigaAvvisiMercatino().indexOf(spento) >= 0];
@@ -104666,9 +104683,13 @@ out.acceso = [acceso.indexOf('avn-spento') < 0, /aria-pressed="true"[^>]*>Attivi
               acceso.indexOf(' disabled') < 0];
 mySeguiti = [{nome: 'Anna & C.', negozio: 'ab12cd34', avatar: ''}, {nome: 'Bruno', negozio: 'neg<888>', avatar: ''}];
 const lista = contenutoAvvisiMercatino();
-out.seguiti = [lista.indexOf('Nessuno:') < 0, (lista.match(/class="avm-seguito"/g) || []).length,
+out.seguiti = [lista.indexOf('Tocca la 🔔') < 0, (lista.match(/class="avm-seguito"/g) || []).length,
                lista.indexOf('Anna &amp; C.') >= 0, lista.indexOf("onclick=\"apriNegozio('ab12cd34')\"") >= 0,
-               lista.indexOf("onclick=\"smettiSegui('neg888')\"") >= 0, lista.indexOf('data-nome="Bruno"') >= 0];
+               lista.indexOf("onclick=\"smettiSegui('neg888')\"") >= 0, lista.indexOf('data-nome="Bruno"') >= 0,
+               (lista.match(/<button type="button" class="tondo segui acceso" aria-pressed="true" onclick="smettiSegui\('[a-z0-9]+'\)" aria-label="Smetti di seguire [^"]+"/g) || []).length,
+               lista.indexOf('Smetti di seguire Anna &amp; C.') >= 0,
+               lista.indexOf('<div class="avm-seguiti">') < lista.indexOf('<div class="avm-tutti">'),
+               lista.indexOf('>Smetti<') < 0];
 out.bottone = [bottoneSegui({negozio: 'neg333', seguito: false}, false), bottoneSegui({negozio: 'neg333', seguito: true}, false),
                bottoneSegui({negozio: 'neg333', seguito: false}, true), bottoneSegui({negozio: '', seguito: false}, false)];
 VETRINA = true; out.vetrina = bottoneSegui({negozio: 'neg333', seguito: false}, false); VETRINA = false;
@@ -104706,15 +104727,22 @@ console.log(JSON.stringify(out));
           {"attivo": True, "categorie": ["Elettronica", "Motori"], "prezzo_max": 50, "valuta": "eur"}, out["normalizza"])
     prova("acceso: «Attivi», le due chip delle categorie accese, «€» accesa, il prezzo nel campo, niente `disabled`",
           [True, True, ["Elettronica", "Motori"], ["scegliValutaAvvisiMercatino('eur')"], True, True], out["acceso"])
-    prova("l'elenco dei seguiti: due righe, il nome scappato, il nome apre il negozio, «Smetti» col codice "
-          "passato dal filtro-alfabeto, la faccia", [True, 2, True, True, True, True], out["seguiti"])
-    prova("IL BOTTONE «🔔 SEGUI»: vuoto se non lo segui, PIENO («Seguito ✓», aria-pressed) se lo segui, "
-          "mai sul proprio negozio, mai senza codice",
-          [True, True, "", ""],
-          [out["bottone"][0].startswith('<button type="button" class="segui-btn" id="seguiBtn" aria-pressed="false"')
-           and out["bottone"][0].endswith(">🔔 Segui</button>"),
-           'class="segui-btn attivo"' in out["bottone"][1] and 'aria-pressed="true"' in out["bottone"][1]
-           and out["bottone"][1].endswith(">🔔 Seguito ✓</button>"),
+    prova("I SEGUITI IN CIMA AL BLOCCO: due righe, il nome scappato, il nome apre il negozio, la faccia, e "
+          "per ognuno la SUA campanella accesa che smette (codice passato dal filtro-alfabeto, il nome "
+          "nell'aria-label), PRIMA dell'interruttore di tutti gli annunci; nessun «Smetti» scritto",
+          [True, 2, True, True, True, True, 2, True, True, True], out["seguiti"])
+    b0, b1 = out["bottone"][0], out["bottone"][1]
+    prova("LA CAMPANELLA «SEGUI»: un tondo VUOTO se non lo segui, PIENO e acceso se lo segui (aria-pressed, "
+          "la campana piena o di solo tratto), l'id per ridisegnarla, nessuna scritta; mai sul proprio "
+          "negozio, mai senza codice",
+          [True, True, True, True, True, True, "", ""],
+          [b0.startswith('<button type="button" class="tondo segui" id="seguiBtn" aria-pressed="false" '
+                         'onclick="toggleSegui(\'neg333\')" aria-label="Seguilo: ti avviso quando pubblica"'),
+           'fill="none" stroke="currentColor"' in b0 and b0.endswith("/></svg></button>"),
+           b1.startswith('<button type="button" class="tondo segui acceso" id="seguiBtn" aria-pressed="true" '),
+           'fill="currentColor"/>' in b1 and 'stroke=' not in b1,
+           'aria-label="Lo segui: tocca per non ricevere più avvisi"' in b1,
+           not any(x in b0 + b1 for x in ("Segui<", "Seguito", "✓")),
            out["bottone"][2], out["bottone"][3]])
     prova("in vetrina anonima, in demo e da anonimi: niente bottone e niente riga",
           ["", ["", ""], ["", ""]], [out["vetrina"], out["demo"], out["anonimo"]])
@@ -119905,9 +119933,10 @@ def prove_volto_unico():
         "fila in vetrina": ("voltoHTML(f, 'p2p-vt-volto'", "function cardVetrinaP2P(o){"),
         "card dell'altra parte": ("voltoHTML(op.volto || Object.assign",
                                   "function cardParte(c, chi, opz){"),
-        # i venditori seguiti nel cassetto Avvisi (9 ott 2026)
+        # i venditori seguiti nel cassetto Avvisi (9 ott 2026; la sera, in
+        # cima al blocco, nella loro funzione)
         "venditori seguiti": ("voltoHTML({nome: s.nome, avatar: s.avatar, negozio: cod",
-                              "function contenutoAvvisiMercatino(){"),
+                              "function seguitiAvvisiMercatino(){"),
     }
     prova("il volto si disegna da undici posti, ognuno col suo nome nel censimento",
           [11, [1] * 11], [fuori.count("voltoHTML("),
