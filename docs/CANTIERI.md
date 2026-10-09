@@ -42053,6 +42053,14 @@ pubblica un acquisto → slide → «Inizia» → giro → «Fine 🎉» → lib
 Screenshot a ogni passaggio nel verbale della sessione. Lezione del
 banco: «Inizia» alla finale va premuto quando la slide finale è pronta,
 un click subito dopo l'arrivo non parte.
+**Il controllo del banner (nota di Andrea dal cantiere 610951c).** La lenta del
+banner parte solo se il giro si chiude con «Fine»: `chiudiTour(true)` →
+`dopo(finito === true)` → `fineGiroP2P(true)` → `animaBannerFeeP2P(true)`.
+Verificato sull'albero ribasato: il giro, anche spostato dopo la prima
+pubblicazione, parte da `avviaTour(TAPPE_GIRO_P2P, fineGiroP2P)` (unica
+chiamata) e `fineGiroP2P` nuda compare solo nel ripiego di un giro che
+non e' potuto partire. Quattro prove in piu' lo tengono fermo
+(`prove_prese_dalle_10`: 66).
 
 ## I tre ritocchi alla causale (9 ott 2026, sera, richiesta di Andrea)
 

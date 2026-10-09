@@ -103024,6 +103024,26 @@ console.log(JSON.stringify(casi));
     prova("dopo la prima pubblicazione, sotto la leva e a tour mai visto, si torna al libro (e il tour parte da li')",
           True, "if (typeof preseChiuseP2P === 'function' && preseChiuseP2P() && !tourP2PVisto()) go('p2p');" in _pub
           and _pub.index("preseChiuseP2P() && !tourP2PVisto()) go('p2p')") > _pub.index("await spuntaAttesaP2P('Ordine pubblicato');"))
+    # LA LENTA DEL BANNER DOPO «FINE» (nota di Andrea dal cantiere del banner,
+    # 610951c): parte solo se il giro si chiude con «Fine» — chiudiTour(true)
+    # → dopo(finito === true) → fineGiroP2P(true) → animaBannerFeeP2P(true).
+    # Quindi il giro, anche spostato dopo la prima pubblicazione, deve
+    # partire da avviaTour(TAPPE_GIRO_P2P, fineGiroP2P) e nessun altro deve
+    # chiamare fineGiroP2P a mano: una chiamata nuda la farebbe passare
+    # per un giro saltato, e la lenta non partirebbe mai.
+    _senza = re.sub(r"/\*.*?\*/", "", mini, flags=re.S)
+    _gg = pezzo_js(_senza, "function giroGuidatoP2P(chiesto){", "\n}\n")
+    prova("il giro guidato parte SOLO da avviaTour(TAPPE_GIRO_P2P, fineGiroP2P)", (1, True),
+          (_senza.count("avviaTour(TAPPE_GIRO_P2P"),
+           "if (!avviaTour(TAPPE_GIRO_P2P, fineGiroP2P)) { fineGiroP2P(); return; }" in _gg))
+    prova("...e fineGiroP2P non si chiama altrove senza argomento: solo il ripiego di chi non e' partito",
+          2, _senza.count("fineGiroP2P("))     # la definizione e il ripiego
+    prova("...«Fine 🎉» e' chiudiTour(true), e il `dopo` riceve finito === true", True,
+          "if (tourTappa >= tourTappe.length) { chiudiTour(true); return; }" in pezzo_js(mini, "function tourAvanti(){", "\n}\n")
+          and "if (dopo) dopo(finito === true);" in pezzo_js(mini, "function chiudiTour(finito){", "\n}\n"))
+    prova("...e il percorso dopo il primo ordine e' quello di sempre: slide → «Inizia» → giroGuidatoP2P",
+          True, "? () => giroGuidatoP2P(chiesto) : null;" in mini
+          and "chiudiTourP2P(giro);" in mini)
     prova("...e «Inizia» delle slide porta al giro sulla pagina, che finisce col banner (lo stesso di sempre)",
           True, "? () => giroGuidatoP2P(chiesto) : null;" in mini
           # (dal commit del banner 610951c la fine del giro sa se e' arrivata a «Fine»: `finito`)
