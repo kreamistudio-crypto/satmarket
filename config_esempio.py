@@ -731,6 +731,16 @@ P2P_CONTANTI_MAX_EURO = 250
 # il giorno del lancio si svuota la lista E si mette True qui.
 # Solo True accende: una stringa o un numero restano spenti.
 P2P_IN_VETRINA = False
+# LA CAMPAGNA A TUTTI (9 ott 2026, la vigilia del lancio): accesa, il
+# giorno che il P2P e' aperto a tutti (P2P acceso e P2P_PROVA_IDS
+# vuota, la condizione della campagna «Avvisami») parte UNA volta sola
+# un messaggio a OGNI iscritto — Telegram o DM Nostr, il canale che
+# ognuno ha scelto — TRANNE chi aveva premuto «Avvisami» sul P2P, che
+# riceve gia' il suo: un messaggio a testa, mai due. Il timbro
+# `campagna_p2p_tutti` (tabella `timbri`) la ferma per sempre dopo il
+# primo giro, anche a leva accesa e riavvio dopo riavvio.
+# Solo True accende: una stringa o un numero restano spenti.
+P2P_CAMPAGNA_TUTTI = False
 # LA CAUZIONE DI CHI PRENDE, NEL CONTANTI DI PERSONA (1 ott 2026): chi
 # prende un ordine in contanti blocca una piccola cauzione (una seconda
 # hold invoice, il 3% con un pavimento di 1.000 sats) che torna a fine

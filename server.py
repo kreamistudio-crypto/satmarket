@@ -27276,6 +27276,20 @@ def _leve_stato():
                          "P2P_PROVA_IDS le vede solo chi prova",
                   spento="le card P2P in vetrina le vedono solo i "
                          "moderatori e chi è nella fase di prova"),
+            # LA CAMPAGNA A TUTTI (9 ott 2026): dice la costante E il
+            # timbro, perche' «accesa» da sola non dice se e' gia' partita
+            _leva("Campagna P2P a tutti", "P2P_CAMPAGNA_TUTTI",
+                  P2P_CAMPAGNA_TUTTI,
+                  acceso=("già partita (timbro scritto): non riparte "
+                          "più, la riga nel config si può togliere"
+                          if timbro_letto(TIMBRO_CAMPAGNA_P2P_TUTTI) else
+                          "parte una volta sola, al primo giro "
+                          "dell'orologio col P2P aperto a tutti: un "
+                          "messaggio a ogni iscritto tranne chi ha "
+                          "premuto «Avvisami», che riceve il suo"),
+                  spento="nessun messaggio a tutti: col P2P aperto "
+                         "parte solo la campagna a chi ha premuto "
+                         "«Avvisami»"),
             # LA CARD «P2P IN ARRIVO» (30 set 2026): la data del lancio
             # che la prima card di «Da scoprire» dice a tutti
             _leva("Card «P2P in arrivo», data", "P2P_IN_ARRIVO_FINO",
@@ -43014,6 +43028,21 @@ try:
     P2P_IN_VETRINA = P2P_IN_VETRINA is True
 except ImportError:
     P2P_IN_VETRINA = False
+# LA CAMPAGNA A TUTTI (9 ott 2026, la vigilia del lancio, richiesta di
+# Andrea): il messaggio «lo scambio P2P e' arrivato» a ogni iscritto,
+# non solo a chi aveva premuto «Avvisami». Il giudice e' la campagna
+# stessa (`avvisa_tutti_p2p`); qui c'e' solo la leva, col patto di
+# P2P_IN_VETRINA: un messaggio a TUTTI e' il gesto piu' largo che il
+# server sappia fare, e una stringa «True» scritta per sbaglio resta
+# spenta e lo si dice all'avvio.
+try:
+    from config import P2P_CAMPAGNA_TUTTI
+    if not isinstance(P2P_CAMPAGNA_TUTTI, bool):
+        print("[p2p] P2P_CAMPAGNA_TUTTI non e' True/False: la campagna a "
+              "tutti resta SPENTA")
+    P2P_CAMPAGNA_TUTTI = P2P_CAMPAGNA_TUTTI is True
+except ImportError:
+    P2P_CAMPAGNA_TUTTI = False
 # LA CAUZIONE DI CHI PRENDE, NEL CONTANTI DI PERSONA (1 ott 2026,
 # cantiere B, decisione di Andrea): l'`anti_abuse_bond` di mostrod
 # 0.19.0, acceso sul nodo SOLO per il metodo «Contanti» (patch 0008 del
@@ -51986,6 +52015,93 @@ async def avvisa_interessi_p2p():
     # sapere a chi e' arrivata (il patto dei timbri)
     print(f"🔄 Campagna «lo scambio P2P è arrivato»: avvisati "
           f"{len(mandati)} {mandati}")
+
+
+TIMBRO_CAMPAGNA_P2P_TUTTI = "campagna_p2p_tutti"
+TESTO_CAMPAGNA_P2P_TUTTI = (
+    "🔄 Su Barattolo è arrivato lo scambio P2P in euro!\n"
+    "Da oggi puoi comprare e vendere bitcoin direttamente con altre "
+    "persone, pagando con SEPA, Revolut e altri metodi.\n"
+    "Apri Barattolo → P2P e prova 🫙")
+_TASK_CAMPAGNA_P2P_TUTTI = None
+
+
+def avvia_campagna_p2p_tutti():
+    """L'orologio la LANCIA e non la aspetta: sono minuti (0,2 s a
+    persona), e in quei minuti l'orologio deve continuare a guardare i
+    pagamenti. Il riferimento al task si tiene, o il garbage collector
+    puo' portarsi via un task che nessuno guarda. Un task ancora vivo
+    non se ne lancia un secondo; a non farla ripartire DOPO e' il
+    timbro, che la campagna scrive prima del primo invio."""
+    global _TASK_CAMPAGNA_P2P_TUTTI
+    if not P2P_CAMPAGNA_TUTTI:
+        return
+    if _TASK_CAMPAGNA_P2P_TUTTI is not None and not _TASK_CAMPAGNA_P2P_TUTTI.done():
+        return
+    _TASK_CAMPAGNA_P2P_TUTTI = asyncio.create_task(avvisa_tutti_p2p())
+
+
+async def avvisa_tutti_p2p():
+    """LA CAMPAGNA A TUTTI (9 ott 2026, la vigilia del lancio, richiesta
+    di Andrea): il giorno che il P2P si apre, un messaggio a OGNI
+    iscritto — non solo a chi aveva premuto «Avvisami».
+
+    LE TRE DOMANDE, nell'ordine di `avvisa_interessi_p2p` e per le sue
+    ragioni: la leva (P2P_CAMPAGNA_TUTTI, solo True), il P2P aperto a
+    TUTTI (acceso e fase di prova vuota — partendo in fase chiusa
+    direbbe «e' arrivato» a chi poi non lo vede, e brucerebbe il
+    turno), e il timbro `campagna_p2p_tutti`, scritto DOPO le guardie e
+    PRIMA degli invii: un riavvio a meta' puo' perdere degli avvisi di
+    cortesia, mai raddoppiarli.
+
+    UN MESSAGGIO A TESTA: chi ha una riga in `interessi` per il P2P
+    riceve gia' quello dell'altra campagna, e qui resta fuori. NOT
+    EXISTS e non NOT IN: un solo tg_id NULL nella sottoquery farebbe
+    tornare zero righe al NOT IN, cioe' una campagna muta e timbrata.
+
+    TUTTI, ANCHE I NATIVI NOSTR: passa da notifica(), che sceglie il
+    canale di ognuno (Telegram, DM cifrato NIP-17, o tutt'e due). In
+    `utenti` stanno solo persone entrate davvero (Telegram, login con
+    firma): i profili Nostr importati non hanno una riga.
+
+    Gli esiti si contano da quel che notifica() RESTITUISCE, perche' lei
+    non alza mai (fail-open): un 403 (bot bloccato o mai avviato) torna
+    come stringa, e qui diventa un «saltato» con la sua riga. Il DM
+    Nostr parte in sottofondo e non dice com'e' andata: vale «inviato»."""
+    if not P2P_CAMPAGNA_TUTTI:
+        return
+    if not _p2p_leve()["attivo"] or P2P_PROVA_IDS:
+        return                    # non c'e', o c'e' per pochi: si tace
+    if timbro_letto(TIMBRO_CAMPAGNA_P2P_TUTTI):
+        return
+    con = db()
+    righe = con.execute(
+        "SELECT u.tg_id FROM utenti u WHERE u.tg_id IS NOT NULL "
+        "AND NOT EXISTS (SELECT 1 FROM interessi i "
+        "WHERE i.funzione='p2p' AND i.tg_id=u.tg_id) "
+        "ORDER BY u.tg_id").fetchall()
+    con.close()
+    timbro_scrivi(TIMBRO_CAMPAGNA_P2P_TUTTI, "fatto")
+    print(f"🔄 Campagna P2P a tutti: parte verso {len(righe)} iscritti",
+          flush=True)
+    inviati, saltati = 0, 0
+    for r in righe:
+        tg_id = r["tg_id"]
+        try:
+            esito = await notifica(tg_id, TESTO_CAMPAGNA_P2P_TUTTI) or ""
+        except Exception as e:          # notifica() non alza; se mai...
+            esito = f"errore {type(e).__name__}: {e}"
+        if ("telegram ok" in esito or "DM Nostr in volo" in esito
+                or "simulata" in esito):
+            inviati += 1
+        else:
+            saltati += 1
+            print(f"⚠️ Campagna P2P a tutti: saltato {tg_id} ({esito})")
+        await asyncio.sleep(0.2)
+    # la riga nel journal SEMPRE a fine giro: il totale, non l'elenco
+    # (sono tutti gli iscritti); i saltati hanno la loro riga qui sopra
+    print(f"🔄 Campagna P2P a tutti: finita — inviati {inviati}, "
+          f"saltati {saltati}", flush=True)
 
 
 def _bech32_polymod(valori: list) -> int:
@@ -64891,6 +65007,13 @@ async def orologio():
             await avvisa_interessi_p2p()
         except Exception as e:
             print(f"⚠️ Campagna P2P saltata: {e}")
+        try:
+            # una-tantum GLOBALE (timbro in `timbri`): lo stesso giorno,
+            # a tutti gli altri iscritti — DOPO quella di «Avvisami» e
+            # in sottofondo (sono minuti: l'orologio non li aspetta)
+            avvia_campagna_p2p_tutti()
+        except Exception as e:
+            print(f"⚠️ Campagna P2P a tutti saltata: {e}")
         try:
             # la ronda degli invarianti: legge e avvisa, non corregge
             # mai niente — e a libro mastro sano non dice nulla

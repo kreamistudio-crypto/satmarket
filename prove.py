@@ -31171,6 +31171,11 @@ def _censimento(acceso, dopo=None):
               # del pannello CHIAMA `_p2p_prese_da(0)`, orologio alla mano
               "_p2p_prese_da", "_leve_stato"):
         exec(pezzo(f), amb)
+    # la campagna a tutti (9 ott 2026): l'ottava volta, la riga del
+    # pannello CHIAMA `timbro_letto` — che aprirebbe il database — e
+    # nomina il timbro; a leve accese il timbro c'e', a spente no
+    amb["timbro_letto"] = (lambda n: "fatto") if acceso else (lambda n: "")
+    amb["TIMBRO_CAMPAGNA_P2P_TUTTI"] = "campagna_p2p_tutti"
     amb.update(dopo or {})
     gruppi = amb["_leve_stato"]()
     voci = {v["chiave"]: v for g in gruppi for v in g["voci"]}
@@ -81869,6 +81874,210 @@ def prove_p2p_campanello():
     prova("...e all'apertura il turno e' ancora intero", [111, 222],
           mandati)
     con.close()
+
+
+def prove_campagna_p2p_tutti():
+    """LA CAMPAGNA P2P A TUTTI (9 ott 2026, la vigilia del lancio,
+    richiesta di Andrea): il giorno che il P2P si apre, un messaggio a
+    ogni iscritto TRANNE chi aveva premuto «Avvisami» — che riceve gia'
+    il suo dalla campagna di sempre. Un messaggio a testa, mai due.
+
+    Si GIRA, come la sorella: le sentinelle dicono dove stanno le righe,
+    mai che al primo invio il turno fosse gia' bruciato, ne' che la
+    sottoquery escluda davvero chi deve. La query va su un sqlite vero
+    in memoria, con dentro una riga d'interesse a tg_id NULL: col NOT
+    IN quella sola riga avrebbe fatto tornare ZERO righe — una campagna
+    muta e timbrata. Il giro vero, riavvio dopo riavvio, sta in
+    `collaudo_campagna_p2p_tutti`."""
+    print("\n[la campagna P2P a tutti]")
+    import sqlite3
+    import asyncio as _aio
+    src = _SORGENTE
+    campagna = pezzo("avvisa_tutti_p2p", fine="\n\n\ndef ")
+    lancio = pezzo("avvia_campagna_p2p_tutti")
+    _es = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- 1) LA LEVA: solo True accende --------------------------------
+    i = src.index("try:\n    from config import P2P_CAMPAGNA_TUTTI")
+    carica = src[i:src.index("    P2P_CAMPAGNA_TUTTI = False\n", i)
+                 + len("    P2P_CAMPAGNA_TUTTI = False\n")]
+    import types as _types
+    import sys as _sys
+    _prima = _sys.modules.get("config")
+    try:
+        for valore, atteso in ((True, True), (False, False),
+                               ("True", False), (1, False), ("assente", False)):
+            cfg = _types.ModuleType("config")
+            if valore != "assente":
+                cfg.P2P_CAMPAGNA_TUTTI = valore
+            _sys.modules["config"] = cfg
+            amb = {"print": lambda *a, **k: None}
+            exec(carica, amb)
+            prova(f"la leva {valore!r} vale {atteso}", atteso,
+                  amb["P2P_CAMPAGNA_TUTTI"])
+    finally:
+        if _prima is None:
+            _sys.modules.pop("config", None)
+        else:
+            _sys.modules["config"] = _prima
+    prova("config_esempio la porta, spenta", True,
+          "\nP2P_CAMPAGNA_TUTTI = False\n" in _es.replace("\r\n", "\n"))
+    prova("il pannello delle leve ha la sua riga", True,
+          '_leva("Campagna P2P a tutti", "P2P_CAMPAGNA_TUTTI",' in src)
+    prova("...che dice anche se e' gia' partita (il timbro)", True,
+          "timbro_letto(TIMBRO_CAMPAGNA_P2P_TUTTI)" in codice(pezzo("_leve_stato")))
+    _g, voci_on, _j = _censimento(True)
+    _g, voci_off, _j = _censimento(False)
+    prova("...e girata col timbro scritto dice «già partita»", True,
+          "già partita" in str(voci_on["P2P_CAMPAGNA_TUTTI"]))
+    prova("...e senza timbro dice quando parte", True,
+          "parte una volta sola" in str(voci_off["P2P_CAMPAGNA_TUTTI"])
+          or "nessun messaggio a tutti" in str(voci_off["P2P_CAMPAGNA_TUTTI"]))
+
+    # --- 2) L'OROLOGIO LA LANCIA, DOPO «AVVISAMI» E SENZA ASPETTARLA ----
+    oro = pezzo("orologio")
+    prova("l'orologio la lancia dopo «Avvisami»", True,
+          "\n            avvia_campagna_p2p_tutti()\n" in oro
+          and -1 < oro.find("await avvisa_interessi_p2p()")
+          < oro.find("avvia_campagna_p2p_tutti()"))
+    prova("...e il lancio crea un task, non la aspetta", True,
+          "asyncio.create_task(avvisa_tutti_p2p())" in codice(lancio)
+          and "await" not in codice(lancio))
+
+    # --- 3) L'ORDINE DELLE GUARDIE (il patto delle campagne) ----------
+    # `find` e non `index`: una riga tolta deve fare ROSSA la prova, non
+    # farla esplodere (la lezione della tortura)
+    def _in_fila(*pezzi):
+        pos = [campagna.find(p) for p in pezzi]
+        return -1 not in pos and pos == sorted(pos)
+    prova("la leva si guarda per prima", True,
+          _in_fila("if not P2P_CAMPAGNA_TUTTI", '_p2p_leve()["attivo"]'))
+    prova("...poi il P2P aperto a tutti, come «Avvisami»", True,
+          'if not _p2p_leve()["attivo"] or P2P_PROVA_IDS:' in campagna)
+    prova("...e il timbro si scrive DOPO le guardie e PRIMA degli invii",
+          True, _in_fila("timbro_letto(TIMBRO_CAMPAGNA_P2P_TUTTI)",
+                         "timbro_scrivi(TIMBRO_CAMPAGNA_P2P_TUTTI",
+                         "await notifica("))
+    prova("...e passa da notifica(), che sceglie il canale", True,
+          "await notifica(tg_id, TESTO_CAMPAGNA_P2P_TUTTI)" in campagna)
+    prova("il testo e' quello deciso", True,
+          "🔄 Su Barattolo è arrivato lo scambio P2P in euro!\\n" in src
+          and "pagando con SEPA, Revolut e altri metodi.\\n" in src
+          and "Apri Barattolo → P2P e prova 🫙\")" in src)
+
+    # --- 4) IL BANCO: la campagna gira intera --------------------------
+    def _db_nuovo():
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.executescript(
+            "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT);"
+            "CREATE TABLE interessi(tg_id INTEGER, funzione TEXT);")
+        for chi in (111, 222, 333, 555, -5, -7):
+            con.execute("INSERT INTO utenti VALUES(?, 'x')", (chi,))
+        for chi, f in ((111, "p2p"), (-7, "p2p"), (555, "aste"), (None, "p2p")):
+            con.execute("INSERT INTO interessi VALUES(?, ?)", (chi, f))
+        return con
+
+    class _ConNonChiude:
+        """La connessione in memoria sopravvive al `con.close()` della
+        campagna: senza, il secondo giro troverebbe un database vuoto."""
+        def __init__(self, con):
+            self.con = con
+
+        def execute(self, *a):
+            return self.con.execute(*a)
+
+        def close(self):
+            pass
+
+    stato = {}
+
+    def _giro(leva=True, attivo=True, prova_ids=set(), bloccati=()):
+        detti, gia_timbrato = [], []
+
+        async def _notifica(tg_id, testo):
+            gia_timbrato.append("campagna_p2p_tutti" in stato["timbri"])
+            stato["mandati"].append(tg_id)
+            if tg_id in bloccati:
+                return "telegram 403: non ha avviato il bot, o l'ha bloccato"
+            if tg_id < 0:
+                return "DM Nostr in volo e NIENTE Telegram (canale scelto: «nostr»)"
+            return "telegram ok (messaggio 1)"
+
+        async def _dormi(_s):
+            return None
+
+        amb = {"P2P_CAMPAGNA_TUTTI": leva,
+               "_p2p_leve": lambda: {"attivo": attivo},
+               "P2P_PROVA_IDS": prova_ids,
+               "timbro_letto": lambda n: stato["timbri"].get(n, ""),
+               "timbro_scrivi": lambda n, v: stato["timbri"].__setitem__(n, v),
+               "db": lambda: _ConNonChiude(stato["con"]),
+               "notifica": _notifica,
+               "asyncio": type("A", (), {"sleep": staticmethod(_dormi)}),
+               "print": lambda *a, **k: detti.append(" ".join(map(str, a))),
+               "TIMBRO_CAMPAGNA_P2P_TUTTI": "campagna_p2p_tutti",
+               "TESTO_CAMPAGNA_P2P_TUTTI": "testo"}
+        exec("async " + campagna, amb)   # `pezzo` taglia l'async
+        _aio.run(amb["avvisa_tutti_p2p"]())
+        return detti, gia_timbrato
+
+    def _nuovo_stato():
+        stato.update(con=_db_nuovo(), timbri={}, mandati=[])
+
+    _nuovo_stato()
+    detti, _g = _giro(leva=False)
+    prova("leva spenta: nessun invio e nessun timbro", ([], {}, []),
+          (stato["mandati"], stato["timbri"], detti))
+    detti, _g = _giro(prova_ids={111})
+    prova("fase chiusa: nessun invio e nessun timbro", ([], {}),
+          (stato["mandati"], stato["timbri"]))
+    detti, _g = _giro(attivo=False)
+    prova("P2P spento: nessun invio e nessun timbro", ([], {}),
+          (stato["mandati"], stato["timbri"]))
+    detti, gia = _giro(bloccati=(333,))
+    prova("leva accesa: a tutti TRANNE chi ha premuto «Avvisami»",
+          [-5, 222, 333, 555], sorted(stato["mandati"]))
+    prova("...la riga d'interesse a tg_id NULL non svuota la campagna",
+          4, len(stato["mandati"]))
+    prova("...chi aveva votato le ASTE e non il P2P la riceve", True,
+          555 in stato["mandati"])
+    prova("...i nativi Nostr (tg_id negativo) ci sono", True,
+          -5 in stato["mandati"])
+    prova("...e il turno era gia' timbrato al primo invio", [True] * 4, gia)
+    prova("il journal dice la partenza", True,
+          any("parte verso 4 iscritti" in d for d in detti))
+    prova("...il bot bloccato saltato, col perche'", True,
+          any("saltato 333" in d and "403" in d for d in detti))
+    prova("...e il totale: il DM Nostr vale inviato", True,
+          any("inviati 3, saltati 1" in d for d in detti))
+    detti, _g = _giro()
+    prova("il secondo giro non manda niente (una volta sola)",
+          ([-5, 222, 333, 555], []), (sorted(stato["mandati"]), detti))
+    stato["con"].close()
+
+    # --- 5) IL LANCIO: leva spenta = nessun task -----------------------
+    nati = []
+
+    class _Asyncio:
+        @staticmethod
+        def create_task(coro):
+            coro.close()
+            t = type("T", (), {"done": lambda self: False})()
+            nati.append(t)
+            return t
+
+    async def _avvisa():
+        return None
+
+    for leva, attesi in ((False, 0), (True, 1)):
+        nati.clear()
+        amb = {"P2P_CAMPAGNA_TUTTI": leva, "_TASK_CAMPAGNA_P2P_TUTTI": None,
+               "asyncio": _Asyncio, "avvisa_tutti_p2p": _avvisa}
+        exec(lancio, amb)
+        amb["avvia_campagna_p2p_tutti"]()
+        amb["avvia_campagna_p2p_tutti"]()   # il secondo trova il primo vivo
+        prova(f"leva {leva}: {attesi} task lanciati", attesi, len(nati))
 
 
 def prove_premio_barattozon():
@@ -134347,7 +134556,7 @@ def main():
               prove_anteprima_avvisi_p2p,
               prove_avvisi_mercatino,
               prove_testo_ricevere_sats,
-              prove_prese_dalle_10,
+              prove_prese_dalle_10, prove_campagna_p2p_tutti,
               prove_prendi_metodo,
               prove_banner_ingresso,
               prove_config_esempio):

@@ -104,6 +104,25 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   browser al coordinatore): la leva viaggia nella busta delle leve
   (`preseDa`) e i bottoni li spegne il client di Barattolo — chi usasse
   un altro client di Mostro sullo stesso libro non la vedrebbe.
+- LA CAMPAGNA P2P A TUTTI (9 ott 2026, la vigilia del lancio): la leva
+  `P2P_CAMPAGNA_TUTTI = True` si AGGIUNGE al `config.py` del VPS insieme
+  alle due righe del lancio (`P2P_PROVA_IDS = []` e `P2P_IN_VETRINA =
+  True`), poi `sudo systemctl restart barattolo` — DOPO le 10:00 del 10
+  ott, non prima (vedi «LE PRESE DALLE 10»). Al primo giro dell'orologio
+  (pochi secondi dopo l'avvio), col P2P aperto a tutti, parte UNA volta
+  sola un messaggio a ogni iscritto — Telegram o DM Nostr, il canale di
+  ognuno — TRANNE chi aveva premuto «Avvisami», che riceve quello della
+  campagna di sempre. Gira in sottofondo, 0,2 s di pausa a persona (mille
+  iscritti ≈ 5-7 minuti): **in quei minuti non si riavvia** — un riavvio a
+  metà ferma gli invii, e il timbro (scritto PRIMA del primo invio) non
+  li fa ripartire. Nel journal: «🔄 Campagna P2P a tutti: parte verso N
+  iscritti», una riga «saltato <id> (…)» per chi non riceve (il 403 di
+  chi ha bloccato il bot è normale) e alla fine «finita — inviati N,
+  saltati M». Il pannello «⚙️ Stato delle leve», riga «Campagna P2P a
+  tutti», dice «già partita» quando il timbro `campagna_p2p_tutti` è
+  scritto: da lì la riga nel config si toglie con comodo. Una stringa
+  «True» resta spenta, e il journal lo dice all'avvio («[p2p]
+  P2P_CAMPAGNA_TUTTI non e' True/False»).
 - LE LEVE RGB E IL NIP-05 DI CASA (8 ott 2026, hackathon di Torino):
   `RGB_ATTIVO`, `RGB_PROVA_IDS` e `NIP05_NOMI` si AGGIUNGONO al config
   del VPS come le altre. Nel codice `RGB_ATTIVO` e' `False` e resta

@@ -43490,3 +43490,107 @@ li incolla); il 13 la domanda a KaleidoSwap su `signet` contro
 `signetcustom` e lo schema di USDT; il 15 i due portatili (la glibc per
 prima cosa: `ldd --version`); la riga «Il tunnel ha la terza gamba» dei
 cantieri vecchi vale solo per il piano B.
+
+## La campagna P2P a tutti (9 ott 2026, sera, la vigilia del lancio, richiesta di Andrea)
+
+**Cosa.** Il 10 ott alle 10:00 il P2P si apre a tutti, e la campagna che
+c'era (`avvisa_interessi_p2p`, «Lo scambio in euro è arrivato») scrive
+SOLO a chi aveva premuto «🔔 Avvisami» sulla pagina P2P. Andrea vuole
+avvisare TUTTI gli iscritti, e strumenti per scrivere a tutti non ce
+n'erano: c'è il messaggio dei moderatori a UN utente
+(`/api/admin/utenti/{tg_id}/messaggio`) e `prova_notifica.py`, anche lui
+per un id solo. Nasce una seconda campagna una-tantum, accanto alla
+prima e sul suo calco: `avvisa_tutti_p2p`, col timbro
+`campagna_p2p_tutti` e la leva nuova `P2P_CAMPAGNA_TUTTI` (default False,
+solo True accende — il patto di P2P_IN_VETRINA). Il testo è quello di
+Andrea, lettera per lettera, in `TESTO_CAMPAGNA_P2P_TUTTI`.
+
+**Com'è fatta.** Tre guardie nell'ordine della sorella: la leva, il P2P
+aperto a TUTTI (`_p2p_leve()["attivo"]` e fase di prova vuota — la
+stessa condizione di «Avvisami», per le stesse ragioni: in fase chiusa
+direbbe «è arrivato» a chi non lo vede e brucerebbe il turno), il timbro.
+Il timbro si scrive DOPO le guardie e PRIMA del primo invio: un riavvio
+a metà può perdere avvisi di cortesia, mai raddoppiarli. UN MESSAGGIO A
+TESTA: la query prende `utenti` con `NOT EXISTS` su `interessi` per il
+P2P — chi ha premuto «Avvisami» riceve il suo dall'altra campagna e qui
+resta fuori; chi aveva votato le aste lo riceve. `NOT EXISTS` e non
+`NOT IN`: una sola riga d'interesse a tg_id NULL farebbe tornare zero
+righe al NOT IN, cioè una campagna muta e timbrata (la prova la semina
+apposta). I NATIVI NOSTR CI SONO: passa da `notifica()`, che sceglie il
+canale di ognuno; in `utenti` stanno solo persone entrate davvero (le
+due porte sono `_upsert_da_telegram` e `crea_utente_nostr`), i profili
+importati da Nostr non hanno una riga. IN SOTTOFONDO: l'orologio, dopo
+`avvisa_interessi_p2p`, chiama `avvia_campagna_p2p_tutti()`, che fa un
+`create_task` e tiene il riferimento (`_TASK_CAMPAGNA_P2P_TUTTI`, contro
+il garbage collector; un task vivo non ne fa nascere un secondo) — sono
+minuti, 0,2 s di pausa a persona, e l'orologio intanto deve guardare i
+pagamenti. GLI ESITI SI CONTANO DA QUEL CHE `notifica()` RESTITUISCE,
+perché lei non alza mai: «telegram ok», «DM Nostr in volo» (che parte in
+sottofondo e non dice com'è andata: vale inviato) o «simulata» del
+collaudo sono inviati; il resto — il 403 di chi ha bloccato il bot o non
+l'ha mai avviato, NESSUN CANALE — è un saltato con la sua riga nel
+journal. Il journal dice «parte verso N iscritti» e alla fine «finita —
+inviati N, saltati M» (il totale e non l'elenco: sono tutti gli
+iscritti). Il pannello «⚙️ Stato delle leve» ha la riga «Campagna P2P a
+tutti», che chiede anche il TIMBRO: accesa e timbrata dice «già partita».
+
+**Strade scartate.** Allungare la campagna di «Avvisami» con un secondo
+giro sotto lo stesso timbro: una leva sola non avrebbe permesso di
+lanciare l'una senza l'altra, e l'avviso a chi ha votato è un debito
+scritto che deve partire comunque. Un comando o una rotta «scrivi a
+tutti» per i moderatori: è uno strumento generale, che resta acceso
+dopo il lancio e chiede le sue difese (conferma, freno, registro) — per
+un annuncio una-tantum basta il calco della campagna che c'è. Escludere
+anche i tester: dopo il lancio la lista è vuota e non si sa più chi
+fossero, e un messaggio in più a loro non fa danni. Lasciare il
+collaudo FUORI dal workflow, la vigilia del lancio, per non rischiare il
+ref `pronto` fermo (PRODUZIONE, «DOPO UN COMMIT CHE TOCCA IL WORKFLOW»):
+l'ho tentato, e la suite l'ha rifiutato — `prove_script_nel_workflow`
+vuole ogni .py della radice nel `compileall`. Quindi il workflow si
+tocca (compileall e lista dei collaudi), e dopo il push si guarda
+`pronto` con `git ls-remote`.
+
+**Provato.** `prove_campagna_p2p_tutti` (31): la leva (True, False,
+«True», 1, assente), config_esempio, la riga del pannello e le sue due
+note dal censimento (timbro sì/no), l'orologio che la lancia DOPO
+«Avvisami» e senza aspettarla, l'ordine delle guardie e del timbro, il
+testo; poi la campagna GIRATA su un sqlite in memoria (sei iscritti, due
+nativi Nostr, una riga d'interesse a NULL, uno sulle aste): leva spenta,
+fase chiusa e P2P spento non mandano né timbrano; accesa manda a -5,
+222, 333, 555 (non a 111 né a -7, che hanno premuto «Avvisami»), col
+turno già timbrato al primo invio, il 403 di 333 saltato col perché,
+«inviati 3, saltati 1»; il secondo giro non manda niente; il lancio a
+leva spenta non fa nascere task e due lanci di fila ne fanno uno.
+Controprova con nove mutazioni di server.py (NOT IN al posto di NOT
+EXISTS, senza esclusione, senza leva, senza fase chiusa, senza timbro
+letto, timbro dopo gli invii, 403 contato come inviato, orologio senza
+lancio, lancio senza leva): tutte rosse, e nessuna esplode (la prima
+stesura usava `index` e tre mutazioni la facevano ESPLODERE: ora `find`).
+`collaudo_campagna_p2p_tutti` (20): il server vero, OGNI AVVIO UN
+PROCESSO NUOVO sullo stesso database usa-e-getta, col finto Telegram
+(segna il messaggio e risponde come Telegram, col 403 per 333) e la
+`notifica()` vera: fase chiusa → niente e nessun timbro; P2P aperto e
+leva spenta → solo «Avvisami» (111 e la nativa -7); leva accesa → a
+tutti tranne loro, la nativa -5 col DM, il testo esatto, il journal con
+partenza, saltato e totale; riavvio → niente; in tutto ognuno ha
+ricevuto UN messaggio. Verde anche nella gabbia (`python collaudi_ci.py
+collaudo_campagna_p2p_tutti`), ed entra nella lista dei collaudi della CI. DAL VIVO con uvicorn su una copia nello
+scratchpad (config dall'esempio, MODALITA_COLLAUDO, relay morto, nsec
+segnaposto, porta 8187, voce del launch.json tolta dopo), quattro
+avvii sullo stesso giro.db con sei iscritti seminati (111 «Avvisami»,
+222, 333, 555 delle aste, 999, la nativa -5): fase chiusa con la leva
+accesa → nessuna riga, nessun timbro, il pannello «parte una volta
+sola…»; aperto a leva spenta → «avvisati 1 [111]», il pannello «nessun
+messaggio a tutti…»; leva accesa → «parte verso 5 iscritti», cinque
+notifiche simulate col testo di Andrea (la -5 instradata sul DM, che la
+npub finta fa cadere nel trasporto, com'è giusto), «finita — inviati
+5, saltati 0», il pannello «già partita»; riavvio → nessuna riga
+«Campagna», nessuna notifica.
+
+**Resta da guardare.** Il 10 ott, dopo le 10:00: la riga
+`P2P_CAMPAGNA_TUTTI = True` nel config del VPS insieme alle due del
+lancio, il riavvio, e nel journal la partenza e il totale; NON riavviare
+finché non compare «finita». Dopo: la riga si toglie con comodo. Dopo il
+push: `pronto` allineato a main (il commit tocca il workflow). Il DM Nostr parte in
+sottofondo e vale «inviato» anche quando poi non arriva: il conto dei
+saltati riguarda solo Telegram.
