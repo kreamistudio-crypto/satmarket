@@ -816,14 +816,25 @@ disputa.»
    fermi, e la convenienza si muove col bitcoin.»
    Poi il percorso, con la testata «Passo 1 di 4 · Il PayCode» (e via
    così) e il riquadro «🧾 …» qui sopra:
-   - **1 Il PayCode** — campo per le nove cifre; «Nove cifre, coi
-     trattini o senza. È il codice che chi compra dà alla cassa del
-     tabacchino: viaggia cifrato, e lo legge solo chi prende l'ordine.» e
-     la riga delle esclusioni Amazon.
-   - **2 L'importo esatto** — coi centesimi; «Quello scritto sulla mail
-     di Amazon, coi centesimi: al tabacchino si paga esattamente quella
-     cifra. Amazon accetta i contanti fino a **999 €** per ordine, senza
-     commissione; un PayCode Barattozon vale almeno **25 €**.»
+   - **1 Il PayCode** — una riga, «Incolla il PayCode» (poi le nove
+     cifre, «479-868-518»), che al tocco apre dal basso il foglio «🧾 Il
+     PayCode» (dal 9 ott 2026, sera): «Le nove cifre della mail di Amazon,
+     coi trattini o senza. Viaggia cifrato: lo legge solo chi prende
+     l'ordine.», un campo grande, «📋 Incolla dagli appunti» (prende le
+     nove cifre anche da una riga intera della mail), «Conferma» e
+     «Annulla». Se gli appunti non si leggono: «Non riesco a leggere gli
+     appunti: tieni premuto sul campo e scegli «Incolla»». Sotto la riga
+     restano «Nove cifre, coi trattini o senza. È il codice che chi
+     compra dà alla cassa del tabacchino: viaggia cifrato, e lo legge
+     solo chi prende l'ordine.» e la riga delle esclusioni Amazon.
+   - **2 L'importo esatto** — una riga, «Scrivi l'importo» (poi «23,47
+     €»), che apre il foglio «💶 L'importo esatto»: «Da 25 € a 999 €, coi
+     centesimi della mail di Amazon.», la cifra grande, il tastierino
+     (1-9, virgola, 0, ⌫), «Conferma» e «Annulla». Sotto la riga resta
+     «Quello scritto sulla mail di Amazon, coi centesimi: al tabacchino si
+     paga esattamente quella cifra. Amazon accetta i contanti fino a
+     **999 €** per ordine, senza commissione; un PayCode Barattozon vale
+     almeno **25 €**.»
    - **3 Quando scade il PayCode** — una riga, «Scegli quando scade»
      (poi «Scade lunedì 12 ottobre alle 14:30»), che al tocco apre dal
      basso il foglio «⏳ Quando scade il PayCode» (dal 9 ott 2026, al

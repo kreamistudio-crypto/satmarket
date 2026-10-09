@@ -26710,7 +26710,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   «paga in contanti nel punto vendita», normalizzato a «479-868-518»
   da `payCodeP2P` (trattini o spazi facoltativi, e SOLO nove cifre: il
   numero d'ordine a 17 e' storto); l'importo coi centesimi (lo stesso
-  campo `p2pNuovoEuro`); la scadenza del PayCode da un FOGLIO DI CASA
+  campo `p2pNuovoEuro`) — DAL 9 OTT 2026, SERA, il PayCode e l'importo
+  sono righe di casa come la scadenza: `apriPayCodeTabP2P` apre
+  `#p2pPayCodeSheet` (un campo grande, «📋 Incolla dagli appunti» che
+  estrae le nove cifre con `estraiPayCodeP2P`, le frasi di
+  `giudizioPayCodeP2P`, che e' anche il giudice della pubblicazione) e
+  `apriEuroTabP2P` apre `#p2pEuroSheet` (la cifra grande, il tastierino
+  di casa con la rete di `tastoEuroTabP2P`, i limiti vivi di
+  `limitiEuroTabP2P`, la frase di `giudizioTappaTabP2P(2)`); le
+  conferme scrivono il `value` della riga e chiamano `cambiaTabP2P` e
+  `cambiaCampoNuovoP2P`, quindi il valore che parte e' quello dei campi
+  di prima; la scadenza del PayCode da un FOGLIO DI CASA
   (9 ott 2026, al posto dell'`<input type="datetime-local">` che su
   iPhone non si vedeva: la riga `p2pNuovoTabScade` e' il campo-bottone
   `.p2p-tendina` — «Scade lunedì 12 ottobre alle 14:30» da
@@ -28653,7 +28663,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `vestiFogliCoperti` da un osservatore delle classi accanto a quello
   della cronologia) e un `::after` lo copre col colore del velo —
   vale per il dettaglio sotto «Quanto» e per «Pubblica» sotto la
-  scadenza e sotto il picker della valuta.
+  scadenza e sotto il picker della valuta. E la TESTATA del pieno
+  coperto non si vede proprio (`visibility:hidden`, 9 ott 2026, sera):
+  velato, il logo nella striscia in cima si leggeva ancora.
   LA CONFERMA NON SPARISCE, CAMBIA CASA: i due bottoni gemelli in
   fondo — «Annulla» e «Compra»/«Vendi», il piede di «Pubblica» — SONO
   la conferma, e la frase che spiegava l'escrow sta sopra di loro

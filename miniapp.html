@@ -3804,6 +3804,13 @@
   .sheet.pieno.coperto::after{content:'';position:absolute;inset:0;z-index:5;
     background:rgba(20,20,22,.5);border-radius:inherit;animation:veloCoperto .15s}
   @keyframes veloCoperto{from{opacity:0}to{opacity:1}}
+  /* ...E LA SUA TESTATA NON SI VEDE PROPRIO (9 ott 2026, sera, dal
+     telefono di Andrea dopo 381becf): velato, il logo Barattozon nella
+     striscia in cima si leggeva ancora. Mentre un foglio gli sta sopra,
+     la testata del pieno — la freccia, il titolo, il logo — sparisce;
+     il velo resta sul corpo. `visibility` e non `display`: la testata
+     tiene il suo posto e il corpo non salta su sotto il velo. */
+  .sheet.pieno.coperto > .foglio-testa{visibility:hidden}
   @media (max-width:767px){
     /* ⚠️ ANCORATO IN ALTO, e questa riga cura un difetto vero
        (ritocco di Andrea: «al tocco sul campo la pagina scende a
@@ -4620,6 +4627,30 @@
   .p2p-scade-fra{color:var(--muted);font-weight:700;font-size:13px}
   #p2pScadeSheet .p2p-tappa-err{margin-top:6px}
   #p2pScadeSheet .btn.orange{margin-top:14px}
+  /* I FOGLI DEI PASSI 1 E 2 (9 ott 2026, sera): il campo grande del
+     PayCode, la cifra grande dell'importo e il tastierino di casa.
+     Il campo sta a 28px: sotto i 16 iOS ingrandirebbe la pagina al
+     tocco. Le celle del tastierino hanno la veste di quelle della
+     scadenza, piu' alte: sono tasti, si premono di fila. */
+  .p2p-paycode-campo{display:block;width:100%;box-sizing:border-box;margin:14px 0 4px;
+    border:1.5px solid var(--field-line);border-radius:14px;background:var(--card);
+    color:var(--ink);font:inherit;font-weight:800;font-size:28px;letter-spacing:.06em;
+    text-align:center;padding:14px 10px;-webkit-appearance:none;appearance:none}
+  .p2p-paycode-campo:focus{outline:none;border-color:var(--sats)}
+  .p2p-paycode-campo::placeholder{color:var(--muted);font-weight:700;opacity:.55}
+  .p2p-euro-cifra{margin:14px 0 4px;text-align:center;font-weight:800;font-size:34px;
+    color:var(--ink);line-height:1.2;font-variant-numeric:tabular-nums}
+  .p2p-euro-cifra.vuota{color:var(--muted)}
+  .p2p-euro-cifra span{font-size:22px;color:var(--muted)}
+  .p2p-tastierino{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .p2p-tasto{min-width:0;border:1.5px solid var(--field-line);background:var(--card);
+    border-radius:12px;padding:11px 0;font:inherit;font-weight:800;font-size:22px;
+    color:var(--ink);cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .p2p-tasto:active{background:var(--chip-bg)}
+  .p2p-tasto:focus-visible{outline:2px solid var(--sats);outline-offset:2px}
+  #p2pPayCodeSheet .p2p-tappa-err,#p2pEuroSheet .p2p-tappa-err{margin-top:6px;text-align:center}
+  #p2pPayCodeSheet .btn.orange,#p2pEuroSheet .btn.orange{margin-top:14px}
+  #p2pPayCodeSheet .p2p-incolla{margin-top:10px}
   .p2p-ico{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5;
     stroke-linecap:round;stroke-linejoin:round}
   /* IL GLIFO STA NELLO STESSO TONDO e ne prende il colore, ma non la
@@ -13061,6 +13092,22 @@ document.getElementById('cartello')?.remove();</script>
          solo a chi la porta riguarda (apriNuovoOrdineP2P la accende) -->
     <div class="hint" id="p2pNuovoPorta" style="margin:0 var(--pad) 6px" hidden>Per entrare oggi pubblica il tuo primo ordine. Dalle 10:00 di domani si prende.</div>
     <div class="foglio-corpo" id="p2pNuovoCorpo"></div>
+  </div>
+
+  <!-- I PASSI 1 E 2 DI BARATTOZON (9 ott 2026, sera): il PayCode e
+       l'importo, come la scadenza qui sotto — una riga nel foglio
+       «Pubblica» che apre un foglio dal basso SOPRA di lui (stanno dopo
+       di lui nel DOM, che e' l'ordine che decide chi copre chi). Il
+       corpo lo scrivono `corpoPayCodeTabP2P` e `corpoEuroTabP2P`. -->
+  <div class="sheet" id="p2pPayCodeSheet" role="dialog" aria-modal="true" aria-labelledby="p2pPayCodeTit">
+    <div class="grab"></div>
+    <h3 id="p2pPayCodeTit">🧾 Il PayCode</h3>
+    <div id="p2pPayCodeCorpo"></div>
+  </div>
+  <div class="sheet" id="p2pEuroSheet" role="dialog" aria-modal="true" aria-labelledby="p2pEuroTit">
+    <div class="grab"></div>
+    <h3 id="p2pEuroTit">💶 L'importo esatto</h3>
+    <div id="p2pEuroCorpo"></div>
   </div>
 
   <!-- LA SCADENZA DEL PAYCODE (9 ott 2026): il foglio che la riga del
@@ -29552,6 +29599,8 @@ function closeSheet(){
   pulisciChiaveModP2P();
   el('p2pNuovoSheet').classList.remove('open');
   el('p2pScadeSheet').classList.remove('open');
+  el('p2pPayCodeSheet').classList.remove('open');
+  el('p2pEuroSheet').classList.remove('open');
   el('p2pDettSheet').classList.remove('open');
   el('p2pQuantoSheet').classList.remove('open');
   el('p2pFiltroSheet').classList.remove('open');
@@ -61118,13 +61167,12 @@ function valeNuovoOrdineP2P(v){
     if (sottoMinimo)
       return {ok: false, manca: sottoMinimo, campo: 'p2pNuovoEuro'};
     /* IL PAYCODE (23 set 2026): nove cifre, o non e' un PayCode —
-       la frase dice la forma, e il vuoto e lo storto hanno due frasi */
-    if (!String(t.ordine || '').trim())
-      return {ok: false, manca: 'Scrivi il PayCode: 9 cifre, come 479-868-518',
-              campo: 'p2pNuovoTabOrdine'};
-    if (!payCodeP2P(t.ordine))
-      return {ok: false, manca: 'Il PayCode ha 9 cifre (479-868-518): controllalo sulla mail di Amazon',
-              campo: 'p2pNuovoTabOrdine'};
+       la frase dice la forma, e il vuoto e lo storto hanno due frasi.
+       (9 ott 2026, sera) le due frasi stanno in `giudizioPayCodeP2P`,
+       che le dice anche il foglio del passo 1: un giudice solo. */
+    const pc = giudizioPayCodeP2P(t.ordine);
+    if (pc.stato !== 'buono')
+      return {ok: false, manca: pc.frase, campo: 'p2pNuovoTabOrdine'};
     const quando = scadeDaCampoP2P(t.scade);
     if (!quando)
       return {ok: false, manca: 'Scrivi quando scade il PayCode: data e ora sono sulla mail di Amazon',
@@ -62034,21 +62082,29 @@ function percorsoTabacchinoP2P(val){
        il codice e basta, e che alla cassa non gli chiedono un
        documento. */
     '<div class="hint">🧾 ' + esc(testoBarattozonP2P(true)) + '</div>' +
+    /* I PASSI 1 E 2 COME IL 3 (9 ott 2026, sera): righe di casa che
+       aprono il loro foglio. Tengono l'id (ogni «manca» del giudice le
+       trova) e il `value` (che `cambiaTabP2P` e `cambiaCampoNuovoP2P`
+       rileggono come leggevano i campi). Il perche' sta sopra
+       apriPayCodeTabP2P. */
     tappa(1, P2P_TAPPE_TAB[0].t,
-      '<input id="p2pNuovoTabOrdine" type="text" inputmode="numeric" maxlength="11" ' +
-        'placeholder="479-868-518" value="' + esc(p2pNuovoTab.ordine) + '" ' +
-        'autocomplete="off" autocapitalize="off" spellcheck="false" ' +
-        'oninput="cambiaTabP2P()" aria-label="PayCode, nove cifre">',
+      '<button type="button" id="p2pNuovoTabOrdine" class="p2p-tendina' +
+        (payCodeP2P(p2pNuovoTab.ordine) ? '' : ' vuota') + '" ' +
+        'value="' + esc(p2pNuovoTab.ordine) + '" aria-haspopup="dialog" ' +
+        'onclick="apriPayCodeTabP2P()">' +
+        '<span>' + esc(etichettaPayCodeTabP2P(p2pNuovoTab.ordine)) + '</span>' +
+        '<i aria-hidden="true">▾</i></button>',
       '<div class="hint">Nove cifre, coi trattini o senza. È il codice che chi compra dà alla cassa del tabacchino: viaggia cifrato, e lo legge solo chi prende l\'ordine.</div>' +
       /* LE ESCLUSIONI DI AMAZON (23 set 2026): se la mail non offre il
          pagamento in contanti, l\'ordine non e' pagabile con Barattozon */
       '<div class="hint">Non vale per Amazon Warehouse, contenuti digitali, oro, abbonamenti a Prime, buoni regalo e acquisti 1-Click: se la mail di Amazon non offre il pagamento in contanti, l\'ordine non è pagabile con Barattozon.</div>') +
     tappa(2, P2P_TAPPE_TAB[1].t + ', in ' + esc(val.cod),
-      '<input id="p2pNuovoEuro" type="text" inputmode="decimal" ' +
-        'placeholder="23,47" value="' + esc(p2pNuovoEuro) + '" ' +
-        'onbeforeinput="soloCentesimiP2P(event)" ' +
-        'oninput="cambiaCampoNuovoP2P()" onblur="rivelaSpiaTabP2P(2)" ' +
-        'aria-label="Importo del PayCode in euro, coi centesimi"' + ariaTappaTabP2P(2, giud[2]) + '>',
+      '<button type="button" id="p2pNuovoEuro" class="p2p-tendina' +
+        (centesimiP2P(p2pNuovoEuro).n > 0 ? '' : ' vuota') + '" ' +
+        'value="' + esc(p2pNuovoEuro) + '" aria-haspopup="dialog" ' +
+        'onclick="apriEuroTabP2P()"' + ariaTappaTabP2P(2, giud[2]) + '>' +
+        '<span>' + esc(etichettaEuroTabP2P(p2pNuovoEuro, val.segno)) + '</span>' +
+        '<i aria-hidden="true">▾</i></button>',
       rigaEuroViaP2P() +
       (maxTestoP2P() ? '<div class="hint">Fase beta: max ' + maxTestoP2P() + '</div>' : '') +
       /* IL MINIMO E' NOSTRO, NON DI AMAZON (30 set 2026): Amazon non ne ha,
@@ -62529,6 +62585,251 @@ function confermaScadeTabP2P(){
   aggiornaPercorsoTabP2P();
   rivelaSpiaTabP2P(3);
 }
+/* ---- I PASSI 1 E 2 COME IL 3: LA RIGA E IL FOGLIO (9 ott 2026, sera,
+   richiesta di Andrea: «il foglio della scadenza e' piaciuto») ----
+   Il PayCode e l'importo erano due campi di testo nel riquadro. Adesso
+   sono RIGHE di casa (`.p2p-tendina`, come la valuta, i metodi e la
+   scadenza) che dicono il valore o invitano a scriverlo, e al tocco
+   aprono un foglio dal basso sopra «Pubblica».
+   IL PAYCODE (#p2pPayCodeSheet): un campo grande con la tastiera dei
+   numeri — l'unico campo di testo dei tre fogli, perche' un PayCode si
+   INCOLLA, e il tieni-premuto-e-incolla del telefono vuole un campo —
+   piu' «📋 Incolla dagli appunti», che dagli appunti ESTRAE le nove cifre
+   (`estraiPayCodeP2P`: anche da «Il tuo PayCode: 479 868 518»). Lo stesso
+   fa l'incolla nel campo, prima che il `maxlength` tagli una riga lunga.
+   Le frasi sono quelle di sempre, in `giudizioPayCodeP2P`, che ora dice
+   anche il giudice della pubblicazione. Il foglio si apre SENZA il fuoco
+   nel campo: la tastiera coprirebbe «Incolla», che e' la via maestra.
+   L'IMPORTO (#p2pEuroSheet): la cifra grande con la valuta e un
+   TASTIERINO DI CASA (cifre, virgola, cancella), niente tastiera di
+   sistema come nella scadenza; la rete e' quella del campo di ieri — una
+   virgola, due decimali, e qui quattro cifre intere (9999: abbastanza
+   per scrivere una cifra sopra i 999 € di Amazon e farsela dire). Sopra,
+   i limiti VIVI (`limitiEuroTabP2P`: il minimo della leva, i 999 €, il
+   tetto beta se piu' stretto); sotto, la frase del giudice del passo 2
+   (`giudizioTappaTabP2P(2)`, chiamato e non riscritto), che aspetta che il
+   dito si fermi come la spia del riquadro. NIENTE CHIP DELLE CIFRE: un
+   PayCode ha l'importo esatto della mail, coi centesimi, e una cifra
+   «comune» non esiste. Dal PC i tasti veri scrivono anche loro.
+   IL VALORE CHE PARTE E' QUELLO DI IERI, PER COSTRUZIONE: «Conferma»
+   scrive il `value` della riga e chiama le funzioni dei campi di ieri —
+   `cambiaTabP2P` per il PayCode (che il recapito normalizza comunque con
+   `payCodeP2P`), `cambiaCampoNuovoP2P` per l'importo (la stessa rete dei
+   centesimi, la frase del cambio di metodo che se ne va, il percorso). */
+function giudizioPayCodeP2P(testo){
+  const t = String(testo == null ? '' : testo).trim();
+  if (!t) return {stato: 'vuoto', frase: 'Scrivi il PayCode: 9 cifre, come 479-868-518'};
+  return payCodeP2P(t) ? {stato: 'buono', frase: ''}
+    : {stato: 'storto', frase: 'Il PayCode ha 9 cifre (479-868-518): controllalo sulla mail di Amazon'};
+}
+/* PURA: le nove cifre dentro un testo qualunque (la riga della mail), o
+   '' — mai un pezzo di un numero piu' lungo */
+function estraiPayCodeP2P(testo){
+  const m = /(?:^|\D)(\d{3}[-\s]?\d{3}[-\s]?\d{3})(?!\d)/.exec(String(testo || ''));
+  return m ? payCodeP2P(m[1]) : '';
+}
+/* PURE: le due righe dal valore com'e' nel foglio */
+function etichettaPayCodeTabP2P(ordine){
+  return payCodeP2P(ordine) || 'Incolla il PayCode';
+}
+function etichettaEuroTabP2P(euro, segno){
+  const c = centesimiP2P(euro);
+  return (!c.storto && c.n > 0) ? centesimiTestoP2P(c.n) + ' ' + (segno || '€') : 'Scrivi l\'importo';
+}
+/* PURA: il tasto del tastierino sulla bozza — cifre, UNA virgola, due
+   decimali, quattro cifre intere; «via» cancella l'ultima */
+const P2P_EURO_CIFRE_INTERE = 4;
+function tastoEuroTabP2P(bozza, tasto){
+  const b = String(bozza == null ? '' : bozza);
+  if (tasto === 'via') return b.slice(0, -1);
+  if (tasto === ',' || tasto === '.') return /[.,]/.test(b) ? b : (b || '0') + ',';
+  if (!/^[0-9]$/.test(String(tasto))) return b;
+  const i = b.search(/[.,]/);
+  if (i >= 0) return (b.length - i - 1 >= 2) ? b : b + tasto;
+  if (b === '0') return String(tasto);
+  return b.length >= P2P_EURO_CIFRE_INTERE ? b : b + tasto;
+}
+/* PURA: la riga dei limiti, dai numeri vivi (0 = leva spenta) */
+function limitiEuroTabP2P(minimo, tetto){
+  const t = Math.floor(Number(tetto)) || 0, m = Math.floor(Number(minimo)) || 0;
+  const max = t > 0 ? Math.min(P2P_PAYCODE_MAX_EURO, t) : P2P_PAYCODE_MAX_EURO;
+  return (m > 0 ? 'Da ' + m + ' € a ' : 'Fino a ') + max + ' €, coi centesimi della mail di Amazon.';
+}
+/* PURA: il corpo del foglio del PayCode, dalla bozza */
+function corpoPayCodeTabP2P(bozza){
+  const g = giudizioPayCodeP2P(bozza);
+  return '<div class="hint">Le nove cifre della mail di Amazon, coi trattini o senza. Viaggia cifrato: lo legge solo chi prende l\'ordine.</div>'
+    + '<input id="p2pPayCodeCampo" class="p2p-paycode-campo" type="text" inputmode="numeric" maxlength="11" '
+    + 'placeholder="479-868-518" value="' + esc(bozza || '') + '" autocomplete="off" autocapitalize="off" '
+    + 'spellcheck="false" aria-label="PayCode, nove cifre" aria-describedby="p2pPayCodeErr" '
+    + 'oninput="scriviPayCodeTabP2P()" onblur="rivelaPayCodeTabP2P()" onpaste="incollaNelCampoPayCodeP2P(event)" '
+    + 'onkeydown="if (event.key === \'Enter\') { event.preventDefault(); confermaPayCodeTabP2P(); }">'
+    + '<div class="p2p-tappa-err" id="p2pPayCodeErr"' + (g.stato === 'storto' ? '' : ' hidden') + '>'
+    + esc(g.stato === 'storto' ? g.frase : '') + '</div>'
+    + '<button type="button" class="btn ghost p2p-incolla" onclick="incollaPayCodeTabP2P()">📋 Incolla dagli appunti</button>'
+    + '<button type="button" class="btn orange" id="p2pPayCodeOk" onclick="confermaPayCodeTabP2P()"'
+    + (g.stato === 'buono' ? '' : ' disabled') + '>Conferma</button>'
+    + '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>';
+}
+/* PURA: il corpo del foglio dell'importo, dalla bozza e dai campi vivi */
+const P2P_TASTI_EURO = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'via'];
+function corpoEuroTabP2P(bozza, campi, segno){
+  const g = giudizioTappaTabP2P(2, Object.assign({}, campi, {euro: bozza}));
+  const piena = String(bozza || '') !== '';
+  return '<div class="hint">' + esc(limitiEuroTabP2P(campi.minEuroBz, campi.maxEuro)) + '</div>'
+    + '<div class="p2p-euro-cifra' + (piena ? '' : ' vuota') + '" id="p2pEuroCifra" aria-live="polite">'
+    + '<b id="p2pEuroBozza">' + esc(piena ? bozza : '0,00') + '</b> <span>' + esc(segno || '€') + '</span></div>'
+    + '<div class="p2p-tappa-err" id="p2pEuroErr"' + (g.stato === 'storto' ? '' : ' hidden') + '>'
+    + esc(g.stato === 'storto' ? g.frase : '') + '</div>'
+    + '<div class="p2p-tastierino" role="group" aria-label="Tastierino dell\'importo">'
+    + P2P_TASTI_EURO.map(k => '<button type="button" class="p2p-tasto" data-tasto="' + k + '" '
+        + 'aria-label="' + (k === 'via' ? 'Cancella' : k === ',' ? 'Virgola' : k) + '" '
+        + 'onclick="tastoEuroP2P(this.dataset.tasto)">' + (k === 'via' ? '⌫' : k) + '</button>').join('')
+    + '</div>'
+    + '<button type="button" class="btn orange" id="p2pEuroOk" onclick="confermaEuroTabP2P()"'
+    + (g.stato === 'buono' ? '' : ' disabled') + '>Conferma</button>'
+    + '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>';
+}
+let p2pPayCodeTrigger = null, p2pEuroTrigger = null, p2pEuroBozza = '';
+const p2pFoglioAttesa = {};
+/* la frase rossa di un foglio coi tempi del dito: la ✕ aspetta che il
+   dito si fermi (P2P_SPIA_ATTESA_MS) — scrivendo «30» si passa da «3» —,
+   tranne a frase gia' a schermo o quando si chiede subito (uscita dal
+   campo, incolla, conferma) */
+function fraseFoglioTabP2P(idErr, g, subito){
+  const n = el(idErr);
+  if (!n) return;
+  clearTimeout(p2pFoglioAttesa[idErr]);
+  p2pFoglioAttesa[idErr] = 0;
+  if (g.stato !== 'storto') { n.textContent = ''; n.hidden = true; return; }
+  const mostra = () => { const q = el(idErr); if (q) { q.textContent = g.frase; q.hidden = false; } };
+  if (subito || !n.hidden) mostra();
+  else p2pFoglioAttesa[idErr] = setTimeout(mostra, P2P_SPIA_ATTESA_MS);
+}
+/* la riga del passo si riveste IN PLACE: il `value`, il testo, il grigio */
+function vestiRigaTendinaTabP2P(id, valore, testo, piena){
+  const b = el(id);
+  if (!b) return;
+  b.value = valore;
+  if (b.setAttribute) b.setAttribute('value', valore);
+  if (b.classList) b.classList.toggle('vuota', !piena);
+  const s = b.querySelector && b.querySelector('span');
+  if (s) s.textContent = testo;
+}
+function apriPayCodeTabP2P(){
+  haptic();
+  p2pPayCodeTrigger = el('p2pNuovoTabOrdine');
+  const box = el('p2pPayCodeCorpo');
+  if (box) box.innerHTML = corpoPayCodeTabP2P(p2pNuovoTab.ordine);
+  el('sheetBg').classList.add('open');
+  el('p2pPayCodeSheet').classList.add('open');
+}
+function scriviPayCodeTabP2P(subito){
+  const c = el('p2pPayCodeCampo');
+  const g = giudizioPayCodeP2P(c ? c.value : '');
+  const ok = el('p2pPayCodeOk');
+  if (ok) ok.disabled = g.stato !== 'buono';
+  if (c) {
+    if (g.stato === 'storto' && (subito || !el('p2pPayCodeErr').hidden)) c.setAttribute('aria-invalid', 'true');
+    else c.removeAttribute('aria-invalid');
+  }
+  fraseFoglioTabP2P('p2pPayCodeErr', g, !!subito);
+}
+function rivelaPayCodeTabP2P(){ scriviPayCodeTabP2P(true); }
+/* l'incolla DENTRO il campo: se nel testo c'e' un PayCode si prende
+   quello, prima che il `maxlength` tagli «Il tuo PayCode: 479…» */
+function incollaNelCampoPayCodeP2P(ev){
+  const testo = ev && ev.clipboardData ? ev.clipboardData.getData('text') : '';
+  const p = estraiPayCodeP2P(testo);
+  if (!p) return;
+  ev.preventDefault();
+  const c = el('p2pPayCodeCampo');
+  if (c) c.value = p;
+  rivelaPayCodeTabP2P();
+}
+/* «📋 Incolla dagli appunti»: dove il browser non lascia leggere gli
+   appunti (certi WebView) lo dice, e mette il fuoco nel campo per il
+   tieni-premuto-e-incolla del telefono */
+async function incollaPayCodeTabP2P(){
+  haptic();
+  const c = el('p2pPayCodeCampo');
+  let testo = null;
+  try { testo = await navigator.clipboard.readText(); } catch(e) { testo = null; }
+  if (testo == null) {
+    toast('Non riesco a leggere gli appunti: tieni premuto sul campo e scegli «Incolla»');
+    if (c) try { c.focus(); } catch(e){}
+    return;
+  }
+  const p = estraiPayCodeP2P(testo);
+  if (!p) { toast('Negli appunti non c\'è un PayCode: copia le nove cifre dalla mail di Amazon'); return; }
+  if (c) c.value = p;
+  rivelaPayCodeTabP2P();
+}
+function confermaPayCodeTabP2P(){
+  const c = el('p2pPayCodeCampo');
+  const p = payCodeP2P(c ? c.value : '');
+  if (!p) { rivelaPayCodeTabP2P(); return; }
+  haptic();
+  vestiRigaTendinaTabP2P('p2pNuovoTabOrdine', p, etichettaPayCodeTabP2P(p), true);
+  /* la funzione del campo di ieri: rilegge il `value` e riscrive il percorso */
+  cambiaTabP2P();
+  chiudiFoglioP2P('p2pPayCodeSheet');
+  if (p2pPayCodeTrigger) { try { p2pPayCodeTrigger.focus({preventScroll: true}); } catch(e){} p2pPayCodeTrigger = null; }
+}
+function segnoValutaTabP2P(){
+  return (P2P_VALUTE.find(v => v.cod === p2pNuovoValuta) || P2P_VALUTE[0]).segno;
+}
+function apriEuroTabP2P(){
+  haptic();
+  p2pEuroTrigger = el('p2pNuovoEuro');
+  p2pEuroBozza = String(p2pNuovoEuro || '');
+  const box = el('p2pEuroCorpo');
+  if (box) box.innerHTML = corpoEuroTabP2P(p2pEuroBozza, campiNuovoP2P(), segnoValutaTabP2P());
+  el('sheetBg').classList.add('open');
+  el('p2pEuroSheet').classList.add('open');
+}
+/* il foglio dell'importo si riscrive IN PLACE a ogni tasto: la cifra, la
+   frase, «Conferma» — mai il tastierino, che ha il dito sopra */
+function aggiornaEuroTabP2P(subito){
+  const g = giudizioTappaTabP2P(2, Object.assign({}, campiNuovoP2P(), {euro: p2pEuroBozza}));
+  const piena = p2pEuroBozza !== '';
+  const cifra = el('p2pEuroCifra'), b = el('p2pEuroBozza'), ok = el('p2pEuroOk');
+  if (cifra) cifra.classList.toggle('vuota', !piena);
+  if (b) b.textContent = piena ? p2pEuroBozza : '0,00';
+  if (ok) ok.disabled = g.stato !== 'buono';
+  fraseFoglioTabP2P('p2pEuroErr', g, !!subito);
+  return g;
+}
+function tastoEuroP2P(k){
+  haptic();
+  p2pEuroBozza = tastoEuroTabP2P(p2pEuroBozza, k);
+  aggiornaEuroTabP2P();
+}
+function confermaEuroTabP2P(){
+  const g = aggiornaEuroTabP2P(true);
+  if (g.stato !== 'buono') return;
+  haptic();
+  const v = p2pEuroBozza;
+  vestiRigaTendinaTabP2P('p2pNuovoEuro', v, etichettaEuroTabP2P(v, segnoValutaTabP2P()), true);
+  /* la funzione del campo di ieri: la rete dei centesimi, la frase del
+     cambio di metodo che se ne va, la riga dei sats e il percorso */
+  cambiaCampoNuovoP2P();
+  chiudiFoglioP2P('p2pEuroSheet');
+  if (p2pEuroTrigger) { try { p2pEuroTrigger.focus({preventScroll: true}); } catch(e){} p2pEuroTrigger = null; }
+  rivelaSpiaTabP2P(2);
+}
+/* dal PC: i tasti veri scrivono nel tastierino, Invio conferma — solo col
+   foglio dell'importo aperto e in cima */
+function tastieraEuroTabP2P(e){
+  const f = el('p2pEuroSheet');
+  if (!f || !f.classList.contains('open') || el('pickerSheet').classList.contains('open')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key;
+  if (/^[0-9]$/.test(k) || k === ',' || k === '.') { e.preventDefault(); tastoEuroP2P(k === '.' ? ',' : k); }
+  else if (k === 'Backspace') { e.preventDefault(); tastoEuroP2P('via'); }
+  else if (k === 'Enter') { e.preventDefault(); confermaEuroTabP2P(); }
+}
+if (typeof addEventListener === 'function') addEventListener('keydown', tastieraEuroTabP2P);
 function apriTendinaMetodiP2P(){
   haptic();
   p2pNuovoAperta = !p2pNuovoAperta;

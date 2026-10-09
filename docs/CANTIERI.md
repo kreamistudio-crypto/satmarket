@@ -42548,3 +42548,117 @@ più largo mangerebbe parte dei 22 px). Sotto i 360 i due cerchietti
 scendono insieme sulla seconda riga, appoggiati a destra: non chiesto,
 non provato su un telefono.
 
+
+
+## I passi 1 e 2 di Barattozon come il 3, e la testata che non si vede (9 ott 2026, sera)
+
+**IL CASO (Andrea, dal telefono vero, dopo 381becf).** Due cose. Aperto
+il foglio della scadenza, nella striscia in cima si vedeva ancora il
+logo Barattozon del foglio sotto, anche se velato: deve non vedersi per
+niente. E il foglio della scadenza è piaciuto: lo stesso stile per il
+passo 1 (il PayCode) e il passo 2 (l'importo).
+
+**COM'ERANO, letto prima di toccare.** Il PayCode: un `<input>` di testo
+con la tastiera dei numeri e `maxlength 11`, letto da `cambiaTabP2P` in
+`p2pNuovoTab.ordine` com'era scritto; giudicato da `payCodeP2P` (nove
+cifre, trattini o spazi facoltativi) con due frasi nel giudice della
+pubblicazione; verso il recapito parte normalizzato
+(`payCodeP2P(campi.tab.ordine)`). L'importo: un `<input>` decimale con la
+rete dei centesimi (`soloCentesimiP2P` sul tasto, `ripuliCentesimiP2P`
+sul valore: una virgola, due decimali), letto da `cambiaCampoNuovoP2P`
+in `p2pNuovoEuro`, giudicato da `giudizioTappaTabP2P(2)`: maggiore di
+zero, il tetto beta `maxEuroP2P`, i 999 € di Amazon, il minimo della leva
+`BARATTOZON_MIN_EURO` (25), e a prezzo fisso i sats del coordinatore.
+
+**LA TESTATA.** Fra le due strade — il foglio sopra che arriva fino in
+cima, o la testata del foglio sotto nascosta — la seconda: i fogli dal
+basso tengono il bordo a 16 px per regola, e allungarli fino in cima
+renderebbe alti tutto lo schermo anche quelli da tre righe (il picker
+della valuta). Una regola sola, `.sheet.pieno.coperto >
+.foglio-testa{visibility:hidden}`, vale per OGNI foglio sopra «Pubblica»
+(il PayCode, l'importo, la scadenza, il picker, la conferma) e per
+«Quanto» sopra il dettaglio, perché la classe `coperto` la mette già
+`vestiFogliCoperti` (381becf). `visibility` e non `display`: la testata
+tiene il posto e il corpo sotto il velo non salta su.
+
+**I DUE FOGLI.** Righe di casa (`.p2p-tendina`) con lo stesso id e un
+`value`, come la scadenza. IL PAYCODE (`#p2pPayCodeSheet`): un campo
+grande (28 px: sotto i 16 iOS ingrandisce la pagina) con la tastiera dei
+numeri — l'unico campo di testo dei tre fogli, perché un PayCode si
+INCOLLA e il tieni-premuto-e-incolla vuole un campo — e «📋 Incolla
+dagli appunti», che dagli appunti ESTRAE le nove cifre
+(`estraiPayCodeP2P`: anche da «Il tuo PayCode: 479 868 518», mai da un
+numero più lungo, il numero d'ordine a 17 cifre resta storto); lo stesso
+fa l'incolla dentro il campo, prima che il `maxlength` tagli la riga.
+Dove il browser non lascia leggere gli appunti lo dice e mette il fuoco
+nel campo. Il foglio si apre SENZA fuoco: la tastiera coprirebbe
+«Incolla». L'IMPORTO (`#p2pEuroSheet`): la cifra grande con la valuta e
+un tastierino di casa (cifre, virgola, ⌫), niente tastiera di sistema
+come nella scadenza; la rete è quella del campo (`tastoEuroTabP2P`: una
+virgola, due decimali, il punto vale la virgola) più quattro cifre
+intere, abbastanza per scrivere 1500 e farsi dire i 999 € di Amazon;
+sopra i limiti vivi (`limitiEuroTabP2P`), sotto la frase del giudice del
+passo 2, che aspetta che il dito si fermi come la spia del riquadro.
+Dal PC i tasti veri scrivono anche loro. **Niente chip delle cifre**: un
+PayCode ha l'importo esatto della mail, coi centesimi, e una cifra
+«comune» non esiste.
+
+**IL VALORE CHE PARTE È QUELLO DI IERI, PER COSTRUZIONE.** «Conferma»
+scrive il `value` della riga e chiama le funzioni dei campi di ieri:
+`cambiaTabP2P` per il PayCode (il foglio scrive la forma normalizzata,
+e il recapito la normalizzava comunque) e `cambiaCampoNuovoP2P` per
+l'importo — la stessa rete dei centesimi, la frase del cambio di metodo
+che se ne va, la riga dei sats e il percorso. Il giudice del PayCode
+ora sta in un posto solo, `giudizioPayCodeP2P`, chiamato dal foglio e
+dalla pubblicazione: le due frasi sono scritte una volta.
+
+**STRADE SCARTATE.** Il foglio sopra fino in cima (sopra). Un tastierino
+anche per il PayCode: si sarebbe perso il tieni-premuto-e-incolla, cioè
+la via di chi non può leggere gli appunti. Un campo numerico per
+l'importo: la tastiera di sistema dentro un foglio dal basso, e la
+lezione dell'iPhone. Le chip delle cifre (sopra).
+
+**LE PROVE DI IERI ALLINEATE.** Cinque banchi ritagliano
+`valeNuovoOrdineP2P` o il percorso per nome e ora si portano anche
+`giudizioPayCodeP2P` (e quello del foglio «Pubblica» le due etichette e
+`centesimiTestoP2P`); quattro sentinelle descrivevano i campi di ieri —
+il `<input id="p2pNuovoEuro">` della spia, l'`onblur` dell'importo, la
+forma del campo decimale nel passo 2, la chiamata `payCodeP2P(t.ordine)`
+dentro il giudice — e ora descrivono la riga, la conferma, il
+tastierino e il giudice solo, con lo stesso scopo.
+
+**PROVATO.** `prove_passi_barattozon_fogli`: la regola della testata;
+le due righe e i due fogli (id, value, ordine nel DOM, `closeSheet`); il
+giudice solo e le frasi scritte una volta; le conferme che scrivono il
+`value` e chiamano le funzioni di ieri; nel banco node il giudice del
+PayCode sui sette casi, l'estrazione dagli appunti, le etichette, il
+tastierino su dieci sequenze, i limiti, i due corpi (stati di «Conferma»,
+frasi, un campo solo, dodici tasti, «23,» che non è ancora una cifra).
+
+**DAL VIVO** (Playwright, server di collaudo sulla 8115 da una copia del
+worktree col relay morto, identità 222), Chrome a 390×844 e WebKit
+«iPhone 13»: le tre righe sono `<button>` («Incolla il PayCode»,
+«Scrivi l'importo», «Scegli quando scade»); con ciascuno dei tre fogli
+aperto `coperto` c'è, testata e logo sono `hidden` e a 6 px dalla cima il
+dito trova il velo di «Pubblica», non la testata. Il PayCode: otto cifre
+e uscita dal campo → la frase del giudice e «Conferma» spento; su Chrome
+«Incolla dagli appunti» con negli appunti «Il tuo PayCode: 479 868 518
+(scade fra 72 ore)» → «479-868-518» nel campo; su WebKit scritto a mano;
+confermato → `p2pNuovoTab.ordine` «479-868-518», la riga lo dice, il
+passo va al 2. L'importo: 2, 4, virgola, 9, 9 → dopo il respiro del dito
+la frase dei 25 € e «Conferma» spento; cancellato e riscritto 25,47 →
+confermato, `p2pNuovoEuro` «25,47», il `value` della riga uguale, la
+spia del passo 2 fatta. La scadenza come ieri. IL VALORE:
+`ordineDaCampiP2P` coi valori del foglio e con quelli che i campi di
+ieri avrebbero tenuto («479868518», «25,47») dà lo stesso ordine, byte
+per byte (`Contanti al tabacchino 25.47`, `fiat_amount` 26 a mercato,
+lo stesso `expires_at`), e il recapito lo stesso PayCode; il giudice
+della pubblicazione dice ok. Nessun errore di pagina. Gli scatti stanno
+nello scratchpad della sessione (`scatti-fogli/`), a viewport intero:
+la cima si vede sempre.
+
+**DA GUARDARE.** Sul telefono vero dentro Telegram: «Incolla dagli
+appunti» (iOS può chiedere il permesso con la sua bolla «Incolla», e il
+WebView di Telegram può negarlo: allora c'è la frase e il campo col
+fuoco), e la tastiera dei numeri sopra il foglio del PayCode (la cura
+dei fogli dal basso del 19 set lo regge, in prova solo simulato).
