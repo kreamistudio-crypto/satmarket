@@ -57278,8 +57278,12 @@ function righeRecapitoP2P(testo){
    ...E SULLA CAUSALE (9 ott 2026, richiesta di Andrea): come l'IBAN si
    incolla in un campo del modulo della banca, e il dito sulla riga
    prenderebbe anche l'etichetta. La si riconosce per ETICHETTA, non
-   per forma: una forma non ce l'ha. L'intestatario resta senza, come
-   dal 23 set. */
+   per forma: una forma non ce l'ha.
+   ...E SULL'INTESTATARIO (9 ott 2026, sera, ritocco di Andrea): i tre
+   campi del bonifico si incollano tutti e tre nel modulo della banca, e
+   tre bottoni uguali in colonna sono il modulo, non la confusione dei
+   sette del 23 set (allora c'era un «Copia» anche sul nome del metodo e
+   sulle righe degli altri recapiti). */
 function riquadroRecapitoP2P(testo, titolo){
   const righe = righeRecapitoP2P(testo);
   if (!righe.length) return '';
@@ -57292,7 +57296,7 @@ function riquadroRecapitoP2P(testo, titolo){
         return FORMA_IBAN.test(nudo)
           ? rigaDato(r.et, nudo, {vista: nudo.replace(/(.{4})(?=.)/g, '$1 '),
                                   mono: true, copia: true})
-          : rigaDato(r.et, r.v, {mono: /^iban$/i.test(r.et), copia: /^causale$/i.test(r.et)});
+          : rigaDato(r.et, r.v, {mono: /^iban$/i.test(r.et), copia: /^(causale|intestatario)$/i.test(r.et)});
       }).join('')
     + '</div>';
 }
@@ -63386,7 +63390,13 @@ const P2P_FORME_RECAPITO = [
   {forma: 'sepa', riconosce: /sepa|bonific|iban/i,
    campi: [{k: 'nome', et: 'Intestatario (nome e cognome)', ph: 'Mario Rossi'},
            {k: 'iban', et: 'IBAN', ph: 'IT60X0542811101000000123456'},
-           {k: 'causale', et: 'Causale (facoltativa)', ph: 'es. regalo Mario', facoltativo: true, max: 140}],
+           /* NON SI RICORDA (9 ott 2026, sera, ritocco di Andrea): e' di
+              QUESTO scambio, al prossimo nasce vuota; nome e IBAN restano
+              ricordati. Per lo STESSO scambio si rilegge dal testo partito
+              (`causaleDaTestoP2P`, in renderCampiP2P): «Aggiorna» non la
+              perde in silenzio */
+           {k: 'causale', et: 'Causale (facoltativa)', ph: 'es. regalo Mario', facoltativo: true, max: 140,
+            nonRicordato: true}],
    componi: (c, m) => (/instant/i.test(String(m || '')) ? 'Bonifico SEPA Instant' : 'Bonifico SEPA')
      + '\nIntestatario: ' + c.nome + '\nIBAN: ' + c.iban
      + (c.causale ? '\nCausale: ' + c.causale : '')},
@@ -63444,6 +63454,22 @@ const P2P_FORME_RECAPITO = [
    frase da dire, che NOMINA i caratteri da togliere: «togli la è» si
    capisce, «caratteri non ammessi» no. PURA, e provata. */
 const FORMA_CAUSALE_SEPA = /^[A-Za-z0-9 \/\-?:().,'+]*$/;
+/* GLI ACCENTI SI CONVERTONO DA SOLI (9 ott 2026, sera, ritocco di
+   Andrea): «caffè» diventa «caffe» PRIMA del giudice, e il campo mostra
+   gia' il testo convertito. La conversione e' quella ovvia — la lettera
+   senza il suo segno (NFD e via i segni combinanti: è é ê → e, à → a,
+   ì → i, ò → o, ù → u, ç → c, ñ → n, maiuscole comprese) — e niente
+   altro: € ! « non hanno una lettera semplice, e restano al giudice col
+   suo messaggio. PURA. */
+function traslitteraCausaleSepaP2P(v){
+  return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+/* la riga «Causale:» del testo composto che e' PARTITO, per
+   ripresentarla nel form dello stesso scambio; '' se non c'e' */
+function causaleDaTestoP2P(testo){
+  const m = /(?:^|\n)Causale:\s*([^\n]+)/.exec(String(testo || ''));
+  return m ? m[1].trim() : '';
+}
 function giudiceCausaleSepaP2P(v, max){
   const t = String(v || '');
   if (!t) return '';
@@ -63900,6 +63926,20 @@ function renderCampiP2P(){
       ? (o.tabacchino ? {campi: {ordine: o.tabacchino.ordine, importo: o.tabacchino.importo,
                                  scade: dataTabacchinoP2P(o.tabacchino.scade)}} : null)
       : (recapitiMiei()[fr.forma] || null);
+    /* IL RICORDO NON PORTA I CAMPI `nonRicordato` (9 ott 2026, sera):
+       chi li ha salvati con l'app di ieri (la causale, per un giorno)
+       non se li ritrova precompilati; al prossimo salvataggio spariscono */
+    if (salvato && salvato.campi) {
+      salvato = {campi: Object.assign({}, salvato.campi)};
+      fr.campi.forEach(c => { if (c.nonRicordato) delete salvato.campi[c.k]; });
+    }
+    /* LA CAUSALE DELLO STESSO SCAMBIO si rilegge dal testo partito, come
+       l'appuntamento qui sotto: «Aggiorna il recapito» la ripresenta,
+       invece di mandarne uno senza in silenzio */
+    if (fr.forma === 'sepa' && miei.euro) {
+      const ca = causaleDaTestoP2P(miei.euro.testo);
+      if (ca) salvato = {campi: Object.assign({}, (salvato && salvato.campi) || {}, {causale: ca})};
+    }
     /* L'APPUNTAMENTO SI CAMBIA DA QUELLO MANDATO (1 ott 2026): luogo, ora
        e punto si rileggono dal recapito gia' partito, non dal ricordo —
        che l'ora non ce l'ha */
@@ -63999,6 +64039,8 @@ async function inviaCampoP2P(tipo, btn){
       /* la causale SEPA ha il suo giudice (9 ott 2026): tetto e alfabeto
          del circuito; vuota passa, perche' e' facoltativa */
       if (c.k === 'causale') {
+        v = traslitteraCausaleSepaP2P(v);
+        if (inp) inp.value = v;           // il campo mostra il testo convertito
         const no = giudiceCausaleSepaP2P(v, c.max);
         if (no) { toast(no, 6000); if (inp) inp.focus(); return; }
       }

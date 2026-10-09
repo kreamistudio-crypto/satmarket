@@ -128783,62 +128783,85 @@ console.log(JSON.stringify(out));
 
 
 def prove_causale_sepa():
-    """LA CAUSALE DEL BONIFICO SEPA (9 ott 2026, richiesta di Andrea).
-    Chi riceve gli euro con un bonifico puo' indicare, oltre al nome e
-    all'IBAN, una CAUSALE facoltativa: al piu' 140 caratteri (il limite
-    del circuito) e solo l'alfabeto che il SEPA ammette, il resto si
-    rifiuta nominando i caratteri da togliere. Fa la stessa strada del
-    nome e dell'IBAN — testo composto, busta cifrata, ricordo del
-    dispositivo — e chi compra la legge sotto l'IBAN col suo «Copia»;
-    vuota, la riga non esiste. Gli altri metodi non cambiano.
-    Il banco ESEGUE l'invio vero (`inviaCampoP2P`) con le forme vere e
-    il giudice vero su un DOM di cartone, poi il riquadro vero di chi
-    compra sul testo che e' partito."""
+    """LA CAUSALE DEL BONIFICO SEPA (9 ott 2026, richiesta di Andrea; i tre
+    ritocchi della sera). Chi riceve gli euro con un bonifico puo'
+    indicare, oltre al nome e all'IBAN, una CAUSALE facoltativa: al piu'
+    140 caratteri (il limite del circuito) e solo l'alfabeto che il SEPA
+    ammette — le lettere accentate si CONVERTONO da sole nella lettera
+    semplice (e il campo mostra il testo convertito), il resto si rifiuta
+    nominando i caratteri da togliere. Fa la strada del nome e dell'IBAN
+    sul filo — testo composto, busta cifrata — ma NON si ricorda: a ogni
+    nuovo scambio nasce vuota, e per lo stesso scambio si rilegge dal
+    testo partito. Chi compra la legge sotto l'IBAN, e i tre campi hanno
+    ognuno il suo «Copia». Gli altri metodi non cambiano.
+    Il banco ESEGUE l'invio vero (`inviaCampoP2P`) e il form vero
+    (`renderCampiP2P`) con le forme vere e i giudici veri su un DOM di
+    cartone, poi il riquadro vero di chi compra sul testo che e' partito."""
     print("\n[la causale del bonifico SEPA]")
     mini = open("miniapp.html", encoding="utf-8").read()
     m = mini.replace("\r\n", "\n")
     forme = pezzo_js(m, "const P2P_FORME_RECAPITO = [", "\n];\n") + "\n];\n"
-    prova("il form SEPA ha il terzo campo: facoltativo, tetto 140, segnaposto d'esempio", True,
+    prova("il form SEPA ha il terzo campo: facoltativo, tetto 140, segnaposto, NON ricordato", True,
           "{k: 'causale', et: 'Causale (facoltativa)', ph: 'es. regalo Mario', "
-          "facoltativo: true, max: 140}" in forme)
+          "facoltativo: true, max: 140,\n            nonRicordato: true}]" in forme)
     prova("...e il testo composto porta la riga «Causale:» solo se c'e'", True,
           "+ (c.causale ? '\\nCausale: ' + c.causale : '')}" in forme)
     prova("il campo del form porta il SUO maxlength, gli altri quello di sempre", True,
           "maxlength=\"' + (c.max || CAMPO_MAX_TESTO) + '\"" in
           pezzo_js(m, "function campoRecapitoP2P(c){", "\n}\n"))
     invio = pezzo_js(m, "async function inviaCampoP2P(", "\n}\n")
-    prova("l'invio chiama il giudice sul campo `causale` col suo tetto, e sul no si ferma", True,
-          "if (c.k === 'causale') {\n        const no = giudiceCausaleSepaP2P(v, c.max);\n"
+    prova("l'invio traslittera, mostra il convertito nel campo, poi chiama il giudice col tetto", True,
+          "if (c.k === 'causale') {\n        v = traslitteraCausaleSepaP2P(v);\n"
+          "        if (inp) inp.value = v;           // il campo mostra il testo convertito\n"
+          "        const no = giudiceCausaleSepaP2P(v, c.max);\n"
           "        if (no) { toast(no, 6000); if (inp) inp.focus(); return; }" in invio)
-    prova("chi compra: la riga «Causale» ha il suo «Copia», riconosciuta per etichetta", True,
-          "copia: /^causale$/i.test(r.et)" in
+    prova("chi compra: «Copia» su causale e intestatario, riconosciuti per etichetta", True,
+          "copia: /^(causale|intestatario)$/i.test(r.et)" in
           pezzo_js(m, "function riquadroRecapitoP2P(testo, titolo){", "\n}\n"))
-    prova("la guida dei tutorial nomina il campo nuovo", True,
-          "«Causale (facoltativa)» → «es. regalo Mario»" in
-          open("docs/GUIDA-P2P-PASSI.md", encoding="utf-8").read())
+    rc = pezzo_js(m, "function renderCampiP2P(", "\n}\n")
+    prova("il form toglie dal ricordo i campi nonRicordato e rilegge la causale dal testo partito",
+          [True, True],
+          ["fr.campi.forEach(c => { if (c.nonRicordato) delete salvato.campi[c.k]; });" in rc,
+           "if (fr.forma === 'sepa' && miei.euro) {\n      const ca = causaleDaTestoP2P(miei.euro.testo);" in rc])
+    prova("la guida dei tutorial dice le tre cose nuove", [True, True, True],
+          [x in open("docs/GUIDA-P2P-PASSI.md", encoding="utf-8").read() for x in
+           ("«caffè» → «caffe», e il campo mostra il testo convertito",
+            "non si ricorda: a ogni nuovo scambio nasce vuota, nome e IBAN restano ricordati",
+            "chi compra ha il «📋 Copia» su intestatario, IBAN e causale")])
 
     js = (
         "let p2pCampiOrdine = 'x', p2pCampoMetodo = '', FOCUS = '';\n"
         "let TOAST = [], INVIATI = [], RICORDI = [];\n"
         "const CAMPO_MAX_TESTO = 300;\n"
         "const INPUT = {};\n"
-        "const el = id => INPUT[id] || null;\n"
+        "const box = {innerHTML: ''};\n"
+        "const el = id => id === 'p2pCampiCorpo' ? box : (INPUT[id] || null);\n"
+        "let SCRITTI = true;   // il DOM vero: quel che si e' scritto sopravvive al ridisegno\n"
+        "const document = {querySelectorAll: () => SCRITTI\n"
+        "  ? Object.keys(INPUT).map(id => ({id, value: INPUT[id].value})) : []};\n"
         "const toast = t => TOAST.push(t);\n"
         "const campoInvia = async (o, tipo, testo) => { INVIATI.push(testo); return o; };\n"
         "const ricordaRecapito = (f, c, t) => RICORDI.push([f, c]);\n"
         "const bottoneInAttesa = () => () => {};\n"
-        "const scriviOrdineP2P = () => {}, renderCampiP2P = () => {};\n"
-        "const recapitiMiei = () => ({});\n"
+        "const scriviOrdineP2P = () => {}, renderCampiP2P_ = () => {};\n"
+        "let RICORDO = {};\n"
+        "const recapitiMiei = () => RICORDO;\n"
         "const metodoSceltoP2P = () => '';\n"
+        "const vesteMetodoP2P = () => false, marchioMetodoP2P = x => x;\n"
         "const bottoneCopiaPiccolo = () => '<piccolo>';\n"
-        "const ORD = {id: 'x', lato: 'vendo', metodi: ['SEPA'], peer: 'p', campiMiei: {}, campiLoro: {}};\n"
+        "let ORD = {id: 'x', lato: 'vendo', metodi: ['SEPA'], peer: 'p', campiMiei: {}, campiLoro: {}};\n"
         "const ordiniP2P = () => ({x: ORD});\n"
         "const testoAppuntamentoP2P = () => '', quandoDaCampoP2P = () => 0, puntoDaCampoP2P = () => null;\n"
+        "const appuntamentoDaTestoP2P = () => null, valoreQuandoP2P = () => '', dataTabacchinoP2P = () => '';\n"
         + pezzo_js(m, "const esc = s => String(s ?? '').replace(", ";\n") + ";\n"
         + forme
         + pezzo_js(m, "const FORMA_CAUSALE_SEPA = ", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "function causaleDaTestoP2P(testo){", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "function giudiceCausaleSepaP2P(v, max){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function formaRecapito(metodo){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function metodoRecapitoScelto(o){", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "function campoRecapitoP2P(c){", "\n}\n") + "\n}\n"
+        + rc + "\n}\n"
         + invio + "\n}\n"
         + pezzo_js(m, "function rigaDato(et, v, op){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function bottoneCopia(v, aria){", "\n}\n") + "\n}\n"
@@ -128850,7 +128873,8 @@ async function giro(nome, iban, causale){
   TOAST = []; INVIATI = []; RICORDI = []; FOCUS = '';
   campo('nome', nome); campo('iban', iban); campo('causale', causale);
   await inviaCampoP2P('euro', {});
-  return {toast: TOAST, inviati: INVIATI, ricordi: RICORDI, focus: FOCUS};
+  return {toast: TOAST, inviati: INVIATI, ricordi: RICORDI, focus: FOCUS,
+          campo: INPUT['p2pCampoEuro_causale'].value};
 }
 const IBAN = 'IT60X0542811101000000123456';
 (async () => {
@@ -128859,8 +128883,11 @@ const IBAN = 'IT60X0542811101000000123456';
   out.piena = await giro('Mario Rossi', 'IT60 X054 2811 1010 0000 0123 456', 'regalo Mario');
   out.tetto = await giro('Mario Rossi', IBAN, 'b'.repeat(140));
   out.lunga = await giro('Mario Rossi', IBAN, 'a'.repeat(141));
-  out.accenti = await giro('Mario Rossi', IBAN, 'caffè per Mario!');
+  out.accenti = await giro('Mario Rossi', IBAN, 'caffè per Mario');
+  out.maiuscole = await giro('Mario Rossi', IBAN, 'È Àà Ìì Òò Ùù Éé Çç Ññ Üü');
+  out.misto = await giro('Mario Rossi', IBAN, 'perché!');
   out.euro = await giro('Mario Rossi', IBAN, '50 €');
+  out.virgolette = await giro('Mario Rossi', IBAN, '«regalo»');
   out.punteggiatura = await giro('Mario Rossi', IBAN, "Rimborso cena 12/10, Mario's (bar) ok? si: +2 - fine.");
   out.troppo = await giro('M'.repeat(200), IBAN, 'c'.repeat(100));
   out.nomeVuoto = await giro('', IBAN, 'regalo Mario');
@@ -128868,6 +128895,21 @@ const IBAN = 'IT60X0542811101000000123456';
     .map(f => f.campi.map(c => c.k)).flat();
   out.giudice = ['', null, 'x'.repeat(140), 'x'.repeat(141), 'è']
     .map(v => giudiceCausaleSepaP2P(v, 140));
+  out.traslittera = ['caffè', 'È', 'ß', '€', ''].map(traslitteraCausaleSepaP2P);
+  /* il form: il ricordo di ieri con la causale, un nuovo scambio, lo stesso scambio */
+  RICORDO = {sepa: {campi: {nome: 'Mario Rossi', iban: IBAN, causale: 'vecchia'}}};
+  SCRITTI = false;   // il foglio si APRE: non c'e' ancora niente di scritto
+  ['nome', 'iban', 'causale'].forEach(k => campo(k, ''));
+  const valori = () => ['nome', 'iban', 'causale'].map(k => INPUT['p2pCampoEuro_' + k].value);
+  ORD = {id: 'x', lato: 'vendo', metodi: ['SEPA'], peer: 'p', campiMiei: {}, campiLoro: {}};
+  renderCampiP2P(); out.formNuovo = valori();
+  ORD = {id: 'x', lato: 'vendo', metodi: ['SEPA'], peer: 'p', campiLoro: {},
+         campiMiei: {euro: {testo: 'Bonifico SEPA\nIntestatario: Mario Rossi\nIBAN: ' + IBAN + '\nCausale: inviata'}}};
+  renderCampiP2P(); out.formStesso = valori();
+  ORD = {id: 'x', lato: 'vendo', metodi: ['SEPA'], peer: 'p', campiLoro: {},
+         campiMiei: {euro: {testo: 'Bonifico SEPA\nIntestatario: Mario Rossi\nIBAN: ' + IBAN}}};
+  renderCampiP2P(); out.formStessoSenza = valori();
+  /* chi compra */
   const html = riquadroRecapitoP2P(out.piena.inviati[0]);
   out.righe = righeRecapitoP2P(out.piena.inviati[0]);
   out.copie = (html.match(/data-v="([^"]*)"/g) || []).map(x => x.slice(8, -1));
@@ -128888,25 +128930,28 @@ const IBAN = 'IT60X0542811101000000123456';
         return
     TRE = "Bonifico SEPA\nIntestatario: Mario Rossi\nIBAN: IT60X0542811101000000123456"
     OK = ["Recapito inviato a chi compra ✓"]
-    prova("vuota: parte il recapito di sempre, senza la riga, e il ricordo tiene la causale vuota",
-          [[TRE], OK, [["sepa", {"nome": "Mario Rossi", "iban": "IT60X0542811101000000123456",
-                                 "causale": ""}]]],
-          [out["vuota"]["inviati"], out["vuota"]["toast"], out["vuota"]["ricordi"]])
-    prova("piena: la quarta riga «Causale:» in coda, l'IBAN pulito come sempre, e il ricordo la tiene",
-          [[TRE + "\nCausale: regalo Mario"], OK, "regalo Mario"],
-          [out["piena"]["inviati"], out["piena"]["toast"],
-           out["piena"]["ricordi"][0][1]["causale"] if out["piena"]["ricordi"] else None])
-    prova("140 caratteri passano", [TRE + "\nCausale: " + "b" * 140],
-          out["tetto"]["inviati"])
+    RIC = [["sepa", {"nome": "Mario Rossi", "iban": "IT60X0542811101000000123456"}]]
+    prova("vuota: parte il recapito di sempre, senza la riga; il ricordo NON porta la causale",
+          [[TRE], OK, RIC], [out["vuota"]["inviati"], out["vuota"]["toast"], out["vuota"]["ricordi"]])
+    prova("piena: la quarta riga «Causale:» in coda, l'IBAN pulito; il ricordo tiene nome e IBAN e basta",
+          [[TRE + "\nCausale: regalo Mario"], OK, RIC],
+          [out["piena"]["inviati"], out["piena"]["toast"], out["piena"]["ricordi"]])
+    prova("140 caratteri passano", [TRE + "\nCausale: " + "b" * 140], out["tetto"]["inviati"])
     prova("141 no: niente parte, la frase dice il tetto e il conto, il fuoco va al campo",
           [[], ["La causale può avere al massimo 140 caratteri: ne hai scritti 141"], "causale"],
           [out["lunga"]["inviati"], out["lunga"]["toast"], out["lunga"]["focus"]])
     ALFA = "Nella causale vanno solo lettere senza accenti, numeri, spazi e . , - / ( ) ' + ? : — togli "
-    prova("l'accento e il punto esclamativo si rifiutano, nominati",
-          [[], [ALFA + "«è» «!»"], "causale"],
-          [out["accenti"]["inviati"], out["accenti"]["toast"], out["accenti"]["focus"]])
-    prova("il simbolo dell'euro si rifiuta, nominato", [[], [ALFA + "«€»"]],
-          [out["euro"]["inviati"], out["euro"]["toast"]])
+    prova("«caffè per Mario» parte come «caffe per Mario», e il campo lo mostra convertito",
+          [[TRE + "\nCausale: caffe per Mario"], OK, "caffe per Mario"],
+          [out["accenti"]["inviati"], out["accenti"]["toast"], out["accenti"]["campo"]])
+    prova("maiuscole, ç e ñ compresi", [TRE + "\nCausale: E Aa Ii Oo Uu Ee Cc Nn Uu"],
+          out["maiuscole"]["inviati"])
+    prova("«perché!»: l'accento si converte, il «!» si rifiuta da solo, e il campo mostra «perche!»",
+          [[], [ALFA + "«!»"], "causale", "perche!"],
+          [out["misto"]["inviati"], out["misto"]["toast"], out["misto"]["focus"], out["misto"]["campo"]])
+    prova("il simbolo dell'euro e le virgolette basse si rifiutano, nominati",
+          [[ALFA + "«€»"], [ALFA + "««» «»»"]],
+          [out["euro"]["toast"], out["virgolette"]["toast"]])
     prova("la punteggiatura del circuito passa tutta: / , ' ( ) ? : + - .",
           [TRE + "\nCausale: Rimborso cena 12/10, Mario's (bar) ok? si: +2 - fine."],
           out["punteggiatura"]["inviati"])
@@ -128917,18 +128962,27 @@ const IBAN = 'IT60X0542811101000000123456';
           [[], ["Compila: Intestatario (nome e cognome)"], "nome"],
           [out["nomeVuoto"]["inviati"], out["nomeVuoto"]["toast"], out["nomeVuoto"]["focus"]])
     prova("gli altri metodi non hanno il campo", False, "causale" in out["altriForm"])
-    prova("il giudice puro: vuota e null passano, 140 passa, 141 e l'accento no",
+    prova("il giudice puro: vuota e null passano, 140 passa, 141 e l'accento (non convertito) no",
           ["", "", "", "La causale può avere al massimo 140 caratteri: ne hai scritti 141",
            ALFA + "«è»"], out["giudice"])
+    prova("la traslitterazione pura: l'accento cade, ß ed € restano, vuota resta vuota",
+          ["caffe", "E", "ß", "€", ""], out["traslittera"])
+    prova("il form di un NUOVO scambio: nome e IBAN dal ricordo, la causale vuota anche se il "
+          "ricordo di ieri la portava", ["Mario Rossi", "IT60X0542811101000000123456", ""],
+          out["formNuovo"])
+    prova("il form dello STESSO scambio: la causale gia' partita si ripresenta",
+          ["Mario Rossi", "IT60X0542811101000000123456", "inviata"], out["formStesso"])
+    prova("...e se non era partita, resta vuota", ["Mario Rossi", "IT60X0542811101000000123456", ""],
+          out["formStessoSenza"])
     prova("chi compra: quattro righe, la causale e' l'ultima, etichetta e valore",
           [{"testa": "Bonifico SEPA"}, {"et": "Intestatario", "v": "Mario Rossi"},
            {"et": "IBAN", "v": "IT60X0542811101000000123456"},
            {"et": "Causale", "v": "regalo Mario"}], out["righe"])
-    prova("...due «Copia», IBAN e causale, nell'ordine; l'intestatario senza, come dal 23 set",
-          [["IT60X0542811101000000123456", "regalo Mario"], True],
+    prova("...tre «Copia»: intestatario, IBAN e causale, nell'ordine",
+          [["Mario Rossi", "IT60X0542811101000000123456", "regalo Mario"], True],
           [out["copie"], out["ordine"]])
-    prova("senza causale: un solo «Copia» e nessuna riga «Causale»",
-          [["IT60X0542811101000000123456"], True], [out["copie0"], out["senzaRiga"]])
+    prova("senza causale: due «Copia» e nessuna riga «Causale»",
+          [["Mario Rossi", "IT60X0542811101000000123456"], True], [out["copie0"], out["senzaRiga"]])
     prova("una causale cattiva arrivata da un altro client resta testo: niente <img>, e il "
           "suo «Copia» c'e' (nel data-v, mai nell'onclick)", [True, True, 2], out["cattivo"])
 

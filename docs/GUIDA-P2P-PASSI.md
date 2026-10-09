@@ -609,7 +609,7 @@ Cosa chiede il foglio «🤝 I vostri recapiti» a chi vende, per metodo:
 
 | Metodo | Campi (etichetta → esempio nel campo) | Cosa riceve chi compra |
 |---|---|---|
-| SEPA, SEPA Instant | «Intestatario (nome e cognome)» → «Mario Rossi»; «IBAN» → un IBAN italiano d'esempio; «Causale (facoltativa)» → «es. regalo Mario» (dal 9 ott 2026: al più 140 caratteri, solo lettere senza accenti, numeri, spazi e . , - / ( ) ' + ? : — il resto si rifiuta dicendo quali togliere) | «Bonifico SEPA / Intestatario: … / IBAN: …» e, solo se scritta, «/ Causale: …» (con SEPA Instant: «Bonifico SEPA Instant / …»); chi compra ha il «📋 Copia» sull'IBAN e sulla causale |
+| SEPA, SEPA Instant | «Intestatario (nome e cognome)» → «Mario Rossi»; «IBAN» → un IBAN italiano d'esempio; «Causale (facoltativa)» → «es. regalo Mario» (dal 9 ott 2026: al più 140 caratteri; le lettere accentate diventano da sole la lettera semplice, «caffè» → «caffe», e il campo mostra il testo convertito; restano solo lettere, numeri, spazi e . , - / ( ) ' + ? : — il resto, es. € ! «, si rifiuta dicendo quali togliere; non si ricorda: a ogni nuovo scambio nasce vuota, nome e IBAN restano ricordati) | «Bonifico SEPA / Intestatario: … / IBAN: …» e, solo se scritta, «/ Causale: …» (con SEPA Instant: «Bonifico SEPA Instant / …»); chi compra ha il «📋 Copia» su intestatario, IBAN e causale |
 | Revolut | «Il tuo RevTag» → «@mariorossi» | «Revolut: @…» |
 | Satispay | «Numero di telefono Satispay» → «333 1234567» | «Satispay: …» |
 | PayPal | «Email o link paypal.me» → «mario@esempio.it» | «PayPal: …» |

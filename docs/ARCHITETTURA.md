@@ -26638,16 +26638,21 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   suo form di recapito (`P2P_FORME_RECAPITO`): un metodo scritto a mano
   cadrebbe nella forma generica, dove chi deve ricevere gli euro trova
   una casella vuota invece dei suoi campi.
-  LA CAUSALE DEL SEPA (9 ott 2026): il form del bonifico chiede
-  intestatario, IBAN e una CAUSALE facoltativa — al più 140 caratteri e
-  il solo alfabeto EPC, giudicati da `giudiceCausaleSepaP2P` (pura) al
-  tocco di «Invia»; il resto si rifiuta nominando i caratteri da
-  togliere. Fa la stessa strada del nome e dell'IBAN — riga «Causale:»
-  nel testo composto, busta cifrata fra le due chiavi, ricordo del
-  dispositivo per forma — e chi compra la legge sotto l'IBAN col suo
-  «📋 Copia» (per etichetta, in `riquadroRecapitoP2P`); vuota, la riga
-  non esiste. Il server non la vede mai, come non vede l'IBAN. Cantieri,
-  «La causale del bonifico SEPA».
+  LA CAUSALE DEL SEPA (9 ott 2026, coi tre ritocchi della sera): il form
+  del bonifico chiede intestatario, IBAN e una CAUSALE facoltativa — al
+  più 140 caratteri e il solo alfabeto EPC. Al tocco di «Invia» le
+  lettere accentate diventano da sole la lettera semplice
+  (`traslitteraCausaleSepaP2P`, NFD e via i segni combinanti; il campo
+  mostra il testo convertito), poi `giudiceCausaleSepaP2P` (pura)
+  rifiuta il resto nominando i caratteri da togliere. Sul filo fa la
+  strada del nome e dell'IBAN — riga «Causale:» nel testo composto, busta
+  cifrata fra le due chiavi — ma NON si ricorda (`nonRicordato`): a ogni
+  nuovo scambio nasce vuota, e per lo stesso scambio si rilegge dal testo
+  partito (`causaleDaTestoP2P`). Chi compra la legge sotto l'IBAN, e i
+  tre campi hanno ognuno il suo «📋 Copia» (per etichetta, in
+  `riquadroRecapitoP2P`); vuota, la riga non esiste. Il server non la
+  vede mai, come non vede l'IBAN. Cantieri, «La causale del bonifico
+  SEPA» e «I tre ritocchi alla causale».
   LA SETTIMA VOCE È «Contanti al tabacchino» (15 set 2026): chi VENDE
   sats genera un ordine Amazon pagabile in contanti (Mooney) e passa a
   chi compra numero, importo e scadenza; chi compra paga alla cassa,

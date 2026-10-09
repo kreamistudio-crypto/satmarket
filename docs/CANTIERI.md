@@ -42000,3 +42000,66 @@ colore si guarda. `prove_prese_dalle_10` sale a 58. Il rebase chiesto
 da Andrea non ha avuto niente da fare: il cantiere del banner delle
 commissioni (62cd972) stava committato nel suo worktree e non su
 origin/main, che era ancora 5a3ee42 — sarà lui a ribasarsi su questo.
+
+## I tre ritocchi alla causale (9 ott 2026, sera, richiesta di Andrea)
+
+Riaperto il cantiere della mattina («La causale del bonifico SEPA»)
+con tre ritocchi di Andrea, tutti e tre un rovescio di una scelta
+scritta là.
+
+**1) Gli accenti si convertono, non si rifiutano.** La mattina «caffè»
+si fermava col messaggio «togli «è»»; ora `traslitteraCausaleSepaP2P`
+(pura) toglie il segno e tiene la lettera — NFD e via i segni
+combinanti, quindi è é ê → e, à → a, ì → i, ò → o, ù → u, ç → c, ñ → n,
+maiuscole comprese — PRIMA del giudice, e `inviaCampoP2P` scrive il
+testo convertito nel campo, così chi scrive lo vede anche quando il
+giudice poi dice no per un altro carattere («perché!» → il campo mostra
+«perche!» e il toast dice solo «togli «!»»). Restano rifiutati, col
+messaggio di ieri, i caratteri senza una lettera semplice: € ! « » ß.
+Scartata una tabella a mano di accentate: la normalizzazione Unicode è
+la stessa cosa detta in una riga, e copre anche le lettere che una
+tabella dimenticherebbe.
+
+**2) La causale non si ricorda.** `nonRicordato: true` sul solo campo
+(la bandiera già in casa per l'ora dell'appuntamento): `ricordaRecapito`
+non la salva, nome e IBAN restano ricordati come ieri. DUE cose in più,
+perché la bandiera da sola non bastava: a) chi ha salvato una causale
+con l'app della mattina (è stata in produzione qualche ora) non deve
+ritrovarsela precompilata — `renderCampiP2P` toglie dal ricordo letto i
+campi `nonRicordato` prima di usarlo, e al prossimo salvataggio sparisce
+anche dal localStorage; b) per lo STESSO scambio, «Aggiorna il recapito»
+ripresentava un form con la causale vuota e l'avrebbe mandato senza, in
+silenzio — ora la causale si rilegge dal testo già partito
+(`causaleDaTestoP2P`, la riga «Causale:» di `campiMiei.euro.testo`), come
+l'appuntamento del contanti si rilegge dal suo. «A ogni NUOVO scambio
+nasce vuota» resta vero alla lettera.
+
+**3) Il «📋 Copia» anche sull'intestatario.** `copia:
+/^(causale|intestatario)$/i.test(r.et)`: i tre campi del bonifico si
+incollano tutti e tre nel modulo della banca. Non contraddice il 23 set:
+allora i bottoni erano sette (anche sul nome del metodo e sugli altri
+recapiti), e tre in colonna sono il modulo stesso.
+
+**Le prove.** `prove_causale_sepa` riscritta (28): le sentinelle nuove
+(il campo con `nonRicordato`, la traslitterazione nell'invio col campo
+che mostra il convertito, il «Copia» per le due etichette, il form che
+pulisce il ricordo e rilegge dal testo partito, le tre frasi della
+GUIDA); il banco node ESEGUE `inviaCampoP2P` e `renderCampiP2P` veri —
+«caffè per Mario» parte come «caffe per Mario», le maiuscole e ç ñ, il
+misto «perché!», € e « », il ricordo che non porta la causale; il form di
+un nuovo scambio con un ricordo di ieri che la portava (vuota), lo
+stesso scambio con la causale partita (ripresentata) e senza (vuota);
+chi compra con tre «Copia» nell'ordine, senza causale due. Suite e
+collaudi: nel verbale del push. Il giro dal vivo sui tre punti: in coda.
+
+**Il giro dal vivo sui tre punti** (PC, due identità, server della
+copia, relay nak locale come la mattina): 1) il ricordo seminato «di
+ieri» con una causale → il foglio di un nuovo scambio nasce con nome e
+IBAN e la causale VUOTA; 2) «caffè per Mario!» → il campo mostra «caffe
+per Mario!», il toast dice solo «togli «!»», niente parte; «caffè per
+Mario» → parte «Causale: caffe per Mario», il ricordo tiene nome e IBAN
+e basta, journal «tocca a te» a 111; il foglio riaperto sullo STESSO
+scambio ripresenta «caffe per Mario» con «Aggiorna il recapito»; 3) il
+compratore riceve dal relay e vede tre «📋 Copia» — intestatario, IBAN,
+causale — e il tocco vero sul primo mette «Mario Rossi» negli appunti
+(«Copiato 📋»). Screenshot 07-11 in `.claude/giri/causale-sepa/`.
