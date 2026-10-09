@@ -43257,3 +43257,113 @@ al titolo dello stesso blocco, dall'altra sessione) git ha fuso da solo
 miniapp.html e prove.py: in conflitto solo questa coda. Lo stesso al
 rebase su 43846c5 (il foglio dell'importo per gli ordini P2P normali)
 e su f67c1e1 («Compra» acceso anche senza metodo).
+
+## L'anteprima degli avvisi P2P, in miniatura (9 ott 2026, sera, richiesta di Andrea)
+
+**Il guaio.** L'avviso dei nuovi ordini del libro (38d068e) finisce con
+il link «🫙 Apri il libro ordini» a `/p2p`, e Telegram ci apre sotto la
+scheda dell'anteprima da solo. La pagina `/p2p` aveva già titolo e
+descrizione suoi, ma l'immagine la prestava il brand (`IMMAGINE_BRAND`,
+`icona-512.png`, il barattolo del mercatino su fondo arancio), e
+Telegram la metteva a tutta larghezza: enorme, e del posto sbagliato.
+
+**Cosa si è fatto.** Due pezzi, uno per lato.
+1. LA PAGINA HA LA SUA IMMAGINE. `IMMAGINE_P2P` =
+   `/assets/p2p-anteprima.jpg`, 400×400, e `TESTA_P2P` la usa (og:image,
+   twitter:image, og:image:width/height). Il file nasce da
+   `p2p-logo-grande.webp` — scelto fra i tre loghi del P2P perché è il
+   COMPLETO, con le due frecce accese: `p2p-logo-compra` e
+   `p2p-logo-vendi` sono i gemelli dei tab, con una freccia spenta, e da
+   soli direbbero metà della cosa; è anche quello della card «Scambio
+   P2P» della home, quindi chi tocca il link riconosce quel che vede.
+   Composto OPACO sul fondo della carta della pagina (#FAF4E4), logo a
+   356 px dentro il quadrato da 400: il logo ha l'alfa, e un barattolo
+   scontornato ogni client lo comporrebbe sul fondo che gli pare (la
+   ragione scritta accanto a `IMMAGINE_BRAND` per non usare l'hero).
+   JPEG e non WebP perché è il formato che ogni crawler di anteprime
+   legge; 25 KB. Rotta esplicita sua, `asset_p2p_anteprima` (regola 3).
+2. IL MESSAGGIO CHIEDE LA MINIATURA. In `_manda_telegram`, accanto al
+   ramo di @trackbot e con la stessa forma: se il testo porta l'href
+   esatto del libro (`LINK_LIBRO_P2P`, la costante nuova accanto a
+   `TESTA_P2P`), il `sendMessage` parte con
+   `link_preview_options = {"url": LINK_LIBRO_P2P, "prefer_small_media":
+   true}`. L'url si scrive anche se è già nel testo, e non è un
+   doppione: la documentazione dell'API Bot (letta il 9 ott 2026, Bot
+   API 10.3) dice che `prefer_small_media` è IGNORATO «if the URL isn't
+   explicitly specified or media size change isn't supported for the
+   preview». `link_preview_options` esiste dalla Bot API 7.0 (29 dic
+   2023) e su `sendMessage` ha preso il posto di
+   `disable_web_page_preview`, che il ramo di @trackbot usa ancora e
+   Telegram accetta ancora: i due rami sono un `if`/`elif`, mai insieme
+   nella stessa chiamata.
+
+**Quali avvisi tocca.** Uno solo: il messaggio dei nuovi ordini
+(`_testo_avviso_nuovi_p2p`), l'unico che manda il link al libro.
+Cercato per nome in tutto server.py: gli altri avvisi del P2P (lo
+scambio, la chat, le attese, le dispute) non portano un link a `/p2p`, e
+il controllo è sull'href ESATTO, chiuso dalla virgoletta — un
+`/p2p/altro` non lo prende. Il post P2P nel canale «Barattolo Vetrina»
+(`_caption_canale_p2p`) parte da `_manda_post_canale`, punta alla home
+e non passa da `_manda_telegram`: resta com'è. Gli altri avvisi del mercatino partono come
+sono sempre partiti (chat_id, text, parse_mode). Il ripiego «spoglio»
+(HTML rifiutato) resta quello di sempre: senza tag non c'è più un link,
+e quindi niente opzioni.
+
+**Le Mini App.** Il link dell'avviso è un indirizzo web normale
+(`https://barattolo.store/p2p`), non un link `t.me/…?startapp`: Telegram
+ne fa un'anteprima di pagina web dai meta Open Graph, ed è lì che
+`prefer_small_media` vale. Le anteprime dei link Mini App sono un'altra
+famiglia (MTProto `webPage` di tipo `app`/`telegram_botapp`: l'icona e
+un bottone che apre l'app), e la documentazione non dice che la misura
+lì si possa scegliere. Il giorno che l'avviso aprisse direttamente la
+Mini App con un `startapp`, questa cura non varrebbe più.
+
+**Quel che resta un desiderio.** «media size change isn't supported»:
+la scelta di quando la misura si può cambiare la fa il crawler di
+Telegram (il flag `has_large_media` della pagina nel MTProto). Con
+un'immagine quadrata da 400 la miniatura è la forma naturale, ma la resa
+VERA si vede solo sul telefono.
+
+**Strade scartate.** Un indirizzo nuovo apposta per l'avviso
+(`/p2p/avviso` o un `?da=`): `/p2p` è già la pagina del P2P coi suoi
+meta, e un secondo indirizzo sarebbe una seconda testa da tenere in
+pari; l'immagine sua la merita anche il link condiviso dal tocco lungo
+sulla card, che è lo stesso indirizzo. Un argomento nuovo a `notifica()`
+per dire «miniatura»: decine di chiamanti e i banchi che ne fanno le
+finte con due parametri; il riconoscimento dall'href è la forma già in
+casa per @trackbot. Il WebP del logo direttamente come og:image: ha
+l'alfa, e non tutti i crawler lo leggono.
+
+**Provato.** `prove_anteprima_avvisi_p2p` (23): il file (JPEG 400×400
+RGB, sotto i 40 KB, il fondo negli angoli), la rotta col suo tipo, la
+testa di `/p2p` ESEGUITA (og:image e twitter:image del P2P, misura
+400×400, niente icona-512, titolo/descrizione/url di prima, NOINDEX
+senza canonical) e la pagina intera da `_pagina_con_meta`; poi
+`_manda_telegram` vero contro un Telegram di cartone col testo VERO
+dell'avviso: url esplicito e `prefer_small_media`, niente
+`disable_web_page_preview`, gli altri avvisi invariati, un `/p2p/altro`
+non preso, trackbot che vince senza mai i due insieme, il ripiego
+spoglio di sempre. Controprova: tolto `prefer_small_media` 2 rosse,
+l'immagine del brand 4, l'url esplicito 2. I cinque banchi che eseguono
+`_manda_telegram` hanno avuto il nome nuovo (`LINK_LIBRO_P2P`): cede il
+banco, mai la regola. Suite intera nel worktree
+(`PROVE_SEVERE=1`): 20327 passate, 0 fallite; i 45 collaudi della CI
+in gabbia: verdi.
+Dal vivo: il server VERO da una copia (config d'esempio, relay morto,
+porta 8149) — `GET /p2p` ha og:image `…/assets/p2p-anteprima.jpg` 400×400
+al byte 496 della pagina, `GET` dell'immagine 200 `image/jpeg`, 24.968
+byte; e un FINTO Telegram su 127.0.0.1:8150 che registra le chiamate,
+con la catena vera presa dal sorgente (`_testo_avviso_nuovi_p2p` →
+`notifica()` → `_manda_telegram`, httpx vero su una socket vera, solo
+l'host di api.telegram.org dirottato e qualunque altro host fa alzare):
+l'avviso di due ordini arriva con `link_preview_options` {url
+`https://barattolo.store/p2p`, `prefer_small_media` true}, l'avviso
+«Venduto» del mercatino arriva con chat_id, text e parse_mode e basta.
+
+**Da guardare (Andrea, sul telefono, dopo il deploy).** La resa vera:
+un avviso nuovo dei nuovi ordini con la miniatura accanto al testo e il
+logo del P2P. Telegram tiene in cache le anteprime: se compare ancora il
+barattolo del mercatino, si scrive a @WebpageBot
+`https://barattolo.store/p2p` e lui la rilegge (risponde con la scheda
+aggiornata); i messaggi già arrivati restano come sono, cambia dal
+messaggio dopo.

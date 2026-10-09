@@ -14571,6 +14571,20 @@ async def _manda_telegram(tg_id: int, testo: str):
     # loro link restano come sono sempre stati.
     if TRACKBOT_START in testo:
         dati["disable_web_page_preview"] = True
+    # L'ANTEPRIMA DEL LIBRO P2P, IN MINIATURA (9 ott 2026, richiesta di
+    # Andrea): l'avviso dei nuovi ordini porta il link a /p2p, e la
+    # scheda che Telegram ci apre era il brand a tutta larghezza. La
+    # pagina adesso ha la SUA immagine (IMMAGINE_P2P, quadrata e
+    # leggera), e qui si chiede la miniatura accanto al testo. L'url
+    # si scrive anche se e' gia' nel testo, e non e' un doppione: l'API
+    # Bot IGNORA `prefer_small_media` quando l'url non e' esplicito. E'
+    # un desiderio, non un ordine — se Telegram non sa cambiare la
+    # misura di quella scheda la lascia com'e', e il messaggio parte lo
+    # stesso. Solo i messaggi che portano QUEL link: gli altri avvisi
+    # partono come sono sempre partiti.
+    elif f'href="{LINK_LIBRO_P2P}"' in testo:
+        dati["link_preview_options"] = {"url": LINK_LIBRO_P2P,
+                                        "prefer_small_media": True}
     async with httpx.AsyncClient(timeout=20) as c:
         r = await c.post(url, json=dati)
         if r.status_code == 400 and "parse" in r.text.lower():
@@ -67147,8 +67161,24 @@ TESTA_PRIVACY = _testa_seo(TITOLO_PRIVACY, META_TESTO_PRIVACY,
 # `indicizza=False` e si aggiunge la riga alla sitemap, dove oggi
 # stanno le due sorelle e questa no — una pagina deindicizzata dentro
 # la sitemap e' un segnale contro l'altro.
-TESTA_P2P = _testa_seo(TITOLO_P2P, META_TESTO_P2P,
-                       f"{URL_PUBBLICO}/p2p", indicizza=False)
+# L'IMMAGINE E' SUA dal 9 ott 2026 (richiesta di Andrea): fino a ieri
+# la pagina prestava quella del brand, e l'avviso dei nuovi ordini —
+# che porta questo indirizzo — si apriva sotto con il barattolo del
+# mercatino a tutta larghezza. Ora c'e' il logo del P2P, il completo
+# con le due frecce accese (p2p-logo-grande, lo stesso della card
+# «Scambio P2P» della home), su un JPEG quadrato da 400: OPACO perche'
+# il logo ha l'alpha e ogni client lo comporrebbe sul fondo che gli
+# pare (la ragione per cui IMMAGINE_BRAND non e' l'hero) — il fondo e'
+# la carta della pagina, #FAF4E4 —, e JPEG perche' e' il formato che
+# ogni crawler legge, e il WebP non ancora tutti. 25 KB. Quadrata e
+# piccola e' anche la forma che Telegram mette in miniatura accanto al
+# testo.
+# Il link e' una costante perche' lo leggono in due: questa testa e
+# _manda_telegram, che riconosce il messaggio dal suo href.
+IMMAGINE_P2P = (f"{URL_PUBBLICO}/assets/p2p-anteprima.jpg", 400, 400)
+LINK_LIBRO_P2P = f"{URL_PUBBLICO}/p2p"
+TESTA_P2P = _testa_seo(TITOLO_P2P, META_TESTO_P2P, immagine=IMMAGINE_P2P,
+                       url=f"{URL_PUBBLICO}/p2p", indicizza=False)
 
 # E NEMMENO LA QUARTA, e per una ragione sua: la pagina dei Consigliati
 # puo' restare VUOTA — lo spazio sponsorizzato scade da solo, e una
@@ -68376,6 +68406,19 @@ def asset_p2p_logo_grande():
     _timbra_asset_pagina."""
     return FileResponse("assets/p2p-logo-grande.webp",
                         media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/assets/p2p-anteprima.jpg")
+def asset_p2p_anteprima():
+    """L'immagine dell'anteprima di /p2p (9 ott 2026, richiesta di
+    Andrea): il logo grande del P2P su un JPEG quadrato da 400, opaco
+    sul fondo della pagina — la legge solo chi disegna la scheda di un
+    link (Telegram, WhatsApp...), il perche' della forma sta accanto a
+    IMMAGINE_P2P. Rotta esplicita come le sorelle: mai un mount
+    (regola 3)."""
+    return FileResponse("assets/p2p-anteprima.jpg",
+                        media_type="image/jpeg",
                         headers={"Cache-Control": "public, max-age=86400"})
 
 

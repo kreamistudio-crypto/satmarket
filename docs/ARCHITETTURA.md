@@ -27262,7 +27262,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   piu' conveniente per lei col giudice della card
   `_convenienza_nuovo_p2p`, il link a `/p2p`), timbrando le righe PRIMA
   dell'invio; un ordine sparito dal libro nel frattempo non si
-  annuncia. Il canale lo sceglie `notifica()`. «Dimentica il profilo» e
+  annuncia. Il canale lo sceglie `notifica()`. L'ANTEPRIMA DI QUEL
+  LINK E' IN MINIATURA (9 ott 2026): `_manda_telegram` riconosce il
+  messaggio dall'href `LINK_LIBRO_P2P` e chiede `link_preview_options`
+  con l'url ESPLICITO (senza, l'API Bot ignora la misura) e
+  `prefer_small_media`; `/p2p` ha la sua og:image, `IMMAGINE_P2P` —
+  vedi CANTIERI, «L'anteprima degli avvisi P2P, in miniatura».
+  «Dimentica il profilo» e
   la fusione dei conti portano la coda con se'. Gli stati
   sul libro si scrivono quando si VEDONO: `pending`, `in-progress`,
   `canceled`, `success` letti dallo specchio il 16 set 2026; `expired`
@@ -29202,6 +29208,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    una pagina vecchia in cache prende un 404 e l'`onerror` toglie
    l'immagine, che e' il ripiego gia' scritto nel markup. Vedi CANTIERI,
    «Il ritocco dell'intestazione» e «I ritocchi del P2P»),
+   `/assets/p2p-anteprima.jpg` (l'og:image di `/p2p`, 9 ott 2026: il
+   logo grande su un JPEG quadrato da 400, OPACO sul fondo della
+   pagina perche' il logo ha l'alfa, 25 KB; la legge solo chi disegna
+   la scheda di un link — vedi CANTIERI, «L'anteprima degli avvisi
+   P2P, in miniatura»),
    `/assets/barattozon.webp` (il marchio del metodo «Contanti al
    tabacchino», 16 set 2026: WebP con trasparenza, 305x96, cartella
    sua e mai assets/categorie/ — vedi «IL VESTITO BARATTOZON»; dal 24

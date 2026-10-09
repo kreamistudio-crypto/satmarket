@@ -17505,6 +17505,7 @@ def prove_notifica_fail_open():
         amb2 = {"httpx": type("H", (), {"AsyncClient": Cliente}),
                 "BOT_TOKEN": "finto", "MODALITA_COLLAUDO": False,
                 "TRACKBOT_START": gemelli_trackbot()["TRACKBOT_START"],
+                "LINK_LIBRO_P2P": "https://barattolo.store/p2p",
                 "spoglia_html": amb_s["spoglia_html"],
                 "print": lambda s: righe.append(s)}
         exec(pezzo_async("_manda_telegram"), amb2)
@@ -34099,6 +34100,7 @@ async function tocca(o){
     exec(pezzo("spoglia_html"), sp)
     amb = gemelli_trackbot({
         "MODALITA_COLLAUDO": False, "BOT_TOKEN": "t", "json": json,
+        "LINK_LIBRO_P2P": "https://barattolo.store/p2p",
         "spoglia_html": sp["spoglia_html"], "print": lambda *a: None,
         "httpx": _types.SimpleNamespace(AsyncClient=Cliente)})
     exec("async " + pezzo("_manda_telegram"), amb)
@@ -34558,6 +34560,7 @@ def prove_titoli_scappati():
         amb = {"MODALITA_COLLAUDO": False, "BOT_TOKEN": "t",
                "spoglia_html": spoglia["spoglia_html"],
                "TRACKBOT_START": gemelli_trackbot()["TRACKBOT_START"],
+               "LINK_LIBRO_P2P": "https://barattolo.store/p2p",
                # il `timeout=` e' arrivato con la cura dell'ordine
                # 151 (set 2026): senza il parametro qui, il banco
                # rispondeva TypeError e questa prova usciva rossa
@@ -92866,6 +92869,7 @@ def prove_telegram_simulato_collaudo():
     stampe = []
     amb = {"MODALITA_COLLAUDO": True, "httpx": _Httpx, "BOT_TOKEN": "x",
            "TRACKBOT_START": gemelli_trackbot()["TRACKBOT_START"],
+           "LINK_LIBRO_P2P": "https://barattolo.store/p2p",
            "print": lambda *a, **k: stampe.append(" ".join(map(str, a)))}
     exec("async " + pezzo("_manda_telegram"), amb)
     esiti = [_aio.new_event_loop().run_until_complete(
@@ -93296,6 +93300,7 @@ def prove_p2p_esito_notifiche():
         amb = {"httpx": type("H", (), {"AsyncClient": Cliente}), "json": json,
                "BOT_TOKEN": "finto", "MODALITA_COLLAUDO": False,
                "TRACKBOT_START": gemelli_trackbot()["TRACKBOT_START"],
+               "LINK_LIBRO_P2P": "https://barattolo.store/p2p",
                "spoglia_html": amb_s["spoglia_html"],
                "print": lambda *a, **k: righe.append(" ".join(str(x) for x in a))}
         exec("async " + pezzo("_manda_telegram"), amb)
@@ -103682,6 +103687,168 @@ console.log(JSON.stringify({prima, dopo}));
            mini.index("function portaPrimoOrdineP2P(){") > _fm))
 
 
+def prove_anteprima_avvisi_p2p():
+    """L'ANTEPRIMA DEGLI AVVISI P2P (9 ott 2026, richiesta di Andrea).
+    L'avviso dei nuovi ordini porta il link a /p2p, e Telegram ci apriva
+    la scheda col brand del mercatino, enorme. Adesso: /p2p ha la SUA
+    immagine (il logo del P2P su un JPEG quadrato da 400, opaco, leggero)
+    e il messaggio chiede la miniatura accanto al testo con
+    `link_preview_options` — url esplicito e `prefer_small_media`, che
+    senza l'url l'API Bot ignora. Solo i messaggi con QUEL link.
+    Qui: il file vero, i meta della pagina ESEGUITI (la testa e la pagina
+    intera), e _manda_telegram vero contro un Telegram di cartone che
+    registra la chiamata, col testo vero dell'avviso."""
+    print("\n[l'anteprima degli avvisi P2P]")
+    import asyncio as _aio
+    import html as _html
+    import re as _re
+    import time as _time
+    import types as _types
+    src = _SORGENTE
+
+    # --- 1) IL FILE: quadrato, opaco, leggero, JPEG --------------------
+    F = os.path.join("assets", "p2p-anteprima.jpg")
+    prova("il file dell'anteprima c'e'", True, os.path.isfile(F))
+    peso = os.path.getsize(F)
+    prova("...e pesa meno di 40 KB (oggi 25)", True, 0 < peso < 40000)
+    from PIL import Image
+    with Image.open(F) as im:
+        prova("...ed e' un JPEG quadrato da 400, OPACO (niente alfa)",
+              ("JPEG", (400, 400), "RGB"), (im.format, im.size, im.mode))
+        angolo = im.getpixel((3, 3))
+    prova("...col fondo della carta della pagina (#FAF4E4) negli angoli",
+          True, all(abs(a - b) <= 6 for a, b in zip(angolo, (0xFA, 0xF4, 0xE4))))
+
+    # --- 2) LA ROTTA: esplicita, col suo tipo ----------------------------
+    rotta = pezzo("asset_p2p_anteprima")
+    prova("la rotta del file e' esplicita, col tipo JPEG", True,
+          '@app.get("/assets/p2p-anteprima.jpg")' in src
+          and 'FileResponse("assets/p2p-anteprima.jpg",' in rotta
+          and 'media_type="image/jpeg"' in rotta)
+
+    # --- 3) I META DI /p2p, ESEGUITI --------------------------------------
+    amb = _amb_seo()
+    i = src.index("\nTITOLO_P2P = ") + 1
+    exec(src[i:src.index("\n\n", i)], amb)
+    for riga in ("IMMAGINE_P2P = (", "LINK_LIBRO_P2P = "):
+        i = src.index("\n" + riga) + 1
+        exec(src[i:src.index("\n", i)], amb)
+    i = src.index("\nTESTA_P2P = ") + 1
+    exec(src[i:src.index(")\n", i) + 2], amb)
+    prova("IMMAGINE_P2P dichiara la misura VERA del file", (400, 400),
+          amb["IMMAGINE_P2P"][1:])
+    T = amb["TESTA_P2P"]
+
+    def meta(chiave):
+        m = _re.search(r'<meta (?:property|name)="' + _re.escape(chiave)
+                       + r'" content="([^"]*)">', T)
+        return _html.unescape(m.group(1)) if m else None
+    IMG = "https://barattolo.store/assets/p2p-anteprima.jpg"
+    prova("og:image e twitter:image di /p2p sono il logo del P2P",
+          [IMG, IMG], [meta("og:image"), meta("twitter:image")])
+    prova("...con la misura dichiarata, 400 per 400", ["400", "400"],
+          [meta("og:image:width"), meta("og:image:height")])
+    prova("...e il brand non c'e' piu'", False, "icona-512" in T)
+    prova("og:title, og:description e og:url restano quelli del P2P",
+          ["Scambio P2P — Barattolo", amb["META_TESTO_P2P"],
+           "https://barattolo.store/p2p"],
+          [meta("og:title"), meta("og:description"), meta("og:url")])
+    prova("...e la pagina resta NOINDEX, senza canonical", (True, False),
+          (T.endswith(amb["META_NOINDEX"]), "canonical" in T))
+    prova("il link del libro e' l'indirizzo della pagina", amb["LINK_LIBRO_P2P"],
+          meta("og:url"))
+    # la pagina INTERA, come la serve la rotta: i meta stanno in cima
+    amb["HTMLResponse"] = lambda corpo, headers=None: corpo
+    amb["HEADER_NO_CACHE"] = {}
+    exec(pezzo("_pagina_con_meta"), amb)
+    pagina = amb["_pagina_con_meta"](T, amb["TITOLO_P2P"])
+    prova("la rotta /p2p serve QUESTA testa", True,
+          "return _pagina_con_meta(TESTA_P2P, TITOLO_P2P)" in pezzo("pagina_p2p"))
+    prova("...e nella pagina intera l'og:image e' quello del P2P, una volta",
+          (1, 0), (pagina.count(f'property="og:image" content="{IMG}"'.encode()),
+                   pagina.count(b'property="og:image" content="https://barattolo.store/assets/icona-512.png"')))
+
+    # --- 4) IL MESSAGGIO: la miniatura, solo per quel link -----------------
+    a2 = {"html": _html, "URL_PUBBLICO": "https://barattolo.store", "time": _time}
+    for riga in ("TIPI_AVVISI_NUOVI_P2P = ",):
+        i = src.index("\n" + riga) + 1
+        exec(src[i:src.index("\n", i)].split("   #")[0], a2)
+    i = src.index("\nNOMI_TIPI_AVVISI_NUOVI_P2P = {") + 1
+    exec(src[i:src.index("}\n", i) + 2], a2)
+    for f in ("_frase_convenienza_p2p", "_testo_avviso_nuovi_p2p"):
+        exec(_senza_prosa(pezzo(f)), a2)
+    avviso = a2["_testo_avviso_nuovi_p2p"](
+        [{"tipo": "vendita", "conv": 3.0, "euro": "50,00 €", "metodi": "SEPA"}])
+    prova("il testo vero dell'avviso porta il link del libro", True,
+          f'<a href="{amb["LINK_LIBRO_P2P"]}">' in avviso)
+
+    mandati = []
+
+    def banco(esiti):
+        mandati.clear()
+
+        class Cliente:
+            def __init__(self, timeout=None): pass
+
+            async def __aenter__(self): return self
+
+            async def __aexit__(self, *a): return False
+
+            async def post(self, url, json=None):
+                mandati.append((url, json))
+                return esiti.pop(0)
+
+        sp = {"html": _html, "re": _re}
+        exec(pezzo("spoglia_html"), sp)
+        b = gemelli_trackbot({
+            "MODALITA_COLLAUDO": False, "BOT_TOKEN": "t", "json": json,
+            "LINK_LIBRO_P2P": amb["LINK_LIBRO_P2P"],
+            "spoglia_html": sp["spoglia_html"], "print": lambda *a: None,
+            "httpx": _types.SimpleNamespace(AsyncClient=Cliente)})
+        exec("async " + pezzo("_manda_telegram"), b)
+        return b
+
+    def ok():
+        return _types.SimpleNamespace(status_code=200,
+                                      text='{"result": {"message_id": 7}}')
+
+    b = banco([ok()])
+    _aio.run(b["_manda_telegram"](222, avviso))
+    url, dati = mandati[0]
+    prova("l'avviso parte a sendMessage, in HTML", (True, "HTML"),
+          (url.endswith("/sendMessage"), dati.get("parse_mode")))
+    prova("...con la miniatura: url ESPLICITO e prefer_small_media",
+          {"url": "https://barattolo.store/p2p", "prefer_small_media": True},
+          dati.get("link_preview_options"))
+    prova("...e niente disable_web_page_preview accanto", False,
+          "disable_web_page_preview" in dati)
+    prova("...ne' il grande o il sopra: solo i due campi", ["prefer_small_media", "url"],
+          sorted(dati["link_preview_options"]))
+    b = banco([ok()])
+    _aio.run(b["_manda_telegram"](222, "🔒 <b>Venduto</b> <a href="
+                                       "\"https://barattolo.store/annuncio/5\">x</a>"))
+    prova("gli altri avvisi partono come sempre", {"chat_id", "text", "parse_mode"},
+          set(mandati[0][1]))
+    b = banco([ok()])
+    _aio.run(b["_manda_telegram"](222, "<a href=\"https://barattolo.store/p2p/altro\">x</a>"))
+    prova("...anche un link che COMINCIA come quello del libro", False,
+          "link_preview_options" in mandati[0][1])
+    b = banco([ok()])
+    _aio.run(b["_manda_telegram"](222, "pacco <a href=\"https://t.me/trackbot?start=AB1\">AB1</a>"
+                                       f" <a href=\"{amb['LINK_LIBRO_P2P']}\">x</a>"))
+    prova("col link a trackbot vince lo spegnimento, mai i due insieme",
+          (True, False), ("disable_web_page_preview" in mandati[0][1],
+                          "link_preview_options" in mandati[0][1]))
+    rifiuto = _types.SimpleNamespace(status_code=400,
+                                     text="Bad Request: can't parse entities")
+    b = banco([rifiuto, ok()])
+    esito = _aio.run(b["_manda_telegram"](222, avviso))
+    prova("il ripiego spoglio resta quello di sempre (chat_id e testo)",
+          ({"chat_id", "text"}, "telegram ok (messaggio 7)"),
+          (set(mandati[1][1]), esito))
+
+
+# ====================================================================
 def prove_avvisi_nuovi_ordini():
     """GLI AVVISI DEI NUOVI ORDINI DEL LIBRO P2P (9 ott 2026, richiesta di
     Andrea). Chi lo chiede — dal bottone 🔔 della testata del libro o dal
@@ -133773,6 +133940,7 @@ def main():
               prove_testi_p2p_confondono,
               prove_garanzia_lunga,
               prove_avvisi_nuovi_ordini,
+              prove_anteprima_avvisi_p2p,
               prove_avvisi_mercatino,
               prove_testo_ricevere_sats,
               prove_prese_dalle_10,
