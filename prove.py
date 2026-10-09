@@ -129872,6 +129872,316 @@ def prove_annuncio_identita():
         shutil.rmtree(casa, ignore_errors=True)
 
 
+def prove_semina_demo():
+    """LA SEMINA DELLA DEMO DI TORINO (9 ott 2026): `semina_demo.py`
+    riempie il database di COLLAUDO di quel che la schermata 3 di
+    HACKATHON-SETUP §11.2 da' per scontato — il negozio To The Mooon
+    col codice che la card «Consigliati» del client gia' porta, un suo
+    annuncio al prezzo in sats che vale 4,80 $, il cliente 111 — e
+    crea l'ordine «creato, non pagato» della mattina. Qui le sentinelle
+    sul testo, i pezzi puri e il giro delle funzioni su un database in
+    memoria con le sole colonne che lo script dichiara di volere; il
+    giro sullo schema VERO lo fa `collaudo_semina_demo.py` col server."""
+    import importlib.util
+    import io
+    import shutil
+    import sqlite3
+    import tempfile
+    import types
+    from decimal import Decimal
+    print("\n🌱 La semina della demo di Torino")
+    percorso = os.path.join(QUI, "semina_demo.py")
+    src = open(percorso, encoding="utf-8").read()
+    cod = codice(src)
+    spec = importlib.util.spec_from_file_location("semina_demo_prova", percorso)
+    sd = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sd)
+
+    # --- 1) le sentinelle sul testo: le regole di casa ------------------
+    prova("non importa server (partirebbe init_db)", False,
+          bool(re.search(r"^\s*(import server|from server import)", cod, re.M)))
+    prova("rifiuta un config senza MODALITA_COLLAUDO = True", True,
+          'getattr(config, "MODALITA_COLLAUDO", False) is not True' in cod)
+    prova("non apre nessuna strada verso la rete", False,
+          any(w in cod for w in ("httpx", "urllib", "requests", "socket",
+                                 "websocket", "ssh")))
+    prova("l'ordine nasce senza payment_hash ne' fattura", True,
+          "'creato','','',?" in cod)
+    prova("...in una cassaforte che il server conosce per nome", True,
+          "VALUES('saas'" in cod
+          and 'CASSAFORTE_SAAS, CASSAFORTE_NODO = "saas", "nodo"' in _SORGENTE)
+    # IL PATTO COL MIETITORE, letto dal server e non dalla docstring
+    # dello script: `controlla_abbandonati` guarda SOLO gli ordini con
+    # un payment_hash. Il giorno che allargasse la rete, l'ordine della
+    # mattina morirebbe in 15 minuti — e questa riga diventa rossa.
+    mietitore = codice(pezzo("controlla_abbandonati"))
+    prova("il mietitore guarda solo gli ordini con un payment_hash", True,
+          bool(re.search(r"FROM ordini WHERE stato='creato' \"\s*\"AND payment_hash != ''",
+                         mietitore)))
+    prova("lo schema non si crea qui: si controlla e ci si ferma", True,
+          "CREATE TABLE" not in cod and "PRAGMA table_info" in cod)
+    prova("il numero dello studio C e' 4,80 $ (480 unita' di USDB)", True,
+          sd.PREZZO_USD == Decimal("4.80"))
+    studio = open(os.path.join(QUI, "docs", "STUDIO-HACKATHON-RGB-2026-10.md"),
+                  encoding="utf-8").read()
+    setup = open(os.path.join(QUI, "docs", "HACKATHON-SETUP.md"),
+                 encoding="utf-8").read()
+    prova("...ed e' quello scritto nello studio C e nella demo di §11.2", True,
+          "«**oppure 4,80 USDB**»" in studio and "«oppure 4,80 USDB»" in setup)
+
+    # --- 2) il codice negozio lo dice il client ---------------------------
+    mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
+    i = mini.index("'to-the-moon': {")
+    voce = mini[i:mini.index("titolo:", i)]
+    atteso = re.search(r"negozio:\s*'([0-9a-f]{8})'", voce).group(1)
+    prova("il codice letto da RACCONTI e' quello della voce to-the-moon",
+          atteso, sd.codice_negozio_del_client(mini))
+    prova("...e quella voce e' consigliata e col logo (la card c'e')", True,
+          "consigliato: true" in voce and "logo: true" in voce)
+    try:
+        sd.codice_negozio_del_client("const RACCONTI = { 'altro': {negozio: 'aa'} }")
+        manca = ""
+    except sd.SeminaFerma as e:
+        manca = str(e)
+    prova("senza la voce la semina si ferma e lo dice", True,
+          "to-the-moon" in manca)
+
+    # --- 3) la npub e il NIP-05: gli stessi di §11 --------------------------
+    m = re.search(r"`tothemooon` → `(npub1[a-z0-9]+)`", setup)
+    prova("la npub seminata e' quella di `tothemooon` in HACKATHON-SETUP §11",
+          m.group(1) if m else "?", sd.NPUB_NEGOZIO)
+    prova("il nome NIP-05 e il link del negozio sono «tothemooon»", True,
+          sd.NIP05_NOME == sd.SLUG_NEGOZIO == "tothemooon"
+          and "tothemooon@barattolo.store" in setup)
+    amb = {"CHARSET_BECH32": sd.CHARSET_BECH32}
+    exec(pezzo("npub_to_hex"), amb)
+    prova("npub_in_hex dice quel che dice npub_to_hex del server",
+          amb["npub_to_hex"](sd.NPUB_NEGOZIO), sd.npub_in_hex(sd.NPUB_NEGOZIO))
+    prova("...64 esadecimali", True,
+          bool(re.fullmatch(r"[0-9a-f]{64}", sd.npub_in_hex(sd.NPUB_NEGOZIO))))
+    for storta in ("nsec1qqqq", "npub1" + "b" * 58):
+        try:
+            sd.npub_in_hex(storta)
+            esito = "passa"
+        except ValueError:
+            esito = "rifiuta"
+        prova(f"una chiave storta ({storta[:8]}…) si rifiuta", "rifiuta", esito)
+
+    # --- 4) i sats da 4,80 $ ---------------------------------------------
+    prova("4,80 $ a 100.000 $/BTC = 4.800 sats", 4800,
+          sd.sats_da_usd(Decimal("4.80"), 100_000))
+    prova("...a 120.000 = 4.000, a 123.456,78 = 3.888 (al sat piu' vicino)",
+          (4000, 3888),
+          (sd.sats_da_usd(Decimal("4.80"), 120_000),
+           sd.sats_da_usd(Decimal("4.80"), 123_456.78)))
+    try:
+        sd.sats_da_usd(Decimal("4.80"), 0)
+        esito = "passa"
+    except ValueError:
+        esito = "rifiuta"
+    prova("un cambio a zero si rifiuta (niente prezzo inventato)", "rifiuta", esito)
+    prova("i numeri si scrivono all'italiana", ("5.820", "4,80"),
+          (sd.fmt_sats(5820), sd.fmt_usd(Decimal("4.80"))))
+
+    # --- 5) i nomi dei file nella forma della whitelist del server ---------
+    i = _SORGENTE.index("NOME_FOTO = re.compile(")
+    amb = {"re": re}
+    exec(_SORGENTE[i:_SORGENTE.index("\nTIPI_FOTO", i)], amb)
+    prova("avatar e foto dell'annuncio hanno la forma di NOME_FOTO", True,
+          all(amb["NOME_FOTO"].match(n) for n in
+              ("av_1b9a53e6_1.jpg", "a12_0.webp", "a12_1.webp")))
+    prova("il logo e le due foto del racconto esistono in assets/", True,
+          os.path.exists(os.path.join(QUI, sd.LOGO))
+          and all(os.path.exists(os.path.join(QUI, "assets", "racconti", f))
+                  for f in sd.FOTO_ANNUNCIO))
+
+    # --- 6) il giro delle funzioni, su un database con le sole colonne
+    #        che lo script dichiara di volere -------------------------------
+    def db_di_cartone(salta_colonna=None):
+        con = sqlite3.connect(":memory:")
+        tipi = {"tg_id": "INTEGER PRIMARY KEY", "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+                "valore": "REAL", "lat": "REAL", "lon": "REAL", "cambio_ordine": "REAL",
+                "prezzo_eur": "REAL"}
+        for tabella, colonne in sd.COLONNE_RICHIESTE.items():
+            defs = []
+            for c in colonne:
+                if (tabella, c) == salta_colonna:
+                    continue
+                t = tipi.get(c, "INTEGER DEFAULT 0" if c.endswith(("_id", "sats", "creato", "aggiornato", "quantita", "quantita_max", "registrato", "quando")) else "TEXT DEFAULT ''")
+                defs.append(f"{c} {t}")
+            con.execute(f"CREATE TABLE {tabella}({', '.join(defs)})")
+        return con
+
+    cartella = tempfile.mkdtemp(prefix="semina-prova-")
+    try:
+        con = db_di_cartone(("ordini", "cambio_ordine"))
+        try:
+            sd.controlla_schema(con)
+            esito = "passa"
+        except sd.SeminaFerma as e:
+            esito = str(e)
+        prova("una colonna che manca ferma la semina e la nomina", True,
+              "`ordini.cambio_ordine`" in esito and "Avvia Barattolo" in esito)
+        con.close()
+
+        con = db_di_cartone()
+        sd.controlla_schema(con)
+        prova("l'ordine prima dell'annuncio si ferma", True,
+              _ferma(sd, lambda: sd.crea_ordine(con, 1, 0.0)).startswith("l'annuncio"))
+        con.execute("INSERT INTO utenti(tg_id, nome, negozio) VALUES(7, 'Altro', 'abcdef01')")
+        prova("un codice che e' di un altro utente non si ruba", True,
+              "dell'utente 7" in _ferma(sd, lambda: sd.semina_negozio(
+                  con, "abcdef01", QUI, cartella, 1000)))
+        con.execute("UPDATE utenti SET negozio='11111111', username='tothemooon' WHERE tg_id=7")
+        prova("un link gia' preso (username altrui) ferma", True,
+              "/negozio/tothemooon" in _ferma(sd, lambda: sd.semina_negozio(
+                  con, "abcdef01", QUI, cartella, 1000)))
+        con.execute("UPDATE utenti SET username='' WHERE tg_id=7")
+        n = sd.semina_negozio(con, "abcdef01", QUI, cartella, 1000)
+        r = con.execute("SELECT nome, negozio, negozio_slug, npub, avatar, registrato "
+                        "FROM utenti WHERE tg_id=444").fetchone()
+        prova("il negozio nasce: 444, nome, codice, slug, npub, data",
+              ("To The Mooon", "abcdef01", "tothemooon", sd.NPUB_NEGOZIO, 1000),
+              (r[0], r[1], r[2], r[3], r[5]))
+        try:
+            from PIL import Image
+            prova("...con l'avatar dal logo, quadrato e nella forma del server",
+                  ("av_abcdef01_1.jpg", (128, 128)),
+                  (n["avatar"], Image.open(os.path.join(cartella, n["avatar"])).size))
+        except ImportError:
+            salta("l'avatar dal logo", "Pillow non c'e'")
+        n2 = sd.semina_negozio(con, "abcdef01", QUI, cartella, 2000)
+        prova("rilanciata: c'era, una riga sola, data della nascita", (False, 1, 1000),
+              (n2["nuovo"], con.execute("SELECT COUNT(*) FROM utenti WHERE tg_id=444").fetchone()[0],
+               con.execute("SELECT registrato FROM utenti WHERE tg_id=444").fetchone()[0]))
+
+        a = sd.semina_annuncio(con, 4800, QUI, cartella, 1000)
+        riga = con.execute("SELECT venditore_id, prezzo_sats, consegna, quantita, stato, "
+                           "valuta, foto, categoria, sottocategoria, zona FROM annunci "
+                           "WHERE id=?", (a["id"],)).fetchone()
+        prova("l'annuncio nasce: di 444, 4.800 sats, ritiro, un pezzo, attivo, in sats",
+              (444, 4800, "ritiro", 1, "attivo", "sats"), riga[:6])
+        prova("...in Sport e hobby / giochi da tavolo, a Torino",
+              ("Sport e hobby", "giochi-tavolo", "Torino (TO)"), riga[7:])
+        prova("...con le due foto copiate coi nomi del server",
+              [f"a{a['id']}_0.webp", f"a{a['id']}_1.webp"], json.loads(riga[6]))
+        prova("...e i file ci sono", True,
+              all(os.path.exists(os.path.join(cartella, f)) for f in json.loads(riga[6])))
+        con.execute("UPDATE annunci SET stato='venduto', quantita=0 WHERE id=?", (a["id"],))
+        a2 = sd.semina_annuncio(con, 4000, QUI, cartella, 2000)
+        riga = con.execute("SELECT prezzo_sats, stato, quantita, creato FROM annunci "
+                           "WHERE id=?", (a["id"],)).fetchone()
+        prova("rilanciata dopo una vendita: stesso id, ritarata, di nuovo attiva",
+              (a["id"], False, 4800, "venduto", 0, 4000, "attivo", 1, 1000),
+              (a2["id"], a2["nuovo"], a2["prezzo_prima"], a2["stato_prima"],
+               a2["pezzi_prima"]) + tuple(riga))
+        prova("...e un annuncio solo", 1,
+              con.execute("SELECT COUNT(*) FROM annunci").fetchone()[0])
+
+        prova("il cliente 111 nasce come al primo ingresso", (True, "Compratore", "compratore"),
+              (sd.semina_cliente(con, 1000)["nuovo"],)
+              + tuple(con.execute("SELECT nome, username FROM utenti WHERE tg_id=111").fetchone()))
+        cod_cli = con.execute("SELECT negozio FROM utenti WHERE tg_id=111").fetchone()[0]
+        prova("...con un codice negozio suo, 8 hex, diverso dal negozio", True,
+              bool(re.fullmatch(r"[0-9a-f]{8}", cod_cli)) and cod_cli != "abcdef01")
+        prova("...e rilanciato non si tocca", False, sd.semina_cliente(con, 2000)["nuovo"])
+
+        o = sd.crea_ordine(con, 3000, 90_000.0)
+        riga = con.execute("SELECT cassaforte, annuncio_id, compratore_id, venditore_id, "
+                           "prezzo_sats, stato, payment_hash, invoice, cambio_ordine, "
+                           "consegna_scelta, quantita, spedizione_sats, protezione_sats "
+                           "FROM ordini WHERE id=?", (o["id"],)).fetchone()
+        prova("l'ordine: saas, l'annuncio, 111 → 444, al prezzo, creato, senza hash ne' fattura",
+              ("saas", a["id"], 111, 444, 4000, "creato", "", "", 90_000.0,
+               "ritiro", 1, 0, 0), tuple(riga))
+        prova("rilanciato: lo stesso ordine, non un secondo",
+              (o["id"], False), (sd.crea_ordine(con, 4000, 0.0)["id"],
+                                 sd.crea_ordine(con, 4000, 0.0)["nuovo"]))
+        o2 = sd.crea_ordine(con, 4000, 0.0, nuovo=True)
+        prova("con `nuovo` un secondo ordine, e due in tutto", (True, 2),
+              (o2["id"] != o["id"],
+               con.execute("SELECT COUNT(*) FROM ordini WHERE stato='creato'").fetchone()[0]))
+        s = sd.stato(con)
+        prova("lo stato racconta tutto", ("abcdef01", "Compratore", a["id"], 2),
+              (s["negozio"]["codice"], s["cliente"], s["annuncio"]["id"], len(s["ordini"])))
+
+        # --- 7) il comando, con un config di cartone --------------------------
+        su_disco = os.path.join(cartella, "collaudo.db")
+        con.commit()      # una transazione aperta fa girare il backup a vuoto per sempre
+        disco = sqlite3.connect(su_disco)
+        con.backup(disco)
+        disco.execute("DELETE FROM ordini")
+        disco.execute("DELETE FROM sqlite_sequence WHERE name='ordini'")
+        disco.commit()
+        disco.close()
+        con.close()
+
+        def comando(args, collaudo=True, cambio_usd=None):
+            finto = types.ModuleType("config")
+            finto.MODALITA_COLLAUDO = collaudo
+            finto.DB = su_disco
+            if cambio_usd:
+                finto.NIP05_NOMI = {"tothemooon": sd.npub_in_hex(sd.NPUB_NEGOZIO)}
+            vero = sys.modules.get("config")
+            sys.modules["config"] = finto
+            uscita, fuori = io.StringIO(), sys.stdout
+            os.environ["SEMINA_CARTELLA_FOTO"] = cartella
+            sys.stdout = uscita
+            try:
+                rc = sd.main(args + (["--cambio-usd", str(cambio_usd)] if cambio_usd else []))
+            finally:
+                sys.stdout = fuori
+                os.environ.pop("SEMINA_CARTELLA_FOTO", None)
+                if vero is not None:
+                    sys.modules["config"] = vero
+                else:
+                    sys.modules.pop("config", None)
+            return rc, uscita.getvalue()
+
+        rc, out = comando([], collaudo=False)
+        prova("col config di produzione il comando si ferma senza scrivere",
+              (1, True), (rc, "MODALITA_COLLAUDO" in out))
+        rc, out = comando([])
+        prova("senza un cambio nel database si ferma e dice --cambio-usd",
+              (1, True), (rc, "--cambio-usd" in out))
+        rc, out = comando([], cambio_usd=100_000)
+        prova("la semina a mano: verde, 4.800 sats = 4,80 $, NIP05_NOMI che combacia",
+              (0, True, True),
+              (rc, "4.800 sats = 4,80 $ al cambio di 100.000 $/BTC (a mano)" in out,
+               "✓ NIP05_NOMI['tothemooon'] nel config combacia" in out))
+        rc, out = comando(["ordine"])
+        prova("`ordine`: verde, e dice creato e non pagato", (0, True),
+              (rc, "Ordine #1 creato" in out and "non pagato" in out))
+        rc, out = comando(["ordine"])
+        prova("`ordine` di nuovo: c'e' gia', e suggerisce --nuovo", (0, True),
+              (rc, "c'è già" in out and "--nuovo" in out))
+        rc, out = comando(["stato"])
+        prova("`stato`: verde, con negozio, cliente, annuncio e ordine", (0, True),
+              (rc, all(w in out for w in ("negozio To The Mooon", "cliente 111: Compratore",
+                                          "annuncio #1", "ordine #1: creato"))))
+        rc, out = comando(["boh"])
+        prova("un comando ignoto spiega l'uso", (2, True), (rc, "USO" in out))
+    finally:
+        shutil.rmtree(cartella, ignore_errors=True)
+
+    # --- 8) i documenti: la riga esatta da lanciare ---------------------------
+    prova("§10 e §11.3 di HACKATHON-SETUP portano la riga della semina e dell'ordine",
+          True, setup.count("py -3 semina_demo.py") >= 2
+          and "py -3 semina_demo.py ordine" in setup)
+    prova("...e il collaudo e' nella lista della CI", True,
+          "collaudo_semina_demo" in open(os.path.join(QUI, ".github", "workflows",
+                                                      "prove.yml"), encoding="utf-8").read())
+
+
+def _ferma(sd, f):
+    """Il messaggio con cui la semina si ferma, o '' se non si ferma."""
+    try:
+        f()
+        return ""
+    except sd.SeminaFerma as e:
+        return str(e)
+
+
 def prove_titoli_importati():
     """I TITOLI IMPORTATI SENZA HTML (8 ott 2026): in vetrina era
     comparso «Pinuts <h6>Cookies al cacao e arachidi…», il nome di un
@@ -130180,6 +130490,7 @@ def main():
     prove_p2p_paycode,
     prove_leva_rgb,
     prove_annuncio_identita,
+    prove_semina_demo,
     prove_premio_barattozon,
     prove_convenienza_vera,
     prove_barattozon_mercato,

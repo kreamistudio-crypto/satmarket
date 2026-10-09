@@ -644,6 +644,7 @@ niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
 | 14-16 ott | §5 riscritta e stampata; gli schermi su carta; il giro provato tre volte; video di riserva della demo | ☐ |
 | 14-16 ott | **Backup della VM**, **portatile con tutto scaricato** (modelli QVAC, `nak`, pacchetti del wallet), **prova di riavvio completa** di tutta la catena, nell'ordine di §6 e col tunnel a tre gambe: i comandi qui sotto, uno alla volta | ☐ backup e portatile. ☑ **8 ott sera, la prova di riavvio completa** (punto 3) tutta verde dal vivo sul PC fisso (Andrea): NIP-05 dalla rotta, «wallet collegato», `get_info → ok (nip44_v2)`; le quattro correzioni ai comandi sono scritte nei punti 2 e 3. Il riavvio del VPS è fatto |
 | 16 ott | I due annunci di MOON e USDB firmati dalle identità di prova e pubblicati sul relay locale, nella forma di `docs/spec/NIP-RGB-ASSETS.md` (evento addressable, kind segnaposto **38180** — 38172/38173 sono di NIP-87, questo sta subito dopo e non è registrato da nessuno —, `d` = ContractId nudo, `i`/`k` di NIP-73, `n` signet, schema, ticker, name, precision, supply, alt; niente `issuer`, il genesis dice `ssi:anonymous`; niente `u`): il comando `annuncio <nome> <asset_id>` in `identita.mjs`, sul calco di `profilo`, e `annuncio --prova <nome> <asset_id>` che stampa l'evento firmato in JSON SENZA pubblicarlo. È infrastruttura dichiarata: l'evento esiste, nessun codice di Barattolo lo legge prima del 17. La cura di D.3 punto 0 | ☑ **8 ott sera, il comando** (cantiere «il comando `annuncio` e la scaletta della demo», copia in `deploy/rgb/`): la tabella `ASSET` coi valori PUBBLICI di §2 (ticker, nome del genesis con gli underscore, precisione, supply) e un contratto → un emittente (`usdb` non annuncia MOON: D.3 punto 4); l'asset_id con o senza `rgb:`; la firma verificata prima di stampare o pubblicare; la privata mai in output. `prove_annuncio_identita` (46): lo script VERO con identità usa-e-getta, la pubblica di `pubblica` è quella dell'evento, la firma Schnorr riverificata in Python puro, il relay morto non tocca `--prova` e senza `--prova` è un errore; in CI nostr-tools arriva da un passo del workflow fuori dal repo. Provato nel WSL su un `nak serve` di prova (porta 7790): pubblicato, riletto con nostr-tools, il secondo invio sostituisce il primo. ☐ **Il 16**: il lancio con le identità vere, i comandi al punto 4) qui sotto e in §11 |
+| 16 ott, e la mattina del 17 e del 18 | **La semina del DB di collaudo** (cantiere «la semina della demo», 9 ott): il DB di collaudo nasce vuoto, e la schermata 3 di §11.2 vuole il negozio To The Mooon — la card «Consigliati» della home lo cerca già col codice `1b9a53e6` del catalogo del client (`RACCONTI` di miniapp.html) e senza di lui dice «Negozio non trovato», la ricerca «Mooon» non trova niente. `semina_demo.py` scrive nel DB di collaudo: il negozio (utente finto 444, codice LETTO dal client, link `/negozio/tothemooon`, la npub pubblica di `tothemooon` di §11, l'avatar dal logo in `assets/consigliati/`), l'annuncio del gioco (un pezzo, ritiro a mano a Torino, PREZZO IN SATS CHE OGGI VALE 4,80 $: lo studio C fissa la cifra in dollari, il cambio lo legge da `cambio_noto` del server, e rilanciarla la mattina della demo lo ritara) e il cliente 111; `ordine` crea l'ordine «creato, non pagato» della mattina. Idempotente: si rilancia senza doppioni. Scrive SOLO con `MODALITA_COLLAUDO = True` e solo su un DB che il server ha già creato; niente rete, niente VPS. Le righe e le risposte attese al punto 5) qui sotto | ☑ 9 ott lo script, provato dal vivo sul PC (server del worktree su un'altra porta, config dal solo esempio: negozio dal codice e dal link, storia e card «Consigliati» che portano al negozio, annuncio in vetrina e in ricerca, ordine in «Ordini» di 111 come «Da pagare»), `prove_semina_demo` in prove.py e `collaudo_semina_demo` sul server vero in CI. ☐ il 16: `py -3 semina_demo.py` sul DB di collaudo vero, poi la controprova nel browser (punto 5) |
 
 **I comandi della riga «14-16 ott»**, nell'ordine, uno alla volta, dal
 WSL e non da PowerShell dove c'è `ssh` (lezione 1 di §9: le virgolette
@@ -787,6 +788,73 @@ fra il 16 e il 17, la mattina del 17 si rilanciano le due righe
 `annuncio` (dieci secondi) prima del kickoff — è nella tabella dei due
 giorni (§11). Dopo, l'archivio delle identità non cambia: le chiavi
 sono quelle dell'8, non serve rifare il backup.
+
+5) **La semina del DB di collaudo** (il 16 dopo la prova di riavvio, e
+di nuovo la mattina del 17 e del 18 per ritarare il prezzo al cambio del
+giorno). Da PowerShell, dalla cartella del repo, con Barattolo in collaudo
+acceso da almeno un minuto CON LA RETE (è lui a scrivere il dollaro in
+`cambio_noto`; sull'hotspot va bene lo stesso, basta che CoinGecko abbia
+risposto una volta). Il server può restare acceso: la semina scrive nel
+suo stesso database e lui la vede alla richiesta dopo.
+
+```powershell
+cd C:\Users\Andrea\Documents\GitHub\satmarket; py -3 semina_demo.py
+```
+
+Deve rispondere cinque righe, tutte con la spunta (i numeri cambiano col
+cambio):
+
+```
+🌱 Semina della demo sul database di collaudo: C:\…\satmarket\satmarket.db
+   ✓ negozio To The Mooon (nuovo): utente 444, codice 1b9a53e6 (dal catalogo del client), /negozio/tothemooon, npub npub12xql9gw…, avatar av_1b9a53e6_1.jpg
+   ✓ NIP05_NOMI['tothemooon'] nel config combacia con la npub seminata
+   ✓ annuncio #N «To The Mooon! — il gioco da tavolo che spiega Bitcoin» nuovo: 5.820 sats = 4,80 $ al cambio di 82.473 $/BTC letto dal server alle 09:30 del 16/10, ritiro a mano a Torino (TO), 2 foto
+   ✓ cliente 111 c’era: pronto a comprare (identita' dall'hash: tgWebAppData=collaudo:111:Compratore)
+   Rilanciabile: niente doppioni. L'ordine della mattina: `py -3 semina_demo.py ordine`.
+```
+
+Rilanciata dice «c’era» su ogni riga e «niente da ritoccare» (o
+«ritoccato: prezzo 5.820 → 5.790 sats» se il cambio si è mosso: è il
+punto). Se la seconda riga dice «NON combacia», la hex in `NIP05_NOMI`
+del config non è quella di `node identita.mjs pubblica tothemooon`:
+sistemare il config, non lo script. Se si ferma con «il server non ha
+ancora letto un cambio $/BTC»: lasciarlo acceso un minuto con la rete e
+rilanciare, o `py -3 semina_demo.py --cambio-usd 82473` col numero di
+mempool/CoinGecko a mano. Se si ferma con «il database non ha lo schema
+del server»: avviare Barattolo una volta su quel database (lo schema lo
+fa lui, la semina non ne tiene una copia). `py -3 semina_demo.py stato`
+racconta cosa c'è senza scrivere.
+
+La controprova nel browser, identità 111 dall'hash (§11.2): aprire
+`http://127.0.0.1:8080/negozio/1b9a53e6#tgWebAppData=collaudo:111:Compratore`
+→ la vetrina di To The Mooon con la storia («Capire Bitcoin, giocando.»),
+il logo tondo nella testata e sotto l'annuncio del gioco col prezzo;
+nella home la ricerca «Mooon» lo trova e la card «Consigliati» della fila
+delle categorie → To The Mooon! → lo stesso negozio (non più «Negozio
+non trovato»). Anche `http://127.0.0.1:8080/negozio/tothemooon` apre lo
+stesso negozio.
+
+**L'ordine della mattina della demo** (domenica, §11.3: quello delle
+13:30 e poi quello del vivo):
+
+```powershell
+py -3 semina_demo.py ordine
+```
+
+```
+🧾 Ordine #N creato (cliente 111 → annuncio #N, 5.820 sats, ritiro a mano): stato «creato», non pagato, nessuna fattura in sats — payment_hash vuoto, il mietitore non lo tocca. Nato alle 13:02 del 18/10.
+```
+
+In «Ordini» di 111 compare «To The Mooon! …» come «Da pagare». Rilanciato
+dice «c'è già» e NON ne fa un secondo: per il secondo ordine (quello del
+vivo, dopo che il primo è stato pagato in USDB) `py -3 semina_demo.py
+ordine --nuovo`. L'ordine nasce SENZA fattura in sats, deliberato: la
+demo lo paga in USDB col foglio di sabato, e un ordine senza
+`payment_hash` è fuori dalla rete del mietitore (`controlla_abbandonati`
+guarda solo chi ne ha uno), quindi resta «creato» tutto il giorno. Il
+rovescio, da sapere: il foglio «Paga ora» di OGGI su quell'ordine
+bussa a LNbits per la fattura che non c'è, e nel log del server esce un
+500 — innocuo, l'ordine non si muove; il foglio di sabato è un altro.
 
 **15 ott, portatile di Alan: tutto quello che serve a Torino senza
 rete**, installato da zero e provato col Wi-Fi spento. È la riserva del
@@ -1035,7 +1103,8 @@ identità 111 dall'hash, il cliente), il terminale del servizio NWC
 `qvac serve` (le richieste che arrivano: l'AI è qui, non in rete); in
 una scheda a parte mempool.space/signet con le tx già confermate. Il
 portatile di Alan con le slide e il video di riserva. Il giro dal vivo
-usa un ordine già creato la mattina (`creato`, non pagato); un secondo
+usa un ordine già creato la mattina (`creato`, non pagato: lo crea
+`py -3 semina_demo.py ordine`, §10 punto 5); un secondo
 ordine, pagato in USDB alle 13:30 e CONFERMATO dal blocco, serve a
 mostrare «Pagato ✓» e i punti arrivati senza aspettare dieci minuti in
 sala.
@@ -1067,7 +1136,7 @@ Andrea. Ogni pezzo è un commit datato nel repo privato, con
 
 | Ora | Andrea (+ Claude) | Alan | Insieme / nota |
 |---|---|---|---|
-| sab 08:30-09:00 | Accende tutto nell'ordine di §6 (VM, tunnel a tre gambe, `rgb_http.py`, `nak serve`, servizio NWC, QVAC, Barattolo in collaudo); se il WSL è stato riavviato, le due righe `annuncio` di §10 punto 4) | Slide e dichiarazione stampata (§5) sul tavolo; il suo portatile acceso con il wallet di prova vuoto | il tunnel va sull'hotspot, non sul Wi-Fi della sala |
+| sab 08:30-09:00 | Accende tutto nell'ordine di §6 (VM, tunnel a tre gambe, `rgb_http.py`, `nak serve`, servizio NWC, QVAC, Barattolo in collaudo), poi `py -3 semina_demo.py` (il negozio, l'annuncio ritarato al cambio del giorno, il cliente: §10 punto 5); se il WSL è stato riavviato, le due righe `annuncio` di §10 punto 4) | Slide e dichiarazione stampata (§5) sul tavolo; il suo portatile acceso con il wallet di prova vuoto | il tunnel va sull'hotspot, non sul Wi-Fi della sala |
 | sab 09:00-09:45 | Kickoff | Kickoff; consegna la dichiarazione | niente codice prima della dichiarazione |
 | sab 09:45-13:00 | **Server**: `/api/rgb/fattura` (la fattura blind di `barattolo` in USDB via `rgb_http.py`, importo al cambio, la prova del `// 100`: D.3 punto 5 PRIMA della rotta) e `/api/rgb/stato`, dietro `RGB_ATTIVO`; la decisione sullo stato dell'ordine pagato in USDB scritta nel commit | **Wallet**: i quattro metodi `rgb_*` in `nwc-wdk.mjs` sopra `punti.mjs` (lista, fattura, paga con conferma a terminale, lookup), provati col client a riga di comando sul suo wallet vuoto, poi portati sul portatile di Andrea | alle 11 un punto di cinque minuti: i NOMI dei campi fra server e wallet (quelli di `docs/spec/NWC-RGB.md`) |
 | sab 13:00-13:45 | pranzo | pranzo | |
@@ -1075,10 +1144,10 @@ Andrea. Ogni pezzo è un commit datato nel repo privato, con
 | sab 16:30-18:00 | **«Emesso da … ✓»**: la verifica NIP-05 lato server (`url_api_ammesso`, senza redirect, cache di 24 h, «verificato il 16 ott» se il DNS manca) e la riga nella card, accanto a «⚠️ Emittente sconosciuto» | Rilegge i due annunci sul relay, confronta i tag col genesis (`punti.mjs saldo`), scrive la prima pagina dei due testi | **alle 18 la ✓ c'è**: da qui la demo è quella decisa il 7 sera |
 | sab 18:00-20:30 | **Consigliami**: la pagina chiama QVAC con lo schema, il fumetto, «Approva» che fa il passo delle 13:45 da solo; se CORS o mixed content mordono, `/api/consigliami/proposta` lato server, dichiarato | Il «motivo» senza cifre (§4: il 1.7B sbaglia i numeri nella frase), la frase di riserva se QVAC tace | |
 | sab 20:30-22:00 | **MOON come bonus** dopo «Pagato» (l'assegnazione del 1 ott agganciata); la card dell'asset completa; il giro intero DUE volte | `git format-patch` del giorno in `fidelity-points`; le slide 3, 4 e 5 con gli screenshot veri | la sera: `pkill` di `rgb_http.py` sulla VM (backup delle 03:30), §6 |
-| dom 08:30-09:00 | Riaccende tutto (§6); se serve, le due righe `annuncio` | Slide in ordine | |
+| dom 08:30-09:00 | Riaccende tutto (§6), `py -3 semina_demo.py` per ritarare il prezzo al cambio del giorno; se serve, le due righe `annuncio` | Slide in ordine | |
 | dom 09:00-11:00 | Gli **errori visibili** («wallet non collegato», «proxy irraggiungibile», «conferma in arrivo»: «UX: error handling» è un criterio) | I **due testi** `docs/spec/NIP-RGB-ASSETS.md` e `NWC-RGB.md` rifiniti con quel che il sabato ha insegnato; la **issue nel repo `nwc`** entro mezzogiorno | |
 | dom 11:00-13:00 | Il giro intero una TERZA volta col portatile sull'hotspot; se avanza, il salvadanaio e il budget (studio C punto 6), sennò niente | Il video di riserva aggiornato (il giro intero registrato, 3 min); la prova a tempo delle slide | |
-| dom 13:00-14:00 | **L'ordine delle 13:30**: creato, pagato in USDB con 40 MOON, il bonus +5 MOON; aspettare il blocco; l'ordine del vivo creato e lasciato in `creato` | Le slide chiuse | **niente codice dopo le 14:00** |
+| dom 13:00-14:00 | **L'ordine delle 13:30**: `py -3 semina_demo.py ordine`, pagato in USDB con 40 MOON, il bonus +5 MOON; aspettare il blocco; l'ordine del vivo con `py -3 semina_demo.py ordine --nuovo`, lasciato in `creato` | Le slide chiuse | **niente codice dopo le 14:00** |
 | dom 14:00-15:00 | Prova generale dei dieci passi di 11.2, a tempo, con le tre finestre sullo schermo; `git format-patch` della domenica | Prova generale | **15:00: il build chiude** — l'ultimo commit datato prima |
 | dom 15:00-16:00 | Consegna; il portatile in standby con tutto su | Pitch | la VM in riserva, l'hotspot acceso, il video sul portatile di Alan |
 
@@ -1101,7 +1170,7 @@ mattina (11.3) copre tutto. In ordine di probabilità:
 | **Il wallet** (i metodi `rgb_*` non rispondono, il servizio muore, la conferma non arriva) | Il pagamento come il 1 ott: dal terminale, `node punti.mjs riscatta <USDB> 480 '<fattura>'` con la fattura presa da `/api/rgb/fattura` (o da `rgb_http.py /fattura`), e `rgb.py aggiorna barattolo`; il foglio passa a «in arrivo» lo stesso perché legge lo stato dal server | «il wallet è self-custodial: lo stesso gesto, dal suo terminale invece che dal bottone; il protocollo NWC-RGB è la bozza che vedete alla slide 4» |
 | **La rete** (hotspot morto, VM irraggiungibile, DNS che non risolve) | Senza VM: il wallet sugli endpoint pubblici (`RGB_INDEXER`/`RGB_PROXY` di §6) e `rgb_http.py` di riserva sul portatile; senza NESSUNA rete: il relay locale e QVAC vanno lo stesso (sono sul portatile), la ✓ dice «verificato il 16 ott» dalla cache (D.3 punto 3), il pagamento NON si fa e si mostra l'ordine delle 13:30 già pagato e il video | «tutto quel che è locale — l'identità, l'annuncio, l'AI — lo vedete dal vivo; la transazione su signet l'abbiamo fatta alle 13:30, eccola su mempool» (screenshot già nelle slide) |
 | **La ✓ non si costruisce il sabato** | La card con «Dichiarato da <npub> · identità non verificata» (la forma 3 di C) e l'evento letto dal relay: l'annuncio firmato esiste dal 16 | «l'annuncio è firmato e pubblicato; la verifica del dominio è la riga che manca, ed è nella roadmap di lunedì» |
-| **Barattolo in collaudo non parte** (db, porta, config) | Il server del worktree con un db nuovo (`MODALITA_COLLAUDO`, le tre identità finte nascono da sole) e il giro rifatto dal catalogo di prova; se nemmeno quello, il video | la demo del 1 ott sul terminale resta (§3) |
+| **Barattolo in collaudo non parte** (db, porta, config) | Il server del worktree con un db nuovo (`MODALITA_COLLAUDO`, le tre identità finte nascono da sole), `py -3 semina_demo.py` su quel db (§10 punto 5) e il giro rifatto; se nemmeno quello, il video | la demo del 1 ott sul terminale resta (§3) |
 
 La regola per il palco: **si cambia strada senza spiegare il guasto**,
 una frase e avanti; la spiegazione tecnica va nelle Q&A se la chiedono.

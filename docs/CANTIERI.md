@@ -41269,3 +41269,140 @@ WSL non ha le credenziali). 4) La prova di riavvio completa (§10 punto
 collegato», `get_info → ok (nip44_v2)`; il riavvio del VPS è fatto.
 Scritte in §10 (riga «14-16», punti 2 e 3, lista del 15 ai punti 4, 5,
 7 e 10) e in §4.
+
+## La semina della demo (9 ott 2026, richiesta di Andrea)
+
+**Il buco, visto dal vivo la mattina del 9.** Andrea fa la messa in scena
+della demo di Torino (HACKATHON-SETUP §11.2) sul suo PC con tutto
+acceso: Barattolo in collaudo sulla 8080 parte, l'utente 111 è loggato,
+ma nel database di collaudo il negozio To The Mooon non esiste. La
+ricerca «Mooon» non trova niente, `/negozio/1b9a53e6` apre il mercatino
+generale e la card «Consigliati» della home — che il client costruisce
+dal SUO catalogo (`RACCONTI` di miniapp.html), negozio `1b9a53e6`
+compreso — porta a un negozio che in quel database non c'è: «Negozio
+non trovato». La schermata 3 non si può fare. Serve una semina del
+database di collaudo, da lanciare dal PC il 16 e la mattina del 17,
+idempotente, con un comando per l'ordine «creato, non pagato» della
+mattina; niente dati di produzione, niente VPS.
+
+**Cosa semina, e i perché.** `semina_demo.py`, nella radice accanto agli
+altri script, tre comandi: `semina` (il default), `ordine`, `stato`.
+1) **Il negozio** è l'utente finto 444 «To The Mooon»: non 222, perché
+il cliente compra da un ALTRO, e non uno dei tre di sempre. Il codice
+negozio NON sta scritto nello script: si legge da miniapp.html, dalla
+voce `'to-the-moon'` di `RACCONTI` (`negozio: '1b9a53e6'`), perché è
+quello che la card «Consigliati» apre — «IL CODICE NEGOZIO È IL LEGAME»,
+dice il catalogo stesso — e se un giorno là cambia la semina lo segue
+invece di divergere. Il link a scelta è `/negozio/tothemooon`, la
+stessa parola del NIP-05 con cui la demo chiama il negozio
+(`tothemooon@barattolo.store`); la npub è la PUBBLICA dell'identità di
+prova `tothemooon` di §11 (il badge auto-dichiarato: regola ferrea 2,
+nessuna nsec da nessuna parte); l'avatar è il logo di
+`assets/consigliati/to-the-moon.webp` posato su un quadrato bianco
+(è largo e basso, il cerchio dell'avatar lo mangerebbe), 128 px JPEG
+come i francobolli del server, nome `av_1b9a53e6_1.jpg` nella forma di
+`NOME_FOTO`, numero fisso così rilanciare riscrive lo stesso file.
+2) **L'annuncio**: il gioco, un pezzo, nuovo, «Sport e hobby / Giochi da
+tavolo», ritiro a mano a Torino — niente spedizione né protezione, così
+il conto dell'ordine È il prezzo e la riga «oppure 4,80 USDB» dello
+studio C torna senza resti. Il prezzo in sats è QUELLO CHE OGGI VALE
+4,80 $: lo studio C fissa la cifra in dollari (480 unità di USDB, «1 USDB
+= 1 $ al cambio di oggi») e non in sats, quindi i sats li dà il cambio,
+che il server sa già — la riga `usd` di `cambio_noto`, dettata da
+CoinGecko. Rilanciare la semina la mattina della demo RITARA il prezzo:
+è il modo in cui 4,80 resta 4,80 anche se bitcoin si è mosso. Senza un
+cambio nel database la semina si FERMA e lo dice (`--cambio-usd` lo
+passa a mano, dichiarato): un prezzo a memoria sarebbe un numero
+inventato. Le due foto sono quelle del racconto in `assets/racconti/`,
+copiate in `foto/` coi nomi `a<id>_0.webp`/`_1.webp` perché la rotta
+`/foto/` serve solo quel che sta lì in forma. `ricerca_v` resta 0:
+l'indice lo rifà il server alla prossima ricerca.
+3) **Il cliente 111** si scrive come `_upsert_da_telegram` al primo
+ingresso, e se c'è già non si tocca (il nome dall'hash resta il suo).
+4) **L'ordine** (`ordine`): 'creato', cassaforte 'saas' (un nome che
+`_chiavi_cassaforte` conosce), ritiro, un pezzo, al prezzo
+dell'annuncio, `cambio_ordine` dall'euro di `cambio_noto`, e
+`payment_hash` e `invoice` VUOTI — deliberato in tutt'e due le
+direzioni. Il mietitore (`controlla_abbandonati`) guarda SOLO gli ordini
+con un payment_hash, quindi questo resta 'creato' tutto il giorno senza
+che nessuno lo annulli alle sue spalle (c'è la sentinella in prove.py
+che legge quella WHERE dal server: il giorno che si allargasse, la
+riga diventa rossa); e una fattura di cartone sarebbe una bugia su un
+ordine che la demo paga in USDB col foglio di sabato. Il rovescio,
+scritto in §10: il foglio «Paga ora» di OGGI su quell'ordine bussa a
+LNbits per una fattura che non c'è e nel log del server esce un 500,
+innocuo (provato: l'ordine non si muove).
+
+**Idempotenza e guardie.** Ogni pezzo si cerca prima di scriverlo — il
+negozio per tg_id (il codice si pretende libero o già suo: se lo porta
+un altro utente ci si ferma, non glielo si ruba; stesso per il link
+preso da uno username altrui), l'annuncio per venditore e titolo (si
+ritara: prezzo, di nuovo attivo e con un pezzo se la demo l'ha già
+venduto), il cliente per tg_id, l'ordine per cliente+annuncio+'creato'
+(`--nuovo` per il secondo della domenica). Scrive SOLO con
+`MODALITA_COLLAUDO = True` nel config (quello del VPS dice False), e
+solo su un database che il server ha GIÀ creato: la semina non conosce
+lo schema, lo controlla con `PRAGMA table_info` sulle colonne che usa e
+si ferma nominando quella che manca — niente `CREATE TABLE` qui, mai
+una copia dello schema da tenere in pari. Niente `import server` (la
+lezione di ricategorizza.py: parte init_db e il giro intero), niente
+rete, niente VPS.
+
+**Strade scartate.** (a) Creare l'ordine da `/api/orders`: quella
+strada conia la invoice su LNbits, che sul portatile della demo non
+c'è, e il reaper poi la guarderebbe. (b) Un payment_hash di cartone:
+con un LNbits raggiungibile il reaper lo troverebbe «non pagato» e
+annullerebbe l'ordine in 15 minuti. (c) Spegnere la card «Consigliati»
+in collaudo: vuol dire toccare il client per il solo collaudo, e la
+richiesta diceva «punti al negozio seminato O non compaia» — col
+negozio che esiste la card fa quel che deve. (d) Il prezzo in sats
+fisso: lo studio non lo dà, e inventarlo è proprio quel che la
+richiesta vietava. (e) Un codice negozio nuovo per il collaudo: la card
+del client ne porta uno solo. (f) Lo schema estratto da server.py per
+girare lo script in prove.py sul «vero» schema: fragile e falso; il
+giro sullo schema vero sta nel collaudo, dove il server c'è.
+
+**Le prove.** `prove_semina_demo` (prove.py): le sentinelle (niente
+import server, niente rete, rifiuto senza collaudo, l'ordine senza hash
+né fattura in una cassaforte nota, la WHERE del mietitore letta da
+server.py, niente CREATE TABLE), il codice letto dal client e la voce
+consigliata col logo, la npub uguale a §11 e `npub_in_hex` uguale a
+`npub_to_hex` del server, 4,80 $ nello studio e nella demo, i sats al
+cambio (4.800 a 100.000, 4.000 a 120.000, 3.888 a 123.456,78, zero
+rifiutato), i nomi dei file contro `NOME_FOTO` vero, e il giro delle
+funzioni su un db in memoria con le sole colonne dichiarate (colonna
+mancante nominata, codice altrui, link preso, nascita/rilancio del
+negozio con l'avatar 128×128, annuncio e ritaratura dopo una vendita,
+cliente, ordine e `--nuovo`, poi il comando con un config di cartone:
+produzione → ferma, senza cambio → `--cambio-usd`, a mano → verde con
+NIP05_NOMI che combacia, `ordine`, `stato`, comando ignoto); 53 righe.
+`collaudo_semina_demo` sul server vero (27 righe, nella lista della
+CI): prima della semina 404 e ricerca vuota, poi il negozio per codice
+e per link con nome/npub/avatar, l'annuncio in vetrina e in ricerca,
+le foto dalla rotta `/foto`, rilancio senza doppioni, ritaratura col
+cambio cambiato, l'ordine in «Ordini» di 111 senza fattura, il
+mietitore un'ora dopo che lo lascia «creato», `verifica-pagamento`
+che non lo tocca, `--nuovo`, la guardia della produzione; le foto in
+una cartella usa-e-getta (`SEMINA_CARTELLA_FOTO`, e `FOTO_DIR` del
+server girato lì). Lezione del banco: `con.backup()` da una connessione
+con una transazione aperta gira a vuoto per sempre (SQLITE_LOCKED
+ritentato ogni 250 ms) — il commit va prima. **Dal vivo**, com'è
+scritto in §10: server del worktree su un'altra porta (8097, config dal
+solo esempio con `MODALITA_COLLAUDO = True` e il relay morto), semina
+due volte (nuovo / c'era), `ordine` due volte (creato / c'è già),
+`stato`; dal server: `/api/negozio/1b9a53e6` e `/tothemooon` 200 con
+nome, npub e avatar, «Mooon» in ricerca, l'ordine in `/api/orders` di
+111, le tre foto 200; nel Browser pane con l'identità 111 dall'hash:
+la vetrina con la storia e il logo tondo in testata, l'annuncio a
+5.820 sats (≈4 €) in home e nel negozio, la card «Consigliati» → To
+The Mooon! → il negozio, «Ordini» con «Da pagare». Le righe esatte e
+le risposte attese stanno in §10 (riga nuova della tabella e punto 5),
+§11.2, §11.3 (sab 08:30, dom 08:30, dom 13:00) e §11.4.
+
+**Resta da guardare.** Il 16, sul DB di collaudo vero di Andrea: la
+semina, la riga «NIP05_NOMI combacia» (il config ha le hex a mano), e
+la controprova nel browser; se la sua istanza ha già un utente 111 col
+nome dall'hash, la semina lo lascia com'è. Il foglio del pagamento di
+sabato è un altro: oggi «Paga ora» su quell'ordine fa il 500 innocuo
+nel log. La semina tocca `foto/` in locale come fa il server (regola 1:
+non si committa, e infatti è ignorata).

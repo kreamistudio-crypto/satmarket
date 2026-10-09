@@ -131,6 +131,7 @@ jobs:
              collaudo_pagamenti_non_arrivati.py
              collaudo_carrello_salvato.py
              collaudo_bollino_staff.py
+             semina_demo.py collaudo_semina_demo.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
@@ -226,6 +227,7 @@ jobs:
              collaudo_avviso_chi_annulla
              collaudo_recapito_aggiornato
              collaudo_garanzia_lunga
+             collaudo_semina_demo
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.
