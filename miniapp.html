@@ -54990,7 +54990,13 @@ function statoTestoP2P(o){
           : (o && o.lato === 'compro' && s.d_compro) ? s.d_compro
           : (vende && s.d_vendo) ? s.d_vendo
           : (s.d || '');
-  return {t: (mio && s.t_mio) || (vende && s.t_vendo) || s.t, d};
+  /* LE PRESE DALLE 10 (9 ott 2026, rifinitura di Andrea): prima dell'ora
+     il ritiro non c'e', e la frase dell'ordine pubblicato lo dice —
+     «Potrai ritirarlo dalle 10:00 di domani» al posto di «Puoi ritirarlo
+     quando vuoi»; passata l'ora torna quella di sempre, da sola */
+  const dOra = (o && o.stato === 'pubblicato' && typeof preseChiuseP2P === 'function' && preseChiuseP2P())
+    ? d.replace('Puoi ritirarlo quando vuoi', 'Potrai ritirarlo dalle 10:00 di domani') : d;
+  return {t: (mio && s.t_mio) || (vende && s.t_vendo) || s.t, d: dOra};
 }
 
 /* ---- quanto chiede una richiesta di pagamento ----
@@ -65799,12 +65805,16 @@ function haOrdiniViviP2P(){
 function portaPrimoOrdineP2P(){
   return !!myTgId && !VETRINA && !DEMO && preseChiuseP2P() && !haOrdiniViviP2P();
 }
-/* la riga al posto del libro, nel vestito dello stato vuoto, col gesto */
+/* la riga al posto del libro, nel vestito dello stato vuoto, col gesto.
+   IL BOTTONE HA IL COLORE DEL LATO (rifinitura di Andrea): verde su
+   «Compra BTC», rosso su «Vendi BTC», come il + e i due «Pubblica
+   ordine» — lo stesso `vestitoInvioP2P` */
 function rigaPortaP2P(){
+  const vestito = typeof vestitoInvioP2P === 'function' ? vestitoInvioP2P(false) : 'primary';
   return '<div class="empty"><img class="scambi-img scambi-libro" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">'
     + '<span class="empty-title">Per entrare oggi pubblica il tuo primo ordine.</span>'
     + 'Dalle 10:00 di domani si prende. '
-    + '<button type="button" class="btn primary" onclick="apriNuovoOrdineP2P()">Pubblica il tuo primo ordine</button></div>';
+    + '<button type="button" class="btn ' + vestito + '" onclick="apriNuovoOrdineP2P()">Pubblica il tuo primo ordine</button></div>';
 }
 /* il foglio si apre da solo UNA volta per ingresso nel tab (vaiP2P e il
    + lo riarmano): chi lo chiude trova la riga e il bottone, non un

@@ -102557,6 +102557,44 @@ console.log(JSON.stringify(casi));
           and "p2pPortaAperta = false;" in pezzo_js(mini, "function libroDaPiuP2P(){", "\n}\n"))
     prova("...ma non sotto il tour, ne' due volte", True,
           "if (p2pPortaAperta || tourP2PInCorso) return;" in pezzo_js(mini, "function apriPortaP2P(){", "\n}\n"))
+    # --- le due rifiniture di Andrea (9 ott 2026, pomeriggio) ---------
+    stati = mini[mini.index("const STATI_P2P = {"):mini.index("\n};", mini.index("const STATI_P2P = {")) + 3]
+    gm = mini[mini.index("const P2P_GIRO_MORTO = {"):mini.index("\n};", mini.index("const P2P_GIRO_MORTO = {")) + 3]
+    banco_frase = (stati + "\n" + gm + "\n" + pezzo_js(mini, "function statoTestoP2P(o){", "\n}\n") + "\n}\n"
+        + """
+/* i giudici che statoTestoP2P chiama su altri stati: qui di cartone,
+   gli stati di questo banco non li raggiungono */
+function aspettaRecapitoP2P(){ return false; }
+function recapitoEuroArrivatoP2P(){ return false; }
+function nomeControparteP2P(){ return ''; }
+function cauzioneVivaP2P(){ return false; }
+let chiuse = true;
+function preseChiuseP2P(){ return chiuse; }
+const prima = [statoTestoP2P({stato: 'pubblicato', lato: 'compro', mio: true}).d,
+               statoTestoP2P({stato: 'pubblicato', lato: 'vendo', mio: true}).d,
+               statoTestoP2P({stato: 'attivo', lato: 'compro'}).d];
+chiuse = false;
+const dopo = [statoTestoP2P({stato: 'pubblicato', lato: 'compro', mio: true}).d,
+              statoTestoP2P({stato: 'pubblicato', lato: 'vendo', mio: true}).d];
+console.log(JSON.stringify({prima, dopo}));
+""")
+    rf = _node_banco(banco_frase)
+    if rf is None:
+        salta("la frase dell'ordine pubblicato prima dell'ora", "node non c'e'")
+    else:
+        prova("prima dell'ora l'ordine pubblicato dice «Potrai ritirarlo dalle 10:00 di domani», sui due lati",
+              [True, True],
+              [("Potrai ritirarlo dalle 10:00 di domani, finché nessuno lo prende." in x
+                and "Puoi ritirarlo" not in x) for x in rf.get("prima", ["", ""])[:2]])
+        prova("...e le altre frasi non si toccano", True,
+              "Puoi ritirarlo" not in rf.get("prima", ["", "", ""])[2]
+              and "Potrai" not in rf.get("prima", ["", "", ""])[2])
+        prova("dopo l'ora torna «Puoi ritirarlo quando vuoi», da sola", [True, True],
+              ["Puoi ritirarlo quando vuoi, finché nessuno lo prende." in x for x in rf.get("dopo", ["", ""])])
+    _rpp = pezzo_js(mini, "function rigaPortaP2P(){", "\n}\n")
+    prova("il bottone della porta veste il colore del lato, come il + (vestitoInvioP2P)", True,
+          "vestitoInvioP2P(false)" in _rpp and "'<button type=\"button\" class=\"btn ' + vestito + '\"" in _rpp
+          and "p2pLato === 'vendo' ? 'rosso' : 'primary'" in pezzo_js(mini, "function vestitoInvioP2P(tab){", "\n}\n"))
     prova("...e chiuso il tour sul libro, la porta si apre allora", True,
           "&& document.querySelector('.view.active')?.id === 'view-p2p') apriPortaP2P();"
           in pezzo_js(mini, "function chiudiTourP2P(poi){", "\n}\n"))

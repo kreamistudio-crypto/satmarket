@@ -41983,3 +41983,20 @@ accendono da soli sui telefoni già aperti (l'orologio del telefono);
 dopo il 10 togliere la riga. Notato e non toccato: la frase di stato
 «Puoi ritirarlo quando vuoi, finché nessuno lo prende» nella pagina
 dell'ordine pubblicato resta com'è anche prima dell'ora.
+
+**Le due rifiniture (9 ott 2026, pomeriggio, richiesta di Andrea).**
+1) Nella pagina dell'ordine pubblicato, prima dell'ora, la frase di
+stato dice «Potrai ritirarlo dalle 10:00 di domani, finché nessuno lo
+prende» al posto di «Puoi ritirarlo quando vuoi…»; passata l'ora torna
+quella di sempre da sola. Sta in `statoTestoP2P`, in coda, col typeof:
+un `replace` sulla frase scelta, solo per lo stato `pubblicato`, così le
+due voci della tabella `STATI_P2P` restano quelle di sempre e i banchi
+che la leggono non cambiano. 2) Il bottone «Pubblica il tuo primo
+ordine» della porta veste il colore del lato come il + e i due
+«Pubblica ordine»: `vestitoInvioP2P(false)`, verde su «Compra BTC» e
+rosso su «Vendi BTC». Prove: la frase si fa girare in node sui due lati,
+prima e dopo l'ora, e su un altro stato che non deve cambiare; il
+colore si guarda. `prove_prese_dalle_10` sale a 58. Il rebase chiesto
+da Andrea non ha avuto niente da fare: il cantiere del banner delle
+commissioni (62cd972) stava committato nel suo worktree e non su
+origin/main, che era ancora 5a3ee42 — sarà lui a ribasarsi su questo.
