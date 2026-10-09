@@ -7316,8 +7316,14 @@
   (::before/::after del bottone), poi si posa. Tutte le regole stanno
   sotto `.fee-primo`, quindi a classe tolta resta lo stato di sempre
   (provato a 0 pixel diversi). Ritaglio che non arriva in 1,2 s → il
-  battito; coi ridotti i passi restano, senza movimento. Le rivedute da
-  «Come funziona» hanno il battito (`battitoFeeP2P`).
+  battito; coi ridotti i passi restano, senza movimento. DALLA SERA
+  STESSA la lenta torna a OGNI giro chiuso con «Fine 🎉», anche rifatto
+  da «Come funziona»: `tourAvanti` oltre l'ultima tappa chiama
+  `chiudiTour(true)`, il motore passa `finito` al suo `dopo`
+  (`fineGiroP2P(finito)`), e `animaBannerFeeP2P(conFine)` fa la lenta
+  con `conFine` o senza timbro. Le rivedute chiuse in un altro modo
+  (Salta, Esc, indietro, il + trascinato) hanno il battito
+  (`battitoFeeP2P`); l'ingresso dal mercatino non anima niente.
   Il blocco vive dopo il giro guidato: quello del libro non scrive cifre.
   Il verbale: CANTIERI, «Il libro subito», «Il tutorial su pagina
   sfocata, e «Invii» nel P2P», «Il giro guidato del P2P» e «Il banner

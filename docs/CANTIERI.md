@@ -42267,3 +42267,58 @@ Il banco della ricarica (`_RICARICA_PROG`) ritaglia `navMotore` intero,
 osservatore nuovo compreso: gli e' servito uno stub di
 `vestiFogliCoperti`, come per `haptic` e i render. Suite intera e
 collaudi della CI: nel rapporto del push.
+
+## Il banner delle commissioni, la lenta anche da «Come funziona» (9 ott 2026, sera, ritocco di Andrea)
+
+Ritocco a «Il banner delle commissioni, la prima volta» (62cd972): la
+versione lenta deve partire OGNI volta che il giro guidato del P2P si
+chiude con «Fine 🎉» — al primo ingresso e quando lo si rifà da «Come
+funziona» —, non solo la prima volta: col timbro `banner_p2p` già
+scritto, chi l'aveva vista non la rivedeva più. L'ingresso nel P2P dal
+mercatino, senza giro, resta com'era (nessuna animazione delle pillole,
+lo stato fisso e il bagliore della capsula). Stato finale ed effetti
+ridotti invariati.
+
+**Il filo, un anello per volta.** «Fine 🎉» è `tourAvanti` oltre
+l'ultima tappa: lì ora si chiama `chiudiTour(true)`, l'unica chiusura
+che il motore dei giri considera FINITA; `chiudiTour(finito)` passa
+`finito === true` al suo `dopo`; `fineGiroP2P(finito)` lo passa al
+banner, `animaBannerFeeP2P(conFine)`, che fa la lenta se `conFine` è
+vero O se il timbro non c'è ancora (la primissima chiusa in un altro
+modo resta lenta, come da 62cd972). Il battito resta alle rivedute
+chiuse con «Salta», Esc, il gesto indietro o il «+» trascinato sul logo
+(`chiudiGiroDalTrascinoP2P`: si chiude «come con Fine» per il timbro, ma
+sta aprendo un foglio e il banner finirebbe sotto). Il motore lo usa
+solo il giro del P2P (il tour del mercatino non ha `dopo`), quindi il
+parametro non tocca nessun altro. Il nome `fee-primo` resta quello del
+primo giro: rinominarlo voleva dire riscrivere CSS, banchi e documenti
+per niente.
+Scartato: un timbro nuovo o un contatore di giri — il «come s'è chiuso»
+lo sa già il motore, nel posto dove succede.
+
+**Provato.** `prove_giro_guidato_p2p`: il banco col motore VERO ora
+registra cosa arriva al banner — `true` dopo «Fine» al primo giro e al
+giro rifatto da «Come funziona», `false` dopo «Salta» a metà;
+le ancore delle firme cambiate (`chiudiTour(finito){`) aggiornate.
+`prove_banner_fee_personale`: la rivista chiusa senza «Fine» fa il
+battito, quella chiusa con «Fine» fa la lenta col timbro già scritto e
+finisce nello stato di sempre. `prove_banner_fee_primo_ingresso`: il filo
+in quattro sentinelle (solo tourAvanti chiude con `true` e nessun altro
+`chiudiTour(true)`; il motore lo passa al `dopo`; fineGiroP2P al banner;
+la condizione della lenta) e l'ingresso dal mercatino che non anima
+(libro, tab, tour, stato fisso). Due mutazioni su una copia — «Fine» che
+non passa `finito`, il banner che ignora `conFine` —: due rosse
+ciascuna, in posti indipendenti.
+**Dal vivo**, il banco di 62cd972 (copia nello scratchpad, relay morti,
+listino 4, CDP headless no-preference): l'identità 230 fa il primo giro
+fino a «Fine» (timbro scritto), poi tocco vero su «Come funziona» in
+fondo al libro (il libro vuoto e fresco dalla pagina, col relay morto),
+slide, giro, «Fine 🎉»: la lenta, posata sull'1,5%. Poi tocco su
+«Esplora» e rientro dalla barra: un MutationObserver sulle classi del
+banner non vede nessun cambio, nessuna animazione sulle pillole, solo il
+bagliore della capsula; l'ultimo fotogramma del giro rifatto e quello del
+rientro: 0 pixel diversi (allineati sui 6 px della vista che si posa).
+GIF e provini in `.claude/giri/banner-fee-come-funziona/` (fuori da git).
+
+**Da guardare**: sul telefono, «Come funziona» → «Fine 🎉» con
+un'identità che il banner l'ha già visto.

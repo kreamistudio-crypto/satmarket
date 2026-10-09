@@ -2482,9 +2482,11 @@
   @keyframes p2pFeeBattito{0%,100%{transform:scale(1)}45%{transform:scale(1.08)}}
   /* LA PRIMA VOLTA, LENTA (9 ott 2026, richiesta di Andrea: il battito
      qui sopra era troppo sobrio per capire la sequenza e quanto si paga
-     davvero). SOLO la prima, quella subito dopo il giro guidato — il
-     timbro `banner_p2p` non ancora scritto —; ogni volta dopo resta il
-     battito di sopra. Il JS (`animaBannerFeeP2P`) mette `fee-primo` e poi
+     davvero). La prima, quella subito dopo il giro guidato — il timbro
+     `banner_p2p` non ancora scritto —, e dalla sera stessa OGNI giro
+     chiuso con «Fine 🎉», anche da «Come funziona»; le rivedute chiuse
+     altrimenti hanno il battito di sopra. Il nome `fee-primo` resta
+     quello del primo giro. Il JS (`animaBannerFeeP2P`) mette `fee-primo` e poi
      un PASSO alla volta, e ogni passo resta fino alla fine:
        1 (0 s)     la prima pillola entra, col «2%» PULITO: nel disegno la
                    barra c'e' gia', e il pezzo mostra il ritaglio senza
@@ -22873,7 +22875,10 @@ function tastoTour(e){
 }
 function tourAvanti(){
   tourTappa++;
-  if (tourTappa >= tourTappe.length) { chiudiTour(); return; }
+  /* oltre l'ultima tappa = «Fine 🎉»: l'unica chiusura che il `dopo`
+     sente come FINITA (Salta, Esc e il gesto indietro passano da
+     navIndietro, il + trascinato da chiudiGiroDalTrascinoP2P) */
+  if (tourTappa >= tourTappe.length) { chiudiTour(true); return; }
   mostraTappa();
 }
 function mostraTappa(){
@@ -22950,7 +22955,7 @@ function posizionaTour(){
   f.style.top = top + 'px';
   f.style.left = left + 'px';
 }
-function chiudiTour(){
+function chiudiTour(finito){
   if (!tourInCorso) return;
   tourInCorso = false;
   el('tour').classList.remove('open');
@@ -22965,7 +22970,7 @@ function chiudiTour(){
   bannerInstallaPwa();   // il banner installa riottiene la sua occasione
   const dopo = tourDopo;
   tourDopo = null;
-  if (dopo) dopo();
+  if (dopo) dopo(finito === true);
 }
 /* «Tutorial»: il tour di benvenuto si rivede quando si vuole, e per
    TUTTI — non solo per gli admin. Rimette in gioco il SOLO timbro
@@ -66423,15 +66428,17 @@ function giroGuidatoP2P(chiesto){
   timbraVisto('giro_p2p');
 }
 /* la fine, qualunque strada la porti: via la card d'esempio, e il lato
-   torna quello di partenza */
-function fineGiroP2P(){
+   torna quello di partenza. `finito` = chiuso con «Fine 🎉» (il motore
+   lo passa solo da tourAvanti oltre l'ultima tappa) */
+function fineGiroP2P(finito){
   const lato = giroP2PLato;
   giroP2PLato = null;
   document.querySelectorAll('.p2p-esempio').forEach(n => n.remove());
   if (lato && lato !== p2pLato) setLatoP2P(lato, true);
   /* ...e il banner delle commissioni si fa personale, con la luce che
-     scorre (IL BANNER PERSONALE): vive fuori da qui, da qui il typeof */
-  if (typeof animaBannerFeeP2P === 'function') animaBannerFeeP2P();
+     scorre (IL BANNER PERSONALE): vive fuori da qui, da qui il typeof.
+     Finito con «Fine 🎉» → la versione LENTA, anche da «Come funziona» */
+  if (typeof animaBannerFeeP2P === 'function') animaBannerFeeP2P(finito === true);
 }
 /* ============ fine del giro guidato del P2P ============ */
 
@@ -66459,9 +66466,14 @@ function fineGiroP2P(){
    LA PRIMISSIMA, quella col timbro non ancora scritto, e' LENTA (9 ott
    2026, richiesta di Andrea): le pillole entrano una alla volta, il 2%
    si barra sotto gli occhi, pop per la BETA e piu' forte per l'1% —
-   vedi LA PRIMA VOLTA, LENTA, nel CSS. Le rivedute da «Come funziona»
-   hanno il battito. Coi ridotti anche la primissima ha i suoi passi, ma
-   le pillole APPAIONO soltanto.
+   vedi LA PRIMA VOLTA, LENTA, nel CSS. Coi ridotti anche la primissima
+   ha i suoi passi, ma le pillole APPAIONO soltanto.
+   E DAL 9 OTT 2026 SERA (ritocco di Andrea) LA LENTA TORNA A OGNI GIRO
+   CHIUSO CON «Fine 🎉», anche rifatto da «Come funziona» col timbro gia'
+   scritto: il motore dei giri passa `finito` al suo `dopo` solo da
+   «Fine». Il battito resta alle rivedute chiuse in un altro modo
+   (Salta, Esc, indietro, il + trascinato); l'ingresso dal mercatino non
+   anima niente, come sempre.
    L'ALT DICE IL PREZZO DI CHI GUARDA, con le cifre del disegno — la
    regola del banner: l'alt descrive QUESTA immagine. */
 const FEE_ANIMA_P2P_MS = 1500;
@@ -66498,18 +66510,20 @@ function bannerFeeFissoP2P(){
 /* L'ANIMAZIONE: si parte TUTTO COLORATO, e battiti e grigi li fanno le
    corse del CSS. Le classi si mettono in due tempi con un reflow in mezzo, o
    il browser vedrebbe solo lo stato finale e non farebbe nessuna corsa. */
-function animaBannerFeeP2P(){
+function animaBannerFeeP2P(conFine){
   const b = el('p2pFeeBanner'), n = pillolaFeeP2P();
   if (!b || !n) return;
-  /* la primissima: il timbro si legge PRIMA di scriverlo */
-  const prima = !hintDismesso('banner_p2p');
+  /* la lenta: OGNI giro chiuso con «Fine 🎉» (`conFine`, anche da «Come
+     funziona»), e la primissima comunque chiusa — il timbro si legge
+     PRIMA di scriverlo */
+  const lenta = conFine === true || !hintDismesso('banner_p2p');
   timbraVisto('banner_p2p');
   clearTimeout(feeAnimaP2PTimer);
   feeAnimaP2PTimer = null;
   fermaPrimaVoltaFeeP2P(b);
   b.classList.remove('fee-anima');
   vestiBannerFeeP2P(0);
-  if (prima) { primaVoltaFeeP2P(b, n); return; }
+  if (lenta) { primaVoltaFeeP2P(b, n); return; }
   battitoFeeP2P(b, n);
 }
 /* IL BATTITO di ogni volta dopo la primissima (e il ripiego di quella,

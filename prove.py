@@ -55338,7 +55338,7 @@ def prove_giro_guidato_p2p():
     # sempre, lasciato sul logo, chiude il giro prima della morfosi
     prova("il velo passa il pointerdown alla tappa, e lo smonta alla chiusura", [True, True],
           ["tv.addEventListener('pointerdown', ditoTour);" in pezzo_js(mini, "function avviaTour(tappe, dopo){", "\n}\n"),
-           "el('tour').removeEventListener('pointerdown', ditoTour);" in pezzo_js(mini, "function chiudiTour(){", "\n}\n")])
+           "el('tour').removeEventListener('pointerdown', ditoTour);" in pezzo_js(mini, "function chiudiTour(finito){", "\n}\n")])
     prova("...e il dito lo chiede la sola tappa della tendina", [1, 1],
           # nel CODICE, non nei commenti («sotto il dito: nella prosa»)
           [giro.count("dito: ditoGiroP2P"), len(re.findall(r"\bdito: [a-z]\w*P2P\b", mini))])
@@ -55402,7 +55402,7 @@ def prove_giro_guidato_p2p():
 
     # --- 4) IL BANCO: motore vero, tour P2P vero, giro vero ------------------
     i_m = mini.index("let tourInCorso = false;")
-    motore = mini[i_m:mini.index("\n}\n", mini.index("function chiudiTour(){")) + 3]
+    motore = mini[i_m:mini.index("\n}\n", mini.index("function chiudiTour(finito){")) + 3]
     blocco_t = mini[mini.index("const TOUR_P2P_CHIAVE = "):
                     mini.index("/* ============ IL MOTORE DELLO SCAMBIO")]
     giudici = re.search(r"const LIVELLO_SCONTO_P2P = \d+;", mini).group(0) + "\n"
@@ -55461,7 +55461,8 @@ let FATTI = [];
 /* il banner personale (IL BANNER PERSONALE): qui si conta quante volte
    la fine del giro lo anima */
 let ANIME = 0;
-function animaBannerFeeP2P(){ ANIME++; }
+let FINI = [];
+function animaBannerFeeP2P(fine){ ANIME++; FINI.push(fine); }
 function toccaPiu(){ FATTI.push('piu'); }
 function apriBarattozonP2P(){ FATTI.push(tourInCorso ? 'barattozon col giro aperto' : 'barattozon'); }
 el('p2pLatoCompro').r = rettangolo(16, 55, 120, 46);
@@ -55594,6 +55595,7 @@ const out = {};
   out.vuotoDopo = stato();
   out.lati = LATI.slice();
   out.animeDopoPrimo = ANIME;
+  out.finePrimo = FINI[FINI.length - 1];
   out.esempiFatti = ESEMPI.map(o => ({esempio: o.esempio, lato: o.lato, premio: o.premium,
     metodi: o.metodi, voti: o.faccia && o.faccia.voti, id: o.id}));
   /* 2) UNA VOLTA SOLA: il tour riaperto senza «Come funziona» non rifa' il giro */
@@ -55613,6 +55615,7 @@ const out = {};
   navIndietro();                 /* il «Salta» del fumetto e' navIndietro() */
   out.salta = stato();
   out.animeDopoSalta = ANIME;
+  out.fineSalta = FINI[FINI.length - 1];
   /* ...e «Salta» proprio sul passo della freccetta: se ne va con lui */
   rivediTourP2P(); slideFinoInizia(); await dorme(A_FUOCO_TOUR_P2P_MS + 150);
   for (let i = 0; i < 6; i++) tourAvanti();
@@ -55625,6 +55628,7 @@ const out = {};
   rivediTourP2P(); slideFinoInizia(); await dorme(A_FUOCO_TOUR_P2P_MS + 150);
   out.pieno = tuttiIPassi();
   out.pienoEsempi = ESEMPI.length;
+  out.finePieno = [ANIME, FINI[FINI.length - 1]];
   /* 6) LA CARD SI RIMETTE DA SOLA: un render la porta via, e se arriva
         una card vera l'esempio se ne va */
   azzera(); VISTI.giro_p2p = 1;
@@ -55772,6 +55776,12 @@ const out = {};
           [1, 1], [o["animeDopoPrimo"], o["animeIngressi"]])
     prova("...e da «Come funziona» si anima di nuovo, a giro finito", [1, 2],
           [o["animeRivisto"], o["animeDopoSalta"]])
+    # «FINE 🎉» → LA LENTA (9 ott 2026 sera, ritocco di Andrea): il motore
+    # dice al banner come s'e' chiuso il giro — «Fine» da tourAvanti oltre
+    # l'ultima tappa, tutto il resto no
+    prova("«FINE 🎉» chiede la lenta: il primo giro e il giro rifatto da «Come funziona»",
+          [True, [o["finePieno"][0], True]], [o["finePrimo"], o["finePieno"]])
+    prova("...«Salta» a meta' no (il battito, alle rivedute)", False, o["fineSalta"])
     prova("«SALTA» A META': chiude tutto, via l'esempio, lato di partenza",
           [5, "vendo", {"giro": False, "lato": "compro", "esempi": 0, "ascolti": 0}],
           [o["primaDelSalta"]["n"], o["primaDelSalta"]["lato"], o["salta"]])
@@ -57404,9 +57414,9 @@ def prove_banner_fee_personale():
 
     # --- 4) QUANDO: fine del giro, e /me per lo stato fisso ---------------
     prova("l'animazione parte da UN posto solo: la fine del giro guidato", [1, True],
-          [len(re.findall(r"\banimaBannerFeeP2P\(\);", re.sub(r"/\*[\s\S]*?\*/", "", mini))),
-           "if (typeof animaBannerFeeP2P === 'function') animaBannerFeeP2P();"
-           in pezzo_js(mini, "function fineGiroP2P(){", "\n}\n")])
+          [len(re.findall(r"\banimaBannerFeeP2P\(finito === true\);", re.sub(r"/\*[\s\S]*?\*/", "", mini))),
+           "if (typeof animaBannerFeeP2P === 'function') animaBannerFeeP2P(finito === true);"
+           in pezzo_js(mini, "function fineGiroP2P(finito){", "\n}\n")])
     prova("...e gli ingressi normali non la chiamano: il libro, il tab, il tour", [0, 0, 0],
           [pezzo_js(mini, f, "\n}\n").count("animaBannerFeeP2P") for f in
            ("function renderP2P(){", "function vaiP2P(){", "function apriTourP2PSePrimaVolta(){")])
@@ -57455,7 +57465,7 @@ class Image { constructor(){ IMMAGINI.push(this); }
 const dorme = ms => new Promise(ok => setTimeout(ok, Math.max(0, ms)));
 const stato = () => ({classi: BANNER.classList.all(), alt: IMG.alt, timbri: TIMBRI.slice()});
 function azzera(sc, tg){
-  fermaPrimaVoltaFeeP2P(BANNER); feeSenzaBarraP2P = null;
+  fermaPrimaVoltaFeeP2P(BANNER); feeSenzaBarraP2P = null; IMMAGINI.length = 0;
   for (const c of BANNER.classList.all()) BANNER.classList.remove(c);
   clearTimeout(feeAnimaP2PTimer); feeAnimaP2PTimer = null;
   p2pSconto = sc; myTgId = tg === undefined ? 111 : tg; RIDOTTI = false; VISTI = {}; TIMBRI = [];
@@ -57488,11 +57498,18 @@ const out = {};
   azzera(PIONIERE, 0); animaBannerFeeP2P(); out.anonimo = stato();
   /* EFFETTI RIDOTTI: nessuna corsa, subito lo stato finale */
   azzera(PIONIERE); VISTI.banner_p2p = 1; RIDOTTI = true; animaBannerFeeP2P(); out.ridotti = stato();
-  /* RIVISTO DA «COME FUNZIONA»: gia' personale, riparte COLORATO e rifa' la corsa */
+  /* RIVISTO DA «COME FUNZIONA» E CHIUSO SENZA «Fine» (Salta, indietro):
+     gia' personale, riparte COLORATO e rifa' la corsa del battito */
   azzera(NESSUNO); VISTI.banner_p2p = 1; bannerFeeFissoP2P(); LOG.length = 0;
-  animaBannerFeeP2P(); out.rivisto = {log: LOG.slice(), classi: BANNER.classList.all()};
+  animaBannerFeeP2P(false); out.rivisto = {log: LOG.slice(), classi: BANNER.classList.all()};
   /* ...e /me che arriva durante la corsa non la interrompe */
   bannerFeeFissoP2P(); out.meInCorsa = BANNER.classList.all();
+  /* RIVISTO E CHIUSO CON «Fine 🎉» (9 ott 2026 sera): la LENTA anche col
+     timbro gia' scritto, e alla fine lo stato di sempre */
+  azzera(PIONIERE); VISTI.banner_p2p = 1; bannerFeeFissoP2P(); animaBannerFeeP2P(true);
+  out.rivistoFineSubito = stato();
+  await dorme(1700); out.rivistoFineMeta = BANNER.classList.all();
+  await dorme(FEE_PRIMO_P2P_MS - 1700 + 250); out.rivistoFineDopo = stato();
   /* LA PRIMISSIMA, LENTA (9 ott 2026): timbro letto prima di scriverlo,
      il banner vuoto SUBITO, il ritaglio chiesto, poi i sei passi nei
      loro tempi, e alla fine lo stato di sempre */
@@ -57559,10 +57576,17 @@ const out = {};
           o["ridotti"]["classi"])
     rv = o["rivisto"]["log"]
     _pos = lambda x: rv.index(x) if x in rv else -1
-    prova("RIVISTO DA «COME FUNZIONA»: riparte colorato e rifa' la corsa", True,
+    prova("RIVISTO DA «COME FUNZIONA» E CHIUSO SENZA «Fine»: riparte colorato e rifa' "
+          "la corsa del battito", True,
           0 <= _pos("-fee-p2") < _pos("+fee-anima") < _pos("+fee-p2"))
     prova("...e /me che arriva a corsa in atto non la ferma", ["fee-anima", "fee-p2"],
           o["meInCorsa"])
+    prova("RIVISTO E CHIUSO CON «Fine 🎉»: la LENTA anche col timbro gia' scritto",
+          [{"classi": ["fee-p3", "fee-primo"], "alt": ALT3, "timbri": ["banner_p2p"]},
+           sorted(["fee-p3", "fee-primo", "fee-passo1", "fee-passo2", "fee-passo3"])],
+          [o["rivistoFineSubito"], o["rivistoFineMeta"]])
+    prova("...e finisce nello stato di sempre", {"classi": ["fee-p3"], "alt": ALT3,
+                                                 "timbri": ["banner_p2p"]}, o["rivistoFineDopo"])
     # LA PRIMISSIMA, LENTA (9 ott 2026, cantiere «banner-fee-primo-ingresso»)
     prova("LA PRIMISSIMA: banner vuoto SUBITO (fee-primo), la pillola gia' scelta, il timbro scritto",
           {"classi": ["fee-p3", "fee-primo"], "alt": ALT3, "timbri": ["banner_p2p"]},
@@ -57738,6 +57762,29 @@ def prove_banner_fee_primo_ingresso():
           [], oltre)
     prova("EFFETTI RIDOTTI: nessun !important fra le regole della prima volta (vince la regola universale)",
           0, len(re.findall(r"fee-primo[^{]*\{[^}]*!important", css)))
+
+    # --- 4) «FINE 🎉» → LA LENTA, ANCHE DA «COME FUNZIONA» (9 ott 2026 sera,
+    # ritocco di Andrea): il filo dal bottone al banner, un anello per volta.
+    # Il banco del giro guidato lo prova col motore vero (Fine sì, Salta no),
+    # quello del banner personale la lenta col timbro gia' scritto
+    codice = re.sub(r"/\*[\s\S]*?\*/", "", mini)
+    prova("SOLO «Fine 🎉» chiude il giro come FINITO: tourAvanti oltre l'ultima tappa, "
+          "e nessun altro chiudiTour(true)", [True, 1],
+          ["if (tourTappa >= tourTappe.length) { chiudiTour(true); return; }"
+           in pezzo_js(codice, "function tourAvanti(){", "\n}\n"),
+           codice.count("chiudiTour(true)")])
+    prova("...il motore lo passa al suo `dopo`, fineGiroP2P al banner", [True, True],
+          ["if (dopo) dopo(finito === true);" in pezzo_js(codice, "function chiudiTour(finito){", "\n}\n"),
+           "animaBannerFeeP2P(finito === true);" in pezzo_js(codice, "function fineGiroP2P(finito){", "\n}\n")])
+    prova("...e il banner fa la lenta con «Fine» O alla primissima, il battito altrimenti", True,
+          "const lenta = conFine === true || !hintDismesso('banner_p2p');"
+          in pezzo_js(codice, "function animaBannerFeeP2P(conFine){", "\n}\n")
+          and "if (lenta) { primaVoltaFeeP2P(b, n); return; }"
+          in pezzo_js(codice, "function animaBannerFeeP2P(conFine){", "\n}\n"))
+    prova("L'INGRESSO DAL MERCATINO non anima niente: il libro, il tab, il tour e lo stato fisso",
+          [0, 0, 0, 0], [pezzo_js(codice, f, "\n}\n").count("animaBannerFeeP2P") for f in
+                         ("function renderP2P(){", "function vaiP2P(){",
+                          "function apriTourP2PSePrimaVolta(){", "function bannerFeeFissoP2P(){")])
 
 
 def prove_p2p_invii():
