@@ -533,13 +533,25 @@ le sezioni in quest'ordine:
    divide in più ordini. <regola> Vedetevi in un posto pubblico e di
    giorno — un bar, un incontro bitcoin —, contate le banconote insieme, e
    mai grosse cifre da soli.»
-3. «Inserisci l'importo in EUR che vuoi inviare» / «…ricevere»: il campo
-   «Importo». **Fisso o intervallo:** toccando il primo campo compare il
+3. «Inserisci l'importo in EUR che vuoi inviare» / «…ricevere»: la riga
+   «Importo». Al tocco si apre dal basso il foglio «💶 L'importo» (dal 9
+   ott 2026, lo stesso di Barattozon): «Euro interi, senza centesimi.»
+   (più «Fase beta: max <cifra>.» se c'è un tetto), la cifra grande con
+   «€», il tastierino (1-9, 0, ⌫: niente virgola), «Conferma» e
+   «Annulla». **Fisso o intervallo:** toccando il primo campo compare il
    secondo, «Importo massimo», preceduto da «a», con il suggerimento «💡
-   Tocca il secondo campo solo se vuoi creare un ordine a intervallo».
-   Lasciato vuoto = ordine a importo fisso; scritto = intervallo «da… a…».
-   Solo euro interi (la virgola non si scrive). Se c'è un tetto: «Fase
-   beta: max <cifra>».
+   Tocca il secondo campo solo se vuoi creare un ordine a intervallo»;
+   il secondo apre lo stesso foglio, «💶 L'importo massimo»: «Il massimo
+   dell'intervallo, più del primo importo. Vuoto, l'ordine ha un importo
+   solo.». Lasciato vuoto = ordine a importo fisso; scritto = intervallo
+   «da… a…». Oltre un limite il foglio dice la frase di sempre — «Troppi:
+   il massimo è <cifra> €», «L'importo massimo deve superare il primo»,
+   quella dei contanti — e «Conferma» resta spento. Se c'è un tetto, sotto
+   la riga resta «Fase beta: max <cifra>». A **prezzo fisso** la riga
+   «Quantità di sats» apre lo stesso foglio, «⚡ La quantità di sats»:
+   «Sats interi. Da <min> a <max> sats.» coi limiti del coordinatore, la
+   cifra con «sats», il tastierino senza virgola, e le frasi «Troppi: il
+   massimo è <N> sats» / «Troppo pochi: il minimo è <N> sats».
 4. «Tipo di prezzo» (con la ⓘ): «**Prezzo di mercato**» o «**Prezzo
    fisso**», con l'interruttore «Mercato». La ⓘ spiega: «• Scegli Prezzo di
    mercato se vuoi usare il prezzo che ha Bitcoin quando qualcuno prende

@@ -4672,6 +4672,9 @@
     color:var(--ink);cursor:pointer;-webkit-tap-highlight-color:transparent}
   .p2p-tasto:active{background:var(--chip-bg)}
   .p2p-tasto:focus-visible{outline:2px solid var(--sats);outline-offset:2px}
+  /* negli ordini a euro interi la virgola non c'e': la sua cella resta
+     vuota e il tastierino tiene la stessa griglia, 0 al centro */
+  .p2p-tasto-vuoto{display:block}
   #p2pPayCodeSheet .p2p-tappa-err,#p2pEuroSheet .p2p-tappa-err{margin-top:6px;text-align:center}
   #p2pPayCodeSheet .btn.orange,#p2pEuroSheet .btn.orange{margin-top:14px}
   #p2pPayCodeSheet .p2p-incolla{margin-top:10px}
@@ -4705,6 +4708,9 @@
   /* i due campi dell'importo: il secondo E' l'intervallo */
   .p2p-duecampi{display:flex;align-items:baseline;gap:8px}
   .p2p-duecampi input{flex:1 1 0;min-width:0}
+  /* (9 ott 2026, notte) i due campi dell'importo sono righe che aprono
+     il foglio dell'importo: si dividono la riga come gli input di ieri */
+  .p2p-duecampi .p2p-tendina{flex:1 1 0;min-width:0}
   .p2p-duecampi em{flex:0 0 auto;font-style:normal;color:var(--muted);
     font-weight:700;font-size:13px}
   /* la tendina dei metodi: la riga che si tocca, e sotto le voci */
@@ -61880,19 +61886,28 @@ function renderNuovoOrdineP2P(){
        il fuoco e chiuderebbe la tastiera (la lezione delle pillole).
        Percio' `style="display:none"` e non l'attributo `hidden`: `.hint`
        potrebbe avere un `display` suo e vincerlo. */
+    /* (9 ott 2026, notte, richiesta di Andrea) I DUE CAMPI SONO RIGHE
+       CHE APRONO IL FOGLIO DELL'IMPORTO di Barattozon, in modo «min» e
+       «max»: cifra grande, tastierino di casa senza virgola, il giudice
+       di sempre. Tengono l'id e un `value` che `cambiaCampoNuovoP2P`
+       rilegge come leggeva i campi. Il primo tocco svela il secondo
+       come faceva il fuoco (`apriEuroTabP2P('min')`). */
     corpo: '<div class="p2p-duecampi">' +
-      '<input id="p2pNuovoEuro" type="text" inputmode="numeric" ' +
-          'placeholder="Importo" value="' + esc(p2pNuovoEuro) + '" ' +
-          'onbeforeinput="soloCifreP2P(event)" ' +
-          'onfocus="svelaSecondoImportoP2P()" oninput="cambiaCampoNuovoP2P()" ' +
-          'aria-label="Importo">' +
+      '<button type="button" id="p2pNuovoEuro" class="p2p-tendina' +
+          (interoP2P(p2pNuovoEuro).n > 0 ? '' : ' vuota') + '" ' +
+          'value="' + esc(p2pNuovoEuro) + '" aria-haspopup="dialog" ' +
+          'onclick="apriEuroTabP2P(\'min\')">' +
+          '<span>' + esc(etichettaEuroFoglioP2P(p2pNuovoEuro, val.segno, 'min')) + '</span>' +
+          '<i aria-hidden="true">▾</i></button>' +
       (p2pNuovoFisso ? '' :
         '<em id="p2pNuovoA"' + (p2pNuovoDue ? '' : ' style="display:none"') + '>a</em>' +
-        '<input id="p2pNuovoEuroMax" type="text" inputmode="numeric" ' +
-        'placeholder="Importo massimo" value="' + esc(p2pNuovoEuroMax) + '" ' +
+        '<button type="button" id="p2pNuovoEuroMax" class="p2p-tendina' +
+        (interoP2P(p2pNuovoEuroMax).n > 0 ? '' : ' vuota') + '" ' +
         (p2pNuovoDue ? '' : 'style="display:none" ') +
-        'onbeforeinput="soloCifreP2P(event)" ' +
-        'oninput="cambiaCampoNuovoP2P()" aria-label="Importo massimo">') +
+        'value="' + esc(p2pNuovoEuroMax) + '" aria-haspopup="dialog" ' +
+        'onclick="apriEuroTabP2P(\'max\')">' +
+        '<span>' + esc(etichettaEuroFoglioP2P(p2pNuovoEuroMax, val.segno, 'max')) + '</span>' +
+        '<i aria-hidden="true">▾</i></button>') +
       '</div>' +
       /* perche' il campo e' vuoto, se a svuotarlo e' stato un cambio
          di metodo: attaccata al campo, prima di ogni altra riga */
@@ -61988,10 +62003,16 @@ function renderNuovoOrdineP2P(){
   const quanti = (!p2pNuovoFisso || tab) ? '' : sezioneNuovoP2P({
     ico: 'sats',
     titolo: 'Inserisci la quantità di sats che vuoi ' + (compro ? 'comprare' : 'vendere'),
-    corpo: '<input id="p2pNuovoSats" type="text" inputmode="numeric" ' +
-      'placeholder="Quantità di sats" value="' + esc(p2pNuovoSats) + '" ' +
-      'onbeforeinput="soloCifreP2P(event)" ' +
-      'oninput="cambiaCampoNuovoP2P()" aria-label="Quantità di sats">' +
+    /* (9 ott 2026, notte, richiesta di Andrea) anche la quantita' di sats
+       e' una riga che apre il foglio dell'importo, in modo «sats»: sats
+       interi, i limiti del coordinatore, le frasi di sempre. Tiene l'id
+       e un `value` che `cambiaCampoNuovoP2P` rilegge come il campo. */
+    corpo: '<button type="button" id="p2pNuovoSats" class="p2p-tendina' +
+      (interoP2P(p2pNuovoSats).n > 0 ? '' : ' vuota') + '" ' +
+      'value="' + esc(p2pNuovoSats) + '" aria-haspopup="dialog" ' +
+      'onclick="apriEuroTabP2P(\'sats\')">' +
+      '<span>' + esc(etichettaEuroFoglioP2P(p2pNuovoSats, 'sats', 'sats')) + '</span>' +
+      '<i aria-hidden="true">▾</i></button>' +
       '<div class="hint">A prezzo fisso il cambio lo decidi tu: chi prende paga ' +
       (compro ? 'gli euro che hai scritto per questi sats.' : 'questi sats per gli euro che hai scritto.') +
       '</div>'
@@ -62868,17 +62889,25 @@ function etichettaEuroTabP2P(euro, segno){
   return (!c.storto && c.n > 0) ? centesimiTestoP2P(c.n) + ' ' + (segno || '€') : 'Scrivi l\'importo';
 }
 /* PURA: il tasto del tastierino sulla bozza — cifre, UNA virgola, due
-   decimali, quattro cifre intere; «via» cancella l'ultima */
+   decimali, quattro cifre intere; «via» cancella l'ultima.
+   (9 ott 2026, notte) con `interi` — gli ordini P2P normali, euro interi
+   come il `fiat_amount` del protocollo — la virgola non entra mai e le
+   cifre intere arrivano a sette: abbastanza per scrivere una cifra
+   sopra ogni tetto e farsela dire dal giudice. `interi` puo' essere
+   anche un NUMERO, le cifre intere massime: i sats ne vogliono dieci. */
 const P2P_EURO_CIFRE_INTERE = 4;
-function tastoEuroTabP2P(bozza, tasto){
+const P2P_EURO_CIFRE_INTERI = 7;
+const P2P_SATS_CIFRE = 10;
+function tastoEuroTabP2P(bozza, tasto, interi){
   const b = String(bozza == null ? '' : bozza);
   if (tasto === 'via') return b.slice(0, -1);
-  if (tasto === ',' || tasto === '.') return /[.,]/.test(b) ? b : (b || '0') + ',';
+  if (tasto === ',' || tasto === '.') return (interi || /[.,]/.test(b)) ? b : (b || '0') + ',';
   if (!/^[0-9]$/.test(String(tasto))) return b;
   const i = b.search(/[.,]/);
   if (i >= 0) return (b.length - i - 1 >= 2) ? b : b + tasto;
   if (b === '0') return String(tasto);
-  return b.length >= P2P_EURO_CIFRE_INTERE ? b : b + tasto;
+  const tetto = !interi ? P2P_EURO_CIFRE_INTERE : (interi === true ? P2P_EURO_CIFRE_INTERI : Number(interi));
+  return b.length >= tetto ? b : b + tasto;
 }
 /* PURA: la riga dei limiti, dai numeri vivi (0 = leva spenta) */
 function limitiEuroTabP2P(minimo, tetto){
@@ -62902,18 +62931,89 @@ function corpoPayCodeTabP2P(bozza){
     + (g.stato === 'buono' ? '' : ' disabled') + '>Conferma</button>'
     + '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>';
 }
-/* PURA: il corpo del foglio dell'importo, dalla bozza e dai campi vivi */
+/* ---- UN FOGLIO DELL'IMPORTO, TRE MODI (9 ott 2026, notte, richiesta di
+   Andrea: «il foglio dell'importo di Barattozon e' piaciuto») ----
+   Lo stesso #p2pEuroSheet riempie tre campi: «tab» l'importo esatto di
+   Barattozon, coi centesimi; «min» l'importo degli ordini normali (o il
+   primo dell'intervallo) e «max» il massimo dell'intervallo, a euro
+   INTERI — nel tastierino la virgola non c'e'. Cambiano tre cose sole,
+   e stanno qui: il campo che si riempie, gli interi, e chi giudica.
+   IL GIUDICE DEGLI ORDINI NORMALI E' QUELLO DELLA PUBBLICAZIONE,
+   `valeNuovoOrdineP2P`, con la bozza al posto del campo: i suoi
+   controlli sull'importo — maggiore di zero, il massimo sopra il
+   primo, il tetto beta, il tetto dei contanti — vengono prima di
+   quello dei metodi, quindi il suo primo «manca» e' quello che conta.
+   Il foglio tiene le sole frasi del SUO campo, piu' «il massimo deve
+   superare il primo» scrivendo il primo, quando e' lui a causarla
+   (`!(massimo > bozza)`, la condizione del giudice). Il massimo vuoto
+   e' buono: vuol dire importo secco, come il campo vuoto di ieri. */
+function modoEuroP2P(m){
+  if (m === 'sats') return {nome: 'sats', campo: 'p2pNuovoSats', interi: P2P_SATS_CIFRE, titolo: '⚡ La quantità di sats', unita: 'sats'};
+  if (m === 'min') return {nome: 'min', campo: 'p2pNuovoEuro', interi: true, titolo: '💶 L\'importo'};
+  if (m === 'max') return {nome: 'max', campo: 'p2pNuovoEuroMax', interi: true, titolo: '💶 L\'importo massimo'};
+  return {nome: 'tab', campo: 'p2pNuovoEuro', interi: false, titolo: '💶 L\'importo esatto'};
+}
+/* PURA: il giudizio della bozza, nel modo del foglio */
+function giudizioEuroFoglioP2P(bozza, campi, modo){
+  const m = modoEuroP2P(modo);
+  if (m.nome === 'tab') return giudizioTappaTabP2P(2, Object.assign({}, campi, {euro: bozza}));
+  const b = String(bozza == null ? '' : bozza), max = m.nome === 'max';
+  if (!b) return {stato: max ? 'buono' : 'vuoto', frase: ''};
+  /* I SATS (9 ott 2026, notte): il loro controllo, nel giudice, viene
+     DOPO l'importo e i metodi — un euro ancora vuoto lo nasconderebbe.
+     Si chiede allo stesso giudice con l'importo e i metodi resi neutri
+     (il blocco dei sats non li legge: guarda i sats e i due tetti del
+     coordinatore), e si tiene la frase dei sats. */
+  if (m.nome === 'sats') {
+    const s = valeNuovoOrdineP2P(Object.assign({}, campi, {sats: b, fisso: true, euro: '1', euroMax: '',
+      metodi: ['SEPA'], maxEuro: 0, maxEuroContanti: 0}));
+    return (!s.ok && s.campo === m.campo) ? {stato: 'storto', frase: s.manca} : {stato: 'buono', frase: ''};
+  }
+  const g = valeNuovoOrdineP2P(Object.assign({}, campi, max ? {euroMax: b} : {euro: b}));
+  if (g.ok) return {stato: 'buono', frase: ''};
+  const suo = g.campo === m.campo
+    || (!max && g.campo === 'p2pNuovoEuroMax' && !(interoP2P(campi.euroMax).n > interoP2P(b).n));
+  return suo ? {stato: 'storto', frase: g.manca} : {stato: 'buono', frase: ''};
+}
+/* PURA: la riga dei limiti sopra la cifra. Negli ordini normali il
+   tetto e' il testo di `maxTestoP2P` (lo stesso della riga sotto il
+   campo), passato in `campi.tettoTesto` da chi apre il foglio */
+function limitiEuroFoglioP2P(campi, modo){
+  const m = modoEuroP2P(modo);
+  if (m.nome === 'tab') return limitiEuroTabP2P(campi.minEuroBz, campi.maxEuro);
+  if (m.nome === 'sats') {
+    const lo = Math.floor(Number(campi.minSats)) || 0, hi = Math.floor(Number(campi.maxSats)) || 0;
+    return 'Sats interi.' + (lo > 0 && hi > 0 ? ' Da ' + fmt(lo) + ' a ' + fmt(hi) + ' sats.'
+      : hi > 0 ? ' Fino a ' + fmt(hi) + ' sats.' : lo > 0 ? ' Almeno ' + fmt(lo) + ' sats.' : '');
+  }
+  return (m.nome === 'max'
+      ? 'Il massimo dell\'intervallo, più del primo importo. Vuoto, l\'ordine ha un importo solo.'
+      : 'Euro interi, senza centesimi.')
+    + (campi.tettoTesto ? ' Fase beta: max ' + campi.tettoTesto + '.' : '');
+}
+/* PURA: la riga del campo, nel modo del foglio */
+function etichettaEuroFoglioP2P(euro, segno, modo){
+  const m = modoEuroP2P(modo);
+  if (m.nome === 'tab') return etichettaEuroTabP2P(euro, segno);
+  const n = interoP2P(euro).n;
+  if (m.nome === 'sats') return n > 0 ? fmt(n) + ' sats' : 'Quantità di sats';
+  return n > 0 ? fmt(n) + ' ' + (segno || '€') : (m.nome === 'max' ? 'Importo massimo' : 'Importo');
+}
+/* PURA: il corpo del foglio dell'importo, dalla bozza, dai campi vivi e
+   dal modo (senza modo e' Barattozon, com'era) */
 const P2P_TASTI_EURO = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'via'];
-function corpoEuroTabP2P(bozza, campi, segno){
-  const g = giudizioTappaTabP2P(2, Object.assign({}, campi, {euro: bozza}));
+function corpoEuroTabP2P(bozza, campi, segno, modo){
+  const m = modoEuroP2P(modo);
+  const g = giudizioEuroFoglioP2P(bozza, campi, m.nome);
   const piena = String(bozza || '') !== '';
-  return '<div class="hint">' + esc(limitiEuroTabP2P(campi.minEuroBz, campi.maxEuro)) + '</div>'
+  return '<div class="hint">' + esc(limitiEuroFoglioP2P(campi, m.nome)) + '</div>'
     + '<div class="p2p-euro-cifra' + (piena ? '' : ' vuota') + '" id="p2pEuroCifra" aria-live="polite">'
-    + '<b id="p2pEuroBozza">' + esc(piena ? bozza : '0,00') + '</b> <span>' + esc(segno || '€') + '</span></div>'
+    + '<b id="p2pEuroBozza">' + esc(piena ? bozza : (m.interi ? '0' : '0,00')) + '</b> <span>' + esc(segno || '€') + '</span></div>'
     + '<div class="p2p-tappa-err" id="p2pEuroErr"' + (g.stato === 'storto' ? '' : ' hidden') + '>'
     + esc(g.stato === 'storto' ? g.frase : '') + '</div>'
     + '<div class="p2p-tastierino" role="group" aria-label="Tastierino dell\'importo">'
-    + P2P_TASTI_EURO.map(k => '<button type="button" class="p2p-tasto" data-tasto="' + k + '" '
+    + P2P_TASTI_EURO.map(k => (m.interi && k === ',') ? '<span class="p2p-tasto-vuoto" aria-hidden="true"></span>'
+      : '<button type="button" class="p2p-tasto" data-tasto="' + k + '" '
         + 'aria-label="' + (k === 'via' ? 'Cancella' : k === ',' ? 'Virgola' : k) + '" '
         + 'onclick="tastoEuroP2P(this.dataset.tasto)">' + (k === 'via' ? '⌫' : k) + '</button>').join('')
     + '</div>'
@@ -62921,7 +63021,7 @@ function corpoEuroTabP2P(bozza, campi, segno){
     + (g.stato === 'buono' ? '' : ' disabled') + '>Conferma</button>'
     + '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>';
 }
-let p2pPayCodeTrigger = null, p2pEuroTrigger = null, p2pEuroBozza = '';
+let p2pPayCodeTrigger = null, p2pEuroTrigger = null, p2pEuroBozza = '', p2pEuroModo = 'tab';
 const p2pFoglioAttesa = {};
 /* la frase rossa di un foglio coi tempi del dito: la ✕ aspetta che il
    dito si fermi (P2P_SPIA_ATTESA_MS) — scrivendo «30» si passa da «3» —,
@@ -63010,44 +63110,54 @@ function confermaPayCodeTabP2P(){
 function segnoValutaTabP2P(){
   return (P2P_VALUTE.find(v => v.cod === p2pNuovoValuta) || P2P_VALUTE[0]).segno;
 }
-function apriEuroTabP2P(){
+function apriEuroTabP2P(modo){
   haptic();
-  p2pEuroTrigger = el('p2pNuovoEuro');
-  p2pEuroBozza = String(p2pNuovoEuro || '');
+  const m = modoEuroP2P(modo);
+  p2pEuroModo = m.nome;
+  /* il primo campo degli ordini normali svela il secondo, come faceva
+     il fuoco sul campo di ieri (a prezzo fisso e con Barattozon tace) */
+  if (m.nome === 'min') svelaSecondoImportoP2P();
+  p2pEuroTrigger = el(m.campo);
+  p2pEuroBozza = String((m.nome === 'max' ? p2pNuovoEuroMax : m.nome === 'sats' ? p2pNuovoSats : p2pNuovoEuro) || '');
+  const tit = el('p2pEuroTit');
+  if (tit) tit.textContent = m.titolo;
   const box = el('p2pEuroCorpo');
-  if (box) box.innerHTML = corpoEuroTabP2P(p2pEuroBozza, campiNuovoP2P(), segnoValutaTabP2P());
+  if (box) box.innerHTML = corpoEuroTabP2P(p2pEuroBozza,
+    Object.assign(campiNuovoP2P(), {tettoTesto: maxTestoP2P()}), m.unita || segnoValutaTabP2P(), m.nome);
   el('sheetBg').classList.add('open');
   el('p2pEuroSheet').classList.add('open');
 }
 /* il foglio dell'importo si riscrive IN PLACE a ogni tasto: la cifra, la
    frase, «Conferma» — mai il tastierino, che ha il dito sopra */
 function aggiornaEuroTabP2P(subito){
-  const g = giudizioTappaTabP2P(2, Object.assign({}, campiNuovoP2P(), {euro: p2pEuroBozza}));
+  const m = modoEuroP2P(p2pEuroModo);
+  const g = giudizioEuroFoglioP2P(p2pEuroBozza, campiNuovoP2P(), m.nome);
   const piena = p2pEuroBozza !== '';
   const cifra = el('p2pEuroCifra'), b = el('p2pEuroBozza'), ok = el('p2pEuroOk');
   if (cifra) cifra.classList.toggle('vuota', !piena);
-  if (b) b.textContent = piena ? p2pEuroBozza : '0,00';
+  if (b) b.textContent = piena ? p2pEuroBozza : (m.interi ? '0' : '0,00');
   if (ok) ok.disabled = g.stato !== 'buono';
   fraseFoglioTabP2P('p2pEuroErr', g, !!subito);
   return g;
 }
 function tastoEuroP2P(k){
   haptic();
-  p2pEuroBozza = tastoEuroTabP2P(p2pEuroBozza, k);
+  p2pEuroBozza = tastoEuroTabP2P(p2pEuroBozza, k, modoEuroP2P(p2pEuroModo).interi);
   aggiornaEuroTabP2P();
 }
 function confermaEuroTabP2P(){
   const g = aggiornaEuroTabP2P(true);
   if (g.stato !== 'buono') return;
   haptic();
-  const v = p2pEuroBozza;
-  vestiRigaTendinaTabP2P('p2pNuovoEuro', v, etichettaEuroTabP2P(v, segnoValutaTabP2P()), true);
-  /* la funzione del campo di ieri: la rete dei centesimi, la frase del
-     cambio di metodo che se ne va, la riga dei sats e il percorso */
+  const m = modoEuroP2P(p2pEuroModo), v = p2pEuroBozza;
+  vestiRigaTendinaTabP2P(m.campo, v, etichettaEuroFoglioP2P(v, m.unita || segnoValutaTabP2P(), m.nome), v !== '');
+  /* la funzione dei campi di ieri: la rete (centesimi con Barattozon,
+     cifre negli altri ordini), la frase del cambio di metodo che se ne
+     va, la riga dei sats e il percorso */
   cambiaCampoNuovoP2P();
   chiudiFoglioP2P('p2pEuroSheet');
   if (p2pEuroTrigger) { try { p2pEuroTrigger.focus({preventScroll: true}); } catch(e){} p2pEuroTrigger = null; }
-  rivelaSpiaTabP2P(2);
+  if (m.nome === 'tab') rivelaSpiaTabP2P(2);
 }
 /* dal PC: i tasti veri scrivono nel tastierino, Invio conferma — solo col
    foglio dell'importo aperto e in cima */

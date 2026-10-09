@@ -72310,7 +72310,18 @@ def prove_p2p_pubblica():
     # mutazione sul massimo tingeva di rosso anche la prova
     # dell'importo. E' la trappola del contenitore troppo grande,
     # trovata dalla tortura.
-    for _id in ("p2pQuantoInp", "p2pNuovoEuro", "p2pNuovoEuroMax", "p2pNuovoSats"):
+    # (9 ott 2026, notte) I DUE CAMPI DELL'IMPORTO SONO RIGHE che aprono il
+    # foglio dell'importo a euro interi: niente <input>, quindi niente
+    # `type="number"` per costruzione, e la rete delle cifre e' il
+    # tastierino senza virgola. Testo filtrato restano «Quanto» e i sats.
+    _tasto = pezzo_js(mini, "function tastoEuroTabP2P(bozza, tasto, interi){", "\n}\n")
+    for _id, _modo in (("p2pNuovoEuro", "min"), ("p2pNuovoEuroMax", "max"), ("p2pNuovoSats", "sats")):
+        _i = mini.index('id="%s"' % _id)
+        _bott = mini[_i:mini.index("</button>", _i)]
+        prova("il campo %s e' la riga del foglio dell'importo, a euro interi" % _id, True,
+              ("onclick=\"apriEuroTabP2P(\\'%s\\')\"" % _modo) in _bott and "<input" not in _bott
+              and "return (interi || /[.,]/.test(b)) ? b : (b || '0') + ',';" in _tasto)
+    for _id in ("p2pQuantoInp", "p2pNuovoEuro"):
         _i = mini.index('id="%s"' % _id)
         _dopo = mini.find("<input", _i)
         _tag = mini[_i:min(_dopo if _dopo > 0 else len(mini), _i + 400)]
@@ -72328,9 +72339,10 @@ def prove_p2p_pubblica():
             prova("il campo p2pNuovoEuro col tabacchino: la riga del foglio, coi centesimi del tastierino", True,
                   "onclick=\"apriEuroTabP2P()\"" in _tag2
                   and "if (i >= 0) return (b.length - i - 1 >= 2) ? b : b + tasto;"
-                  in pezzo_js(mini, "function tastoEuroTabP2P(bozza, tasto){", "\n}\n"))
+                  in pezzo_js(mini, "function tastoEuroTabP2P(bozza, tasto, interi){", "\n}\n"))
             prova("...e la seconda occorrenza e' la sola: non ce n'e' una terza", -1,
                   mini.find('id="p2pNuovoEuro"', _i2 + 1))
+            continue
         prova("il campo %s e' testo filtrato, non un number" % _id, True,
               'type="text"' in _tag and 'type="number"' not in _tag
               and 'inputmode="numeric"' in _tag
@@ -72725,8 +72737,11 @@ def prove_p2p_pubblica():
                "(p2pNuovoDue ? '' : ' style=\"display:none\"')"):
         prova("il secondo campo nasce nascosto (%s…)" % _q[:26], True,
               _q in nuovo)
+    # (9 ott 2026, notte) il primo campo e' una riga che apre il foglio
+    # dell'importo: il secondo si svela a quel tocco, come al fuoco di ieri
     prova("...e si svela al tocco del primo", True,
-          'onfocus="svelaSecondoImportoP2P()"' in nuovo)
+          "onclick=\"apriEuroTabP2P(\\'min\\')\"" in nuovo
+          and "  if (m.nome === 'min') svelaSecondoImportoP2P();" in pezzo_js(mini, "function apriEuroTabP2P(modo){", "\n}\n"))
     prova("...svelando, non ridisegnando", True,
           "n.style.display = '';" in _sv and "renderNuovoOrdineP2P" not in _sv)
     # ...e mai col tabacchino (set 2026): l'ordine Amazon e' una cifra
@@ -82295,6 +82310,214 @@ process.stdout.write(JSON.stringify(out));
           [0.0005, 0, 91000 / 1e8, 0, 0], o["metro"])
 
 
+def prove_importo_foglio():
+    """IL FOGLIO DELL'IMPORTO ANCHE PER GLI ORDINI P2P NORMALI (9 ott 2026,
+    notte, richiesta di Andrea: «il foglio dell'importo di Barattozon e'
+    piaciuto»). Il campo dell'importo del foglio «Pubblica» — e i due,
+    se l'ordine e' a intervallo — aprono lo stesso #p2pEuroSheet di
+    Barattozon invece della tastiera di sistema: un foglio solo, tre
+    modi (tab coi centesimi; min e max a euro interi, senza virgola nel
+    tastierino). Il giudice e' quello della pubblicazione, le frasi le
+    sue, il valore che parte quello di ieri. Barattozon non si muove."""
+    print("\n[Il foglio dell'importo anche per gli ordini normali]")
+    import shutil
+    import subprocess
+    import tempfile
+    import json as _js
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def _intera(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+
+    def _riga(nome):
+        return re.search(r"const " + nome + r" = [^\n]*;", mini).group(0)
+
+    # --- 1) LE SENTINELLE ------------------------------------------------------
+    _fog = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
+    _nudo = re.sub(r"/\*[\s\S]*?\*/", "", _fog)
+    prova("i due campi dell'importo sono righe che aprono il foglio, in modo min e max; nessun <input> dell'importo resta",
+          [True, True, False, False],
+          ["'<button type=\"button\" id=\"p2pNuovoEuro\" class=\"p2p-tendina' +" in _fog
+           and "'onclick=\"apriEuroTabP2P(\\'min\\')\">' +" in _fog,
+           "'<button type=\"button\" id=\"p2pNuovoEuroMax\" class=\"p2p-tendina' +" in _fog
+           and "'onclick=\"apriEuroTabP2P(\\'max\\')\">' +" in _fog,
+           "<input id=\"p2pNuovoEuro\"" in _nudo, "<input id=\"p2pNuovoEuroMax\"" in _nudo])
+    prova("...il secondo nasce nascosto come ieri, e il primo tocco lo svela",
+          [True, True],
+          ["(p2pNuovoDue ? '' : 'style=\"display:none\" ') +" in _fog,
+           "  if (m.nome === 'min') svelaSecondoImportoP2P();" in pezzo_js(mini, "function apriEuroTabP2P(modo){", "\n}\n")])
+    prova("anche la quantita' di sats a prezzo fisso e' una riga che apre lo stesso foglio, in modo sats",
+          [True, False],
+          ["'<button type=\"button\" id=\"p2pNuovoSats\" class=\"p2p-tendina' +" in _fog
+           and "'onclick=\"apriEuroTabP2P(\\'sats\\')\">' +" in _fog,
+           "<input id=\"p2pNuovoSats\"" in _nudo])
+    prova("UN FOGLIO SOLO: nessun secondo foglio dell'importo, nessun secondo tastierino",
+          [1, 1, 1],
+          [mini.count('id="p2pEuroSheet"'), mini.count("class=\"p2p-tastierino\""),
+           mini.count("const P2P_TASTI_EURO = [")])
+    _ce = pezzo_js(mini, "function confermaEuroTabP2P(){", "\n}\n")
+    prova("la conferma riempie il campo del modo e passa dalla funzione dei campi di ieri; la spia solo con Barattozon",
+          [True, True, True],
+          [_ce.index("vestiRigaTendinaTabP2P(m.campo, v,") < _ce.index("cambiaCampoNuovoP2P();"),
+           "  if (m.nome === 'tab') rivelaSpiaTabP2P(2);" in _ce,
+           "  if (e) p2pNuovoEuro = tabacchinoP2P(p2pNuovoMetodi) ? ripuliCentesimiP2P(e) : ripuliCifreP2P(e);"
+           in pezzo_js(mini, "function cambiaCampoNuovoP2P(){", "\n}\n")])
+    prova("il giudice degli ordini normali e' quello della pubblicazione, con la bozza al posto del campo",
+          True, "const g = valeNuovoOrdineP2P(Object.assign({}, campi, max ? {euroMax: b} : {euro: b}));"
+          in pezzo_js(mini, "function giudizioEuroFoglioP2P(bozza, campi, modo){", "\n}\n"))
+    prova("i documenti sanno del foglio per tutti",
+          [True, True, True],
+          ["## Il foglio dell'importo anche per gli ordini P2P normali" in open("docs/CANTIERI.md", encoding="utf-8").read(),
+           "giudizioEuroFoglioP2P" in open("docs/ARCHITETTURA.md", encoding="utf-8").read(),
+           "«💶 L'importo massimo»" in open("docs/GUIDA-P2P-PASSI.md", encoding="utf-8").read()])
+
+    # --- 2) IL BANCO IN NODE ----------------------------------------------------
+    node = shutil.which("node")
+    if not node:
+        salta("il foglio dell'importo per tutti", "serve node")
+        return
+    _prog = (
+        "const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\"/g, '&quot;');\n"
+        + "const fmt = n => String(n);\n"
+        + "\n".join(_riga(n) for n in ("P2P_TABACCHINO", "P2P_TABACCHINO_PM", "P2P_CONTANTI",
+                                       "P2P_PAYCODE_MAX_EURO", "P2P_EURO_CIFRE_INTERE",
+                                       "P2P_EURO_CIFRE_INTERI", "P2P_SATS_CIFRE", "P2P_TASTI_EURO"))
+        + "\n" + "\n".join(_intera(f) for f in (
+            "function interoP2P(testo){", "function centesimiP2P(testo){", "function centesimiTestoP2P(n){",
+            "function metodoBaseP2P(m){", "function tabacchinoP2P(metodi){",
+            "function contantiAManoP2P(metodi){", "function giudiceContantiP2P(euro, metodi, tetto){",
+            "function giudiceImportoPayCodeP2P(euro){", "function giudiceMinimoPayCodeP2P(euro, minimo){",
+            "function giudizioTappaTabP2P(n, v){", "function valeNuovoOrdineP2P(v){",
+            "function etichettaEuroTabP2P(euro, segno){", "function tastoEuroTabP2P(bozza, tasto, interi){",
+            "function limitiEuroTabP2P(minimo, tetto){", "function modoEuroP2P(m){",
+            "function giudizioEuroFoglioP2P(bozza, campi, modo){", "function limitiEuroFoglioP2P(campi, modo){",
+            "function etichettaEuroFoglioP2P(euro, segno, modo){", "function corpoEuroTabP2P(bozza, campi, segno, modo){"))
+        + r"""
+const scrivi = (tasti, interi) => tasti.reduce((b, k) => tastoEuroTabP2P(b, k, interi), '');
+const base = {euro: '', euroMax: '', sats: '', fisso: false, metodi: ['SEPA'], maxSats: 0, minSats: 0,
+              maxEuro: 500, maxEuroContanti: 250, minEuroBz: 25, tettoTesto: '500 €'};
+const con = agg => Object.assign({}, base, agg);
+const g = (b, campi, modo) => giudizioEuroFoglioP2P(b, campi, modo);
+/* le frasi del giudice della pubblicazione, chieste a lui */
+const frase = v => valeNuovoOrdineP2P(con(v)).manca;
+const corpo = (b, campi, modo) => corpoEuroTabP2P(b, campi, '€', modo);
+console.log(JSON.stringify({
+  modi: ['tab', 'min', 'max', undefined, 'boh'].map(m => { const x = modoEuroP2P(m); return [x.nome, x.campo, x.interi]; }),
+  interi: [scrivi(['2', '5', '0'], true), scrivi(['2', ',', '5'], true), scrivi(['.', '7'], true),
+           scrivi(['1', '2', '3', '4', '5', '6', '7', '8'], true), scrivi(['0', '9'], true), scrivi(['4', 'via'], true)],
+  centesimi: [scrivi(['2', '3', ',', '4', '7']), scrivi(['1', '2', '3', '4', '5'])],
+  min: [g('', con({}), 'min'), g('250', con({}), 'min'), g('0', con({}), 'min'),
+        g('750', con({}), 'min'), g('300', con({metodi: ['Contanti']}), 'min'),
+        g('150', con({euroMax: '100'}), 'min'), g('50', con({euroMax: '600'}), 'min'),
+        g('250', con({metodi: []}), 'min')],
+  max: [g('', con({euro: '50'}), 'max'), g('200', con({euro: '50'}), 'max'), g('40', con({euro: '50'}), 'max'),
+        g('900', con({euro: '50'}), 'max'), g('300', con({euro: '50', metodi: ['Contanti']}), 'max')],
+  frasi: [frase({euro: '750'}), frase({euro: '50', euroMax: '40'}), frase({euro: '50', euroMax: '900'}),
+          frase({euro: '300', metodi: ['Contanti']}), frase({euro: '0'})],
+  tab: g('24,99', con({metodi: [P2P_TABACCHINO]}), 'tab'),
+  etichette: [etichettaEuroFoglioP2P('', '€', 'min'), etichettaEuroFoglioP2P('250', '€', 'min'),
+              etichettaEuroFoglioP2P('', '€', 'max'), etichettaEuroFoglioP2P('1200', '€', 'max'),
+              etichettaEuroFoglioP2P('23,47', '€', 'tab'), etichettaEuroFoglioP2P('', '€', 'tab')],
+  limiti: [limitiEuroFoglioP2P(con({}), 'min'), limitiEuroFoglioP2P(con({tettoTesto: ''}), 'min'),
+           limitiEuroFoglioP2P(con({}), 'max'), limitiEuroFoglioP2P(con({}), 'tab')],
+  corpoMin: {
+    tasti: (corpo('', con({}), 'min').match(/class="p2p-tasto"/g) || []).length,
+    vuoto: (corpo('', con({}), 'min').match(/class="p2p-tasto-vuoto"/g) || []).length,
+    virgola: corpo('', con({}), 'min').includes('data-tasto=","'),
+    zero: corpo('', con({}), 'min').includes('<b id="p2pEuroBozza">0</b> <span>€</span>'),
+    spento: corpo('', con({}), 'min').includes('id="p2pEuroOk" onclick="confermaEuroTabP2P()" disabled>'),
+    oltre: corpo('750', con({}), 'min').includes('<div class="p2p-tappa-err" id="p2pEuroErr">Troppi: il massimo è 500 €</div>')
+      && corpo('750', con({}), 'min').includes('id="p2pEuroOk" onclick="confermaEuroTabP2P()" disabled>'),
+    buono: corpo('250', con({}), 'min').includes('id="p2pEuroOk" onclick="confermaEuroTabP2P()">Conferma')
+  },
+  corpoMax: {vuotoBuono: corpo('', con({euro: '50'}), 'max').includes('id="p2pEuroOk" onclick="confermaEuroTabP2P()">Conferma'),
+             sotto: corpo('40', con({euro: '50'}), 'max').includes('id="p2pEuroErr">L&#39;importo massimo deve superare il primo</div>')
+                    || corpo('40', con({euro: '50'}), 'max').includes("id=\"p2pEuroErr\">L'importo massimo deve superare il primo</div>")},
+  /* (9 ott 2026, notte) il modo sats: prezzo fisso, i tetti del coordinatore */
+  sats: (() => {
+    const f = con({fisso: true, euro: '', metodi: [], maxSats: 500000, minSats: 1000});
+    const cs = b => corpoEuroTabP2P(b, f, 'sats', 'sats');
+    return {
+      modo: (x => [x.nome, x.campo, x.interi, x.unita])(modoEuroP2P('sats')),
+      tasti: [scrivi(['1', ',', '5'], P2P_SATS_CIFRE), scrivi(['1','2','3','4','5','6','7','8','9','0','1'], P2P_SATS_CIFRE)],
+      giudizi: [g('', f, 'sats'), g('450000', f, 'sats'), g('600000', f, 'sats'), g('500', f, 'sats'), g('0', f, 'sats'),
+                g('450000', con({fisso: true, maxSats: 0, minSats: 0}), 'sats')],
+      frasi: [valeNuovoOrdineP2P(con({fisso: true, euro: '250', sats: '600000', maxSats: 500000, minSats: 1000})).manca,
+              valeNuovoOrdineP2P(con({fisso: true, euro: '250', sats: '500', maxSats: 500000, minSats: 1000})).manca,
+              valeNuovoOrdineP2P(con({fisso: true, euro: '250', sats: '', maxSats: 500000, minSats: 1000})).manca],
+      limiti: [limitiEuroFoglioP2P(f, 'sats'), limitiEuroFoglioP2P(con({maxSats: 500000, minSats: 0}), 'sats'),
+               limitiEuroFoglioP2P(con({maxSats: 0, minSats: 1000}), 'sats'), limitiEuroFoglioP2P(con({maxSats: 0, minSats: 0}), 'sats')],
+      etichette: [etichettaEuroFoglioP2P('', 'sats', 'sats'), etichettaEuroFoglioP2P('450000', 'sats', 'sats')],
+      corpo: [cs('').includes('<b id="p2pEuroBozza">0</b> <span>sats</span>'), (cs('').match(/class="p2p-tasto-vuoto"/g) || []).length,
+              cs('600000').includes('id="p2pEuroOk" onclick="confermaEuroTabP2P()" disabled>'),
+              cs('450000').includes('id="p2pEuroOk" onclick="confermaEuroTabP2P()">Conferma')]
+    };
+  })(),
+  corpoTab: {tasti: (corpo('', con({}), undefined).match(/class="p2p-tasto"/g) || []).length,
+             vuoto: (corpo('', con({}), undefined).match(/class="p2p-tasto-vuoto"/g) || []).length,
+             zero: corpo('', con({}), undefined).includes('<b id="p2pEuroBozza">0,00</b>')}
+}));
+""")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(_prog)
+    try:
+        _r = subprocess.run([node, f.name], capture_output=True, text=True,
+                            encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(f.name)
+    prova("il banco del foglio dell'importo per tutti gira in node", "", _r.stderr[-1500:] if _r.returncode else "")
+    if _r.returncode:
+        return
+    out = _js.loads(_r.stdout.strip())
+    B, V = {"stato": "buono", "frase": ""}, {"stato": "vuoto", "frase": ""}
+    S = lambda f: {"stato": "storto", "frase": f}
+    prova("tre modi: Barattozon coi centesimi, min e max a euro interi; senza modo (o sconosciuto) e' Barattozon",
+          [["tab", "p2pNuovoEuro", False], ["min", "p2pNuovoEuro", True], ["max", "p2pNuovoEuroMax", True],
+           ["tab", "p2pNuovoEuro", False], ["tab", "p2pNuovoEuro", False]], out["modi"])
+    prova("il tastierino a euro interi: la virgola (e il punto) non entrano, sette cifre, lo zero davanti si sostituisce",
+          ["250", "25", "7", "1234567", "9", ""], out["interi"])
+    prova("...e coi centesimi Barattozon resta com'era", ["23,47", "1234"], out["centesimi"])
+    prova("le frasi sono quelle del giudice della pubblicazione (chieste a lui)",
+          ["Troppi: il massimo è 500 €", "L'importo massimo deve superare il primo",
+           "Troppi: il massimo è 500 €",
+           "In contanti di persona il massimo è 250 € per scambio: sopra, si divide in più ordini",
+           "Scrivi l'importo in euro"], out["frasi"])
+    F = out["frasi"]
+    prova("il primo importo: vuoto senza frase, 250 buono, 0 storto, oltre il tetto beta, oltre i contanti, sotto un massimo gia' scritto, e i metodi non c'entrano",
+          [V, B, S(F[4]), S(F[0]), S(F[3]), S(F[1]), B, B], out["min"])
+    prova("il massimo: vuoto e' buono (importo secco), 200 buono, sotto il primo, oltre il tetto beta, oltre i contanti",
+          [B, B, S(F[1]), S(F[0]), S(F[3])], out["max"])
+    prova("...e Barattozon passa ancora dal giudice del passo 2", S("Un PayCode Barattozon vale almeno 25 €: sotto non si pubblica"), out["tab"])
+    prova("le righe: «Importo» / «Importo massimo» a vuoto, la cifra intera con la valuta; Barattozon coi centesimi",
+          ["Importo", "250 €", "Importo massimo", "1200 €", "23,47 €", "Scrivi l'importo"], out["etichette"])
+    prova("i limiti sopra la cifra: euro interi e il tetto beta di maxTestoP2P; il massimo dice cos'e' il vuoto; Barattozon i suoi",
+          ["Euro interi, senza centesimi. Fase beta: max 500 €.", "Euro interi, senza centesimi.",
+           "Il massimo dell'intervallo, più del primo importo. Vuoto, l'ordine ha un importo solo. Fase beta: max 500 €.",
+           "Da 25 € a 500 €, coi centesimi della mail di Amazon."], out["limiti"])
+    m = out["corpoMin"]
+    prova("il foglio a euro interi: undici tasti e la cella vuota al posto della virgola, «0 €», «Conferma» spento a vuoto, la frase del tetto e spento oltre, acceso a buono",
+          [11, 1, False, True, True, True, True],
+          [m["tasti"], m["vuoto"], m["virgola"], m["zero"], m["spento"], m["oltre"], m["buono"]])
+    prova("...il massimo vuoto si conferma, e sotto il primo dice la frase del giudice",
+          [True, True], [out["corpoMax"]["vuotoBuono"], out["corpoMax"]["sotto"]])
+    s = out["sats"]
+    prova("il modo sats: il campo dei sats, dieci cifre senza virgola, l'unita' «sats»",
+          [["sats", "p2pNuovoSats", 10, "sats"], ["15", "1234567890"]], [s["modo"], s["tasti"]])
+    prova("...le frasi del giudice della pubblicazione (chieste a lui)",
+          ["Troppi: il massimo è 500000 sats", "Troppo pochi: il minimo è 1000 sats", "Scrivi quanti sats"], s["frasi"])
+    prova("...e il foglio le dice anche con l'importo e i metodi ancora vuoti: vuoto senza frase, 450000 buono, oltre, sotto, zero; senza tetti buono",
+          [V, B, S(s["frasi"][0]), S(s["frasi"][1]), S(s["frasi"][2]), B], s["giudizi"])
+    prova("...i limiti del coordinatore sopra la cifra, la riga «Quantità di sats» o la cifra coi sats",
+          [["Sats interi. Da 1000 a 500000 sats.", "Sats interi. Fino a 500000 sats.",
+            "Sats interi. Almeno 1000 sats.", "Sats interi."], ["Quantità di sats", "450000 sats"]],
+          [s["limiti"], s["etichette"]])
+    prova("...il corpo: «0 sats», la cella vuota al posto della virgola, «Conferma» spento oltre e acceso a buono",
+          [True, 1, True, True], s["corpo"])
+    prova("...e Barattozon tiene i suoi dodici tasti, virgola compresa, e «0,00»",
+          [12, 0, True], [out["corpoTab"]["tasti"], out["corpoTab"]["vuoto"], out["corpoTab"]["zero"]])
+
+
 def prove_passi_barattozon_fogli():
     """I PASSI 1 E 2 DI BARATTOZON COME IL 3, E LA TESTATA CHE NON SI VEDE
     (9 ott 2026, sera, richiesta di Andrea dopo 381becf). 1) Velata, la
@@ -82358,11 +82581,15 @@ def prove_passi_barattozon_fogli():
     prova("IL VALORE CHE PARTE E' QUELLO DI IERI: le conferme scrivono il value della riga e chiamano le funzioni dei campi di ieri",
           [True, True, True],
           [_cp.index("vestiRigaTendinaTabP2P('p2pNuovoTabOrdine', p,") < _cp.index("cambiaTabP2P();"),
-           _ce.index("vestiRigaTendinaTabP2P('p2pNuovoEuro', v,") < _ce.index("cambiaCampoNuovoP2P();"),
+           _ce.index("vestiRigaTendinaTabP2P(m.campo, v,") < _ce.index("cambiaCampoNuovoP2P();"),
            "  if (o) p2pNuovoTab.ordine = String(o.value || '');" in pezzo_js(mini, "function cambiaTabP2P(){", "\n}\n")])
     prova("...e il recapito normalizza il PayCode come sempre: la forma che scrive il foglio non cambia niente",
           True, "const t = {ordine: payCodeP2P(campi.tab.ordine) || String(campi.tab.ordine || '').trim()," in mini)
-    _cep = pezzo_js(mini, "function corpoEuroTabP2P(bozza, campi, segno){", "\n}\n")
+    _cep = pezzo_js(mini, "function corpoEuroTabP2P(bozza, campi, segno, modo){", "\n}\n")
+    # (9 ott 2026, notte) il giudizio e i limiti passano dal modo del foglio:
+    # senza modo e' Barattozon, coi giudici di ieri
+    _cep = (_cep + pezzo_js(mini, "function giudizioEuroFoglioP2P(bozza, campi, modo){", "\n}\n")
+            + pezzo_js(mini, "function limitiEuroFoglioP2P(campi, modo){", "\n}\n"))
     prova("l'importo: niente campo, il giudice del passo 2 e i limiti vivi; il PayCode: un campo solo, con l'incolla che estrae",
           [False, True, True, True, True],
           ["<input" in _cep,
@@ -82389,10 +82616,12 @@ def prove_passi_barattozon_fogli():
             "function payCodeP2P(testo){", "function giudizioPayCodeP2P(testo){",
             "function estraiPayCodeP2P(testo){", "function centesimiP2P(testo){",
             "function centesimiTestoP2P(n){", "function etichettaPayCodeTabP2P(ordine){",
-            "function etichettaEuroTabP2P(euro, segno){", "function tastoEuroTabP2P(bozza, tasto){",
+            "function etichettaEuroTabP2P(euro, segno){", "function tastoEuroTabP2P(bozza, tasto, interi){",
             "function limitiEuroTabP2P(minimo, tetto){", "function giudiceImportoPayCodeP2P(euro){",
             "function giudiceMinimoPayCodeP2P(euro, minimo){", "function giudizioTappaTabP2P(n, v){",
-            "function corpoPayCodeTabP2P(bozza){", "function corpoEuroTabP2P(bozza, campi, segno){"))
+            "function corpoPayCodeTabP2P(bozza){", "function modoEuroP2P(m){",
+            "function giudizioEuroFoglioP2P(bozza, campi, modo){", "function limitiEuroFoglioP2P(campi, modo){",
+            "function corpoEuroTabP2P(bozza, campi, segno, modo){"))
         + r"""
 const scrivi = tasti => tasti.reduce((b, k) => tastoEuroTabP2P(b, k), '');
 const campi = {minEuroBz: 25, maxEuro: 0, fisso: false, cambio: 0};
@@ -84194,6 +84423,8 @@ def prove_pubblica_metodo_prima():
         "function etichettaScadeTabP2P(scade){", "function scadeInParoleP2P(epoch){",
         # i passi 1 e 2 come il 3 (9 ott 2026, sera): le loro righe
         "function etichettaPayCodeTabP2P(ordine){", "function etichettaEuroTabP2P(euro, segno){",
+        # (9 ott 2026, notte) le righe dell'importo degli ordini normali
+        "function modoEuroP2P(m){", "function etichettaEuroFoglioP2P(euro, segno, modo){",
         "function centesimiTestoP2P(n){")
     _prog = (
         _blocco("const esc = ", "}[c]));") + "\n"
@@ -133266,6 +133497,7 @@ def main():
     prove_scadenza_barattozon,
     prove_foglio_coperto,
     prove_passi_barattozon_fogli,
+    prove_importo_foglio,
     prove_pubblica_metodo_prima,
     prove_libro_vuoto_monete,
     prove_indietro_dal_libro,

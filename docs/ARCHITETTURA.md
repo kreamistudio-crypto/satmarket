@@ -26777,7 +26777,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `limitiEuroTabP2P`, la frase di `giudizioTappaTabP2P(2)`); le
   conferme scrivono il `value` della riga e chiamano `cambiaTabP2P` e
   `cambiaCampoNuovoP2P`, quindi il valore che parte e' quello dei campi
-  di prima; la scadenza del PayCode da un FOGLIO DI CASA
+  di prima. LO STESSO FOGLIO DELL'IMPORTO SERVE GLI ORDINI NORMALI (9 ott
+  2026, notte): `apriEuroTabP2P(modo)` con `modoEuroP2P` — «tab»
+  Barattozon coi centesimi, «min» l'importo (o il primo dell'intervallo)
+  e «max» il massimo, a euro interi, senza virgola nel tastierino
+  (`tastoEuroTabP2P(bozza, tasto, interi)`); il giudizio
+  `giudizioEuroFoglioP2P` chiede a `valeNuovoOrdineP2P` con la bozza al
+  posto del campo e tiene le frasi del suo campo, i limiti
+  `limitiEuroFoglioP2P` (il tetto beta di `maxTestoP2P`); il primo tocco
+  svela il secondo campo con `svelaSecondoImportoP2P` come il fuoco di
+  prima; e il modo «sats» riempie la quantita' di sats a prezzo fisso
+  (`p2pNuovoSats`, dieci cifre, i limiti del coordinatore, le frasi del
+  blocco dei sats chieste al giudice con importo e metodi resi neutri,
+  perche' quel blocco viene dopo di loro); la scadenza del PayCode da un
+  FOGLIO DI CASA
   (9 ott 2026, al posto dell'`<input type="datetime-local">` che su
   iPhone non si vedeva: la riga `p2pNuovoTabScade` e' il campo-bottone
   `.p2p-tendina` — «Scade lunedì 12 ottobre alle 14:30» da

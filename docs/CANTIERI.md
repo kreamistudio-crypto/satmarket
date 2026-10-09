@@ -42968,3 +42968,125 @@ Playwright su una copia (relay morto, P2P acceso con la npub del config
 d'esempio): il cassetto Avvisi con i due titoli uno sopra l'altro, e il
 foglio della campanella; scatti in `.claude/giri/avvisi-icone/`
 (gitignored).
+
+
+## Il foglio dell'importo anche per gli ordini P2P normali (9 ott 2026, notte)
+
+**IL CASO (Andrea).** Il foglio dell'importo di Barattozon (e57448d) è
+piaciuto: lo stesso nel foglio «Pubblica» degli ordini normali, al posto
+della tastiera di sistema; e coi due campi «da… a…» se l'ordine è a
+intervallo. Tutto il resto com'è: euro interi, stessi limiti, stesso
+giudice e frasi, stesso valore al coordinatore. Barattozon coi centesimi.
+Niente doppioni.
+
+**COM'ERANO, letto prima.** Due `<input>` di testo con la tastiera dei
+numeri e la rete delle cifre (`soloCifreP2P` sul tasto, `ripuliCifreP2P`
+sul valore), letti da `cambiaCampoNuovoP2P` in `p2pNuovoEuro` e
+`p2pNuovoEuroMax`; il secondo nasce nascosto e si svela al fuoco del
+primo (`svelaSecondoImportoP2P`, senza render), a prezzo fisso non c'è.
+Il giudice è uno solo, `valeNuovoOrdineP2P`, e sugli ordini normali
+controlla l'importo PRIMA dei metodi: maggiore di zero («Scrivi
+l'importo in euro»), il massimo sopra il primo, il tetto beta
+`P2P_MAX_EURO` («Troppi: il massimo è N €»), il tetto dei contanti.
+
+**LA CURA: UN FOGLIO SOLO, TRE MODI.** `#p2pEuroSheet` riempie tre campi
+e `modoEuroP2P` dice quale: «tab» (Barattozon, centesimi, com'era),
+«min» (l'importo, o il primo dell'intervallo) e «max» (il massimo), a
+euro interi. Il tastierino è lo stesso con un argomento in più
+(`tastoEuroTabP2P(bozza, tasto, interi)`: la virgola non entra, sette
+cifre intere per scrivere oltre ogni tetto e farselo dire), e al posto
+della virgola una cella vuota tiene la griglia. Il GIUDIZIO negli ordini
+normali è `valeNuovoOrdineP2P` stesso, con la bozza al posto del campo
+(`giudizioEuroFoglioP2P`): il suo primo «manca» sull'importo è la frase,
+ma solo se è del campo che si sta scrivendo, più «il massimo deve
+superare il primo» scrivendo il primo quando è lui a causarla (la stessa
+condizione del giudice). Il massimo vuoto è buono: è l'importo secco,
+come il campo vuoto di ieri. I LIMITI sopra la cifra
+(`limitiEuroFoglioP2P`) dicono «Euro interi, senza centesimi.» e il tetto
+beta col testo di `maxTestoP2P`, lo stesso della riga sotto il campo. Il
+primo tocco svela il secondo campo come faceva il fuoco. La CONFERMA
+riempie il campo del modo e chiama `cambiaCampoNuovoP2P`: la rete delle
+cifre e il valore che parte sono quelli di ieri.
+
+**STRADE SCARTATE.** Un secondo foglio per gli interi: un doppione da
+tenere allineato. Un campo numerico nel foglio: la tastiera di sistema,
+che è proprio quel che si toglie. Ripetere i controlli dell'importo in
+una funzione nuova: le frasi si sarebbero sdoppiate dal giudice della
+pubblicazione al primo ritocco. Il campo dei sats a prezzo fisso
+(«Quantità di sats») resta com'è: non è l'importo in euro, e la
+richiesta non lo nomina.
+
+**LE PROVE DI IERI ALLINEATE.** Il tastierino ha un argomento in più, e
+due banchi lo ritagliavano per la firma vecchia; quello del foglio
+«Pubblica» ora si porta `modoEuroP2P` ed `etichettaEuroFoglioP2P`; la
+prova del 9 ott sera sul foglio dell'importo guarda il giudizio e i
+limiti dove ora stanno; la sentinella «testo filtrato» non vale più per
+i due campi dell'importo (non sono più `<input>`: ora c'è la loro
+prova, riga + tastierino senza virgola), e «si svela al tocco del
+primo» guarda il tocco della riga invece del fuoco.
+
+**PROVATO.** `prove_importo_foglio`: le righe e i modi, il secondo che
+nasce nascosto e si svela, UN foglio e UN tastierino nel file, la
+conferma dalla funzione di ieri, il giudice della pubblicazione, i
+documenti; nel banco node i tre modi, il tastierino a interi e coi
+centesimi, le frasi chieste al giudice, il primo e il massimo su tutti i
+casi (vuoto, buono, zero, tetto beta, contanti, la relazione fra i due,
+i metodi che non c'entrano), Barattozon dal suo giudice, le etichette, i
+limiti, i corpi (undici tasti e la cella vuota, «0 €», «Conferma» acceso
+solo a buono; Barattozon coi suoi dodici e «0,00»).
+
+**DAL VIVO** (Playwright, server di collaudo sulla 8116 da una copia del
+worktree col relay morto e `P2P_MAX_EURO = 500` nel config del giro,
+identità 222 lato vendo, metodo SEPA), Chrome a 390×844 e WebKit
+«iPhone 13»: le due righe sono `<button>` («Importo», e «Importo
+massimo» nascosto); il tocco apre «💶 L'importo» con «Euro interi,
+senza centesimi. Fase beta: max 500 €.», «0 €», nessuna virgola nel
+tastierino, testata di «Pubblica» `hidden` e il velo nella striscia.
+750 → «Troppi: il massimo è 500 €» e «Conferma» spento (il tocco non fa
+niente, `p2pNuovoEuro` resta vuoto); cancellato, la virgola dal tasto
+vero non entra, 250 → confermato: la riga «250 €», il `value` «250», il
+secondo campo svelato, l'ordine per il coordinatore `fiat_amount` 250
+senza min e max, `valeNuovoOrdineP2P` ok. Il massimo: «💶 L'importo
+massimo», «Conferma» acceso a vuoto; 40 → «L'importo massimo deve
+superare il primo»; 600 → «Troppi: il massimo è 500 €»; 400 →
+confermato: le righe «250 €» «400 €», l'ordine `min_amount` 250
+`max_amount` 400, identico byte per byte a quello coi valori che i campi
+di ieri avrebbero tenuto («250», «400»). Passando a Barattozon lo stesso
+foglio è tornato «💶 L'importo esatto» con «0,00» e la virgola. Nessun
+errore di pagina. Gli scatti stanno nello scratchpad della sessione
+(`scatti-importo/`).
+
+**DA GUARDARE.** Sul telefono vero: il tocco sulla riga del primo
+importo svela il secondo campo mentre il foglio sale (la pagina sotto
+non deve saltare: lo svelamento tiene lo `scrollTop`, come col fuoco).
+
+**IL QUARTO MODO, LA QUANTITÀ DI SATS (9 ott 2026, notte, «già che ci
+sei» di Andrea).** A prezzo fisso il campo «Quantità di sats» apre lo
+stesso foglio in modo «sats»: «⚡ La quantità di sats», la cifra con
+«sats», il tastierino senza virgola fino a dieci cifre (`tastoEuroTabP2P`
+accetta come terzo argomento anche il NUMERO di cifre intere), sopra i
+limiti del coordinatore («Sats interi. Da 1 000 a 500 000 sats.», da
+`minSats`/`maxSats` dei campi vivi). IL GIUDICE È LO STESSO, CON UNA
+DIFFERENZA DA SAPERE: il blocco dei sats in `valeNuovoOrdineP2P` viene
+DOPO l'importo e i metodi, quindi con l'euro ancora vuoto il primo
+«manca» sarebbe quello dell'importo e la frase dei sats non arriverebbe
+mai. Il foglio lo interroga con l'importo e i metodi resi neutri (un
+euro, SEPA, tetti in euro spenti: il blocco dei sats non li legge) e
+tiene la frase dei sats — «Scrivi quanti sats», «Troppi: il massimo è N
+sats», «Troppo pochi: il minimo è N sats» —; alla pubblicazione il
+giudice vero rifà tutto coi valori veri. La conferma passa da
+`cambiaCampoNuovoP2P` come gli altri campi: il valore che parte è quello
+di ieri.
+
+**DAL VIVO, I SATS** (server di collaudo sulla 8117, relay morto; i tetti
+in sats del coordinatore seminati nella pagina come li scriverebbe la
+lettura del 38385, `maxSats` 500 000 e `minSats` 1 000), Chrome a 390 e
+WebKit «iPhone 13»: SEPA, prezzo fisso, importo 250 € dal foglio; la riga
+«Quantità di sats» apre «⚡ La quantità di sats» con «Sats interi. Da 1
+000 a 500 000 sats.», «0 sats», niente virgola, la testata di «Pubblica»
+nascosta; 600 000 → «Troppi: il massimo è 500 000 sats», 500 → «Troppo
+pochi: il minimo è 1 000 sats», «Conferma» spento in tutti e due; la
+virgola dal tasto vero non entra; 450 000 → confermato: la riga «450 000
+sats», il `value` «450000», l'ordine `amount` 450 000, `fiat_amount` 250,
+`premium` 0, identico byte per byte a quello coi valori dei campi di ieri;
+`valeNuovoOrdineP2P` ok. Scatti in `scatti-sats/` nello scratchpad.
