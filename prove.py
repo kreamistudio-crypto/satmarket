@@ -103026,7 +103026,8 @@ console.log(JSON.stringify(casi));
           and _pub.index("preseChiuseP2P() && !tourP2PVisto()) go('p2p')") > _pub.index("await spuntaAttesaP2P('Ordine pubblicato');"))
     prova("...e «Inizia» delle slide porta al giro sulla pagina, che finisce col banner (lo stesso di sempre)",
           True, "? () => giroGuidatoP2P(chiesto) : null;" in mini
-          and "if (typeof animaBannerFeeP2P === 'function') animaBannerFeeP2P();" in pezzo_js(mini, "function fineGiroP2P(){", "\n}\n"))
+          # (dal commit del banner 610951c la fine del giro sa se e' arrivata a «Fine»: `finito`)
+          and "if (typeof animaBannerFeeP2P === 'function') animaBannerFeeP2P(finito === true);" in pezzo_js(mini, "function fineGiroP2P(finito){", "\n}\n"))
     # --- le due rifiniture di Andrea (9 ott 2026, pomeriggio) ---------
     stati = mini[mini.index("const STATI_P2P = {"):mini.index("\n};", mini.index("const STATI_P2P = {")) + 3]
     gm = mini[mini.index("const P2P_GIRO_MORTO = {"):mini.index("\n};", mini.index("const P2P_GIRO_MORTO = {")) + 3]
