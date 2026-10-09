@@ -30844,6 +30844,11 @@ def _censimento(acceso, dopo=None):
     # `cassaforte_nuova`, stessa trappola dei tre qui sopra — e i due
     # nomi delle cassaforti vanno scritti, o `__missing__` li fa 7.
     amb["CASSAFORTE_SAAS"], amb["CASSAFORTE_NODO"] = "saas", "nodo"
+    # le prese dalle 10 (9 ott 2026): il giudice dell'ora legge
+    # l'orologio, e `time` da `__missing__` farebbe 7
+    amb["time"] = time
+    amb["P2P_PRESE_DA"] = "2026-10-10 10:00" if acceso else None
+    amb["P2P_PRESE_DA_EPOCH"] = 4102444800 if acceso else 0
     # La porta degli eventi del coordinatore (patch 0007, 18 set 2026):
     # il pannello CHIAMA `eventi_p2p_attivi`, la quarta volta della
     # stessa trappola — e ha smascherato il guaio in due prove sole
@@ -30861,7 +30866,10 @@ def _censimento(acceso, dopo=None):
               # la leva RGB dell'hackathon (8 ott 2026): la sesta volta
               # della trappola, `_rgb_leve()` — tre esplosioni lontane
               # (prove_leve, prove_guardiano_ponte, prove_p2p_server)
-              "_rgb_leve", "_leve_stato"):
+              "_rgb_leve",
+              # le prese dalle 10 (9 ott 2026): la settima volta, la riga
+              # del pannello CHIAMA `_p2p_prese_da(0)`, orologio alla mano
+              "_p2p_prese_da", "_leve_stato"):
         exec(pezzo(f), amb)
     amb.update(dopo or {})
     gruppi = amb["_leve_stato"]()
@@ -76281,7 +76289,9 @@ def prove_p2p_server():
     def _per(tg_id, ids, attivo=True):
         amb = {"_p2p_leve": lambda: {"attivo": attivo, "mostro": "ab",
                                      "relay": ["wss://uno"]},
-               "P2P_PROVA_IDS": ids}
+               "P2P_PROVA_IDS": ids,
+               # le prese dalle 10 (9 ott 2026): la busta porta `preseDa`
+               "_p2p_prese_da": lambda tg: 0}
         exec(per, amb)
         return amb["_p2p_per"](tg_id)
 
@@ -77386,6 +77396,9 @@ console.log(JSON.stringify(out));
                       "function ordinaMieiP2P(righe, criterio){",
                       "function mieiMostratiP2P(righe){",
                       "function mieiRigheP2P(){",
+                      # gli aperti (9 ott 2026, le prese dalle 10): il
+                      # giudice che la striscia chiama, e la porta riusa
+                      "function apertiMieiP2P(righe){",
                       # l'archivio del server (24 set 2026): la striscia lo
                       # adotta dopo il libro, e qui l'archivio e' vuoto —
                       # i suoi casi girano in prove_scambi_ovunque
@@ -80052,7 +80065,9 @@ def prove_intestazione_scambi():
     # ...e CINQUE dal 26 set 2026: lo sfondo delle card P2P in vetrina
     # ...e di nuovo QUATTRO dal 30 set 2026: lo stato vuoto dei miei
     # scambi non la mostra piu' (ritocco di Andrea)
-    prova("i posti che la mostrano escono timbrati col suo hash", 4,
+    # ...e CINQUE dal 9 ott 2026: la porta del primo ordine, al posto
+    # del libro, nel vestito dello stato vuoto (`rigaPortaP2P`)
+    prova("i posti che la mostrano escono timbrati col suo hash", 5,
           timbrata.count(firma))
     # ⚠️ IL CONTENITORE ERA TROPPO GRANDE (22 set 2026, sera). Questa
     # riga diceva «la pagina non incorpora NESSUNA webp» e voleva dire
@@ -102299,6 +102314,258 @@ console.log(JSON.stringify(out));
                '<div class="hint" role="listitem">'
                '<b aria-hidden="true"><b class="p2p-tappa-n">2</b></b>Due &amp; tre</div></div>') in h
           and "p2p-sez-ico" not in h and 'role="button"' not in h)
+
+def prove_prese_dalle_10():
+    """LE PRESE DALLE 10 (9 ott 2026, richiesta di Andrea): la vigilia
+    del lancio la fase chiusa si allarga perche' il libro si riempia, ma
+    prima delle 10:00 del 10 nessuno che non sia moderatore prende ne'
+    annulla, e senza un ordine vivo suo vede il foglio «Pubblica» al
+    posto del libro. La leva `P2P_PRESE_DA` e' un'ora ITALIANA col patto
+    delle altre leve P2P: assente o vuota niente blocco, storta si dice
+    e niente blocco; passata l'ora e' inerte da sola.
+    Si fanno GIRARE: l'ora di Roma (coi due capi dell'ora legale), il
+    blocco di caricamento con un config finto, il giudice per persona
+    con l'orologio in mano, la busta per persona, e i giudici del client
+    in node — i sei casi di Andrea: prima dell'ora senza ordini, con un
+    ordine, moderatore; dopo l'ora; leva assente; data storta."""
+    print("\n[le prese dalle 10: la vigilia del lancio]")
+    src = _SORGENTE
+    T = 1791619200          # 2026-10-10 10:00 di Roma = 08:00 UTC
+
+    # ---- 1. L'ORA DI ROMA, senza tzdata ------------------------------
+    amb = {}
+    exec(pezzo("_epoch_roma"), amb)
+    ep = amb["_epoch_roma"]
+    prova("vuota o assente: 0, nessun blocco", (0, 0), (ep(""), ep(None)))
+    prova("il 10 ott 2026 alle 10:00 e' ora legale: 08:00 UTC", T,
+          ep("2026-10-10 10:00"))
+    prova("...d'inverno un'ora sola: il 1 dic alle 10:00 e' 09:00 UTC",
+          1796115600, ep("2026-12-01 10:00"))
+    # i capi: l'ultima domenica di marzo (29) e di ottobre (25) del 2026
+    prova("il giorno dopo il capo di ottobre (26/10) e' gia' CET",
+          1793005200, ep("2026-10-26 10:00"))
+    prova("...e il 29/3 alle 10 e' gia' CEST", 1774771200,
+          ep("2026-03-29 10:00"))
+    prova("storta: None, e decide chi chiama", [None] * 6,
+          [ep(v) for v in ("2026-10-10", "10/10/2026 10:00", "domani",
+                           20261010, "2026-10-10 10:00:00",
+                           "2026-13-10 10:00")])
+    prova("il modulo non chiede zoneinfo ne' tzdata (su Windows non c'e')",
+          False, "zoneinfo" in codice(pezzo("_epoch_roma")))
+
+    # ---- 2. IL BLOCCO DI CARICAMENTO, con un config finto ---------------
+    _i = src.index("try:\n    from config import P2P_PRESE_DA")
+    _carica = src[_i:src.index("\n\n\n", _i)]
+
+    def _leva(valore, manca=False):
+        import types as _ty
+        _cfg = _ty.ModuleType("config")
+        if not manca:
+            _cfg.P2P_PRESE_DA = valore
+        _vecchio = sys.modules.get("config")
+        sys.modules["config"] = _cfg
+        detti = []
+        try:
+            a = {"_epoch_roma": ep, "print": lambda *x, **k: detti.append(" ".join(map(str, x)))}
+            exec(_carica, a)
+            return (a["P2P_PRESE_DA_EPOCH"], a["P2P_PRESE_DA"], len(detti),
+                    all("P2P_PRESE_DA" in d for d in detti))
+        finally:
+            if _vecchio is None:
+                sys.modules.pop("config", None)
+            else:
+                sys.modules["config"] = _vecchio
+
+    prova("senza la riga nel config: nessun blocco, niente da dire",
+          (0, None, 0, True), _leva(None, manca=True))
+    prova("...vuota o None: lo stesso", [(0, None, 0, True)] * 2,
+          [_leva(""), _leva(None)])
+    prova("...con l'ora: l'epoch, e la leva resta leggibile nel pannello",
+          (T, "2026-10-10 10:00", 0, True), _leva("2026-10-10 10:00"))
+    prova("...storta: nessun blocco, e lo si DICE all'avvio nominandola",
+          [(0, None, 1, True)] * 3,
+          [_leva("2026-10-10"), _leva("domani"), _leva(20261010)])
+
+    # ---- 3. IL GIUDICE PER PERSONA, orologio alla mano -----------------
+    amb = {"time": time, "P2P_PRESE_DA_EPOCH": T,
+           "e_admin": lambda tg: tg == 999}
+    exec(pezzo("_p2p_prese_da"), amb)
+    g = amb["_p2p_prese_da"]
+    prima, dopo = T - 3600, T
+    prova("prima dell'ora chi non e' moderatore aspetta: la busta porta l'ora",
+          T, g(111, prima))
+    prova("...e l'anonimo pure (prendere non puo' comunque)", T, g(0, prima))
+    prova("...il moderatore no: per lui tutto come oggi", 0, g(999, prima))
+    prova("dall'ora in poi la leva e' inerte da sola, per tutti", (0, 0, 0),
+          (g(111, dopo), g(111, dopo + 86400), g(0, dopo)))
+    prova("l'orologio e' quello della richiesta, non dell'avvio", True,
+          "time.time()" in codice(pezzo("_p2p_prese_da")))
+    amb["P2P_PRESE_DA_EPOCH"] = 0
+    prova("leva assente: nessun blocco per nessuno", (0, 0),
+          (g(111, prima), g(0, prima)))
+
+    # ---- 4. LA BUSTA PER PERSONA porta `preseDa` -----------------------
+    per = pezzo("_p2p_per")
+
+    def _per(tg, ids, prese):
+        a = {"_p2p_leve": lambda: {"attivo": True, "mostro": "ab",
+                                   "relay": ["wss://uno"]},
+             "P2P_PROVA_IDS": ids, "_p2p_prese_da": prese}
+        exec(per, a)
+        return a["_p2p_per"](tg)
+
+    prova("la busta per persona porta preseDa, dal giudice", T,
+          _per(111, set(), lambda tg: T)["preseDa"])
+    prova("...anche a chi e' fuori dalla fase di prova", (False, T),
+          (lambda r: (r["attivo"], r["preseDa"]))(_per(333, {111}, lambda tg: T)))
+    prova("...e 0 quando non c'e' niente da aspettare", 0,
+          _per(111, set(), lambda tg: 0)["preseDa"])
+    prova("...per la persona giusta: il giudice riceve il tg_id", 999,
+          _per(999, set(), lambda tg: tg)["preseDa"])
+    prova("le due buste passano ancora dal giudice per persona", True,
+          'risposta["p2p"] = _p2p_per(user["id"] if user else 0)' in src
+          and 'profilo["p2p_leve"] = _p2p_per(user["id"])' in src)
+    prova("`_p2p_leve` (il FATTO, per orologio e pannello) non la porta",
+          False, "preseDa" in pezzo("_p2p_leve"))
+
+    # ---- 5. IL PANNELLO E I DOCUMENTI -----------------------------------
+    prova("il pannello «Stato delle leve» ha la riga, col nome della leva",
+          True, '_leva("Prese P2P dalle (ora italiana)", "P2P_PRESE_DA",' in src)
+    prova("...e chiede all'orologio se vale ancora, non alla costante",
+          True, "_p2p_prese_da(0)" in codice(pezzo("_leve_stato")))
+    _es = open("config_esempio.py", encoding="utf-8").read()
+    prova("config_esempio la dichiara, vuota (nessun blocco di serie)",
+          True, '\nP2P_PRESE_DA = ""\n' in _es
+          and 'P2P_PRESE_DA = "2026-10-10 10:00"' in _es)
+    _pr = open(os.path.join("docs", "PRODUZIONE.md"), encoding="utf-8").read()
+    prova("PRODUZIONE dice la riga da mettere oggi e da togliere dopo il 10",
+          True, '`P2P_PRESE_DA = "2026-10-10 10:00"`' in _pr
+          and "TOGLIE dal config DOPO il 10" in _pr)
+
+    # ---- 6. IL CLIENT: i giudici veri, in node ---------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("la frase e' una sola, e dice quando",
+          True, "const P2P_PRESE_DOMANI = 'Dalle 10:00 di domani';" in mini)
+    finali = re.search(r"^const P2P_FINALI = (\[.*?\]);$", mini, re.M)
+    prova("gli stati finali del client sono una costante leggibile", True,
+          bool(finali))
+    fz = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function preseChiuseP2P(adesso){", "function apertiMieiP2P(righe){",
+        "function haOrdiniViviP2P(){", "function portaPrimoOrdineP2P(){"))
+    banco = """
+const P2P_FINALI = %s;
+let p2pLeve = null, p2pLevaPubblica = null, myTgId = 111, VETRINA = false, DEMO = false;
+let righe = [];
+function mieiRigheP2P(){ return righe; }
+%s
+const T = %d;
+const casi = {};
+Date.now = () => (T - 3600) * 1000;
+p2pLeve = {attivo: true, preseDa: T};
+casi.normale_senza = [preseChiuseP2P(), portaPrimoOrdineP2P()];
+righe = [{id: 'a', stato: 'pubblicato'}];
+casi.normale_con_vivo = [preseChiuseP2P(), portaPrimoOrdineP2P(), haOrdiniViviP2P()];
+righe = [{id: 'a', stato: 'annullato'}, {id: 'b', stato: 'concluso'}, {id: 'c', stato: 'rifiutato'}];
+casi.solo_finali = [portaPrimoOrdineP2P(), haOrdiniViviP2P()];
+righe = [{id: 'a', stato: 'annullato'}, {id: 'b', stato: 'in_garanzia'}];
+casi.uno_vivo_fra_finali = portaPrimoOrdineP2P();
+righe = [];
+p2pLeve = {attivo: true, preseDa: 0};
+casi.moderatore = [preseChiuseP2P(), portaPrimoOrdineP2P()];
+p2pLeve = {attivo: true, preseDa: T};
+Date.now = () => T * 1000;
+casi.dopo = [preseChiuseP2P(), portaPrimoOrdineP2P()];
+Date.now = () => (T + 86400) * 1000;
+casi.giorno_dopo = preseChiuseP2P();
+Date.now = () => (T - 3600) * 1000;
+p2pLeve = {attivo: true};
+casi.assente = [preseChiuseP2P(), portaPrimoOrdineP2P()];
+p2pLeve = {attivo: true, preseDa: 'domani'};
+casi.storta_nella_busta = preseChiuseP2P();
+p2pLeve = null; p2pLevaPubblica = {attivo: true, preseDa: T};
+casi.busta_pubblica = preseChiuseP2P();
+myTgId = 0;
+casi.anonimo_porta = portaPrimoOrdineP2P();
+myTgId = 111; VETRINA = true; p2pLeve = {attivo: true, preseDa: T};
+casi.vetrina_porta = portaPrimoOrdineP2P();
+VETRINA = false; DEMO = true;
+casi.demo_porta = portaPrimoOrdineP2P();
+console.log(JSON.stringify(casi));
+""" % (finali.group(1) if finali else "[]", fz, T)
+    r = _node_banco(banco)
+    if r is None:
+        salta("i giudici del client in node", "node non c'e'")
+    else:
+        prova("prima dell'ora, senza ordini: prese chiuse e la porta (foglio Pubblica)",
+              [True, True], r.get("normale_senza"))
+        prova("...con un ordine vivo: prese chiuse, ma il libro",
+              [True, False, True], r.get("normale_con_vivo"))
+        prova("...coi soli finali (annullato, concluso, rifiutato) e' come senza",
+              [True, False], r.get("solo_finali"))
+        prova("...e basta un vivo fra i finali", False, r.get("uno_vivo_fra_finali"))
+        prova("moderatore (il server manda 0): tutto libero",
+              [False, False], r.get("moderatore"))
+        prova("dall'ora in poi tutto libero, anche senza un /me nuovo",
+              [[False, False], False], [r.get("dopo"), r.get("giorno_dopo")])
+        prova("leva assente dalla busta: tutto libero", [False, False], r.get("assente"))
+        prova("...e una cosa storta nella busta non chiude", False,
+              r.get("storta_nella_busta"))
+        prova("l'anonimo legge la busta pubblica, ma la porta non e' sua",
+              [True, False], [r.get("busta_pubblica"), r.get("anonimo_porta")])
+        prova("fuori da Telegram e nel demo la porta non c'e'", [False, False],
+              [r.get("vetrina_porta"), r.get("demo_porta")])
+
+    # ---- 7. LE PORTE DEL CLIENT: sentinelle sul posto ------------------
+    presa = pezzo_js(mini, "async function eseguiPresaP2P(id, scelto, metodo){", "\n}\n")
+    prova("la cintura della presa: PRIMA del libro vero, con la frase",
+          True, "if (typeof preseChiuseP2P === 'function' && preseChiuseP2P()) { toast(P2P_PRESE_DOMANI); return; }" in presa
+          and presa.index("preseChiuseP2P()") < presa.index("aspettaLibroVeroP2P(null)"))
+    annullo = pezzo_js(mini, "async function inviaAnnulloP2P(modo){", "\n}\n")
+    prova("...e quella dell'annullo, dove passano i tre gesti", True,
+          "if (typeof preseChiuseP2P === 'function' && preseChiuseP2P()) { toast(P2P_PRESE_DOMANI); return; }" in annullo
+          and annullo.index("preseChiuseP2P()") < annullo.index("chiamataOrdineP2P(o, 'cancel')"))
+    dett = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
+    prova("nel dettaglio il bottone resta, spento, e dice quando", True,
+          "id=\"p2pDettVai\" disabled>' + P2P_PRESE_DOMANI + '</button>'" in dett
+          and ": (typeof preseChiuseP2P === 'function' && preseChiuseP2P())\n      ? '<div class=\"foglio-piede\">'" in dett)
+    chiusi = pezzo_js(mini, "const SECONDARI_CHIUSI_P2P = {", "\n};\n")
+    prova("i tre annulli spenti: ritira, annulla, accetta-annullo, tutti disabled e con la frase",
+          (3, 3), (chiusi.count(" disabled>"), chiusi.count("P2P_PRESE_DOMANI")))
+    prova("...e sono gli stessi tre gesti di SECONDARI_P2P che mandano un cancel",
+          True, all("'%s'" % k in chiusi or "%s:" % k in chiusi
+                    for k in ("ritira", "annulla", "accetta-annullo")))
+    ordine = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
+    prova("la pagina dello scambio li preferisce a quelli di sempre", True,
+          "secondarie.map(a => (typeof preseChiuseP2P === 'function' && preseChiuseP2P() && SECONDARI_CHIUSI_P2P[a])" in ordine)
+    rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("renderP2P chiede alla porta nei DUE rami, e apre il foglio solo in quello pieno",
+          (2, 1), (rp.count("if (typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P())"),
+                   rp.count("apriPortaP2P();")))
+    prova("...dopo scambiP2P, che adotta le righe del server", True,
+          rp.rindex("&& portaPrimoOrdineP2P())") > rp.index("mieiBox.innerHTML = scambiP2P()"))
+    prova("«I miei scambi» usa lo stesso giudice degli aperti", True,
+          "const aperti = apertiMieiP2P(righe);" in pezzo_js(mini, "function scambiP2P(){", "\n}\n"))
+    prova("la riga sopra il foglio Pubblica c'e', nascosta di serie, e la accende chi apre il foglio",
+          True, 'id="p2pNuovoPorta" style="margin:0 var(--pad) 6px" hidden>Per entrare oggi pubblica il tuo primo ordine. Dalle 10:00 di domani si prende.</div>' in mini
+          and "if (porta) porta.hidden = !(typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P());" in pezzo_js(mini, "function apriNuovoOrdineP2P(metodo){", "\n}\n"))
+    prova("la riga al posto del libro dice le stesse due frasi e porta al foglio",
+          True, "Per entrare oggi pubblica il tuo primo ordine.</span>" in pezzo_js(mini, "function rigaPortaP2P(){", "\n}\n")
+          and "'Dalle 10:00 di domani si prende. '" in pezzo_js(mini, "function rigaPortaP2P(){", "\n}\n")
+          and 'onclick="apriNuovoOrdineP2P()">Pubblica il tuo primo ordine</button>' in pezzo_js(mini, "function rigaPortaP2P(){", "\n}\n"))
+    prova("il foglio si riapre da solo a ogni ingresso nel tab, e dal +", True,
+          "p2pPortaAperta = false;" in pezzo_js(mini, "function vaiP2P(){", "\n}\n")
+          and "p2pPortaAperta = false;" in pezzo_js(mini, "function libroDaPiuP2P(){", "\n}\n"))
+    prova("...ma non sotto il tour, ne' due volte", True,
+          "if (p2pPortaAperta || tourP2PInCorso) return;" in pezzo_js(mini, "function apriPortaP2P(){", "\n}\n"))
+    prova("...e chiuso il tour sul libro, la porta si apre allora", True,
+          "&& document.querySelector('.view.active')?.id === 'view-p2p') apriPortaP2P();"
+          in pezzo_js(mini, "function chiudiTourP2P(poi){", "\n}\n"))
+    _fm = mini.index("/* ============ fine del motore dello scambio")
+    prova("i giudici degli aperti stanno nel motore (puri); la porta, che tocca fogli e identita', fuori",
+          (True, True, True),
+          (mini.index("function apertiMieiP2P(righe){") < _fm,
+           mini.index("function haOrdiniViviP2P(){") < _fm,
+           mini.index("function portaPrimoOrdineP2P(){") > _fm))
 
 
 def prove_config_esempio():
@@ -131245,6 +131512,7 @@ def main():
               prove_testi_p2p_confondono,
               prove_garanzia_lunga,
               prove_testo_ricevere_sats,
+              prove_prese_dalle_10,
               prove_config_esempio):
         try:
             f()

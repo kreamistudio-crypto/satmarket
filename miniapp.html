@@ -13000,6 +13000,9 @@ document.getElementById('cartello')?.remove();</script>
       <h3 id="p2pNuovoTit">Vuoi comprare Bitcoin</h3>
       <span class="foglio-back vuoto" aria-hidden="true">&#8592;</span>
     </div>
+    <!-- la porta del primo ordine (9 ott 2026): la riga sopra il foglio,
+         solo a chi la porta riguarda (apriNuovoOrdineP2P la accende) -->
+    <div class="hint" id="p2pNuovoPorta" style="margin:0 var(--pad) 6px" hidden>Per entrare oggi pubblica il tuo primo ordine. Dalle 10:00 di domani si prende.</div>
     <div class="foglio-corpo" id="p2pNuovoCorpo"></div>
   </div>
 
@@ -16003,6 +16006,7 @@ function vaiAste(){
    Esplora, la convenzione di casa. */
 function vaiP2P(){
   haptic();
+  p2pPortaAperta = false;   // la porta del primo ordine si riapre a ogni ingresso (9 ott 2026)
   if (!p2pAcceso()) { go('p2ppresto'); return; }
   go('p2p');
 }
@@ -16054,6 +16058,7 @@ function toccaPiu(){
    qui il dito era sul +. La strada e' quella della voce «Libro
    ordini», go('p2p'): la pila della cronologia la sa gia'. */
 function libroDaPiuP2P(){
+  p2pPortaAperta = false;
   setLatoP2P('compro', true);
   go('p2p');
 }
@@ -48227,6 +48232,25 @@ const p2pAcceso = () => p2pLeve ? !!p2pLeve.attivo
 /* dov'e' il coordinator: le due fonti leggono lo stesso config, quindi
    una vale l'altra — si prende quella che c'e' */
 const p2pCoord = () => (p2pLeve && p2pLeve.mostro) ? p2pLeve : p2pLevaPubblica;
+/* LE PRESE DALLE 10 (9 ott 2026, richiesta di Andrea): la vigilia del
+   lancio il libro si riempie, ma nessuno prende ne' annulla prima
+   dell'ora della leva `P2P_PRESE_DA` del server, che arriva nella busta
+   delle leve come `preseDa` (epoch; 0 o assente = nessun blocco, ed e'
+   anche quel che arriva ai moderatori e a chiunque dopo l'ora: a
+   decidere PER PERSONA e' il server, a ogni richiesta). L'orologio si
+   guarda anche qui: alle 10:00 i bottoni si accendono al primo render,
+   senza aspettare un /me nuovo. Le porte: la cintura di
+   `eseguiPresaP2P` (tutte le prese passano di li'), quella di
+   `inviaAnnulloP2P` (tutti gli annulli), il bottone del dettaglio e i
+   tre «Annulla» della pagina dello scambio; e per chi non ha ancora un
+   ordine vivo, il foglio «Pubblica» al posto del libro
+   (`portaPrimoOrdineP2P`). La frase, `P2P_PRESE_DOMANI`, vive nel
+   motore accanto ai tre bottoni spenti. */
+function preseChiuseP2P(adesso){
+  const l = p2pLeve || p2pLevaPubblica;
+  const da = (l && Number(l.preseDa)) || 0;
+  return da > 0 && (adesso || Date.now()) / 1000 < da;
+}
 
 const P2P_VALUTA = 'EUR';          // solo euro nel primo giro (decisione di Andrea)
 const P2P_LIBRO_MS = 8000;         // quanto si aspetta un relay prima di provare il prossimo
@@ -49987,6 +50011,12 @@ function renderP2P(){
         + '<button class="btn ghost" onclick="ricaricaP2P()">↻ Riprova</button></div>'
       : '';
     box.innerHTML = attesa || (typeof scheletroLibroP2P === 'function' ? scheletroLibroP2P() : '');
+    /* la porta del primo ordine vale anche qui (9 ott 2026): niente
+       scheletro di un libro che non si vedra'. Il foglio si apre
+       nell'altro ramo, a libro letto: qui l'archivio del server puo'
+       non aver ancora risposto, e aprirlo a chi un ordine ce l'ha
+       sarebbe un foglio da richiudere. */
+    if (typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P()) box.innerHTML = rigaPortaP2P();
     /* I MIEI SCAMBI NON ASPETTANO UN LIBRO CHE NON RISPONDE (24 set
        2026, l'archivio del server): fin qui la striscia voleva il libro
        perche' solo il libro sapeva ricostruire una riga; adesso le
@@ -50227,6 +50257,14 @@ function renderP2P(){
      conto deve contare le righe che scambiP2P ha appena adottato o
      pulito, cioe' le stesse card che si vedono */
   intestaScambiP2P(mieiRigheP2P());
+  /* LA PORTA DEL PRIMO ORDINE (9 ott 2026), DOPO scambiP2P: le righe
+     che l'adozione ha appena portato dal server contano, e il libro
+     gia' disegnato si copre con la riga e col foglio */
+  if (typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P()) {
+    box.innerHTML = rigaPortaP2P();
+    if (testaBox) testaBox.innerHTML = '';
+    apriPortaP2P();
+  }
 }
 /* l'imbuto, nella lingua delle icone di casa: `viewBox` e tratto della
    nav, come le cinque del foglio «Pubblica» */
@@ -52325,6 +52363,11 @@ function chiudiTourP2P(poi){
      Solo qui, alla fine di un tour — «Inizia», «Salta» o il gesto
      indietro passano tutti da questa funzione. */
   sfocaPaginaTourP2P(false, typeof poi === 'function' ? poi : null);
+  /* LA PORTA DEL PRIMO ORDINE (9 ott 2026): sotto il tour il foglio non
+     si apre (due fogli insieme); chiuso il tour sul libro, si apre
+     adesso — se la porta e' ancora sua */
+  if (typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P()
+      && document.querySelector('.view.active')?.id === 'view-p2p') apriPortaP2P();
 }
 /* LA SFOCATURA DIETRO IL TOUR, in un posto solo. Accesa: la classe
    sull'<html> (il CSS sfoca vista attiva e barra), mai con gli effetti
@@ -56597,6 +56640,14 @@ function renderDettaglioP2P(){
       ? '<div class="foglio-piede sola" id="p2pDettTuoPiede">' +
           '<button type="button" class="btn ghost" onclick="navIndietro()">Indietro</button>' +
         '</div>'
+      /* LE PRESE DALLE 10 (9 ott 2026): il bottone c'e', spento, e dice
+         quando — nello stesso posto di «Compra», che un bottone sparito
+         si cerca; la cintura vera sta in `eseguiPresaP2P` */
+      : (typeof preseChiuseP2P === 'function' && preseChiuseP2P())
+      ? '<div class="foglio-piede">' +
+          '<button type="button" class="btn ghost" onclick="navIndietro()">Indietro</button>' +
+          '<button type="button" class="btn ghost" id="p2pDettVai" disabled>' + P2P_PRESE_DOMANI + '</button>' +
+        '</div>'
       : '<div class="foglio-piede">' +
       '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>' +
       '<button type="button" class="btn ' + (daScegliere ? 'orange' : compro ? 'primary' : 'rosso')
@@ -56818,6 +56869,9 @@ async function eseguiPresaP2P(id, scelto, metodo){
   /* ...e la stessa cintura per il libro (26 set 2026): da una COPIA non
      si prende niente — si aspetta quello vero, e se non arriva ci si
      ferma qui, prima di bruciare una chiave */
+  /* LE PRESE DALLE 10 (9 ott 2026): prima dell'ora non si prende, da
+     nessuna strada — la cintura sta qui, dove passano tutte */
+  if (typeof preseChiuseP2P === 'function' && preseChiuseP2P()) { toast(P2P_PRESE_DOMANI); return; }
   if ((!p2pLibro || p2pLibro.copia) && !(await aspettaLibroVeroP2P(null))) return;
   if (giroCadutoP2P(ordiniP2P()[id])) archiviaGiroCadutoP2P(id);
   if (ordiniP2P()[id]) {
@@ -57094,6 +57148,18 @@ const SECONDARI_P2P = {
 const SECONDARI_EVIDENZA_P2P = {
   annulla: '<button class="btn orange" onclick="annullaScambioP2P()">✕ Annulla</button>',
   'accetta-annullo': '<button class="btn orange" onclick="accettaAnnulloP2P()">🤝 Accetta di annullare</button>'
+};
+/* LE PRESE DALLE 10 (9 ott 2026): prima dell'ora i tre gesti che mandano
+   un `cancel` restano al loro posto, spenti, e dicono quando — anche
+   l'accetta: chi ha preso prima dell'ora e' un moderatore, e la risposta
+   dell'altra parte aspetta le 10 come tutto il resto */
+/* la frase sta QUI, nel motore (il suo banco la vuole al caricamento):
+   la leggono le due cinture, il dettaglio e questi tre bottoni */
+const P2P_PRESE_DOMANI = 'Dalle 10:00 di domani';
+const SECONDARI_CHIUSI_P2P = {
+  ritira: '<button class="btn ghost" disabled>✕ Annulla l\'ordine — ' + P2P_PRESE_DOMANI + '</button>',
+  annulla: '<button class="btn ghost" disabled>✕ Annulla — ' + P2P_PRESE_DOMANI + '</button>',
+  'accetta-annullo': '<button class="btn ghost" disabled>🤝 Accetta di annullare — ' + P2P_PRESE_DOMANI + '</button>'
 };
 
 /* ---- QUANDO IL BOTTONE «I VOSTRI RECAPITI» SERVE (24 set 2026, dalla
@@ -57722,7 +57788,8 @@ function renderOrdineP2P(){
        sue cifre, e la spiega per intero «Info P2P», dove c'e' lo
        spazio anche per il perche'. */
     riquadroRecensioneP2P(o, rec) +
-    secondarie.map(a => (scadutoTab && SECONDARI_EVIDENZA_P2P[a])
+    secondarie.map(a => (typeof preseChiuseP2P === 'function' && preseChiuseP2P() && SECONDARI_CHIUSI_P2P[a])
+                        || (scadutoTab && SECONDARI_EVIDENZA_P2P[a])
                         || SECONDARI_P2P[a] || '').join(''));
   rimettiBozzaRecensioneP2P(bozza);
 }
@@ -60292,6 +60359,10 @@ function apriNuovoOrdineP2P(metodo){
   p2pNuovoPremioTabMano = false;
   p2pNuovoEuroVia = '';
   renderNuovoOrdineP2P();
+  /* la riga della porta del primo ordine (9 ott 2026), solo a chi la
+     porta riguarda: agli altri il foglio e' quello di sempre */
+  const porta = el('p2pNuovoPorta');
+  if (porta) porta.hidden = !(typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P());
   el('sheetBg').classList.add('open');
   /* LA MORFOSI APRE ANCHE IL FOGLIO (deve misurare il bottone d'arrivo
      a foglio gia' a posto): se non se ne occupa — reduced-motion,
@@ -62730,6 +62801,9 @@ async function inviaAnnulloP2P(modo){
   const id = p2pOrdineAperto;
   const o = ordiniP2P()[id];
   if (!o) return;
+  /* LE PRESE DALLE 10 (9 ott 2026): i tre gesti dell'annullo passano
+     tutti di qui, e prima dell'ora nessuno manda un `cancel` */
+  if (typeof preseChiuseP2P === 'function' && preseChiuseP2P()) { toast(P2P_PRESE_DOMANI); return; }
   if (provvisorioP2P(id)) { toast('Aspetta: la risposta non è ancora arrivata'); return; }
   const gesto = ANNULLI_P2P[modo] ? modo : 'chiedi';
   const voce = ANNULLI_P2P[gesto];
@@ -65618,7 +65692,7 @@ function scambiP2P(){
      predefinito — chi non tocca niente vede quel che vedeva ieri. */
   const righe = mieiRigheP2P();
   if (!righe.length) return '';
-  const aperti = righe.filter(o => P2P_FINALI.indexOf(o.stato) < 0);
+  const aperti = apertiMieiP2P(righe);
   if (aperti.length) {
     /* chi apre la pagina dopo un'ora deve trovarci i messaggi
        arrivati nel frattempo: mostroRiascolta e' idempotente — con
@@ -65700,7 +65774,50 @@ function mieiRigheP2P(){
   const tutti = ordiniP2P();
   return Object.keys(tutti).map(k => tutti[k]).filter(o => o && o.id);
 }
+/* PURA: dei propri scambi, quelli ancora APERTI — lo stesso giudice
+   con cui «I miei scambi» decide cosa riascoltare e di cosa chiedere
+   lo stato: uno stato non finale (`P2P_FINALI`). Lo chiama anche la
+   porta del primo ordine (9 ott 2026), che un giudice suo non ce l'ha. */
+function apertiMieiP2P(righe){
+  return righe.filter(o => P2P_FINALI.indexOf(o.stato) < 0);
+}
+function haOrdiniViviP2P(){
+  return apertiMieiP2P(mieiRigheP2P()).length > 0;
+}
 /* ============ fine del motore dello scambio ============ */
+
+/* ============ LA PORTA DEL PRIMO ORDINE (9 ott 2026) ============
+   Fuori dal motore, che resta puro: qui si guardano l'identita', il
+   foglio e il tour. Il giudice degli ordini vivi (`haOrdiniViviP2P`)
+   sta nel motore, accanto a `mieiRigheP2P`. */
+/* LA PORTA DEL PRIMO ORDINE (9 ott 2026, richiesta di Andrea): prima
+   dell'ora, chi e' dentro e non ha nessun ordine vivo non vede il
+   libro ma il foglio «Pubblica», con la riga che dice perche'. Appena
+   ha un ordine vivo — anche appena pubblicato: la riga locale nasce
+   col nome del coordinatore — vede il libro. Fuori da Telegram e nel
+   demo la porta non c'e': li' non si pubblica. */
+function portaPrimoOrdineP2P(){
+  return !!myTgId && !VETRINA && !DEMO && preseChiuseP2P() && !haOrdiniViviP2P();
+}
+/* la riga al posto del libro, nel vestito dello stato vuoto, col gesto */
+function rigaPortaP2P(){
+  return '<div class="empty"><img class="scambi-img scambi-libro" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">'
+    + '<span class="empty-title">Per entrare oggi pubblica il tuo primo ordine.</span>'
+    + 'Dalle 10:00 di domani si prende. '
+    + '<button type="button" class="btn primary" onclick="apriNuovoOrdineP2P()">Pubblica il tuo primo ordine</button></div>';
+}
+/* il foglio si apre da solo UNA volta per ingresso nel tab (vaiP2P e il
+   + lo riarmano): chi lo chiude trova la riga e il bottone, non un
+   foglio che si riapre a ogni render del libro. Sotto il tour no: due
+   fogli aperti insieme, e vince l'ultimo nel DOM. */
+let p2pPortaAperta = false;
+function apriPortaP2P(){
+  if (p2pPortaAperta || tourP2PInCorso) return;
+  const f = el('p2pNuovoSheet');
+  if (!f || f.classList.contains('open')) return;
+  p2pPortaAperta = true;
+  apriNuovoOrdineP2P();
+}
 
 /* ============ IL LIBRO SUBITO (26 set 2026, richiesta di Andrea) ============
    Entrando nel P2P si vedeva il velo «Aspetta…» finche' TUTTI i relay

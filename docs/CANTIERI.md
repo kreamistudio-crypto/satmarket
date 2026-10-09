@@ -41851,3 +41851,135 @@ due righe). Qualche banca italiana è più stretta dell'EPC (per esempio
 sull'apostrofo): se capitasse, si restringe l'alfabeto in un posto solo.
 L'intestatario senza «Copia» è la decisione del 23 set, non di oggi: se
 Andrea lo vuole, è una riga (`copia: /^intestatario$/i.test(r.et)`).
+## Le prese dalle 10 (9 ott 2026, la vigilia del lancio, richiesta di Andrea)
+
+**Cosa.** Domani 10 ott alle 10:00 il P2P si apre a tutti (si svuota
+`P2P_PROVA_IDS`). Oggi la fase chiusa si allarga a più persone perché
+riempiano il libro, ma senza che possano prendere o annullare prima di
+quell'ora, e chiedendo a ognuna di pubblicare un ordine prima di vedere
+il libro. La leva è `P2P_PRESE_DA = "2026-10-10 10:00"` nel config del
+VPS, ORA ITALIANA, col patto delle altre leve P2P: assente o vuota =
+nessun blocco; storta = lo dice il journal all'avvio («[p2p]
+P2P_PRESE_DA non e' un'ora «AAAA-MM-GG HH:MM»») e nessun blocco. Tutto
+vale solo PRIMA dell'ora e solo per chi non è moderatore (`e_admin`):
+per i moderatori niente cambia. Passata l'ora la leva è inerte da sola,
+senza riavvio.
+
+**Com'è fatto, lato server.** `_epoch_roma(testo)` traduce l'ora
+italiana in epoch SENZA tzdata: su Windows (il PC di Andrea) zoneinfo
+non trova «Europe/Rome», e due strade — zoneinfo dove c'è, un ripiego
+altrove — sarebbero due orologi da tenere in pari; la regola dell'ora
+legale europea (dall'ultima domenica di marzo all'ultima di ottobre, alle
+01:00 UTC) è ferma dal 1996 e sta in sei righe. Il blocco di caricamento
+sta dopo `P2P_ARRIVO_CODA_GIORNI` (apposta DOPO: la prova della card «in
+arrivo» esegue il pezzo che finisce lì). `_p2p_prese_da(tg_id, adesso)`
+è il giudice per persona: l'epoch della leva finché il blocco vale per
+quella persona, 0 se non c'è niente da aspettare — e L'OROLOGIO SI
+LEGGE LÌ, a ogni richiesta (`time.time()`), non all'avvio. `_p2p_per`
+porta la risposta nella busta come `preseDa` (0 = libero): sta lì e non
+in `_p2p_leve` perché è una risposta PER PERSONA — il moderatore ha 0
+mentre il suo vicino ha l'ora — e `_p2p_leve` resta il FATTO che
+orologio e pannello guardano. Il pannello «⚙️ Stato delle leve» ha la
+riga «Prese P2P dalle (ora italiana)», che chiede all'orologio e non alla
+costante: prima dell'ora dice cosa succede, dopo dice «ora passata: la
+leva è inerte, la riga nel config si può togliere».
+**NESSUNA ROTTA DA CHIUDERE**, ed è la cosa da sapere: la presa
+(`take-sell`/`take-buy`) e l'annullo (`cancel`) vanno dal browser al
+coordinatore via Nostr, il server fa da bacheca. Quindi la leva la fa
+rispettare il client di Barattolo; chi usasse un altro client di Mostro
+sullo stesso libro non la vedrebbe (è scritto in PRODUZIONE).
+
+**Com'è fatto, lato client.** `preseChiuseP2P()` legge `preseDa` dalla
+busta (quella di /me o quella pubblica) e guarda anche l'orologio del
+telefono: alle 10:00 i bottoni si accendono al primo render, senza
+aspettare un /me nuovo. La frase è una sola, `P2P_PRESE_DOMANI =
+'Dalle 10:00 di domani'`, e vive NEL MOTORE accanto ai tre bottoni
+spenti (il banco del motore la vuole al caricamento). Le porte:
+1) la cintura in fondo a `eseguiPresaP2P`, dove passano tutte le prese
+   (card, dettaglio, vetrina, link): toast con la frase e stop, PRIMA
+   di aspettare il libro vero;
+2) la cintura in `inviaAnnulloP2P`, dove passano i tre gesti
+   (ritira, chiedi, accetta);
+3) nel dettaglio di un ordine del libro il bottone «Compra/Vendi»
+   resta, spento, e dice «Dalle 10:00 di domani» (un bottone sparito si
+   cerca);
+4) nella pagina dello scambio i tre bottoni che mandano un `cancel`
+   (`SECONDARI_CHIUSI_P2P`: «✕ Annulla l'ordine», «✕ Annulla», «🤝
+   Accetta di annullare») restano al loro posto, spenti, con la frase —
+   anche l'accetta: chi ha preso prima dell'ora è un moderatore, e la
+   risposta dell'altra parte aspetta le 10 come il resto;
+5) LA PORTA DEL PRIMO ORDINE: `portaPrimoOrdineP2P()` — dentro, non in
+   vetrina, non nel demo, prese chiuse, nessun ordine vivo — e allora
+   `renderP2P` mette al posto del libro `rigaPortaP2P()` («Per entrare
+   oggi pubblica il tuo primo ordine. Dalle 10:00 di domani si prende.»
+   col bottone «Pubblica il tuo primo ordine», nel vestito dello stato
+   vuoto) e apre da solo il foglio «Pubblica» UNA volta per ingresso nel
+   tab (`p2pPortaAperta`, riarmata da `vaiP2P` e dal +), col la riga
+   sopra il foglio (`#p2pNuovoPorta`, nascosta a chi la porta non
+   riguarda). Nel ramo a libro nullo la riga c'è ma il foglio no (la
+   risposta dell'archivio del server può non essere ancora arrivata, e
+   un foglio aperto a chi un ordine ce l'ha sarebbe da richiudere); nel
+   ramo pieno si decide DOPO `scambiP2P`, che adotta le righe del server.
+   Sotto il tour il foglio non si apre (due fogli insieme, vince
+   l'ultimo nel DOM): lo apre `chiudiTourP2P` quando il tour finisce sul
+   libro.
+IL GIUDICE DEGLI ORDINI VIVI È QUELLO DI «I MIEI SCAMBI» (richiesta di
+Andrea: non inventarne uno nuovo): `apertiMieiP2P(righe)` — stato non
+in `P2P_FINALI` — è l'espressione che `scambiP2P` usava inline per
+riascoltare e chiedere lo stato, estratta e chiamata da tutt'e due;
+`haOrdiniViviP2P()` la applica a `mieiRigheP2P()`. Stanno nel motore
+(puri); la porta, che tocca fogli e identità, sta fuori.
+
+**Strade scartate.** Un booleano «bloccato» nella busta al posto
+dell'epoch: avrebbe chiesto un /me nuovo alle 10:00. Una rotta server
+che rifiuta la presa: non esiste una rotta di presa. zoneinfo con
+ripiego: due orologi. Un giudice nuovo degli ordini vivi: Andrea l'ha
+vietato, e giustamente (sarebbe stata la seconda copia della stessa
+verità). Chiudere solo «ritira» e lasciare «accetta»: una risposta al
+`cancel` di un moderatore prima dell'ora è comunque un `cancel`.
+
+**I banchi, la lezione.** Tre banchi node estraggono `inviaAnnulloP2P`
+per nome e il banco del motore carica il motore intero: un nome nuovo
+dentro una funzione estratta è una `ReferenceError` lontana dal
+cantiere. La cura è quella di casa: `typeof preseChiuseP2P ===
+'function' && …` nelle due cinture, nel dettaglio, nella pagina dello
+scambio e in `renderP2P`; la frase dentro il motore; `apertiMieiP2P`
+aggiunto al banco della corsa e della striscia, che esegue `scambiP2P`;
+`prove_leve` impara `_p2p_prese_da` (la settima volta della trappola
+«int object is not callable» di `__missing__`) e il suo `time`; le
+monete di «I miei scambi» hanno un quinto posto timbrato. E l'heredoc
+del tool Bash ha mangiato le `\n` di una sentinella (è a verbale in
+memoria): gli script di patch si scrivono col Write.
+
+**Provato.** `prove_prese_dalle_10` (52): l'ora di Roma ai due capi
+dell'ora legale e d'inverno, le storte, il blocco con un config finto
+(assente, vuota, con l'ora, storta e detta), il giudice con l'orologio
+in mano (normale, anonimo, moderatore, dopo l'ora, leva assente), la
+busta, il pannello, config_esempio e PRODUZIONE, i giudici del client
+in node nei sei casi di Andrea (senza ordini → porta; con un vivo →
+libro e prese chiuse; soli finali → porta; moderatore → libero; dopo
+l'ora → libero senza /me; leva assente → libero; vetrina, demo e
+anonimo → niente porta) e le sentinelle delle cinque porte. Suite intera
+nel worktree con `PROVE_SEVERE=1`: 19995 passate, 0 fallite, 0 saltate. Dal vivo nel Browser pane, su
+due copie del repo nello scratchpad col config dal solo esempio, relay
+morto e la leva: sulla prima (`"2026-10-10 10:00"`, 8141) l'identità
+111 al tab P2P vede la riga e il bottone al posto del libro (sotto il
+tour la riga, dopo «Salta» il bottone), il foglio «Pubblica» con la
+riga sopra; seminata una riga viva (`scriviOrdineP2P`, stato
+`pubblicato`) vede il libro; la pagina del suo ordine dice «✕ Annulla
+l'ordine — Dalle 10:00 di domani» spento; il dettaglio di un ordine del
+libro (un 38383 di cartone passato da `ordineDaEvento`) dice «Dalle
+10:00 di domani» spento; `eseguiPresaP2P` e `inviaAnnulloP2P` chiamati
+a mano fanno il toast e non toccano niente; l'identità 999 vede il
+libro e «Compra» acceso, e `/api/admin/leve` porta la riga con la nota
+«fino a quest'ora…». Sulla seconda (`"2026-10-09 09:00"`, 8142)
+l'identità 111 senza ordini vede il libro, «Compra» acceso, `preseDa`
+0, e il pannello dice «ora passata». Server fermati, voci del
+launch.json tolte.
+
+**Resta da guardare.** Il giorno 9, dopo il deploy, la riga nel config
+del VPS e il riavvio (PRODUZIONE); il 10 alle 10:00 i bottoni si
+accendono da soli sui telefoni già aperti (l'orologio del telefono);
+dopo il 10 togliere la riga. Notato e non toccato: la frase di stato
+«Puoi ritirarlo quando vuoi, finché nessuno lo prende» nella pagina
+dell'ordine pubblicato resta com'è anche prima dell'ora.

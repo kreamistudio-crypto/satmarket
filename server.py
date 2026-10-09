@@ -27150,6 +27150,19 @@ def _leve_stato():
                          "a tutti «Ora disponibile», per "
                          f"{P2P_ARRIVO_CODA_GIORNI} giorni dopo la data",
                   spento="nessuna card «P2P in arrivo» in «Da scoprire»"),
+            # LE PRESE DALLE 10 (9 ott 2026): la riga dice l'ora della
+            # leva e, orologio alla mano, se vale ancora — la riga nel
+            # config puo' restare per giorni dopo, e questa lo dice
+            _leva("Prese P2P dalle (ora italiana)", "P2P_PRESE_DA",
+                  P2P_PRESE_DA or "",
+                  acceso=("fino a quest'ora chi non è moderatore pubblica "
+                          "ma non prende né annulla, e senza un ordine "
+                          "vivo vede il foglio Pubblica al posto del libro"
+                          if _p2p_prese_da(0) else
+                          "ora passata: la leva è inerte, la riga nel "
+                          "config si può togliere"),
+                  spento="nessun blocco: chi vede il libro prende e "
+                         "annulla quando vuole"),
             _leva("Tetto ordini P2P (€)", "P2P_MAX_EURO", P2P_MAX_EURO,
                   acceso="il foglio Pubblica rifiuta gli importi sopra "
                          "questa cifra; il tetto in sats del "
@@ -42923,8 +42936,14 @@ def _p2p_per(tg_id) -> dict:
     chiusa il tab resta il coming soon di sempre.
     A LISTA VUOTA TORNA IL DIZIONARIO DI SEMPRE, e non e' un dettaglio:
     il giorno dell'apertura questa funzione diventa trasparente e non
-    c'e' niente da togliere."""
+    c'e' niente da togliere.
+    ...PIU' `preseDa` (9 ott 2026, le prese dalle 10): da quando QUESTA
+    persona puo' prendere e annullare, 0 quando non c'e' niente da
+    aspettare — lo dice `_p2p_prese_da`, orologio alla mano. Sta qui e
+    non in `_p2p_leve` perche' e' una risposta PER PERSONA: il
+    moderatore ha 0 mentre il suo vicino ha l'ora."""
     leve = _p2p_leve()
+    prese = _p2p_prese_da(tg_id)
     # ⚠️ `leve["attivo"] and` E' UNA SCORCIATOIA E NON UNA GUARDIA, e va
     # detto perche' la tortura ci torna sopra: a funzione spenta
     # `attivo` e' gia' falso, quindi togliendolo il risultato non
@@ -42933,8 +42952,26 @@ def _p2p_per(tg_id) -> dict:
     # perche' si legge come si pensa («se la funzione non c'e', non
     # c'e' niente da filtrare») e perche' evita una copia del dict.
     if leve["attivo"] and P2P_PROVA_IDS and tg_id not in P2P_PROVA_IDS:
-        return {**leve, "attivo": False}
-    return leve
+        return {**leve, "attivo": False, "preseDa": prese}
+    return {**leve, "preseDa": prese}
+
+
+def _p2p_prese_da(tg_id, adesso=None) -> int:
+    """LE PRESE DALLE 10 (9 ott 2026): da quando QUESTA persona puo'
+    prendere e annullare — l'epoch della leva finche' il blocco vale
+    per lei, 0 quando non c'e' niente da aspettare.
+    L'OROLOGIO SI LEGGE QUI, a ogni richiesta: passata l'ora la leva e'
+    inerte da sola, senza riavvio. I moderatori (`e_admin`) non la
+    vedono mai. L'anonimo (0) la vede come tutti: prendere non puo'
+    comunque, e la busta deve dire la stessa cosa a chiunque guardi."""
+    if not P2P_PRESE_DA_EPOCH:
+        return 0
+    if (time.time() if adesso is None else adesso) >= P2P_PRESE_DA_EPOCH:
+        return 0
+    tg = int(tg_id or 0)
+    if tg and e_admin(tg):
+        return 0
+    return int(P2P_PRESE_DA_EPOCH)
 
 
 def _p2p_vetrina_per(tg_id) -> bool:
@@ -43029,6 +43066,60 @@ P2P_IN_ARRIVO_FINO = P2P_IN_ARRIVO_FINO or None
 # ...e quanti giorni dopo quella data la card «Ora disponibile» se ne
 # va da sola: la novita' e' finita, e il P2P ha il suo tasto nella barra.
 P2P_ARRIVO_CODA_GIORNI = 14
+# LE PRESE DALLE 10 (9 ott 2026, richiesta di Andrea): la vigilia del
+# lancio la fase chiusa si allarga a piu' persone, perche' riempiano il
+# libro — ma nessuno di loro prende ne' annulla prima delle 10:00 del
+# giorno dopo, e chi non ha ancora un ordine vivo nel libro vede il
+# foglio «Pubblica» al posto del libro. La leva e' un'ORA ITALIANA,
+# «AAAA-MM-GG HH:MM» (Europe/Rome), col patto delle altre leve P2P:
+# assente o vuota = nessun blocco; storta = si dice all'avvio e nessun
+# blocco (una data inventata chiuderebbe le prese a tutti per un
+# refuso, e qui il verso sicuro e' «come ieri»). I MODERATORI NON LA
+# VEDONO (`e_admin`): per loro tutto resta com'e' oggi. DOPO L'ORA LA
+# LEVA E' INERTE DA SOLA: l'orologio si legge a ogni richiesta
+# (`_p2p_prese_da`), senza riavvio — la riga nel config si toglie con
+# comodo. NESSUNA ROTTA DA CHIUDERE: la presa (take-sell / take-buy) e
+# l'annullo (cancel) vanno dal browser al coordinatore, il server fa da
+# bacheca; la leva viaggia nella busta delle leve per persona
+# (`preseDa`, epoch) e a spegnere i bottoni e' il client.
+# L'ORA E' DI ROMA SENZA tzdata: su Windows (il PC di Andrea) zoneinfo
+# non trova «Europe/Rome», e due strade — zoneinfo dove c'e', un
+# ripiego altrove — sono due orologi da tenere in pari. La regola
+# dell'ora legale europea (dall'ultima domenica di marzo all'ultima di
+# ottobre, alle 01:00 UTC) e' ferma dal 1996 e sta in sei righe.
+def _epoch_roma(testo):
+    """«AAAA-MM-GG HH:MM» in ora italiana → epoch. 0 se vuota o
+    assente, None se storta: a decidere cosa farne e' chi chiama."""
+    from datetime import datetime, timedelta, timezone
+    if not testo:
+        return 0
+    try:
+        t = datetime.strptime(str(testo), "%Y-%m-%d %H:%M")
+    except (TypeError, ValueError):
+        return None
+
+    def ultima_domenica(mese):
+        d = datetime(t.year, mese, 31)
+        return d - timedelta(days=(d.weekday() + 1) % 7)
+    # i due capi dell'ora legale, in UTC: la domenica alle 01:00
+    inizio = ultima_domenica(3).replace(hour=1)
+    fine = ultima_domenica(10).replace(hour=1)
+    utc = t - timedelta(hours=1)                 # CET
+    if inizio <= utc < fine:
+        utc = t - timedelta(hours=2)             # CEST
+    return int(utc.replace(tzinfo=timezone.utc).timestamp())
+
+
+try:
+    from config import P2P_PRESE_DA
+except ImportError:
+    P2P_PRESE_DA = None
+P2P_PRESE_DA_EPOCH = _epoch_roma(P2P_PRESE_DA)
+if P2P_PRESE_DA_EPOCH is None:
+    print("[p2p] P2P_PRESE_DA non e' un'ora «AAAA-MM-GG HH:MM»: nessun "
+          "blocco delle prese")
+    P2P_PRESE_DA_EPOCH = 0
+P2P_PRESE_DA = P2P_PRESE_DA if P2P_PRESE_DA_EPOCH else None
 
 
 

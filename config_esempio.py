@@ -757,6 +757,16 @@ P2P_LUOGHI_URL = "https://photon.komoot.io"
 # Il default nel codice e' "2026-10-10" e vale anche senza questa riga.
 # None o "" = card spenta. Solo AAAA-MM-GG: una data storta la spegne.
 P2P_IN_ARRIVO_FINO = "2026-10-10"
+# LE PRESE DALLE 10 (9 ott 2026, la vigilia del lancio): fino a quest'ora
+# — ORA ITALIANA, «AAAA-MM-GG HH:MM» — chi non e' moderatore pubblica ma
+# non prende ne' annulla (i bottoni restano, spenti, e dicono «Dalle
+# 10:00 di domani»), e senza un ordine vivo suo nel libro vede il foglio
+# «Pubblica» al posto del libro. I moderatori non la vedono. Passata
+# l'ora la leva e' inerte da sola, senza riavvio: la riga si toglie con
+# comodo. Assente o vuota = nessun blocco; un'ora storta = nessun
+# blocco, e il journal lo dice all'avvio. La riga da mettere il 9 ott:
+# P2P_PRESE_DA = "2026-10-10 10:00"
+P2P_PRESE_DA = ""
 # LO SCONTO FEDELTA' SUL P2P (set 2026): punti percentuali IN MENO
 # sulla propria meta' per chi e' pioniere OPPURE ha il livello 5 (uno
 # sconto solo, non si sommano). ⚠️ Lo sconto vero lo applica il

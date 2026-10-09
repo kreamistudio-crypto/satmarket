@@ -70,6 +70,28 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Se la data passa col P2P ancora chiuso dice «In arrivo a breve». Si
   guarda nel pannello «⚙️ Stato delle leve», riga «Card «P2P in
   arrivo», data».
+- LE PRESE DALLE 10 (9 ott 2026, la vigilia del lancio): la leva
+  `P2P_PRESE_DA = "2026-10-10 10:00"` (ORA ITALIANA, Europe/Rome) si
+  AGGIUNGE al `config.py` del VPS **OGGI, 9 OTT**, insieme ai tg_id in
+  più in `P2P_PROVA_IDS`, poi `sudo systemctl restart barattolo`. Fino
+  a quell'ora chi non è moderatore pubblica ma non prende né annulla
+  (i bottoni restano, spenti, e dicono «Dalle 10:00 di domani»), e
+  senza un ordine vivo suo nel libro vede il foglio «Pubblica» al posto
+  del libro, con la riga «Per entrare oggi pubblica il tuo primo
+  ordine». I moderatori (`ADMIN_IDS`) non la vedono: per loro tutto
+  com'è oggi. PASSATA L'ORA LA LEVA È INERTE DA SOLA — l'orologio si
+  legge a ogni richiesta — quindi il 10 alle 10:00 non si riavvia per
+  lei: si fanno le due righe del lancio scritte sopra (`P2P_PROVA_IDS
+  = []` e `P2P_IN_VETRINA = True`) e **la riga `P2P_PRESE_DA` si
+  TOGLIE dal config DOPO il 10**, con comodo, al primo riavvio utile.
+  Assente o vuota = nessun blocco; un'ora storta non blocca niente e il
+  journal lo dice all'avvio («[p2p] P2P_PRESE_DA non e' un'ora»). Si
+  guarda nel pannello «⚙️ Stato delle leve», riga «Prese P2P dalle (ora
+  italiana)», che dice anche quando l'ora è passata. ⚠️ Il server non ha
+  rotte di presa o annullo (take-sell, take-buy e cancel vanno dal
+  browser al coordinatore): la leva viaggia nella busta delle leve
+  (`preseDa`) e i bottoni li spegne il client di Barattolo — chi usasse
+  un altro client di Mostro sullo stesso libro non la vedrebbe.
 - LE LEVE RGB E IL NIP-05 DI CASA (8 ott 2026, hackathon di Torino):
   `RGB_ATTIVO`, `RGB_PROVA_IDS` e `NIP05_NOMI` si AGGIUNGONO al config
   del VPS come le altre. Nel codice `RGB_ATTIVO` e' `False` e resta
