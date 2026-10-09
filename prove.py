@@ -81914,6 +81914,228 @@ process.stdout.write(JSON.stringify(out));
           [0.0005, 0, 91000 / 1e8, 0, 0], o["metro"])
 
 
+def prove_scadenza_barattozon():
+    """IL SELETTORE DELLA SCADENZA DI BARATTOZON (9 ott 2026, richiesta di
+    Andrea). Il passo 3 del foglio «Pubblica» era un <input
+    type="datetime-local">: segnaposto di sistema «gg/mm/aa, --:--»,
+    selettore del telefono al tocco, e su iPhone il campo non si vedeva
+    (chi aveva un iPhone non riusciva a pubblicare). Adesso e' una riga
+    di casa («Scade lunedì 12 ottobre alle 14:30» / «Scegli quando
+    scade») che apre un foglio dal basso SOLO A TOCCHI: chip del giorno,
+    griglie di ore e minuti. Le quattro cose da tenere: i limiti sono
+    quelli di ieri (un'ora, 72 ore, la garanzia se piu' stretta); il
+    valore che resta nel foglio e' LA STESSA STRINGA di ieri; niente
+    campo di testo nel foglio (la tastiera dell'iPhone, 18-19 set); il
+    foglio sta sopra «Pubblica» e si chiude da solo."""
+    print("\n[Il selettore della scadenza di Barattozon]")
+    import shutil
+    import subprocess
+    import tempfile
+    import json as _js
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def _intera(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+
+    def _riga(nome):
+        return re.search(r"const " + nome + r" = [^\n]*;", mini).group(0)
+
+    # --- 1) LE SENTINELLE: la riga al posto del campo, il foglio, le vie --
+    _per = pezzo_js(mini, "function percorsoTabacchinoP2P(val){", "\n}\n")
+    prova("il passo 3 non e' piu' un <input type=\"datetime-local\">: e' il campo-bottone di casa, con id, value e giudizio",
+          [False, True, True, True, True],
+          ["datetime-local" in re.sub(r"/\*[\s\S]*?\*/", "", _per),   # il commento puo' nominarlo, il codice no
+           "'<button type=\"button\" id=\"p2pNuovoTabScade\" class=\"p2p-tendina' +" in _per,
+           "'value=\"' + esc(p2pNuovoTab.scade) + '\" aria-haspopup=\"dialog\" ' +" in _per,
+           "'onclick=\"apriScadeTabP2P()\"' + ariaTappaTabP2P(3, giud[3]) + '>' +" in _per,
+           "'<span>' + esc(etichettaScadeTabP2P(p2pNuovoTab.scade)) + '</span>' +" in _per])
+    prova("...e il riquadro non veste piu' un campo data (la regola che su iOS lo faceva sparire)",
+          [True, False],
+          [".p2p-sez input[type=text],.p2p-sez input[type=number],.p2p-sez select{" in mini,
+           ".p2p-sez input[type=datetime-local]" in mini])
+    prova("...il giudice del «manca» trova ancora il suo campo, e il foglio lo rilegge come ieri",
+          [True, True, True],
+          ["const P2P_CAMPO_TAPPA_TAB = {2: 'p2pNuovoEuro', 3: 'p2pNuovoTabScade'};" in mini,
+           "  if (s) p2pNuovoTab.scade = String(s.value || '');" in pezzo_js(mini, "function cambiaTabP2P(){", "\n}\n"),
+           "scade: tabacchinoP2P(p2pNuovoMetodi) ? scadeDaCampoP2P(p2pNuovoTab.scade) : 0" in pezzo_js(mini, "function campiNuovoP2P(){", "\n}\n")])
+    _i_nuovo = mini.index('id="p2pNuovoSheet"')
+    _i_scade = mini.index('id="p2pScadeSheet"')
+    prova("il foglio della scadenza esiste, e' un dialogo, e sta DOPO «Pubblica» e PRIMA del dettaglio nel DOM (chi copre chi, chi si chiude prima)",
+          [True, True],
+          ['<div class="sheet" id="p2pScadeSheet" role="dialog" aria-modal="true" aria-labelledby="p2pScadeTit">' in mini,
+           _i_nuovo < _i_scade < mini.index('id="p2pDettSheet"')])
+    prova("...closeSheet lo conosce, e la conferma lo chiude MIRATA (mai closeSheet, che spegnerebbe «Pubblica»)",
+          [True, True, False],
+          ["  el('p2pScadeSheet').classList.remove('open');" in pezzo_js(mini, "function closeSheet(){", "\n}"),
+           "chiudiFoglioP2P('p2pScadeSheet');" in pezzo_js(mini, "function confermaScadeTabP2P(){", "\n}\n"),
+           "closeSheet()" in pezzo_js(mini, "function confermaScadeTabP2P(){", "\n}\n")])
+    _corpo = pezzo_js(mini, "function corpoScadeTabP2P(scelta, adesso, finestra){", "\n}\n")
+    prova("nel foglio SOLO BOTTONI: niente campo di testo, niente tastiera (la lezione dell'iPhone)",
+          [False, True, True],
+          ["<input" in _corpo, 'role="radiogroup"' in _corpo,
+           "giudizioTappaTabP2P(3, {tab: {scade: valore}, finestra, adesso})" in _corpo])
+    _conf = pezzo_js(mini, "function confermaScadeTabP2P(){", "\n}\n")
+    prova("la conferma scrive il valore nel foglio, riveste la riga in place e fa parlare la spia subito",
+          True,
+          "  p2pNuovoTab.scade = valore;\n" in _conf and "vestiRigaScadeTabP2P();" in _conf
+          and _conf.index("aggiornaPercorsoTabP2P();") < _conf.index("rivelaSpiaTabP2P(3);"))
+    prova("i documenti sanno del foglio (Cantieri, Architettura, la guida dei passi)",
+          [True, True, True],
+          ["## Il selettore della scadenza di Barattozon" in open("docs/CANTIERI.md", encoding="utf-8").read(),
+           "apriScadeTabP2P" in open("docs/ARCHITETTURA.md", encoding="utf-8").read(),
+           "Scegli quando scade" in open("docs/GUIDA-P2P-PASSI.md", encoding="utf-8").read()])
+
+    # --- 2) IL BANCO IN NODE: i limiti, le proposte, il valore ---------------
+    node = shutil.which("node")
+    if not node:
+        salta("il selettore della scadenza", "serve node")
+        return
+    _prog = (
+        "const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\"/g, '&quot;');\n"
+        + "\n".join(_riga(n) for n in (
+            "P2P_GIORNI_BREVI", "P2P_MESI_BREVI", "P2P_PAYCODE_MIN_S", "P2P_PAYCODE_MAX_S",
+            "P2P_TABACCHINO_VITA_S", "P2P_TABACCHINO_MARGINE_S",
+            "P2P_GIORNI_LUNGHI", "P2P_SCADE_PASSO_MIN", "P2P_SCADE_MARGINE_PROPOSTA_S"))
+        + "\n" + mini[mini.index("const P2P_MESI_LUNGHI = ["):mini.index("];", mini.index("const P2P_MESI_LUNGHI = [")) + 2]
+        + "\n" + _riga("P2P_CAMPO_TAPPA_TAB")
+        + "\n" + "\n".join(_intera(f) for f in (
+            "function leggiDataTabacchinoP2P(testo){", "function scadeDaCampoP2P(s){",
+            "function campoDaScadeP2P(epoch){", "function vitaLibroTabacchinoP2P(scade, adesso){",
+            "function giudizioTappaTabP2P(n, v){",
+            "function scadeInParoleP2P(epoch){", "function etichettaScadeTabP2P(scade){",
+            "function fraScadeTabP2P(sec){", "function giorniScadeTabP2P(adesso){",
+            "function epochScadeTabP2P(giorno, ora, minuto){",
+            "function finestraScadeTabP2P(adesso, finestra){",
+            "function grigliaScadeTabP2P(adesso, finestra, scelta){",
+            "function sceltaDaScadeTabP2P(scade, adesso){",
+            "function sistemaSceltaScadeP2P(scelta, adesso, finestra){",
+            "function proponiOraScadeP2P(scelta, adesso, finestra){",
+            "function valoreScadeTabP2P(scelta, adesso){",
+            "function corpoScadeTabP2P(scelta, adesso, finestra){"))
+        + r"""
+/* venerdì 9 ottobre 2026 alle 14:32, ora locale di chi gira la prova:
+   la finestra va dalle 15:32 di oggi alle 14:32 di lunedì 12 */
+const ora = Math.floor(new Date(2026, 9, 9, 14, 32, 0, 0).getTime() / 1000);
+const lun1430 = Math.floor(new Date(2026, 9, 12, 14, 30, 0, 0).getTime() / 1000);
+const gr = (fin, scelta) => grigliaScadeTabP2P(ora, fin, scelta);
+const oreOk = (g) => g.ore.filter(o => o.ok).map(o => o.h);
+const minOk = (g) => g.minuti.filter(m => m.ok).map(m => m.m);
+const vuota = {giorno: -1, ora: -1, minuto: 0};
+const ultimo = {giorno: 3, ora: 14, minuto: 30};
+const corpoOk = corpoScadeTabP2P(ultimo, ora, 0);
+const corpoVuoto = corpoScadeTabP2P(vuota, ora, 0);
+const corpoStorto = corpoScadeTabP2P({giorno: 3, ora: 14, minuto: 35}, ora, 0);
+const out = {
+  parole: scadeInParoleP2P(lun1430),
+  etichette: [etichettaScadeTabP2P(''), etichettaScadeTabP2P('2026-10-12T14:30'), etichettaScadeTabP2P('storta')],
+  fra: [fraScadeTabP2P(3600), fraScadeTabP2P(2 * 86400 + 3 * 3600), fraScadeTabP2P(5 * 3600 + 20 * 60),
+        fraScadeTabP2P(300), fraScadeTabP2P(86400), fraScadeTabP2P(0)],
+  giorni: giorniScadeTabP2P(ora).map(g => g.eti),
+  giorniOk: gr(0, vuota).giorni.map(g => g.ok),
+  oreOggi: oreOk(gr(0, {giorno: 0, ora: -1, minuto: 0})),
+  minutiOggi15: minOk(gr(0, {giorno: 0, ora: 15, minuto: 0})),
+  oreLunedi: oreOk(gr(0, {giorno: 3, ora: -1, minuto: 0})),
+  minutiLunedi14: minOk(gr(0, {giorno: 3, ora: 14, minuto: 0})),
+  minutiSenzaOra: minOk(gr(0, {giorno: 3, ora: -1, minuto: 0})),
+  /* la garanzia a dieci ore stringe: fino alle 00:32 di domani */
+  garanziaGiorni: gr(10 * 3600, vuota).giorni.map(g => g.ok),
+  garanziaOreDomani: oreOk(gr(10 * 3600, {giorno: 1, ora: -1, minuto: 0})),
+  garanziaMinutiDomani0: minOk(gr(10 * 3600, {giorno: 1, ora: 0, minuto: 0})),
+  /* alle 23:30 «Oggi» non ha piu' un'ora buona */
+  tardi: grigliaScadeTabP2P(Math.floor(new Date(2026, 9, 9, 23, 30).getTime() / 1000), 0, vuota).giorni.map(g => g.ok),
+  /* la scorciatoia: domani a quest'ora si', oggi no (e' passata), lunedì no (al bordo) */
+  proposte: [proponiOraScadeP2P({giorno: 1, ora: -1, minuto: 0}, ora, 0),
+             proponiOraScadeP2P({giorno: 0, ora: -1, minuto: 0}, ora, 0),
+             proponiOraScadeP2P({giorno: 3, ora: -1, minuto: 0}, ora, 0),
+             proponiOraScadeP2P({giorno: 1, ora: 9, minuto: 0}, ora, 0)],
+  /* la scelta si risistema: l'ora fuori si svuota, il minuto scende al primo che va */
+  sistemate: [sistemaSceltaScadeP2P({giorno: 3, ora: 20, minuto: 0}, ora, 0),
+              sistemaSceltaScadeP2P({giorno: 3, ora: 14, minuto: 45}, ora, 0),
+              sistemaSceltaScadeP2P({giorno: 0, ora: 15, minuto: 0}, ora, 0),
+              sistemaSceltaScadeP2P({giorno: 1, ora: 9, minuto: 15}, ora, 0)],
+  rilette: [sceltaDaScadeTabP2P('2026-10-11T18:37', ora), sceltaDaScadeTabP2P('', ora),
+            sceltaDaScadeTabP2P('2026-10-20T10:00', ora)],
+  /* IL VALORE: la stessa stringa che scriveva il campo di ieri */
+  valore: valoreScadeTabP2P(ultimo, ora),
+  valoreDiIeri: campoDaScadeP2P(lun1430),
+  giro: scadeDaCampoP2P(valoreScadeTabP2P(ultimo, ora)) === lun1430,
+  libro: vitaLibroTabacchinoP2P(scadeDaCampoP2P(valoreScadeTabP2P(ultimo, ora)), ora) === vitaLibroTabacchinoP2P(lun1430, ora),
+  incompleto: [valoreScadeTabP2P(vuota, ora), valoreScadeTabP2P({giorno: 1, ora: -1, minuto: 0}, ora)],
+  /* il corpo: chip, celle, la riga, il bottone */
+  corpo: {
+    chip: (corpoVuoto.match(/class="chip/g) || []).length,
+    celle: (corpoVuoto.match(/class="p2p-scade-cella/g) || []).length,
+    spenteOggi: (corpoScadeTabP2P({giorno: 0, ora: -1, minuto: 0}, ora, 0).match(/ disabled/g) || []).length,
+    vuotoConferma: corpoVuoto.includes('id="p2pScadeOk" onclick="confermaScadeTabP2P()" disabled>'),
+    vuotoRiga: corpoVuoto.includes('class="p2p-scade-riga vuota" id="p2pScadeRiga" aria-live="polite">Scegli il giorno e l\'ora</div>'),
+    okConferma: corpoOk.includes('id="p2pScadeOk" onclick="confermaScadeTabP2P()">Conferma</button>'),
+    okRiga: corpoOk.includes('>Scade lunedì 12 ottobre alle 14:30 <span class="p2p-scade-fra">· fra 2 giorni e 23 ore</span></div>'),
+    okErr: corpoOk.includes('<div class="p2p-tappa-err" id="p2pScadeErr" hidden></div>'),
+    stortoErr: corpoStorto.includes('<div class="p2p-tappa-err" id="p2pScadeErr">Troppo lontana: un PayCode vale al massimo 72 ore</div>'),
+    stortoConferma: corpoStorto.includes('id="p2pScadeOk" onclick="confermaScadeTabP2P()" disabled>'),
+    selezioni: (corpoOk.match(/aria-checked="true"/g) || []).length,
+    input: corpoOk.includes('<input')
+  }
+};
+console.log(JSON.stringify(out));
+""")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(_prog)
+    try:
+        _r = subprocess.run([node, f.name], capture_output=True, text=True,
+                            encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(f.name)
+    prova("il banco del selettore gira in node", "", _r.stderr[-1500:] if _r.returncode else "")
+    if _r.returncode:
+        return
+    out = _js.loads(_r.stdout.strip())
+    prova("la scadenza si dice per esteso: «lunedì 12 ottobre alle 14:30»",
+          "lunedì 12 ottobre alle 14:30", out["parole"])
+    prova("...e la riga del passo 3 la porta, o invita a sceglierla",
+          ["Scegli quando scade", "Scade lunedì 12 ottobre alle 14:30", "Scegli quando scade"], out["etichette"])
+    prova("...il tempo che resta, a parole",
+          ["1 ora", "2 giorni e 3 ore", "5 ore e 20 minuti", "5 minuti", "1 giorno", "0 minuti"], out["fra"])
+    prova("i giorni sono i quattro da oggi, coi loro nomi",
+          ["Oggi", "Domani", "dom 11 ott", "lun 12 ott"], out["giorni"])
+    prova("alle 14:32 di venerdì tutti e quattro hanno almeno un'ora buona", [True, True, True, True], out["giorniOk"])
+    # da un'ora in avanti: oggi dalle 15 (15:35 e' la prima cella), e lunedì fino alle 14:30
+    prova("oggi le ore buone partono dalle 15, e alle 15 i minuti dal 35",
+          [list(range(15, 24)), [35, 40, 45, 50, 55]], [out["oreOggi"], out["minutiOggi15"]])
+    prova("lunedì le ore buone finiscono alle 14, e alle 14 i minuti al 30 (72 ore esatte: mai oltre)",
+          [list(range(0, 15)), [0, 5, 10, 15, 20, 25, 30]], [out["oreLunedi"], out["minutiLunedi14"]])
+    prova("...senza un'ora scelta nessun minuto si tocca", [], out["minutiSenzaOra"])
+    prova("la garanzia piu' stretta (10 ore) chiude a domani alle 00:32: due giorni spenti, un'ora sola, sette minuti",
+          [[True, True, False, False], [0], [0, 5, 10, 15, 20, 25, 30]],
+          [out["garanziaGiorni"], out["garanziaOreDomani"], out["garanziaMinutiDomani0"]])
+    prova("alle 23:30 «Oggi» e' spento: fra un'ora e' gia' domani", [False, True, True, True], out["tardi"])
+    prova("la scorciatoia propone «a quest'ora» solo dentro la finestra con un'ora di margine: domani si', oggi no, lunedì no, e non tocca un'ora gia' scelta",
+          [{"giorno": 1, "ora": 14, "minuto": 30}, {"giorno": 0, "ora": -1, "minuto": 0},
+           {"giorno": 3, "ora": -1, "minuto": 0}, {"giorno": 1, "ora": 9, "minuto": 0}],
+          out["proposte"])
+    prova("la scelta si risistema: l'ora fuori finestra si svuota, il minuto scende al primo che va, e quel che va resta",
+          [{"giorno": 3, "ora": -1, "minuto": 0}, {"giorno": 3, "ora": 14, "minuto": 0},
+           {"giorno": 0, "ora": 15, "minuto": 35}, {"giorno": 1, "ora": 9, "minuto": 15}],
+          out["sistemate"])
+    prova("riaprendo il foglio si riparte dal valore scritto (minuti ai cinque); vuoto o fuori dai quattro giorni, da zero",
+          [{"giorno": 2, "ora": 18, "minuto": 35}, {"giorno": -1, "ora": -1, "minuto": 0},
+           {"giorno": -1, "ora": -1, "minuto": 0}],
+          out["rilette"])
+    prova("IL VALORE SCRITTO NEL FOGLIO E' LA STESSA STRINGA DI IERI, e fa lo stesso giro: epoch, expires_at",
+          ["2026-10-12T14:30", "2026-10-12T14:30", True, True],
+          [out["valore"], out["valoreDiIeri"], out["giro"], out["libro"]])
+    prova("...e una scelta incompleta non scrive niente", ["", ""], out["incompleto"])
+    c = out["corpo"]
+    prova("il corpo: quattro chip, 24 + 12 celle, nessun <input>", [4, 36, False], [c["chip"], c["celle"], c["input"]])
+    prova("...a scelta vuota la riga invita e «Conferma» e' spento", [True, True], [c["vuotoConferma"], c["vuotoRiga"]])
+    prova("...con «Oggi» scelto le ore passate e i minuti sono spenti (15 ore + 12 minuti, e «Conferma»)", 28, c["spenteOggi"])
+    prova("...a scelta buona la riga dice la data e quanto manca, la frase e' nascosta, «Conferma» e' acceso, tre selezioni",
+          [True, True, True, 3], [c["okRiga"], c["okErr"], c["okConferma"], c["selezioni"]])
+    prova("...a scelta storta parla il giudice del passo, e «Conferma» resta spento",
+          [True, True], [c["stortoErr"], c["stortoConferma"]])
+
+
 def prove_barattozon_mercato():
     """BARATTOZON CON LA SCELTA «A MERCATO» O «PREZZO FISSO», MINIMO 25 €
     (30 set 2026, decisione di Andrea). Fino a ieri un PayCode andava nel
@@ -82842,9 +83064,11 @@ DOM = null;
           and "Tab" not in pezzo_js(mini, "function cambiaPremioP2P(v, da){", "\n}\n")
           .replace("TABACCHINO", "")
           and "p2pNuovoPremioTab" not in pezzo_js(mini, "function cambiaPremioP2P(v, da){", "\n}\n"))
-    prova("...il campo data va da un'ora a 72 ore (o alla garanzia, se piu' stretta)", True,
-          "min=\"' + campoDaScadeP2P(adessoTab + P2P_PAYCODE_MIN_S) + '\"" in _per
-          and "Math.min(P2P_PAYCODE_MAX_S, finestraTab)" in _per)
+    # (9 ott 2026) il conto del `min` e del `max` del campo di ieri vive
+    # nella finestra del foglio della scadenza
+    prova("...la scadenza va da un'ora a 72 ore (o alla garanzia, se piu' stretta)", True,
+          "da: adesso + P2P_PAYCODE_MIN_S" in pezzo_js(mini, "function finestraScadeTabP2P(adesso, finestra){", "\n}\n")
+          and "Math.min(P2P_PAYCODE_MAX_S, finestra)" in pezzo_js(mini, "function finestraScadeTabP2P(adesso, finestra){", "\n}\n"))
     prova("...e sotto il cursore c'e' la riga di aiuto, con la regola del verso", True,
           "Premio più basso = più conveniente per chi paga = più probabile che qualcuno lo prenda in tempo."
           in _per
@@ -83318,9 +83542,12 @@ def prove_pubblica_metodo_prima():
         "function vestitoInvioP2P(tab){",
         # il contanti di persona (30 set 2026): la riga sotto il metodo
         "function contantiAManoP2P(metodi){", "function giudiceContantiP2P(euro, metodi, tetto){",
-        "function regolaContantiFoglioP2P(metodi, tetto, lato){", "function maxEuroContantiP2P(){")
+        "function regolaContantiFoglioP2P(metodi, tetto, lato){", "function maxEuroContantiP2P(){",
+        # la riga della scadenza (9 ott 2026): il passo 3 la scrive per esteso
+        "function etichettaScadeTabP2P(scade){", "function scadeInParoleP2P(epoch){")
     _prog = (
         _blocco("const esc = ", "}[c]));") + "\n"
+        + _riga("P2P_GIORNI_LUNGHI") + "\n" + _blocco("const P2P_MESI_LUNGHI = [", "];") + "\n"
         + "\n".join(_riga(n) for n in (
             "P2P_VALUTE", "P2P_METODI", "P2P_TABACCHINO", "P2P_TABACCHINO_PM",
             "P2P_CONTANTI", "REGOLA_CONTANTI_COMPRA", "REGOLA_CONTANTI_VENDE", "CONSIGLI_CONTANTI",
@@ -83618,12 +83845,15 @@ def prove_spia_passi_barattozon():
     prova("...e i due campi si dicono storti al lettore vocale, ognuno col suo giudizio",
           [1, 1],
           [_per.count("'aria-label=\"Importo del PayCode in euro, coi centesimi\"' + ariaTappaTabP2P(2, giud[2]) + '>'"),
-           _per.count("'oninput=\"cambiaTabP2P()\" onblur=\"rivelaSpiaTabP2P(3)\" aria-label=\"Quando scade il PayCode\"' + ariaTappaTabP2P(3, giud[3]) + '>'")])
-    # (7 ott 2026, sera) LASCIARE IL CAMPO RIVELA SUBITO: i due campi
-    # chiamano `rivelaSpiaTabP2P` all'uscita, ognuno col suo passo
-    prova("...e lasciando il campo la spia dice subito quel che c'e'", [1, 1],
+           # (9 ott 2026) il passo 3 e' una riga-bottone, non piu' un campo:
+           # porta lo stesso giudizio per il lettore vocale
+           _per.count("'onclick=\"apriScadeTabP2P()\"' + ariaTappaTabP2P(3, giud[3]) + '>' +")])
+    # (7 ott 2026, sera) LASCIARE IL CAMPO RIVELA SUBITO: l'importo chiama
+    # `rivelaSpiaTabP2P` all'uscita; la scadenza (9 ott 2026) non ha piu'
+    # un campo da lasciare — rivela alla conferma del foglio
+    prova("...e lasciando il campo la spia dice subito quel che c'e'", [1, True],
           [_per.count("'oninput=\"cambiaCampoNuovoP2P()\" onblur=\"rivelaSpiaTabP2P(2)\" ' +"),
-           _per.count("onblur=\"rivelaSpiaTabP2P(3)\"")])
+           "rivelaSpiaTabP2P(3);" in pezzo_js(mini, "function confermaScadeTabP2P(){", "\n}\n")])
     prova("...la riga d'aiuto dei 25 € ha il suo id, e nasce nascosta con la frase", 1,
           _per.count("'<div class=\"hint\" id=\"p2pTabAiuto2\"' + (giud[2].stato === 'storto' ? ' hidden' : '') + '>Quello scritto sulla mail di Amazon"))
     _agg = _intera("function aggiornaPercorsoTabP2P(){")
@@ -130778,6 +131008,7 @@ def main():
     prove_premio_barattozon,
     prove_convenienza_vera,
     prove_barattozon_mercato,
+    prove_scadenza_barattozon,
     prove_pubblica_metodo_prima,
     prove_libro_vuoto_monete,
     prove_indietro_dal_libro,

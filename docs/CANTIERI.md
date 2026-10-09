@@ -41566,3 +41566,139 @@ premuto lì non è il giro del P2P.
 (il movimento lo giudica Andrea); a fine beta, col banner nuovo, si rifà
 anche il ritaglio (`python ritaglia_banner_fee.py`) — e se il disegno
 nuovo non ha più un 2% barrato, la primissima va ripensata.
+
+## Il selettore della scadenza di Barattozon: la riga e il foglio al posto del campo data (9 ott 2026)
+
+**IL CASO (Andrea, dal vivo).** Nel foglio «Pubblica» di Barattozon il
+passo 3 — «Quando scade il PayCode» — era un `<input
+type="datetime-local">`, «la strada corta» del 23 set. Tre difetti visti
+dal vivo: 1) su Chrome mostrava il segnaposto di sistema «gg/mm/aa,
+--:--», brutto e poco chiaro; 2) **su iPhone (Safari e Telegram iOS) il
+campo non si vedeva proprio**, quindi chi aveva un iPhone non riusciva a
+pubblicare — il più grave; 3) al tocco si apriva il selettore di sistema
+di data e ora, che non è di casa e non si veste.
+
+**COSA SIGNIFICA QUELLA SCADENZA, letto prima di disegnare.** È la
+scadenza del PAYCODE di Amazon (data e ora sulla mail, di norma 72 ore
+dal checkout), non dell'ordine: dall'ordine nel libro ne discende
+`expires_at` = scadenza MENO due ore (`vitaLibroTabacchinoP2P`), e la
+stessa data viaggia cifrata a chi prende nella riga «Scade:» del
+recapito (`dataTabacchinoP2P`). I vincoli sono tutti nel client, in un
+giudice solo (`giudizioTappaTabP2P(3)` / `valeNuovoOrdineP2P`): non
+passata, almeno `P2P_PAYCODE_MIN_S` (un'ora) da adesso, al più
+`P2P_PAYCODE_MAX_S` (72 ore), e comunque non oltre la finestra della
+garanzia letta viva dal 38385 (`finestraGaranziaP2P`, che parla solo se
+più stretta). Il server non vede questo campo: l'ordine va al
+coordinatore dal browser, con l'`expires_at` al secondo. Il valore nel
+foglio è la stringa «AAAA-MM-GGTHH:MM» in ORA LOCALE di chi scrive
+(`p2pNuovoTab.scade`, le gemelle `campoDaScadeP2P`/`scadeDaCampoP2P`),
+dichiarata e non nascosta: tutti nello stesso fuso (Europe/Rome), e il
+giorno che servisse un fuso la riga cambia forma in un posto solo.
+
+**LA CURA.** Il campo non si è vestito: si è tolto. Il passo 3 è una
+RIGA — lo stesso campo-bottone `.p2p-tendina` della valuta e dei metodi
+— che dice la scadenza per esteso («Scade lunedì 12 ottobre alle
+14:30», `scadeInParoleP2P`) o invita («Scegli quando scade»), e al
+tocco apre `#p2pScadeSheet`, un foglio dal basso di casa SOPRA il foglio
+«Pubblica» (sta dopo di lui nel DOM, come «Quanto» sopra il dettaglio:
+è l'ordine che decide chi copre chi e chi si chiude per primo con
+l'indietro). Dentro, SOLO TOCCHI: le chip del GIORNO — dentro 72 ore i
+giorni possibili sono al più quattro: «Oggi», «Domani», poi «dom 11
+ott», «lun 12 ott» —, la griglia delle 24 ORE, quella dei MINUTI di
+cinque in cinque; la riga che rilegge la scelta con quanto manca («·
+fra 2 giorni e 23 ore»), la frase del giudice in rosso, «Conferma»
+(spento finché la scelta non è buona) e «Annulla». Niente campo di
+testo, quindi niente tastiera: è la lezione dei fogli dal basso e
+dell'iPhone (18-19 set), pagata due volte. Il tema iOS: la regola del
+riquadro (`-webkit-appearance:none` su tutti i campi della `.p2p-sez`)
+tolto il campo data non lo tocca più; il perché verosimile del campo
+invisibile — su iOS un campo data senza la veste di sistema resta un
+rettangolo vuoto e senza misura — resta un «verosimile», perché un
+iPhone vero in questo cantiere non c'era.
+
+**LE DECISIONI.** (a) **I limiti sono quelli di ieri, letti dallo
+stesso posto**: `finestraScadeTabP2P` fa il conto che facevano `min` e
+`max` del campo (un'ora, 72 ore, la garanzia se più stretta), e
+`grigliaScadeTabP2P` spegne le celle fuori — un giorno, un'ora o un
+minuto che non ha nessun istante buono non si tocca; la frase sotto la
+riga è quella del giudice del passo, chiamato e non riscritto. (b) **Il
+valore che resta è lo stesso di ieri**: «Conferma» scrive in
+`p2pNuovoTab.scade` la stringa di `campoDaScadeP2P`, la riga tiene l'id
+`p2pNuovoTabScade` (ogni «manca» del giudice lo trova) e un `value` che
+`cambiaTabP2P` rilegge come leggeva il campo; `campiNuovoP2P`,
+`ordineDaCampiP2P`, l'`expires_at` e la riga «Scade:» non si sono mossi
+di una riga. (c) **La scorciatoia è nel giorno**: toccato un giorno con
+l'ora ancora vuota, il foglio propone l'ora di adesso ai cinque minuti
+— «domani a quest'ora» è un tocco solo — ma solo con UN'ORA DI MARGINE
+dal tetto (`proponiOraScadeP2P`): una scadenza proposta al bordo delle
+72 ore invecchia mentre si finisce il foglio e il giudice della
+pubblicazione la boccerebbe; al quarto giorno quest'ora è oltre, e
+l'ora resta da scegliere. (d) **La scelta si risistema, mai si tosa in
+silenzio** (`sistemaSceltaScadeP2P`): cambiando giorno, un'ora che nel
+giorno nuovo è fuori finestra si svuota; il minuto scende al primo che
+va. (e) Riaprendo il foglio si riparte dal valore scritto (minuti ai
+cinque). (f) La spia del passo parla SUBITO alla conferma
+(`rivelaSpiaTabP2P(3)`): non c'è un dito che sta ancora scrivendo. (g)
+Il foglio si chiude MIRATO (`chiudiFoglioP2P`), mai con `closeSheet`,
+che spegnerebbe anche «Pubblica».
+
+**STRADE SCARTATE.** Curare il CSS su iOS (togliere `appearance:none`
+al solo campo data): avrebbe tenuto il selettore di sistema e il
+segnaposto, cioè due difetti su tre. Due stepper −/+ per ore e minuti:
+troppi tocchi per andare da 00 a 23. Un campo di testo «gg/mm/aaaa
+alle hh:mm»: riporta la tastiera dentro un foglio dal basso. Chip di
+scadenza intera («Fra 72 ore», «Fra 48 ore»): «Fra 72 ore» è al bordo
+e invecchia in un minuto, le altre non sono scelte vere — la scadenza
+è sulla mail, e si copia; la scorciatoia utile è il giorno con l'ora di
+adesso proposta. I minuti al minuto: la griglia a passi di cinque è
+leggibile e sta in due righe; chi legge «14:37» sulla mail sceglie
+14:35, un paio di minuti PRIMA, che per la vita nel libro e per gli
+avvisi è il verso sicuro.
+
+**PROVATO.** `prove_scadenza_barattozon`: le sentinelle (niente
+`datetime-local` nel percorso né nel CSS del riquadro; la riga con id,
+`value` e giudizio; il foglio dopo «Pubblica» e prima del dettaglio nel
+DOM, in `closeSheet`, chiuso mirato; nessun `<input` nel corpo; il
+giudice del «manca» trova il campo; i documenti) e il banco in node sul
+venerdì 9 ott 2026 alle 14:32: la data per esteso, le etichette, il
+tempo a parole, i quattro giorni, le ore e i minuti spenti ai due bordi
+(oggi dalle 15:35, lunedì fino alle 14:30), la garanzia a dieci ore che
+spegne due giorni, «Oggi» spento alle 23:30, le proposte della
+scorciatoia (domani sì, oggi no, lunedì no, un'ora scelta non si
+tocca), la scelta che si risistema, la rilettura del valore scritto, IL
+VALORE identico a `campoDaScadeP2P` dello stesso istante con lo stesso
+`expires_at`, il corpo (4 chip, 36 celle, spente, riga, frase,
+«Conferma»). Le due sentinelle di ieri sul campo (`min`/`max`,
+`onblur`) sono state portate sulla finestra del foglio e sulla conferma.
+
+**GIRO DAL VIVO (Playwright, server di collaudo sulla 8113 da una copia
+del worktree col relay morto, identità 222 dall'hash
+`tgWebAppData`), tre browser, gli scatti nello scratchpad della
+sessione (`scatti/`):** Chrome desktop 1280×800 (il Chrome installato,
+`channel: 'chrome'`), WebKit con il profilo «iPhone 13» di Playwright
+(390×844, UA iOS, tocco; `tgWebAppPlatform=ios`), Chrome a 320×568.
+In tutti e tre lo stesso giro: la riga «Scegli quando scade ▾» è un
+`<button>` visibile (box 500×35 sul desktop, 330×35 sull'iPhone,
+260×35 a 320 — ieri su iPhone non c'era); il tocco apre il foglio sopra
+«Pubblica» (pila `p2pNuovoSheet`, `p2pScadeSheet`), 4 chip, 36 celle,
+zero `<input>`, «Conferma» spento; «Domani» propone «alle 14:45» (l'ora
+del giro ai cinque); 18 e 30 → «Scade sabato 10 ottobre alle 18:30 ·
+fra 1 giorno e 3 ore», tre selezioni; «Conferma» chiude il solo foglio
+della scadenza, «Pubblica» resta col velo, il fuoco torna sulla riga,
+`p2pNuovoTab.scade` = «2026-10-10T18:30» (la stringa di ieri), il
+`value` della riga uguale, la riga «Scade sabato 10 ottobre alle
+18:30», giudizio del passo «buono», il riepilogo dice «Scade il:
+10/10/2026 alle 18:30» e `ordineDaCampiP2P` dà lo stesso `expires_at`
+di `vitaLibroTabacchinoP2P`; riaperto, le tre selezioni ci sono ancora;
+l'indietro del browser e «Annulla» chiudono il solo foglio della
+scadenza e il valore resta. Nessun errore di pagina. Negli scatti di
+WebKit le chip del giorno uscivano con le grazie: le `.chip` non
+dicono il carattere e un `<button>` non lo eredita — aggiunto
+`font-family:inherit` alle sole chip del foglio.
+
+**DA GUARDARE.** Un iPhone VERO dentro Telegram: il giro WebKit è
+Playwright su Windows, non Safari iOS — la riga c'è e si tocca, ma il
+«non si vedeva» di ieri si chiude solo sul telefono. L'ora che non
+esiste nel salto dell'ora legale (`epochScadeTabP2P` la spegne, non
+provata in CI perché il fuso là è UTC). Le `.chip` della vetrina senza
+`font-family` (stesso difetto, fuori da questo cantiere).

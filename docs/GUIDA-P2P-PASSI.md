@@ -811,11 +811,21 @@ disputa.»
      di Amazon, coi centesimi: al tabacchino si paga esattamente quella
      cifra. Amazon accetta i contanti fino a **999 €** per ordine, senza
      commissione; un PayCode Barattozon vale almeno **25 €**.»
-   - **3 Quando scade il PayCode** — data e ora; «⏳ Amazon dà 72 ore dal
-     checkout: copia la scadenza dalla mail. Deve stare fra un'ora e 72
-     ore da adesso. Nel libro l'ordine resta fino a **due ore prima** di
-     quella scadenza, per lasciare a chi paga il tempo di andare al
-     tabacchino; poi esce da solo.»
+   - **3 Quando scade il PayCode** — una riga, «Scegli quando scade»
+     (poi «Scade lunedì 12 ottobre alle 14:30»), che al tocco apre dal
+     basso il foglio «⏳ Quando scade il PayCode» (dal 9 ott 2026, al
+     posto del selettore di sistema): «Copiala dalla mail di Amazon:
+     deve stare fra un'ora e 72 ore da adesso. Prima il giorno, poi
+     l'ora e i minuti.», le chip del **Giorno** («Oggi», «Domani», poi
+     «dom 11 ott», «lun 12 ott»), la griglia delle **Ore** (00-23) e
+     quella dei **Minuti** (di cinque in cinque; le celle fuori dalla
+     finestra sono spente), la riga «Scade lunedì 12 ottobre alle 14:30
+     · fra 2 giorni e 23 ore», i bottoni «Conferma» e «Annulla». Sotto
+     la riga resta l'aiuto: «⏳ Amazon dà 72 ore dal checkout: copia la
+     scadenza dalla mail. Deve stare fra un'ora e 72 ore da adesso. Nel
+     libro l'ordine resta fino a **due ore prima** di quella scadenza,
+     per lasciare a chi paga il tempo di andare al tabacchino; poi esce
+     da solo.»
    - **4 Il premio** — cursore da −20 a +20 (si può anche scrivere a
      mano, toccando la cifra con la matita), e la riga che fa il conto:
      «Chi paga al tabacchino riceve circa <N> sats al cambio di adesso,

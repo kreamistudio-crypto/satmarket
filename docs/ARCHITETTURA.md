@@ -26673,7 +26673,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   «paga in contanti nel punto vendita», normalizzato a «479-868-518»
   da `payCodeP2P` (trattini o spazi facoltativi, e SOLO nove cifre: il
   numero d'ordine a 17 e' storto); l'importo coi centesimi (lo stesso
-  campo `p2pNuovoEuro`); la scadenza del PayCode da un selettore, fra
+  campo `p2pNuovoEuro`); la scadenza del PayCode da un FOGLIO DI CASA
+  (9 ott 2026, al posto dell'`<input type="datetime-local">` che su
+  iPhone non si vedeva: la riga `p2pNuovoTabScade` e' il campo-bottone
+  `.p2p-tendina` — «Scade lunedì 12 ottobre alle 14:30» da
+  `etichettaScadeTabP2P`, o «Scegli quando scade» — e apre
+  `#p2pScadeSheet` con `apriScadeTabP2P`, subito dopo «Pubblica» nel
+  DOM: le chip dei quattro giorni da oggi, le griglie delle 24 ore e
+  dei minuti a passi di cinque, SOLO TOCCHI; le celle fuori finestra
+  sono spente (`grigliaScadeTabP2P`), la frase e' quella di
+  `giudizioTappaTabP2P(3)`, la scorciatoia del giorno propone l'ora di
+  adesso con un'ora di margine dal tetto (`proponiOraScadeP2P`), e
+  «Conferma» scrive in `p2pNuovoTab.scade` LA STESSA STRINGA di prima,
+  quella di `campoDaScadeP2P`), fra
   UN'ORA e 72 ORE (`P2P_PAYCODE_MIN_S`/`MAX_S`, prima della finestra
   della garanzia, che parla solo se piu' stretta); il PREMIO da −20 a +20
   con una cifra decimale (23 set 2026, `premioTabacchinoP2P`: «2,55» e

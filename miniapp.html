@@ -4541,7 +4541,30 @@
   /* lo scontrino veste il colore dei metodi, di cui e' figlio (set
      2026, col tabacchino); e i suoi tre campi stanno in colonna */
   .p2p-sez-ico.ico-scontrino{background:var(--ship-bg);color:var(--ship-text)}
-  #p2pNuovoTabScade{margin-top:8px}
+  /* ---- IL FOGLIO DELLA SCADENZA (9 ott 2026): le chip del giorno, le
+     griglie di ore e minuti, la riga che rilegge la scelta — tutto a
+     tocchi, niente campo e niente tastiera (vedi apriScadeTabP2P).
+     Le chip sono le `.chip` di casa; le celle hanno la stessa veste
+     ma squadrata, che in una griglia di sei la pillola si schiaccia. */
+  .p2p-scade-eti{font-size:12px;font-weight:800;text-transform:uppercase;
+    letter-spacing:.02em;color:var(--muted);margin:14px 0 6px}
+  .p2p-scade-chip{display:flex;flex-wrap:wrap;gap:8px}
+  /* le `.chip` non dicono il carattere, e un <button> non lo eredita da
+     solo: in WebKit uscivano con le grazie (visto negli scatti del
+     9 ott 2026) */
+  .p2p-scade-chip .chip{font-family:inherit}
+  .p2p-scade-griglia{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+  .p2p-scade-cella{min-width:0;border:1.5px solid var(--field-line);background:var(--card);
+    border-radius:10px;padding:9px 0;font:inherit;font-weight:700;font-size:14px;
+    color:var(--ink);text-align:center;cursor:pointer}
+  .p2p-scade-cella.sel{background:var(--ink);color:var(--on-ink);border-color:var(--ink);font-weight:800}
+  .p2p-scade-cella:disabled,.p2p-scade-chip .chip:disabled{opacity:.35;cursor:default}
+  .p2p-scade-cella:focus-visible,.p2p-scade-chip .chip:focus-visible{outline:2px solid var(--sats);outline-offset:2px}
+  .p2p-scade-riga{margin-top:14px;font-weight:800;font-size:15px;color:var(--ink);line-height:1.35}
+  .p2p-scade-riga.vuota{color:var(--muted);font-weight:700}
+  .p2p-scade-fra{color:var(--muted);font-weight:700;font-size:13px}
+  #p2pScadeSheet .p2p-tappa-err{margin-top:6px}
+  #p2pScadeSheet .btn.orange{margin-top:14px}
   .p2p-ico{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5;
     stroke-linecap:round;stroke-linejoin:round}
   /* IL GLIFO STA NELLO STESSO TONDO e ne prende il colore, ma non la
@@ -4556,7 +4579,7 @@
   /* IL CAMPO DENTRO UN RIQUADRO PERDE IL RECINTO e tiene la sola riga
      sotto: il recinto ce l'ha gia' il riquadro, e due bordi annidati
      sono il rumore che questo disegno esiste per togliere. */
-  .p2p-sez input[type=text],.p2p-sez input[type=number],.p2p-sez input[type=datetime-local],.p2p-sez select{
+  .p2p-sez input[type=text],.p2p-sez input[type=number],.p2p-sez select{
     width:100%;border:0;border-bottom:1.5px solid var(--field-line);border-radius:0;
     background:none;color:var(--ink);font:inherit;font-weight:700;font-size:15px;
     padding:6px 0;-webkit-appearance:none;appearance:none}
@@ -12978,6 +13001,19 @@ document.getElementById('cartello')?.remove();</script>
       <span class="foglio-back vuoto" aria-hidden="true">&#8592;</span>
     </div>
     <div class="foglio-corpo" id="p2pNuovoCorpo"></div>
+  </div>
+
+  <!-- LA SCADENZA DEL PAYCODE (9 ott 2026): il foglio che la riga del
+       passo 3 di Barattozon apre SOPRA il foglio «Pubblica». Sta DOPO di
+       lui nel DOM, ed e' l'ordine che decide chi copre chi e chi si
+       chiude per primo con l'indietro (come «Quanto» sopra il dettaglio).
+       Markup fisso tranne il corpo, che scrive `renderScadeTabP2P`: le
+       chip del giorno, le griglie di ore e minuti, la riga che rilegge la
+       scelta e la frase del giudice. SOLO BOTTONI: niente tastiera. -->
+  <div class="sheet" id="p2pScadeSheet" role="dialog" aria-modal="true" aria-labelledby="p2pScadeTit">
+    <div class="grab"></div>
+    <h3 id="p2pScadeTit">⏳ Quando scade il PayCode</h3>
+    <div id="p2pScadeCorpo"></div>
   </div>
 
   <!-- IL FANTASMA DELLA MORFOSI (set 2026): il bottone che, al tocco
@@ -29412,6 +29448,7 @@ function closeSheet(){
   el('modChiaveSheet').classList.remove('open');
   pulisciChiaveModP2P();
   el('p2pNuovoSheet').classList.remove('open');
+  el('p2pScadeSheet').classList.remove('open');
   el('p2pDettSheet').classList.remove('open');
   el('p2pQuantoSheet').classList.remove('open');
   el('p2pFiltroSheet').classList.remove('open');
@@ -61563,11 +61600,6 @@ function testataPercorsoTabP2P(passo){
   return 'Passo ' + passo + ' di 4 · ' + P2P_TAPPE_TAB[passo - 1].t;
 }
 function percorsoTabacchinoP2P(val){
-  const adessoTab = Math.floor(Date.now() / 1000);
-  const finestraTab = finestraGaranziaP2P(p2pInfo);
-  /* il campo data va da un'ora a 72 ore, e comunque non oltre la
-     garanzia letta viva (che con 576 blocchi e' piu' larga) */
-  const maxTab = finestraTab > 0 ? Math.min(P2P_PAYCODE_MAX_S, finestraTab) : P2P_PAYCODE_MAX_S;
   const campi = campiNuovoP2P();
   const passo = passoTabacchinoP2P(campi);
   /* la spia dei passi 2 e 3 (7 ott 2026): ✕ rossa e frase a valore
@@ -61615,12 +61647,19 @@ function percorsoTabacchinoP2P(val){
          (`p2pTabAiuto2`): la regola dei 25 € non si legge due volte */
       '<div class="hint" id="p2pTabAiuto2"' + (giud[2].stato === 'storto' ? ' hidden' : '') + '>Quello scritto sulla mail di Amazon, coi centesimi: al tabacchino si paga esattamente quella cifra. Amazon accetta i contanti fino a <b>999 €</b> per ordine, senza commissione'
         + (minEuroBzP2P() ? '; un PayCode Barattozon vale almeno <b>' + minEuroBzP2P() + ' €</b>.' : ', senza minimo.') + '</div>') +
+    /* LA RIGA, NON PIU' UN <input type="datetime-local"> (9 ott 2026):
+       lo stesso campo-bottone della valuta e dei metodi, che dice la
+       scadenza per esteso o invita a sceglierla, e apre il foglio di
+       casa. Tiene l'id (ogni «manca» del giudice lo trova) e il `value`
+       (che `cambiaTabP2P` rilegge come leggeva il campo). Il perche'
+       sta sopra apriScadeTabP2P. */
     tappa(3, P2P_TAPPE_TAB[2].t,
-      '<input id="p2pNuovoTabScade" type="datetime-local" ' +
-        'value="' + esc(p2pNuovoTab.scade) + '" ' +
-        'min="' + campoDaScadeP2P(adessoTab + P2P_PAYCODE_MIN_S) + '" ' +
-        'max="' + campoDaScadeP2P(adessoTab + maxTab) + '" ' +
-        'oninput="cambiaTabP2P()" onblur="rivelaSpiaTabP2P(3)" aria-label="Quando scade il PayCode"' + ariaTappaTabP2P(3, giud[3]) + '>',
+      '<button type="button" id="p2pNuovoTabScade" class="p2p-tendina' +
+        (scadeDaCampoP2P(p2pNuovoTab.scade) > 0 ? '' : ' vuota') + '" ' +
+        'value="' + esc(p2pNuovoTab.scade) + '" aria-haspopup="dialog" ' +
+        'onclick="apriScadeTabP2P()"' + ariaTappaTabP2P(3, giud[3]) + '>' +
+        '<span>' + esc(etichettaScadeTabP2P(p2pNuovoTab.scade)) + '</span>' +
+        '<i aria-hidden="true">▾</i></button>',
       '<div class="hint">⏳ Amazon dà 72 ore dal checkout: copia la scadenza dalla mail. Deve stare fra un\'ora e 72 ore da adesso. Nel libro l\'ordine resta fino a <b>due ore prima</b> di quella scadenza, per lasciare a chi paga il tempo di andare al tabacchino; poi esce da solo.</div>') +
     tappa(4, P2P_TAPPE_TAB[3].t,
       '<div class="p2p-premio">' +
@@ -61807,6 +61846,277 @@ function cambiaTabP2P(){
   /* il premio ha i suoi due gestori (`cambiaPremioTabP2P`), che il
      cursore e il campo a mano non si leggono con un `value` solo */
   aggiornaPercorsoTabP2P();
+}
+/* ---- IL SELETTORE DELLA SCADENZA (9 ott 2026, richiesta di Andrea) ----
+   Il passo 3 era un <input type="datetime-local">, «la strada corta»
+   del 23 set. Dal vivo aveva tre difetti: su Chrome mostrava il
+   segnaposto di sistema «gg/mm/aa, --:--»; al tocco apriva il
+   selettore del telefono, che non e' di casa e non si veste; e su
+   iPhone — Safari e Telegram iOS — NON SI VEDEVA PROPRIO, quindi chi
+   aveva un iPhone non riusciva a pubblicare. Il perche' verosimile:
+   il campo portava `-webkit-appearance:none` come i fratelli di testo
+   (la regola del riquadro), e su iOS un campo data senza la veste di
+   sistema resta un rettangolo vuoto e senza misura. Non si e' curato
+   il CSS: si e' tolto il campo.
+   ADESSO il passo 3 e' una RIGA (`.p2p-tendina`, il campo-bottone
+   della valuta e dei metodi) che dice la scadenza per esteso — «Scade
+   lunedì 12 ottobre alle 14:30» — o «Scegli quando scade», e al tocco
+   apre #p2pScadeSheet, un foglio dal basso di casa sopra il foglio
+   «Pubblica» (come «Quanto» sta sopra il dettaglio). Dentro, SOLO
+   TOCCHI: le chip del GIORNO (dentro 72 ore i giorni possibili sono al
+   piu' quattro: «Oggi», «Domani», poi «dom 11 ott»), la griglia delle
+   24 ORE e quella dei MINUTI a passi di cinque. Niente campo di testo,
+   quindi niente tastiera: e' la lezione dei fogli dal basso e
+   dell'iPhone (18-19 set 2026), pagata due volte.
+   LA SCORCIATOIA e' nel giorno: toccato un giorno con l'ora ancora
+   vuota, il foglio propone l'ora di adesso ai cinque minuti — «domani a
+   quest'ora» e' un tocco solo — ma solo con UN'ORA DI MARGINE dal
+   tetto: una scadenza proposta al bordo delle 72 ore invecchia mentre
+   si finisce il foglio, e il giudice della pubblicazione la boccerebbe.
+   Al quarto giorno quest'ora e' oltre, e l'ora resta da scegliere.
+   I LIMITI SONO QUELLI DI SEMPRE, letti dallo stesso posto: fra
+   P2P_PAYCODE_MIN_S e il minore fra P2P_PAYCODE_MAX_S e la garanzia
+   letta viva (il conto che facevano `min` e `max` del campo). Le celle
+   fuori sono spente, e la frase sotto la riga e' quella del giudice del
+   passo (`giudizioTappaTabP2P(3)`), chiamato e non riscritto.
+   IL VALORE CHE RESTA E' LO STESSO DI IERI: la stringa «AAAA-MM-GGTHH:MM»
+   di `campoDaScadeP2P` in `p2pNuovoTab.scade`, che `scadeDaCampoP2P`,
+   `ordineDaCampiP2P` (l'`expires_at`) e la riga «Scade:» del recapito
+   rileggono come prima — il foglio cambia il gesto, non il filo. Ora
+   locale di chi scrive, come le gemelle (vedi dataTabacchinoP2P). */
+const P2P_GIORNI_LUNGHI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+const P2P_MESI_LUNGHI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
+                         'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+const P2P_SCADE_PASSO_MIN = 5;          // i minuti vanno di cinque in cinque
+const P2P_SCADE_MARGINE_PROPOSTA_S = 3600;  // la scorciatoia sta un'ora sotto il tetto
+let p2pScadeScelta = {giorno: -1, ora: -1, minuto: 0};
+let p2pScadeAdesso = 0;             // l'«adesso» con cui il foglio si e' aperto
+let p2pScadeTrigger = null;         // la riga che l'ha aperto, per il focus al ritorno
+/* PURA: «lunedì 12 ottobre alle 14:30»; '' su quel che non e' un'ora */
+function scadeInParoleP2P(epoch){
+  const n = Number(epoch) || 0;
+  if (!(n > 0)) return '';
+  const d = new Date(n * 1000);
+  if (isNaN(d.getTime())) return '';
+  const due = x => (x < 10 ? '0' : '') + x;
+  return P2P_GIORNI_LUNGHI[d.getDay()] + ' ' + d.getDate() + ' ' + P2P_MESI_LUNGHI[d.getMonth()]
+    + ' alle ' + due(d.getHours()) + ':' + due(d.getMinutes());
+}
+/* PURA: la riga del passo 3, dal valore com'e' scritto nel foglio */
+function etichettaScadeTabP2P(scade){
+  const q = scadeDaCampoP2P(scade);
+  return q > 0 ? 'Scade ' + scadeInParoleP2P(q) : 'Scegli quando scade';
+}
+/* PURA: «2 giorni e 3 ore», «5 ore e 20 minuti», «1 ora» — il tempo che
+   resta detto a parole, che una data da sola non dice quanto e' vicina */
+function fraScadeTabP2P(sec){
+  const s = Math.max(0, Math.floor(Number(sec) || 0));
+  const g = Math.floor(s / 86400), h = Math.floor(s / 3600) % 24, m = Math.floor(s / 60) % 60;
+  const pezzo = (n, uno, tanti) => n + ' ' + (n === 1 ? uno : tanti);
+  if (g > 0) return pezzo(g, 'giorno', 'giorni') + (h ? ' e ' + pezzo(h, 'ora', 'ore') : '');
+  if (h > 0) return pezzo(h, 'ora', 'ore') + (m ? ' e ' + pezzo(m, 'minuto', 'minuti') : '');
+  return pezzo(m, 'minuto', 'minuti');
+}
+/* PURA: i quattro giorni da oggi, ognuno con anno/mese/giorno e il nome
+   che porta sulla chip */
+function giorniScadeTabP2P(adesso){
+  const base = new Date(adesso * 1000);
+  const out = [];
+  for (let i = 0; i < 4; i++) {
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i, 0, 0, 0, 0);
+    out.push({a: d.getFullYear(), me: d.getMonth(), g: d.getDate(),
+              eti: i === 0 ? 'Oggi' : i === 1 ? 'Domani'
+                 : P2P_GIORNI_BREVI[d.getDay()] + ' ' + d.getDate() + ' ' + P2P_MESI_BREVI[d.getMonth()]});
+  }
+  return out;
+}
+/* PURA: l'epoch di giorno+ora+minuto, 0 se quell'ora non esiste (il
+   salto dell'ora legale: si rilegge e si confronta, come le gemelle) */
+function epochScadeTabP2P(giorno, ora, minuto){
+  if (!giorno || !(ora >= 0) || !(minuto >= 0)) return 0;
+  const d = new Date(giorno.a, giorno.me, giorno.g, ora, minuto, 0, 0);
+  if (d.getDate() !== giorno.g || d.getHours() !== ora || d.getMinutes() !== minuto) return 0;
+  return Math.floor(d.getTime() / 1000);
+}
+/* PURA: la finestra del foglio da `adesso`: da un'ora al minore fra 72
+   ore e la garanzia letta viva (0 = non la so, e vale il tetto) — lo
+   stesso conto del `min` e del `max` che aveva il campo */
+function finestraScadeTabP2P(adesso, finestra){
+  const maxS = finestra > 0 ? Math.min(P2P_PAYCODE_MAX_S, finestra) : P2P_PAYCODE_MAX_S;
+  return {da: adesso + P2P_PAYCODE_MIN_S, a: adesso + maxS};
+}
+/* PURA: cosa si puo' toccare — i giorni, le 24 ore del giorno scelto, i
+   dodici minuti dell'ora scelta — ognuno con `ok` se almeno un suo
+   minuto sta nella finestra */
+function grigliaScadeTabP2P(adesso, finestra, scelta){
+  const f = finestraScadeTabP2P(adesso, finestra);
+  const ultimo = 60 - P2P_SCADE_PASSO_MIN;
+  const giorni = giorniScadeTabP2P(adesso).map(g => Object.assign({}, g, {
+    ok: epochScadeTabP2P(g, 0, 0) > 0 && epochScadeTabP2P(g, 23, ultimo) >= f.da
+        && epochScadeTabP2P(g, 0, 0) <= f.a}));
+  const giorno = giorni[scelta.giorno] || null;
+  const ore = [];
+  for (let h = 0; h < 24; h++) {
+    const primo = giorno ? epochScadeTabP2P(giorno, h, 0) : 0;
+    const fine = giorno ? epochScadeTabP2P(giorno, h, ultimo) : 0;
+    ore.push({h, ok: primo > 0 && fine >= f.da && primo <= f.a});
+  }
+  const minuti = [];
+  for (let m = 0; m < 60; m += P2P_SCADE_PASSO_MIN) {
+    const q = (giorno && scelta.ora >= 0) ? epochScadeTabP2P(giorno, scelta.ora, m) : 0;
+    minuti.push({m, ok: q > 0 && q >= f.da && q <= f.a});
+  }
+  return {giorni, ore, minuti, da: f.da, a: f.a};
+}
+/* PURA: la scelta che rilegge un valore gia' scritto (riaprendo il
+   foglio si riparte da li', coi minuti ai cinque), o la scelta vuota */
+function sceltaDaScadeTabP2P(scade, adesso){
+  const vuota = {giorno: -1, ora: -1, minuto: 0};
+  const q = scadeDaCampoP2P(scade);
+  if (!(q > 0)) return vuota;
+  const d = new Date(q * 1000);
+  const i = giorniScadeTabP2P(adesso).findIndex(g =>
+    g.a === d.getFullYear() && g.me === d.getMonth() && g.g === d.getDate());
+  if (i < 0) return vuota;
+  return {giorno: i, ora: d.getHours(), minuto: d.getMinutes() - d.getMinutes() % P2P_SCADE_PASSO_MIN};
+}
+/* PURA: la scelta risistemata dopo un tocco sul giorno o sull'ora:
+   un'ora che nel giorno nuovo e' fuori finestra si SVUOTA (mai tosata
+   in silenzio su un'altra), e il minuto scende al primo che va */
+function sistemaSceltaScadeP2P(scelta, adesso, finestra){
+  const s = Object.assign({}, scelta);
+  let gr = grigliaScadeTabP2P(adesso, finestra, s);
+  if (s.ora >= 0 && !gr.ore[s.ora].ok) s.ora = -1;
+  if (s.ora < 0) return s;
+  gr = grigliaScadeTabP2P(adesso, finestra, s);
+  const mio = gr.minuti.find(x => x.m === s.minuto);
+  if (!mio || !mio.ok) {
+    const primo = gr.minuti.find(x => x.ok);
+    s.minuto = primo ? primo.m : 0;
+  }
+  return s;
+}
+/* PURA: la scorciatoia del giorno — l'ora di adesso ai cinque minuti,
+   se nel giorno scelto sta nella finestra con un'ora di margine dal
+   tetto; se no la scelta torna com'era, con l'ora da scegliere */
+function proponiOraScadeP2P(scelta, adesso, finestra){
+  if (scelta.ora >= 0) return scelta;
+  const d = new Date(adesso * 1000);
+  const prova = Object.assign({}, scelta, {ora: d.getHours(),
+    minuto: d.getMinutes() - d.getMinutes() % P2P_SCADE_PASSO_MIN});
+  const giorno = giorniScadeTabP2P(adesso)[prova.giorno] || null;
+  const q = epochScadeTabP2P(giorno, prova.ora, prova.minuto);
+  const f = finestraScadeTabP2P(adesso, finestra);
+  return (q >= f.da && q <= f.a - P2P_SCADE_MARGINE_PROPOSTA_S) ? prova : scelta;
+}
+/* PURA: il valore scelto com'e' scritto nel foglio — LA STESSA STRINGA
+   che scriveva il campo di ieri — o '' se la scelta non e' completa */
+function valoreScadeTabP2P(scelta, adesso){
+  const giorno = giorniScadeTabP2P(adesso)[scelta.giorno] || null;
+  return campoDaScadeP2P(epochScadeTabP2P(giorno, scelta.ora, scelta.minuto));
+}
+/* PURA: il corpo del foglio, dalla scelta e dall'«adesso» dell'apertura.
+   Il giudizio e' quello del passo 3, sul valore che si sta per scrivere. */
+function corpoScadeTabP2P(scelta, adesso, finestra){
+  const gr = grigliaScadeTabP2P(adesso, finestra, scelta);
+  const valore = valoreScadeTabP2P(scelta, adesso);
+  const g = valore ? giudizioTappaTabP2P(3, {tab: {scade: valore}, finestra, adesso})
+                   : {stato: 'vuoto', frase: ''};
+  const q = scadeDaCampoP2P(valore);
+  const due = x => (x < 10 ? '0' : '') + x;
+  const radio = (classe, sel, ok, onclick, testo) =>
+    '<button type="button" role="radio" class="' + classe + (sel ? (classe === 'chip' ? ' active' : ' sel') : '') + '"'
+    + ' aria-checked="' + (sel ? 'true' : 'false') + '"' + (ok ? '' : ' disabled')
+    + ' onclick="' + onclick + '">' + testo + '</button>';
+  return '<div class="hint">Copiala dalla mail di Amazon: deve stare fra un\'ora e 72 ore da adesso. Prima il giorno, poi l\'ora e i minuti.</div>'
+    + '<div class="p2p-scade-eti" id="p2pScadeEtiGiorno">Giorno</div>'
+    + '<div class="p2p-scade-chip" role="radiogroup" aria-labelledby="p2pScadeEtiGiorno">'
+    + gr.giorni.map((gg, i) => radio('chip', i === scelta.giorno, gg.ok,
+        'scegliGiornoScadeP2P(' + i + ')', esc(gg.eti))).join('')
+    + '</div>'
+    + '<div class="p2p-scade-eti" id="p2pScadeEtiOra">Ora</div>'
+    + '<div class="p2p-scade-griglia" role="radiogroup" aria-labelledby="p2pScadeEtiOra">'
+    + gr.ore.map(o => radio('p2p-scade-cella', o.h === scelta.ora, o.ok,
+        'scegliOraScadeP2P(' + o.h + ')', due(o.h))).join('')
+    + '</div>'
+    + '<div class="p2p-scade-eti" id="p2pScadeEtiMin">Minuti</div>'
+    + '<div class="p2p-scade-griglia" role="radiogroup" aria-labelledby="p2pScadeEtiMin">'
+    + gr.minuti.map(m => radio('p2p-scade-cella', scelta.ora >= 0 && m.m === scelta.minuto, m.ok,
+        'scegliMinutoScadeP2P(' + m.m + ')', due(m.m))).join('')
+    + '</div>'
+    + '<div class="p2p-scade-riga' + (q > 0 ? '' : ' vuota') + '" id="p2pScadeRiga" aria-live="polite">'
+    + (q > 0
+       ? esc('Scade ' + scadeInParoleP2P(q))
+         + (g.stato === 'buono' ? ' <span class="p2p-scade-fra">· fra ' + esc(fraScadeTabP2P(q - adesso)) + '</span>' : '')
+       : 'Scegli il giorno e l\'ora')
+    + '</div>'
+    + '<div class="p2p-tappa-err" id="p2pScadeErr"' + (g.stato === 'storto' ? '' : ' hidden') + '>' + esc(g.frase) + '</div>'
+    + '<button type="button" class="btn orange" id="p2pScadeOk" onclick="confermaScadeTabP2P()"'
+    + (g.stato === 'buono' ? '' : ' disabled') + '>Conferma</button>'
+    + '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>';
+}
+function renderScadeTabP2P(fuoco){
+  const box = el('p2pScadeCorpo');
+  if (!box) return;
+  box.innerHTML = corpoScadeTabP2P(p2pScadeScelta, p2pScadeAdesso, finestraGaranziaP2P(p2pInfo));
+  /* il fuoco torna sulla cella appena toccata: il corpo e' stato
+     riscritto, e senza di questo la tastiera ripartirebbe dal foglio */
+  const n = fuoco && box.querySelector(fuoco);
+  if (n) try { n.focus({preventScroll: true}); } catch(e){}
+}
+function apriScadeTabP2P(){
+  haptic();
+  p2pScadeTrigger = el('p2pNuovoTabScade');
+  p2pScadeAdesso = Math.floor(Date.now() / 1000);
+  p2pScadeScelta = sceltaDaScadeTabP2P(p2pNuovoTab.scade, p2pScadeAdesso);
+  renderScadeTabP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pScadeSheet').classList.add('open');
+  const box = el('p2pScadeCorpo');
+  const primo = box.querySelector('.chip.active') || box.querySelector('.chip:not(:disabled)');
+  if (primo) try { primo.focus({preventScroll: true}); } catch(e){}
+}
+function scegliGiornoScadeP2P(i){
+  haptic();
+  const fin = finestraGaranziaP2P(p2pInfo);
+  p2pScadeScelta = sistemaSceltaScadeP2P(
+    proponiOraScadeP2P(Object.assign({}, p2pScadeScelta, {giorno: i}), p2pScadeAdesso, fin),
+    p2pScadeAdesso, fin);
+  renderScadeTabP2P('.p2p-scade-chip .chip.active');
+}
+function scegliOraScadeP2P(h){
+  haptic();
+  p2pScadeScelta = sistemaSceltaScadeP2P(Object.assign({}, p2pScadeScelta, {ora: h}),
+                                         p2pScadeAdesso, finestraGaranziaP2P(p2pInfo));
+  renderScadeTabP2P('.p2p-scade-griglia .p2p-scade-cella.sel');
+}
+function scegliMinutoScadeP2P(m){
+  haptic();
+  p2pScadeScelta = Object.assign({}, p2pScadeScelta, {minuto: m});
+  renderScadeTabP2P('.p2p-scade-griglia:last-of-type .p2p-scade-cella.sel');
+}
+/* la riga del passo 3 si riveste IN PLACE dal valore del foglio: il
+   testo, il `value` (che `cambiaTabP2P` rilegge) e il grigio del vuoto */
+function vestiRigaScadeTabP2P(){
+  const b = el('p2pNuovoTabScade');
+  if (!b) return;
+  b.setAttribute('value', p2pNuovoTab.scade);
+  b.classList.toggle('vuota', !(scadeDaCampoP2P(p2pNuovoTab.scade) > 0));
+  const t = b.querySelector('span');
+  if (t) t.textContent = etichettaScadeTabP2P(p2pNuovoTab.scade);
+}
+function confermaScadeTabP2P(){
+  const valore = valoreScadeTabP2P(p2pScadeScelta, p2pScadeAdesso);
+  if (!valore) return;
+  haptic();
+  p2pNuovoTab.scade = valore;
+  vestiRigaScadeTabP2P();
+  chiudiFoglioP2P('p2pScadeSheet');
+  if (p2pScadeTrigger) { try { p2pScadeTrigger.focus({preventScroll: true}); } catch(e){} p2pScadeTrigger = null; }
+  /* il percorso si riscrive in place come dopo ogni tasto, e la spia
+     parla SUBITO: qui non c'e' un dito che sta ancora scrivendo */
+  aggiornaPercorsoTabP2P();
+  rivelaSpiaTabP2P(3);
 }
 function apriTendinaMetodiP2P(){
   haptic();
