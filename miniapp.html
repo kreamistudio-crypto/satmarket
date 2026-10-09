@@ -3767,6 +3767,22 @@
      modale centrato, e a pieno schermo su un monitor sarebbe una
      finestra vuota con cinque riquadri in mezzo. */
   .sheet.pieno .grab{display:none}
+  /* IL FOGLIO PIENO COPERTO DA UN ALTRO FOGLIO (9 ott 2026, dal telefono
+     di Andrea): il velo `.sheet-bg` sta SOTTO tutti i fogli (40 contro
+     41), quindi un foglio dal basso aperto sopra una pagina piena — la
+     scadenza sopra «Pubblica», il picker della valuta, «Quanto» sopra il
+     dettaglio — lasciava la pagina sotto NUDA nella striscia in cima:
+     oltre il bordo del foglio nuovo spuntava un pezzo del logo
+     Barattozon. La classe `coperto` la mette `vestiFogliCoperti` (dallo
+     stesso osservatore delle classi della cronologia) a ogni foglio
+     pieno aperto che ha DOPO di se' un altro foglio aperto; il velo e'
+     un ::after dentro il foglio pieno — stesso colore del velo di casa,
+     stessa corsa — che ne copre il riquadro intero, angoli compresi, e
+     si prende i tocchi su quel che sta sotto (la freccia della testata
+     nella striscia non si tocca piu' per sbaglio). */
+  .sheet.pieno.coperto::after{content:'';position:absolute;inset:0;z-index:5;
+    background:rgba(20,20,22,.5);border-radius:inherit;animation:veloCoperto .15s}
+  @keyframes veloCoperto{from{opacity:0}to{opacity:1}}
   @media (max-width:767px){
     /* ⚠️ ANCORATO IN ALTO, e questa riga cura un difetto vero
        (ritocco di Andrea: «al tocco sul campo la pagina scende a
@@ -10015,6 +10031,7 @@
     .sicu-hero img{animation:none}
     .sheet{transition:none}
     .sheet-bg.open{animation:none}
+    .sheet.pieno.coperto::after{animation:none}
     body.con-barra #barraCompra{animation:none}
     body.con-pacco #barraPacco{animation:none}
   }
@@ -16623,6 +16640,27 @@ function navVista(){
 /* Ramo + categoria in una stringa sola, che e' quanto basta a
    ricostruire la vetrina e a distinguere due entry diverse. */
 const chiaveVetrina = () => ramoVetrina + '|' + activeCat;
+/* ---- IL VELO FRA DUE FOGLI (9 ott 2026, dal telefono di Andrea) ----
+   PURA: fra i fogli nell'ordine del DOM — {id, pieno, aperto} —, quali
+   pieni e aperti stanno SOTTO un altro foglio aperto (cioe' ne hanno
+   uno dopo di se'). E' lo stesso ordine che decide chi copre chi. */
+function fogliCoperti(fogli){
+  let ultimo = -1;
+  fogli.forEach((f, i) => { if (f.aperto) ultimo = i; });
+  return fogli.filter((f, i) => f.pieno && f.aperto && i < ultimo).map(f => f.id);
+}
+/* la classe `coperto` sui fogli pieni che lo sono, e via dagli altri. Si
+   tocca la classe SOLO se cambia: un toggle a vuoto farebbe scattare di
+   nuovo l'osservatore che chiama questa, a vuoto. */
+function vestiFogliCoperti(){
+  const nodi = [...document.querySelectorAll('.sheet')];
+  const coperti = fogliCoperti(nodi.map(n => ({id: n.id,
+    pieno: n.classList.contains('pieno'), aperto: n.classList.contains('open')})));
+  nodi.forEach(n => {
+    const deve = coperti.indexOf(n.id) >= 0;
+    if (n.classList.contains('coperto') !== deve) n.classList.toggle('coperto', deve);
+  });
+}
 /* La pila: la vista in fondo, sopra gli strati nell'ordine in cui si
    coprono (che e' quello degli z-index: fogli 41, lightbox 70,
    fotocamera 75, tour 80,
@@ -17334,6 +17372,15 @@ function navMotore(){
   [...document.querySelectorAll('.view, .sheet'),
    el('lightbox'), el('fotocamera'), el('tour'), el('tourP2P'), el('testModale')].forEach(n =>
     n && occhio.observe(n, {attributes:true, attributeFilter:['class']}));
+  /* IL VELO FRA DUE FOGLI (9 ott 2026): a ogni cambio di classe di un
+     foglio si riveste chi e' coperto — e' lo stesso fatto della
+     cronologia (un foglio si e' aperto o chiuso), e cosi' ogni via di
+     chiusura, mirata o no, toglie il velo da sola. Un occhio suo e non
+     una riga in navRiflette: quello ragiona di cronologia, questo di
+     vestiti. */
+  const occhioVelo = new MutationObserver(() => vestiFogliCoperti());
+  document.querySelectorAll('.sheet').forEach(n =>
+    occhioVelo.observe(n, {attributes:true, attributeFilter:['class']}));
   addEventListener('popstate', e => {
     /* un indietro mentre l'avvio non e' ancora arrivato alla pagina
        ricordata: vince il dito, e la ricostruzione non parte piu' */

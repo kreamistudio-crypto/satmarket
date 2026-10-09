@@ -42204,3 +42204,66 @@ passano solo con «tutti». Non provato dal vivo il DM Nostr (coperto dalla
 prova su `notifica()`); non provato il Barattozon dal vivo (coperto dal
 banco).
 
+
+
+## Il velo fra due fogli: il pieno coperto dalla scadenza (9 ott 2026, ritocco)
+
+**IL CASO (Andrea, dal telefono, un'ora dopo e22596f).** Aperto il foglio
+«Scegli quando scade» sopra «Pubblica», in cima si vedeva un pezzettino
+del logo Barattozon del foglio sotto, oltre il bordo del foglio nuovo.
+
+**IL PERCHÉ.** I fogli dal basso lasciano 16px (e di più quando il
+contenuto è corto) fra il loro bordo alto e la cima dello schermo, e in
+quella striscia si vede quel che sta sotto, velato da `.sheet-bg`. Ma
+il velo sta SOTTO tutti i fogli (z-index 40 contro 41): quando sotto
+c'è un altro foglio — «Pubblica», che è un `.sheet.pieno` a tutto
+schermo — la striscia mostra lui, nudo e a colori pieni, con la testata
+e il logo. Lo stesso succedeva già al picker della valuta sopra
+«Pubblica» e a «Quanto» sopra il dettaglio del libro: stesso difetto,
+stessa classe, nessuno l'aveva guardato in cima.
+
+**LA CURA.** Il foglio pieno che ha DOPO di sé (nel DOM, che è l'ordine
+che decide chi copre chi) un altro foglio aperto porta la classe
+`coperto`, e un `::after` a tutto riquadro — `inset:0`, `z-index:5`,
+`border-radius:inherit`, il colore del velo di casa `rgba(20,20,22,.5)`
+e una dissolvenza di 150ms spenta con «riduci movimento» — lo copre
+intero, angoli compresi, e si prende i tocchi (la freccia della testata
+che stava nella striscia non si tocca più per sbaglio). `fogliCoperti`
+è pura (la lista dei fogli nell'ordine del DOM → gli id da velare);
+`vestiFogliCoperti` tocca la classe solo se cambia, e la chiama un
+osservatore delle classi su ogni `.sheet`, accanto a quello della
+cronologia: è lo stesso fatto (un foglio si è aperto o chiuso), e così
+ogni via di chiusura — mirata, `closeSheet`, l'indietro — toglie il velo
+da sola, senza una riga in nessun chiudi. Fuori dalla media query: da
+768px in su il pieno è un modale centrato e il velo ne segue gli angoli.
+Niente `:has()`: in questo file non si usa, e l'osservatore c'era già.
+
+**STRADE SCARTATE.** Alzare il velo di casa sopra il pieno (uno z-index
+in più sul foglio in cima): il velo è uno solo per tutta la pila e
+dovrebbe sapere a ogni apertura fra quali due fogli stare. Un `::before`
+del foglio in cima che sborda in alto: il foglio ha `overflow-y:auto` e
+lo taglia. Allungare il foglio della scadenza a tutto schermo: i fogli
+dal basso hanno il loro bordo a 16px per regola, e su un telefono alto
+la striscia tornava comunque. Un velo scoperto SOLO per la scadenza: il
+picker della valuta nello stesso foglio sarebbe rimasto diverso.
+
+**PROVATO.** `prove_foglio_coperto`: il CSS (la regola intera, la
+keyframe, fuori dalla media query, lo stesso colore di `.sheet-bg`,
+«riduci movimento»), il vestito e l'osservatore, i documenti; in node
+`fogliCoperti` sui casi (scadenza sopra «Pubblica», «Pubblica» solo o
+chiuso, il picker, «Quanto» sopra il dettaglio, un pieno sopra un
+piccolo, due piccoli) e `vestiFogliCoperti` su un DOM di cartone: mette
+la classe una volta, a vuoto non tocca niente, la toglie quando il
+foglio sopra si chiude. DAL VIVO con Playwright (server di collaudo
+sulla 8114, relay morto), Chrome a 390×844 e WebKit «iPhone 13», prima
+e dopo: prima, a y=6 il dito trovava `.foglio-testa` di «Pubblica» e il
+logo era in vista sopra il bordo del foglio (a 127px dal bordo su
+Chrome, a 16 sull'iPhone); dopo, il nodo sotto il dito nella striscia è
+«Pubblica» stesso (il suo velo), `::after` con `content` e
+`rgba(20, 20, 22, 0.5)`, e negli scatti la striscia è scura come sotto
+ogni altro foglio. Gli scatti stanno nello scratchpad della sessione
+(`scatti-ritocco/`, con lo scatto del picker della valuta per confronto).
+Il banco della ricarica (`_RICARICA_PROG`) ritaglia `navMotore` intero,
+osservatore nuovo compreso: gli e' servito uno stub di
+`vestiFogliCoperti`, come per `haptic` e i render. Suite intera e
+collaudi della CI: nel rapporto del push.

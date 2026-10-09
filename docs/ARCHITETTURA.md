@@ -28625,6 +28625,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'osservatore delle classi riflette da solo), e il foglio «Quanto»
   degli ordini a intervallo si apre SOPRA di lei senza inventare
   niente — nel DOM sta dopo, ed è l'ordine che decide chi copre chi.
+  E CHI STA SOTTO SI VELA (9 ott 2026): il velo `.sheet-bg` sta sotto
+  tutti i fogli, quindi un foglio pieno con un altro foglio aperto
+  dopo di sé porta la classe `coperto` (`fogliCoperti` pura,
+  `vestiFogliCoperti` da un osservatore delle classi accanto a quello
+  della cronologia) e un `::after` lo copre col colore del velo —
+  vale per il dettaglio sotto «Quanto» e per «Pubblica» sotto la
+  scadenza e sotto il picker della valuta.
   LA CONFERMA NON SPARISCE, CAMBIA CASA: i due bottoni gemelli in
   fondo — «Annulla» e «Compra»/«Vendi», il piede di «Pubblica» — SONO
   la conferma, e la frase che spiegava l'escrow sta sopra di loro

@@ -81933,6 +81933,100 @@ process.stdout.write(JSON.stringify(out));
           [0.0005, 0, 91000 / 1e8, 0, 0], o["metro"])
 
 
+def prove_foglio_coperto():
+    """IL VELO FRA DUE FOGLI (9 ott 2026, dal telefono di Andrea). Il foglio
+    della scadenza si apre sopra «Pubblica», che e' un foglio PIENO; il
+    velo `.sheet-bg` sta sotto tutti i fogli, quindi nella striscia in
+    cima la pagina sotto restava nuda e spuntava un pezzo del logo
+    Barattozon. Adesso il foglio pieno che ha un altro foglio aperto
+    dopo di se' porta la classe `coperto`, e un ::after lo vela col
+    colore del velo di casa. La classe la mette un osservatore delle
+    classi: ogni via di chiusura la toglie da sola."""
+    print("\n[Il velo fra due fogli: il pieno coperto]")
+    import shutil
+    import subprocess
+    import tempfile
+    import json as _js
+    mini = open("miniapp.html", encoding="utf-8").read()
+    stile = mini[mini.index("<style>"):mini.index("</style>")]
+    prova("il CSS: il foglio pieno coperto porta un ::after a tutto riquadro, col colore e la corsa del velo di casa, fuori dalla media query",
+          [True, True, True],
+          [".sheet.pieno.coperto::after{content:'';position:absolute;inset:0;z-index:5;\n    background:rgba(20,20,22,.5);border-radius:inherit;animation:veloCoperto .15s}" in stile,
+           "@keyframes veloCoperto{from{opacity:0}to{opacity:1}}" in stile,
+           stile.index(".sheet.pieno.coperto::after{") < stile.index("    .sheet.pieno{\n      top:0;bottom:auto;")])
+    prova("...e il velo di casa e' quel colore (un posto solo da cambiare, due da tenere uguali)", True,
+          ".sheet-bg{position:fixed;inset:0;background:rgba(20,20,22,.5);z-index:40;display:none}" in stile)
+    prova("...con «riduci movimento» non sfuma, come il velo di casa", True,
+          "    .sheet-bg.open{animation:none}\n    .sheet.pieno.coperto::after{animation:none}\n" in stile)
+    _vesti = pezzo_js(mini, "function vestiFogliCoperti(){", "\n}\n")
+    prova("il vestito legge tutti i fogli nell'ordine del DOM e tocca la classe solo se cambia",
+          [True, True],
+          ["const nodi = [...document.querySelectorAll('.sheet')];" in _vesti,
+           "if (n.classList.contains('coperto') !== deve) n.classList.toggle('coperto', deve);" in _vesti])
+    prova("...e lo chiama un osservatore delle classi su ogni foglio, accanto a quello della cronologia", True,
+          "  const occhioVelo = new MutationObserver(() => vestiFogliCoperti());\n"
+          "  document.querySelectorAll('.sheet').forEach(n =>\n"
+          "    occhioVelo.observe(n, {attributes:true, attributeFilter:['class']}));\n" in mini
+          and mini.index("const occhioVelo = ") > mini.index("const occhio = new MutationObserver(() => navRiflette());"))
+    prova("i documenti sanno del velo", [True, True],
+          ["## Il velo fra due fogli" in open("docs/CANTIERI.md", encoding="utf-8").read(),
+           "vestiFogliCoperti" in open("docs/ARCHITETTURA.md", encoding="utf-8").read()])
+    node = shutil.which("node")
+    if not node:
+        salta("il velo fra due fogli", "serve node")
+        return
+    _prog = (pezzo_js(mini, "function fogliCoperti(fogli){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function vestiFogliCoperti(){", "\n}\n") + "\n}\n"
+             + r"""
+const F = (id, pieno, aperto) => ({id, pieno, aperto});
+/* il DOM di cartone: classList vere, e si contano i toggle */
+let TOGGLE = 0;
+function nodo(id, classi){
+  const s = new Set(classi);
+  return {id, classList: {contains: c => s.has(c), toggle(c, v){ TOGGLE++; v ? s.add(c) : s.delete(c); }}, classi: () => [...s]};
+}
+let NODI = [nodo('p2pNuovoSheet', ['sheet', 'pieno', 'open']), nodo('p2pScadeSheet', ['sheet', 'open']), nodo('pickerSheet', ['sheet'])];
+const document = {querySelectorAll: () => NODI};
+vestiFogliCoperti(); const t1 = TOGGLE; const c1 = NODI[0].classi();
+vestiFogliCoperti(); const t2 = TOGGLE;
+NODI[1] = nodo('p2pScadeSheet', ['sheet']);
+vestiFogliCoperti(); const t3 = TOGGLE; const c3 = NODI[0].classi();
+console.log(JSON.stringify({
+  scade: fogliCoperti([F('p2pNuovoSheet', true, true), F('p2pScadeSheet', false, true), F('pickerSheet', false, false)]),
+  solo: fogliCoperti([F('p2pNuovoSheet', true, true), F('p2pScadeSheet', false, false)]),
+  chiuso: fogliCoperti([F('p2pNuovoSheet', true, false), F('p2pScadeSheet', false, true)]),
+  picker: fogliCoperti([F('p2pNuovoSheet', true, true), F('p2pScadeSheet', false, false), F('pickerSheet', false, true)]),
+  quanto: fogliCoperti([F('p2pDettSheet', true, true), F('p2pQuantoSheet', false, true)]),
+  sopraUnPiccolo: fogliCoperti([F('paySheet', false, true), F('p2pDettSheet', true, true)]),
+  piccoloSuPiccolo: fogliCoperti([F('p2pFiltroSheet', false, true), F('pickerSheet', false, true)]),
+  vestito: {c1, t1, t2, c3, t3}
+}));
+""")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(_prog)
+    try:
+        _r = subprocess.run([node, f.name], capture_output=True, text=True,
+                            encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(f.name)
+    prova("il banco del velo gira in node", "", _r.stderr[-1500:] if _r.returncode else "")
+    if _r.returncode:
+        return
+    out = _js.loads(_r.stdout.strip())
+    prova("la scadenza sopra «Pubblica»: «Pubblica» e' coperto", ["p2pNuovoSheet"], out["scade"])
+    prova("...«Pubblica» da solo no, e chiuso no", [[], []], [out["solo"], out["chiuso"]])
+    prova("...il picker della valuta sopra «Pubblica» lo copre allo stesso modo (stessa classe, stesso difetto)",
+          ["p2pNuovoSheet"], out["picker"])
+    prova("...«Quanto» sopra il dettaglio copre il dettaglio", ["p2pDettSheet"], out["quanto"])
+    prova("...un pieno che sta SOPRA (dopo) un piccolo non e' coperto, e due piccoli non si velano fra loro",
+          [[], []], [out["sopraUnPiccolo"], out["piccoloSuPiccolo"]])
+    v = out["vestito"]
+    prova("il vestito mette `coperto` una volta sola, non tocca niente a vuoto, e lo toglie quando il foglio sopra si chiude",
+          [True, 1, 1, False, 2],
+          ["coperto" in v["c1"], v["t1"], v["t2"], "coperto" in v["c3"], v["t3"]])
+
+
 def prove_scadenza_barattozon():
     """IL SELETTORE DELLA SCADENZA DI BARATTOZON (9 ott 2026, richiesta di
     Andrea). Il passo 3 del foglio «Pubblica» era un <input
@@ -85266,6 +85360,8 @@ function go(v){ if (!el('view-' + v)) { CUR = ''; throw new TypeError('nessuna v
   CUR = v; tocca(); if (!VELO && vivo()) segna(); }
 function toast(t){ if (vivo()) B.toast.push(t); }
 function haptic(){} function renderChips(){} function renderP2P(){} function renderPacco(){}
+/* il velo fra due fogli (9 ott 2026) sta in navMotore accanto all'occhio della cronologia: qui non si veste niente */
+function vestiFogliCoperti(){}
 /* la griglia vera finisce col segnale che il guscio aspetta */
 function renderGrid(){ vetrinaDisegnata(); }
 function rimettiCarrelloPrimaAccordo(){} function salvaCarrello(){} function aggiornaIconaCarrello(){}
@@ -131921,6 +132017,7 @@ def main():
     prove_convenienza_vera,
     prove_barattozon_mercato,
     prove_scadenza_barattozon,
+    prove_foglio_coperto,
     prove_pubblica_metodo_prima,
     prove_libro_vuoto_monete,
     prove_indietro_dal_libro,
