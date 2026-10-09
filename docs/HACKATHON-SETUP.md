@@ -644,7 +644,7 @@ niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
 | 14-16 ott | §5 riscritta e stampata; gli schermi su carta; il giro provato tre volte; video di riserva della demo | ☐ |
 | 14-16 ott | **Backup della VM**, **portatile con tutto scaricato** (modelli QVAC, `nak`, pacchetti del wallet), **prova di riavvio completa** di tutta la catena, nell'ordine di §6 e col tunnel a tre gambe: i comandi qui sotto, uno alla volta | ☐ backup e portatile. ☑ **8 ott sera, la prova di riavvio completa** (punto 3) tutta verde dal vivo sul PC fisso (Andrea): NIP-05 dalla rotta, «wallet collegato», `get_info → ok (nip44_v2)`; le quattro correzioni ai comandi sono scritte nei punti 2 e 3. Il riavvio del VPS è fatto |
 | 16 ott | I due annunci di MOON e USDB firmati dalle identità di prova e pubblicati sul relay locale, nella forma di `docs/spec/NIP-RGB-ASSETS.md` (evento addressable, kind segnaposto **38180** — 38172/38173 sono di NIP-87, questo sta subito dopo e non è registrato da nessuno —, `d` = ContractId nudo, `i`/`k` di NIP-73, `n` signet, schema, ticker, name, precision, supply, alt; niente `issuer`, il genesis dice `ssi:anonymous`; niente `u`): il comando `annuncio <nome> <asset_id>` in `identita.mjs`, sul calco di `profilo`, e `annuncio --prova <nome> <asset_id>` che stampa l'evento firmato in JSON SENZA pubblicarlo. È infrastruttura dichiarata: l'evento esiste, nessun codice di Barattolo lo legge prima del 17. La cura di D.3 punto 0 | ☑ **8 ott sera, il comando** (cantiere «il comando `annuncio` e la scaletta della demo», copia in `deploy/rgb/`): la tabella `ASSET` coi valori PUBBLICI di §2 (ticker, nome del genesis con gli underscore, precisione, supply) e un contratto → un emittente (`usdb` non annuncia MOON: D.3 punto 4); l'asset_id con o senza `rgb:`; la firma verificata prima di stampare o pubblicare; la privata mai in output. `prove_annuncio_identita` (46): lo script VERO con identità usa-e-getta, la pubblica di `pubblica` è quella dell'evento, la firma Schnorr riverificata in Python puro, il relay morto non tocca `--prova` e senza `--prova` è un errore; in CI nostr-tools arriva da un passo del workflow fuori dal repo. Provato nel WSL su un `nak serve` di prova (porta 7790): pubblicato, riletto con nostr-tools, il secondo invio sostituisce il primo. ☐ **Il 16**: il lancio con le identità vere, i comandi al punto 4) qui sotto e in §11 |
-| 16 ott, e la mattina del 17 e del 18 | **La semina del DB di collaudo** (cantiere «la semina della demo», 9 ott): il DB di collaudo nasce vuoto, e la schermata 3 di §11.2 vuole il negozio To The Mooon — la card «Consigliati» della home lo cerca già col codice `1b9a53e6` del catalogo del client (`RACCONTI` di miniapp.html) e senza di lui dice «Negozio non trovato», la ricerca «Mooon» non trova niente. `semina_demo.py` scrive nel DB di collaudo: il negozio (utente finto 444, codice LETTO dal client, link `/negozio/tothemooon`, la npub pubblica di `tothemooon` di §11, l'avatar dal logo in `assets/consigliati/`), l'annuncio del gioco (un pezzo, ritiro a mano a Torino, PREZZO IN SATS CHE OGGI VALE 4,80 $: lo studio C fissa la cifra in dollari, il cambio lo legge da `cambio_noto` del server, e rilanciarla la mattina della demo lo ritara) e il cliente 111; `ordine` crea l'ordine «creato, non pagato» della mattina. Idempotente: si rilancia senza doppioni. Scrive SOLO con `MODALITA_COLLAUDO = True` e solo su un DB che il server ha già creato; niente rete, niente VPS. Le righe e le risposte attese al punto 5) qui sotto | ☑ 9 ott lo script, provato dal vivo sul PC (server del worktree su un'altra porta, config dal solo esempio: negozio dal codice e dal link, storia e card «Consigliati» che portano al negozio, annuncio in vetrina e in ricerca, ordine in «Ordini» di 111 come «Da pagare»), `prove_semina_demo` in prove.py e `collaudo_semina_demo` sul server vero in CI. ☐ il 16: `py -3 semina_demo.py` sul DB di collaudo vero, poi la controprova nel browser (punto 5) |
+| 16 ott, e la mattina del 17 e del 18 | **La semina del DB di collaudo** (cantiere «la semina della demo», 9 ott): il DB di collaudo nasce vuoto, e la schermata 3 di §11.2 vuole il negozio To The Mooon — la card «Consigliati» della home lo cerca già col codice `1b9a53e6` del catalogo del client (`RACCONTI` di miniapp.html) e senza di lui dice «Negozio non trovato», la ricerca «Mooon» non trova niente. `semina_demo.py` scrive nel DB di collaudo: il negozio (utente finto 444, codice LETTO dal client, link `/negozio/tothemooon`, la npub pubblica di `tothemooon` di §11, l'avatar dal logo in `assets/consigliati/`, l'insegna dal banner di `assets/scoprire/` — che il client mostra solo con `BANNER_NEGOZIO_ATTIVO = True` nel config e con un link https al sito del negozio, `--insegna-link`), l'annuncio del gioco (un pezzo, ritiro a mano a Torino, PREZZO IN SATS CHE OGGI VALE 4,80 $: lo studio C fissa la cifra in dollari, il cambio lo legge da `cambio_noto` del server, e rilanciarla la mattina della demo lo ritara) e il cliente 111; `ordine` crea l'ordine «creato, non pagato» della mattina. Idempotente: si rilancia senza doppioni. Scrive SOLO con `MODALITA_COLLAUDO = True` e solo su un DB che il server ha già creato; niente rete, niente VPS. Le righe e le risposte attese al punto 5) qui sotto | ☑ 9 ott lo script, provato dal vivo sul PC (server del worktree su un'altra porta, config dal solo esempio: negozio dal codice e dal link, storia e card «Consigliati» che portano al negozio, annuncio in vetrina e in ricerca, ordine in «Ordini» di 111 come «Da pagare»), `prove_semina_demo` in prove.py e `collaudo_semina_demo` sul server vero in CI. ☐ il 16: `py -3 semina_demo.py` sul DB di collaudo vero, poi la controprova nel browser (punto 5) |
 
 **I comandi della riga «14-16 ott»**, nell'ordine, uno alla volta, dal
 WSL e non da PowerShell dove c'è `ssh` (lezione 1 di §9: le virgolette
@@ -801,12 +801,13 @@ suo stesso database e lui la vede alla richiesta dopo.
 cd C:\Users\Andrea\Documents\GitHub\satmarket; py -3 semina_demo.py
 ```
 
-Deve rispondere cinque righe, tutte con la spunta (i numeri cambiano col
+Deve rispondere sei righe, tutte con la spunta (i numeri cambiano col
 cambio):
 
 ```
 🌱 Semina della demo sul database di collaudo: C:\…\satmarket\satmarket.db
    ✓ negozio To The Mooon (nuovo): utente 444, codice 1b9a53e6 (dal catalogo del client), /negozio/tothemooon, npub npub12xql9gw…, avatar av_1b9a53e6_1.jpg
+   ✓ insegna ban_1b9a53e6_1.jpg (stato attivo), link https://…
    ✓ NIP05_NOMI['tothemooon'] nel config combacia con la npub seminata
    ✓ annuncio #N «To The Mooon! — il gioco da tavolo che spiega Bitcoin» nuovo: 5.820 sats = 4,80 $ al cambio di 82.473 $/BTC letto dal server alle 09:30 del 16/10, ritiro a mano a Torino (TO), 2 foto
    ✓ cliente 111 c’era: pronto a comprare (identita' dall'hash: tgWebAppData=collaudo:111:Compratore)
@@ -825,10 +826,22 @@ del server»: avviare Barattolo una volta su quel database (lo schema lo
 fa lui, la semina non ne tiene una copia). `py -3 semina_demo.py stato`
 racconta cosa c'è senza scrivere.
 
+**L'insegna** (`banner_foto`, aggiunta il 9 ott): la semina la ritaglia
+dal banner di «Da scoprire» (3:1 dalla cima, perché la scritta sta sul
+bordo alto) e la mette in stato attivo, ma il client la mostra SOLO con
+un link https al sito del negozio sotto (è l'uscita «Esci da
+Barattolo?») e con `BANNER_NEGOZIO_ATTIVO = True` nel config di
+collaudo (di serie è False, anche nell'esempio). Il sito del negozio
+vero non sta scritto da nessuna parte e la semina non lo inventa: la
+prima volta `py -3 semina_demo.py --insegna-link https://<sito del
+negozio>`; il link resta in colonna e le semine dopo lo tengono. Finché
+manca, la riga dell'insegna ha il ⚠️ e lo dice.
+
 La controprova nel browser, identità 111 dall'hash (§11.2): aprire
 `http://127.0.0.1:8080/negozio/1b9a53e6#tgWebAppData=collaudo:111:Compratore`
-→ la vetrina di To The Mooon con la storia («Capire Bitcoin, giocando.»),
-il logo tondo nella testata e sotto l'annuncio del gioco col prezzo;
+→ la vetrina di To The Mooon con l'insegna in cima (se link e leva ci
+sono), la storia («Capire Bitcoin, giocando.»), il logo tondo nella
+testata e sotto l'annuncio del gioco col prezzo;
 nella home la ricerca «Mooon» lo trova e la card «Consigliati» della fila
 delle categorie → To The Mooon! → lo stesso negozio (non più «Negozio
 non trovato»). Anche `http://127.0.0.1:8080/negozio/tothemooon` apre lo
@@ -1039,8 +1052,11 @@ ferrea 1).
   (`identita.mjs profilo`): `name`/`display_name`
   «Dollari_di_prova_Barattolo» / «To The Mooon», `about` che dice «di
   prova, nessun valore reale», `nip05` `usdb@barattolo.store` /
-  `tothemooon@barattolo.store`. Manca `picture` (il logo del negozio,
-  già in `assets/`): si aggiunge quando serve. Su un relay pubblico SOLO
+  `tothemooon@barattolo.store`. La `picture` (il logo del negozio, già
+  in `assets/consigliati/` e servito dal sito) si aggiunge il 16 con
+  `identita.mjs profilo <nome> <https://…/logo>` (argomento aggiunto il
+  9 ott, solo https; senza, il kind 0 resta quello dell'8): è la riga
+  in §11.1. Su un relay pubblico SOLO
   se si decide prima (sono chiavi di prova, non segreti della
   piattaforma, ma la regola di casa è «mai eventi pubblicati» nei giri
   di collaudo).
@@ -1078,9 +1094,14 @@ node identita.mjs annuncio --prova usdb rgb:H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~N
 node identita.mjs annuncio usdb rgb:H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A
 node identita.mjs annuncio --prova tothemooon rgb:9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM
 node identita.mjs annuncio tothemooon rgb:9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM
+node identita.mjs profilo tothemooon https://barattolo.store/assets/consigliati/to-the-moon.webp
 ```
 
-poi la riga di rilettura di §10 (nostr-tools): USDB e MOON, autori le
+L'ultima riga (9 ott) rifà il kind 0 di `tothemooon` con la `picture`
+— il logo già in `assets/consigliati/`, servito dal sito — e deve
+rispondere «✓ kind 0 di «tothemooon» (tothemooon@barattolo.store, con
+picture) pubblicato su ws://127.0.0.1:7777»; `usdb` resta senza (non ha
+un logo). Poi la riga di rilettura di §10 (nostr-tools): USDB e MOON, autori le
 due hex di `pubblica`. Cosa pubblica ogni identità, e con quale kind:
 `usdb` UN evento kind 38180 (segnaposto) con `d` =
 `H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A` (USDB, precision 2,
@@ -1140,7 +1161,7 @@ Andrea. Ogni pezzo è un commit datato nel repo privato, con
 | sab 09:00-09:45 | Kickoff | Kickoff; consegna la dichiarazione | niente codice prima della dichiarazione |
 | sab 09:45-13:00 | **Server**: `/api/rgb/fattura` (la fattura blind di `barattolo` in USDB via `rgb_http.py`, importo al cambio, la prova del `// 100`: D.3 punto 5 PRIMA della rotta) e `/api/rgb/stato`, dietro `RGB_ATTIVO`; la decisione sullo stato dell'ordine pagato in USDB scritta nel commit | **Wallet**: i quattro metodi `rgb_*` in `nwc-wdk.mjs` sopra `punti.mjs` (lista, fattura, paga con conferma a terminale, lookup), provati col client a riga di comando sul suo wallet vuoto, poi portati sul portatile di Andrea | alle 11 un punto di cinque minuti: i NOMI dei campi fra server e wallet (quelli di `docs/spec/NWC-RGB.md`) |
 | sab 13:00-13:45 | pranzo | pranzo | |
-| sab 13:45-16:30 | **Client**: nel foglio del pagamento «oppure N USDB», «Paga in USDB» → fattura → `rgb_pay_invoice` via `clientNwc` → «in arrivo» → `rgb.py aggiorna barattolo` → «Pagato» | Il wallet sul portatile della demo: `rgb_pay_invoice` risponde alla pagina; poi comincia la lettura dell'annuncio per `#d` (nostr-tools, lato pagina) | **primo pagamento VERO in USDB su signet entro le 16:30**: il core |
+| sab 13:45-16:30 | **Client**: nel foglio del pagamento «oppure N USDB», «Paga in USDB» → fattura → `rgb_pay_invoice` via `clientNwc` → «in arrivo» → `rgb.py aggiorna barattolo` → «Pagato». **E la pagina «👛 Wallet NWC» chiama `get_info`/`get_balance` a OGNI apertura** (segnato il 9 ott, visto dal vivo: oggi il terminale del servizio si muove solo al «Collega»): alla schermata 4 il terminale deve muoversi mentre Alan parla | Il wallet sul portatile della demo: `rgb_pay_invoice` risponde alla pagina; poi comincia la lettura dell'annuncio per `#d` (nostr-tools, lato pagina) | **primo pagamento VERO in USDB su signet entro le 16:30**: il core |
 | sab 16:30-18:00 | **«Emesso da … ✓»**: la verifica NIP-05 lato server (`url_api_ammesso`, senza redirect, cache di 24 h, «verificato il 16 ott» se il DNS manca) e la riga nella card, accanto a «⚠️ Emittente sconosciuto» | Rilegge i due annunci sul relay, confronta i tag col genesis (`punti.mjs saldo`), scrive la prima pagina dei due testi | **alle 18 la ✓ c'è**: da qui la demo è quella decisa il 7 sera |
 | sab 18:00-20:30 | **Consigliami**: la pagina chiama QVAC con lo schema, il fumetto, «Approva» che fa il passo delle 13:45 da solo; se CORS o mixed content mordono, `/api/consigliami/proposta` lato server, dichiarato | Il «motivo» senza cifre (§4: il 1.7B sbaglia i numeri nella frase), la frase di riserva se QVAC tace | |
 | sab 20:30-22:00 | **MOON come bonus** dopo «Pagato» (l'assegnazione del 1 ott agganciata); la card dell'asset completa; il giro intero DUE volte | `git format-patch` del giorno in `fidelity-points`; le slide 3, 4 e 5 con gli screenshot veri | la sera: `pkill` di `rgb_http.py` sulla VM (backup delle 03:30), §6 |

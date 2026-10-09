@@ -32,6 +32,14 @@ COSA SEMINA, e perche' cosi':
     esiste qui). L'avatar e' il logo gia' in `assets/consigliati/`,
     posato su un quadrato bianco (e' largo, e il cerchio dell'avatar lo
     taglierebbe) nella forma che la whitelist `NOME_FOTO` ammette.
+    L'INSEGNA (banner_foto, richiesta di Andrea del 9 ott) e' il banner
+    gia' in `assets/scoprire/`, ritagliato 3:1 come fa `_salva_banner`,
+    con lo stato 'attivo' che il moderatore darebbe. Il client la mostra
+    SOLO con un link https (e' l'uscita verso il sito del venditore,
+    col «Esci da Barattolo?») e con `BANNER_NEGOZIO_ATTIVO = True` nel
+    config: il sito del negozio vero non sta in nessun documento, e qui
+    non si inventa — si passa con `--insegna-link https://…`, e senza
+    la semina lo dice.
   - L'ANNUNCIO: il gioco, un pezzo, ritiro a mano a Torino (niente
     spedizione ne' protezione: cosi' il conto dell'ordine E' il prezzo,
     e la riga «oppure 4,80 USDB» dello studio C torna senza resti), col
@@ -79,7 +87,8 @@ USO (da PowerShell, dalla cartella del repo, col server acceso o no):
   py -3 semina_demo.py ordine     # l'ordine «creato» della mattina
   py -3 semina_demo.py stato      # cosa c'e', senza scrivere
 Opzioni: --db PERCORSO (default: `DB` del config), --cambio-usd N
-(il cambio $/BTC a mano, se il server non ne ha ancora letto uno).
+(il cambio $/BTC a mano, se il server non ne ha ancora letto uno),
+--insegna-link https://… (il sito del venditore sotto l'insegna).
 Per prove e collaudi: SEMINA_CARTELLA_FOTO sposta la cartella delle foto.
 """
 import json
@@ -111,6 +120,10 @@ NPUB_NEGOZIO = "npub12xql9gw8ru2qv63x8nvhtc2vcqcl06rce5d30sw6vcza4zsjgpns0nr6n4"
 LOGO = os.path.join("assets", "consigliati", f"{SLUG_CATALOGO}.webp")
 AVATAR_LATO = 128          # come AVATAR_LATO del server
 AVATAR_QUALITA = 85        # come AVATAR_QUALITA del server
+# l'insegna: il banner di «Da scoprire» (1040x498), ritagliato 3:1 al
+# centro coi numeri di `_salva_banner` del server
+INSEGNA = os.path.join("assets", "scoprire", f"{SLUG_CATALOGO}.webp")
+BANNER_LARGO, BANNER_ALTO, BANNER_QUALITA = 1200, 400, 88
 
 # --- L'ANNUNCIO ---------------------------------------------------------
 PREZZO_USD = Decimal("4.80")    # lo studio C: «oppure 4,80 USDB», 480 unita'
@@ -136,7 +149,8 @@ TG_CLIENTE, NOME_CLIENTE = 111, "Compratore"
 # --- LO SCHEMA CHE LA SEMINA PRETENDE (lo crea il server, non lei) -------
 COLONNE_RICHIESTE = {
     "utenti": ("tg_id", "nome", "username", "registrato", "negozio",
-               "negozio_slug", "npub", "avatar"),
+               "negozio_slug", "npub", "avatar", "banner_foto", "banner_link",
+               "banner_stato", "banner_deciso_il", "banner_sbloccato_il"),
     "annunci": ("id", "venditore_id", "titolo", "descrizione", "categoria",
                 "sottocategoria", "prezzo_sats", "zona", "valuta",
                 "prezzo_eur", "lat", "lon", "regione", "consegna",
@@ -293,8 +307,44 @@ def _avatar_dal_logo(radice: str, cartella_foto: str, codice: str) -> str:
     return nome
 
 
+def _insegna_dal_banner(radice: str, cartella_foto: str, codice: str) -> str:
+    """L'insegna del negozio dal banner di `assets/scoprire/`: ritaglio
+    3:1 al centro, 1200x400 JPEG, come `_salva_banner` del server, col
+    nome nella forma della whitelist (`ban_<codice>_<n>.jpg`), numero
+    fisso come l'avatar. '' se Pillow o il file mancano."""
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        return ""
+    sorgente = os.path.join(radice, INSEGNA)
+    if not os.path.exists(sorgente):
+        return ""
+    nome = f"ban_{codice}_1.jpg"
+    try:
+        img = Image.open(sorgente).convert("RGB")
+        # il ritaglio parte dalla CIMA (centering 0.0, non il centro 0.5
+        # del server): in questo banner la scritta sta sul bordo alto, e
+        # il taglio centrato le mangiava la testa — visto dal vivo il 9 ott
+        img = ImageOps.fit(img, (BANNER_LARGO, BANNER_ALTO),
+                           Image.Resampling.LANCZOS, centering=(0.5, 0.0))
+        os.makedirs(cartella_foto, exist_ok=True)
+        img.save(os.path.join(cartella_foto, nome), "JPEG",
+                 quality=BANNER_QUALITA)
+    except Exception:
+        return ""
+    return nome
+
+
+def link_insegna_valido(url: str) -> bool:
+    """Il link sotto l'insegna: solo https, con un host, senza
+    credenziali — le prime tre regole di `link_banner_ammesso` del
+    server, che qui bastano perche' il link lo scrive Andrea a mano."""
+    return bool(re.fullmatch(r"https://[a-z0-9.-]+\.[a-z]{2,}(/[^\s@]*)?",
+                             (url or "").strip(), re.I))
+
+
 def semina_negozio(con, codice: str, radice: str, cartella_foto: str,
-                   adesso: int) -> dict:
+                   adesso: int, link_insegna: str = "") -> dict:
     """L'utente 444 col codice del catalogo del client, il link a
     scelta, la npub e l'avatar. Idempotente: la riga si cerca per
     tg_id; il codice si pretende LIBERO o gia' suo — se un altro utente
@@ -324,7 +374,21 @@ def semina_negozio(con, codice: str, radice: str, cartella_foto: str,
                 + (", avatar=?" if avatar else "") + " WHERE tg_id=?",
                 (NOME_NEGOZIO, codice, SLUG_NEGOZIO, NPUB_NEGOZIO)
                 + ((avatar,) if avatar else ()) + (TG_NEGOZIO,))
-    return {"nuovo": not c_era, "codice": codice, "avatar": avatar}
+    insegna, link = _insegna_dal_banner(radice, cartella_foto, codice), ""
+    if insegna:
+        # il link e' quello passato, o quello gia' in colonna: una
+        # semina di ieri con --insegna-link non si spegne rilanciando
+        # senza. Lo stato e' quello che darebbe il moderatore.
+        gia = con.execute("SELECT banner_link FROM utenti WHERE tg_id=?",
+                          (TG_NEGOZIO,)).fetchone()[0] or ""
+        link = (link_insegna or gia).strip()
+        con.execute("UPDATE utenti SET banner_foto=?, banner_link=?, "
+                    "banner_stato='attivo', banner_deciso_il=?, "
+                    "banner_sbloccato_il=CASE WHEN banner_sbloccato_il>0 "
+                    "THEN banner_sbloccato_il ELSE ? END WHERE tg_id=?",
+                    (insegna, link, adesso, adesso, TG_NEGOZIO))
+    return {"nuovo": not c_era, "codice": codice, "avatar": avatar,
+            "insegna": insegna, "link_insegna": link}
 
 
 def _copia_foto(radice: str, cartella_foto: str, annuncio_id: int) -> list:
@@ -443,14 +507,16 @@ def crea_ordine(con, adesso: int, cambio_eur: float, nuovo: bool = False) -> dic
 
 def stato(con) -> dict:
     """Cosa c'e' nel database della demo, senza scrivere niente."""
-    neg = con.execute("SELECT negozio, negozio_slug, npub, avatar, nome FROM utenti "
+    neg = con.execute("SELECT negozio, negozio_slug, npub, avatar, nome, "
+                      "banner_foto, banner_link FROM utenti "
                       "WHERE tg_id=?", (TG_NEGOZIO,)).fetchone()
     cli = con.execute("SELECT nome FROM utenti WHERE tg_id=?", (TG_CLIENTE,)).fetchone()
     a = annuncio_seminato(con)
     ordini = con.execute("SELECT id, stato, prezzo_sats, creato FROM ordini WHERE "
                          "compratore_id=? AND venditore_id=? ORDER BY id",
                          (TG_CLIENTE, TG_NEGOZIO)).fetchall() if a else []
-    return {"negozio": dict(zip(("codice", "slug", "npub", "avatar", "nome"), neg))
+    return {"negozio": dict(zip(("codice", "slug", "npub", "avatar", "nome",
+                                 "insegna", "link_insegna"), neg))
             if neg else None,
             "cliente": cli[0] if cli else None,
             "annuncio": dict(zip(("id", "prezzo_sats", "stato"), a)) if a else None,
@@ -497,6 +563,18 @@ def main(argv=None) -> int:
             db_a_mano = argv[i + 1]
         except IndexError:
             print("--db vuole un percorso")
+            return 2
+        del argv[i:i + 2]
+    link_insegna = ""
+    while "--insegna-link" in argv:
+        i = argv.index("--insegna-link")
+        try:
+            link_insegna = argv[i + 1]
+        except IndexError:
+            print("--insegna-link vuole un indirizzo https://…")
+            return 2
+        if not link_insegna_valido(link_insegna):
+            print("--insegna-link vuole un indirizzo https://dominio/… senza credenziali")
             return 2
         del argv[i:i + 2]
     nuovo = "--nuovo" in argv
@@ -549,12 +627,25 @@ def main(argv=None) -> int:
                                   "`--cambio-usd <dollari per bitcoin>`")
             prezzo = sats_da_usd(PREZZO_USD, usd)
             print(f"🌱 Semina della demo sul database di collaudo: {percorso}")
-            n = semina_negozio(con, codice, QUI, cartella_foto, adesso)
+            n = semina_negozio(con, codice, QUI, cartella_foto, adesso,
+                               link_insegna)
             print(f"   ✓ negozio {NOME_NEGOZIO} ({'nuovo' if n['nuovo'] else 'c’era'}): "
                   f"utente {TG_NEGOZIO}, codice {codice} (dal catalogo del client), "
                   f"/negozio/{SLUG_NEGOZIO}, npub {NPUB_NEGOZIO[:12]}…"
                   + (f", avatar {n['avatar']}" if n["avatar"] else
                      ", senza avatar (Pillow o il logo mancano)"))
+            if not n["insegna"]:
+                print("   · senza insegna (Pillow o il banner di assets/scoprire/ mancano)")
+            else:
+                leva = getattr(cfg, "BANNER_NEGOZIO_ATTIVO", False) is True
+                print(f"   {'✓' if n['link_insegna'] and leva else '⚠️'} insegna "
+                      f"{n['insegna']} (stato attivo)"
+                      + (f", link {n['link_insegna']}" if n["link_insegna"] else
+                         " — SENZA LINK il client non la mostra: "
+                         "`--insegna-link https://<sito del negozio>`")
+                      + ("" if leva else
+                         "; e BANNER_NEGOZIO_ATTIVO non è True nel config: "
+                         "resta nascosta"))
             nomi = getattr(cfg, "NIP05_NOMI", None) or {}
             hex_attesa = npub_in_hex(NPUB_NEGOZIO)
             if isinstance(nomi, dict) and nomi.get(NIP05_NOME):
@@ -608,7 +699,9 @@ def _stampa_stato(s: dict, percorso: str) -> int:
     if s["negozio"]:
         n = s["negozio"]
         print(f"   negozio {n['nome']}: codice {n['codice']}, /negozio/{n['slug']}, "
-              f"npub {n['npub'][:12]}…, avatar {n['avatar'] or '—'}")
+              f"npub {n['npub'][:12]}…, avatar {n['avatar'] or '—'}, "
+              f"insegna {n['insegna'] or '—'}"
+              + (f" → {n['link_insegna']}" if n["link_insegna"] else " (senza link)"))
     else:
         print("   negozio: non seminato")
     print(f"   cliente 111: {s['cliente'] or 'non c’è'}")

@@ -147,10 +147,26 @@ def giro(c, SRV, sd, db, cartella):
     prova("il cliente 111 esiste", 1, SRV.db().execute(
         "SELECT COUNT(*) FROM utenti WHERE tg_id=111").fetchone()[0])
 
+    print("\n[l'insegna]")
+    prova("senza link e con la leva spenta il negozio non ha banner", None,
+          negozio(codice)[1]["venditore"].get("banner"))
+    SRV.BANNER_NEGOZIO_ATTIVO = True
+    sys.modules["config"].BANNER_NEGOZIO_ATTIVO = True   # la semina legge la leva dal config
+    rc, out = comando(sd, ["--insegna-link", "https://esempio.test/gioco"])
+    prova("col link e la leva: ✓ insegna", (0, True),
+          (rc, "✓ insegna ban_" in out and "link https://esempio.test/gioco" in out))
+    prova("...e il negozio porta banner {foto, link, dominio}",
+          {"foto": f"ban_{codice}_1.jpg", "link": "https://esempio.test/gioco",
+           "dominio": "esempio.test"},
+          negozio(codice)[1]["venditore"].get("banner"))
+    prova("...l'insegna esce dalla rotta /foto come JPEG", "image/jpeg",
+          c.get(f"/foto/ban_{codice}_1.jpg").headers.get("content-type", "").split(";")[0])
+
     print("\n[rilanciata: niente doppioni, prezzo ritarato]")
     rc, out = comando(sd, [])
-    prova("la seconda semina: verde, «c’era», niente da ritoccare", (0, True),
-          (rc, out.count("c’era") == 3 and "niente da ritoccare" in out))
+    prova("la seconda semina: verde, «c’era», niente da ritoccare, il link resta", (0, True),
+          (rc, out.count("c’era") == 3 and "niente da ritoccare" in out
+           and "link https://esempio.test/gioco" in out))
     con = SRV.db()
     conti = tuple(con.execute(q).fetchone()[0] for q in (
         "SELECT COUNT(*) FROM utenti WHERE tg_id=444",

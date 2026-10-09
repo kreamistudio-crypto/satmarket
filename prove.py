@@ -130055,6 +130055,33 @@ def prove_semina_demo():
               (n2["nuovo"], con.execute("SELECT COUNT(*) FROM utenti WHERE tg_id=444").fetchone()[0],
                con.execute("SELECT registrato FROM utenti WHERE tg_id=444").fetchone()[0]))
 
+        # L'INSEGNA (9 ott, richiesta di Andrea): dal banner di «Da
+        # scoprire», nella forma del server, stato attivo; il link solo
+        # se dato, e una volta dato resta.
+        def insegna_in_colonna():
+            return tuple(con.execute("SELECT banner_foto, banner_stato, banner_link "
+                                     "FROM utenti WHERE tg_id=444").fetchone())
+        prova("...l'insegna dal banner: nome in forma, attiva, senza link",
+              ("ban_abcdef01_1.jpg", "attivo", ""), insegna_in_colonna())
+        try:
+            from PIL import Image
+            prova("...1200x400 come _salva_banner", (1200, 400),
+                  Image.open(os.path.join(cartella, "ban_abcdef01_1.jpg")).size)
+        except ImportError:
+            salta("l'insegna 1200x400", "Pillow non c'e'")
+        n3 = sd.semina_negozio(con, "abcdef01", QUI, cartella, 3000, "https://esempio.test/x")
+        prova("col link: scritto in colonna e restituito",
+              ("https://esempio.test/x", "https://esempio.test/x"),
+              (n3["link_insegna"], insegna_in_colonna()[2]))
+        n4 = sd.semina_negozio(con, "abcdef01", QUI, cartella, 4000)
+        prova("rilanciata senza link: quello di prima resta",
+              "https://esempio.test/x", n4["link_insegna"])
+        prova("link_insegna_valido: https con host si', http/credenziali/senza dominio no",
+              (True, True, False, False, False),
+              tuple(sd.link_insegna_valido(u) for u in (
+                  "https://sito.it/x", "https://www.sito.it",
+                  "http://sito.it", "https://u:p@sito.it/x", "https://sito")))
+
         a = sd.semina_annuncio(con, 4800, QUI, cartella, 1000)
         riga = con.execute("SELECT venditore_id, prezzo_sats, consegna, quantita, stato, "
                            "valuta, foto, categoria, sottocategoria, zona FROM annunci "
@@ -130112,6 +130139,7 @@ def prove_semina_demo():
         con.backup(disco)
         disco.execute("DELETE FROM ordini")
         disco.execute("DELETE FROM sqlite_sequence WHERE name='ordini'")
+        disco.execute("UPDATE utenti SET banner_link='' WHERE tg_id=444")   # il comando riparte senza link
         disco.commit()
         disco.close()
         con.close()
@@ -130122,6 +130150,7 @@ def prove_semina_demo():
             finto.DB = su_disco
             if cambio_usd:
                 finto.NIP05_NOMI = {"tothemooon": sd.npub_in_hex(sd.NPUB_NEGOZIO)}
+                finto.BANNER_NEGOZIO_ATTIVO = True
             vero = sys.modules.get("config")
             sys.modules["config"] = finto
             uscita, fuori = io.StringIO(), sys.stdout
@@ -130149,6 +130178,15 @@ def prove_semina_demo():
               (0, True, True),
               (rc, "4.800 sats = 4,80 $ al cambio di 100.000 $/BTC (a mano)" in out,
                "✓ NIP05_NOMI['tothemooon'] nel config combacia" in out))
+        prova("...e l'insegna senza link ha il ⚠️ e dice cosa manca", True,
+              "⚠️ insegna ban_1b9a53e6_1.jpg (stato attivo) — SENZA LINK" in out
+              and "--insegna-link" in out)
+        rc, out = comando(["--insegna-link", "https://esempio.test/gioco"], cambio_usd=100_000)
+        prova("col link e la leva accesa: ✓ insegna col link", (0, True),
+              (rc, "✓ insegna ban_1b9a53e6_1.jpg (stato attivo), link https://esempio.test/gioco" in out))
+        rc, out = comando(["--insegna-link", "http://esempio.test"])
+        prova("un link http si rifiuta prima di toccare il database", (2, True),
+              (rc, "https://" in out))
         rc, out = comando(["ordine"])
         prova("`ordine`: verde, e dice creato e non pagato", (0, True),
               (rc, "Ordine #1 creato" in out and "non pagato" in out))
@@ -130164,13 +130202,56 @@ def prove_semina_demo():
     finally:
         shutil.rmtree(cartella, ignore_errors=True)
 
-    # --- 8) i documenti: la riga esatta da lanciare ---------------------------
+    # --- 8) le tre aggiunte del 9 ott: profilo con picture, consiglio ---------
+    ide = open(os.path.join(QUI, "deploy", "rgb", "identita.mjs"), encoding="utf-8").read()
+    prova("identita.mjs profilo prende la picture (facoltativa, solo https)", True,
+          "async profilo (nome, picture)" in ide
+          and "...(picture ? { picture } : {})" in ide
+          and "picture !== undefined && !/^https:" in ide)
+    prova("...e nessuna riga nuova stampa la chiave privata", [],
+          [r for r in ide.splitlines() if ".sk" in r and ("console." in r or "muori(" in r)])
+    cons_p = os.path.join(QUI, "deploy", "rgb", "consiglio.py")
+    spec_c = importlib.util.spec_from_file_location("consiglio_prova", cons_p)
+    cs = importlib.util.module_from_spec(spec_c)
+    spec_c.loader.exec_module(cs)
+    prova("consiglio.py: al modello si chiede la scelta e il perche', non i numeri",
+          ["usa_punti", "asset_id", "perche"], cs.SCHEMA["required"])
+    prova("...e manda ancora reasoning_budget: false", True,
+          '"reasoning_budget": False' in open(cons_p, encoding="utf-8").read())
+    prova("perche_pulito: una riga senza cifre passa", ("Usa i punti massimi", False),
+          cs.perche_pulito("  Usa i punti   massimi "))
+    prova("...una con cifre si scarta per la riserva", (cs.PERCHE_RISERVA, True),
+          cs.perche_pulito("ti diamo un sconto di 60 sat"))
+    prova("...vuota: la riserva, senza dirla scartata", (cs.PERCHE_RISERVA, False),
+          cs.perche_pulito(""))
+    punti_c = [{"asset_id": "rgb:X", "ticker": "MOON", "nome": "Punti", "punti": 60}]
+    prova("motivo(): i numeri li scrive il programma",
+          ("Usi 5 MOON: 5 sats di sconto su 25, paghi 20 sats e ti restano 55 MOON. "
+           "Perché: Usa i punti massimi disponibili", False),
+          cs.motivo({"usa_punti": 5, "asset_id": "rgb:X",
+                     "perche": "Usa i punti massimi disponibili"}, 25, punti_c))
+    prova("...e con le cifre del modello dentro, la riserva al loro posto",
+          ("Usi 5 MOON: 5 sats di sconto su 25, paghi 20 sats e ti restano 55 MOON. "
+           f"Perché: {cs.PERCHE_RISERVA}", True),
+          cs.motivo({"usa_punti": 5, "asset_id": "rgb:X",
+                     "perche": "usi 5 punti (60 sats), 55 rimanenti"}, 25, punti_c))
+    prova("controlla(): il tetto del 20% vale sui punti scelti",
+          (None, "sconto oltre il tetto di 5 sats"),
+          (cs.controlla({"usa_punti": 5, "asset_id": "rgb:X"}, 25, punti_c),
+           cs.controlla({"usa_punti": 6, "asset_id": "rgb:X"}, 25, punti_c)))
+
+    # --- 9) i documenti: la riga esatta da lanciare ---------------------------
     prova("§10 e §11.3 di HACKATHON-SETUP portano la riga della semina e dell'ordine",
           True, setup.count("py -3 semina_demo.py") >= 2
           and "py -3 semina_demo.py ordine" in setup)
     prova("...e il collaudo e' nella lista della CI", True,
           "collaudo_semina_demo" in open(os.path.join(QUI, ".github", "workflows",
                                                       "prove.yml"), encoding="utf-8").read())
+    prova("§11.1 porta la riga del profilo con la picture, §11.3 il wallet a ogni apertura, "
+          "§10 l'insegna", True,
+          "node identita.mjs profilo tothemooon https://barattolo.store/assets/consigliati/to-the-moon.webp" in setup
+          and "`get_info`/`get_balance` a OGNI apertura" in setup
+          and "--insegna-link" in setup)
 
 
 def _ferma(sd, f):

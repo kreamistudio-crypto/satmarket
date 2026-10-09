@@ -41406,3 +41406,55 @@ nome dall'hash, la semina lo lascia com'è. Il foglio del pagamento di
 sabato è un altro: oggi «Paga ora» su quell'ordine fa il 500 innocuo
 nel log. La semina tocca `foto/` in locale come fa il server (regola 1:
 non si committa, e infatti è ignorata).
+
+**Le quattro aggiunte di Andrea, la mattina del 9 (prima del push).**
+1) **L'insegna** (`banner_foto`): la semina la ritaglia dal banner di
+`assets/scoprire/to-the-moon.webp` (1040×498) coi numeri di
+`_salva_banner` — 1200×400 JPEG 88, nome `ban_1b9a53e6_1.jpg` nella
+forma di `NOME_FOTO` — ma dalla CIMA (`centering=(0.5, 0.0)`, non il
+centro del server): la scritta sta sul bordo alto e il taglio centrato le
+mangiava la testa, visto dal vivo. Stato 'attivo', `banner_deciso_il`
+e `banner_sbloccato_il` scritti. Il client la mostra SOLO con un link
+https sotto (`_banner_pubblico`: è l'uscita «Esci da Barattolo?» verso
+il sito del venditore) e con `BANNER_NEGOZIO_ATTIVO = True` nel config
+(di serie False, anche nell'esempio): il sito del negozio vero non sta
+in nessun documento e qui non si inventa — `--insegna-link https://…`,
+validato (solo https, un host, niente credenziali: le prime tre regole
+di `link_banner_ammesso`), che resta in colonna e le semine dopo tengono.
+Senza, la riga ha il ⚠️ e dice cosa manca; se la leva è spenta lo dice
+pure. Provato dal vivo sulla 8097 con la leva accesa nel config del
+worktree e `https://esempio.test/gioco`: `/api/negozio` porta `banner`
+{foto, link, dominio} e la testata del negozio mostra l'insegna col
+dominio sotto. Nel collaudo, con `SRV.BANNER_NEGOZIO_ATTIVO = True`.
+2) **La picture del kind 0**: `identita.mjs profilo <nome> [https://…]`
+— argomento facoltativo, solo https (un kind 0 è pubblico e un'immagine
+su http si caricherebbe in chiaro), nel content solo se dato; la riga
+per il 16 in §11.1 con l'URL del logo servito dal sito
+(`/assets/consigliati/to-the-moon.webp`), e il bullet di §11 che diceva
+«manca picture» ora dice come. `usdb` resta senza logo.
+3) **Il wallet che si muove**: segnato in §11.3 (sab 13:45-16:30, Client)
+che la pagina «👛 Wallet NWC» deve chiamare `get_info`/`get_balance` a
+OGNI apertura — oggi, visto dal vivo, il terminale del servizio si muove
+solo al «Collega», e alla schermata 4 deve muoversi mentre Alan parla.
+4) **I numeri li scrive il programma, lei la frase**: dal vivo la frase
+del modello aveva le cifre sbagliate («hai 5 punti… usi 5 punti (60
+sats)… 55 rimanenti» con saldo 60 e proposta 5/5). In
+`deploy/rgb/consiglio.py` lo schema chiede `usa_punti`, `asset_id` e
+`perche` (niente più `sconto_sats` né `motivo` al modello: lo sconto lo
+conta `SAT_PER_PUNTO`, il controllo resta); `motivo()` compone la frase
+mostrata dai numeri del JSON («Usi 5 MOON: 5 sats di sconto su 25, paghi
+20 sats e ti restano 55 MOON. Perché: …») e `perche_pulito` tiene la
+riga del modello solo se NON porta cifre, sennò la riserva («conviene:
+lo sconto è gratis e i punti che restano valgono domani»). Lo stesso in
+`consigliami-prova.html` (fuori dal repo, in `qvac-prova`): schema con
+`perche` a 120 caratteri, prompt «SENZA numeri né cifre», il fumetto
+della scaletta composto dal programma («Paga 4.74 USDB e usa 60 MOON (60
+sats di sconto): ti restano 495.26 USDB e 0 MOON. Motivo: …») con
+`perchePulito`. Provato dal vivo con QVAC acceso (11434, 1.7B): lo
+script a 25 e a 4800 sats dà la frase giusta coi numeri del programma e
+il perché «Usa i punti massimi disponibili»; la pagina servita da
+`http.server 8081` ha risposto in 4,8 s, e il modello nel perché ha
+scritto «un sconto di 60 sat» — cifra dentro, riga scartata, riserva al
+suo posto: è esattamente il caso per cui il filtro esiste. La copia di
+`consiglio.py` in `qvac-prova` è stata allineata (era quella dell'8
+mattina, senza `reasoning_budget`).

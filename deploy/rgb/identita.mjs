@@ -10,7 +10,7 @@
 // Uso:  node identita.mjs <comando> [argomenti]
 //   nuova <nome> "<Nome mostrato>" <nip05>     crea la coppia di chiavi e il file; stampa la pubblica
 //   pubblica <nome>                             la chiave pubblica (hex e npub), senza toccare niente
-//   profilo <nome>                              firma e pubblica il kind 0 (name, about, nip05) sul relay LOCALE
+//   profilo <nome> [https://…/logo.webp]        firma e pubblica il kind 0 (name, about, nip05, e la picture se data) sul relay LOCALE
 //   annuncio <nome> <asset_id>                  firma e pubblica l'ANNUNCIO dell'asset (docs/spec/NIP-RGB-ASSETS.md,
 //                                               kind segnaposto) sul relay LOCALE: la riga «16 ott» di HACKATHON-SETUP §10
 //   annuncio --prova <nome> <asset_id>          lo stesso evento, firmato e stampato in JSON, NON pubblicato
@@ -108,18 +108,25 @@ const COMANDI = {
     stampaPubblica(nome, getPublicKey(Uint8Array.from(Buffer.from(i.sk, 'hex'))))
   },
 
-  async profilo (nome) {
+  // `picture` (9 ott 2026, richiesta di Andrea): l'URL https del logo
+  // (per tothemooon il file gia' in assets/consigliati/ del sito), che i
+  // client mostrano accanto al nome. Solo https: un kind 0 e' pubblico
+  // per costruzione, e un'immagine su http la caricherebbero in chiaro.
+  // Senza argomento il kind 0 resta quello dell'8 ott, senza picture.
+  async profilo (nome, picture) {
     const i = leggi(nome)
+    if (picture !== undefined && !/^https:\/\/[^\s/]+\/\S+$/.test(picture)) muori('profilo <nome> [https://…/logo]: la picture e\' un URL https')
     const sk = Uint8Array.from(Buffer.from(i.sk, 'hex'))
     const ev = finalizeEvent({
       kind: 0, created_at: Math.floor(Date.now() / 1000), tags: [],
       content: JSON.stringify({
         name: i.display, display_name: i.display, nip05: i.nip05,
-        about: `Identita' di PROVA dell'hackathon RGB di Torino (17-18 ott 2026): l'emittente dichiarato di un asset su signet. Nessun valore reale.`
+        about: `Identita' di PROVA dell'hackathon RGB di Torino (17-18 ott 2026): l'emittente dichiarato di un asset su signet. Nessun valore reale.`,
+        ...(picture ? { picture } : {})
       })
     }, sk)
     await pubblicaEvento(ev)
-    console.log(`✓ kind 0 di «${nome}» (${i.nip05}) pubblicato su ${RELAY}, id ${ev.id.slice(0, 12)}…`)
+    console.log(`✓ kind 0 di «${nome}» (${i.nip05}${picture ? ', con picture' : ''}) pubblicato su ${RELAY}, id ${ev.id.slice(0, 12)}…`)
   },
 
   // Sul calco di `profilo`: legge l'identita', costruisce l'evento della
