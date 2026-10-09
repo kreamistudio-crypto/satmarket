@@ -42867,3 +42867,51 @@ del bot Telegram». Scatti `06-ritocco-spento-*.png` e
 `07-ritocco-acceso-*.png` in `.claude/giri/avvisi-mercatino/`; dopo
 la fusione rigirato uguale (opacità 0,45, titolo e riga dai pezzi del
 P2P): `08-fuso-*.png` e `09-fuso-*.png`.
+## Il banner aspetta il «Fine» del primo giro (9 ott 2026, sera, richiesta di Andrea)
+
+**Cosa.** Sotto la leva `P2P_PRESE_DA`, nella pagina della porta (la riga
+«Per entrare oggi pubblica il tuo primo ordine» con le schede, 1696d20)
+si vedeva già il banner delle commissioni, fermo. Adesso lì non c'è, e
+per chi pubblica il primo ordine compare la PRIMA volta alla fine del
+giro guidato, con la lenta che parte da «Fine 🎉» (610951c). Da lì in
+poi resta come sempre. Moderatori e dopo le 10: come oggi, da soli
+(`preseChiuseP2P` falso).
+
+**Com'è fatto.** Un giudice solo, `bannerNascostoPrimoOrdineP2P()`, nel
+blocco della porta: dentro, sotto la leva, e porta aperta OPPURE la
+bandierina `p2pBannerAlFine`. Lo chiede `veritaBannerFeeP2P`, che resta
+l'unico posto che scrive `hidden` sul banner (col typeof: i banchi che
+la eseguono non conoscono il giudice). La bandierina si accende
+(`aspettaFineBannerP2P`) sul percorso del primo ordine, nello stesso
+`if` di `inviaNuovoOrdineP2P` che torna al libro per le slide, PRIMA del
+`go('p2p')`; si scioglie (`liberaBannerP2P`, che rigiudica) in tre posti:
+in `fineGiroP2P` prima di `animaBannerFeeP2P` (un elemento nascosto non
+anima), in `chiudiTourP2P` quando le slide si chiudono senza giro, e
+dopo un giro che non è partito (`giroGuidatoP2P` ha uscite mute). E
+`renderP2P` rigiudica il banner anche DOPO la porta: in cima al render
+l'adozione delle righe del server non è ancora avvenuta, e una porta che
+si chiude lì lascerebbe il libro senza banner fino al render dopo.
+
+**La strada scartata, da non rifare.** «Nascosto finché manca il timbro
+`banner_p2p`»: il timbro nasce solo con l'animazione, quindi i tester col
+tour fatto da settimane non ce l'hanno e sarebbero rimasti senza banner
+fino alle 10. Una sentinella vieta al giudice di leggere il timbro. La
+bandierina vive in memoria: una ricarica a metà percorso la scioglie, e
+il banner torna fermo come per chi salta il tour — il prezzo detto.
+
+**Provato.** `prove_banner_ingresso` (16): il giudice e le uscite girano
+in node (porta, libro senza bandierina, dopo la pubblicazione, al Fine,
+doppio scioglimento, moderatore e dopo le 10, anonimo, vetrina, demo) e
+le sentinelle sui sei posti; emendata una sentinella di
+`prove_prese_dalle_10` (il `go('p2p')` ora sta in un blocco). Dal vivo
+nel Browser pane (copia con relay morto, leva a domani, cifre del
+disegno nel config del banco — col config d'esempio, commissione 2 e
+sconto 0, il banner è nascosto per il giudice di sempre —, coordinatore
+di cartone): identità 3333 mai entrata → porta senza banner (e
+`bannerFeeVeroP2P` dice vero: a nasconderlo è solo il giudice nuovo) →
+pubblica un acquisto → slide col banner nascosto → «Inizia» → giro col
+banner nascosto → «Fine 🎉» → il banner compare e fa i sei passi della
+lenta (`fee-primo`, `fee-passo1`…`6` misurati a 0,05-4 s), poi resta
+personale (`fee-p2`) sul libro, timbro scritto. Il moderatore 999 vede
+il libro col banner. Il pane emula gli effetti ridotti: le pillole
+appaiono invece di entrare.

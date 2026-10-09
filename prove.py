@@ -103208,8 +103208,11 @@ console.log(JSON.stringify(casi));
           mini.count("apriTourP2PSePrimaVolta();"))
     _pub = pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")
     prova("dopo la prima pubblicazione, sotto la leva e a tour mai visto, si torna al libro (e il tour parte da li')",
-          True, "if (typeof preseChiuseP2P === 'function' && preseChiuseP2P() && !tourP2PVisto()) go('p2p');" in _pub
-          and _pub.index("preseChiuseP2P() && !tourP2PVisto()) go('p2p')") > _pub.index("await spuntaAttesaP2P('Ordine pubblicato');"))
+          # (EMENDATA il 9 ott 2026 sera, cantiere banner-ingresso: il
+          # go('p2p') sta in un blocco, con la bandierina del banner prima)
+          True, "if (typeof preseChiuseP2P === 'function' && preseChiuseP2P() && !tourP2PVisto()) {" in _pub
+          and "      go('p2p');\n    }" in _pub
+          and _pub.index("preseChiuseP2P() && !tourP2PVisto()) {") > _pub.index("await spuntaAttesaP2P('Ordine pubblicato');"))
     # LA LENTA DEL BANNER DOPO «FINE» (nota di Andrea dal cantiere del banner,
     # 610951c): parte solo se il giro si chiude con «Fine» — chiudiTour(true)
     # → dopo(finito === true) → fineGiroP2P(true) → animaBannerFeeP2P(true).
@@ -103715,6 +103718,105 @@ console.log(JSON.stringify(out));
           {"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": ""}, out["normalizza"])
     prova("a leva globale spenta, in demo e da anonimi: niente campana e niente riga",
           [["", ""], ["", ""], ["", ""]], [out["fuoriCasa"], out["demo"], out["anonimo"]])
+
+def prove_banner_ingresso():
+    """IL BANNER ASPETTA IL «FINE» (9 ott 2026, sera, richiesta di Andrea):
+    sotto la leva delle prese il banner delle commissioni non si vede
+    nella pagina della porta, e per chi pubblica il primo ordine compare
+    la prima volta alla fine del giro guidato, con la lenta da «Fine 🎉».
+    Moderatori e dopo-le-10 come oggi.
+    LA TRAPPOLA DA NON RIFARE: legarlo al timbro `banner_p2p`, che nasce
+    solo con l'animazione — i tester col tour fatto da settimane non ce
+    l'hanno, e sarebbero rimasti senza banner fino alle 10. Si prova che
+    il giudice NON lo legge.
+    Il giudice, la bandierina e le tre uscite si fanno GIRARE in node;
+    il resto sono sentinelle sui posti."""
+    print("\n[il banner aspetta il «Fine» del primo giro]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    fz = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function aspettaFineBannerP2P(){", "function liberaBannerP2P(){",
+        "function bannerNascostoPrimoOrdineP2P(){"))
+    fz = fz.replace("function aspettaFineBannerP2P(){ p2pBannerAlFine = true; }\n}\n",
+                    "function aspettaFineBannerP2P(){ p2pBannerAlFine = true; }\n")
+    banco = """
+let myTgId = 111, VETRINA = false, DEMO = false;
+let chiuse = true, porta = true, verita = 0;
+function preseChiuseP2P(){ return chiuse; }
+function portaPrimoOrdineP2P(){ return porta; }
+function veritaBannerFeeP2P(){ verita++; }
+let p2pBannerAlFine = false;
+%s
+const c = {};
+c.porta = bannerNascostoPrimoOrdineP2P();
+porta = false;
+c.libro_senza_bandierina = bannerNascostoPrimoOrdineP2P();
+aspettaFineBannerP2P();
+c.dopo_la_pubblicazione = bannerNascostoPrimoOrdineP2P();
+const v0 = verita;
+liberaBannerP2P();
+c.al_fine = [bannerNascostoPrimoOrdineP2P(), verita - v0];
+const v1 = verita;
+liberaBannerP2P();
+c.libera_due_volte = verita - v1;
+chiuse = false; porta = true; aspettaFineBannerP2P();
+c.moderatore_o_dopo_le_10 = bannerNascostoPrimoOrdineP2P();
+chiuse = true; myTgId = 0;
+c.anonimo = bannerNascostoPrimoOrdineP2P();
+myTgId = 111; VETRINA = true;
+c.vetrina = bannerNascostoPrimoOrdineP2P();
+VETRINA = false; DEMO = true;
+c.demo = bannerNascostoPrimoOrdineP2P();
+console.log(JSON.stringify(c));
+""" % fz
+    r = _node_banco(banco)
+    if r is None:
+        salta("il giudice del banner in node", "node non c'e'")
+    else:
+        prova("la pagina della porta: banner nascosto", True, r.get("porta"))
+        prova("...chi ha gia' un ordine vivo e non e' nel primo giro: banner come sempre",
+              False, r.get("libro_senza_bandierina"))
+        prova("dopo la prima pubblicazione: nascosto fino al «Fine»", True,
+              r.get("dopo_la_pubblicazione"))
+        prova("al «Fine» si rivela, e si rigiudica una volta", [False, 1], r.get("al_fine"))
+        prova("...e sciogliere due volte non rigiudica di nuovo", 0, r.get("libera_due_volte"))
+        prova("moderatore o dopo le 10 (prese aperte): mai nascosto, porta o bandierina che sia",
+              False, r.get("moderatore_o_dopo_le_10"))
+        prova("anonimo, vetrina e demo: mai nascosto da qui", [False, False, False],
+              [r.get("anonimo"), r.get("vetrina"), r.get("demo")])
+
+    # --- LE SENTINELLE SUI POSTI ---------------------------------------
+    giud = pezzo_js(mini, "function bannerNascostoPrimoOrdineP2P(){", "\n}\n")
+    prova("il giudice NON legge il timbro banner_p2p (i tester senza timbro resterebbero senza banner)",
+          False, "banner_p2p" in giud or "hintDismesso" in giud)
+    ver = pezzo_js(mini, "function veritaBannerFeeP2P(){", "\n}\n")
+    prova("veritaBannerFeeP2P, l'unico che scrive `hidden`, chiede al giudice (col typeof)", True,
+          "const aspetta = typeof bannerNascostoPrimoOrdineP2P === 'function'\n    && bannerNascostoPrimoOrdineP2P();" in ver
+          and "b.hidden = aspetta || !bannerFeeVeroP2P(" in ver)
+    prova("...e il banner si nasconde solo da li'", 1,
+          len(re.findall(r"p2pFeeBanner'\)\.hidden|b\.hidden =", re.sub(r"/\*.*?\*/", "", mini, flags=re.S))))
+    pub = pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")
+    i_if = pub.index("preseChiuseP2P() && !tourP2PVisto()) {")
+    prova("la bandierina si accende sul percorso del primo ordine, PRIMA di tornare al libro", True,
+          pub.index("aspettaFineBannerP2P();", i_if) < pub.index("go('p2p');", i_if)
+          and pub.count("aspettaFineBannerP2P") == 2)
+    fg = pezzo_js(mini, "function fineGiroP2P(finito){", "\n}\n")
+    prova("alla fine del giro si scioglie PRIMA della lenta (un elemento nascosto non anima)", True,
+          fg.index("liberaBannerP2P();") < fg.index("animaBannerFeeP2P(finito === true);"))
+    ct = pezzo_js(mini, "function chiudiTourP2P(poi){", "\n}\n")
+    prova("chiudiTourP2P la scioglie senza giro, e dopo un giro che non e' partito", True,
+          "sfocaPaginaTourP2P(false, giro ? () => { giro(); if (!tourInCorso) libera(); } : null);" in ct
+          and "if (!giro) libera();" in ct)
+    rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    i_porta = rp.rindex("&& portaPrimoOrdineP2P()) {")
+    prova("renderP2P rigiudica il banner DOPO la porta (l'adozione puo' averla chiusa)", True,
+          rp.find("if (typeof veritaBannerFeeP2P === 'function') veritaBannerFeeP2P();", i_porta) > i_porta)
+    prova("la lenta resta quella del banner (610951c): «Fine» → fineGiroP2P(true) → animaBannerFeeP2P(true)",
+          True, "const lenta = conFine === true || !hintDismesso('banner_p2p');"
+          in pezzo_js(mini, "function animaBannerFeeP2P(conFine){", "\n}\n"))
+    _fm = mini.index("/* ============ fine del motore dello scambio")
+    prova("il giudice e la bandierina stanno fuori dal motore, col blocco della porta", True,
+          mini.index("function bannerNascostoPrimoOrdineP2P(){") > _fm
+          and mini.index("let p2pBannerAlFine = false;") > _fm)
 
 
 def prove_avvisi_mercatino():
@@ -133243,6 +133345,7 @@ def main():
               prove_avvisi_mercatino,
               prove_testo_ricevere_sats,
               prove_prese_dalle_10,
+              prove_banner_ingresso,
               prove_config_esempio):
         try:
             f()

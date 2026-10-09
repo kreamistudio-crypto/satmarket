@@ -50850,6 +50850,11 @@ function renderP2P(){
     box.innerHTML = rigaPortaP2P();
     if (testaBox) testaBox.innerHTML = '';
   }
+  /* il banner si rigiudica DOPO la porta (9 ott 2026, sera): in cima al
+     render `scambiP2P` non aveva ancora adottato le righe del server, e
+     una porta che si chiude qui lascerebbe il libro senza banner fino al
+     render dopo */
+  if (typeof veritaBannerFeeP2P === 'function') veritaBannerFeeP2P();
 }
 /* l'imbuto, nella lingua delle icone di casa: `viewBox` e tratto della
    nav, come le cinque del foglio «Pubblica» */
@@ -52954,7 +52959,14 @@ function chiudiTourP2P(poi){
      card se n'e' gia' andata, e la sfocatura si scioglie in 0,8 s.
      Solo qui, alla fine di un tour — «Inizia», «Salta» o il gesto
      indietro passano tutti da questa funzione. */
-  sfocaPaginaTourP2P(false, typeof poi === 'function' ? poi : null);
+  /* IL BANNER CHE ASPETTAVA IL «FINE» (9 ott 2026, sera) si scioglie se
+     il giro non arriva: slide chiuse senza giro (Salta, indietro), o un
+     giro che non e' partito (`giroGuidatoP2P` ha le sue uscite mute).
+     Il giro partito lo scioglie lui, in `fineGiroP2P`. */
+  const giro = typeof poi === 'function' ? poi : null;
+  const libera = () => { if (typeof liberaBannerP2P === 'function') liberaBannerP2P(); };
+  sfocaPaginaTourP2P(false, giro ? () => { giro(); if (!tourInCorso) libera(); } : null);
+  if (!giro) libera();
 }
 /* LA SFOCATURA DIETRO IL TOUR, in un posto solo. Accesa: la classe
    sull'<html> (il CSS sfoca vista attiva e barra), mai con gli effetti
@@ -63572,7 +63584,12 @@ async function inviaNuovoOrdineP2P(confermato){
        `apriTourP2PSePrimaVolta` apre le slide di sempre — «Inizia» il
        giro sulla pagina, «Fine 🎉» il libro. Chi il tour l'ha gia'
        fatto resta sulla pagina del suo ordine, come sempre. */
-    if (typeof preseChiuseP2P === 'function' && preseChiuseP2P() && !tourP2PVisto()) go('p2p');
+    if (typeof preseChiuseP2P === 'function' && preseChiuseP2P() && !tourP2PVisto()) {
+      /* ...e il banner aspetta il «Fine» del giro (9 ott 2026, sera):
+         acceso PRIMA di tornare al libro, che il render lo nasconda */
+      if (typeof aspettaFineBannerP2P === 'function') aspettaFineBannerP2P();
+      go('p2p');
+    }
   } catch(e) {
     /* la chiave VIVA e p2pOrdineAperto e non ord.id: fra l apertura e
        l errore il coordinatore puo aver gia dato il nome definitivo */
@@ -66694,6 +66711,35 @@ function haOrdiniViviP2P(){
 function portaPrimoOrdineP2P(){
   return !!myTgId && !VETRINA && !DEMO && preseChiuseP2P() && !haOrdiniViviP2P();
 }
+/* IL BANNER ASPETTA IL «FINE» (9 ott 2026, sera, richiesta di Andrea):
+   sotto la leva delle prese il banner delle commissioni non si vede
+   nella pagina della porta, e per chi pubblica il primo ordine compare
+   la PRIMA volta alla fine del giro guidato, con la lenta che parte da
+   «Fine 🎉» (`fineGiroP2P` → `animaBannerFeeP2P`). Da li' in poi resta
+   come sempre; i moderatori e il dopo-le-10 non lo vedono mai nascosto
+   (`preseChiuseP2P` falso).
+   LA BANDIERINA E NON IL TIMBRO, ed e' la scelta da non rovesciare: il
+   timbro `banner_p2p` nasce solo con l'animazione, quindi chi ha fatto
+   il tour settimane fa non ce l'ha — «nascosto finche' manca il timbro»
+   avrebbe tolto il banner a tutti i tester fino alle 10. La bandierina
+   si accende SOLO sul percorso del primo ordine (`inviaNuovoOrdineP2P`,
+   lo stesso `if` che torna al libro per le slide) e si scioglie in tre
+   posti: la fine del giro (`fineGiroP2P`, prima dell'animazione: un
+   elemento nascosto non anima), le slide chiuse senza giro e il giro
+   che non e' partito (`chiudiTourP2P`). Vive in memoria: una ricarica
+   la scioglie, e il banner torna fermo come per chi ha saltato il tour. */
+let p2pBannerAlFine = false;
+function aspettaFineBannerP2P(){ p2pBannerAlFine = true; }
+function liberaBannerP2P(){
+  if (!p2pBannerAlFine) return;
+  p2pBannerAlFine = false;
+  if (typeof veritaBannerFeeP2P === 'function') veritaBannerFeeP2P();
+}
+/* PURA sugli stati: il banner va tenuto nascosto adesso? */
+function bannerNascostoPrimoOrdineP2P(){
+  if (!myTgId || VETRINA || DEMO || !preseChiuseP2P()) return false;
+  return portaPrimoOrdineP2P() || p2pBannerAlFine;
+}
 /* la riga al posto del libro, nel vestito dello stato vuoto, col gesto.
    IL BOTTONE HA IL COLORE DEL LATO (rifinitura di Andrea): verde su
    «Compra BTC», rosso su «Vendi BTC», come il + e i due «Pubblica
@@ -67022,6 +67068,9 @@ function fineGiroP2P(finito){
   /* ...e il banner delle commissioni si fa personale, con la luce che
      scorre (IL BANNER PERSONALE): vive fuori da qui, da qui il typeof.
      Finito con «Fine 🎉» → la versione LENTA, anche da «Come funziona» */
+  /* il banner che aspettava il «Fine» si rivela PRIMA della lenta (9 ott
+     2026, sera): un elemento nascosto non anima */
+  if (typeof liberaBannerP2P === 'function') liberaBannerP2P();
   if (typeof animaBannerFeeP2P === 'function') animaBannerFeeP2P(finito === true);
 }
 /* ============ fine del giro guidato del P2P ============ */
@@ -67218,7 +67267,11 @@ function veritaBannerFeeP2P(){
   const b = el('p2pFeeBanner');
   if (!b) return;
   const c = typeof p2pCoord === 'function' ? p2pCoord() : null;
-  b.hidden = !bannerFeeVeroP2P(commissioneVivaP2P(),
+  /* ...e sotto la leva delle prese aspetta il «Fine» (9 ott 2026, sera):
+     il giudice vive col blocco della porta, da qui il typeof */
+  const aspetta = typeof bannerNascostoPrimoOrdineP2P === 'function'
+    && bannerNascostoPrimoOrdineP2P();
+  b.hidden = aspetta || !bannerFeeVeroP2P(commissioneVivaP2P(),
     c ? Number(c.commissione) : null,
     p2pSconto ? Number(p2pSconto.punti) : null);
 }
