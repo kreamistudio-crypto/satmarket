@@ -57202,7 +57202,12 @@ function righeRecapitoP2P(testo){
    di Andrea: un bottone per riga faceva confusione), e copia il
    valore SENZA SPAZI — anche quando e' arrivato con gli spazi: e' la
    forma che il sito della banca accetta sempre, e col dito si
-   prenderebbero anche quelli della vista. */
+   prenderebbero anche quelli della vista.
+   ...E SULLA CAUSALE (9 ott 2026, richiesta di Andrea): come l'IBAN si
+   incolla in un campo del modulo della banca, e il dito sulla riga
+   prenderebbe anche l'etichetta. La si riconosce per ETICHETTA, non
+   per forma: una forma non ce l'ha. L'intestatario resta senza, come
+   dal 23 set. */
 function riquadroRecapitoP2P(testo, titolo){
   const righe = righeRecapitoP2P(testo);
   if (!righe.length) return '';
@@ -57215,7 +57220,7 @@ function riquadroRecapitoP2P(testo, titolo){
         return FORMA_IBAN.test(nudo)
           ? rigaDato(r.et, nudo, {vista: nudo.replace(/(.{4})(?=.)/g, '$1 '),
                                   mono: true, copia: true})
-          : rigaDato(r.et, r.v, {mono: /^iban$/i.test(r.et)});
+          : rigaDato(r.et, r.v, {mono: /^iban$/i.test(r.et), copia: /^causale$/i.test(r.et)});
       }).join('')
     + '</div>';
 }
@@ -63291,11 +63296,20 @@ function bloccoModeratoreP2P(o){
       come gli scambi: un IBAN non passa MAI dal server di Barattolo. */
 const RECAPITI_CHIAVE = 'barattolo_p2p_recapiti';
 const P2P_FORME_RECAPITO = [
+  /* LA CAUSALE (9 ott 2026, richiesta di Andrea): facoltativa, al piu'
+     140 caratteri — il limite del bonifico SEPA — e solo i caratteri che
+     il circuito accetta (`giudiceCausaleSepaP2P`, chiamato dall'invio
+     col `max` di qui). Fa LA STESSA STRADA del nome e dell'IBAN: nel
+     testo composto, cifrata fra le due chiavi, nel ricordo di questo
+     dispositivo, precompilata al prossimo scambio; e se e' vuota la sua
+     riga non esiste — ne' sul filo ne' da chi compra. */
   {forma: 'sepa', riconosce: /sepa|bonific|iban/i,
    campi: [{k: 'nome', et: 'Intestatario (nome e cognome)', ph: 'Mario Rossi'},
-           {k: 'iban', et: 'IBAN', ph: 'IT60X0542811101000000123456'}],
+           {k: 'iban', et: 'IBAN', ph: 'IT60X0542811101000000123456'},
+           {k: 'causale', et: 'Causale (facoltativa)', ph: 'es. regalo Mario', facoltativo: true, max: 140}],
    componi: (c, m) => (/instant/i.test(String(m || '')) ? 'Bonifico SEPA Instant' : 'Bonifico SEPA')
-     + '\nIntestatario: ' + c.nome + '\nIBAN: ' + c.iban},
+     + '\nIntestatario: ' + c.nome + '\nIBAN: ' + c.iban
+     + (c.causale ? '\nCausale: ' + c.causale : '')},
   {forma: 'revolut', riconosce: /revolut/i,
    campi: [{k: 'tag', et: 'Il tuo RevTag', ph: '@mariorossi'}],
    componi: c => 'Revolut: ' + c.tag},
@@ -63340,6 +63354,28 @@ const P2P_FORME_RECAPITO = [
            {k: 'punto', tipo: 'hidden', facoltativo: true}],
    componi: c => testoAppuntamentoP2P(c.luogo, quandoDaCampoP2P(c.quando), puntoDaCampoP2P(c.punto))}
 ];
+/* ---- IL GIUDICE DELLA CAUSALE SEPA (9 ott 2026) ----
+   Vuota passa: e' facoltativa. Piena, le due regole del circuito: al
+   piu' `max` caratteri (140, la «remittance information» del bonifico)
+   e il solo alfabeto che l'EPC ammette — lettere senza accenti, cifre,
+   lo spazio e . , - / ( ) ' + ? : — perche' una banca che trova un
+   carattere fuori lo rifiuta o lo storpia, e chi compra se ne
+   accorgerebbe solo allo sportello. Torna '' se va bene, altrimenti la
+   frase da dire, che NOMINA i caratteri da togliere: «togli la è» si
+   capisce, «caratteri non ammessi» no. PURA, e provata. */
+const FORMA_CAUSALE_SEPA = /^[A-Za-z0-9 \/\-?:().,'+]*$/;
+function giudiceCausaleSepaP2P(v, max){
+  const t = String(v || '');
+  if (!t) return '';
+  if (t.length > max)
+    return 'La causale può avere al massimo ' + max + ' caratteri: ne hai scritti ' + t.length;
+  if (!FORMA_CAUSALE_SEPA.test(t)) {
+    const via = Array.from(new Set(Array.from(t).filter(ch => !FORMA_CAUSALE_SEPA.test(ch))));
+    return 'Nella causale vanno solo lettere senza accenti, numeri, spazi e . , - / ( ) \' + ? : '
+      + '— togli ' + via.map(ch => '«' + ch + '»').join(' ');
+  }
+  return '';
+}
 /* un campo del form del recapito: testo, di serie; il selettore di data
    e ora; il nascosto del punto; il luogo coi suggerimenti sotto, la riga
    del punto e «📍 Usa la mia posizione» (1 ott 2026). I valori entrano
@@ -63354,7 +63390,7 @@ function campoRecapitoP2P(c){
       + '" max="' + valoreQuandoP2P(adesso + P2P_APPUNTAMENTO_FUTURO_S) + '"></div>';
   }
   return '<div class="field"><label for="' + id + '">' + esc(c.et) + '</label>'
-    + '<input type="text" id="' + id + '" maxlength="' + CAMPO_MAX_TESTO + '" '
+    + '<input type="text" id="' + id + '" maxlength="' + (c.max || CAMPO_MAX_TESTO) + '" '
     + 'autocomplete="off" autocapitalize="off" spellcheck="false" '
     + (c.luogo ? 'oninput="luogoScrittoP2P(this.value)" ' : '')
     + 'placeholder="' + esc(c.ph) + '">'
@@ -63880,6 +63916,12 @@ async function inviaCampoP2P(tipo, btn){
       const inp = el('p2pCampoEuro_' + c.k);
       let v = String((inp && inp.value) || '').trim();
       if (c.k === 'iban') v = v.replace(/\s+/g, '').toUpperCase();
+      /* la causale SEPA ha il suo giudice (9 ott 2026): tetto e alfabeto
+         del circuito; vuota passa, perche' e' facoltativa */
+      if (c.k === 'causale') {
+        const no = giudiceCausaleSepaP2P(v, c.max);
+        if (no) { toast(no, 6000); if (inp) inp.focus(); return; }
+      }
       /* il punto e' facoltativo, e l'ora la giudica il suo giudice qui sotto */
       if (!v && !c.facoltativo && c.tipo !== 'datetime-local') {
         toast('Compila: ' + c.et); if (inp) inp.focus(); return;
@@ -63931,6 +63973,15 @@ async function inviaCampoP2P(tipo, btn){
       }
       campi.importo = centesimiTestoP2P(imp.n);
       tabRiga = {ordine: campi.ordine, importo: campi.importo, scade: quando};
+    }
+    /* LA CAUSALE NON SI TAGLIA IN SILENZIO (9 ott 2026): un recapito
+       tagliato a meta' e' un recapito ROTTO, e un nome lungo piu' una
+       causale lunga possono passare il tetto del testo — si dice, e si
+       accorcia. Gli altri form restano come ieri. */
+    if (campi.causale && fr.componi(campi, metodoRecapitoScelto(o)).length > CAMPO_MAX_TESTO) {
+      toast('Con questa causale il recapito supera i ' + CAMPO_MAX_TESTO + ' caratteri: accorciala');
+      el('p2pCampoEuro_causale')?.focus();
+      return;
     }
     testo = fr.componi(campi, metodoRecapitoScelto(o)).slice(0, CAMPO_MAX_TESTO);
     /* il ricordo non tiene i campi che al prossimo scambio sarebbero

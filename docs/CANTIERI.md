@@ -41702,3 +41702,152 @@ Playwright su Windows, non Safari iOS — la riga c'è e si tocca, ma il
 esiste nel salto dell'ora legale (`epochScadeTabP2P` la spegne, non
 provata in CI perché il fuso là è UTC). Le `.chip` della vetrina senza
 `font-family` (stesso difetto, fuori da questo cantiere).
+## La causale del bonifico SEPA (9 ott 2026, richiesta di Andrea)
+
+**La richiesta.** Nel P2P, chi riceve gli euro con un bonifico indica
+oggi il nome dell'intestatario e l'IBAN; deve poter indicare anche una
+CAUSALE, facoltativa, al più 140 caratteri (il limite SEPA), coi soli
+caratteri che il circuito ammette e un rifiuto chiaro sul resto;
+segnaposto d'esempio «es. regalo Mario»; chi paga la vede sotto IBAN e
+intestatario col suo bottone «copia»; vuota, la riga non compare. La
+causale deve fare ESATTAMENTE la strada del nome e dell'IBAN, senza
+passare in chiaro da nessuna parte dove oggi l'IBAN non passa. Niente
+cambia per il contanti di persona e per gli altri metodi.
+
+**Com'è fatto il recapito, letto prima di toccare.** Il foglio «🤝 I
+vostri recapiti» (`renderCampiP2P`) sceglie il form dal METODO dello
+scambio (`P2P_FORME_RECAPITO`, forma `sepa`: `riconosce`
+/sepa|bonific|iban/); i campi si precompilano dal ricordo di questo
+dispositivo (`recapitiMiei()`, localStorage `barattolo_p2p_recapiti@<tg>`,
+una voce per forma). Al tocco di «Invia a chi compra» (`inviaCampoP2P`)
+i campi si raccolgono, l'IBAN si pulisce e si giudica sulla sagoma, il
+testo si COMPONE (`componi`: «Bonifico SEPA / Intestatario: … / IBAN:
+…»), si taglia a `CAMPO_MAX_TESTO` (300) e parte con `campoInvia`: un
+kind 1 firmato dalla trade key dello scambio, col tag `t: euro`, dentro
+un kind 14 cifrato NIP-44 fra le due chiavi derivate da ECDH + HKDF
+(`chiaviPeer`), pubblicato sui `MOSTRO_RELAY`. Il server NON lo vede: il
+telefono di chi vende gli dice solo «ho indicato dove ricevere gli
+euro» con l'id dell'ordine (`avvisaRecapitoP2P` → `POST /api/p2p/recapito`,
+senza un campo dove mettere il recapito), e lui avvisa chi compra «tocca
+a te» o, se è una correzione, «📮 … ha aggiornato il recapito». Chi
+compra lo riceve dal relay (`mostroRiascolta`, filtro sull'AUTORE della
+busta), lo decifra e verifica (`campoArriva`), lo scrive in
+`campiLoro.euro` (vince il più recente per tipo) e lo mostra riga per
+riga (`righeRecapitoP2P` → `riquadroRecapitoP2P` → `rigaDato`), col
+«📋 Copia» solo sull'IBAN dal secondo giro del 23 set. Sul filo viaggia
+TESTO COMPOSTO, mai una struttura (regola 2 dell'identità di pagamento):
+chi riceve mostra quel che legge, qualunque versione abbia.
+
+**Cosa si è deciso, e perché.**
+- IL CAMPO sta nella forma `sepa`: `{k: 'causale', et: 'Causale
+  (facoltativa)', ph: 'es. regalo Mario', facoltativo: true, max: 140}`.
+  `facoltativo` è la bandiera che il ciclo dei campi già conosceva (il
+  punto del contanti): vuota non ferma l'invio. `max` è un numero
+  letterale e non una costante: l'elenco delle forme lo ritagliano
+  cinque banchi di `prove.py`, e un nome definito fuori dall'elenco li
+  farebbe esplodere.
+- IL TESTO COMPOSTO porta «Causale: …» come QUARTA riga, SOLO se c'è:
+  la riga vuota non esiste né sul filo né da chi compra. Nessun tipo
+  nuovo del tag `t` (regola 1: il recapito degli euro è UNO per
+  scambio), nessuna struttura sul filo (regola 2): un client di ieri
+  mostra la quarta riga come testo e non si rompe.
+- IL GIUDICE è puro e sta accanto alle forme: `giudiceCausaleSepaP2P(v,
+  max)`. Vuota → ''. Oltre `max` → «La causale può avere al massimo 140
+  caratteri: ne hai scritti N». Fuori dall'alfabeto → «Nella causale
+  vanno solo lettere senza accenti, numeri, spazi e . , - / ( ) ' + ? :
+  — togli «è» «!»»: NOMINA i caratteri da togliere, perché «caratteri
+  non ammessi» non dice cosa fare. L'alfabeto è quello dell'EPC
+  (`FORMA_CAUSALE_SEPA`: A-Z a-z 0-9 spazio / - ? : ( ) . , ' +): le
+  accentate si rifiutano, non si traslitterano — Andrea ha chiesto il
+  rifiuto col messaggio, e una banca che le trova le storpia o le
+  scarta senza dirlo. Il campo ha `maxlength="140"` (ogni campo porta il
+  suo `max`, gli altri restano a `CAMPO_MAX_TESTO`), e il giudice gira
+  lo stesso al tocco: il maxlength è una cortesia, non una guardia.
+- LA CAUSALE NON SI TAGLIA IN SILENZIO: un nome lungo più una causale
+  lunga possono passare i 300 del testo composto, e lo `slice` di prima
+  avrebbe mangiato la coda della causale senza dirlo («un recapito
+  tagliato a metà è un recapito ROTTO», la lezione delle buste). Con la
+  causale piena si controlla la lunghezza PRIMA della riga dello
+  `slice`, che resta com'era (una prova la cita alla lettera): «Con
+  questa causale il recapito supera i 300 caratteri: accorciala». Gli
+  altri form restano come ieri.
+- CHI COMPRA la vede sotto l'IBAN con «📋 Copia» come l'IBAN: la riga si
+  riconosce per ETICHETTA (`/^causale$/i`), non per forma — una forma non
+  ce l'ha — e il valore va nel `data-v`, mai nell'onclick (la prova col
+  testo cattivo c'è anche per lei). L'intestatario resta SENZA «Copia»,
+  come deciso il 23 set (secondo giro: un bottone per riga faceva
+  confusione). Nota: il verbale del 23 set diceva che una futura riga
+  «Causale:» avrebbe avuto «il suo Copia senza toccare niente» — era
+  vero al PRIMO giro, quando ogni riga l'aveva; dopo il secondo giro il
+  «Copia» stava solo sull'IBAN, e la causale ha voluto la sua riga.
+- IL RICORDO la tiene come il nome e l'IBAN (`ricordaRecapito` salva i
+  campi interi): al prossimo scambio SEPA il form nasce con l'ultima
+  causale scritta, modificabile. Andrea ha chiesto «la stessa strada»;
+  se una causale ricordata risultasse più stantia che comoda, si toglie
+  dal ricordo con un `nonRicordato: true` sul campo (la bandiera
+  dell'ora del contanti).
+- L'AVVISO «recapito aggiornato» non ha voluto niente: una causale
+  cambiata è un testo cambiato, quindi una busta con un id nuovo, quindi
+  un `POST /api/p2p/recapito` senza `ripetuto` — e il server, che ne
+  conta già uno, dice «📮 … ha aggiornato il recapito». Il server
+  continua a non vedere il recapito: né l'IBAN né la causale.
+
+**Strade scartate.** 1) Un tipo `causale` sul tag `t`, a parte: vietato
+dalla regola 1 (due buste vive per lo stesso recapito, e un client di
+ieri la lascerebbe cadere in silenzio). 2) Giudicare la causale sul
+server: impossibile per costruzione, il server non la vede — e non deve.
+3) Traslitterare le accentate (è → e) invece di rifiutarle: comoda, ma
+cambierebbe in silenzio quel che l'utente ha scritto, e Andrea ha
+chiesto il rifiuto con un messaggio chiaro. 4) Togliere il carattere
+vietato da soli: stesso motivo.
+
+**Le prove.** `prove_causale_sepa` (21): le sentinelle sul campo, sulla
+riga condizionale, sul `maxlength` per campo, sulla chiamata del giudice
+nell'invio, sul «Copia» per etichetta e sulla GUIDA; poi il banco node che
+ESEGUE `inviaCampoP2P` vero con le forme vere e il giudice vero su un DOM
+di cartone — vuota (tre righe, ricordo con la causale vuota), piena
+(quarta riga, IBAN pulito, ricordo), 140 passa, 141 no col conto e il
+fuoco sul campo, «caffè per Mario!» → «togli «è» «!»», «50 €» → «togli
+«€»», la punteggiatura del circuito tutta insieme, nome da 200 + causale
+da 100 → «supera i 300», nome vuoto ancora obbligatorio, nessun altro
+form col campo, il giudice puro sui cinque casi — e il riquadro vero di
+chi compra sul testo partito: quattro righe, due «Copia» (IBAN e
+causale, nell'ordine), senza causale una sola e nessuna riga, e la
+causale cattiva (`"><img …>`) che resta testo col suo «Copia». Suite
+intera nel worktree: 19962 passate, 0 fallite; i collaudi della CI
+(`collaudi_ci.py`): nel verbale del push.
+
+**Il giro dal vivo (PC, due identità, server del worktree).** La copia
+del worktree nello scratchpad col config di cartone; per la prima volta
+un RELAY LOCALE invece del relay morto — `nak serve --port 7790` nel WSL,
+solo loopback, raggiunto da Windows — perché qui la busta doveva
+davvero VIAGGIARE da un'identità all'altra. Le due identità nella
+stessa scheda del pane via hash (`collaudo:222:Venditore` /
+`collaudo:111:Compratore`); i due mazzi seminati con `ricordaMazzo`, le
+trade key da `chiaveScambio(sk, 0)`, le righe con `scriviOrdineP2P`
+(`peer` = la trade key dell'altro, `pubTrade` = la propria, stato
+`attivo`); il server seminato con le due chiavi in `chiavi_p2p`, la riga
+in `p2p_ordini` e i due eventi `taken` + `hold-invoice-paid` dalla porta
+vera col bearer di cartone. Visto: 1) il form del venditore con i tre
+campi (maxlength 300/300/140, segnaposto «es. regalo Mario»); 2) «regalo
+Mario, grazie!» → toast «… togli «!»», fuoco sul campo, NIENTE partito;
+3) «regalo Mario» → partito (quattro righe), ricordo con la causale,
+journal «💶 Recapito P2P: 222 … avvisato 111» con «tocca a te»; 4) il
+compratore riceve dal relay la busta con LO STESSO id partito, il
+riquadro mostra Intestatario / IBAN+Copia / Causale+Copia; 5) tocco VERO
+sul «Copia» della causale: negli appunti «regalo Mario», toast «Copiato
+📋»; 6) il venditore riapre dopo un reload: il form precompilato dal
+ricordo (causale compresa); cambia in «regalo Mario per il compleanno»,
+«Aggiorna il recapito» → busta nuova, journal «📮 Chi ti vende i sats ha
+aggiornato il recapito. Controlla il nuovo prima di inviare gli euro.»
+a 111; 7) il compratore vede la causale nuova (vince il più recente). Gli
+screenshot stanno in `.claude/giri/causale-sepa/` (01-06, gitignored).
+Pulizia: server fermato, nak fermato, voce tolta dal launch.json, copia
+cancellata.
+
+**Resta da guardare.** Sul telefono, la tastiera sul campo con
+`maxlength="140"` e il toast lungo del rifiuto a 375 px (nel pane sta su
+due righe). Qualche banca italiana è più stretta dell'EPC (per esempio
+sull'apostrofo): se capitasse, si restringe l'alfabeto in un posto solo.
+L'intestatario senza «Copia» è la decisione del 23 set, non di oggi: se
+Andrea lo vuole, è una riga (`copia: /^intestatario$/i.test(r.et)`).
