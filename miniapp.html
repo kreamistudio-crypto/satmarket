@@ -2830,16 +2830,11 @@
      massimo con le due valute accanto, e l'elenco dei venditori seguiti
      con la faccia, il nome (che apre il negozio) e «Smetti».
      ALLEGGERITO (9 ott 2026 sera, ritocco di Andrea, per uniformarlo al
-     blocco P2P): in testa il solo interruttore con la sua scritta
-     (`.avm-titolo`), da spento le scelte grigie (`.avn-corpo.avn-spento`,
-     la stessa del P2P) e `disabled`, in fondo una riga sola
-     (`.avm-dove`, una frase: --ink-soft come le altre a 12,5px).
-     ⚠️ GEMELLE di `.avn-titolo` e `.avn-dove` del ritocco P2P
-     (cantiere avvisi-p2p-ritocco), che quando si scrivono qui non sono
-     ancora su main: il giorno che ci arrivano si fondono in quelle. */
-  .avm-titolo{min-width:0;flex:1;font-size:13.5px;font-weight:800}
-  .avm-dove{margin-top:12px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
-  .avn-corpo.avn-spento .tema-pill[disabled],.avn-corpo.avn-spento input[disabled]{cursor:default}
+     blocco P2P): la testa, il corpo grigio da spento e la riga in fondo
+     sono i PEZZI DEL BLOCCO P2P (`.avn-titolo`, `.avn-corpo.avn-spento`,
+     `.avn-dove`), nessuna copia; qui solo il campo del prezzo, che il
+     P2P non ha, spento come le sue chip. */
+  .avn-corpo.avn-spento input[disabled]{cursor:default}
   .avm-prezzo{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
   .avm-prezzo input{font:inherit;font-size:13px;width:110px;padding:6px 10px;
     border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
@@ -34971,24 +34966,6 @@ let avvisiMercatinoLeve = null;     // {attivi, minuti, seguiMinuti} da /api/me
 function avvisiMercatinoInCasa(){
   return !!(avvisiMercatinoLeve && avvisiMercatinoLeve.attivi) && !DEMO && !!myTgId;
 }
-/* LA RIGA IN FONDO (9 ott 2026 sera, ritocco di Andrea): «Arriva nella
-   chat del bot Telegram» o «Arriva come messaggio Nostr», niente
-   frequenza. La regola e' quella del cassetto (la scelta di
-   `canale_notifiche`, o senza scelta il tipo di login), perche' la riga
-   dica dove arriva DAVVERO; «entrambi» dice le due.
-   ⚠️ E' la frase che il ritocco P2P (avvisi-p2p-ritocco) mette in
-   `doveArrivanoAvvisi()`, che su main oggi torna ancora la forma lunga
-   («nella chat del bot ✈️ Telegram») letta dal blocco P2P: toccarla da
-   qui gli farebbe dire «Arriva Arriva…». Quando quel ritocco arriva, le
-   due si fondono e questa se ne va. */
-function fraseDoveAvvisiMercatino(){
-  const tgOk = myTgId != null && myTgId > 0;
-  const attivo = myCanaleNotifiche || (tgOk ? 'telegram' : 'nostr');
-  return {telegram: 'Arriva nella chat del bot Telegram',
-          nostr: 'Arriva come messaggio Nostr',
-          entrambi: 'Arriva nella chat del bot Telegram e come messaggio Nostr'}[attivo]
-    || 'Arriva nella chat del bot Telegram';
-}
 /* le chip: da spento `disabled`, e il gesto non parte nemmeno se
    qualcuno lo chiama a mano (le guardie nei `scegli…`) */
 const pillAvm = (testo, scelto, gesto, dati, spento) =>
@@ -35004,7 +34981,7 @@ const interruttoreAvm = (on, gesto) =>
 function contenutoAvvisiMercatino(){
   const p = myAvvisiMercatino, on = !!p.attivo, off = !on;
   let h = '<div class="avn-testa">'
-    + '<div class="avm-titolo">Avvisami dei nuovi annunci</div>'
+    + '<div class="avn-titolo">Avvisami dei nuovi annunci</div>'
     + interruttoreAvm(on, 'setAvvisiMercatino({attivo:' + (on ? 'false' : 'true') + '})') + '</div>'
     + '<div class="avn-corpo' + (on ? '' : ' avn-spento') + '"' + (on ? '' : ' aria-disabled="true"') + '>'
     + '<div class="section-label">Categorie</div>'
@@ -35037,7 +35014,9 @@ function contenutoAvvisiMercatino(){
         + '<button type="button" class="tema-pill" onclick="smettiSegui(\'' + cod + '\')">Smetti</button>'
         + '</div>';
     }).join('') + '</div>';
-  return h + '<div class="avm-dove">' + esc(fraseDoveAvvisiMercatino()) + '</div>';
+  /* in fondo la riga sola, la STESSA del blocco P2P: «Arriva nella chat
+     del bot Telegram» o «Arriva come messaggio Nostr», senza frequenza */
+  return h + '<div class="avn-dove">' + esc(doveArrivanoAvvisi()) + '</div>';
 }
 /* la riga del cassetto Avvisi: il blocco «Mercatino», dentro la cornice
    delle righe vicine */

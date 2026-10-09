@@ -9769,12 +9769,11 @@
   porta i seguiti nei due versi e la coda. Frontend: il blocco
   «Mercatino» ACCODATO nel cassetto Avvisi dopo le righe del P2P
   (`rigaAvvisiMercatino`, `insertAdjacentHTML`: la riga delle sorelle
-  non si tocca), alleggerito come quello del P2P — il solo interruttore,
-  da spento categorie e prezzo grigi (`.avn-corpo.avn-spento`) e
-  `disabled`, in fondo la riga sola di `fraseDoveAvvisiMercatino()`
-  senza frequenza; `.avm-titolo`/`.avm-dove` e quella frase sono gemelle
-  di `.avn-titolo`/`.avn-dove`/`doveArrivanoAvvisi()` del ritocco P2P e
-  vi si fondono quando arriva su main —, `bottoneSegui` sotto la riga delle vendite nel
+  non si tocca), alleggerito coi PEZZI del blocco P2P — il solo
+  interruttore in `.avn-titolo`, da spento categorie e prezzo grigi
+  (`.avn-corpo.avn-spento`) e `disabled`, in fondo la riga sola
+  `.avn-dove` con `doveArrivanoAvvisi()`, senza frequenza; nessuna
+  classe gemella —, `bottoneSegui` sotto la riga delle vendite nel
   riquadro di `renderNegozio` (vuoto / pieno «🔔 Seguito ✓», mai sul
   proprio, mai in vetrina anonima), `chiediSegui` che aggiorna il
   bottone e l'elenco dalla stessa risposta.

@@ -42843,20 +42843,27 @@ con l'etichetta e l'elenco, e senza la riga dei 15 minuti. Il titolo del
 blocco è «Mercatino», senza 🛒. Le regole che le frasi tolte dicevano
 (al più uno ogni 60 e 15 minuti, mai per i propri annunci) restano
 tutte nel server: si è tolto il testo, non il comportamento.
-*Il ritocco P2P non era ancora su main* al rebase: esiste solo sul ramo
-locale `cantiere/avvisi-p2p-ritocco` di un'altra sessione. Quindi le sue
-classi non si sono ricalcate: `.avm-titolo` e `.avm-dove` sono le
-GEMELLE di `.avn-titolo` e `.avn-dove` (stesse regole), e la frase sta in
-`fraseDoveAvvisiMercatino()` e non in `doveArrivanoAvvisi()` — quella su
-main torna ancora la forma lunga letta dal blocco P2P, e cambiarla da qui
-gli avrebbe fatto dire «Arriva Arriva…». Il giorno che il ritocco P2P
-arriva, le gemelle si fondono nelle sue (una prova dice già che il blocco
-non chiama `doveArrivanoAvvisi`). *Provato*: `prove_avvisi_mercatino` (64,
-la parte client riscritta: spento grigio e `disabled` su ogni chip e sul
-campo, nessuna frequenza né spiegazione, la riga nei tre canali, le
-guardie dei gesti); dal vivo con Playwright sulla copia (8137): spento 32
+*Il ritocco P2P è arrivato su main a metà strada.* Al primo rebase
+esisteva solo sul ramo locale `cantiere/avvisi-p2p-ritocco` di un'altra
+sessione, e il blocco era nato con due classi GEMELLE (`.avm-titolo`,
+`.avm-dove`) e una frase sua, perché `doveArrivanoAvvisi()` su main
+tornava ancora la forma lunga letta dal blocco P2P — cambiarla da qui gli
+avrebbe fatto dire «Arriva Arriva…». Durante i collaudi del push il
+ritocco P2P è arrivato (53447f0): secondo rebase, e le gemelle si sono
+FUSE nei suoi pezzi — la testa è `.avn-titolo`, il corpo grigio
+`.avn-corpo.avn-spento` (opacità 0,45 e `cursor:default` sulle chip
+`disabled`, i suoi), la riga in fondo `.avn-dove` con
+`doveArrivanoAvvisi()`. Di mio resta solo `input[disabled]` nel corpo
+spento, perché il P2P un campo non ce l'ha. Una prova tiene il patto:
+nessuna classe gemella, la riga è `doveArrivanoAvvisi()`. *Provato*:
+`prove_avvisi_mercatino` (64, la parte client riscritta: spento grigio e
+`disabled` su ogni chip e sul campo, nessuna frequenza né spiegazione,
+la riga nei tre canali letta dal contenuto, le guardie dei gesti, nessun
+doppione del blocco P2P); dal vivo con Playwright sulla copia (8137): spento 32
 chip su 32 e il campo `disabled`, opacità 0,55, un tocco su una chip
 grigia non cambia niente sul server; acceso nessuna `disabled`, la chip
 «Alimenti e bevande» si accende; la riga in fondo dice «Arriva nella chat
 del bot Telegram». Scatti `06-ritocco-spento-*.png` e
-`07-ritocco-acceso-*.png` in `.claude/giri/avvisi-mercatino/`.
+`07-ritocco-acceso-*.png` in `.claude/giri/avvisi-mercatino/`; dopo
+la fusione rigirato uguale (opacità 0,45, titolo e riga dai pezzi del
+P2P): `08-fuso-*.png` e `09-fuso-*.png`.

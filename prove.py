@@ -104120,10 +104120,11 @@ def prove_avvisi_mercatino():
 
     # --- 5) IL CLIENT, in node --------------------------------------------------
     blocco = m[m.index("function normalizzaAvvisiMercatino("):m.index("async function setCanale(canale){")]
-    prova("IL BLOCCO NON LEGGE `doveArrivanoAvvisi`: ha la sua frase (il ritocco P2P ne cambia la forma, "
-          "e il blocco non deve dire «Arriva Arriva…» nel frattempo)", (False, True),
-          ("doveArrivanoAvvisi(" in re.sub(r"/\*[\s\S]*?\*/", "", blocco),
-           "function fraseDoveAvvisiMercatino(){" in blocco))
+    prova("NESSUN DOPPIONE DEL BLOCCO P2P: la riga in fondo e' `doveArrivanoAvvisi()`, testa e riga sono "
+          "`.avn-titolo` e `.avn-dove`, e nessuna classe gemella", (True, True, True, False),
+          ("esc(doveArrivanoAvvisi())" in blocco, '<div class="avn-titolo">' in blocco,
+           '<div class="avn-dove">' in blocco,
+           any(x in m for x in ("avm-titolo", "avm-dove", "fraseDoveAvvisi"))))
     prova("ALLEGGERITO: nessuna riga di spiegazione sotto l'interruttore, nessuna frequenza nel cassetto", False,
           any(x in blocco for x in ("Quando nel mercatino compare", "al massimo uno ogni", "L.minuti", "L.seguiMinuti")))
     js = (
@@ -104134,6 +104135,7 @@ def prove_avvisi_mercatino():
         "const el = () => null, toast = () => {}, haptic = () => {};\n"
         "const numeroFiltro = v => { const n = parseFloat(String(v).trim().replace(',', '.')); return (isFinite(n) && n > 0) ? n : ''; };\n"
         + pezzo_js(m, "const esc = s => String(s ?? '').replace(", ";\n") + ";\n"
+        + pezzo_js(m, "function doveArrivanoAvvisi(){", "\n}\n") + "\n}\n"
         + blocco
         + r"""
 const out = {};
@@ -104151,10 +104153,10 @@ out.spento = [spento.indexOf('avn-spento') >= 0, spento.indexOf('aria-disabled="
               attive(spento), spento.indexOf('value=""') >= 0,
               chipCorpo(spento).length > 3 && chipCorpo(spento).every(b => / disabled>$/.test(b)),
               /<input id="avmPrezzo"[^>]* disabled>/.test(spento),
-              spento.indexOf('<div class="avm-titolo">Avvisami dei nuovi annunci</div>') >= 0,
+              spento.indexOf('<div class="avn-titolo">Avvisami dei nuovi annunci</div>') >= 0,
               spento.indexOf('minuti') < 0,
               spento.indexOf('Nessuno: «🔔 Segui» è nella pagina di ogni venditore.') >= 0,
-              /<div class="avm-dove">Arriva nella chat del bot Telegram<\/div>$/.test(spento)];
+              /<div class="avn-dove">Arriva nella chat del bot Telegram<\/div>$/.test(spento)];
 out.riga = [rigaAvvisiMercatino().indexOf('id="avvisiMercatinoCassetto"') >= 0,
             rigaAvvisiMercatino().indexOf('>Mercatino</div>') >= 0, rigaAvvisiMercatino().indexOf(spento) >= 0];
 myAvvisiMercatino = normalizzaAvvisiMercatino({attivo: 1, categorie: ['Motori', 'Elettronica', 'x', 'Tutto'], prezzo_max: '50', valuta: 'eur'});
@@ -104173,9 +104175,10 @@ out.bottone = [bottoneSegui({negozio: 'neg333', seguito: false}, false), bottone
 VETRINA = true; out.vetrina = bottoneSegui({negozio: 'neg333', seguito: false}, false); VETRINA = false;
 DEMO = true; out.demo = [rigaAvvisiMercatino(), bottoneSegui({negozio: 'neg333'}, false)]; DEMO = false;
 myTgId = null; out.anonimo = [rigaAvvisiMercatino(), bottoneSegui({negozio: 'neg333'}, false)]; myTgId = -3;
-out.nativo = [fraseDoveAvvisiMercatino()];
-myCanaleNotifiche = 'entrambi'; out.nativo.push(fraseDoveAvvisiMercatino());
-myTgId = 222; myCanaleNotifiche = 'nostr'; out.nativo.push(fraseDoveAvvisiMercatino()); myCanaleNotifiche = '';
+const fondo = () => (contenutoAvvisiMercatino().match(/<div class="avn-dove">([^<]*)<\/div>$/) || [])[1];
+out.nativo = [fondo()];
+myCanaleNotifiche = 'entrambi'; out.nativo.push(fondo());
+myTgId = 222; myCanaleNotifiche = 'nostr'; out.nativo.push(fondo()); myCanaleNotifiche = '';
 // da spento le scelte non partono nemmeno chiamate a mano
 let chiesto = 0;
 setAvvisiMercatino = async () => { chiesto++; };
