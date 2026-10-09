@@ -42915,3 +42915,26 @@ lenta (`fee-primo`, `fee-passo1`…`6` misurati a 0,05-4 s), poi resta
 personale (`fee-p2`) sul libro, timbro scritto. Il moderatore 999 vede
 il libro col banner. Il pane emula gli effetti ridotti: le pillole
 appaiono invece di entrare.
+
+## La 🔔 torna davanti alla scritta (9 ott 2026, sera, richiesta di Andrea)
+
+Secondo ritocco a 53447f0: nel blocco P2P del cassetto Avvisi e nel foglio
+della campanella la scritta torna «🔔 Avvisami dei nuovi ordini P2P», con
+l'icona davanti come le righe sorelle del cassetto («💡», «⚡», «👤»).
+Il contenuto è uno solo (`contenutoAvvisiNuoviP2P`), quindi la riga cambia
+in tutt'e due i posti. Tutto il resto dell'alleggerimento resta: niente
+spiegazione sotto, scelte non toccabili da spento, una riga sola in fondo.
+La prova vieta ora le emoji della riga in fondo (✈️, 🟣, 📬) e non più il
+🔔, che ha il suo posto nel titolo.
+LA PARTE DEL MERCATINO NON E' QUI: Andrea ha chiesto anche «🛒 Avvisami dei
+nuovi annunci» per il blocco del mercatino, ma quel blocco vive nei tre
+commit del worktree `avvisi-mercatino` (un'altra sessione, non ancora su
+main) — oggi dice «Avvisami dei nuovi annunci» nel titolo e «🆕 Avvisami
+dei nuovi annunci» nella pagina «I tuoi dati». Il ritocco va fatto la',
+dal suo cantiere.
+Prove: `prove_avvisi_nuovi_ordini` e `prove_p2p_libro` verdi; suite intera
+nel worktree (PROVE_SEVERE=1) 20224 passate, 0 fallite; collaudi della CI
+in gabbia 44 verdi, 0 rossi. Dal vivo a 375 (relay morto): il titolo con
+l'icona nel foglio e nel cassetto (letto dal DOM: lo scatto del Profilo
+esce ingrandito nel pane, le misure della pagina sono normali); scatto in
+`.claude/giri/avvisi-p2p-icona/375-foglio-con-icona.jpg`.

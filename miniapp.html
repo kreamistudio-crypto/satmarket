@@ -34833,7 +34833,11 @@ function contenutoAvvisiNuoviP2P(){
     + (on ? '' : ' disabled') + '>'
     + esc(testo) + '</button>';
   return '<div class="avn-testa">'
-    + '<div class="avn-titolo">Avvisami dei nuovi ordini P2P</div>'
+    /* L'ICONA DAVANTI E' TORNATA (9 ott 2026, sera, secondo ritocco di
+       Andrea): «🔔» come le righe sorelle del cassetto («💡», «⚡», «👤»),
+       e il blocco del mercatino avra' la sua «🛒». Il resto
+       dell'alleggerimento resta com'e'. */
+    + '<div class="avn-titolo">🔔 Avvisami dei nuovi ordini P2P</div>'
     + '<button type="button" onclick="setAvvisiNuoviP2P({attivo:' + (on ? 'false' : 'true') + '})"'
     + ' aria-pressed="' + (on ? 'true' : 'false') + '"'
     + ' style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid '

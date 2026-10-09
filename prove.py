@@ -103651,9 +103651,9 @@ out.attive = attive(foglio);
 out.interruttore = /aria-pressed="true"[^>]*>Attivi</.test(foglio) && foglio.indexOf('avn-spento') < 0;
 out.campana = [campanellaP2P().indexOf(' accesa') >= 0, campanellaP2P().indexOf('fill="currentColor"') >= 0,
                campanellaP2P().indexOf('id="p2pCampanella"') >= 0];
-out.leggero = ['Quando nel libro', 'minuti', 'Mai per i tuoi', 'quanti ordini', '📬', '🔔']
+out.leggero = ['Quando nel libro', 'minuti', 'Mai per i tuoi', 'quanti ordini', '📬', '✈️', '🟣']
   .filter(s => foglio.indexOf(s) >= 0);
-out.titolo = /<div class="avn-testa"><div class="avn-titolo">Avvisami dei nuovi ordini P2P<\/div><button /.test(foglio);
+out.titolo = /<div class="avn-testa"><div class="avn-titolo">🔔 Avvisami dei nuovi ordini P2P<\/div><button /.test(foglio);
 out.inFondo = (foglio.match(/<div class="avn-dove">([^<]*)<\/div>$/) || [])[1];
 out.accesoTocca = [foglio.indexOf(' disabled') < 0, foglio.indexOf('aria-disabled') < 0];
 INVII = []; scegliTipoAvvisiNuoviP2P('acquisto'); scegliSogliaAvvisiNuoviP2P('5');
@@ -103696,9 +103696,11 @@ console.log(JSON.stringify(out));
           (out["interruttore"], out["campana"]))
     # (9 ott 2026 sera, «avvisi-p2p-ritocco») I TESTI ALLEGGERITI: in cima
     # il solo interruttore con la sua scritta, in fondo una riga sola
-    prova("in cima il SOLO interruttore con la scritta «Avvisami dei nuovi ordini P2P»", True,
+    # (9 ott 2026 sera, secondo ritocco di Andrea) l'icona davanti torna:
+    # «🔔 Avvisami dei nuovi ordini P2P», come le righe sorelle del cassetto
+    prova("in cima il SOLO interruttore con la scritta «🔔 Avvisami dei nuovi ordini P2P»", True,
           out["titolo"])
-    prova("...e nessuna spiegazione: via la riga sotto, la frequenza, «mai per i tuoi», le emoji", [],
+    prova("...e nessuna spiegazione: via la riga sotto, la frequenza, «mai per i tuoi», le emoji della riga in fondo", [],
           out["leggero"])
     prova("in fondo UNA riga: «Arriva nella chat del bot Telegram» a chi entra da Telegram",
           "Arriva nella chat del bot Telegram", out["inFondo"])

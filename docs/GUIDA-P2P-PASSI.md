@@ -241,7 +241,7 @@ Ordinamento (in cima): «Recenti» / «Convenienza» / «Più grandi» / «Più
 piccoli». C'è anche un «Filtro». Accanto alla levetta del tema, sulla
 stessa riga, la campanella 🔔 (dal 9 ott 2026; piena e arancio se gli
 avvisi sono accesi, vuota se spenti): apre un foglio dal basso con, in
-cima, il solo interruttore «Avvisami dei nuovi ordini P2P»
+cima, il solo interruttore «🔔 Avvisami dei nuovi ordini P2P»
 (Spenti/Attivi, spento di serie); sotto «Tipo di ordini» («Vendita BTC»
 / «Acquisto BTC» / «Barattozon», a scelta multipla) e «Convenienza»
 («Tutti» / «Solo se conveniente», e con la seconda le chip «A prezzo di
