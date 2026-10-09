@@ -42466,3 +42466,85 @@ stessi tre rossi. Non provato dal vivo nella Mini App.
 tracciamento» nel passo, ma nessun conto di quante spedizioni partono
 senza codice: se dovesse diventare l'abitudine, un numero nel cruscotto
 admin lo direbbe.
+## La 🔔 dei nuovi ordini, ritoccata dal telefono (9 ott 2026, sera, richiesta di Andrea)
+
+**La richiesta.** Visti dal vivo sul telefono gli avvisi dei nuovi
+ordini (38d068e): 1) nella testata del libro la campana stava SOPRA la
+levetta del tema, non accanto; 2) il foglio e il blocco nel cassetto
+Avvisi parlavano troppo. Il comportamento del server resta identico.
+
+**Cosa si è fatto, e perché.**
+- *La riga della testata*: misurata a 360, chiedeva 330 px in 328 —
+  due pixel — e la levetta andava a capo da sola, sotto la campana. Due
+  cure. I due cerchietti stanno in un gruppo (`.p2p-testa-cerchi`, flex,
+  `flex:none`), così non si separano mai: se un giorno la riga non basta
+  (sotto i 360) scendono insieme. E sotto i 400 le due pillole cedono un
+  poco ciascuna — respiro 8/9 invece di 8/11, distanze 5 invece di 6-7,
+  icona 15 invece di 17, corpo 12,5 invece di 13 — senza accorciare le
+  parole («Recenti» e «3 offerte» restano intere). Misurato dal vivo:
+  a 360 tutti e quattro in fila con 22 px d'avanzo (15 con «12 offerte»,
+  7 con «128 offerte»), a 375 con 37, a 390 con 52. Strada scartata:
+  togliere il conteggio dal Filtro o abbreviarlo, che è un'informazione e
+  non un ornamento.
+- *Il foglio e il cassetto, alleggeriti* (un contenuto solo,
+  `contenutoAvvisiNuoviP2P`, quindi uguali nei due posti): in cima il solo
+  interruttore con «Avvisami dei nuovi ordini P2P» (via la riga «Quando
+  nel libro compare…» e l'emoji; via anche il titolo «Nuovi ordini» del
+  foglio, che sopra l'interruttore ripeteva la stessa cosa — il foglio ha
+  il suo `aria-label`); in fondo UNA riga, «Arriva nella chat del bot
+  Telegram» o «Arriva come messaggio Nostr» (`.avn-dove`), via la
+  frequenza, «quanti ordini…», «Mai per i tuoi ordini». Le regole che quei
+  testi dicevano restano tutte nel server: si è tolto il testo, non il
+  comportamento.
+- *Spento = non toccabile*: ogni chip porta `disabled` e il corpo
+  `aria-disabled`, grigio a .45; i due gesti (`scegliTipo…`,
+  `scegliSoglia…`) escono subito a interruttore spento, così nemmeno un
+  tocco che arrivasse lo stesso scrive sul server. Grigie e non nascoste:
+  chi accende vede subito cosa riceverà, e le scelte fatte prima di
+  spegnere restano lì.
+- *La riga di dove arriva* segue la regola del cassetto: senza una scelta
+  in «🔔 Avvisi» decide il tipo di login (Telegram o Nostr, le due frasi
+  chieste); chi ha scelto l'altro canale legge l'altra frase, e chi ha
+  scelto «entrambi» le due insieme in una riga — così la riga dice dove
+  l'avviso arriva DAVVERO, che è quel che fa `notifica()`.
+- Il blocco dell'altro cantiere (avvisi-mercatino) non era ancora su
+  main né scritto nel suo worktree: niente da fondere.
+
+**Prove.** `prove_avvisi_nuovi_ordini`: la campana nel gruppo accanto
+alla levetta, il gruppo che non si spezza, la stretta sotto i 400 (cinque
+regole, `nowrap` sulle pillole), il foglio senza titolo; nel banco node
+il solo interruttore in cima, nessuna spiegazione (né la riga sotto, né la
+frequenza, né le emoji), la riga in fondo per Telegram, Nostr ed
+«entrambi», acceso le scelte si toccano e i gesti partono, spento cinque
+chip su cinque `disabled`, corpo `aria-disabled`, l'interruttore no, e i
+gesti veri che non chiamano il server. Emendata in `prove_p2p_libro` la
+sentinella sulla stretta a 399. Suite intera nel worktree
+(PROVE_SEVERE=1): 20170 passate, 0 fallite; collaudi della CI in gabbia: 44 verdi, 0 rossi.
+
+**Giro dal vivo** (server della copia, relay nak locale, coordinatore di
+cartone, tre ordini di 111 nel libro), identità 222: a 360, 375 e 390 la
+riga misurata in fila e scattata con gli avvisi accesi e spenti; il foglio
+aperto dalla campana con un tocco vero, spento e acceso con tocchi veri
+sull'interruttore (otto chip su otto `disabled` a soglia scelta, campana
+che si vuota e si riempie); un tocco vero su «Acquisto BTC» spento: zero
+chiamate, preferenze invariate. Il cassetto del Profilo a 375 mostra lo
+stesso blocco. Con un'identità di collaudo Nostr (id negativo) la riga in
+fondo dice «Arriva come messaggio Nostr». Scatti in
+`.claude/giri/avvisi-p2p-ritocco/` (gitignored): `{360,375,390}-testata-
+{accesa,spenta}`, `{360,375,390}-foglio-{acceso,spento}`,
+`375-profilo-cassetto-spento`, `375-foglio-nostr-spento`. La suite intera
+ha poi detto due rosse sulla CSS nuova, tutte e due vere: la regola
+`.avn-spento .tema-pill{…}` conteneva la stringa `.tema-pill{` e la prova
+del marchio la leggeva al posto della pillola (riscritta su
+`.tema-pill[disabled]`), e la riga in fondo era una frase a 12,5 px in
+`--muted`, che il censimento del grigio piccolo riserva a controlli e
+dati (ora in `--ink-soft`). Gli scatti di prima hanno il grigio vecchio;
+col colore finale, rifatti a 375 su un banco col relay morto (dietro si
+vede il suo avviso, atteso): `375-foglio-{spento,acceso}-colore-finale`.
+
+**Resta da guardare.** Sul telefono di Andrea la riga a 360 nei due temi
+(il pane emula la larghezza, non il font del telefono: un font di sistema
+più largo mangerebbe parte dei 22 px). Sotto i 360 i due cerchietti
+scendono insieme sulla seconda riga, appoggiati a destra: non chiesto,
+non provato su un telefono.
+

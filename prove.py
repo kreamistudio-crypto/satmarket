@@ -59262,9 +59262,12 @@ def prove_p2p_libro():
     prova("...e una pillola non spezza mai la sua etichetta", True,
           "white-space:nowrap" in pezzo_js(
               mini, "  .p2p-testa-riga .p2p-filtro{", "}"))
+    # EMENDATA (9 ott 2026 sera, «avvisi-p2p-ritocco»): con la campana
+    # i pezzi sono quattro, e la stretta e' piu' forte — la guarda per
+    # intero `prove_avvisi_nuovi_ordini`
     prova("...e sotto i 400 le due pillole si stringono", True,
           "  @media (max-width:399px){" in mini
-          and ".p2p-testa-riga .p2p-filtro{padding:8px 11px;gap:6px}" in mini)
+          and ".p2p-testa-riga .p2p-filtro{padding:8px 9px;gap:5px;font-size:12.5px}" in mini)
 
     # --- LA PILLOLA «ORDINA» (set 2026, decisione di Andrea) ----------
     # Quattro criteri, foglio di casa, e il predefinito e' quello che
@@ -103397,12 +103400,30 @@ def prove_avvisi_nuovi_ordini():
           [("telegram", 111), ("nostr", "npub1nativo"), ("nostr", "npub1badge")], VIA)
 
     # --- 5) IL CLIENT: le due porte sullo stesso stato, in node ---------------
-    prova("la testata del libro porta la campana fra il Filtro e la levetta del tema", True,
-          "+ pillOrdina + pillola\n    + campanellaP2P()\n"
-          "    + '<button type=\"button\" class=\"tema-btn\" onclick=\"alternaTema()\">'" in m)
-    prova("il foglio dal basso esiste, con la pelle dei fogli P2P", True,
-          '<div class="sheet" id="p2pAvvisiSheet" role="dialog" aria-modal="true" aria-labelledby="p2pAvvisiTit">' in m
-          and '<div id="p2pAvvisiCorpo"></div>' in m)
+    # (9 ott 2026 sera, «avvisi-p2p-ritocco») LA CAMPANA STA ACCANTO ALLA
+    # LEVETTA, NELLO STESSO GRUPPO: sciolti nella riga, a 360 la levetta
+    # andava a capo da sola. Il gruppo li tiene insieme, e la stretta sotto
+    # i 400 li fa stare in fila con le due pillole (misurato dal vivo a
+    # 360, 375 e 390, anche con «128 offerte»).
+    prova("la testata del libro porta la campana accanto alla levetta, nello stesso gruppo", True,
+          "+ pillOrdina + pillola\n    + '<span class=\"p2p-testa-cerchi\">' + campanellaP2P()\n"
+          "    + '<button type=\"button\" class=\"tema-btn\" onclick=\"alternaTema()\">'" in m
+          and "'</span></button></span></div>';" in m)
+    prova("...il gruppo e' un flex che non si spezza", True,
+          "  .p2p-testa-cerchi{display:flex;align-items:center;gap:8px;flex:none}" in m)
+    _stretta = m[m.index("  @media (max-width:399px){\n    .p2p-testa-riga{gap:5px}"):]
+    _stretta = _stretta[:_stretta.index("\n  }\n")]
+    prova("...e sotto i 400 cedono respiro, distanze, icona e corpo, mai le parole", [True] * 5,
+          [".p2p-testa-riga .p2p-filtro{padding:8px 9px;gap:5px;font-size:12.5px}" in _stretta,
+           ".p2p-testa-riga .p2p-filtro.p2p-ordina{gap:5px}" in _stretta,
+           ".p2p-testa-riga .p2p-filtro .p2p-ico{width:15px;height:15px}" in _stretta,
+           ".p2p-testa-cerchi{gap:5px}" in _stretta,
+           "white-space:nowrap" in pezzo_js(m, "  .p2p-testa-riga .p2p-filtro{", "}")])
+    prova("il foglio dal basso esiste, con la pelle dei fogli P2P e senza titolo sopra l'interruttore", True,
+          '<div class="sheet" id="p2pAvvisiSheet" role="dialog" aria-modal="true" '
+          'aria-label="Avvisi dei nuovi ordini P2P">\n    <div class="grab"></div>\n'
+          '    <div id="p2pAvvisiCorpo"></div>' in m
+          and 'id="p2pAvvisiTit"' not in m)
     prova("il cassetto Avvisi ha la riga, dopo le tre sorelle", True,
           "${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaRiconosciP2P()}${rigaAvvisiNuoviP2P()}`;" in m)
     prova("il carico da /api/me passa dal normalizzatore (chiave assente = spento)", True,
@@ -103421,6 +103442,12 @@ def prove_avvisi_nuovi_ordini():
         "const vesteMetodoP2P = m => m === P2P_TABACCHINO ? {nome: 'Barattozon'} : null;\n"
         + pezzo_js(m, "const esc = s => String(s ?? '').replace(", ";\n") + ";\n"
         + blocco
+        # i due gesti delle scelte, VERI, con l'invio di cartone: da spento
+        # non devono chiamare niente
+        + "let INVII = []; const toast = () => {};\n"
+        + "async function setAvvisiNuoviP2P(p){ INVII.push(p); }\n"
+        + pezzo_js(m, "function scegliTipoAvvisiNuoviP2P(t){", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "function scegliSogliaAvvisiNuoviP2P(s){", "\n}\n") + "\n}\n"
         + r"""
 const out = {};
 const attive = h => (h.match(/class="tema-pill active" aria-pressed="true" onclick="([^"]+)"/g) || [])
@@ -103433,7 +103460,13 @@ out.attive = attive(foglio);
 out.interruttore = /aria-pressed="true"[^>]*>Attivi</.test(foglio) && foglio.indexOf('avn-spento') < 0;
 out.campana = [campanellaP2P().indexOf(' accesa') >= 0, campanellaP2P().indexOf('fill="currentColor"') >= 0,
                campanellaP2P().indexOf('id="p2pCampanella"') >= 0];
-out.minuti = foglio.indexOf('ogni <b>15 minuti</b>') >= 0;
+out.leggero = ['Quando nel libro', 'minuti', 'Mai per i tuoi', 'quanti ordini', '📬', '🔔']
+  .filter(s => foglio.indexOf(s) >= 0);
+out.titolo = /<div class="avn-testa"><div class="avn-titolo">Avvisami dei nuovi ordini P2P<\/div><button /.test(foglio);
+out.inFondo = (foglio.match(/<div class="avn-dove">([^<]*)<\/div>$/) || [])[1];
+out.accesoTocca = [foglio.indexOf(' disabled') < 0, foglio.indexOf('aria-disabled') < 0];
+INVII = []; scegliTipoAvvisiNuoviP2P('acquisto'); scegliSogliaAvvisiNuoviP2P('5');
+out.invii = INVII.slice();
 out.dove = [doveArrivanoAvvisi()];
 myTgId = -3; out.dove.push(doveArrivanoAvvisi());
 myTgId = 222; myCanaleNotifiche = 'entrambi'; out.dove.push(doveArrivanoAvvisi()); myCanaleNotifiche = '';
@@ -103444,6 +103477,12 @@ myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(null);
 const spento = contenutoAvvisiNuoviP2P();
 out.spento = [spento.indexOf('avn-spento') >= 0, /aria-pressed="false"[^>]*>Spenti</.test(spento),
               campanellaP2P().indexOf(' accesa') < 0, campanellaP2P().indexOf('fill="none" stroke="currentColor"') >= 0];
+const chip = spento.match(/<button type="button" class="tema-pill[^>]*>/g) || [];
+out.spentoChip = [chip.length, chip.filter(c => / disabled>$/.test(c)).length,
+                  spento.indexOf('aria-disabled="true"') >= 0,
+                  /onclick="setAvvisiNuoviP2P\(\{attivo:true\}\)"(?![^>]*disabled)/.test(spento)];
+INVII = []; scegliTipoAvvisiNuoviP2P('acquisto'); scegliSogliaAvvisiNuoviP2P('5');
+out.inviiSpento = INVII.length;
 out.normalizza = normalizzaAvvisiNuoviP2P({attivo: 1, tipi: ['barattozon', 'vendita', 'x'], soglia: '7'});
 p2pLeve.avvisiNuovi = false;
 out.fuoriCasa = [campanellaP2P(), rigaAvvisiNuoviP2P()];
@@ -103464,16 +103503,31 @@ console.log(JSON.stringify(out));
           out["attive"])
     prova("...l'interruttore dice «Attivi», la campana e' PIENA e arancio", (True, [True, True, True]),
           (out["interruttore"], out["campana"]))
-    prova("la riga in fondo dice la finestra col numero del server", True, out["minuti"])
-    prova("...e dove arriva, con la regola del cassetto: Telegram, DM Nostr al nativo, entrambi a chi l'ha scelto",
-          ["nella chat del bot ✈️ Telegram", "come 🟣 DM Nostr cifrato",
-           "nella chat del bot ✈️ Telegram e come 🟣 DM Nostr"], out["dove"])
+    # (9 ott 2026 sera, «avvisi-p2p-ritocco») I TESTI ALLEGGERITI: in cima
+    # il solo interruttore con la sua scritta, in fondo una riga sola
+    prova("in cima il SOLO interruttore con la scritta «Avvisami dei nuovi ordini P2P»", True,
+          out["titolo"])
+    prova("...e nessuna spiegazione: via la riga sotto, la frequenza, «mai per i tuoi», le emoji", [],
+          out["leggero"])
+    prova("in fondo UNA riga: «Arriva nella chat del bot Telegram» a chi entra da Telegram",
+          "Arriva nella chat del bot Telegram", out["inFondo"])
+    prova("...«Arriva come messaggio Nostr» a chi entra con Nostr, e le due insieme a chi ha scelto entrambi",
+          ["Arriva nella chat del bot Telegram", "Arriva come messaggio Nostr",
+           "Arriva nella chat del bot Telegram e come messaggio Nostr"], out["dove"])
+    prova("acceso: le scelte si toccano, e i due gesti partono", ([True, True], 2),
+          (out["accesoTocca"], len(out["invii"])))
     prova("con «tutti»: le tre chip dei tipi e «Tutti» accese, nessuna chip di soglia",
           (["scegliTipoAvvisiNuoviP2P('vendita')", "scegliTipoAvvisiNuoviP2P('acquisto')",
             "scegliTipoAvvisiNuoviP2P('barattozon')", "scegliSogliaAvvisiNuoviP2P('')"], True),
           (out["tutti"], out["senzaChip"]))
     prova("SPENTO DI SERIE: il corpo si spegne a vista, «Spenti», la campana VUOTA", [True, True, True, True],
           out["spento"])
+    # (lo stato di serie ha la soglia «tutti»: le chip visibili sono le tre
+    # dei tipi, «Tutti» e «Solo se conveniente» — le tre della soglia
+    # compaiono solo con la seconda; dal vivo, a soglia scelta, 8 su 8)
+    prova("...e da spento le scelte NON si toccano: cinque chip, cinque `disabled`, il corpo "
+          "aria-disabled, l'interruttore no", [5, 5, True, True], out["spentoChip"])
+    prova("...e un gesto che arrivasse lo stesso non chiama il server", 0, out["inviiSpento"])
     prova("il normalizzatore: tipi nell'ordine delle chip, soglia fuori dalle tre = «tutti»",
           {"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": ""}, out["normalizza"])
     prova("a leva globale spenta, in demo e da anonimi: niente campana e niente riga",

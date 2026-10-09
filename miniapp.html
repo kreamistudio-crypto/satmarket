@@ -2804,17 +2804,36 @@
   .p2p-campanella svg{display:block}
   .p2p-campanella.accesa{color:var(--sats);border-color:var(--sats)}
   /* ...e il corpo delle preferenze, UNO per i due posti (il foglio dal
-     basso e il cassetto Avvisi del Profilo): la testa con l'interruttore,
-     poi tipi e soglia, che a interruttore spento restano toccabili ma
-     si spengono a vista */
+     basso e il cassetto Avvisi del Profilo): la testa col solo
+     interruttore, poi tipi e soglia, e in fondo una riga sola.
+     A INTERRUTTORE SPENTO LE SCELTE NON SI TOCCANO (9 ott 2026 sera,
+     ritocco di Andrea): grigie, e ogni chip `disabled` — non solo
+     smorzate a vista, che lasciava credere di aver scelto qualcosa. */
   .avn-testa{display:flex;align-items:center;gap:10px}
+  .avn-titolo{min-width:0;flex:1;font-size:13.5px;font-weight:800}
   .avn-corpo .section-label{padding-top:12px;padding-bottom:8px}
-  .avn-corpo.avn-spento{opacity:.55}
+  .avn-corpo.avn-spento{opacity:.45}
+  .avn-corpo.avn-spento .tema-pill[disabled]{cursor:default}
+  /* una FRASE, non un dato: in --ink-soft come le altre spiegazioni a
+     12,5px (il censimento del grigio piccolo, prove.py) */
+  .avn-dove{margin-top:12px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
   .avn-soglie{margin-top:-2px}
+  /* il gruppo dei due cerchietti (9 ott 2026 sera): vedi la testata */
+  .p2p-testa-cerchi{display:flex;align-items:center;gap:8px;flex:none}
+  /* ⚠️ SOTTO I 400 LE PILLOLE SI STRINGONO DI PIU' (9 ott 2026 sera,
+     dal telefono di Andrea): con la campana i pezzi della riga sono
+     quattro, e a 360 chiedevano 330 px in 328 — la levetta andava a
+     capo. Respiro, distanze, icona (15 invece di 17) e corpo (12,5
+     invece di 13) cedono un poco ciascuno, e ci stanno in fila con
+     una ventina di pixel d'avanzo. Il testo non si accorcia: «Recenti»
+     e «3 offerte» restano parole intere. */
   @media (max-width:399px){
-    .p2p-testa-riga{gap:6px}
-    .p2p-testa-riga .p2p-filtro{padding:8px 11px;gap:6px}
-    .p2p-testa-riga .p2p-filtro .p2p-filtro-sx{gap:6px}
+    .p2p-testa-riga{gap:5px}
+    .p2p-testa-riga .p2p-filtro{padding:8px 9px;gap:5px;font-size:12.5px}
+    .p2p-testa-riga .p2p-filtro.p2p-ordina{gap:5px}
+    .p2p-testa-riga .p2p-filtro .p2p-filtro-sx{gap:5px}
+    .p2p-testa-riga .p2p-filtro .p2p-ico{width:15px;height:15px}
+    .p2p-testa-cerchi{gap:5px}
   }
   /* LE DUE PILLOLE HANNO LA STESSA PELLE e cambiano solo il dentro:
      `.p2p-filtro` porta bordo, raggio, respiro e i due stati accesi
@@ -13123,9 +13142,8 @@ document.getElementById('cartello')?.remove();</script>
        del Filtro, e DENTRO lo stesso contenuto della riga nel cassetto
        Avvisi del Profilo (`contenutoAvvisiNuoviP2P`): due porte, uno
        stato — quel che si accende qui si ritrova la', e viceversa. -->
-  <div class="sheet" id="p2pAvvisiSheet" role="dialog" aria-modal="true" aria-labelledby="p2pAvvisiTit">
+  <div class="sheet" id="p2pAvvisiSheet" role="dialog" aria-modal="true" aria-label="Avvisi dei nuovi ordini P2P">
     <div class="grab"></div>
-    <h3 id="p2pAvvisiTit">Nuovi ordini</h3>
     <div id="p2pAvvisiCorpo"></div>
   </div>
 
@@ -34701,37 +34719,46 @@ let myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(null);   // spento di serie
 function avvisiNuoviP2PInCasa(){
   return !!(p2pLeve && p2pLeve.attivo && p2pLeve.avvisiNuovi) && !DEMO && !!myTgId;
 }
-/* dove arrivano gli avvisi, con la regola del cassetto: la scelta di
-   `canale_notifiche`, o — senza scelta — Telegram a chi ha la chat e il
-   DM Nostr al nativo */
+/* dove arrivano gli avvisi, UNA RIGA (9 ott 2026 sera, ritocco di
+   Andrea): «Arriva nella chat del bot Telegram» a chi entra da
+   Telegram, «Arriva come messaggio Nostr» a chi entra con Nostr. Con la
+   regola del cassetto, perche' la riga dica dove arriva DAVVERO: senza
+   una scelta in `canale_notifiche` decide il tipo di login; chi ha
+   scelto l'altro canale legge l'altra frase, e chi ha scelto «entrambi»
+   le due insieme. */
 function doveArrivanoAvvisi(){
   const tgOk = myTgId != null && myTgId > 0;
   const attivo = myCanaleNotifiche || (tgOk ? 'telegram' : 'nostr');
-  return {telegram: 'nella chat del bot ✈️ Telegram',
-          nostr: 'come 🟣 DM Nostr cifrato',
-          entrambi: 'nella chat del bot ✈️ Telegram e come 🟣 DM Nostr'}[attivo]
-    || 'nella chat del bot ✈️ Telegram';
+  return {telegram: 'Arriva nella chat del bot Telegram',
+          nostr: 'Arriva come messaggio Nostr',
+          entrambi: 'Arriva nella chat del bot Telegram e come messaggio Nostr'}[attivo]
+    || 'Arriva nella chat del bot Telegram';
 }
+/* ⚠️ ALLEGGERITO (9 ott 2026 sera, ritocco di Andrea dal telefono): in
+   cima il SOLO interruttore con la sua scritta, niente spiegazione
+   sotto; le scelte grigie e non toccabili finche' e' spento; in fondo
+   la sola riga di dove arriva, senza la frequenza e senza il resto. Le
+   regole che le frasi tolte dicevano (al piu' uno ogni N minuti, mai
+   per i propri ordini) restano tutte nel server: si e' tolto il testo,
+   non il comportamento. */
 function contenutoAvvisiNuoviP2P(){
   const p = myAvvisiNuoviP2P;
   const on = !!p.attivo;
-  const minuti = (p2pLeve && p2pLeve.avvisiNuoviMinuti) || 0;
   const pill = (testo, scelto, gesto) =>
     '<button type="button" class="tema-pill' + (scelto ? ' active' : '')
-    + '" aria-pressed="' + (scelto ? 'true' : 'false') + '" onclick="' + gesto + '">'
+    + '" aria-pressed="' + (scelto ? 'true' : 'false') + '" onclick="' + gesto + '"'
+    + (on ? '' : ' disabled') + '>'
     + esc(testo) + '</button>';
   return '<div class="avn-testa">'
-    + '<div style="min-width:0;flex:1">'
-    + '<div style="font-size:13.5px;font-weight:800">🔔 Avvisami dei nuovi ordini P2P</div>'
-    + '<div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">'
-    + 'Quando nel libro compare un ordine che fa per te.</div></div>'
+    + '<div class="avn-titolo">Avvisami dei nuovi ordini P2P</div>'
     + '<button type="button" onclick="setAvvisiNuoviP2P({attivo:' + (on ? 'false' : 'true') + '})"'
     + ' aria-pressed="' + (on ? 'true' : 'false') + '"'
     + ' style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid '
     + (on ? 'var(--sats)' : 'var(--line)') + ';background:' + (on ? 'var(--sats)' : 'transparent')
     + ';color:' + (on ? '#fff' : 'var(--muted)') + ';border-radius:99px;padding:6px 14px;cursor:pointer">'
     + (on ? 'Attivi' : 'Spenti') + '</button></div>'
-    + '<div class="avn-corpo' + (on ? '' : ' avn-spento') + '">'
+    + '<div class="avn-corpo' + (on ? '' : ' avn-spento') + '"'
+    + (on ? '' : ' aria-disabled="true"') + '>'
     + '<div class="section-label">Tipo di ordini</div>'
     + '<div class="p2p-metodi">' + P2P_AVVISI_TIPI.map(t =>
         pill(nomeTipoAvvisiP2P(t), p.tipi.indexOf(t[0]) >= 0,
@@ -34747,10 +34774,7 @@ function contenutoAvvisiNuoviP2P(){
         pill(s[1], p.soglia === s[0], "scegliSogliaAvvisiNuoviP2P('" + s[0] + "')")).join('')
       + '</div>')
     + '</div>'
-    + '<div class="hint">📬 Arriva ' + doveArrivanoAvvisi()
-    + (minuti ? ', al massimo uno ogni <b>' + minuti + ' minuti</b>' : '')
-    + ': quanti ordini nuovi per tipo e il più conveniente per te, con il tocco che apre il libro. '
-    + 'Mai per i tuoi ordini.</div>';
+    + '<div class="avn-dove">' + esc(doveArrivanoAvvisi()) + '</div>';
 }
 /* la riga del cassetto Avvisi: lo stesso contenuto del foglio, dentro
    la cornice delle righe vicine */
@@ -34806,6 +34830,7 @@ async function setAvvisiNuoviP2P(patch){
                                   : 'Avvisi dei nuovi ordini spenti');
 }
 function scegliTipoAvvisiNuoviP2P(t){
+  if (!myAvvisiNuoviP2P.attivo) return;   // spento: le chip sono `disabled`
   const tipi = myAvvisiNuoviP2P.tipi.slice();
   const i = tipi.indexOf(t);
   if (i >= 0) {
@@ -34815,6 +34840,7 @@ function scegliTipoAvvisiNuoviP2P(t){
   setAvvisiNuoviP2P({tipi});
 }
 function scegliSogliaAvvisiNuoviP2P(s){
+  if (!myAvvisiNuoviP2P.attivo) return;
   setAvvisiNuoviP2P({soglia: String(s == null ? '' : s)});
 }
 
@@ -50451,13 +50477,18 @@ function renderP2P(){
      il Filtro e la levetta: stesso cerchietto, campana piena se sono
      accesi e vuota se spenti, e sparisce a chi non puo' averli — vedi
      `campanellaP2P`. Il margine auto del Filtro lo tiene a meta' fra
-     «Ordina» e i due cerchietti, qualunque sia la loro larghezza. */
+     «Ordina» e i due cerchietti, qualunque sia la loro larghezza.
+     ⚠️ I DUE CERCHIETTI STANNO IN UN GRUPPO (`.p2p-testa-cerchi`, 9 ott
+     2026 sera, dal telefono di Andrea): sciolti nella riga, a 360 la
+     levetta andava a capo da sola e la campana restava sopra di lei.
+     Insieme non si separano mai: se la riga non basta (sotto i 360)
+     scendono tutt'e due, appoggiati a destra. */
   if (testaBox) testaBox.innerHTML =
     '<div class="p2p-testa-riga">' + pillOrdina + pillola
-    + campanellaP2P()
+    + '<span class="p2p-testa-cerchi">' + campanellaP2P()
     + '<button type="button" class="tema-btn" onclick="alternaTema()">'
     + '<span class="tema-ico" aria-hidden="true">'
-    + (temaEffettivo() === 'scuro' ? '☀️' : '🌙') + '</span></button></div>';
+    + (temaEffettivo() === 'scuro' ? '☀️' : '🌙') + '</span></button></span></div>';
   /* LA PORTA PER RIVEDERE IL TOUR sta IN FONDO al libro (set 2026,
      scelta di Andrea fra il filtro e il fondo): e' una voce da
      leggere, non un comando da usare — in testa avrebbe rubato una
