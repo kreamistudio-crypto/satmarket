@@ -42322,3 +42322,86 @@ GIF e provini in `.claude/giri/banner-fee-come-funziona/` (fuori da git).
 
 **Da guardare**: sul telefono, «Come funziona» → «Fine 🎉» con
 un'identità che il banner l'ha già visto.
+
+## Il tracciamento del venditore è facoltativo, con il consiglio caldo (9 ott 2026, richiesta di Andrea)
+
+Il compito (Andrea): «vorrei che il numero tracking lato venditore
+fosse opzionale, ma con un alert che suggerisca caldamente di inserirlo
+per poter rispondere correttamente a problemi in caso di disputa».
+
+**Cosa c'era.** `segna_spedito` rispondeva 400 «Inserisci il numero di
+tracciamento (o scegli 'Consegna a mano')» a ogni corriere vero senza
+codice, e `markShipped` lo anticipava con un toast che bloccava. Chi
+spediva una busta senza codice aveva due strade: non segnare la
+spedizione, o scegliere «Consegna a mano» — una bugia che poi si leggeva
+nel passo «Oggetto spedito», nel pannello del venditore (che la consegna
+a mano la esclude dalla correzione) e nelle notifiche («in viaggio in
+consegna a mano»).
+
+**Cosa.** Il server non esige più il codice: il 400 se n'è andato, e
+una regola che costringe a mentire non protegge nessuno. Il consiglio
+caldo vive in tre posti, in ordine di lettura: il cartello sotto il
+campo («⚠️ Metti il tracciamento: non è obbligatorio, ma in caso di
+disputa è la prova che il pacco è partito. Senza, i moderatori hanno
+solo la tua parola»), la domanda unica di `markShipped` quando il campo
+è vuoto su un corriere vero («Spedisci senza numero di tracciamento?»,
+corpo che nomina la disputa, «Spedisci senza codice» / «Lo inserisco»
+che riporta al campo) e il pannello dell'ordine, che a chi ha spedito
+senza compare APERTO come «➕ Aggiungi il tracciamento» (stessa rotta
+`POST /api/orders/{id}/tracking`: trovando il vuoto non mette niente in
+fila — la fila conserva codici, non vuoti — e avvisa chi compra «ha
+aggiunto il tracciamento… ora puoi seguire il pacco», mai «prima era»
+con un prima vuoto; la risposta porta `aggiunto`, il toast lo dice).
+`markShipped` si è diviso in due: la lettura e i controlli restano lì,
+la spedizione che parte è `inviaSpedito(corriere, tracking,
+bustaDiretta)`, chiamata dritta col codice e dal «sì» della domanda
+senza. Nelle notifiche di `segna_spedito` il pezzo «in viaggio…» è UNO
+per i tre avvisi (`viaggio`): col codice come sempre; col solo corriere
+si DICE che manca («con Poste Italiane, senza numero di tracciamento»,
+anche sulla via punto); la consegna a mano resta «in consegna a mano» —
+prima «senza codice» voleva dire «a mano» per forza del 400, adesso a
+dirlo è il corriere. Il passo «Oggetto spedito» senza codice nomina il
+corriere e la mancanza («Poste Italiane — senza numero di
+tracciamento»); «ha consegnato al corriere» resta per gli ordini senza
+corriere. Il reso del compratore NON cambia: la richiesta parlava del
+venditore, e lì il codice resta dovuto.
+
+**Strade scartate.** Un flag «conferma_senza_codice» nel corpo della
+rotta, perché il server «sappia» che la domanda è stata fatta: una
+guardia di forma che un client di ieri non manda, e il server non ha
+niente da decidere su un consiglio. Un tetto di ore per aggiungere il
+codice: la porta della correzione è SEMPRE (6 ott 2026), e l'aggiunta
+ne eredita la regola.
+
+**Provato.** `prove_tracking_facoltativo` (30): `segna_spedito` VERO
+sul banco di cartone (passa senza codice, il vuoto nel database, le
+quattro notifiche: corriere senza codice, col codice, a mano, via punto);
+`correggi_tracking_venditore` VERO su sqlite con la fila vera (aggiunge,
+timbra, ancore intatte, fila vuota, avviso «aggiunto», la correzione dopo
+l'aggiunta mette in fila il codice vero, il vuoto resta un no); le
+sentinelle del client e il banco node che ESEGUE `markShipped` con le
+forme vere (senza codice chiede e non parte, il `poi` spedisce col vuoto
+nel corpo, col codice parte subito ripulito, a mano nessuna domanda) e
+`pannelloTrackingVenditore` (invita aperto senza codice, corregge chiuso
+col codice, tace a chi compra, a mano e prima della spedizione). Emendate
+la sentinella di `prove_disarmo` che guardava la tupla delle sentinelle
+esenti dal 400 e il censimento della domanda unica (ottanta). Sezioni
+toccate più le mie: 957 verdi, 0 rosse. Suite intera nel worktree su
+38d068e (PROVE_SEVERE=1): 20143 passate, 0 fallite, 1 saltata —
+`prove_annuncio_identita`, che vuole nostr-tools e su questo PC non c'è;
+rigirata con `IDENTITA_NODE_MODULES` puntato a una copia locale: 46
+verdi. Collaudi della CI in gabbia: 63 verdi su 66; i tre rossi non
+c'entrano col cantiere — `collaudo_impersonazione` e
+`collaudo_ricategorizza` vogliono la chiave Anthropic del VPS, e
+`collaudo_punti_barattolo` è rosso IDENTICO su una copia pulita di
+origin/main («paga_finta() got an unexpected keyword argument 'riga'»,
+la sezione «prove_giro_chiuso»): pre-esistente, segnalato nel rapporto.
+Main è corso di due commit mentre provavo (il velo fra due fogli, il
+banner delle commissioni): dopo il rebase su 610951c, sezioni toccate
+più la mia 957 verdi, 0 rosse, e i 66 collaudi di nuovo 63 verdi con gli
+stessi tre rossi. Non provato dal vivo nella Mini App.
+
+**Resta da guardare.** Il moderatore in disputa vede «senza numero di
+tracciamento» nel passo, ma nessun conto di quante spedizioni partono
+senza codice: se dovesse diventare l'abitudine, un numero nel cruscotto
+admin lo direbbe.

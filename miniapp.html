@@ -31954,7 +31954,13 @@ function openOrder(id){
         : ritiro
         ? {t:'Consegna a mano',     d:'Vi incontrate e l\'oggetto passa di mano'}
         : {t:'Oggetto spedito',     d:o.tracking?rigaSpedizione()
-            :(o.role==='seller'?'Hai consegnato al corriere':'Il venditore ha consegnato al corriere')},
+            /* SENZA CODICE SI DICE (9 ott 2026, col tracciamento
+               facoltativo): il corriere c'e' e si nomina, e chi compra
+               legge che il pacco non si puo' seguire; «ha consegnato al
+               corriere» resta per gli ordini senza corriere */
+            :(o.corriere && o.corriere!=='Consegna a mano'
+                ? `${esc(o.corriere)} — senza numero di tracciamento`
+                : (o.role==='seller'?'Hai consegnato al corriere':'Il venditore ha consegnato al corriere'))},
       {t:(s==='delivered' && !inPagamento(o)) ? (digitale?'Rivelato: in attesa di conferma':'Consegnato: in attesa di conferma')
                          : (digitale?'Rivelato e confermato':'Ricevuto e confermato'),
        /* L'ATTESA E' DI CHI COMPRA (ago 2026): la finestra per
@@ -32281,7 +32287,13 @@ function openOrder(id){
                 'Altro' no, e li' il selettore resta com'era. */''}
           ${selettoreCorriere('shipCorriere',
               CORRIERI.includes(o.retePunto) ? o.retePunto : '')}
-          <textarea id="shipTracking" style="min-height:38px" placeholder="Numero di tracciamento"></textarea>
+          <textarea id="shipTracking" style="min-height:38px" placeholder="Numero di tracciamento (consigliato)"></textarea>
+          ${/* IL TRACCIAMENTO E' FACOLTATIVO MA SI CONSIGLIA CALDAMENTE
+                (9 ott 2026, decisione di Andrea): il cartello sta sotto
+                il campo, e la domanda unica di markShipped lo ripete a
+                chi spedisce senza. Due volte perche' il codice e' la sola
+                prova che un moderatore ha in mano in disputa. */''}
+          <div class="hint" style="margin-top:6px">⚠️ <b>Metti il tracciamento</b>: non è obbligatorio, ma in caso di disputa è la prova che il pacco è partito. Senza, i moderatori hanno solo la tua parola.</div>
           <div class="hint" style="margin-top:6px">💡 ${AVVISO_INTERMEDIARIO}</div>
           <div class="hint avviso-tracking" id="shipAvviso" style="display:none"></div>
           <button class="btn orange" onclick="markShipped()">📦 Segna come spedito</button>
@@ -38751,15 +38763,37 @@ async function markShipped(){
   haptic();
   const corriere = el('shipCorriere')?.value || '';
   const tracking = el('shipTracking')?.value.trim() || '';
-  if (corriere !== 'Consegna a mano' && !tracking) {
-    toast('Inserisci il tracciamento (o scegli "Consegna a mano")'); return;
-  }
   /* la forma del codice: avvisa, non blocca (vedi FORME_TRACKING) */
   if (!trackingDaControllare(corriere, tracking, 'shipAvviso')) return;
   /* la busta diretta: la spunta esiste solo sulla via punto — il
      `?.checked` fa false dove il nodo non c'e', e il server fuori
      dalla via punto la ignora comunque */
   const bustaDiretta = !!el('shipBustaDiretta')?.checked;
+  /* IL TRACCIAMENTO E' FACOLTATIVO (9 ott 2026, decisione di Andrea):
+     qui c'era un toast che BLOCCAVA («Inserisci il tracciamento (o
+     scegli "Consegna a mano")»), e chi spediva una busta senza codice
+     o sceglieva la consegna a mano — una bugia che poi si legge nel
+     dettaglio e nelle notifiche — o non spediva. Adesso si puo', ma
+     non in silenzio: la domanda unica dice CALDAMENTE perche' il
+     codice conviene — in disputa e' la prova che il pacco e' partito,
+     e senza i moderatori hanno solo la parola di chi vende — e il
+     ripensamento riporta al campo. Il si' spedisce senza, e il
+     pannello «➕ Aggiungi il tracciamento» resta aperto nell'ordine. */
+  if (corriere !== 'Consegna a mano' && !tracking) {
+    chiediConferma({
+      titolo: 'Spedisci senza numero di tracciamento?',
+      corpo: 'Te lo consigliamo caldamente: in caso di disputa il tracciamento è la prova che il pacco è partito e dove si trova. Senza, i moderatori hanno solo la tua parola. Puoi aggiungerlo anche dopo, dall\'ordine.',
+      etichetta: 'Spedisci senza codice',
+      indietro: 'Lo inserisco',
+      poi: () => inviaSpedito(corriere, tracking, bustaDiretta)});
+    return;
+  }
+  await inviaSpedito(corriere, tracking, bustaDiretta);
+}
+/* La spedizione che PARTE, col corriere e il codice gia' letti e
+   controllati da markShipped: la meta' che la domanda unica chiama dopo
+   il si', e che il percorso col codice chiama dritta. */
+async function inviaSpedito(corriere, tracking, bustaDiretta){
   if (DEMO) { currentOrder.state='shipped'; currentOrder.corriere=corriere; currentOrder.tracking=tracking; if (bustaDiretta) currentOrder.bustaDirettaIl = Math.floor(Date.now()/1000); toast('📦 Segnato come spedito'); openOrder(currentOrder.id); return; }
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/spedito`, {
     method:'POST',
@@ -41288,20 +41322,27 @@ function filaTracking(o, reso){
 const STATI_CON_SPEDIZIONE = ['shipped','delivered','confirmed','released',
   'dispute','return_pending','return_shipped','refund','refunded'];
 function pannelloTrackingVenditore(o, s){
-  if (o.role !== 'seller' || !o.tracking) return '';
+  if (o.role !== 'seller') return '';
   if (!STATI_CON_SPEDIZIONE.includes(s)) return '';
   if (['Consegna a mano','Ritiro in zona','Consegna digitale'].includes(o.corriere)
       || ['ritiro','digitale'].includes(o.consegnaScelta)) return '';
+  /* SENZA CODICE IL PANNELLO E' UN INVITO, non un rimedio (9 ott 2026,
+     col tracciamento facoltativo): chi ha spedito senza lo trova
+     APERTO, con le parole dell'aggiunta — e' la terza volta che gli si
+     consiglia il codice, e qui costa un incolla. La rotta e' la stessa:
+     il server, trovando il vuoto, non mette niente in fila e avvisa chi
+     compra che ora il pacco si segue. */
+  const manca = !o.tracking;
   return `
-    <details class="payout" style="margin-top:10px">
-      <summary style="cursor:pointer;font-weight:700;font-size:14px">✏️ Correggi il tracciamento</summary>
-      <div class="hint">Hai inserito il codice sbagliato? Correggilo qui:
-        avvisiamo chi ha comprato, e il codice di prima resta scritto
-        nell'ordine.</div>
+    <details class="payout" style="margin-top:10px"${manca ? ' open' : ''}>
+      <summary style="cursor:pointer;font-weight:700;font-size:14px">${manca ? '➕ Aggiungi il tracciamento' : '✏️ Correggi il tracciamento'}</summary>
+      <div class="hint">${manca
+        ? 'Hai spedito senza codice: appena lo hai, mettilo qui. In caso di disputa è la prova che il pacco è partito, e chi ha comprato potrà seguirlo.'
+        : 'Hai inserito il codice sbagliato? Correggilo qui: avvisiamo chi ha comprato, e il codice di prima resta scritto nell\'ordine.'}</div>
       ${selettoreCorriere('venCorriere', o.corriere)}
-      <textarea id="venTracking" style="min-height:38px" placeholder="Numero di tracciamento corretto">${esc(o.tracking)}</textarea>
+      <textarea id="venTracking" style="min-height:38px" placeholder="${manca ? 'Numero di tracciamento' : 'Numero di tracciamento corretto'}">${esc(o.tracking)}</textarea>
       <div class="hint avviso-tracking" id="venAvviso" style="display:none"></div>
-      <button class="btn ghost" onclick="correggiTrackingVenditore(this)">✏️ Salva il tracciamento corretto</button>
+      <button class="btn ghost" onclick="correggiTrackingVenditore(this)">${manca ? '➕ Salva il tracciamento' : '✏️ Salva il tracciamento corretto'}</button>
     </details>`;
 }
 async function correggiTrackingVenditore(btn){
@@ -41322,7 +41363,8 @@ async function correggiTrackingVenditore(btn){
     trackingForzato = '';
     const id = currentOrder.id;
     await loadOrders(id); renderOrders();
-    toast('✏️ Tracciamento corretto: abbiamo avvisato chi ha comprato');
+    toast(d.aggiunto ? '➕ Tracciamento aggiunto: abbiamo avvisato chi ha comprato'
+                     : '✏️ Tracciamento corretto: abbiamo avvisato chi ha comprato');
     openOrder(id);
   } finally { ripristina(); }
 }

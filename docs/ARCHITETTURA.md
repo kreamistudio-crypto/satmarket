@@ -1616,6 +1616,22 @@
   di prima; lo stesso codice di adesso si rifiuta (niente doppioni in
   fila). Le guardie qui sotto (sentinelle, `spedito_il`, stato)
   valgono identiche per la porta del venditore.
+  IL TRACCIAMENTO È FACOLTATIVO (9 ott 2026, decisione di Andrea):
+  `segna_spedito` non risponde più 400 al corriere vero senza codice.
+  Il consiglio CALDO sta nel client, tre volte: il cartello sotto il
+  campo, la domanda unica di `markShipped` («Spedisci senza numero di
+  tracciamento?», il «sì» chiama `inviaSpedito`, il ripensamento riporta
+  al campo) e il pannello dell'ordine, che senza codice compare APERTO
+  come «➕ Aggiungi il tracciamento» sulla STESSA rotta della correzione:
+  col vuoto in colonna `correggi_tracking_venditore` non mette niente in
+  fila e avvisa chi compra «ha aggiunto il tracciamento» (risposta
+  `aggiunto`). Nelle notifiche di `segna_spedito` il pezzo «in viaggio…»
+  è uno (`viaggio`): col codice; col solo corriere «senza numero di
+  tracciamento»; «in consegna a mano» solo per la sentinella — il vuoto
+  non vuol più dire «a mano». Il passo «Oggetto spedito» senza codice
+  dice «Corriere — senza numero di tracciamento». Il reso del compratore
+  esige ancora il codice. Cantieri, «Il tracciamento del venditore è
+  facoltativo».
   Stati del moderatore shipped/delivered
   (return_shipped per il reso). NON SI TOCCA `spedito_il`, che è
   l'ANCORA del promemoria di `sollecita_conferme_ferme`: riscriverla

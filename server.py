@@ -37458,9 +37458,17 @@ async def segna_spedito(ordine_id: int, req: Request,
     # 'Ritiro in zona' e' il gemello di 'Consegna a mano' per gli
     # ordini col ritiro scelto dal compratore: niente pacco, niente
     # tracciamento — ma il timer di sblocco d'ufficio parte uguale.
-    if corriere not in ("Consegna a mano", "Ritiro in zona") and not tracking:
-        raise HTTPException(400, "Inserisci il numero di tracciamento "
-                                 "(o scegli 'Consegna a mano')")
+    # IL TRACCIAMENTO E' FACOLTATIVO (9 ott 2026, decisione di Andrea):
+    # qui c'era il 400 «Inserisci il numero di tracciamento (o scegli
+    # 'Consegna a mano')», e chi spediva una busta senza codice o
+    # sceglieva la consegna a mano — una bugia che poi si leggeva nel
+    # dettaglio e nelle notifiche — o non segnava la spedizione. Il
+    # consiglio CALDO (in disputa il codice e' la prova che il pacco e'
+    # partito) lo da' il client con la domanda unica prima di spedire
+    # (`markShipped`), e chi ha spedito senza lo aggiunge dopo da
+    # «➕ Aggiungi il tracciamento» (`correggi_tracking_venditore`). Il
+    # server non lo esige: una regola che costringe a mentire non
+    # protegge nessuno.
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
                     "AND stato='locked'", (ordine_id, user["id"])).fetchone()
@@ -37571,6 +37579,19 @@ async def segna_spedito(ordine_id: int, req: Request,
     # corriere, e link a @trackbot dove l'app lo apre (vedi
     # codice_tracking_bot, qui sopra) — il grassetto ce l'ha gia'.
     corr_e, track_e = html.escape(corriere), codice_tracking_bot(tracking)
+    # IL PEZZO «IN VIAGGIO…» E' UNO PER I TRE AVVISI qui sotto (9 ott
+    # 2026, col tracciamento facoltativo): col codice, come sempre; col
+    # solo corriere si DICE che il codice manca — chi compra deve
+    # sapere che il pacco non lo puo' seguire —; e la consegna a mano
+    # non ha niente da aggiungere. Prima «senza codice» voleva dire «a
+    # mano» per forza del 400 che stava sopra: adesso a dirlo e' il
+    # corriere, non il vuoto.
+    if tracking:
+        viaggio = f" con <b>{corr_e}</b>, tracciamento {track_e}"
+    elif corriere and corriere != "Consegna a mano":
+        viaggio = f" con <b>{corr_e}</b>, senza numero di tracciamento"
+    else:
+        viaggio = ""
     if corriere == "Ritiro in zona":
         await notifica(o["compratore_id"],
                        f"🤝 <b>Il venditore ha segnato la consegna a mano</b>. "
@@ -37589,11 +37610,9 @@ async def segna_spedito(ordine_id: int, req: Request,
             # LA BUSTA DIRETTA: qui non si promette «il codice sara'
             # nell'ordine», che non arrivera' mai — lo manda il
             # corriere ai recapiti del compratore, e lo si dice.
-            dettaglio = (f" con <b>{corr_e}</b>, tracciamento "
-                         f"{track_e}" if tracking else "")
             await notifica(o["compratore_id"],
                 f"📦 <b>Il tuo oggetto è in viaggio verso il punto di "
-                f"ritiro</b>{dettaglio}! Il venditore ha indicato i "
+                f"ritiro</b>{viaggio}! Il venditore ha indicato i "
                 f"tuoi recapiti come destinatario: il codice per "
                 f"ritirarlo te lo manda direttamente il corriere "
                 f"quando il pacco arriva.")
@@ -37601,15 +37620,12 @@ async def segna_spedito(ordine_id: int, req: Request,
             # Il caso normale: il pacco parte, il codice arrivera'
             # al venditore quando il pacco e' al punto — e sara' il
             # deposito della busta a dire «ti aspetta».
-            dettaglio = (f" con <b>{corr_e}</b>, tracciamento "
-                         f"{track_e}" if tracking else "")
             await notifica(o["compratore_id"],
                 f"📦 <b>Il tuo oggetto è in viaggio verso il punto di "
-                f"ritiro</b>{dettaglio}! Ti avviseremo quando il nome "
+                f"ritiro</b>{viaggio}! Ti avviseremo quando il nome "
                 f"e il codice per ritirarlo saranno nell'ordine.")
         return {"ok": True}
-    dettaglio = (f"con <b>{corr_e}</b>, tracciamento {track_e}"
-                 if tracking else "in consegna a mano")
+    dettaglio = viaggio.strip() or "in consegna a mano"
     await notifica(o["compratore_id"],
                    f"📦 <b>Il tuo oggetto è in viaggio</b> {dettaglio}! "
                    f"Quando arriva, conferma nella Mini App per sbloccare i "
@@ -56154,7 +56170,14 @@ async def correggi_tracking_venditore(ordine_id: int, req: Request,
     spedizione, e viceversa), niente ordini senza pacco, e lo `stato`
     e `spedito_il` non si toccano (l'ancora dei promemoria). In piu'
     il codice uguale a quello di adesso si dice, invece di riempire la
-    fila di doppioni."""
+    fila di doppioni.
+
+    E AGGIUNGE (9 ott 2026, col tracciamento facoltativo): chi ha
+    spedito senza codice passa da QUESTA porta per metterlo dopo. La
+    differenza e' due righe: il vuoto non si mette in fila (la fila
+    conserva codici, non vuoti) e l'avviso a chi compra dice «aggiunto»
+    e non «corretto… prima era», che con un «prima» vuoto direbbe il
+    falso."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     corriere = (d.get("corriere") or "").strip()[:40]
@@ -56182,26 +56205,42 @@ async def correggi_tracking_venditore(ordine_id: int, req: Request,
             raise HTTPException(400, "È già questo il tracciamento "
                                      "dell'ordine")
         ora = int(time.time())
-        archivia_tracking(con, ordine_id, False, o["corriere"],
-                          o["tracking"], ora, "venditore")
+        # IL CODICE AGGIUNTO DOPO: niente da mettere in fila — un
+        # «Codici di prima: Poste Italiane  (cambiato dal venditore…)»
+        # col codice vuoto direbbe che un codice c'era.
+        aggiunto = not o["tracking"]
+        if not aggiunto:
+            archivia_tracking(con, ordine_id, False, o["corriere"],
+                              o["tracking"], ora, "venditore")
         con.execute("UPDATE ordini SET corriere=?, tracking=?, "
                     "tracking_corretto_il=? WHERE id=?",
                     (corriere, tracking, ora, ordine_id))
         con.commit()
     finally:
         con.close()
-    # AVVISA CHI ASPETTA IL PACCO, col codice di prima accanto: chi l'ha
-    # gia' messo in un'app di tracciamento deve sapere che e' cambiato.
-    await notifica(
-        o["compratore_id"],
-        f"📦 <b>Il venditore ha corretto il tracciamento</b> dell'ordine "
-        f"#{ordine_id}: ora è <b>{html.escape(corriere)}</b>, "
-        f"tracciamento {codice_tracking_bot(tracking)}. Prima era "
-        f"{html.escape(o['corriere'] or '')} "
-        f"<b>{html.escape(o['tracking'] or '')}</b>: il codice di prima "
-        f"resta scritto nell'ordine.")
+    if aggiunto:
+        # AVVISA CHI ASPETTA IL PACCO che adesso lo puo' seguire: la
+        # spedizione gli era arrivata «senza numero di tracciamento».
+        await notifica(
+            o["compratore_id"],
+            f"📦 <b>Il venditore ha aggiunto il tracciamento</b> "
+            f"dell'ordine #{ordine_id}: <b>{html.escape(corriere)}</b>, "
+            f"tracciamento {codice_tracking_bot(tracking)}. Ora puoi "
+            f"seguire il pacco.")
+    else:
+        # AVVISA CHI ASPETTA IL PACCO, col codice di prima accanto: chi
+        # l'ha gia' messo in un'app di tracciamento deve sapere che e'
+        # cambiato.
+        await notifica(
+            o["compratore_id"],
+            f"📦 <b>Il venditore ha corretto il tracciamento</b> dell'ordine "
+            f"#{ordine_id}: ora è <b>{html.escape(corriere)}</b>, "
+            f"tracciamento {codice_tracking_bot(tracking)}. Prima era "
+            f"{html.escape(o['corriere'] or '')} "
+            f"<b>{html.escape(o['tracking'] or '')}</b>: il codice di prima "
+            f"resta scritto nell'ordine.")
     return {"ok": True, "corriere": corriere, "tracking": tracking,
-            "corretto_il": ora}
+            "corretto_il": ora, "aggiunto": aggiunto}
 
 
 @app.post("/api/admin/orders/{ordine_id}/tracking")

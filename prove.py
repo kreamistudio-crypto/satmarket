@@ -2759,8 +2759,14 @@ def prove_disarmo():
     # toglierebbe al venditore l'unico modo di dichiarare la
     # consegna a mano.
     sped = pezzo("segna_spedito")
-    prova("ritiro: segna_spedito lo lascia passare (esente tracking)",
-          True, '("Consegna a mano", "Ritiro in zona")' in sped)
+    # EMENDATA (9 ott 2026, il tracciamento facoltativo): guardava la
+    # tupla delle sentinelle esenti dal 400, e il 400 non c'e' piu' per
+    # nessuno — quel che resta da difendere e' che il ritiro ci passa
+    # e che nessuna guardia nuova sul codice sia rientrata.
+    prova("ritiro: segna_spedito lo lascia passare (il tracciamento non si "
+          "esige piu' a nessuno, 9 ott 2026)", (False, True),
+          ("Inserisci il numero di tracciamento" in codice(sped),
+           '"Ritiro in zona"' in sped))
     prova("...e ha il suo ramo, che non e' un rifiuto", True,
           'if corriere == "Ritiro in zona":' in sped
           and 'o["consegna_scelta"] == "ritiro"' not in sped)
@@ -17000,6 +17006,299 @@ def prove_tracking_venditore():
           "esc(x.corriere)" in mini and "esc(x.tracking)" in mini)
     prova("la riga «chiedi ai moderatori» non c'e' piu'", False,
           "Il tracciamento non si riscrive da soli" in mini)
+
+
+def prove_tracking_facoltativo():
+    """IL TRACCIAMENTO DEL VENDITORE E' FACOLTATIVO (9 ott 2026, decisione
+    di Andrea): il 400 di `segna_spedito` se n'e' andato, al suo posto
+    la domanda unica del client che consiglia CALDAMENTE il codice, e
+    chi ha spedito senza lo aggiunge dopo dal pannello dell'ordine.
+    Tre banchi VERI: la rotta della spedizione (le notifiche con e senza
+    codice), la rotta della correzione che adesso aggiunge (niente vuoti
+    in fila, l'avviso dice «aggiunto»), e il client in node — markShipped
+    che chiede e poi spedisce, e il pannello che invita."""
+    print("\n[il tracciamento facoltativo]")
+    import asyncio as _aio
+    import html as _html
+    import json as _json
+    import sqlite3
+    import subprocess as _sp
+    import time as _time
+
+    # --- 1) segna_spedito: niente 400, e le notifiche dicono il vero -
+    sped = pezzo("segna_spedito")
+    prova("il 400 sul codice vuoto non c'e' piu'", False,
+          "Inserisci il numero di tracciamento" in codice(sped))
+    prova("...e il pezzo «in viaggio» e' uno per i tre avvisi", 1,
+          codice(sped).count('viaggio = f" con <b>{corr_e}</b>, senza numero '
+                             'di tracciamento"'))
+
+    def ordine(**extra):
+        d = {"id": 7, "compratore_id": 111, "venditore_id": 222,
+             "stato": "locked", "consegna_scelta": "spedizione",
+             "annuncio_id": 3, "via_punto": 0, "punto_ritiro": "",
+             "busta_il": 0, "indirizzo_atteso": 0, "indirizzo_il": 0}
+        d.update(extra)
+        return d
+
+    def gira(corriere, tracking, **extra):
+        o = ordine(**extra)
+        scritto = {}
+        con = sqlite3.connect(":memory:")
+
+        class ConFinta:
+            def execute(self, sql, par=()):
+                if sql.startswith("SELECT * FROM ordini"):
+                    return type("T", (), {"fetchone": lambda self: o})()
+                if sql.startswith("UPDATE ordini"):
+                    scritto["corriere"], scritto["tracking"] = par[0], par[1]
+                    return None
+                return con.execute("SELECT 1")
+
+            def commit(self): pass
+
+            def close(self): pass
+
+        detto = []
+
+        async def notifica_finta(chi, testo, *a, **k):
+            detto.append(testo)
+
+        async def json_finto(req):
+            return {"corriere": corriere, "tracking": tracking}
+
+        amb = {"html": _html, "time": _time, "db": lambda: ConFinta(),
+               "notifica": notifica_finta,
+               "MSG_BUSTA_PRONTA": "il pacco ti aspetta",
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "Request": object, "leggi_json": json_finto,
+               "verifica_utente": lambda *a: {"id": 222},
+               "HTTPException": type("HTTPException", (Exception,), {})}
+        gemelli_trackbot(amb)
+        exec("async " + pezzo("segna_spedito"), amb)
+        try:
+            _aio.run(amb["segna_spedito"](7, None, "", ""))
+        except amb["HTTPException"] as e:
+            return f"400 {e}", scritto
+        return (detto[0] if detto else ""), scritto
+
+    testo, scritto = gira("Poste Italiane", "")
+    prova("corriere vero senza codice: la spedizione PASSA", "Poste Italiane",
+          scritto.get("corriere"))
+    prova("...il database porta il vuoto, non un codice inventato", "",
+          scritto.get("tracking"))
+    prova("...e l'avviso a chi compra nomina il corriere E dice che il "
+          "codice manca", True,
+          "con <b>Poste Italiane</b>, senza numero di tracciamento" in testo)
+    prova("...mai «in consegna a mano», che era la bugia di ieri", False,
+          "in consegna a mano" in testo)
+    testo, _ = gira("Poste Italiane", "RR123456789IT")
+    prova("col codice l'avviso e' quello di sempre", True,
+          "tracciamento " in testo and "RR123456789IT" in testo
+          and "senza numero" not in testo)
+    testo, _ = gira("Consegna a mano", "")
+    prova("la consegna a mano resta «in consegna a mano»", True,
+          "in consegna a mano" in testo)
+    testo, _ = gira("InPost", "", via_punto=1, punto_ritiro="Locker")
+    prova("sulla via punto senza codice: il corriere, la mancanza, e il «ti "
+          "avviseremo» di sempre", True,
+          "verso il punto di ritiro</b> con <b>InPost</b>, senza numero di "
+          "tracciamento! Ti avviseremo" in testo)
+
+    # --- 2) correggi_tracking_venditore AGGIUNGE -------------------
+    m = re.search(r"CREATE TABLE IF NOT EXISTS tracking_storico\(.*?\n    \);",
+                  _SORGENTE, re.S)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+    CREATE TABLE ordini(id INTEGER PRIMARY KEY, compratore_id INTEGER,
+      venditore_id INTEGER, stato TEXT, corriere TEXT DEFAULT '',
+      tracking TEXT DEFAULT '', consegna_scelta TEXT DEFAULT 'spedizione',
+      tracking_corretto_il INTEGER DEFAULT 0, spedito_il INTEGER DEFAULT 0,
+      aggiornato INTEGER DEFAULT 0);
+    """ + m.group(0) + ";")
+
+    class Aperta:
+        def __getattr__(self, n):
+            return getattr(con, n)
+
+        def close(self):
+            pass
+
+    class NoHttp(Exception):
+        def __init__(self, codice, detto=""):
+            super().__init__(detto)
+            self.codice, self.detto = codice, detto
+
+    detti, corpo = [], {}
+
+    async def notifica_cartone(chi, testo, *a, **k):
+        detti.append((chi, testo))
+
+    async def json_cartone(req):
+        return dict(corpo)
+
+    amb = {"time": _time, "html": _html, "db": lambda: Aperta(),
+           "notifica": notifica_cartone, "Header": lambda d="": d,
+           "Cookie": lambda d="": d, "Request": object,
+           "leggi_json": json_cartone,
+           "verifica_utente": lambda *a: {"id": 222},
+           "codice_tracking_bot": lambda t: f"<b>{t}</b>",
+           "HTTPException": NoHttp}
+    i = _SORGENTE.index("CORRIERI_SENTINELLA = (")
+    exec(_SORGENTE[i:_SORGENTE.index(")", i) + 1], amb)
+    i = _SORGENTE.index("STATI_CON_SPEDIZIONE = (")
+    exec(_SORGENTE[i:_SORGENTE.index(")", i) + 1], amb)
+    exec(pezzo("archivia_tracking"), amb)
+    exec("async " + pezzo("correggi_tracking_venditore"), amb)
+
+    def correggi(oid, corriere, tracking):
+        corpo.clear()
+        corpo.update(corriere=corriere, tracking=tracking)
+        try:
+            return _aio.run(amb["correggi_tracking_venditore"](oid, None, "", ""))
+        except NoHttp as e:
+            return e.codice
+
+    def fila(oid):
+        return [tuple(r) for r in con.execute(
+            "SELECT corriere, tracking, da FROM tracking_storico WHERE "
+            "ordine_id=? ORDER BY id", (oid,))]
+
+    con.execute("INSERT INTO ordini(id, compratore_id, venditore_id, stato, "
+                "corriere, tracking, spedito_il, aggiornato) "
+                "VALUES(1, 111, 222, 'shipped', 'Poste Italiane', '', 1000, 1000)")
+    r = correggi(1, "InPost", "NUOVO1")
+    prova("spedito senza codice: il venditore lo AGGIUNGE dalla stessa porta",
+          True, isinstance(r, dict) and r["aggiunto"] is True)
+    o1 = con.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("...l'ordine porta il codice, il corriere e il timbro",
+          ("InPost", "NUOVO1", True),
+          (o1["corriere"], o1["tracking"], o1["tracking_corretto_il"] > 0))
+    prova("...le ancore dei promemoria non si toccano", ("shipped", 1000, 1000),
+          (o1["stato"], o1["spedito_il"], o1["aggiornato"]))
+    prova("...e in fila NON finisce un vuoto", [], fila(1))
+    prova("...l'avviso dice «aggiunto», col codice, e mai «prima era»",
+          (111, True, True, False),
+          (detti[-1][0], "aggiunto il tracciamento" in detti[-1][1],
+           "NUOVO1" in detti[-1][1], "Prima era" in detti[-1][1]))
+    r = correggi(1, "InPost", "NUOVO2")
+    prova("la correzione DOPO l'aggiunta e' quella di sempre: in fila il "
+          "codice vero, l'avviso dice «corretto»",
+          (False, [("InPost", "NUOVO1", "venditore")], True),
+          (r["aggiunto"], fila(1), "corretto il tracciamento" in detti[-1][1]))
+    prova("aggiungere il vuoto resta un no", 400, correggi(1, "InPost", " "))
+
+    # --- 3) il client: sentinelle e banco node ---------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    ms = pezzo_js(mini, "async function markShipped(", "\n}\n")
+    prova("markShipped: il toast che bloccava non c'e' piu'", False,
+          "Inserisci il tracciamento (o scegli" in ms)
+    prova("...al suo posto la domanda unica, con l'azione e il ripensamento "
+          "che riporta al campo", (1, True, True, True),
+          (ms.count("chiediConferma({"),
+           "titolo: 'Spedisci senza numero di tracciamento?'" in ms,
+           "poi: () => inviaSpedito(corriere, tracking, bustaDiretta)" in ms,
+           "indietro: 'Lo inserisco'" in ms))
+    prova("...che consiglia CALDAMENTE e nomina la disputa", True,
+          "caldamente" in ms and "disputa" in ms)
+    inv = pezzo_js(mini, "async function inviaSpedito(", "\n}\n")
+    prova("la spedizione parte da inviaSpedito, verso la rotta di sempre",
+          True, "/orders/${currentOrder.id}/spedito`" in inv)
+    i_form = mini.index('id="shipTracking"')
+    i_btn = mini.index("markShipped()", i_form)
+    prova("il form: placeholder «consigliato» e il cartello caldo PRIMA del "
+          "bottone", (True, True),
+          ('placeholder="Numero di tracciamento (consigliato)"' in mini,
+           i_form < mini.index("<b>Metti il tracciamento</b>", i_form) < i_btn))
+    # pezzo_js taglia PRIMA della graffa di chiusura: le sentinelle non
+    # la vogliono, il banco node qui sotto si', e gliela rimette
+    pan = pezzo_js(mini, "function pannelloTrackingVenditore(", "\n}\n")
+    prova("il pannello del venditore non si nega piu' a chi non ha il codice",
+          False, "|| !o.tracking) return ''" in pan)
+    prova("...e senza codice invita, aperto", True,
+          "'➕ Aggiungi il tracciamento'" in pan and "${manca ? ' open' : ''}" in pan)
+    prova("il passo «Oggetto spedito» senza codice nomina il corriere e la "
+          "mancanza", True,
+          "`${esc(o.corriere)} — senza numero di tracciamento`" in mini)
+
+    forme = pezzo_js(mini, "const FORME_TRACKING = {",
+                     "\n\n/* LE NOTIFICHE DEL PACCO")
+    sped_js = pezzo_js(mini, "async function markShipped(",
+                       "\n\n/* Il gemello di markShipped")
+    banco = r"""
+      const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const haptic = () => {};
+      const DEMO = false, API_BASE = '', authHdr = () => '';
+      const orders = []; let currentOrder = {id: 7, viaPunto: false};
+      const toasts = [], chiesti = [], posted = [];
+      const toast = t => toasts.push(t);
+      let ultimoPoi = null;
+      const chiediConferma = c => { chiesti.push(c.titolo); ultimoPoi = c.poi; };
+      const openOrder = () => {};
+      const selettoreCorriere = () => '';
+      const STATI_CON_SPEDIZIONE = ['shipped','delivered','confirmed','released',
+        'dispute','return_pending','return_shipped','refund','refunded'];
+      const campi = {};
+      const el = id => campi[id];
+      const fetch = async (url, o) => { posted.push([url, JSON.parse(o.body)]); return {ok: true, json: async () => ({})}; };
+      """ + forme + "\n" + sped_js + "\n" + pan + "\n}\n" + r"""
+      (async () => {
+        const O = {};
+        const prepara = (corriere, tracking) => {
+          campi.shipCorriere = {value: corriere}; campi.shipTracking = {value: tracking};
+          campi.shipAvviso = {style: {}, innerHTML: ''};
+          toasts.length = 0; chiesti.length = 0; posted.length = 0; ultimoPoi = null;
+        };
+        prepara('Poste Italiane', '');
+        await markShipped();
+        O.senza = [chiesti.slice(), posted.length, toasts.slice()];
+        await ultimoPoi();
+        O.senzaPoi = [posted.map(p => p[1]), toasts.slice()];
+        prepara('Poste Italiane', ' RR123456789IT ');
+        await markShipped();
+        O.con = [chiesti.length, posted.map(p => p[1]), toasts.slice()];
+        prepara('Consegna a mano', '');
+        await markShipped();
+        O.mano = [chiesti.length, posted.map(p => p[1])];
+        const base = {role: 'seller', corriere: 'Poste Italiane', tracking: '', consegnaScelta: 'spedizione'};
+        O.pan = [
+          pannelloTrackingVenditore(base, 'shipped').includes('➕ Aggiungi il tracciamento'),
+          pannelloTrackingVenditore(base, 'shipped').includes('<details class="payout" style="margin-top:10px" open>'),
+          pannelloTrackingVenditore({...base, tracking: 'X1'}, 'shipped').includes('✏️ Correggi il tracciamento'),
+          pannelloTrackingVenditore({...base, tracking: 'X1'}, 'shipped').includes(' open>'),
+          pannelloTrackingVenditore({...base, role: 'buyer'}, 'shipped'),
+          pannelloTrackingVenditore({...base, corriere: 'Consegna a mano'}, 'shipped'),
+          pannelloTrackingVenditore(base, 'locked'),
+        ];
+        console.log(JSON.stringify(O));
+      })().catch(e => console.log(JSON.stringify({rotto: String(e && e.stack || e)})));
+    """
+    _r = _sp.run(["node", "-e", banco], capture_output=True, text=True,
+                 encoding="utf-8", timeout=60)
+    try:
+        v = _json.loads((_r.stdout or "").strip().splitlines()[-1])
+    except Exception:
+        v = None
+    if not v or "rotto" in v:
+        prova("il banco node della spedizione gira", True,
+              f"node ha detto: {((v or {}).get('rotto') or _r.stderr or '')[:400]}")
+        return
+    prova("il banco node della spedizione gira", True, True)
+    prova("senza codice: si CHIEDE, e non parte niente",
+          [["Spedisci senza numero di tracciamento?"], 0, []], v["senza"])
+    prova("...il si' spedisce senza, col vuoto nel corpo e il toast di sempre",
+          [[{"corriere": "Poste Italiane", "tracking": "", "busta_diretta": False}],
+           ["📦 Segnato come spedito"]], v["senzaPoi"])
+    prova("col codice: nessuna domanda, parte subito (e il codice e' ripulito)",
+          [0, [{"corriere": "Poste Italiane", "tracking": "RR123456789IT",
+                "busta_diretta": False}], ["📦 Segnato come spedito"]], v["con"])
+    prova("la consegna a mano: nessuna domanda, come prima",
+          [0, [{"corriere": "Consegna a mano", "tracking": "", "busta_diretta": False}]],
+          v["mano"])
+    prova("il pannello: invita aperto senza codice, corregge chiuso col codice, "
+          "e tace a chi compra, a mano e prima della spedizione",
+          [True, True, True, False, "", "", ""], v["pan"])
 
 
 def prove_notifica_fail_open():
@@ -40182,8 +40481,12 @@ def prove_fogli_di_casa():
     # — «Salva per dopo», «Svuota il carrello», «Annulla» — che la
     # domanda unica, fatta per un si' e un ripensamento, non sa dire.
     # Lo sorveglia prove_carrello_salvato.
-    prova("i gesti che passano dalla domanda unica sono settantanove",
-          79, solo_codice(mini).count("chiediConferma({"))
+    # OTTANTA DI NUOVO (9 ott 2026, il tracciamento facoltativo):
+    # «Spedisci senza numero di tracciamento?» (`markShipped`), solo
+    # quando il campo e' vuoto su un corriere vero — il consiglio
+    # caldo al posto del toast che bloccava.
+    prova("i gesti che passano dalla domanda unica sono ottanta",
+          80, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -131929,6 +132232,7 @@ def main():
               prove_lista_ordini, prove_dettaglio_ordine, prove_card_ordini, prove_righe_ordine,
               prove_ssrf_redirect, prove_niente_ai_nella_ricerca,
               prove_tracking_corretto, prove_tracking_venditore,
+              prove_tracking_facoltativo,
               prove_vantaggi_livelli, prove_cruscotto_admin,
               prove_buoni_cumulabili,
               prove_barattolo,
