@@ -16055,7 +16055,6 @@ function vaiAste(){
    Esplora, la convenzione di casa. */
 function vaiP2P(){
   haptic();
-  p2pPortaAperta = false;   // la porta del primo ordine si riapre a ogni ingresso (9 ott 2026)
   if (!p2pAcceso()) { go('p2ppresto'); return; }
   go('p2p');
 }
@@ -16107,7 +16106,6 @@ function toccaPiu(){
    qui il dito era sul +. La strada e' quella della voce «Libro
    ordini», go('p2p'): la pila della cronologia la sa gia'. */
 function libroDaPiuP2P(){
-  p2pPortaAperta = false;
   setLatoP2P('compro', true);
   go('p2p');
 }
@@ -50299,10 +50297,7 @@ function renderP2P(){
       : '';
     box.innerHTML = attesa || (typeof scheletroLibroP2P === 'function' ? scheletroLibroP2P() : '');
     /* la porta del primo ordine vale anche qui (9 ott 2026): niente
-       scheletro di un libro che non si vedra'. Il foglio si apre
-       nell'altro ramo, a libro letto: qui l'archivio del server puo'
-       non aver ancora risposto, e aprirlo a chi un ordine ce l'ha
-       sarebbe un foglio da richiudere. */
+       scheletro di un libro che non si vedra' */
     if (typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P()) box.innerHTML = rigaPortaP2P();
     /* I MIEI SCAMBI NON ASPETTANO UN LIBRO CHE NON RISPONDE (24 set
        2026, l'archivio del server): fin qui la striscia voleva il libro
@@ -50552,11 +50547,15 @@ function renderP2P(){
   intestaScambiP2P(mieiRigheP2P());
   /* LA PORTA DEL PRIMO ORDINE (9 ott 2026), DOPO scambiP2P: le righe
      che l'adozione ha appena portato dal server contano, e il libro
-     gia' disegnato si copre con la riga e col foglio */
+     gia' disegnato si copre con la riga. IL FOGLIO NON SI APRE PIU' DA
+     SOLO (ritocco di Andrea, visto in produzione): si apriva sul lato
+     del momento — «Compra» — senza modo di pubblicare una vendita, e
+     chiudendolo si finiva nel mercatino. Le schede in alto restano
+     quelle di sempre, e il bottone della riga apre «Pubblica» sul lato
+     della scheda scelta, col suo colore. */
   if (typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P()) {
     box.innerHTML = rigaPortaP2P();
     if (testaBox) testaBox.innerHTML = '';
-    apriPortaP2P();
   }
 }
 /* l'imbuto, nella lingua delle icone di casa: `viewBox` e tratto della
@@ -52520,6 +52519,13 @@ function apriTourP2PSePrimaVolta(){
      scambi», e di la' il tour si aprirebbe sopra la pagina sbagliata —
      per giunta a chi il libro l'ha gia' attraversato. */
   if (document.querySelector('.view.active')?.id !== 'view-p2p') return;
+  /* SOTTO LA LEVA DELLE PRESE IL TOUR ASPETTA IL PRIMO ORDINE (9 ott
+     2026, ritocco di Andrea): finche' la porta mostra la riga al posto
+     del libro, le slide e il giro sulla pagina non hanno un libro da
+     raccontare. Partono subito dopo la prima pubblicazione, da
+     `inviaNuovoOrdineP2P`, che torna al libro: da li' questa funzione
+     li apre come sempre, e chi li ha gia' visti non li rivede. */
+  if (typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P()) return;
   if (!tourP2PVisto()) { apriTourP2P(); return; }
   if (salitaLivelloP2P()) apriSalitaTourP2P();
 }
@@ -52656,11 +52662,6 @@ function chiudiTourP2P(poi){
      Solo qui, alla fine di un tour — «Inizia», «Salta» o il gesto
      indietro passano tutti da questa funzione. */
   sfocaPaginaTourP2P(false, typeof poi === 'function' ? poi : null);
-  /* LA PORTA DEL PRIMO ORDINE (9 ott 2026): sotto il tour il foglio non
-     si apre (due fogli insieme); chiuso il tour sul libro, si apre
-     adesso — se la porta e' ancora sua */
-  if (typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P()
-      && document.querySelector('.view.active')?.id === 'view-p2p') apriPortaP2P();
 }
 /* LA SFOCATURA DIETRO IL TOUR, in un posto solo. Accesa: la classe
    sull'<html> (il CSS sfoca vista attiva e barra), mai con gli effetti
@@ -63019,6 +63020,14 @@ async function inviaNuovoOrdineP2P(confermato){
        dice gia' «Ordine pubblicato» anche lei. */
     renderOrdineP2P();
     await spuntaAttesaP2P('Ordine pubblicato');
+    /* IL GIRO GUIDATO DOPO IL PRIMO ORDINE (9 ott 2026, ritocco di
+       Andrea): sotto la leva delle prese il tour non si e' aperto
+       all'ingresso (la porta mostrava la riga, non il libro). Adesso
+       l'ordine e' vivo e il libro c'e': si torna al libro, e
+       `apriTourP2PSePrimaVolta` apre le slide di sempre — «Inizia» il
+       giro sulla pagina, «Fine 🎉» il libro. Chi il tour l'ha gia'
+       fatto resta sulla pagina del suo ordine, come sempre. */
+    if (typeof preseChiuseP2P === 'function' && preseChiuseP2P() && !tourP2PVisto()) go('p2p');
   } catch(e) {
     /* la chiave VIVA e p2pOrdineAperto e non ord.id: fra l apertura e
        l errore il coordinatore puo aver gia dato il nome definitivo */
@@ -66150,18 +66159,6 @@ function rigaPortaP2P(){
     + '<span class="empty-title">Per entrare oggi pubblica il tuo primo ordine.</span>'
     + 'Dalle 10:00 di domani si prende. '
     + '<button type="button" class="btn ' + vestito + '" onclick="apriNuovoOrdineP2P()">Pubblica il tuo primo ordine</button></div>';
-}
-/* il foglio si apre da solo UNA volta per ingresso nel tab (vaiP2P e il
-   + lo riarmano): chi lo chiude trova la riga e il bottone, non un
-   foglio che si riapre a ogni render del libro. Sotto il tour no: due
-   fogli aperti insieme, e vince l'ultimo nel DOM. */
-let p2pPortaAperta = false;
-function apriPortaP2P(){
-  if (p2pPortaAperta || tourP2PInCorso) return;
-  const f = el('p2pNuovoSheet');
-  if (!f || f.classList.contains('open')) return;
-  p2pPortaAperta = true;
-  apriNuovoOrdineP2P();
 }
 
 /* ============ IL LIBRO SUBITO (26 set 2026, richiesta di Andrea) ============

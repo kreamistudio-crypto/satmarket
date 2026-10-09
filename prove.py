@@ -102991,9 +102991,14 @@ console.log(JSON.stringify(casi));
     prova("la pagina dello scambio li preferisce a quelli di sempre", True,
           "secondarie.map(a => (typeof preseChiuseP2P === 'function' && preseChiuseP2P() && SECONDARI_CHIUSI_P2P[a])" in ordine)
     rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
-    prova("renderP2P chiede alla porta nei DUE rami, e apre il foglio solo in quello pieno",
-          (2, 1), (rp.count("if (typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P())"),
-                   rp.count("apriPortaP2P();")))
+    # IL FOGLIO NON SI APRE PIU' DA SOLO (ritocco di Andrea, 9 ott 2026
+    # sera, visto in produzione): si apriva su «Compra» senza modo di
+    # pubblicare una vendita, e chiudendolo si finiva nel mercatino
+    prova("renderP2P chiede alla porta nei DUE rami, e NON apre nessun foglio da solo",
+          (2, 0, 0), (rp.count("if (typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P())"),
+                      rp.count("apriPortaP2P"), mini.count("function apriPortaP2P(")))
+    prova("...e con la porta restano le schede «Compra BTC / Vendi BTC» di sempre: la porta copre il solo corpo",
+          True, "box.innerHTML = rigaPortaP2P();" in rp and "p2pLatoVendo" not in pezzo_js(mini, "function rigaPortaP2P(){", "\n}\n"))
     prova("...dopo scambiP2P, che adotta le righe del server", True,
           rp.rindex("&& portaPrimoOrdineP2P())") > rp.index("mieiBox.innerHTML = scambiP2P()"))
     prova("«I miei scambi» usa lo stesso giudice degli aperti", True,
@@ -103005,11 +103010,23 @@ console.log(JSON.stringify(casi));
           True, "Per entrare oggi pubblica il tuo primo ordine.</span>" in pezzo_js(mini, "function rigaPortaP2P(){", "\n}\n")
           and "'Dalle 10:00 di domani si prende. '" in pezzo_js(mini, "function rigaPortaP2P(){", "\n}\n")
           and 'onclick="apriNuovoOrdineP2P()">Pubblica il tuo primo ordine</button>' in pezzo_js(mini, "function rigaPortaP2P(){", "\n}\n"))
-    prova("il foglio si riapre da solo a ogni ingresso nel tab, e dal +", True,
-          "p2pPortaAperta = false;" in pezzo_js(mini, "function vaiP2P(){", "\n}\n")
-          and "p2pPortaAperta = false;" in pezzo_js(mini, "function libroDaPiuP2P(){", "\n}\n"))
-    prova("...ma non sotto il tour, ne' due volte", True,
-          "if (p2pPortaAperta || tourP2PInCorso) return;" in pezzo_js(mini, "function apriPortaP2P(){", "\n}\n"))
+    prova("nessuna bandierina della porta e' rimasta in giro", 0, mini.count("p2pPortaAperta"))
+    # IL TOUR SOTTO LA LEVA ASPETTA IL PRIMO ORDINE (ritocco di Andrea):
+    # la guardia sta in apriTourP2PSePrimaVolta, che e' l'unica porta
+    # delle slide all'ingresso (renderP2P e l'arrivo di /me passano di li')
+    _at = pezzo_js(mini, "function apriTourP2PSePrimaVolta(){", "\n}\n")
+    prova("sotto la porta il tour non si apre all'ingresso", True,
+          "if (typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P()) return;" in _at
+          and _at.index("portaPrimoOrdineP2P()) return;") < _at.index("if (!tourP2PVisto()) { apriTourP2P(); return; }"))
+    prova("...e i due ingressi delle slide passano tutti da li'", 2,
+          mini.count("apriTourP2PSePrimaVolta();"))
+    _pub = pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")
+    prova("dopo la prima pubblicazione, sotto la leva e a tour mai visto, si torna al libro (e il tour parte da li')",
+          True, "if (typeof preseChiuseP2P === 'function' && preseChiuseP2P() && !tourP2PVisto()) go('p2p');" in _pub
+          and _pub.index("preseChiuseP2P() && !tourP2PVisto()) go('p2p')") > _pub.index("await spuntaAttesaP2P('Ordine pubblicato');"))
+    prova("...e «Inizia» delle slide porta al giro sulla pagina, che finisce col banner (lo stesso di sempre)",
+          True, "? () => giroGuidatoP2P(chiesto) : null;" in mini
+          and "if (typeof animaBannerFeeP2P === 'function') animaBannerFeeP2P();" in pezzo_js(mini, "function fineGiroP2P(){", "\n}\n"))
     # --- le due rifiniture di Andrea (9 ott 2026, pomeriggio) ---------
     stati = mini[mini.index("const STATI_P2P = {"):mini.index("\n};", mini.index("const STATI_P2P = {")) + 3]
     gm = mini[mini.index("const P2P_GIRO_MORTO = {"):mini.index("\n};", mini.index("const P2P_GIRO_MORTO = {")) + 3]
@@ -103048,9 +103065,8 @@ console.log(JSON.stringify({prima, dopo}));
     prova("il bottone della porta veste il colore del lato, come il + (vestitoInvioP2P)", True,
           "vestitoInvioP2P(false)" in _rpp and "'<button type=\"button\" class=\"btn ' + vestito + '\"" in _rpp
           and "p2pLato === 'vendo' ? 'rosso' : 'primary'" in pezzo_js(mini, "function vestitoInvioP2P(tab){", "\n}\n"))
-    prova("...e chiuso il tour sul libro, la porta si apre allora", True,
-          "&& document.querySelector('.view.active')?.id === 'view-p2p') apriPortaP2P();"
-          in pezzo_js(mini, "function chiudiTourP2P(poi){", "\n}\n"))
+    prova("chiudiTourP2P non apre piu' nessun foglio", False,
+          "apriPortaP2P" in pezzo_js(mini, "function chiudiTourP2P(poi){", "\n}\n"))
     _fm = mini.index("/* ============ fine del motore dello scambio")
     prova("i giudici degli aperti stanno nel motore (puri); la porta, che tocca fogli e identita', fuori",
           (True, True, True),

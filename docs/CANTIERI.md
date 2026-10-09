@@ -42405,3 +42405,55 @@ stessi tre rossi. Non provato dal vivo nella Mini App.
 tracciamento» nel passo, ma nessun conto di quante spedizioni partono
 senza codice: se dovesse diventare l'abitudine, un numero nel cruscotto
 admin lo direbbe.
+**Il ritocco (9 ott 2026, sera, difetto visto da Andrea in produzione con
+6243006).** Un utente non moderatore nella fase di prova, senza ordini
+vivi, entrando nel P2P si ritrovava il foglio «Pubblica» aperto da solo
+sul lato ACQUISTO (il lato del momento: `apriNuovoOrdineP2P` legge
+`p2pLato`, che parte da «compro»), senza modo di pubblicare una vendita;
+e chiudendo il foglio o tornando indietro finiva nel mercatino — il
+foglio si apriva DENTRO il render di `go('p2p')`, prima che la vista
+avesse la sua voce nella pila, e l'indietro scavalcava il P2P.
+LA CURA: il foglio non si apre più da solo. Via `apriPortaP2P`,
+`p2pPortaAperta`, i due riarmi (`vaiP2P`, `libroDaPiuP2P`) e il gancio in
+`chiudiTourP2P`. Entrando, chi non ha ordini vivi vede la pagina del P2P
+con le schede «Compra BTC / Vendi BTC» di sempre e, al posto del libro,
+la riga con il bottone del colore del lato (già così), che apre
+«Pubblica» sul lato della scheda scelta: dentro il foglio non c'è una
+scelta compra/vendi — il lato è la scheda, e il titolo lo segue
+(«Vuoi vendere Bitcoin») — quindi niente da liberare. La riga sopra il
+foglio resta.
+IL GIRO GUIDATO DOPO IL PRIMO ORDINE: prima il tour a slide si apriva
+all'ingresso nel P2P (`apriTourP2PSePrimaVolta`, da `renderP2P` e
+dall'arrivo di /me) e con «Inizia» passava al giro sulla pagina
+(`giroGuidatoP2P`, sette tappe, «Fine 🎉», `animaBannerFeeP2P`). Sotto la
+leva la porta mostra la riga e non il libro, e un tour sul libro che non
+c'è non ha senso: la guardia `portaPrimoOrdineP2P()` sta DENTRO
+`apriTourP2PSePrimaVolta` — un posto solo per i due chiamanti. Dopo la
+prima pubblicazione (`inviaNuovoOrdineP2P`, dopo la spunta «Ordine
+pubblicato»), sotto la leva e a tour mai visto, si torna al libro con
+`go('p2p')`: l'ordine è vivo, la porta non c'è più, e `renderP2P` apre le
+slide come sempre — «Inizia» il giro, «Fine 🎉» il libro. Chi il tour
+l'ha già fatto resta sulla pagina del suo ordine, come sempre. Fuori
+dalla leva niente cambia. Prese, annulli, moderatori, dopo le 10:
+invariati.
+**Provato.** `prove_prese_dalle_10` sale a 62: renderP2P non apre
+nessun foglio (e `apriPortaP2P` non esiste più), le schede restano
+(la porta copre il solo corpo), nessuna bandierina in giro, la guardia
+della porta in `apriTourP2PSePrimaVolta` prima del `tourP2PVisto`, i due
+ingressi delle slide, il `go('p2p')` dopo la spunta, «Inizia» → giro →
+banner. Dal vivo nel Browser pane (copia nello scratchpad, relay morto,
+leva a domani, coordinatore di cartone: `mostroChiama`/`mostroRiascolta`
+sostituiti nella pagina, `cloudTelegram` a null perché il cloud del
+finto Telegram non risponde mai e `assicuraMazzo` restava appeso, e il
+libro di cartone per non aspettare i relay): identità 1111 mai entrata
+→ pagina P2P con la riga e le schede, nessun tour → scheda «Vendi BTC»
+(bottone rosso) → foglio «Vuoi vendere Bitcoin» con la riga sopra →
+pubblica (new-order al cartone, riga `nuovo:1` viva) → le slide partono
+da sole sul libro → «Inizia» → giro 1 di 7 … «Fine 🎉» → libro, lato
+Vendi, tour visto. Identità 2222 mai entrata → riga → bottone (Compra,
+verde) → foglio → freccia indietro del foglio → resta nel P2P con la
+riga; di nuovo foglio → tasto indietro di Telegram → resta nel P2P →
+pubblica un acquisto → slide → «Inizia» → giro → «Fine 🎉» → libro.
+Screenshot a ogni passaggio nel verbale della sessione. Lezione del
+banco: «Inizia» alla finale va premuto quando la slide finale è pronta,
+un click subito dopo l'arrivo non parte.
