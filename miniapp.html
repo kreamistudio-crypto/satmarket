@@ -2791,6 +2791,24 @@
      posto sbagliato. */
   .p2p-testa-riga .p2p-filtro:not(.p2p-ordina){margin:0 auto}
   .p2p-testa-riga .tema-btn{margin:0;flex:none}
+  /* IL BOTTONE 🔔 DEGLI AVVISI DEI NUOVI ORDINI (9 ott 2026, richiesta
+     di Andrea): accanto alla levetta del tema, nello STESSO cerchietto
+     (`.tema-btn`), cosi' misure, bordo e ombra sono gia' quelli. La
+     campana e' un SVG a due stesure — PIENA e arancio quando gli avvisi
+     sono accesi, VUOTA (solo il tratto) e grigia quando sono spenti —
+     perche' un'emoji «campana vuota» non esiste, e 🔕 direbbe «zittito»,
+     che e' un'altra cosa. Lo stato lo legge `campanellaP2P`. */
+  .p2p-campanella{color:var(--muted)}
+  .p2p-campanella svg{display:block}
+  .p2p-campanella.accesa{color:var(--sats);border-color:var(--sats)}
+  /* ...e il corpo delle preferenze, UNO per i due posti (il foglio dal
+     basso e il cassetto Avvisi del Profilo): la testa con l'interruttore,
+     poi tipi e soglia, che a interruttore spento restano toccabili ma
+     si spengono a vista */
+  .avn-testa{display:flex;align-items:center;gap:10px}
+  .avn-corpo .section-label{padding-top:12px;padding-bottom:8px}
+  .avn-corpo.avn-spento{opacity:.55}
+  .avn-soglie{margin-top:-2px}
   @media (max-width:399px){
     .p2p-testa-riga{gap:6px}
     .p2p-testa-riga .p2p-filtro{padding:8px 11px;gap:6px}
@@ -11688,6 +11706,7 @@ document.getElementById('cartello')?.remove();</script>
       <p><b>Negli altri casi</b> — un profilo nato nel browser prima che arrivasse quello del conto — il profilo <b>vive sul dispositivo</b> e non lo può ricavare nessuno. Dentro Telegram ne salviamo una copia nel <b>cloud del tuo account Telegram</b>, così sopravvive alla cache svuotata e ti segue fra telefono e computer: <b>chi ha il tuo account Telegram ce l'ha anche lui</b> — è già così per tutto Barattolo — e Telegram potrebbe leggerlo, che è il prezzo. Il <b>codice segreto</b> serve a portare il profilo <b>fuori da Barattolo</b>, in un altro programma che parla con lo stesso coordinatore.</p>
       <p>In tutti e tre i casi il server conosce la <b>parte pubblica</b> del profilo e le <b>chiavi usa-e-getta</b> di ogni scambio, per poterti avvisare quando c'è una novità, e da settembre 2026 anche <b>a che numero di scambio sei arrivato</b>: serve a non riusare due volte la stessa chiave usa-e-getta quando apri Barattolo da un dispositivo nuovo, ed è un dato che dai conti che teneva già si sarebbe comunque ricavato. Dal foglio qui sotto il <b>codice segreto</b> lo vedi e lo copi, e il profilo lo <b>dimentichi</b>; dimenticandolo si cancella anche la parte pubblica che il server teneva.</p>
       <p>Dal 16 settembre 2026 il server annota anche <b>quali ordini pubblichi e quali prendi</b>, per avvisarti con i numeri quando lo scambio si muove (preso, concluso, annullato, tornato in vetrina): sono i passaggi <b>pubblici</b> del libro, e la cifratura dei messaggi non si tocca. Chi entra <b>da Nostr</b> non viene annotato quando prende un ordine, perché quell'ingresso esiste per chi non vuole lasciare tracce: gli avvisi sui suoi scambi gli arrivano lo stesso, ma il suo nome non compare negli avvisi dell'altra persona. Dal <b>17 settembre 2026</b> però <b>può deciderlo lui</b>: nel cassetto «🔔 Avvisi» c'è «<b>Fatti riconoscere negli scambi</b>», spento di serie — accendendolo la presa viene annotata, chi ha pubblicato vede il suo profilo e le due parti possono <b>recensirsi</b>. Gli avvisi si spengono tutti dal cassetto «🔔 Avvisi» del profilo.</p>
+      <p>Dal <b>9 ottobre 2026</b>, se accendi «<b>🔔 Avvisami dei nuovi ordini P2P</b>» (spento di serie), il server conserva le tue preferenze — quali tipi di ordine e da quale convenienza in su — e, per ogni ordine di cui ti ha avvisato, il suo numero accanto al tuo: serve a non avvisarti due volte dello stesso, e se ne va da solo dopo la finestra del libro. Chi ha pubblicato quegli ordini non lo sa. «Dimentica il profilo» porta via anche quelle righe.</p>
       <p>Dal <b>18 settembre 2026</b> gli avvisi sugli scambi nascono dal <b>coordinatore</b>, che facciamo girare noi: a ogni passo di uno scambio dice al server di Barattolo <b>quale ordine, quale passo, fra quali due chiavi usa-e-getta, e chi dei due ha fatto il gesto</b> — e da lì il server avvisa l'altra persona, con una frase che dice cosa è successo. Il prezzo lo diciamo per intero: <b>il server ora sa a che punto è ogni scambio</b>, e per chi usa Barattolo sa fra quali due account (le chiavi usa-e-getta le conosceva già). <b>Non riceve gli importi</b>, tranne i tre della chiusura — quanto valeva lo scambio, quanto è andato a chi compra e quanto ha bloccato chi vende, che servono alla frase «scambio concluso» — e <b>non riceve mai</b> fatture, recapiti né messaggi: quelli restano cifrati fra voi due. Questa cronaca si cancella da sola dopo quaranta giorni, e subito se dimentichi il profilo. Con questo è <b>sparito</b> l'avviso generico «Novità in un tuo scambio», e con lui due cose che esistevano solo per farlo funzionare: il server <b>non guarda più</b> sui relay le buste cifrate che il coordinatore ti manda, e il tuo telefono <b>non gli dice più</b> «sto facendo un gesto». Una cosa il telefono continua a dirla, solo se <b>vendi</b>: «<b>ho indicato all'altra persona dove ricevere gli euro</b>», col numero dell'ordine — serve ad avvisarla che tocca a lei, perché quel passo il coordinatore non lo vede. Il <b>recapito non passa da noi</b>: l'IBAN, il RevTag o il numero viaggiano cifrati fra i vostri due telefoni, e nell'avviso non ci sono. E dallo stesso giorno il recapito che hai ricordato <b>non parte più da solo</b>: lo trovi già scritto, e parte quando lo invii tu.</p>
       <p>Se togli uno scambio chiuso con la ✕, il server ricorda <b>il numero dell'ordine e quando l'hai tolto</b>, così sparisce anche dagli altri tuoi dispositivi. Si cancella da solo dopo quaranta giorni, e subito se dimentichi il profilo.</p>
       <p>Dal <b>17 settembre 2026</b>, quando un ordine viene <b>preso</b>, le due parti si vedono: chi ha pubblicato e chi ha preso vedono il <b>profilo</b> l'uno dell'altra — lo stesso che sta già sotto ogni annuncio del mercatino: nome, foto, stelline, livello e titolo — e i <b>bottoni per scriversi</b> su Telegram o su Nostr, ma solo dove quei canali esistono davvero (la npub soltanto se ne hai dimostrato il possesso). <b>Prima della presa non si vede niente</b>, e non c'è nessun altro modo di chiederlo: a questa domanda il server risponde solo a una delle due parti di quello scambio. Il perché è che dall'altra parte c'è una persona a cui stai per mandare dei soldi veri, e un volto con una reputazione è quello che rende <i>pesabile</i> la fiducia — la stessa ragione per cui nel mercatino chi vende ha un nome. Te lo diciamo <b>prima</b>: nel foglio dove pubblichi e in quello dove prendi. Al posto dei campi dove prima ci si scriveva il proprio contatto a mano, che non erano verificati da nessuno.</p>
@@ -13078,6 +13097,17 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="p2pFiltroTit">Filtro</h3>
     <div id="p2pFiltroCorpo"></div>
+  </div>
+
+  <!-- GLI AVVISI DEI NUOVI ORDINI (9 ott 2026, richiesta di Andrea): il
+       foglio che apre il bottone 🔔 della testata del libro. Stessa pelle
+       del Filtro, e DENTRO lo stesso contenuto della riga nel cassetto
+       Avvisi del Profilo (`contenutoAvvisiNuoviP2P`): due porte, uno
+       stato — quel che si accende qui si ritrova la', e viceversa. -->
+  <div class="sheet" id="p2pAvvisiSheet" role="dialog" aria-modal="true" aria-labelledby="p2pAvvisiTit">
+    <div class="grab"></div>
+    <h3 id="p2pAvvisiTit">Nuovi ordini</h3>
+    <div id="p2pAvvisiCorpo"></div>
   </div>
 
   <!-- IL FILTRO DEI PROPRI SCAMBI (set 2026): stessa pelle del foglio
@@ -34428,7 +34458,7 @@ function renderAvvisi(){
      solo lo stato e le scelte */
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">${stato}</div>${dentro}
-    ${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaRiconosciP2P()}`;
+    ${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaRiconosciP2P()}${rigaAvvisiNuoviP2P()}`;
 }
 
 /* «💡 Suggerimenti sui miei annunci»: l'interruttore dei consigli che
@@ -34561,6 +34591,169 @@ async function setAvvisiP2P(attivi){
   renderAvvisi();
   toast(myAvvisiP2P ? '⚡ Avvisi sugli scambi attivi'
                     : 'Avvisi sugli scambi spenti: non ti scriviamo più');
+}
+
+/* ---- 🔔 GLI AVVISI DEI NUOVI ORDINI P2P (9 ott 2026, richiesta di
+   Andrea) ----
+   Chi lo chiede riceve un messaggio quando nel libro compare un ordine
+   nuovo che fa per lui: raggruppati (al massimo uno ogni N minuti, il
+   numero lo dice il server), mai per i suoi ordini, mai due volte lo
+   stesso. SPENTO DI SERIE: e' un avviso che nessuno ha chiesto finche'
+   non lo accende lui.
+   DUE PORTE, UNO STATO: il bottone 🔔 nella testata del libro apre un
+   foglio dal basso, e il cassetto Avvisi del Profilo ha una riga — e
+   tutt'e due disegnano `contenutoAvvisiNuoviP2P()` sullo stesso
+   `myAvvisiNuoviP2P`, che cambia SOLO per mano del server (la risposta
+   di /api/me/avvisi-nuovi-p2p): un tocco in un posto si ritrova
+   nell'altro al prossimo disegno, e nessuno dei due ha una memoria sua.
+   COMPARE SOLO A CHI PUO' AVERLO (`avvisiNuoviP2PInCasa`): P2P acceso
+   per lui, leva globale accesa (`p2pLeve.avvisiNuovi`), un account
+   vero — in demo e in vetrina anonima non c'e' niente da accendere.
+   LA CONVENIENZA E' QUELLA DELLA CARD, dal suo punto di vista: «almeno
+   2% meglio» vuol dire che la card gli direbbe «2% piu' conveniente»
+   o piu'. Le tre chip sono le gemelle di SOGLIE_AVVISI_NUOVI_P2P nel
+   server, e una prova le tiene uguali.
+   DOVE ARRIVA lo dice la riga in fondo, con lo stesso giudice del
+   cassetto (`doveArrivanoAvvisi`): bot Telegram a chi entra da
+   Telegram, DM Nostr a chi entra con Nostr, o la scelta fatta la'. */
+/* il nome di Barattozon NON si scrive qui: lo da' il catalogo dei
+   metodi vestiti (`P2P_VESTE_METODI`, la sentinella «nessun posto
+   scrive Barattozon a mano»), letto al disegno e non al carico */
+const P2P_AVVISI_TIPI = [['vendita', 'Vendita BTC'], ['acquisto', 'Acquisto BTC'],
+                         ['barattozon', '']];
+const nomeTipoAvvisiP2P = t =>
+  t[1] || (vesteMetodoP2P(P2P_TABACCHINO) || {}).nome || t[0];
+const P2P_AVVISI_SOGLIE = [['0', 'A prezzo di mercato o meglio'],
+                           ['2', 'Almeno 2% meglio'], ['5', 'Almeno 5% meglio']];
+/* PURA: le preferenze come arrivano dal server, rimesse in forma — i
+   tipi nell'ordine delle chip (vuoto = tutti), la soglia solo se e' una
+   delle tre, spento se manca tutto (un server di ieri) */
+function normalizzaAvvisiNuoviP2P(p){
+  const tutti = P2P_AVVISI_TIPI.map(t => t[0]);
+  const tipi = (p && Array.isArray(p.tipi)) ? tutti.filter(t => p.tipi.indexOf(t) >= 0) : [];
+  const soglia = String((p && p.soglia != null) ? p.soglia : '');
+  return {attivo: !!(p && p.attivo), tipi: tipi.length ? tipi : tutti,
+          soglia: P2P_AVVISI_SOGLIE.some(s => s[0] === soglia) ? soglia : ''};
+}
+let myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(null);   // spento di serie
+function avvisiNuoviP2PInCasa(){
+  return !!(p2pLeve && p2pLeve.attivo && p2pLeve.avvisiNuovi) && !DEMO && !!myTgId;
+}
+/* dove arrivano gli avvisi, con la regola del cassetto: la scelta di
+   `canale_notifiche`, o — senza scelta — Telegram a chi ha la chat e il
+   DM Nostr al nativo */
+function doveArrivanoAvvisi(){
+  const tgOk = myTgId != null && myTgId > 0;
+  const attivo = myCanaleNotifiche || (tgOk ? 'telegram' : 'nostr');
+  return {telegram: 'nella chat del bot ✈️ Telegram',
+          nostr: 'come 🟣 DM Nostr cifrato',
+          entrambi: 'nella chat del bot ✈️ Telegram e come 🟣 DM Nostr'}[attivo]
+    || 'nella chat del bot ✈️ Telegram';
+}
+function contenutoAvvisiNuoviP2P(){
+  const p = myAvvisiNuoviP2P;
+  const on = !!p.attivo;
+  const minuti = (p2pLeve && p2pLeve.avvisiNuoviMinuti) || 0;
+  const pill = (testo, scelto, gesto) =>
+    '<button type="button" class="tema-pill' + (scelto ? ' active' : '')
+    + '" aria-pressed="' + (scelto ? 'true' : 'false') + '" onclick="' + gesto + '">'
+    + esc(testo) + '</button>';
+  return '<div class="avn-testa">'
+    + '<div style="min-width:0;flex:1">'
+    + '<div style="font-size:13.5px;font-weight:800">🔔 Avvisami dei nuovi ordini P2P</div>'
+    + '<div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">'
+    + 'Quando nel libro compare un ordine che fa per te.</div></div>'
+    + '<button type="button" onclick="setAvvisiNuoviP2P({attivo:' + (on ? 'false' : 'true') + '})"'
+    + ' aria-pressed="' + (on ? 'true' : 'false') + '"'
+    + ' style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid '
+    + (on ? 'var(--sats)' : 'var(--line)') + ';background:' + (on ? 'var(--sats)' : 'transparent')
+    + ';color:' + (on ? '#fff' : 'var(--muted)') + ';border-radius:99px;padding:6px 14px;cursor:pointer">'
+    + (on ? 'Attivi' : 'Spenti') + '</button></div>'
+    + '<div class="avn-corpo' + (on ? '' : ' avn-spento') + '">'
+    + '<div class="section-label">Tipo di ordini</div>'
+    + '<div class="p2p-metodi">' + P2P_AVVISI_TIPI.map(t =>
+        pill(nomeTipoAvvisiP2P(t), p.tipi.indexOf(t[0]) >= 0,
+             "scegliTipoAvvisiNuoviP2P('" + t[0] + "')")).join('')
+    + '</div>'
+    + '<div class="section-label">Convenienza</div>'
+    + '<div class="p2p-metodi">'
+    + pill('Tutti', p.soglia === '', "scegliSogliaAvvisiNuoviP2P('')")
+    + pill('Solo se conveniente', p.soglia !== '',
+           "scegliSogliaAvvisiNuoviP2P('" + (p.soglia || P2P_AVVISI_SOGLIE[0][0]) + "')")
+    + '</div>'
+    + (p.soglia === '' ? '' : '<div class="p2p-metodi avn-soglie">' + P2P_AVVISI_SOGLIE.map(s =>
+        pill(s[1], p.soglia === s[0], "scegliSogliaAvvisiNuoviP2P('" + s[0] + "')")).join('')
+      + '</div>')
+    + '</div>'
+    + '<div class="hint">📬 Arriva ' + doveArrivanoAvvisi()
+    + (minuti ? ', al massimo uno ogni <b>' + minuti + ' minuti</b>' : '')
+    + ': quanti ordini nuovi per tipo e il più conveniente per te, con il tocco che apre il libro. '
+    + 'Mai per i tuoi ordini.</div>';
+}
+/* la riga del cassetto Avvisi: lo stesso contenuto del foglio, dentro
+   la cornice delle righe vicine */
+const rigaAvvisiNuoviP2P = () => !avvisiNuoviP2PInCasa() ? '' :
+  '<div id="avvisiNuoviCassetto" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">'
+  + contenutoAvvisiNuoviP2P() + '</div>';
+/* le due campane: PIENA (accesi) e VUOTA (spenti), stesso tracciato */
+const CAMPANA_P2P = 'M12 22a2.2 2.2 0 0 0 2.2-2.2H9.8A2.2 2.2 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1Z';
+function iconaCampanellaP2P(piena){
+  return '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="' + CAMPANA_P2P + '" '
+    + (piena ? 'fill="currentColor"'
+             : 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"')
+    + '/></svg>';
+}
+function campanellaP2P(){
+  if (!avvisiNuoviP2PInCasa()) return '';
+  const on = !!myAvvisiNuoviP2P.attivo;
+  return '<button type="button" class="tema-btn p2p-campanella' + (on ? ' accesa' : '')
+    + '" id="p2pCampanella" title="Avvisi sui nuovi ordini" aria-label="Avvisi sui nuovi ordini: '
+    + (on ? 'attivi' : 'spenti') + '" aria-haspopup="dialog" onclick="apriAvvisiNuoviP2P()">'
+    + iconaCampanellaP2P(on) + '</button>';
+}
+function apriAvvisiNuoviP2P(){
+  haptic();
+  renderAvvisiNuoviP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pAvvisiSheet').classList.add('open');
+}
+/* ridisegna i DUE posti e la campana: e' qui che «stesse preferenze dai
+   due punti» diventa un fatto e non una promessa */
+function renderAvvisiNuoviP2P(){
+  const corpo = el('p2pAvvisiCorpo');
+  if (corpo) corpo.innerHTML = contenutoAvvisiNuoviP2P();
+  if (el('avvisiBlocco')) renderAvvisi();
+  const camp = el('p2pCampanella');
+  if (camp) camp.outerHTML = campanellaP2P();
+}
+async function setAvvisiNuoviP2P(patch){
+  haptic();
+  if (DEMO) { toast('In demo non ci sono avvisi veri 🙂'); return; }
+  const voluto = Object.assign({}, myAvvisiNuoviP2P, patch);
+  try {
+    const r = await fetch(`${API_BASE}/me/avvisi-nuovi-p2p`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({attivo: !!voluto.attivo, tipi: voluto.tipi, soglia: voluto.soglia})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(d.avvisi_nuovi_p2p);
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  renderAvvisiNuoviP2P();
+  if ('attivo' in patch)
+    toast(myAvvisiNuoviP2P.attivo ? '🔔 Ti avviso dei nuovi ordini P2P'
+                                  : 'Avvisi dei nuovi ordini spenti');
+}
+function scegliTipoAvvisiNuoviP2P(t){
+  const tipi = myAvvisiNuoviP2P.tipi.slice();
+  const i = tipi.indexOf(t);
+  if (i >= 0) {
+    if (tipi.length === 1) { toast('Tieni almeno un tipo di ordine'); return; }
+    tipi.splice(i, 1);
+  } else tipi.push(t);
+  setAvvisiNuoviP2P({tipi});
+}
+function scegliSogliaAvvisiNuoviP2P(s){
+  setAvvisiNuoviP2P({soglia: String(s == null ? '' : s)});
 }
 
 async function setCanale(canale){
@@ -50165,8 +50358,14 @@ function renderP2P(){
     + ' onclick="apriPicker(\'p2pOrdinaSel\')">'
     + icoOrdinaP2P() + '<span class="cs-val">'
     + esc(etichettaOrdineP2P(ordAttivo)) + '</span></button>';
+  /* ...E IL BOTTONE 🔔 DEGLI AVVISI DEI NUOVI ORDINI (9 ott 2026), fra
+     il Filtro e la levetta: stesso cerchietto, campana piena se sono
+     accesi e vuota se spenti, e sparisce a chi non puo' averli — vedi
+     `campanellaP2P`. Il margine auto del Filtro lo tiene a meta' fra
+     «Ordina» e i due cerchietti, qualunque sia la loro larghezza. */
   if (testaBox) testaBox.innerHTML =
     '<div class="p2p-testa-riga">' + pillOrdina + pillola
+    + campanellaP2P()
     + '<button type="button" class="tema-btn" onclick="alternaTema()">'
     + '<span class="tema-ico" aria-hidden="true">'
     + (temaEffettivo() === 'scuro' ? '☀️' : '🌙') + '</span></button></div>';
@@ -70125,6 +70324,9 @@ async function avvia(){
     /* e il riconoscimento, col verso ROVESCIATO: un server di ieri
        (chiave assente) vale SPENTO, che qui e' il lato che protegge */
     myRiconosciP2P = !!me.riconosci_p2p;
+    /* gli avvisi dei nuovi ordini (9 ott 2026): dal giudice del server;
+       la chiave assente (un server di ieri) vale SPENTO, lo spento di serie */
+    myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(me.avvisi_nuovi_p2p);
     suggerimentiOgni = me.suggerimenti_ogni_giorni || 0;
     adottaFont(me);   // la misura scelta sull'altro telefono
     adottaVisti(me);  // i timbri «una volta sola»: tour visto, «Non ora»

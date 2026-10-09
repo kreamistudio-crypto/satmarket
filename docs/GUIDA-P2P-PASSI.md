@@ -238,7 +238,19 @@ riprova».
 - sul proprio ordine: «È il tuo ordine — tocca per aprirlo».
 
 Ordinamento (in cima): «Recenti» / «Convenienza» / «Più grandi» / «Più
-piccoli». C'è anche un «Filtro».
+piccoli». C'è anche un «Filtro». Accanto alla levetta del tema, la
+campanella 🔔 (dal 9 ott 2026; piena e arancio se gli avvisi sono
+accesi, vuota se spenti): apre il foglio «**Nuovi ordini**» con
+«🔔 Avvisami dei nuovi ordini P2P» (Spenti/Attivi, spento di serie),
+«Tipo di ordini» («Vendita BTC» / «Acquisto BTC» / «Barattozon», a
+scelta multipla), «Convenienza» («Tutti» / «Solo se conveniente», e
+con la seconda le chip «A prezzo di mercato o meglio» / «Almeno 2%
+meglio» / «Almeno 5% meglio») e la riga «📬 Arriva nella chat del bot
+✈️ Telegram [o come 🟣 DM Nostr cifrato], al massimo uno ogni 15
+minuti: …». Le stesse scelte stanno nel cassetto «🔔 Avvisi» del
+Profilo. L'avviso che arriva: «🔔 2 nuovi ordini nel libro P2P /
+vendita BTC: 2 / Il più conveniente per te: vendita BTC da 50,00 € via
+SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
 
 ### 2b. Ordine a importo fisso
 

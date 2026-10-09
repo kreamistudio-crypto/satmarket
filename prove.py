@@ -76204,7 +76204,9 @@ def prove_p2p_server():
              # il tetto del contanti di persona (30 set 2026), in busta
              "P2P_CONTANTI_MAX_EURO": 250,
              # la cauzione di chi prende (1 ott 2026), in busta
-             "P2P_CAUZIONE": False}
+             "P2P_CAUZIONE": False,
+             # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
+             "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15}
         exec(pezzo("_p2p_leve"), a)
         return a["_p2p_leve"]()
     relay = ["wss://relay.mostro.network", "wss://nos.lol"]
@@ -76223,9 +76225,11 @@ def prove_p2p_server():
           leve(True, hexv, [])["attivo"])
     # (30 set 2026) OTTO: il minimo di Barattozon e il tetto del contanti
     # di persona sono entrati insieme, da due cantieri
-    prova("le chiavi sono otto e sono sempre quelle",
-          ["attivo", "cauzione", "commissione", "maxEuro", "maxEuroContanti", "minEuroBz", "mostro", "relay",
-           "specchio"],
+    # (9 ott 2026) UNDICI: la cauzione (1 ott) e le due chiavi degli
+    # avvisi dei nuovi ordini — la leva globale e la finestra in minuti
+    prova("le chiavi sono undici e sono sempre quelle",
+          ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "commissione", "maxEuro",
+           "maxEuroContanti", "minEuroBz", "mostro", "relay", "specchio"],
           sorted(piena.keys()))
     # IL LISTINO VIAGGIA SEMPRE, come npub e relay: e' pubblico, e il
     # client lo usa solo per dire quando la fee viva e' una promo.
@@ -89741,8 +89745,11 @@ def prove_p2p_avvisi_libro():
     # EMENDATA (7 ott 2026, «La garanzia lunga»): QUATTRO — il passo delle
     # garanzie lunghe ha il suo, e un suo guasto non tocca libro, foto e
     # attese (prove_garanzia_lunga guarda che stia nel battito pieno)
+    # EMENDATA (9 ott 2026, «avvisi dei nuovi ordini»): CINQUE — il giro
+    # degli avvisi dei nuovi ordini ha il suo, dopo la fotografia
+    # (prove_avvisi_nuovi_ordini guarda che stia nel battito pieno)
     prova("...e ognuno ha il suo try (un battito storto non ferma gli altri)",
-          4, codice(orologio).count("except Exception as e:"))
+          5, codice(orologio).count("except Exception as e:"))
     prova("le righe mai viste si chiedono senza segnalibro", True,
           "for ids, da in ((nuovi, 0), (vecchi, since - P2P_MARGINE_S)):" in giro)
     prova("...e solo per due ore: un id che il libro non mostra smette di farsi cercare",
@@ -102604,6 +102611,390 @@ console.log(JSON.stringify({prima, dopo}));
           (mini.index("function apertiMieiP2P(righe){") < _fm,
            mini.index("function haOrdiniViviP2P(){") < _fm,
            mini.index("function portaPrimoOrdineP2P(){") > _fm))
+
+
+def prove_avvisi_nuovi_ordini():
+    """GLI AVVISI DEI NUOVI ORDINI DEL LIBRO P2P (9 ott 2026, richiesta di
+    Andrea). Chi lo chiede — dal bottone 🔔 della testata del libro o dal
+    cassetto Avvisi del Profilo, che mostrano le STESSE preferenze —
+    riceve un messaggio quando nel libro compaiono ordini nuovi: del tipo
+    scelto (vendita BTC, acquisto BTC, Barattozon), «tutti» o solo da una
+    convenienza in su (0, 2, 5 punti a suo favore, la stessa della card),
+    raggruppati al piu' uno ogni N minuti, mai per i suoi ordini, mai due
+    volte lo stesso; spento di serie; sotto la leva globale
+    P2P_AVVISI_NUOVI_ORDINI. Il canale lo sceglie notifica().
+    Qui: le sentinelle, i giudici puri, il banco sqlite con la coda VERA
+    (raggruppamento, auto-avviso, doppioni, soglia nei due versi, tipi),
+    notifica() vera con i due trasporti di cartone, e il client in node."""
+    print("\n[gli avvisi dei nuovi ordini P2P]")
+    import asyncio
+    import html
+    import sqlite3
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    m = mini.replace("\r\n", "\n")
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- 1) LE SENTINELLE DEL SERVER --------------------------------------
+    prova("la leva globale: accesa di serie, solo un booleano conta, storta resta accesa", True,
+          "except ImportError:\n    P2P_AVVISI_NUOVI_ORDINI = True\n" in src
+          and "    if not isinstance(P2P_AVVISI_NUOVI_ORDINI, bool):\n" in src
+          and "        P2P_AVVISI_NUOVI_ORDINI = True\nexcept ImportError:" in src)
+    prova("la finestra: intero da 1 in su, 15 di serie, 15 sul valore storto", True,
+          "    P2P_AVVISI_NUOVI_MINUTI = int(P2P_AVVISI_NUOVI_MINUTI)\n"
+          "    if P2P_AVVISI_NUOVI_MINUTI < 1:\n        raise ValueError" in src
+          and src.count("    P2P_AVVISI_NUOVI_MINUTI = 15\n") == 2)
+    prova("le tre colonne di utenti, SPENTO di serie", True,
+          '"avvisi_nuovi_p2p INTEGER DEFAULT 0",\n'
+          '                    "avvisi_nuovi_tipi TEXT DEFAULT \'\'",\n'
+          '                    "avvisi_nuovi_soglia TEXT DEFAULT \'\'",' in src)
+    prova("la coda ha la chiave (persona, ordine): e' l'anti-doppione sul database", True,
+          "CREATE TABLE IF NOT EXISTS p2p_avvisi_nuovi(" in src
+          and "        mandato INTEGER DEFAULT 0,\n        PRIMARY KEY(tg_id, ordine)\n    );\n"
+          "    CREATE INDEX IF NOT EXISTS idx_p2p_avvisi_nuovi_coda" in src)
+    rotta = pezzo("scegli_avvisi_nuovi_p2p")
+    prova("la rotta esiste, dietro il cancello del P2P e la leva globale", True,
+          '@app.post("/api/me/avvisi-nuovi-p2p")' in src
+          and 'if not _p2p_per(user["id"])["attivo"]:\n        raise HTTPException(409' in rotta
+          and "if not P2P_AVVISI_NUOVI_ORDINI:\n        raise HTTPException(409" in rotta)
+    prova("...vuole almeno un tipo e una soglia delle tre, e risponde col giudice", True,
+          'raise HTTPException(400, "Scegli almeno un tipo di ordine")' in rotta
+          and 'if soglia not in ("",) + SOGLIE_AVVISI_NUOVI_P2P:' in rotta
+          and 'return {"ok": True, "avvisi_nuovi_p2p": _pref_avvisi_nuovi_p2p(' in rotta)
+    prova("/api/me porta le preferenze dal giudice, non dalle colonne grezze", True,
+          '    profilo["avvisi_nuovi_p2p"] = _pref_avvisi_nuovi_p2p(u)\n' in src)
+    oro = codice(pezzo("orologio_p2p"))
+    prova("l'orologio chiama il giro nel battito pieno, DOPO la fotografia", True,
+          "await asyncio.wait_for(_fotografa_libro_p2p(), P2P_FOTO_MAX_S)" in oro
+          and oro.index("_fotografa_libro_p2p(), P2P_FOTO_MAX_S)")
+          < oro.index("await asyncio.wait_for(_giro_avvisi_nuovi_p2p(), P2P_PASSATA_MAX_S)"))
+    prova("il pannello «Stato delle leve» ha le due righe, col nome delle leve", True,
+          '_leva("Avvisi dei nuovi ordini P2P", "P2P_AVVISI_NUOVI_ORDINI",' in src
+          and '"P2P_AVVISI_NUOVI_MINUTI", P2P_AVVISI_NUOVI_MINUTI,' in src)
+    prova("«dimentica il profilo» e la fusione dei conti portano la coda con se'", True,
+          'con.execute("DELETE FROM p2p_avvisi_nuovi WHERE tg_id=?", (user["id"],))'
+          in pezzo("dimentica_chiavi_p2p")
+          and 'con.execute("UPDATE OR IGNORE p2p_avvisi_nuovi SET tg_id=? "' in pezzo("esegui_fusione"))
+    accoda_src = codice(_senza_prosa(pezzo("_accoda_nuovi_p2p")))
+    prova("il giro accoda dietro l'interruttore grande, il cancello per persona e «mai i suoi»", True,
+          '_p2p_per(tg)["attivo"]' in accoda_src and "_avvisi_p2p_accesi(con, tg)" in accoda_src
+          and "if autore and tg == autore:\n                continue" in accoda_src
+          and "INSERT OR IGNORE INTO p2p_avvisi_nuovi(" in accoda_src)
+    giro = codice(_senza_prosa(pezzo("_giro_avvisi_nuovi_p2p")))
+    prova("il giro esce a leva spenta, a P2P spento e senza fotografia; timbra PRIMA di mandare", True,
+          'if not P2P_AVVISI_NUOVI_ORDINI or not _p2p_leve()["attivo"]:\n        return' in giro
+          and 'if not F.get("quando"):\n        return' in giro
+          and giro.index("_scarica_nuovi_p2p(con, adesso, vivi)") < giro.index("await notifica(tg_id, testo)"))
+    scarica_src = codice(_senza_prosa(pezzo("_scarica_nuovi_p2p")))
+    prova("...e la coda si timbra con l'ora PRIMA di comporre il messaggio", True,
+          scarica_src.index("SET mandato=? WHERE tg_id=? AND mandato=0") < scarica_src.index("_testo_avviso_nuovi_p2p(vive)"))
+    amb_l = {"P2P_ATTIVO": True, "MOSTRO_HEX": "a" * 64, "MOSTRO_RELAY": ["ws://127.0.0.1:9"],
+             "MOSTRO_RELAY_SPECCHIO": [], "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
+             "P2P_CONTANTI_MAX_EURO": 250, "BARATTOZON_MIN_EURO": 25, "P2P_CAUZIONE": False,
+             "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15}
+    exec(_senza_prosa(pezzo("_p2p_leve")), amb_l)
+    prova("la busta delle leve porta la leva e la finestra", (True, 15),
+          (amb_l["_p2p_leve"]()["avvisiNuovi"], amb_l["_p2p_leve"]()["avvisiNuoviMinuti"]))
+    soglie_srv = eval(re.search(r"\nSOGLIE_AVVISI_NUOVI_P2P = (\([^)]*\))", src).group(1))
+    soglie_cli = re.findall(r"\['(\d+)', '[^']+'\]",
+                            m[m.index("const P2P_AVVISI_SOGLIE = ["):m.index("];", m.index("const P2P_AVVISI_SOGLIE = ["))])
+    prova("le tre chip della soglia sono le stesse nel server e nel client",
+          [("0", "2", "5"), ("0", "2", "5")], [soglie_srv, tuple(soglie_cli)])
+    prova("il config d'esempio dichiara le due leve", True,
+          "\nP2P_AVVISI_NUOVI_ORDINI = True\n" in cfg and "\nP2P_AVVISI_NUOVI_MINUTI = 15\n" in cfg)
+    frasi = _senza_prosa(pezzo("_testo_avviso_nuovi_p2p"))
+    for spia in ("nostr", "relay", "chiave", "pubkey", "npub", "kind"):
+        prova(f"il messaggio non dice «{spia}»", False, spia in frasi.lower())
+
+    # --- 2) I GIUDICI PURI --------------------------------------------------
+    amb = {"html": html, "URL_PUBBLICO": "https://barattolo.store", "time": time}
+    for riga in ("TIPI_AVVISI_NUOVI_P2P = ", "SOGLIE_AVVISI_NUOVI_P2P = "):
+        i = src.index("\n" + riga) + 1
+        exec(src[i:src.index("\n", i)].split("   #")[0], amb)
+    i = src.index("\nNOMI_TIPI_AVVISI_NUOVI_P2P = {") + 1
+    exec(src[i:src.index("}\n", i) + 2], amb)
+    for f in ("_campo_riga", "_pref_avvisi_nuovi_p2p", "_euro_tabacchino", "_metodi_libro",
+              "_tabacchino_libro", "_euro_libro", "_tipo_nuovo_p2p", "_euro_nuovo_p2p",
+              "_convenienza_nuovo_p2p", "_passa_avviso_nuovo_p2p", "_frase_convenienza_p2p",
+              "_testo_avviso_nuovi_p2p", "_nuovi_dalla_foto_p2p", "_tag_evento_p2p",
+              "_evento_libro_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    pref = amb["_pref_avvisi_nuovi_p2p"]
+    T3 = ["vendita", "acquisto", "barattozon"]
+    SPENTO = {"attivo": False, "tipi": T3, "soglia": ""}
+    prova("SPENTO DI SERIE: riga assente, riga di ieri senza le colonne, riga coi default",
+          [SPENTO, SPENTO, SPENTO],
+          [pref(None), pref({"tg_id": 1}),
+           pref({"avvisi_nuovi_p2p": 0, "avvisi_nuovi_tipi": "", "avvisi_nuovi_soglia": ""})])
+    prova("le preferenze scritte si rileggono: tipi nell'ordine delle chip, soglia solo se e' una delle tre",
+          [{"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "2"},
+           {"attivo": True, "tipi": T3, "soglia": ""}],
+          [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_tipi": "|barattozon|vendita|", "avvisi_nuovi_soglia": "2"}),
+           pref({"avvisi_nuovi_p2p": "1", "avvisi_nuovi_tipi": "|x|", "avvisi_nuovi_soglia": "7"})])
+    tipo = amb["_tipo_nuovo_p2p"]
+    prova("il tipo: sell = vendita, buy = acquisto, il tabacchino = Barattozon qualunque sia il lato",
+          ["vendita", "acquisto", "barattozon", "barattozon", ""],
+          [tipo("sell", ["SEPA"]), tipo("buy", ["Revolut"]),
+           tipo("sell", ["Contanti al tabacchino 30.00"]), tipo("buy", ["Contanti al tabacchino"]),
+           tipo("", [])])
+    conv = amb["_convenienza_nuovo_p2p"]
+    prova("a mercato e' il premio del filo nel verso di affareP2P: + per chi legge se chi pubblica COMPRA",
+          [5.0, -5.0, -3.0, 3.0, 0.0],
+          [conv("buy", 5, 0, 0, 0), conv("sell", 5, 0, 0, 0), conv("buy", -3, 0, 0, 0),
+           conv("sell", -3, 0, 0, 0), conv("sell", 0, 0, 0, 0)])
+    prova("a sats fissi e' il premio implicito contro il cambio (50 € = 50.000 sats a 100.000 €/BTC): "
+          "48.500 sats da chi vende = 3% meno, 51.500 = 3% più; senza cifra o cambio non si sa",
+          [-3.0, 3.0, None, None, -3.0],
+          [conv("sell", 0, 48500, 50.0, 100000), conv("sell", 0, 51500, 50.0, 100000),
+           conv("sell", 0, 48500, 0, 100000), conv("sell", 0, 48500, 50.0, 0),
+           conv("buy", 0, 51500, 50.0, 100000)])
+    passa = amb["_passa_avviso_nuovo_p2p"]
+    P = lambda a, t, s: {"attivo": a, "tipi": t, "soglia": s}
+    prova("spento non passa niente; acceso passa il tipo scelto e non gli altri",
+          [False, True, False],
+          [passa(P(False, ["vendita"], ""), "vendita", 9), passa(P(True, ["vendita"], ""), "vendita", None),
+           passa(P(True, ["vendita"], ""), "acquisto", 9)])
+    prova("LA SOGLIA NEI DUE VERSI: «tutti» passa anche l'ignota e la sfavorevole; «2» vuole almeno +2 "
+          "e non passa l'ignota; «0» passa il prezzo di mercato e non il −1",
+          [True, True, True, False, False, True, False],
+          [passa(P(True, T3, ""), "vendita", None), passa(P(True, T3, ""), "vendita", -7),
+           passa(P(True, T3, "2"), "vendita", 2), passa(P(True, T3, "2"), "vendita", 1.9),
+           passa(P(True, T3, "2"), "vendita", None), passa(P(True, T3, "0"), "vendita", 0),
+           passa(P(True, T3, "0"), "vendita", -1)])
+    testo = amb["_testo_avviso_nuovi_p2p"]
+    LINK = '\n\n<a href="https://barattolo.store/p2p">🫙 Apri il libro ordini</a>'
+    righe = [{"tipo": "vendita", "conv": 3.0, "euro": "50,00 €", "metodi": "SEPA"},
+             {"tipo": "vendita", "conv": -1.0, "euro": "20,00 €", "metodi": "Revolut"},
+             {"tipo": "barattozon", "conv": None, "euro": "30,00 €", "metodi": "Contanti al tabacchino"}]
+    prova("il messaggio raggruppato: quanti per tipo, il piu' conveniente per lui, il tocco che apre il libro",
+          "🔔 <b>3 nuovi ordini nel libro P2P</b>\nvendita BTC: 2 · Barattozon: 1\n"
+          "Il più conveniente per te: vendita BTC da 50,00 € via SEPA, 3% più conveniente" + LINK,
+          testo(righe))
+    prova("uno solo: al singolare, «Per te», e a zero «al prezzo di mercato»",
+          "🔔 <b>1 nuovo ordine nel libro P2P</b>\nacquisto BTC: 1\n"
+          "Per te: acquisto BTC da 10,00 € via SEPA, al prezzo di mercato" + LINK,
+          testo([{"tipo": "acquisto", "conv": 0.0, "euro": "10,00 €", "metodi": "SEPA"}]))
+    prova("senza una convenienza nota la riga manca, e il metodo si scappa",
+          (False, True),
+          ("Per te" in testo([{"tipo": "barattozon", "conv": None, "euro": "", "metodi": ""}]),
+           "via &lt;b&gt;" in testo([{"tipo": "vendita", "conv": 1.0, "euro": "", "metodi": "<b>"}])))
+    nuovi_f = amb["_nuovi_dalla_foto_p2p"]
+
+    def ev(d, quando, s="pending", k="sell", pm=("SEPA",), amt="0", fa=("50",), premium="0"):
+        return {"id": d + str(quando), "kind": 38383, "created_at": quando,
+                "tags": [["d", d], ["s", s], ["k", k], ["amt", amt]]
+                        + [["fa", x] for x in fa] + [["pm", x] for x in pm] + [["premium", premium]],
+                "pubkey": "m", "content": "", "sig": "x"}
+    prova("NUOVO = non noto E dopo il segnalibro: il tornato in vetrina (stesso d) e la copia vecchia restano fuori",
+          (["c"], ["a", "c"]),
+          ([amb["_tag_evento_p2p"](e, "d") for e in nuovi_f([ev("a", 1000), ev("b", 900), ev("c", 1000)], {"a"}, 950)],
+           [amb["_tag_evento_p2p"](e, "d") for e in nuovi_f([ev("a", 1000), ev("b", 900), ev("c", 1000)], None, 950)]))
+
+    # --- 3) IL BANCO: la coda vera, su sqlite ---------------------------------
+    schema = ""
+    for tabella, fine in (("p2p_ordini", "ON p2p_ordini(tg_id);"),
+                          ("p2p_avvisi_nuovi", "ON p2p_avvisi_nuovi(tg_id, mandato);")):
+        i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
+        schema += src[i:src.index(fine, i) + len(fine)] + "\n"
+    schema += ("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, avvisi_p2p INTEGER DEFAULT 1, "
+               "avvisi_nuovi_p2p INTEGER DEFAULT 0, avvisi_nuovi_tipi TEXT DEFAULT '', "
+               "avvisi_nuovi_soglia TEXT DEFAULT '');")
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(schema)
+    amb.update(P2P_AVVISI_NUOVI_MINUTI=15, P2P_FOTO_FINESTRA_S=16 * 86400,
+               _p2p_per=lambda tg: {"attivo": tg != 444})
+    for f in ("_avvisi_p2p_accesi", "_accoda_nuovi_p2p", "_scarica_nuovi_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    accoda, scarica = amb["_accoda_nuovi_p2p"], amb["_scarica_nuovi_p2p"]
+    # 111 vuole le sole vendite almeno +2; 222 tutto; 333 spento; 444 acceso ma
+    # fuori dal P2P; 555 acceso ma con l'interruttore grande spento
+    for tg, on, tipi, soglia, grande in ((111, 1, "|vendita|", "2", 1), (222, 1, "", "", 1),
+                                          (333, 0, "", "", 1), (444, 1, "", "", 1), (555, 1, "", "", 0)):
+        con.execute("INSERT INTO utenti VALUES(?,?,?,?,?)", (tg, grande, on, tipi, soglia))
+    T = 2_000_000_000
+    for o, chi in (("o4", 111), ("o1", 999)):
+        con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, maker) VALUES(?,?,?,1)", (o, chi, T))
+    con.commit()
+    CAMBIO = 100_000.0
+    nuovi = [ev("o1", T, amt="51500"),                                   # vendita, +3 per chi compra
+             ev("o2", T, amt="48500"),                                   # vendita, −3
+             ev("o3", T, k="buy", premium="1"),                          # acquisto a mercato, +1
+             ev("o4", T, amt="51500"),                                   # vendita +3, ma e' di 111
+             ev("o5", T, pm=("Contanti al tabacchino 30.00",), amt="31000", fa=("30",)),  # Barattozon, +3
+             ev("o6", T, s="in-progress", amt="51500")]                  # gia' preso: non e' un'offerta
+    n = accoda(con, nuovi, CAMBIO, T)
+    coda = {tg: sorted(r[0] for r in con.execute(
+        "SELECT ordine FROM p2p_avvisi_nuovi WHERE tg_id=? AND mandato=0", (tg,)))
+        for tg in (111, 222, 333, 444, 555)}
+    prova("in coda: a 111 la sola vendita che conviene almeno 2 e NON la sua; a 222 tutto; agli altri niente",
+          (6, {111: ["o1"], 222: ["o1", "o2", "o3", "o4", "o5"], 333: [], 444: [], 555: []}), (n, coda))
+    prova("NIENTE DOPPIONI: la stessa passata una seconda volta non scrive nulla", 0, accoda(con, nuovi, CAMBIO, T))
+    conv_222 = {r[0]: r[1] for r in con.execute("SELECT ordine, conv FROM p2p_avvisi_nuovi WHERE tg_id=222")}
+    prova("...e ogni riga porta la convenienza per LUI, il Barattozon compreso",
+          {"o1": 3.0, "o2": -3.0, "o3": 1.0, "o4": 3.0, "o5": 3.0}, conv_222)
+    vivi = {"o1", "o2", "o3", "o4", "o5"}
+    avvisi = scarica(con, T, vivi)
+    prova("il primo messaggio parte subito, UNO per persona, con le sue righe",
+          [(111, "🔔 <b>1 nuovo ordine nel libro P2P</b>\nvendita BTC: 1\n"
+                 "Per te: vendita BTC da 50,00 € via SEPA, 3% più conveniente" + LINK),
+           (222, "🔔 <b>5 nuovi ordini nel libro P2P</b>\nvendita BTC: 3 · acquisto BTC: 1 · Barattozon: 1\n"
+                 "Il più conveniente per te: vendita BTC da 50,00 € via SEPA, 3% più conveniente" + LINK)],
+          [(tg, t) for tg, t, _ in avvisi])
+    prova("...e le righe restano timbrate con l'ora del messaggio", [(T, 1), (T, 5)],
+          [tuple(r) for r in con.execute(
+              "SELECT mandato, COUNT(*) FROM p2p_avvisi_nuovi WHERE tg_id IN (111, 222) GROUP BY tg_id ORDER BY tg_id")])
+    # RAGGRUPPATI: due ordini nuovi a un minuto e a cinque minuti dal messaggio
+    # aspettano la finestra ed escono INSIEME, in un messaggio solo
+    accoda(con, [ev("o7", T + 60, amt="52500")], CAMBIO, T + 60)
+    presto = scarica(con, T + 60, vivi | {"o7"})
+    accoda(con, [ev("o8", T + 300, amt="51000")], CAMBIO, T + 300)
+    meta = scarica(con, T + 300, vivi | {"o7", "o8"})
+    tardi = scarica(con, T + 15 * 60, vivi | {"o7", "o8"})
+    prova("RAGGRUPPATI: dentro la finestra niente, alla finestra UN messaggio con tutt'e due (e il migliore)",
+          ([], [], [(111, 2), (222, 2)], True),
+          ([tg for tg, _, _ in presto], [tg for tg, _, _ in meta],
+           [(tg, t.count("via SEPA") and int(t[t.index("<b>") + 3])) for tg, t, _ in tardi],
+           all("Il più conveniente per te: vendita BTC da 50,00 € via SEPA, 5% più conveniente" in t
+               for _, t, _ in tardi)))
+    prova("...e un ordine gia' visto non si riaccoda nemmeno dopo il messaggio", 0,
+          accoda(con, [ev("o1", T + 1000, amt="51500")], CAMBIO, T + 1000))
+    # SPARITO DAL LIBRO prima del suo minuto: si consuma senza messaggio
+    accoda(con, [ev("o9", T + 2000, amt="52500")], CAMBIO, T + 2000)
+    sparito = scarica(con, T + 2 * 15 * 60, vivi)
+    prova("un ordine sparito dal libro prima del suo messaggio non si annuncia, e la riga si consuma",
+          ([], [(1,)]),
+          ([tg for tg, _, _ in sparito],
+           [tuple(r) for r in con.execute("SELECT DISTINCT mandato FROM p2p_avvisi_nuovi WHERE ordine='o9'")]))
+    # CHI SPEGNE nel frattempo: le righe in coda si consumano
+    accoda(con, [ev("o10", T + 3000, amt="52500")], CAMBIO, T + 3000)
+    con.execute("UPDATE utenti SET avvisi_nuovi_p2p=0 WHERE tg_id=222")
+    con.commit()
+    spento = scarica(con, T + 4 * 15 * 60, vivi | {"o10"})
+    prova("chi spegne nel frattempo non riceve la coda arretrata; chi e' acceso si'",
+          ([111], [(1,)]),
+          ([tg for tg, _, _ in spento],
+           [tuple(r) for r in con.execute("SELECT DISTINCT mandato FROM p2p_avvisi_nuovi WHERE tg_id=222 AND ordine='o10'")]))
+
+    # --- 4) IL CANALE: notifica() vera, trasporti di cartone -----------------
+    con4 = sqlite3.connect(":memory:")
+    con4.row_factory = sqlite3.Row
+    con4.executescript("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, canale_notifiche TEXT DEFAULT '', "
+                       "npub TEXT DEFAULT '', npub_verificata INTEGER DEFAULT 0, npub_accesso TEXT DEFAULT '');"
+                       "INSERT INTO utenti(tg_id) VALUES(111);"
+                       "INSERT INTO utenti(tg_id, npub_accesso) VALUES(-5, 'npub1nativo');"
+                       "INSERT INTO utenti(tg_id, canale_notifiche, npub, npub_verificata) VALUES(222, 'nostr', 'npub1badge', 1);")
+
+    class _Con:
+        def execute(self, *a):
+            return con4.execute(*a)
+
+        def close(self):
+            pass
+    VIA = []
+
+    async def _tg(tg, testo):
+        VIA.append(("telegram", tg))
+        return "ok"
+
+    async def _dm(npub, testo, ripiego):
+        VIA.append(("nostr", npub))
+    amb4 = {"db": _Con, "MODALITA_COLLAUDO": False, "asyncio": asyncio,
+            "_manda_telegram": _tg, "_dm_nostr_con_ripiego": _dm, "print": lambda *a, **k: None}
+    # `pezzo` cerca «def notifica(» e perde l'«async » davanti: si rimette
+    exec("async " + _senza_prosa(pezzo("notifica")), amb4)
+
+    async def giro4():
+        for tg in (111, -5, 222):
+            await amb4["notifica"](tg, "🔔 prova")
+            await asyncio.sleep(0)
+    asyncio.run(giro4())
+    prova("IL CANALE LO SCEGLIE notifica(): bot Telegram a chi entra da Telegram, DM Nostr a chi entra "
+          "con Nostr, e la scelta del cassetto a chi l'ha fatta",
+          [("telegram", 111), ("nostr", "npub1nativo"), ("nostr", "npub1badge")], VIA)
+
+    # --- 5) IL CLIENT: le due porte sullo stesso stato, in node ---------------
+    prova("la testata del libro porta la campana fra il Filtro e la levetta del tema", True,
+          "+ pillOrdina + pillola\n    + campanellaP2P()\n"
+          "    + '<button type=\"button\" class=\"tema-btn\" onclick=\"alternaTema()\">'" in m)
+    prova("il foglio dal basso esiste, con la pelle dei fogli P2P", True,
+          '<div class="sheet" id="p2pAvvisiSheet" role="dialog" aria-modal="true" aria-labelledby="p2pAvvisiTit">' in m
+          and '<div id="p2pAvvisiCorpo"></div>' in m)
+    prova("il cassetto Avvisi ha la riga, dopo le tre sorelle", True,
+          "${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaRiconosciP2P()}${rigaAvvisiNuoviP2P()}`;" in m)
+    prova("il carico da /api/me passa dal normalizzatore (chiave assente = spento)", True,
+          "myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(me.avvisi_nuovi_p2p);" in m)
+    prova("il gesto parla con la rotta giusta e prende lo stato dalla risposta del server", True,
+          "/me/avvisi-nuovi-p2p`" in m and "myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(d.avvisi_nuovi_p2p);" in m)
+    prova("la pagina «I tuoi dati» dice cosa conserva il server, e che e' spento di serie", True,
+          "«<b>🔔 Avvisami dei nuovi ordini P2P</b>» (spento di serie), il server conserva le tue preferenze" in m)
+    blocco = m[m.index("const P2P_AVVISI_TIPI = "):m.index("function apriAvvisiNuoviP2P(){")]
+    js = (
+        "let DEMO = false, myTgId = 222, myCanaleNotifiche = '', myNpubAccesso = '', myNpub = '', myNpubVerified = false;\n"
+        "let p2pLeve = {attivo: true, avvisiNuovi: true, avvisiNuoviMinuti: 15};\n"
+        # il nome di Barattozon viene dal catalogo dei metodi vestiti, non
+        # si scrive a mano (la sentinella del catalogo): qui di cartone
+        "const P2P_TABACCHINO = 'Contanti al tabacchino';\n"
+        "const vesteMetodoP2P = m => m === P2P_TABACCHINO ? {nome: 'Barattozon'} : null;\n"
+        + pezzo_js(m, "const esc = s => String(s ?? '').replace(", ";\n") + ";\n"
+        + blocco
+        + r"""
+const out = {};
+const attive = h => (h.match(/class="tema-pill active" aria-pressed="true" onclick="([^"]+)"/g) || [])
+  .map(x => x.replace(/.*onclick="/, '').replace(/"$/, ''));
+myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P({attivo: true, tipi: ['vendita'], soglia: '2'});
+const foglio = contenutoAvvisiNuoviP2P();
+const cassetto = rigaAvvisiNuoviP2P();
+out.stessi = cassetto.indexOf(foglio) >= 0 && cassetto.indexOf('id="avvisiNuoviCassetto"') >= 0;
+out.attive = attive(foglio);
+out.interruttore = /aria-pressed="true"[^>]*>Attivi</.test(foglio) && foglio.indexOf('avn-spento') < 0;
+out.campana = [campanellaP2P().indexOf(' accesa') >= 0, campanellaP2P().indexOf('fill="currentColor"') >= 0,
+               campanellaP2P().indexOf('id="p2pCampanella"') >= 0];
+out.minuti = foglio.indexOf('ogni <b>15 minuti</b>') >= 0;
+out.dove = [doveArrivanoAvvisi()];
+myTgId = -3; out.dove.push(doveArrivanoAvvisi());
+myTgId = 222; myCanaleNotifiche = 'entrambi'; out.dove.push(doveArrivanoAvvisi()); myCanaleNotifiche = '';
+myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P({attivo: true, tipi: ['vendita', 'acquisto', 'barattozon'], soglia: ''});
+out.tutti = attive(contenutoAvvisiNuoviP2P());
+out.senzaChip = contenutoAvvisiNuoviP2P().indexOf('avn-soglie') < 0;
+myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(null);
+const spento = contenutoAvvisiNuoviP2P();
+out.spento = [spento.indexOf('avn-spento') >= 0, /aria-pressed="false"[^>]*>Spenti</.test(spento),
+              campanellaP2P().indexOf(' accesa') < 0, campanellaP2P().indexOf('fill="none" stroke="currentColor"') >= 0];
+out.normalizza = normalizzaAvvisiNuoviP2P({attivo: 1, tipi: ['barattozon', 'vendita', 'x'], soglia: '7'});
+p2pLeve.avvisiNuovi = false;
+out.fuoriCasa = [campanellaP2P(), rigaAvvisiNuoviP2P()];
+p2pLeve.avvisiNuovi = true; DEMO = true;
+out.demo = [campanellaP2P(), rigaAvvisiNuoviP2P()];
+DEMO = false; myTgId = null;
+out.anonimo = [campanellaP2P(), rigaAvvisiNuoviP2P()];
+console.log(JSON.stringify(out));
+""")
+    out = _node_banco(js)
+    if out is None:
+        salta("il client degli avvisi dei nuovi ordini in node", "node non c'e'")
+        return
+    prova("LE DUE PORTE MOSTRANO LE STESSE PREFERENZE: la riga del cassetto e' il corpo del foglio", True,
+          out["stessi"])
+    prova("«solo vendita, almeno 2% meglio»: accese la chip Vendita BTC, «Solo se conveniente» e «Almeno 2% meglio»",
+          ["scegliTipoAvvisiNuoviP2P('vendita')", "scegliSogliaAvvisiNuoviP2P('2')", "scegliSogliaAvvisiNuoviP2P('2')"],
+          out["attive"])
+    prova("...l'interruttore dice «Attivi», la campana e' PIENA e arancio", (True, [True, True, True]),
+          (out["interruttore"], out["campana"]))
+    prova("la riga in fondo dice la finestra col numero del server", True, out["minuti"])
+    prova("...e dove arriva, con la regola del cassetto: Telegram, DM Nostr al nativo, entrambi a chi l'ha scelto",
+          ["nella chat del bot ✈️ Telegram", "come 🟣 DM Nostr cifrato",
+           "nella chat del bot ✈️ Telegram e come 🟣 DM Nostr"], out["dove"])
+    prova("con «tutti»: le tre chip dei tipi e «Tutti» accese, nessuna chip di soglia",
+          (["scegliTipoAvvisiNuoviP2P('vendita')", "scegliTipoAvvisiNuoviP2P('acquisto')",
+            "scegliTipoAvvisiNuoviP2P('barattozon')", "scegliSogliaAvvisiNuoviP2P('')"], True),
+          (out["tutti"], out["senzaChip"]))
+    prova("SPENTO DI SERIE: il corpo si spegne a vista, «Spenti», la campana VUOTA", [True, True, True, True],
+          out["spento"])
+    prova("il normalizzatore: tipi nell'ordine delle chip, soglia fuori dalle tre = «tutti»",
+          {"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": ""}, out["normalizza"])
+    prova("a leva globale spenta, in demo e da anonimi: niente campana e niente riga",
+          [["", ""], ["", ""], ["", ""]], [out["fuoriCasa"], out["demo"], out["anonimo"]])
 
 
 def prove_config_esempio():
@@ -120320,7 +120711,9 @@ def prove_contanti_a_mano():
              # il minimo di Barattozon, entrato nella busta lo stesso giorno
              "BARATTOZON_MIN_EURO": 25,
              # la cauzione (1 ott 2026), entrata in busta il giorno dopo
-             "P2P_CAUZIONE": False}
+             "P2P_CAUZIONE": False,
+             # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
+             "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15}
     exec(_senza_prosa(pezzo("_p2p_leve")), amb_l)
     prova("la busta delle leve porta `maxEuroContanti`, intero", 250, amb_l["_p2p_leve"]()["maxEuroContanti"])
     prova("...e viaggia anche a zero (spenta), mai assente", 0,
@@ -123167,8 +123560,10 @@ def prove_cauzione_p2p():
     # --- 2) LE SENTINELLE DEL SERVER ----------------------------------
     prova("la leva P2P_CAUZIONE: solo True accende, e senza la riga e' spenta", True,
           "    P2P_CAUZIONE = P2P_CAUZIONE is True\nexcept ImportError:\n    P2P_CAUZIONE = False\n" in src)
+    # (9 ott 2026) la cauzione non chiude piu' la busta: dopo di lei
+    # viaggiano le due chiavi degli avvisi dei nuovi ordini
     prova("...viaggia in busta come `cauzione`, e il pannello la censisce", True,
-          '"cauzione": bool(P2P_CAUZIONE)}' in pezzo("_p2p_leve")
+          '"cauzione": bool(P2P_CAUZIONE),' in pezzo("_p2p_leve")
           and '_leva("Cauzione nel contanti di persona", "P2P_CAUZIONE",' in src)
     esempio = open("config_esempio.py", encoding="utf-8").read()
     prova("...e il config d'esempio la porta, spenta", True, "\nP2P_CAUZIONE = False\n" in esempio)
@@ -131610,6 +132005,7 @@ def main():
               prove_causale_sepa,
               prove_testi_p2p_confondono,
               prove_garanzia_lunga,
+              prove_avvisi_nuovi_ordini,
               prove_testo_ricevere_sats,
               prove_prese_dalle_10,
               prove_config_esempio):

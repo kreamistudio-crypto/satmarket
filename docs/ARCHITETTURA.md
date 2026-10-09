@@ -27130,7 +27130,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   «⚡ Avvisi sugli scambi P2P» nel cassetto Avvisi, solo a leva
   accesa): il giudice `_avvisi_p2p_accesi` lo guarda sia il libro sia
   `_nudge_p2p`, quindi spento vuol dire NIENTE — la sveglia del
-  tabacchino no, che la chiede l'utente con un gesto suo. Gli stati
+  tabacchino no, che la chiede l'utente con un gesto suo. GLI AVVISI DEI
+  NUOVI ORDINI (9 ott 2026) stanno SOTTO quell'interruttore e sotto la
+  leva globale `P2P_AVVISI_NUOVI_ORDINI` (accesa di serie, nel pannello
+  delle leve con la finestra `P2P_AVVISI_NUOVI_MINUTI`, 15): per persona
+  SPENTI di serie — `utenti.avvisi_nuovi_p2p`, `avvisi_nuovi_tipi`
+  ('|vendita|acquisto|barattozon|'), `avvisi_nuovi_soglia` ('' = tutti,
+  '0'/'2'/'5' = solo da quella convenienza in su) — scritte dalla rotta
+  `/api/me/avvisi-nuovi-p2p` e lette da `_pref_avvisi_nuovi_p2p` per
+  `/api/me`. Due porte, uno stato: il bottone 🔔 nella testata del libro
+  (foglio `p2pAvvisiSheet`) e la riga nel cassetto Avvisi disegnano lo
+  stesso `contenutoAvvisiNuoviP2P()`. La fonte e' LA FOTOGRAFIA DEL
+  LIBRO: `_giro_avvisi_nuovi_p2p` gira nell'orologio P2P dopo di lei,
+  un ordine e' nuovo se il giro prima non lo conosceva ed e' nato dopo
+  il segnalibro `p2p_nuovi_ordini_visto` (il tornato in vetrina non e'
+  nuovo), `_accoda_nuovi_p2p` mette in coda `p2p_avvisi_nuovi` una riga
+  per (persona, ordine) — la chiave e' l'anti-doppione, mai per chi l'ha
+  pubblicato (`p2p_ordini`), solo per chi passa `_p2p_per` — e
+  `_scarica_nuovi_p2p` compone UN messaggio per persona quando
+  dall'ultimo sono passati i minuti della finestra (quanti per tipo, il
+  piu' conveniente per lei col giudice della card
+  `_convenienza_nuovo_p2p`, il link a `/p2p`), timbrando le righe PRIMA
+  dell'invio; un ordine sparito dal libro nel frattempo non si
+  annuncia. Il canale lo sceglie `notifica()`. «Dimentica il profilo» e
+  la fusione dei conti portano la coda con se'. Gli stati
   sul libro si scrivono quando si VEDONO: `pending`, `in-progress`,
   `canceled`, `success` letti dallo specchio il 16 set 2026; `expired`
   e `dispute` hanno il ramo ma non sono mai stati visti ripubblicati,

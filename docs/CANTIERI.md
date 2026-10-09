@@ -42063,3 +42063,144 @@ scambio ripresenta «caffe per Mario» con «Aggiorna il recapito»; 3) il
 compratore riceve dal relay e vede tre «📋 Copia» — intestatario, IBAN,
 causale — e il tocco vero sul primo mette «Mario Rossi» negli appunti
 («Copiato 📋»). Screenshot 07-11 in `.claude/giri/causale-sepa/`.
+
+## Gli avvisi dei nuovi ordini del libro P2P (9 ott 2026, richiesta di Andrea)
+
+**La richiesta.** Chi vuole deve poter sapere quando nel libro P2P compare
+un ordine nuovo, senza tenere l'app aperta: si accende in due posti che
+mostrano le STESSE preferenze — un bottone campanella nella testata del
+libro, accanto alla levetta del tema, che apre un foglio dal basso; e il
+cassetto Avvisi del Profilo — con l'interruttore (spento di serie), i tipi
+di ordine a scelta multipla (vendita BTC, acquisto BTC, Barattozon), la
+convenienza («tutti» o «solo se conveniente» con le chip 0 / 2 / 5 punti
+dal punto di vista di chi riceve, lo stesso calcolo delle card), e la riga
+che dice dove arriva. Raggruppati (al più uno ogni 15 minuti per persona,
+leva nel config), mai per i propri ordini, mai per uno già visto, sotto
+una leva globale nel pannello delle leve. Il canale lo sceglie
+`notifica()`: bot Telegram a chi entra da Telegram, DM Nostr a chi entra
+con Nostr.
+
+**Cosa si è deciso, e perché.**
+- *La fonte è la fotografia del libro*, non un lettore nuovo: l'orologio
+  del P2P la rifà ogni minuto da tutti i relay, e dopo di lei gira
+  `_giro_avvisi_nuovi_p2p`. Un ordine è NUOVO se al giro prima la
+  fotografia non lo conosceva (il suo `d` non era fra gli `ultimi`) E se è
+  nato dopo il segnalibro `p2p_nuovi_ordini_visto` (timbro in `timbri`).
+  La doppia condizione è il «mai visti» di questo giro: il tornato in
+  vetrina ripubblica il 38383 con lo stesso `d` e non è nuovo; dopo un
+  riavvio si annunciano i soli ordini nati nel frattempo, non tutto il
+  libro; al primissimo sguardo (segnalibro assente) si impara il libro e
+  si parte da adesso. Strada scartata: il giudice «mai visti» del giro del
+  libro (`stato=''` in `p2p_ordini`) parla dei SOLI nostri ordini — qui
+  servono tutti quelli del coordinatore, e li ha solo la fotografia.
+- *La coda è anche l'anti-doppione*: `p2p_avvisi_nuovi(tg_id, ordine)`
+  con la chiave (persona, ordine), sul database e non in memoria. `mandato`
+  dice a che punto è (0 in coda, 1 consumata senza messaggio, >1 l'ora del
+  messaggio): la finestra si misura sul MAX dei `mandato` > 1 della
+  persona. Il primo messaggio parte subito; quelli dopo aspettano la
+  finestra ed escono insieme — quanti per tipo, il più conveniente per lei,
+  il link a `/p2p`. Un ordine sparito dal libro prima del suo minuto non
+  si annuncia (si guarda `vivi`, gli id della fotografia); chi spegne nel
+  frattempo non riceve l'arretrato. Le righe si timbrano PRIMA
+  dell'invio, il patto dei timbri.
+- *Tre colonne su `utenti`* e non una tabella nuova, come `avvisi_p2p` e
+  `riconosci_p2p`: `avvisi_nuovi_p2p` (0 di serie), `avvisi_nuovi_tipi`
+  coi pipe ai bordi come `avvisi_ricerca.categorie`, `avvisi_nuovi_soglia`
+  ('' = tutti, '0'/'2'/'5'). Un giudice solo le legge
+  (`_pref_avvisi_nuovi_p2p`) per `/api/me` e per il giro, così '' nei
+  tipi vale «tutti» in un posto solo. La rotta
+  `/api/me/avvisi-nuovi-p2p` salva le tre insieme, vuole almeno un tipo e
+  una soglia delle tre, sta dietro il cancello del P2P (`_p2p_per`, 409
+  come la sveglia) e dietro la leva globale.
+- *I tipi sono esclusivi*: Barattozon è il suo tipo (il tabacchino nel
+  `pm`, giudice `_tabacchino_libro`), vendita = `sell` senza tabacchino,
+  acquisto = `buy`. Così «quanti per tipo» nel messaggio conta ogni ordine
+  una volta.
+- *La convenienza è quella della card*, dal punto di vista di chi legge:
+  `_convenienza_nuovo_p2p` — a mercato il premio del filo, a sats fissi il
+  premio implicito dei sats contro il cambio di adesso (il calco di
+  `premioImplicitoTabacchinoP2P`), col verso di `affareP2P` (un premio
+  positivo assottiglia i sats: conviene a chi legge solo se chi ha
+  pubblicato COMPRA). `None` quando non si sa, e con una soglia l'ignota
+  non passa; con «tutti» passa. Nel giro dal vivo i tre badge delle card
+  («1% meno», «2% più», «3% più conveniente») hanno detto la stessa cosa
+  della coda.
+- *Sotto gli interruttori di prima*: il giro accoda solo a chi ha acceso
+  ANCHE «⚡ Avvisi sugli scambi P2P» (`_avvisi_p2p_accesi`) e vede il P2P
+  (`_p2p_per`); il canale resta `canale_notifiche`, quindi passa da
+  `notifica()` com'è. «Mai per i suoi»: chi ha pubblicato sta in
+  `p2p_ordini` (la stessa riga dei volti), e si guarda lì e non in
+  `autori` della fotografia, che tiene solo i tg_id > 0.
+- *Due porte, uno stato nel client*: `myAvvisiNuoviP2P` cambia SOLO per
+  mano della risposta del server, e `contenutoAvvisiNuoviP2P()` lo
+  disegna identico nel foglio `p2pAvvisiSheet` (pelle del Filtro) e nella
+  riga del cassetto Avvisi; `renderAvvisiNuoviP2P` ridisegna i due posti e
+  la campana. La campana è un SVG a due stesure — piena e arancio accesa,
+  vuota (solo il tratto) spenta — nello stesso cerchietto `.tema-btn`:
+  un'emoji «campana vuota» non esiste e 🔕 direbbe «zittito». Il nome
+  «Barattozon» della chip viene dal catalogo dei metodi vestiti (la
+  sentinella «nessun posto scrive Barattozon a mano» l'ha preteso). Il
+  bottone sta nella testata del LIBRO e non in quella di «I miei scambi»:
+  è il libro che si guarda per gli ordini nuovi.
+- *Le due leve* col patto delle altre: `P2P_AVVISI_NUOVI_ORDINI` (True di
+  serie: solo un booleano conta, uno storto resta True e lo dice all'avvio)
+  e `P2P_AVVISI_NUOVI_MINUTI` (15; intero da 1 in su, storto vale 15). Nel
+  pannello «Stato delle leve» con due righe, in `config_esempio.py`, in
+  busta (`avvisiNuovi`, `avvisiNuoviMinuti`) perché il client mostri la
+  campana solo se esiste e dica il numero vero. Sul VPS non serve una
+  riga: il default è acceso.
+- *«I tuoi dati»* dice la cosa nuova che il server conserva (le preferenze
+  e, per ogni ordine di cui ha avvisato, il suo numero accanto al tuo) e
+  che «dimentica il profilo» porta via anche quelle righe; la fusione dei
+  conti le porta con sé come `avvisi_notificati`.
+
+**Prove** (`prove_avvisi_nuovi_ordini`, 58): le sentinelle (leve,
+colonne, tabella, rotta, `/api/me`, l'orologio dopo la fotografia, il
+pannello, dimentica/fusione, timbro prima dell'invio, le chip uguali nei
+due mondi, il config d'esempio, niente protocollo nel messaggio); i
+giudici puri (spento di serie da riga assente/di ieri/coi default, i tipi,
+la convenienza nei due versi a mercato e a sats fissi, la soglia nei due
+versi, il messaggio parola per parola); il banco sqlite con la coda VERA
+(sei persone e sei ordini: tipi, soglia, «mai i suoi», fuori dal P2P,
+interruttore grande spento, un `in-progress` che non è un'offerta; niente
+doppioni; il primo messaggio subito, uno per persona; raggruppati — due
+ordini a 1 e 5 minuti escono insieme alla finestra —; un ordine già visto
+non si riaccoda; sparito dal libro si consuma; chi spegne non riceve
+l'arretrato); `notifica()` vera coi due trasporti di cartone (Telegram a
+chi entra da Telegram, DM Nostr al nativo e a chi l'ha scelto); il client
+in node (le due porte mostrano le stesse preferenze, le chip accese,
+campana piena/vuota, dove arriva, leva spenta/demo/anonimo = niente).
+Emendate quattro prove di prima: le due buste finte delle leve
+(`prove_p2p_server`, `prove_contanti_a_mano`), «viaggia in busta come
+cauzione» (la cauzione non chiude più la busta), il quinto try
+dell'orologio, «le chiavi sono undici». Suite intera nel worktree
+(PROVE_SEVERE=1): 20077 passate, 0 fallite; i collaudi della CI in gabbia:
+44 verdi, 0 rossi.
+
+**Giro dal vivo** sul server della copia (collaudo, relay nak LOCALE sul
+loopback a 7790 al posto del relay morto: la fotografia doveva leggere
+davvero, e `lettura_simulata` lascia passare il loopback) con un
+coordinatore di cartone (chiave usa-e-getta, npub nel config della copia):
+222 accende dal cassetto Avvisi del Profilo «solo vendita, almeno 2%
+meglio» (quattro tocchi veri: Spenti→Attivi, via Acquisto BTC e
+Barattozon, Solo se conveniente, Almeno 2% meglio), ricarica e la ritrova
+uguale; nella testata del libro la campana è piena e arancio e il foglio
+che apre mostra le stesse tre chip; un tocco nel foglio (Acquisto BTC) si
+ritrova nel cassetto e viceversa. 111 pubblica tre ordini `sell` a mercato
+(premio −3 su 50 € SEPA, −2 su 80 € Revolut, +1 su 30 € SEPA), intestati a
+lui dalla rotta vera: al giro dopo il journal dice «3 nel libro, 2 righe in
+coda, 1 messaggi in partenza» e a 222 arriva UN messaggio: «🔔 2 nuovi
+ordini nel libro P2P / vendita BTC: 2 / Il più conveniente per te: vendita
+BTC da 50,00 € via SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
+Le passate dopo non lo ripetono. Screenshot in
+`.claude/giri/avvisi-nuovi-ordini/` (gitignored): il cassetto del
+Profilo, la testata col 🔔, il foglio.
+
+**Cosa resta da guardare.** Il primo giro sul VPS: il segnalibro nasce
+lì (nessun annuncio sugli ordini di ieri), e la prima persona che accende
+vedrà il primo messaggio al primo ordine nuovo dopo. La convenienza a sats
+fissi vuole il cambio vivo: a cambio muto quelle righe hanno `conv` NULL e
+passano solo con «tutti». Non provato dal vivo il DM Nostr (coperto dalla
+prova su `notifica()`); non provato il Barattozon dal vivo (coperto dal
+banco).
+

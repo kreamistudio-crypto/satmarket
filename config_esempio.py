@@ -742,6 +742,19 @@ P2P_IN_VETRINA = False
 # passo, la voce in «Info P2P» —, e il client crede solo a tutt'e due:
 # la leva E il 38385 del coordinatore. Solo True accende.
 P2P_CAUZIONE = False
+# GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026): chi lo chiede dal
+# bottone 🔔 della testata del libro o dal cassetto Avvisi del Profilo
+# riceve un messaggio quando nel libro compaiono ordini nuovi — del tipo
+# che vuole (vendita BTC, acquisto BTC, Barattozon) e, se lo chiede, solo
+# da una certa convenienza in su. Per persona e' SPENTO di serie; questa
+# e' la leva GLOBALE, accesa di serie: a False nessuno riceve niente e il
+# bottone sparisce. Solo un booleano conta; un valore storto resta True.
+P2P_AVVISI_NUOVI_ORDINI = True
+# ...e la finestra del raggruppamento, in minuti: a una persona non
+# arriva piu' di un messaggio ogni tanti minuti, e gli ordini nati nel
+# mezzo escono insieme nel prossimo (quanti per tipo, il piu' conveniente
+# per lei). Un intero da 1 in su; storto o sotto 1 vale 15.
+P2P_AVVISI_NUOVI_MINUTI = 15
 # I SUGGERIMENTI DEGLI INDIRIZZI DELL'APPUNTAMENTO (1 ott 2026): mentre chi
 # vende in contanti scrive dove vedersi, il server chiede indirizzi veri a
 # Photon (dati OpenStreetMap) mandando SOLO il testo cercato, col freno e

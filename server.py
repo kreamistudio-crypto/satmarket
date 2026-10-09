@@ -5737,6 +5737,35 @@ def init_db():
         quando INTEGER NOT NULL,
         PRIMARY KEY(tg_id, ordine)
     );
+    CREATE TABLE IF NOT EXISTS p2p_avvisi_nuovi(
+        -- GLI AVVISI DEI NUOVI ORDINI, PER PERSONA (9 ott 2026): una
+        -- riga per ogni ordine nuovo del libro che passa le preferenze
+        -- di qualcuno. E' insieme LA CODA e L'ANTI-DOPPIONE: la chiave
+        -- (persona, ordine) fa che lo stesso ordine non si accodi due
+        -- volte alla stessa persona — nemmeno dopo un riavvio, nemmeno
+        -- se torna in vetrina — e `mandato` dice a che punto e':
+        --   0  in coda, aspetta il messaggio;
+        --   1  consumata senza messaggio (l'ordine era gia' sparito
+        --      dal libro quando toccava a lei, o la persona ha spento);
+        --   >1 l'ora del messaggio in cui e' uscita.
+        -- La finestra del raggruppamento si misura sul MAX dei
+        -- `mandato` > 1 della persona. `conv` e' la convenienza per
+        -- LEI, in punti col segno (NULL = non si sa); `euro` e
+        -- `metodi` sono gia' scritti come si leggono, per la frase.
+        -- Se ne vanno da sole dopo la finestra del libro.
+        tg_id INTEGER NOT NULL,
+        ordine TEXT NOT NULL,
+        tipo TEXT DEFAULT '',
+        conv REAL,
+        euro TEXT DEFAULT '',
+        metodi TEXT DEFAULT '',
+        quando INTEGER DEFAULT 0,
+        accodato INTEGER DEFAULT 0,
+        mandato INTEGER DEFAULT 0,
+        PRIMARY KEY(tg_id, ordine)
+    );
+    CREATE INDEX IF NOT EXISTS idx_p2p_avvisi_nuovi_coda
+        ON p2p_avvisi_nuovi(tg_id, mandato);
     CREATE TABLE IF NOT EXISTS p2p_avvisi(
         -- L'ANTI-DOPPIONE, ed e' UNO per tutte le strade (patch 0007):
         -- stesso ordine + stesso momento + stessa persona (+ stesso
@@ -7044,6 +7073,19 @@ def init_db():
                     # `spedizione_zone`. La legge SOLO
                     # `spedizione_standard_leggi`, e la scrivono il Salva
                     # del cassetto e l'aggiornamento in blocco.
+                    # GLI AVVISI DEI NUOVI ORDINI P2P (9 ott 2026, richiesta
+                    # di Andrea): 0 = SPENTO, di serie — e' un avviso che
+                    # nessuno ha chiesto finche' non lo accende lui. I
+                    # tipi che vuole, coi pipe ai bordi come
+                    # `avvisi_ricerca.categorie` ('|vendita|acquisto|
+                    # barattozon|'; vuoto vale «tutti»), e la soglia di
+                    # convenienza: '' = tutti gli ordini, '0' / '2' / '5'
+                    # = solo se per lui conviene almeno cosi' tanto. Le
+                    # legge un giudice solo, `_pref_avvisi_nuovi_p2p`,
+                    # per /api/me e per il giro dell'orologio.
+                    "avvisi_nuovi_p2p INTEGER DEFAULT 0",
+                    "avvisi_nuovi_tipi TEXT DEFAULT ''",
+                    "avvisi_nuovi_soglia TEXT DEFAULT ''",
                     "spedizione_standard TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
@@ -14924,6 +14966,12 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE avvisi_notificati SET tg_id=? "
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM avvisi_notificati WHERE tg_id=?",
+                    (id_nostr,))
+        # ...e la coda degli avvisi dei nuovi ordini P2P (9 ott 2026),
+        # in unione come il dedup qui sopra: una riga per ordine basta
+        con.execute("UPDATE OR IGNORE p2p_avvisi_nuovi SET tg_id=? "
+                    "WHERE tg_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM p2p_avvisi_nuovi WHERE tg_id=?",
                     (id_nostr,))
         # Il barattolo dei preferiti segue l'utente, in unione come i
         # distintivi (stesso annuncio salvato da entrambe le meta':
@@ -27194,6 +27242,21 @@ def _leve_stato():
                   spento="il client non promette nessuna cauzione; se il "
                          "coordinatore la chiede lo stesso, la richiesta "
                          "arriva e si gestisce, senza cifre dette prima"),
+            # GLI AVVISI DEI NUOVI ORDINI (9 ott 2026): la leva globale e la
+            # finestra del raggruppamento; la preferenza resta per persona
+            _leva("Avvisi dei nuovi ordini P2P", "P2P_AVVISI_NUOVI_ORDINI",
+                  P2P_AVVISI_NUOVI_ORDINI,
+                  acceso="chi lo chiede (spento di serie, per persona) "
+                         "riceve un messaggio quando nel libro compaiono "
+                         "ordini nuovi; raggruppati, mai per i suoi",
+                  spento="nessun avviso dei nuovi ordini per nessuno: il "
+                         "bottone 🔔 e la riga del Profilo spariscono"),
+            _leva("Avvisi nuovi ordini — finestra (minuti)",
+                  "P2P_AVVISI_NUOVI_MINUTI", P2P_AVVISI_NUOVI_MINUTI,
+                  acceso="fra un messaggio e il successivo alla stessa "
+                         "persona passano almeno questi minuti; gli "
+                         "ordini nati nel mezzo escono insieme",
+                  spento="(non si spegne: sotto il minuto vale 15)"),
             # LO SCONTO FEDELTA': la leva dice la cifra che il CLIENT
             # mostra; a scontare davvero e' il coordinatore (patch
             # 0005), che chiede a /api/p2p/sconto. Due righe perche'
@@ -39184,6 +39247,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # diverse, e il client ha gia' il calco di `asteAccese` per
     # metterle insieme.
     profilo["p2p_leve"] = _p2p_per(user["id"])
+    # ...e le preferenze degli avvisi dei nuovi ordini (9 ott 2026), dal
+    # giudice e non dalle colonne grezze: '' nei tipi vale «tutti», e il
+    # client non deve saperlo
+    profilo["avvisi_nuovi_p2p"] = _pref_avvisi_nuovi_p2p(u)
     # ...e quanti dei miei scambi aspettano un mio gesto: il pallino
     # all'apertura lo legge da qui, senza aprire i relay
     profilo["p2p_tocca"] = p2p_tocca
@@ -41389,6 +41456,51 @@ async def scegli_avvisi_p2p(req: Request, x_tg_init_data: str = Header(""),
     return {"ok": True, "attivi": bool(attivi)}
 
 
+@app.post("/api/me/avvisi-nuovi-p2p")
+async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """«🔔 Avvisami dei nuovi ordini P2P» (9 ott 2026, richiesta di
+    Andrea): le TRE preferenze in una rotta sola — l'interruttore, i tipi
+    di ordine che vuole (vendita BTC, acquisto BTC, Barattozon, almeno
+    uno) e la soglia di convenienza ('' = tutti, oppure 0 / 2 / 5 punti
+    almeno a suo favore). Le salvano uguali il bottone della testata del
+    libro e il cassetto Avvisi del Profilo, e tornano come le legge
+    /api/me (`_pref_avvisi_nuovi_p2p`): due viste, uno stato.
+    Il canale (Telegram, DM Nostr) resta quello di `canale_notifiche`:
+    questa dice SE e QUALI, quella dice DOVE. E l'interruttore grande
+    degli avvisi P2P (`avvisi_p2p`) sta sopra: spento quello, non parte
+    nemmeno questo. Solo per chi il P2P ce l'ha (409 agli altri, come la
+    sveglia), e solo con la leva globale accesa."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    if not P2P_AVVISI_NUOVI_ORDINI:
+        raise HTTPException(409, "Gli avvisi dei nuovi ordini sono spenti")
+    d = await leggi_json(req)
+    attivo = 1 if d.get("attivo") else 0
+    grezzi = d.get("tipi")
+    if grezzi is None:
+        tipi = list(TIPI_AVVISI_NUOVI_P2P)
+    else:
+        if not isinstance(grezzi, list):
+            raise HTTPException(400, "Tipi in formato sbagliato")
+        tipi = [t for t in TIPI_AVVISI_NUOVI_P2P if t in grezzi]
+        if not tipi:
+            raise HTTPException(400, "Scegli almeno un tipo di ordine")
+    soglia = str(d.get("soglia") if d.get("soglia") is not None else "").strip()
+    if soglia not in ("",) + SOGLIE_AVVISI_NUOVI_P2P:
+        raise HTTPException(400, "Soglia sconosciuta: tutti, 0, 2 o 5")
+    con = db()
+    con.execute("UPDATE utenti SET avvisi_nuovi_p2p=?, avvisi_nuovi_tipi=?, "
+                "avvisi_nuovi_soglia=? WHERE tg_id=?",
+                (attivo, "|" + "|".join(tipi) + "|", soglia, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "avvisi_nuovi_p2p": _pref_avvisi_nuovi_p2p(
+        {"avvisi_nuovi_p2p": attivo, "avvisi_nuovi_tipi": "|" + "|".join(tipi) + "|",
+         "avvisi_nuovi_soglia": soglia})}
+
+
 @app.post("/api/me/riconoscimi-p2p")
 async def scegli_riconoscimi_p2p(req: Request, x_tg_init_data: str = Header(""),
                                  barattolo_sessione: str = Cookie("")):
@@ -42698,6 +42810,38 @@ try:
     P2P_CAUZIONE = P2P_CAUZIONE is True
 except ImportError:
     P2P_CAUZIONE = False
+# GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026, richiesta di Andrea):
+# chi lo chiede riceve un messaggio quando nel libro P2P compaiono
+# ordini nuovi — raggruppati, al piu' uno ogni P2P_AVVISI_NUOVI_MINUTI
+# per persona, mai per i suoi ordini, mai per uno gia' visto. La
+# preferenza e' PER PERSONA e nasce SPENTA (`utenti.avvisi_nuovi_p2p`);
+# questa e' la leva GLOBALE, accesa di serie, col patto delle altre leve
+# del P2P: solo un booleano vero conta, e un valore storto nel config
+# lascia il default e lo dice all'avvio. Spenta: niente avvisi per
+# nessuno, il bottone e la riga del Profilo spariscono, la rotta risponde
+# 409, e il pannello «Stato delle leve» lo mostra.
+try:
+    from config import P2P_AVVISI_NUOVI_ORDINI
+    if not isinstance(P2P_AVVISI_NUOVI_ORDINI, bool):
+        print("[p2p] P2P_AVVISI_NUOVI_ORDINI non e' True/False: gli avvisi "
+              "dei nuovi ordini restano ACCESI")
+        P2P_AVVISI_NUOVI_ORDINI = True
+except ImportError:
+    P2P_AVVISI_NUOVI_ORDINI = True
+# ...e la finestra del raggruppamento, in minuti: fra un messaggio e il
+# successivo alla stessa persona passano almeno questi minuti, e gli
+# ordini nati nel mezzo escono insieme nel prossimo. 15 di serie.
+try:
+    from config import P2P_AVVISI_NUOVI_MINUTI
+    P2P_AVVISI_NUOVI_MINUTI = int(P2P_AVVISI_NUOVI_MINUTI)
+    if P2P_AVVISI_NUOVI_MINUTI < 1:
+        raise ValueError("una finestra sotto il minuto non raggruppa niente")
+except ImportError:
+    P2P_AVVISI_NUOVI_MINUTI = 15
+except (TypeError, ValueError):
+    P2P_AVVISI_NUOVI_MINUTI = 15
+    print("[p2p] P2P_AVVISI_NUOVI_MINUTI non e' un numero intero: vale la "
+          "finestra di serie, 15 minuti")
 # LO SCONTO FEDELTA' SUL P2P (set 2026, deciso con Alan): chi e'
 # PIONIERE oppure ha raggiunto il livello 5 paga mezzo punto in meno
 # sulla SUA meta' della commissione — 1% invece dell'1,5% della beta.
@@ -42915,7 +43059,13 @@ def _p2p_leve() -> dict:
             # la cauzione di chi prende nel contanti (1 ott 2026): il
             # client la mostra solo con questa E col 38385 del
             # coordinatore che la annuncia; viaggia sempre, anche falsa
-            "cauzione": bool(P2P_CAUZIONE)}
+            "cauzione": bool(P2P_CAUZIONE),
+            # gli avvisi dei nuovi ordini (9 ott 2026): la leva globale
+            # e la finestra, perche' la riga del Profilo e il bottone
+            # della testata compaiano solo se esistono, e dicano
+            # «al massimo uno ogni N minuti» col numero vero
+            "avvisiNuovi": bool(P2P_AVVISI_NUOVI_ORDINI),
+            "avvisiNuoviMinuti": int(P2P_AVVISI_NUOVI_MINUTI)}
 
 
 def _p2p_per(tg_id) -> dict:
@@ -44667,6 +44817,9 @@ def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
     # ...e gli scambi tolti con la ✕ (7 ott 2026): «I tuoi dati» promette
     # che se ne vanno subito con il profilo
     con.execute("DELETE FROM p2p_tolti WHERE tg_id=?", (user["id"],))
+    # ...e la coda degli avvisi dei nuovi ordini (9 ott 2026): righe
+    # (persona, ordine) che senza la persona non dicono piu' niente
+    con.execute("DELETE FROM p2p_avvisi_nuovi WHERE tg_id=?", (user["id"],))
     con.commit()
     con.close()
     return {"ok": True, "tolte": tolte, "volti": volti}
@@ -46747,6 +46900,352 @@ async def _giro_garanzie_p2p():
         await asyncio.sleep(0.2)
 
 
+# ═══ GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026, richiesta di Andrea) ═══
+# Chi lo chiede sa quando nel libro compare un ordine nuovo, senza
+# tenere l'app aperta. LA FONTE E' LA FOTOGRAFIA DEL LIBRO, che
+# l'orologio rifa' ogni minuto: un ordine e' NUOVO se al giro prima la
+# fotografia non lo conosceva (il suo `d` non era fra gli `ultimi`) e se
+# e' nato dopo il segnalibro — cosi' un ordine TORNATO in vetrina, che
+# ripubblica il 38383 con lo stesso `d`, non e' nuovo, e dopo un
+# riavvio si annunciano i soli ordini nati nel frattempo, non tutto il
+# libro. Al primo sguardo in assoluto (segnalibro assente) si impara il
+# libro e non si annuncia niente.
+# QUATTRO REGOLE, e ognuna ha il suo posto nel codice:
+# 1) SPENTO DI SERIE, per persona (`utenti.avvisi_nuovi_p2p`), e solo per
+#    chi vede il P2P (`_p2p_per`) — sotto la leva globale e sotto
+#    l'interruttore grande degli avvisi P2P (`_avvisi_p2p_accesi`).
+# 2) RAGGRUPPATI: ogni ordine che passa le preferenze di qualcuno va in
+#    CODA (`p2p_avvisi_nuovi`), e il messaggio parte quando dall'ultimo
+#    sono passati P2P_AVVISI_NUOVI_MINUTI — con quanti per tipo, il piu'
+#    conveniente per lui, e il tocco che apre il libro. Il primo parte
+#    subito. Un ordine sparito dal libro nel frattempo non si annuncia.
+# 3) MAI PER I SUOI (chi l'ha pubblicato sta in `p2p_ordini`), MAI DUE
+#    VOLTE LO STESSO (la chiave della coda e' persona+ordine: e' il
+#    «mai visti» di questo giro, sul database e non in memoria).
+# 4) LA LEVA GLOBALE P2P_AVVISI_NUOVI_ORDINI, nel pannello delle leve.
+# LA CONVENIENZA E' QUELLA DELLA CARD, dal punto di vista di chi riceve:
+# a mercato il premio del filo, a sats fissi il premio implicito dei sats
+# contro il cambio di adesso (il calco di `premioImplicitoTabacchinoP2P`
+# e `affareP2P` del client: un premio positivo assottiglia i sats, quindi
+# conviene a chi legge solo se chi ha pubblicato COMPRA).
+# IL CANALE LO SCEGLIE `notifica()`: bot Telegram a chi entra da
+# Telegram, DM Nostr a chi entra con Nostr, o la preferenza del cassetto.
+TIPI_AVVISI_NUOVI_P2P = ("vendita", "acquisto", "barattozon")
+NOMI_TIPI_AVVISI_NUOVI_P2P = {"vendita": "vendita BTC", "acquisto": "acquisto BTC",
+                              "barattozon": "Barattozon"}
+SOGLIE_AVVISI_NUOVI_P2P = ("0", "2", "5")   # le tre chip, gemelle di P2P_AVVISI_SOGLIE nel client
+TIMBRO_NUOVI_P2P = "p2p_nuovi_ordini_visto"  # il segnalibro: il created_at piu' nuovo gia' guardato
+_P2P_NUOVI = {"noti": None}   # gli id che la fotografia conosceva al giro prima (None = mai guardata)
+
+
+def _campo_riga(riga, nome, default):
+    """Un campo da una Row o da un dict, col default se la colonna non
+    c'e' (i banchi, un database di ieri)."""
+    try:
+        v = riga[nome]
+    except (KeyError, IndexError, TypeError):
+        return default
+    return default if v is None else v
+
+
+def _pref_avvisi_nuovi_p2p(riga) -> dict:
+    """PURA: le tre colonne di `utenti` come le legge il client —
+    {attivo, tipi, soglia}. Una riga assente, o di ieri senza le colonne,
+    vale SPENTO coi tre tipi e «tutti»: lo spento di serie e' una regola,
+    non un default del database."""
+    if not riga:
+        return {"attivo": False, "tipi": list(TIPI_AVVISI_NUOVI_P2P), "soglia": ""}
+    try:
+        attivo = bool(int(_campo_riga(riga, "avvisi_nuovi_p2p", 0) or 0))
+    except (TypeError, ValueError):
+        attivo = False
+    tipi_txt = str(_campo_riga(riga, "avvisi_nuovi_tipi", "") or "")
+    tipi = [t for t in TIPI_AVVISI_NUOVI_P2P if f"|{t}|" in tipi_txt] \
+        or list(TIPI_AVVISI_NUOVI_P2P)
+    soglia = str(_campo_riga(riga, "avvisi_nuovi_soglia", "") or "").strip()
+    if soglia not in SOGLIE_AVVISI_NUOVI_P2P:
+        soglia = ""
+    return {"attivo": attivo, "tipi": tipi, "soglia": soglia}
+
+
+def _tipo_nuovo_p2p(lato: str, metodi) -> str:
+    """PURA: il tipo di un ordine del libro per le preferenze —
+    `barattozon` se il metodo e' il tabacchino (il giudice e' quello
+    degli avvisi, `_tabacchino_libro`), altrimenti `vendita` (chi ha
+    pubblicato VENDE sats, `sell`) o `acquisto` (`buy`). '' = non si sa."""
+    if _tabacchino_libro(metodi):
+        return "barattozon"
+    return {"sell": "vendita", "buy": "acquisto"}.get(str(lato or ""), "")
+
+
+def _euro_nuovo_p2p(valori, metodi) -> float:
+    """PURA: la cifra in euro di un ordine, per il conto della convenienza:
+    l'importo esatto del tabacchino se c'e', altrimenti il `fa` se e' uno
+    solo. Un intervallo (l'ordine a cifra aperta) e' 0: li' il conto non
+    si fa, e a mercato non serve."""
+    esatto = max([_euro_tabacchino(m) for m in metodi or []] + [0.0])
+    if esatto > 0:
+        return esatto
+    nums = []
+    for v in valori or []:
+        try:
+            n = float(v)
+        except (TypeError, ValueError):
+            continue
+        if n > 0:
+            nums.append(n)
+    return nums[0] if len(nums) == 1 else 0.0
+
+
+def _convenienza_nuovo_p2p(lato: str, premio, sats, euro: float, cambio: float):
+    """PURA: la convenienza di un ordine PER CHI LEGGE, in punti col segno
+    (+ = conviene a lui), la stessa che la card scrive «X% piu'/meno
+    conveniente». A mercato e' il premio del filo; a sats fissi
+    (Barattozon o no) e' il premio implicito dei sats contro il `cambio`
+    di adesso (euro per bitcoin): `round((1 - sats/pieno) * 100)`, il
+    calco di `premioImplicitoTabacchinoP2P`. Il verso e' quello di
+    `affareP2P`: un premio positivo assottiglia i sats, quindi conviene a
+    chi legge quando chi ha pubblicato COMPRA (`buy`), e sfavorisce
+    quando VENDE. None = non si sa (sats fissi senza cifra o senza
+    cambio): mai un numero inventato."""
+    try:
+        s = int(sats or 0)
+    except (TypeError, ValueError):
+        s = 0
+    if s > 0:
+        if not (euro and euro > 0) or not (cambio and cambio > 0):
+            return None
+        pieno = euro / (cambio / 1e8)
+        p = float(round((1 - s / pieno) * 100))
+    else:
+        try:
+            p = float(premio or 0)
+        except (TypeError, ValueError):
+            p = 0.0
+        if p != p:
+            p = 0.0
+    return p if lato == "buy" else -p
+
+
+def _passa_avviso_nuovo_p2p(pref: dict, tipo: str, conv) -> bool:
+    """PURA: queste preferenze vogliono quest'ordine? Acceso, del tipo
+    giusto, e — se la soglia c'e' — con una convenienza nota almeno
+    pari alla soglia. Con «tutti» ('') passa anche a convenienza
+    ignota."""
+    if not pref.get("attivo") or tipo not in (pref.get("tipi") or []):
+        return False
+    soglia = pref.get("soglia") or ""
+    if soglia == "":
+        return True
+    try:
+        return conv is not None and float(conv) >= float(soglia)
+    except (TypeError, ValueError):
+        return False
+
+
+def _frase_convenienza_p2p(conv) -> str:
+    """PURA: «3% piu' conveniente», «2% meno conveniente», «al prezzo di
+    mercato» — le parole della card e del canale."""
+    n = abs(int(round(float(conv))))
+    if not n:
+        return "al prezzo di mercato"
+    return f"{n}% {'più' if conv > 0 else 'meno'} conveniente"
+
+
+def _testo_avviso_nuovi_p2p(righe: list) -> str:
+    """PURA: il messaggio raggruppato — quanti ordini nuovi e di che tipo,
+    il piu' conveniente per chi legge (se almeno uno ha una convenienza
+    nota), e il tocco che apre il libro. Le righe portano `tipo`,
+    `conv`, `euro` e `metodi` gia' scritti come si leggono. Nessun
+    nome di chi ha pubblicato: il libro e' la pagina dove si guarda."""
+    n = len(righe)
+    testo = (f"🔔 <b>{n} {'nuovo ordine' if n == 1 else 'nuovi ordini'} "
+             "nel libro P2P</b>")
+    conti = []
+    for t in TIPI_AVVISI_NUOVI_P2P:
+        q = sum(1 for r in righe if r.get("tipo") == t)
+        if q:
+            conti.append(f"{NOMI_TIPI_AVVISI_NUOVI_P2P[t]}: {q}")
+    if conti:
+        testo += "\n" + " · ".join(conti)
+    noti = [r for r in righe if r.get("conv") is not None]
+    if noti:
+        m = max(noti, key=lambda r: float(r["conv"]))
+        cosa = NOMI_TIPI_AVVISI_NUOVI_P2P.get(m.get("tipo"), "ordine")
+        cifra = f" da {m['euro']}" if m.get("euro") else ""
+        via = f" via {html.escape(str(m['metodi']))}" if m.get("metodi") else ""
+        testo += (f"\n{'Il più conveniente per te' if n > 1 else 'Per te'}: "
+                  f"{cosa}{cifra}{via}, {_frase_convenienza_p2p(m['conv'])}")
+    testo += f"\n\n<a href=\"{URL_PUBBLICO}/p2p\">🫙 Apri il libro ordini</a>"
+    return testo
+
+
+def _nuovi_dalla_foto_p2p(eventi, noti, timbro: int) -> list:
+    """PURA: i 38383 vivi della fotografia che il giro prima NON
+    conosceva (`noti`: gli id degli `ultimi` di allora) e che sono nati
+    dopo il segnalibro — gli ordini NUOVI. La doppia condizione e'
+    voluta: `noti` tiene fuori il tornato in vetrina (stesso `d`,
+    created_at nuovo), il segnalibro tiene fuori il libro intero al
+    primo sguardo dopo un riavvio e una copia in ritardo di un relay."""
+    noti = noti or set()
+    fuori = []
+    for ev in eventi or []:
+        if not isinstance(ev, dict) or ev.get("kind") != 38383:
+            continue
+        d = _tag_evento_p2p(ev, "d")
+        if not d or d in noti:
+            continue
+        if int(ev.get("created_at") or 0) <= int(timbro or 0):
+            continue
+        fuori.append(ev)
+    return fuori
+
+
+def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
+    """Per ogni ordine nuovo, le persone che lo vogliono: in CODA, una
+    riga per (persona, ordine). Qui stanno le regole 1 e 3 — le
+    preferenze, il cancello del P2P, l'interruttore grande, mai i propri
+    ordini — e l'anti-doppione e' la chiave della tabella. Torna quante
+    righe nuove ha scritto. Committa."""
+    if not nuovi:
+        return 0
+    persone = con.execute(
+        "SELECT tg_id, avvisi_nuovi_p2p, avvisi_nuovi_tipi, avvisi_nuovi_soglia "
+        "FROM utenti WHERE avvisi_nuovi_p2p=1").fetchall()
+    if not persone:
+        return 0
+    scritte = 0
+    for ev in nuovi:
+        o = _evento_libro_p2p(ev)
+        if not o or o["stato"] != "pending":
+            continue
+        tipo = _tipo_nuovo_p2p(o["lato"], o["metodi"])
+        if not tipo:
+            continue
+        euro = _euro_nuovo_p2p(o["euro"], o["metodi"])
+        conv = _convenienza_nuovo_p2p(o["lato"], o["premio"], o["sats"], euro, cambio)
+        autore = con.execute("SELECT tg_id FROM p2p_ordini WHERE ordine=?",
+                             (o["id"],)).fetchone()
+        autore = int(autore["tg_id"] or 0) if autore else 0
+        euro_txt = _euro_libro(o["euro"], o["metodi"])
+        metodi_txt = ", ".join(_metodi_libro(o["metodi"]))
+        for p in persone:
+            tg = int(p["tg_id"])
+            if autore and tg == autore:
+                continue                      # mai per i suoi
+            if not _passa_avviso_nuovo_p2p(_pref_avvisi_nuovi_p2p(p), tipo, conv):
+                continue
+            if not _p2p_per(tg)["attivo"] or not _avvisi_p2p_accesi(con, tg):
+                continue
+            cur = con.execute(
+                "INSERT OR IGNORE INTO p2p_avvisi_nuovi(tg_id, ordine, tipo, conv, "
+                "euro, metodi, quando, accodato, mandato) VALUES(?,?,?,?,?,?,?,?,0)",
+                (tg, o["id"], tipo, conv, euro_txt, metodi_txt, o["quando"], adesso))
+            scritte += cur.rowcount
+    con.commit()
+    return scritte
+
+
+def _scarica_nuovi_p2p(con, adesso: int, vivi) -> list:
+    """La regola 2: per ogni persona con righe in coda, se dall'ultimo
+    messaggio sono passati P2P_AVVISI_NUOVI_MINUTI (o non ce n'e' mai
+    stato uno) si compone UN messaggio con le righe i cui ordini sono
+    ANCORA nel libro (`vivi`: gli id della fotografia), e le righe si
+    timbrano PRIMA dell'invio col patto di sempre. Le righe di ordini
+    gia' spariti, e quelle di chi ha spento nel frattempo, si consumano
+    senza messaggio. Torna [(tg_id, testo, riga di journal)]. Committa."""
+    finestra = int(P2P_AVVISI_NUOVI_MINUTI) * 60
+    con.execute("UPDATE p2p_avvisi_nuovi SET mandato=1 WHERE mandato=0 AND tg_id IN "
+                "(SELECT tg_id FROM utenti WHERE avvisi_nuovi_p2p=0)")
+    persone = con.execute(
+        "SELECT a.tg_id AS tg_id, "
+        "MAX(CASE WHEN a.mandato > 1 THEN a.mandato ELSE 0 END) AS ultimo, "
+        "SUM(CASE WHEN a.mandato = 0 THEN 1 ELSE 0 END) AS in_coda "
+        "FROM p2p_avvisi_nuovi a GROUP BY a.tg_id").fetchall()
+    fuori = []
+    for p in persone:
+        if not p["in_coda"]:
+            continue
+        tg = int(p["tg_id"])
+        if adesso - int(p["ultimo"] or 0) < finestra:
+            continue
+        righe = con.execute(
+            "SELECT ordine, tipo, conv, euro, metodi FROM p2p_avvisi_nuovi "
+            "WHERE tg_id=? AND mandato=0 ORDER BY quando, ordine", (tg,)).fetchall()
+        vive = [dict(r) for r in righe if r["ordine"] in vivi]
+        if not vive:
+            con.execute("UPDATE p2p_avvisi_nuovi SET mandato=1 WHERE tg_id=? AND mandato=0",
+                        (tg,))
+            continue
+        con.execute("UPDATE p2p_avvisi_nuovi SET mandato=? WHERE tg_id=? AND mandato=0",
+                    (adesso, tg))
+        fuori.append((tg, _testo_avviso_nuovi_p2p(vive),
+                      f"🔔 Nuovi ordini P2P: {len(vive)} a {tg}"))
+    con.execute("DELETE FROM p2p_avvisi_nuovi WHERE accodato < ?",
+                (adesso - P2P_FOTO_FINESTRA_S,))
+    con.commit()
+    return fuori
+
+
+async def _giro_avvisi_nuovi_p2p():
+    """Un battito degli avvisi dei nuovi ordini, dopo la fotografia: cosa
+    c'e' di nuovo, chi lo vuole in coda, a chi tocca il messaggio. Esce
+    a leva spenta, a P2P spento e finche' una fotografia non c'e'.
+    Fail-open come le sorelle: ogni invio ha il suo try e la sua riga
+    nel journal."""
+    if not P2P_AVVISI_NUOVI_ORDINI or not _p2p_leve()["attivo"]:
+        return
+    F = _P2P_FOTO
+    if not F.get("quando"):
+        return
+    adesso = int(time.time())
+    try:
+        timbro = int(timbro_letto(TIMBRO_NUOVI_P2P) or 0)
+    except ValueError:
+        timbro = 0
+    if timbro <= 0:
+        # il primo sguardo in assoluto: si impara il libro, e si parte
+        # da adesso — niente annunci su ordini di ieri
+        timbro = adesso
+        timbro_scrivi(TIMBRO_NUOVI_P2P, str(adesso))
+    prima = _P2P_NUOVI["noti"]
+    ultimi = F.get("ultimi") or {}
+    _P2P_NUOVI["noti"] = set(ultimi)
+    eventi = [e for e in (F.get("eventi") or []) if isinstance(e, dict)
+              and e.get("kind") == 38383]
+    nuovi = _nuovi_dalla_foto_p2p(eventi, prima, timbro)
+    vivi = {_tag_evento_p2p(e, "d") for e in eventi}
+    cambio = 0.0
+    if nuovi:
+        try:
+            cambio = float(await cambio_btc_eur() or 0)
+        except Exception:
+            cambio = 0.0
+    con = db()
+    try:
+        accodati = _accoda_nuovi_p2p(con, nuovi, cambio, adesso)
+        avvisi = _scarica_nuovi_p2p(con, adesso, vivi)
+    finally:
+        con.close()
+    # il segnalibro: il created_at piu' nuovo che la fotografia conosce,
+    # mai oltre l'orologio, mai indietro
+    visto = max([int(e.get("created_at") or 0) for e in ultimi.values()] + [timbro])
+    visto = min(visto, adesso)
+    if visto > timbro:
+        timbro_scrivi(TIMBRO_NUOVI_P2P, str(visto))
+    if nuovi or avvisi:
+        print(f"🔔 Nuovi ordini P2P: {len(nuovi)} nel libro, {accodati} righe in coda, "
+              f"{len(avvisi)} messaggi in partenza", flush=True)
+    for tg_id, testo, riga in avvisi:
+        try:
+            esito = await notifica(tg_id, testo)
+            print(f"{riga}: mandato ({esito})" if esito else f"{riga}: mandato",
+                  flush=True)
+        except Exception as e:
+            print(f"⚠️ {riga}: SALTATO ({type(e).__name__}: {e})", flush=True)
+        await asyncio.sleep(0.2)
+
+
 async def orologio_p2p():
     """Il giro del P2P, uno al minuto: il LIBRO (la rete di sicurezza
     degli avvisi) e le ATTESE (gli avvisi che aspettano il loro
@@ -46834,6 +47333,15 @@ async def orologio_p2p():
                 await asyncio.wait_for(_giro_garanzie_p2p(), P2P_PASSATA_MAX_S)
             except Exception as e:
                 print(f"⚠️ Garanzie lunghe P2P: battito saltato "
+                      f"({type(e).__name__}: {e})", flush=True)
+            _P2P_BATTITO["vivo"] = time.time()
+        # GLI AVVISI DEI NUOVI ORDINI (9 ott 2026): dopo la fotografia,
+        # nel battito pieno, col suo tetto e il suo try
+        if not lampo and not solo_attese:
+            try:
+                await asyncio.wait_for(_giro_avvisi_nuovi_p2p(), P2P_PASSATA_MAX_S)
+            except Exception as e:
+                print(f"⚠️ Avvisi nuovi ordini P2P: battito saltato "
                       f"({type(e).__name__}: {e})", flush=True)
             _P2P_BATTITO["vivo"] = time.time()
         # UNA RIGA A PASSATA, ANCHE A VUOTO: e' quella che distingue
