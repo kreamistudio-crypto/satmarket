@@ -108541,8 +108541,10 @@ const box = riquadroRecapitoP2P('Bonifico SEPA\nIntestatario: Mario Rossi\nIBAN:
 out.copie = (box.match(/class="p2p-recapito-copia"/g) || []).length;
 out.titolo = box.indexOf('<div class="p2p-recapito"><div class="p2p-paycode-tit">💶 Dove mandare gli euro</div>') === 0;
 out.testaSenzaCopia = box.indexOf('<div class="p2p-recapito-testa">Bonifico SEPA</div><div class="p2p-recapito-riga">') >= 0;
-/* la riga dell'intestatario e' testo e basta: si chiude subito dopo il dato */
-out.nomeSenzaCopia = box.indexOf('<span>Intestatario</span><b>Mario Rossi</b></div></div>') >= 0;
+/* la riga dell'intestatario ha il suo «Copia» (9 ott 2026, sera, «I tre
+   ritocchi alla causale»): prima era testo e basta */
+out.nomeConCopia = box.indexOf('<span>Intestatario</span><b>Mario Rossi</b></div>'
+  + '<button type="button" class="p2p-recapito-copia" data-v="Mario Rossi"') >= 0;
 out.ibanMono = box.indexOf('<b class="mono">IT60 X054 2811 1010 0000 0123 456</b>') >= 0;
 /* a gruppi di quattro SOLO se ha la forma di un IBAN, e il «Copia» solo
    li' — che copia SENZA spazi anche quando e' arrivato con gli spazi */
@@ -108604,16 +108606,20 @@ console.log(JSON.stringify(out));
         # lunga, e il bottone resta sulla sola riga dell'IBAN — che copia
         # SENZA spazi, anche quando e' arrivato con gli spazi (prima
         # copiava il valore com'era arrivato).
-        prova("il riquadro: il titolo, e il «Copia» sulla sola riga dell'IBAN",
-              [True, 1, True, True], [out.get("titolo"), out.get("copie"),
-                                      out.get("testaSenzaCopia"), out.get("nomeSenzaCopia")])
+        # ⚠️ RI-EMENDATE (9 ott 2026, sera, «I tre ritocchi alla causale»,
+        # ritocco di Andrea): il «Copia» sta anche sull'intestatario e
+        # sulla causale — i tre campi del bonifico — e NON sul nome del
+        # metodo ne' sulle righe senza forma.
+        prova("il riquadro: il titolo, e il «Copia» su intestatario e IBAN (non sul nome del metodo)",
+              [True, 2, True, True], [out.get("titolo"), out.get("copie"),
+                                      out.get("testaSenzaCopia"), out.get("nomeConCopia")])
         prova("...l'IBAN in monospazio e a gruppi di quattro, il nome no", [True, True],
               [out.get("ibanMono"), out.get("nomeNonMono")])
         prova("...a gruppi SOLO se ha la forma di un IBAN (e solo li' il «Copia»), "
               "che copia SENZA spazi", [True, 0, True],
               [out.get("ibanStrano"), out.get("stranoCopie"), out.get("ibanConSpazi")])
-        prova("...e il «Copia» dell'IBAN prende il VALORE dal dataset, senza l'etichetta",
-              [1, True], [out.get("copiaDalDataset"), out.get("copiaIban")])
+        prova("...e i due «Copia» prendono il VALORE dal dataset, senza l'etichetta",
+              [2, True], [out.get("copiaDalDataset"), out.get("copiaIban")])
         prova("il testo dell'altra persona non diventa markup ne' codice, etichetta compresa",
               [True, True, 0, True],
               [out.get("cattivoSenzaTag"), out.get("cattivoNelTesto"),
@@ -128711,6 +128717,7 @@ def prove_recapito_corto():
         "const document = {querySelectorAll: () => []};\n"
         "const esc = s => String(s);\n"
         "const recapitiMiei = () => ({});\n"
+        "const causaleDaTestoP2P = () => '';\n"
         "const metodoSceltoP2P = o => o.deciso || '';\n"
         "const vesteMetodoP2P = () => false;\n"
         "const marchioMetodoP2P = m => m;\n"
