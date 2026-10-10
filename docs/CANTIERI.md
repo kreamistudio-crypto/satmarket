@@ -45239,3 +45239,131 @@ ribasato su `0c333a9`. Main è poi corso di due commit non miei
 coda, tenute tutte le voci), rigirate le sezioni che leggono i documenti
 toccati e i due passi dello scanner dei segreti; il resto lo dice la CI
 del push.
+
+## Apri nel wallet: la strada per piattaforma, e l'avviso del wallet muto (10 ott 2026, cantiere apri-nel-wallet, richiesta di Andrea)
+
+**IL CASO.** Un utente su Android, con Barattolo salvato sulla schermata
+Home e Wallet of Satoshi, tocca «⚡ Apri nel wallet» per la garanzia P2P:
+il wallet non si apre, e paga copiando la fattura. Era il punto «DA
+GUARDARE SUL TELEFONO» lasciato aperto il 24 set e il 6 ott: lo schema
+`lightning:` nudo dentro le WebView e nell'app installata.
+
+**IL CENSIMENTO.** I bottoni che aprono un wallet con un link sono DUE
+ancore sole, vestite dallo stesso pezzo (`portaWallet`): `#payWallet` nel
+foglio del mercatino (ordini, set, puntate, sblocchi, fatture rigenerate,
+Barattozon compreso: tutti passano da `mostraQr` → `orologioPay`) e
+`#p2pHoldWallet` nel foglio del P2P (garanzia e cauzione,
+`orologioHoldP2P`). Tutti e due erano `<a href="lightning:…">` nudi,
+senza `window.location`, `window.open` né `openLink`; il P2P ci
+appendeva a mano un `onclick` per il tentativo della reputazione. I QR
+scrivono la stessa stringa. Nessun flusso lancia il link dopo una fetch:
+il foglio mostra il bottone a fattura GIÀ pronta, e il tocco è il
+secondo gesto — quindi la causa «attivazione utente persa dopo
+un'attesa» NON colpiva il nostro codice. Colpivano le altre due: in
+modalità app (PWA/TWA) il link nudo può restare muto, e dentro Telegram
+la WebView non è Chrome. `openInvoice` non c'entra: apre le fatture di
+Telegram Payments (Stars), non una bolt11.
+
+**DECISO.** La porta aggancia il tocco ad `apriNelWallet`, che sceglie
+la strada dalla piattaforma (`stradaWallet`, pura: `tg.initData` →
+telegram; UA Android; UA iPhone/iPad; altro). Dentro Telegram il link lo
+passa `tg.openLink` (il link si previene SOLO se openLink è passato;
+senza openLink o con un'eccezione, il link parte da solo come prima).
+Altrove il link `lightning:` nudo parte dal tocco, nativo: l'evento non
+si tocca. Poi il cane da guardia (`attendiWallet`, `WALLET_ATTIMO_MS` =
+1200): ascolta visibilitychange, pagehide e blur — quando un'app passa
+davanti la pagina si nasconde o perde il fuoco (il selettore «Apri con»
+è una finestra del sistema) — e se dopo l'attimo niente è successo mette
+l'AVVISO sotto la riga della scadenza: «⚠️ Non si è aperto nessun
+wallet: copia la fattura e incollala nel tuo wallet», col tasto «📋
+Copia la fattura» grande (`.btn.primary`, sul fondo `--warn-bg`), che
+copia la stessa bolt11 del QR con `copiaLink`. Su Android nell'avviso
+c'è anche «⚡ Riprova in un altro modo»: un LINK nella forma
+`intent://<bolt11>#Intent;scheme=lightning;end` (`intentWallet`, pura),
+quella che Chrome Android traduce in un Intent e consegna all'app che
+ha dichiarato lo schema; se resta muto pure lui, il Riprova sparisce e
+resta il Copia. Niente `browser_fallback_url` (ricaricherebbe la pagina
+sopra il foglio) e nessun pacchetto nel link (il wallet lo sceglie il
+telefono). Un tocco nuovo toglie l'avviso vecchio e fa tacere il cane
+del tocco prima (`walletGiro`); una fattura nuova (`portaWallet`) o
+morta (`vestiScadenzaFattura`) lo tolgono pure. Il gancio
+`tentativo(gesto)` è il terzo argomento della porta: il P2P ci passa
+`tentativoWalletP2P`, che ora dice 'garanzia_wallet'/'cauzione_wallet'
+al tocco (e al Riprova) e 'garanzia_copiata'/'cauzione_copiata' alla
+copia dall'avviso — gesti già nell'elenco del server, nessuno nuovo.
+Il flusso del pagamento non cambia di una riga: cambia solo come si
+apre il wallet, e il resto (QR, stringa, «Copia la richiesta», «Ho
+pagato») è quello di prima.
+
+**LA LEZIONE DEL GIRO, che ha cambiato il disegno.** La richiesta diceva:
+se `lightning:` non apre niente entro un attimo, prova `intent://` da
+solo, e solo dopo l'avviso. La prima stesura faceva così, e il giro dal
+vivo (Chrome 156 emulato Android) l'ha bocciata con una riga di console:
+«Not allowed to launch 'intent://…' because a user gesture is required».
+Chrome vuole un tocco per OGNI lancio verso un'app: il primo lancio
+consuma l'attivazione, e un secondo da un timer — anche dopo un secondo,
+anche dentro la finestra dei cinque secondi — è fermato. Non c'è modo
+di farlo partire da solo, e su Android vale la stessa regola
+(`ExternalNavigationHandler`). Da qui l'intent come LINK nell'avviso, un
+secondo tocco: stessa scaletta (lightning → intent → copia), ogni passo
+dal dito. La controprova sta nel giro: il Riprova toccato dà «Failed to
+launch 'intent://…' because the scheme does not have a registered
+handler» — cioè il lancio è stato tentato davvero, non rifiutato.
+
+**STRADE SCARTATE.** `intent://` come PRIMO link su Android: Chrome lo
+consiglia, ma l'Intent consegna al wallet `lightning://…` con le due
+barre, e non ogni wallet le digerisce — resta il Riprova, dove un
+fallimento non costa niente. Un `window.location = 'lightning:'`
+dentro `preventDefault` al posto del link nativo: stesso gesto, stessa
+regola, un passaggio in più per nulla. L'avviso scritto nel markup dei
+due fogli: il foglio P2P si ridisegna da `innerHTML` e il mercatino no,
+quindi l'avviso nasce dal tocco (`insertAdjacentHTML` dopo la riga) e
+vale per ogni foglio di domani. `openInvoice` dentro Telegram: non è per
+le bolt11.
+
+**PROVATO.** `prove_apri_nel_wallet` (41): le sentinelle (lo schema in
+un posto solo, le due porte, il gancio portato dalla porta, NIENTE
+`location`/`window.open`/`click()`/`dispatchEvent` nel blocco, l'intent
+solo nel Riprova e solo su Android, openLink e mai openInvoice, i
+quattro gesti nell'elenco del server, l'avviso tolto a fattura morta, il
+testo e il tasto, i due giudici puri) e il banco node coi pezzi VERI e
+un DOM di cartone (le tre strade, le tre orecchie, il tocco nuovo che
+fa tacere il vecchio, il Riprova che dice il tentativo e sparisce se
+muto, le fatture nuova e morta, il link `#`). Aggiornate le ancore dei
+banchi che ritagliano `portaWallet` per firma («Paga ora», «Apri nel
+wallet anche sulle fatture del P2P») e la sentinella della reputazione
+sul vecchio `pw.onclick`. Suite intera `PROVE_SEVERE=1` nel worktree da
+origin/main (ccea57f): 21.078 passate, 0 fallite sulla prima stesura,
+21.081 passate, 0 fallite sull'albero finale. Collaudi della CI nella
+gabbia: 50 verdi, 0 rossi. DAL VIVO con Playwright su Chrome
+156 (canale chrome, device Pixel 7, tocchi veri con `tap`, server dalla
+copia in collaudo col relay morto e LNbits morta): Chrome Android
+normale — tocco su «Apri nel wallet», console «Failed to launch
+'lightning:…' …no registered handler», avviso a 1215 ms col Riprova
+`intent://` della stessa bolt11, tocco sul Riprova → «Failed to launch
+'intent://…'» (lancio tentato) e Riprova sparito dopo l'attimo, Copia →
+`writeText` con la bolt11 intera e il toast «Fattura copiata 📋»; un
+tocco nuovo toglie l'avviso e con un `blur` entro l'attimo non torna;
+il foglio del mercatino, stessa porta, stesso avviso. Dentro il finto
+Telegram (hash `tgWebAppData`, platform android): `openLink` chiamata
+col link, nessun lancio nativo, avviso a 1208 ms SENZA Riprova. Gli
+scatti in `.claude/giri/apri-nel-wallet/` (01-07). Nessun errore di
+pagina nei tre contesti.
+
+**NON PROVATO, detto chiaro.** La «app installata» si è provata con lo
+stesso Chrome Android emulato: `display-mode: standalone` non si emula
+né da CDP (`Emulation.setEmulatedMedia` non la conosce) né con `--app`
+in headless, e il codice non la legge — la strada è la stessa del
+Chrome normale, decisa dall'UA. Il telefono vero resta da guardare: se
+in WoS il `lightning:` nudo dalla PWA apre adesso o se serve il Riprova;
+se `tg.openLink` con uno schema `lightning:` apre il wallet su Android e
+iPhone dentro Telegram (la Bot API dice «in an external browser», i
+client lo passano al sistema: da vedere); se WoS accetta
+`lightning://…` dall'intent. Un wallet che si apre LENTO oltre l'attimo
+mostra l'avviso per niente: innocuo (resta il Copia), e il tocco
+successivo lo toglie.
+
+**DA GUARDARE.** Sul telefono di Andrea, nella PWA e dentro Telegram, i
+tre casi qui sopra, con gli scatti; se dentro Telegram `openLink` non
+apre, si torna al link nativo in quella sola strada (una riga in
+`apriNelWallet`).

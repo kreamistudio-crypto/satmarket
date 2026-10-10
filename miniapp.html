@@ -9754,6 +9754,12 @@
     gap:10px;margin:-4px 0 12px;font-size:12.5px;font-weight:700;
     color:var(--ink-soft)}
   .pay-scade .btn.mini{text-decoration:none;flex:0 0 auto}
+  /* L'AVVISO DEL WALLET MUTO (10 ott 2026): sotto la riga della
+     scadenza, sul fondo dell'allarme, col tasto Copia a tutta larghezza */
+  .wallet-avviso{display:flex;flex-direction:column;gap:10px;margin:-4px 0 12px;
+    padding:12px;border-radius:14px;background:var(--warn-bg);color:var(--ink);
+    font-size:13px;font-weight:600;line-height:1.35;text-align:left}
+  .wallet-avviso .btn{margin:0;text-decoration:none}
   .sheet.fattura-scaduta .qr,.sheet.fattura-scaduta .invoice{opacity:.3}
   /* ---------- festa: le monete ₿ quando i sats si sbloccano ---------- */
   .festa-box{position:fixed;inset:0;pointer-events:none;z-index:70;overflow:hidden}
@@ -29292,11 +29298,161 @@ function orologioPay(invoice, ripiego){
 }
 /* LA PORTA DEL WALLET: lo schema `lightning:` lo apre il sistema, che
    lo passa al wallet installato (la stessa stringa del QR). Niente
-   parte da solo: e' un link, e il wallet chiede conferma a modo suo. */
-function portaWallet(a, inv){
+   parte da solo: e' un link, e il wallet chiede conferma a modo suo.
+   DAL 10 OTT 2026 («apri-nel-wallet») il tocco passa da `apriNelWallet`,
+   che sceglie la strada per piattaforma e si accorge se nessun wallet
+   si e' fatto vivo; l'`href` resta, per il tocco lungo e per chi legge
+   il link. `tentativo(gesto)` e' il gancio di chi vuole sapere del tocco
+   ('wallet') e della copia dall'avviso ('copiata'): il P2P lo usa per
+   la reputazione, il mercatino non ne ha. Una fattura nuova toglie
+   l'avviso della vecchia. */
+function portaWallet(a, inv, tentativo){
   const s = String(inv || '').trim();
-  if (a) a.href = s ? 'lightning:' + s : '#';
+  if (!a) return;
+  a.href = s ? 'lightning:' + s : '#';
+  a.onclick = ev => apriNelWallet(a, ev, tentativo);
+  togliAvvisoWallet(a);
 }
+/* ═══ COME SI APRE IL WALLET (10 ott 2026, cantiere «apri-nel-wallet»,
+   richiesta di Andrea) ═══════════════════════════════════════════════
+   IL CASO: Android, Barattolo installato sulla Home (PWA/APK), Wallet of
+   Satoshi; il tocco su «⚡ Apri nel wallet» per la garanzia P2P non
+   apriva niente, e si e' pagato copiando la fattura. Il link
+   `lightning:` nudo e' sempre partito dal tocco (nessun flusso lo lancia
+   dopo una fetch: il foglio mostra il bottone a fattura GIA' pronta, e
+   il tocco e' il secondo gesto), quindi l'attivazione dell'utente non si
+   perde; ma Chrome in modalita' app e le WebView non dicono niente
+   quando lo schema non trova chi lo apre: la pagina resta li', muta.
+   LA REGOLA DI CHROME, vista dal vivo (10 ott 2026, Chrome 156 emulato
+   Android): OGNI lancio verso un'app vuole il SUO tocco. Un secondo
+   lancio fatto da uno script dopo un'attesa — anche di un secondo,
+   anche dentro la finestra dell'attivazione — Chrome lo ferma: «Not
+   allowed to launch 'intent://…' because a user gesture is required».
+   Il primo lancio consuma l'attivazione del tocco. Quindi qui NIENTE
+   parte da uno script: ogni lancio e' un link che l'utente tocca, e
+   quel che si fa dopo l'attesa e' solo mostrare.
+   LE TRE STRADE, una per piattaforma (`stradaWallet`, pura):
+   • 'telegram' (dentro il client, `tg.initData`): il link lo passa
+     `tg.openLink`, la via documentata della Bot API per uscire dalla
+     Mini App — la WebView del client non e' Chrome e non e' detto che
+     segua uno schema estraneo. `openInvoice` NON serve: apre le fatture
+     di Telegram Payments (Stars), non una bolt11. Se `openLink` manca o
+     esplode, il link parte da solo come prima.
+   • 'android' (Chrome, normale o installato): il link `lightning:`
+     parte dal tocco, nativo — e' la strada che Chrome conosce. Se non
+     apre niente, nell'avviso compare anche «⚡ Riprova in un altro
+     modo»: un link nella forma `intent://…#Intent;scheme=lightning;end`,
+     quella che Chrome Android traduce in un Intent e consegna all'app
+     che ha dichiarato lo schema (la PWA/TWA la rispetta anche dove il
+     link nudo resta muto). E' un secondo tocco, per la regola qui
+     sopra. Niente `browser_fallback_url`: ci ricaricherebbe la pagina
+     sopra il foglio. Nessun pacchetto nel link: il wallet lo sceglie il
+     telefono. Se anche l'intent resta muto, il «Riprova» sparisce e
+     resta il Copia.
+   • 'ios' e 'altro': il link nudo dal tocco (Safari chiede «Aprire
+     in …?» e basta); `intent://` e' solo di Android.
+   COME SI SA CHE NON SI E' APERTO NIENTE: quando un'app passa davanti
+   la pagina si nasconde (visibilitychange, pagehide) o perde il fuoco
+   (il selettore «Apri con» e' una finestra del sistema). Se dopo
+   l'attimo (`WALLET_ATTIMO_MS`) niente di tutto questo e' successo,
+   nessun wallet si e' fatto vivo: l'AVVISO sotto la riga, «Non si è
+   aperto nessun wallet: copia la fattura», col tasto Copia grande (e su
+   Android il Riprova). L'avviso NON cambia il pagamento: la fattura e'
+   la stessa del QR, la copia e' quella dei bottoni di sempre
+   (`copiaLink`), e il P2P la registra come tentativo, come fa «Copia la
+   richiesta». Un tocco nuovo toglie l'avviso vecchio; una fattura nuova
+   o morta pure (`portaWallet`, `vestiScadenzaFattura`). */
+const WALLET_ATTIMO_MS = 1200;
+let walletGiro = 0;              /* il tocco in corso: uno vecchio tace */
+let walletMuto = null;           /* {bolt11, tentativo} dell'avviso aperto */
+/* PURA: la strada per aprire il wallet, dalla piattaforma */
+function stradaWallet(dentroTelegram, ua){
+  if (dentroTelegram) return 'telegram';
+  const s = String(ua || '');
+  if (/Android/i.test(s)) return 'android';
+  if (/iPhone|iPad|iPod/.test(s)) return 'ios';
+  return 'altro';
+}
+/* PURA: la forma intent:// di un link lightning: ('' se non lo e') */
+function intentWallet(url){
+  const m = /^lightning:(.+)$/i.exec(String(url || '').trim());
+  return m ? 'intent://' + m[1] + '#Intent;scheme=lightning;end' : '';
+}
+/* il tocco su «⚡ Apri nel wallet»: dice la strada presa */
+function apriNelWallet(a, ev, tentativo){
+  const url = String((a && a.getAttribute) ? a.getAttribute('href') : (a && a.href) || '');
+  if (!/^lightning:/i.test(url)) { if (ev) ev.preventDefault(); return 'niente'; }
+  const bolt11 = url.slice('lightning:'.length);
+  togliAvvisoWallet(a);
+  if (typeof tentativo === 'function') { try { tentativo('wallet'); } catch(e){} }
+  const strada = stradaWallet(!!(tg && tg.initData), navigator.userAgent);
+  const giro = ++walletGiro;
+  if (strada === 'telegram') {
+    let passato = false;
+    if (tg && typeof tg.openLink === 'function') {
+      try { tg.openLink(url); passato = true; } catch(e) { passato = false; }
+    }
+    /* passato a Telegram: il link non deve partire anche da solo */
+    if (passato && ev) ev.preventDefault();
+  }
+  /* altrove il link nudo parte dal tocco, nativo: l'evento non si tocca */
+  attendiWallet(giro, aperto => { if (!aperto) avvisaWalletMuto(a, bolt11, tentativo, strada); });
+  return strada;
+}
+/* il cane da guardia: dopo l'attimo dice se qualcosa e' passato davanti
+   alla pagina (un tocco piu' nuovo lo fa tacere) */
+function attendiWallet(giro, poi){
+  let aperto = false;
+  const vede = () => { aperto = true; };
+  document.addEventListener('visibilitychange', vede);
+  window.addEventListener('pagehide', vede);
+  window.addEventListener('blur', vede);
+  setTimeout(() => {
+    document.removeEventListener('visibilitychange', vede);
+    window.removeEventListener('pagehide', vede);
+    window.removeEventListener('blur', vede);
+    if (giro !== walletGiro) return;
+    poi(aperto || document.visibilityState === 'hidden');
+  }, WALLET_ATTIMO_MS);
+}
+/* l'avviso sotto la riga della scadenza: il Copia, e su Android il
+   Riprova con l'intent (un link: il tocco e' il suo) */
+function avvisaWalletMuto(a, bolt11, tentativo, strada){
+  const riga = a && a.parentNode;
+  if (!riga || !riga.insertAdjacentHTML) return false;
+  walletMuto = {bolt11: bolt11, tentativo: tentativo};
+  const intent = strada === 'android' ? intentWallet('lightning:' + bolt11) : '';
+  riga.insertAdjacentHTML('afterend',
+    '<div class="wallet-avviso" role="status">' +
+      '<span>⚠️ Non si è aperto nessun wallet: copia la fattura e incollala nel tuo wallet.</span>' +
+      '<button type="button" class="btn primary" onclick="copiaWalletMuto()">📋 Copia la fattura</button>' +
+      (intent ? '<a class="btn ghost" id="walletRiprova" href="' + intent + '" onclick="riprovaWalletMuto(this)">⚡ Riprova in un altro modo</a>' : '') +
+    '</div>');
+  return true;
+}
+function copiaWalletMuto(){
+  if (!walletMuto) return;
+  haptic();
+  copiaLink(walletMuto.bolt11, 'Fattura copiata 📋');
+  if (typeof walletMuto.tentativo === 'function') { try { walletMuto.tentativo('copiata'); } catch(e){} }
+}
+/* il tocco su «Riprova»: il link intent:// parte da solo (nativo); qui
+   si dice il tentativo e si aspetta: se anche questo resta muto, il
+   Riprova sparisce e resta il Copia */
+function riprovaWalletMuto(link){
+  if (walletMuto && typeof walletMuto.tentativo === 'function') { try { walletMuto.tentativo('wallet'); } catch(e){} }
+  const giro = ++walletGiro;
+  attendiWallet(giro, aperto => { if (!aperto && link) link.style.display = 'none'; });
+}
+function togliAvvisoWallet(a){
+  const foglio = (a && typeof a.closest === 'function') ? a.closest('.sheet') : null;
+  const v = foglio && foglio.querySelector ? foglio.querySelector('.wallet-avviso') : null;
+  if (!v) return false;
+  v.remove();
+  walletMuto = null;
+  return true;
+}
+/* ============ fine di come si apre il wallet ============ */
 /* LA RIGA DELLA SCADENZA, VESTITA (6 ott 2026): il pezzo comune al
    foglio del mercatino (battitoPay) e a quello del P2P
    (battitoHoldP2P). Senza una scadenza la riga non c'e'; a fattura
@@ -29319,6 +29475,8 @@ function vestiScadenzaFattura(foglio, riga, scadeEl, walletEl, scadeIl){
   if (scadeEl) scadeEl.textContent = viva ? '⏱ Scade tra ' + minutiSecondi(resta)
                                           : '⌛ Fattura scaduta';
   if (walletEl) walletEl.style.display = viva ? '' : 'none';
+  /* a fattura morta l'avviso «copia la fattura» direbbe il contrario */
+  if (walletEl && !viva) togliAvvisoWallet(walletEl);
   return viva;
 }
 function battitoPay(){
@@ -58929,12 +59087,12 @@ function orologioHoldP2P(o){
   if (typeof vestiScadenzaFattura !== 'function') return;
   const r = richiestaFoglioP2P(o);
   p2pHoldScadeIl = scadenzaFoglioP2P(o, p2pHoldModo);
-  portaWallet(el('p2pHoldWallet'), r ? r.bolt11 : '');
   /* il tocco su «Apri nel wallet» e' un tentativo (10 ott 2026,
-     reputazione-p2p): si aggancia qui, dove la porta si veste, e il
+     reputazione-p2p), e lo e' anche la copia dall'avviso del wallet
+     muto: il gancio lo porta la porta stessa (`portaWallet`), e il
      markup della riga resta quello del mercatino */
-  const pw = el('p2pHoldWallet');
-  if (pw && typeof tentativoWalletP2P === 'function') pw.onclick = tentativoWalletP2P;
+  portaWallet(el('p2pHoldWallet'), r ? r.bolt11 : '',
+              typeof tentativoWalletP2P === 'function' ? tentativoWalletP2P : null);
   if (p2pHoldOrologio) { clearInterval(p2pHoldOrologio); p2pHoldOrologio = null; }
   /* una richiesta gia' morta all'apertura non accende nessun battito */
   if (!battitoHoldP2P()) return;
@@ -70204,9 +70362,12 @@ function segnaTentativoP2P(id, gesto, motivo){
   } catch(e) { return false; }
   return true;
 }
-/* «⚡ Apri nel wallet» del foglio della garanzia o della cauzione */
-function tentativoWalletP2P(){
-  segnaTentativoP2P(p2pHoldOrdine, p2pHoldModo === 'cauzione' ? 'cauzione_wallet' : 'garanzia_wallet');
+/* «⚡ Apri nel wallet» del foglio della garanzia o della cauzione: il
+   tocco ('wallet') e la copia dall'avviso del wallet muto ('copiata',
+   lo stesso gesto di «Copia la richiesta») */
+function tentativoWalletP2P(gesto){
+  const quale = p2pHoldModo === 'cauzione' ? 'cauzione_' : 'garanzia_';
+  segnaTentativoP2P(p2pHoldOrdine, quale + (gesto === 'copiata' ? 'copiata' : 'wallet'));
 }
 /* ============ fine della reputazione che chiede ============ */
 

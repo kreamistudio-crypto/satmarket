@@ -121619,7 +121619,8 @@ console.log(JSON.stringify(esiti));
     # 4b) il foglio: il conto alla rovescia e il bottoncino che cambia
     #     mestiere, sui flussi veri che lo aprono
     banco = base + "\n" + "\n".join([
-        fetta("function portaWallet(a, inv){"),
+        fetta("function portaWallet(a, inv, tentativo){"),
+        fetta("function togliAvvisoWallet(a){"),
         fetta("function vestiScadenzaFattura(foglio, riga, scadeEl, walletEl, scadeIl){"),
         fetta("function orologioPay(invoice, ripiego){"),
         fetta("function battitoPay(){")]) + """
@@ -128021,7 +128022,7 @@ def prove_apri_wallet_p2p():
           [1, True, True],
           [mini.count("'lightning:' + s"),
            "portaWallet(el('payWallet'), inv);" in fn("function orologioPay(invoice, ripiego){"),
-           "portaWallet(el('p2pHoldWallet'), r ? r.bolt11 : '');" in fn("function orologioHoldP2P(o){")])
+           "portaWallet(el('p2pHoldWallet'), r ? r.bolt11 : '',\n" in fn("function orologioHoldP2P(o){")])
     prova("il velo della fattura morta vale per ogni foglio, non per il solo paySheet", True,
           "  .sheet.fattura-scaduta .qr,.sheet.fattura-scaduta .invoice{opacity:.3}\n" in mini
           and "#paySheet.fattura-scaduta" not in mini)
@@ -128047,7 +128048,8 @@ def prove_apri_wallet_p2p():
         fn("function minutiSecondi(sec){"),
         fn("function holdVivaP2P(o){"), fn("function cauzioneVivaP2P(o, adesso){"),
         fn("function richiestaFoglioP2P(o){"),
-        fn("function portaWallet(a, inv){"),
+        fn("function portaWallet(a, inv, tentativo){"),
+        fn("function togliAvvisoWallet(a){"),
         fn("function vestiScadenzaFattura(foglio, riga, scadeEl, walletEl, scadeIl){"),
         fn("function scadenzaFoglioP2P(o, modo){"),
         "let p2pHoldScadeIl = 0, p2pHoldOrologio = null;",
@@ -138196,6 +138198,358 @@ def prove_dati_reputazione_p2p():
                for c in ("bolt11", "fattura TEXT", "invoice"))))
 
 
+def prove_apri_nel_wallet():
+    """COME SI APRE IL WALLET (10 ott 2026, cantiere «apri-nel-wallet»,
+    richiesta di Andrea). Il caso: Android, Barattolo installato sulla
+    Home e Wallet of Satoshi, il tocco su «⚡ Apri nel wallet» della
+    garanzia P2P non apriva niente. La porta (`portaWallet`) ora aggancia
+    il tocco ad `apriNelWallet`, che sceglie la strada per piattaforma —
+    Telegram → `tg.openLink`; Android, iPhone e altro → il link nudo dal
+    tocco — e se dopo l'attimo (`WALLET_ATTIMO_MS`) nessuna app e' passata
+    davanti mette l'AVVISO col tasto Copia e, su Android, il «Riprova»
+    nella forma `intent://` (un LINK: Chrome vuole un tocco per ogni
+    lancio, visto dal vivo). Qui:
+    1) le SENTINELLE: lo schema in un posto solo, le due porte, il gancio
+       della reputazione portato dalla porta, NIENTE lancio da script nel
+       blocco (ne' location ne' window.open), l'intent senza pacchetto ne'
+       fallback e solo nel Riprova, openLink e mai openInvoice, i gesti
+       noti al server, l'avviso tolto a fattura morta, il testo e il tasto;
+    2) il BANCO node, coi pezzi VERI e un DOM di cartone: le tre strade
+       (android con l'avviso e il Riprova intent:// al primo attimo;
+       telegram con openLink e il link prevenuto; ios e altro senza
+       Riprova), «qualcosa e' passato davanti» (visibilitychange, blur,
+       pagina gia' nascosta) che tace, un tocco nuovo che fa tacere il
+       vecchio, la copia dall'avviso coi suoi gesti, il Riprova che dice
+       il tentativo e sparisce se resta muto, l'avviso tolto dal tocco
+       nuovo, dalla fattura nuova e dalla fattura morta, il link `#` che
+       non fa niente, e i due giudici puri."""
+    print("\n[«Apri nel wallet»: la strada per piattaforma, e l'avviso del wallet muto]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    # --- 1) LE SENTINELLE --------------------------------------------
+    blocco = mini[mini.index("/* ═══ COME SI APRE IL WALLET"):
+                  mini.index("/* ============ fine di come si apre il wallet ============ */")]
+    codice = nudo(blocco)
+    pw = fn("function portaWallet(a, inv, tentativo){")
+    prova("la porta scrive l'href E aggancia il tocco ad `apriNelWallet`: lo schema in un posto solo",
+          [1, True, True, 1],
+          [mini.count("'lightning:' + s"),
+           "a.onclick = ev => apriNelWallet(a, ev, tentativo);" in pw,
+           "togliAvvisoWallet(a);" in pw,
+           mini.count("=> apriNelWallet(a, ev, tentativo)")])
+    GANCIO = ("portaWallet(el('p2pHoldWallet'), r ? r.bolt11 : '',\n"
+              "              typeof tentativoWalletP2P === 'function' ? tentativoWalletP2P : null);")
+    prova("mercatino e P2P passano dalla stessa porta; il P2P le da' il gancio della reputazione, "
+          "e il vecchio onclick a mano non c'e' piu'",
+          [True, True, 0],
+          ["portaWallet(el('payWallet'), inv);" in fn("function orologioPay(invoice, ripiego){"),
+           GANCIO in fn("function orologioHoldP2P(o){"),
+           mini.count("pw.onclick = tentativoWalletP2P")])
+    anw = nudo(fn("function apriNelWallet(a, ev, tentativo){"))
+    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, nei tre QR "
+          "e nel Riprova, e in nessuna navigazione da script",
+          [0, 4],
+          [len([l for l in mini.splitlines()
+                if re.search(r"""location(\.href)?\s*=\s*['"`]lightning:""", l)]),
+           mini.count("('lightning:' + ")])
+    prova("NIENTE parte da uno script nel blocco (la regola di Chrome: un tocco per ogni lancio): "
+          "ne' location, ne' window.open, ne' click() finti",
+          [False, False, False, False],
+          ["location" in codice, "window.open" in codice, ".click()" in codice, "dispatchEvent" in codice])
+    prova("la forma intent:// si scrive in un posto solo, senza pacchetto e senza fallback url, "
+          "e vive SOLO nel link «Riprova» dell'avviso, solo su Android",
+          [1, False, False, True, True],
+          [mini.count("'#Intent;scheme=lightning;end'"),
+           "package=" in blocco, "browser_fallback_url=" in blocco,
+           "const intent = strada === 'android' ? intentWallet('lightning:' + bolt11) : '';"
+           in fn("function avvisaWalletMuto(a, bolt11, tentativo, strada){"),
+           'id="walletRiprova" href="\' + intent + \'" onclick="riprovaWalletMuto(this)"' in blocco])
+    prova("dentro Telegram si passa da openLink (prevenendo il link solo se e' passato), mai da openInvoice",
+          [True, True, False],
+          ["try { tg.openLink(url); passato = true; }" in anw,
+           "if (passato && ev) ev.preventDefault();" in anw,
+           "openInvoice" in codice])
+    att = nudo(fn("function attendiWallet(giro, poi){"))
+    prova("il cane da guardia ascolta visibilitychange, pagehide e blur, e li toglie quando ha finito",
+          [3, 3, True],
+          [att.count("addEventListener("), att.count("removeEventListener("),
+           "poi(aperto || document.visibilityState === 'hidden');" in att])
+    prova("il tocco e' un tentativo, il Riprova pure, e la copia dall'avviso, coi gesti del P2P",
+          [True, True, True, True],
+          ["tentativo('wallet')" in anw,
+           "walletMuto.tentativo('wallet')" in nudo(fn("function riprovaWalletMuto(link){")),
+           "tentativo('copiata')" in nudo(fn("function copiaWalletMuto(){")),
+           "quale + (gesto === 'copiata' ? 'copiata' : 'wallet')" in fn("function tentativoWalletP2P(gesto){")])
+    srv = open("server.py", encoding="utf-8").read()
+    gesti = srv[srv.index("P2P_GESTI_TENTATIVO = ("):]
+    gesti = gesti[:gesti.index(")")]
+    prova("...e i quattro gesti stanno gia' nell'elenco del server: nessun gesto nuovo",
+          [True, True, True, True],
+          [f'"{g}"' in gesti for g in ("garanzia_wallet", "garanzia_copiata", "cauzione_wallet", "cauzione_copiata")])
+    prova("la fattura morta toglie l'avviso", True,
+          "if (walletEl && !viva) togliAvvisoWallet(walletEl);"
+          in fn("function vestiScadenzaFattura(foglio, riga, scadeEl, walletEl, scadeIl){"))
+    css = mini[mini.index(".wallet-avviso{"):mini.index(".wallet-avviso .btn{")]
+    prova("l'avviso: il testo di Andrea, il tasto Copia grande (primary), il fondo dell'allarme",
+          [True, True, True],
+          ["Non si è aperto nessun wallet: copia la fattura" in blocco,
+           '<button type="button" class="btn primary" onclick="copiaWalletMuto()">📋 Copia la fattura</button>' in blocco,
+           "background:var(--warn-bg)" in css])
+    prova("nessun pagamento parte da solo: niente pay_invoice ne' fetch nel blocco",
+          [False, False], ["pay_invoice" in blocco, "fetch(" in blocco])
+    for spia in ("el(", "document", "navigator", "tg", "Date.now"):
+        prova(f"`stradaWallet` e `intentWallet` sono pure: nessun `{spia}`", False,
+              spia in nudo(fn("function stradaWallet(dentroTelegram, ua){")) + nudo(fn("function intentWallet(url){")))
+
+    # --- 2) IL BANCO -------------------------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco di «Apri nel wallet»", "node non c'e'")
+        return
+    T = 1_790_000_000
+    BOLT = bolt11_finta(25_000, 900, T - 60, phash=21)
+    BOLT2 = bolt11_finta(25_000, 900, T - 10, phash=22)
+    UA_AND = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
+    UA_IOS = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
+    UA_PC = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+    pezzi = "\n".join([
+        "let tg = null;",
+        "const navigator = {userAgent: ''};",
+        "const timers = [];",
+        "globalThis.setTimeout = (f, ms) => { timers.push({f, ms}); return timers.length; };",
+        "const scatta = () => { const t = timers.splice(0); t.forEach(x => x.f()); return t.length; };",
+        "const ascolti = [];",
+        "const document = {visibilityState: 'visible',",
+        "  addEventListener: (n, f) => ascolti.push([n, f]),",
+        "  removeEventListener: (n, f) => { const i = ascolti.findIndex(x => x[0] === n && x[1] === f); if (i >= 0) ascolti.splice(i, 1); }};",
+        "const window = {addEventListener: document.addEventListener, removeEventListener: document.removeEventListener};",
+        "const emetti = n => ascolti.filter(x => x[0] === n).forEach(x => x[1]());",
+        "let copiato = [], haptics = 0;",
+        "const copiaLink = (s, msg) => { copiato.push([s, msg]); };",
+        "const haptic = () => haptics++;",
+        mini[mini.index("const WALLET_ATTIMO_MS"):mini.index("/* PURA: la strada per aprire il wallet")],
+        fn("function stradaWallet(dentroTelegram, ua){"), fn("function intentWallet(url){"),
+        fn("function apriNelWallet(a, ev, tentativo){"), fn("function attendiWallet(giro, poi){"),
+        fn("function avvisaWalletMuto(a, bolt11, tentativo, strada){"), fn("function copiaWalletMuto(){"),
+        fn("function riprovaWalletMuto(link){"),
+        fn("function togliAvvisoWallet(a){"), fn("function portaWallet(a, inv, tentativo){"),
+        fn("function minutiSecondi(sec){"),
+        fn("function vestiScadenzaFattura(foglio, riga, scadeEl, walletEl, scadeIl){"),
+        "const V = " + _json.dumps({"bolt": BOLT, "bolt2": BOLT2, "and": UA_AND, "ios": UA_IOS, "pc": UA_PC}) + ";",
+    ]) + r"""
+/* il DOM di cartone: un foglio, la riga della scadenza, il link */
+function foglioFinto(){
+  const cl = new Set();
+  const f = {avviso: null, inseriti: [], querySelector: sel => sel === '.wallet-avviso' ? f.avviso : null,
+    classList: {add: c => cl.add(c), remove: c => cl.delete(c), contains: c => cl.has(c),
+      toggle: (c, v) => (v === undefined ? !cl.has(c) : v) ? cl.add(c) : cl.delete(c)}};
+  const riga = {style: {display: ''}, insertAdjacentHTML: (pos, html) => {
+    f.inseriti.push(pos); f.avviso = {html, pos, remove(){ f.avviso = null; }}; }};
+  const a = {href: '#', getAttribute: n => n === 'href' ? a.href : null, parentNode: riga,
+    closest: sel => sel === '.sheet' ? f : null, style: {display: ''}};
+  return {f, riga, a, scade: {textContent: ''}};
+}
+const ev = () => { const e = {prevenuto: false, preventDefault(){ e.prevenuto = true; }}; return e; };
+const riprova = html => { const m = /<a class="btn ghost" id="walletRiprova" href="([^"]+)"/.exec(html || ''); return m ? m[1] : null; };
+const out = {};
+/* 0) i giudici puri */
+out.strade = [stradaWallet(true, V.pc), stradaWallet(false, V.and), stradaWallet(false, V.ios),
+  stradaWallet(false, V.pc), stradaWallet(false, ''), stradaWallet(false, 'Mozilla/5.0 (iPad; CPU OS 17_5) ...')];
+out.intent = [intentWallet('lightning:' + V.bolt), intentWallet(' lightning:ABC '), intentWallet(''),
+  intentWallet('https://x'), intentWallet('LIGHTNING:lnbc1'), intentWallet(null)];
+/* 1) ANDROID, nessun wallet si fa vivo: il link nudo, l'avviso col Riprova intent://, la copia */
+navigator.userAgent = V.and; tg = null;
+let {f, a} = foglioFinto();
+const gesti = [];
+portaWallet(a, V.bolt, g => gesti.push(g));
+const e1 = ev();
+const strada1 = a.onclick(e1);
+out.android = {strada: strada1, href: a.href, prevenuto: e1.prevenuto, gesti: gesti.slice(), timers: timers.length,
+  ms: timers[0] && timers[0].ms, avvisoSubito: !!f.avviso, ascolti: ascolti.length};
+scatta();
+out.androidMuto = {html: f.avviso && f.avviso.html, pos: f.avviso && f.avviso.pos, riprova: riprova(f.avviso && f.avviso.html),
+  timers: timers.length, ascolti: ascolti.length, muto: !!walletMuto};
+copiaWalletMuto();
+out.androidCopia = {copiato: copiato.slice(), gesti: gesti.slice(), haptics};
+/* ...il Riprova: il link parte da solo, qui si dice il tentativo e si aspetta; muto → sparisce */
+const link = {style: {display: ''}};
+riprovaWalletMuto(link);
+out.riprova = {gesti: gesti.slice(), timers: timers.length, ascolti: ascolti.length};
+scatta();
+out.riprovaMuto = {link: link.style.display, avviso: !!f.avviso, muto: !!walletMuto};
+/* ...e il Riprova che APRE il wallet (la pagina si nasconde): il link resta */
+const link2 = {style: {display: ''}};
+riprovaWalletMuto(link2);
+emetti('visibilitychange');
+scatta();
+out.riprovaAperto = {link: link2.style.display};
+/* ...un tocco nuovo toglie subito l'avviso vecchio, e la copia non ha piu' niente */
+const e2 = ev(); a.onclick(e2);
+copiaWalletMuto();
+out.toccoNuovo = {avviso: !!f.avviso, muto: !!walletMuto, copiati: copiato.length, timers: timers.length};
+scatta();
+out.toccoNuovoMuto = {avviso: !!f.avviso, inseriti: f.inseriti.length};
+/* 2) ANDROID, il wallet si apre al primo colpo (la pagina si nasconde): niente avviso */
+({f, a} = foglioFinto());
+portaWallet(a, V.bolt);
+a.onclick(ev());
+emetti('visibilitychange');
+scatta();
+out.androidAperto = {avviso: !!f.avviso, timers: timers.length, ascolti: ascolti.length};
+/* ...il fuoco se ne va (il selettore «Apri con»): niente avviso */
+({f, a} = foglioFinto());
+portaWallet(a, V.bolt);
+a.onclick(ev());
+emetti('blur');
+scatta();
+out.androidFuoco = {avviso: !!f.avviso, timers: timers.length};
+/* ...la pagina e' gia' nascosta quando l'attimo scade, senza evento: tace */
+({f, a} = foglioFinto());
+portaWallet(a, V.bolt);
+a.onclick(ev());
+document.visibilityState = 'hidden';
+scatta();
+out.androidNascosta = {avviso: !!f.avviso, timers: timers.length};
+document.visibilityState = 'visible';
+/* 3) due tocchi di fila: il primo tace, un avviso solo */
+({f, a} = foglioFinto());
+portaWallet(a, V.bolt);
+a.onclick(ev()); a.onclick(ev());
+const pendenti = timers.length;
+scatta();
+out.dueTocchi = {pendenti, inseriti: f.inseriti.length, avviso: !!f.avviso, timers: timers.length};
+/* 4) TELEGRAM: openLink, il link prevenuto, l'avviso SENZA Riprova se la pagina resta */
+const aperti = [];
+tg = {initData: 'query_id=1', openLink: u => aperti.push(u)};
+({f, a} = foglioFinto());
+portaWallet(a, V.bolt);
+const e3 = ev();
+const strada3 = a.onclick(e3);
+out.telegram = {strada: strada3, aperti: aperti.slice(), prevenuto: e3.prevenuto, timers: timers.length};
+scatta();
+out.telegramMuto = {avviso: !!f.avviso, riprova: riprova(f.avviso && f.avviso.html), timers: timers.length};
+/* ...openLink che esplode: il link parte da solo (non prevenuto), nessun errore */
+tg = {initData: 'query_id=1', openLink: () => { throw new Error('no'); }};
+({f, a} = foglioFinto());
+portaWallet(a, V.bolt);
+const e4 = ev(); a.onclick(e4);
+emetti('pagehide'); scatta();
+out.telegramEsplode = {prevenuto: e4.prevenuto, avviso: !!f.avviso};
+/* ...un client senza openLink: come prima */
+tg = {initData: 'query_id=1'};
+({f, a} = foglioFinto());
+portaWallet(a, V.bolt);
+const e5 = ev(); a.onclick(e5);
+out.telegramSenza = {prevenuto: e5.prevenuto};
+scatta();
+/* 5) IPHONE e ALTRO: il link nudo, l'avviso al primo attimo, senza Riprova */
+tg = null;
+for (const [nome, ua] of [['ios', V.ios], ['altro', V.pc]]) {
+  navigator.userAgent = ua;
+  ({f, a} = foglioFinto());
+  portaWallet(a, V.bolt);
+  const e = ev();
+  const s = a.onclick(e);
+  const primaTimers = timers.length;
+  scatta();
+  out[nome] = {strada: s, prevenuto: e.prevenuto, primaTimers, avviso: !!f.avviso, riprova: riprova(f.avviso && f.avviso.html), timers: timers.length};
+}
+/* 6) il link `#` (fattura non ancora pronta): si previene e basta */
+timers.splice(0);
+({f, a} = foglioFinto());
+const g6 = [];
+portaWallet(a, '', g => g6.push(g));
+const e6 = ev(); const s6 = a.onclick(e6);
+out.cancelletto = {href: a.href, strada: s6, prevenuto: e6.prevenuto, timers: timers.length, gesti: g6.length};
+/* 7) l'avviso lo tolgono la fattura nuova (portaWallet) e la fattura morta (vestiScadenzaFattura) */
+navigator.userAgent = V.ios;
+({f, a} = foglioFinto());
+portaWallet(a, V.bolt); a.onclick(ev()); scatta();
+const cera = !!f.avviso;
+portaWallet(a, V.bolt2);
+out.fatturaNuova = {cera, avviso: !!f.avviso, href: a.href};
+a.onclick(ev()); scatta();
+const cera2 = !!f.avviso;
+const scadeEl = {textContent: ''};
+const viva = vestiScadenzaFattura(f, a.parentNode, scadeEl, a, 1);
+out.fatturaMorta = {cera2, viva, avviso: !!f.avviso, testo: scadeEl.textContent, wallet: a.style.display};
+/* ...e una fattura viva lo lascia */
+a.onclick(ev()); scatta();
+const viva2 = vestiScadenzaFattura(f, a.parentNode, scadeEl, a, Math.floor(Date.now() / 1000) + 600);
+out.fatturaViva = {viva2, avviso: !!f.avviso};
+console.log(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp(prefix="apri_nel_wallet_")
+    pb = os.path.join(cart, "banco.js")
+    open(pb, "w", encoding="utf-8").write(pezzi)
+    rr = _sp.run([node, pb], capture_output=True, text=True, timeout=120, encoding="utf-8")
+    prova("il banco gira", "", (rr.stderr or "")[-900:])
+    if rr.returncode != 0:
+        return
+    o = _json.loads(rr.stdout)
+    INTENT = "intent://" + BOLT + "#Intent;scheme=lightning;end"
+    prova("stradaWallet: telegram vince su tutto, poi Android, iPhone/iPad, altro",
+          ["telegram", "android", "ios", "altro", "altro", "ios"], o["strade"])
+    prova("intentWallet: la bolt11 dopo intent://, lo schema in coda; '' per quel che non e' lightning:",
+          [INTENT, "intent://ABC#Intent;scheme=lightning;end", "", "", "intent://lnbc1#Intent;scheme=lightning;end", ""],
+          o["intent"])
+    v = o["android"]
+    prova("ANDROID, il tocco: strada android, l'href e' il lightning: della bolt11, il link NON e' prevenuto "
+          "(parte nativo dal tocco), il tentativo 'wallet' detto, un attimo armato con tre orecchie, niente avviso",
+          ["android", "lightning:" + BOLT, False, ["wallet"], 1, 1200, False, 3],
+          [v["strada"], v["href"], v["prevenuto"], v["gesti"], v["timers"], v["ms"], v["avvisoSubito"], v["ascolti"]])
+    v = o["androidMuto"]
+    prova("...l'attimo, pagina a schermo: l'avviso sotto la riga col testo, il Copia e il Riprova intent:// "
+          "della stessa bolt11; orecchie tolte, niente altro armato",
+          [True, True, "afterend", INTENT, 0, 0, True],
+          ["Non si è aperto nessun wallet: copia la fattura" in (v["html"] or ""),
+           'onclick="copiaWalletMuto()"' in (v["html"] or ""), v["pos"], v["riprova"], v["timers"], v["ascolti"], v["muto"]])
+    v = o["androidCopia"]
+    prova("...il tasto Copia copia la stessa bolt11, vibra, e dice il tentativo 'copiata'",
+          [[[BOLT, "Fattura copiata 📋"]], ["wallet", "copiata"], 1], [v["copiato"], v["gesti"], v["haptics"]])
+    prova("...il Riprova dice il tentativo 'wallet' e arma un attimo (il link parte da solo, nativo)",
+          {"gesti": ["wallet", "copiata", "wallet"], "timers": 1, "ascolti": 3}, o["riprova"])
+    prova("...muto anche lui: il Riprova sparisce, l'avviso e il Copia restano",
+          {"link": "none", "avviso": True, "muto": True}, o["riprovaMuto"])
+    prova("...ma se apre il wallet (la pagina si nasconde) il Riprova resta", {"link": ""}, o["riprovaAperto"])
+    prova("un tocco nuovo toglie subito l'avviso vecchio (e la copia resta muta), poi ne rimette uno solo",
+          [{"avviso": False, "muto": False, "copiati": 1, "timers": 1}, {"avviso": True, "inseriti": 2}],
+          [o["toccoNuovo"], o["toccoNuovoMuto"]])
+    prova("ANDROID, il wallet si apre al primo colpo: niente avviso, orecchie tolte",
+          {"avviso": False, "timers": 0, "ascolti": 0}, o["androidAperto"])
+    prova("...il fuoco se ne va (il selettore del sistema): niente avviso", {"avviso": False, "timers": 0}, o["androidFuoco"])
+    prova("...pagina gia' nascosta allo scadere dell'attimo, senza evento: tace", {"avviso": False, "timers": 0}, o["androidNascosta"])
+    prova("due tocchi di fila: due attimi armati, il primo tace, un avviso solo",
+          {"pendenti": 2, "inseriti": 1, "avviso": True, "timers": 0}, o["dueTocchi"])
+    v = o["telegram"]
+    prova("TELEGRAM: openLink col link lightning:, il link prevenuto (non parte due volte), un attimo",
+          ["telegram", ["lightning:" + BOLT], True, 1], [v["strada"], v["aperti"], v["prevenuto"], v["timers"]])
+    prova("...pagina a schermo dopo l'attimo: l'avviso, e MAI il Riprova intent:// dentro Telegram",
+          {"avviso": True, "riprova": None, "timers": 0}, o["telegramMuto"])
+    prova("...openLink che esplode: il link parte da solo (non prevenuto); se qualcosa passa davanti, niente avviso",
+          {"prevenuto": False, "avviso": False}, o["telegramEsplode"])
+    prova("...un client senza openLink: il link parte da solo, come prima", {"prevenuto": False}, o["telegramSenza"])
+    prova("IPHONE: il link nudo dal tocco, l'avviso al primo attimo, senza Riprova",
+          {"strada": "ios", "prevenuto": False, "primaTimers": 1, "avviso": True, "riprova": None, "timers": 0}, o["ios"])
+    prova("ALTRO (un PC): lo stesso",
+          {"strada": "altro", "prevenuto": False, "primaTimers": 1, "avviso": True, "riprova": None, "timers": 0}, o["altro"])
+    prova("il link `#` (fattura non pronta): prevenuto e basta, niente attimo, nessun tentativo",
+          {"href": "#", "strada": "niente", "prevenuto": True, "timers": 0, "gesti": 0}, o["cancelletto"])
+    prova("una fattura nuova toglie l'avviso della vecchia e cambia l'href",
+          {"cera": True, "avviso": False, "href": "lightning:" + BOLT2}, o["fatturaNuova"])
+    prova("la fattura morta toglie l'avviso (e la porta, come prima)",
+          {"cera2": True, "viva": False, "avviso": False, "testo": "⌛ Fattura scaduta", "wallet": "none"}, o["fatturaMorta"])
+    prova("...quella viva lo lascia", {"viva2": True, "avviso": True}, o["fatturaViva"])
+
+
 def prove_reputazione_p2p():
     """LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, I TENTATIVI, IL
     FILTRO DI CHI PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, cantiere
@@ -138714,7 +139068,7 @@ console.log(JSON.stringify(c));
           ["segnaTentativoP2P(id, 'garanzia_aperta')" in fn("async function apriHoldP2P(){"),
            "segnaTentativoP2P(id, 'cauzione_aperta')" in fn("async function apriCauzioneP2P(){"),
            "p2pHoldModo === 'cauzione' ? 'cauzione_copiata' : 'garanzia_copiata'" in fn("function copiaHoldP2P(){"),
-           m.count("pw.onclick = tentativoWalletP2P;")])
+           m.count("typeof tentativoWalletP2P === 'function' ? tentativoWalletP2P : null")])
     inc = re.sub(r"/\*[\s\S]*?\*/", "", fn("async function inviaIncassoP2P(){"))
     prova("...la fattura: inviata PRIMA della chiamata, scartata nei tre casi, rifiutata nel catch",
           [True, 3, True],
@@ -138864,7 +139218,8 @@ def main():
               prove_casa_vuota_gratis,
               prove_spedizione_standard,
               prove_cambio_converte,
-              prove_paga_ora, prove_apri_wallet_p2p, prove_conto_intervallo,
+              prove_paga_ora, prove_apri_wallet_p2p, prove_apri_nel_wallet,
+              prove_conto_intervallo,
               prove_catalogo_esterno,
               prove_modulo_negozio,
               prove_script_nel_workflow, prove_deploy,

@@ -1275,6 +1275,25 @@
   6 ott 2026 veste anche il foglio del P2P (`p2pHoldSheet`, garanzia e
   cauzione: `orologioHoldP2P`, l'ora da `scadenzaFoglioP2P`); CANTIERI,
   «Apri nel wallet anche sulle fatture del P2P».
+  COME SI APRE IL WALLET (10 ott 2026, «apri-nel-wallet»): la porta
+  aggancia il tocco ad `apriNelWallet`, che sceglie la strada dalla
+  piattaforma (`stradaWallet`, pura): dentro Telegram `tg.openLink`
+  (mai `openInvoice`, che è dei pagamenti Telegram), altrove il link
+  `lightning:` nudo parte dal tocco, nativo. NIENTE parte da uno
+  script: Chrome vuole un tocco per OGNI lancio verso un'app (il primo
+  consuma l'attivazione; un `intent://` da un timer è «Not allowed …
+  user gesture is required», visto dal vivo). Il cane da guardia
+  `attendiWallet` (`WALLET_ATTIMO_MS` 1200) ascolta visibilitychange,
+  pagehide e blur: se nessuna app è passata davanti mette l'avviso
+  `.wallet-avviso` sotto la riga («Non si è aperto nessun wallet: copia
+  la fattura», `copiaWalletMuto` → `copiaLink`) e su Android anche
+  «⚡ Riprova in un altro modo», un LINK `intent://…#Intent;scheme=
+  lightning;end` (`intentWallet`, pura; niente pacchetto né fallback
+  url) che sparisce se resta muto pure lui (`riprovaWalletMuto`). Il
+  gancio `tentativo(gesto)` della porta porta al P2P i tentativi
+  ('wallet', 'copiata' → `tentativoWalletP2P`). Un tocco nuovo, una
+  fattura nuova o morta tolgono l'avviso. CANTIERI, «Apri nel wallet:
+  la strada per piattaforma».
   In lista lo stesso ordine è «Da pagare» PIENO (`dapagare`) a chi
   compra e «In attesa del pagamento» NEUTRO (`attesa`) a chi vende, dal
   giudice `badgeOrdine`.
