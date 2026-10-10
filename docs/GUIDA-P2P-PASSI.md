@@ -419,8 +419,14 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
   wallet.»
 - Non dai il recapito sats in tempo (i minuti del coordinatore, §9): ✈️ «🔄 **Non hai proseguito in
   tempo:** l'ordine è tornato in vetrina. Se ti interessa ancora, puoi
-  riprenderlo.» Nell'app: «Il giro si è chiuso senza garanzia: l'ordine
-  è tornato nel libro».
+  riprenderlo.» e, dal 10 ott 2026, se ti è stato contato: «Questo conta
+  come scambio non completato. Il primo è tollerato; dal secondo in 90
+  giorni comparirà sul tuo profilo.» (dal secondo: «…con questo sono 2
+  negli ultimi 90 giorni, e sul tuo profilo compare «⚠️ 2 non
+  completati». Finché ce n'è più di uno nell'ultimo mese, chi pubblica
+  con un filtro può non accettarti.»). Chi ci ha provato — fattura
+  mandata, anche rifiutata — non la riceve. Nell'app: «Il giro si è
+  chiuso senza garanzia: l'ordine è tornato nel libro».
 - Il pagamento dei sats non passa: ✈️ «⚠️ **Il pagamento dei sats non è
   passato** (<motivo>): apri «Dove ricevere i sats» e dai una fattura
   nuova. *I sats restano fermi per te finché il pagamento non passa.*»
@@ -533,7 +539,8 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
 - «La richiesta di pagamento non è ancora arrivata» (toast, se tocchi
   «🔒 Blocca i sats» troppo presto).
 - Non blocchi in tempo (i minuti del coordinatore, §9): se l'ordine era di un altro ✈️ «🔄 **Non hai
-  proseguito in tempo:** l'ordine è tornato in vetrina…»; se era tuo ✈️
+  proseguito in tempo:** l'ordine è tornato in vetrina…» (con la riga del
+  conto, come sopra, se non avevi nemmeno aperto la richiesta); se era tuo ✈️
   «⏰ **Non hai proseguito in tempo:** il tuo ordine è stato annullato.
   Puoi ripubblicarlo quando vuoi.» All'altra persona: «🔄 **Chi aveva
   preso il tuo ordine non ha proseguito.** È tornato in vetrina: non devi

@@ -30008,9 +30008,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   scartata nei tre casi, rifiutata nel catch) e `fatturaDalWalletP2P`.
   Dove si vede il marchio: `repRiquadroP2P`, `cardParte`,
   `renderNegozio`, `renderProfiloP2P`. Le stelline non si toccano.
-  Prove: `prove_reputazione_p2p`, `collaudo_reputazione_p2p` (gabbia
-  della CI). Vale dentro Barattolo: un altro client Mostro prende
-  comunque (il perché e la patch che servirebbe: CANTIERI).
+  Il messaggio Telegram «Non hai proseguito in tempo» a chi ha preso
+  porta la riga del conto (`_avvisi_evento_p2p` mette `mancato_contato`
+  e `mancati` nei dati della frase; `_testo_evento_p2p` la scrive, al
+  primo e dal secondo in poi). Prove: `prove_reputazione_p2p`,
+  `collaudo_reputazione_p2p` (gabbia della CI). Vale dentro Barattolo:
+  un altro client Mostro prende comunque (il perché e la patch che
+  servirebbe: CANTIERI).
 
 - LA CASSA DI RISONANZA SU X (9 ott 2026). I post di Barattolo su Nostr
   escono anche su X, dal server: un orologio in sottofondo

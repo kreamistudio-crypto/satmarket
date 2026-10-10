@@ -50359,8 +50359,21 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
         if maker:
             return ("🔄 <b>Chi aveva preso il tuo ordine non ha proseguito.</b> "
                     f"È tornato in vetrina: non devi fare niente.{tornati}")
+        # ...e il conto, detto chiaro e gentile (10 ott 2026, richiesta di
+        # Andrea): al primo si dice che e' tollerato e cosa succede dal
+        # secondo; dal secondo in poi quanti sono e che si vedono
+        n = int(dati.get("mancati") or 0)
+        conto = ""
+        if dati.get("mancato_contato"):
+            conto = ("\n\nQuesto conta come scambio non completato. Il primo è "
+                     "tollerato; dal secondo in 90 giorni comparirà sul tuo profilo."
+                     if n <= 1 else
+                     f"\n\nQuesto conta come scambio non completato: con questo sono "
+                     f"{n} negli ultimi 90 giorni, e sul tuo profilo compare "
+                     f"«⚠️ {n} non completati». Finché ce n'è più di uno nell'ultimo "
+                     "mese, chi pubblica con un filtro può non accettarti.")
         return ("🔄 <b>Non hai proseguito in tempo:</b> l'ordine è tornato "
-                "in vetrina. Se ti interessa ancora, puoi riprenderlo.")
+                "in vetrina. Se ti interessa ancora, puoi riprenderlo." + conto)
     if momento == "scaduto" and paycode and vende:
         # LE DUE SCADENZE, dette (23 set 2026): il libro chiude due ore
         # prima del PayCode — e' il margine per chi deve andare al
@@ -50528,6 +50541,27 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
             "SELECT 1 FROM p2p_momenti WHERE ordine=? AND momento='cauzione_persa' "
             "LIMIT 1", (ordine,)).fetchone())
     # chi ha PUBBLICATO: l'altro lato rispetto a chi ha preso
+    # LA RIGA DEL CONTO A CHI HA PRESO (10 ott 2026, reputazione-p2p,
+    # richiesta di Andrea): sul SUO timeout la frase dice se questo
+    # giro gli e' stato contato come non completato
+    # (`_segna_esiti_p2p` gira prima di qui, nella rotta) e quanti ne ha
+    # negli ultimi 90 giorni. Una riga in piu' nel messaggio non puo'
+    # far cadere l'avviso: un database senza la tabella — i banchi di
+    # ieri — vale «non contato», e il resto della frase e' quello di sempre.
+    if momento == "tornato" and ev.get("dettaglio") == "taker-timeout":
+        chi_preso = {"buyer": fatto["compratore"],
+                     "seller": fatto["venditore"]}.get(fatto["preso_dal"], 0)
+        if chi_preso:
+            try:
+                dati["mancato_contato"] = con.execute(
+                    "SELECT 1 FROM p2p_esiti WHERE tg_id=? AND ordine=? AND giro=? "
+                    "AND esito='mancato'", (chi_preso, ordine, giro)).fetchone() is not None
+                dati["mancati"] = int(con.execute(
+                    "SELECT COUNT(*) FROM p2p_esiti WHERE tg_id=? AND esito='mancato' "
+                    "AND quando>=?", (chi_preso, adesso - P2P_MANCATI_FINESTRA_S)
+                ).fetchone()[0] or 0)
+            except Exception:
+                dati["mancato_contato"], dati["mancati"] = False, 0
     lato_maker = {"buyer": "vende", "seller": "compra"}.get(fatto["preso_dal"], "")
     fuori = []
 

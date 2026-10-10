@@ -87605,8 +87605,9 @@ def _banco_eventi_p2p(eventi_attivi=True):
                  "P2P_EVENTO_OROLOGIO_S = ", "P2P_SATS_MAX_EVENTO = ",
                  "P2P_RECAPITO_MAX = ",
                  "P2P_LIBRO_MEMORIA_S = ", "FORMA_DETTAGLIO_P2P = ",
-                 # (10 ott 2026, reputazione-p2p) la memoria lunga degli esiti
-                 "P2P_ESITI_MEMORIA_S = ",
+                 # (10 ott 2026, reputazione-p2p) la memoria lunga degli esiti,
+                 # e la finestra del marchio (la riga del conto nel messaggio)
+                 "P2P_ESITI_MEMORIA_S = ", "P2P_MANCATI_FINESTRA_S = ",
                  # gli stati finali del libro: la riserva superata (24 set)
                  "STATI_LIBRO_FINALI = ",
                  # il giudice del pagamento, per l'attesa del rilascio
@@ -135871,7 +135872,8 @@ def prove_contanti_zona():
           ["Milano centro", "", "", "", "", "", ""], o["canale"])
 
 
-# =============================================================def prove_promemoria_gesto():
+# ====================================================================
+def prove_promemoria_gesto():
     """IL PROMEMORIA DEL GESTO A TEMPO (10 ott 2026, cantiere «promemoria
     garanzia», richiesta di Andrea). Il caso: a chi vendeva arriva «Paga
     la garanzia» alle 10:04, il coordinatore gli da' un quarto d'ora,
@@ -136686,6 +136688,35 @@ def prove_reputazione_p2p():
            con.execute("SELECT motivo FROM p2p_tentativi WHERE ordine=? AND gesto='fattura_scartata'",
                        (O2,)).fetchone()[0])[1])
     prova("...i nove gesti del catalogo", 9, len(amb["P2P_GESTI_TENTATIVO"]))
+    # q) la riga del conto nel messaggio a chi ha preso (richiesta di Andrea)
+    testo = amb["_testo_evento_p2p"]
+    base = dict(amb["_dati_frase_p2p"](con, O1))
+    primo = testo("tornato", "taker-timeout", "compra", dict(base, mancato_contato=True, mancati=1), "", False)
+    secondo = testo("tornato", "taker-timeout", "compra", dict(base, mancato_contato=True, mancati=2), "", False)
+    nessuno = testo("tornato", "taker-timeout", "compra", dict(base, mancato_contato=False, mancati=3), "", False)
+    chi_ha_pubblicato = testo("tornato", "taker-timeout", "vende", dict(base, mancato_contato=True, mancati=2), "", True)
+    prova("q) al primo non completato la riga dice che e' tollerato e cosa succede dal secondo",
+          True, primo.startswith("🔄 <b>Non hai proseguito in tempo:</b>")
+          and "Questo conta come scambio non completato. Il primo è tollerato; dal secondo in 90 giorni "
+              "comparirà sul tuo profilo." in primo)
+    prova("...dal secondo dice quanti sono e che si vedono, e il filtro di chi pubblica", True,
+          "con questo sono 2 negli ultimi 90 giorni" in secondo and "«⚠️ 2 non completati»" in secondo
+          and "chi pubblica con un filtro" in secondo)
+    prova("...niente riga se non e' stato contato (ha provato), e niente a chi ha pubblicato",
+          [False, False], ["non completato" in nessuno, "non completato" in chi_ha_pubblicato])
+    O16 = ordine(16)
+    ev(O16, "taken", "buyer", "invoice-next", ORA - 40)
+    ev(O16, "buyer-invoice-requested", "mostro", "", ORA - 40)
+    d16 = {"v": 1, "order": O16, "action": "expired", "ts": ORA - 1, "actor": "mostro",
+           "buyer": KA, "seller": KB, "detail": "taker-timeout"}
+    e16 = amb["_evento_p2p_pulito"](d16, ORA)
+    f16 = amb["_registra_evento_p2p"](con, e16, ORA)
+    amb["_segna_esiti_p2p"](con, e16, f16, ORA)
+    detti = dict(amb["_avvisi_evento_p2p"](con, e16, f16, ORA))
+    prova("...e dalla rotta vera il conto arriva nel messaggio di chi ha preso, non in quello di chi ha pubblicato",
+          [True, False],
+          ["con questo sono 4 negli ultimi 90 giorni" in detti.get(222, ""),
+           "non completato" in detti.get(111, "")])
     # o) la pulizia e la memoria lunga
     n_prima = con.execute("SELECT COUNT(*) FROM p2p_esiti").fetchone()[0]
     amb["_pulisci_memoria_p2p"](con, ORA + amb["P2P_LIBRO_MEMORIA_S"] + 10)

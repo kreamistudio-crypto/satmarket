@@ -44530,6 +44530,20 @@ tentativi della fattura sono finiti in `p2p_tentativi` del db del giro.
 **Da guardare.** Il primo `taker-timeout` vero sul VPS: la riga
 «⚠️ Reputazione P2P: a … si conta uno scambio non completato» nel
 journal, e che il tentativo di chi ha aperto il foglio lo scusi. Il
-messaggio Telegram del ritorno in vetrina a chi ha preso NON dice che
-gli è stato contato: si può aggiungere una riga (non chiesto). Il
 filtro del mercatino (sopra). La patch 0009 al fork, se si vorrà.
+
+**La riga del conto nel messaggio (aggiunta prima del push, richiesta
+di Andrea).** A chi ha preso e non ha proseguito, il «🔄 Non hai
+proseguito in tempo» dice anche se gli è stato contato: al primo
+«Questo conta come scambio non completato. Il primo è tollerato; dal
+secondo in 90 giorni comparirà sul tuo profilo.», dal secondo «…con
+questo sono N negli ultimi 90 giorni, e sul tuo profilo compare «⚠️ N
+non completati». Finché ce n'è più di uno nell'ultimo mese, chi
+pubblica con un filtro può non accettarti.» I dati li mette
+`_avvisi_evento_p2p` (`mancato_contato`, `mancati`, letti da
+`p2p_esiti` dopo che `_segna_esiti_p2p` ha scritto; un db senza la
+tabella vale «non contato» e la frase resta quella di sempre), la frase
+sta in `_testo_evento_p2p`; niente riga a chi ha pubblicato né a chi
+ha provato. Prove: i casi «q)» di `prove_reputazione_p2p` (frase al
+primo, dal secondo, non contato, chi ha pubblicato; e dalla rotta vera
+il conto arriva solo a chi ha preso).

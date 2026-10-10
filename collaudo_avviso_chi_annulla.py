@@ -241,11 +241,15 @@ async def giro():
     semina_ordine(o, "sell")
     await fino_a(o, "garanzia", t0 + 800)
     await posta(busta(o, "expired", t0 + 1800, "mostro", "taker-timeout"))
+    # EMENDATA (10 ott 2026, reputazione-p2p): a chi ha preso e non ha
+    # proseguito arriva anche la riga del conto — e' il suo primo
     prova("chi ha preso non prosegue: a chi vende (ha pubblicato e bloccato) i sats tornati",
           [(V, "🔄 <b>Chi aveva preso il tuo ordine non ha proseguito.</b> È "
                f"tornato in vetrina: non devi fare niente.{TORNATI}"),
            (C, "🔄 <b>Non hai proseguito in tempo:</b> l'ordine è tornato in "
-               "vetrina. Se ti interessa ancora, puoi riprenderlo.")], detto())
+               "vetrina. Se ti interessa ancora, puoi riprenderlo.\n\nQuesto conta "
+               "come scambio non completato. Il primo è tollerato; dal secondo in "
+               "90 giorni comparirà sul tuo profilo.")], detto())
     o = ordine(10)
     t0 = ora(900)
     semina_ordine(o, "sell")
