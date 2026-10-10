@@ -809,6 +809,13 @@ P2P_CAMPAGNA_TUTTI = False
 # passo, la voce in «Info P2P» —, e il client crede solo a tutt'e due:
 # la leva E il 38385 del coordinatore. Solo True accende.
 P2P_CAUZIONE = False
+# LA CAUZIONE SUL METODO SCELTO (11 ott 2026): accesa, il client manda il
+# metodo scelto nel take (`Payload::Order`) e promette la cauzione SOLO a
+# chi sceglie «Contanti»; spenta, come ieri (la cauzione dell'ordine
+# intero). Vuole la patch 0010 del fork sul nodo (`-bar7`, PRODUZIONE):
+# accesa prima, un nodo senza la 0010 rifiuterebbe le prese sugli
+# intervalli e chiederebbe la cauzione a chi aveva letto «niente».
+P2P_CAUZIONE_SUL_METODO = False
 # GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026): chi lo chiede dal
 # bottone 🔔 della testata del libro o dal cassetto Avvisi del Profilo
 # riceve un messaggio quando nel libro compaiono ordini nuovi — del tipo

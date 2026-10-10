@@ -61388,13 +61388,13 @@ def prove_p2p_libro():
     # (10 ott 2026, cauzione-metodo-scelto) il metodo scelto viaggia nel
     # take come `Payload::Order`, con la cifra dell'intervallo dentro
     prova("la cifra scelta e il metodo viaggiano col payload della presa (`payloadPresaP2P`)", True,
-          "payload: payloadPresaP2P(riga, scelta, met)});" in _ep
+          "payload: payloadPresaP2P(riga, scelta, met, cauzioneSulMetodoP2P())});" in _ep
           and "const scelta = riga.euroMax ? Math.floor(Number(scelto) || 0) : 0;" in _ep)
     # senza, un «Riprova» su un intervallo ripartirebbe SENZA la
     # scelta e si prenderebbe un `OutOfRangeSatsAmount` che nessuno
     # collegherebbe al gesto
     prova("...e il «Riprova» la rimanda", True,
-          "payloadPresaP2P(o, o.importoScelto, o.metodoScelto));"
+          "payloadPresaP2P(o, o.importoScelto, o.metodoScelto, cauzioneSulMetodoP2P()));"
           in pezzo_js(mini, "async function riprovaPresaP2P(){", "\n}\n"))
     # EMENDATA (set 2026, il morto che risorge): la REQ NON filtra piu'
     # ne' stato ne' valuta — con `#s: pending` la sostituzione a
@@ -63102,8 +63102,9 @@ def prove_p2p_dettaglio():
         "function regolaContantiFoglioP2P(metodi, tetto, lato){",
         "function maxEuroContantiP2P(){",
         # la cauzione di chi prende (1 ott 2026): la riga e i suoi giudici
-        "function rigaCauzioneDettP2P(o, info, leva, scelto){",
-        "function cauzioneServeP2P(o, info, leva){",
+        "function rigaCauzioneDettP2P(o, info, leva, scelto, sulMetodo){",
+        "function cauzioneServeP2P(o, info, leva, sulMetodo){",
+        "function cauzioneSulMetodoP2P(){",
         "function cauzioneInfoP2P(info){",
         "function cauzioneSpentaP2P(){",
         "function metodoInCauzioneP2P(metodi, lista){",
@@ -63636,10 +63637,10 @@ console.log(JSON.stringify(out));
           [["Blocchi la cauzione e indichi dove ricevere i sats"] + _c_con[1:],
            ["Blocchi la cauzione e metti i sats in garanzia"] + _v_con[1:]],
           [_ps["cauzione"], _ps["cauzioneVendi"]])
-    # (10 ott 2026, cauzione-metodo-scelto) la cauzione segue il metodo SCELTO: con SEPA accanto ai
-    # contanti il primo passo e' quello di sempre, senza cauzione
-    prova("...la cauzione segue il metodo SCELTO: con SEPA scelto accanto ai contanti non c'e'",
-          _c_gen, _ps["cauzioneSepa"])
+    # (11 ott 2026, cauzione-metodo-scelto) A LEVA SPENTA (il banco non la stubba: `cauzioneSulMetodoP2P`
+    # legge `p2pCoord()` e dice no) la cauzione segue ancora l'ordine: il nodo senza la 0010 la chiede
+    prova("...a leva spenta la cauzione segue i metodi dell'ORDINE (SEPA scelto accanto ai contanti), come il nodo senza la 0010",
+          ["Blocchi la cauzione e indichi dove ricevere i sats"] + _c_gen[1:], _ps["cauzioneSepa"])
     prova("...mai sul mio ordine, e mai a leva spenta",
           ["Aspetti che qualcuno lo prenda", _c_con],
           [(_ps["cauzioneTuo"] or [None])[0], _ps["cauzioneSpenta"]])
@@ -78543,6 +78544,7 @@ def prove_p2p_server():
              "P2P_CONTANTI_MAX_EURO": 250,
              # la cauzione di chi prende (1 ott 2026), in busta
              "P2P_CAUZIONE": False,
+             "P2P_CAUZIONE_SUL_METODO": False,
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              # i wallet il cui indirizzo non passa (10 ott 2026), in busta
@@ -78567,9 +78569,10 @@ def prove_p2p_server():
     # di persona sono entrati insieme, da due cantieri
     # (9 ott 2026) UNDICI: la cauzione (1 ott) e le due chiavi degli
     # avvisi dei nuovi ordini — la leva globale e la finestra in minuti
-    # (10 ott 2026) DODICI: l'elenco dei wallet il cui indirizzo non passa
-    prova("le chiavi sono dodici e sono sempre quelle",
-          ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "commissione",
+    # (10 ott 2026) DODICI: l'elenco dei wallet il cui indirizzo non passa;
+    # (11 ott 2026) TREDICI: la cauzione sul metodo scelto, dietro la -bar7
+    prova("le chiavi sono tredici e sono sempre quelle",
+          ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "cauzioneSulMetodo", "commissione",
            "indirizziNo", "maxEuro", "maxEuroContanti", "minEuroBz", "mostro", "relay",
            "specchio"],
           sorted(piena.keys()))
@@ -105522,7 +105525,7 @@ def prove_passi_libro_p2p():
           "passiDettP2P(passiScambioP2P({" in dett
           and "compro: compro, tuo: !!tuo," in dett
           and "metodo: p2pDettMetodo || ((o.metodi || []).length === 1 ? o.metodi[0] : '')," in dett
-          and "cauzione: !tuo && cauzioneServeP2P(Object.assign({}, o, {mio: false, metodoScelto: p2pDettMetodo || ''}), p2pInfo, cauzioneAccesaP2P())" in dett)
+          and "cauzione: !tuo && cauzioneServeP2P(Object.assign({}, o, {mio: false, metodoScelto: p2pDettMetodo || ''}), p2pInfo, cauzioneAccesaP2P(), cauzioneSulMetodoP2P())" in dett)
     prova("...e la frase di prima non c'e' piu', ne' il suo riquadro", [False, False, False],
           ["tu mandi gli euro col metodo scelto" in mini,
            "Tu blocchi i sats in garanzia, ricevi gli euro" in mini,
@@ -106397,6 +106400,7 @@ def prove_avvisi_nuovi_ordini():
     amb_l = {"P2P_ATTIVO": True, "MOSTRO_HEX": "a" * 64, "MOSTRO_RELAY": ["ws://127.0.0.1:9"],
              "MOSTRO_RELAY_SPECCHIO": [], "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
              "P2P_CONTANTI_MAX_EURO": 250, "BARATTOZON_MIN_EURO": 25, "P2P_CAUZIONE": False,
+             "P2P_CAUZIONE_SUL_METODO": False,
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              "P2P_INDIRIZZI_NON_PASSANO": {}}
     exec(_senza_prosa(pezzo("_p2p_leve")), amb_l)
@@ -127581,6 +127585,7 @@ def prove_contanti_a_mano():
              "BARATTOZON_MIN_EURO": 25,
              # la cauzione (1 ott 2026), entrata in busta il giorno dopo
              "P2P_CAUZIONE": False,
+             "P2P_CAUZIONE_SUL_METODO": False,
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              "P2P_INDIRIZZI_NON_PASSANO": {}}
@@ -130941,10 +130946,10 @@ def prove_cauzione_p2p():
           and "if (eco.incasso && JSON.stringify(eco.incasso) !== JSON.stringify(ord.incasso || null)) {" in app)
     dett = fn("function renderDettaglioP2P(){")
     prova("il dettaglio di chi sta per prendere dice la cauzione dopo la regola del contanti, mai al proprietario", True,
-          0 < dett.find("regolaContantiFoglioP2P(") < dett.find("(tuo ? '' : rigaCauzioneDettP2P(o, p2pInfo, cauzioneAccesaP2P(), p2pDettMetodo)) +") < dett.find("repRiquadroP2P("))
+          0 < dett.find("regolaContantiFoglioP2P(") < dett.find("(tuo ? '' : rigaCauzioneDettP2P(o, p2pInfo, cauzioneAccesaP2P(), p2pDettMetodo, cauzioneSulMetodoP2P())) +") < dett.find("repRiquadroP2P("))
     prova("«Info P2P» ha la voce viva della cauzione", True,
           '<li id="p2pInfoCauzione"></li>' in mini
-          and "if (cauz) cauz.innerHTML = testoCauzioneInfoP2P(p2pInfo, cauzioneAccesaP2P());" in fn("function renderP2PInfo(){"))
+          and "if (cauz) cauz.innerHTML = testoCauzioneInfoP2P(p2pInfo, cauzioneAccesaP2P(), cauzioneSulMetodoP2P());" in fn("function renderP2PInfo(){"))
     dec = nudo(fn("async function eseguiDecisioneP2P(ordine, esito){"))
     prova("il moderatore: la cauzione a registro E al coordinatore come `bond_resolution`, solo se si brucia", True,
           "cauzione: cauzione}" in dec
@@ -130960,7 +130965,7 @@ def prove_cauzione_p2p():
           and "await chiamataOrdineP2P(o, 'add-bond-invoice', {payment_request: [null, bolt, null]});" in fn("async function inviaFatturaCauzioneP2P(){"))
     for spia in ("localStorage", "el(", "document", "fetch(", "await ", "toast("):
         prova(f"i giudici della cauzione sono puri: nessun `{spia}`", False,
-              spia in nudo(fn("function cauzioneServeP2P(o, info, leva){")
+              spia in nudo(fn("function cauzioneServeP2P(o, info, leva, sulMetodo){")
                            + fn("function metodoInCauzioneP2P(metodi, lista){")
                            + fn("function importoCauzioneP2P(sats, info){")
                            + fn("function cauzioneVivaP2P(o, adesso){")))
@@ -130972,6 +130977,7 @@ def prove_cauzione_p2p():
     # viaggiano le due chiavi degli avvisi dei nuovi ordini
     prova("...viaggia in busta come `cauzione`, e il pannello la censisce", True,
           '"cauzione": bool(P2P_CAUZIONE),' in pezzo("_p2p_leve")
+          and '"cauzioneSulMetodo": bool(P2P_CAUZIONE_SUL_METODO),' in pezzo("_p2p_leve")
           and '_leva("Cauzione nel contanti di persona", "P2P_CAUZIONE",' in src)
     esempio = open("config_esempio.py", encoding="utf-8").read()
     prova("...e il config d'esempio la porta, spenta", True, "\nP2P_CAUZIONE = False\n" in esempio)
@@ -131366,15 +131372,16 @@ def prove_cauzione_p2p():
         re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0),
         fn("function cauzioneSpentaP2P(){"), fn("function cauzioneDaInfoP2P(ev){"),
         fn("function cauzioneInfoP2P(info){"), fn("function cauzioneAccesaP2P(){"),
-        fn("function metodoInCauzioneP2P(metodi, lista){"), fn("function cauzioneServeP2P(o, info, leva){"),
+        fn("function metodoInCauzioneP2P(metodi, lista){"), fn("function cauzioneServeP2P(o, info, leva, sulMetodo){"),
         fn("function cauzioneServeQuiP2P(o){"), fn("function importoCauzioneP2P(sats, info){"),
         fn("function satsBaseCauzioneP2P(o){"), fn("function cauzioneVivaP2P(o, adesso){"),
         fn("function satsCauzioneP2P(o){"), fn("function cauzioneAFineP2P(o){"),
-        fn("function rigaCauzioneDettP2P(o, info, leva, scelto){"),
-        # (10 ott 2026, cauzione-metodo-scelto) il payload della presa
-        fn("function payloadPresaP2P(riga, scelta, metodo){"),
+        fn("function rigaCauzioneDettP2P(o, info, leva, scelto, sulMetodo){"),
+        # (10 ott 2026, cauzione-metodo-scelto) il payload della presa, e la seconda leva
+        fn("function payloadPresaP2P(riga, scelta, metodo, sulMetodo){"),
+        fn("function cauzioneSulMetodoP2P(){"),
         fn("function riquadroCauzioneP2P(o){"), fn("function riquadroIncassoCauzioneP2P(o){"),
-        fn("function testoCauzioneInfoP2P(info, leva){"),
+        fn("function testoCauzioneInfoP2P(info, leva, sulMetodo){"),
         fn("function contantiAManoP2P(metodi){"), fn("function contantiModP2P(d){"),
         fn("function cauzioneModSceltaP2P(ordine){"), fn("function cauzioneModP2P(d, bozze){"),
         fn("function cauzioneFraseModP2P(ordine){"),
@@ -131511,19 +131518,28 @@ out.dett = [rigaCauzioneDettP2P({metodi: ['Contanti'], euro: 100, sats: 0}, p2pI
   rigaCauzioneDettP2P({metodi: ['Contanti'], euro: 100, sats: 0}, p2pInfo, false), rigaCauzioneDettP2P({metodi: ['SEPA'], euro: 100}, p2pInfo, true)];
 /* (10 ott 2026, cauzione-metodo-scelto) il metodo SCELTO decide, per chi prende */
 const misto = {metodi: ['Satispay', 'PayPal', 'Contanti'], mio: false};
-out.scelto = [cauzioneServeP2P(Object.assign({}, misto, {metodoScelto: 'Satispay'}), p2pInfo, true),
-  cauzioneServeP2P(Object.assign({}, misto, {metodoScelto: 'Contanti'}), p2pInfo, true),
-  cauzioneServeP2P(Object.assign({}, misto, {metodoScelto: ' contanti '}), p2pInfo, true),
-  cauzioneServeP2P(Object.assign({}, misto, {metodoScelto: 'Revolut'}), p2pInfo, true),   // fuori elenco: non e' una scelta, due metodi: no
-  cauzioneServeP2P({metodi: ['Contanti'], mio: false, metodoScelto: 'SEPA'}, p2pInfo, true),   // fuori elenco su un solo metodo: l'ordine
-  cauzioneServeP2P({metodi: ['SEPA'], mio: false, metodoScelto: 'Contanti'}, p2pInfo, true),
-  cauzioneServeP2P({metodi: ['SEPA', 'Contanti'], mio: true, metodoScelto: 'SEPA'}, {cauzione: Object.assign({}, p2pInfo.cauzione, {applyTo: 'make'})}, true),   // chi pubblica: l'ordine
-  rigaCauzioneDettP2P({metodi: ['Satispay', 'PayPal', 'Contanti'], euro: 100, sats: 0}, p2pInfo, true, 'Satispay'),
-  rigaCauzioneDettP2P({metodi: ['Satispay', 'PayPal', 'Contanti'], euro: 100, sats: 0}, p2pInfo, true, '').length,
-  rigaCauzioneDettP2P({metodi: ['Satispay', 'PayPal', 'Contanti'], euro: 100, sats: 0}, p2pInfo, true, 'Contanti').indexOf('in contanti blocchi una piccola cauzione di circa <b>3000 sats</b>') >= 0];
-out.presa = [payloadPresaP2P({euro: 100, premium: 2}, 0, 'SEPA'), payloadPresaP2P({euro: 100}, 60, 'Contanti'),
-  payloadPresaP2P({euro: 100}, 60, ''), payloadPresaP2P({euro: 100}, 0, null), payloadPresaP2P(null, 0, ' PayPal ')];
-out.fisso = [P2P_METODO_FISSO, testoCauzioneInfoP2P(p2pInfo, true).indexOf(P2P_METODO_FISSO) >= 0];
+const SU = true;   // la seconda leva ACCESA (il nodo alla -bar7)
+out.scelto = [cauzioneServeP2P(Object.assign({}, misto, {metodoScelto: 'Satispay'}), p2pInfo, true, SU),
+  cauzioneServeP2P(Object.assign({}, misto, {metodoScelto: 'Contanti'}), p2pInfo, true, SU),
+  cauzioneServeP2P(Object.assign({}, misto, {metodoScelto: ' contanti '}), p2pInfo, true, SU),
+  cauzioneServeP2P(Object.assign({}, misto, {metodoScelto: 'Revolut'}), p2pInfo, true, SU),   // fuori elenco: non e' una scelta, due metodi: no
+  cauzioneServeP2P({metodi: ['Contanti'], mio: false, metodoScelto: 'SEPA'}, p2pInfo, true, SU),   // fuori elenco su un solo metodo: l'ordine
+  cauzioneServeP2P({metodi: ['SEPA'], mio: false, metodoScelto: 'Contanti'}, p2pInfo, true, SU),
+  cauzioneServeP2P({metodi: ['SEPA', 'Contanti'], mio: true, metodoScelto: 'SEPA'}, {cauzione: Object.assign({}, p2pInfo.cauzione, {applyTo: 'make'})}, true, SU),   // chi pubblica: l'ordine
+  rigaCauzioneDettP2P({metodi: ['Satispay', 'PayPal', 'Contanti'], euro: 100, sats: 0}, p2pInfo, true, 'Satispay', SU),
+  rigaCauzioneDettP2P({metodi: ['Satispay', 'PayPal', 'Contanti'], euro: 100, sats: 0}, p2pInfo, true, '', SU).length,
+  rigaCauzioneDettP2P({metodi: ['Satispay', 'PayPal', 'Contanti'], euro: 100, sats: 0}, p2pInfo, true, 'Contanti', SU).indexOf('in contanti blocchi una piccola cauzione di circa <b>3000 sats</b>') >= 0];
+/* (11 ott 2026) A LEVA SPENTA, come ieri: l'ordine intero decide, anche con Satispay scelto, e il take non porta il metodo */
+out.levaSpenta = [cauzioneServeP2P(Object.assign({}, misto, {metodoScelto: 'Satispay'}), p2pInfo, true),
+  cauzioneServeP2P(Object.assign({}, misto, {metodoScelto: 'Satispay'}), p2pInfo, true, false),
+  rigaCauzioneDettP2P({metodi: ['Satispay', 'PayPal', 'Contanti'], euro: 100, sats: 0}, p2pInfo, true, 'Satispay').indexOf('in contanti blocchi') >= 0,
+  payloadPresaP2P({euro: 100, premium: 2}, 0, 'SEPA'), payloadPresaP2P({euro: 100}, 60, 'Contanti', false),
+  cauzioneSulMetodoP2P()];
+out.presa = [payloadPresaP2P({euro: 100, premium: 2}, 0, 'SEPA', SU), payloadPresaP2P({euro: 100}, 60, 'Contanti', SU),
+  payloadPresaP2P({euro: 100}, 60, '', SU), payloadPresaP2P({euro: 100}, 0, null, SU), payloadPresaP2P(null, 0, ' PayPal ', SU)];
+out.fisso = [P2P_METODO_FISSO, testoCauzioneInfoP2P(p2pInfo, true, SU).indexOf(P2P_METODO_FISSO) >= 0,
+  testoCauzioneInfoP2P(p2pInfo, true).indexOf(P2P_METODO_FISSO) >= 0];
+out.infoSu = testoCauzioneInfoP2P(p2pInfo, true, SU);
 out.info = [testoCauzioneInfoP2P(p2pInfo, true), testoCauzioneInfoP2P(p2pInfo, false), testoCauzioneInfoP2P(null, true)];
 /* 12) il moderatore */
 out.mod = [cauzioneModP2P({ordine: 'o1', cauzione_di: 'compra', metodi: 'Contanti, Revolut'}, {}),
@@ -131553,8 +131569,8 @@ console.log(JSON.stringify(out));
     prova("il metodo: parola intera, senza maiuscole e spazi; il tabacchino no; lista vuota = tutti",
           [True, True, True, False, False, False, True, True], o["metodo"])
     prova("a chi serve: chi prende un contanti con leva e 38385 accesi; mai a chi pubblica con `take`; mai su altri metodi; "
-          "con due metodi e nessuna scelta NO (10 ott 2026); `make` e `both` girano",
-          [True, False, False, False, False, False, False, True, False, True, True], o["serve"])
+          "con due metodi e nessuna scelta SI' a leva spenta (la regola dell'ordine, 11 ott 2026); `make` e `both` girano",
+          [True, False, False, False, True, False, False, True, False, True, True], o["serve"])
     prova("il metodo SCELTO decide: Satispay no, Contanti si' (anche sporco), fuori elenco no su due metodi e l'ordine su uno, "
           "Contanti scelto su un SEPA no, chi pubblica resta all'ordine; la riga del dettaglio solo con Contanti scelto",
           [False, True, True, False, True, False, True, "", 0, True], o["scelto"])
@@ -131567,10 +131583,17 @@ console.log(JSON.stringify(out));
            {"order": {"kind": None, "status": None, "amount": 0, "fiat_code": "EUR", "min_amount": None, "max_amount": None,
                       "fiat_amount": 0, "payment_method": "PayPal", "premium": 0, "created_at": None, "expires_at": None}}],
           o["presa"])
-    prova("«il metodo scelto resta fissato» sta sotto le pillole e in «Info P2P», con le stesse parole",
-          [True, True, True],
-          [o["fisso"][0].startswith("Il metodo che scegli resta fissato per lo scambio"), o["fisso"][1],
+    prova("«il metodo scelto resta fissato» sta sotto le pillole e in «Info P2P» (con la leva accesa e spenta), con le stesse parole",
+          [True, True, True, True],
+          [o["fisso"][0].startswith("Il metodo che scegli resta fissato per lo scambio"), o["fisso"][1], o["fisso"][2],
            "<div class=\"hint p2p-metodo-fisso\">' + esc(P2P_METODO_FISSO) + '</div>" in fn("function metodiDettP2P(o){")])
+    prova("A LEVA SPENTA come ieri: Satispay scelto su un misto ha la cauzione (anche col quarto argomento assente o false), "
+          "la riga dice «in contanti», il take porta solo la cifra, e la leva letta dal contesto del banco dice no",
+          [True, True, True, None, {"amount": 60}, False], o["levaSpenta"])
+    prova("...e «Info P2P» a leva accesa dice «scegliendo «Contanti» alla presa», a leva spenta «negli ordini che accettano «Contanti»»",
+          [True, True],
+          ["scegliendo «Contanti» alla presa (su un ordine con più metodi solo chi sceglie «Contanti»)" in o["infoSu"],
+           "negli ordini che accettano «Contanti» (su un ordine con più metodi, con qualunque metodo scelto)" in o["info"][0]])
     prova("...e la scorciatoia col contesto vivo", [True, False], [o["serveQui"], o["serveQuiSpenta"]])
     # 1200.3 → 1200 e 1234.5 → 1235: lo stesso `round()` del coordinatore
     # (mezzo si allontana dallo zero, come in Rust)
@@ -131615,7 +131638,7 @@ console.log(JSON.stringify(out));
                             and "torna a fine scambio" in o["dett"][0]), o["dett"][1], o["dett"][2]])
     prova("«Info P2P»: la voce viva (3%, almeno 1000, «Contanti», 50% all'altra persona, 15 giorni) e la voce spenta",
           [True, True, True],
-          [("il <b>3%</b> dei sats, almeno 1000 sats" in o["info"][0] and "scegliendo «Contanti» alla presa (su un ordine con più metodi solo chi sceglie «Contanti»)" in o["info"][0]
+          [("il <b>3%</b> dei sats, almeno 1000 sats" in o["info"][0] and "«Contanti»" in o["info"][0]
             and "50% va all'altra persona" in o["info"][0] and "15 giorni" in o["info"][0]),
            "in questo momento non c'è" in o["info"][1], "in questo momento non c'è" in o["info"][2]])
     prova("il moderatore: la spunta per chi ha preso un contanti (chi compra), spuntata dalla bozza; niente su SEPA, senza chi, o col tabacchino",

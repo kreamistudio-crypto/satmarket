@@ -439,7 +439,12 @@ se e solo se sta nella policy; senza una dichiarazione usabile decide
 l'ordine intero, come ieri (un client che dicesse «SEPA» su un ordine
 solo-contanti non la scansa; un client di un'altra app, che non dichiara,
 resta alla 0008). `bond_applies_to_take` legge la policy dalle settings,
-`taker_bond_required_for_take` la mette insieme all'interruttore.
+`taker_bond_required_for_take` la mette insieme all'interruttore. Il
+client la manda SOLO con la leva `P2P_CAUZIONE_SUL_METODO` accesa sul
+VPS (11 ott 2026): un nodo senza la 0010 ignora `Payload::Order` su un
+ordine normale ma su un intervallo risponde `OutOfRangeSatsAmount`
+(`get_amount` legge solo `Amount` e `PaymentRequest`), quindi la leva si
+accende dopo la `-bar7`.
 **C)** `take_buy.rs` e `take_sell.rs`: `bond_required` passa da
 `taker_bond_required_for_take(&order, taker_payment_method(&msg).as_deref())`.
 `maker_bond_required_for` (chi pubblica, `apply_to = make|both`) non

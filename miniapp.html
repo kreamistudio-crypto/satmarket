@@ -51354,7 +51354,7 @@ function renderP2PInfo(){
   if (tettoC) tettoC.innerHTML = testoTettoContantiP2P(maxEuroContantiP2P());
   /* LA CAUZIONE, VIVA (1 ott 2026): la leva del server E il 38385 */
   const cauz = el('p2pInfoCauzione');
-  if (cauz) cauz.innerHTML = testoCauzioneInfoP2P(p2pInfo, cauzioneAccesaP2P());
+  if (cauz) cauz.innerHTML = testoCauzioneInfoP2P(p2pInfo, cauzioneAccesaP2P(), cauzioneSulMetodoP2P());
   /* LA COMMISSIONE, dallo stesso giudice del conto dello scambio: le
      due cifre non possono divergere perche' la fonte e' una sola. La
      frase la scrive `testoFeeInfoP2P` (25 set 2026: la beta, il prezzo
@@ -56292,6 +56292,20 @@ function cauzioneAccesaP2P(){
   const c = p2pCoord();
   return !!(c && c.cauzione === true);
 }
+/* LA SECONDA LEVA, `cauzioneSulMetodo` (11 ott 2026, cantiere cauzione-
+   metodo-scelto): il metodo scelto viaggia nel take e la cauzione si
+   giudica su quello SOLO quando il nodo ha la patch 0010. Finche' e'
+   spenta il client fa come ieri — `Amount` o niente nel take, la
+   cauzione dell'ordine intero, il foglio della cauzione quando il
+   coordinatore la chiede — perche' un nodo senza la 0010 ignora il
+   payload (su un intervallo risponderebbe `OutOfRangeSatsAmount`) e
+   chiede la cauzione a chi sceglie SEPA su un «SEPA, Contanti»: dire
+   «niente cauzione» sarebbe una bugia. Si accende sul VPS DOPO la
+   `-bar7` (PRODUZIONE, «LA SALITA ALLA -bar7», punto 9). */
+function cauzioneSulMetodoP2P(){
+  const c = p2pCoord();
+  return !!(c && c.cauzioneSulMetodo === true);
+}
 /* PURA, e ricalca la regola del coordinatore (patch 0008,
    `bond_applies_to_order`): fra i metodi dell'ORDINE — non quello
    scelto alla presa, che il coordinatore non vede — ce n'e' uno della
@@ -56318,13 +56332,15 @@ function metodoInCauzioneP2P(metodi, lista){
    ignora), decide l'ordine come prima. Chi PUBBLICA (`make`, `both`)
    resta alla regola dell'ordine intero: la sua cauzione non ha una
    scelta dietro. */
-function cauzioneServeP2P(o, info, leva){
+function cauzioneServeP2P(o, info, leva, sulMetodo){
   const c = cauzioneInfoP2P(info);
   if (!o || !leva || !c.accesa) return false;
   const prende = !o.mio;
   const tocca = c.applyTo === 'both' ? true : c.applyTo === 'make' ? !prende : prende;
   if (!tocca) return false;
-  if (prende) {
+  /* `sulMetodo` e' la seconda leva (`cauzioneSulMetodoP2P`): spenta, la
+     regola dell'ordine intero per tutti, come il nodo senza la 0010 */
+  if (prende && sulMetodo) {
     const m = String(o.metodoScelto || '').trim().toLowerCase();
     const dell = (o.metodi || []).map(x => String(x || '').trim().toLowerCase());
     if (m && dell.indexOf(m) >= 0) return metodoInCauzioneP2P([m], c.metodi);
@@ -56333,7 +56349,7 @@ function cauzioneServeP2P(o, info, leva){
   return metodoInCauzioneP2P(o.metodi, c.metodi);
 }
 function cauzioneServeQuiP2P(o){
-  return cauzioneServeP2P(o, p2pInfo, cauzioneAccesaP2P());
+  return cauzioneServeP2P(o, p2pInfo, cauzioneAccesaP2P(), cauzioneSulMetodoP2P());
 }
 /* PURA: quanti sats, con la formula del coordinatore letta sui byte
    (`compute_bond_amount` in src/app/bond/math.rs):
@@ -56391,8 +56407,8 @@ function cauzioneAFineP2P(o){
    il metodo delle pillole (10 ott 2026, cauzione-metodo-scelto): su un
    ordine a piu' metodi la riga compare SOLO scegliendo «Contanti» —
    prima usciva anche con Satispay scelto, e diceva «in contanti». */
-function rigaCauzioneDettP2P(o, info, leva, scelto){
-  if (!cauzioneServeP2P(Object.assign({}, o, {mio: false, metodoScelto: scelto || ''}), info, leva)) return '';
+function rigaCauzioneDettP2P(o, info, leva, scelto, sulMetodo){
+  if (!cauzioneServeP2P(Object.assign({}, o, {mio: false, metodoScelto: scelto || ''}), info, leva, sulMetodo)) return '';
   const c = cauzioneInfoP2P(info);
   const stima = importoCauzioneP2P(satsBaseCauzioneP2P(o), info);
   return '<div class="hint cauzione-regola">🔐 <b>La cauzione di chi prende.</b> '
@@ -56441,7 +56457,7 @@ function riquadroIncassoCauzioneP2P(o){
     + '</div>';
 }
 /* la voce in «Info P2P», coi numeri vivi del 38385 e della leva */
-function testoCauzioneInfoP2P(info, leva){
+function testoCauzioneInfoP2P(info, leva, sulMetodo){
   const c = cauzioneInfoP2P(info);
   if (!leva || !c.accesa)
     return '<b>La cauzione di chi prende:</b> in questo momento non c\'è: chi prende un ordine in contanti non blocca niente prima dell\'incontro.';
@@ -56449,7 +56465,10 @@ function testoCauzioneInfoP2P(info, leva){
   /* (10 ott 2026, cauzione-metodo-scelto) la chiede il metodo SCELTO alla
      presa: su un ordine a piu' metodi solo chi sceglie quello */
   const voci = c.metodi.map(m => '«' + m.charAt(0).toUpperCase() + m.slice(1) + '»').join(', ');
-  const dove = c.metodi.length ? ' scegliendo ' + esc(voci) + ' alla presa (su un ordine con più metodi solo chi sceglie ' + esc(voci) + ')' : ' in ogni scambio';
+  const dove = !c.metodi.length ? ' in ogni scambio'
+    : sulMetodo ? ' scegliendo ' + esc(voci) + ' alla presa (su un ordine con più metodi solo chi sceglie ' + esc(voci) + ')'
+    /* a leva spenta la regola di ieri, detta per intero: l'ordine */
+    : ' negli ordini che accettano ' + esc(voci) + ' (su un ordine con più metodi, con qualunque metodo scelto)';
   return '<b>La cauzione di chi prende:</b>' + dove + ' ' + chi + ' blocca una piccola cauzione'
     + (c.pct > 0 ? ' — il <b>' + esc(String(Math.round(c.pct * 1000) / 10).replace('.', ',')) + '%</b> dei sats'
         + (c.base > 0 ? ', almeno ' + fmt(c.base) + ' sats' : '') + ' —' : '')
@@ -58642,7 +58661,7 @@ function renderDettaglioP2P(){
     regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo] : (o.metodi || []), maxEuroContantiP2P(),
                             compro ? 'compro' : 'vendo') +
     /* la cauzione di chi prende, PRIMA di premere (1 ott 2026) */
-    (tuo ? '' : rigaCauzioneDettP2P(o, p2pInfo, cauzioneAccesaP2P(), p2pDettMetodo)) +
+    (tuo ? '' : rigaCauzioneDettP2P(o, p2pInfo, cauzioneAccesaP2P(), p2pDettMetodo, cauzioneSulMetodoP2P())) +
     repRiquadroP2P(p2pFacce[o.id], o.id) +
     /* il filtro di chi ha pubblicato, a chi guarda (10 ott 2026) */
     (tuo || typeof rigaFiltroDettP2P !== 'function' ? '' : rigaFiltroDettP2P(o.id)) +
@@ -58665,7 +58684,7 @@ function renderDettaglioP2P(){
     passiDettP2P(passiScambioP2P({
       compro: compro, tuo: !!tuo,
       metodo: p2pDettMetodo || ((o.metodi || []).length === 1 ? o.metodi[0] : ''),
-      cauzione: !tuo && cauzioneServeP2P(Object.assign({}, o, {mio: false, metodoScelto: p2pDettMetodo || ''}), p2pInfo, cauzioneAccesaP2P())
+      cauzione: !tuo && cauzioneServeP2P(Object.assign({}, o, {mio: false, metodoScelto: p2pDettMetodo || ''}), p2pInfo, cauzioneAccesaP2P(), cauzioneSulMetodoP2P())
     })) +
     /* col tabacchino, il rimando al passo per passo SUBITO SOTTO i quattro
        passi (7 ott 2026, sera: prima stava sopra, con la riga 🧾) */
@@ -59033,7 +59052,7 @@ async function eseguiPresaP2P(id, scelto, metodo){
        /* il metodo scelto e la cifra, come `Payload::Order` (10 ott 2026,
           patch 0010); senza metodo, `Payload::Amount` solo sull'intervallo
           (`get_amount` in message.rs), e su un ordine normale niente */
-       payload: payloadPresaP2P(riga, scelta, met)});
+       payload: payloadPresaP2P(riga, scelta, met, cauzioneSulMetodoP2P())});
     await mostroChiama(tk.sk, msg, {mazzoSk: reput ? mz.sk : null, primoContatto: true});
     ord = ordiniP2P()[id] || ord;
     ord.contattato = true;
@@ -59073,7 +59092,7 @@ async function riprovaPresaP2P(){
   try {
     await mostroRiascolta();
     await chiamataOrdineP2P(o, o.lato === 'compro' ? 'take-sell' : 'take-buy',
-      payloadPresaP2P(o, o.importoScelto, o.metodoScelto));
+      payloadPresaP2P(o, o.importoScelto, o.metodoScelto, cauzioneSulMetodoP2P()));
     const agg = ordiniP2P()[id] || o;
     agg.contattato = true;
     scriviOrdineP2P(agg);
@@ -59167,10 +59186,12 @@ async function riprovaPubblicazioneP2P(){
    intervallo, niente su un ordine normale. I campi sono quelli di
    `CAMPI_MOSTRO.ordine`, nell'ordine di serde; `SmallOrder` rifiuta i
    campi sconosciuti (`deny_unknown_fields`), quindi niente di piu'. */
-function payloadPresaP2P(riga, scelta, metodo){
+function payloadPresaP2P(riga, scelta, metodo, sulMetodo){
   const m = String(metodo || '').trim();
   const cifra = Math.floor(Number(scelta) || 0);
-  if (!m) return cifra ? {amount: cifra} : null;
+  /* a leva spenta (`sulMetodo`, vedi `cauzioneSulMetodoP2P`) come ieri:
+     il nodo senza la 0010 non legge l'ordine nel payload */
+  if (!m || !sulMetodo) return cifra ? {amount: cifra} : null;
   return {order: {kind: null, status: null, amount: 0, fiat_code: 'EUR',
     min_amount: null, max_amount: null,
     fiat_amount: cifra || Math.floor(Number(riga && riga.euro) || 0),

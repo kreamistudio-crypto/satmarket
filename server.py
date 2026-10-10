@@ -28372,6 +28372,14 @@ def _leve_stato():
                   spento="il client non promette nessuna cauzione; se il "
                          "coordinatore la chiede lo stesso, la richiesta "
                          "arriva e si gestisce, senza cifre dette prima"),
+            _leva("Cauzione sul metodo scelto (nodo alla -bar7)",
+                  "P2P_CAUZIONE_SUL_METODO", P2P_CAUZIONE_SUL_METODO,
+                  acceso="il client manda il metodo scelto nel take e "
+                         "promette la cauzione solo a chi sceglie "
+                         "«Contanti»: vuole la patch 0010 sul nodo",
+                  spento="come ieri: la cauzione dell'ordine intero, "
+                         "anche a chi sceglie SEPA su un ordine con i "
+                         "contanti; da accendere dopo la -bar7"),
             # GLI AVVISI DEI NUOVI ORDINI (9 ott 2026): la leva globale e la
             # finestra del raggruppamento; la preferenza resta per persona
             _leva("Avvisi dei nuovi ordini P2P", "P2P_AVVISI_NUOVI_ORDINI",
@@ -44130,6 +44138,20 @@ try:
     P2P_CAUZIONE = P2P_CAUZIONE is True
 except ImportError:
     P2P_CAUZIONE = False
+# LA CAUZIONE SUL METODO SCELTO (11 ott 2026, cantiere cauzione-metodo-
+# scelto): spenta di serie, si accende sul VPS DOPO che il nodo ha la
+# patch 0010 (`-bar7`). Accesa, il client manda il metodo scelto nel
+# take e promette la cauzione solo a chi sceglie «Contanti»; spenta, fa
+# come ieri (la cauzione dell'ordine intero, che il nodo senza la 0010
+# chiede lo stesso). Solo True accende.
+try:
+    from config import P2P_CAUZIONE_SUL_METODO
+    if not isinstance(P2P_CAUZIONE_SUL_METODO, bool):
+        print("[p2p] P2P_CAUZIONE_SUL_METODO non e' True/False: la cauzione "
+              "resta sull'ordine intero")
+    P2P_CAUZIONE_SUL_METODO = P2P_CAUZIONE_SUL_METODO is True
+except ImportError:
+    P2P_CAUZIONE_SUL_METODO = False
 # GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026, richiesta di Andrea):
 # chi lo chiede riceve un messaggio quando nel libro P2P compaiono
 # ordini nuovi — raggruppati, al piu' uno ogni P2P_AVVISI_NUOVI_MINUTI
@@ -44404,6 +44426,8 @@ def _p2p_leve() -> dict:
             # client la mostra solo con questa E col 38385 del
             # coordinatore che la annuncia; viaggia sempre, anche falsa
             "cauzione": bool(P2P_CAUZIONE),
+            # ...e sul metodo scelto (11 ott 2026): solo col nodo alla -bar7
+            "cauzioneSulMetodo": bool(P2P_CAUZIONE_SUL_METODO),
             # gli avvisi dei nuovi ordini (9 ott 2026): la leva globale
             # e la finestra, perche' la riga del Profilo e il bottone
             # della testata compaiano solo se esistono, e dicano

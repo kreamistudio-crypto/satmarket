@@ -49144,6 +49144,44 @@ otto pezzi nella patch, le DUE prese e non chi pubblica, i test del
 (lo stepper passa la scelta). Suite, collaudi e giro dal vivo: nel
 verbale del push.
 
+**LA GARANZIA PRIMA DEL PUSH (11 ott 2026, notte, domanda di Andrea: l'app
+va online subito, il nodo resta senza la 0010 finché non la installiamo
+insieme).**
+1) UN NODO SENZA LA 0010 ACCETTA UN TAKE COL `payment_method` NEL PAYLOAD?
+Letto su mostro-core 0.16.0 e mostrod v0.19.0 con le otto patch: la
+forma passa (`MessageKind::verify`, `src/message.rs` righe 865-905 di
+mostro-core: `TakeSell | TakeBuy | …` finiscono nel braccio che chiede
+solo `id` presente e NON `BondResolution`/`BondPayoutRequest` — un
+`Payload::Order` va bene); la fattura non c'è (`get_payment_request`,
+righe 951-963: su `Order(ord)` legge `ord.buyer_invoice`, vuoto →
+`validate_invoice` in `src/util.rs` 2251-2277 non valida niente); la
+cifra: `get_fiat_amount_requested` (`src/util.rs` 2104-2121) su un
+ordine NORMALE torna `Some(order.fiat_amount)` senza guardare il
+payload — ACCETTATO COME OGGI —, ma su un INTERVALLO chiede
+`get_amount()` (`message.rs` 969-978: solo `Amount` e `PaymentRequest`)
+→ `None` → `take_sell.rs` 175-178 / `take_buy.rs` 125 rispondono
+`OutOfRangeSatsAmount`: UN INTERVALLO SAREBBE RIFIUTATO. Quindi no, non
+«come oggi» per tutto: ecco la leva.
+2) LA LEVA `P2P_CAUZIONE_SUL_METODO` (server, spenta di serie; busta
+`cauzioneSulMetodo`, dodicesima chiave; pannello «Stato delle leve»;
+`config_esempio.py`). Nel client `cauzioneSulMetodoP2P()` entra come
+ultimo argomento in `payloadPresaP2P` (spenta: `Amount` o niente, come
+ieri), `cauzioneServeP2P` (spenta: la cauzione dell'ordine intero, anche
+a chi sceglie SEPA su un misto — che il nodo senza la 0010 chiede
+davvero: il foglio della cauzione arriva da `pay-bond-invoice` e si
+gestisce come oggi), `rigaCauzioneDettP2P` (spenta: la riga di ieri,
+«in contanti», su ogni ordine con i contanti) e `testoCauzioneInfoP2P`
+(spenta: «negli ordini che accettano «Contanti» (su un ordine con più
+metodi, con qualunque metodo scelto)»; accesa: «scegliendo «Contanti»
+alla presa…»). La frase del metodo fissato resta sempre. Si accende sul
+VPS DOPO la `-bar7` (PRODUZIONE, «LA SALITA ALLA -bar7», punto 9); il
+rollback è la leva a False. Prove: `prove_cauzione_p2p` coi casi a leva
+accesa (`SU`) e spenta (`levaSpenta`: Satispay su un misto ha la
+cauzione, la riga dice «in contanti», il take porta solo la cifra, la
+leva letta dal contesto dice no), `prove_p2p_dettaglio` (a leva spenta il
+passo della cauzione con SEPA scelto, come il nodo senza la 0010),
+`prove_p2p_server` (dodici chiavi), `prove_config_esempio`.
+
 ## La cauzione sul metodo scelto, il verbale del push (11 ott 2026, notte): cosa è girato su quale albero
 
 Sull'albero di partenza (e8a24ad + le modifiche): la suite PROVE_SEVERE

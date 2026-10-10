@@ -3248,11 +3248,17 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   cauzione si chiede SOLO a chi sceglie i contanti; su «SEPA, Contanti»
   chi sceglie SEPA, Satispay, PayPal o il PayCode non blocca niente).
   Nessuna settings nuova, nessuna migrazione, `settings.toml` com'è; il
-  38385 non cambia. Il client la manda già dal push del cantiere: fino
-  alla `-bar7` il nodo ignora la dichiarazione e decide sull'ordine
-  intero (la regola della 0008), quindi NIENTE si rompe nel frattempo —
-  cambia solo quando il nodo sale. Il rollback è la riga dell'immagine
-  nel compose, a `-bar6`.
+  38385 non cambia. ⚠️ IL CLIENT STA DIETRO UNA LEVA SPENTA
+  (`P2P_CAUZIONE_SUL_METODO`, 11 ott 2026): finché è spenta manda il take
+  come ieri (`Amount` sull'intervallo, niente sul normale) e promette la
+  cauzione dell'ordine intero, che il nodo senza la 0010 chiede lo
+  stesso — e gestisce il foglio della cauzione come oggi. Un nodo SENZA
+  la 0010 che ricevesse `Payload::Order` lo ignorerebbe su un ordine
+  normale (`get_fiat_amount_requested` torna `order.fiat_amount`) ma su
+  un INTERVALLO risponderebbe `OutOfRangeSatsAmount` (`get_amount` legge
+  solo `Amount` e `PaymentRequest`): per questo la leva si accende DOPO
+  la `-bar7`, punto 9. Il rollback è la riga dell'immagine nel compose,
+  a `-bar6`, e la leva di nuovo a False.
   Host, in cima a tutto (l'alias ssh può essere un altro: è quello di
   sempre del nodo di Dublino):
   `ssh debian@185.18.221.96`
@@ -3317,9 +3323,18 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   SI FERMA: la prova vera — un «SEPA, Contanti» preso scegliendo SEPA
   senza `pay-bond-invoice`, e preso scegliendo Contanti con la cauzione
   — è di Andrea, a due telefoni, dopo.
-  ROLLBACK: la riga dell'immagine a `mostro:v0.19.0-bar6` e `docker
-  compose up -d mostro` (a libro fermo). Il client resta com'è: il nodo
-  `-bar6` ignora la dichiarazione e torna alla regola dell'ordine.
+  9) LA LEVA DEL CLIENT, SUL VPS, solo DOPO il punto 8 e con la
+  `-bar7` in servizio: `nano /srv/barattolo/config.py`, la riga
+  `P2P_CAUZIONE_SUL_METODO = True` (da AGGIUNGERE: nel codice è False), poi
+  `sudo systemctl restart barattolo` e il pannello «⚙️ Stato delle leve»
+  → «Cauzione sul metodo scelto (nodo alla -bar7): acceso». Da lì il
+  client manda il metodo scelto nel take e promette la cauzione solo a
+  chi sceglie «Contanti». Accesa PRIMA della `-bar7` rompe le prese
+  sugli intervalli (sopra): mai.
+  ROLLBACK: la leva a `False` sul VPS e riavvio (basta da sola: il
+  client torna a ieri e il nodo `-bar7` con `Amount` decide
+  sull'ordine); e, se serve, la riga dell'immagine a
+  `mostro:v0.19.0-bar6` con `docker compose up -d mostro` a libro fermo.
 - LA SALITA A MOSTRO 0.19.0, COM'È ANDATA (1 ott 2026, la liturgia qui
   sopra eseguita da Andrea un comando alla volta, i comandi scritti da
   Claude; il nodo gira `mostro:v0.19.0-bar6` con le OTTO patch e la

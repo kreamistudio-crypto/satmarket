@@ -28089,7 +28089,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   nel client `cauzioneServeP2P` legge `o.metodoScelto` allo stesso modo,
   con due metodi e nessuna scelta non promette niente, con un metodo solo
   o una scelta fuori elenco decide l'ordine; chi pubblica resta all'ordine
-  intero. La riga del dettaglio (`rigaCauzioneDettP2P(o, info, leva,
+  intero. TUTTO QUESTO DIETRO UNA SECONDA LEVA (11 ott 2026):
+  `P2P_CAUZIONE_SUL_METODO` del server, in busta come `cauzioneSulMetodo`
+  (dodicesima chiave di `_p2p_leve`, pannello «Stato delle leve»), letta
+  da `cauzioneSulMetodoP2P()` e passata come ultimo argomento a
+  `payloadPresaP2P`, `cauzioneServeP2P`, `rigaCauzioneDettP2P` e
+  `testoCauzioneInfoP2P`: spenta, il take porta `Amount` o niente e la
+  cauzione è dell'ordine intero come ieri (il nodo senza la 0010 la
+  chiede lo stesso); si accende sul VPS dopo la `-bar7` (PRODUZIONE,
+  punto 9). La riga del dettaglio (`rigaCauzioneDettP2P(o, info, leva,
   scelto)`, con `p2pDettMetodo`) compare solo scegliendo «Contanti», e
   sotto le pillole `P2P_METODO_FISSO` dice che il metodo scelto resta
   fissato per lo scambio (chi vende non sceglie: `renderCampiP2P` senza
