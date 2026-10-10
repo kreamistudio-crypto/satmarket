@@ -49325,8 +49325,34 @@ fallite; i 58 collaudi del workflow, verdi; la tortura, 17 su 17; i due
 passi dello scanner dei segreti; il giro dal vivo. Poi main è corso di
 quattro commit (i percorsi del VPS nei documenti, il dominio nel
 journal degli indirizzi Lightning, l'elenco dei wallet al client, il
-cambio sui cartellini). SULL'ALBERO CHE PARTE (sopra 4cb9761): la suite
-intera di nuovo, 22130 e 0; `collaudo_promemoria_gesto` nella gabbia,
-verde; lo scanner. Gli altri collaudi su QUESTO albero li gira la CI.
-Un solo conflitto al rebase, la coda di questo file, risolto tenendo
-tutt'e due i lati.
+cambio sui cartellini). SOPRA 4cb9761: la suite intera di nuovo, 22130
+e 0; `collaudo_promemoria_gesto` nella gabbia, verde; lo scanner. Poi
+main è corso di altri quattro commit (la cauzione sul metodo scelto e
+la sua leva). SULL'ALBERO PARTITO (fab9a31, sopra f0768aa): le sole
+sezioni toccate — `prove_link_dentro_telegram` e il censimento degli
+indirizzi di Telegram (`prove_telegram_simulato_collaudo`): 130 e 0 —,
+`collaudo_promemoria_gesto` nella gabbia, verde, e la sintassi di
+server.py. NON la suite intera. A ogni rebase un solo conflitto, la
+coda di questo file, risolto tenendo tutt'e due i lati.
+LA CI DI fab9a31 È USCITA ROSSA, e non per questo cantiere: 22115
+passate e 1 fallita, `prove_indirizzo_non_verificato` esplosa su
+`P2P_CAUZIONE_SUL_METODO` — la leva arrivata coi commit della cauzione
+subito prima, che al banco di quella prova mancava. Rossa allo stesso
+modo la CI di f0768aa, la punta su cui ho pushato. L'ha curata la
+sessione della cauzione con e331c1b (una riga nell'ambiente della
+prova); io non l'ho toccata. `pronto` è rimasto su 4cb9761 finché main
+non è tornato verde, con e331c1b (CI verde, `pronto` lì sopra): questo
+cantiere è andato in produzione con e331c1b, non col suo commit.
+DUE ERRORI MIEI, DETTI. 1) Ho pushato sopra una punta con la CI ANCORA
+IN CORSO (l'ultima finita, 4cb9761, era verde), senza la suite intera
+sull'albero che partiva: la suite intera avrebbe mostrato il rosso —
+non mio, ma avrei aspettato la cura invece di mettermici sopra. Con
+main che corre ogni dieci minuti la tentazione è non aspettare: la
+regola resta «si guarda la CI della PUNTA». 2) fab9a31 è partito col
+verbale fermo al rebase PRIMA (diceva «sull'albero che parte, sopra
+4cb9761»): lo script che doveva aggiornarlo è caduto su un controllo
+suo, e la riga di comandi non si è fermata — dopo un `;` il push è
+partito lo stesso. Il CODICE partito è quello provato qui sopra;
+sbagliata era quella frase, corretta con questo commit di soli
+documenti. La lezione: verbale e push in due chiamate separate, e il
+push solo dopo aver RILETTO la coda del verbale.
