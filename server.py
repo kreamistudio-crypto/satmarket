@@ -6128,6 +6128,58 @@ def init_db():
         versione INTEGER DEFAULT 1,
         creato INTEGER
     );
+    CREATE TABLE IF NOT EXISTS p2p_conti(
+        -- IL REGISTRO DEI CONTI DEL P2P (10 ott 2026, cantiere
+        -- statistiche-p2p): una riga per ogni scambio CHIUSO — concluso,
+        -- annullato, tornato in vetrina — e per ogni ordine scaduto o
+        -- ritirato senza essere preso. Nasce perche' la cronaca
+        -- (`p2p_momenti`, `p2p_scambi`) se ne va dopo quaranta giorni
+        -- (`_pulisci_memoria_p2p`), e i conti di un servizio non
+        -- possono avere quaranta giorni di memoria: il «tutto» delle
+        -- statistiche e la quota di Alan si fanno su questi numeri.
+        -- La scrive `_consolida_conti_p2p`, dalla cronaca, PRIMA della
+        -- potatura; chi la legge e' `_statistiche_p2p`.
+        -- ⚠️ NESSUN ACCOUNT, NESSUNA CHIAVE, ed e' la riga da non
+        -- ammorbidire: qui stanno l'id PUBBLICO dell'ordine (il `d`
+        -- del 38383), le ore, l'esito e le cifre. Chi ha scambiato con
+        -- chi resta nella cronaca, che continua a cancellarsi come
+        -- promesso in «I tuoi dati». `sconto_c` e `sconto_v` dicono se
+        -- quella meta' della commissione aveva lo sconto fedelta'
+        -- ('' | 'pioniere' | 'livello'), `parti_note` quante delle due
+        -- parti erano account di Barattolo (0-2): fatti sullo scambio,
+        -- non nomi.
+        -- LE CIFRE: `sats` l'importo dello scambio, `sats_compratore`
+        -- il netto pagato a chi compra, `sats_venditore` il totale
+        -- bloccato da chi vende — i tre numeri che mostrod manda alla
+        -- chiusura; `euro` la cifra del libro (0 = non si sa),
+        -- `cambio` gli euro per bitcoin alla presa (0 = non si sa).
+        -- `routing_msat` e' la fee di instradamento del pagamento a
+        -- chi compra, letta da LND e abbinata per importo e ora
+        -- (`_abbina_routing_p2p`): -1 = non si sa (ancora), e
+        -- `routing_rif` e' il capo dell'hash di quel pagamento, perche'
+        -- lo stesso non si conti su due scambi.
+        ordine TEXT NOT NULL,
+        giro INTEGER NOT NULL DEFAULT 0,
+        esito TEXT NOT NULL,
+        motivo TEXT DEFAULT '',
+        preso INTEGER DEFAULT 0,
+        chiuso INTEGER DEFAULT 0,
+        pagato INTEGER DEFAULT 0,
+        lato TEXT DEFAULT '',
+        euro REAL DEFAULT 0,
+        metodi TEXT DEFAULT '',
+        sats INTEGER DEFAULT 0,
+        sats_compratore INTEGER DEFAULT 0,
+        sats_venditore INTEGER DEFAULT 0,
+        cambio REAL DEFAULT 0,
+        sconto_c TEXT DEFAULT '',
+        sconto_v TEXT DEFAULT '',
+        parti_note INTEGER DEFAULT 0,
+        routing_msat INTEGER DEFAULT -1,
+        routing_rif TEXT DEFAULT '',
+        PRIMARY KEY(ordine, giro, esito)
+    );
+    CREATE INDEX IF NOT EXISTS idx_p2p_conti_chiuso ON p2p_conti(chiuso);
     CREATE TABLE IF NOT EXISTS punti_ritiro(
         -- I punti di ritiro che CHI COMPRA si tiene (ago 2026): il
         -- locker sotto casa non cambia, e riscriverlo a ogni acquisto
@@ -26541,7 +26593,12 @@ async def dati_lnd_cruscotto(nostri: set, rimborsi: set = frozenset()) -> dict:
          "attivo": bool(c.get("active"))}
         for c in ((canali or {}).get("channels") or [])]
     dati["canali_motivo"] = m2
-    _cruscotto_lnd.update(quando=adesso, dati=dati)
+    # ...e le uscite che NON sono del mercatino, tenute da parte per i
+    # conti del P2P (10 ott 2026): fra quelle ci sono i pagamenti di
+    # mostrod a chi compra. Stanno FUORI da `dati`, che va al browser di
+    # ogni moderatore: le legge solo `statistiche_p2p_admin`.
+    _cruscotto_lnd.update(quando=adesso, dati=dati,
+                          uscite=uscite_altrui_lnd(pagamenti, nostri))
     return dati
 
 
@@ -26566,7 +26623,11 @@ async def cruscotto_admin(x_tg_init_data: str = Header(""),
     except Exception:
         dati["eur_per_btc"] = 0
     dati["generato"] = int(time.time())
-    return dati
+    # la sezione «Scambi P2P» (10 ott 2026): la pagina la disegna solo a
+    # chi puo' leggerla — un sì o un no, e i numeri li chiede a parte,
+    # alla rotta che rifa' la stessa domanda. COPIA e non scrittura:
+    # `dati` porta dentro la risposta di LND, che e' la stessa per tutti
+    return {**dati, "p2p_statistiche": vede_statistiche_p2p(user["id"])}
 
 
 @app.get("/api/admin/stats")
@@ -27364,6 +27425,18 @@ def _leve_stato():
                          "non parte",
                   spento="aperto a tutti: appena P2P_ATTIVO si accende "
                          "lo scambio vale per chiunque"),
+            # CHI VEDE I CONTI DEL P2P (10 ott 2026): un CONTEGGIO, mai
+            # gli id — il patto di ADMIN_IDS qui sopra, e questo
+            # pannello lo leggono tutti i moderatori
+            _leva("Statistiche P2P: amministratori",
+                  "P2P_STATISTICHE_IDS", len(P2P_STATISTICHE_IDS),
+                  acceso="quanti vedono la sezione «Scambi P2P» del "
+                         "cruscotto (volume e commissioni): devono "
+                         "essere anche moderatori, o la lista non li "
+                         "fa entrare",
+                  spento="la sezione «Scambi P2P» del cruscotto non la "
+                         "vede nessuno, e la sua rotta risponde 403 a "
+                         "tutti: si riempie nel config del VPS"),
             _leva("Relay del coordinator", "MOSTRO_RELAY",
                   _elenco(MOSTRO_RELAY),
                   spento="senza i relay lo scambio non si accende: qui "
@@ -43306,6 +43379,30 @@ except (TypeError, ValueError):
     P2P_PROVA_IDS = {0}            # storta: chiusa a tutti, e si dice
     print("[p2p] P2P_PROVA_IDS non e' una lista di numeri: la fase di "
           "prova resta CHIUSA (0 e' un id che non esiste)")
+# CHI VEDE I CONTI DEL P2P (10 ott 2026, cantiere statistiche-p2p,
+# richiesta di Andrea): la sezione «Scambi P2P» del cruscotto dice
+# quanto si e' scambiato e quanto si e' incassato, ed e' roba degli
+# AMMINISTRATORI — Andrea e Alan — non di ogni moderatore. Una lista
+# degli amministratori nel config non c'era: `ADMIN_IDS` vuol dire
+# «moderatore» (le code, le dispute, il pannello delle leve), e chi
+# modera non deve per questo leggere gli incassi. Quindi una leva sua.
+# IL VUOTO E' «NESSUNO», il verso opposto di `P2P_PROVA_IDS` qui sopra:
+# la' la lista vuota apre, qui chiude — non dichiarata, vuota o storta
+# la sezione non la vede nessuno e la rotta risponde 403 a tutti. E chi
+# e' in lista deve essere ANCHE moderatore (`vede_statistiche_p2p`): un
+# id sbagliato di una cifra non apre i conti a uno sconosciuto.
+try:
+    from config import P2P_STATISTICHE_IDS
+    if isinstance(P2P_STATISTICHE_IDS, (str, bytes)):
+        # la stessa trappola di P2P_PROVA_IDS: `"123"` iterata e' {1,2,3}
+        raise TypeError("una stringa non e' una lista di id")
+    P2P_STATISTICHE_IDS = {int(i) for i in P2P_STATISTICHE_IDS}
+except ImportError:
+    P2P_STATISTICHE_IDS = set()    # non dichiarata: nessuno
+except (TypeError, ValueError):
+    P2P_STATISTICHE_IDS = set()    # storta: nessuno, e si dice
+    print("[p2p] P2P_STATISTICHE_IDS non e' una lista di numeri: le "
+          "statistiche del P2P non le vede NESSUNO")
 
 
 
@@ -47633,6 +47730,544 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
     return fuori, int((q and q[0]) or 0)
 
 
+# --- I CONTI DEL P2P (10 ott 2026, cantiere statistiche-p2p) ---------
+# La sezione «Scambi P2P» del cruscotto `/admin`: quanti scambi, quanto
+# volume, quante commissioni, che fine fanno gli ordini. La vedono SOLO
+# gli amministratori (`vede_statistiche_p2p`), e la rotta chiede a quel
+# giudice PRIMA di aprire il database.
+# DA DOVE VENGONO I NUMERI, ed e' la cosa da sapere per leggerli:
+# • la CRONACA del coordinatore (`p2p_momenti`): ogni passo di ogni
+#   scambio, con l'ora di mostrod. E' un fatto — lo dice chi lo fa — e
+#   copre TUTTI gli scambi del nostro coordinatore, anche fra client
+#   che non sono Barattolo;
+# • i TRE IMPORTI della chiusura (`p2p_scambi`): lo scambio, il netto a
+#   chi compra, il totale bloccato da chi vende. La commissione
+#   incassata e' la differenza fra gli ultimi due, ed e' un fatto;
+# • gli EURO e i METODI vengono dal LIBRO (`p2p_ordini`), che il server
+#   segue solo per gli ordini con almeno un account di Barattolo: per
+#   gli altri non si sanno, e si dice quanti sono;
+# • il ROUTING del pagamento a chi compra lo sa LND, non mostrod: si
+#   abbina per importo esatto e ora (`_abbina_routing_p2p`), e dove
+#   LND non risponde resta «non disponibile»;
+# • CHI aveva lo sconto lo dice il nostro giudice (`_sconto_p2p`) al
+#   momento del consolidamento, non il coordinatore: la CIFRA e' vera,
+#   la sua divisione in «piena» e «scontata» e' dedotta.
+# LA CRONACA SI CANCELLA DOPO QUARANTA GIORNI e il registro no: a ogni
+# lettura, e ogni ora PRIMA della scopa (`_conti_salvi_p2p`), gli
+# scambi chiusi passano in `p2p_conti` — cifre ed esito, mai account.
+P2P_PERIODI_CONTI = ("oggi", "7", "30", "tutto")
+P2P_CONTI_CACHE_S = 60          # i conti si rifanno al piu' una volta al minuto
+P2P_ULTIMI_CONTI = 20           # le righe della tabella degli ultimi scambi
+# la finestra in cui un pagamento di LND puo' essere il pagamento a chi
+# compra di uno scambio: da cinque minuti prima del rilascio (i due
+# orologi) a un giorno dopo (una fattura rifatta dopo un tentativo
+# fallito). L'importo deve combaciare AL SAT.
+P2P_ROUTING_PRIMA_S = 300
+P2P_ROUTING_DOPO_S = 86400
+_p2p_conti_cache = {}           # periodo -> (quando, dati)
+
+
+def vede_statistiche_p2p(tg_id) -> bool:
+    """IL GIUDICE DI CHI VEDE I CONTI DEL P2P: un AMMINISTRATORE, cioe'
+    un moderatore (`e_admin`) che sta ANCHE in `P2P_STATISTICHE_IDS`.
+    Tutt'e due: la lista da sola aprirebbe i conti a uno sconosciuto
+    per un id sbagliato di una cifra, e il moderatore da solo e' proprio
+    chi non deve leggerli. Lista vuota = nessuno, nemmeno il 999 del
+    collaudo. Lo chiedono la rotta e la bandierina del cruscotto: il
+    bottone non puo' comparire dove la rotta rifiuterebbe."""
+    try:
+        chi = int(tg_id)
+    except (TypeError, ValueError):
+        return False
+    return bool(chi) and e_admin(chi) and chi in P2P_STATISTICHE_IDS
+
+
+def _inizio_periodo_p2p(periodo: str, adesso: int) -> int:
+    """PURA: da quale istante conta il periodo. `oggi` e' dalla
+    mezzanotte ITALIANA (`_epoch_roma`, senza tzdata), `7` e `30` sono
+    giorni interi a ritroso da adesso, `tutto` e' zero."""
+    if periodo in ("7", "30"):
+        return int(adesso) - int(periodo) * 86400
+    if periodo != "oggi":
+        return 0
+    from datetime import datetime, timezone
+    inizio = 0
+    # Roma sta a +1 o a +2 da UTC: delle due mezzanotti candidate vale
+    # l'ultima che e' gia' passata
+    for ore in (1, 2):
+        giorno = datetime.fromtimestamp(int(adesso) + ore * 3600,
+                                        timezone.utc).strftime("%Y-%m-%d")
+        mezzanotte = _epoch_roma(giorno + " 00:00") or 0
+        if inizio < mezzanotte <= int(adesso):
+            inizio = mezzanotte
+    return inizio
+
+
+def _motivo_annullo_p2p(attore: str, dettaglio: str, visti) -> str:
+    """PURA: perche' uno scambio preso non e' arrivato in fondo, dal
+    gesto che l'ha chiuso e dai momenti visti in quel giro.
+    A MANO se l'ha chiuso una delle due parti; CONCORDATO se l'altra ha
+    accettato; MODERATORE per una disputa decisa. Il resto sono le
+    scadenze di mostrod, e a dire QUALE gesto e' mancato e' la cronaca:
+    la garanzia chiesta e mai pagata, la fattura chiesta e mai data. Con
+    la garanzia pagata e il tempo finito lo stesso e' `garanzia_scaduta`."""
+    if dettaglio == "admin":
+        return "moderatore"
+    if dettaglio == "cooperative":
+        return "concordato"
+    if attore in ("buyer", "seller") and dettaglio in ("", "republished"):
+        return "a_mano"
+    if "garanzia_chiesta" in visti and "garanzia_pagata" not in visti:
+        return "garanzia_non_pagata"
+    if dettaglio == "escrow-deadline":
+        return "garanzia_scaduta"
+    if "fattura_chiesta" in visti and "fattura_data" not in visti:
+        return "fattura_non_data"
+    return "tempo_scaduto"
+
+
+def _esiti_cronaca_p2p(momenti) -> list:
+    """PURA: la cronaca di UN ordine (le righe di `p2p_momenti` dette da
+    mostrod) in una lista di ESITI, uno per fatto che si conta:
+    • uno SCAMBIO per giro — `completato` (rilasciato o concluso),
+      `annullato`, `tornato` (chi aveva preso si e' ritirato o non ha
+      proseguito, e l'ordine e' tornato in vetrina) o `in_corso`;
+    • un fatto dell'ORDINE quando muore senza uno scambio aperto:
+      `scaduto` (nessuno l'ha preso) o `ritirato` (l'ha tolto chi
+      l'aveva pubblicato).
+    Ogni esito porta `giro`, `preso` e `chiuso` (ore di mostrod, 0 =
+    non si sa), `motivo`, `pagato` (il pagamento a chi compra e'
+    arrivato: `concluso`), `disputa`, `ultimo` (l'ultimo momento).
+    IL GIRO E' QUELLO DELLA CRONACA: quante prese mostrod ha raccontato
+    fin li'. A parita' d'ora decide `_PESO_MOMENTO_P2P`, come per lo
+    stato che vede il client. UNA CRONACA CHE COMINCIA A META' (la presa
+    mai arrivata) apre lo scambio al primo momento che vede."""
+    per_giro = {}
+    for m in momenti or []:
+        per_giro.setdefault(int(m["giro"] or 0), []).append(m)
+    fuori = []
+    for giro in sorted(per_giro):
+        fila = sorted(per_giro[giro], key=lambda m: (
+            int(m["quando"] or 0), _PESO_MOMENTO_P2P.get(str(m["momento"]), 0)))
+        s, visti = None, set()
+        for m in fila:
+            nome, quando = str(m["momento"] or ""), int(m["quando"] or 0)
+            aperto = s is not None and s["esito"] == "in_corso"
+            if nome in P2P_MOMENTI_IN_CORSO or nome in ("payout_fallito",
+                                                        "rilasciato", "concluso"):
+                if s is None:
+                    s = {"giro": giro, "esito": "in_corso", "motivo": "",
+                         "preso": quando if nome == "preso" else 0, "chiuso": 0,
+                         "pagato": False, "disputa": False, "ultimo": nome}
+                elif s["esito"] not in ("in_corso", "completato"):
+                    continue          # un giro gia' chiuso non si riapre
+                visti.add(nome)
+                s["ultimo"] = nome
+                if nome == "disputa":
+                    s["disputa"] = True
+                if nome in ("rilasciato", "concluso"):
+                    s["esito"] = "completato"
+                    s["chiuso"] = s["chiuso"] or quando
+                    s["pagato"] = s["pagato"] or nome == "concluso"
+            elif nome in ("annullato", "tornato") and aperto:
+                s.update(esito=nome, chiuso=quando, ultimo=nome,
+                         motivo=_motivo_annullo_p2p(str(m["attore"] or ""),
+                                                    str(m["dettaglio"] or ""), visti))
+            elif nome in ("annullato", "scaduto"):
+                fuori.append({"giro": giro, "motivo": "", "preso": 0,
+                              "esito": "scaduto" if nome == "scaduto" else "ritirato",
+                              "chiuso": quando, "pagato": False,
+                              "disputa": False, "ultimo": nome})
+        if s is not None:
+            fuori.append(s)
+    return fuori
+
+
+def _metodi_conti_p2p(testo) -> list:
+    """PURA: i metodi di un ordine come li dice il libro, coi nomi che
+    si leggono nei conti — il tabacchino senza il suo importo, e col
+    nome con cui lo conosce chi usa Barattolo."""
+    return ["Barattozon" if m == "Contanti al tabacchino" else m
+            for m in _metodi_libro(_metodi_lista_p2p(testo))]
+
+
+def _consolida_conti_p2p(con, adesso: int) -> list:
+    """DALLA CRONACA AL REGISTRO. Pura sulla connessione. Legge tutta la
+    cronaca di mostrod (al piu' quaranta giorni: e' quel che la scopa
+    lascia), ne ricava gli esiti (`_esiti_cronaca_p2p`) e scrive in
+    `p2p_conti` quelli CHIUSI che ancora non ci sono; a uno scambio gia'
+    scritto come rilasciato aggiunge solo il «pagato» quando arriva.
+    Torna gli scambi IN CORSO adesso, che nel registro non entrano.
+    IDEMPOTENTE: la chiave e' ordine + giro + esito, e una riga scritta
+    non si riscrive — porta le cifre e lo sconto di QUEL momento, e il
+    routing abbinato dopo.
+    LE CIFRE valgono solo se `p2p_scambi` parla ancora di quel giro: un
+    ordine tornato in vetrina e ripreso ha le parti del giro nuovo.
+    UNA CRONACA POTATA A META' (la presa oltre i quaranta giorni,
+    l'annullo no) leggerebbe l'annullo come un ritiro dal libro: se il
+    registro ha gia' l'annullo di quel giro, il ritiro non si scrive."""
+    gia = {(r[0], int(r[1] or 0), r[2]): int(r[3] or 0) for r in con.execute(
+        "SELECT ordine, giro, esito, pagato FROM p2p_conti WHERE chiuso>=?",
+        (int(adesso) - P2P_LIBRO_MEMORIA_S - 2 * 86400,))}
+    per_ordine = {}
+    for r in con.execute(
+            "SELECT ordine, momento, quando, giro, attore, dettaglio "
+            "FROM p2p_momenti WHERE fonte='mostro'"):
+        per_ordine.setdefault(r["ordine"], []).append(r)
+    in_corso, scritte = [], 0
+    for ordine, momenti in per_ordine.items():
+        for e in _esiti_cronaca_p2p(momenti):
+            giro, esito = e["giro"], e["esito"]
+            if esito == "in_corso":
+                in_corso.append({"ordine": ordine[:8], "giro": giro,
+                                 "preso": e["preso"], "ultimo": e["ultimo"],
+                                 "disputa": e["disputa"]})
+                continue
+            chiave = (ordine, giro, esito)
+            if chiave in gia:
+                if e["pagato"] and not gia[chiave]:
+                    scritte += con.execute(
+                        "UPDATE p2p_conti SET pagato=1 WHERE ordine=? AND "
+                        "giro=? AND esito=?", chiave).rowcount
+                continue
+            if esito == "ritirato" and (ordine, giro, "annullato") in gia:
+                continue
+            o = con.execute("SELECT lato, euro, metodi, sats FROM p2p_ordini "
+                            "WHERE ordine=?", (ordine,)).fetchone()
+            s = con.execute(
+                "SELECT compratore, venditore, preso_dal, giro, sats, "
+                "sats_compratore, sats_venditore, cambio_presa FROM p2p_scambi "
+                "WHERE ordine=?", (ordine,)).fetchone()
+            if s is not None and (int(s["giro"] or 0) != giro
+                                  or esito in ("scaduto", "ritirato")):
+                s = None
+            lato = (o["lato"] if o else "") or ""
+            if lato not in ("sell", "buy"):
+                # senza il libro lo dice la presa: chi compra prende un
+                # ordine di vendita, chi vende uno di acquisto
+                lato = {"buyer": "sell", "seller": "buy"}.get(
+                    (s["preso_dal"] if s else "") or "", "")
+            euro, euro_max = _euri_numero_p2p(o["euro"] if o else "")
+            fatto = esito == "completato" and s is not None
+            parti = [int(s[p] or 0) for p in ("compratore", "venditore")] if s else []
+            scritte += con.execute(
+                "INSERT OR IGNORE INTO p2p_conti(ordine, giro, esito, motivo, "
+                "preso, chiuso, pagato, lato, euro, metodi, sats, "
+                "sats_compratore, sats_venditore, cambio, sconto_c, sconto_v, "
+                "parti_note) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (ordine, giro, esito, e["motivo"], e["preso"], e["chiuso"],
+                 1 if e["pagato"] else 0, lato,
+                 # un intervallo ancora da scegliere non e' una cifra
+                 0.0 if euro_max else euro,
+                 json.dumps(_metodi_conti_p2p(o["metodi"] if o else ""),
+                            ensure_ascii=False),
+                 int((s["sats"] if fatto else (o["sats"] if o else 0)) or 0),
+                 int(s["sats_compratore"] or 0) if fatto else 0,
+                 int(s["sats_venditore"] or 0) if fatto else 0,
+                 float(s["cambio_presa"] or 0) if s else 0.0,
+                 _sconto_p2p(con, parti[0])["motivo"] if fatto and parti[0] else "",
+                 _sconto_p2p(con, parti[1])["motivo"] if fatto and parti[1] else "",
+                 sum(1 for p in parti if p))).rowcount
+    if scritte:
+        con.commit()
+    return in_corso
+
+
+def _conti_salvi_p2p(con, adesso: int) -> bool:
+    """I CONTI PRIMA DELLA SCOPA: il consolidamento che gira ogni ora
+    davanti a `_pulisci_memoria_p2p`. Se alza, la scopa di quell'ora NON
+    passa — una cronaca che resta un'ora in piu' non costa niente, uno
+    scambio potato prima di finire nel registro non torna piu' — e il
+    journal lo dice, col solo tipo dell'errore."""
+    try:
+        _consolida_conti_p2p(con, adesso)
+        return True
+    except Exception as e:
+        con.rollback()
+        print(f"⚠️ P2P: i conti non si sono consolidati ({type(e).__name__}): "
+              "la cronaca non si pota finché non riesce", flush=True)
+        return False
+
+
+def uscite_altrui_lnd(pagamenti: list, nostri: set) -> list:
+    """PURA: i pagamenti RIUSCITI di LND che non sono del mercatino,
+    ridotti a `(creato, sats, fee_msat, rif)` — fra questi ci sono i
+    pagamenti di mostrod a chi compra. `rif` e' il capo dell'hash: basta
+    a non contare due volte lo stesso pagamento, e non e' l'hash."""
+    fuori = []
+    for p in pagamenti or []:
+        if not isinstance(p, dict):
+            continue
+        if str(p.get("status") or "").upper() != "SUCCEEDED":
+            continue
+        h = str(p.get("payment_hash") or "").lower()
+        if not h or h in nostri:
+            continue
+        try:
+            sats = int(p.get("value_sat") or 0)
+            fee = int(p.get("fee_msat") or 0)
+            creato = (int(p.get("creation_time_ns") or 0) // 10 ** 9
+                      or int(p.get("creation_date") or 0))
+        except (TypeError, ValueError):
+            continue
+        if sats > 0 and creato > 0 and fee >= 0:
+            fuori.append((creato, sats, fee, h[:16]))
+    return fuori
+
+
+def _abbina_routing_p2p(con, uscite: list, adesso: int) -> int:
+    """LA FEE DI ROUTING DI OGNI SCAMBIO, da LND. Pura sulla connessione;
+    torna quanti ne ha abbinati. mostrod non dice quanto gli e' costato
+    pagare chi compra: lo sa LND, e il suo pagamento si riconosce
+    dall'IMPORTO — il netto a chi compra, al sat — e dall'ORA, dentro la
+    finestra attorno al rilascio. Fra piu' candidati vale il piu' vicino,
+    e un pagamento gia' abbinato non si riusa (`routing_rif`).
+    E' UN ABBINAMENTO, NON UNA DICHIARAZIONE: due pagamenti dello stesso
+    importo esatto nella stessa finestra potrebbero scambiarsi di posto —
+    la somma resterebbe giusta. Chi non trova il suo resta a -1, e i
+    conti dicono «non disponibile» invece di zero."""
+    limite = int(adesso) - P2P_LIBRO_MEMORIA_S
+    attese = con.execute(
+        "SELECT ordine, giro, chiuso, sats_compratore FROM p2p_conti "
+        "WHERE esito='completato' AND routing_msat<0 AND sats_compratore>0 "
+        "AND chiuso>=? ORDER BY chiuso", (limite,)).fetchall()
+    if not attese or not uscite:
+        return 0
+    usati = {r[0] for r in con.execute(
+        "SELECT routing_rif FROM p2p_conti WHERE routing_rif<>'' AND chiuso>=?",
+        (limite - P2P_ROUTING_DOPO_S,))}
+    per_importo = {}
+    for creato, sats, fee, rif in uscite:
+        per_importo.setdefault(int(sats), []).append((int(creato), int(fee), rif))
+    fatti = 0
+    for a in attese:
+        chiuso = int(a["chiuso"] or 0)
+        buoni = [u for u in per_importo.get(int(a["sats_compratore"]), [])
+                 if u[2] not in usati
+                 and chiuso - P2P_ROUTING_PRIMA_S <= u[0] <= chiuso + P2P_ROUTING_DOPO_S]
+        if not buoni:
+            continue
+        creato, fee, rif = min(buoni, key=lambda u: abs(u[0] - chiuso))
+        usati.add(rif)
+        fatti += con.execute(
+            "UPDATE p2p_conti SET routing_msat=?, routing_rif=? WHERE ordine=? "
+            "AND giro=? AND esito='completato' AND routing_msat<0",
+            (fee, rif, a["ordine"], a["giro"])).rowcount
+    if fatti:
+        con.commit()
+    return fatti
+
+
+def _iniziali_p2p(nome, tg_id) -> str:
+    """PURA: una persona nei conti. Le INIZIALI del nome (due al piu'),
+    o l'id breve — le ultime tre cifre — se un nome non c'e'. Mai il
+    nome, mai lo username, mai l'id intero: la tabella degli ultimi
+    scambi si guarda anche con qualcuno alle spalle. Zero = nessuno."""
+    parole = [p for p in re.split(r"[^\w]+", str(nome or "")) if p and p[0].isalpha()]
+    if parole:
+        return "".join(p[0].upper() + "." for p in parole[:2])
+    chi = abs(int(tg_id or 0))
+    return f"#{chi % 1000:03d}" if chi else ""
+
+
+def _statistiche_p2p(con, da: int, adesso: int, in_corso: list) -> dict:
+    """I CONTI DEL PERIODO, dal registro. Pura sulla connessione: `da`
+    e' l'inizio (`_inizio_periodo_p2p`), `in_corso` gli scambi aperti
+    adesso (`_consolida_conti_p2p`), che non hanno un periodo.
+    UNO SCAMBIO STA NEL PERIODO IN CUI SI E' CHIUSO; un ordine in quello
+    in cui e' stato pubblicato. IL TASSO e' completati su chiusi —
+    completati piu' annullati — e senza chiusi non c'e' (None, mai 0%).
+    LE COMMISSIONI sono il totale bloccato da chi vende meno il netto a
+    chi compra: lorde. Nette = meno il routing, e SOLO se il routing di
+    tutti gli scambi del periodo si conosce: una somma a meta' passata
+    per netto sarebbe una cifra piu' bella del vero.
+    LE PERSONE si contano sugli ordini conclusi che il server ha gia'
+    intestati (`p2p_ordini`: chi ha pubblicato, chi ha preso): chi
+    prende da Nostr senza farsi riconoscere non e' annotato, e non si
+    conta — per scelta sua."""
+    da = int(da)
+    righe = [dict(r) for r in con.execute(
+        "SELECT * FROM p2p_conti WHERE chiuso>=? ORDER BY chiuso DESC, ordine",
+        (da,))]
+    fatti = [r for r in righe if r["esito"] == "completato"]
+    rotti = [r for r in righe if r["esito"] in ("annullato", "tornato")]
+    motivi = {}
+    for r in rotti:
+        motivi[r["motivo"] or "tempo_scaduto"] = motivi.get(
+            r["motivo"] or "tempo_scaduto", 0) + 1
+    chiusi = len(fatti) + len(rotti)
+    scambi = {"completati": len(fatti), "annullati": len(rotti),
+              "tornati": sum(1 for r in rotti if r["esito"] == "tornato"),
+              "in_viaggio": sum(1 for r in fatti if not r["pagato"]),
+              "motivi": motivi, "in_corso": len(in_corso),
+              "in_disputa": sum(1 for s in in_corso if s.get("disputa")),
+              "tasso": round(len(fatti) * 100 / chiusi, 1) if chiusi else None}
+
+    def metodi_di(r):
+        try:
+            return " + ".join(str(m) for m in json.loads(r["metodi"] or "[]"))
+        except ValueError:
+            return ""
+
+    def a_gruppi(chiave_di):
+        g = {}
+        for r in fatti:
+            v = g.setdefault(chiave_di(r), {"nome": chiave_di(r), "scambi": 0,
+                                            "euro": 0.0, "sats": 0})
+            v["scambi"] += 1
+            v["euro"] = round(v["euro"] + (r["euro"] or 0), 2)
+            v["sats"] += int(r["sats"] or 0)
+        return sorted(g.values(), key=lambda v: (-v["sats"], v["nome"]))
+    volume = {"euro": round(sum(r["euro"] or 0 for r in fatti), 2),
+              "sats": sum(int(r["sats"] or 0) for r in fatti),
+              "senza_euro": sum(1 for r in fatti if not r["euro"]),
+              "lati": a_gruppi(lambda r: r["lato"] or ""),
+              "metodi": a_gruppi(metodi_di)}
+    # --- le commissioni: la cifra e' di mostrod, la divisione e' nostra
+    fette = {k: {"meta": 0, "sats": 0, "base": 0}
+             for k in ("piena", "pioniere", "livello")}
+    lorde = non_divise = senza_importi = senza_cambio = 0
+    in_euro = 0.0
+    for r in fatti:
+        v, c, s = (int(r[k] or 0) for k in
+                   ("sats_venditore", "sats_compratore", "sats"))
+        if v <= 0 or c <= 0 or v < c:
+            senza_importi += 1
+            continue
+        lorde += v - c
+        if c <= s <= v:
+            for meta, sconto in ((v - s, r["sconto_v"]), (s - c, r["sconto_c"])):
+                f = fette[sconto if sconto in ("pioniere", "livello") else "piena"]
+                f["meta"] += 1
+                f["sats"] += meta
+                f["base"] += s
+        else:
+            non_divise += v - c
+        # al cambio del momento: quello della presa, e dove manca quello
+        # che lo scambio stesso dice (gli euro sui suoi sats)
+        cambio = float(r["cambio"] or 0) or (
+            (r["euro"] or 0) / s * 1e8 if s > 0 else 0)
+        if cambio > 0:
+            in_euro += (v - c) * cambio / 1e8
+        else:
+            senza_cambio += 1
+    for f in fette.values():
+        f["percento"] = round(f["sats"] * 100 / f["base"], 2) if f["base"] else None
+        del f["base"]
+    noti = [int(r["routing_msat"]) for r in fatti
+            if r["routing_msat"] is not None and int(r["routing_msat"]) >= 0]
+    mancanti = len(fatti) - len(noti)
+    routing_sats = int(round(sum(noti) / 1000))
+    commissioni = {
+        "lorde_sats": lorde, "euro": round(in_euro, 2),
+        "senza_cambio": senza_cambio, "senza_importi": senza_importi,
+        "fette": fette, "non_divise": non_divise,
+        "routing": {"stato": ("ok" if not mancanti else
+                              ("parziale" if noti else "assente")),
+                    "sats": routing_sats, "abbinati": len(noti),
+                    "mancanti": mancanti},
+        "nette_sats": lorde - routing_sats if not mancanti else None}
+    # --- gli ordini e le persone: una passata sola sul libro intestato
+    pubblicati = a_intervallo = 0
+    cifre, primo, ultimo = [], {}, {}
+    for o in con.execute("SELECT tg_id, preso_da, stato, visto, maker, creato, "
+                         "euro FROM p2p_ordini"):
+        if int(o["maker"] or 0) == 1 and (o["stato"] or "") \
+                and int(o["creato"] or 0) >= da:
+            pubblicati += 1
+            euro, euro_max = _euri_numero_p2p(o["euro"])
+            if euro_max:
+                a_intervallo += 1
+            elif euro:
+                cifre.append(euro)
+        if o["stato"] == "success":
+            quando = int(o["visto"] or 0)
+            for chi in (int(o["tg_id"] or 0), int(o["preso_da"] or 0)):
+                if chi:
+                    primo[chi] = min(primo.get(chi, quando), quando)
+                    ultimo[chi] = max(ultimo.get(chi, quando), quando)
+    ordini = {"pubblicati": pubblicati, "a_intervallo": a_intervallo,
+              "presi": sum(1 for r in fatti + rotti + list(in_corso)
+                           if int(r.get("preso") or r.get("chiuso") or adesso) >= da),
+              "scaduti": sum(1 for r in righe if r["esito"] == "scaduto"),
+              "ritirati": sum(1 for r in righe if r["esito"] == "ritirato"),
+              "importo_medio": round(sum(cifre) / len(cifre), 2) if cifre else None}
+    persone = {"diverse": sum(1 for q in ultimo.values() if q >= da),
+               "nuove": sum(1 for q in primo.values() if q >= da),
+               "parti_ignote": sum(2 - int(r["parti_note"] or 0) for r in fatti)}
+    # --- gli ultimi scambi: iniziali, mai nomi
+    ultimi = []
+    for r in sorted(fatti + rotti,
+                    key=lambda r: -int(r["chiuso"] or 0))[:P2P_ULTIMI_CONTI]:
+        o = con.execute("SELECT tg_id, preso_da FROM p2p_ordini WHERE ordine=?",
+                        (r["ordine"],)).fetchone()
+        chi = []
+        # chi ha preso si dice solo dove la riga e' dell'ULTIMO giro: di
+        # un ordine tornato in vetrina il libro ricorda la presa nuova
+        for tg in ((o["tg_id"], o["preso_da"] if r["esito"] != "tornato" else 0)
+                   if o else (0, 0)):
+            u = con.execute("SELECT nome FROM utenti WHERE tg_id=?",
+                            (int(tg or 0),)).fetchone() if tg else None
+            chi.append(_iniziali_p2p(u["nome"] if u else "", tg))
+        v, c = int(r["sats_venditore"] or 0), int(r["sats_compratore"] or 0)
+        ultimi.append({
+            "quando": int(r["chiuso"] or 0), "ordine": r["ordine"][:8],
+            "lato": r["lato"] or "", "euro": r["euro"] or 0,
+            "sats": int(r["sats"] or 0), "metodi": metodi_di(r),
+            "esito": r["esito"], "motivo": r["motivo"] or "",
+            "pagato": bool(r["pagato"]),
+            "commissione": v - c if r["esito"] == "completato" and v >= c > 0 else None,
+            "routing": (int(round(int(r["routing_msat"]) / 1000))
+                        if r["esito"] == "completato" and r["routing_msat"] is not None
+                        and int(r["routing_msat"]) >= 0 else None),
+            "pubblica": chi[0], "prende": chi[1]})
+    return {"da": da, "scambi": scambi, "volume": volume,
+            "commissioni": commissioni, "ordini": ordini, "persone": persone,
+            "ultimi": ultimi}
+
+
+@app.get("/api/admin/p2p-statistiche")
+async def statistiche_p2p_admin(periodo: str = "oggi",
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """SOLO AMMINISTRATORI: i conti del P2P per la sezione «Scambi P2P»
+    di `/admin`. Il controllo e' il PRIMO gesto, prima del database e
+    del nodo, e chi non passa riceve un 403 senza un numero. La risposta
+    si tiene un minuto (`P2P_CONTI_CACHE_S`): la pagina che si ricarica
+    non rifa' i conti, e il nodo lo sente al piu' ogni cinque minuti
+    (la cache di `dati_lnd_cruscotto`, la stessa del cruscotto)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not vede_statistiche_p2p(user["id"]):
+        raise HTTPException(403, "Riservato agli amministratori")
+    if periodo not in P2P_PERIODI_CONTI:
+        raise HTTPException(400, "Periodo sconosciuto")
+    adesso = int(time.time())
+    in_cache = _p2p_conti_cache.get(periodo)
+    if in_cache and adesso - in_cache[0] < P2P_CONTI_CACHE_S:
+        return JSONResponse(in_cache[1], headers={"Cache-Control": "no-store"})
+    con = db()
+    try:
+        nostri, rimborsi = hash_nostri(con), hash_rimborsi(con)
+    finally:
+        con.close()
+    lnd = await dati_lnd_cruscotto(nostri, rimborsi)
+    con = db()
+    try:
+        in_corso = _consolida_conti_p2p(con, adesso)
+        if lnd.get("stato") == "ok":
+            _abbina_routing_p2p(con, _cruscotto_lnd.get("uscite") or [], adesso)
+        dati = _statistiche_p2p(con, _inizio_periodo_p2p(periodo, adesso),
+                                adesso, in_corso)
+    finally:
+        con.close()
+    dati.update(periodo=periodo, generato=adesso,
+                eur_per_btc=cambio_noto_ora(),
+                lnd={"stato": lnd.get("stato") or "assente",
+                     "motivo": lnd.get("motivo") or ""})
+    _p2p_conti_cache[periodo] = (adesso, dati)
+    return JSONResponse(dati, headers={"Cache-Control": "no-store"})
+
+
 def _pulisci_memoria_p2p(con, adesso: int) -> int:
     """La cronaca non e' un archivio: oltre `P2P_LIBRO_MEMORIA_S` — la
     vita piu' lunga che un ordine possa avere, scambio compreso — le
@@ -47681,7 +48316,10 @@ async def _giro_attese_p2p():
         avvisi, prossima = _scarica_attese_p2p(con, adesso, bottoni)
         if adesso - _P2P_ATTESE.get("pulito", 0) > 3600:
             _P2P_ATTESE["pulito"] = adesso
-            tolte = _pulisci_memoria_p2p(con, adesso)
+            # I CONTI PRIMA DELLA SCOPA (10 ott 2026): gli scambi chiusi
+            # passano nel registro, e solo allora la cronaca si pota
+            tolte = _pulisci_memoria_p2p(con, adesso) \
+                if _conti_salvi_p2p(con, adesso) else 0
             if tolte:
                 print(f"🧹 P2P: tolte {tolte} righe di cronaca piu' vecchie "
                       f"di {P2P_LIBRO_MEMORIA_S // 86400} giorni", flush=True)

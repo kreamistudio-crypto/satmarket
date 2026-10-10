@@ -44547,3 +44547,148 @@ sta in `_testo_evento_p2p`; niente riga a chi ha pubblicato né a chi
 ha provato. Prove: i casi «q)» di `prove_reputazione_p2p` (frase al
 primo, dal secondo, non contato, chi ha pubblicato; e dalla rotta vera
 il conto arriva solo a chi ha preso).
+## Le statistiche del P2P: i conti per gli amministratori (10 ott 2026, cantiere statistiche-p2p, richiesta di Andrea)
+
+**LA RICHIESTA.** Il giorno del lancio, coi primi due scambi veri
+conclusi: una sezione dedicata agli scambi P2P nelle statistiche, nello
+stile delle tabelle che ci sono già — scambi, volume, commissioni,
+ordini, persone, gli ultimi venti — col filtro oggi / 7 giorni / 30
+giorni / tutto, e visibile SOLO ad Andrea e ad Alan, non a ogni
+moderatore.
+
+**DOVE STA.** In fondo al cruscotto `/admin` (`admin.html`), che è la
+pagina che ha già le tessere e le tabelle: una sezione «🔁 Scambi P2P»
+col suo periodo e la sua rotta, `GET /api/admin/p2p-statistiche`. Non
+nel pannello «📊 Statistiche» del Profilo: lì ci sono le code da
+smaltire, e una pagina di conti non è una coda.
+
+**CHI LA VEDE.** Una lista degli amministratori nel config non c'era:
+`ADMIN_IDS` vuol dire «moderatore». Quindi la leva nuova
+`P2P_STATISTICHE_IDS`, vuota di serie. Tre decisioni: 1) IL VUOTO È
+«NESSUNO» — il verso opposto di `P2P_PROVA_IDS`, dove il vuoto apre —
+e vale anche per la riga assente o storta; 2) chi è in lista deve
+essere ANCHE moderatore (`vede_statistiche_p2p`): un id sbagliato di una
+cifra non apre gli incassi a uno sconosciuto; 3) il giudice lo chiedono
+in due — la rotta, come primo gesto (prima della cache, del database e
+del nodo), e il cruscotto, che alla pagina manda un solo sì o no: a chi
+non passa la pagina non disegna niente e non fa nemmeno la richiesta.
+Nel pannello delle leve esce il CONTEGGIO, mai gli id.
+
+**COSA SA DAVVERO BARATTOLO (letto prima di scrivere).**
+- CERTO, lo dice il coordinatore: ogni passo di ogni scambio con la sua
+  ora (`p2p_momenti`, dalla patch 0007), per TUTTI gli scambi del nostro
+  mostrod, anche fra client che non sono Barattolo; e i tre importi
+  della chiusura (`p2p_scambi`: lo scambio, il netto a chi compra, il
+  totale bloccato da chi vende). La commissione incassata è la
+  differenza fra gli ultimi due. Coi numeri di controllo di Andrea:
+  64.960 − 63.352 = 1.608 e 123.127 − 120.689 = 2.438, cioè 4.046.
+- CERTO MA PARZIALE: euro, metodo e tipo dell'ordine vengono dal libro
+  (`p2p_ordini`), che il server segue solo per gli ordini con almeno un
+  account di Barattolo; gli ordini «pubblicati» sono quelli pubblicati
+  da qui (mostrod non racconta la pubblicazione); le persone sono
+  quelle che il libro ha intestato — chi prende da Nostr senza farsi
+  riconoscere non è annotato, per scelta sua, e non si conta.
+- DEDOTTO: il motivo di un annullo per scadenza (quale gesto mancava:
+  la garanzia chiesta e mai pagata, la fattura chiesta e mai data); la
+  divisione fra fee piena e scontata (chi aveva diritto allo sconto lo
+  dice `_sconto_p2p` al consolidamento, la cifra l'ha applicata
+  mostrod: accanto a ogni riga c'è la percentuale effettiva, che è il
+  controllo a occhio); il routing — la fee è quella vera di LND, ma
+  l'abbinamento allo scambio è per importo al sat e ora.
+- STIMA: gli euro delle commissioni (sats per il cambio della presa,
+  o dove manca per quello che lo scambio stesso dice) e ogni «≈ al
+  cambio di adesso».
+- NON C'È: il routing senza il ponte di LND («non disponibile», e le
+  nette senza cifra); il motivo SCRITTO di un annullo a mano (mostrod
+  dice chi, non perché); quale metodo sia stato usato in un ordine che
+  ne offriva due (lo sanno le due parti).
+
+**LA SCOPERTA CHE HA CAMBIATO IL PROGETTO.** La cronaca non è un
+archivio: `_pulisci_memoria_p2p` cancella momenti e parti dopo quaranta
+giorni, ed è scritto anche in «I tuoi dati». Il filtro «tutto» e la
+quota di Alan non possono avere quaranta giorni di memoria. Quindi il
+REGISTRO `p2p_conti`: una riga per scambio chiuso (o ordine scaduto o
+ritirato), scritta da `_consolida_conti_p2p` a ogni lettura della
+sezione e ogni ora PRIMA della scopa — se il consolidamento alza, la
+scopa di quell'ora non passa (`_conti_salvi_p2p`): una cronaca che
+resta un'ora in più non costa niente, uno scambio potato prima di
+finire nei conti non torna.
+
+**LE STRADE SCARTATE.**
+- I conti sui soli quaranta giorni, senza registro: «tutto» sarebbe
+  stato falso dal 28 ottobre in poi (quaranta giorni dalla patch 0007).
+- Gli account nel registro (chi ha scambiato con chi, per sempre): era
+  la strada comoda per «persone» e per le iniziali, e rovesciava la
+  promessa dei quaranta giorni. Il registro NON ha un posto per un
+  account né per una chiave (lo prova il DDL): le persone si contano da
+  quel che il server conserva già e che «dimentica il profilo» già
+  cancella (`p2p_ordini`), e le iniziali degli ultimi scambi vengono da
+  lì.
+- Una tabella `p2p_persone` (primo e ultimo scambio di ognuno): un dato
+  personale nuovo, con la sua riga nella fusione degli account e nel
+  «dimentica», per un numero che il libro dà già.
+- Il routing chiesto a mostrod: non lo racconta. Scritto a mano nel
+  registro: sarebbe un numero che nessuno aggiorna.
+- Classificare piena/scontata dalla percentuale pagata: la fee vera sta
+  nel `settings.toml` del nodo e il server non la legge; il listino
+  (`P2P_COMMISSIONE_PERCENTO`) è una promessa, non il fatto.
+- Il gancio nella rotta degli eventi (scrivere il registro a ogni
+  chiusura): è la strada calda degli avvisi, e un guasto dei conti non
+  deve poter fermare un avviso. Il consolidamento legge la cronaca dopo.
+
+**«I TUOI DATI».** Un paragrafo nuovo nella pagina (`#priv-p2p`): dal
+10 ottobre di ogni scambio chiuso restano oltre i quaranta giorni i
+conti — numero dell'ordine, date, esito, importi, metodo, cifra in euro
+— senza le persone. La frase dei quaranta giorni sulla cronaca resta
+vera com'era.
+
+**UN DIFETTO TROVATO DAL GIRO, e curato perché la sezione ci sarebbe
+caduta dentro:** `tabella()` di `admin.html` con una tabella VUOTA
+faceva `new Set(0)` e alzava, portandosi via la pagina intera — su un
+database appena nato, e nella sezione nuova in ogni giorno senza
+scambi. Ora la tabella vuota esce prima.
+
+**PROVATO.** `prove_statistiche_p2p` (76 prove): la porta e la
+leva nei tre versi, i quattro periodi (la mezzanotte italiana d'estate
+e d'inverno), una cronaca di cartone con scambi di ogni tipo sul DDL
+vero, i conti di oggi coi numeri di controllo (4.046 lorde, routing 7 +
+243 = 250, nette 3.796: i «circa 3.800»), 7 giorni, 30, tutto, il
+«concluso» che arriva dopo, la cronaca potata a metà, il registro che
+regge da solo dopo la scopa. `collaudo_statistiche_p2p` (26 passi, in
+CI nella gabbia): la rotta VERA con le tre identità — 403 al moderatore
+non in lista, all'utente normale, a chi è in lista senza moderare, e
+all'admin a lista vuota; 403 anche con la risposta dell'amministratore
+già in cache; la scopa vera dopo i conti. LA TORTURA, sulla copia: 25 mutazioni, 23 prese al primo giro. Le due
+sfuggite — l'annullo che chiude anche dove non c'è uno scambio aperto, e
+la tabella vuota che torna a esplodere — hanno fatto nascere due prove
+(«tornato e poi ritirato nello stesso giro», e il DISEGNO VERO della
+sezione in node, con le funzioni della pagina e le risposte del
+giudice: oggi, un periodo vuoto, un metodo scritto per fare danni) e
+rifatte sono prese: 25 su 25. La
+mutazione «la rotta dietro un `if False`» la prende SOLO il collaudo:
+è il motivo per cui c'è. IL GIRO DAL VIVO (Chrome headless via CDP sul
+server della copia, collaudo, relay morti): i due scambi di oggi e due
+in corso raccontati dalla porta vera `/api/p2p/evento`, il resto di
+cartone; la sezione nei quattro periodi e a 390 px; 222 (moderatore)
+vede il cruscotto senza la sezione e riceve 403; 111 non vede il
+cruscotto e riceve 403; senza identità 401. Il routing nel giro è stato
+SCRITTO nel registro a mano (in locale LND non c'è): quel che il giro
+prova è la resa, l'abbinamento lo provano prove e collaudo con LND di
+cartone. MISURATO su 40.000 momenti e 55.000 righe di registro: il
+consolidamento a regime 68 ms, i conti di oggi 15 ms, «tutto» 487 ms,
+una volta al minuto (la cache). La suite intera (`PROVE_SEVERE=1`) e i
+collaudi della CI sono girati su quest'albero prima del commit: i
+numeri nel messaggio del commit.
+
+**DA GUARDARE.** • Sul VPS la riga `P2P_STATISTICHE_IDS` va AGGIUNTA
+(PRODUZIONE, «LE STATISTICHE DEL P2P»): finché manca la sezione non la
+vede nessuno. • I DUE SCAMBI VERI DI OGGI: la sezione deve dire 2
+completati, 150 €, 4.046 sats incassati, routing 250, nette 3.796. Se
+il routing non si abbina, è il primo posto dove guardare: l'importo
+pagato da LND deve essere il netto a chi compra AL SAT. • La divisione
+piena/sconto del 50 €: i suoi numeri (804 per parte, se lo scambio era
+di 64.156 sats) non stanno né all'1% né all'1,5% tondi — la riga della
+percentuale effettiva lo dirà, e se la fee del nodo non è quella che
+crediamo si vede lì. • Il primo passaggio della scopa a quaranta giorni
+dal 18 settembre (verso il 28 ottobre): nel journal «🧹 P2P: tolte N
+righe» senza «⚠️ i conti non si sono consolidati» prima.

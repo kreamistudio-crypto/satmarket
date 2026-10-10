@@ -31048,6 +31048,10 @@ def _censimento(acceso, dopo=None):
     # spente la riga deve dire l'apertura, e senza questa distinzione
     # quel ramo non lo guarderebbe nessuno.
     amb["P2P_PROVA_IDS"] = {1, 2, 3} if acceso else set()
+    # CHI VEDE I CONTI DEL P2P (10 ott 2026): un insieme anche lui, di
+    # cui il pannello dice la sola LUNGHEZZA — e a leve spente e' vuoto,
+    # che qui vuol dire «nessuno»
+    amb["P2P_STATISTICHE_IDS"] = {1, 2} if acceso else set()
     amb["MOSTRO_HEX"] = "ab" * 32 if acceso else ""
     # LA FASE DI PROVA RGB E I NOMI NIP-05 (ott 2026): la stessa forma
     # della fase P2P — un insieme e un dizionario che il pannello
@@ -91776,6 +91780,9 @@ def prove_p2p_orologio():
                      "_giro_attese_p2p", "orologio_p2p", "guardiano_p2p"):
                 testo = "async " + testo
             exec(testo, amb)
+        # i conti prima della scopa (10 ott 2026) hanno la loro prova:
+        # qui si guarda l'orologio, e la scopa passa come prima
+        amb["_conti_salvi_p2p"] = lambda con, adesso: True
 
         # UNA PASSATA e' il libro e poi le attese, come nell'orologio: il
         # libro prepara, le attese mandano
@@ -92050,6 +92057,8 @@ def prove_p2p_tutti_i_relay():
               "_pulisci_memoria_p2p") + asincrone:
         testo = _senza_prosa(pezzo(f))
         exec(("async " if f in asincrone else "") + testo, amb)
+    # i conti prima della scopa (10 ott 2026) hanno la loro prova
+    amb["_conti_salvi_p2p"] = lambda con, adesso: True
 
     async def _passata():
         # il libro prepara, le attese mandano: come nell'orologio
@@ -92687,6 +92696,8 @@ def prove_p2p_ascolto():
               "_pagamento_ordine_p2p",
               "_pulisci_memoria_p2p") + asincrone:
         exec(("async " if f in asincrone else "") + _senza_prosa(pezzo(f)), amb6)
+    # i conti prima della scopa (10 ott 2026) hanno la loro prova
+    amb6["_conti_salvi_p2p"] = lambda con, adesso: True
 
     ORD, ALTRUI = "ordine-del-lampo", "ordine-di-un-altro"
     c = _db()
@@ -108644,6 +108655,619 @@ def prove_cruscotto_admin():
     prova("...e la pagina carica solo da casa e da telegram.org", [],
           [u for u in re.findall(r'src="(https?://[^"]+)"', pagina)
            if not u.startswith("https://telegram.org/")])
+
+
+def prove_statistiche_p2p():
+    """I CONTI DEL P2P (10 ott 2026, cantiere statistiche-p2p). I giudici
+    girano per davvero su un database col DDL VERO e una cronaca di
+    cartone con scambi di ogni tipo: conclusi (con sconto e senza, di
+    Barattolo e di altri client), annullati per ogni motivo, tornati in
+    vetrina e ripresi, scaduti, ritirati, in corso, in disputa, col
+    pagamento ancora in viaggio. Poi i quattro periodi, il routing
+    abbinato da LND, il registro che regge da solo dopo la potatura, e
+    la porta: chi non e' amministratore non passa."""
+    import sqlite3, json as _js
+    print("\n[i conti del P2P]")
+    src = _SORGENTE
+    amb = {"time": time, "sqlite3": sqlite3, "json": _js, "re": re,
+           "P2P_SCONTO_FEDELTA_PERCENTO": 0.5, "P2P_SCONTO_LIVELLO": 5,
+           "P2P_LIBRO_MEMORIA_S": 40 * 86400, "ADMIN_IDS": [10, 20],
+           "MODALITA_COLLAUDO": True, "P2P_STATISTICHE_IDS": {10},
+           "print": lambda *a, **k: None,
+           # la scala vera non serve: qui il quinto gradino e' «1000 xp»
+           "livello_utente": lambda xp, affari: {"numero": 5 if xp >= 1000 else 1}}
+    for capo, coda in (("_PESO_MOMENTO_P2P = {", "}\n"),
+                       ("P2P_MOMENTI_IN_CORSO = (", ")\n"),
+                       ("P2P_PERIODI_CONTI = (", "_p2p_conti_cache = {}")):
+        i = src.index(capo)
+        exec(src[i:src.index(coda, i) + len(coda)], amb)
+    for f in ("_epoch_roma", "e_admin", "vede_statistiche_p2p",
+              "_inizio_periodo_p2p", "_motivo_annullo_p2p", "_esiti_cronaca_p2p",
+              "_euro_tabacchino", "_metodi_libro", "_metodi_lista_p2p",
+              "_metodi_conti_p2p", "_euro_numero_p2p", "_euri_numero_p2p",
+              "_sconto_p2p_fatti", "_sconto_p2p", "_consolida_conti_p2p",
+              "_conti_salvi_p2p", "uscite_altrui_lnd", "_abbina_routing_p2p",
+              "_iniziali_p2p", "_statistiche_p2p"):
+        exec(pezzo(f), amb)
+
+    # --- 1) LA PORTA ---------------------------------------------------
+    vede = amb["vede_statistiche_p2p"]
+    prova("l'amministratore (moderatore E in lista) vede i conti", True, vede(10))
+    prova("...il moderatore che non e' in lista no", False, vede(20))
+    prova("...l'utente normale no", False, vede(111))
+    amb["P2P_STATISTICHE_IDS"] = {10, 111}
+    prova("...e nemmeno chi e' in lista senza essere moderatore: un id "
+          "sbagliato di una cifra non apre i conti", False, vede(111))
+    amb["P2P_STATISTICHE_IDS"] = set()
+    prova("lista vuota: nessuno, nemmeno il moderatore ne' il 999 del "
+          "collaudo", (False, False), (vede(10), vede(999)))
+    prova("...e un id che non e' un numero non passa e non esplode",
+          (False, False, False), (vede(None), vede("pippo"), vede(0)))
+    amb["P2P_STATISTICHE_IDS"] = {10}
+    i_l = src.index("try:\n    from config import P2P_STATISTICHE_IDS")
+    blocco = src[i_l:src.index("\n\n\n", i_l)]
+
+    def _leva_con(valore):
+        a = {"print": lambda *x, **k: None}
+        finto = type("C", (), {})()
+        if valore is not None:
+            finto.P2P_STATISTICHE_IDS = valore
+        import sys as _s
+        vecchio = _s.modules.get("config")
+        _s.modules["config"] = finto
+        try:
+            exec(blocco, a)
+        finally:
+            if vecchio is None:
+                _s.modules.pop("config", None)
+            else:
+                _s.modules["config"] = vecchio
+        return a["P2P_STATISTICHE_IDS"]
+
+    prova("la leva legge la lista", {111, 222}, _leva_con([111, 222]))
+    prova("...non dichiarata, una stringa, una lista di parole: NESSUNO "
+          "(qui il vuoto chiude)", (set(), set(), set()),
+          (_leva_con(None), _leva_con("123"), _leva_con(["pippo"])))
+    rotta = pezzo("statistiche_p2p_admin")
+    prova("la rotta chiede al giudice PRIMA di aprire il database, di "
+          "guardare la cache e di chiamare il nodo", True,
+          rotta.index("vede_statistiche_p2p(") < rotta.index("_p2p_conti_cache.get(")
+          < rotta.index("db()") < rotta.index("dati_lnd_cruscotto("))
+    prova("...e a chi non passa da' un 403", True,
+          'raise HTTPException(403, "Riservato agli amministratori")' in rotta)
+    prova("...un periodo sconosciuto e' un 400, e i quattro sono quelli",
+          (True, ("oggi", "7", "30", "tutto")),
+          ("if periodo not in P2P_PERIODI_CONTI" in rotta,
+           amb["P2P_PERIODI_CONTI"]))
+    prova("il cruscotto dice alla pagina solo un si' o un no, chiesto "
+          "allo stesso giudice", True,
+          '"p2p_statistiche": vede_statistiche_p2p(user["id"])'
+          in pezzo("cruscotto_admin"))
+    prova("le uscite di LND per il P2P stanno FUORI dai dati che vanno "
+          "al browser dei moderatori", True,
+          "uscite=uscite_altrui_lnd(pagamenti, nostri)"
+          in pezzo("dati_lnd_cruscotto")
+          and 'dati["uscite"]' not in pezzo("dati_lnd_cruscotto"))
+    prova("il pannello delle leve dice QUANTI sono, mai gli id", True,
+          '"P2P_STATISTICHE_IDS", len(P2P_STATISTICHE_IDS)'
+          in pezzo("_leve_stato"))
+    prova("...e config_esempio.py porta il segnaposto vuoto", True,
+          "\nP2P_STATISTICHE_IDS = []\n"
+          in open("config_esempio.py", encoding="utf-8").read())
+
+    # --- 2) I PERIODI --------------------------------------------------
+    er, inizio = amb["_epoch_roma"], amb["_inizio_periodo_p2p"]
+    ORA = er("2026-10-10 18:00")
+    prova("«oggi» parte dalla mezzanotte italiana", er("2026-10-10 00:00"),
+          inizio("oggi", ORA))
+    prova("...anche mezz'ora dopo e mezz'ora prima della mezzanotte, "
+          "d'estate e d'inverno",
+          [er("2026-07-01 00:00"), er("2026-07-01 00:00"),
+           er("2026-12-01 00:00"), er("2026-12-01 00:00")],
+          [inizio("oggi", er("2026-07-01 00:30")),
+           inizio("oggi", er("2026-07-01 23:30")),
+           inizio("oggi", er("2026-12-01 00:30")),
+           inizio("oggi", er("2026-12-01 23:30"))])
+    prova("7 e 30 sono giorni interi a ritroso, «tutto» e' zero",
+          (ORA - 7 * 86400, ORA - 30 * 86400, 0),
+          (inizio("7", ORA), inizio("30", ORA), inizio("tutto", ORA)))
+
+    # --- 3) LA CRONACA DI CARTONE -------------------------------------
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    i = src.index("CREATE TABLE IF NOT EXISTS p2p_ordini(")
+    con.executescript(src[i:src.index("CREATE TABLE IF NOT EXISTS p2p_tolti(", i)])
+    i = src.index("CREATE TABLE IF NOT EXISTS p2p_conti(")
+    ddl_conti = src[i:src.index("CREATE TABLE IF NOT EXISTS punti_ritiro(", i)]
+    con.executescript(ddl_conti)
+    con.executescript("""
+    CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT, username TEXT,
+      coorte TEXT DEFAULT '', xp INTEGER DEFAULT 0,
+      vendite_ok INTEGER DEFAULT 0, acquisti_ok INTEGER DEFAULT 0);
+    INSERT INTO utenti VALUES
+      (111, 'Andrea Rossi', 'andrea_r', 'pioniere', 0, 0, 0),
+      (222, 'marta', 'martab', '', 10, 1, 1),
+      (333, 'Élise von Kranz', '', '', 5000, 30, 30),
+      (444, '🫙', 'barattolaio', '', 0, 0, 0);
+    """)
+    G = 86400
+
+    def scambio(ordine, quando, passi, giro=1):
+        """Una fila di momenti, a un minuto l'uno dall'altro."""
+        for n, (momento, attore, dettaglio) in enumerate(passi):
+            con.execute(
+                "INSERT INTO p2p_momenti(ordine, momento, quando, fonte, giro, "
+                "attore, dettaglio, arrivato) VALUES(?,?,?,'mostro',?,?,?,?)",
+                (ordine, momento, quando + n * 60, giro, attore, dettaglio,
+                 quando + n * 60))
+        return quando + (len(passi) - 1) * 60
+
+    def libro(ordine, maker, preso_da, stato, lato, euro, metodi, creato,
+              visto, sats=0):
+        con.execute(
+            "INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, "
+            "visto, preso_da, euro, sats, metodi) VALUES(?,?,?,?,?,1,?,?,?,?,?)",
+            (ordine, maker, creato, stato, lato, visto, preso_da, euro, sats,
+             _js.dumps(metodi)))
+
+    def parti(ordine, compratore, venditore, preso_dal, giro, sats=0, netto=0,
+              totale=0, cambio=0):
+        con.execute(
+            "INSERT INTO p2p_scambi(ordine, compratore, venditore, preso_dal, "
+            "giro, sats, sats_compratore, sats_venditore, cambio_presa, "
+            "aggiornato) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (ordine, compratore, venditore, preso_dal, giro, sats, netto,
+             totale, cambio, ORA))
+    COMPRA_PRENDE = [("preso", "buyer", ""), ("fattura_chiesta", "mostro", ""),
+                     ("fattura_data", "buyer", "hold-next"),
+                     ("garanzia_chiesta", "mostro", "invoice"),
+                     ("garanzia_pagata", "seller", "active"),
+                     ("fiat", "buyer", "")]
+    FINE = [("rilasciato", "seller", ""), ("concluso", "mostro", "")]
+    # A e B: i due scambi di OGGI, coi numeri di controllo di Andrea —
+    # 50 € (garanzia 64.960, al compratore 63.352, routing 7) e 100 €
+    # (garanzia 123.127, al compratore 120.689, routing 243)
+    oggi = er("2026-10-10 00:00")
+    libro("ordine-a", 222, 111, "success", "sell", "50,00 €", ["SEPA"],
+          oggi + 3600, oggi + 4 * 3600)
+    scambio("ordine-a", oggi + 2 * 3600, COMPRA_PRENDE + FINE)
+    parti("ordine-a", 111, 222, "buyer", 1, 64000, 63352, 64960, 78125)
+    libro("ordine-b", 111, 333, "success", "buy", "100,00 €", ["Revolut"],
+          oggi + 5 * 3600, oggi + 9 * 3600)
+    chiuso_b = scambio("ordine-b", oggi + 8 * 3600,
+                       [("preso", "seller", "take"),
+                        ("garanzia_chiesta", "mostro", "take"),
+                        ("garanzia_pagata", "seller", ""),
+                        ("fattura_chiesta", "mostro", ""),
+                        ("fattura_data", "buyer", "active"),
+                        ("fiat", "buyer", "")] + FINE) - 60
+    parti("ordine-b", 111, 333, "seller", 1, 121908, 120689, 123127, 82000)
+    # C: tre giorni fa, chi vende non paga la garanzia e mostrod chiude
+    libro("ordine-c", 222, 111, "canceled", "sell", "30,00 €", ["SEPA"],
+          ORA - 3 * G - 3600, ORA - 3 * G, 40000)
+    scambio("ordine-c", ORA - 3 * G, COMPRA_PRENDE[:4]
+            + [("annullato", "mostro", "maker-timeout")])
+    # D: cinque giorni fa chi ha preso non dice dove ricevere i sats e
+    # l'ordine TORNA in vetrina; il giorno dopo un altro lo riprende e
+    # annulla a mano. Due giri, due esiti.
+    libro("ordine-d", 222, 0, "canceled", "sell", "40,00 €",
+          ["SEPA", "Revolut"], ORA - 6 * G, ORA - 4 * G)
+    scambio("ordine-d", ORA - 5 * G, COMPRA_PRENDE[:2]
+            + [("tornato", "mostro", "taker-timeout")], giro=1)
+    scambio("ordine-d", ORA - 4 * G, COMPRA_PRENDE[:2]
+            + [("annullato", "buyer", "")], giro=2)
+    parti("ordine-d", 444, 222, "buyer", 2, cambio=80000)
+    # E: dieci giorni fa, uno scambio fra due client che NON sono
+    # Barattolo — niente libro, niente parti: solo cronaca e importi
+    scambio("ordine-e", ORA - 10 * G, [("preso", "seller", "take")] + FINE)
+    parti("ordine-e", 0, 0, "seller", 1, 25000, 24750, 25250, 0)
+    # F: venti giorni fa, un Barattozon, tutt'e due con lo sconto
+    libro("ordine-f", 111, 333, "success", "buy", "25,47 €",
+          ["Contanti al tabacchino 25.47"], ORA - 21 * G, ORA - 20 * G)
+    scambio("ordine-f", ORA - 20 * G, [("preso", "seller", "take")] + FINE)
+    parti("ordine-f", 111, 333, "seller", 1, 30000, 29700, 30300, 84900)
+    # G: trentacinque giorni fa, annullo concordato
+    libro("ordine-g", 222, 111, "canceled", "sell", "15,00 €", ["SEPA"],
+          ORA - 36 * G, ORA - 35 * G)
+    scambio("ordine-g", ORA - 35 * G, COMPRA_PRENDE[:5]
+            + [("annullo_chiesto", "buyer", ""),
+               ("annullato", "seller", "cooperative")])
+    # H e I: un ordine scaduto senza essere preso, uno ritirato a mano
+    libro("ordine-h", 222, 0, "canceled", "sell", "60,00 €", ["SEPA"],
+          ORA - 4 * G, ORA - 2 * G)
+    scambio("ordine-h", ORA - 2 * G, [("scaduto", "mostro", "book")], giro=0)
+    libro("ordine-i", 222, 0, "canceled", "sell", "70,00 €", ["SEPA"],
+          ORA - 7 * G, ORA - 6 * G)
+    scambio("ordine-i", ORA - 6 * G, [("annullato", "seller", "")], giro=0)
+    # J e K: in corso adesso — uno attivo da un'ora, uno in disputa da ieri
+    libro("ordine-j", 444, 111, "active", "sell", "20,00 €", ["Contanti"],
+          ORA - G - 7200, ORA - 3600)
+    scambio("ordine-j", ORA - 3600, COMPRA_PRENDE[:5])
+    scambio("ordine-k", ORA - G - 3600, COMPRA_PRENDE
+            + [("disputa", "buyer", "")])
+    # L: due giorni fa, rilasciato ma il pagamento a chi compra e'
+    # fallito — concluso per chi vende, ancora in viaggio per chi compra
+    libro("ordine-l", 444, 0, "in-progress", "sell", "10,00 €", ["SEPA"],
+          ORA - 2 * G - 3600, ORA - 2 * G)
+    scambio("ordine-l", ORA - 2 * G, COMPRA_PRENDE
+            + [("rilasciato", "seller", ""), ("payout_fallito", "mostro", "")])
+    parti("ordine-l", -55, 444, "buyer", 1, 12000, 11880, 12120, 83000)
+    # M: quindici giorni fa, una disputa che il moderatore ha annullato
+    scambio("ordine-m", ORA - 15 * G, COMPRA_PRENDE
+            + [("disputa", "seller", ""), ("annullato", "mostro", "admin")])
+    # ...e un ordine a intervallo pubblicato oggi, ancora in vetrina
+    libro("ordine-n", 222, 0, "pending", "sell", "da 20,00 a 100,00 €",
+          ["SEPA"], oggi + 6 * 3600, oggi + 6 * 3600)
+    con.commit()
+
+    # --- 4) DAI MOMENTI AGLI ESITI (pura) -----------------------------
+    esiti = amb["_esiti_cronaca_p2p"]
+
+    def di(ordine):
+        return [(e["giro"], e["esito"], e["motivo"]) for e in esiti(
+            con.execute("SELECT * FROM p2p_momenti WHERE ordine=?",
+                        (ordine,)).fetchall())]
+    prova("un ordine tornato in vetrina e ripreso sono DUE scambi, "
+          "ognuno col suo motivo",
+          [(1, "tornato", "fattura_non_data"), (2, "annullato", "a_mano")],
+          di("ordine-d"))
+    prova("la garanzia chiesta e mai pagata, l'annullo concordato, la "
+          "disputa decisa dal moderatore",
+          [[(1, "annullato", "garanzia_non_pagata")],
+           [(1, "annullato", "concordato")], [(1, "annullato", "moderatore")]],
+          [di("ordine-c"), di("ordine-g"), di("ordine-m")])
+    prova("senza una presa, la morte dell'ordine non e' uno scambio "
+          "annullato: e' uno scaduto o un ritirato",
+          [[(0, "scaduto", "")], [(0, "ritirato", "")]],
+          [di("ordine-h"), di("ordine-i")])
+    prova("rilasciato col pagamento fallito e' completato ma non pagato; "
+          "la disputa aperta resta in corso",
+          [("completato", False, False), ("in_corso", False, True)],
+          [(e["esito"], e["pagato"], e["disputa"])
+           for o in ("ordine-l", "ordine-k")
+           for e in esiti(con.execute("SELECT * FROM p2p_momenti WHERE "
+                                      "ordine=?", (o,)).fetchall())])
+    motivo = amb["_motivo_annullo_p2p"]
+    prova("la garanzia pagata e arrivata a scadenza, e la scadenza di "
+          "cui la cronaca non dice il gesto",
+          ("garanzia_scaduta", "tempo_scaduto"),
+          (motivo("mostro", "escrow-deadline",
+                  {"garanzia_chiesta", "garanzia_pagata"}),
+           motivo("mostro", "maker-timeout", {"preso"})))
+    prova("a parita' d'ora decide il peso dei momenti: la presa e la "
+          "garanzia chiesta nello stesso secondo non si scambiano",
+          [(1, "in_corso", "garanzia_chiesta")],
+          [(e["giro"], e["esito"], e["ultimo"]) for e in esiti([
+              {"momento": "garanzia_chiesta", "quando": 5, "giro": 1,
+               "attore": "mostro", "dettaglio": "take"},
+              {"momento": "preso", "quando": 5, "giro": 1,
+               "attore": "seller", "dettaglio": "take"}])])
+
+    prova("un ordine tornato in vetrina e poi ritirato da chi l'aveva "
+          "pubblicato, nello stesso giro: lo scambio resta «tornato», "
+          "e il ritiro e' un fatto dell'ordine (trovata dalla tortura)",
+          [(1, "ritirato", ""), (1, "tornato", "tempo_scaduto")],
+          [(e["giro"], e["esito"], e["motivo"]) for e in esiti([
+              {"momento": "preso", "quando": 10, "giro": 1,
+               "attore": "buyer", "dettaglio": ""},
+              {"momento": "tornato", "quando": 20, "giro": 1,
+               "attore": "mostro", "dettaglio": "taker-timeout"},
+              {"momento": "annullato", "quando": 30, "giro": 1,
+               "attore": "seller", "dettaglio": ""}])])
+
+    # --- 5) IL REGISTRO -----------------------------------------------
+    consolida, conti = amb["_consolida_conti_p2p"], amb["_statistiche_p2p"]
+    in_corso = consolida(con, ORA)
+    righe = con.execute("SELECT COUNT(*) FROM p2p_conti").fetchone()[0]
+    prova("il consolidamento scrive gli scambi chiusi e gli ordini morti "
+          "(5 conclusi, 5 annullati o tornati, 1 scaduto, 1 ritirato)",
+          12, righe)
+    prova("...e torna quelli in corso, che nel registro non entrano",
+          [("ordine-j"[:8], False), ("ordine-k"[:8], True)],
+          sorted((s["ordine"], s["disputa"]) for s in in_corso))
+    consolida(con, ORA)
+    prova("...due volte non raddoppia niente", righe,
+          con.execute("SELECT COUNT(*) FROM p2p_conti").fetchone()[0])
+    colonne = [r[1] for r in con.execute("PRAGMA table_info(p2p_conti)")]
+    prova("il registro NON ha un posto per un account ne' per una chiave",
+          [], [c for c in colonne
+               if any(spia in c for spia in ("tg_id", "compratore_id",
+                                             "venditore_id", "chiave",
+                                             "nome", "pubkey", "maker"))
+               or c in ("compratore", "venditore", "preso_da")])
+    prova("...e nessun id di persona finisce in una sua riga", [],
+          [dict(r) for r in con.execute("SELECT * FROM p2p_conti")
+           if any(v in (111, 222, 333, 444, -55) for v in dict(r).values())])
+    prova("lo sconto di ogni meta' lo dice il giudice di sempre: chi "
+          "vende a fee piena e chi compra da pioniere, poi livello 5 e "
+          "pioniere",
+          [("", "pioniere"), ("livello", "pioniere")],
+          [(r["sconto_v"], r["sconto_c"]) for r in con.execute(
+              "SELECT sconto_v, sconto_c FROM p2p_conti WHERE ordine IN "
+              "('ordine-a','ordine-b') ORDER BY ordine")])
+    prova("senza il libro il tipo dell'ordine lo dice la presa, e gli "
+          "euro restano «non si sa»", ("buy", 0.0, 0),
+          tuple(con.execute("SELECT lato, euro, parti_note FROM p2p_conti "
+                            "WHERE ordine='ordine-e'").fetchone()))
+    prova("il tabacchino entra col nome che si legge, senza l'importo",
+          '["Barattozon"]',
+          con.execute("SELECT metodi FROM p2p_conti WHERE ordine='ordine-f'"
+                      ).fetchone()[0])
+
+    # --- 6) I CONTI DI OGGI, COI NUMERI DI CONTROLLO --------------------
+    d = conti(con, inizio("oggi", ORA), ORA, in_corso)
+    prova("oggi: 2 completati, nessun annullato, 2 in corso (1 in "
+          "disputa), tasso 100%", (2, 0, 2, 1, 100.0),
+          (d["scambi"]["completati"], d["scambi"]["annullati"],
+           d["scambi"]["in_corso"], d["scambi"]["in_disputa"],
+           d["scambi"]["tasso"]))
+    prova("...150 € e 185.908 sats, divisi per tipo e per metodo",
+          (150.0, 185908, [("buy", 1, 100.0, 121908), ("sell", 1, 50.0, 64000)],
+           [("Revolut", 1, 100.0), ("SEPA", 1, 50.0)]),
+          (d["volume"]["euro"], d["volume"]["sats"],
+           [(g["nome"], g["scambi"], g["euro"], g["sats"])
+            for g in d["volume"]["lati"]],
+           [(g["nome"], g["scambi"], g["euro"])
+            for g in d["volume"]["metodi"]]))
+    prova("...commissioni incassate: 1.608 + 2.438 = 4.046 sats, e in "
+          "euro al cambio della presa", (4046, 3.26),
+          (d["commissioni"]["lorde_sats"], d["commissioni"]["euro"]))
+    prova("...una meta' a fee piena (960 sats, 1,5%), due da pioniere, "
+          "una da livello 5",
+          {"piena": {"meta": 1, "sats": 960, "percento": 1.5},
+           "pioniere": {"meta": 2, "sats": 648 + 1219, "percento": 1.0},
+           "livello": {"meta": 1, "sats": 1219, "percento": 1.0}},
+          d["commissioni"]["fette"])
+    prova("...il routing, finche' il nodo non l'ha detto, e' «non "
+          "disponibile» — e le nette non si inventano",
+          ({"stato": "assente", "sats": 0, "abbinati": 0, "mancanti": 2}, None),
+          (d["commissioni"]["routing"], d["commissioni"]["nette_sats"]))
+    chiuso_a = con.execute("SELECT chiuso FROM p2p_conti WHERE "
+                           "ordine='ordine-a'").fetchone()[0]
+    # LND di cartone: gli hash COSTRUITI qui (un esadecimale da 64
+    # scritto per intero nel sorgente fa rossa la CI)
+    h = lambda c: c * 64
+
+    def pag(hh, sats, fee_msat, creato, stato="SUCCEEDED"):
+        return {"payment_hash": hh, "status": stato, "value_sat": str(sats),
+                "fee_msat": str(fee_msat),
+                "creation_time_ns": str(creato * 10 ** 9)}
+    lnd = [pag(h("a"), 63352, 7000, chiuso_a + 4),
+           pag(h("b"), 120689, 243000, chiuso_b + 6),
+           pag(h("c"), 63352, 99000, chiuso_a - 3 * G),   # stesso importo, altro giorno
+           pag(h("d"), 63352, 55000, chiuso_a + 900),     # stesso importo, piu' lontano
+           pag(h("e"), 120689, 1000, chiuso_b + 2),       # del mercatino: fuori
+           pag(h("f"), 120689, 1000, chiuso_b + 1, stato="FAILED"),
+           "spazzatura", {"payment_hash": h("9"), "status": "SUCCEEDED",
+                          "value_sat": "x"}]
+    uscite = amb["uscite_altrui_lnd"](lnd, {h("e")})
+    prova("le uscite di LND per il P2P: riuscite, non del mercatino, e "
+          "dell'hash resta solo il capo",
+          [(63352, 7000, "a" * 16), (120689, 243000, "b" * 16),
+           (63352, 99000, "c" * 16), (63352, 55000, "d" * 16)],
+          [u[1:] for u in uscite])
+    abbina = amb["_abbina_routing_p2p"]
+    prova("il routing si abbina per importo AL SAT e per ora: due scambi, "
+          "due pagamenti", 2, abbina(con, uscite, ORA))
+    prova("...e una seconda passata non riabbina niente ne' riusa un "
+          "pagamento", 0, abbina(con, uscite, ORA))
+    # un pagamento solo per due scambi dello stesso importo, e due
+    # pagamenti fuori dalla finestra: su un registro a parte
+    con2 = sqlite3.connect(":memory:")
+    con2.row_factory = sqlite3.Row
+    con2.executescript(ddl_conti)
+    for n, (netto, chiuso) in enumerate(((5000, ORA), (5000, ORA + 100),
+                                         (7000, ORA), (8000, ORA))):
+        con2.execute("INSERT INTO p2p_conti(ordine, giro, esito, chiuso, "
+                     "sats_compratore) VALUES(?,1,'completato',?,?)",
+                     (f"gemello-{n}", chiuso, netto))
+    abbina(con2, [(ORA + 50, 5000, 1000, "x"), (ORA - 3 * G, 7000, 1000, "y"),
+                  (ORA + 2 * G, 8000, 1000, "z")], ORA + 3 * G)
+    prova("un pagamento non si conta su due scambi, e fuori dalla "
+          "finestra — prima o dopo — non e' il suo",
+          [1000, -1, -1, -1],
+          [r[0] for r in con2.execute("SELECT routing_msat FROM p2p_conti "
+                                      "ORDER BY ordine")])
+    prova("di un ordine tornato in vetrina e ripreso, le parti e il "
+          "cambio sono del giro NUOVO: il primo non li eredita",
+          [(1, 0, 0.0), (2, 2, 80000.0)],
+          [tuple(r) for r in con.execute(
+              "SELECT giro, parti_note, cambio FROM p2p_conti WHERE "
+              "ordine='ordine-d' ORDER BY giro")])
+    d = conti(con, inizio("oggi", ORA), ORA, in_corso)
+    prova("oggi col nodo: routing 7 + 243 = 250 sats, nette 3.796 — i "
+          "«circa 3.800» di Andrea",
+          ({"stato": "ok", "sats": 250, "abbinati": 2, "mancanti": 0}, 3796),
+          (d["commissioni"]["routing"], d["commissioni"]["nette_sats"]))
+    prova("...ordini di oggi: 3 pubblicati (1 a intervallo), 3 presi, "
+          "importo medio 75 €", (3, 1, 3, 75.0),
+          (d["ordini"]["pubblicati"], d["ordini"]["a_intervallo"],
+           d["ordini"]["presi"], d["ordini"]["importo_medio"]))
+    prova("...persone di oggi: 3 diverse, 1 sola al primo scambio",
+          {"diverse": 3, "nuove": 1, "parti_ignote": 0}, d["persone"])
+    prova("...gli ultimi scambi: iniziali e id breve, mai un nome",
+          [("ordine-b"[:8], "A.R.", "É.V.", 2438, 243),
+           ("ordine-a"[:8], "M.", "A.R.", 1608, 7)],
+          [(u["ordine"], u["pubblica"], u["prende"], u["commissione"],
+            u["routing"]) for u in d["ultimi"]])
+    tutto = _js.dumps(d, ensure_ascii=False)
+    prova("...e nella risposta non c'e' un nome, uno username ne' una "
+          "chiave che porti un id", [],
+          [spia for spia in ("Andrea", "Rossi", "marta", "martab", "Kranz",
+                             "barattolaio", "andrea_r", "tg_id", "preso_da",
+                             "compratore", "venditore")
+           if spia in tutto])
+    prova("...e nessun valore degli ultimi scambi e' l'id di una persona",
+          [], [v for u in d["ultimi"] for v in u.values()
+               if v in (111, 222, 333, 444, -55)])
+    ini = amb["_iniziali_p2p"]
+    prova("le iniziali: due al piu'; senza un nome le ultime tre cifre "
+          "dell'id; nessuno e' vuoto",
+          ("A.R.", "M.", "#444", "#055", ""),
+          (ini("Andrea Rossi Bianchi", 111), ini("marta", 222),
+           ini("🫙", 444), ini("", -55), ini("", 0)))
+
+    # --- 7) GLI ALTRI PERIODI ------------------------------------------
+    d7 = conti(con, inizio("7", ORA), ORA, in_corso)
+    prova("7 giorni: 3 completati (1 col pagamento in viaggio), 3 "
+          "annullati (1 tornato in vetrina), tasso 50%",
+          (3, 1, 3, 1, 50.0),
+          (d7["scambi"]["completati"], d7["scambi"]["in_viaggio"],
+           d7["scambi"]["annullati"], d7["scambi"]["tornati"],
+           d7["scambi"]["tasso"]))
+    prova("...i motivi, uno per uno",
+          {"garanzia_non_pagata": 1, "fattura_non_data": 1, "a_mano": 1},
+          d7["scambi"]["motivi"])
+    prova("...1 scaduto senza essere preso, 1 ritirato", (1, 1),
+          (d7["ordini"]["scaduti"], d7["ordini"]["ritirati"]))
+    prova("...un routing che manca fa «parziale», e le nette restano "
+          "senza cifra: una somma a meta' non passa per netto",
+          ("parziale", 250, 1, None),
+          (d7["commissioni"]["routing"]["stato"],
+           d7["commissioni"]["routing"]["sats"],
+           d7["commissioni"]["routing"]["mancanti"],
+           d7["commissioni"]["nette_sats"]))
+    prova("...fra i conclusi di sette giorni i metodi sono SEPA e "
+          "Revolut: l'ordine a due metodi non si e' concluso",
+          ["Revolut", "SEPA"],
+          sorted(g["nome"] for g in d7["volume"]["metodi"]))
+    d30 = conti(con, inizio("30", ORA), ORA, in_corso)
+    prova("30 giorni: 5 completati, 4 annullati; uno scambio senza euro "
+          "e senza cambio, due parti non riconosciute",
+          (5, 4, 1, 1, 2),
+          (d30["scambi"]["completati"], d30["scambi"]["annullati"],
+           d30["volume"]["senza_euro"], d30["commissioni"]["senza_cambio"],
+           d30["persone"]["parti_ignote"]))
+    prova("...Barattozon e «non noto» fra i metodi, e il tipo dedotto "
+          "dalla presa",
+          (["", "Barattozon", "Revolut", "SEPA"], 3),
+          (sorted(g["nome"] for g in d30["volume"]["metodi"]),
+           [g["scambi"] for g in d30["volume"]["lati"]
+            if g["nome"] == "buy"][0]))
+    prova("...persone: le stesse 3, tutte al primo scambio nel periodo",
+          (3, 3), (d30["persone"]["diverse"], d30["persone"]["nuove"]))
+    dt = conti(con, 0, ORA, in_corso)
+    prova("tutto: 5 completati, 5 annullati (c'e' anche il concordato di "
+          "35 giorni fa), tasso 50%", (5, 5, 50.0, 1),
+          (dt["scambi"]["completati"], dt["scambi"]["annullati"],
+           dt["scambi"]["tasso"], dt["scambi"]["motivi"].get("concordato")))
+    prova("un periodo senza scambi chiusi non ha un tasso (mai 0%)", None,
+          conti(con, ORA + 1, ORA, [])["scambi"]["tasso"])
+
+    # --- 8) IL PAGAMENTO CHE ARRIVA DOPO, E LA POTATURA ----------------
+    scambio("ordine-l", ORA - 60, [("fattura_data", "buyer", "new-invoice"),
+                                   ("concluso", "mostro", "")])
+    con.commit()
+    consolida(con, ORA)
+    prova("il «concluso» che arriva dopo accende il pagato sulla riga "
+          "che c'era, senza una riga nuova", (1, 1),
+          tuple(con.execute("SELECT COUNT(*), MAX(pagato) FROM p2p_conti "
+                            "WHERE ordine='ordine-l'").fetchone()))
+    # la scopa porta via la presa di C e lascia l'annullo
+    con.execute("DELETE FROM p2p_momenti WHERE ordine='ordine-c' AND "
+                "momento<>'annullato'")
+    con.commit()
+    consolida(con, ORA)
+    prova("una cronaca potata a meta' non fa di un annullo un ritiro",
+          ["annullato"],
+          [r[0] for r in con.execute("SELECT esito FROM p2p_conti WHERE "
+                                     "ordine='ordine-c'")])
+    prima = _js.dumps(conti(con, 0, ORA, []), sort_keys=True)
+    con.execute("DELETE FROM p2p_momenti")
+    con.execute("DELETE FROM p2p_scambi")
+    con.commit()
+    prova("dopo la scopa dei quaranta giorni il registro regge da solo: "
+          "gli stessi conti, e nessuno in corso",
+          (True, []),
+          (_js.dumps(conti(con, 0, ORA, consolida(con, ORA)),
+                     sort_keys=True) == prima, consolida(con, ORA)))
+    giro = pezzo("_giro_attese_p2p")
+    prova("la scopa passa SOLO se i conti sono in salvo", True,
+          "if _conti_salvi_p2p(con, adesso) else 0" in giro)
+    rotto = sqlite3.connect(":memory:")
+    rotto.row_factory = sqlite3.Row
+    prova("...e se il consolidamento esplode dice di no invece di "
+          "lasciar potare", False, amb["_conti_salvi_p2p"](rotto, ORA))
+    prova("...mentre sul database sano dice di si'", True,
+          amb["_conti_salvi_p2p"](con, ORA))
+
+    # --- 9) LA PAGINA ---------------------------------------------------
+    pagina = open("admin.html", encoding="utf-8").read()
+    prova("la pagina chiede i conti solo se il cruscotto ha detto di si'",
+          True, "if (D.p2p_statistiche) caricaP2P();" in pagina)
+    prova("...a un 403 il riquadro resta VUOTO: la sezione non compare",
+          True, "if (r && (r.status === 403 || r.status === 401)) "
+                "{ P = null; box.innerHTML = ''; return; }" in pagina)
+    prova("...i quattro periodi sono quelli del server",
+          list(amb["P2P_PERIODI_CONTI"]),
+          re.findall(r"\['(\w+)', '[^']+'\]",
+                     pagina[pagina.index("const PERIODI_P2P"):
+                            pagina.index("const MOTIVI_P2P")]))
+    prova("...ogni motivo che il server puo' dire ha la sua frase", [],
+          [m for m in ("garanzia_non_pagata", "fattura_non_data",
+                       "tempo_scaduto", "garanzia_scaduta", "a_mano",
+                       "concordato", "moderatore")
+           if m + ":" not in pagina
+           or f'return "{m}"' not in pezzo("_motivo_annullo_p2p")])
+    prova("...e il testo che viene dal server passa da esc()", True,
+          all(x in pagina for x in ("esc(u.ordine)", "esc(u.metodi || '—')",
+                                    "esc(x || '—')", "nome(g.nome)")))
+    # LA SEZIONE SI DISEGNA PER DAVVERO, con le funzioni VERE della
+    # pagina e le risposte VERE del giudice: i conti di oggi, un periodo
+    # senza niente (la tabella vuota che il 10 ott faceva `new Set(0)` e
+    # si portava via la pagina), e un metodo scritto per fare danni.
+    import shutil as _sh, subprocess as _sp, tempfile as _tf
+    node = _sh.which("node")
+    if not node:
+        salta("la sezione degli scambi P2P si disegna", "node non installato")
+        return
+    vuoto = conti(con, ORA + 1, ORA, [])
+    cattivo = _js.loads(_js.dumps(d))
+    cattivo["ultimi"][0].update(metodi="<img src=x onerror=alert(1)>",
+                                pubblica="<b>A.</b>")
+    cattivo["volume"]["metodi"][0]["nome"] = "<script>x</script>"
+    for r in (d, vuoto, cattivo):
+        r.update(periodo="oggi", generato=ORA, eur_per_btc=80000,
+                 lnd={"stato": "ok", "motivo": ""})
+
+    def fetta(capo, coda):
+        i = pagina.index(capo)
+        return pagina[i:pagina.index(coda, i)]
+    banco = "\n".join([
+        fetta("const esc = s =>", "\nconst el = "),
+        "const scatola = {innerHTML: ''}; const el = () => scatola;",
+        fetta("let P = null, periodoP2P", "\nasync function caricaP2P(){"),
+        fetta("function disegnaP2P(){", "\nlet ridisegno = 0;"),
+        fetta("function tabella(testa, righe, numeriche){", "\n/* un nodo:"),
+        "const fuori = {};",
+        "for (const [nome, r] of Object.entries(%s)) {"
+        " P = r; scatola.innerHTML = ''; disegnaP2P();"
+        " fuori[nome] = scatola.innerHTML; }" % _js.dumps(
+            {"oggi": d, "vuoto": vuoto, "cattivo": cattivo}),
+        "fuori.tabella_vuota = tabella(['A', 'B'], []);",
+        "console.log(JSON.stringify(fuori));"])
+    pf = os.path.join(_tf.mkdtemp(prefix="conti_p2p_"), "sezione.js")
+    open(pf, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, pf], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco della sezione gira (anche con un periodo vuoto)", "",
+          (r.stderr or "")[-600:])
+    if r.returncode:
+        return
+    o = _js.loads(r.stdout)
+    prova("una tabella vuota dice «Ancora niente» e non alza",
+          '<div class="nota">Ancora niente.</div>', o["tabella_vuota"])
+    prova("oggi a schermo: le cifre di controllo, col punto delle migliaia",
+          [], [x for x in ("4.046 sats", "250 sats", "3.796 sats",
+                           "€ 150,00", "185.908", "A.R. → É.V.")
+               if x not in o["oggi"]])
+    prova("il periodo vuoto si disegna: zero scambi, tasso «—», nessuna "
+          "cifra netta inventata", (True, True, True),
+          ("Ancora niente." in o["vuoto"], ">—<" in o["vuoto"],
+           "0 sats" in o["vuoto"]))
+    prova("un metodo o un'iniziale scritti per fare danni escono come "
+          "testo", (False, False, False, True),
+          ("<img src=x" in o["cattivo"], "<script>x" in o["cattivo"],
+           "<b>A.</b>" in o["cattivo"], "&lt;img src=x" in o["cattivo"]))
 
 
 def prove_vantaggi_livelli():
@@ -137014,6 +137638,7 @@ def main():
               prove_tracking_corretto, prove_tracking_venditore,
               prove_tracking_facoltativo,
               prove_vantaggi_livelli, prove_cruscotto_admin,
+              prove_statistiche_p2p,
               prove_buoni_cumulabili,
               prove_barattolo,
               prove_savers_proprietario, prove_visualizzazioni,

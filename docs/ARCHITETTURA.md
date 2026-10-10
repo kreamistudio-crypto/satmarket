@@ -10244,6 +10244,49 @@
   fattura vive 15 minuti), la conclusione il primo `payout_tentati`.
   Le fee dei rimborsi: `lnd.rimborsi`, la stessa `conti_instradamento`
   sui soli `hash_rimborsi`.
+  I CONTI DEL P2P (10 ott 2026, cantiere statistiche-p2p): la sezione
+  «🔁 Scambi P2P» in fondo a `/admin`, col SUO periodo (oggi dalla
+  mezzanotte italiana, 7 e 30 giorni a ritroso, tutto) e la SUA rotta,
+  `GET /api/admin/p2p-statistiche?periodo=`. CHI LA VEDE: il giudice e'
+  `vede_statistiche_p2p` — moderatore (`e_admin`) E in
+  `P2P_STATISTICHE_IDS`; lista vuota, assente o storta = nessuno. Lo
+  chiedono la rotta, come PRIMO gesto (prima della cache, del database
+  e del nodo: 403), e il cruscotto, che alla pagina manda il solo
+  booleano `p2p_statistiche`: a chi non passa la pagina non disegna
+  niente e non fa la richiesta. DA DOVE VENGONO I NUMERI: la cronaca di
+  mostrod (`p2p_momenti`) diventa esiti con `_esiti_cronaca_p2p`, pura
+  — uno SCAMBIO per giro (`completato` al rilascio, `annullato`,
+  `tornato` in vetrina, `in_corso`) e i fatti dell'ORDINE senza uno
+  scambio aperto (`scaduto`, `ritirato`); il motivo di un annullo lo
+  dice `_motivo_annullo_p2p` dal gesto che chiude e dai momenti visti
+  (garanzia chiesta e mai pagata, fattura chiesta e mai data, a mano,
+  concordato, moderatore). Le cifre sono i tre importi che mostrod
+  manda alla chiusura (`p2p_scambi`): la commissione incassata e' il
+  totale bloccato da chi vende meno il netto a chi compra. Euro,
+  metodo e tipo vengono dal libro (`p2p_ordini`), quindi solo per gli
+  ordini con un account di Barattolo; le persone si contano sugli
+  ordini `success` intestati li' (chi prende da Nostr senza farsi
+  riconoscere non e' annotato, e non si conta). IL REGISTRO: la cronaca
+  si cancella a quaranta giorni (`_pulisci_memoria_p2p`), i conti no —
+  `_consolida_conti_p2p` copia gli esiti CHIUSI in `p2p_conti` (chiave
+  ordine + giro + esito, idempotente; una riga scritta non si riscrive,
+  salvo il «pagato» che arriva dopo), a ogni lettura della sezione e
+  ogni ora PRIMA della scopa (`_conti_salvi_p2p`: se alza, la scopa di
+  quell'ora non passa). ⚠️ `p2p_conti` NON HA UN POSTO PER UN ACCOUNT
+  NE' PER UNA CHIAVE: l'id pubblico dell'ordine, ore, esito, cifre, lo
+  sconto di ogni meta' ('' | pioniere | livello, chiesto a
+  `_sconto_p2p` al consolidamento) e quante parti erano dei nostri.
+  IL ROUTING lo sa LND, non mostrod: `dati_lnd_cruscotto` tiene da
+  parte le uscite riuscite che non sono del mercatino
+  (`uscite_altrui_lnd`, in `_cruscotto_lnd["uscite"]`, MAI dentro i
+  dati che vanno al browser) e `_abbina_routing_p2p` le abbina agli
+  scambi per importo AL SAT (il netto a chi compra) e ora (da 5 minuti
+  prima del rilascio a un giorno dopo), il piu' vicino, mai lo stesso
+  pagamento due volte (`routing_rif`, il capo dell'hash). Chi non trova
+  il suo resta a -1: «non disponibile», e le NETTE escono solo se il
+  routing di tutti gli scambi del periodo si conosce. La risposta si
+  tiene un minuto in memoria (`P2P_CONTI_CACHE_S`); gli ultimi scambi
+  portano le iniziali (`_iniziali_p2p`), mai nomi ne' id.
   I VANTAGGI DI OGNI LIVELLO (ott 2026, parola di Andrea): `/api/me`
   porta `livelli_scala` (`scala_livelli`): un gradino per livello con
   soglie XP/affari e i vantaggi che apre OGGI, letti dalle leve vive —

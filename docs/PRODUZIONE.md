@@ -37,6 +37,27 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   del client (`📖 [p2p] libro: ...=N`): e' li' che si vede uno
   specchio che ha smesso di aggiornarsi, perche' non fallisce — torna
   zero, e zero si legge come «oggi non c'e' nessun ordine».
+- LE STATISTICHE DEL P2P (10 ott 2026): la sezione «🔁 Scambi P2P» in
+  fondo al cruscotto `/admin` la vedono solo gli AMMINISTRATORI, e la
+  leva `P2P_STATISTICHE_IDS` si AGGIUNGE al config del VPS: finche'
+  manca, e' vuota o e' scritta male non la vede NESSUNO (403 a tutti,
+  e all'avvio una riga `[p2p] P2P_STATISTICHE_IDS non e' una lista`
+  solo se e' storta). Si guarda prima cosa c'e':
+  `grep -n "P2P_STATISTICHE_IDS\|^ADMIN_IDS" ~/satmarket/config.py`,
+  poi si aggiunge la riga coi due id Telegram —
+  `P2P_STATISTICHE_IDS = [id_di_andrea, id_di_alan]` — e
+  `sudo systemctl restart barattolo`. Tutt'e due gli id devono stare
+  ANCHE in `ADMIN_IDS`: la lista da sola non fa entrare nessuno. Il
+  pannello «⚙️ Stato delle leve» dice quanti sono («Statistiche P2P:
+  amministratori»), mai chi. IL REGISTRO `p2p_conti` nasce da solo al
+  primo avvio (`CREATE TABLE IF NOT EXISTS`) e si riempie da solo: alla
+  prima apertura della sezione e ogni ora, prima della scopa dei
+  quaranta giorni. Se nel journal compare «⚠️ P2P: i conti non si sono
+  consolidati» la scopa di quell'ora NON e' passata, apposta: la
+  cronaca resta finche' i conti non sono in salvo, e si guarda perche'.
+  IL ROUTING vuole il ponte di LND (`LND_PONTE_MACAROON_LETTURA`): senza,
+  la sezione dice «non disponibile» e le commissioni nette non hanno
+  una cifra. Coi perche': Architettura, «I CONTI DEL P2P».
 - LE CARD P2P IN VETRINA (26 set 2026): la leva `P2P_IN_VETRINA` si
   AGGIUNGE al config del VPS come le altre, e finche' manca o e'
   `False` le card le vedono solo i moderatori e chi e' in

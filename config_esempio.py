@@ -644,6 +644,15 @@ P2P_ATTIVO = False
 # l'apertura vorrebbe dire uno scambio di denaro vero aperto al
 # mercatino intero senza averlo deciso.
 P2P_PROVA_IDS = []
+# CHI VEDE LE STATISTICHE DEL P2P (10 ott 2026): la sezione «Scambi
+# P2P» del cruscotto /admin — scambi, volume, commissioni incassate —
+# e' degli AMMINISTRATORI, non di tutti i moderatori. Qui vanno i loro
+# user id Telegram, es. [123456789, 987654321]. Chi e' in lista deve
+# essere ANCHE in ADMIN_IDS: la lista da sola non fa entrare nessuno.
+# ⚠️ Il verso e' l'OPPOSTO della riga qui sopra: VUOTA (o assente, o
+# scritta male) = non la vede NESSUNO, e il server risponde 403 a
+# tutti. Si riempie sul VPS e si riavvia.
+P2P_STATISTICHE_IDS = []
 # IL SEGRETO DEL PROFILO DI SCAMBIO (set 2026): da qui si ricava la
 # chiave d'identita' Mostro di chi entra da Telegram, cosi' i suoi
 # scambi si vedono uguali dal bot, dal sito e dall'app. Serve anche il

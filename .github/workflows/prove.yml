@@ -137,6 +137,7 @@ jobs:
              collaudo_bollino_staff.py
              semina_demo.py collaudo_semina_demo.py
              collaudo_campagna_p2p_tutti.py
+             collaudo_statistiche_p2p.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
@@ -238,6 +239,7 @@ jobs:
              collaudo_x_risonanza
              collaudo_semina_demo
              collaudo_campagna_p2p_tutti
+             collaudo_statistiche_p2p
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.

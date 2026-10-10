@@ -77,6 +77,10 @@
   <h1>📊 Cruscotto di Barattolo</h1>
   <div class="sub" id="sub">Carico i numeri…</div>
   <div id="corpo"></div>
+  <!-- SCAMBI P2P (10 ott 2026): resta VUOTO per chi non e' amministratore.
+       Il cruscotto dice un si' o un no, e i numeri li da' un'altra rotta
+       che rifa' la stessa domanda (`vede_statistiche_p2p`). -->
+  <div id="p2p"></div>
 </main>
 <script>
 const tg = window.Telegram && window.Telegram.WebApp;
@@ -109,6 +113,7 @@ async function carica(){
   el('sub').textContent = 'Aggiornato alle ' + new Date(D.generato * 1000)
     .toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
   disegna();
+  if (D.p2p_statistiche) caricaP2P();
 }
 function stato(t){ el('sub').textContent = ''; el('corpo').innerHTML = `<div class="stato">${esc(t)}</div>`; }
 
@@ -377,8 +382,11 @@ function cardAnnulli(A, L){
 }
 
 function tabella(testa, righe, numeriche){
-  const num = new Set(numeriche || righe.length && testa.map((_, i) => i).filter(i => i > 0));
+  /* una tabella VUOTA esce prima di tutto (10 ott 2026): `righe.length &&`
+     dava 0, e `new Set(0)` alzava — su un giorno senza scambi P2P, o su
+     un database appena nato, portandosi via la pagina intera */
   if (!righe.length) return '<div class="nota">Ancora niente.</div>';
+  const num = new Set(numeriche || testa.map((_, i) => i).filter(i => i > 0));
   return `<table><thead><tr>${testa.map((h, i) => `<th class="${num.has(i) ? 'n' : ''}">${esc(h)}</th>`).join('')}</tr></thead><tbody>`
     + righe.map(r => `<tr>${r.map((c, i) => `<td class="${num.has(i) ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('') + '</tbody></table>';
 }
@@ -390,6 +398,138 @@ function nodo(pub, alias){
   return (alias ? `<b>${esc(alias)}</b><br>` : '')
     + `<a class="mono" href="https://amboss.space/node/${p}" target="_blank" rel="noopener">${corto}</a>`;
 }
+
+/* ---- SCAMBI P2P (10 ott 2026): la sezione degli amministratori ----
+   Ha il SUO periodo e la SUA richiesta: i numeri li fa il server per
+   il periodo chiesto (`/api/admin/p2p-statistiche`), non questa pagina.
+   Chi non e' amministratore qui non arriva — `D.p2p_statistiche` e'
+   falso e la richiesta non parte — e se arrivasse lo stesso il server
+   risponde 403 e il riquadro resta vuoto. */
+let P = null, periodoP2P = 'oggi';
+const PERIODI_P2P = [['oggi', 'Oggi'], ['7', '7 giorni'], ['30', '30 giorni'], ['tutto', 'Tutto']];
+const MOTIVI_P2P = {garanzia_non_pagata: 'garanzia non pagata', fattura_non_data: 'fattura non data',
+  tempo_scaduto: 'tempo scaduto', garanzia_scaduta: 'garanzia arrivata a scadenza',
+  a_mano: 'annullato a mano', concordato: 'annullo concordato', moderatore: 'deciso da un moderatore'};
+const LATI_P2P = {sell: 'Vendi', buy: 'Compra'};
+const ESITI_P2P = {completato: '✅ concluso', annullato: '❌ annullato', tornato: '🔄 tornato in vetrina'};
+/* i sats col punto delle migliaia SEMPRE: l'italiano di serie non lo
+   mette sotto le cinque cifre, e «4046 sats» accanto a «185.908» stona */
+const fmtP = n => Number(n || 0).toLocaleString('it-IT', {useGrouping: 'always'});
+const euro2 = n => '€ ' + Number(n || 0).toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+async function caricaP2P(){
+  const box = el('p2p');
+  box.querySelectorAll('.filtri button').forEach(b => b.setAttribute('aria-pressed', b.dataset.p === periodoP2P));
+  let r;
+  try {
+    r = await fetch('/api/admin/p2p-statistiche?periodo=' + encodeURIComponent(periodoP2P),
+      {credentials: 'same-origin', headers: {'X-Tg-Init-Data': intestazione()}});
+  } catch(e) { r = null; }
+  if (r && (r.status === 403 || r.status === 401)) { P = null; box.innerHTML = ''; return; }
+  if (!r || !r.ok) {
+    box.innerHTML = `<h1 style="margin-top:28px">🔁 Scambi P2P</h1><div class="stato">Non riesco a leggere i conti del P2P${r ? ` (il server ha risposto ${r.status})` : ''}: riprova fra poco.</div>`;
+    return;
+  }
+  P = await r.json();
+  disegnaP2P();
+}
+
+function disegnaP2P(){
+  if (!P) return;
+  const s = P.scambi, v = P.volume, c = P.commissioni, o = P.ordini, pe = P.persone, rt = c.routing;
+  /* uno scambio, due scambi */
+  const sc = n => n === 1 ? 'scambio' : 'scambi';
+  const t = (k, val, d) => `<div class="tile"><div class="k">${k}</div><div class="v">${val}</div><div class="d">${d || ''}</div></div>`;
+  const eurOra = sats => P.eur_per_btc > 0 ? `≈ ${euro2(sats / 1e8 * P.eur_per_btc)} al cambio di adesso` : '';
+  const motivi = Object.entries(s.motivi || {}).sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${fmtP(n)} ${esc(MOTIVI_P2P[k] || k)}`).join(' · ');
+  const gruppi = (righe, nome) => righe.map(g => [nome(g.nome), fmtP(g.scambi), g.euro ? euro2(g.euro) : '—', fmtP(g.sats)]);
+  const fetta = (nome, f) => [nome, fmtP(f.meta), fmtP(f.sats), f.percento == null ? '—' : fmtd(f.percento, 2) + '%'];
+  const fette = [fetta('A fee piena', c.fette.piena), fetta('Con sconto pionieri', c.fette.pioniere), fetta('Con sconto Lv5', c.fette.livello)];
+  if (c.non_divise) fette.push(['Non divisibili (manca l\'importo dello scambio)', '—', fmtP(c.non_divise), '—']);
+  const routing = rt.stato === 'ok' ? fmtP(rt.sats) + ' sats'
+    : rt.stato === 'parziale' ? fmtP(rt.sats) + ' sats <span class="sub">parziale</span>' : 'non disponibile';
+  const routingD = !s.completati ? 'nessuno scambio concluso nel periodo'
+    : rt.stato === 'ok' ? rt.abbinati === 1 ? 'letto dal nodo' : `letto dal nodo per tutti e ${fmtP(rt.abbinati)} gli scambi`
+    : rt.stato === 'parziale' ? `noto per ${fmtP(rt.abbinati)} ${sc(rt.abbinati)} su ${fmtP(s.completati)}: per gli altri non disponibile`
+    : (P.lnd.stato === 'ok' ? 'il nodo risponde, ma non ha un pagamento che combaci' : esc(P.lnd.motivo || 'il nodo non risponde'));
+  const quando = ts => ts ? new Date(ts * 1000).toLocaleString('it-IT', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : '—';
+  const esito = u => esc(ESITI_P2P[u.esito] || u.esito)
+    + (u.esito === 'completato' ? (u.pagato ? '' : ' <span class="sub">pagamento in viaggio</span>')
+       /* accanto a «annullato» il motivo perde la parola che lo ripete */
+       : ` <span class="sub">${esc((MOTIVI_P2P[u.motivo] || u.motivo || '').replace(/^(annullato|annullo) /, ''))}</span>`);
+  const chi = u => [u.pubblica, u.prende].map(x => esc(x || '—')).join(' → ');
+  el('p2p').innerHTML = `
+  <h1 style="margin-top:28px">🔁 Scambi P2P</h1>
+  <div class="sub">Riservato agli amministratori · conti aggiornati alle ${new Date(P.generato * 1000).toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'})}</div>
+  <div class="filtri" role="group" aria-label="Periodo degli scambi P2P">
+    ${PERIODI_P2P.map(([p, nome]) => `<button data-p="${p}" aria-pressed="${p === P.periodo}" onclick="periodoP2P='${p}';caricaP2P()">${nome}</button>`).join('')}
+  </div>
+
+  <div class="card"><h2>Scambi</h2>
+    <div class="tiles">
+      ${t('Completati', fmtP(s.completati), s.in_viaggio ? `${fmtP(s.in_viaggio)} col pagamento a chi compra ancora in viaggio` : 'sats arrivati a chi compra')}
+      ${t('Annullati', fmtP(s.annullati), (motivi || 'nessuno') + (s.tornati ? ` — ${fmtP(s.tornati)} con l'ordine tornato in vetrina` : ''))}
+      ${t('In corso adesso', fmtP(s.in_corso), (s.in_disputa ? `${fmtP(s.in_disputa)} in disputa · ` : '') + 'non dipende dal periodo')}
+      ${t('Tasso di completamento', s.tasso == null ? '—' : fmtd(s.tasso, 1) + '%', 'completati su chiusi (completati + annullati)')}
+    </div>
+  </div>
+
+  <div class="card"><h2>Volume</h2>
+    <div class="tiles">
+      ${t('Euro scambiati', euro2(v.euro), v.senza_euro ? `${fmtP(v.senza_euro)} ${sc(v.senza_euro)} senza cifra in euro (ordini di altri client)` : 'la cifra del libro, scambi conclusi')}
+      ${t('Sats passati', fmtP(v.sats), eurOra(v.sats))}
+      ${t('Scambio medio', s.completati - v.senza_euro > 0 ? euro2(v.euro / (s.completati - v.senza_euro)) : '—', s.completati ? fmtP(Math.round(v.sats / s.completati)) + ' sats in media' : '')}
+    </div>
+    <h2 style="margin-top:14px">Per tipo di ordine</h2>
+    <div class="tab">${tabella(['Tipo', 'Scambi', 'Euro', 'Sats'], gruppi(v.lati, n => esc(LATI_P2P[n] || 'Non noto')))}</div>
+    <h2 style="margin-top:14px">Per metodo di pagamento</h2>
+    <div class="tab">${tabella(['Metodo', 'Scambi', 'Euro', 'Sats'], gruppi(v.metodi, n => esc(n || 'Non noto')))}</div>
+    <div class="nota">«Vendi» e «Compra» sono dal lato di chi ha pubblicato l'ordine. Un ordine con più metodi sta in una riga sua: quale dei due sia stato usato lo sanno solo le due parti.</div>
+  </div>
+
+  <div class="card"><h2>Commissioni</h2>
+    <div class="tiles">
+      ${t('Incassate', fmtP(c.lorde_sats) + ' sats', c.lorde_sats ? `≈ ${euro2(c.euro)} al cambio del momento${c.senza_cambio ? ` (${fmtP(c.senza_cambio)} ${sc(c.senza_cambio)} senza cambio)` : ''}` : '')}
+      ${t('Routing dei payout', routing, routingD)}
+      ${t('Nette', c.nette_sats == null ? '—' : fmtP(c.nette_sats) + ' sats', c.nette_sats == null ? 'servono le fee di routing di tutti gli scambi' : 'incassate meno il routing')}
+    </div>
+    <div class="tab">${tabella(['Come è stata pagata', 'Metà', 'Sats', '% sullo scambio'], fette)}</div>
+    <div class="nota">Ogni scambio ha due metà di commissione: una di chi vende, una di chi compra.${c.senza_importi ? ` ${fmtP(c.senza_importi)} ${c.senza_importi === 1 ? 'scambio concluso non porta' : 'scambi conclusi non portano'} gli importi di chiusura e qui non ${c.senza_importi === 1 ? 'entra' : 'entrano'}.` : ''}</div>
+  </div>
+
+  <div class="card"><h2>Ordini</h2>
+    <div class="tiles">
+      ${t('Pubblicati', fmtP(o.pubblicati), 'da Barattolo' + (o.a_intervallo ? ` · ${fmtP(o.a_intervallo)} a intervallo` : ''))}
+      ${t('Presi', fmtP(o.presi), 'le prese raccontate dal coordinatore')}
+      ${t('Scaduti senza essere presi', fmtP(o.scaduti), o.ritirati ? `${fmtP(o.ritirati)} ${o.ritirati === 1 ? 'ritirato' : 'ritirati'} da chi li aveva pubblicati` : 'nessuno ritirato a mano')}
+      ${t('Importo medio', o.importo_medio == null ? '—' : euro2(o.importo_medio), 'degli ordini pubblicati a cifra fissa')}
+    </div>
+  </div>
+
+  <div class="card"><h2>Persone</h2>
+    <div class="tiles">
+      ${t('Utenti diversi', fmtP(pe.diverse), 'con almeno uno scambio concluso nel periodo')}
+      ${t('Nuovi', fmtP(pe.nuove), 'al primo scambio concluso nel periodo')}
+      ${pe.parti_ignote ? t('Parti non riconosciute', fmtP(pe.parti_ignote), 'altri client, o chiavi che il server non conosce') : ''}
+    </div>
+  </div>
+
+  <div class="card"><h2>Ultimi scambi${P.ultimi.length ? ` (${fmtP(P.ultimi.length)})` : ''}</h2>
+    <div class="tab">${tabella(['Data', 'Ordine', 'Tipo', 'Importo', 'Sats', 'Metodo', 'Esito', 'Commissione', 'Routing', 'Pubblica → prende'],
+      P.ultimi.map(u => [quando(u.quando), `<span class="mono">${esc(u.ordine)}</span>`, esc(LATI_P2P[u.lato] || '—'),
+        u.euro ? euro2(u.euro) : '—', u.sats ? fmtP(u.sats) : '—', esc(u.metodi || '—'), esito(u),
+        u.commissione == null ? '—' : fmtP(u.commissione), u.routing == null ? '—' : fmtP(u.routing), chi(u)]), [3, 4, 7, 8])}</div>
+    <div class="nota">Al posto dei nomi le iniziali, o le ultime tre cifre dell'id per chi un nome non ce l'ha. «—» è chi il server non conosce, o non ricorda più.</div>
+    <details><summary>Cosa è certo e cosa è una stima</summary>
+      <div class="nota"><b>Certo</b> (lo dice il coordinatore): quanti scambi, i loro passi e le ore; i tre importi di chiusura — lo scambio, il netto a chi compra, il totale bloccato da chi vende — e quindi le commissioni incassate.</div>
+      <div class="nota"><b>Certo ma parziale</b>: euro, metodo e tipo vengono dal libro, che il server segue per gli ordini con almeno un account di Barattolo; gli ordini «pubblicati» sono quelli pubblicati da qui; le persone sono quelle che il libro ha intestato (chi prende da Nostr senza farsi riconoscere non si conta).</div>
+      <div class="nota"><b>Dedotto</b>: il motivo di un annullo per scadenza (quale gesto mancava nella cronaca); la divisione fra fee piena e scontata (chi aveva diritto allo sconto secondo Barattolo, mentre la cifra l'ha applicata il coordinatore); il routing, che è la fee vera letta dal nodo ma abbinata allo scambio per importo e ora.</div>
+      <div class="nota"><b>Stima</b>: gli euro delle commissioni (sats per il cambio della presa) e ogni «≈ al cambio di adesso».</div>
+    </details>
+  </div>`;
+}
+
 let ridisegno = 0;
 addEventListener('resize', () => { if (!D) return; clearTimeout(ridisegno); ridisegno = setTimeout(disegna, 150); });
 carica();
