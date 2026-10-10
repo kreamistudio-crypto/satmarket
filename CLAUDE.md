@@ -163,9 +163,12 @@ in ogni sessione:
 - IL BACKUP non contiene `channel.db`, ed è voluto (per i canali esiste
   solo l'SCB); cifra con la sola chiave pubblica age e il PC tira in pull.
 - `pow_first_contact` resta SPENTO finché il termometro degli eventi non
-  salta di un ordine di grandezza senza utenti nuovi. I 900 secondi di
-  `expiration_seconds` restano 900 (opzione gratuita sul cambio: la cura
-  sono i bond, non la finestra). La dev fee sta a `dev_fee_percentage =
+  salta di un ordine di grandezza senza utenti nuovi. `expiration_seconds`
+  è 1800 dal 10 ott 2026 (era 900; decisione di Andrea, NODO-MOSTRO «DAL
+  10 OTT 2026 SONO 1800»): 30 minuti PER GESTO, e non si allunga ancora
+  senza la cauzione che brucia al timeout (opzione gratuita sul cambio).
+  `hold_invoice_expiration_window` resta 900: scade solo la richiesta di
+  CAUZIONE, la garanzia no (letto sul nodo). La dev fee sta a `dev_fee_percentage =
   0` per il circuito Tor freddo (difetto upstream): NON esentare i due
   domini LNURL da Tor, un IP che bussa lì si dichiara coordinator.
 - L'admin macaroon NON serve e non si dà: il ristretto ha retto lo

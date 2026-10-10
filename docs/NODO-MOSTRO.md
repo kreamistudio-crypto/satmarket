@@ -331,6 +331,54 @@ poi). Quindi **la cura per «15 minuti sono pochi» sono i BOND, non la
 finestra**: con quelli accesi `slash_or_release_on_timeout` brucia il
 bond di chi teneva il dovere, e allora la finestra si allunga senza
 regalare niente. Cantiere suo, e va PRIMA di qualunque ritocco ai 900.
+**DAL 10 OTT 2026 SONO 1800** (decisione di Andrea, che rovescia la riga
+qui sopra sapendolo). IL CASO: la mattina del lancio un PayCode
+Barattozon da 111,80 €; alle 10:04 a chi vendeva arriva «Paga la
+garanzia», alle 10:20 il coordinatore annulla, lui legge alle 10:48.
+Quindici minuti per un gesto che si fa da un wallet esterno, dopo un
+avviso su Telegram, sono pochi per una persona che non ha il telefono in
+mano. IL CAMBIO, fatto da Andrea sul nodo: nel `[mostro]` di
+`~/nodo/mostro/settings.toml` `expiration_seconds = 1800` (era 900),
+`docker compose restart mostro` a libro fermo, ripartito alle 14:04 con
+«Settings correctly loaded» (parola di Andrea: da qui il nodo non si
+guarda). `hold_invoice_expiration_window` RESTA 900, E NON ACCORCIA
+NIENTE — la domanda era legittima (se fosse la scadenza BOLT11 della
+garanzia, a 900 contro 1800 chi vende avrebbe in pratica 15 minuti) ed
+è stata chiusa sul sorgente che gira, letto da Andrea sul nodo lo stesso
+pomeriggio: `create_hold_invoice` (`src/lightning/mod.rs:453`) chiama
+`create_hold_invoice_with_expiry` con `None`, quindi la fattura di
+garanzia prende la scadenza di default di LND, 86400 secondi: il solo
+limite di chi vende è `expiration_seconds`. `hold_invoice_expiration_window`
+lo legge soltanto il flusso della cauzione (`src/app/bond/flow.rs:186`,
+`223`, `392`, `1875`: la fattura della cauzione e la sua
+riconciliazione), lo nomina un commento sulla cauzione in
+`scheduler.rs:1392`, e `nip33.rs:599` lo pubblica nel 38385. ⚠️ Il
+commento a `nip33.rs:584` lo descrive ancora come «il tempo di chi
+prende per pagare o dare la fattura»: è il mestiere di
+`expiration_seconds`, e chi legge il tag del 38385 credendo a quel nome
+dice 15 minuti dove ce ne sono 30. In Barattolo quel tag (`holdFinestra`)
+lo leggono solo i tre punti della cauzione — `cauzioneVivaP2P`,
+`renderCauzioneP2P` e `scadenzaFoglioP2P` nel modo `cauzione`, tutti
+come ripiego della scadenza scritta nella bolt11 —; «Info P2P», il
+foglio «Blocca i sats», il conto alla rovescia e gli avvisi del server
+leggono `expiration_seconds` (ricontrollato il 10 ott 2026: niente da
+correggere). Alzarlo a 1800 allungherebbe solo la richiesta di cauzione
+del contanti, ed è un'altra decisione. IL PREZZO, accettato: la finestra è PER GESTO (il cronometro
+riparte a ogni passaggio di turno, vedi sopra), quindi sono 30 + 30
+minuti, e sugli ordini a prezzo di mercato l'opzione gratuita sul cambio
+vale il doppio di prima — poco, a mezz'ora (a stima il movimento tipico
+resta sotto commissione e premio), ma non più niente; e chi prende senza
+proseguire tiene fermo l'ordine altrui 30 minuti invece di 15. La
+cauzione oggi copre il solo «Contanti» e al timeout NON brucia
+(`slash_on_waiting_timeout = false`), quindi quella difesa non c'è.
+LA REGOLA CHE RESTA: oltre i 1800 non si va senza la cauzione che brucia
+al timeout, su tutti i metodi — il ragionamento di sopra vale intero per
+2, 6 e 12 ore. BARATTOLO SEGUE DA SOLO: il numero lo leggono dal 38385
+l'app (`scadenzaSec`: «Hai circa 30 minuti», il conto alla rovescia) e il
+server (`_finestra_gesto_p2p`: «⏳ Hai 30 minuti», il promemoria a metà
+tempo), e non c'è niente da girare sul VPS (CANTIERI, «Il promemoria
+della garanzia»). PER TORNARE INDIETRO: la stessa riga a 900 e lo stesso
+riavvio a libro fermo.
 E LA PROVA È FATTA (6 set 2026, il primo ordine vero del coordinator:
 25 EUR, Satispay, id `992e288e`): `expires_at` è caduto **168 ore
 ESATTE** dopo la creazione — il 13 set alle 09:49:11 contro le 09:49:11
@@ -436,7 +484,8 @@ metodi che `only_payment_methods` nomina, e le tarature sono
 900` (che nella 0.19.0 è SOLO la scadenza della richiesta di cauzione,
 #999). Il 38385 le annuncia (`bond_enabled true`, i sette `bond_*`, il
 nostro `bond_only_payment_methods Contanti`). Quel che NON cambia: i
-900 secondi restano 900, e il timeout che brucia resta SPENTO — la
+900 secondi restano 900 (fino al 10 ott 2026: da allora 1800, vedi «DAL
+10 OTT 2026 SONO 1800»), e il timeout che brucia resta SPENTO — la
 cauzione si perde solo per la direttiva del moderatore (`bond_resolution`),
 quindi «la cura per "15 minuti sono pochi" sono i bond» resta un
 cantiere DOPO, quando le cauzioni sono provate. Restano NON provati sul

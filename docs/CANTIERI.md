@@ -45194,3 +45194,48 @@ suite e collaudi NON rifatti su quest'ultima punta. Il giro dal vivo e
 la tortura non sono stati rifatti dopo i rebase: i commit arrivati
 toccano il dettaglio solo con la riga del «no», che le prove di
 tutt'e due i cantieri tengono.
+
+## La finestra del gesto a 30 minuti: la regola riscritta (10 ott 2026, pomeriggio, decisione di Andrea)
+
+Solo documenti, nessun file di codice. Andrea ha girato sul nodo
+`expiration_seconds` da 900 a 1800 (`hold_invoice_expiration_window`
+resta 900: è la sola scadenza della cauzione), coordinatore riavviato
+alle 14:04 con «Settings correctly loaded». La regola di CLAUDE.md
+diceva «i 900 secondi restano 900», ed è cambiata: adesso dice 1800 dal
+10 ott, che la finestra è PER GESTO, e che oltre non si va senza la
+cauzione che brucia al timeout. Il perché — il caso della mattina, il
+prezzo accettato (l'opzione gratuita sul cambio che raddoppia, l'ordine
+altrui fermo mezz'ora), la regola che resta per 2, 6 e 12 ore, come
+tornare indietro — sta in NODO-MOSTRO, «DAL 10 OTT 2026 SONO 1800»,
+accanto alla decisione di settembre che rovescia. Barattolo non si
+tocca: app e avvisi leggono il numero dal 38385 («Il promemoria della
+garanzia», qui sopra). CLAUDE.md resta sotto il tetto (260 righe su 262).
+
+**LA DOMANDA SULLA RIGA 15, CHIUSA.** Se `hold_invoice_expiration_window`
+fosse stata la scadenza BOLT11 della garanzia, a 900 contro 1800 chi
+vende avrebbe avuto in pratica 15 minuti. Letto da Andrea sul sorgente
+che gira: `create_hold_invoice` (`src/lightning/mod.rs:453`) passa
+`None` come scadenza (il default di LND, 86400 secondi), e quel numero
+lo legge il solo flusso della cauzione (`src/app/bond/flow.rs`). Resta a
+900, nessun secondo riavvio. E NELL'APP, ricontrollato: il tag del 38385
+con quel nome (`holdFinestra`) lo leggono solo i tre punti della
+cauzione; «Info P2P», il foglio «Blocca i sats», il conto alla rovescia
+e gli avvisi leggono `expiration_seconds`. Niente da correggere nel
+codice. Le righe del codice e il commento upstream che inganna
+(`nip33.rs:584`) stanno in NODO-MOSTRO.
+
+**DA GUARDARE.** «Info P2P» deve dire «ogni passo ha 30 minuti», e il
+primo «Paga la garanzia» vero «⏳ Hai 30 minuti». La scadenza della
+finestra, almeno dal lato di chi ha pubblicato, la mattina del 10 è
+successa dal vivo a 900 secondi (10:04 → 10:20, scambio annullato): la
+riga di CLAUDE.md che la dà fra le cose «NON provate» non è stata
+toccata, e va decisa da Andrea.
+
+**COSA È GIRATO SU QUALE ALBERO.** Solo documenti (CLAUDE.md,
+NODO-MOSTRO, questa voce). La suite severa intera (21.132 passate, 0
+fallite) e i 51 collaudi della CI nella gabbia sono girati sul commit
+ribasato su `0c333a9`. Main è poi corso di due commit non miei
+(`658d941`, `1e3805d`): ribasato di nuovo (un conflitto solo, qui in
+coda, tenute tutte le voci), rigirate le sezioni che leggono i documenti
+toccati e i due passi dello scanner dei segreti; il resto lo dice la CI
+del push.
