@@ -13640,6 +13640,43 @@ def volto_unico_js(mini):
                     "/* ============ fine del volto unico ============ */") + "\n"
 
 
+def _fn_js(mini, firma):
+    """Una funzione JS intera, dalla firma alla sua graffa."""
+    return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+
+
+def _riga_js(mini, inizio):
+    """Una riga di miniapp.html (una `const`, un `let`), dal suo inizio."""
+    i = mini.index(inizio)
+    return mini[i:mini.index("\n", i)] + "\n"
+
+
+def zone_ricevute_js(mini):
+    """LE ZONE CHE ARRIVANO DAL SERVER (10 ott 2026, contanti-zona): la
+    cache, il tetto, la pulizia e chi le prende — per i banchi che fanno
+    girare una lettura della fotografia o dei volti. Vuole dal banco
+    `idMostroVero`."""
+    return (_riga_js(mini, "const P2P_ZONA_MAX = ") + _riga_js(mini, "let p2pZone = ")
+            + _fn_js(mini, "function zonaPulitaP2P(t){")
+            + _fn_js(mini, "function prendiZoneP2P(m){"))
+
+
+def contanti_zona_js(mini):
+    """IL BLOCCO DELLA ZONA E DEL VESTITO DEL CONTANTI (10 ott 2026): tutto
+    quel che una card o il foglio chiedono dietro il loro typeof. Vuole
+    dal banco `esc` e `ordiniP2P`; `sezioneZonaNuovoP2P` vuole anche
+    `sezioneNuovoP2P` e `p2pNuovoZona`, e chi non la chiama non li deve."""
+    return (_riga_js(mini, "const P2P_CONTANTI = ") + _riga_js(mini, "const P2P_ZONA_MAX = ")
+            + _riga_js(mini, "const P2P_CONTANTI_ICO = ") + _riga_js(mini, "let p2pZone = ")
+            + "".join(_fn_js(mini, f) for f in (
+                "function contantiAManoP2P(metodi){", "function zonaPulitaP2P(t){",
+                "function giudiceZonaP2P(zona, metodi){", "function zonaDaCampiP2P(campi){",
+                "function zonaOrdineP2P(o){", "function zoneDaDichiarareP2P(ids){",
+                "function rigaZonaP2P(o){", "function zonaDettP2P(o){",
+                "function etichettaContantiP2P(m){", "function sezioneZonaNuovoP2P(metodi){",
+                "function cambiaZonaNuovoP2P(campo){")))
+
+
 # LA BOLT11 VERA del 16 set 2026: 7468 sats, scadenza 3600 s, cltv 80,
 # nata alle 14:28:38 UTC — quella che il foglio ha suggerito e il
 # coordinatore ha rifiutato. E' pubblica (una fattura non porta segreti)
@@ -55195,7 +55232,8 @@ def prove_libro_subito():
           '    F["cambi"] = _cambi_foto_p2p(F["eventi"])' in srv
           # (27 set 2026) dopo `via` c'e' la mappa degli autori: la memoria
           # non si chiude piu' li'
-          and '"facce": {}, "cambi": {}, "via": {},\n             "autori": {}}' in srv)
+          # (10 ott 2026) ...e dopo gli autori le zone del contanti
+          and '"facce": {}, "cambi": {}, "via": {},\n             "autori": {}, "zone": {}}' in srv)
 
     # --- 3) IL CLIENT: dove vivono le cose, e il velo che non torna -------
     i_bl = mini.index("/* ============ IL LIBRO SUBITO (26 set 2026")
@@ -55283,6 +55321,8 @@ def prove_libro_subito():
              # 2026): le funzioni VERE, e la cache dichiarata qui sotto
              + pezzo_js(mini, "function idMostroVero(id){", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function prendiCambiPubP2P(m){", "\n}\n") + "\n}\n"
+             # ...e le zone del contanti (10 ott 2026), con la loro pulizia
+             + zone_ricevute_js(mini)
              # i volti della fotografia entrano nella cache del volto
              # unico, con `prendiFacceP2P` (28 set 2026)
              + volto_unico_js(mini)
@@ -56253,6 +56293,10 @@ def prove_ritocchi_prova_alan():
                      "_cambio_pub_buono", "_registra_ordini_p2p", "_facce_ordini_p2p",
                      "_cambi_pub_p2p", "_facce_foto_p2p", "_autori_foto_p2p",
                      "_cambi_foto_p2p", "_foto_ha_ordine_p2p",
+                     # (10 ott 2026, contanti-zona) il rinfresco rifa' anche le
+                     # zone: senza le loro tre funzioni alzerebbe, e il suo
+                     # fail-open lascerebbe indietro gli autori IN SILENZIO
+                     "_metodi_lista_p2p", "_zone_p2p", "_zone_foto_p2p",
                      "_rinfresca_volti_foto_p2p", "_intesta_dal_canale_p2p"):
             exec(pezzo(nome), amb)
         EV = lambda d: {"kind": 38383, "created_at": 1, "tags": [["d", d]]}
@@ -56978,6 +57022,7 @@ function aggiornaFrecce(id){ FRECCE.push(id); }
         + pezzo_js(mini, "function nettoLatoP2P(o, sats){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function idMostroVero(id){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function prendiCambiPubP2P(m){", "\n}\n") + "\n}\n" \
+        + zone_ricevute_js(mini) \
         + pezzo_js(mini, "function prendiFacceP2P(facce, chiesti){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function tagValore(ev, nome){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function tagValori(ev, nome){", "\n}\n") + "\n}\n" \
@@ -59959,8 +60004,14 @@ def prove_p2p_libro():
     pezzi.append(mini[i_v:mini.index("\n};", i_v) + 3])
     for f in ("function vesteMetodoP2P(m){",
               "function marchioMetodoP2P(m, conTesto){",
+              # (10 ott 2026) l'insegna ha il suo giudice
+              "function soloMarchiP2P(metodi){",
               "function iconaMetodiP2P(metodi){"):
         pezzi.append(pezzo_js(mini, f, "\n}\n") + "\n}")
+    # LA ZONA E IL VESTITO DEL CONTANTI (10 ott 2026): la card li chiede
+    # dietro un typeof, quindi senza questo pezzo il banco girerebbe lo
+    # stesso — e non proverebbe niente del contanti
+    pezzi.append(contanti_zona_js(mini))
     # le chiavi del dispositivo portano il conto nel nome (set 2026):
     # qui non c'e' identita', e senza vale il nome di ieri
     pezzi.append("let myTgId = null;")
@@ -60318,6 +60369,20 @@ out.lapideCorrotta = lapidataP2P('lap-viva') === false;
 const adesso = Math.floor(Date.now()/1000);
 out.scade = [scadeTestoP2P(0), scadeTestoP2P(adesso - 5), scadeTestoP2P(adesso + 120),
              scadeTestoP2P(adesso + 7200), scadeTestoP2P(adesso + 3*86400)];
+/* IL CONTANTI DI PERSONA SULLA CARD VERA (10 ott 2026, contanti-zona):
+   l'icona, l'etichetta e la zona — e gli ordini di prima, senza zona */
+const contante = (d, pm) => ordineDaEvento(ev(38383, [['d', d],['k','sell'],['f','EUR'],['s','pending'],
+  ['amt','0'],['fa','50'],['pm'].concat(pm),['expires_at', String(ora+90000)]]), ora);
+p2pZone = {'cash-1': 'Milano centro', 'cash-3': 'Bergamo e provincia', 'sepa-1': 'Zona su un SEPA',
+           'tab-z': 'Zona su Barattozon', 'cash-x': '<b>via Roma 1</b>'};
+out.cashZona = rigaOrdineP2P(contante('cash-1', ['Contanti']));
+out.cashVecchio = rigaOrdineP2P(contante('cash-2', ['Contanti']));
+out.cashMisto = rigaOrdineP2P(contante('cash-3', ['SEPA', 'Contanti']));
+out.sepaConZona = rigaOrdineP2P(contante('sepa-1', ['SEPA']));
+out.tabConZona = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','tab-z'],['k','sell'],['f','EUR'],['s','pending'],
+  ['amt','46940'],['fa','23'],['pm','Contanti al tabacchino 23.47'],['expires_at', String(ora+3600)]]), ora));
+out.cashVeleno = rigaOrdineP2P(contante('cash-x', ['Contanti']));
+p2pZone = {};
 console.log(JSON.stringify(out));
 """
     d = _tf.mkdtemp()
@@ -61039,6 +61104,43 @@ console.log(JSON.stringify(out));
           out["lapideFallback"])
     prova("...e un localStorage corrotto vale vuoto, mai un'esplosione",
           True, out["lapideCorrotta"])
+    # IL CONTANTI DI PERSONA SULLA CARD VERA (10 ott 2026, cantiere
+    # contanti-zona): la scatola dei metodi porta l'etichetta verde con le
+    # banconote al posto del 💳, e sotto sta «📍 zona». Sulla card VERA,
+    # col lettore vero del libro: i giudici puri hanno il loro banco in
+    # `prove_contanti_zona`.
+    _eti = '<span class="p2p-contanti">💵 Contanti</span>'
+    _zona = '<div class="p2p-box p2p-zona" title="Zona di scambio indicativa">📍 Milano centro</div>'
+    cz = out["cashZona"]
+    prova("la card di un ordine in contanti: l'etichetta con le banconote, e nessun 💳", [True, 0],
+          ['<div class="p2p-box p2p-paga" title="Contanti">' + _eti + '</div>' in cz, cz.count("💳")])
+    prova("...la scatola NON diventa l'insegna navy dei marchi", False, "p2p-paga-marchio" in cz)
+    prova("...e la zona sta subito sotto la scatola dei metodi", True,
+          _eti + '</div>\n    ' + _zona in cz)
+    cv = out["cashVecchio"]
+    prova("UN ORDINE IN CONTANTI DI PRIMA, senza zona: la card c'e', si prende, ha la sua etichetta "
+          "— e della zona non mostra niente",
+          [True, True, True, False, False],
+          ['data-id="cash-2"' in cv, 'onclick="prendiOrdineP2P(this.dataset.id)"' in cv, _eti in cv,
+           "p2p-zona" in cv, "📍" in cv])
+    cm = out["cashMisto"]
+    prova("con due metodi il 💳 intesta SEPA, il contanti tiene la sua etichetta, e la zona c'e'",
+          [True, True],
+          ['title="SEPA, Contanti">💳 SEPA, ' + _eti + '</div>' in cm,
+           '📍 Bergamo e provincia</div>' in cm])
+    prova("ICONA, ETICHETTA E ZONA SOLO SUI CONTANTI: un SEPA non le prende, nemmeno a zona dichiarata",
+          [True, False, False, False],
+          ['title="SEPA">💳 SEPA</div>' in out["sepaConZona"], "💵" in out["sepaConZona"],
+           "p2p-contanti" in out["sepaConZona"], "p2p-zona" in out["sepaConZona"]])
+    prova("...e nemmeno Barattozon, che resta l'insegna col suo marchio",
+          [True, False, False, False],
+          ["p2p-paga-marchio" in out["tabConZona"], "💵" in out["tabConZona"],
+           "p2p-contanti" in out["tabConZona"], "p2p-zona" in out["tabConZona"]])
+    prova("...e le card degli altri metodi sono rimaste com'erano", [False, False, False, True],
+          ["💵" in out["cardAltrui"], "p2p-contanti" in out["cardAltrui"], "p2p-zona" in out["cardAltrui"],
+           "💳 Revolut, Satispay</div>" in out["cardAltrui"]])
+    prova("la zona di uno sconosciuto esce scappata anche sulla card", [True, False],
+          ["📍 &lt;b&gt;via Roma 1&lt;/b&gt;</div>" in out["cashVeleno"], "<b>via" in out["cashVeleno"]])
 
 
 def prove_p2p_dettaglio():
@@ -71768,7 +71870,8 @@ def prove_p2p_pubblica():
     # parole con lei, quindi si sceglie prima di arrivarci; per gli
     # altri metodi l'ordine e' quello di ieri
     prova("l'ordine delle scatole, e il bottone sotto l'ultima", True,
-          "valuta + metodi + importo + (tab ? tipo + percorso : percorso + tipo) + quanti + premio"
+          # (10 ott 2026) la zona di scambio del contanti, subito sotto i metodi
+          "valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo) + quanti + premio"
           " + riquadroLimitiP2P() + '<div class=\"foglio-piede sola\">'"
           in re.sub(r"\s+", " ", _foglio))
     _riq = pezzo_js(mini, "function riquadroLimitiP2P(){", "\n}\n")
@@ -74627,9 +74730,16 @@ def prove_p2p_barattozon():
     # domanda divergono al primo ritocco — e divergerebbero in
     # silenzio, con una scatola navy che porta del testo o un'icona su
     # un'insegna.
-    prova("la scatola diventa un'insegna con lo stesso giudice dell'icona",
+    # EMENDATA (10 ott 2026, contanti-zona): le domande sono diventate
+    # DUE. «Qui dentro c'e' solo un marchio?» la chiede `soloMarchiP2P`
+    # (l'insegna navy); «c'e' un nome da intestare col 💳?» resta a
+    # `iconaMetodiP2P`. Fino a ieri coincidevano; col contanti di persona
+    # no: la sua voce porta la sua icona, il 💳 se ne va, ma la scatola
+    # NON e' un'insegna. Ogni domanda si chiede UNA volta, al suo giudice.
+    prova("la scatola diventa un'insegna col giudice dei soli marchi, chiesto una volta",
           True,
-          "const senzaIcona = iconaMetodiP2P(o.metodi) === '';" in riga
+          "const senzaIcona = soloMarchiP2P(o.metodi);" in riga
+          and riga.count("soloMarchiP2P(") == 1
           and "${senzaIcona ? ' p2p-paga-marchio' : ''}" in riga
           and "(senzaIcona ? '' : iconaMetodiP2P(o.metodi))" in riga)
     # ⚠️ E LA CARD NON HA NIENTE DI SUO: nessuna pelle, nessun ordine
@@ -74653,7 +74763,8 @@ def prove_p2p_barattozon():
     scambio = pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n")
     prova("la card dei miei scambi: lo stesso vestito della sorella", True,
           "metodi.map(m => marchioMetodoP2P(m)).join(', ')" in scambio
-          and "const senzaNomi = metodi.length > 0 && iconaMetodiP2P(metodi) === '';"
+          # (10 ott 2026) lo stesso giudice dei soli marchi della sorella
+          and "const senzaNomi = soloMarchiP2P(metodi);"
           in scambio
           and "(senzaNomi ? ' p2p-paga-marchio' : '')" in scambio
           and "(senzaNomi ? '' : iconaMetodiP2P(metodi))" in scambio)
@@ -78662,6 +78773,8 @@ def prove_p2p_card_scambio():
         "function convenienzaFissaP2P(o, metro){", "function metroFissoP2P(o){",
         "function vesteMetodoP2P(m){",
         "function marchioMetodoP2P(m, conTesto){",
+        # (10 ott 2026) l'insegna ha il suo giudice
+        "function soloMarchiP2P(metodi){",
         "function iconaMetodiP2P(metodi){",
         "function tintaStatoP2P(o){",
         # la card indossa la tinta del suo stato (22 set 2026): senza
@@ -82179,7 +82292,8 @@ def prove_premio_barattozon():
           '(d or {}).get("cambi"), cambio_noto_ora())' in pezzo("registra_ordini_p2p"))
     prova("...i volti portano i cambi accanto, la fotografia li da' a TUTTI, l'archivio per scambio",
           [True, True, True],
-          ['return {"facce": facce, "cambi": cambi}' in pezzo("facce_ordini_p2p"),
+          # (10 ott 2026) ...e accanto ai cambi le zone del contanti
+          ['return {"facce": facce, "cambi": cambi, "zone": zone}' in pezzo("facce_ordini_p2p"),
            'if fuori["eventi"] and F.get("cambi"):\n        fuori["cambi"] = F["cambi"]'
            in pezzo("libro_fotografato_p2p")
            and pezzo("libro_fotografato_p2p").index('fuori["cambi"]')
@@ -83334,7 +83448,7 @@ def prove_barattozon_mercato():
           [True, True, True, False],
           ["const tipo = sezioneNuovoP2P({" in _fog,
            "(!tab ? '' : '<div class=\"hint\" id=\"p2pTabTipoNota\">' + esc(notaTipoPrezzoTabP2P(p2pNuovoFisso)) + '</div>')" in _fog,
-           "valuta + metodi + importo + (tab ? tipo + percorso : percorso + tipo)" in _fog,
+           "valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo)" in _fog,
            "const tipo = tab ? '' :" in _fog])
     _campi = pezzo_js(mini, "function campiNuovoP2P(){", "\n}\n")
     prova("i campi del foglio portano la leva com'e' (anche col tabacchino) e il minimo dalla busta",
@@ -84182,7 +84296,7 @@ DOM = null;
     prova("il foglio col tabacchino monta il percorso al posto dello scontrino, e il bottone dice «Rileggi e pubblica»", True,
           "const percorso = !tab ? '' : percorsoTabacchinoP2P(val);" in _fog
           # (30 set 2026) col tabacchino la leva del prezzo sta prima del percorso
-          and "valuta + metodi + importo + (tab ? tipo + percorso : percorso + tipo)" in _fog
+          and "valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo)" in _fog
           # (24 set 2026) col logo di Barattozon al posto della ricevuta
           and "(tab ? LOGO_BZ_HTML + 'Rileggi e pubblica' : '⚡ Pubblica ordine')" in _fog
           and "const importo = tab ? '' : sezioneNuovoP2P({" in _fog
@@ -93991,7 +94105,10 @@ def prove_p2p_recapito_passo():
           # la parola di mostrod prima di diventare `preso_da`
           ["creato", "euro", "lato", "maker", "metodi", "ordine", "preso_da",
            "preso_dichiarato", "recapito_avviso", "recapito_n", "sats", "stato",
-           "tg_id", "tornati", "visto"],
+           # ...e `zona` (10 ott 2026, contanti-zona): la zona INDICATIVA
+           # dello scambio in contanti, che chi pubblica scrive perche' si
+           # legga sulla card — pubblica per dichiarazione, mai un recapito
+           "tg_id", "tornati", "visto", "zona"],
           sorted(re.findall(r"^\s+(\w+) (?:TEXT|INTEGER)", ddl, re.M)))
     prova("...e le tre colonne stanno nell'ALTER per i database di ieri", True,
           all(c in src for c in ('"euro TEXT DEFAULT \'\'"', '"recapito_avviso INTEGER DEFAULT 0"',
@@ -122045,8 +122162,11 @@ def prove_annullati_ritocchi():
     ev = pezzo("_evento_libro_p2p")
     prova("...il lettore del libro porta il premio, e un premio storto vale zero", True,
           '"premio": premio}' in ev and "if premio != premio or abs(premio) > 100:" in ev)
+    # EMENDATA (10 ott 2026, contanti-zona): la colonna del premio non e'
+    # piu' l'ultima — dopo c'e' la zona di scambio —, quindi si cerca
+    # senza la chiusura, come gia' quella del cambio
     prova("...la colonna c'e' nel CREATE e nel giro dei database di ieri", [True, True],
-          ["        premio REAL DEFAULT 0\n    );" in src, '"premio REAL DEFAULT 0"):' in src])
+          ["        premio REAL DEFAULT 0,\n" in src, '"premio REAL DEFAULT 0",' in src])
     prova("...un 38383 senza cifra non cancella quella nota, e il premio si scrive", True,
           "euro=COALESCE(NULLIF(?, ''), euro)" in src and "tornati=?, premio=? WHERE ordine=?" in src)
     sc = pezzo("_scambi_p2p")
@@ -134744,6 +134864,416 @@ def prove_titoli_importati():
               r"\$\{(?:l\.title|a\.titolo|l\.titolo|x\.title)\}", r)])
 
 
+BANCO_CONTANTI_ZONA = r"""
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => String(n);
+let ordiniFinti = {};
+function ordiniP2P(){ return ordiniFinti; }
+let p2pNuovoZona = '';
+__PEZZI__
+const out = {};
+const Q = 'x'.repeat(40), QQ = 'x'.repeat(41);
+const T = 'Contanti al tabacchino';
+const A = '5a1e0000-7777-4a2b-9c3d-0000000000a1', B = '5a1e0000-7777-4a2b-9c3d-0000000000b2',
+      C = '5a1e0000-7777-4a2b-9c3d-0000000000c3', D = '5a1e0000-7777-4a2b-9c3d-0000000000d4';
+/* 1) la pulizia */
+out.pulita = [zonaPulitaP2P('  Milano   centro '), zonaPulitaP2P('a\nb\tc'), zonaPulitaP2P(Q) === Q,
+              zonaPulitaP2P(QQ), zonaPulitaP2P(''), zonaPulitaP2P(null), zonaPulitaP2P(undefined),
+              zonaPulitaP2P('   '), zonaPulitaP2P('Mi‮lano'), zonaPulitaP2P(12)];
+/* 2) il giudice: obbligatoria SOLO coi contanti */
+out.giudice = [
+  giudiceZonaP2P('', ['Contanti']), giudiceZonaP2P('   ', ['Contanti']), giudiceZonaP2P(null, ['Contanti']),
+  giudiceZonaP2P('Milano centro', ['Contanti']), giudiceZonaP2P(Q, ['Contanti']), giudiceZonaP2P(QQ, ['Contanti']),
+  giudiceZonaP2P('', ['SEPA', 'Contanti']), giudiceZonaP2P('', [' Contanti ']),
+  giudiceZonaP2P('', ['SEPA']), giudiceZonaP2P('', [T]), giudiceZonaP2P('', [T + ' 23.47']),
+  giudiceZonaP2P('', []), giudiceZonaP2P('', null), giudiceZonaP2P(QQ, ['Revolut']),
+  giudiceZonaP2P('', ['contanti'])];
+/* 3) il giudice del foglio, quello VERO */
+const base = {euro: '50', euroMax: '', sats: '', fisso: false, premio: 0, maxEuro: 0,
+              maxEuroContanti: 250, lato: 'vendo', tab: {}, finestra: 0, adesso: 1800000000};
+const vale = (metodi, zona, piu) => valeNuovoOrdineP2P(Object.assign({}, base, {metodi: metodi, zona: zona}, piu || {}));
+out.vale = {
+  senza: vale(['Contanti'], ''), spazi: vale(['Contanti'], '   '), assente: vale(['Contanti'], undefined),
+  con: vale(['Contanti'], 'Milano centro'), giusta40: vale(['Contanti'], Q), lunga: vale(['Contanti'], QQ),
+  misto: vale(['SEPA', 'Contanti'], ''), mistoCon: vale(['SEPA', 'Contanti'], 'Bergamo e provincia'),
+  sepa: vale(['SEPA'], ''), sepaLunga: vale(['SEPA'], QQ), nessuno: vale([], ''),
+  senzaEuro: vale(['Contanti'], '', {euro: ''}), oltre: vale(['Contanti'], '', {euro: '251'})
+};
+out.daCampi = [zonaDaCampiP2P({metodi: ['Contanti'], zona: ' Milano  centro '}),
+               zonaDaCampiP2P({metodi: ['SEPA'], zona: 'Milano'}),
+               zonaDaCampiP2P({metodi: ['Contanti'], zona: QQ}), zonaDaCampiP2P(null)];
+/* 4) le zone che arrivano dal server */
+out.prese = [prendiZoneP2P({[A]: 'Milano centro', [B]: QQ, 'storto': 'Roma', [C]: '  ', [D]: 12}),
+             prendiZoneP2P({[A]: 'Milano centro'}), prendiZoneP2P({[A]: ' Milano  centro '}),
+             prendiZoneP2P(null), prendiZoneP2P('x'), Object.keys(p2pZone)];
+/* 5) cosa mostra un ordine: col contanti e la zona si', gli ordini di prima niente */
+out.ordine = [
+  zonaOrdineP2P({id: A, metodi: ['Contanti']}),
+  zonaOrdineP2P({id: B, metodi: ['Contanti']}),
+  zonaOrdineP2P({id: A, metodi: ['SEPA']}),
+  zonaOrdineP2P({id: A, metodi: [T + ' 23.47']}),
+  zonaOrdineP2P({id: B, metodi: ['Contanti'], zona: 'Lecco'}),
+  zonaOrdineP2P({id: A, metodi: ['SEPA', 'Contanti']}),
+  zonaOrdineP2P(null), zonaOrdineP2P({id: B}), zonaOrdineP2P({id: B, metodi: ['Contanti'], zona: QQ})];
+out.righe = [rigaZonaP2P({id: A, metodi: ['Contanti']}), rigaZonaP2P({id: B, metodi: ['Contanti']}),
+             zonaDettP2P({id: A, metodi: ['Contanti']}), zonaDettP2P({id: B, metodi: ['Contanti']}),
+             rigaZonaP2P({id: B, metodi: ['Contanti'], zona: '<i>via Roma 1</i>'}),
+             zonaDettP2P({id: A, metodi: ['SEPA']})];
+/* 6) cosa si dichiara all'intestazione: solo i MIEI, solo col contanti, solo se c'e' */
+p2pZone = {};
+ordiniFinti = {[A]: {id: A, mio: true, metodi: ['Contanti'], zona: 'Milano centro'},
+               [B]: {id: B, mio: false, metodi: ['Contanti'], zona: 'Roma'},
+               [C]: {id: C, mio: true, metodi: ['SEPA'], zona: 'Torino'},
+               [D]: {id: D, mio: true, metodi: ['Contanti']}};
+out.dichiaro = [zoneDaDichiarareP2P([A, B, C, D, 'manca']), Object.assign({}, p2pZone), zoneDaDichiarareP2P(null)];
+/* 7) il vestito: l'icona e l'etichetta SOLO sul contanti di persona */
+out.voce = [marchioMetodoP2P('Contanti'), marchioMetodoP2P('SEPA'), marchioMetodoP2P('Contanti', true),
+            marchioMetodoP2P(' Contanti '), marchioMetodoP2P('contanti'), marchioMetodoP2P('Contanti a Milano'),
+            marchioMetodoP2P('<b>')];
+out.tabVoce = marchioMetodoP2P(T + ' 23.47');
+out.etichette = P2P_METODI.map(m => etichettaContantiP2P(m) !== '');
+out.icone = [iconaMetodiP2P(['Contanti']), iconaMetodiP2P(['SEPA', 'Contanti']), iconaMetodiP2P(['SEPA']),
+             iconaMetodiP2P([T]), iconaMetodiP2P([]), iconaMetodiP2P(null),
+             iconaMetodiP2P(['Revolut', 'PayPal']), iconaMetodiP2P(['Contanti a Milano'])];
+out.insegna = [soloMarchiP2P(['Contanti']), soloMarchiP2P([T]), soloMarchiP2P(['SEPA']),
+               soloMarchiP2P([]), soloMarchiP2P(null), soloMarchiP2P([T, 'Contanti'])];
+/* 8) il campo nel foglio */
+p2pNuovoZona = 'Milano "centro" <b>';
+out.sezione = [sezioneZonaNuovoP2P(['Contanti']), sezioneZonaNuovoP2P(['SEPA']), sezioneZonaNuovoP2P([T]),
+               sezioneZonaNuovoP2P([]), sezioneZonaNuovoP2P(['SEPA', 'Contanti']) !== ''];
+cambiaZonaNuovoP2P({value: 'Bergamo'});
+out.campo = [p2pNuovoZona];
+cambiaZonaNuovoP2P(null);
+out.campo.push(p2pNuovoZona);
+console.log(JSON.stringify(out));
+"""
+
+
+def prove_contanti_zona():
+    """LA ZONA DI SCAMBIO E IL VESTITO DEL CONTANTI (10 ott 2026, cantiere
+    contanti-zona, richiesta di Andrea). Quattro cose: 1) la zona
+    INDICATIVA e' obbligatoria nel foglio «Pubblica» quando «Contanti» e'
+    fra i metodi — e SOLO allora —, al massimo 40 caratteri, con la frase
+    del giudice del foglio; 2) si vede sulla card del libro e nel
+    dettaglio, «📍 Milano centro», e vive nel database di Barattolo sulla
+    strada del cambio di Barattozon (dichiarata da chi pubblica
+    all'intestazione, la prima resta, esce accanto ai volti e con la
+    fotografia); 3) il metodo «Contanti» ha la sua icona, le banconote, e
+    non il 💳 che intesta gli altri nomi; 4) nella scatola dei metodi
+    delle card la voce e' un'etichetta verde.
+
+    QUEL CHE SI ROMPE IN SILENZIO: la zona chiesta anche a chi pubblica
+    con SEPA (un campo che non c'e', e un foglio che non pubblica piu');
+    la zona NON chiesta a chi mette «Contanti» insieme a un altro metodo;
+    un ordine di prima — senza zona — che perde la card o mostra «📍» e
+    niente; la zona di uno scritta sull'ordine di un altro, o riscritta
+    dopo; una zona che esce su un ordine SEPA; il 💵 su «Contanti al
+    tabacchino», che e' Barattozon e ha il suo marchio; la scatola del
+    solo contanti che diventa l'insegna navy dei marchi perche' il 💳 se
+    n'e' andato; l'etichetta verde che esce dalla scatola e macchia le
+    pillole; la zona di uno sconosciuto che entra nella pagina senza
+    esc()."""
+    import json as _json, shutil as _sh, subprocess as _sp, tempfile as _tf, os as _os
+    import sqlite3
+    print("\n[contanti-zona: la zona obbligatoria, dove vive, l'icona e l'etichetta]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+    fn = lambda firma: _fn_js(mini, firma)
+    Q, QQ = "x" * 40, "x" * 41
+
+    # --- 1) IL SERVER: la pulizia, pura ----------------------------------
+    amb = {"re": re, "json": json, "FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
+           "MAX_ORDINI_P2P": 200}
+    for _c in ("P2P_ZONA_MAX = ", "_ZONA_VIA_P2P = "):
+        exec(next(r for r in src.split("\n") if r.startswith(_c)), amb)
+    for f in ("_zona_pulita_p2p", "_dichiara_zone_p2p", "_zone_p2p", "_ordini_puliti_p2p",
+              "_metodi_lista_p2p"):
+        exec(pezzo(f), amb)
+    pul = amb["_zona_pulita_p2p"]
+    prova("il tetto e' 40, scritto una volta sul server e una nel client", [40, True],
+          [amb["P2P_ZONA_MAX"], "\nconst P2P_ZONA_MAX = 40;\n" in mini])
+    prova("la zona si tiene su una riga, con gli spazi in fila ridotti a uno",
+          ["Milano centro", "a b c", "Mi lano"],
+          [pul("  Milano   centro "), pul("a\nb\tc"), pul("Mi‮lano")])
+    prova("...40 caratteri passano, 41 si RIFIUTANO (non si tosano), e il vuoto e lo storto sono vuoti",
+          [Q, "", "", "", "", "", ""],
+          [pul(Q), pul(QQ), pul(""), pul("   "), pul(None), pul(12), pul(["Milano"])])
+
+    # --- 2) IL SERVER: chi la scrive, e a chi esce, sul database vero ------
+    _i = src.index("CREATE TABLE IF NOT EXISTS p2p_ordini(")
+    _fine = "ON p2p_ordini(tg_id);"
+    schema = src[_i:src.index(_fine, _i) + len(_fine)]
+    prova("la colonna c'e' nel CREATE e nel giro dei database di ieri", [True, True],
+          ["        zona TEXT DEFAULT ''\n    );" in schema, "\"zona TEXT DEFAULT ''\"):" in src])
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(schema)
+    A, B, C, D, E, F, G, V, W = ("ord-aaaa-1111", "ord-bbbb-2222", "ord-cccc-3333", "ord-dddd-4444",
+                                 "ord-eeee-5555", "ord-ffff-6666", "ord-gggg-7777", "ord-vvvv-8888",
+                                 "ord-wwww-9999")
+    righe = [(A, 111, 1, ""),                               # appena pubblicato: il libro non ha ancora parlato
+             (B, 111, 1, "Contanti"),                       # il libro ha detto «Contanti»
+             (C, 222, 1, "Contanti"),                       # di un ALTRO account
+             (D, 111, 0, "Contanti"),                       # sua la riga, ma non l'ha pubblicato lui
+             (E, 111, 1, "SEPA,Revolut"),                   # suo, ma senza contanti
+             (F, 111, 1, "Contanti al tabacchino 23.47"),   # Barattozon: un'altra cosa
+             (G, 111, 1, '["SEPA", "Contanti"]'),           # due metodi, come lista
+             (V, 333, 1, "Contanti"),                       # UN ORDINE DI PRIMA: contanti, senza zona
+             (W, 111, 1, "Contanti")]                       # per le forme storte
+    for o, tg, mk, met in righe:
+        con.execute("INSERT INTO p2p_ordini(ordine, tg_id, maker, metodi) VALUES(?,?,?,?)",
+                    (o, tg, mk, met))
+    dichiara, zone_di = amb["_dichiara_zone_p2p"], amb["_zone_p2p"]
+    tutti = [A, B, C, D, E, F, G, V, W]
+    prova("un ordine di prima, e ogni ordine senza zona, non ha niente da mostrare", {},
+          zone_di(con, tutti))
+    n = dichiara(con, 111, {A: "Milano centro", B: "  Bergamo   e provincia ", C: "Roma",
+                            D: "Torino", E: "Napoli", F: "Bari", G: "Lecco",
+                            W: QQ, "corto": "Pisa", 7: "Asti", "ord-mai-vista": "Enna"})
+    prova("la zona si scrive SOLO sulle righe che questo account ha pubblicato, pulita", 5, n)
+    prova("...l'ordine di un altro e la riga non da maker restano vuoti, e 41 caratteri non entrano",
+          ["", "", ""],
+          [con.execute("SELECT zona FROM p2p_ordini WHERE ordine=?", (x,)).fetchone()[0]
+           for x in (C, D, W)])
+    prova("esce la zona degli ordini col contanti (anche fra due metodi, anche prima che il libro parli)",
+          {A: "Milano centro", B: "Bergamo e provincia", G: "Lecco"}, zone_di(con, tutti))
+    prova("...e MAI su un ordine che il libro dice SEPA o Barattozon, anche se qualcuno l'ha dichiarata",
+          [True, True, False, False],
+          [con.execute("SELECT zona FROM p2p_ordini WHERE ordine=?", (x,)).fetchone()[0] != ""
+           for x in (E, F)] + [x in zone_di(con, tutti) for x in (E, F)])
+    prova("LA PRIMA RESTA: una seconda dichiarazione non la riscrive, nemmeno la sua",
+          [0, "Milano centro"],
+          [dichiara(con, 111, {A: "Altrove"}), zone_di(con, [A])[A]])
+    prova("...e un altro account non la scrive ne' la cambia", [0, 0, "Bergamo e provincia"],
+          [dichiara(con, 222, {B: "Roma"}), dichiara(con, 222, {D: "Roma"}), zone_di(con, [B])[B]])
+    prova("una mappa storta e' una mappa vuota, mai un'esplosione", [0, 0, 0, 0],
+          [dichiara(con, 111, None), dichiara(con, 111, ["x"]), dichiara(con, 111, "Milano"),
+           dichiara(con, 111, {})])
+    prova("...mentre la lista storta alza come le sorelle dei volti e dei cambi", True,
+          bool(_alza(lambda: zone_di(con, ["corto"]))))
+    con.close()
+
+    # --- 3) IL SERVER: le rotte --------------------------------------------
+    reg = pezzo("registra_ordini_p2p")
+    prova("l'intestazione scrive la zona DOPO il registro (che accende `maker`), nello stesso try",
+          True,
+          '_dichiara_zone_p2p(con, user["id"], (d or {}).get("zone"))' in reg
+          and reg.index("esito = _registra_ordini_p2p(") < reg.index("_dichiara_zone_p2p(con,")
+          < reg.index("except ValueError as e:"))
+    prova("...e il registro degli ordini non ha cambiato firma", True,
+          "cambi=None, cambio_server: float = 0.0) -> dict:" in src)
+    fac = pezzo("facce_ordini_p2p")
+    prova("i volti portano le zone accanto, dagli stessi id", True,
+          'zone = _zone_p2p(con, (d or {}).get("ordini"))' in fac
+          and 'return {"facce": facce, "cambi": cambi, "zone": zone}' in fac)
+    lib = pezzo("libro_fotografato_p2p")
+    prova("la fotografia le da' a TUTTI, prima di chiedere chi guarda (non sono un volto)", True,
+          'if fuori["eventi"] and F.get("zone"):\n        fuori["zone"] = F["zone"]' in lib
+          and lib.index('fuori["zone"]') < lib.index("_chi_guarda_p2p("))
+    prova("...l'orologio le fotografa col libro, e il rinfresco dalla memoria le rifa'", 2,
+          src.count('F["zone"] = _zone_foto_p2p(F["eventi"])'))
+    prova("...e la gemella della fotografia chiede allo stesso giudice", True,
+          "return _zone_p2p(con, ids)" in pezzo("_zone_foto_p2p"))
+
+    # --- 4) IL CLIENT: i ganci nei pezzi che c'erano ----------------------
+    vale = fn("function valeNuovoOrdineP2P(v){")
+    prova("il giudice del foglio chiede la zona dopo i metodi e prima del tabacchino, col suo campo",
+          True,
+          "const zonaNo = typeof giudiceZonaP2P === 'function' ? giudiceZonaP2P(v.zona, v.metodi) : '';" in vale
+          and "if (zonaNo) return {ok: false, manca: zonaNo, campo: 'p2pNuovoZona'};" in vale
+          and vale.index("'Scegli almeno un metodo di pagamento'") < vale.index("const zonaNo = ")
+          < vale.index("if (tabacchinoP2P(v.metodi)) {"))
+    prova("i campi del foglio portano la zona com'e' scritta", True,
+          "zona: typeof p2pNuovoZona === 'string' ? p2pNuovoZona : ''," in fn("function campiNuovoP2P(){"))
+    fog = fn("function renderNuovoOrdineP2P(){")
+    prova("il foglio monta la sezione della zona subito sotto i metodi", True,
+          "const zona = typeof sezioneZonaNuovoP2P === 'function' ? sezioneZonaNuovoP2P(p2pNuovoMetodi) : '';" in fog
+          and "valuta + metodi + zona + importo + " in fog)
+    prova("...e riparte vuoto a ogni apertura, come gli altri campi", True,
+          "  p2pNuovoMetodi = [];\n  p2pNuovoZona = '';\n" in fn("function apriNuovoOrdineP2P(metodo){"))
+    inv = fn("async function inviaNuovoOrdineP2P(confermato){")
+    prova("alla pubblicazione la zona va sulla riga PRIMA che la riga si scriva", True,
+          "const zonaOrd = typeof zonaDaCampiP2P === 'function' ? zonaDaCampiP2P(campi) : '';" in inv
+          and "if (zonaOrd) ord.zona = zonaOrd;" in inv
+          and inv.index("if (zonaOrd) ord.zona = zonaOrd;") < inv.index("scriviOrdineP2P(ord);"))
+    prova("...e NON entra nel messaggio al coordinatore ne' nel tag dei metodi", [False, False],
+          ["zona" in fn("function ordineDaCampiP2P(v, lato){"),
+           "zona" in inv[inv.index("const msg = messaggioMostro('new-order'"):
+                         inv.index("await mostroChiama(tk.sk, msg")]])
+    regc = fn("async function registraOrdiniP2P(ids, pubblicati, presi){")
+    prova("l'intestazione dichiara le zone dei miei ordini, dentro la stessa POST", True,
+          "const zone = typeof zoneDaDichiarareP2P === 'function' ? zoneDaDichiarareP2P(lista) : {};" in regc
+          and "zone: zone,\n" in regc and regc.count("fetch(") == 1)
+    prova("le zone arrivano dai volti e dalle due letture della fotografia", [True, True, True],
+          ["if (prendiZoneP2P(d && d.zone)) nuove++;" in fn("async function chiediFacceP2P(ids){"),
+           "const zone = prendiZoneP2P(d && d.zone);" in fn("async function chiediFotoLibroP2P(){")
+           and "> 0 || cambi || zone;" in fn("async function chiediFotoLibroP2P(){"),
+           mini.count("\n  prendiZoneP2P(d && d.zone);\n") == 1])
+    riga = fn("function rigaOrdineP2P(o){")
+    prova("la card del libro mette la zona sotto la scatola dei metodi; la card d'esempio no",
+          [True, 1],
+          ["const zona = typeof rigaZonaP2P === 'function' ? rigaZonaP2P(o) : '';" in riga
+           and "    ${paga}\n    ${zona}\n    ${rep ? " in riga,
+           riga.count("${zona}")])
+    dett = fn("function metodiDettP2P(o){")
+    prova("il dettaglio la mette sotto il metodo, con uno e con piu' metodi", [True, True, True],
+          ["const zona = typeof zonaDettP2P === 'function' ? zonaDettP2P(o) : '';" in dett,
+           "+ marchioMetodoP2P(metodi[0]) + '</b>' + zona});" in dett,
+           "+ marchioMetodoP2P(m) + '</button>').join('') + '</div>' + zona\n" in dett])
+    mar = fn("function marchioMetodoP2P(m, conTesto){")
+    prova("il vestito del metodo chiede l'etichetta al blocco del contanti, e il 💵 non lo scrive a mano",
+          [True, 0],
+          ["if (!v) return (typeof etichettaContantiP2P === 'function' && etichettaContantiP2P(m)) || esc(m);"
+           in mar, mar.count(chr(0x1F4B5))])
+    prova("l'icona delle banconote sta in UNA costante, e nessuna card la scrive a mano",
+          ["const P2P_CONTANTI_ICO = '" + chr(0x1F4B5) + "';", 0, 0],
+          [_riga_js(mini, "const P2P_CONTANTI_ICO = ").strip(), riga.count(chr(0x1F4B5)),
+           fn("function rigaScambioP2P(o){").count(chr(0x1F4B5))])
+
+    # --- 5) IL CSS: verde solo nella scatola, e leggibile nei due temi ----
+    prova("l'etichetta si tinge SOLO dentro la scatola dei metodi; nuda non ha fondo",
+          [True, True, 2],
+          ["  .p2p-contanti{white-space:nowrap}\n" in mini,
+           "  .p2p-paga .p2p-contanti{display:inline-block;background:var(--trust-soft);\n"
+           "    color:var(--trust-text);font-weight:800;padding:1px 8px;border-radius:999px}\n" in mini,
+           mini.count(".p2p-contanti{")])
+    prova("la zona va a capo invece di allargare la card, sulla card e nel dettaglio", [True, True],
+          ["overflow-wrap:anywhere" in pezzo_js(mini, "  .p2p-zona{", "}"),
+           "overflow-wrap:anywhere" in pezzo_js(mini, "  .p2p-dett-zona{", "}")])
+    prova("la sezione ha il suo spillo, nel verde del contanti", [True, True],
+          ["\n  zona: '<path class=\"velo\" d=\"" in mini,
+           "  .p2p-sez-ico.ico-zona{background:var(--trust-soft);color:var(--trust-text)}\n" in mini])
+
+    def _token(nome):
+        """Il token nei due temi: il primo e' del giorno, quello dopo il
+        blocco `html[data-tema="scuro"]{` e' della sera."""
+        sera = mini.index('html[data-tema="scuro"]{')
+        tutti = [(m.start(), m.group(1)) for m in re.finditer(nome + r":(#[0-9A-Fa-f]{6})", mini)]
+        return ([v for p, v in tutti if p < sera][0], [v for p, v in tutti if p > sera][0])
+
+    def _lum(h):
+        c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    def _contrasto(a, b):
+        la, lb = _lum(a), _lum(b)
+        return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+    fondo, testo = _token("--trust-soft"), _token("--trust-text")
+    cr = [round(_contrasto(testo[i], fondo[i]), 1) for i in (0, 1)]
+    prova("l'etichetta verde passa l'AA del testo piccolo nei due temi (4,5:1), coi numeri del commento",
+          [True, True, [5.2, 7.4]], [cr[0] >= 4.5, cr[1] >= 4.5, cr])
+    prova("...e il verde di giorno e quello di sera sono due verdi (il tema scuro ha i suoi token)", True,
+          fondo[0] != fondo[1] and testo[0] != testo[1])
+
+    # --- 6) IL BANCO: le funzioni vere del client --------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco di contanti-zona", "node non c'e'")
+        return
+    i_v = mini.index("const P2P_VESTE_METODI = {")
+    i_i = mini.index("const P2P_ICONE = {")
+    pezzi = "".join([
+        contanti_zona_js(mini),
+        _riga_js(mini, "const P2P_METODI = "),
+        _riga_js(mini, "const P2P_TABACCHINO = "), _riga_js(mini, "const P2P_TABACCHINO_PM = "),
+        mini[i_v:mini.index("\n};", i_v) + 3] + "\n",
+        mini[i_i:mini.index("\n};", i_i) + 3] + "\n",
+        _riga_js(mini, "const P2P_GLIFI = "),
+        fn("function icoNuovoP2P(nome){"), fn("function sezioneNuovoP2P(o){"),
+        fn("function metodoBaseP2P(m){"), fn("function tabacchinoP2P(metodi){"),
+        fn("function vesteMetodoP2P(m){"), fn("function marchioMetodoP2P(m, conTesto){"),
+        fn("function soloMarchiP2P(metodi){"), fn("function iconaMetodiP2P(metodi){"),
+        fn("function idMostroVero(id){"), fn("function prendiZoneP2P(m){"),
+        fn("function interoP2P(testo){"), fn("function centesimiP2P(testo){"),
+        fn("function giudiceContantiP2P(euro, metodi, tetto){"),
+        fn("function valeNuovoOrdineP2P(v){")])
+    cart = _tf.mkdtemp(prefix="zona_")
+    pb = _os.path.join(cart, "banco.js")
+    open(pb, "w", encoding="utf-8").write(BANCO_CONTANTI_ZONA.replace("__PEZZI__", pezzi))
+    rr = _sp.run([node, pb], capture_output=True, text=True, timeout=60, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco di contanti-zona gira", "", (rr.stderr or "")[-900:])
+    if rr.returncode or not rr.stdout.strip():
+        return
+    o = _json.loads(rr.stdout.strip().splitlines()[-1])
+    MANCA = "Scrivi la zona di scambio: una città o una zona, come «Milano centro»"
+    LUNGA = "La zona di scambio è troppo lunga: al massimo 40 caratteri"
+    prova("il client pulisce come il server: una riga, spazi singoli, 40 si' e 41 no",
+          ["Milano centro", "a b c", True, "", "", "", "", "", "Mi lano", ""], o["pulita"])
+    prova("LA ZONA E' OBBLIGATORIA COI CONTANTI: vuota, di soli spazi o assente manca; 40 passa, 41 e' troppo lunga",
+          [MANCA, MANCA, MANCA, "", "", LUNGA], o["giudice"][:6])
+    prova("...anche con «Contanti» insieme a un altro metodo (chi prende puo' scegliere quello)",
+          [MANCA, MANCA], o["giudice"][6:8])
+    prova("...e SOLO coi contanti: SEPA, Barattozon (con e senza importo), nessun metodo, e una zona "
+          "troppo lunga rimasta in memoria non fermano niente; «contanti» minuscolo non e' la voce",
+          ["", "", "", "", "", "", ""], o["giudice"][8:])
+    v = o["vale"]
+    no_zona = {"ok": False, "manca": MANCA, "campo": "p2pNuovoZona"}
+    passa = {"ok": True, "manca": "", "campo": ""}
+    prova("il foglio «Pubblica»: coi contanti e senza zona non si pubblica, con la frase e il campo",
+          [no_zona, no_zona, no_zona, no_zona],
+          [v["senza"], v["spazi"], v["assente"], v["misto"]])
+    prova("...con la zona si pubblica, da sola e fra due metodi, fino a 40 caratteri",
+          [passa, passa, passa], [v["con"], v["giusta40"], v["mistoCon"]])
+    prova("...41 caratteri no, con la sua frase sullo stesso campo",
+          {"ok": False, "manca": LUNGA, "campo": "p2pNuovoZona"}, v["lunga"])
+    prova("...e senza contanti il foglio pubblica com'era, qualunque cosa sia rimasta nel campo",
+          [passa, passa], [v["sepa"], v["sepaLunga"]])
+    prova("...l'ordine dei giudizi resta quello: prima l'importo e il tetto del contanti, poi i metodi, poi la zona",
+          ["p2pNuovoEuro", "p2pNuovoEuro", "p2pNuovoMetodiBtn"],
+          [v["senzaEuro"]["campo"], v["oltre"]["campo"], v["nessuno"]["campo"]])
+    prova("la zona parte con l'ordine pulita, e solo coi contanti",
+          ["Milano centro", "", "", ""], o["daCampi"])
+    A1, B1 = "5a1e0000-7777-4a2b-9c3d-0000000000a1", "5a1e0000-7777-4a2b-9c3d-0000000000b2"
+    prova("dal server entra solo una zona buona su un id vero; la stessa due volte non e' una novita'",
+          [True, False, False, False, False, [A1]], o["prese"])
+    prova("UN ORDINE MOSTRA LA ZONA se ha i contanti e la zona c'e'; un ordine di prima non mostra niente",
+          ["Milano centro", ""], o["ordine"][:2])
+    prova("...niente su SEPA o Barattozon anche a zona nota; la riga mia vince sul server; fra due metodi si'; "
+          "e il nulla, l'ordine senza metodi e la zona troppo lunga sono vuoti",
+          ["", "", "Lecco", "Milano centro", "", "", ""], o["ordine"][2:])
+    prova("la riga della card e quella del dettaglio: «📍 Milano centro», e per l'ordine di prima NIENTE",
+          ['<div class="p2p-box p2p-zona" title="Zona di scambio indicativa">📍 Milano centro</div>', "",
+           '<div class="p2p-dett-zona" title="Zona di scambio indicativa">📍 Milano centro</div>', ""],
+          o["righe"][:4])
+    prova("...la zona di uno sconosciuto esce scappata, e il dettaglio di un SEPA non la mostra",
+          [True, True, ""],
+          ["&lt;i&gt;via Roma 1&lt;/i&gt;" in o["righe"][4], "<i>" not in o["righe"][4], o["righe"][5]])
+    prova("all'intestazione si dichiarano solo i MIEI ordini in contanti che la zona ce l'hanno, "
+          "e la mia card la sa subito",
+          [{A1: "Milano centro"}, {A1: "Milano centro"}, {}], o["dichiaro"])
+    ETI = '<span class="p2p-contanti">💵 Contanti</span>'
+    prova("IL CONTANTI HA LA SUA ICONA: le banconote nell'etichetta, anche nel foglio e con gli spazi intorno",
+          [ETI, ETI, ETI], [o["voce"][0], o["voce"][2], o["voce"][3]])
+    prova("...e SOLO lui: SEPA, «contanti» minuscolo, «Contanti a Milano» e un metodo avvelenato restano testo",
+          ["SEPA", "contanti", "Contanti a Milano", "&lt;b&gt;"],
+          [o["voce"][1], o["voce"][4], o["voce"][5], o["voce"][6]])
+    prova("...Barattozon tiene il suo marchio, senza banconote", [True, False, False],
+          ['class="p2p-marca"' in o["tabVoce"], "💵" in o["tabVoce"], "p2p-contanti" in o["tabVoce"]])
+    prova("...nel vocabolario dei sette metodi l'etichetta ce l'ha uno solo, «Contanti»",
+          [False, False, False, False, False, True, False], o["etichette"])
+    prova("il 💳 se ne va quando ogni voce ha il suo segno (solo contanti, solo marchio) e resta a intestare i nomi",
+          ["", "💳 ", "💳 ", "", "💳 ", "💳 ", "💳 ", "💳 "], o["icone"])
+    prova("...ma l'INSEGNA navy e' dei soli marchi: la scatola del contanti non lo diventa",
+          [False, True, False, False, False, False], o["insegna"])
+    sez = o["sezione"]
+    prova("IL CAMPO C'E' SOLO COI CONTANTI: con SEPA, con Barattozon e senza metodi la sezione non esiste",
+          [True, "", "", "", True], [sez[0] != "", sez[1], sez[2], sez[3], sez[4]])
+    prova("...col suo titolo, lo spillo, il tetto dei 40 nel campo e la riga piccola",
+          [],
+          [x for x in ("<span>Zona di scambio</span>", 'class="p2p-sez-ico ico-zona"',
+                       '<input type="text" id="p2pNuovoZona" maxlength="40" ',
+                       'oninput="cambiaZonaNuovoP2P(this)"',
+                       '<div class="hint">Solo indicativa: non scrivere il tuo indirizzo</div>')
+           if x not in sez[0]])
+    prova("...e quel che c'era scritto torna nel campo scappato, dopo un ridisegno", True,
+          'value="Milano &quot;centro&quot; &lt;b&gt;"' in sez[0])
+    prova("...scrivere nel campo aggiorna la memoria e basta (nessun ridisegno: il dito e' sul campo)",
+          [["Bergamo", ""], False],
+          [o["campo"], "render" in fn("function cambiaZonaNuovoP2P(campo){")])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -135014,6 +135544,7 @@ def main():
               prove_testo_ricevere_sats,
               prove_prese_dalle_10, prove_campagna_p2p_tutti,
               prove_prendi_metodo,
+              prove_contanti_zona,
               prove_banner_ingresso,
               prove_x_risonanza,
               prove_config_esempio):

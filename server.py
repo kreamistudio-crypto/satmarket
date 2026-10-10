@@ -5685,7 +5685,21 @@ def init_db():
         -- pubblico come la cifra. L'archivio degli scambi lo porta al
         -- dispositivo che l'ordine non l'ha scritto: senza, la card e il
         -- conto di un annullato dicevano «al prezzo di mercato».
-        premio REAL DEFAULT 0
+        premio REAL DEFAULT 0,
+        -- LA ZONA DI SCAMBIO DEL CONTANTI DI PERSONA (10 ott 2026,
+        -- cantiere contanti-zona): «Milano centro», «Bergamo e
+        -- provincia» — indicativa, scritta da chi ha pubblicato un
+        -- ordine con «Contanti» fra i metodi, perche' chi guarda il
+        -- libro capisca subito se lo scambio fa per lui. STA QUI e non
+        -- nel libro: il messaggio al coordinatore non ha un campo
+        -- libero, e nel tag `pm` romperebbe la parola intera
+        -- «Contanti» su cui poggiano la cauzione del nodo (patch
+        -- 0008), il tetto e le frasi. E' la strada del cambio di
+        -- Barattozon: la dichiara il client all'intestazione, la
+        -- prima resta, esce accanto ai volti e con la fotografia.
+        -- '' = non detta (gli ordini di prima, e quelli degli altri
+        -- client): la card non mostra niente.
+        zona TEXT DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_ordini_tg ON p2p_ordini(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_momenti(
@@ -7181,7 +7195,9 @@ def init_db():
                     # il cambio di Barattozon (26 set 2026)
                     "cambio_pub REAL DEFAULT 0",
                     # il premio del libro (27 set 2026)
-                    "premio REAL DEFAULT 0"):
+                    "premio REAL DEFAULT 0",
+                    # la zona di scambio del contanti (10 ott 2026)
+                    "zona TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -44030,6 +44046,97 @@ def _cambio_pub_buono(cambi, ordine: str, cambio_server: float) -> float:
     return c
 
 
+# LA ZONA DI SCAMBIO DEL CONTANTI DI PERSONA (10 ott 2026, cantiere
+# contanti-zona, richiesta di Andrea): chi pubblica un ordine con
+# «Contanti» fra i metodi scrive una zona INDICATIVA — una citta' o una
+# zona, mai un indirizzo — e la card del libro la mostra con «📍».
+# DOVE VIVE, E PERCHE' QUI. Le strade erano tre:
+# - il coordinatore: l'ordine che gli si manda ha i suoi campi contati
+#   (importo, valuta, metodi, premio) e nessuno libero; un campo nuovo
+#   vorrebbe una patch del fork e un tag in piu' nel 38383;
+# - il tag `pm` del libro («Contanti Milano centro»): viaggerebbe da
+#   solo e lo leggerebbero anche gli altri client, ma «Contanti» si
+#   confronta a PAROLA INTERA in tre posti che contano — la cauzione
+#   del nodo (patch 0008, `only_payment_methods`), il tetto del
+#   contanti, le frasi di «Ho consegnato i contanti» — e una voce
+#   finta accanto («Contanti,📍 Milano») sarebbe un metodo che chi
+#   prende potrebbe scegliere;
+# - il database di Barattolo: la strada gia' aperta dal cambio di
+#   Barattozon (`cambio_pub`). La dichiara il client di chi ha
+#   pubblicato quando intesta l'ordine, si scrive SOLO sulla sua riga,
+#   la prima resta, ed esce accanto ai volti e con la fotografia.
+# Scelta la terza. IL SUO LIMITE, detto: la zona la vede chi guarda il
+# libro da Barattolo; un altro client di Mostro vede l'ordine senza.
+# E' UNA DICHIARAZIONE di chi pubblica, come il nome sul profilo: si
+# pulisce la forma, non si verifica il luogo.
+P2P_ZONA_MAX = 40
+_ZONA_VIA_P2P = re.compile("[\x00-\x1f\x7f\u202a-\u202e\u2066-\u2069]")
+
+
+def _zona_pulita_p2p(testo) -> str:
+    """PURA: la zona come si tiene, o '' se non si tiene. Una riga
+    sola — a capo, tab e caratteri di controllo (anche quelli che
+    rovesciano il verso del testo) diventano uno spazio, gli spazi in
+    fila uno solo —, e al massimo `P2P_ZONA_MAX` caratteri: una piu'
+    lunga NON si tosa, si rifiuta, che il client ha lo stesso tetto e
+    chi lo passa non e' il nostro foglio."""
+    if not isinstance(testo, str):
+        return ""
+    t = " ".join(_ZONA_VIA_P2P.sub(" ", testo).split())
+    return t if 0 < len(t) <= P2P_ZONA_MAX else ""
+
+
+def _dichiara_zone_p2p(con, tg_id: int, zone) -> int:
+    """Scrive le zone dichiarate, `{ordine: zona}`, e torna quante ne
+    ha scritte. SOLO sulla riga di chi l'ordine l'ha PUBBLICATO
+    (`tg_id` suo e `maker` acceso: lo accende l'intestazione, che gira
+    un attimo prima nella stessa rotta, o il libro), e LA PRIMA RESTA:
+    un ordine pubblicato non si corregge — si ritira e se ne fa un
+    altro —, e cosi' nessuno riscrive la zona sotto gli occhi di chi
+    sta venendo all'incontro. Chi dichiara per un ordine non suo non
+    scrive niente, in silenzio: il WHERE non lo trova. Una mappa
+    storta e' una mappa vuota — il client la manda insieme alla lista,
+    e la zona non deve far cadere l'intestazione."""
+    if not isinstance(zone, dict):
+        return 0
+    scritte = 0
+    for ordine, testo in list(zone.items())[:MAX_ORDINI_P2P]:
+        if not isinstance(ordine, str) or not FORMA_ORDINE_P2P.fullmatch(ordine):
+            continue
+        z = _zona_pulita_p2p(testo)
+        if not z:
+            continue
+        scritte += con.execute(
+            "UPDATE p2p_ordini SET zona=? WHERE ordine=? AND tg_id=? "
+            "AND maker=1 AND (zona IS NULL OR zona='')",
+            (z, ordine, int(tg_id))).rowcount
+    if scritte:
+        con.commit()
+    return scritte
+
+
+def _zone_p2p(con, ordini) -> dict:
+    """Da una lista di id alla zona di scambio di quelli in contanti:
+    `{ordine: zona}`, solo le dette. NON E' UN VOLTO, come il cambio di
+    Barattozon: chi l'ha scritta l'ha scritta perche' si legga sulla
+    card, quindi esce anche a chi guarda senza sessione (la
+    fotografia). QUANDO IL LIBRO HA GIA' DETTO I METODI, esce solo se
+    «Contanti» c'e' davvero, a parola intera: una zona dichiarata su
+    un ordine SEPA non e' di nessuna card. Alza ValueError come le
+    sorelle, sulla lista storta."""
+    pulite = _ordini_puliti_p2p(ordini)
+    segni = ",".join("?" * len(pulite))
+    fuori = {}
+    for r in con.execute(
+            f"SELECT ordine, zona, metodi FROM p2p_ordini "
+            f"WHERE ordine IN ({segni}) AND zona <> ''", pulite):
+        metodi = _metodi_lista_p2p(r["metodi"])
+        if metodi and "Contanti" not in metodi:
+            continue
+        fuori[r["ordine"]] = r["zona"]
+    return fuori
+
+
 def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int,
                          pubblicati: bool = False,
                          presi: bool = False,
@@ -44405,6 +44512,10 @@ async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
                                      # il cambio di Barattozon (26 set 2026),
                                      # confrontato col nostro dalla cache
                                      (d or {}).get("cambi"), cambio_noto_ora())
+        # LA ZONA DEL CONTANTI (10 ott 2026): dopo l'intestazione, che
+        # ha appena acceso `maker` sulla riga di chi pubblica — e
+        # solo li' si scrive (`_dichiara_zone_p2p`)
+        _dichiara_zone_p2p(con, user["id"], (d or {}).get("zone"))
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -44457,11 +44568,13 @@ async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
                                   int(time.time()))
         # e il cambio di Barattozon, accanto ai volti (26 set 2026)
         cambi = _cambi_pub_p2p(con, (d or {}).get("ordini"))
+        # e la zona di scambio del contanti (10 ott 2026)
+        zone = _zone_p2p(con, (d or {}).get("ordini"))
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
         con.close()
-    return {"facce": facce, "cambi": cambi}
+    return {"facce": facce, "cambi": cambi, "zone": zone}
 
 
 @app.get("/api/p2p/libro")
@@ -44505,6 +44618,10 @@ def libro_fotografato_p2p(req: Request, x_tg_init_data: str = Header(""),
     # l'orologio (`_cambi_foto_p2p`), e qui non si apre niente.
     if fuori["eventi"] and F.get("cambi"):
         fuori["cambi"] = F["cambi"]
+    # LE ZONE DEL CONTANTI ESCONO A TUTTI (10 ott 2026), con la stessa
+    # ragione: chi l'ha scritta l'ha scritta per la card
+    if fuori["eventi"] and F.get("zone"):
+        fuori["zone"] = F["zone"]
     chi = _chi_guarda_p2p(x_tg_init_data, barattolo_sessione) \
         if fuori["eventi"] else 0
     if chi and F.get("facce"):
@@ -47871,7 +47988,7 @@ P2P_FOTO_MAX_S = 60                # il tetto di una fotografia, relay compresi
 _CAMPI_EVENTO = ("id", "pubkey", "created_at", "kind", "tags", "content", "sig")
 _P2P_FOTO = {"ultimi": {}, "info": None, "quando": 0, "intera": 0,
              "visto": 0, "eventi": [], "facce": {}, "cambi": {}, "via": {},
-             "autori": {}}
+             "autori": {}, "zone": {}}
 
 
 def libro_intero_da_relay(relay: str, mostro: str, since: int):
@@ -48001,6 +48118,8 @@ async def _fotografa_libro_p2p():
     F["facce"] = _facce_foto_p2p(F["eventi"], adesso)
     # ...e i cambi di Barattozon (26 set 2026), con la stessa ragione
     F["cambi"] = _cambi_foto_p2p(F["eventi"])
+    # ...e le zone di scambio del contanti (10 ott 2026)
+    F["zone"] = _zone_foto_p2p(F["eventi"])
     # ...e CHI HA PUBBLICATO COSA (27 set 2026, la fila «Scambi P2P» senza
     # i propri ordini): resta in memoria e non esce MAI intero — la rotta
     # ne da' a ciascuno solo la sua parte (`miei`)
@@ -48169,6 +48288,7 @@ def _rinfresca_volti_foto_p2p(ordini=None) -> bool:
     try:
         F["facce"] = _facce_foto_p2p(F["eventi"], int(time.time()))
         F["cambi"] = _cambi_foto_p2p(F["eventi"])
+        F["zone"] = _zone_foto_p2p(F["eventi"])
         F["autori"] = _autori_foto_p2p(F["eventi"])
     except Exception as e:
         print(f"⚠️ Fotografia del libro, volti non rifatti: {e}", flush=True)
@@ -48195,6 +48315,24 @@ def _intesta_dal_canale_p2p(tg_id: int, ordine: str) -> None:
               flush=True)
         return
     _rinfresca_volti_foto_p2p([ordine])
+
+
+def _zone_foto_p2p(eventi) -> dict:
+    """Le zone di scambio degli ordini della fotografia (10 ott 2026),
+    calcolate UNA volta per giro dell'orologio come i volti e i cambi:
+    il giudice e' `_zone_p2p`, sugli stessi id che la rotta serve."""
+    ids = [d for d in (_tag_evento_p2p(e, "d") for e in eventi or []
+                       if e.get("kind") == 38383)
+           if FORMA_ORDINE_P2P.fullmatch(d)][:MAX_ORDINI_P2P]
+    if not ids:
+        return {}
+    con = db()
+    try:
+        return _zone_p2p(con, ids)
+    except ValueError:
+        return {}
+    finally:
+        con.close()
 
 
 def _cambi_foto_p2p(eventi) -> dict:

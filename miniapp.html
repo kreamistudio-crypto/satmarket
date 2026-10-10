@@ -3555,6 +3555,27 @@
      puo' allargare. Chi rimettesse questa riga in un flex si ricompra
      il difetto, e allora quella riga torna obbligatoria. */
   .p2p-paga{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* IL CONTANTI DI PERSONA SI RICONOSCE A COLPO D'OCCHIO (10 ott 2026,
+     cantiere contanti-zona, richiesta di Andrea): nella scatola dei
+     metodi la voce «Contanti» e' un'ETICHETTA verde con la sua icona
+     (💵, e non il 💳 che intesta gli altri nomi), e sotto la scatola sta
+     la zona di scambio, «📍 Milano centro».
+     IL VERDE E' QUELLO DI CASA, la coppia `--trust-soft`/`--trust-text`
+     che veste gia' la banconota dell'importo nel foglio «Pubblica»: 5,2:1
+     di giorno e 7,4:1 di sera, e una prova rifa' il conto sui token.
+     ⚠️ LA TINTA VALE SOLO DENTRO LA SCATOLA (`.p2p-paga`): la stessa voce
+     nelle pillole del filtro, nel foglio e nel dettaglio porta l'icona
+     e basta — li' un fondo verde dentro una pillola che ha gia' il suo
+     colore (arancio quando e' scelta) sarebbe una macchia.
+     L'ETICHETTA NON VA A CAPO; la zona si', che e' testo di sconosciuti
+     lungo fino a 40 caratteri: `overflow-wrap` la spezza dove serve e la
+     card non si allarga. */
+  .p2p-contanti{white-space:nowrap}
+  .p2p-paga .p2p-contanti{display:inline-block;background:var(--trust-soft);
+    color:var(--trust-text);font-weight:800;padding:1px 8px;border-radius:999px}
+  .p2p-zona{color:var(--ink-soft);font-weight:700;overflow-wrap:anywhere}
+  .p2p-dett-zona{margin-top:8px;font-size:14px;font-weight:700;
+    color:var(--ink-soft);overflow-wrap:anywhere}
   /* CHI C'E' DALL'ALTRA PARTE, nella sua scatola: il filo che la
      staccava non serve piu' — a staccarla e' il riquadro, come nel
      riferimento. Ultima e non prima: in un libro si scorre per PREZZO,
@@ -4655,6 +4676,9 @@
   /* lo scontrino veste il colore dei metodi, di cui e' figlio (set
      2026, col tabacchino); e i suoi tre campi stanno in colonna */
   .p2p-sez-ico.ico-scontrino{background:var(--ship-bg);color:var(--ship-text)}
+  /* lo spillo della zona di scambio veste il verde del contanti, di
+     cui e' figlio (10 ott 2026) */
+  .p2p-sez-ico.ico-zona{background:var(--trust-soft);color:var(--trust-text)}
   /* ---- IL FOGLIO DELLA SCADENZA (9 ott 2026): le chip del giorno, le
      griglie di ore e minuti, la riga che rilegge la scelta — tutto a
      tocchi, niente campo e niente tastiera (vedi apriScadeTabP2P).
@@ -50401,11 +50425,15 @@ function rigaOrdineP2P(o){
      `.p2p-paga-marchio`. Il giudice e' lo STESSO dell'icona — «qui
      dentro c'e' solo un marchio» — e si chiede una volta sola, perche'
      due giudici sulla stessa domanda divergono al primo ritocco. */
-  const senzaIcona = iconaMetodiP2P(o.metodi) === '';
+  const senzaIcona = soloMarchiP2P(o.metodi);
   const paga = o.metodi.length
     ? `<div class="p2p-box p2p-paga${senzaIcona ? ' p2p-paga-marchio' : ''}" title="${esc(o.metodi.join(', '))}">`
       + (senzaIcona ? '' : iconaMetodiP2P(o.metodi))
       + o.metodi.map(m => marchioMetodoP2P(m)).join(', ') + '</div>' : '';
+  /* LA ZONA DI SCAMBIO DEL CONTANTI (10 ott 2026): «📍 Milano centro»
+     sotto la scatola dei metodi, per gli ordini che ce l'hanno — quelli
+     di prima e quelli degli altri client non mostrano niente */
+  const zona = typeof rigaZonaP2P === 'function' ? rigaZonaP2P(o) : '';
   /* LE STELLINE SONO QUELLE DEL MERCATINO (set 2026, decisione di
      Andrea): sotto il metodo, la media che quella persona ha gia'
      ricevuto QUI — e non piu' quella del coordinatore, che parlava di
@@ -50452,6 +50480,7 @@ function rigaOrdineP2P(o){
     ${paghiEuro ? rigaSats : rigaEuro}
     ${badge ? `<div class="p2p-badge-riga">${badge}${affarone}</div>` : ''}
     ${paga}
+    ${zona}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
   </div>`;
@@ -57089,6 +57118,8 @@ function titoloMetodiP2P(o){
 function metodiDettP2P(o){
   const metodi = (o.metodi || []).slice();
   const titolo = titoloMetodiP2P(o);
+  /* la zona di scambio del contanti, sotto il metodo (10 ott 2026) */
+  const zona = typeof zonaDettP2P === 'function' ? zonaDettP2P(o) : '';
   if (!metodi.length)
     return sezioneNuovoP2P({ico: 'metodi', titolo: titolo,
       corpo: '<div class="hint">Chi ha pubblicato non l\'ha indicato: '
@@ -57102,7 +57133,7 @@ function metodiDettP2P(o){
   if (metodi.length === 1)
     return sezioneNuovoP2P({ico: 'metodi', titolo: titolo,
       corpo: '<b class="p2p-dett-uno" title="' + esc(metodi[0]) + '">'
-        + marchioMetodoP2P(metodi[0]) + '</b>'});
+        + marchioMetodoP2P(metodi[0]) + '</b>' + zona});
   /* LA DOMANDA SOPRA LE PILLOLE (9 ott 2026, cantiere prendi-metodo):
      la frase che stava in fondo, rossa, accanto al bottone spento, sale
      qui dove si risponde, e si vede quando serve — al tocco di
@@ -57117,7 +57148,7 @@ function metodiDettP2P(o){
       '<button type="button" class="tema-pill' + (m === p2pDettMetodo ? ' active' : '')
       + (vesteMetodoP2P(m) ? ' p2p-pill-marchio' : '')
       + '" data-m="' + esc(m) + '" onclick="scegliMetodoDettP2P(this.dataset.m)">'
-      + marchioMetodoP2P(m) + '</button>').join('') + '</div>'
+      + marchioMetodoP2P(m) + '</button>').join('') + '</div>' + zona
   });
 }
 /* il rimando del dettaglio a «Info P2P», dove sta il passo per passo
@@ -60032,6 +60063,116 @@ const P2P_CONTANTI = 'Contanti';
 function contantiAManoP2P(metodi){
   return (metodi || []).some(m => String(m || '').trim() === P2P_CONTANTI);
 }
+/* ---- LA ZONA DI SCAMBIO, E IL VESTITO DEL CONTANTI (10 ott 2026,
+   cantiere contanti-zona, richiesta di Andrea) ----
+   Chi pubblica con «Contanti» fra i metodi scrive una zona INDICATIVA —
+   una citta' o una zona, «Milano centro», «Bergamo e provincia», mai un
+   indirizzo — e la card del libro e il dettaglio la mostrano con «📍»:
+   chi guarda capisce subito se lo scambio fa per lui, prima di prendere
+   un ordine che si fa a duecento chilometri.
+   DOVE VIVE: sulla riga locale di chi pubblica (`o.zona`) e, per tutti
+   gli altri, nel database di Barattolo — la dichiara
+   `registraOrdiniP2P` quando intesta l'ordine, e torna accanto ai volti
+   e con la fotografia del libro (`p2pZone`), la strada del cambio di
+   Barattozon. NON nel tag `pm`: li' «Contanti» si confronta a parola
+   intera — la cauzione del nodo, il tetto, le frasi — e il perche' per
+   esteso sta sul server, sopra `_zona_pulita_p2p`.
+   GLI ORDINI DI PRIMA, e quelli pubblicati da un altro client, la zona
+   non ce l'hanno: per loro non si mostra niente, e tutto il resto
+   funziona com'era.
+   I GANCI NEI PEZZI VECCHI PASSANO DA UN `typeof`, come il resto di
+   questo blocco: il giudice vive qui. */
+const P2P_ZONA_MAX = 40;
+/* l'icona del contanti di persona: le banconote, e non la carta */
+const P2P_CONTANTI_ICO = '💵';
+let p2pZone = {};             // ordine -> zona di scambio, come la dice il server
+/* PURA: la zona come si tiene, o '' se non si tiene — una riga sola,
+   gli spazi in fila uno solo, al massimo P2P_ZONA_MAX caratteri (una
+   piu' lunga si RIFIUTA, non si tosa). La gemella del server, che come
+   lei tiene solo un TESTO: un numero o un oggetto non sono una zona. */
+function zonaPulitaP2P(t){
+  if (typeof t !== 'string') return '';
+  const z = t
+    .replace(/[\u0000-\u001f\u007f‪-‮⁦-⁩]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+  return (z && Array.from(z).length <= P2P_ZONA_MAX) ? z : '';
+}
+/* PURO: la frase che manca, o ''. La zona e' OBBLIGATORIA solo quando
+   «Contanti» e' fra i metodi (anche insieme ad altri: chi prende puo'
+   scegliere proprio quello — la regola del tetto); senza contanti il
+   campo non c'e' e il giudice tace, qualunque cosa ci sia scritta. */
+function giudiceZonaP2P(zona, metodi){
+  if (!contantiAManoP2P(metodi)) return '';
+  if (zonaPulitaP2P(zona)) return '';
+  const scritta = String(zona == null ? '' : zona).replace(/\s+/g, ' ').trim();
+  return Array.from(scritta).length > P2P_ZONA_MAX
+    ? 'La zona di scambio è troppo lunga: al massimo ' + P2P_ZONA_MAX + ' caratteri'
+    : 'Scrivi la zona di scambio: una città o una zona, come «Milano centro»';
+}
+/* la zona che parte con l'ordine: dai campi, solo col contanti */
+function zonaDaCampiP2P(campi){
+  return (campi && contantiAManoP2P(campi.metodi)) ? zonaPulitaP2P(campi.zona) : '';
+}
+/* la zona di UN ordine, per chi lo guarda: dalla riga se la porta (il
+   mio, appena pubblicato), se no da quel che ha detto il server. Solo
+   sugli ordini col contanti: su un altro metodo non e' di nessuna card. */
+function zonaOrdineP2P(o){
+  if (!o || !contantiAManoP2P(o.metodi)) return '';
+  return zonaPulitaP2P(o.zona || p2pZone[o.id] || '');
+}
+/* quel che si DICHIARA al server all'intestazione: le zone dei MIEI
+   ordini in questa lista. Si ricordano anche qui, cosi' la mia card le
+   mostra senza aspettare il giro dei volti. */
+function zoneDaDichiarareP2P(ids){
+  const zone = {}, mie = ordiniP2P();
+  for (const id of ids || []) {
+    const riga = mie[id];
+    const z = (riga && riga.mio) ? zonaOrdineP2P(riga) : '';
+    if (z) { zone[id] = z; p2pZone[id] = z; }
+  }
+  return zone;
+}
+/* la riga della card del libro e quella del dettaglio: «📍 Milano
+   centro», o niente. Testo di sconosciuti: esc() come sempre. */
+function rigaZonaP2P(o){
+  const z = zonaOrdineP2P(o);
+  return z ? '<div class="p2p-box p2p-zona" title="Zona di scambio indicativa">📍 '
+    + esc(z) + '</div>' : '';
+}
+function zonaDettP2P(o){
+  const z = zonaOrdineP2P(o);
+  return z ? '<div class="p2p-dett-zona" title="Zona di scambio indicativa">📍 '
+    + esc(z) + '</div>' : '';
+}
+/* la voce «Contanti» come si MOSTRA: la sua icona e il nome, in
+   un'etichetta che la scatola dei metodi delle card tinge di verde
+   (vedi il CSS di `.p2p-contanti`). '' per ogni altro metodo — anche
+   per «Contanti al tabacchino», che e' un'altra cosa e ha il suo marchio. */
+function etichettaContantiP2P(m){
+  return contantiAManoP2P([m])
+    ? '<span class="p2p-contanti">' + P2P_CONTANTI_ICO + ' ' + esc(P2P_CONTANTI) + '</span>' : '';
+}
+/* IL CAMPO NEL FOGLIO «PUBBLICA»: una sezione sua, subito sotto i
+   metodi, che c'e' solo quando «Contanti» e' scelto. Il tetto dei 40
+   sta anche nel campo (`maxlength`), e la riga piccola dice la cosa che
+   conta: e' una zona, non casa tua. LA RIGA PICCOLA STA NEL «SOTTO»,
+   fuori dalla riga dell'icona: dentro, lo spillo scendeva a meta' fra
+   il campo e la riga (visto negli scatti del giro). */
+function sezioneZonaNuovoP2P(metodi){
+  if (!contantiAManoP2P(metodi)) return '';
+  return sezioneNuovoP2P({
+    ico: 'zona', titolo: 'Zona di scambio',
+    corpo: '<input type="text" id="p2pNuovoZona" maxlength="' + P2P_ZONA_MAX + '" '
+      + 'value="' + esc(p2pNuovoZona) + '" placeholder="Città o zona, es. Milano centro" '
+      + 'autocomplete="off" enterkeyhint="done" aria-label="Zona di scambio" '
+      + 'oninput="cambiaZonaNuovoP2P(this)">',
+    sotto: '<div class="hint">Solo indicativa: non scrivere il tuo indirizzo</div>'
+  });
+}
+/* si legge il campo e basta, MAI un render: il dito e' sul campo */
+function cambiaZonaNuovoP2P(campo){
+  p2pNuovoZona = String((campo && campo.value) || '');
+}
 /* lo SCAMBIO e' in contanti se il metodo scelto alla presa e' quello, o —
    quando una scelta non c'e' (chi ha pubblicato non sa quale metodo ha
    scelto l'altra parte) — se «Contanti» sta fra i metodi dell'ordine:
@@ -60480,7 +60621,10 @@ function vesteMetodoP2P(m){
    che c'e' — vedi il CSS di `.p2p-marca`, dove il conto e' scritto. */
 function marchioMetodoP2P(m, conTesto){
   const v = vesteMetodoP2P(m);
-  if (!v) return esc(m);
+  /* IL CONTANTI DI PERSONA HA LA SUA ICONA (10 ott 2026): le banconote
+     nella sua etichetta, in tutti i posti che passano di qua. Il
+     giudice vive nel blocco del contanti: da qui il typeof */
+  if (!v) return (typeof etichettaContantiP2P === 'function' && etichettaContantiP2P(m)) || esc(m);
   const img = '<span class="p2p-marca" title="' + esc(m) + '"><img src="'
     + v.logo + '" alt="' + esc(v.nome)
     + '" onerror="this.parentNode.replaceWith(this.parentNode.title)"></span>';
@@ -60497,10 +60641,23 @@ function marchioMetodoP2P(m, conTesto){
    Oggi non succede — il tabacchino e' esclusivo nell'ordine — ma la
    funzione risponde al caso, non alla regola di adesso, che e' scritta
    altrove e potrebbe cambiare senza passare di qua. */
+/* ⚠️ DAL 10 OTT 2026 LE DOMANDE SONO DUE, e hanno due giudici: «qui
+   dentro c'e' SOLO un marchio?» (`soloMarchiP2P`: la scatola diventa
+   l'insegna navy) e «c'e' un nome da intestare col 💳?» (questa). Fino
+   a ieri coincidevano, e le card chiedevano la seconda per sapere la
+   prima; col contanti di persona non piu': la sua voce porta gia' la
+   sua icona — le banconote, dentro l'etichetta — quindi il 💳 se ne va
+   anche li', ma la scatola NON e' un'insegna. Con «SEPA, Contanti» il
+   💳 resta: intesta SEPA. */
+function soloMarchiP2P(metodi){
+  const m = metodi || [];
+  return m.length > 0 && m.every(x => !!(vesteMetodoP2P(x) || {}).soloMarchio);
+}
 function iconaMetodiP2P(metodi){
   const m = metodi || [];
-  return m.length && m.every(x => (vesteMetodoP2P(x) || {}).soloMarchio)
-    ? '' : '💳 ';
+  const segnata = x => (vesteMetodoP2P(x) || {}).soloMarchio
+    || (typeof etichettaContantiP2P === 'function' && !!etichettaContantiP2P(x));
+  return m.length && m.every(segnata) ? '' : '💳 ';
 }
 /* i metodi che il foglio OFFRE dipendono dal lato (set 2026): il
    tabacchino lo puo' scegliere solo chi vende sats, perche' l'ordine
@@ -60580,7 +60737,12 @@ const P2P_ICONE = {
      dentato in basso e tre righe, stesso tratto e stesso velo */
   scontrino: '<path class="velo" d="M6.2 3.4h11.6v17.2l-2.3-1.6-2.3 1.6-1.2-.8-1.2.8-2.3-1.6-2.3 1.6z"/>'
     + '<path d="M6.2 3.4h11.6v17.2l-2.3-1.6-2.3 1.6-1.2-.8-1.2.8-2.3-1.6-2.3 1.6z"/>'
-    + '<path d="M9 8.2h6M9 11.6h6M9 15h3.4"/>'
+    + '<path d="M9 8.2h6M9 11.6h6M9 15h3.4"/>',
+  /* LO SPILLO (10 ott 2026, la zona di scambio del contanti): la goccia
+     col suo occhio, stesso tratto e stesso velo delle sorelle */
+  zona: '<path class="velo" d="M12 20.6s-6-5.3-6-10.1a6 6 0 0 1 12 0c0 4.8-6 10.1-6 10.1z"/>'
+    + '<path d="M12 20.6s-6-5.3-6-10.1a6 6 0 0 1 12 0c0 4.8-6 10.1-6 10.1z"/>'
+    + '<path d="M12 8.3a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4z"/>'
 };
 /* IL «$» E' IL GLIFO VERO del carattere di casa (scelta di Andrea) e
    non un disegno a tratto: il dollaro E' un segno tipografico, con le
@@ -60609,6 +60771,7 @@ let p2pNuovoPremioMano = false;  // il premio si scrive invece di trascinarlo
 let p2pNuovoTab = {ordine: '', importo: '', scade: ''};  // i tre dati del tabacchino; `scade` come lo scrive il campo data
 let p2pNuovoPremioTab = '';   // il premio di Barattozon, COME LO SCRIVE il campo (o il cursore): il testo, perche' «20,1» si deve poter rifiutare invece che tosare
 let p2pNuovoPremioTabMano = false;  // il premio di Barattozon si scrive invece di trascinarlo
+let p2pNuovoZona = '';        // la zona di scambio del contanti, come sta nel campo (10 ott 2026)
 let p2pNuovoEuroVia = '';     // la frase del cambio di metodo che ha svuotato l'importo («23,47 → gli ordini SEPA sono in euro interi»): resta finche' non si riscrive la cifra
 
 /* ====== LA MORFOSI DEL + (set 2026, richiesta di Andrea) ======
@@ -61059,6 +61222,7 @@ function apriNuovoOrdineP2P(metodo){
   if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
   p2pNuovoEuro = ''; p2pNuovoEuroMax = ''; p2pNuovoSats = '';
   p2pNuovoMetodi = [];
+  p2pNuovoZona = '';
   /* IL TASTO BARATTOZON (23 set 2026) apre questo stesso foglio col
      metodo gia' scelto, e lo sceglie QUI — prima del disegno e prima
      della morfosi, non dopo: col tabacchino il bottone d'arrivo dice
@@ -61473,6 +61637,12 @@ function valeNuovoOrdineP2P(v){
   if (!(v.metodi || []).length)
     return {ok: false, manca: 'Scegli almeno un metodo di pagamento',
             campo: 'p2pNuovoMetodiBtn'};
+  /* LA ZONA DI SCAMBIO (10 ott 2026): obbligatoria col contanti di
+     persona, al massimo 40 caratteri — la frase e' di `giudiceZonaP2P`,
+     che vive nel blocco del contanti (da qui il typeof). Senza
+     «Contanti» il campo non c'e' e il giudice tace. */
+  const zonaNo = typeof giudiceZonaP2P === 'function' ? giudiceZonaP2P(v.zona, v.metodi) : '';
+  if (zonaNo) return {ok: false, manca: zonaNo, campo: 'p2pNuovoZona'};
   /* IL TABACCHINO (set 2026): i tre dati sono OBBLIGATORI e la
      scadenza sta dentro la finestra della garanzia letta VIVA —
      senza 38385 non si sa quanto copre, e allora NON si pubblica:
@@ -61600,6 +61770,8 @@ function campiNuovoP2P(){
     sats: (p2pNuovoFisso && !tabacchinoP2P(p2pNuovoMetodi)) ? p2pNuovoSats : '',
     fisso: p2pNuovoFisso,
     metodi: p2pNuovoMetodi,
+    /* la zona di scambio del contanti, come sta nel campo (10 ott 2026) */
+    zona: typeof p2pNuovoZona === 'string' ? p2pNuovoZona : '',
     premio: p2pNuovoPremio,
     /* il premio del percorso Barattozon, come scritto (23 set 2026) */
     premioTab: p2pNuovoPremioTab,
@@ -62062,6 +62234,11 @@ function renderNuovoOrdineP2P(){
       + regolaContantiFoglioP2P(p2pNuovoMetodi, maxEuroContantiP2P(), compro ? 'compro' : 'vendo')
   });
 
+  /* LA ZONA DI SCAMBIO (10 ott 2026): la sua sezione, subito sotto i
+     metodi, solo quando «Contanti» e' scelto — vedi
+     `sezioneZonaNuovoP2P` */
+  const zona = typeof sezioneZonaNuovoP2P === 'function' ? sezioneZonaNuovoP2P(p2pNuovoMetodi) : '';
+
   /* I TRE DATI DEL TABACCHINO (set 2026), solo quando la voce e'
      scelta: numero, importo e scadenza dell'ordine Amazon, che chi
      compra riceve cifrati appena prende l'ordine. Il campo della
@@ -62186,7 +62363,7 @@ function renderNuovoOrdineP2P(){
        percorso segue i metodi come prima — e la LEVA del prezzo sta
        PRIMA del percorso (30 set 2026): il passo 4 e il riepilogo
        cambiano parole con lei, quindi si sceglie prima di arrivarci. */
-    valuta + metodi + importo + (tab ? tipo + percorso : percorso + tipo)
+    valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo)
     + quanti + premio + riquadroLimitiP2P() +
     /* ⚠️ SOTTO LE SCATOLE NON C'E' PIU' NIENTE (17 set 2026,
        decisione di Andrea): qui stavano due righe sciolte — «Finche'
@@ -63698,6 +63875,11 @@ async function inviaNuovoOrdineP2P(confermato){
     hold: null, contattato: false, cantDo: '', errore: '', votabile: false,
     creato: adesso, aggiornato: adesso
   };
+  /* LA ZONA DI SCAMBIO STA SULLA RIGA (10 ott 2026): parte verso il
+     server all'intestazione, appena il coordinatore da' all'ordine il
+     suo nome (`registraOrdiniP2P`), e intanto la mia card la mostra */
+  const zonaOrd = typeof zonaDaCampiP2P === 'function' ? zonaDaCampiP2P(campi) : '';
+  if (zonaOrd) ord.zona = zonaOrd;
   /* I TRE DATI DEL TABACCHINO STANNO SULLA RIGA (set 2026), e non
      nel ricordo per forma: sono di QUESTO ordine, e partono da soli
      verso chi compra appena si sa chi e' (`recapitoDaAutoInvio` li
@@ -65732,7 +65914,7 @@ function rigaScambioP2P(o){
   const scelto = metodoSceltoP2P(o);
   const metodi = scelto ? [scelto] : (o.metodi || []);
   const met = metodi.join(', ');
-  const senzaNomi = metodi.length > 0 && iconaMetodiP2P(metodi) === '';
+  const senzaNomi = soloMarchiP2P(metodi);
   const sats = satsScambioP2P(o);
   /* le due cifre, e il lato dice SOLO in quale riga vanno: `sell` nel
      vocabolario del libro vuol dire che chi legge riceve sats */
@@ -67075,6 +67257,8 @@ async function chiediFotoLibroP2P(){
      sessione: non sono un volto, sono il metro di un premio che sta
      gia' sulla card (26 set 2026) */
   const cambi = prendiCambiPubP2P(d && d.cambi);
+  /* ...e le zone di scambio del contanti, a tutti come i cambi (10 ott 2026) */
+  const zone = prendiZoneP2P(d && d.zone);
   /* ...e i miei secondo il server (28 set 2026): la stessa lista della
      fila della home, che il libro prima ignorava — e cosi' un ordine
      pubblicato da un altro dispositivo qui sembrava di un altro */
@@ -67082,7 +67266,7 @@ async function chiediFotoLibroP2P(){
   const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
   const quando = (Number(d && d.quando) || 0) * 1000;
   if (p2pLibro || !eventi.length || !(quando > 0)
-      || Date.now() - quando > P2P_COPIA_MAX_MS) return Object.keys(facce).length > 0 || cambi;
+      || Date.now() - quando > P2P_COPIA_MAX_MS) return Object.keys(facce).length > 0 || cambi || zone;
   libroDaCopiaP2P(eventi, quando, 'server');
   /* i volti chiesti gia' qui: la domanda del render non ripartirebbe
      per un id che la fotografia ha gia' detto di non conoscere */
@@ -67718,6 +67902,8 @@ async function chiediFotoVetrinaP2P(){
   /* e i cambi di Barattozon, che la fotografia porta a tutti (26 set
      2026): il premio scelto sulla card della fila, anche senza sessione */
   prendiCambiPubP2P(d && d.cambi);
+  /* ...e le zone di scambio del contanti (10 ott 2026) */
+  prendiZoneP2P(d && d.zone);
   /* i miei secondo il server (27 set 2026): ogni risposta prende il
      posto della precedente, e senza sessione non ce ne sono */
   p2pVetrinaMiei = new Set(Array.isArray(d && d.miei) ? d.miei.map(String) : []);
@@ -67930,6 +68116,21 @@ function prendiCambiPubP2P(m){
   }
   return nuovi;
 }
+/* LE ZONE DI SCAMBIO DEL CONTANTI (10 ott 2026): ordine -> «Milano
+   centro», dal server accanto ai volti e con la fotografia del libro.
+   Testo di un altro: solo id veri, e la zona passa dalla stessa pulizia
+   di chi la scrive (`zonaPulitaP2P`) — una storta non entra. Vero se ne
+   e' entrata almeno una nuova. */
+function prendiZoneP2P(m){
+  if (!m || typeof m !== 'object') return false;
+  let nuove = false;
+  for (const id of Object.keys(m)) {
+    const z = idMostroVero(id) ? zonaPulitaP2P(m[id]) : '';
+    if (!z) continue;
+    if (p2pZone[id] !== z) { p2pZone[id] = z; nuove = true; }
+  }
+  return nuove;
+}
 async function registraOrdiniP2P(ids, pubblicati, presi){
   if (DEMO || VETRINA || !myTgId) return false;
   /* SOLO GLI ID VERI del coordinatore: i provvisori del client
@@ -67953,6 +68154,11 @@ async function registraOrdiniP2P(ids, pubblicati, presi){
     const riga = ordiniP2P()[id];
     if (riga && riga.tabacchino && riga.cambioPub > 0) cambi[id] = riga.cambioPub;
   }
+  /* LA ZONA DI SCAMBIO DEL CONTANTI (10 ott 2026): chi ha pubblicato la
+     dichiara con l'intestazione, dalla SUA riga — anche dalla restore,
+     che il server tiene la prima e ignora le altre: un'intestazione
+     persa alla pubblicazione la recupera la sessione dopo */
+  const zone = typeof zoneDaDichiarareP2P === 'function' ? zoneDaDichiarareP2P(lista) : {};
   try {
     const r = await fetch(`${API_BASE}/p2p/ordini`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
@@ -67967,6 +68173,7 @@ async function registraOrdiniP2P(ids, pubblicati, presi){
                                Il server lo annota solo a chi entra da
                                Telegram; per chi entra da Nostr lo ignora. */
                             presi: !!presi,
+                            zone: zone,
                             cambi: cambi})});
     return r.ok;
   } catch(e){ return false; }
@@ -68110,6 +68317,8 @@ async function chiediFacceP2P(ids){
       let nuove = prendiFacceP2P(facce, lista);
       /* e il cambio di Barattozon, che viaggia accanto ai volti */
       if (prendiCambiPubP2P(d && d.cambi)) nuove++;
+      /* ...e la zona di scambio del contanti (10 ott 2026) */
+      if (prendiZoneP2P(d && d.zone)) nuove++;
       return nuove > 0;
     } catch(e){ return false; }
     finally { p2pFacceGiro = null; }

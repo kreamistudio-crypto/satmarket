@@ -43766,3 +43766,148 @@ journal). I prezzi «soggetti a cambiare»: si riguardano nella console.
 Il peso dei caratteri segue le fasce di twitter-text: un testo con
 molti segni rari potrebbe essere contato diverso da X di qualche unità
 (il taglio lascia margine solo per la coda).
+
+## La zona di scambio e il vestito del contanti (10 ott 2026, cantiere contanti-zona, richiesta di Andrea)
+
+**COSA.** Quattro cose sugli ordini P2P in contanti di persona, chieste
+da Andrea la mattina del lancio. 1) Nel foglio «Pubblica», se fra i
+metodi c'è «Contanti», compare una sezione «Zona di scambio» (lo spillo,
+il campo col segnaposto «Città o zona, es. Milano centro», sotto la riga
+piccola «Solo indicativa: non scrivere il tuo indirizzo») ed è
+OBBLIGATORIA: senza, il bottone avvisa «Scrivi la zona di scambio: una
+città o una zona, come «Milano centro»» e accende il campo, come per
+ogni altro «manca» del foglio. Al massimo 40 caratteri (`maxlength` nel
+campo, e il giudice lo ridice: «La zona di scambio è troppo lunga: al
+massimo 40 caratteri»). Senza contanti il campo non c'è e il giudice
+tace. 2) La zona si vede: «📍 Milano centro» sulla card del libro, in
+una scatola sua sotto quella dei metodi, e nel dettaglio dell'ordine
+sotto il metodo. 3) Il metodo «Contanti» ha la sua icona, le banconote
+💵, al posto del 💳. 4) Nella scatola dei metodi delle card la voce è
+un'etichetta verde.
+
+**DOVE VIVE LA ZONA, E PERCHÉ.** Prima di scrivere ho guardato dove
+stanno oggi i dati di un ordine. Sono tre posti. IL COORDINATORE: il
+messaggio `new-order` porta i campi contati di `ordineDaCampiP2P`
+(lato, importo o intervallo, valuta, sats, `payment_method`, premio) e
+nessuno libero; mostrod ne fa il 38383 coi tag `d, k, s, f, fa, amt,
+premium, pm, expires_at`. IL TAG `pm` del libro: testo libero, lo
+leggono tutti i client. IL DATABASE DI BARATTOLO: `p2p_ordini`, una
+riga per ordine con chi l'ha pubblicato e i numeri pubblici del libro;
+dal 26 set ci sta anche `cambio_pub`, il cambio di Barattozon, che È
+già una dichiarazione di chi pubblica tenuta dal server e servita
+accanto ai volti.
+- SCARTATO il coordinatore: un campo nuovo vuole una patch del fork e
+  un tag in più nel 38383, cioè un deploy sul nodo, il giorno del lancio.
+- SCARTATO il tag `pm` («Contanti Milano centro», come si fa con
+  «Contanti al tabacchino 23.47»): sarebbe la strada più leggera e la
+  zona la vedrebbero anche gli altri client, ma «Contanti» si confronta
+  a PAROLA INTERA in tre posti che contano — la cauzione del nodo (patch
+  0008, `only_payment_methods = ["Contanti"]`: con la zona dentro la
+  voce la cauzione non scatterebbe più, in silenzio), il tetto dei 250 €
+  (`giudiceContantiP2P`) e le frasi di «Ho consegnato i contanti»
+  (`pagaInContantiP2P`, `_dati_frase_p2p` sul server). Una voce finta
+  accanto («Contanti,📍 Milano») sarebbe un metodo che chi prende può
+  scegliere, e spezzerebbe il «solo metodo Contanti» degli avvisi.
+- SCELTO il database, sulla strada di `cambio_pub`: colonna
+  `p2p_ordini.zona`; la dichiara il client di chi ha pubblicato dentro
+  la stessa POST dell'intestazione (`/api/p2p/ordini`, chiave `zone`);
+  il server la scrive SOLO sulla riga di quell'account con `maker`
+  acceso e SOLO la prima volta (`_dichiara_zone_p2p`); esce accanto ai
+  volti (`/api/p2p/facce`), a tutti con la fotografia del libro
+  (`/api/p2p/libro`) e nel client vive in `p2pZone`. Nessuna rotta
+  nuova, nessun messaggio in più, niente sul nodo.
+IL LIMITE, detto: la zona la vede chi guarda il libro da Barattolo; un
+altro client di Mostro vede l'ordine in contanti senza zona. È una
+DICHIARAZIONE di chi pubblica, come il nome sul profilo: il server ne
+pulisce la forma (una riga, spazi singoli, 40 caratteri, via i
+caratteri di controllo e quelli che rovesciano il verso), non verifica
+il luogo. Non si corregge dopo: un ordine pubblicato si ritira e si
+rifà. Quando il libro ha già detto i metodi, il server la serve solo se
+«Contanti» c'è davvero; il client comunque la mostra solo sugli ordini
+col contanti.
+
+**GLI ORDINI DI PRIMA.** Un ordine in contanti già nel libro, o
+pubblicato da un altro client, non ha zona: la card e il dettaglio non
+mostrano niente («📍» non compare) e tutto il resto è com'era — si
+prende, ha la cauzione, ha il tetto. La colonna entra nei database di
+ieri col giro degli ALTER, vuota.
+
+**L'ICONA E L'ETICHETTA.** Guardando gli altri metodi: oggi NESSUN
+metodo ha un'icona sua. La scatola dei metodi delle card porta un solo
+💳 in testa che intesta tutti i nomi («💳 SEPA, Revolut»), e nel foglio
+la sezione «Metodi» ha un'unica icona disegnata, la carta. L'unica
+eccezione è Barattozon, che al posto del nome mostra il suo marchio.
+Toccati solo i contanti: `marchioMetodoP2P` chiede al blocco del
+contanti `etichettaContantiP2P`, che per la sola voce «Contanti» (parola
+intera: non «Contanti al tabacchino», non «contanti» minuscolo di un
+altro client) torna `<span class="p2p-contanti">💵 Contanti</span>`. Vale
+in tutti i posti che passano di lì: card del libro, card dei miei
+scambi, filtro, foglio «Pubblica», dettaglio, pagina dello scambio. IL
+VERDE è la coppia `--trust-soft`/`--trust-text`, quella che veste già
+la banconota dell'importo nel foglio: 5,2:1 di giorno e 7,4:1 di sera
+(una prova rifà il conto sui token). La tinta vale SOLO dentro
+`.p2p-paga`, la scatola delle card: nelle pillole, che hanno già il
+loro colore, resta l'icona e basta. Ho scelto l'ETICHETTA e non tutta
+la striscia: con «SEPA, Contanti» una striscia tutta verde direbbe
+«ordine in contanti» di un ordine che si può pagare anche col bonifico.
+⚠️ I GIUDICI SONO DIVENTATI DUE. Fino a ieri le card chiedevano a
+`iconaMetodiP2P` anche se la scatola fosse un'insegna («'' = solo
+marchi»). Col contanti il 💳 se ne va anche quando la voce è sola, ma
+la scatola NON deve diventare l'insegna navy di Barattozon: adesso
+l'insegna la decide `soloMarchiP2P`, e `iconaMetodiP2P` risponde solo a
+«c'è un nome da intestare?». Le due sentinelle che pretendevano un
+giudice solo sono emendate, col perché.
+
+**LE ALTRE SCELTE.** I ganci nei pezzi vecchi (`valeNuovoOrdineP2P`,
+`campiNuovoP2P`, `renderNuovoOrdineP2P`, `inviaNuovoOrdineP2P`,
+`registraOrdiniP2P`, `rigaOrdineP2P`, `metodiDettP2P`) passano da un
+`typeof`, come il resto del blocco del contanti: i banchi di ieri
+girano senza portarsi dietro il blocco nuovo. `_registra_ordini_p2p`
+NON ha cambiato firma: la zona ha la sua funzione, chiamata dalla rotta
+subito dopo. Il campo riparte vuoto a ogni apertura del foglio, come gli
+altri. La riga piccola sta nel «sotto» della sezione: dentro la riga
+dell'icona lo spillo scendeva a metà (visto al primo giro di scatti).
+La zona NON entra nel messaggio al coordinatore né nel post del canale.
+
+**PROVATO.** `prove_contanti_zona` (63 righe): la pulizia sul server e
+nel client, uguale; il database vero (la riga di chi pubblica sì, quella
+di un altro e quella non da maker no, la prima resta, 41 caratteri
+rifiutati, un ordine di prima senza niente, SEPA e Barattozon mai
+serviti anche a zona dichiarata); le rotte; i ganci del client; il CSS
+(tinta solo nella scatola, contrasto nei due temi); e un banco node con
+le funzioni vere: il giudice del foglio con e senza contanti, da solo e
+fra due metodi, 40 e 41, l'ordine dei giudizi; le zone dal server; cosa
+mostra un ordine; cosa si dichiara; l'etichetta su uno solo dei sette
+metodi; l'insegna. In `prove_p2p_libro` la card VERA col lettore vero:
+contanti con zona, contanti di prima, due metodi, SEPA e Barattozon a
+zona dichiarata, la zona avvelenata. Tenuti in pari cinque banchi e
+nove sentinelle (elencati nel diff di prove.py). TORTURA sulla copia
+del repo: venti difetti messi apposta (la zona non chiesta, chiesta a
+tutti, il tetto a 60 di qua e di là, la riga non da maker, la
+riscrittura, l'ordine di un altro, il SEPA servito e mostrato,
+l'etichetta a Barattozon, l'insegna, il 💳 rimasto, la card senza zona,
+il verde fuori dalla scatola, la POST senza zona, le zone altrui
+dichiarate, la zona senza esc, fotografia, volti e rotta muti): venti
+morte su venti. Suite intera severa e collaudi della CI: nel rapporto
+del push.
+DAL VIVO, su una copia nello scratchpad in collaudo col relay morto
+(`ws://127.0.0.1:9`), Chrome via Playwright a 390×844 densità 3, nei due
+temi, coi tocchi veri: il campo non c'è senza metodi e con SEPA, compare
+con «Contanti»; «Pubblica» senza zona dà la frase e accende la sezione,
+e non nasce nessun ordine; il campo si ferma a 40; un ridisegno non
+perde quel che c'è scritto; la pubblicazione col coordinatore di cartone
+(`mostroChiama` sostituita, poi le due righe che la risposta vera
+chiama: rinomina e intesta) mette la zona sulla riga, la manda nella
+POST e un ALTRO account la rilegge dal server; nel messaggio al
+coordinatore il metodo è «Contanti» nudo. Cinque card (contanti con
+zona dichiarata dall'account 222 per la rotta vera, due metodi, contanti
+di prima, SEPA, Barattozon) e i due dettagli. Dodici scatti in
+`.claude/giri/contanti-zona/`. Nessun errore di pagina.
+
+**NON PROVATO, DA GUARDARE.** Sul telefono vero, dentro Telegram: la
+tastiera sul campo della zona (iPhone: che il foglio non salti) e la
+resa di 💵 e 📍. Il coordinatore vero: che un ordine in contanti
+pubblicato dopo il deploy esca col `pm` «Contanti» e con la cauzione
+com'era (il messaggio non è cambiato, ma si guarda). Una pagina rimasta
+aperta dal deploy di prima pubblica in contanti senza zona finché non si
+ricarica: è un ordine «di prima», e la card non mostra niente.

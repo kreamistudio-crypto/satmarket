@@ -669,6 +669,15 @@ contanti» (contanti di persona), «✅ Ho pagato al tabacchino»
   andare via.»; a chi vende «Conta i contanti davanti a chi ti paga, poi
   premi «Libera i sats» lì, davanti a lui: chi compra deve vedere lo
   scambio concluso prima di andare via.»
+- **La zona di scambio** (dal 10 ott 2026): nel foglio «Pubblica»,
+  appena fra i metodi c'è «💵 Contanti», sotto compare la sezione «Zona
+  di scambio» col campo «Città o zona, es. Milano centro» e la riga
+  «Solo indicativa: non scrivere il tuo indirizzo». È obbligatoria, al
+  massimo 40 caratteri: senza, «⚡ Pubblica ordine» avvisa «Scrivi la
+  zona di scambio: una città o una zona, come «Milano centro»». Poi si
+  legge sulla card del libro, sotto i metodi, e nel dettaglio: «📍
+  Milano centro». Gli ordini in contanti pubblicati prima non la
+  mostrano. Sulle card la voce è un'etichetta verde, «💵 Contanti».
 - **La cauzione** (solo se accesa: leva `P2P_CAUZIONE` E coordinatore
   che la chiede; sul nodo: 3% dei sats, almeno 1.000 sats, solo a chi
   PRENDE, solo col metodo «Contanti»):

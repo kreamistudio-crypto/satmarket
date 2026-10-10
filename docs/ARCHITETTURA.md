@@ -29847,6 +29847,37 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `prove_contanti_pagina_leggera`, il caso del contanti in
   `prove_p2p_eventi`, e `collaudo_contanti_p2p` (server vero, Photon di
   cartone sul loopback, nella gabbia della CI).
+- LA ZONA DI SCAMBIO E IL VESTITO DEL CONTANTI (10 ott 2026, perché in
+  CANTIERI, «La zona di scambio e il vestito del contanti»). Chi
+  pubblica con «Contanti» fra i metodi scrive una zona indicativa, al
+  massimo `P2P_ZONA_MAX` (40) caratteri: obbligatoria SOLO col contanti
+  (`giudiceZonaP2P`, chiamato da `valeNuovoOrdineP2P` dopo i metodi; il
+  campo è `sezioneZonaNuovoP2P`, lo stato `p2pNuovoZona`). NON viaggia
+  verso il coordinatore né nel tag `pm`: sta sulla riga locale
+  (`o.zona`, scritta da `inviaNuovoOrdineP2P`) e in
+  `p2p_ordini.zona`. IL GIRO: `registraOrdiniP2P` la dichiara nella POST
+  dell'intestazione (`zone: {ordine: zona}`, da `zoneDaDichiarareP2P`:
+  solo le righe `mio` col contanti); la rotta chiama
+  `_dichiara_zone_p2p` DOPO `_registra_ordini_p2p` (che accende
+  `maker`), e quella scrive solo sulla riga di chi ha pubblicato, solo
+  se vuota, dopo `_zona_pulita_p2p`; `_zone_p2p` la serve accanto ai
+  volti (`/api/p2p/facce`, chiave `zone`) e la fotografia la dà a tutti
+  (`_zone_foto_p2p`, `F["zone"]`, `/api/p2p/libro`), ma mai su un ordine
+  di cui il libro ha già detto metodi senza «Contanti». Nel client la
+  cache è `p2pZone` (`prendiZoneP2P`, dalle stesse tre letture dei
+  cambi di Barattozon); `zonaOrdineP2P(o)` è il giudice di cosa si
+  mostra — solo sugli ordini col contanti — e lo chiedono la card del
+  libro (`rigaZonaP2P`, sotto la scatola dei metodi) e il dettaglio
+  (`zonaDettP2P`, dentro `metodiDettP2P`). Un ordine senza zona non
+  mostra niente. IL VESTITO: `etichettaContantiP2P(m)` dà alla sola voce
+  «Contanti» l'icona `P2P_CONTANTI_ICO` (💵) in uno `span.p2p-contanti`,
+  e `marchioMetodoP2P` la chiede per tutti i posti; il CSS la tinge di
+  verde solo dentro `.p2p-paga`. DUE GIUDICI sulla scatola dei metodi:
+  `soloMarchiP2P` (diventa l'insegna navy) e `iconaMetodiP2P` (resta un
+  nome da intestare col 💳?). I ganci nei pezzi che c'erano passano da
+  un `typeof`. Prove: `prove_contanti_zona` e la coda di
+  `prove_p2p_libro`.
+
 - LA CASSA DI RISONANZA SU X (9 ott 2026). I post di Barattolo su Nostr
   escono anche su X, dal server: un orologio in sottofondo
   (`orologio_x`, `X_GIRO_S` 5 minuti, parte da `avvia_x` SOLO se
