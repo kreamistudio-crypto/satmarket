@@ -295,11 +295,17 @@ jobs:
       # segreta vive su carta + Bitwarden e non deve mai entrare nel
       # repo — nel repo sta solo la PUBBLICA, che sa cifrare e basta.
       FORME: >-
-        nsec1[0-9a-z]{50,}|[0-9]{8,12}:[A-Za-z0-9_-]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|nostr\+walletconnect://[A-Za-z0-9._~:/?#@!$&*+,;=%-]{20,}|(LNBITS_INVOICE_KEY|LNBITS_ADMIN_KEY|LNBITS_NODO_INVOICE_KEY|LNBITS_NODO_ADMIN_KEY|TELEGRAM_WEBHOOK_SEGRETO|CHIAVE_CONTENUTI_DIGITALI|P2P_SCONTO_SEGRETO|LND_PONTE_MACAROON_LETTURA|X_API_KEY|X_API_SECRET|X_ACCESS_TOKEN|X_ACCESS_SECRET|SEGRETI_PROFILO_P2P)[[:space:]]*=[[:space:]]*['"][^'"]|\b(ck|cs)_[0-9a-f]{40,}|\bshp(at|ca|pa|ss)_[0-9a-f]{32,}|AGE-SECRET-KEY-1[0-9A-Z]{40,}
+        nsec1[0-9a-z]{50,}|[0-9]{8,12}:[A-Za-z0-9_-]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|nostr\+walletconnect://[A-Za-z0-9._~:/?#@!$&*+,;=%-]{20,}|(LNBITS_INVOICE_KEY|LNBITS_ADMIN_KEY|LNBITS_NODO_INVOICE_KEY|LNBITS_NODO_ADMIN_KEY|TELEGRAM_WEBHOOK_SEGRETO|CHIAVE_CONTENUTI_DIGITALI|P2P_SCONTO_SEGRETO|LND_PONTE_MACAROON_LETTURA|X_API_KEY|X_API_SECRET|X_ACCESS_TOKEN|X_ACCESS_SECRET|SEGRETI_PROFILO_P2P)[[:space:]]*=[[:space:]]*['"][^'"\\]|\b(ck|cs)_[0-9a-f]{40,}|\bshp(at|ca|pa|ss)_[0-9a-f]{32,}|AGE-SECRET-KEY-1[0-9A-Z]{40,}
       # E la chiave Nostr in esadecimale nudo, che ha una regola sua
       # perche' ha un'eccezione sua: vendor/nostr.bundle.js ne contiene
       # per mestiere. Sta qui, accanto a FORME, per la stessa ragione
       # di FORME — la guardano in due, e due copie divergono.
+      # ⚠️ IL VALORE NON COMINCIA MAI CON UNA BARRA ROVESCIATA (10 ott
+      # 2026, cantiere controllo-fattura): la riga di una PROCEDURA —
+      # `grep -oP 'LND_PONTE_MACAROON_LETTURA = "\K…'` in PRODUZIONE — ha
+      # la forma di un'assegnazione, e nella CRONOLOGIA resta per sempre:
+      # il secondo passo la trovava a ogni corsa, anche altrui. Una chiave
+      # vera dopo la virgoletta ha una lettera o una cifra, mai `\`.
       # I SEGNAPOSTI: quel che NON e' un segreto pur avendone la
       # forma. `INCOLLA_QUI` e' il config d'esempio; il secondo e' la
       # chiave di cartone dei BANCHI, che per costruire un modulo

@@ -44891,6 +44891,22 @@ client; chi chiama la rotta senza finestra prende 3600. • Il tetto di 30
 controlli l'ora è a memoria del processo (un riavvio lo azzera): va bene
 per quel che è.
 
+**LA SESTA VOLTA DELLO SCANNER DEI SEGRETI (10 ott 2026, dopo il push).**
+La CI del push `b2b3d92` è andata rossa nel job `segreti` sulla riga della
+procedura in PRODUZIONE — `MAC=$(grep -oP 'LND_PONTE_MACAROON_LETTURA =
+"\K…')` — che ha la forma `NOME = "qualcosa` di un'assegnazione. La riga
+riscritta con `\s*=\s*"` (commit `c48e3a0`) ha pulito il primo passo, ma
+il SECONDO guarda la cronologia intera (`git log -p`), dove la riga vecchia
+resta per sempre: rosso di nuovo, e rosso per ogni corsa futura, anche
+delle altre sessioni. Cede il banco, mai la regola: la forma esclude un
+valore che comincia con `\` (`['"][^'"\\]`) — una chiave vera dopo la
+virgoletta ha una lettera o una cifra. Controprova in locale PRIMA del
+push, con le forme prese dal log della CI: la cronologia dei soli commit
+remoti vuota, la riga vecchia non presa, una `LND_PONTE_MACAROON_LETTURA =
+"0201…"` finta presa. La lezione, in memoria: i DUE passi dello scanner
+si girano in locale prima del push, e un comando di procedura con
+`NOME = "` dentro si scrive da subito in una forma che non combacia.
+
 ## «I tuoi dati» e gli esiti del P2P (10 ott 2026, pomeriggio, ritocco chiesto da Andrea)
 
 **IL BUCO.** Notato chiudendo le statistiche del P2P: il cantiere
