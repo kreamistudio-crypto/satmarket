@@ -1310,7 +1310,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   la dice `docker compose exec lnd lncli listchannels` alla voce
   `remote_pubkey`, e sul VPS si mette in `PK` a mano (è pubblica):
   `PK=INCOLLA_QUI_LA_REMOTE_PUBKEY`
-  `MAC=$(grep -oP 'LND_PONTE_MACAROON_LETTURA = "\K[0-9a-f]+' ~/satmarket/config.py)`
+  `MAC=$(grep -oP '^LND_PONTE_MACAROON_LETTURA\s*=\s*"\K[0-9a-f]+' ~/satmarket/config.py)`
   `curl -s --cacert /etc/barattolo/lnd-tls.cert -H "Grpc-Metadata-macaroon: $MAC" https://127.0.0.1:18080/v1/graph/node/$PK | head -c 300; echo`
   `curl -s --cacert /etc/barattolo/lnd-tls.cert -H "Grpc-Metadata-macaroon: $MAC" -X POST -d '{"route_hints":[]}' https://127.0.0.1:18080/v1/graph/routes/$PK/1000 | head -c 400; echo`
   Col macaroon vecchio tutt'e due rispondono `"message": "permission
