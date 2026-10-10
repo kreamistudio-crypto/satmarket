@@ -118,7 +118,7 @@ modo in cui si rifà un errore già pagato.
   (es. `MAX_PREFERITI = 20`, mentre il codice dice 10) tiene in vita il
   valore vecchio finché non si cambia o cancella a mano, e riavvia. Si
   guarda PRIMA del deploy, in sola lettura: `grep -n "MAX_PREFERITI"
-  ~/satmarket/config.py`. Le leve nuove (`P2P_ATTIVO`, `MOSTRO_NPUB`...)
+  /srv/barattolo/config.py`. Le leve nuove (`P2P_ATTIVO`, `MOSTRO_NPUB`...)
   si AGGIUNGONO al config del VPS: non compaiono da sole.
 - DEPLOY AUTOMATICO: commit+push su main, e basta; entro un minuto è
   online se la CI è verde. Config e database NON viaggiano mai. IL VPS
