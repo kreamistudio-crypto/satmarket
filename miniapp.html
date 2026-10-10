@@ -6674,6 +6674,20 @@
   .sped-intl>summary::after{content:'\25be';float:right;color:var(--muted)}
   .sped-intl[open]>summary::after{content:'\25b4'}
   .sped-intl-conto{font-weight:700;color:var(--sats);margin-left:6px}
+  /* LA TENDINA «COME APRIRLO SU ANDROID» (10 ott 2026), accanto
+     all'indirizzo .onion: lo stesso vestito della spedizione
+     internazionale, un elenco corto dentro. */
+  .onion-android{margin-top:10px;border:1px solid var(--line);
+    border-radius:12px;padding:8px 10px;background:var(--bg)}
+  .onion-android>summary{cursor:pointer;font-size:13px;font-weight:800;
+    color:var(--ink);list-style:none}
+  .onion-android>summary::-webkit-details-marker{display:none}
+  .onion-android>summary::after{content:'\25be';float:right;color:var(--muted)}
+  .onion-android[open]>summary::after{content:'\25b4'}
+  .onion-android ol{margin:8px 0 0 18px;padding:0;font-size:13px;
+    line-height:1.5;color:var(--ink-soft)}
+  .onion-android li+li{margin-top:6px}
+  .onion-android code{font-size:12px;word-break:break-all}
   .via-opzione .via-tot{font-family:'JetBrains Mono',monospace;
     flex:0 0 auto;font-size:14.5px}
   /* «gratuita» e' una parola, non un numero: niente mono, grassetto
@@ -11968,7 +11982,14 @@ document.getElementById('cartello')?.remove();</script>
            chi non si e' ancora fidato abbastanza da entrare. La
            spiegazione resta in un posto solo, e la fonte del dato e'
            una variabile sola. -->
-      <p id="privOnionBlocco" style="display:none">L'indirizzo è <b class="mono" id="privOnionVal" style="user-select:all;word-break:break-all"></b> — per aprirlo serve il Tor Browser.</p>
+      <div id="privOnionBlocco" style="display:none">
+        <p>L'indirizzo è <b class="mono" id="privOnionVal" style="user-select:all;word-break:break-all"></b> — per aprirlo serve il Tor Browser, o uno dei modi qui sotto.</p>
+        <!-- la tendina dei modi per aprirlo su Android arriva da scriviOnion(),
+             dalla STESSA fonte del cassetto del Profilo (tendinaOnionAndroid):
+             un testo in due posti e' due posti che un giorno dicono cose
+             diverse -->
+        <div id="privOnionAndroid"></div>
+      </div>
 
       <h3 id="priv-no">Cosa non facciamo</h3>
       <ul class="sicu-lista">
@@ -14262,6 +14283,26 @@ function scriviOnion(){
   const b = el('privOnionBlocco'); if (!b) return;
   b.style.display = onionHost ? '' : 'none';
   const s = el('privOnionVal'); if (s) s.textContent = onionHost;
+  /* la tendina e' testo FISSO di casa (nessun dato del server dentro),
+     scritto una volta in tendinaOnionAndroid() e messo qui e nel
+     cassetto del Profilo */
+  const t = el('privOnionAndroid'); if (t) t.innerHTML = onionHost ? tendinaOnionAndroid() : '';
+}
+
+/* COME APRIRLO SU ANDROID (10 ott 2026, da un tester: con Orbot in VPN
+   e Vanadium il .onion si apre; coi browser di Firefox serve in piu'
+   una chiave di about:config; Tor Browser fa da solo). UNA fonte per i
+   due posti che mostrano l'indirizzo. Testo fisso: niente da escapare. */
+function tendinaOnionAndroid(){
+  return `<details class="onion-android">
+    <summary>📱 Come aprirlo su Android</summary>
+    <ol>
+      <li><b>Tor Browser</b> — il più semplice: apre gli indirizzi .onion da solo.</li>
+      <li><b>Orbot</b> in modalità VPN, più un browser Chromium (<b>Brave, Cromite, Vanadium</b>): nelle impostazioni di Android metti <b>Private DNS</b> su <b>Off</b>, altrimenti l'indirizzo non si trova.</li>
+      <li><b>Firefox, Fennec, Focus</b>: oltre a Orbot in VPN, in <code>about:config</code> metti <code>network.dns.blockDotOnion</code> su <b>false</b>.</li>
+      <li><b>Avvisi senza Telegram</b>: <b>Amethyst</b> sotto Tor riceve i nostri messaggi (sono messaggi privati Nostr); per le notifiche usa <b>UnifiedPush</b> (es. ntfy).</li>
+    </ol>
+  </details>`;
 }
 /* IL DOMINIO DA CUI SI CONDIVIDE. Da Tor un link `.onion` mandato a
    qualcuno e' un link che quasi nessuno puo' aprire — e per giunta
@@ -23521,11 +23562,13 @@ function renderTor(){
     ? `Sei su Tor: <b>questo è l'indirizzo che stai usando</b>. Copialo
        per mandarlo a qualcuno che usa il Tor Browser.`
     : `Barattolo si raggiunge anche <b>da dentro la rete Tor</b>, a
-       questo indirizzo. Per aprirlo serve il Tor Browser.`;
+       questo indirizzo. Per aprirlo serve il Tor Browser, o uno dei
+       modi qui sotto.`;
   box.innerHTML = `
     <div class="hint">${riga}</div>
     <div class="hint mono" style="user-select:all;word-break:break-all;margin-top:8px">${esc(onionHost)}</div>
     <button class="btn ghost" onclick="copiaOnion()">📋 Copia l'indirizzo</button>
+    ${tendinaOnionAndroid()}
     <div class="hint" style="margin-top:10px"><button type="button" class="scopri-link" onclick="apriPrivacy('priv-tor')">Scopri di più ›</button></div>`;
 }
 /* La copia passa dal giudice unico: se la clipboard non c'e' mette

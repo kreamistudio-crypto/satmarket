@@ -103149,7 +103149,10 @@ def _banco_profilo(mini):
                  "function aggiornaGruppiProfilo(){",
                  "function chiudiAltriGruppi(tenuto){",
                  "function toggleGrp(id){",
-                 "function renderTor(){"):
+                 "function renderTor(){",
+                 "function impostaOnion(v){",
+                 "function scriviOnion(){",
+                 "function tendinaOnionAndroid(){"):
         # pezzo_js si ferma PRIMA del terminatore: la graffa finale
         # va rimessa, o il banco non compila.
         pezzi.append(pezzo_js(mini, nome, "\n}\n") + "\n}")
@@ -103213,6 +103216,8 @@ VISTA.appendChild(mkGruppo('g1', ['c1','c2']));
 VISTA.appendChild(mkGruppo('g2', ['c3']));
 NODI['torBlocco'] = new Nodo('', 'torBlocco');
 NODI['accTor'] = new Nodo('acc', 'accTor');
+// i tre nodi di «I tuoi dati» (10 ott 2026): il blocco, l'indirizzo, la tendina
+for (const id of ['privOnionBlocco', 'privOnionVal', 'privOnionAndroid']) NODI[id] = new Nodo('', id);
 const document = {
   querySelectorAll: (sel)=> sel.startsWith('#view-profilo')
     ? VISTA.querySelectorAll(sel.split(' ').pop()) : []
@@ -103279,6 +103284,17 @@ out.fuori = [NODI['accTor'].style.display, NODI['torBlocco'].innerHTML];
 ONION = true;
 renderTor();
 out.dentro = NODI['torBlocco'].innerHTML;
+// 5) la tendina «Come aprirlo su Android» (10 ott 2026): nel cassetto
+// e in «I tuoi dati», dalla STESSA fonte; accesa con l'indirizzo,
+// spenta senza
+out.tendinaCassetto = NODI['torBlocco'].innerHTML;
+impostaOnion('abc123.onion');
+out.privAndroid = NODI['privOnionAndroid'].innerHTML;
+out.privDisplay = NODI['privOnionBlocco'].style.display;
+out.privVal = NODI['privOnionVal'].textContent;
+impostaOnion('');
+out.privSpento = [NODI['privOnionBlocco'].style.display, NODI['privOnionAndroid'].innerHTML];
+impostaOnion('abc123.onion');
 // lo scroll parte da un setTimeout(80): si aspetta, o si
 // misurerebbe zero e la prova direbbe il falso.
 setTimeout(()=>{ out.scroll = SCROLL; out.come = COME;
@@ -103350,6 +103366,28 @@ setTimeout(()=>{ out.scroll = SCROLL; out.come = COME;
          and "da dentro la rete Tor" not in o["dentro"]),
         ("e l'indirizzo c'e' in tutti e due i casi", True,
          "abc123.onion" in o["dentro"]),
+        # LA TENDINA «COME APRIRLO SU ANDROID» (10 ott 2026): si GIRA il
+        # render e si legge cosa esce, nei due posti.
+        ("il cassetto porta la tendina «Come aprirlo su Android»", True,
+         "<details class=\"onion-android\"" in o["tendinaCassetto"]
+         and "Come aprirlo su Android" in o["tendinaCassetto"]),
+        ("...coi tre modi: Tor Browser, Orbot in VPN con Private DNS, "
+         "Firefox con blockDotOnion", [True, True, True, True, True],
+         [x in o["tendinaCassetto"] for x in
+          ("Tor Browser", "Orbot", "Private DNS", "network.dns.blockDotOnion",
+           "about:config")]),
+        # la quarta riga (10 ott 2026, sera): gli avvisi senza Telegram —
+        # i nostri DM sono NIP-17 (kind 1059) e Amethyst li legge
+        ("...e la riga degli avvisi senza Telegram: Amethyst e UnifiedPush",
+         [True, True, True],
+         [x in o["tendinaCassetto"] for x in ("Amethyst", "UnifiedPush", "ntfy")]),
+        ("...e «I tuoi dati» la riceve UGUALE, dalla stessa fonte", True,
+         o["privAndroid"].startswith("<details class=\"onion-android\"")
+         and o["privAndroid"] in o["tendinaCassetto"]),
+        ("...accesa con l'indirizzo (e l'indirizzo col textContent)",
+         ["", "abc123.onion"], [o["privDisplay"], o["privVal"]]),
+        ("...e spenta senza: blocco nascosto, tendina vuota",
+         ["none", ""], o["privSpento"]),
     ]
 
 
@@ -103551,6 +103589,19 @@ def prove_profilo_sezioni():
     prova("e la copia passa dal giudice unico", True,
           "copiaLink(onionHost"
           in pezzo_js(mini, "function copiaOnion(){", "\n}\n"))
+    # LA TENDINA HA UNA FONTE SOLA (10 ott 2026): il testo vive in
+    # tendinaOnionAndroid() e i due posti lo CHIAMANO — un testo
+    # ricopiato e' due posti che un giorno dicono cose diverse.
+    prova("il testo della tendina e' scritto una volta sola", 1,
+          mini.count("Come aprirlo su Android"))
+    prova("...e lo chiamano il cassetto e «I tuoi dati»", (True, True),
+          ("tendinaOnionAndroid()" in rt,
+           "tendinaOnionAndroid()" in pezzo_js(mini, "function scriviOnion(){", "\n}\n")))
+    prova("...dentro il blocco dell'indirizzo, che nasce spento", True,
+          'id="privOnionAndroid"' in priv
+          and priv.index('id="privOnionBlocco"') < priv.index('id="privOnionAndroid"'))
+    prova("la tendina non ha dati del server dentro (niente ${ nel testo)",
+          False, "${" in pezzo_js(mini, "function tendinaOnionAndroid(){", "\n}\n"))
 
     esiti = _banco_profilo(mini)
     if esiti is None:

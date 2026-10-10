@@ -22895,6 +22895,33 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   fra i browser da mettere nella VPN di Orbot per gli indirizzi `.onion`),
   a UNA condizione — «Private DNS» di Android su Off, altrimenti la
   richiesta DNS scavalca la VPN e l'onion non si risolve.
+  LA TENDINA «COME APRIRLO SU ANDROID» (10 ott 2026, sera, cantiere
+  onion-android, da un tester): accanto all'indirizzo, nei DUE posti
+  che lo mostrano (il cassetto del Profilo e «I tuoi dati»), un
+  `<details>` con quattro righe — Tor Browser, che fa da solo; Orbot in
+  VPN più un browser Chromium (Brave, Cromite, Vanadium) con «Private
+  DNS» di Android su Off; Firefox e i suoi (Fennec, Focus) con in più
+  `network.dns.blockDotOnion` su false in about:config; e gli avvisi
+  senza Telegram, Amethyst sotto Tor con UnifiedPush. UNA FONTE SOLA,
+  `tendinaOnionAndroid()`: il cassetto la mette nel suo template e
+  `scriviOnion` la scrive nel segnaposto `#privOnionAndroid` di «I tuoi
+  dati» — la pagina resta markup fisso, e il frammento è testo di casa
+  senza dati del server (una sentinella conta la frase una volta sola,
+  un'altra vieta `${` dentro). Spenta senza indirizzo, come il blocco.
+  PERCHÉ AMETHYST LI RICEVE: i nostri avvisi a chi entra con Nostr sono
+  DM NIP-17 — rumor kind 14, sigillo kind 13, pacco regalo kind 1059
+  cifrato NIP-44 — consegnati ai relay che il destinatario dichiara nel
+  kind 10050 (o ai nostri quattro, se non lo pubblica); Amethyst
+  implementa NIP-17 e NIP-59, ha Tor incorporato e le notifiche via
+  UnifiedPush (ntfy è un distributore UnifiedPush). Il buco dichiarato:
+  chi non pubblica il 10050 e non legge i nostri quattro relay il pacco
+  non lo vede. E TOR BROWSER TIENE IL COOKIE ANCHE SECURE: tratta i
+  `.onion` come origini potenzialmente affidabili
+  (`dom.securecontext.allowlist_onions`), e da Firefox 77 anche il
+  servizio dei cookie segue quella regola (bug 1633015) — più la
+  verifica di Andrea dell'agosto 2026 sul VPS. Con la cura del cookie
+  sul tunnel il cookie di là esce senza Secure, che Tor Browser tiene
+  a maggior ragione.
   NEL CLIENT I GIUDICI SONO DUE, e il primo non chiede niente al
   server: `.onion` è un TLD RISERVATO (RFC 7686), nessun dominio vero
   può finire così, quindi `suOnion()` guarda `location.hostname` e

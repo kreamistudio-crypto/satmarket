@@ -46527,3 +46527,55 @@ quarantanove NON rifatti su quest'ultima punta. A ogni rebase il solo
 conflitto è stata la coda di CANTIERI, sciolta tenendo tutte le voci.
 Prima del push ho aspettato la CI della punta di main (`2d8cf0d`):
 verde. Tortura e giri dal vivo non rifatti dopo i rebase.
+## Come aprirlo su Android: la tendina accanto all'indirizzo .onion (10 ott 2026, sera, cantiere onion-android, richiesta di Andrea da un tester)
+
+Un tester scrive: con Orbot in VPN e Vanadium il `.onion` si apre, e
+così probabilmente Cromite, Ungoogled Chromium e Brave; coi browser di
+Firefox (Fennec, Focus/Klar) serve in più `network.dns.blockDotOnion =
+false` in about:config; Tor Browser per Android fa da solo. E poi:
+Amethyst sotto Tor, con le notifiche via UnifiedPush (ntfy), per usare
+Barattolo solo con Nostr e Tor.
+
+**LA CURA.** `tendinaOnionAndroid()` in miniapp.html: un `<details>`
+col vestito di `.sped-intl`, quattro righe (Tor Browser; Orbot in VPN
+più Brave/Cromite/Vanadium con Private DNS su Off; Firefox/Fennec/Focus
+con blockDotOnion su false; gli avvisi senza Telegram con Amethyst e
+UnifiedPush). Il cassetto «🧅 Sito Tor» del Profilo la mette sotto il
+bottone di copia; `scriviOnion` la scrive nel segnaposto nuovo
+`#privOnionAndroid` di «I tuoi dati», dentro il blocco dell'indirizzo
+(diventato un `div` col paragrafo e il segnaposto, spento senza
+indirizzo come prima). Una fonte sola, due posti: il testo non si
+ricopia.
+
+**VERIFICATO DA FONTI.** 1) Tor Browser tiene i cookie Secure sul
+`.onion`: tratta gli onion come origini potenzialmente affidabili
+(`dom.securecontext.allowlist_onions`, già `whitelist_onions`), e
+Firefox 77 ha chiuso il buco dei cookie (bug 1633015: un'origine
+affidabile come un onion può sostituire un cookie Secure); in più la
+verifica di Andrea dell'agosto 2026 sul VPS («il cookie di sessione
+passa»). Con la cura di stamattina il cookie di là esce senza Secure,
+che è il caso facile. 2) I nostri avvisi a chi entra con Nostr sono
+DM NIP-17: `impacchetta_dm` fa rumor kind 14 → sigillo kind 13 → pacco
+kind 1059 cifrato NIP-44 v2 con chiave usa-e-getta, e `relay_dm_di` li
+consegna ai relay del kind 10050 del destinatario (o ai nostri quattro
+se non lo pubblica). Amethyst implementa NIP-17 e NIP-59, ha Tor
+incorporato e le notifiche push via Google o UnifiedPush (ntfy è un
+distributore UnifiedPush). Quindi la quarta riga della tendina. Il
+buco dichiarato: chi non pubblica il 10050 e non legge i nostri quattro
+relay il pacco non lo vede.
+
+**PROVATO.** Nel banco node del Profilo (`_banco_profilo`): il cassetto
+porta la tendina coi cinque segni (Tor Browser, Orbot, Private DNS,
+blockDotOnion, about:config) e la riga Amethyst/UnifiedPush/ntfy; «I
+tuoi dati» riceve lo STESSO frammento; acceso con l'indirizzo, spento
+senza. Sentinelle: la frase scritta una volta sola, chiamata dai due
+posti, il segnaposto dentro il blocco, niente `${` nel testo. Tortura:
+cinque mutazioni sulla copia intera (cassetto senza tendina, «I tuoi
+dati» senza, accesa senza indirizzo, via la riga di Private DNS, il
+testo ricopiato), cinque rosse. Dal vivo in collaudo: il cassetto e la
+pagina «I tuoi dati» col config d'esempio e l'indirizzo vero, scatti in
+`.claude/giri/onion-android/`. Suite e collaudi: nel verbale del push.
+
+**NON PROVATO, DA GUARDARE.** Focus/Klar: l'about:config lì non è
+detto che ci sia (la riga segue il tester). Amethyst dal vivo: un
+avviso vero ricevuto sotto Tor con ntfy, dal telefono.
