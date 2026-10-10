@@ -1295,7 +1295,10 @@
   gancio `tentativo(gesto)` della porta porta al P2P i tentativi
   ('wallet', 'copiata' → `tentativoWalletP2P`). Un tocco nuovo, una
   fattura nuova o morta tolgono l'avviso. CANTIERI, «Apri nel wallet:
-  la strada per piattaforma».
+  la strada per piattaforma». I due fogli del P2P (garanzia e
+  cauzione) dicono nel primo riquadro che nel wallet il pagamento resta
+  «in sospeso» finché lo scambio non finisce: è la hold, non un
+  pagamento inceppato (10 ott 2026, prova-wallet).
   In lista lo stesso ordine è «Da pagare» PIENO (`dapagare`) a chi
   compra e «In attesa del pagamento» NEUTRO (`attesa`) a chi vende, dal
   giudice `badgeOrdine`.
@@ -29396,7 +29399,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    `/admin` (il cruscotto degli admin, ott 2026: il file
    `admin.html` letto dalla SUA rotta, senza dati dentro — i numeri li
    dà `/api/admin/cruscotto` solo agli admin —, noindex e no-store;
-   vedi «IL CRUSCOTTO DEGLI ADMIN»),
+   vedi «IL CRUSCOTTO DEGLI ADMIN»), `/prova-wallet` (10 ott 2026,
+   cantiere prova-wallet: la pagina di prova dei link al wallet per
+   l'utente di WoS self-custodial — sei modi sulla stessa fattura da
+   1 sat del nodo, coniata una volta e tenuta in `impostazioni`; senza
+   login, noindex, no-store, fuori da sitemap e menu; nascosta, non
+   segreta; vedi CANTIERI, «La pagina di prova dei link al wallet»),
    `/.well-known/nostr.json` (ott 2026, il NIP-05 di casa: i nomi di
    `NIP05_NOMI` del config con le chiavi PUBBLICHE in hex, `?name=`
    che filtra, CORS aperto, mai un redirect; nato per gli emittenti

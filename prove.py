@@ -4145,8 +4145,10 @@ def prove_doppio_wallet():
            if "cassaforte=" not in cod[i:i + 400]])
     # SEI dal 24 set 2026: la sesta e' `nuova_fattura_ordine`, la
     # fattura nuova per lo STESSO ordine quando quella di prima e'
-    # scaduta senza pagamento («Paga ora»)
-    prova("...e le strade che coniano sono sei", 6, len(chiamate))
+    # scaduta senza pagamento («Paga ora»). SETTE dal 10 ott 2026: la
+    # fattura da 1 sat di `/prova-wallet` (`_fattura_prova_wallet`), che
+    # non e' di nessun ordine e passa la cassaforte del denaro nuovo.
+    prova("...e le strade che coniano sono sette", 7, len(chiamate))
 
     # 3) chi legge passa la colonna della riga, mai un letterale
     prova("nessun invoice_pagata a un argomento solo", [],
@@ -25155,9 +25157,12 @@ def prove_pagina_acquisto():
     prova("nuova_fattura_ordine: ferie e annuncio attivo prima della "
           "fattura", True, -1 < i_f < i_c and -1 < i_a < i_c)
     # E IL CENSIMENTO DEI CHIAMANTI, che vale piu' dell'elenco: sono
-    # SEI, e il settimo di domani lo sente da qui invece di
-    # scoprirlo il giorno che un incasso resta senza riga.
-    prova("chi conia una fattura in entrata e' sei", 6,
+    # SETTE dal 10 ott 2026 (il settimo e' `_fattura_prova_wallet`, la
+    # fattura da 1 sat della pagina di prova: non ha una riga d'ordine
+    # da scrivere, e la sentinella qui sotto non lo cerca), e l'ottavo
+    # di domani lo sente da qui invece di scoprirlo il giorno che un
+    # incasso resta senza riga.
+    prova("chi conia una fattura in entrata e' sette", 7,
           codice(src).count("await crea_invoice_escrow("))
 
     # 3. Il punto NON esce su Nostr (tariffa interna del checkout,
@@ -139485,6 +139490,103 @@ console.log(JSON.stringify(out));
     prova("...quella viva lo lascia", {"viva2": True, "avviso": True}, o["fatturaViva"])
 
 
+def prove_prova_wallet():
+    """LA PAGINA DI PROVA DEI LINK AL WALLET e la riga «in sospeso» (10 ott
+    2026, cantiere prova-wallet, richiesta di Andrea). L'utente di WoS
+    self-custodial: dal link «Elaborazione in corso» subito, senza
+    conferma; incollando, la conferma subito. `/prova-wallet` gli da' sei
+    modi sulla stessa fattura da 1 sat: cinque link (A lightning:
+    minuscolo = il tasto di oggi, B tutto maiuscolo, C lightning://, D
+    intent:// col pacchetto di WoS, E bitcoin:?lightning=) e la fattura
+    nuda (F). Qui: la rotta (una, senza login, HTMLResponse e mai il file
+    nudo, noindex e no-store, nell'elenco di ARCHITETTURA), la fattura
+    (1 sat, sette giorni, memo «NON pagare», coniata una volta e tenuta
+    in `impostazioni` finche' vive), i due giudici PURI fatti girare
+    davvero (le sei forme, la pagina con le istruzioni a freddo e a
+    caldo, la pagina d'errore senza link), e la riga nei due fogli P2P:
+    «in sospeso finche' lo scambio non finisce»."""
+    print("\n[la pagina di prova dei link al wallet, e la riga «in sospeso»]")
+    import html as _html
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    arch = open(os.path.join(QUI, "docs", "ARCHITETTURA.md"), encoding="utf-8").read()
+
+    # --- 1) la rotta ---------------------------------------------------
+    i = src.index('@app.get("/prova-wallet")')
+    rotta = src[i:src.index("\n\n\n", i)]
+    prova("la rotta e' una, senza login, e serve l'HTML dalla sua funzione (mai il file nudo)",
+          [1, False, False, True, False],
+          [src.count('@app.get("/prova-wallet")'), "verifica_utente" in rotta,
+           "Depends(" in rotta, "HTMLResponse(pagina_prova_wallet(bolt11, errore)" in rotta,
+           "FileResponse(" in rotta])
+    prova("...noindex e no-store", [True, True],
+          ['"X-Robots-Tag": "noindex, nofollow"' in rotta, "**HEADER_NO_CACHE" in rotta])
+    prova("...e sta nell'elenco delle rotte pubbliche di ARCHITETTURA", True,
+          "`/prova-wallet`" in arch)
+    prova("la pagina non entra nella sitemap", False, "prova-wallet" in codice(pezzo("sitemap_xml")))
+    fat = codice(pezzo("_fattura_prova_wallet"))
+    prova("la fattura: 1 sat sulla cassaforte del denaro nuovo, sette giorni, memo che dice di NON pagare",
+          [True, True, True],
+          ["crea_invoice_escrow(1, PROVA_WALLET_MEMO," in fat,
+           "PROVA_WALLET_SCADENZA = 7 * 24 * 3600" in src,
+           "NON pagare" in src[src.index("PROVA_WALLET_MEMO = "):src.index("\n", src.index("PROVA_WALLET_MEMO = "))]])
+    prova("...coniata una volta: si rilegge da impostazioni e si tiene finche' le resta piu' di un'ora",
+          [True, True, True, True],
+          ["impostazione(PROVA_WALLET_CHIAVE" in fat, "vita_fattura(vecchia)" in fat,
+           "vita > PROVA_WALLET_RISERVA" in fat, "scrivi_impostazione(PROVA_WALLET_CHIAVE, nuova)" in fat])
+    prova("...e se LNbits non risponde la pagina esce lo stesso con la frase, mai un 500",
+          [True, True], ["except Exception" in fat, 'return "", "La fattura di prova non è pronta' in fat])
+    for spia in ("db(", "impostazione(", "crea_invoice", "await ", "print("):
+        prova(f"i due giudici della pagina sono puri: nessun `{spia}`", False,
+              spia in codice(pezzo("varianti_link_wallet")) + codice(pezzo("pagina_prova_wallet")))
+
+    # --- 2) i giudici, fatti girare -------------------------------------
+    amb = {"html": _html, "PROVA_WALLET_PACKAGE_WOS": "com.livingroomofsatoshi.wallet"}
+    exec(pezzo("varianti_link_wallet"), amb)
+    exec(pezzo("pagina_prova_wallet"), amb)
+    B = bolt11_finta(1, 7 * 24 * 3600, 1_790_000_000, phash=41)
+    v = amb["varianti_link_wallet"](" " + B + " ")
+    prova("le cinque forme, nell'ordine, con la bolt11 ripulita",
+          ["A", "B", "C", "D", "E"], [x[0] for x in v])
+    prova("A e' il tasto di oggi: lightning: minuscolo e la bolt11 com'e'", "lightning:" + B, v[0][2])
+    prova("B e' la forma del QR: schema e fattura MAIUSCOLI", "LIGHTNING:" + B.upper(), v[1][2])
+    prova("C le due barre", "lightning://" + B, v[2][2])
+    prova("D l'intent col pacchetto di Wallet of Satoshi, scheme lightning, niente fallback url",
+          "intent://" + B + "#Intent;scheme=lightning;package=com.livingroomofsatoshi.wallet;end", v[3][2])
+    prova("E il BIP21 unificato", "bitcoin:?lightning=" + B, v[4][2])
+    pag = amb["pagina_prova_wallet"](B)
+    prova("la pagina: le istruzioni a freddo e a caldo in cima, prima dei bottoni",
+          True, pag.index("A freddo") < pag.index("A caldo") < pag.index('class="b"'))
+    prova("...dice di NON pagare, e che la fattura e' la stessa per tutti", [True, True],
+          ["non pagarla" in pag, "<b>stessa</b> fattura" in pag])
+    prova("...i cinque link sono <a href> veri, uno per forma, con la lettera",
+          [True] * 5,
+          [('href="' + _html.escape(h, quote=True) + '"') in pag and ('<span class="l">' + l + '</span>') in pag
+           for l, _, h in v])
+    prova("...la F: la fattura nuda in un campo da copiare, dopo i link",
+          [True, True], ["<textarea id=\"f\" readonly>" + B + "</textarea>" in pag,
+                         pag.index("F · la fattura nuda") > pag.rindex('class="b"')])
+    prova("...noindex anche nel meta, e niente script salvo il Copia",
+          [True, 0, 1], ['<meta name="robots" content="noindex,nofollow">' in pag,
+                         pag.count("<script"), pag.count("onclick=")])
+    err = amb["pagina_prova_wallet"]("", "La fattura di prova non è pronta: riprova fra un minuto.")
+    prova("la pagina d'errore: la frase, nessun link e nessuna fattura",
+          [True, 0, 0], ["non è pronta" in err, err.count('href="'), err.count("<textarea")])
+    prova("una bolt11 con caratteri da HTML non rompe la pagina", True,
+          "&lt;" in amb["pagina_prova_wallet"]("lnbc1<x>") and "<x>" not in amb["pagina_prova_wallet"]("lnbc1<x>"))
+
+    # --- 3) la riga «in sospeso» nei due fogli P2P -----------------------
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}"
+    rh, rc = fn("function renderHoldP2P(){"), fn("function renderCauzioneP2P(o){")
+    prova("la garanzia lo dice: nel wallet il pagamento resta «in sospeso» finche' lo scambio non finisce, ed e' normale",
+          True, "Nel tuo wallet il pagamento resterà <b>in sospeso</b> (o «in corso») finché lo scambio non finisce: è normale, è la garanzia che tiene." in rh)
+    prova("...e la cauzione pure, con le sue parole", True,
+          "Nel tuo wallet resterà <b>in sospeso</b> finché lo scambio non finisce: è normale." in rc)
+    prova("...tutt'e due nel primo riquadro, prima del QR", [True, True],
+          [rh.index("in sospeso") < rh.index('id="p2pHoldQr"'), rc.index("in sospeso") < rc.index('id="p2pHoldQr"')])
+
+
 def prove_reputazione_p2p():
     """LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, I TENTATIVI, IL
     FILTRO DI CHI PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, cantiere
@@ -140201,6 +140303,7 @@ def main():
               prove_spedizione_standard,
               prove_cambio_converte,
               prove_paga_ora, prove_apri_wallet_p2p, prove_apri_nel_wallet,
+              prove_prova_wallet,
               prove_conto_intervallo,
               prove_catalogo_esterno,
               prove_modulo_negozio,

@@ -46026,3 +46026,77 @@ sono testi e prove. PRIMA DEL PUSH guardata la CI di main: l'ultima
 corsa conclusa verde, e nelle corse ancora in giro il job dei segreti
 già verde — aspettarle tutte fino in fondo voleva dire farsi superare
 un'altra volta (la regola di «main che corre»: non si insegue).
+
+## La pagina di prova dei link al wallet, e la riga «in sospeso» (10 ott 2026, cantiere prova-wallet, richiesta di Andrea)
+
+**IL CASO, precisato dall'utente.** Pagava la garanzia di un Barattozon,
+da Barattolo salvato sulla Home su Android, con Wallet of Satoshi
+self-custodial (quello con l'icona delle chiavi). Dal tasto «⚡ Apri nel
+wallet» WoS si apre e resta SUBITO su «Elaborazione in corso -
+attendere...», senza nessuna schermata di conferma, due volte su due.
+Incollando la stessa fattura a mano, la conferma compare subito. Non è
+la hold in sospeso (quella viene DOPO la conferma): è il deep link, a
+freddo, che WoS non digerisce nella forma in cui glielo passiamo, o
+l'app che parte da zero e si incanta prima di decodificare.
+
+**L'URI CHE PASSIAMO, confrontato.** Il tasto vero scrive `lightning:`
+minuscolo più la bolt11 esattamente come arriva (minuscola, da LND via
+LNbits o da mostrod), senza `//`, senza parametri; il QR è la stessa
+stringa tutta maiuscola; l'`intent://` del Riprova, senza pacchetto,
+nasce solo dopo il tocco e non c'entra con l'episodio. L'app di Mostro fa
+la stessa cosa (`url_launcher`, `Uri.parse('lightning:$invoice')`,
+minuscolo, la bolt11 com'è, in `pay_lightning_invoice_screen.dart`).
+Phoenix dichiara nel manifest gli schemi `lightning`, `bitcoin`, `lnurl*`
+senza host né path: `lightning:` e `lightning://` gli arrivano entrambi.
+Di WoS non esiste sorgente né documentazione sui deep link; la tabella
+di RoboSats lo dava «good» alla 1.15.0, che era un'altra app. Quindi la
+forma «giusta» non si deduce: si prova.
+
+**DECISO: la pagina `/prova-wallet`.** Una rotta sua (regola ferrea 3),
+senza login, noindex e no-store, fuori da sitemap e menu: nascosta, non
+segreta. In cima le istruzioni, due volte per ogni bottone: a freddo (WoS
+chiuso del tutto) e a caldo (WoS aperto, si torna su Barattolo, si
+tocca); poi sei modi sulla STESSA fattura da 1 sat, che non va pagata:
+A `lightning:` minuscolo (il tasto di oggi), B `LIGHTNING:` e fattura
+tutta maiuscola (la forma del QR), C `lightning://`, D `intent://` col
+pacchetto `com.livingroomofsatoshi.wallet` e `scheme=lightning`, E
+`bitcoin:?lightning=` (BIP21 unificato), F la fattura nuda in un campo
+col Copia (il modo che gli ha funzionato: il confronto). I link sono
+`<a href>` veri, con la lettera grande: all'utente basta dire la lettera
+e cosa è successo. La fattura la conia `crea_invoice_escrow` sulla
+cassaforte del denaro nuovo (il nodo) con sette giorni di scadenza e il
+memo «Prova dei link al wallet di Barattolo: NON pagare», UNA volta: si
+tiene in `impostazioni` (`prova_wallet_bolt11`) finché le resta più di
+un'ora, e un riavvio non la perde; un'ondata di richieste non conia
+niente. Se LNbits non risponde la pagina esce senza bottoni e lo dice,
+mai un 500. Due giudici puri (`varianti_link_wallet`,
+`pagina_prova_wallet`) e un tubo (`_fattura_prova_wallet`). IL TASTO
+VERO NON CAMBIA: lo si cambia quando la prova dice quale forma funziona.
+
+**LA RIGA «IN SOSPESO» NEI DUE FOGLI P2P** (sì di Andrea alla voce
+notata): nel primo riquadro della garanzia «Nel tuo wallet il pagamento
+resterà in sospeso (o «in corso») finché lo scambio non finisce: è
+normale, è la garanzia che tiene»; nella cauzione «Nel tuo wallet
+resterà in sospeso finché lo scambio non finisce: è normale». È quel che
+le FAQ di Mostro dicono dei wallet («queued, frozen, in flight,
+pending») e che RoboSats documenta come l'equivoco più comune.
+
+**PROVATO.** `prove_prova_wallet`: la rotta (una, senza login, HTML dalla
+sua funzione e mai il file nudo, noindex e no-store, nell'elenco di
+ARCHITETTURA, fuori dalla sitemap), la fattura (1 sat, sette giorni,
+memo, la cache in impostazioni con la riserva di un'ora, l'errore
+morbido), i giudici puri eseguiti davvero (le cinque forme esatte su una
+bolt11 finta, la pagina con istruzioni prima dei bottoni, i cinque href
+escapati, la F, il meta noindex, un solo onclick e nessuno script, la
+pagina d'errore senza link, l'escape di una bolt11 ostile) e la riga nei
+due fogli. Dal vivo nel Browser pane (copia in collaudo, LNbits morta,
+fattura finta seminata in `impostazioni`): la pagina con i sei modi; e
+senza fattura la pagina d'errore. Suite intera `PROVE_SEVERE=1` nel
+worktree da origin/main (6bfa0b2): 21.326 passate, 0 fallite; i 51
+collaudi della CI nella gabbia: nel verbale del push.
+
+**DA GUARDARE.** La risposta dell'utente, lettera per lettera, a freddo e
+a caldo. Se conferma il deep link a freddo, la riga sotto «Apri nel
+wallet» per chi usa WoS (proposta a parte, tasto fermo finché Andrea non
+dice sì). La fattura di prova: dopo l'esperimento la rotta può uscire o
+restare come attrezzo; non è nel menu di nessuno.

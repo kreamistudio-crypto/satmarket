@@ -72801,6 +72801,158 @@ def pwa_offline():
                         headers=HEADER_NO_CACHE)
 
 
+# ---------------- LA PAGINA DI PROVA DEI LINK AL WALLET (10 ott 2026) ----
+# IL CASO (cantiere «apri-nel-wallet», poi «prova-wallet», richiesta di
+# Andrea): un utente su Android, Barattolo salvato sulla Home, Wallet of
+# Satoshi self-custodial (quello con l'icona delle chiavi), pagava la
+# garanzia di un Barattozon: dal tasto «⚡ Apri nel wallet» WoS si apre e
+# resta SUBITO su «Elaborazione in corso - attendere...», senza mai la
+# schermata di conferma, due volte su due; incollando la stessa fattura a
+# mano, la conferma compare subito. Il link e' quello di sempre —
+# `lightning:` minuscolo piu' la bolt11 com'e' arrivata (minuscola, da
+# LND), senza `//` ne' parametri: la stessa forma dell'app di Mostro
+# (`Uri.parse('lightning:$invoice')`) — quindi la domanda e' quale FORMA
+# WoS digerisce dal deep link, e a freddo o a caldo. Questa pagina la fa
+# all'utente: cinque bottoni, uno per forma, piu' la fattura nuda da
+# copiare, tutti sulla STESSA fattura da 1 sat della cassaforte del
+# denaro nuovo (il nodo), che NON va pagata: lui tocca e dice quale
+# bottone apre la conferma, prima a WoS chiuso e poi a WoS gia' aperto.
+# NASCOSTA, NON SEGRETA: senza login (chi la riceve non deve entrare),
+# noindex e no-store, fuori da sitemap e menu; e' una rotta sua, come
+# ogni pagina (regola ferrea 3). La fattura si conia UNA volta e si tiene
+# in `impostazioni` finche' le resta almeno un'ora di vita (sette giorni
+# di scadenza): un'ondata di richieste non conia niente, e un riavvio non
+# la perde. Se LNbits non risponde la pagina esce lo stesso, senza
+# bottoni, e lo dice. IL TASTO VERO NON CAMBIA finche' la prova non parla.
+PROVA_WALLET_CHIAVE = "prova_wallet_bolt11"
+PROVA_WALLET_SCADENZA = 7 * 24 * 3600
+PROVA_WALLET_RISERVA = 3600        # sotto un'ora di vita se ne conia una nuova
+PROVA_WALLET_MEMO = "Prova dei link al wallet di Barattolo: NON pagare"
+PROVA_WALLET_PACKAGE_WOS = "com.livingroomofsatoshi.wallet"
+
+
+def varianti_link_wallet(bolt11: str) -> list:
+    """PURA: le forme del link, nell'ordine della pagina, come terne
+    (lettera, come si chiama, href). La A e' il tasto vero di oggi: la
+    bolt11 com'e', senza toccarla; la B e' la forma del QR (tutto
+    maiuscolo); la D e' l'Intent di Chrome Android col pacchetto di
+    Wallet of Satoshi dichiarato, cosi' il telefono non sceglie."""
+    s = str(bolt11 or "").strip()
+    return [
+        ("A", "lightning: minuscolo (il tasto di oggi)", "lightning:" + s),
+        ("B", "LIGHTNING: e fattura TUTTA MAIUSCOLA (la forma del QR)",
+         "LIGHTNING:" + s.upper()),
+        ("C", "lightning:// con le due barre", "lightning://" + s),
+        ("D", "intent:// con il pacchetto di Wallet of Satoshi",
+         "intent://" + s + "#Intent;scheme=lightning;package="
+         + PROVA_WALLET_PACKAGE_WOS + ";end"),
+        ("E", "bitcoin:?lightning= (il BIP21 unificato)",
+         "bitcoin:?lightning=" + s),
+    ]
+
+
+def pagina_prova_wallet(bolt11: str, errore: str = "") -> str:
+    """PURA: l'HTML della pagina, intero. Le istruzioni in cima (prima a
+    freddo, poi a caldo), i cinque link con la lettera grande, la
+    fattura nuda da copiare (F). Niente script salvo il Copia della F,
+    e i link sono `<a href>` veri: parte dal tocco, come il tasto vero.
+    Con `errore` la pagina esce senza bottoni e lo dice."""
+    e = html.escape
+    testa = (
+        "<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<meta name=\"robots\" content=\"noindex,nofollow\">"
+        "<title>Barattolo: prova dei link al wallet</title>"
+        "<style>body{font-family:system-ui,sans-serif;margin:0;padding:18px 16px 40px;"
+        "background:#FAF4E4;color:#2B2419;line-height:1.4}"
+        "h1{font-size:22px;margin:0 0 10px}h2{font-size:16px;margin:22px 0 8px}"
+        ".box{background:#fff;border-radius:14px;padding:12px 14px;margin:0 0 12px;"
+        "box-shadow:0 1px 3px rgba(0,0,0,.08)}"
+        "ol{padding-left:20px;margin:6px 0}li{margin:4px 0}"
+        "a.b{display:flex;align-items:center;gap:12px;background:#F7931A;color:#fff;"
+        "text-decoration:none;border-radius:14px;padding:14px;margin:10px 0;font-weight:800}"
+        "a.b .l{font-size:26px;background:#fff;color:#F7931A;border-radius:10px;"
+        "min-width:40px;height:40px;display:flex;align-items:center;justify-content:center}"
+        "a.b small{display:block;font-weight:600;opacity:.9;word-break:break-all;font-size:11px}"
+        "textarea{width:100%;box-sizing:border-box;font:12px ui-monospace,monospace;"
+        "border:1px solid #D9CFB5;border-radius:10px;padding:8px;height:92px}"
+        "button{font:inherit;font-weight:800;background:#1E7B4D;color:#fff;border:0;"
+        "border-radius:12px;padding:12px 16px;width:100%;margin-top:8px}"
+        ".err{background:#FDE8E4;color:#8A2B1B;font-weight:700}"
+        ".m{color:#6B5E48;font-size:13px}</style></head><body>"
+    )
+    corpo = [
+        "<h1>🫙⚡ Prova dei link al wallet</h1>",
+        "<div class=\"box\"><b>Grazie di darci una mano.</b> Qui sotto ci sono sei modi "
+        "di aprire il wallet sulla <b>stessa</b> fattura di prova da 1 sat: "
+        "<b>non pagarla</b>, serve solo a vedere quale bottone fa comparire la "
+        "schermata di conferma del pagamento.</div>",
+        "<div class=\"box\"><b>Come fare la prova, due volte:</b><ol>"
+        "<li><b>A freddo:</b> chiudi del tutto Wallet of Satoshi (dalle app recenti), "
+        "poi tocca un bottone e guarda cosa compare.</li>"
+        "<li><b>A caldo:</b> apri Wallet of Satoshi, torna qui su Barattolo senza "
+        "chiuderlo, tocca lo stesso bottone e guarda di nuovo.</li></ol>"
+        "Fallo per ogni lettera e scrivici, per ognuna, cosa succede nei due casi: "
+        "«conferma subito», «Elaborazione in corso», «non si apre niente». "
+        "Non serve pagare: dalla schermata di conferma torna indietro.</div>",
+    ]
+    if errore or not bolt11:
+        corpo.append("<div class=\"box err\">" + e(errore or "La fattura di prova non è pronta.")
+                     + "</div>")
+    else:
+        for lettera, nome, href in varianti_link_wallet(bolt11):
+            corpo.append(
+                "<a class=\"b\" href=\"" + e(href, quote=True) + "\"><span class=\"l\">"
+                + lettera + "</span><span>" + e(nome) + "<small>"
+                + e(href[:28]) + "…</small></span></a>")
+        corpo.append(
+            "<h2>F · la fattura nuda, da incollare</h2>"
+            "<div class=\"box\"><textarea id=\"f\" readonly>" + e(bolt11) + "</textarea>"
+            "<button type=\"button\" onclick=\"var t=document.getElementById('f');"
+            "t.select();(navigator.clipboard?navigator.clipboard.writeText(t.value)"
+            ":Promise.reject()).catch(function(){document.execCommand('copy')});"
+            "this.textContent='Copiata: incollala nel wallet'\">📋 Copia la fattura</button>"
+            "<div class=\"m\">È il modo che ti ha funzionato: serve come confronto.</div></div>")
+    corpo.append("<p class=\"m\">Fattura da 1 sat del nodo di Barattolo, scade da sola. "
+                 "Nessun dato viene raccolto da questa pagina.</p></body></html>")
+    return testa + "".join(corpo)
+
+
+async def _fattura_prova_wallet() -> tuple:
+    """La fattura di prova: quella in `impostazioni` se le resta piu' di
+    un'ora, altrimenti una nuova da 1 sat sulla cassaforte del denaro
+    nuovo, scritta li'. (bolt11, errore): con l'errore la bolt11 e' vuota
+    e la pagina lo dice, senza mai esplodere."""
+    vecchia = impostazione(PROVA_WALLET_CHIAVE, "").strip()
+    vita = vita_fattura(vecchia) if vecchia else None
+    if vita is not None and vita > PROVA_WALLET_RISERVA:
+        return vecchia, ""
+    try:
+        inv = await crea_invoice_escrow(1, PROVA_WALLET_MEMO,
+                                        expiry=PROVA_WALLET_SCADENZA,
+                                        cassaforte=cassaforte_nuova())
+        nuova = str(inv.get("payment_request") or "").strip()
+        if not nuova.lower().startswith("ln"):
+            raise ValueError("LNbits ha risposto senza fattura")
+        scrivi_impostazione(PROVA_WALLET_CHIAVE, nuova)
+        return nuova, ""
+    except Exception as e:
+        print(f"⚠️ prova-wallet: fattura non coniata ({type(e).__name__}: {e})",
+              flush=True)
+        return "", "La fattura di prova non è pronta: riprova fra un minuto."
+
+
+@app.get("/prova-wallet")
+async def rotta_prova_wallet():
+    """La pagina di prova dei link al wallet: senza login, noindex,
+    no-store. Vedi il blocco qui sopra e ARCHITETTURA, «LE ROTTE
+    PUBBLICHE»."""
+    bolt11, errore = await _fattura_prova_wallet()
+    return HTMLResponse(pagina_prova_wallet(bolt11, errore),
+                        headers={**HEADER_NO_CACHE,
+                                 "X-Robots-Tag": "noindex, nofollow"})
+
+
 # Le icone dell'app: generate da genera_icone.py (barattolo su tessera
 # arancio; le -maskable hanno il margine per i ritagli di Android).
 @app.get("/assets/icona-192.png")

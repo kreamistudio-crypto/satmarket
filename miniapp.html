@@ -59542,7 +59542,8 @@ function renderCauzioneP2P(o){
   box.innerHTML =
     '<div class="hint">' + (quanti ? 'Paga <b>' + esc(quanti) + '</b> dal tuo wallet: ' : 'Paga dal tuo wallet: ') +
       'è la <b>cauzione</b> dello scambio in contanti. Resta in sospeso nel tuo wallet e <b>torna a fine scambio</b>; la perdi solo se un moderatore decide che non ti sei presentato.' +
-      (min ? ' Hai circa ' + min + (min === 1 ? ' minuto' : ' minuti') + ': scaduta, l\'ordine resta nel libro e va ripreso.' : '') + '</div>' +
+      (min ? ' Hai circa ' + min + (min === 1 ? ' minuto' : ' minuti') + ': scaduta, l\'ordine resta nel libro e va ripreso.' : '') +
+      ' Nel tuo wallet resterà <b>in sospeso</b> finché lo scambio non finisce: è normale.' + '</div>' +
     '<div class="qr" id="p2pHoldQr"></div>' +
     '<div class="invoice" id="p2pHoldInvoice"></div>' +
     '<div class="pay-scade" id="p2pHoldScadeRiga" style="display:none">' +
@@ -59574,7 +59575,10 @@ function renderHoldP2P(){
   box.innerHTML =
     '<div class="hint">' + (quanti ? 'Paga <b>' + esc(quanti) + '</b> dal tuo wallet: ' : 'Paga dal tuo wallet: ') +
       'i sats restano <b>bloccati in garanzia</b> e non escono finché non li liberi tu.' +
-      (min ? ' Hai circa ' + min + ' minuti.' : '') + '</div>' +
+      (min ? ' Hai circa ' + min + ' minuti.' : '') +
+      /* il wallet lo mostra «in sospeso» per tutto lo scambio (10 ott
+         2026, prova-wallet): e' la hold, non un pagamento inceppato */
+      ' Nel tuo wallet il pagamento resterà <b>in sospeso</b> (o «in corso») finché lo scambio non finisce: è normale, è la garanzia che tiene.' + '</div>' +
     '<div class="qr" id="p2pHoldQr"></div>' +
     '<div class="invoice" id="p2pHoldInvoice"></div>' +
     '<div class="pay-scade" id="p2pHoldScadeRiga" style="display:none">' +
