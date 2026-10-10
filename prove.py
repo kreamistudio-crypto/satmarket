@@ -137511,6 +137511,103 @@ console.log(JSON.stringify(out));
           [r.get("battitoZero"), r.get("fuoriPagina")])
 
 
+def prove_dati_reputazione_p2p():
+    """«I TUOI DATI» E GLI ESITI DEL P2P (10 ott 2026, ritocco chiesto da
+    Andrea). Il cantiere reputazione-p2p ha messo in `p2p_esiti` gli
+    esiti degli scambi PER PERSONA, per piu' di un anno, e la pagina non
+    lo diceva. Il paragrafo nuovo dice cosa, per quanto, a cosa serve,
+    chi lo vede e cosa fa «dimentica il profilo» — e ogni numero che
+    scrive si confronta qui con la COSTANTE del server: il giorno che
+    una finestra cambia, o che «dimentica» cambia verso, la pagina non
+    puo' restare a dire quella di ieri."""
+    print("\n[«I tuoi dati» e gli esiti del P2P]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    dati = mini[mini.index('<h3 id="priv-p2p">'):]
+    dati = dati[:dati.index("apriProfiloP2P()")]
+    capo = "come sono finiti i tuoi scambi"
+    prova("la sezione P2P di «I tuoi dati» ha UN paragrafo sugli esiti", 1,
+          dati.count(capo))
+    i = dati.index(capo)
+    par = dati[dati.rindex("<p>", 0, i):dati.index("</p>", i)]
+    testo = re.sub(r"<[^>]+>", "", par)
+    amb = {}
+    for riga in ("P2P_MANCATI_FINESTRA_S = ", "P2P_MANCATI_FILTRO_S = ",
+                 "P2P_MANCATI_TOLLERATI = ", "P2P_FILTRO_SOGLIE = ",
+                 "P2P_ESITI_MEMORIA_S = ", "P2P_LIBRO_MEMORIA_S = "):
+        j = src.index("\n" + riga) + 1
+        exec(src[j:src.index("\n", j)], amb)
+    prova("...legato all'account, dal giorno in cui il server ha cominciato",
+          (True, True), ("legato al tuo account" in testo,
+                         "Dal 10 ottobre 2026" in testo))
+    prova("la finestra del contatore e' quella del server (90 giorni), e "
+          "il primo si tollera",
+          (90, 1, True, True),
+          (amb["P2P_MANCATI_FINESTRA_S"] // 86400, amb["P2P_MANCATI_TOLLERATI"],
+           "«⚠️ N non completati», che conta solo gli ultimi 90 giorni" in testo,
+           "compare dal secondo (il primo si tollera)" in testo))
+    prova("...quella del filtro di chi pubblica pure (30 giorni), con le "
+          "tre soglie",
+          (30, (1, 3, 5), True, True),
+          (amb["P2P_MANCATI_FILTRO_S"] // 86400, amb["P2P_FILTRO_SOGLIE"],
+           "non completati negli ultimi 30 giorni" in testo,
+           "almeno 1, 3 o 5 scambi completati" in testo))
+    prova("...e la memoria: circa quattrocento giorni gli esiti, quaranta "
+          "i tentativi (con la cronaca)",
+          (400, 40, True, True),
+          (amb["P2P_ESITI_MEMORIA_S"] // 86400,
+           amb["P2P_LIBRO_MEMORIA_S"] // 86400,
+           "circa quattrocento giorni" in testo,
+           "se ne vanno con la cronaca, dopo quaranta giorni" in testo))
+    scopa = pezzo("_pulisci_memoria_p2p")
+    prova("...che e' quel che fa la scopa: i tentativi con la cronaca, "
+          "gli esiti con la loro memoria lunga", (True, True),
+          ('("p2p_tentativi", "quando")' in scopa,
+           "adesso - P2P_ESITI_MEMORIA_S" in scopa))
+    dim = codice(pezzo("dimentica_chiavi_p2p"))
+    prova("«dimentica il profilo»: la pagina dice quel che la rotta FA — "
+          "via i tentativi, gli esiti restano",
+          (True, False, True),
+          ('"DELETE FROM p2p_tentativi WHERE tg_id=?"' in dim,
+           "p2p_esiti" in dim,
+           "«Dimentica il profilo» cancella subito i tentativi ma non gli "
+           "esiti" in testo))
+    segna = codice(pezzo("_segna_esiti_p2p"))
+    prova("cosa sta in una riga: niente importi, e la pagina lo dice",
+          (False, True),
+          (any(x in segna for x in ("sats", "euro")), "niente importi" in testo))
+    prova("...«completato» a tutte e due, «non completato» solo a chi ha "
+          "preso: come scrive il giudice",
+          (True, True, True, True),
+          ("for tg, ruolo in ((compra, \"compra\"), (vende, \"vende\")):" in segna,
+           '"taker-timeout"' in segna,
+           "a tutte e due le parti" in testo,
+           "solo a chi ha preso un ordine" in testo))
+    prova("chi vede cosa: il contatore accanto al volto e nel negozio, i "
+          "completati solo a chi li ha", (True, True, True, True),
+          ("nella pagina del tuo negozio" in testo,
+           "lo vedi solo tu" in testo,
+           'venditore["non_completati"] = non_completati' in src,
+           '"completati": rep["completati"]' in pezzo("_posso_prendere_p2p")))
+    volti = [src[m.start():m.start() + 3000] for m in re.finditer(
+        r"marchi = _marchi_mancati_p2p\(", src)]
+    prova("...e nei due costruttori dei volti il conto dei completati "
+          "non c'e'", (2, []),
+          (len(volti), [v[:80] for v in volti if '"completati"' in v
+                        or "_reputazione_p2p(" in v]))
+    prova("chi entra da Nostr e prende senza farsi riconoscere: l'esito "
+          "si scrive lo stesso, e la pagina non lo tace", True,
+          "anche se entri con una chiave Nostr" in testo
+          and "l'esito si scrive sul tuo account come per tutti" in testo)
+    prova("i tentativi: il gesto, mai la fattura ne' il pagamento",
+          (True, False),
+          ("il gesto, mai la fattura né il pagamento" in testo,
+           any(c in src[src.index("CREATE TABLE IF NOT EXISTS p2p_tentativi("):
+                        src.index("CREATE INDEX IF NOT EXISTS idx_p2p_tentativi_ordine")]
+               .split("tg_id INTEGER NOT NULL,")[1]
+               for c in ("bolt11", "fattura TEXT", "invoice"))))
+
+
 def prove_reputazione_p2p():
     """LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, I TENTATIVI, IL
     FILTRO DI CHI PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, cantiere
@@ -138331,7 +138428,7 @@ def main():
               prove_prendi_metodo,
               prove_contanti_zona,
               prove_banner_ingresso, prove_tour_banner_p2p,
-              prove_reputazione_p2p,
+              prove_reputazione_p2p, prove_dati_reputazione_p2p,
               prove_x_risonanza,
               prove_config_esempio):
         try:

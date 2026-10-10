@@ -44890,3 +44890,62 @@ scadenza: il server rifà il controllo con la finestra che gli manda il
 client; chi chiama la rotta senza finestra prende 3600. • Il tetto di 30
 controlli l'ora è a memoria del processo (un riavvio lo azzera): va bene
 per quel che è.
+
+## «I tuoi dati» e gli esiti del P2P (10 ott 2026, pomeriggio, ritocco chiesto da Andrea)
+
+**IL BUCO.** Notato chiudendo le statistiche del P2P: il cantiere
+reputazione-p2p conserva in `p2p_esiti` gli esiti degli scambi PER
+PERSONA (completati, non completati) per circa quattrocento giorni, e
+in `p2p_tentativi` i gesti dichiarati dal telefono, ma la sezione P2P
+di «I tuoi dati» non lo diceva. Un paragrafo nuovo in `#priv-p2p`,
+subito dopo quello dei conti: cosa teniamo (una riga per esito: numero
+dell'ordine, quando, il lato, com'è finita — niente importi), a cosa
+serve, chi lo vede, per quanto, e cosa fa «dimentica il profilo».
+
+**LETTO NEL CODICE PRIMA DI SCRIVERE, e tre cose non erano come nella
+richiesta.**
+- LE FINESTRE SONO DUE: il contatore «⚠️ N non completati» conta gli
+  ultimi 90 giorni (`P2P_MANCATI_FINESTRA_S`) e compare dal secondo; il
+  filtro di chi pubblica guarda i non completati degli ultimi 30
+  (`P2P_MANCATI_FILTRO_S`) e i completati di tutta la memoria. La
+  pagina dice tutt'e due.
+- «DIMENTICA IL PROFILO» NON TOGLIE GLI ESITI, e non è una svista: lo
+  ha deciso reputazione-p2p la mattina stessa («sono dell'account, non
+  delle chiavi, e non è il modo di togliersi un marchio»), con la sua
+  prova e il suo collaudo. La richiesta diceva «se non lo cancella,
+  fallo cancellare»: NON l'ho fatto, e l'ho portato ad Andrea con le
+  due strade e i due testi. DECISO DA ANDREA: gli esiti restano (la
+  strada A); il codice non si tocca, la pagina lo dice per intero —
+  via subito i tentativi, gli esiti scadono da soli.
+- CHI ENTRA DA NOSTR e prende senza farsi riconoscere: la presa non si
+  annota in `p2p_ordini`, ma l'esito si scrive sul suo account come per
+  tutti (`_segna_esiti_p2p` va per le parti dette da mostrod). La pagina
+  diceva «quella presa non viene annotata» e basta: il paragrafo nuovo
+  lo dichiara — all'altra persona non si dice chi è, l'esito si scrive.
+
+**CHI VEDE COSA, com'è scritto:** il contatore lo vede chi vede la
+persona (il riquadro di chi ha pubblicato, la card dell'altra parte, il
+negozio); i completati li vede solo chi li ha, nel profilo di scambio
+(`_posso_prendere_p2p`); chi pubblica col filtro non riceve i numeri di
+nessuno — decide il server e lo dice a chi chiede.
+
+**LA STRADA SCARTATA.** Far cancellare gli esiti da «dimentica» (la
+strada B): un marchio che si toglie con un tocco non è un marchio, e il
+filtro di chi pubblica non fermerebbe più nessuno.
+
+**PROVATO.** `prove_dati_reputazione_p2p` (13 prove): ogni numero del
+paragrafo si confronta con la COSTANTE del server (90, 30, la
+tolleranza del primo, le tre soglie, 400 e 40 giorni), «dimentica» con
+quel che la rotta fa (via i tentativi, nessuna riga sugli esiti), cosa
+sta in una riga col giudice che la scrive, e i completati che non
+viaggiano nei due costruttori dei volti. Il giorno che una finestra
+cambia, o che «dimentica» cambia verso, la pagina non può restare a
+dire quella di ieri. Solo testo e prove: nessuna riga di `server.py`.
+Suite `PROVE_SEVERE=1` sull'albero di ccea57f più il ritocco: 21.053
+passate, 0 fallite. Niente giro dal vivo: è un paragrafo di testo in
+una pagina che non cambia forma.
+
+**DA GUARDARE.** • La frase di sempre sul Nostr che prende («quella
+presa non viene annotata», due paragrafi più giù) resta vera per
+`p2p_ordini` e per il volto, ma va letta insieme al paragrafo nuovo: se
+Andrea la vuole più netta, è un ritocco di testo a parte.
