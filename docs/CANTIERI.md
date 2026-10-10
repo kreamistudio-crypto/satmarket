@@ -46100,3 +46100,28 @@ a caldo. Se conferma il deep link a freddo, la riga sotto «Apri nel
 wallet» per chi usa WoS (proposta a parte, tasto fermo finché Andrea non
 dice sì). La fattura di prova: dopo l'esperimento la rotta può uscire o
 restare come attrezzo; non è nel menu di nessuno.
+
+
+## La pagina di prova dei link al wallet, il verbale del push (10 ott 2026): cosa è girato su quale albero
+
+Main è corso DUE volte mentre il cantiere chiudeva: cinque commit
+(f5a0868 la scadenza di expiration_seconds, 07e4dce, 1e59d99, 105e126 e
+89ea7bc il login col bunker e il suo verbale) e, finiti i collaudi del
+primo rebase, altri quattro (89bf030 il controllo della fattura nel
+client, 0e0130d l'avviso del blocco sui filtri, a520c0b e d2c77ef «la
+stessa verità fuori da I tuoi dati»): due rebase, l'ultimo su d2c77ef,
+ogni volta un solo conflitto in coda a questo file, sciolto tenendo le
+due voci. Nessuno dei nove toccava le ancore del cantiere
+(`crea_invoice_escrow`, i due render del foglio P2P, la rotta di
+`offline.html`, il registro delle prove), e ogni simbolo nuovo è
+definito una volta sola. L'ultima CI di main era verde prima del push,
+guardata tutt'e due le volte. COSA È GIRATO SU QUALE ALBERO: sull'albero
+di 6bfa0b2 più il cantiere, la suite `PROVE_SEVERE=1` intera (21.326
+passate, 0 fallite), i 51 collaudi della CI nella gabbia (51 verdi) e il
+giro dal vivo nel pane; sul primo albero ribasato (89ea7bc) le sezioni
+toccate (691 verdi) e i 51 collaudi (51 verdi); sull'albero RIBASATO
+FINALE (d2c77ef più il commit del cantiere), le sezioni toccate (700
+verdi: la pagina di prova, il doppio wallet, la pagina d'acquisto, le
+anteprime, i due fogli P2P, la reputazione, apri-nel-wallet, onion) e i
+52 collaudi della CI, uno in più arrivato da main (52 verdi, 0 rossi);
+non la suite intera né il giro.
