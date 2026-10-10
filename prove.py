@@ -118231,7 +118231,13 @@ def prove_copertura_home():
           tg_.count("document.getElementById('copertura')?.remove();"))
 
     # --- 2) L'ATTESA DELLE IMMAGINI, VERA SOTTO NODE ------------------
-    fun = (pezzo_js(mini, "function immaginiInVista(){", "\n}\n") + "\n}\n"
+    # (10 ott 2026) il giudice del riquadro ha un nome suo
+    # (`immagineInVista`): lo chiedono in due, chi sceglie le immagini e
+    # chi smette di aspettarle quando escono (`decodificaInVista`)
+    fun = (pezzo_js(mini, "function immagineInVista(img){", "\n}\n") + "\n}\n"
+           + pezzo_js(mini, "function immaginiInVista(){", "\n}\n") + "\n}\n"
+           + _riga_js(mini, "const ATTESA_IMMAGINE_MAX = ") + "\n"
+           + pezzo_js(mini, "function decodificaInVista(img){", "\n}\n") + "\n}\n"
            + pezzo_js(mini, "async function immaginiPronte(){", "\n}\n")
            + "\n}\n")
     prova("contano solo le immagini nel riquadro dello schermo, e non il "
@@ -118241,7 +118247,9 @@ def prove_copertura_home():
               "r.width > 0 && r.height > 0 && r.bottom > 0" in fun])
     prova("...si aspettano DECODIFICATE, con allSettled, in due giri",
           [True, True, True], [
-              "img.decode ? img.decode() : Promise.resolve()" in fun,
+              "if (!img.decode) return Promise.resolve();" in fun
+              and "img.decode().then(fine, fine);" in fun
+              and "immaginiInVista().map(decodificaInVista)" in fun,
               "await Promise.allSettled(attese);" in fun,
               "for (let giro = 0; giro < 2; giro++) {" in fun])
     node = shutil.which("node")
@@ -118250,6 +118258,7 @@ def prove_copertura_home():
         return
     js = ("const fatti = [];\n"
           "globalThis.innerHeight = 700; globalThis.innerWidth = 360;\n"
+          "globalThis.requestAnimationFrame = f => setTimeout(f, 1);\n"
           "const R = (top, left, w, h) => ({top, left, width: w, height: h,"
           " bottom: top + h, right: left + w});\n"
           "const immagini = [];\n"
@@ -118295,6 +118304,80 @@ def prove_copertura_home():
               ["vista", "rotta", "cavallo"],
               ["cavallo", "cavallo", "nata", "rotta", "rotta", "vista",
                "vista"]], avuto)
+
+    # --- 2bis) CHI ESCE DALLA VISTA NON SI ASPETTA PIU' (10 ott 2026) --
+    # Dal giro dal vivo: arrivando su un reparto la pagina scorre, e le
+    # prime figurine della striscia — lazy, in vista un istante prima —
+    # escono dal riquadro prima di caricarsi: il loro `decode()` non
+    # risponde MAI, e la copertura la alzava il tetto dei due secondi.
+    prova("l'attesa finisce al decode OPPURE all'uscita dal riquadro, col giudice di "
+          "chi le ha scelte, e la guardia ha una fine sua", [True, True, True], [
+              "if (!immagineInVista(img) || Date.now() > scade) { fine(); return; }" in fun,
+              "return [...document.images].filter(immagineInVista);" in fun,
+              "const ATTESA_IMMAGINE_MAX = 4000;" in fun])
+    js_b = ("globalThis.innerHeight = 700; globalThis.innerWidth = 360;\n"
+            "globalThis.requestAnimationFrame = f => setTimeout(f, 1);\n"
+            "const R = (top, left, w, h) => ({top, left, width: w, height: h,"
+            " bottom: top + h, right: left + w});\n"
+            "const t0 = Date.now(); const ms = () => Date.now() - t0;\n"
+            "const mai = () => new Promise(() => {});\n"
+            "const dopo = n => new Promise(r => setTimeout(r, n));\n"
+            "const img = (nome, rect, decode) => ({nome, closest: () => null,"
+            " getBoundingClientRect: () => rect(), decode});\n"
+            + fun.replace("const ATTESA_IMMAGINE_MAX = 4000;",
+                          "const ATTESA_IMMAGINE_MAX = 120;") +
+            "(async () => {\n"
+            "  const esiti = {};\n"
+            # 1) la striscia che scorre via: tre figurine lazy che non
+            #    rispondono mai, in vista per 20 ms e poi fuori; e una che
+            #    ENTRA in vista con lo scorrimento e si decodifica
+            "  let scorsa = false; setTimeout(() => { scorsa = true; }, 20);\n"
+            "  const decodificate = [];\n"
+            "  globalThis.document = {images: [\n"
+            "    img('tutto', () => scorsa ? R(-300, 10, 90, 90) : R(60, 10, 90, 90), mai),\n"
+            "    img('consigliati', () => scorsa ? R(-300, 110, 90, 90) : R(60, 110, 90, 90), mai),\n"
+            "    img('elettronica', () => scorsa ? R(-300, 210, 90, 90) : R(60, 210, 90, 90), mai),\n"
+            "    img('card', () => scorsa ? R(200, 10, 160, 160) : R(900, 10, 160, 160),"
+            " () => dopo(5).then(() => { decodificate.push('card'); })),\n"
+            "    img('ferma', () => R(400, 10, 90, 90),"
+            " () => dopo(8).then(() => { decodificate.push('ferma'); }))]};\n"
+            "  let a = ms(); await immaginiPronte();\n"
+            "  esiti.striscia = [ms() - a < 110, decodificate.slice().sort()];\n"
+            # 2) chi RESTA in vista si aspetta, come prima: nessuna uscita anticipata
+            "  let finita = false;\n"
+            "  globalThis.document = {images: [img('lenta', () => R(100, 10, 90, 90),"
+            " () => dopo(60).then(() => { finita = true; }))]};\n"
+            "  a = ms(); await immaginiPronte(); esiti.resta = [finita, ms() - a >= 55];\n"
+            # 3) in vista e muta per sempre: la guardia ha una fine sua
+            #    (qui 120 ms per giro, due giri), poi il resto e' del tetto
+            "  globalThis.document = {images: [img('muta', () => R(100, 10, 90, 90), mai)]};\n"
+            "  a = ms(); await immaginiPronte(); const t = ms() - a;\n"
+            "  esiti.muta = [t >= 115, t < 900];\n"
+            # 4) un'immagine senza decode non si aspetta, come prima
+            "  globalThis.document = {images: [{nome: 'vecchia', closest: () => null,"
+            " getBoundingClientRect: () => R(100, 10, 90, 90)}]};\n"
+            "  a = ms(); await immaginiPronte(); esiti.senzaDecode = ms() - a < 30;\n"
+            "  console.log(JSON.stringify(esiti));\n"
+            "})().catch(e => { console.log(JSON.stringify({esplosa: String(e)})); });\n")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js_b)
+    try:
+        out = subprocess.run([node, f.name], capture_output=True,
+                             encoding="utf-8", timeout=60)
+        avuto_b = json.loads((out.stdout or "null").strip().splitlines()[-1])
+    except Exception as e:
+        avuto_b = {"esplosa": f"node: {e}"}
+    finally:
+        os.unlink(f.name)
+    prova("LA STRISCIA CHE SCORRE VIA: le figurine uscite dal riquadro non tengono su la "
+          "copertura, e il secondo giro prende quella entrata in vista",
+          [True, ["card", "ferma", "ferma"]], avuto_b.get("striscia", avuto_b))
+    prova("...chi RESTA in vista si aspetta fino in fondo, come prima", [True, True],
+          avuto_b.get("resta"))
+    prova("...in vista e muta per sempre: la guardia finisce da sola (il resto e' del tetto)",
+          [True, True], avuto_b.get("muta"))
+    prova("...e un'immagine senza `decode` non si aspetta", True, avuto_b.get("senzaDecode"))
 
     # --- 3) togliGuscio, VERA sotto node: l'ordine del gesto ----------
     js2 = ("let guscioVia = false, diagnosiTieneGuscio = false;\n"
@@ -119142,13 +119225,18 @@ def prove_effetti_ridotti():
     #   navArrivoSecco: due fotogrammi di ATTESA prima di ridare le
     #     transizioni (lo swipe di Chrome ha gia' mostrato l'arrivo) —
     #     non anima niente, le SPEGNE
+    #   decodificaInVista (10 ott 2026): una GUARDIA, un fotogramma alla
+    #     volta, che smette di aspettare un'immagine uscita dal riquadro
+    #     (il suo `decode()` non risponderebbe mai) — non anima niente, e
+    #     si ferma da sola al decode, all'uscita o ad ATTESA_IMMAGINE_MAX
     chi = collections.Counter()
     for m in re.finditer(r"requestAnimationFrame", js):
         nomi = re.findall(r"function\s+(\w+)\s*\(", js[:m.start()])
         chi[nomi[-1] if nomi else "?"] += 1
     prova("chi chiama requestAnimationFrame e' censito, col suo perche'",
-          {"togliGuscio": 2, "navArrivoSecco": 2, "avviaTour": 2,
-           "mostraTappa": 2, "barreCorri": 2, "lbApplica": 1, "passo": 2},
+          {"togliGuscio": 2, "decodificaInVista": 2, "navArrivoSecco": 2,
+           "avviaTour": 2, "mostraTappa": 2, "barreCorri": 2, "lbApplica": 1,
+           "passo": 2},
           dict(chi))
 
     # --- 5) PRIMA DEL PRIMO PAINT, E DOPO /me -----------------------

@@ -48164,3 +48164,120 @@ altri collaudi NON rifatti sull'ultima punta (i due commit arrivati
 toccano l'indirizzo Lightning, non il P2P). Tortura non fatta. LA CI DI
 MAIN prima del push: aspettata verde la punta 450d4ac, e poi la 0a2d3a4.
 Il sì al push è di Andrea: stava nel brief incollato («Ok al push»).
+
+## La copertura che aspettava un'immagine uscita dallo schermo, e la Mini App col nome breve (10 ott 2026, sera, cantiere copertura-filtri, richieste di Andrea)
+
+**1. IL RITARDO DI ESPLORA: LA CAUSA NON ERA IL PREZZO MASSIMO.** Nel
+verbale di prima avevo scritto «con `?max=` nell'indirizzo la copertura
+scende a 2,3 secondi»: la misura era vera, la causa detta no. Rimisurato
+indirizzo per indirizzo: `/?max=…` scende a mezzo secondo, come la
+home; a scendere tardi è l'arrivo su un REPARTO (`/categoria/<slug>`),
+col tetto o senza — e non sempre: è una gara, per questo nel giro di
+prima il reparto nudo era uscito veloce e quello col tetto no.
+LA CAUSA, misurata immagine per immagine dentro `immaginiPronte`:
+arrivando su un reparto la pagina scorre fino agli strumenti, e le
+prime tre figurine della striscia delle categorie (`tutto`,
+`consigliati`, `elettronica`) — che un istante prima erano nel riquadro
+dello schermo, e per questo si aspettavano — ne escono prima che il
+browser abbia cominciato a scaricarle. Sono `loading="lazy"`: fuori
+dalla vista non si scaricano più, e il loro `decode()` non risponde
+MAI, né sì né no. `allSettled` copre l'immagine che fallisce, non
+quella che tace: il primo giro restava appeso, il secondo non partiva,
+e la copertura la alzava il tetto dei due secondi.
+LA CURA è la regola detta fino in fondo: si aspettano le immagini che
+stanno nel riquadro — e una che non c'è più non è più fra quelle.
+`decodificaInVista`: ogni attesa finisce al `decode()` OPPURE quando
+l'immagine esce dal riquadro, guardato a ogni fotogramma con lo stesso
+giudice di chi le ha scelte (`immagineInVista`, che ha preso un nome
+suo). Chi resta in vista si aspetta come prima; la guardia ha una fine
+sua (`ATTESA_IMMAGINE_MAX`, quattro secondi) perché un'immagine in
+vista che non arriva mai non tenga acceso un giro di fotogrammi per
+sempre. STRADE SCARTATE: un tempo massimo corto per ogni immagine
+(avrebbe tagliato anche le attese buone su una rete lenta); togliere
+`lazy` alla striscia (curava questo caso e non il prossimo).
+PROVATO: `prove_copertura_home` (20): la striscia che scorre via, in
+node coi pezzi veri — le tre figurine mute uscite dal riquadro non
+tengono su niente, e il secondo giro prende la card entrata in vista —;
+chi resta si aspetta fino in fondo; la muta per sempre finisce da sola;
+senza `decode` non si aspetta. TORTURA sulla copia: 13 mutazioni su 13
+mordono (chi esce si aspetta ancora, la guardia senza fine, chi resta
+lasciato, il giro solo, il riquadro senza un lato...). Il censimento di
+chi chiama `requestAnimationFrame` ha preso `decodificaInVista` col suo
+perché: è una guardia, non anima niente. DAL VIVO (Chrome a 390×844, Playwright,
+copia in collaudo, una sonda che annota quando scende la copertura):
+prima della cura `/categoria/motori` 2318 ms e
+`/categoria/motori?max=49.5&valuta=eur` 2334 ms, con le tre figurine
+«appese»; dopo, su cinque giri, fra 417 e 532 ms — il reparto nudo, col
+tetto, altri due reparti, e dal link della Mini App
+(`startapp=cat_motori_max4950e`, 458-467 ms) — come la home (476-557).
+
+**2. LA MINI APP COL NOME BREVE, per riavere un'anteprima con
+l'immagine.** Andrea ha scelto la prima delle tre strade. Cercata la
+procedura nella documentazione UFFICIALE (core.telegram.org:
+bots/webapps, bots/features, api/bots/webapps, api/links, i costruttori
+`botApp`, `webPage`, `messageMediaWebPage`, `inputMediaWebPage`, il
+registro delle modifiche fino alla 5.1; e tre post del blog).
+COSA C'È SCRITTO: il link ha la forma `t.me/<bot>/<nome>?startapp=…`
+(«a single bot can offer multiple named mini apps, distinguished by
+their short_name»); l'app ha un titolo, una descrizione, una FOTO
+obbligatoria («bot mini app photo»), un'animazione facoltativa e il
+nome breve; in chat l'anteprima di quel link è del tipo
+`telegram_botapp`: «the photo is the app preview, and clients render a
+button that opens the Mini App». Per il link di OGGI (la Mini App
+principale, tipo `app`) la foto è invece «the app icon».
+COSA NON C'È SCRITTO, e quindi non lo scrivo nemmeno io: il comando di
+BotFather che la crea, i campi che chiede e in che ordine, le MISURE
+della foto (i «640×360» che girano non sono in nessuna pagina letta), i
+caratteri e la lunghezza del nome breve, se un bot può avere insieme la
+Mini App principale e una col nome (i due meccanismi sono descritti
+separati, mai detti incompatibili). La pagina dei bot rimanda a
+BotFather stesso: «simply type / in the input field to see the full
+list». Quindi la procedura si fa leggendo quel che BotFather risponde,
+un messaggio alla volta.
+LA MINIATURA PICCOLA: per i messaggi scritti da una persona il blog
+dice che chi scrive può cambiare la misura dell'anteprima («You can
+change the size of media», 28 ott 2023), ma vale solo dove la pagina lo
+permette (`webPage.has_large_media`: «Whether the size of the media in
+the preview can be changed») e per le anteprime delle Mini App non è
+scritto se lo permetta. Per i messaggi del BOT c'è
+`prefer_small_media`, «ignored if … media size change isn't supported
+for the preview». Quale delle due immagini dia la miniatura piccola,
+quindi, non lo dice nessuna fonte: si vede provando.
+LE IMMAGINI, dal barattolo di casa (`assets/barattolo-icona-sorgente.jpeg`,
+2048 px), senza scritte — titolo e descrizione li mette Telegram —:
+la grande 1280×720 (e 640×360), col fondo arancio che continua ai lati
+riga per riga, e la quadrata 640×640 (e 400×400). Stanno in
+`.claude/giri/anteprima-miniapp/` (fuori dal repo: sono da caricare su
+BotFather, non le serve il sito).
+E UNA CORREZIONE A QUEL CHE AVEVO SCRITTO: per `startapp` la lunghezza
+massima È documentata, 512 caratteri, nel registro delle modifiche
+della Bot API 6.8; non lo sono i caratteri. Il codice resta dentro i
+limiti di `start` (64, A-Z a-z 0-9 _ -), i soli scritti per intero; il
+commento in server.py è corretto.
+NEL CODICE non cambia niente: la forma `https://t.me/<bot>/<nome>` la
+leva la regge dal primo giorno. Con quella forma il controllo all'avvio
+guarda il solo nome del bot (`getMe` non dice delle app col nome).
+
+**3. IL TESTO PRIMA DEL LINK VA ANCORA PROVATO SU TELEGRAM VERO.** Nel
+selettore delle chat il messaggio viaggia intero nel campo `url` (il
+testo, a capo il link t.me): è provato in node e dal vivo con un
+registratore al posto del selettore, NON su un Telegram vero. Lo prova
+Andrea dal telefono: Android, iPhone e desktop. Se un client lo
+rifiutasse, il ripiego è tornare a `url` + `text` (il link prima).
+
+**VERBALE DEL PUSH (copertura-filtri): cosa è girato su quale albero.**
+Main è corso cinque volte durante il giro. SUL CANTIERE NUDO (sopra
+6b4eb19): la suite intera, 21770 passate e 0 fallite; i 56 collaudi del
+workflow, verdi; la tortura, 13 su 13; i due passi dello scanner dei
+segreti. SUL PRIMO REBASE (sopra 010f98c: il cambio sul libro P2P, la
+tendina di Android, i gesti del PayCode): la suite intera, 21832 e 0; i
+57 collaudi, verdi; lo scanner. SULL'ALBERO CHE PARTE (sopra 41ae6c8:
+in più Wallet of Satoshi, il sollecito del recapito, l'indirizzo
+Lightning di casa e il riquadro dei contanti): le sezioni
+toccate — `prove_copertura_home`, `prove_effetti_ridotti` (il
+censimento), `prove_link_dentro_telegram`,
+`prove_condividi_ordine_p2p`: 236 e 0 —, lo scanner, la sintassi di
+server.py e degli script della pagina. La suite intera e i collaudi su
+QUESTO albero li gira la CI. A ogni rebase un solo conflitto, la coda
+di questo file, risolto tenendo tutt'e due i lati. Il giro dal vivo è
+quello del cantiere nudo.

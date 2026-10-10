@@ -15221,9 +15221,14 @@ def spoglia_html(testo: str) -> str:
 # Nostr, il foglio di condivisione del telefono e gli appunti restano
 # barattolo.store: fuori da Telegram un t.me non serve a niente.
 # I LIMITI DEL PARAMETRO: per `startapp` la documentazione di Telegram
-# NON ne scrive (verificato il 10 ott 2026 su core.telegram.org); per il
-# fratello `start` scrive «A-Z, a-z, 0-9, _ e -», 64 caratteri al
-# massimo. Si sta dentro QUELLI, che sono i piu' stretti: un id d'ordine
+# scrive la sola LUNGHEZZA — 512 caratteri, nel registro delle modifiche
+# della Bot API 6.8 («Increased to 512 characters the maximum length of
+# the startapp parameter in direct Web App links») — e non i caratteri.
+# (CORRETTO la sera del 10 ott 2026: la prima stesura diceva «non ne
+# scrive», perche' la riga sta nel changelog e non nelle pagine dei
+# link, lette per prime.) Per il fratello `start` scrive anche quelli:
+# «A-Z, a-z, 0-9, _ e -», 64 caratteri al massimo. Si sta dentro
+# QUELLI, che sono i piu' stretti e i soli scritti per intero: un id d'ordine
 # e' un UUID (36 caratteri, cifre lettere e trattini) e col suo nome
 # davanti fa 43 o 44. Un parametro che uscisse dalla forma o dalla
 # misura NON si tronca e non si codifica: il link resta quello del sito.

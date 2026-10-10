@@ -61,7 +61,13 @@ TELEGRAM_WEBHOOK_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
 #       va accesa in BotFather (/mybots > il bot > Bot Settings >
 #       Configure Mini App > Enable Mini App), con l'indirizzo del sito;
 #   "https://t.me/ilbarattolobot/<app>"  una Mini App col suo nome breve,
-#       creata in BotFather (/newapp).
+#       creata in BotFather. ⚠️ La procedura NON e' nella documentazione
+#       ufficiale di Telegram (cercata il 10 ott 2026: ne' il comando ne'
+#       le misure dell'immagine): la dice BotFather stesso, passo per
+#       passo. Di ufficiale c'e' solo che l'app ha un titolo, una
+#       descrizione, una FOTO obbligatoria, un'animazione facoltativa e
+#       il nome breve, e che in chat il suo link mostra quella foto con
+#       un bottone che apre la Mini App.
 # ⚠️ VUOTA NEL CODICE, e si accende SOLO dopo aver guardato BotFather:
 # un link `?startapp=` verso un bot senza la Mini App principale apre la
 # chat del bot e basta, e la destinazione si perde. All'avvio il server

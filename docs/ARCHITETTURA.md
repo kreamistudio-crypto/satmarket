@@ -24792,7 +24792,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   la classe `copertura` dentro Telegram e nel browser, con una rete sua
   nell'head (a pagina letta, quattro secondi). Tutt'e due scendono a
   HOME FINITA: vetrina disegnata e font, poi le immagini nel riquadro
-  dello schermo DECODIFICATE (`immaginiPronte`: due giri, `allSettled`)
+  dello schermo DECODIFICATE (`immaginiPronte`: due giri, `allSettled`;
+  dal 10 ott 2026 ogni attesa è di `decodificaInVista` e finisce anche
+  quando l'immagine ESCE dal riquadro — una figurina `lazy` scorsa via
+  prima di caricarsi non risponde mai al `decode()`, e arrivando su un
+  reparto teneva su la copertura fino al tetto; il giudice del riquadro
+  è uno, `immagineInVista`, e la guardia finisce da sola dopo
+  `ATTESA_IMMAGINE_MAX`: CANTIERI, «La copertura che aspettava
+  un'immagine uscita dallo schermo»)
   — il primo render della griglia arriva sempre dopo la busta del
   server, quindi a quel punto «Da scoprire» ha già la sponsorizzata e
   le offerte. Il tetto è di due secondi dall'avvio dell'app
@@ -30594,7 +30601,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Telegram (`getMe`) e `_giudizio_link_miniapp` la spegne se il bot non
   è questo o non ha la Mini App principale. IL PARAMETRO è un
   vocabolario chiuso, dentro i limiti che Telegram scrive per `start`
-  (A-Z a-z 0-9 _ -, 64): `p2p`, `scambio_<id>`, `ordine_<id>`. TRE
+  (A-Z a-z 0-9 _ -, 64; per `startapp` scrive la sola lunghezza, 512,
+  nel registro della Bot API 6.8): `p2p`, `scambio_<id>`, `ordine_<id>`. TRE
   GEMELLI: `_startapp_da_link` (server) e `startappDaLink` (client) lo
   scrivono, `percorsoDaStartapp` (client) lo rilegge. SI TRADUCE in due
   posti soli, tutt'e due verso Telegram: `_manda_telegram` (il bottone

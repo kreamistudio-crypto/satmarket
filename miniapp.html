@@ -14523,18 +14523,58 @@ setTimeout(togliGuscio, TETTO_APERTURA);
    prende quelle. Di piu' non serve, e a tenere il conto c'e' il tetto.
    `allSettled`: un'immagine che non arriva (un 404, una rete che cade)
    non deve tenere su la copertura — ci pensa il suo ripiego. */
+function immagineInVista(img){
+  if (img.closest('#guscio')) return false;
+  const r = img.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && r.bottom > 0
+    && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
+}
 function immaginiInVista(){
-  return [...document.images].filter(img => {
-    if (img.closest('#guscio')) return false;
-    const r = img.getBoundingClientRect();
-    return r.width > 0 && r.height > 0 && r.bottom > 0
-      && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
+  return [...document.images].filter(immagineInVista);
+}
+/* CHI ESCE DALLA VISTA NON SI ASPETTA PIU' (10 ott 2026, dal giro dal
+   vivo: arrivando su un reparto la copertura scendeva dopo due secondi
+   invece che a mezzo — cioe' la alzava il TETTO, non la home finita).
+   LA CAUSA, misurata immagine per immagine: su `/categoria/<reparto>`
+   la pagina scorre fino agli strumenti del reparto, e le prime figurine
+   della striscia delle categorie — che un istante prima ERANO nel
+   riquadro, e per questo si aspettavano — ne escono prima che il
+   browser abbia cominciato a scaricarle. Sono `loading="lazy"`: fuori
+   dalla vista non si scaricano piu', e il loro `decode()` non risponde
+   MAI — ne' si', ne' no. `allSettled` copre l'immagine che fallisce,
+   non quella che tace: il primo giro restava appeso, il secondo (che
+   avrebbe preso le immagini arrivate in vista con lo scorrimento) non
+   partiva, e a scoprire la pagina era il tetto dei due secondi.
+   LA CURA E' LA REGOLA DETTA FINO IN FONDO: si aspettano le immagini
+   che stanno nel riquadro dello schermo — e un'immagine che NON C'E'
+   PIU' non e' piu' fra quelle. Ogni attesa finisce al `decode()` (bene
+   o male) OPPURE quando l'immagine esce dal riquadro, guardato a ogni
+   fotogramma con lo stesso giudice di chi le ha scelte
+   (`immagineInVista`). Chi resta in vista si aspetta come prima.
+   LA GUARDIA HA UNA FINE SUA (`ATTESA_IMMAGINE_MAX`): un'immagine in
+   vista che non arriva mai (una rete ferma) non deve tenere acceso un
+   giro di fotogrammi per sempre; la copertura, in quel caso, la alza
+   il tetto come ieri. A pagina nascosta i fotogrammi non girano e
+   l'attesa e' quella di prima: resta il tetto. */
+const ATTESA_IMMAGINE_MAX = 4000;
+function decodificaInVista(img){
+  if (!img.decode) return Promise.resolve();
+  return new Promise(fatto => {
+    let viva = true;
+    const scade = Date.now() + ATTESA_IMMAGINE_MAX;
+    const fine = () => { viva = false; fatto(); };
+    img.decode().then(fine, fine);
+    const guarda = () => {
+      if (!viva) return;
+      if (!immagineInVista(img) || Date.now() > scade) { fine(); return; }
+      requestAnimationFrame(guarda);
+    };
+    requestAnimationFrame(guarda);
   });
 }
 async function immaginiPronte(){
   for (let giro = 0; giro < 2; giro++) {
-    const attese = immaginiInVista().map(img =>
-      img.decode ? img.decode() : Promise.resolve());
+    const attese = immaginiInVista().map(decodificaInVista);
     if (!attese.length) return;
     await Promise.allSettled(attese);
   }

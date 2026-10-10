@@ -3314,8 +3314,24 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
      accesa (o la si accende lì: Enable Mini App, con l'indirizzo
      `https://barattolo.store/?v=2`, lo stesso del bottone di menu), la
      riga è `TELEGRAM_MINIAPP_LINK = "https://t.me/ilbarattolobot"`. Se
-     invece si preferisce una Mini App col nome breve (`/newapp`), la
+     invece si preferisce una Mini App col nome breve, la
      riga porta anche il nome: `"https://t.me/ilbarattolobot/<nome>"`.
+     ⚠️ LA MINI APP COL NOME BREVE (10 ott 2026, sera): è la strada per
+     riavere in chat un'anteprima con l'IMMAGINE. La sua creazione NON
+     è nella documentazione ufficiale di Telegram — né il comando, né i
+     campi, né le misure della foto —: la guida è BotFather stesso («type
+     / in the input field to see the full list», dice la pagina dei bot).
+     Di ufficiale c'è che l'app ha titolo, descrizione, una foto
+     OBBLIGATORIA, un'animazione facoltativa e il nome breve, e che il
+     link `t.me/<bot>/<nome>` in chat mostra quella foto con un bottone
+     che apre la Mini App. Le immagini pronte, dal barattolo di casa:
+     `anteprima-miniapp-grande-1280x720.jpg` (e 640x360) e
+     `anteprima-miniapp-quadrata-640x640.jpg` (e 400x400), rifatte da
+     `assets/barattolo-icona-sorgente.jpeg`. Con questa forma il server
+     NON può chiedere a Telegram se l'app esiste (`getMe` dice solo della
+     Mini App principale): all'avvio controlla il solo nome del bot, e la
+     prova a mano del punto 2 va fatta sul link col nome —
+     `https://t.me/ilbarattolobot/<nome>?startapp=p2p`.
   2) LA PROVA A MANO, prima del config: dal telefono, in una chat
      qualunque, toccare `https://t.me/ilbarattolobot?startapp=p2p`. Deve
      aprirsi la Mini App sul libro degli ordini. Se si apre la chat del
