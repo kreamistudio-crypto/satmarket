@@ -29629,9 +29629,16 @@ async function confermaCompraSubito(btn){
   }
 }
 
+/* LA COPIA DELL'INVOICE PASSA DALL'ULTIMO GRADINO (10 ott 2026,
+   cantiere cookie-onion): la forma `navigator.clipboard?.writeText(t)`
+   seguita dal toast diceva «copiata» anche dove gli appunti non ci
+   sono — su http nudo, cioe' sull'onion da Chrome con Orbot — e
+   l'invoice restava dove stava. `copiaLink` prova gli appunti, poi la
+   copia all'antica, e se non puo' scrive il testo nel toast: mai una
+   bugia. */
 function copiaInvoice(){
   const t = el('payInvoice').textContent;
-  if (t.startsWith('ln')) { navigator.clipboard?.writeText(t); toast('📋 Invoice copiata'); }
+  if (t.startsWith('ln')) copiaLink(t, '📋 Invoice copiata');
 }
 
 /* ---------------- il QR vero della invoice (ago 2026) ----------------

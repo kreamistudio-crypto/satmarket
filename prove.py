@@ -37972,6 +37972,47 @@ def prove_seo():
         # scala aprirebbe il selettore chat di Telegram, che e'
         # un'altra cosa da quella che quel bottone promette
         prova(f"...e resta i soli appunti", False, "condividiLink(" in f)
+    # LA COPIA DELL'INVOICE (10 ott 2026, cantiere cookie-onion, notata
+    # censendo cio' che manca su http nudo): era rimasta alla forma
+    # muta, col toast «copiata» scritto a prescindere — e su un
+    # contesto non sicuro l'invoice non andava da nessuna parte. Si
+    # GIRA, non si guarda: appunti assenti e appunti presenti.
+    ci = pezzo_js(testo_mini, "function copiaInvoice(){", "\n}\n")
+    prova("copiaInvoice passa dall'ultimo gradino", True, "copiaLink(" in ci)
+    prova("...e non torna alla forma muta", False,
+          "navigator.clipboard" in ci or "toast(" in ci)
+    import subprocess as _spc
+    _banco_ci = "\n".join([
+        "let toasti = []; function toast(m, ms){ toasti.push(ms ? [m, ms] : [m]); }",
+        "const INVOICE = 'lnbc10u1p3finta0invoice0di0cartone';",
+        "function el(id){ return {textContent: INVOICE}; }",
+        "let navigator = {};",
+        ci + "\n}", pezzo_js(testo_mini, "function copiaLink(", "\n}\n") + "\n}",
+        pezzo_js(testo_mini, "function copiaAllAntica(", "\n}\n") + "\n}",
+        "(async () => {",
+        "  copiaInvoice(); await new Promise(r => setTimeout(r, 0));",
+        "  const senza = toasti.slice(); toasti = []; let copiato = null;",
+        "  navigator = {clipboard: {writeText: t => { copiato = t; return Promise.resolve(); }}};",
+        "  copiaInvoice(); await new Promise(r => setTimeout(r, 0));",
+        "  console.log(JSON.stringify({senza, con: toasti, copiato}));",
+        "})().catch(e => console.log(JSON.stringify({rotto: String(e && e.stack || e)})));",
+    ])
+    _r = _spc.run(["node", "-e", _banco_ci], capture_output=True, text=True,
+                  encoding="utf-8", timeout=60)
+    try:
+        v = json.loads((_r.stdout or "").strip().splitlines()[-1])
+    except Exception:
+        v = None
+    if not v or "rotto" in v:
+        prova("il banco della copia dell'invoice gira", True,
+              f"node ha detto: {((v or {}).get('rotto') or _r.stderr or '')[:400]}")
+    else:
+        prova("senza appunti (http nudo) il toast porta l'invoice da copiare "
+              "a mano, non «copiata»",
+              [["lnbc10u1p3finta0invoice0di0cartone", 5000]], v["senza"])
+        prova("...e con gli appunti copia e lo dice",
+              ("lnbc10u1p3finta0invoice0di0cartone", [["📋 Invoice copiata"]]),
+              (v["copiato"], v["con"]))
 
     # IL POSTO: NON C'E' PIU' UN BOTTONE (ago 2026, decisione di Andrea
     # che ROVESCIA il giro prima). Il reparto si condivide TENENDO
