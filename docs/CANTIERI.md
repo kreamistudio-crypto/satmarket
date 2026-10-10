@@ -46009,3 +46009,20 @@ vecchie (`prove_p2p_dettaglio`, `prove_parti_si_vedono` — compresa
 l'ancora viva del censimento —, `prove_recensione_p2p`). Suite `PROVE_SEVERE=1` sull'albero di 6bfa0b2 più il ritocco: 21.302 passate, 0 fallite; i 51 collaudi della CI nella gabbia: 51 verdi. Niente
 giro dal vivo: sono frasi dentro righe che non cambiano forma, e i
 banchi in node di quelle prove le disegnano con le funzioni vere.
+
+**IL PUSH (10 ott 2026, pomeriggio, con l'ok di Andrea).** Main è
+corso TRE volte mentre si provava e si aspettava la sua CI: cinque
+commit (il login col bunker, la riga di CLAUDE.md sulla scadenza), poi
+89bf030 (il controllo della fattura, seconda tappa: il primo push è
+stato respinto per lui), poi 0e0130d (l'avviso del blocco sui filtri).
+Tre rebase, l'ultimo su 0e0130d; ogni volta il solito conflitto
+delle voci appese in fondo a questo file, tenute tutte. COSA È GIRATO
+SU QUALE ALBERO: sull'albero di 6bfa0b2 più il ritocco, la suite intera
+(21.302 passate, 0 fallite) e i 51 collaudi della CI; sull'albero
+FINALE le diciotto sezioni che leggono la pagina dei dati, il
+dettaglio, le parti e le recensioni del P2P, la reputazione e gli
+avvisi del libro (1.674 passate, 0 fallite), non i collaudi:
+sono testi e prove. PRIMA DEL PUSH guardata la CI di main: l'ultima
+corsa conclusa verde, e nelle corse ancora in giro il job dei segreti
+già verde — aspettarle tutte fino in fondo voleva dire farsi superare
+un'altra volta (la regola di «main che corre»: non si insegue).
