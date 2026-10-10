@@ -47444,3 +47444,140 @@ alla stessa origine, `connect-src 'self'`, e `collaudo_csp` è verde).
 LA CI DI MAIN prima del push: ho aspettato la punta (`6b4eb19`),
 verde, come le due prima di lei. Il sì al push è di Andrea: stava nel
 brief incollato, e l'ho richiesto prima di spingere.
+
+
+## I gesti prima di pagare il PayCode: il punto abilitato, la frase per la cassa, lo scontrino, il buono regalo (10 ott 2026, sera, cantiere guida-paycode, richiesta di Andrea dal campo)
+
+**IL FATTO.** Un compratore Barattozon è entrato in una tabaccheria
+PuntoLis e la cassiera, invece di pagare il PayCode, gli ha emesso un
+Buono Regalo Amazon da 111,80 €. Il PayCode si paga SOLO nei punti
+abilitati; la «ricarica in cassa» e i buoni regalo (sul sito di PuntoLis
+stanno fra i «Codici acquisto») si fanno in molte più tabaccherie, ma
+NON pagano l'ordine. Il nostro riquadro diceva «Vai in tabaccheria, al
+bar, in edicola o alla posta: dove si accettano i pagamenti Amazon in
+contanti»: è la riga che l'ha mandato lì.
+
+**COSA SI È DECISO, IN TRE GIRI DELLA STESSA SERA.** I quattro gesti
+del riquadro di chi paga (`riquadroPayCodeP2P`) restano quattro, ma
+dicono dove, cosa dire e cosa guardare. I testi definitivi:
+1. «**Trova un punto abilitato**: mappa di Amazon (serve un account).
+   Non ce l'hai? Scrivi il tuo CAP a chi vende: lo cerca lui.»
+2. «Mostra il codice alla cassa: **«Devo pagare un ordine Amazon in
+   contanti con un PayCode»**. Non una ricarica, non un buono regalo.»
+3. «Controlla lo scontrino: **pagamento dell'ordine**, non «codice
+   acquisto» o buono. Tienilo: è la tua prova.»
+4. «Torna qui e tocca «Ho pagato al tabacchino»» (invariato).
+Sotto la lista, sul rosso tenue delle ultime ore (`.p2p-paycode-buono`,
+i due colori del tema): «⚠️ **Ti danno un buono regalo?** Non toccare
+«Ho pagato»: scrivi a chi vende e decidete insieme.»
+«Info P2P» dice le stesse cose nel passo «Chi compra va a pagare» (lì
+con «senza commissione» e col perché) e ha un paragrafo suo, «**Se ti
+danno un buono regalo.**», dopo «Se scade». La guida dei tutorial
+(GUIDA-P2P-PASSI, §7b e «cosa va storto») porta i testi esatti.
+
+**LA MAPPA.** `LINK_MAPPA_PAYCODE` è l'indirizzo dato da Andrea
+(`https://www.amazon.it/cpe/locations/paycode`), scritto una volta, e
+`apriMappaPayCodeP2P` lo apre con la scala di casa di `apriLinkGuida`:
+dentro Telegram `tg.openLink`, fuori una scheda nuova con `noopener`.
+Niente foglio di conferma: l'indirizzo è nostro, non di un utente. Nel
+riquadro è un bottone vestito da link (`.scopri-link`), mai l'indirizzo
+scritto.
+
+**IL SECONDO GIRO: LA MAPPA CHIEDE UN ACCOUNT.** Verificato aprendola
+senza accesso: rimanda alla pagina «Sign in» di Amazon (uno qualsiasi,
+non quello dell'ordine). Chi paga non è chi ha fatto l'ordine, può non
+avere un account e stare in un'altra città. Quindi il primo gesto dice
+«serve un account» e dà l'altra strada, il CAP a chi vende; e a chi
+vende, a sats in garanzia (lo stato `attivo`, quando l'altro esce a
+pagare), una riga sotto il suo gesto (`promemoriaMappaVendoP2P`, pura,
+montata dopo `avvisoRecapitoFermoP2P`): «🗺️ Se chi paga ti scrive il suo
+CAP, cercagli un punto abilitato sulla mappa di Amazon.» Non compare a
+«pagato», a chi compra, con gli altri metodi, a scambio finito.
+⚠️ «SCRIVI A CHI VENDE» E NON «NELLA CHAT DELLO SCAMBIO», come diceva
+la richiesta: nella pagina dello scambio una chat fra le due parti non
+c'è. Ci sono i tasti del profilo dell'altra persona
+(`profiloControparteP2P`: Telegram, Nostr) e «🤝 I vostri recapiti»,
+cifrati; la sola chat è quella col moderatore, a disputa aperta. Una
+frase che manda a una chat che non esiste è un altro modo di perdersi.
+Segnalato ad Andrea.
+
+**IL TERZO GIRO: CORTI** (parola di Andrea: «non fare il testo troppo
+lungo, alleggeriscilo il più possibile, resta elegante»). La scatola è
+uno strumento che si riapre alla cassa, e la prima stesura la portava a
+sedici righe di gesti. Una frase per gesto; via «apri», «vicino a te»,
+«col tuo account Amazon», «dal suo profilo qui sotto», «prima di
+uscire», «deve riportare»; l'importo NON si ripete nel secondo gesto
+(sta due righe sopra, «Importo … in contanti») e «senza commissione»
+esce dal riquadro e resta a «Info P2P». A 375 px la lista dei gesti è
+alta 266 px (undici righe) e il riquadro intero sta in una schermata.
+Un TETTO provato lo tiene così: nessun gesto oltre 130 caratteri di
+testo, i quattro insieme sotto i 400, nessuna cifra e nessun «€» nei
+gesti. Chi allunga un gesto deve accorciarne un altro, non alzare il
+tetto.
+
+**LE FONTI PUBBLICHE (richiesta di Andrea: dirle PRIMA di usarle).**
+Guardate il 10 ott 2026, senza accedere a nessun account (Andrea l'ha
+vietato, e la pagina di accesso è il punto in cui ci si ferma):
+- `amazon.it/cpe/locations/paycode` (la mappa): chiede l'accesso.
+- `amazon.it/pagaincontanti` (pubblica): «Ora in oltre 35.000 punti
+  vendita PuntoLis e Western Union»; il suo «Cerca un punto vendita»
+  porta alla stessa mappa con l'accesso. Le domande frequenti danno la
+  frase per la cassa («comunica al cassiere che desideri pagare un
+  ordine Amazon in contanti e fornisci il codice a barre o numerico») e
+  la differenza con «Ricarica in cassa», che ricarica il saldo buono
+  regalo PRIMA dell'acquisto: è esattamente lo scambio di oggi.
+- `puntolis.it/it/pagamenti/amazon-paga-in-contanti.html` (pubblica):
+  il servizio visto da PuntoLis, «uno dei tanti PuntoLis abilitati al
+  servizio» — quindi non tutti. Il suo «Cerca il punto vendita»
+  (`puntolis.it/it/servizi-al-cittadino.html`) è PUBBLICO, cerca per
+  indirizzo, città o CAP e ha il filtro «Servizi al cittadino → Amazon
+  Paga in Contanti»; provato con un CAP di Torino, dà l'elenco coi
+  telefoni. Limiti: il filtro va spuntato a mano (nessun indirizzo che
+  lo porti già scelto), copre i soli PuntoLis, e in centro città non ho
+  potuto dimostrare che il filtro stringa l'elenco (cinquanta righe con
+  e senza).
+- `location.westernunion.com` (pubblica): le agenzie, ma senza un
+  filtro per Amazon — non è una fonte per questo.
+IL LINK PUBBLICO NON È STATO MESSO: aspetta il sì di Andrea sulla fonte
+PuntoLis.
+
+**LE STRADE SCARTATE.** Tenere la riga dei quattro posti accanto alla
+nuova (due frasi che si contraddicono, e una è quella dell'errore).
+Aggiungere un quinto gesto (i gesti restano quattro, l'avviso sta
+sotto). Scrivere l'indirizzo della mappa nel testo (lungo, e non si
+tocca). La frase «nella chat dello scambio» (vedi sopra). La riga di
+chi vende in tutti gli stati (serve mentre l'altro esce a pagare, e
+basta). Ripetere l'importo e «senza commissione» nel secondo gesto (la
+stesura lunga: tolti al terzo giro). Toccare la conferma «Hai pagato il
+PayCode al tabacchino?» e gli avvisi del server: non chiesti, elencati
+ad Andrea.
+
+**PROVATO.** `prove_p2p_paycode` emendata dove guardava le frasi
+vecchie e allargata (135 prove nella sezione): i quattro gesti e il
+loro ordine, il bottone della mappa e non l'indirizzo, «serve un
+account» e la strada del CAP (e la parola «chat» assente), la frase per
+la cassa, lo scontrino, il tetto di lunghezza e l'importo non ripetuto,
+l'avviso del buono una volta e prima delle spiegazioni, il riquadro
+senza importo, zero copie della riga vecchia in tutto il file (un mio
+commento che la ricopiava ha fatto rossa una suite: tolto),
+l'indirizzo scritto una volta, la scala di casa col `noopener`, la riga
+di chi vende nel solo stato giusto e montata una volta, i tre posti che
+chiamano la mappa, il CSS coi colori del tema, «Info P2P» e la guida
+dei tutorial con le stesse parole. Tortura sulla copia intera: 26
+mutazioni su 26 uccise, giro a codice intatto verde prima e dopo. Dal
+vivo sul server della copia (collaudo, relay morto, CSP accesa) con
+Playwright: Chrome a 375, Chrome a 320 col tema scuro, Chrome dentro il
+finto Telegram, WebKit «iPhone 13» — 47 controlli verdi: i testi letti
+dal DOM, il contrasto dell'avviso (4,69 di giorno, 5,25 di notte),
+niente sfora di lato, il tocco vero che apre la scheda sull'indirizzo
+di Amazon (letto dalla richiesta intercettata e abortita: Amazon non è
+stato caricato) senza opener, `web_app_open_link` dentro Telegram, la
+riga di chi vende presente a sats in garanzia e assente a «pagato»,
+nessun rifiuto della CSP. Nel Browser pane lo stesso riquadro, alla
+prima stesura; poi gli scatti lì uscivano bianchi (finestra dietro), da
+qui Playwright. Suite e collaudi: nel verbale del push.
+
+**DA GUARDARE.** Sul telefono vero: il link della mappa dentro Telegram
+e nell'APK. La decisione sul link pubblico di PuntoLis. La conferma
+«Hai pagato il PayCode al tabacchino?» e gli avvisi Telegram del
+percorso non dicono ancora niente del buono regalo.

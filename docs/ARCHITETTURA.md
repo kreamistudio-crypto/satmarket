@@ -27184,6 +27184,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   il PayCode o lo sconto al server, quindi nessun giudice lato server
   su di loro: e' scritto, non dimenticato. Il verbale: CANTIERI, «Il
   percorso guidato di Barattozon».
+  I GESTI PRIMA DI PAGARE (10 ott 2026, guida-paycode, dal campo: una
+  cassiera ha emesso un buono regalo al posto del pagamento). I
+  quattro gesti di `riquadroPayCodeP2P` dicono DOVE (un punto
+  abilitato: la mappa di Amazon, `apriMappaPayCodeP2P` su
+  `LINK_MAPPA_PAYCODE`, con la scala di `apriLinkGuida` — la mappa
+  chiede un account Amazon, e chi non ce l'ha scrive il CAP a chi
+  vende), COSA DIRE alla cassa («Devo pagare un ordine Amazon in
+  contanti con un PayCode»: non una ricarica, non un buono regalo) e
+  COSA GUARDARE sullo scontrino; sotto, l'avviso del buono regalo
+  (`.p2p-paycode-buono`): non toccare «Ho pagato», scrivere prima a
+  chi vende. I gesti sono CORTI e un tetto provato li tiene cosi'
+  (130 caratteri l'uno, 400 in quattro, mai l'importo ripetuto). A
+  chi vende, nel solo stato `attivo`,
+  `promemoriaMappaVendoP2P` ricorda che il punto lo puo' cercare lui
+  col CAP di chi paga. «Info P2P» ripete tutto, col paragrafo «Se ti
+  danno un buono regalo». Nella pagina dello scambio NON c'e' una chat
+  fra le parti (ci sono i tasti del profilo e i recapiti cifrati): i
+  testi non la nominano. Il verbale e le fonti pubbliche guardate:
+  CANTIERI, «I gesti prima di pagare il PayCode».
   I LIMITI DI AMAZON (23 set 2026): 999 € per ordine e nessun minimo DI
   AMAZON oltre lo zero (il minimo e' NOSTRO, dal 30 set 2026: il
   paragrafo qui sotto), nessuna commissione — `P2P_PAYCODE_MAX_EURO` col

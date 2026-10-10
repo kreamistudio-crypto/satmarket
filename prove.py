@@ -85417,7 +85417,9 @@ def prove_p2p_paycode():
             "function scadenzaTabacchinoOrdineP2P(o){",
             "function statoPayCodeP2P(o){", "function inizioEuroInviatiP2P(o){",
             "function riquadroPayCodeP2P(o, adesso){",
-            "function riquadroControlloTabP2P(o, adesso){"))
+            "function riquadroControlloTabP2P(o, adesso){",
+            # (10 ott 2026, guida-paycode) la mappa col CAP di chi paga
+            "function promemoriaMappaVendoP2P(o){"))
         + """
 /* ---- IL BANCO DEL CURSORE (23 set 2026), gemello di quello del
    premio normale: un DOM di cartone dove il riquadro riscritto PORTA
@@ -85621,6 +85623,10 @@ DOM = null;
         "  inizio: [inizioEuroInviatiP2P(vendo), inizioEuroInviatiP2P({ultimaMossa: 5, aggiornato: 9}), inizioEuroInviatiP2P({aggiornato: 9}),\n"
         "           inizioEuroInviatiP2P({}), inizioEuroInviatiP2P(null)],\n"
         "  riquadroCompro: riquadroPayCodeP2P(compro, ora),\n"
+        "  riquadroComproZero: riquadroPayCodeP2P(Object.assign({}, compro, {euro: 0}), ora),\n"
+        "  promemoria: [promemoriaMappaVendoP2P(Object.assign({}, vendo, {stato: 'attivo'})), promemoriaMappaVendoP2P(vendo),\n"
+        "               promemoriaMappaVendoP2P(compro), promemoriaMappaVendoP2P(Object.assign({}, vendo, {stato: 'attivo', metodi: ['SEPA']})),\n"
+        "               promemoriaMappaVendoP2P(Object.assign({}, vendo, {stato: 'concluso'})), promemoriaMappaVendoP2P(null)],\n"
         "  riquadroSenza: riquadroPayCodeP2P(Object.assign({}, compro, {campiLoro: {euro: {testo: 'Revolut: @x'}}}), ora),\n"
         "  riquadroVendo: riquadroControlloTabP2P(vendo, ora),\n"
         "  riquadroVendoMuto: riquadroControlloTabP2P({lato: 'vendo', stato: 'euro_inviati', metodi: [T]}, ora),\n"
@@ -85988,7 +85994,9 @@ DOM = null;
           and "non vedi nome" not in _rq
           and _CORTO in _rcq
           and "Tieni lo scontrino in caso di disputa" not in _rcq
-          and _rcq.index("Tieni lo scontrino: è la tua prova")
+          # (10 ott 2026, guida-paycode) il terzo gesto adesso CONTROLLA
+          # lo scontrino e poi lo tiene: «Tienilo: è la tua prova»
+          and _rcq.index("Tienilo: è la tua prova")
               < _rcq.index(_CORTO) < _rcq.index("Il codice resta tuo"))
     # ⚠️ E «INFO P2P» LE RICOPIA, che il markup e' fermo: questa prova e'
     # l'unica cosa che impedisce alle due copie di scollarsi
@@ -86006,9 +86014,84 @@ DOM = null;
     # cappello, sopra, e un `index` sul riquadro intero prendeva QUELLO
     # — l'ordine usciva storto su un riquadro sano.
     _ol = _rc[_rc.index('<ol class="p2p-paycode-passi">'):]
-    prova("...coi quattro gesti nell'ordine: vai, dai il codice e paga, tieni lo scontrino, torna e segna", True,
-          _ol.index("Vai in tabaccheria") < _ol.index("Dai il PayCode alla cassa")
-          < _ol.index("Tieni lo scontrino") < _ol.index("«Ho pagato al tabacchino»"))
+    # EMENDATA (10 ott 2026, cantiere guida-paycode, dal campo): un
+    # compratore e' entrato in una tabaccheria PuntoLis e gli hanno
+    # emesso un Buono Regalo Amazon invece di pagare il PayCode. I
+    # quattro gesti restano quattro, ma dicono DOVE (un punto abilitato,
+    # con la mappa di Amazon), COSA DIRE alla cassa, COSA GUARDARE sullo
+    # scontrino; sotto la lista, cosa fare se il buono e' gia' in mano.
+    prova("...coi quattro gesti nell'ordine: trova il punto abilitato, mostra il codice e chiedi, controlla lo scontrino, torna e segna", True,
+          _ol.index("Trova un punto abilitato")
+          < _ol.index("Devo pagare un ordine Amazon in contanti con un PayCode")
+          < _ol.index("Controlla lo scontrino") < _ol.index("«Ho pagato al tabacchino»"))
+    _gesti = _ol[:_ol.index("</ol>")].split("<li>")[1:]
+    prova("...che restano quattro", 4, len(_gesti))
+    # (secondo giro, stesso giorno) LA MAPPA CHIEDE UN ACCOUNT AMAZON:
+    # chi non ce l'ha scrive il CAP a chi vende — e mai «in chat», che
+    # una chat dello scambio nella pagina non c'e'
+    prova("il primo gesto porta alla mappa di Amazon, con un bottone e non con un indirizzo scritto, e dice che serve un account", True,
+          '<b>Trova un punto abilitato</b>: <button type="button" class="scopri-link" onclick="apriMappaPayCodeP2P()">mappa di Amazon</button> (serve un account).' in _gesti[0]
+          and "amazon.it" not in _rc)
+    prova("...e a chi non ha un account da' l'altra strada: il CAP a chi vende", True,
+          "Non ce l'hai? Scrivi il tuo CAP a chi vende: lo cerca lui.</li>" in _gesti[0]
+          and "chat" not in _gesti[0])
+    prova("il secondo dice la frase per la cassa, e che non e' ne' una ricarica ne' un buono regalo", True,
+          _gesti[1].startswith("Mostra il codice alla cassa: <b>«Devo pagare un ordine Amazon in contanti con un PayCode»</b>.")
+          and "Non una ricarica, non un buono regalo.</li>" in _gesti[1])
+    prova("il terzo fa leggere lo scontrino: il pagamento dell'ordine, non un codice acquisto o un buono", True,
+          "Controlla lo scontrino: <b>pagamento dell'ordine</b>, non «codice acquisto» o buono." in _gesti[2]
+          and "Tienilo: è la tua prova." in _gesti[2])
+    # ⚠️ CORTI (terzo giro, parola di Andrea: «non fare il testo troppo
+    # lungo, resta elegante»): la scatola si riapre alla cassa. Un tetto
+    # per gesto, sul testo senza i tag; l'importo non si ripete (sta due
+    # righe sopra) e «senza commissione» lo dice «Info P2P». Chi allunga
+    # un gesto oltre il tetto deve accorciarne un altro, non alzarlo.
+    _nudi = [re.sub(r"<[^>]+>", "", g).strip() for g in _gesti]
+    prova("i gesti restano corti: nessuno oltre 130 caratteri, i quattro insieme sotto i 400", [True, True],
+          [max(len(g) for g in _nudi) <= 130, sum(len(g) for g in _nudi) <= 400])
+    prova("...e non ripetono l'importo, che sta nella riga sopra: nessuna cifra, nessun «€»", [False, False, True],
+          [any("€" in g for g in _nudi), any(re.search(r"\d", g) for g in _nudi),
+           "<span>Importo</span><b>23.47 € in contanti</b>" in _rc])
+    _dopo = _rc[_rc.index("</ol>"):]
+    prova("sotto i gesti l'avviso del buono regalo: non toccare «Ho pagato», scrivi a chi vende", True,
+          _dopo.startswith('</ol><div class="p2p-paycode-buono">⚠️ <b>Ti danno un buono regalo?</b> '
+                           'Non toccare «Ho pagato»: scrivi a chi vende e decidete insieme.</div>'))
+    prova("...una volta sola, e prima delle spiegazioni in fondo", [1, True],
+          [_rc.count("p2p-paycode-buono"),
+           _rc.index("p2p-paycode-buono") < _rc.index(_CORTO)])
+    _rz = out["riquadroComproZero"]
+    prova("senza importo i gesti sono gli stessi: niente NaN, niente undefined", True,
+          _rz[_rz.index('<ol class="p2p-paycode-passi">'):_rz.index("</ol>")] == _ol[:_ol.index("</ol>")]
+          and "NaN" not in _rz and "undefined" not in _rz)
+    prova("la riga che mandava in una tabaccheria qualunque non c'e' piu', in nessun posto", 0,
+          mini.count("in tabaccheria, al bar, in edicola o alla posta"))
+    prova("la mappa e' un indirizzo solo, quello di Amazon, scritto una volta", [1, 1],
+          [mini.count("const LINK_MAPPA_PAYCODE = 'https://www.amazon.it/cpe/locations/paycode';"),
+           mini.count("amazon.it/cpe/locations")])
+    _mp = pezzo_js(mini, "function apriMappaPayCodeP2P(){", "\n}\n")
+    prova("...e si apre con la scala di casa: il browser di Telegram, o una scheda nuova con noopener", True,
+          "if (tg?.initData && tg.openLink) { try { tg.openLink(LINK_MAPPA_PAYCODE); return; } catch(e){} }" in _mp
+          and "window.open(LINK_MAPPA_PAYCODE, '_blank', 'noopener');" in _mp
+          and "chiediConferma" not in _mp)
+    # A CHI VENDE (secondo giro): chi paga puo' non avere un account
+    # Amazon, e allora il punto col suo CAP lo cerca chi vende
+    _pm = out["promemoria"]
+    prova("a chi vende, a sats in garanzia, una riga ricorda la mappa col CAP di chi paga", True,
+          _pm[0] == '<div class="hint">🗺️ Se chi paga ti scrive il suo CAP, cercagli un punto abilitato sulla '
+                    '<button type="button" class="scopri-link" onclick="apriMappaPayCodeP2P()">mappa di Amazon</button>.</div>')
+    prova("...e solo li': non a «pagato», non a chi compra, non con un altro metodo, non a scambio finito, non senza riga",
+          ["", "", "", "", ""], _pm[1:])
+    _renPc = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
+    prova("...la pagina dello scambio la monta una volta, sotto il gesto e l'avviso del recapito", [1, True],
+          [_renPc.count("promemoriaMappaVendoP2P(o)"),
+           0 < _renPc.find("avvisoRecapitoFermoP2P(o) +") < _renPc.find("promemoriaMappaVendoP2P(o) +")])
+    prova("...e la mappa la chiamano tre posti: chi paga, chi vende, «Info P2P»", 3,
+          mini.count('onclick="apriMappaPayCodeP2P()"'))
+    _cssb = re.search(r"\.p2p-paycode-buono\{([^}]*)\}", mini)
+    prova("l'avviso del buono veste il rosso tenue delle ultime ore, coi colori del tema", True,
+          bool(_cssb) and "color:var(--rosso-p2p-testo)" in _cssb.group(1)
+          and "background:var(--rosso-p2p-tenue)" in _cssb.group(1)
+          and "#" not in _cssb.group(1))
     prova("...e il bottone per copiare il codice", True,
           "copiaLink(this.dataset.pc, 'PayCode copiato 📋')" in _rc)
     prova("senza un PayCode nel testo il riquadro non c'e' (vale il recapito di sempre)", "", out["riquadroSenza"])
@@ -86126,12 +86209,47 @@ DOM = null;
           and "'; un PayCode Barattozon vale almeno <b>' + minEuroBzP2P() + ' €</b>.'" in _per2)
     prova("...e non la dice piu' nessun altro posto", 0,
           mini.count("uno solo, niente intervallo"))
-    prova("...il riquadro di chi paga dice i quattro posti e «senza commissione»", True,
-          "Vai in tabaccheria, al bar, in edicola o alla posta" in out["riquadroCompro"]
-          and "senza commissione" in out["riquadroCompro"])
-    prova("...e «Info P2P» le ripete: posti, novecentonovantanove in lettere, le esclusioni", True,
-          "in tabaccheria, al bar, in edicola o alla posta" in _inf
-          and "novecentonovantanove euro" in _inf and "senza commissione; per Barattozon un PayCode vale almeno <b>venticinque euro</b>" in _inf
+    # EMENDATA (10 ott 2026, guida-paycode): i «quattro posti» se ne
+    # sono andati — non ogni tabaccheria paga un PayCode — e al loro
+    # posto c'e' il punto ABILITATO, con la mappa di Amazon; «senza
+    # commissione» esce dal riquadro (corto) e resta a «Info P2P»
+    _sezPc = _inf[_inf.index('<h3 id="p2pinfo-tabacchino"'):_inf.index("<h3>I tempi</h3>")]
+    _vaPc = _sezPc[_sezPc.index("<li><b>Chi compra va a pagare</b>"):]
+    _vaPc = _vaPc[:_vaPc.index("</li>")]
+    prova("...il riquadro di chi paga dice il punto abilitato; «senza commissione» lo dice «Info P2P»", [True, False, True],
+          ["Trova un punto abilitato" in out["riquadroCompro"],
+           "senza commissione" in out["riquadroCompro"], "senza commissione" in _vaPc])
+    prova("«Info P2P», a chi va a pagare: il punto abilitato con la mappa, la frase per la cassa, lo scontrino", True,
+          "in un <b>punto abilitato al PayCode</b>: non tutte le tabaccherie lo sono." in _vaPc
+          and '<button type="button" class="scopri-link" onclick="apriMappaPayCodeP2P()">mappa di Amazon</button>' in _vaPc
+          and "<b>«devo pagare un ordine Amazon in contanti con un PayCode»</b>" in _vaPc
+          and "<b>non una ricarica, non un buono regalo</b>, che non pagano l'ordine." in _vaPc
+          and "<b>controlla lo scontrino</b>: pagamento dell'ordine, non «codice acquisto» o buono." in _vaPc
+          and "<b>tiene lo scontrino</b>" in _vaPc
+          and _vaPc.index("punto abilitato") < _vaPc.index("devo pagare un ordine Amazon")
+          < _vaPc.index("controlla lo scontrino") < _vaPc.index("«Ho pagato al tabacchino»"))
+    prova("...la mappa vuole un account Amazon, e chi non ce l'ha scrive il CAP a chi vende", True,
+          "che chiede un account Amazon (uno qualsiasi); <b>chi non ce l'ha scrive il suo CAP a chi vende</b>, "
+          "che lo cerca per lui." in _vaPc)
+    prova("...e il paragrafo del buono regalo, dopo le scadenze: non toccare «Ho pagato», scrivi a chi vende", True,
+          "<p><b>Se ti danno un buono regalo.</b>" in _sezPc
+          and _sezPc.index("<b>Se scade.</b>") < _sezPc.index("<b>Se ti danno un buono regalo.</b>")
+          and "l'ordine di chi vende <b>non risulta pagato</b>. Non toccare «Ho pagato al tabacchino»: "
+              "scrivi a chi vende e decidete insieme.</p>" in _sezPc)
+    _guidaPc = " ".join(open(os.path.join("docs", "GUIDA-P2P-PASSI.md"), encoding="utf-8").read().split())
+    prova("la guida dei tutorial dice le stesse parole: la mappa, la frase per la cassa, lo scontrino, il buono, la riga di chi vende",
+          [True, True, True, True, True, True, False],
+          ["«**Trova un punto abilitato**: mappa di Amazon (serve un account). Non ce l'hai? "
+           "Scrivi il tuo CAP a chi vende: lo cerca lui.»" in _guidaPc,
+           "«Mostra il codice alla cassa: **«Devo pagare un ordine Amazon in contanti con un PayCode»**. "
+           "Non una ricarica, non un buono regalo.»" in _guidaPc,
+           "«Controlla lo scontrino: **pagamento dell'ordine**, non «codice acquisto» o buono. Tienilo: è la tua prova.»" in _guidaPc,
+           "«⚠️ **Ti danno un buono regalo?** Non toccare «Ho pagato»: scrivi a chi vende e decidete insieme.»" in _guidaPc,
+           "«🗺️ Se chi paga ti scrive il suo CAP, cercagli un punto abilitato sulla mappa di Amazon.»" in _guidaPc,
+           "https://www.amazon.it/cpe/locations/paycode" in _guidaPc,
+           "Vai in tabaccheria, al bar, in edicola o alla posta" in _guidaPc])
+    prova("...e «Info P2P» ripete il resto: novecentonovantanove in lettere, le esclusioni", True,
+          "novecentonovantanove euro" in _inf and "senza commissione; per Barattozon un PayCode vale almeno <b>venticinque euro</b>" in _inf
           and "Non vale per Amazon Warehouse, contenuti digitali, oro, abbonamenti a Prime, buoni regalo e acquisti 1-Click" in _inf
           and "settantadue ore dal checkout" in _inf)
     prova("le frasi del tempo dicono PayCode e l'avviso alla presa spiega le due ore", True,

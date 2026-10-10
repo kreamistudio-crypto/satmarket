@@ -1026,17 +1026,29 @@ disputa.»
 2. 🧑 Compra, dà l'indirizzo sats (come §2b). 📱 Il riquadro «🧾 Il PayCode
    da pagare al tabacchino» compare con codice (e «📋»: «PayCode copiato
    📋»), «Importo 25,47 € in contanti», «Scade il …», «Tempo che resta:
-   <conto>», e i quattro passi: «Vai in tabaccheria, al bar, in edicola o
-   alla posta: dove si accettano i pagamenti Amazon in contanti, senza
-   commissione.» / «Dai il PayCode alla cassa e paga **25,47 €** in
-   contanti.» / «Tieni lo scontrino: è la tua prova.» / «Torna qui e tocca
-   **«Ho pagato al tabacchino»**». Finché la garanzia non c'è: «⚠️ **Non
+   <conto>», e i quattro passi (dal 10 ott 2026: dove andare, cosa dire,
+   cosa guardare): «**Trova un punto abilitato**: mappa di Amazon (serve
+   un account). Non ce l'hai? Scrivi il tuo CAP a chi vende: lo cerca
+   lui.» («mappa di Amazon» è un link: apre
+   https://www.amazon.it/cpe/locations/paycode, che chiede di entrare con
+   un account Amazon, uno qualsiasi) / «Mostra il codice alla cassa:
+   **«Devo pagare un ordine Amazon in contanti con un PayCode»**. Non una
+   ricarica, non un buono regalo.» / «Controlla lo scontrino: **pagamento
+   dell'ordine**, non «codice acquisto» o buono. Tienilo: è la tua
+   prova.» / «Torna qui e tocca **«Ho pagato al tabacchino»**». Sotto i
+   passi, su fondo rosso tenue: «⚠️ **Ti danno un buono regalo?** Non
+   toccare «Ho pagato»: scrivi a chi vende e decidete insieme.»
+   Finché la garanzia non c'è: «⚠️ **Non
    inviare ancora niente:** aspetta che questa pagina dica «Sats in
    garanzia».»
 3. 📱 A garanzia bloccata: «**Sats in garanzia**» «I sats sono al sicuro in
    garanzia. Vai al tabacchino col PayCode qui sotto, paga in contanti alla
    cassa, tieni lo scontrino e poi torna qui a segnare «pagato».»
-4. 🧑 Paga in contanti alla cassa, **tiene lo scontrino**, torna e tocca «✅
+4. 🧑 Va in un **punto abilitato al PayCode** (la mappa di Amazon, o il
+   CAP scritto a chi vende), mostra il codice e dice «devo pagare un
+   ordine Amazon in contanti con un PayCode» — non una ricarica, non un
+   buono regalo —, paga in contanti alla cassa, **controlla e tiene lo
+   scontrino**, torna e tocca «✅
    Ho pagato al tabacchino». 📱 «Hai pagato il PayCode al tabacchino?» —
    «Dillo solo dopo aver pagato davvero 25,47 € in contanti alla cassa.
    Tieni lo scontrino: chi vende controlla su Amazon che l'ordine risulti
@@ -1051,6 +1063,16 @@ disputa.»
 
 ### ⚠️ Barattozon: le scadenze e cosa va storto
 
+- Alla cassa emettono un **buono regalo Amazon** (o una ricarica) invece di
+  pagare il PayCode (successo il 10 ott 2026 in una tabaccheria PuntoLis):
+  l'ordine di chi vende non risulta pagato. 🧑 Chi compra **non tocca «Ho
+  pagato al tabacchino»**: scrive prima a chi vende e decidono insieme. Lo
+  dicono l'avviso rosso sotto i quattro passi e «Info P2P» («**Se ti danno
+  un buono regalo.**»).
+- Chi paga non ha un account Amazon (la mappa lo chiede): scrive il suo CAP
+  a chi vende. 📱 A chi vende, a sats in garanzia, sotto lo stato: «🗺️ Se
+  chi paga ti scrive il suo CAP, cercagli un punto abilitato sulla mappa
+  di Amazon.» («mappa di Amazon» è lo stesso link).
 - Il PayCode si avvicina alla scadenza (a sats in garanzia): 📱 «Il PayCode
   scade fra meno di sei ore» / «Il PayCode scade fra meno di un'ora» /
   «Il PayCode è scaduto», con la frase per lato (a chi compra, scaduto:
