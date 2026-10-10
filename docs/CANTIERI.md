@@ -45531,11 +45531,13 @@ difetto di oggi riprodotto. Scatti e log in
 `.claude/giri/cookie-onion/`. Suite severa e collaudi della CI: nel
 rapporto.
 
-**NON PROVATO, DA GUARDARE.** Il telefono vero: Chrome con Orbot sul
-`.onion` di produzione dopo le righe nel Caddyfile e la leva nel config
-(la procedura in PRODUZIONE, «IL COOKIE SUL TUNNEL»); `ss -ltnp | grep
-8081` deve dire `127.0.0.1`. Tor Browser deve restare com'era (un
-cookie senza Secure lo tiene lo stesso).
+**FATTO SUL VPS (Andrea, 10 ott 2026, 17:11).** `ONION_SEGNALE` nel
+config, `header_up` nei due blocchi di Caddy (`validate` ok, `reload`
+ok), restart di barattolo. Pubblico 200, via Tor 200. Dal telefono:
+login Nostr sul `.onion`, ricarica, si resta dentro — il difetto del
+mattino è chiuso in produzione. Resta da guardare: Tor Browser com'era
+(un cookie senza Secure lo tiene lo stesso) e `ss -ltnp | grep 8081`
+su `127.0.0.1`.
 
 ## La scadenza di `expiration_seconds`, provata dal vivo: la riga di CLAUDE.md (10 ott 2026, pomeriggio, decisione di Andrea)
 

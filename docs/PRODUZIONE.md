@@ -1087,6 +1087,10 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
      «Private DNS» su Off, o l'indirizzo `.onion` non si risolve — si
      entra con Nostr dal `.onion` e si RICARICA: si resta dentro. Su
      barattolo.store tutto com'era: login, ricarica, logout.
+  FATTA IL 10 OTT 2026 ALLE 17:11 (Andrea): leva nel config, le due
+  righe nel Caddyfile (validate e reload ok), restart; pubblico 200, via
+  Tor 200, e dal telefono il login Nostr sul `.onion` regge alla
+  ricarica. Da allora questa è la configurazione viva del VPS.
   TORNARE INDIETRO: via la riga `ONION_SEGNALE` dal config (o vuota) e
   `systemctl restart barattolo` — il cookie torna Secure ovunque anche
   con le righe di Caddy ancora lì (un testimone solo non basta); le righe
