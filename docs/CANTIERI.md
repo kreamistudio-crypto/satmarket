@@ -45775,3 +45775,63 @@ giusto, due volte «chiusa: false», chiave storta 400. In prove.py le
 sentinelle sui numeri e sui giudizi, e sul cartone: il bunker col foglio
 chiuso cade subito con «foglio chiuso» e manda la chiusura col biglietto
 in keepalive; il QR idem, e un appuntamento nuovo chiude il vecchio.
+
+## `switch_relays` dopo la connect, come chiede la NIP-46 (10 ott 2026, sera)
+
+Il compito (Andrea, in coda al cantiere del login col bunker): mandare
+`switch_relays` dopo la connect, come la NIP-46 chiede ai client, in un
+commit separato con le sue prove.
+
+**COSA DICE LA NIP-46 E COSA FANNO I FIRMATARI.** «I client dovrebbero
+mandare `switch_relays` appena la connessione è stabilita»; il firmatario
+risponde con l'elenco dei relay su cui preferisce parlare, o null. Amber
+(letto nel sorgente, 6.6.7) risponde coi suoi quattro relay di serie E
+SI SPOSTA LÌ: ignorare la risposta vuol dire parlare in una stanza che
+lui ha lasciato — ed è il motivo per cui la domanda non si manda «per
+cortesia» ma si ONORA. Clave risponde `null` apposta (una lista vera
+faceva migrare Coracle e piantava l'accoppiamento). nsec.app non conosce
+il metodo: un errore, o silenzio.
+
+**LA CURA.** In `firmatarioBunker`, dopo la connect (e dopo il QR, dove la
+connect si salta), `chiama('switch_relays', [], NIP46_SWITCH_MS)` con 5
+secondi di attesa: è una domanda di servizio e se nessuno risponde si va
+avanti dove si è. La risposta si legge come array o come JSON in una
+stringa (Amber la manda così), solo `wss://`, senza la barra in coda.
+Con un elenco diverso dalla stanza di adesso si aprono i relay nuovi
+(`apriStanzeNip46`) e SOLO se almeno uno risponde si cambia:
+`ascolto.cambiaStanza` chiude le voci vecchie e mette le nuove nel coro
+(sveglie e `since` restano: è lo stesso appuntamento in un'altra stanza),
+`cassetta.sposta` rideposita coi relay nuovi (il server li aggiunge), e
+la sessione che si conserva porta la stanza nuova — col secret della URI
+incollata, così domani si va dritti dove il firmatario ascolta. Se
+nessuno dei relay nuovi risponde da qui si resta sui propri e lo si dice
+nel foglio. Con `null`, un errore o il silenzio la sessione resta la URI
+incollata com'era.
+
+**STRADE SCARTATE.** 1) Non mandarla (com'era): con Amber la stanza
+sarebbe cambiata sotto i piedi. 2) Cambiare stanza anche se i relay
+nuovi non rispondono: si resterebbe senza nessuno; meglio la stanza di
+prima, che Amber tiene aperta comunque per le sue connessioni esistenti
+nella misura in cui lo fa — e il messaggio dice cosa è successo.
+3) Aspettare di più: i cinque secondi coprono Amber (un decimo di
+secondo) e Tor; un firmatario che tace oltre non risponderebbe
+nemmeno dopo.
+
+**PROVATO.** Sul cartone di `prove_bunker_muto`: il firmatario che
+preferisce un altro relay (che risponde) — la richiesta dopo parte solo
+lì, si ascolta solo lì, lo si dice, e la sessione porta la stanza nuova
+col secret di prima e senza la vecchia; `null` (si resta, la sessione è
+la URI incollata); un errore (si resta); il silenzio (si va avanti dopo
+la leva, misurato, senza restare appesi); relay preferiti che non
+rispondono (si resta sui propri, e lo si dice). Le sentinelle: la
+chiamata sta dopo la connect e prima del «firmatario pronto», la leva fra
+2 e 10 secondi, il cambio solo con una voce viva, l'elenco letto nelle
+due forme. I casi di prima aggiornati alla richiesta in più sul filo
+(la socket caduta: connect, connect rimandata, switch_relays; «già
+connesso»: solo la switch, nessuna connect). Tre sezioni: 185 verdi.
+
+**DA GUARDARE.** Amber vero: che dopo la migrazione risponda sui relay
+nuovi anche alle firme della coda (la sessione conservata ora li porta).
+Il cartone chiude solo la PROPRIA sottoscrizione (`di === this`): un
+relay del caso prima si portava via quella del nuovo — lezione del
+banco, non del codice.

@@ -107794,6 +107794,7 @@ def _banco_nip46_js(mini):
         riga("NIP46_PERMESSI"), riga("NIP46_UMANO_MS"),
         riga("NIP46_SERVIZIO_MS"), riga("NOSTRCONNECT_ATTESA_MS"),
         "const NIP46_SECONDA_LINGUA_MS = 150;",
+        "const NIP46_SWITCH_MS = 150;",
         "const NIP46_RIAGGANCIO_MS = [120, 240, 480];",
         "const CASSETTA_POLL_MS = 40;",
         "const API_BASE = '/api';",
@@ -108045,6 +108046,26 @@ def prove_bunker_muto():
           "capisce tutte e due le lingue potrebbe vedersela chiedere "
           "due volte)", True, bool(_sl) and 10000 <= int(_sl.group(1)) <= 60000)
 
+    # --- switch_relays dopo la connect, come chiede la NIP-46 ---
+    _sw = re.search(r"const NIP46_SWITCH_MS = (\d+);", mini)
+    prova("dopo la connect si manda switch_relays, con la sua leva corta "
+          "(e' una domanda di servizio: se nessuno risponde si va avanti)",
+          (True, True),
+          ("const r = await chiama('switch_relays', [], NIP46_SWITCH_MS);" in fb,
+           bool(_sw) and 2000 <= int(_sw.group(1)) <= 10000))
+    prova("...e sta DOPO la connect e PRIMA del «firmatario pronto»", True,
+          fb.index("if (!opz.giaConnesso) {") < fb.index("chiama('switch_relays'")
+          < fb.index("firmatario pronto"))
+    prova("...con un elenco si cambia stanza SOLO se almeno un relay nuovo "
+          "risponde: il coro, la cassetta, la URI della sessione",
+          (True, True, True, True),
+          ("if (nuova.vive.length) {" in fb, "ascolto.cambiaStanza(nuova.vive);" in fb,
+           "cassetta.sposta(stanza);" in fb, "function cambiaStanza(nuove){" in asc))
+    prova("...accetta l'elenco come array o come JSON in una stringa, solo "
+          "wss, senza la barra in coda", (True, True),
+          ("if (typeof elenco === 'string') { try { elenco = JSON.parse(elenco); }" in fb,
+           ".replace(/\\/+$/, ''))" in fb))
+
     # --- la presentazione si salta quando l'ha gia' fatta il firmatario ---
     prova("con `giaConnesso` la connect non parte: il firmatario del QR "
           "si e' gia' presentato col segreto", (True, True),
@@ -108097,29 +108118,36 @@ function NTfinto(comeConnette, comePubblica){
       constructor(url){ this.url = url; }
       connect(opts){ connessioni[this.url] = (connessioni[this.url] || 0) + 1;
                      return comeConnette(this.url, opts, connessioni[this.url]); }
-      subscribe(f, params){ subs[this.url] = params; return {close(){}}; }
+      subscribe(f, params){ subs[this.url] = Object.assign(params, {di: this}); return {close(){}}; }
       publish(ev){ (pubblicati[this.url] = pubblicati[this.url] || []).push(ev);
                    return comePubblica(this.url, ev, pubblicati[this.url].length); }
       auth(firma){ autenticati.push(this.url); return Promise.resolve(); }
-      close(){}
+      /* chiudere toglie l'ascolto, come nella libreria vera — il PROPRIO:
+         un relay del caso prima non deve portarsi via quello del nuovo */
+      close(){ if (subs[this.url] && subs[this.url].di === this) delete subs[this.url]; }
     },
   };
 }
 const UNO = 'wss://uno.example', DUE = 'wss://due.example';
-const URI = 'bunker://' + 'a'.repeat(64) + '?relay=' + UNO + '&relay=' + DUE;
+const URI = 'bunker://' + 'a'.repeat(64) + '?relay=' + UNO + '&relay=' + DUE + '&secret=s3';
 const idDi = ev => JSON.parse(String(ev.content).replace(/^nip04:/, '')).id;
+const metodoDi = ev => JSON.parse(String(ev.content).replace(/^nip04:/, '')).method;
 let nEv = 0;
+/* la risposta a switch_relays la decide il caso: {result} o {error};
+   senza niente, 'ack' — che per un elenco di relay non vale (si resta) */
+let switchRisposta = null;
 const rispondi = (url, ev, contenuto) => setTimeout(() => subs[url] && subs[url].onevent(
   {id: 'ev' + (++nEv), pubkey: 'b'.repeat(64), content: contenuto || JSON.stringify(
-    {id: idDi(ev), result: 'ack'})}), 0);
+    Object.assign({id: idDi(ev)}, (metodoDi(ev) === 'switch_relays' && switchRisposta) || {result: 'ack'}))}), 0);
 const esiti = {};
 /* IL CANE DA GUARDIA C'E' SEMPRE, ed e' la riga che rende questo banco
    capace di FALLIRE: il difetto sotto esame e' proprio un'attesa che
    non finisce mai, quindi senza di lui una mutazione che la rimette lo
    fa PIANTARE — e un banco piantato esplode invece di diventare rosso,
    cioe' passa per «mutazione sopravvissuta». */
-async function caso(nome, comeConnette, comePubblica, ms, opz, laPosta){
+async function caso(nome, comeConnette, comePubblica, ms, opz, laPosta, laSwitch){
   subs = {}; pubblicati = {}; autenticati = []; connessioni = {}; detti = []; cassettaPost = []; cassettaGet = 0;
+  switchRisposta = laSwitch || null;
   posta = laPosta || (() => ({viva: true, eventi: [], n: 0}));
   document.visibilityState = 'visible';
   globalThis.window = Object.assign({NostrTools: NTfinto(comeConnette, comePubblica)}, finestra);
@@ -108200,8 +108228,10 @@ const muto = () => new Promise(() => {});
         else rispondi(UNO, ev); }
       return subito(); }, 900);
   esiti.caduta_connessioni = connessioni;
+  // su UNO: la connect, la connect rimandata, la switch_relays; su DUE la connect e la switch
   esiti.caduta_inviate = [(pubblicati[UNO] || []).length, (pubblicati[DUE] || []).length];
-  esiti.caduta_stessoId = (pubblicati[UNO] || []).length === 2 && idDi(pubblicati[UNO][0]) === idDi(pubblicati[UNO][1]);
+  esiti.caduta_metodi = (pubblicati[UNO] || []).map(metodoDi);
+  esiti.caduta_stessoId = (pubblicati[UNO] || []).length >= 2 && idDi(pubblicati[UNO][0]) === idDi(pubblicati[UNO][1]);
   esiti.caduta_detto = detti.some(t => /riagganciato/i.test(t));
   // (o) LA PAGINA TORNA: la socket e' caduta mentre si era via; al
   //     ritorno (visibilitychange) la voce si riapre SUBITO, senza
@@ -108236,12 +108266,45 @@ const muto = () => new Promise(() => {});
   esiti.secondaLingua_inviate = (pubblicati[UNO] || []).map(e => String(e.content).slice(0, 6));
   esiti.secondaLingua_stessoId = (pubblicati[UNO] || []).length >= 2 && idDi(pubblicati[UNO][0]) === idDi(pubblicati[UNO][1]);
   // (r) GIA' CONNESSO: niente connect, firmatario pronto subito
-  await caso('giaConnesso', subito, () => subito(), 300, {giaConnesso: true});
-  esiti.giaConnesso_inviate = Object.keys(pubblicati).length;
+  await caso('giaConnesso', subito, (url, ev) => { rispondi(url, ev); return subito(); }, 300, {giaConnesso: true});
+  esiti.giaConnesso_metodi = [...new Set(Object.values(pubblicati).flat().map(metodoDi))];
   // (s) la socket muore con l'OK del publish in viaggio: non e' un
   //     rifiuto, si aspetta
   await caso('socketPublish', subito,
     () => Promise.reject(new Error('relay connection closed')), 300);
+  // (u) SWITCH_RELAYS: il firmatario preferisce TRE (che risponde): la
+  //     richiesta DOPO parte su TRE e basta, si ascolta su TRE, e la
+  //     sessione che si conserva porta TRE (col secret di prima)
+  const TRE = 'wss://tre.example';
+  const fsw = await caso('switchSi', subito,
+    (url, ev) => { rispondi(url, ev); return subito(); }, 600, undefined, undefined,
+    {result: JSON.stringify([TRE + '/'])});
+  if (fsw) { fsw.pubkey().catch(() => {});
+    await new Promise(ok => setTimeout(ok, 20));
+    esiti.switchSi_dopo = Object.entries(pubblicati).filter(([u, l]) => l.some(e => metodoDi(e) === 'get_public_key')).map(([u]) => u);
+    esiti.switchSi_ascolti = Object.keys(subs).sort();
+    esiti.switchSi_uri = fsw.sessione.uri; }
+  esiti.switchSi_detto = detti.some(t => /mi sposto/i.test(t));
+  // (v) risponde null: si resta, e la sessione e' la URI incollata
+  const fnull = await caso('switchNull', subito,
+    (url, ev) => { rispondi(url, ev); return subito(); }, 600, undefined, undefined,
+    {result: 'null'});
+  esiti.switchNull_uri = fnull ? fnull.sessione.uri : null;
+  // (w) risponde con un errore (nsec.app: metodo sconosciuto): si resta
+  await caso('switchErrore', subito,
+    (url, ev) => { rispondi(url, ev); return subito(); }, 600, undefined, undefined,
+    {error: 'unknown method'});
+  // (x) NON risponde alla switch (un firmatario di ieri): si va avanti
+  //     dopo la leva, senza restare appesi
+  await caso('switchMuto', subito,
+    (url, ev) => { if (metodoDi(ev) !== 'switch_relays') rispondi(url, ev); return subito(); }, 900);
+  // (y) preferisce relay che da qui non rispondono: si resta, e lo si dice
+  await caso('switchGiu',
+    (url) => url === 'wss://giu.example' ? Promise.reject(new Error('dns')) : subito(),
+    (url, ev) => { rispondi(url, ev); return subito(); }, 600, undefined, undefined,
+    {result: JSON.stringify(['wss://giu.example'])});
+  esiti.switchGiu_ascolti = Object.keys(subs).sort();
+  esiti.switchGiu_detto = detti.some(t => /non rispondono da qui/i.test(t));
   // (t) IL FOGLIO SI CHIUDE mentre si aspetta l'umano: l'attesa cade
   //     subito con «foglio chiuso», e la cassetta si chiude sul server
   //     col biglietto, in keepalive
@@ -108315,9 +108378,9 @@ const muto = () => new Promise(() => {});
     # --- il riaggancio, sul cartone ---
     prova("LA SOCKET CADE: la voce si riapre da sola, la connect riparte "
           "su di lei con lo STESSO id, e il bunker si collega",
-          ("COLLEGATO", 2, [2, 1], True),
+          ("COLLEGATO", 2, [3, 2], ["connect", "connect", "switch_relays"], True),
           (d["caduta"], d["caduta_connessioni"].get("wss://uno.example"),
-           d["caduta_inviate"], d["caduta_stessoId"]))
+           d["caduta_inviate"], d["caduta_metodi"], d["caduta_stessoId"]))
     prova("...e lo dice nella sala d'attesa", True, d["caduta_detto"])
     prova("LA PAGINA TORNA: la voce caduta si riapre SUBITO al "
           "visibilitychange, senza aspettare il suo turno, e si entra",
@@ -108335,8 +108398,9 @@ const muto = () => new Promise(() => {});
            d["secondaLingua_inviate"][:2] == [
                d["secondaLingua_inviate"][0], "nip04:"]
            and not d["secondaLingua_inviate"][0].startswith("nip04:")))
-    prova("GIA' CONNESSO: nessuna connect sul filo, firmatario pronto",
-          ("COLLEGATO", 0), (d["giaConnesso"], d["giaConnesso_inviate"]))
+    prova("GIA' CONNESSO: nessuna connect sul filo (solo la switch_relays), "
+          "firmatario pronto", ("COLLEGATO", ["switch_relays"]),
+          (d["giaConnesso"], d["giaConnesso_metodi"]))
     prova("la socket che muore con l'OK del publish in viaggio non e' "
           "un rifiuto: si aspetta il riaggancio",
           "ANCORA IN ATTESA", d["socketPublish"])
@@ -108347,6 +108411,26 @@ const muto = () => new Promise(() => {});
           [{"corpo": {"pub": "pub", "biglietto": "b1"}, "keepalive": True}],
           d["foglioChiuso_chiusure"])
     prova("...e il motore in corso non c'e' piu'", None, d["foglioChiuso_motore"])
+    # --- switch_relays, sul cartone ---
+    prova("SWITCH_RELAYS: il firmatario preferisce un altro relay (che "
+          "risponde): la richiesta DOPO parte solo li', si ascolta li', "
+          "e lo si dice", ("COLLEGATO", ["wss://tre.example"], ["wss://tre.example"], True),
+          (d["switchSi"], d.get("switchSi_dopo"), d.get("switchSi_ascolti"), d["switchSi_detto"]))
+    prova("...e la sessione che si conserva porta la stanza nuova, col "
+          "secret di prima e senza la vecchia", (True, True, False),
+          ("relay=wss%3A%2F%2Ftre.example" in (d.get("switchSi_uri") or ""),
+           "secret=s3" in (d.get("switchSi_uri") or ""),
+           "uno.example" in (d.get("switchSi_uri") or "")))
+    prova("risponde null: si resta, e la sessione e' la URI incollata",
+          ("COLLEGATO", True), (d["switchNull"], (d.get("switchNull_uri") or "").startswith(
+              "bunker://" + "a" * 64 + "?relay=wss://uno.example")))
+    prova("risponde con un errore (metodo sconosciuto): si resta",
+          "COLLEGATO", d["switchErrore"])
+    prova("non risponde: si va avanti dopo la leva, senza restare appesi",
+          True, d["switchMuto"] == "COLLEGATO" and 150 <= d["switchMuto_ms"] < 900)
+    prova("preferisce relay che da qui non rispondono: si resta sui "
+          "propri, e lo si dice", ("COLLEGATO", ["wss://due.example", "wss://uno.example"], True),
+          (d["switchGiu"], d["switchGiu_ascolti"], d["switchGiu_detto"]))
 
     # --- il quinto silenzio: l'auth_url che non si apre ---
     # I firmatari che vivono sul telefono (Amber e i suoi) rispondono

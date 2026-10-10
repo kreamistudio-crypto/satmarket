@@ -47983,6 +47983,16 @@ const NOSTRCONNECT_ATTESA_MS = 600000;
    chiedere la stessa cosa due volte — ed e' per questo che i secondi
    sono venti e non cinque. */
 const NIP46_SECONDA_LINGUA_MS = 20000;
+/* SWITCH_RELAYS (10 ott 2026, sera): la NIP-46 chiede al client di
+   mandare `switch_relays` appena la connessione e' stabilita, e il
+   firmatario risponde con l'elenco dei relay su cui preferisce parlare
+   (o null: restiamo dove siamo). Amber risponde coi suoi relay di
+   serie E SI SPOSTA LI': ignorare la risposta vorrebbe dire parlare in
+   una stanza che lui ha lasciato. Clave risponde null; nsec.app non
+   conosce il metodo (un errore, o silenzio). Quanto si aspetta: pochi
+   secondi — e' una domanda di servizio, e se nessuno risponde si va
+   avanti dove si e'. */
+const NIP46_SWITCH_MS = 5000;
 /* IL RIAGGANCIO: quanto si aspetta prima di riaprire una websocket
    caduta, tentativo dopo tentativo. Il primo subito, che la caduta piu'
    comune (iOS che sospende la pagina) si cura in un attimo; poi con
@@ -48285,8 +48295,18 @@ function ascoltoNip46(NT, coro, opz){
     sveglie.forEach(([dove, nome, fn]) => dove.removeEventListener(nome, fn));
     coro.vive.slice().forEach(v => { clearTimeout(v.timer); try { v.relay.close(); } catch(e){} });
   }
+  /* LA STANZA CAMBIA (switch_relays): le voci vecchie si chiudono, le
+     nuove — gia' connesse da apriStanzeNip46 — entrano nel coro e si
+     ascoltano. Le sveglie e il `since` restano quelli: e' lo stesso
+     appuntamento in un'altra stanza. */
+  function cambiaStanza(nuove){
+    if (finito || !nuove.length) return;
+    coro.vive.slice().forEach(v => { clearTimeout(v.timer); try { v.relay.close(); } catch(e){} });
+    coro.vive.splice(0, coro.vive.length, ...nuove);
+    coro.vive.slice().forEach(ascolta);
+  }
   coro.vive.slice().forEach(ascolta);
-  return {consegna, vive, nomi, chiudi, esce, get finito(){ return finito; }};
+  return {consegna, vive, nomi, chiudi, esce, cambiaStanza, get finito(){ return finito; }};
 }
 
 /* LA CASSETTA POSTALE (10 ott 2026): il server ascolta i relay al posto
@@ -48340,6 +48360,12 @@ function cassettaNip46(pubLocale, relays, consegna, etichetta){
   function rinfresca(){
     if (viva !== false && Date.now() - apertaA > 240000) apri();
   }
+  /* la stanza e' cambiata: si rideposita con i relay nuovi (il server
+     li AGGIUNGE alla cassetta: i vecchi restano in ascolto, non costano) */
+  function sposta(nuovi){
+    relays = nuovi.slice();
+    if (viva !== false) apri();
+  }
   /* SI CHIUDE SUL SERVER (10 ott 2026, sera): quando l'utente chiude il
      foglio o e' entrato, la cassetta non deve restare aperta i suoi
      dieci minuti — e' un posto in memoria e un orecchio sui relay. Col
@@ -48359,7 +48385,7 @@ function cassettaNip46(pubLocale, relays, consegna, etichetta){
       console.log(`🟪 [${etichetta}] cassetta chiusa`);
     } catch(e){}
   }
-  return {apri, leggi, rinfresca, chiudi,
+  return {apri, leggi, rinfresca, chiudi, sposta,
           get viva(){ return viva; }, get orecchi(){ return orecchi; },
           /* per i messaggi: quali orecchi del server ascoltano davvero */
           racconta(){
@@ -48574,13 +48600,59 @@ async function firmatarioBunker(uri, skHex, modoCifrario, opz){
   } else {
     console.log('🟪 [bunker] il firmatario si è già presentato: salto la connect');
   }
+  /* SWITCH_RELAYS, come chiede la NIP-46 (vedi NIP46_SWITCH_MS). La
+     risposta e' un elenco di relay (un array, o la sua forma JSON in
+     una stringa) oppure null; un errore («metodo sconosciuto») o il
+     silenzio valgono null. Con un elenco si apre la stanza nuova
+     (apriStanzeNip46: le voci che rispondono), e SOLO se almeno una
+     risponde si cambia: il coro, la cassetta e la URI della sessione
+     che si conserva — cosi' domani si va dritti dove il firmatario
+     ascolta. Se nessuna risponde si resta dove si e', e lo si dice. */
+  let stanza = relays.slice();
+  try {
+    const r = await chiama('switch_relays', [], NIP46_SWITCH_MS);
+    let elenco = r;
+    if (typeof elenco === 'string') { try { elenco = JSON.parse(elenco); } catch(e){ elenco = null; } }
+    const nuovi = Array.isArray(elenco)
+      ? [...new Set(elenco.filter(x => typeof x === 'string' && /^wss:\/\//i.test(x)).map(x => x.trim().replace(/\/+$/, '')))]
+      : [];
+    if (!nuovi.length) {
+      console.log('🟪 [bunker] switch_relays: il firmatario resta dove siamo');
+    } else if (nuovi.length === stanza.length && nuovi.every(x => stanza.includes(x))) {
+      console.log('🟪 [bunker] switch_relays: la stanza è già quella');
+    } else {
+      console.log(`🟪 [bunker] switch_relays: il firmatario preferisce ${nuovi.join(' · ')}`);
+      bunkerDice(`Il firmatario preferisce altri relay (${nuovi.join(' · ')}): mi sposto…`);
+      const nuova = await apriStanzeNip46(nuovi);
+      if (nuova.vive.length) {
+        ascolto.cambiaStanza(nuova.vive);
+        stanza = nuova.vive.map(v => v.url);
+        cassetta.sposta(stanza);
+        bunkerDice(`In ascolto su ${nomi()}: continuo…`);
+      } else {
+        console.log(`🟪 [bunker] switch_relays: nessuno dei relay nuovi risponde (${nuova.rifiuti.join(' · ')}): resto dove sono`);
+        bunkerDice(`I relay preferiti dal firmatario non rispondono da qui: resto su ${nomi()}…`);
+      }
+    }
+  } catch(e){
+    console.log(`🟪 [bunker] switch_relays senza esito (${e?.message || e}): resto dove sono`);
+  }
   console.log('🟪 [bunker] firmatario pronto');
+  /* la URI che si conserva: quella incollata se la stanza e' la stessa
+     (col suo secret: nsec.app a un secret gia' approvato dice «already
+     connected», ed e' la strada di sempre), altrimenti la stanza nuova
+     con lo stesso secret */
+  const cambiata = !(stanza.length === relays.length && stanza.every(x => relays.includes(x)));
+  const uriSessione = !cambiata ? uri.trim()
+    : 'bunker://' + bunkerPub + '?' + stanza.map(r => 'relay=' + encodeURIComponent(r)).join('&')
+      + (par.get('secret') ? '&secret=' + encodeURIComponent(par.get('secret')) : '');
   return {
     pubkey: () => chiama('get_public_key', []),
     firma:  async (evento) => JSON.parse(await chiama('sign_event', [JSON.stringify(evento)], NIP46_UMANO_MS)),
     chiudi,
-    /* per ricordaBunker: uri + chiave client = la sessione riusabile */
-    sessione: {uri: uri.trim(), sk: NT.utils.bytesToHex(skLocale)},
+    /* per ricordaBunker: uri (con la stanza di ADESSO) + chiave client =
+       la sessione riusabile */
+    sessione: {uri: uriSessione, sk: NT.utils.bytesToHex(skLocale)},
   };
 }
 

@@ -9017,6 +9017,11 @@
   attesa rimandate con lo stesso id) e `cassettaNip46` (il secondo
   orecchio, ogni 4 s e subito al ritorno). Gli errori li spiega
   `spiegaNip46` (famiglia → cosa è successo, cosa fare, dettaglio).
+  Dopo la connect il client manda `switch_relays` (NIP-46; leva
+  `NIP46_SWITCH_MS`, 5 s): con un elenco di relay che rispondono cambia
+  stanza (`ascolto.cambiaStanza`, `cassetta.sposta`, la sessione
+  conservata porta la stanza nuova), con null/errore/silenzio resta
+  (Cantieri «switch_relays dopo la connect»).
   `hex_to_npub` (bech32 con checksum vero) è il gemello speculare di
   `npub_to_hex`. `vendor/nostr.bundle.js` = nostr-tools 2.23.12
   committato a versione bloccata e servito da `GET /vendor/nostr.js`
