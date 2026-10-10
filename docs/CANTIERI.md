@@ -45383,3 +45383,27 @@ successivo lo toglie.
 
 **DA GUARDARE.** Sul telefono di Andrea, nella PWA e dentro Telegram, i
 tre casi qui sopra, con gli scatti.
+
+
+## Apri nel wallet, il verbale del push (10 ott 2026): cosa è girato su quale albero
+
+Main era corso di otto commit mentre il cantiere era aperto (b2b3d92 e
+c48e3a0 il controllo della fattura, 3946174 e a35fc20 «I tuoi dati» e
+gli esiti del P2P, 0c333a9, 658d941 lo scanner dei segreti, 1e3805d il
+«Condividi» di un ordine P2P, af616d8 la finestra del gesto a 30 minuti):
+rebase su af616d8, due conflitti sciolti tenendo tutt'e due le parti —
+in `prove.py` la `prove_dati_reputazione_p2p` di main e la
+`prove_apri_nel_wallet` di qui, inserite nello stesso punto; in questo
+file due voci appese in fondo. Nessuno degli otto commit toccava le
+ancore del cantiere (`portaWallet`, `payWallet`, `p2pHoldWallet`,
+`vestiScadenzaFattura`, `tentativoWalletP2P`), e ogni simbolo nuovo è
+definito una volta sola. COSA È GIRATO SU QUALE ALBERO: sull'albero di
+ccea57f più il cantiere, la suite `PROVE_SEVERE=1` (21.079 passate e una
+rossa — il nome dello script di Telegram citato in un commento, che la
+sentinella onion vede nella pagina: riformulato — poi le sezioni
+toccate e `prove_onion` verdi), i 50 collaudi della CI nella gabbia (50
+verdi) e il giro dal vivo con Playwright nei tre contesti; sull'albero
+RIBASATO (af616d8 più i due commit del cantiere), le sezioni toccate
+(360 verdi), la suite intera (21.253 passate, 0 fallite) e i collaudi
+della CI, 51 con quello portato da main (51 verdi, 0 rossi); non il
+giro dal vivo.
