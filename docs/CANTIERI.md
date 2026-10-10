@@ -46578,7 +46578,10 @@ testo ricopiato), cinque rosse. Dal vivo in collaudo: il cassetto e la
 pagina «I tuoi dati» col config d'esempio e l'indirizzo vero, scatti in
 `.claude/giri/onion-android/`. Suite e collaudi: nel verbale del push.
 
-**NON PROVATO, DA GUARDARE.** Focus/Klar: l'about:config lì non è
+**FOCUS/KLAR TOLTI DALLA RIGA (10 ott 2026, sera, Andrea):** la riga di
+about:config nomina Firefox e Fennec, dove about:config c'è di sicuro;
+una prova lo tiene fermo. Il resto com'era: **NON PROVATO, DA
+GUARDARE.** Focus/Klar: l'about:config lì non è
 detto che ci sia (la riga segue il tester). Amethyst dal vivo: un
 avviso vero ricevuto sotto Tor con ntfy, dal telefono.
 ## La CSP accesa, dietro una leva che nasce accesa (10 ott 2026, sera, cantiere csp-accesa, richiesta di Andrea)

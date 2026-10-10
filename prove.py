@@ -103612,6 +103612,12 @@ setTimeout(()=>{ out.scroll = SCROLL; out.come = COME;
            "about:config")]),
         # la quarta riga (10 ott 2026, sera): gli avvisi senza Telegram —
         # i nostri DM sono NIP-17 (kind 1059) e Amethyst li legge
+        # Focus/Klar via dalla riga di about:config (10 ott 2026, sera,
+        # Andrea): li' about:config non e' detto che ci sia; Firefox e
+        # Fennec ce l'hanno di sicuro
+        ("...e la riga di about:config nomina Firefox e Fennec, non Focus",
+         [True, False],
+         ["Firefox e Fennec" in o["tendinaCassetto"], "Focus" in o["tendinaCassetto"]]),
         ("...e la riga degli avvisi senza Telegram: Amethyst e UnifiedPush",
          [True, True, True],
          [x in o["tendinaCassetto"] for x in ("Amethyst", "UnifiedPush", "ntfy")]),

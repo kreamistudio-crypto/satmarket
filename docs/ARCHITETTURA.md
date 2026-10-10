@@ -22953,7 +22953,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che lo mostrano (il cassetto del Profilo e «I tuoi dati»), un
   `<details>` con quattro righe — Tor Browser, che fa da solo; Orbot in
   VPN più un browser Chromium (Brave, Cromite, Vanadium) con «Private
-  DNS» di Android su Off; Firefox e i suoi (Fennec, Focus) con in più
+  DNS» di Android su Off; Firefox e Fennec (Focus/Klar tolti la sera
+  stessa: lì about:config non è detto che ci sia) con in più
   `network.dns.blockDotOnion` su false in about:config; e gli avvisi
   senza Telegram, Amethyst sotto Tor con UnifiedPush. UNA FONTE SOLA,
   `tendinaOnionAndroid()`: il cassetto la mette nel suo template e
