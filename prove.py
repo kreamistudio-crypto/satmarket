@@ -55531,6 +55531,7 @@ def prove_card_parte_ordine():
     # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
     amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
     amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
+    amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
     for f in ("livello_utente", "_volti_persone", "miei_ordini"):
         exec(pezzo(f), amb)
     # la SPIA sul costruttore: chi gli si chiede, a ogni giro
@@ -57766,6 +57767,7 @@ def prove_ritocchi_prova_alan():
         # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
         amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
         amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
+        amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
         for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "MAX_ORDINI_MAI_VISTI_P2P = ", "P2P_ORDINI_MAI_VISTI_S = ", "P2P_CAMBIO_PUB_SCARTO = "):
             i = _SORGENTE.index("\n" + riga) + 1
             exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
@@ -64618,6 +64620,7 @@ def prove_parti_si_vedono():
     # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
     amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
     amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
+    amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
     for f in ("_ordini_puliti_p2p", "livello_utente", "_volti_persone",
               "_controparti_p2p"):
         exec(pezzo(f), amb)
@@ -67689,6 +67692,7 @@ def prove_volti_libro():
     # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
     amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
     amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
+    amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
     for f in ("_ordini_puliti_p2p", "_registra_ordini_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p",
               "_facce_ordini_p2p"):
         exec(pezzo(f), amb)
@@ -95487,7 +95491,9 @@ def _ambiente_libro_p2p(detto):
            # il marchio (10 ott 2026, reputazione-p2p): qui nessuno ce l'ha
            "_marchi_mancati_p2p": lambda con, ids, adesso: {},
            # (10 ott 2026, malus-p2p) il gemello delle dispute perse
-           "_marchi_dispute_p2p": lambda con, ids, adesso: {}}
+           "_marchi_dispute_p2p": lambda con, ids, adesso: {},
+           # (10 ott 2026, feedback-p2p) gli scambi completati accanto al nome
+           "_completati_p2p": lambda con, ids: {}}
     _m = _SORGENTE.index("\nMOMENTI_DEL_LIBRO_P2P = {") + 1
     exec(_SORGENTE[_m:_SORGENTE.index("}\n", _m) + 2], amb)
     return {**amb, "html": _html,
@@ -95802,6 +95808,7 @@ def prove_p2p_recapito_passo():
     # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
     amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
     amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
+    amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
     for f in _FUNZIONI_LIBRO_P2P + ("_volti_persone", "_controparti_p2p", "_nome_altro_p2p",
                                     # col contanti l'avviso dice l'appuntamento (1 ott 2026)
                                     "_tabacchino_libro", "_dati_frase_p2p",
@@ -114939,8 +114946,12 @@ console.log(JSON.stringify(out));
         i = _SORGENTE.index(riga)
         exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
     for nome in ("_ordini_puliti_p2p", "_pagamenti_p2p", "_pagamento_ordine_p2p",
-                 "_ammette_recensione_p2p", "_scambio_concluso_p2p"):
+                 "_ammette_recensione_p2p", "_scambio_concluso_p2p",
+                 # (10 ott 2026, feedback-p2p) la terza strada: la disputa
+                 # chiusa da un moderatore. Qui la tabella non c'e', e vale no
+                 "_chiusa_da_moderatore_p2p"):
         exec(pezzo(nome), amb)
+    amb["sqlite3"] = _sq
     con = _sq.connect(":memory:")
     con.row_factory = _sq.Row
     con.executescript(tabella("p2p_momenti") + "\n" + tabella("p2p_scambi"))
@@ -139938,18 +139949,27 @@ def prove_dati_reputazione_p2p():
            '"taker-timeout"' in segna,
            "a tutte e due le parti" in testo,
            "solo a chi ha preso un ordine" in testo))
-    prova("chi vede cosa: il contatore accanto al volto e nel negozio, i "
-          "completati solo a chi li ha", (True, True, True, True),
+    # (EMENDATE il 10 ott 2026, cantiere feedback-p2p, decisione di Andrea
+    # col pacchetto C dello studio sul feedback: gli scambi COMPLETATI non
+    # li vede piu' solo l'interessato — stanno accanto alle stelline, dove
+    # chi sta per scambiare decide di chi fidarsi. La pagina lo dice, e i
+    # due costruttori dei volti ora quel conto lo portano; i numeri GREZZI
+    # della reputazione — i mancati sotto la soglia — restano di chi li ha)
+    prova("chi vede cosa: il contatore e i completati accanto al volto e nel negozio",
+          (True, True, False, True, True, True),
           ("nella pagina del tuo negozio" in testo,
+           "quanti scambi hai completato, dal 10 ottobre 2026, lo vede anche chi vede te" in testo,
            "lo vedi solo tu" in testo,
            'venditore["non_completati"] = non_completati' in src,
+           'venditore["scambi_completati"] = scambi_completati' in src,
            '"completati": rep["completati"]' in pezzo("_posso_prendere_p2p")))
     volti = [src[m.start():m.start() + 3000] for m in re.finditer(
         r"marchi = _marchi_mancati_p2p\(", src)]
-    prova("...e nei due costruttori dei volti il conto dei completati "
-          "non c'e'", (2, []),
-          (len(volti), [v[:80] for v in volti if '"completati"' in v
-                        or "_reputazione_p2p(" in v]))
+    prova("...e i due costruttori dei volti portano il conto dei completati dal suo "
+          "giudice (una query per tutti), mai i numeri grezzi della reputazione", (2, 2, []),
+          (len(volti), sum(1 for v in volti if "fatti = _completati_p2p(con, " in v
+                           and '["completati"] = fatti[' in v),
+           [v[:80] for v in volti if "_reputazione_p2p(" in v]))
     prova("chi entra da Nostr e prende senza farsi riconoscere: l'esito "
           "si scrive lo stesso, e la pagina non lo tace", True,
           "anche se entri con una chiave Nostr" in testo
@@ -140608,8 +140628,10 @@ def prove_solleciti_p2p():
           "non risulta detto", True,
           0 < att.find("_sollecito_euro_p2p_fermo(con, r)")
           < att.index("INSERT OR IGNORE INTO p2p_avvisi"))
+    # (emendata il 10 ott 2026, feedback-p2p: il bottone lo porta anche il
+    # promemoria della recensione)
     prova("i solleciti portano il bottone dello scambio, come il promemoria", True,
-          'r["fonte"] in ("promemoria", "sollecito", "sollecito_euro")' in att)
+          'r["fonte"] in ("promemoria", "sollecito", "sollecito_euro", "recensione")' in att)
     ev_p = pezzo("_avvisi_evento_p2p")
     prova("i solleciti del PayCode nascono ancora dov'erano, e li' non e' entrato "
           "nient'altro", [1, False],
@@ -140625,7 +140647,10 @@ def prove_solleciti_p2p():
            '_dati_frase_p2p(con, ordine)["recapito_detto"]' in fermo])
 
     con, amb = _banco_eventi_p2p()
-    for riga in ("SOLLECITI_RILASCIO_S = ", "SOLLECITI_EURO_S = "):
+    for riga in ("SOLLECITI_RILASCIO_S = ", "SOLLECITI_EURO_S = ",
+                 # (10 ott 2026, feedback-p2p) il promemoria della recensione
+                 # nasce dalla stessa funzione, a concluso e a disputa chiusa
+                 "P2P_RECENSIONE_PROMEMORIA_S = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)].split("  #")[0], amb)
     for blocco in ("SOLLECITO_RILASCIO_TESTI = {", "SOLLECITO_RILASCIO_CONTANTI_TESTI = {",
@@ -140633,7 +140658,8 @@ def prove_solleciti_p2p():
                    "_PESO_MOMENTO_P2P = {"):
         i = src.index("\n" + blocco) + 1
         exec(src[i:src.index("}\n", i) + 2], amb)
-    for f in ("_stato_scambio_p2p", "_sollecito_euro_p2p_fermo", "_solleciti_evento_p2p"):
+    for f in ("_stato_scambio_p2p", "_sollecito_euro_p2p_fermo", "_solleciti_evento_p2p",
+              "_testo_promemoria_recensione_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
     H = 3600
     prova("gli intervalli: a chi vende gli stessi del PayCode (un'ora, sei, venti), a chi "
@@ -140912,6 +140938,362 @@ def prove_solleciti_p2p():
           [len(attese(o, "sollecito")),
            sorted(r[0] for r in con.execute("SELECT testo FROM p2p_attese WHERE ordine=? "
                                             "AND fonte='sollecito'", (o,)))])
+
+
+def prove_feedback_p2p():
+    """IL FEEDBACK RIFINITO (10 ott 2026, cantiere feedback-p2p, richiesta
+    di Andrea: il pacchetto C dello studio sul feedback P2P). La recensione
+    a fine scambio c'era gia'; mancavano tre cose: UN promemoria se dopo
+    un giorno non e' stata lasciata; la recensione anche dopo una disputa
+    CHIUSA DA UN MODERATORE (fin qui solo sullo scambio andato in porto:
+    chi non pagava e perdeva non riceveva mai un voto); e il numero degli
+    scambi COMPLETATI accanto alle stelline, che vedeva solo l'interessato.
+
+    Quel che qui si rompe in silenzio: il promemoria a chi ha gia'
+    recensito, o a chi una recensione non la puo' lasciare (porterebbe a
+    un muro), o due volte; la recensione aperta da un annullo qualunque;
+    il numero dei completati mostrato anche a zero, o la riga delle
+    stelline che cambia per chi quel numero non ce l'ha.
+
+    Il banco e' quello degli avvisi P2P coi giudici veri, la tabella
+    `feedback` e le due delle dispute dallo schema vero. Il client gira in
+    node coi pezzi veri."""
+    print("\n[il feedback rifinito: il promemoria, la recensione dopo la disputa, i completati]")
+    import re as _re
+    import sqlite3
+    src = _SORGENTE
+    m = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- 1) LE SENTINELLE --------------------------------------------------
+    sc = codice(_senza_prosa(pezzo("_scambio_concluso_p2p")))
+    prova("lo scambio «chiuso» per la recensione ha TRE strade: il libro, la cronaca, la "
+          "disputa chiusa da un moderatore — nell'ordine", True,
+          0 < sc.index("if _ammette_recensione_p2p(stato_libro):")
+          < sc.index("momento='concluso'") < sc.find("return _chiusa_da_moderatore_p2p(con, ordine)"))
+    prova("...e la terza guarda SOLO le dispute chiuse da un moderatore", True,
+          "stato='chiusa' \"\n            \"AND chiusa_da='moderatore'"
+          in pezzo("_chiusa_da_moderatore_p2p"))
+    sol = codice(_senza_prosa(pezzo("_solleciti_evento_p2p")))
+    prova("il promemoria nasce al concluso e alla chiusura del moderatore, a un giorno, "
+          "uno per parte (il vecchio si toglie)", [True, True, True],
+          ['if momento == "concluso" or (' in sol
+           and 'ev.get("attore") == "mostro"\n            and ev.get("dettaglio") == "admin"):' in sol,
+           "int(adesso) + P2P_RECENSIONE_PROMEMORIA_S" in sol,
+           "DELETE FROM p2p_attese WHERE ordine=? AND tg_id=? AND \"\n"
+           "                            \"fonte='recensione'" in sol])
+    att = codice(_senza_prosa(pezzo("_scarica_attese_p2p")))
+    prova("alla scadenza il giudice sta PRIMA del timbro, dentro un try, e il promemoria "
+          "porta il bottone dello scambio", [True, True, True],
+          [0 < att.find("perche = _promemoria_recensione_p2p_fermo(con, r)")
+           < att.index("INSERT OR IGNORE INTO p2p_avvisi"),
+           "try:\n                perche = _promemoria_recensione_p2p_fermo(con, r)" in att,
+           'r["fonte"] in ("promemoria", "sollecito", "sollecito_euro", "recensione")' in att])
+    fermo = codice(_senza_prosa(pezzo("_promemoria_recensione_p2p_fermo")))
+    prova("i giudici del promemoria sono quelli della rotta che la recensione la scrive",
+          [True, True, True],
+          ['_scambio_concluso_p2p(con, ordine, o["stato"])' in fermo,
+           '_parti_recensione_p2p(o["tg_id"], o["preso_da"], io)' in fermo,
+           "_mia_recensione_p2p(con, ordine, io)" in fermo])
+    for nome, chiave in (
+            ("_facce_ordini_p2p", 'fatti = _completati_p2p(con, [r["autore"] for r in righe])'),
+            ("_facce_ordini_p2p", 'if fatti.get(int(r["autore"] or 0)):\n            '
+                                  'volto["completati"] = fatti[int(r["autore"] or 0)]'),
+            ("_volti_persone", "fatti = _completati_p2p(con, ids)"),
+            ("_volti_persone", 'if fatti.get(int(u["tg_id"])):\n            '
+                               'chi["completati"] = fatti[int(u["tg_id"])]'),
+            ("negozio", 'scambi_completati = _completati_p2p(con, [v["tg_id"]]).get('
+                        'int(v["tg_id"]), 0)'),
+            ("negozio", 'venditore["scambi_completati"] = scambi_completati')):
+        prova(f"gli scambi completati escono da `{nome}`: {chiave[:40]}…", True,
+              chiave in pezzo(nome))
+
+    # --- 2) IL BANCO --------------------------------------------------------
+    con, amb = _banco_eventi_p2p()
+    amb["sqlite3"] = sqlite3
+    for riga in ("SOLLECITI_RILASCIO_S = ", "SOLLECITI_EURO_S = ", "STATI_RECENSIONE_P2P = ",
+                 "P2P_RECENSIONE_PROMEMORIA_S = "):
+        i = src.index("\n" + riga) + 1
+        exec(src[i:src.index("\n", i)].split("  #")[0], amb)
+    for blocco in ("SOLLECITO_RILASCIO_TESTI = {", "SOLLECITO_RILASCIO_CONTANTI_TESTI = {",
+                   "SOLLECITO_EURO_TESTI = {", "SOLLECITO_EURO_PAYCODE_TESTI = {",
+                   "_PESO_MOMENTO_P2P = {"):
+        i = src.index("\n" + blocco) + 1
+        exec(src[i:src.index("}\n", i) + 2], amb)
+    for f in ("_stato_scambio_p2p", "_sollecito_euro_p2p_fermo", "_solleciti_evento_p2p",
+              "_ammette_recensione_p2p", "_scambio_concluso_p2p", "_chiusa_da_moderatore_p2p",
+              "_mia_recensione_p2p", "_testo_promemoria_recensione_p2p",
+              "_promemoria_recensione_p2p_fermo", "_completati_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    schema = ""
+    for tabella, fine in (("feedback", "\n    );"), ("p2p_dispute", "\n    );"),
+                          ("p2p_dispute_registro", "ON p2p_dispute_registro(ordine);")):
+        i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
+        schema += src[i:src.index(fine, i) + len(fine)] + "\n"
+    con.executescript(schema)
+    prova("il promemoria aspetta un giorno", 24 * 3600, amb["P2P_RECENSIONE_PROMEMORIA_S"])
+    testo = amb["_testo_promemoria_recensione_p2p"]
+    pulito = _re.sub(r"</?[bi]>", "", testo("Anna"))
+    prova("la frase: col nome dell'altra persona, dice dove sta la recensione e che e' "
+          "definitiva; senza nome «chi ha scambiato con te»", [True, True, True, None],
+          [pulito.startswith("⭐ Com'è andata con Anna? Ieri avete chiuso uno scambio e non "
+                             "hai ancora lasciato la recensione: la trovi nella pagina dello "
+                             "scambio."),
+           pulito.endswith("È definitiva, e aiuta chi scambierà dopo di te."),
+           "Com'è andata con chi ha scambiato con te?" in testo(""),
+           _re.search(r"[\d€]", pulito)])
+
+    C, V = 111, 222                      # compra, vende (e ha pubblicato)
+    KC, KV, KX = "a" * 64, "b" * 64, "c" * 64
+    for chi, pub in ((C, KC), (V, KV)):
+        con.execute("INSERT INTO utenti VALUES(?,1)", (chi,))
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", (pub, chi))
+    # (nel banco `_NOMI` dice il nome che QUELLA persona vede, cioe' dell'altra)
+    amb["_NOMI"].update({C: "Vito", V: "Carla"})
+    giornale = []
+    amb["print"] = lambda *a, **k: giornale.append(" ".join(str(x) for x in a))
+    ORA = 1_790_000_000
+    H = 3600
+    URL = "https://barattolo.store/p2p?scambio="
+    conta = [0]
+
+    def nuovo(taker=C):
+        conta[0] += 1
+        o = f"{conta[0]:08x}-7b2d-4c6a-9e11-aa00bb11cc55"
+        con.execute(
+            "INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, "
+            "preso_da, euro, sats, metodi) VALUES(?,?,0,'in-progress','sell',1,?,"
+            "'10,00 €',15000,'[\"SEPA\"]')", (o, V, taker))
+        return o
+
+    def ev(o, azione, attore="mostro", dettaglio="", quando=ORA, buyer=KC, **extra):
+        d = {"v": 1, "order": o, "action": azione, "ts": quando,
+             "buyer": buyer, "seller": KV, "actor": attore}
+        if dettaglio:
+            d["detail"] = dettaglio
+        d.update(extra)
+        e = amb["_evento_p2p_pulito"](d, quando)
+        fatto = amb["_registra_evento_p2p"](con, e, quando)
+        if fatto is None:
+            return None
+        amb["_solleciti_evento_p2p"](con, e, fatto, quando)
+        amb["_avvisi_evento_p2p"](con, e, fatto, quando)
+        return fatto
+
+    def attese(o):
+        return [(r["momento"], r["tg_id"], r["scade"]) for r in con.execute(
+            "SELECT momento, tg_id, scade FROM p2p_attese WHERE ordine=? AND "
+            "fonte='recensione' ORDER BY tg_id", (o,))]
+
+    def batte(quando):
+        bottoni = {}
+        fuori, _ = amb["_scarica_attese_p2p"](con, quando, bottoni)
+        return sorted((t, _re.sub(r"</?[bi]>", "", x), bottoni.get(i, ("", ""))[1])
+                      for i, (t, x, f) in enumerate(fuori) if f == "recensione")
+
+    def concluso(o, t, buyer=KC):
+        ev(o, "taken", "buyer", "invoice-next", t, buyer)
+        ev(o, "hold-invoice-paid", "seller", "active", t + 50, buyer)
+        ev(o, "fiat-sent", "buyer", "", t + 100, buyer)
+        ev(o, "released", "seller", "", t + 200, buyer,
+           sats=15000, sats_buyer=14775, sats_seller=15225)
+        ev(o, "success", "mostro", "", t + 300, buyer,
+           sats=15000, sats_buyer=14775, sats_seller=15225)
+        return t + 300
+
+    def recensisce(o, da, per):
+        con.execute("INSERT INTO feedback(ordine_id, da_tg_id, per_tg_id, voto, commento, "
+                    "creato, scambio) VALUES(?,?,?,5,'',?,?)",
+                    (-(conta[0] * 100 + da), da, per, ORA, o))
+
+    # --- 3) IL PROMEMORIA -----------------------------------------------------
+    o = nuovo()
+    t = concluso(o, ORA)
+    prova("a scambio concluso: un promemoria in attesa per ciascuna delle due parti, a un "
+          "giorno", [("recensione_promemoria", C, t + 24 * H),
+                     ("recensione_promemoria", V, t + 24 * H)], attese(o))
+    prova("un secondo prima del giorno non parte niente", [], batte(t + 24 * H - 1))
+    PC = _re.sub(r"</?[bi]>", "", testo("Vito"))
+    PV = _re.sub(r"</?[bi]>", "", testo("Carla"))
+    prova("a un giorno, a tutti e due: ognuno col nome dell'ALTRO, e il bottone che apre "
+          "quello scambio", [(C, PC, URL + o), (V, PV, URL + o)], batte(t + 24 * H))
+    prova("una volta sola: ripassando non c'e' piu' niente, e in attesa non resta niente",
+          ([], []), (batte(t + 30 * H), attese(o)))
+    # chi ha gia' recensito non lo riceve
+    o = nuovo()
+    t = concluso(o, ORA + 1000)
+    recensisce(o, C, V)
+    giornale.clear()
+    prova("chi la recensione l'ha gia' lasciata non riceve niente; l'altro si'",
+          [(V, PV, URL + o)], batte(t + 24 * H))
+    prova("...e il journal dice perche'", True,
+          any(f"Promemoria recensione P2P: {o[:8]} a {C} non parte" in r
+              and "l'ha gia' lasciata" in r for r in giornale))
+    # l'altra parte non si conosce: niente promemoria (porterebbe a un muro)
+    o = nuovo(taker=0)
+    t = concluso(o, ORA + 2000, KX)
+    prova("se l'altra persona non e' dei nostri c'e' una sola attesa, quella di chi lo e'",
+          [("recensione_promemoria", V, t + 24 * H)], attese(o))
+    giornale.clear()
+    prova("...e alla scadenza non parte: non c'e' un posto per la sua recensione",
+          [[], True],
+          [batte(t + 24 * H), any("non c'e' un posto per la sua recensione (ignota)" in r
+                                  for r in giornale)])
+    # gli avvisi spenti
+    o = nuovo()
+    t = concluso(o, ORA + 3000)
+    con.execute("UPDATE utenti SET avvisi_p2p=0 WHERE tg_id=?", (C,))
+    prova("chi ha gli avvisi P2P spenti non lo riceve, e non risulta detto",
+          [[(V, PV, URL + o)], 0],
+          [batte(t + 24 * H),
+           con.execute("SELECT COUNT(*) FROM p2p_avvisi WHERE ordine=? AND tg_id=? AND "
+                       "momento='recensione_promemoria'", (o, C)).fetchone()[0]])
+    con.execute("UPDATE utenti SET avvisi_p2p=1 WHERE tg_id=?", (C,))
+    # il concluso raccontato due volte nello stesso giro non raddoppia
+    o = nuovo()
+    t = concluso(o, ORA + 4000)
+    ev(o, "success", "mostro", "", t + 5, sats=15000, sats_buyer=14775, sats_seller=15225)
+    prova("un concluso raccontato due volte lascia due attese (una per parte), non quattro",
+          2, len(attese(o)))
+    # un giudice che inciampa non ferma il battito
+    vero = amb["_scambio_concluso_p2p"]
+
+    def rotto(*a, **k):
+        raise RuntimeError("cartone")
+    amb["_scambio_concluso_p2p"] = rotto
+    giornale.clear()
+    fuori = batte(t + 5 + 24 * H)
+    amb["_scambio_concluso_p2p"] = vero
+    prova("se il giudice inciampa il battito non cade: le righe se ne vanno, e il journal "
+          "lo dice", [[], [], True],
+          [fuori, attese(o), any("il giudice e' inciampato (RuntimeError: cartone)" in r
+                                 for r in giornale)])
+
+    # --- 4) LA RECENSIONE DOPO LA DISPUTA -------------------------------------
+    SC = amb["_scambio_concluso_p2p"]
+
+    def in_disputa(t, chiusa_da="moderatore"):
+        o = nuovo()
+        ev(o, "taken", "buyer", "invoice-next", t)
+        ev(o, "hold-invoice-paid", "seller", "active", t + 50)
+        ev(o, "fiat-sent", "buyer", "", t + 100)
+        ev(o, "dispute-opened", "seller", "", t + 200)
+        con.execute("INSERT INTO p2p_dispute(ordine, giro, aperta_il, aperta_da, compratore, "
+                    "venditore, stato, esito, chiusa_da, chiusa_il) VALUES(?,1,?,'vende',?,?,"
+                    "'chiusa','venditore',?,?)", (o, t + 200, C, V, chiusa_da, t + 300))
+        return o
+
+    o = in_disputa(ORA + 10000)
+    prova("prima della chiusura raccontata da mostrod il promemoria non c'e'", [], attese(o))
+    ev(o, "canceled", "mostro", "admin", ORA + 10300)
+    prova("disputa chiusa da un moderatore, i sats tornati a chi vende: lo scambio e' "
+          "«chiuso» per la recensione", True, SC(con, o, "canceled"))
+    prova("...e il promemoria aspetta le due parti anche qui",
+          [("recensione_promemoria", C, ORA + 10300 + 24 * H),
+           ("recensione_promemoria", V, ORA + 10300 + 24 * H)], attese(o))
+    prova("...e a un giorno parte, a tutti e due",
+          [(C, PC, URL + o), (V, PV, URL + o)], batte(ORA + 10300 + 24 * H))
+    o = in_disputa(ORA + 20000, "parti")
+    ev(o, "canceled", "mostro", "cooperative", ORA + 20300)
+    prova("la disputa chiusa dalle PARTI (l'annullo d'accordo) non apre la recensione, e "
+          "non mette promemoria", [False, []], [SC(con, o, "canceled"), attese(o)])
+    o = nuovo()
+    ev(o, "taken", "buyer", "invoice-next", ORA + 30000)
+    ev(o, "canceled", "buyer", "republished", ORA + 30100)
+    prova("un annullo qualunque nemmeno", [False, []], [SC(con, o, "canceled"), attese(o)])
+    con_nudo, amb_nudo = _banco_eventi_p2p()
+    amb_nudo["sqlite3"] = sqlite3
+    exec(_senza_prosa(pezzo("_chiusa_da_moderatore_p2p")), amb_nudo)
+    prova("un database senza la tabella delle dispute vale «no», mai un errore", False,
+          amb_nudo["_chiusa_da_moderatore_p2p"](con_nudo, o))
+
+    # --- 5) GLI SCAMBI COMPLETATI ACCANTO AL NOME ------------------------------
+    for k in range(3):
+        con.execute("INSERT INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, quando) "
+                    "VALUES(?,?,1,'completato','vende',?)", (V, f"fatto-{k}", ORA - k))
+    con.execute("INSERT INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, quando) "
+                "VALUES(?,'fatto-9',1,'completato','compra',?)", (C, ORA - 500 * 86400))
+    con.execute("INSERT INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, quando) "
+                "VALUES(333,'mancato-1',1,'mancato','compra',?)", (ORA,))
+    prova("i completati in una mappa: tutta la memoria, solo chi ne ha almeno uno — un "
+          "mancato non e' un completato", {V: 3, C: 1},
+          amb["_completati_p2p"](con, [C, V, 333, 444, 0]))
+    prova("...lista vuota e database senza tabella: nessun numero, mai un errore", [{}, {}],
+          [amb["_completati_p2p"](con, []),
+           amb["_completati_p2p"](sqlite3.connect(":memory:"), [V])])
+
+    # --- 6) IL CLIENT, in node -------------------------------------------------
+    prova("il numero dei completati sta nei quattro posti: riga delle stelline, riquadro, "
+          "card dell'altra parte, negozio", [1, 1, 1, 2],
+          [m.count("completatiP2P(f.completati, true)"), m.count("completatiP2P(f.completati)"),
+           m.count("completatiP2P(c.completati, true)"),
+           m.count("completatiP2P(v.scambi_completati, true)")])
+    porta = ("if (!o || (o.stato !== 'concluso' && !(o.stato === 'annullato' && rec\n"
+             "                                         && (rec.si === true || rec.gia === true)))) "
+             "return '';")
+    prova("la condizione che apre la recensione e' scritta UGUALE in testa al gesto e al "
+          "riquadro (due volte in tutto)", [2, True, True],
+          [m.count(porta), porta in _fn_js(m, "function gestoRecensioneP2P(o, rec){"),
+           porta in _fn_js(m, "function riquadroRecensioneP2P(o, rec){")])
+    prova("la pagina chiede se si puo' recensire anche sullo scambio annullato, ma solo se "
+          "c'e' stata una disputa", True,
+          "if (o.stato === 'concluso'\n      || (o.stato === 'annullato' && (o.disputaId || "
+          "o.moderatore))) chiediRecensibileP2P(o.id);" in m)
+    prova("«I tuoi dati» dice che i completati li vede anche chi vede te, e del promemoria",
+          [True, True, False],
+          ["<b>quanti scambi hai completato</b>, dal 10 ottobre 2026, lo vede anche chi vede te"
+           in m, "ti arriva <b>un solo promemoria</b>" in m,
+           "quanti scambi hai completato lo vedi <b>solo tu</b>" in m])
+    js = r"""
+const esc = s => String(s == null ? '' : s);
+function stellaP2P(media){ return '[stella ' + media + ']'; }
+function icoPersonaP2P(){ return '[omino]'; }
+function stelleSceltaP2P(){ return '[stelle]'; }
+function nomeControparteP2P(o, altrimenti){ return altrimenti; }
+""" + "".join(_fn_js(m, f) for f in (
+        "function completatiP2P(n, inRiga){", "function stellineP2P(f){",
+        "function gestoRecensioneP2P(o, rec){",
+        "function riquadroRecensioneP2P(o, rec){", "function moduloRecensioneP2P(o){")) + r"""
+const c = {};
+c.riga = [0, 1, 2, 12, 'x', -3].map(n => completatiP2P(n, true));
+c.box = [completatiP2P(1), completatiP2P(12), completatiP2P(0)];
+c.stelline = [stellineP2P({voti: 24, media: 4.9}), stellineP2P({voti: 24, media: 4.9, completati: 12}),
+              stellineP2P({voti: 0, media: 0, completati: 3}), stellineP2P({voti: 0, media: 0}),
+              stellineP2P(null)];
+const A = {id: 'x', stato: 'annullato'}, K = {id: 'y', stato: 'concluso'};
+c.aperto = [gestoRecensioneP2P({id: 'z', stato: 'attivo'}, {si: true}),
+            riquadroRecensioneP2P({id: 'z', stato: 'attivo'}, {si: true}),
+            gestoRecensioneP2P(null, {si: true}), riquadroRecensioneP2P(null, {si: true}),
+            gestoRecensioneP2P(A, {si: 1}), riquadroRecensioneP2P(A, {gia: 'true'})];
+c.gesto = [gestoRecensioneP2P(A, {si: true}), gestoRecensioneP2P(A, {si: false, motivo: 'non_conclusa'}),
+           gestoRecensioneP2P(A, null),
+           gestoRecensioneP2P({id: 'x', stato: 'annullato', votabile: true}, {si: false, motivo: 'ignota'}),
+           gestoRecensioneP2P(K, {si: true}), gestoRecensioneP2P(K, null)];
+c.riquadro = [riquadroRecensioneP2P(A, {si: true}).indexOf('Lascia una recensione') >= 0,
+              riquadroRecensioneP2P(A, {si: false, gia: true, voto: 4}).indexOf('Recensione lasciata') >= 0,
+              riquadroRecensioneP2P(A, {si: false, motivo: 'non_conclusa'}),
+              riquadroRecensioneP2P(A, null)];
+console.log(JSON.stringify(c));
+"""
+    c = _node_banco(js)
+    if c is None:
+        salta("il client del feedback P2P", "node non c'e'")
+    else:
+        prova("client: i completati in riga — niente a zero, singolare a uno, plurale dopo",
+              ["", "✅ 1 scambio", "✅ 2 scambi", "✅ 12 scambi", "", ""], c["riga"])
+        prova("...e nel riquadro la forma intera", [True, True, ""],
+              ["✅ <b>1</b> scambio completato" in c["box"][0],
+               "✅ <b>12</b> scambi completati" in c["box"][1], c["box"][2]])
+        prova("client: la riga delle stelline SENZA il numero e' quella di sempre; col numero "
+              "lo porta in coda; senza voti ma con scambi fatti mostra quelli; senza niente tace",
+              ["[stella 4.9] 4,9 · [omino] 24", "[stella 4.9] 4,9 · [omino] 24 · ✅ 12 scambi",
+               "✅ 3 scambi", "", ""], c["stelline"])
+        prova("client: a scambio aperto, senza scambio, o con un si' che non e' un true "
+              "vero, niente — mai per lo stato da solo", [""] * 6, c["aperto"])
+        prova("client: sullo scambio annullato il gesto e' la recensione solo col si' del "
+              "server, e mai il voto del circuito", ["recensisci", "", "", "", "recensisci", ""],
+              c["gesto"])
+        prova("client: il riquadro sull'annullato — da compilare col si', «lasciata» se c'e' "
+              "gia', niente negli altri casi", [True, True, "", ""], c["riquadro"])
 
 
 def prove_malus_p2p():
@@ -142447,6 +142829,7 @@ def main():
               prove_banner_ingresso, prove_tour_banner_p2p,
               prove_reputazione_p2p, prove_dati_reputazione_p2p,
               prove_malus_p2p,
+              prove_feedback_p2p,
               prove_x_risonanza,
               prove_config_esempio):
         try:

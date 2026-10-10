@@ -1320,7 +1320,12 @@ ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
 - «Tieni le prove di quello che hai fatto: la ricevuta del bonifico, la
   schermata del pagamento. Sono quelle che guarda chi decide.» Le chat
   fuori da Barattolo non contano.
-- Dopo una disputa chiusa in porto la recensione si può lasciare.
+- Dopo una disputa chiusa in porto la recensione si può lasciare. Dal 10
+  ott 2026 anche dopo una disputa che il **moderatore** ha chiuso
+  rimandando i sats a chi vende: lo scambio risulta «Annullato», ma nella
+  sua pagina compare lo stesso riquadro «⭐ Lascia una recensione», per
+  tutte e due le parti. Un annullo qualunque (d'accordo, o a tempo) non
+  apre nessuna recensione.
 - ⚠️ Storto: «Non è riuscita: <motivo>».
 
 ---
@@ -1351,6 +1356,17 @@ ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
   vedere con le stelle del tuo negozio su Barattolo.») → «Mando il voto…»
   → «Grazie ⭐».
 
+- ✈️ **Il promemoria, un giorno dopo** (dal 10 ott 2026). Se a 24 ore
+  dalla chiusura — scambio concluso, o disputa chiusa da un moderatore —
+  la recensione non c'è, arriva UNA volta, col bottone «**⚡ Apri lo
+  scambio**»: «⭐ **Com'è andata con <nome>?** Ieri avete chiuso uno
+  scambio e non hai ancora lasciato la recensione: la trovi nella pagina
+  dello scambio. *È definitiva, e aiuta chi scambierà dopo di te.*»
+  (senza un nome da mostrare: «Com'è andata con chi ha scambiato con
+  te?»). Non arriva a chi l'ha già lasciata, a chi non ha un posto dove
+  lasciarla (l'altra persona non è su Barattolo), né a chi ha spento gli
+  avvisi P2P.
+
 ### La stellina e lo scudo Staff
 
 - **La stellina** è la media delle recensioni di chi ha pubblicato, la
@@ -1359,6 +1375,13 @@ ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
   si riempie per quanto vale la media. Nella card P2P della home sta
   all'angolo del volto (per il lettore di schermo: «Valutazione 4,9 su
   5»). Senza recensioni, niente stella.
+- **Gli scambi completati** (dal 10 ott 2026) stanno accanto alle
+  stelline, da uno in su: sulla card del libro «★ 4,9 · 👤 24 · ✅ 12
+  scambi» (chi non ha ancora recensioni ma ha già scambiato mostra solo
+  «✅ 3 scambi»), nel dettaglio sotto le tre colonne «✅ **12** scambi
+  completati», nella card dell'altra persona «✅ 12 scambi», nel negozio
+  «✅ 12 scambi P2P» accanto alle vendite concluse. Prima quel numero lo
+  vedeva solo l'interessato, nel suo profilo di scambio.
 - **Lo scudo Staff**: il bollino «Staff» (sui volti nelle card, nella card
   dell'altra persona nella pagina dello scambio). **Ha la precedenza**: chi
   è staff porta lo scudo e non la stellina. Toccandolo: «**Staff di

@@ -23770,6 +23770,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     # ...e «⚖️ N dispute perse» (10 ott 2026, malus-p2p): da una in su
     dispute_perse = _marchi_dispute_p2p(
         con, [v["tg_id"]], int(time.time())).get(int(v["tg_id"]), 0)
+    scambi_completati = _completati_p2p(con, [v["tg_id"]]).get(int(v["tg_id"]), 0)
     seguito = bool(user and int(user["id"]) != int(v["tg_id"]) and con.execute(
         "SELECT 1 FROM venditori_seguiti WHERE tg_id=? AND venditore_id=?",
         (user["id"], v["tg_id"])).fetchone())
@@ -23778,6 +23779,8 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     venditore["seguito"] = seguito
     venditore["non_completati"] = non_completati
     venditore["dispute_perse"] = dispute_perse
+    # ...e quanti scambi P2P ha completato (10 ott 2026, feedback-p2p)
+    venditore["scambi_completati"] = scambi_completati
     venditore["distintivi"] = [
         dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
              descrizione=d["descrizione"])
@@ -45447,6 +45450,28 @@ def _marchi_dispute_p2p(con, ids, adesso: int) -> dict:
     return {int(r[0]): int(r[1]) for r in righe if int(r[1] or 0) > 0}
 
 
+def _completati_p2p(con, ids) -> dict:
+    """`{tg_id: n}` degli scambi COMPLETATI di ogni persona chiesta, in
+    UNA query — solo chi ne ha almeno uno (10 ott 2026, cantiere
+    feedback-p2p). Fino a oggi quel numero lo vedeva solo l'interessato,
+    nel suo profilo di scambio, e lo usava il filtro di chi pubblica:
+    adesso sta accanto alle stelline, dove chi sta per scambiare decide
+    di chi fidarsi (decisione di Andrea; «I tuoi dati» lo dice). E' tutta
+    la memoria degli esiti, come il conto del filtro. Un database senza
+    la tabella vale «nessun numero», mai un errore su un volto."""
+    ids = sorted({int(i) for i in ids or [] if i})
+    if not ids:
+        return {}
+    segni = ",".join("?" * len(ids))
+    try:
+        righe = con.execute(
+            f"SELECT tg_id, COUNT(*) AS n FROM p2p_esiti WHERE esito='completato' "
+            f"AND tg_id IN ({segni}) GROUP BY tg_id", ids).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    return {int(r[0]): int(r[1]) for r in righe if int(r[1] or 0) > 0}
+
+
 def _euro_sospesi_p2p(con, tg_id, adesso: int) -> int:
     """IN QUANTI SCAMBI chi vende aspetta gli euro di questa persona da
     piu' di P2P_EURO_SOSPESI_DOPO_S (10 ott 2026, «I MALUS DOPO LA
@@ -46117,6 +46142,8 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
     marchi = _marchi_mancati_p2p(con, [r["autore"] for r in righe], adesso)
     # le dispute perse con colpa (10 ott 2026, malus-p2p), accanto
     perse = _marchi_dispute_p2p(con, [r["autore"] for r in righe], adesso)
+    # ...e gli scambi completati, accanto alle stelline (feedback-p2p)
+    fatti = _completati_p2p(con, [r["autore"] for r in righe])
     fuori = {}
     for r in righe:
         voti = int(r["n_feedback"] or 0)
@@ -46140,6 +46167,8 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
             volto["mancati"] = marchi[int(r["autore"] or 0)]
         if perse.get(int(r["autore"] or 0)):
             volto["dispute"] = perse[int(r["autore"] or 0)]
+        if fatti.get(int(r["autore"] or 0)):
+            volto["completati"] = fatti[int(r["autore"] or 0)]
         fuori[r["ordine"]] = volto
     return fuori
 
@@ -46245,6 +46274,8 @@ def _volti_persone(con, ids, adesso) -> dict:
     marchi = _marchi_mancati_p2p(con, ids, adesso)
     # le dispute perse con colpa (10 ott 2026, malus-p2p), accanto
     perse = _marchi_dispute_p2p(con, ids, adesso)
+    # ...e gli scambi completati, accanto alle stelline (feedback-p2p)
+    fatti = _completati_p2p(con, ids)
     volti = {}
     for u in con.execute(
             f"SELECT tg_id, nome, username, npub, npub_verificata, "
@@ -46285,6 +46316,8 @@ def _volti_persone(con, ids, adesso) -> dict:
             chi["mancati"] = marchi[int(u["tg_id"])]
         if perse.get(int(u["tg_id"])):
             chi["dispute"] = perse[int(u["tg_id"])]
+        if fatti.get(int(u["tg_id"])):
+            chi["completati"] = fatti[int(u["tg_id"])]
         volti[int(u["tg_id"])] = chi
     return volti
 
@@ -46751,9 +46784,31 @@ def _scambio_concluso_p2p(con, ordine: str, stato_libro) -> bool:
     non puo' comparire dove l'invio verrebbe rifiutato."""
     if _ammette_recensione_p2p(stato_libro):
         return True
-    return con.execute("SELECT 1 FROM p2p_momenti WHERE ordine=? "
-                       "AND momento='concluso' LIMIT 1",
-                       (ordine,)).fetchone() is not None
+    if con.execute("SELECT 1 FROM p2p_momenti WHERE ordine=? "
+                   "AND momento='concluso' LIMIT 1",
+                   (ordine,)).fetchone() is not None:
+        return True
+    # LA TERZA STRADA (10 ott 2026, cantiere feedback-p2p): la DISPUTA
+    # CHIUSA DA UN MODERATORE, da qualunque parte siano andati i sats.
+    # Fino a oggi si recensiva solo lo scambio andato in porto: chi non
+    # mandava gli euro e perdeva la disputa — i sats tornati a chi vende,
+    # lo scambio «annullato» — non riceveva mai un voto, cioe' proprio
+    # dove una recensione dice la cosa piu' utile. Lo stato e' assorbente
+    # come il `success`: decide il coordinatore, e non c'e' appello.
+    # Un annullo qualunque (d'accordo, a tempo) NON apre la recensione.
+    return _chiusa_da_moderatore_p2p(con, ordine)
+
+
+def _chiusa_da_moderatore_p2p(con, ordine: str) -> bool:
+    """Su quest'ordine c'e' una disputa CHIUSA DA UN MODERATORE? Pura
+    sulla connessione; un database senza la tabella delle dispute — i
+    banchi di ieri — vale «no», mai un errore."""
+    try:
+        return con.execute(
+            "SELECT 1 FROM p2p_dispute WHERE ordine=? AND stato='chiusa' "
+            "AND chiusa_da='moderatore' LIMIT 1", (ordine,)).fetchone() is not None
+    except sqlite3.OperationalError:
+        return False
 
 
 def _parti_recensione_p2p(maker_id, preso_da, chi) -> tuple:
@@ -49271,6 +49326,51 @@ def _sollecito_p2p_vivo(momenti, quando_fiat: int) -> bool:
     return True
 
 
+# IL PROMEMORIA DELLA RECENSIONE (10 ott 2026, cantiere feedback-p2p,
+# richiesta di Andrea): l'invito a recensire sta nel messaggio «Scambio
+# concluso», uno solo, e si perde. Un giorno dopo la chiusura — lo scambio
+# concluso, o la disputa chiusa da un moderatore — a chi puo' ancora
+# recensire e non l'ha fatto arriva UN promemoria, col bottone dello
+# scambio. E' un'attesa come le altre (`p2p_attese`, fonte `recensione`,
+# momento `recensione_promemoria`): la mette `_solleciti_evento_p2p`, e
+# alla scadenza la giudica `_promemoria_recensione_p2p_fermo` — gli
+# stessi tre giudici della rotta che la recensione la scrive. La frase si
+# scrive ALLORA, col nome dell'altra persona come la pagina lo mostra.
+P2P_RECENSIONE_PROMEMORIA_S = 24 * 3600
+
+
+def _testo_promemoria_recensione_p2p(nome: str) -> str:
+    """PURA: la frase del promemoria. `nome` e' dell'altra persona come
+    la pagina dello scambio la mostra, gia' scappato, o vuoto: allora si
+    dice «chi ha scambiato con te», mai un nome che la pagina non mostra."""
+    chi = nome or "chi ha scambiato con te"
+    return (f"⭐ <b>Com'è andata con {chi}?</b> Ieri avete chiuso uno scambio e "
+            "non hai ancora lasciato la recensione: la trovi nella pagina dello "
+            "scambio.\n\n<i>È definitiva, e aiuta chi scambierà dopo di te.</i>")
+
+
+def _promemoria_recensione_p2p_fermo(con, r) -> str:
+    """IL PROMEMORIA DELLA RECENSIONE HA ANCORA SENSO? Pura sulla
+    connessione; `r` e' la riga dell'attesa. Torna '' se parte, o il
+    PERCHE' non parte, per il journal. Parte solo se la recensione si
+    puo' ANCORA lasciare e non c'e': i giudici sono quelli della rotta
+    che la scrive (`_scambio_concluso_p2p`, `_parti_recensione_p2p`,
+    `_mia_recensione_p2p`) — un promemoria non deve portare a un muro."""
+    ordine, io = r["ordine"], int(r["tg_id"] or 0)
+    o = con.execute("SELECT tg_id, preso_da, stato FROM p2p_ordini WHERE ordine=?",
+                    (ordine,)).fetchone()
+    if not o:
+        return "l'ordine non c'e' piu'"
+    if not _scambio_concluso_p2p(con, ordine, o["stato"]):
+        return "lo scambio non risulta chiuso"
+    _, motivo = _parti_recensione_p2p(o["tg_id"], o["preso_da"], io)
+    if motivo:
+        return f"non c'e' un posto per la sua recensione ({motivo})"
+    if _mia_recensione_p2p(con, ordine, io):
+        return "la recensione l'ha gia' lasciata"
+    return ""
+
+
 def _sollecito_euro_p2p_fermo(con, r) -> str:
     """IL SOLLECITO A CHI COMPRA HA ANCORA SENSO? Pura sulla connessione;
     `r` e' la riga dell'attesa. Torna '' se parte, o il PERCHE' non parte
@@ -49345,6 +49445,23 @@ def _solleciti_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
                 (ordine, f"{nome}{livello}", giro, chi, testi[livello], ts,
                  int(adesso) + int(fra), fonte))
 
+    # IL PROMEMORIA DELLA RECENSIONE (10 ott 2026, cantiere feedback-p2p): a
+    # scambio concluso, o a disputa chiusa da un moderatore, un'attesa a
+    # un giorno per ciascuna delle due parti. Il testo si scrive alla
+    # scadenza, dove si decide anche se parte
+    if momento == "concluso" or (
+            momento in ("rilasciato", "annullato") and ev.get("attore") == "mostro"
+            and ev.get("dettaglio") == "admin"):
+        for chi in (compra, vende):
+            if chi:
+                con.execute("DELETE FROM p2p_attese WHERE ordine=? AND tg_id=? AND "
+                            "fonte='recensione'", (ordine, chi))
+                con.execute(
+                    "INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, "
+                    "quando, scade, fonte) VALUES(?,'recensione_promemoria',?,?,?,?,?,"
+                    "'recensione')",
+                    (ordine, giro, chi, _testo_promemoria_recensione_p2p(""), ts,
+                     int(adesso) + P2P_RECENSIONE_PROMEMORIA_S))
     if momento == "garanzia_pagata" and compra:
         dati = _dati_frase_p2p(con, ordine)
         if "Contanti" in _metodi_libro(dati["metodi_lista"]):
@@ -49496,6 +49613,21 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
                 print(f"· Promemoria P2P: {corto} «{r['momento']}» a "
                       f"{r['tg_id']} non parte: {perche}", flush=True)
                 continue
+        if r["fonte"] == "recensione":
+            # IL PROMEMORIA DELLA RECENSIONE (10 ott 2026, feedback-p2p):
+            # parte solo se si puo' ancora lasciare e non c'e'. Un giudice
+            # che inciampa non ferma il battito (la lezione dei solleciti)
+            try:
+                perche = _promemoria_recensione_p2p_fermo(con, r)
+                if not perche:
+                    promemoria = _testo_promemoria_recensione_p2p(
+                        _nome_altro_p2p(con, r["ordine"], r["tg_id"], adesso))
+            except Exception as e:
+                perche = f"il giudice e' inciampato ({type(e).__name__}: {e})"
+            if perche:
+                print(f"· Promemoria recensione P2P: {corto} a {r['tg_id']} non "
+                      f"parte: {perche}", flush=True)
+                continue
         if r["fonte"] == "libro" and con.execute(
                 "SELECT 1 FROM p2p_momenti WHERE ordine=? AND momento=? "
                 "AND fonte='mostro' AND ABS(quando-?)<=?",
@@ -49566,7 +49698,7 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
                       f"coordinatore NON l'ha raccontato in {P2P_RISERVA_S}s: "
                       "parla il libro (nel log del nodo: barattolo_eventi)",
                       flush=True)
-        if (r["fonte"] in ("promemoria", "sollecito", "sollecito_euro")
+        if (r["fonte"] in ("promemoria", "sollecito", "sollecito_euro", "recensione")
                 and bottoni is not None):
             # (dal 10 ott 2026 anche i solleciti — a chi vende e a chi
             # compra — portano il bottone: dicono «dalla pagina dello

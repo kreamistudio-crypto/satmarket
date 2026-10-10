@@ -47187,3 +47187,113 @@ stesso istante è arrivato `660f1ed` (una riga di CLAUDE.md); ribasato
 senza conflitti, rifatti lo scanner, la prova del cantiere e quella del
 tetto di CLAUDE.md, e spinto. Tortura e giri dal vivo non rifatti dopo
 i rebase.
+
+## Il feedback rifinito: il promemoria della recensione, la recensione dopo la disputa, gli scambi completati accanto al nome (10 ott 2026, cantiere feedback-p2p, richiesta di Andrea)
+
+**Da dove viene.** È il pacchetto C dello studio sul feedback («I
+solleciti per tutti i metodi» ha lo studio e le decisioni; «I malus dopo
+la garanzia» è il B). La recensione a fine scambio c'era già, ai due
+lati, nella media del mercatino: mancavano tre cose. La quarta dello
+studio, la busta chiusa contro la ritorsione, Andrea l'ha rimandata.
+
+**1) La recensione anche dopo una disputa chiusa da un moderatore.** Si
+recensiva solo lo scambio andato in porto (`success` sul libro, o
+`concluso` nella cronaca): chi non mandava gli euro e perdeva la disputa
+— i sats tornati a chi vende, lo scambio «annullato» — non riceveva mai
+un voto, cioè proprio dove una recensione dice la cosa più utile.
+`_scambio_concluso_p2p`, il giudice UNICO delle due rotte, ha una terza
+strada: `_chiusa_da_moderatore_p2p` (la riga di `p2p_dispute` chiusa da
+un moderatore, qualunque esito). Lo stato è assorbente come il `success`
+— decide il coordinatore, e non c'è appello —, che è la condizione di
+sempre per recensire. Un annullo qualunque (d'accordo, a tempo, la
+disputa chiusa dalle parti) NON apre niente. NEL CLIENT la condizione che
+apre il gesto e il riquadro vale anche sullo scambio `annullato`, ma solo
+quando il SERVER risponde `si` (o `gia`): mai per lo stato da solo. E la
+pagina lo chiede solo sugli annullati su cui c'è stata una disputa
+(`disputaId` o `moderatore` sulla riga), per non bussare al server a
+ogni annullo.
+
+**2) Il promemoria, un giorno dopo.** L'invito stava in coda a «Scambio
+concluso», uno solo, e si perde. A 24 ore dalla chiusura — il concluso,
+o la chiusura del moderatore — a chi può ancora recensire e non l'ha
+fatto arriva UN promemoria col bottone dello scambio: «⭐ Com'è andata
+con <nome>? Ieri avete chiuso uno scambio e non hai ancora lasciato la
+recensione: la trovi nella pagina dello scambio. È definitiva, e aiuta
+chi scambierà dopo di te.» È un'attesa come le altre (`p2p_attese`,
+fonte `recensione`): la mette `_solleciti_evento_p2p`, la funzione dei
+solleciti del pacchetto A, e alla scadenza la giudica
+`_promemoria_recensione_p2p_fermo` con gli STESSI tre giudici della
+rotta che la recensione la scrive — chiuso, parti, già lasciata —,
+perché un promemoria non deve portare a un muro. Il nome è quello che la
+pagina mostra (`_nome_altro_p2p`), o «chi ha scambiato con te». Il
+giudice gira in un `try`, la lezione di A.
+
+**3) Gli scambi completati accanto al nome.** Il numero c'era — lo usa
+il filtro di chi pubblica — ma lo vedeva solo l'interessato, e «I tuoi
+dati» lo prometteva così. DECISIONE DI ANDREA (il sì al pacchetto C):
+sta accanto alle stelline, da uno in su — «✅ 12 scambi» sulla card del
+libro, nel dettaglio, nella card dell'altra persona, nel negozio («✅ 12
+scambi P2P», perché lì accanto ci sono le vendite). Chi non ha ancora
+una recensione ma ha già scambiato mostra quello: è un fatto, non un
+voto. «I tuoi dati» è riscritto dove diceva «lo vedi solo tu», e le due
+sentinelle che tenevano quella promessa sono emendate con la data e il
+perché. Restano di chi li ha i numeri GREZZI: i non completati sotto la
+soglia della scritta, e i tentativi.
+
+**Le strade scartate.** Un nome nuovo nella pagina per la condizione
+«la recensione esiste» (`chiusoPerRecensioneP2P`): scartata dopo la
+prima suite — quaranta rosse a cascata, perché i banchi estraggono
+`gestoRecensioneP2P` e `riquadroRecensioneP2P` per nome e non
+conoscevano il terzo; la condizione sta scritta UGUALE in testa alle
+due, e una prova le tiene pari. L'invito a recensire subito, nel
+messaggio dell'annullo del moderatore: scartato — a chi ha appena perso
+una disputa si scrive già la riga della disputa persa; il promemoria del
+giorno dopo arriva a mente fredda. Una funzione sua per mettere in
+attesa il promemoria: scartata, c'è già quella dei solleciti nella
+rotta. Mostrare i completati anche a zero («0 scambi»): scartata, chi è
+nuovo non deve portare un marchio per esserlo. Contare solo gli scambi
+con controparti diverse: è il buco 7 dello studio, e per decisione di
+Andrea resta la regola di oggi.
+
+**Provato.** `prove_feedback_p2p` (43, nuova): le sentinelle; il
+promemoria sul banco degli avvisi coi giudici veri e la tabella
+`feedback` dallo schema vero (a tutti e due col nome dell'altro e il
+bottone, una volta sola, non a chi ha già recensito, non dove non c'è un
+posto, non con gli avvisi spenti, il concluso raccontato due volte, il
+giudice che inciampa); la recensione dopo la disputa (moderatore sì,
+parti no, annullo qualunque no, il database senza tabella); i completati
+(la mappa, solo da uno, un mancato non è un completato); il client in
+node (i completati in riga e nel riquadro, la riga delle stelline byte
+per byte quella di prima senza il numero, il gesto e il riquadro
+sull'annullato). `collaudo_feedback_p2p` (20, nuovo, nel
+workflow e nella gabbia): il server vero dalle rotte vere — eventi,
+`/api/p2p/recensibile`, `/api/p2p/recensione`, i volti, la controparte,
+il negozio, il moderatore — col battito vero delle attese e le lancette
+che avanzano. La tortura: sedici mutazioni del server su una copia (la
+recensione aperta da qualunque annullo, o mai, o dalla disputa chiusa da
+chiunque; il promemoria che non nasce al concluso, o alla chiusura del
+moderatore, dopo due ore, a chi ha già recensito, dove non c'è un posto,
+senza bottone, senza nome, a una parte sola, senza giudice; i completati
+che contano i mancati, o che non escono sul volto, nella card, nel
+negozio) — la prova le prende tutte e sedici, il collaudo quattordici
+(gli sfuggono la disputa chiusa dalle parti e il promemoria dove non c'è
+un posto, che tiene la prova).
+
+**Cosa è girato su quale albero.** La suite severa intera (21.735
+passate, 0 fallite), i 56 collaudi della CI nella gabbia (56 verdi) e
+le due torture sono girati sul lavoro finito sopra `e1627d3` (i malus).
+Main è poi corso di quattro commit non miei (il cookie sul tunnel, il
+codice di ritiro unico, la riga di CLAUDE.md sul config del VPS, i link
+dentro Telegram al terzo giro: `ed2151e`…`6104ffd`): ribasato, un
+conflitto solo qui in coda (tenute tutte le voci), e sull'albero finale
+sono rigirate la prova nuova con le sezioni della reputazione, dei
+dati, dei solleciti, dei malus, degli avvisi P2P e della stellina (765
+passate, 0 fallite) e dieci collaudi nella gabbia (i P2P, e quello dei
+numeri del negozio); il resto lo dice la CI del push. Prima del push
+guardata la CI di main, come chiesto da Andrea.
+
+**Da guardare.** Sul telefono: la riga «★ 4,9 · 👤 24 · ✅ 12 scambi»
+sulla card del libro a 375 px (è più lunga di prima: qui non l'ho vista
+a schermo), e il riquadro della recensione su uno scambio annullato da
+un moderatore. Sul VPS: «📬 Attese P2P: avvisati … (recensione)» il
+giorno dopo il primo scambio concluso.

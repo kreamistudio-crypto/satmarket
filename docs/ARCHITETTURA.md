@@ -30312,6 +30312,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   cauzione), `colpaFraseModP2P` (le due conferme), `conColpaModP2P` (il
   corpo della decisione porta `colpa` solo con la spunta). Il verbale:
   CANTIERI, «I malus dopo la garanzia».
+  IL FEEDBACK RIFINITO (10 ott 2026, cantiere feedback-p2p). 1) LA
+  RECENSIONE DOPO LA DISPUTA: `_scambio_concluso_p2p`, il giudice delle
+  due rotte della recensione, ha una terza strada dopo il libro e la
+  cronaca — `_chiusa_da_moderatore_p2p` (`p2p_dispute` chiusa, da un
+  moderatore, qualunque esito); nel client la condizione che apre gesto
+  e riquadro (`gestoRecensioneP2P`, `riquadroRecensioneP2P`) vale anche
+  sullo scambio `annullato` quando il server risponde `si` o `gia`, e
+  `renderOrdineP2P` lo chiede solo dove c'è stata una disputa. 2) IL
+  PROMEMORIA: `_solleciti_evento_p2p` a `concluso` e alla chiusura del
+  moderatore mette un'attesa per parte (fonte `recensione`, momento
+  `recensione_promemoria`, a `P2P_RECENSIONE_PROMEMORIA_S`);
+  `_scarica_attese_p2p` la giudica con `_promemoria_recensione_p2p_fermo`
+  (gli stessi tre giudici della rotta che scrive: chiuso, parti, già
+  lasciata) dentro un `try`, scrive la frase ALLORA col nome dell'altra
+  persona (`_testo_promemoria_recensione_p2p`, `_nome_altro_p2p`) e le
+  dà il bottone dello scambio. 3) GLI SCAMBI COMPLETATI ACCANTO AL NOME:
+  `_completati_p2p` (una query, da uno in su, tutta la memoria degli
+  esiti) cuce `completati` sui volti (`_facce_ordini_p2p`,
+  `_volti_persone`) e `scambi_completati` in `/api/negozio`; nel client
+  `completatiP2P` li scrive in coda a `stellineP2P` (la card), in
+  `repRiquadroP2P`, `cardParte` e `renderNegozio`. Il verbale: CANTIERI,
+  «Il feedback rifinito».
   Il messaggio Telegram «Non hai proseguito in tempo» a chi ha preso
   porta la riga del conto: la scrive `_riga_conto_p2p` (pura, una frase
   per Telegram e app: al primo la tolleranza e il blocco dei 30 giorni
