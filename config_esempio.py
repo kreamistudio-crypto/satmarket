@@ -122,6 +122,16 @@ GUARDIANO_PONTE_AVVISA = []  # a chi scrive, per id Telegram: es.
 LND_PONTE_MACAROON_LETTURA = ""          # esadecimale, tutto su una riga
 LND_PONTE_CERT = "/opt/lnbits/data/tls.cert"   # il tls.cert di LND
 LND_PONTE_URL = "https://127.0.0.1:18080"      # lnd-ponte (socat + tor)
+# LE HOLD DI PROVA (10 ott 2026, cantiere prova-hold): i bottoni G e H di
+# `/prova-wallet` coniano due hold invoice da 1 sat sul nodo, che si
+# cancellano da sole dopo tre minuti e non si saldano MAI. Vogliono un
+# macaroon SUO, cotto sul nodo coi soli tre metodi (niente settle per
+# costruzione), `root_key_id 4` cosi' si revoca da solo:
+#   lncli bakemacaroon --root_key_id 4 --save_to hold.macaroon uri:/invoicesrpc.Invoices/AddHoldInvoice uri:/invoicesrpc.Invoices/CancelInvoice uri:/lnrpc.Lightning/LookupInvoice
+#   xxd -p -c 9999 hold.macaroon
+# Vuoto = G e H «non attive», e la pagina esce lo stesso. Vedi
+# docs/PRODUZIONE.md, «LE HOLD DI PROVA».
+LND_PONTE_MACAROON_HOLD = ""             # esadecimale, tutto su una riga
 
 # --- Regole del mercatino --------------------------------------------
 COMMISSIONE_PERCENTO = 0     # trattenuta a vendita conclusa (0 = sospesa: cifra da decidere)

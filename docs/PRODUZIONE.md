@@ -3327,3 +3327,37 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
      non è più la miniatura del P2P ma quella che Telegram disegna per
      un link t.me.
   PER SPEGNERLA: togliere la riga (o metterla a `""`) e riavviare.
+
+
+- LE HOLD DI PROVA, IL MACAROON `root_key_id 4` (10 ott 2026, cantiere
+  prova-hold). I bottoni G e H di `https://barattolo.store/prova-wallet`
+  coniano due hold invoice da 1 sat sul nostro LND (cltv 40 e 576) per
+  capire se il wallet dell'utente si incanta sulla hold o sul CLTV
+  lungo; vivono tre minuti e il server le cancella da solo (giro ogni
+  mezzo minuto, e all'avvio), MAI le salda. Il server le chiede alla
+  REST di LND dal ponte di sempre (`LND_PONTE_URL`, `LND_PONTE_CERT`)
+  con un macaroon SUO, `LND_PONTE_MACAROON_HOLD`: ristretto per METODO,
+  non per entita', cosi' SettleInvoice non c'e' proprio. Finche' la riga
+  manca dal config G e H dicono «non attive» e la pagina esce lo stesso.
+  LA PROCEDURA, un comando alla volta, con l'host in cima; i comandi li
+  esegue Andrea, mai il server.
+  Sul NODO (`~/nodo`), prima si guarda cosa c'e' — gli id gia' usati
+  sono il 1 (LNbits) e quello del macaroon di lettura del server:
+  `docker compose exec lnd lncli listmacaroonids`
+  Se il 4 e' libero, si cuoce:
+  `docker compose exec lnd lncli bakemacaroon --root_key_id 4 --save_to /tmp/barattolo-hold.macaroon uri:/invoicesrpc.Invoices/AddHoldInvoice uri:/invoicesrpc.Invoices/CancelInvoice uri:/lnrpc.Lightning/LookupInvoice`
+  e si legge in esadecimale:
+  `docker compose exec lnd xxd -p -c 9999 /tmp/barattolo-hold.macaroon`
+  (se manca `xxd`: `od -An -tx1 -v FILE | tr -d ' \n'`). Controllo
+  DOPO sul nodo: `docker compose exec lnd lncli listmacaroonids` deve
+  dire anche il 4, e `docker compose exec lnd rm /tmp/barattolo-hold.macaroon`
+  (la copia nel container non serve piu'). Sul VPS (`~/satmarket`),
+  controllo PRIMA: `grep -n "LND_PONTE_MACAROON_HOLD" config.py` deve
+  dire niente; poi la riga `LND_PONTE_MACAROON_HOLD = "<esadecimale>"`
+  in coda al config (600, di `barattolo`), e `sudo systemctl restart
+  barattolo`. Controllo DOPO: `journalctl -u barattolo -n 50 | grep 🧪`
+  deve dire «Hold di prova (G e H di /prova-wallet): attive», e
+  `curl -s https://barattolo.store/prova-wallet | grep -c 'class="b hold"'`
+  deve dire 2. Si revoca da solo con `lncli deletemacaroonid 4` sul
+  nodo (e la riga via dal config). Finito l'esperimento la riga puo'
+  sparire: G e H tornano «non attive» senza altro da fare.

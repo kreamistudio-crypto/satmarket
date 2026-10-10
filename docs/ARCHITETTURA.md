@@ -29478,10 +29478,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    dà `/api/admin/cruscotto` solo agli admin —, noindex e no-store;
    vedi «IL CRUSCOTTO DEGLI ADMIN»), `/prova-wallet` (10 ott 2026,
    cantiere prova-wallet: la pagina di prova dei link al wallet per
-   l'utente di WoS self-custodial — sei modi sulla stessa fattura da
-   1 sat del nodo, coniata una volta e tenuta in `impostazioni`; senza
-   login, noindex, no-store, fuori da sitemap e menu; nascosta, non
-   segreta; vedi CANTIERI, «La pagina di prova dei link al wallet»),
+   l'utente di WoS self-custodial — i modi A, B, E sulla stessa fattura
+   da 1 sat del nodo, coniata una volta e tenuta in `impostazioni`, la
+   F nuda, e dal cantiere prova-hold le due hold G e H, cltv 40 e 576,
+   coniate dal ponte col macaroon `LND_PONTE_MACAROON_HOLD` e
+   cancellate da sole dopo tre minuti, mai saldate — «non attive» senza
+   la riga nel config; senza login, noindex, no-store, fuori da sitemap
+   e menu; nascosta, non segreta; vedi CANTIERI, «La pagina di prova
+   dei link al wallet» e «Le hold di prova G e H»),
    `/.well-known/nostr.json` (ott 2026, il NIP-05 di casa: i nomi di
    `NIP05_NOMI` del config con le chiavi PUBBLICHE in hex, `?name=`
    che filtra, CORS aperto, mai un redirect; nato per gli emittenti

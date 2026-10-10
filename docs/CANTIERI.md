@@ -46695,3 +46695,89 @@ registrato) con la CSP accesa; le due righe «eval» del journal lette
 con `@ file:riga «campione»`; il journal per una settimana dopo
 l'accensione; Telegram Web (iframe) con la CSP accesa — la CSP delle
 pagine non ha `frame-ancestors` e non lo chiude, ma va visto.
+## Le hold di prova G e H: la stessa pagina, due hold invoice che si annullano da sole (10 ott 2026, sera, cantiere prova-hold, richiesta di Andrea)
+
+**LA PRIMA RISPOSTA DELLA PAGINA.** Andrea, con WoS self-custodial
+(icona delle chiavi), da Chrome e dall'app sulla Home, a freddo e a
+caldo: A `lightning:` minuscolo, B tutto maiuscolo ed E
+`bitcoin:?lightning=` aprono WoS con la conferma da 1 sat subito; C
+`lightning://` e D `intent://` col pacchetto danno «non è un indirizzo
+LN»; F funziona. Quindi il tasto di oggi (A) va bene su una fattura
+NORMALE. L'unica differenza col caso dell'utente: lui pagava una
+GARANZIA, cioè una hold invoice.
+
+**DECISO: G e H.** Via C e D. Due bottoni in più, lo stesso link di A
+(`lightning:` minuscolo) su due hold invoice da 1 sat del nostro LND:
+G con `cltv_expiry` 40, H con 576 come Mostro. Così si capisce in un
+colpo se il problema è la hold in sé o il CLTV lungo. Come nascono:
+LNbits non sa coniarle, quindi il server le chiede alla REST di LND dal
+ponte di sempre (`POST /v2/invoices/hodl`), con un macaroon SUO,
+`LND_PONTE_MACAROON_HOLD`, cotto sul nodo con `root_key_id 4` e
+ristretto per METODO — AddHoldInvoice, CancelInvoice, LookupInvoice —
+così SettleInvoice non esiste per costruzione e la chiave si revoca da
+sola (`deletemacaroonid 4`; il 3 lo usa già il macaroon di lettura del
+controllo fattura, il 1 LNbits; l'elenco vero lo dice
+`listmacaroonids`, che Andrea guarda prima di cuocere). Il preimage
+nasce, se ne fa lo sha256 e si butta: resta solo l'hash, saldare è
+impossibile anche volendo. Il corpo del hodl è puro
+(`richiesta_hold_prova`): hash in base64, `value` "1", `expiry` 600,
+`cltv_expiry` della lettera, memo «NON pagare, si annulla da sola». Come
+muoiono: ognuna vive `PROVA_HOLD_VITA_S` (tre minuti) dal conio,
+registrata in `impostazioni` (`prova_hold_G`/`_H`: hash, bolt11,
+quando, annullata); un giro ogni mezzo minuto (`ripulisci_hold_prova`,
+avviato dallo startup `avvia_hold_prova`, che gira subito anche per le
+hold rimaste da un riavvio) le CANCELLA (`POST /v2/invoices/cancel`)
+pagate o no, e la riga lo ricorda; l'«already canceled» di LND vale
+come annullata, una cancel che non passa si riprova al giro dopo. Una
+nuova apertura della pagina con la hold scaduta e mai annullata la
+cancella prima di coniarne una nuova. Niente `asyncio.create_task`
+per-hold (sarebbe morto col processo): un giro solo, che sopravvive e
+si prova. Se qualcuno la paga: l'HTLC resta ACCEPTED (il sat non è
+nostro) finché la cancel lo rimanda indietro, entro tre minuti e mezzo;
+se il server morisse prima, il tetto è il `cltv_expiry` e LND rimanda
+indietro da solo. MAI settle, in tutto il server (sentinella sulla
+rotta `/v2/invoices/settle` e sulla parola nel codice). LA LEVA: finché
+`LND_PONTE_MACAROON_HOLD` non è nel config, `_hold_prova_configurata`
+dice no, G e H escono «non attive» in una riga grigia e nessuno bussa a
+LND; la pagina intera resta in piedi. Il tubo `_lnd_scrivi` è separato
+da `_lnd_leggi`: il macaroon di LETTURA nelle POST non entra mai. Con
+LND muto o un macaroon che non apre, G e H dicono «non pronta: LND ha
+risposto 500: …» col `message` di LND, e il resto della pagina non ne
+risente.
+
+**LA PAGINA.** Le istruzioni dicono che se A, B ed E sono già provate
+bastano G e H; il riquadro delle hold spiega: tre minuti dal
+caricamento (ricaricare prima), si annullano da sole, se pagate il sat
+torna, dopo la conferma il wallet le mostra «in sospeso» ed è normale;
+chiediamo se la conferma compare come per A o se resta «Elaborazione
+in corso». I due bottoni sono viola per distinguerli, con «cltv 40
+blocchi» e «cltv 576 blocchi (come Mostro)».
+
+**PROVATO.** `prove_prova_wallet` riscritta (65): le tre forme rimaste
+e C/D assenti, il corpo del hodl esatto, la freschezza negli otto casi,
+la pagina nei tre stati delle hold (attive, non attive, una sì e una
+no) e d'errore, le sentinelle (numeri, mai settle nel codice e mai la
+rotta, hodl e cancel una volta ciascuna dal solo `_lnd_scrivi`, il
+macaroon di lettura mai nelle POST, il preimage mai tenuto, la cancel
+prima del conio nuovo, il giro a 30 s e lo startup, l'already, il
+collaudo nelle due liste del workflow, il config d'esempio e PRODUZIONE
+col `root_key_id 4` e i tre metodi). `collaudo_prova_hold.py` (22), in
+CI: la rotta vera col TestClient e il server VERO contro un LND di
+cartone su 127.0.0.1 — leva spenta senza chiamate, due hodl con
+macaroon, hash a 32 byte diversi, 1 sat, 600, cltv 40/576, righe in
+impostazioni, seconda apertura senza conio, pulizia dopo tre minuti con
+le due cancel sui loro hash, seconda pulizia muta, l'already, l'hash
+non esadecimale, hold nuove dopo la pulizia, la hold scaduta mai
+annullata cancellata prima del conio, LND che non conia, macaroon che
+non apre. (Il banco mette un httpx di cartone al posto di quello vero:
+qui si rimette quello vero per le hold, verso il cartone di LND.) Nella
+gabbia: verde. Dal vivo nel Browser pane: la pagina coi due bottoni e
+la riga «non attive». Suite intera `PROVE_SEVERE=1` nel worktree da
+origin/main (31cb369): 21.598 passate, 0 fallite; i collaudi della CI
+nella gabbia: nel verbale del push.
+
+**DA GUARDARE.** Il macaroon lo cuoce Andrea sul nodo dopo il push
+(PRODUZIONE, «LE HOLD DI PROVA»): prima `listmacaroonids`, poi il 4, poi
+la riga nel config e il riavvio, col controllo del journal (🧪) e dei
+due bottoni. Poi la risposta dell'utente su G e H. Dopo l'esperimento la
+riga può uscire dal config e il macaroon revocarsi.

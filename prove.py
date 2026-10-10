@@ -140083,24 +140083,34 @@ console.log(JSON.stringify(out));
 
 def prove_prova_wallet():
     """LA PAGINA DI PROVA DEI LINK AL WALLET e la riga «in sospeso» (10 ott
-    2026, cantiere prova-wallet, richiesta di Andrea). L'utente di WoS
-    self-custodial: dal link «Elaborazione in corso» subito, senza
-    conferma; incollando, la conferma subito. `/prova-wallet` gli da' sei
-    modi sulla stessa fattura da 1 sat: cinque link (A lightning:
-    minuscolo = il tasto di oggi, B tutto maiuscolo, C lightning://, D
-    intent:// col pacchetto di WoS, E bitcoin:?lightning=) e la fattura
-    nuda (F). Qui: la rotta (una, senza login, HTMLResponse e mai il file
-    nudo, noindex e no-store, nell'elenco di ARCHITETTURA), la fattura
-    (1 sat, sette giorni, memo «NON pagare», coniata una volta e tenuta
-    in `impostazioni` finche' vive), i due giudici PURI fatti girare
-    davvero (le sei forme, la pagina con le istruzioni a freddo e a
-    caldo, la pagina d'errore senza link), e la riga nei due fogli P2P:
-    «in sospeso finche' lo scambio non finisce»."""
-    print("\n[la pagina di prova dei link al wallet, e la riga «in sospeso»]")
+    2026, cantieri prova-wallet e prova-hold, richieste di Andrea).
+    L'utente di WoS self-custodial: dal link «Elaborazione in corso»
+    subito, senza conferma; incollando, la conferma subito. La prima prova
+    (Andrea, 10 ott sera) ha detto che A `lightning:` minuscolo, B tutto
+    maiuscolo ed E `bitcoin:?lightning=` aprono la conferma e C, D no
+    (tolte): il tasto di oggi va bene su una fattura NORMALE, e l'unica
+    differenza col caso vero e' la HOLD. Da qui G e H: lo stesso link di
+    A su due hold da 1 sat del nostro LND, cltv 40 e 576 (come Mostro),
+    coniate dal ponte col macaroon `LND_PONTE_MACAROON_HOLD` (root key 4,
+    solo AddHoldInvoice/CancelInvoice/LookupInvoice), vive tre minuti e
+    poi CANCELLATE da un giro ogni mezzo minuto (e all'avvio), MAI
+    saldate; senza la riga nel config «non attive». Qui: la rotta (una,
+    senza login, HTMLResponse e mai il file nudo, noindex e no-store,
+    nell'elenco di ARCHITETTURA, fuori dalla sitemap), la fattura normale
+    (1 sat, sette giorni, memo «NON pagare», coniata una volta e tenuta in
+    `impostazioni`), le hold (i numeri, mai `settle` nel blocco, il
+    macaroon di lettura mai nelle POST, il preimage mai tenuto, il giro e
+    l'avvio), i giudici PURI fatti girare davvero (le tre forme, il corpo
+    del hodl, la freschezza, la pagina coi tre stati di G/H, la pagina
+    d'errore), e la riga nei due fogli P2P. Il pezzo che parla con LND
+    gira in `collaudo_prova_hold.py`, contro un LND di cartone."""
+    print("\n[la pagina di prova dei link al wallet, le hold G e H, e la riga «in sospeso»]")
+    import base64 as _b64
     import html as _html
     src = _SORGENTE
     mini = open("miniapp.html", encoding="utf-8").read()
     arch = open(os.path.join(QUI, "docs", "ARCHITETTURA.md"), encoding="utf-8").read()
+    prod = open(os.path.join(QUI, "docs", "PRODUZIONE.md"), encoding="utf-8").read()
 
     # --- 1) la rotta ---------------------------------------------------
     i = src.index('@app.get("/prova-wallet")')
@@ -140108,7 +140118,7 @@ def prove_prova_wallet():
     prova("la rotta e' una, senza login, e serve l'HTML dalla sua funzione (mai il file nudo)",
           [1, False, False, True, False],
           [src.count('@app.get("/prova-wallet")'), "verifica_utente" in rotta,
-           "Depends(" in rotta, "HTMLResponse(pagina_prova_wallet(bolt11, errore)" in rotta,
+           "Depends(" in rotta, "HTMLResponse(pagina_prova_wallet(bolt11, errore, hold)" in rotta,
            "FileResponse(" in rotta])
     prova("...noindex e no-store", [True, True],
           ['"X-Robots-Tag": "noindex, nofollow"' in rotta, "**HEADER_NO_CACHE" in rotta])
@@ -140116,7 +140126,7 @@ def prove_prova_wallet():
           "`/prova-wallet`" in arch)
     prova("la pagina non entra nella sitemap", False, "prova-wallet" in codice(pezzo("sitemap_xml")))
     fat = codice(pezzo("_fattura_prova_wallet"))
-    prova("la fattura: 1 sat sulla cassaforte del denaro nuovo, sette giorni, memo che dice di NON pagare",
+    prova("la fattura normale: 1 sat sulla cassaforte del denaro nuovo, sette giorni, memo che dice di NON pagare",
           [True, True, True],
           ["crea_invoice_escrow(1, PROVA_WALLET_MEMO," in fat,
            "PROVA_WALLET_SCADENZA = 7 * 24 * 3600" in src,
@@ -140127,46 +140137,124 @@ def prove_prova_wallet():
            "vita > PROVA_WALLET_RISERVA" in fat, "scrivi_impostazione(PROVA_WALLET_CHIAVE, nuova)" in fat])
     prova("...e se LNbits non risponde la pagina esce lo stesso con la frase, mai un 500",
           [True, True], ["except Exception" in fat, 'return "", "La fattura di prova non è pronta' in fat])
-    for spia in ("db(", "impostazione(", "crea_invoice", "await ", "print("):
-        prova(f"i due giudici della pagina sono puri: nessun `{spia}`", False,
-              spia in codice(pezzo("varianti_link_wallet")) + codice(pezzo("pagina_prova_wallet")))
 
-    # --- 2) i giudici, fatti girare -------------------------------------
-    amb = {"html": _html, "PROVA_WALLET_PACKAGE_WOS": "com.livingroomofsatoshi.wallet"}
-    exec(pezzo("varianti_link_wallet"), amb)
-    exec(pezzo("pagina_prova_wallet"), amb)
+    # --- 2) le hold: i numeri e le regole ----------------------------------
+    blocco = src[src.index("# ---------------- LA PAGINA DI PROVA DEI LINK AL WALLET"):
+                 src.index('@app.get("/prova-wallet")')]
+    cod = codice(blocco)
+    prova("G cltv 40 e H cltv 576 come Mostro; tre minuti di vita; 1 sat; scadenza 600",
+          [True, True, True, True],
+          ['PROVA_HOLD_CLTV = {"G": 40, "H": 576}' in src, "PROVA_HOLD_VITA_S = 180" in src,
+           '"value": "1",' in codice(pezzo("richiesta_hold_prova")), "PROVA_HOLD_EXPIRY_S = 600" in src])
+    prova("MAI settle: ne' la parola nel CODICE del blocco (i commenti lo nominano per dire che non c'e'), ne' la rotta in tutto il server",
+          [False, False], ["settle" in re.sub(r'"""[\s\S]*?"""', "", cod).lower(), "/v2/invoices/settle" in src])
+    prova("le due POST a LND sono solo hodl e cancel, dal tubo delle hold, col macaroon HOLD e mai quello di lettura",
+          [1, 1, True, False],
+          [cod.count('"/v2/invoices/hodl"'), cod.count('"/v2/invoices/cancel"'),
+           "LND_PONTE_MACAROON_HOLD" in codice(pezzo("_lnd_scrivi")),
+           "LND_PONTE_MACAROON_LETTURA" in cod])
+    prova("la leva: la riga del config, letta con l'import morbido; senza, «non attive» e nessuna chiamata",
+          [True, True, True],
+          ["from config import LND_PONTE_MACAROON_HOLD" in src,
+           'return "", "non attive"' in codice(pezzo("_hold_prova_wallet")),
+           'return None, "hold non attive su questo server"' in codice(pezzo("_lnd_scrivi"))])
+    prova("il preimage non si tiene: nasce, se ne fa l'hash e resta solo l'hash",
+          [True, False],
+          ["hashlib.sha256(secrets.token_bytes(32)).digest()" in codice(pezzo("_hold_prova_wallet")),
+           "preimage" in codice(pezzo("_hold_prova_wallet")).replace("# il preimage", "")])
+    prova("la cancellazione: la vecchia non annullata prima del conio nuovo, il giro ogni mezzo minuto, e all'avvio",
+          [True, True, True, True],
+          ["await _annulla_hold_prova(vecchia[\"hash\"])" in codice(pezzo("_hold_prova_wallet")),
+           "await asyncio.sleep(30)" in codice(pezzo("_ciclo_hold_prova")),
+           "asyncio.create_task(_ciclo_hold_prova())" in codice(pezzo("avvia_hold_prova")),
+           '@app.on_event("startup")\nasync def avvia_hold_prova' in src])
+    prova("l'«already canceled» di LND vale come annullata; una cancel che non passa si riprova al giro dopo",
+          [True, True],
+          ['"already" in perche.lower()' in codice(pezzo("_annulla_hold_prova")),
+           'if await _annulla_hold_prova(r["hash"]):' in codice(pezzo("ripulisci_hold_prova"))])
+    prova("il collaudo delle hold e' nella CI (elenco e compileall)",
+          [1, 1], [open(os.path.join(QUI, ".github", "workflows", "prove.yml"), encoding="utf-8").read()
+                   .count("\n             collaudo_prova_hold\n"),
+                   open(os.path.join(QUI, ".github", "workflows", "prove.yml"), encoding="utf-8").read()
+                   .count("collaudo_prova_hold.py")])
+    prova("il config d'esempio e PRODUZIONE portano la leva e il macaroon root key 4 coi soli tre metodi",
+          [True, True, True],
+          ['LND_PONTE_MACAROON_HOLD = ""' in open(os.path.join(QUI, "config_esempio.py"), encoding="utf-8").read(),
+           "--root_key_id 4" in prod,
+           "uri:/invoicesrpc.Invoices/AddHoldInvoice uri:/invoicesrpc.Invoices/CancelInvoice uri:/lnrpc.Lightning/LookupInvoice" in prod])
+    for spia in ("el(", "db(", "impostazione(", "crea_invoice", "await ", "print(", "LND_"):
+        prova(f"i giudici della pagina sono puri: nessun `{spia}`", False,
+              spia in codice(pezzo("varianti_link_wallet")) + codice(pezzo("pagina_prova_wallet"))
+              + codice(pezzo("richiesta_hold_prova")) + codice(pezzo("hold_prova_fresca")))
+
+    # --- 3) i giudici, fatti girare -------------------------------------
+    amb = {"html": _html, "base64": _b64, "PROVA_HOLD_CLTV": {"G": 40, "H": 576},
+           "PROVA_HOLD_VITA_S": 180, "PROVA_HOLD_EXPIRY_S": 600,
+           "PROVA_HOLD_MEMO": "Prova di Barattolo, hold invoice da 1 sat: NON pagare, si annulla da sola"}
+    for nome in ("varianti_link_wallet", "pagina_prova_wallet", "richiesta_hold_prova", "hold_prova_fresca"):
+        exec(pezzo(nome), amb)
     B = bolt11_finta(1, 7 * 24 * 3600, 1_790_000_000, phash=41)
+    HG = bolt11_finta(1, 600, 1_790_000_000, phash=42)
+    HH = bolt11_finta(1, 600, 1_790_000_000, phash=43)
     v = amb["varianti_link_wallet"](" " + B + " ")
-    prova("le cinque forme, nell'ordine, con la bolt11 ripulita",
-          ["A", "B", "C", "D", "E"], [x[0] for x in v])
+    prova("le tre forme rimaste, nell'ordine, con la bolt11 ripulita: A, B, E (C e D uscite)",
+          ["A", "B", "E"], [x[0] for x in v])
     prova("A e' il tasto di oggi: lightning: minuscolo e la bolt11 com'e'", "lightning:" + B, v[0][2])
     prova("B e' la forma del QR: schema e fattura MAIUSCOLI", "LIGHTNING:" + B.upper(), v[1][2])
-    prova("C le due barre", "lightning://" + B, v[2][2])
-    prova("D l'intent col pacchetto di Wallet of Satoshi, scheme lightning, niente fallback url",
-          "intent://" + B + "#Intent;scheme=lightning;package=com.livingroomofsatoshi.wallet;end", v[3][2])
-    prova("E il BIP21 unificato", "bitcoin:?lightning=" + B, v[4][2])
-    pag = amb["pagina_prova_wallet"](B)
+    prova("E il BIP21 unificato", "bitcoin:?lightning=" + B, v[2][2])
+    h = bytes(range(32))
+    prova("il corpo del hodl: hash in base64, 1 sat come stringa, scadenza, memo con la lettera, cltv della lettera",
+          [{"hash": _b64.b64encode(h).decode(), "value": "1",
+            "memo": "Prova di Barattolo, hold invoice da 1 sat: NON pagare, si annulla da sola (G)",
+            "expiry": "600", "cltv_expiry": "40"}, "576"],
+          [amb["richiesta_hold_prova"](h, "G"), amb["richiesta_hold_prova"](h, "H")["cltv_expiry"]])
+    T = 1_790_000_000
+    riga = {"hash": "ab" * 32, "bolt11": HG, "quando": T}
+    prova("la freschezza: viva per tre minuti, poi no; mai se annullata, senza hash o bolt11, o storta",
+          [True, True, False, False, False, False, False, False],
+          [amb["hold_prova_fresca"](riga, T + 1), amb["hold_prova_fresca"](riga, T + 179),
+           amb["hold_prova_fresca"](riga, T + 180), amb["hold_prova_fresca"](dict(riga, annullata=True), T + 1),
+           amb["hold_prova_fresca"](dict(riga, hash=""), T + 1), amb["hold_prova_fresca"](dict(riga, bolt11=""), T + 1),
+           amb["hold_prova_fresca"](None, T), amb["hold_prova_fresca"](dict(riga, quando="ieri"), T)])
+    pag = amb["pagina_prova_wallet"](B, "", {"G": (HG, ""), "H": (HH, "")})
     prova("la pagina: le istruzioni a freddo e a caldo in cima, prima dei bottoni",
           True, pag.index("A freddo") < pag.index("A caldo") < pag.index('class="b"'))
-    prova("...dice di NON pagare, e che la fattura e' la stessa per tutti", [True, True],
-          ["non pagarla" in pag, "<b>stessa</b> fattura" in pag])
-    prova("...i cinque link sono <a href> veri, uno per forma, con la lettera",
-          [True] * 5,
-          [('href="' + _html.escape(h, quote=True) + '"') in pag and ('<span class="l">' + l + '</span>') in pag
-           for l, _, h in v])
-    prova("...la F: la fattura nuda in un campo da copiare, dopo i link",
-          [True, True], ["<textarea id=\"f\" readonly>" + B + "</textarea>" in pag,
-                         pag.index("F · la fattura nuda") > pag.rindex('class="b"')])
+    prova("...dice di NON pagare e che se hai gia' provato A, B ed E bastano G e H", [True, True],
+          ["non pagarle" in pag, "bastano <b>G e H</b>" in pag])
+    prova("...i tre link normali sono <a href> veri, uno per forma, con la lettera; C e D non ci sono",
+          [True] * 3 + [0, 0],
+          [('href="' + _html.escape(hh, quote=True) + '"') in pag and ('<span class="l">' + l + '</span>') in pag
+           for l, _, hh in v] + [pag.count('href="lightning://'), pag.count('href="intent://')])
+    prova("...G e H: lo stesso lightning: minuscolo di A, sulle loro bolt11, con i cltv e «come Mostro» su H, dopo le tre e prima della F",
+          [True, True, True, True, True],
+          ['class="b hold" href="lightning:' + HG + '"' in pag, 'class="b hold" href="lightning:' + HH + '"' in pag,
+           "cltv 40 blocchi" in pag and "cltv 576 blocchi (come Mostro)" in pag,
+           pag.index('class="b hold"') > pag.rindex('class="b" href'),
+           pag.rindex('class="b hold"') < pag.index("F · la fattura nuda")])
+    prova("...e la frase delle hold: tre minuti, si annullano da sole, il sat torna, «in sospeso» e' normale",
+          [True, True, True, True],
+          ["valgono <b>tre minuti</b>" in pag, "si annullano da sole" in pag, "il sat ti torna" in pag,
+           "«in sospeso»: è normale" in pag])
+    off = amb["pagina_prova_wallet"](B, "", {"G": ("", "non attive"), "H": ("", "non attive")})
+    prova("senza la leva: la riga «non attive» al posto di G e H, nessun link hold, il resto intero",
+          [True, 0, 3, True],
+          ["G e H (hold invoice) non attive su questo server." in off, off.count('class="b hold"'),
+           off.count('class="b" href'), "F · la fattura nuda" in off])
+    meta = amb["pagina_prova_wallet"](B, "", {"G": (HG, ""), "H": ("", "non pronta: LND ha risposto 500: x")})
+    prova("una hold pronta e una no: il link per la prima, la nota per la seconda", [1, True],
+          [meta.count('class="b hold"'), "H non pronta: LND ha risposto 500: x" in meta])
     prova("...noindex anche nel meta, e niente script salvo il Copia",
           [True, 0, 1], ['<meta name="robots" content="noindex,nofollow">' in pag,
                          pag.count("<script"), pag.count("onclick=")])
-    err = amb["pagina_prova_wallet"]("", "La fattura di prova non è pronta: riprova fra un minuto.")
-    prova("la pagina d'errore: la frase, nessun link e nessuna fattura",
-          [True, 0, 0], ["non è pronta" in err, err.count('href="'), err.count("<textarea")])
+    err = amb["pagina_prova_wallet"]("", "La fattura di prova non è pronta: riprova fra un minuto.", None)
+    prova("la pagina d'errore: la frase, nessun link, nessuna fattura, e G/H «non attive»",
+          [True, 0, 0, True], ["non è pronta" in err, err.count('href="'), err.count("<textarea"),
+                               "non attive su questo server" in err])
     prova("una bolt11 con caratteri da HTML non rompe la pagina", True,
-          "&lt;" in amb["pagina_prova_wallet"]("lnbc1<x>") and "<x>" not in amb["pagina_prova_wallet"]("lnbc1<x>"))
+          "&lt;" in amb["pagina_prova_wallet"]("lnbc1<x>", "", {"G": ("lnbc1<y>", ""), "H": ("", "non attive")})
+          and "<x>" not in amb["pagina_prova_wallet"]("lnbc1<x>", "", None))
 
-    # --- 3) la riga «in sospeso» nei due fogli P2P -----------------------
+    # --- 4) la riga «in sospeso» nei due fogli P2P -----------------------
     def fn(firma):
         return pezzo_js(mini, firma, "\n}\n") + "\n}"
     rh, rc = fn("function renderHoldP2P(){"), fn("function renderCauzioneP2P(o){")
