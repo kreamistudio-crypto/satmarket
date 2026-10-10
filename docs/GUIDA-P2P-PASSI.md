@@ -1178,6 +1178,7 @@ tarda: controllo com'è andata…».
 | Sats in garanzia fino alla scadenza, col recapito ricevuto e gli euro mai segnati | circa quattro giorni | dal 10 ott 2026 a chi **compra** conta come scambio non completato. ✈️ in coda a «La garanzia è arrivata a scadenza…»: «Gli euro non risultano inviati. Questo conta come scambio non completato. Il primo è tollerato; …» (la riga di §3). Senza recapito, o col «pagato» segnato, o con una disputa, non si conta a nessuno. |
 | Sats già in garanzia | circa quattro giorni | «Coi sats in garanzia avete **circa quattro giorni**. Se chi compra non ha ancora detto di aver pagato, allo scadere i sats **tornano da soli a chi vende**; se l'ha detto, si apre una disputa.» Dal sorgente della 0.19.0: il coordinatore si muove a ~92 ore; una disputa già aperta e non decisa la chiude LND a ~94 ore, coi sats a chi vende. ✈️ «⏰ **La garanzia è arrivata a scadenza: lo scambio è annullato.** I sats tornano a chi vende.» |
 | Barattozon, dopo «pagato» | 24 ore «a vista» per chi vende | promemoria a 1, 6, 20 ore; poi nulla di automatico |
+| Sats in garanzia, recapito non ancora dato | nessuna scadenza prima dei quattro giorni | ✈️ a chi vende un promemoria a 1 e 6 ore dalla garanzia bloccata (dal 10 ott 2026, sera) |
 | Sats in garanzia, euro non ancora segnati | nessuna scadenza prima dei quattro giorni | ✈️ a chi compra un promemoria a 1, 6 e 24 ore dalla garanzia bloccata (dal 10 ott 2026; non col contanti di persona) |
 | Dopo «pagato», ogni altro metodo | nessuna scadenza prima dei quattro giorni | ✈️ a chi vende un promemoria a 1, 6 e 20 ore (dal 10 ott 2026) |
 | La fattura di chi compra | meglio almeno un giorno | se scade prima del rilascio: «Serve una fattura nuova» |
@@ -1230,6 +1231,25 @@ Barattolo, su Telegram (o nel DM Nostr), sempre col bottone «**⚡ Apri lo
 scambio**». Ogni promemoria parte una volta sola, e solo se lo scambio è
 ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
 
+- ✈️ **A chi vende, finché non dice dove ricevere gli euro** (dal 10 ott
+  2026, sera) — a 1 ora e a 6 ore dalla garanzia bloccata. Parte solo se
+  il recapito manca ancora e lo scambio lo aspetta; se ne va appena chi
+  vende lo dà, e non parte dopo «pagato», una disputa o un annullo. Solo
+  quando chi compra è su Barattolo.
+  1. «💶 Promemoria: i tuoi sats sono in garanzia da un'ora, ma chi compra
+     non sa ancora dove mandarti gli euro. Apri la pagina dello scambio e
+     tocca «💶 Indica dove ricevere gli euro»: senza, non può pagarti.»
+  2. «💶 Sono passate sei ore: i tuoi sats sono fermi in garanzia e chi
+     compra aspetta ancora di sapere dove mandarti gli euro. Tocca «💶
+     Indica dove ricevere gli euro» nella pagina dello scambio. Se non
+     vuoi più proseguire tocca «✕ Annulla»: chi compra deve accettare, e
+     i sats ti tornano.»
+  Col solo **Contanti**: «📍 Promemoria: … chi compra non sa ancora dove e
+  quando vedervi. Apri la pagina dello scambio e tocca «📍 Indica dove e
+  quando vedervi».» Con **Barattozon** (se il PayCode non è partito da
+  solo): «🧾 Promemoria: … a chi compra non risulta arrivato il PayCode
+  da pagare. Apri la pagina dello scambio e mandaglielo da lì: senza, non
+  può andare al tabacchino.»
 - ✈️ **A chi compra, finché non segna gli euro come inviati** — a 1 ora,
   6 ore e 24 ore dalla garanzia bloccata. Parte solo se chi vende ha già
   indicato dove ricevere gli euro; non parte dopo «pagato», dopo una

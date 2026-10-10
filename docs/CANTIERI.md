@@ -47691,3 +47691,108 @@ dieci minuti avrebbe trovato main corso di nuovo (è successo quattro
 volte di fila). Il cantiere stesso non tocca server.py. LA LEZIONE:
 quando main corre più dei collaudi, si chiede ad Andrea se tenerli solo
 sull'ultimo albero, prima di inseguirlo per un'ora.
+
+## Il sollecito del recapito a chi vende, e la riga dei completati misurata a 320 e 375 px (10 ott 2026, sera, cantiere recapito-e-riga, richiesta di Andrea)
+
+Due code dei tre pacchetti del feedback, tutt'e due «notate e non fatte»
+nei loro verbali.
+
+**1) IL SOLLECITO DEL RECAPITO.** A garanzia bloccata chi vende deve dire
+dove ricevere gli euro; finché non lo fa chi compra non può pagare, e
+prima delle 48 ore della «garanzia lunga» non glielo ricordava nessuno.
+Adesso a un'ora e a sei ore dalla garanzia (`SOLLECITI_RECAPITO_S`) gli
+arriva «💶 Promemoria: i tuoi sats sono in garanzia da un'ora, ma chi
+compra non sa ancora dove mandarti gli euro. Apri la pagina dello scambio
+e tocca «💶 Indica dove ricevere gli euro»: senza, non può pagarti.», col
+bottone dello scambio; col solo «Contanti» le parole dell'appuntamento
+(«📍 Indica dove e quando vedervi»), col PayCode quelle del PayCode da
+mandare. È LO SPECCHIO del sollecito degli euro del pacchetto A: quello
+parte a chi compra solo se il recapito c'è, questo a chi vende solo se
+non c'è — il calco di `_tocca_a_me_p2p`, cogli stessi due giudici
+(`_stato_scambio_p2p` dal lato di chi vende, `_dati_frase_p2p`) in
+`_sollecito_recapito_p2p_fermo`, dentro un `try`. Le attese le mette
+`_solleciti_evento_p2p` alla `garanzia_pagata` e se ne vanno SUBITO
+quando il recapito viene dichiarato (`_avviso_recapito_p2p`) o lo scambio
+si muove. SOLO SE CHI COMPRA È DEI NOSTRI: verso un altro client il
+recapito viaggia cifrato fra i due telefoni e a noi non lo dichiara
+nessuno — sollecitare sarebbe dire «non l'hai dato» a chi l'ha dato.
+
+**IL DIFETTO TROVATO DALLA PROVA, e la regola che ne resta.** Nella
+prima stesura i due timbri si chiamavano `recapito_sollecito1|2`. Ma il
+server riconosce il recapito DETTO da `LIKE 'recapito%'` in `p2p_avvisi`
+(`_dati_frase_p2p`, e il tetto anti-abuso di `_avviso_recapito_p2p`): il
+sollecito, appena partito, risultava «recapito detto», e nello STESSO
+battito a chi compra partiva «invia gli euro» senza un posto dove
+mandarli — esattamente la frase falsa che il pacchetto A aveva chiuso.
+L'ha presa la prova di A («a un'ora, SENZA recapito, a chi compra non
+parte niente»). I timbri si chiamano `sollecito_recapito1|2`, una
+sentinella vieta il prefisso, e la tortura lo rimette apposta e lo
+vuole rosso. LA REGOLA: un momento nuovo in `p2p_avvisi` non comincia
+MAI per `recapito`.
+
+**2) LA RIGA «★ 4,9 · 👤 24 · ✅ 12 scambi» SULLA CARD DEL LIBRO.** Era
+il «da guardare» del pacchetto C: più lunga di prima, mai vista a
+schermo. MISURATA DAL VIVO in Chrome (headless pilotato via CDP con
+`Emulation.setDeviceMetricsOverride`, mobile, a 320 e a 375 px) sulla
+pagina VERA: una copia di `miniapp.html` con in coda uno script che
+accende la vista del libro e ci disegna sei card con la funzione vera
+(`rigaOrdineP2P`, la stessa della card d'esempio del giro guidato), con
+sei volti diversi. NON VA A CAPO in nessun caso: a 320 px la riga ha 258
+px e la più lunga provata («★ 5,0 · 👤 1234 · ✅ 1234 scambi») ne chiede
+213; «★ 4,9 · 👤 24 · ✅ 12 scambi» 184; a 375 px ce ne sono 313. Quindi
+NIENTE DA ACCORCIARE, e la card non è stata toccata («✅ 12» avrebbe
+tolto la parola che dice cosa conta, senza bisogno). I due scatti stanno
+in `.claude/giri/riga-card-p2p/`. Il limite della misura, detto: è il
+tema chiaro, coi caratteri di sistema di questo PC; un telefono con
+caratteri ingranditi dalle impostazioni di accessibilità ha meno margine
+— 45 px a 320 reggono fino a circa il 20% in più.
+
+**Le strade scartate.** Sollecitare chi vende anche quando chi compra
+scambia da un altro client: scartata (sopra). Un terzo sollecito a 24
+ore: non chiesto — a 48 arriva già l'avviso della garanzia lunga, alle
+due parti. Scrivere il testo alla scadenza invece che alla nascita: non
+serve, non porta numeri né nomi. Accorciare comunque la riga «per
+sicurezza»: scartata, la misura dice che non serve.
+
+**Le sentinelle emendate**, con la data: le due che pinzano la lista
+delle fonti col bottone (`prove_solleciti_p2p`, `prove_feedback_p2p`:
+ora in coda c'è `sollecito_recapito`), e nel collaudo dei solleciti il
+battito a un'ora senza recapito, dove adesso arriva il sollecito a chi
+vende.
+
+**Provato.** La sezione nuova in coda a `prove_solleciti_p2p` (85
+controlli in tutto, erano 55): le sentinelle, i testi, lo scambio (nasce, parte a
+un'ora, una volta sola, se ne va col recapito, non parte se il recapito
+c'è già, la riga rimasta fermata dal giudice, la fattura non ancora
+data, un altro giro, quel che lo porta via, la richiesta di annullo, chi
+compra da un altro client, il contanti e il PayCode, il giudice che
+inciampa). `collaudo_solleciti_p2p` (52, era 37): il caso 8 sulle rotte
+vere — a un'ora e a sei il sollecito a chi vende e niente a chi compra
+(e a cinque ore niente), il journal che dice perché, il recapito dato
+tardi e dato presto, la richiesta di annullo, il «pagato» che li porta
+via, le parole del contanti e del PayCode. La tortura: tredici mutazioni
+su una copia (il sollecito col recapito già detto, senza guardare lo
+stato o il giro, anche verso un altro client, col timbro che comincia
+per «recapito», a chi compra, senza la pulizia al recapito o al
+«pagato», senza bottone, a tre ore, senza giudice, con le parole
+sbagliate) — la prova le prende tutte e tredici; il collaudo ne prendeva
+quattro, e coi cinque casi aggiunti dopo quella prima passata ne prende
+dieci (gli sfuggono il recapito già detto con una riga rimasta, un altro
+giro e chi compra da un altro client, che dalle rotte non si mettono in
+scena: li tiene la prova).
+
+**Cosa è girato su quale albero.** La suite severa intera (21.834
+passate, 0 fallite) e i 57 collaudi della CI nella gabbia (57 verdi)
+sono girati sul lavoro sopra `4f60dac`, prima dei cinque casi aggiunti
+al collaudo (che è poi rigirato da solo, anche nella gabbia). Main è poi
+corso di cinque commit non miei (la tendina di Firefox, i gesti prima
+di pagare il PayCode, la riga per Wallet of Satoshi: `062d404`…
+`167cca7`): ribasato, un conflitto solo qui in coda (tenute tutte le
+voci), e sull'albero finale sono rigirate la sezione dei solleciti con
+quelle che le stanno intorno (feedback, malus, reputazione, promemoria,
+eventi, PayCode, garanzia lunga: 771 passate, 0 fallite) e dieci
+collaudi P2P nella gabbia (10 verdi); il resto lo dice la CI del push.
+Prima del push guardata la CI di main, come chiesto da Andrea.
+
+**Da guardare.** Sul VPS, il primo scambio in cui chi vende tarda a dare
+il recapito: «📬 Attese P2P: avvisati … (sollecito_recapito)».

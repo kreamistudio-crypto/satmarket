@@ -36,7 +36,10 @@ Qui gira il SERVER VERO sul database usa-e-getta:
      parole;
   6. il PayCode: le sue parole a chi compra, e a chi vende tre
      solleciti, non sei;
-  7. l'interruttore degli avvisi P2P spento: niente, e non risulta detto.
+  7. l'interruttore degli avvisi P2P spento: niente, e non risulta detto;
+  8. (10 ott 2026, sera) chi vende non da' il recapito: a un'ora e a sei
+     il sollecito e' SUO — «Indica dove ricevere gli euro» —, e a chi
+     compra niente finche' il recapito non c'e'.
 
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
 `collaudo_pagamento_p2p`), niente Telegram, niente relay, niente
@@ -225,8 +228,12 @@ async def giro():
     detti, _ = await battito(G + H - 60)
     prova("a 59 minuti niente", [], detti)
     detti, giornale = await battito(G + H + 5)
+    # (emendata la sera del 10 ott 2026, cantiere recapito-e-riga: a quel
+    # battito adesso parte il sollecito del RECAPITO, a chi vende)
     prova("a un'ora, SENZA recapito, a chi compra non arriva niente: non ha dove "
-          "mandare gli euro", [], detti)
+          "mandare gli euro", [], [x for x in detti if x[0] == C])
+    prova("...e a chi VENDE arriva il sollecito del recapito, col bottone dello scambio",
+          [(V, SRV.SOLLECITO_RECAPITO_TESTI[1], bottone(a))], detti)
     prova("...e il journal dice perche'", True,
           f"Sollecito P2P: {a[:8]} «euro_sollecito1» a {C} non parte: chi vende non ha "
           "ancora detto dove ricevere gli euro" in giornale)
@@ -373,6 +380,80 @@ async def giro():
     con.commit()
     con.close()
     prova("...e non risulta detto", 0, n)
+
+    print("\n8) chi vende non da' il recapito")
+    k = ordine(9)
+
+    def di(o, detti):
+        """I soli avvisi di QUELLO scambio: nei battiti di qui scadono anche
+        le attese rimaste dai casi di prima (l'ora di partenza e' la stessa)."""
+        return [x for x in detti if x[2] and x[2][1].endswith(o)]
+    await scambio_attivo(k)
+    G = quando(k, "garanzia_pagata")
+    prova("la garanzia bloccata mette in attesa i due solleciti del recapito, a chi vende",
+          [("sollecito_recapito1", V), ("sollecito_recapito2", V)],
+          in_attesa(k, "sollecito_recapito"))
+    detti, _ = await battito(G + H - 60)
+    prova("a 59 minuti niente, a nessuno", [], di(k, detti))
+    detti, _ = await battito(G + H + 5)
+    prova("a un'ora: a chi vende «Indica dove ricevere gli euro», a chi compra niente",
+          [(V, SRV.SOLLECITO_RECAPITO_TESTI[1], bottone(k))], di(k, detti))
+    detti, _ = await battito(G + 5 * H)
+    prova("a cinque ore niente: il secondo aspetta le sei", [], di(k, detti))
+    detti, giornale = await battito(G + 6 * H + 5)
+    prova("a sei ore, ancora senza recapito: a chi vende il secondo, a chi compra niente",
+          [(V, SRV.SOLLECITO_RECAPITO_TESTI[2], bottone(k))], di(k, detti))
+    prova("...e il journal dice perche' a chi compra no — il sollecito a chi vende NON "
+          "vale come recapito detto", True,
+          f"Sollecito P2P: {k[:8]} «euro_sollecito2» a {C} non parte: chi vende non ha "
+          "ancora detto dove ricevere gli euro" in giornale)
+    OROLOGIO.fissa(G + 7 * H)
+    await recapito(k)
+    detti, _ = await battito(G + 24 * H + 5)
+    prova("dato il recapito a sette ore, il giorno dopo tocca a chi compra: il terzo "
+          "degli euro, e a chi vende piu' niente", [(C, EURO[3], bottone(k))], di(k, detti))
+    m = ordine(10)
+    await scambio_attivo(m)
+    G = quando(m, "garanzia_pagata")
+    OROLOGIO.fissa(G + 1800)
+    await recapito(m)
+    prova("il recapito dato a mezz'ora porta via subito i solleciti di chi vende", [],
+          in_attesa(m, "sollecito_recapito"))
+    detti, giornale = await battito(G + H + 5)
+    prova("...a un'ora a chi vende niente, e a chi compra il primo degli euro",
+          [(C, EURO[1], bottone(m))], di(m, detti))
+    prova("...e nessuna riga «non parte» nel journal per il recapito", False,
+          "sollecito_recapito" in giornale)
+    # chi ha davanti una richiesta di annullo non si sollecita: lo ferma il giudice
+    n1 = ordine(11)
+    await scambio_attivo(n1)
+    G = quando(n1, "garanzia_pagata")
+    OROLOGIO.fissa(G + 600)
+    await evento(n1, "cancel-requested", "buyer")
+    detti, giornale = await battito(G + H + 5)
+    prova("con una richiesta di annullo davanti, a chi vende il recapito non si "
+          "sollecita, e il journal dice in che stato e' lo scambio", [[], True],
+          [di(n1, detti), f"Sollecito P2P: {n1[:8]} «sollecito_recapito1» a {V} non parte: "
+                          "lo scambio non aspetta il recapito" in giornale])
+    # il «pagato» porta via subito i solleciti del recapito
+    n2 = ordine(12)
+    await scambio_attivo(n2)
+    G = quando(n2, "garanzia_pagata")
+    OROLOGIO.fissa(G + 600)
+    await evento(n2, "fiat-sent", "buyer")
+    prova("se chi compra segna «pagato» lo stesso, i solleciti del recapito se ne vanno",
+          [], in_attesa(n2, "sollecito_recapito"))
+    # le parole: il contanti di persona e il PayCode
+    for n, metodi, testi, nome in (
+            (13, '["Contanti"]', SRV.SOLLECITO_RECAPITO_CONTANTI_TESTI,
+             "col solo Contanti: «Indica dove e quando vedervi»"),
+            (14, '["Contanti al tabacchino 111.80"]', SRV.SOLLECITO_RECAPITO_PAYCODE_TESTI,
+             "col PayCode non partito: «mandaglielo da li'»")):
+        o = ordine(n)
+        await scambio_attivo(o, metodi)
+        G = quando(o, "garanzia_pagata")
+        detti, _ = await battito(G + H + 5)
+        prova(f"a un'ora, {nome}", [(V, testi[1], bottone(o))], di(o, detti))
     SRV.time = time
 
 

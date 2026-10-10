@@ -27890,6 +27890,21 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   solleciti, PayCode compreso, portano il bottone «Apri lo scambio» del
   promemoria. Anti-doppione: il timbro di sempre in `p2p_avvisi`. Il
   verbale: CANTIERI, «I solleciti per tutti i metodi».
+  IL SOLLECITO DEL RECAPITO, A CHI VENDE (10 ott 2026, sera): lo specchio
+  di quello degli euro. A `garanzia_pagata`, se le DUE parti sono dei
+  nostri, due attese a chi vende (`sollecito_recapito1|2`, fonte
+  `sollecito_recapito`, a `SOLLECITI_RECAPITO_S`: 1 e 6 ore); alla
+  scadenza `_sollecito_recapito_p2p_fermo` — scambio «attivo» dal lato
+  di chi vende nello stesso giro, e recapito NON detto — dentro un
+  `try`. Se ne vanno quando il recapito viene dichiarato
+  (`_avviso_recapito_p2p`) e quando lo scambio si muove. ⚠️ IL NOME DEL
+  TIMBRO NON COMINCIA PER `recapito`: `_dati_frase_p2p` e
+  `_avviso_recapito_p2p` riconoscono il recapito DETTO da `LIKE
+  'recapito%'` in `p2p_avvisi`, e un sollecito con quel prefisso si
+  sarebbe fatto passare per il recapito (trovato dalla prova: a chi
+  compra partiva «invia gli euro» senza un posto dove mandarli). Tre
+  famiglie di due testi (`SOLLECITO_RECAPITO_TESTI`, `…_CONTANTI_TESTI`,
+  `…_PAYCODE_TESTI`). Il verbale: CANTIERI, «Il sollecito del recapito».
   IL RECAPITO (`_avviso_recapito_p2p`) riconosce le parti dallo SCAMBIO
   IN CORSO (`_parti_scambio_p2p`: prima `p2p_scambi`, cioè il
   coordinatore; poi, se lui tace, `p2p_ordini` come prima), e `vivo`
