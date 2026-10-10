@@ -146,12 +146,16 @@ async def scambio_attivo(o, metodi='["SEPA"]'):
     await evento(o, "hold-invoice-paid", "seller", "active")
 
 
-async def recapito(o):
+async def recapito(o, contanti=None):
     """Chi vende dichiara il recapito dalla rotta vera. Dentro un giro
     async `banco.chiama` non si usa (apre un loop suo): la rotta si
-    aspetta qui."""
+    aspetta qui. `contanti` (10 ott 2026) e' la FORMA del recapito, il
+    SI'/NO che il telefono manda: None = un telefono di ieri."""
     banco.come(V)
-    r = await banco.SRV.recapito_p2p(banco.Busta({"ordine": o, "attivo": True}))
+    corpo = {"ordine": o, "attivo": True}
+    if contanti is not None:
+        corpo["contanti"] = contanti
+    r = await banco.SRV.recapito_p2p(banco.Busta(corpo))
     await asyncio.sleep(0.05)
     return r
 
@@ -454,6 +458,42 @@ async def giro():
         G = quando(o, "garanzia_pagata")
         detti, _ = await battito(G + H + 5)
         prova(f"a un'ora, {nome}", [(V, testi[1], bottone(o))], di(o, detti))
+
+    print("\n9) «Contanti» FRA i metodi: decide la forma del recapito (10 ott 2026, riquadro-contanti-sepa)")
+    # su «SEPA, Contanti» chi vende puo' mandare l'IBAN o l'appuntamento:
+    # le attese degli euro NASCONO, e al battito decide la forma che il
+    # telefono ha dichiarato con la rotta vera — prima tacevano tutte
+    for forma, nome, testi in ((False, "l'IBAN", RIL), (True, "l'appuntamento", SRV.SOLLECITO_RILASCIO_CONTANTI_TESTI),
+                               (None, "un telefono di ieri", RIL)):
+        i = ordine(15 + [False, True, None].index(forma))
+        await scambio_attivo(i, '["SEPA", "Contanti"]')
+        G = quando(i, "garanzia_pagata")
+        prova(f"con {nome} in arrivo: le tre attese degli euro nascono lo stesso",
+              [("euro_sollecito1", C), ("euro_sollecito2", C), ("euro_sollecito3", C)],
+              in_attesa(i, "sollecito_euro"))
+        await recapito(i, contanti=forma)
+        con = banco.con_db()
+        forma_db = con.execute("SELECT dettaglio FROM p2p_momenti WHERE ordine=? AND momento='recapito' "
+                               "AND fonte='telefono' ORDER BY quando DESC LIMIT 1", (i,)).fetchone()[0]
+        con.close()
+        prova(f"...la dichiarazione scrive la forma ({nome}) nella cronaca, mai il recapito",
+              {False: "euro", True: "contanti", None: ""}[forma], forma_db)
+        detti, giornale = await battito(G + H + 5)
+        miei = [x for x in detti if x[0] == C and x[2] == bottone(i)]
+        if forma is False:
+            prova(f"...dichiarato {nome}: a un'ora il sollecito degli euro parte, a chi compra",
+                  [(C, EURO[1], bottone(i))], miei)
+        else:
+            prova(f"...dichiarato {nome}: a un'ora nessun sollecito degli euro, e il journal dice perche'",
+                  ([], True),
+                  (miei, f"Sollecito P2P: {i[:8]} «euro_sollecito1» a {C} non parte: si puo' pagare in "
+                         "contanti di persona: gli euro non si inviano" in giornale))
+        OROLOGIO.fissa(G + 2 * H)
+        await evento(i, "fiat-sent", "buyer")
+        F = quando(i, "fiat")
+        detti, _ = await battito(F + H + 5)
+        prova(f"...e dopo il «pagato», a chi vende, le parole di {nome}",
+              [(V, testi[1], bottone(i))], [x for x in detti if x[2] == bottone(i)])
     SRV.time = time
 
 

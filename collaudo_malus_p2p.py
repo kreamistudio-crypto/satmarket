@@ -128,16 +128,20 @@ async def chiama(fn, corpo=None, come=None):
     return json.loads(r.body) if hasattr(r, "body") else r
 
 
-async def attivo(o, metodi='["SEPA"]', recapito=True):
+async def attivo(o, metodi='["SEPA"]', recapito=True, contanti=None):
     """Una vendita presa da chi compra, fino alla garanzia bloccata; e chi
-    vende dice dove ricevere gli euro."""
+    vende dice dove ricevere gli euro. `contanti` (10 ott 2026) e' la
+    FORMA del recapito dichiarata dal telefono: None = non detta."""
     libro(o, metodi)
     await evento(o, "taken", "buyer", "invoice-next")
     await evento(o, "buyer-invoice-added", "buyer", "hold-next")
     await evento(o, "hold-invoice-requested", "mostro", "invoice")
     await evento(o, "hold-invoice-paid", "seller", "active")
     if recapito:
-        await chiama(banco.SRV.recapito_p2p, {"ordine": o, "attivo": True}, V)
+        corpo = {"ordine": o, "attivo": True}
+        if contanti is not None:
+            corpo["contanti"] = contanti
+        await chiama(banco.SRV.recapito_p2p, corpo, V)
 
 
 async def in_disputa(o, n):
@@ -378,6 +382,23 @@ async def giro():
     prova("uno scambio con la garanzia appena bloccata non conta ancora fra i sospesi: "
           "c'e' un'ora di respiro", (True, 1),
           (r["ordini"][libero]["ok"], r["euro_sospesi"]))
+
+    stampa_vera("\n6) gli euro in sospeso su «SEPA, Contanti»: decide la forma del recapito (10 ott 2026)")
+    # l'IBAN dichiarato conta (chi compra deve mandare gli euro); l'appuntamento
+    # no; e senza la forma — un telefono di ieri — resta il silenzio di prima
+    OROLOGIO.fissa(ADESSO - 3 * H)
+    await attivo(ordine(12), '["SEPA", "Contanti"]', contanti=False)
+    OROLOGIO.fissa(ADESSO - 540)
+    r = await chiama(SRV.posso_prendere_p2p, {"ordini": [libero]}, C)
+    prova("con l'IBAN dichiarato su «SEPA, Contanti» lo scambio conta: due sospesi, presa spenta",
+          (False, 2), (r["ordini"][libero]["ok"], r["euro_sospesi"]))
+    OROLOGIO.fissa(ADESSO - 3 * H)
+    await attivo(ordine(13), '["SEPA", "Contanti"]', contanti=True)
+    await attivo(ordine(14), '["SEPA", "Contanti"]')
+    OROLOGIO.fissa(ADESSO - 540)
+    r = await chiama(SRV.posso_prendere_p2p, {"ordini": [libero]}, C)
+    prova("con l'appuntamento dichiarato, o senza la forma, non conta: restano due",
+          2, r["euro_sospesi"])
     SRV.time = time
     del SRV.print
 

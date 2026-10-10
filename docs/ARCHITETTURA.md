@@ -30025,8 +30025,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   privacy»). La voce «Contanti» di `P2P_METODI` è l'incontro a mano;
   `P2P_CONTANTI` la nomina e `contantiAManoP2P(metodi)` la cerca per
   PAROLA INTERA (il tabacchino ha il suo nome esatto e resta fuori);
-  `scambioInContantiP2P(o)` guarda il metodo scelto alla presa, o i
-  metodi dell'ordine quando una scelta non c'è.
+  `scambioInContantiP2P(o)` dice se LO SCAMBIO è in contanti da quel che
+  si sa (dal 10 ott 2026, CANTIERI, «Il riquadro dei contanti su un
+  ordine a due metodi»): 1) il recapito viaggiato
+  (`recapitoInContantiP2P`, true/false/null su `testoRecapitoScambioP2P`:
+  il mio a chi vende, quello arrivato a chi compra — la prima riga che
+  comincia con «Contanti» e non è il tabacchino), 2) il metodo scelto o
+  arrivato (`metodoSceltoP2P`), 3) l'unico metodo dell'ordine. Con due
+  metodi e niente di saputo NON è in contanti. `pagaInContantiP2P` è lo
+  stesso giudice.
   IL TETTO. La leva `P2P_CONTANTI_MAX_EURO` (250 di serie ANCHE senza
   la riga nel config, 0 = spenta) viaggia in busta con le leve come
   `maxEuroContanti` (`_p2p_leve`, sette chiavi) e sta nel pannello
@@ -30064,9 +30071,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `passoDueContantiP2P(o, azione)` mette il «2» sopra il bottone solo se
   il bottone pieno è `euro-inviati` o `rilascia` (e allora c'è anche
   l'«1»), anche a presenza già segnata. LE PAROLE DEL GESTO col SOLO
-  contanti: `pagaInContantiP2P(o)` (metodo scelto o arrivato con
-  `metodoSceltoP2P`, o l'unico dell'ordine — più stretto di
-  `scambioInContantiP2P`) le decide per `gestoPagoP2P` («Ho consegnato i
+  contanti: `pagaInContantiP2P(o)` (dal 10 ott 2026 lo STESSO giudice di
+  `scambioInContantiP2P`: il recapito viaggiato, poi il metodo scelto o
+  arrivato, poi l'unico dell'ordine) le decide per `gestoPagoP2P` («Ho consegnato i
   contanti», acceso e spento), la conferma di `euroInviatiP2P` (con
   `REGOLA_CONTANTI_COMPRA` intera e, senza la mia presenza,
   l'avviso `senzaPresenza` con `REGOLA_DISPUTA_CONTANTI` e «Indietro»:

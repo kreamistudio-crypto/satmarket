@@ -61883,15 +61883,55 @@ function zonaCanaleP2P(ordine){
   const riga = ordine ? ordiniP2P()[ordine] : null;
   return (riga && riga.mio) ? zonaOrdineP2P(riga) : '';
 }
-/* lo SCAMBIO e' in contanti se il metodo scelto alla presa e' quello, o —
-   quando una scelta non c'e' (chi ha pubblicato non sa quale metodo ha
-   scelto l'altra parte) — se «Contanti» sta fra i metodi dell'ordine:
-   il riquadro a chi pubblica con due metodi lo si mostra lo stesso,
-   che una regola in piu' non fa danno e una in meno si' */
+/* ---- IL METODO DELLO SCAMBIO, DA QUEL CHE SI SA (10 ott 2026, cantiere
+   riquadro-contanti-sepa, bug visto in produzione da Andrea) ----
+   Su un ordine a due metodi («SEPA, Contanti») chi vende aveva mandato
+   l'IBAN, e a chi comprava restava il riquadro dei contanti — «Consegna
+   i contanti solo quando…», «📍 Sono qui», la regola della disputa —
+   sopra i dati del bonifico. Il giudice di prima guardava il metodo
+   scelto alla presa (che ce l'ha solo chi ha PRESO) e, senza, i metodi
+   dell'ORDINE: a chi aveva pubblicato con due metodi il riquadro usciva
+   sempre, anche a scelta arrivata e a IBAN in mano. Dal 10 ott decide
+   QUEL CHE SI SA, in quest'ordine:
+   1) IL RECAPITO CHE E' VIAGGIATO (`recapitoInContantiP2P`): il mio a
+      chi vende, quello arrivato a chi compra. E' il fatto piu' forte —
+      e' quel che chi vende ha scelto davvero nel foglio, e il testo
+      composto NOMINA sempre il metodo (la regola 2 dell'identita' di
+      pagamento): l'appuntamento comincia con «Contanti alla mano»
+      (`P2P_APPUNTAMENTO_TESTA`), il recapito di un client di ieri con
+      «Contanti:», il tabacchino con «Contanti al tabacchino» — che NON
+      e' il contanti di persona. Tutto il resto («Bonifico SEPA»,
+      «Revolut: …») e' un metodo che non e' il contanti.
+   2) IL METODO SCELTO, mio alla presa o arrivato dall'altra parte
+      (`metodoSceltoP2P`, che non si fida di un metodo fuori elenco).
+   3) L'UNICO METODO dell'ordine, quando e' «Contanti».
+   Con due metodi e NIENTE di saputo il riquadro NON si mostra piu' (la
+   scelta del 1 ott, «una regola in piu' non fa danno», e' rovesciata su
+   richiesta di Andrea: il danno c'era — a chi pagava con SEPA la pagina
+   diceva di consegnare contanti). `scambioInContantiP2P` e
+   `pagaInContantiP2P` sono lo STESSO giudice, coi due nomi che i
+   chiamanti hanno: il riquadro, i passi, «Sono qui», l'appuntamento, le
+   parole del gesto e gli stati leggono tutti la stessa verita'. */
+function testoRecapitoScambioP2P(o){
+  if (!o) return '';
+  const campo = ((o.lato === 'vendo' ? o.campiMiei : o.campiLoro) || {}).euro;
+  return campo ? String(campo.testo || '') : '';
+}
+/* PURO: true/false se un recapito e' viaggiato, null se non c'e' ancora */
+function recapitoInContantiP2P(o){
+  const prima = testoRecapitoScambioP2P(o).replace(/\r/g, '').split('\n')
+    .map(r => r.trim()).filter(Boolean)[0] || '';
+  if (!prima) return null;
+  return /^contanti\b/i.test(prima) && !/tabacch/i.test(prima);
+}
 function scambioInContantiP2P(o){
   if (!o) return false;
-  if (o.metodoScelto) return String(o.metodoScelto).trim() === P2P_CONTANTI;
-  return contantiAManoP2P(o.metodi);
+  const r = recapitoInContantiP2P(o);
+  if (r !== null) return r;
+  const m = metodoSceltoP2P(o);
+  if (m) return m === P2P_CONTANTI;
+  const met = o.metodi || [];
+  return met.length === 1 && String(met[0] || '').trim() === P2P_CONTANTI;
 }
 /* PURO: la frase del tetto del contanti, o '' se la cifra ci sta.
    `tetto` e' la leva del server (0 = spenta), `metodi` quelli
@@ -61946,21 +61986,17 @@ function consigliIncontroP2P(lato){
     '«📍 Sono qui» lo preme ognuno dal suo telefono, quando arriva: lascia l\'ora esatta e, se il telefono la dà, la posizione. Le guarda un moderatore, solo in caso di disputa; l\'altra persona vede l\'ora, mai la tua posizione.',
     'Il GPS si può falsificare: la posizione è una conferma, non una prova assoluta.'];
 }
-/* LE PAROLE DEL GESTO SONO PIU' STRETTE DEL RIQUADRO (1 ott 2026): «Ho
-   consegnato i contanti», il passo e gli avvisi cambiano solo quando il
-   metodo dello scambio E' il contanti — scelto alla presa, arrivato
-   dall'altra parte (`metodoSceltoP2P`, che non si fida di un metodo
-   fuori elenco), o l'unico dell'ordine. Con due metodi e nessuna scelta
-   nota il riquadro si mostra lo stesso, perche' una regola in piu' non
-   fa danno; un bottone che dicesse «contanti» a chi paga con SEPA,
-   invece, mentirebbe. Lo stesso confine lo tiene il server negli avvisi
-   (`_dati_frase_p2p`, il solo metodo «Contanti»). */
+/* LE PAROLE DEL GESTO (1 ott 2026): «Ho consegnato i contanti», il passo
+   e gli avvisi cambiano solo quando il metodo dello scambio E' il
+   contanti. Dal 10 ott 2026 e' LO STESSO giudice del riquadro
+   (`scambioInContantiP2P`, qui sopra: il recapito viaggiato, poi il
+   metodo scelto o arrivato, poi l'unico dell'ordine) — prima il riquadro
+   era piu' largo delle parole, e su un ordine a due metodi usciva a chi
+   pagava con SEPA. Lo stesso confine lo tiene il server negli avvisi
+   (`_dati_frase_p2p`: il recapito dichiarato dal telefono, o il solo
+   metodo «Contanti»). */
 function pagaInContantiP2P(o){
-  if (!o) return false;
-  const m = metodoSceltoP2P(o);
-  if (m) return m === P2P_CONTANTI;
-  const met = o.metodi || [];
-  return met.length === 1 && String(met[0] || '').trim() === P2P_CONTANTI;
+  return scambioInContantiP2P(o);
 }
 /* le due righe di `STATI_P2P` che col contanti di persona cambiano
    parole (1 ott 2026), e il giudice che le sceglie: lo chiama
@@ -71999,9 +72035,18 @@ function cauzioneModSceltaP2P(ordine){
   const v = String((p2pModBozze[ordine] || {}).cauzione || '');
   return (v === 'compratore' || v === 'venditore') ? v : '';
 }
+/* E' UNO SCAMBIO IN CONTANTI DI PERSONA, per il moderatore (10 ott 2026,
+   riquadro-contanti-sepa): lo dice il server (`contanti`, dal recapito
+   dichiarato dal telefono di chi vende; senza dichiarazione, «Contanti»
+   fra i metodi); un server di ieri che il campo non lo manda lascia la
+   regola di prima, i metodi dell'ordine. */
+function contantiModP2P(d){
+  if (d && typeof d.contanti === 'boolean') return d.contanti;
+  return contantiAManoP2P(String((d && d.metodi) || '').split(','));
+}
 function cauzioneModP2P(d, bozze){
   const lato = {compra: 'compratore', vende: 'venditore'}[d && d.cauzione_di] || '';
-  if (!lato || !contantiAManoP2P(String(d.metodi || '').split(','))) return '';
+  if (!lato || !contantiModP2P(d)) return '';
   const chi = lato === 'compratore' ? 'chi compra' : 'chi vende';
   const altro = lato === 'compratore' ? 'chi vende' : 'chi compra';
   const spunta = (bozze || {}).cauzione === lato;
@@ -72348,7 +72393,7 @@ function regolaDisputaModP2P(c){
     : r === 'senza_prova' ? REGOLA_DISPUTA_MOD_SENZA : '';
 }
 function rigaIncontroModP2P(d, aperta){
-  const contanti = contantiAManoP2P(String(d.metodi || '').split(','));
+  const contanti = contantiModP2P(d);
   const p = d.incontro;
   if (p && p.ora > 0)
     return '<div class="mod-riga mod-incontro">🤝 Incontro confermato col codice (QR) ' + esc(quandoIncontroP2P(p.ora))
@@ -72977,6 +73022,15 @@ function avvisaRecapitoP2P(id){
   p2pRecapitoTentati[chiave] = adesso;
   const corpo = {ordine: o.id, attivo: attivo};
   if (attivo && o.recapitoDetto === campo.id) corpo.ripetuto = true;
+  /* LA FORMA, NON IL RECAPITO (10 ott 2026, riquadro-contanti-sepa): un
+     SI'/NO in piu' — e' l'appuntamento del contanti di persona, o un
+     posto dove mandare gli euro? Il server non vede la scelta (viaggia
+     cifrata fra i due telefoni) e su un ordine «SEPA, Contanti»
+     sollecitava e parlava a caso: con questo bit sceglie le parole
+     giuste e tace gli «invia gli euro» a chi si vede di persona. Il
+     testo del recapito resta fuori dal filo, come sempre. */
+  const contanti = recapitoInContantiP2P(o);
+  if (contanti !== null) corpo.contanti = contanti;
   fetch(`${API_BASE}/p2p/recapito`, {method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
     body: JSON.stringify(corpo)})

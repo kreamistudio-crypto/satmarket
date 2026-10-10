@@ -48011,3 +48011,133 @@ locked"» della contesa nel giro dei negozi, una prova a cronometro che
 in locale passa; non l'ho toccata. Ho aspettato la corsa dopo
 (`167cca7`): verde. Il sì al push è di Andrea (10 ott, a lavoro
 chiuso).
+
+## Il riquadro dei contanti su un ordine a due metodi: decide il recapito (10 ott 2026, sera, cantiere riquadro-contanti-sepa, bug in produzione visto da Andrea)
+
+IL DIFETTO. In uno scambio P2P su un ordine «SEPA, Contanti» chi vende
+aveva mandato i dati del bonifico, e nella pagina di chi comprava
+restava il riquadro dei contanti di persona — «💵 Consegna i contanti
+solo quando chi vende preme «Libera i sats» davanti a te», il passo «1
+📍 Sono qui» con le due righe delle presenze, la regola della disputa
+sulla prova d'incontro — sopra l'IBAN. Il giudice del riquadro,
+`scambioInContantiP2P` (nato il 30 set, 81a6ac4, e fermo da allora),
+guardava `metodoScelto`, che ha SOLO chi ha PRESO l'ordine, e senza
+quello «Contanti» fra i metodi dell'ORDINE: a chi aveva PUBBLICATO con
+due metodi il riquadro usciva sempre, anche a scelta arrivata
+(`campiLoro.metodo`, che il giudice non leggeva) e a IBAN in mano. Le
+parole del gesto (`pagaInContantiP2P`) invece leggevano anche il metodo
+arrivato: da qui la pagina con «Ho inviato gli euro» sotto un riquadro
+che diceva di consegnare contanti. La scelta del 1 ott («il riquadro si
+mostra anche con due metodi e nessuna scelta nota: una regola in più non
+fa danno») era la radice: il danno c'era.
+NON È UNA REGRESSIONE DI OGGI, ed è una risposta a una domanda precisa
+di Andrea («nei giorni scorsi con SEPA non compariva: guarda i commit di
+oggi e di ieri»). Guardati uno per uno i commit dell'8-10 ott che toccano
+client e server (`git log -G` su `scambioInContantiP2P`,
+`riquadroContantiP2P`, `contantiAManoP2P`, `pagaInContantiP2P`,
+`metodoSceltoP2P`, `metodoScelto`, e i diff di solleciti 2d8cf0d,
+promemoria bb6d453, link dentro Telegram d0529f9 e 6104ffd, contanti-zona
+0819a78, avviso del blocco 0e0130d, cambio sul libro 4f60dac): nessuno
+cambia il giudice né chi scrive `metodoScelto`; la guida PayCode e
+indirizzo-lightning sono su rami NON ancora su main. La differenza con le
+prove dei giorni scorsi sta nei DATI: su un ordine col solo SEPA il
+riquadro non è mai uscito (non c'è «Contanti» fra i metodi), e chi PRENDE
+scegliendo SEPA ha `metodoScelto` e non lo vede; lo vedeva solo chi aveva
+PUBBLICATO un ordine a due metodi, dal 30 set. L'ordine di produzione
+non l'ho potuto leggere (il VPS è fuori dal mio perimetro): il comando
+per trovarlo sta nel rapporto.
+COSA SI È DECISO.
+- UN GIUDICE SOLO, da quel che si SA: `scambioInContantiP2P(o)` legge,
+  nell'ordine, 1) il RECAPITO VIAGGIATO (`recapitoInContantiP2P`: il mio
+  a chi vende, quello arrivato a chi compra, da `testoRecapitoScambioP2P`
+  — la prima riga che comincia con «Contanti» e non è il tabacchino:
+  prende l'appuntamento di oggi, «Contanti alla mano — propongo di
+  vederci», e il «Contanti: …» di un client di ieri; «Bonifico SEPA»,
+  «Revolut: …» e tutto il resto sono «non contanti»; null se non c'è
+  ancora), 2) il metodo scelto o arrivato (`metodoSceltoP2P`), 3)
+  l'unico metodo dell'ordine. Con due metodi e niente di saputo il
+  riquadro NON c'è più. `pagaInContantiP2P` è lo stesso giudice: il
+  riquadro, i passi, «Sono qui», l'appuntamento in cima, le parole del
+  gesto, gli stati e il titolo del recapito leggono la stessa verità.
+  IL RECAPITO VINCE SULLA SCELTA: chi ha preso scegliendo «Contanti» e
+  riceve l'IBAN vede il bonifico (è quel che chi vende ha mandato davvero,
+  e il testo composto nomina sempre il metodo — la regola 2 dell'identità
+  di pagamento); e un appuntamento arrivato su un ordine SEPA si mostra.
+- IL SERVER IMPARA LA FORMA, NON IL RECAPITO: la dichiarazione
+  `POST /api/p2p/recapito` porta un terzo SI'/NO, `contanti`
+  (`recapitoInContantiP2P(o)` di chi vende), che `_avviso_recapito_p2p`
+  scrive in `p2p_momenti.dettaglio` ('contanti' | 'euro'; '' da un
+  telefono di ieri) — letto per tipo, una stringa vale «non detto».
+  `_recapito_contanti_p2p(con, ordine, giro)` rilegge l'ULTIMA
+  dichiarazione del giro (chi vende può correggersi: vale quel che ha
+  mandato per ultimo, come nella pagina). `_dati_frase_p2p` ha due
+  gradi: `contanti` = quel che si sa (la forma dichiarata, o il libro col
+  SOLO «Contanti») e sceglie le PAROLE — «consegnato», l'avviso
+  dell'appuntamento, i testi del rilascio in contanti; `contanti_possibile`
+  = quel che non si può escludere (la forma dichiarata, o «Contanti» fra i
+  metodi) e sceglie i SILENZI. `contanti_detto` porta il grezzo.
+- I SOLLECITI DEGLI EURO NASCONO ANCHE SU «SEPA, CONTANTI»
+  (`_solleciti_evento_p2p` tace solo col contanti SAPUTO) e al battito
+  `_sollecito_euro_p2p_fermo` li ferma se il contanti è possibile («si
+  puo' pagare in contanti di persona: gli euro non si inviano»): prima,
+  con «Contanti» fra i metodi, a chi pagava con l'IBAN non arrivava
+  nessun sollecito. Gli euro in sospeso (`_euro_sospesi_p2p`, i malus)
+  usano lo stesso silenzio: con l'IBAN dichiarato lo scambio conta.
+- IL MODERATORE: la scheda della disputa porta `contanti` (il possibile)
+  e il client (`contantiModP2P(d)`) ci appende la spunta «brucia la
+  cauzione» e la regola dell'incontro; un server di ieri senza il campo
+  lascia la regola dei metodi.
+SCARTATO. Dedurre il metodo dal testo del recapito sul server (il
+recapito non passa di lì, e non deve: basta un bit). Mandare la scelta di
+chi prende al server (viaggia cifrata fra i due telefoni, e il recapito
+è il fatto più forte). Far tacere i solleciti su «Contanti» fra i metodi
+senza guardare la forma (era il bug sul lato server). Decidere al
+battito dal solo `contanti` SAPUTO (un telefono di ieri che dichiara
+senza forma su «SEPA, Contanti» riceverebbe «invia gli euro» mentre si
+vede di persona: si resta sul silenzio).
+PROVATO. `prove_riquadro_contanti_sepa` (nuova, 35 prove): le
+sentinelle su chi legge cosa (client e server), i due gradi di
+`_dati_frase_p2p` con la forma dichiarata (l'ultima vince, il giro, il
+telefono di ieri, il solo «Contanti» smentito dall'IBAN), il banco in
+node del giudice (undici righe, le stesse ai due nomi), la pagina senza
+riquadro col bonifico arrivato, il moderatore. Riallineate
+`prove_contanti_a_mano` (con due metodi e niente di saputo: NON contanti;
+l'appuntamento «senza contanti» è col bonifico arrivato),
+`prove_contanti_pagina_leggera`, `prove_moderazione_p2p`,
+`prove_cauzione_p2p` (il pezzo nuovo nei banchi), `prove_p2p_recapito_passo`
+(la rotta legge tre SI'/NO; il corpo porta `contanti`),
+`prove_solleciti_p2p` (su «Contanti, Revolut» le attese nascono e decide
+la forma, filtrate per scambio) e la sentinella sul freno in
+`prove_cambio_libro_p2p`. Collaudi: `collaudo_solleciti_p2p` sezione 8
+(la rotta vera con la forma, la cronaca, il sollecito che parte o tace,
+le parole del rilascio) e `collaudo_malus_p2p` sezione 6 (gli euro in
+sospeso con l'IBAN, l'appuntamento, senza forma).
+GIRO DAL VIVO (Browser pane, copia in collaudo nello scratchpad col
+relay morto, identità 111 Compratore dall'hash, righe seminate con
+`scriviOrdineP2P` da chi ha PUBBLICATO un «SEPA, Contanti» con
+`campiLoro.metodo` = SEPA e l'IBAN arrivato): PRIMA, col giudice vecchio
+rimesso in pagina sugli stessi dati, il riquadro dei contanti, «Sono
+qui», «Non hai ancora segnato la presenza», la regola della disputa (lo
+scatto 01 in `.claude/giri/riquadro-contanti-sepa/`; lì anche «Dove
+vedervi — Bonifico SEPA» e «Totale da consegnare», che in produzione non
+c'erano: nel giro il `pagaInContantiP2P` nuovo delega al giudice
+sostituito). DOPO: niente riquadro, «✅ Ho inviato gli euro», «💶 Dove
+mandare gli euro» con intestatario, IBAN e causale, «Totale da inviare»
+(scatti 02-03); con l'appuntamento arrivato il riquadro c'è, con
+l'appuntamento in cima e «Totale da consegnare» (04). Dal lato di chi
+vende (riga `vendo` col SUO recapito): con l'IBAN niente riquadro, con
+l'appuntamento riquadro e regola di chi vende; e la dichiarazione
+`POST /api/p2p/recapito` porta `contanti: false` con l'IBAN e
+`contanti: true` con l'appuntamento (corpi letti avvolgendo `fetch`).
+Suite PROVE_SEVERE intera sull'albero del cantiere (062d404 + le
+modifiche): 21.840 passate, 0 fallite, 0 saltate; i quattro collaudi
+vicini nella gabbia (solleciti, malus, contanti, recapito aggiornato):
+4 verdi. Il rebase e i collaudi della CI: nel verbale del push.
+DA GUARDARE. L'ordine vero di produzione: il journal del VPS con
+`sudo journalctl -u barattolo --since today | grep -E "Recapito P2P|💶"`
+e, in sola lettura, `python3 -c` su `/srv/barattolo/dati/satmarket.db`
+per i `p2p_ordini` di oggi con `metodi` che contiene sia SEPA sia
+Contanti, per sapere chi aveva pubblicato e confermare la lettura. Un
+telefono di ieri (dichiarazione senza forma) su «SEPA, Contanti» resta
+nel silenzio di prima; in produzione il client è sempre l'ultimo (gli
+header anti-cache), quindi la finestra è di minuti.

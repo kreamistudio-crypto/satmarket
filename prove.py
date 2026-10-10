@@ -89280,7 +89280,9 @@ def _banco_eventi_p2p(eventi_attivi=True):
               # di chi e' la cauzione, e la sua coda (1 ott 2026)
               "_tag_evento_p2p", "_cauzione_dal_38385_p2p", "_cauzione_di_evento_p2p",
               "_coda_cauzione_p2p",
-              "_testo_evento_p2p", "_nome_altro_p2p", "_dati_frase_p2p",
+              "_testo_evento_p2p", "_nome_altro_p2p",
+              # la forma del recapito dichiarato (10 ott 2026, riquadro-contanti-sepa)
+              "_recapito_contanti_p2p", "_dati_frase_p2p",
               "_avvisi_evento_p2p", "_scarica_attese_p2p",
               # l'avviso superato e la presa detta (24 set 2026)
               "_superato_p2p", "_presa_detta_p2p",
@@ -95885,8 +95887,11 @@ def prove_p2p_recapito_passo():
     # vede lo scambio attivo?) e `ripetuto` (e' lo stesso recapito di
     # prima?). Ancora nessun posto per il recapito, e i due si leggono
     # con `is`: una stringa — o un IBAN — in quei campi non vale niente.
-    prova("la rotta legge dal corpo l'id dell'ordine e due SI'/NO, e nient'altro",
-          ["attivo", "ordine", "ripetuto"],
+    # (10 ott 2026, riquadro-contanti-sepa) e un terzo SI'/NO, `contanti`: la
+    # FORMA del recapito — appuntamento o posto dove mandare gli euro —,
+    # letta per tipo (`isinstance(bool)`): una stringa vale «non detta»
+    prova("la rotta legge dal corpo l'id dell'ordine e tre SI'/NO, e nient'altro",
+          ["attivo", "contanti", "ordine", "ripetuto"],
           sorted(set(re.findall(r'\.get\("(\w+)"\)', codice(rotta)))))
     prova("...e i due SI'/NO si leggono per identita': quel che non e' un "
           "booleano non vale niente", True,
@@ -95939,7 +95944,7 @@ def prove_p2p_recapito_passo():
     amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
     for f in _FUNZIONI_LIBRO_P2P + ("_volti_persone", "_controparti_p2p", "_nome_altro_p2p",
                                     # col contanti l'avviso dice l'appuntamento (1 ott 2026)
-                                    "_tabacchino_libro", "_dati_frase_p2p",
+                                    "_tabacchino_libro", "_recapito_contanti_p2p", "_dati_frase_p2p",
                                     "_parti_scambio_p2p", "_avviso_recapito_p2p",
                                     "_momento_evento_p2p", "_evento_p2p_pulito",
                                     "_registra_evento_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p"):
@@ -96298,6 +96303,8 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
 })();
 """
     pezzi = "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        # (10 ott 2026) la forma del recapito, che la dichiarazione porta
+        "function testoRecapitoScambioP2P(o){", "function recapitoInContantiP2P(o){",
         "function avvisaRecapitoP2P(id){",))
     # (19 set 2026) gli stati da cui il recapito si DICHIARA presto sono
     # quelli del giro aperto: la costante VERA, non una copia
@@ -96317,26 +96324,26 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
     finally:
         _sh.rmtree(d, ignore_errors=True)
     prova("chi vende, a scambio attivo, col recapito partito: l'avviso parte", 1, o["recapitoParte"])
-    prova("...col SOLO id dell'ordine: il recapito non passa dal server",
-          '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true} /api/p2p/recapito',
+    prova("...con l'id dell'ordine e la FORMA (un SI'/NO, qui l'IBAN): il recapito non passa dal server",
+          '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true,"contanti":false} /api/p2p/recapito',
           o["recapitoCorpo"])
     prova("...si segna QUALE recapito e' stato detto, e non si ripete", ["m1", 0],
           [o["recapitoSegnato"], o["recapitoNonRipete"]])
     prova("...una correzione e' un altro recapito, e riparte", 1, o["correzioneRiparte"])
     prova("PRIMA dello scambio attivo si dichiara e basta: `attivo: false`, "
           "segnato a parte — e «avvisato» resta vuoto",
-          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":false}', "m1", True],
+          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":false,"contanti":false}', "m1", True],
           o["prestoDichiara"])
     prova("...una volta sola", 0, o["prestoNonRipete"])
     prova("...e a scambio attivo lo stesso recapito si RIDICHIARA come ripetuto",
-          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true,"ripetuto":true}', "m1"],
+          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true,"ripetuto":true,"contanti":false}', "m1"],
           o["attivoRidichiara"])
     prova("...e il freno del «presto» non ferma la dichiarazione a scambio "
           "attivo, dieci secondi dopo", [False, True], o.get("freniSeparati"))
     prova("DOPO «HO INVIATO GLI EURO» (7 ott 2026): parte SOLO un recapito nato "
           "dopo l'ora del pagato, come aggiornamento; uno di prima, o della stessa "
           "ora, no — e nemmeno in disputa, o con l'ora del pagato a zero",
-          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true}', "m2", 0, 0, 0, 0],
+          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true,"contanti":false}', "m2", 0, 0, 0, 0],
           o.get("dopoPagato"))
     prova("a euro inviati senza l'ora del pagato, a scambio concluso, o a ordine "
           "ancora in vetrina, non parte niente", [0, 0, 0], o["dopoNo"])
@@ -126824,7 +126831,11 @@ out.riquadroApp = {
   senzaOra: ha(riquadroAppuntamentoP2P(ow({campiLoro: {euro: {id: 'e4', testo: 'Contanti alla mano — propongo di vederci: Bar Sport'}}})),
     '📍 <b>Dove vedervi</b>'),
   vuoti: [riquadroAppuntamentoP2P(ow({stato: 'concluso'})), riquadroAppuntamentoP2P(ow({stato: 'rilasciato'})),
-    riquadroAppuntamentoP2P(ow({metodi: ['SEPA']})), riquadroAppuntamentoP2P(ow({campiLoro: {}})),
+    /* (10 ott 2026, riquadro-contanti-sepa) «senza contanti» e' il BONIFICO
+       arrivato: un appuntamento arrivato su un ordine SEPA si mostra, perche'
+       il recapito viaggiato vince sui metodi dell'ordine */
+    riquadroAppuntamentoP2P(ow({metodi: ['SEPA'], campiLoro: {euro: {id: 'e6', testo: 'Bonifico SEPA, IBAN: IT60X'}}})),
+    riquadroAppuntamentoP2P(ow({campiLoro: {}})),
     riquadroAppuntamentoP2P(ow({metodi: ['Contanti al tabacchino 23.47']})), riquadroAppuntamentoP2P(null)],
   cambiaNo: [ha(riquadroAppuntamentoP2P(ow({lato: 'vendo', stato: 'euro_inviati', campiMiei: {euro: {id: 'e2', testo: testo}}})), 'Cambia'),
     ha(riquadroAppuntamentoP2P(ow({lato: 'vendo', soloVista: true, campiMiei: {euro: {id: 'e2', testo: testo}}})), 'Cambia')],
@@ -127083,6 +127094,8 @@ def prove_contanti_pagina_leggera():
     pezzi = "\n".join([
         riga_js("const P2P_CONTANTI = "),
         fn("function contantiAManoP2P(metodi){"), fn("function scambioInContantiP2P(o){"),
+        # (10 ott 2026, riquadro-contanti-sepa) il recapito viaggiato, letto dal giudice
+        fn("function testoRecapitoScambioP2P(o){"), fn("function recapitoInContantiP2P(o){"),
         riga_js("const REGOLA_CONTANTI_COMPRA = "), riga_js("const REGOLA_CONTANTI_VENDE = "),
         riga_js("const CONSIGLI_CONTANTI = "),
         riga_js("const REGOLA_BREVE_CONTANTI_COMPRA = "), riga_js("const REGOLA_BREVE_CONTANTI_VENDE = "),
@@ -127822,6 +127835,8 @@ def prove_contanti_a_mano():
         # (10 ott 2026) le banconote nella riga della regola
         riga_js("const P2P_CONTANTI_ICO = "),
         fn("function contantiAManoP2P(metodi){"), fn("function scambioInContantiP2P(o){"),
+        # (10 ott 2026, riquadro-contanti-sepa) il recapito viaggiato, letto dal giudice
+        fn("function testoRecapitoScambioP2P(o){"), fn("function recapitoInContantiP2P(o){"),
         fn("function giudiceContantiP2P(euro, metodi, tetto){"),
         riga_js("const REGOLA_CONTANTI_COMPRA = "), riga_js("const REGOLA_CONTANTI_VENDE = "),
         riga_js("const CONSIGLI_CONTANTI = "), riga_js("const REGOLA_BREVE_CONTANTI_COMPRA = "),
@@ -127849,6 +127864,7 @@ def prove_contanti_a_mano():
         fn("function rigaAppuntamentoModP2P(c){"), fn("function righeConfrontoModP2P(c){"),
         riga_js("const REGOLA_DISPUTA_MOD_DECIDE = "), riga_js("const REGOLA_DISPUTA_MOD_SENZA = "),
         fn("function regolaDisputaModP2P(c){"), fn("function rigaIncontroModP2P(d, aperta){"),
+        fn("function contantiModP2P(d){"),
         fn("function maxEuroP2P(){"), fn("function maxEuroContantiP2P(){"),
         # il giudice del foglio Pubblica, coi suoi attrezzi
         fn("function interoP2P(testo){"), fn("function centesimiP2P(testo){"),
@@ -127874,8 +127890,10 @@ def prove_contanti_a_mano():
     frase = "In contanti di persona il massimo è 250 € per scambio: sopra, si divide in più ordini"
     prova("il giudice: 250 passa, 251 no; leva spenta, altro metodo e il tabacchino non c'entrano; con due metodi conta",
           ["", frase, "", "", "", frase, frase], o["giudice"])
-    prova("lo scambio e' in contanti per il metodo SCELTO, o per la voce fra i metodi; il tabacchino no",
-          [False, True, True, False, True, False], o["scambio"])
+    # (10 ott 2026, riquadro-contanti-sepa) con due metodi e niente di saputo
+    # NON e' piu' in contanti: la regola nuova ha la sua prova
+    prova("lo scambio e' in contanti per il metodo SCELTO, o per l'UNICO metodo; con due metodi senza scelta no; il tabacchino no",
+          [False, True, False, False, True, False], o["scambio"])
     prova("la leva dal client: 250; zero e nulla sono spente; una cifra con la virgola si tronca",
           [250, 0, 250, 0], o["leva"])
     p = o["pubblica"]
@@ -127965,7 +127983,7 @@ def prove_contanti_a_mano():
           [True, True, True, True, False], ra_["compra"])
     prova("...a chi vende anche «Cambia»; l'indirizzo scritto a mano dice gentile che il link non c'e'", [[True, True], [True, False]],
           [ra_["vende"], ra_["aMano"]])
-    prova("...senza ora resta «Dove vedervi»; finito, liberato, senza contanti, senza recapito, al tabacchino: niente",
+    prova("...senza ora resta «Dove vedervi»; finito, liberato, col bonifico arrivato, senza recapito, al tabacchino: niente",
           [True, ["", "", "", "", "", ""]], [ra_["senzaOra"], ra_["vuoti"]])
     prova("...«Cambia» non c'e' a contanti consegnati ne' sulla riga solo da guardare; il luogo passa da esc()",
           [[False, False], True], [ra_["cambiaNo"], ra_["scappato"]])
@@ -129050,6 +129068,7 @@ def prove_moderazione_p2p():
         # pezzi VERI che `rigaIncontroModP2P` chiama
         riga_js("const P2P_CONTANTI = "),
         fn("function contantiAManoP2P(metodi){"),
+        fn("function contantiModP2P(d){"),
         fn("function quandoIncontroP2P(ts){"),
         fn("function distanzaIncontroP2P(p){"),
         chat, modulo])
@@ -130965,7 +130984,7 @@ def prove_cauzione_p2p():
         fn("function rigaCauzioneDettP2P(o, info, leva){"),
         fn("function riquadroCauzioneP2P(o){"), fn("function riquadroIncassoCauzioneP2P(o){"),
         fn("function testoCauzioneInfoP2P(info, leva){"),
-        fn("function contantiAManoP2P(metodi){"),
+        fn("function contantiAManoP2P(metodi){"), fn("function contantiModP2P(d){"),
         fn("function cauzioneModSceltaP2P(ordine){"), fn("function cauzioneModP2P(d, bozze){"),
         fn("function cauzioneFraseModP2P(ordine){"),
         fn("function mossaDopoRilascioP2P(o, azione, ord){"),
@@ -139408,6 +139427,216 @@ out.canale = [zonaCanaleP2P(A), zonaCanaleP2P(B), zonaCanaleP2P(C), zonaCanaleP2
 """
 
 
+BANCO_RIQUADRO_CONTANTI_SEPA = r"""
+const out = {};
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g,
+  c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c])); }
+function fmt(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+function dataBreveP2P(t){ return t ? '3 ott' : ''; }
+const P2P_DISPUTABILI = ['attivo', 'pagamento_ritentato', 'euro_inviati'];
+__PEZZI__
+const ID = '82231748-1a2b-4c3d-9e8f-0a1b2c3d4e5f';
+const SEPA = 'Bonifico SEPA\nIntestatario: Mario Rossi\nIBAN: IT60X0542811101000000123456';
+const APP = P2P_APPUNTAMENTO_TESTA + 'Bar Sport, piazza Garibaldi\nQuando: 04/10/2031 alle 18:30';
+const base = {id: ID, lato: 'compro', stato: 'attivo', metodi: ['SEPA', 'Contanti'], peer: 'b'.repeat(64)};
+const C = x => Object.assign({}, base, x);
+const loro = t => ({campiLoro: {euro: {testo: t}}});
+/* --- la forma del recapito viaggiato: true, false, o null se non c'e' --- */
+out.recapito = [recapitoInContantiP2P(C({})), recapitoInContantiP2P(C(loro(SEPA))),
+  recapitoInContantiP2P(C(loro(APP))), recapitoInContantiP2P(C(loro('Contanti: davanti al bar'))),
+  recapitoInContantiP2P(C(loro('Contanti al tabacchino\nPayCode: 479-868-518'))),
+  recapitoInContantiP2P(C(loro('\r\n  contanti ALLA MANO — propongo di vederci: qui'))),
+  recapitoInContantiP2P(C({lato: 'vendo', campiMiei: {euro: {testo: APP}}, campiLoro: {euro: {testo: SEPA}}})),
+  recapitoInContantiP2P(C({lato: 'vendo', campiLoro: {euro: {testo: APP}}})),
+  recapitoInContantiP2P(C(loro(''))), recapitoInContantiP2P(null)];
+/* --- il giudice: le stesse righe a tutti e due i nomi --- */
+const righe = [
+  C({}),                                                        // due metodi, niente saputo: IL BUG
+  C({campiLoro: {metodo: {testo: 'SEPA'}}}),                    // a chi ha pubblicato e' arrivato «SEPA»
+  C({campiLoro: {metodo: {testo: 'Contanti'}}}),                // ...o «Contanti»
+  C({metodoScelto: 'Contanti'}),                                // scelto alla presa
+  C(Object.assign({metodoScelto: 'Contanti'}, loro(SEPA))),     // scelto contanti, ma e' arrivato l'IBAN: vince il recapito
+  C(Object.assign({metodoScelto: 'SEPA'}, loro(APP))),          // scelto SEPA, ma e' arrivato l'appuntamento
+  C({metodoScelto: 'Revolut'}),                                 // fuori elenco: non e' una scelta
+  C({metodi: ['Contanti']}),                                    // l'unico metodo
+  C({metodi: ['Contanti'], campiLoro: {euro: {testo: SEPA}}}),  // ...smentito dall'IBAN arrivato
+  C({lato: 'vendo', campiMiei: {euro: {testo: SEPA}}}),         // chi vende col SUO IBAN
+  C({lato: 'vendo', campiMiei: {euro: {testo: APP}}})];         // chi vende col SUO appuntamento
+out.scambio = righe.map(scambioInContantiP2P);
+out.paga = righe.map(pagaInContantiP2P);
+out.gesto = [gestoPagoP2P(C(loro(SEPA))), gestoPagoP2P(C(loro(APP))), gestoPagoP2P(C({}))];
+/* --- la pagina: col bonifico arrivato niente riquadro, niente passo 2; con l'appuntamento si' --- */
+const sepaArrivato = C({campiLoro: {euro: {testo: SEPA}, metodo: {testo: 'SEPA'}}});
+const ha = (h, t) => h.indexOf(t) >= 0;
+out.pagina = [riquadroContantiP2P(sepaArrivato, 'euro-inviati'), passoDueContantiP2P(sepaArrivato, 'euro-inviati'),
+  riquadroContantiP2P(C({}), 'euro-inviati'), passoDueContantiP2P(C({}), 'euro-inviati'),
+  ha(riquadroContantiP2P(C(loro(APP)), 'euro-inviati'), 'Sono qui'),
+  ha(riquadroContantiP2P(C({campiLoro: {metodo: {testo: 'Contanti'}}}), 'euro-inviati'), esc(REGOLA_BREVE_CONTANTI_COMPRA)),
+  ha(riquadroContantiP2P(C({lato: 'vendo', campiMiei: {euro: {testo: APP}}}), 'rilascia'), esc(REGOLA_BREVE_CONTANTI_VENDE))];
+/* --- il moderatore: il server dice, se no i metodi --- */
+out.mod = [contantiModP2P({metodi: 'SEPA, Contanti', contanti: false}), contantiModP2P({metodi: 'SEPA, Contanti', contanti: true}),
+  contantiModP2P({metodi: 'SEPA, Contanti'}), contantiModP2P({metodi: 'SEPA'}),
+  contantiModP2P({metodi: 'SEPA', contanti: 'si'}), contantiModP2P(null),
+  cauzioneModP2P({ordine: 'o1', cauzione_di: 'compra', metodi: 'SEPA, Contanti', contanti: false}, {}),
+  ha(cauzioneModP2P({ordine: 'o1', cauzione_di: 'compra', metodi: 'SEPA, Contanti', contanti: true}, {}), 'Brucia la cauzione')];
+console.log(JSON.stringify(out));
+"""
+
+
+def prove_riquadro_contanti_sepa():
+    """IL RIQUADRO DEI CONTANTI SOLO QUANDO LO SCAMBIO E' IN CONTANTI (10 ott
+    2026, cantiere riquadro-contanti-sepa, bug visto in produzione da
+    Andrea): su un ordine «SEPA, Contanti» chi vende aveva mandato l'IBAN e
+    a chi comprava restava il riquadro dei contanti — la regola, «📍 Sono
+    qui», la disputa — sopra i dati del bonifico. Il giudice guardava il
+    metodo scelto alla presa (che ha solo chi ha PRESO) e, senza, i metodi
+    dell'ordine. Adesso decide quel che si sa: il recapito viaggiato, poi
+    il metodo scelto o arrivato, poi l'unico metodo; con due metodi e
+    niente di saputo il riquadro non c'e' (rovesciata la scelta del 1 ott,
+    «una regola in piu' non fa danno»). Riquadro e parole del gesto sono lo
+    STESSO giudice. Il server riceve dal telefono la FORMA del recapito
+    (`contanti`: SI'/NO, mai il recapito), la scrive in `dettaglio` e con
+    quella sceglie le parole (`contanti`) e i silenzi
+    (`contanti_possibile`): i solleciti degli euro nascono anche su «SEPA,
+    Contanti» e si fermano al battito se e' l'appuntamento; gli euro in
+    sospeso e la scheda del moderatore leggono lo stesso timbro.
+
+    QUEL CHE SI ROMPE IN SILENZIO: il riquadro che torna a leggere i
+    metodi dell'ordine; il recapito che non vince sulla scelta; un
+    telefono che manda il testo del recapito al server invece del bit; la
+    dichiarazione di un altro giro letta come questa; la forma vecchia
+    («Contanti: …» di un client di ieri) non riconosciuta; il tabacchino
+    preso per contanti di persona."""
+    import json as _json, shutil as _sh, subprocess as _sp, tempfile as _tf, os as _os
+    print("\n[il riquadro dei contanti su un ordine a due metodi: il recapito decide]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    riga_js = lambda firma: mini[mini.index(firma):mini.index("\n", mini.index(firma))]
+
+    # --- 1) LE SENTINELLE SUL TESTO: chi legge cosa --------------------------
+    giudice = fn("function scambioInContantiP2P(o){")
+    prova("il giudice legge, nell'ordine: il recapito viaggiato, il metodo scelto o arrivato, l'unico dell'ordine", True,
+          0 < giudice.find("recapitoInContantiP2P(o)") < giudice.find("metodoSceltoP2P(o)")
+          < giudice.find("met.length === 1"))
+    prova("...e «Contanti» fra i metodi dell'ordine non lo guarda piu'", False, "contantiAManoP2P" in giudice)
+    prova("le parole del gesto sono lo stesso giudice del riquadro", True,
+          "return scambioInContantiP2P(o);" in fn("function pagaInContantiP2P(o){"))
+    avvisa = fn("function avvisaRecapitoP2P(id){")
+    prova("la dichiarazione al server porta la FORMA (un SI'/NO), mai il testo del recapito", [True, False],
+          ["corpo.contanti = contanti" in avvisa and "recapitoInContantiP2P(o)" in avvisa,
+           "campo.testo" in avvisa or "testoRecapitoScambioP2P" in avvisa])
+    for nome in ("cauzioneModP2P(d, bozze){", "rigaIncontroModP2P(d, aperta){"):
+        corpo = fn("function " + nome)
+        prova(f"il moderatore chiede a `contantiModP2P`: {nome.split('(')[0]}", [True, False],
+              ["contantiModP2P(d)" in corpo, "contantiAManoP2P" in corpo])
+    i = src.index('"contanti": bool(dati["contanti_possibile"])')
+    j = src.rfind("\ndef ", 0, i) + 5
+    scheda = src[j:src.index("(", j)]
+    prova(f"la scheda del moderatore (`{scheda}`) porta il timbro del contanti possibile", True,
+          scheda.endswith("_p2p") and '"contanti": bool(dati["contanti_possibile"])' in pezzo(scheda))
+    for nome, dentro in (("_avviso_recapito_p2p",
+                          'forma = "" if contanti is None else ("contanti" if contanti else "euro")'),
+                         ("recapito_p2p", "contanti=forma if isinstance(forma, bool) else None"),
+                         ("_sollecito_euro_p2p_fermo", 'if dati["contanti_possibile"]:'),
+                         ("_euro_sospesi_p2p", '_dati_frase_p2p(con, s[0])["contanti_possibile"]'),
+                         ("_solleciti_evento_p2p", 'if dati["contanti"]:')):
+        prova(f"il server: `{nome}` legge la forma dichiarata", True, dentro in codice(_senza_prosa(pezzo(nome))))
+    prova("...e la dichiarazione scrive `dettaglio` nella riga del momento", True,
+          "giro, attore, dettaglio, arrivato" in pezzo("_avviso_recapito_p2p"))
+    prova("i solleciti degli euro non tacciono piu' su «Contanti» FRA i metodi: decide il battito", False,
+          '"Contanti" in _metodi_libro(dati["metodi_lista"])' in codice(_senza_prosa(pezzo("_solleciti_evento_p2p"))))
+
+    # --- 2) IL SERVER: i due gradi del contanti, dalla forma dichiarata ----
+    con, amb = _banco_eventi_p2p()
+    ORD = "0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc88"
+
+    def libro(metodi):
+        con.execute(
+            "INSERT OR REPLACE INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, "
+            "preso_da, euro, sats, metodi) VALUES(?,?,0,'in-progress','sell',1,?,'5,00 €',7034,?)",
+            (ORD, 222, 111, metodi))
+
+    def dichiara(quando, forma, giro=0):
+        con.execute("INSERT INTO p2p_momenti(ordine, momento, quando, fonte, giro, attore, dettaglio, "
+                    "arrivato) VALUES(?,'recapito',?,'telefono',?,'seller',?,?)",
+                    (ORD, quando, giro, forma, quando))
+
+    gradi = lambda: tuple(amb["_dati_frase_p2p"](con, ORD)[k] for k in ("contanti_detto", "contanti", "contanti_possibile"))
+    libro('["SEPA", "Contanti"]')
+    prova("«SEPA, Contanti» senza dichiarazione: non si sa, le parole degli euro, il contanti resta possibile",
+          (None, False, True), gradi())
+    dichiara(100, "euro")
+    prova("dichiarato l'IBAN: niente contanti, ne' saputo ne' possibile", (False, False, False), gradi())
+    dichiara(200, "contanti")
+    prova("poi «vediamoci»: l'ULTIMA dichiarazione vince, e il contanti e' saputo", (True, True, True), gradi())
+    dichiara(300, "")
+    prova("un telefono di ieri che la forma non la dice: si torna a non sapere, e decide il libro",
+          (None, False, True), gradi())
+    prova("la forma si legge sul giro in corso: su un altro giro e' nessuna",
+          [None, True], [amb["_recapito_contanti_p2p"](con, ORD, 1), amb["_recapito_contanti_p2p"](con, ORD, 0) is None])
+    dichiara(400, "contanti", giro=1)
+    prova("...e una dichiarazione del giro 1 non parla per il giro 0", (None, False, True), gradi())
+    libro('["Contanti"]')
+    prova("col solo «Contanti» il libro basta anche senza una forma", (None, True, True), gradi())
+    dichiara(500, "euro")
+    prova("...ma un IBAN dichiarato lo smentisce: sono gli euro", (False, False, False), gradi())
+    libro('["SEPA"]')
+    dichiara(600, "contanti")
+    prova("e un appuntamento dichiarato su un ordine SEPA e' contanti: vale quel che chi vende ha mandato",
+          (True, True, True), gradi())
+    con.close()
+
+    # --- 3) IL BANCO DEL CLIENT ---------------------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco del riquadro dei contanti", "node non c'e'")
+        return
+    blocco_const = lambda nome: (lambda i: mini[i:mini.index("\n};", i) + 3])(mini.index("const " + nome + " = {"))
+    pezzi = "\n".join([
+        riga_js("const P2P_CONTANTI = "), riga_js("const P2P_CONTANTI_ICO = "),
+        riga_js("const P2P_APPUNTAMENTO_TESTA = "),
+        fn("function contantiAManoP2P(metodi){"), fn("function testoRecapitoScambioP2P(o){"),
+        fn("function recapitoInContantiP2P(o){"), fn("function scambioInContantiP2P(o){"),
+        fn("function pagaInContantiP2P(o){"), fn("function metodoSceltoP2P(o){"),
+        fn("function gestoPagoP2P(o){"),
+        riga_js("const REGOLA_CONTANTI_COMPRA = "), riga_js("const REGOLA_CONTANTI_VENDE = "),
+        riga_js("const CONSIGLI_CONTANTI = "),
+        riga_js("const REGOLA_BREVE_CONTANTI_COMPRA = "), riga_js("const REGOLA_BREVE_CONTANTI_VENDE = "),
+        riga_js("const SPIEGA_SONO_QUI = "), riga_js("const REGOLA_DISPUTA_CONTANTI = "),
+        riga_js("const REGOLA_DISPUTA_ECCEZIONE = "),
+        fn("function consigliIncontroP2P(lato){"), blocco_const("STATI_CONTANTI_P2P"),
+        fn("function statoContantiP2P(o, t){"),
+        fn("function oraPresenzaP2P(ts, adesso){"), fn("function righePresenzeP2P(o, adesso){"),
+        riga_js("let p2pConsigliAperti = "),
+        fn("function riquadroContantiP2P(o, azione){"), fn("function passoDueContantiP2P(o, a){"),
+        fn("function contantiModP2P(d){"), fn("function cauzioneModP2P(d, bozze){")])
+    cart = _tf.mkdtemp(prefix="contanti_sepa_")
+    pb = _os.path.join(cart, "banco.js")
+    open(pb, "w", encoding="utf-8").write(BANCO_RIQUADRO_CONTANTI_SEPA.replace("__PEZZI__", pezzi))
+    rr = _sp.run([node, pb], capture_output=True, text=True, timeout=120, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    if rr.returncode != 0:
+        prova("il banco del riquadro dei contanti gira", 0, rr.returncode)
+        print(rr.stderr[:2000])
+        return
+    o = _json.loads(rr.stdout)
+    prova("la forma del recapito viaggiato: null senza, false col bonifico, true con l'appuntamento (anche vecchio, anche sporco), "
+          "false col tabacchino; a chi vende conta il SUO",
+          [None, False, True, True, False, True, True, None, None, None], o["recapito"])
+    attesi = [False, False, True, True, False, True, False, True, False, False, True]
+    prova("il giudice: due metodi senza niente NO; il metodo arrivato; quello scelto; il recapito vince sulla scelta; "
+          "fuori elenco no; l'unico si', smentito dall'IBAN no; chi vende col suo", attesi, o["scambio"])
+    prova("...e le parole del gesto dicono lo stesso, riga per riga", attesi, o["paga"])
+    prova("il verbo: inviato col bonifico, consegnato con l'appuntamento, inviato senza niente",
+          ["Ho inviato gli euro", "Ho consegnato i contanti", "Ho inviato gli euro"], o["gesto"])
+    prova("LA PAGINA: col bonifico arrivato niente riquadro e niente passo 2 — era il bug —, e nemmeno con due metodi e "
+          "niente di saputo; con l'appuntamento «Sono qui», col metodo arrivato la regola, a chi vende la sua",
+          ["", "", "", "", True, True, True], o["pagina"])
+    prova("il moderatore: il server dice (false/true), senza il server i metodi, un valore storto vale «non detto»",
+          [False, True, True, False, False, False, "", True], o["mod"])
+
+
 def prove_contanti_zona():
     """LA ZONA DI SCAMBIO E IL VESTITO DEL CONTANTI (10 ott 2026, cantiere
     contanti-zona, richiesta di Andrea). Quattro cose: 1) la zona
@@ -141618,7 +141847,7 @@ def prove_solleciti_p2p():
     prova("a dire se tocca a chi compra sono i giudici della pagina, non una regola nuova",
           [True, True],
           ['_stato_scambio_p2p(momenti, "compro", "", "", False)["stato"]' in fermo,
-           '_dati_frase_p2p(con, ordine)["recapito_detto"]' in fermo])
+           'dati = _dati_frase_p2p(con, ordine)' in fermo and 'dati["recapito_detto"]' in fermo])
 
     con, amb = _banco_eventi_p2p()
     for riga in ("SOLLECITI_RILASCIO_S = ", "SOLLECITI_EURO_S = ",
@@ -141889,19 +142118,46 @@ def prove_solleciti_p2p():
 
     # ---- IL CONTANTI DI PERSONA ----
     CONT = amb["SOLLECITO_RILASCIO_CONTANTI_TESTI"]
-    for metodi, testi, nome in (('["Contanti"]', CONT, "col solo Contanti"),
-                                ('["Contanti", "Revolut"]', RIL, "col Contanti fra due metodi")):
-        o = nuovo(metodi)
+    o = nuovo('["Contanti"]')
+    giornale.clear()
+    G = fino_alla_garanzia(o)
+    prova("col solo Contanti: a chi compra NESSUN sollecito degli euro (ci si da' appuntamento)",
+          [], attese(o, "sollecito_euro"))
+    prova("col solo Contanti: ...e il journal lo dice", True,
+          any(f"Solleciti P2P: {o[:8]}" in r and "contanti di persona" in r
+              for r in giornale))
+    arriva(o, "fiat-sent", "buyer", "", G + 100)
+    prova("col solo Contanti: dopo il «pagato» a chi vende i tre del rilascio, con le parole giuste",
+          [(B, CONT[1])], batte(G + 100 + H)[0])
+    # (10 ott 2026, riquadro-contanti-sepa) con «Contanti» FRA i metodi le
+    # attese NASCONO — chi vende puo' mandare l'IBAN — e decide il battito,
+    # con la FORMA del recapito dichiarata dal telefono: prima tacevano
+    # tutte, e a chi pagava con l'IBAN non arrivava niente
+    for forma, nome, testi in ((True, "l'appuntamento", CONT), (False, "l'IBAN", RIL),
+                               (None, "un telefono di ieri", RIL)):
+        o = nuovo('["Contanti", "Revolut"]')
         giornale.clear()
         G = fino_alla_garanzia(o)
-        prova(f"{nome}: a chi compra NESSUN sollecito degli euro (ci si da' appuntamento)",
-              [], attese(o, "sollecito_euro"))
-        prova(f"{nome}: ...e il journal lo dice", True,
-              any(f"Solleciti P2P: {o[:8]}" in r and "contanti di persona" in r
-                  for r in giornale))
-        arriva(o, "fiat-sent", "buyer", "", G + 100)
-        prova(f"{nome}: dopo il «pagato» a chi vende i tre del rilascio, con le parole giuste",
-              [(B, testi[1])], batte(G + 100 + H)[0])
+        prova("col Contanti fra due metodi: le tre attese degli euro nascono, senza la riga del journal",
+              (3, False), (len(attese(o, "sollecito_euro")),
+                           any(f"Solleciti P2P: {o[:8]}" in r and "contanti di persona" in r
+                               for r in giornale)))
+        giornale.clear()
+        recapito(con, o, B, G + 10, contanti=forma)
+        # solo i messaggi di QUESTO scambio: altri ordini della prova hanno
+        # attese in sospeso alle stesse ore, e ogni sollecito porta il suo link
+        di_questo = lambda quando, o=o: [d for d, u in zip(*batte(quando)) if u == URL + o]
+        detti = di_questo(G + H)
+        if forma is False:
+            prova(f"...dichiarato {nome}: al battito il sollecito degli euro PARTE", [(A, EURO[1])], detti)
+        else:
+            prova(f"...dichiarato {nome}: al battito nessun sollecito degli euro, e il journal dice perche'",
+                  ([], True),
+                  (detti, any(f"{o[:8]} «euro_sollecito1» a {A} non parte" in r
+                              and "gli euro non si inviano" in r for r in giornale)))
+        arriva(o, "fiat-sent", "buyer", "", G + 2 * H)
+        prova(f"...e dopo il «pagato», a chi vende, le parole di {nome}",
+              [(B, testi[1])], di_questo(G + 3 * H))
 
     # ---- IL PAYCODE: i suoi testi, e tre solleciti a chi vende, non sei ----
     PAY = amb["SOLLECITO_EURO_PAYCODE_TESTI"]
@@ -143957,6 +144213,7 @@ def main():
               prove_prese_dalle_10, prove_campagna_p2p_tutti,
               prove_prendi_metodo,
               prove_contanti_zona,
+              prove_riquadro_contanti_sepa,
               prove_banner_ingresso, prove_tour_banner_p2p,
               prove_reputazione_p2p, prove_dati_reputazione_p2p,
               prove_malus_p2p,

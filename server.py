@@ -45524,8 +45524,10 @@ def _euro_sospesi_p2p(con, tg_id, adesso: int) -> int:
         if not g or g > int(adesso) - P2P_EURO_SOSPESI_DOPO_S \
                 or g < int(adesso) - P2P_EURO_SOSPESI_FINO_S:
             continue
-        o = con.execute("SELECT metodi FROM p2p_ordini WHERE ordine=?", (s[0],)).fetchone()
-        if "Contanti" in _metodi_libro(_metodi_lista_p2p(o[0] if o else "")):
+        # (10 ott 2026) il contanti POSSIBILE — la forma dichiarata, o
+        # «Contanti» fra i metodi senza una forma — non conta: e' lo
+        # stesso silenzio del sollecito, che lo ripete al battito
+        if _dati_frase_p2p(con, s[0])["contanti_possibile"]:
             continue
         if _sollecito_euro_p2p_fermo(con, {"ordine": s[0], "giro": giro}):
             continue
@@ -47359,7 +47361,8 @@ def _parti_scambio_p2p(con, ordine: str) -> dict:
 
 
 def _avviso_recapito_p2p(con, ordine, io: int, adesso: int,
-                         attivo: bool = True, ripetuto: bool = False) -> tuple:
+                         attivo: bool = True, ripetuto: bool = False,
+                         contanti=None) -> tuple:
     """Chi vende ha mandato dove ricevere gli euro: a chi dirlo, e con
     che frase. Puro sulla connessione. Torna `(tg_id, testo)`, o
     `(0, perche')` quando non parte niente — e il perche' e' per il
@@ -47407,10 +47410,20 @@ def _avviso_recapito_p2p(con, ordine, io: int, adesso: int,
     giro = parti["giro"]
     # LA DICHIARAZIONE SI SCRIVE, che l'avviso parta o no: e' da qui che
     # la frase della garanzia sa che chi vende il recapito l'ha gia' dato
+    # ...E DICE LA FORMA (10 ott 2026, riquadro-contanti-sepa): `contanti`
+    # e' il SI'/NO del telefono — e' l'appuntamento del contanti di
+    # persona, o un posto dove mandare gli euro? — e finisce in
+    # `dettaglio` ('contanti' | 'euro'; '' da un telefono di ieri, che
+    # non lo dice). Su un ordine «SEPA, Contanti» il libro non basta a
+    # scegliere le parole ne' a tacere i solleciti: lo legge
+    # `_recapito_contanti_p2p`, per `_dati_frase_p2p`. Il recapito, come
+    # sempre, qui non passa.
+    forma = "" if contanti is None else ("contanti" if contanti else "euro")
     con.execute(
         "INSERT OR IGNORE INTO p2p_momenti(ordine, momento, quando, fonte, "
-        "giro, attore, arrivato) VALUES(?,'recapito',?,'telefono',?,'seller',?)",
-        (ordine, adesso, giro, adesso))
+        "giro, attore, dettaglio, arrivato) "
+        "VALUES(?,'recapito',?,'telefono',?,'seller',?,?)",
+        (ordine, adesso, giro, forma, adesso))
     # ...e i solleciti del recapito che aspettavano se ne vanno SUBITO (10
     # ott 2026, sera): il giudice alla scadenza resta, ma cosi' uno scambio
     # andato bene non lascia righe «non parte» nel journal
@@ -47516,10 +47529,14 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
     try:
         # `attivo` manca nei telefoni di ieri, che chiamavano SOLO a
         # scambio attivo: l'assenza vale True
+        # `contanti` (10 ott 2026): la forma del recapito, se il telefono la
+        # dice; qualunque cosa non sia un vero/falso vale «non detta»
+        forma = (d or {}).get("contanti")
         a_chi, testo = _avviso_recapito_p2p(
             con, (d or {}).get("ordine"), user["id"], int(time.time()),
             attivo=(d or {}).get("attivo") is not False,
-            ripetuto=(d or {}).get("ripetuto") is True)
+            ripetuto=(d or {}).get("ripetuto") is True,
+            contanti=forma if isinstance(forma, bool) else None)
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -49480,8 +49497,14 @@ def _sollecito_euro_p2p_fermo(con, r) -> str:
     stato = _stato_scambio_p2p(momenti, "compro", "", "", False)["stato"]
     if stato != "attivo":
         return f"lo scambio non aspetta gli euro (e' «{stato or 'non si sa'}»)"
-    if not _dati_frase_p2p(con, ordine)["recapito_detto"]:
+    dati = _dati_frase_p2p(con, ordine)
+    if not dati["recapito_detto"]:
         return "chi vende non ha ancora detto dove ricevere gli euro"
+    # (10 ott 2026) l'appuntamento dichiarato — o «Contanti» fra i metodi
+    # senza che il telefono abbia detto la forma — e' «forse ci si vede»:
+    # un «invia gli euro» a chi si vede di persona sarebbe una bugia
+    if dati["contanti_possibile"]:
+        return "si puo' pagare in contanti di persona: gli euro non si inviano"
     return ""
 
 
@@ -49587,8 +49610,14 @@ def _solleciti_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
                   SOLLECITI_RECAPITO_S, "sollecito_recapito")
     if momento == "garanzia_pagata" and compra:
         dati = _dati_frase_p2p(con, ordine)
-        if "Contanti" in _metodi_libro(dati["metodi_lista"]):
-            righe.append(f"· Solleciti P2P: {corto} si puo' pagare in contanti di "
+        # (10 ott 2026, riquadro-contanti-sepa) le attese NASCONO salvo il
+        # contanti saputo — il solo «Contanti», o l'appuntamento gia'
+        # dichiarato — e su «SEPA, Contanti» e' il battito a decidere, col
+        # recapito in mano (`_sollecito_euro_p2p_fermo`): prima, con
+        # «Contanti» fra i metodi, a chi pagava con l'IBAN non arrivava
+        # nessun sollecito
+        if dati["contanti"]:
+            righe.append(f"· Solleciti P2P: {corto} si paga in contanti di "
                          "persona: a chi compra nessun sollecito degli euro")
         else:
             in_attesa("euro_sollecito", compra,
@@ -53207,6 +53236,23 @@ def _nome_altro_p2p(con, ordine: str, per: int, adesso: int) -> str:
     return html.escape(str(nome))
 
 
+def _recapito_contanti_p2p(con, ordine: str, giro: int):
+    """LA FORMA DEL RECAPITO DICHIARATO IN QUESTO GIRO (10 ott 2026,
+    riquadro-contanti-sepa): True se l'ultimo recapito che il telefono di
+    chi vende ha dichiarato e' l'appuntamento del contanti di persona,
+    False se e' un posto dove mandare gli euro, None se non c'e' una
+    dichiarazione o viene da un telefono di ieri, che la forma non la
+    dice. L'ULTIMA vince: chi vende puo' correggersi (prima l'IBAN, poi
+    «vediamoci»), e vale quel che ha mandato per ultimo — come nella
+    pagina, dove il recapito e' uno. Pura sulla connessione."""
+    r = con.execute(
+        "SELECT dettaglio FROM p2p_momenti WHERE ordine=? AND giro=? "
+        "AND momento='recapito' AND fonte='telefono' "
+        "ORDER BY quando DESC LIMIT 1", (ordine, int(giro or 0))).fetchone()
+    forma = str((r["dettaglio"] if r else "") or "")
+    return True if forma == "contanti" else False if forma == "euro" else None
+
+
 def _dati_frase_p2p(con, ordine: str) -> dict:
     """I NUMERI DELLA FRASE, da dove stanno: `sats`, `euro` e `metodi`
     dal libro (`p2p_ordini`: sono i tag pubblici del 38383, che mostrod
@@ -53214,10 +53260,21 @@ def _dati_frase_p2p(con, ordine: str) -> dict:
     (gli unici importi che manda). A chiusura detta, i sats di mostrod
     vincono su quelli del libro: sono quelli veri dello scambio. Un
     ordine che il libro non segue da' un dizionario vuoto, e la frase
-    esce senza cifre."""
+    esce senza cifre.
+    IL CONTANTI DI PERSONA, in due gradi (10 ott 2026, riquadro-contanti-
+    sepa): `contanti` e' quel che si SA — la forma del recapito
+    dichiarato dal telefono in questo giro (`contanti_detto`, True/False/
+    None), o, senza, il libro col SOLO «Contanti» — e sceglie le PAROLE
+    («consegnato», l'appuntamento). `contanti_possibile` e' quel che non
+    si puo' escludere — la forma dichiarata, o, senza, «Contanti» fra i
+    metodi — e sceglie i SILENZI: niente sollecito degli euro e niente
+    «euro in sospeso» a chi forse si vede di persona. Prima c'era il solo
+    libro, e su «SEPA, Contanti» le parole erano quelle degli euro anche
+    all'appuntamento, e i solleciti tacevano anche con l'IBAN in mano."""
     dati = {"sats": 0, "euro": "", "metodi": "", "netto": 0, "totale": 0,
             "maker": 0, "preso_da": 0, "recapito_detto": False,
             "tabacchino": False, "contanti": False,
+            "contanti_detto": None, "contanti_possibile": False,
             # la cauzione (1 ott 2026): il lato dell'ordine e i metodi
             # GREZZI servono a dire di chi e'; `cauzione_di` e le due
             # righe accanto le scrive `_avvisi_evento_p2p`
@@ -53265,6 +53322,15 @@ def _dati_frase_p2p(con, ordine: str) -> dict:
         or con.execute("SELECT 1 FROM p2p_avvisi WHERE ordine=? AND giro=? "
                        "AND momento LIKE 'recapito%' LIMIT 1",
                        (ordine, giro)).fetchone())
+    # la forma dichiarata, se c'e', vince sul libro (10 ott 2026)
+    detto = _recapito_contanti_p2p(con, ordine, giro)
+    dati["contanti_detto"] = detto
+    fra_i_metodi = "Contanti" in _metodi_libro(dati["metodi_lista"])
+    if detto is not None:
+        dati["contanti"] = detto
+        dati["contanti_possibile"] = detto
+    else:
+        dati["contanti_possibile"] = fra_i_metodi
     return dati
 
 
@@ -53849,6 +53915,11 @@ def _riga_disputa_p2p(con, r, io: int) -> dict:
         "compra_staff": e_staff(r["compratore"]), "vende_staff": e_staff(r["venditore"]),
         "presa_da_staff": e_staff(r["presa_da"]),
         "sats": dati["sats"], "euro": nudo(dati["euro"]), "metodi": nudo(dati["metodi"]),
+        # E' IN CONTANTI DI PERSONA? (10 ott 2026, riquadro-contanti-sepa)
+        # il contanti possibile: la forma del recapito dichiarato, o
+        # «Contanti» fra i metodi. Il client ci appende la spunta della
+        # cauzione e la regola dell'incontro (`contantiModP2P`)
+        "contanti": bool(dati["contanti_possibile"]),
         # CHI HA MESSO LA CAUZIONE (1 ott 2026): chi ha PRESO secondo
         # mostrod (`apply_to = take` sul nodo) — 'compra' | 'vende' | ''.
         # Il client la propone solo sugli scambi in contanti.
