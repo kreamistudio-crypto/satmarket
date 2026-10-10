@@ -1048,6 +1048,49 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   IL CONTROLLO SUL PROCESSO VIVO dopo un riavvio: `systemctl show
   barattolo -p ActiveEnterTimestamp` e la riga `tr … environ | grep
   UVICORN` qui sopra, che deve dire `UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN=10`.
+- IL COOKIE SUL TUNNEL (10 ott 2026, cantiere cookie-onion): dal `.onion`
+  il login reggeva SOLO con Tor Browser, che tratta l'onion come contesto
+  sicuro; Chrome, Brave e Vanadium con Orbot scartano un cookie «Secure»
+  dato su http, e di là si restava in vetrina. Il server ora dà il cookie
+  di sessione (e il portachiavi, suo gemello) SENZA Secure quando DUE
+  testimoni dicono «tunnel»: l'Host (`ONION_HOST`, il giudice di sempre)
+  e l'header `X-Barattolo-Onion` col segreto `ONION_SEGNALE`, che mette
+  SOLO il blocco onion di Caddy e che il blocco pubblico CANCELLA. Tutto
+  il resto del cookie è uguale (HttpOnly, SameSite=Lax, 30 giorni, `/`).
+  Sul dominio pubblico non cambia niente; senza la leva nel config non
+  cambia niente da nessuna parte (il perché e le prove: Architettura,
+  «IL COOKIE SUL TUNNEL HA DUE TESTIMONI»). LA PROCEDURA, in ordine:
+  1) il segreto, una riga da copiare in due posti: `openssl rand -hex 24`.
+  2) nel config del VPS (`~/satmarket/config.py`, da `barattolo`), accanto
+     a `ONION_HOST`: `ONION_SEGNALE = "INCOLLA_QUI_IL_SEGRETO"` (il valore vero al posto
+     del segnaposto).
+  3) nel Caddyfile (`/etc/caddy/Caddyfile`, da root), prima la copia:
+     `cp -a /etc/caddy/Caddyfile /etc/caddy/Caddyfile.prima-del-cookie-onion`.
+     Nel blocco dell'ONION (quello di `http://ckmc…onion:8081`), DENTRO il
+     suo `reverse_proxy 127.0.0.1:8080 { … }` (è già un blocco dal riavvio
+     dolce), la riga:
+       `header_up X-Barattolo-Onion "<il segreto>"`
+     Nel blocco PUBBLICO (`barattolo.store`), dentro il suo
+     `reverse_proxy … { … }`, la riga:
+       `header_up -X-Barattolo-Onion`
+     (col MENO davanti: cancella l'header se un client da internet lo
+     manda da sé). Il blocco onion deve ascoltare solo dove bussa Tor:
+     `ss -ltnp | grep 8081` deve dire `127.0.0.1:8081`; se dice `*:8081`
+     o `0.0.0.0:8081`, dentro quel blocco anche la riga `bind 127.0.0.1`.
+  4) `caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`,
+     poi `systemctl reload caddy` (con una configurazione storta tiene
+     la vecchia), poi `systemctl restart barattolo` (il config si legge
+     all'avvio).
+  5) LA CONTROPROVA: nel pannello «⚙️ Stato delle leve» dell'admin la
+     leva «Cookie senza Secure sul tunnel Tor» è accesa. Dal telefono,
+     Chrome con Orbot in modalità VPN — nelle impostazioni Android
+     «Private DNS» su Off, o l'indirizzo `.onion` non si risolve — si
+     entra con Nostr dal `.onion` e si RICARICA: si resta dentro. Su
+     barattolo.store tutto com'era: login, ricarica, logout.
+  TORNARE INDIETRO: via la riga `ONION_SEGNALE` dal config (o vuota) e
+  `systemctl restart barattolo` — il cookie torna Secure ovunque anche
+  con le righe di Caddy ancora lì (un testimone solo non basta); le righe
+  si tolgono con la copia di prima e `systemctl reload caddy`.
 - LE SESSIONI CLOUD (24 set 2026, regola di Andrea): una sessione di
   Claude Code che gira nel cloud (claude.ai/code, o una sessione spostata
   lì dal PC) lavora su un ramo `cantiere/<nome>` e apre una PR verso

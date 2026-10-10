@@ -35006,6 +35006,129 @@ def _vetrina_finta(con):
     return con
 
 
+def prove_cookie_onion():
+    """IL COOKIE SUL TUNNEL (10 ott 2026, cantiere cookie-onion). Tor
+    Browser tratta un `.onion` come contesto sicuro e tiene un cookie
+    Secure dato su http; Chrome, Brave e Vanadium con Orbot lo scartano,
+    e di la' il login non reggeva. Sul tunnel il cookie esce senza
+    Secure, e a dire «sei sul tunnel» devono essere DUE testimoni: l'Host
+    e l'header segreto che mette solo il blocco onion di Caddy. Qui si
+    GIRA il giudice vero (`cookie_sicuro` → `dal_tunnel` → `su_onion`)
+    coi contextvar veri, nei sette casi che contano, e si guarda cosa
+    esce DAVVERO dal set_cookie — non solo che la riga ci sia."""
+    print("\n[il cookie sul tunnel Tor]")
+    ONION = "ckmc76bxrwjnja5n4qryeayzj5kqkiixnpmi6ode3e6vdpw4gutlrbyd.onion"
+    SEGRETO = "a3f1c9e2d8b74650a3f1c9e2d8b74650a3f1c9e2d8b74650"
+
+    def cookie_di(amb, host, segnale):
+        """Una richiesta finta: i due contextvar come li scrive il
+        middleware, poi il login dalla porta unica."""
+        amb["_HOST_RICHIESTA"].set(host)
+        amb["_SEGNALE_RICHIESTA"].set(segnale)
+        r = amb["Response"]()
+        amb["apri_sessione"](r, 11, "")
+        return r.scudi["barattolo_sessione"], r.scudi["barattolo_portachiavi"]
+
+    # --- 1) il dominio pubblico: Secure, com'e' sempre stato ---------
+    amb, con, _ = _amb_portachiavi(collaudo=False, onion_host=ONION,
+                                   onion_segnale=SEGRETO)
+    con.execute("INSERT INTO utenti(tg_id,nome,username,negozio,avatar,"
+                "avatar_scelta) VALUES(11,'Alan','alan','neg','','')")
+    con.commit()
+    s, pc = cookie_di(amb, "barattolo.store", "")
+    prova("sul dominio pubblico il cookie di sessione e' Secure", True,
+          s["secure"])
+    prova("...e il portachiavi pure", True, pc["secure"])
+
+    # --- 2) il tunnel coi due testimoni: senza Secure, il resto uguale
+    s2, pc2 = cookie_di(amb, ONION, SEGRETO)
+    prova("sul tunnel, con l'header di Caddy, il cookie NON e' Secure",
+          False, s2["secure"])
+    prova("...e nemmeno il portachiavi", False, pc2["secure"])
+    uguali = {k: v for k, v in s.items() if k != "secure"}
+    prova("tutto il resto e' identico (HttpOnly, SameSite, durata, path)",
+          uguali, {k: v for k, v in s2.items() if k != "secure"})
+    prova("...cioe' httponly, lax, 30 giorni, /",
+          {"httponly": True, "samesite": "lax",
+           "max_age": 30 * 86400, "path": "/"}, uguali)
+    # la separazione fra i due siti e' del browser: un cookie senza
+    # `domain=` vale SOLO per l'host che l'ha dato (host-only), quindi
+    # quello del .onion non viaggia mai verso barattolo.store, ne' il
+    # contrario — e nessuno dei due lo scrive
+    for n in ("imposta_cookie_sessione", "imposta_cookie_portachiavi"):
+        prova(f"{n} non scrive mai un domain= (cookie host-only)", False,
+              "domain" in codice(pezzo(n)))
+
+    # --- 3) un testimone solo non basta ------------------------------
+    s3, _ = cookie_di(amb, ONION, "")
+    prova("l'Host onion da solo (senza header) lascia il cookie Secure",
+          True, s3["secure"])
+    s4, _ = cookie_di(amb, "barattolo.store", SEGRETO)
+    prova("l'header giusto sul dominio pubblico (riga di Caddy "
+          "dimenticata) lascia il cookie Secure", True, s4["secure"])
+    s5, _ = cookie_di(amb, ONION, "1")
+    prova("un header falsificato (valore sbagliato) e' ignorato", True,
+          s5["secure"])
+    s6, _ = cookie_di(amb, ONION + ":8081", SEGRETO)
+    prova("...mentre la porta nell'Host non conta (Tor inoltra dove vuole)",
+          False, s6["secure"])
+
+    # --- 4) le leve spente: com'era ieri -----------------------------
+    amb0, con0, _ = _amb_portachiavi(collaudo=False, onion_host=ONION,
+                                     onion_segnale="")
+    con0.execute("INSERT INTO utenti(tg_id,nome,username,negozio,avatar,"
+                 "avatar_scelta) VALUES(11,'Alan','alan','neg','','')")
+    con0.commit()
+    s7, _ = cookie_di(amb0, ONION, "")
+    prova("senza ONION_SEGNALE nel config il segreto vuoto NON passa "
+          "(\"\" == \"\" sarebbe vero per chiunque)", True, s7["secure"])
+    ambh, conh, _ = _amb_portachiavi(collaudo=False, onion_host="",
+                                     onion_segnale=SEGRETO)
+    conh.execute("INSERT INTO utenti(tg_id,nome,username,negozio,avatar,"
+                 "avatar_scelta) VALUES(11,'Alan','alan','neg','','')")
+    conh.commit()
+    s8, _ = cookie_di(ambh, ONION, SEGRETO)
+    prova("senza ONION_HOST il tunnel non esiste: Secure", True, s8["secure"])
+    ambc, conc, _ = _amb_portachiavi(collaudo=True, onion_host="",
+                                     onion_segnale="")
+    conc.execute("INSERT INTO utenti(tg_id,nome,username,negozio,avatar,"
+                 "avatar_scelta) VALUES(11,'Alan','alan','neg','','')")
+    conc.commit()
+    s9, _ = cookie_di(ambc, "localhost:8080", "")
+    prova("in collaudo il cookie resta senza Secure (siamo su http)",
+          False, s9["secure"])
+
+    # --- 5) le sentinelle sul sorgente -------------------------------
+    for n in ("imposta_cookie_sessione", "imposta_cookie_portachiavi"):
+        prova(f"{n} chiede l'attributo al giudice", True,
+              "secure=cookie_sicuro()" in codice(pezzo(n)))
+    prova("nessun cookie decide Secure da solo con MODALITA_COLLAUDO", False,
+          "secure=not MODALITA_COLLAUDO" in _SORGENTE)
+    g = codice(pezzo("dal_tunnel"))
+    prova("il giudice chiede l'Host a su_onion (il testimone di sempre)",
+          True, "su_onion()" in g)
+    prova("...e confronta il segreto a tempo costante", True,
+          "hmac.compare_digest(" in g)
+    prova("...e un segreto vuoto non passa", True,
+          "if not ONION_SEGNALE or not su_onion():" in g)
+    mw = [r.strip() for r in pezzo("segna_host").splitlines()]
+    prova("il middleware segna l'header del tunnel su ogni richiesta", True,
+          '_SEGNALE_RICHIESTA.set(request.headers.get("x-barattolo-onion", ""))'
+          in mw)
+    prova("il contextvar del segnale nasce vuoto (fail-closed)", True,
+          '_SEGNALE_RICHIESTA = contextvars.ContextVar("segnale_richiesta",'
+          ' default="")' in _SORGENTE)
+    prova("`su_onion` resta quello di ieri: l'Host, nessun header", True,
+          "X-" not in pezzo("su_onion") and "_SEGNALE" not in pezzo("su_onion"))
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    prova("la leva nasce vuota nel config d'esempio", True,
+          '\nONION_SEGNALE = ""\n' in cfg)
+    prova("il pannello delle leve la conosce", True,
+          '"ONION_SEGNALE",' in codice(pezzo("_leve_stato")))
+    prova("la pagina non cambia: il client non sa del segnale", False,
+          "x-barattolo-onion" in open("miniapp.html", encoding="utf-8").read().lower())
+
+
 def prove_onion():
     """BARATTOLO SU TOR (ago 2026). Chi arriva dal servizio nascosto lo
     fa per non far sapere da dove si collega, e finche' la pagina
@@ -102155,9 +102278,11 @@ def prove_finestra():
           False, "vetrinaCursore.split" in mini or "cursore.split" in mini)
 
 
-def _amb_portachiavi():
+def _amb_portachiavi(collaudo=True, onion_host="", onion_segnale=""):
     """Il portachiavi VERO su un database di cartone, piu' un Response
-    che registra i cookie invece di spedirli.
+    che registra i cookie invece di spedirli. Dal cantiere cookie-onion
+    l'ambiente si puo' montare FUORI dal collaudo e con le due leve del
+    tunnel: e' li' che l'attributo Secure ha qualcosa da decidere.
 
     Gira invece di essere guardato, ed e' il punto: le sentinelle
     dicono che la dedup e il tetto ci sono, mai che rispondano giusto —
@@ -102170,10 +102295,12 @@ def _amb_portachiavi():
     class Resp:
         def __init__(self):
             self.cookie = {}
+            self.scudi = {}      # gli attributi (secure, httponly...) per nome
             self.tolti = []
 
         def set_cookie(self, nome, valore, **kw):
             self.cookie[nome] = valore
+            self.scudi[nome] = kw
 
         def delete_cookie(self, nome, **kw):
             self.tolti.append(nome)
@@ -102197,11 +102324,19 @@ def _amb_portachiavi():
                             avatar_scelta TEXT DEFAULT '');
     """)
     amb = {"hashlib": _h, "time": _t, "db": lambda: con,
-           "MODALITA_COLLAUDO": True,
+           "MODALITA_COLLAUDO": collaudo,
            "GIORNI_SESSIONE_WEB": 30, "MAX_ACCOUNT_BROWSER": 3,
            "COOKIE_PORTACHIAVI": "barattolo_portachiavi",
-           "SEP_PORTACHIAVI": ".", "Response": Resp, "secrets": __import__("secrets")}
-    for n in ("crea_sessione", "imposta_cookie_sessione",
+           "SEP_PORTACHIAVI": ".", "Response": Resp, "secrets": __import__("secrets"),
+           # i due testimoni del tunnel (cantiere cookie-onion): i
+           # contextvar VERI, nati vuoti come nel server, e le due leve
+           "contextvars": __import__("contextvars"), "hmac": __import__("hmac"),
+           "ONION_HOST": onion_host, "ONION_SEGNALE": onion_segnale}
+    exec('_HOST_RICHIESTA = contextvars.ContextVar("host_richiesta", default="")\n'
+         '_SEGNALE_RICHIESTA = contextvars.ContextVar("segnale_richiesta", default="")',
+         amb)
+    for n in ("su_onion", "dal_tunnel", "cookie_sicuro",
+              "crea_sessione", "imposta_cookie_sessione",
               "imposta_cookie_portachiavi", "_portachiavi_token",
               "portachiavi_conti", "portachiavi_adottato", "apri_sessione"):
         exec(pezzo(n), amb)
@@ -102337,7 +102472,7 @@ def prove_portachiavi():
     # --- gli scudi: gli stessi del fratello, ne' piu' ne' meno ---
     c = codice(pezzo("imposta_cookie_portachiavi"))
     for scudo in ("httponly=True", "samesite=\"lax\"",
-                  "secure=not MODALITA_COLLAUDO"):
+                  "secure=cookie_sicuro()"):
         prova(f"il portachiavi ha lo scudo {scudo}", True, scudo in c)
 
     # --- IL TOKEN NON ESCE MAI: e' la riga da non ammorbidire ---
@@ -139208,7 +139343,7 @@ def main():
               prove_pagina_acquisto,
               prove_posizione_vetrina, prove_liste_ritorno,
               prove_sbirciata, prove_anteprime, prove_seo,
-              prove_onion,
+              prove_onion, prove_cookie_onion,
               prove_impersonazione, prove_avviso_spedizione,
               prove_tracciamento_nei_messaggi,
               prove_niente_passo_intermedio,

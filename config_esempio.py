@@ -1399,6 +1399,18 @@ PROTEGGI_IFRAME = False
 # prima di migrare la macchina.
 ONION_HOST = ""
 
+# IL SEGNALE DEL TUNNEL (ott 2026): il segreto che il blocco onion del
+# Caddyfile mette nell'header `X-Barattolo-Onion` e che il blocco pubblico
+# cancella (`header_up -X-Barattolo-Onion`). Con ONION_HOST acceso e
+# questo segreto qui e la', il cookie di sessione dato sul .onion esce
+# SENZA l'attributo Secure — l'unico modo perche' il login regga anche su
+# Chrome, Brave e Vanadium con Orbot, che un cookie Secure su http lo
+# scartano (Tor Browser invece lo tiene). Sul dominio pubblico non cambia
+# niente. VUOTO = com'e' sempre stato: il cookie resta Secure ovunque.
+# Un valore lungo e a caso (`openssl rand -hex 24`), lo stesso nel
+# Caddyfile; la procedura sta in PRODUZIONE, «IL COOKIE SUL TUNNEL».
+ONION_SEGNALE = ""
+
 # Quanto resta buono un cambio BTC/EUR che non riusciamo a rinfrescare.
 # L'ultimo cambio letto vive nel database e torna in cache a ogni
 # riavvio (prima la cache nasceva vuota, e un deploy dentro

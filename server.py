@@ -899,6 +899,16 @@ try:
 except ImportError:
     ONION_HOST = ""
 
+# IL SEGNALE DEL TUNNEL (10 ott 2026, cantiere cookie-onion): il segreto
+# che il blocco onion di Caddy mette nell'header `X-Barattolo-Onion` e
+# che il blocco pubblico cancella. Vuoto = la funzione non esiste, e il
+# cookie di sessione esce com'e' sempre uscito. Il perche' sta su
+# `dal_tunnel` e `cookie_sicuro`.
+try:
+    from config import ONION_SEGNALE
+except ImportError:
+    ONION_SEGNALE = ""
+
 # QUANTO VALE UN CAMBIO VECCHIO (ago 2026, da un caso vero: due deploy
 # a quattordici minuti l'uno dall'altro, e in tutti e due CoinGecko
 # muta — un compratore si e' trovato la pagina d'acquisto bloccata da
@@ -1941,12 +1951,38 @@ async def no_iframe(request, call_next):
 # le esegue in un threadpool. E' stato provato, non dedotto.
 _HOST_RICHIESTA = contextvars.ContextVar("host_richiesta", default="")
 
+# IL COOKIE SUL TUNNEL (10 ott 2026, cantiere cookie-onion). Tor Browser
+# tratta un `.onion` come contesto sicuro, e un cookie «Secure» dato su
+# http lo tiene; Chrome, Brave e Vanadium con Orbot no — lo scartano, e
+# di la' il login non regge. Quindi sul tunnel il cookie di sessione (e
+# il portachiavi, suo gemello) esce SENZA Secure. Sul dominio pubblico
+# non cambia niente.
+#
+# CHI DECIDE «questa richiesta viene dal tunnel»: NON l'Host da solo,
+# che da internet chiunque puo' scrivere a mano verso barattolo.store.
+# Devono dire di si' DUE testimoni: l'Host (`su_onion`, lo stesso
+# giudice dello script di Telegram) e un header che mette SOLO il blocco
+# onion di Caddy — `X-Barattolo-Onion: <ONION_SEGNALE>` — e che il blocco
+# pubblico CANCELLA (`header_up -X-Barattolo-Onion`). Il valore e' un
+# SEGRETO del config e non un «1»: cosi' anche il giorno che la riga che
+# cancella sparisse, un header inventato da fuori non basterebbe.
+# Per lo script di Telegram l'header era stato scartato (vedi `su_onion`)
+# e quella decisione resta: li' il peggio che un Host finto puo' fare e'
+# una pagina senza script; qui il peggio sarebbe un cookie senza Secure
+# sul dominio vero, e un testimone solo non basta.
+# FAIL-CLOSED tre volte: senza ONION_SEGNALE nel config, senza un Host
+# onion, senza l'header giusto, il cookie e' quello di sempre (Secure).
+# ⚠️ Il confronto e' `hmac.compare_digest` sui byte, e il segreto VUOTO
+# non passa mai: "" == "" sarebbe vero per chiunque.
+_SEGNALE_RICHIESTA = contextvars.ContextVar("segnale_richiesta", default="")
+
 
 @app.middleware("http")
 async def segna_host(request, call_next):
     """Il primo middleware registrato e' l'ultimo a girare, quindi
     questo si mette in coda: quando la rotta legge, l'host c'e'."""
     _HOST_RICHIESTA.set(request.headers.get("host", ""))
+    _SEGNALE_RICHIESTA.set(request.headers.get("x-barattolo-onion", ""))
     return await call_next(request)
 
 
@@ -1972,6 +2008,26 @@ def su_onion() -> bool:
     # inoltrare su una porta qualunque.
     arrivato = _HOST_RICHIESTA.get("").split(":")[0].strip().lower()
     return bool(arrivato) and arrivato == ONION_HOST.strip().lower()
+
+
+def dal_tunnel() -> bool:
+    """La richiesta corrente e' arrivata dal servizio nascosto E lo
+    conferma il blocco onion di Caddy? Tutt'e due, o e' no (il perche'
+    sta sopra `_SEGNALE_RICHIESTA`)."""
+    if not ONION_SEGNALE or not su_onion():
+        return False
+    return hmac.compare_digest(_SEGNALE_RICHIESTA.get("").encode(),
+                               ONION_SEGNALE.encode())
+
+
+def cookie_sicuro(collaudo: bool = MODALITA_COLLAUDO) -> bool:
+    """L'attributo Secure dei cookie di sessione e portachiavi: sempre,
+    salvo in collaudo (in locale siamo su http) e sul tunnel Tor
+    (`dal_tunnel`). E' l'UNICA cosa che cambia: HttpOnly, SameSite,
+    durata e percorso restano identici su ogni porta."""
+    if collaudo:
+        return False
+    return not dal_tunnel()
 
 
 # ------------------------- DATABASE --------------------------------
@@ -9069,7 +9125,7 @@ def imposta_cookie_sessione(response: Response, token: str):
     response.set_cookie(
         "barattolo_sessione", token,
         max_age=GIORNI_SESSIONE_WEB * 86400, httponly=True,
-        secure=not MODALITA_COLLAUDO,   # in locale siamo su http
+        secure=cookie_sicuro(),   # Secure, salvo collaudo e tunnel Tor
         samesite="lax", path="/")
 
 
@@ -9083,7 +9139,7 @@ def imposta_cookie_portachiavi(response: Response, token_list: list):
     response.set_cookie(
         COOKIE_PORTACHIAVI, SEP_PORTACHIAVI.join(token_list),
         max_age=GIORNI_SESSIONE_WEB * 86400, httponly=True,
-        secure=not MODALITA_COLLAUDO,
+        secure=cookie_sicuro(),
         samesite="lax", path="/")
 
 
@@ -26805,6 +26861,17 @@ def _leve_stato():
                          ".onion la pagina esce SENZA lo script di "
                          "telegram.org — una strada in più, e su quella "
                          "il login è solo Nostr"),
+            _leva("Cookie senza Secure sul tunnel Tor", "ONION_SEGNALE",
+                  bool(ONION_SEGNALE),
+                  acceso="alle richieste che arrivano dal .onion E portano "
+                         "l'header del blocco onion di Caddy il cookie di "
+                         "sessione esce senza Secure: così regge anche su "
+                         "Chrome, Brave e Vanadium con Orbot. Sul dominio "
+                         "pubblico non cambia niente",
+                  spento="sul .onion il login regge solo con Tor Browser: "
+                         "Chrome e i suoi fratelli scartano un cookie "
+                         "Secure dato su http. Serve il segreto qui e nel "
+                         "Caddyfile (PRODUZIONE, «IL COOKIE SUL TUNNEL»)"),
             _leva("Negozi collegati (Shopify e WooCommerce)",
                   "CONNETTORI_NEGOZIO_APERTI",
                   bool(CONNETTORI_NEGOZIO_APERTI),

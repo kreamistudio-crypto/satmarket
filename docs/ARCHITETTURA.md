@@ -22789,6 +22789,69 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   NO, cioè la pagina esce esattamente com'è sempre stata. La PORTA non
   fa parte dell'identità dell'host, e Tor può inoltrare su una porta
   qualunque.
+  IL COOKIE SUL TUNNEL HA DUE TESTIMONI (10 ott 2026, cantiere
+  cookie-onion). Il cookie di sessione nasceva «Secure» ovunque fuori
+  dal collaudo, e con Tor Browser passava: Tor Browser tratta un
+  `.onion` come contesto sicuro. Chrome, Brave e Vanadium con Orbot NO —
+  un cookie Secure dato su http lo scartano, e di là il login non
+  reggeva (si entrava e alla ricarica si era in vetrina). La cura è
+  `cookie_sicuro()`, che dà `secure=` ai due cookie (sessione e
+  portachiavi, lo stesso giudice per tutti e due): False in collaudo,
+  False sul tunnel, True altrove — e NIENT'ALTRO cambia (HttpOnly,
+  SameSite=Lax, durata, path restano identici, e una prova li
+  confronta campo per campo). CHI DICE «TUNNEL» È `dal_tunnel()`, e qui
+  la decisione di sopra NON si rovescia ma si AFFIANCA: per lo script
+  di Telegram il solo Host basta, perché il peggio che un Host finto
+  può fare è una pagina senza script; per il cookie il peggio sarebbe
+  un cookie senza Secure sul dominio vero, e un testimone solo non
+  basta. Quindi devono dire di sì in DUE: `su_onion()` (l'Host, il
+  giudice di sempre, che resta com'era: la sentinella «nessun header
+  X-» su di lui è ancora lì) E l'header `X-Barattolo-Onion` col segreto
+  `ONION_SEGNALE`, che mette SOLO il blocco onion di Caddy e che il
+  blocco pubblico cancella (`header_up -X-Barattolo-Onion`). IL VALORE È
+  UN SEGRETO E NON UN «1», ed è la risposta all'obiezione di sopra («la
+  riga che cancella, qualcuno può toglierla»): se un giorno sparisse,
+  un header inventato da fuori non avrebbe comunque il valore giusto. Il
+  confronto è `hmac.compare_digest` sui byte, e il segreto VUOTO non
+  passa mai — `"" == ""` sarebbe vero per chiunque, ed è la mutazione
+  che la tortura ha visto rossa per prima. FAIL-CLOSED TRE VOLTE: senza
+  `ONION_SEGNALE` nel config, senza un Host onion, senza l'header
+  giusto, il cookie è quello di sempre. L'header viaggia in un secondo
+  contextvar (`_SEGNALE_RICHIESTA`), scritto dallo stesso middleware
+  dell'Host, per la stessa ragione: `imposta_cookie_sessione` non ha la
+  Request in firma e la porta unica `apri_sessione` nemmeno. SCARTATA
+  la porta/listener come segnale: uvicorn ascolta UNA porta e tutt'e
+  due i blocchi di Caddy ci inoltrano; un secondo listener avrebbe
+  voluto un secondo processo o una seconda `app`, per un bit. SCARTATO
+  anche legare la sessione all'host che l'ha aperta: la separazione
+  dei due siti è già del browser (nessun `domain=`, cookie host-only:
+  quello del `.onion` non viaggia mai verso barattolo.store né il
+  contrario), e un token copiato a mano dall'uno all'altro è lo stesso
+  utente nello stesso browser. COSA NON FUNZIONA COMUNQUE su Chromium
+  in http (censito prima di scrivere, poi visto dal vivo col Browser
+  pane su un IP di rete, che è contesto non sicuro come l'onion):
+  `crypto.subtle` non c'è ma NESSUNO lo usa (né la pagina né
+  `vendor/nostr.bundle.js`: Schnorr e NIP-44 sono @noble in puro JS),
+  quindi bunker e nsec firmano e cifrano lo stesso e i `wss://` verso i
+  relay da una pagina http sono permessi — il login Nostr REGGE, ed è
+  stato il giro dal vivo (nsec usa-e-getta, sfida firmata in pagina);
+  `crypto.randomUUID` manca e `idOspite` ha già il ripiego su
+  `getRandomValues`; `navigator.clipboard` manca e ogni copia ha già il
+  suo ripiego (toast col numero, `execCommand`, `?.`); `navigator.share`
+  manca e si ricade sulla copia; il service worker non si registra (il
+  `.catch(() => {})` è già lì: niente dispensa offline, nient'altro);
+  `getUserMedia` manca ma fuori da Telegram la foto passa dall'input con
+  `capture`, che funziona; la geolocalizzazione fallisce e `fine(null)`
+  è già il ripiego; `window.nostr` (NIP-07) non dipende dal contesto
+  sicuro — una content script si inietta anche su http — ma su Android
+  Chrome, Brave e Vanadium NON hanno estensioni, quindi di là è il
+  bunker o la nsec; Amber (`nostrsigner:`) ha la sua guardia che non
+  apre lo schema, com'era già, e non c'entra con http. E CHROME CON
+  ORBOT APRE DAVVERO UN `.onion` in modalità VPN: Orbot risolve i nomi
+  `.onion` dentro il tunnel (la guida di Start9 elenca Chrome e Vanadium
+  fra i browser da mettere nella VPN di Orbot per gli indirizzi `.onion`),
+  a UNA condizione — «Private DNS» di Android su Off, altrimenti la
+  richiesta DNS scavalca la VPN e l'onion non si risolve.
   NEL CLIENT I GIUDICI SONO DUE, e il primo non chiede niente al
   server: `.onion` è un TLD RISERVATO (RFC 7686), nessun dominio vero
   può finire così, quindi `suOnion()` guarda `location.hostname` e
@@ -23361,7 +23424,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'unica porta è Nostr.
   LE TRE VERIFICHE CHE VENGONO PRIMA le ha fatte Andrea sul VPS con
   Tor Browser, e la prima era BLOCCANTE: il cookie di sessione passa
-  (quindi `secure=` non si tocca), i relay rispondono da Tor, il
+  (quindi `secure=` non si tocca — vero fino al 10 ott 2026, quando
+  Chrome con Orbot ha mostrato il rovescio: «IL COOKIE SUL TUNNEL HA DUE
+  TESTIMONI», qui sopra), i relay rispondono da Tor, il
   service worker si registra. Se la prima fosse caduta il cantiere
   avrebbe cambiato forma.
   ⚠️ LA CHIAVE È L'INDIRIZZO: un onion v3 non è registrato da nessuna

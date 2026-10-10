@@ -45456,3 +45456,77 @@ del libro e conti (1.350 passate, 0 fallite), non i collaudi: il
 ritocco è testo e prove. PRIMA DEL PUSH si è guardata anche la CI di
 main, come chiesto da Andrea dopo la rossa non nostra del ritocco
 prima: l'ultima corsa conclusa era verde.
+## Il cookie sul tunnel Tor: senza Secure dal .onion, con due testimoni (10 ott 2026, cantiere cookie-onion, richiesta di Andrea)
+
+Il `.onion` di Barattolo (Caddy sulla 8081 del VPS) funziona con Tor
+Browser, che tratta l'onion come contesto sicuro. Con Chrome, Vanadium e
+Brave più Orbot il login non reggeva: il cookie di sessione è «Secure» e
+su http quei browser lo scartano — si entrava, e alla ricarica si era di
+nuovo in vetrina. La richiesta: sul tunnel il cookie SENZA Secure, tutto
+il resto uguale, e su barattolo.store NIENTE di diverso. Con quattro
+regole: la decisione non può poggiare sul solo Host; i cookie dei due
+siti non devono valere l'uno per l'altro; prima di scrivere, censire
+cosa altro non funziona su Chromium in http e se il login Nostr regge
+senza contesto sicuro; e dire se Chrome con Orbot apre davvero un
+`.onion`, sennò il cantiere non serve.
+
+**LE DUE DOMANDE CHE VENIVANO PRIMA.** Orbot in modalità VPN risolve i
+nomi `.onion` dentro il tunnel: la guida di Start9 mette Chrome e
+Vanadium fra i browser da aggiungere alla VPN di Orbot proprio per gli
+indirizzi `.onion`, con una condizione — «Private DNS» di Android su
+Off, altrimenti la richiesta DNS scavalca la VPN (e quello spiega le
+segnalazioni vecchie «non risolve»). Il login Nostr regge: `crypto.subtle`
+manca su http ma non lo usa nessuno (Schnorr e NIP-44 sono @noble in puro
+JS nel bundle), i `wss://` da una pagina http sono permessi, il
+localStorage è per origine come già sull'onion di Tor Browser. Quel che
+manca su Chromium in http — appunti, `navigator.share`, service worker,
+`getUserMedia`, geolocalizzazione, `randomUUID` — ha già il suo ripiego
+in pagina, riga per riga (l'elenco in Architettura). NIP-07 non c'entra
+col contesto sicuro: su Android quei tre browser non hanno estensioni e
+basta. Quindi si è scritto.
+
+**LA CURA.** `cookie_sicuro()` dà `secure=` ai due cookie (sessione e
+portachiavi): False in collaudo come prima, False sul tunnel, True
+altrove. `dal_tunnel()` vuole DUE testimoni: `su_onion()` (l'Host, il
+giudice di sempre, non toccato) e l'header `X-Barattolo-Onion` con il
+segreto `ONION_SEGNALE` del config, che mette SOLO il blocco onion di
+Caddy e che il blocco pubblico cancella. Il segreto viaggia in un
+secondo contextvar scritto dallo stesso middleware dell'Host. La leva
+nasce vuota (`config_esempio.py`) e compare nel pannello delle leve.
+IL PERCHÉ DEL SEGRETO e non di un «1»: ad agosto l'header di Caddy era
+stato scartato per lo script di Telegram («una riga che qualcuno può
+togliere, e va cancellata sul blocco pubblico»); qui non si rovescia
+quella decisione, si affianca: col valore segreto, anche se la riga che
+cancella sparisse, un header inventato da fuori non basterebbe, e col
+solo Host (che da internet chiunque scrive) nemmeno. Il segreto vuoto
+non passa mai: `"" == ""` sarebbe vero per chiunque.
+
+**STRADE SCARTATE.** La porta/listener come segnale: uvicorn ascolta una
+porta sola e tutt'e due i blocchi di Caddy ci inoltrano. Legare la
+sessione all'host che l'ha aperta: la separazione è già del browser
+(cookie host-only, nessun `domain=`, e una sentinella lo dice), e un
+token copiato a mano dall'uno all'altro è lo stesso utente.
+
+**PROVATO.** `prove_cookie_onion` (27 prove): il giudice vero coi
+contextvar veri in sette casi — pubblico Secure, tunnel coi due
+testimoni senza Secure e il resto identico campo per campo, Host solo,
+header solo (riga di Caddy dimenticata), header sbagliato, porta
+nell'Host, leve spente, collaudo — più le sentinelle (nessun `secure=not
+MODALITA_COLLAUDO` rimasto, `su_onion` senza header, il client che non
+sa del segnale). `_amb_portachiavi` ora si monta anche fuori dal
+collaudo e il `Resp` di cartone registra gli attributi. Tortura: 10
+mutazioni sulla copia, 10 rosse. Dal vivo nel Browser pane (Chromium)
+su un IP di rete, che è contesto non sicuro come l'onion, con un «Caddy
+di cartone» a due porte (8081 aggiunge l'header, 8082 lo cancella) e il
+server fuori collaudo col config d'esempio: dalla 8081, login con una
+nsec usa-e-getta, `Set-Cookie` senza Secure, ricarica, `/api/me` 200 —
+si resta dentro; dalla 8082 `Set-Cookie … Secure`, ricarica, 401 — il
+difetto di oggi riprodotto. Scatti e log in
+`.claude/giri/cookie-onion/`. Suite severa e collaudi della CI: nel
+rapporto.
+
+**NON PROVATO, DA GUARDARE.** Il telefono vero: Chrome con Orbot sul
+`.onion` di produzione dopo le righe nel Caddyfile e la leva nel config
+(la procedura in PRODUZIONE, «IL COOKIE SUL TUNNEL»); `ss -ltnp | grep
+8081` deve dire `127.0.0.1`. Tor Browser deve restare com'era (un
+cookie senza Secure lo tiene lo stesso).
