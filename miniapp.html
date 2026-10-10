@@ -2125,6 +2125,9 @@
   .card-p2p .tag-price .price-sub .p2p-vt-verbo{margin-right:0}
   .card-p2p .p2p-vt-cifra{white-space:nowrap}
   .card-p2p .p2p-vt-premio{justify-content:flex-start}
+  /* la zona di scambio del contanti (10 ott 2026): una riga sola coi
+     puntini — `.luogo` e' quella del comune nelle card del mercatino */
+  .card-p2p .p2p-vt-zona{justify-content:flex-start;font-weight:700}
   .card-p2p .p2p-vt-premio .p2p-badge{margin-top:0;font-size:11.5px}
   /* il cartellino dell'affare piu' grande (ritocco di Andrea), fino a
      riempire la riga: a 320 px la card e' larga 138 e dentro ne restano 114 */
@@ -60172,6 +60175,49 @@ function sezioneZonaNuovoP2P(metodi){
 /* si legge il campo e basta, MAI un render: il dito e' sul campo */
 function cambiaZonaNuovoP2P(campo){
   p2pNuovoZona = String((campo && campo.value) || '');
+  /* chi scrive ha deciso lui: da qui il server non gliela ripropone */
+  p2pZonaToccata = true;
+}
+/* ---- L'ULTIMA ZONA USATA (10 ott 2026, ritocco di Andrea) ----
+   Il campo «Zona di scambio» parte gia' compilato con l'ultima zona che
+   questa persona ha usato, e resta un campo: la cambia quando vuole.
+   LA FONTE E' IL SERVER (`/api/p2p/zona`), non il telefono: cosi' vale
+   anche sul telefono nuovo, e non nasce un terzo posto dove la zona
+   vive. Si chiede UNA volta per sessione, alla prima apertura del
+   foglio; da li' la tiene questa variabile, che ogni pubblicazione
+   aggiorna (`ricordaZonaUltimaP2P`).
+   ⚠️ MAI SOPRA QUEL CHE HA SCRITTO LUI: la risposta puo' arrivare a
+   foglio gia' aperto, e la proposta entra solo se il campo e' vuoto e
+   nessuno l'ha toccato (`proponiZonaNuovoP2P`) — anche chi l'ha
+   svuotato apposta resta col campo vuoto. */
+let p2pZonaUltima = null;     // null = non ancora chiesta; '' = non ne ha mai usata una
+let p2pZonaToccata = false;   // in questo foglio il campo l'ha gia' scritto lui
+function ricordaZonaUltimaP2P(z){
+  const pulita = zonaPulitaP2P(z);
+  if (pulita) p2pZonaUltima = pulita;
+}
+function proponiZonaNuovoP2P(z){
+  const pulita = zonaPulitaP2P(z);
+  if (!pulita || p2pZonaToccata || p2pNuovoZona) return false;
+  p2pNuovoZona = pulita;
+  /* nel campo, se c'e' gia' a schermo: senza ridisegnare il foglio */
+  const c = el('p2pNuovoZona');
+  if (c && !c.value) c.value = pulita;
+  return true;
+}
+/* all'apertura del foglio: la zona nota subito, quella mai chiesta
+   appena il server risponde */
+function preparaZonaNuovoP2P(){
+  p2pZonaToccata = false;
+  if (p2pZonaUltima !== null) { proponiZonaNuovoP2P(p2pZonaUltima); return; }
+  if (typeof chiediZonaUltimaP2P === 'function')
+    chiediZonaUltimaP2P().then(proponiZonaNuovoP2P, () => {});
+}
+/* la zona da dire nel post del canale: quella del MIO ordine appena
+   pubblicato, dalla sua riga — e solo se e' in contanti */
+function zonaCanaleP2P(ordine){
+  const riga = ordine ? ordiniP2P()[ordine] : null;
+  return (riga && riga.mio) ? zonaOrdineP2P(riga) : '';
 }
 /* lo SCAMBIO e' in contanti se il metodo scelto alla presa e' quello, o —
    quando una scelta non c'e' (chi ha pubblicato non sa quale metodo ha
@@ -60275,7 +60321,10 @@ function regolaContantiFoglioP2P(metodi, tetto, lato){
   /* la frase e' quella del PROPRIO lato: chi vende legge cosa deve fare
      lui, non cosa deve fare chi gli paga */
   const regola = lato === 'vendo' ? REGOLA_CONTANTI_VENDE : REGOLA_CONTANTI_COMPRA;
-  return '<div class="hint contanti-regola">💶 <b>Contanti di persona</b>' +
+  /* le banconote del metodo (10 ott 2026, ritocco di Andrea): la riga
+     della regola porta la STESSA icona della voce «Contanti», non il 💶
+     che nel resto dell'app vuol dire «gli euro» */
+  return '<div class="hint contanti-regola">' + P2P_CONTANTI_ICO + ' <b>Contanti di persona</b>' +
     (t > 0 ? ' — al massimo <b>' + fmt(t) + ' €</b> per scambio: sopra, si divide in più ordini.' : '.') +
     ' ' + esc(regola) + ' ' + esc(CONSIGLI_CONTANTI) + '</div>';
 }
@@ -61223,6 +61272,9 @@ function apriNuovoOrdineP2P(metodo){
   p2pNuovoEuro = ''; p2pNuovoEuroMax = ''; p2pNuovoSats = '';
   p2pNuovoMetodi = [];
   p2pNuovoZona = '';
+  /* ...e la zona riparte dall'ULTIMA USATA, chiesta al server (10 ott
+     2026): vedi `preparaZonaNuovoP2P` */
+  if (typeof preparaZonaNuovoP2P === 'function') preparaZonaNuovoP2P();
   /* IL TASTO BARATTOZON (23 set 2026) apre questo stesso foglio col
      metodo gia' scelto, e lo sceglie QUI — prima del disegno e prima
      della morfosi, non dopo: col tabacchino il bottone d'arrivo dice
@@ -63880,6 +63932,7 @@ async function inviaNuovoOrdineP2P(confermato){
      suo nome (`registraOrdiniP2P`), e intanto la mia card la mostra */
   const zonaOrd = typeof zonaDaCampiP2P === 'function' ? zonaDaCampiP2P(campi) : '';
   if (zonaOrd) ord.zona = zonaOrd;
+  if (zonaOrd && typeof ricordaZonaUltimaP2P === 'function') ricordaZonaUltimaP2P(zonaOrd);
   /* I TRE DATI DEL TABACCHINO STANNO SULLA RIGA (set 2026), e non
      nel ricordo per forma: sono di QUESTO ordine, e partono da soli
      verso chi compra appena si sa chi e' (`recapitoDaAutoInvio` li
@@ -67820,6 +67873,11 @@ function cardVetrinaP2P(o){
     : sats > 0 ? '<span class="p2p-vt-verbo">' + verboSats + '</span><span class="p2p-vt-cifra">≈ '
                  + fmt(sats) + ' sats</span>' : '';
   const metodi = (o.metodi || []).map(m => esc(metodoBaseP2P(m))).join(', ');
+  /* LA ZONA DI SCAMBIO DEL CONTANTI (10 ott 2026): lo stesso «📍» del
+     libro, su una riga sua sotto i metodi, per gli ordini che ce
+     l'hanno; una riga sola coi puntini (la card e' stretta), e per
+     intero nell'etichetta che si legge ad alta voce */
+  const zona = typeof zonaOrdineP2P === 'function' ? zonaOrdineP2P(o) : '';
   const premio = affaroneP2P(o) || badgePremioP2P(o);
   const lato = compro ? 'Compra BTC' : 'Vendi BTC';
   /* L'ETICHETTA DICE ANCHE L'ANGOLO DEL VOLTO (7 ott 2026, richiesta di
@@ -67829,7 +67887,8 @@ function cardVetrinaP2P(o){
      `codaVoceVolto` dalla cache, e `ridisegnaVolti` la riscrive quando
      il volto arriva in ritardo. */
   const voce = lato + ', ' + verboEuro.toLowerCase() + ' ' + euro + ' euro'
-    + (metodi ? ', ' + (o.metodi || []).map(metodoBaseP2P).join(', ') : '');
+    + (metodi ? ', ' + (o.metodi || []).map(metodoBaseP2P).join(', ') : '')
+    + (zona ? ', zona ' + zona : '');
   const chiave = chiaveVolto('p2p:' + o.id);
   return `<div class="card card-p2p${tab ? ' card-p2p-bz' : ''}" data-p2p="${esc(o.id)}" role="button" tabindex="0"
       data-voce-di="${esc(chiave)}" data-voce="${esc(voce)}"
@@ -67843,6 +67902,7 @@ function cardVetrinaP2P(o){
       </div>
       <div class="info">
         <div class="title">${metodi || 'Scambio P2P'}</div>
+        ${zona ? `<div class="meta p2p-vt-zona" title="Zona di scambio indicativa"><span class="luogo">📍 ${esc(zona)}</span></div>` : ''}
         <div class="meta p2p-vt-premio">${premio}</div>
       </div>
     </div>`;
@@ -70521,11 +70581,41 @@ async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine){
   /* l'id del mio ordine (27 set 2026): il server rifa' la fotografia
      subito e sa quale aspettare — riprova solo se non c'e' ancora */
   if (ordine) corpo.ordine = String(ordine);
+  /* la zona di scambio del contanti (10 ott 2026): la stessa «📍» della
+     card, dalla riga del mio ordine. E' pubblica — sta sulla card — e
+     senza contanti o senza zona la chiave non c'e' */
+  const zona = typeof zonaCanaleP2P === 'function' ? zonaCanaleP2P(ordine) : '';
+  if (zona) corpo.zona = zona;
   try {
     await fetch(`${API_BASE}/p2p/canale`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
       body: JSON.stringify(corpo)});
   } catch(e){}
+}
+/* L'ULTIMA ZONA USATA, CHIESTA AL SERVER (10 ott 2026): sta qui accanto
+   al canale, fuori dal motore e fuori dal blocco del contanti, perche'
+   e' una chiamata vera al server di casa. Una volta per sessione: un
+   giro fallito (rete, 409) torna '' e non timbra niente, cosi' la
+   prossima apertura del foglio ci riprova. Chi la usa e'
+   `preparaZonaNuovoP2P`. */
+let p2pZonaUltimaGiro = null;
+async function chiediZonaUltimaP2P(){
+  if (DEMO || VETRINA || !myTgId) return '';
+  if (p2pZonaUltima !== null) return p2pZonaUltima;
+  if (p2pZonaUltimaGiro) return p2pZonaUltimaGiro;
+  p2pZonaUltimaGiro = (async () => {
+    try {
+      const r = await fetch(`${API_BASE}/p2p/zona`, {cache: 'no-store',
+        headers: {'X-Tg-Init-Data': authHdr()}});
+      if (!r.ok) return '';
+      const d = await r.json();
+      /* una pubblicazione arrivata nel frattempo vince: e' piu' nuova */
+      if (p2pZonaUltima === null) p2pZonaUltima = zonaPulitaP2P(d && d.zona);
+      return p2pZonaUltima;
+    } catch(e) { return ''; }
+    finally { p2pZonaUltimaGiro = null; }
+  })();
+  return p2pZonaUltimaGiro;
 }
 
 /* STA QUI, FUORI DAL MOTORE E FUORI DAL MAZZO, ed e' un patto: il

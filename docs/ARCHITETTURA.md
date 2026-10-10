@@ -29875,8 +29875,21 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   verde solo dentro `.p2p-paga`. DUE GIUDICI sulla scatola dei metodi:
   `soloMarchiP2P` (diventa l'insegna navy) e `iconaMetodiP2P` (resta un
   nome da intestare col 💳?). I ganci nei pezzi che c'erano passano da
-  un `typeof`. Prove: `prove_contanti_zona` e la coda di
-  `prove_p2p_libro`.
+  un `typeof`. L'ULTIMA ZONA USATA: il foglio la propone nel campo
+  all'apertura (`preparaZonaNuovoP2P` → `proponiZonaNuovoP2P`, mai sopra
+  quel che l'utente ha scritto: `p2pZonaToccata`), presa dal server con
+  `GET /api/p2p/zona` (`_zona_ultima_p2p`: il suo ordine da maker più
+  recente con una zona; nessun parametro, gate della persona, no-store)
+  una volta per sessione (`chiediZonaUltimaP2P`, `p2pZonaUltima`) e
+  aggiornata a ogni pubblicazione (`ricordaZonaUltimaP2P`); niente in
+  localStorage. FUORI DAL LIBRO: la card «Scambi P2P» di Esplora
+  (`cardVetrinaP2P`, riga `p2p-vt-zona` e coda dell'etichetta) e il post
+  del canale (`annunciaCanaleP2P` mette `zona` nel corpo da
+  `zonaCanaleP2P`; `/api/p2p/canale` la tiene solo col contanti e
+  pulita; `_caption_canale_p2p(..., zona)` aggiunge «📍 zona» sotto il
+  metodo). La riga «Contanti di persona» (`regolaContantiFoglioP2P`)
+  porta la stessa icona del metodo. Prove: `prove_contanti_zona`, la
+  coda di `prove_p2p_libro` e `prove_card_p2p_vetrina`.
 
 - LA CASSA DI RISONANZA SU X (9 ott 2026). I post di Barattolo su Nostr
   escono anche su X, dal server: un orologio in sottofondo

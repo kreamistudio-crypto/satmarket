@@ -43864,10 +43864,11 @@ giudice solo sono emendate, col perché.
 `typeof`, come il resto del blocco del contanti: i banchi di ieri
 girano senza portarsi dietro il blocco nuovo. `_registra_ordini_p2p`
 NON ha cambiato firma: la zona ha la sua funzione, chiamata dalla rotta
-subito dopo. Il campo riparte vuoto a ogni apertura del foglio, come gli
-altri. La riga piccola sta nel «sotto» della sezione: dentro la riga
-dell'icona lo spillo scendeva a metà (visto al primo giro di scatti).
-La zona NON entra nel messaggio al coordinatore né nel post del canale.
+subito dopo. La riga piccola sta nel «sotto» della sezione: dentro la
+riga dell'icona lo spillo scendeva a metà (visto al primo giro di
+scatti). La zona NON entra nel messaggio al coordinatore. (Il campo che
+ripartiva vuoto e il post del canale senza zona sono cambiati la stessa
+mattina: vedi «I tre ritocchi» in fondo a questa voce.)
 
 **PROVATO.** `prove_contanti_zona` (63 righe): la pulizia sul server e
 nel client, uguale; il database vero (la riga di chi pubblica sì, quella
@@ -43911,3 +43912,75 @@ pubblicato dopo il deploy esca col `pm` «Contanti» e con la cauzione
 com'era (il messaggio non è cambiato, ma si guarda). Una pagina rimasta
 aperta dal deploy di prima pubblica in contanti senza zona finché non si
 ricarica: è un ordine «di prima», e la card non mostra niente.
+
+**I TRE RITOCCHI (10 ott 2026, stessa mattina, prima del push: richiesta
+di Andrea dopo il primo rapporto).**
+1) LA RIGA DELLA REGOLA COL 💵. «Contanti di persona», nel foglio e nel
+dettaglio (è la stessa funzione, `regolaContantiFoglioP2P`), porta le
+banconote del metodo dalla costante `P2P_CONTANTI_ICO`, non più il 💶
+che nel resto dell'app vuol dire «gli euro». NON toccata la testa della
+regola nella pagina dello scambio (`contanti-regola-forte`), che non
+era nella richiesta: lì il 💶 resta.
+2) L'ULTIMA ZONA USATA. Il campo «Zona di scambio» parte già compilato
+con l'ultima zona che quella persona ha usato, e resta un campo: la
+cambia quando vuole. LA FONTE È IL SERVER, come chiesto: una rotta
+piccola, `GET /api/p2p/zona`, senza parametri (si chiede solo di sé),
+con lo stesso gate di `/api/p2p/ordini` e senza cache;
+`_zona_ultima_p2p` legge la zona del suo ordine da maker più recente.
+Niente nel telefono: nessuna chiave in localStorage, quindi vale anche
+sul telefono nuovo e «dimentica il profilo» la porta via con le righe.
+Il client la chiede UNA volta per sessione, alla prima apertura del
+foglio (`chiediZonaUltimaP2P`, accanto al canale: è una chiamata vera
+al server e sta fuori dal blocco del contanti); da lì la tiene
+`p2pZonaUltima`, che ogni pubblicazione aggiorna. LA REGOLA CHE CONTA:
+la proposta non scrive mai sopra quel che ha scritto lui — entra solo
+se il campo è vuoto e nessuno l'ha toccato (`proponiZonaNuovoP2P`,
+`p2pZonaToccata`), anche quando la risposta arriva a foglio già aperto,
+e chi svuota il campo apposta lo ritrova vuoto. Un server che dice no o
+una rete giù lasciano il campo vuoto e non timbrano niente: la prossima
+apertura riprova. SCARTATO: chiederla a ogni apertura (una pubblicazione
+appena fatta arriva al server dopo la risposta del coordinatore, e la
+risposta vecchia avrebbe coperto la zona nuova), e infilarla in `/api/me`
+(un dato del P2P in tasca a ogni pagina del mercatino).
+3) LA ZONA SU ESPLORA E NEL CANALE, con lo stesso «📍», solo per gli
+ordini in contanti che ce l'hanno. Sulla card «Scambi P2P» è una riga
+sua sotto i metodi (`p2p-vt-zona`, una riga coi puntini come il comune
+delle card del mercatino; per intero nell'etichetta che si legge ad
+alta voce); il giudice è lo stesso `zonaOrdineP2P` e le zone arrivano
+con la fotografia, che le dà a tutti. Nel post del canale è la riga
+«📍 Milano centro» sotto «💳 Contanti»: il client la mette nel corpo
+dalla riga del suo ordine (`zonaCanaleP2P`; la firma di
+`annunciaCanaleP2P` non cambia), la rotta la tiene solo se fra i metodi
+c'è «Contanti» a parola intera e solo pulita — una zona storta non è un
+400, il post esce senza — e `_caption_canale_p2p` la scappa come il
+metodo. Senza zona il post è quello di ieri, parola per parola.
+PROVATO: in `prove_contanti_zona` altre 29 righe (92 in tutto) — la riga
+col 💵 dalla costante; l'ultima zona sul database vero (la più recente,
+non di un altro, non da maker, il pari merito, dopo «dimentica») e la
+rotta; un banco node col server di cartone che conta le domande (nota,
+cambiata, svuotata, mai usata, una domanda sola con due aperture, la
+risposta in ritardo che non sovrascrive, il 409, la rete giù, la zona
+storta, il ricordo dopo la pubblicazione, il campo non ancora a
+schermo); la caption vera con e senza zona e la zona avvelenata; la
+rotta del canale. In `prove_card_p2p_vetrina` la card vera di Esplora
+(contanti con zona, di prima, due metodi, SEPA e Barattozon a zona
+dichiarata, zona avvelenata). Tre banchi tenuti in pari per la costante
+dell'icona, una sentinella emendata (la chiamata della caption).
+TORTURA dei ritocchi sulla copia: venti difetti messi apposta, venti
+morti (diciannove con una riga rossa, uno facendo esplodere la prova).
+DAL VIVO, stessa ricetta del primo giro, col canale di cartone (in
+collaudo il bot stampa e non chiama): alla prima apertura il campo è
+vuoto; pubblicato «Milano centro», il corpo della POST al canale porta
+la zona e il post simulato esce con «💳 Contanti / 📍 Milano centro»; su
+una PAGINA NUOVA (nessuna memoria) il campo nasce «Milano centro» con
+una sola domanda al server e niente in localStorage; nel tema scuro la
+si cambia in «Monza e Brianza», si pubblica, e la pagina nuova propone
+quella; la riga della regola dice 💵 nel foglio e nel dettaglio; le
+card di Esplora (seminate nella fila con le zone prese dal server)
+mostrano la riga solo sulle due in contanti con zona, tutte alte
+uguali. Otto scatti in più in `.claude/giri/contanti-zona/` (R1, R2,
+R3).
+NON PROVATO, DA GUARDARE: la fila di Esplora con la fotografia VERA del
+server (nel giro il relay è morto e la fotografia è vuota: le card sono
+state disegnate dalla pagina con le funzioni vere); il post nel canale
+Telegram vero.

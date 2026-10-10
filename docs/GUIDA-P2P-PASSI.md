@@ -85,7 +85,8 @@ ordini**, **premio/sconto** (lo scostamento dal prezzo di mercato).
      «Attivo» / «Spento».
 4. **Il canale Telegram «Barattolo Vetrina»**: ogni ordine pubblicato
    esce come post «🔁 **Compra BTC su Barattolo**» (o «Vende BTC»), «💶
-   <cifra> €», «🏷️ <premio>» (solo Barattozon), «💳 <metodo>», «🔒 Sats
+   <cifra> €», «🏷️ <premio>» (solo Barattozon), «💳 <metodo>», «📍
+   <zona>» (solo in contanti, se c'è), «🔒 Sats
    bloccati in un deposito di garanzia fino allo scambio», il link «🫙
    Apri lo Scambio P2P su Barattolo», la firma di chi l'ha pubblicato e
    «#p2p #barattolo».
@@ -533,7 +534,7 @@ le sezioni in quest'ordine:
 2. «Come vuoi inviare — puoi sceglierne più di uno» / «Come vuoi
    ricevere — puoi sceglierne più di uno»: la tendina «Seleziona metodi
    di pagamento», con le voci da spuntare (✓). Barattozon c'è solo
-   vendendo, e da solo (§7). Coi contanti compare la regola: «💶
+   vendendo, e da solo (§7). Coi contanti compare la regola: «💵
    **Contanti di persona** — al massimo **250 €** per scambio: sopra, si
    divide in più ordini. <regola> Vedetevi in un posto pubblico e di
    giorno — un bar, un incontro bitcoin —, contate le banconote insieme, e
@@ -674,10 +675,13 @@ contanti» (contanti di persona), «✅ Ho pagato al tabacchino»
   di scambio» col campo «Città o zona, es. Milano centro» e la riga
   «Solo indicativa: non scrivere il tuo indirizzo». È obbligatoria, al
   massimo 40 caratteri: senza, «⚡ Pubblica ordine» avvisa «Scrivi la
-  zona di scambio: una città o una zona, come «Milano centro»». Poi si
-  legge sulla card del libro, sotto i metodi, e nel dettaglio: «📍
-  Milano centro». Gli ordini in contanti pubblicati prima non la
-  mostrano. Sulle card la voce è un'etichetta verde, «💵 Contanti».
+  zona di scambio: una città o una zona, come «Milano centro»». Dalla
+  seconda volta il campo parte già compilato con l'ultima zona usata, e
+  si può cambiare. Poi si legge sulla card del libro, sotto i metodi,
+  nel dettaglio, sulla card «Scambi P2P» della home e nel post del
+  canale: «📍 Milano centro». Gli ordini in contanti pubblicati prima
+  non la mostrano. Sulle card del libro la voce è un'etichetta verde,
+  «💵 Contanti».
 - **La cauzione** (solo se accesa: leva `P2P_CAUZIONE` E coordinatore
   che la chiede; sul nodo: 3% dei sats, almeno 1.000 sats, solo a chi
   PRENDE, solo col metodo «Contanti»):

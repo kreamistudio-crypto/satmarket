@@ -13668,13 +13668,20 @@ def contanti_zona_js(mini):
     `sezioneNuovoP2P` e `p2pNuovoZona`, e chi non la chiama non li deve."""
     return (_riga_js(mini, "const P2P_CONTANTI = ") + _riga_js(mini, "const P2P_ZONA_MAX = ")
             + _riga_js(mini, "const P2P_CONTANTI_ICO = ") + _riga_js(mini, "let p2pZone = ")
+            # (10 ott 2026, i ritocchi) l'ultima zona usata
+            + _riga_js(mini, "let p2pZonaUltima = ") + _riga_js(mini, "let p2pZonaToccata = ")
             + "".join(_fn_js(mini, f) for f in (
                 "function contantiAManoP2P(metodi){", "function zonaPulitaP2P(t){",
                 "function giudiceZonaP2P(zona, metodi){", "function zonaDaCampiP2P(campi){",
                 "function zonaOrdineP2P(o){", "function zoneDaDichiarareP2P(ids){",
                 "function rigaZonaP2P(o){", "function zonaDettP2P(o){",
                 "function etichettaContantiP2P(m){", "function sezioneZonaNuovoP2P(metodi){",
-                "function cambiaZonaNuovoP2P(campo){")))
+                "function cambiaZonaNuovoP2P(campo){",
+                # (10 ott 2026, i ritocchi) `proponiZonaNuovoP2P` vuole `el`
+                # e `preparaZonaNuovoP2P` chiede `chiediZonaUltimaP2P` dietro
+                # un typeof: chi non le chiama non deve niente
+                "function ricordaZonaUltimaP2P(z){", "function proponiZonaNuovoP2P(z){",
+                "function preparaZonaNuovoP2P(){", "function zonaCanaleP2P(ordine){")))
 
 
 # LA BOLT11 VERA del 16 set 2026: 7468 sats, scadenza 3600 s, cltv 80,
@@ -57022,7 +57029,7 @@ function aggiornaFrecce(id){ FRECCE.push(id); }
         + pezzo_js(mini, "function nettoLatoP2P(o, sats){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function idMostroVero(id){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function prendiCambiPubP2P(m){", "\n}\n") + "\n}\n" \
-        + zone_ricevute_js(mini) \
+        + contanti_zona_js(mini) + _fn_js(mini, "function prendiZoneP2P(m){") \
         + pezzo_js(mini, "function prendiFacceP2P(facce, chiesti){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function tagValore(ev, nome){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function tagValori(ev, nome){", "\n}\n") + "\n}\n" \
@@ -57062,6 +57069,17 @@ out.muto = cardVetrinaP2P(O('m1', 'sell', 10));
 ricordaVolto('p2p:ig1', {ignoto: true});
 out.ignoto = cardVetrinaP2P(O('ig1', 'sell', 10));
 cambioVivo = true; eurPerSat = 0.00075;
+/* LA ZONA DI SCAMBIO DEL CONTANTI (10 ott 2026): «📍» sulla card di
+   Esplora, solo per gli ordini in contanti che ce l'hanno */
+p2pZone = {cz1: 'Milano centro', cz3: 'Bergamo e provincia', sz1: 'Zona su un SEPA',
+           bz9: 'Zona su Barattozon', vz1: '<b>via Roma 1</b>'};
+out.zonaCash = cardVetrinaP2P(O('cz1', 'sell', 50, {metodi: ['Contanti']}));
+out.zonaVecchio = cardVetrinaP2P(O('cz2', 'sell', 50, {metodi: ['Contanti']}));
+out.zonaMisto = cardVetrinaP2P(O('cz3', 'sell', 50, {metodi: ['SEPA', 'Contanti']}));
+out.zonaSepa = cardVetrinaP2P(O('sz1', 'sell', 50, {metodi: ['SEPA']}));
+out.zonaBz = cardVetrinaP2P(O('bz9', 'sell', 23.47, {sats: 30000, metodi: ['Contanti al tabacchino 23.47']}));
+out.zonaVeleno = cardVetrinaP2P(O('vz1', 'sell', 50, {metodi: ['Contanti']}));
+p2pZone = {};
 /* QUALI ORDINI */
 LAPIDI = new Set(['lap']);
 const libro = {ordini: [
@@ -57329,6 +57347,30 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
 
     def c(k):
         return o[k]
+    # LA ZONA DI SCAMBIO DEL CONTANTI SULLA CARD DI ESPLORA (10 ott 2026,
+    # cantiere contanti-zona, i ritocchi): lo stesso «📍» del libro, su una
+    # riga sua sotto i metodi; nell'etichetta del bottone per intero.
+    _zr = ('<div class="meta p2p-vt-zona" title="Zona di scambio indicativa">'
+           '<span class="luogo">📍 %s</span></div>')
+    prova("la card di Esplora di un ordine in contanti dice la zona, sotto i metodi e nell'etichetta",
+          [True, True],
+          ['<div class="title">Contanti</div>\n        ' + _zr % "Milano centro" in o["zonaCash"],
+           'data-voce="Compra BTC, invia 50 euro, Contanti, zona Milano centro"' in o["zonaCash"]])
+    prova("...anche fra due metodi", True,
+          '<div class="title">SEPA, Contanti</div>\n        ' + _zr % "Bergamo e provincia" in o["zonaMisto"])
+    prova("...un ordine in contanti di prima, senza zona, non mostra niente e resta la card di sempre",
+          [False, False, True, True],
+          ["p2p-vt-zona" in o["zonaVecchio"], "📍" in o["zonaVecchio"],
+           'data-voce="Compra BTC, invia 50 euro, Contanti"' in o["zonaVecchio"],
+           '<div class="title">Contanti</div>\n        \n' in o["zonaVecchio"]])
+    prova("...SOLO SUI CONTANTI: un SEPA e Barattozon non la prendono nemmeno a zona dichiarata",
+          [False, False, False, False],
+          ["p2p-vt-zona" in o["zonaSepa"], "zona" in o["zonaSepa"].split("data-voce=")[1].split('"')[1],
+           "p2p-vt-zona" in o["zonaBz"], "📍" in o["zonaBz"]])
+    prova("...le card degli altri metodi sono rimaste com'erano", [False, False],
+          ["p2p-vt-zona" in o["vende"], "📍" in o["vende"]])
+    prova("...e la zona di uno sconosciuto esce scappata, nel testo e nell'etichetta", [True, False],
+          ["📍 &lt;b&gt;via Roma 1&lt;/b&gt;</span>" in o["zonaVeleno"], "<b>via" in o["zonaVeleno"]])
     # LE FRECCE DELLA FILA (6 ott 2026): ogni disegno della fila riallinea
     # le SUE frecce — sei card o due cambiano quanto c'e' da scorrere, e
     # senza questa riga resterebbero come le ha lasciate il disegno prima
@@ -61522,6 +61564,8 @@ def prove_p2p_dettaglio():
     # le costanti e le due variabili del foglio: dal client, mai ribattute
     for riga in ("const P2P_VALUTA = ", "const P2P_VALUTE = ",
                  "const P2P_CONTANTI = ", "const REGOLA_CONTANTI_COMPRA = ",
+                 # (10 ott 2026) le banconote nella riga della regola
+                 "const P2P_CONTANTI_ICO = ",
                  "const REGOLA_CONTANTI_VENDE = ", "const CONSIGLI_CONTANTI = ",
                  "const P2P_GLIFI = ", "const P2P_ULTIMO_GIORNO_S = ",
                  "const P2P_ANELLO_VICINA_S = ", "const P2P_ANELLONE_TACCHE = ",
@@ -75230,7 +75274,8 @@ def prove_p2p_canale():
           and "isinstance(premio, bool) or not isinstance(premio, int)" in rotta
           and "abs(premio) > P2P_PREMIO_CANALE_MAX" in rotta
           and 'raise HTTPException(400, "Premio storto")' in rotta
-          and "_caption_canale_p2p(lato, euro, metodo, venditore, premio)" in rotta)
+          # (10 ott 2026) ...e in coda la zona di scambio del contanti
+          and "_caption_canale_p2p(lato, euro, metodo, venditore, premio, zona)" in rotta)
     prova("...e la scala e' quella del cursore del client", True,
           "P2P_PREMIO_CANALE_MAX = 20\n" in _SORGENTE
           and "const P2P_PREMIO_TAB_MAX = 20;" in open("miniapp.html", encoding="utf-8").read())
@@ -84832,6 +84877,8 @@ def prove_pubblica_metodo_prima():
         + "\n".join(_riga(n) for n in (
             "P2P_VALUTE", "P2P_METODI", "P2P_TABACCHINO", "P2P_TABACCHINO_PM",
             "P2P_CONTANTI", "REGOLA_CONTANTI_COMPRA", "REGOLA_CONTANTI_VENDE", "CONSIGLI_CONTANTI",
+            # (10 ott 2026) le banconote nella riga della regola
+            "P2P_CONTANTI_ICO",
             "P2P_PREMIO_MAX", "P2P_POLLICE", "P2P_PREMIO_TAB_MAX", "P2P_PAYCODE_MAX_EURO",
             "P2P_PAYCODE_MIN_S", "P2P_PAYCODE_MAX_S", "P2P_TABACCHINO_VITA_S",
             "P2P_TABACCHINO_MARGINE_S", "P2P_MARGINE_HOLD_BLOCCHI", "P2P_SEC_PER_BLOCCO", "P2P_CAMPO_TAPPA_TAB", "P2P_SPIA_ATTESA_MS", "p2pSpiaTab",
@@ -124035,6 +124082,8 @@ def prove_contanti_a_mano():
         return
     pezzi = "\n".join([
         riga_js("const P2P_CONTANTI = "), riga_js("const P2P_FINALI = "),
+        # (10 ott 2026) le banconote nella riga della regola
+        riga_js("const P2P_CONTANTI_ICO = "),
         fn("function contantiAManoP2P(metodi){"), fn("function scambioInContantiP2P(o){"),
         fn("function giudiceContantiP2P(euro, metodi, tetto){"),
         riga_js("const REGOLA_CONTANTI_COMPRA = "), riga_js("const REGOLA_CONTANTI_VENDE = "),
@@ -134870,6 +134919,20 @@ const fmt = n => String(n);
 let ordiniFinti = {};
 function ordiniP2P(){ return ordiniFinti; }
 let p2pNuovoZona = '';
+/* per l'ultima zona usata (i ritocchi): il campo a schermo, e un server
+   di cartone che conta le domande */
+const DEMO = false, VETRINA = false, myTgId = 111, API_BASE = '/api';
+const authHdr = () => 'collaudo:111:Compratore';
+let campoFinto = null;
+const el = id => id === 'p2pNuovoZona' ? campoFinto : null;
+const chieste = [];
+let RISPOSTA = null;
+async function fetch(url, opz){
+  chieste.push([url, Object.keys((opz || {}).headers || {}).join()]);
+  if (!RISPOSTA) throw new Error('rete giu');
+  return {ok: RISPOSTA.ok, json: async () => ({zona: RISPOSTA.zona})};
+}
+const pausa = () => new Promise(r => setTimeout(r, 25));
 __PEZZI__
 const out = {};
 const Q = 'x'.repeat(40), QQ = 'x'.repeat(41);
@@ -134945,7 +135008,71 @@ cambiaZonaNuovoP2P({value: 'Bergamo'});
 out.campo = [p2pNuovoZona];
 cambiaZonaNuovoP2P(null);
 out.campo.push(p2pNuovoZona);
-console.log(JSON.stringify(out));
+/* 9) I RITOCCHI: la riga della regola porta le banconote del metodo */
+out.regola = [regolaContantiFoglioP2P(['Contanti'], 250, 'vendo'), regolaContantiFoglioP2P(['Contanti'], 0, 'compro'),
+              regolaContantiFoglioP2P(['SEPA'], 250, 'vendo')];
+/* 10) la zona nel post del canale: dalla riga del MIO ordine in contanti */
+p2pZone = {};
+ordiniFinti = {[A]: {id: A, mio: true, metodi: ['Contanti'], zona: 'Milano centro'},
+               [B]: {id: B, mio: false, metodi: ['Contanti'], zona: 'Roma'},
+               [C]: {id: C, mio: true, metodi: ['SEPA'], zona: 'Torino'},
+               [D]: {id: D, mio: true, metodi: ['Contanti']}};
+out.canale = [zonaCanaleP2P(A), zonaCanaleP2P(B), zonaCanaleP2P(C), zonaCanaleP2P(D),
+              zonaCanaleP2P(''), zonaCanaleP2P('nuovo:3'), zonaCanaleP2P(undefined)];
+/* 11) l'ultima zona usata: dal server, proposta, mai sopra quel che scrive lui */
+(async () => {
+  const stato = () => [p2pNuovoZona, campoFinto ? campoFinto.value : null];
+  const apri = () => { p2pNuovoZona = ''; campoFinto = {value: ''}; preparaZonaNuovoP2P(); };
+  /* a) gia' nota: proposta subito, senza chiedere */
+  p2pZonaUltima = 'Milano centro'; apri();
+  out.nota = [stato(), chieste.length];
+  /* b) lui la cambia, e resta la sua */
+  cambiaZonaNuovoP2P({value: 'Lecco'});
+  out.cambiata = [p2pNuovoZona, proponiZonaNuovoP2P('Milano centro'), p2pNuovoZona];
+  /* c) svuotata apposta: resta vuota */
+  cambiaZonaNuovoP2P({value: ''});
+  out.svuotata = [proponiZonaNuovoP2P('Milano centro'), p2pNuovoZona];
+  /* d) il server ha gia' detto «mai usata»: niente, e nessuna domanda */
+  p2pZonaUltima = ''; apri();
+  out.maiUsata = [stato(), chieste.length];
+  /* e) mai chiesta: UNA domanda anche con due aperture, e la risposta
+     entra nel campo a foglio aperto, pulita */
+  p2pZonaUltima = null; RISPOSTA = {ok: true, zona: '  Bergamo   e provincia '};
+  apri(); preparaZonaNuovoP2P();
+  out.primaDellaRisposta = stato();
+  await pausa();
+  out.dopoLaRisposta = [stato(), chieste.slice(), p2pZonaUltima];
+  /* f) la seconda apertura non richiede */
+  apri();
+  out.secondaApertura = [stato(), chieste.length];
+  /* g) la risposta arriva DOPO che lui ha scritto: non lo sovrascrive */
+  p2pZonaUltima = null; RISPOSTA = {ok: true, zona: 'Roma'};
+  apri();
+  campoFinto.value = 'Como'; cambiaZonaNuovoP2P(campoFinto);
+  await pausa();
+  out.scrittaPrima = [stato(), p2pZonaUltima];
+  /* h) il server dice no (409) e poi la rete cade: campo vuoto, niente
+     timbro, e alla prossima apertura si riprova */
+  p2pZonaUltima = null; RISPOSTA = {ok: false}; chieste.length = 0;
+  apri(); await pausa();
+  const dopoNo = [stato(), p2pZonaUltima, chieste.length];
+  RISPOSTA = null;
+  apri(); await pausa();
+  out.muto = [dopoNo, stato(), p2pZonaUltima, chieste.length];
+  /* i) una zona storta dal server non entra */
+  RISPOSTA = {ok: true, zona: QQ};
+  apri(); await pausa();
+  out.storta = [stato(), p2pZonaUltima];
+  /* l) pubblicare aggiorna il ricordo; una vuota o storta non lo cancella */
+  ricordaZonaUltimaP2P(' Pavia  centro '); ricordaZonaUltimaP2P(''); ricordaZonaUltimaP2P(QQ);
+  out.ricordo = p2pZonaUltima;
+  /* m) contanti non ancora scelto: il campo non c'e', la proposta sta in
+     memoria e il campo nasce gia' compilato */
+  p2pZonaUltima = 'Milano centro'; p2pNuovoZona = ''; campoFinto = null;
+  preparaZonaNuovoP2P();
+  out.senzaCampo = [p2pNuovoZona, sezioneZonaNuovoP2P(['Contanti']).includes('value="Milano centro"')];
+  console.log(JSON.stringify(out));
+})();
 """
 
 
@@ -135187,7 +135314,12 @@ def prove_contanti_zona():
         fn("function idMostroVero(id){"), fn("function prendiZoneP2P(m){"),
         fn("function interoP2P(testo){"), fn("function centesimiP2P(testo){"),
         fn("function giudiceContantiP2P(euro, metodi, tetto){"),
-        fn("function valeNuovoOrdineP2P(v){")])
+        fn("function valeNuovoOrdineP2P(v){"),
+        # i ritocchi: la riga della regola e la domanda al server
+        _riga_js(mini, "const REGOLA_CONTANTI_COMPRA = "), _riga_js(mini, "const REGOLA_CONTANTI_VENDE = "),
+        _riga_js(mini, "const CONSIGLI_CONTANTI = "),
+        fn("function regolaContantiFoglioP2P(metodi, tetto, lato){"),
+        _riga_js(mini, "let p2pZonaUltimaGiro = "), fn("async function chiediZonaUltimaP2P(){")])
     cart = _tf.mkdtemp(prefix="zona_")
     pb = _os.path.join(cart, "banco.js")
     open(pb, "w", encoding="utf-8").write(BANCO_CONTANTI_ZONA.replace("__PEZZI__", pezzi))
@@ -135272,6 +135404,139 @@ def prove_contanti_zona():
     prova("...scrivere nel campo aggiorna la memoria e basta (nessun ridisegno: il dito e' sul campo)",
           [["Bergamo", ""], False],
           [o["campo"], "render" in fn("function cambiaZonaNuovoP2P(campo){")])
+
+    # ================= I TRE RITOCCHI (10 ott 2026, stessa mattina) =================
+    # --- R1) LA RIGA DELLA REGOLA: 💵 come il metodo, non 💶 -----------------------
+    reg_js = fn("function regolaContantiFoglioP2P(metodi, tetto, lato){")
+    prova("la riga «Contanti di persona» prende l'icona dalla costante del metodo, e il 💶 non c'e' piu'",
+          [True, 0],
+          ["'<div class=\"hint contanti-regola\">' + P2P_CONTANTI_ICO + ' <b>Contanti di persona</b>'" in reg_js,
+           # nel CODICE: il commento che spiega il cambio lo nomina
+           re.sub(r"/\*[\s\S]*?\*/", "", reg_js).count(chr(0x1F4B6))])
+    prova("...nel foglio e nel dettaglio e' la STESSA funzione", [True, True],
+          ["regolaContantiFoglioP2P(p2pNuovoMetodi," in fog,
+           "regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo] : (o.metodi || [])," in mini])
+    prova("...a schermo: «💵 Contanti di persona», per chi vende e per chi compra; senza contanti niente",
+          [True, True, ""],
+          [o["regola"][0].startswith('<div class="hint contanti-regola">💵 <b>Contanti di persona</b> — al massimo <b>250 €</b>'),
+           o["regola"][1].startswith('<div class="hint contanti-regola">💵 <b>Contanti di persona</b>.'),
+           o["regola"][2]])
+
+    # --- R2) L'ULTIMA ZONA USATA: dal server -----------------------------------------
+    exec(pezzo("_zona_ultima_p2p"), amb)
+    ultima = amb["_zona_ultima_p2p"]
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(schema)
+    for riga in (("ord-ult-0001", 111, 1, "Milano centro", 1000),
+                 ("ord-ult-0002", 111, 1, "Bergamo e provincia", 3000),
+                 ("ord-ult-0003", 111, 1, "", 5000),             # piu' nuovo, ma SEPA: senza zona
+                 ("ord-ult-0004", 111, 0, "Non da maker", 9000),  # sua la riga, non l'ha pubblicato lui
+                 ("ord-ult-0005", 222, 1, "Roma", 8000)):         # di un altro
+        con.execute("INSERT INTO p2p_ordini(ordine, tg_id, maker, zona, creato) VALUES(?,?,?,?,?)", riga)
+    prova("l'ultima zona e' quella del suo ordine in contanti PIU' RECENTE: non quella di un altro, "
+          "non una riga non da maker, e un ordine senza zona in mezzo non la cancella",
+          ["Bergamo e provincia", "Roma", ""], [ultima(con, 111), ultima(con, 222), ultima(con, 333)])
+    con.execute("INSERT INTO p2p_ordini(ordine, tg_id, maker, zona, creato) VALUES(?,?,?,?,?)",
+                ("ord-ult-0006", 111, 1, "Lecco", 3000))
+    prova("...e nello stesso secondo vince l'ultima scritta", "Lecco", ultima(con, 111))
+    con.execute("DELETE FROM p2p_ordini WHERE tg_id=111")
+    prova("...«dimentica il profilo» toglie le sue righe, e con loro il ricordo", "", ultima(con, 111))
+    con.close()
+    rz = pezzo("zona_ultima_p2p")
+    prova("la rotta: solo di se' (nessun parametro), stesso gate di chi la scrive, niente cache, niente scritture",
+          [True, True, True, True, False],
+          ['def zona_ultima_p2p(x_tg_init_data: str = Header(""),\n'
+           '                    barattolo_sessione: str = Cookie("")):' in rz,
+           'if not _p2p_per(user["id"])["attivo"]:' in rz,
+           'zona = _zona_ultima_p2p(con, user["id"])' in rz,
+           '"Cache-Control": "no-store, private"' in rz,
+           any(x in codice(_senza_prosa(rz)) for x in ("INSERT", "UPDATE", "DELETE", "commit"))])
+    prova("...ed e' una GET sua, dichiarata prima del libro", True,
+          '@app.get("/api/p2p/zona")\ndef zona_ultima_p2p(' in src
+          and src.index('@app.get("/api/p2p/zona")') < src.index('@app.get("/api/p2p/libro")'))
+    chz = fn("async function chiediZonaUltimaP2P(){")
+    prova("il client la chiede al server (mai al telefono), con la sua identita', fuori dal blocco del contanti",
+          [True, True, False, True],
+          ["fetch(`${API_BASE}/p2p/zona`, {cache: 'no-store'," in chz,
+           "headers: {'X-Tg-Init-Data': authHdr()}" in chz,
+           "localStorage" in chz + fn("function preparaZonaNuovoP2P(){") + fn("function proponiZonaNuovoP2P(z){")
+           + fn("function ricordaZonaUltimaP2P(z){"),
+           mini.index("async function chiediZonaUltimaP2P(){")
+           > mini.index("/* ============ fine del contanti di persona ============ */")])
+    prova("il foglio la prepara a ogni apertura, dopo aver svuotato il campo; e pubblicare la ricorda", [True, True],
+          ["  p2pNuovoZona = '';\n" in fn("function apriNuovoOrdineP2P(metodo){")
+           and fn("function apriNuovoOrdineP2P(metodo){").index("  p2pNuovoZona = '';\n")
+           < fn("function apriNuovoOrdineP2P(metodo){").index(
+               "if (typeof preparaZonaNuovoP2P === 'function') preparaZonaNuovoP2P();"),
+           "if (zonaOrd && typeof ricordaZonaUltimaP2P === 'function') ricordaZonaUltimaP2P(zonaOrd);" in inv])
+    MI, BG = ["Milano centro", "Milano centro"], ["Bergamo e provincia", "Bergamo e provincia"]
+    prova("IL CAMPO PARTE GIA' COMPILATO con l'ultima zona nota, senza chiedere di nuovo", [MI, 0], o["nota"])
+    prova("...e LUI PUO' CAMBIARLA: quel che scrive resta, la proposta non torna", ["Lecco", False, "Lecco"],
+          o["cambiata"])
+    prova("...anche se la svuota apposta", [False, ""], o["svuotata"])
+    prova("chi non ne ha mai usata una parte col campo vuoto, e il server non si richiede", [["", ""], 0],
+          o["maiUsata"])
+    prova("la prima apertura la chiede al server UNA volta (anche con due aperture di fila)...", ["", ""],
+          o["primaDellaRisposta"])
+    prova("...e la risposta entra nel campo a foglio aperto, pulita, senza ridisegnare",
+          [BG, [["/api/p2p/zona", "X-Tg-Init-Data"]], "Bergamo e provincia"], o["dopoLaRisposta"])
+    prova("...la seconda apertura la propone subito e non richiede", [BG, 1], o["secondaApertura"])
+    prova("UNA RISPOSTA IN RITARDO NON SCRIVE SOPRA quel che lui ha gia' scritto", [["Como", "Como"], "Roma"],
+          o["scrittaPrima"])
+    prova("col server che dice no o la rete giu' il campo resta vuoto, e la prossima apertura riprova",
+          [[["", ""], None, 1], ["", ""], None, 2], o["muto"])
+    prova("...e una zona storta dal server non entra nel campo", [["", ""], ""], o["storta"])
+    prova("pubblicare aggiorna il ricordo (pulito); una zona vuota o troppo lunga non lo cancella",
+          "Pavia centro", o["ricordo"])
+    prova("col contanti non ancora scelto la proposta aspetta in memoria, e il campo nasce compilato",
+          ["Milano centro", True], o["senzaCampo"])
+
+    # --- R3) LA ZONA NEL POST DEL CANALE (la card di Esplora: prove_card_p2p_vetrina) ---
+    import html as _html
+    amb_c = {"html": _html, "URL_PUBBLICO": "https://barattolo.store"}
+    exec(next(r for r in src.split("\n") if r.startswith("CHARSET_BECH32")), amb_c)
+    for f in ("_fmt_eur", "_bech32_polymod", "npub_to_hex", "hex_to_npub", "chiave_nostr_provata",
+              "_npub_breve", "_npub_venditore", "_firma_venditore", "_premio_canale_p2p",
+              "_caption_canale_p2p"):
+        exec(pezzo(f), amb_c)
+    cap = amb_c["_caption_canale_p2p"]
+    rosina = {"venditore": "Rosina", "venditore_username": "rosina", "venditore_negozio": "aaa11111"}
+    con_zona = cap("vendo", 50, "Contanti", rosina, None, "Milano centro")
+    prova("il post del canale dice la zona con lo stesso «📍», subito sotto il metodo", True,
+          "\n💳 Contanti\n📍 Milano centro\n🔒 Sats bloccati" in con_zona)
+    prova("...senza zona il post e' quello di ieri, parola per parola", [True, False, True],
+          [cap("vendo", 50, "Contanti", rosina) == cap("vendo", 50, "Contanti", rosina, None, ""),
+           "📍" in cap("vendo", 50, "Contanti", rosina),
+           con_zona.replace("\n📍 Milano centro", "") == cap("vendo", 50, "Contanti", rosina)])
+    prova("...e la zona di un utente esce scappata", [True, False],
+          ["\n📍 &lt;b&gt;x&lt;/b&gt; &amp; y\n" in cap("vendo", 50, "Contanti", rosina, None, "<b>x</b> & y"),
+           "<b>x</b>" in cap("vendo", 50, "Contanti", rosina, None, "<b>x</b> & y")])
+    rc = src[src.index('@app.post("/api/p2p/canale")'):]
+    rc = rc[:rc.index("\n\n\n")]
+    prova("la rotta del canale la tiene SOLO col contanti a parola intera, pulita, e una storta non e' un errore",
+          [True, True, False],
+          # il terzo: fra la lettura della zona e il post non c'e' nessun 400 che la nomini
+          ['zona = _zona_pulita_p2p(d.get("zona")) \\\n        if "Contanti" in _metodi_lista_p2p(metodo) else ""' in rc,
+           "_caption_canale_p2p(lato, euro, metodo, venditore, premio, zona)" in rc,
+           "HTTPException" in rc[rc.index("zona = _zona_pulita_p2p"):rc.index("postato = False")]])
+
+    def _zona_rotta(metodo, zona):
+        return amb["_zona_pulita_p2p"](zona) if "Contanti" in amb["_metodi_lista_p2p"](metodo) else ""
+    prova("...contanti da solo e fra due metodi si'; SEPA, Barattozon, «contanti» minuscolo e 41 caratteri no",
+          ["Milano centro", "Milano centro", "", "", "", ""],
+          [_zona_rotta("Contanti", " Milano  centro "), _zona_rotta("SEPA, Contanti", "Milano centro"),
+           _zona_rotta("SEPA", "Milano centro"), _zona_rotta("Contanti al tabacchino", "Milano centro"),
+           _zona_rotta("contanti", "Milano centro"), _zona_rotta("Contanti", QQ)])
+    ann = fn("async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine){")
+    prova("il client la mette nel corpo dalla riga del suo ordine, e solo se c'e'; la firma non e' cambiata", True,
+          "const zona = typeof zonaCanaleP2P === 'function' ? zonaCanaleP2P(ordine) : '';" in ann
+          and "if (zona) corpo.zona = zona;" in ann
+          and ann.index("if (zona) corpo.zona = zona;") < ann.index("body: JSON.stringify(corpo)"))
+    A1, B1 = "5a1e0000-7777-4a2b-9c3d-0000000000a1", "5a1e0000-7777-4a2b-9c3d-0000000000b2"
+    prova("...la zona del canale: il MIO ordine in contanti si'; uno non mio, un SEPA, uno senza zona, "
+          "un nome provvisorio e il nulla no",
+          ["Milano centro", "", "", "", "", "", ""], o["canale"])
 
 
 def main():

@@ -44137,6 +44137,20 @@ def _zone_p2p(con, ordini) -> dict:
     return fuori
 
 
+def _zona_ultima_p2p(con, tg_id: int) -> str:
+    """L'ULTIMA ZONA USATA da questo account (10 ott 2026, ritocco di
+    Andrea): quella dell'ordine in contanti piu' recente che ha
+    PUBBLICATO lui, o '' se non ne ha mai scritta una. Serve a far
+    partire il campo «Zona di scambio» gia' compilato — dal SERVER e non
+    dal telefono, cosi' vale anche sul telefono nuovo. Solo le sue righe
+    da maker: la stessa porta da cui la zona e' entrata. «Dimentica il
+    profilo» cancella le sue righe di `p2p_ordini`, e con loro questa."""
+    r = con.execute(
+        "SELECT zona FROM p2p_ordini WHERE tg_id=? AND maker=1 AND zona <> '' "
+        "ORDER BY creato DESC, rowid DESC LIMIT 1", (int(tg_id),)).fetchone()
+    return _zona_pulita_p2p(r[0]) if r else ""
+
+
 def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int,
                          pubblicati: bool = False,
                          presi: bool = False,
@@ -44575,6 +44589,28 @@ async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
     finally:
         con.close()
     return {"facce": facce, "cambi": cambi, "zone": zone}
+
+
+@app.get("/api/p2p/zona")
+def zona_ultima_p2p(x_tg_init_data: str = Header(""),
+                    barattolo_sessione: str = Cookie("")):
+    """«Qual e' l'ultima zona di scambio che ho usato?» (10 ott 2026): la
+    chiede il foglio «Pubblica» quando si apre, per proporla nel campo.
+    NESSUN PARAMETRO, il patto di /api/p2p/chiavi e di mio-sconto: si
+    chiede solo di se', e non esiste la sintassi per chiedere di un
+    altro. Stesso gate della persona di /api/p2p/ordini, che e' la rotta
+    da cui la zona entra (409 = silenzio: il campo parte vuoto). Non si
+    scrive niente, e la risposta non si tiene in nessuna cache."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    con = db()
+    try:
+        zona = _zona_ultima_p2p(con, user["id"])
+    finally:
+        con.close()
+    return JSONResponse({"zona": zona},
+                        headers={"Cache-Control": "no-store, private"})
 
 
 @app.get("/api/p2p/libro")
@@ -45844,7 +45880,7 @@ def _premio_canale_p2p(lato: str, premio: int) -> str:
 
 
 def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
-                        premio=None) -> str:
+                        premio=None, zona: str = "") -> str:
     """La caption del post P2P nel canale «Barattolo Vetrina», gemella
     di `_caption_canale` ma per un ordine invece che per un annuncio
     (chiesto da Andrea, set 2026: il P2P deve vedersi in vetrina come
@@ -45872,6 +45908,12 @@ def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
     if premio is not None:
         testo += f"\n🏷️ {_premio_canale_p2p(lato, premio)}"
     testo += f"\n💳 {html.escape(metodo)}"
+    # LA ZONA DI SCAMBIO DEL CONTANTI (10 ott 2026): la stessa riga della
+    # card, «📍 Milano centro», sotto il metodo. Arriva gia' giudicata
+    # dalla rotta (solo col contanti, solo pulita); senza, la caption e'
+    # quella di ieri. Testo di un utente: si scappa come il metodo.
+    if zona:
+        testo += f"\n📍 {html.escape(zona)}"
     testo += "\n🔒 Sats bloccati in un deposito di garanzia fino allo scambio"
     testo += f"\n\n<a href=\"{URL_PUBBLICO}\">🫙 Apri lo Scambio P2P su Barattolo</a>"
     testo += f"\n\n{_firma_venditore(venditore)}"
@@ -45957,6 +45999,11 @@ async def annuncia_ordine_p2p_canale(req: Request,
         if (isinstance(premio, bool) or not isinstance(premio, int)
                 or abs(premio) > P2P_PREMIO_CANALE_MAX):
             raise HTTPException(400, "Premio storto")
+    # la zona di scambio (10 ott 2026): solo se fra i metodi c'e'
+    # «Contanti» a parola intera, e solo pulita. Una zona storta NON e' un
+    # 400: il post esce senza, che la vetrina non deve fermare nessuno.
+    zona = _zona_pulita_p2p(d.get("zona")) \
+        if "Contanti" in _metodi_lista_p2p(metodo) else ""
     postato = False
     # UN POST PER ORDINE, E UNO OGNI DIECI MINUTI PER PERSONA (cura 4, la
     # M3 del secondo audit): il doppione e il raffica NON sono un 429 —
@@ -45980,7 +46027,7 @@ async def annuncia_ordine_p2p_canale(req: Request,
                 "venditore_npub_accesso": (riga["npub_accesso"] if riga else "") or "",
                 "venditore_negozio": (riga["negozio"] if riga else "") or "",
             }
-            caption = _caption_canale_p2p(lato, euro, metodo, venditore, premio)
+            caption = _caption_canale_p2p(lato, euro, metodo, venditore, premio, zona)
             postato = bool(await _manda_post_canale(canale_id(), caption, []))
             if postato and buono:
                 if len(_CANALE_POSTATI) > 5000:
