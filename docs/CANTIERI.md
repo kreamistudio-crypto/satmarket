@@ -49143,3 +49143,37 @@ otto pezzi nella patch, le DUE prese e non chi pubblica, i test del
 `prove_p2p_libro` (il take porta `payloadPresaP2P`), `prove_passi_libro_p2p`
 (lo stepper passa la scelta). Suite, collaudi e giro dal vivo: nel
 verbale del push.
+
+## La cauzione sul metodo scelto, il verbale del push (11 ott 2026, notte): cosa è girato su quale albero
+
+Sull'albero di partenza (e8a24ad + le modifiche): la suite PROVE_SEVERE
+intera, 22.016 passate e UNA rossa — la sentinella della zona nel
+dettaglio (`prove_contanti_zona`), che fissava le pillole seguite
+dalla zona senza la riga nuova del metodo fissato in mezzo: aggiornata
+e rigirata, 98 verdi —; i collaudi del workflow nella gabbia, 58 verdi e
+0 rossi; il giro dal vivo (Browser pane, copia in collaudo con la leva
+`P2P_CAUZIONE` accesa e il 38385 di cartone, un «SEPA, Contanti» da
+100 €: con SEPA scelto niente riga della cauzione, il primo passo
+«Indichi dove ricevere i sats» e sotto le pillole il metodo fissato;
+con Contanti la riga di sempre con «circa 4 049 sats» e il passo
+«Blocchi la cauzione…»; il take serializzato da `messaggioMostro` con
+`payload.order.payment_method` SEPA/Contanti e `fiat_amount` 100 (o
+150 scelti su un intervallo); «Info P2P» con le parole nuove; scatti
+in `.claude/giri/cauzione-metodo-scelto/`). Main è corso di sette
+commit (fino a 41e859d: le hold di prova, la contesa, le due monete,
+la scheda summary, l'indirizzo non verificato, PuntoLis e il suo
+verbale): rebase con un solo conflitto, la coda di CANTIERI, tenute le
+due voci; sull'albero ribasato, quello del push, le otto sezioni
+toccate o vicine (cauzione, dettaglio, libro, passi del libro, pagina
+leggera, riquadro dei contanti, contanti a mano, zona: 1.011 verdi, 0
+rosse) e quattro collaudi vicini nella gabbia (contanti, pagamento,
+dispute, solleciti: 4 verdi); suite intera e gli altri collaudi NON
+rifatti sull'ultima punta. Il fork: patcher a secco e per davvero sul
+clone della v0.19.0 con le otto via `git am`, e `git am` delle nove su
+un secondo clone con lo stesso albero (`1385488c`); NON compilato (sul
+PC non c'è cargo): la build è la liturgia `-bar7`, da fare sul nodo.
+Poi main è corso ancora di uno (e817faa, i percorsi del VPS: solo
+documenti): secondo rebase, la coda di CANTIERI, e le due sezioni coi
+documenti del fork (cauzione, dettaglio) rigirate verdi. LA CI DI MAIN
+prima del push: aspettata verde la punta 41e859d e poi la e817faa. Il
+sì al push è di Andrea: stava nel brief incollato («Ok al push»).
