@@ -29258,7 +29258,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    sorella, set 2026: lo scambio come pagina vera, l'indirizzo che
    esce dal tocco lungo sulla card nella striscia — NOINDEX finché la
    leva è una fase di prova, e fuori dalla sitemap per la stessa
-   ragione), `/consigliati` (la quarta sorella, set 2026: la pagina
+   ragione; dal 10 ott 2026 col parametro `?ordine=<id>` è il link di
+   UN ordine del libro: stessa pagina, la testa dice cosa offre, letta
+   dalla fotografia in memoria — vedi «IL "CONDIVIDI" DI UN ORDINE
+   P2P»), `/consigliati` (la quarta sorella, set 2026: la pagina
    dei negozi consigliati, l'indirizzo che esce dal tocco lungo sulla
    sua card — NOINDEX perché può restare vuota, fuori dalla sitemap,
    e la testa non legge il database), `/barattolo/{token}` (la
@@ -30163,3 +30166,38 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   collaudo `collaudo_controllo_fattura` (LND di cartone in HTTPS coi tre
   macaroon). La procedura del macaroon nuovo e la verifica dal VPS:
   PRODUZIONE, «IL CONTROLLO DELLA FATTURA P2P».
+
+- IL «CONDIVIDI» DI UN ORDINE P2P (10 ott 2026, perché in CANTIERI, «Il
+  "Condividi" di un ordine P2P»). Un ordine del libro si manda fuori con
+  un testo corto e il link `/p2p?ordine=<id>`. IL LINK non è una rotta
+  nuova: è la pagina `/p2p` con un parametro, e ha un nome diverso da
+  `?scambio=` perché è un'altra domanda (`scambio` = il MIO scambio, se
+  la riga manca porta a «I miei scambi»; `ordine` = un ordine del LIBRO,
+  se non c'è più lo dice). SUL SERVER cambia solo la testa:
+  `pagina_p2p(ordine)` chiede a `_seo_ordine_p2p`, che legge l'ordine
+  VIVO dalla fotografia in memoria (`_ordine_condiviso_p2p`: pending,
+  non scaduto, in euro, leva accesa, id nella forma di
+  `FORMA_ORDINE_P2P`) e ne fa il titolo con `_frase_ordine_p2p`
+  («Vendesi BTC per 50 € · SEPA, Revolut»); sparito, storto o guasto =
+  la testa del libro. Niente database, niente relay, niente autori;
+  sempre NOINDEX. NEL CLIENT il blocco «IL "CONDIVIDI" DI UN ORDINE»
+  (dopo le card P2P in vetrina): `testoOrdineCondivisoP2P` è il gemello
+  della frase del server («Vendo»/«Compro» sul proprio ordine,
+  «Vendesi»/«Cercasi» sugli altri), `ordineDaCondividereP2P` dice cosa
+  si può dire (la riga del libro, o il proprio ordine `pubblicato`),
+  `condividiOrdineP2P` passa dal tubo unico `condividiLink`; i bottoni
+  stanno nel dettaglio del libro (`renderDettaglioP2P`), nella pagina
+  del proprio ordine (`condividiMioP2P`) e nel piede della card di «I
+  miei scambi» (`condividiCardP2P`). L'ARRIVO è `apriOrdineCondivisoP2P`
+  (da `apriP2PDaUrl`, solo a leva accesa): lo scambio mio apre la sua
+  pagina; l'ordine nel libro apre il dettaglio — a chi non è entrato
+  con «Entra» al posto di «Compra» —; se non c'è, la riga fissa
+  `#p2pOrdineSparito` sopra il corpo del libro. «Non c'è più» si dice
+  solo dopo la fotografia fresca del server e il libro vero dei relay,
+  e il sì di una fotografia si riguarda sul libro vero
+  (`riguardaCondivisoP2P`). Il tour della prima volta aspetta
+  (`condivisoDavantiP2P`). LA NOTA SU NOSTR (`pubblicaOrdineSuNostrP2P`,
+  `firmaNotaOrdineP2P`) è tutta nel browser: kind 1, firmata dalla
+  chiave d'accesso col firmatario di casa, mandata ai relay di
+  `nip85_relays`; in collaudo si firma e non si bussa. Nessuna rotta
+  del server la tocca. LE PROVE: `prove_condividi_ordine_p2p`.

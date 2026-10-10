@@ -35591,8 +35591,14 @@ def prove_onion():
           tuple(p in mini for p in _porte2))
     prova("...e il ponte grande che lo chiamava non c'e' piu'", False,
           "etichettaNostr(`Scrivi ${chi} su Nostr`)" in mini)
-    prova("...e le chiamate al giudice sono SETTE", 7,
+    # ⚠️ E TORNANO OTTO (10 ott 2026, il «Condividi» di un ordine P2P):
+    # l'ottava e' il bottone «Pubblica su Nostr» accanto a «🔗 Condividi»
+    # (`bottoniCondividiP2P`), che compare solo a chi e' entrato con
+    # Nostr — un bottone col glifo, cioe' proprio il mestiere del giudice.
+    prova("...e le chiamate al giudice sono OTTO", 8,
           mini.count("etichettaNostr("))
+    prova("...l'ottava e' il «Pubblica su Nostr» di un ordine P2P", True,
+          "etichettaNostr('Pubblica su Nostr')" in mini)
     # ⚠️ IL CENSIMENTO HA CAMBIATO LATO (ago 2026, dal campo, e la
     # decisione con lui): qui si chiedeva che i bottoni col glifo
     # fossero TRE — «il perimetro e' stretto apposta, il difetto e'
@@ -36534,8 +36540,14 @@ def prove_anteprime():
     # rotta pubblica NUOVA non la sorvegliava nessuno finche' qualcuno
     # non si ricordava di aggiungerla qui. Adesso il conto deve tornare:
     # chi ne aggiunge una senza elencarla trova la CI rossa.
+    # ...PIU' UNA (10 ott 2026): /p2p ha DUE uscite dalla stessa rotta — il
+    # libro, con la sua testa costante, e l'ordine condiviso (`?ordine=`),
+    # che la testa la legge dalla fotografia. La rotta resta una, e in
+    # elenco c'e': il conto sale perche' sale il numero dei `return`.
     prova("le rotte che servono la pagina sono tutte in elenco",
-          len(ROTTE_PAGINA), _SORGENTE.count("return _pagina_con_meta("))
+          len(ROTTE_PAGINA) + 1, _SORGENTE.count("return _pagina_con_meta("))
+    prova("...e la seconda uscita e' quella di /p2p, non una rotta dimenticata", 2,
+          pezzo("pagina_p2p").count("return _pagina_con_meta("))
     # /offerta/{id} e' l'unica rotta-pagina che NON deve leggere il
     # database: una trattativa e' roba di due persone, e quella
     # testa la vede chiunque abbia il link. E' da qui che
@@ -51627,6 +51639,563 @@ def prove_condividi_col_link():
           [["copia", link]], es.get("nudo"))
 
 
+def prove_condividi_ordine_p2p():
+    """IL «CONDIVIDI» DI UN ORDINE P2P (10 ott 2026, idea di un utente).
+
+    Un ordine del libro si manda fuori — Telegram, Nostr, dovunque — con
+    un testo corto e il link `/p2p?ordine=<id>`, che apre QUELL'ordine a
+    chiunque e porta nell'anteprima cosa offre. La famiglia difende
+    quattro cose:
+    • IL TESTO: lato, cifra, metodi, e nient'altro — quel che il libro
+      pubblico dice gia'. «Vendo»/«Compro» solo sul proprio ordine,
+      «Vendesi»/«Cercasi» su quello di un altro; e la frase di mezzo e'
+      la STESSA del titolo dell'anteprima (i due gemelli girano sugli
+      stessi eventi, uno in node e uno in Python).
+    • IL LINK: esce dal tubo di casa (`condividiLink`), e la pagina lo
+      sa rileggere.
+    • L'ORDINE SPARITO: l'anteprima ricade sul libro, e la pagina dice
+      «non piu' disponibile» SOLO su una parola fresca — mai sulla copia
+      vecchia del telefono.
+    • I META OG: titolo, descrizione, immagine del P2P, noindex; le
+      parole di uno sconosciuto ci entrano escapate.
+    E la nota su Nostr: la firma chi e' entrato, col suo firmatario, e
+    la manda il browser — in quel pezzo non c'e' una sola chiamata al
+    server."""
+    print("\n[il «Condividi» di un ordine P2P]")
+    import html as _html
+    import json as _j
+    import re as _re
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+    INIZIO = "/* ============ IL «CONDIVIDI» DI UN ORDINE (10 ott 2026) ============"
+    FINE = "/* ============ fine del «Condividi» di un ordine ============ */"
+    blocco = mini[mini.index(INIZIO):mini.index(FINE)]
+
+    # ---------------- 1) IL SERVER: la frase, l'ordine vivo, i meta ----
+    amb = _amb_seo()
+    i = src.index("\nTITOLO_P2P = ") + 1
+    exec(src[i:src.index("\n\n", i)], amb)
+    for riga in ("IMMAGINE_P2P = (", "LINK_LIBRO_P2P = ", "FORMA_ORDINE_P2P = "):
+        i = src.index("\n" + riga) + 1
+        exec(src[i:src.index("\n", i)], amb)
+    i = src.index("\nTESTA_P2P = ") + 1
+    exec(src[i:src.index(")\n", i) + 2], amb)
+    i = src.index("\nTETTO_METODI_CONDIVISI_P2P = ") + 1
+    exec(src[i:src.index("\n\n", i)], amb)
+    leva = {"attivo": True}
+    amb["_p2p_leve"] = lambda: leva
+    amb["_P2P_FOTO"] = {"eventi": [], "autori": {}}
+    for f in ("_euro_tabacchino", "_metodi_libro", "_euro_libro",
+              "_tag_evento_p2p", "_evento_libro_p2p", "_metodi_condivisi_p2p",
+              "_frase_ordine_p2p", "_ordine_condiviso_p2p", "_seo_ordine_p2p"):
+        exec(pezzo(f), amb)
+    frase, vivo, seo = (amb["_frase_ordine_p2p"], amb["_ordine_condiviso_p2p"],
+                        amb["_seo_ordine_p2p"])
+    ADESSO = 1_790_000_000
+    MOSTRO = "ab" * 32
+
+    def ev(d, k, fa, pm, s="pending", f="EUR", scade=ADESSO + 3600, quando=ADESSO - 60,
+           altri=()):
+        return {"id": "e" + d, "pubkey": MOSTRO, "created_at": quando,
+                "kind": 38383, "content": "", "sig": "",
+                "tags": [["d", d], ["k", k], ["s", s], ["f", f],
+                         ["fa"] + [str(x) for x in fa], ["pm"] + list(pm),
+                         ["amt", "0"], ["premium", "1"],
+                         ["expires_at", str(scade)]] + [list(a) for a in altri]}
+
+    ID = "0f3a9c1e-7b2d-4e5f-8a6b-1c2d3e4f5a6b"
+    GEMELLI = [
+        (ev(ID, "sell", [50], ["SEPA", "Revolut"]),
+         "Vendesi BTC per 50 € · SEPA, Revolut"),
+        (ev(ID, "buy", [20, 100], ["Satispay"]),
+         "Cercasi BTC da 20 a 100 € · Satispay"),
+        (ev(ID, "sell", [23], ["Contanti al tabacchino 23.47"]),
+         "Vendesi BTC per 23,47 € · Contanti al tabacchino"),
+        (ev(ID, "buy", [1250], ["SEPA", "Revolut", "SEPA", "Satispay", "Wise"]),
+         "Cercasi BTC per 1.250 € · SEPA, Revolut, Satispay e altri"),
+        (ev(ID, "sell", [5], ["  Bonifico\n  SEPA   Instant ", "x" * 60]),
+         "Vendesi BTC per 5 € · Bonifico SEPA Instant, " + "x" * 40),
+        (ev(ID, "sell", [50], []), "Vendesi BTC per 50 €"),
+    ]
+    ev2riga = amb["_evento_libro_p2p"]
+    prova("la frase dell'anteprima, sugli eventi del libro",
+          [g[1] for g in GEMELLI], [frase(ev2riga(g[0])) for g in GEMELLI])
+    prova("...e senza una frase da dire tace: lato storto, nessuna cifra, niente",
+          ["", "", ""],
+          [frase(ev2riga(ev(ID, "boh", [50], ["SEPA"]))),
+           frase(ev2riga(ev(ID, "sell", [], ["SEPA"]))), frase(None)])
+
+    F = amb["_P2P_FOTO"]
+    F["eventi"] = [ev(ID, "sell", [50], ["SEPA", "Revolut"])]
+    prova("l'ordine vivo della fotografia si trova", "sell",
+          (vivo(ID, ADESSO) or {}).get("lato"))
+    prova("...un id che non c'e', no", None, vivo(ID[:-1] + "0", ADESSO))
+    prova("...un id storto non arriva nemmeno alla fotografia", [None, None, None],
+          [vivo("../../etc", ADESSO), vivo("", ADESSO), vivo("a" * 65, ADESSO)])
+    for nome, storto in (
+            ("preso", ev(ID, "sell", [50], ["SEPA"], s="in-progress")),
+            ("annullato", ev(ID, "sell", [50], ["SEPA"], s="canceled")),
+            ("scaduto", ev(ID, "sell", [50], ["SEPA"], scade=ADESSO - 1)),
+            ("in un'altra valuta (la pagina non lo aprirebbe)",
+             ev(ID, "sell", [50], ["SEPA"], f="USD"))):
+        F["eventi"] = [storto]
+        prova(f"l'ordine {nome} non e' piu' un ordine da dire", None, vivo(ID, ADESSO))
+    F["eventi"] = [ev(ID, "sell", [50], ["SEPA", "Revolut"])]
+    leva["attivo"] = False
+    prova("a leva spenta non c'e' nessun ordine da dire", None, vivo(ID, ADESSO))
+    leva["attivo"] = True
+
+    def meta(T, chiave):
+        m = _re.search(r'<meta (?:property|name)="' + _re.escape(chiave)
+                       + r'" content="([^"]*)">', T)
+        return _html.unescape(m.group(1)) if m else None
+    IMG = "https://barattolo.store/assets/p2p-anteprima.jpg"
+    # la scadenza la guarda l'orologio vero: l'evento vive un'ora da ADESSO
+    amb["time"] = type("T", (), {"time": staticmethod(lambda: ADESSO)})
+    T, titolo = seo(ID)
+    prova("i meta dell'ordine: titolo, descrizione, indirizzo",
+          ["Vendesi BTC per 50 € · SEPA, Revolut — Barattolo P2P",
+           amb["META_TESTO_ORDINE_P2P"],
+           "https://barattolo.store/p2p?ordine=" + ID],
+          [meta(T, "og:title"), meta(T, "og:description"), meta(T, "og:url")])
+    prova("...il <title> della pagina e' lo stesso dell'og:title", titolo,
+          meta(T, "og:title"))
+    prova("...l'immagine e' quella del P2P, con la sua misura",
+          [IMG, IMG, "400", "400"],
+          [meta(T, "og:image"), meta(T, "twitter:image"),
+           meta(T, "og:image:width"), meta(T, "og:image:height")])
+    prova("...e resta NOINDEX, senza canonical", (True, False),
+          (T.endswith(amb["META_NOINDEX"]), "canonical" in T))
+    # NIENTE DI PERSONALE: chi ha pubblicato sta negli `autori` della
+    # fotografia e in nessun tag che la frase legge
+    F["autori"] = {ID: 424242}
+    F["eventi"] = [ev(ID, "sell", [50], ["SEPA"],
+                      altri=(("name", "MARIO-ROSSI"), ("rating", '{"total_reviews":7}'),
+                             ("g", "u0n")))]
+    T2, _t = seo(ID)
+    prova("nei meta non entra niente di chi ha pubblicato", [],
+          [x for x in ("424242", "MARIO-ROSSI", "total_reviews", "u0n", MOSTRO)
+           if x in T2])
+    # LE PAROLE DI UNO SCONOSCIUTO: il `pm` e' testo libero
+    F["eventi"] = [ev(ID, "sell", [50], ['"><script>alert(1)</script>'])]
+    T3, _t = seo(ID)
+    prova("un metodo ostile esce escapato, mai come markup", (False, True),
+          ("<script>" in T3, "&lt;script&gt;" in T3))
+    # L'ORDINE SPARITO ricade sulla testa del libro, IDENTICA
+    for nome, eventi in (("preso", [ev(ID, "sell", [50], ["SEPA"], s="in-progress")]),
+                         ("mai esistito", [])):
+        F["eventi"] = eventi
+        prova(f"l'ordine {nome}: l'anteprima e' quella del libro",
+              (amb["TESTA_P2P"], amb["TITOLO_P2P"]), seo(ID))
+    # LA ROTTA: una sola pagina, il parametro cambia la testa — e un
+    # guasto nell'anteprima non impedisce alla pagina di aprirsi
+    amb["_pagina_con_meta"] = lambda testa, titolo="", corpo="": (testa, titolo)
+    exec(pezzo("pagina_p2p"), amb)
+    rotta = amb["pagina_p2p"]
+    F["eventi"] = [ev(ID, "sell", [50], ["SEPA", "Revolut"])]
+    prova("la rotta: senza parametro la testa del libro", (amb["TESTA_P2P"], amb["TITOLO_P2P"]),
+          rotta())
+    prova("...con l'ordine vivo, la sua",
+          "Vendesi BTC per 50 € · SEPA, Revolut — Barattolo P2P", rotta(ID)[1])
+    amb["_seo_ordine_p2p"] = lambda oid: 1 / 0
+    import contextlib as _cl
+    import io as _io
+    try:
+        with _cl.redirect_stdout(_io.StringIO()):
+            guasta = rotta(ID)
+    except Exception as e:      # una rossa che parla, non un banco che esplode
+        guasta = "LA ROTTA HA ALZATO: " + repr(e)
+    prova("...e se l'anteprima si rompe, la pagina si apre col libro",
+          (amb["TESTA_P2P"], amb["TITOLO_P2P"]), guasta)
+    prova("l'anteprima legge la fotografia in memoria: ne' database ne' relay", [],
+          [x for x in ("db()", "con.execute", "create_connection", "_chiedi_tutti_p2p")
+           if x in codice(pezzo("_ordine_condiviso_p2p") + pezzo("_seo_ordine_p2p"))])
+
+    # ---------------- 2) IL CLIENT: sentinelle sul testo ----------------
+    cod = _senza_commenti_js(blocco)
+    prova("condividiOrdineP2P passa dal tubo di casa", True,
+          "return condividiLink(linkOrdineP2P(id), testo, 'Scambio P2P');" in cod)
+    i_n = blocco.index("/* ---- la nota su Nostr ---- */")
+    nostr = _senza_commenti_js(blocco[i_n:blocco.index("/* ---- l'arrivo dal link ---- */")])
+    prova("la nota su Nostr non chiama MAI il server", [],
+          [x for x in ("fetch(", "API_BASE", "XMLHttpRequest", "sendBeacon") if x in nostr])
+    prova("...la firma chi e' entrato, col firmatario di casa", [True, True, True],
+          ["await firmatarioAutomatico()" in nostr,
+           "apriNostrSheet(f => firmaNotaOrdineP2P(f, testo, link))" in nostr,
+           "await f.firma(bozza)" in nostr])
+    prova("il parametro `ordine` ha la forma dell'id, come `scambio`", True,
+          "(location.search.match(/[?&]ordine=([0-9a-zA-Z-]{8,64})(?:&|$)/) || [])[1]" in mini)
+    ap = _senza_commenti_js(_fn_js(mini, "function apriP2PDaUrl(){"))
+    prova("l'arrivo dal link: solo a leva accesa, e lo scambio mio vince",
+          [True, True],
+          ["const condiviso = !!P2P_ORDINE_URL && !P2P_SCAMBIO_URL && p2pAcceso()\n"
+           "    && typeof apriOrdineCondivisoP2P === 'function';\n"
+           "  if (condiviso) p2pCondivisoInVolo = true;\n  vaiP2P();" in ap,
+           "else if (condiviso) apriOrdineCondivisoP2P(P2P_ORDINE_URL);" in ap])
+    tour = _senza_commenti_js(_fn_js(mini, "function apriTourP2PSePrimaVolta(){"))
+    prova("il tour della prima volta aspetta dietro l'ordine del link", True,
+          0 < tour.find("condivisoDavantiP2P()) return;") < tour.find("apriTourP2P()"))
+    i_s = mini.index('id="p2pOrdineSparito"')
+    riga_s = mini[mini.rindex("<div", 0, i_s):mini.index("</div>\n      <div id=\"p2pCorpo\">", i_s)]
+    prova("la riga gentile: spenta in partenza, sopra il corpo del libro, col suo ✕",
+          [True, True, True],
+          [" hidden>" in riga_s,
+           "<b>Questo ordine non è più disponibile</b>" in riga_s,
+           'onclick="ordineSparitoP2P(false)"' in riga_s])
+    dett = _fn_js(mini, "function renderDettaglioP2P(){")
+    prova("il dettaglio porta il «Condividi», sopra i bottoni della decisione", True,
+          0 < dett.find("bottoniCondividiP2P(o.id)") < dett.find('class="foglio-piede'))
+    prova("...e a chi non e' entrato da' la porta al posto di «Compra»", True,
+          0 < dett.find(": (VETRINA || !myTgId)")
+          < dett.find('onclick="entraDaDettaglioP2P()">Entra</button>')
+          < dett.find("preseChiuseP2P()"))
+    prova("la pagina del proprio ordine e la sua card lo portano anche loro",
+          [True, True],
+          ["condividiMioP2P(o)" in _fn_js(mini, "function renderOrdineP2P(){"),
+           "(via || condividiCardP2P(o))" in _fn_js(mini, "function rigaScambioP2P(o){")])
+    css = mini[:mini.index("</style>")]
+    prova("lo stile: i due bottoni stanno in colonna, e `hidden` vince sulla riga gentile",
+          [True, True],
+          [".p2p-condividi{display:flex;flex-direction:column;" in css,
+           ".p2p-sparito[hidden]{display:none}" in css])
+
+    # ---------------- 3) IL CLIENT: i pezzi veri in node ----------------
+    if _node_banco("console.log('1')") is None:
+        salta("il testo, il link, la nota e l'arrivo girano davvero",
+              "node non installato")
+        return
+    veri = (_riga_js(mini, "const P2P_TABACCHINO = ") + "\n"
+            + _riga_js(mini, "const P2P_TABACCHINO_PM = ") + "\n"
+            + "".join(_fn_js(mini, f) for f in (
+                "function metodoBaseP2P(", "function euroTabacchinoP2P(",
+                "function euroFiloTabacchinoP2P(", "function combaciaEsattoP2P(",
+                "function tagValore(", "function tagValori(",
+                "function ordineDaEvento(", "function provvisorioP2P(",
+                "function testoColLink(")))
+    cartone = r"""
+let DEMO = false, VETRINA = false, myTgId = 111;
+let myNpubAccesso = '', myNip85Relays = [], myNip85Collaudo = false;
+let visto = [];
+let libro = [], miei = {}, tuoi = new Set();
+let p2pLibro = null, p2pVetrinaFoto = null, p2pVetrinaFresca = false;
+let p2pDettOrdine = '', vista = 'view-p2p';
+const nodi = {p2pOrdineSparito: {hidden: true},
+              p2pDettSheet: {aperto: false, classList: {contains: () => nodi.p2pDettSheet.aperto}}};
+const el = id => nodi[id] || null;
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const etichettaNostr = t => 'N ' + t;
+const INVITO_ONION = {p2p: 'INVITO-P2P'};
+function haptic(){}
+function toast(m){ visto.push(['toast', m]); }
+function baseCondivisione(){ return 'https://barattolo.store'; }
+function rigaLibroP2P(id){ return libro.find(x => x.id === id) || null; }
+function ordiniP2P(){ return miei; }
+function ordineTuoP2P(id){ return tuoi.has(id); }
+function condividiLink(l, t, tit){ visto.push(['tubo', l, t, tit]); return 'TUBO'; }
+function renderP2P(){ visto.push(['render']); }
+function vistaAttivaP2P(){ return vista; }
+function setLatoP2P(l, zitto){ visto.push(['lato', l, zitto]); }
+function apriDettaglioP2P(id){ visto.push(['dettaglio', id]); p2pDettOrdine = id; nodi.p2pDettSheet.aperto = true; }
+function prendiOrdineP2P(id){ visto.push(['prendi', id]); p2pDettOrdine = id; nodi.p2pDettSheet.aperto = true; }
+function apriOrdineP2P(id){ visto.push(['scambio', id]); }
+function chiudiFoglioP2P(id){ visto.push(['chiudi', id]); if (nodi[id]) nodi[id].aperto = false; }
+function invitoTelegram(t, k){ visto.push(['invito', t, k]); }
+function libroDaCopiaP2P(eventi, quando, fonte){ visto.push(['copia', fonte]); libro = eventi.slice(); p2pLibro = {copia: fonte}; }
+let fotoDice = null, relayDice = null;
+async function chiediFotoVetrinaP2P(){ visto.push(['foto', p2pVetrinaFresca]); p2pVetrinaFoto = fotoDice; return true; }
+async function caricaLibroP2P(){ visto.push(['relay']); if (relayDice === 'giu') throw new Error('giu'); libro = relayDice || []; p2pLibro = {}; }
+/* la firma di cartone: l'id e' una funzione di quel che si firma, cosi'
+   un firmatario che cambia la nota si vede */
+const window = {NostrTools: {
+  nip19: {decode: n => ({data: n.replace('npub1', '')})},
+  getEventHash: e => 'H:' + JSON.stringify([e.pubkey, e.created_at, e.kind, e.tags, e.content])}};
+async function caricaNostrTools(){}
+let relayOk = 2;
+async function pubblicaEventoSuRelay(relays, e){ visto.push(['relay-pub', relays, e]); return relayOk; }
+let autoF = null;
+async function firmatarioAutomatico(){ return autoF; }
+function apriNostrSheet(scopo){ visto.push(['foglio-firma']); }
+"""
+    ev_gemelli = [g[0] for g in GEMELLI]
+    prog = (cartone + veri
+            + blocco.replace("console.log('🟣 [nostr simulato dal browser]', firmato);",
+                             "visto.push(['simulato', firmato]);")
+            # la regola VERA con cui la pagina rilegge il parametro
+            + "const rxOrdine = s => (s.match("
+            + _re.search(r"location\.search\.match\((/\[\?&\]ordine=.+?/)\)", mini).group(1)
+            + ") || [])[1] || '';\n"
+            + "const EV = " + _j.dumps(ev_gemelli) + ", ID = " + _j.dumps(ID) + ";\n"
+            + r"""
+(async () => {
+  const R = {};
+  const ADESSO = """ + str(ADESSO) + r""";
+  const dalLibro = e => { const o = ordineDaEvento(e, ADESSO);
+    return {vende: o.lato === 'sell', mio: false, euro: o.euro, euroMax: o.euroMax, metodi: o.metodi}; };
+  /* I GEMELLI: gli stessi eventi del server, letti dal lettore VERO del libro */
+  R.gemelli = EV.map(e => testoOrdineCondivisoP2P(dalLibro(e)));
+  R.mio = [testoOrdineCondivisoP2P({vende: true, mio: true, euro: 50, metodi: ['SEPA', 'Revolut']}),
+           testoOrdineCondivisoP2P({vende: false, mio: true, euro: 20, euroMax: 100, metodi: ['Satispay']})];
+  R.muto = [testoOrdineCondivisoP2P(null), testoOrdineCondivisoP2P({vende: true, euro: 0, metodi: ['SEPA']})];
+  R.cifre = [0.5, 5, 23.47, 999, 1000, 1250.5, 1234567].map(cifraCondivisaP2P);
+  R.link = linkOrdineP2P(ID);
+  /* la pagina rilegge il link che il tasto scrive */
+  const q = s => rxOrdine(s);
+  R.rilegge = [q(new URL(R.link).search), q('?ordine=' + ID + '&x=1'), q('?x=1&ordine=' + ID),
+               q('?ordine=corto'), q('?ordine=' + ID + '%2F..'), q('?scambio=' + ID), q('?xordine=' + ID)];
+
+  /* COSA SI PUO' DIRE DI UN ORDINE */
+  const riga = {id: ID, lato: 'sell', euro: 50, euroMax: 0, metodi: ['SEPA', 'Revolut']};
+  libro = [riga];
+  R.altrui = ordineDaCondividereP2P(ID);
+  tuoi.add(ID); R.mioNelLibro = ordineDaCondividereP2P(ID).mio; tuoi.clear();
+  libro = [];
+  R.sparito = ordineDaCondividereP2P(ID);
+  miei[ID] = {id: ID, mio: true, stato: 'pubblicato', lato: 'compro', euro: 30, euroMax: 0, metodi: ['SEPA']};
+  R.mioSenzaLibro = ordineDaCondividereP2P(ID);
+  miei[ID].stato = 'attivo'; R.mioPreso = ordineDaCondividereP2P(ID);
+  miei[ID].stato = 'pubblicato'; miei[ID].mio = false; R.nonMio = ordineDaCondividereP2P(ID);
+  miei = {'nuovo:1': {id: 'nuovo:1', mio: true, stato: 'pubblicato', lato: 'vendo', euro: 30, metodi: []}};
+  R.provvisorio = ordineDaCondividereP2P('nuovo:1');
+  miei = {};
+
+  /* IL TASTO: dal tubo, col testo e il link; il tocco non apre la card */
+  libro = [riga]; visto = [];
+  let fermati = 0;
+  R.tasto = condividiOrdineP2P(ID, {stopPropagation(){ fermati++; }});
+  R.tastoVisto = visto.slice(); R.fermati = fermati;
+  libro = []; visto = [];
+  condividiOrdineP2P(ID, null);
+  R.tastoSparito = visto.slice();
+
+  /* I BOTTONI */
+  libro = [riga];
+  R.bottoniTutti = bottoniCondividiP2P(ID);
+  myNpubAccesso = 'npub1aa'; myNip85Relays = ['wss://r1'];
+  R.bottoniNostr = bottoniCondividiP2P(ID);
+  VETRINA = true; R.bottoniVetrinaNostr = (bottoniCondividiP2P(ID).match(/<button/g) || []).length; VETRINA = false;
+  myNip85Relays = []; R.senzaRelay = (bottoniCondividiP2P(ID).match(/<button/g) || []).length;
+  myNip85Collaudo = true; R.inCollaudo = (bottoniCondividiP2P(ID).match(/<button/g) || []).length;
+  DEMO = true; R.bottoniDemo = bottoniCondividiP2P(ID); DEMO = false;
+  R.bottoniOstile = bottoniCondividiP2P('a"><img src=x>');
+  R.card = [condividiCardP2P({id: ID, mio: true, stato: 'pubblicato'}).length > 0,
+            condividiCardP2P({id: ID, mio: true, stato: 'attivo'}),
+            condividiCardP2P({id: ID, mio: false, stato: 'pubblicato'}),
+            condividiCardP2P({id: 'nuovo:1', mio: true, stato: 'pubblicato'})];
+  R.mioPagina = [condividiMioP2P({id: ID, mio: true, stato: 'pubblicato'}).length > 0,
+                 condividiMioP2P({id: ID, mio: true, stato: 'pubblicato', soloVista: true}).length > 0,
+                 condividiMioP2P({id: ID, mio: true, stato: 'concluso'})];
+
+  /* LA NOTA SU NOSTR */
+  const firmatario = (pub, come) => { const f = {firme: 0,
+    pubkey: async () => pub,
+    firma: async b => { f.firme++;
+      if (come === 'rifiuta') throw new Error('no');
+      const e = Object.assign({}, b, come === 'altera' ? {content: b.content + ' compra qui'} : {});
+      return Object.assign(e, {id: window.NostrTools.getEventHash(Object.assign({}, e, {pubkey: pub})), sig: 'S'}); }};
+    return f; };
+  const T = testoOrdineCondivisoP2P(R.altrui), L = R.link;
+  R.nota = notaOrdineP2P('aa', T, L, 1);
+  myNpubAccesso = 'npub1aa'; myNip85Relays = ['wss://r1', 'wss://r2'];
+  /* in collaudo: firma si', relay no */
+  myNip85Collaudo = true; visto = []; let f = firmatario('aa');
+  R.collaudo = [await firmaNotaOrdineP2P(f, T, L), f.firme,
+                visto.filter(v => v[0] === 'relay-pub').length,
+                visto.filter(v => v[0] === 'simulato').map(v => v[1].content)[0]];
+  /* dal vero: i relay di casa, dal browser */
+  myNip85Collaudo = false; visto = []; f = firmatario('aa');
+  R.vero = [await firmaNotaOrdineP2P(f, T, L),
+            visto.filter(v => v[0] === 'relay-pub').map(v => [v[1], v[2].kind, v[2].pubkey, v[2].sig])[0],
+            visto.filter(v => v[0] === 'toast').map(v => v[1]).pop()];
+  /* nessun relay risponde */
+  relayOk = 0; visto = []; f = firmatario('aa');
+  R.nessunRelay = [await firmaNotaOrdineP2P(f, T, L), visto.filter(v => v[0] === 'toast').map(v => v[1]).pop()];
+  relayOk = 2;
+  /* un'altra chiave: non si firma nemmeno */
+  visto = []; f = firmatario('bb');
+  R.altraChiave = [await firmaNotaOrdineP2P(f, T, L), f.firme, visto.filter(v => v[0] === 'relay-pub').length];
+  /* il firmatario cambia la nota: non parte niente */
+  visto = []; f = firmatario('aa', 'altera');
+  R.alterata = [await firmaNotaOrdineP2P(f, T, L), visto.filter(v => v[0] === 'relay-pub').length];
+  /* ...o dice di no */
+  visto = []; f = firmatario('aa', 'rifiuta');
+  R.rifiutata = [await firmaNotaOrdineP2P(f, T, L), visto.filter(v => v[0] === 'relay-pub').length];
+  /* il foglio della firma si chiude senza portarsi via il velo */
+  R.chiudeIlFoglio = visto.some(v => v[0] === 'chiudi' && v[1] === 'nostrSheet');
+  /* il tocco: firmatario pronto → firma; nessuno → il foglio */
+  libro = [riga]; visto = []; autoF = {f: firmatario('aa'), chiudi: false};
+  await pubblicaOrdineSuNostrP2P(ID, null);
+  R.toccoAuto = [autoF.f.firme, visto.filter(v => v[0] === 'relay-pub').length];
+  visto = []; autoF = null;
+  await pubblicaOrdineSuNostrP2P(ID, null);
+  R.toccoFoglio = visto.filter(v => v[0] === 'foglio-firma').length;
+  /* chi non e' entrato con Nostr non pubblica niente, nemmeno chiamando */
+  myNpubAccesso = ''; visto = []; autoF = {f: firmatario('aa'), chiudi: false};
+  await pubblicaOrdineSuNostrP2P(ID, null);
+  R.senzaNostr = [autoF.f.firme, visto.length];
+  autoF = null;
+
+  /* L'ARRIVO DAL LINK */
+  const giro = async (prima) => {
+    visto = []; libro = []; miei = {}; p2pLibro = null; p2pVetrinaFoto = null;
+    fotoDice = null; relayDice = null; vista = 'view-p2p'; VETRINA = false; myTgId = 111;
+    nodi.p2pOrdineSparito.hidden = true; nodi.p2pDettSheet.aperto = false;
+    p2pDettOrdine = ''; p2pCondivisoAperto = '';
+    prima();
+    const p = apriOrdineCondivisoP2P(ID);
+    const inVolo = condivisoDavantiP2P();
+    await p;
+    /* il riguardo sul libro vero arriva un giro dopo */
+    await new Promise(r => setTimeout(r, 0));
+    return {passi: visto.map(v => v[0]), inVolo, davanti: condivisoDavantiP2P(),
+            fresca: visto.filter(v => v[0] === 'foto').map(v => v[1]),
+            fonte: visto.filter(v => v[0] === 'copia').map(v => v[1]),
+            sparito: !nodi.p2pOrdineSparito.hidden};
+  };
+  const foto = {quando: 5, eventi: [riga], ordini: [riga]};
+  R.mioScambio = await giro(() => { miei[ID] = {id: ID}; });
+  R.nelLibroVero = await giro(() => { libro = [riga]; p2pLibro = {}; });
+  R.anonimo = await giro(() => { libro = [riga]; p2pLibro = {}; VETRINA = true; myTgId = 0; });
+  R.dallaFoto = await giro(() => { p2pLibro = {copia: 'telefono'}; fotoDice = foto; relayDice = [riga]; });
+  /* la fotografia lo porta ancora, il libro vero no: preso un attimo fa */
+  R.fotoVecchia = await giro(() => { p2pLibro = {copia: 'telefono'}; fotoDice = foto; relayDice = []; });
+  /* ...e se intanto chi guarda ha chiuso il dettaglio, non gli si rimette niente davanti */
+  R.fotoVecchiaChiuso = await giro(() => { p2pLibro = {copia: 'telefono'}; fotoDice = foto; relayDice = [];
+    const vero = prendiOrdineP2P; prendiOrdineP2P = id => { vero(id); nodi.p2pDettSheet.aperto = false; }; });
+  /* ...e col libro vero che non risponde resta la copia: il no, se serve, lo dira' la presa */
+  R.fotoRelayGiu = await giro(() => { p2pLibro = {copia: 'telefono'}; fotoDice = foto; relayDice = 'giu'; });
+  R.daiRelay = await giro(() => { fotoDice = {quando: 5, eventi: [], ordini: []}; relayDice = [riga]; });
+  R.nessuno = await giro(() => { p2pLibro = {copia: 'telefono'}; fotoDice = {quando: 5, eventi: [], ordini: []}; relayDice = []; });
+  R.relayGiu = await giro(() => { fotoDice = {quando: 0, eventi: [], ordini: []}; relayDice = 'giu'; });
+  R.veroSenza = await giro(() => { p2pLibro = {}; });
+  R.altrove = await giro(() => { libro = [riga]; p2pLibro = {}; vista = 'view-esplora'; });
+  /* chiuso il dettaglio, davanti non c'e' piu' niente */
+  await giro(() => { libro = [riga]; p2pLibro = {}; });
+  nodi.p2pDettSheet.aperto = false; R.dopoChiuso = condivisoDavantiP2P();
+  /* la riga gentile si toglie, e il libro si ridisegna */
+  await giro(() => { p2pLibro = {}; }); visto = [];
+  ordineSparitoP2P(false);
+  R.tolta = [nodi.p2pOrdineSparito.hidden, visto.map(v => v[0]), condivisoDavantiP2P()];
+  /* «Entra» */
+  visto = []; entraDaDettaglioP2P();
+  R.entra = visto.slice();
+  console.log(JSON.stringify(R));
+})().catch(e => { console.error(e); process.exit(1); });
+""")
+    R = _node_banco(prog) or {}
+    prova("I GEMELLI: il testo del client dice la frase del server, evento per evento",
+          ["🔄 " + g[1] + " · su Barattolo P2P" for g in GEMELLI], R.get("gemelli"))
+    prova("sul PROPRIO ordine il verbo e' in prima persona",
+          ["🔄 Vendo BTC per 50 € · SEPA, Revolut · su Barattolo P2P",
+           "🔄 Compro BTC da 20 a 100 € · Satispay · su Barattolo P2P"], R.get("mio"))
+    prova("...e senza una cifra non c'e' un testo", ["", ""], R.get("muto"))
+    prova("le cifre: migliaia col punto, centesimi solo se ci sono",
+          ["0,50", "5", "23,47", "999", "1.000", "1.250,50", "1.234.567"], R.get("cifre"))
+    prova("il link dell'ordine", "https://barattolo.store/p2p?ordine=" + ID, R.get("link"))
+    prova("la pagina rilegge il link che il tasto scrive — e solo un id fatto bene",
+          [ID, ID, ID, "", "", "", ""], R.get("rilegge"))
+    prova("dal libro: il lato, la cifra, i metodi, e «non e' mio»",
+          {"vende": True, "mio": False, "euro": 50, "euroMax": 0,
+           "metodi": ["SEPA", "Revolut"]}, R.get("altrui"))
+    prova("...«e' mio» lo dice il giudice di sempre", True, R.get("mioNelLibro"))
+    prova("...un ordine che nel libro non c'e' non si condivide", None, R.get("sparito"))
+    prova("...il proprio ordine pubblicato si', col lato tradotto",
+          {"vende": False, "mio": True, "euro": 30, "euroMax": 0, "metodi": ["SEPA"]},
+          R.get("mioSenzaLibro"))
+    prova("...preso no, di un altro no, col nome provvisorio no", [None, None, None],
+          [R.get("mioPreso"), R.get("nonMio"), R.get("provvisorio")])
+    prova("il tasto manda nel tubo il link, il testo e il titolo — e ferma il tocco",
+          ["TUBO", [["tubo", "https://barattolo.store/p2p?ordine=" + ID,
+                     "🔄 Vendesi BTC per 50 € · SEPA, Revolut · su Barattolo P2P",
+                     "Scambio P2P"]], 1],
+          [R.get("tasto"), R.get("tastoVisto"), R.get("fermati")])
+    prova("...e su un ordine sparito lo dice, senza condividere niente",
+          [["toast", "Quest'ordine non è più nel libro"]], R.get("tastoSparito"))
+    bt = R.get("bottoniTutti") or ""
+    prova("a tutti UN bottone, «🔗 Condividi», con l'id nel data-id",
+          [1, True, True, False],
+          [bt.count("<button"), ">🔗 Condividi</button>" in bt,
+           f'data-id="{ID}"' in bt, ID in bt.replace(f'data-id="{ID}"', "")])
+    bn = R.get("bottoniNostr") or ""
+    prova("a chi e' entrato con Nostr anche «Pubblica su Nostr»", [2, True],
+          [bn.count("<button"), "N Pubblica su Nostr</button>" in bn])
+    prova("...in vetrina no, senza relay no, in collaudo si' (non bussa a nessuno)",
+          [1, 1, 2], [R.get("bottoniVetrinaNostr"), R.get("senzaRelay"), R.get("inCollaudo")])
+    prova("in DEMO nessun bottone: il link punterebbe al nulla", "", R.get("bottoniDemo"))
+    prova("un id ostile non esce dall'attributo", False,
+          "<img" in (R.get("bottoniOstile") or "<img"))
+    prova("la card: solo il mio ordine ancora nel libro, col nome vero",
+          [True, "", "", ""], R.get("card"))
+    prova("la pagina del mio ordine: finche' e' nel libro — anche da dove lo si segue soltanto",
+          [True, True, ""], R.get("mioPagina"))
+    nota = R.get("nota") or {}
+    LINK = "https://barattolo.store/p2p?ordine=" + ID
+    prova("la nota: kind 1, il testo col link in fondo, il link nel tag `r`",
+          [1, "aa", "🔄 Vendesi BTC per 50 € · SEPA, Revolut · su Barattolo P2P\n" + LINK,
+           [["r", LINK], ["t", "barattolo"], ["t", "p2p"]]],
+          [nota.get("kind"), nota.get("pubkey"), nota.get("content"), nota.get("tags")])
+    prova("in collaudo si firma e NON si bussa a nessun relay",
+          [True, 1, 0, nota.get("content")], R.get("collaudo"))
+    prova("dal vero parte dal browser, ai relay di casa, firmata da chi e' entrato",
+          [True, [["wss://r1", "wss://r2"], 1, "aa", "S"], "🟣 Pubblicato su Nostr"],
+          R.get("vero"))
+    prova("nessun relay risponde: lo dice, e non e' partito niente",
+          [False, "Nessun relay ha risposto: riprova tra poco (non è partito niente)"],
+          R.get("nessunRelay"))
+    prova("con un'altra chiave non si firma nemmeno", [False, 0, 0], R.get("altraChiave"))
+    prova("il firmatario che cambia la nota: non parte", [False, 0], R.get("alterata"))
+    prova("il firmatario che dice no: non parte", [False, 0], R.get("rifiutata"))
+    prova("il foglio della firma si chiude senza toccare il velo del dettaglio", True,
+          R.get("chiudeIlFoglio"))
+    prova("il tocco: col firmatario pronto firma, senza apre il foglio",
+          [[1, 1], 1], [R.get("toccoAuto"), R.get("toccoFoglio")])
+    prova("chi non e' entrato con Nostr non pubblica, nemmeno chiamando", [0, 0],
+          R.get("senzaNostr"))
+
+    def passi(k):
+        return (R.get(k) or {}).get("passi")
+    prova("dal link: lo scambio MIO apre la sua pagina", ["scambio"], passi("mioScambio"))
+    prova("...l'ordine nel libro vero: il lato giusto, e la strada di un tocco sulla card",
+          ["lato", "render", "prendi"], passi("nelLibroVero"))
+    prova("...chi non e' entrato vede il dettaglio lo stesso",
+          ["lato", "render", "dettaglio"], passi("anonimo"))
+    prova("...la copia del telefono non lo ha: si chiede la fotografia FRESCA, e basta lei",
+          [["foto", "copia", "lato", "render", "prendi", "relay"], [True], ["server"]],
+          [passi("dallaFoto"), (R.get("dallaFoto") or {}).get("fresca"),
+           (R.get("dallaFoto") or {}).get("fonte")])
+    prova("...e il si' di una fotografia si RIGUARDA sul libro vero: sparito li', il dettaglio "
+          "lascia il posto alla riga gentile",
+          [["foto", "copia", "lato", "render", "prendi", "relay", "chiudi", "render"], True],
+          [passi("fotoVecchia"), (R.get("fotoVecchia") or {}).get("sparito")])
+    prova("...ma a chi ha gia' chiuso il dettaglio non si rimette niente davanti",
+          [["foto", "copia", "lato", "render", "prendi", "relay"], False],
+          [passi("fotoVecchiaChiuso"), (R.get("fotoVecchiaChiuso") or {}).get("sparito")])
+    prova("...e col libro vero muto resta la copia, senza errori",
+          [["foto", "copia", "lato", "render", "prendi", "relay"], False],
+          [passi("fotoRelayGiu"), (R.get("fotoRelayGiu") or {}).get("sparito")])
+    prova("...la fotografia non lo ha: si aspetta il libro vero",
+          ["foto", "relay", "lato", "render", "prendi"], passi("daiRelay"))
+    prova("...non c'e' da nessuna parte: la riga gentile, e nessun dettaglio",
+          [["foto", "relay", "render"], True],
+          [passi("nessuno"), (R.get("nessuno") or {}).get("sparito")])
+    prova("...relay giu' e fotografia vuota: la riga gentile lo stesso, mai un errore",
+          [["foto", "relay", "render"], True],
+          [passi("relayGiu"), (R.get("relayGiu") or {}).get("sparito")])
+    prova("...col libro vero in pagina il no e' subito: nessuna domanda in piu'",
+          [["render"], True],
+          [passi("veroSenza"), (R.get("veroSenza") or {}).get("sparito")])
+    prova("...se intanto si e' andati altrove non si apre niente sopra", [],
+          passi("altrove"))
+    prova("il tour aspetta: in volo, col dettaglio aperto, con la riga a vista",
+          [True, True, True, True],
+          [(R.get("nessuno") or {}).get("inVolo"), (R.get("nelLibroVero") or {}).get("davanti"),
+           (R.get("anonimo") or {}).get("davanti"), (R.get("nessuno") or {}).get("davanti")])
+    prova("...chiuso il dettaglio non aspetta piu'", False, R.get("dopoChiuso"))
+    prova("...e tolta la riga il libro si ridisegna (e' li' che il tour riparte)",
+          [True, ["render"], False], R.get("tolta"))
+    prova("«Entra»: chiude il dettaglio e apre l'invito di casa",
+          [["chiudi", "p2pDettSheet"], ["invito", "INVITO-P2P", "p2p"]], R.get("entra"))
+
+
 def prove_altri_scorrimento():
     """«ALTRI OGGETTI DEL VENDITORE» A SCORRIMENTO CONTINUO (ago 2026):
     in fondo al dettaglio si vede TUTTO il negozio, una pagina alla
@@ -59354,6 +59923,11 @@ def prove_p2p_libro():
                         r'(?:<!--[\s\S]*?-->\s*)?'
                         r'(?:<button [^>]*id="p2pFeeBanner"[\s\S]*?'
                         r'</button>\s*)?'
+                        # ...e la riga dell'ordine condiviso che non c'e'
+                        # piu' (10 ott 2026): fuori dal blocco anche lei,
+                        # subito sopra il corpo che scorre
+                        r'(?:<!--[\s\S]*?-->\s*<div [^>]*id="p2pOrdineSparito"'
+                        r'[\s\S]*?</button>\s*</div>\s*)?'
                         r'<div id="p2pCorpo">', mini) is not None)
     # ⚠️ IL LIBRO NON HA VELO, ed e' una decisione presa e disfatta in
     # un pomeriggio (22 set 2026): per un'ora la testata ha avuto dietro
@@ -61630,6 +62204,9 @@ let p2pLibro = null;
    `prove_recensione_p2p`), e serve anche a non far esplodere il
    banco: senza, il foglio nomina una variabile che non c'e'. */
 let myTgId = 111;
+/* ...e la vetrina anonima (10 ott 2026): il piede del dettaglio la
+   guarda per dare «Entra» a chi non e' entrato */
+let VETRINA = false;
 let myRiconosciP2P = false;
 /* le impostazioni del coordinator e la busta delle leve: i casi del
    conto le girano come vogliono, e il p2pCoord e' quello VERO */
@@ -77675,8 +78252,12 @@ def prove_p2p_server():
     # nuova. Il dettaglio chiede anche lui a `ordineTuoP2P`.
     prova("...e lo chiamano il giudice unico e il volto della card nuova", 2,
           solo_codice(mini).count("ordineMioP2P(") - 1)
+    # ...E DAL 10 OTT 2026 IN SEI: il «Condividi» di un ordine chiede allo
+    # stesso giudice se l'ordine del libro e' mio, per scegliere il verbo
+    # («Vendo» sul mio, «Vendesi» su quello di un altro:
+    # `ordineDaCondividereP2P`).
     prova("...e il giudice unico lo chiamano la card, la porta, la cintura, il "
-          "dettaglio e la fila della home", 5,
+          "dettaglio, la fila della home e il «Condividi»", 6,
           solo_codice(mini).count("ordineTuoP2P(") - 1)
     # --- 15c) LA CINTURA PRIMA DI FIRMARE (14 set 2026) ------------
     # Lo strato sotto all'avviso: OTTO posti derivano la trade key dal
@@ -78604,8 +79185,14 @@ def prove_p2p_card_scambio():
     # stessa cosa tre centimetri piu' giu', dove l'occhio arriva per
     # ultimo. Le due non potevano comunque coesistere: l'una vive sugli
     # stati vivi, l'altra sui finali.
+    # ⚠️ ...E «🔗 CONDIVIDI» (10 ott 2026), che vive sull'ordine ancora
+    # nel libro: nemmeno lui incontra la ✕ — un ordine `pubblicato` non
+    # si toglie — quindi il piede resta di UN pezzo, e senza nessuno dei
+    # due continua a non scriversi.
     prova("il piede non si scrive quando non ha niente da dire", True,
-          "(via ? '<div class=\"p2p-meta\">'" in rs)
+          "+ ((via || (typeof condividiCardP2P === 'function' && condividiCardP2P(o)))\n"
+          "        ? '<div class=\"p2p-meta\">' + (via || condividiCardP2P(o)) + '</div>' : '')"
+          in rs)
 
     # --- 2) UN POSTO SOLO PER I PEZZI CONDIVISI ----------------------
     riga = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
@@ -86845,7 +87432,8 @@ def _banco_ricarica_resta(mini, scenari, url="/"):
         + "".join(_const(n) for n in (
             "RADICE_MADRE", "VISTE_NAV_P2P", "MADRE_P2P", "FIGLIE_P2P", "chiaveVetrina",
             "navStesso", "mqApp", "navSitoBrowser", "NEGOZIO_URL", "ANNUNCIO_URL",
-            "SICUREZZA_URL", "PRIVACY_URL", "P2P_URL", "CONSIGLIATI_URL", "CATEGORIA_URL",
+            "SICUREZZA_URL", "PRIVACY_URL", "P2P_URL", "P2P_SCAMBIO_URL",
+            "P2P_ORDINE_URL", "CONSIGLIATI_URL", "CATEGORIA_URL",
             "CATEGORIA_DA_URL", "OFFERTA_URL", "BARATTOLO_URL", "BOZZA_URL",
             "INVITO_ALFABETO_CLIENT"))
         + _blocco("const navUguali = ", "));")
@@ -138270,6 +138858,7 @@ def main():
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_condivisione_venditore, prove_condividi_col_link,
+              prove_condividi_ordine_p2p,
               prove_zona_comune_in_modifica,
               prove_cassa_strada_chiusa,
               prove_casa_vuota_gratis,

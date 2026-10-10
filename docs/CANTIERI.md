@@ -44997,3 +44997,200 @@ sezione in `prove_reputazione_p2p`, emendate (con «Tutti» nessun
 `.hint`; con 3+ la frase esatta e un solo `.hint`; la frase a 1, 5, 0 e
 fuori catalogo). Dal vivo: i quattro scatti delle quattro scelte in
 `.claude/giri/testi-accesso-p2p/`. GUIDA-P2P-PASSI §4 aggiornata.
+
+## Il «Condividi» di un ordine P2P (10 ott 2026, cantiere condividi-ordine-p2p, idea di un utente, richiesta di Andrea)
+
+Un utente ha chiesto di poter mandare un ordine del libro FUORI da
+Barattolo — Nostr, Telegram, dovunque — per farlo conoscere. Fino a
+oggi si poteva condividere solo la sezione (`/p2p`, dal tocco lungo
+sulla card), mai un ordine.
+
+**COSA C'È ADESSO.** Cinque pezzi, nell'ordine della richiesta.
+1. IL TASTO «🔗 Condividi» nel dettaglio di un ordine del libro (anche
+   altrui, anche per chi non è entrato), in fondo al corpo, sopra i due
+   bottoni della decisione. Passa dal tubo di casa, `condividiLink` —
+   il foglio di condivisione del telefono dove c'è, il selettore di
+   Telegram nella Mini App, e in fondo «Link copiato 🔗» — che è quello
+   degli annunci: un secondo tubo sarebbe un secondo posto dove il link
+   si perde (vedi «Il link nel "Condividi"», 24 set). Il vestito è il
+   `btn ghost` di «🔗 Condividi questa pagina».
+2. IL LINK, `/p2p?ordine=<id>`: apre QUELL'ordine da Telegram, dal
+   browser e da non loggati. Chi non è entrato vede il dettaglio intero
+   e, al posto di «Compra»/«Vendi», «Entra» (apre l'invito di casa);
+   chi è entrato passa dalla strada di un tocco sulla card
+   (`prendiOrdineP2P`, con tutte le sue guardie); chi ha quell'ordine
+   fra i SUOI scambi atterra sulla sua pagina. Se l'ordine non c'è più
+   (preso, scaduto, ritirato, mai esistito) si resta sul libro degli
+   altri, con sopra la riga «Questo ordine non è più disponibile» e la
+   sua ✕.
+3. L'ANTEPRIMA: titolo «Vendesi BTC per 50 € · SEPA, Revolut —
+   Barattolo P2P», descrizione fissa, l'immagine P2P di ieri
+   (`assets/p2p-anteprima.jpg`), NOINDEX. La legge `_seo_ordine_p2p`
+   dalla fotografia del libro in memoria: né database né relay per
+   richiesta. Un ordine sparito ricade sulla testa del libro.
+4. «PUBBLICA SU NOSTR», per chi è entrato con Nostr: un kind 1 col
+   testo e il link (più il tag `r` col link e i `t` barattolo e p2p),
+   firmato da lui col suo firmatario — chiave su questo dispositivo,
+   bunker, estensione, o il foglio della firma — e mandato ai relay DAL
+   BROWSER. Non era complicato: la scala dei firmatari
+   (`firmatarioAutomatico`, `apriNostrSheet`) e `pubblicaEventoSuRelay`
+   c'erano già, e i relay sono quelli che /me porta per la dichiarazione
+   di fiducia (`nip85_relays`). NESSUNA rotta nuova: il server la nota
+   non la vede, non la prepara e non la firma.
+5. SUI PROPRI ORDINI: la voce «🔗 Condividi» nel piede della card di «I
+   miei scambi» e la riga dei bottoni nella pagina del proprio ordine,
+   sopra «✕ Annulla l'ordine» — finché l'ordine è nel libro
+   (`pubblicato`, col nome vero).
+
+**LE DECISIONI, COI PERCHÉ.**
+- `?ordine=` E NON `?scambio=`. Il link profondo di stamattina
+  (`/p2p?scambio=<id>`, il promemoria della garanzia) c'era, e la
+  richiesta diceva di riusarlo se esisteva: si riusa la PAGINA e la
+  forma dell'id, non il nome. `scambio` vuol dire «il MIO scambio»: se
+  la riga su quel telefono non c'è porta a «I miei scambi», dove nasce.
+  `ordine` vuol dire «un ordine del LIBRO»: se non c'è più lo dice. Con
+  un nome solo, l'avviso di uno scambio preso aperto su un telefono
+  nuovo avrebbe detto «non più disponibile» a chi lo sta facendo. Se
+  nell'indirizzo ci sono tutti e due vince `scambio`.
+- «VENDO» SOLO SUL PROPRIO. Il testo d'esempio era in prima persona, ma
+  il tasto c'è anche sugli ordini altrui: «Vendo» in bocca a chi non
+  vende è una bugia che viaggia inoltrata. Sul proprio ordine «Vendo» /
+  «Compro» (lo dice il giudice di sempre, `ordineTuoP2P`), su quello di
+  un altro «Vendesi» / «Cercasi», che sono le parole di un annuncio. E
+  l'anteprima, che non sa chi condivide, dice sempre «Vendesi» /
+  «Cercasi».
+- «50 €» E NON «50,00 €»: in una riga letta al volo gli zeri sono
+  rumore; i centesimi veri restano («23,47 €»), le migliaia col punto.
+  Su un intervallo il «per» cade: «Vendesi BTC da 20 a 100 €».
+- I METODI sono parole di sconosciuti: una riga sola, quaranta
+  caratteri a voce, niente doppioni, i primi tre e poi «e altri». Il
+  tabacchino perde l'importo che si porta nel nome.
+- NIENTE DI PERSONALE: lato, cifra, metodi — quel che il libro pubblico
+  dice già. Mai chi ha pubblicato: nel server gli `autori` restano
+  nella fotografia e da `_seo_ordine_p2p` non passano (c'è la prova).
+- DUE GEMELLI: `_frase_ordine_p2p` (server, il titolo dell'anteprima) e
+  `testoOrdineCondivisoP2P` (client, il messaggio). Una prova li fa
+  girare sugli STESSI 38383 — uno in Python e uno in node, col lettore
+  vero del libro — e pretende la stessa frase.
+- «NON C'È PIÙ» SOLO SU UNA PAROLA FRESCA. La copia del libro sul
+  telefono può avere giorni: se in pagina non c'è il libro vero, prima
+  si chiede la fotografia del server (senza cache), poi si aspetta il
+  libro vero dai relay. Solo dopo, il no.
+- IL TOUR DELLA PRIMA VOLTA ASPETTA. Chi arriva da un link è quasi
+  sempre nuovo, e il tour — un fondo pieno — gli avrebbe coperto
+  proprio l'ordine. `condivisoDavantiP2P` lo tiene fermo mentre si
+  cerca l'ordine, finché il dettaglio è aperto e con la riga gentile a
+  vista; riparte al primo ridisegno del libro.
+- I DUE BOTTONI IN COLONNA. Affiancati, a 390 px «Pubblica su Nostr»
+  andava su due righe e alzava anche il vicino (75 px invece di 52).
+
+**CORRETTO DAL VIVO** (tre cose che le prove non potevano dire).
+- UN ORDINE ANNULLATO DA DIECI SECONDI SI APRIVA COME VIVO: la
+  fotografia del server ha fino a un minuto, e in quel minuto lo porta
+  ancora. `riguardaCondivisoP2P`: se il dettaglio si è aperto su una
+  copia, appena arriva il libro vero lo si riguarda, e se l'ordine non
+  c'è più il dettaglio lascia il posto alla riga gentile — solo se chi
+  guarda è ancora lì (stesso ordine, dettaglio aperto, nessun foglio
+  sopra). In produzione la finestra è più stretta (mostrod avvisa e la
+  fotografia si rifà subito), ma c'è.
+- LA RIGA «SOLO DA GUARDARE» NON AVEVA IL TASTO: l'avevo escluso con
+  gli altri gesti, ma condividere non vuole la chiave dello scambio —
+  ed è proprio il telefono su cui uno apre il link del SUO ordine.
+- «Entra per scambiare» andava su due righe: «Entra».
+
+**STRADE SCARTATE.** Una rotta nuova `/p2p/ordine/<id>`: avrebbe
+aggiunto una rotta-pagina dove basta un parametro, e un secondo posto
+da cui la pagina si apre. Una rotta del server che PREPARA la nota
+Nostr (come le firme degli annunci): lì serve perché il server deve
+credere all'evento; qui non deve saperne niente. Il tag `a` verso il
+38383 del coordinatore: lo leggerebbero solo i client che conoscono
+Mostro, e lega la nota alla npub del nodo — si può aggiungere. Il tasto
+come icona nella testata del foglio: non c'era posto per il secondo.
+
+**SENTINELLE RITOCCATE** (cambiano perché cambia il fatto, e ognuna
+dice perché): le rotte-pagina contano un `return _pagina_con_meta(` in
+più, quello di `/p2p` con l'ordine; `etichettaNostr` torna a otto
+chiamate; `ordineTuoP2P` ha un sesto chiamante; il piede della card di
+«I miei scambi»; la forma del blocco attaccato del libro (la riga
+gentile sta fuori, sopra il corpo). Due banchi hanno imparato un pezzo:
+quello del dettaglio (`VETRINA`) e quello della navigazione
+(`P2P_SCAMBIO_URL` e `P2P_ORDINE_URL` — la prima mancava da stamattina,
+e il banco reggeva per caso: la porta alzava DOPO essere entrata).
+
+**PROVATO.** `prove_condividi_ordine_p2p` (79): la frase su sei eventi,
+l'ordine vivo e i sei modi di non esserlo (id storto, preso, annullato,
+scaduto, altra valuta, leva spenta), i meta eseguiti (titolo,
+descrizione, indirizzo, immagine con la misura, noindex, niente autori,
+il metodo ostile escapato), la rotta eseguita (il guasto dell'anteprima
+non ferma la pagina); in node, i pezzi veri del client: i gemelli, le
+cifre, il link e la regola con cui la pagina lo rilegge, cosa si può
+dire di un ordine, il tasto nel tubo, i bottoni, la nota e la firma
+(chiave giusta, altra chiave, nota alterata, rifiuto, collaudo, nessun
+relay), e l'arrivo dal link in dodici scenari. TORTURA: 41 mutazioni su
+una copia intera, 41 rosse (al primo giro erano 40: la rotta che rialza
+faceva ESPLODERE il banco invece di arrossarlo, e la prova ora la
+prende e la dice).
+DAL VIVO (Chrome a 390×844 e a 320 con Playwright, tocchi veri, copia
+in collaudo; un coordinatore di cartone con una chiave usa-e-getta che
+FIRMA i suoi 38383 su un relay nak solo loopback: il server li legge
+davvero e fa la fotografia; nessun relay vero): da anonimo il link apre
+il dettaglio con «Chiudi» ed «Entra», e il titolo della scheda è quello
+dell'ordine; «Entra» apre l'invito; da entrato «Annulla» e «Compra»;
+dentro Telegram (hash di collaudo) l'ordine a intervallo si apre sul
+lato giusto e il tasto consegna al selettore `url` e testo; il tocco su
+«Condividi» col registratore al posto del foglio: «🔄 Vendesi BTC per
+50 € · SEPA, Revolut · su Barattolo P2P» e il link in fondo, un campo
+solo su Android; senza foglio «Link copiato 🔗» e il link negli
+appunti; «I miei scambi» di 222 con la voce nel piede, che non apre la
+card e dice «🔄 Vendo BTC per 30 € · SEPA»; il link del proprio ordine
+su un telefono senza la riga apre la sua pagina; «Pubblica su Nostr»
+con un'estensione di cartone che firma davvero: in collaudo firma e non
+bussa, e verso il SOLO relay locale la nota parte dal browser e si
+rilegge dal relay con la firma buona; l'ordine annullato sul momento:
+prima il dettaglio, poi la riga gentile, e tolta la riga parte il tour;
+un id mai esistito: la riga; `/p2p` nudo: niente riga; l'anteprima del
+server ricade sul libro in 52 secondi; a 320 i due bottoni stanno in
+una riga ciascuno e la pagina non sfora. Quindici scatti in
+`.claude/giri/condividi-ordine-p2p/` (gitignored).
+
+**NON PROVATO, DA GUARDARE.** • Il telefono vero: il foglio di
+condivisione di Android e di iPhone (su iPhone il link va nel testo E
+nell'`url`: un'app che li tiene tutti e due lo mostra due volte, il
+prezzo già scritto il 24 set), e l'anteprima vera in Telegram e in
+WhatsApp. • Toccare il link DA Telegram: si apre nel browser di
+Telegram, non nella Mini App — chi è entrato solo nel bot lì è un
+anonimo, vede l'ordine e «Entra», e dopo essere entrato dal bot
+l'ordine deve ritrovarselo nel libro (la stessa cosa annotata
+stamattina per «⚡ Apri lo scambio»; la cura sarebbe un link
+`t.me/…?startapp=`). • La nota su Nostr coi relay veri e con un bunker
+vero: c'è la prova e il relay locale, non l'occhio. • Chiuso il
+dettaglio aperto dal link, il tour della prima volta parte al primo
+ridisegno del libro (pochi secondi), non all'istante. • Un ordine in
+un'altra valuta pubblicato da un altro client sul nostro coordinatore:
+il libro non lo mostra, e il suo link dice «non più disponibile» anche
+se è vivo.
+
+**IL VERBALE DEL PUSH (10 ott 2026).** Main è corso cinque volte a
+cantiere aperto: dodici commit non miei (il cronometro della fattura,
+la reputazione del P2P con la riga del conto e il testo del filtro, le
+statistiche del P2P, il controllo della fattura con le sue due cure
+dello scanner, «I tuoi dati» e gli esiti). COSA È GIRATO SU QUALE
+ALBERO. Sull'albero di partenza (`bb6d453`): suite severa 20.941 verdi
+e 0 rosse, collaudi della CI 48 su 48, la tortura (41 su 41) e tutto il
+giro dal vivo. Ribasato su `f2e7436` — due conflitti, tenuti i due
+lati: in coda a CANTIERI, e nel dettaglio del libro dove il «Condividi»
+sta SOPRA il «no» del server della reputazione, che deve restare
+attaccato ai bottoni —: suite 21.045 verdi, collaudi 49 su 49, i
+simboli che il cantiere chiama ricontati per nome. Ribasato su
+`b2b3d92` (code di CANTIERI e ARCHITETTURA): suite 21.199 verdi,
+collaudi 51 su 51; lì lo scanner dei segreti era ROSSO per una riga di
+PRODUZIONE non mia (il controllo della fattura): non l'ho curata io, ho
+aspettato le due cure su main. Ribasato su `0c333a9` (coda di
+CANTIERI): suite severa 21.213 verdi e 0 rosse, collaudi 51 su 51.
+Ribasato su `658d941` senza conflitti (di là cambiano solo il workflow
+e CANTIERI): i due passi dello scanner dei segreti puliti come li gira
+la CI, la prova del cantiere e quella delle anteprime (184 verdi);
+suite e collaudi NON rifatti su quest'ultima punta. Il giro dal vivo e
+la tortura non sono stati rifatti dopo i rebase: i commit arrivati
+toccano il dettaglio solo con la riga del «no», che le prove di
+tutt'e due i cantieri tengono.

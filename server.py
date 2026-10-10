@@ -70304,6 +70304,100 @@ LINK_LIBRO_P2P = f"{URL_PUBBLICO}/p2p"
 TESTA_P2P = _testa_seo(TITOLO_P2P, META_TESTO_P2P, immagine=IMMAGINE_P2P,
                        url=f"{URL_PUBBLICO}/p2p", indicizza=False)
 
+# ═══ L'ORDINE P2P CONDIVISO (10 ott 2026, idea di un utente) ═══
+# Un ordine del libro si puo' mandare in giro: `/p2p?ordine=<id>` apre
+# QUELL'ordine, e la sua anteprima dice cosa offre invece del generico
+# «Scambio P2P». E' la STESSA pagina di /p2p con un parametro in piu',
+# non una rotta nuova: il link profondo degli avvisi (`?scambio=<id>`,
+# stamattina) apre lo scambio di CHI lo riceve, questo apre l'ordine
+# per CHIUNQUE — due domande diverse, e per questo due nomi.
+# L'ANTEPRIMA SI LEGGE DALLA FOTOGRAFIA IN MEMORIA (`_P2P_FOTO`): niente
+# database e niente relay per richiesta, come la rotta del libro. Dice
+# SOLO quel che il libro pubblico dice gia' a chiunque — il lato, la
+# cifra, i metodi — e mai chi l'ha pubblicato: gli `autori` restano in
+# memoria e da qui non passano.
+# UN ORDINE CHE NON C'E' PIU' (preso, scaduto, annullato, mai esistito)
+# ricade sulla testa del libro: la pagina che si apre e' il libro con
+# la riga gentile, e l'anteprima dice quello che si trovera'.
+# SEMPRE NOINDEX, come il libro e piu' del libro: un ordine vive ore.
+# LE PAROLE SONO «Vendesi» E «Cercasi», quelle di un annuncio: a
+# condividere puo' essere chiunque, e «Vendo» in bocca a chi non vende
+# sarebbe una bugia (il client dice «Vendo»/«Compro» solo a chi
+# condivide il SUO: `testoOrdineCondivisoP2P`, il gemello di questa
+# frase — una prova li tiene in pari).
+TETTO_METODI_CONDIVISI_P2P = 3
+META_TESTO_ORDINE_P2P = (
+    "Un ordine aperto nel libro dello scambio P2P di Barattolo: aprilo "
+    "per vedere il prezzo e scambiare sats da persona a persona.")
+
+
+def _metodi_condivisi_p2p(metodi) -> str:
+    """PURA: i metodi come si SCRIVONO in un testo che viaggia. Sono
+    parole di sconosciuti (il `pm` e' testo libero): una riga sola,
+    quaranta caratteri a voce, niente doppioni, i primi tre e poi «e
+    altri» — un messaggio non e' il posto di un elenco."""
+    puliti = []
+    for m in _metodi_libro(metodi):
+        m = " ".join(str(m).split())[:40].strip()
+        if m and m not in puliti:
+            puliti.append(m)
+    testo = ", ".join(puliti[:TETTO_METODI_CONDIVISI_P2P])
+    return testo + (" e altri" if len(puliti) > TETTO_METODI_CONDIVISI_P2P else "")
+
+
+def _frase_ordine_p2p(o) -> str:
+    """PURA: «Vendesi BTC per 50 € · SEPA, Revolut», dalla riga di
+    `_evento_libro_p2p`. Vuota se non c'e' una frase da dire (lato
+    storto, nessuna cifra): chi chiama ricade sul libro. La cifra e'
+    quella di `_euro_libro` senza gli zeri dei centesimi, che in una
+    riga da leggere al volo sono rumore; i centesimi veri restano.
+    Su un intervallo il «per» cade: «Vendesi BTC da 20 a 100 €»."""
+    if not o or o.get("lato") not in ("sell", "buy"):
+        return ""
+    euro = _euro_libro(o.get("euro"), o.get("metodi")).replace(",00", "")
+    if not euro:
+        return ""
+    metodi = _metodi_condivisi_p2p(o.get("metodi"))
+    return (("Vendesi" if o["lato"] == "sell" else "Cercasi") + " BTC "
+            + ("" if euro.startswith("da ") else "per ") + euro
+            + (f" · {metodi}" if metodi else ""))
+
+
+def _ordine_condiviso_p2p(oid: str, adesso: int = 0):
+    """L'ordine VIVO con quell'id, dalla fotografia in memoria, o None.
+    Vivo come lo intende il libro del client: `pending`, non scaduto,
+    in euro (`libroDaEventi` tiene solo quelli: un ordine in un'altra
+    valuta la pagina non lo mostrerebbe, e un'anteprima che promette
+    quel che la pagina non apre e' il difetto da non fare). A leva
+    spenta non c'e' nessun ordine da dire."""
+    if not oid or not FORMA_ORDINE_P2P.match(oid) or not _p2p_leve()["attivo"]:
+        return None
+    adesso = adesso or int(time.time())
+    for ev in _P2P_FOTO.get("eventi") or []:
+        if (not isinstance(ev, dict) or ev.get("kind") != 38383
+                or _tag_evento_p2p(ev, "d") != oid):
+            continue
+        o = _evento_libro_p2p(ev)
+        if (not o or o["stato"] != "pending"
+                or (o["scade"] and o["scade"] <= adesso)
+                or _tag_evento_p2p(ev, "f").upper() != "EUR"):
+            return None
+        return o
+    return None
+
+
+def _seo_ordine_p2p(oid: str):
+    """(testa, titolo) per `/p2p?ordine=<id>`: quelli dell'ordine se
+    c'e' ancora, quelli del libro altrimenti."""
+    frase = _frase_ordine_p2p(_ordine_condiviso_p2p(oid))
+    if not frase:
+        return TESTA_P2P, TITOLO_P2P
+    titolo = f"{_taglia_meta(frase, 80)} — Barattolo P2P"
+    return _testa_seo(titolo, META_TESTO_ORDINE_P2P,
+                      f"{URL_PUBBLICO}/p2p?ordine={oid}",
+                      immagine=IMMAGINE_P2P, indicizza=False), titolo
+
+
 # E NEMMENO LA QUARTA, e per una ragione sua: la pagina dei Consigliati
 # puo' restare VUOTA — lo spazio sponsorizzato scade da solo, e una
 # pagina senza logo non entra — e un risultato di ricerca che porta a un
@@ -71361,10 +71455,17 @@ def pagina_privacy():
 
 
 @app.get("/p2p")
-def pagina_p2p():
+def pagina_p2p(ordine: str = ""):
     """Link condivisibile dello scambio P2P: la terza sorella di
     /sicurezza e /privacy, stessa liturgia — stessa Mini App, il JS
     legge /p2p dall'URL e apre la vista.
+
+    COL PARAMETRO `ordine` (10 ott 2026) e' il link di UN ordine del
+    libro, quello che esce dal «Condividi»: la pagina e' la stessa — ad
+    aprire l'ordine e' il client — e cambia solo la testa, che dice
+    cosa offre (`_seo_ordine_p2p`, dalla fotografia in memoria). Un id
+    storto, un ordine sparito o un guasto ricadono sulla testa del
+    libro: un'anteprima e' un ornamento, la pagina si apre comunque.
 
     NON E' UNA VISTA SCELTA QUI: il client chiama il suo giudice unico
     (`vaiP2P`), quindi chi ha la leva accesa atterra sul libro degli
@@ -71372,9 +71473,16 @@ def pagina_p2p():
     deve sapere quale dei due: la leva e' per persona, e una pagina
     che la leggesse qui dovrebbe conoscere chi bussa — cosa che a un
     link condiviso non succede.
-    Nessun `{parametro}` come nelle due sorelle: la pagina e' UNA, e
-    per la stessa ragione la sua testa e' una costante. Che sia
-    NOINDEX lo dice la voce di TESTA_P2P, col perche'."""
+    Nessun `{parametro}` nel percorso come nelle due sorelle: la
+    pagina e' UNA, e senza `ordine` la sua testa e' una costante. Che
+    sia NOINDEX lo dice la voce di TESTA_P2P, col perche'."""
+    if ordine:
+        try:
+            testa, titolo = _seo_ordine_p2p(ordine)
+        except Exception as e:
+            print(f"⚠️ Anteprima dell'ordine P2P non costruita: {e}", flush=True)
+            testa, titolo = TESTA_P2P, TITOLO_P2P
+        return _pagina_con_meta(testa, titolo)
     return _pagina_con_meta(TESTA_P2P, TITOLO_P2P)
 
 

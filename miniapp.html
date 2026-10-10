@@ -3838,6 +3838,32 @@
      due: `.p2p-meta` vuota lascerebbe un respiro che non separa
      niente. */
   .p2p-x{margin-left:auto}
+  /* IL «CONDIVIDI» DI UN ORDINE (10 ott 2026, idea di un utente).
+     Nel dettaglio e nella pagina del proprio ordine e' una riga di
+     bottoni `ghost`, il vestito di «🔗 Condividi questa pagina»: uno
+     per tutti, e accanto «Pubblica su Nostr» per chi e' entrato con
+     Nostr. STANNO UNO SOTTO L'ALTRO, a tutta larghezza: affiancati,
+     a 390 px «Pubblica su Nostr» andava su due righe e alzava anche
+     il vicino (visto dal vivo: 75 px invece di 52), e a 320 peggio.
+     Il margine dei `.btn` si azzera perche' il respiro lo da' la colonna.
+     SULLA CARD DI «I MIEI SCAMBI» e' una voce piccola nel piede, a
+     destra come la ✕: le due non si incontrano — la ✕ vive sui
+     finali, questa solo sull'ordine ancora nel libro — quindi il
+     piede resta di UN pezzo, la misura per cui era stato provato. Il
+     bersaglio cresce col suo `::after`, come quello della ✕. */
+  .p2p-condividi{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+  .p2p-condividi .btn{width:100%;margin:0}
+  .p2p-condividi-mini{position:relative;margin-left:auto;border:0;
+    background:none;color:var(--muted);font:inherit;font-weight:700;
+    padding:4px 2px;cursor:pointer}
+  .p2p-condividi-mini::after{content:'';position:absolute;inset:-10px -6px}
+  /* L'ORDINE CONDIVISO CHE NON C'E' PIU': una riga gentile sopra il
+     libro, col suo ✕. `hidden` deve vincere sul `display:flex`. */
+  .p2p-sparito{display:flex;align-items:flex-start;gap:10px;
+    margin:12px 0 4px;padding:12px;font-size:13.5px;line-height:1.4}
+  .p2p-sparito[hidden]{display:none}
+  .p2p-sparito b{display:block;color:var(--ink);font-size:15px;margin-bottom:2px}
+  .p2p-sparito>div{flex:1;min-width:0}
   #view-p2p .btn{margin-top:14px}
   /* la voce che riapre il tour: discreta, centrata, con l'aria di
      una nota a pie' di pagina — che e' quel che e' */
@@ -11095,6 +11121,17 @@ document.getElementById('cartello')?.remove();</script>
            Se il file non arriva il bottone se ne va: un bottone vuoto
            in cima al libro sarebbe un buco. -->
       <button type="button" class="p2p-fee-banner" id="p2pFeeBanner" aria-haspopup="dialog" onclick="apriFeeP2P()"><img src="/assets/p2p-banner-fee.webp" width="1000" height="258"alt="Fee P2P: 2% barrato, in beta 1,5% per parte, in beta 1% per pionieri o livello 5" onerror="this.parentNode.remove()"><span class="fee-pz fee-pz1" aria-hidden="true"><i></i></span><span class="fee-pz fee-pz2" aria-hidden="true"><i></i></span><span class="fee-pz fee-pz3" aria-hidden="true"><i></i></span><span class="fee-pz fee-pz3 fee-tag" aria-hidden="true"><i></i></span><span class="fee-barra" aria-hidden="true"></span></button>
+      <!-- L'ORDINE CONDIVISO CHE NON C'E' PIU' (10 ott 2026): chi apre
+           il link di un ordine preso, scaduto o ritirato atterra sul
+           libro degli altri, e questa riga gli dice perche' non vede
+           quello che cercava. Markup fisso, la accende e la spegne
+           `ordineSparitoP2P`; sta SOPRA il corpo che `renderP2P`
+           riscrive, cosi' un ridisegno del libro non la porta via. -->
+      <div class="p2p-box p2p-sparito" id="p2pOrdineSparito" role="status" hidden>
+        <div><b>Questo ordine non è più disponibile</b>
+          È stato preso, è scaduto oppure chi l'aveva pubblicato l'ha ritirato. Qui sotto trovi gli altri ordini aperti.</div>
+        <button type="button" class="order-x" aria-label="Chiudi l'avviso" onclick="ordineSparitoP2P(false)">✕</button>
+      </div>
       <div id="p2pCorpo"></div>
       <!-- LA RIGA DISCRETA DEL LIBRO SUBITO (26 set 2026): finche' i
            relay non hanno risposto, sopra la barra e fuori dal flusso
@@ -52952,6 +52989,13 @@ function scordaTourP2P(){
    col gesto indietro e dalla cronologia — che da li' non passano mai. */
 function apriTourP2PSePrimaVolta(){
   if (tourP2PInCorso || tourInCorso || testModaleInCorso) return;
+  /* L'ORDINE CONDIVISO PASSA DAVANTI (10 ott 2026): chi arriva dal link
+     di un ordine e' quasi sempre alla prima volta, e il tour — un fondo
+     pieno sopra tutta la pagina — gli coprirebbe proprio la cosa che
+     ha chiesto di vedere. Aspetta: parte al primo ridisegno del libro
+     dopo che il dettaglio (o la riga «non piu' disponibile») si e'
+     chiuso. Il giudice vive col «Condividi», da qui il typeof. */
+  if (typeof condivisoDavantiP2P === 'function' && condivisoDavantiP2P()) return;
   /* CHI E' DENTRO ASPETTA /me (26 set 2026): il tour ormai si apre
      all'ingresso, e prima di /me i timbri del profilo non ci sono —
      chi l'ha visto su un altro dispositivo se lo ritroverebbe. /me lo
@@ -57448,12 +57492,28 @@ function renderDettaglioP2P(){
     (myTgId < 0 && !myRiconosciP2P
       ? '<div class="hint">🕶️ Tu resti anonimo: sei entrato con un profilo senza nome, e chi ha pubblicato non saprà chi sei. Il suo profilo invece lo vedi qui sopra. Se vuoi farti riconoscere — e potervi recensire — c\'è l\'interruttore nel cassetto «🔔 Avvisi».</div>'
       : '') +
+    /* IL «CONDIVIDI» (10 ott 2026): in fondo al corpo, sopra i due
+       bottoni della decisione — e' un gesto di contorno, e non deve
+       stare fra il conto e «Compra». Vale per ogni ordine del libro,
+       anche altrui e anche per chi non e' entrato: chi arriva da un
+       link e' proprio chi lo rimanda. */
+    (typeof bottoniCondividiP2P === 'function' ? bottoniCondividiP2P(o.id) : '') +
     /* IL «NO» DEL SERVER, sopra i bottoni (10 ott 2026, reputazione-p2p):
        il filtro di chi ha pubblicato o il limite delle prese, con la frase */
     (tuo || typeof avvisoVetoP2P !== 'function' ? '' : avvisoVetoP2P(o.id)) +
     (tuo
       ? '<div class="foglio-piede sola" id="p2pDettTuoPiede">' +
           '<button type="button" class="btn ghost" onclick="navIndietro()">Indietro</button>' +
+        '</div>'
+      /* CHI NON E' ENTRATO VEDE L'ORDINE E LA PORTA (10 ott 2026): qui
+         ci arriva solo dal link di un ordine condiviso
+         (`apriOrdineCondivisoP2P`) — dal libro il tocco su una card lo
+         ferma prima, sull'invito. Al posto di «Compra»/«Vendi», che non
+         potrebbe premere, il bottone che lo fa entrare. */
+      : (VETRINA || !myTgId)
+      ? '<div class="foglio-piede">' +
+          '<button type="button" class="btn ghost" onclick="navIndietro()">Chiudi</button>' +
+          '<button type="button" class="btn orange" id="p2pDettVai" onclick="entraDaDettaglioP2P()">Entra</button>' +
         '</div>'
       /* LE PRESE DALLE 10 (9 ott 2026): il bottone c'e', spento, e dice
          quando — nello stesso posto di «Compra», che un bottone sparito
@@ -58628,6 +58688,10 @@ function renderOrdineP2P(){
        sopra il niente. La garanzia la dice il conto qui sopra con le
        sue cifre, e la spiega per intero «Info P2P», dove c'e' lo
        spazio anche per il perche'. */
+    /* IL «CONDIVIDI» DEL PROPRIO ORDINE (10 ott 2026): finche' e' nel
+       libro, sopra «✕ Annulla l'ordine» — prima il gesto che lo fa
+       conoscere, poi quello che lo toglie */
+    (typeof condividiMioP2P === 'function' ? condividiMioP2P(o) : '') +
     riquadroRecensioneP2P(o, rec) +
     secondarie.map(a => (typeof preseChiuseP2P === 'function' && preseChiuseP2P() && SECONDARI_CHIUSI_P2P[a])
                         || (scadutoTab && SECONDARI_EVIDENZA_P2P[a])
@@ -66590,7 +66654,12 @@ function rigaScambioP2P(o){
        sugli stati vivi, l'altra sui finali. Senza di lei la riga non
        si scrive proprio: una `.p2p-meta` vuota lascerebbe un respiro
        che non separa niente. */
-    + (via ? '<div class="p2p-meta">' + via + '</div>' : '')
+    /* ...e «🔗 Condividi» (10 ott 2026), che vive sull'ordine ANCORA
+       NEL LIBRO: le due voci non si incontrano mai — un ordine
+       `pubblicato` non si toglie con la ✕ — e la riga resta di un
+       pezzo solo. Il giudice vive col «Condividi», da qui il typeof. */
+    + ((via || (typeof condividiCardP2P === 'function' && condividiCardP2P(o)))
+        ? '<div class="p2p-meta">' + (via || condividiCardP2P(o)) + '</div>' : '')
     /* LA FRECCETTA CHE DICE «SI ENTRA» (set 2026, richiesta di
        Andrea): la card e' gia' `role="button"`, ma niente lo faceva
        VEDERE — in un elenco dove ogni riga porta riquadri e scatole,
@@ -68677,6 +68746,325 @@ function apriTelegramDaCosaP2P(){
   invitoTelegram(INVITO_ONION.p2p, 'p2p');
 }
 /* ============ fine delle card P2P in vetrina ============ */
+
+/* ============ IL «CONDIVIDI» DI UN ORDINE (10 ott 2026) ============
+   Idea di un utente: un ordine del libro si deve poter mandare FUORI —
+   su Telegram, su Nostr, dovunque — per farlo conoscere. Tre pezzi:
+   • IL TASTO, nel dettaglio di un ordine del libro (anche altrui),
+     nella pagina del proprio ordine ancora nel libro e sulla sua card
+     in «I miei scambi». Passa dal TUBO DI CASA (`condividiLink`: il
+     foglio di condivisione del telefono dove c'e', il selettore di
+     Telegram nella Mini App, e in fondo «Link copiato 🔗») — un secondo
+     tubo sarebbe un secondo posto dove il link si perde.
+   • IL LINK, `/p2p?ordine=<id>`: apre quell'ordine a chiunque
+     (`apriOrdineCondivisoP2P`), e il server gli mette in testa
+     l'anteprima dell'ordine (`_seo_ordine_p2p`).
+   • LA NOTA SU NOSTR, per chi e' entrato con Nostr: un kind 1 col
+     testo e il link, firmato da LUI col suo metodo di accesso
+     (estensione, bunker, chiave su questo dispositivo) e mandato ai
+     relay DA QUESTO BROWSER. Il server non la vede, non la prepara e
+     non la firma: non c'e' nessuna rotta dietro.
+   COSA DICE IL TESTO: il lato, la cifra, i metodi — quel che il libro
+   pubblico dice gia' a chiunque lo legga. Mai un nome, mai chi l'ha
+   pubblicato, nemmeno quando l'ordine e' il proprio: a dire «e' mio»
+   e' la sola prima persona del verbo, e la sceglie chi condivide
+   premendo il tasto.
+   LE PAROLE: «Vendo»/«Compro» sul PROPRIO ordine, «Vendesi»/«Cercasi»
+   su quello di un altro — «Vendo» in bocca a chi non vende sarebbe una
+   bugia, e viaggerebbe inoltrata. La frase di mezzo («… BTC per 50 € ·
+   SEPA, Revolut») e' la gemella di `_frase_ordine_p2p` del server, che
+   la mette nel titolo dell'anteprima: una prova le tiene in pari. */
+const P2P_TETTO_METODI_CONDIVISI = 3;
+/* PURA: una cifra come si scrive in un messaggio — il punto delle
+   migliaia, la virgola dei centesimi SOLO quando ci sono: «50», «23,47»,
+   «1.250». Gli zeri di «50,00» in una riga letta al volo sono rumore. */
+function cifraCondivisaP2P(n){
+  const c = Math.round((Number(n) || 0) * 100);
+  const interi = String(Math.floor(c / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return c % 100 ? interi + ',' + String(c % 100).padStart(2, '0') : interi;
+}
+/* PURA: i metodi in un testo che viaggia. Sono parole di sconosciuti
+   (il `pm` e' testo libero): una riga sola, quaranta caratteri a voce,
+   niente doppioni, i primi tre e poi «e altri». Il tabacchino perde
+   l'importo che si porta nel nome (`metodoBaseP2P`): sta gia' nella
+   cifra. */
+function metodiCondivisiP2P(metodi){
+  const puliti = [];
+  (metodi || []).forEach(m => {
+    const v = metodoBaseP2P(m).split(/\s+/).join(' ').slice(0, 40).trim();
+    if (v && puliti.indexOf(v) < 0) puliti.push(v);
+  });
+  return puliti.slice(0, P2P_TETTO_METODI_CONDIVISI).join(', ')
+    + (puliti.length > P2P_TETTO_METODI_CONDIVISI ? ' e altri' : '');
+}
+/* PURA: «🔄 Vendo BTC per 50 € · SEPA, Revolut · su Barattolo P2P».
+   `q` = {vende, mio, euro, euroMax, metodi}; vuota se non c'e' una
+   cifra da dire. Su un intervallo il «per» cade: «Vendo BTC da 20 a
+   100 €». */
+function testoOrdineCondivisoP2P(q){
+  if (!q || !(Number(q.euro) > 0)) return '';
+  const verbo = q.mio ? (q.vende ? 'Vendo' : 'Compro')
+                      : (q.vende ? 'Vendesi' : 'Cercasi');
+  const euro = (Number(q.euroMax) > Number(q.euro)
+    ? 'da ' + cifraCondivisaP2P(q.euro) + ' a ' + cifraCondivisaP2P(q.euroMax)
+    : 'per ' + cifraCondivisaP2P(q.euro)) + ' €';
+  const metodi = metodiCondivisiP2P(q.metodi);
+  return '🔄 ' + verbo + ' BTC ' + euro + (metodi ? ' · ' + metodi : '')
+    + ' · su Barattolo P2P';
+}
+/* il link: il dominio di `baseCondivisione` (da Tor si manda il
+   clearnet, in collaudo localhost) e l'id pubblico dell'ordine */
+function linkOrdineP2P(id){
+  return baseCondivisione() + '/p2p?ordine=' + encodeURIComponent(id);
+}
+/* Quel che di un ordine si puo' dire, o null se non e' (piu') nel libro.
+   Due fonti: la riga del LIBRO — vale per tutti, e «mio» lo dice il
+   giudice di sempre (`ordineTuoP2P`) — e, quando il libro in pagina non
+   c'e' o non lo porta ancora, la riga del PROPRIO ordine `pubblicato`,
+   col lato tradotto nel vocabolario del libro. Un nome provvisorio non
+   e' un ordine che esiste: niente link verso il niente. */
+function ordineDaCondividereP2P(id){
+  if (!id || provvisorioP2P(id)) return null;
+  const r = rigaLibroP2P(id);
+  if (r) return {vende: r.lato === 'sell', mio: !!ordineTuoP2P(id, r),
+                 euro: r.euro, euroMax: r.euroMax, metodi: r.metodi};
+  const o = ordiniP2P()[id];
+  if (o && o.mio && o.stato === 'pubblicato')
+    return {vende: o.lato === 'vendo', mio: true,
+            euro: o.euro, euroMax: o.euroMax, metodi: o.metodi};
+  return null;
+}
+/* il tocco su «Condividi». `ev` c'e' quando il tasto vive DENTRO una
+   card che e' a sua volta un bottone: il tocco non deve aprirla. */
+function condividiOrdineP2P(id, ev){
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  const q = ordineDaCondividereP2P(id);
+  const testo = testoOrdineCondivisoP2P(q);
+  if (!testo) { haptic(); toast('Quest\'ordine non è più nel libro'); return; }
+  return condividiLink(linkOrdineP2P(id), testo, 'Scambio P2P');
+}
+/* CHI VEDE «PUBBLICA SU NOSTR»: chi e' entrato con Nostr (la chiave
+   d'accesso, la stessa che firma i suoi annunci) e ha dei relay a cui
+   mandarla — la lista e' quella che /me porta gia' per la dichiarazione
+   di fiducia (`nip85_relays`), cioe' i relay di casa: nessuna domanda
+   nuova al server. In collaudo il bottone c'e' comunque, e non bussa a
+   nessun relay (vedi `firmaNotaOrdineP2P`). */
+function nostrPerCondividereP2P(){
+  return !DEMO && !VETRINA && !!myNpubAccesso
+    && ((myNip85Relays || []).length > 0 || myNip85Collaudo);
+}
+/* la riga dei bottoni, per il dettaglio e per la pagina del proprio
+   ordine. L'id viaggia nel `data-id`, mai dentro l'onclick. */
+function bottoniCondividiP2P(id){
+  if (DEMO || !id || provvisorioP2P(id)) return '';
+  return '<div class="p2p-condividi">'
+    + '<button type="button" class="btn ghost" data-id="' + esc(id) + '" '
+    + 'onclick="condividiOrdineP2P(this.dataset.id, event)">🔗 Condividi</button>'
+    + (nostrPerCondividereP2P()
+       ? '<button type="button" class="btn ghost" id="p2pNostrVai" data-id="' + esc(id) + '" '
+         + 'onclick="pubblicaOrdineSuNostrP2P(this.dataset.id, event)">'
+         + etichettaNostr('Pubblica su Nostr') + '</button>'
+       : '')
+    + '</div>';
+}
+/* ...e sul PROPRIO ordine: la riga c'e' finche' l'ordine e' nel libro
+   (`pubblicato`, col nome vero). Preso, non e' piu' un'offerta da far
+   conoscere: il link direbbe «non piu' disponibile».
+   ANCHE SULLA RIGA SOLO DA GUARDARE (`soloVista`: l'ordine pubblicato
+   da un altro dispositivo, che qui si segue e basta): condividere non
+   e' un gesto verso il coordinatore e non vuole la chiave dello
+   scambio — dal vivo, e' proprio il telefono su cui uno apre il link
+   del SUO ordine. */
+function condividiMioP2P(o){
+  return (o && o.mio && o.stato === 'pubblicato')
+    ? bottoniCondividiP2P(o.id) : '';
+}
+/* la voce piccola nel piede della card di «I miei scambi» */
+function condividiCardP2P(o){
+  if (DEMO || !o || !o.mio || o.stato !== 'pubblicato' || provvisorioP2P(o.id)) return '';
+  return '<button type="button" class="p2p-condividi-mini" data-id="' + esc(o.id) + '" '
+    + 'aria-label="Condividi questo ordine" '
+    + 'onclick="condividiOrdineP2P(this.dataset.id, event)">🔗 Condividi</button>';
+}
+
+/* ---- la nota su Nostr ---- */
+/* PURA: il kind 1 da firmare. Il contenuto e' il testo col link in
+   fondo (lo stesso che parte dal «Condividi»); il tag `r` ripete il
+   link per i client che ne fanno un'anteprima, i due `t` sono gli
+   argomenti. Nessun `p`, nessun riferimento a chi ha pubblicato
+   l'ordine. */
+function notaOrdineP2P(pub, testo, link, quando){
+  return {kind: 1, pubkey: pub, created_at: quando,
+          tags: [['r', link], ['t', 'barattolo'], ['t', 'p2p']],
+          content: testoColLink(testo, link)};
+}
+let p2pNostrInVolo = false;
+/* il tocco su «Pubblica su Nostr»: la scala dei firmatari e' quella di
+   casa — quello che c'e' gia' SENZA foglio (chiave su questo
+   dispositivo, bunker, estensione: `firmatarioAutomatico`), altrimenti
+   il foglio della firma. */
+async function pubblicaOrdineSuNostrP2P(id, ev){
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  haptic();
+  if (p2pNostrInVolo || !nostrPerCondividereP2P()) return;
+  const testo = testoOrdineCondivisoP2P(ordineDaCondividereP2P(id));
+  if (!testo) { toast('Quest\'ordine non è più nel libro'); return; }
+  const link = linkOrdineP2P(id);
+  p2pNostrInVolo = true;
+  try {
+    const auto = await firmatarioAutomatico();
+    if (auto) {
+      try { await firmaNotaOrdineP2P(auto.f, testo, link); }
+      finally { if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} } }
+      return;
+    }
+    toast('🟣 Ora serve la tua firma…', 4000);
+    apriNostrSheet(f => firmaNotaOrdineP2P(f, testo, link));
+  } finally { p2pNostrInVolo = false; }
+}
+/* I passi sono quelli di `firmaEConsegna`, senza il server in fondo:
+   (1) e' la chiave d'accesso di chi e' entrato? — PRIMA di firmare;
+   (2) la firma, con l'id ricontrollato in pagina (un firmatario che
+   cambia la nota non passa); (3) i relay, da questo browser. Zero
+   relay = non e' partito niente, e si dice. In collaudo il browser non
+   bussa a relay VERI (il patto di casa): si firma e ci si ferma li'.
+   Torna vero se la nota e' in piazza. */
+async function firmaNotaOrdineP2P(f, testo, link){
+  /* il foglio della firma, se e' lui ad averci portati qui, si chiude
+     SENZA portarsi via il velo del dettaglio che gli sta sotto */
+  chiudiFoglioP2P('nostrSheet');
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  const attesa = myNpubAccesso.startsWith('npub1')
+    ? NT.nip19.decode(myNpubAccesso).data : myNpubAccesso.toLowerCase();
+  let pub;
+  try { pub = String(await f.pubkey() || '').toLowerCase(); }
+  catch(e){ toast(`Il firmatario non risponde: ${e.message||'riprova'}`, 7000); return false; }
+  if (pub !== attesa) {
+    toast('Questa non è la tua chiave d\'accesso Nostr: la nota non è partita', 7000);
+    return false;
+  }
+  if (f.ricorda) f.ricorda();
+  const bozza = notaOrdineP2P(pub, testo, link, Math.floor(Date.now() / 1000));
+  let firmato;
+  try { firmato = await f.firma(bozza); }
+  catch(e){ toast(`Firma non riuscita: ${e.message||'rifiutata'}`, 7000); return false; }
+  if (!firmato || firmato.id !== NT.getEventHash({...bozza, pubkey: pub})) {
+    toast('Il firmatario ha cambiato la nota: non pubblico niente', 7000);
+    return false;
+  }
+  let ok;
+  if (myNip85Collaudo) {
+    console.log('🟣 [nostr simulato dal browser]', firmato);
+    ok = 1;
+  } else {
+    toast('📡 Pubblico la nota sui relay…', 4000);
+    ok = await pubblicaEventoSuRelay(myNip85Relays || [], firmato);
+  }
+  if (!ok) { toast('Nessun relay ha risposto: riprova tra poco (non è partito niente)', 7000); return false; }
+  toast('🟣 Pubblicato su Nostr');
+  return true;
+}
+
+/* ---- l'arrivo dal link ---- */
+let p2pCondivisoInVolo = false;   // si sta cercando l'ordine del link
+let p2pCondivisoAperto = '';      // l'ordine del link, col dettaglio aperto
+/* «davanti c'e' l'ordine del link»: mentre lo si cerca, finche' il suo
+   dettaglio e' aperto, o con la riga «non piu' disponibile» a vista.
+   E' la domanda del tour della prima volta, che aspetta. */
+function condivisoDavantiP2P(){
+  if (p2pCondivisoInVolo) return true;
+  const s = el('p2pOrdineSparito');
+  if (s && !s.hidden) return true;
+  return !!p2pCondivisoAperto && p2pDettOrdine === p2pCondivisoAperto
+    && !!el('p2pDettSheet')?.classList.contains('open');
+}
+function ordineSparitoP2P(mostra){
+  const s = el('p2pOrdineSparito');
+  if (!s) return;
+  s.hidden = !mostra;
+  /* tolto l'avviso, il libro si ridisegna: e' il momento in cui il
+     tour della prima volta, che aspettava, puo' partire */
+  if (!mostra) renderP2P();
+}
+/* L'ORDINE DEL LINK. Quattro esiti:
+   • e' uno scambio MIO su questo dispositivo → la sua pagina;
+   • e' nel libro → il suo dettaglio, sul lato giusto del libro. Per
+     chi e' dentro la strada e' quella di un tocco sulla card
+     (`prendiOrdineP2P`, con tutte le sue guardie: e' il mio, la presa
+     caduta…); per chi NON e' entrato il dettaglio si apre lo stesso —
+     e' il punto del link — e al posto di «Compra» c'e' «Entra»
+     (`renderDettaglioP2P`);
+   • non c'e' piu' → la riga gentile sopra il libro degli altri;
+   • (leva spenta: qui non si arriva, si resta sul coming soon).
+   ⚠️ «NON C'E' PIU'» SI DICE SOLO SU UNA PAROLA FRESCA: la copia del
+   telefono puo' avere giorni, e un ordine nato un'ora fa li' non c'e'
+   — dire «non piu' disponibile» sarebbe una bugia. Quindi, se in
+   pagina non c'e' il libro vero, prima si chiede la fotografia del
+   server (un minuto al massimo, dalla memoria), e se nemmeno lei lo
+   porta si aspetta il libro vero dai relay. Solo dopo, il no. */
+async function apriOrdineCondivisoP2P(id){
+  p2pCondivisoInVolo = true;
+  try {
+    if (ordiniP2P()[id]) { apriOrdineP2P(id); return; }
+    const veroLibro = () => !!p2pLibro && !p2pLibro.copia;
+    if (!rigaLibroP2P(id) && !veroLibro()) {
+      try {
+        p2pVetrinaFresca = true;
+        await chiediFotoVetrinaP2P();
+        const f = p2pVetrinaFoto;
+        if (f && f.quando && !veroLibro() && (f.ordini || []).some(o => o.id === id))
+          libroDaCopiaP2P(f.eventi, f.quando, 'server');
+      } catch(e) {}
+    }
+    if (!rigaLibroP2P(id) && !veroLibro()) {
+      try { await caricaLibroP2P(); } catch(e) {}
+    }
+    const riga = rigaLibroP2P(id);
+    /* nel frattempo si e' andati altrove: non si apre niente sopra
+       un'altra pagina */
+    if (vistaAttivaP2P() !== 'view-p2p') return;
+    if (!riga) { ordineSparitoP2P(true); renderP2P(); return; }
+    setLatoP2P(riga.lato === 'sell' ? 'compro' : 'vendo', true);
+    renderP2P();
+    p2pCondivisoAperto = id;
+    if (VETRINA || !myTgId) apriDettaglioP2P(id);
+    else prendiOrdineP2P(id);
+    if (!veroLibro()) riguardaCondivisoP2P(id);
+  } finally { p2pCondivisoInVolo = false; }
+}
+/* IL «SI'» DI UNA COPIA SI RIGUARDA SUL LIBRO VERO (dal giro dal vivo:
+   un ordine annullato da dieci secondi si apriva come vivo). La
+   fotografia del server puo' avere un minuto, e in quel minuto un
+   ordine preso o ritirato li' c'e' ancora: il dettaglio si apre subito
+   — e' il patto del «libro subito» — ma appena il libro vero arriva dai
+   relay (la lettura e' gia' in volo: non ne parte una seconda) lo si
+   riguarda, e se l'ordine non c'e' piu' il dettaglio lascia il posto
+   alla riga gentile. Solo se chi guarda e' ancora li': stesso ordine,
+   dettaglio aperto, nessun foglio sopra, stessa vista. Se il libro vero
+   non risponde resta la copia, e a dire di no — se serve — sara' la
+   presa, come da una card. */
+function riguardaCondivisoP2P(id){
+  caricaLibroP2P().then(() => {
+    if (rigaLibroP2P(id) || p2pCondivisoAperto !== id || p2pDettOrdine !== id) return;
+    if (!el('p2pDettSheet')?.classList.contains('open')
+        || el('p2pQuantoSheet')?.classList.contains('open')) return;
+    if (vistaAttivaP2P() !== 'view-p2p') return;
+    chiudiFoglioP2P('p2pDettSheet');
+    ordineSparitoP2P(true);
+    renderP2P();
+  }).catch(() => {});
+}
+/* «Entra», il piede del dettaglio per chi non e' entrato (una parola:
+   in mezza riga a 320 px due non ci stanno):
+   il dettaglio si chiude e si apre l'invito di casa, lo stesso che
+   trova chi tocca una card del libro da fuori. */
+function entraDaDettaglioP2P(){
+  haptic();
+  chiudiFoglioP2P('p2pDettSheet');
+  invitoTelegram(INVITO_ONION.p2p, 'p2p');
+}
+/* ============ fine del «Condividi» di un ordine ============ */
 
 /* ============ I VOLTI SUL LIBRO (set 2026, decisione di Andrea) ====
    Le card mostrano chi ha pubblicato, con la faccia che quella persona
@@ -71800,13 +72188,33 @@ const P2P_URL = location.pathname.match(/^\/p2p\/?$/);
    solo a leva accesa: chi atterra sul coming soon resta li'. */
 const P2P_SCAMBIO_URL = (P2P_URL
   && (location.search.match(/[?&]scambio=([0-9a-zA-Z-]{8,64})(?:&|$)/) || [])[1]) || '';
+/* L'ORDINE NELL'INDIRIZZO (10 ott 2026, il «Condividi» di un ordine):
+   `/p2p?ordine=<id>` e' il link che si manda in giro, e apre QUELL'ordine
+   del libro a chiunque — anche a chi non e' entrato. Stessa pagina e
+   stessa forma dell'id di `scambio`, ma un altro nome perche' e'
+   un'altra domanda: `scambio` e' «il MIO scambio» (se la riga qui non
+   c'e' ancora porta a «I miei scambi», dove nasce), `ordine` e' «un
+   ordine del LIBRO» (se non c'e' piu', lo dice e mostra gli altri). Con
+   un nome solo l'avviso di uno scambio preso, aperto su un dispositivo
+   nuovo, direbbe «non piu' disponibile» a chi lo sta facendo. A leva
+   spenta si resta sul coming soon, come la sorella. */
+const P2P_ORDINE_URL = (P2P_URL
+  && (location.search.match(/[?&]ordine=([0-9a-zA-Z-]{8,64})(?:&|$)/) || [])[1]) || '';
 let p2pApertoDaUrl = false;
 function apriP2PDaUrl(){
   if (!P2P_URL || p2pApertoDaUrl) return;
   p2pApertoDaUrl = true;
+  /* l'ordine condiviso: solo a leva accesa, e lo scambio MIO vince.
+     La bandierina si alza PRIMA di entrare nel libro: il tour della
+     prima volta la guarda al primo render (`condivisoDavantiP2P`).
+     Tutto il resto vive col «Condividi», da qui il typeof. */
+  const condiviso = !!P2P_ORDINE_URL && !P2P_SCAMBIO_URL && p2pAcceso()
+    && typeof apriOrdineCondivisoP2P === 'function';
+  if (condiviso) p2pCondivisoInVolo = true;
   vaiP2P();
   if (P2P_SCAMBIO_URL && p2pAcceso() && typeof apriOrdineP2P === 'function')
     apriOrdineP2P(P2P_SCAMBIO_URL);
+  else if (condiviso) apriOrdineCondivisoP2P(P2P_ORDINE_URL);
 }
 
 /* /consigliati — la pagina dei negozi consigliati (set 2026): l'indirizzo
