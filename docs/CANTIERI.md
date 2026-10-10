@@ -47796,3 +47796,185 @@ Prima del push guardata la CI di main, come chiesto da Andrea.
 
 **Da guardare.** Sul VPS, il primo scambio in cui chi vende tarda a dare
 il recapito: «📬 Attese P2P: avvisati … (sollecito_recapito)».
+
+## L'indirizzo Lightning di casa: zap@barattolo.store (10 ott 2026, sera, cantiere indirizzo-lightning, richiesta di Andrea)
+
+**LA RICHIESTA.** Un Lightning address di Barattolo, `zap@barattolo.store`,
+da mettere nel profilo Nostr ufficiale (la npub `npub19ea0…`, campo
+`lud16`) per ricevere gli zap: LNURL-pay su `/.well-known/lnurlp/zap`,
+le fatture su un wallet LNbits SEPARATO dalla cassaforte, NIP-57 con la
+ricevuta kind 9735, limiti e freno, cosa finisce nel journal, come si
+vedono e si spostano i sats; e i comandi per aggiungere `lud16` al kind
+0 senza perdere gli altri campi. Prima lo studio e la proposta, poi il
+sì di Andrea, poi il codice.
+
+**COSA C'ERA GIÀ (letto, non supposto).** Nessuna PR, nessun ramo,
+nessuna voce sul tema. Il server ha una chiave sua,
+`NOSTR_NSEC_PIATTAFORMA`, che firma gli annunci NIP-99; la npub
+ufficiale nel codice è `X_NPUB` (la cassa di risonanza), e il commento
+lì accanto dice a chiare lettere che NON è la chiave con cui il server
+firma. `_frena` e `_secchio_passa` per i freni, `_x_firma_valida` per
+una firma Nostr (coincurve dov'è, `schnorr_puro` in CI),
+`_spedisci_ai_relay` che in collaudo stampa, `url_foto_ammesso` per la
+regola anti-SSRF sull'host. LNbits del nodo è la `v1.6.1` pinnata.
+
+**LE DECISIONI DI ANDREA (10 ott).** 1) La ricevuta la firma la chiave
+della piattaforma, quella già sul VPS: NIP-57 non chiede che firmi chi
+riceve, i client guardano che la 9735 sia della `nostrPubkey` dichiarata
+dal citofono. La chiave del profilo resta sul suo WSL e sul server non
+ci va. Una chiave dedicata sarebbe servita solo a far sopravvivere le
+ricevute a un cambio della chiave di piattaforma, al prezzo di un
+segreto in più. 2) Limiti: da 1 a 100.000 sat, commento a 140. 3) La
+card nell'admin sì. 4) Il push a lavoro chiuso; dopo, i passi per lui.
+
+**COM'È FATTO** (per intero in ARCHITETTURA, «L'INDIRIZZO LIGHTNING DI
+CASA»). Un blocco in fondo a server.py: il citofono, il callback,
+l'orologio che chiede a LNbits delle fatture in attesa, la ricevuta, la
+tabella `zap`, la card e le leve. Il salvadanaio NON è una terza
+cassaforte: non passa da `_chiavi_cassaforte`, e il server ne ha la
+sola invoice key — conia e guarda, non spende. La leva `ZAP_ATTIVO`
+nasce spenta: senza, o senza la chiave, il citofono dice 404.
+
+**LE SCELTE CHE NON ERANO NELLA PROPOSTA, e perché.**
+- LA FATTURA SI RILEGGE PRIMA DI DARLA. Una fattura LNURL deve portare
+  l'impronta (lo sha256) della `metadata`, o della richiesta di zap, al
+  posto della descrizione; a LNbits lo si chiede con due campi
+  (`unhashed_description`, `description_hash`) e non potevo provare da
+  qui che la versione del VPS li rispetti. Quindi `zap_leggi_bolt11`
+  legge importo, campo `h` e campo `p` dalla fattura tornata, e
+  `zap_conia` alza se non combaciano: il wallet riceve un 503 e il
+  journal dice «non porta l'impronta», invece di una fattura che un
+  wallet serio rifiuta — o peggio paga, per uno zap che nessun client
+  conterebbe. Il lettore è provato sui due campi dell'esempio della
+  specifica BOLT11 (i valori attesi rifatti nella prova: lo sha256 della
+  frase, i byte del payment hash).
+- IL TAG `p` DEVE ESSERE BARATTOLO. NIP-57 chiede UN `p`; qui deve
+  anche essere il nostro, o chiunque appenderebbe `zap@barattolo.store`
+  al suo profilo e si farebbe firmare da noi ricevute per zap «a lui».
+- IL MESSAGGIO DI UNO ZAP NON SI TAGLIA A 140. I 140 valgono per il
+  commento di LUD-12 (dichiarato e fatto rispettare). Il messaggio dello
+  zap sta DENTRO la richiesta firmata: non si può accorciare, e
+  rifiutarlo sarebbe perdere lo zap. Lo limita il tetto dell'insieme
+  (4096 byte); in tabella e nella card si legge tagliato a 140.
+- UNA FATTURA SCADE SOLO SU UN «NON PAGATA» DI LNBITS. Se LNbits tace
+  il giro si ferma e riprova: un silenzio non fa scadere una fattura
+  che magari è stata pagata.
+- LA PREIMAGE SI CREDE SOLO SE TORNA COL PAYMENT HASH: certi LNbits
+  rispondono una riga di zeri, e una ricevuta con una preimage falsa è
+  peggio di una senza.
+- I RELAY DELLA RICEVUTA PASSANO DA UNA GUARDIA: li scrive uno
+  sconosciuto nella richiesta. Solo `wss`, senza credenziali, al più
+  otto, e l'host passa dalla regola di `url_foto_ammesso` (mai un
+  indirizzo di casa). In collaudo la guardia non gira (risolverebbe un
+  nome) e la ricevuta si stampa.
+- LA CHIAVE DELLA RIGA NEL PANNELLO DELLE LEVE È `ZAP_NPUB`, non
+  `NOSTR_NSEC_PIATTAFORMA`: il censimento è per chiave, e la mia riga
+  copriva quella che c'era (l'ha presa `prove_leve`).
+
+**TROVATO NEL GIRO DAL VIVO, e curato.** uvicorn scrive nel suo
+registro degli accessi l'indirizzo INTERO di ogni richiesta: per il
+callback vuol dire il commento di chi paga e la richiesta di zap per
+intero, quattromila caratteri a zap, nel journal. Le prove e il
+collaudo non potevano vederlo (guardano i `print` del blocco, e
+TestClient non passa da uvicorn). La cura è un filtro sul registro
+`uvicorn.access`, `_ZapQueryFuoriDalJournal`: la riga resta, se ne va
+quel che segue il punto interrogativo, e solo per quella strada.
+Riavviato il server del giro, la riga è `GET /api/lnurl/zap?… 200`.
+CADDY: il Caddyfile del VPS non ha nessuna direttiva `log` (detto da
+Andrea il 10 ott, dopo averlo guardato), quindi un registro degli
+accessi di Caddy non c'è e la query non finisce nemmeno lì. Se un
+giorno lo si accende, va tolta anche da quel file.
+
+**STRADE SCARTATE.** L'estensione «Pay Links» di LNbits (fa già
+indirizzo e zap, ma vorrebbe LNbits esposto su internet: oggi ascolta
+solo su 127.0.0.1). Il webhook di LNbits per sapere del pagamento (una
+rotta in entrata in più; il poll è lo stile di casa, e l'orologio
+riposa quando non c'è niente in attesa). Una chiave Nostr dedicata
+alle ricevute (decisione 1). Il freno sul citofono (non tocca né il
+database né LNbits). Accettare i millisatoshi sciolti arrotondando
+(il wallet controlla che la fattura dica l'importo chiesto).
+
+**SENTINELLE E BANCHI RITOCCATI.** `prove_freni` (i due secchi nuovi
+nei «numeri concordati»); il banco del pannello delle leve (la nona
+volta della trappola del 7: i giudici di `_zap_leve` e `URL_PUBBLICO`);
+il workflow (il collaudo nei due elenchi). La sentinella delle cifre in
+sats ha preso le due righe di journal scritte a mano: ora passano da
+`_fmt_sats`. In fondo a server.py una riga di commento dopo l'ultima
+funzione: `pezzo` ritaglia fino alle due righe vuote, e l'ultima del
+file senza niente dopo non si ritagliava (sei prove lontane esplose).
+
+**IL KIND 0** (PRODUZIONE, passo 7 della procedura). I comandi provati
+nel WSL di Andrea con `nak` v0.21.0, chiave usa-e-getta e un `nak
+serve` sul loopback: i campi e i tag di prima restano, si aggiunge
+`lud16`. Due trappole viste: senza chiave `nak` firma lo stesso con una
+chiave «della macchina» (per questo si firma SENZA relay e si guarda la
+`pubkey` prima di pubblicare), e `--prompt-sec` con lo stdin da un file
+resta appeso e sospende anche il `timeout` che lo avvolge. Nel WSL
+manca `jq`: i comandi usano `python3`.
+
+**PROVATO.** `prove_indirizzo_lightning` (75): chi è vivo e quando (la
+leva, la chiave, il segnaposto, l'indirizzo di LNbits), il citofono, il
+giudice della richiesta con sedici no ognuno col suo motivo, i relay e
+la guardia, la lettura della BOLT11 (unità, reti di prova, senza
+importo, col memo, i due campi della specifica), la ricevuta coi tag in
+ordine e la firma vera, la tabella, e le sentinelle: le due rotte,
+l'ordine dei gesti nel callback, il salvadanaio che non conosce una
+chiave che paga, ogni `print` del blocco guardato con l'albero, il
+filtro degli accessi, i documenti. `collaudo_indirizzo_lightning` (94),
+il server vero per HTTP con un LNbits di cartone che ricorda con quale
+chiave è stato chiamato: la leva spenta e accesa senza chiave, il
+citofono con e senza la chiave della piattaforma, il pagamento
+semplice, i limiti, lo zap dalla richiesta firmata alla 9735
+riverificata, le richieste storte, la preimage falsa, la ricevuta che
+nessun relay prende (tre tentativi, sempre la stessa), LNbits che tace
+e la scadenza, LNbits che conia senza impronta, il freno per IP e per
+tutti, il tetto delle attese, la card, le leve, i segreti; verde anche
+nella gabbia. LA TORTURA, su una copia del repo intero: 26 mutazioni
+di server.py, 26 prese (al primo giro 21 su 22: sfuggiva la preimage
+creduta sulla parola, e da lì è nata la scena del collaudo).
+
+**IL GIRO DAL VIVO** (server vero con uvicorn sulla 8197, config
+dall'esempio in collaudo, database usa-e-getta, `MOSTRO_RELAY`,
+`MOSTRO_RELAY_SPECCHIO` e `RELAY_NOSTR` al relay morto, un LNbits di
+cartone su 127.0.0.1:5099; config, database e voce del launch.json
+tolti dopo). Primo giro senza chiave della piattaforma: il citofono
+senza `allowsNostr`, una fattura da 21 sat col commento, pagata
+sull'LNbits di cartone e vista dall'orologio in 9 secondi; riavvio, la
+riga in attesa ritrovata; la card di `/admin` col commento
+`<b>grassetto</b>` reso innocuo; il pannello delle leve senza la
+chiave; il cruscotto 403 a chi non è admin. Secondo giro, col sì di
+Andrea a una nsec usa-e-getta nel config (generata sul momento da
+`nak`, mai stampata, via dal file prima del commit): una richiesta di
+zap firmata DA `nak` nel WSL — non da `schnorr_puro` come nel collaudo —
+accettata dal server con coincurve; la stessa richiesta per un importo
+diverso rifiutata; pagata, incassata in 9 secondi; il relay `ws://`
+della richiesta scartato; la ricevuta «pubblicata» solo a schermo
+(`[nostr simulato]`). LA RICEVUTA GUARDATA DA UN'ALTRA IMPLEMENTAZIONE,
+nostr-tools 2.25.2 nel WSL: `verifyEvent` vero sulla 9735 e sulla
+richiesta dentro, `nip57.validateZapRequest(description)` senza
+errori, `description` uguale byte per byte alla richiesta mandata,
+`P` e `p` giusti, lo sha256 della description uguale a quello rifatto
+in Python.
+
+**NON PROVATO, e detto.** 1) IL LNBITS VERO. Decisione di Andrea (10
+ott): niente fattura vera prima del push — la fa lui dopo il deploy,
+creando il wallet «zap». Quindi non è provato che LNbits `v1.6.1` col
+LND dietro rispetti `unhashed_description`/`description_hash`: se non
+li rispettasse il server non dà la fattura e il journal lo dice
+(PRODUZIONE, passo 6, con la riga da riportare). 2) Uno zap vero da un
+client Nostr al profilo, con la ricevuta sui relay veri: solo in
+produzione, dopo il kind 0. 3) La forma della risposta di LNbits vero
+a `GET /api/v1/payments/<hash>` e a `/api/v1/wallet` (il saldo della
+card): il codice legge `paid`, `preimage` e `balance` come li dà la
+1.x, e un saldo che non si legge esce «—», non un numero falso.
+
+**RESTA DA GUARDARE** (dopo il deploy, passi di Andrea in PRODUZIONE,
+«L'INDIRIZZO LIGHTNING DI CASA»). Il wallet «zap» e la sola invoice key
+nel config del VPS; `ZAP_ATTIVO = True`, il riavvio, la riga «⚡
+Indirizzo Lightning di casa: … ACCESO» nel journal; il citofono col
+`curl`; la fattura di prova da 21 sat e le due righe del journal; la
+card di `/admin` col saldo; poi `lud16` nel kind 0 dal WSL, col
+controllo prima e dopo; poi uno zap vero e la riga «🧾 zap: ricevuta …
+presa da N relay». Dopo il push: `pronto` allineato a main (il commit
+tocca il workflow). E per sempre: `NOSTR_NSEC_PIATTAFORMA` non si
+cambia, o i client non contano più gli zap già ricevuti.

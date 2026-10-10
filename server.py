@@ -39,6 +39,7 @@ import html
 import io
 import ipaddress
 import json
+import logging
 import math
 import os
 import re
@@ -1837,6 +1838,8 @@ FRENI = {
     "canale": (1, 600),         # il post nel canale P2P, per persona (non un 429: si salta il post)
     "foto_recensione": (20, 3600),  # un feedback con foto (caricate su Blossom), per persona
     "carrello": (120, 60),      # il carrello salvato a ogni tocco, per persona (un dito non ci arriva)
+    "zap": (20, 60),            # le fatture dell'indirizzo Lightning di casa, per IP (ognuna conia sul nodo)
+    "zap_tutti": (120, 60),     # ...e per tutti insieme: copre anche chi un IP leggibile non ce l'ha
 }
 MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
 MSG_FRENO = "Troppe richieste in poco tempo: riprova fra qualche minuto"
@@ -27417,7 +27420,10 @@ async def cruscotto_admin(x_tg_init_data: str = Header(""),
     # chi puo' leggerla — un sì o un no, e i numeri li chiede a parte,
     # alla rotta che rifa' la stessa domanda. COPIA e non scrittura:
     # `dati` porta dentro la risposta di LND, che e' la stessa per tutti
-    return {**dati, "p2p_statistiche": vede_statistiche_p2p(user["id"])}
+    # la card «Zap» (10 ott 2026, l'indirizzo Lightning di casa): None =
+    # niente card. Anche questa entra nella COPIA, per la stessa ragione
+    return {**dati, "p2p_statistiche": vede_statistiche_p2p(user["id"]),
+            "zap": await dati_zap_cruscotto()}
 
 
 @app.get("/api/admin/stats")
@@ -28468,6 +28474,9 @@ def _leve_stato():
         # che chiede ai giudici vivi (una leva accesa senza le chiavi
         # vale spenta) e non dice mai una chiave.
         {"gruppo": "🐦 Cassa di risonanza su X", "voci": _x_leve()},
+        # L'INDIRIZZO LIGHTNING DI CASA (10 ott 2026): le voci le da'
+        # `_zap_leve`, che chiede ai giudici vivi e non dice la chiave.
+        {"gruppo": "⚡ Indirizzo Lightning di casa", "voci": _zap_leve()},
         {"gruppo": "🔔 Avvisi ai moderatori", "voci": [
             _leva("Campanello dei nuovi iscritti", "AVVISI_ISCRITTI",
                   bool(AVVISI_ISCRITTI),
@@ -74446,3 +74455,742 @@ def nip05_nostr_json(name: str = ""):
     return JSONResponse({"names": nomi},
                         headers={"Cache-Control": "public, max-age=3600",
                                  "Access-Control-Allow-Origin": "*"})
+
+
+# ---------- L'INDIRIZZO LIGHTNING DI CASA: zap@barattolo.store ----------
+# (10 ott 2026, cantiere «indirizzo-lightning», richiesta di Andrea.)
+# Un Lightning address di Barattolo, da scrivere nel profilo Nostr
+# ufficiale (`lud16`) per ricevere gli zap. Sono due rotte e un orologio:
+#
+#   · IL CITOFONO, `/.well-known/lnurlp/zap` (LUD-16 → LUD-06): dice al
+#     wallet quanto si puo' mandare e dove chiedere la fattura. Vale il
+#     SOLO nome `zap`; ogni altro nome e' un 404.
+#   · IL CALLBACK, `/api/lnurl/zap`: conia la fattura sul SALVADANAIO.
+#   · L'OROLOGIO, `orologio_zap`: chiede a LNbits se le fatture in
+#     attesa sono state pagate, e per uno zap firma e pubblica la
+#     ricevuta (NIP-57, kind 9735).
+#
+# IL SALVADANAIO NON E' UNA CASSAFORTE, e non passa da
+# `_chiavi_cassaforte`: e' un wallet a parte dello stesso LNbits del
+# nodo, e di lui il server conosce la SOLA invoice key
+# (`ZAP_LNBITS_INVOICE_KEY`) — puo' coniare e guardare, non puo'
+# spendere. Garanzie, cauzioni e pagamenti del mercatino stanno in un
+# altro wallet con altre chiavi: qui dentro non entra e non esce mai un
+# sat loro. I sats degli zap li sposta Andrea, a mano, dal pannello di
+# LNbits.
+#
+# LA RICEVUTA LA FIRMA LA CHIAVE DELLA PIATTAFORMA
+# (`NOSTR_NSEC_PIATTAFORMA`, decisione di Andrea del 10 ott): NIP-57 non
+# chiede che firmi chi riceve — i client controllano che la 9735 sia
+# della `nostrPubkey` dichiarata dal citofono. La chiave del profilo
+# ufficiale resta sul computer di Andrea e sul server non ci viene.
+# ⚠️ Quella chiave deve restare FERMA: se cambia, i client smettono di
+# contare gli zap gia' ricevuti.
+#
+# SENZA LA LEVA, O SENZA L'INVOICE KEY, IL CITOFONO DICE 404: e' il
+# mondo di ieri. Senza la chiave della piattaforma l'indirizzo incassa
+# lo stesso, ma non dichiara `allowsNostr` e non firma ricevute.
+try:
+    from config import ZAP_ATTIVO
+except ImportError:
+    ZAP_ATTIVO = False
+try:
+    from config import ZAP_LNBITS_INVOICE_KEY
+except ImportError:
+    ZAP_LNBITS_INVOICE_KEY = ""
+# Dove sta il salvadanaio: vuoto = lo stesso LNbits del nodo
+# (`LNBITS_NODO_URL`). La riga serve solo se un giorno traslocasse.
+try:
+    from config import ZAP_LNBITS_URL
+except ImportError:
+    ZAP_LNBITS_URL = ""
+try:
+    from config import ZAP_MAX_SATS
+except ImportError:
+    ZAP_MAX_SATS = 100_000
+# A CHI vanno gli zap: la npub ufficiale di Barattolo, quella del
+# profilo che porta `lud16`. E' pubblica; la riga serve solo per i giri
+# di prova con una chiave usa-e-getta.
+try:
+    from config import ZAP_NPUB
+except ImportError:
+    ZAP_NPUB = "npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy"
+
+ZAP_NOME = "zap"                # la parte prima della chiocciola, l'unica
+ZAP_TESTO = "Zap a Barattolo"   # quel che il wallet mostra a chi paga
+ZAP_MIN_SATS = 1
+ZAP_COMMENTO = 140              # LUD-12: i caratteri del commento
+ZAP_SCADENZA_S = 600            # una fattura vive dieci minuti
+ZAP_GRAZIA_S = 120              # ...e la si richiede ancora per due
+ZAP_TETTO_RICHIESTA = 4096      # byte della richiesta di zap (la 9734)
+ZAP_MAX_RELAY = 8               # relay della richiesta a cui si risponde
+ZAP_MAX_ATTESA = 100            # fatture in attesa tutte insieme
+ZAP_GIRO_S = 5                  # ogni quanto l'orologio chiede a LNbits
+ZAP_FRESCA_S = 120              # fino a qui si chiede a ogni giro...
+ZAP_LENTO_S = 30                # ...poi ogni mezzo minuto
+ZAP_TENTATIVI_RICEVUTA = 3      # pubblicazioni tentate, se nessun relay la prende
+_ZAP_STATO = {"attesa": True, "giri": 0}   # attesa: c'e' da chiedere a LNbits
+_ZAP_VISTI: dict = {}           # payment_hash -> ultima domanda a LNbits
+_TASK_ZAP = None
+_ZAP_CORS = {"Access-Control-Allow-Origin": "*"}
+
+
+def zap_wallet() -> tuple:
+    """(url, invoice key) del salvadanaio; ('', '') se non c'e'. La
+    chiave e' la SOLA invoice key: qui dentro una chiave che paga non
+    esiste, e non si deve aggiungere."""
+    url = str(ZAP_LNBITS_URL or LNBITS_NODO_URL or "").rstrip("/")
+    chiave = str(ZAP_LNBITS_INVOICE_KEY or "")
+    if not url.startswith("http") or not chiave or "INCOLLA_QUI" in chiave:
+        return "", ""
+    return url, chiave
+
+
+def zap_vivo() -> bool:
+    """L'indirizzo risponde: la leva accesa E il salvadanaio
+    configurato. La leva accesa senza l'invoice key vale SPENTA, come
+    per le cassaforti."""
+    return bool(ZAP_ATTIVO) and bool(zap_wallet()[0])
+
+
+def zap_destinatario() -> str:
+    """La chiave a cui vanno gli zap, in esadecimale; '' se la riga e'
+    storta (e allora niente zap Nostr: l'indirizzo incassa e basta)."""
+    try:
+        chiave = str(ZAP_NPUB or "").strip()
+        if re.fullmatch(r"[0-9a-fA-F]{64}", chiave):
+            return chiave.lower()
+        return npub_to_hex(chiave).lower()
+    except Exception:
+        return ""
+
+
+def zap_nostr_vivo() -> bool:
+    """Gli zap NIP-57: l'indirizzo vivo, una chiave con cui firmare la
+    ricevuta e un destinatario che si legge."""
+    return zap_vivo() and _NOSTR is not None and bool(zap_destinatario())
+
+
+def zap_max_sats() -> int:
+    """Il tetto di un pagamento, letto vivo; una riga storta nel config
+    vale il default, non zero (un tetto a zero spegnerebbe l'indirizzo
+    senza dirlo)."""
+    try:
+        n = int(ZAP_MAX_SATS)
+    except (TypeError, ValueError):
+        return 100_000
+    return n if n >= ZAP_MIN_SATS else 100_000
+
+
+def zap_indirizzo() -> str:
+    """zap@barattolo.store, col dominio di URL_PUBBLICO."""
+    return f"{ZAP_NOME}@{urlparse(URL_PUBBLICO).hostname or ''}"
+
+
+def zap_metadata() -> str:
+    """La stringa `metadata` di LUD-06, SEMPRE la stessa byte per byte:
+    il wallet controlla che la fattura porti lo sha256 di QUESTA
+    stringa, quindi citofono e callback devono leggerla da qui."""
+    return json.dumps([["text/plain", ZAP_TESTO],
+                       ["text/identifier", zap_indirizzo()]],
+                      separators=(",", ":"), ensure_ascii=False)
+
+
+def zap_citofono() -> dict:
+    """La risposta di `/.well-known/lnurlp/zap` (un payRequest di
+    LUD-06, col commento di LUD-12 e i due campi di NIP-57). Gli importi
+    sono in MILLIsatoshi, come vuole il protocollo."""
+    fuori = {"tag": "payRequest",
+             "callback": f"{URL_PUBBLICO}/api/lnurl/zap",
+             "minSendable": ZAP_MIN_SATS * 1000,
+             "maxSendable": zap_max_sats() * 1000,
+             "metadata": zap_metadata(),
+             "commentAllowed": ZAP_COMMENTO}
+    if zap_nostr_vivo():
+        fuori["allowsNostr"] = True
+        fuori["nostrPubkey"] = _NOSTR[1]
+    return fuori
+
+
+def zap_giudica_richiesta(testo: str, msat: int) -> tuple:
+    """La richiesta di zap (kind 9734) che il wallet manda nel parametro
+    `nostr`: (evento, '') se e' buona, (None, motivo) se no. Sono i
+    controlli dell'appendice D di NIP-57 — firma valida, UN solo tag
+    `p`, al piu' un `e` e un `a`, l'importo del tag `amount` uguale a
+    quello chiesto — piu' uno NOSTRO: il `p` deve essere la chiave di
+    Barattolo. Senza, chiunque potrebbe appendere il nostro indirizzo
+    al SUO profilo e farsi firmare da noi ricevute per zap «a lui».
+    Il messaggio (`content`) non ha un tetto suo: lo firma chi zappa e
+    non si puo' accorciare; lo limita il tetto in byte dell'insieme."""
+    if len(testo.encode("utf-8")) > ZAP_TETTO_RICHIESTA:
+        return None, "troppo lunga"
+    try:
+        ev = json.loads(testo)
+    except ValueError:
+        return None, "non si legge"
+    if not isinstance(ev, dict) or ev.get("kind") != 9734 \
+            or isinstance(ev.get("kind"), bool):
+        return None, "non è una richiesta di zap"
+    tags = ev.get("tags")
+    if not (isinstance(tags, list) and tags
+            and all(isinstance(t, list) and t
+                    and all(isinstance(x, str) for x in t) for t in tags)):
+        return None, "tag mancanti o storti"
+    if not isinstance(ev.get("content"), str) \
+            or not isinstance(ev.get("created_at"), int) \
+            or not RE_HEX_64.fullmatch(str(ev.get("pubkey") or "")) \
+            or not RE_HEX_128.fullmatch(str(ev.get("sig") or "")):
+        return None, "campi mancanti o storti"
+    if not _x_firma_valida(ev):
+        return None, "firma non valida"
+    p = [t for t in tags if t[0] == "p"]
+    if len(p) != 1 or len(p[0]) < 2 or p[0][1] != zap_destinatario():
+        return None, "non è per Barattolo"
+    e = [t for t in tags if t[0] == "e"]
+    if len(e) > 1 or (e and not (len(e[0]) > 1 and RE_HEX_64.fullmatch(e[0][1]))):
+        return None, "tag e storto"
+    if len([t for t in tags if t[0] == "a"]) > 1:
+        return None, "tag a ripetuto"
+    importi = [t for t in tags if t[0] == "amount"]
+    if len(importi) > 1 or (importi and (len(importi[0]) < 2
+                                         or importi[0][1] != str(msat))):
+        return None, "importo diverso da quello chiesto"
+    return ev, ""
+
+
+def zap_relay_richiesti(ev: dict) -> list:
+    """I relay a cui chi zappa vuole la ricevuta (il tag `relays` della
+    richiesta): solo `wss://`, senza credenziali nell'indirizzo, senza
+    doppioni, al piu' ZAP_MAX_RELAY. Qui si giudica la FORMA; dove
+    risolve l'host lo guarda `zap_relay_ammesso`, al momento di
+    bussare."""
+    fuori = []
+    for t in ev.get("tags") or []:
+        if not t or t[0] != "relays":
+            continue
+        for r in t[1:]:
+            r = r.strip()
+            try:
+                p = urlparse(r)
+                buono = (p.scheme == "wss" and bool(p.hostname)
+                         and not p.username and not p.password)
+            except ValueError:
+                buono = False
+            if buono and len(r) <= 200 and r not in fuori:
+                fuori.append(r)
+    return fuori[:ZAP_MAX_RELAY]
+
+
+def zap_relay_ammesso(relay: str) -> bool:
+    """LA GUARDIA ANTI-SSRF DEI RELAY DELLA RICEVUTA: l'indirizzo lo
+    scrive uno sconosciuto dentro la richiesta di zap, e senza questo
+    controllo un `wss://` che risolve in casa farebbe bussare il server
+    alla sua stessa rete. La regola sull'host vive in un posto solo
+    (`url_foto_ammesso`: risolto davvero, mai privato, loopback o
+    link-local). RISOLVE UN NOME: va chiamata in un thread, e mai in
+    collaudo."""
+    try:
+        p = urlparse(relay)
+        if p.scheme != "wss" or not p.hostname:
+            return False
+        return url_foto_ammesso(f"https://{p.hostname}/")
+    except Exception:
+        return False
+
+
+def zap_leggi_bolt11(bolt11: str) -> dict:
+    """Quel che serve di una fattura BOLT11, letto QUI e senza chiedere
+    a nessuno: l'importo in millisatoshi (None se non lo dichiara),
+    l'impronta della descrizione (il campo `h`) e il payment hash (il
+    campo `p`), in esadecimale. {} se non si legge. Il checksum non si
+    rifa': la fattura l'ha appena coniata il NOSTRO LNbits, e qui si
+    guarda che cosa ci ha messo dentro, non se e' arrivata intera."""
+    try:
+        b = str(bolt11).strip().lower()
+        taglio = b.rindex("1")
+        m = re.fullmatch(r"ln[a-z]+?(\d+)?([munp]?)", b[:taglio])
+        if not m:
+            return {}
+        msat = None
+        if m.group(1):
+            quanti, unita = int(m.group(1)), m.group(2)
+            if unita == "p":
+                if quanti % 10:
+                    return {}
+                msat = quanti // 10
+            else:
+                msat = quanti * {"": 10**11, "m": 10**8, "u": 10**5,
+                                 "n": 100}[unita]
+        dati = [CHARSET_BECH32.index(c) for c in b[taglio + 1:]]
+        corpo = dati[7:-110]            # via l'ora, la firma e il checksum
+        campi, i = {}, 0
+        while i + 3 <= len(corpo):
+            lungo = corpo[i + 1] * 32 + corpo[i + 2]
+            campi.setdefault(corpo[i], corpo[i + 3:i + 3 + lungo])
+            i += 3 + lungo
+
+        def in_hex(gruppi):
+            if not gruppi or len(gruppi) != 52:
+                return ""
+            n = 0
+            for g in gruppi:
+                n = (n << 5) | g
+            return f"{n >> 4:064x}"     # 260 bit: gli ultimi 4 sono riempitivo
+        return {"msat": msat, "h": in_hex(campi.get(23)),
+                "payment_hash": in_hex(campi.get(1))}
+    except Exception:
+        return {}
+
+
+def _zap_prepara_tabella(con):
+    """`zap`: una riga per fattura coniata dall'indirizzo di casa. Il
+    payment hash e' la chiave con cui la si richiede a LNbits;
+    `richiesta` e' la 9734 COM'E' ARRIVATA, byte per byte (la fattura
+    ne porta l'impronta, e la ricevuta la ricopia); `ricevuta` e' la
+    9735 firmata, cosi' una pubblicazione andata a vuoto riparte da li'."""
+    con.execute("""CREATE TABLE IF NOT EXISTS zap(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        payment_hash TEXT UNIQUE,
+        bolt11 TEXT DEFAULT '',
+        sats INTEGER DEFAULT 0,
+        tipo TEXT DEFAULT 'semplice',      -- zap | semplice
+        mittente TEXT DEFAULT '',          -- la chiave di chi zappa (hex)
+        commento TEXT DEFAULT '',
+        richiesta TEXT DEFAULT '',
+        relay TEXT DEFAULT '[]',
+        stato TEXT DEFAULT 'attesa',       -- attesa | pagato | scaduto
+        creato INTEGER DEFAULT 0,
+        scade INTEGER DEFAULT 0,
+        pagato_il INTEGER DEFAULT 0,
+        ricevuta TEXT DEFAULT '',
+        ricevuta_relay INTEGER DEFAULT 0,
+        ricevuta_tentativi INTEGER DEFAULT 0)""")
+
+
+def _zap_db():
+    """Una connessione con la tabella pronta: la crea chi arriva prima,
+    il callback o l'orologio."""
+    con = db()
+    _zap_prepara_tabella(con)
+    return con
+
+
+async def zap_conia(sats: int, descrizione: str) -> dict:
+    """Conia sul salvadanaio una fattura che porta l'IMPRONTA di
+    `descrizione` (lo sha256, il campo `h` di BOLT11) al posto del
+    testo: e' quel che LUD-06 chiede per la stringa `metadata`, e NIP-57
+    per la richiesta di zap. A LNbits si dicono tutt'e due le forme che
+    conosce (`unhashed_description` e `description_hash`, in
+    esadecimale), e poi NON CI SI FIDA: la fattura tornata si rilegge
+    qui, e se non porta quell'impronta e quell'importo si ALZA — una
+    fattura senza impronta un wallet serio la rifiuta, e uno zap pagato
+    li' sopra non sarebbe uno zap per nessun client."""
+    url, chiave = zap_wallet()
+    grezzo = descrizione.encode("utf-8")
+    impronta = hashlib.sha256(grezzo).hexdigest()
+    async with httpx.AsyncClient(timeout=15) as c:
+        r = await c.post(f"{url}/api/v1/payments",
+                         headers={"X-Api-Key": chiave},
+                         json={"out": False, "amount": sats,
+                               "memo": ZAP_TESTO, "expiry": ZAP_SCADENZA_S,
+                               "unhashed_description": grezzo.hex(),
+                               "description_hash": impronta})
+        r.raise_for_status()
+        inv = r.json()
+    bolt11 = str(inv.get("payment_request") or inv.get("bolt11") or "")
+    letta = zap_leggi_bolt11(bolt11)
+    if letta.get("h") != impronta or letta.get("msat") != sats * 1000:
+        raise ValueError("la fattura di LNbits non porta l'impronta o "
+                         "l'importo chiesti")
+    return {"payment_hash": str(inv.get("payment_hash")
+                                or letta.get("payment_hash") or ""),
+            "bolt11": bolt11}
+
+
+async def zap_pagata(payment_hash: str):
+    """Chiede a LNbits di UNA fattura del salvadanaio: None = non
+    pagata, un dizionario = pagata (con la `preimage`, se LNbits la da'
+    e torna col payment hash). Un LNbits che non risponde ALZA: «non lo
+    so» non e' «non pagata», e chi chiama non deve far scadere niente
+    su un silenzio."""
+    url, chiave = zap_wallet()
+    async with httpx.AsyncClient(timeout=15) as c:
+        r = await c.get(f"{url}/api/v1/payments/{payment_hash}",
+                        headers={"X-Api-Key": chiave})
+    if r.status_code == 404:
+        return None                 # mai vista, o gia' buttata perche' scaduta
+    if r.status_code != 200:
+        raise RuntimeError(f"LNbits ha risposto {r.status_code}")
+    d = r.json()
+    if not d.get("paid", False):
+        return None
+    pre = str(d.get("preimage") or (d.get("details") or {}).get("preimage")
+              or "").lower()
+    try:
+        vera = hashlib.sha256(bytes.fromhex(pre)).hexdigest() == payment_hash
+    except ValueError:
+        vera = False
+    return {"preimage": pre if vera else ""}
+
+
+def zap_ricevuta(riga: dict, preimage: str = "") -> dict:
+    """LA RICEVUTA DI ZAP (kind 9735, appendice E di NIP-57), firmata
+    con la chiave della piattaforma: i tag `p`, `e`, `a` e `k` ricopiati
+    dalla richiesta, `P` con la chiave di chi ha zappato, la fattura,
+    la richiesta COM'E' ARRIVATA nel tag `description` (la fattura ne
+    porta l'impronta: una virgola spostata e i client la scartano), e
+    l'ora del pagamento come `created_at`. Il contenuto e' vuoto."""
+    ev = json.loads(riga["richiesta"])
+    tags = []
+    for nome in ("p", "e", "a", "k"):
+        primo = next((t for t in ev["tags"] if t and t[0] == nome), None)
+        if primo:
+            tags.append(primo)
+    tags += [["P", ev["pubkey"]], ["bolt11", riga["bolt11"]],
+             ["description", riga["richiesta"]]]
+    if preimage:
+        tags.append(["preimage", preimage])
+    sk, pubkey = _NOSTR
+    ric = evento_non_firmato(pubkey, 9735, tags, "", int(riga["pagato_il"]))
+    ric["sig"] = sk.sign_schnorr(bytes.fromhex(ric["id"])).hex()
+    return ric
+
+
+async def _zap_pubblica(riga: dict, preimage: str = ""):
+    """Firma (se non l'ha gia') e pubblica la ricevuta di UNA riga
+    pagata: ai relay chiesti da chi ha zappato, passati dalla guardia,
+    piu' i nostri di serie. In collaudo non esce niente
+    (`_spedisci_ai_relay` stampa), e la guardia — che risolve un nome —
+    non si chiama. Ogni giro e' un tentativo contato: una ricevuta che
+    nessun relay prende si riprova ZAP_TENTATIVI_RICEVUTA volte e poi
+    resta scritta in colonna."""
+    if _NOSTR is None:
+        presi, ric = 0, None
+    else:
+        ric = (json.loads(riga["ricevuta"]) if riga.get("ricevuta")
+               else zap_ricevuta(riga, preimage))
+        richiesti = json.loads(riga.get("relay") or "[]")
+        if not MODALITA_COLLAUDO:
+            richiesti = [r for r in richiesti
+                         if await asyncio.to_thread(zap_relay_ammesso, r)]
+        relays = richiesti + [r for r in RELAYS_VERIFICA if r not in richiesti]
+        try:
+            presi = await _spedisci_ai_relay(ric, relays)
+        except Exception:
+            presi = 0
+        print(f"🧾 zap: ricevuta {ric['id'][:8]} presa da {presi} relay su "
+              f"{len(relays)}", flush=True)
+    con = _zap_db()
+    try:
+        con.execute("UPDATE zap SET ricevuta=?, ricevuta_relay=?, "
+                    "ricevuta_tentativi=ricevuta_tentativi+1 WHERE id=?",
+                    (json.dumps(ric, ensure_ascii=False) if ric else "",
+                     presi, riga["id"]))
+        con.commit()
+    finally:
+        con.close()
+
+
+async def _zap_incassa(riga: dict, esito: dict, adesso: int):
+    """Una fattura in attesa risulta PAGATA: la riga cambia stato una
+    volta sola (l'UPDATE condizionato e' il cancello: un secondo giro
+    sulla stessa riga non firma una seconda ricevuta), il journal lo
+    dice, e per uno zap parte la ricevuta. Nel journal vanno i sats e
+    chi — mai il commento, mai la fattura intera."""
+    con = _zap_db()
+    try:
+        cur = con.execute("UPDATE zap SET stato='pagato', pagato_il=? "
+                          "WHERE id=? AND stato='attesa'", (adesso, riga["id"]))
+        con.commit()
+        mia = cur.rowcount == 1
+    finally:
+        con.close()
+    if not mia:
+        return
+    chi = (f"zap di {riga['mittente'][:8]}…" if riga["tipo"] == "zap"
+           else "pagamento semplice")
+    print(f"⚡ Zap ricevuto: {_fmt_sats(riga['sats'])} sats ({chi}), fattura "
+          f"{riga['payment_hash'][:8]}…", flush=True)
+    if riga["tipo"] == "zap":
+        await _zap_pubblica(dict(riga, stato="pagato", pagato_il=adesso),
+                            esito.get("preimage", ""))
+
+
+async def giro_zap() -> int:
+    """UN GIRO DELL'OROLOGIO: ogni fattura in attesa si chiede a LNbits
+    — a ogni giro finche' e' fresca, poi ogni mezzo minuto — e quelle
+    pagate si incassano. Una fattura scade SOLO dopo un «non pagata»
+    detto da LNbits a tempo scaduto: se LNbits tace il giro si ferma
+    li' e riprova dopo, senza far scadere niente. In coda, le ricevute
+    che nessun relay ha ancora preso. Torna quante ne ha incassate."""
+    if not zap_vivo():
+        return 0
+    adesso = int(time.time())
+    con = _zap_db()
+    try:
+        attese = [dict(r) for r in con.execute(
+            "SELECT * FROM zap WHERE stato='attesa' ORDER BY id")]
+        da_rifare = [dict(r) for r in con.execute(
+            "SELECT * FROM zap WHERE stato='pagato' AND tipo='zap' AND "
+            "ricevuta_relay=0 AND ricevuta_tentativi<? ORDER BY id",
+            (ZAP_TENTATIVI_RICEVUTA,))]
+    finally:
+        con.close()
+    incassate = 0
+    for r in attese:
+        h = r["payment_hash"]
+        scaduta = adesso > r["scade"] + ZAP_GRAZIA_S
+        if not scaduta and adesso - r["creato"] > ZAP_FRESCA_S \
+                and adesso - _ZAP_VISTI.get(h, 0) < ZAP_LENTO_S:
+            continue
+        _ZAP_VISTI[h] = adesso
+        try:
+            esito = await zap_pagata(h)
+        except Exception as e:
+            print(f"⚠️ zap: LNbits non risponde ({type(e).__name__}: "
+                  f"{str(e)[:120]}): le fatture restano in attesa", flush=True)
+            break
+        if esito is not None:
+            await _zap_incassa(r, esito, adesso)
+            incassate += 1
+        elif scaduta:
+            con = _zap_db()
+            try:
+                con.execute("UPDATE zap SET stato='scaduto' WHERE id=? AND "
+                            "stato='attesa'", (r["id"],))
+                con.commit()
+            finally:
+                con.close()
+    for r in da_rifare:
+        await _zap_pubblica(r)
+    vive = {r["payment_hash"] for r in attese}
+    for h in [h for h in _ZAP_VISTI if h not in vive]:
+        _ZAP_VISTI.pop(h, None)
+    if not attese and not da_rifare:
+        _ZAP_STATO["attesa"] = False    # niente da chiedere: l'orologio riposa
+    _ZAP_STATO["giri"] += 1
+    return incassate
+
+
+async def orologio_zap():
+    while True:
+        try:
+            if _ZAP_STATO["attesa"]:
+                await giro_zap()
+        except Exception as e:
+            print(f"⚠️ zap: giro saltato ({type(e).__name__}: {str(e)[:120]}): "
+                  "il prossimo riparte da solo", flush=True)
+        await asyncio.sleep(ZAP_GIRO_S)
+
+
+@app.on_event("startup")
+async def avvia_zap():
+    """La riga all'avvio dice lo stato VIVO: una leva accesa senza
+    l'invoice key vale spenta, e qui lo si legge."""
+    global _TASK_ZAP
+    if ZAP_ATTIVO and not zap_vivo():
+        print("⚠️ ZAP_ATTIVO e' True ma manca ZAP_LNBITS_INVOICE_KEY (o "
+              "l'indirizzo di LNbits): l'indirizzo Lightning vale SPENTO",
+              flush=True)
+    if not zap_vivo():
+        print("⚡ Indirizzo Lightning di casa: spento (ZAP_ATTIVO)", flush=True)
+        return
+    print(f"⚡ Indirizzo Lightning di casa: {zap_indirizzo()} ACCESO — "
+          + (f"zap Nostr con ricevuta firmata da {_NOSTR[1][:16]}…"
+             if zap_nostr_vivo() else
+             "SENZA zap Nostr (manca la chiave della piattaforma o "
+             "ZAP_NPUB non si legge): incassa e basta"), flush=True)
+    _TASK_ZAP = asyncio.create_task(orologio_zap())
+
+
+def _zap_risposta(corpo: dict, codice: int = 200, cache: str = "no-store"):
+    return JSONResponse(corpo, status_code=codice,
+                        headers={**_ZAP_CORS, "Cache-Control": cache})
+
+
+def _zap_errore(motivo: str, codice: int = 200):
+    """L'errore nella forma di LUD-06, che il wallet sa mostrare."""
+    return _zap_risposta({"status": "ERROR", "reason": motivo}, codice)
+
+
+class _ZapQueryFuoriDalJournal(logging.Filter):
+    """LA QUERY DEL CALLBACK NON VA NEL JOURNAL (10 ott 2026, visto nel
+    giro dal vivo): uvicorn scrive nel suo registro degli accessi
+    l'indirizzo INTERO di ogni richiesta, e in quella del callback ci
+    sono il commento di chi paga e la richiesta di zap per intero —
+    quattromila caratteri a zap, e proprio le due cose che il journal
+    dell'indirizzo non deve dire. La riga resta (metodo, strada,
+    codice): se ne va cio' che segue il punto interrogativo. Non
+    scarta mai una riga e non alza mai: e' un filtro sul registro di
+    tutti."""
+
+    def filter(self, record):
+        try:
+            a = record.args
+            if isinstance(a, tuple) and len(a) >= 3 and isinstance(a[2], str) \
+                    and a[2].startswith("/api/lnurl/zap?"):
+                record.args = a[:2] + ("/api/lnurl/zap?…",) + a[3:]
+        except Exception:
+            pass
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_ZapQueryFuoriDalJournal())
+
+
+@app.get("/.well-known/lnurlp/{nome}")
+@app.head("/.well-known/lnurlp/{nome}")
+def zap_lnurlp(nome: str):
+    """IL CITOFONO di zap@barattolo.store. Stesso patto di `nostr.json`:
+    rotta esplicita (regola ferrea 3), HEAD con la sua riga, CORS aperto
+    perche' a chiedere e' il JavaScript di un client su un altro
+    dominio, mai un redirect. Il nome arriva dal client e passa dalla
+    whitelist piu' corta che c'e': uno. Non tocca ne' il database ne'
+    LNbits, quindi non ha un freno."""
+    if nome != ZAP_NOME or not zap_vivo():
+        return _zap_errore("Qui questo indirizzo non c'è", 404)
+    return _zap_risposta(zap_citofono(), cache="public, max-age=300")
+
+
+@app.get("/api/lnurl/zap")
+async def zap_fattura(request: Request, amount: str = "", nostr: str = "",
+                      comment: str = ""):
+    """IL CALLBACK: conia la fattura sul salvadanaio. `amount` e' in
+    millisatoshi e deve fare sat INTERI (LNbits conia a sat, e il wallet
+    controlla che la fattura dica l'importo chiesto: arrotondare
+    sarebbe farsela rifiutare). Con `nostr` e' uno zap: la richiesta si
+    giudica PRIMA di chiamare LNbits. Il freno e' doppio — per IP e per
+    tutti — piu' un tetto alle fatture in attesa: ogni colpo qui e' una
+    fattura sul nodo."""
+    if not zap_vivo():
+        return _zap_errore("Qui questo indirizzo non c'è", 404)
+    adesso = time.time()
+    ip = _ip_di(request)
+    if (ip and not _secchio_passa(f"zap:{ip}", *FRENI["zap"], adesso)) \
+            or not _secchio_passa("zap_tutti:tutti", *FRENI["zap_tutti"], adesso):
+        return _zap_errore(MSG_FRENO, 429)
+    if not re.fullmatch(r"[0-9]{1,15}", amount) or int(amount) % 1000:
+        return _zap_errore("L'importo va in millisatoshi e deve fare sat interi")
+    msat = int(amount)
+    sats = msat // 1000
+    if not ZAP_MIN_SATS <= sats <= zap_max_sats():
+        return _zap_errore(f"L'importo va da {ZAP_MIN_SATS} a "
+                           f"{zap_max_sats()} sat")
+    if len(comment) > ZAP_COMMENTO:
+        return _zap_errore(f"Il commento può avere al massimo {ZAP_COMMENTO} "
+                           "caratteri")
+    ev = None
+    if nostr:
+        if not zap_nostr_vivo():
+            return _zap_errore("Qui gli zap Nostr non sono attivi")
+        ev, motivo = zap_giudica_richiesta(nostr, msat)
+        if ev is None:
+            return _zap_errore(f"Richiesta di zap non valida: {motivo}")
+    con = _zap_db()
+    try:
+        in_attesa = con.execute(
+            "SELECT COUNT(*) AS n FROM zap WHERE stato='attesa' AND scade>?",
+            (int(adesso),)).fetchone()["n"]
+    finally:
+        con.close()
+    if in_attesa >= ZAP_MAX_ATTESA:
+        return _zap_errore(MSG_FRENO, 429)
+    try:
+        inv = await zap_conia(sats, nostr if ev else zap_metadata())
+    except Exception as e:
+        print(f"⚠️ zap: fattura non coniata ({type(e).__name__}: "
+              f"{str(e)[:160]})", flush=True)
+        return _zap_errore("Il nodo non risponde: riprova fra poco", 503)
+    con = _zap_db()
+    try:
+        con.execute(
+            "INSERT OR IGNORE INTO zap(payment_hash,bolt11,sats,tipo,mittente,"
+            "commento,richiesta,relay,stato,creato,scade) "
+            "VALUES(?,?,?,?,?,?,?,?,'attesa',?,?)",
+            (inv["payment_hash"], inv["bolt11"], sats,
+             "zap" if ev else "semplice", ev["pubkey"] if ev else "",
+             (ev["content"] if ev else comment)[:ZAP_COMMENTO],
+             nostr if ev else "",
+             json.dumps(zap_relay_richiesti(ev) if ev else []),
+             int(adesso), int(adesso) + ZAP_SCADENZA_S))
+        con.commit()
+    finally:
+        con.close()
+    _ZAP_STATO["attesa"] = True
+    print(f"⚡ zap: fattura da {_fmt_sats(sats)} sats "
+          f"({'zap di ' + ev['pubkey'][:8] + '…' if ev else 'pagamento semplice'}"
+          f"), {inv['payment_hash'][:8]}…", flush=True)
+    return _zap_risposta({"pr": inv["bolt11"], "routes": []})
+
+
+async def dati_zap_cruscotto():
+    """La card «Zap» della pagina `/admin`: il saldo VIVO del
+    salvadanaio (chiesto a LNbits con la invoice key; None se tace),
+    quanti ne sono arrivati e gli ultimi venti. None = niente card
+    (indirizzo spento e nessuna riga). Chi ha zappato esce come npub;
+    il commento e' testo di uno sconosciuto, e la pagina lo scrive
+    sempre passando da `esc`."""
+    con = _zap_db()
+    try:
+        tot = con.execute("SELECT COUNT(*) AS n, COALESCE(SUM(sats),0) AS s "
+                          "FROM zap WHERE stato='pagato'").fetchone()
+        in_attesa = con.execute(
+            "SELECT COUNT(*) AS n FROM zap WHERE stato='attesa'").fetchone()["n"]
+        ultimi = [dict(r) for r in con.execute(
+            "SELECT pagato_il, sats, tipo, mittente, commento, ricevuta_relay "
+            "FROM zap WHERE stato='pagato' ORDER BY pagato_il DESC, id DESC "
+            "LIMIT 20")]
+    finally:
+        con.close()
+    if not zap_vivo() and not tot["n"]:
+        return None
+    for u in ultimi:
+        u["mittente"] = hex_to_npub(u["mittente"]) if u["mittente"] else ""
+    saldo = None
+    url, chiave = zap_wallet()
+    if url:
+        try:
+            async with httpx.AsyncClient(timeout=8) as c:
+                r = await c.get(f"{url}/api/v1/wallet",
+                                headers={"X-Api-Key": chiave})
+            if r.status_code == 200:
+                saldo = int(r.json().get("balance") or 0) // 1000
+        except Exception:
+            saldo = None
+    return {"vivo": zap_vivo(), "nostr": zap_nostr_vivo(),
+            "indirizzo": zap_indirizzo(), "saldo_sats": saldo,
+            "quanti": tot["n"], "totale_sats": tot["s"],
+            "in_attesa": in_attesa, "ultimi": ultimi}
+
+
+def _zap_leve() -> list:
+    """Le voci del pannello «Stato delle leve»: i fatti, mai la chiave."""
+    return [
+        _leva("Indirizzo Lightning di casa", "ZAP_ATTIVO", zap_vivo(),
+              allarme=bool(ZAP_ATTIVO) and not zap_vivo(),
+              acceso=f"{zap_indirizzo()} risponde e conia fatture sul "
+                     "salvadanaio degli zap",
+              spento="/.well-known/lnurlp/zap risponde 404; se la leva è "
+                     "True nel config, manca l'invoice key del salvadanaio"),
+        _leva("Il salvadanaio degli zap", "ZAP_LNBITS_INVOICE_KEY",
+              bool(zap_wallet()[0]),
+              acceso="c'è la sola invoice key: il server conia e guarda, "
+                     "non può spendere",
+              spento="senza, la leva qui sopra vale spenta"),
+        # la chiave della riga e' ZAP_NPUB e non NOSTR_NSEC_PIATTAFORMA:
+        # quella una riga sua ce l'ha gia', e due righe con la stessa
+        # chiave nel censimento si coprono
+        _leva("Zap Nostr con ricevuta (NIP-57)", "ZAP_NPUB",
+              zap_nostr_vivo(),
+              acceso="il citofono dichiara allowsNostr e la ricevuta la "
+                     "firma la chiave della piattaforma",
+              spento="l'indirizzo incassa ma non firma ricevute: manca la "
+                     "chiave della piattaforma, o ZAP_NPUB non si legge"),
+        _leva("Importo massimo di uno zap (sats)", "ZAP_MAX_SATS",
+              zap_max_sats()),
+    ]
+
+
+# (Qui finisce il blocco dell'indirizzo Lightning di casa. La riga non e'
+# un vezzo: le prove ritagliano una funzione fino alle due righe vuote
+# che la seguono, e l'ultima del file senza niente dopo non si ritaglia.)

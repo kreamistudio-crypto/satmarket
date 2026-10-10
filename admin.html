@@ -324,7 +324,9 @@ function disegna(){
   <div class="card"><h2>I canali del nodo</h2>
     ${(L.canali || []).length ? `<div class="tab">${tabella(['Con chi','Capacità','Nostri / loro',''], L.canali.map(c => [nodo(c.nodo, c.alias), fmt(c.capacita), `<div class="barra" title="${fmt(c.nostri)} nostri · ${fmt(c.loro)} loro"><b style="width:${c.capacita ? c.nostri / c.capacita * 100 : 0}%"></b><s style="width:${c.capacita ? c.loro / c.capacita * 100 : 0}%"></s></div><div class="sub">${fmt(c.nostri)} · ${fmt(c.loro)}</div>`, c.attivo ? '🟢' : '⚪️ spento']), [1])}</div>`
       : `<div class="nota">Non disponibili${L.canali_motivo ? ': ' + esc(L.canali_motivo) : ''}.</div>`}
-  </div>`;
+  </div>
+
+  ${cardZap(D.zap)}`;
 
   barre(el('gNuovi'), ks, [{colore:colore('--s-tg')}, {colore:colore('--s-nostr')}], nuovi,
     (k, v) => `${esc(etichetta(k, modo))} · Telegram ${fmt(v[0])} · Nostr ${fmt(v[1])}`);
@@ -378,6 +380,29 @@ function cardAnnulli(A, L){
       ${r ? t('Fee spese nei rimborsi', fmtd((r.fee_msat || 0) / 1000, 0) + ' sats', fmt(r.pagamenti) + ' rimborsi in uscita · ' + fmtd(r.percento, 2) + '% del rimborsato') : ''}
     </div>
     ${r ? '' : '<div class="nota">Le fee dei rimborsi le sa il nodo: compaiono quando risponde.</div>'}
+  </div>`;
+}
+
+/* ---- GLI ZAP (10 ott 2026): l'indirizzo Lightning di casa ----
+   Il salvadanaio e' un wallet a parte dello stesso LNbits del nodo: il
+   server ne ha la sola invoice key, quindi qui si GUARDA e basta — i
+   sats li sposta Andrea dal pannello di LNbits. `Z` nullo = indirizzo
+   spento e mai uno zap: niente card. Il commento lo scrive uno
+   sconosciuto: passa SEMPRE da `esc`, come la npub. */
+function cardZap(Z){
+  if (!Z) return '';
+  const data = ts => ts ? new Date(ts * 1000).toLocaleString('it-IT', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : '—';
+  const chi = u => u.tipo !== 'zap' ? '<span class="sub">pagamento semplice</span>'
+    : `<span class="mono" title="${esc(u.mittente)}">${esc(u.mittente.slice(0, 12))}…${esc(u.mittente.slice(-4))}</span>`
+      + (u.ricevuta_relay ? '' : ' <span class="sub">ricevuta non ancora presa</span>');
+  return `<div class="card"><h2>⚡ Zap</h2>
+    <div class="tiles">
+      <div class="tile"><div class="k">Nel salvadanaio</div><div class="v">${Z.saldo_sats == null ? '—' : fmt(Z.saldo_sats) + ' sats'}</div><div class="d">${Z.saldo_sats == null ? 'LNbits non risponde' : 'saldo vivo del wallet «zap»'}</div></div>
+      <div class="tile"><div class="k">Arrivati in tutto</div><div class="v">${fmt(Z.totale_sats)} sats</div><div class="d">${fmt(Z.quanti)} ${Z.quanti === 1 ? 'pagamento' : 'pagamenti'}</div></div>
+      <div class="tile"><div class="k">Indirizzo</div><div class="v" style="font-size:15px">${esc(Z.indirizzo)}</div><div class="d">${Z.vivo ? (Z.nostr ? 'acceso, con ricevute di zap' : 'acceso, senza ricevute di zap') : 'spento'}${Z.in_attesa ? ` · ${fmt(Z.in_attesa)} in attesa` : ''}</div></div>
+    </div>
+    <div class="tab">${tabella(['Quando', 'Sats', 'Da chi', 'Messaggio'], (Z.ultimi || []).map(u => [data(u.pagato_il), fmt(u.sats), chi(u), esc(u.commento || '')]), [1])}</div>
+    <div class="nota">Gli ultimi venti. I sats si spostano a mano dal pannello di LNbits (wallet «zap»): il server ha la sola chiave che incassa.</div>
   </div>`;
 }
 

@@ -31250,6 +31250,11 @@ def _censimento(acceso, dopo=None):
     amb["ipaddress"] = __import__("ipaddress")
     amb["re"] = re
     amb["X_API_BASE"] = "https://api.x.com"
+    # L'INDIRIZZO LIGHTNING DI CASA (10 ott 2026): `zap_indirizzo` passa
+    # URL_PUBBLICO a urlparse, che su un 7 alza; le altre righe del
+    # config finto (leva, chiave, npub) possono restare 7: senza un
+    # indirizzo di LNbits l'indirizzo vale spento, senza esplodere.
+    amb["URL_PUBBLICO"] = "https://barattolo.store"
     for f in ("webhook_attivo", "relay_chiavi_attivo", "sconto_p2p_attivo",
               "eventi_p2p_attivi", "ronda_nodo_attiva", "_leva", "_elenco",
               "_prezzo_banner", "_p2p_leve", "_segreto_p2p_vivo",
@@ -31269,7 +31274,12 @@ def _censimento(acceso, dopo=None):
               # volta della trappola, `_x_leve()` e i suoi giudici
               "x_configurato", "_x_base_di_casa", "x_in_prova",
               "x_ripubblica_viva", "x_riepilogo_vivo", "x_npub_hex",
-              "_x_spesa_mese", "relay_di_casa", "_x_leve", "_leve_stato"):
+              "_x_spesa_mese", "relay_di_casa", "_x_leve",
+              # l'indirizzo Lightning di casa (10 ott 2026): la nona
+              # volta della trappola, `_zap_leve()` e i suoi giudici
+              "zap_wallet", "zap_vivo", "zap_destinatario",
+              "zap_nostr_vivo", "zap_max_sats", "zap_indirizzo",
+              "_zap_leve", "_leve_stato"):
         exec(pezzo(f), amb)
     # la campagna a tutti (9 ott 2026): l'ottava volta, la riga del
     # pannello CHIAMA `timbro_letto` — che aprirebbe il database — e
@@ -107772,6 +107782,435 @@ def prove_x_risonanza():
           "collaudo_x_risonanza" in wf[wf.index("python collaudi_ci.py"):])
 
 
+def _banco_zap(extra=None):
+    """L'ambiente dell'indirizzo Lightning di casa: le costanti e i
+    pezzi VERI di server.py, con una chiave della piattaforma di
+    cartone (`schnorr_puro`: in CI coincurve non c'e') e la invoice key
+    in un DIZIONARIO, la forma che lo scanner dei segreti non prende."""
+    import hashlib
+    import schnorr_puro
+    from urllib.parse import urlparse
+    sk = bytes.fromhex("07" * 31 + "11")
+
+    class _Chiave:
+        def sign_schnorr(self, msg):
+            return schnorr_puro.firma(sk, msg)
+
+    amb = {"re": re, "json": json, "time": time, "hashlib": hashlib,
+           "urlparse": urlparse, "ChiavePubblicaNostr": None,
+           "CHARSET_BECH32": "qpzry9x8gf2tvdw0s3jn54khce6mua7l",
+           "RE_HEX_64": re.compile(r"[0-9a-f]{64}"),
+           "RE_HEX_128": re.compile(r"[0-9a-f]{128}"),
+           "URL_PUBBLICO": "https://barattolo.store",
+           "LNBITS_NODO_URL": "http://127.0.0.1:5001",
+           "ZAP_ATTIVO": True, "ZAP_LNBITS_URL": "", "ZAP_MAX_SATS": 100_000,
+           "ZAP_LNBITS_INVOICE_KEY": "collaudo-usa-e-getta-zap",
+           "_NOSTR": (_Chiave(), schnorr_puro.pubblica(sk).hex()),
+           "MODALITA_COLLAUDO": True}
+    src = _SORGENTE
+    i = src.index('ZAP_NOME = "zap"')
+    exec(src[i:src.index("def zap_wallet(", i)], amb)
+    for f in ("_bech32_polymod", "evento_non_firmato", "npub_to_hex",
+              "hex_to_npub", "_x_firma_valida", "zap_wallet", "zap_vivo",
+              "zap_destinatario", "zap_nostr_vivo", "zap_max_sats",
+              "zap_indirizzo", "zap_metadata", "zap_citofono",
+              "zap_giudica_richiesta", "zap_relay_richiesti",
+              "zap_relay_ammesso", "zap_leggi_bolt11", "zap_ricevuta",
+              "_zap_prepara_tabella"):
+        exec(pezzo(f), amb)
+    amb["ZAP_NPUB"] = amb["hex_to_npub"](
+        schnorr_puro.pubblica(bytes.fromhex("09" * 31 + "13")).hex())
+    amb.update(extra or {})
+    return amb
+
+
+def prove_indirizzo_lightning():
+    """L'INDIRIZZO LIGHTNING DI CASA (10 ott 2026): zap@barattolo.store.
+    Qui i pezzi PURI — chi e' vivo e quando, il citofono, il giudice
+    della richiesta di zap, i relay, la lettura della fattura BOLT11 su
+    due campi della specifica, la ricevuta — e le sentinelle sul testo:
+    le due rotte, l'ordine dei gesti nel callback, il salvadanaio che
+    non conosce una chiave che paga, il journal che non dice commenti
+    ne' fatture. Il server vero, con un LNbits di cartone, sta in
+    `collaudo_indirizzo_lightning`."""
+    print("\n[l'indirizzo Lightning di casa]")
+    import ast as _ast
+    import hashlib
+    import sqlite3
+    import schnorr_puro
+    amb = _banco_zap()
+    src = _SORGENTE
+    blocco = src[src.index("# ---------- L'INDIRIZZO LIGHTNING DI CASA"):]
+    nudo = codice(blocco)
+
+    # --- 1) chi e' vivo, e quando ------------------------------------
+    prova("leva accesa e invoice key: l'indirizzo e' vivo, sul LNbits del nodo",
+          (True, ("http://127.0.0.1:5001", "collaudo-usa-e-getta-zap")),
+          (amb["zap_vivo"](), amb["zap_wallet"]()))
+    for nome, valore, perche in (
+            ("ZAP_ATTIVO", False, "la leva spenta"),
+            ("ZAP_LNBITS_INVOICE_KEY", "", "senza l'invoice key"),
+            ("ZAP_LNBITS_INVOICE_KEY", "INCOLLA_QUI_LA_INVOICE_KEY_DEL_WALLET_ZAP",
+             "col segnaposto del config d'esempio"),
+            ("LNBITS_NODO_URL", "", "senza un indirizzo di LNbits")):
+        a = _banco_zap({nome: valore})
+        prova(f"{perche}: spento, e senza zap Nostr", (False, False),
+              (a["zap_vivo"](), a["zap_nostr_vivo"]()))
+    prova("ZAP_LNBITS_URL, se c'e', vince sull'indirizzo del nodo",
+          "https://altrove.example",
+          _banco_zap({"ZAP_LNBITS_URL": "https://altrove.example/"})["zap_wallet"]()[0])
+    prova("senza la chiave della piattaforma: vivo, ma senza zap Nostr",
+          (True, False), (lambda a: (a["zap_vivo"](), a["zap_nostr_vivo"]()))(
+              _banco_zap({"_NOSTR": None})))
+    prova("una ZAP_NPUB storta: vivo, ma senza zap Nostr", (True, False, ""),
+          (lambda a: (a["zap_vivo"](), a["zap_nostr_vivo"](),
+                      a["zap_destinatario"]()))(_banco_zap({"ZAP_NPUB": "npub1storta"})))
+    dest = amb["zap_destinatario"]()
+    prova("il destinatario si legge dalla npub, in esadecimale minuscolo",
+          (64, amb["ZAP_NPUB"]), (len(dest), amb["hex_to_npub"](dest)))
+    prova("il destinatario di serie e' la npub ufficiale di Barattolo", True,
+          'ZAP_NPUB = "npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy"'
+          in blocco)
+    prova("il massimo: il numero del config, e il default se e' storto o zero",
+          [500, 100_000, 100_000, 100_000],
+          [_banco_zap({"ZAP_MAX_SATS": v})["zap_max_sats"]()
+           for v in (500, "storto", 0, None)])
+
+    # --- 2) il citofono ------------------------------------------------
+    cit = amb["zap_citofono"]()
+    prova("il citofono: un payRequest da 1 a 100.000 sat, commento a 140",
+          ("payRequest", "https://barattolo.store/api/lnurl/zap", 1000,
+           100_000_000, 140),
+          (cit["tag"], cit["callback"], cit["minSendable"], cit["maxSendable"],
+           cit["commentAllowed"]))
+    prova("...la metadata porta zap@barattolo.store",
+          [["text/plain", "Zap a Barattolo"],
+           ["text/identifier", "zap@barattolo.store"]],
+          json.loads(cit["metadata"]))
+    prova("...ed e' la STESSA stringa che il callback impronta", True,
+          cit["metadata"] == amb["zap_metadata"]()
+          and "zap_conia(sats, nostr if ev else zap_metadata())"
+          in codice(pezzo("zap_fattura")))
+    prova("...con allowsNostr e la chiave che firma la ricevuta",
+          (True, amb["_NOSTR"][1]), (cit["allowsNostr"], cit["nostrPubkey"]))
+    prova("...che NON e' la chiave a cui vanno gli zap", True,
+          cit["nostrPubkey"] != dest)
+    senza = _banco_zap({"_NOSTR": None})["zap_citofono"]()
+    prova("senza la chiave della piattaforma i due campi Nostr non ci sono",
+          False, "allowsNostr" in senza or "nostrPubkey" in senza)
+
+    # --- 3) il giudice della richiesta di zap --------------------------
+    sk_z = bytes.fromhex("0b" * 31 + "17")
+    pub_z = schnorr_puro.pubblica(sk_z).hex()
+    altro = schnorr_puro.pubblica(bytes.fromhex("0d" * 31 + "19")).hex()
+    giudica = amb["zap_giudica_richiesta"]
+
+    def richiesta(msat=21000, tags=None, kind=9734, content="grazie",
+                  creato=1_790_000_000, guasta=False, **in_piu):
+        if tags is None:
+            tags = [["relays", "wss://relay.uno.example"],
+                    ["amount", str(msat)], ["p", dest], ["e", "ab" * 32]]
+        ev = amb["evento_non_firmato"](pub_z, kind, tags, content, creato)
+        ev["sig"] = schnorr_puro.firma(sk_z, bytes.fromhex(ev["id"])).hex()
+        if guasta:
+            ev["content"] += "!"
+        ev.update(in_piu)
+        return json.dumps(ev, ensure_ascii=False, separators=(",", ":"))
+
+    ev, motivo = giudica(richiesta(), 21000)
+    prova("una richiesta buona passa, e torna l'evento", (pub_z, ""),
+          (ev and ev["pubkey"], motivo))
+    prova("...anche senza i tag facoltativi (amount, e, relays)", "",
+          giudica(richiesta(tags=[["p", dest]]), 21000)[1])
+    storte = {
+        "troppo lunga": (richiesta(content="x" * 5000), "troppo lunga"),
+        "non JSON": ("{no", "non si legge"),
+        "una lista": ("[]", "non è una richiesta di zap"),
+        "un altro kind": (richiesta(kind=9735), "non è una richiesta di zap"),
+        "senza tag": (richiesta(tags=[]), "tag mancanti o storti"),
+        "un tag non di stringhe": (richiesta(tags=[["p", dest], ["x", 1]]),
+                                   "tag mancanti o storti"),
+        "la firma di un altro testo": (richiesta(guasta=True), "firma non valida"),
+        "created_at non intero": (richiesta(created_at="ieri"),
+                                  "campi mancanti o storti"),
+        "la chiave in maiuscolo": (richiesta(pubkey=pub_z.upper()),
+                                   "campi mancanti o storti"),
+        "per un altro profilo": (richiesta(tags=[["p", altro]]),
+                                 "non è per Barattolo"),
+        "due tag p": (richiesta(tags=[["p", dest], ["p", altro]]),
+                      "non è per Barattolo"),
+        "nessun tag p": (richiesta(tags=[["e", "ab" * 32]]), "non è per Barattolo"),
+        "due tag e": (richiesta(tags=[["p", dest], ["e", "ab" * 32],
+                                      ["e", "cd" * 32]]), "tag e storto"),
+        "un tag e che non e' un id": (richiesta(tags=[["p", dest], ["e", "boh"]]),
+                                      "tag e storto"),
+        "due tag a": (richiesta(tags=[["p", dest], ["a", "30023:x:y"],
+                                      ["a", "30023:x:z"]]), "tag a ripetuto"),
+        "l'importo del tag diverso": (richiesta(msat=42000),
+                                      "importo diverso da quello chiesto"),
+    }
+    prova("ogni richiesta storta ha il SUO no",
+          {k: v[1] for k, v in storte.items()},
+          {k: giudica(v[0], 21000)[1] for k, v in storte.items()})
+    prova("...e nessuna torna un evento", True,
+          all(giudica(v[0], 21000)[0] is None for v in storte.values()))
+    prova("il tetto in byte e' quello dichiarato (4096)", (4096, "troppo lunga"),
+          (amb["ZAP_TETTO_RICHIESTA"], giudica("x" * 4097, 21000)[1]))
+
+    # --- 4) i relay della ricevuta -------------------------------------
+    rel = amb["zap_relay_richiesti"]
+    prova("i relay: solo wss, senza credenziali, senza doppioni, in ordine",
+          ["wss://uno.example", "wss://due.example:7777/percorso"],
+          rel({"tags": [["relays", "wss://uno.example", "ws://chiaro.example",
+                         " wss://uno.example ", "https://sito.example",
+                         "wss://io:parola@tre.example", "wss://",
+                         "wss://due.example:7777/percorso", "x" * 300],
+                        ["p", dest]]}))
+    prova("...al piu' otto, anche da due tag", 8,
+          len(rel({"tags": [["relays"] + [f"wss://a{i}.example" for i in range(6)],
+                            ["relays"] + [f"wss://b{i}.example" for i in range(6)]]})))
+    prova("...e senza il tag nessuno", [], rel({"tags": [["p", dest]]}))
+    chiesti = []
+
+    def guardia_finta(url):
+        chiesti.append(url)
+        return "interno" not in url
+    amb["url_foto_ammesso"] = guardia_finta
+    ammesso = amb["zap_relay_ammesso"]
+    prova("la guardia: wss che risolve fuori si', che risolve in casa no, ws mai",
+          [True, False, False, False],
+          [ammesso("wss://relay.example:7777/x"), ammesso("wss://interno.example"),
+           ammesso("ws://relay.example"), ammesso("non un indirizzo")])
+    prova("...e chiede alla regola di casa il SOLO host (un posto solo)",
+          ["https://relay.example/", "https://interno.example/"], chiesti)
+    pub = codice(pezzo("_zap_pubblica"))
+    prova("la ricevuta parte da `_spedisci_ai_relay` (che in collaudo stampa)",
+          True, "await _spedisci_ai_relay(ric, relays)" in pub)
+    prova("...coi relay chiesti passati dalla guardia, in un thread, mai in collaudo",
+          True, "if not MODALITA_COLLAUDO:" in pub
+          and "await asyncio.to_thread(zap_relay_ammesso, r)" in pub)
+    prova("...e nel blocco nessuna connessione a un relay aperta a mano", False,
+          "create_connection(" in nudo)
+
+    # --- 5) la lettura della fattura BOLT11 ------------------------------
+    leggi = amb["zap_leggi_bolt11"]
+    A = amb["CHARSET_BECH32"]
+
+    def gruppi(dati):
+        n, bits, fuori = 0, 0, []
+        for b in dati:
+            n, bits = (n << 8) | b, bits + 8
+            while bits >= 5:
+                bits -= 5
+                fuori.append((n >> bits) & 31)
+        if bits:
+            fuori.append((n << (5 - bits)) & 31)
+        return fuori
+
+    def campo(tipo, g):
+        return [A.index(tipo), len(g) // 32, len(g) % 32] + g
+
+    def fattura(hrp, h_pagamento, impronta=None, memo="un memo"):
+        corpo = [0] * 7 + campo("p", gruppi(h_pagamento))
+        corpo += (campo("h", gruppi(impronta)) if impronta
+                  else campo("d", gruppi(memo.encode())))
+        return hrp + "1" + "".join(A[x] for x in corpo + [0] * 110)
+
+    hp, hd = bytes(range(32)), hashlib.sha256(b"la descrizione").digest()
+    letta = leggi(fattura("lnbc210n", hp, hd))
+    prova("una fattura da 21 sat: l'importo, l'impronta, il payment hash",
+          (21000, hd.hex(), hp.hex()),
+          (letta.get("msat"), letta.get("h"), letta.get("payment_hash")))
+    prova("le unita' dell'importo: n, u, m, p, e i bitcoin interi",
+          [21000, 2_100_000, 100_000_000, 1, 10**11],
+          [leggi(fattura(h, hp, hd)).get("msat")
+           for h in ("lnbc210n", "lnbc21u", "lnbc1m", "lnbc10p", "lnbc1")])
+    prova("...e le reti di prova si leggono uguale", [21000, 21000],
+          [leggi(fattura(h, hp, hd)).get("msat") for h in ("lntbs210n", "lnbcrt210n")])
+    prova("una fattura senza importo: None, non zero", None,
+          leggi(fattura("lnbc", hp, hd)).get("msat"))
+    prova("un decimo di millisatoshi non e' un importo", {},
+          leggi(fattura("lnbc15p", hp, hd)))
+    prova("una fattura col MEMO al posto dell'impronta: l'impronta e' vuota", "",
+          leggi(fattura("lnbc210n", hp)).get("h"))
+    prova("in maiuscolo si legge uguale", hd.hex(),
+          leggi(fattura("lnbc210n", hp, hd).upper()).get("h"))
+    prova("quel che non e' una fattura torna vuoto, senza alzare", [{}, {}, {}, {}],
+          [leggi(x) for x in ("", "ciao", "lnbc210n1bbb", None)])
+    # I DUE CAMPI DELLA SPECIFICA (BOLT11, «Examples»): il payment hash
+    # 0001020304050607080900010203…0102 e l'impronta della lista della
+    # spesa («One piece of chocolate cake…»). Le due stringhe bech32 sono
+    # quelle del documento; i valori attesi si RIFANNO qui — lo sha256
+    # della frase, i byte del payment hash — cosi' una lettura sbagliata
+    # dei cinque bit non puo' tornare per caso.
+    frase = ("One piece of chocolate cake, one icecream cone, one pickle, one "
+             "slice of swiss cheese, one slice of salami, one lollypop, one "
+             "piece of cherry pie, one sausage, one cupcake, and one slice of "
+             "watermelon")
+    spec = ("lnbc20m1pvjluez"
+            "pp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypq"
+            "hp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqs"
+            + "q" * 110)
+    letta = leggi(spec)
+    prova("i campi dell'esempio di BOLT11 si leggono come dice la specifica",
+          (2_000_000_000, hashlib.sha256(frase.encode()).hexdigest(),
+           (bytes(range(10)) * 3 + bytes([1, 2])).hex()),
+          (letta.get("msat"), letta.get("h"), letta.get("payment_hash")))
+    conia = codice(pezzo("zap_conia"))
+    prova("zap_conia dice a LNbits tutt'e due le forme dell'impronta", True,
+          '"unhashed_description": grezzo.hex()' in conia
+          and '"description_hash": impronta' in conia)
+    prova("...e RILEGGE la fattura prima di darla: impronta e importo", True,
+          'letta.get("h") != impronta or letta.get("msat") != sats * 1000' in conia
+          and conia.index("zap_leggi_bolt11(") < conia.index("raise ValueError"))
+    prova("...e conia SOLO per incassare, con la invoice key del salvadanaio",
+          True, '"out": False' in conia and "url, chiave = zap_wallet()" in conia)
+
+    # --- 6) la ricevuta --------------------------------------------------
+    req = richiesta(tags=[["relays", "wss://relay.uno.example"],
+                          ["amount", "21000"], ["p", dest], ["e", "ab" * 32],
+                          ["a", "30023:x:y"], ["k", "30023"]])
+    riga = {"richiesta": req, "bolt11": "lnbc210n1fattura", "pagato_il": 1_790_000_123}
+    ric = amb["zap_ricevuta"](riga, "ef" * 32)
+    prova("la ricevuta: una 9735 vuota, con l'ora del pagamento",
+          (9735, "", 1_790_000_123, amb["_NOSTR"][1]),
+          (ric["kind"], ric["content"], ric["created_at"], ric["pubkey"]))
+    prova("...i tag nell'ordine di NIP-57: p, e, a, k, P, bolt11, description, preimage",
+          [["p", dest], ["e", "ab" * 32], ["a", "30023:x:y"], ["k", "30023"],
+           ["P", pub_z], ["bolt11", "lnbc210n1fattura"], ["description", req],
+           ["preimage", "ef" * 32]], ric["tags"])
+    prova("...firmata davvero dalla chiave della piattaforma", True,
+          amb["_x_firma_valida"](ric))
+    prova("senza preimage il tag non c'e'", False,
+          any(t[0] == "preimage" for t in amb["zap_ricevuta"](riga)["tags"]))
+    incassa = codice(pezzo("_zap_incassa"))
+    prova("una riga si incassa UNA volta: l'UPDATE condizionato e' il cancello",
+          True, "WHERE id=? AND stato='attesa'" in incassa
+          and "cur.rowcount == 1" in incassa
+          and incassa.index("if not mia:") < incassa.index("_zap_pubblica("))
+    giro = codice(pezzo("giro_zap"))
+    prova("una fattura scade solo DOPO un «non pagata» di LNbits", True,
+          giro.index("await zap_pagata(h)") < giro.index("stato='scaduto'")
+          and "elif scaduta:" in giro)
+    prova("...e un LNbits che tace ferma il giro, non fa scadere niente", True,
+          giro.index("except Exception as e:") < giro.index("break")
+          < giro.index("stato='scaduto'"))
+    pagata = codice(pezzo("zap_pagata"))
+    prova("zap_pagata: un codice che non e' 200 ne' 404 ALZA", True,
+          "raise RuntimeError(" in pagata)
+    prova("...e la preimage si crede solo se torna col payment hash", True,
+          "hashlib.sha256(bytes.fromhex(pre)).hexdigest() == payment_hash" in pagata)
+
+    # --- 7) la tabella ---------------------------------------------------
+    con = sqlite3.connect(":memory:")
+    amb["_zap_prepara_tabella"](con)
+    amb["_zap_prepara_tabella"](con)          # due volte: non alza
+    colonne = {r[1] for r in con.execute("PRAGMA table_info(zap)")}
+    prova("la tabella zap ha le colonne che il giro legge e scrive", True,
+          {"payment_hash", "bolt11", "sats", "tipo", "mittente", "commento",
+           "richiesta", "relay", "stato", "creato", "scade", "pagato_il",
+           "ricevuta", "ricevuta_relay", "ricevuta_tentativi"} <= colonne)
+    con.execute("INSERT INTO zap(payment_hash) VALUES('h1')")
+    doppia = False
+    try:
+        con.execute("INSERT INTO zap(payment_hash) VALUES('h1')")
+    except sqlite3.IntegrityError:
+        doppia = True
+    prova("...e un payment hash non entra due volte", True, doppia)
+    prova("una riga nasce in attesa e «semplice»", ("attesa", "semplice"),
+          tuple(con.execute("SELECT stato, tipo FROM zap").fetchone()))
+    con.close()
+
+    # --- 8) le sentinelle sul testo ----------------------------------------
+    prova("il citofono c'e' una volta, GET e HEAD (regola ferrea 3)", (1, 1),
+          (src.count('@app.get("/.well-known/lnurlp/{nome}")'),
+           src.count('@app.head("/.well-known/lnurlp/{nome}")')))
+    prova("...e il callback una volta", 1, src.count('@app.get("/api/lnurl/zap")'))
+    cit_src = codice(pezzo("zap_lnurlp"))
+    prova("il nome passa dalla whitelist PRIMA di tutto, e a leva spenta e' 404",
+          True, cit_src.index("if nome != ZAP_NOME or not zap_vivo():")
+          < cit_src.index("zap_citofono()") and ", 404)" in cit_src)
+    prova("il nome dell'indirizzo e' uno solo: zap", "zap", amb["ZAP_NOME"])
+    cb = codice(pezzo("zap_fattura"))
+    ordine = [cb.index(x) for x in (
+        "if not zap_vivo():", "_secchio_passa(", "int(amount) % 1000",
+        "len(comment) > ZAP_COMMENTO", "zap_giudica_richiesta(nostr, msat)",
+        "in_attesa >= ZAP_MAX_ATTESA", "await zap_conia(", "INSERT OR IGNORE INTO zap")]
+    prova("il callback: la leva, il freno, i limiti, il giudice, il tetto — "
+          "e SOLO DOPO LNbits e la riga", ordine, sorted(ordine))
+    prova("...col freno per IP e quello per tutti", True,
+          '_secchio_passa(f"zap:{ip}", *FRENI["zap"], adesso)' in cb
+          and '_secchio_passa("zap_tutti:tutti", *FRENI["zap_tutti"], adesso)' in cb)
+    prova("...che risponde nella forma di LUD-06 anche quando frena", True,
+          "return _zap_errore(MSG_FRENO, 429)" in cb)
+    prova("...e uno zap senza la chiave della piattaforma si rifiuta PRIMA di coniare",
+          True, cb.index("if not zap_nostr_vivo():") < cb.index("await zap_conia("))
+    prova("il salvadanaio non conosce una chiave che paga, ne' le cassaforti",
+          [False, False, False],
+          ["ADMIN_KEY" in nudo, "_chiavi_cassaforte(" in nudo, '"out": True' in nudo])
+    prova("...e le cassaforti non conoscono lui", False,
+          "ZAP_" in codice(pezzo("_chiavi_cassaforte")))
+    # IL JOURNAL: ogni print del blocco, guardato con l'albero. Non deve
+    # nominare ne' il commento ne' la fattura ne' la richiesta ne' una
+    # chiave: i sats, chi (otto caratteri), l'inizio del payment hash.
+    vietati = {"commento", "comment", "bolt11", "richiesta", "ricevuta",
+               "preimage", "content", "chiave", "nostr", "sk",
+               "ZAP_LNBITS_INVOICE_KEY"}
+    nominati = set()
+    stampe = 0
+    for nodo in _ast.walk(_ast.parse(blocco)):
+        if isinstance(nodo, _ast.Call) and getattr(nodo.func, "id", "") == "print":
+            stampe += 1
+            for dentro in _ast.walk(nodo):
+                if isinstance(dentro, _ast.Name):
+                    nominati.add(dentro.id)
+                elif isinstance(dentro, _ast.Subscript) \
+                        and isinstance(dentro.slice, _ast.Constant):
+                    nominati.add(dentro.slice.value)
+    prova("il journal dell'indirizzo non stampa mai commento, fattura, "
+          "richiesta o chiave", (set(), True),
+          (nominati & vietati, stampe >= 8))
+    prova("...ma i sats e l'inizio del payment hash si'", True,
+          {"sats", "payment_hash"} <= nominati)
+    # ...e il registro degli ACCESSI di uvicorn, che scriverebbe la
+    # query intera del callback (il commento, la richiesta di zap): il
+    # filtro c'e', e' montato sul registro giusto, e non scarta righe
+    filtro = src[src.index("class _ZapQueryFuoriDalJournal("):
+                 src.index('@app.get("/.well-known/lnurlp/{nome}")')]
+    prova("la query del callback non entra nel registro degli accessi", True,
+          'logging.getLogger("uvicorn.access").addFilter(_ZapQueryFuoriDalJournal())'
+          in codice(filtro) and 'a[2].startswith("/api/lnurl/zap?")' in filtro
+          and "return False" not in codice(filtro))
+    prova("il pannello delle leve chiede a _zap_leve", True,
+          "_zap_leve()" in codice(pezzo("_leve_stato")))
+    prova("...e il cruscotto degli admin porta la card, DOPO il controllo di chi e' admin",
+          True, (lambda c: c.index("if not e_admin(") < c.index(
+              '"zap": await dati_zap_cruscotto()'))(codice(pezzo("cruscotto_admin"))))
+    pagina = open("admin.html", encoding="utf-8").read()
+    prova("la pagina /admin disegna la card e scappa cio' che scrive uno sconosciuto",
+          True, "${cardZap(D.zap)}" in pagina and "esc(u.commento" in pagina
+          and "esc(u.mittente" in pagina and "if (!Z) return '';" in pagina)
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    prova("nel config d'esempio la leva nasce SPENTA e la chiave e' il segnaposto",
+          True, "\nZAP_ATTIVO = False\n" in esempio
+          and '\nZAP_LNBITS_INVOICE_KEY = "INCOLLA_QUI' in esempio)
+    prova("...e nel codice pure: senza la riga nel config vale False", True,
+          "except ImportError:\n    ZAP_ATTIVO = False\n" in blocco)
+    flusso = open(os.path.join(".github", "workflows", "prove.yml"),
+                  encoding="utf-8").read()
+    prova("il collaudo gira in CI, nella gabbia", True,
+          "             collaudo_indirizzo_lightning\n" in flusso)
+    arch = open(os.path.join("docs", "ARCHITETTURA.md"), encoding="utf-8").read()
+    prova("ARCHITETTURA elenca le due rotte fra le pubbliche", True,
+          "`/.well-known/lnurlp/zap`" in arch and "`/api/lnurl/zap`" in arch
+          and "L'INDIRIZZO LIGHTNING DI CASA" in arch)
+    prod = open(os.path.join("docs", "PRODUZIONE.md"), encoding="utf-8").read()
+    prova("PRODUZIONE ha la procedura: il wallet, la riga, la leva, il controllo",
+          True, "L'INDIRIZZO LIGHTNING DI CASA" in prod
+          and "ZAP_LNBITS_INVOICE_KEY" in prod and "ZAP_ATTIVO = True" in prod
+          and "/.well-known/lnurlp/zap" in prod)
+
+
 def prove_config_esempio():
     """`config_esempio.py` E' IL FILE DA CUI SI COPIA (ago 2026, dal
     campo: le sei leve dei connettori erano cablate, funzionavano col
@@ -133553,7 +133992,10 @@ def prove_freni():
           "feedback con foto 20/ora, carrello salvato 120/min",
           {"annunci": (60, 3600), "anteprima": (60, 3600), "pagamento": (30, 60),
            "ln_address": (30, 60), "login": (30, 60), "canale": (1, 600),
-           "foto_recensione": (20, 3600), "carrello": (120, 60)}, F)
+           "foto_recensione": (20, 3600), "carrello": (120, 60),
+           # l'indirizzo Lightning di casa (10 ott 2026): 20 fatture al
+           # minuto per IP, 120 per tutti insieme
+           "zap": (20, 60), "zap_tutti": (120, 60)}, F)
     prova("...e cinque ordini «creato» vivi per compratore", 5, amb["MAX_ORDINI_CREATO"])
 
     # --- il secchio, con l'orologio di cartone ----------------------------
@@ -143520,6 +143962,7 @@ def main():
               prove_malus_p2p,
               prove_feedback_p2p,
               prove_x_risonanza,
+              prove_indirizzo_lightning,
               prove_config_esempio):
         try:
             f()

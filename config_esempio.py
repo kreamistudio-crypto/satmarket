@@ -1051,6 +1051,28 @@ X_NPUB = "npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy"
 # sul loopback): in produzione resta questa.
 X_API_BASE = "https://api.x.com"
 
+# --- L'indirizzo Lightning di casa: zap@barattolo.store (ott 2026) ---
+# Un Lightning address di Barattolo, da scrivere nel profilo Nostr
+# ufficiale (campo lud16) per ricevere gli zap. Acceso, il server
+# risponde su /.well-known/lnurlp/zap e conia le fatture su un wallet
+# LNbits A PARTE, il «salvadanaio»: mai quello delle garanzie.
+# Nasce SPENTO: con la leva False (o senza l'invoice key qui sotto)
+# quell'indirizzo risponde 404.
+ZAP_ATTIVO = False
+# La INVOICE key del wallet «zap» (LNbits del nodo → wallet «zap» →
+# «API info» → «Invoice/read key»). SOLO quella: con lei il server
+# conia e guarda, NON spende. La Admin key di quel wallet qui non si
+# mette mai. Solo nel config del VPS, a mano: mai in chat, mai su GitHub.
+ZAP_LNBITS_INVOICE_KEY = "INCOLLA_QUI_LA_INVOICE_KEY_DEL_WALLET_ZAP"
+# Dove sta quel wallet: vuoto = lo stesso LNbits del nodo
+# (LNBITS_NODO_URL). Si scrive solo se un giorno traslocasse.
+ZAP_LNBITS_URL = ""
+# Il massimo di un singolo pagamento, in sats (il minimo e' 1).
+ZAP_MAX_SATS = 100_000
+# A chi vanno gli zap: la npub ufficiale di Barattolo. E' gia' nel
+# codice: la riga serve solo per un giro di prova con un'altra chiave.
+ZAP_NPUB = "npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy"
+
 # --- Import aperto da Nostr -------------------------------------------
 # Barattolo mostra gli annunci NIP-99 che stanno su Nostr: chiunque
 # pubblichi in italiano si ritrova in vetrina, e chi non ci vuole

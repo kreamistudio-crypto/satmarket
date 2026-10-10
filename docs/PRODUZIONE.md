@@ -3377,3 +3377,106 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   deve dire 2. Si revoca da solo con `lncli deletemacaroonid 4` sul
   nodo (e la riga via dal config). Finito l'esperimento la riga puo'
   sparire: G e H tornano «non attive» senza altro da fare.
+- L'INDIRIZZO LIGHTNING DI CASA (10 ott 2026; perché in CANTIERI,
+  «L'indirizzo Lightning di casa: zap@barattolo.store»; com'è fatto in
+  ARCHITETTURA, stesso titolo). `zap@barattolo.store`, per ricevere gli
+  zap sul profilo Nostr ufficiale. Le leve NON compaiono da sole nel
+  config del VPS e nel codice l'indirizzo è spento: finché non lo si
+  accende, `https://barattolo.store/.well-known/lnurlp/zap` risponde
+  404. PER ACCENDERLO, in quest'ordine:
+  1) IL WALLET «zap», SUL PC: aprire il pannello di LNbits del nodo
+     (`ssh -N -L 5001:127.0.0.1:5001 root@VPS` in un terminale, poi
+     `http://127.0.0.1:5001` nel browser, login «LNbits nodo» in
+     KeePass). Con lo STESSO utente della cassaforte: «Add a new
+     wallet», nome `zap`. Dentro il wallet nuovo, a destra, «Node URL,
+     API keys and API docs»: si copia la «Invoice/read key» — SOLO
+     quella. La «Admin key» di quel wallet non si copia e non si mette
+     da nessuna parte: è la chiave che spende.
+  2) IL CONFIG, SUL VPS, da `barattolo`: prima si guarda che le righe
+     non ci siano già — `grep -n "^ZAP_" /srv/barattolo/config.py` — poi
+     si aggiungono in fondo a `/srv/barattolo/config.py` le due righe:
+     la chiave, `ZAP_LNBITS_INVOICE_KEY` uguale alla invoice key copiata
+     (fra virgolette), e la leva, `ZAP_ATTIVO = True`. Nient'altro:
+     l'indirizzo di LNbits è quello del nodo (`LNBITS_NODO_URL`), il
+     massimo è 100.000 sat (`ZAP_MAX_SATS` per cambiarlo), la npub che
+     riceve è quella ufficiale (`ZAP_NPUB`). La invoice key non si
+     scrive mai in chat, su GitHub o in un log.
+  3) IL RIAVVIO: `sudo systemctl restart barattolo`.
+  4) IL JOURNAL, subito dopo:
+     `journalctl -u barattolo -n 120 --no-pager | grep "Indirizzo Lightning"`
+     — «⚡ Indirizzo Lightning di casa: zap@barattolo.store ACCESO — zap
+     Nostr con ricevuta firmata da …» è il verde; «SENZA zap Nostr» vuol
+     dire che manca `NOSTR_NSEC_PIATTAFORMA` (l'indirizzo incassa, ma
+     non firma ricevute); «spento» o la riga «⚠️ ZAP_ATTIVO e' True ma
+     manca…» vuol dire che la chiave non è stata letta.
+  5) IL CITOFONO, da qualunque computer:
+     `curl -s https://barattolo.store/.well-known/lnurlp/zap` — deve
+     tornare un JSON con `"tag":"payRequest"`, `"allowsNostr":true` e una
+     `nostrPubkey`. Un `{"status":"ERROR"…}` vuol dire spento.
+  6) UNA FATTURA DI PROVA, E COSA DICE IL JOURNAL. ⚠️ È LA PRIMA
+     FATTURA VERA dell'indirizzo: prima del push è stato provato tutto
+     con un LNbits di cartone, NON col LNbits del nodo (decisione di
+     Andrea, 10 ott). Sul VPS si tiene aperto il journal:
+     `journalctl -u barattolo -f | grep -i zap`. Poi, da un wallet che
+     paga un Lightning address, si mandano 21 sat a
+     `zap@barattolo.store`; oppure si chiede la fattura a mano, da
+     qualunque computer —
+     `curl -s "https://barattolo.store/api/lnurl/zap?amount=21000"`
+     (l'importo è in MILLIsatoshi: 21000 = 21 sat) — e la `pr` che
+     torna (`lnbc210n1…`) si incolla nel wallet e si paga.
+     NEL JOURNAL, in ordine: «⚡ zap: fattura da 21 sats (pagamento
+     semplice), abcd1234…» appena chiesta; entro una decina di secondi
+     dal pagamento «⚡ Zap ricevuto: 21 sats (pagamento semplice),
+     fattura abcd1234…». La card «⚡ Zap» di `/admin` mostra il saldo e
+     la riga.
+     SE INVECE il journal dice:
+     · «⚠️ zap: fattura non coniata (ValueError: la fattura di LNbits
+       non porta l'impronta o l'importo chiesti)»: LNbits ha coniato una
+       fattura SENZA l'impronta della descrizione, e il server non l'ha
+       data (il wallet riceve «Il nodo non risponde», niente è stato
+       pagato). È il caso che da qui non si poteva provare: si spegne la
+       leva (`ZAP_ATTIVO = False`, riavvio) e si riporta la riga com'è;
+     · «⚠️ zap: fattura non coniata (…)» con un altro motivo: LNbits o il
+       ponte verso LND sono giù, o la invoice key è sbagliata (401);
+     · «⚠️ zap: LNbits non risponde (…): le fatture restano in attesa»:
+       l'orologio non riesce a chiedere; niente scade, riprova da solo.
+     Nel journal NON ci sono mai il commento, la fattura intera, la
+     richiesta di zap o la chiave: la riga d'accesso di uvicorn del
+     callback esce come `GET /api/lnurl/zap?… 200`, senza la query. Il
+     Caddyfile del VPS non ha nessuna direttiva `log` (detto da Andrea,
+     10 ott 2026), quindi un registro degli accessi di Caddy non c'è:
+     se un giorno lo si accende, la query del callback va tolta anche
+     lì, o i commenti finiscono in quel file.
+  7) SOLO ADESSO IL PROFILO NOSTR: il campo `lud16` del kind 0 della
+     npub ufficiale diventa `zap@barattolo.store`. Lo fa Andrea dal WSL,
+     dove sta la chiave, con `nak` (v0.21.0; nel WSL `jq` non c'è, si usa
+     `python3`), senza perdere gli altri campi: si scarica il kind 0 di
+     adesso (`nak req -k 0 -a <hex della npub> <relay…> > prima.json`), si
+     prende il più recente, si aggiunge `lud16` al `content` tenendo i
+     `tags`, si FIRMA SENZA RELAY (`nak event < nuovo.json >
+     firmato.json`, con la chiave in `NOSTR_SECRET_KEY` letta da `read
+     -rs`, e `unset` subito dopo), si GUARDA che la `pubkey` del firmato
+     sia quella della npub, e solo allora si pubblica il firmato
+     (`nak event <relay…> < firmato.json`, che non rifirma) e si rilegge.
+     ⚠️ DUE TRAPPOLE di `nak`, viste il 10 ott: senza chiave firma lo
+     stesso, con una chiave «della macchina» (per questo si guarda la
+     `pubkey` prima di pubblicare); `--prompt-sec` con lo stdin da un
+     file resta appeso.
+  8) UNO ZAP VERO, da un client Nostr, al profilo o a una nota: nel
+     journal «⚡ Zap ricevuto: N sats (zap di abcd1234…)» e «🧾 zap:
+     ricevuta … presa da N relay»; nel client lo zap compare sotto la
+     nota. Se il journal dice «presa da 0 relay» la ricevuta resta in
+     tabella e si riprova da sola altre due volte.
+  COME SI SPOSTANO I SATS: a mano, dal pannello di LNbits — wallet
+  «zap» > «Send» > si incolla una fattura del proprio wallet. Il server
+  non può farlo (ha la sola invoice key), ed è voluto. Mai verso il
+  wallet della cassaforte: i due registri restano separati.
+  COSA NON TOCCARE: `NOSTR_NSEC_PIATTAFORMA`. È la chiave che firma le
+  ricevute e che il citofono dichiara: cambiata, i client non contano
+  più gli zap già ricevuti.
+  PER SPEGNERLO: `ZAP_ATTIVO = False` (o via la riga) e riavvio; il
+  citofono torna 404, e i wallet che provano l'indirizzo dicono che non
+  esiste. Le fatture già coniate e non pagate non si incassano più da
+  sole finché la leva è spenta: riaccesa, l'orologio le richiede a
+  LNbits. Lo stato VIVO sta nel pannello «⚙️ Stato delle leve», gruppo
+  «⚡ Indirizzo Lightning di casa».

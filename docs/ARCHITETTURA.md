@@ -29565,6 +29565,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    che filtra, CORS aperto, mai un redirect; nato per gli emittenti
    degli asset RGB dell'hackathon di Torino, non dipende da
    `RGB_ATTIVO` — vedi HACKATHON-SETUP, §11),
+   `/.well-known/lnurlp/zap` e `/api/lnurl/zap` (10 ott 2026,
+   l'indirizzo Lightning di casa `zap@barattolo.store`: il citofono
+   LUD-16 e il callback che conia la fattura; JSON, CORS aperto, mai un
+   redirect, il SOLO nome `zap` — ogni altro è 404 —, e 404 anche a
+   leva `ZAP_ATTIVO` spenta; vedi «L'INDIRIZZO LIGHTNING DI CASA»),
    `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
    trovare»: la prima è una costante PURA che non tocca il database e
    non può sollevare — un 5xx lì sospende la scansione di tutto il sito
@@ -30626,3 +30631,84 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `condividiLink`, col link della Mini App il messaggio viaggia intero
   nel campo `url` del selettore (`testo`, a capo il link); col link del
   sito resta `url` + `text`.
+- L'INDIRIZZO LIGHTNING DI CASA (10 ott 2026, perché in CANTIERI,
+  «L'indirizzo Lightning di casa: zap@barattolo.store»). Un Lightning
+  address di Barattolo, da scrivere nel profilo Nostr ufficiale
+  (`lud16`) per ricevere gli zap. In fondo a server.py, un blocco solo.
+  LE DUE ROTTE: `GET/HEAD /.well-known/lnurlp/{nome}` (`zap_lnurlp`, il
+  citofono: un payRequest LUD-06 con `commentAllowed` di LUD-12 e i due
+  campi di NIP-57; il nome passa dalla whitelist più corta che c'è,
+  `ZAP_NOME`) e `GET /api/lnurl/zap` (`zap_fattura`, il callback).
+  Rispondono JSON con CORS aperto, mai un redirect; gli errori hanno la
+  forma di LUD-06 (`{"status":"ERROR","reason":…}`) anche sul 404 e sul
+  429. A leva spenta, o senza l'invoice key, tutt'e due dicono 404.
+  IL SALVADANAIO NON È UNA CASSAFORTE: un wallet a parte dello stesso
+  LNbits del nodo, di cui il server ha la SOLA invoice key
+  (`ZAP_LNBITS_INVOICE_KEY`; l'indirizzo è `LNBITS_NODO_URL`, o
+  `ZAP_LNBITS_URL` se un giorno traslocasse). Non passa da
+  `_chiavi_cassaforte` e nel blocco non esiste una chiave che paga: il
+  server conia e guarda, i sats li sposta Andrea dal pannello di LNbits.
+  La separazione è nel REGISTRO di LNbits (wallet e chiavi diversi); i
+  sats stanno fisicamente negli stessi canali del nodo.
+  IL CALLBACK, NELL'ORDINE: la leva, il freno (`FRENI["zap"]` 20 al
+  minuto per IP, `FRENI["zap_tutti"]` 120 al minuto per tutti — copre
+  chi un IP leggibile non ce l'ha), i limiti (`amount` in millisatoshi
+  che fa sat INTERI, da `ZAP_MIN_SATS` a `zap_max_sats()`; il commento a
+  `ZAP_COMMENTO` caratteri), il giudice della richiesta di zap, il tetto
+  delle fatture in attesa (`ZAP_MAX_ATTESA`), e SOLO DOPO LNbits e la
+  riga in tabella. `zap_conia` chiede a LNbits una fattura che porta
+  l'IMPRONTA della descrizione (lo sha256 della `metadata`, o della
+  richiesta di zap com'è arrivata) nelle due forme che LNbits conosce,
+  e poi la RILEGGE con `zap_leggi_bolt11` (importo, campo `h`, campo
+  `p`, letti qui senza chiedere a nessuno): se l'impronta o l'importo
+  non tornano alza, e il wallet riceve un 503 invece di una fattura che
+  rifiuterebbe.
+  IL GIUDICE, `zap_giudica_richiesta` (l'appendice D di NIP-57): al più
+  `ZAP_TETTO_RICHIESTA` byte, kind 9734, firma valida (`_x_firma_valida`:
+  coincurve dov'è, `schnorr_puro` in CI), UN solo tag `p`, al più un `e`
+  e un `a`, il tag `amount` uguale all'importo chiesto. E UNO NOSTRO: il
+  `p` deve essere `zap_destinatario()` (la npub ufficiale, `ZAP_NPUB`),
+  o chiunque appenderebbe il nostro indirizzo al suo profilo e si
+  farebbe firmare ricevute da noi. Il messaggio dello zap non ha un
+  tetto suo (lo firma chi zappa): lo limita il tetto in byte, e in
+  tabella e nella card si legge tagliato a 140.
+  LA RICEVUTA LA FIRMA LA CHIAVE DELLA PIATTAFORMA
+  (`NOSTR_NSEC_PIATTAFORMA`, `_NOSTR`): è la `nostrPubkey` del citofono,
+  ed è quel che i client controllano. La chiave del profilo ufficiale
+  sul server non c'è e non serve. ⚠️ Deve restare FERMA: cambiata, i
+  client non contano più gli zap già ricevuti. Senza `_NOSTR` il
+  citofono non dichiara `allowsNostr` e una richiesta di zap si rifiuta
+  prima di coniare: l'indirizzo incassa e basta. `zap_ricevuta` fa la
+  9735 dell'appendice E: i tag `p`, `e`, `a`, `k` ricopiati, `P`,
+  `bolt11`, `description` con la richiesta BYTE PER BYTE, `preimage` se
+  LNbits la dà e torna col payment hash; `created_at` è l'ora del
+  pagamento.
+  L'OROLOGIO, `orologio_zap` → `giro_zap`, ogni `ZAP_GIRO_S` e solo se
+  `_ZAP_STATO["attesa"]` (lo accendono il callback e l'avvio; lo spegne
+  un giro senza righe): ogni fattura in attesa si chiede a LNbits
+  (`zap_pagata`) a ogni giro finché è fresca, poi ogni mezzo minuto.
+  `_zap_incassa` cambia stato con un UPDATE condizionato — il cancello
+  per cui una riga non firma due ricevute — e `_zap_pubblica` manda la
+  ricevuta ai relay della richiesta (`zap_relay_richiesti`: solo `wss`,
+  senza credenziali, al più otto; `zap_relay_ammesso`: la guardia
+  anti-SSRF, che chiede a `url_foto_ammesso`, in un thread, mai in
+  collaudo) più `RELAYS_VERIFICA`, con `_spedisci_ai_relay` (che in
+  collaudo stampa). Una ricevuta che nessun relay prende si riprova tre
+  volte e resta in colonna. Una fattura scade SOLO dopo un «non pagata»
+  di LNbits a tempo scaduto: un LNbits che tace ferma il giro e non fa
+  scadere niente.
+  LA TABELLA `zap`: una riga per fattura (payment hash unico, `tipo`
+  zap | semplice, `stato` attesa | pagato | scaduto, la richiesta e la
+  ricevuta intere). NEL JOURNAL: «⚡ zap: fattura da N sats», «⚡ Zap
+  ricevuto: N sats (zap di abcd1234… | pagamento semplice)», «🧾 zap:
+  ricevuta … presa da N relay»; mai il commento, la fattura, la
+  richiesta, una chiave (lo guarda una sentinella con l'albero).
+  DOVE SI VEDE: la card «⚡ Zap» di `/admin` (`dati_zap_cruscotto` dentro
+  `/api/admin/cruscotto`: saldo vivo del wallet, totale, gli ultimi
+  venti; commento e npub passano da `esc`) e il gruppo «⚡ Indirizzo
+  Lightning di casa» del pannello delle leve (`_zap_leve`).
+  LE PROVE: `prove_indirizzo_lightning` (i pezzi puri, la lettura della
+  BOLT11 sui due campi dell'esempio della specifica, le sentinelle) e
+  `collaudo_indirizzo_lightning` (il server vero per HTTP con un LNbits
+  di cartone, in CI nella gabbia). La procedura: PRODUZIONE,
+  «L'INDIRIZZO LIGHTNING DI CASA».
