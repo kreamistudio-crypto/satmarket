@@ -6,6 +6,14 @@ push su main = online entro un minuto, il config del VPS che vince sul
 default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
 — restano in `CLAUDE.md`. Qui c'è tutto il resto.
 
+I PERCORSI DEL VPS SONO SCRITTI PER ESTESO (10 ott 2026, cantiere
+percorsi-vps, richiesta di Andrea): la cartella del server è
+`/srv/barattolo`, il config `/srv/barattolo/config.py`, il database
+`/srv/barattolo/dati/satmarket.db`. `~/satmarket` porta allo stesso
+posto (è un collegamento, verificato con `readlink -f`), ma la tilde
+sotto `sudo -u barattolo` la espande la shell di root, e per questo qui
+non compare più: ogni comando vale da qualunque utente lo lanci.
+
 - La coda delle categorie si riempie da sola dopo ogni giro d'import
   (leva `RICATEGORIZZA_AUTO`, accesa di serie): nel journal la riga
   «🗂 Ricategorizzazione: N guardati, M proposte in coda», e ai
@@ -266,7 +274,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Telegram (canale scelto: «nostr»)`, `NESSUN CANALE (…)`.
   DAL CHAT ID ALL'ACCOUNT: in una chat privata il chat id E' il
   `tg_id`, quindi sul VPS, in sola lettura:
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT tg_id, nome, username, canale_notifiche, avvisi_p2p FROM utenti WHERE tg_id IN (<id1>, <id2>);"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT tg_id, nome, username, canale_notifiche, avvisi_p2p FROM utenti WHERE tg_id IN (<id1>, <id2>);"`
   — la colonna `canale_notifiche` e' quella da guardare per prima:
   `nostr` vuol dire che sul bot non arriva niente PER SCELTA.
   IL BOT E' UNO SOLO: mercatino e P2P passano dalla stessa `notifica`
@@ -275,7 +283,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   quando a fermare un invio e' l'interruttore, `⏳ Campanello P2P: … e'
   nel gate (ultimo avviso Ns fa, pausa Ps)` quando e' la pausa.
   LA PROVA VERA DEL TRASPORTO, sul VPS:
-  `cd ~/satmarket && python3 prova_notifica.py <chat_id>` — fa la
+  `cd /srv/barattolo && python3 prova_notifica.py <chat_id>` — fa la
   stessa `sendMessage` del server con lo stesso token (che non stampa
   mai) e mostra la risposta di Telegram cosi' com'e'; prima dice CHI
   e' quel chat id (`getChat`: nome e username, se ha avviato il bot).
@@ -913,7 +921,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   nessuno riceva niente — e la popolazione dove me lo aspetto di più
   sono gli importati da Nostr, che sono descrizioni scritte per altri
   mercatini. Il censimento è in SOLA LETTURA e non tocca niente:
-  `cd ~/satmarket && python3 -c "import sqlite3, server;
+  `cd /srv/barattolo && python3 -c "import sqlite3, server;
   con = sqlite3.connect(server.DB); con.row_factory = sqlite3.Row;
   [print(r['id'], '·'.join(v['dominio'] for v in server.link_vivi(r['descrizione'] or '')), '|', (r['titolo'] or '')[:50])
    for r in con.execute(\"SELECT id, titolo, descrizione FROM annunci WHERE stato='attivo' AND descrizione LIKE '%https://%'\")
@@ -1431,9 +1439,9 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   «muto», cioe' si aspetta. Non c'e' niente da seminare a mano: basta
   che nel database ci sia UN payout riuscito dalla cassaforte `nodo`.
   I CONTROLLI A MANO, tutti di sola lettura. Sul VPS, la coda:
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT 'ordini',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM ordini WHERE payout_stato NOT IN ('','uscito') UNION ALL SELECT 'rimborsi',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM rimborsi_asta WHERE payout_stato NOT IN ('','uscito') UNION ALL SELECT 'sblocchi',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM pagamenti WHERE payout_stato NOT IN ('','uscito');"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT 'ordini',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM ordini WHERE payout_stato NOT IN ('','uscito') UNION ALL SELECT 'rimborsi',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM rimborsi_asta WHERE payout_stato NOT IN ('','uscito') UNION ALL SELECT 'sblocchi',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM pagamenti WHERE payout_stato NOT IN ('','uscito');"`
   Tutti gli hash tentati per una riga (qui l'ordine 163):
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT hash,datetime(quando,'unixepoch'),esito FROM payout_tentati WHERE tabella='ordini' AND riga_id=163;"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT hash,datetime(quando,'unixepoch'),esito FROM payout_tentati WHERE tabella='ordini' AND riga_id=163;"`
   La voce di LND per un hash, dal VPS attraverso il ponte (il
   macaroon sta in un file 600, NON sulla riga di comando):
   `H=<payment_hash>; B=$(python3 -c "import base64,sys;print(base64.urlsafe_b64encode(bytes.fromhex(sys.argv[1])).decode())" $H); curl -s --max-time 30 --cacert /opt/lnbits/data/tls.cert -H "Grpc-Metadata-macaroon: $(cat /root/lettura.macaroon.hex)" https://127.0.0.1:18080/v2/router/track/$B | head -c 600`
@@ -1486,13 +1494,13 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   e dopo questo deploy è un numero che può solo scendere.
   DOVE SI LEGGE: `journalctl -u barattolo | grep "⌛"`. Il motivo di
   ogni payout mancato sta nella riga dell'ordine:
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,stato,payout_stato,payout_tentativi,payout_errore FROM ordini WHERE COALESCE(payout_errore,'')<>'' ORDER BY id DESC LIMIT 20;"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT id,stato,payout_stato,payout_tentativi,payout_errore FROM ordini WHERE COALESCE(payout_errore,'')<>'' ORDER BY id DESC LIMIT 20;"`
   «Pagamento in uscita FALLITO» adesso dice il PERCHÉ in parole
   (fattura scaduta, nessuna strada, saldo NOSTRO insufficiente, ponte
   giù, tempo scaduto per strada, rifiutata da chi riceve, fattura già
   bruciata) col testo grezzo di LNbits accanto. «Saldo nostro» e
   «ponte giù» sono gli unici due che chiedono un gesto NOSTRO, subito.
-  IL CENSIMENTO: `cd ~/satmarket && python3 censimento_scadenze.py` —
+  IL CENSIMENTO: `cd /srv/barattolo && python3 censimento_scadenze.py` —
   sola lettura, niente rete. Dice da dove veniva la fattura di ogni
   ordine pagato (incollata o Lightning address), con che margine è
   arrivata al payout, e — la parte che serve — quali ordini APERTI
@@ -1513,9 +1521,9 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   dopo 30 minuti IN VOLO parte il 🧊 di sempre, e in quell'istante le
   due parti leggono «ci stiamo lavorando noi».
   DOVE SI LEGGE. Gli ordini in pagamento adesso:
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,stato,payout_stato,payout_verso,payout_tentativi,payout_errore FROM ordini WHERE stato='confirmed' OR (payout_verso='venditore' AND payout_stato IN ('in_volo','incerto','da_riprovare')) ORDER BY id DESC;"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT id,stato,payout_stato,payout_verso,payout_tentativi,payout_errore FROM ordini WHERE stato='confirmed' OR (payout_verso='venditore' AND payout_stato IN ('in_volo','incerto','da_riprovare')) ORDER BY id DESC;"`
   La linea del tempo di UN ordine (sostituisci 152):
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT datetime(quando,'unixepoch','localtime'),passo,motivo,volte,datetime(ultimo,'unixepoch','localtime') FROM payout_passi WHERE tabella='ordini' AND riga_id=152 ORDER BY id;"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT datetime(quando,'unixepoch','localtime'),passo,motivo,volte,datetime(ultimo,'unixepoch','localtime') FROM payout_passi WHERE tabella='ordini' AND riga_id=152 ORDER BY id;"`
   Nel journal: `journalctl -u barattolo | grep -E "🔁|🛬|🧊|⌛"`.
   IL DRILL (col venditore di prova, fattura INCOLLATA e lunga):
   `systemctl stop lnd-ponte`, si aspetta che il guardiano dica «giù»
@@ -1599,11 +1607,11 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   chiude a mano allo stesso modo.
   IL #152, PASSO PER PASSO (dopo il deploy; il VPS lo guarda Andrea).
   1) Lo stato di partenza, in sola lettura:
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,stato,payout_stato,payout_verso,cassaforte,cassaforte_payout,payout_hash,length(invoice_venditore) FROM ordini WHERE id=152;"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT id,stato,payout_stato,payout_verso,cassaforte,cassaforte_payout,payout_hash,length(invoice_venditore) FROM ordini WHERE id=152;"`
   — atteso `confirmed | incerto | venditore | saas | (vuoto) | <hash> |
   <lunghezza>`. Se `payout_stato` è `in_volo` si aspetta la ronda (30
   minuti dal tentativo). Gli hash tentati, con cassaforte e scadenza:
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT hash,datetime(quando,'unixepoch'),esito,cassaforte,datetime(scade,'unixepoch') FROM payout_tentati WHERE tabella='ordini' AND riga_id=152;"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT hash,datetime(quando,'unixepoch'),esito,cassaforte,datetime(scade,'unixepoch') FROM payout_tentati WHERE tabella='ordini' AND riga_id=152;"`
   (`scade` a 1970 = ancora ignota: la trascrive il primo tocco del
   bottone, dalla fattura in colonna o chiedendola a LNbits).
   2) Il capitale sul nodo: vedi l'avviso qui sopra. 247.707 + ~2.500.
@@ -1618,7 +1626,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   «Arrivati ✓», ai moderatori «🔀 …pagato da un'altra cassaforte», e in
   «🔀 Crediti da recuperare» la riga del #152 sul SaaS.
   DOVE SI LEGGE: `journalctl -u barattolo | grep -E "⚖️ Altra cassaforte|🔎"`.
-  I crediti: `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,riga_id,cassaforte,pagato_da,sats,stato,datetime(deciso_il,'unixepoch','localtime'),motivo,nota FROM crediti_cassaforte;"`
+  I crediti: `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT id,riga_id,cassaforte,pagato_da,sats,stato,datetime(deciso_il,'unixepoch','localtime'),motivo,nota FROM crediti_cassaforte;"`
   SE VA STORTO. Il pagamento dal nodo fallisce (nessuna strada, saldo):
   l'ordine torna a «serve una fattura nuova», la cassaforte d'uscita
   RESTA il nodo, e la prossima fattura che Pedro incolla si paga da lì
@@ -1628,7 +1636,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   colonne e la tabella nuove restano e non danno fastidio, ma un ordine
   GIÀ deviato e non ancora pagato tornerebbe a pagare dalla cassaforte
   d'origine — si guarda prima che non ce ne siano:
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,stato,payout_stato FROM ordini WHERE COALESCE(cassaforte_payout,'')<>'' AND stato NOT IN ('released','refunded');"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT id,stato,payout_stato FROM ordini WHERE COALESCE(cassaforte_payout,'')<>'' AND stato NOT IN ('released','refunded');"`
   NON PROVATO DAL VIVO: LNbits vero sulle due cassaforti, la forma di
   `details.bolt11` (è un ripiego, e si crede solo se l'hash combacia),
   il bottone sul telefono. Provato: tutto il resto, su cartone.
@@ -1643,7 +1651,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   0) Dopo il deploy: Profilo → 👑 → cassetto «🏦 Cassaforte SaaS». Leggi
   «Escono ancora dal SaaS» (dovrebbero essere 6 ordini) e «Spostati sul
   nodo» (0). Sola lettura sul VPS, per confronto:
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,stato,payout_stato,payout_verso,cassaforte,cassaforte_payout,prezzo_sats FROM ordini WHERE cassaforte='saas' AND stato NOT IN ('creato','annullato','released','refunded');"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT id,stato,payout_stato,payout_verso,cassaforte,cassaforte_payout,prezzo_sats FROM ordini WHERE cassaforte='saas' AND stato NOT IN ('creato','annullato','released','refunded');"`
   1) IL #152 (P3dr0, 247.707 sats, «pending» dal 20 set). Prima: sul
   nodo devono esserci 247.707 sats nostri piu' la riserva fee di LNbits
   (max(1%, 10 sats) = 2.477): spostali a mano. Poi 🧊 Pagamenti da
@@ -1685,7 +1693,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   hash mai saldato»): cosi' il 🏁 puo' suonare. Poi sweep del saldo e
   disdetta, come dice «Il doppio wallet» in CANTIERI.
   DOVE SI LEGGE: `journalctl -u barattolo | grep "⚖️ Cassaforte SaaS"`;
-  il registro: `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT riga_id,gesto,da,a,sats,deciso_da,datetime(deciso_il,'unixepoch','localtime'),motivo FROM gesti_cassaforte;"`
+  il registro: `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT riga_id,gesto,da,a,sats,deciso_da,datetime(deciso_il,'unixepoch','localtime'),motivo FROM gesti_cassaforte;"`
   IL ROLLBACK e' il commit precedente: la tabella resta e non da'
   fastidio; un ordine SPOSTATO e non ancora chiuso paga ancora dal nodo
   (il codice del 21 set legge `cassaforte_payout` per l'incasso) ma un
@@ -1694,7 +1702,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   cassaforti e il pannello sul telefono; provato tutto il resto col
   server vero, su cartone.
   IL CONTROLLO DEGLI ORFANI, sulle due casseforti (set 2026):
-  `cd ~/satmarket && python3 orfani.py` — sola lettura, legge il
+  `cd /srv/barattolo && python3 orfani.py` — sola lettura, legge il
   registro di ogni cassaforte configurata con la sua invoice key e
   lo incrocia coi `payment_hash` di ordini, rilanci e pagamenti.
   Tre elenchi: ORFANI (nostro memo, nessuna riga: devono essere
@@ -1704,7 +1712,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   tace. Ha sostituito l'`orfani.py` non tracciato del 10 ago 2026,
   che leggeva una cassaforte sola e non conosceva `pagamenti`:
   quello si cancella.
-  IL CAPITALE, per dichiararlo al polso 23: `cd ~/satmarket && python3
+  IL CAPITALE, per dichiararlo al polso 23: `cd /srv/barattolo && python3
   capitale_cassa.py` — legge i due registri e stampa un totale per
   cassaforte, il complessivo e le due righe `INSERT OR REPLACE` con le
   chiavi `capitale_saas_sats` e `capitale_nodo_sats`. Dal set 2026 il
@@ -1818,7 +1826,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `git -c core.autocrlf=false -C C:\Users\Andrea\Documents\GitHub\satmarket archive --format=tar -o "$env:TEMP\ponte.tar" origin/main deploy/ponte`
   `scp "$env:TEMP\ponte.tar" UTENTE@185.18.221.96:/tmp/`
   Poi SUL NODO: `tar -xf /tmp/ponte.tar -C /tmp && sha256sum /tmp/deploy/ponte/*`
-  e SUL VPS: `sha256sum ~/satmarket/deploy/ponte/*`
+  e SUL VPS: `sha256sum /srv/barattolo/deploy/ponte/*`
   — le quattro impronte devono essere IDENTICHE sulle due macchine. Se
   una differisce, il file è arrivato storto: non si va avanti.
   PASSO 4 — SUL NODO, il tunnel e il socat:
@@ -1841,7 +1849,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   — UNA riga, e l'indirizzo è `10.77.0.1:18080`. Se dice `0.0.0.0` o
   `*`: `sudo systemctl stop lnd-rest-wg` e riferisci.
   PASSO 5 — SUL VPS, il tunnel, e la prova PRIMA di toccare il ponte:
-  `install -m 600 ~/satmarket/deploy/ponte/wg0-vps.conf /etc/wireguard/wg0.conf`
+  `install -m 600 /srv/barattolo/deploy/ponte/wg0-vps.conf /etc/wireguard/wg0.conf`
   `sed -i 's|INCOLLA_QUI_LA_PUBBLICA_DEL_NODO|LA_PUBBLICA_DEL_NODO|' /etc/wireguard/wg0.conf`
   `grep -c INCOLLA_QUI /etc/wireguard/wg0.conf` — `0`.
   `systemctl enable --now wg-quick@wg0`
@@ -1857,7 +1865,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   PASSO 6 — SUL VPS, LO SCAMBIO (un secondo di buco):
   `cp -a /etc/systemd/system/lnd-ponte.service /etc/systemd/system/lnd-ponte-tor.service`
   — il ponte di prima, salvato col nome del piano B. Non si abilita.
-  `install -m 644 ~/satmarket/deploy/ponte/lnd-ponte.service /etc/systemd/system/lnd-ponte.service`
+  `install -m 644 /srv/barattolo/deploy/ponte/lnd-ponte.service /etc/systemd/system/lnd-ponte.service`
   `systemctl daemon-reload`
   `systemctl restart lnd-ponte`
   `systemctl status lnd-ponte --no-pager | head -12`
@@ -2108,9 +2116,9 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   GUARDARE SUBITO: un relay che serve eventi non di mostrod; `⚠️ Libro
   P2P: coincurve non c'e'` vuol dire che il libro è fermo (pip).
   LA CRONACA DI UN ORDINE, quando qualcosa non torna (in sola lettura):
-  `sqlite3 ~/satmarket/satmarket.db "SELECT datetime(quando,'unixepoch'), momento, dettaglio, attore, fonte, giro FROM p2p_momenti WHERE ordine LIKE '0f3a5c1e%' ORDER BY quando"`
+  `sqlite3 /srv/barattolo/dati/satmarket.db "SELECT datetime(quando,'unixepoch'), momento, dettaglio, attore, fonte, giro FROM p2p_momenti WHERE ordine LIKE '0f3a5c1e%' ORDER BY quando"`
   e chi è stato avvisato di cosa:
-  `sqlite3 ~/satmarket/satmarket.db "SELECT datetime(quando,'unixepoch'), momento, giro, tg_id, fonte FROM p2p_avvisi WHERE ordine LIKE '0f3a5c1e%' ORDER BY quando"`.
+  `sqlite3 /srv/barattolo/dati/satmarket.db "SELECT datetime(quando,'unixepoch'), momento, giro, tg_id, fonte FROM p2p_avvisi WHERE ordine LIKE '0f3a5c1e%' ORDER BY quando"`.
   LA PROVA A DUE TELEFONI (A compra e pubblica, B vende e prende; poi
   SUBITO un secondo scambio a parti rovesciate — è il caso che il 18 set
   ha rotto tutto): la checklist sta nel verbale in CANTIERI, e ogni riga
@@ -2287,10 +2295,10 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   ogni passo: ognuno lascia la macchina in uno stato che funziona.
   PASSO 1 — IL TOKEN DEL VPS, che deve saper LEGGERE e basta. Tre
   controlli, nessuno mostra il token:
-  `cd ~/satmarket && python3 giudice_deploy.py token`
+  `cd /srv/barattolo && python3 giudice_deploy.py token`
   — dice che token è. «fine-grained» va bene; «⚠️ token CLASSICO … SA
   SCRIVERE» va sostituito.
-  `cd ~/satmarket && git push --dry-run origin HEAD:refs/heads/prova-permessi`
+  `cd /srv/barattolo && git push --dry-run origin HEAD:refs/heads/prova-permessi`
   — DEVE FALLIRE con un 403 («Write access to repository not granted»
   o simile). `--dry-run` non scrive niente nemmeno se il permesso ci
   fosse; se invece risponde «To https://github.com/…» senza errori, il
@@ -2307,7 +2315,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   PER SOSTITUIRLO: se ne genera uno nuovo lì, con quei permessi e una
   scadenza (alla scadenza il deploy si ferma e «⏳ … (401): scaduto o
   revocato?» lo dice); dove sta quello vecchio lo dice
-  `git -C ~/satmarket config --get-regexp 'credential|remote.origin.url'`
+  `git -C /srv/barattolo config --get-regexp 'credential|remote.origin.url'`
   — con `credential.helper store` è la riga di `/root/.git-credentials`
   (`https://UTENTE:TOKEN@github.com`): si apre con `nano`, si cambia il
   solo TOKEN, e `chmod 600 /root/.git-credentials`. Poi i tre controlli
@@ -2315,7 +2323,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   incolla mai in chat.
   PASSO 2 — LE DUE UNIT (la copia dello script sotto `/run`). Prima si
   guarda che sul VPS non abbiano ritocchi a mano:
-  `cd ~/satmarket && for u in barattolo-deploy barattolo-backup; do git diff --no-index --stat /etc/systemd/system/$u.service deploy/$u.service; done`
+  `cd /srv/barattolo && for u in barattolo-deploy barattolo-backup; do git diff --no-index --stat /etc/systemd/system/$u.service deploy/$u.service; done`
   — devono cambiare SOLO le righe `RuntimeDirectory…`, `ExecStart` e i
   commenti. Se c'è altro: FERMATI e riferisci. Poi:
   `cp deploy/barattolo-deploy.service deploy/barattolo-backup.service /etc/systemd/system/ && systemctl daemon-reload`
@@ -2324,7 +2332,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   PASSO 3 — IL CAMBIO D'UTENTE. Lo fa uno script, perché per qualche
   secondo il sito è giù e in quei secondi non si digita. PRIMA si
   guarda, e non tocca niente:
-  `cd ~/satmarket && bash deploy/utente/cambio-utente.sh`
+  `cd /srv/barattolo && bash deploy/utente/cambio-utente.sh`
   — stampa LA FOTOGRAFIA (come gira il servizio, dove stanno
   l'interprete e le librerie, il database, il disco). Se c'è un «ALT»
   il cambio oggi non si fa: si incolla l'uscita a Claude. Se finisce
@@ -2378,12 +2386,12 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   avvisi 🌉 e il ponte torna su DA SOLO. Se l'esito dice «a password is
   required» manca la regola di sudoers.
   ⚠️ DA QUEL GIORNO GLI SCRIPT CHE SCRIVONO si lanciano DA LUI:
-  `cd ~/satmarket && sudo -u barattolo python3 <script>.py`. Da root
+  `cd /srv/barattolo && sudo -u barattolo python3 <script>.py`. Da root
   funzionano lo stesso, ma un file NATO da root in `dati/` o `foto/` il
   servizio non lo sa più riscrivere. Le letture (`sqlite3 -readonly`,
   i censimenti) restano come sono.
   TORNARE A ROOT, se qualcosa non gira:
-  `bash ~/satmarket/deploy/utente/cambio-utente.sh --torna`
+  `bash /srv/barattolo/deploy/utente/cambio-utente.sh --torna`
   — o, a mano, i due comandi che fa lui:
   `rm /etc/systemd/system/barattolo.service.d/utente.conf`
   `systemctl daemon-reload && systemctl restart barattolo`
@@ -2412,7 +2420,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `mkdir -p /etc/barattolo-deploy && chmod 700 /etc/barattolo-deploy`
   `nano /etc/barattolo-deploy/firmatari.prova`
   — una riga per chiave: `andrea namespaces="git" ssh-ed25519 AAAA…`
-  `cd ~/satmarket && git -c gpg.ssh.allowedSignersFile=/etc/barattolo-deploy/firmatari.prova verify-commit -v HEAD 2>&1 | head -3`
+  `cd /srv/barattolo && git -c gpg.ssh.allowedSignersFile=/etc/barattolo-deploy/firmatari.prova verify-commit -v HEAD 2>&1 | head -3`
   — deve dire `Good "git" signature for andrea`. SOLO ALLORA:
   `mv /etc/barattolo-deploy/firmatari.prova /etc/barattolo-deploy/firmatari && chmod 600 /etc/barattolo-deploy/firmatari`
   `./deploy.sh --dimmi` — la prima riga ora dice «firma richiesta».
@@ -2438,7 +2446,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   — entro un minuto su Telegram: «⛔ Deploy rifiutato: xxxxxxxx non sta
   su main: qualcuno ha spostato «pronto» a mano». Sul VPS
   `./deploy.sh --dimmi` dice «⛔ il giudice lo RIFIUTEREBBE», e
-  `git -C ~/satmarket log -1 --oneline` è ANCORA il commit di prima.
+  `git -C /srv/barattolo log -1 --oneline` è ANCORA il commit di prima.
   POI SI RIMETTE A POSTO, o il prossimo semaforo della CI trova
   `pronto` fuori strada e diventa rosso:
   `git -C $env:TEMP\prova-pronto push --force origin origin/main:refs/heads/pronto`
@@ -2679,7 +2687,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
 - LE FAMIGLIE DI UN NEGOZIO COLLEGATO (30 set 2026): le scrive il giro
   dell'ora, quindi dopo il deploy compaiono al PRIMO giro e non prima.
   Si guardano, in sola lettura, per collegamento:
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT famiglia, famiglia_titolo, stato, COUNT(*) FROM annunci WHERE connettore_id=<id> GROUP BY famiglia, stato"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT famiglia, famiglia_titolo, stato, COUNT(*) FROM annunci WHERE connettore_id=<id> GROUP BY famiglia, stato"`
   — righe con `famiglia` vuota = prodotti senza famiglia (o giro non
   ancora passato).
   NASCONDERE UN NEGOZIO DALLA VETRINA SENZA CANCELLARE NIENTE (il gesto
@@ -2687,7 +2695,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   riaccende mai (lo aggiorna, lo spegne se il prodotto sparisce). È il
   ↩︎ del moderatore fatto in blocco, e lascia fuori le righe con un
   ordine vivo (anche dentro un carrello) e le aste. Prima la fotografia:
-  `sqlite3 -readonly ~/satmarket/satmarket.db ".backup /root/prima-<nome>.db"`.
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db ".backup /root/prima-<nome>.db"`.
   ⚠️ LA TILDE SOTTO `sudo -u barattolo` NON È SUA: la espande la shell di
   root prima che sudo parta, quindi diventa `/root/satmarket/...`, dove
   `barattolo` non entra («unable to open database file», nessuna
@@ -2710,7 +2718,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   server di adesso quella busta NON la sa più incassare
   (`_incasso_del_motivo` conosce 'banner' e 'negozio_slug'), quindi
   PRIMA del deploy si guarda, in sola lettura, che non ce ne siano:
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT 'busta', id, stato, importo_sats, datetime(creato,'unixepoch','localtime') FROM pagamenti WHERE motivo='carrello' UNION ALL SELECT 'ordine', id, stato, pagamento_id, datetime(creato,'unixepoch','localtime') FROM ordini WHERE pagamento_id > 0;"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT 'busta', id, stato, importo_sats, datetime(creato,'unixepoch','localtime') FROM pagamenti WHERE motivo='carrello' UNION ALL SELECT 'ordine', id, stato, pagamento_id, datetime(creato,'unixepoch','localtime') FROM ordini WHERE pagamento_id > 0;"`
   Nessuna riga (o «no such column: pagamento_id», su un database che
   quella colonna non l'ha mai avuta) = si va: il 24 set 2026, prima
   del push, non ha stampato niente. Una `busta` in `creato` = una
@@ -2734,7 +2742,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   nuovo (`init_db`, `CREATE TABLE IF NOT EXISTS`), e la scopa dei sette
   giorni gira nell'orologio. Per guardare, in sola lettura — quanti
   carrelli ci sono e il più vecchio:
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT COUNT(*), datetime(MIN(aggiornato),'unixepoch','localtime') FROM carrello_salvato;"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT COUNT(*), datetime(MIN(aggiornato),'unixepoch','localtime') FROM carrello_salvato;"`
   Il più vecchio non deve superare i sette giorni (più il giro
   dell'orologio). TORNARE INDIETRO col codice di prima non chiede
   niente: quel codice la tabella non la legge né la scrive, e resta lì
@@ -2851,8 +2859,8 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   con un `cp` a caldo — `UPDATE users SET is_solver=0 WHERE pubkey='<chiave esadecimale>' AND is_solver=1;`
   (mostrod cerca il solver nel database a ogni richiesta). Si prova su
   una chiave usa-e-getta PRIMA di averne bisogno.
-  IL REGISTRO, sul VPS: `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT ordine, gesto, tg_id, datetime(quando,'unixepoch','localtime'), esito, motivo FROM p2p_dispute_registro ORDER BY id DESC LIMIT 20;"`
-  e le dispute: `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT ordine, stato, aperta_da, compratore, venditore, presa_da, esito, chiusa_da, datetime(aperta_il,'unixepoch','localtime') FROM p2p_dispute ORDER BY aperta_il DESC LIMIT 20;"`.
+  IL REGISTRO, sul VPS: `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT ordine, gesto, tg_id, datetime(quando,'unixepoch','localtime'), esito, motivo FROM p2p_dispute_registro ORDER BY id DESC LIMIT 20;"`
+  e le dispute: `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT ordine, stato, aperta_da, compratore, venditore, presa_da, esito, chiusa_da, datetime(aperta_il,'unixepoch','localtime') FROM p2p_dispute ORDER BY aperta_il DESC LIMIT 20;"`.
   ⚠️ UNA DISPUTA APERTA PRIMA DI QUESTO DEPLOY NON HA LA SUA RIGA (la
   riga nasce all'evento `dispute-opened`): la sua chiusura non arriva
   ai moderatori, e non è un guasto.
@@ -2957,7 +2965,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `aperta`, `id_dichiarato`, `id_diverso`, `chiave`, `presa_chiesta`,
   `presa`, `presa_fallita`, `decisione`, `non_riuscita`, `chiusa`,
   `allarme`. Le chiavi registrate:
-  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT tg_id, chiave, datetime(creata,'unixepoch','localtime') FROM p2p_moderatori;"`
+  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT tg_id, chiave, datetime(creata,'unixepoch','localtime') FROM p2p_moderatori;"`
   COSA NON È PROVATO: tutto quel che parla col coordinatore VERO. I
   messaggi del moderatore sono costruiti sulle pagine del protocollo e
   provati contro un coordinatore finto; che mostrod 0.18.8-bar5 li
@@ -2974,7 +2982,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   di persona (€)»). Sta SOTTO `P2P_MAX_EURO` quando quello è acceso.
   LA TABELLA `p2p_presenze` nasce da sola al primo riavvio (`CREATE
   TABLE IF NOT EXISTS`): niente migrazione a mano. Verifica in sola
-  lettura: `sqlite3 ~/satmarket/satmarket.db ".schema p2p_presenze"`.
+  lettura: `sqlite3 /srv/barattolo/dati/satmarket.db ".schema p2p_presenze"`.
   IN UNA DISPUTA SUL CONTANTI il moderatore legge la riga «🤝 Incontro
   confermato…» o «Nessuna prova d'incontro» nella card della disputa;
   la regola scritta in «Info P2P» è quella di Hodl Hodl: senza prova
@@ -2982,7 +2990,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   rilascio vanno a chi compra. Le due firme le ha già verificate il
   server; la posizione viene dal GPS dei telefoni e si può falsificare.
   Per guardare la riga dal VPS (sola lettura): `sqlite3
-  ~/satmarket/satmarket.db "SELECT ordine, ora_mostra, ora_legge,
+  /srv/barattolo/dati/satmarket.db "SELECT ordine, ora_mostra, ora_legge,
   distanza_m, posizioni, posizioni_via, caricata_da FROM p2p_presenze
   ORDER BY quando DESC LIMIT 20"` — le colonne `lat_*`/`lon_*`/`acc_*` e
   `prova` sono a NULL/vuote dopo la chiusura (o dopo quindici giorni,
@@ -3403,9 +3411,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   (se manca `xxd`: `od -An -tx1 -v FILE | tr -d ' \n'`). Controllo
   DOPO sul nodo: `docker compose exec lnd lncli listmacaroonids` deve
   dire anche il 4, e `docker compose exec lnd rm /tmp/barattolo-hold.macaroon`
-  (la copia nel container non serve piu'). Sul VPS il config e'
-  `/srv/barattolo/config.py` (non `~/satmarket/config.py`: corretto il
-  10 ott 2026 sera, con CLAUDE.md), controllo PRIMA:
+  (la copia nel container non serve piu'). Sul VPS, controllo PRIMA:
   `grep -n "LND_PONTE_MACAROON_HOLD" /srv/barattolo/config.py` deve
   dire niente; poi la riga `LND_PONTE_MACAROON_HOLD = "<esadecimale>"`
   in coda al config (600, di `barattolo`), e `sudo systemctl restart

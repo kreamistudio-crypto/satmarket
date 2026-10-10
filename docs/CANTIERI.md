@@ -12795,7 +12795,7 @@ WoS e Boltz), o la connessione di mostrod verso di lui è morta e non
 si rialza. Conta più di questo cantiere: i CLIENT di altri leggono da
 lì. Si guarda nei log di mostrod, in sola lettura.
 2) La query per il punto 4, sul VPS, in sola lettura:
-`sqlite3 ~/satmarket/satmarket.db "SELECT substr(pubkey,1,8), tg_id,
+`sqlite3 /srv/barattolo/dati/satmarket.db "SELECT substr(pubkey,1,8), tg_id,
 creato FROM chiavi_p2p WHERE pubkey LIKE '260b482f%' OR pubkey LIKE
 '7f8c0b11%'"` — due righe = erano registrate, e a mancare era solo il
 relay.
@@ -15457,7 +15457,7 @@ coperto dal velo d'ingresso).
 numeri veri li dà `confronta_vetrina.py`, che è fatto apposta per
 girare in SOLA LETTURA sul database di produzione (`mode=ro`, tre
 regole e il negozio finto in memoria, la `ordine_finestra` letta dal
-sorgente vero): `cd ~/satmarket && python3 confronta_vetrina.py
+sorgente vero): `cd /srv/barattolo && python3 confronta_vetrina.py
 satmarket.db`. Lo scorrimento infinito nel Browser pane (gli
 IntersectionObserver lì non emettono): la coerenza delle pagine è
 provata sull'API. Il telefono.
@@ -17829,7 +17829,7 @@ nome era fisso, `barattolo` poteva occuparlo prima, e root avrebbe
 eseguito un file suo — la BASSA dell'audit, che diventa vera proprio
 il giorno in cui nasce un utente non-root. E `/root/satmarket` trasloca
 in `/srv/barattolo` (in `/root`, 700, non si entra) lasciando un
-collegamento: le decine di `~/satmarket` di PRODUZIONE valgono uguali.
+collegamento: i `~/satmarket` di PRODUZIONE valevano uguali (dal 10 ott 2026 PRODUZIONE scrive `/srv/barattolo` per esteso).
 LE STRADE SCARTATE: `chmod 711 /root` o una ACL (ogni 644 dentro /root
 diventa del servizio); la cartella col bit sticky (il servizio ci crea
 file, e root ci importa); cambiare `DB` nel config (un gesto a mano in
@@ -22991,7 +22991,7 @@ bozza, e il TESTO invece non esce mai.
 sia l'account di Manuele non lo so. Serve il suo CODICE NEGOZIO (otto
 caratteri): lo si legge dal pannello («💬 Scrivi a un utente», cercando
 «Manuele»: la riga mostra `#tg_id · codice`) o dal VPS in sola lettura
-(`sqlite3 -readonly ~/satmarket/satmarket.db "SELECT tg_id, nome,
+(`sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT tg_id, nome,
 username, negozio FROM utenti WHERE nome LIKE '%Manuele%' OR username
 LIKE '%manuele%';"`), e poi è una riga in `racconti.py`. Il cassetto dice subito se il codice scritto non è di
 nessun negozio.
@@ -34936,7 +34936,7 @@ annuncio, provato solo nelle prove.
 
 **IL CONFIG DEL VPS.** Niente da AGGIUNGERE: i valori nuovi sono i
 default del codice. Ma il config vince: prima del deploy, in sola
-lettura, `grep -n "MAX_PRODOTTI_CONNETTORE\|MAX_NUOVI_CONNETTORE\|ORE_RODAGGIO\|DB_BUSY_TIMEOUT" ~/satmarket/config.py`
+lettura, `grep -n "MAX_PRODOTTI_CONNETTORE\|MAX_NUOVI_CONNETTORE\|ORE_RODAGGIO\|DB_BUSY_TIMEOUT" /srv/barattolo/config.py`
 — una riga `MAX_PRODOTTI_CONNETTORE = 200` (copiata dal config d'esempio
 di prima) va portata a 1000 o cancellata, e si riavvia (PRODUZIONE, «I
 NEGOZI GRANDI»).
@@ -38542,10 +38542,10 @@ quattro comandi in sola lettura lanciati da Andrea.
   (deploy, riavvio), o una chiusura scritta a mano nel database del
   nodo, che non ripubblica niente.
 - L'esito della correzione sui tre dispositivi.
-- Le letture di PRODUZIONE puntano a `~/satmarket/satmarket.db`, ma il
+- Le letture di PRODUZIONE puntavano a `~/satmarket/satmarket.db`, ma il
   database vero è `/srv/barattolo/dati/satmarket.db` (Andrea, 6 ott); e
-  sul nodo `sqlite3` non c'è (Andrea ha letto con python3). Due righe di
-  PRODUZIONE da sistemare, a parte.
+  sul nodo `sqlite3` non c'è (Andrea ha letto con python3). Sistemate
+  tutte il 10 ott 2026 sera (cantiere percorsi-vps).
 
 ## L'indietro dal negozio riapre il dettaglio (6 ott 2026, difetto segnalato da Andrea)
 
@@ -48862,3 +48862,22 @@ I REBASE: ogni volta un solo conflitto, in coda a CANTIERI (tutti
 accodano lì): preso il file di main e riaccodata la voce; nient'altro
 toccato a mano, i simboli del cantiere ricontati. Il push porta solo i
 due commit del cantiere, firmati.
+
+## I percorsi del VPS scritti per esteso (10 ott 2026, sera, cantiere percorsi-vps, richiesta di Andrea)
+
+`~/satmarket` sul VPS è un collegamento a `/srv/barattolo` (verificato da
+Andrea con `readlink -f`), ma nei documenti le due forme convivevano:
+40 tilde in PRODUZIONE e le righe dei comandi in questo file, e 26 di
+quelle puntavano a `~/satmarket/satmarket.db` dove
+il database vero è `/srv/barattolo/dati/satmarket.db`. La tilde, poi,
+sotto `sudo -u barattolo` la espande la shell di root (la trappola del
+giro dei connettori, 6 ott). DECISO: ovunque `/srv/barattolo/...` —
+config `/srv/barattolo/config.py`, database
+`/srv/barattolo/dati/satmarket.db`, `cd /srv/barattolo && ...` — e una
+nota una volta sola in testa a PRODUZIONE che dice che `~/satmarket`
+porta allo stesso posto. Restano con la tilde, apposta, le tre frasi di
+questo file che la raccontano (la trappola dell'espansione, la
+correzione di CLAUDE.md di stasera), e la riga della chiavetta in
+HACKATHON-SETUP, che gira sul portatile Pop!_OS dove il clone sta
+davvero in `~/satmarket`: lì `/srv/barattolo` non esiste. Solo
+documenti; la suite intera e l'esito stanno nel verbale del push.
