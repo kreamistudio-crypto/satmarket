@@ -48517,13 +48517,63 @@ spento a fine giro): `/assets/p2p-ordine-anteprima.jpg` risponde 200,
 di un ordine mai esistito e `/p2p` portano il logo del libro.
 COSA È GIRATO DOVE: la suite intera (21948 e 0) con le monete sopra
 0a2d3a4; dopo l'ultimo rebase (sopra il cantiere della copertura, già
-su main) la prova dell'ordine condiviso e la tortura. NON PUSHATO: il
-push aspetta l'ok di Andrea, che su questo ritocco non l'ha ancora
-dato.
+su main) la prova dell'ordine condiviso e la tortura. Il push ha
+aspettato l'ok di Andrea, arrivato con la richiesta della scheda qui
+sotto: il verbale del push sta in fondo alla voce.
 DA GUARDARE dopo il deploy: l'anteprima VERA in una chat — incollare
 un link `https://barattolo.store/p2p?ordine=<id>` di un ordine aperto
 su WhatsApp e su Telegram. Telegram tiene in memoria le anteprime: se
 quel link l'ha già disegnato col logo vecchio, lo ridisegna solo dopo
-un passaggio da @WebpageBot. NOTATO e non toccato: `twitter:card` dice
-`summary_large_image` anche per queste due immagini quadrate da 400
-(lo fa `_testa_seo` per tutti).
+un passaggio da @WebpageBot. NOTATO: `twitter:card` diceva
+`summary_large_image` anche per queste due immagini quadrate da 400 —
+curato subito dopo, col sì di Andrea (qui sotto).
+
+**LA SCHEDA «SUMMARY» PER LE QUADRATE DA 400 (stessa sera, il sì di
+Andrea: «ok alle due monete quadrate; per le anteprime quadrate da 400
+deve essere summary»).** `summary_large_image` chiede una scheda larga,
+e chi la disegna ci ritaglia dentro l'immagine: a un quadrato taglia la
+testa e i piedi. `_meta_anteprima` ora sceglie dalla FORMA dichiarata:
+quadrata e fino a 400 di lato → `summary`; tutto il resto come ieri. La
+regola per forma e non un elenco di nomi perché la funzione resta
+chiusa in sé (i banchi la eseguono da sola) e la prossima quadrata
+piccola la prende senza che nessuno se ne ricordi. COSA CAMBIA: le due
+del P2P e basta — il logo del libro (`/p2p`, l'ordine sparito) e le
+monete dell'ordine. COSA NON CAMBIA: il brand (512×512: resta grande,
+è una decisione sua e nessuno l'ha chiesta), i reparti (1200×630), le
+foto degli annunci (misura non dichiarata). STRADA SCARTATA: «ogni
+quadrata è summary» — avrebbe cambiato anche il brand.
+PROVATO: `prove_anteprime`, sul pezzo vero di `_meta_anteprima` — 400
+e 300 quadrate `summary`; 401, 512, 1200×630, 400×300, 300×400 e la
+foto senza misura grandi; la regola in un posto solo —;
+`prove_condividi_ordine_p2p` e `prove_anteprima_avvisi_p2p`: nei meta
+veri dell'ordine e del libro la scheda è `summary`.
+TORTURA sulla copia: 8 mutazioni su 8 mordono (il confine a 512 o
+sotto i 400, la regola senza «quadrata», senza «dichiarata», al
+contrario, tutto grande, tutto piccolo, la riga che non la legge).
+DAL VIVO (lo stesso banco delle monete: copia in collaudo, relay solo
+loopback, tutto spento a fine giro), la scheda servita pagina per
+pagina: l'ordine vivo `summary` con le monete 400×400; `/p2p` `summary`
+col logo del libro 400×400; la home e `/sicurezza`
+`summary_large_image` col brand 512×512; `/categoria/motori`
+`summary_large_image` con la sua 1200×630.
+
+**VERBALE DEL PUSH (le due monete e la scheda): cosa è girato su quale
+albero.** I due commit partono insieme. SOPRA 1b1d05f (il cantiere
+della copertura, già su main): la suite intera, 21993 passate e 0
+fallite; i 58 collaudi del workflow, verdi; i due passi dello
+scanner dei segreti; le due torture (7 su 7 e 8 su 8); i due giri dal
+vivo. Poi main è corso tre volte. SOPRA e8a24ad (in più «il cambio, le
+cose notate», che tocca la pagina e le prove e non il server): le
+sezioni toccate — `prove_anteprime`,
+`prove_condividi_ordine_p2p`, `prove_anteprima_avvisi_p2p`,
+`prove_link_dentro_telegram`: 318 e 0 —, lo scanner, la sintassi di
+server.py. SOPRA f486043 (in più un commit di SOLI documenti, la
+procedura delle hold di prova): la suite intera di nuovo, 22020 e 0, e
+lo scanner dei segreti. L'ALBERO CHE PARTE sta sopra db3522c, che
+aggiunge «la prova della contesa senza cronometro» (prove.py e questo
+file, niente server né pagina): lì sopra le sezioni toccate di nuovo
+(318 e 0) e lo scanner. La suite intera e i collaudi su QUESTO
+albero li gira la CI. Ai rebase un solo conflitto per volta, la coda
+di questo file, risolto tenendo tutt'e due i lati. Al momento del push
+l'ultima CI finita di main era verde (e8a24ad); quelle dei due commit
+arrivati dopo erano ancora in corso.

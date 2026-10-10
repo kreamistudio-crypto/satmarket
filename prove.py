@@ -36425,6 +36425,34 @@ def prove_anteprime():
           "og:image:width" in
           amb["_meta_anteprima"]("t", "d", "u", ("https://x/a.jpg", 0, 0)))
 
+    # --- 3bis) LA SCHEDA SEGUE LA FORMA (10 ott 2026, sera) ----------
+    # `summary_large_image` fa ritagliare l'immagine in una scheda larga:
+    # a un quadrato da 400 taglia testa e piedi. Le quadrate piccole (le
+    # due del P2P) dicono `summary`; tutte le altre restano come ieri.
+    def _scheda(immagine=None):
+        m_ = (amb["_meta_anteprima"]("t", "d", "u") if immagine is None
+              else amb["_meta_anteprima"]("t", "d", "u", immagine))
+        return _re.findall(r'<meta name="twitter:card" content="([^"]*)">', m_)
+    prova("twitter:card: una quadrata da 400 dice «summary», una volta",
+          ["summary"], _scheda(("https://x/a.jpg", 400, 400)))
+    prova("...e una quadrata piu' piccola pure", ["summary"],
+          _scheda(("https://x/a.jpg", 300, 300)))
+    prova("...il brand (512) resta grande, come ieri", ["summary_large_image"],
+          _scheda())
+    prova("...il confine e' a 400: da 401 in su resta grande",
+          ["summary_large_image"], _scheda(("https://x/a.jpg", 401, 401)))
+    prova("...una larga resta grande (i reparti, 1200x630)",
+          ["summary_large_image"], _scheda(("https://x/a.jpg", 1200, 630)))
+    prova("...una piccola NON quadrata resta grande: la regola e' la forma",
+          [["summary_large_image"], ["summary_large_image"]],
+          [_scheda(("https://x/a.jpg", 400, 300)), _scheda(("https://x/a.jpg", 300, 400))])
+    prova("...e la foto di un annuncio, che la misura non la dichiara, resta grande",
+          ["summary_large_image"], _scheda(("https://x/a.jpg", 0, 0)))
+    prova("...la regola sta in UN posto, e nessuno scrive piu' la scheda a mano",
+          [1, 1, 0],
+          [_SORGENTE.count('"summary_large_image"'), _SORGENTE.count('scheda = ("summary" if'),
+           _SORGENTE.count('"twitter:card", "summary')])
+
     # --- 4) quale immagine finisce nella card -----------------------
     img = amb["_immagine_anteprima"]
     with tempfile.TemporaryDirectory() as d:
@@ -52055,6 +52083,11 @@ def prove_condividi_ordine_p2p():
            meta(T, "og:image:width"), meta(T, "og:image:height")])
     prova("...e quella del libro nella testa dell'ordine non c'e'", False,
           IMG_LIBRO in T)
+    # (10 ott 2026, sera) quadrate da 400: la scheda e' «summary», il
+    # quadratino accanto al testo — la grande le ritaglierebbe
+    prova("...la scheda dell'ordine e' «summary», e quella del libro pure",
+          ["summary", "summary"],
+          [meta(T, "twitter:card"), meta(amb["TESTA_P2P"], "twitter:card")])
     prova("...mentre il libro (e l'ordine sparito, che ricade li') tiene la sua",
           [IMG_LIBRO, False],
           [meta(amb["TESTA_P2P"], "og:image"), IMG in amb["TESTA_P2P"]])
@@ -105982,6 +106015,8 @@ def prove_anteprima_avvisi_p2p():
           [IMG, IMG], [meta("og:image"), meta("twitter:image")])
     prova("...con la misura dichiarata, 400 per 400", ["400", "400"],
           [meta("og:image:width"), meta("og:image:height")])
+    prova("...e la scheda «summary»: quadrata e piccola, non si ritaglia",
+          "summary", meta("twitter:card"))
     prova("...e il brand non c'e' piu'", False, "icona-512" in T)
     prova("og:title, og:description e og:url restano quelli del P2P",
           ["Scambio P2P — Barattolo", amb["META_TESTO_P2P"],

@@ -71589,8 +71589,20 @@ def _meta_anteprima(titolo: str, descrizione: str, url: str,
                     immagine=IMMAGINE_BRAND) -> str:
     """Il blocchetto che i crawler leggono: og:* per tutti quelli che
     ci interessano, name="description" per chi Open Graph non lo
-    conosce, twitter:card solo per dire «falla grande»."""
+    conosce, twitter:card per dire quanto grande farla.
+
+    LA SCHEDA SEGUE LA FORMA DELL'IMMAGINE (10 ott 2026, sera, richiesta
+    di Andrea): `summary_large_image` chiede una scheda larga, e chi la
+    disegna ci RITAGLIA dentro l'immagine — a un quadrato da 400 taglia
+    la testa e i piedi. Un'immagine dichiarata quadrata e piccola (fino
+    a 400 di lato: le due del P2P, il logo del libro e le monete
+    dell'ordine) dice `summary`, la scheda col quadratino accanto al
+    testo, che e' la forma per cui sono nate. Tutte le altre restano
+    grandi come ieri: il brand (512), i reparti (1200x630), e le foto
+    degli annunci, che la misura non la dichiarano."""
     img, larg, alt = immagine
+    scheda = ("summary" if larg and larg == alt and larg <= 400
+              else "summary_large_image")
     righe = [("property", "og:site_name", "Barattolo"),
              ("property", "og:type", "website"),
              ("property", "og:locale", "it_IT"),
@@ -71599,7 +71611,7 @@ def _meta_anteprima(titolo: str, descrizione: str, url: str,
              ("property", "og:url", url),
              ("property", "og:image", img),
              ("name", "description", descrizione),
-             ("name", "twitter:card", "summary_large_image"),
+             ("name", "twitter:card", scheda),
              ("name", "twitter:title", titolo),
              ("name", "twitter:description", descrizione),
              ("name", "twitter:image", img)]
