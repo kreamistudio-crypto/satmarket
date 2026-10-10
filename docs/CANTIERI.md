@@ -47662,3 +47662,32 @@ verbale del push.
 
 **DA GUARDARE.** La risposta del supporto di WoS; se un giorno la hold
 dal link passa, la riga si toglie con una sentinella da rovesciare.
+
+
+## La riga per chi usa Wallet of Satoshi, il verbale del push (10 ott 2026, sera): cosa è girato su quale albero
+
+Main è corso CINQUE volte mentre il cantiere chiudeva, nove commit in
+tutto: ed2151e e 384a3ce (il cookie sul tunnel, il codice di ritiro
+unico), 660f1ed e 6104ffd (CLAUDE.md col config in /srv/barattolo, i
+link dentro Telegram terzo giro), 6b4eb19 e 4f60dac (il feedback
+rifinito, il cambio sul libro P2P), 062d404 (la tendina «Come aprirlo su
+Android»), 35243c5 e 010f98c (i gesti prima di pagare il PayCode e il
+suo verbale): cinque rebase, l'ultimo su 010f98c, i conflitti in coda a
+questo file sciolti tenendo le due voci. Nessuno dei nove toccava i
+render del foglio P2P, la riga della scadenza o il Copia, e
+`rigaWosHoldP2P` è definita una volta sola. L'ultima CI di main era
+verde prima del push, guardata a ogni giro. COSA È GIRATO SU QUALE
+ALBERO: sull'albero di e1627d3 più il cantiere, la suite `PROVE_SEVERE=1`
+intera (21.695 passate, 0 fallite), i 55 collaudi della CI nella gabbia
+(55 verdi) e il giro dal vivo nel pane; sugli alberi ribasati intermedi
+(384a3ce, 6104ffd, 4f60dac, 062d404) le sezioni toccate (282 verdi) e i
+collaudi (55, 55, 57 e 57 verdi, 0 rossi) ogni volta; sull'albero RIBASATO FINALE
+(010f98c più il commit del cantiere), le sezioni toccate (282 verdi: i
+due fogli P2P, la reputazione, apri-nel-wallet, la pagina di prova,
+«Paga ora»); i collaudi NON sono stati rigirati sull'ultimo albero,
+dichiarato: i due commit arrivati per ultimi toccano miniapp.html,
+prove.py e documenti, non server.py né i collaudi, e un quinto giro da
+dieci minuti avrebbe trovato main corso di nuovo (è successo quattro
+volte di fila). Il cantiere stesso non tocca server.py. LA LEZIONE:
+quando main corre più dei collaudi, si chiede ad Andrea se tenerli solo
+sull'ultimo albero, prima di inseguirlo per un'ora.
