@@ -107801,6 +107801,9 @@ def _banco_nip46_js(mini):
         pezzo_js(mini, "function cifrarioNip46(NT, skLocale, pubRemota, modoIniziale){"),
         pezzo_js(mini, "function ascoltoNip46(NT, coro, opz){"),
         pezzo_js(mini, "function cassettaNip46(pubLocale, relays, consegna, etichetta){"),
+        _riga_js(mini, "let motoreNip46 = null;"),
+        _fn_js(mini, "function registraMotoreNip46(m){"),
+        _fn_js(mini, "function chiudiAppuntamentoNip46(perche){"),
     ])
     # LA PAGINA DI CARTONE: `document` e `window` con gli ascoltatori
     # delle sveglie (il banco li puo' far scattare), un `fetch` che il
@@ -107810,15 +107813,18 @@ def _banco_nip46_js(mini):
 const vero = console.log;
 console.log = () => {};
 const el = () => null;
-let detti = [], ascoltatori = {}, cassettaPost = [], cassettaGet = 0, posta = () => ({viva: true, eventi: [], n: 0});
+let detti = [], ascoltatori = {}, cassettaPost = [], cassettaChiusure = [], cassettaGet = 0, posta = () => ({viva: true, eventi: [], n: 0});
 function bunkerDice(t){ detti.push(String(t)); }
 function apriAutorizzazioneBunker(){}
 async function caricaNostrTools(){}
+/* si toglie SOLO il proprio ascoltatore (come fa il DOM): un motore
+   vecchio che si chiude non deve portarsi via le sveglie del nuovo */
 globalThis.document = {visibilityState: 'visible',
-  addEventListener(n, fn){ ascoltatori[n] = fn; }, removeEventListener(n){ delete ascoltatori[n]; }};
-const finestra = {addEventListener(n, fn){ ascoltatori[n] = fn; }, removeEventListener(n){ delete ascoltatori[n]; }};
+  addEventListener(n, fn){ ascoltatori[n] = fn; }, removeEventListener(n, fn){ if (ascoltatori[n] === fn) delete ascoltatori[n]; }};
+const finestra = {addEventListener(n, fn){ ascoltatori[n] = fn; }, removeEventListener(n, fn){ if (ascoltatori[n] === fn) delete ascoltatori[n]; }};
 globalThis.fetch = async (url, o) => {
-  if (o && o.method === 'POST') { cassettaPost.push(JSON.parse(o.body)); return {ok: true, json: async () => ({relays: JSON.parse(o.body).relays})}; }
+  if (o && o.method === 'POST' && /chiudi/.test(String(url))) { cassettaChiusure.push({corpo: JSON.parse(o.body), keepalive: !!o.keepalive}); return {ok: true, json: async () => ({ok: true, chiusa: true})}; }
+  if (o && o.method === 'POST') { cassettaPost.push(JSON.parse(o.body)); return {ok: true, json: async () => ({relays: JSON.parse(o.body).relays, biglietto: 'b1'})}; }
   cassettaGet++;
   const dopo = Number((String(url).match(/dopo=(\d+)/) || [0, 0])[1]);
   const d = posta(dopo);
@@ -108236,6 +108242,20 @@ const muto = () => new Promise(() => {});
   //     rifiuto, si aspetta
   await caso('socketPublish', subito,
     () => Promise.reject(new Error('relay connection closed')), 300);
+  // (t) IL FOGLIO SI CHIUDE mentre si aspetta l'umano: l'attesa cade
+  //     subito con «foglio chiuso», e la cassetta si chiude sul server
+  //     col biglietto, in keepalive
+  chiudiAppuntamentoNip46('pulizia del banco');   // il motore del caso prima
+  subs = {}; pubblicati = {}; detti = []; cassettaPost = []; cassettaChiusure = [];
+  posta = () => ({viva: true, eventi: [], n: 0});
+  globalThis.window = Object.assign({NostrTools: NTfinto(subito, () => subito())}, finestra);
+  const pc = firmatarioBunker(URI).then(() => 'COLLEGATO', e => e.message);
+  await new Promise(ok => setTimeout(ok, 120));
+  cassettaChiusure = [];
+  chiudiAppuntamentoNip46('foglio chiuso');
+  esiti.foglioChiuso = await Promise.race([pc, new Promise(ok => setTimeout(() => ok('ANCORA IN ATTESA'), 300))]);
+  esiti.foglioChiuso_chiusure = cassettaChiusure;
+  esiti.foglioChiuso_motore = motoreNip46;
   vero(JSON.stringify(esiti));
   process.exit(0);   // i timeout umani terrebbero vivo node
 })();
@@ -108320,6 +108340,13 @@ const muto = () => new Promise(() => {});
     prova("la socket che muore con l'OK del publish in viaggio non e' "
           "un rifiuto: si aspetta il riaggancio",
           "ANCORA IN ATTESA", d["socketPublish"])
+    prova("IL FOGLIO SI CHIUDE: l'attesa cade subito con «foglio chiuso», "
+          "senza stare i minuti dell'umano", "foglio chiuso", d["foglioChiuso"])
+    prova("...e la cassetta si chiude sul server col biglietto, in "
+          "keepalive (la chiusura puo' precedere un reload)",
+          [{"corpo": {"pub": "pub", "biglietto": "b1"}, "keepalive": True}],
+          d["foglioChiuso_chiusure"])
+    prova("...e il motore in corso non c'e' piu'", None, d["foglioChiuso_motore"])
 
     # --- il quinto silenzio: l'auth_url che non si apre ---
     # I firmatari che vivono sul telefono (Amber e i suoi) rispondono
@@ -108690,6 +108717,21 @@ const conTetto = (p, ms) => Promise.race([p,
   relayNip46 = [];
   esiti.senzaRelay = await conTetto(avvia(() => Promise.resolve()));
   esiti.qrSenzaRelay = qrMostrato;
+  // (h) IL FOGLIO SI CHIUDE durante l'appuntamento: cade subito, la
+  //     cassetta si chiude col biglietto; e un appuntamento NUOVO
+  //     chiude da solo quello vecchio
+  relayNip46 = ['wss://uno.example'];
+  p = avvia(() => Promise.resolve());
+  await conTetto(p);
+  cassettaChiusure = [];
+  chiudiAppuntamentoNip46('foglio chiuso');
+  esiti.foglioChiuso = await conTetto(p, 300);
+  esiti.foglioChiuso_chiusure = cassettaChiusure.length;
+  p = avvia(() => Promise.resolve());
+  await conTetto(p);
+  const p2 = avvia(() => Promise.resolve());
+  esiti.rimpiazzato = await conTetto(p, 300);
+  esiti.nuovoVivo = await conTetto(p2, 100);
   vero(JSON.stringify(esiti));
   process.exit(0);   // il timeout dell'attesa umana terrebbe vivo node
 })();
@@ -108771,6 +108813,12 @@ const conTetto = (p, ms) => Promise.race([p,
     prova("senza relay non si disegna nessun codice", (True, None),
           ("appuntamento non disponibile" in d["senzaRelay"],
            d["qrSenzaRelay"]))
+    prova("IL FOGLIO SI CHIUDE: l'appuntamento cade subito e la cassetta "
+          "si chiude sul server", ("foglio chiuso", 1),
+          (d["foglioChiuso"], d["foglioChiuso_chiusure"]))
+    prova("...e un appuntamento nuovo chiude da solo quello vecchio, che "
+          "non puo' piu' entrare al suo posto", (True, "ANCORA IN ATTESA"),
+          ("un altro appuntamento" in d["rimpiazzato"], d["nuovoVivo"]))
 
 
 def prove_cassetta_nip46():
@@ -108817,6 +108865,39 @@ def prove_cassetta_nip46():
           [True] * 4, [f"{n} = " in blocco for n in
                        ("CASSETTA_VITA_S", "CASSETTA_TETTO",
                         "CASSETTA_EVENTI_MAX", "CASSETTA_RELAY_MAX")])
+    # I LIMITI (10 ott 2026, sera): oltre, un errore e nessun thread
+    _n = {k: int(re.search(rf"{k} = (\d+)", blocco).group(1)) for k in
+          ("CASSETTA_TETTO", "CASSETTA_PER_IP", "CASSETTA_RELAY_MAX",
+           "CASSETTA_ORECCHI_MAX")}
+    prova("i numeri scelti: 300 cassette in tutto, 5 per IP, 6 relay per "
+          "cassetta, 20 relay in ascolto in tutto",
+          {"CASSETTA_TETTO": 300, "CASSETTA_PER_IP": 5,
+           "CASSETTA_RELAY_MAX": 6, "CASSETTA_ORECCHI_MAX": 20}, _n)
+    prova("per IP si conta PRIMA di creare, e oltre e' un 429 che lo dice",
+          True, 'x["ip"] == ip) >= CASSETTA_PER_IP:' in blocco
+          and 'raise HTTPException(429, "Troppi accessi in corso da questa "' in blocco)
+    prova("un relay nuovo oltre il tetto degli orecchi si rifiuta invece di "
+          "aprire un thread, e si dice fra i rifiutati", (True, True),
+          ("posti = max(0, CASSETTA_ORECCHI_MAX - len(aperti))" in blocco,
+           'rifiutati.append(r + " (troppi relay in ascolto sul server)")' in blocco))
+    prova("...e i tetti si giudicano col lucchetto in mano, prima di "
+          "`_orecchi_apri`", True,
+          blocco.index("if len(vive) >= CASSETTA_TETTO:")
+          < blocco.index("_orecchi_apri(set(tenuti))"))
+    prova("la rotta di chiusura esiste, col freno del login (come il "
+          "deposito)", (True, True, True),
+          ('@app.post("/api/login/nostr/cassetta/chiudi")' in blocco,
+           '_frena("login", _ip_di(req))' in blocco[blocco.index("cassetta/chiudi"):],
+           '_frena("login", ip)' in blocco))
+    prova("...e vuole il biglietto del deposito (confronto a tempo "
+          "costante): la chiave effimera la vede chiunque sul relay",
+          (True, True),
+          ('"biglietto": secrets.token_hex(16)' in blocco,
+           'secrets.compare_digest(biglietto, c["biglietto"])' in blocco))
+    prova("...un biglietto storto e' un 403, una cassetta che non c'e' non "
+          "e' un errore", (True, True),
+          ('raise HTTPException(403, "Biglietto non valido")' in blocco,
+           'return {"ok": True, "chiusa": False}' in blocco))
 
     # --- il giudice dei relay, fatto girare ---
     import ipaddress as _ip
@@ -108876,6 +108957,19 @@ def prove_cassetta_nip46():
     prova("...a ritmo lento, e senza aspettare il server per partire",
           (True, True), ("setInterval(leggi, CASSETTA_POLL_MS)" in cas,
                          "cassetta.apri();" in mini))
+    prova("la cassetta si chiude sul server col biglietto, in keepalive",
+          (True, True),
+          ("`${API_BASE}/login/nostr/cassetta/chiudi`, {method:'POST', keepalive: true," in cas,
+           "body: JSON.stringify({pub: pubLocale, biglietto})" in cas))
+    prova("il foglio che si chiude chiude il motore in corso; e il foglio "
+          "che si riapre pure", (True, True),
+          ("chiudiAppuntamentoNip46('foglio chiuso');" in pezzo_js(mini, "function closeSheet(){", "\n}"),
+           "chiudiAppuntamentoNip46('foglio riaperto');" in pezzo_js(mini, "function apriNostrSheet(scopo){", "\n}")))
+    prova("...e chi entra chiude il firmatario PRIMA del reload", True,
+          "if (firmatario.chiudi) { try { firmatario.chiudi(); } catch(e){} }\r\n  navDaCapo(); location.reload();"
+          .replace("\r\n", "\n") in pezzo_js(mini, "async function entraConNostr(firmatario){"))
+    prova("una chiusura voluta non e' un errore da mostrare, nelle due "
+          "strade", 2, mini.count("if (chiusoApposta(motivo)) return;"))
     sp = pezzo_js(mini, "function spiegaNip46(motivo){")
     be = pezzo_js(mini, "function bunkerErrore(motivo){")
     prova("l'errore spiegato si costruisce a nodi, mai con innerHTML: "

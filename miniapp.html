@@ -29921,6 +29921,7 @@ function closeSheet(){
   el('paySheet').classList.remove('open');
   el('invitoSheet').classList.remove('open');
   el('nostrSheet').classList.remove('open');
+  chiudiAppuntamentoNip46('foglio chiuso');   // la cassetta non aspetta i suoi dieci minuti
   el('nostrGuidaSheet').classList.remove('open');
   el('collegaSheet').classList.remove('open');
   el('nwcConfermaSheet').classList.remove('open');
@@ -48301,7 +48302,7 @@ function ascoltoNip46(NT, coro, opz){
    che scarta le copie. Dopo meta' vita si rinnova (`rinfresca`): un
    giro col bunker puo' durare piu' di una cassetta. */
 function cassettaNip46(pubLocale, relays, consegna, etichetta){
-  let n = 0, viva = null, timer = null, ferma = false, orecchi = {}, apertaA = 0;
+  let n = 0, viva = null, timer = null, ferma = false, orecchi = {}, apertaA = 0, biglietto = '';
   async function apri(){
     if (ferma) return;
     apertaA = Date.now();          // da subito: un rinfresca() durante l'apertura non deve riaprire
@@ -48311,6 +48312,7 @@ function cassettaNip46(pubLocale, relays, consegna, etichetta){
         body: JSON.stringify({pub: pubLocale, relays})});
       const d = await r.json().catch(() => ({}));
       viva = r.ok;
+      if (d.biglietto) biglietto = d.biglietto;   // serve a chiuderla: resta uguale ai rinnovi
       apertaA = Date.now();
       console.log(`🟪 [${etichetta}] cassetta ${r.ok ? 'aperta su ' + (d.relays || []).join(' · ') : 'rifiutata: ' + (d.detail || r.status)}`
         + ((d.rifiutati || []).length ? ` (relay non ammessi: ${d.rifiutati.join(' · ')})` : ''));
@@ -48338,7 +48340,25 @@ function cassettaNip46(pubLocale, relays, consegna, etichetta){
   function rinfresca(){
     if (viva !== false && Date.now() - apertaA > 240000) apri();
   }
-  function chiudi(){ ferma = true; clearInterval(timer); timer = null; }
+  /* SI CHIUDE SUL SERVER (10 ott 2026, sera): quando l'utente chiude il
+     foglio o e' entrato, la cassetta non deve restare aperta i suoi
+     dieci minuti — e' un posto in memoria e un orecchio sui relay. Col
+     biglietto del deposito, e con `keepalive`: la chiusura parte
+     spesso un attimo prima di un reload, e senza keepalive il browser
+     la butterebbe con la pagina. */
+  function chiudi(){
+    if (ferma) return;
+    ferma = true;
+    clearInterval(timer);
+    timer = null;
+    if (!biglietto) return;
+    try {
+      fetch(`${API_BASE}/login/nostr/cassetta/chiudi`, {method:'POST', keepalive: true,
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({pub: pubLocale, biglietto})}).catch(() => {});
+      console.log(`🟪 [${etichetta}] cassetta chiusa`);
+    } catch(e){}
+  }
   return {apri, leggi, rinfresca, chiudi,
           get viva(){ return viva; }, get orecchi(){ return orecchi; },
           /* per i messaggi: quali orecchi del server ascoltano davvero */
@@ -48349,6 +48369,28 @@ function cassettaNip46(pubLocale, relays, consegna, etichetta){
             return 'cassetta: ' + o.map(([r, s]) => `${r} ${s.stato}${s.perche ? ' (' + s.perche + ')' : ''}`).join(' · ');
           }};
 }
+
+/* IL MOTORE IN CORSO (10 ott 2026, sera): il bunker o l'appuntamento
+   del QR che sta aspettando adesso. Chi chiude il foglio del login, o
+   ne apre uno nuovo, lo chiude: le websocket, la cassetta sul server e
+   l'attesa — che cade con «foglio chiuso» invece di stare i suoi
+   minuti. E' UNO perche' il foglio e' uno: un motore nuovo prende il
+   posto del vecchio, che si chiude. */
+let motoreNip46 = null;
+function registraMotoreNip46(m){
+  if (motoreNip46 && motoreNip46 !== m) { try { motoreNip46.chiudi('un altro appuntamento'); } catch(e){} }
+  motoreNip46 = m;
+}
+function chiudiAppuntamentoNip46(perche){
+  const m = motoreNip46;
+  motoreNip46 = null;
+  if (m) { console.log(`🟪 [nip46] chiudo il motore in corso: ${perche}`); try { m.chiudi(perche); } catch(e){} }
+}
+/* I motivi di chi ha chiuso APPOSTA (il foglio, o un appuntamento
+   nuovo al posto del vecchio): un'attesa che cade cosi' non e' un
+   errore da mostrare — chi l'ha chiusa lo sa. */
+const MOTIVI_CHIUSURA_NIP46 = /foglio chiuso|foglio riaperto|appuntamento chiuso|un altro appuntamento/;
+function chiusoApposta(motivo){ return MOTIVI_CHIUSURA_NIP46.test(String(motivo || '')); }
 
 /* `opz.giaConnesso` (10 ott 2026): la strada del QR arriva qui DOPO che
    il firmatario si e' presentato da solo col segreto — rifargli la
@@ -48507,10 +48549,14 @@ async function firmatarioBunker(uri, skHex, modoCifrario, opz){
      sul telefono. Chiederli qui = un'autorizzazione sola, chiara.
      Timeout umano: la prima connect può voler dire aprire l'app del
      bunker e approvare. */
-  const chiudi = () => {
+  const chiudi = (perche) => {
+    if (motoreNip46 === motore) motoreNip46 = null;
     ascolto.chiudi();
     cassetta.chiudi();
+    if (perche && Object.keys(attese).length) saltano(perche);
   };
+  const motore = {chiudi};
+  registraMotoreNip46(motore);
   if (!opz.giaConnesso) {
     try {
       await chiama('connect', [bunkerPub, par.get('secret') || '',
@@ -48638,6 +48684,13 @@ async function firmatarioNostrConnect(){
   });
   const cassetta = cassettaNip46(pubLocale, stanza, ascolto.consegna, 'qr');
   cassetta.apri();                   // il secondo orecchio: non si aspetta
+  const motore = {chiudi(perche){
+    ascolto.chiudi();
+    cassetta.chiudi();
+    clearTimeout(t);
+    cadi(new Error(perche || 'appuntamento chiuso'));
+  }};
+  registraMotoreNip46(motore);
   const uri = 'nostrconnect://' + pubLocale
     + '?' + stanza.map(r => 'relay=' + encodeURIComponent(r)).join('&')
     + '&secret=' + segreto
@@ -48651,7 +48704,11 @@ async function firmatarioNostrConnect(){
   await mostraQrConnessione(uri);
   let remoto;
   try { remoto = await risposta; }
-  finally { ascolto.chiudi(); cassetta.chiudi(); }
+  finally {
+    if (motoreNip46 === motore) motoreNip46 = null;
+    ascolto.chiudi();
+    cassetta.chiudi();
+  }
   bunkerDice('Firmatario collegato: preparo la firma…');
   return await firmatarioBunker(
     'bunker://' + remoto + '?' + stanza.map(r => 'relay=' + encodeURIComponent(r)).join('&'),
@@ -48787,6 +48844,9 @@ function spiegaNip46(motivo){
     [/URI bunker:\/\/ non valida|non indica nessun relay/i,
      'Il link incollato non è un bunker:// completo.',
      'Copialo per intero dal tuo firmatario (nsec.app, Amber, Clave…): comincia con bunker:// e contiene almeno un relay.'],
+    [/foglio chiuso|foglio riaperto|appuntamento chiuso|un altro appuntamento/i,
+     'Accesso annullato.',
+     'Hai chiuso il foglio: riapri «Entra con Nostr» quando vuoi.'],
     [/appuntamento non disponibile/i,
      'L\'appuntamento col firmatario non è disponibile.',
      'Ricarica l\'app e riprova.'],
@@ -48991,6 +49051,10 @@ async function entraConNostr(firmatario){
      Telegram l'identita' viaggia li', quindi WEB va acceso prima. */
   if (!tg?.initData) WEB = true;
   try { await svuotaFirmeNostr(firmatario, true); } catch(e){}
+  /* IL FIRMATARIO SI CHIUDE QUI, prima del reload: il `finally` di chi
+     ci ha chiamato arriverebbe a pagina gia' morta, e la cassetta sul
+     server resterebbe aperta i suoi dieci minuti */
+  if (firmatario.chiudi) { try { firmatario.chiudi(); } catch(e){} }
   navDaCapo(); location.reload();
 }
 
@@ -49035,6 +49099,7 @@ async function loginNostrQr(){
   } catch(e){
     const motivo = e?.message || 'non risponde';
     if (giro !== nostrQrGiro) return;   // il fallimento e' di un giro morto
+    if (chiusoApposta(motivo)) return;  // il foglio chiuso da chi lo ha chiuso: niente da dire
     nascondiQrConnessione();
     /* IL MOTIVO NEL FOGLIO e non solo nel toast, la regola del bunker:
        dice quale relay e cosa ha risposto, ed e' l'unica cosa con cui
@@ -49060,6 +49125,7 @@ async function loginNostrBunker(){
     await consegnaFirmatario(f);
   } catch(e){
     const motivo = e?.message || 'non risponde';
+    if (chiusoApposta(motivo)) return;  // il foglio chiuso da chi lo ha chiuso: niente da dire
     /* IL MOTIVO STA NEL FOGLIO E NON SOLO NEL TOAST: dice quale relay
        e cosa ha risposto, ed è l'unica cosa con cui si può decidere
        di cambiare bunker. Un toast che se ne va quella decisione non
@@ -49133,6 +49199,7 @@ function apriNostrSheet(scopo){
      parlare di un foglio che non c'e' piu'. */
   nostrQrGiro++;
   nascondiQrConnessione();
+  chiudiAppuntamentoNip46('foglio riaperto');
   /* IL CODICE INVITO e' del login, non della firma: nel foglio della
      firma la riga non c'e'. Al login, se il link d'invito ha lasciato
      un codice, il campo nasce compilato e aperto. */

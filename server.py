@@ -9846,10 +9846,29 @@ async def login_nostr_collega(req: Request, response: Response,
 # deve diventare una porta per bussare dentro casa. In collaudo vale la
 # regola di sempre: verso un relay che non e' di casa non si esce
 # (`lettura_simulata`), e un ws:// di loopback e' il relay dei collaudi.
+# I LIMITI (10 ott 2026, sera, richiesta di Andrea): ogni cassetta e' un
+# posto in memoria e ogni relay nuovo e' un THREAD, e una porta aperta a
+# chiunque non puo' far nascere ne' l'una ne' l'altro senza tetto.
+#  - una cassetta per chiave di client (la «sessione» del login: la
+#    chiave effimera nasce e muore con un tentativo; ridepositarla
+#    rinnova, non aggiunge);
+#  - CASSETTA_PER_IP aperte insieme dallo stesso IP (solo in chiaro:
+#    sull'onion l'IP non c'e', e vale il tetto totale);
+#  - CASSETTA_TETTO aperte in tutto;
+#  - CASSETTA_RELAY_MAX relay per cassetta (quelli di una URI);
+#  - CASSETTA_ORECCHI_MAX relay DISTINTI in ascolto in tutto: oltre, un
+#    relay nuovo si rifiuta (e si dice) invece di aprire un thread;
+#  - il freno per IP delle porte del login (FRENI["login"], 30 al minuto)
+#    sul deposito e sulla chiusura.
+# Oltre un tetto si risponde un errore — 429 per quello per IP, 503 per
+# quelli totali — e NESSUN thread parte: `collaudo_cassetta_nip46` lo
+# prova contando gli orecchi.
 CASSETTA_VITA_S = 600          # dieci minuti: l'umano, l'app, il ritorno
-CASSETTA_TETTO = 500           # cassette aperte insieme, oltre si rifiuta
+CASSETTA_TETTO = 300           # cassette aperte insieme, in tutto
+CASSETTA_PER_IP = 5            # cassette aperte insieme dallo stesso IP
 CASSETTA_EVENTI_MAX = 40       # eventi tenuti per cassetta
 CASSETTA_RELAY_MAX = 6         # relay per cassetta: quelli di una URI
+CASSETTA_ORECCHI_MAX = 20      # relay distinti in ascolto, in tutto
 CASSETTA_ORECCHIO_RIPOSO_S = 60   # senza cassette, l'orecchio si chiude
 _CASSETTE: dict[str, dict] = {}   # pub effimera -> la cassetta
 _ORECCHI: dict[str, dict] = {}    # relay -> {"stato", "da", "perche", "ferma"}
@@ -10057,6 +10076,11 @@ def _orecchi_apri(relays: set):
         O["filo"].start()
 
 
+def _orecchi_aperti() -> set:
+    """I relay con un orecchio vivo (il thread c'e' ancora)."""
+    return {r for r, o in _ORECCHI.items() if o["filo"].is_alive()}
+
+
 def _cassetta_stato(pub: str) -> dict:
     """Lo stato per il client: viva, e come stanno i suoi orecchi."""
     with _CASSETTE_LOCK:
@@ -10074,8 +10098,14 @@ async def login_nostr_cassetta_apri(req: Request):
     """La pagina deposita la sua chiave effimera e i relay
     dell'appuntamento: da qui il server ascolta per lei. Si puo'
     richiamare per la stessa chiave (la vita si rinnova, i relay si
-    aggiungono). Freno per IP come le altre porte del login."""
-    _frena("login", _ip_di(req))
+    aggiungono; il biglietto resta quello). Freno per IP come le altre
+    porte del login, e i tetti qui sopra: oltre, un errore e nessun
+    thread. Torna il BIGLIETTO che serve a chiuderla (vedi la rotta di
+    chiusura): la chiave effimera la vede chiunque guardi il relay, e
+    senza un segreto in piu' chiunque potrebbe chiudere l'appuntamento
+    di un altro."""
+    ip = _ip_di(req)
+    _frena("login", ip)
     d = await leggi_json(req)
     pub = str(d.get("pub") or "").strip().lower()
     if not RE_HEX_64.fullmatch(pub):
@@ -10102,13 +10132,58 @@ async def login_nostr_cassetta_apri(req: Request):
             if len(vive) >= CASSETTA_TETTO:
                 raise HTTPException(503, "Troppi accessi in corso: riprova "
                                          "fra un minuto")
+            if ip and sum(1 for x in vive.values() if x["ip"] == ip) >= CASSETTA_PER_IP:
+                raise HTTPException(429, "Troppi accessi in corso da questa "
+                                         "rete: chiudi gli altri o riprova "
+                                         "fra qualche minuto")
             c = vive[pub] = {"scade": 0, "relays": set(), "eventi": [],
-                             "ids": set(), "n": 0, "nata": adesso}
+                             "ids": set(), "n": 0, "nata": adesso, "ip": ip,
+                             "biglietto": secrets.token_hex(16)}
+        # UN RELAY NUOVO E' UN THREAD: oltre il tetto degli orecchi si
+        # tengono solo quelli che un orecchio ce l'hanno gia'
+        aperti = _orecchi_aperti()
+        posti = max(0, CASSETTA_ORECCHI_MAX - len(aperti))
+        tenuti = []
+        for r in buoni:
+            if r in aperti or r in c["relays"]:
+                tenuti.append(r)
+            elif posti > 0:
+                tenuti.append(r)
+                posti -= 1
+            else:
+                rifiutati.append(r + " (troppi relay in ascolto sul server)")
+        if not tenuti:
+            raise HTTPException(503, "Troppi relay in ascolto sul server: "
+                                     "riprova fra un minuto")
         c["scade"] = adesso + CASSETTA_VITA_S
-        c["relays"].update(buoni)
-        _orecchi_apri(set(buoni))
-    return {"ok": True, "relays": buoni, "rifiutati": rifiutati,
-            "vita": CASSETTA_VITA_S}
+        c["relays"].update(tenuti)
+        _orecchi_apri(set(tenuti))
+    return {"ok": True, "relays": tenuti, "rifiutati": rifiutati,
+            "vita": CASSETTA_VITA_S, "biglietto": c["biglietto"]}
+
+
+@app.post("/api/login/nostr/cassetta/chiudi")
+async def login_nostr_cassetta_chiudi(req: Request):
+    """La pagina chiude la sua cassetta — quando l'utente chiude il
+    foglio o quando e' entrato — invece di lasciarla morire dopo dieci
+    minuti. Vuole il biglietto del deposito: senza, chiunque veda la
+    chiave effimera sul relay potrebbe chiudere l'appuntamento di un
+    altro. Un biglietto storto e' un 403; una cassetta che non c'e'
+    (gia' chiusa, scaduta) non e' un errore: «chiusa: false»."""
+    _frena("login", _ip_di(req))
+    d = await leggi_json(req)
+    pub = str(d.get("pub") or "").strip().lower()
+    biglietto = str(d.get("biglietto") or "")
+    if not RE_HEX_64.fullmatch(pub):
+        raise HTTPException(400, "Chiave del client non valida")
+    with _CASSETTE_LOCK:
+        c = _cassette_vive().get(pub)
+        if not c:
+            return {"ok": True, "chiusa": False}
+        if not secrets.compare_digest(biglietto, c["biglietto"]):
+            raise HTTPException(403, "Biglietto non valido")
+        _CASSETTE.pop(pub, None)
+    return {"ok": True, "chiusa": True}
 
 
 @app.get("/api/login/nostr/cassetta")

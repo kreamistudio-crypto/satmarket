@@ -182,6 +182,74 @@ def main():
           (503, True), (r.status_code, "Troppi" in r.json().get("detail", "")))
     S.CASSETTA_TETTO = tetto
 
+    print("\n[i limiti: oltre, un errore e nessun thread nuovo]")
+    IP = {"x-forwarded-for": "93.184.216.34"}
+    orecchi_prima = len(S._orecchi_aperti())
+    per_ip = S.CASSETTA_PER_IP
+    S.CASSETTA_PER_IP = 2
+    esiti = [c.post(VIA, json={"pub": f"{k}" * 64, "relays": [RELAY_CASA]},
+                    headers=IP).status_code for k in ("1", "2", "3")]
+    prova("per IP: due si aprono, la terza e' un 429", [200, 200, 429], esiti)
+    r = c.post(VIA, json={"pub": "3" * 64, "relays": [RELAY_CASA]}, headers=IP)
+    prova("...che lo dice", True, "questa rete" in r.json().get("detail", ""))
+    prova("...e lo stesso IP puo' RINNOVARE una sua cassetta (non e' una "
+          "nuova)", 200, c.post(VIA, json={"pub": "1" * 64, "relays": [RELAY_CASA]},
+                               headers=IP).status_code)
+    S.CASSETTA_PER_IP = per_ip
+    orecchi_max = S.CASSETTA_ORECCHI_MAX
+    S.CASSETTA_ORECCHI_MAX = len(S._orecchi_aperti())
+    r = c.post(VIA, json={"pub": "4" * 64, "relays": ["wss://nuovo.relay.example"]})
+    prova("al tetto degli orecchi un relay NUOVO si rifiuta: 503 che lo dice, "
+          "e nessun thread", (503, True, orecchi_prima),
+          (r.status_code, "relay in ascolto" in r.json().get("detail", ""),
+           len(S._orecchi_aperti())))
+    r = c.post(VIA, json={"pub": "4" * 64, "relays": [RELAY_CASA, "wss://nuovo.relay.example"]})
+    prova("...con un relay gia' in ascolto accanto si apre su quello, e il "
+          "nuovo e' fra i rifiutati con la ragione", (200, [RELAY_CASA], True),
+          (r.status_code, r.json().get("relays"),
+           any("troppi relay" in x for x in r.json().get("rifiutati", []))))
+    S.CASSETTA_ORECCHI_MAX = orecchi_max
+    tetto = S.CASSETTA_TETTO
+    S.CASSETTA_TETTO = len(S._CASSETTE)
+    r = c.post(VIA, json={"pub": "5" * 64, "relays": [RELAY_CASA]})
+    prova("al tetto totale una cassetta nuova e' un 503, e nessun thread",
+          (503, orecchi_prima), (r.status_code, len(S._orecchi_aperti())))
+    S.CASSETTA_TETTO = tetto
+    prova("i numeri scelti: 300 in tutto, 5 per IP, 6 relay per cassetta, "
+          "20 relay in ascolto", (300, 5, 6, 20),
+          (S.CASSETTA_TETTO, S.CASSETTA_PER_IP, S.CASSETTA_RELAY_MAX,
+           S.CASSETTA_ORECCHI_MAX))
+    secchio = S._SECCHI
+    secchio.clear()
+    esiti = [c.post(VIA, json={"pub": "6" * 64, "relays": [RELAY_CASA]},
+                    headers={"x-forwarded-for": "8.8.8.8"}).status_code
+             for _ in range(31)]
+    prova("il deposito ha il freno delle porte del login: trenta al minuto "
+          "per IP, il trentunesimo e' un 429", (30, 429),
+          (esiti.count(200), esiti[-1]))
+    secchio.clear()
+    for k in ("1", "2", "3", "4", "5", "6"):
+        with S._CASSETTE_LOCK:
+            S._CASSETTE.pop(k * 64, None)
+
+    print("\n[la chiusura dalla pagina]")
+    r = c.post(VIA, json={"pub": "7" * 64, "relays": [RELAY_CASA]})
+    biglietto = r.json().get("biglietto")
+    prova("il deposito torna un biglietto", True, bool(biglietto) and len(biglietto) == 32)
+    prova("...che resta lo stesso al rinnovo", biglietto,
+          c.post(VIA, json={"pub": "7" * 64, "relays": [RELAY_CASA]}).json().get("biglietto"))
+    r = c.post(VIA + "/chiudi", json={"pub": "7" * 64, "biglietto": "sbagliato"})
+    prova("chiudere col biglietto sbagliato e' un 403, e la cassetta resta",
+          (403, True), (r.status_code, c.get(VIA, params={"pub": "7" * 64}).json()["viva"]))
+    r = c.post(VIA + "/chiudi", json={"pub": "7" * 64, "biglietto": biglietto})
+    prova("col biglietto giusto si chiude", (200, True), (r.status_code, r.json().get("chiusa")))
+    prova("...e non c'e' piu'", False, c.get(VIA, params={"pub": "7" * 64}).json()["viva"])
+    r = c.post(VIA + "/chiudi", json={"pub": "7" * 64, "biglietto": biglietto})
+    prova("chiuderla due volte non e' un errore: «chiusa: false»", (200, False),
+          (r.status_code, r.json().get("chiusa")))
+    prova("...una chiave storta si', un 400", 400,
+          c.post(VIA + "/chiudi", json={"pub": "x", "biglietto": "b"}).status_code)
+
     print("\n[la scadenza: la cassetta muore, l'orecchio si chiude]")
     with S._CASSETTE_LOCK:
         for cass in S._CASSETTE.values():

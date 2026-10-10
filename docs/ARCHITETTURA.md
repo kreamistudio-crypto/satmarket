@@ -9001,7 +9001,16 @@
   nome, mai IP, credenziali o .onion) e `_orecchio_indirizzo_pubblico`
   (il nome risolto deve essere pubblico); in collaudo verso un relay
   non di casa non si esce (`lettura_simulata`). Freno per IP del
-  `login` sul POST, nessuno sul GET (lettura in memoria). Lato client
+  `login` sul POST e sulla chiusura, nessuno sul GET (lettura in
+  memoria). I TETTI (la sera del 10 ott): una cassetta per chiave di
+  client, `CASSETTA_PER_IP` 5 (429), `CASSETTA_TETTO` 300 (503),
+  `CASSETTA_RELAY_MAX` 6, `CASSETTA_ORECCHI_MAX` 20 relay distinti in
+  ascolto (oltre, un relay nuovo si rifiuta e si nomina fra i
+  `rifiutati`; nessun thread oltre il limite). Il deposito torna un
+  `biglietto`; `POST /api/login/nostr/cassetta/chiudi` {pub, biglietto}
+  chiude (403 col biglietto storto): il client la chiude quando il
+  foglio si chiude o si riapre (`motoreNip46`, `chiudiAppuntamentoNip46`)
+  e quando entra, prima del reload, in `keepalive`. Lato client
   `ascoltoNip46` (il coro che si riaggancia: socket caduta ≠ rifiuto,
   riapertura con pazienza crescente e subito al ritorno della pagina,
   `since` sul filtro, copie scartate per id di evento, richieste in

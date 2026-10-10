@@ -45738,3 +45738,40 @@ cassetta non si chiude quando l'utente chiude il foglio: dieci minuti e
 muore da sola. 5) `switch_relays` dopo la connect (la NIP-46 lo chiede
 ai client): non lo mandiamo; Clave risponde null, Amber migrerebbe sui
 suoi relay di serie.
+
+**SEGUITO (la sera, richiesta di Andrea): i limiti e la chiusura.** Una
+cassetta e' un posto in memoria e un relay nuovo e' un thread, e una
+porta aperta a chiunque non puo' far nascere ne' l'una ne' l'altro senza
+tetto. I NUMERI: una cassetta per chiave di client (la «sessione» del
+login: ridepositarla rinnova, non aggiunge); 5 aperte insieme per IP
+(`CASSETTA_PER_IP`, solo in chiaro — sull'onion l'IP non c'e' e vale il
+totale); 300 in tutto (`CASSETTA_TETTO`); 6 relay per cassetta
+(`CASSETTA_RELAY_MAX`); 20 relay DISTINTI in ascolto in tutto
+(`CASSETTA_ORECCHI_MAX`): oltre, un relay nuovo si rifiuta e si dice fra
+i `rifiutati` («troppi relay in ascolto sul server»), e se non ne resta
+nessuno un 503; il freno delle porte del login (30 al minuto per IP) sul
+deposito e sulla chiusura. Per IP e' un 429, i totali un 503, e i tetti
+si giudicano col lucchetto in mano PRIMA di `_orecchi_apri`: nessun
+thread nasce oltre il limite. LA CHIUSURA: il deposito torna un
+`biglietto` (16 byte, uguale ai rinnovi) e `POST
+/api/login/nostr/cassetta/chiudi` {pub, biglietto} chiude; senza il
+biglietto chiunque veda la chiave effimera sul relay potrebbe chiudere
+l'appuntamento di un altro (403 col biglietto storto; una cassetta che
+non c'e' piu' e' «chiusa: false», non un errore). Nel client c'e' UN
+motore in corso (`motoreNip46`): `closeSheet` e `apriNostrSheet` lo
+chiudono («foglio chiuso» / «foglio riaperto»: le websocket, la cassetta
+sul server in `keepalive`, e l'attesa cade subito invece di stare i suoi
+minuti); chi entra chiude il firmatario PRIMA del reload, perche' il
+`finally` di chi l'ha chiamato arriverebbe a pagina morta; un
+appuntamento nuovo chiude da solo quello vecchio. Una chiusura voluta non
+e' un errore da mostrare (`chiusoApposta`). PROVATO: `collaudo_cassetta_nip46`
+(37/37): per IP due si aprono e la terza e' un 429, il rinnovo passa, al
+tetto degli orecchi un relay nuovo e' un 503 e gli orecchi non crescono
+(contati), con un relay gia' in ascolto accanto si apre su quello e il
+nuovo e' fra i rifiutati, al tetto totale 503 senza thread, il freno
+(trenta al minuto, il trentunesimo 429), il biglietto uguale al rinnovo,
+403 col biglietto storto e la cassetta resta, chiusa col biglietto
+giusto, due volte «chiusa: false», chiave storta 400. In prove.py le
+sentinelle sui numeri e sui giudizi, e sul cartone: il bunker col foglio
+chiuso cade subito con «foglio chiuso» e manda la chiusura col biglietto
+in keepalive; il QR idem, e un appuntamento nuovo chiude il vecchio.
