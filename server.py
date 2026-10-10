@@ -15136,6 +15136,105 @@ def spoglia_html(testo: str) -> str:
     return html.unescape(re.sub(r"<[^>]+>", "", testo))
 
 
+# ═══ I LINK DENTRO TELEGRAM APRONO LA MINI APP (10 ott 2026) ═══
+# Richiesta di Andrea, dopo il «Condividi» di un ordine P2P: un link a
+# barattolo.store toccato DENTRO Telegram si apre nel browser di
+# Telegram, dove chi e' entrato solo dal bot e' un anonimo — vede «Entra»
+# invece del suo scambio. Il link ufficiale di Telegram apre invece la
+# Mini App, gia' entrati: `https://t.me/<bot>?startapp=<parametro>` (la
+# Mini App PRINCIPALE del bot) o `https://t.me/<bot>/<app>?startapp=…`
+# (una Mini App col suo nome breve). Il parametro arriva alla pagina
+# (`tgWebAppStartParam`), che lo ritraduce nell'indirizzo di sempre.
+# LA LEVA E' L'INDIRIZZO, e nel codice e' SPENTA: quale delle due forme
+# valga lo sa solo BotFather (la Mini App principale va ACCESA li', il
+# nome breve va CREATO li'), e un link `?startapp=` verso un bot che non
+# ha la Mini App principale apre la chat del bot e basta — la
+# destinazione persa, cioe' peggio del link di oggi. Vuota = ogni link
+# resta barattolo.store, il comportamento di ieri. Una forma storta la
+# spegne e lo dice all'avvio; in produzione, all'avvio, si chiede a
+# Telegram (`controlla_link_miniapp`).
+# COSA SI TRADUCE: un vocabolario CHIUSO, i soli indirizzi del P2P — il
+# libro, lo scambio (`?scambio=`, il bottone del promemoria) e l'ordine
+# (`?ordine=`, il «Condividi»). Gli annunci NO, ed e' una scelta: il
+# loro link web porta in chat l'anteprima con la FOTO dell'oggetto, e un
+# link t.me mostrerebbe la scheda del bot.
+# SOLO VERSO TELEGRAM: il bottone degli avvisi del bot, e dal client i
+# link condivisi dalla Mini App verso una chat. Il DM Nostr, la nota su
+# Nostr, il foglio di condivisione del telefono e gli appunti restano
+# barattolo.store: fuori da Telegram un t.me non serve a niente.
+# I LIMITI DEL PARAMETRO: per `startapp` la documentazione di Telegram
+# NON ne scrive (verificato il 10 ott 2026 su core.telegram.org); per il
+# fratello `start` scrive «A-Z, a-z, 0-9, _ e -», 64 caratteri al
+# massimo. Si sta dentro QUELLI, che sono i piu' stretti: un id d'ordine
+# e' un UUID (36 caratteri, cifre lettere e trattini) e col suo nome
+# davanti fa 43 o 44. Un parametro che uscisse dalla forma o dalla
+# misura NON si tronca e non si codifica: il link resta quello del sito.
+try:
+    from config import TELEGRAM_MINIAPP_LINK
+except ImportError:
+    TELEGRAM_MINIAPP_LINK = ""
+_FORMA_MINIAPP_LINK = re.compile(
+    r"https://t\.me/([A-Za-z][A-Za-z0-9_]{3,31})(/[A-Za-z0-9_]{3,30})?")
+if TELEGRAM_MINIAPP_LINK and not (
+        isinstance(TELEGRAM_MINIAPP_LINK, str)
+        and _FORMA_MINIAPP_LINK.fullmatch(TELEGRAM_MINIAPP_LINK)):
+    print("[telegram] TELEGRAM_MINIAPP_LINK non e' https://t.me/<bot> ne' "
+          "https://t.me/<bot>/<app>: i link restano quelli del sito",
+          flush=True)
+    TELEGRAM_MINIAPP_LINK = ""
+TELEGRAM_MINIAPP_LINK = TELEGRAM_MINIAPP_LINK or ""
+STARTAPP_MAX = 64
+_FORMA_STARTAPP = re.compile(r"[A-Za-z0-9_-]{1,64}")
+_FORMA_ID_STARTAPP = re.compile(r"[0-9a-zA-Z-]{8,64}")
+
+
+def _startapp_da_link(url) -> str:
+    """PURA: il parametro `startapp` di un indirizzo di casa, o '' se
+    quell'indirizzo non si traduce. Vocabolario chiuso: `/p2p` → `p2p`,
+    `/p2p?scambio=<id>` → `scambio_<id>`, `/p2p?ordine=<id>` →
+    `ordine_<id>`. Il gemello nel client e' `startappDaLink`, e chi lo
+    rilegge e' `percorsoDaStartapp`: una prova tiene in pari i tre."""
+    u = str(url or "")
+    base = URL_PUBBLICO + "/p2p"
+    if u == base:
+        return "p2p"
+    for nome in ("scambio", "ordine"):
+        testa = f"{base}?{nome}="
+        if u.startswith(testa):
+            oid = u[len(testa):]
+            p = f"{nome}_{oid}"
+            if (_FORMA_ID_STARTAPP.fullmatch(oid) and len(p) <= STARTAPP_MAX
+                    and _FORMA_STARTAPP.fullmatch(p)):
+                return p
+    return ""
+
+
+def _link_dentro_telegram(url) -> str:
+    """PURA: l'indirizzo da mettere in un bottone del bot. A leva accesa
+    e con un indirizzo che si traduce, il link che apre la Mini App;
+    in ogni altro caso l'indirizzo com'e' arrivato."""
+    p = _startapp_da_link(url) if TELEGRAM_MINIAPP_LINK else ""
+    return f"{TELEGRAM_MINIAPP_LINK}?startapp={p}" if p else str(url or "")
+
+
+def _link_casa_telegram() -> str:
+    """LA PORTA DI CASA, per i due posti che vivono SOLO dentro Telegram
+    e oggi portano alla home del sito (10 ott 2026, stesso giorno,
+    secondo sì di Andrea): la riga «🫙 Apri Barattolo» in cima alle
+    tastiere del bot e il link «🫙 Apri lo Scambio P2P su Barattolo» del
+    post P2P nel canale. A leva accesa aprono la Mini App (`casa`, la
+    quarta parola del vocabolario: la pagina la rilegge come `/`), a
+    leva spenta restano l'indirizzo del sito.
+    NON sta in `_startapp_da_link`, ed e' voluto: quella traduce gli
+    indirizzi che ARRIVANO (il bottone di un avviso, un link condiviso),
+    e li' la home del sito deve restare la home del sito — gli avvisi
+    del mercatino («Sfoglia il mercatino», «Apri Esplora») e ogni link
+    che la Mini App condivide non si toccano. Qui la chiede per nome
+    chi la vuole."""
+    return (f"{TELEGRAM_MINIAPP_LINK}?startapp=casa"
+            if TELEGRAM_MINIAPP_LINK else URL_PUBBLICO)
+
+
 async def _manda_telegram(tg_id: int, testo: str, bottone: tuple = None):
     """Il ramo Telegram di notifica(): il messaggio via bot (l'utente
     deve averlo avviato almeno una volta), simulato nel collaudo.
@@ -15192,6 +15291,12 @@ async def _manda_telegram(tg_id: int, testo: str, bottone: tuple = None):
     # fermarlo era solo il token segnaposto. Con un config che porta il
     # BOT_TOKEN vero sarebbe arrivato a una persona a caso. La regola
     # dei relay (`lettura_simulata`): la leva basta, l'id non conta.
+    # IL BOTTONE, DENTRO TELEGRAM, APRE LA MINI APP (10 ott 2026): qui e
+    # solo qui — questo e' il ramo Telegram, il DM Nostr tiene l'indirizzo
+    # del sito. A leva spenta, o con un indirizzo che non si traduce,
+    # `_link_dentro_telegram` lo rende com'e' arrivato.
+    if bottone:
+        bottone = (bottone[0], _link_dentro_telegram(bottone[1]))
     if MODALITA_COLLAUDO:
         print(f"📨 [notifica simulata per utente {tg_id}] {testo}"
               + (f" [bottone «{bottone[0]}» → {bottone[1]}]" if bottone else ""))
@@ -15219,6 +15324,10 @@ async def _manda_telegram(tg_id: int, testo: str, bottone: tuple = None):
     # misura di quella scheda la lascia com'e', e il messaggio parte lo
     # stesso. Solo i messaggi che portano QUEL link: gli altri avvisi
     # partono come sono sempre partiti.
+    # (10 ott 2026) A leva `TELEGRAM_MINIAPP_LINK` accesa quel link non
+    # c'e' piu' — l'avviso porta quello che apre la Mini App — e questo
+    # ramo non scatta: l'anteprima di un link t.me la disegna Telegram
+    # (la scheda del bot), e la misura li' non si chiede.
     elif f'href="{LINK_LIBRO_P2P}"' in testo:
         dati["link_preview_options"] = {"url": LINK_LIBRO_P2P,
                                         "prefer_small_media": True}
@@ -16224,8 +16333,13 @@ def _riga_webapp() -> list:
     `web_app` di Telegram apre la Mini App solo dentro l'app di
     Telegram e in chat private, mentre il link funziona ovunque —
     desktop, browser, client alternativi — e dentro Telegram il bot
-    e' comunque configurato col suo bottone di menu."""
-    return [{"text": "🫙 Apri Barattolo", "url": URL_PUBBLICO}]
+    e' comunque configurato col suo bottone di menu.
+    DAL 10 OTT 2026, a leva accesa (`TELEGRAM_MINIAPP_LINK`), il link e'
+    quello che apre la Mini App: resta un link normale — un t.me
+    funziona ovunque anche lui — ma chi lo tocca dentro Telegram entra
+    gia' riconosciuto invece di finire nel browser. A leva spenta e'
+    l'indirizzo del sito, com'e' sempre stato."""
+    return [{"text": "🫙 Apri Barattolo", "url": _link_casa_telegram()}]
 
 
 def tastiera_bot(righe: list = None) -> dict:
@@ -17224,6 +17338,70 @@ async def registra_webhook_telegram():
 
     global _TASK_WEBHOOK
     _TASK_WEBHOOK = asyncio.create_task(_registra())
+
+
+def _giudizio_link_miniapp(leva: str, io: dict) -> str:
+    """PURA: la leva `TELEGRAM_MINIAPP_LINK` regge davanti a quel che
+    Telegram dice del bot (`getMe`)? Torna '' se si', altrimenti la
+    ragione per spegnerla. DUE controlli: il bot del link dev'essere
+    QUESTO bot (un nome battuto male manderebbe la gente dal bot di un
+    altro), e nella forma senza nome d'app il bot deve avere la Mini App
+    principale (`has_main_web_app`), o il link aprirebbe la sola chat.
+    La forma col nome d'app non si puo' chiedere a Telegram: li' vale la
+    parola di chi ha scritto la leva."""
+    m = _FORMA_MINIAPP_LINK.fullmatch(leva or "")
+    if not m:
+        return "la forma non e' https://t.me/<bot>[/<app>]"
+    bot = str((io or {}).get("username") or "")
+    if m.group(1).lower() != bot.lower():
+        return f"il bot del link e' @{m.group(1)}, questo e' @{bot or '?'}"
+    if not m.group(2) and (io or {}).get("has_main_web_app") is not True:
+        return ("il bot non ha la Mini App principale accesa in BotFather: "
+                "il link aprirebbe la chat e basta")
+    return ""
+
+
+_TASK_LINK_MINIAPP = None     # stesso motivo di _TASK_WEBHOOK qui sopra
+
+
+@app.on_event("startup")
+async def controlla_link_miniapp():
+    """LA LEVA DEI LINK DENTRO TELEGRAM SI CHIEDE A TELEGRAM (10 ott
+    2026). Accesa male non da' un errore: da' un bottone che porta alla
+    chat del bot invece che allo scambio, e nessuno lo verrebbe a dire.
+    Quindi all'avvio, in produzione, un `getMe`: se il giudizio dice di
+    no la leva si SPEGNE per questo processo (i link tornano quelli del
+    sito) e il journal dice perche'. Se Telegram non risponde la leva
+    resta com'e' scritta — l'ha scritta una persona, e un getMe caduto
+    non e' un no. In collaudo non si chiama nessuno."""
+    if not TELEGRAM_MINIAPP_LINK:
+        return
+    if MODALITA_COLLAUDO:
+        print("🔗 Link dentro Telegram: leva accesa, in collaudo non si "
+              "chiede niente a Telegram", flush=True)
+        return
+
+    async def _chiedi():
+        global TELEGRAM_MINIAPP_LINK
+        try:
+            async with httpx.AsyncClient(timeout=20) as c:
+                r = await c.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe")
+            no = _giudizio_link_miniapp(TELEGRAM_MINIAPP_LINK,
+                                        (r.json() or {}).get("result") or {})
+        except Exception as e:
+            print(f"⚠️ Link dentro Telegram: getMe non ha risposto ({e}): "
+                  "la leva resta com'e' scritta", flush=True)
+            return
+        if no:
+            print(f"⚠️ Link dentro Telegram SPENTI: {no}. I link restano "
+                  "quelli del sito.", flush=True)
+            TELEGRAM_MINIAPP_LINK = ""
+        else:
+            print(f"🔗 Link dentro Telegram: accesi su {TELEGRAM_MINIAPP_LINK}",
+                  flush=True)
+
+    global _TASK_LINK_MINIAPP
+    _TASK_LINK_MINIAPP = asyncio.create_task(_chiedi())
 
 
 _TASK_HANDLER_NOSTRO = None   # stesso motivo di _TASK_WEBHOOK qui sopra
@@ -22047,6 +22225,11 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # condizionato, e chi sta sul clearnet semplicemente non lo
         # guarda. Gratis, che questa risposta il client la chiede gia'.
         risposta["dominio_pubblico"] = URL_PUBBLICO
+        # IL LINK CHE APRE LA MINI APP (10 ott 2026): la leva
+        # `TELEGRAM_MINIAPP_LINK`, che il client usa SOLO quando
+        # condivide verso una chat di Telegram. Viaggia sempre, anche
+        # vuota: vuota = i link restano quelli del sito.
+        risposta["tg_miniapp"] = TELEGRAM_MINIAPP_LINK
         # LA STANZA DEL LOGIN COL QR (ago 2026): senza questa riga il
         # bottone «Col telefono» non nasce affatto, ed e' voluto — un
         # QR che punta a un relay inventato dal client sarebbe un
@@ -27968,6 +28151,21 @@ def _leve_stato():
             # LE CARD P2P IN VETRINA (26 set 2026): la leva del lancio.
             # Dice la costante e non chi le vede: a leva spenta le
             # vedono comunque moderatori e fase di prova, ed e' scritto.
+            # I LINK DENTRO TELEGRAM (10 ott 2026): il valore VIVO — se
+            # all'avvio Telegram ha detto di no, qui e' vuoto anche col
+            # config pieno, e il journal dice perche'.
+            _leva("Link dentro Telegram → Mini App", "TELEGRAM_MINIAPP_LINK",
+                  TELEGRAM_MINIAPP_LINK,
+                  acceso="il bottone e il link del libro degli avvisi "
+                         "P2P, il link del post P2P nel canale, la riga "
+                         "«🫙 Apri Barattolo» delle tastiere e i link P2P "
+                         "condivisi dalla Mini App verso una chat aprono "
+                         "la Mini App, già entrati; fuori da Telegram, e "
+                         "per gli annunci, restano barattolo.store",
+                  spento="i link restano barattolo.store: dentro Telegram "
+                         "si aprono nel suo browser. Per accenderla: "
+                         "https://t.me/<bot> (con la Mini App principale "
+                         "accesa in BotFather) o https://t.me/<bot>/<app>"),
             _leva("Card P2P in vetrina", "P2P_IN_VETRINA", P2P_IN_VETRINA,
                   acceso="gli ordini vivi del libro compaiono fra gli "
                          "annunci per tutti — ma solo con la fase di "
@@ -47553,7 +47751,9 @@ def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
     if zona:
         testo += f"\n📍 {html.escape(zona)}"
     testo += "\n🔒 Sats bloccati in un deposito di garanzia fino allo scambio"
-    testo += f"\n\n<a href=\"{URL_PUBBLICO}\">🫙 Apri lo Scambio P2P su Barattolo</a>"
+    # il post vive nel canale Telegram e basta: a leva accesa il link apre
+    # la Mini App (`_link_casa_telegram`), a leva spenta e' quello di ieri
+    testo += f"\n\n<a href=\"{_link_casa_telegram()}\">🫙 Apri lo Scambio P2P su Barattolo</a>"
     testo += f"\n\n{_firma_venditore(venditore)}"
     testo += "\n\n#p2p #barattolo"
     return testo
@@ -50047,7 +50247,14 @@ def _testo_avviso_nuovi_p2p(righe: list) -> str:
         via = f" via {html.escape(str(m['metodi']))}" if m.get("metodi") else ""
         testo += (f"\n{'Il più conveniente per te' if n > 1 else 'Per te'}: "
                   f"{cosa}{cifra}{via}, {_frase_convenienza_p2p(m['conv'])}")
-    testo += f"\n\n<a href=\"{URL_PUBBLICO}/p2p\">🫙 Apri il libro ordini</a>"
+    # IL LINK DEL LIBRO, DENTRO TELEGRAM (10 ott 2026): a leva accesa apre
+    # la Mini App sul libro (`startapp=p2p`), a leva spenta e' quello di
+    # ieri, byte per byte. Si traduce QUI e non nel trasporto perche' un
+    # link di testo esiste solo su Telegram: l'altro canale degli avvisi
+    # passa da `spoglia_html`, che dei tag non lascia niente — nemmeno
+    # l'indirizzo.
+    testo += (f"\n\n<a href=\"{_link_dentro_telegram(URL_PUBBLICO + '/p2p')}\">"
+              "🫙 Apri il libro ordini</a>")
     return testo
 
 

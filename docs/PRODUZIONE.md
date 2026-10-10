@@ -3267,3 +3267,41 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `mostro:v0.18.8-bar5` E `settings.toml` dalla copia `prima-bar6`, poi
   `up -d`; prima la query sulle dispute `cooperatively-canceled`; sul VPS
   `P2P_CAUZIONE = False` e riavvio.
+- I LINK DENTRO TELEGRAM (10 ott 2026; perché in CANTIERI, «I link
+  dentro Telegram aprono la Mini App»). La leva `TELEGRAM_MINIAPP_LINK`
+  NON compare da sola nel config del VPS e nel codice è spenta: finché
+  non c'è, il bottone «⚡ Apri lo scambio», il link «🫙 Apri il libro
+  ordini», quello del post P2P nel canale, la riga «🫙 Apri Barattolo»
+  delle tastiere e i link P2P condivisi restano barattolo.store, come
+  prima. PER ACCENDERLA, in quest'ordine:
+  1) BOTFATHER, e si guarda prima di scrivere: `/mybots` > @ilbarattolobot
+     > Bot Settings > Configure Mini App. Se la Mini App principale è
+     accesa (o la si accende lì: Enable Mini App, con l'indirizzo
+     `https://barattolo.store/?v=2`, lo stesso del bottone di menu), la
+     riga è `TELEGRAM_MINIAPP_LINK = "https://t.me/ilbarattolobot"`. Se
+     invece si preferisce una Mini App col nome breve (`/newapp`), la
+     riga porta anche il nome: `"https://t.me/ilbarattolobot/<nome>"`.
+  2) LA PROVA A MANO, prima del config: dal telefono, in una chat
+     qualunque, toccare `https://t.me/ilbarattolobot?startapp=p2p`. Deve
+     aprirsi la Mini App sul libro degli ordini. Se si apre la chat del
+     bot, la Mini App principale non è accesa: NON mettere la riga.
+  3) IL CONFIG: aggiungere la riga a `~/satmarket/config.py` (prima
+     `grep -n "TELEGRAM_MINIAPP_LINK" ~/satmarket/config.py`: non deve
+     esserci già) e riavviare il servizio.
+  4) IL JOURNAL, subito dopo il riavvio:
+     `journalctl -u barattolo -n 80 --no-pager | grep "Link dentro Telegram"`
+     — «🔗 Link dentro Telegram: accesi su …» vuol dire che Telegram ha
+     confermato (il bot è questo, la Mini App principale c'è); «⚠️ Link
+     dentro Telegram SPENTI: …» dice perché no, e i link restano quelli
+     del sito finché non si corregge e si riavvia. Il valore VIVO sta
+     nel pannello «⚙️ Stato delle leve».
+  5) IL TELEFONO: far arrivare un promemoria («⚡ Apri lo scambio») e
+     toccarlo; dalla Mini App, «Condividi» un ordine in una chat e
+     toccare il link; mandare `/start` al bot e toccare «🫙 Apri
+     Barattolo»; al primo avviso dei nuovi ordini toccare «🫙 Apri il
+     libro ordini», e al primo post P2P nel canale il suo link. Devono
+     aprire la Mini App, già entrati, sul posto giusto. Si guarda anche
+     l'ANTEPRIMA sotto l'avviso dei nuovi ordini: con la leva accesa
+     non è più la miniatura del P2P ma quella che Telegram disegna per
+     un link t.me.
+  PER SPEGNERLA: togliere la riga (o metterla a `""`) e riavviare.

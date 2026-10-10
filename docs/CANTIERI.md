@@ -46323,3 +46323,207 @@ garanzia se gli euro non sono segnati, e «(sollecito)» a un'ora dal
 sollecito apra quello scambio. Notato e non fatto: quando a garanzia
 bloccata manca il RECAPITO di chi vende, a lui non arriva nessun
 promemoria prima delle 48 ore.
+
+
+## I link dentro Telegram aprono la Mini App (10 ott 2026, cantiere link-dentro-telegram, richiesta di Andrea)
+
+Subito dopo il «Condividi» di un ordine P2P. Un link a barattolo.store
+toccato DENTRO Telegram — il bottone «⚡ Apri lo scambio» del promemoria,
+un ordine condiviso in una chat — si apre nel browser di Telegram, dove
+chi è entrato solo dal bot è un anonimo: vede «Entra» invece del suo
+scambio (era fra le cose «da guardare» dei due cantieri di oggi). La
+richiesta: quei link devono aprire la Mini App, già entrati, col link
+ufficiale di Telegram; quelli destinati fuori (Nostr, WhatsApp, il
+browser) restano barattolo.store.
+
+**IL NOME DEL BOT E DELL'APP.** Il bot è `ilbarattolobot` (`LINK_BOT`
+in server.py). Un nome d'APP nel codice e nel config non c'è: una Mini
+App col nome breve non è mai stata creata (ARCHITETTURA lo diceva già:
+«servirebbe la Mini App nominata su BotFather»), e la Mini App si apre
+dal bottone di menu del bot. Le forme ufficiali sono due, e quale valga
+lo sa solo BotFather: `https://t.me/<bot>?startapp=…` apre la Mini App
+PRINCIPALE del bot, che va accesa lì (Bot Settings > Configure Mini App
+> Enable Mini App); `https://t.me/<bot>/<app>?startapp=…` apre una Mini
+App creata lì col suo nome breve.
+
+**LA LEVA È L'INDIRIZZO, E NASCE SPENTA.** `TELEGRAM_MINIAPP_LINK`:
+vuota nel codice e nel config d'esempio, cioè tutto com'era ieri. Non
+l'ho accesa io e non ha un default perché sbagliarla non dà un errore:
+la documentazione di Telegram dice che un link `?startapp=` verso un
+bot SENZA Mini App principale «ricade sul link del nome utente», cioè
+apre la chat del bot e la destinazione si perde — peggio del link di
+oggi. Si accende sul VPS dopo aver guardato BotFather (PRODUZIONE, «I
+LINK DENTRO TELEGRAM»). TRE CINTURE: la forma (una riga storta la
+spegne e lo dice all'avvio); all'avvio, in produzione, un `getMe` — se
+il bot del link non è questo bot, o nella forma senza nome d'app il bot
+non ha `has_main_web_app`, la leva si SPEGNE per quel processo e il
+journal dice perché (se Telegram non risponde resta com'è scritta: un
+getMe caduto non è un no); e il pannello «⚙️ Stato delle leve» mostra il
+valore VIVO.
+
+**I LIMITI DI `startapp`, E COME SI STA DENTRO.** Per `startapp` la
+documentazione ufficiale NON scrive né lunghezza né caratteri
+(verificato il 10 ott 2026 su core.telegram.org: bots/webapps,
+api/links, bots/features, i due metodi MTProto; i «512 caratteri» che
+girano non ci sono). Li scrive per il fratello `start`: «A-Z, a-z, 0-9,
+_ e -», 64 caratteri al massimo. Si sta dentro QUELLI, i più stretti:
+`p2p`, `scambio_<id>`, `ordine_<id>`. Un id d'ordine è un UUID — 36
+caratteri, cifre lettere e trattini — e col nome davanti fa 43 o 44.
+Niente base64 e niente codifiche: l'id entra com'è, perché il suo
+alfabeto è già dentro quello ammesso, e il separatore è `_` perché il
+trattino sta negli id. Un parametro fuori forma o oltre i 64 NON si
+tronca: il link resta quello del sito (la forma degli id ne ammette
+fino a 64, che col nome davanti sforerebbero: non esistono, ma il
+caso è scritto e provato).
+
+**COSA SI TRADUCE, E COSA NO.** Vocabolario CHIUSO, i soli indirizzi
+del P2P: il libro (`/p2p`), lo scambio (`?scambio=`), l'ordine
+(`?ordine=`). VERSO TELEGRAM, in due posti soli: `_manda_telegram`
+(il bottone degli avvisi del bot — oggi uno, «⚡ Apri lo scambio» — che
+resta un bottone `url`, mai `web_app`: la regola di `_riga_webapp`) e
+il ramo Telegram del tubo `condividiLink` (i link che la Mini App manda
+al selettore delle chat). NON si traducono: il DM Nostr (la riga in
+coda tiene l'indirizzo del sito), la nota «Pubblica su Nostr», il
+foglio di condivisione del telefono, gli appunti.
+GLI ANNUNCI NO, ed è una scelta da non «completare» senza pensarci: il
+loro link web porta in chat l'anteprima con la FOTO dell'oggetto, e un
+link t.me mostrerebbe la scheda del bot. Per un ordine P2P si perde
+solo il titolo dell'anteprima, che il testo del messaggio dice già.
+
+**COME ARRIVA LA PAGINA.** Telegram apre la Mini App col parametro in
+`tgWebAppStartParam` (nell'indirizzo) e in `start_param` (nell'initData).
+`arrivoDaStartapp`, in cima allo script, lo ritraduce
+(`percorsoDaStartapp`) e lo SCRIVE nella barra con `replaceState` prima
+che chiunque legga `location`: le porte di sempre (`apriP2PDaUrl` e
+sorelle, che leggono l'indirizzo in una `const` al caricamento) fanno
+il loro mestiere senza sapere da dove si è arrivati, e una ricarica
+riparte dallo stesso posto. Solo dalla porta di casa (`/`,
+`/miniapp.html`), con lo stato della storia e il frammento di Telegram
+intatti. Quel che non è nel vocabolario — un parametro d'altri, una
+forma storta — non sposta niente.
+
+**STRADE SCARTATE.** Il bottone `web_app`: apre la Mini App senza
+passare da BotFather, ma solo in chat privata e solo dentro l'app, e
+rovescia una regola scritta (`_riga_webapp`: «il link funziona
+ovunque»); un link t.me in un bottone `url` funziona ovunque lo stesso.
+Un parametro generico (l'indirizzo in base64url, per tradurre OGNI
+link): un vocabolario aperto da richiudere con una whitelist, e
+avrebbe portato dentro anche gli annunci. Accendere la leva nel codice:
+vedi sopra.
+
+**SENTINELLE E BANCHI RITOCCATI.** Il censimento di chi parla con
+api.telegram.org passa da quattro a cinque (`_chiedi`, il getMe: in
+collaudo si ferma prima anche lui); il banco del tubo e quello del
+trasporto del promemoria montano i pezzi veri della traduzione, a leva
+spenta.
+
+**PROVATO.** `prove_link_dentro_telegram` (55): la leva (le due forme,
+le storte, il default spento), il vocabolario su diciannove indirizzi
+coi bordi dei 64, il bottone eseguito nel `_manda_telegram` vero (leva
+accesa, spenta, collaudo), il DM Nostr che non passa dalla traduzione,
+il giudizio su getMe; in node i TRE GEMELLI (chi scrive nel server, chi
+scrive nel client, chi rilegge nella pagina) sugli stessi casi e il
+giro intero scrivi-rileggi, l'arrivo in undici scenari, il tubo dentro
+e fuori Telegram. TORTURA: 31 mutazioni su una copia, 31 rosse.
+`collaudo_promemoria_gesto` ha una sezione in più (31 su 31, anche
+nella gabbia): col server vero, a leva accesa il promemoria esce col
+bottone `https://t.me/ilbarattolobot?startapp=scambio_<id>` mentre a
+`notifica` — cioè al DM Nostr — arriva ancora l'indirizzo del sito;
+rispenta, torna quello di ieri.
+DAL VIVO (Chrome a 390×844 con Playwright, tocchi veri, copia in
+collaudo con la leva accesa, coordinatore di cartone su un relay nak
+solo loopback; Telegram è FINTO, dall'hash di collaudo: nessun relay
+vero e nessuna chiamata a Telegram): la pagina aperta con
+`?tgWebAppStartParam=ordine_<id>` mostra il dettaglio di quell'ordine,
+già entrati, con «Annulla» e «Compra», e nella barra c'è
+`/p2p?ordine=<id>`; con `scambio_<id>`, sul telefono dove lo scambio
+c'è, la pagina di quello scambio; con `p2p` il libro; con un parametro
+non nostro o senza parametro la home, senza errori; con un ordine che
+non c'è più la riga gentile; il tocco su «Condividi» dentro Telegram
+consegna al selettore `https://t.me/ilbarattolobot?startapp=ordine_<id>`
+e il testo, fuori da Telegram il foglio del telefono riceve il link del
+sito. Tre scatti in `.claude/giri/link-dentro-telegram/` (gitignored).
+
+**NON PROVATO, DA GUARDARE — e serve Andrea.** • TUTTO QUEL CHE È
+TELEGRAM VERO: che il bot abbia la Mini App principale accesa (o quale
+nome breve), che il link apra davvero la Mini App su Android, iPhone e
+desktop, e cosa mostra Telegram prima di aprirla (la documentazione
+dice che da un bottone o da un link di testo il client DEVE chiedere
+conferma). La leva si accende sul VPS solo dopo. • Sul telefono dove lo
+scambio NON c'è ancora, `scambio_<id>` porta a «I miei scambi» (è il
+comportamento di `?scambio=` di stamattina, non cambia). • Con la Mini
+App già aperta, il tocco su un altro link: Telegram la riapre col
+parametro nuovo? Non è scritto, si guarda. • L'anteprima di un link
+t.me in chat è la scheda del bot, non quella dell'ordine.
+• I link di testo degli avvisi («🫙 Apri il libro ordini», «🫙 Apri lo
+Scambio P2P su Barattolo») e la riga «🫙 Apri Barattolo» delle
+tastiere, che al primo giro erano rimasti sul sito: FATTI lo stesso
+giorno, vedi «IL SECONDO SÌ» qui sotto. I link degli annunci restano
+sul sito per scelta.
+
+**IL SECONDO SÌ: I LINK DI TESTO E LA RIGA DELLE TASTIERE (stesso
+giorno, prima del push).** Andrea ha detto sì alla prima delle cose
+notate: sotto la STESSA leva aprono la Mini App anche «🫙 Apri il libro
+ordini» (l'avviso dei nuovi ordini), «🫙 Apri lo Scambio P2P su
+Barattolo» e la riga «🫙 Apri Barattolo» in cima alle tastiere del bot.
+Gli annunci del mercatino restano come sono, per l'anteprima con la
+foto.
+- TRADOTTI ALLA FONTE, non nel trasporto: un link di testo esiste solo
+  su Telegram (l'altro canale degli avvisi passa da `spoglia_html`, che
+  dei tag non lascia niente), quindi chi scrive il link chiede la
+  traduzione — `_testo_avviso_nuovi_p2p` a `_link_dentro_telegram`
+  (`startapp=p2p`), e gli altri due a `_link_casa_telegram`. Riscrivere
+  gli href dentro `_manda_telegram` avrebbe toccato ogni avviso del bot
+  e ogni banco che lo esegue, per tre link.
+- «🫙 Apri lo Scambio P2P su Barattolo» NON è un avviso del bot: sta
+  nella caption del post P2P del CANALE (`_caption_canale_p2p`, mandata
+  da `_manda_post_canale`). Chi lo tocca è comunque dentro Telegram.
+  Porta alla home, com'è sempre stato: la destinazione non l'ho
+  cambiata (il libro sarebbe più giusto, ed è una riga: si decide).
+- `casa`, LA QUARTA PAROLA: i due link che oggi portano alla home del
+  sito diventano `?startapp=casa`, e la pagina la rilegge come `/`
+  (ripulendo l'indirizzo dal parametro). NON sta nel vocabolario di chi
+  traduce gli indirizzi che ARRIVANO (`_startapp_da_link`, e il gemello
+  del client): lì la home del sito resta la home del sito, o si
+  sarebbero tradotti anche «🫙 Sfoglia il mercatino» e «🫙 Apri Esplora»
+  degli avvisi del mercatino, che nessuno ha chiesto. La chiede per
+  nome chi la vuole, e una prova conta che siano due.
+- L'ANTEPRIMA DELL'AVVISO DEI NUOVI ORDINI: la miniatura del P2P (9 ott)
+  si chiede a Telegram solo quando l'avviso porta il link del sito; a
+  leva accesa il link è un t.me e l'anteprima la disegna Telegram (la
+  scheda del bot). È il prezzo di aprire la Mini App, e si guarda sul
+  telefono.
+PROVATO: `prove_link_dentro_telegram` sale a 69 (la porta di casa nelle
+due forme, la riga delle tastiere, l'avviso e la caption ESEGUITI a
+leva accesa e spenta — e uguali a ieri in tutto tranne quel link —, la
+home che arriva che non si traduce, gli annunci fuori, `casa` riletta);
+tortura dell'allargamento 11 su 11; `collaudo_promemoria_gesto` 35 su
+35 anche nella gabbia, col modulo vero: tastiera, avviso e post a leva
+accesa e poi spenta. I cinque banchi che eseguono le funzioni ritoccate
+montano i pezzi veri con `gemelli_link_telegram`, a leva spenta. Dal
+vivo (Telegram finto, relay morto): `?tgWebAppStartParam=casa` apre la
+home già entrati e la barra torna `/`; `Casa` con la maiuscola non
+sposta niente. Suite 21.328 verdi e 0 rosse.
+RESTANO sul sito, non chiesti: «🫙 Sfoglia il mercatino» e «🫙 Apri
+Esplora» degli avvisi del mercatino, e tutti i link degli annunci.
+
+**IL VERBALE DEL PUSH (10 ott 2026, sera): i link dentro Telegram.**
+Main è corso quattro volte a cantiere aperto, ventuno commit non miei
+(apri nel wallet, «I tuoi dati», il cookie sul tunnel Tor, il login col
+bunker, la reputazione e i suoi testi, la rete nel client, la pagina di
+prova dei link al wallet, i solleciti). COSA È GIRATO SU QUALE ALBERO.
+Sull'albero di partenza (`af616d8`) il primo giro: suite 21.269 verdi,
+tortura 31 su 31, il giro dal vivo. Ribasato su `f45b860`: suite
+21.314, collaudi 51 su 51, scanner pulito. Lì sopra il secondo sì: suite
+21.328, tortura 11 su 11, il collaudo del promemoria 35 su 35, il giro
+di `casa`. I due commit del cantiere sono diventati UNO prima del
+rebase (stesso albero, controllato). Ribasato su `89ea7bc`: suite
+21.460, collaudi 52 su 52, scanner pulito. Ribasato su `d2c77ef`: suite
+severa 21.478 verdi e 0 rosse, collaudi 52 su 52, i due passi dello
+scanner dei segreti puliti. Ribasato su `2d8cf0d`: suite severa 21.561
+verdi e 0 rosse, scanner pulito, e dei collaudi i tre che toccano gli
+avvisi del bot (promemoria, avvisi in ordine, campagna); gli altri
+quarantanove NON rifatti su quest'ultima punta. A ogni rebase il solo
+conflitto è stata la coda di CANTIERI, sciolta tenendo tutte le voci.
+Prima del push ho aspettato la CI della punta di main (`2d8cf0d`):
+verde. Tortura e giri dal vivo non rifatti dopo i rebase.

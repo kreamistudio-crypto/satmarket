@@ -43,6 +43,31 @@ FONDATORI = []               # es. [123456789, 987654321]
 # solo A-Za-z0-9_-) e incollala SOLO nel config.py del server.
 # Finche' resta il segnaposto, il bot resta solo-invio come prima.
 TELEGRAM_WEBHOOK_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
+# I LINK DENTRO TELEGRAM APRONO LA MINI APP (10 ott 2026): l'indirizzo
+# con cui Telegram apre la Mini App, a cui il server attacca
+# `?startapp=<parametro>` — nel bottone degli avvisi P2P («⚡ Apri lo
+# scambio»), nel link «🫙 Apri il libro ordini» dell'avviso dei nuovi
+# ordini, in «🫙 Apri lo Scambio P2P su Barattolo» del post P2P nel
+# canale, nella riga «🫙 Apri Barattolo» delle tastiere del bot e nei
+# link P2P che la Mini App condivide verso una chat. Chi li tocca dentro
+# Telegram atterra nella Mini App, gia' entrato, sullo scambio,
+# sull'ordine, sul libro o sulla home; fuori da Telegram (Nostr,
+# WhatsApp, il browser) i link restano barattolo.store, e i link degli
+# ANNUNCI restano sempre quelli del sito (portano la foto in anteprima).
+# DUE FORME, e quale vale lo dice BotFather:
+#   "https://t.me/ilbarattolobot"        la Mini App PRINCIPALE del bot:
+#       va accesa in BotFather (/mybots > il bot > Bot Settings >
+#       Configure Mini App > Enable Mini App), con l'indirizzo del sito;
+#   "https://t.me/ilbarattolobot/<app>"  una Mini App col suo nome breve,
+#       creata in BotFather (/newapp).
+# ⚠️ VUOTA NEL CODICE, e si accende SOLO dopo aver guardato BotFather:
+# un link `?startapp=` verso un bot senza la Mini App principale apre la
+# chat del bot e basta, e la destinazione si perde. All'avvio il server
+# lo chiede a Telegram (getMe): se il bot del link non e' questo bot, o
+# la Mini App principale non c'e', la leva si spegne da sola e il
+# journal dice perche' («⚠️ Link dentro Telegram SPENTI»). Una forma
+# storta la spegne. Il valore vivo sta nel pannello «⚙️ Stato delle leve».
+TELEGRAM_MINIAPP_LINK = ""
 
 # --- Anthropic (ricerca AI in linguaggio naturale) -------------------
 ANTHROPIC_API_KEY = "INCOLLA_QUI_LA_API_KEY"

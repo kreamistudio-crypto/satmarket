@@ -318,6 +318,51 @@ async def giro():
           [(V, "⏳ Restano circa 23 minuti per bloccare la garanzia, altrimenti lo "
                "scambio si annulla.",
             ("⚡ Apri lo scambio", f"{link}?scambio={i}"))], detti)
+
+    print("\n8) a leva accesa il bottone, dentro Telegram, apre la Mini App")
+    # I LINK DENTRO TELEGRAM (10 ott 2026): la leva `TELEGRAM_MINIAPP_LINK`
+    # cambia SOLO quel che il ramo Telegram mette nel bottone. Chi chiama
+    # `notifica` passa ancora l'indirizzo del sito — ed e' quello che va
+    # nella riga in coda al DM Nostr, che Telegram non lo apre.
+    SRV.TELEGRAM_MINIAPP_LINK = "https://t.me/ilbarattolobot"
+    annuncia(900)
+    m = ordine(10)
+    await vendita_presa(m)
+    del STAMPE[:]
+    detti, _ = await battito(m, 7 * 60 + 30)
+    prova("a `notifica` arriva ancora l'indirizzo del sito (e' quello del DM Nostr)",
+          [("⚡ Apri lo scambio", f"{link}?scambio={m}")], [d[2] for d in detti])
+    prova("...e il ramo Telegram vero mette nel bottone il link della Mini App", True,
+          f"[bottone «⚡ Apri lo scambio» → https://t.me/ilbarattolobot?startapp=scambio_{m}]"
+          in "".join(STAMPE))
+    # ...e, sotto la stessa leva, i link di testo e la riga delle tastiere
+    # (il secondo sì di Andrea): dal modulo VERO, coi suoi pezzi veri
+    prova("la riga «🫙 Apri Barattolo» delle tastiere apre la Mini App",
+          {"text": "🫙 Apri Barattolo", "url": "https://t.me/ilbarattolobot?startapp=casa"},
+          SRV.tastiera_bot()["inline_keyboard"][0][0])
+    nuovi = SRV._testo_avviso_nuovi_p2p(
+        [{"tipo": "vendita", "conv": 3.0, "euro": "50,00 €", "metodi": "SEPA"}])
+    prova("l'avviso dei nuovi ordini porta «🫙 Apri il libro ordini» verso la Mini App",
+          True, '<a href="https://t.me/ilbarattolobot?startapp=p2p">🫙 Apri il libro ordini</a>'
+          in nuovi)
+    post = SRV._caption_canale_p2p("vendo", 100, "Revolut", {"venditore": "Rosina"})
+    prova("il post P2P nel canale porta «🫙 Apri lo Scambio P2P su Barattolo» verso la Mini App",
+          True, '<a href="https://t.me/ilbarattolobot?startapp=casa">'
+                '🫙 Apri lo Scambio P2P su Barattolo</a>' in post)
+    SRV.TELEGRAM_MINIAPP_LINK = ""
+    prova("...e spenta la leva tornano tutti e tre al sito",
+          [SRV.URL_PUBBLICO, True, True],
+          [SRV.tastiera_bot()["inline_keyboard"][0][0]["url"],
+           f'<a href="{link}">🫙 Apri il libro ordini</a>' in SRV._testo_avviso_nuovi_p2p(
+               [{"tipo": "vendita", "conv": 3.0, "euro": "50,00 €", "metodi": "SEPA"}]),
+           f'<a href="{SRV.URL_PUBBLICO}">🫙 Apri lo Scambio P2P su Barattolo</a>'
+           in SRV._caption_canale_p2p("vendo", 100, "Revolut", {"venditore": "Rosina"})])
+    n = ordine(11)
+    await vendita_presa(n)
+    del STAMPE[:]
+    await battito(n, 7 * 60 + 30)
+    prova("...spenta di nuovo, il bottone torna quello del sito", True,
+          f"[bottone «⚡ Apri lo scambio» → {link}?scambio={n}]" in "".join(STAMPE))
     SRV.time = time
 
 

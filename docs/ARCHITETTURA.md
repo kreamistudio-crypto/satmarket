@@ -30370,3 +30370,41 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   chiave d'accesso col firmatario di casa, mandata ai relay di
   `nip85_relays`; in collaudo si firma e non si bussa. Nessuna rotta
   del server la tocca. LE PROVE: `prove_condividi_ordine_p2p`.
+
+- I LINK DENTRO TELEGRAM APRONO LA MINI APP (10 ott 2026, perché in
+  CANTIERI, «I link dentro Telegram aprono la Mini App»). LA LEVA è
+  `TELEGRAM_MINIAPP_LINK`, l'indirizzo con cui Telegram apre la Mini
+  App (`https://t.me/<bot>`, la principale, o `https://t.me/<bot>/<app>`):
+  vuota nel codice = ogni link resta barattolo.store. Forma storta =
+  spenta; all'avvio in produzione `controlla_link_miniapp` chiede a
+  Telegram (`getMe`) e `_giudizio_link_miniapp` la spegne se il bot non
+  è questo o non ha la Mini App principale. IL PARAMETRO è un
+  vocabolario chiuso, dentro i limiti che Telegram scrive per `start`
+  (A-Z a-z 0-9 _ -, 64): `p2p`, `scambio_<id>`, `ordine_<id>`. TRE
+  GEMELLI: `_startapp_da_link` (server) e `startappDaLink` (client) lo
+  scrivono, `percorsoDaStartapp` (client) lo rilegge. SI TRADUCE in due
+  posti soli, tutt'e due verso Telegram: `_manda_telegram` (il bottone
+  degli avvisi, via `_link_dentro_telegram`) e il ramo Telegram di
+  `condividiLink` (via `linkDentroTelegram`; la leva arriva al client
+  nella busta di prima pagina, `tg_miniapp`). Il DM Nostr, la nota su
+  Nostr, il foglio del telefono e gli appunti tengono l'indirizzo del
+  sito; gli annunci non si traducono (il link web porta la foto in
+  anteprima). L'ARRIVO: `arrivoDaStartapp`, in cima allo script, legge
+  `tgWebAppStartParam` (o `start_param` dell'initData) e riscrive
+  l'indirizzo con `replaceState` PRIMA delle porte che leggono
+  `location` — da lì `apriP2PDaUrl` fa il resto. LE PROVE:
+  `prove_link_dentro_telegram`, e la sezione 8 di
+  `collaudo_promemoria_gesto`. La procedura: PRODUZIONE, «I LINK DENTRO
+  TELEGRAM».
+  E SOTTO LA STESSA LEVA (stesso giorno, il secondo sì di Andrea) tre
+  link che vivono solo dentro Telegram, tradotti ALLA FONTE: «🫙 Apri il
+  libro ordini» dell'avviso dei nuovi ordini (`_testo_avviso_nuovi_p2p`,
+  via `_link_dentro_telegram`: `startapp=p2p`), «🫙 Apri lo Scambio P2P
+  su Barattolo» del post P2P nel canale (`_caption_canale_p2p`) e la
+  riga «🫙 Apri Barattolo» delle tastiere (`_riga_webapp`), questi due
+  via `_link_casa_telegram`: `startapp=casa`, la quarta parola, che la
+  pagina rilegge come `/`. `casa` NON sta in `_startapp_da_link`: la
+  home del sito che ARRIVA (gli avvisi del mercatino, un link condiviso)
+  resta la home del sito, e gli annunci non si traducono mai. I banchi
+  che eseguono chi chiama la traduzione montano i pezzi veri con
+  `gemelli_link_telegram`.

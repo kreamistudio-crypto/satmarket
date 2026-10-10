@@ -112,6 +112,25 @@ def gemelli_trackbot(amb=None):
     return amb
 
 
+def gemelli_link_telegram(amb, leva=""):
+    """I pezzi VERI dei link dentro Telegram (10 ott 2026) — la forma
+    della leva, `_startapp_da_link`, `_link_dentro_telegram`,
+    `_link_casa_telegram` — montati in `amb` per i banchi che eseguono
+    chi li chiama: il bottone di `_manda_telegram`, la riga delle
+    tastiere, l'avviso dei nuovi ordini, il post P2P nel canale. Con
+    `leva` vuota (il default del codice) ogni link esce com'era ieri:
+    e' cosi' che i banchi di prima continuano a guardare i link di
+    prima. Vuole `URL_PUBBLICO` in `amb`. Pezzi veri, mai stub (vedi
+    `reale`)."""
+    amb.setdefault("re", re)
+    amb["TELEGRAM_MINIAPP_LINK"] = leva
+    i = _SORGENTE.index("\n_FORMA_MINIAPP_LINK = re.compile(") + 1
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\ndef _startapp_da_link(", i)], amb)
+    for f in ("_startapp_da_link", "_link_dentro_telegram", "_link_casa_telegram"):
+        exec(pezzo(f), amb)
+    return amb
+
+
 def cataloghi_zone():
     """I cataloghi delle zone e i loro tre lettori, VERI.
 
@@ -31479,6 +31498,7 @@ def prove_canale_bot():
     # nel callback_data (64 byte scarsi, e il nome ci starebbe stretto).
     amb2["EMOJI_CATEGORIA"] = server_em
     amb2["URL_PUBBLICO"] = "https://barattolo.store"
+    gemelli_link_telegram(amb2)     # a leva spenta: il link di sempre
     exec(pezzo("_riga_webapp"), amb2)
     exec(pezzo("tastiera_categorie"), amb2)
     tast = amb2["tastiera_categorie"]()["inline_keyboard"]
@@ -51785,6 +51805,15 @@ def prove_condividi_col_link():
         "function copiaLink(l, f){ visto.push(['copia', l]); }\n"
         "let tg = null;\n"
         "const navigator = {userAgent: ''};\n"
+        # (10 ott 2026) nel ramo Telegram il tubo chiede a
+        # `linkDentroTelegram`: i pezzi VERI, a leva spenta — qui si
+        # guarda il link di sempre; la leva accesa ha la sua famiglia,
+        # `prove_link_dentro_telegram`
+        "let tgMiniappLink = '';\n"
+        "function baseCondivisione(){ return 'https://barattolo.store'; }\n"
+        + "".join(_fn_js(mini, f) for f in (
+            "function percorsoDaStartapp(", "function startappDaLink(",
+            "function linkDentroTelegram("))
         + tl + "\n}\n" + cl + "\n}\n"
         + "const L = " + _j.dumps(link) + ", T = " + _j.dumps(testo) + ";\n"
         "(async () => {\n"
@@ -52415,6 +52444,438 @@ function apriNostrSheet(scopo){ visto.push(['foglio-firma']); }
           [True, ["render"], False], R.get("tolta"))
     prova("«Entra»: chiude il dettaglio e apre l'invito di casa",
           [["chiudi", "p2pDettSheet"], ["invito", "INVITO-P2P", "p2p"]], R.get("entra"))
+
+
+def prove_link_dentro_telegram():
+    """I LINK DENTRO TELEGRAM APRONO LA MINI APP (10 ott 2026, richiesta
+    di Andrea dopo il «Condividi» di un ordine P2P).
+
+    Un link a barattolo.store toccato dentro Telegram si apre nel suo
+    browser, dove chi e' entrato solo dal bot e' un anonimo. A leva
+    accesa (`TELEGRAM_MINIAPP_LINK`) il bottone degli avvisi del bot e i
+    link P2P condivisi dalla Mini App verso una chat diventano
+    `https://t.me/<bot>?startapp=<parametro>`, e la pagina ritraduce il
+    parametro nell'indirizzo di sempre. La famiglia difende:
+    • LA LEVA: spenta nel codice, e spenta = tutto com'era ieri; una
+      forma storta la spegne; all'avvio il giudizio su `getMe`;
+    • IL PARAMETRO: vocabolario chiuso, dentro i limiti scritti da
+      Telegram per `start` (A-Z a-z 0-9 _ -, 64 caratteri); fuori misura
+      non si tronca, resta il link del sito;
+    • I TRE GEMELLI: chi lo scrive nel server, chi lo scrive nel client
+      e chi lo rilegge nella pagina dicono la stessa cosa;
+    • SOLO VERSO TELEGRAM: il DM Nostr, la nota su Nostr, il foglio del
+      telefono e gli appunti tengono barattolo.store."""
+    print("\n[i link dentro Telegram aprono la Mini App]")
+    import asyncio as _aio
+    import contextlib as _cl
+    import io as _io
+    import json as _j
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    ID = "0f3a9c1e-7b2d-4e5f-8a6b-1c2d3e4f5a6b"
+    BASE = "https://barattolo.store"
+    BOT = "https://t.me/ilbarattolobot"
+
+    # ---------------- 1) LA LEVA: la forma, e il codice la tiene spenta ---
+    i = src.index("\n_FORMA_MINIAPP_LINK = re.compile(") + 1
+    blocco_leva = src[i:src.index("\n\n\ndef _startapp_da_link(", i)]
+
+    def leva(valore):
+        amb = {"re": re, "TELEGRAM_MINIAPP_LINK": valore}
+        fuori = _io.StringIO()
+        with _cl.redirect_stdout(fuori):
+            exec(blocco_leva, amb)
+        return amb["TELEGRAM_MINIAPP_LINK"], bool(fuori.getvalue())
+    prova("la leva: le due forme di Telegram passano, e non dicono niente",
+          [(BOT, False), (BOT + "/barattolo", False)],
+          [leva(BOT), leva(BOT + "/barattolo")])
+    prova("...vuota resta vuota, in silenzio", ("", False), leva(""))
+    storte = ["http://t.me/ilbarattolobot", BOT + "/", BOT + "?startapp=x",
+              "https://t.me/ab", "https://barattolo.store", BOT + "/app/altro",
+              "https://t.me.evil.example/ilbarattolobot", True, 7, ["x"]]
+    prova("...e una forma storta la SPEGNE e lo dice",
+          [("", True)] * len(storte), [leva(s) for s in storte])
+    prova("nel codice nasce spenta: senza la riga nel config non c'e' nessun link t.me",
+          True, 'except ImportError:\n    TELEGRAM_MINIAPP_LINK = ""' in src)
+    es = open("config_esempio.py", encoding="utf-8").read()
+    prova("...e il config d'esempio la porta vuota, col perche'", [True, True],
+          ['\nTELEGRAM_MINIAPP_LINK = ""\n' in es, "Enable Mini App" in es])
+
+    # ---------------- 2) IL PARAMETRO, nel server -------------------------
+    def server(leva_viva):
+        amb = {"re": re, "TELEGRAM_MINIAPP_LINK": leva_viva, "URL_PUBBLICO": BASE}
+        exec(blocco_leva, amb)
+        exec(pezzo("_startapp_da_link"), amb)
+        exec(pezzo("_link_dentro_telegram"), amb)
+        return amb
+    S = server(BOT)
+    sp, ld = S["_startapp_da_link"], S["_link_dentro_telegram"]
+    LUNGO = "a" * 64            # un id nella forma, ma col nome davanti sfora i 64
+    LINK = [BASE + "/p2p", BASE + "/p2p?scambio=" + ID, BASE + "/p2p?ordine=" + ID,
+            BASE + "/p2p?ordine=" + "b" * 57,                 # 7 + 57 = 64: l'ultimo che entra
+            BASE + "/p2p?ordine=" + "b" * 58,                 # 65: fuori
+            BASE + "/p2p?scambio=" + LUNGO,
+            BASE + "/p2p?ordine=corto", BASE + "/p2p?ordine=" + ID + "&x=1",
+            BASE + "/p2p?ordine=" + ID[:-1] + "_", BASE + "/p2p?ordine=" + ID + "%2F",
+            BASE + "/p2p?altro=" + ID, BASE + "/p2p/", BASE + "/annuncio/7-poster",
+            BASE + "/negozio/ABC", BASE, "https://altrove.example/p2p?ordine=" + ID,
+            "http://barattolo.store/p2p?ordine=" + ID, "", None]
+    ATTESI = ["p2p", "scambio_" + ID, "ordine_" + ID, "ordine_" + "b" * 57] + [""] * 15
+    prova("il vocabolario chiuso: il libro, lo scambio, l'ordine — e nient'altro",
+          ATTESI, [sp(u) for u in LINK])
+    prova("ogni parametro sta nei limiti scritti da Telegram (A-Z a-z 0-9 _ -, 64)",
+          [], [p for p in ATTESI if p and not (re.fullmatch(r"[A-Za-z0-9_-]{1,64}", p))])
+    prova("a leva accesa il bottone porta alla Mini App",
+          [BOT + "?startapp=p2p", BOT + "?startapp=scambio_" + ID,
+           BOT + "?startapp=ordine_" + ID],
+          [ld(u) for u in LINK[:3]])
+    prova("...quel che non si traduce resta com'e' arrivato: mai troncato, mai codificato",
+          LINK[4:17] + ["", ""], [ld(u) for u in LINK[4:]])
+    S_app = server(BOT + "/barattolo")
+    prova("...e con la Mini App col nome breve il parametro si attacca a quella",
+          BOT + "/barattolo?startapp=scambio_" + ID,
+          S_app["_link_dentro_telegram"](LINK[1]))
+    S0 = server("")
+    prova("A LEVA SPENTA ogni link resta quello di ieri", LINK[:3],
+          [S0["_link_dentro_telegram"](u) for u in LINK[:3]])
+
+    # ---------------- 3) IL BOTTONE: Telegram si', Nostr no ----------------
+    def manda(leva_viva, collaudo):
+        mandati, righe = [], []
+
+        class Cliente:
+            def __init__(self, timeout=None):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def post(self, url, json=None):
+                mandati.append(json)
+                return type("R", (), {"status_code": 200,
+                                      "text": '{"result": {"message_id": 1}}'})()
+        amb = server(leva_viva)
+        amb.update({"httpx": type("H", (), {"AsyncClient": Cliente}), "json": json,
+                    "BOT_TOKEN": "finto", "MODALITA_COLLAUDO": collaudo,
+                    "TRACKBOT_START": gemelli_trackbot()["TRACKBOT_START"],
+                    "LINK_LIBRO_P2P": BASE + "/p2p",
+                    "spoglia_html": lambda t: t,
+                    "print": lambda *a, **k: righe.append(" ".join(str(x) for x in a))})
+        exec("async " + pezzo("_manda_telegram"), amb)
+        esito = _aio.run(amb["_manda_telegram"](
+            111, "⏳ <b>Restano 8 minuti</b>",
+            ("⚡ Apri lo scambio", BASE + "/p2p?scambio=" + ID)))
+        _aio.run(amb["_manda_telegram"](111, "senza bottone"))
+        return mandati, righe, esito
+    mandati, _r, _e = manda(BOT, False)
+    prova("il bottone del promemoria, a leva accesa, apre la Mini App sullo scambio",
+          {"inline_keyboard": [[{"text": "⚡ Apri lo scambio",
+                                 "url": BOT + "?startapp=scambio_" + ID}]]},
+          mandati[0].get("reply_markup"))
+    prova("...ed e' ancora un bottone `url`, mai `web_app` (la regola di _riga_webapp)",
+          False, "web_app" in _j.dumps(mandati[0]))
+    prova("...il messaggio senza bottone parte com'e' sempre partito", False,
+          "reply_markup" in mandati[1])
+    mandati0, _r, _e = manda("", False)
+    prova("...a leva spenta il bottone e' quello di ieri",
+          BASE + "/p2p?scambio=" + ID,
+          mandati0[0]["reply_markup"]["inline_keyboard"][0][0]["url"])
+    _m, righe, esito = manda(BOT, True)
+    prova("in collaudo non esce niente, e la riga simulata dice il link VERO del bottone",
+          [[], True, "simulata (collaudo)"],
+          [_m, f"→ {BOT}?startapp=scambio_{ID}]" in righe[0], esito])
+    dm = pezzo("_dm_nostr_con_ripiego")
+    prova("IL DM NOSTR TIENE L'INDIRIZZO DEL SITO: la riga in coda non passa dalla traduzione",
+          [True, False],
+          ['(f"\\n\\n{bottone[0]}: {bottone[1]}" if bottone else "")' in dm,
+           "_link_dentro_telegram" in dm])
+    prova("la traduzione ha DUE chiamanti: il bottone del ramo Telegram e il link "
+          "di testo dell'avviso dei nuovi ordini", [2, True, True],
+          [codice(src).count("_link_dentro_telegram(") - 1,
+           "_link_dentro_telegram(bottone[1])" in pezzo("_manda_telegram"),
+           "_link_dentro_telegram(URL_PUBBLICO + '/p2p')" in pezzo("_testo_avviso_nuovi_p2p")])
+
+    # ---------------- 3bis) I LINK DI TESTO E LA RIGA DELLE TASTIERE ------
+    # (10 ott 2026, il secondo si' di Andrea) sotto la stessa leva: «🫙
+    # Apri il libro ordini» dell'avviso dei nuovi ordini, «🫙 Apri lo
+    # Scambio P2P su Barattolo» del post nel canale, e la riga «🫙 Apri
+    # Barattolo» in cima alle tastiere del bot.
+    def casa(leva_viva):
+        return gemelli_link_telegram({"URL_PUBBLICO": BASE}, leva_viva)
+    prova("la porta di casa: spenta e' il sito, accesa e' la Mini App — nelle due forme",
+          [BASE, BOT + "?startapp=casa", BOT + "/barattolo?startapp=casa"],
+          [casa(l)["_link_casa_telegram"]() for l in ("", BOT, BOT + "/barattolo")])
+    prova("...e la home del sito che ARRIVA non si traduce mai: gli avvisi del "
+          "mercatino e i link condivisi restano com'erano", [BASE, BASE + "/"],
+          [ld(BASE), ld(BASE + "/")])
+    prova("...la chiedono per nome in due, la riga delle tastiere e il post nel canale",
+          [2, True, True],
+          [codice(src).count("_link_casa_telegram(") - 1,
+           '"url": _link_casa_telegram()}' in pezzo("_riga_webapp"),
+           'href=\\"{_link_casa_telegram()}\\">🫙 Apri lo Scambio P2P su Barattolo</a>'
+           in pezzo("_caption_canale_p2p")])
+
+    def tastiera(leva_viva):
+        amb = casa(leva_viva)
+        exec(pezzo("_riga_webapp"), amb)
+        exec(pezzo("tastiera_bot"), amb)
+        return amb["tastiera_bot"]([[{"text": "x", "callback_data": "y"}]])
+    prova("la riga «🫙 Apri Barattolo»: a leva accesa apre la Mini App, e resta la "
+          "prima riga, un bottone `url`",
+          {"inline_keyboard": [[{"text": "🫙 Apri Barattolo", "url": BOT + "?startapp=casa"}],
+                               [{"text": "x", "callback_data": "y"}]]}, tastiera(BOT))
+    prova("...a leva spenta e' quella di ieri", BASE,
+          tastiera("")["inline_keyboard"][0][0]["url"])
+
+    def avviso_nuovi(leva_viva):
+        amb = casa(leva_viva)
+        amb.update({"html": __import__("html"), "time": time})
+        j = src.index("\nTIPI_AVVISI_NUOVI_P2P = ") + 1
+        exec(src[j:src.index("\n", j)].split("   #")[0], amb)
+        j = src.index("\nNOMI_TIPI_AVVISI_NUOVI_P2P = {") + 1
+        exec(src[j:src.index("}\n", j) + 2], amb)
+        for f in ("_frase_convenienza_p2p", "_testo_avviso_nuovi_p2p"):
+            exec(pezzo(f), amb)
+        return amb["_testo_avviso_nuovi_p2p"](
+            [{"tipo": "vendita", "conv": 3.0, "euro": "50,00 €", "metodi": "SEPA"}])
+    prova("«🫙 Apri il libro ordini»: a leva accesa apre la Mini App sul libro",
+          True, f'<a href="{BOT}?startapp=p2p">🫙 Apri il libro ordini</a>'
+          in avviso_nuovi(BOT))
+    prova("...a leva spenta l'avviso e' quello di ieri, col link del sito",
+          True, f'<a href="{BASE}/p2p">🫙 Apri il libro ordini</a>' in avviso_nuovi(""))
+    prova("...e l'avviso cambia SOLO in quel link", avviso_nuovi(""),
+          avviso_nuovi(BOT).replace(BOT + "?startapp=p2p", BASE + "/p2p"))
+
+    def caption(leva_viva):
+        amb = casa(leva_viva)
+        amb["html"] = __import__("html")
+        exec(next(r for r in src.split("\n") if r.startswith("CHARSET_BECH32")), amb)
+        for f in ("_fmt_eur", "_bech32_polymod", "npub_to_hex", "hex_to_npub",
+                  "chiave_nostr_provata", "_npub_breve", "_npub_venditore",
+                  "_firma_venditore", "_premio_canale_p2p", "_caption_canale_p2p"):
+            exec(pezzo(f), amb)
+        return amb["_caption_canale_p2p"](
+            "vendo", 100, "Revolut", {"venditore": "Rosina", "venditore_username": "rosina",
+                                      "venditore_negozio": "aaa11111"})
+    prova("«🫙 Apri lo Scambio P2P su Barattolo» nel canale: a leva accesa apre la Mini App",
+          True, f'<a href="{BOT}?startapp=casa">🫙 Apri lo Scambio P2P su Barattolo</a>'
+          in caption(BOT))
+    prova("...a leva spenta il post e' quello di ieri", True,
+          f'<a href="{BASE}">🫙 Apri lo Scambio P2P su Barattolo</a>' in caption(""))
+    prova("...e il post cambia SOLO in quel link: il negozio di chi vende resta sul sito",
+          [caption(""), True],
+          [caption(BOT).replace(BOT + "?startapp=casa", BASE),
+           BASE + "/negozio/" in caption(BOT)])
+    # GLI ANNUNCI RESTANO COME SONO: i link degli annunci nei messaggi del
+    # bot e nelle caption del canale non passano da nessuna delle due
+    for chi in ("_caption_canale", "_riga_annuncio_bot"):
+        if f"def {chi}(" in src:
+            prova(f"{chi}: gli annunci non passano dalla traduzione (l'anteprima con la foto)",
+                  [], [x for x in ("_link_dentro_telegram", "_link_casa_telegram")
+                       if x in pezzo(chi)])
+
+    # ---------------- 4) L'AVVIO: il giudizio su getMe ---------------------
+    amb = {"re": re, "TELEGRAM_MINIAPP_LINK": BOT}
+    exec(blocco_leva, amb)
+    exec(pezzo("_giudizio_link_miniapp"), amb)
+    g = amb["_giudizio_link_miniapp"]
+    IO = {"username": "ilbarattolobot", "has_main_web_app": True}
+    prova("il giudizio: il bot giusto con la Mini App principale accesa regge", "",
+          g(BOT, IO))
+    prova("...il nome del bot non conta le maiuscole", "",
+          g("https://t.me/IlBarattoloBot", IO))
+    prova("...senza la Mini App principale NO: il link aprirebbe la chat", True,
+          "Mini App principale" in g(BOT, {"username": "ilbarattolobot"}))
+    prova("...il bot di un altro NO, anche se ha la sua Mini App", True,
+          "@altrobot" in g("https://t.me/altrobot",
+                           {"username": "ilbarattolobot", "has_main_web_app": True}))
+    prova("...col nome breve dell'app la Mini App principale non serve", "",
+          g(BOT + "/barattolo", {"username": "ilbarattolobot"}))
+    prova("...e una risposta vuota di Telegram e' un NO, non un si'", True,
+          bool(g(BOT, {})) and bool(g(BOT, None)))
+    cl = pezzo("controlla_link_miniapp")
+    prova("all'avvio: a leva spenta e in collaudo non si chiama nessuno",
+          True, 0 < cl.find("if not TELEGRAM_MINIAPP_LINK:\n        return")
+          < cl.find("if MODALITA_COLLAUDO:") < cl.find("api.telegram.org"))
+    prova("...il no SPEGNE la leva, il silenzio di Telegram la lascia com'e'",
+          [True, True],
+          ['TELEGRAM_MINIAPP_LINK = ""' in cl[cl.index("if no:"):],
+           "la leva resta com'e' scritta" in cl[:cl.index("if no:")]])
+    prova("...col timeout di casa", True, "httpx.AsyncClient(timeout=20)" in cl)
+    prova("la busta di prima pagina porta la leva VIVA, anche vuota", True,
+          'risposta["tg_miniapp"] = TELEGRAM_MINIAPP_LINK' in src)
+    prova("...e il pannello delle leve la mostra viva", True,
+          '_leva("Link dentro Telegram → Mini App", "TELEGRAM_MINIAPP_LINK",\n'
+          '                  TELEGRAM_MINIAPP_LINK,' in src)
+
+    # ---------------- 5) IL CLIENT: sentinelle -----------------------------
+    prova("la pagina ritraduce il parametro PRIMA di ogni porta che legge l'indirizzo",
+          True, 0 < mini.find("\narrivoDaStartapp();\n")
+          < min(mini.index("\nconst " + n + " = ") for n in (
+              "NEGOZIO_URL", "ANNUNCIO_URL", "SICUREZZA_URL", "PRIVACY_URL",
+              "P2P_URL", "CONSIGLIATI_URL", "CATEGORIA_URL")))
+    tubo = _senza_commenti_js(_fn_js(mini, "async function condividiLink("))
+    i_tg, i_sh = tubo.index("if (tg?.initData) {"), tubo.index("if (navigator.share) {")
+    prova("nel tubo la traduzione vive SOLO nel ramo Telegram",
+          [1, True, True],
+          [tubo.count("linkDentroTelegram("),
+           i_tg < tubo.find("linkDentroTelegram(link)") < i_sh,
+           "tg.shareURL(dentro, testo)" in tubo
+           and "encodeURIComponent(dentro)" in tubo])
+    prova("...il foglio del telefono e gli appunti tengono il link del sito",
+          [True, True],
+          ["dati.url = link;" in tubo[i_sh:],
+           "return copiaLink(link, 'Link copiato 🔗');" in tubo[i_sh:]])
+    prova("la traduzione ha UN chiamante, il tubo", 1,
+          _senza_commenti_js(mini).count("linkDentroTelegram(") - 1)
+    nota = _fn_js(mini, "async function pubblicaOrdineSuNostrP2P(")
+    prova("la nota su Nostr porta il link del sito, mai quello di Telegram",
+          [True, False], ["const link = linkOrdineP2P(id);" in nota,
+                          "linkDentroTelegram" in nota])
+    prova("il client legge la leva dalla busta, e un server di ieri la lascia spenta",
+          [True, True],
+          ["if (j.tg_miniapp !== undefined) tgMiniappLink = String(j.tg_miniapp || '');" in mini,
+           "\nlet tgMiniappLink = '';\n" in mini])
+
+    # ---------------- 6) IL CLIENT: i pezzi veri in node --------------------
+    if _node_banco("console.log('1')") is None:
+        salta("i tre gemelli, l'arrivo e il tubo girano davvero", "node non installato")
+        return
+    PARAMETRI = ["p2p", "scambio_" + ID, "ordine_" + ID, "ordine_" + "b" * 57,
+                 "ordine_" + "b" * 58, "scambio_" + LUNGO, "ordine_corto", "P2P",
+                 "ordine_" + ID + "/..", "ordine_" + ID + "&x=1", "scambio_", "annuncio_7",
+                 "invito_ABC", "p2p ", "", None, "casa", "Casa"]
+    prog = (
+        "let tg = null, tgMiniappLink = '', visto = [];\n"
+        "let location = {pathname: '/', search: '', hash: ''};\n"
+        "const history = {state: null, replaceState(s, t, u){ visto.push(['replace', s, u]); }};\n"
+        "function baseCondivisione(){ return " + _j.dumps(BASE) + "; }\n"
+        "function haptic(){}\n"
+        "function copiaLink(l, f){ visto.push(['copia', l]); }\n"
+        "const navigator = {userAgent: 'Android'};\n"
+        + "".join(_fn_js(mini, f) for f in (
+            "function percorsoDaStartapp(", "function arrivoDaStartapp(",
+            "function startappDaLink(", "function linkDentroTelegram(",
+            "function testoColLink(", "async function condividiLink("))
+        + "const LINK = " + _j.dumps(LINK) + ", PAR = " + _j.dumps(PARAMETRI) + ";\n"
+        + "const ID = " + _j.dumps(ID) + ", BOT = " + _j.dumps(BOT) + ";\n"
+        + r"""
+(async () => {
+  const R = {};
+  R.scrive = LINK.map(u => startappDaLink(u, baseCondivisione()));
+  R.rilegge = PAR.map(percorsoDaStartapp);
+  /* IL GIRO INTERO: quel che il server scrive, la pagina lo rilegge nell'indirizzo di partenza */
+  R.giro = LINK.slice(0, 4).map(u => baseCondivisione() + percorsoDaStartapp(startappDaLink(u, baseCondivisione())));
+  /* la leva nel client */
+  tgMiniappLink = BOT; R.acceso = LINK.slice(0, 3).map(linkDentroTelegram).concat([linkDentroTelegram(LINK[12])]);
+  tgMiniappLink = BOT + '/barattolo'; R.conApp = linkDentroTelegram(LINK[2]);
+  R.storta = ['', 'http://t.me/ilbarattolobot', 'https://t.me.evil.example/ilbarattolobot', BOT + '?x=1', 'javascript:alert(1)']
+    .map(l => { tgMiniappLink = l; return linkDentroTelegram(LINK[2]); });
+
+  /* L'ARRIVO: il parametro nell'indirizzo, o nell'initData; solo dalla porta di casa */
+  const arrivo = (pathname, search, hash, start) => {
+    visto = []; location = {pathname, search, hash}; tg = start === undefined ? null : {initDataUnsafe: {start_param: start}};
+    const dove = arrivoDaStartapp();
+    return [dove, visto.slice()];
+  };
+  R.arrivi = {
+    url: arrivo('/', '?v=2&tgWebAppStartParam=ordine_' + ID, '#tgWebAppData=x'),
+    urlScambio: arrivo('/', '?tgWebAppStartParam=scambio_' + ID + '&v=2', ''),
+    initData: arrivo('/', '?v=2', '#h', 'ordine_' + ID),
+    urlVince: arrivo('/', '?tgWebAppStartParam=p2p', '', 'ordine_' + ID),
+    miniapp: arrivo('/miniapp.html', '?tgWebAppStartParam=p2p', ''),
+    storto: arrivo('/', '?tgWebAppStartParam=annuncio_7', '', 'boh'),
+    codificato: arrivo('/', '?tgWebAppStartParam=ordine_' + ID + '%2F..', ''),
+    rotto: arrivo('/', '?tgWebAppStartParam=%E0%A4%A', ''),
+    giaAltrove: arrivo('/annuncio/7', '?tgWebAppStartParam=ordine_' + ID, ''),
+    niente: arrivo('/', '?v=2', '', undefined),
+    casa: arrivo('/', '?v=2&tgWebAppStartParam=casa', '#h'),
+    senzaInitData: arrivo('/', '', '', '')
+  };
+
+  /* IL TUBO, dentro e fuori Telegram */
+  const L = baseCondivisione() + '/p2p?ordine=' + ID, T = 'testo';
+  const tubo = async (dentro, leva, link, ragnatela) => {
+    visto = []; tgMiniappLink = leva;
+    tg = dentro ? Object.assign({initData: 'x', openTelegramLink: u => visto.push(['tg', u])},
+                                ragnatela ? {shareURL: (u, t) => visto.push(['shareURL', u, t])} : {}) : null;
+    navigator.share = dentro ? undefined : async d => { visto.push(['share', d]); };
+    await condividiLink(link || L, T, 'Scambio P2P');
+    return visto.slice();
+  };
+  R.tuboDentro = await tubo(true, BOT);
+  R.tuboDentroShareURL = await tubo(true, BOT, null, true);
+  R.tuboDentroSpenta = await tubo(true, '');
+  R.tuboDentroAnnuncio = await tubo(true, BOT, baseCondivisione() + '/annuncio/7-poster');
+  R.tuboFuori = await tubo(false, BOT);
+  navigator.share = undefined; visto = []; tg = null; tgMiniappLink = BOT;
+  await condividiLink(L, T, 'Scambio P2P'); R.tuboAppunti = visto.slice();
+  console.log(JSON.stringify(R));
+})().catch(e => { console.error(e); process.exit(1); });
+""")
+    R = _node_banco(prog) or {}
+    prova("I GEMELLI: il client scrive il parametro come il server, link per link",
+          ATTESI, R.get("scrive"))
+    prova("...e la pagina rilegge SOLO il vocabolario chiuso",
+          ["/p2p", "/p2p?scambio=" + ID, "/p2p?ordine=" + ID, "/p2p?ordine=" + "b" * 57]
+          + [""] * 12 + ["/", ""], R.get("rilegge"))
+    prova("IL GIRO INTERO: quel che si scrive si rilegge nell'indirizzo di partenza",
+          LINK[:4], R.get("giro"))
+    prova("la leva nel client: i link P2P diventano t.me, un annuncio resta com'e'",
+          [BOT + "?startapp=p2p", BOT + "?startapp=scambio_" + ID,
+           BOT + "?startapp=ordine_" + ID, LINK[12]], R.get("acceso"))
+    prova("...col nome breve dell'app", BOT + "/barattolo?startapp=ordine_" + ID,
+          R.get("conApp"))
+    prova("...e una leva vuota o storta lascia il link del sito", [LINK[2]] * 5,
+          R.get("storta"))
+    A = R.get("arrivi") or {}
+    DOVE = "/p2p?ordine=" + ID
+    prova("l'arrivo: il parametro nell'indirizzo diventa l'indirizzo di casa, col "
+          "frammento di Telegram e lo stato della storia intatti",
+          [DOVE, [["replace", None, DOVE + "#tgWebAppData=x"]]], A.get("url"))
+    prova("...in qualunque posto della query", "/p2p?scambio=" + ID,
+          (A.get("urlScambio") or [None])[0])
+    prova("...o dall'initData, se l'indirizzo non lo porta",
+          [DOVE, [["replace", None, DOVE + "#h"]]], A.get("initData"))
+    prova("...e se ci sono tutti e due vince l'indirizzo", "/p2p",
+          (A.get("urlVince") or [None])[0])
+    prova("...vale anche da /miniapp.html", "/p2p", (A.get("miniapp") or [None])[0])
+    prova("...un parametro che non e' nostro, storto, codificato o rotto: si resta "
+          "dove si e', senza toccare l'indirizzo",
+          [["", []]] * 4,
+          [A.get("storto"), A.get("codificato"), A.get("rotto"), A.get("senzaInitData")])
+    prova("...chi e' gia' su un indirizzo suo non si sposta", ["", []],
+          A.get("giaAltrove"))
+    prova("...e senza parametro non succede niente", ["", []], A.get("niente"))
+    prova("...`casa` (la riga delle tastiere, il post nel canale) resta sulla home, e "
+          "ripulisce l'indirizzo dal parametro", ["/", [["replace", None, "/#h"]]],
+          A.get("casa"))
+    prova("...ma il client `casa` non la scrive mai: la home condivisa resta la home",
+          "", (R.get("scrive") or [None] * 15)[14])
+    L_WEB = BASE + "/p2p?ordine=" + ID
+    L_TG = BOT + "?startapp=ordine_" + ID
+    from urllib.parse import parse_qs as _pq, urlsplit as _us
+
+    def selettore(visti):
+        u = (visti or [[None, ""]])[0][1]
+        q = _pq(_us(u).query)
+        return [u.split("?")[0], (q.get("url") or [""])[0], (q.get("text") or [""])[0]]
+    prova("IL TUBO dentro Telegram: nel selettore delle chat va il link della Mini App",
+          ["https://t.me/share/url", L_TG, "testo"], selettore(R.get("tuboDentro")))
+    prova("...anche dalla strada di shareURL", [["shareURL", L_TG, "testo"]],
+          R.get("tuboDentroShareURL"))
+    prova("...a leva spenta quello del sito, come ieri",
+          ["https://t.me/share/url", L_WEB, "testo"],
+          selettore(R.get("tuboDentroSpenta")))
+    prova("...e un annuncio resta sul sito anche a leva accesa (porta la foto in anteprima)",
+          BASE + "/annuncio/7-poster", selettore(R.get("tuboDentroAnnuncio"))[1])
+    prova("FUORI da Telegram il foglio del telefono riceve il link del sito",
+          [["share", {"title": "Scambio P2P", "text": "testo\n" + L_WEB}]],
+          R.get("tuboFuori"))
+    prova("...e gli appunti pure", [["copia", L_WEB]], R.get("tuboAppunti"))
 
 
 def prove_altri_scorrimento():
@@ -76013,6 +76474,7 @@ def prove_p2p_canale():
 
     # --- 1) LA CAPTION E' PURA, E FIRMA DAVVERO --------------------
     amb = {"html": _html, "URL_PUBBLICO": "https://barattolo.store"}
+    gemelli_link_telegram(amb)      # a leva spenta: il link di sempre
     exec(next(r for r in _SORGENTE.split("\n")
               if r.startswith("CHARSET_BECH32")), amb)
     for f in ("_fmt_eur", "_bech32_polymod", "npub_to_hex", "hex_to_npub",
@@ -94105,8 +94567,12 @@ def prove_telegram_simulato_collaudo():
     for catena, riga in siti:
         nome = catena[0].name if catena else "(fuori da ogni funzione)"
         trovati[nome] = any(ferma_prima(fn, riga) for fn in catena)
-    prova("il censimento trova i quattro indirizzi di oggi",
-          ["_foto_profilo_telegram", "_manda_telegram", "_registra",
+    # ...E CINQUE dal 10 ott 2026: `_chiedi`, il `getMe` con cui all'avvio
+    # si chiede a Telegram se la leva dei link dentro Telegram regge
+    # (`controlla_link_miniapp`). In collaudo si ferma prima anche lui: lo
+    # dice la riga qui sotto, che vale per ognuno dei cinque.
+    prova("il censimento trova i cinque indirizzi di oggi",
+          ["_chiedi", "_foto_profilo_telegram", "_manda_telegram", "_registra",
            "bot_api"], sorted(trovati))
     for nome, ok in sorted(trovati.items()):
         prova(f"{nome}: in collaudo si ferma prima di Telegram", True, ok)
@@ -105079,6 +105545,7 @@ def prove_anteprima_avvisi_p2p():
 
     # --- 4) IL MESSAGGIO: la miniatura, solo per quel link -----------------
     a2 = {"html": _html, "URL_PUBBLICO": "https://barattolo.store", "time": _time}
+    gemelli_link_telegram(a2)       # a leva spenta: il link di sempre
     for riga in ("TIPI_AVVISI_NUOVI_P2P = ",):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)].split("   #")[0], a2)
@@ -105253,6 +105720,7 @@ def prove_avvisi_nuovi_ordini():
 
     # --- 2) I GIUDICI PURI --------------------------------------------------
     amb = {"html": html, "URL_PUBBLICO": "https://barattolo.store", "time": time}
+    gemelli_link_telegram(amb)      # a leva spenta: il link di sempre
     for riga in ("TIPI_AVVISI_NUOVI_P2P = ", "SOGLIE_AVVISI_NUOVI_P2P = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)].split("   #")[0], amb)
@@ -138361,6 +138829,7 @@ def prove_contanti_zona():
     # --- R3) LA ZONA NEL POST DEL CANALE (la card di Esplora: prove_card_p2p_vetrina) ---
     import html as _html
     amb_c = {"html": _html, "URL_PUBBLICO": "https://barattolo.store"}
+    gemelli_link_telegram(amb_c)    # a leva spenta: il link di sempre
     exec(next(r for r in src.split("\n") if r.startswith("CHARSET_BECH32")), amb_c)
     for f in ("_fmt_eur", "_bech32_polymod", "npub_to_hex", "hex_to_npub", "chiave_nostr_provata",
               "_npub_breve", "_npub_venditore", "_firma_venditore", "_premio_canale_p2p",
@@ -138820,6 +139289,15 @@ def prove_promemoria_gesto():
              "LINK_LIBRO_P2P": "https://barattolo.store/p2p",
              "spoglia_html": sp["spoglia_html"], "print": lambda *a: None,
              "httpx": _types.SimpleNamespace(AsyncClient=Cliente)}
+    # (10 ott 2026) il bottone passa da `_link_dentro_telegram`: i pezzi
+    # VERI, a leva spenta — qui il link e' quello del sito, com'e' nato;
+    # la leva accesa la guarda `prove_link_dentro_telegram`
+    amb_t.update({"re": re, "TELEGRAM_MINIAPP_LINK": "",
+                  "URL_PUBBLICO": "https://barattolo.store"})
+    _i = _SORGENTE.index("\n_FORMA_MINIAPP_LINK = re.compile(") + 1
+    exec(_SORGENTE[_i:_SORGENTE.index("\n\n\ndef _startapp_da_link(", _i)], amb_t)
+    exec(pezzo("_startapp_da_link"), amb_t)
+    exec(pezzo("_link_dentro_telegram"), amb_t)
     exec("async " + pezzo("_manda_telegram"), amb_t)
     bott = ("⚡ Apri lo scambio", "https://barattolo.store/p2p?scambio=abc")
     _aio.run(amb_t["_manda_telegram"](111, "⏳ <b>Restano</b>", bott))
@@ -140644,6 +141122,7 @@ def main():
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_condivisione_venditore, prove_condividi_col_link,
               prove_condividi_ordine_p2p,
+              prove_link_dentro_telegram,
               prove_zona_comune_in_modifica,
               prove_cassa_strada_chiusa,
               prove_casa_vuota_gratis,

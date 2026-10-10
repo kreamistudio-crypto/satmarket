@@ -14068,6 +14068,47 @@ document.getElementById('cartello')?.remove();</script>
 const API_BASE = location.protocol.startsWith('http') ? '/api' : 'http://localhost:8080/api';
 const tg = window.Telegram?.WebApp;
 
+/* ══ IL LINK DENTRO TELEGRAM (10 ott 2026) ═══════════════════════
+   Un link `https://t.me/<bot>?startapp=<parametro>` toccato dentro
+   Telegram apre QUESTA pagina come Mini App, gia' entrati, e ci porta
+   il parametro in due posti: `tgWebAppStartParam` nell'indirizzo e
+   `start_param` nell'initData. Qui lo si ritraduce nell'indirizzo di
+   casa che vuol dire — e lo si SCRIVE nella barra con `replaceState`,
+   prima che chiunque legga `location`: cosi' le porte di sempre
+   (`apriP2PDaUrl` e sorelle, che leggono l'indirizzo in una `const`
+   al caricamento) fanno il loro mestiere senza sapere da dove si e'
+   arrivati, e una ricarica riparte dallo stesso posto.
+   IL VOCABOLARIO E' CHIUSO, il gemello di `_startapp_da_link` del
+   server: `p2p`, `scambio_<id>`, `ordine_<id>`. Tutto il resto — un
+   parametro di un altro mondo, una forma storta, piu' di 64 caratteri
+   — non e' un indirizzo: si resta dove si e', senza dire niente.
+   SOLO DALLA PORTA DI CASA (`/` o `/miniapp.html`): chi e' gia' su un
+   indirizzo suo non si sposta. Lo stato della storia non si tocca: un
+   arrivo vero ha lo stato vuoto, ed e' cosi' che le porte lo
+   riconoscono. Il frammento resta, che Telegram ci tiene i suoi dati. */
+function percorsoDaStartapp(p){
+  p = String(p || '');
+  if (p === 'p2p') return '/p2p';
+  /* `casa`: la porta di casa — la riga «🫙 Apri Barattolo» delle
+     tastiere del bot e il link del post P2P nel canale. La scrive solo
+     il server (`_link_casa_telegram`); qui vuol dire «resta sulla home»,
+     e l'indirizzo si ripulisce del parametro */
+  if (p === 'casa') return '/';
+  const m = /^(scambio|ordine)_([0-9a-zA-Z-]{8,64})$/.exec(p);
+  return (m && p.length <= 64) ? '/p2p?' + m[1] + '=' + m[2] : '';
+}
+function arrivoDaStartapp(){
+  try {
+    if (!/^\/(miniapp\.html)?$/.test(location.pathname)) return '';
+    const q = (location.search.match(/[?&]tgWebAppStartParam=([^&]*)/) || [])[1];
+    const dove = percorsoDaStartapp(q ? decodeURIComponent(q)
+                                      : (tg?.initDataUnsafe?.start_param || ''));
+    if (dove) history.replaceState(history.state, '', dove + location.hash);
+    return dove;
+  } catch(e) { return ''; }
+}
+arrivoDaStartapp();
+
 /* ══ IL SERVER CHE SI RIAVVIA (30 set 2026) ══════════════════════
    Ogni deploy riavvia il servizio, e per quei pochi secondi Caddy
    risponde 502 al posto suo: la sera del 30 set, fra una decina di
@@ -14237,6 +14278,34 @@ function scriviOnion(){
 let dominioPubblico = '';
 function baseCondivisione(){
   return (suOnion() && dominioPubblico) ? dominioPubblico : location.origin;
+}
+/* IL LINK CHE APRE LA MINI APP (10 ott 2026): la leva del server
+   `TELEGRAM_MINIAPP_LINK`, che arriva nella busta di prima pagina
+   (`tg_miniapp`). Vuota — o un server di ieri che non la manda — vuol
+   dire «spenta»: ogni link resta quello del sito. La usa SOLO il ramo
+   Telegram del tubo (`condividiLink`): fuori da Telegram un link t.me
+   non serve a niente.
+   `startappDaLink` e' il gemello di `_startapp_da_link` del server, e
+   chiede la forma a `percorsoDaStartapp`: quel che questa pagina non
+   saprebbe rileggere non si scrive. */
+let tgMiniappLink = '';
+function startappDaLink(link, base){
+  const u = String(link || ''), radice = base + '/p2p';
+  if (u === radice) return 'p2p';
+  for (const nome of ['scambio', 'ordine']) {
+    const testa = radice + '?' + nome + '=';
+    if (u.indexOf(testa) === 0) {
+      const p = nome + '_' + u.slice(testa.length);
+      if (percorsoDaStartapp(p)) return p;
+    }
+  }
+  return '';
+}
+function linkDentroTelegram(link){
+  if (!/^https:\/\/t\.me\/[A-Za-z][A-Za-z0-9_]{3,31}(\/[A-Za-z0-9_]{3,30})?$/.test(tgMiniappLink))
+    return link;
+  const p = startappDaLink(link, baseCondivisione());
+  return p ? tgMiniappLink + '?startapp=' + p : link;
 }
 
 /* LA STANZA DELL'APPUNTAMENTO col firmatario (il login col telefono):
@@ -15917,6 +15986,10 @@ async function loadListings(anonimo){
      riga la legge baseCondivisione, e senza (server di ieri) resta
      location.origin, cioe' il comportamento di sempre */
   if (j.dominio_pubblico) dominioPubblico = j.dominio_pubblico;
+  /* ...e il link che apre la Mini App, per chi condivide verso una chat
+     di Telegram (vedi `linkDentroTelegram`): assente = server di ieri =
+     spenta, e resta quel che c'era */
+  if (j.tg_miniapp !== undefined) tgMiniappLink = String(j.tg_miniapp || '');
   /* L'indirizzo del servizio nascosto, per chi lo vuole COPIARE: il
      giudice suOnion() dice se ci siamo dentro, questo dice QUAL E'.
      Senza (server di ieri, o ONION_HOST vuoto) il cassetto e il
@@ -34308,10 +34381,17 @@ function renderAvatar(){
 async function condividiLink(link, testo, titolo){
   haptic();
   if (tg?.initData) {
-    if (typeof tg.shareURL === 'function') { tg.shareURL(link, testo); return; }
+    /* VERSO UNA CHAT DI TELEGRAM il link apre la Mini App (10 ott
+       2026): chi lo tocca li' e' dentro Telegram per costruzione. Solo
+       in questo ramo — il foglio del telefono e gli appunti qui sotto
+       tengono l'indirizzo del sito — e solo per gli indirizzi che si
+       traducono (`linkDentroTelegram`): gli altri, e tutti a leva
+       spenta, passano come sono. */
+    const dentro = linkDentroTelegram(link);
+    if (typeof tg.shareURL === 'function') { tg.shareURL(dentro, testo); return; }
     if (typeof tg.openTelegramLink === 'function') {
       tg.openTelegramLink('https://t.me/share/url?url='
-        + encodeURIComponent(link) + '&text=' + encodeURIComponent(testo));
+        + encodeURIComponent(dentro) + '&text=' + encodeURIComponent(testo));
       return;
     }
   }
