@@ -128243,7 +128243,9 @@ def prove_controllo_fattura_p2p():
         salta("`importoBolt11` e `importo_bolt11` sono gemelli", "node non c'e'")
     else:
         js = (pezzo_js(mini, "function importoBolt11(pr){", "\n}\n") + "\n}\n"
-              + "console.log(JSON.stringify(" + _json.dumps(mazzo) + ".map(importoBolt11)));\n")
+              + pezzo_js(mini, "function reteBolt11(pr){", "\n}\n") + "\n}\n"
+              + "console.log(JSON.stringify([" + _json.dumps(mazzo) + ".map(importoBolt11), "
+              + _json.dumps(mazzo) + ".map(reteBolt11)]));\n")
         with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
             f.write(js)
         try:
@@ -128254,7 +128256,29 @@ def prove_controllo_fattura_p2p():
         finally:
             os.unlink(f.name)
         prova("gemelli: `importoBolt11` e `importo_bolt11` leggono le stesse cifre da undici hrp",
-              [importo(x) for x in mazzo], dal_client)
+              [importo(x) for x in mazzo], dal_client[0] if isinstance(dal_client, list) else dal_client)
+        prova("...e `reteBolt11` e `rete_bolt11` la stessa rete (10 ott 2026, seconda tappa)",
+              [rete(x) for x in mazzo], dal_client[1] if isinstance(dal_client, list) else dal_client)
+    # LA RETE SI RIFIUTA NEL CLIENT, SUBITO (10 ott 2026, si' di Andrea):
+    # prima del server, con le sue parole, nei due punti del foglio
+    i_rete, i_ctl = invia.find("avvisoReteBolt11(testo)"), invia.find("controlloFatturaP2P(o, testo)")
+    prova("la fattura incollata di un'altra rete si ferma nel client, PRIMA del server", True,
+          0 < i_rete < i_ctl and "if (altraRete) { dillo(altraRete); return; }" in invia)
+    w_rete, w_ctl = wallet.find("avvisoReteBolt11(bolt)"), wallet.find("controlloFatturaP2P(o, bolt)")
+    prova("...e quella del wallet pure, prima della cifra", True,
+          0 < w_rete < w_ctl and w_rete < wallet.find("b.sats !== deve"))
+    avviso = nudo(pezzo_js(mini, "function avvisoReteBolt11(pr){", "\n}\n"))
+    prova("...con la frase della rete, la stessa del server — e SENZA il custode, che a schermo non si nomina", True,
+          "non di Bitcoin: qui si pagano solo fatture della rete vera" in avviso
+          and "coordinatore" not in avviso.lower() and "return '';" in avviso)
+    # LA REGOLA DI SET 2026 VALE ANCHE PER LE FRASI DEL SERVER che questo
+    # foglio mostra: le stringhe utente del blocco del controllo non
+    # nominano il custode (la sentinella del client non le legge)
+    blocco = _SORGENTE[_SORGENTE.index("try:\n    from config import P2P_TETTO_ROTTA"):
+                       _SORGENTE.index('\n\n\n@app.post("/api/p2p/seme")')]
+    frasi = re.findall(r'"([^"\\\n]{12,})"', blocco)
+    prova("...e nemmeno le frasi del server che il foglio mostra", [],
+          [f for f in frasi if "coordinatore" in f.lower()])
 
     # --- 11) IL CONFIG D'ESEMPIO -----------------------------------------
     esempio = open("config_esempio.py", encoding="utf-8").read()

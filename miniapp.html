@@ -56489,6 +56489,24 @@ function importoBolt11(pr){
   if (msat % 1000) return null;   // una frazione di sat non si sa dire
   return Math.round(msat / 1000);
 }
+/* ---- di QUALE RETE e' una richiesta di pagamento (10 ott 2026) ----
+   Dal prefisso: 'bc' Bitcoin, 'tb' testnet, 'tbs' signet, 'bcrt'
+   regtest, '' se non si legge. `bcrt` si prova PRIMA di `bc`, che ne
+   e' l'inizio. Gemella di `rete_bolt11` del server, con la sua prova.
+   Il coordinatore paga solo sulla rete vera: una fattura di prova si
+   ferma QUI, con le sue parole, senza aspettare il server (cantiere
+   controllo-fattura, seconda tappa: decisione di Andrea). */
+function reteBolt11(pr){
+  const m = /^ln(bcrt|bc|tbs|tb)/i.exec(String(pr || '').trim());
+  return m ? m[1].toLowerCase() : '';
+}
+/* la frase per chi ha dato una fattura di un'altra rete, o '' se e' Bitcoin */
+function avvisoReteBolt11(pr){
+  const rete = reteBolt11(pr);
+  if (rete === 'bc') return '';
+  const nome = {tb: 'testnet', tbs: 'signet', bcrt: 'regtest'}[rete] || 'di prova';
+  return 'Questa fattura è della rete ' + nome + ', non di Bitcoin: qui si pagano solo fatture della rete vera. Generane una dal wallet che usi davvero.';
+}
 
 /* ---- quel che DICE una richiesta di pagamento, oltre la cifra ----
    (16 set 2026) Il coordinatore rifiuta una bolt11 che scada prima di
@@ -59844,6 +59862,9 @@ async function fatturaDalWalletP2P(id){
     const bolt = String((r && r.invoice) || '').trim();
     const b = leggiBolt11(bolt);
     if (!b) throw new Error('ha risposto con una fattura che non si legge');
+    /* la rete prima della cifra (10 ott 2026): un wallet di testnet
+       ha anche la cifra giusta, e la ragione vera e' la rete */
+    if (avvisoReteBolt11(bolt)) throw new Error('ha fatto una fattura di ' + ({tb: 'testnet', tbs: 'signet', bcrt: 'regtest'}[reteBolt11(bolt)] || 'un\'altra rete') + ', non di Bitcoin');
     if (b.sats !== deve) throw new Error('ha fatto una fattura di ' + fmt(b.sats) + ' sats invece di ' + fmt(deve));
     /* IL BLOCCO E' QUELLO DEL COORDINATORE, come nel foglio a mano
        (`finestraFatturaP2P`): al wallet si chiede la vita dell'ordine,
@@ -60238,6 +60259,10 @@ async function inviaIncassoP2P(){
       dillo('Questa richiesta di pagamento non si legge: controlla di averla copiata tutta.');
       return;
     }
+    /* la RETE si giudica qui, prima di tutto il resto e prima del
+       server (10 ott 2026): testnet, signet e regtest non si pagano */
+    const altraRete = avvisoReteBolt11(testo);
+    if (altraRete) { dillo(altraRete); return; }
     const q = b.sats;
     /* la cifra che il coordinatore pretende, non quella dell'ordine:
        vedi l'avviso su `satsDaRicevereP2P`. A cifra ignota non si

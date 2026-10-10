@@ -30292,6 +30292,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   collaudo `collaudo_controllo_fattura` (LND di cartone in HTTPS coi tre
   macaroon). La procedura del macaroon nuovo e la verifica dal VPS:
   PRODUZIONE, «IL CONTROLLO DELLA FATTURA P2P».
+  Dal 10 ott 2026 (seconda tappa) la RETE la giudica anche il client,
+  prima di tutto: `reteBolt11` e `avvisoReteBolt11` accanto a
+  `importoBolt11`, nel foglio a mano subito dopo «non si legge» e nella
+  fattura dal wallet prima della cifra; il server la rigiudica lo stesso.
 
 - IL «CONDIVIDI» DI UN ORDINE P2P (10 ott 2026, perché in CANTIERI, «Il
   "Condividi" di un ordine P2P»). Un ordine del libro si manda fuori con

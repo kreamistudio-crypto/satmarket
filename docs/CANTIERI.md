@@ -45861,3 +45861,44 @@ nella gabbia (52 verdi, 0 rossi). La suite intera resta quella di `87b3cf3`. Il 
 dal vivo resta quello dell'albero di prima (`ccea57f`): i tre commit non
 toccano niente che main abbia cambiato nel login. Chiusa su GitHub la
 PR 17 «Entrare con Amber».
+
+## Il controllo della fattura, seconda tappa: la rete si rifiuta nel client (10 ott 2026, cantiere rete-nel-client, sì di Andrea a una delle cose notate)
+
+**LA COSA NOTATA, E IL SÌ.** Nel verbale del controllo della fattura
+stava scritto che `leggiBolt11` del client accetta `lntb`, `lntbs` e
+`lnbcrt` come se fossero `lnbc`, e che a fermare una fattura di testnet
+era il server. Andrea ha detto sì a questa sola: il client deve
+rifiutarla subito, col messaggio giusto, senza aspettare il server; le
+altre due (la sonda `EstimateRouteFee`, il tetto in memoria) restano
+come sono.
+
+**COM'È FATTO.** Due funzioni PURE accanto a `importoBolt11`: `reteBolt11`
+(dal prefisso: `bc`, `tb`, `tbs`, `bcrt`, `''`; `bcrt` provato prima di
+`bc`, che ne è l'inizio — la gemella di `rete_bolt11` del server, con la
+prova dei gemelli via node sugli stessi undici hrp) e `avvisoReteBolt11`,
+che dà la frase — la STESSA del server, «Questa fattura è della rete
+testnet, non di Bitcoin: qui si pagano solo fatture della rete vera.
+Generane una dal wallet che usi davvero.» — o `''` se è Bitcoin. Nel
+foglio a mano (`inviaIncassoP2P`) il giudizio sta subito dopo «non si
+legge» e PRIMA di cifra, scadenza e server; nella fattura dal wallet
+(`fatturaDalWalletP2P`) prima della cifra, perché un wallet di testnet
+ha anche la cifra giusta e la ragione vera è la rete. Il controllo del
+server resta com'era: chi chiama la rotta a mano non passa dal client.
+Non toccata la fattura della CAUZIONE dal wallet (`add-bond-invoice`):
+lì non c'è nessun controllo di rete, né del client né del server.
+
+**IL CUSTODE NON SI NOMINA A SCHERMO.** La prima stesura diceva «il
+coordinatore paga solo sulla rete vera», e la sentinella di set 2026
+(fase 6: il coordinatore non si presenta, il nome vive solo in «I tuoi
+dati») l'ha presa. Riscritta senza soggetto — «qui si pagano solo
+fatture della rete vera» — e con lei le TRE frasi del server del
+cantiere di stamattina che il foglio mostra e che la sentinella non
+legge (rete, costo oltre il tetto, Phoenix): una prova nuova guarda le
+stringhe del blocco del controllo nel server.
+
+**PROVATO.** In `prove_controllo_fattura_p2p` cinque prove in più (83):
+i gemelli della rete, il giudizio prima del server nel foglio a mano,
+prima della cifra nel wallet, la frase uguale a quella del server. Un
+banco node fuori dalle prove ha fatto girare `inviaIncassoP2P` VERA con
+una fattura `lntb`: la frase nel foglio e nessuna chiamata, né al server
+né al coordinatore. Suite intera e collaudi: nel verbale del push.

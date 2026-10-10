@@ -46886,7 +46886,7 @@ def _controllo_locale_fattura_p2p(bolt11: str, deve: int, finestra: int,
             rete, "di prova")
         return {"esito": "rete",
                 "messaggio": f"Questa fattura è della rete {nome}, non di "
-                             "Bitcoin: il coordinatore paga solo sulla rete "
+                             "Bitcoin: qui si pagano solo fatture della rete "
                              "vera. Generane una dal wallet che usi davvero."}
     if sats > 0 and deve > 0 and sats != deve:
         return {"esito": "importo",
@@ -46967,8 +46967,8 @@ async def _controllo_rete_fattura_p2p(bolt11: str, sats: int,
             return {"esito": "costo", "dest": dest, "fee": fee, "tetto": tetto,
                     "messaggio": f"Arrivare a questa fattura costa almeno "
                                  f"{_fmt_sats(fee)} sats di rete, più del "
-                                 f"tetto di {_fmt_sats(tetto)} sats che il "
-                                 "coordinatore accetta: il pagamento molto "
+                                 f"tetto di {_fmt_sats(tetto)} sats ammesso "
+                                 "per lo scambio: il pagamento molto "
                                  "probabilmente fallirebbe. "
                                  + MEGLIO_ALTRI_WALLET}
         return {"esito": "ok", "dest": dest, "fee": fee, "tetto": tetto}
@@ -47005,8 +47005,8 @@ async def _controllo_indirizzo_p2p(indirizzo: str, deve: int, chiedi=None,
     if dominio in DOMINI_BIP353:
         return {"esito": "indirizzo", "tramite": "indirizzo",
                 "messaggio": "Questo è un indirizzo Phoenix (BIP-353), che "
-                             "parla un'altra lingua: il coordinatore non lo "
-                             "sa pagare. Non hai sbagliato a scriverlo — usa "
+                             "parla un'altra lingua, e qui non si sa pagare. "
+                             "Non hai sbagliato a scriverlo — usa "
                              "l'indirizzo di un altro wallet (Blink, Wallet "
                              "of Satoshi, Alby) o incolla una fattura."}
     if deve <= 0:
