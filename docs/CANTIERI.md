@@ -47978,3 +47978,36 @@ controllo prima e dopo; poi uno zap vero e la riga «🧾 zap: ricevuta …
 presa da N relay». Dopo il push: `pronto` allineato a main (il commit
 tocca il workflow). E per sempre: `NOSTR_NSEC_PIATTAFORMA` non si
 cambia, o i client non contano più gli zap già ricevuti.
+
+**IL VERBALE DEL PUSH: cosa è girato su quale albero.** Main è corso di
+undici commit durante il cantiere. SULL'ALBERO DI PARTENZA (`31cb369`):
+la suite intera con `PROVE_SEVERE=1`, 21.659 passate e 0 fallite; gli 82
+collaudi della CI nella gabbia, 82 verdi; la tortura (26 su 26) e i due
+giri dal vivo. RIBASATO SU `4f60dac` (dieci commit: le hold di prova, i
+malus, il feedback, i link dentro Telegram, il cambio sul libro…): la
+suite intera, 21.879 e 0; gli 89 collaudi della CI nella gabbia, 89
+verdi; lo scanner dei segreti (le forme e i 64 esadecimali) sul commit
+e sull'albero, pulito. I conflitti: le code di CANTIERI, ARCHITETTURA e
+PRODUZIONE e i due elenchi del workflow, sciolti tenendo tutte le voci
+— e in CANTIERI l'unione aveva riportato in coda cinque righe della
+voce della CSP che main aveva riscritto: tolte guardando il diff contro
+main (solo aggiunte mie, zero righe tolte). Per NOME, dopo il rebase:
+i pezzi del blocco una volta sola, e niente di arrivato da main che
+tocchi `FRENI`, il pannello delle leve o il cruscotto. Corretto dopo il
+rebase il percorso del config del VPS nella procedura
+(`/srv/barattolo/config.py`, la regola arrivata con `660f1ed`).
+POI MAIN HA CONTINUATO A CORRERE, e l'ho inseguito altre quattro volte:
+su `062d404` (la tendina di Android, senza conflitti) suite 21.880 e 0;
+su `010f98c` (i gesti prima del PayCode) 21.902 e 0; su `167cca7` (la
+riga per Wallet of Satoshi) 21.905 e 0; su `450d4ac` (il sollecito del
+recapito), la base del push, 21.935 e 0. A ogni giro
+`collaudo_indirizzo_lightning` verde nella gabbia, la coda di CANTIERI
+sciolta come sopra e il diff contro main riguardato (solo aggiunte
+mie). Gli ALTRI collaudi, la tortura e i giri dal vivo NON sono stati
+rifatti su queste quattro punte: valgono per `4f60dac`. LA CI DI MAIN
+prima del push: la corsa di `010f98c` è uscita ROSSA, due volte, su
+una prova non di questo cantiere — «…senza MAI un "database is
+locked"» della contesa nel giro dei negozi, una prova a cronometro che
+in locale passa; non l'ho toccata. Ho aspettato la corsa dopo
+(`167cca7`): verde. Il sì al push è di Andrea (10 ott, a lavoro
+chiuso).
