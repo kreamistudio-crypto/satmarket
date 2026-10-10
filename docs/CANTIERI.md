@@ -48838,3 +48838,27 @@ copia intera, giro dal vivo, suite e collaudi: nel verbale del push.
 **DA GUARDARE.** Sul telefono vero i due link, dentro Telegram e
 nell'APK. Se la pagina di PuntoLis a tutto schermo convince di più, il
 cambio è una riga (`LINK_PUNTOLIS_PAYCODE`).
+
+
+## I gesti prima di pagare il PayCode, secondo cantiere: il verbale del push (10 ott 2026, sera): cosa è girato su quale albero
+
+Main è corso due volte mentre il cantiere si chiudeva (cinque commit di
+altre sessioni: la procedura delle hold, la prova della contesa senza
+cronometro, le due monete dell'anteprima, la scheda «summary»,
+l'indirizzo che il coordinatore non verifica). COSA È GIRATO, E DOVE:
+- sull'albero di partenza (e8a24ad più il cantiere): la suite intera
+  `PROVE_SEVERE=1`, 22.009 passate e 0 fallite; i 58 collaudi della CI
+  nella gabbia, 58 verdi (questa volta il server è toccato: i tre
+  promemoria); la tortura, 21 mutazioni su 21; il giro dal vivo con
+  Playwright, 46 controlli verdi;
+- dopo il primo rebase, su 3086eac: le 85 sezioni di prove.py che
+  nominano quel che il cantiere tocca, 6.248 verdi;
+- dopo il secondo rebase, su 5ba9d24: le sezioni toccate, rigirate dopo
+  aver scritto questa voce e prima del push — rosse, il push non
+  partiva. Suite intera e collaudi non sono rigirati dopo i rebase (la
+  regola del main che corre): li gira la CI del push, guardata fino al
+  verde.
+I REBASE: ogni volta un solo conflitto, in coda a CANTIERI (tutti
+accodano lì): preso il file di main e riaccodata la voce; nient'altro
+toccato a mano, i simboli del cantiere ricontati. Il push porta solo i
+due commit del cantiere, firmati.
