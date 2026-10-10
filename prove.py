@@ -35020,6 +35020,12 @@ def prove_cookie_onion():
     ONION = "ckmc76bxrwjnja5n4qryeayzj5kqkiixnpmi6ode3e6vdpw4gutlrbyd.onion"
     SEGRETO = "a3f1c9e2d8b74650a3f1c9e2d8b74650a3f1c9e2d8b74650"
 
+    # OGNI COOKIE USCITO DA OGNI CASO finisce qui, e in fondo si guarda
+    # che HttpOnly e SameSite siano gli stessi su tutti (richiesta di
+    # Andrea, 10 ott 2026): la cura deve togliere Secure sul tunnel e
+    # NIENT'ALTRO, e un confronto fatto su un caso solo non lo dice.
+    usciti = []
+
     def cookie_di(amb, host, segnale):
         """Una richiesta finta: i due contextvar come li scrive il
         middleware, poi il login dalla porta unica."""
@@ -35027,6 +35033,8 @@ def prove_cookie_onion():
         amb["_SEGNALE_RICHIESTA"].set(segnale)
         r = amb["Response"]()
         amb["apri_sessione"](r, 11, "")
+        usciti.append((host, segnale, "sessione", r.scudi["barattolo_sessione"]))
+        usciti.append((host, segnale, "portachiavi", r.scudi["barattolo_portachiavi"]))
         return r.scudi["barattolo_sessione"], r.scudi["barattolo_portachiavi"]
 
     # --- 1) il dominio pubblico: Secure, com'e' sempre stato ---------
@@ -35097,6 +35105,28 @@ def prove_cookie_onion():
     s9, _ = cookie_di(ambc, "localhost:8080", "")
     prova("in collaudo il cookie resta senza Secure (siamo su http)",
           False, s9["secure"])
+
+    # --- 4-bis) HttpOnly e SameSite in TUTTI i casi, cookie per cookie
+    # Nove richieste (i sette casi, piu' le due con le leve spente), due
+    # cookie ciascuna: diciotto righe, e su ognuna gli scudi che non
+    # devono cambiare MAI — pubblico o tunnel, Secure o no.
+    prova("sono usciti 18 cookie da 9 richieste", 18, len(usciti))
+    prova("OGNI cookie, in ogni caso, e' HttpOnly", [],
+          [(h, q, n) for h, q, n, d in usciti if d.get("httponly") is not True])
+    prova("...e OGNI cookie ha SameSite=lax", [],
+          [(h, q, n) for h, q, n, d in usciti if d.get("samesite") != "lax"])
+    prova("...con la stessa durata e lo stesso percorso", [],
+          [(h, q, n) for h, q, n, d in usciti
+           if d.get("max_age") != 30 * 86400 or d.get("path") != "/"])
+    prova("...e l'UNICO attributo che cambia fra un caso e l'altro e' secure",
+          {"secure"},
+          {k for _, _, _, d in usciti for k in d
+           if len({str(x[3].get(k)) for x in usciti}) > 1})
+    prova("...che e' falso solo sul tunnel coi due testimoni, e in collaudo",
+          [(ONION, SEGRETO, "sessione"), (ONION, SEGRETO, "portachiavi"),
+           (ONION + ":8081", SEGRETO, "sessione"), (ONION + ":8081", SEGRETO, "portachiavi"),
+           ("localhost:8080", "", "sessione"), ("localhost:8080", "", "portachiavi")],
+          [(h, q, n) for h, q, n, d in usciti if not d["secure"]])
 
     # --- 5) le sentinelle sul sorgente -------------------------------
     for n in ("imposta_cookie_sessione", "imposta_cookie_portachiavi"):
