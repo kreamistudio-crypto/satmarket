@@ -30181,9 +30181,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Dove si vede il marchio: `repRiquadroP2P`, `cardParte`,
   `renderNegozio`, `renderProfiloP2P`. Le stelline non si toccano.
   Il messaggio Telegram «Non hai proseguito in tempo» a chi ha preso
-  porta la riga del conto (`_avvisi_evento_p2p` mette `mancato_contato`
-  e `mancati` nei dati della frase; `_testo_evento_p2p` la scrive, al
-  primo e dal secondo in poi). Prove: `prove_reputazione_p2p`,
+  porta la riga del conto: la scrive `_riga_conto_p2p` (pura, una frase
+  per Telegram e app: al primo la tolleranza e il blocco dei 30 giorni
+  con un secondo nel mese; dal secondo quanti sono e «Fino al <data>»),
+  la legge `_conto_esito_p2p` (con `_blocco_filtro_fino_p2p`: il secondo
+  mancato più recente nei 30 giorni + 30 giorni), `_avvisi_evento_p2p`
+  la mette nei dati (`conto`) e `_testo_evento_p2p` la accoda;
+  l'archivio `_scambi_p2p` la manda come `conto` (`_conto_scambio_p2p`)
+  e la pagina dello scambio la mostra (`contoServer`);
+  `/api/p2p/posso-prendere` manda `fino` e il veto dice «Potrai
+  riprenderli dal <data>». Prove: `prove_reputazione_p2p`,
   `collaudo_reputazione_p2p` (gabbia della CI). Vale dentro Barattolo:
   un altro client Mostro prende comunque (il perché e la patch che
   servirebbe: CANTIERI).

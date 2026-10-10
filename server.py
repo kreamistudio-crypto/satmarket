@@ -45183,7 +45183,10 @@ def _posso_prendere_p2p(con, io, ordini, adesso: int) -> dict:
     return {"ordini": fuori, "completati": rep["completati"],
             "mancati": _marchio_mancati_p2p(rep["mancati"]),
             "mancati_30": rep["mancati_30"], "prese_aperte": prese,
-            "limite": P2P_PRESE_APERTE_MAX, "tollerati": P2P_MANCATI_TOLLERATI}
+            "limite": P2P_PRESE_APERTE_MAX, "tollerati": P2P_MANCATI_TOLLERATI,
+            # fino a quando il filtro non lo accetta (0 = non bloccato), per
+            # la riga «Potrai riprenderli dal …» del riquadro del veto
+            "fino": _blocco_filtro_fino_p2p(con, io, adesso)}
 
 
 def _segna_tentativo_p2p(con, io, ordine, gesto, motivo, adesso: int) -> dict:
@@ -45216,6 +45219,79 @@ def _segna_tentativo_p2p(con, io, ordine, gesto, motivo, adesso: int) -> dict:
         (int(io or 0), ordine, int(s["giro"] or 0) if s else 0, gesto, int(adesso), motivo))
     con.commit()
     return {"ok": True, "motivo": ""}
+
+
+def _blocco_filtro_fino_p2p(con, tg_id, adesso: int) -> int:
+    """FINO A QUANDO il filtro di chi pubblica non accetta questa persona
+    (10 ott 2026, l'avviso del blocco): 0 se non e' bloccata. Il blocco
+    vale finche' negli ultimi 30 giorni i mancati sono piu' di
+    P2P_MANCATI_TOLLERATI, e finisce quando il (tollerati + 1)-esimo piu'
+    recente esce dalla finestra: quel `quando` piu' P2P_MANCATI_FILTRO_S.
+    Pura sulla connessione; e' lo stesso conto di `_giudice_presa_p2p`,
+    letto come una data."""
+    righe = con.execute(
+        "SELECT quando FROM p2p_esiti WHERE tg_id=? AND esito='mancato' AND quando>=? "
+        "ORDER BY quando DESC", (int(tg_id or 0), int(adesso) - P2P_MANCATI_FILTRO_S)).fetchall()
+    if len(righe) <= P2P_MANCATI_TOLLERATI:
+        return 0
+    return int(righe[P2P_MANCATI_TOLLERATI][0]) + P2P_MANCATI_FILTRO_S
+
+
+def _riga_conto_p2p(contato: bool, n: int, fino_testo: str) -> str:
+    """PURA: LA RIGA DEL CONTO a chi ha preso e non ha proseguito, detta
+    chiara e gentile (10 ott 2026, richiesta di Andrea; l'avviso del
+    blocco sui filtri aggiunto lo stesso giorno). '' se non contato. Al
+    primo: tollerato, e cosa succede con un secondo nel mese. Dal
+    secondo: quanti sono, che si vedono, e FINO A QUANDO gli ordini col
+    filtro non si prendono (`fino_testo`, una data come «12 novembre»);
+    senza data (due nei 90 giorni ma uno solo nel mese) la regola a
+    parole. E' UNA frase sola, scritta qui, per il Telegram e per
+    l'app."""
+    if not contato:
+        return ""
+    n = int(n or 0)
+    if n <= 1:
+        return ("Questo conta come scambio non completato. Il primo è tollerato; "
+                "con un secondo nello stesso mese non potrai prendere gli ordini "
+                "con filtro (1+, 3+, 5+) per 30 giorni, e da due in 90 giorni "
+                "comparirà sul tuo profilo.")
+    testo = (f"Questo conta come scambio non completato: con questo sono {n} "
+             f"negli ultimi 90 giorni, e sul tuo profilo compare «⚠️ {n} non completati».")
+    if fino_testo:
+        testo += (f" Fino al {fino_testo} non puoi prendere gli ordini con filtro "
+                  "(1+, 3+, 5+); gli altri sì.")
+    else:
+        testo += (" Finché ce n'è più di uno nell'ultimo mese, chi pubblica con un "
+                  "filtro non ti accetta.")
+    return testo
+
+
+def _conto_esito_p2p(con, tg_id, ordine: str, giro: int, adesso: int) -> dict:
+    """`{contato, mancati, fino, fino_testo, riga}` di una persona su un
+    giro: se QUESTO giro le e' stato contato come non completato, quanti
+    ne ha negli ultimi 90 giorni, fino a quando il filtro non la accetta
+    (0 = non bloccata) e la riga da dirle. Lo chiedono l'avviso Telegram
+    (`_avvisi_evento_p2p`) e l'archivio (`_scambi_p2p`): una lettura
+    sola per i due posti. FAIL-OPEN: un database senza la tabella — i
+    banchi di ieri — vale «non contato», e nessun avviso cade per una
+    riga in piu'."""
+    vuoto = {"contato": False, "mancati": 0, "fino": 0, "fino_testo": "", "riga": ""}
+    try:
+        contato = con.execute(
+            "SELECT 1 FROM p2p_esiti WHERE tg_id=? AND ordine=? AND giro=? AND esito='mancato'",
+            (int(tg_id or 0), ordine, int(giro or 0))).fetchone() is not None
+        if not contato:
+            return vuoto
+        n = int(con.execute(
+            "SELECT COUNT(*) FROM p2p_esiti WHERE tg_id=? AND esito='mancato' AND quando>=?",
+            (int(tg_id or 0), int(adesso) - P2P_MANCATI_FINESTRA_S)).fetchone()[0] or 0)
+        fino = _blocco_filtro_fino_p2p(con, tg_id, adesso)
+    except Exception:
+        return vuoto
+    t = time.localtime(fino) if fino else None
+    fino_testo = f"{t.tm_mday} {MESI_IT[t.tm_mon - 1]}" if t else ""
+    return {"contato": True, "mancati": n, "fino": fino, "fino_testo": fino_testo,
+            "riga": _riga_conto_p2p(True, n, fino_testo)}
 
 
 
@@ -51922,20 +51998,13 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
             return ("🔄 <b>Chi aveva preso il tuo ordine non ha proseguito.</b> "
                     f"È tornato in vetrina: non devi fare niente.{tornati}")
         # ...e il conto, detto chiaro e gentile (10 ott 2026, richiesta di
-        # Andrea): al primo si dice che e' tollerato e cosa succede dal
-        # secondo; dal secondo in poi quanti sono e che si vedono
-        n = int(dati.get("mancati") or 0)
-        conto = ""
-        if dati.get("mancato_contato"):
-            conto = ("\n\nQuesto conta come scambio non completato. Il primo è "
-                     "tollerato; dal secondo in 90 giorni comparirà sul tuo profilo."
-                     if n <= 1 else
-                     f"\n\nQuesto conta come scambio non completato: con questo sono "
-                     f"{n} negli ultimi 90 giorni, e sul tuo profilo compare "
-                     f"«⚠️ {n} non completati». Finché ce n'è più di uno nell'ultimo "
-                     "mese, chi pubblica con un filtro può non accettarti.")
+        # Andrea): la riga la scrive `_riga_conto_p2p`, UNA per Telegram e
+        # per l'app, e arriva nei dati (`conto`) gia' fatta — vuota se
+        # questo giro non e' stato contato
+        conto = str(dati.get("conto") or "")
         return ("🔄 <b>Non hai proseguito in tempo:</b> l'ordine è tornato "
-                "in vetrina. Se ti interessa ancora, puoi riprenderlo." + conto)
+                "in vetrina. Se ti interessa ancora, puoi riprenderlo."
+                + ("\n\n" + conto if conto else ""))
     if momento == "scaduto" and paycode and vende:
         # LE DUE SCADENZE, dette (23 set 2026): il libro chiude due ore
         # prima del PayCode — e' il margine per chi deve andare al
@@ -52114,16 +52183,12 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         chi_preso = {"buyer": fatto["compratore"],
                      "seller": fatto["venditore"]}.get(fatto["preso_dal"], 0)
         if chi_preso:
+            # la riga intera la scrive `_conto_esito_p2p` (con la data del
+            # blocco sui filtri); nei banchi di ieri non c'e', e tace
             try:
-                dati["mancato_contato"] = con.execute(
-                    "SELECT 1 FROM p2p_esiti WHERE tg_id=? AND ordine=? AND giro=? "
-                    "AND esito='mancato'", (chi_preso, ordine, giro)).fetchone() is not None
-                dati["mancati"] = int(con.execute(
-                    "SELECT COUNT(*) FROM p2p_esiti WHERE tg_id=? AND esito='mancato' "
-                    "AND quando>=?", (chi_preso, adesso - P2P_MANCATI_FINESTRA_S)
-                ).fetchone()[0] or 0)
+                dati["conto"] = _conto_esito_p2p(con, chi_preso, ordine, giro, adesso)["riga"]
             except Exception:
-                dati["mancato_contato"], dati["mancati"] = False, 0
+                dati["conto"] = ""
     lato_maker = {"buyer": "vende", "seller": "compra"}.get(fatto["preso_dal"], "")
     fuori = []
 
@@ -54384,10 +54449,25 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
                 con, ordine, giro_s, "compra" if lato == "compro" else "vende"),
             "momenti": [{"m": str(m.get("momento") or ""), "q": int(m.get("quando") or 0),
                          "a": str(m.get("attore") or ""), "d": str(m.get("dettaglio") or "")}
-                        for m in momenti]}
+                        for m in momenti],
+            # LA RIGA DEL CONTO NELL'APP (10 ott 2026, l'avviso del blocco):
+            # se QUESTO giro mi e' stato contato come non completato, la
+            # stessa frase del Telegram — la pagina dello scambio tornato
+            # nel libro la mostra. '' per tutti gli altri; nei banchi senza
+            # il giudice, ''
+            "conto": _conto_scambio_p2p(con, io, ordine, giro_s, adesso)}
         if len(fuori) >= MAX_ORDINI_P2P:
             break
     return fuori
+
+
+def _conto_scambio_p2p(con, io, ordine: str, giro: int, adesso: int) -> str:
+    """La riga del conto per l'archivio, fail-open come il giudice che la
+    scrive: un banco senza `_conto_esito_p2p` o senza la tabella vale ''."""
+    try:
+        return _conto_esito_p2p(con, io, ordine, giro, adesso)["riga"]
+    except Exception:
+        return ""
 
 
 def _quanti_tocca_p2p(con, io, adesso: int) -> int:

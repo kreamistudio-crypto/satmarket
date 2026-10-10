@@ -248,8 +248,10 @@ async def giro():
                f"tornato in vetrina: non devi fare niente.{TORNATI}"),
            (C, "🔄 <b>Non hai proseguito in tempo:</b> l'ordine è tornato in "
                "vetrina. Se ti interessa ancora, puoi riprenderlo.\n\nQuesto conta "
-               "come scambio non completato. Il primo è tollerato; dal secondo in "
-               "90 giorni comparirà sul tuo profilo.")], detto())
+               "come scambio non completato. Il primo è tollerato; con un secondo "
+               "nello stesso mese non potrai prendere gli ordini con filtro (1+, 3+, "
+               "5+) per 30 giorni, e da due in 90 giorni comparirà sul tuo profilo.")],
+          detto())
     o = ordine(10)
     t0 = ora(900)
     semina_ordine(o, "sell")

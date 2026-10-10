@@ -59290,6 +59290,13 @@ function renderOrdineP2P(){
     '<div class="trust-note nota-scambio"><span><b>' + esc(st.t) + '</b>'
       + (azione ? '<span class="p2p-tocca">👉 tocca a te</span>' : pillolaAttesaP2P(o))
       + (rigaAttesaP2P(o) || '<br>') + esc(st.d) + '</span></div>' +
+    /* IL CONTO, NELL'APP (10 ott 2026, l'avviso del blocco sui filtri):
+       la stessa riga del Telegram, dal server (`contoServer`), sotto lo
+       stato dello scambio tornato nel libro — solo quando questo giro
+       mi e' stato contato come non completato */
+    (o.contoServer
+      ? '<div class="trust-note nota-scambio"><span>⚠️</span><span>' + esc(o.contoServer) + '</span></div>'
+      : '') +
     /* LA RIGA SOLO DA GUARDARE (24 set 2026, l'archivio del server):
        lo scambio c'e' e si segue, ma le chiavi cifrate con cui si
        fanno i gesti stanno sul dispositivo dove e' stato aperto */
@@ -61144,7 +61151,11 @@ function fraseVetoP2P(v, rep){
       + ' scambi completati' + (r.completati !== undefined ? ' (tu ne hai ' + r.completati + ')' : '') + '.';
   if (v.motivo === 'mancati')
     return 'Quest\'ordine accetta solo chi non ha scambi non completati negli ultimi 30 giorni'
-      + (r.mancati_30 !== undefined ? ': tu ne hai ' + r.mancati_30 : '') + '.';
+      + (r.mancati_30 !== undefined ? ': tu ne hai ' + r.mancati_30 : '') + '.'
+      /* ...e fino a quando (10 ott 2026, l'avviso del blocco): la data la
+         dice il server, la scrive il calendario di casa */
+      + (r.fino > 0 && typeof dataBreveP2P === 'function'
+         ? ' Potrai riprenderli dal ' + dataBreveP2P(r.fino) + '.' : '');
   if (v.motivo === 'prese')
     return 'Hai già ' + (r.limite || 2) + ' scambi presi in attesa del tuo primo gesto: '
       + 'finiscili (o lascia che scadano) prima di prenderne un altro.';
@@ -61164,7 +61175,9 @@ function prendiPrendibiliP2P(d, ids){
   if (!d || typeof d !== 'object') return 0;
   p2pMiaRep = {completati: Number(d.completati) || 0, mancati: Number(d.mancati) || 0,
                mancati_30: Number(d.mancati_30) || 0, prese_aperte: Number(d.prese_aperte) || 0,
-               limite: Number(d.limite) || 2};
+               limite: Number(d.limite) || 2,
+               /* fino a quando il filtro non mi accetta (10 ott 2026): 0 = non bloccato */
+               fino: Number(d.fino) || 0};
   const verdetti = (d.ordini && typeof d.ordini === 'object') ? d.ordini : {};
   let n = 0;
   for (const id of ids || []) {
@@ -67571,7 +67584,7 @@ function indiceMakerP2P(id, mz, o){
 }
 /* quel che una riga porta SOLO perche' era una presa: non e' dell'ordine */
 const P2P_DELLA_PRESA = ['peer', 'hold', 'satsMiei', 'satsNetti', 'importoScelto',
-  'metodoScelto', 'preso', 'giroMorto', 'giroCaduto', 'statoGrezzo', 'fermoA',
+  'metodoScelto', 'preso', 'giroMorto', 'giroCaduto', 'statoGrezzo', 'fermoA', 'contoServer',
   'cambioPresa', 'ultimaMossa', 'quando', 'inRitardo', 'nonPartito', 'soloVista',
   'campiMiei', 'campiLoro', 'euroInviatiAt', 'payoutFallito', 'votabile',
   /* ...e quel che le prese hanno imparato a portare dopo (7 ott 2026, «Lo
@@ -68014,6 +68027,11 @@ function rigaDaServerP2P(id, s, tk, stato, adesso){
   if (pr) o.presenze = pr;
   if (stato === 'annullato' || stato === 'rifiutato') o.fermoA = fermoDaMomentiP2P(s.momenti);
   if (s.payout_fallito && lato === 'vendo' && stato === 'rilasciato') o.payoutFallito = true;
+  /* LA RIGA DEL CONTO (10 ott 2026, l'avviso del blocco): il server la
+     manda quando QUESTO giro mi e' stato contato come non completato;
+     la pagina dello scambio la mostra. E' della presa: un giro nuovo
+     la toglie */
+  if (s.conto) o.contoServer = String(s.conto); else delete o.contoServer;
   return o;
 }
 /* PURA: DOVE SI E' FERMATO uno scambio annullato, dalla cronaca del

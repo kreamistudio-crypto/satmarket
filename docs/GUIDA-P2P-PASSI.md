@@ -274,7 +274,8 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
      dice di no, e sopra i bottoni compare il riquadro arancio: «🚫 Chi
      ha pubblicato quest'ordine accetta solo chi ha almeno 3 scambi
      completati (tu ne hai 1).», oppure «🚫 Quest'ordine accetta solo chi
-     non ha scambi non completati negli ultimi 30 giorni: tu ne hai 2.»,
+     non ha scambi non completati negli ultimi 30 giorni: tu ne hai 2.
+     Potrai riprenderli dal 12 novembre.»,
      oppure — su qualunque ordine — «🚫 Hai già 2 scambi presi in attesa
      del tuo primo gesto: finiscili (o lascia che scadano) prima di
      prenderne un altro.»; una presa partita lo stesso si ferma con lo
@@ -420,13 +421,18 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
 - Non dai il recapito sats in tempo (i minuti del coordinatore, §9): ✈️ «🔄 **Non hai proseguito in
   tempo:** l'ordine è tornato in vetrina. Se ti interessa ancora, puoi
   riprenderlo.» e, dal 10 ott 2026, se ti è stato contato: «Questo conta
-  come scambio non completato. Il primo è tollerato; dal secondo in 90
-  giorni comparirà sul tuo profilo.» (dal secondo: «…con questo sono 2
-  negli ultimi 90 giorni, e sul tuo profilo compare «⚠️ 2 non
-  completati». Finché ce n'è più di uno nell'ultimo mese, chi pubblica
-  con un filtro può non accettarti.»). Chi ci ha provato — fattura
-  mandata, anche rifiutata — non la riceve. Nell'app: «Il giro si è
-  chiuso senza garanzia: l'ordine è tornato nel libro».
+  come scambio non completato. Il primo è tollerato; con un secondo
+  nello stesso mese non potrai prendere gli ordini con filtro (1+, 3+,
+  5+) per 30 giorni, e da due in 90 giorni comparirà sul tuo profilo.»
+  (dal secondo: «…con questo sono 2 negli ultimi 90 giorni, e sul tuo
+  profilo compare «⚠️ 2 non completati». Fino al 12 novembre non puoi
+  prendere gli ordini con filtro (1+, 3+, 5+); gli altri sì.» — la data
+  è 30 giorni dopo il secondo mancato più recente; se nel mese ne hai
+  uno solo: «Finché ce n'è più di uno nell'ultimo mese, chi pubblica con
+  un filtro non ti accetta.»). Chi ci ha provato — fattura mandata,
+  anche rifiutata — non la riceve. Nell'app: «Il giro si è chiuso senza
+  garanzia: l'ordine è tornato nel libro», e sotto, se ti è stato
+  contato, la stessa riga del messaggio in un riquadro «⚠️».
 - Il pagamento dei sats non passa: ✈️ «⚠️ **Il pagamento dei sats non è
   passato** (<motivo>): apri «Dove ricevere i sats» e dai una fattura
   nuova. *I sats restano fermi per te finché il pagamento non passa.*»

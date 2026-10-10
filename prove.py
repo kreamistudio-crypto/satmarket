@@ -90231,7 +90231,9 @@ def prove_scambi_ovunque():
               "_parti_mostro_p2p", "_tocca_a_me_p2p",
               # «📍 Sono qui» del contanti (1 ott 2026, al posto della prova
               # col QR): senza la tabella vale None
-              "_tabella_p2p", "_presenze_per_parte_p2p", "_scambi_p2p"):
+              "_tabella_p2p", "_presenze_per_parte_p2p", "_scambi_p2p",
+              # (10 ott 2026) la riga del conto dell'archivio: qui tace (fail-open)
+              "_conto_scambio_p2p"):
         exec(pezzo(f), amb)
     euro, metodi = amb["_euro_numero_p2p"], amb["_metodi_lista_p2p"]
     stato = amb["_stato_scambio_p2p"]
@@ -91132,6 +91134,8 @@ def prove_tolti_ovunque():
     for f in ("_euro_numero_p2p", "_euri_numero_p2p", "_metodi_lista_p2p",
               "_stato_scambio_p2p", "_tocca_a_me_p2p", "_tabella_p2p",
               "_presenze_per_parte_p2p", "_scambi_p2p",
+              # (10 ott 2026) la riga del conto dell'archivio: qui tace (fail-open)
+              "_conto_scambio_p2p",
               "_tolti_p2p", "_tolto_vale_p2p", "_togli_scambio_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
     togli, tolti, vale = amb["_togli_scambio_p2p"], amb["_tolti_p2p"], amb["_tolto_vale_p2p"]
@@ -122791,7 +122795,9 @@ def prove_ritocchi_flusso_p2p():
               # «📍 Sono qui» del contanti (1 ott 2026, al posto della prova
               # col QR): senza la tabella vale None
               "_tabella_p2p", "_presenze_per_parte_p2p",
-              "_scambi_p2p", "_quanti_tocca_p2p"):
+              "_scambi_p2p", "_quanti_tocca_p2p",
+              # (10 ott 2026) la riga del conto dell'archivio: qui tace (fail-open)
+              "_conto_scambio_p2p"):
         exec(pezzo(f), amb)
     tocca = amb["_tocca_a_me_p2p"]
     prova("il giudice del server: chi compra tocca su fattura, fattura nuova, e attivo col recapito detto",
@@ -139470,8 +139476,13 @@ def prove_reputazione_p2p():
               "_segna_esiti_p2p", "_reputazione_p2p", "_marchi_mancati_p2p",
               "_prese_aperte_p2p", "_giudice_presa_p2p", "_soglia_filtro_p2p",
               "_dichiara_filtri_p2p", "_filtri_p2p", "_posso_prendere_p2p",
-              "_segna_tentativo_p2p"):
+              "_segna_tentativo_p2p",
+              # (10 ott 2026, l'avviso del blocco) la data del blocco e la riga del conto
+              "_blocco_filtro_fino_p2p", "_riga_conto_p2p", "_conto_esito_p2p",
+              "_conto_scambio_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
+    i_m = src.index("\nMESI_IT = (") + 1
+    exec(src[i_m:src.index(")\n", i_m) + 2], amb)
     prova("le soglie del foglio sono 1, 3 e 5; il limite delle prese e' 2; il primo si tollera",
           [(1, 3, 5), 2, 1],
           [amb["P2P_FILTRO_SOGLIE"], amb["P2P_PRESE_APERTE_MAX"], amb["P2P_MANCATI_TOLLERATI"]])
@@ -139691,22 +139702,42 @@ def prove_reputazione_p2p():
            con.execute("SELECT motivo FROM p2p_tentativi WHERE ordine=? AND gesto='fattura_scartata'",
                        (O2,)).fetchone()[0])[1])
     prova("...i nove gesti del catalogo", 9, len(amb["P2P_GESTI_TENTATIVO"]))
-    # q) la riga del conto nel messaggio a chi ha preso (richiesta di Andrea)
+    # q) la riga del conto nel messaggio a chi ha preso (richiesta di Andrea),
+    #    con l'avviso del blocco sui filtri e la data (aggiunto lo stesso giorno)
+    riga = amb["_riga_conto_p2p"]
+    primo, secondo = riga(True, 1, ""), riga(True, 2, "12 novembre")
+    senza_data, nessuno = riga(True, 2, ""), riga(False, 3, "12 novembre")
+    prova("q) al primo la riga dice che e' tollerato, e che con un secondo nel mese non prende "
+          "gli ordini con filtro per 30 giorni", True,
+          primo.startswith("Questo conta come scambio non completato. Il primo è tollerato;")
+          and "con un secondo nello stesso mese non potrai prendere gli ordini con filtro (1+, 3+, 5+) "
+              "per 30 giorni" in primo and "da due in 90 giorni comparirà sul tuo profilo" in primo)
+    prova("...dal secondo dice quanti sono, che si vedono, e FINO A QUANDO", True,
+          "con questo sono 2 negli ultimi 90 giorni" in secondo and "«⚠️ 2 non completati»" in secondo
+          and "Fino al 12 novembre non puoi prendere gli ordini con filtro (1+, 3+, 5+); gli altri sì." in secondo)
+    prova("...senza una data (due nei 90 giorni, uno solo nel mese) la regola a parole", True,
+          "Finché ce n'è più di uno nell'ultimo mese, chi pubblica con un filtro non ti accetta." in senza_data
+          and "Fino al" not in senza_data)
+    prova("...e niente se non e' stato contato", "", nessuno)
     testo = amb["_testo_evento_p2p"]
     base = dict(amb["_dati_frase_p2p"](con, O1))
-    primo = testo("tornato", "taker-timeout", "compra", dict(base, mancato_contato=True, mancati=1), "", False)
-    secondo = testo("tornato", "taker-timeout", "compra", dict(base, mancato_contato=True, mancati=2), "", False)
-    nessuno = testo("tornato", "taker-timeout", "compra", dict(base, mancato_contato=False, mancati=3), "", False)
-    chi_ha_pubblicato = testo("tornato", "taker-timeout", "vende", dict(base, mancato_contato=True, mancati=2), "", True)
-    prova("q) al primo non completato la riga dice che e' tollerato e cosa succede dal secondo",
-          True, primo.startswith("🔄 <b>Non hai proseguito in tempo:</b>")
-          and "Questo conta come scambio non completato. Il primo è tollerato; dal secondo in 90 giorni "
-              "comparirà sul tuo profilo." in primo)
-    prova("...dal secondo dice quanti sono e che si vedono, e il filtro di chi pubblica", True,
-          "con questo sono 2 negli ultimi 90 giorni" in secondo and "«⚠️ 2 non completati»" in secondo
-          and "chi pubblica con un filtro" in secondo)
-    prova("...niente riga se non e' stato contato (ha provato), e niente a chi ha pubblicato",
-          [False, False], ["non completato" in nessuno, "non completato" in chi_ha_pubblicato])
+    con_riga = testo("tornato", "taker-timeout", "compra", dict(base, conto=primo), "", False)
+    prova("...la frase del Telegram porta la riga dai dati, e a chi ha pubblicato no",
+          [True, False],
+          [con_riga.startswith("🔄 <b>Non hai proseguito in tempo:</b>") and "\n\n" + primo in con_riga,
+           "non completato" in testo("tornato", "taker-timeout", "vende", dict(base, conto=primo), "", True)])
+    # il blocco e la sua data: 222 ha tre mancati nei 30 giorni (O1, O3, O5)
+    fino = amb["_blocco_filtro_fino_p2p"](con, 222, ORA)
+    secondo_recente = con.execute(
+        "SELECT quando FROM p2p_esiti WHERE tg_id=222 AND esito='mancato' AND quando>=? "
+        "ORDER BY quando DESC LIMIT 1 OFFSET 1", (ORA - amb["P2P_MANCATI_FILTRO_S"],)).fetchone()[0]
+    prova("il blocco finisce quando il secondo mancato piu' recente esce dai 30 giorni", True,
+          fino == secondo_recente + amb["P2P_MANCATI_FILTRO_S"] and fino > ORA)
+    prova("...e chi ha un solo mancato nel mese non e' bloccato (333), ne' chi non ne ha (111)",
+          [0, 0], [amb["_blocco_filtro_fino_p2p"](con, 333, ORA), amb["_blocco_filtro_fino_p2p"](con, 111, ORA)])
+    prova("...la risposta al telefono porta `fino`", True,
+          amb["_posso_prendere_p2p"](con, 222, [], ORA)["fino"] == fino
+          and amb["_posso_prendere_p2p"](con, 333, [], ORA)["fino"] == 0)
     O16 = ordine(16)
     ev(O16, "taken", "buyer", "invoice-next", ORA - 40)
     ev(O16, "buyer-invoice-requested", "mostro", "", ORA - 40)
@@ -139715,11 +139746,22 @@ def prove_reputazione_p2p():
     e16 = amb["_evento_p2p_pulito"](d16, ORA)
     f16 = amb["_registra_evento_p2p"](con, e16, ORA)
     amb["_segna_esiti_p2p"](con, e16, f16, ORA)
+    c16 = amb["_conto_esito_p2p"](con, 222, O16, 1, ORA)
+    prova("...il giudice del giro: contato, 4 nei 90 giorni, la data del blocco scritta come «giorno mese»",
+          [True, 4, True, True],
+          [c16["contato"], c16["mancati"], c16["fino"] > ORA,
+           bool(re.fullmatch(r"\d{1,2} [a-z]+", c16["fino_testo"]))])
+    prova("...e un giro NON contato (ha provato) da' la riga vuota", "",
+          amb["_conto_esito_p2p"](con, 222, O2, 1, ORA)["riga"])
     detti = dict(amb["_avvisi_evento_p2p"](con, e16, f16, ORA))
-    prova("...e dalla rotta vera il conto arriva nel messaggio di chi ha preso, non in quello di chi ha pubblicato",
+    prova("...e dalla rotta vera il conto con la data arriva a chi ha preso, non a chi ha pubblicato",
           [True, False],
-          ["con questo sono 4 negli ultimi 90 giorni" in detti.get(222, ""),
+          [("con questo sono 4 negli ultimi 90 giorni" in detti.get(222, "")
+            and "Fino al " + c16["fino_testo"] + " non puoi prendere" in detti.get(222, "")),
            "non completato" in detti.get(111, "")])
+    prova("...la riga nell'archivio e' la stessa (e tace su un giro non contato)", [True, ""],
+          [pezzo("_scambi_p2p").count('"conto": _conto_scambio_p2p(con, io, ordine, giro_s, adesso)') == 1,
+           amb["_conto_scambio_p2p"](con, 222, O2, 1, ORA) if "_conto_scambio_p2p" in amb else ""])
     # o) la pulizia e la memoria lunga
     n_prima = con.execute("SELECT COUNT(*) FROM p2p_esiti").fetchone()[0]
     amb["_pulisci_memoria_p2p"](con, ORA + amb["P2P_LIBRO_MEMORIA_S"] + 10)
@@ -139818,9 +139860,11 @@ const c = {};
 c.marchio = [0, 1, 2, 7, 'x'].map(n => marchioMancatiP2P(n, true));
 c.marchioBox = marchioMancatiP2P(2);
 c.frasi = [fraseMancatiP2P(1), fraseMancatiP2P(3)];
+function dataBreveP2P(ts){ return ts === 1800000000 ? '12 novembre' : 'x'; }
 c.veto = [fraseVetoP2P({ok: true}), fraseVetoP2P(null),
   fraseVetoP2P({ok: false, motivo: 'filtro', soglia: 3}, {completati: 1}),
   fraseVetoP2P({ok: false, motivo: 'mancati'}, {mancati_30: 2}),
+  fraseVetoP2P({ok: false, motivo: 'mancati'}, {mancati_30: 2, fino: 1800000000}),
   fraseVetoP2P({ok: false, motivo: 'prese'}, {limite: 2}),
   fraseVetoP2P({ok: false, motivo: 'boh'})];
 const ID = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001', ID2 = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002';
@@ -139830,7 +139874,8 @@ c.segno = [segnoFiltroP2P({id: ID}), segnoFiltroP2P({id: ID2})];
 MIE = {[ID2]: {id: ID2, mio: true, filtro: 5}};
 c.mio = [filtroOrdineP2P({id: ID2}), filtroOrdineP2P({id: ID}), filtroOrdineP2P(null)];
 c.prendibili = [prendiPrendibiliP2P({ordini: {[ID]: {ok: false, motivo: 'filtro', soglia: 3}, [ID2]: 'x'},
-                                     completati: 1, mancati: 0, mancati_30: 0, prese_aperte: 0, limite: 2}, [ID, ID2]),
+                                     completati: 1, mancati: 0, mancati_30: 0, prese_aperte: 0, limite: 2, fino: 1800000000}, [ID, ID2]),
+                p2pMiaRep.fino,
                 vetoPresaP2P(ID), vetoPresaP2P(ID2), prendiPrendibiliP2P(null, [ID]), prendiPrendibiliP2P({}, [])];
 c.riquadro = [rigaFiltroDettP2P(ID), avvisoVetoP2P(ID), avvisoVetoP2P(ID2)];
 p2pMiaRep = null; c.mia = [rigaMiaReputazioneP2P()];
@@ -139873,21 +139918,23 @@ console.log(JSON.stringify(c));
                "2 scambi non completati" in c["marchioBox"] and "90 giorni" in c["marchioBox"]])
         prova("...singolare e plurale", ["1 scambio non completato", "3 scambi non completati"], c["frasi"])
         prova("client: le frasi del veto, dal codice del server, coi numeri di chi chiede",
-              ["", "", True, True, True, True],
+              ["", "", True, True, True, True, True],
               [c["veto"][0], c["veto"][1],
                "almeno 3 scambi completati" in c["veto"][2] and "(tu ne hai 1)" in c["veto"][2],
-               "30 giorni" in c["veto"][3] and "tu ne hai 2" in c["veto"][3],
-               "2 scambi presi" in c["veto"][4], "non si può prendere" in c["veto"][5]])
+               "30 giorni" in c["veto"][3] and "tu ne hai 2" in c["veto"][3] and "Potrai" not in c["veto"][3],
+               # (10 ott 2026, l'avviso del blocco) con `fino` la data di quando riprendere
+               c["veto"][4].endswith("tu ne hai 2. Potrai riprenderli dal 12 novembre."),
+               "2 scambi presi" in c["veto"][5], "non si può prendere" in c["veto"][6]])
         prova("client: i filtri del server entrano solo con id veri e soglie del catalogo",
               [True, {ID: 3}, False, False], c["filtri"])
         prova("...il segno sulla card c'e' solo col filtro, piccolo e con la soglia",
               [True, ""], ['p2p-accesso' in c["segno"][0] and 'Da 3 scambi completati' in c["segno"][0], c["segno"][1]])
         prova("...la mia riga vince sul server, il server vale per gli altri, niente e' 0",
               [5, 3, 0], c["mio"])
-        prova("client: i verdetti del server entrano (uno storto no), e il veto si legge per id",
-              [1, True, "", 0, 0],
-              [c["prendibili"][0], "almeno 3 scambi completati" in c["prendibili"][1],
-               c["prendibili"][2], c["prendibili"][3], c["prendibili"][4]])
+        prova("client: i verdetti del server entrano (uno storto no), `fino` con loro, e il veto si legge per id",
+              [1, 1800000000, True, "", 0, 0],
+              [c["prendibili"][0], c["prendibili"][1], "almeno 3 scambi completati" in c["prendibili"][2],
+               c["prendibili"][3], c["prendibili"][4], c["prendibili"][5]])
         prova("...la riga del filtro nel dettaglio e il riquadro del veto", [True, True, ""],
               ["almeno 3 scambi completati e nessuno scambio non completato" in c["riquadro"][0],
                'id="p2pDettVeto"' in c["riquadro"][1] and "🚫" in c["riquadro"][1], c["riquadro"][2]])
@@ -139961,6 +140008,12 @@ console.log(JSON.stringify(c));
            "segnaTentativoP2P(o.id, 'fattura_rifiutata', e.motivo);" in wal and "fraseRifiutoIncassoP2P(e, 'ln', o)" in wal])
     prova("...e il foglio della garanzia dice cosa fare se il wallet non paga", True,
           "Se il pagamento dal wallet non va a buon fine, riprova da qui: il tentativo è registrato" in fn("function renderHoldP2P(){"))
+    # (10 ott 2026, l'avviso del blocco) la riga del conto nell'app
+    prova("la riga del conto arriva con l'archivio, e' della presa, e la pagina la mostra sotto lo stato",
+          [True, True, True],
+          ["if (s.conto) o.contoServer = String(s.conto); else delete o.contoServer;" in m,
+           "'contoServer'" in _riga_js(m, "  'metodoScelto', 'preso', 'giroMorto'"),
+           "esc(o.contoServer)" in fn("function renderOrdineP2P(){")])
     prova("l'intestazione manda i filtri con zone e cambi", True,
           "filtri: filtri," in fn("async function registraOrdiniP2P(ids, pubblicati, presi){"))
     prova("i filtri arrivano dalle tre letture, come le zone", 3, m.count("prendiFiltriP2P(d && d.filtri)"))

@@ -44314,9 +44314,11 @@ vende, dare la fattura se compra. Lo dice mostrod, non si deduce: nel
 fork (`scheduler.rs`, `job_cancel_orders`) il dettaglio è
 `taker-timeout` SOLO quando l'ordine torna `Pending`, cioè quando a
 mancare è stato chi ha preso; se manca chi ha pubblicato l'ordine si
-annulla ed esce `maker-timeout`. Mai a chi ha pubblicato (può non aver
-visto l'avviso: per lui la conseguenza è già l'ordine tornato in
-vetrina), mai a chi ha aspettato, mai a chi si ritira prima
+annulla ed esce `maker-timeout`. Mai a chi ha pubblicato — il motivo,
+scritto da Andrea il 10 ott 2026 sera, quando gli ho chiesto se fosse
+voluto: chi pubblica non sceglie QUANDO qualcuno prende (può essere di
+notte, e lui dorme), chi prende sì; per lui la conseguenza resta
+l'ordine annullato —, mai a chi ha aspettato, mai a chi si ritira prima
 (`canceled`/`republished`), mai sullo scaduto in libro (`book`). La
 riga sta in `p2p_esiti` (tg_id, ordine, giro, esito, ruolo, quando =
 l'ora di mostrod, dettaglio), con la memoria LUNGA (`P2P_ESITI_MEMORIA_S`,
@@ -45902,3 +45904,61 @@ prima della cifra nel wallet, la frase uguale a quella del server. Un
 banco node fuori dalle prove ha fatto girare `inviaIncassoP2P` VERA con
 una fattura `lntb`: la frase nel foglio e nessuna chiamata, né al server
 né al coordinatore. Suite intera e collaudi: nel verbale del push.
+
+
+
+
+## L'avviso del blocco sui filtri, e il motivo del «mai a chi ha pubblicato» (10 ott 2026, sera, richiesta di Andrea al cantiere reputazione-p2p)
+
+La domanda di Andrea: Luca, quando riceve un «non completato», viene
+avvisato subito che dal secondo nel mese non può prendere gli ordini con
+filtro per 30 giorni, e cosa vede quando ci prova? Veniva avvisato solo
+su Telegram e solo in parte (al primo la riga non diceva la conseguenza,
+dal secondo la diceva senza una data); nell'app niente al momento, e nel
+riquadro del veto il numero senza il quando. Andrea ha detto sì a tutti
+e quattro i punti proposti:
+1. TELEGRAM AL PRIMO: «Questo conta come scambio non completato. Il primo
+   è tollerato; con un secondo nello stesso mese non potrai prendere gli
+   ordini con filtro (1+, 3+, 5+) per 30 giorni, e da due in 90 giorni
+   comparirà sul tuo profilo.»
+2. TELEGRAM DAL SECONDO, CON LA DATA: «…con questo sono N negli ultimi 90
+   giorni, e sul tuo profilo compare «⚠️ N non completati». Fino al
+   <giorno mese> non puoi prendere gli ordini con filtro (1+, 3+, 5+);
+   gli altri sì.» La data la sa il server: `_blocco_filtro_fino_p2p` —
+   il blocco finisce quando il (tollerati + 1)-esimo mancato più recente
+   esce dai 30 giorni, cioè il secondo più recente + 30 giorni; è lo
+   stesso conto di `_giudice_presa_p2p` letto come una data. Senza data
+   (due nei 90 giorni ma uno solo nel mese): «Finché ce n'è più di uno
+   nell'ultimo mese, chi pubblica con un filtro non ti accetta.»
+3. IL RIQUADRO DEL VETO: «…tu ne hai 2. Potrai riprenderli dal <data>.»
+   — `/api/p2p/posso-prendere` manda `fino` (0 = non bloccato),
+   `prendiPrendibiliP2P` lo tiene in `p2pMiaRep.fino`, `fraseVetoP2P` lo
+   scrive col calendario di casa (`dataBreveP2P`).
+4. NELL'APP, SULLO SCAMBIO TORNATO NEL LIBRO: l'archivio (`_scambi_p2p`)
+   porta `conto`, la STESSA riga del Telegram, quando QUESTO giro mi è
+   stato contato; `adottaScambiServerP2P` la mette sulla riga locale
+   (`contoServer`, della presa: un giro nuovo la toglie) e
+   `renderOrdineP2P` la mostra in un riquadro «⚠️» sotto lo stato.
+UNA FRASE SOLA, scritta in un posto: `_riga_conto_p2p` (pura); la legge
+`_conto_esito_p2p` (contato / quanti / fino / la riga, fail-open sulla
+tabella assente), che servono l'avviso (`_avvisi_evento_p2p`, dati
+`conto`) e l'archivio (`_conto_scambio_p2p`). La vecchia coppia di
+chiavi `mancato_contato`/`mancati` nei dati della frase non c'è più.
+Prove: i casi q) di `prove_reputazione_p2p` riscritti (la riga al primo,
+dal secondo con la data, senza data, non contato, il Telegram con la
+riga e non a chi ha pubblicato, il blocco e la sua data, `fino` nella
+risposta, il giudice del giro con la data in «giorno mese», il giro non
+contato, l'archivio); nel client la data nel veto e `fino` coi verdetti,
+le sentinelle della riga nell'app; `collaudo_reputazione_p2p` (la data
+del blocco dalla rotta vera, l'archivio col conto sul giro contato e non
+sugli altri); `collaudo_avviso_chi_annulla` emendato col testo nuovo.
+GUIDA-P2P-PASSI aggiornata nei tre posti.
+
+LA FRASE SU NOSTR IN «I TUOI DATI» (chiesta da Andrea): nel frattempo
+l'ha corretta l'altra sessione, su main prima di questo push
+(`8320396`, «chi entra da Nostr e prende resta sconosciuto all'altra
+persona, non al server»): i due paragrafi del patto ora dicono a CHI
+resta sconosciuto — all'altra persona — e che l'esito si scrive sul suo
+account come per tutti, perché il coordinatore dice fra quali due
+account è lo scambio. La mia stesura della stessa frase, nata in
+parallelo, è caduta al rebase: si tiene la sua, con la sua sentinella.

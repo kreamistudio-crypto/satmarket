@@ -213,6 +213,15 @@ async def giro():
           ([("mancato", A), ("mancato", C)], []), (esiti(TAKER), esiti(MAKER)))
     r = await posso(TAKER, [F])
     prova("...e da due la scritta c'e'", 2, r["mancati"])
+    # (10 ott 2026, l'avviso del blocco): fino a quando, e la riga nell'archivio
+    prova("...e il blocco sui filtri ha una data: 30 giorni dal secondo mancato piu' recente",
+          t0 + 400 + 30 * 86400, r["fino"])
+    banco.come(TAKER)
+    arch = (await chiama(SRV.scambi_p2p, {}))["scambi"]
+    prova("...l'archivio porta la riga del conto sul giro contato, non sugli altri",
+          [True, ""],
+          ["Fino al " in arch[C]["conto"] and "sono 2 negli ultimi 90 giorni" in arch[C]["conto"],
+           arch[B]["conto"]])
     banco.come(MAKER)
     facce = (await chiama(SRV.facce_ordini_p2p, {"ordini": [I, F]}))["facce"]
     prova("il volto di chi ha pubblicato porta il marchio; quello senza marchio non ha la chiave",
