@@ -48412,3 +48412,61 @@ Tortura e giro dal vivo NON rifatti dopo il rebase. Lo scanner dei
 segreti sulle righe aggiunte: pulito, con la controprova. LA CI DI MAIN
 prima del push: la punta (`1b1d05f`) verde. Il sì al push è di Andrea:
 stava nel brief incollato, e l'ho richiesto prima di spingere.
+
+## La prova della contesa senza cronometro: «…senza MAI un "database is locked"» (10 ott 2026, sera, cantiere contesa-affidabile, richiesta di Andrea)
+
+**IL FATTO.** La scena 4 di `prove_db_contesa_negozi` — il giro di un
+negozio in un thread mentre le rotte scrivono — è uscita ROSSA A CASO in
+CI: due corse su tre del commit `010f98c` (che non la toccava), con
+`avuto: (1, [])`, cioè UN «locked» su un centinaio di scritture; la
+corsa dopo verde. In locale non è mai uscita.
+
+**PERCHÉ ERA FRAGILE.** Confrontava due tempi vicini: foto da 0,3
+secondi (0,6 a riga col guasto del 1 ott, le foto dentro la
+transazione) contro una rotta con MEZZO secondo di pazienza. Il guasto
+si riconosceva dal fatto che 0,6 supera 0,5; ma basta che un commit
+sano del giro resti 0,5 secondi col lucchetto in mano — un disco che
+inciampa, un thread che non prende la CPU su una macchina affollata — e
+la rotta muore lo stesso, senza nessun guasto.
+
+**COSA È PROVATO E COSA NO, sulla causa.** NON riprodotta la causa in
+CI: dieci giri della scena di prima con dodici processi di carico (sei
+che macinano CPU, sei che scrivono su disco con fsync), zero rossi; e
+gli orari nel log della CI sono tutti uguali (uscita a blocchi), non
+dicono quanto è durata la scena. RIPRODOTTO il meccanismo: facendo
+aspettare 0,7 secondi UN commit del giro prima di chiudere la
+transazione, la scena di prima esce rossa cinque volte su cinque e con
+la stessa firma della CI, `(1, [])`. È un'ipotesi che torna, non una
+causa vista.
+
+**LA CURA: D'ORDINE, NON DI CRONOMETRO** (la lezione di «fame di
+lucchetto», e quel che `collaudo_db_contesa` fa già con le sue sonde).
+Il download non dorme più: alza una bandierina e resta FERMO finché il
+ciclo principale — un altro thread, un'altra connessione — non ha
+scritto tre volte con pazienza ZERO. Mentre il giro è fermo lì dentro
+la risposta non dipende da nessun orologio: se tiene una transazione
+aperta le scritture falliscono tutte, a ogni foto; se no, passano
+tutte. Fra un download e l'altro le rotte continuano a scrivere, con la
+pazienza vera di `db()` (15 secondi) e un respiro proporzionale a
+quanto ci hanno messo (al più un secondo), per non affamare il giro. La
+connessione del giro ha la stessa pazienza.
+
+**NIENTE TOLTO.** Restano: le rotte scrivono davvero durante il giro da
+un altro thread (prima «almeno 20», a tempo; ora 24 esatte, tre per
+ognuna delle otto foto, più quelle fra un download e l'altro); mai un
+«locked» né un altro errore; il giro finisce il lavoro, foto comprese.
+In più: nessun download ha aspettato invano la rotta. Le prove della
+sezione salgono da 25 a 26, e la scena dura 1,6 secondi invece di 3,7.
+
+**PROVATO.** Il guasto del 1 ott rimesso su una copia del repo (via il
+commit prima delle foto in `_una_riga`): la scena nuova rossa tre volte
+su tre, con le ventiquattro scritture tutte «locked» — prima lo
+prendeva «a ogni riga», adesso a ogni foto. Il singhiozzo: un commit
+del giro fermo 0,7 secondi, tre giri, zero rossi; fermo 5 secondi, zero
+rossi. Quaranta giri di fila a riposo e venti con dodici processi di
+carico: zero rossi. Solo `prove.py` e questo file: `importa_negozio.py`
+e il server non sono toccati.
+
+**NON TOCCATO, e detto.** `collaudo_db_contesa` ha una scena sorella
+con DUE secondi di pazienza (e le sonde senza orologio accanto): non è
+mai uscita rossa e non era nella richiesta.

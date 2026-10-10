@@ -134427,22 +134427,51 @@ def prove_db_contesa_negozi():
     con3.close()
 
     # --- 4) il giro lungo MENTRE le rotte scrivono, da un altro thread ------
-    # La riproduzione alla lettera: foto lente (0,3 s l'una, due per riga)
-    # in un thread come nel server, e il ciclo principale che scrive ogni
-    # pochi millisecondi con la pazienza di mezzo secondo. Col codice di
-    # ieri ogni riga teneva il lucchetto 0,6 s e la rotta moriva; adesso
-    # le transazioni del giro durano quanto un commit.
+    # Il giro in un thread come nel server, e il ciclo principale che fa
+    # la rotta. Col codice di ieri ogni riga teneva il lucchetto di
+    # scrittura per tutta la durata delle sue foto, e la rotta moriva.
+    #
+    # ⚠️ E' UNA PROVA D'ORDINE, NON DI CRONOMETRO (10 ott 2026). Fino a
+    # oggi qui si misuravano due tempi vicini: foto da 0,3 secondi (0,6 a
+    # riga col codice di ieri) contro una rotta con mezzo secondo di
+    # pazienza. In locale tornava sempre; in CI e' uscita ROSSA A CASO —
+    # UN «locked» su un centinaio di scritture, due corse su tre dello
+    # stesso commit, verde quella dopo. La causa in CI NON e' stata
+    # riprodotta (dieci giri qui con dodici processi che macinano CPU e
+    # disco: zero rossi); quel che si e' VISTO e' il meccanismo: basta
+    # che UN commit del giro resti 0,7 secondi col lucchetto in mano — un
+    # disco che inciampa, un thread che non prende la CPU — e la scena di
+    # prima diventa rossa, senza che il guasto che cerca ci sia.
+    # ADESSO IL DOWNLOAD NON DORME: SI FERMA E ASPETTA LA ROTTA. Lo
+    # scaricatore alza una bandierina e resta fermo finche' il ciclo
+    # principale — un altro thread, un'altra connessione — non ha scritto
+    # tre volte con pazienza ZERO. Mentre il giro e' fermo li' dentro la
+    # risposta non dipende da nessun orologio: se tiene una transazione
+    # aperta le tre scritture falliscono TUTTE, a ogni foto (il guasto di
+    # ieri, preso al cento per cento e non «quasi sempre»); se non la
+    # tiene passano tutte. Fra un download e l'altro le rotte continuano
+    # a scrivere come scrivono nel server, con la pazienza VERA di `db()`
+    # (quindici secondi, non mezzo) e col respiro proporzionale a quanto
+    # ci hanno messo — una raffica di scritture affamerebbe il giro, che
+    # sarebbe un altro rosso a caso: li' un «locked» vorrebbe dire un
+    # lucchetto tenuto quindici secondi, non un commit lento.
     percorso4, con4 = banco()
     con4.close()
     finito = threading.Event()
-    conto = {"ok": 0, "locked": 0, "altro": []}
+    scarico, fatto = threading.Event(), threading.Event()
+    SCRITTURE_A_DOWNLOAD = 3
+    PAZIENZA_VERA = 15          # il DB_BUSY_TIMEOUT di serie (sezione 5)
+    conto = {"durante": [], "fra": 0, "locked": 0, "altro": [], "sordi": 0}
 
-    def foto_lenta(annuncio_id, i, u):
-        time.sleep(0.3)
+    def foto_che_aspetta(annuncio_id, i, u):
+        fatto.clear()
+        scarico.set()
+        if not fatto.wait(60):          # la rotta non ha risposto: si dice
+            conto["sordi"] += 1
         return f"a{annuncio_id}_{i}.jpg"
 
     def il_thread():
-        c = sqlite3.connect(percorso4)
+        c = sqlite3.connect(percorso4, timeout=PAZIENZA_VERA)
         c.row_factory = sqlite3.Row
         try:
             with contextlib.redirect_stdout(io.StringIO()):
@@ -134450,7 +134479,7 @@ def prove_db_contesa_negozi():
                     c, CONNETTORE,
                     [riga(k, (f"https://cdn/{k}a.jpg", f"https://cdn/{k}b.jpg"))
                      for k in range(4)],
-                    foto_lenta, {}, completo=True)
+                    foto_che_aspetta, {}, completo=True)
         finally:
             c.close()
             finito.set()
@@ -134458,19 +134487,29 @@ def prove_db_contesa_negozi():
     t = threading.Thread(target=il_thread, daemon=True)
     t.start()
     while not finito.is_set():
-        e = rotta_che_scrive(percorso4, timeout=0.5)
+        if scarico.wait(0.01):
+            # il giro e' FERMO dentro un download: pazienza zero
+            for _ in range(SCRITTURE_A_DOWNLOAD):
+                conto["durante"].append(rotta_che_scrive(percorso4))
+            scarico.clear()
+            fatto.set()
+            continue
+        inizio = time.time()
+        e = rotta_che_scrive(percorso4, timeout=PAZIENZA_VERA)
         if e == "ok":
-            conto["ok"] += 1
+            conto["fra"] += 1
         elif e == "locked":
             conto["locked"] += 1
         else:
             conto["altro"].append(e)
-        time.sleep(0.01)
+        time.sleep(min(1.0, max(0.01, 2 * (time.time() - inizio))))
     t.join(10)
-    prova("quattro righe con foto lente, e le rotte hanno scritto davvero nel frattempo",
-          True, conto["ok"] >= 20)
+    prova("quattro righe, otto foto: a OGNI download le rotte scrivono davvero, "
+          "da un altro thread e senza aspettare (pazienza zero)",
+          ["ok"] * (8 * SCRITTURE_A_DOWNLOAD), conto["durante"])
     prova("...senza MAI un «database is locked» (ieri: a ogni riga)", (0, []),
-          (conto["locked"], conto["altro"]))
+          (conto["locked"] + conto["durante"].count("locked"), conto["altro"]))
+    prova("...e nessun download ha aspettato invano la rotta", 0, conto["sordi"])
     c = sqlite3.connect(percorso4)
     prova("...e il giro ha finito il suo lavoro, foto comprese", 4,
           c.execute("SELECT COUNT(*) FROM annunci WHERE foto LIKE '%.jpg%' "
