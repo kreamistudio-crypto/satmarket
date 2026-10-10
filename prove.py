@@ -137752,6 +137752,7 @@ def prove_indirizzo_non_verificato():
         a = {"P2P_ATTIVO": True, "MOSTRO_HEX": "ab" * 32, "MOSTRO_RELAY": ["wss://x"],
              "MOSTRO_RELAY_SPECCHIO": [], "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
              "P2P_CONTANTI_MAX_EURO": 250, "BARATTOZON_MIN_EURO": 25, "P2P_CAUZIONE": False,
+             "P2P_CAUZIONE_SUL_METODO": False,
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              "P2P_INDIRIZZI_NON_PASSANO": elenco}
         exec(pezzo("_p2p_leve"), a)
