@@ -44697,3 +44697,17 @@ percentuale effettiva lo dirà, e se la fee del nodo non è quella che
 crediamo si vede lì. • Il primo passaggio della scopa a quaranta giorni
 dal 18 settembre (verso il 28 ottobre): nel journal «🧹 P2P: tolte N
 righe» senza «⚠️ i conti non si sono consolidati» prima.
+
+**IL PUSH (10 ott 2026, pomeriggio, con l'ok di Andrea).** Main era
+corso di tre commit di altre sessioni (b725df1 la scadenza vera della
+fattura, 2fa0df3 e f2e7436 la reputazione del P2P): rebase su f2e7436,
+un solo conflitto — due voci appese in fondo a questo file, tenute
+tutt'e due. COSA È GIRATO SU QUALE ALBERO: sull'albero di bb6d453 più
+il cantiere, la suite `PROVE_SEVERE=1` (20.936 passate, 0 fallite), 49
+collaudi nella gabbia, la tortura e il giro dal vivo; sull'albero
+RIBASATO (f2e7436 più i due commit del cantiere), di nuovo la suite
+intera (21.040 passate, 0 fallite) e i 50 collaudi della CI (50 verdi),
+non la tortura né il giro. La reputazione del P2P ha portato una
+tabella sua, `p2p_esiti` (gli esiti PER PERSONA, per il marchio dei non
+completati): non è un doppione di `p2p_conti`, che è per SCAMBIO e non
+ha persone — due domande diverse, due tabelle.
