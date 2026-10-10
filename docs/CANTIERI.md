@@ -46692,11 +46692,42 @@ una settimana di journal in mezzo. In tutto 4-5 giorni di cantiere
 più l'attesa, in due o tre PR (delega+registro e codemod; banchi;
 hash e rollout). Nessun codice toccato per questo studio.
 
-**NON PROVATO, DA GUARDARE.** Il login Telegram vero sul sito (dominio
-registrato) con la CSP accesa; le due righe «eval» del journal lette
-con `@ file:riga «campione»`; il journal per una settimana dopo
-l'accensione; Telegram Web (iframe) con la CSP accesa — la CSP delle
-pagine non ha `frame-ancestors` e non lo chiude, ma va visto.
+**FATTO SUL VPS (Andrea, 10 ott 2026, sera).** Deploy fatto, il login
+Telegram sul sito e la Mini App funzionano con la CSP accesa; nel
+journal, dopo l'accensione, solo righe di `chrome-extension`. Resta da
+guardare: le due righe «eval» del 9 ott lette con `@ file:riga
+«campione»`, il journal per una settimana, Telegram Web (iframe) con la
+CSP accesa.
+
+## Il codice di ritiro unico fra quelli attivi, e la prova senza dado (10 ott 2026, sera, richiesta di Andrea dopo una CI rossa a caso)
+
+La CI del push della sera e' stata rossa per «...e non si ripete (300
+giri, 300 codici)»: la prova coniava 300 codici col dado vero e
+pretendeva zero doppioni — sei caratteri su 32 simboli fanno un
+miliardo di combinazioni, e 300 estrazioni ci cadono sopra una volta
+ogni ventimila corse. E' successo, e il rilancio del job l'ha fatta
+verde. Due cose chieste da Andrea: il conio unico fra i codici ATTIVI
+nel database (sennò si rifa'), e la prova deterministica.
+
+**LA CURA.** `conia_codice_ritiro(occupati, scegli)`: `occupati` sono i
+codici in gioco e il conio si ripete finche' non ne trova uno libero
+(venti volte, poi alza: un doppione non si consegna mai); `scegli` e' la
+sorgente, `secrets.choice` di serie e una sequenza scritta a mano nelle
+prove. `codici_ritiro_attivi(con)`: gli ordini al punto, presi in
+carico, non ancora ritirati (`via_punto=1`, `stato='shipped'`,
+`punto_preso_il>0`), DECIFRATI uno per uno — la colonna e' cifrata con
+un sale casuale, due cifrati dello stesso codice non si somigliano, il
+confronto va fatto in chiaro; sono decine, il conio di un pacco se lo
+paga. La rotta `punto_preso_in_carico` conia fra quelli.
+
+**PROVATO.** `prove_presa_in_carico`: il dado vero una volta sola (sei
+caratteri, dentro l'alfabeto senza 0 1 I O); con la sorgente scritta a
+mano il codice e' quello scritto; se e' gia' in uso si rifa' (il
+secondo, poi il terzo della sequenza); dopo venti coni occupati alza;
+`secrets` e mai `random`; gli attivi su un database di cartone (i due
+al punto presi in carico; non il ritirato, non il non preso, non quello
+fuori dal punto); la rotta conia fra gli attivi. Nessuna prova dipende
+piu' dal dado.
 ## Le hold di prova G e H: la stessa pagina, due hold invoice che si annullano da sole (10 ott 2026, sera, cantiere prova-hold, richiesta di Andrea)
 
 **LA PRIMA RISPOSTA DELLA PAGINA.** Andrea, con WoS self-custodial

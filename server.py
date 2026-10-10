@@ -38173,7 +38173,7 @@ async def pacchi_del_punto(x_tg_init_data: str = Header(""),
 ALFABETO_RITIRO = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 
 
-def conia_codice_ritiro() -> str:
+def conia_codice_ritiro(occupati=frozenset(), scegli=None) -> str:
     """Il codice che chi compra dice al banco. Sei caratteri.
 
     L'ALFABETO E' SENZA `0`, `1`, `I` e `O` APPOSTA: al banco quel
@@ -38186,8 +38186,33 @@ def conia_codice_ritiro() -> str:
     `secrets` e non `random`: e' pur sempre la chiave che apre un
     pacco di qualcun altro, e un generatore prevedibile non si usa mai
     dove una stringa vale qualcosa.
+
+    UNICO FRA QUELLI ATTIVI (10 ott 2026, richiesta di Andrea): un
+    miliardo di combinazioni non e' una garanzia, e' una probabilita'
+    — e due pacchi vivi allo stesso banco con lo stesso codice sarebbero
+    il pacco sbagliato in mano a chi lo dice. `occupati` sono i codici
+    ancora in gioco (`codici_ritiro_attivi`), e se il conio ci cade
+    sopra si rifa'. `scegli` e' la sorgente: `secrets.choice` di serie,
+    una sequenza scritta a mano nelle prove — cosi' la prova dice il
+    vero sempre, invece di dipendere da un dado.
     """
-    return "".join(secrets.choice(ALFABETO_RITIRO) for _ in range(6))
+    scegli = scegli or secrets.choice
+    for _ in range(20):
+        codice = "".join(scegli(ALFABETO_RITIRO) for _ in range(6))
+        if codice not in occupati:
+            return codice
+    raise RuntimeError("codice di ritiro: venti coni di fila gia' in uso")
+
+
+def codici_ritiro_attivi(con) -> set:
+    """I codici di ritiro ancora in gioco: ordini al punto, presi in
+    carico, non ancora ritirati (stato `shipped`). Si DECIFRANO uno per
+    uno: la colonna e' cifrata con un sale casuale, due cifrati dello
+    stesso codice non si somigliano, e il confronto va fatto in chiaro.
+    Sono decine, non migliaia: il conio di un pacco puo' pagarselo."""
+    return {_decifra_contenuto(r[0]) for r in con.execute(
+        "SELECT busta_codice FROM ordini WHERE via_punto=1 "
+        "AND stato='shipped' AND punto_preso_il>0 AND busta_codice<>''")}
 
 
 @app.post("/api/orders/{ordine_id}/punto/preso")
@@ -38251,7 +38276,7 @@ async def punto_preso_in_carico(ordine_id: int,
         con.close()
         return {"ok": True, "punto_preso_il": o["punto_preso_il"]}
     adesso = int(time.time())
-    codice = conia_codice_ritiro()
+    codice = conia_codice_ritiro(codici_ritiro_attivi(con))
     # LA BUSTA SI SCRIVE QUI, ed e' il ribaltamento del cantiere: su
     # ogni altra rete la deposita il venditore col nome di fantasia
     # che ha messo sull'etichetta, qui il nome sull'etichetta e' il

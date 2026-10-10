@@ -110007,23 +110007,66 @@ def prove_presa_in_carico():
     corpo = _senza_prosa(codice(rotta))
 
     # ---- il codice di ritiro: si fa girare, non si guarda -----------
-    amb = {"secrets": __import__("secrets")}
+    # DETERMINISTICA (10 ott 2026, richiesta di Andrea): la versione di
+    # prima coniava 300 codici col dado vero e pretendeva zero doppioni
+    # — una CI rossa a caso ogni ventimila corse, ed e' successo. Qui la
+    # sorgente dei caratteri e' una sequenza scritta a mano, e il dado
+    # vero lo si guarda una volta sola per l'alfabeto e la lunghezza.
+    import sqlite3 as _sq
+    amb = {"secrets": __import__("secrets"), "CHIAVE_CONTENUTI_DIGITALI": "",
+           "Fernet": None}
     i = src.index("ALFABETO_RITIRO = ")
     exec(src[i:src.index("\n", i)], amb)
-    exec(pezzo("conia_codice_ritiro"), amb)
-    codici = {amb["conia_codice_ritiro"]() for _ in range(300)}
-    prova("il codice di ritiro e' di sei caratteri",
-          {6}, {len(c) for c in codici})
+    for n in ("conia_codice_ritiro", "codici_ritiro_attivi", "_decifra_contenuto"):
+        exec(pezzo(n), amb)
+    uno = amb["conia_codice_ritiro"]()
+    prova("il codice di ritiro e' di sei caratteri", 6, len(uno))
     # L'ALFABETO E' LA RIGA CHE CONTA, e non e' pignoleria: quel
     # codice si legge ad alta voce a un banco, e «zero o o?» e'
     # l'unico modo in cui questo pezzo puo' fallire.
-    prova("...e non contiene mai 0, 1, I o O",
-          set(), set("01IO") & set("".join(codici)))
-    prova("...e non si ripete (300 giri, 300 codici)", 300, len(codici))
+    prova("...e l'alfabeto non ha mai 0, 1, I o O", set(),
+          set("01IO") & set(amb["ALFABETO_RITIRO"]))
+    prova("...ed e' tutto dentro l'alfabeto", True,
+          set(uno) <= set(amb["ALFABETO_RITIRO"]))
+
+    def dado(sequenza):
+        """Una sorgente scritta a mano: un carattere per chiamata."""
+        it = iter(sequenza)
+        return lambda alfabeto: next(it)
+
+    prova("con la sorgente scritta a mano il codice e' quello scritto",
+          "AAAAAA", amb["conia_codice_ritiro"](scegli=dado("AAAAAA")))
+    prova("...e se e' gia' in uso si RIFA' (il secondo della sequenza)",
+          "BBBBBB", amb["conia_codice_ritiro"]({"AAAAAA"}, dado("AAAAAABBBBBB")))
+    prova("...finche' ne trova uno libero", "CCCCCC",
+          amb["conia_codice_ritiro"]({"AAAAAA", "BBBBBB"}, dado("AAAAAABBBBBBCCCCCC")))
+    try:
+        amb["conia_codice_ritiro"]({"AAAAAA"}, dado("AAAAAA" * 20))
+        esploso = False
+    except RuntimeError:
+        esploso = True
+    prova("...e dopo venti coni tutti occupati alza, non consegna un doppione",
+          True, esploso)
     prova("il codice viene da `secrets` e mai da `random`",
           (True, False),
-          ("secrets.choice(ALFABETO_RITIRO)" in src,
-           "random.choice(ALFABETO_RITIRO)" in src))
+          ("secrets.choice" in codice(pezzo("conia_codice_ritiro")),
+           "random.choice" in codice(pezzo("conia_codice_ritiro"))))
+    # GLI ATTIVI: al punto, presi in carico, non ancora ritirati. Il
+    # ritirato (delivered) e il non preso in carico non contano.
+    _c = _sq.connect(":memory:")
+    _c.executescript("""
+        CREATE TABLE ordini(id INTEGER PRIMARY KEY, via_punto INT, stato TEXT,
+                            punto_preso_il INT, busta_codice TEXT);
+        INSERT INTO ordini VALUES(1, 1, 'shipped', 100, 'plain:AAAAAA');
+        INSERT INTO ordini VALUES(2, 1, 'shipped', 100, 'plain:BBBBBB');
+        INSERT INTO ordini VALUES(3, 1, 'delivered', 100, 'plain:CCCCCC');
+        INSERT INTO ordini VALUES(4, 1, 'shipped', 0, '');
+        INSERT INTO ordini VALUES(5, 0, 'shipped', 100, 'plain:DDDDDD');
+    """)
+    prova("gli attivi sono i due al punto, presi in carico e non ritirati",
+          {"AAAAAA", "BBBBBB"}, amb["codici_ritiro_attivi"](_c))
+    prova("...e la rotta conia fra quelli", True,
+          "conia_codice_ritiro(codici_ritiro_attivi(con))" in corpo)
 
     # ---- la rotta ----------------------------------------------------
     # IL PUNTO SPENTO NON PRENDE PIU' IN CARICO NIENTE: si guardano i
