@@ -43994,3 +43994,120 @@ NON PROVATO, DA GUARDARE: la fila di Esplora con la fotografia VERA del
 server (nel giro il relay è morto e la fotografia è vuota: le card sono
 state disegnate dalla pagina con le funzioni vere); il post nel canale
 Telegram vero.
+
+## Il tutorial già fatto vale come il timbro: il banner P2P sul telefono nuovo (10 ott 2026, cantiere tour-banner-p2p, richiesta di Andrea)
+
+**Cosa si è visto.** La mattina dell'apertura a tutti (`P2P_PROVA_IDS =
+[]`, `P2P_PRESE_DA` passata alle 10) Andrea, moderatore, col tutorial del
+P2P già fatto su un altro telefono, è entrato da un telefono nuovo: il
+tutorial non è ripartito (giusto), ma il banner delle commissioni è
+rimasto tutto colorato — le tre pillole accese, come prima della sua
+animazione — finché non ha rifatto il giro da «Come funziona».
+
+**Perché.** Lo stato «personale e fermo» del banner dipendeva dal SOLO
+timbro `banner_p2p`, che nasce con l'animazione di fine giro
+(`animaBannerFeeP2P`). Il timbro sta sul profilo e viaggia fra i
+telefoni, ma non tutti ce l'hanno: chi ha fatto il tutorial prima che il
+banner esistesse (26 set), chi ha chiuso le slide con «Salta», chi ha
+ricaricato a metà, chi è passato dalla porta del 9 ott senza finire il
+giro. Per tutti loro il tutorial non riparte più (`tour_p2p` c'è) e
+quindi l'animazione non arriva mai da sola: banner colorato a ogni
+ingresso, su ogni telefono. Non era un difetto del telefono nuovo: lì si
+è solo visto. Riprodotto a codice intatto sulla copia: profilo con
+`tour_p2p` e `giro_p2p`, telefono vuoto → `tourP2PVisto()` vero,
+`hintDismesso('banner_p2p')` falso, banner senza classi per sempre.
+
+**La cura.** Il tutorial FATTO vale come il timbro. Il giudice è uno,
+`bannerFeeGiaMioP2P()`, nel blocco del banner: il timbro, oppure
+`tourP2PVisto()` — che legge prima il profilo (`vistiMem.tour_p2p`, da
+/me) e poi il telefono. `bannerFeeFissoP2P` chiede a lui. L'unica attesa
+è il primo giro di QUESTA apertura: le slide timbrano `tour_p2p` alla
+comparsa, e senza una bandierina un /me arrivato a metà giro avrebbe
+spento le pillole prima della lenta di «Fine 🎉». La bandierina
+`feePrimoGiroP2P` (in memoria) si accende in `apriTourP2PSePrimaVolta`,
+cioè solo dove le slide si aprono DA SOLE, e si scioglie in due modi:
+`animaBannerFeeP2P` (il giro è finito, comunque sia finito) e
+`posaBannerFeeP2P`, che `chiudiTourP2P` chiama nello stesso `libera` del
+banner della porta — slide saltate, gesto indietro, giro non partito — e
+che mette il banner personale e fermo subito. È il calco della
+bandierina del 9 ott (`p2pBannerAlFine`), con le stesse tre uscite.
+
+**Le scelte, e le strade scartate.**
+- Scrivere il timbro `banner_p2p` al «Salta» o all'ingresso di chi ha il
+  tutorial: scartata. Il timbro resta «la prima animazione VISTA», e a
+  chi l'ha saltata la lenta tocca ancora al primo giro rifatto da «Come
+  funziona» (`lenta = conFine || !timbro`, non toccato).
+- Far partire l'animazione da sola all'ingresso di chi ha il tutorial ma
+  non il timbro: scartata. «L'ingresso dal mercatino non anima niente» è
+  una regola con le sue prove, e Andrea ha chiesto un banner che sa e sta
+  fermo.
+- Accendere la bandierina in `apriTourP2P` (che serve anche «Come
+  funziona»): scartata. Chi rivede il tutorial ce l'ha già fatto, e un
+  /me nel mezzo gli avrebbe riacceso le tre pillole sotto le slide.
+- Una migrazione sul server (dare `banner_p2p` a chi ha `tour_p2p`):
+  scartata, avrebbe tolto la lenta a chi non l'ha mai vista e voleva una
+  query sul VPS per una cosa che il client sa già.
+- Chi salta le slide vede il banner farsi personale subito, senza
+  animazione: prima restava colorato fino al giro rifatto, e alla prima
+  ricarica la regola nuova lo avrebbe comunque fatto personale — due
+  comportamenti per lo stesso stato.
+
+**La regola delle 10, controllata.** Dopo `P2P_PRESE_DA` non resta
+attivo niente dei cantieri «Le prese dalle 10» e «Il banner aspetta il
+Fine»: il server manda `preseDa: 0` (`_p2p_prese_da` legge l'orologio a
+ogni richiesta) e `preseChiuseP2P()` guarda anche l'orologio del
+telefono, quindi anche una pagina rimasta aperta da prima delle 10 con
+la busta vecchia ha la porta chiusa, il tutorial libero e il banner mai
+nascosto (nemmeno con `p2pBannerAlFine` rimasta accesa). Nessun codice
+tolto: la leva è inerte da sola, e la riga nel config del VPS si può
+cancellare quando si vuole (lo dice già il pannello delle leve).
+
+**Provato.** `prove_tour_banner_p2p` (25, nuova): girano in node le
+funzioni VERE — `tourP2PVisto`, `apriTourP2PSePrimaVolta`, `apriTourP2P`,
+`chiudiTourP2P`, `fineGiroP2P`, il blocco del banner, i tre giudici della
+porta — nei casi: esperto su telefono nuovo (anche pioniere), veterano
+col timbro, tutorial solo sul telefono, memoria muta, anonimo e server
+che tace, «Come funziona» con un /me nel mezzo, utente nuovo che salta,
+giro che non parte, utente nuovo che fa tutto fino alla lenta, e la
+porta un minuto prima e un minuto dopo le 10 (con la busta vecchia e con
+quella nuova); più le sentinelle sui posti. Controprova: sei mutazioni
+della cura (stato fisso sul solo timbro, bandierina mai accesa, chiusura
+che non posa, fine giro che non scioglie, giudice che ignora l'attesa,
+bandierina anche da «Come funziona»), tutte rosse, da 2 a 7 righe.
+Le prove di ieri (`prove_banner_fee_personale`, `prove_banner_ingresso`,
+`prove_banner_fee_primo_ingresso`, `prove_prese_dalle_10`,
+`prove_tour_p2p`) sono verdi SENZA emendamenti: nei loro banchi
+`tourP2PVisto` non esiste e il typeof tiene lo stato di prima.
+
+**Dal vivo**, a misura di telefono (Playwright con Chrome, 390×844,
+tocchi veri, movimento NON ridotto e chiesto alla pagina; copia del
+worktree nello scratchpad, server di collaudo sulla 8163, relay morti,
+`P2P_PRESE_DA = "2026-10-10 10:00"` e l'orologio vero dopo le 10, le
+cifre del disegno nel config del banco; ogni identità in un contesto
+nuovo = un telefono vuoto; fuori dal loopback solo lo script di
+Telegram):
+- UTENTE NUOVO (4101): entra nel P2P → niente porta (`preseDa` 0), le
+  slide partono da sole, banner colorato sotto; sette tocchi fino a
+  «Inizia», il giro in sette passi col banner sempre colorato; «Fine 🎉»
+  → `fee-primo` e i sei passi a 0,1 / 1,1 / 1,6 / 2,0 / 2,8 / 3,5 s, a
+  3,9 s resta `fee-p2`, fermo; sul server `tour_p2p`, `giro_p2p`,
+  `banner_p2p`; ricarica → niente tutorial, banner personale fermo.
+- UTENTE NUOVO CHE SALTA (4102): «Salta» → `fee-p2` subito e fermo, sul
+  server solo `tour_p2p`; ricarica → uguale.
+- ESPERTO SU TELEFONO NUOVO (4202, sul profilo `tour_p2p` e `giro_p2p`,
+  nessun `banner_p2p`): PRIMA della cura banner senza classi per 4 s,
+  DOPO `fee-p2` dal primo campione e fermo, tutorial non ripartito. Poi
+  «Come funziona»: banner personale sotto slide e giro, a «Fine 🎉» la
+  lenta, alla fine `fee-p2` e il timbro sul server.
+- VETERANO (4203, con `banner_p2p`): `fee-p2` fermo, com'era.
+- MODERATORE (999, solo `tour_p2p`: il caso di Andrea): PRIMA colorato,
+  DOPO `fee-p2` fermo.
+Scatti in `.claude/giri/tour-banner-p2p/` (gitignored): `prima/` i due
+col difetto, `dopo/` i dieci del giro.
+
+**NON PROVATO, DA GUARDARE.** Il telefono vero di Andrea dopo il deploy:
+entrando nel P2P il banner deve essere già personale (grigie le pillole
+che non valgono per lui) senza toccare niente. Nel giro il libro era
+vuoto (relay morto): il banner non dipende dal libro, ma lo scatto con le
+card vere è quello del telefono. Il CloudStorage di Telegram non esiste
+nel banco: la strada provata è quella del profilo sul server.

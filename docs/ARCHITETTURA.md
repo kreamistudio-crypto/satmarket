@@ -7340,10 +7340,26 @@
   con `conFine` o senza timbro. Le rivedute chiuse in un altro modo
   (Salta, Esc, indietro, il + trascinato) hanno il battito
   (`battitoFeeP2P`); l'ingresso dal mercatino non anima niente.
+  DAL 10 OTT 2026 IL TUTORIAL GIA' FATTO VALE COME IL TIMBRO: lo stato
+  fisso lo decide `bannerFeeGiaMioP2P` — il timbro `banner_p2p`, OPPURE
+  il tutorial gia' visto (`tourP2PVisto`: `tour_p2p` sta sul profilo e
+  arriva con /me anche sul telefono vuoto). Il solo timbro lasciava il
+  banner tutto colorato per sempre a chi il tutorial l'aveva fatto
+  prima del banner, o saltato, o interrotto: nasce soltanto con
+  l'animazione. UNICA ATTESA, la bandierina in memoria
+  `feePrimoGiroP2P`: accesa dove le slide si aprono DA SOLE
+  (`apriTourP2PSePrimaVolta`, mai da «Come funziona») perche' `tour_p2p`
+  si timbra alla comparsa e un /me a meta' giro spegnerebbe le pillole
+  prima della lenta; sciolta da `animaBannerFeeP2P` (il giro e' finito)
+  o da `posaBannerFeeP2P`, che `chiudiTourP2P` chiama accanto a
+  `liberaBannerP2P` (slide saltate, gesto indietro, giro non partito) e
+  che mette il banner personale e fermo. Il timbro NON si scrive da li':
+  resta il segno della prima animazione vista.
   Il blocco vive dopo il giro guidato: quello del libro non scrive cifre.
   Il verbale: CANTIERI, «Il libro subito», «Il tutorial su pagina
-  sfocata, e «Invii» nel P2P», «Il giro guidato del P2P» e «Il banner
-  personale delle commissioni».
+  sfocata, e «Invii» nel P2P», «Il giro guidato del P2P», «Il banner
+  personale delle commissioni» e «Il tutorial già fatto vale come il
+  timbro».
   LE CARD P2P IN VETRINA (26 set 2026): una fila «Scambi P2P» sopra la
   griglia di Esplora (`#p2pVetrinaSez`), con le card degli ordini vivi
   del libro — la `.card` del mercatino, «Compra/Vendi BTC» dal lato di

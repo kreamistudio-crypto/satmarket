@@ -104794,6 +104794,242 @@ console.log(JSON.stringify(c));
           and mini.index("let p2pBannerAlFine = false;") > _fm)
 
 
+def prove_tour_banner_p2p():
+    """IL TUTORIAL GIA' FATTO VALE COME IL TIMBRO (10 ott 2026, il giorno
+    dell'apertura del P2P a tutti; cantiere tour-banner-p2p, visto da
+    Andrea entrando da un telefono nuovo). Il banner delle commissioni
+    diventava personale e fermo solo col timbro `banner_p2p`, che nasce
+    con l'animazione di fine giro: chi il tutorial l'aveva fatto ma quel
+    timbro non ce l'aveva (fatto prima del banner, slide saltate, ricarica
+    a meta') lo trovava tutto colorato a ogni ingresso, su ogni telefono.
+    Adesso il tutorial FATTO — `tour_p2p`, che sta sul profilo e arriva
+    con /me — basta; l'unica attesa e' il primo giro di QUESTA apertura.
+    E dopo le 10 la regola delle prese (tour dopo il primo ordine, niente
+    banner sulla pagina della porta) non frena piu' nessuno.
+    Le funzioni VERE girano in node: il tour (visto, apertura, chiusura),
+    la fine del giro, il blocco del banner, i giudici della porta."""
+    print("\n[il tutorial gia' fatto e il banner delle commissioni P2P]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i_b = mini.index("/* ============ IL BANNER PERSONALE DELLE COMMISSIONI (26 set 2026)")
+    f_b = mini.index("/* ============ fine del banner personale ============ */")
+    blocco = mini[i_b:f_b]
+    fz = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function preseChiuseP2P(adesso){", "function portaPrimoOrdineP2P(){",
+        "function liberaBannerP2P(){", "function bannerNascostoPrimoOrdineP2P(){",
+        "function tourP2PVisto(){", "function apriTourP2PSePrimaVolta(){",
+        "function apriTourP2P(){", "function chiudiTourP2P(poi){",
+        "function fineGiroP2P(finito){"))
+    banco = r"""
+const LOG = [];
+function fintoCl(){ const s = new Set();
+  return {add: (...c) => c.forEach(x => { s.add(x); LOG.push('+' + x); }),
+          remove: (...c) => c.forEach(x => { s.delete(x); LOG.push('-' + x); }),
+          contains: c => s.has(c),
+          toggle: (c, v) => { if (v) { if (!s.has(c)) LOG.push('+' + c); s.add(c); }
+                              else { if (s.has(c)) LOG.push('-' + c); s.delete(c); } },
+          all: () => [...s].sort()}; }
+const IMG = {alt: 'tutti', dataset: {}};
+const BANNER = {classList: fintoCl(), hidden: false, get offsetWidth(){ return 1; },
+  querySelector: s => s === 'img' ? IMG : null};
+const PEZZI = {p2pFeeBanner: BANNER, tourP2PVia: {disabled: false},
+  tourP2P: {classList: fintoCl()}, tourP2PNastro: {removeEventListener(){}}};
+const el = id => PEZZI[id] || null;
+const document = {querySelector: s => s === '.view.active' ? {id: VISTA} : null,
+  querySelectorAll: () => [], removeEventListener(){}};
+let LS = {}, LS_MUTA = false;
+const localStorage = {
+  getItem: k => { if (LS_MUTA) throw new Error('muta'); return k in LS ? LS[k] : null; },
+  setItem: (k, v) => { if (LS_MUTA) throw new Error('muta'); LS[k] = String(v); }};
+class Image { decode(){ return Promise.resolve(); } }
+/* lo stato della pagina */
+let myTgId = 111, VETRINA = false, DEMO = false, VISTA = 'view-p2p';
+let p2pLeve = {attivo: true, preseDa: 0}, p2pLevaPubblica = null, p2pSconto = null;
+let vistiMem = {}, VISTI = {}, TIMBRI = [], RICORDATI = [], MONTATI = 0, VIVI = false;
+let tourP2PInCorso = false, tourInCorso = false, testModaleInCorso = false;
+let tourP2PSolo = false, tourP2PChiesto = false, giroFineTourP2P = 0;
+let giroP2PLato = null, p2pLato = 'compro', p2pBannerAlFine = false;
+let POI = null, VERITA = 0, LIBERATE = [];
+/* quel che sta intorno, di cartone */
+function hintDismesso(id){ return !!(VISTI[id] || (id !== 'tour_p2p' && vistiMem[id])); }
+function timbraVisto(id){ VISTI[id] = 1; TIMBRI.push(id); }
+function ricordaVisto(id, q){ vistiMem[id] = q; RICORDATI.push(id); }
+function effettiRidotti(){ return false; }
+function chiaveTourP2P(){ return 'tour_p2p_' + myTgId; }
+function haOrdiniViviP2P(){ return VIVI; }
+function montaTourP2P(solo){ tourP2PInCorso = true; tourP2PSolo = solo; tourP2PChiesto = false; MONTATI++; }
+function salitaLivelloP2P(){ return false; }
+function apriSalitaTourP2P(){}
+function scorriTourP2P(){} function tastoTourP2P(){} function setLatoP2P(){}
+function sfocaPaginaTourP2P(accesa, poi){ POI = poi || null; }
+function veritaBannerFeeP2P(){ VERITA++; }
+function aspettaFineBannerP2P(){ p2pBannerAlFine = true; }
+/* «Come funziona», com'e' nella pagina (una riga: il banco la riscrive
+   uguale, e una sentinella in Python tiene in pari l'originale) */
+function rivediTourP2P(){ apriTourP2P(); tourP2PChiesto = true; }
+""" + fz + blocco + r"""
+const classi = () => BANNER.classList.all();
+const ORA_10 = Date.UTC(2026, 9, 10, 8, 0, 0) / 1000;      /* le 10:00 di Roma */
+const vero = Date.now;
+function azzera(sc){
+  fermaPrimaVoltaFeeP2P(BANNER); feeSenzaBarraP2P = null;
+  clearTimeout(feeAnimaP2PTimer); feeAnimaP2PTimer = null;
+  for (const c of classi()) BANNER.classList.remove(c);
+  feePrimoGiroP2P = false; p2pBannerAlFine = false;
+  myTgId = 111; VISTA = 'view-p2p'; p2pLeve = {attivo: true, preseDa: 0};
+  p2pSconto = sc === undefined ? {attivo: false, motivo: '', punti: 0.5} : sc;
+  vistiMem = {}; VISTI = {}; TIMBRI = []; RICORDATI = []; MONTATI = 0; VIVI = false;
+  LS = {}; LS_MUTA = false; POI = null; LIBERATE = [];
+  tourP2PInCorso = false; tourInCorso = false; tourP2PChiesto = false; giroP2PLato = null;
+  Date.now = vero; LOG.length = 0;
+}
+const corse = () => LOG.filter(x => /fee-anima|fee-primo|fee-passo/.test(x));
+const c = {};
+/* 1) L'ESPERTO SUL TELEFONO NUOVO: sul profilo c'e' il tutorial, non il
+      timbro del banner; il telefono non sa niente */
+azzera(); vistiMem = {tour_p2p: 5, giro_p2p: 5};
+bannerFeeFissoP2P(); apriTourP2PSePrimaVolta();
+c.esperto = {classi: classi(), montati: MONTATI, timbri: TIMBRI.slice(), corse: corse(),
+             attesa: feePrimoGiroP2P};
+azzera({attivo: true, motivo: 'pioniere', punti: 0.5}); vistiMem = {tour_p2p: 5};
+bannerFeeFissoP2P(); c.espertoPioniere = classi();
+/* ...e chi il timbro ce l'ha: com'era */
+azzera(); vistiMem = {tour_p2p: 5, banner_p2p: 5}; bannerFeeFissoP2P(); c.veterano = classi();
+/* ...il tutorial fatto su QUESTO telefono e mai arrivato al server */
+azzera(); LS[chiaveTourP2P()] = '5'; bannerFeeFissoP2P(); c.soloTelefono = classi();
+/* ...la memoria muta (per il tour vale «visto»): personale anche lui */
+azzera(); LS_MUTA = true; bannerFeeFissoP2P(); c.memoriaMuta = classi();
+/* ...ma chi non e' entrato e il server che tace restano colorati */
+azzera(); vistiMem = {tour_p2p: 5}; myTgId = 0; bannerFeeFissoP2P(); c.anonimo = classi();
+azzera(null); vistiMem = {tour_p2p: 5}; bannerFeeFissoP2P(); c.tace = classi();
+/* 2) «COME FUNZIONA» per l'esperto: il banner resta personale sotto le
+      slide e sotto il giro, anche se /me arriva nel mezzo */
+azzera(); vistiMem = {tour_p2p: 5}; bannerFeeFissoP2P();
+rivediTourP2P(); bannerFeeFissoP2P();
+c.rivede = {classi: classi(), attesa: feePrimoGiroP2P, montati: MONTATI};
+/* 3) L'UTENTE NUOVO CHE SALTA: prima colorato, alle slide ancora
+      colorato (anche con un /me nel mezzo), al «Salta» personale e fermo */
+azzera(); bannerFeeFissoP2P(); c.nuovoPrima = classi();
+apriTourP2PSePrimaVolta();
+c.nuovoSlide = {montati: MONTATI, ricordati: RICORDATI.slice(), attesa: feePrimoGiroP2P,
+                visto: tourP2PVisto()};
+bannerFeeFissoP2P(); c.nuovoMeSulleSlide = classi();
+const v0 = VERITA;
+chiudiTourP2P();
+c.salta = {classi: classi(), timbri: TIMBRI.slice(), corse: corse(), attesa: feePrimoGiroP2P};
+posaBannerFeeP2P(); c.posaDueVolte = VERITA - v0;
+/* 4) IL GIRO CHE NON PARTE dopo «Inizia»: si posa lo stesso */
+azzera(); apriTourP2PSePrimaVolta();
+chiudiTourP2P(() => {}); c.inizia_primaDelFuoco = classi();
+POI(); c.giroNonPartito = classi();
+/* 5) L'UTENTE NUOVO CHE FA TUTTO: colorato fino a «Fine 🎉», poi la lenta */
+azzera(); bannerFeeFissoP2P(); apriTourP2PSePrimaVolta();
+chiudiTourP2P(() => { tourInCorso = true; giroP2PLato = 'compro'; });
+POI(); bannerFeeFissoP2P();
+c.nuovoNelGiro = {classi: classi(), attesa: feePrimoGiroP2P};
+tourInCorso = false; fineGiroP2P(true);
+c.nuovoFine = {classi: classi(), timbri: TIMBRI.slice(), attesa: feePrimoGiroP2P};
+/* 6) DOPO LE 10: la busta rimasta in pagina da prima dell'ora non frena
+      piu' ne' il tutorial ne' il banner; e quella che il server manda
+      dopo l'ora (0) nemmeno. Il controllo: un minuto prima, si' */
+azzera(); p2pLeve = {attivo: true, preseDa: ORA_10};
+Date.now = () => (ORA_10 - 60) * 1000;
+c.primaDelle10 = [preseChiuseP2P(), portaPrimoOrdineP2P(), bannerNascostoPrimoOrdineP2P()];
+apriTourP2PSePrimaVolta(); c.primaDelle10Tour = MONTATI;
+Date.now = () => (ORA_10 + 60) * 1000;
+c.dopoLe10 = [preseChiuseP2P(), portaPrimoOrdineP2P(), bannerNascostoPrimoOrdineP2P()];
+p2pBannerAlFine = true; c.dopoLe10Bandierina = bannerNascostoPrimoOrdineP2P();
+apriTourP2PSePrimaVolta(); c.dopoLe10Tour = MONTATI;
+azzera(); p2pLeve = {attivo: true, preseDa: 0};
+c.bustaDopoLOra = [preseChiuseP2P(), portaPrimoOrdineP2P(), bannerNascostoPrimoOrdineP2P()];
+Date.now = vero;
+console.log(JSON.stringify(c));
+process.exit(0);
+"""
+    r = _node_banco(banco)
+    if r is None:
+        salta("il tutorial gia' fatto e il banner, in node", "node non c'e'")
+    else:
+        prova("L'ESPERTO SUL TELEFONO NUOVO (tutorial sul profilo, nessun timbro del banner): "
+              "banner personale e fermo, il tutorial non riparte",
+              {"classi": ["fee-p2"], "montati": 0, "timbri": [], "corse": [], "attesa": False},
+              r.get("esperto"))
+        prova("...al pioniere resta accesa la terza", ["fee-p3"], r.get("espertoPioniere"))
+        prova("...chi il timbro ce l'ha: com'era", ["fee-p2"], r.get("veterano"))
+        prova("...vale anche il tutorial fatto su questo telefono, e la memoria muta",
+              [["fee-p2"], ["fee-p2"]], [r.get("soloTelefono"), r.get("memoriaMuta")])
+        prova("...chi non e' entrato e il server che tace restano tutto colorato",
+              [[], []], [r.get("anonimo"), r.get("tace")])
+        prova("«COME FUNZIONA» per l'esperto: slide aperte, il banner resta personale anche "
+              "se /me arriva nel mezzo (la bandierina e' solo dell'apertura automatica)",
+              {"classi": ["fee-p2"], "attesa": False, "montati": 1}, r.get("rivede"))
+        prova("L'UTENTE NUOVO: prima del tutorial il banner e' tutto colorato", [],
+              r.get("nuovoPrima"))
+        prova("...il tutorial parte, timbra `tour_p2p` alla comparsa e il banner si mette in attesa",
+              {"montati": 1, "ricordati": ["tour_p2p"], "attesa": True, "visto": True},
+              r.get("nuovoSlide"))
+        prova("...un /me a slide aperte NON lo spegne: resta colorato fino al giro", [],
+              r.get("nuovoMeSulleSlide"))
+        prova("...«Salta»: personale e fermo SUBITO, senza corsa e senza scrivere il timbro "
+              "(la lenta gli tocca ancora al primo giro rifatto)",
+              {"classi": ["fee-p2"], "timbri": [], "corse": [], "attesa": False}, r.get("salta"))
+        prova("...e posare due volte non ridisegna", 1, r.get("posaDueVolte"))
+        prova("«Inizia» e il giro che non parte: colorato finche' la pagina torna a fuoco, "
+              "poi si posa", [[], ["fee-p2"]],
+              [r.get("inizia_primaDelFuoco"), r.get("giroNonPartito")])
+        prova("L'UTENTE NUOVO CHE FA TUTTO: colorato per tutto il giro, /me compreso",
+              {"classi": [], "attesa": True}, r.get("nuovoNelGiro"))
+        prova("...a «Fine 🎉» parte la lenta, il timbro si scrive e l'attesa finisce",
+              {"classi": ["fee-p2", "fee-primo"], "timbri": ["banner_p2p"], "attesa": False},
+              r.get("nuovoFine"))
+        prova("IL CONTROLLO, un minuto prima delle 10: prese chiuse, porta, banner nascosto, "
+              "tutorial fermo", [[True, True, True], 0],
+              [r.get("primaDelle10"), r.get("primaDelle10Tour")])
+        prova("DOPO LE 10, con la busta di prima ancora in pagina: niente porta, niente banner "
+              "nascosto (nemmeno con la bandierina rimasta accesa), e il tutorial parte",
+              [[False, False, False], False, 1],
+              [r.get("dopoLe10"), r.get("dopoLe10Bandierina"), r.get("dopoLe10Tour")])
+        prova("...e con la busta che il server manda dopo l'ora (preseDa 0): lo stesso",
+              [False, False, False], r.get("bustaDopoLOra"))
+
+    # --- LE SENTINELLE SUI POSTI ---------------------------------------
+    senza = re.sub(r"/\*[\s\S]*?\*/", "", mini)
+    fisso = pezzo_js(mini, "function bannerFeeFissoP2P(){", "\n}\n")
+    prova("lo stato fisso chiede al giudice nuovo, non piu' al solo timbro", [True, False],
+          ["vestiBannerFeeP2P(bannerFeeGiaMioP2P() ? pillolaFeeP2P() : 0);" in fisso,
+           "hintDismesso(" in fisso])
+    giud = pezzo_js(mini, "function bannerFeeGiaMioP2P(){", "\n}\n")
+    prova("il giudice: il timbro, OPPURE il tutorial fatto fuori dal primo giro (col typeof: "
+          "`tourP2PVisto` vive col tour)", True,
+          "if (hintDismesso('banner_p2p')) return true;" in giud
+          and "return !feePrimoGiroP2P && typeof tourP2PVisto === 'function' && tourP2PVisto();" in giud)
+    prova("giudice, bandierina e posa stanno nel blocco del banner personale", [1, 1, 1, 1],
+          [blocco.count(x) for x in ("function bannerFeeGiaMioP2P(){", "let feePrimoGiroP2P = false;",
+                                     "function aspettaGiroBannerFeeP2P(){", "function posaBannerFeeP2P(){")])
+    prova("...e nessuno dei tre scrive il timbro: resta il segno della prima animazione VISTA",
+          [0, 0, 1],
+          [giud.count("timbraVisto"), pezzo_js(mini, "function posaBannerFeeP2P(){", "\n}\n").count("timbraVisto"),
+           senza.count("timbraVisto('banner_p2p')")])
+    at = pezzo_js(mini, "function apriTourP2PSePrimaVolta(){", "\n}\n")
+    riga = "if (!tourP2PVisto() && typeof aspettaGiroBannerFeeP2P === 'function') aspettaGiroBannerFeeP2P();"
+    prova("la bandierina si accende in UN posto: dove le slide si aprono da sole, subito prima",
+          [True, 1, 0, 0],
+          [riga in at and at.index(riga) < at.index("if (!tourP2PVisto()) { apriTourP2P(); return; }"),
+           senza.count("aspettaGiroBannerFeeP2P();"),
+           pezzo_js(mini, "function apriTourP2P(){", "\n}\n").count("aspettaGiroBannerFeeP2P"),
+           senza.count("function rivediTourP2P(){ haptic(); apriTourP2P(); tourP2PChiesto = true; }") - 1])
+    ct = pezzo_js(mini, "function chiudiTourP2P(poi){", "\n}\n")
+    prova("chiudiTourP2P posa il banner dove scioglie quello della porta, e DOPO (prima si "
+          "rivela, poi si veste)", True,
+          "if (typeof posaBannerFeeP2P === 'function') posaBannerFeeP2P();" in ct
+          and ct.index("liberaBannerP2P();") < ct.index("posaBannerFeeP2P();")
+          and "if (!giro) libera();" in ct)
+    an = pezzo_js(mini, "function animaBannerFeeP2P(conFine){", "\n}\n")
+    prova("l'animazione di fine giro scioglie l'attesa PRIMA di ogni uscita", True,
+          0 < an.index("feePrimoGiroP2P = false;") < an.index("if (!b || !n) return;"))
+    prova("il blocco continua a non leggere cifre del coordinatore", [],
+          [x for x in ("0.01", "0.015", "0.03", "commissioneVivaP2P") if x in blocco])
+
+
 def prove_avvisi_mercatino():
     """GLI AVVISI DEL MERCATINO: I NUOVI ANNUNCI E I VENDITORI SEGUITI (9
     ott 2026, richiesta di Andrea). Chi lo chiede riceve un messaggio
@@ -135843,7 +136079,7 @@ def main():
               prove_prese_dalle_10, prove_campagna_p2p_tutti,
               prove_prendi_metodo,
               prove_contanti_zona,
-              prove_banner_ingresso,
+              prove_banner_ingresso, prove_tour_banner_p2p,
               prove_x_risonanza,
               prove_config_esempio):
         try:

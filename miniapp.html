@@ -52924,6 +52924,15 @@ function apriTourP2PSePrimaVolta(){
      `inviaNuovoOrdineP2P`, che torna al libro: da li' questa funzione
      li apre come sempre, e chi li ha gia' visti non li rivede. */
   if (typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P()) return;
+  /* IL BANNER ASPETTA QUESTO GIRO (10 ott 2026): le slide timbrano
+     `tour_p2p` alla comparsa, e da quel momento il banner delle
+     commissioni si crederebbe gia' personale — la sua prima volta e'
+     invece la lenta di «Fine 🎉». La bandierina lo tiene colorato
+     finche' il giro non finisce o non ci si rinuncia: vedi IL TUTORIAL
+     GIA' FATTO VALE COME IL TIMBRO, nel blocco del banner (da qui il
+     typeof). Solo qui, dove le slide si aprono DA SOLE: chi le riapre
+     da «Come funziona» il tutorial l'ha gia' fatto. */
+  if (!tourP2PVisto() && typeof aspettaGiroBannerFeeP2P === 'function') aspettaGiroBannerFeeP2P();
   if (!tourP2PVisto()) { apriTourP2P(); return; }
   if (salitaLivelloP2P()) apriSalitaTourP2P();
 }
@@ -53064,7 +53073,12 @@ function chiudiTourP2P(poi){
      giro che non e' partito (`giroGuidatoP2P` ha le sue uscite mute).
      Il giro partito lo scioglie lui, in `fineGiroP2P`. */
   const giro = typeof poi === 'function' ? poi : null;
-  const libera = () => { if (typeof liberaBannerP2P === 'function') liberaBannerP2P(); };
+  const libera = () => {
+    if (typeof liberaBannerP2P === 'function') liberaBannerP2P();
+    /* ...e quello che aspettava il primo giro si posa, personale e
+       fermo (10 ott 2026): il tutorial e' fatto anche se saltato */
+    if (typeof posaBannerFeeP2P === 'function') posaBannerFeeP2P();
+  };
   sfocaPaginaTourP2P(false, giro ? () => { giro(); if (!tourInCorso) libera(); } : null);
   if (!giro) libera();
 }
@@ -67565,6 +67579,39 @@ function fineGiroP2P(finito){
    regola del banner: l'alt descrive QUESTA immagine. */
 const FEE_ANIMA_P2P_MS = 1500;
 let feeAnimaP2PTimer = null;
+/* IL TUTORIAL GIA' FATTO VALE COME IL TIMBRO (10 ott 2026, il giorno
+   dell'apertura a tutti: visto da Andrea entrando da un telefono nuovo).
+   Il timbro `banner_p2p` nasce SOLO con l'animazione di fine giro: chi
+   il tutorial l'ha fatto prima che il banner esistesse, o ha chiuso le
+   slide con «Salta», o ha ricaricato a meta', non ce l'ha — e per lui
+   il banner restava tutto colorato a OGNI ingresso, su ogni telefono,
+   finche' non rifaceva il giro da «Come funziona». Ma che il tutorial
+   e' FATTO il server lo sa gia': `tour_p2p` sta sul profilo e arriva
+   con /me anche sul telefono vuoto (`tourP2PVisto`, che vive col tour:
+   da qui il typeof). Chi l'ha fatto trova il banner personale e fermo.
+   UNICA ATTESA, il primo giro di QUESTA apertura: le slide timbrano
+   `tour_p2p` alla COMPARSA, e senza la bandierina un /me arrivato a
+   meta' giro spegnerebbe le pillole prima della lenta di «Fine 🎉». Si
+   accende dove le slide si aprono DA SOLE (`apriTourP2PSePrimaVolta`,
+   mai da «Come funziona») e si scioglie dove il giro finisce
+   (`animaBannerFeeP2P`) o non arriva (`chiudiTourP2P`, che posa il
+   banner: slide saltate, gesto indietro, giro non partito).
+   IL TIMBRO NON SI SCRIVE DA QUI: resta il segno della prima
+   animazione VISTA, e a chi l'ha saltata la lenta tocca ancora al
+   primo giro rifatto. La bandierina vive in memoria: una ricarica la
+   scioglie e il banner e' personale — per il server il tutorial e' fatto. */
+let feePrimoGiroP2P = false;
+function aspettaGiroBannerFeeP2P(){ feePrimoGiroP2P = true; }
+function posaBannerFeeP2P(){
+  if (!feePrimoGiroP2P) return;
+  feePrimoGiroP2P = false;
+  bannerFeeFissoP2P();
+}
+/* PURA sugli stati: il banner e' gia' di chi guarda? */
+function bannerFeeGiaMioP2P(){
+  if (hintDismesso('banner_p2p')) return true;
+  return !feePrimoGiroP2P && typeof tourP2PVisto === 'function' && tourP2PVisto();
+}
 /* 0 = tutto colorato; 2 o 3 = la pillola accesa */
 function pillolaFeeP2P(){
   if (!myTgId || !p2pSconto) return 0;
@@ -67585,20 +67632,23 @@ function vestiBannerFeeP2P(n){
   if (img.dataset.altTutti === undefined) img.dataset.altTutti = img.alt;
   img.alt = n ? altFeeP2P(n) : img.dataset.altTutti;
 }
-/* lo stato FISSO, a ogni ingresso: personale solo dopo la prima
-   animazione (il timbro), e mai sopra un'animazione in corsa */
+/* lo stato FISSO, a ogni ingresso: personale dopo la prima animazione
+   (il timbro) o a tutorial gia' fatto (`bannerFeeGiaMioP2P`), e mai
+   sopra un'animazione in corsa */
 function bannerFeeFissoP2P(){
   /* il banner che mente se ne va: il giudice sta FUORI da questo
      blocco, che non legge cifre del coordinatore (vedi sotto) */
   if (typeof veritaBannerFeeP2P === 'function') veritaBannerFeeP2P();
   if (feeAnimaP2PTimer) return;
-  vestiBannerFeeP2P(hintDismesso('banner_p2p') ? pillolaFeeP2P() : 0);
+  vestiBannerFeeP2P(bannerFeeGiaMioP2P() ? pillolaFeeP2P() : 0);
 }
 /* L'ANIMAZIONE: si parte TUTTO COLORATO, e battiti e grigi li fanno le
    corse del CSS. Le classi si mettono in due tempi con un reflow in mezzo, o
    il browser vedrebbe solo lo stato finale e non farebbe nessuna corsa. */
 function animaBannerFeeP2P(conFine){
   const b = el('p2pFeeBanner'), n = pillolaFeeP2P();
+  /* il giro e' finito: chi lo aspettava non aspetta piu' (10 ott 2026) */
+  feePrimoGiroP2P = false;
   if (!b || !n) return;
   /* la lenta: OGNI giro chiuso con «Fine 🎉» (`conFine`, anche da «Come
      funziona»), e la primissima comunque chiusa — il timbro si legge
