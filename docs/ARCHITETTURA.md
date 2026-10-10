@@ -27241,7 +27241,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   col CAP di chi paga. «Info P2P» ripete tutto, col paragrafo «Se ti
   danno un buono regalo». Nella pagina dello scambio NON c'e' una chat
   fra le parti (ci sono i tasti del profilo e i recapiti cifrati): i
-  testi non la nominano. Il verbale e le fonti pubbliche guardate:
+  testi non la nominano. DAL SECONDO CANTIERE (stessa sera): accanto
+  alla mappa il link pubblico di PuntoLis (`apriPuntoLisPayCodeP2P` su
+  `LINK_PUNTOLIS_PAYCODE`, per chi non ha un account Amazon: si cerca
+  per CAP e si spunta «Amazon Paga in Contanti»); i quattro gesti hanno
+  i numeri davanti (`.sicu ol.p2p-paycode-passi`: la pagina dello
+  scambio sta dentro `.sicu`, che li toglieva a ogni elenco); e la
+  frase del buono regalo, `AVVISO_BUONO_PAYCODE`, sta in coda alla
+  conferma «Hai pagato il PayCode al tabacchino?» e, parola per
+  parola, ai tre promemoria Telegram di chi paga
+  (`SOLLECITO_EURO_PAYCODE_TESTI`). Il verbale e le fonti pubbliche guardate:
   CANTIERI, «I gesti prima di pagare il PayCode».
   I LIMITI DI AMAZON (23 set 2026): 999 € per ordine e nessun minimo DI
   AMAZON oltre lo zero (il minimo e' NOSTRO, dal 30 set 2026: il

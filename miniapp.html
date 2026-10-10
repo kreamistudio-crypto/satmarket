@@ -4644,6 +4644,16 @@
   .p2p-paycode-resta.scaduto{color:var(--rosso-p2p-testo);background:var(--rosso-p2p-tenue)}
   .p2p-paycode-passi{margin:8px 0 6px 18px;padding:0;font-size:13.5px;line-height:1.45}
   .p2p-paycode-passi li{margin:4px 0}
+  /* I NUMERI DAVANTI AI QUATTRO GESTI (10 ott 2026, guida-paycode,
+     secondo cantiere): l'elenco e' un <ol>, ma la pagina dello scambio
+     sta dentro `.sicu`, e `.sicu ol` toglie a ogni elenco i numeri e i
+     margini — vince per specificita' sulla riga qui sopra, e i gesti
+     uscivano senza cifra da sempre. Questa regola e' piu' specifica di
+     quella: ridà i numeri (in grassetto, col ::marker) e il margine in
+     cui stanno. Il corpo e l'interlinea restano quelli di `.sicu li`,
+     che e' com'erano gia' in pagina. */
+  .sicu ol.p2p-paycode-passi{list-style:decimal outside;margin:8px 0 6px 20px}
+  .sicu ol.p2p-paycode-passi li::marker{font-weight:800}
   /* L'AVVISO DEL BUONO REGALO (10 ott 2026, cantiere guida-paycode):
      sotto i quattro gesti, col rosso tenue delle ultime ore — e' la
      riga da rileggere alla cassa, se lo scontrino non torna */
@@ -11371,7 +11381,7 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>Chi vende pubblica qui</b>, con Barattozon come unico metodo, e il foglio lo porta per mano in <b>quattro passi</b>: il PayCode, l'importo, la scadenza (con un selettore di data e ora, fra un'ora e settantadue ore) e il <b>premio</b>, con lo stesso cursore degli altri ordini, da meno venti a più venti per cento, a numeri interi. <b>Un PayCode vale almeno 25 €.</b> Prima dei quattro passi si sceglie il <b>tipo di prezzo</b>, come per ogni ordine: <b>a prezzo di mercato</b> i sats si calcolano quando qualcuno prende l'ordine, col premio, sull'importo arrotondato <b>per eccesso</b> all'euro intero (25,47 € diventano 26: chi paga riceve sempre almeno il valore di quel che paga, e la differenza la mette chi pubblica); <b>a prezzo fisso</b> i sats nascono adesso, sui centesimi esatti e al cambio di oggi, e la convenienza per chi prende si muove col bitcoin. <b>Il segno decide il verso:</b> col premio positivo chi paga al tabacchino riceve meno sats del cambio pieno e la differenza resta a chi vende; col premio negativo ne riceve di più, e quella differenza la paga chi vende per la comodità. A zero passa il cambio pieno. <b>Premio più basso = più conveniente per chi paga = più probabile che qualcuno lo prenda in tempo.</b> Prima di pubblicare c'è il riepilogo, che a prezzo di mercato dice anche l'arrotondamento. Il cambio si fissa lì a prezzo fisso, alla presa a mercato; l'ordine resta nel libro fino a <b>due ore prima</b> della scadenza del PayCode (mai oltre settantadue ore): poi esce da solo.</li>
         <li><b>Nel libro la card dice quanto conviene adesso</b>, come negli altri ordini: «più conveniente» o «meno conveniente» per chi guarda, e dal dieci per cento il cartellino dell'affare. I sats sono fissi dalla pubblicazione e il bitcoin no, quindi <b>la convenienza vera si muove col prezzo</b>, e il numero la segue, senza limiti. Nel dettaglio trovi i due numeri uno accanto all'altro: <b>il premio scelto</b> da chi vende e quello <b>al prezzo di adesso</b>. Dopo la presa il conto si ferma al prezzo di quel momento: i sats che ricevi sono quelli scritti, al satoshi.</li>
         <li><b>Chi compra prende l'ordine</b>, indica dove ricevere i sats, e chi vende li blocca in garanzia. Il PayCode, l'importo e la scadenza gli arrivano <b>qui dentro e cifrati</b> appena l'ordine è suo, in un riquadro col tempo che resta: si paga solo quando la pagina dice «Sats in garanzia». Nel libro pubblico c'è solo l'importo: il PayCode non lo vede nessun altro, nemmeno Barattolo.</li>
-        <li><b>Chi compra va a pagare</b> in un <b>punto abilitato al PayCode</b>: non tutte le tabaccherie lo sono. Si cercano sulla <button type="button" class="scopri-link" onclick="apriMappaPayCodeP2P()">mappa di Amazon</button>, che chiede un account Amazon (uno qualsiasi); <b>chi non ce l'ha scrive il suo CAP a chi vende</b>, che lo cerca per lui. Alla cassa mostra il codice e dice <b>«devo pagare un ordine Amazon in contanti con un PayCode»</b>: <b>non una ricarica, non un buono regalo</b>, che non pagano l'ordine. Paga l'importo esatto, senza commissione, e <b>controlla lo scontrino</b>: pagamento dell'ordine, non «codice acquisto» o buono. Poi <b>tiene lo scontrino</b>, la sua prova, e torna qui a toccare «Ho pagato al tabacchino».</li>
+        <li><b>Chi compra va a pagare</b> in un <b>punto abilitato al PayCode</b>: non tutte le tabaccherie lo sono. Si cercano sulla <button type="button" class="scopri-link" onclick="apriMappaPayCodeP2P()">mappa di Amazon</button>, che chiede un account Amazon (uno qualsiasi); <b>chi non ce l'ha</b> cerca per CAP su <button type="button" class="scopri-link" onclick="apriPuntoLisPayCodeP2P()">PuntoLis</button> spuntando «Amazon Paga in Contanti», o scrive il suo CAP a chi vende, che lo cerca per lui. Alla cassa mostra il codice e dice <b>«devo pagare un ordine Amazon in contanti con un PayCode»</b>: <b>non una ricarica, non un buono regalo</b>, che non pagano l'ordine. Paga l'importo esatto, senza commissione, e <b>controlla lo scontrino</b>: pagamento dell'ordine, non «codice acquisto» o buono. Poi <b>tiene lo scontrino</b>, la sua prova, e torna qui a toccare «Ho pagato al tabacchino».</li>
         <li><b>Chi vende controlla su Amazon</b> che l'ordine risulti saldato, e sceglie fra due bottoni: <b>«Risulta pagato: libera i sats»</b> oppure <b>«Non risulta pagato: apri una disputa»</b>. Ha <b>ventiquattro ore</b> a vista, e Barattolo glielo ricorda su Telegram dopo un'ora, sei ore e venti ore. <b>Non esiste una conferma automatica</b>: Amazon non parla con Barattolo, e i sats non si liberano da soli. Se chi vende non fa nulla, i sats restano in garanzia e chi ha pagato può aprire lui la disputa: decide un moderatore, e lo scontrino è quel che guarda.</li>
       </ol>
       <p><b>Se scade.</b> Ci sono due scadenze, e vanno tenute distinte. Quella <b>del libro</b> cade due ore prima di quella del PayCode: se nessuno ha preso l'ordine, esce dalla vetrina e a chi vende arriva un avviso — il PayCode vale ancora per poche ore, ma nessuno può più prenderlo; quando scade anche lui, l'ordine Amazon va rifatto e ripubblicato con un PayCode nuovo. Quella <b>del PayCode</b> conta quando i sats sono già in garanzia: la pagina dello scambio lo dice, ti avvisa <b>sei ore prima e un'ora prima</b> (anche su Telegram o Nostr, secondo le tue impostazioni) e mette in evidenza l'<b>annullo d'accordo</b>, con cui i sats tornano a chi li ha bloccati. Nessuno annulla da solo: se hai pagato in tempo, lo scontrino lo dimostra e chi vende libera.</p>
@@ -59322,12 +59332,25 @@ function riquadroRecapitoP2P(testo, titolo){
    riga di chi vende e la pagina «Info P2P».
    ⚠️ LA MAPPA CHIEDE DI ENTRARE CON UN ACCOUNT AMAZON (verificato il 10
    ott 2026: senza, rimanda alla pagina di accesso). Per questo i testi
-   dicono «col tuo account Amazon» e danno l'altra strada, il CAP a
-   chi vende. */
+   dicono «senza account Amazon» e danno l'altra strada.
+   L'ALTRA STRADA E' PUNTOLIS (stessa sera, col si' di Andrea sulla
+   fonte): «Cerca il punto vendita» sul sito di PuntoLis e' pubblico,
+   cerca per CAP e ha il filtro «Amazon Paga in Contanti» (sotto
+   «Servizi al cittadino»), che va spuntato a mano — non esiste un
+   indirizzo che lo porti gia' scelto, quindi il testo lo dice. Copre
+   i soli PuntoLis, non le agenzie Western Union. Stessa scala. */
+/* LA FRASE DEL BUONO REGALO, una volta sola: la conferma «Hai pagato il
+   PayCode al tabacchino?» e, parola per parola, i promemoria Telegram */
+const AVVISO_BUONO_PAYCODE = 'Se ti hanno dato un buono regalo, non confermare.';
 const LINK_MAPPA_PAYCODE = 'https://www.amazon.it/cpe/locations/paycode';
+const LINK_PUNTOLIS_PAYCODE = 'https://www.puntolis.it/it/servizi-al-cittadino.html';
 function apriMappaPayCodeP2P(){
   if (tg?.initData && tg.openLink) { try { tg.openLink(LINK_MAPPA_PAYCODE); return; } catch(e){} }
   window.open(LINK_MAPPA_PAYCODE, '_blank', 'noopener');
+}
+function apriPuntoLisPayCodeP2P(){
+  if (tg?.initData && tg.openLink) { try { tg.openLink(LINK_PUNTOLIS_PAYCODE); return; } catch(e){} }
+  window.open(LINK_PUNTOLIS_PAYCODE, '_blank', 'noopener');
 }
 /* ---- IL RIQUADRO DEL PAYCODE, a chi compra (23 set 2026) ----
    Dal testo cifrato arrivato: PayCode (normalizzato), importo (quello
@@ -59382,8 +59405,13 @@ function riquadroPayCodeP2P(o, adesso){
          cassa, e ogni riga in piu' allontana il codice dal gesto. Una
          frase per gesto; l'importo NON si ripete (sta due righe sopra,
          «Importo … in contanti») e «senza commissione» lo dice «Info
-         P2P». Chi allunga qui, toglie altrove. */
-      '<li><b>Trova un punto abilitato</b>: <button type="button" class="scopri-link" onclick="apriMappaPayCodeP2P()">mappa di Amazon</button> (serve un account). Non ce l\'hai? Scrivi il tuo CAP a chi vende: lo cerca lui.</li>' +
+         P2P». Chi allunga qui, toglie altrove.
+         E COSI' E' ANDATA COL LINK DI PUNTOLIS (secondo cantiere, col
+         si' di Andrea): entra la sua frase, esce «scrivi il tuo CAP a
+         chi vende» — chi non ha un account adesso il punto se lo
+         cerca da se', su una pagina pubblica. La strada del CAP resta
+         a «Info P2P» e nella riga di chi vende. */
+      '<li><b>Trova un punto abilitato</b>: <button type="button" class="scopri-link" onclick="apriMappaPayCodeP2P()">mappa di Amazon</button>. Senza account Amazon: cerca per CAP su <button type="button" class="scopri-link" onclick="apriPuntoLisPayCodeP2P()">PuntoLis</button> e spunta «Amazon Paga in Contanti».</li>' +
       '<li>Mostra il codice alla cassa: <b>«Devo pagare un ordine Amazon in contanti con un PayCode»</b>. Non una ricarica, non un buono regalo.</li>' +
       '<li>Controlla lo scontrino: <b>pagamento dell\'ordine</b>, non «codice acquisto» o buono. Tienilo: è la tua prova.</li>' +
       '<li>Torna qui e tocca <b>«Ho pagato al tabacchino»</b>' + (attivo ? '' : ' (quando i sats sono in garanzia)') + '.</li>' +
@@ -61045,7 +61073,14 @@ function euroInviatiP2P(){
     titolo: tab ? 'Hai pagato il PayCode al tabacchino?'
       : contanti ? 'Hai consegnato i contanti?' : 'Hai inviato gli euro?',
     corpo: tab
+      /* IL BUONO REGALO, UNA RIGA (10 ott 2026, guida-paycode, col si' di
+         Andrea): e' l'ultimo cancello prima di un gesto che non si
+         annulla, e chi ha in mano un buono invece di un pagamento
+         deve fermarsi QUI. La stessa frase la dicono i tre promemoria
+         Telegram di chi paga (server, `SOLLECITO_EURO_PAYCODE_TESTI`):
+         una prova le confronta. */
       ? 'Dillo solo dopo aver pagato davvero ' + fmtEur(o.euro) + ' € in contanti alla cassa. Tieni lo scontrino: chi vende controlla su Amazon che l\'ordine risulti saldato e libera i sats. Da qui non potrai più annullare: se qualcosa va storto, resta la disputa.'
+        + '\n\n⚠️ ' + AVVISO_BUONO_PAYCODE
       : contanti
       ? (senzaPresenza ? '📍 Non hai segnato «Sono qui». ' + REGOLA_DISPUTA_CONTANTI
                          + ' Puoi tornare indietro e segnarlo adesso, o proseguire.\n\n' : '')

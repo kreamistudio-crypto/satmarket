@@ -86242,12 +86242,18 @@ DOM = null;
     # (secondo giro, stesso giorno) LA MAPPA CHIEDE UN ACCOUNT AMAZON:
     # chi non ce l'ha scrive il CAP a chi vende — e mai «in chat», che
     # una chat dello scambio nella pagina non c'e'
-    prova("il primo gesto porta alla mappa di Amazon, con un bottone e non con un indirizzo scritto, e dice che serve un account", True,
-          '<b>Trova un punto abilitato</b>: <button type="button" class="scopri-link" onclick="apriMappaPayCodeP2P()">mappa di Amazon</button> (serve un account).' in _gesti[0]
-          and "amazon.it" not in _rc)
-    prova("...e a chi non ha un account da' l'altra strada: il CAP a chi vende", True,
-          "Non ce l'hai? Scrivi il tuo CAP a chi vende: lo cerca lui.</li>" in _gesti[0]
-          and "chat" not in _gesti[0])
+    # EMENDATA (stessa sera, secondo cantiere, col si' di Andrea sulla
+    # fonte): l'altra strada per chi non ha un account e' la pagina
+    # PUBBLICA di PuntoLis, col filtro da spuntare a mano; «scrivi il
+    # tuo CAP a chi vende» esce dal gesto (il tetto: chi allunga toglie)
+    # e resta a «Info P2P» e nella riga di chi vende
+    prova("il primo gesto porta alla mappa di Amazon, con un bottone e non con un indirizzo scritto", True,
+          '<b>Trova un punto abilitato</b>: <button type="button" class="scopri-link" onclick="apriMappaPayCodeP2P()">mappa di Amazon</button>. ' in _gesti[0]
+          and "amazon.it" not in _rc and "puntolis.it" not in _rc)
+    prova("...e a chi non ha un account Amazon da' l'altra strada: PuntoLis per CAP, col filtro da spuntare", True,
+          'Senza account Amazon: cerca per CAP su <button type="button" class="scopri-link" '
+          'onclick="apriPuntoLisPayCodeP2P()">PuntoLis</button> e spunta «Amazon Paga in Contanti».</li>' in _gesti[0]
+          and "chat" not in _gesti[0] and "a chi vende" not in _gesti[0])
     prova("il secondo dice la frase per la cassa, e che non e' ne' una ricarica ne' un buono regalo", True,
           _gesti[1].startswith("Mostra il codice alla cassa: <b>«Devo pagare un ordine Amazon in contanti con un PayCode»</b>.")
           and "Non una ricarica, non un buono regalo.</li>" in _gesti[1])
@@ -86300,6 +86306,54 @@ DOM = null;
            0 < _renPc.find("avvisoRecapitoFermoP2P(o) +") < _renPc.find("promemoriaMappaVendoP2P(o) +")])
     prova("...e la mappa la chiamano tre posti: chi paga, chi vende, «Info P2P»", 3,
           mini.count('onclick="apriMappaPayCodeP2P()"'))
+    # PUNTOLIS (secondo cantiere): l'indirizzo pubblico, scritto una
+    # volta, con la stessa scala; lo chiamano chi paga e «Info P2P»
+    prova("PuntoLis e' un indirizzo solo, quello di «Cerca il punto vendita», scritto una volta", [1, 1],
+          [mini.count("const LINK_PUNTOLIS_PAYCODE = 'https://www.puntolis.it/it/servizi-al-cittadino.html';"),
+           mini.count("puntolis.it")])
+    _pl = pezzo_js(mini, "function apriPuntoLisPayCodeP2P(){", "\n}\n")
+    prova("...si apre con la stessa scala della mappa, e lo chiamano due posti: chi paga e «Info P2P»", [True, 2],
+          ["if (tg?.initData && tg.openLink) { try { tg.openLink(LINK_PUNTOLIS_PAYCODE); return; } catch(e){} }" in _pl
+           and "window.open(LINK_PUNTOLIS_PAYCODE, '_blank', 'noopener');" in _pl
+           and "chiediConferma" not in _pl,
+           mini.count('onclick="apriPuntoLisPayCodeP2P()"')])
+    # I NUMERI DAVANTI AI GESTI (secondo cantiere): l'elenco e' un <ol>
+    # ma la pagina dello scambio sta dentro `.sicu`, e `.sicu ol` toglie
+    # i numeri a ogni elenco — vinceva per specificita', e i gesti
+    # uscivano nudi. Si chiede alla CASCATA chi vince, non alla regola.
+    _i0 = mini.find("<style>")
+    _regPc, _ = _regole_css(mini[_i0 + 7:mini.find("</style>", _i0)])
+    _catPc = [{"tag": t, "attr": {}, "classi": set(c)} for t, c in
+              (("html", ()), ("body", ()), ("div", ("view", "active")), ("div", ("sicu",)),
+               ("div", ("p2p-paycode",)), ("ol", ("p2p-paycode-passi",)))]
+    _vPc = _vince_css(_regPc, _catPc, ("list-style", "margin"))
+    _ordPc = mini[mini.index('id="view-p2pordine"'):]
+    prova("i quattro gesti hanno i numeri davanti: nella pagina dello scambio, che sta dentro .sicu, vince la regola dell'elenco",
+          [True, "decimal outside", ".sicu ol.p2p-paycode-passi", "8px 0 6px 20px", True],
+          [_ordPc[:_ordPc.index(">") + 40].split(">", 1)[1].strip().startswith('<div class="sicu"'),
+           _vPc.get("list-style", (None,))[0], _vPc.get("list-style", (None, None))[1],
+           _vPc.get("margin", (None,))[0],
+           '<ol class="p2p-paycode-passi">' in _rc and _rc.count("<li>") == 4])
+    prova("...e la regola di .sicu che li toglieva e' ancora li' (e' quella da battere), col numero in grassetto", [True, True],
+          [".sicu ol,.sicu ul{margin:0;padding-left:0;list-style:none}" in mini,
+           ".sicu ol.p2p-paycode-passi li::marker{font-weight:800}" in mini])
+    # LA FRASE DEL BUONO REGALO, UGUALE NELLA CONFERMA E NEI PROMEMORIA
+    # TELEGRAM (secondo cantiere, parola di Andrea: «lo dicono uguale»)
+    _FRASE_BUONO = "Se ti hanno dato un buono regalo, non confermare."
+    _euPc = pezzo_js(mini, "function euroInviatiP2P(){", "\n}\n")
+    prova("la conferma «Hai pagato il PayCode al tabacchino?» ricorda il buono regalo, in una riga sua, col giudice unico", [1, True, 1],
+          [mini.count("const AVVISO_BUONO_PAYCODE = '" + _FRASE_BUONO + "';"),
+           "resta la disputa.'\n        + '\\n\\n⚠️ ' + AVVISO_BUONO_PAYCODE\n" in _euPc,
+           _euPc.count("AVVISO_BUONO_PAYCODE")])
+    _dizPc = re.search(r"SOLLECITO_EURO_PAYCODE_TESTI = (\{.*?\n\})\n", src, re.S)
+    _solPc = ast.literal_eval(_dizPc.group(1)) if _dizPc else {}
+    prova("...e i tre promemoria Telegram di chi paga il PayCode finiscono con la STESSA frase, una volta l'uno",
+          [[1, 2, 3], [True] * 3, [1] * 3],
+          [sorted(_solPc), [t.endswith(" " + _FRASE_BUONO) for _, t in sorted(_solPc.items())],
+           [t.count("buono regalo") for _, t in sorted(_solPc.items())]])
+    _dizEu = re.search(r"SOLLECITO_EURO_TESTI = (\{.*?\n\})\n", src, re.S)
+    prova("...mentre i promemoria degli altri metodi non parlano di buoni", False,
+          any("buono" in t for t in ast.literal_eval(_dizEu.group(1)).values()))
     _cssb = re.search(r"\.p2p-paycode-buono\{([^}]*)\}", mini)
     prova("l'avviso del buono veste il rosso tenue delle ultime ore, coi colori del tema", True,
           bool(_cssb) and "color:var(--rosso-p2p-testo)" in _cssb.group(1)
@@ -86441,9 +86495,10 @@ DOM = null;
           and "<b>tiene lo scontrino</b>" in _vaPc
           and _vaPc.index("punto abilitato") < _vaPc.index("devo pagare un ordine Amazon")
           < _vaPc.index("controlla lo scontrino") < _vaPc.index("«Ho pagato al tabacchino»"))
-    prova("...la mappa vuole un account Amazon, e chi non ce l'ha scrive il CAP a chi vende", True,
-          "che chiede un account Amazon (uno qualsiasi); <b>chi non ce l'ha scrive il suo CAP a chi vende</b>, "
-          "che lo cerca per lui." in _vaPc)
+    prova("...la mappa vuole un account Amazon, e chi non ce l'ha cerca su PuntoLis o scrive il CAP a chi vende", True,
+          'che chiede un account Amazon (uno qualsiasi); <b>chi non ce l\'ha</b> cerca per CAP su <button type="button" '
+          'class="scopri-link" onclick="apriPuntoLisPayCodeP2P()">PuntoLis</button> spuntando «Amazon Paga in Contanti», '
+          'o scrive il suo CAP a chi vende, che lo cerca per lui.' in _vaPc)
     prova("...e il paragrafo del buono regalo, dopo le scadenze: non toccare «Ho pagato», scrivi a chi vende", True,
           "<p><b>Se ti danno un buono regalo.</b>" in _sezPc
           and _sezPc.index("<b>Se scade.</b>") < _sezPc.index("<b>Se ti danno un buono regalo.</b>")
@@ -86451,9 +86506,12 @@ DOM = null;
               "scrivi a chi vende e decidete insieme.</p>" in _sezPc)
     _guidaPc = " ".join(open(os.path.join("docs", "GUIDA-P2P-PASSI.md"), encoding="utf-8").read().split())
     prova("la guida dei tutorial dice le stesse parole: la mappa, la frase per la cassa, lo scontrino, il buono, la riga di chi vende",
-          [True, True, True, True, True, True, False],
-          ["«**Trova un punto abilitato**: mappa di Amazon (serve un account). Non ce l'hai? "
-           "Scrivi il tuo CAP a chi vende: lo cerca lui.»" in _guidaPc,
+          [True, True, True, True, True, True, True, True, True, False],
+          ["«**Trova un punto abilitato**: mappa di Amazon. Senza account Amazon: cerca per CAP su PuntoLis "
+           "e spunta «Amazon Paga in Contanti».»" in _guidaPc,
+           "https://www.puntolis.it/it/servizi-al-cittadino.html" in _guidaPc,
+           "«⚠️ Se ti hanno dato un buono regalo, non confermare.»" in _guidaPc,
+           "un moderatore. Se ti hanno dato un buono regalo, non confermare.»" in _guidaPc,
            "«Mostra il codice alla cassa: **«Devo pagare un ordine Amazon in contanti con un PayCode»**. "
            "Non una ricarica, non un buono regalo.»" in _guidaPc,
            "«Controlla lo scontrino: **pagamento dell'ordine**, non «codice acquisto» o buono. Tienilo: è la tua prova.»" in _guidaPc,
@@ -136940,6 +136998,9 @@ def prove_testi_p2p_confondono():
         + pezzo_js(m, "const P2P_ANNULLO_DA_SOLO_TESTO =", "\n") + "\n"
         + pezzo_js(m, "function corpoAnnulloDisputaP2P(", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function annullaScambioP2P(){", "\n}\n") + "\n}\n"
+        # (10 ott 2026, guida-paycode) la frase del buono regalo, che la
+        # conferma del PayCode porta in coda
+        + pezzo_js(m, "const AVVISO_BUONO_PAYCODE =", "\n") + "\n"
         + pezzo_js(m, "function euroInviatiP2P(){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function apriDisputaP2P(){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "const P2P_FORME_RECAPITO = [", "\n];\n") + "\n];\n"
@@ -137019,7 +137080,10 @@ console.log(JSON.stringify(out));
            and p["contanti"].startswith("Dillo quando consegni 50 € a chi vende"),
            p["tabacchino"] == "Dillo solo dopo aver pagato davvero 50 € in contanti alla "
                               "cassa. Tieni lo scontrino: chi vende controlla su Amazon che "
-                              "l'ordine risulti saldato e libera i sats." + DOPO])
+                              "l'ordine risulti saldato e libera i sats." + DOPO
+                              # (10 ott 2026, guida-paycode) ...e col PayCode una riga
+                              # in piu', sua: il buono regalo non si conferma
+                              + "\n\n⚠️ Se ti hanno dato un buono regalo, non confermare."])
     prova("la disputa non parla piu' del contatto, ma del profilo coi bottoni", [True, False],
           ["Se qui sopra c'è il suo profilo coi bottoni per scrivergli, provate prima a "
            "sentirvi." in (out["disputa"] or ""),

@@ -1033,12 +1033,16 @@ disputa.»
 2. 🧑 Compra, dà l'indirizzo sats (come §2b). 📱 Il riquadro «🧾 Il PayCode
    da pagare al tabacchino» compare con codice (e «📋»: «PayCode copiato
    📋»), «Importo 25,47 € in contanti», «Scade il …», «Tempo che resta:
-   <conto>», e i quattro passi (dal 10 ott 2026: dove andare, cosa dire,
-   cosa guardare): «**Trova un punto abilitato**: mappa di Amazon (serve
-   un account). Non ce l'hai? Scrivi il tuo CAP a chi vende: lo cerca
-   lui.» («mappa di Amazon» è un link: apre
+   <conto>», e i quattro passi, NUMERATI da 1 a 4 (dal 10 ott 2026: dove
+   andare, cosa dire, cosa guardare): «**Trova un punto abilitato**:
+   mappa di Amazon. Senza account Amazon: cerca per CAP su PuntoLis e
+   spunta «Amazon Paga in Contanti».» (due link: «mappa di Amazon» apre
    https://www.amazon.it/cpe/locations/paycode, che chiede di entrare con
-   un account Amazon, uno qualsiasi) / «Mostra il codice alla cassa:
+   un account Amazon, uno qualsiasi; «PuntoLis» apre
+   https://www.puntolis.it/it/servizi-al-cittadino.html, pubblica: si
+   scrive il CAP, si tocca il tasto dei filtri e sotto «Servizi al
+   cittadino» si spunta «Amazon Paga in Contanti») / «Mostra il codice
+   alla cassa:
    **«Devo pagare un ordine Amazon in contanti con un PayCode»**. Non una
    ricarica, non un buono regalo.» / «Controlla lo scontrino: **pagamento
    dell'ordine**, non «codice acquisto» o buono. Tienilo: è la tua
@@ -1060,7 +1064,8 @@ disputa.»
    «Dillo solo dopo aver pagato davvero 25,47 € in contanti alla cassa.
    Tieni lo scontrino: chi vende controlla su Amazon che l'ordine risulti
    saldato e libera i sats. Da qui non potrai più annullare: se qualcosa va
-   storto, resta la disputa.» — «Sì, ho pagato». Stato «**PayCode pagato**»
+   storto, resta la disputa.» e, in una riga sua, «⚠️ Se ti hanno dato un
+   buono regalo, non confermare.» — «Sì, ho pagato». Stato «**PayCode pagato**»
    «Hai detto di aver pagato al tabacchino. Chi vende controlla su Amazon
    che l'ordine risulti saldato e libera i sats: tieni lo scontrino, è la
    tua prova.»
@@ -1076,7 +1081,8 @@ disputa.»
   pagato al tabacchino»**: scrive prima a chi vende e decidono insieme. Lo
   dicono l'avviso rosso sotto i quattro passi e «Info P2P» («**Se ti danno
   un buono regalo.**»).
-- Chi paga non ha un account Amazon (la mappa lo chiede): scrive il suo CAP
+- Chi paga non ha un account Amazon (la mappa lo chiede): cerca per CAP su
+  PuntoLis (il link nel primo passo), oppure scrive il suo CAP
   a chi vende. 📱 A chi vende, a sats in garanzia, sotto lo stato: «🗺️ Se
   chi paga ti scrive il suo CAP, cercagli un punto abilitato sulla mappa
   di Amazon.» («mappa di Amazon» è lo stesso link).
@@ -1279,7 +1285,9 @@ ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
   Pagalo in contanti al tabacchino, poi tocca «Ho pagato al tabacchino»
   nella pagina dello scambio…», «🧾 Sono passate sei ore: … il PayCode
   non risulta pagato…», «⏰ È passato un giorno: … un PayCode non vale
-  per sempre…».
+  per sempre…». Tutt'e tre finiscono con la frase della conferma (dal 10
+  ott 2026): «…a decidere sarà un moderatore. Se ti hanno dato un buono
+  regalo, non confermare.»
 - ✈️ **A chi vende, dopo «pagato», finché non libera** — a 1 ora, 6 ore e
   20 ore, per ogni metodo (Barattozon tiene i suoi, §7). Non parte dopo
   il rilascio, una disputa o un annullo.

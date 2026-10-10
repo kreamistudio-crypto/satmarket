@@ -49255,21 +49255,31 @@ SOLLECITO_EURO_TESTI = {
        "oppure tocca «✕ Annulla» nella pagina dello scambio. Chi vende può "
        "aprire una disputa: a decidere sarà un moderatore.",
 }
+# IL BUONO REGALO, IN CODA A TUTT'E TRE (10 ott 2026, cantiere
+# guida-paycode, col si' di Andrea): una cassiera ha emesso un Buono
+# Regalo Amazon al posto del pagamento del PayCode, e ognuno di questi
+# tre invita a toccare «Ho pagato al tabacchino». La frase e' LA STESSA
+# della conferma nell'app (`AVVISO_BUONO_PAYCODE` in miniapp.html), parola
+# per parola: una prova le confronta. Sta scritta per esteso in ogni
+# testo, e non in una costante a parte, perche' le prove e i collaudi
+# ritagliano questo dizionario da solo.
 SOLLECITO_EURO_PAYCODE_TESTI = {
     1: "🧾 Promemoria: i sats sono in garanzia da un'ora e aspettano il "
        "pagamento del PayCode. Pagalo in contanti al tabacchino, poi tocca "
        "«Ho pagato al tabacchino» nella pagina dello scambio. Se l'hai già "
-       "pagato, segnalo lì: chi vende aspetta quel gesto.",
+       "pagato, segnalo lì: chi vende aspetta quel gesto. Se ti hanno dato "
+       "un buono regalo, non confermare.",
     2: "🧾 Sono passate sei ore: i sats di chi vende sono fermi in garanzia "
        "e il PayCode non risulta pagato. Pagalo al tabacchino e tocca «Ho "
        "pagato al tabacchino». Se non puoi più, tocca «✕ Annulla» nella "
        "pagina dello scambio: chi vende deve accettare, e i sats gli "
-       "tornano.",
+       "tornano. Se ti hanno dato un buono regalo, non confermare.",
     3: "⏰ È passato un giorno: i sats di chi vende sono ancora fermi in "
        "garanzia per te, e un PayCode non vale per sempre. Se l'hai pagato "
        "tocca «Ho pagato al tabacchino»; se no, tocca «✕ Annulla» nella "
        "pagina dello scambio. Chi vende può aprire una disputa: a decidere "
-       "sarà un moderatore.",
+       "sarà un moderatore. Se ti hanno dato un buono regalo, non "
+       "confermare.",
 }
 
 

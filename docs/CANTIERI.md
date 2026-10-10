@@ -48766,3 +48766,75 @@ della fattura, i metodi delle rotte, la contesa, i negozi grandi).
 L'ultima CI di main FINITA era verde (`e8a24ad`); quelle dei quattro
 commit arrivati dopo erano ancora in corso da piu' di venti minuti, e
 non le ho aspettate oltre: main correva piu' della CI.
+
+
+## I gesti prima di pagare il PayCode, secondo cantiere: PuntoLis, il buono nella conferma e nei promemoria, i numeri davanti ai gesti (10 ott 2026, sera, cantiere guida-paycode-2, col sì di Andrea)
+
+Il seguito della voce «I gesti prima di pagare il PayCode»: le quattro
+cose rimaste aperte lì, tutte con un sì di Andrea.
+
+**IL LINK DI PUNTOLIS, accanto alla mappa di Amazon.** Sì di Andrea
+alla fonte. Il primo gesto adesso dice: «**Trova un punto abilitato**:
+mappa di Amazon. Senza account Amazon: cerca per CAP su PuntoLis e
+spunta «Amazon Paga in Contanti».» Due bottoni vestiti da link:
+`apriMappaPayCodeP2P` e il gemello `apriPuntoLisPayCodeP2P` su
+`LINK_PUNTOLIS_PAYCODE` (`https://www.puntolis.it/it/servizi-al-cittadino.html`,
+la pagina «Cerca il punto vendita»), stessa scala. Il filtro va
+spuntato a mano — non esiste un indirizzo che lo porti già scelto — e
+la frase lo dice. Guardata sul telefono dal pane, senza accedere a
+niente: campo del CAP in cima, tasto dei filtri, nessun login; la mappa
+lì dentro è bassa (un riquadro di 194 px). ESISTE una pagina a tutto
+schermo, più comoda sul telefono (`puntolis.it/punti-vendita/lis/`), ma
+è il contenuto interno di quella ufficiale, senza marchio né menu: si è
+scelta la pagina col nome, quella approvata; l'altra è detta ad Andrea.
+⚠️ «SCRIVI IL TUO CAP A CHI VENDE» ESCE DAL GESTO: il tetto (130
+caratteri per gesto, 400 in quattro) dice che chi allunga toglie, e
+chi non ha un account adesso il punto se lo cerca da sé. La strada del
+CAP resta a «Info P2P» («…cerca per CAP su PuntoLis spuntando «Amazon
+Paga in Contanti», o scrive il suo CAP a chi vende, che lo cerca per
+lui») e nella riga di chi vende, che non cambia.
+
+**IL BUONO REGALO NELLA CONFERMA.** «Hai pagato il PayCode al
+tabacchino?» porta in coda, in una riga sua (`\n\n`, il corpo è
+`pre-line`): «⚠️ Se ti hanno dato un buono regalo, non confermare.» È
+l'ultimo cancello prima di un gesto che non si annulla. La frase sta in
+una costante, `AVVISO_BUONO_PAYCODE`.
+
+**...E NEI PROMEMORIA TELEGRAM, UGUALE.** I tre promemoria di chi paga
+il PayCode (`SOLLECITO_EURO_PAYCODE_TESTI`: un'ora, sei ore, un giorno
+dalla garanzia) finiscono con la stessa frase, parola per parola: sono
+i tre avvisi che invitano a toccare «Ho pagato al tabacchino». Scritta
+per esteso in ognuno e non in una costante, perché prove e collaudi
+ritagliano quel dizionario da solo; a tenerle in pari c'è una prova.
+NON toccato l'avviso della garanzia bloccata («…tocca a te»): non
+invita a confermare, e lì chi paga alla cassa non c'è ancora stato. I
+promemoria degli altri metodi non parlano di buoni. I promemoria già
+in attesa nel database partono col testo di prima (il testo si scrive
+quando l'attesa nasce).
+
+**I NUMERI DAVANTI AI GESTI.** L'elenco è un `<ol>`, ma i numeri non
+uscivano: la pagina dello scambio sta dentro `.sicu`, e `.sicu ol`
+toglie numeri e margini a ogni elenco — vince per specificità su
+`.p2p-paycode-passi`. È così dal giorno del riquadro (23 set). La cura
+è una regola più specifica, `.sicu ol.p2p-paycode-passi` (decimal
+outside, il margine di 20 px in cui i numeri stanno) e il `::marker`
+in grassetto. Corpo e interlinea restano quelli di `.sicu li`, cioè
+com'erano già in pagina: non si è rimpicciolito niente. Col margine la
+lista a 375 px è alta 335 px (prima 266): il riquadro intero sta
+ancora in una schermata.
+
+**NON TOCCATA** `prove_db_contesa_negozi` (la prova a cronometro che ha
+fatto rossa la CI del primo push): la sta sistemando un'altra sessione,
+parola di Andrea.
+
+**PROVATO.** `prove_p2p_paycode` (9 prove in più: i due link e i loro
+indirizzi scritti una volta, la scala, i numeri chiesti alla CASCATA
+con `_vince_css` e non alla regola, la frase del buono con la sua
+costante, i tre promemoria che finiscono uguale, gli altri metodi
+senza buoni) e `prove_testi_p2p_confondono` (la conferma, col banco
+che ora porta la costante): 162 verdi nelle due sezioni. Tortura sulla
+copia intera, giro dal vivo, suite e collaudi: nel verbale del push.
+
+**DA GUARDARE.** Sul telefono vero i due link, dentro Telegram e
+nell'APK. Se la pagina di PuntoLis a tutto schermo convince di più, il
+cambio è una riga (`LINK_PUNTOLIS_PAYCODE`).
