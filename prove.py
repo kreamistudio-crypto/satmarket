@@ -138203,21 +138203,23 @@ def prove_apri_nel_wallet():
     richiesta di Andrea). Il caso: Android, Barattolo installato sulla
     Home e Wallet of Satoshi, il tocco su «⚡ Apri nel wallet» della
     garanzia P2P non apriva niente. La porta (`portaWallet`) ora aggancia
-    il tocco ad `apriNelWallet`, che sceglie la strada per piattaforma —
-    Telegram → `tg.openLink`; Android, iPhone e altro → il link nudo dal
-    tocco — e se dopo l'attimo (`WALLET_ATTIMO_MS`) nessuna app e' passata
+    il tocco ad `apriNelWallet`: su ogni strada il link nudo parte dal
+    tocco, nativo (dentro Telegram compreso: `tg.openLink` rifiuta gli
+    schemi non http, «Url protocol is not supported» /
+    `WebAppTgUrlInvalid`, righe 3011-3017 dello script del 10 ott 2026,
+    e non si usa), e se dopo l'attimo (`WALLET_ATTIMO_MS`) nessuna app e' passata
     davanti mette l'AVVISO col tasto Copia e, su Android, il «Riprova»
     nella forma `intent://` (un LINK: Chrome vuole un tocco per ogni
     lancio, visto dal vivo). Qui:
     1) le SENTINELLE: lo schema in un posto solo, le due porte, il gancio
        della reputazione portato dalla porta, NIENTE lancio da script nel
        blocco (ne' location ne' window.open), l'intent senza pacchetto ne'
-       fallback e solo nel Riprova, openLink e mai openInvoice, i gesti
+       fallback e solo nel Riprova, ne' openLink ne' openInvoice, i gesti
        noti al server, l'avviso tolto a fattura morta, il testo e il tasto;
     2) il BANCO node, coi pezzi VERI e un DOM di cartone: le tre strade
        (android con l'avviso e il Riprova intent:// al primo attimo;
-       telegram con openLink e il link prevenuto; ios e altro senza
-       Riprova), «qualcosa e' passato davanti» (visibilitychange, blur,
+       telegram col link nativo, mai openLink, e senza Riprova; ios e
+       altro senza Riprova), «qualcosa e' passato davanti» (visibilitychange, blur,
        pagina gia' nascosta) che tace, un tocco nuovo che fa tacere il
        vecchio, la copia dall'avviso coi suoi gesti, il Riprova che dice
        il tentativo e sparisce se resta muto, l'avviso tolto dal tocco
@@ -138272,11 +138274,10 @@ def prove_apri_nel_wallet():
            "const intent = strada === 'android' ? intentWallet('lightning:' + bolt11) : '';"
            in fn("function avvisaWalletMuto(a, bolt11, tentativo, strada){"),
            'id="walletRiprova" href="\' + intent + \'" onclick="riprovaWalletMuto(this)"' in blocco])
-    prova("dentro Telegram si passa da openLink (prevenendo il link solo se e' passato), mai da openInvoice",
-          [True, True, False],
-          ["try { tg.openLink(url); passato = true; }" in anw,
-           "if (passato && ev) ev.preventDefault();" in anw,
-           "openInvoice" in codice])
+    prova("dentro Telegram NIENTE openLink (rifiuta gli schemi non http: WebAppTgUrlInvalid) ne' openInvoice: "
+          "il link nudo come sempre, e l'unico preventDefault e' quello del link `#`",
+          [False, False, 1],
+          ["openLink" in codice, "openInvoice" in codice, anw.count("preventDefault")])
     att = nudo(fn("function attendiWallet(giro, poi){"))
     prova("il cane da guardia ascolta visibilitychange, pagehide e blur, e li toglie quando ha finito",
           [3, 3, True],
@@ -138426,9 +138427,9 @@ a.onclick(ev()); a.onclick(ev());
 const pendenti = timers.length;
 scatta();
 out.dueTocchi = {pendenti, inseriti: f.inseriti.length, avviso: !!f.avviso, timers: timers.length};
-/* 4) TELEGRAM: openLink, il link prevenuto, l'avviso SENZA Riprova se la pagina resta */
+/* 4) TELEGRAM: il link nativo (non prevenuto), openLink MAI chiamata, l'avviso SENZA Riprova */
 const aperti = [];
-tg = {initData: 'query_id=1', openLink: u => aperti.push(u)};
+tg = {initData: 'query_id=1', openLink: u => { aperti.push(u); throw new Error('WebAppTgUrlInvalid'); }};
 ({f, a} = foglioFinto());
 portaWallet(a, V.bolt);
 const e3 = ev();
@@ -138436,20 +138437,12 @@ const strada3 = a.onclick(e3);
 out.telegram = {strada: strada3, aperti: aperti.slice(), prevenuto: e3.prevenuto, timers: timers.length};
 scatta();
 out.telegramMuto = {avviso: !!f.avviso, riprova: riprova(f.avviso && f.avviso.html), timers: timers.length};
-/* ...openLink che esplode: il link parte da solo (non prevenuto), nessun errore */
-tg = {initData: 'query_id=1', openLink: () => { throw new Error('no'); }};
+/* ...e se qualcosa passa davanti, niente avviso */
 ({f, a} = foglioFinto());
 portaWallet(a, V.bolt);
-const e4 = ev(); a.onclick(e4);
+a.onclick(ev());
 emetti('pagehide'); scatta();
-out.telegramEsplode = {prevenuto: e4.prevenuto, avviso: !!f.avviso};
-/* ...un client senza openLink: come prima */
-tg = {initData: 'query_id=1'};
-({f, a} = foglioFinto());
-portaWallet(a, V.bolt);
-const e5 = ev(); a.onclick(e5);
-out.telegramSenza = {prevenuto: e5.prevenuto};
-scatta();
+out.telegramAperto = {avviso: !!f.avviso};
 /* 5) IPHONE e ALTRO: il link nudo, l'avviso al primo attimo, senza Riprova */
 tg = null;
 for (const [nome, ua] of [['ios', V.ios], ['altro', V.pc]]) {
@@ -138530,13 +138523,11 @@ console.log(JSON.stringify(out));
     prova("due tocchi di fila: due attimi armati, il primo tace, un avviso solo",
           {"pendenti": 2, "inseriti": 1, "avviso": True, "timers": 0}, o["dueTocchi"])
     v = o["telegram"]
-    prova("TELEGRAM: openLink col link lightning:, il link prevenuto (non parte due volte), un attimo",
-          ["telegram", ["lightning:" + BOLT], True, 1], [v["strada"], v["aperti"], v["prevenuto"], v["timers"]])
+    prova("TELEGRAM: il link nativo dal tocco (non prevenuto), openLink MAI chiamata, un attimo",
+          ["telegram", [], False, 1], [v["strada"], v["aperti"], v["prevenuto"], v["timers"]])
     prova("...pagina a schermo dopo l'attimo: l'avviso, e MAI il Riprova intent:// dentro Telegram",
           {"avviso": True, "riprova": None, "timers": 0}, o["telegramMuto"])
-    prova("...openLink che esplode: il link parte da solo (non prevenuto); se qualcosa passa davanti, niente avviso",
-          {"prevenuto": False, "avviso": False}, o["telegramEsplode"])
-    prova("...un client senza openLink: il link parte da solo, come prima", {"prevenuto": False}, o["telegramSenza"])
+    prova("...se qualcosa passa davanti, niente avviso", {"avviso": False}, o["telegramAperto"])
     prova("IPHONE: il link nudo dal tocco, l'avviso al primo attimo, senza Riprova",
           {"strada": "ios", "prevenuto": False, "primaTimers": 1, "avviso": True, "riprova": None, "timers": 0}, o["ios"])
     prova("ALTRO (un PC): lo stesso",

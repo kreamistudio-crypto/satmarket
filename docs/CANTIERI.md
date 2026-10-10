@@ -45266,11 +45266,10 @@ Telegram Payments (Stars), non una bolt11.
 
 **DECISO.** La porta aggancia il tocco ad `apriNelWallet`, che sceglie
 la strada dalla piattaforma (`stradaWallet`, pura: `tg.initData` →
-telegram; UA Android; UA iPhone/iPad; altro). Dentro Telegram il link lo
-passa `tg.openLink` (il link si previene SOLO se openLink è passato;
-senza openLink o con un'eccezione, il link parte da solo come prima).
-Altrove il link `lightning:` nudo parte dal tocco, nativo: l'evento non
-si tocca. Poi il cane da guardia (`attendiWallet`, `WALLET_ATTIMO_MS` =
+telegram; UA Android; UA iPhone/iPad; altro). Su OGNI strada il link
+`lightning:` nudo parte dal tocco, nativo: l'evento non si tocca, e la
+strada decide solo se mostrare il Riprova. DENTRO TELEGRAM NIENTE
+`openLink` (prima stesura scartata, vedi sotto). Poi il cane da guardia (`attendiWallet`, `WALLET_ATTIMO_MS` =
 1200): ascolta visibilitychange, pagehide e blur — quando un'app passa
 davanti la pagina si nasconde o perde il fuoco (il selettore «Apri con»
 è una finestra del sistema) — e se dopo l'attimo niente è successo mette
@@ -45310,7 +45309,25 @@ dal dito. La controprova sta nel giro: il Riprova toccato dà «Failed to
 launch 'intent://…' because the scheme does not have a registered
 handler» — cioè il lancio è stato tentato davvero, non rifiutato.
 
-**STRADE SCARTATE.** `intent://` come PRIMO link su Android: Chrome lo
+**OPENLINK, VERIFICATO NEL SORGENTE E TOLTO** (richiesta di Andrea prima
+del push). La prima stesura passava il link a `tg.openLink` dentro
+Telegram. Andrea ricordava che lo script rifiuta gli schemi estranei, e
+il sorgente gli dà ragione: nella copia di `telegram-web-app.js`
+scaricata il 10 ott 2026 da telegram.org (119.731 byte), `WebApp.openLink`
+(riga 3011) fa `a.href = url` e alle righe 3014-3017, se `a.protocol`
+non è `http:` né `https:`, stampa `console.error('[Telegram.WebApp] Url
+protocol is not supported', url)` e lancia `Error('WebAppTgUrlInvalid')`;
+solo dopo normalizza l'URL e manda `web_app_open_link` al client (6.1+)
+o fa `window.open`. Quindi con `lightning:` openLink NON apre nulla, mai:
+la prima stesura ci cadeva nel `catch` e lasciava partire il link
+nativo, cioè faceva già la cosa giusta per sbaglio, con un errore in
+console a ogni tocco. Tolto: dentro Telegram resta il link nativo di
+prima più il cane da guardia, l'avviso e il Copia, senza Riprova
+(l'intent è di Chrome Android). Lo stesso vale per `openTelegramLink`
+(righe 3030-3040, stesso rifiuto più il controllo dell'host t.me).
+
+**STRADE SCARTATE.** `tg.openLink` su `lightning:` (sopra). `intent://`
+come PRIMO link su Android: Chrome lo
 consiglia, ma l'Intent consegna al wallet `lightning://…` con le due
 barre, e non ogni wallet le digerisce — resta il Riprova, dove un
 fallimento non costa niente. Un `window.location = 'lightning:'`
@@ -45334,8 +45351,9 @@ banchi che ritagliano `portaWallet` per firma («Paga ora», «Apri nel
 wallet anche sulle fatture del P2P») e la sentinella della reputazione
 sul vecchio `pw.onclick`. Suite intera `PROVE_SEVERE=1` nel worktree da
 origin/main (ccea57f): 21.078 passate, 0 fallite sulla prima stesura,
-21.081 passate, 0 fallite sull'albero finale. Collaudi della CI nella
-gabbia: 50 verdi, 0 rossi. DAL VIVO con Playwright su Chrome
+21.081 passate, 0 fallite sulla stesura con openLink e 50 collaudi
+verdi nella gabbia; i conti dell'albero finale (senza openLink,
+ribasato) nel verbale del push. DAL VIVO con Playwright su Chrome
 156 (canale chrome, device Pixel 7, tocchi veri con `tap`, server dalla
 copia in collaudo col relay morto e LNbits morta): Chrome Android
 normale — tocco su «Apri nel wallet», console «Failed to launch
@@ -45345,8 +45363,9 @@ normale — tocco su «Apri nel wallet», console «Failed to launch
 `writeText` con la bolt11 intera e il toast «Fattura copiata 📋»; un
 tocco nuovo toglie l'avviso e con un `blur` entro l'attimo non torna;
 il foglio del mercatino, stessa porta, stesso avviso. Dentro il finto
-Telegram (hash `tgWebAppData`, platform android): `openLink` chiamata
-col link, nessun lancio nativo, avviso a 1208 ms SENZA Riprova. Gli
+Telegram (hash `tgWebAppData`, platform android), con la stesura
+finale: il link nativo lanciato (la stessa riga di console di Chrome),
+`openLink` mai chiamata, avviso SENZA Riprova. Gli
 scatti in `.claude/giri/apri-nel-wallet/` (01-07). Nessun errore di
 pagina nei tre contesti.
 
@@ -45356,14 +45375,11 @@ né da CDP (`Emulation.setEmulatedMedia` non la conosce) né con `--app`
 in headless, e il codice non la legge — la strada è la stessa del
 Chrome normale, decisa dall'UA. Il telefono vero resta da guardare: se
 in WoS il `lightning:` nudo dalla PWA apre adesso o se serve il Riprova;
-se `tg.openLink` con uno schema `lightning:` apre il wallet su Android e
-iPhone dentro Telegram (la Bot API dice «in an external browser», i
-client lo passano al sistema: da vedere); se WoS accetta
-`lightning://…` dall'intent. Un wallet che si apre LENTO oltre l'attimo
+se dentro Telegram, su Android e iPhone, il link nativo apre il wallet
+(se non lo fa, resta il Copia dell'avviso: non c'è un'altra via dalla
+Mini App); se WoS accetta `lightning://…` dall'intent. Un wallet che si apre LENTO oltre l'attimo
 mostra l'avviso per niente: innocuo (resta il Copia), e il tocco
 successivo lo toglie.
 
 **DA GUARDARE.** Sul telefono di Andrea, nella PWA e dentro Telegram, i
-tre casi qui sopra, con gli scatti; se dentro Telegram `openLink` non
-apre, si torna al link nativo in quella sola strada (una riga in
-`apriNelWallet`).
+tre casi qui sopra, con gli scatti.

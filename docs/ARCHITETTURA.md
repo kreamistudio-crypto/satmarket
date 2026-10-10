@@ -1276,11 +1276,13 @@
   cauzione: `orologioHoldP2P`, l'ora da `scadenzaFoglioP2P`); CANTIERI,
   «Apri nel wallet anche sulle fatture del P2P».
   COME SI APRE IL WALLET (10 ott 2026, «apri-nel-wallet»): la porta
-  aggancia il tocco ad `apriNelWallet`, che sceglie la strada dalla
-  piattaforma (`stradaWallet`, pura): dentro Telegram `tg.openLink`
-  (mai `openInvoice`, che è dei pagamenti Telegram), altrove il link
-  `lightning:` nudo parte dal tocco, nativo. NIENTE parte da uno
-  script: Chrome vuole un tocco per OGNI lancio verso un'app (il primo
+  aggancia il tocco ad `apriNelWallet`: su ogni strada il link
+  `lightning:` nudo parte dal tocco, nativo (`stradaWallet`, pura, dice
+  solo dove mostrare il Riprova). Dentro Telegram NIENTE `tg.openLink`:
+  lo script di Telegram rifiuta gli schemi non http/https («Url
+  protocol is not supported», `WebAppTgUrlInvalid`, righe 3011-3017 di
+  telegram-web-app.js al 10 ott 2026); né `openInvoice`, che è dei
+  pagamenti Telegram. NIENTE parte da uno script: Chrome vuole un tocco per OGNI lancio verso un'app (il primo
   consuma l'attivazione; un `intent://` da un timer è «Not allowed …
   user gesture is required», visto dal vivo). Il cane da guardia
   `attendiWallet` (`WALLET_ATTIMO_MS` 1200) ascolta visibilitychange,

@@ -29332,12 +29332,15 @@ function portaWallet(a, inv, tentativo){
    parte da uno script: ogni lancio e' un link che l'utente tocca, e
    quel che si fa dopo l'attesa e' solo mostrare.
    LE TRE STRADE, una per piattaforma (`stradaWallet`, pura):
-   • 'telegram' (dentro il client, `tg.initData`): il link lo passa
-     `tg.openLink`, la via documentata della Bot API per uscire dalla
-     Mini App — la WebView del client non e' Chrome e non e' detto che
-     segua uno schema estraneo. `openInvoice` NON serve: apre le fatture
-     di Telegram Payments (Stars), non una bolt11. Se `openLink` manca o
-     esplode, il link parte da solo come prima.
+   • 'telegram' (dentro il client, `tg.initData`): il link nudo dal
+     tocco, come sempre. `tg.openLink` NON si usa: lo script di Telegram
+     (lo script `WebApp` di telegram.org, `openLink`, righe 3011-3017 della copia
+     scaricata il 10 ott 2026) fa `a.href = url` e se `a.protocol` non
+     e' `http:` o `https:` stampa «Url protocol is not supported» e
+     lancia `WebAppTgUrlInvalid`: con un `lightning:` non apre nulla.
+     `openInvoice` NON serve: apre le fatture di Telegram Payments
+     (Stars), non una bolt11. Dentro Telegram niente Riprova: l'intent
+     e' di Chrome Android, e la strada serve solo a non mostrarlo.
    • 'android' (Chrome, normale o installato): il link `lightning:`
      parte dal tocco, nativo — e' la strada che Chrome conosce. Se non
      apre niente, nell'avviso compare anche «⚡ Riprova in un altro
@@ -29387,15 +29390,8 @@ function apriNelWallet(a, ev, tentativo){
   if (typeof tentativo === 'function') { try { tentativo('wallet'); } catch(e){} }
   const strada = stradaWallet(!!(tg && tg.initData), navigator.userAgent);
   const giro = ++walletGiro;
-  if (strada === 'telegram') {
-    let passato = false;
-    if (tg && typeof tg.openLink === 'function') {
-      try { tg.openLink(url); passato = true; } catch(e) { passato = false; }
-    }
-    /* passato a Telegram: il link non deve partire anche da solo */
-    if (passato && ev) ev.preventDefault();
-  }
-  /* altrove il link nudo parte dal tocco, nativo: l'evento non si tocca */
+  /* il link nudo parte dal tocco, nativo, su ogni strada: l'evento non
+     si tocca (dentro Telegram compreso: vedi sopra, openLink rifiuta) */
   attendiWallet(giro, aperto => { if (!aperto) avvisaWalletMuto(a, bolt11, tentativo, strada); });
   return strada;
 }
