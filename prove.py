@@ -136120,28 +136120,30 @@ def prove_promemoria_gesto():
               arriva(o, "hold-invoice-requested", "mostro", "take", ORA))
         prova(f"[{W}s] ...a meta' finestra", [("garanzia_promemoria", B, ORA + W // 2, "promemoria")],
               attese(o))
-        # ⚠️ IL CASO NON VERIFICATO sul sorgente del coordinatore: la
-        # fattura chiesta DOPO la garanzia. Finche' non si sa se li' il suo
-        # cronometro riparte, vale la scadenza piu' VICINA — contata dalla
-        # garanzia chiesta. Il giorno che si legge che riparte, questi due
-        # numeri diventano quelli della finestra intera.
+        # LA FATTURA CHIESTA DOPO LA GARANZIA HA LA FINESTRA INTERA: il
+        # coordinatore fa ripartire il cronometro anche qui (letto sul
+        # sorgente del nodo il 10 ott 2026: `hold_invoice_paid` ri-timbra
+        # `taken_at` entrando in `waiting-buyer-invoice`). Fino ad allora
+        # questi numeri erano quelli prudenti, contati dalla presa.
         D = W // 3
         pagata = arriva(o, "hold-invoice-paid", "seller", "invoice-next", ORA + D)
         prova(f"[{W}s] garanzia pagata dopo un terzo del tempo: a chi compra il primo "
-              "avviso dice quel che RESTA dalla presa (la prudenza del caso non verificato)",
+              "avviso dice la finestra INTERA — il cronometro e' ripartito",
               (A, "🔒 Anna ha bloccato i sats in garanzia: indica dove ricevere i sats."
-                  f"\n\n⏳ Hai {(W - D + 30) // 60} minuti, poi lo scambio si annulla."),
+                  f"\n\n⏳ Hai {M} minuti, poi lo scambio si annulla."),
               [x for x in pagata if x[0] == A][0])
         prova(f"[{W}s] ...e a chi vende, che ha solo da aspettare, nessun tempo", False,
               "Hai " in [x for x in pagata if x[0] == B][0][1])
         arriva(o, "buyer-invoice-requested", "mostro", "", ORA + D)
-        prova(f"[{W}s] ...e il promemoria di chi compra sta a meta' di quel che resta",
-              ("fattura_promemoria", A, ORA + D + (W - D) // 2, "promemoria"),
+        prova(f"[{W}s] ...e il promemoria di chi compra sta a meta' della SUA finestra",
+              ("fattura_promemoria", A, ORA + D + W // 2, "promemoria"),
               [a for a in attese(o) if a[0] == "fattura_promemoria"][0])
+        prova(f"[{W}s] ...quindi a meta' di quel che restava dalla presa non parte ancora",
+              ([], {}), batte(ORA + D + (W - D) // 2))
         giornale.clear()
-        detti, _ = batte(ORA + D + (W - D) // 2)
+        detti, _ = batte(ORA + D + W // 2)
         prova(f"[{W}s] al battito parte SOLO quello della fattura: la garanzia e' pagata",
-              [(A, f"⏳ Restano circa {(W - D - (W - D) // 2 + 30) // 60} minuti per indicare "
+              [(A, f"⏳ Restano circa {(W - W // 2 + 30) // 60} minuti per indicare "
                    "dove ricevere i sats, altrimenti lo scambio si annulla.", "promemoria")],
               detti)
         con.execute("DELETE FROM p2p_attese")
@@ -136281,10 +136283,9 @@ def prove_promemoria_gesto():
           "return scadenzaFoglioP2P(o, 'hold');" in scad)
     prova("...e la finestra della fattura e' quella del 38385, col ripiego di sempre",
           True, "(p2pInfo && p2pInfo.scadenzaSec > 0) ? p2pInfo.scadenzaSec : 900" in scad)
-    timbro = mini[mini.index("  if (nuovo.preso && !ord.preso) nuovo.presaAt"):]
-    timbro = timbro[:timbro.index("\n", timbro.index("else if (!nuovo.preso)")) + 1]
-    prova("l'ora della presa e' fra le cose che una riga perde tornando nel libro",
-          True, "'ultimaMossa', 'presaAt', 'quando'" in mini)
+    prova("...e parte dal messaggio che la chiede, per chi ha preso e per chi ha "
+          "pubblicato: nessun timbro della presa", [True, False],
+          ["const da = Math.floor(Number(o.ultimaMossa) || 0);" in scad, "presaAt" in mini])
     prova("l'indirizzo del bottone apre QUELLO scambio, e solo a leva accesa", [True, True],
           ["(location.search.match(/[?&]scambio=([0-9a-zA-Z-]{8,64})(?:&|$)/) || [])[1]" in mini,
            "if (P2P_SCAMBIO_URL && p2pAcceso() && typeof apriOrdineP2P === 'function')\n"
@@ -136311,18 +136312,15 @@ const document = {querySelector: s => IN_PAGINA ? BOX : null};
         + _fn_js(mini, "function testoTempoGestoP2P(azione, resta){") \
         + _fn_js(mini, "function rigaTempoGestoP2P(o, azione){") \
         + _fn_js(mini, "function battitoGestoP2P(){") + r"""
-function timbra(ord, nuovo, quando){
-""" + timbro + r"""  return nuovo;
-}
 const out = {};
 const hold = {stato: 'attesa_mia_hold', lato: 'vendo', hold: {bolt11: 'lnbc1000', quando: 1003}};
-const presa = {stato: 'attesa_mia_fattura', lato: 'compro', mio: false, ultimaMossa: 1000, presaAt: 1000};
-const pubbl = {stato: 'attesa_mia_fattura', lato: 'compro', mio: true, ultimaMossa: 1000, presaAt: 400};
+const presa = {stato: 'attesa_mia_fattura', lato: 'compro', mio: false, ultimaMossa: 1000};
+const pubbl = {stato: 'attesa_mia_fattura', lato: 'compro', mio: true, ultimaMossa: 1000};
 out.scade = {};
 for (const w of [900, 1800, 0]) {
   p2pInfo = w ? {scadenzaSec: w} : null;
   out.scade[w] = [scadenzaGestoP2P(hold), scadenzaGestoP2P(presa), scadenzaGestoP2P(pubbl),
-    scadenzaGestoP2P(Object.assign({}, pubbl, {presaAt: 0})),
+    scadenzaGestoP2P(Object.assign({}, pubbl, {ultimaMossa: 0})),
     scadenzaGestoP2P({stato: 'attivo', ultimaMossa: 1000}),
     scadenzaGestoP2P({stato: 'attesa_mia_hold', lato: 'vendo'})];
 }
@@ -136344,13 +136342,6 @@ ORA = 2800; battitoGestoP2P(); battitoGestoP2P(); battitoGestoP2P();
 out.battitoZero = ridisegni;
 IN_PAGINA = false; ridisegni = 0; BOX._c = {}; battitoGestoP2P();
 out.fuoriPagina = ridisegni;
-/* l'ora della presa: una volta, entrando; persa tornando nel libro */
-ORA = 5000;
-out.timbro = [
-  timbra({}, {preso: true}, 4242).presaAt,
-  timbra({}, {preso: true}, 0).presaAt,
-  timbra({preso: true, presaAt: 4242}, {preso: true, presaAt: 4242}, 4999).presaAt,
-  'presaAt' in timbra({preso: true, presaAt: 4242}, {presaAt: 4242}, 4999)];
 console.log(JSON.stringify(out));
 """
     r = _node_banco(banco)
@@ -136359,11 +136350,11 @@ console.log(JSON.stringify(out));
         return
     for w in (900, 1800):
         prova(f"[{w}s] la pagina: la garanzia scade alla nascita della bolt11 + la "
-              "finestra; la fattura di chi ha PRESO dal messaggio che la chiede; quella "
-              "di chi ha PUBBLICATO dalla presa (la prudenza); senza l'ora della presa, "
-              "fuori dai due stati o senza la richiesta, niente",
-              [1000 + w, 1000 + w, 400 + w, 0, 0, 0], r.get("scade", {}).get(str(w)))
-    prova("senza il 38385 la pagina usa il ripiego di sempre", [1900, 1900, 1300, 0, 0, 0],
+              "finestra; la fattura dal messaggio che la chiede, per chi ha PRESO e per "
+              "chi ha PUBBLICATO (il cronometro riparte); senza quell'ora, fuori dai due "
+              "stati o senza la richiesta, niente",
+              [1000 + w, 1000 + w, 1000 + w, 0, 0, 0], r.get("scade", {}).get(str(w)))
+    prova("senza il 38385 la pagina usa il ripiego di sempre", [1900, 1900, 1900, 0, 0, 0],
           r.get("scade", {}).get("0"))
     prova("la riga della garanzia: le cifre che scorrono, la scadenza e il gesto",
           '<div class="p2p-gesto-tempo" role="timer" data-fine="2800" data-azione="hold">'
@@ -136381,9 +136372,6 @@ console.log(JSON.stringify(out));
           [["1:01", 0], ["0:01", 0]], [r.get("battito1"), r.get("battito2")])
     prova("...allo zero ridisegna UNA volta, e fuori dalla pagina non fa niente", [1, 0],
           [r.get("battitoZero"), r.get("fuoriPagina")])
-    prova("l'ora della presa si timbra entrando (dal messaggio, o dall'orologio), non si "
-          "sposta dopo, e si perde tornando nel libro", [4242, 5000, 4242, False],
-          r.get("timbro"))
 
 
 def main():

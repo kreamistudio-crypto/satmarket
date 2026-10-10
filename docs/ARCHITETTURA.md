@@ -27552,11 +27552,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   della fotografia (`_P2P_FOTO["info"]`, gli stessi byte che il client
   usa per `scadenzaSec`) e torna `(secondi, letta)`; il ripiego
   `P2P_FINESTRA_GESTO_RIPIEGO_S` vale solo senza 38385, e con lui le
-  frasi restano senza cifra. LA SCADENZA la dà `_scadenza_gesto_p2p`
-  dalla cronaca: l'ora di mostrod della richiesta più la finestra; per
-  la fattura chiesta DOPO la garanzia (chi vende ha preso) vale la più
-  vicina, contata dalla garanzia chiesta, finché non si legge sul nodo
-  se lì `taken_at` si ri-timbra. TRE EFFETTI: 1) il primo avviso del
+  frasi restano senza cifra. LA SCADENZA la dà `_scadenza_gesto_p2p`,
+  pura: l'ora di mostrod della richiesta più la finestra, per tutti e
+  due i gesti e in tutti e due i versi — il coordinatore ri-timbra
+  `taken_at` a ogni passaggio di turno (`show_hold_invoice` e
+  `hold_invoice_paid`, letti sul sorgente della `-bar6` il 10 ott 2026;
+  fino ad allora la fattura chiesta DOPO la garanzia si contava per
+  prudenza dalla presa). TRE EFFETTI: 1) il primo avviso del
   gesto porta in coda «⏳ Hai N minuti, poi lo scambio si annulla»
   (`tempo_gesto` in `dati`, da `_avvisi_evento_p2p`); 2) alla richiesta
   nasce un'attesa in `p2p_attese` con fonte `promemoria` e scadenza a
@@ -27578,10 +27580,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   bottone del gesto (`rigaTempoGestoP2P`), che batte nell'unico interval
   dell'app (`battitoGestoP2P`) e chiede la scadenza a
   `scadenzaGestoP2P`: per la garanzia lo stesso giudice del foglio
-  (`scadenzaFoglioP2P`), per la fattura `ultimaMossa` di chi ha preso o
-  `presaAt` di chi ha pubblicato (timbrata in `applicaMessaggioP2P`,
-  persa tornando nel libro), più la finestra del 38385. Il verbale:
-  CANTIERI, «Il promemoria della garanzia».
+  (`scadenzaFoglioP2P`), per la fattura `ultimaMossa` — l'ora del
+  messaggio che la chiede, per chi ha preso e per chi ha pubblicato —
+  più la finestra del 38385. Il verbale: CANTIERI, «Il promemoria della
+  garanzia» e «La scadenza vera della fattura».
   IL RECAPITO (`_avviso_recapito_p2p`) riconosce le parti dallo SCAMBIO
   IN CORSO (`_parti_scambio_p2p`: prima `p2p_scambi`, cioè il
   coordinatore; poi, se lui tace, `p2p_ordini` come prima), e `vivo`

@@ -46814,8 +46814,9 @@ P2P_IN_PAGAMENTO_TESTI = {
 # non e' ancora arrivato (i primi secondi dopo un riavvio), ed e' quello
 # che il client usa da sempre; con lui le frasi restano SENZA CIFRA — un
 # numero che il coordinatore non ha detto non si scrive.
-# L'INIZIO E' L'ORA DI MOSTROD (`ts` dell'evento, l'orologio che decide),
-# e sta nella cronaca: vedi `_scadenza_gesto_p2p`.
+# L'INIZIO E' L'ORA DI MOSTROD sulla richiesta del gesto (`ts`
+# dell'evento, l'orologio che decide): il coordinatore fa ripartire il
+# suo cronometro a ogni passaggio di turno. Vedi `_scadenza_gesto_p2p`.
 # IL PROMEMORIA E' UN'ATTESA (`p2p_attese`, fonte `promemoria`), come i
 # solleciti del PayCode: nasce quando il gesto viene chiesto, scade a
 # META' del tempo, e alla scadenza `_scarica_attese_p2p` lo lascia cadere
@@ -46847,41 +46848,20 @@ def _finestra_gesto_p2p(info) -> tuple:
     return P2P_FINESTRA_GESTO_RIPIEGO_S, False
 
 
-def _scadenza_gesto_p2p(con, ordine: str, momento: str, quando: int,
-                        finestra: int) -> int:
-    """QUANDO IL COORDINATORE ANNULLA se il gesto non arriva. Pura sulla
-    connessione. `momento` e' quello che CHIEDE il gesto (le chiavi di
-    `P2P_GESTI_A_TEMPO`), `quando` la sua ora per mostrod.
-    Il coordinatore conta da `taken_at`, e lo RI-TIMBRA quando chiede la
-    garanzia (`show_hold_invoice`: verificato sul sorgente, NODO-MOSTRO
-    «I TRE TIMER») — quindi la garanzia scade a `quando + finestra`, e
-    cosi' la fattura chiesta ALLA PRESA (chi compra ha preso: il timbro
-    e' quello).
-    ⚠️ LA FATTURA CHIESTA DOPO LA GARANZIA — chi vende ha preso, ha
-    bloccato, e ora tocca a chi compra — E' IL CASO NON VERIFICATO: se li'
-    mostrod non ri-timbra, il conto e' partito alla presa. Finche' non lo
-    si legge sul nodo vale la scadenza PIU' VICINA, quella contata dalla
-    garanzia chiesta in QUESTA presa: si puo' dire a qualcuno che ha meno
-    tempo del vero, mai di piu'.
-    «Questa presa» si legge dalle ORE e non dal numero del giro: la
-    garanzia chiesta piu' recente prima della fattura, purche' in mezzo
-    lo scambio non si sia chiuso (allora era la presa di prima). Il giro
-    di un evento arrivato prima della sua presa — due POST, e Tor li
-    rimescola — e' indietro di uno, e qui non deve contare."""
-    inizio = int(quando or 0)
-    if momento == "fattura_chiesta":
-        g = con.execute(
-            "SELECT MAX(quando) FROM p2p_momenti WHERE ordine=? AND "
-            "fonte='mostro' AND momento='garanzia_chiesta' AND quando<=?",
-            (ordine, inizio)).fetchone()
-        g = int((g and g[0]) or 0)
-        segni = ",".join("?" * len(P2P_MOMENTI_FINALI))
-        if g and not con.execute(
-                f"SELECT 1 FROM p2p_momenti WHERE ordine=? AND quando>? AND "
-                f"quando<=? AND momento IN ({segni}) LIMIT 1",
-                (ordine, g, inizio) + tuple(P2P_MOMENTI_FINALI)).fetchone():
-            inizio = g
-    return inizio + int(finestra or 0)
+def _scadenza_gesto_p2p(quando: int, finestra: int) -> int:
+    """PURA: QUANDO IL COORDINATORE ANNULLA se il gesto non arriva — l'ora
+    di mostrod della richiesta del gesto, piu' la finestra.
+    Il coordinatore conta da `taken_at` e lo RI-TIMBRA A OGNI PASSAGGIO DI
+    TURNO, letto sul sorgente del nodo (la `-bar6`, 10 ott 2026):
+    `show_hold_invoice` entrando in `waiting-payment`, e `hold_invoice_paid`
+    entrando in `waiting-buyer-invoice` (`order.set_timestamp_now()`, coi
+    loro commenti: chi ha tardato nel turno prima non deve mangiare la
+    finestra di chi viene dopo). Quindi OGNI gesto ha la finestra INTERA
+    da quando gli viene chiesto, in tutti e due i versi.
+    Fino a quella lettura la fattura chiesta DOPO la garanzia (chi vende
+    ha preso) si contava per prudenza dalla presa: quel ramo non c'e' piu'
+    (NODO-MOSTRO, «I TRE TIMER»)."""
+    return int(quando or 0) + int(finestra or 0)
 
 
 def _quando_promemoria_p2p(quando: int, scadenza: int) -> int:
@@ -46920,8 +46900,9 @@ def _promemoria_p2p_vivo(con, r, adesso: int) -> tuple:
     riga dell'attesa. Torna `(testo, '')` se parte, `('', perche')` se no
     — il perche' e' per il journal.
     NON PARTE se il gesto e' gia' stato fatto dopo la richiesta (la
-    cronaca, di qualunque fonte e senza guardare il numero del giro: vedi
-    `_scadenza_gesto_p2p`), se lo scambio si e' chiuso dopo la richiesta (lo
+    cronaca, di qualunque fonte, e per ORA, non per numero del giro:
+    quello di un evento arrivato prima della sua presa — due POST, e
+    Tor li rimescola — e' indietro di uno), se lo scambio si e' chiuso dopo la richiesta (lo
     stesso giudice degli avvisi superati, `_superato_p2p`: annullato,
     tornato in vetrina, scaduto...), o se non resta nemmeno un minuto —
     un server tornato su tardi non ricorda una scadenza gia' passata.
@@ -46940,7 +46921,7 @@ def _promemoria_p2p_vivo(con, r, adesso: int) -> tuple:
     if chiuso:
         return "", f"lo scambio si e' chiuso ({chiuso})"
     finestra, letta = _finestra_gesto_p2p(_P2P_FOTO["info"])
-    resta = _scadenza_gesto_p2p(con, ordine, chiesto, quando, finestra) - int(adesso)
+    resta = _scadenza_gesto_p2p(quando, finestra) - int(adesso)
     if resta < P2P_PROMEMORIA_MINIMO_S:
         return "", "non resta nemmeno un minuto"
     return _testo_promemoria_p2p(gesto, resta, letta), ""
@@ -50051,7 +50032,7 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     finestra, finestra_letta = _finestra_gesto_p2p(_P2P_FOTO["info"])
     if gesto and fatto["venditore" if gesto[1] == "vende" else "compratore"]:
         chi_deve = fatto["venditore" if gesto[1] == "vende" else "compratore"]
-        scadenza = _scadenza_gesto_p2p(con, ordine, momento, ev["ts"], finestra)
+        scadenza = _scadenza_gesto_p2p(ev["ts"], finestra)
         con.execute("DELETE FROM p2p_attese WHERE ordine=? AND momento=? AND "
                     "giro=? AND tg_id=? AND fonte='promemoria'",
                     (ordine, gesto[0] + "_promemoria", giro, chi_deve))
@@ -50083,8 +50064,8 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
             "garanzia_pagata": "" if ev["dettaglio"] == "active" else "fattura_chiesta",
             "fattura_chiesta": "fattura_chiesta"}.get(momento, "")
     if apre and finestra_letta:
-        dati["tempo_gesto"] = _frase_tempo_gesto_p2p(_scadenza_gesto_p2p(
-            con, ordine, apre, ev["ts"], finestra) - adesso)
+        dati["tempo_gesto"] = _frase_tempo_gesto_p2p(
+            _scadenza_gesto_p2p(ev["ts"], finestra) - adesso)
     if momento == "rilasciato" and ev["attore"] == "seller" and fatto["venditore"]:
         # L'ATTESA DI CHI VENDE: se in un minuto il pagamento a chi
         # compra non e' passato, gli arriva «Sats in pagamento». Ha il

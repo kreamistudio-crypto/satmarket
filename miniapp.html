@@ -55963,12 +55963,6 @@ function applicaMessaggioP2P(ord, dentro){
   }
   const nuovo = avanzaOrdineP2P(ord, azione, dentro.payload || null);
   if (quando > 0 && AVANZA_P2P[azione]) nuovo.ultimaMossa = quando;
-  /* L'ORA DELLA PRESA SI TIMBRA QUI (10 ott 2026, il conto alla rovescia
-     del gesto): la riga la scrive quando entra nello scambio e la perde
-     tornando nel libro, come `preso`. Serve a un caso solo — vedi
-     `scadenzaGestoP2P`. Una volta sola: le mosse dopo non la spostano. */
-  if (nuovo.preso && !ord.preso) nuovo.presaAt = quando || Math.floor(Date.now() / 1000);
-  else if (!nuovo.preso) delete nuovo.presaAt;
   /* L'ORA DI «PAGATO» SI TIMBRA QUI (23 set 2026): e' da li' che
      decorrono le 24 ore del controllo di chi vende. Una volta sola,
      entrando nello stato; l'eco ripetuta non la sposta. */
@@ -58837,22 +58831,21 @@ function battitoHoldP2P(){
    • la garanzia: lo stesso giudice del foglio (`scadenzaFoglioP2P`: la
      nascita della bolt11 piu' `expiration_seconds` del 38385). Il
      coordinatore ri-timbra il suo cronometro proprio quando la crea;
-   • la fattura di chi ha PRESO: gli viene chiesta alla presa, e il conto
-     parte dal messaggio che la chiede (`ultimaMossa`);
-   • la fattura di chi ha PUBBLICATO — chi vende ha preso, ha bloccato i
-     sats, e ora tocca a chi compra: ⚠️ sul sorgente del coordinatore
-     NON e' verificato che li' il cronometro riparta. Vale l'ora piu'
-     vecchia, quella della presa (`presaAt`): si puo' mostrare meno
-     tempo del vero, mai di piu'. Senza quell'ora (una riga nata
-     dall'archivio) la riga non c'e': un conto che non si sa non si
-     mostra. E' lo stesso ragionamento del server, `_scadenza_gesto_p2p`.
+   • la fattura: dal messaggio che la chiede (`ultimaMossa`), sia per chi
+     ha PRESO (gli viene chiesta alla presa) sia per chi ha PUBBLICATO
+     (chi vende ha preso e ha bloccato i sats: gli viene chiesta dopo).
+     Il coordinatore fa ripartire il cronometro anche li' — letto sul
+     sorgente del nodo il 10 ott 2026 (`hold_invoice_paid`), e fino ad
+     allora quel verso si contava per prudenza dalla presa. Senza
+     quell'ora la riga non c'e': un conto che non si sa non si mostra.
+     E' la stessa regola del server, `_scadenza_gesto_p2p`.
    Il ripiego della finestra e' quello di sempre (i 900 s del
    coordinatore), solo finche' il 38385 non e' letto. */
 function scadenzaGestoP2P(o){
   if (!o) return 0;
   if (o.stato === 'attesa_mia_hold') return scadenzaFoglioP2P(o, 'hold');
   if (o.stato !== 'attesa_mia_fattura') return 0;
-  const da = Math.floor(Number(o.mio ? o.presaAt : o.ultimaMossa) || 0);
+  const da = Math.floor(Number(o.ultimaMossa) || 0);
   if (!(da > 0)) return 0;
   return da + ((p2pInfo && p2pInfo.scadenzaSec > 0) ? p2pInfo.scadenzaSec : 900);
 }
@@ -66470,7 +66463,7 @@ function indiceMakerP2P(id, mz, o){
 /* quel che una riga porta SOLO perche' era una presa: non e' dell'ordine */
 const P2P_DELLA_PRESA = ['peer', 'hold', 'satsMiei', 'satsNetti', 'importoScelto',
   'metodoScelto', 'preso', 'giroMorto', 'giroCaduto', 'statoGrezzo', 'fermoA',
-  'cambioPresa', 'ultimaMossa', 'presaAt', 'quando', 'inRitardo', 'nonPartito', 'soloVista',
+  'cambioPresa', 'ultimaMossa', 'quando', 'inRitardo', 'nonPartito', 'soloVista',
   'campiMiei', 'campiLoro', 'euroInviatiAt', 'payoutFallito', 'votabile',
   /* ...e quel che le prese hanno imparato a portare dopo (7 ott 2026, «Lo
      stesso id, un giro nuovo»): la cauzione, l'incasso, la disputa e il

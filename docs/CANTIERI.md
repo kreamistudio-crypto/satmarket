@@ -44245,10 +44245,54 @@ da Telegram — il link si apre nel browser di Telegram, non nella Mini
 App: se lì la sessione non c'è, o la riga dello scambio non è su quel
 dispositivo, si atterra su «I miei scambi» o sul login. Se non va bene,
 la cura è un bottone `web_app` (o un link `t.me/…?startapp=`), ed è una
-riga. • Il caso non verificato qui sopra (un `grep` sul nodo). • Il
+riga. • ~~Il caso non verificato qui sopra~~ (chiuso lo stesso giorno: «La scadenza vera della fattura», qui sotto). • Il
 promemoria sul canale Nostr vero (la riga col link in coda al DM): c'è
 la prova, non l'occhio. • Dopo il cambio sul nodo: «Info P2P» deve dire
 «ogni passo ha 30 minuti», e il primo «Paga la garanzia» vero «Hai 30
 minuti». • Un POST del gesto perso per strada (mostrod ritenta, ma se
 non arriva mai) farebbe partire un promemoria a chi il gesto l'ha fatto:
 non c'è un'altra fonte, e la riga del journal lo direbbe.
+
+## La scadenza vera della fattura: il cronometro riparte a ogni passaggio di turno (10 ott 2026, stesso giorno, richiesta di Andrea)
+
+Il seguito de «Il promemoria della garanzia», che lasciava un caso
+contato per prudenza: la fattura chiesta DOPO la garanzia (chi vende ha
+PRESO un ordine di acquisto, ha bloccato i sats, e tocca a chi compra
+dire dove riceverli). Non si sapeva se lì il coordinatore facesse
+ripartire il suo cronometro, e nel dubbio si contava dalla presa.
+
+**LETTO SUL NODO** (Andrea, in sola lettura, sul sorgente della `-bar6`:
+il `grep` di `taken_at` non bastava — `src/flow.rs` non lo nomina mai —
+e sono serviti i pezzi di `flow.rs`, `util.rs`, `scheduler.rs`):
+`hold_invoice_paid`, entrando in `waiting-buyer-invoice`, fa
+`order.set_timestamp_now()`, col suo commento («buy-order mirror of the
+`show_hold_invoice` re-anchor»: un venditore che ha tardato non deve
+mangiare la finestra di chi compra), e lo scheduler rilegge la riga
+prima di annullare proprio per questo (`reconfirm_timeout_eligibility`).
+Il cronometro RIPARTE a ogni passaggio di turno, in tutti e due i versi.
+Scritto in NODO-MOSTRO, «I TRE TIMER».
+
+**LA CURA.** La scadenza è una sola regola: l'ora della richiesta del
+gesto più la finestra del coordinatore. `_scadenza_gesto_p2p` torna
+pura (via la lettura della cronaca e il ramo della presa); nel client
+`scadenzaGestoP2P` conta la fattura da `ultimaMossa` per chi ha preso e
+per chi ha pubblicato, e il timbro `presaAt` — nato ieri mattina per la
+sola prudenza — se ne va con la sua riga in `P2P_DELLA_PRESA` (un campo
+rimasto su qualche telefono non lo legge più nessuno). Effetto per chi
+compra in quel verso: il primo avviso dice la finestra intera, il
+promemoria arriva a metà della SUA finestra, e la riga della pagina c'è
+anche sulle righe nate dall'archivio (prima, senza l'ora della presa,
+non si mostrava).
+
+**PROVATO.** `prove_promemoria_gesto`: le attese del verso «chi vende ha
+preso» sono tornate alla finestra intera (a 900 e a 1800), più una
+nuova — a metà di quel che restava dalla presa il promemoria NON parte
+ancora —; la pagina in node conta chi ha pubblicato dal messaggio che
+chiede la fattura. Controprova: 31 mutazioni su una copia, tutte rosse.
+`collaudo_promemoria_gesto` non cambia (il suo verso era già quello
+verificato). Dal vivo, un giro breve (Chrome 390×844, copia in collaudo,
+relay morto): chi ha pubblicato un acquisto, con la fattura chiesta
+adesso, vede «Hai ancora 14:56…» — la finestra intera dalla richiesta
+(col ripiego, perché senza relay il 38385 non c'è), e sulla riga nessun
+`presaAt`; lo scatto è l'undicesimo in `.claude/giri/promemoria-garanzia/`.
+Suite severa e collaudi della CI: nel rapporto.

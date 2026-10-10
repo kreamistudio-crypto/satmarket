@@ -285,6 +285,16 @@ un compratore che si è attardato mangerebbe la finestra del venditore
 facendogli bruciare il bond. Quindi i 900 s sono PER GESTO: chi compra
 ha 15 minuti per incollare la invoice, e da lì chi vende ne ha altri
 15 per pagare — un umano ha già mezz'ora, in due tranche.
+**E VALE ANCHE NELL'ALTRO VERSO** (10 ott 2026, letto sul sorgente della
+`-bar6` sul nodo: `sed` di `src/flow.rs` e `src/scheduler.rs`): quando
+chi vende ha PRESO e ha pagato la garanzia, `hold_invoice_paid` entrando
+in `waiting-buyer-invoice` fa `order.set_timestamp_now()` — il gemello
+dichiarato del ri-timbro di `show_hold_invoice` — e
+`reconfirm_timeout_eligibility` rilegge la riga prima di annullare,
+proprio perché un passaggio di turno può aver spostato `taken_at`.
+Quindi OGNI gesto ha la finestra intera da quando viene chiesto, in
+tutti e due i versi: è la regola su cui Barattolo conta le scadenze
+(`_scadenza_gesto_p2p` nel server, `scadenzaGestoP2P` nel client).
 • `hold_invoice_expiration_window` (300) **non la legge NESSUNO: è
 configurazione morta in v0.18.6.** Dichiarata nella struct, scritta
 dal wizard, presente in una fixture di test, e in nessun altro posto
