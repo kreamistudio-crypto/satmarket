@@ -48577,3 +48577,192 @@ albero li gira la CI. Ai rebase un solo conflitto per volta, la coda
 di questo file, risolto tenendo tutt'e due i lati. Al momento del push
 l'ultima CI finita di main era verde (e8a24ad); quelle dei due commit
 arrivati dopo erano ancora in corso.
+
+## L'indirizzo che il coordinatore non verifica: il «no» si ricorda, e quando si sa si dice prima (10 ott 2026, sera, cantiere indirizzo-non-verificato, bug dal campo)
+
+**IL FATTO.** Un utente del P2P, fermo su «Dove ricevere i sats»
+(ordine `44c46ddf`, 127.063 sats), dà il suo indirizzo Lightning — un
+`@sbpc.ch`, Swiss Bitcoin Pay — e legge «Non sono riuscito a verificare
+questo indirizzo: usa una fattura del tuo wallet.», con SOPRA la
+scorciatoia «⚡ Usa l'indirizzo dei tuoi incassi» che gli ripropone lo
+stesso indirizzo. Ci riprova quattro volte in un minuto (16:29–16:30
+UTC). Nel journal, alle stesse ore, quattro righe «✅ Fattura P2P: …
+indirizzo, dest 03c181e1…, fee 65/1270: ok». Il sospetto di Andrea: una
+seconda chiamata che fallisce, la CSP accesa oggi, o un cambio di oggi.
+
+**LA DIAGNOSI.** Le due frasi non si contraddicono: sono DUE verifiche.
+1. Il nostro controllo (`/api/p2p/fattura`, di stamattina) risolve
+   l'indirizzo dal VPS, in chiaro, e chiede la strada al nostro LND:
+   da lì i quattro «ok».
+2. Poi l'indirizzo parte COM'È nell'`add-invoice` (decisione di sempre:
+   lo risolve il coordinatore, nessun wallet di terzi risponde al
+   nostro browser) e mostrod lo verifica PER CONTO SUO — letto sul
+   sorgente della 0.19.0: `validate_invoice` → `is_valid_invoice` →
+   `validate_lightning_address` → `ln_exists`, cioè il solo documento
+   `.well-known/lnurlp/<nome>` con `tag: payRequest`, attraverso
+   `lnurl_get` (DNS, IP inchiodato, niente redirect, i tre budget che
+   il nostro fork porta a 30/15/10 s). Ogni suo fallimento esce come
+   `cant-do invalid-invoice`, senza una riga nel suo log.
+La frase del client la scrive UN posto solo (`ragioneIncassoP2P`), e
+solo su quel `cant-do` con una chiocciola nel testo. Il browser non
+risolve nessun LNURL: la CSP non c'entra (e infatti nessuna riga CSP
+per `sbpc.ch`). Nessun cambio di oggi c'entra: il controllo nuovo ha
+solo reso VISIBILE, nel journal, che noi dicevamo «ok».
+MISURATO DAL PC, in chiaro: `sbpc.ch` risponde `payRequest` in 0,16 s,
+dietro un Caddy (niente Cloudflare), anche senza User-Agent, con quello
+di mostro, in HTTP/1.1 e TLS 1.2, e senza badare a maiuscole e
+minuscole; un solo record A, lo stesso del `callback`
+(`api.swiss-bitcoin-pay.ch`); catena Let's Encrypt della generazione
+nuova (YE2 → Root YE → X2 → X1), che le radici di Mozilla accettano.
+DAL NODO (Andrea, la sera stessa): gli indirizzi in generale passano —
+oggi due payout riusciti con `bitbox.cash` e `sats.mobi` — e `sbpc.ch`
+non era mai stato usato. Quindi è quel servizio, non una regressione.
+I TEMPI DICONO «RIFIUTO», NON «TIMEOUT»: fra il terzo e il quarto
+tentativo passano 10 secondi, controllo nostro compreso, e coi budget a
+30/15/10 un timeout ne vorrebbe di più.
+**COSA NON SO.** PERCHÉ mostrod non arriva a `sbpc.ch`. L'ipotesi è il
+blocco delle uscite Tor da parte di quel servizio; da qui non si prova
+(niente Tor in locale, e il nodo non è nel mio perimetro). I comandi in
+sola lettura sono dati ad Andrea e scritti in PRODUZIONE, «I WALLET IL
+CUI INDIRIZZO NON PASSA». Se dal nodo `sbpc.ch` rispondesse 200, resta
+da guardare il client HTTP di mostrod (reqwest con rustls: la catena
+nuova di Let's Encrypt è il primo sospetto).
+
+**LA CURA, in due parti.**
+1) IL «NO» SI RICORDA. Il difetto NOSTRO era sopra la frase: la
+scorciatoia che riproponeva l'indirizzo appena rifiutato. Adesso il
+rifiuto resta sulla riga dell'ordine (`indirizziRifiutati`, in
+minuscolo: un ELENCO corto e non un campo, perché un secondo indirizzo
+rifiutato non faccia dimenticare il primo — gli ultimi cinque, senza
+doppioni), lo scrive `segnaIndirizzoRifiutatoP2P`, e `renderIncassoP2P` — se è
+l'indirizzo degli incassi — al posto della scorciatoia scrive «⚠️ Il
+tuo indirizzo <indirizzo> qui non è passato: incolla una fattura dal
+tuo wallet.» (la veste e la via d'uscita della riga di Wallet of
+Satoshi). Il foglio si ridisegna subito, col campo e la frase
+com'erano; riaperto, se lo ricorda; un ALTRO indirizzo rifiutato non
+tocca la scorciatoia; la richiesta accettata (`ricordaFatturaP2P`) lo
+cancella. Vale nei due fogli, «Dove ricevere i sats» e «Una fattura
+nuova».
+2) QUANDO SI SA, SI DICE PRIMA (richiesta di Andrea a cantiere aperto).
+Il server tiene l'elenco dei wallet il cui indirizzo il coordinatore
+non verifica — la leva `P2P_INDIRIZZI_NON_PASSANO` (dominio esatto →
+nome da dire), nel codice col solo Wallet of Satoshi, noto dal 24 set —
+e `_controllo_indirizzo_p2p` li ferma PRIMA di bussare a chiunque e
+prima dell'invio: esito `wallet_non_passa`, «Gli indirizzi <nome> qui
+non funzionano: incolla una fattura dal tuo wallet.», senza «Usa
+comunque» (manderebbe al rifiuto). Il client quel «no» lo ricorda come
+quello del coordinatore: stessa riga, stessa scorciatoia tolta. Nel
+journal va il solo dominio. Wallet of Satoshi scritto A MANO, che dal
+24 set andava dritto al rifiuto («fermarlo prima è un ritocco a sé»),
+adesso si ferma prima.
+`sbpc.ch` NON è nell'elenco del codice: entra — nel config del VPS, o
+qui — quando la prova dal nodo dice che è davvero un rifiuto stabile.
+UN RITOCCO DI COERENZA nello stesso giro: due frasi del controllo di
+stamattina (nodo privato, Phoenix) consigliavano «l'indirizzo di un
+altro wallet (Blink, Wallet of Satoshi, Alby)»: Wallet of Satoshi è
+uscito da quel consiglio, che lo stesso controllo ora ferma.
+
+**LE STRADE SCARTATE.**
+- IL RIPIEGO AUTOMATICO SULLA FATTURA che il nostro server ha già in
+  mano (l'indirizzo lo risolve lui): metterebbe il server di Barattolo
+  nella strada del payout del P2P — una fattura scritta da noi al posto
+  di quella di chi compra — cioè cambierebbe il modello di fiducia; e
+  le fatture LNURL sono spesso corte, mentre il coordinatore ne vuole
+  più di un'ora e la paga al rilascio. Non si fa senza una decisione.
+- IL BROWSER CHE RISOLVE L'LNURL: la CSP lo vieta, e la regola è che
+  nessun wallet di terzi risponde al nostro browser.
+- UN ELENCO SOLO NEL CLIENT (`P2P_WALLET_NON_PASSANO`): vorrebbe un
+  deploy per ogni dominio. L'elenco del client resta quello che decide
+  la scorciatoia a foglio appena aperto; una prova lo tiene DENTRO
+  quello del server.
+- IL SERVER CHE PROVA «LA STRADA DI MOSTRO»: vorrebbe un Tor sul VPS e
+  una dipendenza nuova, per uscire comunque da altre porte di quelle
+  del nodo. L'elenco dice la stessa cosa con una riga.
+- IMPARARE DA SOLI i domini dai rifiuti dichiarati dai telefoni: un
+  dato scritto dal client fermerebbe gli indirizzi di tutti (basta un
+  telefono che mente). Proposta, non fatta.
+- RIPROVARE DA SOLI l'invio: i quattro tentativi dell'utente dicono che
+  con quel servizio non sarebbe servito.
+- MOSTROD IN CHIARO SOLO PER LNURL: analizzato per Andrea, niente
+  toccato. Le destinazioni le sceglie l'utente, quindi non si esentano
+  per dominio; esentarle tutte mostra l'IP del nodo a chiunque scriva
+  un dominio. La forma pulita sarebbe una patch al fork che fa passare
+  il solo `lnurl_get` da un proxy sul VPS attraverso il tunnel
+  WireGuard: fuori esce l'IP di Barattolo, che è già pubblico, e il
+  nostro «ok» diventerebbe la stessa strada del suo. Costa una patch
+  0009, un servizio in più sul VPS, e il VPS nella strada dei payout a
+  indirizzo. Decisione di Andrea, cantiere a sé.
+
+**PROVATO.** `prove_indirizzo_non_verificato` (sentinelle sul testo, i
+giudici VERI del server con l'elenco di serie e uno allargato, la leva
+pulita, il foglio VERO in node in dieci casi) e due sezioni nuove nel
+banco del motore: 4-quater (il «no» del coordinatore all'indirizzo
+degli incassi, coi nodi del foglio buttati dopo il ridisegno come fa il
+DOM) e 4-quinquies (il «no» del nostro controllo, di cartone: niente
+parte). GIRO DAL VIVO nel finto Telegram (hash `collaudo:111`), copia
+nello scratchpad, relay morto, coordinatore di cartone che risponde
+`invalid_invoice` agli indirizzi: scorciatoia toccata, «Invia», il
+foglio resta aperto senza la scorciatoia e con la riga nuova, campo e
+frase al loro posto, la pagina sotto ripete la stessa frase; riaperto
+se lo ricorda; richiesta accettata → foglio chiuso, ricordo cancellato,
+si torna a «I miei scambi». Poi, col server VERO della copia e la leva
+allargata a un dominio di prova: il «no» arriva dal nostro controllo
+prima dell'invio, niente parte, stessa riga.
+**NON PROVATO.** Il rifiuto vero di mostrod (il banco dal vivo lo
+recita un cartone); un telefono vero; `sbpc.ch` da dietro Tor.
+**RESTA DA GUARDARE.** L'esito dei comandi sul nodo, e da lì la riga di
+`sbpc.ch` nella leva. L'utente dell'ordine `44c46ddf` intanto passa con
+una fattura del suo wallet (senza importo o di 127.063 esatti).
+
+**IL VERBALE (10 ott 2026, sera): cosa è girato su quale albero.**
+Sull'albero di partenza (`4f60dac`) con la sola prima parte (il «no»
+che si ricorda): suite severa 21.837 verdi e 0 rosse. Sullo stesso
+albero col cantiere intero: suite severa 21.862 verdi e 0 rosse, 57
+collaudi su 57 nella gabbia, lo scanner dei segreti pulito sulle righe
+aggiunte (controprova: due finti presi su due), i due giri dal vivo, e
+la TORTURA su una copia del repo intero — 32 mutazioni, 21 nel client
+e 11 nel server, 32 prese: sette dall'ESPLOSIONE della prova (un
+`KeyError` o un `ValueError` della sezione, che la suite conta come una
+fallita) e non da una riga rossa; e una, «il foglio si ridisegna per
+qualunque indirizzo», dalla sola sentinella sul testo — nessun banco
+conta i ridisegni quando l'indirizzo rifiutato NON è quello degli
+incassi (un ridisegno in più butterebbe l'avviso: lo si vedrebbe a
+occhio, non in una prova). Ribasato su `167cca7` (cinque commit non
+miei: la tendina di Android, i gesti prima del PayCode e la riga per
+chi usa Wallet of Satoshi, coi loro verbali): un conflitto solo, la
+coda di CANTIERI, sciolto tenendo tutte le voci; suite severa 21.888
+verdi e 0 rosse, 57 collaudi su 57. Tortura e giri dal vivo NON rifatti
+dopo il rebase. IL PUSH aspetta l'ok di Andrea: quello scritto nel
+brief incollato l'ho richiesto, perché la cura consegnata non è quella
+che il brief si aspettava (l'indirizzo `@sbpc.ch` continua a non
+passare: adesso lo si sa prima, o lo si ricorda dopo).
+L'OK È ARRIVATO a lavoro chiuso: «così com'è, senza `sbpc.ch`
+nell'elenco» — lo aggiunge Andrea dal config del VPS se la prova dal
+nodo conferma il blocco — e un sì a due delle cose notate (il dominio
+nel journal a ogni controllo di un indirizzo, l'elenco dei domini al
+client), in commit separati dopo questo; la patch 0009 no, è una
+decisione da prendere con Alan. Nell'attesa main è corso altre tre
+volte (sette commit non miei: il sollecito del recapito, l'indirizzo
+Lightning di casa, il riquadro dei contanti a due metodi, la copertura
+e il nome breve della Mini App, le cose notate sul cambio, coi loro
+verbali). Ribasato su `0a2d3a4`: suite severa 21.993 verdi e 0 rosse,
+58 collaudi su 58. Ribasato su `1b1d05f`: 19 sezioni — le mie, quelle
+toccate o nate coi commit arrivati, la bussola, il tetto di CLAUDE.md,
+la sintassi del client (1.413 verdi, 0 rosse) — e 58 collaudi su 58.
+Ribasato su `e8a24ad`, l'albero del push (il commit arrivato non tocca
+server.py): 11 sezioni (944 verdi, 0 rosse) e quattro collaudi nella
+gabbia (la CSP, il controllo della fattura, i metodi delle rotte, il
+cambio); la suite intera e gli altri collaudi NON rifatti su
+quest'ultima punta. I conflitti: la coda di CANTIERI a ogni rebase,
+sciolta tenendo tutte le voci. LA CI DI MAIN prima del push: aspettata
+la punta (`e8a24ad`), verde. E IL PRIMO PUSH È STATO RESPINTO: main era
+corso di nuovo fra il fetch e la spinta (`f486043`, soli documenti), e
+poi altre tre volte mentre aspettavo la sua CI (`db3522c`, `8a14eba`,
+`3086eac`: la prova della contesa, le due monete, la scheda summary).
+Ribasato su `3086eac`, l'albero del push: 12 sezioni — le mie, quelle
+toccate dai commit arrivati, la bussola, il tetto, la sintassi del
+client (799 verdi, 0 rosse) — e cinque collaudi (la CSP, il controllo
+della fattura, i metodi delle rotte, la contesa, i negozi grandi).
+L'ultima CI di main FINITA era verde (`e8a24ad`); quelle dei quattro
+commit arrivati dopo erano ancora in corso da piu' di venti minuti, e
+non le ho aspettate oltre: main correva piu' della CI.

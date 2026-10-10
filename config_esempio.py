@@ -908,6 +908,16 @@ P2P_LOG_PASSATE = True
 # coordinatore non la pagherebbe, e lo si dice subito (con un «Usa
 # comunque»). Se cambia la', va cambiato qui: il server non lo legge.
 P2P_TETTO_ROTTA = 0.01
+# I WALLET IL CUI INDIRIZZO NON PASSA (10 ott 2026, cantiere
+# indirizzo-non-verificato): il coordinatore la Lightning address la
+# verifica per conto suo, da dietro Tor, e a certi servizi non riesce
+# ad arrivare — anche quando il nostro controllo, che esce in chiaro,
+# dice «pagabile». Per i domini scritti qui il foglio «Dove ricevere i
+# sats» ferma PRIMA dell'invio e manda alla fattura (che di quei wallet
+# passa: non passa solo l'indirizzo). Dominio in minuscolo -> il nome
+# da dire. Senza questa riga vale l'elenco del codice (il solo Wallet
+# of Satoshi); scritta qui lo SOSTITUISCE: le voci vanno ripetute tutte.
+P2P_INDIRIZZI_NON_PASSANO = {"walletofsatoshi.com": "Wallet of Satoshi"}
 
 DB = "satmarket.db"
 

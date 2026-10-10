@@ -47615,10 +47615,31 @@ try:
     from config import P2P_TETTO_ROTTA
 except ImportError:
     P2P_TETTO_ROTTA = 0.01
+# I WALLET IL CUI INDIRIZZO NON PASSA (10 ott 2026, cantiere
+# indirizzo-non-verificato). La Lightning address parte verso il
+# coordinatore COSI' COM'E', e lui la verifica PER CONTO SUO, da dietro
+# Tor (`ln_exists` di Mostro): certi servizi a lui non rispondono, e al
+# nostro server — che esce in chiaro — si'. Su quegli indirizzi il
+# nostro «ok» non vale niente: chi li manda si prende `invalid-invoice`
+# DOPO l'invio (l'ordine 44c46ddf, un indirizzo @sbpc.ch: quattro «ok»
+# nostri e quattro «no» suoi in un minuto). Quelli che si SANNO si
+# dicono PRIMA, e fermano: dominio (minuscolo, esatto) -> il nome da
+# dire. La FATTURA di quei wallet passa: non passa solo l'indirizzo.
+# Sta nel config perche' l'elenco cresce dal campo, senza un deploy;
+# una leva scritta male vale «nessuno» e non ferma l'avvio.
+try:
+    from config import P2P_INDIRIZZI_NON_PASSANO
+except ImportError:
+    P2P_INDIRIZZI_NON_PASSANO = {"walletofsatoshi.com": "Wallet of Satoshi"}
+P2P_INDIRIZZI_NON_PASSANO = {
+    str(k).strip().lower(): str(v).strip()
+    for k, v in (P2P_INDIRIZZI_NON_PASSANO.items()
+                 if isinstance(P2P_INDIRIZZI_NON_PASSANO, dict) else ())
+    if str(k).strip() and str(v).strip()}
 LND_FATTURA_ATTESA_S = 10         # per domanda: tre al massimo, e il client ne aspetta 40
 TETTO_CONTROLLI_FATTURA_ORA = 30  # per utente: ogni indirizzo e' un giro di rete verso un dominio scelto da lui
 FATTURA_FERMA = ("illeggibile", "importo", "scaduta", "corta", "rete",
-                 "nodo_assente", "indirizzo")
+                 "nodo_assente", "indirizzo", "wallet_non_passa")
 FATTURA_AVVISA = ("senza_strada", "costo")
 FATTURA_NON_DISPONIBILE = "non_disponibile"
 LND_NEGATO = "negato"
@@ -47643,12 +47664,16 @@ MSG_INDIRIZZO = {
     "nodo_assente": ("Questo indirizzo porta a un nodo privato senza "
                      "indicazioni di strada, che la rete Lightning non "
                      "raggiunge. Usa l'indirizzo di un altro wallet "
-                     "(Blink, Wallet of Satoshi, Alby) o incolla una "
-                     "fattura."),
+                     "(Blink, Alby) o incolla una fattura."),
     "senza_strada": ("Il nostro nodo non trova una strada fino al wallet "
                      "di questo indirizzo: il pagamento potrebbe fallire. "
                      "Meglio l'indirizzo di un altro wallet, o una fattura."),
 }
+# il wallet che si SA che non passa (`P2P_INDIRIZZI_NON_PASSANO`): la
+# famiglia delle due righe del foglio su Wallet of Satoshi, e la via
+# d'uscita e' una sola
+MSG_WALLET_NON_PASSA = ("Gli indirizzi {nome} qui non funzionano: incolla "
+                        "una fattura dal tuo wallet.")
 _controlli_fattura = {}   # tg_id → [secondi di ogni controllo nell'ultima ora]
 
 
@@ -47820,7 +47845,11 @@ async def _controllo_indirizzo_p2p(indirizzo: str, deve: int, chiedi=None,
     come una fattura incollata, sulla sola rete: la scadenza non conta,
     perche' QUELLA fattura non parte da nessuna parte (il coordinatore
     all'add-invoice se ne fa una sua). Dominio inesistente = certo e
-    si ferma (quasi sempre un refuso); wallet muto = non si sa."""
+    si ferma (quasi sempre un refuso); wallet muto = non si sa.
+    ⚠️ UN «OK» DI QUI NON E' IL «SI'» DEL COORDINATORE (10 ott 2026):
+    noi risolviamo l'indirizzo dalla rete aperta, lui lo verifica per
+    conto suo da dietro Tor. I wallet che a lui non rispondono stanno
+    in `P2P_INDIRIZZI_NON_PASSANO`, e fermano prima (`wallet_non_passa`)."""
     risolvi = risolvi or invoice_da_ln_address
     diagnosi = diagnosi or diagnosi_ln_address
     nome, _, dominio = str(indirizzo or "").strip().lower().partition("@")
@@ -47834,8 +47863,16 @@ async def _controllo_indirizzo_p2p(indirizzo: str, deve: int, chiedi=None,
                 "messaggio": "Questo è un indirizzo Phoenix (BIP-353), che "
                              "parla un'altra lingua, e qui non si sa pagare. "
                              "Non hai sbagliato a scriverlo — usa "
-                             "l'indirizzo di un altro wallet (Blink, Wallet "
-                             "of Satoshi, Alby) o incolla una fattura."}
+                             "l'indirizzo di un altro wallet (Blink, Alby) "
+                             "o incolla una fattura."}
+    # il wallet che si SA che non passa: si dice senza bussare a nessuno,
+    # e prima della cifra (vale anche a cifra ignota). Nel journal il
+    # solo dominio: l'indirizzo intero e' di una persona
+    if dominio in P2P_INDIRIZZI_NON_PASSANO:
+        return {"esito": "wallet_non_passa", "tramite": "indirizzo",
+                "perche": dominio,
+                "messaggio": MSG_WALLET_NON_PASSA.format(
+                    nome=P2P_INDIRIZZI_NON_PASSANO[dominio])}
     if deve <= 0:
         return {"esito": FATTURA_NON_DISPONIBILE, "tramite": "indirizzo",
                 "perche": "cifra ignota: l'indirizzo non si prova"}

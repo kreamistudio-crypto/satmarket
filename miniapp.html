@@ -60624,6 +60624,10 @@ function ricordaFatturaP2P(id, scade){
   const agg = ordiniP2P()[id];
   if (!agg) return;
   agg.fatturaScade = Math.floor(Number(scade) || 0);
+  /* accettata: gli indirizzi rifiutati prima non sono piu' una notizia
+     (10 ott 2026, vedi «L'INDIRIZZO CHE IL COORDINATORE HA RIFIUTATO»
+     in `renderIncassoP2P`) */
+  delete agg.indirizziRifiutati;
   scriviOrdineP2P(agg);
 }
 /* ---- I WALLET CHE COL P2P NON PASSANO (24 set 2026, dalla prova vera
@@ -60712,6 +60716,22 @@ function renderIncassoP2P(){
      (`.p2p-wallet-no`, qui sotto), e la riga generica dei due fogli
      non compare — due avvisi uguali uno sotto l'altro erano un doppione. */
   const wosSalvato = !!(myLnAddress && walletNonPassaP2P(myLnAddress));
+  /* L'INDIRIZZO CHE IL COORDINATORE HA RIFIUTATO NON SI RIPROPONE (10
+     ott 2026, dal campo: l'ordine 44c46ddf, un indirizzo @sbpc.ch).
+     Il nostro controllo aveva detto «pagabile» — il server lo risolve
+     dalla rete aperta — e il coordinatore, che l'indirizzo lo verifica
+     PER CONTO SUO da dietro Tor, ha risposto `invalid-invoice`: quattro
+     volte in un minuto, perche' sopra la frase «usa una fattura»
+     restava la scorciatoia che riproponeva LO STESSO indirizzo. Adesso
+     il rifiuto resta sulla riga (`indirizziRifiutati`, minuscoli: li
+     scrive `segnaIndirizzoRifiutatoP2P`, al «no» del coordinatore e a
+     quello del nostro controllo) e, se e' quello degli incassi, al
+     posto della scorciatoia c'e' la riga che manda alla fattura — la
+     strada di Wallet of Satoshi, ma imparata dal «no» e per quel solo
+     scambio: quale wallet non risponde al coordinatore lo sa solo lui,
+     e un elenco scritto qui arriverebbe sempre dopo. */
+  const salvatoRifiutato = !!(myLnAddress && !wosSalvato && Array.isArray(o.indirizziRifiutati)
+    && o.indirizziRifiutati.indexOf(String(myLnAddress).trim().toLowerCase()) >= 0);
   const vie = dopo
     ? '<div class="hint" style="margin-top:12px">Incolla una fattura dal tuo wallet, senza importo' +
       (quanti ? ' o di ' + esc(quanti) + ' esatti' : '') + '. La paghiamo subito.' +
@@ -60749,6 +60769,9 @@ function renderIncassoP2P(){
     (myLnAddress && walletNonPassaP2P(myLnAddress)
       ? '<div class="hint p2p-wallet-no">⚠️ Il tuo indirizzo ' + esc(walletNonPassaP2P(myLnAddress))
         + ' qui non funziona: incolla una fattura dal tuo wallet.</div>'
+      : salvatoRifiutato
+      ? '<div class="hint p2p-wallet-no">⚠️ Il tuo indirizzo ' + esc(myLnAddress)
+        + ' qui non è passato: incolla una fattura dal tuo wallet.</div>'
       : myLnAddress
       ? '<button class="btn ghost" type="button" onclick="usaIndirizzoSalvatoP2P()">⚡ Usa l\'indirizzo dei tuoi incassi: '
         + esc(myLnAddress) + '</button>'
@@ -60796,6 +60819,35 @@ function ragioneIncassoP2P(e, testo){
   if (e && e.cantDo && e.motivo === 'invalid-invoice' && String(testo || '').indexOf('@') >= 0)
     return P2P_INDIRIZZO_RIFIUTATO;
   return ragioneGestoP2P(e);
+}
+/* L'INDIRIZZO CHE NON E' PASSATO SI RICORDA SULLA RIGA (10 ott 2026,
+   cantiere indirizzo-non-verificato). Lo chiamano i due «no» che un
+   indirizzo puo' prendersi: quello del coordinatore DOPO l'invio
+   (`invalid-invoice`) e quello del nostro controllo PRIMA (il server sa
+   che gli indirizzi di quel wallet il coordinatore non li verifica:
+   `wallet_non_passa`). Lo aggiunge a `indirizziRifiutati`, in minuscolo,
+   e — se e' l'indirizzo degli incassi e il foglio e' ancora quello di
+   quest'ordine — lo ridisegna: via la scorciatoia, al suo posto la riga
+   che manda alla fattura (vedi `renderIncassoP2P`), col campo com'era.
+   Torna true se ha ridisegnato: l'AVVISO il ridisegno lo butta, e lo
+   rimette chi chiama, che sa quale frase dire.
+   UN ELENCO E NON UN CAMPO: con l'ultimo soltanto, un secondo indirizzo
+   rifiutato farebbe dimenticare il primo, e la scorciatoia di quello
+   degli incassi tornerebbe. Corto (gli ultimi cinque) e senza doppioni:
+   la riga dell'ordine non deve crescere a ogni tentativo. */
+function segnaIndirizzoRifiutatoP2P(id, testo){
+  const agg = ordiniP2P()[id];
+  if (!agg) return false;
+  const ind = String(testo || '').trim().toLowerCase();
+  const gia = Array.isArray(agg.indirizziRifiutati) ? agg.indirizziRifiutati : [];
+  agg.indirizziRifiutati = gia.filter(x => x !== ind).concat(ind).slice(-5);
+  scriviOrdineP2P(agg);
+  if (p2pIncassoOrdine !== id || !myLnAddress
+      || ind !== String(myLnAddress).trim().toLowerCase()) return false;
+  renderIncassoP2P();
+  const campo = el('p2pIncassoInp');
+  if (campo) campo.value = testo;
+  return true;
 }
 async function inviaIncassoP2P(){
   const o = ordiniP2P()[p2pIncassoOrdine];
@@ -60871,6 +60923,10 @@ async function inviaIncassoP2P(){
     fermo = typeof controlloFatturaP2P === 'function'
       ? await controlloFatturaP2P(o, testo) : null;
   } finally { ripC(); }
+  /* IL NOSTRO CONTROLLO SA CHE L'INDIRIZZO DI QUEL WALLET NON PASSA (10
+     ott 2026): e' il «no» del coordinatore detto PRIMA dell'invio, e si
+     ricorda allo stesso modo — poi la frase, sui nodi di adesso */
+  if (fermo && fermo.esito === 'wallet_non_passa') segnaIndirizzoRifiutatoP2P(o.id, testo);
   if (fermo) { mostraFermoFatturaP2P(fermo); return; }
   const rip = attesaP2P('Mando dove ricevere i sats…', el('p2pIncassoBtn'));
   try {
@@ -60931,6 +60987,13 @@ async function inviaIncassoP2P(){
         agg.cantDo = perche;
         scriviOrdineP2P(agg);
         if (p2pOrdineAperto === o.id) renderOrdineP2P();
+      }
+      /* ...e QUALE indirizzo non e' passato resta sulla riga (10 ott
+         2026): se e' quello degli incassi il foglio smette di proporlo.
+         Il ridisegno butta l'avviso, e la frase si rimette qui */
+      if (segnaIndirizzoRifiutatoP2P(o.id, testo)) {
+        const avviso = el('p2pIncassoAvviso');
+        if (avviso) { avviso.textContent = perche; avviso.style.display = ''; }
       }
     }
   } finally {

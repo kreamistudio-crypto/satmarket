@@ -71088,6 +71088,125 @@ function reset(){
   out.altroNoTieneLaSuaRagione =
     String(nodi.p2pIncassoAvviso.textContent).indexOf('in questo momento dello scambio') >= 0
     && String(nodi.p2pIncassoAvviso.textContent).indexOf('verificare questo indirizzo') < 0;
+  /* ---- 4-quater) L'INDIRIZZO DEGLI INCASSI RIFIUTATO NON SI RIPROPONE
+     (10 ott 2026, dal campo: l'ordine 44c46ddf). Il coordinatore dice
+     `invalid_invoice` all'indirizzo SALVATO: il rifiuto resta sulla
+     riga, il foglio si ridisegna senza la scorciatoia e con la riga
+     che manda alla fattura, e campo e frase restano com'erano — sui
+     nodi NUOVI, perche' il ridisegno vero butta il campo e l'avviso
+     e li rifa' (qui lo si imita: dopo il ridisegno i due nodi di
+     cartone si buttano, e chi non li riscrive lascia un campo vuoto). */
+  await presaCheRifiuta('invalid_invoice');
+  {
+    const ID = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002';
+    const prima = String(nodi.p2pIncassoCorpo.innerHTML || '');
+    out.salvatoPrimaSiPropone = prima.indexOf('usaIndirizzoSalvatoP2P()') >= 0
+      && prima.indexOf('qui non è passato') < 0;
+    const veroRender = renderIncassoP2P;
+    let ridisegni = 0;
+    renderIncassoP2P = function(){
+      veroRender(); ridisegni++;
+      delete nodi.p2pIncassoInp; delete nodi.p2pIncassoAvviso;
+    };
+    try {
+      el('p2pIncassoInp').value = 'IO@Wallet.com';
+      await inviaIncassoP2P();
+      await pausa(60);
+    } finally { renderIncassoP2P = veroRender; }
+    const h = String(nodi.p2pIncassoCorpo.innerHTML || '');
+    out.salvatoRifiutatoPartito = ricevuti.length === 2
+      && ricevuti[1].dentro.payload.payment_request[1] === 'IO@Wallet.com';
+    out.salvatoRifiutatoSullaRiga = (ordiniP2P()[ID].indirizziRifiutati || []).join(',');
+    out.salvatoRifiutatoNonSiPropone = ridisegni === 1
+      && h.indexOf('usaIndirizzoSalvatoP2P') < 0
+      && h.indexOf('<div class="hint p2p-wallet-no">⚠️ Il tuo indirizzo io@wallet.com qui non è passato: incolla una fattura dal tuo wallet.</div>') >= 0;
+    out.salvatoRifiutatoCampoEFrase = !!nodi.p2pIncassoInp && !!nodi.p2pIncassoAvviso
+      && nodi.p2pIncassoInp.value === 'IO@Wallet.com'
+      && nodi.p2pIncassoAvviso.textContent === P2P_INDIRIZZO_RIFIUTATO
+      && nodi.p2pIncassoAvviso.style.display === '';
+    out.salvatoRifiutatoFoglioAperto = chiusi.indexOf('p2pIncassoSheet') < 0
+      && ordiniP2P()[ID].stato === 'attesa_mia_fattura';
+    /* riaperto, il foglio se lo ricorda: sta sulla riga */
+    apriIncassoP2P();
+    {
+      const r = String(nodi.p2pIncassoCorpo.innerHTML || '');
+      out.salvatoRifiutatoRiaperto = r.indexOf('usaIndirizzoSalvatoP2P') < 0
+        && r.indexOf('qui non è passato') >= 0;
+    }
+    /* un SECONDO indirizzo rifiutato non fa dimenticare il primo: l'elenco
+       cresce, senza doppioni e mai oltre cinque, e la scorciatoia resta via */
+    segnaIndirizzoRifiutatoP2P(ID, ' Altro@Wallet.com ');
+    segnaIndirizzoRifiutatoP2P(ID, 'altro@wallet.com');
+    out.secondoRifiutoNonDimentica = (ordiniP2P()[ID].indirizziRifiutati || []).join(',');
+    renderIncassoP2P();
+    out.secondoRifiutoScorciatoiaVia =
+      String(nodi.p2pIncassoCorpo.innerHTML || '').indexOf('usaIndirizzoSalvatoP2P') < 0;
+    for (let i = 0; i < 7; i++) segnaIndirizzoRifiutatoP2P(ID, 'n' + i + '@w.it');
+    out.elencoCorto = (ordiniP2P()[ID].indirizziRifiutati || []).join(',');
+    /* un ALTRO indirizzo rifiutato, da solo, non toglie la scorciatoia del salvato */
+    { const r = ordiniP2P()[ID]; r.indirizziRifiutati = ['altro@wallet.com']; scriviOrdineP2P(r); }
+    renderIncassoP2P();
+    {
+      const r = String(nodi.p2pIncassoCorpo.innerHTML || '');
+      out.altroRifiutatoScorciatoiaResta = r.indexOf('usaIndirizzoSalvatoP2P()') >= 0
+        && r.indexOf('qui non è passato') < 0;
+    }
+    /* ...e la richiesta ACCETTATA cancella il rifiuto: non e' piu' una notizia */
+    { const r = ordiniP2P()[ID]; r.indirizziRifiutati = ['io@wallet.com']; scriviOrdineP2P(r); }
+    ricordaFatturaP2P(ID, 0);
+    out.accettataDimenticaIlRifiuto = !('indirizziRifiutati' in ordiniP2P()[ID])
+      && ordiniP2P()[ID].fatturaScade === 0;
+  }
+  /* ---- 4-quinquies) IL «NO» DEL NOSTRO CONTROLLO, PRIMA DELL'INVIO
+     (10 ott 2026). Il server sa che l'indirizzo di quel wallet non
+     passa (`wallet_non_passa`): niente parte verso il coordinatore, e
+     il rifiuto si ricorda come quello suo — via la scorciatoia, la
+     riga che manda alla fattura, il campo com'era, e la frase del
+     server sui nodi nuovi. Il controllo vive FUORI dal motore: qui e'
+     di cartone, appeso al globale come lo trova il `typeof`. */
+  await presaCheRifiuta('invalid_invoice');
+  {
+    const ID = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002';
+    const FRASE = 'Gli indirizzi Wallet Finto qui non funzionano: incolla una fattura dal tuo wallet.';
+    let chiesti = [];
+    globalThis.controlloFatturaP2P = async (o, testo) => { chiesti.push(testo);
+      return {messaggio: FRASE, comunque: false, esito: 'wallet_non_passa'}; };
+    globalThis.mostraFermoFatturaP2P = fermo => { const a = el('p2pIncassoAvviso');
+      a.textContent = fermo.messaggio; a.style.display = ''; };
+    const veroRender = renderIncassoP2P;
+    renderIncassoP2P = function(){
+      veroRender();
+      delete nodi.p2pIncassoInp; delete nodi.p2pIncassoAvviso;
+    };
+    try {
+      el('p2pIncassoInp').value = 'io@wallet.com';
+      await inviaIncassoP2P();
+      await pausa(60);
+    } finally { renderIncassoP2P = veroRender; }
+    const h = String(nodi.p2pIncassoCorpo.innerHTML || '');
+    out.fermoPrimaNonParte = ricevuti.length === 1 && chiesti.length === 1
+      && chiesti[0] === 'io@wallet.com';
+    out.fermoPrimaSullaRiga = (ordiniP2P()[ID].indirizziRifiutati || []).join(',');
+    out.fermoPrimaNonSiPropone = h.indexOf('usaIndirizzoSalvatoP2P') < 0
+      && h.indexOf('io@wallet.com qui non è passato: incolla una fattura dal tuo wallet.') >= 0;
+    out.fermoPrimaCampoEFrase = !!nodi.p2pIncassoInp && !!nodi.p2pIncassoAvviso
+      && nodi.p2pIncassoInp.value === 'io@wallet.com'
+      && nodi.p2pIncassoAvviso.textContent === FRASE;
+    out.fermoPrimaScambioFermo = ordiniP2P()[ID].stato === 'attesa_mia_fattura'
+      && !ordiniP2P()[ID].cantDo && chiusi.indexOf('p2pIncassoSheet') < 0;
+    /* un verdetto d'ALTRO tipo ferma lo stesso, ma non ricorda niente */
+    await presaCheRifiuta('invalid_invoice');
+    globalThis.controlloFatturaP2P = async () => ({messaggio: 'M', comunque: false, esito: 'nodo_assente'});
+    try {
+      el('p2pIncassoInp').value = 'io@wallet.com';
+      await inviaIncassoP2P();
+      await pausa(60);
+    } finally { delete globalThis.controlloFatturaP2P; delete globalThis.mostraFermoFatturaP2P; }
+    out.altroFermoNonRicorda = ricevuti.length === 1
+      && !('indirizziRifiutati' in ordiniP2P()[ID])
+      && String(nodi.p2pIncassoCorpo.innerHTML || '').indexOf('usaIndirizzoSalvatoP2P()') >= 0
+      && nodi.p2pIncassoAvviso.textContent === 'M';
+  }
   /* PURA: il messaggio mai partito e il silenzio restano i loro */
   out.ragioneIncassoPura =
     ragioneIncassoP2P({cantDo: true, motivo: 'invalid-invoice', message: 'x'}, 'a@b.it') === P2P_INDIRIZZO_RIFIUTATO
@@ -71858,6 +71977,24 @@ function reset(){
         "indirizzoRifiutatoInPagina": "...e la pagina sotto ripete la STESSA frase, non quella generica",
         "fatturaRifiutataDiceLaSua": "una FATTURA rifiutata tiene la frase di sempre, su importo e scadenza",
         "altroNoTieneLaSuaRagione": "un «no» d'altro tipo su un indirizzo tiene la sua ragione vera",
+        "salvatoPrimaSiPropone": "l'indirizzo degli incassi, prima di un rifiuto, si propone con la scorciatoia",
+        "salvatoRifiutatoPartito": "...scritto con le maiuscole parte com'e': lo abbassa solo il ricordo",
+        "salvatoRifiutatoSullaRiga": ("...e il rifiuto del coordinatore resta sulla riga, in minuscolo", "io@wallet.com"),
+        "salvatoRifiutatoNonSiPropone": "...il foglio si ridisegna UNA volta: via la scorciatoia, al suo posto la riga che manda alla fattura",
+        "salvatoRifiutatoCampoEFrase": "...e sui nodi NUOVI il campo e la frase del rifiuto ci sono ancora",
+        "salvatoRifiutatoFoglioAperto": "...col foglio aperto e lo scambio fermo dov'era",
+        "salvatoRifiutatoRiaperto": "...e riaperto il foglio se lo ricorda",
+        "secondoRifiutoNonDimentica": ("un SECONDO indirizzo rifiutato non fa dimenticare il primo, e non si scrive due volte", "io@wallet.com,altro@wallet.com"),
+        "secondoRifiutoScorciatoiaVia": "...e la scorciatoia dell'indirizzo degli incassi resta via",
+        "elencoCorto": ("...l'elenco tiene gli ultimi cinque: la riga non cresce a ogni tentativo", "n2@w.it,n3@w.it,n4@w.it,n5@w.it,n6@w.it"),
+        "altroRifiutatoScorciatoiaResta": "un ALTRO indirizzo rifiutato, da solo, non toglie la scorciatoia di quello salvato",
+        "accettataDimenticaIlRifiuto": "...e la richiesta accettata cancella il rifiuto dalla riga",
+        "fermoPrimaNonParte": "il «no» del NOSTRO controllo (`wallet_non_passa`): niente parte verso il coordinatore",
+        "fermoPrimaSullaRiga": ("...e il rifiuto si ricorda sulla riga come quello del coordinatore", "io@wallet.com"),
+        "fermoPrimaNonSiPropone": "...via la scorciatoia, al suo posto la riga che manda alla fattura",
+        "fermoPrimaCampoEFrase": "...col campo com'era e la frase del server, sui nodi NUOVI",
+        "fermoPrimaScambioFermo": "...lo scambio fermo, il foglio aperto, e nessun «no» del coordinatore scritto in pagina",
+        "altroFermoNonRicorda": "un verdetto d'altro tipo ferma lo stesso, ma non ricorda niente e la scorciatoia resta",
         "ragioneIncassoPura": "ragioneIncassoP2P e' pura: non partito e silenzio restano i loro",
         "rifiutato": ("un «no» del coordinatore si legge", "rifiutato"),
         "motivoInItaliano": "...e il motivo e' in italiano",
@@ -137085,6 +137222,303 @@ console.log(JSON.stringify({
            "altro wallet" in guida])
 
 
+def prove_indirizzo_non_verificato():
+    """L'INDIRIZZO CHE IL COORDINATORE HA RIFIUTATO NON SI RIPROPONE (10
+    ott 2026, cantiere «indirizzo-non-verificato», dal campo: l'ordine
+    44c46ddf, un indirizzo @sbpc.ch). Il server aveva detto quattro
+    volte «pagabile» e l'app quattro volte «Non sono riuscito a
+    verificare questo indirizzo»: non si contraddicono, sono DUE
+    verifiche — la nostra dalla rete aperta (`/api/p2p/fattura`), e
+    quella del coordinatore, che l'indirizzo lo riceve com'e' e lo
+    risolve per conto suo da dietro Tor (`ln_exists`): il suo «no» e'
+    l'unica cosa che scrive quella frase. Il difetto NOSTRO era sopra
+    la frase: la scorciatoia che riproponeva lo stesso indirizzo. La
+    cura: il rifiuto resta sulla riga dell'ordine, e se e' l'indirizzo
+    degli incassi al posto della scorciatoia c'e' la riga che manda
+    alla fattura. E IL «NO» SI DICE PRIMA quando si sa: il server tiene
+    l'elenco dei wallet il cui indirizzo il coordinatore non verifica
+    (`P2P_INDIRIZZI_NON_PASSANO`, nel config: parte con Wallet of
+    Satoshi) e il nostro controllo ferma prima dell'invio, con la via
+    d'uscita. Qui le sentinelle sul testo, i giudici VERI del server e
+    il foglio VERO girato in node; l'invio intero (i due «no», il
+    ridisegno, campo e frase sui nodi nuovi) sta nel banco del motore,
+    sezioni 4-quater e 4-quinquies."""
+    print("\n[l'indirizzo che il coordinatore ha rifiutato]")
+    import html as _html
+    mini = open("miniapp.html", encoding="utf-8").read()
+    m = mini.replace("\r\n", "\n")
+
+    def nudo(js):
+        """senza i commenti: una sentinella parla di quel che il
+        programma FA"""
+        return re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+
+    inc = nudo(_fn_js(m, "function renderIncassoP2P(){"))
+    inv = nudo(_fn_js(m, "async function inviaIncassoP2P(){"))
+    ric = nudo(_fn_js(m, "function ricordaFatturaP2P(id, scade){"))
+    rag = nudo(_fn_js(m, "function ragioneIncassoP2P(e, testo){"))
+
+    # --- chi scrive la frase, e cosa la fa scattare ------------------
+    prova("la frase e' scritta in un posto solo, e la dicono in due: la ragione "
+          "dell'incasso, e chi la riscrive in pagina", [1, 1, 1],
+          [m.count("'Non sono riuscito a verificare questo indirizzo: usa una fattura "
+                   "del tuo wallet.'"),
+           rag.count("P2P_INDIRIZZO_RIFIUTATO"), inv.count("P2P_INDIRIZZO_RIFIUTATO")])
+    prova("...e la fa scattare SOLO il «no» del coordinatore (`invalid-invoice`) su un "
+          "testo con la chiocciola", True,
+          "if (e && e.cantDo && e.motivo === 'invalid-invoice' && "
+          "String(testo || '').indexOf('@') >= 0)\n    return P2P_INDIRIZZO_RIFIUTATO;" in rag)
+    prova("l'indirizzo parte ancora com'e': lo risolve il coordinatore, non il browser "
+          "e non il nostro server", [True, 0],
+          ["await chiamataOrdineP2P(o, 'add-invoice', {payment_request: [null, testo, null]});"
+           in inv, inv.count("lnurlp")])
+    prova("...e il nostro controllo viene PRIMA e non decide del suo: un «ok» nostro non "
+          "e' il «si'» del coordinatore", True,
+          inv.index("await controlloFatturaP2P(o, testo)")
+          < inv.index("await chiamataOrdineP2P(o, 'add-invoice'")
+          < inv.index("const perche = ragioneIncassoP2P(e, testo);"))
+
+    # --- la cura: il rifiuto sulla riga, il foglio che smette di proporlo
+    segna = nudo(_fn_js(m, "function segnaIndirizzoRifiutatoP2P(id, testo){"))
+    blocco = inv[inv.index("if (perche === P2P_INDIRIZZO_RIFIUTATO) {"):]
+    prova("il ricordo lo scrive un attrezzo solo, in minuscolo e senza spazi intorno: "
+          "un elenco corto e senza doppioni, perche' un secondo rifiuto non faccia "
+          "dimenticare il primo",
+          [1, True],
+          [m.count("indirizziRifiutati = "),
+           "const ind = String(testo || '').trim().toLowerCase();\n"
+           "  const gia = Array.isArray(agg.indirizziRifiutati) ? agg.indirizziRifiutati : [];\n"
+           "  agg.indirizziRifiutati = gia.filter(x => x !== ind).concat(ind).slice(-5);\n"
+           "  scriviOrdineP2P(agg);" in segna])
+    prova("...che ridisegna il foglio solo se e' ancora quello di quest'ordine e "
+          "l'indirizzo e' quello degli incassi, e rimette il campo", True,
+          "if (p2pIncassoOrdine !== id || !myLnAddress\n"
+          "      || ind !== String(myLnAddress).trim().toLowerCase()) return false;\n"
+          "  renderIncassoP2P();\n"
+          "  const campo = el('p2pIncassoInp');\n"
+          "  if (campo) campo.value = testo;\n"
+          "  return true;" in segna)
+    prova("lo chiamano i due «no»: quello del coordinatore, che poi rimette la frase "
+          "buttata dal ridisegno", True,
+          "if (segnaIndirizzoRifiutatoP2P(o.id, testo)) {\n"
+          "        const avviso = el('p2pIncassoAvviso');\n"
+          "        if (avviso) { avviso.textContent = perche; avviso.style.display = ''; }"
+          in blocco)
+    prova("...e quello del nostro controllo PRIMA dell'invio (`wallet_non_passa`), che la "
+          "frase la scrive dopo, sui nodi nuovi", True,
+          "if (fermo && fermo.esito === 'wallet_non_passa') "
+          "segnaIndirizzoRifiutatoP2P(o.id, testo);\n"
+          "  if (fermo) { mostraFermoFatturaP2P(fermo); return; }" in inv
+          and inv.index("fermo.esito === 'wallet_non_passa'")
+          < inv.index("await chiamataOrdineP2P(o, 'add-invoice'"))
+    prova("...due chiamate, e nessun altro", 2,
+          m.count("segnaIndirizzoRifiutatoP2P(") - 1)
+    prova("nel foglio il giudizio viene dopo Wallet of Satoshi e prima della scorciatoia",
+          True,
+          inc.index("(myLnAddress && walletNonPassaP2P(myLnAddress)\n")
+          < inc.index(": salvatoRifiutato\n")
+          < inc.index("onclick=\"usaIndirizzoSalvatoP2P()\""))
+    prova("...ed e' un confronto fra minuscole con l'indirizzo degli incassi, che con "
+          "Wallet of Satoshi tace (ha gia' la sua riga)", True,
+          "const salvatoRifiutato = !!(myLnAddress && !wosSalvato && Array.isArray(o.indirizziRifiutati)\n"
+          "    && o.indirizziRifiutati.indexOf(String(myLnAddress).trim().toLowerCase()) >= 0);"
+          in inc)
+    prova("la richiesta accettata cancella il rifiuto dalla riga", True,
+          "delete agg.indirizziRifiutati;" in ric
+          and ric.index("delete agg.indirizziRifiutati;") < ric.index("scriviOrdineP2P(agg);"))
+    prova("...e chi la ricorda e' la strada del foglio E quella del wallet collegato", 2,
+          m.count("ricordaFatturaP2P(") - 1)
+
+    # --- IL SERVER SA QUALI WALLET NON PASSANO, E LO DICE PRIMA --------
+    import asyncio as _as
+    K = costanti_controllo_fattura()
+    detto, bussate = [], []
+
+    async def _risolvi(addr, sats):
+        bussate.append(addr)
+        return None
+
+    S = {**K, "re": re, "asyncio": _as, "time": time,
+         "_fmt_sats": reale("_fmt_sats"),
+         "print": lambda *a, **k: detto.append(" ".join(map(str, a))),
+         "invoice_da_ln_address": _risolvi,
+         "diagnosi_ln_address": lambda d: "muto"}
+    exec(pezzo("_risposta_fattura_p2p"), S)
+    exec("async " + pezzo("_controllo_indirizzo_p2p"), S)
+    indir = lambda *a: _as.run(S["_controllo_indirizzo_p2p"](*a))
+    FRASE_WOS = ("Gli indirizzi Wallet of Satoshi qui non funzionano: incolla una fattura "
+                 "dal tuo wallet.")
+    prova("server: l'elenco del codice ha Wallet of Satoshi, e il suo esito FERMA (non "
+          "avvisa: «usa comunque» manderebbe al rifiuto)",
+          [{"walletofsatoshi.com": "Wallet of Satoshi"}, True, False],
+          [K["P2P_INDIRIZZI_NON_PASSANO"], "wallet_non_passa" in K["FATTURA_FERMA"],
+           "wallet_non_passa" in K["FATTURA_AVVISA"]])
+    v = indir("Mario@WalletOfSatoshi.com", 127063)
+    prova("...un indirizzo di quell'elenco si ferma senza bussare a nessuno, col nome del "
+          "wallet e la via d'uscita",
+          ["wallet_non_passa", "indirizzo", FRASE_WOS, "walletofsatoshi.com", []],
+          [v["esito"], v["tramite"], v["messaggio"], v["perche"], list(bussate)])
+    prova("...anche a cifra ignota", ["wallet_non_passa", []],
+          [indir("mario@walletofsatoshi.com", 0)["esito"], list(bussate)])
+    S["P2P_INDIRIZZI_NON_PASSANO"] = dict(K["P2P_INDIRIZZI_NON_PASSANO"],
+                                          **{"sbpc.ch": "Swiss Bitcoin Pay"})
+    v = indir("qualcuno@sbpc.ch", 127063)
+    FRASE_SBP = ("Gli indirizzi Swiss Bitcoin Pay qui non funzionano: incolla una fattura "
+                 "dal tuo wallet.")
+    prova("...un dominio aggiunto dal config si ferma allo stesso modo, col SUO nome",
+          ["wallet_non_passa", FRASE_SBP, []], [v["esito"], v["messaggio"], list(bussate)])
+    altri = [indir(a, 1000)["esito"] for a in ("a@pay.sbpc.ch", "a@sbpc.ch.example",
+                                                "a@wallet.com")]
+    prova("...solo il dominio esatto: un sottodominio, uno che gli somiglia e un altro "
+          "wallet vanno avanti e bussano come prima",
+          [["non_disponibile"] * 3, ["a@pay.sbpc.ch", "a@sbpc.ch.example", "a@wallet.com"]],
+          [altri, list(bussate)])
+    prova("...e Phoenix resta di Phoenix, e una forma storta resta una forma storta",
+          ["indirizzo", "indirizzo"],
+          [indir("mario@phoenixwallet.me", 1000)["esito"], indir("ma rio@sbpc.ch", 1000)["esito"]])
+    detto.clear()
+    r = S["_risposta_fattura_p2p"](indir("qualcuno@sbpc.ch", 127063), 111, "44c46ddf-2270")
+    prova("la risposta al client ferma senza «usa comunque», con la frase",
+          {"ok": False, "esito": "wallet_non_passa", "comunque": False, "messaggio": FRASE_SBP}, r)
+    prova("...e nel journal va il DOMINIO, mai l'indirizzo di una persona",
+          ["⛔ Fattura P2P: ordine 44c46ddf, da 111, indirizzo, sbpc.ch: wallet_non_passa", False],
+          [detto[-1], "qualcuno" in " ".join(detto)])
+    i = _SORGENTE.index("P2P_INDIRIZZI_NON_PASSANO = {\n    str(k).strip().lower()")
+    norma = _SORGENTE[i:_SORGENTE.index("}\n", i) + 2]
+
+    def pulita(valore):
+        amb = {"P2P_INDIRIZZI_NON_PASSANO": valore}
+        exec(norma, amb)
+        return amb["P2P_INDIRIZZI_NON_PASSANO"]
+
+    prova("la leva del config si pulisce (minuscole, spazi, voci vuote), e una leva che "
+          "non e' un dizionario vale «nessuno» senza fermare l'avvio",
+          [{"sbpc.ch": "Swiss Bitcoin Pay"}, {}, {}],
+          [pulita({" SBPC.ch ": " Swiss Bitcoin Pay ", "": "x", "a.it": " "}),
+           pulita(["sbpc.ch"]), pulita(None)])
+    prova("...sta nel config d'esempio, uguale all'elenco del codice, e dice che scritta "
+          "la' lo SOSTITUISCE", True,
+          '\nP2P_INDIRIZZI_NON_PASSANO = {"walletofsatoshi.com": "Wallet of Satoshi"}\n'
+          in open("config_esempio.py", encoding="utf-8").read().replace("\r\n", "\n")
+          and "lo SOSTITUISCE" in open("config_esempio.py", encoding="utf-8").read())
+    prova("...e i wallet che il client non propone (la scorciatoia) il server li ferma "
+          "anche scritti a mano: l'elenco del client sta dentro quello del server", True,
+          "const P2P_WALLET_NON_PASSANO = {'walletofsatoshi.com': 'Wallet of Satoshi'};" in m
+          and K["P2P_INDIRIZZI_NON_PASSANO"].get("walletofsatoshi.com") == "Wallet of Satoshi")
+    prova("le altre frasi sull'indirizzo non consigliano piu' quello di Wallet of Satoshi, "
+          "che non passa", [False, False],
+          ["Wallet of Satoshi" in " ".join(K["MSG_INDIRIZZO"].values()),
+           "Wallet of Satoshi" in indir("mario@phoenixwallet.me", 1000)["messaggio"]])
+    prova("...la frase sta nella famiglia delle due righe del foglio, e non nomina il "
+          "coordinatore", [True, False],
+          [K["MSG_WALLET_NON_PASSA"].endswith("qui non funzionano: incolla una fattura dal "
+                                              "tuo wallet."),
+           "coordinatore" in K["MSG_WALLET_NON_PASSA"].lower()])
+
+    # --- il foglio VERO, in node -------------------------------------
+    js = (
+        "const nodi = {p2pIncassoCorpo: {innerHTML: ''}, p2pIncassoTit: {textContent: ''}};\n"
+        "const el = id => nodi[id] || null;\n"
+        "let ORD = {}, myLnAddress = '', p2pIncassoOrdine = 'x';\n"
+        "const ordiniP2P = () => ({x: ORD});\n"
+        "const satsDaRicevereP2P = o => o.netto || 0;\n"
+        "const finestraFatturaP2P = () => 3600;\n"
+        + pezzo_js(m, "const fmt = n =>", "\n") + "\n"
+        + pezzo_js(m, "const esc = s =>", "));\n") + "));\n"
+        + _fn_js(m, "function percheFallitoP2P(o, adesso){")
+        + _riga_js(m, "const P2P_WALLET_NON_PASSANO =")
+        + _fn_js(m, "function walletNonPassaP2P(indirizzo){")
+        + _fn_js(m, "function renderIncassoP2P(){")
+        + r"""
+const giro = (o, ln) => {
+  ORD = Object.assign({id: 'x', lato: 'compro', stato: 'attesa_mia_fattura', netto: 6645}, o);
+  myLnAddress = ln || '';
+  nodi.p2pIncassoCorpo.innerHTML = '';
+  renderIncassoP2P();
+  return nodi.p2pIncassoCorpo.innerHTML;
+};
+console.log(JSON.stringify({
+  mai: giro({}, 'io@wallet.com'),
+  rifiutato: giro({indirizziRifiutati: ['io@wallet.com']}, 'Io@Wallet.com'),
+  spazi: giro({indirizziRifiutati: ['io@wallet.com']}, ' io@wallet.com '),
+  altro: giro({indirizziRifiutati: ['altro@wallet.com']}, 'io@wallet.com'),
+  fraTanti: giro({indirizziRifiutati: ['altro@wallet.com', 'io@wallet.com', 'terzo@w.it']}, 'io@wallet.com'),
+  wos: giro({indirizziRifiutati: ['io@walletofsatoshi.com']}, 'io@walletofsatoshi.com'),
+  senza: giro({indirizziRifiutati: ['io@wallet.com']}, ''),
+  dopo: giro({indirizziRifiutati: ['io@wallet.com'], stato: 'fattura_nuova'}, 'io@wallet.com'),
+  riserva: giro({indirizziRifiutati: ['io@wallet.com'], stato: 'rilasciato'}, 'io@wallet.com'),
+  strano: giro({indirizziRifiutati: ['a<b>"x@w.it']}, 'a<b>"x@w.it'),
+  nonElenco: giro({indirizziRifiutati: 'io@wallet.com'}, 'io@wallet.com'),
+  vuoto: giro({indirizziRifiutati: []}, 'io@wallet.com'),
+}));
+""")
+    out = _node_banco(js)
+    if out is None:
+        salta("il foglio con l'indirizzo rifiutato girato in node", "node non c'e'")
+        return
+
+    def righe(h):
+        t = re.sub(r"<br\s*/?>|</div>|</button>|</label>", "\n", h)
+        t = _html.unescape(re.sub(r"<[^>]+>", "", t)).replace(" ", " ")
+        return [r.strip() for r in t.split("\n") if r.strip()]
+
+    SCORCIATOIA = "usaIndirizzoSalvatoP2P()"
+    FISSA = " qui non è passato: incolla una fattura dal tuo wallet."
+    RIGA = "⚠️ Il tuo indirizzo Io@Wallet.com" + FISSA
+    INDIRIZZO = ["⚡ Indirizzo Lightning (consigliato)",
+                 "Quello che finisce per @qualcosa. Non scade mai.",
+                 "⚠️ Wallet of Satoshi non funziona qui: con quello incolla una fattura."]
+    prova("senza un rifiuto la scorciatoia c'e', e la riga nuova no", [True, False],
+          [SCORCIATOIA in out["mai"], "non è passato" in out["mai"]])
+    prova("col rifiuto dell'indirizzo degli incassi (maiuscole comprese): niente "
+          "scorciatoia, e al suo posto la riga che manda alla fattura",
+          [False, ["Riceverai 6 645 sats."] + INDIRIZZO
+           + [RIGA, "🧾 Oppure una fattura dal tuo wallet"]],
+          [SCORCIATOIA in out["rifiutato"], righe(out["rifiutato"])[:6]])
+    prova("...con la stessa veste della riga di Wallet of Satoshi, e una volta sola", 1,
+          out["rifiutato"].count('<div class="hint p2p-wallet-no">⚠️ Il tuo indirizzo '
+                                 'Io@Wallet.com qui non è passato: incolla una fattura dal '
+                                 'tuo wallet.</div>'))
+    prova("...il resto del foglio e' lo stesso byte per byte: cambia solo quel pezzo", True,
+          out["rifiutato"].replace(
+              '<div class="hint p2p-wallet-no">⚠️ Il tuo indirizzo Io@Wallet.com qui non è '
+              'passato: incolla una fattura dal tuo wallet.</div>', "§")
+          == out["mai"].replace(
+              '<button class="btn ghost" type="button" onclick="usaIndirizzoSalvatoP2P()">'
+              '⚡ Usa l\'indirizzo dei tuoi incassi: io@wallet.com</button>', "§"))
+    prova("...e gli spazi intorno all'indirizzo salvato non lo fanno sembrare un altro",
+          [False, True], [SCORCIATOIA in out["spazi"], "non è passato" in out["spazi"]])
+    prova("un ALTRO indirizzo rifiutato lascia la scorciatoia di quello salvato",
+          [True, False], [SCORCIATOIA in out["altro"], "non è passato" in out["altro"]])
+    prova("con Wallet of Satoshi salvato parla la SUA riga, e basta",
+          [False, False, 1],
+          [SCORCIATOIA in out["wos"], "non è passato" in out["wos"],
+           out["wos"].count("qui non funziona: incolla una fattura dal tuo wallet.")])
+    prova("senza un indirizzo salvato non c'e' niente da togliere ne' da dire",
+          [False, False], [SCORCIATOIA in out["senza"], "non è passato" in out["senza"]])
+    prova("vale anche nel foglio «⚡ Una fattura nuova», fallito e porta di riserva",
+          [[False, True]] * 2,
+          [[SCORCIATOIA in out[k], "⚠️ Il tuo indirizzo io@wallet.com" + FISSA in righe(out[k])]
+           for k in ("dopo", "riserva")])
+    prova("l'indirizzo e' testo dell'utente: nella riga passa da esc()", [True, False],
+          ["a&lt;b&gt;&quot;x@w.it qui non è passato" in out["strano"],
+           "a<b>" in out["strano"]])
+    prova("...e basta che sia UNO dei rifiutati, non l'ultimo", [False, True],
+          [SCORCIATOIA in out["fraTanti"], "non è passato" in out["fraTanti"]])
+    prova("un ricordo che non e' un elenco, o un elenco vuoto, non tolgono niente",
+          [True, True], [SCORCIATOIA in out["nonElenco"], SCORCIATOIA in out["vuoto"]])
+    WOS = "⚠️ Il tuo indirizzo Wallet of Satoshi qui non funziona: incolla una fattura dal tuo wallet."
+    prova("la riga e' corta come la sorella di Wallet of Satoshi (senza l'indirizzo)", True,
+          len("⚠️ Il tuo indirizzo" + FISSA) <= len(WOS))
+    guida = " ".join(open(os.path.join("docs", "GUIDA-P2P-PASSI.md"),
+                          encoding="utf-8").read().split())
+    prova("la guida dei passi dice le due frasi, parola per parola", [True, True],
+          ["«Non sono riuscito a verificare questo indirizzo: usa una fattura del tuo "
+           "wallet.»" in guida,
+           "«⚠️ Il tuo indirizzo <indirizzo> qui non è passato: incolla una fattura dal "
+           "tuo wallet.»" in guida])
+
+
 def prove_garanzia_lunga():
     """LA GARANZIA LUNGA (7 ott 2026, cantiere «avviso garanzia lunga»,
     testi e regole approvati da Andrea). Dall'ora in cui il coordinatore
@@ -144800,6 +145234,7 @@ def main():
               prove_anteprima_avvisi_p2p,
               prove_avvisi_mercatino,
               prove_testo_ricevere_sats,
+              prove_indirizzo_non_verificato,
               prove_prese_dalle_10, prove_campagna_p2p_tutti,
               prove_prendi_metodo,
               prove_contanti_zona,

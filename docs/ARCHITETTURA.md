@@ -30587,6 +30587,31 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `controlloFatturaP2P(o, bolt, o.incasso.sats)` (il terzo argomento è la
   cifra; senza, vale quella dello scambio) e il fermo nel suo foglio
   (`FERMO_CAUZIONE_P2P`, `usaComunqueFatturaCauzioneP2P`).
+  E dal cantiere indirizzo-non-verificato (stesso giorno, sera): UN «OK»
+  DEL NOSTRO CONTROLLO SU UN INDIRIZZO NON È IL «SÌ» DEL COORDINATORE.
+  Le verifiche sono due e indipendenti: la nostra risolve la Lightning
+  address dal VPS, in chiaro (`invoice_da_ln_address`); poi l'indirizzo
+  parte COM'È nell'`add-invoice` e mostrod lo verifica per conto suo
+  (`is_valid_invoice` → `ln_exists`: il solo documento LNURL, da dietro
+  Tor, coi budget del fork 30/15/10 s), e ogni suo fallimento esce come
+  `cant-do invalid-invoice` — l'unica cosa che fa dire al client «Non
+  sono riuscito a verificare questo indirizzo» (`ragioneIncassoP2P`).
+  Per i wallet che a lui non rispondono c'è `P2P_INDIRIZZI_NON_PASSANO`
+  (config; dominio esatto → nome; nel codice il solo Wallet of Satoshi):
+  `_controllo_indirizzo_p2p` li ferma PRIMA di bussare, esito
+  `wallet_non_passa` (in `FATTURA_FERMA`), frase `MSG_WALLET_NON_PASSA`,
+  nel journal il solo dominio. Nel client il «no» su un indirizzo si
+  RICORDA sulla riga dell'ordine (`indirizziRifiutati`: un elenco corto,
+  in minuscolo, gli ultimi cinque senza doppioni) con
+  `segnaIndirizzoRifiutatoP2P`, chiamata dai due «no» — il
+  `wallet_non_passa` nostro prima dell'invio, l'`invalid-invoice` suo
+  dopo — e `renderIncassoP2P`, se l'indirizzo ricordato è quello degli
+  incassi, al posto della scorciatoia «⚡ Usa l'indirizzo dei tuoi
+  incassi» scrive la riga che manda alla fattura; `ricordaFatturaP2P`
+  (richiesta accettata) lo cancella. Prove:
+  `prove_indirizzo_non_verificato` e le sezioni 4-quater e 4-quinquies
+  di `prove_p2p_motore`. La procedura (la prova dal nodo, la riga da
+  aggiungere): PRODUZIONE, «I WALLET IL CUI INDIRIZZO NON PASSA».
 
 - IL «CONDIVIDI» DI UN ORDINE P2P (10 ott 2026, perché in CANTIERI, «Il
   "Condividi" di un ordine P2P»). Un ordine del libro si manda fuori con

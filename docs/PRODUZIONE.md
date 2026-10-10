@@ -1404,6 +1404,26 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   avvisata col «Usa comunque» (nessuna strada, costo oltre il tetto),
   · non si è potuto controllare (col perché), ✅ ok; mai la fattura
   intera, solo l'ordine e la destinazione accorciati.
+  I WALLET IL CUI INDIRIZZO NON PASSA (10 ott 2026, cantiere
+  indirizzo-non-verificato): quando chi compra legge «Non sono riuscito
+  a verificare questo indirizzo» e nel journal, lo stesso minuto, c'è
+  «✅ Fattura P2P: … indirizzo …: ok», NON è un guasto nostro: il «no» è
+  di mostrod, che l'indirizzo lo verifica per conto suo da dietro Tor.
+  Si prova dal NODO (sola lettura, tre volte: le uscite cambiano), con
+  l'indirizzo vero al posto di NOME e DOMINIO:
+  `docker run --rm --pull never --network container:nodo-mostro-1 curlimages/curl -s -m 40 -A "mostro/0.19.0" -w '\nVIA TOR: http %{http_code}, tls %{time_appconnect}s, totale %{time_total}s\n' https://DOMINIO/.well-known/lnurlp/NOME`
+  Passa = `http 200` con `"tag":"payRequest"`. Un 403, uno 000 o una
+  pagina di sfida = quel servizio non parla con le uscite Tor: il
+  dominio si AGGIUNGE alla leva nel config del VPS
+  (`/srv/barattolo/config.py`, a mano; la riga SOSTITUISCE l'elenco del
+  codice, quindi le voci si ripetono tutte):
+  `P2P_INDIRIZZI_NON_PASSANO = {"walletofsatoshi.com": "Wallet of Satoshi", "DOMINIO": "Nome del wallet"}`
+  poi `sudo systemctl restart barattolo`. Da lì il foglio ferma PRIMA
+  dell'invio («Gli indirizzi Nome del wallet qui non funzionano: incolla
+  una fattura dal tuo wallet.») e nel journal resta
+  `⛔ Fattura P2P: … indirizzo, DOMINIO: wallet_non_passa`. La prova in
+  chiaro NON si fa dal nodo (mostrerebbe il suo IP a quel servizio): si
+  fa dal PC o dal VPS.
   IL CANARINO: un «LND non l'ha mai visto» si crede solo se, nello
   stesso giro, LND riconosce un hash che conosce di sicuro — uno per
   cui lui stesso ha gia' detto SUCCEEDED (timbro `lnd_canarino`, o gli
