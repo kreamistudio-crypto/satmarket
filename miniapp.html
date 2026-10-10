@@ -2144,10 +2144,6 @@
   .p2p-vt-tutti{background:none;border:0;padding:4px 0;cursor:pointer;
     font:800 13px Nunito,sans-serif;color:var(--sats-text)}
   .p2p-cosa-corpo p{margin:0 0 10px;font-size:14px;line-height:1.5}
-  /* il cambio fermo: la stessa riga piccola e grigia, in vetrina e sul libro */
-  .cambio-fermo{padding:10px var(--pad) 0;font-size:12px;font-weight:700;
-    color:var(--muted);line-height:1.3}
-  .cambio-fermo[hidden]{display:none}
   /* la fila spenta: una riga piccola e discreta, col solo «Mostra» a colore */
   .p2p-vt-via{padding:12px var(--pad) 0;font-size:12px;font-weight:700;
     color:var(--muted);line-height:1.3}
@@ -10782,10 +10778,6 @@ document.getElementById('cartello')?.remove();</script>
       <span id="ospiteTesto"></span>
       <button type="button" class="btn mini" onclick="chiudiOspite()">Vai al mercatino</button>
     </div>
-    <!-- IL CAMBIO FERMO (10 ott 2026): la accende `mostraCambioFermo`
-         quando il server dichiara il cambio non disponibile. Testo
-         fisso, nessun dato ci passa. -->
-    <div id="cambioFermoVetrina" class="cambio-fermo" role="status" hidden>Prezzo del bitcoin non aggiornato: le cifre con ≈ sono indicative.</div>
     <div class="strumenti">
       <div class="conta-blocco">
         <div class="section-label riga-conta" id="gridLabel">In vetrina</div>
@@ -11180,8 +11172,6 @@ document.getElementById('cartello')?.remove();</script>
           È stato preso, è scaduto oppure chi l'aveva pubblicato l'ha ritirato. Qui sotto trovi gli altri ordini aperti.</div>
         <button type="button" class="order-x" aria-label="Chiudi l'avviso" onclick="ordineSparitoP2P(false)">✕</button>
       </div>
-      <!-- IL CAMBIO FERMO, la gemella di quella della vetrina -->
-      <div id="cambioFermoLibro" class="cambio-fermo" role="status" hidden>Prezzo del bitcoin non aggiornato: stime e percentuali sono indicative.</div>
       <div id="p2pCorpo"></div>
       <!-- LA RIGA DISCRETA DEL LIBRO SUBITO (26 set 2026): finche' i
            relay non hanno risposto, sopra la barra e fuori dal flusso
@@ -21827,41 +21817,12 @@ function cardParteOrdine(o, lato){
    omette, che e' il patto di sempre. */
 let eurPerSat = 0.00092;   // valore di riserva se il cambio non arriva
 let cambioVivo = false;    // true solo col cambio VERO in mano
-/* IL CAMBIO FERMO SI DICE (10 ott 2026, cantiere cambio-ovunque,
-   richiesta di Andrea). Quando CoinGecko tace da piu' di
-   ORE_CAMBIO_VALIDO il server risponde 0, «non disponibile», e qui lo
-   zero non entra (mai un numero inventato): resta in mano il cambio di
-   prima — o quello di riserva, per chi ha aperto l'app adesso — e le
-   conversioni continuavano a uscire come se niente fosse. Adesso
-   l'ultima parola del server si ricorda (`cambioFermo`) e la dicono due
-   righe piccole, una in vetrina e una sul libro del P2P: «Prezzo del
-   bitcoin non aggiornato». Il numero resta quello: meglio un ordine di
-   grandezza dichiarato vecchio che una pagina senza cifre.
-   SOLO LO ZERO DETTO: una risposta storta, un server muto, la rete
-   giu' non sono una dichiarazione, e non accendono niente (il patto
-   fail-open di sempre). Si spegne da sola al primo cambio buono. */
-let cambioFermo = false;   // l'ultima parola del server: «non disponibile»
 function eur(sats){ return (sats * eurPerSat).toFixed(0); }
 function impostaCambio(eurPerBtc){
   const v = Number(eurPerBtc) || 0;
-  if (v <= 0 && eurPerBtc === 0) segnaCambioFermo(true);
   if (v <= 0) return;   // 0 = «non disponibile»: mai un numero inventato
   eurPerSat = v / 100000000; cambioVivo = true;
   cambioChiesto = Date.now();   // un cambio appena arrivato non si richiede
-  segnaCambioFermo(false);
-}
-function segnaCambioFermo(fermo){
-  if (cambioFermo === fermo) return;
-  cambioFermo = fermo;
-  mostraCambioFermo();
-}
-/* le due righe stanno nel markup fisso, spente: qui si accendono e si
-   spengono soltanto, senza un render */
-function mostraCambioFermo(){
-  for (const id of ['cambioFermoVetrina', 'cambioFermoLibro']) {
-    const n = el(id);
-    if (n) n.hidden = !cambioFermo;
-  }
 }
 /* IL CAMBIO SUL LIBRO P2P (10 ott 2026, cantiere cambio-libro-p2p).
    La busta di /api/listings basta a chi sfoglia la vetrina, che la
@@ -21906,7 +21867,26 @@ function mostraCambioFermo(){
      il coordinatore non ha ancora detto i sats, o uno a sats fissi non
      ancora preso (la riga della convenienza). Dalla presa in poi le
      cifre sono un fatto e la pagina non chiede niente.
-   Il resto di Esplora (i «≈» degli annunci) segue ancora la busta.
+   ...E I CARTELLINI DEGLI ANNUNCI, E IL FOGLIO DI UN ORDINE (10 ott
+   2026, notte, cantiere cambio-annunci-foglio: le ultime due cose
+   notate, col si' di Andrea):
+   - i «≈» degli annunci nella griglia di Esplora. NON si ridisegna la
+     griglia (`renderGrid` ogni minuto rifarebbe foto, posizione e
+     scroll infinito, e senza argomenti butterebbe via una lista chiusa
+     come il barattolo): si rifa' il solo CARTELLINO di ogni card
+     (`ridisegnaPrezziGriglia`), chiedendolo a `cardHTML` — il giudice
+     di sempre, dentro un <template> che non carica niente — e
+     toccando il DOM solo dove la cifra e' cambiata;
+   - il foglio che si apre toccando un ordine del libro (o una card
+     della fila), finche' resta aperto, sopra qualunque vista: il suo
+     conto e' sempre una stima, perche' un ordine del libro e' ancora
+     da prendere. Si ridisegna FERMO (`ridisegnaFoglioFermoP2P`): tiene
+     lo scorrimento e la domanda del metodo se era accesa; la cifra
+     scelta e il metodo stanno in variabili e li tiene da se'.
+   IL CAMBIO SCADUTO NON SI DICE (stessa notte, cambio di idea di
+   Andrea sulla riga del «prezzo non aggiornato», nata e tolta
+   in poche ore): lo zero del server non entra e non accende niente,
+   resta in mano il cambio di prima — com'era fino a ieri.
    UNA DOMANDA ALLA VOLTA, e fail-open: server muto, risposta storta o
    cambio a zero lasciano quello che c'era (il patto di impostaCambio).
    Il tempo limite e' per la tirata, che questa risposta l'aspetta: la
@@ -21965,8 +21945,56 @@ function scambioDavantiP2P(){
   if (vistaAttivaP2P() !== 'view-p2pordine' || typeof ordiniP2P !== 'function') return false;
   return scambioAlCambioP2P(ordiniP2P()[p2pOrdineAperto]);
 }
+/* la griglia di Esplora ha davanti almeno un cartellino con una cifra
+   convertita (ogni card ne ha una: il «≈» sta sulla valuta che NON e'
+   quella del listino) */
+function grigliaAlCambio(){
+  if (vistaAttivaP2P() !== 'view-esplora') return false;
+  const g = el('grid');
+  return !!g && !!g.querySelector('.card[data-vid] .circa');
+}
+/* il foglio di un ordine del libro e' aperto */
+function foglioLibroApertoP2P(){
+  const f = el('p2pDettSheet');
+  return !!f && f.classList.contains('open');
+}
 function cambioDavantiP2P(){
-  return libroDavantiP2P() || scambioDavantiP2P() || filaDavantiP2P();
+  return libroDavantiP2P() || scambioDavantiP2P() || foglioLibroApertoP2P()
+    || grigliaAlCambio() || filaDavantiP2P();
+}
+/* I CARTELLINI DELLA GRIGLIA, uno per uno e in place: torna quanti ne
+   ha toccati. La card si richiede INTERA a `cardHTML` e se ne prende il
+   solo cartellino: cosi' lampo, sconto, asta e accordo restano del loro
+   giudice, e qui non c'e' una seconda formula del prezzo. */
+function ridisegnaPrezziGriglia(){
+  const g = el('grid');
+  if (!g) return 0;
+  const stampo = document.createElement('template');
+  let mossi = 0;
+  g.querySelectorAll('.card[data-vid]').forEach(card => {
+    const l = listings.find(x => x.id === Number(card.dataset.vid));
+    const vecchio = card.querySelector('.tag-price');
+    if (!l || !vecchio) return;
+    stampo.innerHTML = cardHTML(l);
+    const nuovo = stampo.content.querySelector('.tag-price');
+    if (!nuovo || nuovo.innerHTML === vecchio.innerHTML) return;
+    vecchio.innerHTML = nuovo.innerHTML;
+    mossi++;
+  });
+  return mossi;
+}
+/* il foglio di un ordine riscritto TENENDO lo scorrimento e la domanda
+   del metodo, se chi guarda l'aveva fatta comparire */
+function ridisegnaFoglioFermoP2P(){
+  const foglio = el('p2pDettSheet'), corpo = el('p2pDettCorpo');
+  const y = foglio ? foglio.scrollTop : 0, yc = corpo ? corpo.scrollTop : 0;
+  const prima = el('p2pDettScegliMetodo');
+  const domanda = !!prima && !prima.hidden;
+  renderDettaglioP2P();
+  const dopo = el('p2pDettScegliMetodo');
+  if (domanda && dopo) dopo.hidden = false;
+  if (foglio && y) foglio.scrollTop = y;
+  if (corpo && yc) corpo.scrollTop = yc;
 }
 /* la fila riscritta TENENDO lo scorrimento di lato */
 function ridisegnaFilaFermaP2P(){
@@ -21983,7 +22011,12 @@ function ridisegnaColCambioP2P(){
     cambioRidisegna = true;
     try { ridisegnaLibroFermoP2P(); } finally { cambioRidisegna = false; }
   } else if (scambioDavantiP2P()) renderOrdineP2P();
-  else if (filaDavantiP2P()) ridisegnaFilaFermaP2P();
+  else if (vistaAttivaP2P() === 'view-esplora') {
+    if (grigliaAlCambio()) ridisegnaPrezziGriglia();
+    if (filaDavantiP2P()) ridisegnaFilaFermaP2P();
+  }
+  /* il foglio sta SOPRA una di quelle viste: si rifa' anche lui */
+  if (foglioLibroApertoP2P()) ridisegnaFoglioFermoP2P();
 }
 function battitoCambioLibroP2P(){
   if (Date.now() - cambioChiesto < CAMBIO_LIBRO_MS) return;

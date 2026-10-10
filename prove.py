@@ -60895,11 +60895,6 @@ def prove_p2p_libro():
                         # subito sopra il corpo che scorre
                         r'(?:<!--[\s\S]*?-->\s*<div [^>]*id="p2pOrdineSparito"'
                         r'[\s\S]*?</button>\s*</div>\s*)?'
-                        # ...e la riga del cambio fermo (10 ott 2026, sera,
-                        # cambio-ovunque): una riga di testo, spenta, fuori
-                        # dal blocco come le altre due
-                        r'(?:<!--[\s\S]*?-->\s*<div id="cambioFermoLibro"'
-                        r'[^>]*>[^<]*</div>\s*)?'
                         r'<div id="p2pCorpo">', mini) is not None)
     # ⚠️ IL LIBRO NON HA VELO, ed e' una decisione presa e disfatta in
     # un pomeriggio (22 set 2026): per un'ora la testata ha avuto dietro
@@ -142595,28 +142590,32 @@ __TIRATA__
 
 
 def prove_cambio_ovunque():
-    """IL CAMBIO, LE COSE NOTATE (10 ott 2026, sera, cantiere «cambio-ovunque»,
-    col si' di Andrea alle quattro voci lasciate in fondo al cantiere del
-    cambio sul libro):
-    1) la fila «Scambi P2P» di Esplora segue il battito del cambio quando
-       si vede;
-    2) la pagina di UNO scambio lo segue finche' il suo conto e' fatto col
-       cambio di adesso (a mercato senza la cifra del coordinatore, a sats
-       fissi non ancora preso), e dopo non chiede niente;
-    3) il cambio che il server dichiara non disponibile (lo zero) si DICE,
-       con una riga piccola in vetrina e una sul libro, invece di restare
-       in uso in silenzio;
-    4) chi guarda il libro senza essere entrato lo rilegge dai relay col
-       passo di chi e' entrato.
+    """IL CAMBIO, LE COSE NOTATE (10 ott 2026, sera e notte: i cantieri
+    «cambio-ovunque» e «cambio-annunci-foglio», col si' di Andrea alle voci
+    lasciate in fondo al cantiere del cambio sul libro). Il battito del
+    cambio, oltre al libro, segue:
+    1) la fila «Scambi P2P» di Esplora, quando si vede;
+    2) la pagina di UNO scambio, finche' il suo conto e' fatto col cambio
+       di adesso (a mercato senza la cifra del coordinatore, a sats fissi
+       non ancora preso), e dopo non chiede niente;
+    3) i «≈» degli annunci nella griglia di Esplora: il solo cartellino
+       di ogni card, in place, mai la griglia intera;
+    4) il foglio che si apre toccando un ordine del libro, finche' resta
+       aperto, sopra qualunque vista.
+    E chi guarda il libro senza essere entrato lo rilegge dai relay col
+    passo di chi e' entrato.
+    IL CAMBIO SCADUTO NON SI DICE: la riga «Prezzo del bitcoin non
+    aggiornato» e' nata la sera e Andrea l'ha tolta la notte stessa. Lo
+    zero del server non entra e non accende niente, come prima.
 
     Quel che qui si rompe in silenzio: la fila riportata all'inizio a ogni
-    minuto sotto il dito di chi la scorre; la pagina di uno scambio GIA'
-    preso che chiede il cambio a vuoto, o quella da prendere che non lo
-    chiede; un server muto o una risposta storta scambiati per «cambio
-    scaduto» (l'avviso acceso a torto), o l'avviso che non si spegne piu';
-    l'anonimo che interroga la rotta degli scambi, o il battito che per
-    lui ridisegna anche dove non c'e' un libro."""
-    print("\n[il cambio: la fila di Esplora, la pagina di uno scambio, il cambio fermo, l'anonimo]")
+    minuto sotto il dito di chi la scorre; la griglia rifatta intera (foto,
+    posizione, e il barattolo buttato via) per cambiare tre cifre; un
+    cartellino riscritto con un'altra formula del prezzo; la pagina di uno
+    scambio GIA' preso che chiede il cambio a vuoto; il foglio che al
+    minuto torna in cima o perde la domanda del metodo; la riga del cambio
+    fermo che ricompare; l'anonimo che interroga la rotta degli scambi."""
+    print("\n[il cambio: la fila e gli annunci di Esplora, la pagina di uno scambio, il foglio del libro, l'anonimo]")
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
     nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
 
@@ -142628,41 +142627,57 @@ def prove_cambio_ovunque():
     blocco = mini[mini.index("let eurPerSat = 0.00092;"):
                   mini.index("/* ---------------- doppia valuta: la vista")]
     cod = nudo(blocco)
-    imp = nudo(fn("function impostaCambio(eurPerBtc){"))
-    prova("lo zero DETTO dal server accende l'avviso prima di essere scartato, e un cambio "
-          "buono lo spegne; lo zero continua a non entrare", [True, True, True],
-          [0 < imp.find("if (v <= 0 && eurPerBtc === 0) segnaCambioFermo(true);")
-           < imp.find("if (v <= 0) return;"),
-           imp.rstrip().rstrip("}").rstrip().endswith("segnaCambioFermo(false);"),
-           "if (v <= 0) return;" in imp])
-    righe = re.findall(r'<div id="(cambioFermo\w+)" class="cambio-fermo" role="status" hidden>'
-                       r'(Prezzo del bitcoin non aggiornato: [^<]+)</div>', mini)
-    prova("le due righe stanno nel markup fisso, spente, col testo scritto li': una in "
-          "vetrina e una sul libro, e sono le due che `mostraCambioFermo` accende",
-          [["cambioFermoVetrina", "cambioFermoLibro"], True, [1, 1], True],
-          [[r[0] for r in righe],
-           "for (const id of ['cambioFermoVetrina', 'cambioFermoLibro'])" in cod,
-           [mini.count('id="cambioFermoVetrina"'), mini.count('id="cambioFermoLibro"')],
-           ".cambio-fermo[hidden]{display:none}" in mini])
-    i_v, i_l = mini.find('id="cambioFermoVetrina"'), mini.find('id="cambioFermoLibro"')
-    prova("...quella della vetrina sopra la griglia di Esplora, quella del libro sopra le sue card",
-          [True, True],
-          [mini.find('id="view-esplora"') < i_v < mini.find('<div class="grid" id="grid">'),
-           0 < i_l < mini.find('<div id="p2pCorpo">') and mini.find('<div id="p2pCorpo">') - i_l < 400])
+    prova("la riga del cambio fermo NON c'e' piu', da nessuna parte: ne' la bandiera, ne' le "
+          "due righe, ne' il loro CSS, ne' la frase", [0, 0, 0, 0],
+          [len(re.findall(r"cambioFermo|segnaCambioFermo|mostraCambioFermo", mini)),
+           mini.count("cambio-fermo"), mini.count("Prezzo del bitcoin non aggiornato"),
+           mini.count("non aggiornato:")])
+    prova("...e `impostaCambio` e' tornata quella di prima: lo zero esce senza toccare niente",
+          "function impostaCambio(eurPerBtc){\n"
+          "  const v = Number(eurPerBtc) || 0;\n"
+          "  if (v <= 0) return;\n"
+          "  eurPerSat = v / 100000000; cambioVivo = true;\n"
+          "  cambioChiesto = Date.now();\n}\n",
+          re.sub(r"[ \t]*//[^\n]*", "", nudo(fn("function impostaCambio(eurPerBtc){"))))
     bat = nudo(fn("function battitoCambioLibroP2P(){"))
-    prova("il battito chiede col libro, con la pagina di uno scambio al cambio o con la fila "
-          "davanti, e ridisegna quel che c'e' davanti quando la risposta arriva",
-          [True, True, True, 1],
+    prova("il battito chiede col libro, con la pagina di uno scambio al cambio, col foglio di "
+          "un ordine aperto, con gli annunci o con la fila di Esplora davanti, e ridisegna "
+          "quel che c'e' davanti quando la risposta arriva", [True, True, True, 1],
           ["if (document.visibilityState === 'hidden' || !cambioDavantiP2P()) return;" in bat,
-           "return libroDavantiP2P() || scambioDavantiP2P() || filaDavantiP2P();"
-           in nudo(fn("function cambioDavantiP2P(){")),
+           "return libroDavantiP2P() || scambioDavantiP2P() || foglioLibroApertoP2P()\n"
+           "    || grigliaAlCambio() || filaDavantiP2P();" in nudo(fn("function cambioDavantiP2P(){")),
            "if (cambiato) ridisegnaColCambioP2P();" in bat, cod.count("fetch(")])
     rid = nudo(fn("function ridisegnaColCambioP2P(){"))
-    prova("...il libro col ridisegno fermo e la bandiera, la pagina dello scambio col suo "
-          "render, la fila tenendo lo scorrimento: uno solo, nell'ordine", True,
+    prova("...il libro col ridisegno fermo e la bandiera, O la pagina dello scambio, O Esplora "
+          "(i cartellini e la fila); e IN PIU' il foglio, se e' aperto sopra", True,
           0 < rid.find("if (libroDavantiP2P()) {") < rid.find("ridisegnaLibroFermoP2P();")
           < rid.find("} else if (scambioDavantiP2P()) renderOrdineP2P();")
-          < rid.find("else if (filaDavantiP2P()) ridisegnaFilaFermaP2P();"))
+          < rid.find("else if (vistaAttivaP2P() === 'view-esplora') {")
+          < rid.find("if (grigliaAlCambio()) ridisegnaPrezziGriglia();")
+          < rid.find("if (filaDavantiP2P()) ridisegnaFilaFermaP2P();")
+          < rid.find("\n  if (foglioLibroApertoP2P()) ridisegnaFoglioFermoP2P();"))
+    gri = nudo(fn("function ridisegnaPrezziGriglia(){"))
+    prova("i cartellini si chiedono a `cardHTML`, in un <template>, e si scrive solo dove la "
+          "cifra e' cambiata; la griglia intera non si rifa' MAI da qui",
+          [True, True, True, 0],
+          ["stampo.innerHTML = cardHTML(l);" in gri,
+           "const stampo = document.createElement('template');" in gri,
+           "if (!nuovo || nuovo.innerHTML === vecchio.innerHTML) return;" in gri,
+           cod.count("renderGrid(")])
+    i_ch = mini.find("const cardHTML = l => {")
+    ch = mini[i_ch:mini.find("\n};\n", i_ch)]
+    prova("...e la card ha ancora la forma che `ridisegnaPrezziGriglia` cerca: `data-vid`, il "
+          "cartellino `.tag-price`, e il «≈» con la classe `circa`", [True, True, True],
+          ['data-vid="${l.id}"' in ch, '<div class="tag-price' in ch,
+           "const circa = '<span class=\"circa\">≈</span>';" in fn("function prezzoParte(l){")])
+    fog = nudo(fn("function ridisegnaFoglioFermoP2P(){"))
+    prova("il foglio si rifa' con `renderDettaglioP2P`, tenendo lo scorrimento e la domanda "
+          "del metodo; e `renderDettaglioP2P` non ha effetti suoi (ne' fuoco, ne' rete, ne' "
+          "vibrazione)", [True, True, True, 0],
+          ["renderDettaglioP2P();" in fog, "if (domanda && dopo) dopo.hidden = false;" in fog,
+           "if (foglio && y) foglio.scrollTop = y;" in fog and "if (corpo && yc) corpo.scrollTop = yc;" in fog,
+           len(re.findall(r"\.focus\(|fetch\(|haptic\(|scrollIntoView|toast\(",
+                          nudo(fn("function renderDettaglioP2P(){"))))])
     # il giudice della pagina ricalca le domande del conto vero: se una di
     # queste righe cambia, `scambioAlCambioP2P` va riallineato con lei
     prova("`scambioAlCambioP2P` ricalca il conto VERO della pagina: l'intervallo senza conto, "
@@ -142696,22 +142711,64 @@ const cifra = () => Math.round(eurPerSat * 1e8);
 
 let DEMO = false, VETRINA = false, myTgId = 111;
 const API_BASE = '/api';
-const document = {visibilityState: 'visible'};
 let VISTA = 'view-esplora';
 function vistaAttivaP2P(){ return VISTA; }
 
-/* il DOM di cartone: le due righe dell'avviso e la fila */
-const NODI = {cambioFermoVetrina: {hidden: true}, cambioFermoLibro: {hidden: true},
-              p2pVetrinaFila: {scrollLeft: 0}};
-function el(id){ return NODI[id] || null; }
-const avviso = () => [cambioFermo, NODI.cambioFermoVetrina.hidden, NODI.cambioFermoLibro.hidden];
+/* ---- IL DOM DI CARTONE ---- */
+/* la griglia: ogni card ha il suo cartellino, e conta le scritture */
+let scritture = 0;
+function carta(vid, html){
+  const tag = {_h: html, get innerHTML(){ return this._h; }, set innerHTML(v){ this._h = v; scritture++; }};
+  return {dataset: {vid: String(vid)}, tag: tag, querySelector: s => s === '.tag-price' ? tag : null};
+}
+let CARTE = [];
+const GRID = {
+  querySelectorAll: s => s === '.card[data-vid]' ? CARTE : [],
+  querySelector: s => s === '.card[data-vid] .circa'
+    ? (CARTE.find(c => c.tag._h.indexOf('class="circa"') >= 0) || null) : null,
+};
+/* il <template>: prende l'HTML di una card e ne ritrova il cartellino */
+let stampi = 0;
+const document = {visibilityState: 'visible', createElement: t => {
+  if (t !== 'template') throw new Error('solo un template');
+  stampi++;
+  const s = {_h: '', set innerHTML(v){ this._h = v; }, content: {querySelector: q => {
+    if (q !== '.tag-price') return null;
+    const m = /<div class="tag-price">([\s\S]*?)<\/div>/.exec(s._h);
+    return m ? {innerHTML: m[1]} : null;
+  }}};
+  return s;
+}};
+/* il foglio di un ordine del libro */
+let APERTO = false, foglioDisegni = 0;
+const FOGLIO = {classList: {contains: c => APERTO && c === 'open'}, scrollTop: 0};
+const CORPO = {scrollTop: 0};
+let DOMANDA = {hidden: true};
+function renderDettaglioP2P(){ foglioDisegni++; FOGLIO.scrollTop = 0; CORPO.scrollTop = 0; DOMANDA = DOMANDA && {hidden: true}; }
+const FILA = {scrollLeft: 0};
+function el(id){
+  return ({grid: GRID, p2pDettSheet: FOGLIO, p2pDettCorpo: CORPO, p2pDettScegliMetodo: DOMANDA,
+           p2pVetrinaFila: FILA})[id] || null;
+}
+
+/* il catalogo e la card: una formula sola, quella della card */
+let listings = [];
+let cardChieste = 0, grigliaIntera = 0;
+function cardHTML(l){
+  cardChieste++;
+  const prezzo = l.fermo ? '<b>' + l.price + ' sats</b>'
+    : '<span class="circa">≈</span>' + Math.round(l.price * eurPerSat) + ' €';
+  return '<div class="card" data-vid="' + l.id + '"><img src="/foto/' + l.id + '.jpg">'
+    + '<div class="tag-price">' + prezzo + '</div></div>';
+}
+function renderGrid(){ grigliaIntera++; }
 
 /* la fila di Esplora, di cartone attorno al giudice VERO `vetrinaDavantiP2P` */
-let NUDA = true, NASCOSTA = false, p2pVetrinaFirma = 'una card';
+let NUDA = true, NASCOSTA = false, p2pVetrinaFirma = null;
 function vetrinaNudaP2P(){ return NUDA; }
 function filaP2PNascosta(){ return NASCOSTA; }
 let fila = [], frecce = 0;
-function renderVetrinaP2P(){ fila.push(cifra()); NODI.p2pVetrinaFila.scrollLeft = 0; }
+function renderVetrinaP2P(){ fila.push(cifra()); FILA.scrollLeft = 0; }
 function aggiornaFrecce(id){ if (id === 'p2pVetrinaFila') frecce++; }
 
 /* il libro e la pagina di uno scambio */
@@ -142732,7 +142789,6 @@ function fetch(url, opz){
     json: async () => { if (r.storto) throw new Error('json'); return r.corpo; }});
 }
 
-/* gli scambi del server, per il battito di tutti */
 let scambiChiesti = 0, SCAMBI_OK = true;
 function chiediScambiServerP2P(){ scambiChiesti++; return Promise.resolve(SCAMBI_OK); }
 let p2pScambiBattito = 0;
@@ -142744,82 +142800,86 @@ __COMELIBRO__
 __COSTANTE__
 __BATTITO__
 
-(async () => {
-  /* ---- IL CAMBIO FERMO ---- */
-  out.nascita = avviso();
-  impostaCambio(0);                 // chi apre adesso, e il server non ne ha uno
-  out.zeroSenzaCambio = [avviso(), cambioVivo, eurPerSat, cambioChiesto];
-  impostaCambio(100000);
-  out.buono = [avviso(), cambioVivo, cifra(), cambioChiesto === ORA];
-  const prima = cambioChiesto; ORA += 5000;
-  impostaCambio(0);                 // il server lo dichiara scaduto
-  out.zeroColCambio = [avviso(), cambioVivo, cifra(), cambioChiesto === prima];
-  impostaCambio(0);
-  out.zeroDiNuovo = avviso();
-  impostaCambio(100000);
-  out.tornato = avviso();
-  const storti = {};
-  for (const [nome, v] of [['niente', undefined], ['null', null], ['parola', 'ciao'], ['negativo', -5],
-                           ['NaN', NaN], ['zero di testo', '0'], ['oggetto', {}], ['falso', false]]) {
-    impostaCambio(v);
-    storti[nome] = [cambioFermo, cifra()];
-  }
-  out.storti = storti;
-  /* senza le due righe nel DOM (un banco, una pagina a meta') non esplode */
-  const tieni = Object.assign({}, NODI);
-  delete NODI.cambioFermoVetrina; delete NODI.cambioFermoLibro;
-  impostaCambio(0); impostaCambio(100000);
-  out.senzaNodi = cambioFermo;
-  Object.assign(NODI, tieni);
-  /* dalla rotta: lo zero accende e NON fa ridisegnare; la rete giu' e il 500 non accendono */
-  VISTA = 'view-esplora';
-  const daRotta = {};
-  for (const [nome, r] of [['rete', 'rete'], ['500', {ok: false, corpo: {cambio_eur: 0}}],
-                           ['json storto', {ok: true, storto: true}], ['vuoto', {ok: true, corpo: null}],
-                           ['zero', {ok: true, corpo: {cambio_eur: 0}}],
-                           ['stesso numero', {ok: true, corpo: {cambio_eur: 100000}}]]) {
-    RISPOSTA = r; ORA += 60000; const f = fila.length, n = chieste.length;
-    battitoCambioLibroP2P(); await tick(); await tick();
-    daRotta[nome] = [chieste.length - n, avviso(), cifra(), fila.length - f];
-  }
-  out.daRotta = daRotta;
+/* un battito al minuto, con la risposta data */
+async function minuto(risposta){
+  if (risposta !== undefined) RISPOSTA = risposta;
+  ORA += 60000;
+  const prima = {n: chieste.length, s: scritture, c: cardChieste, f: fila.length, l: libro.length,
+                 p: pagine.length, d: foglioDisegni};
+  battitoCambioLibroP2P(); await tick(); await tick();
+  return {chieste: chieste.length - prima.n, scritture: scritture - prima.s, card: cardChieste - prima.c,
+          fila: fila.length - prima.f, libro: libro.length - prima.l, pagine: pagine.length - prima.p,
+          foglio: foglioDisegni - prima.d};
+}
+const cambio = v => ({ok: true, corpo: {cambio_eur: v}});
+const cartellini = () => CARTE.map(c => c.tag._h);
 
-  /* ---- LA FILA DI ESPLORA ---- */
-  RISPOSTA = {ok: true, corpo: {cambio_eur: 125000}};
-  NODI.p2pVetrinaFila.scrollLeft = 240; frecce = 0; fila = [];
+(async () => {
+  impostaCambio(100000);
+
+  /* ---- IL CAMBIO SCADUTO NON SI DICE ---- */
+  listings = [{id: 1, price: 50000}, {id: 2, price: 20000}, {id: 3, price: 7000, fermo: true}];
+  CARTE = [carta(1, cardHTML(listings[0]).match(/tag-price">([\s\S]*?)<\/div>/)[1]),
+           carta(2, cardHTML(listings[1]).match(/tag-price">([\s\S]*?)<\/div>/)[1]),
+           carta(3, cardHTML(listings[2]).match(/tag-price">([\s\S]*?)<\/div>/)[1]),
+           carta(99, '<span class="circa">≈</span>7 €')];      // una card che nel catalogo non c'e'
+  out.inizio = cartellini();
+  const zero = await minuto(cambio(0));
+  out.zero = [zero, cifra(), cambioVivo, typeof cambioFermo, cartellini()];
+
+  /* ---- I CARTELLINI DEGLI ANNUNCI ---- */
+  cardChieste = 0;
   let n = chieste.length;
   ORA += 59000; battitoCambioLibroP2P(); await tick();
   const a59 = chieste.length - n;
-  ORA += 1000; battitoCambioLibroP2P(); await tick();
-  out.fila = {a59: a59, chieste: chieste.slice(n), disegni: fila.slice(),
-              scorrimento: NODI.p2pVetrinaFila.scrollLeft, frecce: frecce,
-              libro: libro.length, pagine: pagine.length};
-  /* in cima alla fila non c'e' niente da rimettere */
-  RISPOSTA = {ok: true, corpo: {cambio_eur: 126000}};
-  NODI.p2pVetrinaFila.scrollLeft = 0; frecce = 0;
-  ORA += 60000; battitoCambioLibroP2P(); await tick();
-  out.filaInCima = [fila.length, NODI.p2pVetrinaFila.scrollLeft, frecce];
-  /* quando NON si vede */
+  ORA -= 59000;
+  const g1 = await minuto(cambio(124000));
+  out.griglia = {a59: a59, giro: g1, cartellini: cartellini(), stampi: stampi, intera: grigliaIntera};
+  out.grigliaStesso = await minuto(cambio(124000));
+  /* quando i «≈» NON si vedono */
+  const tieni = CARTE;
   const nonSiVede = {};
-  const prove = {
+  const casi = {
+    'griglia vuota': () => { CARTE = []; },
+    'nessun «≈» in griglia': () => { CARTE = [carta(3, '<b>7000 sats</b>')]; },
+    'pagina nascosta': () => { document.visibilityState = 'hidden'; },
+    'la scheda di un annuncio': () => { VISTA = 'view-dettaglio'; },
+    'il profilo': () => { VISTA = 'view-profilo'; },
+    'in DEMO': () => { DEMO = true; },
+  };
+  for (const nome in casi) {
+    casi[nome]();
+    nonSiVede[nome] = (await minuto(cambio(126000))).chieste;
+    CARTE = tieni; document.visibilityState = 'visible'; VISTA = 'view-esplora'; DEMO = false;
+  }
+  out.griglianNonSiVede = nonSiVede;
+  out.grigliaTornata = await minuto(cambio(140000));
+
+  /* ---- LA FILA DI ESPLORA, da sola e con la griglia ---- */
+  CARTE = []; p2pVetrinaFirma = 'una card';
+  FILA.scrollLeft = 240; frecce = 0; fila = [];
+  const f1 = await minuto(cambio(130000));
+  out.fila = {giro: f1, disegni: fila.slice(), scorrimento: FILA.scrollLeft, frecce: frecce};
+  FILA.scrollLeft = 0; frecce = 0;
+  await minuto(cambio(131000));
+  out.filaInCima = [fila.length, FILA.scrollLeft, frecce];
+  const filaNo = {};
+  const casiFila = {
     'vetrina filtrata': () => { NUDA = false; },
     'spenta da chi guarda': () => { NASCOSTA = true; },
     'senza card': () => { p2pVetrinaFirma = ''; },
     'mai disegnata': () => { p2pVetrinaFirma = null; },
-    'pagina nascosta': () => { document.visibilityState = 'hidden'; },
-    'un\'altra vista': () => { VISTA = 'view-affari'; },
-    'in DEMO': () => { DEMO = true; },
   };
-  for (const nome in prove) {
-    prove[nome](); ORA += 60000; n = chieste.length;
-    battitoCambioLibroP2P(); await tick();
-    nonSiVede[nome] = chieste.length - n;
-    NUDA = true; NASCOSTA = false; p2pVetrinaFirma = 'una card'; DEMO = false;
-    document.visibilityState = 'visible'; VISTA = 'view-esplora';
+  for (const nome in casiFila) {
+    casiFila[nome]();
+    filaNo[nome] = (await minuto(cambio(132000))).chieste;
+    NUDA = true; NASCOSTA = false; p2pVetrinaFirma = 'una card';
   }
-  out.filaNonSiVede = nonSiVede;
-  n = chieste.length; battitoCambioLibroP2P(); await tick();
-  out.filaTornata = chieste.length - n;
+  out.filaNonSiVede = filaNo;
+  CARTE = tieni; FILA.scrollLeft = 90;
+  out.grigliaEFila = await minuto(cambio(134000));
+  out.grigliaEFilaDopo = [FILA.scrollLeft, cartellini().slice(0, 2)];
+  p2pVetrinaFirma = null;
 
   /* ---- LA PAGINA DI UNO SCAMBIO ---- */
   ORDINI = {
@@ -142836,7 +142896,6 @@ __BATTITO__
   for (const id in ORDINI) giudice[id] = scambioAlCambioP2P(ORDINI[id]);
   giudice['nessuno'] = scambioAlCambioP2P(undefined);
   out.giudice = giudice;
-  /* il giudice contro il METRO vero dei sats fissi: si muove col cambio? */
   const metroSiMuove = {};
   for (const id of ['fisso, da prendere', 'fisso, con l\'eco dei netti', 'fisso, preso']) {
     const riga = comeLibroP2P(Object.assign({lato: 'compro', id: id}, ORDINI[id]));
@@ -142850,10 +142909,8 @@ __BATTITO__
   let giro = 0;
   for (const id of Object.keys(ORDINI).concat(['che non c\'e\''])) {
     p2pOrdineAperto = id;
-    RISPOSTA = {ok: true, corpo: {cambio_eur: 131000 + (++giro) * 1000}};
-    ORA += 60000; n = chieste.length; const p = pagine.length, l = libro.length, f = fila.length;
-    battitoCambioLibroP2P(); await tick(); await tick();
-    pagina[id] = [chieste.length - n, pagine.length - p, libro.length - l, fila.length - f];
+    const g = await minuto(cambio(140000 + (++giro) * 1000));
+    pagina[id] = [g.chieste, g.pagine, g.libro, g.fila, g.scritture, g.foglio];
   }
   out.pagina = pagina;
   /* uscito dalla pagina mentre la risposta e' in volo */
@@ -142865,16 +142922,60 @@ __BATTITO__
   await tick(); await tick();
   out.dallaPaginaAlLibro = [pagine.length - p, libro.slice(l), cambioRidisegna, cifra()];
   VISTA = 'view-p2pordine'; RISPOSTA = 'appesa'; ORA += 60000; p = pagine.length; l = libro.length;
-  const f0 = fila.length;
+  const s0 = scritture;
   battitoCambioLibroP2P();
   VISTA = 'view-profilo';
   appese.shift()({ok: true, json: async () => ({cambio_eur: 151000})});
   await tick(); await tick();
-  out.dallaPaginaAltrove = [pagine.length - p, libro.length - l, fila.length - f0, cifra()];
+  out.dallaPaginaAltrove = [pagine.length - p, libro.length - l, scritture - s0, cifra()];
+
+  /* ---- IL FOGLIO DI UN ORDINE DEL LIBRO ---- */
+  const foglio = {};
+  /* sopra il libro, con la pagina scorsa e la domanda del metodo accesa */
+  VISTA = 'view-p2p'; APERTO = true; FOGLIO.scrollTop = 120; CORPO.scrollTop = 80; DOMANDA = {hidden: false};
+  let g = await minuto(cambio(160000));
+  foglio['sopra il libro'] = [g.chieste, g.libro, g.foglio, FOGLIO.scrollTop, CORPO.scrollTop, DOMANDA.hidden,
+                              libro[libro.length - 1], cambioRidisegna];
+  /* la domanda spenta resta spenta, e in cima non c'e' niente da rimettere */
+  DOMANDA = {hidden: true}; FOGLIO.scrollTop = 0; CORPO.scrollTop = 0;
+  g = await minuto(cambio(162000));
+  foglio['domanda spenta, in cima'] = [g.foglio, FOGLIO.scrollTop, CORPO.scrollTop, DOMANDA.hidden];
+  /* sul mio ordine la domanda non esiste proprio */
+  DOMANDA = null;
+  g = await minuto(cambio(163000));
+  foglio['senza la domanda'] = [g.foglio, DOMANDA];
+  DOMANDA = {hidden: true};
+  /* sopra Esplora (aperto da una card della fila): i cartellini E il foglio */
+  VISTA = 'view-esplora';
+  g = await minuto(cambio(164000));
+  foglio['sopra Esplora'] = [g.chieste, g.scritture, g.foglio, g.libro];
+  /* sopra una vista che col cambio non c'entra: chiede lo stesso, per lui */
+  VISTA = 'view-profilo';
+  g = await minuto(cambio(165000));
+  foglio['sopra il profilo'] = [g.chieste, g.foglio, g.libro, g.scritture, g.pagine];
+  /* lo stesso numero: chiede, non ridisegna */
+  g = await minuto(cambio(165000));
+  foglio['stesso numero'] = [g.chieste, g.foglio];
+  /* chiuso: sul profilo non chiede piu' nessuno; sul libro si rifa' il libro e basta */
+  APERTO = false;
+  g = await minuto(cambio(166000));
+  foglio['chiuso, sul profilo'] = [g.chieste, g.foglio];
+  VISTA = 'view-p2p';
+  g = await minuto(cambio(167000));
+  foglio['chiuso, sul libro'] = [g.chieste, g.libro, g.foglio];
+  /* chiuso mentre la risposta e' in volo */
+  APERTO = true; VISTA = 'view-profilo'; RISPOSTA = 'appesa'; ORA += 60000;
+  const d0 = foglioDisegni;
+  battitoCambioLibroP2P();
+  APERTO = false;
+  appese.shift()({ok: true, json: async () => ({cambio_eur: 168000})});
+  await tick(); await tick();
+  foglio['chiuso con la risposta in volo'] = [foglioDisegni - d0, cifra()];
+  out.foglio = foglio;
 
   /* ---- CHI NON E' ENTRATO, SUL LIBRO ---- */
   const passo = {};
-  const casi = {
+  const casiAnonimo = {
     'anonimo sul libro':          () => { VETRINA = true; myTgId = 0; VISTA = 'view-p2p'; },
     'senza id sul libro':         () => { VETRINA = false; myTgId = 0; VISTA = 'view-p2p'; },
     'anonimo su «I miei scambi»': () => { VETRINA = true; myTgId = 0; VISTA = 'view-p2pmiei'; },
@@ -142884,15 +142985,14 @@ __BATTITO__
     'anonimo in DEMO':            () => { VETRINA = true; myTgId = 0; VISTA = 'view-p2p'; DEMO = true; },
     'entrato sul libro':          () => { VETRINA = false; myTgId = 111; VISTA = 'view-p2p'; },
   };
-  for (const nome in casi) {
-    casi[nome](); ORA += 120000;
-    const l0 = libro.length, s0 = scambiChiesti, d0 = disegniLibro;
+  for (const nome in casiAnonimo) {
+    casiAnonimo[nome](); ORA += 120000;
+    const l0 = libro.length, sc0 = scambiChiesti, di0 = disegniLibro;
     battitoScambiP2P(); await tick();
-    passo[nome] = [libro.length - l0, scambiChiesti - s0, disegniLibro - d0];
+    passo[nome] = [libro.length - l0, scambiChiesti - sc0, disegniLibro - di0];
     document.visibilityState = 'visible'; DEMO = false;
   }
   out.passo = passo;
-  /* il passo e' di due minuti, non di un secondo */
   VETRINA = true; myTgId = 0; VISTA = 'view-p2p';
   ORA += 120000; let l0 = libro.length; battitoScambiP2P();
   ORA += 119000; battitoScambiP2P();
@@ -142912,43 +143012,41 @@ __BATTITO__
     if out is None:
         salta("il banco del cambio ovunque", "node non c'e'")
         return
-    SPENTO, ACCESO = [False, True, True], [True, False, False]
-    RISERVA = 0.00092
-    prova("le due righe nascono spente", SPENTO, out.get("nascita"))
-    prova("chi apre l'app mentre il server non ha un cambio: l'avviso si accende, resta il "
-          "valore di riserva con `cambioVivo` falso, e l'orologio del battito non si sposta",
-          [ACCESO, False, RISERVA, 0], out.get("zeroSenzaCambio"))
-    prova("un cambio buono lo spegne", [SPENTO, True, 100000, True], out.get("buono"))
-    prova("il server lo dichiara scaduto: l'avviso si accende sulle due righe, e in mano "
-          "resta il cambio di prima, ancora acceso (lo zero non sposta l'orologio)",
-          [ACCESO, True, 100000, True], out.get("zeroColCambio"))
-    prova("...un secondo zero non cambia niente, e il cambio che torna lo spegne",
-          [ACCESO, SPENTO], [out.get("zeroDiNuovo"), out.get("tornato")])
-    prova("una risposta storta NON e' una dichiarazione: niente, null, una parola, un "
-          "negativo, NaN, lo zero scritto come testo, un oggetto, un falso — l'avviso resta spento",
-          {k: [False, 100000] for k in ("niente", "null", "parola", "negativo", "NaN",
-                                        "zero di testo", "oggetto", "falso")},
-          out.get("storti"))
-    prova("senza le due righe nel DOM non esplode", False, out.get("senzaNodi"))
-    prova("dalla rotta: rete giu', 500 (anche con lo zero dentro), JSON storto e corpo vuoto "
-          "non accendono niente; lo ZERO accende e non ridisegna; lo stesso numero di prima "
-          "spegne, e non ridisegna",
-          {"rete": [1, SPENTO, 100000, 0], "500": [1, SPENTO, 100000, 0],
-           "json storto": [1, SPENTO, 100000, 0], "vuoto": [1, SPENTO, 100000, 0],
-           "zero": [1, ACCESO, 100000, 0], "stesso numero": [1, SPENTO, 100000, 0]},
-          out.get("daRotta"))
-    prova("LA FILA DI ESPLORA: a 59 secondi niente; al minuto una domanda a /api/cambio, la "
-          "fila ridisegnata col numero nuovo e lo scorrimento di lato RIMESSO dov'era (240), "
-          "con le frecce; il libro e la pagina dello scambio non c'entrano",
-          {"a59": 0, "chieste": ["/api/cambio"], "disegni": [125000], "scorrimento": 240,
-           "frecce": 1, "libro": 0, "pagine": 0}, out.get("fila"))
-    prova("...e con la fila in cima non c'e' niente da rimettere", [2, 0, 0], out.get("filaInCima"))
-    prova("la fila che NON si vede non chiede: vetrina filtrata, spenta da chi guarda, senza "
-          "card, mai disegnata, pagina nascosta, un'altra vista, DEMO",
-          {k: 0 for k in ("vetrina filtrata", "spenta da chi guarda", "senza card",
-                          "mai disegnata", "pagina nascosta", "un'altra vista", "in DEMO")},
-          out.get("filaNonSiVede"))
-    prova("...e tornata a vedersi chiede al primo battito", 1, out.get("filaTornata"))
+    C = '<span class="circa">≈</span>'
+    A100 = [C + "50 €", C + "20 €", "<b>7000 sats</b>", C + "7 €"]
+    NIENTE = {"chieste": 1, "scritture": 0, "card": 3, "fila": 0, "libro": 0, "pagine": 0, "foglio": 0}
+    prova("LO ZERO DEL SERVER: una domanda, e niente si muove — il cambio di prima resta in "
+          "mano e acceso, i cartellini sono quelli, e la bandiera del cambio fermo non esiste",
+          [dict(NIENTE, card=0), 100000, True, "undefined", A100],
+          [out.get("inizio") == A100 and out.get("zero", [None])[0]] + (out.get("zero") or [])[1:])
+    prova("I CARTELLINI DEGLI ANNUNCI: a 59 secondi niente; al minuto una domanda, la card "
+          "richiesta a `cardHTML` per i tre annunci del catalogo, e scritti SOLO i due "
+          "cartellini che cambiano (62 e 25 €) — non quello in sats, non la card che nel "
+          "catalogo non c'e'; un <template> solo, e la griglia intera mai rifatta",
+          {"a59": 0, "giro": dict(NIENTE, scritture=2),
+           "cartellini": [C + "62 €", C + "25 €", "<b>7000 sats</b>", C + "7 €"],
+           "stampi": 1, "intera": 0}, out.get("griglia"))
+    prova("...con lo stesso numero si chiede e non si scrive niente (nemmeno la card si richiede)",
+          dict(NIENTE, card=0), out.get("grigliaStesso"))
+    prova("i «≈» che NON si vedono non chiedono: griglia vuota, nessun «≈», pagina nascosta, "
+          "la scheda di un annuncio, il profilo, DEMO",
+          {k: 0 for k in ("griglia vuota", "nessun «≈» in griglia", "pagina nascosta",
+                          "la scheda di un annuncio", "il profilo", "in DEMO")},
+          out.get("griglianNonSiVede"))
+    prova("...e tornati a vedersi chiedono al primo battito, e i due cartellini seguono",
+          dict(NIENTE, scritture=2), out.get("grigliaTornata"))
+    prova("LA FILA DI ESPLORA, da sola: una domanda, la fila ridisegnata col numero nuovo e "
+          "lo scorrimento di lato RIMESSO dov'era (240), con le frecce",
+          {"giro": dict(NIENTE, card=0, fila=1), "disegni": [130000], "scorrimento": 240,
+           "frecce": 1}, out.get("fila"))
+    prova("...con la fila in cima non c'e' niente da rimettere; e quando non si vede (vetrina "
+          "filtrata, spenta da chi guarda, senza card, mai disegnata) non chiede",
+          [[2, 0, 0], {k: 0 for k in ("vetrina filtrata", "spenta da chi guarda", "senza card",
+                                      "mai disegnata")}],
+          [out.get("filaInCima"), out.get("filaNonSiVede")])
+    prova("griglia E fila insieme: una domanda sola, i due cartellini e la fila, ognuno col "
+          "suo posto tenuto", [dict(NIENTE, scritture=2, fila=1), [90, [C + "67 €", C + "27 €"]]],
+          [out.get("grigliaEFila"), out.get("grigliaEFilaDopo")])
     AL_CAMBIO = {"a mercato, da prendere": True, "a mercato, cifra detta": False,
                  "a mercato, cifra sotto il sat": True, "fisso, da prendere": True,
                  "fisso, con l'eco dei netti": True, "fisso, preso": False,
@@ -142961,17 +143059,38 @@ __BATTITO__
           "non e' preso, poi sta fermo",
           {k: AL_CAMBIO[k] for k in ("fisso, da prendere", "fisso, con l'eco dei netti",
                                      "fisso, preso")}, out.get("metroSiMuove"))
-    atteso = {k: ([1, 1, 0, 0] if v else [0, 0, 0, 0]) for k, v in AL_CAMBIO.items()
+    atteso = {k: ([1, 1, 0, 0, 0, 0] if v else [0] * 6) for k, v in AL_CAMBIO.items()
               if k != "nessuno"}
-    atteso["che non c'e'"] = [0, 0, 0, 0]
+    atteso["che non c'e'"] = [0] * 6
     prova("LA PAGINA DI UNO SCAMBIO chiede il cambio e si ridisegna solo quando il giudice "
-          "dice si'; sulle altre nessuna domanda, e mai il libro o la fila", atteso,
-          out.get("pagina"))
+          "dice si'; sulle altre nessuna domanda, e mai il libro, la fila, i cartellini o il "
+          "foglio", atteso, out.get("pagina"))
     prova("chi dalla pagina passa al libro mentre la risposta e' in volo: si ridisegna il "
           "LIBRO, fermo e con la bandiera (che poi scende), non la pagina",
           [0, [True], False, 150000], out.get("dallaPaginaAlLibro"))
     prova("...e chi va altrove non ridisegna niente: il cambio nuovo resta in mano",
           [0, 0, 0, 151000], out.get("dallaPaginaAltrove"))
+    prova("IL FOGLIO DI UN ORDINE, aperto sopra il libro: una domanda, il libro rifatto fermo "
+          "con la bandiera E il foglio rifatto — con lo scorrimento rimesso (120 e 80) e la "
+          "domanda del metodo ancora accesa; la bandiera poi e' giu'",
+          [1, 1, 1, 120, 80, False, True, False], (out.get("foglio") or {}).get("sopra il libro"))
+    prova("...la domanda spenta resta spenta e in cima non si rimette niente; sul mio ordine, "
+          "dove la domanda non esiste, non esplode",
+          [[1, 0, 0, True], [1, None]],
+          [(out.get("foglio") or {}).get("domanda spenta, in cima"),
+           (out.get("foglio") or {}).get("senza la domanda")])
+    prova("...sopra Esplora (aperto da una card della fila) si rifanno i cartellini E il "
+          "foglio; sopra una vista che col cambio non c'entra chiede lo stesso, e si rifa' "
+          "lui solo", [[1, 2, 1, 0], [1, 1, 0, 0, 0]],
+          [(out.get("foglio") or {}).get("sopra Esplora"),
+           (out.get("foglio") or {}).get("sopra il profilo")])
+    prova("...con lo stesso numero chiede e non si rifa'; CHIUSO non chiede piu' (sul "
+          "profilo) e sul libro si rifa' il libro e basta; chiuso con la risposta in volo "
+          "non si rifa', e il cambio nuovo resta in mano",
+          [[1, 0], [0, 0], [1, 1, 0], [0, 168000]],
+          [(out.get("foglio") or {}).get(k) for k in
+           ("stesso numero", "chiuso, sul profilo", "chiuso, sul libro",
+            "chiuso con la risposta in volo")])
     prova("CHI NON E' ENTRATO, sul libro: un ridisegno fermo ogni due minuti e nessuna "
           "domanda alla rotta degli scambi; non su «I miei scambi», non sulla pagina, non in "
           "Esplora, non a pagina nascosta; in DEMO e per chi e' entrato tutto com'era",

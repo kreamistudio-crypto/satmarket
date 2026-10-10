@@ -17496,16 +17496,24 @@
   stesse domande di `contoDettP2P` e `metroFissoP2P`: a mercato senza
   `satsNetti`, a sats fissi senza `satsMiei`; un intervallo no). A
   decidere cosa ridisegnare è `ridisegnaColCambioP2P`, che guarda cosa
-  c'è davanti quando la risposta ARRIVA. I «≈» degli annunci di Esplora
-  seguono ancora la busta.
-  IL CAMBIO FERMO: lo zero che il server risponde oltre
-  `ORE_CAMBIO_VALIDO` nel client non entra (resta il numero di prima, o
-  quello di riserva), ma si ricorda in `cambioFermo` e lo dicono due
-  righe nel markup fisso, spente di serie — `#cambioFermoVetrina` sopra
-  «In vetrina» e `#cambioFermoLibro` sopra le card del libro, classe
-  `.cambio-fermo`. Le accende e spegne `segnaCambioFermo`, chiamata da
-  `impostaCambio`: solo lo zero DETTO accende (una risposta storta o un
-  server muto no), ogni cambio buono spegne.
+  c'è davanti quando la risposta ARRIVA.
+  ...E I CARTELLINI DEGLI ANNUNCI, E IL FOGLIO DI UN ORDINE (10 ott 2026,
+  notte, cantiere cambio-annunci-foglio). I «≈» degli annunci nella
+  griglia di Esplora (`grigliaAlCambio`: Esplora davanti e almeno una
+  card in `#grid`) si rifanno uno per uno e in place con
+  `ridisegnaPrezziGriglia`: la card si richiede a `cardHTML` dentro un
+  `<template>` e si scrive il solo `.tag-price`, dove è cambiato — MAI
+  `renderGrid`, che ogni minuto rifarebbe foto e posizione e butterebbe
+  via una lista chiusa. Il foglio che si apre toccando un ordine del
+  libro (`foglioLibroApertoP2P`) fa chiedere il cambio sopra qualunque
+  vista e si rifà IN PIÙ a quel che ha sotto, con
+  `ridisegnaFoglioFermoP2P` (tiene lo scorrimento e la domanda del
+  metodo).
+  IL CAMBIO SCADUTO NON SI DICE: lo zero che il server risponde oltre
+  `ORE_CAMBIO_VALIDO` nel client non entra e non accende niente; resta
+  il numero di prima, o quello di riserva. Una riga «Prezzo del bitcoin
+  non aggiornato» è esistita per poche ore la sera del 10 ott 2026 e
+  Andrea l'ha tolta la notte stessa: non riproporla.
   CHI NON È ENTRATO, SUL LIBRO: in `battitoScambiP2P`, prima della
   rotta degli scambi che per lui non esiste, un ridisegno fermo ogni
   `P2P_SCAMBI_OGNI_MS` — è il render che attraversa la rilettura dei 60

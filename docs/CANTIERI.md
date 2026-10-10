@@ -48947,3 +48947,97 @@ MAIN prima del push: aspettata quella di `41e859d`, verde; quella di
 `e817faa`, arrivato mentre aspettavo, era appena partita. L'ok al push
 è quello di Andrea per il cantiere, che diceva sì anche a queste due
 cose «in commit separati».
+
+## Il cambio: via la riga del cambio fermo; i cartellini degli annunci e il foglio di un ordine seguono il battito (10 ott 2026, notte, cantiere cambio-annunci-foglio, richiesta di Andrea)
+
+Terzo giro sullo stesso filo, la notte stessa.
+LA RIGA «PREZZO DEL BITCOIN NON AGGIORNATO» È TOLTA, da ogni posto:
+cambio di idea di Andrea, poche ore dopo averla chiesta (voce
+precedente, punto 3). Via la bandiera, le due funzioni che la
+scrivevano, le due righe nel markup, il loro CSS; `impostaCambio` è
+tornata la funzione di prima, e la forma sorvegliata fra la pillola e il
+corpo del libro (`prove_p2p_libro`) è tornata com'era. Col cambio
+scaduto il client fa quel che faceva fino a ieri: lo zero del server non
+entra, resta in mano il cambio di prima (o quello di riserva), e non si
+dice niente. NON RIPROPORLA senza che la chieda lui. Una sentinella
+conta che non ne resti traccia.
+POI LE ULTIME DUE COSE NOTATE.
+1) I «≈» DEGLI ANNUNCI IN ESPLORA SEGUONO IL BATTITO. Ogni card ha una
+cifra convertita (il «≈» sta sulla valuta che non è quella del listino),
+quindi «si vedono» vuol dire: Esplora davanti, pagina visibile, almeno
+una card in griglia (`grigliaAlCambio`). LA STRADA SCARTATA è la più
+ovvia: `renderGrid()`, quella del cambio di valuta. Ogni minuto
+rifarebbe foto e nodi, sposterebbe la pagina, e chiamata senza argomenti
+butterebbe via una lista chiusa come il barattolo (`ultimaRicercaAI =
+!!items`). Si rifà invece il SOLO CARTELLINO di ogni card
+(`ridisegnaPrezziGriglia`): la card si richiede intera a `cardHTML` —
+così lampo, sconto, asta e accordo restano del loro giudice, e non
+nasce una seconda formula del prezzo — dentro un `<template>`, che non
+carica niente, e si scrive nel DOM solo dove il cartellino è cambiato.
+Vale per la griglia di Esplora (`#grid`); le griglie del negozio, del
+barattolo condiviso e degli «altri oggetti» non sono Esplora e seguono
+il loro giro.
+2) IL FOGLIO DI UN ORDINE DEL LIBRO SEGUE IL BATTITO FINCHÉ È APERTO,
+sopra qualunque vista (dal libro, da una card della fila di Esplora, dal
+link condiviso): il suo conto è sempre una stima, perché un ordine del
+libro è ancora da prendere. `foglioLibroApertoP2P` entra fra le cose che
+fanno chiedere il cambio, e `ridisegnaColCambioP2P` rifà il foglio IN
+PIÙ a quel che c'è sotto. Fermo anche lui (`ridisegnaFoglioFermoP2P`):
+tiene lo scorrimento e, se chi guarda l'aveva fatta comparire, la
+domanda del metodo; la cifra scelta e il metodo stanno in variabili e
+`renderDettaglioP2P` li rilegge da sé (una sentinella controlla che quel
+render non abbia effetti suoi: né fuoco, né rete, né vibrazione).
+PROVATO. `prove_cambio_ovunque` riscritta, 29: le sentinelle (la riga
+tolta e `impostaCambio` di prima, l'ordine dei ridisegni, il cartellino
+chiesto a `cardHTML` in un template e mai `renderGrid` dal blocco, la
+forma della card che il ridisegno cerca) e il banco node col blocco
+VERO e un DOM di cartone che conta le scritture: lo zero che non muove
+niente, i due cartellini scritti su quattro card (non quello che non
+cambia, non la card senza annuncio), i sei modi in cui i «≈» non si
+vedono, griglia e fila insieme, il foglio sopra il libro, sopra Esplora
+e sopra una vista qualunque, chiuso, chiuso con la risposta in volo, con
+e senza la domanda del metodo; più tutto quel che c'era (fila, pagina di
+uno scambio, anonimo). `prove_cambio_libro_p2p` resta a 39. Tortura: 34
+mutazioni su 34 uccise, ognuna con una rossa col suo nome.
+DAL VIVO (Chrome col tocco via Playwright, 390×844; copia del worktree,
+config d'esempio, relay morto, server nella gabbia; quattro annunci e la
+fotografia del libro seminati sul server, la manopola del cambio), 15 su
+15: quattro annunci a «≈ 50 €, 20 €, 7 €, 120 €»; cambio a 125.000 e a
+61 secondi dalla busta diventano 63, 25, 9 e 150 € — le card e le foto
+sono GLI STESSI NODI di prima, la pagina non si è mossa, la vetrina non
+è stata richiesta. Toccata una card della fila, il foglio dice ≈ 80.000
+sats; cambio a 80.000 e dopo un minuto dice ≈ 125.000, scorso dov'era
+(150 px), e sotto i cartellini sono a 40, 16, 6 e 96 €. Cambio fatto
+SCADERE: la domanda parte e non cambia niente — nessuna riga, nessun
+nodo, nessuna bandiera. Sul libro, toccato un ordine a due metodi e
+chiesto «Compra» senza sceglierne uno: dopo un minuto il conto è al
+cambio nuovo, la domanda del metodo è ancora accesa, e la card sotto
+segue senza che il libro si rilegga. Nessun errore di pagina; fuori dal
+server del giro solo gli script di Telegram.
+RESTA DA GUARDARE. Sul telefono: Esplora ferma un paio di minuti con gli
+annunci in vista; un ordine del libro aperto e lasciato lì un minuto.
+NON FATTO, e si vede: la scheda di un annuncio, il carrello e la cassa
+non seguono il battito (la cassa ha il suo preventivo dal server); le
+griglie fuori da Esplora (negozio, barattolo condiviso) nemmeno; il
+foglio «Quanto» di un ordine a intervallo resta col cambio di quando si
+apre.
+
+**IL VERBALE DEL PUSH (11 ott 2026, notte): via la riga del cambio fermo, i cartellini e il foglio.**
+Main è corso una volta a cantiere aperto, sei commit non miei
+(l'indirizzo che il coordinatore non verifica, i gesti prima di pagare
+il PayCode secondo cantiere col suo verbale, i percorsi del VPS nei
+documenti, il dominio nel journal, l'elenco dei wallet che non passano):
+un solo conflitto, la coda di CANTIERI, sciolto tenendo tutte le voci.
+COSA È GIRATO SU QUALE ALBERO. Sull'albero di partenza (`3086eac`):
+suite severa 22.023 verdi e 0 rosse, 58 collaudi su 58 nella gabbia, la
+tortura 34 su 34 e il giro dal vivo. Ribasato su `b9579ce`, l'albero
+del push: dodici sezioni — le due del cambio, il libro, la sintassi del
+client, la bussola, il tetto di CLAUDE.md, il config d'esempio e quelle
+toccate o nate coi commit arrivati (1.075 verdi, 0 rosse) — e quattro
+collaudi nella gabbia (il cambio, i freni, la CSP, i metodi delle
+rotte); la suite intera e gli altri collaudi NON rifatti su
+quest'ultima punta, e nemmeno tortura e giro dal vivo. Lo scanner dei
+segreti sulle righe aggiunte: pulito, con la controprova. LA CI DI MAIN
+prima del push: aspettata la punta (`b9579ce`), verde. Il sì al push è
+di Andrea: stava nel brief incollato, e l'ho richiesto prima di
+spingere.
