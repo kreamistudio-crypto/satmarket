@@ -44711,3 +44711,182 @@ non la tortura né il giro. La reputazione del P2P ha portato una
 tabella sua, `p2p_esiti` (gli esiti PER PERSONA, per il marchio dei non
 completati): non è un doppione di `p2p_conti`, che è per SCAMBIO e non
 ha persone — due domande diverse, due tabelle.
+## Il controllo della fattura prima del coordinatore (10 ott 2026, cantiere controllo-fattura, richiesta di Andrea)
+
+**IL CASO.** Il 10 ott 2026 un payout P2P da 180.917 sats fallisce tre
+volte con `FailureReasonNoRoute` e ZERO tentativi HTLC. La fattura di
+chi comprava veniva da un nodo che nel grafo pubblico non esiste («unable
+to find node») e non portava route hints: impagabile da chiunque, non
+solo dal nostro nodo — e lo si è scoperto alla FINE dello scambio, con la
+garanzia già incassata e i sats fermi. Andrea chiede che Barattolo
+guardi la fattura (o la Lightning address) APPENA chi compra la
+inserisce, prima che parta verso il coordinatore: sia alla presa sia
+quando il coordinatore chiede una fattura nuova (`add-invoice` dopo i
+payout falliti).
+
+**DOVE PARTIVA LA FATTURA, E DOVE STA IL CONTROLLO.** La fattura va dal
+BROWSER al coordinatore via Nostr, il server non la vedeva mai. I punti
+sono due in `miniapp.html` e finiscono nella stessa
+`chiamataOrdineP2P(o, 'add-invoice', …)`: il foglio «Dove vuoi ricevere
+i sats» (`inviaIncassoP2P`: fattura incollata o indirizzo) e la fattura
+fatta dal wallet NWC (`fatturaDalWalletP2P`). Alla presa Barattolo non
+manda nessuna bolt11 dentro il take-sell: la prima fattura è la risposta
+all'`add-invoice` del coordinatore, e la «fattura nuova» dopo i payout
+falliti passa dallo stesso foglio (il bottone «I sats non arrivano? Dai
+una fattura nuova»). Quindi UN controllo copre tutti e due i momenti: il
+client chiama `POST /api/p2p/fattura` un attimo prima dell'add-invoice,
+nei due punti, e il server chiede al nostro LND. Il browser non parla
+con un nodo: la domanda doveva stare sul server. I controlli che il
+client faceva già (importo uguale a `satsDaRicevereP2P`, scadenza oltre
+la finestra del coordinatore) restano suoi e arrivano prima; il server
+li rifà per conto suo (chi chiama la rotta a mano non passa dal client)
+e aggiunge quello che il client non sa: la RETE (il lettore del client
+accetta `lntb` e `lnbcrt` come se fossero `lnbc`, e un giorno qualcuno
+incollerà una fattura di signet) e la RAGGIUNGIBILITÀ.
+
+**I DUE GRADI DI GIUDIZIO (decisione di Andrea).** CERTO, e si ferma:
+importo diverso da quello dovuto, scaduta o più corta della finestra,
+rete sbagliata, nodo ASSENTE dal grafo senza route hints, indirizzo
+Phoenix (BIP-353) o con un dominio che non esiste. PROBABILE, e si
+avvisa forte lasciando il bottone «Usa comunque questa fattura»: nessuna
+strada trovata con il nodo presente nel grafo (il grafo non vede i saldi
+dei canali: LND può non trovare una strada che il coordinatore, con
+mission control e i suoi tentativi, trova), costo di rete oltre il tetto
+`max_routing_fee` del coordinatore (la rotta più economica di OGGI). E
+IL CONTROLLO NON FERMA MAI QUANDO NON SI PUÒ FARE: LND muto, ponte
+spento, macaroon senza il permesso, wallet dell'indirizzo che non
+risponde, server che non risponde al client, 4xx, 5xx, 40 secondi
+passati — la fattura parte come partiva ieri, e nel journal resta
+l'avviso. Il controllo aiuta; a dire di no è solo un verdetto.
+
+**COSA SI CHIEDE A LND, E LA SORPRESA DEL MACAROON.** Tre domande REST
+sullo stesso ponte di `_chiedi_lnd` (`_lnd_rest`: TLS guardato contro il
+`tls.cert`, macaroon nell'header, mai il percorso nel journal perché su
+`payreq` il percorso È la fattura): 1) `GET /v1/payreq/{bolt11}`
+(DecodePayReq): destinazione, route hints, importo — e la firma la
+verifica LND, che il nostro lettore guarda solo il checksum; 2) senza
+route hints, `GET /v1/graph/node/{dest}` (GetNodeInfo): «unable to find
+node» è il caso certo di oggi; 3) `POST /v1/graph/routes/{dest}/{sats}`
+(QueryRoutes) coi route hints nel corpo e SENZA `fee_limit`, così LND
+cerca la più economica fino al 100% e noi la confrontiamo col tetto
+(`sats × P2P_TETTO_ROTTA`): «unable to find a path» = avviso, fee sopra
+il tetto = avviso. La sorpresa, letta sul sorgente di LND
+(`rpcserver.go`, `MainRPCServerPermissions`): `DecodePayReq` vuole
+`offchain:read`, ma `GetNodeInfo` e `QueryRoutes` vogliono `info:read` —
+e il macaroon di lettura del set 2026 sul VPS ha SOLO `offchain:read`.
+Quindi col macaroon di oggi la decodifica passa e le altre due
+rispondono «permission denied»: il codice lo legge come `negato`, lo
+scrive nel journal con quella parola, e lascia passare. Il macaroon
+nuovo (`offchain:read info:read`, `root_key_id 3`, poi `deletemacaroonid
+2`) è un gesto di Andrea sul nodo: la procedura sta in PRODUZIONE, «IL
+CONTROLLO DELLA FATTURA P2P». Il tetto è una leva nuova del config,
+`P2P_TETTO_ROTTA` (0.01 nel codice): lo SPECCHIO del `settings.toml` del
+nodo, confermato da Andrea il 10 ott, che il server non può leggere.
+
+**LA LIGHTNING ADDRESS.** Il server la risolve con `invoice_da_ln_address`
+(la strada degli incassi del mercatino, con la guardia anti-SSRF del 1
+ott) per la cifra dovuta, e giudica QUELLA fattura sulla sola rete: la
+scadenza non conta, perché quella fattura non parte da nessuna parte — il
+coordinatore all'add-invoice se ne fa una sua. Phoenix e dominio
+inesistente fermano (anche il coordinatore li rifiuterebbe), un wallet
+muto lascia passare; le frasi del nodo privato e della strada assente
+sono riscritte per chi ha dato un indirizzo («generane una da un altro
+wallet» a chi non ha incollato nessuna fattura è una frase per un'altra
+persona). A cifra ignota l'indirizzo non si prova. E un tetto per utente
+(30 controlli l'ora): ogni indirizzo è un giro di rete verso un dominio
+scelto da chi lo scrive; oltre il tetto non si guarda, e la fattura
+passa.
+
+**LE STRADE SCARTATE.** • `EstimateRouteFee` (`POST
+/v2/router/route/estimatefee` con la `payment_request`): vuole solo
+`offchain:read`, quindi girerebbe col macaroon di oggi, ed è una SONDA
+VERA — un HTLC con hash finto fino al nodo di destinazione — che avrebbe
+detto NoRoute anche il 10 ott. Scartata (per ora) perché mette un
+pagamento in viaggio per ogni fattura incollata, impiega secondi, e un
+HTLC appeso su un hop che muore resta in volo fino al CLTV; vuole LND ≥
+0.18 per la forma con la payment_request. Resta la prossima tappa se il
+grafo si rivela troppo cieco. • Decodificare la bolt11 in casa (il campo
+`n`, o la chiave recuperata dalla firma con `schnorr_puro`): LND lo fa
+già, verifica anche la firma, e dà i route hints nella forma che
+QueryRoutes rivuole nel corpo — passano così come sono. • Fermare anche
+«nessuna strada» e «costo oltre il tetto»: Andrea ha scelto l'avviso col
+bottone, perché il grafo non è il pagamento. • `fee_limit` nella
+domanda: avrebbe reso «costo» indistinguibile da «nessuna strada» (LND a
+fee limit basso risponde NO_ROUTE, è la lezione del 17 set). •
+Allargare `leggi_bolt11` con importo e rete: la prova dei gemelli
+confronta il dizionario intero col client, quindi due lettori nuovi
+(`importo_bolt11`, gemello di `importoBolt11` con la sua prova via node,
+e `rete_bolt11`).
+
+**LE PAROLE.** Il messaggio del nodo privato è quello di Andrea, parola
+per parola. Nei «certi» il verbo è «Rifalla» o «Generane una»; negli
+«avvisi» è «potrebbe fallire» e «molto probabilmente fallirebbe», con la
+fee e il tetto in sats; Phoenix si dice con «Non hai sbagliato a
+scriverlo» (la regola di `diagnosi_ln_address`). Il bottone è ghost e
+non arancione: il gesto consigliato resta rifare la fattura, e
+l'arancione resta «Invia». Nel journal una riga per controllo — ⛔ ferma,
+⚠️ avvisa, · non si sa, ✅ ok — con l'ordine e la destinazione accorciati,
+la cifra, fee/tetto e il perché; la fattura MAI (una prova lo guarda sul
+testo di un giro intero).
+
+**LA LEZIONE DELLA PRIMA SUITE.** Il blocco client del controllo era
+nato accanto a `fatturaDalWalletP2P`, cioè DENTRO il motore dello
+scambio, e la prima suite ha dato dieci rosse di altri cantieri in un
+colpo: nove sentinelle che vogliono il motore a ZERO `fetch` (il motore
+non chiama mai il server di Barattolo), e una che vuole il blocco P2P
+del server senza la parola «LNbits» nel codice — e la docstring di
+`_lnd_rest` la nominava. Il blocco è andato dopo il marcatore «fine del
+motore», come le presenze e l'appuntamento, e dal motore si chiama con
+`typeof` (un banco che fa girare il motore da solo trova `null`, cioè
+«non si sa», e manda come ieri); la docstring dice «lo stesso ponte di
+`_chiedi_lnd`». Una sentinella nuova tiene il blocco fuori dal motore.
+
+**PROVATO.** `prove_controllo_fattura_p2p` (nuova, 78 prove): i due
+lettori; il giudice locale su finte di `bolt11_finta` (e una rifirmata
+su `lntb` da un `ricambia_hrp` del banco); la raggiungibilità con un
+`chiedi` di cartone che annota le domande — nodo assente ferma senza
+chiedere strade, coi hint il nodo non si cerca e i hint viaggiano nel
+corpo della POST, fee sopra il tetto avvisa coi due numeri (e l'msat si
+arrotonda per eccesso), nove modi di «non lo so» che lasciano tutti
+passare col perché, la fattura senza importo sulla cifra dovuta;
+l'indirizzo coi suoi quattro fermi e il wallet muto; il giudice unico;
+la risposta e il journal (la fattura passata perfino come `ordine` e
+come `messaggio` non esce); il tetto per utente; la rotta con le sue
+guardie (409, i 400, la finestra fra un minuto e 30 giorni, il tetto
+che lascia passare); le sentinelle sul client (il controllo PRIMA
+dell'add-invoice nei due punti, la fattura del wallet che resta nel
+campo, i tre `null` che non fermano mai, `esc`, l'«usa comunque»
+dimenticato alla riapertura, il blocco fuori dal motore coi `typeof`); i
+gemelli dell'importo su undici hrp via
+node; la leva nel config d'esempio. `collaudo_controllo_fattura` (nuovo,
+26, nella gabbia della CI): `_lnd_rest` e i giudici VERI contro un LND
+di cartone in HTTPS con tre macaroon — PIENO, quello di OGGI (la
+decodifica passa, nodo e strade «permission denied», la fattura passa e
+il journal dice «negato»), uno che non apre — e i guasti del ponte
+(certificato sbagliato senza che il macaroon parta, rotta sbagliata del
+gateway mai letta come nodo assente, strade che non rispondono entro
+l'attesa). Il giro dal vivo sulla copia col config di cartone (relay
+morto, LND finto sulla 18180): importo diverso e scaduta fermate dal
+client, testnet fermata dal server, nodo privato fermato con la frase di
+Andrea, «nessuna strada» con l'avviso e il bottone, il bottone toccato
+davvero → `add-invoice` partito e «Inviato ✅», costo oltre il tetto con
+5.000/1.000, l'indirizzo Phoenix, la buona che parte; poi l'LND finto
+SPENTO e la stessa fattura del nodo privato che PASSA con «· …
+decodifica muto: non_disponibile» nel journal. Gli scatti in
+`.claude/giri/controllo-fattura/`.
+
+**NON PROVATO, DA GUARDARE.** • Il nodo VERO: che la REST di LND accetti
+la POST su `/v1/graph/routes/{pk}/{amt}` col corpo (il `additional_bindings`
+della GET; se rispondesse 404/405 il codice dice «non si sa» e passa —
+si vede nel journal come «rotte errore»), che «unable to find node» e
+«permission denied» abbiano proprio quelle parole, e la forma del JSON
+di GetNodeInfo: la verifica con `curl` dal VPS sta in PRODUZIONE. • Il
+macaroon nuovo: finché Andrea non lo fa, ogni controllo di rete finisce
+«nodo negato (permission denied)» e passa — cioè OGGI il controllo ferma
+solo rete, importo, scadenza, Phoenix e dominio inesistente. • Una
+fattura vera di un nodo privato con route hints verso un hop che il
+grafo non conosce: LND la gestisce col hint, ma non l'ho visto. • La
+scadenza: il server rifà il controllo con la finestra che gli manda il
+client; chi chiama la rotta senza finestra prende 3600. • Il tetto di 30
+controlli l'ora è a memoria del processo (un riavvio lo azzera): va bene
+per quel che è.

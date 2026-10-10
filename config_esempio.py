@@ -84,11 +84,16 @@ GUARDIANO_PONTE_AVVISA = []  # a chi scrive, per id Telegram: es.
 # ritentare un pagamento, il server chiede com'e' finito anche a LND,
 # attraverso lo stesso ponte di LNbits. Serve un macaroon SUO, di SOLA
 # LETTURA — sul nodo:
-#   lncli bakemacaroon --root_key_id 2 --save_to lettura.macaroon offchain:read
+#   lncli bakemacaroon --root_key_id 2 --save_to lettura.macaroon offchain:read info:read
 #   xxd -p -c 9999 lettura.macaroon
 # — perche' questo e' un server web pubblico, e una chiave che sa pagare
 # qui dentro non ci entra. Vuoto = LND «spento»: decide LNbits da sola,
 # come prima. Vedi docs/PRODUZIONE.md, «I PAGAMENTI DA VERIFICARE».
+# `info:read` c'e' dal 10 ott 2026 (cantiere controllo-fattura): serve
+# al controllo della fattura di chi compra nel P2P (`getnodeinfo` e
+# `queryroutes`); col macaroon di prima, solo `offchain:read`, quel
+# controllo risponde «non si sa» e lascia passare — vedi PRODUZIONE,
+# «IL CONTROLLO DELLA FATTURA P2P».
 LND_PONTE_MACAROON_LETTURA = ""          # esadecimale, tutto su una riga
 LND_PONTE_CERT = "/opt/lnbits/data/tls.cert"   # il tls.cert di LND
 LND_PONTE_URL = "https://127.0.0.1:18080"      # lnd-ponte (socat + tor)
@@ -851,6 +856,15 @@ RONDA_NODO_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
 # False la spegne; le righe di partenza, di relay muto e di guasto
 # restano comunque.
 P2P_LOG_PASSATE = True
+
+# IL TETTO DI ROTTA DEL COORDINATORE (10 ott 2026, cantiere
+# controllo-fattura): lo SPECCHIO di `max_routing_fee` nel settings.toml
+# del nodo (0.01 dal 17 set 2026). Serve al controllo della fattura di
+# chi compra, PRIMA che parta verso il coordinatore: se la strada piu'
+# economica fino a quella fattura costa piu' di `sats × tetto`, il
+# coordinatore non la pagherebbe, e lo si dice subito (con un «Usa
+# comunque»). Se cambia la', va cambiato qui: il server non lo legge.
+P2P_TETTO_ROTTA = 0.01
 
 DB = "satmarket.db"
 

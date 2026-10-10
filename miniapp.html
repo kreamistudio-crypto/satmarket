@@ -59052,6 +59052,7 @@ function apriIncassoP2P(){
   haptic();
   p2pIncassoOrdine = id;
   renderIncassoP2P();
+  p2pFatturaComunque = '';
   el('sheetBg').classList.add('open');
   el('p2pIncassoSheet').classList.add('open');
   const c = el('p2pIncassoInp');
@@ -59116,6 +59117,18 @@ async function fatturaDalWalletP2P(id){
     if (b.scade < adessoW + finestraFatturaP2P())
       throw new Error('ha fatto una fattura che scade troppo presto');
     const cortaW = b.scade < adessoW + vitaMinimaFatturaP2P(o);
+    /* IL CONTROLLO PRIMA DEL COORDINATORE (10 ott 2026), anche sulla
+       fattura del wallet — che puo' essere proprio quella di un nodo
+       privato. Se ferma o avvisa, la fattura resta nel campo: si legge,
+       e «Usa comunque» la manda cosi' com'e' dal foglio a mano. */
+    const fermoW = typeof controlloFatturaP2P === 'function'
+      ? await controlloFatturaP2P(o, bolt) : null;
+    if (fermoW) {
+      const inpW = el('p2pIncassoInp');
+      if (inpW) inpW.value = bolt;
+      mostraFermoFatturaP2P(fermoW);
+      return false;
+    }
     if (p2pIncassoOrdine !== id) return false;   /* il foglio e' gia' passato ad altro */
     if (typeof segnaTentativoP2P === 'function') segnaTentativoP2P(o.id, 'fattura_inviata');
     await chiamataOrdineP2P(o, 'add-invoice', {payment_request: [null, bolt, null]});
@@ -59531,6 +59544,17 @@ async function inviaIncassoP2P(){
   }
   /* qui il bottone c'e' e resta suo: il velo lo veste dell'anello e
      l'etichetta la mette `bottoneInAttesa` dentro `attesaP2P` */
+  /* IL CONTROLLO PRIMA DEL COORDINATORE (10 ott 2026): pagabile? Lo
+     dice il server col nostro LND — vedi `controlloFatturaP2P`. Un
+     verdetto che ferma si legge qui nel foglio; uno che avvisa lascia
+     «Usa comunque»; il silenzio lascia passare. */
+  const ripC = attesaP2P('Controllo che sia pagabile…', el('p2pIncassoBtn'));
+  let fermo = null;
+  try {
+    fermo = typeof controlloFatturaP2P === 'function'
+      ? await controlloFatturaP2P(o, testo) : null;
+  } finally { ripC(); }
+  if (fermo) { mostraFermoFatturaP2P(fermo); return; }
   const rip = attesaP2P('Mando dove ricevere i sats…', el('p2pIncassoBtn'));
   try {
     /* l'indirizzo Lightning si manda COSI' COM'E': lo risolve il
@@ -67557,6 +67581,74 @@ function haOrdiniViviP2P(){
   return apertiMieiP2P(mieiRigheP2P()).length > 0;
 }
 /* ============ fine del motore dello scambio ============ */
+
+/* ═══ IL CONTROLLO DELLA FATTURA PRIMA DEL COORDINATORE (10 ott 2026,
+   cantiere controllo-fattura, richiesta di Andrea) ══════════════════
+   Il 10 ott 2026 un payout da 180.917 sats e' fallito tre volte senza
+   un solo HTLC: la fattura di chi comprava veniva da un nodo che nel
+   grafo pubblico non esiste, senza route hints — impagabile da
+   chiunque, e lo si e' saputo alla FINE dello scambio. Il browser non
+   puo' saperlo (non parla con un nodo), quindi lo chiede al server
+   (`POST /api/p2p/fattura`), che lo chiede al nostro LND: la
+   decodifica, il nodo nel grafo, una strada entro il tetto del
+   coordinatore. Vale per le DUE strade del foglio — la fattura
+   incollata (o l'indirizzo) e quella fatta dal wallet NWC — e per i
+   due momenti in cui il foglio si apre: la presa, e la fattura nuova
+   dopo i payout falliti.
+   TRE RISPOSTE: `ok` = parte com'e'; `ok` false con `comunque` =
+   avviso forte e il bottone «Usa comunque questa fattura» (nessuna
+   strada trovata, costo di rete oltre il tetto: PROBABILE, non certo);
+   `ok` false senza `comunque` = si ferma (importo, scadenza, rete,
+   nodo privato senza indicazioni di strada, indirizzo che non esiste).
+   E IL CONTROLLO NON FERMA MAI DA SOLO: server che non risponde, 4xx,
+   5xx, 40 secondi passati — la fattura parte come partiva ieri. Il
+   controllo aiuta; a dire di no e' solo il verdetto.
+   STA FUORI DAL MOTORE apposta: il motore dello scambio non chiama mai
+   il server di Barattolo (una sentinella conta le sue `fetch` e
+   pretende zero), e questa e' una chiamata. Dal motore —
+   `inviaIncassoP2P` e `fatturaDalWalletP2P` — si chiama con `typeof`,
+   come le presenze e l'appuntamento: un banco che fa girare il motore
+   da solo trova un `null`, cioe' «non si sa», e manda come ieri. */
+let P2P_CONTROLLO_ATTESA_MS = 40000;   /* tre domande a LND da 10 s, piu' il wallet di un indirizzo */
+let p2pFatturaComunque = '';           /* il testo per cui si e' detto «usa comunque»: il controllo non si rifa' */
+async function controlloFatturaP2P(o, testo){
+  if (DEMO || VETRINA) return null;
+  if (p2pFatturaComunque && p2pFatturaComunque === testo) return null;
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), P2P_CONTROLLO_ATTESA_MS);
+  try {
+    const r = await fetch(`${API_BASE}/p2p/fattura`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({ordine: o.id, testo: testo, sats: satsDaRicevereP2P(o),
+                            finestra: finestraFatturaP2P()}),
+      signal: ctl.signal});
+    if (!r.ok) return null;
+    const v = await r.json();
+    if (!v || v.ok !== false || !v.messaggio) return null;
+    diarioP2P('fattura ' + (v.esito || '?') + (v.comunque ? ' (si può forzare)' : ' (ferma)'));
+    return {messaggio: String(v.messaggio), comunque: !!v.comunque, esito: String(v.esito || '')};
+  } catch(e) {
+    return null;
+  } finally { clearTimeout(t); }
+}
+/* l'avviso nel foglio, e — quando il verdetto lo concede — il bottone
+   per insistere. Ghost e non arancione: il gesto consigliato e' rifare
+   la fattura, e il bottone grande resta «Invia» */
+function mostraFermoFatturaP2P(fermo){
+  const av = el('p2pIncassoAvviso');
+  if (!av) return;
+  av.innerHTML = esc(fermo.messaggio) + (fermo.comunque
+    ? '<br><button class="btn ghost" type="button" style="margin-top:8px" onclick="usaComunqueFatturaP2P()">Usa comunque questa fattura</button>'
+    : '');
+  av.style.display = '';
+}
+function usaComunqueFatturaP2P(){
+  const inp = el('p2pIncassoInp');
+  if (!inp) return;
+  p2pFatturaComunque = String(inp.value || '').trim();
+  haptic();
+  inviaIncassoP2P();
+}
 
 /* ============ LA PORTA DEL PRIMO ORDINE (9 ott 2026) ============
    Fuori dal motore, che resta puro: qui si guardano l'identita', il

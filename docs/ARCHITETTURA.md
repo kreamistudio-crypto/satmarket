@@ -30121,3 +30121,45 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   vero, relay di cartone, un X di cartone sul loopback che RIFÀ la firma
   OAuth, nella gabbia della CI). La procedura: PRODUZIONE, «LA CASSA DI
   RISONANZA SU X».
+
+- IL CONTROLLO DELLA FATTURA P2P (10 ott 2026, perché in CANTIERI, «Il
+  controllo della fattura prima del coordinatore»). La fattura (o la
+  Lightning address) di chi compra va dal browser al coordinatore via
+  Nostr, e prima di partire passa da `POST /api/p2p/fattura` `{ordine,
+  testo, sats, finestra}` → `{ok, comunque, messaggio, esito}`. Il
+  client (`controlloFatturaP2P`, chiamato in `inviaIncassoP2P` e in
+  `fatturaDalWalletP2P` un attimo prima di `chiamataOrdineP2P(o,
+  'add-invoice', …)`) legge tre risposte: `ok` parte com'è; `ok` false
+  con `comunque` è un avviso col bottone «Usa comunque questa fattura»
+  (`mostraFermoFatturaP2P`, `usaComunqueFatturaP2P`: il testo forzato
+  sta in `p2pFatturaComunque`, che il foglio dimentica alla riapertura);
+  `ok` false senza `comunque` ferma nel foglio. Server muto, 4xx, 5xx,
+  40 secondi passati: `null`, e la fattura parte come ieri. Sul server
+  il GIUDICE UNICO è `controlla_fattura_p2p(testo, deve, finestra)`:
+  per una bolt11 prima `_controllo_locale_fattura_p2p` (PURA:
+  `leggi_bolt11` + i due lettori nuovi `importo_bolt11`, gemello di
+  `importoBolt11`, e `rete_bolt11`; esiti `illeggibile`, `rete`,
+  `importo`, `scaduta`, `corta`), poi `_controllo_rete_fattura_p2p`
+  (tre domande al nostro LND via `_lnd_rest`, lo stesso ponte, TLS e
+  macaroon di `_chiedi_lnd`: `GET /v1/payreq/{bolt11}` per destinazione
+  e route hints, senza hint `GET /v1/graph/node/{dest}` dove «unable to
+  find node» è `nodo_assente`, poi `POST /v1/graph/routes/{dest}/{sats}`
+  coi hint nel corpo e senza fee_limit, da cui `senza_strada` o `costo`
+  se la rotta più economica supera `sats × P2P_TETTO_ROTTA`); per un
+  indirizzo `_controllo_indirizzo_p2p` (forma LUD-16, Phoenix/BIP-353,
+  la fattura chiesta con `invoice_da_ln_address` e giudicata sulla sola
+  rete, dominio inesistente da `diagnosi_ln_address`). Gli esiti stanno
+  in due tuple: `FATTURA_FERMA` (certi) e `FATTURA_AVVISA` (probabili,
+  col «comunque»); tutto il resto che non è `ok` è `non_disponibile` e
+  PASSA — la regola del cantiere, «il controllo aiuta, mai ferma» —
+  compreso `negato`, che è «permission denied» del macaroon:
+  `getnodeinfo` e `queryroutes` vogliono `info:read`, `payreq` solo
+  `offchain:read` (letto sul sorgente di LND). `_risposta_fattura_p2p`
+  scrive la riga del journal (⛔ ⚠️ · ✅, ordine e destinazione
+  accorciati, cifra, fee/tetto, perché — mai la fattura) e la risposta.
+  `_controllo_fattura_concesso`: 30 controlli l'ora per utente, oltre
+  non si guarda e passa. La leva `P2P_TETTO_ROTTA` (0.01) specchia il
+  `max_routing_fee` del nodo. Prove: `prove_controllo_fattura_p2p`;
+  collaudo `collaudo_controllo_fattura` (LND di cartone in HTTPS coi tre
+  macaroon). La procedura del macaroon nuovo e la verifica dal VPS:
+  PRODUZIONE, «IL CONTROLLO DELLA FATTURA P2P».

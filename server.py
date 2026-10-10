@@ -12149,6 +12149,35 @@ def leggi_bolt11(bolt11: str, con_hash: bool = False) -> dict | None:
     return letta
 
 
+def importo_bolt11(bolt11: str) -> int | None:
+    """Quanti SATS chiede una bolt11, letto dall'hrp e basta (BOLT-11:
+    la cifra dopo `lnbc` e il moltiplicatore m/u/n/p). 0 = fattura
+    senza importo; None = non si legge, o chiede una frazione di sat
+    (che nessuno sa pagare). E' il gemello di `importoBolt11` del
+    client, e c'e' una prova che li fa leggere le stesse fatture
+    (10 ott 2026, cantiere controllo-fattura). Qui si fa coi decimi di
+    millisat in interi, cosi' «p» non passa dai float."""
+    m = re.match(r"^ln(?:bc|tb|tbs|bcrt)(\d+)?([munp])?1",
+                 str(bolt11 or "").strip().lower())
+    if not m:
+        return None
+    if not m.group(1):
+        return 0
+    decimi = int(m.group(1)) * {"": 10 ** 12, "m": 10 ** 9, "u": 10 ** 6,
+                                "n": 10 ** 3, "p": 1}[m.group(2) or ""]
+    if decimi % 10_000:
+        return None
+    return decimi // 10_000
+
+
+def rete_bolt11(bolt11: str) -> str:
+    """Di QUALE rete e' una bolt11, dal prefisso: 'bc' Bitcoin, 'tb'
+    testnet, 'tbs' signet, 'bcrt' regtest; '' se non si legge. `bcrt`
+    si prova PRIMA di `bc`, che ne e' l'inizio."""
+    m = re.match(r"^ln(bcrt|bc|tbs|tb)", str(bolt11 or "").strip().lower())
+    return m.group(1) if m else ""
+
+
 def vita_fattura(bolt11: str, adesso: int | None = None) -> int | None:
     """Quanti secondi restano a questa fattura: negativo = scaduta da
     tanto, None = non si legge (e non si afferma niente). E' il GIUDICE
@@ -46219,6 +46248,412 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
           f"euro, avvisato {a_chi}", flush=True)
     _esiti_p2p_dice("💶", [(a_chi, esito)])
     return {"ok": True}
+
+
+# ═══ IL CONTROLLO DELLA FATTURA PRIMA DEL COORDINATORE (10 ott 2026,
+# cantiere controllo-fattura, richiesta di Andrea) ═══════════════════
+# IL PERCHE': il 10 ott 2026 un payout P2P da 180.917 sats e' fallito
+# tre volte con NO_ROUTE e ZERO tentativi HTLC. La fattura di chi
+# comprava veniva da un nodo che nel grafo pubblico non esiste («unable
+# to find node») e non portava route hints: impagabile da chiunque, non
+# solo da noi — e lo si e' saputo solo alla fine dello scambio, con la
+# garanzia gia' incassata. Da oggi la fattura (o la Lightning address)
+# si guarda APPENA la si inserisce, PRIMA che parta verso il
+# coordinatore: sia alla presa sia quando il coordinatore chiede una
+# fattura nuova (`add-invoice` dopo i payout falliti), che nel client
+# passano dallo stesso foglio e dalla stessa rotta (`/api/p2p/fattura`).
+# DUE GRADI DI GIUDIZIO (decisione di Andrea, 10 ott 2026):
+#   • CERTO, e si ferma (`FATTURA_FERMA`): importo diverso da quello
+#     dovuto, fattura scaduta o piu' corta della finestra del
+#     coordinatore, rete sbagliata, nodo ASSENTE dal grafo senza route
+#     hints, indirizzo Phoenix (BIP-353) o con un dominio che non c'e'.
+#   • PROBABILE, e si avvisa forte lasciando un «Usa comunque questa
+#     fattura» (`FATTURA_AVVISA`): nessuna strada trovata con il nodo
+#     presente nel grafo, costo di rete oltre il tetto del coordinatore.
+# E IL CONTROLLO NON FERMA MAI GLI SCAMBI quando non si puo' fare: LND
+# muto, macaroon senza il permesso (`getnodeinfo` e `queryroutes`
+# vogliono `info:read`, e quello di lettura del set 2026 ha solo
+# `offchain:read` — verificato sul sorgente di LND, `rpcserver.go`),
+# ponte spento, wallet dell'indirizzo che non risponde: la fattura
+# passa e nel journal resta l'avviso. Il controllo deve AIUTARE: un
+# «non lo so» non e' un «no».
+# NEL JOURNAL una riga per controllo, con l'esito e MAI la fattura
+# intera: la destinazione accorciata basta a riconoscerla, e una bolt11
+# in un log e' una riga che qualcuno un giorno copia.
+# COSA SI CHIEDE A LND, sullo stesso ponte di `_chiedi_lnd`:
+#   1) `GET /v1/payreq/{bolt11}` (DecodePayReq, `offchain:read`): la
+#      destinazione, i route hints, l'importo — e la firma la verifica
+#      LND, che il nostro lettore guarda solo il checksum;
+#   2) senza route hints, `GET /v1/graph/node/{dest}` (GetNodeInfo,
+#      `info:read`): «unable to find node» = il nodo non e' nel grafo,
+#      e senza indicazioni di strada e' il caso CERTO di oggi;
+#   3) `POST /v1/graph/routes/{dest}/{sats}` (QueryRoutes, `info:read`)
+#      coi route hints nel corpo e SENZA fee_limit (LND cerca la piu'
+#      economica fino al 100%): se non c'e' strada e' un avviso, se la
+#      piu' economica costa piu' di `sats × P2P_TETTO_ROTTA` il
+#      coordinatore, che ha quel tetto, non la pagherebbe — avviso.
+# IL TETTO e' `max_routing_fee` del settings.toml del nodo (0.01 dal
+# 17 set 2026, confermato da Andrea il 10 ott): il config del VPS lo
+# SPECCHIA, non lo legge — se cambia la', va cambiato qui.
+try:
+    from config import P2P_TETTO_ROTTA
+except ImportError:
+    P2P_TETTO_ROTTA = 0.01
+LND_FATTURA_ATTESA_S = 10         # per domanda: tre al massimo, e il client ne aspetta 40
+TETTO_CONTROLLI_FATTURA_ORA = 30  # per utente: ogni indirizzo e' un giro di rete verso un dominio scelto da lui
+FATTURA_FERMA = ("illeggibile", "importo", "scaduta", "corta", "rete",
+                 "nodo_assente", "indirizzo")
+FATTURA_AVVISA = ("senza_strada", "costo")
+FATTURA_NON_DISPONIBILE = "non_disponibile"
+LND_NEGATO = "negato"
+ALTRI_WALLET = ("Generane una da un altro wallet (Phoenix, Breez, Blink, "
+                "Wallet of Satoshi) o usa una Lightning address.")
+MEGLIO_ALTRI_WALLET = ("Meglio una fattura da un altro wallet (Phoenix, "
+                       "Breez, Blink, Wallet of Satoshi), o una Lightning "
+                       "address.")
+MSG_NODO_ASSENTE = ("Questa fattura non è raggiungibile dalla rete "
+                    "Lightning: viene da un nodo privato senza indicazioni "
+                    "di strada. " + ALTRI_WALLET)
+MSG_SENZA_STRADA = ("Il nostro nodo non trova una strada per arrivare a "
+                    "questa fattura: il pagamento potrebbe fallire. "
+                    + MEGLIO_ALTRI_WALLET)
+MSG_SCADENZA_LUNGA = ("Rifalla con una scadenza più lunga: molti wallet "
+                      "la fanno scegliere nelle opzioni della richiesta, "
+                      "alla voce «Scadenza» (o «Expiry»).")
+# le stesse ragioni, dette a chi ha dato un INDIRIZZO e non una fattura:
+# «generane una da un altro wallet» a chi non ne ha incollata nessuna
+# sarebbe una frase per un'altra persona
+MSG_INDIRIZZO = {
+    "nodo_assente": ("Questo indirizzo porta a un nodo privato senza "
+                     "indicazioni di strada, che la rete Lightning non "
+                     "raggiunge. Usa l'indirizzo di un altro wallet "
+                     "(Blink, Wallet of Satoshi, Alby) o incolla una "
+                     "fattura."),
+    "senza_strada": ("Il nostro nodo non trova una strada fino al wallet "
+                     "di questo indirizzo: il pagamento potrebbe fallire. "
+                     "Meglio l'indirizzo di un altro wallet, o una fattura."),
+}
+_controlli_fattura = {}   # tg_id → [secondi di ogni controllo nell'ultima ora]
+
+
+async def _lnd_rest(metodo: str, percorso: str, corpo: dict | None = None,
+                    cosa: str = "") -> tuple[str, dict]:
+    """Una domanda REST a LND attraverso lo stesso ponte, lo stesso TLS
+    guardato e lo stesso macaroon di `_chiedi_lnd`. Torna (stato,
+    risposta): 'ok' col JSON; `negato` se il macaroon non ha il
+    permesso (un guasto di CONFIGURAZIONE, e il journal lo dice con
+    quella parola); 'errore' col `message` di LND, che e' il «no» di
+    una domanda arrivata («unable to find node», «unable to find a
+    path to destination»); `muto` se non risponde; `spento` senza
+    macaroon. NON ALZA MAI, e nel journal del guasto mette il TIPO e
+    `cosa` — mai il percorso, che su `payreq` porta la fattura intera."""
+    if not _lnd_configurato():
+        return LND_SPENTO, {}
+    try:
+        tls = ssl.create_default_context(cafile=LND_PONTE_CERT)
+        async with httpx.AsyncClient(timeout=LND_FATTURA_ATTESA_S,
+                                     verify=tls) as c:
+            r = await c.request(
+                metodo, f"{LND_PONTE_URL}{percorso}", json=corpo,
+                headers={"Grpc-Metadata-macaroon":
+                         str(LND_PONTE_MACAROON_LETTURA).strip()})
+    except Exception as e:
+        print(f"⚡ LND non ha risposto su {cosa or 'una domanda'} "
+              f"({type(e).__name__})", flush=True)
+        return LND_MUTO, {}
+    try:
+        d = r.json()
+    except ValueError:
+        d = {}
+    if not isinstance(d, dict):
+        d = {}
+    err = d.get("error")
+    msg = str((err.get("message") if isinstance(err, dict) else err)
+              or d.get("message") or "")
+    if "permission denied" in msg.lower():
+        return LND_NEGATO, {"message": msg}
+    if r.status_code == 200 and not err:
+        return "ok", d
+    return "errore", {"message": msg, "status": r.status_code}
+
+
+def _controllo_locale_fattura_p2p(bolt11: str, deve: int, finestra: int,
+                                  adesso: int) -> dict:
+    """Quel che di una bolt11 si giudica SENZA rete, e che il
+    coordinatore rifiuterebbe di sicuro: la forma, la rete, l'importo
+    (uguale a `deve`, la cifra che lui pretende — a cifra ignota non si
+    sbarra la strada, come nel client), la scadenza (gia' passata, o
+    sotto la finestra che il coordinatore esige all'arrivo). PURA.
+    Torna {'esito', 'messaggio'} piu' `sats` e `scade` se passa."""
+    letta = leggi_bolt11(bolt11)
+    sats = importo_bolt11(bolt11)
+    if letta is None or sats is None:
+        return {"esito": "illeggibile",
+                "messaggio": "Questa richiesta di pagamento non si legge: "
+                             "controlla di averla copiata tutta."}
+    rete = rete_bolt11(bolt11)
+    if rete != "bc":
+        nome = {"tb": "testnet", "tbs": "signet", "bcrt": "regtest"}.get(
+            rete, "di prova")
+        return {"esito": "rete",
+                "messaggio": f"Questa fattura è della rete {nome}, non di "
+                             "Bitcoin: il coordinatore paga solo sulla rete "
+                             "vera. Generane una dal wallet che usi davvero."}
+    if sats > 0 and deve > 0 and sats != deve:
+        return {"esito": "importo",
+                "messaggio": f"La richiesta è di {_fmt_sats(sats)} sats, ma "
+                             f"ne devi ricevere {_fmt_sats(deve)}. Rifalla "
+                             "dell'importo esatto, oppure lascia l'importo "
+                             "libero."}
+    if letta["scade"] <= adesso:
+        return {"esito": "scaduta",
+                "messaggio": "Questa richiesta è già scaduta. Rifanne una "
+                             "nuova. " + MSG_SCADENZA_LUNGA}
+    if letta["scade"] < adesso + finestra:
+        resta = max(1, (letta["scade"] - adesso) // 60)
+        return {"esito": "corta",
+                "messaggio": f"Questa richiesta scade fra {resta} minuti, e "
+                             "viene accettata solo se vale ancora più di "
+                             f"{-(-finestra // 60)} minuti quando arriva. "
+                             + MSG_SCADENZA_LUNGA}
+    return {"esito": "ok", "messaggio": "", "sats": sats,
+            "scade": letta["scade"]}
+
+
+async def _controllo_rete_fattura_p2p(bolt11: str, sats: int,
+                                      chiedi=None) -> dict:
+    """LA RAGGIUNGIBILITA', chiesta al nostro LND (i tre passi del
+    cappello di questa sezione). `sats` e' la cifra che il coordinatore
+    paghera' — quella della fattura, o quella dovuta se la fattura e'
+    senza importo. `chiedi` e' `_lnd_rest` o il suo cartone nelle prove.
+    Torna {'esito', 'messaggio', 'dest', 'fee', 'tetto', 'perche'}:
+    `non_disponibile` ogni volta che LND non sa rispondere, col perche'
+    per il journal."""
+    chiedi = chiedi or _lnd_rest
+    stato, dec = await chiedi("GET", f"/v1/payreq/{bolt11}", None, "payreq")
+    if stato != "ok":
+        return {"esito": FATTURA_NON_DISPONIBILE,
+                "perche": f"decodifica {stato}" + (
+                    f" ({dec['message']})" if dec.get("message") else "")}
+    dest = str(dec.get("destination") or "").lower()
+    hints = dec.get("route_hints") or []
+    if not re.fullmatch(r"[0-9a-f]{66}", dest):
+        return {"esito": FATTURA_NON_DISPONIBILE,
+                "perche": "decodifica senza destinazione"}
+    try:
+        importo = int(sats) or int(dec.get("num_satoshis") or 0)
+    except (TypeError, ValueError):
+        importo = 0
+    if not hints:
+        stato, nodo = await chiedi("GET", f"/v1/graph/node/{dest}", None,
+                                   "nodo")
+        if stato == "errore" and "unable to find node" in str(
+                nodo.get("message") or "").lower():
+            return {"esito": "nodo_assente", "dest": dest,
+                    "messaggio": MSG_NODO_ASSENTE}
+        if stato != "ok":
+            return {"esito": FATTURA_NON_DISPONIBILE, "dest": dest,
+                    "perche": f"nodo {stato}" + (
+                        f" ({nodo['message']})" if nodo.get("message")
+                        else "")}
+    if importo <= 0:
+        return {"esito": "ok", "dest": dest,
+                "perche": "senza importo e cifra ignota: la strada non si prova"}
+    stato, rotte = await chiedi("POST", f"/v1/graph/routes/{dest}/{importo}",
+                                {"route_hints": hints}, "rotte")
+    tetto = int(importo * P2P_TETTO_ROTTA)
+    if stato == "ok":
+        vie = rotte.get("routes") or []
+        if not vie:
+            return {"esito": "senza_strada", "dest": dest,
+                    "messaggio": MSG_SENZA_STRADA}
+        v0 = vie[0] if isinstance(vie[0], dict) else {}
+        try:
+            fee = (int(v0["total_fees_msat"]) + 999) // 1000 \
+                if v0.get("total_fees_msat") is not None \
+                else int(v0.get("total_fees") or 0)
+        except (TypeError, ValueError):
+            fee = 0
+        if fee > tetto:
+            return {"esito": "costo", "dest": dest, "fee": fee, "tetto": tetto,
+                    "messaggio": f"Arrivare a questa fattura costa almeno "
+                                 f"{_fmt_sats(fee)} sats di rete, più del "
+                                 f"tetto di {_fmt_sats(tetto)} sats che il "
+                                 "coordinatore accetta: il pagamento molto "
+                                 "probabilmente fallirebbe. "
+                                 + MEGLIO_ALTRI_WALLET}
+        return {"esito": "ok", "dest": dest, "fee": fee, "tetto": tetto}
+    if stato == "errore":
+        m = str(rotte.get("message") or "").lower()
+        if "unable to find a path" in m or "no path" in m \
+                or "unable to find node" in m:
+            return {"esito": "senza_strada", "dest": dest,
+                    "messaggio": MSG_SENZA_STRADA}
+    return {"esito": FATTURA_NON_DISPONIBILE, "dest": dest,
+            "perche": f"rotte {stato}" + (
+                f" ({rotte['message']})" if rotte.get("message") else "")}
+
+
+async def _controllo_indirizzo_p2p(indirizzo: str, deve: int, chiedi=None,
+                                   risolvi=None, diagnosi=None) -> dict:
+    """La Lightning address: la forma (LUD-16), Phoenix (BIP-353: parla
+    un'altra lingua, e il coordinatore come il nostro nodo non la sa
+    pagare), poi si chiede al suo wallet una fattura di `deve` sats
+    con `invoice_da_ln_address` — la stessa strada degli incassi del
+    mercatino, con la guardia anti-SSRF del 1 ott — e la si giudica
+    come una fattura incollata, sulla sola rete: la scadenza non conta,
+    perche' QUELLA fattura non parte da nessuna parte (il coordinatore
+    all'add-invoice se ne fa una sua). Dominio inesistente = certo e
+    si ferma (quasi sempre un refuso); wallet muto = non si sa."""
+    risolvi = risolvi or invoice_da_ln_address
+    diagnosi = diagnosi or diagnosi_ln_address
+    nome, _, dominio = str(indirizzo or "").strip().lower().partition("@")
+    if not nome or not FORMA_LN_NOME.fullmatch(nome) \
+            or not FORMA_LN_DOMINIO.fullmatch(dominio):
+        return {"esito": "indirizzo", "tramite": "indirizzo",
+                "messaggio": "Non sembra un indirizzo Lightning: la forma è "
+                             "nome@dominio, come mario@walletofsatoshi.com."}
+    if dominio in DOMINI_BIP353:
+        return {"esito": "indirizzo", "tramite": "indirizzo",
+                "messaggio": "Questo è un indirizzo Phoenix (BIP-353), che "
+                             "parla un'altra lingua: il coordinatore non lo "
+                             "sa pagare. Non hai sbagliato a scriverlo — usa "
+                             "l'indirizzo di un altro wallet (Blink, Wallet "
+                             "of Satoshi, Alby) o incolla una fattura."}
+    if deve <= 0:
+        return {"esito": FATTURA_NON_DISPONIBILE, "tramite": "indirizzo",
+                "perche": "cifra ignota: l'indirizzo non si prova"}
+    pr = await risolvi(indirizzo.strip().lower(), deve)
+    if not pr:
+        d = await asyncio.to_thread(diagnosi, dominio)
+        if d == "inesistente":
+            return {"esito": "indirizzo", "tramite": "indirizzo",
+                    "messaggio": f"Il dominio di questo indirizzo "
+                                 f"({dominio}) non esiste: controlla di "
+                                 "averlo scritto giusto."}
+        return {"esito": FATTURA_NON_DISPONIBILE, "tramite": "indirizzo",
+                "perche": f"il wallet dell'indirizzo non ha dato una fattura ({d})"}
+    v = await _controllo_rete_fattura_p2p(str(pr).strip().lower(), deve,
+                                          chiedi)
+    v["tramite"] = "indirizzo"
+    if v["esito"] in MSG_INDIRIZZO:
+        v["messaggio"] = MSG_INDIRIZZO[v["esito"]]
+    return v
+
+
+async def controlla_fattura_p2p(testo: str, deve: int, finestra: int,
+                                adesso: int | None = None, chiedi=None,
+                                risolvi=None, diagnosi=None) -> dict:
+    """IL GIUDICE UNICO di quel che chi compra mette nel foglio «Dove
+    vuoi ricevere i sats»: una bolt11 (prima il locale, poi la rete) o
+    una Lightning address. `deve` e' la cifra che il coordinatore ha
+    detto (0 = ignota), `finestra` la sua `invoice_expiration_window`.
+    Torna il dizionario del giudice che ha deciso, con `tramite`."""
+    adesso = int(time.time()) if adesso is None else int(adesso)
+    testo = str(testo or "").strip()
+    if re.fullmatch(r"ln[a-z0-9]+", testo, re.I):
+        v = _controllo_locale_fattura_p2p(testo.lower(), deve, finestra,
+                                          adesso)
+        v["tramite"] = "fattura"
+        if v["esito"] != "ok":
+            return v
+        r = await _controllo_rete_fattura_p2p(testo.lower(),
+                                              v["sats"] or deve, chiedi)
+        r["tramite"] = "fattura"
+        r.setdefault("sats", v["sats"])
+        return r
+    if "@" in testo:
+        return await _controllo_indirizzo_p2p(testo, deve, chiedi, risolvi,
+                                              diagnosi)
+    return {"esito": "illeggibile", "tramite": "?",
+            "messaggio": "Non sembra un indirizzo Lightning né una "
+                         "richiesta di pagamento."}
+
+
+def _risposta_fattura_p2p(v: dict, chi, ordine, adesso: int | None = None
+                          ) -> dict:
+    """La riga del journal e la risposta al client, da un verdetto.
+    PURA a parte il print. Al client vanno tre cose: `ok` (puo' partire
+    cosi' com'e'), `comunque` (puo' partire se l'utente insiste) e il
+    `messaggio`; l'`esito` viaggia per il diario della diagnosi, che
+    non e' mai un segreto. Nel journal MAI la fattura: l'ordine e la
+    destinazione accorciati, la cifra, l'esito e il perche'."""
+    esito = str(v.get("esito") or "")
+    ferma, avvisa = esito in FATTURA_FERMA, esito in FATTURA_AVVISA
+    segno = ("⛔" if ferma else "⚠️" if avvisa
+             else "·" if esito == FATTURA_NON_DISPONIBILE else "✅")
+    dest = str(v.get("dest") or "")
+    pezzi = [str(v.get("tramite") or "")]
+    if v.get("sats"):
+        pezzi.append(f"{_fmt_sats(v['sats'])} sats")
+    if dest:
+        pezzi.append(f"dest {dest[:12]}…")
+    if v.get("fee") is not None and v.get("tetto") is not None:
+        pezzi.append(f"fee {v['fee']}/{v['tetto']}")
+    if v.get("perche"):
+        pezzi.append(str(v["perche"]))
+    nome = re.sub(r"[^\w-]", "", str(ordine or ""))[:8] or "?"
+    print(f"{segno} Fattura P2P: ordine {nome}, da {chi}, "
+          f"{', '.join(p for p in pezzi if p)}: {esito}", flush=True)
+    return {"ok": not (ferma or avvisa), "esito": esito,
+            "comunque": avvisa,
+            "messaggio": str(v.get("messaggio") or "") if (ferma or avvisa)
+            else ""}
+
+
+def _controllo_fattura_concesso(chi, adesso: int | None = None) -> bool:
+    """Il tetto per utente di `TETTO_CONTROLLI_FATTURA_ORA`: ogni
+    indirizzo e' un giro di rete verso un dominio scelto da chi lo
+    scrive, e un LND non e' un servizio da interrogare a raffica.
+    Oltre il tetto il controllo NON si fa, e la fattura passa come
+    passava ieri (la regola: il controllo aiuta, mai ferma)."""
+    t = int(time.time()) if adesso is None else int(adesso)
+    if len(_controlli_fattura) > 2000:
+        _controlli_fattura.clear()
+    vivi = [x for x in _controlli_fattura.get(chi, []) if x > t - 3600]
+    if len(vivi) >= TETTO_CONTROLLI_FATTURA_ORA:
+        _controlli_fattura[chi] = vivi
+        return False
+    _controlli_fattura[chi] = vivi + [t]
+    return True
+
+
+@app.post("/api/p2p/fattura")
+async def fattura_p2p(req: Request, x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """«Questa fattura (o indirizzo) e' pagabile?», chiesto dal foglio
+    «Dove vuoi ricevere i sats» PRIMA dell'add-invoice al coordinatore.
+    Corpo: `testo` (bolt11 o Lightning address), `sats` (la cifra che
+    il coordinatore ha detto, 0 = ignota), `finestra` (la sua
+    `invoice_expiration_window`), `ordine` (solo per il journal).
+    Risposta: `{ok, comunque, messaggio, esito}` — `ok` false e
+    `comunque` false ferma, `comunque` true lascia il bottone «Usa
+    comunque». Un 4xx/5xx o un silenzio qui il client li legge come
+    «non si sa», e manda: questa rotta non puo' fermare uno scambio
+    rompendosi."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    d = d if isinstance(d, dict) else {}
+    testo = str(d.get("testo") or "").strip()
+    if not testo or len(testo) > 4096:
+        raise HTTPException(400, "Serve una fattura o un indirizzo")
+    try:
+        deve = max(0, int(d.get("sats") or 0))
+        finestra = int(d.get("finestra") or 3600)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Cifra o finestra illeggibili")
+    finestra = min(max(finestra, 60), 30 * 86400)
+    if not _controllo_fattura_concesso(user["id"]):
+        v = {"esito": FATTURA_NON_DISPONIBILE, "tramite": "?",
+             "perche": "oltre il tetto di controlli dell'ora: non si guarda"}
+    else:
+        v = await controlla_fattura_p2p(testo, deve, finestra)
+    return _risposta_fattura_p2p(v, user["id"], d.get("ordine"))
 
 
 @app.post("/api/p2p/seme")

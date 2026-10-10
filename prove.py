@@ -126380,6 +126380,467 @@ def prove_moderazione_p2p():
           [[["disputa", {"ordine": "a", "disputa": DISP_B}]], 1], o["dichiara"])
 
 
+def costanti_controllo_fattura():
+    """Le costanti del controllo della fattura P2P, prese dal sorgente:
+    il blocco fra il cappello della sezione e `_lnd_rest`, piu' quelle
+    di LNURL e del bech32 che i giudici nominano. `from config import
+    P2P_TETTO_ROTTA` cade sull'ImportError (nel worktree non c'e' un
+    config, e se c'e' non ha la leva): resta il default del codice."""
+    amb = {"re": re}
+    i = _SORGENTE.index("try:\n    from config import P2P_TETTO_ROTTA")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\nasync def _lnd_rest(", i)], amb)
+    for inizio in ("_BECH32_ALFABETO = ", "_BECH32_GEN = ", "DOMINI_BIP353 = ",
+                   "FORMA_LN_NOME = ", "FORMA_LN_DOMINIO = ",
+                   "LND_ASSENTE, LND_MUTO, LND_SPENTO = "):
+        j = _SORGENTE.index("\n" + inizio) + 1
+        exec(_SORGENTE[j:_SORGENTE.index("\n", j)], amb)
+    amb.pop("__builtins__", None)
+    return amb
+
+
+def prove_controllo_fattura_p2p():
+    """IL CONTROLLO DELLA FATTURA PRIMA DEL COORDINATORE (10 ott 2026,
+    cantiere controllo-fattura, richiesta di Andrea).
+
+    Un payout da 180.917 sats fallito tre volte senza un HTLC: la fattura
+    di chi comprava veniva da un nodo assente dal grafo, senza route
+    hints. Da oggi il foglio «Dove vuoi ricevere i sats» chiede al server,
+    e il server al nostro LND, PRIMA dell'add-invoice. Qui girano i
+    giudici VERI di server.py con un LND di cartone dietro `chiedi`, la
+    rotta coi suoi rifiuti, e le sentinelle sul client.
+
+    Le cose che si rompono in silenzio: un «non lo so» di LND letto come
+    un «no» (e il controllo ferma gli scambi invece di aiutarli); un
+    «permission denied» letto come «nessuna strada» (il macaroon di oggi
+    non ha `info:read`, e fermerebbe TUTTE le fatture); il nodo assente
+    giudicato anche quando i route hints ci sono; la fattura intera nel
+    journal; i due lettori dell'importo che leggono due cifre diverse."""
+    print("\n[il controllo della fattura prima del coordinatore]")
+    import asyncio as _as
+    import io as _io
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    import contextlib as _ctx
+
+    K = costanti_controllo_fattura()
+    adesso = 1_760_000_000
+    detto = []
+    S = {**K, "time": time, "asyncio": _as, "re": re,
+         "leggi_bolt11": reale("leggi_bolt11", K),
+         "_fmt_sats": reale("_fmt_sats"),
+         "print": lambda *a, **k: detto.append(" ".join(map(str, a)))}
+
+    # i due che escono di casa (LNURL e DNS) qui non girano MAI: le prove
+    # passano sempre i loro cartoni, e questi due servono solo a far
+    # risolvere i nomi — se uno li chiamasse, si vedrebbe
+    async def _mai_lnurl(addr, sats):
+        raise AssertionError("invoice_da_ln_address chiamata senza cartone")
+
+    S["invoice_da_ln_address"] = _mai_lnurl
+    S["diagnosi_ln_address"] = lambda d: (_ for _ in ()).throw(
+        AssertionError("diagnosi_ln_address chiamata senza cartone"))
+    for nome in ("importo_bolt11", "rete_bolt11",
+                 "_controllo_locale_fattura_p2p", "_risposta_fattura_p2p",
+                 "_controllo_fattura_concesso"):
+        exec(pezzo(nome), S)
+    for nome in ("_controllo_rete_fattura_p2p", "_controllo_indirizzo_p2p",
+                 "controlla_fattura_p2p"):
+        exec("async " + pezzo(nome), S)
+    gira = lambda co: _as.run(co)
+
+    # --- 1) I DUE LETTORI: importo e rete --------------------------
+    importo, rete = S["importo_bolt11"], S["rete_bolt11"]
+    prova("importo: 2500u = 250.000 sats, 10n = 1 sat, 1m = 100.000, senza = 0",
+          [250000, 1, 100000, 0],
+          [importo(x) for x in ("lnbc2500u1pxyz", "lnbc10n1pxyz",
+                                "lnbc1m1pxyz", "lnbc1pxyz")])
+    prova("...una frazione di sat (10p) e un hrp sconosciuto: None",
+          [None, None, None], [importo("lnbc10p1pxyz"), importo("lnurl1abc"),
+                               importo("")])
+    prova("rete: bc, tb, tbs, bcrt — e `bcrt` non si legge «bc»",
+          ["bc", "tb", "tbs", "bcrt", ""],
+          [rete(x) for x in ("lnbc1pxyz", "lntb20m1pxyz", "lntbs1pxyz",
+                             "lnbcrt1pxyz", "ciao")])
+
+    # --- 2) IL GIUDICE LOCALE -----------------------------------------
+    locale = S["_controllo_locale_fattura_p2p"]
+    buona = bolt11_finta(1000, 86400, adesso)
+    esito = lambda v: v["esito"]
+    prova("una fattura che non si legge: illeggibile", ["illeggibile"] * 2,
+          [esito(locale(x, 1000, 3600, adesso)) for x in ("lnbc1ciao", "")])
+
+    def ricambia_hrp(bolt11, hrp):
+        """La stessa fattura su un'altra rete: via l'hrp e il checksum,
+        e si rifirma col bech32 (il lettore vuole il checksum giusto)."""
+        corpo = bolt11[bolt11.rfind("1") + 1:-6]
+        ALF = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+        v = [ALF.index(c) for c in corpo]
+        esp = [ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp]
+        chk = 1
+        for x in esp + v + [0] * 6:
+            alto = chk >> 25
+            chk = ((chk & 0x1ffffff) << 5) ^ x
+            for i, g in enumerate((0x3b6a57b2, 0x26508e6d, 0x1ea119fa,
+                                   0x3d4233dd, 0x2a1462b3)):
+                if (alto >> i) & 1:
+                    chk ^= g
+        chk ^= 1
+        return hrp + "1" + corpo + "".join(
+            ALF[(chk >> 5 * (5 - i)) & 31] for i in range(6))
+
+    testnet = ricambia_hrp(buona, "lntb10u")
+    prova("...e la finta di testnet si legge (il banco e' sano)", True,
+          S["leggi_bolt11"](testnet) is not None)
+    v = locale(testnet, 1000, 3600, adesso)
+    prova("rete sbagliata: ferma, e dice quale", ("rete", True),
+          (esito(v), "testnet" in v["messaggio"]))
+    v = locale(buona, 1200, 3600, adesso)
+    prova("importo diverso da quello dovuto: ferma, con le due cifre",
+          ("importo", True), (esito(v), "1.000" in v["messaggio"]
+                              and "1.200" in v["messaggio"]))
+    prova("...ma a cifra ignota (deve=0) o fattura senza importo passa",
+          ["ok", "ok"], [esito(locale(buona, 0, 3600, adesso)),
+                         esito(locale(bolt11_finta(0, 86400, adesso), 1200,
+                                      3600, adesso))])
+    prova("scaduta: ferma", "scaduta",
+          esito(locale(bolt11_finta(1000, 600, adesso - 1000), 1000, 3600,
+                       adesso)))
+    v = locale(bolt11_finta(1000, 1800, adesso), 1000, 3600, adesso)
+    prova("piu' corta della finestra del coordinatore: ferma, coi minuti",
+          ("corta", True), (esito(v), "fra 30 minuti" in v["messaggio"]
+                            and "più di 60 minuti" in v["messaggio"]))
+    v = locale(buona, 1000, 3600, adesso)
+    prova("quella buona passa, con cifra e scadenza", ("ok", 1000, adesso + 86400),
+          (esito(v), v["sats"], v["scade"]))
+
+    # --- 3) LA RAGGIUNGIBILITA', con un LND di cartone ---------------
+    DEST = "02" + "ab" * 32
+    chiamate = []
+
+    def lnd(risposte):
+        """`chiedi` di cartone: risponde per prefisso di percorso, e
+        annota ogni domanda (metodo, percorso, corpo)."""
+        async def chiedi(metodo, percorso, corpo=None, cosa=""):
+            chiamate.append((metodo, percorso, corpo))
+            for pref, r in risposte.items():
+                if percorso.startswith(pref):
+                    return r
+            return ("errore", {"message": "Not Found", "status": 404})
+        return chiedi
+
+    DEC = ("ok", {"destination": DEST, "num_satoshis": "1000",
+                  "route_hints": []})
+    HINT = [{"hop_hints": [{"node_id": "03" + "cd" * 32, "chan_id": "1",
+                            "fee_base_msat": 1000,
+                            "fee_proportional_millionths": 1,
+                            "cltv_expiry_delta": 40}]}]
+    DEC_HINT = ("ok", {**DEC[1], "route_hints": HINT})
+    NODO_OK = ("ok", {"node": {"pub_key": DEST}, "num_channels": 3})
+    NODO_NO = ("errore", {"message": "unable to find node", "status": 500})
+    ROTTA = lambda fee_msat: ("ok", {"routes": [{"total_fees_msat": str(fee_msat),
+                                                 "total_fees": str(fee_msat // 1000),
+                                                 "hops": [{}]}]})
+    rete_j = S["_controllo_rete_fattura_p2p"]
+
+    chiamate.clear()
+    v = gira(rete_j(buona, 1000, lnd({"/v1/payreq/": DEC, "/v1/graph/node/": NODO_NO})))
+    prova("nodo assente dal grafo, senza route hints: FERMA (il caso del 10 ott)",
+          ("nodo_assente", K["MSG_NODO_ASSENTE"], DEST),
+          (esito(v), v["messaggio"], v["dest"]))
+    prova("...e le strade non si chiedono nemmeno (due domande, non tre)", 2, len(chiamate))
+    prova("...la decodifica e' una GET sulla fattura, il nodo sulla destinazione",
+          ("GET", "/v1/payreq/" + buona, "GET", "/v1/graph/node/" + DEST),
+          (chiamate[0][0], chiamate[0][1], chiamate[1][0], chiamate[1][1]))
+
+    chiamate.clear()
+    v = gira(rete_j(buona, 1000, lnd({"/v1/payreq/": DEC_HINT, "/v1/graph/node/": NODO_NO,
+                                      "/v1/graph/routes/": ROTTA(5000)})))
+    prova("coi route hints il nodo NON si cerca nel grafo (l'indicazione di strada basta)",
+          ("ok", ["/v1/payreq/", "/v1/graph/routes/"]),
+          (esito(v), [c[1][:len(p)] for c, p in zip(chiamate, ("/v1/payreq/", "/v1/graph/routes/"))]))
+    prova("...e i hint viaggiano nel CORPO della POST delle strade, con dest e cifra nel percorso",
+          ("POST", f"/v1/graph/routes/{DEST}/1000", {"route_hints": HINT}),
+          chiamate[-1])
+
+    chiamate.clear()
+    v = gira(rete_j(buona, 1000, lnd({"/v1/payreq/": DEC, "/v1/graph/node/": NODO_OK,
+                                      "/v1/graph/routes/": ROTTA(5000)})))
+    prova("nodo nel grafo, strada trovata, fee 5 sats sotto il tetto (10 di 1000): ok",
+          ("ok", 5, 10), (esito(v), v["fee"], v["tetto"]))
+    prova("...il tetto e' `sats × P2P_TETTO_ROTTA`, e la leva vale 0.01 nel codice",
+          0.01, K["P2P_TETTO_ROTTA"])
+    v = gira(rete_j(buona, 100000, lnd({"/v1/payreq/": DEC, "/v1/graph/node/": NODO_OK,
+                                        "/v1/graph/routes/": ROTTA(2_000_001)})))
+    prova("la strada piu' economica costa piu' del tetto: AVVISA, con fee e tetto nella frase",
+          ("costo", 2001, 1000, True),
+          (esito(v), v["fee"], v["tetto"], "2.001 sats" in v["messaggio"]
+           and "1.000 sats" in v["messaggio"]))
+    prova("...(la fee in msat si arrotonda per ECCESSO: 2.000.001 msat sono 2.001 sats)",
+          2001, v["fee"])
+    for nome, risp in (("routes vuoto", ("ok", {"routes": []})),
+                       ("«unable to find a path to destination»",
+                        ("errore", {"message": "unable to find a path to destination", "status": 500}))):
+        v = gira(rete_j(buona, 1000, lnd({"/v1/payreq/": DEC, "/v1/graph/node/": NODO_OK,
+                                          "/v1/graph/routes/": risp})))
+        prova(f"nessuna strada ({nome}) col nodo nel grafo: AVVISA, non ferma",
+              ("senza_strada", K["MSG_SENZA_STRADA"]), (esito(v), v["messaggio"]))
+
+    # «non lo so» NON e' «no»: ogni voce che manca lascia passare
+    NEG = (K["LND_NEGATO"], {"message": "permission denied"})
+    MUTO, SPENTO = (K["LND_MUTO"], {}), (K["LND_SPENTO"], {})
+    casi = [("la decodifica negata dal macaroon", {"/v1/payreq/": NEG}, "decodifica negato"),
+            ("la decodifica muta", {"/v1/payreq/": MUTO}, "decodifica muto"),
+            ("il ponte spento", {"/v1/payreq/": SPENTO}, "decodifica spento"),
+            ("il nodo negato (il macaroon di oggi, senza info:read)",
+             {"/v1/payreq/": DEC, "/v1/graph/node/": NEG}, "nodo negato"),
+            ("il nodo muto", {"/v1/payreq/": DEC, "/v1/graph/node/": MUTO}, "nodo muto"),
+            ("le strade negate", {"/v1/payreq/": DEC_HINT, "/v1/graph/routes/": NEG}, "rotte negato"),
+            ("le strade mute", {"/v1/payreq/": DEC_HINT, "/v1/graph/routes/": MUTO}, "rotte muto"),
+            ("un errore di LND che non si riconosce",
+             {"/v1/payreq/": DEC_HINT, "/v1/graph/routes/": ("errore", {"message": "boh", "status": 500})},
+             "rotte errore"),
+            ("una decodifica senza destinazione",
+             {"/v1/payreq/": ("ok", {"destination": "", "route_hints": []})}, "decodifica senza")]
+    for nome, risp, perche in casi:
+        v = gira(rete_j(buona, 1000, lnd(risp)))
+        prova(f"non si puo' controllare — {nome}: non_disponibile, col perche' per il journal",
+              ("non_disponibile", True), (esito(v), str(v.get("perche", "")).startswith(perche)))
+    prova("...e un «unable to find node» DOPO i hint (sulle strade) e' un avviso, non un fermo",
+          "senza_strada", esito(gira(rete_j(buona, 1000, lnd(
+              {"/v1/payreq/": DEC_HINT,
+               "/v1/graph/routes/": ("errore", {"message": "unable to find node", "status": 500})})))))
+    chiamate.clear()
+    v = gira(rete_j(bolt11_finta(0, 86400, adesso), 0, lnd(
+        {"/v1/payreq/": ("ok", {"destination": DEST, "num_satoshis": "0", "route_hints": []}),
+         "/v1/graph/node/": NODO_OK})))
+    prova("senza importo e cifra ignota: ok, senza chiedere strade (non c'e' una cifra da provare)",
+          ("ok", 2, True), (esito(v), len(chiamate), "senza importo" in v["perche"]))
+    chiamate.clear()
+    gira(rete_j(bolt11_finta(0, 86400, adesso), 5000, lnd(
+        {"/v1/payreq/": ("ok", {"destination": DEST, "num_satoshis": "0", "route_hints": []}),
+         "/v1/graph/node/": NODO_OK, "/v1/graph/routes/": ROTTA(1000)})))
+    prova("...senza importo ma con la cifra dovuta, la strada si prova su QUELLA",
+          f"/v1/graph/routes/{DEST}/5000", chiamate[-1][1])
+
+    # --- 4) LA LIGHTNING ADDRESS --------------------------------------
+    indir = S["_controllo_indirizzo_p2p"]
+    coniate = []
+
+    async def risolvi(addr, sats):
+        coniate.append((addr, sats))
+        return buona if "muto" not in addr and "nonce" not in addr else None
+
+    diag = lambda dominio: "inesistente" if dominio.startswith("nonce") else "muto"
+    v = gira(indir("ma rio@wallet.com", 1000, lnd({}), risolvi, diag))
+    prova("una forma che non e' nome@dominio: ferma", ("indirizzo", True),
+          (esito(v), "nome@dominio" in v["messaggio"]))
+    v = gira(indir("mario@phoenixwallet.me", 1000, lnd({}), risolvi, diag))
+    prova("Phoenix (BIP-353): ferma senza bussare, e dice che non ha sbagliato a scriverlo",
+          ("indirizzo", True, 0), (esito(v), "Non hai sbagliato" in v["messaggio"], len(coniate)))
+    prova("a cifra ignota l'indirizzo non si prova: non_disponibile",
+          "non_disponibile", esito(gira(indir("mario@wallet.com", 0, lnd({}), risolvi, diag))))
+    v = gira(indir("mario@nonce.example", 1000, lnd({}), risolvi, diag))
+    prova("il wallet non risponde e il dominio NON esiste: ferma (un refuso), col dominio nella frase",
+          ("indirizzo", True), (esito(v), "nonce.example" in v["messaggio"]))
+    v = gira(indir("mario@muto.example", 1000, lnd({}), risolvi, diag))
+    prova("...il wallet non risponde ma il dominio c'e': non_disponibile (lascia passare)",
+          ("non_disponibile", True), (esito(v), "muto" in v["perche"]))
+    coniate.clear()
+    v = gira(indir("Mario@Wallet.com", 1000, lnd({"/v1/payreq/": DEC, "/v1/graph/node/": NODO_NO}),
+                   risolvi, diag))
+    prova("il wallet risponde: si chiede la fattura della cifra dovuta, minuscola, e la si giudica sulla rete",
+          [("mario@wallet.com", 1000)], coniate)
+    prova("...e il nodo privato si dice con la frase dell'INDIRIZZO, non quella della fattura",
+          ("nodo_assente", K["MSG_INDIRIZZO"]["nodo_assente"], "indirizzo"),
+          (esito(v), v["messaggio"], v["tramite"]))
+
+    # --- 5) IL GIUDICE UNICO -------------------------------------------
+    unico = S["controlla_fattura_p2p"]
+    tutto_ok = lnd({"/v1/payreq/": DEC, "/v1/graph/node/": NODO_OK, "/v1/graph/routes/": ROTTA(1000)})
+    prova("«ciao»: illeggibile, e col tramite «?»", ("illeggibile", "?"),
+          (lambda v: (esito(v), v["tramite"]))(gira(unico("ciao", 1000, 3600, adesso, tutto_ok))))
+    v = gira(unico(buona.upper(), 1000, 3600, adesso, tutto_ok))
+    prova("una bolt11 MAIUSCOLA passa dal locale alla rete e torna ok, con cifra e tramite",
+          ("ok", 1000, "fattura"), (esito(v), v["sats"], v["tramite"]))
+    prova("...il locale che ferma non arriva alla rete", "importo",
+          esito(gira(unico(buona, 1200, 3600, adesso, lnd({})))))
+    prova("...e l'indirizzo va dal suo giudice", "indirizzo",
+          esito(gira(unico("mario@phoenixwallet.me", 1000, 3600, adesso, lnd({}), risolvi, diag))))
+
+    # --- 6) LA RISPOSTA E IL JOURNAL -----------------------------------
+    risp = S["_risposta_fattura_p2p"]
+    detto.clear()
+    r = risp({"esito": "nodo_assente", "tramite": "fattura", "sats": 180917, "dest": DEST,
+              "messaggio": "M"}, 111, "3fcdb207-xx")
+    prova("un verdetto che ferma: ok false, comunque false, col messaggio",
+          {"ok": False, "esito": "nodo_assente", "comunque": False, "messaggio": "M"}, r)
+    prova("...e la riga del journal: ⛔, ordine e destinazione accorciati, la cifra, l'esito",
+          f"⛔ Fattura P2P: ordine 3fcdb207, da 111, fattura, 180.917 sats, dest {DEST[:12]}…: nodo_assente",
+          detto[-1])
+    r = risp({"esito": "costo", "tramite": "fattura", "fee": 2001, "tetto": 1000, "dest": DEST,
+              "messaggio": "M"}, 111, None)
+    prova("uno che avvisa: ok false, comunque TRUE", (False, True, "M"),
+          (r["ok"], r["comunque"], r["messaggio"]))
+    prova("...⚠️ nel journal, con fee/tetto e «?» senza ordine", True,
+          detto[-1].startswith("⚠️ Fattura P2P: ordine ?, da 111") and "fee 2001/1000" in detto[-1])
+    r = risp({"esito": "non_disponibile", "tramite": "fattura", "perche": "nodo negato (permission denied)",
+              "messaggio": "non deve uscire"}, 111, "abc")
+    prova("non disponibile: ok TRUE senza messaggio (passa), e il journal dice il perche' con ·",
+          (True, False, "", True), (r["ok"], r["comunque"], r["messaggio"],
+                                    detto[-1].startswith("· Fattura P2P") and "permission denied" in detto[-1]))
+    r = risp({"esito": "ok", "tramite": "indirizzo", "fee": 3, "tetto": 10}, 111, "abc")
+    prova("ok: ✅", (True, True), (r["ok"], detto[-1].startswith("✅ Fattura P2P")))
+    risp({"esito": "ok"}, 1, "abc\n⛔ finto")
+    prova("l'id dell'ordine nel journal passa da una whitelist di caratteri (niente a capo, otto al massimo)",
+          True, "ordine abcfinto," in detto[-1] and "\n" not in detto[-1])
+    # MAI LA FATTURA NEL JOURNAL: il verdetto porta solo pezzi scelti, e
+    # la bolt11 non e' fra quelli — si guarda sul testo di tutto il giro
+    gira(unico(buona, 1000, 3600, adesso, lnd({"/v1/payreq/": DEC, "/v1/graph/node/": NODO_NO})))
+    risp({"esito": "nodo_assente", "tramite": "fattura", "sats": 1000, "dest": DEST, "messaggio": buona},
+         111, buona)
+    prova("la fattura intera non compare MAI nel journal (nemmeno passata come ordine o messaggio)",
+          False, any(buona in riga or buona[:30] in riga for riga in detto))
+    prova("...e `_lnd_rest` nel journal non stampa il percorso (che su payreq E' la fattura)",
+          False, "percorso" in [r for r in codice(pezzo("_lnd_rest")).split("\n") if "print(" in r][0])
+
+    # --- 7) IL TETTO PER UTENTE ----------------------------------------
+    concesso = S["_controllo_fattura_concesso"]
+    S["_controlli_fattura"].clear()
+    esiti = [concesso(111, adesso + i) for i in range(K["TETTO_CONTROLLI_FATTURA_ORA"] + 1)]
+    prova("il tetto: i primi 30 dell'ora si fanno, il 31° no", (30, False),
+          (sum(esiti), esiti[-1]))
+    prova("...un altro utente non c'entra, e dopo un'ora si riparte", (True, True),
+          (concesso(222, adesso), concesso(111, adesso + 3601)))
+
+    # --- 8) LA ROTTA -----------------------------------------------------
+    class _H(Exception):
+        def __init__(self, status_code, detail=""):
+            self.status_code, self.detail = status_code, detail
+
+    class _Req:
+        def __init__(self, corpo, rotto=False):
+            self._c, self._r = corpo, rotto
+
+        async def json(self):
+            if self._r:
+                raise ValueError("non e' json")
+            return self._c
+
+    giudicate = []
+
+    async def _controlla(testo, deve, finestra, *a, **k):
+        giudicate.append((testo, deve, finestra))
+        return {"esito": "ok", "tramite": "fattura"}
+
+    stato = {"attivo": True}
+    A = {**S, "HTTPException": _H, "Header": lambda d="": d, "Cookie": lambda d="": d,
+         "Request": object, "app": type("App", (), {"post": lambda self, p: (lambda f: f)})(),
+         "verifica_utente": lambda a, b: {"id": 111},
+         "_p2p_per": lambda tg: dict(stato), "controlla_fattura_p2p": _controlla,
+         "_controllo_fattura_concesso": lambda chi: True}
+    exec("async " + pezzo("fattura_p2p"), A)
+    rotta = A["fattura_p2p"]
+
+    def chiama(corpo, rotto=False):
+        try:
+            return gira(rotta(_Req(corpo, rotto), "", ""))
+        except _H as e:
+            return e.status_code
+
+    prova("la rotta e' `POST /api/p2p/fattura`", True,
+          '@app.post("/api/p2p/fattura")\nasync def fattura_p2p(' in _SORGENTE)
+    stato["attivo"] = False
+    prova("col P2P spento: 409", 409, chiama({"testo": buona}))
+    stato["attivo"] = True
+    prova("un corpo che non e' json: 400; senza testo: 400; testo di 5000 caratteri: 400",
+          [400, 400, 400], [chiama({}, True), chiama({"testo": ""}), chiama({"testo": "x" * 5000})])
+    prova("cifra o finestra illeggibili: 400", 400, chiama({"testo": buona, "sats": "boh"}))
+    giudicate.clear()
+    r = chiama({"testo": " " + buona + " ", "sats": -5, "finestra": 10, "ordine": "abc"})
+    prova("il giudice riceve il testo ripulito, la cifra mai negativa, la finestra mai sotto il minuto",
+          [(buona, 0, 60)], giudicate)
+    prova("...e la risposta e' quella di `_risposta_fattura_p2p`",
+          {"ok": True, "esito": "ok", "comunque": False, "messaggio": ""}, r)
+    chiama({"testo": buona, "sats": "1000", "finestra": 10 ** 9})
+    prova("la finestra ha un tetto di 30 giorni, e la cifra arriva intera anche da stringa",
+          (buona, 1000, 30 * 86400), giudicate[-1])
+    A["_controllo_fattura_concesso"] = lambda chi: False
+    giudicate.clear()
+    r = chiama({"testo": buona, "sats": 1000})
+    prova("oltre il tetto dell'ora: non si giudica, e la fattura PASSA", ([], True, "non_disponibile"),
+          (giudicate, r["ok"], r["esito"]))
+
+    # --- 9) IL CLIENT: dove sta il controllo ----------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+    invia = nudo(pezzo_js(mini, "async function inviaIncassoP2P(){", "\n}\n"))
+    i_ctl, i_add = invia.find("await controlloFatturaP2P(o, testo)"), invia.find("chiamataOrdineP2P(o, 'add-invoice'")
+    prova("la fattura incollata passa dal controllo PRIMA dell'add-invoice", True,
+          0 < i_ctl < i_add)
+    prova("...e un verdetto ferma il gesto nel foglio, senza mandare", True,
+          "if (fermo) { mostraFermoFatturaP2P(fermo); return; }" in invia)
+    wallet = nudo(pezzo_js(mini, "async function fatturaDalWalletP2P(id){", "\n}\n"))
+    w_ctl, w_add = wallet.find("await controlloFatturaP2P(o, bolt)"), wallet.find("chiamataOrdineP2P(o, 'add-invoice'")
+    prova("anche la fattura del wallet NWC passa dal controllo prima dell'add-invoice", True,
+          0 < w_ctl < w_add)
+    prova("...e se ferma, la fattura del wallet resta nel campo (per leggerla, o per «usa comunque»)", True,
+          "inpW.value = bolt;" in wallet and "return false;" in wallet[w_ctl:w_add])
+    ctl = nudo(pezzo_js(mini, "async function controlloFatturaP2P(o, testo){", "\n}\n"))
+    prova("il controllo chiede a `/p2p/fattura` con ordine, testo, cifra dovuta e finestra", True,
+          "`${API_BASE}/p2p/fattura`" in ctl and "satsDaRicevereP2P(o)" in ctl
+          and "finestraFatturaP2P()" in ctl)
+    prova("...NON FERMA MAI DA SOLO: 4xx/5xx, eccezione, silenzio oltre l'attesa — tutti null", True,
+          "if (!r.ok) return null;" in ctl and "catch(e) {\n    return null;" in ctl
+          and "AbortController" in ctl and "ctl.abort()" in ctl)
+    prova("...e il «comunque» gia' detto per QUEL testo non si richiede", True,
+          "if (p2pFatturaComunque && p2pFatturaComunque === testo) return null;" in ctl)
+    prova("...in demo e in vetrina non bussa", True, "if (DEMO || VETRINA) return null;" in ctl)
+    # IL MOTORE RESTA A ZERO FETCH (la lezione della prima suite di questo
+    # cantiere, 10 ott 2026: il blocco era nato DENTRO il motore, e nove
+    # sentinelle di altri cantieri sono diventate rosse insieme)
+    prova("il controllo sta FUORI dal motore dello scambio, che non chiama mai il server", True,
+          mini.index("async function controlloFatturaP2P(o, testo){")
+          > mini.index("/* ============ fine del motore dello scambio"))
+    prova("...e dal motore lo si chiama con `typeof`, nei due punti", (True, True),
+          ("typeof controlloFatturaP2P === 'function'\n      ? await controlloFatturaP2P(o, testo) : null" in invia,
+           "typeof controlloFatturaP2P === 'function'\n      ? await controlloFatturaP2P(o, bolt) : null" in wallet))
+    mostra = nudo(pezzo_js(mini, "function mostraFermoFatturaP2P(fermo){", "\n}\n"))
+    prova("l'avviso passa da `esc` e il bottone «Usa comunque» c'e' solo col `comunque`", True,
+          "esc(fermo.messaggio)" in mostra and "fermo.comunque\n    ? " in mostra
+          and "Usa comunque questa fattura" in mostra)
+    apri = nudo(pezzo_js(mini, "function apriIncassoP2P(){", "\n}\n"))
+    prova("il foglio che si riapre dimentica l'«usa comunque» di prima", True,
+          "p2pFatturaComunque = '';" in apri)
+
+    # --- 10) I GEMELLI: importoBolt11 e importo_bolt11 ----------------
+    node = _sh.which("node")
+    mazzo = ["lnbc2500u1pxyz", "lnbc10n1pxyz", "lnbc1m1pxyz", "lnbc1pxyz", "lnbc10p1pxyz",
+             "lnbc20p1pxyz", "lntb20m1pxyz", "lnbcrt1500n1pxyz", "lnurl1abc", "", "LNBC1U1PXYZ"]
+    if not node:
+        salta("`importoBolt11` e `importo_bolt11` sono gemelli", "node non c'e'")
+    else:
+        js = (pezzo_js(mini, "function importoBolt11(pr){", "\n}\n") + "\n}\n"
+              + "console.log(JSON.stringify(" + _json.dumps(mazzo) + ".map(importoBolt11)));\n")
+        with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+            f.write(js)
+        try:
+            out = _sp.run([node, f.name], capture_output=True, encoding="utf-8", timeout=60)
+            dal_client = _json.loads(out.stdout or "[]")
+        except Exception as e:
+            dal_client = f"node e' esploso: {e}"
+        finally:
+            os.unlink(f.name)
+        prova("gemelli: `importoBolt11` e `importo_bolt11` leggono le stesse cifre da undici hrp",
+              [importo(x) for x in mazzo], dal_client)
+
+    # --- 11) IL CONFIG D'ESEMPIO -----------------------------------------
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    prova("`P2P_TETTO_ROTTA = 0.01` sta nel config d'esempio, col rimando a max_routing_fee", True,
+          "\nP2P_TETTO_ROTTA = 0.01\n" in esempio and "max_routing_fee" in esempio)
+
+
 def prove_dopo_gesto_p2p():
     """DOPO OGNI GESTO SI TORNA A «I MIEI SCAMBI» (1 ott 2026, ritocco di
     Andrea).
@@ -137600,7 +138061,7 @@ def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
-    for f in (prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
+    for f in (prove_controllo_fattura_p2p, prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
               prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,

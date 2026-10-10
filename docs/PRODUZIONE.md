@@ -1254,6 +1254,9 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   pubblico (e fino al set 2026 girava da root): una chiave che sa PAGARE qui non entra, e
   quella di LNbits resta dov'e'. Sul NODO, dalla cartella `~/nodo`:
   `docker compose exec lnd lncli bakemacaroon --root_key_id 2 --save_to /tmp/barattolo-lettura.macaroon offchain:read`
+  (⚠️ dal 10 ott 2026 il macaroon vuole ANCHE `info:read`, e si rifà
+  col root key 3: la procedura sta più sotto, «IL CONTROLLO DELLA
+  FATTURA P2P»; questa riga resta per dire com'era)
   e poi `docker compose exec lnd xxd -p -c 9999 /tmp/barattolo-lettura.macaroon`
   (se il servizio non si chiama `lnd`, il nome giusto lo dice
   `docker compose ps`; se nel container manca `xxd`, lo stesso lo fa
@@ -1277,6 +1280,52 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   macaroon di lettura manca: quello sì si guarda. Il 20 set, sull'ordine
   #152, le due cose si scrivevano uguali e hanno fatto cercare un
   guasto che non c'era.
+  IL CONTROLLO DELLA FATTURA P2P (10 ott 2026, cantiere
+  controllo-fattura; il perché in CANTIERI, «Il controllo della fattura
+  prima del coordinatore»). Prima che la fattura di chi compra parta
+  verso il coordinatore, il server chiede al nostro LND se è pagabile:
+  `GET /v1/payreq` (DecodePayReq), `GET /v1/graph/node/{pk}`
+  (GetNodeInfo) e `POST /v1/graph/routes/{pk}/{sats}` (QueryRoutes),
+  sullo stesso ponte e con lo stesso macaroon della verità dei
+  pagamenti. ⚠️ GetNodeInfo e QueryRoutes vogliono `info:read`, e il
+  macaroon del set 2026 ha solo `offchain:read`: finché non si rifà, il
+  journal dice «· Fattura P2P: … nodo negato (permission denied):
+  non_disponibile» e la fattura PASSA (il controllo non ferma mai quando
+  non sa). Il macaroon NUOVO, sul NODO da `~/nodo`, con un root key
+  SUO (il 2 è quello vecchio, l'1 è di LNbits), un comando per riga:
+  `docker compose exec lnd lncli bakemacaroon --root_key_id 3 --save_to /tmp/barattolo-lettura.macaroon offchain:read info:read`
+  `docker compose exec lnd xxd -p -c 9999 /tmp/barattolo-lettura.macaroon`
+  `docker compose exec lnd rm /tmp/barattolo-lettura.macaroon`
+  (l'esadecimale NON si incolla in chat né nel canale Telegram). Sul VPS,
+  nel config (`~/satmarket/config.py`, a mano): si sostituisce il valore
+  di `LND_PONTE_MACAROON_LETTURA` con l'esadecimale nuovo, e si AGGIUNGE
+  la leva `P2P_TETTO_ROTTA = 0.01` (lo specchio di `max_routing_fee` nel
+  `settings.toml` del nodo: se cambia là, va cambiato qui). Poi:
+  `sudo systemctl restart barattolo`
+  `journalctl -u barattolo -n 80 --no-pager | grep -E "🔎 Verità|⚡|Fattura P2P"`
+  (si aspetta «🔎 Verità dei pagamenti: LND ACCESO»). LA VERIFICA che
+  queryroutes risponda, dal VPS attraverso il ponte, col macaroon letto
+  dal config senza stamparlo. La chiave pubblica di prova è quella di
+  ACINQ, il nostro vicino (una strada di un salto, fee zero): sul NODO
+  la dice `docker compose exec lnd lncli listchannels` alla voce
+  `remote_pubkey`, e sul VPS si mette in `PK` a mano (è pubblica):
+  `PK=INCOLLA_QUI_LA_REMOTE_PUBKEY`
+  `MAC=$(grep -oP 'LND_PONTE_MACAROON_LETTURA = "\K[0-9a-f]+' ~/satmarket/config.py)`
+  `curl -s --cacert /etc/barattolo/lnd-tls.cert -H "Grpc-Metadata-macaroon: $MAC" https://127.0.0.1:18080/v1/graph/node/$PK | head -c 300; echo`
+  `curl -s --cacert /etc/barattolo/lnd-tls.cert -H "Grpc-Metadata-macaroon: $MAC" -X POST -d '{"route_hints":[]}' https://127.0.0.1:18080/v1/graph/routes/$PK/1000 | head -c 400; echo`
+  Col macaroon vecchio tutt'e due rispondono `"message": "permission
+  denied"`; con quello nuovo il primo dà `"node": {"pub_key": …,
+  "alias": "ACINQ" …}` e il secondo `"routes": [{… "total_fees": "0"
+  …}]`. Se il secondo rispondesse «Not Found» o «405», la REST di quel
+  LND non ha la POST su queryroutes: il controllo lo scrive come «rotte
+  errore» e passa — si dice, e si cambia strada (la GET senza hint, o
+  EstimateRouteFee). Solo DOPO il verde: sul nodo `docker compose exec
+  lnd lncli deletemacaroonid 2` revoca il vecchio da solo (LNbits non lo
+  tocca). DOVE SI LEGGE: `journalctl -u barattolo | grep "Fattura P2P"`
+  — ⛔ fermata (importo, scadenza, rete, nodo assente, indirizzo), ⚠️
+  avvisata col «Usa comunque» (nessuna strada, costo oltre il tetto),
+  · non si è potuto controllare (col perché), ✅ ok; mai la fattura
+  intera, solo l'ordine e la destinazione accorciati.
   IL CANARINO: un «LND non l'ha mai visto» si crede solo se, nello
   stesso giro, LND riconosce un hash che conosce di sicuro — uno per
   cui lui stesso ha gia' detto SUCCEEDED (timbro `lnd_canarino`, o gli
