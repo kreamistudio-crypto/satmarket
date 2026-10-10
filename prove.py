@@ -57352,17 +57352,26 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
     # riga sua sotto i metodi; nell'etichetta del bottone per intero.
     _zr = ('<div class="meta p2p-vt-zona" title="Zona di scambio indicativa">'
            '<span class="luogo">📍 %s</span></div>')
+    _ec = '<span class="p2p-contanti">💵 Contanti</span>'
     prova("la card di Esplora di un ordine in contanti dice la zona, sotto i metodi e nell'etichetta",
           [True, True],
-          ['<div class="title">Contanti</div>\n        ' + _zr % "Milano centro" in o["zonaCash"],
+          ['<div class="title">' + _ec + '</div>\n        ' + _zr % "Milano centro" in o["zonaCash"],
            'data-voce="Compra BTC, invia 50 euro, Contanti, zona Milano centro"' in o["zonaCash"]])
     prova("...anche fra due metodi", True,
-          '<div class="title">SEPA, Contanti</div>\n        ' + _zr % "Bergamo e provincia" in o["zonaMisto"])
+          '<div class="title">SEPA, ' + _ec + '</div>\n        ' + _zr % "Bergamo e provincia" in o["zonaMisto"])
     prova("...un ordine in contanti di prima, senza zona, non mostra niente e resta la card di sempre",
           [False, False, True, True],
           ["p2p-vt-zona" in o["zonaVecchio"], "📍" in o["zonaVecchio"],
            'data-voce="Compra BTC, invia 50 euro, Contanti"' in o["zonaVecchio"],
-           '<div class="title">Contanti</div>\n        \n' in o["zonaVecchio"]])
+           '<div class="title">' + _ec + '</div>\n        \n' in o["zonaVecchio"]])
+    # (10 ott 2026, i punti notati) 💵 davanti a «Contanti» anche su Esplora
+    prova("la card di Esplora mette le banconote davanti a «Contanti», e solo a lui",
+          [1, 1, 0, 0, 0, True],
+          [o["zonaCash"].count("💵"), o["zonaMisto"].count("💵"), o["zonaSepa"].count("💵"),
+           o["zonaBz"].count("💵"), o["vende"].count("💵"),
+           '<div class="title">Revolut</div>' in o["vende"]])
+    prova("...l'etichetta che si legge ad alta voce resta a parole, senza icone", False,
+          "💵" in o["zonaCash"].split('data-voce="')[1].split('"')[0])
     prova("...SOLO SUI CONTANTI: un SEPA e Barattozon non la prendono nemmeno a zona dichiarata",
           [False, False, False, False],
           ["p2p-vt-zona" in o["zonaSepa"], "zona" in o["zonaSepa"].split("data-voce=")[1].split('"')[1],
@@ -123353,6 +123362,8 @@ def prove_contanti_pagina_leggera():
         riga_js("const REGOLA_BREVE_CONTANTI_COMPRA = "), riga_js("const REGOLA_BREVE_CONTANTI_VENDE = "),
         riga_js("const SPIEGA_SONO_QUI = "), riga_js("const REGOLA_DISPUTA_CONTANTI = "),
         riga_js("const REGOLA_DISPUTA_ECCEZIONE = "),
+        # (10 ott 2026) le banconote nella riga breve della regola
+        riga_js("const P2P_CONTANTI_ICO = "),
         fn("function consigliIncontroP2P(lato){"), fn("function pagaInContantiP2P(o){"),
         fn("function metodoSceltoP2P(o){"), blocco_const("STATI_CONTANTI_P2P"),
         fn("function statoContantiP2P(o, t){"), fn("function gestoPagoP2P(o){"),
@@ -135413,6 +135424,13 @@ def prove_contanti_zona():
           ["'<div class=\"hint contanti-regola\">' + P2P_CONTANTI_ICO + ' <b>Contanti di persona</b>'" in reg_js,
            # nel CODICE: il commento che spiega il cambio lo nomina
            re.sub(r"/\*[\s\S]*?\*/", "", reg_js).count(chr(0x1F4B6))])
+    # (10 ott 2026, i punti notati) la riga breve della pagina dello scambio
+    riq = fn("function riquadroContantiP2P(o, azione){")
+    prova("la riga breve della regola, nella pagina dello scambio, porta le stesse banconote", [True, 0],
+          ["'<div class=\"contanti-regola-forte\">' + P2P_CONTANTI_ICO + ' ' + esc(vendo ? REGOLA_BREVE_CONTANTI_VENDE"
+           in riq, re.sub(r"/\*[\s\S]*?\*/", "", riq).count(chr(0x1F4B6))])
+    prova("...e nel blocco del contanti il 💶 non intesta piu' nessuna riga della regola", 0,
+          len(re.findall(r"contanti-regola[a-z-]*\">" + chr(0x1F4B6), mini)))
     prova("...nel foglio e nel dettaglio e' la STESSA funzione", [True, True],
           ["regolaContantiFoglioP2P(p2pNuovoMetodi," in fog,
            "regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo] : (o.metodi || [])," in mini])
@@ -135504,7 +135522,22 @@ def prove_contanti_zona():
     rosina = {"venditore": "Rosina", "venditore_username": "rosina", "venditore_negozio": "aaa11111"}
     con_zona = cap("vendo", 50, "Contanti", rosina, None, "Milano centro")
     prova("il post del canale dice la zona con lo stesso «📍», subito sotto il metodo", True,
-          "\n💳 Contanti\n📍 Milano centro\n🔒 Sats bloccati" in con_zona)
+          "\n💵 Contanti\n📍 Milano centro\n🔒 Sats bloccati" in con_zona)
+    # (10 ott 2026, i punti notati) «💵 Contanti» al posto di «💳 Contanti»
+    def _riga_metodo(metodo):
+        return cap("vendo", 50, metodo, rosina).split("\n")[2]
+    prova("NEL POST IL CONTANTI HA LE SUE BANCONOTE: da solo «💵 Contanti», senza carta", "💵 Contanti",
+          _riga_metodo("Contanti"))
+    prova("...con piu' metodi il 💵 sta solo davanti a «Contanti», e il 💳 intesta gli altri",
+          ["💳 SEPA, 💵 Contanti", "💳 SEPA, Revolut, 💵 Contanti", "💵 Contanti, 💳 SEPA, Revolut"],
+          [_riga_metodo("SEPA, Contanti"), _riga_metodo("SEPA, Revolut, Contanti"),
+           _riga_metodo("Contanti, SEPA, Revolut")])
+    prova("...gli altri metodi, Barattozon e un «contanti» minuscolo restano la riga di ieri",
+          ["💳 SEPA", "💳 Revolut, Satispay", "💳 Contanti al tabacchino", "💳 contanti", "💳 &lt;b&gt;x"],
+          [_riga_metodo("SEPA"), _riga_metodo("Revolut, Satispay"), _riga_metodo("Contanti al tabacchino"),
+           _riga_metodo("contanti"), _riga_metodo("<b>x")])
+    prova("...e un metodo avvelenato accanto al contanti esce scappato", "💳 &lt;b&gt;x, 💵 Contanti",
+          _riga_metodo("<b>x, Contanti"))
     prova("...senza zona il post e' quello di ieri, parola per parola", [True, False, True],
           [cap("vendo", 50, "Contanti", rosina) == cap("vendo", 50, "Contanti", rosina, None, ""),
            "📍" in cap("vendo", 50, "Contanti", rosina),

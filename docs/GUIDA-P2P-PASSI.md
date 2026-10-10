@@ -85,7 +85,8 @@ ordini**, **premio/sconto** (lo scostamento dal prezzo di mercato).
      «Attivo» / «Spento».
 4. **Il canale Telegram «Barattolo Vetrina»**: ogni ordine pubblicato
    esce come post «🔁 **Compra BTC su Barattolo**» (o «Vende BTC»), «💶
-   <cifra> €», «🏷️ <premio>» (solo Barattozon), «💳 <metodo>», «📍
+   <cifra> €», «🏷️ <premio>» (solo Barattozon), «💳 <metodo>» (il
+   contanti di persona: «💵 Contanti», anche accanto ad altri), «📍
    <zona>» (solo in contanti, se c'è), «🔒 Sats
    bloccati in un deposito di garanzia fino allo scambio», il link «🫙
    Apri lo Scambio P2P su Barattolo», la firma di chi l'ha pubblicato e

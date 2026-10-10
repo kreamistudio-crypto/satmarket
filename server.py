@@ -45907,7 +45907,23 @@ def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
     # la caption resta quella di ieri.
     if premio is not None:
         testo += f"\n🏷️ {_premio_canale_p2p(lato, premio)}"
-    testo += f"\n💳 {html.escape(metodo)}"
+    # «💵 CONTANTI» NEL POST (10 ott 2026): il contanti di persona porta le
+    # sue banconote come sulla card, e il 💳 resta a intestare gli ALTRI
+    # nomi — «💳 SEPA, 💵 Contanti». A parola intera: «Contanti al
+    # tabacchino» e' Barattozon e resta sotto il 💳, come ieri. Senza
+    # «Contanti» fra le voci la riga e' quella di ieri, byte per byte.
+    voci = [m.strip() for m in str(metodo or "").split(",") if m.strip()]
+    if "Contanti" in voci:
+        pezzi, intestato = [], False
+        for m in voci:
+            if m == "Contanti":
+                pezzi.append("💵 Contanti")
+            else:
+                pezzi.append(("" if intestato else "💳 ") + html.escape(m))
+                intestato = True
+        testo += "\n" + ", ".join(pezzi)
+    else:
+        testo += f"\n💳 {html.escape(metodo)}"
     # LA ZONA DI SCAMBIO DEL CONTANTI (10 ott 2026): la stessa riga della
     # card, «📍 Milano centro», sotto il metodo. Arriva gia' giudicata
     # dalla rotta (solo col contanti, solo pulita); senza, la caption e'

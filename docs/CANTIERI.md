@@ -43980,6 +43980,16 @@ card di Esplora (seminate nella fila con le zone prese dal server)
 mostrano la riga solo sulle due in contanti con zona, tutte alte
 uguali. Otto scatti in più in `.claude/giri/contanti-zona/` (R1, R2,
 R3).
+I TRE PUNTI NOTATI, SISTEMATI (stessa mattina, terza richiesta di
+Andrea): 💵 anche nella riga breve della regola nella pagina dello
+scambio (`contanti-regola-forte`, dalla costante); nel post del canale
+«💵 Contanti» al posto di «💳 Contanti», e con più metodi il 💵 solo
+davanti a «Contanti» («💳 SEPA, 💵 Contanti»: il 💳 intesta gli altri
+nomi; senza «Contanti» fra le voci la riga è quella di ieri, Barattozon
+compreso); 💵 davanti a «Contanti» nel titolo della card di Esplora,
+dalla stessa etichetta delle altre card (l'etichetta ad alta voce resta
+a parole). Provato in `prove_contanti_zona` e `prove_card_p2p_vetrina`;
+un banco in più tenuto in pari per la costante.
 NON PROVATO, DA GUARDARE: la fila di Esplora con la fotografia VERA del
 server (nel giro il relay è morto e la fotografia è vuota: le card sono
 state disegnate dalla pagina con le funzioni vere); il post nel canale

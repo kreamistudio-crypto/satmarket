@@ -60431,7 +60431,9 @@ function riquadroContantiP2P(o, azione){
   const vendo = o.lato === 'vendo';
   const mia = !!(o.presenze && o.presenze.mia);
   let h = '<div class="p2p-box contanti-box">' +
-    '<div class="contanti-regola-forte">💶 ' + esc(vendo ? REGOLA_BREVE_CONTANTI_VENDE : REGOLA_BREVE_CONTANTI_COMPRA) + '</div>' +
+    /* le banconote del metodo anche qui (10 ott 2026): la stessa icona
+       della voce «Contanti» e della riga del foglio */
+    '<div class="contanti-regola-forte">' + P2P_CONTANTI_ICO + ' ' + esc(vendo ? REGOLA_BREVE_CONTANTI_VENDE : REGOLA_BREVE_CONTANTI_COMPRA) + '</div>' +
     '<div class="contanti-incontro">' +
       '<div class="contanti-passo">' + (passoDueContantiP2P(o, azione) ? '<span class="contanti-num">1</span>' : '') +
         '<b>📍 Sono qui</b><span class="contanti-quando">quando arrivi · facoltativo</span></div>' +
@@ -67872,7 +67874,13 @@ function cardVetrinaP2P(o){
   const sotto = o.euroMax ? '<span class="p2p-vt-cifra">scegli tu</span>'
     : sats > 0 ? '<span class="p2p-vt-verbo">' + verboSats + '</span><span class="p2p-vt-cifra">≈ '
                  + fmt(sats) + ' sats</span>' : '';
-  const metodi = (o.metodi || []).map(m => esc(metodoBaseP2P(m))).join(', ');
+  /* «💵 Contanti» anche qui (10 ott 2026): la voce del contanti di
+     persona porta le sue banconote, dalla stessa etichetta delle altre
+     card (senza tinta: quella vale solo nella scatola del libro). Gli
+     altri metodi restano il loro nome; l'etichetta ad alta voce pure. */
+  const metodi = (o.metodi || []).map(m =>
+    (typeof etichettaContantiP2P === 'function' && etichettaContantiP2P(m))
+    || esc(metodoBaseP2P(m))).join(', ');
   /* LA ZONA DI SCAMBIO DEL CONTANTI (10 ott 2026): lo stesso «📍» del
      libro, su una riga sua sotto i metodi, per gli ordini che ce
      l'hanno; una riga sola coi puntini (la card e' stretta), e per

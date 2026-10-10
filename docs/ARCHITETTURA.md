@@ -29888,7 +29888,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `zonaCanaleP2P`; `/api/p2p/canale` la tiene solo col contanti e
   pulita; `_caption_canale_p2p(..., zona)` aggiunge «📍 zona» sotto il
   metodo). La riga «Contanti di persona» (`regolaContantiFoglioP2P`)
-  porta la stessa icona del metodo. Prove: `prove_contanti_zona`, la
+  porta la stessa icona del metodo, e così la riga breve della pagina
+  dello scambio (`riquadroContantiP2P`), il titolo della card di Esplora
+  e la riga del metodo nel post del canale («💳 SEPA, 💵 Contanti»: il
+  💵 solo davanti a «Contanti», a parola intera). Prove: `prove_contanti_zona`, la
   coda di `prove_p2p_libro` e `prove_card_p2p_vetrina`.
 
 - LA CASSA DI RISONANZA SU X (9 ott 2026). I post di Barattolo su Nostr
