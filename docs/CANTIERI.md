@@ -46781,3 +46781,18 @@ nella gabbia: nel verbale del push.
 la riga nel config e il riavvio, col controllo del journal (🧪) e dei
 due bottoni. Poi la risposta dell'utente su G e H. Dopo l'esperimento la
 riga può uscire dal config e il macaroon revocarsi.
+
+
+## Le hold di prova G e H, il verbale del push (10 ott 2026, sera): cosa è girato su quale albero
+
+Main non è corso: il worktree era da origin/main 31cb369 (la CSP accesa)
+e lo è rimasto fino al push, con la sua CI verde guardata prima. Un
+inciampo mio, scritto perché non si rifaccia: la sostituzione «dalla
+`def` della prova alla `def` successiva» in prove.py ha portato via
+`prove_solleciti_p2p`, che main aveva infilato in mezzo quel pomeriggio
+— la prima suite è esplosa con un NameError nel registro, la funzione è
+tornata dal commit base (`git show HEAD:prove.py`) e la suite è rigirata
+intera. COSA È GIRATO: sull'albero finale (31cb369 più il commit del
+cantiere) la suite `PROVE_SEVERE=1` intera (21.598 passate, 0 fallite) e
+i 54 collaudi nella gabbia, i 53 della CI più `collaudo_prova_hold`
+(54 verdi, 0 rossi); il giro dal vivo nel pane con l'LND di cartone.
