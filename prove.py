@@ -91780,8 +91780,12 @@ def prove_p2p_avvisi_libro():
     prova("...e la presa passa anche su un id gia' detto dalla restore", True,
           "(presi || !p2pOrdiniRegistrati.has(id))" in _mini
           and "presi: !!presi" in _mini)
-    prova("il patto dichiara che chi entra da Nostr non viene annotato, e cosa comporta",
-          True, "Chi entra <b>da Nostr</b> non viene annotato quando prende un ordine"
+    # (10 ott 2026: la frase diceva «non viene annotato», e dal cantiere
+    # reputazione-p2p non era piu' vero per intero — l'esito si scrive
+    # sul suo account. Ora dice a CHI resta sconosciuto: all'altra
+    # persona. Il resto lo guarda `prove_dati_reputazione_p2p`.)
+    prova("il patto dichiara che chi entra da Nostr e prende resta sconosciuto all'altra persona, e cosa comporta",
+          True, "Chi entra <b>da Nostr</b> e prende un ordine <b>resta sconosciuto all'altra persona</b>"
           in _mini and "il tuo nome negli avvisi dell'altra persona non compare" in _mini)
     prova("...e nessun testo promette piu' l'avviso generico", False,
           "ricevi l'avviso generico" in _mini or "riceve l'avviso generico" in _mini)
@@ -138189,6 +138193,38 @@ def prove_dati_reputazione_p2p():
           "si scrive lo stesso, e la pagina non lo tace", True,
           "anche se entri con una chiave Nostr" in testo
           and "l'esito si scrive sul tuo account come per tutti" in testo)
+    # LE DUE FRASI DI PRIMA SUL NOSTR CHE PRENDE (10 ott 2026, secondo
+    # ritocco di Andrea): dicevano «non viene annotato» e «quella presa
+    # non viene annotata», che dal cantiere reputazione-p2p era vero solo
+    # per i volti. Ora dicono a CHI resta sconosciuto — all'altra persona
+    # — e che l'esito si scrive lo stesso. E il perche' sta nel codice:
+    # l'interruttore «Fatti riconoscere» lo guarda chi annota la presa
+    # fra i volti, NON chi scrive gli esiti.
+    prova("la pagina non dice piu' che chi entra da Nostr e prende «non "
+          "viene annotato»", [],
+          [f for f in ("non viene annotato quando prende",
+                       "quella presa non viene annotata",
+                       "resta anonimo quando prende",
+                       "per chi non vuole lasciare tracce")
+           if f in re.sub(r"<[^>]+>", "", dati)])
+    nostr = [p for p in re.sub(r"<[^>]+>", "", dati).split("\n")
+             if "resta sconosciuto all'altra persona" in p]
+    prova("...lo dicono i due paragrafi che ne parlano: sconosciuto "
+          "all'altra persona, e l'esito sul suo account", (2, 2),
+          (len(nostr), sum("l'esito dello scambio" in p.lower()
+                           and "si scrive sul suo account" in p for p in nostr)))
+    prova("...«sconosciuto all'altra persona, non al server», con la "
+          "cronaca e i quattrocento giorni", True,
+          "Sconosciuto all'altra persona, non al server" in nostr[0]
+          and "circa quattrocento giorni" in nostr[0]
+          and "fra quali due account" in nostr[0])
+    prova("...e «dimentica il profilo» toglie le prese annotate, non gli "
+          "esiti: anche qui", True,
+          "che toglie le prese annotate, non gli esiti" in nostr[1])
+    prova("nel codice: l'interruttore «Fatti riconoscere» decide i volti "
+          "(la presa annotata), non gli esiti", (True, False),
+          ("_p2p_riconosciuto(con, user[\"id\"])" in pezzo("registra_ordini_p2p"),
+           "_p2p_riconosciuto" in segna))
     prova("i tentativi: il gesto, mai la fattura ne' il pagamento",
           (True, False),
           ("il gesto, mai la fattura né il pagamento" in testo,

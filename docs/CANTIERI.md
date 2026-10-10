@@ -45407,3 +45407,40 @@ RIBASATO (af616d8 più i due commit del cantiere), le sezioni toccate
 (360 verdi), la suite intera (21.253 passate, 0 fallite) e i collaudi
 della CI, 51 con quello portato da main (51 verdi, 0 rossi); non il
 giro dal vivo.
+## «I tuoi dati»: chi entra da Nostr e prende resta sconosciuto all'altra persona, non al server (10 ott 2026, pomeriggio, secondo ritocco chiesto da Andrea)
+
+**LA FRASE CHE NON ERA PIÙ VERA.** Lasciata «da guardare» dal ritocco
+qui sopra: in due paragrafi di `#priv-p2p` la pagina diceva che chi
+entra da Nostr «non viene annotato quando prende un ordine, perché
+quell'ingresso esiste per chi non vuole lasciare tracce» e che «quella
+presa non viene annotata». Era vero per intero fino alla mattina: dal
+cantiere reputazione-p2p l'esito dello scambio si scrive sull'account
+di chiunque, e `_segna_esiti_p2p` non guarda l'interruttore «Fatti
+riconoscere negli scambi» (lo guarda `registra_ordini_p2p`, che annota
+la presa fra i volti).
+
+**COSA DICE ADESSO.** A CHI resta sconosciuto: all'altra persona — non
+le diciamo chi è, non le mostriamo il profilo, il nome non compare nei
+suoi avvisi, fra i volti del libro la presa non si annota. E subito
+dopo, netto: «sconosciuto all'altra persona, non al server» — il
+coordinatore ci dice fra quali due account è lo scambio (la cronaca dei
+quaranta giorni) e l'esito si scrive sul suo account col numero
+dell'ordine, per circa quattrocento giorni. Nel secondo paragrafo: se
+arriva al contatore, quello compare dove compare lui (il negozio, gli
+ordini che pubblica); «invisibile» è diventato «invisibile all'altra
+persona»; e «dimentica il profilo» toglie le prese annotate, non gli
+esiti. Via «per chi non vuole lasciare tracce»: una traccia c'è, e la
+pagina non può promettere il contrario.
+
+**NON TOCCATO.** Il codice: è un ritocco di testo. E la riga del
+cassetto «🔔 Avvisi» per chi entra da Nostr («non annotiamo quali
+ordini prendi»), che non sta in «I tuoi dati»: segnalata ad Andrea.
+
+**PROVATO.** `prove_dati_reputazione_p2p` sale a 18: le quattro frasi
+vecchie non ci sono più, i due paragrafi dicono tutt'e due «resta
+sconosciuto all'altra persona» e «l'esito… si scrive sul suo account»,
+il primo porta «non al server», la cronaca e i quattrocento giorni, il
+secondo «non gli esiti» — e la sentinella sul codice: l'interruttore
+sta in chi annota la presa e NON in chi scrive gli esiti. La sentinella
+di `prove_p2p_avvisi_libro` che citava la frase vecchia è riscritta sulla
+nuova. Suite `PROVE_SEVERE=1` sull'albero di af616d8 più il ritocco: 21.218 passate, 0 fallite; i 51 collaudi della CI nella gabbia: 51 verdi.
