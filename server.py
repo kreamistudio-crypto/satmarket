@@ -44409,7 +44409,16 @@ def _p2p_leve() -> dict:
             # della testata compaiano solo se esistono, e dicano
             # «al massimo uno ogni N minuti» col numero vero
             "avvisiNuovi": bool(P2P_AVVISI_NUOVI_ORDINI),
-            "avvisiNuoviMinuti": int(P2P_AVVISI_NUOVI_MINUTI)}
+            "avvisiNuoviMinuti": int(P2P_AVVISI_NUOVI_MINUTI),
+            # i wallet il cui indirizzo non passa (10 ott 2026, cantiere
+            # indirizzo-non-verificato): dominio -> nome, lo stesso
+            # elenco con cui il controllo della fattura ferma prima
+            # dell'invio. Al client serve a NON proporre la scorciatoia
+            # dell'indirizzo degli incassi gia' all'apertura del foglio.
+            # Viaggia sempre, anche vuoto; una leva che non e' un
+            # dizionario vale «nessuno»
+            "indirizziNo": dict(P2P_INDIRIZZI_NON_PASSANO)
+            if isinstance(P2P_INDIRIZZI_NON_PASSANO, dict) else {}}
 
 
 def _p2p_per(tg_id) -> dict:

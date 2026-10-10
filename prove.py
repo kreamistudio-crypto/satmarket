@@ -78543,7 +78543,9 @@ def prove_p2p_server():
              # la cauzione di chi prende (1 ott 2026), in busta
              "P2P_CAUZIONE": False,
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
-             "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15}
+             "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
+             # i wallet il cui indirizzo non passa (10 ott 2026), in busta
+             "P2P_INDIRIZZI_NON_PASSANO": {"walletofsatoshi.com": "Wallet of Satoshi"}}
         exec(pezzo("_p2p_leve"), a)
         return a["_p2p_leve"]()
     relay = ["wss://relay.mostro.network", "wss://nos.lol"]
@@ -78564,9 +78566,11 @@ def prove_p2p_server():
     # di persona sono entrati insieme, da due cantieri
     # (9 ott 2026) UNDICI: la cauzione (1 ott) e le due chiavi degli
     # avvisi dei nuovi ordini — la leva globale e la finestra in minuti
-    prova("le chiavi sono undici e sono sempre quelle",
-          ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "commissione", "maxEuro",
-           "maxEuroContanti", "minEuroBz", "mostro", "relay", "specchio"],
+    # (10 ott 2026) DODICI: l'elenco dei wallet il cui indirizzo non passa
+    prova("le chiavi sono dodici e sono sempre quelle",
+          ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "commissione",
+           "indirizziNo", "maxEuro", "maxEuroContanti", "minEuroBz", "mostro", "relay",
+           "specchio"],
           sorted(piena.keys()))
     # IL LISTINO VIAGGIA SEMPRE, come npub e relay: e' pubblico, e il
     # client lo usa solo per dire quando la fee viva e' una promo.
@@ -106392,7 +106396,8 @@ def prove_avvisi_nuovi_ordini():
     amb_l = {"P2P_ATTIVO": True, "MOSTRO_HEX": "a" * 64, "MOSTRO_RELAY": ["ws://127.0.0.1:9"],
              "MOSTRO_RELAY_SPECCHIO": [], "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
              "P2P_CONTANTI_MAX_EURO": 250, "BARATTOZON_MIN_EURO": 25, "P2P_CAUZIONE": False,
-             "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15}
+             "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
+             "P2P_INDIRIZZI_NON_PASSANO": {}}
     exec(_senza_prosa(pezzo("_p2p_leve")), amb_l)
     prova("la busta delle leve porta la leva e la finestra", (True, 15),
           (amb_l["_p2p_leve"]()["avvisiNuovi"], amb_l["_p2p_leve"]()["avvisiNuoviMinuti"]))
@@ -127576,7 +127581,8 @@ def prove_contanti_a_mano():
              # la cauzione (1 ott 2026), entrata in busta il giorno dopo
              "P2P_CAUZIONE": False,
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
-             "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15}
+             "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
+             "P2P_INDIRIZZI_NON_PASSANO": {}}
     exec(_senza_prosa(pezzo("_p2p_leve")), amb_l)
     prova("la busta delle leve porta `maxEuroContanti`, intero", 250, amb_l["_p2p_leve"]()["maxEuroContanti"])
     prova("...e viaggia anche a zero (spenta), mai assente", 0,
@@ -137503,6 +137509,39 @@ def prove_indirizzo_non_verificato():
           "anche scritti a mano: l'elenco del client sta dentro quello del server", True,
           "const P2P_WALLET_NON_PASSANO = {'walletofsatoshi.com': 'Wallet of Satoshi'};" in m
           and K["P2P_INDIRIZZI_NON_PASSANO"].get("walletofsatoshi.com") == "Wallet of Satoshi")
+    # L'ELENCO VIAGGIA AL CLIENT CON LE LEVE DEL P2P (10 ott 2026,
+    # richiesta di Andrea): la scorciatoia non si propone gia' all'apertura
+    def leve_con(elenco):
+        a = {"P2P_ATTIVO": True, "MOSTRO_HEX": "ab" * 32, "MOSTRO_RELAY": ["wss://x"],
+             "MOSTRO_RELAY_SPECCHIO": [], "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
+             "P2P_CONTANTI_MAX_EURO": 250, "BARATTOZON_MIN_EURO": 25, "P2P_CAUZIONE": False,
+             "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
+             "P2P_INDIRIZZI_NON_PASSANO": elenco}
+        exec(pezzo("_p2p_leve"), a)
+        return a["_p2p_leve"]()
+
+    elenco = {"walletofsatoshi.com": "Wallet of Satoshi", "sbpc.ch": "Swiss Bitcoin Pay"}
+    busta = leve_con(elenco)
+    prova("le leve del P2P portano al client l'elenco dei wallet che non passano: lo "
+          "stesso del controllo, in copia", [elenco, False],
+          [busta.get("indirizziNo"), busta.get("indirizziNo") is elenco])
+    prova("...vuoto viaggia vuoto, e una leva che non e' un dizionario vale «nessuno»",
+          [{}, {}, {}], [leve_con({})["indirizziNo"], leve_con(7)["indirizziNo"],
+                         leve_con(None)["indirizziNo"]])
+    prova("...e le due buste del client passano tutt'e due da li' (`_p2p_per`)", True,
+          '{**leve, "preseDa": prese}' in pezzo("_p2p_per")
+          and 'risposta["p2p"] = _p2p_per(' in _SORGENTE
+          and 'profilo["p2p_leve"] = _p2p_per(' in _SORGENTE)
+    wnp = nudo(_fn_js(m, "function walletNonPassaP2P(indirizzo){"))
+    prova("client: il giudice dei wallet guarda prima l'elenco di casa e poi quello del "
+          "server, dietro un `typeof` (chi lo ritaglia da solo trova il solo elenco di casa)",
+          True,
+          "const leve = typeof p2pCoord === 'function' ? p2pCoord() : null;\n"
+          "  return sua(P2P_WALLET_NON_PASSANO, m[1]) || sua(leve && leve.indirizziNo, m[1]);"
+          in wnp)
+    prova("...e prende solo le voci PROPRIE dell'elenco, e solo se sono un testo", True,
+          "Object.prototype.hasOwnProperty.call(elenco, d) && typeof elenco[d] === 'string')"
+          in wnp)
     prova("le altre frasi sull'indirizzo non consigliano piu' quello di Wallet of Satoshi, "
           "che non passa", [False, False],
           ["Wallet of Satoshi" in " ".join(K["MSG_INDIRIZZO"].values()),
@@ -137518,6 +137557,8 @@ def prove_indirizzo_non_verificato():
         "const nodi = {p2pIncassoCorpo: {innerHTML: ''}, p2pIncassoTit: {textContent: ''}};\n"
         "const el = id => nodi[id] || null;\n"
         "let ORD = {}, myLnAddress = '', p2pIncassoOrdine = 'x';\n"
+        "let LEVE = null;\n"
+        "const p2pCoord = () => LEVE;\n"
         "const ordiniP2P = () => ({x: ORD});\n"
         "const satsDaRicevereP2P = o => o.netto || 0;\n"
         "const finestraFatturaP2P = () => 3600;\n"
@@ -137548,6 +137589,21 @@ console.log(JSON.stringify({
   strano: giro({indirizziRifiutati: ['a<b>"x@w.it']}, 'a<b>"x@w.it'),
   nonElenco: giro({indirizziRifiutati: 'io@wallet.com'}, 'io@wallet.com'),
   vuoto: giro({indirizziRifiutati: []}, 'io@wallet.com'),
+  // L'ELENCO DEL SERVER, dalle leve: la scorciatoia non nasce nemmeno
+  server: (LEVE = {indirizziNo: {'sbpc.ch': 'Swiss Bitcoin Pay', 'w.it': '<b>Wallet</b> & co'}},
+           giro({}, 'Io@SBPC.ch')),
+  serverDopo: giro({stato: 'fattura_nuova'}, 'io@sbpc.ch'),
+  serverAltro: giro({}, 'io@wallet.com'),
+  serverSotto: giro({}, 'io@pay.sbpc.ch'),
+  serverEsc: giro({}, 'io@w.it'),
+  serverWos: giro({}, 'io@walletofsatoshi.com'),
+  giudice: ['a@sbpc.ch', ' A@SBPC.CH ', 'a@constructor', 'a@toString', 'a@wallet.com', 'sbpc.ch', '']
+    .map(walletNonPassaP2P),
+  leveStorte: [null, {}, {indirizziNo: null}, {indirizziNo: 'sbpc.ch'}, {indirizziNo: ['sbpc.ch']},
+               {indirizziNo: {'sbpc.ch': 7}}, {indirizziNo: {'sbpc.ch': '   '}}]
+    .map(l => (LEVE = l, walletNonPassaP2P('a@sbpc.ch'))),
+  lungo: (LEVE = {indirizziNo: {'sbpc.ch': 'x'.repeat(90)}}, walletNonPassaP2P('a@sbpc.ch').length),
+  senzaLeve: (LEVE = null, [walletNonPassaP2P('a@sbpc.ch'), walletNonPassaP2P('a@walletofsatoshi.com')]),
 }));
 """)
     out = _node_banco(js)
@@ -137605,6 +137661,27 @@ console.log(JSON.stringify({
           [SCORCIATOIA in out["fraTanti"], "non è passato" in out["fraTanti"]])
     prova("un ricordo che non e' un elenco, o un elenco vuoto, non tolgono niente",
           [True, True], [SCORCIATOIA in out["nonElenco"], SCORCIATOIA in out["vuoto"]])
+    # --- l'elenco del server, dalle leve: la scorciatoia non nasce ------
+    SBP = ("⚠️ Il tuo indirizzo Swiss Bitcoin Pay qui non funziona: incolla una fattura dal "
+           "tuo wallet.")
+    prova("con un indirizzo che il SERVER dice che non passa, il foglio nasce senza "
+          "scorciatoia e con la riga col nome del wallet (maiuscole comprese), nei due fogli",
+          [[False, True], [False, True]],
+          [[SCORCIATOIA in out[k], SBP in righe(out[k])] for k in ("server", "serverDopo")])
+    prova("...un altro wallet e un sottodominio tengono la loro scorciatoia", [True, True],
+          [SCORCIATOIA in out["serverAltro"], SCORCIATOIA in out["serverSotto"]])
+    prova("...il nome che arriva dal server passa da esc()", [True, False],
+          ["Il tuo indirizzo &lt;b&gt;Wallet&lt;/b&gt; &amp; co qui non funziona" in out["serverEsc"],
+           "<b>Wallet</b>" in out["serverEsc"]])
+    prova("...e Wallet of Satoshi resta quello di casa", 1,
+          out["serverWos"].count("Il tuo indirizzo Wallet of Satoshi qui non funziona"))
+    prova("il giudice: il dominio esatto, minuscolo; un nome da attrezzo degli oggetti "
+          "non e' un wallet; senza chiocciola niente",
+          ["Swiss Bitcoin Pay", "Swiss Bitcoin Pay", "", "", "", "", ""], out["giudice"])
+    prova("...leve assenti o storte valgono «nessuno», e un nome lungo si accorcia a 40",
+          [[""] * 7, 40], [out["leveStorte"], out["lungo"]])
+    prova("...senza leve resta il solo elenco di casa", ["", "Wallet of Satoshi"],
+          out["senzaLeve"])
     WOS = "⚠️ Il tuo indirizzo Wallet of Satoshi qui non funziona: incolla una fattura dal tuo wallet."
     prova("la riga e' corta come la sorella di Wallet of Satoshi (senza l'indirizzo)", True,
           len("⚠️ Il tuo indirizzo" + FISSA) <= len(WOS))

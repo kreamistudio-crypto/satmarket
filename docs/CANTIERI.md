@@ -48903,3 +48903,47 @@ ce l'ha come tutti. In PRODUZIONE il grep che li conta.
 PROVATO: i giudici veri in `prove_indirizzo_non_verificato` (cinque
 righe di journal parola per parola, il nome che non entra, la riga
 finta che non passa).
+
+**2) L'ELENCO DEI DOMINI AL CLIENT.** Con l'elenco solo sul server, chi
+aveva salvato un indirizzo che non passa vedeva ancora la scorciatoia,
+la toccava, e solo a «Invia» leggeva il no. Adesso `_p2p_leve` porta
+l'elenco (`indirizziNo`, in copia; una leva che non è un dizionario
+vale «nessuno») nelle due buste del client, e `walletNonPassaP2P`
+guarda prima l'elenco di casa e poi quello: il foglio NASCE senza
+scorciatoia e con la riga di sempre, col nome del wallet («⚠️ Il tuo
+indirizzo Swiss Bitcoin Pay qui non funziona: incolla una fattura dal
+tuo wallet.»). Il giudice non è più puro — legge le leve, dietro un
+`typeof p2pCoord`: i banchi che lo ritagliano da solo trovano il solo
+elenco di casa — e prende le voci solo se sono PROPRIE dell'elenco e
+sono un testo (un dominio «constructor» tornava la funzione degli
+oggetti: difetto di prima, curato qui). Le chiavi della busta delle
+leve sono dodici.
+PROVATO: i giudici veri del server (la busta, il vuoto, la leva
+storta), il foglio vero in node con le leve di cartone (i due fogli, il
+sottodominio, l'esc() sul nome che arriva dal server, le leve storte),
+e un giro dal vivo col server della copia e un dominio di prova nel
+config: il foglio si apre già senza scorciatoia.
+NON PROVATO: un telefono vero; la riga nel config del VPS.
+
+**IL VERBALE DEL PUSH (10 ott 2026, notte): cosa è girato su quale albero.**
+Il primo push del cantiere (`5ba9d24`) ha avuto la CI verde — prove,
+segreti, pronto — e `pronto` ci si è posato sopra. Le due aggiunte,
+sull'albero di quel push: le sezioni toccate da ciascuna (137 verdi la
+prima, 1.392 la seconda, 0 rosse), 58 collaudi su 58 nella gabbia con
+tutt'e due, lo scanner dei segreti pulito, il giro dal vivo della
+seconda, e la tortura su una copia del repo intero: 14 mutazioni, 14
+prese (una, «le voci si prendono anche se non sono proprie
+dell'elenco», dalla sola sentinella sul testo: con la guardia sul tipo
+accanto, nessun dominio la distingue). Ribasate su `41e859d` (due
+commit non miei, il secondo cantiere dei gesti del PayCode e il suo
+verbale): 15 sezioni (1.413 verdi, 0 rosse) e sei collaudi (la CSP, il
+controllo della fattura, i metodi delle rotte, il pagamento P2P, il
+PayCode riconosciuto, la reputazione). Ribasate su `e817faa`, l'albero
+del push (un commit di soli documenti, i percorsi del VPS): la mia
+sezione, la bussola e il tetto di CLAUDE.md; la suite intera e gli
+altri collaudi NON rifatti su queste due ultime punte. I conflitti: la
+coda di CANTIERI a ogni rebase, sciolta tenendo tutte le voci. LA CI DI
+MAIN prima del push: aspettata quella di `41e859d`, verde; quella di
+`e817faa`, arrivato mentre aspettavo, era appena partita. L'ok al push
+è quello di Andrea per il cantiere, che diceva sì anche a queste due
+cose «in commit separati».

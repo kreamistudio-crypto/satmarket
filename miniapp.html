@@ -60669,11 +60669,28 @@ function ricordaFatturaP2P(id, scade){
    torna il nome del wallet o ''. Decide se la scorciatoia
    dell'indirizzo salvato si offre; l'invio di un indirizzo scritto a
    mano resta com'e' — il «no» del coordinatore ha gia' la sua frase
-   (`P2P_INDIRIZZO_RIFIUTATO`). */
+   (`P2P_INDIRIZZO_RIFIUTATO`).
+   ...E QUELLI CHE DICE IL SERVER (10 ott 2026, cantiere
+   indirizzo-non-verificato): l'elenco di qui e' quello che si sa a
+   pagina appena scritta; il server tiene il suo nel config
+   (`P2P_INDIRIZZI_NON_PASSANO`, cresce dal campo senza un deploy) e lo
+   manda con le leve del P2P, alla voce `indirizziNo`. Si guarda DOPO
+   quello di casa e con le stesse regole — il solo dominio, minuscolo,
+   esatto — cosi' la scorciatoia di un indirizzo che non passera' non
+   compare gia' all'apertura del foglio. Non e' piu' un giudice puro:
+   legge le leve (`p2pCoord`, dietro un `typeof`: i banchi che lo
+   ritagliano da solo trovano il solo elenco di casa). Le voci si
+   prendono se sono PROPRIE dell'elenco: un dominio che si chiama
+   come un attrezzo degli oggetti (`constructor`) non e' un wallet. */
 const P2P_WALLET_NON_PASSANO = {'walletofsatoshi.com': 'Wallet of Satoshi'};
 function walletNonPassaP2P(indirizzo){
   const m = /^[^@\s]+@([^@\s]+)$/.exec(String(indirizzo || '').trim().toLowerCase());
-  return (m && P2P_WALLET_NON_PASSANO[m[1]]) || '';
+  if (!m) return '';
+  const sua = (elenco, d) => (elenco && typeof elenco === 'object'
+    && Object.prototype.hasOwnProperty.call(elenco, d) && typeof elenco[d] === 'string')
+    ? elenco[d].trim().slice(0, 40) : '';
+  const leve = typeof p2pCoord === 'function' ? p2pCoord() : null;
+  return sua(P2P_WALLET_NON_PASSANO, m[1]) || sua(leve && leve.indirizziNo, m[1]);
 }
 function renderIncassoP2P(){
   const box = el('p2pIncassoCorpo');

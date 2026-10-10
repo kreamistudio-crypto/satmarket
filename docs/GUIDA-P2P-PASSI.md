@@ -221,6 +221,10 @@ Il P2P non ha un wallet suo: serve un **wallet Lightning esterno**.
   fattura dal tuo wallet.» (La fattura di Wallet of Satoshi passa: non
   passa solo il suo indirizzo.) È l'unico avviso su Wallet of Satoshi
   che vede: la riga generica dei due fogli, in quel caso, non compare.
+  La stessa riga, col nome del suo wallet, la legge chi ha salvato
+  l'indirizzo di un altro servizio che si sa che non passa: 📱 «⚠️ Il
+  tuo indirizzo <nome del wallet> qui non funziona: incolla una fattura
+  dal tuo wallet.»
 - ⚠️ **Un indirizzo che il servizio di scambio non riesce a
   verificare** (può capitare con qualunque wallet, anche se
   l'indirizzo è giusto): 📱 «Non sono riuscito a verificare questo

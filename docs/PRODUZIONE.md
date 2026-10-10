@@ -1426,7 +1426,10 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   (`/srv/barattolo/config.py`, a mano; la riga SOSTITUISCE l'elenco del
   codice, quindi le voci si ripetono tutte):
   `P2P_INDIRIZZI_NON_PASSANO = {"walletofsatoshi.com": "Wallet of Satoshi", "DOMINIO": "Nome del wallet"}`
-  poi `sudo systemctl restart barattolo`. Da lì il foglio ferma PRIMA
+  poi `sudo systemctl restart barattolo`. Da lì — al primo caricamento
+  della pagina, l'elenco viaggia con le leve del P2P — chi ha salvato
+  un indirizzo di quel dominio non vede più la scorciatoia «⚡ Usa
+  l'indirizzo dei tuoi incassi», e il foglio ferma PRIMA
   dell'invio («Gli indirizzi Nome del wallet qui non funzionano: incolla
   una fattura dal tuo wallet.») e nel journal resta
   `⛔ Fattura P2P: … indirizzo @DOMINIO: wallet_non_passa`. La prova in

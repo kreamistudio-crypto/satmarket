@@ -30620,7 +30620,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   dopo — e `renderIncassoP2P`, se l'indirizzo ricordato è quello degli
   incassi, al posto della scorciatoia «⚡ Usa l'indirizzo dei tuoi
   incassi» scrive la riga che manda alla fattura; `ricordaFatturaP2P`
-  (richiesta accettata) lo cancella. Prove:
+  (richiesta accettata) lo cancella. L'ELENCO DEL SERVER VIAGGIA AL
+  CLIENT con le leve del P2P (`_p2p_leve`, voce `indirizziNo`, nelle
+  due buste di `_p2p_per`): `walletNonPassaP2P` guarda prima l'elenco
+  di casa (`P2P_WALLET_NON_PASSANO`) e poi quello, dietro un `typeof
+  p2pCoord`, così la scorciatoia di un indirizzo che non passerà non
+  compare già all'apertura del foglio. Prove:
   `prove_indirizzo_non_verificato` e le sezioni 4-quater e 4-quinquies
   di `prove_p2p_motore`. La procedura (la prova dal nodo, la riga da
   aggiungere): PRODUZIONE, «I WALLET IL CUI INDIRIZZO NON PASSA».
