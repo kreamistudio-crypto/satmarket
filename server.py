@@ -9567,7 +9567,9 @@ def logout(response: Response, barattolo_sessione: str = Cookie(""),
 # riparte la sfida muore — il client ne chiede semplicemente un'altra.
 
 SFIDE_LOGIN: dict[str, int] = {}     # sfida -> scadenza (unix)
-SECONDI_SFIDA_LOGIN = 300            # 5 minuti per firmare, poi si rifa'
+SECONDI_SFIDA_LOGIN = 600            # 10 minuti per firmare, poi si rifa'
+# (erano 5 fino al 10 ott 2026: con un firmatario sullo stesso telefono
+# si cambia app due volte, e la seconda approvazione puo' arrivare tardi)
 
 RE_HEX_64 = re.compile(r"[0-9a-f]{64}")
 RE_HEX_128 = re.compile(r"[0-9a-f]{128}")
@@ -9606,7 +9608,10 @@ def verifica_evento_login(evento, host: str) -> str:
         raise err
     if not (isinstance(ev_id, str) and RE_HEX_64.fullmatch(ev_id)):
         raise err
-    if not isinstance(creato, int) or abs(int(time.time()) - creato) > 300:
+    # la tolleranza sull'ora e' la vita della sfida: l'evento si compone
+    # PRIMA di chiedere la firma, e la firma puo' aspettare l'umano
+    if (not isinstance(creato, int)
+            or abs(int(time.time()) - creato) > SECONDI_SFIDA_LOGIN):
         raise HTTPException(401, "Login Nostr scaduto: riprova")
     if not (isinstance(tags, list)
             and all(isinstance(t, list)
@@ -9800,6 +9805,338 @@ async def login_nostr_collega(req: Request, response: Response,
     await premia_distintivi(tg_id)   # doppia cittadinanza appena nata
     return {"ok": True, "collegato": True}
 
+
+# --- LA CASSETTA POSTALE DEL NIP-46 (10 ott 2026) ------------------------
+# IL FATTO, DAL CAMPO: su iPhone chi entra con un firmatario che sta
+# sullo STESSO telefono (Clave) copia il link nostrconnect, passa
+# all'app, approva e torna — e mentre e' nell'altra app iOS sospende
+# la pagina e le chiude le websocket. La risposta del firmatario
+# (kind 24133, fascia EFFIMERA: i relay di norma non la conservano)
+# arriva sui relay in quel momento, e quando la pagina si risveglia non
+# c'e' piu' nessuno che l'abbia sentita. Il riaggancio al ritorno non
+# basta: nella strada del QR e' il FIRMATARIO a parlare per primo, e
+# una risposta persa non si puo' richiedere — non si sa nemmeno a chi.
+# Misurato il 10 ott 2026 (REQ in sola lettura, `since` a un giorno):
+# nrs.primal.net e nos.lol i 24133 li conservano, bucket.coracle.social
+# e relay.nip46.com no. Quindi un `since` al riaggancio aiuta su meta'
+# della lista, e non e' una promessa.
+# LA CURA: IL SERVER FA DA ORECCHIO. La pagina, quando apre
+# l'appuntamento, deposita qui la sua chiave EFFIMERA di client (quella
+# pubblica) e i relay dell'appuntamento; il server ascolta quei relay
+# al posto suo per CASSETTA_VITA_S e tiene da parte ogni 24133
+# indirizzato a quella chiave. La pagina, quando torna (e intanto, a
+# ritmo lento, come secondo orecchio), chiede «c'e' posta?» e si porta
+# via gli eventi: li apre LEI, con la chiave privata che non e' mai
+# uscita dal browser.
+# COSA VEDE IL SERVER: la chiave effimera del client (nasce e muore con
+# un login), il mittente (la chiave per-connessione del firmatario) e
+# il testo CIFRATO — esattamente quel che vede un relay pubblico, e
+# niente che possa aprire. La regola ferrea 2 e' intatta: nessuna
+# chiave privata, nessuna custodia. E non c'e' stato: la cassetta vive
+# in memoria, dieci minuti, e si butta.
+# UN ORECCHIO PER RELAY E NON PER CASSETTA: cento login in corso sono
+# quattro connessioni, non quattrocento — il filtro porta TUTTE le
+# chiavi in ascolto su quel relay (`#p`) e si rimanda quando la lista
+# cambia. E' la forma dell'ascolto P2P (`_ascolto_p2p_filo`), in un
+# thread suo perche' websocket-client e' sincrona.
+# I RELAY DI UNA URI bunker:// NON SONO I NOSTRI: li scrive il
+# firmatario dell'utente, quindi il server li giudica prima di bussare
+# (`_relay_cassetta_ammesso`): solo wss, un nome e non un IP, mai un
+# indirizzo privato o di loopback una volta risolto — la cassetta non
+# deve diventare una porta per bussare dentro casa. In collaudo vale la
+# regola di sempre: verso un relay che non e' di casa non si esce
+# (`lettura_simulata`), e un ws:// di loopback e' il relay dei collaudi.
+CASSETTA_VITA_S = 600          # dieci minuti: l'umano, l'app, il ritorno
+CASSETTA_TETTO = 500           # cassette aperte insieme, oltre si rifiuta
+CASSETTA_EVENTI_MAX = 40       # eventi tenuti per cassetta
+CASSETTA_RELAY_MAX = 6         # relay per cassetta: quelli di una URI
+CASSETTA_ORECCHIO_RIPOSO_S = 60   # senza cassette, l'orecchio si chiude
+_CASSETTE: dict[str, dict] = {}   # pub effimera -> la cassetta
+_ORECCHI: dict[str, dict] = {}    # relay -> {"stato", "da", "perche", "ferma"}
+_CASSETTE_LOCK = threading.Lock()
+# LA PORTA DEL BANCO: la connessione la fa questa, e le prove la
+# sostituiscono con una di cartone — il resto gira vero.
+_cassetta_connetti = create_connection
+
+
+def _relay_cassetta_ammesso(url: str) -> bool:
+    """Un relay su cui il server puo' bussare per conto della pagina.
+    Sintassi sola, senza rete: wss:// con un nome di dominio (niente
+    IP, niente credenziali, niente percorso strano); oppure ws:// di
+    casa, che e' il relay dei collaudi. La risoluzione del nome e il
+    rifiuto degli indirizzi privati stanno nel thread
+    (`_orecchio_indirizzo_pubblico`), che e' l'unico a fare rete."""
+    try:
+        u = urlparse(str(url or "").strip())
+    except ValueError:
+        return False
+    if len(url) > 200 or u.username or u.password or u.fragment:
+        return False
+    host = (u.hostname or "").lower()
+    if not host:
+        return False
+    if u.scheme == "ws":
+        return relay_di_casa(url)
+    if u.scheme != "wss":
+        return False
+    try:
+        ipaddress.ip_address(host)
+        return False                       # un IP nudo: no
+    except ValueError:
+        pass
+    return "." in host and not host.endswith(".onion") \
+        and re.fullmatch(r"[a-z0-9.-]+", host) is not None
+
+
+def _orecchio_indirizzo_pubblico(url: str) -> bool:
+    """Risolve il nome e rifiuta tutto quel che non e' un indirizzo
+    pubblico (privato, loopback, link-local, riservato). Di casa
+    (loopback letterale) passa: e' il relay dei collaudi."""
+    if relay_di_casa(url):
+        return True
+    host = urlparse(url).hostname or ""
+    try:
+        indirizzi = socket.getaddrinfo(host, None)
+    except OSError:
+        return False
+    if not indirizzi:
+        return False
+    for a in indirizzi:
+        try:
+            ip = ipaddress.ip_address(a[4][0])
+        except ValueError:
+            return False
+        if not ip.is_global:
+            return False
+    return True
+
+
+def _cassette_vive(adesso: float = None) -> dict:
+    """Le cassette non scadute; le scadute si buttano qui, di passaggio.
+    Si chiama col lucchetto in mano."""
+    adesso = adesso or time.time()
+    for k in [k for k, c in _CASSETTE.items() if c["scade"] < adesso]:
+        _CASSETTE.pop(k, None)
+    return _CASSETTE
+
+
+def _cassetta_deposita(ev: dict, relay: str) -> bool:
+    """Un 24133 letto da un relay: se e' per una cassetta viva si tiene
+    (una volta sola per id, fino al tetto). True se e' entrato."""
+    if not isinstance(ev, dict) or ev.get("kind") != 24133:
+        return False
+    ev_id = ev.get("id")
+    if not (isinstance(ev_id, str) and RE_HEX_64.fullmatch(ev_id)):
+        return False
+    tags = ev.get("tags") or []
+    dest = {t[1] for t in tags if isinstance(t, list) and len(t) >= 2
+            and t[0] == "p" and isinstance(t[1], str)}
+    entrato = False
+    with _CASSETTE_LOCK:
+        for pub in dest:
+            c = _cassette_vive().get(pub)
+            if not c or ev_id in c["ids"] or len(c["eventi"]) >= CASSETTA_EVENTI_MAX:
+                continue
+            c["ids"].add(ev_id)
+            c["n"] += 1
+            # SOLO I CAMPI DELL'EVENTO, nella forma di un relay: il
+            # client li da' allo stesso lettore delle websocket
+            c["eventi"].append({"n": c["n"], "via": relay, "evento": {
+                k: ev.get(k) for k in ("id", "pubkey", "created_at",
+                                       "kind", "tags", "content", "sig")}})
+            entrato = True
+    return entrato
+
+
+def _orecchio_pubs(relay: str) -> list:
+    """Le chiavi in ascolto su questo relay, ordinate: e' il filtro."""
+    with _CASSETTE_LOCK:
+        return sorted(p for p, c in _cassette_vive().items()
+                      if relay in c["relays"])
+
+
+def _orecchio_filo(relay: str):
+    """L'ORECCHIO: una connessione al relay, tenuta viva e rifatta
+    quando cade, con la REQ sui 24133 per TUTTE le chiavi delle
+    cassette che lo nominano. Quando la lista cambia la REQ si rimanda
+    (stesso id: il relay sostituisce il filtro). Senza cassette da
+    CASSETTA_ORECCHIO_RIPOSO_S si chiude ed esce. Il `since` e'
+    l'apertura dell'orecchio meno la vita di una cassetta: sui relay che
+    i 24133 li conservano (nrs.primal.net, nos.lol) ritrova anche
+    quello arrivato prima che l'orecchio si aprisse."""
+    O = _ORECCHI[relay]
+    if lettura_simulata(relay, "della cassetta NIP-46 (24133)"):
+        O.update(stato="simulato", perche="in collaudo non esce dal computer")
+        return
+    if not _orecchio_indirizzo_pubblico(relay):
+        O.update(stato="rifiutato",
+                 perche="il relay non risolve a un indirizzo pubblico")
+        with _CASSETTE_LOCK:
+            for c in _CASSETTE.values():
+                c["relays"].discard(relay)
+        return
+    attesa, senza = 2, 0.0
+    while not O["ferma"].is_set():
+        pubs = _orecchio_pubs(relay)
+        if not pubs:
+            if not senza:
+                senza = time.time()
+            elif time.time() - senza > CASSETTA_ORECCHIO_RIPOSO_S:
+                break
+            time.sleep(1)
+            continue
+        senza = 0.0
+        ws = None
+        try:
+            ws = _cassetta_connetti(relay, timeout=10,
+                                    sslopt={"cert_reqs": ssl.CERT_NONE})
+            ws.settimeout(3)
+            since = int(time.time()) - CASSETTA_VITA_S
+            filtro = list(pubs)
+            ws.send(json.dumps(["REQ", "cassetta", {
+                "kinds": [24133], "#p": filtro, "since": since}]))
+            O.update(stato="connesso", da=time.time(), perche="")
+            attesa = 2
+            while not O["ferma"].is_set():
+                try:
+                    grezzo = ws.recv()
+                except Exception as e:
+                    if "Timeout" not in type(e).__name__ \
+                            and not isinstance(e, socket.timeout):
+                        raise
+                    grezzo = None
+                if grezzo:
+                    msg = json.loads(grezzo)
+                    if isinstance(msg, list) and len(msg) >= 3 \
+                            and msg[0] == "EVENT" and msg[1] == "cassetta":
+                        if _cassetta_deposita(msg[2], relay):
+                            O["letti"] = O.get("letti", 0) + 1
+                    elif isinstance(msg, list) and msg[0] == "CLOSED":
+                        raise RuntimeError(f"sottoscrizione chiusa: {msg[2:]}")
+                pubs = _orecchio_pubs(relay)
+                if not pubs:
+                    break                  # si chiude, e si riposa
+                if list(pubs) != filtro:
+                    filtro = list(pubs)
+                    ws.send(json.dumps(["REQ", "cassetta", {
+                        "kinds": [24133], "#p": filtro, "since": since}]))
+            try:
+                ws.close()
+            except Exception:
+                pass
+        except Exception as e:
+            O.update(stato="giu", da=time.time(),
+                     perche=f"{type(e).__name__}: {str(e)[:120]}")
+            try:
+                if ws:
+                    ws.close()
+            except Exception:
+                pass
+            if O["ferma"].is_set():
+                break
+            O["ferma"].wait(attesa)
+            attesa = min(attesa * 2, 30)
+    O.update(stato="chiuso")
+    with _CASSETTE_LOCK:
+        if _ORECCHI.get(relay) is O:
+            _ORECCHI.pop(relay, None)
+
+
+def _orecchi_apri(relays: set):
+    """Un orecchio per relay, se non c'e' gia' (o se il suo filo e'
+    finito). Si chiama col lucchetto in mano."""
+    for r in relays:
+        o = _ORECCHI.get(r)
+        if o and o["filo"].is_alive():
+            continue
+        O = {"stato": "apro", "da": time.time(), "perche": "",
+             "ferma": threading.Event(), "letti": 0}
+        O["filo"] = threading.Thread(target=_orecchio_filo, args=(r,),
+                                     daemon=True, name=f"orecchio {r}")
+        _ORECCHI[r] = O
+        O["filo"].start()
+
+
+def _cassetta_stato(pub: str) -> dict:
+    """Lo stato per il client: viva, e come stanno i suoi orecchi."""
+    with _CASSETTE_LOCK:
+        c = _cassette_vive().get(pub)
+        if not c:
+            return {"viva": False}
+        return {"viva": True, "scade": int(c["scade"]),
+                "orecchi": {r: {"stato": (_ORECCHI.get(r) or {}).get("stato", "assente"),
+                                "perche": (_ORECCHI.get(r) or {}).get("perche", "")}
+                            for r in sorted(c["relays"])}}
+
+
+@app.post("/api/login/nostr/cassetta")
+async def login_nostr_cassetta_apri(req: Request):
+    """La pagina deposita la sua chiave effimera e i relay
+    dell'appuntamento: da qui il server ascolta per lei. Si puo'
+    richiamare per la stessa chiave (la vita si rinnova, i relay si
+    aggiungono). Freno per IP come le altre porte del login."""
+    _frena("login", _ip_di(req))
+    d = await leggi_json(req)
+    pub = str(d.get("pub") or "").strip().lower()
+    if not RE_HEX_64.fullmatch(pub):
+        raise HTTPException(400, "Chiave del client non valida")
+    chiesti = d.get("relays")
+    if not isinstance(chiesti, list):
+        raise HTTPException(400, "Relay mancanti")
+    buoni, rifiutati = [], []
+    for r in chiesti[:CASSETTA_RELAY_MAX * 2]:
+        r = str(r or "").strip()
+        (buoni if _relay_cassetta_ammesso(r) else rifiutati).append(r)
+    buoni = list(dict.fromkeys(buoni))[:CASSETTA_RELAY_MAX]
+    if not buoni:
+        raise HTTPException(400, "Nessun relay su cui ascoltare: serve un "
+                                 "wss:// con un nome di dominio")
+    if create_connection is None:
+        raise HTTPException(503, "La cassetta non è disponibile: sul server "
+                                 "manca il pacchetto websocket-client")
+    adesso = time.time()
+    with _CASSETTE_LOCK:
+        vive = _cassette_vive(adesso)
+        c = vive.get(pub)
+        if not c:
+            if len(vive) >= CASSETTA_TETTO:
+                raise HTTPException(503, "Troppi accessi in corso: riprova "
+                                         "fra un minuto")
+            c = vive[pub] = {"scade": 0, "relays": set(), "eventi": [],
+                             "ids": set(), "n": 0, "nata": adesso}
+        c["scade"] = adesso + CASSETTA_VITA_S
+        c["relays"].update(buoni)
+        _orecchi_apri(set(buoni))
+    return {"ok": True, "relays": buoni, "rifiutati": rifiutati,
+            "vita": CASSETTA_VITA_S}
+
+
+@app.get("/api/login/nostr/cassetta")
+def login_nostr_cassetta_leggi(pub: str = "", dopo: int = 0):
+    """«C'e' posta?»: gli eventi della cassetta dopo il contatore
+    `dopo` (il client tiene l'ultimo `n` ricevuto), e lo stato degli
+    orecchi, che e' la diagnosi quando non arriva niente. Senza freno:
+    e' una lettura in memoria, e la pagina chiede a ritmo lento."""
+    pub = str(pub or "").strip().lower()
+    if not RE_HEX_64.fullmatch(pub):
+        raise HTTPException(400, "Chiave del client non valida")
+    stato = _cassetta_stato(pub)
+    if not stato["viva"]:
+        return {"viva": False, "eventi": [], "n": int(dopo or 0)}
+    with _CASSETTE_LOCK:
+        c = _CASSETTE.get(pub) or {"eventi": [], "n": 0}
+        nuovi = [e for e in c["eventi"] if e["n"] > int(dopo or 0)]
+        n = c["n"]
+    return {**stato, "eventi": nuovi, "n": n}
+
+
+def _cassette_chiudi_tutto():
+    """Per le prove e lo spegnimento: ferma gli orecchi, svuota."""
+    with _CASSETTE_LOCK:
+        for o in _ORECCHI.values():
+            o["ferma"].set()
+        _ORECCHI.clear()
+        _CASSETTE.clear()
 
 # ------------------------- LNBITS (escrow) --------------------------
 
@@ -43002,11 +43339,21 @@ if not RELAYS_VERIFICA:
 # GET risponde) invece di andare a memoria.
 # ⚠️ E' una COSTANTE nel codice, non una leva del config: sul VPS non
 # c'e' niente da aggiungere.
+# IL QUINTO E' DI CLAVE (10 ott 2026): `relay.powr.build` e' il relay a
+# cui Clave (iPhone) lega il suo bunker e il suo proxy delle notifiche;
+# i suoi documenti chiedono ai client di metterlo fra i relay del
+# nostrconnect perche' le richieste di firma dopo l'approvazione
+# arrivino via push anche a Clave chiusa. Misurato il 10 ott 2026: conn
+# 0,50 s / EOSE 0,16 s, e i 24133 li conserva. Lo stesso giorno la
+# rimisura degli altri: nrs.primal.net 0,19/0,03 (conserva), bucket
+# 0,71/0,19, relay.nip46.com 0,77/0,21, nos.lol 0,08/0,03 (conserva);
+# relay.nsec.app timeout a 10 s; auth.nostr1.com vuole l'AUTH.
 RELAYS_NIP46 = [
     "wss://nrs.primal.net",
     "wss://bucket.coracle.social",
     "wss://relay.nip46.com",
     "wss://nos.lol",
+    "wss://relay.powr.build",
 ]
 CHARSET_BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 

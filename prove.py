@@ -107781,6 +107781,53 @@ def prove_tutorial():
     prova("...e si dice perche'", 1, d["detto"])
 
 
+def _banco_nip46_js(mini):
+    """I PEZZI COMUNI AI BANCHI NIP-46 (10 ott 2026): le costanti, il
+    cifrario, il coro, l'ascolto che si riaggancia e la cassetta. Le
+    leve LENTE si abbassano nel cartone — il riaggancio aspetta un
+    secondo, la seconda lingua venti, la cassetta chiede ogni quattro —
+    e i valori VERI li guardano le sentinelle, non questo banco."""
+    def riga(nome):
+        return re.search(rf"const {nome} = [^;]+;", mini).group(0)
+    pezzi = "\n".join([
+        riga("BUNKER_CONNETTI_MS"), riga("NIP46_GRAZIA_MS"),
+        riga("NIP46_PERMESSI"), riga("NIP46_UMANO_MS"),
+        riga("NIP46_SERVIZIO_MS"), riga("NOSTRCONNECT_ATTESA_MS"),
+        "const NIP46_SECONDA_LINGUA_MS = 150;",
+        "const NIP46_RIAGGANCIO_MS = [120, 240, 480];",
+        "const CASSETTA_POLL_MS = 40;",
+        "const API_BASE = '/api';",
+        pezzo_js(mini, "async function apriStanzeNip46(relays){"),
+        pezzo_js(mini, "function cifrarioNip46(NT, skLocale, pubRemota, modoIniziale){"),
+        pezzo_js(mini, "function ascoltoNip46(NT, coro, opz){"),
+        pezzo_js(mini, "function cassettaNip46(pubLocale, relays, consegna, etichetta){"),
+    ])
+    # LA PAGINA DI CARTONE: `document` e `window` con gli ascoltatori
+    # delle sveglie (il banco li puo' far scattare), un `fetch` che il
+    # banco decide caso per caso, e la sala d'attesa che si ricorda
+    # cosa ha detto.
+    pagina = r"""
+const vero = console.log;
+console.log = () => {};
+const el = () => null;
+let detti = [], ascoltatori = {}, cassettaPost = [], cassettaGet = 0, posta = () => ({viva: true, eventi: [], n: 0});
+function bunkerDice(t){ detti.push(String(t)); }
+function apriAutorizzazioneBunker(){}
+async function caricaNostrTools(){}
+globalThis.document = {visibilityState: 'visible',
+  addEventListener(n, fn){ ascoltatori[n] = fn; }, removeEventListener(n){ delete ascoltatori[n]; }};
+const finestra = {addEventListener(n, fn){ ascoltatori[n] = fn; }, removeEventListener(n){ delete ascoltatori[n]; }};
+globalThis.fetch = async (url, o) => {
+  if (o && o.method === 'POST') { cassettaPost.push(JSON.parse(o.body)); return {ok: true, json: async () => ({relays: JSON.parse(o.body).relays})}; }
+  cassettaGet++;
+  const dopo = Number((String(url).match(/dopo=(\d+)/) || [0, 0])[1]);
+  const d = posta(dopo);
+  return {ok: true, json: async () => d};
+};
+"""
+    return pezzi + "\n" + pagina
+
+
 def prove_bunker_muto():
     """Il bunker che non poteva fallire (ago 2026, dal campo: da Tor
     «Chiamo il bunker…» e poi silenzio per sempre).
@@ -107798,17 +107845,30 @@ def prove_bunker_muto():
     relay su cui si ascoltava, per i due minuti del timeout umano,
     senza mai provare il secondo. Adesso ci si connette a tutti, si
     ascolta su tutti, ogni richiesta parte su tutti, e si cade solo a
-    coro vuoto."""
+    coro vuoto.
+
+    E IL RIAGGANCIO (10 ott 2026, dal campo: due utenti in due giorni,
+    uno col bunker e uno con Clave su iPhone). Una websocket che cade
+    — iOS che sospende la pagina quando si passa all'app del
+    firmatario — valeva come un relay che ci caccia, e a coro vuoto le
+    attese cadevano: «non ha funzionato». Ora la voce resta, si
+    riapre da sola (subito, quando la pagina torna), le richieste in
+    attesa si rimandano, e la cassetta postale del server tiene la
+    risposta arrivata nel frattempo. La presentazione che resta senza
+    risposta si ripete in NIP-04, la lingua dei firmatari di ieri."""
     mini = open("miniapp.html", encoding="utf-8").read()
-    fb = pezzo_js(mini, "async function firmatarioBunker(uri, skHex, modoCifrario){")
+    fb = pezzo_js(mini, "async function firmatarioBunker(uri, skHex, modoCifrario, opz){")
     coro = pezzo_js(mini, "async function apriStanzeNip46(relays){")
     cif = pezzo_js(mini, "function cifrarioNip46(NT, skLocale, pubRemota, modoIniziale){")
-    # I TRE PEZZI FINISCONO CON LA LORO GRAFFA: pezzo_js taglia alla
+    asc = pezzo_js(mini, "function ascoltoNip46(NT, coro, opz){")
+    cas = pezzo_js(mini, "function cassettaNip46(pubLocale, relays, consegna, etichetta){")
+    # I PEZZI FINISCONO CON LA LORO GRAFFA: pezzo_js taglia alla
     # prima riga vuota, e una riga vuota DENTRO una di queste funzioni
     # restituirebbe un pezzo monco che il banco qui sotto non sa
-    # nemmeno parsare — meglio una riga che lo dice.
+    # nemmeno parsare — meglio una riga che lo dica.
     for nome, pz in (("firmatarioBunker", fb), ("apriStanzeNip46", coro),
-                     ("cifrarioNip46", cif)):
+                     ("cifrarioNip46", cif), ("ascoltoNip46", asc),
+                     ("cassettaNip46", cas)):
         prova(f"{nome} si estrae intero (nessuna riga vuota dentro)",
               True, pz.rstrip().endswith("}"))
 
@@ -107842,18 +107902,22 @@ def prove_bunker_muto():
     prova("chi arriva DOPO la grazia si chiude: la stanza e' l'elenco "
           "su cui si ascolta, mai di piu'", True,
           "relay.close()" in _tardi[:_tardi.index("return;")])
+    prova("ogni voce nasce VIVA: e' il segno che l'ascolto abbassa "
+          "quando la socket cade", True,
+          "vive.push({url: r, relay, viva: true, cadute: 0});" in coro)
     prova("si ascolta su OGNI relay vivo", True,
-          "coro.vive.slice().forEach(ascolta);" in fb)
-    prova("ogni richiesta parte su TUTTI i relay vivi", True,
-          "destinatari.forEach(v => v.relay.publish(ev)" in fb)
+          "coro.vive.slice().forEach(ascolta);" in asc)
+    prova("ogni richiesta parte su TUTTI i relay vivi", (True, True),
+          ("invia(id, ascolto.vive());" in fb,
+           "voci.forEach(v => v.relay.publish(ev)" in fb))
     prova("...e si cade solo quando l'hanno rifiutata TUTTI: finche' "
           "uno l'ha presa la risposta puo' ancora arrivare", True,
-          "if (rifiutata.length >= destinatari.length && attese[id])" in fb)
+          "if (rifiutata.length >= voci.length && attese[id] && !at.rimandata)" in fb)
     prova("le copie della stessa risposta (due relay) si scartano per id",
           True, "risposta già servita o non attesa" in fb)
     prova("un relay che chiude esce dal coro, e si cade solo a coro vuoto",
           (True, True),
-          ("coro.vive.splice(i, 1);" in fb, "if (coro.vive.length) {" in fb))
+          ("coro.vive.splice(i, 1);" in asc, "if (coro.vive.length) {" in asc))
     prova("...e la URI con lo stesso relay due volte non lo apre due volte",
           True, "[...new Set(par.getAll('relay'))]" in fb)
 
@@ -107863,25 +107927,29 @@ def prove_bunker_muto():
     prova("...e l'errore finale li NOMINA: senza, chi legge non puo' "
           "decidere di cambiare bunker",
           True, "rifiuti.join(" in fb)
-    prova("il timeout umano dice da quali relay non e' arrivato niente",
-          True, "(via ${nomi() || 'nessun relay vivo'})" in fb)
+    prova("il timeout umano dice da quali relay non e' arrivato niente, "
+          "e come sta la cassetta", (True, True),
+          ("(via ${nomi() || 'nessun relay vivo'}" in fb,
+           "${cassetta.racconta()}" in fb))
 
-    # --- le attese che cadono invece di aspettare due minuti ---
+    # --- le attese che cadono invece di aspettare i minuti ---
     prova("la sottoscrizione ha il suo onclose (CLOSED del relay, o "
-          "websocket caduta)", True, "onclose(motivo){" in fb)
-    prova("...e a coro vuoto le attese cadono col motivo", True,
-          "saltano(`${v.url} ha chiuso l'ascolto: ${motivo} — e non resta "
-          "nessun altro relay`);" in fb)
+          "websocket caduta)", True, "onclose(motivo){" in asc)
+    prova("...e a coro vuoto le attese cadono col motivo", (True, True),
+          ("suCoroVuoto(motivo){ if (Object.keys(attese).length) saltano(motivo); }" in fb,
+           "opz.suCoroVuoto(`${v.url} ha chiuso l'ascolto: ${motivo} — e non "
+           "resta nessun altro relay`)" in asc))
     prova("la chiusura NOSTRA di fine giro non dice niente", (True, True),
-          ("if (i < 0 || finito) return;" in fb, "finito = true;" in fb))
+          ("if (i < 0 || finito) return;" in asc, "finito = true;" in asc))
 
     # --- il publish rifiutato non e' piu' una riga di console ---
-    prova("il publish distingue il RIFIUTO dall'OK che tarda: buttare "
-          "una chiamata ancora viva costa una connessione",
-          True, "/timed out/i.test(motivo)" in fb)
+    prova("il publish distingue il RIFIUTO dall'OK che tarda e dalla "
+          "socket morta con l'OK in viaggio: buttare una chiamata "
+          "ancora viva costa una connessione",
+          True, "/timed out|relay connection/i.test(motivo)" in fb)
     prova("...e sul rifiuto di TUTTI fa cadere l'attesa dicendo chi e' "
           "stato", True,
-          "no(new Error(`ogni relay ha rifiutato la richiesta: "
+          "at.no(new Error(`ogni relay ha rifiutato la richiesta: "
           "${rifiutata.join(' · ')}`));" in fb)
 
     # --- il cifrario lo sceglie chi risponde ---
@@ -107893,15 +107961,89 @@ def prove_bunker_muto():
            "NT.nip04.encrypt(skLocale, a, testo)" in cif))
     prova("...e un contenuto che non si apre e' «non era per noi»: null, "
           "si resta in ascolto", True, "catch(e){ return null; }" in cif)
+    prova("...e si ricorda se dal firmatario e' MAI arrivato qualcosa: "
+          "e' la domanda della seconda lingua", (True, True),
+          ("get visto(){ return visto; }" in cif, "visto = true;" in cif))
     prova("il bunker scrive col cifrario, mai con nip44 a mano",
           (True, False), ("cifra.scrivi(" in fb, "nip44.encrypt(" in fb))
 
     # --- l'AUTH NIP-42, con la chiave del client ---
     prova("l'auth-required si firma con la chiave del CLIENT, mai "
           "quella dell'utente", True,
-          "v.relay.auth(evt => NT.finalizeEvent(evt, skLocale))" in fb)
+          "v.relay.auth(evt => NT.finalizeEvent(evt, skLocale))" in asc)
     prova("...una volta sola per relay: se rifiuta anche la firma, esce",
-          (True, True), ("!v.autenticato" in fb, "v.autenticato = true;" in fb))
+          (True, True), ("!v.autenticato" in asc, "v.autenticato = true;" in asc))
+
+    # --- IL RIAGGANCIO (10 ott 2026) ---
+    prova("la socket caduta («relay connection closed/failed/timed "
+          "out», che e' come la libreria chiude le sottoscrizioni quando "
+          "la websocket muore) NON e' un rifiuto: la voce resta e si "
+          "riapre", (True, True),
+          ("if (/^relay connection|connessione caduta|websocket/i.test(motivo)) { caduta(v, motivo); return; }" in asc,
+           "v.timer = setTimeout(() => riapri(v, `dopo ${ms/1000}s`), ms);" in asc))
+    _ri = re.search(r"const NIP46_RIAGGANCIO_MS = \[([^\]]+)\];", mini)
+    _ri = [int(x) for x in _ri.group(1).split(",")] if _ri else []
+    prova("...con pazienza crescente: il primo tentativo entro un paio "
+          "di secondi (iOS si cura in un attimo), poi sempre piu' rado",
+          True, len(_ri) >= 3 and _ri[0] <= 2000 and _ri == sorted(_ri))
+    prova("la pagina che torna riapre SUBITO le voci cadute: "
+          "visibilitychange, pageshow, online, focus — i quattro modi "
+          "in cui un browser dice «sono tornato»", [True] * 4,
+          [f"'{n}'" in asc for n in ("visibilitychange", "pageshow", "online", "focus")])
+    prova("...e gli ascoltatori si tolgono a fine giro", True,
+          "sveglie.forEach(([dove, nome, fn]) => dove.removeEventListener(nome, fn));" in asc)
+    prova("la sottoscrizione porta un `since`: sui relay che i 24133 li "
+          "conservano (nrs.primal.net, nos.lol: misurato) la riapertura "
+          "ritrova la risposta arrivata mentre si dormiva", (True, True),
+          ("const since = Math.floor(Date.now()/1000) - 60;" in asc,
+           "'#p':[pubLocale], since}" in asc))
+    prova("le copie si scartano per ID DI EVENTO, una volta sola: due "
+          "relay, il since e la cassetta portano la stessa risposta",
+          (True, True),
+          ("if (ev.id && visti.has(ev.id)) return;" in asc, "visti.add(ev.id)" in asc))
+    prova("alla voce riaperta il bunker RIMANDA le richieste in attesa, "
+          "con lo stesso id", (True, True),
+          ("suRiaggancio(v){" in fb, "invia(id, [v]);" in fb))
+    prova("...e una richiesta rimandata non cade piu' per un rifiuto "
+          "parziale", True, "if (at.inviata) at.rimandata = true;" in fb)
+
+    # --- i tempi dell'umano ---
+    _um = re.search(r"const NIP46_UMANO_MS = (\d+);", mini)
+    _sv = re.search(r"const NIP46_SERVIZIO_MS = (\d+);", mini)
+    prova("l'attesa dell'umano (connect, sign_event) e' di almeno "
+          "cinque minuti: dall'altra parte si cambia app due volte",
+          True, bool(_um) and int(_um.group(1)) >= 300000)
+    prova("...e le chiamate di servizio di almeno un minuto",
+          True, bool(_sv) and int(_sv.group(1)) >= 60000)
+    prova("...e i due timeout si usano dalle leve, mai ribattuti",
+          (True, True, True),
+          ("NIP46_PERMESSI], NIP46_UMANO_MS);" in fb,
+           "[JSON.stringify(evento)], NIP46_UMANO_MS))" in fb,
+           "const ms = timeoutMs || NIP46_SERVIZIO_MS;" in fb))
+    src = open("server.py", encoding="utf-8").read()
+    prova("la sfida del server vale altrettanto (10 minuti), e la "
+          "tolleranza sull'ora dell'evento e' la stessa leva",
+          (True, True),
+          (re.search(r"SECONDI_SFIDA_LOGIN = 600\b", src) is not None,
+           "abs(int(time.time()) - creato) > SECONDI_SFIDA_LOGIN" in src))
+
+    # --- la seconda lingua ---
+    _sl = re.search(r"const NIP46_SECONDA_LINGUA_MS = (\d+);", mini)
+    prova("la presentazione senza risposta si ripete in NIP-04, SOLO la "
+          "connect, SOLO se dal firmatario non e' mai arrivato niente",
+          (True, True, True),
+          ("if (metodo === 'connect' && cifra.modo === 'nip44') {" in fb,
+           "if (!attese[id] || cifra.visto) return;" in fb,
+           "invia(id, ascolto.vive(), 'nip04');" in fb))
+    prova("...dopo un'attesa che non e' un attimo (un firmatario che "
+          "capisce tutte e due le lingue potrebbe vedersela chiedere "
+          "due volte)", True, bool(_sl) and 10000 <= int(_sl.group(1)) <= 60000)
+
+    # --- la presentazione si salta quando l'ha gia' fatta il firmatario ---
+    prova("con `giaConnesso` la connect non parte: il firmatario del QR "
+          "si e' gia' presentato col segreto", (True, True),
+          ("if (!opz.giaConnesso) {" in fb,
+           "salto la connect" in fb))
 
     # --- il motivo si legge, e non e' HTML ---
     bd = pezzo_js(mini, "function bunkerDice(testo){", "\n}")
@@ -107910,7 +108052,8 @@ def prove_bunker_muto():
           (True, False), ("textContent" in bd, "innerHTML" in bd))
     lb = pezzo_js(mini, "async function loginNostrBunker(){", "\n}")
     prova("il motivo resta nel foglio e non solo nel toast, che se ne "
-          "va", True, "bunkerDice(`Non ha funzionato" in lb)
+          "va — e SPIEGATO", (True, True),
+          ("bunkerErrore(motivo);" in lb, "spiegaNip46(motivo)" in lb))
 
     # E SI FA GIRARE, che le sentinelle qui sopra dicono che le righe
     # ci sono, mai che il giro risponda giusto — e qui la domanda e'
@@ -107922,33 +108065,16 @@ def prove_bunker_muto():
         salta("firmatarioBunker dice quale relay e cosa ha risposto",
               "node non installato")
         return
-    _pezzi = (re.search(r"const BUNKER_CONNETTI_MS = \d+;", mini).group(0)
-              + "\n" + re.search(r"const NIP46_GRAZIA_MS = \d+;", mini).group(0)
-              # i permessi vivono in una costante condivisa con la
-              # strada del QR: senza portarsela dietro il banco esplode
-              # con un ReferenceError sulla connect, cioe' dice il
-              # motivo sbagliato per tutti i casi
-              + "\n" + re.search(r"const NIP46_PERMESSI = '[^']*';",
-                                 mini).group(0)
-              + "\n" + bd + "\n}\n"
-              + "function apriAutorizzazioneBunker(){}\n"
-              + "async function caricaNostrTools(){}\n"
-              + coro + "\n" + cif + "\n" + fb + "\n")
+    _pezzi = _banco_nip46_js(mini) + "\n" + fb + "\n"
     # il cartone: una libreria che si comporta come quella vera nei
     # punti che contano — la connect che rigetta con una STRINGA (il
-    # timeout) o con un Error (il resto), il publish che rigetta come
+    # timeout) o con un Error (il resto) e che si puo' RICHIAMARE
+    # sulla stessa voce (il riaggancio), il publish che rigetta come
     # fa il bundle su OK:false, la sottoscrizione che tiene i suoi
     # callback PER RELAY in modo che il banco possa chiuderla o farla
     # rispondere da fuori, il nip04 che apre solo il suo
     _prog = _pezzi + r"""
-/* firmatarioBunker RACCONTA (le righe 🟪 sono meta' della diagnosi dal
-   campo): qui pero' finirebbero nello stesso stdout del risultato e lo
-   sporcherebbero. Si zittisce e si scrive il JSON dalla porta di
-   servizio. */
-const vero = console.log;
-console.log = () => {};
-const el = () => null;
-let subs = {}, pubblicati = {}, autenticati = [];
+let subs = {}, pubblicati = {}, autenticati = [], connessioni = {};
 function NTfinto(comeConnette, comePubblica){
   return {
     utils: {hexToBytes: h => h, bytesToHex: b => String(b)},
@@ -107963,10 +108089,11 @@ function NTfinto(comeConnette, comePubblica){
               return String(s).slice(6); }},
     Relay: class {
       constructor(url){ this.url = url; }
-      connect(opts){ return comeConnette(this.url, opts); }
+      connect(opts){ connessioni[this.url] = (connessioni[this.url] || 0) + 1;
+                     return comeConnette(this.url, opts, connessioni[this.url]); }
       subscribe(f, params){ subs[this.url] = params; return {close(){}}; }
       publish(ev){ (pubblicati[this.url] = pubblicati[this.url] || []).push(ev);
-                   return comePubblica(this.url, ev); }
+                   return comePubblica(this.url, ev, pubblicati[this.url].length); }
       auth(firma){ autenticati.push(this.url); return Promise.resolve(); }
       close(){}
     },
@@ -107974,20 +108101,24 @@ function NTfinto(comeConnette, comePubblica){
 }
 const UNO = 'wss://uno.example', DUE = 'wss://due.example';
 const URI = 'bunker://' + 'a'.repeat(64) + '?relay=' + UNO + '&relay=' + DUE;
+const idDi = ev => JSON.parse(String(ev.content).replace(/^nip04:/, '')).id;
+let nEv = 0;
 const rispondi = (url, ev, contenuto) => setTimeout(() => subs[url] && subs[url].onevent(
-  {pubkey: 'b'.repeat(64), content: contenuto || JSON.stringify(
-    {id: JSON.parse(String(ev.content).replace(/^nip04:/, '')).id, result: 'ack'})}), 0);
+  {id: 'ev' + (++nEv), pubkey: 'b'.repeat(64), content: contenuto || JSON.stringify(
+    {id: idDi(ev), result: 'ack'})}), 0);
 const esiti = {};
 /* IL CANE DA GUARDIA C'E' SEMPRE, ed e' la riga che rende questo banco
    capace di FALLIRE: il difetto sotto esame e' proprio un'attesa che
    non finisce mai, quindi senza di lui una mutazione che la rimette lo
    fa PIANTARE — e un banco piantato esplode invece di diventare rosso,
    cioe' passa per «mutazione sopravvissuta». */
-async function caso(nome, comeConnette, comePubblica, ms){
-  subs = {}; pubblicati = {}; autenticati = [];
-  globalThis.window = {NostrTools: NTfinto(comeConnette, comePubblica)};
+async function caso(nome, comeConnette, comePubblica, ms, opz, laPosta){
+  subs = {}; pubblicati = {}; autenticati = []; connessioni = {}; detti = []; cassettaPost = []; cassettaGet = 0;
+  posta = laPosta || (() => ({viva: true, eventi: [], n: 0}));
+  document.visibilityState = 'visible';
+  globalThis.window = Object.assign({NostrTools: NTfinto(comeConnette, comePubblica)}, finestra);
   const t0 = Date.now();
-  const p = firmatarioBunker(URI).then(f => ({f, esito: 'COLLEGATO'}),
+  const p = firmatarioBunker(URI, undefined, undefined, opz).then(f => ({f, esito: 'COLLEGATO'}),
                                       e => ({esito: e.message}));
   const r = await Promise.race([p, new Promise(ok =>
     setTimeout(() => ok({esito: 'ANCORA IN ATTESA'}), ms || 600))]);
@@ -108035,7 +108166,7 @@ const muto = () => new Promise(() => {});
   //     richiesta DOPO parte in NIP-04
   const f = await caso('nip04', subito,
     (url, ev) => { if (url === DUE) rispondi(DUE, ev, 'nip04:' + JSON.stringify(
-      {id: JSON.parse(String(ev.content).replace(/^nip04:/, '')).id, result: 'ack'}));
+      {id: idDi(ev), result: 'ack'}));
       return subito(); });
   if (f) { f.pubkey().catch(() => {});
     await new Promise(ok => setTimeout(ok, 20));
@@ -108053,8 +108184,60 @@ const muto = () => new Promise(() => {});
   await caso('grazia',
     (url) => url === UNO ? subito() : muto(),
     (url, ev) => { rispondi(UNO, ev); return subito(); }, 6000);
+  // (n) LA SOCKET CADE (iOS che sospende la pagina): UNO si scollega
+  //     dopo la connect; non e' un rifiuto, la voce si riapre da sola
+  //     col suo turno, la connect RIPARTE su UNO con lo stesso id, e
+  //     stavolta la risposta arriva
+  await caso('caduta', subito,
+    (url, ev, n) => { if (url === UNO) {
+        if (n === 1) setTimeout(() => subs[UNO].onclose('relay connection closed'), 0);
+        else rispondi(UNO, ev); }
+      return subito(); }, 900);
+  esiti.caduta_connessioni = connessioni;
+  esiti.caduta_inviate = [(pubblicati[UNO] || []).length, (pubblicati[DUE] || []).length];
+  esiti.caduta_stessoId = (pubblicati[UNO] || []).length === 2 && idDi(pubblicati[UNO][0]) === idDi(pubblicati[UNO][1]);
+  esiti.caduta_detto = detti.some(t => /riagganciato/i.test(t));
+  // (o) LA PAGINA TORNA: la socket e' caduta mentre si era via; al
+  //     ritorno (visibilitychange) la voce si riapre SUBITO, senza
+  //     aspettare il suo turno, e lo si dice
+  await caso('sveglia', subito,
+    (url, ev, n) => { if (url === UNO) {
+        if (n === 1) setTimeout(() => {
+          document.visibilityState = 'hidden'; ascoltatori.visibilitychange();
+          subs[UNO].onclose('relay connection closed');
+          document.visibilityState = 'visible'; ascoltatori.visibilitychange();
+        }, 0);
+        else rispondi(UNO, ev); }
+      return subito(); }, 100);
+  esiti.sveglia_bentornato = detti.some(t => /bentornato/i.test(t));
+  esiti.sveglia_connessioni = connessioni[UNO];
+  // (p) LA CASSETTA: i relay sono vivi ma il firmatario risponde
+  //     MENTRE la pagina dormiva, e la risposta sta nella cassetta del
+  //     server: la pagina la legge da li' e si collega
+  await caso('cassetta', subito, (url, ev) => subito(), 600, undefined,
+    (dopo) => dopo >= 1 ? {viva: true, eventi: [], n: 1} : {viva: true, n: 1, eventi: [
+      {n: 1, via: UNO, evento: {id: 'evcassetta', pubkey: 'b'.repeat(64),
+        content: JSON.stringify({id: idDi(pubblicati[UNO][0]), result: 'ack'})}}]});
+  esiti.cassetta_post = cassettaPost[0];
+  esiti.cassetta_letture = cassettaGet;
+  // (q) LA SECONDA LINGUA: nessuno risponde alla connect in NIP-44;
+  //     dopo la leva la stessa connect riparte in NIP-04 e il
+  //     firmatario di ieri, che ora la capisce, risponde
+  await caso('secondaLingua', subito,
+    (url, ev, n) => { if (url === UNO && String(ev.content).startsWith('nip04:'))
+        rispondi(UNO, ev, 'nip04:' + JSON.stringify({id: idDi(ev), result: 'ack'}));
+      return subito(); }, 600);
+  esiti.secondaLingua_inviate = (pubblicati[UNO] || []).map(e => String(e.content).slice(0, 6));
+  esiti.secondaLingua_stessoId = (pubblicati[UNO] || []).length >= 2 && idDi(pubblicati[UNO][0]) === idDi(pubblicati[UNO][1]);
+  // (r) GIA' CONNESSO: niente connect, firmatario pronto subito
+  await caso('giaConnesso', subito, () => subito(), 300, {giaConnesso: true});
+  esiti.giaConnesso_inviate = Object.keys(pubblicati).length;
+  // (s) la socket muore con l'OK del publish in viaggio: non e' un
+  //     rifiuto, si aspetta
+  await caso('socketPublish', subito,
+    () => Promise.reject(new Error('relay connection closed')), 300);
   vero(JSON.stringify(esiti));
-  process.exit(0);   // i timeout umani da 120s terrebbero vivo node
+  process.exit(0);   // i timeout umani terrebbero vivo node
 })();
 """
     _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -108084,7 +108267,7 @@ const muto = () => new Promise(() => {});
     prova("un relay chiude l'ascolto ma l'altro e' vivo: si resta",
           "ANCORA IN ATTESA", d["chiusoMeta"])
     prova("chiudono tutti e due: si cade SUBITO col motivo, invece di "
-          "stare i due minuti del timeout umano",
+          "stare i minuti del timeout umano",
           [True, True],
           ["restricted: registrati" in d["chiusoTutti"],
            "non resta nessun altro relay" in d["chiusoTutti"]])
@@ -108109,6 +108292,34 @@ const muto = () => new Promise(() => {});
           "fermo il coro oltre la grazia (ne' i 15 secondi del timeout)",
           True, d["grazia"] == "COLLEGATO"
           and int(_gr.group(1)) - 200 <= d["grazia_ms"] < int(_ms.group(1)))
+    # --- il riaggancio, sul cartone ---
+    prova("LA SOCKET CADE: la voce si riapre da sola, la connect riparte "
+          "su di lei con lo STESSO id, e il bunker si collega",
+          ("COLLEGATO", 2, [2, 1], True),
+          (d["caduta"], d["caduta_connessioni"].get("wss://uno.example"),
+           d["caduta_inviate"], d["caduta_stessoId"]))
+    prova("...e lo dice nella sala d'attesa", True, d["caduta_detto"])
+    prova("LA PAGINA TORNA: la voce caduta si riapre SUBITO al "
+          "visibilitychange, senza aspettare il suo turno, e si entra",
+          ("COLLEGATO", 2, True),
+          (d["sveglia"], d["sveglia_connessioni"], d["sveglia_bentornato"]))
+    prova("LA CASSETTA: la risposta arrivata mentre si dormiva si legge "
+          "dal server e basta per collegarsi", "COLLEGATO", d["cassetta"])
+    prova("...e la cassetta si era aperta con la chiave del client e i "
+          "relay della URI", {"pub": "pub", "relays": ["wss://uno.example", "wss://due.example"]},
+          d["cassetta_post"])
+    prova("LA SECONDA LINGUA: la connect senza risposta riparte in "
+          "NIP-04 con lo stesso id, e il firmatario di ieri risponde",
+          ("COLLEGATO", True, True),
+          (d["secondaLingua"], d["secondaLingua_stessoId"],
+           d["secondaLingua_inviate"][:2] == [
+               d["secondaLingua_inviate"][0], "nip04:"]
+           and not d["secondaLingua_inviate"][0].startswith("nip04:")))
+    prova("GIA' CONNESSO: nessuna connect sul filo, firmatario pronto",
+          ("COLLEGATO", 0), (d["giaConnesso"], d["giaConnesso_inviate"]))
+    prova("la socket che muore con l'OK del publish in viaggio non e' "
+          "un rifiuto: si aspetta il riaggancio",
+          "ANCORA IN ATTESA", d["socketPublish"])
 
     # --- il quinto silenzio: l'auth_url che non si apre ---
     # I firmatari che vivono sul telefono (Amber e i suoi) rispondono
@@ -108141,7 +108352,12 @@ def prove_login_qr():
 
     E DAL 1 OTT 2026 LA STANZA E' UN CORO: nel codice vanno TUTTI i
     relay su cui si ascolta, l'ascolto si apre PRIMA di disegnare il
-    codice, e la risposta vale da qualunque relay arrivi."""
+    codice, e la risposta vale da qualunque relay arrivi.
+
+    E DAL 10 OTT 2026 LA RISPOSTA SOPRAVVIVE AL SONNO: qui e' il
+    firmatario a parlare per primo, e se la pagina dorme (iOS, cambio
+    d'app) la risposta la tiene la cassetta del server; l'ascolto si
+    riaggancia al ritorno, e al bunker si passa `giaConnesso`."""
     mini = open("miniapp.html", encoding="utf-8").read()
     src = open("server.py", encoding="utf-8").read()
     print("\n[il login col telefono]")
@@ -108168,17 +108384,21 @@ def prove_login_qr():
     # websocket e non risponde a nessuna REQ, e col coro non fa piu'
     # danni — ma un posto in lista e' un posto nel QR, e un relay che
     # il telefono prova per primo senza esito e' tempo perso. I tre
-    # di serie di Amber ci sono: li raggiunge per costruzione.
+    # di serie di Amber ci sono: li raggiunge per costruzione. E dal
+    # 10 ott 2026 il relay di Clave, che i suoi documenti chiedono.
     _lista = src[src.index("RELAYS_NIP46 = ["):]
     _lista = _lista[:_lista.index("]")]
-    prova("la lista porta i tre relay di serie di Amber e non damus",
-          [True, True, True, False],
+    prova("la lista porta i tre relay di serie di Amber, quello di Clave, "
+          "e non damus",
+          [True, True, True, True, False],
           [t in _lista for t in ("wss://nrs.primal.net",
                                  "wss://bucket.coracle.social",
                                  "wss://relay.nip46.com",
+                                 "wss://relay.powr.build",
                                  "relay.damus.io")])
 
     fnc = pezzo_js(mini, "async function firmatarioNostrConnect(){")
+    asc = pezzo_js(mini, "function ascoltoNip46(NT, coro, opz){")
     prova("firmatarioNostrConnect si estrae intero", True,
           fnc.rstrip().endswith("}"))
 
@@ -108196,15 +108416,20 @@ def prove_login_qr():
     prova("...cioe' esattamente quelli su cui si ascolta",
           (True, True),
           ("const stanza = coro.vive.map(v => v.url);" in fnc,
-           "coro.vive.slice().forEach(ascolta);" in fnc))
+           "coro.vive.slice().forEach(ascolta);" in asc))
     prova("...e l'ascolto si apre PRIMA di disegnare il codice: il "
           "kind 24133 e' effimero, un relay non lo conserva",
-          True, fnc.index("coro.vive.slice().forEach(ascolta);")
+          True, fnc.index("const ascolto = ascoltoNip46(NT, coro,")
           < fnc.index("await mostraQrConnessione(uri);"))
     prova("un relay che chiude esce dal coro; si cade solo a coro vuoto",
           (True, True),
-          ("if (coro.vive.length) return;" in fnc,
-           "non resta nessun altro relay" in fnc))
+          ("suCoroVuoto(motivo){ clearTimeout(t); cadi(new Error(motivo)); }" in fnc,
+           "non resta nessun altro relay" in asc))
+    prova("...e la cassetta del server si apre anche qui, sugli stessi "
+          "relay del codice, e si legge al ritorno della pagina",
+          (True, True),
+          ("const cassetta = cassettaNip46(pubLocale, stanza, ascolto.consegna, 'qr');" in fnc,
+           "suSveglia(tornata){ if (tornata) cassetta.leggi(); }" in fnc))
 
     # --- il segreto e' la porta ---
     # Verso la nostra chiave effimera puo' cifrare CHIUNQUE veda il
@@ -108224,10 +108449,13 @@ def prove_login_qr():
           True, "return await firmatarioBunker(" in fnc)
     # IL SECRET NON SI RIPETE: e' servito una volta, e certi firmatari
     # lo trattano come usa-e-getta — ripresentarlo vorrebbe dire
-    # rischiare un rifiuto DOPO che l'utente ha gia' approvato.
+    # rischiare un rifiuto DOPO che l'utente ha gia' approvato. E dal
+    # 10 ott 2026 la seconda connect non si fa proprio.
     _bk = fnc[fnc.index("return await firmatarioBunker("):]
     prova("...e nella sua URI il secret non si ripete", False,
           "secret" in _bk)
+    prova("...e la connect non si rifa' proprio: il firmatario si e' "
+          "gia' presentato", True, "{giaConnesso: true}" in _bk)
     prova("...con la chiave client appena usata, o il firmatario non "
           "ci riconoscerebbe", True, "bytesToHex(skLocale)" in _bk)
     prova("...con gli STESSI relay del QR, e la lingua gia' imparata",
@@ -108245,6 +108473,9 @@ def prove_login_qr():
           "strade", (True, 2),
           ("const NIP46_PERMESSI = " in mini,
            mini.count("NIP46_PERMESSI") - 1))
+    _at = re.search(r"const NOSTRCONNECT_ATTESA_MS = (\d+);", mini)
+    prova("l'appuntamento aspetta almeno dieci minuti: comincia con "
+          "«installa l'app»", True, bool(_at) and int(_at.group(1)) >= 600000)
 
     # --- il disegno del QR e' una fabbrica sola ---
     # I codici da disegnare sono due (la invoice e questa URI) e la
@@ -108268,9 +108499,19 @@ def prove_login_qr():
           "prima e' un appuntamento su una chiave che non ascolta "
           "piu'", (True, True),
           ("nostrQrGiro++" in _ap, "nascondiQrConnessione()" in _ap))
+    # SU IPHONE SI CONSIGLIA IL BUNKER (10 ott 2026): sullo stesso
+    # iPhone il nostrconnect muore di iOS (Clave lo scrive nei suoi
+    # documenti), il bunker:// di Clave firma via notifica.
+    prova("su iPhone il foglio accende il consiglio del bunker di Clave "
+          "e apre la tendina", (True, True, True),
+          ("/iPhone|iPad|iPod/i.test(navigator.userAgent" in _ap,
+           "bi.closest('details').open = true" in _ap,
+           'id="bunkerIphone"' in mini))
     _lq = pezzo_js(mini, "async function loginNostrQr(){", "\n}")
     prova("...e l'attesa che atterra su un giro morto non entra al "
           "posto di quella nuova", 2, _lq.count("giro !== nostrQrGiro"))
+    prova("...e l'errore del QR e' SPIEGATO, nel foglio e nel toast",
+          (True, True), ("bunkerErrore(motivo);" in _lq, "spiegaNip46(motivo)" in _lq))
 
     # --- la guida, e la porta che ci arriva ---
     prova("il foglio della guida esiste e sta DOPO quello del login: "
@@ -108339,30 +108580,13 @@ def prove_login_qr():
     if not _node:
         salta("il giro del login col telefono", "node non installato")
         return
-    _pezzi = (re.search(r"const BUNKER_CONNETTI_MS = \d+;", mini).group(0)
-              + "\n"
-              + re.search(r"const NIP46_GRAZIA_MS = \d+;", mini).group(0)
-              + "\n"
-              + re.search(r"const NIP46_PERMESSI = '[^']*';", mini).group(0)
-              + "\n"
-              + re.search(r"const NOSTRCONNECT_ATTESA_MS = \d+;",
-                          mini).group(0)
-              + "\n" + pezzo_js(mini, "async function apriStanzeNip46(relays){")
-              + "\n" + pezzo_js(mini, "function cifrarioNip46(NT, skLocale, pubRemota, modoIniziale){")
-              + "\n" + fnc + "\n")
+    _pezzi = _banco_nip46_js(mini) + "\n" + fnc + "\n"
     _prog = _pezzi + r"""
-/* il pezzo RACCONTA (le righe 🟪 sono meta' della diagnosi dal campo):
-   qui finirebbero nello stesso stdout del risultato e lo
-   sporcherebbero. Si zittisce e si scrive dalla porta di servizio. */
-const vero = console.log;
-console.log = () => {};
-let subs = {}, qrMostrato = null, qrAscolti = null, alBunker = null;
-async function caricaNostrTools(){}
-function bunkerDice(){}
+let subs = {}, filtri = {}, qrMostrato = null, qrAscolti = null, alBunker = null;
 async function mostraQrConnessione(uri){ qrMostrato = uri; qrAscolti = Object.keys(subs).sort(); }
 function baseCondivisione(){ return 'https://barattolo.store'; }
-async function firmatarioBunker(uri, sk, modo){
-  alBunker = {uri, sk, modo};
+async function firmatarioBunker(uri, sk, modo, opz){
+  alBunker = {uri, sk, modo, opz};
   return {pubkey: async () => 'REMOTO', firma: async (e) => e,
           chiudi(){}, sessione: {uri, sk}};
 }
@@ -108385,7 +108609,7 @@ function NTfinto(comeConnette){
     Relay: class {
       constructor(url){ this.url = url; }
       connect(opts){ return comeConnette(this.url, opts); }
-      subscribe(f, params){ subs[this.url] = params; return {close(){}}; }
+      subscribe(f, params){ subs[this.url] = params; filtri[this.url] = f; return {close(){}}; }
       publish(){ return Promise.resolve(); }
       auth(){ return Promise.resolve(); }
       close(){}
@@ -108393,9 +108617,13 @@ function NTfinto(comeConnette){
   };
 }
 const esiti = {};
+let nEv = 0;
+const ev = (pubkey, msg) => ({id: 'ev' + (++nEv), pubkey, content: JSON.stringify(msg)});
 function avvia(comeConnette){
-  globalThis.window = {NostrTools: NTfinto(comeConnette)};
-  qrMostrato = null; qrAscolti = null; alBunker = null; subs = {};
+  globalThis.window = Object.assign({NostrTools: NTfinto(comeConnette)}, finestra);
+  qrMostrato = null; qrAscolti = null; alBunker = null; subs = {}; filtri = {}; detti = []; cassettaPost = [];
+  posta = () => ({viva: true, eventi: [], n: 0});
+  document.visibilityState = 'visible';
   return firmatarioNostrConnect().then(() => 'FATTO', e => e.message);
 }
 /* il cane da guardia c'e' SEMPRE: qui il difetto sotto esame e'
@@ -108412,14 +108640,13 @@ const conTetto = (p, ms) => Promise.race([p,
   esiti.attesa = await conTetto(p);
   esiti.qr = qrMostrato;
   esiti.qrAscolti = qrAscolti;
+  esiti.since = typeof (filtri['wss://tre.example'] || [{}])[0].since;
   // (b) un messaggio col segreto SBAGLIATO non apre niente
-  subs['wss://tre.example'].onevent({pubkey: 'IMPOSTORE',
-               content: JSON.stringify({id: '1', result: 'ack'})});
+  subs['wss://tre.example'].onevent(ev('IMPOSTORE', {id: '1', result: 'ack'}));
   esiti.impostore = await conTetto(p);
   esiti.dopoImpostore = alBunker;
   // (c) col segreto giusto si passa al bunker di sempre
-  subs['wss://tre.example'].onevent({pubkey: 'REMOTO',
-               content: JSON.stringify({id: '2', result: 'ilsegreto'})});
+  subs['wss://tre.example'].onevent(ev('REMOTO', {id: '2', result: 'ilsegreto'}));
   esiti.buono = await conTetto(p, 400);
   esiti.bunker = alBunker;
   // (d) DUE relay vivi: nel QR ci sono tutti e due, l'ascolto e' su
@@ -108429,8 +108656,7 @@ const conTetto = (p, ms) => Promise.race([p,
   esiti.attesa2 = await conTetto(p);
   esiti.qr2 = qrMostrato;
   esiti.qrAscolti2 = qrAscolti;
-  subs['wss://tre.example'].onevent({pubkey: 'REMOTO2',
-               content: JSON.stringify({id: '3', result: 'ilsegreto'})});
+  subs['wss://tre.example'].onevent(ev('REMOTO2', {id: '3', result: 'ilsegreto'}));
   esiti.buono2 = await conTetto(p, 400);
   esiti.bunker2 = alBunker;
   // (e) un relay chiude l'ascolto, l'altro resta: si aspetta ancora;
@@ -108442,7 +108668,25 @@ const conTetto = (p, ms) => Promise.race([p,
   subs['wss://due.example'].onclose('rate-limited: calma');
   subs['wss://tre.example'].onclose('restricted: no');
   esiti.chiusoTutti = await conTetto(p, 400);
-  // (f) senza relay non si mostra nessun codice
+  // (f) LA PAGINA DORME (10 ott 2026): la socket cade, ma NON e' un
+  //     rifiuto — si resta in attesa; la risposta del firmatario
+  //     intanto e' finita nella cassetta del server, e al ritorno
+  //     della pagina si legge da li': si entra, col bunker che NON
+  //     rifa' la connect
+  p = avvia(() => Promise.resolve());
+  await conTetto(p);
+  subs['wss://uno.example'].onclose('relay connection closed');
+  subs['wss://due.example'].onclose('relay connection closed');
+  subs['wss://tre.example'].onclose('relay connection closed');
+  esiti.dormita = await conTetto(p);
+  posta = (dopo) => dopo >= 1 ? {viva: true, eventi: [], n: 1} : {viva: true, n: 1, eventi: [
+    {n: 1, via: 'wss://uno.example', evento: ev('REMOTO3', {id: '9', result: 'ilsegreto'})}]};
+  document.visibilityState = 'hidden'; ascoltatori.visibilitychange();
+  document.visibilityState = 'visible'; ascoltatori.visibilitychange();
+  esiti.sveglia = await conTetto(p, 400);
+  esiti.bunker3 = alBunker;
+  esiti.cassettaRelays = (cassettaPost[0] || {}).relays;
+  // (g) senza relay non si mostra nessun codice
   relayNip46 = [];
   esiti.senzaRelay = await conTetto(avvia(() => Promise.resolve()));
   esiti.qrSenzaRelay = qrMostrato;
@@ -108479,6 +108723,7 @@ const conTetto = (p, ms) => Promise.race([p,
                               "secret=ilsegreto", "perms=")])
     prova("l'ascolto era GIA' aperto quando il codice e' comparso",
           ["wss://tre.example"], d["qrAscolti"])
+    prova("...con un since nel filtro", "number", d["since"])
     prova("finche' nessuno risponde si resta in ascolto, senza "
           "inventarsi un firmatario",
           ("ANCORA IN ATTESA", None), (d["attesa"], d["dopoImpostore"]))
@@ -108491,6 +108736,8 @@ const conTetto = (p, ms) => Promise.race([p,
            .startswith("bunker://REMOTO"), (d["bunker"] or {}).get("sk")])
     prova("...e senza il secret, che e' gia' servito una volta",
           False, "secret" in (d["bunker"] or {}).get("uri", ""))
+    prova("...e col bunker che non rifa' la connect", True,
+          ((d["bunker"] or {}).get("opz") or {}).get("giaConnesso"))
     _qr2 = _unq(d["qr2"] or "")
     prova("con DUE relay vivi il codice li porta tutti e due, e non "
           "il terzo che non c'e'", (True, True, False, 2),
@@ -108511,9 +108758,184 @@ const conTetto = (p, ms) => Promise.race([p,
     prova("...e a coro vuoto si cade subito, col motivo", [True, True],
           ["restricted: no" in d["chiusoTutti"],
            "non resta nessun altro relay" in d["chiusoTutti"]])
+    prova("LA PAGINA DORME: tutte le socket cadute NON fanno cadere "
+          "l'appuntamento", "ANCORA IN ATTESA", d["dormita"])
+    prova("...al ritorno la risposta si legge dalla cassetta del server "
+          "e si entra, col bunker senza connect",
+          ("FATTO", True, True),
+          (d["sveglia"], (d["bunker3"] or {}).get("uri", "").startswith("bunker://REMOTO3"),
+           ((d["bunker3"] or {}).get("opz") or {}).get("giaConnesso")))
+    prova("...e la cassetta si era aperta sui relay del codice",
+          ["wss://due.example", "wss://tre.example", "wss://uno.example"],
+          sorted(d["cassettaRelays"] or []))
     prova("senza relay non si disegna nessun codice", (True, None),
           ("appuntamento non disponibile" in d["senzaRelay"],
            d["qrSenzaRelay"]))
+
+
+def prove_cassetta_nip46():
+    """LA CASSETTA POSTALE DEL NIP-46 (10 ott 2026) — il lato server,
+    senza fastapi: le sentinelle sul testo, il giudice dei relay fatto
+    girare, il deposito con le copie e il tetto; e il lato client, con
+    gli errori spiegati fatti girare in node. Il giro VERO delle due
+    rotte e dell'orecchio sta in `collaudo_cassetta_nip46` (CI)."""
+    print("\n[la cassetta postale NIP-46]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+    i = src.index("# --- LA CASSETTA POSTALE DEL NIP-46")
+    blocco = src[i:src.index("\n# ------------------------- LNBITS (escrow)", i)]
+
+    # --- le due rotte, e cosa NON fanno ---
+    prova("le due rotte esistono: la pagina deposita, la pagina legge",
+          (True, True),
+          ('@app.post("/api/login/nostr/cassetta")' in blocco,
+           '@app.get("/api/login/nostr/cassetta")' in blocco))
+    prova("il deposito ha il freno per IP delle porte del login",
+          True, '_frena("login", _ip_di(req))' in blocco)
+    prova("la cassetta NON tocca il database: vive in memoria e si butta",
+          (False, False), ("con.execute" in codice(blocco), "db()" in codice(blocco)))
+    prova("...e non legge mai una chiave privata: tiene solo i campi "
+          "dell'evento, com'e' sul relay", True,
+          '"id", "pubkey", "created_at",' in blocco)
+    prova("in collaudo verso un relay che non e' di casa non si esce "
+          "(la regola di sempre, `lettura_simulata`)", True,
+          'lettura_simulata(relay, "della cassetta NIP-46 (24133)")' in blocco)
+    prova("il nome del relay si RISOLVE e un indirizzo non pubblico si "
+          "rifiuta: la cassetta non e' una porta per bussare dentro casa",
+          (True, True), ("socket.getaddrinfo(host, None)" in blocco,
+                         "if not ip.is_global:" in blocco))
+    prova("un orecchio per RELAY, non per cassetta: il filtro porta "
+          "tutte le chiavi e si rimanda quando cambia", (True, True),
+          ('"#p": filtro, "since": since}' in blocco,
+           "if list(pubs) != filtro:" in blocco))
+    prova("...in un thread daemon, come l'ascolto P2P", True,
+          "daemon=True, name=f\"orecchio {r}\"" in blocco)
+    prova("la connessione passa da una porta che il banco sostituisce",
+          (True, True), ("_cassetta_connetti = create_connection" in blocco,
+                         "ws = _cassetta_connetti(relay, timeout=10," in blocco))
+    prova("vita, tetto, eventi e relay per cassetta hanno la loro leva",
+          [True] * 4, [f"{n} = " in blocco for n in
+                       ("CASSETTA_VITA_S", "CASSETTA_TETTO",
+                        "CASSETTA_EVENTI_MAX", "CASSETTA_RELAY_MAX")])
+
+    # --- il giudice dei relay, fatto girare ---
+    import ipaddress as _ip
+    from urllib.parse import urlparse as _up
+    amb = {"urlparse": _up, "ipaddress": _ip, "re": re}
+    exec(pezzo("relay_di_casa"), amb)
+    exec(pezzo("_relay_cassetta_ammesso"), amb)
+    g = amb["_relay_cassetta_ammesso"]
+    prova("wss con un nome di dominio: si'", [True, True],
+          [g("wss://nrs.primal.net"), g("wss://relay.powr.build/")])
+    prova("ws:// di casa (il relay dei collaudi): si'; ws:// altrove: no",
+          [True, True, False],
+          [g("ws://127.0.0.1:7790"), g("ws://localhost:7790"), g("ws://relay.example")])
+    prova("un IP nudo, http, credenziali, .onion, vuoto, troppo lungo: no",
+          [False] * 6,
+          [g("wss://1.2.3.4"), g("http://relay.example"),
+           g("wss://u:p@relay.example"), g("wss://abc.onion"),
+           g(""), g("wss://" + "a" * 200 + ".example")])
+
+    # --- il deposito, con le copie e il tetto ---
+    import threading as _th
+    amb2 = {"RE_HEX_64": re.compile(r"[0-9a-f]{64}"), "_CASSETTE": {},
+            "_CASSETTE_LOCK": _th.Lock(), "CASSETTA_EVENTI_MAX": 2,
+            "time": time}
+    exec(pezzo("_cassette_vive"), amb2)
+    exec(pezzo("_cassetta_deposita"), amb2)
+    dep = amb2["_cassetta_deposita"]
+    pub = "a" * 64
+    amb2["_CASSETTE"][pub] = {"scade": time.time() + 60, "relays": {"r"},
+                              "eventi": [], "ids": set(), "n": 0}
+    ev = lambda i, p=pub: {"id": i, "pubkey": "c" * 64, "kind": 24133,
+                           "tags": [["p", p]], "content": "x", "sig": "s",
+                           "created_at": 1}
+    prova("un 24133 per una cassetta viva entra", True, dep(ev("1" * 64), "r"))
+    prova("...la copia (stesso id) no", False, dep(ev("1" * 64), "r"))
+    prova("...uno per una chiave senza cassetta no", False,
+          dep(ev("2" * 64, "b" * 64), "r"))
+    prova("...un kind diverso o un id storto no", [False, False],
+          [dep({**ev("3" * 64), "kind": 1}, "r"), dep(ev("corto"), "r")])
+    prova("...il secondo entra, il terzo oltre il tetto no", [True, False],
+          [dep(ev("4" * 64), "r"), dep(ev("5" * 64), "r")])
+    prova("...e ogni evento depositato porta il contatore e il relay",
+          [(1, "r"), (2, "r")],
+          [(e["n"], e["via"]) for e in amb2["_CASSETTE"][pub]["eventi"]])
+    amb2["_CASSETTE"][pub]["scade"] = time.time() - 1
+    prova("una cassetta scaduta non riceve piu', e si butta", (False, 0),
+          (dep(ev("6" * 64), "r"), len(amb2["_CASSETTE"])))
+
+    # --- il client: la cassetta e gli errori spiegati ---
+    cas = pezzo_js(mini, "function cassettaNip46(pubLocale, relays, consegna, etichetta){")
+    prova("il client deposita con un POST e legge con un GET col "
+          "contatore, e consegna gli eventi alla stessa porta delle "
+          "websocket", [True] * 3,
+          ["`${API_BASE}/login/nostr/cassetta`, {method:'POST'" in cas,
+           "`${API_BASE}/login/nostr/cassetta?pub=${pubLocale}&dopo=${n}`" in cas,
+           "consegna(e.evento, `cassetta (${e.via})`);" in cas])
+    prova("...a ritmo lento, e senza aspettare il server per partire",
+          (True, True), ("setInterval(leggi, CASSETTA_POLL_MS)" in cas,
+                         "cassetta.apri();" in mini))
+    sp = pezzo_js(mini, "function spiegaNip46(motivo){")
+    be = pezzo_js(mini, "function bunkerErrore(motivo){")
+    prova("l'errore spiegato si costruisce a nodi, mai con innerHTML: "
+          "nel dettaglio finisce la risposta di un relay",
+          (True, False, True),
+          ("document.createElement(" in be, "innerHTML" in be,
+           "'Dettaglio: ' + sp.dettaglio" in be))
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("spiegaNip46 gira sul cartone", "node non installato")
+        return
+    _prog = sp + r"""
+const motivi = {
+  relay: 'nessun relay raggiungibile — wss://relay.nsec.app → connection timed out',
+  tempo: 'nessuna risposta dal bunker in 300s (via wss://nos.lol; cassetta: wss://nos.lol connesso)',
+  tempoQr: 'nessuna risposta in 10 minuti (via wss://nos.lol; cassetta del server aperta)',
+  rifiuto: 'ogni relay ha rifiutato la richiesta: wss://nos.lol → blocked',
+  caduta: 'wss://nos.lol ha chiuso l\'ascolto: restricted — e non resta nessun altro relay',
+  uri: 'URI bunker:// non valida',
+  senzaRelay: 'la URI non indica nessun relay',
+  no: 'invalid secret',
+  noPerm: 'no permission',
+  appuntamento: 'appuntamento non disponibile',
+  libreria: 'La libreria di sicurezza non è arrivata: controlla la rete e riprova.',
+  boh: 'qualcosa di mai visto',
+};
+const out = {};
+for (const [k, m] of Object.entries(motivi)) { const s = spiegaNip46(m); out[k] = [s.cosa, s.fare, s.dettaglio === m]; }
+console.log(JSON.stringify(out));
+"""
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+    _f.write(_prog)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=30, encoding="utf-8")
+    os.unlink(_f.name)
+    if _r.returncode != 0:
+        prova("spiegaNip46 gira sul cartone", "0", f"{_r.returncode}: {_r.stderr[:300]}")
+        return
+    d = _js.loads(_r.stdout.strip())
+    prova("ogni famiglia di guasto ha la sua frase: cosa e' andato storto "
+          "E cosa fare, col dettaglio tecnico intero",
+          [True] * len(d),
+          [bool(v[0]) and bool(v[1]) and v[2] for v in d.values()])
+    frasi = {k: v[0] for k, v in d.items()}
+    prova("...e le famiglie non si confondono: relay giu', firmatario "
+          "muto, rifiuto dei relay, connessione caduta, link storto, "
+          "il no del firmatario sono sei frasi diverse", 6,
+          len({frasi[k] for k in ("relay", "tempo", "rifiuto", "caduta", "uri", "no")}))
+    prova("...il no del firmatario prende anche «no permission» (Amber)",
+          frasi["no"], frasi["noPerm"])
+    prova("...il link senza relay e' la stessa famiglia del link storto",
+          frasi["uri"], frasi["senzaRelay"])
+    prova("...il timeout del QR e quello del bunker dicono la stessa "
+          "cosa, e consigliano il bunker di Clave su iPhone",
+          (frasi["tempo"], True), (frasi["tempoQr"], "Clave" in d["tempo"][1]))
+    prova("...e un motivo mai visto resta leggibile, col dettaglio da "
+          "copiare", (True, True),
+          (frasi["boh"].startswith("Non ha funzionato"), "copia il dettaglio" in d["boh"][1]))
 
 
 def prove_punti_barattolo():
@@ -139595,6 +140017,7 @@ def main():
               prove_avvio_apk,
               prove_bunker_muto,
               prove_login_qr,
+              prove_cassetta_nip46,
               prove_profilo_sezioni,
               prove_profilo_elegante,
               prove_utenti_home,

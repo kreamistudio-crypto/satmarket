@@ -13921,11 +13921,17 @@ document.getElementById('cartello')?.remove();</script>
       <div class="qr" id="nostrQr"></div>
       <div class="invoice" id="nostrQrUri" style="user-select:all;margin-top:10px"></div>
       <button class="btn mini" style="margin-top:6px" onclick="copiaUriConnessione()">📋 Copia il link</button>
-      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:6px">Se il firmatario ce l'hai su <b>questo</b> telefono il codice non lo puoi inquadrare da solo: copia il link e incollalo nell'app.</div>
+      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:6px">Se il firmatario ce l'hai su <b>questo</b> telefono il codice non lo puoi inquadrare da solo: copia il link, incollalo nell'app, approva e <b>torna qui</b>: la risposta ti aspetta. Su <b>iPhone con Clave</b> è più sicura la strada del <b>bunker://</b> qui sotto (Clave firma senza che tu cambi app).</div>
     </div>
     <button class="btn primary" style="margin-top:10px" onclick="loginNostrEstensione()">🧩 Con l'estensione del browser</button>
     <details style="margin-top:10px">
       <summary style="cursor:pointer;font-weight:700;font-size:14px;padding:6px 0">🔗 Con un bunker remoto (NIP-46)</summary>
+      <!-- IL CONSIGLIO PER L'IPHONE (10 ott 2026, dal campo): sullo
+           stesso iPhone il nostrconnect muore di iOS, che sospende la
+           pagina mentre si approva in Clave; il bunker:// di Clave
+           invece firma via notifica, senza cambiare app. La riga si
+           accende solo su iOS (vedi apriNostrSheet). -->
+      <div id="bunkerIphone" style="display:none;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin:6px 0 2px">📱 <b>Su iPhone con Clave</b> è la strada che funziona meglio: in Clave apri <b>Connect → Bunker</b>, tocca <b>Copy URI</b> e incolla qui sotto. Clave firma da sola, senza che tu cambi app.</div>
       <div class="field" style="margin-top:8px">
         <input id="bunkerUri" placeholder="bunker://…" autocomplete="off" spellcheck="false">
       </div>
@@ -47951,6 +47957,42 @@ const NIP46_GRAZIA_MS = 2500;
    un permesso in piu' o in meno di quello che poi usa. */
 const NIP46_PERMESSI = 'sign_event:22242,sign_event:30402';
 
+/* I TEMPI DELL'UMANO (10 ott 2026, dal campo: due utenti in due giorni
+   fuori dalla porta, uno col bunker e uno con Clave su iPhone). Dall'altra
+   parte di una richiesta NIP-46 c'e' una PERSONA che prende il telefono,
+   apre l'app del firmatario, legge e approva — e se il firmatario sta
+   sullo STESSO telefono cambia app due volte. I due minuti di ieri erano
+   stretti: cinque. Le chiamate di servizio (get_public_key) non
+   aspettano nessuno, ma passano dagli stessi relay e dallo stesso
+   telefono che magari e' ancora nell'altra app: un minuto.
+   L'appuntamento del QR, che comincia con «installa l'app», dieci. La
+   sfida del server vale altrettanto (SECONDI_SFIDA_LOGIN). */
+const NIP46_UMANO_MS = 300000;
+const NIP46_SERVIZIO_MS = 60000;
+const NOSTRCONNECT_ATTESA_MS = 600000;
+/* LA SECONDA LINGUA: la presentazione (`connect`) parte in NIP-44, che
+   e' quel che la NIP-46 chiede e quel che parlano Amber, Clave, nak e
+   nostr-tools. Un firmatario di ieri che sa SOLO il NIP-04 pero' non la
+   apre nemmeno, e tace — e il cifrario qui sotto cambia lingua solo
+   quando QUALCUNO gli scrive in NIP-04, cioe' mai. Quindi se dopo questi
+   secondi dal firmatario non e' arrivato NIENTE (ne' una risposta ne'
+   un'auth_url) la stessa presentazione, con lo stesso id, riparte in
+   NIP-04. Il prezzo dichiarato: un firmatario che capisce tutte e due
+   le lingue e sta aspettando che l'umano approvi la prima puo' vedersi
+   chiedere la stessa cosa due volte — ed e' per questo che i secondi
+   sono venti e non cinque. */
+const NIP46_SECONDA_LINGUA_MS = 20000;
+/* IL RIAGGANCIO: quanto si aspetta prima di riaprire una websocket
+   caduta, tentativo dopo tentativo. Il primo subito, che la caduta piu'
+   comune (iOS che sospende la pagina) si cura in un attimo; poi con
+   pazienza crescente, che un relay davvero giu' non va martellato. */
+const NIP46_RIAGGANCIO_MS = [1000, 2000, 4000, 8000, 15000, 30000];
+/* IL SECONDO ORECCHIO, la cassetta postale del server (vedi
+   cassettaNip46): ogni quanto si chiede «c'e' posta?» mentre si aspetta.
+   Le websocket restano la strada veloce; questa e' quella che regge
+   quando la pagina e' stata sospesa. */
+const CASSETTA_POLL_MS = 4000;
+
 /* 2) Bunker NIP-46: le firme le fa un signer remoto. Il protocollo è
    una chat cifrata su un relay: noi (chiave locale del CLIENT, mai
    quella dell'utente) mandiamo richieste kind-24133 cifrate NIP-44,
@@ -47974,7 +48016,21 @@ const NIP46_PERMESSI = 'sign_event:22242,sign_event:30402';
    (le copie si scartano per id). Un relay che chiude l'ascolto esce
    dal coro; si cade solo quando il coro è vuoto. E' quel che fanno i
    client NIP-46 di riferimento (nostr-tools, Amber stesso), ed è la
-   NIP-46 letta per intero: «via the specified relays», al plurale. */
+   NIP-46 letta per intero: «via the specified relays», al plurale.
+
+   E IL CORO SI RIAGGANCIA (10 ott 2026, dal campo: iPhone, Clave,
+   «passa all'app, approva, torna, e non ha funzionato»). Quando si
+   cambia app iOS sospende la pagina e le chiude le websocket; al
+   ritorno la libreria chiude le sottoscrizioni con «relay connection
+   closed», e fino a ieri quella riga valeva come un relay che ci
+   caccia: a coro vuoto si cadeva. Ora una socket caduta NON e' un
+   rifiuto: la voce resta nel coro, si riapre da sola (e subito, quando
+   la pagina torna visibile), e le richieste ancora in attesa si
+   rimandano su quella voce — il firmatario che ha gia' approvato
+   risponde da solo. E la risposta arrivata MENTRE si dormiva la tiene
+   la cassetta postale del server (`cassettaNip46`): e' l'unico modo
+   per non perderla, perche' il 24133 e' effimero. Tutto questo sta in
+   `ascoltoNip46`, che e' uno per le due strade. */
 
 /* IL CORO SI APRE IN PARALLELO, e si parte appena c'è una voce: ogni
    relay si chiama insieme agli altri col suo timeout, e si va avanti
@@ -47992,7 +48048,9 @@ const NIP46_PERMESSI = 'sign_event:22242,sign_event:30402';
    argomenti, quindi il suo `opts?.timeout` è per sempre undefined. E
    senza timeout, se la socket resta appesa in CONNECTING — un exit
    node che scarta i pacchetti, un relay morto — quella promise NON SI
-   RISOLVE MAI: era il buco, «Chiamo il bunker…» e poi silenzio. */
+   RISOLVE MAI: era il buco, «Chiamo il bunker…» e poi silenzio.
+   OGNI VOCE NASCE VIVA (`viva: true`): e' il segno che ascoltoNip46
+   abbassa quando la socket cade e rialza al riaggancio. */
 async function apriStanzeNip46(relays){
   const NT = window.NostrTools;
   const vive = [], rifiuti = [];
@@ -48007,7 +48065,7 @@ async function apriStanzeNip46(relays){
         try { relay.close(); } catch(_){}
         return;
       }
-      vive.push({url: r, relay});
+      vive.push({url: r, relay, viva: true, cadute: 0});
       console.log(`🟪 [coro] relay connesso: ${r}`);
       primaVoce();
     } catch(e){
@@ -48034,24 +48092,35 @@ async function apriStanzeNip46(relays){
    QR: il mittente non si conosce in anticipo, è proprio quel che si
    aspetta di scoprire) la chiave di conversazione si deriva da CHI
    HA SCRITTO. Un contenuto che non si apre in nessuno dei due modi
-   è un messaggio per qualcun altro: null, e si resta in ascolto. */
+   è un messaggio per qualcun altro: null, e si resta in ascolto.
+   `visto` dice se dal firmatario e' MAI arrivato qualcosa che si
+   apre: e' la domanda della seconda lingua (vedi NIP46_SECONDA_LINGUA_MS).
+   `scrivi` accetta una lingua FORZATA per quel solo messaggio: e' la
+   presentazione ripetuta in NIP-04, che non cambia la lingua di casa
+   finche' il firmatario non risponde in quella. */
 function cifrarioNip46(NT, skLocale, pubRemota, modoIniziale){
   let modo = modoIniziale === 'nip04' ? 'nip04' : 'nip44';
+  let visto = false;
   const chiave44 = (pub) => NT.nip44.getConversationKey(skLocale, pub);
   const fissa = pubRemota ? chiave44(pubRemota) : null;
   return {
     get modo(){ return modo; },
-    scrivi(testo, pub){
+    get visto(){ return visto; },
+    scrivi(testo, pub, modoForzato){
       const a = pub || pubRemota;
-      return modo === 'nip04' ? NT.nip04.encrypt(skLocale, a, testo)
-                              : NT.nip44.encrypt(testo, fissa || chiave44(a));
+      const m = modoForzato || modo;
+      return m === 'nip04' ? NT.nip04.encrypt(skLocale, a, testo)
+                           : NT.nip44.encrypt(testo, fissa || chiave44(a));
     },
     leggi(ev){
       try {
-        return JSON.parse(NT.nip44.decrypt(ev.content, fissa || chiave44(ev.pubkey)));
+        const msg = JSON.parse(NT.nip44.decrypt(ev.content, fissa || chiave44(ev.pubkey)));
+        visto = true;
+        return msg;
       } catch(e){}
       try {
         const msg = JSON.parse(NT.nip04.decrypt(skLocale, ev.pubkey, ev.content));
+        visto = true;
         if (modo !== 'nip04') {
           modo = 'nip04';
           console.log('🟪 [bunker] il firmatario parla NIP-04: da qui in poi anche noi');
@@ -48062,7 +48131,232 @@ function cifrarioNip46(NT, skLocale, pubRemota, modoIniziale){
   };
 }
 
-async function firmatarioBunker(uri, skHex, modoCifrario){
+/* L'ASCOLTO CHE SI RIAGGANCIA (10 ott 2026): la sottoscrizione sul
+   kind 24133 verso la NOSTRA chiave effimera, su ogni voce del coro,
+   con tre cose che prima stavano sparse in due copie (bunker e QR):
+   • LA SOCKET CADUTA NON E' UN RIFIUTO. La libreria chiude le
+     sottoscrizioni con «relay connection closed / failed / timed out»
+     quando la websocket muore — ed e' esattamente quel che iOS fa alla
+     pagina quando si passa all'app del firmatario. La voce resta nel
+     coro con `viva = false`, si riapre con la pazienza di
+     NIP46_RIAGGANCIO_MS, e SUBITO quando la pagina torna visibile
+     (visibilitychange, pageshow, online, focus: i quattro modi in cui
+     un browser dice «sono tornato»). Un CLOSED del relay (restricted,
+     rate-limited…) resta una porta chiusa: la voce esce, e a coro
+     vuoto si cade come ieri.
+   • IL `since` SULLA SOTTOSCRIZIONE: l'inizio dell'appuntamento, meno
+     un minuto. Sui relay che i 24133 li conservano (nrs.primal.net e
+     nos.lol, misurati il 10 ott 2026) la riapertura ritrova la risposta
+     arrivata mentre si dormiva; sugli altri due non costa niente.
+   • LE COPIE SI SCARTANO PER ID DI EVENTO, qui e una volta sola: la
+     stessa risposta puo' arrivare da due relay, dal `since` e dalla
+     cassetta postale, e chi sta sopra deve vederla UNA volta.
+   `suEvento(ev, via)` riceve ogni evento buono; `suRiaggancio(v)` scatta
+   a ogni voce riaperta (il bunker ci rimanda le richieste in attesa);
+   `suSveglia(tornata)` a ogni ritorno della pagina (si legge la
+   cassetta); `suCoroVuoto(motivo)` quando l'ultima voce e' stata
+   cacciata. `consegna(ev, via)` e' la porta per gli eventi che arrivano
+   da fuori (la cassetta): passano dallo stesso scarto delle copie. */
+function ascoltoNip46(NT, coro, opz){
+  const {skLocale, pubLocale, suEvento, dice, etichetta} = opz;
+  const since = Math.floor(Date.now()/1000) - 60;
+  const visti = new Set();
+  let finito = false, nascosta = (typeof document !== 'undefined' && document.visibilityState === 'hidden');
+  const vive = () => coro.vive.filter(v => v.viva);
+  const nomi = () => vive().map(v => v.url).join(' · ');
+  function consegna(ev, via){
+    if (finito || !ev) return;
+    if (ev.id && visti.has(ev.id)) return;   // la stessa risposta, da un'altra strada
+    if (ev.id) visti.add(ev.id);
+    suEvento(ev, via);
+  }
+  /* UNA VOCE ESCE DAL CORO: un CLOSED del relay (restricted,
+     rate-limited…) o un'auth rifiutata. Finché resta un'altra voce si
+     va avanti e lo si dice; a coro vuoto chi sta sopra decide. */
+  function esce(v, motivo){
+    const i = coro.vive.indexOf(v);
+    if (i < 0 || finito) return;
+    coro.vive.splice(i, 1);
+    clearTimeout(v.timer);
+    try { v.relay.close(); } catch(_){}
+    console.log(`🟪 [${etichetta}] ${v.url} ha chiuso l'ascolto: ${motivo}`);
+    if (coro.vive.length) {
+      dice(`${v.url} ha chiuso (${motivo}): resto in ascolto su ${nomi() || 'un relay che sto riaprendo'}`);
+      return;
+    }
+    if (opz.suCoroVuoto) opz.suCoroVuoto(`${v.url} ha chiuso l'ascolto: ${motivo} — e non resta nessun altro relay`);
+  }
+  /* LA SOCKET E' CADUTA: la voce resta, si riapre. Se sono cadute
+     TUTTE lo si dice, perche' da fuori sembrerebbe silenzio. */
+  function caduta(v, motivo){
+    if (finito || !v.viva) return;
+    v.viva = false;
+    console.log(`🟪 [${etichetta}] ${v.url} si è scollegato (${motivo}): lo riapro`);
+    if (!vive().length) dice('La connessione coi relay è caduta: la riapro da sola, resta su questa pagina…');
+    programma(v);
+  }
+  function programma(v){
+    if (finito) return;
+    const ms = NIP46_RIAGGANCIO_MS[Math.min(v.cadute || 0, NIP46_RIAGGANCIO_MS.length - 1)];
+    clearTimeout(v.timer);
+    v.timer = setTimeout(() => riapri(v, `dopo ${ms/1000}s`), ms);
+  }
+  async function riapri(v, perche){
+    if (finito || v.viva || v.riaprendo || coro.vive.indexOf(v) < 0) return;
+    v.riaprendo = true;
+    try {
+      await v.relay.connect({timeout: BUNKER_CONNETTI_MS});
+      if (finito) { try { v.relay.close(); } catch(_){} return; }
+      v.viva = true;
+      v.cadute = 0;
+      ascolta(v);
+      console.log(`🟪 [${etichetta}] ${v.url} riagganciato (${perche})`);
+      dice(`Riagganciato ${v.url}: resto in ascolto su ${nomi()}…`);
+      if (opz.suRiaggancio) opz.suRiaggancio(v);
+    } catch(e){
+      const motivo = e?.message || String(e);
+      v.cadute = (v.cadute || 0) + 1;
+      console.log(`🟪 [${etichetta}] ${v.url} non si riapre (${motivo}): tentativo ${v.cadute}`);
+      /* UN OGGETTO NUOVO PER IL PROSSIMO TENTATIVO (dal giro dal vivo):
+         la libreria tiene in memoria la promessa della connessione
+         anche quando e' stata rifiutata, e un `connect()` dopo quel
+         rifiuto torna la STESSA promessa, rifiutata, per sempre — il
+         relay sembrerebbe giu' anche a rete tornata. Si butta e si
+         rifa': costa niente, e lo stato stantio non puo' seguirci. */
+      try { v.relay.close(); } catch(_){}
+      v.relay = new NT.Relay(v.url);
+      programma(v);
+    } finally { v.riaprendo = false; }
+  }
+  function ascolta(v){
+    v.relay.subscribe([{kinds:[24133], '#p':[pubLocale], since}], {onevent(ev){
+      consegna(ev, v.url);
+    },
+    onclose(motivo){
+      if (finito) return;              // la chiusura NOSTRA di fine giro: niente da dire
+      motivo = motivo || 'connessione caduta';
+      /* L'AUTH NIP-42 SI FIRMA CON LA CHIAVE DEL CLIENT (1 ott 2026):
+         i relay dedicati al NIP-46 (auth.nostr1.com, fra quelli di
+         serie di Amber) chiudono l'ascolto con «auth-required» e
+         vogliono una firma — la nostra chiave effimera basta, non è
+         mai quella dell'utente. Una volta sola per relay: se rifiuta
+         anche la firma, esce dal coro col suo motivo. */
+      if (/^auth-required: /.test(motivo) && !v.autenticato) {
+        v.autenticato = true;
+        console.log(`🟪 [${etichetta}] ${v.url} chiede l'AUTH: firmo con la chiave del client`);
+        v.relay.auth(evt => NT.finalizeEvent(evt, skLocale))
+          .then(() => ascolta(v))
+          .catch(e => esce(v, `auth rifiutata: ${e?.message || String(e)}`));
+        return;
+      }
+      if (/^relay connection|connessione caduta|websocket/i.test(motivo)) { caduta(v, motivo); return; }
+      esce(v, motivo);
+    }});
+  }
+  /* I QUATTRO MODI IN CUI LA PAGINA DICE «SONO TORNATA». Si riaprono
+     subito le voci cadute (senza aspettare il loro turno) e si avvisa
+     chi sta sopra, che va a leggere la cassetta. `nascosta` ricorda se
+     la pagina e' stata via: solo allora il messaggio dice «bentornato»,
+     che a chi non si e' mosso suonerebbe strano. */
+  const sveglie = [];
+  function sveglia(perche){
+    return () => {
+      if (finito) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') { nascosta = true; return; }
+      const tornata = nascosta;
+      nascosta = false;
+      const giu = coro.vive.filter(v => !v.viva);
+      console.log(`🟪 [${etichetta}] sveglia (${perche}): ${giu.length} relay da riaprire${tornata ? ', la pagina era via' : ''}`);
+      if (tornata && giu.length) dice('Bentornato: mentre eri nell\'altra app la connessione si era chiusa. La riapro e controllo se la risposta è già arrivata…');
+      giu.forEach(v => { clearTimeout(v.timer); riapri(v, perche); });
+      if (opz.suSveglia) opz.suSveglia(tornata);
+    };
+  }
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    for (const [dove, nome] of [[document, 'visibilitychange'], [window, 'pageshow'], [window, 'online'], [window, 'focus']]) {
+      const fn = sveglia(nome);
+      dove.addEventListener(nome, fn);
+      sveglie.push([dove, nome, fn]);
+    }
+  }
+  function chiudi(){
+    finito = true;
+    sveglie.forEach(([dove, nome, fn]) => dove.removeEventListener(nome, fn));
+    coro.vive.slice().forEach(v => { clearTimeout(v.timer); try { v.relay.close(); } catch(e){} });
+  }
+  coro.vive.slice().forEach(ascolta);
+  return {consegna, vive, nomi, chiudi, esce, get finito(){ return finito; }};
+}
+
+/* LA CASSETTA POSTALE (10 ott 2026): il server ascolta i relay al posto
+   della pagina, per la nostra chiave EFFIMERA, e tiene da parte i 24133
+   arrivati mentre la pagina dormiva (vedi server.py, «LA CASSETTA
+   POSTALE DEL NIP-46»). Il server vede quel che vede un relay — la
+   chiave effimera, il mittente, il testo cifrato — e la chiave privata
+   che apre quei messaggi non e' mai uscita da qui: gli eventi tornano
+   nella pagina e li legge `cifra.leggi`, come quelli delle websocket.
+   E' il SECONDO orecchio: si apre senza aspettarla (se il server non
+   risponde si va avanti con le websocket sole), si legge a ritmo lento
+   e SUBITO quando la pagina torna. Gli eventi passano da `consegna`,
+   che scarta le copie. Dopo meta' vita si rinnova (`rinfresca`): un
+   giro col bunker puo' durare piu' di una cassetta. */
+function cassettaNip46(pubLocale, relays, consegna, etichetta){
+  let n = 0, viva = null, timer = null, ferma = false, orecchi = {}, apertaA = 0;
+  async function apri(){
+    if (ferma) return;
+    apertaA = Date.now();          // da subito: un rinfresca() durante l'apertura non deve riaprire
+    try {
+      const r = await fetch(`${API_BASE}/login/nostr/cassetta`, {method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({pub: pubLocale, relays})});
+      const d = await r.json().catch(() => ({}));
+      viva = r.ok;
+      apertaA = Date.now();
+      console.log(`🟪 [${etichetta}] cassetta ${r.ok ? 'aperta su ' + (d.relays || []).join(' · ') : 'rifiutata: ' + (d.detail || r.status)}`
+        + ((d.rifiutati || []).length ? ` (relay non ammessi: ${d.rifiutati.join(' · ')})` : ''));
+    } catch(e){
+      viva = false;
+      console.log(`🟪 [${etichetta}] cassetta non raggiungibile: ${e?.message || e}`);
+    }
+    if (viva && !timer) timer = setInterval(leggi, CASSETTA_POLL_MS);
+  }
+  async function leggi(){
+    if (ferma || !viva) return;
+    try {
+      const r = await fetch(`${API_BASE}/login/nostr/cassetta?pub=${pubLocale}&dopo=${n}`);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) return;
+      orecchi = d.orecchi || {};
+      for (const e of (d.eventi || [])) {
+        n = Math.max(n, e.n || 0);
+        console.log(`🟪 [${etichetta}] dalla cassetta: un evento via ${e.via}`);
+        consegna(e.evento, `cassetta (${e.via})`);
+      }
+      if (!d.viva) { viva = false; clearInterval(timer); timer = null; }
+    } catch(e){}
+  }
+  function rinfresca(){
+    if (viva !== false && Date.now() - apertaA > 240000) apri();
+  }
+  function chiudi(){ ferma = true; clearInterval(timer); timer = null; }
+  return {apri, leggi, rinfresca, chiudi,
+          get viva(){ return viva; }, get orecchi(){ return orecchi; },
+          /* per i messaggi: quali orecchi del server ascoltano davvero */
+          racconta(){
+            const o = Object.entries(orecchi);
+            if (viva === false) return 'cassetta del server non disponibile';
+            if (!o.length) return viva ? 'cassetta del server aperta' : 'cassetta del server in apertura';
+            return 'cassetta: ' + o.map(([r, s]) => `${r} ${s.stato}${s.perche ? ' (' + s.perche + ')' : ''}`).join(' · ');
+          }};
+}
+
+/* `opz.giaConnesso` (10 ott 2026): la strada del QR arriva qui DOPO che
+   il firmatario si e' presentato da solo col segreto — rifargli la
+   `connect` vuol dire chiedergli un'approvazione in piu', e un
+   firmatario severo potrebbe dire di no DOPO che l'utente ha gia'
+   approvato, che e' il momento peggiore in cui fallire. Si salta. */
+async function firmatarioBunker(uri, skHex, modoCifrario, opz){
+  opz = opz || {};
   await caricaNostrTools();
   const NT = window.NostrTools;
   const m = uri.trim().match(/^bunker:\/\/([0-9a-f]{64})\??(.*)$/i);
@@ -48082,150 +48376,162 @@ async function firmatarioBunker(uri, skHex, modoCifrario){
      e basta: senza quei dati chi legge non può decidere di cambiare
      bunker, che è l'unica cosa che può fare da solo. */
   if (!coro.vive.length) throw new Error('nessun relay raggiungibile — ' + coro.rifiuti.join(' · '));
-  const nomi = () => coro.vive.map(v => v.url).join(' · ');
-  bunkerDice(`In ascolto su ${nomi()}: chiamo il bunker…`);
-  const attese = {};   // id richiesta -> {ok, no} della Promise in corso
-  let finito = false;  // la chiusura NOSTRA di fine giro: niente da dire
+  const attese = {};   // id richiesta -> {ok, no, metodo, params} della Promise in corso
   /* Fa cadere le attese in corso con lo stesso motivo. Serve quando la
      strada si chiude sotto i piedi: da lì in poi la risposta non può
-     PIÙ arrivare, e stare i due minuti del timeout umano vuol dire
+     PIÙ arrivare, e stare i minuti del timeout umano vuol dire
      aspettare una cosa che non può succedere. */
   function saltano(motivo){
     for (const id of Object.keys(attese)) {
       const at = attese[id];
       delete attese[id];
+      clearTimeout(at.lingua);
       console.log(`🟪 [bunker] attesa ${id} caduta: ${motivo}`);
       at.no(new Error(motivo));
     }
   }
-  /* UNA VOCE ESCE DAL CORO: un CLOSED (restricted, rate-limited…) o la
-     websocket che muore. Finché resta un altro relay si va avanti e lo
-     si dice; a coro vuoto le attese cadono, perché la risposta non ha
-     più nessuna strada per arrivare. */
-  function esce(v, motivo){
-    const i = coro.vive.indexOf(v);
-    if (i < 0 || finito) return;
-    coro.vive.splice(i, 1);
-    try { v.relay.close(); } catch(_){}
-    console.log(`🟪 [bunker] ${v.url} ha chiuso l'ascolto: ${motivo}`);
-    if (coro.vive.length) {
-      bunkerDice(`${v.url} ha chiuso (${motivo}): resto in ascolto su ${nomi()}`);
-      return;
+  function suEvento(ev, via){
+    const msg = cifra.leggi(ev);
+    if (!msg) return;               // non era per noi
+    if (msg.result === 'auth_url') {  // il bunker vuole il tuo permesso
+      /* PRIMA del lookup in attese: un'auth_url che arriva tardi
+         (l'umano è lento, la richiesta magari è già scaduta) va
+         mostrata LO STESSO — buttarla lasciava il flusso muto. */
+      console.log(`🟪 [bunker] ← auth_url (id ${msg.id}): serve l'autorizzazione`);
+      apriAutorizzazioneBunker(msg.error);
+      return;                         // la vera risposta arriverà dopo
     }
-    if (!Object.keys(attese).length) return;
-    saltano(`${v.url} ha chiuso l'ascolto: ${motivo} — e non resta nessun altro relay`);
+    const at = attese[msg.id];
+    /* la stessa risposta può arrivare da più relay: la prima vale,
+       le copie si scartano qui, in silenzio */
+    if (!at) { console.log(`🟪 [bunker] ← risposta già servita o non attesa (id ${msg.id}, via ${via})`); return; }
+    console.log(`🟪 [bunker] ← risposta per id ${msg.id} via ${via}: ${msg.error ? 'ERRORE ' + msg.error : 'ok'}`);
+    delete attese[msg.id];
+    clearTimeout(at.lingua);
+    if (msg.error) at.no(new Error(msg.error)); else at.ok(msg.result);
   }
-  function ascolta(v){
-    v.relay.subscribe([{kinds:[24133], '#p':[pubLocale]}], {onevent(ev){
-      const msg = cifra.leggi(ev);
-      if (!msg) return;               // non era per noi
-      if (msg.result === 'auth_url') {  // il bunker vuole il tuo permesso
-        /* PRIMA del lookup in attese: un'auth_url che arriva tardi
-           (l'umano è lento, la richiesta magari è già scaduta) va
-           mostrata LO STESSO — buttarla lasciava il flusso muto. */
-        console.log(`🟪 [bunker] ← auth_url (id ${msg.id}): serve l'autorizzazione`);
-        apriAutorizzazioneBunker(msg.error);
-        return;                         // la vera risposta arriverà dopo
+  const ascolto = ascoltoNip46(NT, coro, {skLocale, pubLocale, suEvento,
+    dice: bunkerDice, etichetta: 'bunker',
+    suCoroVuoto(motivo){ if (Object.keys(attese).length) saltano(motivo); },
+    /* LA VOCE E' TORNATA: le richieste ancora in attesa ripartono su di
+       lei, con lo stesso id. Il firmatario che le aveva gia' ricevute
+       (e magari risposto nel vuoto) risponde di nuovo; quello che non
+       le aveva mai viste le vede adesso. */
+    suRiaggancio(v){
+      for (const id of Object.keys(attese)) {
+        console.log(`🟪 [bunker] rimando ${attese[id].metodo} (id ${id}) su ${v.url}`);
+        invia(id, [v]);
       }
-      const at = attese[msg.id];
-      /* la stessa risposta può arrivare da più relay: la prima vale,
-         le copie si scartano qui, in silenzio */
-      if (!at) { console.log(`🟪 [bunker] ← risposta già servita o non attesa (id ${msg.id}, via ${v.url})`); return; }
-      console.log(`🟪 [bunker] ← risposta per id ${msg.id} via ${v.url}: ${msg.error ? 'ERRORE ' + msg.error : 'ok'}`);
-      delete attese[msg.id];
-      if (msg.error) at.no(new Error(msg.error)); else at.ok(msg.result);
     },
-    onclose(motivo){
-      /* L'AUTH NIP-42 SI FIRMA CON LA CHIAVE DEL CLIENT (1 ott 2026):
-         i relay dedicati al NIP-46 (auth.nostr1.com, fra quelli di
-         serie di Amber) chiudono l'ascolto con «auth-required» e
-         vogliono una firma — la nostra chiave effimera basta, non è
-         mai quella dell'utente. Una volta sola per relay: se rifiuta
-         anche la firma, esce dal coro col suo motivo. */
-      if (/^auth-required: /.test(motivo || '') && !v.autenticato) {
-        v.autenticato = true;
-        console.log(`🟪 [bunker] ${v.url} chiede l'AUTH: firmo con la chiave del client`);
-        v.relay.auth(evt => NT.finalizeEvent(evt, skLocale))
-          .then(() => ascolta(v))
-          .catch(e => esce(v, `auth rifiutata: ${e?.message || String(e)}`));
+    suSveglia(tornata){ if (tornata) cassetta.leggi(); },
+  });
+  const cassetta = cassettaNip46(pubLocale, relays, ascolto.consegna, 'bunker');
+  cassetta.apri();                   // il secondo orecchio: non si aspetta
+  const nomi = ascolto.nomi;
+  bunkerDice(`In ascolto su ${nomi()}: chiamo il bunker…`);
+  /* Una richiesta, com'e' scritta sul filo: un evento NUOVO a ogni
+     invio (l'ora cambia, la cifratura ha il suo sale), lo stesso id
+     dentro. `modoForzato` e' la seconda lingua della presentazione. */
+  function invia(id, voci, modoForzato){
+    const at = attese[id];
+    if (!at) return;
+    const ev = NT.finalizeEvent({kind:24133,
+      created_at: Math.floor(Date.now()/1000), tags:[['p', bunkerPub]],
+      content: cifra.scrivi(JSON.stringify({id, method: at.metodo, params: at.params}), null, modoForzato)},
+      skLocale);
+    console.log(`🟪 [bunker] → ${at.metodo} (id ${id}${modoForzato ? ', in ' + modoForzato : ''}) su ${voci.map(v => v.url).join(' · ') || 'nessun relay vivo: aspetto il riaggancio'}`);
+    const rifiutata = [];
+    voci.forEach(v => v.relay.publish(ev).catch(e=>{
+      const motivo = e?.message || String(e);
+      /* DUE COSE DIVERSE, e confonderle costa una connessione buttata
+         via. «publish timed out» vuol dire che l'evento È PARTITO e
+         manca solo l'OK del relay, che su Tor può tardare più dei
+         4,4s che la libreria si dà — lì si ASPETTA, o si butta una
+         chiamata ancora viva. E «relay connection closed» (10 ott
+         2026) vuol dire che la socket e' morta con l'OK in viaggio: la
+         voce si sta gia' riaprendo e la richiesta ripartira' da sola.
+         Un rifiuto vero (OK:false — blocked, auth-required,
+         restricted…) dice che su QUEL relay la richiesta non è
+         entrata: si cade solo quando l'hanno rifiutata TUTTI, perché
+         finché uno l'ha presa la risposta può ancora arrivare — e si
+         dice chi e con che parole. */
+      if (/timed out|relay connection/i.test(motivo)) {
+        console.log(`🟪 [bunker] ${v.url} tarda l'OK (${motivo}): resto in ascolto`);
         return;
       }
-      esce(v, motivo || 'connessione caduta');
-    }});
+      console.log(`🟪 [bunker] ${v.url} ha rifiutato ${at.metodo}: ${motivo}`);
+      rifiutata.push(`${v.url} → ${motivo}`);
+      if (rifiutata.length >= voci.length && attese[id] && !at.rimandata) {
+        delete attese[id];
+        clearTimeout(at.lingua);
+        at.no(new Error(`ogni relay ha rifiutato la richiesta: ${rifiutata.join(' · ')}`));
+      }
+    }));
+    if (at.inviata) at.rimandata = true;
+    at.inviata = true;
   }
-  coro.vive.slice().forEach(ascolta);
   function chiama(metodo, params, timeoutMs){
+    cassetta.rinfresca();
     return new Promise((ok, no)=>{
       const id = Math.random().toString(36).slice(2);
-      const destinatari = coro.vive.slice();
-      if (!destinatari.length) { no(new Error('nessun relay è rimasto in ascolto')); return; }
-      attese[id] = {ok, no};
-      const ev = NT.finalizeEvent({kind:24133,
-        created_at: Math.floor(Date.now()/1000), tags:[['p', bunkerPub]],
-        content: cifra.scrivi(JSON.stringify({id, method:metodo, params}))},
-        skLocale);
-      console.log(`🟪 [bunker] → ${metodo} (id ${id}) su ${destinatari.map(v => v.url).join(' · ')}`);
-      const rifiutata = [];
-      destinatari.forEach(v => v.relay.publish(ev).catch(e=>{
-        const motivo = e?.message || String(e);
-        /* DUE COSE DIVERSE, e confonderle costa una connessione buttata
-           via. «publish timed out» vuol dire che l'evento È PARTITO e
-           manca solo l'OK del relay, che su Tor può tardare più dei
-           4,4s che la libreria si dà — lì si ASPETTA, o si butta una
-           chiamata ancora viva. Un rifiuto vero (OK:false — blocked,
-           auth-required, restricted…) dice che su QUEL relay la
-           richiesta non è entrata: si cade solo quando l'hanno
-           rifiutata TUTTI, perché finché uno l'ha presa la risposta
-           può ancora arrivare — e si dice chi e con che parole. */
-        if (/timed out/i.test(motivo)) {
-          console.log(`🟪 [bunker] ${v.url} tarda l'OK (${motivo}): resto in ascolto`);
-          return;
-        }
-        console.log(`🟪 [bunker] ${v.url} ha rifiutato ${metodo}: ${motivo}`);
-        rifiutata.push(`${v.url} → ${motivo}`);
-        if (rifiutata.length >= destinatari.length && attese[id]) {
-          delete attese[id];
-          no(new Error(`ogni relay ha rifiutato la richiesta: ${rifiutata.join(' · ')}`));
-        }
-      }));
+      attese[id] = {ok, no, metodo, params};
+      invia(id, ascolto.vive());
+      /* LA SECONDA LINGUA, solo per la presentazione: se in
+         NIP46_SECONDA_LINGUA_MS dal firmatario non e' arrivato NIENTE
+         che si apra, la stessa connect riparte in NIP-04 (vedi la
+         costante per il prezzo). */
+      if (metodo === 'connect' && cifra.modo === 'nip44') {
+        attese[id].lingua = setTimeout(() => {
+          if (!attese[id] || cifra.visto) return;
+          console.log(`🟪 [bunker] nessuna risposta in ${NIP46_SECONDA_LINGUA_MS/1000}s: ripeto la presentazione in NIP-04, la lingua dei firmatari di ieri`);
+          bunkerDice(`Il bunker non ha ancora risposto: riprovo a presentarmi nella lingua di ieri (NIP-04)… Se sul telefono hai l'app del firmatario, la richiesta potrebbe aspettare lì.`);
+          invia(id, ascolto.vive(), 'nip04');
+        }, NIP46_SECONDA_LINGUA_MS);
+      }
       /* La firma aspetta un ESSERE UMANO che approva su un altro
-         dispositivo: 2 minuti. Le chiamate di servizio restano a 30s. */
-      const ms = timeoutMs || 30000;
-      setTimeout(()=>{ if (attese[id]) { delete attese[id];
+         dispositivo, o sullo stesso cambiando app: NIP46_UMANO_MS. Le
+         chiamate di servizio restano a NIP46_SERVIZIO_MS. */
+      const ms = timeoutMs || NIP46_SERVIZIO_MS;
+      setTimeout(()=>{ if (attese[id]) { const at = attese[id]; delete attese[id];
+        clearTimeout(at.lingua);
         console.log(`🟪 [bunker] ⏱ ${metodo} senza risposta dopo ${ms/1000}s`);
         /* I NOMI DEI RELAY ANCHE QUI: «il bunker non risponde» non
            dice se a tacere è il bunker o la strada per arrivarci, e
            sono due guasti con due rimedi diversi. */
-        no(new Error(`nessuna risposta dal bunker in ${ms/1000}s (via ${nomi() || 'nessun relay vivo'})`)); } }, ms);
+        no(new Error(`nessuna risposta dal bunker in ${ms/1000}s (via ${nomi() || 'nessun relay vivo'}; ${cassetta.racconta()})`)); } }, ms);
     });
   }
   /* Il terzo parametro della connect sono i PERMESSI richiesti: senza,
      certi bunker (nsec.app…) trattano ogni firma come non autorizzata
      e chiedono un'approvazione via auth_url che magari non arriva mai
      sul telefono. Chiederli qui = un'autorizzazione sola, chiara.
-     Timeout umano (120s): la prima connect può voler dire aprire
-     l'app del bunker e approvare, in 30s non ci si sta. */
+     Timeout umano: la prima connect può voler dire aprire l'app del
+     bunker e approvare. */
   const chiudi = () => {
-    finito = true;
-    coro.vive.slice().forEach(v => { try { v.relay.close(); } catch(e){} });
+    ascolto.chiudi();
+    cassetta.chiudi();
   };
-  try {
-    await chiama('connect', [bunkerPub, par.get('secret') || '',
-                             NIP46_PERMESSI], 120000);
-  } catch(e){
-    if (!/already connected/i.test(e.message || '')) {
-      chiudi();                       // niente websocket orfane
-      throw e;
+  if (!opz.giaConnesso) {
+    try {
+      await chiama('connect', [bunkerPub, par.get('secret') || '',
+                               NIP46_PERMESSI], NIP46_UMANO_MS);
+    } catch(e){
+      if (!/already connected/i.test(e.message || '')) {
+        chiudi();                       // niente websocket orfane
+        throw e;
+      }
+      /* "already connected" NON è un errore: nsec.app risponde così
+         quando questo secret è già stato approvato (es. al login).
+         Vuol dire solo "sei già dentro": avanti con la firma. */
+      console.log('🟪 [bunker] connect: already connected — va benissimo, avanti');
     }
-    /* "already connected" NON è un errore: nsec.app risponde così
-       quando questo secret è già stato approvato (es. al login).
-       Vuol dire solo "sei già dentro": avanti con la firma. */
-    console.log('🟪 [bunker] connect: already connected — va benissimo, avanti');
+  } else {
+    console.log('🟪 [bunker] il firmatario si è già presentato: salto la connect');
   }
   console.log('🟪 [bunker] firmatario pronto');
   return {
     pubkey: () => chiama('get_public_key', []),
-    firma:  async (evento) => JSON.parse(await chiama('sign_event', [JSON.stringify(evento)], 120000)),
+    firma:  async (evento) => JSON.parse(await chiama('sign_event', [JSON.stringify(evento)], NIP46_UMANO_MS)),
     chiudi,
     /* per ricordaBunker: uri + chiave client = la sessione riusabile */
     sessione: {uri: uri.trim(), sk: NT.utils.bytesToHex(skLocale)},
@@ -48276,10 +48582,17 @@ async function firmatarioBunker(uri, skHex, modoCifrario){
    IL SECRET NON SI RIPETE nella seconda connect: e' servito una volta,
    alla presentazione, e certi firmatari lo trattano come usa-e-getta —
    ripresentarlo vorrebbe dire rischiare un rifiuto DOPO che l'utente
-   ha gia' approvato, che e' il momento peggiore in cui fallire. */
-const NOSTRCONNECT_ATTESA_MS = 180000;   /* 3 minuti: dall'altra parte
-   c'e' un umano che prende il telefono, apre l'app, inquadra e
-   approva. Coi 30s delle chiamate di servizio non ci si sta. */
+   ha gia' approvato, che e' il momento peggiore in cui fallire. E dal
+   10 ott 2026 la seconda connect NON SI FA PROPRIO (`giaConnesso`): il
+   firmatario si e' gia' presentato lui.
+
+   LA RISPOSTA CHE ARRIVA MENTRE SI DORME (10 ott 2026, dal campo: iPhone
+   e Clave sullo stesso telefono). Qui e' il firmatario a parlare per
+   primo, e se la pagina e' sospesa quando lo fa non c'e' richiesta da
+   rimandare: non si sa nemmeno a chi. L'ascolto si riaggancia da solo
+   al ritorno (`ascoltoNip46`, col `since`), e la cassetta postale del
+   server (`cassettaNip46`) tiene la risposta arrivata nel frattempo:
+   al ritorno si legge subito. */
 let nostrQrGiro = 0;
 async function firmatarioNostrConnect(){
   await caricaNostrTools();
@@ -48298,51 +48611,33 @@ async function firmatarioNostrConnect(){
   const coro = await apriStanzeNip46(relays);
   if (!coro.vive.length) throw new Error('nessun relay raggiungibile — ' + coro.rifiuti.join(' · '));
   const stanza = coro.vive.map(v => v.url);
-  const nomi = () => coro.vive.map(v => v.url).join(' · ');
-  const risposta = new Promise((ok, no)=>{
-    const t = setTimeout(()=> no(new Error(
-      `nessuna risposta in ${NOSTRCONNECT_ATTESA_MS/60000} minuti (via ${stanza.join(' · ')})`)),
-      NOSTRCONNECT_ATTESA_MS);
-    /* il relay puo' chiuderci l'ascolto (auth-required, rate-limit,
-       websocket caduta): finche' ne resta un altro si va avanti, a coro
-       vuoto si cade — senza stare i tre minuti per niente */
-    const esce = (v, motivo) => {
-      const i = coro.vive.indexOf(v);
-      if (i < 0) return;
-      coro.vive.splice(i, 1);
-      try { v.relay.close(); } catch(_){}
-      console.log(`🟪 [qr] ${v.url} ha chiuso l'ascolto: ${motivo}`);
-      if (coro.vive.length) return;
-      clearTimeout(t);
-      no(new Error(`${v.url} ha chiuso l'ascolto: ${motivo} — e non resta nessun altro relay`));
-    };
-    const ascolta = (v) => {
-      v.relay.subscribe([{kinds:[24133], '#p':[pubLocale]}], {onevent(ev){
-        const msg = cifra.leggi(ev);
-        if (!msg) return;              // non era per noi
-        if (msg.result !== segreto) {
-          console.log(`🟪 [qr] ← messaggio senza il segreto giusto (via ${v.url}): ignorato`);
-          return;
-        }
-        console.log(`🟪 [qr] ← eccolo: ${ev.pubkey.slice(0,8)}… via ${v.url}`);
-        clearTimeout(t);
-        ok(ev.pubkey);
-      },
-      onclose(motivo){
-        if (/^auth-required: /.test(motivo || '') && !v.autenticato) {
-          v.autenticato = true;
-          console.log(`🟪 [qr] ${v.url} chiede l'AUTH: firmo con la chiave del client`);
-          v.relay.auth(evt => NT.finalizeEvent(evt, skLocale))
-            .then(() => ascolta(v))
-            .catch(e => esce(v, `auth rifiutata: ${e?.message || String(e)}`));
-          return;
-        }
-        esce(v, motivo || 'connessione caduta');
-      }});
-    };
-    coro.vive.slice().forEach(ascolta);
-  });
+  let risolvi, cadi;
+  const risposta = new Promise((ok, no) => { risolvi = ok; cadi = no; });
   risposta.catch(()=>{});   // il rifiuto lo raccoglie l'await qui sotto
+  const t = setTimeout(()=> cadi(new Error(
+    `nessuna risposta in ${NOSTRCONNECT_ATTESA_MS/60000} minuti (via ${stanza.join(' · ')}; ${cassetta.racconta()})`)),
+    NOSTRCONNECT_ATTESA_MS);
+  function suEvento(ev, via){
+    const msg = cifra.leggi(ev);
+    if (!msg) return;              // non era per noi
+    if (msg.result !== segreto) {
+      console.log(`🟪 [qr] ← messaggio senza il segreto giusto (via ${via}): ignorato`);
+      return;
+    }
+    console.log(`🟪 [qr] ← eccolo: ${ev.pubkey.slice(0,8)}… via ${via}`);
+    clearTimeout(t);
+    risolvi(ev.pubkey);
+  }
+  const ascolto = ascoltoNip46(NT, coro, {skLocale, pubLocale, suEvento,
+    dice: bunkerDice, etichetta: 'qr',
+    /* il relay puo' chiuderci l'ascolto (auth-required, rate-limit):
+       finche' ne resta un altro si va avanti, a coro vuoto si cade —
+       senza stare i dieci minuti per niente */
+    suCoroVuoto(motivo){ clearTimeout(t); cadi(new Error(motivo)); },
+    suSveglia(tornata){ if (tornata) cassetta.leggi(); },
+  });
+  const cassetta = cassettaNip46(pubLocale, stanza, ascolto.consegna, 'qr');
+  cassetta.apri();                   // il secondo orecchio: non si aspetta
   const uri = 'nostrconnect://' + pubLocale
     + '?' + stanza.map(r => 'relay=' + encodeURIComponent(r)).join('&')
     + '&secret=' + segreto
@@ -48356,11 +48651,11 @@ async function firmatarioNostrConnect(){
   await mostraQrConnessione(uri);
   let remoto;
   try { remoto = await risposta; }
-  finally { coro.vive.slice().forEach(v => { try { v.relay.close(); } catch(e){} }); }
+  finally { ascolto.chiudi(); cassetta.chiudi(); }
   bunkerDice('Firmatario collegato: preparo la firma…');
   return await firmatarioBunker(
     'bunker://' + remoto + '?' + stanza.map(r => 'relay=' + encodeURIComponent(r)).join('&'),
-    NT.utils.bytesToHex(skLocale), cifra.modo);
+    NT.utils.bytesToHex(skLocale), cifra.modo, {giaConnesso: true});
 }
 
 /* Il codice a schermo, e la stringa sotto per chi ha il firmatario su
@@ -48377,10 +48672,12 @@ async function mostraQrConnessione(uri){
   const fatto = await disegnaQr(el('nostrQr'), uri, 'Byte');
   bunkerDice(fatto
     ? "Inquadra il codice col tuo firmatario (Amber su Android, Clave "
-    + "su iPhone, nsec.app…) e "
-    + "approva: resto in ascolto."
+    + "su iPhone, nsec.app…) e approva: resto in ascolto. Se per "
+    + "approvare passi a un'altra app, torna qui dopo: la risposta ti "
+    + "aspetta."
     : "Il codice non si e' potuto disegnare: copia il link qui sotto e "
-    + "incollalo nel tuo firmatario. Resto in ascolto.");
+    + "incollalo nel tuo firmatario. Resto in ascolto, anche se passi "
+    + "a un'altra app e torni.");
 }
 function nascondiQrConnessione(){
   const box = el('nostrQrBox');
@@ -48460,6 +48757,70 @@ function scordaBunker(pub){
 function bunkerDice(testo){
   const s = el('nostrSheetSub');
   if (s) s.textContent = testo;
+}
+
+/* L'ERRORE SPIEGATO (10 ott 2026, dal campo: «mi dice che non ha
+   funzionato»). Il motivo tecnico — quale relay, cosa ha risposto — e'
+   la diagnosi, e resta; ma da solo non dice a chi legge COSA e' andato
+   storto ne' COSA PUO' FARE, e un utente davanti a «nessuna risposta
+   dal bunker in 300s (via wss://…)» chiude l'app. Qui ogni famiglia di
+   guasto ha la sua frase e il suo rimedio; il dettaglio va sotto, in
+   piccolo, da copiare quando si scrive a noi. Le famiglie sono quelle
+   che il motore sa produrre: chi ne aggiunge una la aggiunga qui.
+   L'ORDINE CONTA: la riga del «no» del firmatario cerca parole comuni
+   (secret, rejected…) e sta DOPO quelle piu' precise. */
+function spiegaNip46(motivo){
+  const m = String(motivo || '');
+  const regole = [
+    [/nessun relay raggiungibile/i,
+     'Nessuno dei relay del firmatario risponde da qui.',
+     'Controlla la rete (su Tor i relay possono non rispondere); se il firmatario lo permette, scegli un relay diverso e genera un link nuovo. Il relay di nsec.app oggi spesso non risponde.'],
+    [/nessuna risposta (dal bunker|in \d+ minuti)/i,
+     'Il firmatario non ha risposto in tempo.',
+     'Apri l\'app del firmatario: la richiesta di Barattolo potrebbe aspettare lì. Approvala, torna qui e riprova. Su iPhone con Clave usa il suo bunker:// (firma anche senza cambiare app).'],
+    [/ogni relay ha rifiutato/i,
+     'I relay non hanno accettato la richiesta.',
+     'Riprova fra un minuto; se continua, nel firmatario scegli un relay diverso.'],
+    [/non resta nessun altro relay|ha chiuso l'ascolto/i,
+     'La connessione coi relay si è chiusa e non si è riaperta.',
+     'Controlla la rete e riprova; se continua, nel firmatario scegli un relay diverso.'],
+    [/URI bunker:\/\/ non valida|non indica nessun relay/i,
+     'Il link incollato non è un bunker:// completo.',
+     'Copialo per intero dal tuo firmatario (nsec.app, Amber, Clave…): comincia con bunker:// e contiene almeno un relay.'],
+    [/appuntamento non disponibile/i,
+     'L\'appuntamento col firmatario non è disponibile.',
+     'Ricarica l\'app e riprova.'],
+    [/libreria/i,
+     'La libreria di sicurezza non è arrivata.',
+     'Controlla la rete e ricarica l\'app.'],
+    [/secret|unauthori|not authori|no permission|rejected|denied|forbidden|invalid|rifiut/i,
+     'Il firmatario ha detto di no.',
+     'Nel firmatario approva Barattolo, oppure genera un bunker:// nuovo e incollalo: certi firmatari accettano un link una volta sola.'],
+  ];
+  for (const [re, cosa, fare] of regole) if (re.test(m)) return {cosa, fare, dettaglio: m};
+  return {cosa: 'Non ha funzionato.',
+          fare: 'Riprova; se succede ancora, copia il dettaglio qui sotto e scrivici.',
+          dettaglio: m};
+}
+/* Scrive l'errore spiegato nel foglio: titolo, rimedio, dettaglio.
+   COSTRUITO A NODI e mai con innerHTML, per la stessa ragione di
+   bunkerDice: nel dettaglio finisce la risposta di un relay. */
+function bunkerErrore(motivo){
+  const s = el('nostrSheetSub');
+  if (!s) return;
+  const sp = spiegaNip46(motivo);
+  s.textContent = '';
+  const b = document.createElement('b');
+  b.textContent = '❌ ' + sp.cosa;
+  s.appendChild(b);
+  s.appendChild(document.createElement('br'));
+  s.appendChild(document.createTextNode(sp.fare));
+  if (sp.dettaglio && sp.dettaglio !== sp.cosa) {
+    const d = document.createElement('div');
+    d.style.cssText = 'font-size:11.5px;opacity:.75;margin-top:6px;word-break:break-word';
+    d.textContent = 'Dettaglio: ' + sp.dettaglio;
+    s.appendChild(d);
+  }
 }
 
 /* auth_url del bunker: MAI window.open automatico — fuori dal gesto
@@ -48677,9 +49038,12 @@ async function loginNostrQr(){
     nascondiQrConnessione();
     /* IL MOTIVO NEL FOGLIO e non solo nel toast, la regola del bunker:
        dice quale relay e cosa ha risposto, ed e' l'unica cosa con cui
-       si puo' decidere di riprovare o cambiare strada. */
-    bunkerDice(`Non ha funzionato — ${motivo}`);
-    toast(`Accesso col telefono: ${motivo}`, tempoLettura(motivo));
+       si puo' decidere di riprovare o cambiare strada. E SPIEGATO (10
+       ott 2026): cosa e' andato storto e cosa fare, col dettaglio
+       tecnico sotto — vedi spiegaNip46. */
+    bunkerErrore(motivo);
+    const sp = spiegaNip46(motivo);
+    toast(`${sp.cosa} ${sp.fare}`, tempoLettura(sp.cosa + sp.fare));
   }
   finally { if (f) f.chiudi(); }        // la websocket si chiude comunque
 }
@@ -48701,8 +49065,9 @@ async function loginNostrBunker(){
        di cambiare bunker. Un toast che se ne va quella decisione non
        la fa prendere a nessuno — e questi messaggi sono lunghi, quindi
        il toast prende il tempo di lettura di casa. */
-    bunkerDice(`Non ha funzionato — ${motivo}`);
-    toast(`Bunker: ${motivo}`, tempoLettura(motivo));
+    bunkerErrore(motivo);
+    const sp = spiegaNip46(motivo);
+    toast(`${sp.cosa} ${sp.fare}`, tempoLettura(sp.cosa + sp.fare));
   }
   finally { if (f) f.chiudi(); }   // la websocket si chiude comunque
 }
@@ -48780,6 +49145,12 @@ function apriNostrSheet(scopo){
      peggio di un bottone che non c'e'. */
   const q = el('nostrQrBtn');
   if (q) q.style.display = relayNip46.length ? '' : 'none';
+  /* SU IPHONE SI CONSIGLIA IL BUNKER (10 ott 2026): la riga si accende
+     e la tendina si apre da sola, che il consiglio non resti chiuso
+     dietro un «▸». Fuori da iOS niente cambia. */
+  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  const bi = el('bunkerIphone');
+  if (bi) { bi.style.display = ios ? '' : 'none'; if (ios) bi.closest('details').open = true; }
   el('sheetBg').classList.add('open');
   el('nostrSheet').classList.add('open');
 }

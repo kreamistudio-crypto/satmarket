@@ -8964,7 +8964,9 @@
   `/api/login/telegram` (`{"collaudo": true}`) vale solo con
   MODALITA_COLLAUDO.
   Login web con Nostr: `GET /api/login/nostr/sfida` emette una sfida
-  monouso (dict in memoria, TTL 5 min: uvicorn è mono-processo);
+  monouso (dict in memoria, TTL 10 min dal 10 ott 2026 — con un
+  firmatario sullo stesso telefono si cambia app due volte; uvicorn è
+  mono-processo);
   `POST /api/login/nostr` verifica un evento kind-22242 stile NIP-42
   con `verifica_evento_login` (sfida bruciata PRIMA della firma, tag
   `relay` ≡ Host, id ricalcolato NIP-01, Schnorr con `PublicKeyXOnly`
@@ -8982,6 +8984,30 @@
   doppioni) → account nativo nuovo (nome = npub abbreviata, badge
   🟣 da subito: la firma Schnorr dimostra il possesso). Un badge
   NON verificato non dà MAI accesso all'account che lo dichiara.
+  LA CASSETTA POSTALE DEL NIP-46 (10 ott 2026, Cantieri «Login col
+  bunker e con Clave»): `POST /api/login/nostr/cassetta` {pub, relays}
+  deposita la chiave EFFIMERA del client NIP-46 e i relay
+  dell'appuntamento; il server ascolta quei relay per `CASSETTA_VITA_S`
+  (600 s) con un thread per relay (`_orecchio_filo`, filtro `#p` di tutte
+  le chiavi in ascolto) e tiene in memoria i kind 24133 per quella
+  chiave; `GET /api/login/nostr/cassetta?pub=&dopo=` li consegna alla
+  pagina, che li apre con la chiave privata mai uscita dal browser. È la
+  cura per iOS che sospende la pagina e chiude le websocket mentre si
+  approva nell'app del firmatario (Clave): il 24133 è effimero e una
+  risposta persa non si può richiedere. Il server vede quel che vede un
+  relay pubblico (chiave effimera, mittente, testo cifrato); nessuna
+  chiave privata, nessun database, nessuna leva nel config. I relay di
+  una `bunker://` li giudica `_relay_cassetta_ammesso` (solo wss con un
+  nome, mai IP, credenziali o .onion) e `_orecchio_indirizzo_pubblico`
+  (il nome risolto deve essere pubblico); in collaudo verso un relay
+  non di casa non si esce (`lettura_simulata`). Freno per IP del
+  `login` sul POST, nessuno sul GET (lettura in memoria). Lato client
+  `ascoltoNip46` (il coro che si riaggancia: socket caduta ≠ rifiuto,
+  riapertura con pazienza crescente e subito al ritorno della pagina,
+  `since` sul filtro, copie scartate per id di evento, richieste in
+  attesa rimandate con lo stesso id) e `cassettaNip46` (il secondo
+  orecchio, ogni 4 s e subito al ritorno). Gli errori li spiega
+  `spiegaNip46` (famiglia → cosa è successo, cosa fare, dettaglio).
   `hex_to_npub` (bech32 con checksum vero) è il gemello speculare di
   `npub_to_hex`. `vendor/nostr.bundle.js` = nostr-tools 2.23.12
   committato a versione bloccata e servito da `GET /vendor/nostr.js`

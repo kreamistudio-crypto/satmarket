@@ -45552,3 +45552,189 @@ conflitto solo, qui in coda, tenute tutte le voci) e rigirate le due
 sezioni che leggono i documenti toccati e i due passi dello scanner dei
 segreti. Prima del push si è guardata la CI di main, come chiesto da
 Andrea: verde su `f45b860`, e attesa quella di `6bfa0b2`.
+## Login col bunker e con Clave: il coro si riaggancia, la cassetta postale del server, gli errori spiegati (10 ott 2026)
+
+Il compito (Andrea, dal campo): due utenti in due giorni fuori dalla
+porta del login NIP-46 — ieri uno col suo bunker («Barattolo chiama il
+Bunker e mi dice che non ha funzionato», e nel journal del server
+nessuna richiesta di login: si fermava prima), oggi uno con Clave su
+iPhone, che copia il link nostrconnect, passa all'app, approva, torna,
+e trova un errore. Da leggere com'è fatto il login, riprodurre dal vivo
+con un firmatario locale (nsec.app se possibile), dedurre Clave e Amber
+dal loro supporto noto, e curare quel che è nostro: relay più robusti,
+un'attesa che sopravviva al cambio d'app col riaggancio al ritorno,
+timeout più lunghi, NIP-04 e NIP-44, e messaggi d'errore che dicano
+cosa è andato storto e cosa fare. Uguale da barattolo.store, dalla
+Mini App e dal .onion.
+
+**COM'ERA FATTO.** Un motore solo (`firmatarioBunker`) chiamato da due
+strade: la URI `bunker://` incollata (il client manda la `connect` col
+secret e i permessi, poi `get_public_key` e `sign_event`) e il
+`nostrconnect://` del QR (il firmatario si presenta col segreto, poi si
+passa al bunker di sempre). Coro di relay dal 1 ott (tutti insieme, la
+prima risposta vale), cifratura NIP-44 in scrittura e NIP-44-poi-NIP-04
+in lettura, la lingua cambiava solo se QUALCUNO scriveva in NIP-04.
+Attese: connect e sign_event 120 s, servizio 30 s, QR 3 minuti, sfida
+del server 5 minuti. E un difetto di forma: quando la websocket cadeva
+la libreria chiudeva le sottoscrizioni con «relay connection closed», e
+quel motivo valeva come un relay che ci caccia — a coro vuoto le attese
+cadevano: «Non ha funzionato — … e non resta nessun altro relay».
+
+**IL FATTO, MISURATO E LETTO.** 1) iOS sospende la pagina quando si passa
+a un'altra app e le chiude le websocket (Clave lo scrive nei suoi
+documenti, `docs/nip46-compatibility.md`: «fundamental iOS WebSocket
+suspension constraint that no signer-side fix can route around», e
+consiglia il suo `bunker://` per lo stesso telefono). Nella strada del
+QR è il FIRMATARIO a parlare per primo, e il kind 24133 è effimero: una
+risposta arrivata mentre la pagina dorme non si può richiedere — non si
+sa nemmeno a chi. Misurato il 10 ott con una REQ in sola lettura
+(`since` a un giorno): nrs.primal.net, nos.lol e relay.powr.build i
+24133 li conservano, bucket.coracle.social e relay.nip46.com no;
+relay.nsec.app timeout a 10 s (come il 1 ott) e il sito di nsec.app
+irraggiungibile lo stesso giorno. 2) Clave (letto nel sorgente, HEAD
+230229a): risponde al nostrconnect sempre in NIP-44 col segreto, su
+TUTTI i relay della URI, tre volte con 2 s di distanza; mostra
+«Connection Failed — No relay specified» quando in 10 s non aggancia
+nessun relay della URI o tutti rifiutano la risposta; il suo bunker
+sta su `wss://relay.powr.build` con secret usa-e-getta, e un client già
+accoppiato che rifà la connect col secret vecchio viene accettato; dopo
+l'accoppiamento firma via notifica push (≤30 s) senza essere in primo
+piano. 3) Amber (6.6.7): risponde nella lingua della richiesta (NIP-04
+o NIP-44), a una connect ripetuta da un'app conosciuta risponde «ack»
+senza chiedere, scartando per id le richieste doppie in coda;
+inquadrare due volte lo stesso QR rimanda il segreto. 4) nsec.app
+(noauth, codice di 17 mesi fa): risponde SEMPRE in NIP-44, alla
+`connect` del bunker con «ack», IGNORA in silenzio una richiesta con un
+id già servito, e nel suo nostrconnect NON legge i relay della URI
+(pubblica sui suoi: relay.nsec.app più nos.lol, damus, primal…). 5)
+nostr-tools 2.25 manda e legge SOLO NIP-44; NDK parte in NIP-44 e passa
+a NIP-04 solo se il firmatario scrive così. La NIP-46 di oggi dice solo
+NIP-44.
+
+**LA CURA, IN CINQUE PEZZI.** (a) **L'ascolto che si riaggancia**
+(`ascoltoNip46`, uno per le due strade): una socket caduta («relay
+connection closed/failed/timed out») NON è un rifiuto — la voce resta
+nel coro, si riapre con pazienza crescente (1, 2, 4, 8, 15, 30 s) e
+SUBITO quando la pagina torna (visibilitychange, pageshow, online,
+focus); un CLOSED del relay (restricted, rate-limited…) resta una porta
+chiusa. La sottoscrizione porta un `since` (sui relay che conservano i
+24133 la riapertura ritrova la risposta), le copie si scartano per id
+di evento una volta sola, e alla voce riaperta il bunker RIMANDA le
+richieste in attesa con lo stesso id (Amber le scarta se doppie, nak e
+Clave rispondono di nuovo, nsec.app ignora — ma lì c'è la cassetta).
+Dal giro dal vivo: dopo un tentativo di riapertura fallito nostr-tools
+tiene la promessa rifiutata e ogni `connect()` dopo rifiuta all'istante,
+quindi al fallimento si rifà l'oggetto Relay da zero. (b) **La cassetta
+postale del server** (`POST/GET /api/login/nostr/cassetta`,
+`_orecchio_filo`): la pagina deposita la sua chiave EFFIMERA di client
+e i relay dell'appuntamento, il server ascolta quei relay per dieci
+minuti (un thread per relay con `#p` di tutte le chiavi, non uno per
+cassetta) e tiene da parte ogni 24133 per quella chiave; la pagina
+chiede «c'è posta?» ogni 4 s e subito al ritorno, e apre i messaggi lei
+con la chiave privata mai uscita dal browser. Il server vede quel che
+vede un relay pubblico: chiave effimera, mittente, testo cifrato. I
+relay di una `bunker://` li scrive il firmatario dell'utente: il server
+li giudica (solo wss con un nome, mai un IP, mai credenziali, mai
+.onion; il nome si risolve e un indirizzo non pubblico si rifiuta) e in
+collaudo non esce verso chi non è di casa. Nessun database, nessun
+config: la cassetta vive in memoria, con tetto (500), vita (600 s),
+eventi (40) e relay (6) per cassetta. (c) **I tempi dell'umano**:
+connect e sign_event 5 minuti, servizio 1 minuto, QR 10 minuti, sfida
+del server 10 minuti (`SECONDI_SFIDA_LOGIN`, e la tolleranza sull'ora
+dell'evento è la stessa leva). (d) **La seconda lingua**: la connect
+parte in NIP-44; se dopo 20 s dal firmatario non è arrivato NIENTE che
+si apra, la stessa connect (stesso id) riparte in NIP-04; dal primo
+messaggio NIP-04 si scrive così. E la connect NON si rifà dopo il QR
+(`giaConnesso`): il firmatario si è già presentato. (e) **Gli errori
+spiegati** (`spiegaNip46`, `bunkerErrore`): ogni famiglia di guasto ha
+la frase su cosa è andato storto e il rimedio, col dettaglio tecnico
+sotto da copiare; costruiti a nodi, mai innerHTML. Più il quinto relay
+in `RELAYS_NIP46` (`relay.powr.build`, quello di Clave, che i suoi
+documenti chiedono ai client), e il consiglio su iPhone: la riga «Su
+iPhone con Clave è la strada che funziona meglio: Connect → Bunker →
+Copy URI» si accende dal `userAgent` e apre la tendina del bunker.
+
+**LA DIAGNOSI DEI DUE CASI.** Il bunker di ieri: se era nsec.app, il suo
+relay da questa rete va in timeout e il sito non risponde — «nessun
+relay raggiungibile», che ora si spiega; se era un altro bunker su
+iPhone, era la socket caduta al cambio d'app, letta come coro vuoto. In
+tutti e due i casi il server non vede nulla perché la sfida si chiede
+SOLO a firmatario collegato. Clave: il link copiato, l'app aperta, la
+risposta pubblicata mentre Safari/Telegram dormiva — e nessuno in
+ascolto; il messaggio di Clave («Connection Failed — No relay
+specified») compare anche quando in 10 s non aggancia nessuno dei
+nostri relay, cosa che da un iPhone su rete mobile non si esclude. Da
+oggi la risposta la tiene la cassetta, e su iPhone si consiglia il
+bunker di Clave, che firma via push senza cambiare app.
+
+**STRADE SCARTATE.** 1) `enableReconnect` di nostr-tools: riaggancia in
+silenzio con 10 s di attesa al primo colpo e senza callback, quindi né
+«bentornato» né il rinvio delle richieste: il riaggancio è in casa. 2)
+Il solo `since` sul filtro (la proposta di Andrea): aiuta su tre relay
+su cinque ed è una gentilezza dei relay, non una promessa — c'è, ma non
+basta da solo, e la cassetta non dipende da nessuno. 3) Rimandare le
+richieste con un id NUOVO: nsec.app risponderebbe di nuovo, ma Amber
+chiederebbe due volte all'umano; con lo stesso id Amber scarta, Clave
+e nak rispondono, nsec.app tace e lì vale la cassetta. 4) Mandare la
+connect in NIP-04 e NIP-44 insieme: un firmatario che le capisce tutte
+e due chiede due volte; da qui i 20 s. 5) La cassetta per OGNI relay
+del mondo: il server bussa solo su wss con un nome che risolve a un
+indirizzo pubblico. 6) Un orecchio per cassetta: cento login sono
+quattro connessioni, non quattrocento.
+
+**PROVATO.** `prove_bunker_muto` e `prove_login_qr` riscritte per il
+riaggancio (sentinelle sul testo e i due banchi di cartone in node con
+la pagina finta: `document`, le sveglie, un `fetch` che il banco
+decide): oltre ai casi del 1 ott, la socket che cade e la voce che si
+riapre col rinvio della connect sullo stesso id, la pagina che torna e
+riapre subito al visibilitychange («Bentornato»), la risposta letta
+dalla cassetta che basta a collegarsi, la seconda lingua con lo stesso
+id, `giaConnesso` senza connect sul filo, la socket morta con l'OK del
+publish in viaggio che non è un rifiuto; per il QR tutte le socket
+cadute che non fanno cadere l'appuntamento e la risposta dalla cassetta
+che apre col bunker senza connect. `prove_cassetta_nip46` nuova: le
+sentinelle sul server, il giudice dei relay e il deposito fatti girare,
+gli errori spiegati in node (sei famiglie, sei frasi). Il collaudo nuovo
+`collaudo_cassetta_nip46` in CI: le due rotte sul server vero, l'orecchio
+con una websocket di cartone (un evento entra, la copia no, il filtro si
+allarga alla seconda cassetta senza una seconda connessione, l'orecchio
+pubblico in collaudo è «simulato», l'onion senza freno, il tetto, la
+scadenza che chiude l'orecchio): 22/22, verde anche nella gabbia.
+DAL VIVO, sulla copia in collaudo (porta 8147) con `nak serve` locale
+(WSL, 7792) e `nak bunker` come firmatario: il foglio su iPhone emulato
+(Playwright, Chrome «iPhone 13») col consiglio e la tendina aperta; il
+link storto e il relay morto con l'errore spiegato in meno di un
+secondo (niente 15 s: «connection failed» arriva subito); il `bunker://`
+che entra (connect, get_public_key, sign_event, sessione) e la stessa
+cosa dentro il finto Telegram (hash `collaudo:111`, piattaforma ios); e
+il caso della Clave riprodotto nel Browser pane: QR, pagina «sospesa»
+(socket chiuse, riaperture che falliscono, `fetch` spento, document
+hidden), il firmatario che risponde nel frattempo (`nak bunker
+connect`), la cassetta del server che ha l'evento (via ws://127.0.0.1:7792,
+dal firmatario, cifrato), il ritorno della pagina: «dalla cassetta: un
+evento», «eccolo via cassetta», connect saltata, get_public_key,
+sign_event, dentro con la npub del firmatario. Suite intera severa
+(`PROVE_SEVERE=1`, nel worktree senza config, su `ccea57f`): 21.106
+passate, 0 fallite, 0 saltate; i 51 collaudi della CI nella gabbia
+senza rete: 51 verdi, 0 rossi.
+
+**NON PROVATO DAL VIVO.** nsec.app: creare un account su un servizio
+altrui non rientra in quel che posso fare da solo, e lo stesso giorno
+sito e relay non rispondevano — Andrea può incollare il suo `bunker://`
+di nsec.app e il motore dice quale relay e cosa ha risposto. Clave e
+Amber veri: dedotti dal sorgente (sopra). iOS vero: la sospensione è
+emulata (socket chiuse, fetch spento, hidden); su un iPhone i timer non
+girano mentre si dorme, e il riaggancio parte al ritorno — che è la
+strada provata. Il Playwright con «iPhone 13» si è PIANTATO sul QR
+(«Target crashed» dopo minuti): il giro del QR si è fatto nel pane.
+
+**DA GUARDARE.** 1) Un iPhone vero con Clave: QR + ritorno, e il
+`bunker://` di Clave (relay.powr.build). 2) Il journal del VPS dopo il
+primo login dal vivo: le righe della cassetta non ci sono (è silenziosa
+per scelta: ogni login ne apre una) — se serve, un contatore. 3) Il
+`websocket-client` sul VPS c'è già (la verifica npub lo usa): senza, la
+rotta risponde 503 e il client va avanti con le sole websocket. 4) La
+cassetta non si chiude quando l'utente chiude il foglio: dieci minuti e
+muore da sola. 5) `switch_relays` dopo la connect (la NIP-46 lo chiede
+ai client): non lo mandiamo; Clave risponde null, Amber migrerebbe sui
+suoi relay di serie.

@@ -73,6 +73,7 @@ jobs:
              censimento_spedizione.py censimento_payout.py capitale_cassa.py orfani.py
              censimento_scadenze.py collaudo_fatture_scadute.py
              collaudo_rotte_metodi.py
+             collaudo_cassetta_nip46.py
              collaudo_in_pagamento.py collaudo_altra_cassaforte.py
              collaudo_chiusura_saas.py collaudo_csp.py collaudo_freni.py
              ripulisci_anello_nostr.py
@@ -201,6 +202,7 @@ jobs:
              collaudo_lnbits_muto
              collaudo_fatture_scadute
              collaudo_rotte_metodi
+             collaudo_cassetta_nip46
              collaudo_pagamento_p2p
              collaudo_avvisi_in_ordine_p2p
              collaudo_avvisi_mercatino
