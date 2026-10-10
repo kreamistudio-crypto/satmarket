@@ -49041,3 +49041,105 @@ segreti sulle righe aggiunte: pulito, con la controprova. LA CI DI MAIN
 prima del push: aspettata la punta (`b9579ce`), verde. Il sì al push è
 di Andrea: stava nel brief incollato, e l'ho richiesto prima di
 spingere.
+
+## La cauzione sul metodo scelto: si chiede solo a chi prende scegliendo i contanti (10 ott 2026, sera, cantiere cauzione-metodo-scelto, decisione definitiva di Andrea)
+
+IL FATTO E LA DOMANDA. Nel dettaglio di un «Satispay, PayPal, Contanti»
+con Satispay scelto compariva «🔐 La cauzione di chi prende. Per
+prendere quest'ordine in contanti blocchi una piccola cauzione…». Andrea
+ha chiesto chi decide la cauzione. CHI DECIDE: il coordinatore, per
+l'ordine intero — letto sui byte della patch 0008 (`bond_applies_to_order`
+→ `payment_method_in(&order.payment_method, …)` spezza la lista
+dell'ordine sulla virgola; `take_sell.rs` e `take_buy.rs` chiedono
+`taker_bond_required_for(&order)`), e il metodo scelto da chi prende non
+arrivava mai a mostrod: sul take legge `Payload::Amount` e la bolt11.
+PRIMA RISPOSTA (sera, scartata): i testi che dicevano il vero sulla
+regola di allora («accetta anche i contanti… anche se paghi con
+Satispay») e cinque strade proposte. Andrea l'ha fermata prima del push
+— decisione definitiva: la cauzione si chiede SOLO quando chi prende
+sceglie i contanti; con SEPA, Satispay, PayPal o PayCode scelti su un
+ordine misto niente cauzione; e il metodo scelto resta fissato per lo
+scambio. Quei testi non esistono più.
+PERCHÉ LA STRADA 3 ERA STATA SCARTATA. Il coordinatore non riceve la
+scelta: mostro-core apre il messaggio tipizzato (`unwrap_incoming`, nella
+crate, non in mostrod: il JSON grezzo non c'è, e `MessageKind` scarta le
+chiavi sconosciute), e `Payload` non ha una variante «metodo». Sembrava
+un protocollo nuovo. LA PORTA C'ERA: `verify()` di mostro-core accetta
+QUALUNQUE payload su `TakeSell`/`TakeBuy`; un `Payload::Order(SmallOrder)`
+porta `payment_method` nei campi standard, `get_amount` lo ignora (per
+l'intervallo la cifra va in `fiat_amount`), e `get_payment_request` legge
+`buyer_invoice`, che resta vuoto: niente fattura da validare. Nessuna
+variante nuova, nessun campo fuori standard.
+COSA SI È FATTO.
+- IL FORK, PATCH 0010 (`deploy/mostro/patch-0010-cauzione-metodo-
+  dichiarato.py` e la `.patch`; README del fork, voce «0010»): in
+  `util.rs` `taker_payment_method(&msg)` e `taker_declared_amount(&msg)`
+  (e `get_fiat_amount_requested` legge anche quella, sull'intervallo:
+  senza, `OutOfRangeSatsAmount`); in `bond/flow.rs`
+  `bond_applies_to_take_with(offered, declared, allowed)`, PURA — il
+  metodo dichiarato conta SOLO se è dell'ordine (parola intera, senza
+  maiuscole), e allora la cauzione c'è se e solo se sta nella policy;
+  senza una dichiarazione usabile decide l'ordine, come la 0008: «SEPA»
+  dichiarato su un solo-contanti non la scansa, un client di un'altra
+  app resta a ieri — e `taker_bond_required_for_take`; le due prese
+  passano da lì; `maker_bond_required_for` (chi pubblica) non cambia.
+  Tre test in `barattolo_bond_take`. Fatta sul PC come le altre:
+  patcher a secco e poi per davvero su un clone pulito della v0.19.0 con
+  le otto via `git am`, commit, `format-patch --start-number 10` (la 0009
+  resta la proposta della fee per chiavi); `git am` delle nove su un
+  secondo clone dà lo stesso albero (`1385488c`). ⚠️ NON compilata (sul
+  PC non c'è cargo): la prima build è la `-bar7`, con la liturgia in
+  PRODUZIONE («LA SALITA ALLA -bar7»: libro fermo in sola lettura,
+  backup, patcher, test, build, `up -d mostro`, controllo, e lì ci si
+  ferma). FINO ALLA -bar7 il nodo ignora la dichiarazione e decide
+  sull'ordine intero: il client nuovo non rompe niente nel frattempo —
+  promette «niente cauzione» a chi sceglie SEPA su un misto e il nodo
+  `-bar6` gliela chiede lo stesso (il client la paga come sempre: lo
+  stato `attesa_mia_cauzione` arriva da `pay-bond-invoice`, un fatto).
+  Finestra dichiarata, non nascosta: la liturgia va fatta presto.
+- IL CLIENT: `payloadPresaP2P(riga, scelta, metodo)` (pura) manda il
+  take come `Payload::Order` col metodo scelto e la cifra (quella scelta
+  sull'intervallo, se no quella dell'ordine), nei campi di
+  `CAMPI_MOSTRO.ordine` e nell'ordine di serde; senza metodo come prima
+  (`Amount` sull'intervallo, niente sul normale). Le due strade della
+  presa (`eseguiPresaP2P` e il «Riprova» con `chiamataOrdineP2P`) la
+  usano. `cauzioneServeP2P`: per chi prende decide `o.metodoScelto` se è
+  uno dei metodi dell'ordine; con due metodi e nessuna scelta non
+  promette niente; con un metodo solo, o una scelta fuori elenco (non è
+  una scelta, il coordinatore la ignora), decide l'ordine; chi pubblica
+  (`make`, `both`) resta all'ordine intero. `rigaCauzioneDettP2P(o, info,
+  leva, scelto)` riceve `p2pDettMetodo`: la riga compare SOLO scegliendo
+  «Contanti» (o col solo Contanti), col testo di sempre; il passo della
+  cauzione nello stepper del dettaglio passa la stessa scelta.
+- IL METODO SCELTO RESTA FISSATO: `P2P_METODO_FISSO` («Il metodo che
+  scegli resta fissato per lo scambio: chi sceglie un metodo online non
+  può passare ai contanti dopo») sotto le pillole del dettaglio (non sul
+  proprio ordine) e in coda alla voce della cauzione di «Info P2P»
+  (`testoCauzioneInfoP2P`, che ora dice «scegliendo «Contanti» alla presa
+  (su un ordine con più metodi solo chi sceglie «Contanti»)»). Chi vende
+  non sceglie: `renderCampiP2P` già toglie le pillole quando la scelta
+  di chi prende è arrivata (set 2026), e il giudice del contanti del
+  cantiere di prima resta (il recapito viaggiato vince: un appuntamento
+  mandato da un client di ieri su una scelta SEPA si vede, ma il nostro
+  client non lo manda).
+SCARTATO. Dedurre il metodo dal recapito sul nodo (il recapito non passa
+di lì). Un campo JSON in più nel messaggio (`MessageKind` lo scarta e il
+grezzo non arriva a mostrod). `PaymentRequest(Some(small), "", amount)`
+(`get_payment_request` darebbe una bolt11 vuota da validare:
+`InvalidInvoice`). Dichiarare il metodo al NOSTRO server e far chiedere
+mostrod al server dentro la presa (una chiamata HTTP sincrona nel take,
+su Tor). Cambiare la 0008 in «solo se l'unico metodo è Contanti»
+(toglierebbe la cauzione proprio a chi sceglie il contante su un misto).
+PROVATO. `prove_cauzione_p2p`: il giudice col metodo scelto (Satispay
+no, Contanti sì anche sporco, fuori elenco, un metodo solo, chi
+pubblica), la riga del dettaglio solo con Contanti scelto, il payload
+della presa nei suoi campi (metodo, cifra scelta o dell'ordine, senza
+metodo come prima), la frase del metodo fissato uguale sotto le pillole
+e in Info, la voce di Info; e la sezione 4-bis sulla 0010 (la `.patch`
+una volta e in LF, il patcher con `--secco` che pretende la 0008, gli
+otto pezzi nella patch, le DUE prese e non chi pubblica, i test del
+«fuori dall'ordine», il README e la liturgia). `prove_p2p_dettaglio`
+(con SEPA scelto accanto ai contanti il primo passo è quello di sempre),
+`prove_p2p_libro` (il take porta `payloadPresaP2P`), `prove_passi_libro_p2p`
+(lo stepper passa la scelta). Suite, collaudi e giro dal vivo: nel
+verbale del push.

@@ -28078,10 +28078,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   coordinatore (`bond_enabled` più i sette tag `bond_*`, e il nostro
   `bond_only_payment_methods`) dice che il nodo la CHIEDE; il client
   crede solo a tutt'e due (`cauzioneServeP2P`, pura: la leva, il 38385,
-  il metodo dell'ORDINE confrontato come parola intera senza maiuscole
-  — non quello scelto alla presa, che il coordinatore non vede — e
-  `apply_to`: `take` chi prende, `make` chi pubblica, `both` tutt'e
-  due). L'importo ricalca `compute_bond_amount`: max(round(pct × sats),
+  il metodo confrontato come parola intera senza maiuscole e `apply_to`:
+  `take` chi prende, `make` chi pubblica, `both` tutt'e due). PER CHI
+  PRENDE DECIDE IL METODO SCELTO (dal 10 ott 2026, CANTIERI, «La cauzione
+  sul metodo scelto»; la patch 0010 del fork, `deploy/mostro/README.md`):
+  la scelta viaggia nel take come `Payload::Order.payment_method`
+  (`payloadPresaP2P`, con la cifra dell'intervallo in `fiat_amount`), e
+  il coordinatore la guarda se è uno dei metodi dell'ordine — allora la
+  cauzione c'è se e solo se sta nella policy (`bond_applies_to_take_with`);
+  nel client `cauzioneServeP2P` legge `o.metodoScelto` allo stesso modo,
+  con due metodi e nessuna scelta non promette niente, con un metodo solo
+  o una scelta fuori elenco decide l'ordine; chi pubblica resta all'ordine
+  intero. La riga del dettaglio (`rigaCauzioneDettP2P(o, info, leva,
+  scelto)`, con `p2pDettMetodo`) compare solo scegliendo «Contanti», e
+  sotto le pillole `P2P_METODO_FISSO` dice che il metodo scelto resta
+  fissato per lo scambio (chi vende non sceglie: `renderCampiP2P` senza
+  pillole a scelta arrivata); «Info P2P» lo ripete. L'importo ricalca `compute_bond_amount`: max(round(pct × sats),
   base), sui sats del taker (`importoCauzioneP2P`); prima della presa è
   una stima (`satsBaseCauzioneP2P`: i sats detti, poi la cifra fissa,
   poi il mercato sul capo alto di un intervallo), e la cifra vera la

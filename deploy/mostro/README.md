@@ -1,4 +1,16 @@
-# IL FORK DI MOSTRO — otto patch sopra il tag v0.19.0
+# IL FORK DI MOSTRO — otto patch sopra il tag v0.19.0, più la 0010
+
+**Dal 10 ottobre 2026 (sera) c'è la 0010**, la cauzione sul metodo che chi
+prende DICHIARA nel take (cantiere `cauzione-metodo-scelto`, decisione di
+Andrea: la cauzione si chiede SOLO a chi sceglie i contanti). Sta sopra
+la 0008, ha il suo patcher (`patch-0010-cauzione-metodo-dichiarato.py`)
+e la sua voce in fondo a «LE SETTE PATCH»; la 0009 resta la PROPOSTA in
+`proposte/`, non applicata, e il numero è suo. ⚠️ NON compilata sul PC:
+la prima build è la `-bar7` (PRODUZIONE, «LA SALITA ALLA -bar7»). Fatta
+come le altre: patcher a `--secco` e poi per davvero su un clone pulito
+della `v0.19.0` con le otto applicate via `git am`, un commit,
+`git format-patch -1 --start-number 10`; e `git am` delle nove su un
+secondo clone dà l'albero byte per byte uguale (tree `1385488c`).
 
 **Dal 6 ottobre 2026 c'è una patch PROPOSTA, non applicata**: la 0009,
 in `proposte/` col suo README — la fee per parte letta per coppia di
@@ -404,7 +416,46 @@ scrivere; pretende la 0005 e la 0007 sotto; controlla che
 `bond-slashed` sia entrata in `ACTIONS` e nel vocabolario dei dettagli,
 e che nessun aggancio sia finito sotto `#[cfg(test)]`).
 
-## GLI OTTO PATCHER
+**0010 — LA CAUZIONE SUL METODO CHE CHI PRENDE DICHIARA** (10 ott 2026,
+cantiere `cauzione-metodo-scelto`, decisione di Andrea; `src/util.rs`,
+`src/app/bond/flow.rs`, `mod.rs`, `take_buy.rs`, `take_sell.rs`: 8
+agganci in 5 file più un modulo di test in coda a `flow.rs`). La 0008
+decide la cauzione sull'ORDINE: su un «SEPA, Contanti» chi prende pagando
+con SEPA la bloccava lo stesso, perché il metodo scelto alla presa non
+arrivava mai a mostrod (sul take legge `Payload::Amount` e la bolt11).
+Ora il client lo DICHIARA nel take: `verify()` di mostro-core accetta
+qualunque payload su `TakeSell`/`TakeBuy`, e un `Payload::Order(SmallOrder)`
+porta `payment_method` (e `fiat_amount` per l'intervallo) senza una
+fattura da validare (`get_payment_request` legge `buyer_invoice`, vuoto).
+**A)** `util.rs`: `taker_payment_method(&msg)` (il metodo dichiarato,
+pulito; `None` se assente o vuoto) e `taker_declared_amount(&msg)` (la
+cifra dell'intervallo da `fiat_amount`), e `get_fiat_amount_requested`
+che sull'intervallo legge anche quella — senza, un take con
+`Payload::Order` su un intervallo risponderebbe `OutOfRangeSatsAmount`.
+**B)** `flow.rs`: `bond_applies_to_take_with(offered, declared, allowed)`,
+PURA: il metodo dichiarato conta SOLO se è uno di quelli dell'ordine
+(parola intera, senza maiuscole, come la 0008) — allora la cauzione c'è
+se e solo se sta nella policy; senza una dichiarazione usabile decide
+l'ordine intero, come ieri (un client che dicesse «SEPA» su un ordine
+solo-contanti non la scansa; un client di un'altra app, che non dichiara,
+resta alla 0008). `bond_applies_to_take` legge la policy dalle settings,
+`taker_bond_required_for_take` la mette insieme all'interruttore.
+**C)** `take_buy.rs` e `take_sell.rs`: `bond_required` passa da
+`taker_bond_required_for_take(&order, taker_payment_method(&msg).as_deref())`.
+`maker_bond_required_for` (chi pubblica, `apply_to = make|both`) non
+cambia. Il modulo di test `barattolo_bond_take` (tre test: il dichiarato
+decide quando l'ordine lo offre; fuori dall'ordine, vuoto o assente si
+torna all'ordine, e Barattozon mai; policy vuota = tutti) entra nel
+filtro del `cargo test` con `barattolo_bond`. Niente settings nuove e
+niente migrazioni: il rollback resta la riga dell'immagine nel compose.
+⚠️ Non compilata sul PC: le firme lette sul clone della v0.19.0 con le
+otto applicate; il primo `cargo` è quello del nodo, punto 4 della
+liturgia `-bar7`. Nasce da `patch-0010-cauzione-metodo-dichiarato.py`
+(`--secco` prova le ancore senza scrivere; pretende la 0008 sotto —
+`taker_bond_required_for` in `flow.rs`; si ferma se la 0010 è già
+dentro; controlla che nessun aggancio sia finito sotto `#[cfg(test)]`).
+
+## GLI OTTO PATCHER (più il decimo)
 
 Dal 22 set 2026 OGNI patch ha il suo script accanto, tutti con la stessa
 forma: si lanciano dalla radice di `mostro-src`, provano TUTTE le ancore
@@ -424,6 +475,7 @@ fermano («porta gia' questa modifica»).
 | 0006 | `patch-0006-perche-e-fallito.py` | `src/app/release.rs`, 1 |
 | 0007 | `patch-0007-eventi-al-server.py` + `barattolo_eventi.rs` | 25 agganci in 13 file |
 | 0008 | `patch-0008-cauzione-solo-contanti.py` | 20 agganci in 10 file (il ventesimo, 1 ott 2026, emenda il test della 0007 sugli importi), più i test in coda a `flow.rs` e `nip33.rs` (1 ott 2026) |
+| 0010 | `patch-0010-cauzione-metodo-dichiarato.py` | 8 agganci in 5 file (`util.rs`, `bond/flow.rs`, `bond/mod.rs`, `take_buy.rs`, `take_sell.rs`), più i test in coda a `flow.rs` (10 ott 2026); pretende la 0008 |
 
 I primi tre sono nati il 22 set 2026 (fino ad allora quelle patch
 esistevano solo come `.patch`, da ritocchi a mano sul nodo); la 0004 ha

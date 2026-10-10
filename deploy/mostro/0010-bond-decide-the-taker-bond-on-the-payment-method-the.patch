@@ -1,0 +1,250 @@
+From ebecfeb2ec92d4f1b465b8098eb67194d0e47cbe Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@barattolo.store>
+Date: Sat, 10 Oct 2026 23:45:42 +0200
+Subject: [PATCH] bond: decide the taker bond on the payment method the taker
+ declares
+
+---
+ src/app/bond/flow.rs | 88 ++++++++++++++++++++++++++++++++++++++++++++
+ src/app/bond/mod.rs  |  1 +
+ src/app/take_buy.rs  |  8 ++--
+ src/app/take_sell.rs |  9 +++--
+ src/util.rs          | 47 ++++++++++++++++++++++-
+ 5 files changed, 146 insertions(+), 7 deletions(-)
+
+diff --git a/src/app/bond/flow.rs b/src/app/bond/flow.rs
+index 9888544..c7bdc7d 100644
+--- a/src/app/bond/flow.rs
++++ b/src/app/bond/flow.rs
+@@ -124,6 +124,50 @@ pub fn taker_bond_required_for(order: &Order) -> bool {
+     taker_bond_required() && bond_applies_to_order(order)
+ }
+ 
++/// Barattolo fork (patch 0010): [`taker_bond_required`] for THIS take,
++/// decided on the payment method the taker declared
++/// (`Payload::Order.payment_method`, read by `util::taker_payment_method`)
++/// when the order offers it; otherwise, as patch 0008, on the order's
++/// whole list. A taker who picks an online method on a «SEPA, Contanti»
++/// order posts no bond; one who picks «Contanti» does.
++pub fn taker_bond_required_for_take(order: &Order, declared: Option<&str>) -> bool {
++    taker_bond_required() && bond_applies_to_take(order, declared)
++}
++
++/// [`bond_applies_to_order`] for THIS take (patch 0010): the policy from
++/// the settings, the rest in [`bond_applies_to_take_with`].
++pub fn bond_applies_to_take(order: &Order, declared: Option<&str>) -> bool {
++    Settings::get_bond()
++        .map(|cfg| {
++            bond_applies_to_take_with(&order.payment_method, declared, &cfg.only_payment_methods)
++        })
++        .unwrap_or(false)
++}
++
++/// Pure (patch 0010): `offered` is the order's comma-separated list,
++/// `declared` the taker's method, `allowed` the policy's list. The
++/// declared method counts only when it is one of the offered ones (whole
++/// word, trimmed, case-insensitive): then the bond applies iff it is in
++/// the policy. With no usable declaration the order's whole list decides
++/// (patch 0008): a client cannot dodge the bond by naming a method the
++/// order does not offer, and a client that declares nothing keeps the
++/// rule of yesterday.
++pub fn bond_applies_to_take_with(offered: &str, declared: Option<&str>, allowed: &[String]) -> bool {
++    if let Some(d) = declared
++        .map(|d| d.trim().to_lowercase())
++        .filter(|d| !d.is_empty())
++    {
++        let offered_lower: Vec<String> = offered
++            .split(',')
++            .map(|m| m.trim().to_lowercase())
++            .collect();
++        if offered_lower.contains(&d) {
++            return payment_method_in(&d, allowed);
++        }
++    }
++    payment_method_in(offered, allowed)
++}
++
+ /// [`maker_bond_required`] for THIS order (patch 0008).
+ pub fn maker_bond_required_for(order: &Order) -> bool {
+     maker_bond_required() && bond_applies_to_order(order)
+@@ -5019,3 +5063,47 @@ mod barattolo_bond_methods {
+         assert!(!maker_bond_required_for(&order));
+     }
+ }
++
++#[cfg(test)]
++mod barattolo_bond_take {
++    // Barattolo fork (patch 0010): the bond decided on the method the
++    // taker declares, only when the order offers it.
++    use super::bond_applies_to_take_with;
++
++    fn v(a: &[&str]) -> Vec<String> {
++        a.iter().map(|s| s.to_string()).collect()
++    }
++
++    #[test]
++    fn declared_method_decides_when_the_order_offers_it() {
++        let p = v(&["Contanti"]);
++        assert!(!bond_applies_to_take_with("SEPA, Contanti", Some("SEPA"), &p));
++        assert!(!bond_applies_to_take_with("Satispay,PayPal,Contanti", Some(" paypal "), &p));
++        assert!(bond_applies_to_take_with("SEPA, Contanti", Some("Contanti"), &p));
++        assert!(bond_applies_to_take_with("SEPA, Contanti", Some("contanti"), &p));
++        assert!(bond_applies_to_take_with("Contanti", Some("Contanti"), &p));
++    }
++
++    #[test]
++    fn a_declaration_the_order_does_not_offer_falls_back_to_the_order() {
++        let p = v(&["Contanti"]);
++        // naming «SEPA» on a cash-only order does not dodge the bond
++        assert!(bond_applies_to_take_with("Contanti", Some("SEPA"), &p));
++        // naming «Contanti» on a SEPA-only order does not create one
++        assert!(!bond_applies_to_take_with("SEPA", Some("Contanti"), &p));
++        assert!(bond_applies_to_take_with("SEPA, Contanti", Some("Revolut"), &p));
++        assert!(bond_applies_to_take_with("SEPA, Contanti", Some(""), &p));
++        assert!(bond_applies_to_take_with("SEPA, Contanti", Some("   "), &p));
++        // no declaration at all: the rule of patch 0008
++        assert!(bond_applies_to_take_with("SEPA, Contanti", None, &p));
++        assert!(!bond_applies_to_take_with("SEPA", None, &p));
++        // Barattozon keeps its own exact name: never the cash bond
++        assert!(!bond_applies_to_take_with("Contanti al tabacchino 23.47", Some("Contanti al tabacchino 23.47"), &p));
++    }
++
++    #[test]
++    fn an_empty_policy_still_covers_every_take() {
++        assert!(bond_applies_to_take_with("SEPA, Contanti", Some("SEPA"), &v(&[])));
++        assert!(bond_applies_to_take_with("SEPA", None, &v(&[])));
++    }
++}
+diff --git a/src/app/bond/mod.rs b/src/app/bond/mod.rs
+index ad081ea..ebaf15f 100644
+--- a/src/app/bond/mod.rs
++++ b/src/app/bond/mod.rs
+@@ -24,6 +24,7 @@ pub use flow::{
+     release_bonds_for_order_or_warn, release_taker_bonds_for_order_or_warn, request_maker_bond,
+     request_taker_bond, resubscribe_active_bonds, taker_bond_required,
+     bond_applies_to_order, maker_bond_required_for, payment_method_in, taker_bond_required_for,
++    bond_applies_to_take, bond_applies_to_take_with, taker_bond_required_for_take,
+     trade_committed_by_locked_taker_bond, TakerContext,
+ };
+ pub use math::{compute_bond_amount, compute_node_share};
+diff --git a/src/app/take_buy.rs b/src/app/take_buy.rs
+index 9985bba..5601708 100644
+--- a/src/app/take_buy.rs
++++ b/src/app/take_buy.rs
+@@ -5,7 +5,7 @@ use crate::config::settings::Settings;
+ use crate::util::{
+     enqueue_order_msg, get_dev_fee, get_fiat_amount_requested, get_market_amount_and_fee,
+     get_order, is_order_take_window_closed, show_cashu_escrow_request, show_hold_invoice,
+-    HoldInvoiceOrigin,
++    taker_payment_method, HoldInvoiceOrigin,
+ };
+ 
+ use crate::db::{seller_has_pending_order, update_user_trade_index};
+@@ -79,8 +79,10 @@ pub async fn take_buy_action(
+     // count `Locked` *taker* bonds; otherwise a locked maker bond would
+     // wrongly block every taker with `PendingOrderExists`.
+     // Barattolo fork (patch 0008): only for the payment methods the node's
+-    // policy names (`only_payment_methods`, empty = every method).
+-    let bond_required = bond::taker_bond_required_for(&order);
++    // policy names (`only_payment_methods`, empty = every method) — and
++    // (patch 0010) on the method the taker declared, when the order offers it.
++    let bond_required =
++        bond::taker_bond_required_for_take(&order, taker_payment_method(&msg).as_deref());
+     if bond_required {
+         let active = crate::app::bond::db::find_active_bonds_for_order(pool, order.id).await?;
+         if bond::trade_committed_by_locked_taker_bond(&active) {
+diff --git a/src/app/take_sell.rs b/src/app/take_sell.rs
+index 11f2cbe..ba9ab4b 100644
+--- a/src/app/take_sell.rs
++++ b/src/app/take_sell.rs
+@@ -6,7 +6,8 @@ use crate::db::{buyer_has_pending_order, update_user_trade_index};
+ use crate::util::{
+     enqueue_order_msg, get_dev_fee, get_fiat_amount_requested, get_market_amount_and_fee,
+     get_order, is_order_take_window_closed, set_waiting_invoice_status, show_cashu_escrow_request,
+-    show_hold_invoice, update_order_event, validate_invoice, HoldInvoiceOrigin,
++    show_hold_invoice, taker_payment_method, update_order_event, validate_invoice,
++    HoldInvoiceOrigin,
+ };
+ use mostro_core::prelude::*;
+ use nostr_sdk::prelude::*;
+@@ -125,8 +126,10 @@ pub async fn take_sell_action(
+     // count `Locked` *taker* bonds; otherwise a locked maker bond would
+     // wrongly block every taker with `PendingOrderExists`.
+     // Barattolo fork (patch 0008): only for the payment methods the node's
+-    // policy names (`only_payment_methods`, empty = every method).
+-    let bond_required = bond::taker_bond_required_for(&order);
++    // policy names (`only_payment_methods`, empty = every method) — and
++    // (patch 0010) on the method the taker declared, when the order offers it.
++    let bond_required =
++        bond::taker_bond_required_for_take(&order, taker_payment_method(&msg).as_deref());
+     if bond_required {
+         let active = crate::app::bond::db::find_active_bonds_for_order(pool, order.id).await?;
+         if bond::trade_committed_by_locked_taker_bond(&active) {
+diff --git a/src/util.rs b/src/util.rs
+index 3e94bdc..f8dc5a3 100644
+--- a/src/util.rs
++++ b/src/util.rs
+@@ -2105,7 +2105,15 @@ pub fn get_fiat_amount_requested(order: &Order, msg: &Message) -> Option<i64> {
+     // Check if order is range and get amount request after checking boundaries
+     // set order fiat amount to the value requested preparing for hold invoice
+     if order.is_range_order() {
+-        if let Some(amount_buyer) = msg.get_inner_message_kind().get_amount() {
++        // Barattolo fork (patch 0010): a take that carries `Payload::Order`
++        // (the taker's declared payment method) puts the requested fiat
++        // amount in `fiat_amount`; `get_amount` reads only `Amount` and
++        // `PaymentRequest`.
++        let amount_buyer = msg
++            .get_inner_message_kind()
++            .get_amount()
++            .or_else(|| taker_declared_amount(msg));
++        if let Some(amount_buyer) = amount_buyer {
+             info!("amount_buyer: {amount_buyer}");
+             match Some(amount_buyer) <= order.max_amount && Some(amount_buyer) >= order.min_amount {
+                 true => Some(amount_buyer),
+@@ -2120,6 +2128,43 @@ pub fn get_fiat_amount_requested(order: &Order, msg: &Message) -> Option<i64> {
+     }
+ }
+ 
++/// Barattolo fork (patch 0010): the payment method the taker declared in
++/// the take message, when the client sent `Payload::Order`. Trimmed;
++/// `None` when absent or empty (an upstream client sends `Amount` or
++/// nothing). The bond policy reads it through
++/// `bond::taker_bond_required_for_take`.
++pub fn taker_payment_method(msg: &Message) -> Option<String> {
++    let inner = msg.get_inner_message_kind();
++    if inner.action != Action::TakeSell && inner.action != Action::TakeBuy {
++        return None;
++    }
++    match &inner.payload {
++        Some(Payload::Order(small)) => {
++            let m = small.payment_method.trim();
++            if m.is_empty() {
++                None
++            } else {
++                Some(m.to_string())
++            }
++        }
++        _ => None,
++    }
++}
++
++/// Barattolo fork (patch 0010): the fiat amount a taker asked for on a
++/// range order when the take carries `Payload::Order`; `None` when the
++/// payload has another shape or the amount is not positive.
++pub fn taker_declared_amount(msg: &Message) -> Option<i64> {
++    let inner = msg.get_inner_message_kind();
++    if inner.action != Action::TakeSell && inner.action != Action::TakeBuy {
++        return None;
++    }
++    match &inner.payload {
++        Some(Payload::Order(small)) if small.fiat_amount > 0 => Some(small.fiat_amount),
++        _ => None,
++    }
++}
++
+ /// Getter function with error management for nostr Client
+ pub fn get_nostr_client() -> Result<&'static Client, MostroError> {
+     if let Some(client) = NOSTR_CLIENT.get() {
+-- 
+2.55.0.windows.3
+

@@ -3240,6 +3240,86 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   lato SENZA cauzione deve tornare «su quel lato non c'è una cauzione da
   bruciare». Nel database del nodo, in sola lettura, `SELECT role, state,
   amount_sats, slashed_reason FROM bonds` racconta le stesse cose.
+- LA SALITA ALLA `-bar7`, immagine `mostro:v0.19.0-bar7` (preparata il
+  10 ott 2026 sera, cantiere `cauzione-metodo-scelto`; ⚠️ DA FARE SUL
+  NODO, un comando alla volta, i comandi scritti da Claude: NON li
+  esegue lui). Cosa cambia: la patch 0010 del fork — la cauzione sul
+  metodo che chi prende DICHIARA nel take (decisione di Andrea: la
+  cauzione si chiede SOLO a chi sceglie i contanti; su «SEPA, Contanti»
+  chi sceglie SEPA, Satispay, PayPal o il PayCode non blocca niente).
+  Nessuna settings nuova, nessuna migrazione, `settings.toml` com'è; il
+  38385 non cambia. Il client la manda già dal push del cantiere: fino
+  alla `-bar7` il nodo ignora la dichiarazione e decide sull'ordine
+  intero (la regola della 0008), quindi NIENTE si rompe nel frattempo —
+  cambia solo quando il nodo sale. Il rollback è la riga dell'immagine
+  nel compose, a `-bar6`.
+  Host, in cima a tutto (l'alias ssh può essere un altro: è quello di
+  sempre del nodo di Dublino):
+  `ssh debian@185.18.221.96`
+  FASE 1 — IN SOLA LETTURA, tutt'e tre:
+  a) `docker inspect --format '{{.Config.Image}}' nodo-mostro-1`
+  → `mostro:v0.19.0-bar6`.
+  b) `cd ~/nodo/mostro-src && git status && git log --oneline v0.19.0..HEAD`
+  → branch `barattolo/v0.19.0`, albero PULITO, OTTO righe (la 0008 in
+  cima: «bond: apply the anti-abuse bond only to the payment methods
+  the policy names»). Se non è pulito NON si va avanti.
+  c) IL LIBRO FERMO (la stessa query della `-bar6`, `mode=ro`):
+  `sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); print(c.execute('SELECT status, COUNT(*) FROM orders GROUP BY status ORDER BY 2 DESC').fetchall())"`
+  Devono comparire SOLO `pending` e stati finali; uno fra
+  `waiting-payment`, `waiting-buyer-invoice`, `waiting-taker-bond`,
+  `active`, `fiat-sent`, `settled-hold-invoice`, `in-progress` o
+  `dispute` = c'è uno scambio in corso: si ASPETTA.
+  FASE 2 — IL BACKUP (costa un secondo):
+  `cp ~/nodo/mostro/mostro.db ~/nodo/mostro/mostro.db.prima-bar7`
+  `cp ~/nodo/docker-compose.yml ~/nodo/docker-compose.yml.prima-bar7`
+  FASE 3 — LA BUILD:
+  1) SUL PC, il patcher al nodo, in una cartella NUOVA e FUORI da
+  `mostro-src`:
+  `ssh debian@185.18.221.96 mkdir -p nodo/patch-bar7`
+  `scp deploy/mostro/patch-0010-cauzione-metodo-dichiarato.py deploy/mostro/0010-bond-decide-the-taker-bond-on-the-payment-method-the.patch debian@185.18.221.96:nodo/patch-bar7/`
+  2) SUL NODO, a secco e poi per davvero, un commit:
+  `cd ~/nodo/mostro-src`
+  `python3 ~/nodo/patch-bar7/patch-0010-cauzione-metodo-dichiarato.py --secco`
+  → deve dire «A SECCO: 8 agganci in 5 file, tutte le ancore al loro
+  conto, il modulo di test in coda a flow.rs. Niente scritto.» (la
+  stessa riga del PC, 10 ott). Un FERMO qualunque si incolla a Claude.
+  `python3 ~/nodo/patch-bar7/patch-0010-cauzione-metodo-dichiarato.py && git add -A && git commit -m "bond: decide the taker bond on the payment method the taker declares"`
+  `git log --oneline v0.19.0..HEAD` → NOVE righe. (Strada equivalente:
+  `git am ~/nodo/patch-bar7/0010-*.patch`: stesso albero, verificato sul
+  PC il 10 ott — tree `1385488c`.)
+  3) I TEST PRIMA DELLA BUILD VERA (il filtro della `-bar6` con i test
+  della 0010, `barattolo_bond_take`, dentro `barattolo_bond`):
+  `docker build -f docker/Dockerfile --target builder -t mostro-test:bar7 .`
+  `docker run --rm mostro-test:bar7 cargo test --release -- app::take_buy app::take_sell flow barattolo_bond toml_only_payment_methods util`
+  Fra i verdi devono comparire `barattolo_bond_take::declared_method_decides_when_the_order_offers_it`,
+  `…::a_declaration_the_order_does_not_offer_falls_back_to_the_order`,
+  `…::an_empty_policy_still_covers_every_take` e i tre della 0008. Se la
+  build o i test si fermano: l'errore si incolla a Claude, sul nodo
+  `git reset --hard` al commit della 0008 (`git log` lo dice) e niente
+  ritocchi a mano.
+  4) VERDI: `git format-patch -1 --start-number 10 -o ~/nodo/patch-bar7/export`
+  e la `.patch` torna sul PC con `scp`: `diff` contro quella nel repo
+  deve dire solo `index`, `From` e `Date`, MAI una riga di codice.
+  5) LA BUILD VERA: `docker build -f docker/Dockerfile -t mostro:v0.19.0-bar7 .`
+  — tag nuovo; la `-bar6` resta sulla macchina.
+  6) IL COMPOSE: `cd ~/nodo` e con `nano docker-compose.yml` la SOLA
+  riga dell'immagine a `mostro:v0.19.0-bar7`. `settings.toml` NON si
+  tocca.
+  FASE 4 — IL RIAVVIO DEL SOLO CONTAINER MOSTRO, e il controllo:
+  7) IL LIBRO FERMO, di nuovo (la query della fase 1, c). Se è fermo:
+  `docker compose up -d mostro`
+  (`up -d`, non `restart`: la riga dell'immagine è cambiata).
+  8) `docker inspect --format '{{.Config.Image}}' nodo-mostro-1` →
+  `-bar7`; `docker compose logs mostro --since 2m` → «Settings
+  correctly loaded», `Transport: nip44`, NESSUNA riga di migrazione,
+  `barattolo_eventi: order events go to …`; il 38385 come prima
+  (`bond_enabled true`, `bond_only_payment_methods Contanti`). E QUI CI
+  SI FERMA: la prova vera — un «SEPA, Contanti» preso scegliendo SEPA
+  senza `pay-bond-invoice`, e preso scegliendo Contanti con la cauzione
+  — è di Andrea, a due telefoni, dopo.
+  ROLLBACK: la riga dell'immagine a `mostro:v0.19.0-bar6` e `docker
+  compose up -d mostro` (a libro fermo). Il client resta com'è: il nodo
+  `-bar6` ignora la dichiarazione e torna alla regola dell'ordine.
 - LA SALITA A MOSTRO 0.19.0, COM'È ANDATA (1 ott 2026, la liturgia qui
   sopra eseguita da Andrea un comando alla volta, i comandi scritti da
   Claude; il nodo gira `mostro:v0.19.0-bar6` con le OTTO patch e la

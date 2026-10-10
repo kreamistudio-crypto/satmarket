@@ -485,7 +485,11 @@ prende», la liturgia in PRODUZIONE, «LA SALITA A MOSTRO 0.19.0», punto
 `[anti_abuse_bond]` commentata)» e «oggi abbandonare non costa NULLA:
 `[anti_abuse_bond]` è opt-in e sul nostro nodo è tutta commentata» —
 restano VERE fino a quel riavvio, e da lì DIVENTANO FALSE per il solo
-metodo «Contanti»: la patch 0008 del fork limita l'`anti_abuse_bond` ai
+metodo «Contanti» (e DAL 10 OTT 2026, con la `-bar7` e la patch 0010,
+solo a chi prende SCEGLIENDO «Contanti»: la scelta viaggia nel take come
+`Payload::Order.payment_method`, e un «SEPA, Contanti» preso con SEPA non
+chiede niente — PRODUZIONE, «LA SALITA ALLA -bar7», da fare; fino ad
+allora il nodo decide sull'ordine intero): la patch 0008 del fork limita l'`anti_abuse_bond` ai
 metodi che `only_payment_methods` nomina, e le tarature sono
 `amount_pct = 0.03`, `base_amount_sats = 1000`, `apply_to = "take"`,
 `slash_on_waiting_timeout = false`, `hold_invoice_expiration_window =
