@@ -405,6 +405,14 @@ la riconsegna al libro di `job_cancel_orders` e i 576 blocchi del
 `cltv_delta`, che l'HTLC non è mai andato vicino a spirare. Si provano
 solo lasciando scadere un ordine APPOSTA, e si agganciano alla tappa 8
 del cantiere client P2P.
+**LA SCADENZA È SUCCESSA DAL VIVO, il 10 ott 2026** (sulla `-bar6`, con
+la finestra ancora a 900): un PayCode Barattozon da 111,80 €, garanzia
+chiesta a chi aveva PUBBLICATO alle 10:04, non pagata, scambio annullato
+dal coordinatore alle 10:20 — i 900 secondi più il giro dello scheduler —
+e niente rimasto appeso. Quindi la SCADENZA di `expiration_seconds` dal
+lato di chi ha pubblicato (l'ordine MUORE) è provata. Restano NON
+provati l'altro ramo — manca chi ha PRESO, e l'ordine TORNA nel libro —
+e i 576 blocchi del `cltv_delta`.
 IL CONTO DELLO SCAMBIO, AL SATOSHI: 7338 sats entrati e 7264 usciti al
 venditore, cioè **74 di fee** (l'1% del coordinator); il 30% di quei
 74 fa 22,2 e la dev fee è **22**; il netto per noi è **+50**, cioè 74

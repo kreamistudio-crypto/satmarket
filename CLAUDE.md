@@ -175,8 +175,9 @@ in ogni sessione:
   scambio vero del 7 set 2026. Il secondo macaroon, dedicato a LNbits e
   revocabile da solo (`root_key_id 1`), vive sul VPS (Cantieri, «Il
   doppio wallet»; il ponte: PRODUZIONE, «IL PONTE VIA WIREGUARD»).
-- Restano NON provati la scadenza di `expiration_seconds`, la riconsegna
-  al libro e i 576 blocchi del `cltv_delta` (tappa 8 del client P2P).
+- La scadenza di `expiration_seconds` è PROVATA dal vivo dal lato di chi
+  ha pubblicato (10 ott 2026: scambio annullato). Restano NON provati la
+  riconsegna al libro e i 576 blocchi del `cltv_delta` (tappa 8).
 
 ## Regole ferree
 

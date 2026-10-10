@@ -45530,3 +45530,25 @@ rapporto.
 (la procedura in PRODUZIONE, «IL COOKIE SUL TUNNEL»); `ss -ltnp | grep
 8081` deve dire `127.0.0.1`. Tor Browser deve restare com'era (un
 cookie senza Secure lo tiene lo stesso).
+
+## La scadenza di `expiration_seconds`, provata dal vivo: la riga di CLAUDE.md (10 ott 2026, pomeriggio, decisione di Andrea)
+
+Solo documenti. CLAUDE.md teneva fra le cose «NON provate» sul nodo la
+scadenza di `expiration_seconds`: la mattina del 10 è successa per
+davvero, con la finestra ancora a 900 — garanzia chiesta a chi aveva
+pubblicato alle 10:04, non pagata, scambio annullato dal coordinatore
+alle 10:20. Andrea ha detto di toglierla. Adesso la riga dice che è
+provata dal lato di chi ha pubblicato, e che restano NON provati la
+riconsegna al libro (manca chi ha preso) e i 576 blocchi del
+`cltv_delta`. Il fatto, con le ore, sta in NODO-MOSTRO accanto alla
+riga di settembre che lo dava per non provato. CLAUDE.md: 261 righe su
+262.
+
+**COSA È GIRATO SU QUALE ALBERO.** La suite severa intera (21.253
+passate, 0 fallite) e i 51 collaudi della CI nella gabbia sono girati
+sul commit basato su `87b3cf3`. Main è poi corso due volte, di sei
+commit non miei in tutto (fino a `6bfa0b2`): ribasato ogni volta (un
+conflitto solo, qui in coda, tenute tutte le voci) e rigirate le due
+sezioni che leggono i documenti toccati e i due passi dello scanner dei
+segreti. Prima del push si è guardata la CI di main, come chiesto da
+Andrea: verde su `f45b860`, e attesa quella di `6bfa0b2`.
