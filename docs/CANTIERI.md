@@ -44640,7 +44640,12 @@ finire nei conti non torna.
 10 ottobre di ogni scambio chiuso restano oltre i quaranta giorni i
 conti — numero dell'ordine, date, esito, importi, metodo, cifra in euro
 — senza le persone. La frase dei quaranta giorni sulla cronaca resta
-vera com'era.
+vera com'era. RILETTO DA ANDREA PRIMA DEL PUSH, con due correzioni: il
+testo nomina anche gli ordini scaduti o ritirati senza essere presi
+(il registro li tiene, e la prima stesura diceva meno di quel che il
+server fa), e chi lo legge sono «gli amministratori», senza il numero:
+a deciderlo è la leva, e un «due» scritto nella pagina sarebbe
+diventato falso al primo cambio della lista.
 
 **UN DIFETTO TROVATO DAL GIRO, e curato perché la sezione ci sarebbe
 caduta dentro:** `tabella()` di `admin.html` con una tabella VUOTA
