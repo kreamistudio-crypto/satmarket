@@ -48141,3 +48141,26 @@ Contanti, per sapere chi aveva pubblicato e confermare la lettura. Un
 telefono di ieri (dichiarazione senza forma) su «SEPA, Contanti» resta
 nel silenzio di prima; in produzione il client è sempre l'ultimo (gli
 header anti-cache), quindi la finestra è di minuti.
+
+## Il riquadro dei contanti su un ordine a due metodi, il verbale del push (10 ott 2026, sera): cosa è girato su quale albero
+
+Main è corso due volte durante il cantiere. Sull'albero di partenza
+(062d404 + le modifiche): la suite PROVE_SEVERE intera, 21.840 passate e
+0 fallite, 0 saltate; i quattro collaudi vicini nella gabbia (solleciti,
+malus, contanti, recapito aggiornato) verdi; il giro dal vivo. Primo
+rebase su 450d4ac (cinque commit: la guida PayCode, la riga WoS coi due
+verbali, il sollecito del recapito a chi vende): tre conflitti — in
+`server.py` la mia INSERT con `dettaglio` e il loro DELETE delle attese
+del sollecito del recapito, tenuti tutti e due; in
+`collaudo_solleciti_p2p.py` la loro sezione 8 e la mia, rinumerata 9 con
+gli ordini 15-17 (i loro usano 9-14); la coda di CANTIERI. Su
+quell'albero: le dodici sezioni toccate o vicine (947 verdi, 0 rosse),
+la suite intera (21.895 passate, 0 fallite) e TUTTI i collaudi del
+workflow nella gabbia (57 verdi, 0 rossi). Secondo rebase su 0a2d3a4
+(l'indirizzo Lightning di casa e il suo verbale): un conflitto, la coda
+di CANTIERI. Su quest'albero, quello del push: le dodici sezioni (947
+verdi) e i quattro collaudi vicini (4 verdi); la suite intera e gli
+altri collaudi NON rifatti sull'ultima punta (i due commit arrivati
+toccano l'indirizzo Lightning, non il P2P). Tortura non fatta. LA CI DI
+MAIN prima del push: aspettata verde la punta 450d4ac, e poi la 0a2d3a4.
+Il sì al push è di Andrea: stava nel brief incollato («Ok al push»).
