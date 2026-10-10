@@ -48470,3 +48470,60 @@ e il server non sono toccati.
 **NON TOCCATO, e detto.** `collaudo_db_contesa` ha una scena sorella
 con DUE secondi di pazienza (e le sonde senza orologio accanto): non è
 mai uscita rossa e non era nella richiesta.
+
+## Le due monete: l'anteprima degli ordini P2P condivisi (10 ott 2026, sera, richiesta e disegno di Andrea)
+
+Andrea ha mandato un'immagine — una moneta bitcoin e una da un euro,
+PNG con la trasparenza, 1280×714 — con una riga: «usa questa per la
+condivisione degli ordini P2P». DOVE VA: nell'`og:image` della pagina
+di un ordine condiviso (`/p2p?ordine=<id>`), che fino a oggi prestava
+il logo del libro. È l'anteprima che disegna chi riceve il link del
+SITO: WhatsApp, Nostr, un browser, e Telegram quando il link è quello
+di barattolo.store.
+LA FORMA è quella della sorella (`p2p-anteprima.jpg`, 9 ott, coi suoi
+perché): JPEG quadrato da 400, OPACO sulla carta della pagina
+(#FAF4E4) perché il disegno ha l'alfa e ogni client lo comporrebbe sul
+fondo che gli pare, 29 KB. Le monete sono ritagliate sul loro riquadro
+e portate a 372 di larghezza, al centro. Quadrata e piccola è la forma
+che in chat diventa una miniatura accanto al testo, quella che Andrea
+ha chiesto il 9 per gli avvisi.
+COSA: `assets/p2p-ordine-anteprima.jpg`, la sua rotta esplicita
+(`asset_p2p_ordine_anteprima`, regola 3), `IMMAGINE_ORDINE_P2P`, e
+`_seo_ordine_p2p` che la porta. L'ordine SPARITO ricade come prima
+sulla testa del libro, con l'immagine del libro: l'anteprima dice
+quello che si troverà. Il libro (`/p2p`) e l'avviso dei nuovi ordini
+tengono il logo con le frecce.
+COSA NON CAMBIA, e va detto: a leva `TELEGRAM_MINIAPP_LINK` accesa
+(com'è sul VPS dal pomeriggio) un ordine condiviso DENTRO Telegram
+viaggia col link t.me, e la scheda di un link t.me la disegna Telegram
+con la foto della Mini App caricata su BotFather — una sola per tutta
+l'app, non una per ordine. Le monete lì non arrivano da questo file.
+Il sorgente di Andrea non è nel repo (mezzo mega di PNG che il sito
+non serve): sta in `.claude/giri/anteprima-miniapp/`, e ce l'ha lui; il
+JPEG si rifà con la ricetta scritta qui sopra (riquadro dell'alfa,
+372 di larghezza, carta, qualità 88).
+PROVATO: `prove_condividi_ordine_p2p` — il file (JPEG 400 opaco, la
+carta nei quattro angoli, il disegno in mezzo, sotto i 40 KB), la
+rotta, la misura dichiarata, i meta dell'ordine con le monete e senza
+il logo del libro, il libro che tiene il suo.
+TORTURA sulla copia: 7 mutazioni su 7 mordono (l'ordine che torna al
+logo del libro, la misura o il file sbagliati nella costante, la rotta
+col tipo, il file o l'indirizzo sbagliati). DAL VIVO (copia in
+collaudo, relay SOLO loopback con cinque ordini di cartone, tutto
+spento a fine giro): `/assets/p2p-ordine-anteprima.jpg` risponde 200,
+`image/jpeg`, 29.216 byte uguali al file; `/p2p?ordine=<vivo>` porta
+«Vendesi BTC per 50 € · SEPA, Revolut — Barattolo P2P» con le monete in
+`og:image` e `twitter:image`, 400×400, una volta sola; `/p2p?ordine=`
+di un ordine mai esistito e `/p2p` portano il logo del libro.
+COSA È GIRATO DOVE: la suite intera (21948 e 0) con le monete sopra
+0a2d3a4; dopo l'ultimo rebase (sopra il cantiere della copertura, già
+su main) la prova dell'ordine condiviso e la tortura. NON PUSHATO: il
+push aspetta l'ok di Andrea, che su questo ritocco non l'ha ancora
+dato.
+DA GUARDARE dopo il deploy: l'anteprima VERA in una chat — incollare
+un link `https://barattolo.store/p2p?ordine=<id>` di un ordine aperto
+su WhatsApp e su Telegram. Telegram tiene in memoria le anteprime: se
+quel link l'ha già disegnato col logo vecchio, lo ridisegna solo dopo
+un passaggio da @WebpageBot. NOTATO e non toccato: `twitter:card` dice
+`summary_large_image` anche per queste due immagini quadrate da 400
+(lo fa `_testa_seo` per tutti).

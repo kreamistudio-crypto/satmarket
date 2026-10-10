@@ -72157,10 +72157,19 @@ TESTA_P2P = _testa_seo(TITOLO_P2P, META_TESTO_P2P, immagine=IMMAGINE_P2P,
 # sarebbe una bugia (il client dice «Vendo»/«Compro» solo a chi
 # condivide il SUO: `testoOrdineCondivisoP2P`, il gemello di questa
 # frase — una prova li tiene in pari).
+# L'IMMAGINE E' SUA (10 ott 2026, sera, richiesta di Andrea, che l'ha
+# disegnata): le due monete, bitcoin ed euro — un ordine E' quello
+# scambio, e in una chat si distingue a colpo d'occhio dal libro, che
+# tiene il logo con le frecce. Stessa forma della sorella
+# (IMMAGINE_P2P, e li' i perche'): JPEG quadrato da 400, OPACO sulla
+# carta della pagina perche' il disegno ha l'alfa, 29 KB. La porta solo
+# l'ordine che C'E': quello sparito ricade sulla testa del libro, con
+# l'immagine del libro.
 TETTO_METODI_CONDIVISI_P2P = 3
 META_TESTO_ORDINE_P2P = (
     "Un ordine aperto nel libro dello scambio P2P di Barattolo: aprilo "
     "per vedere il prezzo e scambiare sats da persona a persona.")
+IMMAGINE_ORDINE_P2P = (f"{URL_PUBBLICO}/assets/p2p-ordine-anteprima.jpg", 400, 400)
 
 
 def _metodi_condivisi_p2p(metodi) -> str:
@@ -72227,7 +72236,7 @@ def _seo_ordine_p2p(oid: str):
     titolo = f"{_taglia_meta(frase, 80)} — Barattolo P2P"
     return _testa_seo(titolo, META_TESTO_ORDINE_P2P,
                       f"{URL_PUBBLICO}/p2p?ordine={oid}",
-                      immagine=IMMAGINE_P2P, indicizza=False), titolo
+                      immagine=IMMAGINE_ORDINE_P2P, indicizza=False), titolo
 
 
 # E NEMMENO LA QUARTA, e per una ragione sua: la pagina dei Consigliati
@@ -73482,6 +73491,19 @@ def asset_p2p_anteprima():
     IMMAGINE_P2P. Rotta esplicita come le sorelle: mai un mount
     (regola 3)."""
     return FileResponse("assets/p2p-anteprima.jpg",
+                        media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/assets/p2p-ordine-anteprima.jpg")
+def asset_p2p_ordine_anteprima():
+    """L'immagine dell'anteprima di un ordine P2P condiviso (10 ott
+    2026, richiesta e disegno di Andrea): le due monete, bitcoin ed
+    euro, su un JPEG quadrato da 400, opaco sul fondo della pagina — la
+    legge solo chi disegna la scheda di un link, il perche' sta accanto
+    a IMMAGINE_ORDINE_P2P. Rotta esplicita come la sorella: mai un
+    mount (regola 3)."""
+    return FileResponse("assets/p2p-ordine-anteprima.jpg",
                         media_type="image/jpeg",
                         headers={"Cache-Control": "public, max-age=86400"})
 

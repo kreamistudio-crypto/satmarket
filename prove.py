@@ -52015,7 +52015,30 @@ def prove_condividi_ordine_p2p():
         m = _re.search(r'<meta (?:property|name)="' + _re.escape(chiave)
                        + r'" content="([^"]*)">', T)
         return _html.unescape(m.group(1)) if m else None
-    IMG = "https://barattolo.store/assets/p2p-anteprima.jpg"
+    # (10 ott 2026, sera) l'ordine ha l'immagine SUA: le due monete di
+    # Andrea. Il libro tiene la sua, e l'ordine sparito ricade su quella.
+    IMG = "https://barattolo.store/assets/p2p-ordine-anteprima.jpg"
+    IMG_LIBRO = "https://barattolo.store/assets/p2p-anteprima.jpg"
+    F_IMG = os.path.join("assets", "p2p-ordine-anteprima.jpg")
+    prova("il file delle due monete c'e', e pesa meno di 40 KB (oggi 29)", True,
+          os.path.isfile(F_IMG) and 0 < os.path.getsize(F_IMG) < 40000)
+    from PIL import Image as _Imm
+    with _Imm.open(F_IMG) as _im:
+        prova("...ed e' un JPEG quadrato da 400, OPACO (niente alfa)",
+              ("JPEG", (400, 400), "RGB"), (_im.format, _im.size, _im.mode))
+        _angoli = [_im.getpixel(p) for p in ((3, 3), (396, 3), (3, 396), (396, 396))]
+        _centro = _im.getpixel((200, 200))
+    prova("...col fondo della carta della pagina (#FAF4E4) nei quattro angoli", True,
+          all(abs(a - b) <= 6 for ang in _angoli for a, b in zip(ang, (0xFA, 0xF4, 0xE4))))
+    prova("...e in mezzo c'e' il disegno, non la carta", True,
+          max(abs(a - b) for a, b in zip(_centro, (0xFA, 0xF4, 0xE4))) > 20)
+    _rotta_img = pezzo("asset_p2p_ordine_anteprima")
+    prova("la rotta del file e' esplicita, col tipo JPEG", True,
+          '@app.get("/assets/p2p-ordine-anteprima.jpg")' in src
+          and 'FileResponse("assets/p2p-ordine-anteprima.jpg",' in _rotta_img
+          and 'media_type="image/jpeg"' in _rotta_img)
+    prova("IMMAGINE_ORDINE_P2P dichiara la misura VERA del file", (IMG, 400, 400),
+          amb["IMMAGINE_ORDINE_P2P"])
     # la scadenza la guarda l'orologio vero: l'evento vive un'ora da ADESSO
     amb["time"] = type("T", (), {"time": staticmethod(lambda: ADESSO)})
     T, titolo = seo(ID)
@@ -52026,10 +52049,15 @@ def prove_condividi_ordine_p2p():
           [meta(T, "og:title"), meta(T, "og:description"), meta(T, "og:url")])
     prova("...il <title> della pagina e' lo stesso dell'og:title", titolo,
           meta(T, "og:title"))
-    prova("...l'immagine e' quella del P2P, con la sua misura",
+    prova("...l'immagine e' la SUA, le due monete, con la sua misura",
           [IMG, IMG, "400", "400"],
           [meta(T, "og:image"), meta(T, "twitter:image"),
            meta(T, "og:image:width"), meta(T, "og:image:height")])
+    prova("...e quella del libro nella testa dell'ordine non c'e'", False,
+          IMG_LIBRO in T)
+    prova("...mentre il libro (e l'ordine sparito, che ricade li') tiene la sua",
+          [IMG_LIBRO, False],
+          [meta(amb["TESTA_P2P"], "og:image"), IMG in amb["TESTA_P2P"]])
     prova("...e resta NOINDEX, senza canonical", (True, False),
           (T.endswith(amb["META_NOINDEX"]), "canonical" in T))
     # NIENTE DI PERSONALE: chi ha pubblicato sta negli `autori` della

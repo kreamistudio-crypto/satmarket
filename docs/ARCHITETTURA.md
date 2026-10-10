@@ -29640,6 +29640,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    pagina perche' il logo ha l'alfa, 25 KB; la legge solo chi disegna
    la scheda di un link — vedi CANTIERI, «L'anteprima degli avvisi
    P2P, in miniatura»),
+   `/assets/p2p-ordine-anteprima.jpg` (l'og:image di un ordine
+   condiviso, `/p2p?ordine=<id>`, 10 ott 2026: le due monete di Andrea,
+   bitcoin ed euro, stessa forma della sorella — JPEG quadrato da 400,
+   opaco sulla carta, 29 KB; l'ordine sparito ricade sull'immagine del
+   libro — vedi CANTIERI, «Le due monete»),
    `/assets/barattozon.webp` (il marchio del metodo «Contanti al
    tabacchino», 16 set 2026: WebP con trasparenza, 305x96, cartella
    sua e mai assets/categorie/ — vedi «IL VESTITO BARATTOZON»; dal 24
