@@ -128,6 +128,11 @@ def gemelli_link_telegram(amb, leva=""):
     exec(_SORGENTE[i:_SORGENTE.index("\n\n\ndef _startapp_da_link(", i)], amb)
     for f in ("_startapp_da_link", "_link_dentro_telegram", "_link_casa_telegram"):
         exec(pezzo(f), amb)
+    # ...e Esplora coi suoi filtri (il terzo si', stessa sera)
+    i = _SORGENTE.index("\n_FORMA_ESPLORA_WEB = re.compile(") + 1
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\ndef _startapp_esplora(", i)], amb)
+    for f in ("_startapp_esplora", "_link_esplora_telegram"):
+        exec(pezzo(f), amb)
     return amb
 
 
@@ -32493,6 +32498,7 @@ def prove_vetrina_canale():
              # la strada del post di testo, cioe' quella che queste
              # prove sorvegliano da sempre.
              "_salva_podio": lambda con, top, oggi: ""}
+        gemelli_link_telegram(a)    # a leva spenta: il link di sempre
         for f in ("timbro_letto", "timbro_scrivi", "_conta_settimana"):
             exec(pezzo(f), a)
         # pezzo() taglia dal «def», quindi l'«async » va rimesso a mano
@@ -52081,7 +52087,9 @@ def prove_condividi_ordine_p2p():
           ["const condiviso = !!P2P_ORDINE_URL && !P2P_SCAMBIO_URL && p2pAcceso()\n"
            "    && typeof apriOrdineCondivisoP2P === 'function';\n"
            "  if (condiviso) p2pCondivisoInVolo = true;\n  vaiP2P();" in ap,
-           "else if (condiviso) apriOrdineCondivisoP2P(P2P_ORDINE_URL);" in ap])
+           0 < ap.find("else if (condiviso) {")
+           < ap.find("Promise.resolve(apriOrdineCondivisoP2P(P2P_ORDINE_URL))\n"
+                     "      .then(arrivoP2PFatto, arrivoP2PFatto);")])
     tour = _senza_commenti_js(_fn_js(mini, "function apriTourP2PSePrimaVolta(){"))
     prova("il tour della prima volta aspetta dietro l'ordine del link", True,
           0 < tour.find("condivisoDavantiP2P()) return;") < tour.find("apriTourP2P()"))
@@ -52611,12 +52619,90 @@ def prove_link_dentro_telegram():
     prova("...e la home del sito che ARRIVA non si traduce mai: gli avvisi del "
           "mercatino e i link condivisi restano com'erano", [BASE, BASE + "/"],
           [ld(BASE), ld(BASE + "/")])
-    prova("...la chiedono per nome in due, la riga delle tastiere e il post nel canale",
-          [2, True, True],
+    prova("...la chiedono per nome in quattro: la riga delle tastiere, il post P2P nel "
+          "canale e i due «🫙 Sfoglia il mercatino» del riepilogo (il vero e la sua prova)",
+          [4, True, True, 2],
           [codice(src).count("_link_casa_telegram(") - 1,
            '"url": _link_casa_telegram()}' in pezzo("_riga_webapp"),
            'href=\\"{_link_casa_telegram()}\\">🫙 Apri lo Scambio P2P su Barattolo</a>'
-           in pezzo("_caption_canale_p2p")])
+           in pezzo("_caption_canale_p2p"),
+           src.count('<a href=\\"{_link_casa_telegram()}\\">🫙 Sfoglia il mercatino</a>')])
+
+    # ---------------- 3ter) ESPLORA COI SUOI FILTRI (il terzo si') ---------
+    # «🫙 Apri Esplora» degli avvisi del mercatino: il link della Mini App
+    # porta il reparto e il prezzo massimo, come quello del sito.
+    def mercato(leva_viva):
+        amb = casa(leva_viva)
+        amb.update({"html": __import__("html"), "time": time, "TITOLI_AVVISO_MERCATINO": 3})
+        j = src.index("CATEGORIE = (")
+        exec(src[j:src.index(")", j) + 1], amb)
+        for f in ("_fmt_eur", "_fmt_sats", "slug_categoria", "_titoli_avviso_mercatino",
+                  "_link_esplora_avvisi", "_frase_filtro_avvisi_mercatino",
+                  "_testo_avviso_mercatino_tutti", "_testo_avviso_mercatino_segui"):
+            exec(_senza_prosa(pezzo(f)), amb)
+        return amb
+    M = mercato(BOT)
+
+    def pref(cats, tetto, valuta):
+        return {"attivo": True, "categorie": cats, "prezzo_max": tetto, "valuta": valuta}
+    PREF = [pref([], 0, "sats"), pref(["Elettronica"], 0, "sats"),
+            pref(["Casa e giardino"], 49.5, "eur"), pref([], 20000, "sats"),
+            pref(["Motori"], 50000, "sats"), pref(["Motori", "Bitcoin"], 50.0, "eur"),
+            pref(["Console e videogiochi"], 12.5, "eur")]
+    WEB = [M["_link_esplora_avvisi"](q) for q in PREF]
+    PAROLE = ["casa", "cat_elettronica", "cat_casa-e-giardino_max4950e", "casa_max20000s",
+              "cat_motori_max50000s", "casa_max5000e", "cat_console-e-videogiochi_max1250e"]
+    prova("la parola di Esplora: la home o il reparto, e il prezzo massimo in coda "
+          "(gli euro in centesimi: nel parametro il punto non ci sta)",
+          PAROLE, [M["_startapp_esplora"](u) for u in WEB])
+    prova("...ogni parola sta nei limiti di `start` (A-Z a-z 0-9 _ -, 64)", [],
+          [w for w in PAROLE if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", w)])
+    STORTI = [BASE, BASE + "/annuncio/7-poster", BASE + "/negozio/ab12cd34",
+              BASE + "/categoria/Elettronica", BASE + "/categoria/a_b",
+              BASE + "/?max=0&valuta=eur", BASE + "/?max=5&valuta=usd",
+              BASE + "/?max=5", BASE + "/?valuta=eur&max=5", BASE + "/?max=5&valuta=eur&x=1",
+              BASE + "/categoria/" + "a" * 60 + "?max=123456789012&valuta=sats",
+              BASE + "/?max=99999999999&valuta=eur", BASE + "/p2p",
+              "https://altrove.example/?max=5&valuta=eur", "", None]
+    prova("...e quel che non e' un indirizzo di Esplora, o non sta nella misura, non ha "
+          "parola: annunci e negozi restano sul sito", [""] * len(STORTI),
+          [M["_startapp_esplora"](u) for u in STORTI])
+    prova("a leva accesa «🫙 Apri Esplora» apre la Mini App coi filtri di chi lo riceve",
+          [BOT + "?startapp=" + w for w in PAROLE],
+          [M["_link_esplora_telegram"](u) for u in WEB])
+    prova("...a leva spenta, o senza parola, l'indirizzo resta com'e' arrivato",
+          [WEB, STORTI[:13]],
+          [[mercato("")["_link_esplora_telegram"](u) for u in WEB],
+           [M["_link_esplora_telegram"](u) for u in STORTI[:13]]])
+    R_ = [{"annuncio_id": 1, "titolo": "Uno"}, {"annuncio_id": 2, "titolo": "Due"}]
+
+    def tutti(leva_viva, q):
+        return mercato(leva_viva)["_testo_avviso_mercatino_tutti"](R_, q)
+
+    def segui(leva_viva, righe, nome, negozio):
+        return mercato(leva_viva)["_testo_avviso_mercatino_segui"](righe, nome, negozio)
+    prova("l'avviso dei nuovi annunci: a leva accesa il tocco apre la Mini App sul reparto "
+          "e col tetto di chi lo riceve", True,
+          f'<a href="{BOT}?startapp=cat_casa-e-giardino_max4950e">🫙 Apri Esplora</a>'
+          in tutti(BOT, PREF[2]))
+    prova("...e l'avviso cambia SOLO in quel link", tutti("", PREF[2]),
+          tutti(BOT, PREF[2]).replace(BOT + "?startapp=cat_casa-e-giardino_max4950e", WEB[2]))
+    prova("...a leva spenta e' quello di ieri", True,
+          f'<a href="{WEB[2]}">🫙 Apri Esplora</a>' in tutti("", PREF[2]))
+    prova("chi segue un venditore senza negozio: «🫙 Apri Esplora» apre la Mini App sulla home",
+          [True, True],
+          [f'<a href="{BOT}?startapp=casa">🫙 Apri Esplora</a>' in segui(BOT, R_, "", ""),
+           f'<a href="{BASE}/">🫙 Apri Esplora</a>' in segui("", R_, "", "")])
+    prova("GLI ANNUNCI E I NEGOZI RESTANO SUL SITO anche a leva accesa (l'anteprima con la foto)",
+          [True, True, segui("", R_[:1], "Anna", "ab12cd34"), segui("", R_, "Anna", "ab12cd34")],
+          [f'<a href="{BASE}/annuncio/1">🫙 Apri l\'annuncio</a>' in segui(BOT, R_[:1], "Anna", "ab12cd34"),
+           f'<a href="{BASE}/negozio/ab12cd34">🫙 Apri il suo negozio</a>' in segui(BOT, R_, "Anna", "ab12cd34"),
+           segui(BOT, R_[:1], "Anna", "ab12cd34"), segui(BOT, R_, "Anna", "ab12cd34")])
+    prova("la parola di Esplora la scrivono i due «🫙 Apri Esplora», e nessun altro",
+          [2, True, True],
+          [codice(src).count("_link_esplora_telegram(") - 1,
+           "_link_esplora_telegram(_link_esplora_avvisi(pref))" in pezzo("_testo_avviso_mercatino_tutti"),
+           "_link_esplora_telegram(URL_PUBBLICO + '/')" in pezzo("_testo_avviso_mercatino_segui")])
 
     def tastiera(leva_viva):
         amb = casa(leva_viva)
@@ -52724,7 +52810,7 @@ def prove_link_dentro_telegram():
           [tubo.count("linkDentroTelegram("),
            i_tg < tubo.find("linkDentroTelegram(link)") < i_sh,
            "tg.shareURL(dentro, testo)" in tubo
-           and "encodeURIComponent(dentro)" in tubo])
+           and "encodeURIComponent(testoColLink(testo, dentro))" in tubo])
     prova("...il foglio del telefono e gli appunti tengono il link del sito",
           [True, True],
           ["dati.url = link;" in tubo[i_sh:],
@@ -52748,6 +52834,9 @@ def prove_link_dentro_telegram():
                  "ordine_" + "b" * 58, "scambio_" + LUNGO, "ordine_corto", "P2P",
                  "ordine_" + ID + "/..", "ordine_" + ID + "&x=1", "scambio_", "annuncio_7",
                  "invito_ABC", "p2p ", "", None, "casa", "Casa"]
+    ESPLORA_NO = ["cat_", "cat_Elettronica", "casa_max0e", "casa_max5x", "cat_a_b",
+                  "casa_max12e_x", "cat_elettronica_max", "casa_max0123s",
+                  "cat_" + "a" * 41, "casa_max1234567890123s"]
     prog = (
         "let tg = null, tgMiniappLink = '', visto = [];\n"
         "let location = {pathname: '/', search: '', hash: ''};\n"
@@ -52761,12 +52850,15 @@ def prove_link_dentro_telegram():
             "function startappDaLink(", "function linkDentroTelegram(",
             "function testoColLink(", "async function condividiLink("))
         + "const LINK = " + _j.dumps(LINK) + ", PAR = " + _j.dumps(PARAMETRI) + ";\n"
+        + "const ESP = " + _j.dumps(PAROLE) + ", ESP_NO = " + _j.dumps(ESPLORA_NO) + ";\n"
         + "const ID = " + _j.dumps(ID) + ", BOT = " + _j.dumps(BOT) + ";\n"
         + r"""
 (async () => {
   const R = {};
   R.scrive = LINK.map(u => startappDaLink(u, baseCondivisione()));
   R.rilegge = PAR.map(percorsoDaStartapp);
+  R.esplora = ESP.map(percorsoDaStartapp);
+  R.esploraNo = ESP_NO.map(percorsoDaStartapp);
   /* IL GIRO INTERO: quel che il server scrive, la pagina lo rilegge nell'indirizzo di partenza */
   R.giro = LINK.slice(0, 4).map(u => baseCondivisione() + percorsoDaStartapp(startappDaLink(u, baseCondivisione())));
   /* la leva nel client */
@@ -52793,6 +52885,7 @@ def prove_link_dentro_telegram():
     giaAltrove: arrivo('/annuncio/7', '?tgWebAppStartParam=ordine_' + ID, ''),
     niente: arrivo('/', '?v=2', '', undefined),
     casa: arrivo('/', '?v=2&tgWebAppStartParam=casa', '#h'),
+    esplora: arrivo('/', '?v=2&tgWebAppStartParam=cat_casa-e-giardino_max4950e', '#h'),
     senzaInitData: arrivo('/', '', '', '')
   };
 
@@ -52853,6 +52946,25 @@ def prove_link_dentro_telegram():
     prova("...`casa` (la riga delle tastiere, il post nel canale) resta sulla home, e "
           "ripulisce l'indirizzo dal parametro", ["/", [["replace", None, "/#h"]]],
           A.get("casa"))
+    # IL GIRO INTERO DI ESPLORA: la parola che il server scrive, la pagina
+    # la rilegge nell'indirizzo che il link del sito avrebbe avuto — stesso
+    # percorso, stesso tetto (come NUMERO: «50.0» e «50» sono lo stesso
+    # prezzo), stessa valuta
+    from urllib.parse import parse_qs as _pq2, urlsplit as _us2
+
+    def luogo(u):
+        s = _us2(u)
+        q = _pq2(s.query)
+        return [s.path, float((q.get("max") or ["0"])[0]), (q.get("valuta") or [""])[0]]
+    prova("IL GIRO INTERO DI ESPLORA: la parola riletta e' l'indirizzo del sito, filtri compresi",
+          [luogo(u) for u in WEB], [luogo(BASE + x) for x in (R.get("esplora") or [""] * 7)])
+    prova("...e una parola di Esplora storta non e' un indirizzo", [""] * len(ESPLORA_NO),
+          R.get("esploraNo"))
+    prova("...l'arrivo: il reparto e il tetto finiscono nella barra, dove le porte di "
+          "sempre li leggono",
+          ["/categoria/casa-e-giardino?max=49.5&valuta=eur",
+           [["replace", None, "/categoria/casa-e-giardino?max=49.5&valuta=eur#h"]]],
+          A.get("esplora"))
     prova("...ma il client `casa` non la scrive mai: la home condivisa resta la home",
           "", (R.get("scrive") or [None] * 15)[14])
     L_WEB = BASE + "/p2p?ordine=" + ID
@@ -52863,8 +52975,9 @@ def prove_link_dentro_telegram():
         u = (visti or [[None, ""]])[0][1]
         q = _pq(_us(u).query)
         return [u.split("?")[0], (q.get("url") or [""])[0], (q.get("text") or [""])[0]]
-    prova("IL TUBO dentro Telegram: nel selettore delle chat va il link della Mini App",
-          ["https://t.me/share/url", L_TG, "testo"], selettore(R.get("tuboDentro")))
+    prova("IL TUBO dentro Telegram: nel selettore delle chat va il link della Mini App, "
+          "e PRIMA il testo — tutto nel campo `url`, nessun campo `text` da sostituire",
+          ["https://t.me/share/url", "testo\n" + L_TG, ""], selettore(R.get("tuboDentro")))
     prova("...anche dalla strada di shareURL", [["shareURL", L_TG, "testo"]],
           R.get("tuboDentroShareURL"))
     prova("...a leva spenta quello del sito, come ieri",
@@ -52872,6 +52985,103 @@ def prove_link_dentro_telegram():
           selettore(R.get("tuboDentroSpenta")))
     prova("...e un annuncio resta sul sito anche a leva accesa (porta la foto in anteprima)",
           BASE + "/annuncio/7-poster", selettore(R.get("tuboDentroAnnuncio"))[1])
+    # ---------------- 7) IL LINK DEL P2P SENZA IL LAMPO DELLA HOME -------
+    i_g = mini.index("let vetrinaDisegnata;")
+    guscio = mini[i_g:mini.index("let guscioVia = false;", i_g)]
+    i_c = mini.index("Promise.allSettled([Promise.race([")
+    catena = mini[i_c:mini.index("  .finally(() => togliGuscio());", i_c)] + "  .finally(() => togliGuscio());"
+    prog_velo = (
+        "const GUSCIO = " + _j.dumps(_senza_commenti_js(guscio)) + ";\n"
+        "const CATENA = " + _j.dumps(_senza_commenti_js(catena)) + ";\n"
+        + r"""
+const respiro = () => new Promise(r => setTimeout(r, 5));
+async function giro(pathname, copione){
+  let tolto = 0, esponi = null, fineAvvia, rompiAvvia;
+  const location = {pathname};
+  const document = {fonts: {ready: Promise.resolve()}};
+  async function immaginiPronte(){}
+  function togliGuscio(){ tolto++; }
+  function avvia(){ return new Promise((si, no) => { fineAvvia = si; rompiAvvia = no; }); }
+  eval(GUSCIO + '\n' + CATENA + '\n;esponi = {vetrina: () => vetrinaDisegnata(), porta: () => arrivoP2PFatto()};');
+  const passi = [];
+  for (const mossa of copione) {
+    if (mossa === 'vetrina') esponi.vetrina();
+    if (mossa === 'porta') esponi.porta();
+    if (mossa === 'avvio') fineAvvia();
+    if (mossa === 'avvioRotto') rompiAvvia(new Error('x'));
+    await respiro();
+    passi.push(tolto);
+  }
+  return passi;
+}
+(async () => {
+  const R = {};
+  R.home = await giro('/', ['vetrina']);
+  R.annuncio = await giro('/annuncio/7', ['vetrina']);
+  R.p2p = await giro('/p2p', ['vetrina', 'avvio', 'porta']);
+  R.p2pBarra = await giro('/p2p/', ['vetrina', 'porta']);
+  R.p2pPortaPrima = await giro('/p2p', ['porta', 'vetrina']);
+  R.p2pAvvioRotto = await giro('/p2p', ['avvioRotto']);
+  R.p2pSenzaPorta = await giro('/p2p', ['vetrina', 'avvio']);
+  R.p2pSoloAvvio = await giro('/p2p', ['avvio', 'porta']);
+  console.log(JSON.stringify(R));
+})().catch(e => { console.error(e); process.exit(1); });
+""")
+    V = _node_banco(prog_velo) or {}
+    prova("IL VELO: sulla home e su un annuncio scende alla vetrina disegnata, come ieri",
+          [[1], [1]], [V.get("home"), V.get("annuncio")])
+    prova("...sul link del P2P la vetrina non basta e la fine dell'avvio nemmeno: scende "
+          "quando la porta e' aperta", [[0, 0, 1], [0, 1]], [V.get("p2p"), V.get("p2pBarra")])
+    prova("...in qualunque ordine arrivino", [[0, 1], [0, 1]],
+          [V.get("p2pPortaPrima"), V.get("p2pSoloAvvio")])
+    prova("...se l'avvio si rompe scende lo stesso: mai un fondo vuoto per un guasto", [1],
+          V.get("p2pAvvioRotto"))
+    prova("...e se la porta non si apre mai, a scendere e' il tetto dei due secondi (non "
+          "la catena)", [[0, 0], True],
+          [V.get("p2pSenzaPorta"), "setTimeout(togliGuscio, TETTO_APERTURA);" in mini])
+    porta = (
+        "let visto = [], acceso = true, p2pApertoDaUrl = false, p2pCondivisoInVolo = false;\n"
+        "let P2P_URL = ['/p2p'], P2P_SCAMBIO_URL = '', P2P_ORDINE_URL = '';\n"
+        "let esitoOrdine = 'ok';\n"
+        "const p2pAcceso = () => acceso;\n"
+        "function vaiP2P(){ visto.push('vai'); }\n"
+        "function apriOrdineP2P(id){ visto.push('scambio'); }\n"
+        "function arrivoP2PFatto(){ visto.push('velo'); }\n"
+        "async function apriOrdineCondivisoP2P(id){ visto.push('ordine');"
+        " await new Promise(r => setTimeout(r, 5));"
+        " if (esitoOrdine !== 'ok') throw new Error('x'); visto.push('aperto'); }\n"
+        "let negozioAperto, annuncioAperto, sicurezzaAperta, privacyAperta, categoriaAperta,"
+        " consigliatiApertiDaUrl, offertaAperta, barattoloAperto, invitoDaUrlMostrato, bozzaAperta;\n"
+        + _fn_js(mini, "function apriP2PDaUrl(){") + _fn_js(mini, "function spegniLinkDaUrl(){")
+        + r"""
+(async () => {
+  const R = {};
+  const giro = async (prima) => { visto = []; p2pApertoDaUrl = false; P2P_URL = ['/p2p'];
+    P2P_SCAMBIO_URL = ''; P2P_ORDINE_URL = ''; acceso = true; esitoOrdine = 'ok'; prima();
+    apriP2PDaUrl(); const subito = visto.slice(); await new Promise(r => setTimeout(r, 30));
+    return [subito, visto.slice()]; };
+  R.libro = await giro(() => {});
+  R.spenta = await giro(() => { acceso = false; });
+  R.scambio = await giro(() => { P2P_SCAMBIO_URL = 'abcdefgh'; });
+  R.ordine = await giro(() => { P2P_ORDINE_URL = 'abcdefgh'; });
+  R.ordineRotto = await giro(() => { P2P_ORDINE_URL = 'abcdefgh'; esitoOrdine = 'no'; });
+  R.altrove = await giro(() => { P2P_URL = null; });
+  visto = []; spegniLinkDaUrl(); R.ricarica = [visto.slice(), p2pApertoDaUrl];
+  console.log(JSON.stringify(R));
+})().catch(e => { console.error(e); process.exit(1); });
+""")
+    Q = _node_banco(porta) or {}
+    prova("LA PORTA scioglie il velo: sul libro, sul coming soon e sullo scambio, subito",
+          [["vai", "velo"], ["vai", "velo"], ["vai", "scambio", "velo"]],
+          [(Q.get(k) or [None])[0] for k in ("libro", "spenta", "scambio")])
+    prova("...su un ordine condiviso SOLO a ordine aperto (o sparito): non prima",
+          [["vai", "ordine"], ["vai", "ordine", "aperto", "velo"]], Q.get("ordine"))
+    prova("...e anche se l'apertura dell'ordine si rompe", ["vai", "ordine", "velo"],
+          (Q.get("ordineRotto") or [None, None])[1])
+    prova("...fuori dal P2P la porta non tocca niente (la promessa nasce sciolta)",
+          [[], []], Q.get("altrove"))
+    prova("...e su una ricarica, dove le porte tacciono, lo scioglie chi le spegne",
+          [["velo"], True], Q.get("ricarica"))
     prova("FUORI da Telegram il foglio del telefono riceve il link del sito",
           [["share", {"title": "Scambio P2P", "text": "testo\n" + L_WEB}]],
           R.get("tuboFuori"))
@@ -88425,9 +88635,13 @@ _ATTESI_RICARICA = {
         'esplora Tutto |tutti Tutto [esplora p2p p2pmiei esplora] registro-a-meta visto:p2p>esplora',
         'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:p2pmiei',
     ],
+    # (10 ott 2026) il secondo passo diceva `visto:esplora>p2p`: arrivando
+    # da un link a /p2p si VEDEVA la home e poi il libro — il lampo che
+    # Andrea ha visto dal telefono. Ora il velo aspetta la porta del P2P,
+    # e a schermo arriva solo il libro.
     'link al p2p': [
         'dettaglio 3 |tutti Tutto [esplora dettaglio] visto:esplora>dettaglio',
-        'p2p - |tutti Tutto [esplora dettaglio esplora p2p] registro-a-meta visto:esplora>p2p',
+        'p2p - |tutti Tutto [esplora dettaglio esplora p2p] registro-a-meta visto:p2p',
         'p2p - |tutti Tutto [esplora dettaglio esplora p2p] registro-a-meta visto:p2p',
         'dettaglio 3 |tutti Tutto [esplora dettaglio esplora p2p dettaglio] registro-a-meta visto:p2p>dettaglio',
         'dettaglio 3 |tutti Tutto [esplora dettaglio esplora p2p dettaglio] registro-a-meta visto:dettaglio',
@@ -88749,8 +88963,14 @@ def prove_ricarica_resta():
           mini.count("const TETTO_RICARICA = 3000;"),
           mini.count("const MADRE_RICARICA = {p2pordine: 'p2pmiei', ordine: 'affari', dettaglio: 'esplora',\n"
                      "  negozio: 'esplora', pacco: 'esplora', acquisto: 'esplora', classifica: 'esplora'};")])
-    prova("...e la catena dell'ultima riga e' quella di sempre: aspetta lo stesso segnale", 1,
-          mini.count("Promise.allSettled([Promise.race([guscioVetrina, avvia()]),"))
+    # (10 ott 2026) LA CATENA HA UN PEZZO IN PIU', e solo sul link del P2P:
+    # accanto al segnale della vetrina aspetta la porta del P2P
+    # (`guscioArrivoP2P`, gia' sciolta su ogni altro indirizzo — vedi
+    # `prove_link_dentro_telegram`, che la fa girare). Il segnale che la
+    # ricarica mette da parte e' sempre lo stesso, `guscioVetrina`.
+    prova("...e la catena dell'ultima riga aspetta lo stesso segnale (e, sul link del "
+          "P2P, anche la sua porta)", 1,
+          mini.count("Promise.allSettled([Promise.race([Promise.all([guscioVetrina, guscioArrivoP2P]),\n                                  avvia().then(() => guscioArrivoP2P)]),"))
     prova("la pagina pronta scioglie il velo; arrivata tardi non fa niente", True,
           apr.rstrip().endswith("sciogliPaginaRicordata();")
           and _in_ordine(apr, "if (navRicordataTarda) return;", "navRicordata = null;"))
@@ -106603,6 +106823,7 @@ def prove_avvisi_mercatino():
     # --- 2) I GIUDICI PURI ------------------------------------------------------
     amb = {"html": html, "re": re, "URL_PUBBLICO": "https://barattolo.store", "time": time,
            "TITOLI_AVVISO_MERCATINO": 3}
+    gemelli_link_telegram(amb)      # a leva spenta: il link di sempre
     i = src.index("CATEGORIE = (")
     exec(src[i:src.index(")", i) + 1], amb)
     for f in ("_campo_riga", "_fmt_eur", "_fmt_sats", "slug_categoria", "in_ferie",
@@ -116956,8 +117177,14 @@ def prove_guscio_apertura():
     # aspettarli vorrebbe dire far aspettare al telefono dei giri di
     # rete che non si vedono. Misurato in locale: 80 ms, dove la rete
     # non c'e' nemmeno.
+    # (10 ott 2026) ...E SUL LINK DEL P2P ANCHE ALLA PORTA APERTA: li' la
+    # vetrina disegnata non basta — sotto il velo sceso c'era la home, e
+    # un attimo dopo la pagina giusta. `guscioArrivoP2P` su ogni altro
+    # indirizzo nasce sciolta, e la regola resta quella qui sopra.
     prova("scende alla vetrina DISEGNATA, non alla fine della coda di "
-          "avvia()", 1, js.count("Promise.race([guscioVetrina, avvia()])"))
+          "avvia() — e sul link del P2P alla sua porta aperta", 1,
+          js.count("Promise.race([Promise.all([guscioVetrina, guscioArrivoP2P]),\n"
+                   "                                  avvia().then(() => guscioArrivoP2P)])"))
     prova("...e i font corrono insieme a lei", 1,
           js.count("document.fonts?.ready])"))
     prova("...con allSettled e non all: se una delle due si rompe, il "

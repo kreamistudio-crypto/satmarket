@@ -15262,12 +15262,60 @@ def _link_casa_telegram() -> str:
     leva spenta restano l'indirizzo del sito.
     NON sta in `_startapp_da_link`, ed e' voluto: quella traduce gli
     indirizzi che ARRIVANO (il bottone di un avviso, un link condiviso),
-    e li' la home del sito deve restare la home del sito — gli avvisi
-    del mercatino («Sfoglia il mercatino», «Apri Esplora») e ogni link
-    che la Mini App condivide non si toccano. Qui la chiede per nome
-    chi la vuole."""
+    e li' la home del sito deve restare la home del sito — ogni link
+    che la Mini App condivide non si tocca. Qui la chiede per nome chi
+    la vuole.
+    ...E DAL TERZO SI' (stessa sera) la chiedono anche «🫙 Sfoglia il
+    mercatino» del riepilogo del lunedi' (nel canale, e nella sua prova
+    per gli admin) e «🫙 Apri Esplora» dell'avviso di un venditore
+    seguito senza negozio. I link degli ANNUNCI e dei negozi no."""
     return (f"{TELEGRAM_MINIAPP_LINK}?startapp=casa"
             if TELEGRAM_MINIAPP_LINK else URL_PUBBLICO)
+
+
+# ESPLORA COI SUOI FILTRI (10 ott 2026, il terzo si' di Andrea): «🫙 Apri
+# Esplora» dell'avviso dei nuovi annunci porta al reparto e al prezzo
+# massimo di chi lo riceve (`_link_esplora_avvisi`: `/categoria/<slug>` o
+# `/`, e in coda `?max=…&valuta=…`). Aprire la Mini App sulla home nuda
+# avrebbe perso proprio il filtro per cui l'avviso e' partito: quindi
+# la parola li porta con se'. `casa` o `cat_<slug>`, e in coda
+# `_max<numero><e|s>` — gli euro in CENTESIMI, perche' il punto dei
+# decimali nel parametro non ci puo' stare (A-Z a-z 0-9 _ -), i sats
+# interi. Lo slug di un reparto e' fatto di minuscole e trattini, quindi
+# `_` separa senza ambiguita'. La pagina la rilegge nell'indirizzo di
+# partenza (`percorsoDaStartapp`), e una prova fa il giro intero.
+_FORMA_ESPLORA_WEB = re.compile(
+    r"/(?:categoria/([a-z0-9-]{1,40}))?"
+    r"(?:\?max=(\d{1,12}(?:\.\d{1,6})?)&valuta=(eur|sats))?")
+
+
+def _startapp_esplora(url) -> str:
+    """PURA: la parola `startapp` di un indirizzo di Esplora com'e'
+    scritto da `_link_esplora_avvisi`, o '' se non e' uno di quelli (o
+    non sta nella forma e nella misura: allora resta il link del sito)."""
+    u = str(url or "")
+    if not u.startswith(URL_PUBBLICO):
+        return ""
+    m = _FORMA_ESPLORA_WEB.fullmatch(u[len(URL_PUBBLICO):])
+    if not m:
+        return ""
+    p = f"cat_{m.group(1)}" if m.group(1) else "casa"
+    if m.group(2):
+        tetto = float(m.group(2))
+        n = round(tetto * 100) if m.group(3) == "eur" else int(tetto)
+        if n <= 0 or n >= 10 ** 12:
+            return ""
+        p += f"_max{n}{'e' if m.group(3) == 'eur' else 's'}"
+    return p if len(p) <= STARTAPP_MAX and _FORMA_STARTAPP.fullmatch(p) else ""
+
+
+def _link_esplora_telegram(url) -> str:
+    """PURA: l'indirizzo di «🫙 Apri Esplora» per un messaggio che vive
+    dentro Telegram. A leva accesa, il link che apre la Mini App su
+    Esplora con gli stessi filtri; a leva spenta, o se la parola non si
+    puo' scrivere, l'indirizzo com'e' arrivato."""
+    p = _startapp_esplora(url) if TELEGRAM_MINIAPP_LINK else ""
+    return f"{TELEGRAM_MINIAPP_LINK}?startapp={p}" if p else str(url or "")
 
 
 async def _manda_telegram(tg_id: int, testo: str, bottone: tuple = None):
@@ -16611,7 +16659,7 @@ async def _anteprima_riepilogo(chat: int):
     if venduti:
         righe.append(f"🏆 I più venduti: {venduti}")
     testo = ("📊 <b>La settimana di Barattolo</b>\n\n" + "\n".join(righe)
-             + f"\n\n<a href=\"{URL_PUBBLICO}\">🫙 Sfoglia il mercatino</a>")
+             + f"\n\n<a href=\"{_link_casa_telegram()}\">🫙 Sfoglia il mercatino</a>")
     if nome:
         r = await bot_api("sendPhoto", {
             "chat_id": chat, "parse_mode": "HTML",
@@ -28207,7 +28255,8 @@ def _leve_stato():
                   TELEGRAM_MINIAPP_LINK,
                   acceso="il bottone e il link del libro degli avvisi "
                          "P2P, il link del post P2P nel canale, la riga "
-                         "«🫙 Apri Barattolo» delle tastiere e i link P2P "
+                         "«🫙 Apri Barattolo» delle tastiere, «🫙 Sfoglia "
+                         "il mercatino», «🫙 Apri Esplora» e i link P2P "
                          "condivisi dalla Mini App verso una chat aprono "
                          "la Mini App, già entrati; fuori da Telegram, e "
                          "per gli annunci, restano barattolo.store",
@@ -59908,7 +59957,10 @@ def _testo_avviso_mercatino_tutti(righe: list, pref: dict) -> str:
     if filtro:
         testo += f"\nIl tuo filtro: {filtro}"
     testo += _titoli_avviso_mercatino(righe)
-    testo += f"\n\n<a href=\"{_link_esplora_avvisi(pref)}\">🫙 Apri Esplora</a>"
+    # (10 ott 2026) dentro Telegram, a leva accesa, il tocco apre la Mini App
+    # su Esplora con gli stessi filtri (`_link_esplora_telegram`)
+    testo += (f"\n\n<a href=\"{_link_esplora_telegram(_link_esplora_avvisi(pref))}\">"
+              "🫙 Apri Esplora</a>")
     return testo
 
 
@@ -59926,7 +59978,7 @@ def _testo_avviso_mercatino_segui(righe: list, nome: str, negozio: str) -> str:
     elif cod:
         testo += f"\n\n<a href=\"{URL_PUBBLICO}/negozio/{cod}\">🫙 Apri il suo negozio</a>"
     else:
-        testo += f"\n\n<a href=\"{URL_PUBBLICO}/\">🫙 Apri Esplora</a>"
+        testo += f"\n\n<a href=\"{_link_esplora_telegram(URL_PUBBLICO + '/')}\">🫙 Apri Esplora</a>"
     return testo
 
 
@@ -69985,7 +70037,7 @@ async def riepilogo_settimana():
             righe.append(f"🏆 I più venduti: {venduti}")
     testo = ("📊 <b>La settimana di Barattolo</b>\n\n"
              + "\n".join(righe)
-             + f"\n\n<a href=\"{URL_PUBBLICO}\">🫙 Sfoglia il mercatino</a>")
+             + f"\n\n<a href=\"{_link_casa_telegram()}\">🫙 Sfoglia il mercatino</a>")
     # IL PODIO si ALLEGA, non sostituisce: la didascalia resta quella
     # di sempre, coi titoli — chi ha le immagini spente, o un client
     # che non le carica, legge la stessa cosa di prima. Se la figura

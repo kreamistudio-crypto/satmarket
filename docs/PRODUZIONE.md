@@ -3334,7 +3334,10 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
      toccarlo; dalla Mini App, «Condividi» un ordine in una chat e
      toccare il link; mandare `/start` al bot e toccare «🫙 Apri
      Barattolo»; al primo avviso dei nuovi ordini toccare «🫙 Apri il
-     libro ordini», e al primo post P2P nel canale il suo link. Devono
+     libro ordini», e al primo post P2P nel canale il suo link; al primo
+     avviso dei nuovi annunci «🫙 Apri Esplora» (deve aprire il reparto
+     e il tetto del proprio filtro), e il lunedì «🫙 Sfoglia il
+     mercatino» del riepilogo. Devono
      aprire la Mini App, già entrati, sul posto giusto. Si guarda anche
      l'ANTEPRIMA sotto l'avviso dei nuovi ordini: con la leva accesa
      non è più la miniatura del P2P ma quella che Telegram disegna per

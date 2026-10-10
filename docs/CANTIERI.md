@@ -47059,3 +47059,131 @@ riga «⚖️ Reputazione P2P: a … si segna una disputa persa», e nessun
 allarme. La prima `escrow-deadline` vera: la riga del conto, o il perché
 non si è contato. NON provati dal vivo: nessuna disputa vera è mai stata
 chiusa con `admin-settle` dopo oggi.
+
+
+## I link dentro Telegram, terzo giro: Sfoglia ed Esplora, il lampo della home, il testo prima del link (10 ott 2026, sera, cantiere link-telegram-mercatino, richieste di Andrea)
+
+Tre richieste arrivate una dopo l'altra, la seconda e la terza dal
+telefono a leva ACCESA sul VPS (alle 16:56 il journal ha detto «🔗 Link
+dentro Telegram: accesi»: `t.me/ilbarattolobot?startapp=p2p` apre il
+libro, e un ordine condiviso apre quell'ordine).
+
+**1. «🫙 SFOGLIA IL MERCATINO» E «🫙 APRI ESPLORA».** Sotto la stessa
+leva aprono la Mini App. «Sfoglia il mercatino» sta nel riepilogo del
+lunedì (nel canale, e nella prova che un admin si fa mandare): `casa`,
+via `_link_casa_telegram`. «Apri Esplora» sta nei due avvisi del
+mercatino, e in quello dei nuovi annunci NON porta alla home: porta al
+reparto e al prezzo massimo di chi lo riceve (`_link_esplora_avvisi`).
+Aprire la Mini App sulla home nuda avrebbe perso proprio il filtro per
+cui l'avviso è partito, quindi la parola li porta con sé: `casa` o
+`cat_<reparto>`, e in coda `_max<numero><e|s>`. Gli euro viaggiano in
+CENTESIMI (nel parametro il punto non ci può stare), i sats interi; lo
+slug di un reparto ha solo minuscole e trattini, quindi `_` separa
+senza ambiguità; la parola più lunga del catalogo sta sotto i 45
+caratteri. La pagina la rilegge in `/categoria/<reparto>?max=…&valuta=…`,
+che le porte di sempre sanno già leggere. Un indirizzo che non è uno di
+quelli, un tetto a zero o smisurato: nessuna parola, resta il link del
+sito. I link degli ANNUNCI e dei negozi restano sul sito (decisione di
+Andrea: l'anteprima con la foto).
+
+**2. IL LAMPO DELLA HOME.** Aprendo dal link si vedeva per un attimo il
+mercatino e poi la pagina giusta. Il velo d'apertura (la copertura; il
+guscio nell'app) scende alla vetrina disegnata, ma la porta del P2P si
+apre in coda all'avvio, perché le servono le leve: in mezzo c'era la
+home. È il difetto della ricarica del 7 ott, da un'altra porta, e la
+cura è sorella: quando l'indirizzo d'arrivo è `/p2p` il velo aspetta
+ANCHE la porta — il libro, lo scambio, il dettaglio dell'ordine o la
+riga «non più disponibile» —, e fino ad allora si vede il fondo della
+pagina. Vale per il link di Telegram (che a quell'ora è già stato
+ritradotto in `/p2p…`) e per quello del sito. LE RETI sono quelle di
+sempre: se l'avvio si rompe il velo scende lo stesso, e il tetto dei
+due secondi lo alza comunque — su una rete lenta si rivede la home,
+mai un fondo vuoto. STRADA SCARTATA: mettere `/p2p` fra le viste
+anticipate (come /sicurezza): senza le leve si mostrerebbe «coming
+soon» a chi sta per vedere il libro.
+
+**3. IL TESTO PRIMA DEL LINK.** Condividendo un ordine dalla Mini App in
+una chat, il messaggio era il link t.me (lungo, e senza anteprima: t.me
+non la dà) e SOTTO «🔄 Vendesi BTC…». Il selettore di Telegram compone
+«url a capo testo» e l'ordine non si sceglie; quindi, quando il link è
+quello della Mini App, il messaggio viaggia INTERO nel campo `url`, già
+nell'ordine giusto — il testo, a capo il link — e il campo `text` non
+si usa. Non i due campi scambiati: i client selezionano `text` perché
+chi scrive lo sostituisca, e lì ci sarebbe finito il link. Col link del
+SITO (gli annunci, e tutto a leva spenta) resta com'era: lì
+l'anteprima con l'immagine dice già tutto.
+L'ANTEPRIMA CON L'IMMAGINE, la domanda di Andrea. Un link `t.me/<bot>?
+startapp=` non ha un'anteprima scelta da noi. Tre strade, nessuna fatta
+qui: (a) una Mini App col NOME BREVE creata in BotFather: il suo link
+`t.me/<bot>/<nome>?startapp=…` mostra in chat la scheda dell'app con
+l'immagine caricata lì — una sola per tutti i link, non il titolo
+dell'ordine —; il codice la regge già, basta cambiare la leva (da
+verificare su BotFather: nella documentazione letta la procedura non
+c'è). (b) Il messaggio PREPARATO dal bot (Bot API 8.0,
+`savePreparedInlineMessage` + `shareMessage` nella Mini App): foto,
+testo e un bottone che apre la Mini App, per ogni ordine; è un cantiere
+vero (una rotta, il bot in modalità inline). (c) Due link nel messaggio,
+quello del sito per l'anteprima e quello t.me per aprire: funziona
+subito ma chi tocca la scheda finisce nel browser.
+
+**PROVATO.** `prove_link_dentro_telegram` sale a 93: la parola di
+Esplora su sette filtri veri e sedici indirizzi storti, il giro intero
+(la parola riletta è l'indirizzo del sito, filtri compresi), i due
+avvisi eseguiti a leva accesa e spenta — uguali a ieri in tutto tranne
+quel link, annunci e negozi fermi sul sito —; il velo: la catena VERA
+eseguita in node (sulla home scende alla vetrina come ieri; su /p2p
+aspetta la porta in qualunque ordine; avvio rotto: scende) e la porta
+vera (libro, coming soon, scambio: subito; ordine: solo ad apertura
+finita, anche se si rompe; ricarica: lo scioglie chi spegne le porte);
+il tubo col testo in testa. Tortura 24 su 24 su una copia.
+`collaudo_promemoria_gesto` 38 su 38 anche nella gabbia, col modulo
+vero. Quattro sentinelle della catena del velo aggiornate col loro
+perché — e una diceva il difetto: il banco della navigazione registrava
+`visto:esplora>p2p` arrivando da un link a /p2p, ora `visto:p2p`.
+DAL VIVO (Chrome a 390×844, Playwright, Telegram finto dall'hash di
+collaudo, coordinatore di cartone su un relay nak solo loopback), con
+una sonda che gira nella pagina dal primo istante e annota a ogni
+fotogramma cosa c'è a schermo a copertura scesa: dal link dell'ordine
+si vede SOLO il libro col dettaglio aperto; dal link del libro solo il
+libro; dall'ordine sparito solo il libro con la riga gentile; lo stesso
+dal link del sito, da anonimo e da entrato; la home e un annuncio come
+ieri. LA CONTROPROVA: la stessa sonda sulla pagina servita con la
+catena di ieri (riscritta al volo) vede `esplora → p2p → dettaglio`.
+Il tocco su «Condividi» consegna al selettore «🔄 Vendesi BTC per 50 €
+· SEPA, Revolut · su Barattolo P2P», a capo il link t.me, in un campo
+solo. `?tgWebAppStartParam=cat_motori_max4950e` apre Esplora sul
+reparto Motori col tetto a 49,50 € e il bottone Filtro acceso. Due
+scatti in `.claude/giri/link-dentro-telegram/`.
+
+**NON PROVATO, DA GUARDARE.** • Il telefono, per tutt'e tre: che il
+selettore di Telegram accetti il messaggio intero nel campo `url` su
+Android, iPhone e desktop (è il comportamento dei client che conosco,
+non l'ho potuto toccare); il lampo sul telefono vero, dove la rete c'è
+(se /me e la vetrina passano i due secondi, il tetto alza il velo e la
+home si rivede); «Apri Esplora» col proprio filtro. • NOTATO E NON
+TOCCATO: con `?max=` nell'indirizzo la copertura scende a 2,3 secondi
+invece che a mezzo — uguale dal link del sito di ieri, quindi non è di
+questo cantiere: sembra il tetto dei due secondi (la vetrina filtrata
+per prezzo non scioglie il segnale in tempo).
+
+**IL VERBALE DEL PUSH (10 ott 2026, sera): il terzo giro.** Main è
+corso tre volte a cantiere aperto, sei commit non miei (le hold di
+prova, la terza tappa del controllo della fattura, i malus dopo la
+garanzia, il codice di ritiro). COSA È GIRATO SU QUALE ALBERO. Sull'albero di partenza
+(`31cb369`): suite severa 21.608 verdi e 0 rosse, tortura 24 su 24, il
+collaudo del promemoria 38 su 38, i due giri dal vivo con la sonda e la
+controprova. Ribasato su `b14f5e2`: suite 21.622 verdi, collaudi della
+CI 54 su 54, i due passi dello scanner dei segreti puliti. Ribasato su
+`e1627d3`: suite severa 21.716 verdi e 0 rosse, scanner pulito, e dei
+collaudi i quattro che toccano gli avvisi (promemoria, avvisi del
+mercatino, avvisi in ordine, campagna); gli altri cinquanta NON rifatti
+su quest'ultima punta. A ogni rebase il solo conflitto è stata la coda
+di CANTIERI. Aspettata la CI di `e1627d3` (verde), main è corso una
+terza volta (il codice di ritiro, due commit): ribasato su `384a3ce`
+senza conflitti, suite severa 21.722 verdi e 0 rosse e scanner pulito;
+collaudi non rifatti su quella punta. Prima del push ho aspettato anche
+la CI di `384a3ce` (verde). Il primo push è stato rifiutato: nello
+stesso istante è arrivato `660f1ed` (una riga di CLAUDE.md); ribasato
+senza conflitti, rifatti lo scanner, la prova del cantiere e quella del
+tetto di CLAUDE.md, e spinto. Tortura e giri dal vivo non rifatti dopo
+i rebase.

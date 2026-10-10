@@ -30514,3 +30514,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   resta la home del sito, e gli annunci non si traducono mai. I banchi
   che eseguono chi chiama la traduzione montano i pezzi veri con
   `gemelli_link_telegram`.
+  E IL TERZO SÌ (stessa sera): «🫙 Sfoglia il mercatino» del riepilogo
+  del lunedì (nel canale e nella sua prova: `_link_casa_telegram`) e «🫙
+  Apri Esplora» degli avvisi del mercatino, che porta i FILTRI di chi lo
+  riceve: `_startapp_esplora` scrive `casa` o `cat_<reparto>` e in coda
+  `_max<numero><e|s>` (gli euro in centesimi), `_link_esplora_telegram`
+  ne fa il link, e `percorsoDaStartapp` lo rilegge in
+  `/categoria/<reparto>?max=…&valuta=…`. Annunci e negozi restano sul
+  sito. IL VELO D'APERTURA SUL LINK DEL P2P: quando l'indirizzo d'arrivo
+  è `/p2p` (anche ritradotto da `startapp`) la catena in fondo allo
+  script aspetta, oltre alla vetrina disegnata, la porta del P2P
+  (`guscioArrivoP2P`, sciolta da `apriP2PDaUrl`, dalla fine di
+  `apriOrdineCondivisoP2P` e da `spegniLinkDaUrl`): a velo sceso non si
+  vede più la home. IL TESTO PRIMA DEL LINK: nel ramo Telegram di
+  `condividiLink`, col link della Mini App il messaggio viaggia intero
+  nel campo `url` del selettore (`testo`, a capo il link); col link del
+  sito resta `url` + `text`.

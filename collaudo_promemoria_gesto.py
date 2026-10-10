@@ -349,7 +349,24 @@ async def giro():
     prova("il post P2P nel canale porta «🫙 Apri lo Scambio P2P su Barattolo» verso la Mini App",
           True, '<a href="https://t.me/ilbarattolobot?startapp=casa">'
                 '🫙 Apri lo Scambio P2P su Barattolo</a>' in post)
+    # ...e gli avvisi del mercatino (il terzo sì): «🫙 Apri Esplora» porta
+    # con sé il reparto e il tetto di chi lo riceve; l'annuncio resta sul sito
+    pref = {"attivo": True, "categorie": ["Motori"], "prezzo_max": 49.5, "valuta": "eur"}
+    righe = [{"annuncio_id": 7, "titolo": "Uno"}, {"annuncio_id": 8, "titolo": "Due"}]
+    prova("«🫙 Apri Esplora» dei nuovi annunci apre la Mini App sul reparto, col tetto",
+          True, '<a href="https://t.me/ilbarattolobot?startapp=cat_motori_max4950e">'
+                '🫙 Apri Esplora</a>' in SRV._testo_avviso_mercatino_tutti(righe, pref))
+    prova("...quello di un venditore seguito senza negozio apre la Mini App sulla home, "
+          "e il link di un ANNUNCIO resta sul sito",
+          [True, True],
+          ['<a href="https://t.me/ilbarattolobot?startapp=casa">🫙 Apri Esplora</a>'
+           in SRV._testo_avviso_mercatino_segui(righe, "", ""),
+           f'<a href="{SRV.URL_PUBBLICO}/annuncio/7">🫙 Apri l\'annuncio</a>'
+           in SRV._testo_avviso_mercatino_segui(righe[:1], "Anna", "ab12cd34")])
     SRV.TELEGRAM_MINIAPP_LINK = ""
+    prova("...e a leva spenta «🫙 Apri Esplora» è il link del sito, coi suoi filtri",
+          True, f'<a href="{SRV.URL_PUBBLICO}/categoria/motori?max=49.5&valuta=eur">'
+                '🫙 Apri Esplora</a>' in SRV._testo_avviso_mercatino_tutti(righe, pref))
     prova("...e spenta la leva tornano tutti e tre al sito",
           [SRV.URL_PUBBLICO, True, True],
           [SRV.tastiera_bot()["inline_keyboard"][0][0]["url"],

@@ -48,10 +48,12 @@ TELEGRAM_WEBHOOK_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
 # `?startapp=<parametro>` — nel bottone degli avvisi P2P («⚡ Apri lo
 # scambio»), nel link «🫙 Apri il libro ordini» dell'avviso dei nuovi
 # ordini, in «🫙 Apri lo Scambio P2P su Barattolo» del post P2P nel
-# canale, nella riga «🫙 Apri Barattolo» delle tastiere del bot e nei
-# link P2P che la Mini App condivide verso una chat. Chi li tocca dentro
-# Telegram atterra nella Mini App, gia' entrato, sullo scambio,
-# sull'ordine, sul libro o sulla home; fuori da Telegram (Nostr,
+# canale, nella riga «🫙 Apri Barattolo» delle tastiere del bot, in «🫙
+# Sfoglia il mercatino» del riepilogo del lunedi', in «🫙 Apri Esplora»
+# degli avvisi del mercatino (col reparto e il prezzo massimo di chi lo
+# riceve) e nei link P2P che la Mini App condivide verso una chat. Chi li
+# tocca dentro Telegram atterra nella Mini App, gia' entrato, sullo
+# scambio, sull'ordine, sul libro, su Esplora o sulla home; fuori da Telegram (Nostr,
 # WhatsApp, il browser) i link restano barattolo.store, e i link degli
 # ANNUNCI restano sempre quelli del sito (portano la foto in anteprima).
 # DUE FORME, e quale vale lo dice BotFather:

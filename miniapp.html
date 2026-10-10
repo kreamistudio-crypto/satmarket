@@ -14115,6 +14115,20 @@ function percorsoDaStartapp(p){
      il server (`_link_casa_telegram`); qui vuol dire «resta sulla home»,
      e l'indirizzo si ripulisce del parametro */
   if (p === 'casa') return '/';
+  /* ESPLORA COI SUOI FILTRI (10 ott 2026, il terzo si'): «🫙 Apri
+     Esplora» degli avvisi del mercatino. `casa` o `cat_<reparto>`, e in
+     coda `_max<numero><e|s>` — il prezzo massimo, gli euro in centesimi
+     (nel parametro il punto non ci puo' stare). Si rilegge
+     nell'indirizzo che il link del sito avrebbe avuto:
+     `/categoria/<reparto>?max=…&valuta=…`, che le porte di sempre
+     (`CATEGORIA_URL`, `preparaFiltriDaUrl`) sanno gia' leggere. La
+     scrive solo il server (`_startapp_esplora`). */
+  const e = /^(casa|cat_([a-z0-9-]{1,40}))(?:_max([1-9]\d{0,11})([es]))?$/.exec(p);
+  if (e && p.length <= 64) {
+    const max = e[3] ? (e[4] === 'e' ? Number(e[3]) / 100 : Number(e[3])) : 0;
+    return (e[2] ? '/categoria/' + e[2] : '/')
+      + (max ? '?max=' + max + '&valuta=' + (e[4] === 'e' ? 'eur' : 'sats') : '');
+  }
   const m = /^(scambio|ordine)_([0-9a-zA-Z-]{8,64})$/.exec(p);
   return (m && p.length <= 64) ? '/p2p?' + m[1] + '=' + m[2] : '';
 }
@@ -14401,6 +14415,31 @@ if (tg) tg.expand();
    chiamata molto dopo, e a quel punto questa riga e' gia' girata. */
 let vetrinaDisegnata;
 const guscioVetrina = new Promise(sciogli => { vetrinaDisegnata = sciogli; });
+/* IL LINK DEL P2P SENZA IL LAMPO DELLA HOME (10 ott 2026, dal telefono
+   di Andrea: aprendo `t.me/…?startapp=…` si vedeva per un attimo il
+   mercatino, e poi la pagina giusta). Il velo d'apertura scende alla
+   vetrina disegnata, ma la porta del P2P (`apriP2PDaUrl`) si apre in
+   CODA all'avvio — le servono le leve, che arrivano con /me —: in
+   mezzo, a velo gia' sceso, c'era la home. E' il difetto della ricarica
+   del 7 ott, da un'altra porta.
+   Quando l'indirizzo d'arrivo e' quello del P2P (a quest'ora il
+   parametro di Telegram e' gia' stato ritradotto: `arrivoDaStartapp`
+   gira piu' in alto) il velo aspetta ANCHE la sua porta: la catena in
+   fondo al file lo fa scendere a vetrina disegnata E porta aperta — il
+   libro, lo scambio, il dettaglio dell'ordine o la riga «non piu'
+   disponibile». Fino ad allora si vede il fondo della pagina (la
+   copertura; nell'app il guscio), mai la home.
+   CHI LA SCIOGLIE: `apriP2PDaUrl`, e per un ordine condiviso la fine di
+   `apriOrdineCondivisoP2P`; `spegniLinkDaUrl`, quando l'arrivo e' una
+   ricarica e le porte tacciono. LE RETI restano quelle di sempre: se
+   l'avvio si rompe la catena scende lo stesso, e il tetto dei due
+   secondi (`TETTO_APERTURA`) alza il velo comunque — su una rete lenta
+   si vede la home come ieri, mai un fondo vuoto per sempre.
+   Su ogni altro indirizzo la promessa nasce gia' sciolta: non cambia
+   niente. */
+let arrivoP2PFatto = () => {};
+const guscioArrivoP2P = /^\/p2p\/?$/.test(location.pathname)
+  ? new Promise(sciogli => { arrivoP2PFatto = sciogli; }) : Promise.resolve();
 let guscioVia = false;
 /* IL GUSCIO E' IN VISTA? (set 2026) Lo chiede `applicaTema`, che
    finche' c'e' il guscio lascia la barra di stato del suo arancio (il
@@ -34436,8 +34475,21 @@ async function condividiLink(link, testo, titolo){
     const dentro = linkDentroTelegram(link);
     if (typeof tg.shareURL === 'function') { tg.shareURL(dentro, testo); return; }
     if (typeof tg.openTelegramLink === 'function') {
-      tg.openTelegramLink('https://t.me/share/url?url='
-        + encodeURIComponent(dentro) + '&text=' + encodeURIComponent(testo));
+      /* COL LINK DELLA MINI APP, PRIMA IL TESTO (10 ott 2026, dal
+         telefono di Andrea): il selettore compone «url a capo testo», e
+         un link t.me non ha anteprima — in chat si leggeva prima un
+         indirizzo lungo e solo dopo di cosa si trattava. Quando il link
+         e' quello della Mini App il messaggio viaggia INTERO nel campo
+         `url`, gia' nell'ordine giusto: il testo, a capo il link (lo
+         stesso `testoColLink` del foglio del telefono). Un campo solo e
+         non i due scambiati: i client selezionano il campo `text`
+         perche' chi scrive lo sostituisca, e li' ci sarebbe finito il
+         link. Col link del SITO resta com'era: li' l'anteprima con
+         l'immagine dice gia' tutto. */
+      tg.openTelegramLink(dentro !== link
+        ? 'https://t.me/share/url?url=' + encodeURIComponent(testoColLink(testo, dentro))
+        : 'https://t.me/share/url?url='
+          + encodeURIComponent(link) + '&text=' + encodeURIComponent(testo));
       return;
     }
   }
@@ -73180,7 +73232,17 @@ function apriP2PDaUrl(){
   vaiP2P();
   if (P2P_SCAMBIO_URL && p2pAcceso() && typeof apriOrdineP2P === 'function')
     apriOrdineP2P(P2P_SCAMBIO_URL);
-  else if (condiviso) apriOrdineCondivisoP2P(P2P_ORDINE_URL);
+  else if (condiviso) {
+    /* il velo d'apertura aspetta l'ordine: scende a dettaglio aperto, o
+       con la riga «non piu' disponibile» (vedi IL LINK DEL P2P SENZA IL
+       LAMPO DELLA HOME) */
+    Promise.resolve(apriOrdineCondivisoP2P(P2P_ORDINE_URL))
+      .then(arrivoP2PFatto, arrivoP2PFatto);
+    return;
+  }
+  /* la porta e' aperta — il libro, lo scambio, o il coming soon: il velo
+     d'apertura puo' scendere */
+  arrivoP2PFatto();
 }
 
 /* /consigliati — la pagina dei negozi consigliati (set 2026): l'indirizzo
@@ -73416,6 +73478,9 @@ function spegniLinkDaUrl(){
   categoriaAperta = p2pApertoDaUrl = consigliatiApertiDaUrl = true;
   offertaAperta = barattoloAperto = invitoDaUrlMostrato = true;
   bozzaAperta = true;
+  /* ...e la porta del P2P non si aprira': il velo d'apertura non la
+     aspetta (vedi IL LINK DEL P2P SENZA IL LAMPO DELLA HOME) */
+  arrivoP2PFatto();
 }
 
 const BOZZA_URL = (location.search.match(/[?&]bozza=([a-z0-9-]{2,40})(?:&|$)/) || [])[1] || '';
@@ -74077,7 +74142,14 @@ tinteVociP2P();   /* le voci della barra P2P si accendono con uno strato */
    `finally` e non `then`: se l'attesa delle immagini esplodesse, la
    copertura deve scendere lo stesso. L'ultima rete e' il tetto dei due
    secondi, armato molto piu' in alto. */
-Promise.allSettled([Promise.race([guscioVetrina, avvia()]),
+/* ...E LA PORTA DEL P2P, quando si arriva da li' (10 ott 2026, vedi IL
+   LINK DEL P2P SENZA IL LAMPO DELLA HOME): la vetrina disegnata non
+   basta, serve anche la porta aperta; e se l'avvio finisce prima, si
+   aspetta lei (un ordine condiviso si apre un attimo dopo la fine
+   dell'avvio). Su ogni altro indirizzo `guscioArrivoP2P` e' gia'
+   sciolta e la catena e' quella di ieri. */
+Promise.allSettled([Promise.race([Promise.all([guscioVetrina, guscioArrivoP2P]),
+                                  avvia().then(() => guscioArrivoP2P)]),
                     document.fonts?.ready])
   .then(() => immaginiPronte())
   .finally(() => togliGuscio());
