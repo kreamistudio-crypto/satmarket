@@ -44949,3 +44949,17 @@ una pagina che non cambia forma.
 presa non viene annotata», due paragrafi più giù) resta vera per
 `p2p_ordini` e per il volto, ma va letta insieme al paragrafo nuovo: se
 Andrea la vuole più netta, è un ritocco di testo a parte.
+
+**IL PUSH (10 ott 2026, pomeriggio, con l'ok di Andrea: strada A, testo
+approvato com'era).** Main è corso due volte mentre giravano le prove:
+b2b3d92 (il controllo della fattura) e poi c48e3a0 (una riga di
+PRODUZIONE). Due rebase; un conflitto solo, le due voci appese in fondo
+a questo file, tenute tutt'e due. COSA È GIRATO SU QUALE ALBERO:
+sull'albero di ccea57f più il ritocco, la suite `PROVE_SEVERE=1` intera
+(21.053 passate, 0 fallite); sull'albero di b2b3d92 più il ritocco, le
+quindici sezioni che leggono la pagina dei dati o toccano la
+reputazione e i conti (1.215 passate, 0 fallite) e i 51 collaudi della
+CI nella gabbia (51 verdi); sull'albero finale (c48e3a0 più il ritocco:
+in più una riga di documento) di nuovo le quindici sezioni, non i
+collaudi — il ritocco è testo e prove, e nessun collaudo legge né l'uno
+né le altre.
