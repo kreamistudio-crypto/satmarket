@@ -9779,6 +9779,11 @@
     padding:12px;border-radius:14px;background:var(--warn-bg);color:var(--ink);
     font-size:13px;font-weight:600;line-height:1.35;text-align:left}
   .wallet-avviso .btn{margin:0;text-decoration:none}
+  /* LA RIGA PER CHI USA WALLET OF SATOSHI nei fogli della garanzia e
+     della cauzione (10 ott 2026, riga-wos): sotto «Apri nel wallet»,
+     sopra il Copia, sul fondo dell'allarme */
+  .hint.wos-hold{background:var(--warn-bg);color:var(--ink);border-radius:12px;
+    padding:10px 12px;margin:-4px 0 10px;font-weight:600}
   .sheet.fattura-scaduta .qr,.sheet.fattura-scaduta .invoice{opacity:.3}
   /* ---------- festa: le monete ₿ quando i sats si sbloccano ---------- */
   .festa-box{position:fixed;inset:0;pointer-events:none;z-index:70;overflow:hidden}
@@ -59890,6 +59895,23 @@ async function apriCauzioneP2P(){
   await disegnaQr(el('p2pHoldQr'),
                   ('lightning:' + o.cauzione.bolt11.trim()).toUpperCase(), 'Alphanumeric');
 }
+/* LA RIGA PER CHI USA WALLET OF SATOSHI (10 ott 2026, sera, cantiere
+   riga-wos, richiesta di Andrea). IL FATTO, provato da Andrea su Android
+   con WoS self-custodial (icona delle chiavi) dall'app sulla Home, sulla
+   pagina /prova-wallet: il link `lightning:` nudo su una fattura NORMALE
+   apre WoS con la conferma subito; lo STESSO link su una HOLD invoice
+   (cltv 40 o 576, uguale) apre WoS su «Elaborazione in corso» e poi
+   «impossibile connettersi a internet», mai la conferma; la stessa hold
+   INCOLLATA a mano si paga. E' quel che era successo all'utente con la
+   garanzia vera. Quindi: WoS col deep link non regge le hold, il CLTV
+   non c'entra, e il tasto resta com'e' per gli altri wallet. Qui sotto
+   «Apri nel wallet», nei due fogli (garanzia e cauzione: tutt'e due
+   hold), una riga che lo dice e manda al Copia, che diventa il bottone
+   in evidenza del foglio. PURA: `cosa` e' la parola del foglio. */
+function rigaWosHoldP2P(cosa){
+  return '<div class="hint wos-hold">💡 Usi Wallet of Satoshi? Con la ' + cosa +
+    ' il tasto si blocca su «Elaborazione in corso»: tocca <b>📋 Copia</b> e incolla la richiesta in WoS.</div>';
+}
 function renderCauzioneP2P(o){
   const box = el('p2pHoldCorpo');
   const c = o.cauzione;
@@ -59909,7 +59931,8 @@ function renderCauzioneP2P(o){
     '<div class="pay-scade" id="p2pHoldScadeRiga" style="display:none">' +
       '<span id="p2pHoldScade"></span>' +
       '<a class="btn mini" id="p2pHoldWallet" href="#">⚡ Apri nel wallet</a></div>' +
-    '<button class="btn ghost" onclick="copiaHoldP2P()">📋 Copia la richiesta</button>' +
+    rigaWosHoldP2P('cauzione') +
+    '<button class="btn primary" onclick="copiaHoldP2P()">📋 Copia la richiesta</button>' +
     '<div class="hint">Quando la cauzione è bloccata questo foglio si chiude da solo e lo scambio va avanti: non c\'è niente da confermare.</div>';
   el('p2pHoldInvoice').textContent = c.bolt11;
   orologioHoldP2P(o);
@@ -59944,7 +59967,8 @@ function renderHoldP2P(){
     '<div class="pay-scade" id="p2pHoldScadeRiga" style="display:none">' +
       '<span id="p2pHoldScade"></span>' +
       '<a class="btn mini" id="p2pHoldWallet" href="#">⚡ Apri nel wallet</a></div>' +
-    '<button class="btn ghost" onclick="copiaHoldP2P()">📋 Copia la richiesta</button>' +
+    rigaWosHoldP2P('garanzia') +
+    '<button class="btn primary" onclick="copiaHoldP2P()">📋 Copia la richiesta</button>' +
     '<div class="hint">Quando i sats sono in garanzia questo foglio si chiude da solo: non c\'è niente da confermare.' +
       /* cosa fare se il wallet non paga (10 ott 2026, reputazione-p2p):
          il server vede che hai provato, non il pagamento fallito */

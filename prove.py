@@ -129825,16 +129825,28 @@ def prove_apri_wallet_p2p():
         return pezzo_js(mini, firma, "\n}\n") + "\n}"
 
     # --- 1) LE SENTINELLE --------------------------------------------
-    RIGA = ("'<div class=\"pay-scade\" id=\"p2pHoldScadeRiga\" style=\"display:none\">' +\n"
-            "      '<span id=\"p2pHoldScade\"></span>' +\n"
-            "      '<a class=\"btn mini\" id=\"p2pHoldWallet\" href=\"#\">⚡ Apri nel wallet</a></div>' +\n"
-            "    '<button class=\"btn ghost\" onclick=\"copiaHoldP2P()\">📋 Copia la richiesta</button>'")
+    # dal 10 ott 2026 sera (riga-wos) fra la riga e il Copia c'e' la riga
+    # per chi usa Wallet of Satoshi, e il Copia e' il bottone in evidenza
+    def RIGA(cosa):
+        return ("'<div class=\"pay-scade\" id=\"p2pHoldScadeRiga\" style=\"display:none\">' +\n"
+                "      '<span id=\"p2pHoldScade\"></span>' +\n"
+                "      '<a class=\"btn mini\" id=\"p2pHoldWallet\" href=\"#\">⚡ Apri nel wallet</a></div>' +\n"
+                "    rigaWosHoldP2P('" + cosa + "') +\n"
+                "    '<button class=\"btn primary\" onclick=\"copiaHoldP2P()\">📋 Copia la richiesta</button>'")
     rh, rc = fn("function renderHoldP2P(){"), fn("function renderCauzioneP2P(o){")
-    prova("la riga sta in tutt'e due le vesti del foglio P2P, dopo la stringa e prima di «Copia»",
-          [True, True, 2],
-          [RIGA in rh and rh.find('id="p2pHoldInvoice"') < rh.find(RIGA),
-           RIGA in rc and rc.find('id="p2pHoldInvoice"') < rc.find(RIGA),
-           mini.count(RIGA)])
+    prova("la riga sta in tutt'e due le vesti del foglio P2P, dopo la stringa, con la riga WoS e poi «Copia» in evidenza",
+          [True, True, 1, 1],
+          [RIGA("garanzia") in rh and rh.find('id="p2pHoldInvoice"') < rh.find(RIGA("garanzia")),
+           RIGA("cauzione") in rc and rc.find('id="p2pHoldInvoice"') < rc.find(RIGA("cauzione")),
+           mini.count(RIGA("garanzia")), mini.count(RIGA("cauzione"))])
+    wos = nudo(fn("function rigaWosHoldP2P(cosa){"))
+    prova("la riga WoS: pura, il testo di Andrea, la parola del foglio, il Copia in grassetto",
+          [True, True, True, False],
+          ["Usi Wallet of Satoshi? Con la ' + cosa +" in wos,
+           "il tasto si blocca su «Elaborazione in corso»: tocca <b>📋 Copia</b> e incolla la richiesta in WoS." in wos,
+           'class="hint wos-hold"' in wos, any(s in wos for s in ("el(", "document", "fetch(", "localStorage"))])
+    prova("...e il suo css sta sul fondo dell'allarme", True,
+          ".hint.wos-hold{background:var(--warn-bg)" in mini)
     prova("...e tutt'e due accendono l'orologio dopo aver scritto la stringa",
           [True, True],
           [rh.rstrip().endswith("el('p2pHoldInvoice').textContent = o.hold.bolt11;\n  orologioHoldP2P(o);\n}"),
@@ -129882,6 +129894,7 @@ def prove_apri_wallet_p2p():
         fn("function scadenzaFoglioP2P(o, modo){"),
         "let p2pHoldScadeIl = 0, p2pHoldOrologio = null;",
         fn("function orologioHoldP2P(o){"), fn("function battitoHoldP2P(){"),
+        fn("function rigaWosHoldP2P(cosa){"),
         fn("function renderCauzioneP2P(o){"), fn("function renderHoldP2P(){"),
         "const esc = s => String(s ?? '').replace(/[&<>\"']/g, c => "
         "({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));",
@@ -129932,6 +129945,9 @@ const html = nodi.p2pHoldCorpo.innerHTML;
 out.renderHold = [html.indexOf('id="p2pHoldInvoice"') < html.indexOf('id="p2pHoldScadeRiga"'),
   html.indexOf('id="p2pHoldScadeRiga"') < html.indexOf('copiaHoldP2P()'), html.indexOf('⚡ Apri nel wallet') > 0,
   nodi.p2pHoldInvoice.textContent === V.hold, nodi.p2pHoldTit.textContent];
+/* la riga WoS (riga-wos): fra «Apri nel wallet» e il Copia, con la parola del foglio */
+out.wosHold = [html.indexOf('id="p2pHoldScadeRiga"') < html.indexOf('wos-hold'), html.indexOf('wos-hold') < html.indexOf('copiaHoldP2P()'),
+  html.indexOf('Con la garanzia il tasto si blocca') > 0, html.indexOf('class="btn primary" onclick="copiaHoldP2P()"') > 0];
 out.holdViva = foto();
 p2pHoldModo = 'cauzione';
 renderHoldP2P();
@@ -129939,6 +129955,8 @@ const html2 = nodi.p2pHoldCorpo.innerHTML;
 out.renderCauz = [html2.indexOf('id="p2pHoldInvoice"') < html2.indexOf('id="p2pHoldScadeRiga"'),
   html2.indexOf('id="p2pHoldScadeRiga"') < html2.indexOf('copiaHoldP2P()'),
   nodi.p2pHoldInvoice.textContent === V.cauz, nodi.p2pHoldTit.textContent];
+out.wosCauz = [html2.indexOf('id="p2pHoldScadeRiga"') < html2.indexOf('wos-hold'), html2.indexOf('wos-hold') < html2.indexOf('copiaHoldP2P()'),
+  html2.indexOf('Con la cauzione il tasto si blocca') > 0, html2.indexOf('class="btn primary" onclick="copiaHoldP2P()"') > 0];
 out.cauzViva = foto();
 /* 3) il battito: viva → morta, il bottone sparisce e l'orologio si ferma */
 const primaFermati = fermati;
@@ -129986,6 +130004,8 @@ console.log(JSON.stringify(out));
           [v["riga"], v["testo"], v["wallet"], v["href"], v["velo"], v["orologio"] is not None])
     prova("renderCauzioneP2P: la stessa riga, la cauzione nella stringa, il titolo",
           [True, True, True, "🔐 Blocca la cauzione"], o["renderCauz"])
+    prova("la riga WoS, nei due render veri: fra «Apri nel wallet» e il Copia in evidenza, con la parola del foglio",
+          [[True, True, True, True], [True, True, True, True]], [o["wosHold"], o["wosCauz"]])
     v = o["cauzViva"]
     prova("...cauzione viva: la porta porta la cauzione, e il conto e' il suo",
           ["", "⏱ Scade tra 4:30", "", "lightning:" + CAUZ, False],

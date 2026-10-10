@@ -1299,6 +1299,16 @@
   cauzione) dicono nel primo riquadro che nel wallet il pagamento resta
   «in sospeso» finché lo scambio non finisce: è la hold, non un
   pagamento inceppato (10 ott 2026, prova-wallet).
+  IL FATTO SU WALLET OF SATOSHI (10 ott 2026, sera, provato da Andrea
+  su /prova-wallet con WoS self-custodial dall'app sulla Home): il link
+  `lightning:` nudo su una fattura normale apre la conferma; lo stesso
+  link su una HOLD invoice, cltv 40 o 576 indifferente, apre WoS su
+  «Elaborazione in corso» e poi «impossibile connettersi a internet»;
+  la stessa hold incollata si paga. WoS col deep link non regge le
+  hold: il tasto resta per gli altri wallet, e sotto «Apri nel wallet»
+  nei due fogli hold (garanzia e cauzione) c'è la riga
+  `rigaWosHoldP2P` («Usi Wallet of Satoshi? … tocca Copia e incolla»)
+  col «📋 Copia la richiesta» in evidenza (cantiere riga-wos).
   In lista lo stesso ordine è «Da pagare» PIENO (`dapagare`) a chi
   compra e «In attesa del pagamento» NEUTRO (`attesa`) a chi vende, dal
   giudice `badgeOrdine`.
@@ -29529,7 +29539,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    da 1 sat del nodo, coniata una volta e tenuta in `impostazioni`, la
    F nuda, e dal cantiere prova-hold le due hold G e H, cltv 40 e 576,
    coniate dal ponte col macaroon `LND_PONTE_MACAROON_HOLD` e
-   cancellate da sole dopo tre minuti, mai saldate — «non attive» senza
+   cancellate da sole dopo tre minuti, mai saldate; dal 10 ott sera,
+   a prova fatta, il macaroon è revocato e G e H restano in pagina
+   spente, «non attive» senza
    la riga nel config; senza login, noindex, no-store, fuori da sitemap
    e menu; nascosta, non segreta; vedi CANTIERI, «La pagina di prova
    dei link al wallet» e «Le hold di prova G e H»),

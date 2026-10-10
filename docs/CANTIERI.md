@@ -47613,3 +47613,52 @@ I REBASE: nei primi tre un solo conflitto, in coda a CANTIERI (tutti
 accodano lì): preso il file di main e riaccodata la voce; nient'altro
 toccato a mano, i simboli del cantiere ricontati dopo ogni rebase. Il
 push porta solo i due commit del cantiere, firmati.
+
+## Wallet of Satoshi non regge le hold dal deep link: la riga sotto «Apri nel wallet» (10 ott 2026, sera, cantiere riga-wos, richiesta di Andrea)
+
+**IL FATTO, provato.** Andrea, Android, WoS self-custodial (icona delle
+chiavi), Barattolo dall'app sulla Home, sulla pagina `/prova-wallet`:
+G e H — lo stesso link `lightning:` di A, su due hold invoice da 1 sat
+del nostro LND con cltv 40 e 576 — aprono WoS su «Elaborazione in
+corso» e poi «impossibile connettersi a internet», mai la schermata di
+conferma. A (la stessa forma di link su una fattura normale) e F (la
+fattura incollata) funzionano. L'utente vero con la garanzia vera ha
+pagato incollando a mano. Verdetto: WoS col deep link non regge le hold
+invoice, qualunque sia il CLTV; il tasto di oggi va bene per gli altri
+wallet e per le fatture normali. Il cantiere apri-nel-wallet partiva da
+un'ipotesi sbagliata (il link che non apre), la pagina di prova l'ha
+corretta in due giri: prima «la forma del link è giusta», poi «è la
+hold».
+
+**DECISO.** Nei due fogli hold del P2P — garanzia e cauzione — sotto la
+riga «⚡ Apri nel wallet» e sopra il Copia, una riga sul fondo
+dell'allarme: «💡 Usi Wallet of Satoshi? Con la garanzia [cauzione] il
+tasto si blocca su «Elaborazione in corso»: tocca 📋 Copia e incolla la
+richiesta in WoS.» (`rigaWosHoldP2P(cosa)`, pura, la parola del foglio
+come argomento). Il «📋 Copia la richiesta» diventa il bottone in
+evidenza del foglio (`btn primary` invece di `ghost`): è la strada che
+funziona per tutti, e in quel foglio non c'è un altro gesto principale.
+Il tasto «Apri nel wallet» resta com'è: per Phoenix, Blink e gli altri
+funziona, e il mercatino (fatture normali) non è toccato. Il macaroon
+delle hold di prova lo revoca Andrea: G e H tornano «non attive» e la
+pagina resta com'è, per la prossima volta.
+
+**AL SUPPORTO DI WALLET OF SATOSHI** va un messaggio in inglese (scritto
+nella risposta del cantiere): deep link `lightning:` su una hold
+invoice → «Processing» poi «unable to connect to the internet»; la
+stessa fattura incollata va; una fattura normale dallo stesso link va;
+versione self-custodial, Android.
+
+**PROVATO.** La sentinella della riga in `prove_apri_wallet_p2p` ora
+pretende, in tutt'e due le vesti, la riga della scadenza, poi
+`rigaWosHoldP2P` con la parola giusta, poi il Copia `primary`; la
+funzione è pura e porta il testo di Andrea; il css sul fondo
+dell'allarme; nel banco node i due render VERI mostrano la riga fra
+«Apri nel wallet» e il Copia con la parola del foglio. Dal vivo nel
+Browser pane: il foglio della garanzia con la riga e il Copia verde.
+Suite intera `PROVE_SEVERE=1` nel worktree da origin/main (e1627d3):
+21.695 passate, 0 fallite; i collaudi della CI nella gabbia: nel
+verbale del push.
+
+**DA GUARDARE.** La risposta del supporto di WoS; se un giorno la hold
+dal link passa, la riga si toglie con una sentinella da rovesciare.
