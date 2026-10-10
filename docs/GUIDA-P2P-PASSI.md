@@ -41,7 +41,7 @@ Le leve che cambiano quel che si vede (valori al 7 ott 2026):
 | `BARATTOZON_MIN_EURO` | 25 € | 25 € se il config non dice altro |
 | `P2P_CAUZIONE` | False | da guardare nel pannello (il nodo -bar6 la chiede) |
 | `expiration_hours` (vita nel libro) | default client 168 h | 168 h = 7 giorni (NODO-MOSTRO) |
-| `expiration_seconds` (tempo per passo) | default client 900 s | 900 s = 15 minuti |
+| `expiration_seconds` (tempo per passo) | default client 900 s | 900 s = 15 minuti fino al 10 ott 2026, poi 1800 s = 30 minuti (si gira sul nodo: app e avvisi lo leggono da soli, §9) |
 
 Il glossario che i video devono usare, perché è quello dell'app:
 **garanzia** (i sats bloccati), **recapito** (dove mandare gli euro),
@@ -304,12 +304,13 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
    un giorno: se scade prima te ne chiediamo un'altra.» — «📋 Copia la
    cifra: <N>» — campo
    «Dove vuoi ricevere i sats» (segnaposto «tuonome@wallet.com oppure
-   lnbc…») — bottone «Invia». Hai 15 minuti.
+   lnbc…») — bottone «Invia». Hai i minuti che dice il coordinatore (§9, «Il tempo di ogni passo»).
    📱 Dopo: toast «Inviato ✅», stato «**Chi vende sta bloccando i
    sats**» «Appena sono al sicuro in garanzia te lo diciamo: da lì potrai
    inviare gli euro.»
    ✈️ A chi vende: «🔒 **Paga la garanzia: la richiesta è nell'app.**
-   <nome> ha indicato dove ricevere i sats, ora tocca a te.»
+   <nome> ha indicato dove ricevere i sats, ora tocca a te.» e, a capo,
+   «⏳ **Hai <n> minuti**, poi lo scambio si annulla.» (§9).
 4. Chi vende blocca i sats (§3, passo 2).
    ✈️ A chi compra: «🔒 **<nome> ha bloccato i sats in garanzia.** Appena
    ti indica dove inviare 50,00 €, tocca a te.»
@@ -390,7 +391,7 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
   indirizzo Lightning né una richiesta di pagamento.»; «Non sono
   riuscito a verificare questo indirizzo: usa una fattura del tuo
   wallet.»
-- Non dai il recapito sats in 15 minuti: ✈️ «🔄 **Non hai proseguito in
+- Non dai il recapito sats in tempo (i minuti del coordinatore, §9): ✈️ «🔄 **Non hai proseguito in
   tempo:** l'ordine è tornato in vetrina. Se ti interessa ancora, puoi
   riprenderlo.» Nell'app: «Il giro si è chiuso senza garanzia: l'ordine
   è tornato nel libro».
@@ -436,7 +437,7 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
    bottone «🔒 Blocca i sats».
    🧑 Lo tocca. 📱 Foglio «🔒 Blocca i sats»: «Paga **<N> sats** dal tuo
    wallet: i sats restano **bloccati in garanzia** e non escono finché non
-   li liberi tu. Hai circa 15 minuti.», QR, «⚡ Apri nel wallet», «📋
+   li liberi tu. Hai circa <n> minuti.», QR, «⚡ Apri nel wallet», «📋
    Copia la richiesta», «Quando i sats sono in garanzia questo foglio si
    chiude da solo: non c'è niente da confermare.» Il numero da pagare è
    i sats PIÙ la tua metà di commissione.
@@ -505,7 +506,7 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
 
 - «La richiesta di pagamento non è ancora arrivata» (toast, se tocchi
   «🔒 Blocca i sats» troppo presto).
-- Non blocchi in 15 minuti: se l'ordine era di un altro ✈️ «🔄 **Non hai
+- Non blocchi in tempo (i minuti del coordinatore, §9): se l'ordine era di un altro ✈️ «🔄 **Non hai
   proseguito in tempo:** l'ordine è tornato in vetrina…»; se era tuo ✈️
   «⏰ **Non hai proseguito in tempo:** il tuo ordine è stato annullato.
   Puoi ripubblicarlo quando vuoi.» All'altra persona: «🔄 **Chi aveva
@@ -1084,7 +1085,7 @@ tarda: controllo com'è andata…».
 |---|---|---|
 | Un ordine nel libro | 7 giorni (168 h, dal nodo) | «Info P2P»: «Un ordine vive nel libro **7 giorni**. Scaduto quello sparisce da solo, e non è successo niente.» ✈️ a chi l'ha pubblicato: «⏰ **Il tuo ordine è scaduto** senza che la presa fosse completata: vendevi/compravi <N> sats per <cifra> via <metodo>. Puoi ripubblicarlo quando vuoi.» |
 | Un ordine Barattozon | fino a 2 h prima della scadenza del PayCode (mai oltre 72 h) | esce da solo, avviso dedicato (§7) |
-| Ogni passo dopo la presa | 15 minuti | «Preso l'ordine, **ogni passo ha 15 minuti**, e il primo tocca sempre a chi l'ha preso: se compri, dici dove vuoi i sats e poi chi vende li blocca; se vendi, blocchi i sats e poi chi compra dice dove li vuole. Il cronometro **riparte a ogni mossa**.» Se manca chi ha **preso**, l'ordine torna nel libro; se manca chi ha **pubblicato**, si chiude. Nessuno perde niente. |
+| Ogni passo dopo la presa | <n> minuti, letti dal coordinatore (15 fino al 10 ott 2026, poi 30) | «Preso l'ordine, **ogni passo ha <n> minuti**, e il primo tocca sempre a chi l'ha preso: se compri, dici dove vuoi i sats e poi chi vende li blocca; se vendi, blocchi i sats e poi chi compra dice dove li vuole. Il cronometro **riparte a ogni mossa**.» Se manca chi ha **preso**, l'ordine torna nel libro; se manca chi ha **pubblicato**, si chiude. Nessuno perde niente. |
 | La richiesta della cauzione | qualche minuto (lo dice il foglio) | l'ordine torna nel libro, va ripreso |
 | Sats già in garanzia | circa quattro giorni | «Coi sats in garanzia avete **circa quattro giorni**. Se chi compra non ha ancora detto di aver pagato, allo scadere i sats **tornano da soli a chi vende**; se l'ha detto, si apre una disputa.» Dal sorgente della 0.19.0: il coordinatore si muove a ~92 ore; una disputa già aperta e non decisa la chiude LND a ~94 ore, coi sats a chi vende. ✈️ «⏰ **La garanzia è arrivata a scadenza: lo scambio è annullato.** I sats tornano a chi vende.» |
 | Barattozon, dopo «pagato» | 24 ore «a vista» per chi vende | promemoria a 1, 6, 20 ore; poi nulla di automatico |
@@ -1097,6 +1098,38 @@ tarda: controllo com'è andata…».
 dettaglio, l'orologio dentro il foglio da pagare.
 
 ---
+
+### Il tempo di ogni passo: l'avviso, il promemoria, il conto alla rovescia (10 ott 2026)
+
+Due gesti hanno un cronometro sul coordinatore: **bloccare la garanzia**
+(chi vende) e **dire dove ricevere i sats** (chi compra). I minuti li
+decide il coordinatore (`expiration_seconds`) e li leggono da soli sia
+l'app sia gli avvisi: qui sotto `<n>` è quel numero (15 fino al 10 ott
+2026, 30 da quando il nodo è stato girato).
+
+- ✈️ **Il primo avviso dice quanto tempo c'è.** In coda a «Paga la
+  garanzia: la richiesta è nell'app.», a «…indica dove ricevere i sats.»
+  e alle due «Cauzione bloccata ✓» compare una riga a capo: «⏳ **Hai
+  <n> minuti**, poi lo scambio si annulla.» Se il server non ha ancora
+  letto il numero dal coordinatore (i primi secondi dopo un riavvio) la
+  riga non c'è.
+- ✈️ **A metà tempo, un promemoria** a chi non ha ancora fatto il
+  gesto: «⏳ **Restano circa <m> minuti per bloccare la garanzia**,
+  altrimenti lo scambio si annulla.» (a chi compra: «…per indicare dove
+  ricevere i sats…»), con sotto il bottone «**⚡ Apri lo scambio**» che
+  porta alla pagina di quello scambio. Su Nostr il bottone è una riga in
+  coda col link. Uno solo per scambio e per gesto; non parte se il gesto
+  è già fatto, se lo scambio è annullato o se non resta nemmeno un
+  minuto. Arriva anche a chi ha preso con l'app in mano e poi l'ha
+  posata.
+- 📱 **Nella pagina dello scambio**, sopra il bottone del gesto, una
+  riga arancio tenue col conto alla rovescia: «⏱ Hai ancora **<mm:ss>**
+  per bloccare i sats, poi lo scambio si annulla.» (a chi compra: «…per
+  dire dove ricevere i sats…»). A tempo finito diventa grigia: «⌛ Il
+  tempo per bloccare i sats è finito: lo scambio sta per annullarsi.» —
+  non dice «annullato», perché lo decide il coordinatore, che passa una
+  volta al minuto. Nel foglio «🔒 Blocca i sats» resta la riga di sempre
+  («⏱ Scade tra <mm:ss>»), con la stessa scadenza.
 
 ## 10. Disputa
 

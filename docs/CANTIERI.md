@@ -44111,3 +44111,144 @@ che non valgono per lui) senza toccare niente. Nel giro il libro era
 vuoto (relay morto): il banner non dipende dal libro, ma lo scatto con le
 card vere è quello del telefono. Il CloudStorage di Telegram non esiste
 nel banco: la strada provata è quella del profilo sul server.
+
+## Il promemoria della garanzia: il tempo del gesto detto, ricordato e contato (10 ott 2026, cantiere promemoria-garanzia, richiesta di Andrea)
+
+**IL CASO.** La mattina del lancio, un PayCode Barattozon da 111,80 €.
+Alle 10:04 a chi vendeva arriva «Paga la garanzia: la richiesta è
+nell'app», il coordinatore gli dà 15 minuti, alle 10:20 lo scambio si
+annulla; lui legge alle 10:48. Andrea porta a parte la finestra del nodo
+da 900 a 1800 secondi (`expiration_seconds`: è quella sola a decidere,
+`hold_invoice_expiration_window` è la scadenza della cauzione; vedi
+NODO-MOSTRO, «I TRE TIMER»). Qui, senza toccare il nodo, tre cose:
+l'avviso dice quanto tempo c'è, a metà tempo arriva un promemoria col
+bottone, e la pagina dello scambio conta alla rovescia.
+
+**DA DOVE SI LEGGE IL TEMPO — E NIENT'ALTRO.** Dal 38385 del
+coordinatore, `expiration_seconds`. Il server non lo chiede di nuovo a
+nessuno: usa quello firmato che la fotografia del libro tiene già in
+memoria (`_P2P_FOTO["info"]`) e serve al client, cioè gli stessi byte da
+cui la pagina legge `scadenzaSec`. `_finestra_gesto_p2p` torna
+`(secondi, letta)`. IL RIPIEGO resta quello che il client ha da sempre
+(900, il default del coordinatore), ha UN nome
+(`P2P_FINESTRA_GESTO_RIPIEGO_S`) e serve solo a decidere QUANDO mandare
+il promemoria nei secondi in cui il 38385 non c'è: una frase scritta col
+ripiego non dice nessuna cifra («il tempo sta finendo»), e il primo
+avviso resta quello di prima. Un numero che il coordinatore non ha detto
+non si scrive.
+
+**DA QUANDO SI CONTA.** Dall'ora di mostrod sull'evento che chiede il
+gesto (`ts`, l'orologio che decide), che sta nella cronaca. Per la
+garanzia è verificato sul sorgente (`show_hold_invoice` ri-timbra
+`taken_at`), e così per la fattura chiesta alla presa. ⚠️ NON È
+VERIFICATO il terzo caso: chi vende ha PRESO un ordine di acquisto, ha
+bloccato i sats, e la fattura viene chiesta a chi compra DOPO — se lì
+mostrod non ri-timbra, il suo conto è partito alla presa. Finché non si
+legge sul nodo (`grep -n "taken_at" -r ~/nodo/mostro-src/src/`), server
+e client usano la scadenza PIÙ VICINA, contata dalla garanzia chiesta
+(nel client: `presaAt`, un timbro nuovo sulla riga): si può dire a
+qualcuno che ha meno tempo del vero, mai di più. Il giorno che si legge
+che riparte, cade un ramo in `_scadenza_gesto_p2p` e uno in
+`scadenzaGestoP2P`, e due attese di `prove_promemoria_gesto` tornano
+alla finestra intera (sono segnate).
+
+**IL SERVER.** 1) IL PRIMO AVVISO: in coda a «Paga la garanzia…» (le
+tre varianti e la presa che la chiede subito), a «…indica dove ricevere
+i sats.» e alle due «Cauzione bloccata ✓», una riga a capo: «⏳ Hai N
+minuti, poi lo scambio si annulla.» — N sono i minuti che restano in
+quel momento, non la finestra copiata. 2) IL PROMEMORIA: quando mostrod
+chiede il gesto nasce un'attesa in `p2p_attese` (fonte `promemoria`, la
+tabella dei solleciti del PayCode: nessuna tabella e nessun timer nuovi)
+che scade a METÀ del tempo. Va a chi DEVE il gesto anche se il primo
+avviso a lui non era partito (ha preso con l'app in mano: se la posa, è
+a lui che serve). Se il gesto arriva o lo scambio si chiude l'attesa se
+ne va subito; alla scadenza la giudica comunque `_promemoria_p2p_vivo`
+(due POST arrivano anche rovesciati), e la frase si scrive lì: «⏳
+Restano circa N minuti per bloccare la garanzia, altrimenti lo scambio
+si annulla.» Sotto il minuto non parte. UNO per scambio e per gesto: il
+timbro di sempre in `p2p_avvisi`, scritto prima dell'invio. 3) IL
+BOTTONE «⚡ Apri lo scambio»: `notifica` ha imparato un `bottone=`
+facoltativo — su Telegram una tastiera con un LINK, nel DM Nostr una
+riga in coda — e chi non lo passa parte com'è sempre partito (ai due
+rami l'argomento arriva solo quando c'è: i banchi con la firma vecchia
+non esplodono). L'indirizzo è `/p2p?scambio=<id>` con l'id PUBBLICO
+dell'ordine: nessuna rotta nuova, e il client apre la pagina di quello
+scambio.
+
+**IL CLIENT.** La riga `.p2p-gesto-tempo` sopra «🔒 Blocca i sats» e
+«💸 Dove ricevere i sats»: «⏱ Hai ancora 14:32 per bloccare i sats, poi
+lo scambio si annulla.» Batte nell'unico interval dell'app e riscrive le
+sole cifre. A tempo finito si spegne e dice «sta per annullarsi», NON
+«annullato»: lo decide il coordinatore, che passa una volta al minuto, e
+fino ad allora il gesto può riuscire. Per la garanzia chiede allo STESSO
+giudice del foglio (`scadenzaFoglioP2P`), quindi pagina e foglio dicono
+la stessa ora. In «Sicurezza» la frase «alcuni passi hanno un quarto
+d'ora di tempo» non porta più un numero. I tre ripieghi a 900 del client
+restano: sono il ripiego, non la fonte.
+
+**LE PAROLE.** Andrea aveva scritto «dare la fattura»: negli avvisi e
+nella pagina quel gesto si chiama da sempre «indicare/dire dove ricevere
+i sats» (il bottone è «Dove ricevere i sats»), e il promemoria usa
+quelle. Una riga da cambiare se preferisce l'altra.
+
+**LE STRADE SCARTATE.** • Un numero di minuti nel config del VPS: una
+seconda copia da tenere in pari col nodo, ed è il difetto da cui si
+partiva. • Un orologio nuovo sul server per i promemoria: le attese
+battono già ogni minuto, e sopravvivono a un deploy. • Un bottone
+`web_app`: la regola di casa è il link (`_riga_webapp`: «funziona
+ovunque»), e si è tenuta; cosa succede toccandolo sul telefono va
+guardato (sotto). • Dire i minuti anche col ripiego: se il nodo è a 1800
+e il server è appena ripartito, «Hai 15 minuti» sarebbe falso. • Far
+dire alla riga «scambio annullato» allo zero: lo dice il coordinatore.
+• Giudicare il promemoria solo alla scadenza, senza togliere l'attesa
+quando il gesto arriva: ogni scambio andato bene lasciava due righe «non
+parte» nel journal (e una prova di ieri, che conta le attese dopo uno
+scambio intero, lo diceva). • Legare «il gesto è fatto» al numero del
+giro: un evento arrivato prima della sua presa ha il giro indietro di
+uno; si guarda l'ora.
+
+**PROVATO.** `prove_promemoria_gesto` (nuova): le sentinelle sul tempo
+letto dal 38385 e sull'assenza di minuti scritti a mano, i pezzi puri, e
+lo scambio intero sul banco degli avvisi (i giudici veri sul database in
+memoria) girato DUE volte, a 900 e a 1800, coi numeri attesi calcolati
+dalla finestra: il primo avviso, la metà, il bottone, una volta sola
+(anche se il coordinatore richiede la fattura), il gesto fatto prima,
+i due POST rovesciati, i tre annulli, gli avvisi spenti, il server
+tornato tardi, il verso «chi vende ha preso», il ripiego senza cifre e
+il 38385 arrivato dopo; il trasporto (la tastiera col link, `notifica`
+ai due canali) e la pagina in node (scadenze, riga, battito, timbro
+della presa). Controprova: 30 mutazioni su una copia, tutte rosse. Il
+banco comune `_banco_eventi_p2p` ha imparato le funzioni nuove.
+`collaudo_promemoria_gesto` (nuovo, nel workflow): il server vero col
+coordinatore e Telegram di cartone e l'orologio spostato — le 10:04 di
+stamattina a 900 («Hai 15 minuti», promemoria a 7 e mezzo: «Restano
+circa 8 minuti»), lo stesso a 1800 senza toccare niente («Hai 30
+minuti», promemoria al quarto d'ora), una volta sola, chi compra, il
+gesto fatto, l'annullo, il tempo scaduto, l'interruttore spento, il
+ripiego; 28 su 28, anche nella gabbia senza rete.
+DAL VIVO (Chrome a 390×844 con Playwright, tocchi veri, copia in
+collaudo; il coordinatore di cartone con una chiave usa-e-getta che
+FIRMA il suo 38385 su un relay nak solo loopback, e racconta lo scambio
+dalla rotta vera `/api/p2p/evento`; nessun relay vero): a 240 secondi il
+server manda «Hai 4 minuti» e, due minuti dopo, «Restano circa 2 minuti
+per bloccare la garanzia» col bottone; l'indirizzo del bottone apre la
+pagina di quello scambio; la riga conta 3:53 → 0:50 → 0:05 e poi si
+spegne; il foglio «Blocca i sats» dice la stessa scadenza al secondo.
+Ripubblicato il 38385 a 1800 e poi a 900, senza toccare altro: «Hai 30
+minuti» e 29:53 sulla pagina, «Hai 15 minuti» e 14:53. Chi compra: «Hai
+ancora 14:53 per dire dove ricevere i sats». A 320 e a 390 in tema
+scuro la riga sta in due righe e non sfora. Dieci scatti in
+`.claude/giri/promemoria-garanzia/` (gitignored).
+
+**NON PROVATO, DA GUARDARE.** • Il telefono: toccare «⚡ Apri lo scambio»
+da Telegram — il link si apre nel browser di Telegram, non nella Mini
+App: se lì la sessione non c'è, o la riga dello scambio non è su quel
+dispositivo, si atterra su «I miei scambi» o sul login. Se non va bene,
+la cura è un bottone `web_app` (o un link `t.me/…?startapp=`), ed è una
+riga. • Il caso non verificato qui sopra (un `grep` sul nodo). • Il
+promemoria sul canale Nostr vero (la riga col link in coda al DM): c'è
+la prova, non l'occhio. • Dopo il cambio sul nodo: «Info P2P» deve dire
+«ogni passo ha 30 minuti», e il primo «Paga la garanzia» vero «Hai 30
+minuti». • Un POST del gesto perso per strada (mostrod ritenta, ma se
+non arriva mai) farebbe partire un promemoria a chi il gesto l'ha fatto:
+non c'è un'altra fonte, e la riga del journal lo direbbe.

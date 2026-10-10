@@ -27543,6 +27543,45 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   col journal una volta sola. Le soglie e i perché (92 ore del
   coordinatore, 94 di LND, `holdexpirydelta` di default) stanno nel
   commento del blocco e in CANTIERI, «La garanzia lunga».
+  IL PROMEMORIA DEL GESTO A TEMPO (10 ott 2026). Due gesti hanno un
+  cronometro sul coordinatore — bloccare la garanzia (`waiting-payment`)
+  e dire dove ricevere i sats (`waiting-buyer-invoice`) — e la tabella
+  `P2P_GESTI_A_TEMPO` dice, per il momento che lo CHIEDE, di chi è e
+  quale momento dice «fatto». IL TEMPO È DEL COORDINATORE:
+  `_finestra_gesto_p2p` legge `expiration_seconds` dal 38385 firmato
+  della fotografia (`_P2P_FOTO["info"]`, gli stessi byte che il client
+  usa per `scadenzaSec`) e torna `(secondi, letta)`; il ripiego
+  `P2P_FINESTRA_GESTO_RIPIEGO_S` vale solo senza 38385, e con lui le
+  frasi restano senza cifra. LA SCADENZA la dà `_scadenza_gesto_p2p`
+  dalla cronaca: l'ora di mostrod della richiesta più la finestra; per
+  la fattura chiesta DOPO la garanzia (chi vende ha preso) vale la più
+  vicina, contata dalla garanzia chiesta, finché non si legge sul nodo
+  se lì `taken_at` si ri-timbra. TRE EFFETTI: 1) il primo avviso del
+  gesto porta in coda «⏳ Hai N minuti, poi lo scambio si annulla»
+  (`tempo_gesto` in `dati`, da `_avvisi_evento_p2p`); 2) alla richiesta
+  nasce un'attesa in `p2p_attese` con fonte `promemoria` e scadenza a
+  METÀ tempo (`_quando_promemoria_p2p`), tolta subito se arriva il
+  gesto o una chiusura, e giudicata comunque alla scadenza da
+  `_promemoria_p2p_vivo` (gesto fatto, scambio chiuso via
+  `_superato_p2p`, meno di `P2P_PROMEMORIA_MINIMO_S`): la frase si
+  scrive lì, coi minuti di quel momento, e l'anti-doppione è il timbro
+  di sempre in `p2p_avvisi` (`garanzia_promemoria` | `fattura_promemoria`
+  per giro e persona); 3) col promemoria viaggia un bottone:
+  `_scarica_attese_p2p` riempie il dizionario `bottoni` che
+  `_giro_attese_p2p` gli presta, e `notifica(..., bottone=(etichetta,
+  indirizzo))` lo porta ai due canali — su Telegram una tastiera con UN
+  link (mai `web_app`, la regola di `_riga_webapp`), nel DM Nostr una
+  riga in coda. L'indirizzo è `/p2p?scambio=<id>`: nessuna rotta nuova
+  (è la pagina `/p2p`), e il client (`P2P_SCAMBIO_URL`, in
+  `apriP2PDaUrl`) apre la pagina di quello scambio a leva accesa. NEL
+  CLIENT la pagina dello scambio ha la riga `.p2p-gesto-tempo` sopra il
+  bottone del gesto (`rigaTempoGestoP2P`), che batte nell'unico interval
+  dell'app (`battitoGestoP2P`) e chiede la scadenza a
+  `scadenzaGestoP2P`: per la garanzia lo stesso giudice del foglio
+  (`scadenzaFoglioP2P`), per la fattura `ultimaMossa` di chi ha preso o
+  `presaAt` di chi ha pubblicato (timbrata in `applicaMessaggioP2P`,
+  persa tornando nel libro), più la finestra del 38385. Il verbale:
+  CANTIERI, «Il promemoria della garanzia».
   IL RECAPITO (`_avviso_recapito_p2p`) riconosce le parti dallo SCAMBIO
   IN CORSO (`_parti_scambio_p2p`: prima `p2p_scambi`, cioè il
   coordinatore; poi, se lui tace, `p2p_ordini` come prima), e `vivo`

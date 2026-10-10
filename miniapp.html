@@ -3256,6 +3256,17 @@
   .p2p-aspetta-riga{flex-basis:100%;font-size:12px;font-weight:600;color:var(--ink-soft)}
   .nota-scambio .p2p-tocca,.nota-scambio .p2p-aspetta{margin-left:6px}
   .nota-scambio .p2p-aspetta-riga{display:block;margin:2px 0}
+  /* IL TEMPO DEL GESTO (10 ott 2026): la riga sopra «Blocca i sats» e
+     «Dove ricevere i sats» col conto alla rovescia del coordinatore.
+     L'arancio tenue dell'avviso — e' una scadenza, non un errore — e le
+     cifre a larghezza fissa, che se no la riga balla a ogni secondo.
+     A tempo finito si spegne sull'inchiostro morbido: non c'e' piu'
+     niente da contare. */
+  .p2p-gesto-tempo{margin:0 0 10px;padding:9px 12px;border-radius:12px;
+    background:var(--sats-soft);color:var(--sats-text);
+    font-size:13px;font-weight:700;line-height:1.35}
+  .p2p-gesto-tempo .mono{font-weight:800;font-variant-numeric:tabular-nums}
+  .p2p-gesto-tempo.finito{background:var(--chip-bg);color:var(--ink-soft)}
   /* ⚠️ LA MANINA E' L'UNICA COSA CHE SI MUOVE in questa card, ed e'
      una chiamata e non un racconto: si sposta di tre pixel verso le
      parole che indica, avanti e indietro. `inline-block` perche' su
@@ -11311,7 +11322,7 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>Niente</b>, per un gesto che hai <b>fatto tu</b>: l'hai già davanti. L'avviso va a chi deve fare il passo dopo, o deve saperlo.</li>
       </ul>
       <p><b>Da dove vengono.</b> A raccontarci i passi è il <b>coordinatore</b> — che facciamo girare noi — nel momento in cui succedono. Ci dice <b>quale ordine, quale passo, e fra quali due chiavi usa-e-getta</b>; degli importi ci dice solo quelli della <b>chiusura</b>. <b>Non ci manda</b> fatture, recapiti né messaggi: quelli restano cifrati fra voi due, e non li vediamo. Se un suo avviso si perde per strada, i passi pubblici — preso, concluso, annullato, scaduto — li leggiamo dal libro, e te li diciamo un minuto dopo.</p>
-      <p class="sicu-nota">Gli avvisi si spengono tutti dal cassetto «🔔 Avvisi» del profilo. A scambio aperto conviene tenerli accesi: alcuni passi hanno un quarto d'ora di tempo.</p>
+      <p class="sicu-nota">Gli avvisi si spengono tutti dal cassetto «🔔 Avvisi» del profilo. A scambio aperto conviene tenerli accesi: alcuni passi hanno i minuti contati, e l'avviso dice quanti.</p>
 
       <h3 id="p2pinfo-storto">Se qualcosa va storto</h3>
       <p>Prima di tutto: <b>dai tempo all'altra persona</b>. Quasi sempre è un bonifico che deve arrivare, o qualcuno che dorme.</p>
@@ -21874,6 +21885,7 @@ setInterval(() => {
      due orologi sullo stesso secondo si sfasano. Esce subito se la
      pagina non e' aperta — vedi «L'ANELLO GRANDE DEL TEMPO». */
   battitoAnelloneP2P();
+  battitoGestoP2P();
   battitoTabacchinoP2P();
   battitoControlloTabP2P();
   battitoPagamentiP2P();
@@ -55951,6 +55963,12 @@ function applicaMessaggioP2P(ord, dentro){
   }
   const nuovo = avanzaOrdineP2P(ord, azione, dentro.payload || null);
   if (quando > 0 && AVANZA_P2P[azione]) nuovo.ultimaMossa = quando;
+  /* L'ORA DELLA PRESA SI TIMBRA QUI (10 ott 2026, il conto alla rovescia
+     del gesto): la riga la scrive quando entra nello scambio e la perde
+     tornando nel libro, come `preso`. Serve a un caso solo — vedi
+     `scadenzaGestoP2P`. Una volta sola: le mosse dopo non la spostano. */
+  if (nuovo.preso && !ord.preso) nuovo.presaAt = quando || Math.floor(Date.now() / 1000);
+  else if (!nuovo.preso) delete nuovo.presaAt;
   /* L'ORA DI «PAGATO» SI TIMBRA QUI (23 set 2026): e' da li' che
      decorrono le 24 ore del controllo di chi vende. Una volta sola,
      entrando nello stato; l'eco ripetuta non la sposta. */
@@ -58486,6 +58504,9 @@ function renderOrdineP2P(){
        consegnare */
     riquadroContantiP2P(o, azione) +
     passoDueContantiP2P(o, azione) +
+    /* IL TEMPO DEL GESTO (10 ott 2026): sopra il suo bottone, quanto
+       manca prima che il coordinatore annulli */
+    rigaTempoGestoP2P(o, azione) +
     (bottoni[azione] || '') +
     /* IL RECAPITO STA SOTTO IL SUO GESTO (23 set 2026): subito dopo «Ho
        inviato gli euro», che e' dove l'IBAN si legge e si copia */
@@ -58801,6 +58822,73 @@ function battitoHoldP2P(){
                                     el('p2pHoldScade'), el('p2pHoldWallet'), p2pHoldScadeIl);
   if (!viva && p2pHoldOrologio) { clearInterval(p2pHoldOrologio); p2pHoldOrologio = null; }
   return viva;
+}
+/* ═══ IL TEMPO DEL GESTO, SULLA PAGINA DELLO SCAMBIO (10 ott 2026,
+   cantiere «promemoria garanzia», richiesta di Andrea) ═══════════════
+   Il caso: a chi vendeva e' arrivato «Paga la garanzia», il coordinatore
+   gli dava un quarto d'ora, e lo scambio si e' annullato prima che
+   aprisse l'app. Il conto alla rovescia c'era, ma DENTRO il foglio
+   «Blocca i sats»: sulla pagina dello scambio — dove si atterra dal
+   bottone dell'avviso — niente diceva che il tempo correva, e a chi
+   compra (dire dove ricevere i sats) non lo diceva nessuno.
+   DUE GESTI HANNO UN CRONOMETRO sul coordinatore, e sono questi due:
+   la riga compare sopra il loro bottone e batte con l'orologio dell'app.
+   QUANDO SCADE, e da dove si legge — mai un numero scritto qui:
+   • la garanzia: lo stesso giudice del foglio (`scadenzaFoglioP2P`: la
+     nascita della bolt11 piu' `expiration_seconds` del 38385). Il
+     coordinatore ri-timbra il suo cronometro proprio quando la crea;
+   • la fattura di chi ha PRESO: gli viene chiesta alla presa, e il conto
+     parte dal messaggio che la chiede (`ultimaMossa`);
+   • la fattura di chi ha PUBBLICATO — chi vende ha preso, ha bloccato i
+     sats, e ora tocca a chi compra: ⚠️ sul sorgente del coordinatore
+     NON e' verificato che li' il cronometro riparta. Vale l'ora piu'
+     vecchia, quella della presa (`presaAt`): si puo' mostrare meno
+     tempo del vero, mai di piu'. Senza quell'ora (una riga nata
+     dall'archivio) la riga non c'e': un conto che non si sa non si
+     mostra. E' lo stesso ragionamento del server, `_scadenza_gesto_p2p`.
+   Il ripiego della finestra e' quello di sempre (i 900 s del
+   coordinatore), solo finche' il 38385 non e' letto. */
+function scadenzaGestoP2P(o){
+  if (!o) return 0;
+  if (o.stato === 'attesa_mia_hold') return scadenzaFoglioP2P(o, 'hold');
+  if (o.stato !== 'attesa_mia_fattura') return 0;
+  const da = Math.floor(Number(o.mio ? o.presaAt : o.ultimaMossa) || 0);
+  if (!(da > 0)) return 0;
+  return da + ((p2pInfo && p2pInfo.scadenzaSec > 0) ? p2pInfo.scadenzaSec : 900);
+}
+/* PURA: la frase della riga. A tempo finito non dice «annullato» — lo
+   decide il coordinatore, che passa una volta al minuto: finche' lo
+   stato non cambia il gesto puo' ancora riuscire. */
+function testoTempoGestoP2P(azione, resta){
+  const cosa = azione === 'hold' ? 'bloccare i sats' : 'dire dove ricevere i sats';
+  return resta > 0
+    ? {prima: '⏱ Hai ancora ', conto: minutiSecondi(resta), dopo: ' per ' + cosa + ', poi lo scambio si annulla.'}
+    : {prima: '⌛ Il tempo per ' + cosa + ' è finito: lo scambio sta per annullarsi.', conto: '', dopo: ''};
+}
+function rigaTempoGestoP2P(o, azione){
+  if (azione !== 'hold' && azione !== 'fattura') return '';
+  /* `minutiSecondi` vive col foglio del mercatino, fuori dal motore: nel
+     banco del motore non c'e' (il typeof, come in `orologioHoldP2P`) */
+  if (typeof minutiSecondi !== 'function') return '';
+  const fine = scadenzaGestoP2P(o);
+  if (!fine) return '';
+  const t = testoTempoGestoP2P(azione, fine - Date.now() / 1000);
+  return '<div class="p2p-gesto-tempo' + (t.conto ? '' : ' finito') + '" role="timer" data-fine="' + fine
+    + '" data-azione="' + azione + '">' + esc(t.prima)
+    + (t.conto ? '<b class="mono">' + esc(t.conto) + '</b>' : '') + esc(t.dopo) + '</div>';
+}
+/* IL BATTITO sta nell'unico interval dell'app, come l'anello: riscrive
+   IN PLACE le sole cifre, e al passaggio dello zero ridisegna la riga
+   una volta (la frase cambia). Fuori dalla pagina dello scambio esce
+   subito. */
+function battitoGestoP2P(){
+  const box = document.querySelector('.view.active .p2p-gesto-tempo');
+  if (!box) return;
+  const resta = (Number(box.dataset.fine) || 0) - Date.now() / 1000;
+  const conto = box.querySelector('.mono');
+  if (resta > 0 && conto) { conto.textContent = minutiSecondi(resta); return; }
+  if (resta <= 0 && !box.classList.contains('finito') && typeof renderOrdineP2P === 'function')
+    renderOrdineP2P();
 }
 /* la fattura si legge dall'ordine e non da un onclick: e' lunga
    duecento caratteri e non va interpolata in un attributo */
@@ -66382,7 +66470,7 @@ function indiceMakerP2P(id, mz, o){
 /* quel che una riga porta SOLO perche' era una presa: non e' dell'ordine */
 const P2P_DELLA_PRESA = ['peer', 'hold', 'satsMiei', 'satsNetti', 'importoScelto',
   'metodoScelto', 'preso', 'giroMorto', 'giroCaduto', 'statoGrezzo', 'fermoA',
-  'cambioPresa', 'ultimaMossa', 'quando', 'inRitardo', 'nonPartito', 'soloVista',
+  'cambioPresa', 'ultimaMossa', 'presaAt', 'quando', 'inRitardo', 'nonPartito', 'soloVista',
   'campiMiei', 'campiLoro', 'euroInviatiAt', 'payoutFallito', 'votabile',
   /* ...e quel che le prese hanno imparato a portare dopo (7 ott 2026, «Lo
      stesso id, un giro nuovo»): la cauzione, l'incasso, la disputa e il
@@ -71211,11 +71299,23 @@ function apriPrivacyDaUrl(){
    chiesto: e' il prezzo del giudice unico, ed e' un prezzo che si
    paga volentieri — la coppia di rami scritta due volte no. */
 const P2P_URL = location.pathname.match(/^\/p2p\/?$/);
+/* LO SCAMBIO NELL'INDIRIZZO (10 ott 2026, il promemoria del gesto a
+   tempo): `/p2p?scambio=<id>` e' il bottone «⚡ Apri lo scambio» degli
+   avvisi, e porta alla PAGINA di quello scambio invece che al libro.
+   L'id e' quello pubblico dell'ordine (la forma di FORMA_ORDINE_P2P del
+   server) e non dice niente di chi apre. La strada e' quella di sempre
+   — `apriOrdineP2P`, che se la riga su questo dispositivo non c'e'
+   ancora porta a «I miei scambi», dove l'archivio la fa nascere — e
+   solo a leva accesa: chi atterra sul coming soon resta li'. */
+const P2P_SCAMBIO_URL = (P2P_URL
+  && (location.search.match(/[?&]scambio=([0-9a-zA-Z-]{8,64})(?:&|$)/) || [])[1]) || '';
 let p2pApertoDaUrl = false;
 function apriP2PDaUrl(){
   if (!P2P_URL || p2pApertoDaUrl) return;
   p2pApertoDaUrl = true;
   vaiP2P();
+  if (P2P_SCAMBIO_URL && p2pAcceso() && typeof apriOrdineP2P === 'function')
+    apriOrdineP2P(P2P_SCAMBIO_URL);
 }
 
 /* /consigliati — la pagina dei negozi consigliati (set 2026): l'indirizzo

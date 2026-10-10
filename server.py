@@ -14525,9 +14525,15 @@ def spoglia_html(testo: str) -> str:
     return html.unescape(re.sub(r"<[^>]+>", "", testo))
 
 
-async def _manda_telegram(tg_id: int, testo: str):
+async def _manda_telegram(tg_id: int, testo: str, bottone: tuple = None):
     """Il ramo Telegram di notifica(): il messaggio via bot (l'utente
     deve averlo avviato almeno una volta), simulato nel collaudo.
+
+    `bottone` (10 ott 2026, il promemoria del gesto a tempo) e' una
+    coppia `(etichetta, indirizzo)` o niente: un bottone SOTTO il
+    messaggio. E' un LINK e non un `web_app`, la regola di
+    `_riga_webapp`: il link funziona ovunque. Senza, il messaggio parte
+    com'e' sempre partito.
 
     LA RETE DI SICUREZZA DELL'HTML (ago 2026): le notifiche nascono coi
     tag di Telegram e dentro ci finisce testo di chi vende e di chi
@@ -14576,10 +14582,14 @@ async def _manda_telegram(tg_id: int, testo: str):
     # BOT_TOKEN vero sarebbe arrivato a una persona a caso. La regola
     # dei relay (`lettura_simulata`): la leva basta, l'id non conta.
     if MODALITA_COLLAUDO:
-        print(f"📨 [notifica simulata per utente {tg_id}] {testo}")
+        print(f"📨 [notifica simulata per utente {tg_id}] {testo}"
+              + (f" [bottone «{bottone[0]}» → {bottone[1]}]" if bottone else ""))
         return "simulata (collaudo)"
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     dati = {"chat_id": tg_id, "text": testo, "parse_mode": "HTML"}
+    if bottone:
+        dati["reply_markup"] = {"inline_keyboard": [[
+            {"text": str(bottone[0]), "url": str(bottone[1])}]]}
     # IL CODICE DI TRACCIAMENTO CLICCABILE (25 set 2026): un link a
     # @trackbot si porterebbe dietro la scheda d'anteprima del bot
     # sotto l'avviso. Il link e' il codice stesso, e basta lui: la
@@ -14610,8 +14620,11 @@ async def _manda_telegram(tg_id: int, testo: str):
             # ma e' il suo esito quello che conta per le righe qui
             # sotto — se anche lo spoglio si prende un 429, il
             # messaggio e' perduto e va detto.
-            r = await c.post(url, json={"chat_id": tg_id,
-                                        "text": spoglia_html(testo)})
+            # ...e il bottone, se c'era, resta: e' fuori dal testo
+            r = await c.post(url, json=dict(
+                {"chat_id": tg_id, "text": spoglia_html(testo)},
+                **({"reply_markup": dati["reply_markup"]}
+                   if "reply_markup" in dati else {})))
         if r.status_code == 429:
             print(f"⚠️ Telegram a briglia corta (429) per l'utente "
                   f"{tg_id}: l'avviso NON e' arrivato — {r.text[:200]}")
@@ -14638,27 +14651,39 @@ async def _manda_telegram(tg_id: int, testo: str):
         return f"telegram {r.status_code}: NON arrivato — {r.text[:120]}"
 
 
-async def _dm_nostr_con_ripiego(npub: str, testo: str, ripiego_tg_id: int):
+async def _dm_nostr_con_ripiego(npub: str, testo: str, ripiego_tg_id: int,
+                                bottone: tuple = None):
     """Il ramo Nostr di notifica(), in sottofondo: prova il DM cifrato
-    e, se non parte e c'e' una chat Telegram di riserva, usa quella."""
+    e, se non parte e c'e' una chat Telegram di riserva, usa quella.
+    Un DM e' testo puro e bottoni non ne ha: quello del promemoria (10
+    ott 2026) diventa una riga in coda, etichetta e indirizzo."""
     try:
-        ok = await manda_dm_nostr(npub_to_hex(npub), spoglia_html(testo))
+        ok = await manda_dm_nostr(
+            npub_to_hex(npub), spoglia_html(testo)
+            + (f"\n\n{bottone[0]}: {bottone[1]}" if bottone else ""))
     except Exception as e:
         print(f"⚠️ DM Nostr saltato: {e}")
         ok = False
     if not ok and ripiego_tg_id > 0:
         try:
+            if bottone:
+                await _manda_telegram(ripiego_tg_id, testo, bottone)
+                return
             await _manda_telegram(ripiego_tg_id, testo)
         except Exception as e:
             print(f"⚠️ Anche il ripiego Telegram e' fallito: {e}")
 
 
-async def notifica(tg_id: int, testo: str):
+async def notifica(tg_id: int, testo: str, bottone: tuple = None):
     """Recapita un avviso sul canale che l'utente preferisce: Telegram,
     DM Nostr cifrato (NIP-17), o entrambi. Senza preferenza decide il
     buon senso: chi ha Telegram riceve li', il nativo Nostr riceve il
     DM. Fail-open totale, TRASPORTO COMPRESO: mai un errore al flusso
-    chiamante — vedi la riga dove quella promessa diventa vera."""
+    chiamante — vedi la riga dove quella promessa diventa vera.
+    `bottone` (10 ott 2026) e' la coppia `(etichetta, indirizzo)` di un
+    bottone sotto il messaggio, o niente: su Telegram e' un bottone, nel
+    DM una riga in coda. Ai due rami arriva SOLO quando c'e': chi non lo
+    passa li chiama come li ha sempre chiamati."""
     riga = None
     try:
         con = db()
@@ -14696,7 +14721,8 @@ async def notifica(tg_id: int, testo: str):
         # gira anche dentro l'orologio e gli sblocchi. Il ripiego
         # Telegram scatta solo se non stiamo gia' avvisando li'.
         asyncio.create_task(_dm_nostr_con_ripiego(
-            dest_npub, testo, 0 if via_telegram else max(tg_id, 0)))
+            dest_npub, testo, 0 if via_telegram else max(tg_id, 0),
+            *([bottone] if bottone else [])))
     if via_telegram:
         # IL FAIL-OPEN CHE IL DOCSTRING PROMETTEVA DA SEMPRE (set 2026,
         # ordine 151): qui l'unico `try` copriva la lettura del
@@ -14714,7 +14740,8 @@ async def notifica(tg_id: int, testo: str):
         # delle tre possa alzare. Chi vuole sapere com'e' andata non ha
         # un valore di ritorno da guardare: ha il journal.
         try:
-            esito.append(await _manda_telegram(tg_id, testo) or "telegram: esito non detto")
+            esito.append(await _manda_telegram(tg_id, testo, *([bottone] if bottone else []))
+                         or "telegram: esito non detto")
         except Exception as e:
             esito.append(f"telegram NON consegnato ({type(e).__name__}: {e})")
             print(f"⚠️ Avviso Telegram non consegnato all'utente "
@@ -46767,6 +46794,158 @@ P2P_IN_PAGAMENTO_TESTI = {
 }
 
 
+# ═══ IL PROMEMORIA DEL GESTO A TEMPO (10 ott 2026, cantiere «promemoria
+# garanzia», richiesta di Andrea) ═══════════════════════════════════════
+# IL CASO: un PayCode Barattozon da 111,80 €. Alle 10:04 a chi vendeva
+# arriva «Paga la garanzia: la richiesta è nell'app», il coordinatore gli
+# da' un quarto d'ora, alle 10:20 lo scambio si annulla; lui legge alle
+# 10:48. L'avviso non diceva QUANTO tempo c'era, e non ce n'era un
+# secondo.
+# DUE GESTI HANNO UN CRONOMETRO SUL COORDINATORE, e sono i due stati che
+# `job_cancel_orders` guarda: bloccare la garanzia (`waiting-payment`,
+# di chi vende) e dire dove ricevere i sats (`waiting-buyer-invoice`, di
+# chi compra). La tabella dice, per il momento che CHIEDE il gesto, il
+# suo nome, di chi e', e il momento che dice «fatto».
+# IL TEMPO E' DEL COORDINATORE, MAI NOSTRO: `expiration_seconds` del suo
+# 38385 — quello firmato che la fotografia del libro tiene in memoria e
+# serve al client (`_P2P_FOTO["info"]`), cioe' gli STESSI byte da cui la
+# pagina dello scambio conta alla rovescia. Il giorno che sul nodo
+# diventa 1800 qui non si tocca niente. Il ripiego vale solo se il 38385
+# non e' ancora arrivato (i primi secondi dopo un riavvio), ed e' quello
+# che il client usa da sempre; con lui le frasi restano SENZA CIFRA — un
+# numero che il coordinatore non ha detto non si scrive.
+# L'INIZIO E' L'ORA DI MOSTROD (`ts` dell'evento, l'orologio che decide),
+# e sta nella cronaca: vedi `_scadenza_gesto_p2p`.
+# IL PROMEMORIA E' UN'ATTESA (`p2p_attese`, fonte `promemoria`), come i
+# solleciti del PayCode: nasce quando il gesto viene chiesto, scade a
+# META' del tempo, e alla scadenza `_scarica_attese_p2p` lo lascia cadere
+# se il gesto e' fatto o lo scambio si e' chiuso. La frase si scrive
+# ALLORA, coi minuti che restano davvero. Uno per scambio e per gesto:
+# l'anti-doppione di sempre (`p2p_avvisi`, col suo momento).
+P2P_FINESTRA_GESTO_RIPIEGO_S = 900     # solo senza 38385: il default del coordinatore
+P2P_PROMEMORIA_MINIMO_S = 60           # sotto il minuto non c'e' piu' niente da ricordare
+P2P_GESTI_A_TEMPO = {"garanzia_chiesta": ("garanzia", "vende", "garanzia_pagata"),
+                     "fattura_chiesta": ("fattura", "compra", "fattura_data")}
+P2P_GESTI_PAROLE = {"garanzia": "bloccare la garanzia",
+                    "fattura": "indicare dove ricevere i sats"}
+P2P_BOTTONE_SCAMBIO = "⚡ Apri lo scambio"
+
+
+def _finestra_gesto_p2p(info) -> tuple:
+    """PURA: quanto dura la finestra di un gesto, come la annuncia il
+    38385 del coordinatore (`expiration_seconds`). Torna `(secondi,
+    letta)`: `letta` falsa vuol dire che il numero e' il RIPIEGO — il
+    38385 non c'e', o il tag e' storto — e chi scrive una frase non lo
+    deve dire come un fatto."""
+    try:
+        s = int(float(_tag_evento_p2p(info, "expiration_seconds"))) \
+            if isinstance(info, dict) else 0
+    except (ValueError, OverflowError):
+        s = 0
+    if s > 0:
+        return s, True
+    return P2P_FINESTRA_GESTO_RIPIEGO_S, False
+
+
+def _scadenza_gesto_p2p(con, ordine: str, momento: str, quando: int,
+                        finestra: int) -> int:
+    """QUANDO IL COORDINATORE ANNULLA se il gesto non arriva. Pura sulla
+    connessione. `momento` e' quello che CHIEDE il gesto (le chiavi di
+    `P2P_GESTI_A_TEMPO`), `quando` la sua ora per mostrod.
+    Il coordinatore conta da `taken_at`, e lo RI-TIMBRA quando chiede la
+    garanzia (`show_hold_invoice`: verificato sul sorgente, NODO-MOSTRO
+    «I TRE TIMER») — quindi la garanzia scade a `quando + finestra`, e
+    cosi' la fattura chiesta ALLA PRESA (chi compra ha preso: il timbro
+    e' quello).
+    ⚠️ LA FATTURA CHIESTA DOPO LA GARANZIA — chi vende ha preso, ha
+    bloccato, e ora tocca a chi compra — E' IL CASO NON VERIFICATO: se li'
+    mostrod non ri-timbra, il conto e' partito alla presa. Finche' non lo
+    si legge sul nodo vale la scadenza PIU' VICINA, quella contata dalla
+    garanzia chiesta in QUESTA presa: si puo' dire a qualcuno che ha meno
+    tempo del vero, mai di piu'.
+    «Questa presa» si legge dalle ORE e non dal numero del giro: la
+    garanzia chiesta piu' recente prima della fattura, purche' in mezzo
+    lo scambio non si sia chiuso (allora era la presa di prima). Il giro
+    di un evento arrivato prima della sua presa — due POST, e Tor li
+    rimescola — e' indietro di uno, e qui non deve contare."""
+    inizio = int(quando or 0)
+    if momento == "fattura_chiesta":
+        g = con.execute(
+            "SELECT MAX(quando) FROM p2p_momenti WHERE ordine=? AND "
+            "fonte='mostro' AND momento='garanzia_chiesta' AND quando<=?",
+            (ordine, inizio)).fetchone()
+        g = int((g and g[0]) or 0)
+        segni = ",".join("?" * len(P2P_MOMENTI_FINALI))
+        if g and not con.execute(
+                f"SELECT 1 FROM p2p_momenti WHERE ordine=? AND quando>? AND "
+                f"quando<=? AND momento IN ({segni}) LIMIT 1",
+                (ordine, g, inizio) + tuple(P2P_MOMENTI_FINALI)).fetchone():
+            inizio = g
+    return inizio + int(finestra or 0)
+
+
+def _quando_promemoria_p2p(quando: int, scadenza: int) -> int:
+    """PURA: l'ora del promemoria — a META' del tempo che c'e' fra la
+    richiesta del gesto e la sua scadenza."""
+    return int(quando or 0) + max(0, int(scadenza or 0) - int(quando or 0)) // 2
+
+
+def _frase_tempo_gesto_p2p(secondi) -> str:
+    """PURA: i secondi che restano, in parole — «30 minuti», «1 minuto».
+    Al minuto piu' vicino; sotto il mezzo minuto vuota, e chi la usa non
+    scrive niente."""
+    m = (int(secondi or 0) + 30) // 60
+    if m < 1:
+        return ""
+    return "1 minuto" if m == 1 else f"{m} minuti"
+
+
+def _testo_promemoria_p2p(gesto: str, secondi: int, letta: bool) -> str:
+    """PURA: la frase del promemoria. Coi minuti SOLO se la finestra e'
+    stata letta dal coordinatore; col ripiego dice che il tempo sta
+    finendo, senza una cifra che nessuno ha detto."""
+    cosa = P2P_GESTI_PAROLE.get(gesto, "")
+    if not cosa:
+        return ""
+    tempo = _frase_tempo_gesto_p2p(secondi) if letta else ""
+    coda = ", altrimenti lo scambio si annulla."
+    if not tempo:
+        return f"⏳ <b>Il tempo per {cosa} sta finendo:</b> fallo adesso" + coda
+    resta = "Resta" if tempo.startswith("1 ") else "Restano"
+    return f"⏳ <b>{resta} circa {tempo} per {cosa}</b>" + coda
+
+
+def _promemoria_p2p_vivo(con, r, adesso: int) -> tuple:
+    """IL PROMEMORIA HA ANCORA SENSO? Pura sulla connessione; `r` e' la
+    riga dell'attesa. Torna `(testo, '')` se parte, `('', perche')` se no
+    — il perche' e' per il journal.
+    NON PARTE se il gesto e' gia' stato fatto dopo la richiesta (la
+    cronaca, di qualunque fonte e senza guardare il numero del giro: vedi
+    `_scadenza_gesto_p2p`), se lo scambio si e' chiuso dopo la richiesta (lo
+    stesso giudice degli avvisi superati, `_superato_p2p`: annullato,
+    tornato in vetrina, scaduto...), o se non resta nemmeno un minuto —
+    un server tornato su tardi non ricorda una scadenza gia' passata.
+    I MINUTI SI CONTANO ADESSO, con la finestra di ADESSO: se quando
+    l'attesa e' nata il 38385 non c'era ancora, qui c'e'."""
+    chiesto = {v[0] + "_promemoria": k for k, v in P2P_GESTI_A_TEMPO.items()}.get(
+        str(r["momento"]), "")
+    if not chiesto:
+        return "", "un momento che non si conosce"
+    gesto, _, fatto = P2P_GESTI_A_TEMPO[chiesto]
+    ordine, giro, quando = r["ordine"], int(r["giro"] or 0), int(r["quando"] or 0)
+    if con.execute("SELECT 1 FROM p2p_momenti WHERE ordine=? AND momento=? "
+                   "AND quando>=? LIMIT 1", (ordine, fatto, quando)).fetchone():
+        return "", "il gesto e' gia' stato fatto"
+    chiuso = _superato_p2p(con, ordine, chiesto, giro, quando)
+    if chiuso:
+        return "", f"lo scambio si e' chiuso ({chiuso})"
+    finestra, letta = _finestra_gesto_p2p(_P2P_FOTO["info"])
+    resta = _scadenza_gesto_p2p(con, ordine, chiesto, quando, finestra) - int(adesso)
+    if resta < P2P_PROMEMORIA_MINIMO_S:
+        return "", "non resta nemmeno un minuto"
+    return _testo_promemoria_p2p(gesto, resta, letta), ""
+
+
 def _sollecito_p2p_vivo(momenti, quando_fiat: int) -> bool:
     """PURA: il sollecito parte solo se dal «pagato» in poi lo scambio
     non si e' mosso. `momenti` sono le righe della cronaca di quel giro
@@ -46851,7 +47030,7 @@ def _presa_detta_p2p(con, ordine: str, giro: int, tg_id: int) -> bool:
         (ordine, int(giro or 0), int(tg_id or 0))).fetchone())
 
 
-def _scarica_attese_p2p(con, adesso: int) -> tuple:
+def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
     """Le attese SCADUTE: chi avvisare adesso, e con che frase. Pura
     sulla connessione. Torna `(avvisi, prossima)`: la lista di
     `(tg_id, testo, fonte)` e quando scade la prossima attesa rimasta
@@ -46862,7 +47041,12 @@ def _scarica_attese_p2p(con, adesso: int) -> tuple:
     raddoppia.
     CHI HA SPENTO GLI AVVISI nel frattempo non riceve niente, e non si
     timbra: alla riaccensione un avviso vecchio non direbbe il vero, ma
-    nemmeno deve risultare «gia' detto» quel che non lo e' stato."""
+    nemmeno deve risultare «gia' detto» quel che non lo e' stato.
+    `bottoni` (10 ott 2026) e' un dizionario che chi chiama PRESTA, e che
+    qui si riempie: per il posto in lista di un avviso che porta un
+    bottone — oggi solo il promemoria del gesto a tempo, «Apri lo
+    scambio» — la coppia `(etichetta, indirizzo)`. La lista resta di
+    terne, com'era: chi non presta niente non vede cambiare niente."""
     fuori = []
     righe = con.execute(
         "SELECT id, ordine, momento, giro, tg_id, testo, quando, fonte "
@@ -46879,6 +47063,16 @@ def _scarica_attese_p2p(con, adesso: int) -> tuple:
             print(f"· Sollecito PayCode: {corto} «{r['momento']}» lo scambio "
                   "si è già mosso: non parte", flush=True)
             continue
+        promemoria = ""
+        if r["fonte"] == "promemoria":
+            # IL PROMEMORIA DEL GESTO A TEMPO (10 ott 2026): parte solo se
+            # il gesto manca ancora e lo scambio e' vivo, e la frase si
+            # scrive ADESSO, coi minuti che restano davvero
+            promemoria, perche = _promemoria_p2p_vivo(con, r, adesso)
+            if not promemoria:
+                print(f"· Promemoria P2P: {corto} «{r['momento']}» a "
+                      f"{r['tg_id']} non parte: {perche}", flush=True)
+                continue
         if r["fonte"] == "libro" and con.execute(
                 "SELECT 1 FROM p2p_momenti WHERE ordine=? AND momento=? "
                 "AND fonte='mostro' AND ABS(quando-?)<=?",
@@ -46911,7 +47105,7 @@ def _scarica_attese_p2p(con, adesso: int) -> tuple:
                           "vetrina senza presa non e' una notizia: il libro "
                           "tace", flush=True)
                     continue
-        testo = r["testo"]
+        testo = promemoria or r["testo"]
         if r["fonte"] == "rilascio":
             # IL PAGAMENTO A CHI COMPRA si chiede al SUO giudice, lo
             # stesso della card di chi vende, e la frase si sceglie ADESSO
@@ -46949,6 +47143,11 @@ def _scarica_attese_p2p(con, adesso: int) -> tuple:
                       f"coordinatore NON l'ha raccontato in {P2P_RISERVA_S}s: "
                       "parla il libro (nel log del nodo: barattolo_eventi)",
                       flush=True)
+        if r["fonte"] == "promemoria" and bottoni is not None:
+            # l'ordine e' un id pubblico del libro (il `d` del 38383):
+            # nell'indirizzo non viaggia niente di chi lo apre
+            bottoni[len(fuori)] = (P2P_BOTTONE_SCAMBIO,
+                                   f"{LINK_LIBRO_P2P}?scambio={r['ordine']}")
         fuori.append((r["tg_id"], testo, r["fonte"]))
     q = con.execute("SELECT MIN(scade) FROM p2p_attese").fetchone()
     con.commit()
@@ -46992,8 +47191,9 @@ async def _giro_attese_p2p():
         return
     adesso = int(time.time())
     con = db()
+    bottoni = {}
     try:
-        avvisi, prossima = _scarica_attese_p2p(con, adesso)
+        avvisi, prossima = _scarica_attese_p2p(con, adesso, bottoni)
         if adesso - _P2P_ATTESE.get("pulito", 0) > 3600:
             _P2P_ATTESE["pulito"] = adesso
             tolte = _pulisci_memoria_p2p(con, adesso)
@@ -47004,9 +47204,15 @@ async def _giro_attese_p2p():
         con.close()
     _P2P_ATTESE["scade"] = prossima
     esiti = []
-    for tg_id, testo, _ in avvisi:
+    for posto, (tg_id, testo, _) in enumerate(avvisi):
         try:
-            esiti.append((tg_id, await notifica(tg_id, testo)))
+            # il bottone solo dove c'e' (il promemoria del gesto a tempo):
+            # ogni altro avviso parte com'e' sempre partito
+            if posto in bottoni:
+                esiti.append((tg_id, await notifica(tg_id, testo,
+                                                    bottone=bottoni[posto])))
+            else:
+                esiti.append((tg_id, await notifica(tg_id, testo)))
         except Exception as e:
             esiti.append((tg_id, f"SALTATO ({type(e).__name__}: {e})"))
             print(f"⚠️ Avviso P2P in attesa saltato per {tg_id}: {e}")
@@ -49488,13 +49694,20 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
     # che l'ha bloccata prendendo l'ordine, o vuoto: le due frasi qui
     # sotto esistono solo per lui, tornato dal wallet senza sapere
     cauzione_mia = bool(dati.get("cauzione_di")) and dati.get("cauzione_di") == ruolo
+    # QUANTO TEMPO C'E' (10 ott 2026, «IL PROMEMORIA DEL GESTO A TEMPO»):
+    # in coda al PRIMO avviso di un gesto a tempo — bloccare la garanzia,
+    # dire dove ricevere i sats — i minuti che il coordinatore concede,
+    # letti dal suo 38385 (`tempo_gesto`, da `_avvisi_evento_p2p`). Senza
+    # quel numero la riga non c'e': non si inventa
+    tempo = (f"\n\n⏳ <b>Hai {dati['tempo_gesto']}</b>, poi lo scambio si annulla."
+             if dati.get("tempo_gesto") else "")
     if momento == "preso":
         testa = (("🧾 <b>Il tuo PayCode è stato preso" if paycode and vende
                   else "⚡ <b>Il tuo ordine è stato preso")
                  + (f" da {nome}" if nome else "") + "!</b> "
                  + ("Vendi " if vende else "Compri ") + quanto + ".\n\n")
         if vende and dettaglio == "hold-next":
-            return testa + "Paga la garanzia: la richiesta è nell'app."
+            return testa + "Paga la garanzia: la richiesta è nell'app." + tempo
         if vende:
             return testa + (f"Appena {l_altro} indica dove ricevere i sats, "
                             "tocca a te bloccare la garanzia.")
@@ -49506,17 +49719,17 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
             # cauzione da un wallet esterno: la garanzia gliela chiede
             # mostrod subito dopo, e lui non ha l'app davanti
             return ("🔐 <b>Cauzione bloccata ✓:</b> ora paga la garanzia, "
-                    "la richiesta è nell'app.")
+                    "la richiesta è nell'app.") + tempo
         if dettaglio == "invoice":
             return (f"🔒 <b>Paga la garanzia: la richiesta è nell'app.</b> "
-                    f"{altro} ha indicato dove ricevere i sats, ora tocca a te.")
-        return "🔒 <b>Paga la garanzia: la richiesta è nell'app.</b>"
+                    f"{altro} ha indicato dove ricevere i sats, ora tocca a te.") + tempo
+        return "🔒 <b>Paga la garanzia: la richiesta è nell'app.</b>" + tempo
     if momento == "fattura_chiesta" and cauzione_mia:
         # chi compra ha PRESO un ordine di vendita e ha pagato la
         # cauzione da un wallet esterno: il passo dopo e' suo (l'ordine
         # 82231748 di Alan, 1 ott 2026: nell'app il passo c'era, su
         # Telegram niente)
-        return "🔐 <b>Cauzione bloccata ✓:</b> ora indica dove ricevere i sats."
+        return "🔐 <b>Cauzione bloccata ✓:</b> ora indica dove ricevere i sats." + tempo
     # IL RECAPITO E' GIA' PARTITO? (19 set 2026) Lo dichiara il telefono
     # di chi vende (`_avviso_recapito_p2p`), anche PRIMA che lo scambio
     # sia attivo: i dati del tabacchino partono alla presa. A chi l'ha
@@ -49545,7 +49758,7 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
             return (f"🔒 <b>{altro} ha bloccato i sats in garanzia.</b> Appena "
                     f"ti indica dove inviare {cifra or 'gli euro'}, tocca a te.")
         return (f"🔒 <b>{altro} ha bloccato i sats in garanzia:</b> indica "
-                "dove ricevere i sats.")
+                "dove ricevere i sats.") + tempo
     if momento == "fattura_data":
         if detto:
             return (f"⚡ <b>{altro} ha indicato dove ricevere i sats:</b> "
@@ -49828,6 +50041,50 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
                 "quando, scade, fonte) VALUES(?,?,?,?,?,?,?,'sollecito')",
                 (ordine, f"fiat_sollecito{livello}", giro, fatto["venditore"],
                  SOLLECITO_PAYCODE_TESTI[livello], ev["ts"], adesso + fra))
+    # IL GESTO A TEMPO (10 ott 2026, «IL PROMEMORIA DEL GESTO A TEMPO»):
+    # quando mostrod CHIEDE la garanzia o la fattura, a chi deve farla si
+    # mette in attesa il promemoria di meta' tempo — anche se il primo
+    # avviso a lui non parte (ha preso con l'app in mano: se poi la posa,
+    # e' proprio a lui che serve). Una richiesta rifatta nello stesso
+    # giro sposta la sua attesa, non ne aggiunge una.
+    gesto = P2P_GESTI_A_TEMPO.get(momento)
+    finestra, finestra_letta = _finestra_gesto_p2p(_P2P_FOTO["info"])
+    if gesto and fatto["venditore" if gesto[1] == "vende" else "compratore"]:
+        chi_deve = fatto["venditore" if gesto[1] == "vende" else "compratore"]
+        scadenza = _scadenza_gesto_p2p(con, ordine, momento, ev["ts"], finestra)
+        con.execute("DELETE FROM p2p_attese WHERE ordine=? AND momento=? AND "
+                    "giro=? AND tg_id=? AND fonte='promemoria'",
+                    (ordine, gesto[0] + "_promemoria", giro, chi_deve))
+        con.execute(
+            "INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, "
+            "quando, scade, fonte) VALUES(?,?,?,?,?,?,?,'promemoria')",
+            (ordine, gesto[0] + "_promemoria", giro, chi_deve,
+             _testo_promemoria_p2p(gesto[0], 0, False), ev["ts"],
+             _quando_promemoria_p2p(ev["ts"], scadenza)))
+    # ...E QUANDO IL GESTO ARRIVA, o lo scambio si chiude, la sua attesa
+    # se ne va SUBITO. Il giudice alla scadenza resta (`_promemoria_p2p_vivo`:
+    # due POST possono arrivare rovesciati, e allora l'attesa nasce dopo),
+    # ma di regola non trova niente da buttare — e il journal non si
+    # riempie di promemoria «non partiti» a ogni scambio andato bene. Solo
+    # le attese nate PRIMA di questo fatto: una richiesta piu' recente
+    # resta dov'e'.
+    for g in P2P_GESTI_A_TEMPO.values():
+        if momento == g[2] or momento in P2P_MOMENTI_FINALI:
+            con.execute("DELETE FROM p2p_attese WHERE ordine=? AND momento=? AND "
+                        "fonte='promemoria' AND quando<=?",
+                        (ordine, g[0] + "_promemoria", ev["ts"]))
+    # ...E IL PRIMO AVVISO DICE QUANTO TEMPO C'E', col numero del
+    # coordinatore: i minuti che restano ADESSO al gesto che questo
+    # momento apre (la presa che chiede subito la garanzia, la garanzia
+    # chiesta, la garanzia pagata che chiede la fattura, la fattura
+    # chiesta). Col ripiego la frase resta senza cifra.
+    apre = {"preso": "garanzia_chiesta" if ev["dettaglio"] == "hold-next" else "",
+            "garanzia_chiesta": "garanzia_chiesta",
+            "garanzia_pagata": "" if ev["dettaglio"] == "active" else "fattura_chiesta",
+            "fattura_chiesta": "fattura_chiesta"}.get(momento, "")
+    if apre and finestra_letta:
+        dati["tempo_gesto"] = _frase_tempo_gesto_p2p(_scadenza_gesto_p2p(
+            con, ordine, apre, ev["ts"], finestra) - adesso)
     if momento == "rilasciato" and ev["attore"] == "seller" and fatto["venditore"]:
         # L'ATTESA DI CHI VENDE: se in un minuto il pagamento a chi
         # compra non e' passato, gli arriva «Sats in pagamento». Ha il

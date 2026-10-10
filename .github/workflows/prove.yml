@@ -125,6 +125,7 @@ jobs:
              collaudo_avviso_chi_annulla.py
              collaudo_recapito_aggiornato.py
              collaudo_garanzia_lunga.py
+             collaudo_promemoria_gesto.py
              collaudo_x_risonanza.py
              collaudo_annullo_venditore.py
              collaudo_db_contesa.py collaudo_negozi_grandi.py
@@ -231,6 +232,7 @@ jobs:
              collaudo_avviso_chi_annulla
              collaudo_recapito_aggiornato
              collaudo_garanzia_lunga
+             collaudo_promemoria_gesto
              collaudo_x_risonanza
              collaudo_semina_demo
              collaudo_campagna_p2p_tutti

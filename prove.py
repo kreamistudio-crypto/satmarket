@@ -87575,7 +87575,9 @@ def _banco_eventi_p2p(eventi_attivi=True):
            "_NOMI": nomi,
            # la cauzione (1 ott 2026): la leva e il 38385 della
            # fotografia, SPENTI di serie — la prova che li vuole li accende
-           "P2P_CAUZIONE": False, "_P2P_FOTO": {"info": None}}
+           "P2P_CAUZIONE": False, "_P2P_FOTO": {"info": None},
+           # il bottone del promemoria (10 ott 2026) porta alla pagina P2P
+           "LINK_LIBRO_P2P": "https://barattolo.store/p2p"}
     # le costanti si prendono dal sorgente, non si ricopiano: una
     # ricopiata resterebbe verde il giorno che quella vera cambia
     for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "MAX_ORDINI_MAI_VISTI_P2P = ", "P2P_ORDINI_MAI_VISTI_S = ",
@@ -87586,7 +87588,10 @@ def _banco_eventi_p2p(eventi_attivi=True):
                  # gli stati finali del libro: la riserva superata (24 set)
                  "STATI_LIBRO_FINALI = ",
                  # il giudice del pagamento, per l'attesa del rilascio
-                 "_DOPO_RILASCIO_P2P = "):
+                 "_DOPO_RILASCIO_P2P = ",
+                 # il promemoria del gesto a tempo (10 ott 2026)
+                 "P2P_FINESTRA_GESTO_RIPIEGO_S = ", "P2P_PROMEMORIA_MINIMO_S = ",
+                 "P2P_BOTTONE_SCAMBIO = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)].split("  #")[0], amb)
     for blocco, fine in (("STATI_LIBRO_PRESO = (", ")\n"),
@@ -87604,7 +87609,10 @@ def _banco_eventi_p2p(eventi_attivi=True):
                          ("SOLLECITO_PAYCODE_TESTI = {", "}\n"),
                          ("P2P_MOMENTI_CHIUDONO_FIAT = (", ")\n"),
                          # «Sats in pagamento» a chi vende (23 set 2026)
-                         ("P2P_IN_PAGAMENTO_TESTI = {", "}\n")):
+                         ("P2P_IN_PAGAMENTO_TESTI = {", "}\n"),
+                         # i due gesti a tempo e le loro parole (10 ott 2026)
+                         ("P2P_GESTI_A_TEMPO = {", "}\n"),
+                         ("P2P_GESTI_PAROLE = {", "}\n")):
         i = src.index("\n" + blocco) + 1
         exec(src[i:src.index(fine, i) + len(fine)], amb)
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_parti_recensione_p2p",
@@ -87622,7 +87630,11 @@ def _banco_eventi_p2p(eventi_attivi=True):
               "_superato_p2p", "_presa_detta_p2p",
               "_pagamento_ordine_p2p",
               "_pulisci_memoria_p2p", "_parti_scambio_p2p",
-              "_avviso_recapito_p2p"):
+              "_avviso_recapito_p2p",
+              # il promemoria del gesto a tempo (10 ott 2026)
+              "_finestra_gesto_p2p", "_scadenza_gesto_p2p",
+              "_quando_promemoria_p2p", "_frase_tempo_gesto_p2p",
+              "_testo_promemoria_p2p", "_promemoria_p2p_vivo"):
         exec(_senza_prosa(pezzo(f)), amb)
     return con, amb
 
@@ -135808,6 +135820,572 @@ def prove_contanti_zona():
           ["Milano centro", "", "", "", "", "", ""], o["canale"])
 
 
+# ====================================================================
+def prove_promemoria_gesto():
+    """IL PROMEMORIA DEL GESTO A TEMPO (10 ott 2026, cantiere «promemoria
+    garanzia», richiesta di Andrea). Il caso: a chi vendeva arriva «Paga
+    la garanzia» alle 10:04, il coordinatore gli da' un quarto d'ora,
+    alle 10:20 lo scambio si annulla, lui legge alle 10:48.
+
+    Quel che qui si rompe in silenzio: un numero scritto a mano che
+    resta 15 il giorno che il nodo dice 30 (per questo OGNI scenario gira
+    due volte, a 900 e a 1800, e i numeri attesi si CALCOLANO dalla
+    finestra); il promemoria che parte due volte, o dopo che il gesto e'
+    fatto, o dopo l'annullo; la cifra detta quando il coordinatore non
+    l'ha detta; il bottone che non porta allo scambio.
+
+    Il banco e' quello degli avvisi P2P (`_banco_eventi_p2p`: i giudici
+    VERI sul database vero in memoria), l'orologio lo sposta la prova; il
+    38385 e' un evento di cartone coi soli tag che servono. La pagina
+    gira in node coi pezzi veri di miniapp.html."""
+    print("\n[il promemoria del gesto a tempo]")
+    import asyncio as _aio
+    import re as _re
+    import types as _types
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- 1) LE SENTINELLE: da dove viene il tempo ----------------------
+    fin = _senza_prosa(pezzo("_finestra_gesto_p2p"))
+    prova("la finestra si legge dal 38385 del coordinatore: `expiration_seconds`",
+          True, '_tag_evento_p2p(info, "expiration_seconds")' in fin)
+    prova("...quello firmato della fotografia, gli stessi byte che legge il client",
+          [True, True],
+          ['_finestra_gesto_p2p(_P2P_FOTO["info"])' in pezzo("_avvisi_evento_p2p"),
+           '_finestra_gesto_p2p(_P2P_FOTO["info"])' in pezzo("_promemoria_p2p_vivo")])
+    prova("il ripiego ha UN nome e un posto solo, ed e' il default del coordinatore",
+          [1, True],
+          [len(_re.findall(r"\nP2P_FINESTRA_GESTO_RIPIEGO_S = 900\b", src)),
+           "return P2P_FINESTRA_GESTO_RIPIEGO_S, False" in fin])
+    for f in ("_scadenza_gesto_p2p", "_quando_promemoria_p2p", "_testo_promemoria_p2p",
+              "_promemoria_p2p_vivo"):
+        prova(f"nessun minuto scritto a mano in `{f}`", None,
+              _re.search(r"\b(15|30|450|900|1800)\b", codice(_senza_prosa(pezzo(f)))))
+    testi = codice(_senza_prosa(pezzo("_testo_evento_p2p")))
+    prova("il primo avviso dice il tempo con la frase calcolata, mai con una cifra sua",
+          [True, None],
+          ["<b>Hai {dati['tempo_gesto']}</b>, poi lo scambio si annulla." in testi,
+           _re.search(r"Hai (circa )?\d+ minut", testi)])
+    att = pezzo("_scarica_attese_p2p")
+    prova("il giudice del promemoria sta PRIMA del timbro: quel che non parte non "
+          "risulta detto", True,
+          0 < att.index("_promemoria_p2p_vivo(con, r, adesso)")
+          < att.index("INSERT OR IGNORE INTO p2p_avvisi"))
+    prova("...e il bottone e' l'indirizzo della pagina P2P con l'id PUBBLICO dell'ordine",
+          True, "f\"{LINK_LIBRO_P2P}?scambio={r['ordine']}\"" in att)
+    giro_src = pezzo("_giro_attese_p2p")
+    prova("il battito delle attese presta il dizionario dei bottoni e lo passa a notifica",
+          [True, True],
+          ["_scarica_attese_p2p(con, adesso, bottoni)" in giro_src,
+           "bottone=bottoni[posto]" in giro_src])
+    prova("...e chi non ha un bottone parte com'e' sempre partito", True,
+          "await notifica(tg_id, testo)))" in giro_src)
+
+    # --- 2) I PEZZI PURI -------------------------------------------------
+    con, amb = _banco_eventi_p2p()
+    finestra, frase = amb["_finestra_gesto_p2p"], amb["_frase_tempo_gesto_p2p"]
+
+    def info(valore):
+        return {"kind": 38385, "tags": [["d", "x"], ["expiration_seconds", valore]]}
+
+    prova("la finestra letta: 900 e 1800 escono com'entrano, e sono «lette»",
+          [(900, True), (1800, True), (1800, True)],
+          [finestra(info("900")), finestra(info("1800")), finestra(info("1800.0"))])
+    prova("senza 38385, o con un tag storto, vale il ripiego — e si sa che e' un ripiego",
+          [(900, False)] * 7,
+          [finestra(None), finestra({"tags": []}), finestra(info("abc")),
+           finestra(info("0")), finestra(info("-5")), finestra(info("nan")),
+           finestra(info("inf"))])
+    prova("i secondi in parole, al minuto piu' vicino",
+          ["30 minuti", "30 minuti", "15 minuti", "1 minuto", "1 minuto", ""],
+          [frase(1800), frase(1795), frase(900), frase(60), frase(31), frase(29)])
+    prova("il promemoria sta a META' fra la richiesta e la scadenza",
+          [1450, 1900, 1010],
+          [amb["_quando_promemoria_p2p"](1000, 1900),
+           amb["_quando_promemoria_p2p"](1000, 2800),
+           amb["_quando_promemoria_p2p"](1000, 1020)])
+    tp = amb["_testo_promemoria_p2p"]
+    prova("la frase del promemoria, coi minuti letti",
+          ["⏳ <b>Restano circa 15 minuti per bloccare la garanzia</b>, altrimenti "
+           "lo scambio si annulla.",
+           "⏳ <b>Resta circa 1 minuto per indicare dove ricevere i sats</b>, altrimenti "
+           "lo scambio si annulla."],
+          [tp("garanzia", 900, True), tp("fattura", 70, True)])
+    prova("...e SENZA cifra quando la finestra e' il ripiego",
+          "⏳ <b>Il tempo per bloccare la garanzia sta finendo:</b> fallo adesso, "
+          "altrimenti lo scambio si annulla.", tp("garanzia", 450, False))
+    prova("...e nessuna cifra nella frase senza numero", None,
+          _re.search(r"\d", tp("fattura", 450, False)))
+
+    # --- 3) LO SCAMBIO, A 900 E A 1800 -----------------------------------
+    pulisci, registra = amb["_evento_p2p_pulito"], amb["_registra_evento_p2p"]
+    avvisi, scarica = amb["_avvisi_evento_p2p"], amb["_scarica_attese_p2p"]
+    A, B = 5001, 5002                    # A compra, B vende
+    KA, KB = "a" * 64, "b" * 64
+    for chi, pub in ((A, KA), (B, KB)):
+        con.execute("INSERT INTO utenti VALUES(?,1)", (chi,))
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)",
+                    (pub, chi))
+    amb["_NOMI"].update({A: "Anna", B: "Bruno"})
+    giornale = []
+    amb["print"] = lambda *a, **k: giornale.append(" ".join(str(x) for x in a))
+    _tag = _re.compile(r"</?[bi]>")
+    ORA = 1_790_000_000
+    conta = [0]
+
+    def nuovo(lato, maker, taker):
+        conta[0] += 1
+        o = f"{conta[0]:08x}-7b2d-4c6a-9e11-aa00bb11cc22"
+        con.execute(
+            "INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, "
+            "preso_da, euro, sats, metodi) VALUES(?,?,0,'in-progress',?,1,?,"
+            "'10,00 €',15000,'[\"SEPA\"]')", (o, maker, lato, taker))
+        return o
+
+    def arriva(o, azione, attore="mostro", dettaglio="", quando=ORA):
+        d = {"v": 1, "order": o, "action": azione, "ts": quando,
+             "buyer": KA, "seller": KB, "actor": attore}
+        if dettaglio:
+            d["detail"] = dettaglio
+        e = pulisci(d, quando)
+        fatto = registra(con, e, quando)
+        if fatto is None:
+            return None
+        return [(t, _tag.sub("", x)) for t, x in avvisi(con, e, fatto, quando)]
+
+    def attese(o):
+        return [(r["momento"], r["tg_id"], r["scade"], r["fonte"]) for r in con.execute(
+            "SELECT momento, tg_id, scade, fonte FROM p2p_attese WHERE ordine=? "
+            "AND fonte='promemoria' ORDER BY id", (o,))]
+
+    def batte(quando):
+        """Un battito delle attese a quell'ora: (avvisi senza tag, bottoni)."""
+        bottoni = {}
+        fuori, _ = scarica(con, quando, bottoni)
+        return [(t, _tag.sub("", x), f) for t, x, f in fuori], bottoni
+
+    for W in (900, 1800):
+        amb["_P2P_FOTO"]["info"] = info(str(W))
+        M = W // 60
+        # ---- VERSO UNO: una vendita di B, presa da A (chi compra) ----
+        o = nuovo("sell", B, A)
+        arriva(o, "taken", "buyer", "invoice-next", ORA)
+        prova(f"[{W}s] la fattura chiesta alla presa non parla (chi compra ha l'app in "
+              "mano), ma gli mette in attesa il promemoria", [],
+              arriva(o, "buyer-invoice-requested", "mostro", "", ORA))
+        prova(f"[{W}s] ...a META' della finestra del coordinatore",
+              [("fattura_promemoria", A, ORA + W // 2, "promemoria")], attese(o))
+        prova(f"[{W}s] un secondo prima della meta' non parte niente", ([], {}),
+              batte(ORA + W // 2 - 1))
+        detti, bottoni = batte(ORA + W // 2)
+        prova(f"[{W}s] a meta' tempo, a chi compra: i minuti che RESTANO",
+              [(A, f"⏳ Restano circa {(W - W // 2 + 30) // 60} minuti per "
+                   "indicare dove ricevere i sats, altrimenti lo scambio si annulla.",
+                "promemoria")], detti)
+        prova(f"[{W}s] ...col bottone che apre QUELLO scambio",
+              {0: ("⚡ Apri lo scambio", f"https://barattolo.store/p2p?scambio={o}")}, bottoni)
+        prova(f"[{W}s] una volta sola: ripassando non c'e' piu' niente", ([], {}),
+              batte(ORA + W // 2 + 60))
+        # una richiesta RIFATTA nello stesso giro rimette l'attesa, ma il
+        # timbro dell'anti-doppione ferma il secondo invio
+        arriva(o, "buyer-invoice-requested", "mostro", "", ORA + 5)
+        giornale.clear()
+        prova(f"[{W}s] ...nemmeno se il coordinatore richiede la fattura un'altra volta",
+              ([], {}), batte(ORA + W // 2 + 61))
+        prova(f"[{W}s] ...e il journal dice che era gia' stato detto", True,
+              any("«fattura_promemoria»" in r and "gia' stato detto" in r for r in giornale))
+        # la fattura arriva: tocca a chi vende, e il PRIMO avviso dice quanto ha
+        t1 = ORA + W // 2 + 100
+        arriva(o, "buyer-invoice-added", "buyer", "hold-next", t1)
+        prova(f"[{W}s] il primo avviso a chi vende dice il tempo, col numero del coordinatore",
+              [(B, "🔒 Paga la garanzia: la richiesta è nell'app. Bruno ha indicato dove "
+                   f"ricevere i sats, ora tocca a te.\n\n⏳ Hai {M} minuti, poi lo scambio "
+                   "si annulla.")],
+              arriva(o, "hold-invoice-requested", "mostro", "invoice", t1))
+        prova(f"[{W}s] ...e il suo promemoria aspetta la meta' del SUO tempo",
+              [("garanzia_promemoria", B, t1 + W // 2, "promemoria")], attese(o))
+        detti, bottoni = batte(t1 + W // 2)
+        prova(f"[{W}s] a meta' tempo, a chi vende",
+              [(B, f"⏳ Restano circa {(W - W // 2 + 30) // 60} minuti per bloccare la "
+                   "garanzia, altrimenti lo scambio si annulla.", "promemoria")], detti)
+        prova(f"[{W}s] ...col suo bottone", [f"https://barattolo.store/p2p?scambio={o}"],
+              [b[1] for b in bottoni.values()])
+
+        # ---- IL GESTO FATTO PRIMA: niente promemoria ----
+        o = nuovo("sell", B, A)
+        arriva(o, "taken", "buyer", "invoice-next", ORA)
+        arriva(o, "buyer-invoice-requested", "mostro", "", ORA)
+        arriva(o, "buyer-invoice-added", "buyer", "hold-next", ORA + 40)
+        prova(f"[{W}s] la fattura data porta via SUBITO il suo promemoria", [],
+              [a for a in attese(o) if a[0] == "fattura_promemoria"])
+        arriva(o, "hold-invoice-requested", "mostro", "invoice", ORA + 40)
+        arriva(o, "hold-invoice-paid", "seller", "active", ORA + 90)
+        prova(f"[{W}s] ...e la garanzia pagata il suo: in attesa non resta niente", [],
+              attese(o))
+        giornale.clear()
+        prova(f"[{W}s] fattura data e garanzia pagata prima della meta': nessuno dei "
+              "due promemoria parte", ([], {}), batte(ORA + W))
+        prova(f"[{W}s] ...e uno scambio andato bene non lascia righe di promemoria nel "
+              "journal", [], [r for r in giornale if "Promemoria P2P" in r])
+        prova(f"[{W}s] ...e quel che non e' partito non risulta detto", 0,
+              con.execute("SELECT COUNT(*) FROM p2p_avvisi WHERE ordine=? AND momento "
+                          "LIKE '%_promemoria'", (o,)).fetchone()[0])
+        # I DUE POST ARRIVATI ROVESCIATI (Tor): la garanzia pagata prima
+        # della sua richiesta. L'attesa nasce DOPO il fatto, e a fermarla
+        # e' il giudice alla scadenza
+        o = nuovo("sell", B, A)
+        arriva(o, "taken", "buyer", "invoice-next", ORA)
+        arriva(o, "buyer-invoice-added", "buyer", "hold-next", ORA + 40)
+        arriva(o, "hold-invoice-paid", "seller", "active", ORA + 90)
+        arriva(o, "hold-invoice-requested", "mostro", "invoice", ORA + 40)
+        prova(f"[{W}s] la richiesta arrivata DOPO il pagamento mette lo stesso la sua attesa",
+              ["garanzia_promemoria"], [a[0] for a in attese(o)])
+        giornale.clear()
+        prova(f"[{W}s] ...ma alla scadenza il giudice la ferma", ([], {}), batte(ORA + W))
+        prova(f"[{W}s] ...e il journal dice perche'", True,
+              any(f"{o[:8]} «garanzia_promemoria»" in r and "il gesto e' gia' stato fatto" in r
+                  for r in giornale))
+
+        # ---- L'ANNULLO PRIMA: niente promemoria ----
+        for azione, attore, dettaglio in (("canceled", "buyer", "republished"),
+                                          ("expired", "mostro", "taker-timeout"),
+                                          ("canceled", "seller", "")):
+            o = nuovo("sell", B, A)
+            arriva(o, "taken", "buyer", "invoice-next", ORA)
+            arriva(o, "buyer-invoice-requested", "mostro", "", ORA)
+            arriva(o, azione, attore, dettaglio, ORA + 30)
+            prova(f"[{W}s] «{azione}»/{dettaglio or '—'} porta via subito il promemoria",
+                  [], attese(o))
+            prova(f"[{W}s] ...e a meta' tempo non parte niente", ([], {}),
+                  batte(ORA + W // 2 + 5))
+            # ...e rovesciati: la richiesta registrata DOPO la chiusura
+            o = nuovo("sell", B, A)
+            arriva(o, "taken", "buyer", "invoice-next", ORA)
+            arriva(o, azione, attore, dettaglio, ORA + 30)
+            arriva(o, "buyer-invoice-requested", "mostro", "", ORA)
+            giornale.clear()
+            prova(f"[{W}s] ...nemmeno se la richiesta arriva dopo «{azione}»/"
+                  f"{dettaglio or '—'}", ([], {}), batte(ORA + W // 2 + 5))
+            prova(f"[{W}s] ...e il journal dice che lo scambio si e' chiuso", True,
+                  any(f"{o[:8]} «fattura_promemoria»" in r and "lo scambio si e' chiuso" in r
+                      for r in giornale))
+
+        # ---- GLI AVVISI SPENTI, E IL SERVER TORNATO SU TARDI ----
+        o = nuovo("sell", B, A)
+        arriva(o, "taken", "buyer", "invoice-next", ORA)
+        arriva(o, "buyer-invoice-requested", "mostro", "", ORA)
+        con.execute("UPDATE utenti SET avvisi_p2p=0 WHERE tg_id=?", (A,))
+        prova(f"[{W}s] chi ha spento gli avvisi P2P non lo riceve, e non risulta detto",
+              (([], {}), 0),
+              (batte(ORA + W // 2),
+               con.execute("SELECT COUNT(*) FROM p2p_avvisi WHERE ordine=? AND momento "
+                           "LIKE '%_promemoria'", (o,)).fetchone()[0]))
+        con.execute("UPDATE utenti SET avvisi_p2p=1 WHERE tg_id=?", (A,))
+        o = nuovo("sell", B, A)
+        arriva(o, "taken", "buyer", "invoice-next", ORA)
+        arriva(o, "buyer-invoice-requested", "mostro", "", ORA)
+        giornale.clear()
+        prova(f"[{W}s] un server tornato su a mezzo minuto dalla fine non ricorda niente",
+              ([], {}), batte(ORA + W - 30))
+        prova(f"[{W}s] ...e lo dice", True,
+              any("non resta nemmeno un minuto" in r for r in giornale))
+        o = nuovo("sell", B, A)
+        arriva(o, "taken", "buyer", "invoice-next", ORA)
+        arriva(o, "buyer-invoice-requested", "mostro", "", ORA)
+        prova(f"[{W}s] ...ma in ritardo di poco parte, coi minuti che restano DAVVERO",
+              [(A, f"⏳ Restano circa {(W - (W // 2 + 200) + 30) // 60} minuti per indicare "
+                   "dove ricevere i sats, altrimenti lo scambio si annulla.", "promemoria")],
+              batte(ORA + W // 2 + 200)[0])
+
+        # ---- LA PRESA CHE CHIEDE SUBITO LA GARANZIA: chi compra prende
+        # una vendita avendo gia' detto dove vuole i sats. Parla la PRESA
+        # (la garanzia chiesta nello stesso istante tace), ed e' lei il
+        # primo avviso del gesto: il tempo lo porta lei ----
+        o = nuovo("sell", B, A)
+        prova(f"[{W}s] la presa che chiede subito la garanzia dice a chi vende quanto ha",
+              [(B, "⚡ Il tuo ordine è stato preso da Bruno! Vendi 15.000 sats per 10,00 € "
+                   "via SEPA.\n\nPaga la garanzia: la richiesta è nell'app.\n\n"
+                   f"⏳ Hai {M} minuti, poi lo scambio si annulla.")],
+              arriva(o, "taken", "buyer", "hold-next", ORA))
+        prova(f"[{W}s] ...la garanzia chiesta nello stesso istante tace, ma mette il "
+              "promemoria", ([], [("garanzia_promemoria", B, ORA + W // 2, "promemoria")]),
+              (arriva(o, "hold-invoice-requested", "mostro", "take", ORA), attese(o)))
+        con.execute("DELETE FROM p2p_attese WHERE ordine=?", (o,))
+
+        # ---- VERSO DUE: un acquisto di A, preso da B (chi vende) ----
+        o = nuovo("buy", A, B)
+        arriva(o, "taken", "seller", "hold-next", ORA)
+        prova(f"[{W}s] chi vende ha PRESO con l'app in mano: la garanzia chiesta non "
+              "parla, ma il promemoria lo aspetta lo stesso", [],
+              arriva(o, "hold-invoice-requested", "mostro", "take", ORA))
+        prova(f"[{W}s] ...a meta' finestra", [("garanzia_promemoria", B, ORA + W // 2, "promemoria")],
+              attese(o))
+        # ⚠️ IL CASO NON VERIFICATO sul sorgente del coordinatore: la
+        # fattura chiesta DOPO la garanzia. Finche' non si sa se li' il suo
+        # cronometro riparte, vale la scadenza piu' VICINA — contata dalla
+        # garanzia chiesta. Il giorno che si legge che riparte, questi due
+        # numeri diventano quelli della finestra intera.
+        D = W // 3
+        pagata = arriva(o, "hold-invoice-paid", "seller", "invoice-next", ORA + D)
+        prova(f"[{W}s] garanzia pagata dopo un terzo del tempo: a chi compra il primo "
+              "avviso dice quel che RESTA dalla presa (la prudenza del caso non verificato)",
+              (A, "🔒 Anna ha bloccato i sats in garanzia: indica dove ricevere i sats."
+                  f"\n\n⏳ Hai {(W - D + 30) // 60} minuti, poi lo scambio si annulla."),
+              [x for x in pagata if x[0] == A][0])
+        prova(f"[{W}s] ...e a chi vende, che ha solo da aspettare, nessun tempo", False,
+              "Hai " in [x for x in pagata if x[0] == B][0][1])
+        arriva(o, "buyer-invoice-requested", "mostro", "", ORA + D)
+        prova(f"[{W}s] ...e il promemoria di chi compra sta a meta' di quel che resta",
+              ("fattura_promemoria", A, ORA + D + (W - D) // 2, "promemoria"),
+              [a for a in attese(o) if a[0] == "fattura_promemoria"][0])
+        giornale.clear()
+        detti, _ = batte(ORA + D + (W - D) // 2)
+        prova(f"[{W}s] al battito parte SOLO quello della fattura: la garanzia e' pagata",
+              [(A, f"⏳ Restano circa {(W - D - (W - D) // 2 + 30) // 60} minuti per indicare "
+                   "dove ricevere i sats, altrimenti lo scambio si annulla.", "promemoria")],
+              detti)
+        con.execute("DELETE FROM p2p_attese")
+        con.commit()
+
+    # --- 4) SENZA IL 38385: il ripiego, e nessuna cifra -----------------
+    amb["_P2P_FOTO"]["info"] = None
+    o = nuovo("sell", B, A)
+    arriva(o, "taken", "buyer", "invoice-next", ORA)
+    arriva(o, "buyer-invoice-requested", "mostro", "", ORA)
+    arriva(o, "buyer-invoice-added", "buyer", "hold-next", ORA + 10)
+    prova("senza 38385 il primo avviso resta quello di sempre: nessun tempo inventato",
+          [(B, "🔒 Paga la garanzia: la richiesta è nell'app. Bruno ha indicato dove "
+               "ricevere i sats, ora tocca a te.")],
+          arriva(o, "hold-invoice-requested", "mostro", "invoice", ORA + 10))
+    prova("...il promemoria si mette lo stesso, a meta' del ripiego",
+          ("garanzia_promemoria", B, ORA + 10 + 450, "promemoria"),
+          [a for a in attese(o) if a[0] == "garanzia_promemoria"][0])
+    con.execute("DELETE FROM p2p_attese WHERE momento='fattura_promemoria'")
+    prova("...e parte senza cifra",
+          [(B, "⏳ Il tempo per bloccare la garanzia sta finendo: fallo adesso, altrimenti "
+               "lo scambio si annulla.", "promemoria")], batte(ORA + 10 + 450)[0])
+    # il 38385 arriva DOPO che l'attesa e' nata: i minuti si contano con
+    # la finestra di adesso
+    o = nuovo("sell", B, A)
+    arriva(o, "taken", "buyer", "invoice-next", ORA)
+    arriva(o, "buyer-invoice-requested", "mostro", "", ORA)
+    amb["_P2P_FOTO"]["info"] = info("1800")
+    prova("il 38385 arrivato dopo: il promemoria nato col ripiego dice i minuti VERI",
+          [(A, f"⏳ Restano circa {(1800 - 450 + 30) // 60} minuti per indicare dove "
+               "ricevere i sats, altrimenti lo scambio si annulla.", "promemoria")],
+          batte(ORA + 450)[0])
+
+    # --- 5) LA CAUZIONE: le due frasi «bloccata ✓» portano il tempo -----
+    testo = amb["_testo_evento_p2p"]
+    d_t = {"cauzione_di": "compra", "tempo_gesto": "30 minuti"}
+    prova("a chi ha pagato la cauzione da fuori, il passo dopo col suo tempo",
+          "🔐 <b>Cauzione bloccata ✓:</b> ora indica dove ricevere i sats.\n\n"
+          "⏳ <b>Hai 30 minuti</b>, poi lo scambio si annulla.",
+          testo("fattura_chiesta", "", "compra", d_t))
+    coda_t = "\n\n⏳ <b>Hai 30 minuti</b>, poi lo scambio si annulla."
+    prova("...e le altre due frasi della garanzia chiesta lo portano uguale",
+          ["🔐 <b>Cauzione bloccata ✓:</b> ora paga la garanzia, la richiesta è nell'app."
+           + coda_t, "🔒 <b>Paga la garanzia: la richiesta è nell'app.</b>" + coda_t],
+          [testo("garanzia_chiesta", "take", "vende", dict(d_t, cauzione_di="vende")),
+           testo("garanzia_chiesta", "", "vende", {"tempo_gesto": "30 minuti"})])
+    prova("...e i momenti che non aprono un gesto a tempo restano senza", [False] * 3,
+          ["poi lo scambio si annulla" in testo(m, d, r, dict(d_t, sats=1000))
+           for m, d, r in (("fiat", "", "vende"), ("garanzia_pagata", "active", "compra"),
+                           ("preso", "invoice-next", "vende"))])
+
+    # --- 6) IL TRASPORTO: il bottone arriva a Telegram, e solo se c'e' ---
+    mandati = []
+
+    class Cliente:
+        def __init__(self, timeout=None):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, json=None):
+            mandati.append(json)
+            return _types.SimpleNamespace(status_code=200,
+                                          text='{"result": {"message_id": 1}}')
+
+    sp = {"html": __import__("html"), "re": re}
+    exec(pezzo("spoglia_html"), sp)
+    amb_t = {"MODALITA_COLLAUDO": False, "BOT_TOKEN": "t", "json": json,
+             "TRACKBOT_START": "\x00mai\x00",
+             "LINK_LIBRO_P2P": "https://barattolo.store/p2p",
+             "spoglia_html": sp["spoglia_html"], "print": lambda *a: None,
+             "httpx": _types.SimpleNamespace(AsyncClient=Cliente)}
+    exec("async " + pezzo("_manda_telegram"), amb_t)
+    bott = ("⚡ Apri lo scambio", "https://barattolo.store/p2p?scambio=abc")
+    _aio.run(amb_t["_manda_telegram"](111, "⏳ <b>Restano</b>", bott))
+    _aio.run(amb_t["_manda_telegram"](111, "⏳ <b>Restano</b>"))
+    prova("col bottone: una tastiera con UN link (mai un `web_app`: la regola di casa)",
+          {"inline_keyboard": [[{"text": bott[0], "url": bott[1]}]]},
+          mandati[0].get("reply_markup"))
+    prova("...senza, il messaggio e' quello di sempre",
+          {"chat_id", "text", "parse_mode"}, set(mandati[1]))
+    visti = []
+
+    async def _tele(tg_id, testo, *a):
+        visti.append(("telegram", a))
+        return "ok"
+
+    async def _dm(npub, testo, ripiego, *a):
+        visti.append(("dm", a))
+
+    class _Con:
+        def __init__(self, riga):
+            self.riga = riga
+
+        def execute(self, *a):
+            return self
+
+        def fetchone(self):
+            return self.riga
+
+        def close(self):
+            pass
+
+    riga_utente = {"canale_notifiche": "entrambi", "npub": "", "npub_verificata": 0,
+                   "npub_accesso": "npub1x"}
+    amb_n = {"db": lambda: _Con(riga_utente), "_manda_telegram": _tele,
+             "_dm_nostr_con_ripiego": _dm, "asyncio": _aio,
+             "MODALITA_COLLAUDO": False, "print": lambda *a: None}
+    exec("async " + pezzo("notifica"), amb_n)
+
+    async def _due():
+        await amb_n["notifica"](555, "ciao", bottone=bott)
+        await amb_n["notifica"](555, "ciao")
+        await _aio.sleep(0)
+    _aio.run(_due())
+    prova("notifica passa il bottone ai DUE canali, e solo quando c'e'",
+          [("dm", ()), ("dm", (bott,)), ("telegram", ()), ("telegram", (bott,))],
+          sorted(visti))
+    dm_src = pezzo("_dm_nostr_con_ripiego")
+    prova("nel DM, che e' testo puro, il bottone diventa una riga in coda", True,
+          'f"\\n\\n{bottone[0]}: {bottone[1]}" if bottone else ""' in dm_src)
+
+    # --- 7) LA PAGINA: il conto alla rovescia sopra il bottone ----------
+    rend = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
+    prova("la riga del tempo sta SOPRA il bottone del gesto", True,
+          0 < rend.index("rigaTempoGestoP2P(o, azione) +")
+          < rend.index("(bottoni[azione] || '') +"))
+    batt = mini[mini.index("battitoAnelloneP2P();\n  battitoGestoP2P();"):][:80]
+    prova("il battito sta nell'unico interval dell'app, accanto a quello dell'anello",
+          True, "battitoGestoP2P();" in batt)
+    scad = _fn_js(mini, "function scadenzaGestoP2P(o){")
+    prova("la garanzia chiede allo STESSO giudice del foglio", True,
+          "return scadenzaFoglioP2P(o, 'hold');" in scad)
+    prova("...e la finestra della fattura e' quella del 38385, col ripiego di sempre",
+          True, "(p2pInfo && p2pInfo.scadenzaSec > 0) ? p2pInfo.scadenzaSec : 900" in scad)
+    timbro = mini[mini.index("  if (nuovo.preso && !ord.preso) nuovo.presaAt"):]
+    timbro = timbro[:timbro.index("\n", timbro.index("else if (!nuovo.preso)")) + 1]
+    prova("l'ora della presa e' fra le cose che una riga perde tornando nel libro",
+          True, "'ultimaMossa', 'presaAt', 'quando'" in mini)
+    prova("l'indirizzo del bottone apre QUELLO scambio, e solo a leva accesa", [True, True],
+          ["(location.search.match(/[?&]scambio=([0-9a-zA-Z-]{8,64})(?:&|$)/) || [])[1]" in mini,
+           "if (P2P_SCAMBIO_URL && p2pAcceso() && typeof apriOrdineP2P === 'function')\n"
+           "    apriOrdineP2P(P2P_SCAMBIO_URL);" in mini])
+    prova("la pagina «Sicurezza» non dice piu' «un quarto d'ora»", [False, True],
+          ["un quarto d'ora di tempo" in mini,
+           "alcuni passi hanno i minuti contati, e l'avviso dice quanti." in mini])
+    banco = r"""
+let p2pInfo = null;
+let ORA = 1000;
+Date.now = () => ORA * 1000;
+const esc = s => String(s == null ? '' : s);
+const leggiBolt11 = b => { const m = /^lnbc(\d+)$/.exec(String(b)); return m ? {quando: +m[1]} : null; };
+let ridisegni = 0;
+function renderOrdineP2P(){ ridisegni++; BOX.classList.add('finito'); }
+const CONTO = {textContent: ''};
+const BOX = {dataset: {}, _c: {}, classList: {
+    contains: c => !!BOX._c[c], add: c => { BOX._c[c] = 1; }},
+  querySelector: s => s === '.mono' ? CONTO : null};
+let IN_PAGINA = true;
+const document = {querySelector: s => IN_PAGINA ? BOX : null};
+""" + _fn_js(mini, "function minutiSecondi(sec){") \
+        + _fn_js(mini, "function scadenzaFoglioP2P(o, modo){") + scad \
+        + _fn_js(mini, "function testoTempoGestoP2P(azione, resta){") \
+        + _fn_js(mini, "function rigaTempoGestoP2P(o, azione){") \
+        + _fn_js(mini, "function battitoGestoP2P(){") + r"""
+function timbra(ord, nuovo, quando){
+""" + timbro + r"""  return nuovo;
+}
+const out = {};
+const hold = {stato: 'attesa_mia_hold', lato: 'vendo', hold: {bolt11: 'lnbc1000', quando: 1003}};
+const presa = {stato: 'attesa_mia_fattura', lato: 'compro', mio: false, ultimaMossa: 1000, presaAt: 1000};
+const pubbl = {stato: 'attesa_mia_fattura', lato: 'compro', mio: true, ultimaMossa: 1000, presaAt: 400};
+out.scade = {};
+for (const w of [900, 1800, 0]) {
+  p2pInfo = w ? {scadenzaSec: w} : null;
+  out.scade[w] = [scadenzaGestoP2P(hold), scadenzaGestoP2P(presa), scadenzaGestoP2P(pubbl),
+    scadenzaGestoP2P(Object.assign({}, pubbl, {presaAt: 0})),
+    scadenzaGestoP2P({stato: 'attivo', ultimaMossa: 1000}),
+    scadenzaGestoP2P({stato: 'attesa_mia_hold', lato: 'vendo'})];
+}
+p2pInfo = {scadenzaSec: 1800};
+ORA = 1000 + 1800 - 125;
+out.rigaHold = rigaTempoGestoP2P(hold, 'hold');
+out.rigaFattura = rigaTempoGestoP2P(presa, 'fattura');
+out.rigaAltro = [rigaTempoGestoP2P(hold, 'euro-inviati'), rigaTempoGestoP2P(hold, ''),
+                 rigaTempoGestoP2P({stato: 'attivo'}, 'hold')];
+ORA = 1000 + 1800;
+out.rigaFinita = rigaTempoGestoP2P(hold, 'hold');
+/* il battito: riscrive le cifre in place, e allo zero ridisegna UNA volta */
+BOX.dataset = {fine: String(2800), azione: 'hold'};
+ORA = 2800 - 61; battitoGestoP2P();
+out.battito1 = [CONTO.textContent, ridisegni];
+ORA = 2800 - 1; battitoGestoP2P();
+out.battito2 = [CONTO.textContent, ridisegni];
+ORA = 2800; battitoGestoP2P(); battitoGestoP2P(); battitoGestoP2P();
+out.battitoZero = ridisegni;
+IN_PAGINA = false; ridisegni = 0; BOX._c = {}; battitoGestoP2P();
+out.fuoriPagina = ridisegni;
+/* l'ora della presa: una volta, entrando; persa tornando nel libro */
+ORA = 5000;
+out.timbro = [
+  timbra({}, {preso: true}, 4242).presaAt,
+  timbra({}, {preso: true}, 0).presaAt,
+  timbra({preso: true, presaAt: 4242}, {preso: true, presaAt: 4242}, 4999).presaAt,
+  'presaAt' in timbra({preso: true, presaAt: 4242}, {presaAt: 4242}, 4999)];
+console.log(JSON.stringify(out));
+"""
+    r = _node_banco(banco)
+    if r is None:
+        salta("il conto alla rovescia della pagina", "node non c'e'")
+        return
+    for w in (900, 1800):
+        prova(f"[{w}s] la pagina: la garanzia scade alla nascita della bolt11 + la "
+              "finestra; la fattura di chi ha PRESO dal messaggio che la chiede; quella "
+              "di chi ha PUBBLICATO dalla presa (la prudenza); senza l'ora della presa, "
+              "fuori dai due stati o senza la richiesta, niente",
+              [1000 + w, 1000 + w, 400 + w, 0, 0, 0], r.get("scade", {}).get(str(w)))
+    prova("senza il 38385 la pagina usa il ripiego di sempre", [1900, 1900, 1300, 0, 0, 0],
+          r.get("scade", {}).get("0"))
+    prova("la riga della garanzia: le cifre che scorrono, la scadenza e il gesto",
+          '<div class="p2p-gesto-tempo" role="timer" data-fine="2800" data-azione="hold">'
+          '⏱ Hai ancora <b class="mono">2:05</b> per bloccare i sats, poi lo scambio si '
+          'annulla.</div>', r.get("rigaHold"))
+    prova("la riga della fattura dice il SUO gesto", True,
+          '<b class="mono">2:05</b> per dire dove ricevere i sats, poi lo scambio si annulla.'
+          in str(r.get("rigaFattura")))
+    prova("fuori dai due gesti la riga non c'e'", ["", "", ""], r.get("rigaAltro"))
+    prova("a tempo finito la riga si spegne e NON dice «annullato»: lo decide il coordinatore",
+          '<div class="p2p-gesto-tempo finito" role="timer" data-fine="2800" data-azione="hold">'
+          '⌛ Il tempo per bloccare i sats è finito: lo scambio sta per annullarsi.</div>',
+          r.get("rigaFinita"))
+    prova("il battito riscrive le sole cifre, senza ridisegnare la pagina",
+          [["1:01", 0], ["0:01", 0]], [r.get("battito1"), r.get("battito2")])
+    prova("...allo zero ridisegna UNA volta, e fuori dalla pagina non fa niente", [1, 0],
+          [r.get("battitoZero"), r.get("fuoriPagina")])
+    prova("l'ora della presa si timbra entrando (dal messaggio, o dall'orologio), non si "
+          "sposta dopo, e si perde tornando nel libro", [4242, 5000, 4242, False],
+          r.get("timbro"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -136072,6 +136650,7 @@ def main():
               prove_causale_sepa,
               prove_testi_p2p_confondono,
               prove_garanzia_lunga,
+              prove_promemoria_gesto,
               prove_avvisi_nuovi_ordini,
               prove_anteprima_avvisi_p2p,
               prove_avvisi_mercatino,
