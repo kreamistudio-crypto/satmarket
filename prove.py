@@ -62705,12 +62705,12 @@ out.senzaVoltoNienteRep = out.paginaVendi.indexOf('p2p-rep-tre') < 0;
    pagina e' la STESSA e cambia una variabile sola, che e' il modo di
    provare che a decidere e' chi guarda e non l'ordine. */
 out.nienteAvviso = out.paginaVendi.indexOf('vi vedete') < 0;
-out.notoNonLaVede = out.paginaVendi.indexOf('Tu resti anonimo') < 0;
+out.notoNonLaVede = out.paginaVendi.indexOf('Per chi ha pubblicato resti sconosciuto') < 0;
 myTgId = -9;
 renderDettaglioP2P();
 out.paginaAnonima = el('p2pDettCorpo').innerHTML;
 out.anonimoNienteAvviso = out.paginaAnonima.indexOf('vi vedete') < 0;
-out.anonimoLoDice = out.paginaAnonima.indexOf('Tu resti anonimo') >= 0;
+out.anonimoLoDice = out.paginaAnonima.indexOf('Per chi ha pubblicato resti sconosciuto') >= 0;
 myTgId = 111;
 
 /* ---- IL DETTAGLIO BARATTOZON DAL LIBRO (7 ott 2026, sera, decisione
@@ -64016,8 +64016,10 @@ def prove_parti_si_vedono():
     # la zona da guardare, i divieti qui sotto passerebbero tutti senza
     # guardare niente — una sentinella cieca che si legge verde. Questa
     # riga tiene un'ancora VIVA nel pezzo che resta.
+    # (10 ott 2026: l'ancora era «tu resti anonimo», la frase del foglio
+    # dove si prende; ora quella frase dice a CHI si resta sconosciuti)
     prova("il censimento guarda davvero il client", True,
-          "tu resti anonimo" in _fuori)
+          "per chi ha pubblicato resti sconosciuto" in _fuori)
     for _frase in ("appena lo prendi vi vedete",
                    "appena qualcuno lo prende vi vedete",
                    "vi vedete:",
@@ -64075,7 +64077,7 @@ out.primaDellaPresa = profiloControparteP2P(ord({peer: ''})) === '';
 out.primaNonChiede = chiamate === 0;
 /* 2) NON SI SA ANCORA: una riga sola, e non si indovina fra i casi */
 const attesa = profiloControparteP2P(ord({}));
-out.nonSiSa = attesa.indexOf('non sappiamo niente') >= 0
+out.nonSiSa = attesa.indexOf('non possiamo dirtelo') >= 0
   && attesa.indexOf('seller') < 0;
 await new Promise(r => setTimeout(r, 0));
 out.haChiesto = chiamate === 1;
@@ -116125,8 +116127,12 @@ console.log(JSON.stringify(out));
     _pian = " ".join(_riga.split())
     prova("...e dice cosa comporta, nei due versi", True,
           "l'altra parte vede il tuo profilo e potete recensirvi" in _pian
-          and "resti invisibile e su quegli scambi non ci sono recensioni"
-          in _pian)
+          and "per l'altra parte resti sconosciuto e su quegli scambi non "
+              "ci sono recensioni" in _pian
+          # (10 ott 2026) ...e che l'esito si scrive comunque: «invisibile»
+          # da solo prometteva piu' di quel che il server fa
+          and "L'esito dello scambio si scrive sul tuo account in tutti e due "
+              "i casi" in _pian)
     prova("...e nasce SPENTO", True,
           "let myRiconosciP2P = false;" in mini)
     _set = pezzo_js(mini, "async function setRiconosciP2P(attivo){", "\n}\n")
@@ -139083,6 +139089,50 @@ def prove_dati_reputazione_p2p():
           "(la presa annotata), non gli esiti", (True, False),
           ("_p2p_riconosciuto(con, user[\"id\"])" in pezzo("registra_ordini_p2p"),
            "_p2p_riconosciuto" in segna))
+    # LA STESSA VERITA' NEL RESTO DELL'APP E NELLA GUIDA (10 ott 2026,
+    # terzo ritocco di Andrea): la promessa «non annotiamo quali ordini
+    # prendi» stava anche nel cassetto «🔔 Avvisi», nell'interruttore
+    # «Fatti riconoscere», nel foglio dove si prende, in un toast e
+    # nella riga di chi guarda l'altra parte. Fuori dai commenti non
+    # deve restarne una.
+    senza_commenti = re.sub(r"/\*.*?\*/", "", mini, flags=re.S)
+    prova("in tutto il client nessuna frase promette piu' che la presa "
+          "di chi entra da Nostr non lascia niente", [],
+          [f for f in ("non annotiamo quali ordini prendi",
+                       "Tu resti anonimo",
+                       "le tue prese non vengono annotate",
+                       "Dell'altra persona non sappiamo niente",
+                       "resti invisibile e")
+           if f in senza_commenti])
+    piano = " ".join(senza_commenti.split())
+    prova("...e i tre posti che parlano a chi prende da Nostr dicono che "
+          "l'esito si scrive sul suo account: gli avvisi, l'interruttore, "
+          "il foglio dove si prende",
+          (True, True, True),
+          ("per lei resti sconosciuto. L'esito dello scambio si scrive "
+           "comunque sul tuo account." in piano,
+           "L'esito dello scambio si scrive sul tuo account in tutti e due i "
+           "casi." in piano,
+           "Per chi ha pubblicato resti sconosciuto: sei entrato con un "
+           "profilo senza nome, e non saprà chi sei." in piano
+           and "L\\'esito dello scambio si scrive comunque sul tuo account. "
+               "Se vuoi farti riconoscere" in piano))
+    prova("...a chi guarda l'altra parte non diciamo «non sappiamo "
+          "niente»: diciamo che non possiamo dirglielo", True,
+          "Chi è l'altra persona non possiamo dirtelo" in piano)
+    guida = " ".join(open(os.path.join("docs", "GUIDA-P2P-PASSI.md"),
+                          encoding="utf-8").read().split())
+    prova("...e la guida cita i testi nuovi, non quelli di ieri",
+          (True, True, True, []),
+          ("«🕶️ Per chi ha pubblicato resti sconosciuto: sei entrato con un "
+           "profilo senza nome, e non saprà chi sei." in guida,
+           "per l'altra parte resti sconosciuto e su quegli scambi non ci "
+           "sono recensioni. L'esito dello scambio si scrive sul tuo account "
+           "in tutti e due i casi.»" in guida,
+           "«Da ora, quando prendi un ordine, l'altra persona non ti vede "
+           "(gli scambi già presi restano)»" in guida,
+           [f for f in ("Tu resti anonimo", "non vengono annotate",
+                        "resti invisibile") if f in guida]))
     prova("i tentativi: il gesto, mai la fattura ne' il pagamento",
           (True, False),
           ("il gesto, mai la fattura né il pagamento" in testo,

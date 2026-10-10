@@ -45962,3 +45962,50 @@ resta sconosciuto — all'altra persona — e che l'esito si scrive sul suo
 account come per tutti, perché il coordinatore dice fra quali due
 account è lo scambio. La mia stesura della stessa frase, nata in
 parallelo, è caduta al rebase: si tiene la sua, con la sua sentinella.
+## La stessa verità fuori da «I tuoi dati»: il cassetto «🔔 Avvisi», l'interruttore, il foglio dove si prende, la guida (10 ott 2026, pomeriggio, terzo ritocco chiesto da Andrea)
+
+**LA RICHIESTA.** Corretti i due paragrafi di «I tuoi dati», restava la
+riga del cassetto «🔔 Avvisi» che a chi entra da Nostr diceva «non
+annotiamo quali ordini prendi». Andrea: correggerla, e cercare in tutto
+il resto dell'app e nella guida le altre frasi con la stessa promessa.
+
+**TROVATE CINQUE, più la guida che ne cita tre** (cercate sulle parole:
+annotare, anonimo, invisibile, tracce, «non sappiamo»):
+1. il cassetto «🔔 Avvisi», riga degli avvisi P2P: «…non annotiamo quali
+   ordini prendi» → «…per lei resti sconosciuto. L'esito dello scambio
+   si scrive comunque sul tuo account.»;
+2. l'interruttore «👤 Fatti riconoscere negli scambi»: «se resta spento,
+   resti invisibile…» → «…per l'altra parte resti sconosciuto e su
+   quegli scambi non ci sono recensioni. L'esito dello scambio si
+   scrive sul tuo account in tutti e due i casi.»;
+3. il foglio dove si prende un ordine: «🕶️ Tu resti anonimo…» → «🕶️
+   Per chi ha pubblicato resti sconosciuto: sei entrato con un profilo
+   senza nome, e non saprà chi sei. … L'esito dello scambio si scrive
+   comunque sul tuo account.»;
+4. il toast di quando si spegne l'interruttore: «Da ora le tue prese
+   non vengono annotate…» → «Da ora, quando prendi un ordine, l'altra
+   persona non ti vede (gli scambi già presi restano)»;
+5. la riga di chi guarda l'altra parte e non ne riceve il volto:
+   «Dell'altra persona non sappiamo niente: può essere entrata con un
+   profilo anonimo…» → «Chi è l'altra persona non possiamo dirtelo: può
+   essere entrata con un profilo che non si fa riconoscere…». Era la
+   promessa vista dall'altro lato: per chi scambia da un'altra app è
+   vero che non sappiamo niente, per chi è entrato da Nostr no — e «non
+   possiamo dirtelo» è vero in tutti e due i casi.
+`docs/GUIDA-P2P-PASSI.md` cita la 2, la 3 e la 4 coi testi esatti:
+riscritte lì con le parole nuove.
+
+**NON TOCCATO.** I commenti del codice che dicono «la presa non si
+annota» (è ancora vero: fra i volti non si annota), e il codice: è un
+ritocco di testi. Nel server non c'è un testo per gli utenti con quella
+promessa.
+
+**PROVATO.** `prove_dati_reputazione_p2p` sale a 22: fuori dai commenti
+nessuna delle cinque frasi vecchie in tutto il client, i tre posti che
+parlano a chi prende dicono dell'esito, la riga di chi guarda dice «non
+possiamo dirtelo», la guida cita i testi nuovi e nessuno dei vecchi.
+Riscritte sulle frasi nuove le quattro sentinelle che citavano le
+vecchie (`prove_p2p_dettaglio`, `prove_parti_si_vedono` — compresa
+l'ancora viva del censimento —, `prove_recensione_p2p`). Suite `PROVE_SEVERE=1` sull'albero di 6bfa0b2 più il ritocco: 21.302 passate, 0 fallite; i 51 collaudi della CI nella gabbia: 51 verdi. Niente
+giro dal vivo: sono frasi dentro righe che non cambiano forma, e i
+banchi in node di quelle prove le disegnano con le funzioni vere.

@@ -175,18 +175,23 @@ vere sullo schermo, si salta come il tour):
   fine dello scambio.», il bottone per il bot e «…o entra con Nostr».
   Dall'indirizzo .onion: «🧅 Entra con la tua chiave» e «Entra con
   Nostr».
-- **Con una chiave Nostr** 🧑 quando PRENDI un ordine resti anonimo.
-  📱 Nel dettaglio: «🕶️ Tu resti anonimo: sei entrato con un profilo
-  senza nome, e chi ha pubblicato non saprà chi sei. Il suo profilo
-  invece lo vedi qui sopra. Se vuoi farti riconoscere — e potervi
-  recensire — c'è l'interruttore nel cassetto «🔔 Avvisi».» Nel
+- **Con una chiave Nostr** 🧑 quando PRENDI un ordine resti sconosciuto
+  all'altra persona — non al server: l'esito dello scambio si scrive
+  comunque sul tuo account (10 ott 2026).
+  📱 Nel dettaglio: «🕶️ Per chi ha pubblicato resti sconosciuto: sei
+  entrato con un profilo senza nome, e non saprà chi sei. Il suo profilo
+  invece lo vedi qui sopra. L'esito dello scambio si scrive comunque sul
+  tuo account. Se vuoi farti riconoscere — e potervi recensire — c'è
+  l'interruttore nel cassetto «🔔 Avvisi».» Nel
   cassetto «🔔 Avvisi» del Profilo: «👤 Fatti riconoscere negli scambi»
   — «Se lo accendi, quando prendi un ordine l'altra parte vede il tuo
-  profilo e potete recensirvi; se resta spento, resti invisibile e su
-  quegli scambi non ci sono recensioni.» — «Spento» / «Attivo».
+  profilo e potete recensirvi; se resta spento, per l'altra parte resti
+  sconosciuto e su quegli scambi non ci sono recensioni. L'esito dello
+  scambio si scrive sul tuo account in tutti e due i casi.» — «Spento» /
+  «Attivo».
   Toast: «👤 Da ora chi scambia con te ti vede, e potete recensirvi» /
-  «Da ora le tue prese non vengono annotate (gli scambi già presi
-  restano)». Chi entra con Nostr e PUBBLICA si mostra comunque col nome
+  «Da ora, quando prendi un ordine, l'altra persona non ti vede (gli
+  scambi già presi restano)». Chi entra con Nostr e PUBBLICA si mostra comunque col nome
   e la foto della sua chiave. L'interruttore chi entra da Telegram non
   lo vede.
 - **Gli avvisi**, per tutti, nel cassetto «🔔 Avvisi»: «⚡ Avvisi sugli

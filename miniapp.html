@@ -34991,7 +34991,7 @@ const rigaAvvisiP2P = () => (!p2pLeve || !p2pLeve.attivo) ? '' : `
         e quando tocca a te. Spenti, non ti scriviamo nulla dello scambio.${
           myTgId < 0 ? (myRiconosciP2P
             ? " Ti sei fatto riconoscere negli scambi: l'altra persona vede il tuo nome, anche negli avvisi."
-            : " Entrando da Nostr gli avvisi ti arrivano lo stesso, ma il tuo nome negli avvisi dell'altra persona non compare: non annotiamo quali ordini prendi.") : ""}</div>
+            : " Entrando da Nostr gli avvisi ti arrivano lo stesso, ma il tuo nome negli avvisi dell'altra persona non compare: per lei resti sconosciuto. L'esito dello scambio si scrive comunque sul tuo account.") : ""}</div>
     </div>
     <button onclick="setAvvisiP2P(${myAvvisiP2P ? 'false' : 'true'})"
       aria-pressed="${myAvvisiP2P ? 'true' : 'false'}"
@@ -35017,8 +35017,10 @@ const rigaRiconosciP2P = () => (!p2pLeve || !p2pLeve.attivo
       <div style="font-size:13.5px;font-weight:800">👤 Fatti riconoscere negli scambi</div>
       <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
         Se lo accendi, quando prendi un ordine l'altra parte vede il tuo
-        profilo e potete recensirvi; se resta spento, resti invisibile e
-        su quegli scambi non ci sono recensioni.</div>
+        profilo e potete recensirvi; se resta spento, per l'altra parte
+        resti sconosciuto e su quegli scambi non ci sono recensioni.
+        L'esito dello scambio si scrive sul tuo account in tutti e due
+        i casi.</div>
     </div>
     <button onclick="setRiconosciP2P(${myRiconosciP2P ? 'false' : 'true'})"
       aria-pressed="${myRiconosciP2P ? 'true' : 'false'}"
@@ -35043,7 +35045,7 @@ async function setRiconosciP2P(attivo){
      recensione gia' scritta non si ritira con una leva. */
   toast(myRiconosciP2P
     ? '👤 Da ora chi scambia con te ti vede, e potete recensirvi'
-    : 'Da ora le tue prese non vengono annotate (gli scambi già presi restano)',
+    : 'Da ora, quando prendi un ordine, l\'altra persona non ti vede (gli scambi già presi restano)',
     6000);
 }
 
@@ -58179,7 +58181,7 @@ function renderDettaglioP2P(){
        anonimo» a chi si e' fatto riconoscere sarebbe la bugia che
        questa riga esiste per non dire. */
     (myTgId < 0 && !myRiconosciP2P
-      ? '<div class="hint">🕶️ Tu resti anonimo: sei entrato con un profilo senza nome, e chi ha pubblicato non saprà chi sei. Il suo profilo invece lo vedi qui sopra. Se vuoi farti riconoscere — e potervi recensire — c\'è l\'interruttore nel cassetto «🔔 Avvisi».</div>'
+      ? '<div class="hint">🕶️ Per chi ha pubblicato resti sconosciuto: sei entrato con un profilo senza nome, e non saprà chi sei. Il suo profilo invece lo vedi qui sopra. L\'esito dello scambio si scrive comunque sul tuo account. Se vuoi farti riconoscere — e potervi recensire — c\'è l\'interruttore nel cassetto «🔔 Avvisi».</div>'
       : '') +
     /* IL «CONDIVIDI» (10 ott 2026): in fondo al corpo, sopra i due
        bottoni della decisione — e' un gesto di contorno, e non deve
@@ -70227,8 +70229,8 @@ function profiloControparteP2P(o){
       if (n && p2pOrdineAperto === o.id) renderOrdineP2P();
     }).catch(() => {});
     return '<div class="trust-note nota-scambio"><span>🕶️</span><span>'
-      + "Dell'altra persona non sappiamo niente: può essere entrata con "
-      + 'un profilo anonimo, o scambiare da un\'altra app. Per parlarvi '
+      + "Chi è l'altra persona non possiamo dirtelo: può essere entrata con "
+      + 'un profilo che non si fa riconoscere, o scambiare da un\'altra app. Per parlarvi '
       + 'restano i recapiti qui sotto, cifrati fra voi due.</span></div>';
   }
   /* IL NOME DI BATTESIMO per la frase del tondo («Scrivi a Mario»),
