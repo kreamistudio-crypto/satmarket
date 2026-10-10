@@ -23719,6 +23719,9 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     # vende un oggetto vede con chi ha a che fare. 0 = niente da scrivere
     non_completati = _marchi_mancati_p2p(
         con, [v["tg_id"]], int(time.time())).get(int(v["tg_id"]), 0)
+    # ...e «⚖️ N dispute perse» (10 ott 2026, malus-p2p): da una in su
+    dispute_perse = _marchi_dispute_p2p(
+        con, [v["tg_id"]], int(time.time())).get(int(v["tg_id"]), 0)
     seguito = bool(user and int(user["id"]) != int(v["tg_id"]) and con.execute(
         "SELECT 1 FROM venditori_seguiti WHERE tg_id=? AND venditore_id=?",
         (user["id"], v["tg_id"])).fetchone())
@@ -23726,6 +23729,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     venditore = dict(v)
     venditore["seguito"] = seguito
     venditore["non_completati"] = non_completati
+    venditore["dispute_perse"] = dispute_perse
     venditore["distintivi"] = [
         dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
              descrizione=d["descrizione"])
@@ -45178,7 +45182,53 @@ P2P_TENTATIVO_MARGINE_S = 60
 P2P_GESTI_TENTATIVO = ("garanzia_aperta", "garanzia_copiata", "garanzia_wallet",
                        "cauzione_aperta", "cauzione_copiata", "cauzione_wallet",
                        "fattura_inviata", "fattura_rifiutata", "fattura_scartata")
-P2P_MOTIVI_PRESA = ("filtro", "mancati", "prese")
+P2P_MOTIVI_PRESA = ("filtro", "mancati", "prese", "sospesi", "dispute")
+# ═══ I MALUS DOPO LA GARANZIA (10 ott 2026, cantiere malus-p2p, richiesta
+# di Andrea dopo lo studio sul feedback). Le quattro regole qui sopra
+# guardano il PRIMO gesto; a garanzia bloccata non c'era nessuna
+# conseguenza. Quattro aggiunte, tutte del SERVER e tutte in `p2p_esiti`:
+# a) LA DISPUTA PERSA CON COLPA. Il moderatore, decidendo, puo' segnare
+#    la colpa a chi PERDE (la spunta nel foglio della decisione: a
+#    registro col resto, gesto `colpa`, PRIMA della firma). Quando
+#    mostrod racconta che la disputa l'ha chiusa un moderatore con
+#    QUELL'esito, a chi ha perso si scrive `disputa_persa`: sul profilo
+#    compare «⚖️ N dispute perse» per P2P_DISPUTE_FINESTRA_S, da UNA
+#    (nessuna tolleranza: l'ha deciso una persona, guardando le prove), e
+#    quello scambio NON gli vale come «completato» anche se i sats sono
+#    arrivati a chi compra. Senza spunta non succede niente: una disputa
+#    nata da un malinteso non marchia nessuno.
+#    E BLOCCA DAGLI ORDINI CON FILTRO (decisione di Andrea, 10 ott 2026,
+#    prima del push): finche' ne ha una nella finestra, chi pubblica con
+#    un filtro (1+, 3+, 5+) non lo accetta — motivo `dispute`, con la
+#    data in cui l'ultima esce dai 90 giorni (`_blocco_dispute_fino_p2p`).
+#    E GLI SI DICE: in coda al messaggio della chiusura, a lui solo, la
+#    riga di `_riga_disputa_persa_p2p`; la stessa nell'archivio dell'app.
+# b) LA GARANZIA ARRIVATA A SCADENZA (`escrow-deadline`, ~92 ore): se chi
+#    vende aveva detto dove ricevere gli euro e chi compra non ha mai
+#    segnato «pagato» ne' aperto una disputa, a chi COMPRA si conta un
+#    `mancato` — lo stesso esito del primo gesto mancato, con la stessa
+#    tolleranza, lo stesso marchio e lo stesso filtro. Senza recapito
+#    non si conta a nessuno: non aveva dove mandarli.
+# c) LA SCUSA DEL TENTATIVO VALE UNA VOLTA OGNI P2P_SCUSA_FINESTRA_S: chi
+#    lascia scadere il primo gesto ma «ci ha provato» resta scusato, e
+#    la scusa si SCRIVE (`scusato`); se nella finestra ne ha gia' una, il
+#    giro si conta. Prima bastava aprire il foglio della garanzia ogni
+#    volta per non essere mai contati.
+# d) GLI EURO IN SOSPESO: chi ha gia' P2P_EURO_SOSPESI_MAX scambi in cui
+#    chi vende aspetta i suoi euro da piu' di P2P_EURO_SOSPESI_DOPO_S non
+#    ne prende un altro (motivo `sospesi`). Dare una fattura e' gratis:
+#    senza questo, chi compra poteva tenere ferme le garanzie di molti.
+#    Il giudice e' lo stesso del sollecito degli euro
+#    (`_sollecito_euro_p2p_fermo`), e come lui non guarda gli ordini che
+#    si possono pagare in contanti di persona.
+# Quel che RESTA COM'ERA, per decisione di Andrea: mai a chi ha
+# pubblicato e non prosegue (`maker-timeout`), e nessun controllo sugli
+# scambi fra gli stessi due account.
+P2P_DISPUTE_FINESTRA_S = 90 * 86400   # la finestra del marchio «dispute perse»
+P2P_SCUSA_FINESTRA_S = 30 * 86400     # una scusa del tentativo ogni 30 giorni
+P2P_EURO_SOSPESI_MAX = 2              # scambi con gli euro in sospeso, insieme
+P2P_EURO_SOSPESI_DOPO_S = 3600        # da quando la garanzia bloccata «aspetta»
+P2P_EURO_SOSPESI_FINO_S = 4 * 86400   # oltre, la garanzia non c'e' piu'
 
 
 def _primo_gesto_p2p(preso_dal: str) -> str:
@@ -45206,6 +45256,155 @@ def _ha_provato_p2p(con, tg_id, ordine: str, dal: int) -> bool:
                     int(dal or 0) - P2P_TENTATIVO_MARGINE_S)).fetchone() is not None
 
 
+def _colpa_disputa_p2p(con, ordine: str, giro: int, esito: str) -> bool:
+    """IL MODERATORE HA SEGNATO LA COLPA A CHI PERDE? (10 ott 2026, «I
+    MALUS DOPO LA GARANZIA», a). Pura sulla connessione. `esito` e' dove
+    sono andati i sats secondo MOSTROD ('compratore' | 'venditore').
+    Vale l'ULTIMA decisione a registro con quello STESSO esito — la
+    regola dell'allarme: il registro le tiene tutte, e a contare e'
+    quella che il coordinatore ha poi eseguito — e la colpa e' la riga
+    `colpa` scritta INSIEME a lei (stesso moderatore, stesso istante),
+    che nomina chi perde. Solo per la disputa di QUESTO giro. Un database
+    senza le tabelle delle dispute — i banchi di ieri — vale «nessuna
+    colpa»."""
+    try:
+        d = con.execute("SELECT giro FROM p2p_dispute WHERE ordine=?",
+                        (ordine,)).fetchone()
+        if not d or int(d[0] or 0) != int(giro or 0):
+            return False
+        r = con.execute(
+            "SELECT tg_id, quando FROM p2p_dispute_registro WHERE ordine=? "
+            "AND gesto='decisione' AND esito=? ORDER BY id DESC LIMIT 1",
+            (ordine, esito)).fetchone()
+        if not r:
+            return False
+        perde = "venditore" if esito == "compratore" else "compratore"
+        return con.execute(
+            "SELECT 1 FROM p2p_dispute_registro WHERE ordine=? AND gesto='colpa' "
+            "AND esito=? AND tg_id=? AND quando=? LIMIT 1",
+            (ordine, perde, r[0], r[1])).fetchone() is not None
+    except sqlite3.OperationalError:
+        return False
+
+
+def _esiti_dopo_garanzia_p2p(con, ev: dict, fatto: dict) -> list:
+    """GLI ESITI CHE NASCONO DOPO LA GARANZIA BLOCCATA (10 ott 2026, «I
+    MALUS DOPO LA GARANZIA», a e b). Pura sulla connessione; torna le
+    righe di journal. NON COMMITTA: lo fa `_segna_esiti_p2p`, che la
+    chiama.
+    • la disputa chiusa da un MODERATORE — `released` o `canceled` di
+      `mostro` col dettaglio `admin`, che e' come la patch 0007 racconta
+      `admin-settle` e `admin-cancel` —: se a registro la decisione
+      porta la colpa (`_colpa_disputa_p2p`), a chi ha perso si scrive
+      `disputa_persa`. Chi non e' dei nostri vale 0 e non si scrive.
+    • la garanzia arrivata a scadenza (`escrow-deadline`): `mancato` a
+      chi COMPRA, ma solo se in questo giro la garanzia era bloccata, chi
+      vende aveva detto dove ricevere gli euro (la sua dichiarazione in
+      cronaca, o l'avviso del recapito gia' partito: lo stesso doppio
+      sguardo di `_dati_frase_p2p`) e non c'e' ne' un «pagato» ne' una
+      disputa. In ogni altro caso non si conta a nessuno, e il journal
+      dice perche'."""
+    righe = []
+    ordine, giro = ev["ordine"], int(fatto.get("giro") or 0)
+    momento, ts = str(fatto.get("momento") or ""), int(ev["ts"])
+    compra = int(fatto.get("compratore") or 0)
+    vende = int(fatto.get("venditore") or 0)
+    corto = ordine[:8]
+    esito = ""
+    if ev.get("attore") == "mostro" and ev.get("dettaglio") == "admin":
+        esito = {"rilasciato": "compratore", "annullato": "venditore"}.get(momento, "")
+    if esito and _colpa_disputa_p2p(con, ordine, giro, esito):
+        tg, ruolo = (vende, "vende") if esito == "compratore" else (compra, "compra")
+        if not tg:
+            righe.append(f"· Reputazione P2P: {corto} disputa chiusa con la colpa a "
+                         "chi perde, che non e' dei nostri: non si scrive")
+        elif con.execute(
+                "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, "
+                "quando, dettaglio) VALUES(?,?,?,'disputa_persa',?,?,'admin')",
+                (tg, ordine, giro, ruolo, ts)).rowcount:
+            righe.append(f"⚖️ Reputazione P2P: a {tg} si segna una disputa persa "
+                         f"({corto}, giro {giro}: lo ha deciso il moderatore, a registro)")
+    if momento == "annullato" and ev.get("dettaglio") == "escrow-deadline":
+        nomi = {r[0] for r in con.execute(
+            "SELECT DISTINCT momento FROM p2p_momenti WHERE ordine=? AND giro=?",
+            (ordine, giro))}
+        detto = "recapito" in nomi or con.execute(
+            "SELECT 1 FROM p2p_avvisi WHERE ordine=? AND giro=? AND momento LIKE "
+            "'recapito%' LIMIT 1", (ordine, giro)).fetchone() is not None
+        if not compra:
+            perche = "chi compra non e' dei nostri"
+        elif "garanzia_pagata" not in nomi:
+            perche = "la garanzia bloccata in questo giro non risulta"
+        elif nomi & {"fiat", "disputa"}:
+            perche = "c'era un «pagato» o una disputa"
+        elif not detto:
+            perche = "chi vende non aveva detto dove ricevere gli euro"
+        else:
+            perche = ""
+        if perche:
+            righe.append(f"· Reputazione P2P: {corto} garanzia arrivata a scadenza, "
+                         f"ma {perche}: non si conta a nessuno")
+        elif con.execute(
+                "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, "
+                "quando, dettaglio) VALUES(?,?,?,'mancato','compra',?,'escrow-deadline')",
+                (compra, ordine, giro, ts)).rowcount:
+            righe.append(f"⚠️ Reputazione P2P: a {compra} si conta uno scambio non "
+                         f"completato ({corto}, giro {giro}: garanzia arrivata a "
+                         "scadenza senza gli euro segnati, col recapito detto)")
+    return righe
+
+
+def _marchi_dispute_p2p(con, ids, adesso: int) -> dict:
+    """`{tg_id: n}` delle dispute perse con colpa negli ultimi
+    P2P_DISPUTE_FINESTRA_S, in UNA query per tutte le persone chieste —
+    da UNA in su, senza tolleranza. Il gemello di `_marchi_mancati_p2p`,
+    e come lui un database senza la tabella vale «nessun marchio»."""
+    ids = sorted({int(i) for i in ids or [] if i})
+    if not ids:
+        return {}
+    segni = ",".join("?" * len(ids))
+    try:
+        righe = con.execute(
+            f"SELECT tg_id, COUNT(*) AS n FROM p2p_esiti WHERE esito='disputa_persa' "
+            f"AND quando>=? AND tg_id IN ({segni}) GROUP BY tg_id",
+            [int(adesso) - P2P_DISPUTE_FINESTRA_S] + ids).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    return {int(r[0]): int(r[1]) for r in righe if int(r[1] or 0) > 0}
+
+
+def _euro_sospesi_p2p(con, tg_id, adesso: int) -> int:
+    """IN QUANTI SCAMBI chi vende aspetta gli euro di questa persona da
+    piu' di P2P_EURO_SOSPESI_DOPO_S (10 ott 2026, «I MALUS DOPO LA
+    GARANZIA», d). Pura sulla connessione. A dire che tocca a lei e' LO
+    STESSO giudice del sollecito degli euro (`_sollecito_euro_p2p_fermo`:
+    scambio «attivo» nel giro corrente, recapito detto), e come il
+    sollecito non guarda gli ordini che si possono pagare in contanti di
+    persona. Una garanzia piu' vecchia di P2P_EURO_SOSPESI_FINO_S non
+    c'e' piu', e non conta."""
+    tg = int(tg_id or 0)
+    if not tg:
+        return 0
+    n = 0
+    for s in con.execute("SELECT ordine, giro FROM p2p_scambi WHERE compratore=? "
+                         "AND venditore<>?", (tg, tg)).fetchall():
+        giro = int(s[1] or 0)
+        g = int(con.execute(
+            "SELECT MAX(quando) FROM p2p_momenti WHERE ordine=? AND giro=? AND "
+            "momento='garanzia_pagata' AND fonte='mostro'",
+            (s[0], giro)).fetchone()[0] or 0)
+        if not g or g > int(adesso) - P2P_EURO_SOSPESI_DOPO_S \
+                or g < int(adesso) - P2P_EURO_SOSPESI_FINO_S:
+            continue
+        o = con.execute("SELECT metodi FROM p2p_ordini WHERE ordine=?", (s[0],)).fetchone()
+        if "Contanti" in _metodi_libro(_metodi_lista_p2p(o[0] if o else "")):
+            continue
+        if _sollecito_euro_p2p_fermo(con, {"ordine": s[0], "giro": giro}):
+            continue
+        n += 1
+    return n
+
+
 def _segna_esiti_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     """GLI ESITI DA UN EVENTO NUOVO di mostrod (`fatto` e' quel che torna
     `_registra_evento_p2p`: momento, giro, le due parti, preso_dal).
@@ -45223,8 +45422,20 @@ def _segna_esiti_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     ordine, giro = ev["ordine"], int(fatto.get("giro") or 0)
     compra = int(fatto.get("compratore") or 0)
     vende = int(fatto.get("venditore") or 0)
+    # DOPO LA GARANZIA (10 ott 2026, «I MALUS DOPO LA GARANZIA»): la
+    # disputa persa con colpa e la garanzia arrivata a scadenza
+    righe.extend(_esiti_dopo_garanzia_p2p(con, ev, fatto))
     if fatto.get("momento") == "concluso":
         for tg, ruolo in ((compra, "compra"), (vende, "vende")):
+            # ...e a chi ha PERSO LA DISPUTA CON COLPA questo scambio non
+            # vale come completato, anche se i sats sono arrivati a chi
+            # compra: la riga l'ha scritta il rilascio del moderatore
+            if tg and con.execute(
+                    "SELECT 1 FROM p2p_esiti WHERE tg_id=? AND ordine=? AND giro=? "
+                    "AND esito='disputa_persa'", (tg, ordine, giro)).fetchone():
+                righe.append(f"· Reputazione P2P: {ordine[:8]} concluso, ma a {tg} "
+                             "non vale come completato: ha perso la disputa con colpa")
+                continue
             if tg:
                 con.execute(
                     "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, "
@@ -45233,6 +45444,7 @@ def _segna_esiti_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         con.commit()
         return righe
     if not (ev.get("azione") == "expired" and ev.get("dettaglio") == "taker-timeout"):
+        con.commit()
         return righe
     lato = fatto.get("preso_dal") or ""
     tg, ruolo = {"buyer": (compra, "compra"), "seller": (vende, "vende")}.get(lato, (0, ""))
@@ -45251,19 +45463,37 @@ def _segna_esiti_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     presa = con.execute(
         "SELECT MAX(quando) FROM p2p_momenti WHERE ordine=? AND giro=? "
         "AND momento='preso' AND fonte='mostro'", (ordine, giro)).fetchone()[0]
+    dettaglio = ev.get("dettaglio") or ""
     if _ha_provato_p2p(con, tg, ordine, int(presa or 0) or int(ev["ts"]) - P2P_PRESA_APERTA_S):
-        righe.append(f"· Reputazione P2P: {ordine[:8]} tornato in vetrina, ma {tg} "
-                     f"ha provato a {'dare la fattura' if ruolo == 'compra' else 'bloccare la garanzia'}: "
-                     f"non si conta")
-        return righe
+        # LA SCUSA VALE UNA VOLTA OGNI P2P_SCUSA_FINESTRA_S (10 ott 2026, «I
+        # MALUS DOPO LA GARANZIA», c): la prima si scrive, e scusa; se
+        # nella finestra ce n'e' gia' una di un ALTRO giro, questo si conta
+        gia = con.execute(
+            "SELECT 1 FROM p2p_esiti WHERE tg_id=? AND esito='scusato' AND quando>=? "
+            "AND NOT (ordine=? AND giro=?) LIMIT 1",
+            (tg, int(ev["ts"]) - P2P_SCUSA_FINESTRA_S, ordine, giro)).fetchone()
+        if not gia:
+            con.execute(
+                "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, "
+                "quando, dettaglio) VALUES(?,?,?,'scusato',?,?,?)",
+                (tg, ordine, giro, ruolo, int(ev["ts"]), dettaglio))
+            con.commit()
+            righe.append(f"· Reputazione P2P: {ordine[:8]} tornato in vetrina, ma {tg} "
+                         f"ha provato a {'dare la fattura' if ruolo == 'compra' else 'bloccare la garanzia'}: "
+                         f"non si conta (la scusa del tentativo, una ogni "
+                         f"{P2P_SCUSA_FINESTRA_S // 86400} giorni)")
+            return righe
+        dettaglio += "+tentativo"
     con.execute(
         "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, quando, "
         "dettaglio) VALUES(?,?,?,'mancato',?,?,?)",
-        (tg, ordine, giro, ruolo, int(ev["ts"]), ev.get("dettaglio") or ""))
+        (tg, ordine, giro, ruolo, int(ev["ts"]), dettaglio))
     con.commit()
     righe.append(f"⚠️ Reputazione P2P: a {tg} si conta uno scambio non completato "
                  f"({ordine[:8]}, giro {giro}: non ha "
-                 f"{'dato la fattura' if ruolo == 'compra' else 'bloccato la garanzia'} in tempo)")
+                 f"{'dato la fattura' if ruolo == 'compra' else 'bloccato la garanzia'} in tempo"
+                 + (", e la scusa del tentativo l'aveva gia' usata"
+                    if dettaglio.endswith("+tentativo") else "") + ")")
     return righe
 
 
@@ -45280,7 +45510,10 @@ def _reputazione_p2p(con, tg_id, adesso: int) -> dict:
             (tg, esito, int(dal))).fetchone()[0] or 0)
     return {"completati": conta("completato", 0),
             "mancati": conta("mancato", adesso - P2P_MANCATI_FINESTRA_S),
-            "mancati_30": conta("mancato", adesso - P2P_MANCATI_FILTRO_S)}
+            "mancati_30": conta("mancato", adesso - P2P_MANCATI_FILTRO_S),
+            # le dispute perse con colpa nella loro finestra (10 ott 2026,
+            # malus-p2p): le guarda il filtro, senza tolleranza
+            "dispute_90": conta("disputa_persa", adesso - P2P_DISPUTE_FINESTRA_S)}
 
 
 def _marchi_mancati_p2p(con, ids, adesso: int) -> dict:
@@ -45350,6 +45583,10 @@ def _giudice_presa_p2p(soglia, rep: dict, prese_aperte) -> tuple:
             return False, "filtro"
         if int((rep or {}).get("mancati_30") or 0) > P2P_MANCATI_TOLLERATI:
             return False, "mancati"
+        # ...e una disputa persa con colpa negli ultimi 90 giorni, da UNA
+        # (10 ott 2026, malus-p2p, decisione di Andrea): nessuna tolleranza
+        if int((rep or {}).get("dispute_90") or 0) > 0:
+            return False, "dispute"
     return True, ""
 
 
@@ -45419,14 +45656,31 @@ def _posso_prendere_p2p(con, io, ordini, adesso: int) -> dict:
     rep = _reputazione_p2p(con, io, adesso)
     prese = _prese_aperte_p2p(con, io, adesso)
     filtri = _filtri_p2p(con, pulite) if pulite else {}
+    # GLI EURO IN SOSPESO (10 ott 2026, «I MALUS DOPO LA GARANZIA», d): si
+    # giudicano PRIMA di tutto e valgono su ogni ordine. Un conto che non
+    # riesce non chiude la porta a nessuno: vale zero
+    try:
+        sospesi = _euro_sospesi_p2p(con, io, adesso)
+    except Exception:
+        sospesi = 0
     fuori = {}
     for o in pulite:
+        if sospesi >= P2P_EURO_SOSPESI_MAX:
+            fuori[o] = {"ok": False, "motivo": "sospesi", "soglia": filtri.get(o, 0)}
+            continue
         ok, motivo = _giudice_presa_p2p(filtri.get(o, 0), rep, prese)
         fuori[o] = {"ok": ok, "motivo": motivo, "soglia": filtri.get(o, 0)}
     return {"ordini": fuori, "completati": rep["completati"],
             "mancati": _marchio_mancati_p2p(rep["mancati"]),
             "mancati_30": rep["mancati_30"], "prese_aperte": prese,
             "limite": P2P_PRESE_APERTE_MAX, "tollerati": P2P_MANCATI_TOLLERATI,
+            # gli euro in sospeso e il loro tetto, e le mie dispute perse
+            # (10 ott 2026, malus-p2p)
+            "euro_sospesi": sospesi, "limite_sospesi": P2P_EURO_SOSPESI_MAX,
+            "dispute": _marchi_dispute_p2p(con, [io], adesso).get(int(io or 0), 0),
+            # ...e fino a quando una disputa persa mi tiene fuori dagli
+            # ordini con filtro (0 = non bloccato)
+            "fino_dispute": _blocco_dispute_fino_p2p(con, io, adesso),
             # fino a quando il filtro non lo accetta (0 = non bloccato), per
             # la riga «Potrai riprenderli dal …» del riquadro del veto
             "fino": _blocco_filtro_fino_p2p(con, io, adesso)}
@@ -45480,6 +45734,45 @@ def _blocco_filtro_fino_p2p(con, tg_id, adesso: int) -> int:
     return int(righe[P2P_MANCATI_TOLLERATI][0]) + P2P_MANCATI_FILTRO_S
 
 
+def _blocco_dispute_fino_p2p(con, tg_id, adesso: int) -> int:
+    """FINO A QUANDO il filtro di chi pubblica non accetta questa persona
+    per una DISPUTA PERSA (10 ott 2026, malus-p2p): 0 se non ne ha nella
+    finestra. Senza tolleranza: il blocco finisce quando la PIU' RECENTE
+    esce dai P2P_DISPUTE_FINESTRA_S. Pura sulla connessione; il gemello di
+    `_blocco_filtro_fino_p2p`, e lo stesso conto di `_giudice_presa_p2p`
+    letto come una data."""
+    r = con.execute(
+        "SELECT MAX(quando) FROM p2p_esiti WHERE tg_id=? AND esito='disputa_persa' "
+        "AND quando>=?", (int(tg_id or 0), int(adesso) - P2P_DISPUTE_FINESTRA_S)).fetchone()
+    return int(r[0]) + P2P_DISPUTE_FINESTRA_S if r and r[0] else 0
+
+
+def _riga_disputa_persa_p2p(fino_testo: str) -> str:
+    """PURA: LA RIGA A CHI HA PERSO UNA DISPUTA CON COLPA (10 ott 2026,
+    malus-p2p; la frase e' di Andrea). In coda al messaggio della
+    chiusura e nell'archivio dell'app: UNA frase, scritta qui. Con la
+    data (`fino_testo`, «8 gennaio») dice anche fino a quando gli ordini
+    col filtro non si prendono; i giorni sono quelli di
+    P2P_DISPUTE_FINESTRA_S, e una prova lo tiene vero."""
+    testo = ("Il moderatore ha segnato la disputa come persa per te: comparirà "
+             "sul tuo profilo per 90 giorni.")
+    if fino_testo:
+        testo += (f" Fino al {fino_testo} non puoi prendere gli ordini con filtro "
+                  "(1+, 3+, 5+); gli altri sì.")
+    return testo
+
+
+# LE DUE FRASI DELLA SCUSA DEL TENTATIVO (10 ott 2026, malus-p2p): a chi
+# e' stato scusato, e — davanti alla riga del conto — a chi la scusa
+# l'aveva gia' usata. I giorni sono quelli di P2P_SCUSA_FINESTRA_S, e una
+# prova lo tiene vero.
+P2P_RIGA_SCUSA = ("Questa volta non conta: risulta che ci hai provato. Vale una "
+                  "volta ogni 30 giorni: alla prossima, anche provandoci, conta "
+                  "come scambio non completato.")
+P2P_RIGA_SCUSA_USATA = ("Risulta che ci hai provato, ma quella scusa vale una "
+                        "volta ogni 30 giorni e l'hai già usata. ")
+
+
 def _riga_conto_p2p(contato: bool, n: int, fino_testo: str) -> str:
     """PURA: LA RIGA DEL CONTO a chi ha preso e non ha proseguito, detta
     chiara e gentile (10 ott 2026, richiesta di Andrea; l'avviso del
@@ -45520,11 +45813,32 @@ def _conto_esito_p2p(con, tg_id, ordine: str, giro: int, adesso: int) -> dict:
     riga in piu'."""
     vuoto = {"contato": False, "mancati": 0, "fino": 0, "fino_testo": "", "riga": ""}
     try:
+        # LA DISPUTA PERSA DI QUESTO GIRO (10 ott 2026, malus-p2p): non e'
+        # un «non completato» — `contato` resta falso —, ma la riga c'e',
+        # con la data del SUO blocco: la leggono il messaggio della
+        # chiusura e l'archivio (`persa` dice che e' lei)
+        if con.execute(
+                "SELECT 1 FROM p2p_esiti WHERE tg_id=? AND ordine=? AND giro=? "
+                "AND esito='disputa_persa'",
+                (int(tg_id or 0), ordine, int(giro or 0))).fetchone():
+            fino_d = _blocco_dispute_fino_p2p(con, tg_id, adesso)
+            td = time.localtime(fino_d) if fino_d else None
+            return dict(vuoto, persa=True, riga=_riga_disputa_persa_p2p(
+                f"{td.tm_mday} {MESI_IT[td.tm_mon - 1]}" if td else ""))
         contato = con.execute(
-            "SELECT 1 FROM p2p_esiti WHERE tg_id=? AND ordine=? AND giro=? AND esito='mancato'",
-            (int(tg_id or 0), ordine, int(giro or 0))).fetchone() is not None
+            "SELECT dettaglio FROM p2p_esiti WHERE tg_id=? AND ordine=? AND giro=? AND esito='mancato'",
+            (int(tg_id or 0), ordine, int(giro or 0))).fetchone()
         if not contato:
+            # LA SCUSA DEL TENTATIVO, DETTA (10 ott 2026, malus-p2p): il
+            # giro non e' contato, ma chi e' stato scusato deve sapere che
+            # vale una volta sola nella finestra
+            if con.execute(
+                    "SELECT 1 FROM p2p_esiti WHERE tg_id=? AND ordine=? AND giro=? "
+                    "AND esito='scusato'",
+                    (int(tg_id or 0), ordine, int(giro or 0))).fetchone():
+                return dict(vuoto, riga=P2P_RIGA_SCUSA)
             return vuoto
+        negata = str(contato[0] or "").endswith("+tentativo")
         n = int(con.execute(
             "SELECT COUNT(*) FROM p2p_esiti WHERE tg_id=? AND esito='mancato' AND quando>=?",
             (int(tg_id or 0), int(adesso) - P2P_MANCATI_FINESTRA_S)).fetchone()[0] or 0)
@@ -45534,7 +45848,8 @@ def _conto_esito_p2p(con, tg_id, ordine: str, giro: int, adesso: int) -> dict:
     t = time.localtime(fino) if fino else None
     fino_testo = f"{t.tm_mday} {MESI_IT[t.tm_mon - 1]}" if t else ""
     return {"contato": True, "mancati": n, "fino": fino, "fino_testo": fino_testo,
-            "riga": _riga_conto_p2p(True, n, fino_testo)}
+            "riga": (P2P_RIGA_SCUSA_USATA if negata else "")
+            + _riga_conto_p2p(True, n, fino_testo)}
 
 
 
@@ -45726,6 +46041,8 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
     # IL MARCHIO «⚠️ N NON COMPLETATI» (10 ott 2026, reputazione-p2p): una
     # query per tutti gli autori, e la chiave c'e' SOLO da due in su
     marchi = _marchi_mancati_p2p(con, [r["autore"] for r in righe], adesso)
+    # le dispute perse con colpa (10 ott 2026, malus-p2p), accanto
+    perse = _marchi_dispute_p2p(con, [r["autore"] for r in righe], adesso)
     fuori = {}
     for r in righe:
         voti = int(r["n_feedback"] or 0)
@@ -45747,6 +46064,8 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
             volto["giorni"] = max(0, (adesso - iscritto) // 86400)
         if marchi.get(int(r["autore"] or 0)):
             volto["mancati"] = marchi[int(r["autore"] or 0)]
+        if perse.get(int(r["autore"] or 0)):
+            volto["dispute"] = perse[int(r["autore"] or 0)]
         fuori[r["ordine"]] = volto
     return fuori
 
@@ -45850,6 +46169,8 @@ def _volti_persone(con, ids, adesso) -> dict:
     # il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p):
     # «vale ovunque», e la card dell'altra parte e' uno dei posti
     marchi = _marchi_mancati_p2p(con, ids, adesso)
+    # le dispute perse con colpa (10 ott 2026, malus-p2p), accanto
+    perse = _marchi_dispute_p2p(con, ids, adesso)
     volti = {}
     for u in con.execute(
             f"SELECT tg_id, nome, username, npub, npub_verificata, "
@@ -45888,6 +46209,8 @@ def _volti_persone(con, ids, adesso) -> dict:
             chi["giorni"] = max(0, (adesso - iscritto) // 86400)
         if marchi.get(int(u["tg_id"])):
             chi["mancati"] = marchi[int(u["tg_id"])]
+        if perse.get(int(u["tg_id"])):
+            chi["dispute"] = perse[int(u["tg_id"])]
         volti[int(u["tg_id"])] = chi
     return volti
 
@@ -52412,8 +52735,12 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
     if momento == "rilasciato":
         # solo il moderatore arriva qui: il rilascio di chi vende non
         # avvisa nessuno (vedi `_destinatari_evento_p2p`)
+        # ...e a chi l'ha persa con colpa, in coda, la sua riga (10 ott
+        # 2026, malus-p2p): arriva nei dati gia' fatta
         return ("⚖️ <b>Un moderatore ha chiuso la disputa: i sats vanno a "
-                "chi compra.</b>")
+                "chi compra.</b>"
+                + ("\n\n" + str(dati.get("riga_persa") or "")
+                   if dati.get("persa_di") == ruolo and dati.get("riga_persa") else ""))
     if momento == "annullo_chiesto":
         return (f"↩️ <b>{altro} chiede di annullare lo scambio.</b> Se sei "
                 "d'accordo, annulla anche tu dalla pagina dello scambio; se "
@@ -52440,7 +52767,9 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
             return (f"❌ <b>{altro} ha accettato di annullare: lo scambio è "
                     f"annullato.</b>{coda}")
         if dettaglio == "admin":
-            return f"⚖️ <b>Un moderatore ha annullato lo scambio.</b>{coda}"
+            return (f"⚖️ <b>Un moderatore ha annullato lo scambio.</b>{coda}"
+                    + ("\n\n" + str(dati.get("riga_persa") or "")
+                       if dati.get("persa_di") == ruolo and dati.get("riga_persa") else ""))
         if dettaglio == "maker-timeout" and maker:
             return ("⏰ <b>Non hai proseguito in tempo:</b> il tuo ordine è "
                     "stato annullato. Puoi ripubblicarlo quando vuoi.")
@@ -52448,8 +52777,12 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
             return ("⏰ <b>Chi aveva pubblicato l'ordine non ha proseguito in "
                     f"tempo:</b> lo scambio è annullato, non devi fare niente.{tornati}")
         if dettaglio == "escrow-deadline":
+            # ...e a chi compra, se gli e' stato contato, la riga del conto
+            # (10 ott 2026, malus-p2p): arriva nei dati gia' fatta
+            conto = "" if vende else str(dati.get("conto_compra") or "")
             return ("⏰ <b>La garanzia è arrivata a scadenza: lo scambio è "
-                    "annullato.</b>" + (tornati or " I sats tornano a chi vende."))
+                    "annullato.</b>" + (tornati or " I sats tornano a chi vende.")
+                    + ("\n\n" + conto if conto else ""))
         return f"❌ <b>{altro} ha annullato lo scambio.</b>{coda}"
     if momento == "tornato":
         if dettaglio == "republished":
@@ -52650,6 +52983,31 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
                 dati["conto"] = _conto_esito_p2p(con, chi_preso, ordine, giro, adesso)["riga"]
             except Exception:
                 dati["conto"] = ""
+    # LA DISPUTA PERSA, A CHI L'HA PERSA (10 ott 2026, malus-p2p, decisione
+    # di Andrea): quando la chiusura e' di un moderatore, a chi su questo
+    # giro ha la riga `disputa_persa` (`_segna_esiti_p2p` gira prima di
+    # qui, nella rotta) la frase porta in coda la sua riga. Nei banchi di
+    # ieri il giudice non c'e', e tace
+    if (momento in ("rilasciato", "annullato") and ev.get("attore") == "mostro"
+            and ev.get("dettaglio") == "admin"):
+        for tg_p, ruolo_p in ((fatto["compratore"], "compra"), (fatto["venditore"], "vende")):
+            try:
+                c = _conto_esito_p2p(con, tg_p, ordine, giro, adesso) if tg_p else {}
+            except Exception:
+                c = {}
+            if c.get("persa"):
+                dati["persa_di"], dati["riga_persa"] = ruolo_p, c["riga"]
+    # LA GARANZIA ARRIVATA A SCADENZA, A CHI COMPRA (10 ott 2026, malus-
+    # p2p): se questo giro gli e' stato contato, la stessa riga del conto
+    # — con davanti il fatto. Nei banchi di ieri il giudice non c'e', e tace
+    if (momento == "annullato" and ev.get("dettaglio") == "escrow-deadline"
+            and fatto["compratore"]):
+        try:
+            c = _conto_esito_p2p(con, fatto["compratore"], ordine, giro, adesso)
+            dati["conto_compra"] = ("Gli euro non risultano inviati. " + c["riga"]
+                                    if c["contato"] else "")
+        except Exception:
+            dati["conto_compra"] = ""
     lato_maker = {"buyer": "vende", "seller": "compra"}.get(fatto["preso_dal"], "")
     fuori = []
 
@@ -53316,6 +53674,11 @@ def _decisione_disputa_p2p(con, io: int, d: dict, adesso: int) -> tuple:
     # LA CAUZIONE (1 ott 2026): di chi si brucia — 'compratore' |
     # 'venditore' — o vuota (nessuna: e' il caso di sempre)
     cauzione = str(d.get("cauzione") or "")
+    # LA COLPA A CHI PERDE (10 ott 2026, malus-p2p): un `true` letterale,
+    # come la conferma. Chi perde lo dice l'esito: e' il lato che i sats
+    # NON li riceve
+    colpa = ({"compratore": "venditore", "venditore": "compratore"}.get(esito, "")
+             if d.get("colpa") is True else "")
     if not FORMA_ORDINE_P2P.fullmatch(ordine) or esito not in P2P_DISPUTA_ESITI:
         return (400, "Richiesta non valida")
     if cauzione and cauzione not in P2P_DISPUTA_ESITI:
@@ -53353,8 +53716,16 @@ def _decisione_disputa_p2p(con, io: int, d: dict, adesso: int) -> tuple:
     if cauzione:
         _registro_disputa_p2p(con, ordine, "cauzione", io, adesso, esito=cauzione,
                               motivo=motivo, chiave=chiave)
+    # ...e la colpa la sua, con lo STESSO istante della decisione: e' da
+    # li' che `_colpa_disputa_p2p` la ritrova. `esito` dice chi perde.
+    if colpa:
+        _registro_disputa_p2p(con, ordine, "colpa", io, adesso, esito=colpa,
+                              motivo=motivo, chiave=chiave)
     con.commit()
-    return (200, {"ok": True, "esito": esito, "cauzione": cauzione})
+    # (la chiave `colpa` c'e' SOLO quando la colpa e' segnata: senza
+    # spunta la risposta resta quella di sempre)
+    return (200, dict({"ok": True, "esito": esito, "cauzione": cauzione},
+                      **({"colpa": colpa} if colpa else {})))
 
 
 def _esito_gesto_disputa_p2p(con, io: int, ordine, esito, motivo, adesso: int) -> tuple:

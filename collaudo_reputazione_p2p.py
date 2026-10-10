@@ -88,7 +88,10 @@ async def posta(b):
 def esiti(tg):
     con = banco.con_db()
     r = [tuple(x) for x in con.execute(
-        "SELECT esito, ordine FROM p2p_esiti WHERE tg_id=? ORDER BY quando, esito", (tg,))]
+        # (10 ott 2026, malus-p2p) la scusa del tentativo ora si SCRIVE
+        # (`scusato`): ha il suo collaudo, e qui resta fuori dal conto
+        "SELECT esito, ordine FROM p2p_esiti WHERE tg_id=? AND esito<>'scusato' "
+        "ORDER BY quando, esito", (tg,))]
     con.close()
     return r
 
@@ -218,8 +221,11 @@ async def giro():
           t0 + 400 + 30 * 86400, r["fino"])
     banco.come(TAKER)
     arch = (await chiama(SRV.scambi_p2p, {}))["scambi"]
-    prova("...l'archivio porta la riga del conto sul giro contato, non sugli altri",
-          [True, ""],
+    # (emendata il 10 ott 2026, malus-p2p: sul giro SCUSATO dal tentativo
+    # l'archivio ora porta la riga che lo dice — vale una volta ogni 30 giorni)
+    prova("...l'archivio porta la riga del conto sul giro contato, e su quello scusato "
+          "la riga della scusa",
+          [True, SRV.P2P_RIGA_SCUSA],
           ["Fino al " in arch[C]["conto"] and "sono 2 negli ultimi 90 giorni" in arch[C]["conto"],
            arch[B]["conto"]])
     banco.come(MAKER)

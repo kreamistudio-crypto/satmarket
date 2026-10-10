@@ -280,11 +280,18 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
      ha pubblicato quest'ordine accetta solo chi ha almeno 3 scambi
      completati (tu ne hai 1).», oppure «🚫 Quest'ordine accetta solo chi
      non ha scambi non completati negli ultimi 30 giorni: tu ne hai 2.
-     Potrai riprenderli dal 12 novembre.»,
+     Potrai riprenderli dal 12 novembre.», oppure — dal 10 ott 2026 —
+     «🚫 Quest'ordine accetta solo chi non ha dispute perse negli ultimi
+     90 giorni: tu ne hai 1. Potrai riprenderli dal 8 gennaio.»,
      oppure — su qualunque ordine — «🚫 Hai già 2 scambi presi in attesa
      del tuo primo gesto: finiscili (o lascia che scadano) prima di
-     prenderne un altro.»; una presa partita lo stesso si ferma con lo
-     stesso avviso in un toast;
+     prenderne un altro.», oppure — dal 10 ott 2026, sempre su qualunque
+     ordine — «🚫 Hai già 2 scambi in cui chi vende aspetta i tuoi euro
+     da più di un'ora: inviali (o annulla quegli scambi) prima di
+     prenderne un altro.» (contano gli scambi con la garanzia bloccata da
+     più di un'ora, il recapito ricevuto e gli euro non ancora segnati;
+     non quelli pagabili in contanti di persona); una presa partita lo
+     stesso si ferma con lo stesso avviso in un toast;
    - (solo contanti) la regola e il tetto, vedi §6;
    - «Chi ha pubblicato quest'ordine»: media, recensioni, volto (il
      tocco porta al suo negozio) e, dal 10 ott 2026, se ne ha almeno due
@@ -294,8 +301,9 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
      se vende, la fattura se compra —, mai a chi ha pubblicato, mai a
      chi ci ha provato);
    - (solo se chi ha pubblicato ha messo il filtro) «🛡️ Chi ha
-     pubblicato accetta solo chi ha almeno 3 scambi completati e nessuno
-     scambio non completato negli ultimi 30 giorni»;
+     pubblicato accetta solo chi ha almeno 3 scambi completati, nessuno
+     scambio non completato negli ultimi 30 giorni e nessuna disputa
+     persa negli ultimi 90»;
    - «Tempo rimasto: <6g 23:47:17>»;
    - il **conto**: «Controvalore di **50 €**», poi (se c'è) «Premio
      richiesto dall'utente» o «Sconto offerto dall'utente» e
@@ -435,7 +443,14 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
   è 30 giorni dopo il secondo mancato più recente; se nel mese ne hai
   uno solo: «Finché ce n'è più di uno nell'ultimo mese, chi pubblica con
   un filtro non ti accetta.»). Chi ci ha provato — fattura mandata,
-  anche rifiutata — non la riceve. Nell'app: «Il giro si è chiuso senza
+  anche rifiutata — è scusato, ma dal 10 ott 2026 **una volta ogni 30
+  giorni**, e glielo si dice: «Questa volta non conta: risulta che ci
+  hai provato. Vale una volta ogni 30 giorni: alla prossima, anche
+  provandoci, conta come scambio non completato.» Se la scusa l'ha già
+  usata nel mese il giro si conta, e la riga comincia così: «Risulta
+  che ci hai provato, ma quella scusa vale una volta ogni 30 giorni e
+  l'hai già usata. Questo conta come scambio non completato…».
+  Nell'app: «Il giro si è chiuso senza
   garanzia: l'ordine è tornato nel libro», e sotto, se ti è stato
   contato, la stessa riga del messaggio in un riquadro «⚠️».
 - Il pagamento dei sats non passa: ✈️ «⚠️ **Il pagamento dei sats non è
@@ -632,7 +647,8 @@ le sezioni in quest'ordine:
    «Tutti» (accesa di serie, e sotto niente), «1+ scambi», «3+ scambi»,
    «5+ scambi»; scelta una soglia, sotto una riga sola: «Solo chi ha
    completato almeno 3 scambi e non ha nessun «non completato» segnalato
-   negli ultimi 30 giorni.» (con 1: «…almeno 1 scambio e…»). Sulla card
+   negli ultimi 30 giorni né dispute perse negli ultimi 90.» (con 1:
+   «…almeno 1 scambio e…»). Sulla card
    del libro compare il segno piccolo «🛡️ Da 3 scambi completati».
 8. «Quanto si può, e quanto costa»: per esempio «Al momento si accettano
    ordini fino a 500 000 sats — la fee P2P è dell'1,5% per parte» (a un
@@ -1137,6 +1153,7 @@ tarda: controllo com'è andata…».
 | Un ordine Barattozon | fino a 2 h prima della scadenza del PayCode (mai oltre 72 h) | esce da solo, avviso dedicato (§7) |
 | Ogni passo dopo la presa | <n> minuti, letti dal coordinatore (15 fino al 10 ott 2026, poi 30) | «Preso l'ordine, **ogni passo ha <n> minuti**, e il primo tocca sempre a chi l'ha preso: se compri, dici dove vuoi i sats e poi chi vende li blocca; se vendi, blocchi i sats e poi chi compra dice dove li vuole. Il cronometro **riparte a ogni mossa**.» Se manca chi ha **preso**, l'ordine torna nel libro; se manca chi ha **pubblicato**, si chiude. Nessuno perde niente. |
 | La richiesta della cauzione | qualche minuto (lo dice il foglio) | l'ordine torna nel libro, va ripreso |
+| Sats in garanzia fino alla scadenza, col recapito ricevuto e gli euro mai segnati | circa quattro giorni | dal 10 ott 2026 a chi **compra** conta come scambio non completato. ✈️ in coda a «La garanzia è arrivata a scadenza…»: «Gli euro non risultano inviati. Questo conta come scambio non completato. Il primo è tollerato; …» (la riga di §3). Senza recapito, o col «pagato» segnato, o con una disputa, non si conta a nessuno. |
 | Sats già in garanzia | circa quattro giorni | «Coi sats in garanzia avete **circa quattro giorni**. Se chi compra non ha ancora detto di aver pagato, allo scadere i sats **tornano da soli a chi vende**; se l'ha detto, si apre una disputa.» Dal sorgente della 0.19.0: il coordinatore si muove a ~92 ore; una disputa già aperta e non decisa la chiude LND a ~94 ore, coi sats a chi vende. ✈️ «⏰ **La garanzia è arrivata a scadenza: lo scambio è annullato.** I sats tornano a chi vende.» |
 | Barattozon, dopo «pagato» | 24 ore «a vista» per chi vende | promemoria a 1, 6, 20 ore; poi nulla di automatico |
 | Sats in garanzia, euro non ancora segnati | nessuna scadenza prima dei quattro giorni | ✈️ a chi compra un promemoria a 1, 6 e 24 ore dalla garanzia bloccata (dal 10 ott 2026; non col contanti di persona) |
@@ -1270,6 +1287,26 @@ ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
   resta nel registro, col tuo nome.») e sceglie una delle due: «I sats
   vanno a chi compra» o «I sats tornano a chi vende» (nei contanti può
   anche spuntare «🔐 **Brucia la cauzione di …**»).
+- **La colpa a chi perde** (dal 10 ott 2026). Sopra il motivo c'è una
+  spunta, spenta di serie: «⚖️ **Segna la colpa a chi perde**: a chi non
+  riceve i sats viene segnata una **disputa persa**. Compare sul suo
+  profilo per 90 giorni, in quei 90 giorni non può prendere gli ordini
+  con filtro, e questo scambio non gli vale come completato. Lasciala
+  spenta se è stato un malinteso in buona fede.» Con la spunta, le due
+  conferme dicono chi è: «A chi vende viene segnata una disputa persa:
+  compare sul suo profilo per 90 giorni.» (o «A chi compra…», se i sats
+  tornano a chi vende). ✈️ **A chi perde lo si dice subito**, in coda al
+  suo messaggio di chiusura (qui sotto) e solo a lui: «Il moderatore ha
+  segnato la disputa come persa per te: comparirà sul tuo profilo per 90
+  giorni. Fino al 8 gennaio non puoi prendere gli ordini con filtro (1+,
+  3+, 5+); gli altri sì.» (la data è 90 giorni dopo la disputa persa più
+  recente). Da quel momento accanto al suo nome — sugli ordini che
+  pubblica, nella card che vede l'altra persona, nel negozio, nel suo
+  profilo di scambio — compare «⚖️ **1 disputa persa**» (nel riquadro:
+  «⚖️ 1 disputa persa negli ultimi 90 giorni»), già dalla prima; chi
+  pubblica con un filtro non lo accetta finché quella scritta c'è (il
+  riquadro arancio di §2 lo dice, con la data); e se i sats sono andati
+  a chi compra, a chi ha perso quello scambio non conta fra i completati.
 - **Cosa succede ai sats**: restano fermi in garanzia finché il
   moderatore non decide (o le parti non annullano d'accordo). Due strade
   sole. ✈️ Esiti: «⚖️ **Un moderatore ha chiuso la disputa: i sats vanno a
@@ -1333,7 +1370,9 @@ ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
   completati» se l'altra persona ne ha almeno due negli ultimi 90
   giorni: lo stesso marchio sta nel suo negozio, accanto ai feedback
   («· ⚠️ 2 non completati»). Le stelline restano quelle di sempre: il
-  contatore è una cosa a parte.
+  contatore è una cosa a parte. Negli stessi posti, dal 10 ott 2026,
+  «⚖️ 1 disputa persa» se un moderatore gliel'ha segnata negli ultimi
+  90 giorni (§10).
 
 ### La ✕ in «I miei scambi»
 

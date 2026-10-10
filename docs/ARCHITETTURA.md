@@ -30269,6 +30269,49 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   scartata nei tre casi, rifiutata nel catch) e `fatturaDalWalletP2P`.
   Dove si vede il marchio: `repRiquadroP2P`, `cardParte`,
   `renderNegozio`, `renderProfiloP2P`. Le stelline non si toccano.
+  I MALUS DOPO LA GARANZIA (10 ott 2026, cantiere malus-p2p): quattro
+  aggiunte agli esiti (`p2p_esiti`, stessa tabella, tre esiti nuovi
+  accanto a `completato` e `mancato`). a) `disputa_persa`: la decisione
+  del moderatore porta `colpa: true` (`_decisione_disputa_p2p`: un true
+  letterale, e a registro una riga `colpa` con lo STESSO istante della
+  decisione, che nomina chi perde — il lato che i sats non li riceve);
+  quando mostrod racconta `released`/`canceled` di `mostro` col
+  dettaglio `admin`, `_esiti_dopo_garanzia_p2p` (chiamata da
+  `_segna_esiti_p2p`, prima del concluso) chiede a `_colpa_disputa_p2p`
+  — l'ULTIMA decisione con quell'esito, la disputa di quel giro — e
+  scrive l'esito a chi ha perso; al `concluso` chi ha `disputa_persa`
+  su quel giro NON riceve `completato`. Il marchio lo cuce
+  `_marchi_dispute_p2p` (da una, 90 giorni: `P2P_DISPUTE_FINESTRA_S`)
+  accanto a quello dei mancati: `dispute` sui volti (`_facce_ordini_p2p`,
+  `_volti_persone`), `dispute_perse` in `/api/negozio`, `dispute` nei
+  numeri di `/api/p2p/posso-prendere`; nel client lo scrive
+  `marchioDisputeP2P`, negli stessi quattro posti. E BLOCCA DAL FILTRO
+  (decisione di Andrea prima del push): `_reputazione_p2p` porta
+  `dispute_90` e `_giudice_presa_p2p` — il giudice puro — risponde
+  `dispute` da UNA, solo sugli ordini con soglia, dopo `filtro` e
+  `mancati`; la data la dà `_blocco_dispute_fino_p2p` (la più recente
+  più 90 giorni) e viaggia come `fino_dispute`; `fraseVetoP2P` la scrive.
+  E SI DICE A CHI PERDE: `_riga_disputa_persa_p2p` (pura, UNA frase) la
+  serve `_conto_esito_p2p` (chiave `persa`), da cui la prendono
+  `_avvisi_evento_p2p` — in coda al messaggio della chiusura, `persa_di`
+  e `riga_persa` nei dati — e l'archivio dell'app. b) `mancato` con
+  dettaglio `escrow-deadline`: a chi COMPRA, se nel giro la garanzia
+  era bloccata, il recapito detto, e non c'è né `fiat` né `disputa`; il
+  messaggio a chi compra porta `conto_compra`. c) `scusato`: la scusa
+  del tentativo vale una volta ogni `P2P_SCUSA_FINESTRA_S`; la seconda
+  nella finestra dà `mancato` col dettaglio `taker-timeout+tentativo`, e
+  `_conto_esito_p2p` mette davanti alla riga `P2P_RIGA_SCUSA_USATA`
+  (`P2P_RIGA_SCUSA` a chi è scusato). d) gli euro in sospeso:
+  `_euro_sospesi_p2p` conta gli scambi in cui chi vende aspetta gli euro
+  di chi chiede da più di `P2P_EURO_SOSPESI_DOPO_S` (lo stesso giudice
+  del sollecito, `_sollecito_euro_p2p_fermo`; non il contanti di
+  persona), e `_posso_prendere_p2p` a `P2P_EURO_SOSPESI_MAX` risponde
+  `sospesi` PRIMA di `_giudice_presa_p2p`, che resta puro; un conto che
+  inciampa vale zero. Nel client: `fraseVetoP2P` (il quarto motivo), e
+  per il moderatore `colpaModP2P` (la spunta nella card, dopo la
+  cauzione), `colpaFraseModP2P` (le due conferme), `conColpaModP2P` (il
+  corpo della decisione porta `colpa` solo con la spunta). Il verbale:
+  CANTIERI, «I malus dopo la garanzia».
   Il messaggio Telegram «Non hai proseguito in tempo» a chi ha preso
   porta la riga del conto: la scrive `_riga_conto_p2p` (pura, una frase
   per Telegram e app: al primo la tolleranza e il blocco dei 30 giorni

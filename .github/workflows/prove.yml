@@ -142,6 +142,7 @@ jobs:
              collaudo_campagna_p2p_tutti.py
              collaudo_statistiche_p2p.py
              collaudo_solleciti_p2p.py
+             collaudo_malus_p2p.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
@@ -248,6 +249,7 @@ jobs:
              collaudo_campagna_p2p_tutti
              collaudo_statistiche_p2p
              collaudo_solleciti_p2p
+             collaudo_malus_p2p
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.

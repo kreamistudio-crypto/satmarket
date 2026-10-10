@@ -55320,6 +55320,7 @@ def prove_card_parte_ordine():
     # il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p) ha la
     # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
     amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
+    amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
     for f in ("livello_utente", "_volti_persone", "miei_ordini"):
         exec(pezzo(f), amb)
     # la SPIA sul costruttore: chi gli si chiede, a ogni giro
@@ -57554,6 +57555,7 @@ def prove_ritocchi_prova_alan():
         # il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p) ha la
         # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
         amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
+        amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
         for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "MAX_ORDINI_MAI_VISTI_P2P = ", "P2P_ORDINI_MAI_VISTI_S = ", "P2P_CAMBIO_PUB_SCARTO = "):
             i = _SORGENTE.index("\n" + riga) + 1
             exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
@@ -64405,6 +64407,7 @@ def prove_parti_si_vedono():
     # il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p) ha la
     # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
     amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
+    amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
     for f in ("_ordini_puliti_p2p", "livello_utente", "_volti_persone",
               "_controparti_p2p"):
         exec(pezzo(f), amb)
@@ -67475,6 +67478,7 @@ def prove_volti_libro():
     # il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p) ha la
     # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
     amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
+    amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
     for f in ("_ordini_puliti_p2p", "_registra_ordini_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p",
               "_facce_ordini_p2p"):
         exec(pezzo(f), amb)
@@ -95261,7 +95265,9 @@ def _ambiente_libro_p2p(detto):
     amb = {"json": json, "P2P_EVENTI_SEGRETO": "", "P2P_RISERVA_S": 60,
            "sqlite3": __import__("sqlite3"),
            # il marchio (10 ott 2026, reputazione-p2p): qui nessuno ce l'ha
-           "_marchi_mancati_p2p": lambda con, ids, adesso: {}}
+           "_marchi_mancati_p2p": lambda con, ids, adesso: {},
+           # (10 ott 2026, malus-p2p) il gemello delle dispute perse
+           "_marchi_dispute_p2p": lambda con, ids, adesso: {}}
     _m = _SORGENTE.index("\nMOMENTI_DEL_LIBRO_P2P = {") + 1
     exec(_SORGENTE[_m:_SORGENTE.index("}\n", _m) + 2], amb)
     return {**amb, "html": _html,
@@ -95575,6 +95581,7 @@ def prove_p2p_recapito_passo():
     # il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p) ha la
     # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
     amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
+    amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
     for f in _FUNZIONI_LIBRO_P2P + ("_volti_persone", "_controparti_p2p", "_nome_altro_p2p",
                                     # col contanti l'avviso dice l'appuntamento (1 ott 2026)
                                     "_tabacchino_libro", "_dati_frase_p2p",
@@ -140637,6 +140644,619 @@ def prove_solleciti_p2p():
                                             "AND fonte='sollecito'", (o,)))])
 
 
+def prove_malus_p2p():
+    """I MALUS DOPO LA GARANZIA (10 ott 2026, cantiere malus-p2p, richiesta
+    di Andrea dopo lo studio sul feedback). Le regole della reputazione
+    guardavano solo il primo gesto; a garanzia bloccata non c'era nessuna
+    conseguenza. Quattro aggiunte: la DISPUTA PERSA con la colpa segnata
+    dal moderatore (e niente «completato» a chi la perde), la garanzia
+    arrivata a SCADENZA contata a chi doveva mandare gli euro, la SCUSA
+    del tentativo una volta ogni 30 giorni, il limite sugli EURO IN
+    SOSPESO.
+
+    Quel che qui si rompe in silenzio: una disputa persa segnata a chi ha
+    VINTO, o senza che il moderatore l'abbia chiesto, o per una decisione
+    che il coordinatore non ha eseguito; la scadenza contata a chi non
+    aveva un recapito a cui pagare; la scusa che torna a valere sempre;
+    chi aspetta un bonifico tenuto fuori dalle prese.
+
+    Il banco e' quello degli avvisi P2P (`_banco_eventi_p2p`) coi giudici
+    veri della reputazione e delle dispute, e le due tabelle delle
+    dispute con lo schema vero. Il client gira in node coi pezzi veri."""
+    print("\n[i malus dopo la garanzia: disputa persa, scadenza, scusa, euro in sospeso]")
+    import re as _re
+    import sqlite3
+    src = _SORGENTE
+    m = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- 1) LE SENTINELLE --------------------------------------------------
+    segna = codice(_senza_prosa(pezzo("_segna_esiti_p2p")))
+    prova("gli esiti dopo la garanzia si scrivono PRIMA del concluso, e ogni uscita committa",
+          [True, True],
+          [0 < segna.find("righe.extend(_esiti_dopo_garanzia_p2p(con, ev, fatto))")
+           < segna.index('if fatto.get("momento") == "concluso":'),
+           'ev.get("dettaglio") == "taker-timeout"):\n        con.commit()\n        return righe'
+           in segna])
+    dopo = codice(_senza_prosa(pezzo("_esiti_dopo_garanzia_p2p")))
+    prova("la disputa persa nasce SOLO da una chiusura del moderatore: attore mostro, "
+          "dettaglio admin", True,
+          'if ev.get("attore") == "mostro" and ev.get("dettaglio") == "admin":' in dopo)
+    dec = codice(_senza_prosa(pezzo("_decisione_disputa_p2p")))
+    prova("la colpa e' un `true` letterale, chi perde lo dice l'esito, e va a registro "
+          "DOPO la decisione con lo stesso istante", [True, True, True],
+          ['if d.get("colpa") is True else ""' in dec,
+           '{"compratore": "venditore", "venditore": "compratore"}.get(esito, "")' in dec,
+           0 < dec.index('_registro_disputa_p2p(con, ordine, "decisione", io, adesso')
+           < dec.find('_registro_disputa_p2p(con, ordine, "colpa", io, adesso, esito=colpa')])
+    posso = codice(_senza_prosa(pezzo("_posso_prendere_p2p")))
+    prova("gli euro in sospeso si giudicano prima del giudice della presa, e un conto che "
+          "non riesce vale zero (non chiude la porta)", [True, True],
+          [0 < posso.find("if sospesi >= P2P_EURO_SOSPESI_MAX:")
+           < posso.index("_giudice_presa_p2p("),
+           "try:\n        sospesi = _euro_sospesi_p2p(con, io, adesso)\n    except Exception:\n"
+           "        sospesi = 0" in posso])
+    prova("...e il giudice PURO della presa non e' stato toccato", False,
+          "sospesi" in pezzo("_giudice_presa_p2p"))
+    prova("gli euro in sospeso chiedono allo STESSO giudice del sollecito", True,
+          '_sollecito_euro_p2p_fermo(con, {"ordine": s[0], "giro": giro})'
+          in codice(_senza_prosa(pezzo("_euro_sospesi_p2p"))))
+    for nome, chiave in (("_facce_ordini_p2p", 'volto["dispute"]'),
+                         ("_volti_persone", 'chi["dispute"]'),
+                         ("negozio", 'venditore["dispute_perse"]')):
+        prova(f"il marchio delle dispute perse esce da `{nome}`", True, chiave in pezzo(nome))
+
+    # --- 2) IL BANCO --------------------------------------------------------
+    def banco():
+        con, amb = _banco_eventi_p2p()
+        amb["sqlite3"] = sqlite3
+        for riga in ("P2P_MANCATI_FINESTRA_S = ", "P2P_MANCATI_FILTRO_S = ",
+                     "P2P_MANCATI_TOLLERATI = ", "P2P_PRESE_APERTE_MAX = ",
+                     "P2P_PRESA_APERTA_S = ", "P2P_ESITI_MEMORIA_S = ",
+                     "P2P_TENTATIVO_MARGINE_S = ", "P2P_DISPUTE_FINESTRA_S = ",
+                     "P2P_SCUSA_FINESTRA_S = ", "P2P_EURO_SOSPESI_MAX = ",
+                     "P2P_EURO_SOSPESI_DOPO_S = ", "P2P_EURO_SOSPESI_FINO_S = ",
+                     "P2P_MOTIVO_MIN = ", "P2P_MOTIVO_MAX = "):
+            i = src.index("\n" + riga) + 1
+            exec(src[i:src.index("\n", i)].split("  #")[0], amb)
+        for blocco in ("P2P_FILTRO_SOGLIE = (", "P2P_GESTI_TENTATIVO = (",
+                       "P2P_MOTIVI_PRESA = (", "P2P_RIGA_SCUSA = (",
+                       "P2P_RIGA_SCUSA_USATA = (", "MESI_IT = ("):
+            i = src.index("\n" + blocco) + 1
+            exec(src[i:src.index(")\n", i) + 2], amb)
+        for blocco in ("_PESO_MOMENTO_P2P = {", "P2P_DISPUTA_ESITI = {"):
+            i = src.index("\n" + blocco) + 1
+            exec(src[i:src.index("}\n", i) + 2], amb)
+        for f in ("_primo_gesto_p2p", "_marchio_mancati_p2p", "_ha_provato_p2p",
+                  "_segna_esiti_p2p", "_reputazione_p2p", "_marchi_mancati_p2p",
+                  "_prese_aperte_p2p", "_giudice_presa_p2p", "_soglia_filtro_p2p",
+                  "_filtri_p2p", "_posso_prendere_p2p", "_segna_tentativo_p2p",
+                  "_blocco_filtro_fino_p2p", "_riga_conto_p2p", "_conto_esito_p2p",
+                  "_colpa_disputa_p2p", "_esiti_dopo_garanzia_p2p", "_marchi_dispute_p2p",
+                  "_euro_sospesi_p2p", "_sollecito_euro_p2p_fermo", "_stato_scambio_p2p",
+                  "_metodi_lista_p2p", "_registro_disputa_p2p", "_decisione_disputa_p2p",
+                  "_blocco_dispute_fino_p2p", "_riga_disputa_persa_p2p", "_dichiara_filtri_p2p"):
+            exec(_senza_prosa(pezzo(f)), amb)
+        return con, amb
+
+    def dispute(con):
+        schema = ""
+        for tabella, fine in (("p2p_dispute", "\n    );"),
+                              ("p2p_dispute_registro", "ON p2p_dispute_registro(ordine);")):
+            i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
+            schema += src[i:src.index(fine, i) + len(fine)] + "\n"
+        con.executescript(schema)
+
+    con, amb = banco()
+    dispute(con)
+    prova("le finestre: 90 giorni il marchio delle dispute, 30 la scusa; il tetto degli euro "
+          "in sospeso e' 2, da un'ora, e la garanzia vale quattro giorni",
+          [90 * 86400, 30 * 86400, 2, 3600, 4 * 86400],
+          [amb["P2P_DISPUTE_FINESTRA_S"], amb["P2P_SCUSA_FINESTRA_S"],
+           amb["P2P_EURO_SOSPESI_MAX"], amb["P2P_EURO_SOSPESI_DOPO_S"],
+           amb["P2P_EURO_SOSPESI_FINO_S"]])
+    giorni = str(amb["P2P_SCUSA_FINESTRA_S"] // 86400)
+    prova("le due frasi della scusa dicono i giorni della costante, senza importi ne' id",
+          [True, True, None],
+          [f"una volta ogni {giorni} giorni" in amb["P2P_RIGA_SCUSA"],
+           f"una volta ogni {giorni} giorni" in amb["P2P_RIGA_SCUSA_USATA"],
+           _re.search(r"[€<>]", amb["P2P_RIGA_SCUSA"] + amb["P2P_RIGA_SCUSA_USATA"])])
+
+    C, V, MOD = 111, 222, 999            # compra, vende, il moderatore
+    KC, KV, KX = "a" * 64, "b" * 64, "c" * 64
+    KM = "d" * 64                        # la chiave pubblica del moderatore
+    for chi, pub in ((C, KC), (V, KV)):
+        con.execute("INSERT INTO utenti VALUES(?,1)", (chi,))
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", (pub, chi))
+    amb["_NOMI"].update({C: "Carla", V: "Vito"})
+    ORA = 1_790_000_000
+    H, G = 3600, 86400
+    conta = [0]
+
+    def nuovo(metodi='["SEPA"]', taker=C):
+        conta[0] += 1
+        o = f"{conta[0]:08x}-7b2d-4c6a-9e11-aa00bb11cc44"
+        con.execute(
+            "INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, "
+            "preso_da, euro, sats, metodi) VALUES(?,?,0,'in-progress','sell',1,?,"
+            "'10,00 €',15000,?)", (o, V, taker, metodi))
+        return o
+
+    def ev(o, azione, attore="mostro", dettaglio="", quando=ORA, buyer=KC, **extra):
+        """Come la rotta: la cronaca, poi gli esiti. Torna (fatto, journal,
+        avvisi senza tag)."""
+        d = {"v": 1, "order": o, "action": azione, "ts": quando,
+             "buyer": buyer, "seller": KV, "actor": attore}
+        if dettaglio:
+            d["detail"] = dettaglio
+        d.update(extra)
+        e = amb["_evento_p2p_pulito"](d, quando)
+        fatto = amb["_registra_evento_p2p"](con, e, quando)
+        if fatto is None:
+            return None, [], {}
+        righe = amb["_segna_esiti_p2p"](con, e, fatto, quando)
+        detti = {t: _re.sub(r"</?[bi]>", "", x)
+                 for t, x in amb["_avvisi_evento_p2p"](con, e, fatto, quando)}
+        return fatto, righe, detti
+
+    def esiti(tg, o=None):
+        return [tuple(r) for r in con.execute(
+            "SELECT esito, ruolo, dettaglio FROM p2p_esiti WHERE tg_id=? "
+            + ("AND ordine=? " if o else "") + "ORDER BY quando, esito",
+            (tg, o) if o else (tg,))]
+
+    def attivo(o, t, buyer=KC, recapito=True):
+        """Una vendita presa da chi compra, fino alla garanzia bloccata (t+90)."""
+        ev(o, "taken", "buyer", "invoice-next", t, buyer)
+        ev(o, "buyer-invoice-added", "buyer", "hold-next", t + 40, buyer)
+        ev(o, "hold-invoice-requested", "mostro", "invoice", t + 41, buyer)
+        ev(o, "hold-invoice-paid", "seller", "active", t + 90, buyer)
+        if recapito:
+            amb["_avviso_recapito_p2p"](con, o, V, t + 100)
+        return t + 90
+
+    def disputa(o, giro=1):
+        con.execute("INSERT INTO p2p_dispute(ordine, giro, aperta_il, aperta_da, compratore, "
+                    "venditore, stato, presa_da, chiave_moderatore) VALUES(?,?,?,'compra',?,?,"
+                    "'presa',?,?)", (o, giro, ORA, C, V, MOD, KM))
+        con.commit()
+
+    def decide(o, esito, colpa=None, quando=ORA):
+        d = {"ordine": o, "esito": esito, "conferma": True, "chiave": KM,
+             "motivo": "Il bonifico risulta arrivato, lo dice la ricevuta."}
+        if colpa is not None:
+            d["colpa"] = colpa
+        return amb["_decisione_disputa_p2p"](con, MOD, d, quando)
+
+    def registro(o):
+        return [tuple(r) for r in con.execute(
+            "SELECT gesto, esito FROM p2p_dispute_registro WHERE ordine=? ORDER BY id", (o,))]
+
+    # --- 3) LA DISPUTA PERSA ------------------------------------------------
+    # a) i sats a chi compra, la colpa a chi vende (non liberava)
+    o = nuovo()
+    g = attivo(o, ORA - 5000)
+    ev(o, "fiat-sent", "buyer", "", g + 100)
+    ev(o, "dispute-opened", "buyer", "", g + 200)
+    disputa(o)
+    prova("a) la decisione con la spunta: 200, e dice chi perde",
+          (200, {"ok": True, "esito": "compratore", "cauzione": "", "colpa": "venditore"}),
+          decide(o, "compratore", True, g + 300))
+    prova("...a registro: la decisione, e accanto la colpa di chi perde",
+          [("decisione", "compratore"), ("colpa", "venditore")], registro(o))
+    prova("...ma finche' il coordinatore non la esegue non si scrive niente a nessuno",
+          ([], []), (esiti(V, o), esiti(C, o)))
+    _, righe, detti = ev(o, "released", "mostro", "admin", g + 400,
+                         sats=15000, sats_buyer=14775, sats_seller=15225)
+    prova("...quando mostrod racconta la chiusura del moderatore: «disputa persa» a chi "
+          "vende, e solo a lui", ([("disputa_persa", "vende", "admin")], []),
+          (esiti(V, o), esiti(C, o)))
+    FINO = g + 400 + 90 * G
+    tf = time.localtime(FINO)
+    DATA = f"{tf.tm_mday} {amb['MESI_IT'][tf.tm_mon - 1]}"
+    RIGA = ("Il moderatore ha segnato la disputa come persa per te: comparirà sul tuo "
+            f"profilo per 90 giorni. Fino al {DATA} non puoi prendere gli ordini con "
+            "filtro (1+, 3+, 5+); gli altri sì.")
+    prova("...e GLIELO SI DICE: in coda al messaggio della chiusura, a chi ha perso, la "
+          "frase di Andrea con la data del blocco", True,
+          detti.get(V, "") == "⚖️ Un moderatore ha chiuso la disputa: i sats vanno a chi "
+                              "compra.\n\n" + RIGA)
+    prova("...a chi ha vinto il messaggio di sempre, senza una parola in piu'",
+          "⚖️ Un moderatore ha chiuso la disputa: i sats vanno a chi compra.", detti.get(C, ""))
+    prova("...la riga e' UNA, scritta in un posto, coi giorni della costante; senza data "
+          "resta la prima frase", [True, True, True],
+          [amb["_riga_disputa_persa_p2p"](DATA) == RIGA,
+           f"per {amb['P2P_DISPUTE_FINESTRA_S'] // 86400} giorni" in RIGA,
+           amb["_riga_disputa_persa_p2p"]("") == RIGA.split(" Fino al ")[0]])
+    cv = amb["_conto_esito_p2p"](con, V, o, 1, g + 500)
+    prova("...l'archivio dell'app porta la stessa riga sul giro perso, che NON e' un «non "
+          "completato»; a chi ha vinto niente", [RIGA, False, True, ""],
+          [cv["riga"], cv["contato"], cv.get("persa"),
+           amb["_conto_esito_p2p"](con, C, o, 1, g + 500)["riga"]])
+    FILTRATO = nuovo(taker=0)
+    con.execute("UPDATE p2p_ordini SET min_completati=1, stato='pending' WHERE ordine=?",
+                (FILTRATO,))
+    SENZA = nuovo(taker=0)
+    for k in range(1, 4):                # tre completati, cosi' a fermarlo e' solo la disputa
+        con.execute("INSERT INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, quando) "
+                    "VALUES(?,?,1,'completato','vende',?)", (V, f"vecchio-{k}", ORA - 100 * G))
+    r = amb["_posso_prendere_p2p"](con, V, [FILTRATO, SENZA], g + 600)
+    prova("...e BLOCCA DAGLI ORDINI CON FILTRO: «dispute», con la data; gli ordini senza "
+          "filtro si prendono", ({"ok": False, "motivo": "dispute", "soglia": 1},
+                                 True, FINO, 1),
+          (r["ordini"][FILTRATO], r["ordini"][SENZA]["ok"], r["fino_dispute"], r["dispute"]))
+    prova("...per novanta giorni dall'ultima, poi la porta si riapre e la data torna a zero",
+          [(False, FINO), (True, 0)],
+          [(lambda x: (x["ordini"][FILTRATO]["ok"], x["fino_dispute"]))(
+              amb["_posso_prendere_p2p"](con, V, [FILTRATO], t)) for t in (FINO - 5, FINO + 5)])
+    giud = amb["_giudice_presa_p2p"]
+    prova("...il giudice puro: una disputa persa ferma da UNA, solo col filtro, e viene "
+          "dopo completati e mancati",
+          [(False, "dispute"), (True, ""), (False, "filtro"), (False, "mancati"), (True, "")],
+          [giud(1, {"completati": 5, "mancati_30": 0, "dispute_90": 1}, 0),
+           giud(0, {"completati": 5, "mancati_30": 0, "dispute_90": 3}, 0),
+           giud(3, {"completati": 1, "mancati_30": 0, "dispute_90": 1}, 0),
+           giud(1, {"completati": 5, "mancati_30": 2, "dispute_90": 1}, 0),
+           giud(1, {"completati": 5, "mancati_30": 1}, 0)])
+    prova("...e il journal lo dice", True,
+          any(f"a {V} si segna una disputa persa" in r for r in righe))
+    _, righe, _ = ev(o, "success", "mostro", "", g + 500,
+                     sats=15000, sats_buyer=14775, sats_seller=15225)
+    prova("...e al concluso lo scambio vale «completato» a chi compra, NON a chi ha perso",
+          ([("completato", "compra", "")], [("disputa_persa", "vende", "admin")]),
+          (esiti(C, o), esiti(V, o)))
+    prova("...il journal dice perche'", True,
+          any(f"a {V} non vale come completato" in r for r in righe))
+    prova("...il marchio: una disputa persa a chi vende, niente a chi compra, e i «non "
+          "completati» non c'entrano", [{V: 1}, {}],
+          [amb["_marchi_dispute_p2p"](con, [C, V, 0], ORA),
+           amb["_marchi_mancati_p2p"](con, [C, V], ORA)])
+    prova("...per novanta giorni, poi esce dal conto", [{V: 1}, {}],
+          [amb["_marchi_dispute_p2p"](con, [V], g + 400 + 90 * G - 5),
+           amb["_marchi_dispute_p2p"](con, [V], g + 400 + 90 * G + 5)])
+    prova("...e chi lo chiede di se' lo legge fra i suoi numeri", [1, 0],
+          [amb["_posso_prendere_p2p"](con, t, [], ORA)["dispute"] for t in (V, C)])
+    # b) i sats tornano a chi vende, la colpa a chi compra (il «pagato» finto)
+    o = nuovo()
+    g = attivo(o, ORA - 4000)
+    ev(o, "fiat-sent", "buyer", "", g + 100)
+    ev(o, "dispute-opened", "seller", "", g + 200)
+    disputa(o)
+    decide(o, "venditore", True, g + 300)
+    prova("b) i sats tornano a chi vende con la spunta: a registro perde chi compra",
+          [("decisione", "venditore"), ("colpa", "compratore")], registro(o))
+    _, _, detti = ev(o, "canceled", "mostro", "admin", g + 400)
+    prova("...e all'annullo del moderatore la disputa persa e' di chi compra",
+          ([("disputa_persa", "compra", "admin")], []), (esiti(C, o), esiti(V, o)))
+    prova("...e la riga sta in coda al SUO messaggio, non a quello di chi vende",
+          [True, False],
+          [detti.get(C, "").startswith("⚖️ Un moderatore ha annullato lo scambio.")
+           and "\n\nIl moderatore ha segnato la disputa come persa per te: comparirà sul "
+               "tuo profilo per 90 giorni. Fino al " in detti.get(C, ""),
+           "disputa come persa" in detti.get(V, "")])
+    # c) senza spunta: niente, e il concluso vale a tutti e due
+    o = nuovo()
+    g = attivo(o, ORA - 3000)
+    ev(o, "fiat-sent", "buyer", "", g + 100)
+    ev(o, "dispute-opened", "buyer", "", g + 200)
+    disputa(o)
+    prova("c) senza spunta la decisione non porta colpa: la risposta e' quella di sempre",
+          (200, {"ok": True, "esito": "compratore", "cauzione": ""}),
+          decide(o, "compratore", None, g + 300))
+    _, _, detti = ev(o, "released", "mostro", "admin", g + 400, sats=15000,
+                     sats_buyer=14775, sats_seller=15225)
+    prova("...senza colpa il messaggio della chiusura e' quello di sempre per tutti e due",
+          ["⚖️ Un moderatore ha chiuso la disputa: i sats vanno a chi compra."] * 2,
+          [detti.get(V, ""), detti.get(C, "")])
+    ev(o, "success", "mostro", "", g + 500, sats=15000, sats_buyer=14775, sats_seller=15225)
+    prova("...nessuna disputa persa, e «completato» a tutti e due",
+          ([("completato", "compra", "")], [("completato", "vende", "")]),
+          (esiti(C, o), esiti(V, o)))
+    # d) una spunta che non e' un `true` letterale non segna niente
+    for storta in ("true", 1, "si", [True]):
+        o = nuovo()
+        disputa(o)
+        prova(f"d) `colpa: {storta!r}` non e' la spunta: nessuna riga di colpa",
+              [("decisione", "compratore")],
+              (decide(o, "compratore", storta), registro(o))[1])
+    # e) la colpa vale per la decisione che il coordinatore ha ESEGUITO
+    o = nuovo()
+    g = attivo(o, ORA - 2500)
+    ev(o, "fiat-sent", "buyer", "", g + 100)
+    ev(o, "dispute-opened", "buyer", "", g + 200)
+    disputa(o)
+    decide(o, "compratore", True, g + 300)       # non riuscita: il coordinatore ha detto no
+    decide(o, "venditore", None, g + 310)        # ...e poi ridecisa al contrario, senza colpa
+    ev(o, "canceled", "mostro", "admin", g + 400)
+    prova("e) una prima decisione con la colpa, non eseguita, non marchia nessuno quando "
+          "ne viene eseguita un'altra", ([], []), (esiti(C, o), esiti(V, o)))
+    o = nuovo()
+    g = attivo(o, ORA - 2400)
+    ev(o, "fiat-sent", "buyer", "", g + 100)
+    ev(o, "dispute-opened", "buyer", "", g + 200)
+    disputa(o)
+    decide(o, "compratore", True, g + 300)
+    decide(o, "compratore", None, g + 310)       # ridecisa uguale, ma togliendo la spunta
+    ev(o, "released", "mostro", "admin", g + 400, sats=15000, sats_buyer=14775,
+       sats_seller=15225)
+    prova("...e vale l'ULTIMA con quell'esito: tolta la spunta, niente colpa", [],
+          esiti(V, o))
+    # f) chi vende libera da se' a disputa aperta: non e' una decisione
+    o = nuovo()
+    g = attivo(o, ORA - 2300)
+    ev(o, "fiat-sent", "buyer", "", g + 100)
+    ev(o, "dispute-opened", "buyer", "", g + 200)
+    disputa(o)
+    decide(o, "compratore", True, g + 300)
+    ev(o, "released", "seller", "", g + 400, sats=15000, sats_buyer=14775, sats_seller=15225)
+    ev(o, "success", "mostro", "", g + 500, sats=15000, sats_buyer=14775, sats_seller=15225)
+    prova("f) se chi vende libera da se' prima che il moderatore firmi, nessuna disputa "
+          "persa: e' completato per tutti e due",
+          ([("completato", "vende", "")], [("completato", "compra", "")]),
+          (esiti(V, o), esiti(C, o)))
+    # g) chi perde non e' dei nostri; la disputa di un altro giro; il banco senza tabelle
+    o = nuovo(taker=0)
+    g = attivo(o, ORA - 2200, KX, False)
+    ev(o, "dispute-opened", "seller", "", g + 200, KX)
+    con.execute("INSERT INTO p2p_dispute(ordine, giro, aperta_il, aperta_da, compratore, "
+                "venditore, stato, presa_da, chiave_moderatore) VALUES(?,1,?,'vende',0,?,"
+                "'presa',?,?)", (o, ORA, V, MOD, KM))
+    decide(o, "venditore", True, g + 300)
+    _, righe, _ = ev(o, "canceled", "mostro", "admin", g + 400, KX)
+    prova("g) chi perde scambia da un altro client: non si scrive, e il journal lo dice",
+          [0, True],
+          [con.execute("SELECT COUNT(*) FROM p2p_esiti WHERE ordine=?", (o,)).fetchone()[0],
+           any("non e' dei nostri" in r for r in righe)])
+    prova("...la colpa di una disputa di un ALTRO giro non vale", [True, False],
+          [amb["_colpa_disputa_p2p"](con, o, 1, "venditore"),
+           amb["_colpa_disputa_p2p"](con, o, 2, "venditore")])
+    con_nudo, amb_nudo = banco()
+    prova("...e un database senza le tabelle delle dispute vale «nessuna colpa», mai un "
+          "errore", False, amb_nudo["_colpa_disputa_p2p"](con_nudo, o, 1, "venditore"))
+
+    # --- 4) LA GARANZIA ARRIVATA A SCADENZA --------------------------------
+    T = ORA - 600
+    o = nuovo()
+    g = attivo(o, T - 95 * H)
+    _, righe, detti = ev(o, "canceled", "mostro", "escrow-deadline", T)
+    prova("la garanzia scade col recapito detto e senza «pagato»: un «mancato» a chi "
+          "compra, e solo a lui", ([("mancato", "compra", "escrow-deadline")], []),
+          (esiti(C, o), esiti(V, o)))
+    prova("...il journal dice a chi e perche'", True,
+          any(f"a {C} si conta uno scambio non completato" in r
+              and "garanzia arrivata a scadenza" in r for r in righe))
+    riga = amb["_riga_conto_p2p"](True, 1, "")
+    prova("...a chi compra il messaggio dice il fatto e la riga del conto, la stessa di sempre",
+          True, detti.get(C, "").startswith("⏰ La garanzia è arrivata a scadenza: lo scambio "
+                                            "è annullato.")
+          and detti[C].endswith("\n\nGli euro non risultano inviati. " + riga))
+    prova("...a chi vende no: i sats tornati, e niente conto", [True, False],
+          ["sono tornati a te" in detti.get(V, ""), "non completato" in detti.get(V, "")])
+    prova("...ed e' lo stesso conto del primo gesto mancato: entra nei 90 e nei 30 giorni",
+          (1, 1), (amb["_reputazione_p2p"](con, C, ORA)["mancati"],
+                   amb["_reputazione_p2p"](con, C, ORA)["mancati_30"]))
+    casi = (("senza recapito", dict(recapito=False), None, "non aveva detto dove ricevere"),
+            ("col «pagato» segnato", {}, ("fiat-sent", "buyer"), "c'era un «pagato» o una disputa"),
+            ("con una disputa aperta", {}, ("dispute-opened", "seller"),
+             "c'era un «pagato» o una disputa"),
+            ("con chi compra da un altro client", dict(buyer=KX, recapito=False), None,
+             "non e' dei nostri"))
+    for nome, come, mossa, perche in casi:
+        o = nuovo(taker=0 if "buyer" in come else C)
+        g = attivo(o, T - 95 * H, **come)
+        b = come.get("buyer", KC)
+        if mossa:
+            ev(o, mossa[0], mossa[1], "", g + 500, b)
+        _, righe, detti = ev(o, "canceled", "mostro", "escrow-deadline", T, b)
+        prova(f"la scadenza {nome}: non si conta a nessuno, e il journal dice perche'",
+              [0, True, False],
+              [con.execute("SELECT COUNT(*) FROM p2p_esiti WHERE ordine=?", (o,)).fetchone()[0],
+               any(perche in r for r in righe), "non completato" in detti.get(C, "")])
+    o = nuovo()
+    ev(o, "taken", "buyer", "invoice-next", T - 500)
+    _, righe, _ = ev(o, "canceled", "mostro", "escrow-deadline", T)
+    prova("la scadenza senza una garanzia bloccata in cronaca: non si conta",
+          [0, True],
+          [con.execute("SELECT COUNT(*) FROM p2p_esiti WHERE ordine=?", (o,)).fetchone()[0],
+           any("non risulta" in r for r in righe)])
+
+    # --- 5) LA SCUSA DEL TENTATIVO, UNA OGNI 30 GIORNI ---------------------
+    con, amb = banco()
+    dispute(con)
+    for chi, pub in ((C, KC), (V, KV)):
+        con.execute("INSERT INTO utenti VALUES(?,1)", (chi,))
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", (pub, chi))
+
+    def timeout(t, tenta=True):
+        """Chi compra prende, (prova a dare la fattura,) e lascia scadere."""
+        o = nuovo()
+        ev(o, "taken", "buyer", "invoice-next", t)
+        ev(o, "buyer-invoice-requested", "mostro", "", t + 1)
+        if tenta:
+            amb["_segna_tentativo_p2p"](con, C, o, "fattura_rifiutata", "invalid-invoice", t + 60)
+        return (o,) + ev(o, "expired", "mostro", "taker-timeout", t + 800)[1:]
+
+    T0 = ORA - 40 * G
+    o1, righe, detti = timeout(T0)
+    prova("il primo timeout con un tentativo: scusato, e la scusa si SCRIVE",
+          [("scusato", "compra", "taker-timeout")], esiti(C, o1))
+    prova("...il journal dice che e' la scusa, e quanto vale", True,
+          any("ha provato" in r and "una ogni 30 giorni" in r for r in righe))
+    prova("...a lui il messaggio lo dice: stavolta non conta, ma vale una volta ogni 30 giorni",
+          True, detti.get(C, "").endswith("\n\n" + amb["P2P_RIGA_SCUSA"]))
+    prova("...e non e' contato: niente fra i non completati", 0,
+          amb["_reputazione_p2p"](con, C, T0 + 900)["mancati"])
+    o2, righe, detti = timeout(T0 + 10 * G)
+    prova("dieci giorni dopo, un altro timeout con un tentativo: la scusa e' gia' usata, "
+          "si conta", [("mancato", "compra", "taker-timeout+tentativo")], esiti(C, o2))
+    prova("...il journal lo dice", True,
+          any("la scusa del tentativo l'aveva gia' usata" in r for r in righe))
+    prova("...e a lui il messaggio spiega perche', poi la riga del conto di sempre", True,
+          detti.get(C, "").endswith("\n\n" + amb["P2P_RIGA_SCUSA_USATA"]
+                                    + amb["_riga_conto_p2p"](True, 1, "")))
+    o3, _, _ = timeout(T0 + 31 * G)
+    prova("a trentun giorni dalla scusa la finestra e' passata: scusato di nuovo",
+          [("scusato", "compra", "taker-timeout")], esiti(C, o3))
+    o4, _, detti = timeout(T0 + 32 * G, tenta=False)
+    c4 = amb["_conto_esito_p2p"](con, C, o4, 1, T0 + 32 * G + 800)
+    prova("senza tentativo si conta come sempre, con la riga di sempre (nessuna scusa "
+          "nominata)", [[("mancato", "compra", "taker-timeout")], 2, True, False],
+          [esiti(C, o4), c4["mancati"],
+           c4["riga"].startswith("Questo conta come scambio non completato: con questo "
+                                 "sono 2") and detti.get(C, "").endswith("\n\n" + c4["riga"]),
+           "scusa" in c4["riga"]])
+    prova("...e una scusa NON e' un non completato: non entra nel marchio ne' nel filtro",
+          (2, 2), (amb["_reputazione_p2p"](con, C, T0 + 33 * G)["mancati"],
+                   con.execute("SELECT COUNT(*) FROM p2p_esiti WHERE tg_id=? AND "
+                               "esito='scusato'", (C,)).fetchone()[0]))
+
+    # --- 6) GLI EURO IN SOSPESO ---------------------------------------------
+    con, amb = banco()
+    dispute(con)
+    for chi, pub in ((C, KC), (V, KV)):
+        con.execute("INSERT INTO utenti VALUES(?,1)", (chi,))
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", (pub, chi))
+    sospesi = amb["_euro_sospesi_p2p"]
+    libero = nuovo(taker=0)              # un ordine qualunque, da prendere
+    a = nuovo()
+    attivo(a, ORA - 3 * H)
+    prova("uno scambio attivo col recapito, garanzia bloccata da tre ore: un sospeso a chi "
+          "compra, nessuno a chi vende", (1, 0), (sospesi(con, C, ORA), sospesi(con, V, ORA)))
+    prova("...con uno solo si prende ancora", True,
+          amb["_posso_prendere_p2p"](con, C, [libero], ORA)["ordini"][libero]["ok"])
+    b = nuovo()
+    attivo(b, ORA - 2 * H)
+    r = amb["_posso_prendere_p2p"](con, C, [libero], ORA)
+    prova("al secondo, la presa e' spenta su ogni ordine: «sospesi», coi numeri di chi chiede",
+          ({"ok": False, "motivo": "sospesi", "soglia": 0}, 2, 2),
+          (r["ordini"][libero], r["euro_sospesi"], r["limite_sospesi"]))
+    prova("...a chi vende, che aspetta, la porta resta aperta", True,
+          amb["_posso_prendere_p2p"](con, V, [libero], ORA)["ordini"][libero]["ok"])
+    ev(b, "fiat-sent", "buyer", "", ORA - 10)
+    prova("segnato il «pagato» su uno, il sospeso scende e si riprende", (1, True),
+          (sospesi(con, C, ORA),
+           amb["_posso_prendere_p2p"](con, C, [libero], ORA)["ordini"][libero]["ok"]))
+    for nome, metodi, quando, recapito in (
+            ("garanzia bloccata da meno di un'ora", '["SEPA"]', ORA - 1800, True),
+            ("senza il recapito di chi vende", '["SEPA"]', ORA - 3 * H, False),
+            ("col contanti di persona fra i metodi", '["Contanti", "SEPA"]', ORA - 3 * H, True),
+            ("garanzia piu' vecchia di quattro giorni", '["SEPA"]', ORA - 97 * H, True)):
+        o = nuovo(metodi)
+        attivo(o, quando, recapito=recapito)
+        prova(f"non conta fra i sospesi: {nome}", 1, sospesi(con, C, ORA))
+    vero = amb["_euro_sospesi_p2p"]
+
+    def rotto(*a_, **k_):
+        raise RuntimeError("cartone")
+    amb["_euro_sospesi_p2p"] = rotto
+    r = amb["_posso_prendere_p2p"](con, C, [libero], ORA)
+    amb["_euro_sospesi_p2p"] = vero
+    prova("se il conto dei sospesi inciampa la porta NON si chiude: vale zero",
+          (True, 0), (r["ordini"][libero]["ok"], r["euro_sospesi"]))
+
+    # --- 7) IL CLIENT, in node ------------------------------------------------
+    prova("il marchio delle dispute perse sta nei quattro posti del contatore", [1, 1, 1, 2],
+          [m.count("marchioDisputeP2P(f.dispute)"), m.count("marchioDisputeP2P(c.dispute, true)"),
+           m.count("marchioDisputeP2P(v.dispute_perse, true)"),
+           m.count("marchioDisputeP2P(r.dispute, true)")])
+    prova("la spunta della colpa sta nella card della decisione, dopo quella della cauzione, "
+          "ed entra nel corpo della decisione SOLO quando c'e'", [True, True],
+          [0 < m.find("+ cauzioneModP2P(d, bozze)") < m.find("+ colpaModP2P(d, bozze)")
+           < m.find("+ '<textarea id=\"p2pModMotivo\""),
+           "await modFetch('moderazione/decisione', conColpaModP2P(ordine,\n" in m])
+    prova("«I tuoi dati» dice quel che da oggi si tiene in piu'", [True] * 4,
+          ["«<b>disputa persa</b>»" in m, "«<b>⚖️ N dispute perse</b>»" in m,
+           "la scusa vale <b>una volta ogni 30 giorni</b>" in m,
+           "la garanzia arriva a <b>scadenza</b>" in m])
+    prova("...e che la disputa persa blocca dal filtro, e che chi la perde lo sa subito",
+          [True, True],
+          ["in quei 90 giorni chi pubblica con un filtro <b>non ti accetta</b>" in m,
+           "lo viene a sapere <b>subito</b>, nel messaggio che chiude la disputa" in m])
+    js = r"""
+const esc = s => String(s == null ? '' : s);
+let p2pModBozze = {};
+function dataBreveP2P(ts){ return ts === 1800000000 ? '8 gennaio' : 'x'; }
+const P2P_FILTRO_SOGLIE = [1, 3, 5];
+function filtroOrdineP2P(o){ return 3; }
+""" + "".join(_fn_js(m, f) for f in (
+        "function marchioDisputeP2P(n, inRiga){", "function fraseVetoP2P(v, rep){",
+        "function rigaFiltroDettP2P(id){", "function fraseAccessoNuovoP2P(n){",
+        "function sogliaFiltroP2P(v){",
+        "function colpaModSceltaP2P(ordine){", "function colpaModP2P(d, bozze){",
+        "function conColpaModP2P(ordine, corpo){",
+        "function colpaFraseModP2P(ordine, esito){")) + r"""
+const c = {};
+c.marchio = [0, 1, 2, 5, 'x', -1].map(n => marchioDisputeP2P(n, true));
+c.box = marchioDisputeP2P(1);
+c.veto = [fraseVetoP2P({ok: false, motivo: 'sospesi', soglia: 0}, {limite_sospesi: 2}),
+          fraseVetoP2P({ok: false, motivo: 'sospesi'}, null)];
+c.vetoDispute = [fraseVetoP2P({ok: false, motivo: 'dispute', soglia: 1},
+                              {dispute: 1, fino_dispute: 1800000000}),
+                 fraseVetoP2P({ok: false, motivo: 'dispute'}, null)];
+c.regola = [rigaFiltroDettP2P('x'), fraseAccessoNuovoP2P(3)];
+const D = {ordine: 'ord-1'};
+c.spenta = colpaModP2P(D, {});
+c.accesa = colpaModP2P(D, {colpa: true});
+c.storta = colpaModP2P(D, {colpa: 'true'});
+c.senza = [colpaModSceltaP2P('ord-1'), colpaFraseModP2P('ord-1', 'compratore')];
+c.corpoSenza = conColpaModP2P('ord-1', {ordine: 'ord-1', cauzione: ''});
+p2pModBozze['ord-1'] = {colpa: true};
+c.corpoCon = conColpaModP2P('ord-1', {ordine: 'ord-1', cauzione: ''});
+c.con = [colpaModSceltaP2P('ord-1'), colpaFraseModP2P('ord-1', 'compratore'),
+         colpaFraseModP2P('ord-1', 'venditore')];
+p2pModBozze['ord-1'] = {colpa: 'true'};
+c.finta = colpaModSceltaP2P('ord-1');
+console.log(JSON.stringify(c));
+"""
+    c = _node_banco(js)
+    if c is None:
+        salta("il client dei malus P2P", "node non c'e'")
+    else:
+        prova("client: il marchio tace a zero e scrive da UNA in su, singolare e plurale",
+              ["", True, True, True, "", ""],
+              [c["marchio"][0], "⚖️ 1 disputa persa" in c["marchio"][1],
+               "⚖️ 2 dispute perse" in c["marchio"][2], "⚖️ 5 dispute perse" in c["marchio"][3],
+               c["marchio"][4], c["marchio"][5]])
+        prova("...e nel riquadro dice la finestra", True,
+              "⚖️ 1 disputa persa" in c["box"] and "negli ultimi 90 giorni" in c["box"])
+        prova("client: la frase del veto per gli euro in sospeso, col tetto del server",
+              ["Hai già 2 scambi in cui chi vende aspetta i tuoi euro da più di un'ora: "
+               "inviali (o annulla quegli scambi) prima di prenderne un altro."] * 2, c["veto"])
+        prova("client: la frase del veto per la disputa persa, col numero e la data del "
+              "server; senza numeri resta la regola",
+              ["Quest'ordine accetta solo chi non ha dispute perse negli ultimi 90 giorni: "
+               "tu ne hai 1. Potrai riprenderli dal 8 gennaio.",
+               "Quest'ordine accetta solo chi non ha dispute perse negli ultimi 90 giorni."],
+              c["vetoDispute"])
+        prova("client: la regola del filtro, dove si legge e dove si sceglie, nomina le "
+              "dispute perse", [True, True],
+              ["nessuno scambio non completato negli ultimi 30 giorni e nessuna disputa "
+               "persa negli ultimi 90" in c["regola"][0],
+               c["regola"][1] == "Solo chi ha completato almeno 3 scambi e non ha nessun "
+               "«non completato» segnalato negli ultimi 30 giorni né dispute perse negli "
+               "ultimi 90."])
+        prova("client: la spunta della colpa nasce SPENTA, e si accende solo con un true vero",
+              [False, True, False],
+              [" checked" in c["spenta"], " checked" in c["accesa"], " checked" in c["storta"]])
+        prova("...dice cosa fa, per quanto, e quando lasciarla spenta", [True] * 4,
+              ["Segna la colpa a chi perde" in c["spenta"], "disputa persa" in c["spenta"],
+               "per 90 giorni, in quei 90 giorni non può prendere gli ordini con filtro"
+               in c["spenta"],
+               "Lasciala spenta se è stato un malinteso in buona fede." in c["spenta"]])
+        prova("...senza spunta la conferma non dice niente; con la spunta nomina CHI PERDE, "
+              "che e' chi i sats non li riceve", [[False, ""], True, True, True],
+              [c["senza"], c["con"][0],
+               c["con"][1] == "\n\nA chi vende viene segnata una disputa persa: compare sul "
+                              "suo profilo per 90 giorni.",
+               c["con"][2] == "\n\nA chi compra viene segnata una disputa persa: compare sul "
+                              "suo profilo per 90 giorni."])
+        prova("...e una bozza storta non e' una spunta", False, c["finta"])
+        prova("client: nel corpo della decisione la colpa c'e' solo con la spunta — un "
+              "`true` letterale — e senza il corpo e' quello di sempre",
+              [{"ordine": "ord-1", "cauzione": ""},
+               {"ordine": "ord-1", "cauzione": "", "colpa": True}],
+              [c["corpoSenza"], c["corpoCon"]])
+
+
 def prove_reputazione_p2p():
     """LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, I TENTATIVI, IL
     FILTRO DI CHI PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, cantiere
@@ -140668,10 +141288,16 @@ def prove_reputazione_p2p():
     for riga in ("P2P_MANCATI_FINESTRA_S = ", "P2P_MANCATI_FILTRO_S = ",
                  "P2P_MANCATI_TOLLERATI = ", "P2P_PRESE_APERTE_MAX = ",
                  "P2P_PRESA_APERTA_S = ", "P2P_ESITI_MEMORIA_S = ",
-                 "P2P_TENTATIVO_MARGINE_S = "):
+                 "P2P_TENTATIVO_MARGINE_S = ",
+                 # (10 ott 2026, malus-p2p) i malus dopo la garanzia
+                 "P2P_DISPUTE_FINESTRA_S = ", "P2P_SCUSA_FINESTRA_S = ",
+                 "P2P_EURO_SOSPESI_MAX = ", "P2P_EURO_SOSPESI_DOPO_S = ",
+                 "P2P_EURO_SOSPESI_FINO_S = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)].split("  #")[0], amb)
-    for blocco in ("P2P_FILTRO_SOGLIE = (", "P2P_GESTI_TENTATIVO = (", "P2P_MOTIVI_PRESA = ("):
+    for blocco in ("P2P_FILTRO_SOGLIE = (", "P2P_GESTI_TENTATIVO = (", "P2P_MOTIVI_PRESA = (",
+                   # (10 ott 2026, malus-p2p) le due frasi della scusa
+                   "P2P_RIGA_SCUSA = (", "P2P_RIGA_SCUSA_USATA = ("):
         i = src.index("\n" + blocco) + 1
         exec(src[i:src.index(")\n", i) + 2], amb)
     for f in ("_primo_gesto_p2p", "_marchio_mancati_p2p", "_ha_provato_p2p",
@@ -140681,8 +141307,15 @@ def prove_reputazione_p2p():
               "_segna_tentativo_p2p",
               # (10 ott 2026, l'avviso del blocco) la data del blocco e la riga del conto
               "_blocco_filtro_fino_p2p", "_riga_conto_p2p", "_conto_esito_p2p",
-              "_conto_scambio_p2p"):
+              "_conto_scambio_p2p",
+              # (10 ott 2026, malus-p2p) la colpa, gli esiti dopo la garanzia,
+              # il marchio delle dispute, gli euro in sospeso col loro giudice
+              "_colpa_disputa_p2p", "_esiti_dopo_garanzia_p2p", "_marchi_dispute_p2p",
+              "_euro_sospesi_p2p", "_sollecito_euro_p2p_fermo", "_stato_scambio_p2p",
+              "_metodi_lista_p2p", "_blocco_dispute_fino_p2p", "_riga_disputa_persa_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
+    i_p = src.index("\n_PESO_MOMENTO_P2P = {") + 1
+    exec(src[i_p:src.index("}\n", i_p) + 2], amb)
     i_m = src.index("\nMESI_IT = (") + 1
     exec(src[i_m:src.index(")\n", i_m) + 2], amb)
     prova("le soglie del foglio sono 1, 3 e 5; il limite delle prese e' 2; il primo si tollera",
@@ -140716,9 +141349,17 @@ def prove_reputazione_p2p():
         righe = amb["_segna_esiti_p2p"](con, e, fatto, ORA) if fatto else []
         return fatto, righe
 
+    # (10 ott 2026, malus-p2p) LA SCUSA DEL TENTATIVO VALE UNA VOLTA OGNI 30
+    # GIORNI, e ha la sua prova (`prove_malus_p2p`). I casi qui sotto sono
+    # nati quando valeva sempre, e usano la stessa persona per tutti: qui
+    # la finestra si spegne (nessuna scusa risulta «gia' usata»), e le
+    # righe `scusato`, che da oggi si scrivono, restano fuori da `esiti()`
+    amb["P2P_SCUSA_FINESTRA_S"] = -10 ** 9
+
     def esiti(tg):
         return [tuple(r) for r in con.execute(
-            "SELECT esito, ordine, giro FROM p2p_esiti WHERE tg_id=? ORDER BY quando, esito", (tg,))]
+            "SELECT esito, ordine, giro FROM p2p_esiti WHERE tg_id=? AND esito<>'scusato' "
+            "ORDER BY quando, esito", (tg,))]
 
     def rep(tg):
         return amb["_reputazione_p2p"](con, tg, ORA + 600)
@@ -140827,7 +141468,10 @@ def prove_reputazione_p2p():
     con.commit()
     r3 = amb["_reputazione_p2p"](con, 333, ORA)
     prova("j) la finestra: di tre mancati (91, 45 e 5 giorni fa) il marchio ne vede 2, il filtro 1; "
-          "il completato di 200 giorni fa conta", {"completati": 1, "mancati": 2, "mancati_30": 1}, r3)
+          "il completato di 200 giorni fa conta",
+          # (emendata il 10 ott 2026, malus-p2p: i numeri portano anche le
+          # dispute perse dei 90 giorni, che il filtro guarda)
+          {"completati": 1, "mancati": 2, "mancati_30": 1, "dispute_90": 0}, r3)
     prova("...il marchio: 0 e 1 tacciono, 2 e 7 si scrivono", [0, 0, 2, 7],
           [amb["_marchio_mancati_p2p"](n) for n in (0, 1, 2, 7)])
     prova("...e i marchi per i volti escono SOLO da due in su, in una mappa",
@@ -140844,7 +141488,9 @@ def prove_reputazione_p2p():
           (True, ""), g(3, {"completati": 3, "mancati_30": 1}, 1))
     prova("...con due mancati nel mese no: «mancati»", (False, "mancati"), g(3, {"completati": 3, "mancati_30": 2}, 0))
     prova("...senza filtro i mancati non fermano nessuno", (True, ""), g(0, {"completati": 0, "mancati_30": 5}, 1))
-    prova("...e i motivi sono i tre del catalogo", ("filtro", "mancati", "prese"), amb["P2P_MOTIVI_PRESA"])
+    # (emendata il 10 ott 2026, malus-p2p: gli euro in sospeso e la disputa persa)
+    prova("...e i motivi sono i cinque del catalogo",
+          ("filtro", "mancati", "prese", "sospesi", "dispute"), amb["P2P_MOTIVI_PRESA"])
     # l) il filtro di chi pubblica: dichiarato come la zona
     d = amb["_dichiara_filtri_p2p"]
     prova("l) il filtro si scrive sulla riga di chi ha pubblicato, la prima resta, e solo dal catalogo",
@@ -140953,17 +141599,23 @@ def prove_reputazione_p2p():
           [True, 4, True, True],
           [c16["contato"], c16["mancati"], c16["fino"] > ORA,
            bool(re.fullmatch(r"\d{1,2} [a-z]+", c16["fino_testo"]))])
-    prova("...e un giro NON contato (ha provato) da' la riga vuota", "",
-          amb["_conto_esito_p2p"](con, 222, O2, 1, ORA)["riga"])
+    # (emendate il 10 ott 2026, malus-p2p: chi e' stato SCUSATO dal
+    # tentativo adesso se lo sente dire — la scusa vale una volta ogni 30
+    # giorni —, e la riga vuota resta a chi non c'entra: il maker-timeout)
+    prova("...e un giro NON contato perche' ha provato porta la riga della scusa, non contato",
+          [False, amb["P2P_RIGA_SCUSA"]],
+          [amb["_conto_esito_p2p"](con, 222, O2, 1, ORA)[k] for k in ("contato", "riga")])
+    prova("...e un giro che non lo riguarda (maker-timeout) da' la riga vuota", "",
+          amb["_conto_esito_p2p"](con, 222, O6, 1, ORA)["riga"])
     detti = dict(amb["_avvisi_evento_p2p"](con, e16, f16, ORA))
     prova("...e dalla rotta vera il conto con la data arriva a chi ha preso, non a chi ha pubblicato",
           [True, False],
           [("con questo sono 4 negli ultimi 90 giorni" in detti.get(222, "")
             and "Fino al " + c16["fino_testo"] + " non puoi prendere" in detti.get(222, "")),
            "non completato" in detti.get(111, "")])
-    prova("...la riga nell'archivio e' la stessa (e tace su un giro non contato)", [True, ""],
+    prova("...la riga nell'archivio e' la stessa (e tace su un giro che non lo riguarda)", [True, ""],
           [pezzo("_scambi_p2p").count('"conto": _conto_scambio_p2p(con, io, ordine, giro_s, adesso)') == 1,
-           amb["_conto_scambio_p2p"](con, 222, O2, 1, ORA) if "_conto_scambio_p2p" in amb else ""])
+           amb["_conto_scambio_p2p"](con, 222, O6, 1, ORA) if "_conto_scambio_p2p" in amb else ""])
     # o) la pulizia e la memoria lunga
     n_prima = con.execute("SELECT COUNT(*) FROM p2p_esiti").fetchone()[0]
     amb["_pulisci_memoria_p2p"](con, ORA + amb["P2P_LIBRO_MEMORIA_S"] + 10)
@@ -141091,7 +141743,7 @@ scegliFiltroNuovoP2P(3);
 const sez3 = sezioneAccessoNuovoP2P();
 c.sezione3 = [p2pNuovoFiltro, RIDISEGNI, (sez3.match(/ on"/g) || []).length,
               sez3.indexOf('aria-pressed="true" data-n="3"') >= 0,
-              sez3.indexOf('Solo chi ha completato almeno 3 scambi e non ha nessun «non completato» segnalato negli ultimi 30 giorni.') >= 0,
+              sez3.indexOf('Solo chi ha completato almeno 3 scambi e non ha nessun «non completato» segnalato negli ultimi 30 giorni né dispute perse negli ultimi 90.') >= 0,
               (sez3.match(/class="hint"/g) || []).length === 1];
 c.frasiAccesso = [fraseAccessoNuovoP2P(1), fraseAccessoNuovoP2P(5), fraseAccessoNuovoP2P(0), fraseAccessoNuovoP2P(2)];
 scegliFiltroNuovoP2P(2); c.sezioneFuori = p2pNuovoFiltro;
@@ -141138,7 +141790,9 @@ console.log(JSON.stringify(c));
               [c["prendibili"][0], c["prendibili"][1], "almeno 3 scambi completati" in c["prendibili"][2],
                c["prendibili"][3], c["prendibili"][4], c["prendibili"][5]])
         prova("...la riga del filtro nel dettaglio e il riquadro del veto", [True, True, ""],
-              ["almeno 3 scambi completati e nessuno scambio non completato" in c["riquadro"][0],
+              # (emendata il 10 ott 2026, malus-p2p: la regola nomina le dispute perse)
+              ["almeno 3 scambi completati, nessuno scambio non completato negli ultimi 30 "
+               "giorni e nessuna disputa persa negli ultimi 90" in c["riquadro"][0],
                'id="p2pDettVeto"' in c["riquadro"][1] and "🚫" in c["riquadro"][1], c["riquadro"][2]])
         prova("client: la riga del profilo di scambio: niente senza numeri, i completati, il marchio da 2",
               ["", True, True, ""],
@@ -141152,8 +141806,11 @@ console.log(JSON.stringify(c));
         prova("...scelto 3+: una sola accesa, il foglio si ridisegna, sotto la frase corta e basta",
               [3, 1, 1, True, True, True], c["sezione3"])
         prova("...la frase: singolare a 1, plurale a 5, niente a 0 e fuori catalogo",
-              ["Solo chi ha completato almeno 1 scambio e non ha nessun «non completato» segnalato negli ultimi 30 giorni.",
-               "Solo chi ha completato almeno 5 scambi e non ha nessun «non completato» segnalato negli ultimi 30 giorni.",
+              # (emendata il 10 ott 2026, malus-p2p, decisione di Andrea: una
+              # disputa persa negli ultimi 90 giorni blocca dal filtro, e la
+              # frase lo dice)
+              ["Solo chi ha completato almeno 1 scambio e non ha nessun «non completato» segnalato negli ultimi 30 giorni né dispute perse negli ultimi 90.",
+               "Solo chi ha completato almeno 5 scambi e non ha nessun «non completato» segnalato negli ultimi 30 giorni né dispute perse negli ultimi 90.",
                "", ""], c["frasiAccesso"])
         prova("...una soglia fuori catalogo torna a «tutti»", 0, c["sezioneFuori"])
         prova("...il filtro parte dai campi solo dal catalogo", [5, 0, 0], c["campi"])
@@ -141519,6 +142176,7 @@ def main():
               prove_contanti_zona,
               prove_banner_ingresso, prove_tour_banner_p2p,
               prove_reputazione_p2p, prove_dati_reputazione_p2p,
+              prove_malus_p2p,
               prove_x_risonanza,
               prove_config_esempio):
         try:

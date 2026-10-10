@@ -46834,3 +46834,195 @@ il fermo nel suo foglio, il `typeof`), quella dal wallet (rete, cifra,
 server, la fattura che resta nel campo), il terzo argomento del
 controllo, la riapertura che dimentica, l'«usa comunque» della cauzione.
 Il motore resta a zero fetch. Collaudi e suite: nel verbale del push.
+
+## I malus dopo la garanzia: la disputa persa, la scadenza, la scusa una volta al mese, gli euro in sospeso (10 ott 2026, cantiere malus-p2p, richiesta di Andrea)
+
+**Da dove viene.** È il pacchetto B dello studio sul feedback («I
+solleciti per tutti i metodi», qui sopra, ha lo studio e le decisioni).
+Le quattro regole della reputazione guardavano il PRIMO gesto di chi
+prende; a garanzia bloccata non c'era nessuna conseguenza. Quattro
+aggiunte, tutte del server, tutte in `p2p_esiti` — la tabella è la
+stessa e lo schema non cambia: la sua chiave porta già l'esito, e gli
+esiti nuovi sono tre parole (`disputa_persa`, `scusato`, e `mancato` con
+un dettaglio nuovo).
+
+**a) La disputa persa, con la colpa segnata dal moderatore.** Fino a
+ieri una disputa persa non lasciava traccia, e se i sats andavano a chi
+compra il server segnava «completato» a TUTTI E DUE — anche a chi aveva
+tenuto l'altro fermo per giorni. Adesso nel foglio della decisione c'è
+una spunta, spenta di serie: «⚖️ Segna la colpa a chi perde». CHI PERDE
+LO DICE L'ESITO, non la spunta (è il lato che i sats non li riceve): per
+questo la spunta è UNA, e il nome compare nelle due conferme, dopo che
+il moderatore ha scelto dove vanno i sats. Va a registro con la
+decisione, PRIMA della firma (riga `colpa`, stesso moderatore, stesso
+istante: è da lì che `_colpa_disputa_p2p` la ritrova). Il server scrive
+`disputa_persa` SOLO quando mostrod racconta che la disputa l'ha chiusa
+un moderatore (`released`/`canceled` di `mostro`, dettaglio `admin`) e
+vale l'ULTIMA decisione a registro con QUELL'esito — la regola
+dell'allarme: una decisione con la colpa che il coordinatore ha
+rifiutato, seguita da una senza, non marchia nessuno. Poi: sul profilo
+«⚖️ N dispute perse» per 90 giorni, DA UNA (nessuna tolleranza: l'ha
+deciso una persona guardando le prove), negli stessi quattro posti del
+contatore dei non completati; e quello scambio non vale «completato» a
+chi ha perso.
+DUE AGGIUNTE DI ANDREA, viste le frasi prima del push. 1) A CHI PERDE LO
+SI DICE: in coda al suo messaggio di chiusura, e a lui solo, «Il
+moderatore ha segnato la disputa come persa per te: comparirà sul tuo
+profilo per 90 giorni.» — la frase è sua — e, perché sia tutta la
+verità, «Fino al <giorno mese> non puoi prendere gli ordini con filtro
+(1+, 3+, 5+); gli altri sì.». UNA frase, scritta in un posto
+(`_riga_disputa_persa_p2p`), che esce da `_conto_esito_p2p` (chiave
+`persa`) per il Telegram e per l'archivio dell'app. Nella prima stesura
+non c'era: lo si scopriva guardando il profilo. 2) BLOCCA DAGLI ORDINI
+CON FILTRO per 90 giorni, da una: il motivo `dispute` nel giudice puro
+della presa (dopo `filtro` e `mancati`), `dispute_90` nei numeri, la
+data da `_blocco_dispute_fino_p2p` (la più recente più 90 giorni) come
+`fino_dispute`, e nel riquadro del veto «Quest'ordine accetta solo chi
+non ha dispute perse negli ultimi 90 giorni: tu ne hai 1. Potrai
+riprenderli dal …». La regola del filtro è cambiata, e le tre frasi che
+la dicono — nel dettaglio dell'ordine, nel foglio «Pubblica», nella
+spunta del moderatore — la dicono intera («…né dispute perse negli
+ultimi 90»). I numeri confermati da Andrea: 90 giorni la disputa persa;
+due scambi, dopo un'ora, gli euro in sospeso.
+
+**b) La garanzia arrivata a scadenza.** `escrow-deadline` (~92 ore): se
+in quel giro la garanzia era bloccata, chi vende aveva detto dove
+ricevere gli euro (la sua dichiarazione in cronaca, o l'avviso del
+recapito già partito: lo stesso doppio sguardo di `_dati_frase_p2p`) e
+non c'è né un «pagato» né una disputa, a chi COMPRA si conta un
+`mancato` col dettaglio `escrow-deadline`: lo stesso esito del primo
+gesto mancato, con la stessa tolleranza, lo stesso marchio, lo stesso
+filtro e la stessa riga («Gli euro non risultano inviati. Questo conta
+come scambio non completato…» in coda al messaggio della scadenza, e
+nell'app sulla riga dello scambio). In ogni altro caso non si conta a
+nessuno e il journal dice perché. Dal pacchetto A chi compra ha avuto
+tre promemoria prima di arrivarci.
+
+**c) La scusa del tentativo, una volta ogni 30 giorni.** Chi lascia
+scadere il primo gesto ma «ci ha provato» restava scusato SEMPRE: bastava
+aprire il foglio della garanzia ogni volta. Adesso la scusa si SCRIVE
+(`scusato`) e vale una volta ogni `P2P_SCUSA_FINESTRA_S`; se nella
+finestra ce n'è già una di un altro giro, il giro si conta (`mancato`,
+dettaglio `taker-timeout+tentativo`). E si DICE, tutte e due le volte:
+«Questa volta non conta: risulta che ci hai provato. Vale una volta ogni
+30 giorni…», e poi «Risulta che ci hai provato, ma quella scusa vale una
+volta ogni 30 giorni e l'hai già usata.» davanti alla riga del conto. Un
+onesto col wallet che fa i capricci ha quindi una scusa e un mancato
+tollerato prima di qualunque scritta.
+
+**d) Gli euro in sospeso.** Il limite delle 2 prese guarda solo il primo
+gesto, e dare una fattura è gratis: chi compra poteva poi tenere ferme
+le garanzie di molti. Chi ha già `P2P_EURO_SOSPESI_MAX` (2) scambi in
+cui chi vende aspetta i suoi euro da più di un'ora non ne prende un
+altro (motivo `sospesi`, giudicato PRIMA di tutto, su ogni ordine).
+Conta `_euro_sospesi_p2p`, col giudice del sollecito degli euro
+(`_sollecito_euro_p2p_fermo`: scambio «attivo», recapito detto) — uno
+solo per i due usi — e come lui non guarda gli ordini pagabili in
+contanti di persona. SOLO chi compra: chi vende e aspetta un bonifico
+non c'entra, e tenerlo fuori dalle prese sarebbe stato punire chi sta
+facendo la cosa giusta. Un conto che inciampa vale zero: un server che
+sbaglia non chiude la porta a nessuno.
+
+**Quel che resta com'era**, per decisione di Andrea: mai a chi ha
+pubblicato e non prosegue (`maker-timeout`), e nessun controllo sugli
+scambi fra gli stessi due account. E quel che vale da sempre: tutto
+questo vale DENTRO Barattolo (un altro client prende comunque), chi non
+è dei nostri vale zero, le stelline non si toccano (la sentinella sul
+blocco regge), «Dimentica il profilo» tiene gli esiti.
+
+**Le strade scartate.** La colpa come scelta a tre («nessuno / chi
+compra / chi vende»): scartata — permetteva di segnare la colpa a chi
+VINCE, cioè una «disputa persa» a chi i sats li ha ricevuti; la spunta
+unica non può sbagliare lato. Scrivere `disputa_persa` al momento della
+decisione: scartata, la decisione può non essere eseguita (il
+coordinatore rifiuta, il moderatore ridecide) — si scrive quando il
+fatto lo racconta mostrod. Una cintura al `concluso` («se il rilascio
+del moderatore si è perso per strada»): scartata, a quel punto non si sa
+più se ha liberato il moderatore o chi vende, e nel dubbio non si
+marchia. Mettere la disputa persa nello stesso contatore dei non
+completati: scartata, non è la stessa notizia (lì c'è una tolleranza, e
+un orologio; qui un giudizio di una persona) — due marchi, stessa veste.
+Contare fra i sospesi
+anche chi vende e non libera: scartata (sopra). Un giudice suo per i
+sospesi, senza dipendenze: scartato, sarebbero stati due giudici sullo
+stesso fatto — si è preferito aggiungere i tre nomi al banco. La chiave
+`colpa` sempre presente nella risposta e nel corpo della decisione:
+scartata dopo la prima suite — sei prove di settembre pinzano quel corpo
+byte per byte; adesso c'è SOLO quando la colpa è segnata, e senza spunta
+tutto è com'era (nessuna di quelle prove è stata toccata).
+
+**Le sentinelle emendate**, con la data accanto: in
+`prove_reputazione_p2p` i motivi del veto (cinque, non tre), i numeri di
+`_reputazione_p2p` (c'è `dispute_90`), le tre frasi della regola del
+filtro, la riga del giro scusato (ora la porta), `esiti()` senza le
+righe `scusato` e la finestra della scusa spenta per quei casi (sono
+nati quando valeva sempre, e usano la stessa persona per tutti: la
+regola nuova ha la sua prova); in `collaudo_reputazione_p2p` i due punti
+della scusa. I banchi: il
+gemello `_marchi_dispute_p2p` accanto a `_marchi_mancati_p2p` nei sei
+che gli danno un cartone, e i nomi nuovi nel banco della reputazione.
+
+**Provato.** `prove_malus_p2p` (88, nuova): le sentinelle, e sui giudici
+veri col registro e le due tabelle delle dispute dallo schema vero — la
+disputa persa nei due versi, senza spunta, la spunta che non è un `true`
+letterale (quattro forme), la decisione non eseguita e quella ridecisa
+togliendo la spunta, chi vende che libera da sé, chi perde che non è dei
+nostri, la disputa di un altro giro, il database senza tabelle; la
+scadenza contata e i cinque casi in cui non si conta; la scusa (la
+prima, la seconda nel mese, a trentun giorni, senza tentativo, e che una
+scusa non è un non completato); i sospesi (uno, due, il «pagato» che
+riapre, i quattro che non contano, il conto che inciampa); il client in
+node (il marchio, la frase del veto, la spunta spenta di serie, le due
+conferme, il corpo con e senza colpa; e, per le due aggiunte di Andrea,
+il messaggio a chi perde nei due versi e non a chi vince, la riga
+nell'archivio, il blocco sui filtri con la data e la sua scadenza, il
+giudice puro nei cinque casi, la frase del veto e le tre frasi della
+regola). `collaudo_malus_p2p` (29, nuovo,
+nel workflow e nella gabbia): il server vero dalle rotte vere — eventi
+col bearer, recapito, tentativo, posso-prendere, e il moderatore dalle
+sue (chiave, prendi nei due tempi, decisione) sulla disputa nata
+dall'evento vero. La tortura: ventisette mutazioni del server su una
+copia (la disputa persa a chi ha vinto, senza moderatore, senza un true,
+di un altro giro; il completato a chi ha perso; la scadenza senza
+recapito, col «pagato», a chi vende, non detta; la scusa che vale
+sempre, mai, ogni tre giorni, non detta; i sospesi spenti, col contanti,
+senza l'ora, senza il giudice, a chi vende; il marchio per sempre, e
+fuori dai numeri; il blocco sui filtri tolto, o anche senza filtro; la
+riga a chi perde tolta, o detta anche a chi vince; la data sbagliata) —
+la prova le prende tutte e ventisette, il collaudo ventidue: gli
+sfuggono cinque casi di confine che dalle rotte costano un giro a testa
+e che tiene la prova (un altro giro, la scadenza col «pagato», la
+finestra della scusa, il contanti fra i sospesi, i novanta giorni del
+marchio).
+
+**Una cosa trovata facendolo.** Nel collaudo l'orologio del banco tiene
+gli eventi dello stesso ordine in fila di un secondo, come mostrod: in
+mezzo secondo vero di banco ne passano quattro «di coordinatore», e la
+garanzia «appena bloccata» finiva nel FUTURO del server — dove il conto
+dei sospesi non la vedeva per la ragione sbagliata, e la mutazione
+passava verde. Il caso ora sposta le lancette di un minuto prima di
+chiedere.
+
+**Cosa è girato su quale albero.** La suite severa intera (21.580
+passate, 0 fallite), i 54 collaudi della CI nella gabbia (54 verdi) e
+le due torture sono girati sul lavoro finito sopra `2d8cf0d` (i
+solleciti). Main è poi corso di cinque commit non miei (i link dentro
+Telegram, l'onion su Android, la CSP accesa, le hold di prova:
+`d0529f9`…`b14f5e2`): ribasato, un conflitto solo qui in coda (tenute
+tutte le voci), e sull'albero finale sono rigirate la prova nuova con
+le sezioni della reputazione, dei dati, dei solleciti e degli avvisi
+P2P (698 passate, 0 fallite) e dieci collaudi P2P nella gabbia (10
+verdi). Al momento del push main era corso di un altro commit (la terza
+tappa del controllo della fattura, `35de88d`: pagina, prove e
+documenti): secondo rebase, lo stesso conflitto in coda, e rigirati la
+prova e il collaudo nuovi con le sezioni della reputazione. Il resto lo
+dice la CI del push. Prima del push guardata la CI di main, come
+chiesto da Andrea.
+
+**Da guardare.** Sul telefono di un moderatore: la spunta nella card
+della decisione e la frase nelle due conferme (qui provate in node, non
+viste a schermo). Sul VPS, alla prima disputa chiusa con la spunta: la
+riga «⚖️ Reputazione P2P: a … si segna una disputa persa», e nessun
+allarme. La prima `escrow-deadline` vera: la riga del conto, o il perché
+non si è contato. NON provati dal vivo: nessuna disputa vera è mai stata
+chiusa con `admin-settle` dopo oggi.
