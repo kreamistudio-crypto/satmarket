@@ -3383,8 +3383,10 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   (se manca `xxd`: `od -An -tx1 -v FILE | tr -d ' \n'`). Controllo
   DOPO sul nodo: `docker compose exec lnd lncli listmacaroonids` deve
   dire anche il 4, e `docker compose exec lnd rm /tmp/barattolo-hold.macaroon`
-  (la copia nel container non serve piu'). Sul VPS (`~/satmarket`),
-  controllo PRIMA: `grep -n "LND_PONTE_MACAROON_HOLD" config.py` deve
+  (la copia nel container non serve piu'). Sul VPS il config e'
+  `/srv/barattolo/config.py` (non `~/satmarket/config.py`: corretto il
+  10 ott 2026 sera, con CLAUDE.md), controllo PRIMA:
+  `grep -n "LND_PONTE_MACAROON_HOLD" /srv/barattolo/config.py` deve
   dire niente; poi la riga `LND_PONTE_MACAROON_HOLD = "<esadecimale>"`
   in coda al config (600, di `barattolo`), e `sudo systemctl restart
   barattolo`. Controllo DOPO: `journalctl -u barattolo -n 50 | grep 🧪`

@@ -47643,11 +47643,22 @@ funziona, e il mercatino (fatture normali) non è toccato. Il macaroon
 delle hold di prova lo revoca Andrea: G e H tornano «non attive» e la
 pagina resta com'è, per la prossima volta.
 
-**AL SUPPORTO DI WALLET OF SATOSHI** va un messaggio in inglese (scritto
-nella risposta del cantiere): deep link `lightning:` su una hold
-invoice → «Processing» poi «unable to connect to the internet»; la
-stessa fattura incollata va; una fattura normale dallo stesso link va;
-versione self-custodial, Android.
+**IL MESSAGGIO PER IL SUPPORTO DI WALLET OF SATOSHI**, scritto e NON
+spedito (decisione di Andrea, 10 ott 2026 sera): resta qui, pronto, se
+un giorno servirà.
+> Subject: lightning: deep link fails on hold invoices (Android,
+> self-custody). Hi, I run a small marketplace that uses Lightning hold
+> invoices for escrow. On Android with the self-custody Wallet of
+> Satoshi (keys icon), opening a hold invoice through a `lightning:lnbc…`
+> deep link makes the app open on "Processing, please wait…" and then
+> show "Unable to connect to the internet"; the confirmation screen
+> never appears. Pasting the same hold invoice into the app works and
+> shows the confirmation immediately. A regular (non-hold) invoice
+> opened through the identical deep link works fine. We reproduced it
+> with two hold invoices (cltv_expiry 40 and 576 blocks), cold and warm
+> start, from Chrome and from the installed web app, always the same.
+> It looks like the deep-link path handles hold invoices differently
+> from the paste path. Happy to provide test invoices or more details.
 
 **PROVATO.** La sentinella della riga in `prove_apri_wallet_p2p` ora
 pretende, in tutt'e due le vesti, la riga della scadenza, poi
