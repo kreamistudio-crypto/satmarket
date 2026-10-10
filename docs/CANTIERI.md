@@ -48881,3 +48881,25 @@ correzione di CLAUDE.md di stasera), e la riga della chiavetta in
 HACKATHON-SETUP, che gira sul portatile Pop!_OS dove il clone sta
 davvero in `~/satmarket`: lì `/srv/barattolo` non esiste. Solo
 documenti; la suite intera e l'esito stanno nel verbale del push.
+
+## Le due cose notate sull'indirizzo che non passa: il dominio nel journal, l'elenco al client (10 ott 2026, sera, cantiere indirizzo-non-verificato, sì di Andrea)
+
+Dopo il push della voce qui sopra Andrea ha detto sì a due delle cose
+notate, in commit separati; `sbpc.ch` resta FUORI dall'elenco del
+codice (lo aggiunge lui dal config del VPS se la prova dal nodo
+conferma il blocco) e la patch 0009 non si fa adesso: è una decisione
+da prendere con Alan.
+
+**1) IL DOMINIO NEL JOURNAL A OGNI CONTROLLO DI UN INDIRIZZO.** Per
+trovare `sbpc.ch` c'è voluto l'utente che lo scrivesse: le quattro
+righe «✅ Fattura P2P: … indirizzo …: ok» non dicevano di QUALE wallet.
+Adesso `controlla_fattura_p2p` posa il dominio sul verdetto (solo se ha
+la forma di un dominio) e `_risposta_fattura_p2p` lo scrive accanto al
+tramite: «indirizzo @sbpc.ch», a ogni esito — ok, non disponibile,
+fermo. MAI il nome prima della chiocciola, che è di una persona; e il
+dominio nella riga passa ancora da una whitelist di caratteri. Il
+verdetto `wallet_non_passa` non porta più il suo `perche`: il dominio
+ce l'ha come tutti. In PRODUZIONE il grep che li conta.
+PROVATO: i giudici veri in `prove_indirizzo_non_verificato` (cinque
+righe di journal parola per parola, il nome che non entra, la riga
+finta che non passa).

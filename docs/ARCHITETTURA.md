@@ -30608,8 +30608,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Per i wallet che a lui non rispondono c'è `P2P_INDIRIZZI_NON_PASSANO`
   (config; dominio esatto → nome; nel codice il solo Wallet of Satoshi):
   `_controllo_indirizzo_p2p` li ferma PRIMA di bussare, esito
-  `wallet_non_passa` (in `FATTURA_FERMA`), frase `MSG_WALLET_NON_PASSA`,
-  nel journal il solo dominio. Nel client il «no» su un indirizzo si
+  `wallet_non_passa` (in `FATTURA_FERMA`), frase `MSG_WALLET_NON_PASSA`.
+  NEL JOURNAL, a ogni controllo di un indirizzo, il solo dominio
+  accanto al tramite («indirizzo @dominio»): lo posa il giudice unico
+  (`v["dominio"]`, se ha la forma di un dominio) e lo scrive
+  `_risposta_fattura_p2p`. Nel client il «no» su un indirizzo si
   RICORDA sulla riga dell'ordine (`indirizziRifiutati`: un elenco corto,
   in minuscolo, gli ultimi cinque senza doppioni) con
   `segnaIndirizzoRifiutatoP2P`, chiamata dai due «no» — il

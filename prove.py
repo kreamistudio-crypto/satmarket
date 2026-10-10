@@ -137420,8 +137420,8 @@ def prove_indirizzo_non_verificato():
     v = indir("Mario@WalletOfSatoshi.com", 127063)
     prova("...un indirizzo di quell'elenco si ferma senza bussare a nessuno, col nome del "
           "wallet e la via d'uscita",
-          ["wallet_non_passa", "indirizzo", FRASE_WOS, "walletofsatoshi.com", []],
-          [v["esito"], v["tramite"], v["messaggio"], v["perche"], list(bussate)])
+          ["wallet_non_passa", "indirizzo", FRASE_WOS, []],
+          [v["esito"], v["tramite"], v["messaggio"], list(bussate)])
     prova("...anche a cifra ignota", ["wallet_non_passa", []],
           [indir("mario@walletofsatoshi.com", 0)["esito"], list(bussate)])
     S["P2P_INDIRIZZI_NON_PASSANO"] = dict(K["P2P_INDIRIZZI_NON_PASSANO"],
@@ -137440,13 +137440,47 @@ def prove_indirizzo_non_verificato():
     prova("...e Phoenix resta di Phoenix, e una forma storta resta una forma storta",
           ["indirizzo", "indirizzo"],
           [indir("mario@phoenixwallet.me", 1000)["esito"], indir("ma rio@sbpc.ch", 1000)["esito"]])
+    # IL DOMINIO NEL JOURNAL, A OGNI CONTROLLO DI UN INDIRIZZO (10 ott
+    # 2026, richiesta di Andrea): lo posa il giudice unico, e la riga
+    # lo scrive accanto al tramite. Mai il nome prima della chiocciola.
+    exec("async " + pezzo("controlla_fattura_p2p"), S)
+    unico = lambda *a: _as.run(S["controlla_fattura_p2p"](*a))
+    risp = S["_risposta_fattura_p2p"]
     detto.clear()
-    r = S["_risposta_fattura_p2p"](indir("qualcuno@sbpc.ch", 127063), 111, "44c46ddf-2270")
+    r = risp(unico("Qualcuno@SBPC.ch", 127063, 3600), 111, "44c46ddf-2270")
     prova("la risposta al client ferma senza «usa comunque», con la frase",
           {"ok": False, "esito": "wallet_non_passa", "comunque": False, "messaggio": FRASE_SBP}, r)
-    prova("...e nel journal va il DOMINIO, mai l'indirizzo di una persona",
-          ["⛔ Fattura P2P: ordine 44c46ddf, da 111, indirizzo, sbpc.ch: wallet_non_passa", False],
-          [detto[-1], "qualcuno" in " ".join(detto)])
+    prova("...e nel journal va il DOMINIO accanto al tramite, mai l'indirizzo di una persona",
+          ["⛔ Fattura P2P: ordine 44c46ddf, da 111, indirizzo @sbpc.ch: wallet_non_passa", False],
+          [detto[-1], "qualcuno" in " ".join(detto).lower()])
+    detto.clear()
+    risp(unico("Mario@Wallet.com", 1000, 3600), 111, None)
+    risp(unico("mario@phoenixwallet.me", 1000, 3600), 111, None)
+    risp(unico("ma rio@wallet.com", 1000, 3600), 111, None)
+    prova("il dominio c'e' a OGNI controllo di un indirizzo: quello che non si e' potuto "
+          "guardare, Phoenix, la forma storta",
+          ["· Fattura P2P: ordine ?, da 111, indirizzo @wallet.com, il wallet dell'indirizzo "
+           "non ha dato una fattura (muto): non_disponibile",
+           "⛔ Fattura P2P: ordine ?, da 111, indirizzo @phoenixwallet.me: indirizzo",
+           "⛔ Fattura P2P: ordine ?, da 111, indirizzo @wallet.com: indirizzo"],
+          detto[-3:])
+    prova("...e il nome prima della chiocciola non ci entra mai", False,
+          "mario" in " ".join(detto).lower() or "rio@" in " ".join(detto))
+    detto.clear()
+    risp(unico("mario@dominio_storto", 1000, 3600), 111, None)
+    risp(unico("ciao", 1000, 3600), 111, None)
+    prova("un dominio che non ha la forma di un dominio non si scrive, e quel che non "
+          "e' un indirizzo non ne ha", [False, False], ["@" in d for d in detto[-2:]])
+    detto.clear()
+    risp({"esito": "ok", "tramite": "indirizzo", "dominio": "x.it\n⛔ Finto, da 1"}, 111, "abc")
+    prova("...e nella riga passa ancora da una whitelist di caratteri: niente a capo, "
+          "niente riga finta", ["✅ Fattura P2P: ordine abc, da 111, indirizzo @x.itintoda1: ok"],
+          detto)
+    cod_unico = codice(pezzo("controlla_fattura_p2p"))
+    prova("il dominio lo posa il giudice unico, e solo se ha la forma di un dominio", True,
+          'dominio = testo.lower().rpartition("@")[2]\n'
+          '        if FORMA_LN_DOMINIO.fullmatch(dominio):\n'
+          '            v["dominio"] = dominio' in cod_unico)
     i = _SORGENTE.index("P2P_INDIRIZZI_NON_PASSANO = {\n    str(k).strip().lower()")
     norma = _SORGENTE[i:_SORGENTE.index("}\n", i) + 2]
 

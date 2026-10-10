@@ -47867,10 +47867,9 @@ async def _controllo_indirizzo_p2p(indirizzo: str, deve: int, chiedi=None,
                              "o incolla una fattura."}
     # il wallet che si SA che non passa: si dice senza bussare a nessuno,
     # e prima della cifra (vale anche a cifra ignota). Nel journal il
-    # solo dominio: l'indirizzo intero e' di una persona
+    # dominio lo posa il giudice unico, come per ogni indirizzo
     if dominio in P2P_INDIRIZZI_NON_PASSANO:
         return {"esito": "wallet_non_passa", "tramite": "indirizzo",
-                "perche": dominio,
                 "messaggio": MSG_WALLET_NON_PASSA.format(
                     nome=P2P_INDIRIZZI_NON_PASSANO[dominio])}
     if deve <= 0:
@@ -47916,8 +47915,18 @@ async def controlla_fattura_p2p(testo: str, deve: int, finestra: int,
         r.setdefault("sats", v["sats"])
         return r
     if "@" in testo:
-        return await _controllo_indirizzo_p2p(testo, deve, chiedi, risolvi,
-                                              diagnosi)
+        v = await _controllo_indirizzo_p2p(testo, deve, chiedi, risolvi,
+                                           diagnosi)
+        # IL DOMINIO VA NEL JOURNAL A OGNI CONTROLLO DI UN INDIRIZZO (10
+        # ott 2026, richiesta di Andrea): i wallet che il coordinatore
+        # rifiuta si trovano con un grep, accanto al nostro «ok» — che
+        # su un indirizzo non e' il suo «si'». Il SOLO dominio, e solo
+        # se ha la forma di un dominio: il nome prima della chiocciola
+        # e' di una persona, e nel journal non entra.
+        dominio = testo.lower().rpartition("@")[2]
+        if FORMA_LN_DOMINIO.fullmatch(dominio):
+            v["dominio"] = dominio
+        return v
     return {"esito": "illeggibile", "tramite": "?",
             "messaggio": "Non sembra un indirizzo Lightning né una "
                          "richiesta di pagamento."}
@@ -47937,6 +47946,11 @@ def _risposta_fattura_p2p(v: dict, chi, ordine, adesso: int | None = None
              else "·" if esito == FATTURA_NON_DISPONIBILE else "✅")
     dest = str(v.get("dest") or "")
     pezzi = [str(v.get("tramite") or "")]
+    # di un indirizzo, il dominio accanto al tramite («indirizzo
+    # @sbpc.ch»): lo posa `controlla_fattura_p2p`, e qui passa ancora da
+    # una whitelist di caratteri — una riga di journal non si spezza
+    if v.get("dominio"):
+        pezzi[0] += " @" + re.sub(r"[^a-z0-9.-]", "", str(v["dominio"]))[:80]
     if v.get("sats"):
         pezzi.append(f"{_fmt_sats(v['sats'])} sats")
     if dest:

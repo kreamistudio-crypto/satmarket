@@ -1429,9 +1429,17 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   poi `sudo systemctl restart barattolo`. Da lì il foglio ferma PRIMA
   dell'invio («Gli indirizzi Nome del wallet qui non funzionano: incolla
   una fattura dal tuo wallet.») e nel journal resta
-  `⛔ Fattura P2P: … indirizzo, DOMINIO: wallet_non_passa`. La prova in
+  `⛔ Fattura P2P: … indirizzo @DOMINIO: wallet_non_passa`. La prova in
   chiaro NON si fa dal nodo (mostrerebbe il suo IP a quel servizio): si
   fa dal PC o dal VPS.
+  DOVE SI TROVANO I CANDIDATI: ogni riga «Fattura P2P» di un indirizzo
+  porta il dominio accanto al tramite («indirizzo @DOMINIO», mai il
+  nome prima della chiocciola), anche quando l'esito è «ok». Tutti i
+  domini passati dal controllo, contati:
+  `journalctl -u barattolo --since "7 days ago" | grep "Fattura P2P" | grep -o "indirizzo @[a-z0-9.-]*" | sort | uniq -c | sort -rn`
+  Un dominio che torna più volte nello stesso minuto per lo stesso
+  ordine, sempre «ok», è il segno di qualcuno che riprova perché il
+  coordinatore gli dice di no: è il primo da provare dal nodo.
   IL CANARINO: un «LND non l'ha mai visto» si crede solo se, nello
   stesso giro, LND riconosce un hash che conosce di sicuro — uno per
   cui lui stesso ha gia' detto SUCCEEDED (timbro `lnd_canarino`, o gli
