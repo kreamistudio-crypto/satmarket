@@ -45444,3 +45444,15 @@ secondo «non gli esiti» — e la sentinella sul codice: l'interruttore
 sta in chi annota la presa e NON in chi scrive gli esiti. La sentinella
 di `prove_p2p_avvisi_libro` che citava la frase vecchia è riscritta sulla
 nuova. Suite `PROVE_SEVERE=1` sull'albero di af616d8 più il ritocco: 21.218 passate, 0 fallite; i 51 collaudi della CI nella gabbia: 51 verdi.
+
+**IL PUSH (10 ott 2026, pomeriggio, con l'ok di Andrea).** Main era
+corso di tre commit (9188081, 5650a28, 87b3cf3: «Apri nel wallet»):
+rebase su 87b3cf3, il solito conflitto delle due voci appese in fondo a
+questo file, tenute tutt'e due. COSA È GIRATO SU QUALE ALBERO:
+sull'albero di af616d8 più il ritocco, la suite intera (21.218 passate,
+0 fallite) e i 51 collaudi della CI; sull'albero RIBASATO, le sedici
+sezioni che leggono la pagina dei dati o toccano reputazione, avvisi
+del libro e conti (1.350 passate, 0 fallite), non i collaudi: il
+ritocco è testo e prove. PRIMA DEL PUSH si è guardata anche la CI di
+main, come chiesto da Andrea dopo la rossa non nostra del ritocco
+prima: l'ultima corsa conclusa era verde.
