@@ -48281,3 +48281,123 @@ server.py e degli script della pagina. La suite intera e i collaudi su
 QUESTO albero li gira la CI. A ogni rebase un solo conflitto, la coda
 di questo file, risolto tenendo tutt'e due i lati. Il giro dal vivo è
 quello del cantiere nudo.
+
+## Il cambio, le cose notate: la fila di Esplora, la pagina di uno scambio, il cambio fermo, l'anonimo sul libro (10 ott 2026, sera, cantiere cambio-ovunque, col sì di Andrea)
+
+Le quattro voci lasciate in fondo al cantiere «Il cambio sul libro P2P»,
+a cui Andrea ha detto sì la sera stessa.
+1) LA FILA «SCAMBI P2P» DI ESPLORA SEGUE IL BATTITO. Le sue card stimano
+i sats come quelle del libro (`satsMercatoP2P`), ma restavano col cambio
+della busta. Il battito del cambio ora chiede anche con la fila davanti
+(`filaDavantiP2P`: le condizioni del suo giro della fotografia — Esplora
+davanti, vetrina nuda, non spenta da chi guarda — più «c'è almeno una
+card»). Si ridisegna da `renderVetrinaP2P`, che già confronta la firma;
+ma TENENDO LO SCORRIMENTO DI LATO (`ridisegnaFilaFermaP2P`): riscrivere
+la fila la riporta all'inizio, e una volta al minuto, sotto il dito di
+chi la scorre, sarebbe stato un dispetto. Il resto di Esplora — i «≈»
+degli annunci — segue ancora la busta: non era chiesto.
+2) LA PAGINA DI UNO SCAMBIO: SÌ, SERVE, ma solo fino alla presa. Letto
+il conto vero (`contoDettP2P`): a mercato stima col cambio di adesso
+finché il coordinatore non dice la cifra (`satsNetti` → `satsDetti`), a
+sats fissi la riga della convenienza usa il cambio di adesso finché
+l'ordine non è preso (`satsMiei` → `preso`, poi il metro è
+`cambioPresa`, fermo). Un intervallo non ancora preso non ha un conto.
+Quindi un giudice PURO, `scambioAlCambioP2P(o)`, con le stesse domande
+nello stesso ordine: il battito chiede solo quando dice sì, e ridisegna
+con `renderOrdineP2P` (che i campi scritti a mano li tiene da sé). Dalla
+presa in poi la pagina non chiede niente — la promessa di «Info P2P»:
+da lì in poi non cambia più.
+3) IL CAMBIO FERMO SI DICE. Oltre `ORE_CAMBIO_VALIDO` il server risponde
+0, «non disponibile», e nel client lo zero non entra: restava in mano il
+cambio di prima — o quello di riserva, per chi apre l'app in quel
+momento — e le conversioni uscivano come se niente fosse. Adesso
+l'ultima parola del server si ricorda (`cambioFermo`) e la dicono due
+righe piccole e grigie, nel markup fisso e spente di serie: in vetrina,
+sopra «In vetrina», «Prezzo del bitcoin non aggiornato: le cifre con ≈
+sono indicative.»; sul libro, sopra le card, «…stime e percentuali sono
+indicative.». IL NUMERO RESTA: un ordine di grandezza dichiarato vecchio
+vale più di una pagina senza cifre (la strada scartata: spegnere
+`cambioVivo`, che avrebbe tolto stime e conversioni in tutta l'app per
+un guasto di CoinGecko). SOLO LO ZERO DETTO accende: rete giù,
+500, JSON storto non sono una dichiarazione (il fail-open di sempre). Si
+spegne al primo cambio buono, dalla busta, dalla tirata o dal battito.
+Sul server non è cambiato niente: lo zero c'era già.
+4) CHI NON È ENTRATO RILEGGE IL LIBRO. Motivo per cui non lo faceva:
+NESSUNO deciso. A chi è entrato il libro si rilegge dai relay ogni due
+minuti per caso — è il ridisegno di `battitoScambiP2P`, dopo la domanda
+«i miei scambi», che attraversa la rilettura dei 60 secondi di
+`renderP2P`. L'anonimo quella domanda non la fa, quindi niente render e
+niente rilettura: il suo libro restava quello dell'apertura, corretto
+solo dall'ascolto. Ora, nello stesso battito e col suo passo, per chi
+non è entrato e SOLO sul libro parte un ridisegno fermo
+(`ridisegnaLibroFermoP2P`), senza toccare la rotta degli scambi. Costa
+una REQ ogni due minuti sul websocket che l'ascolto tiene già aperto.
+PROVATO. `prove_cambio_ovunque`, 27: le sentinelle (lo zero che accende
+prima di essere scartato, le due righe nel markup e la loro posizione,
+l'ordine dei tre ridisegni, le righe del conto vero che il giudice
+ricalca, il ramo dell'anonimo prima della rotta) e il banco node coi
+pezzi VERI — il blocco del cambio, `vetrinaDavantiP2P`, `metroFissoP2P`,
+`comeLibroP2P`, `battitoScambiP2P` —: l'avviso nei suoi stati e otto
+risposte storte che non lo accendono, la fila con lo scorrimento rimesso
+a 240, i sette modi in cui la fila non si vede, il giudice della pagina
+su otto ordini e contro il metro vero, chi cambia vista con la risposta
+in volo, l'anonimo nelle otto combinazioni e il passo di due minuti.
+`prove_cambio_libro_p2p` resta a 39 (il suo banco ha ricevuto l'`el` di
+cartone, e la sentinella del ridisegno guarda la sua casa nuova).
+Tortura: 53 mutazioni, 52 uccise con una rossa col suo nome; la
+cinquantatreesima («la pagina prima del libro» in
+`ridisegnaColCambioP2P`) è equivalente — le due viste si escludono.
+La forma sorvegliata fra la pillola e il corpo del libro
+(`prove_p2p_libro`) ha imparato la riga del cambio fermo, fuori dal
+blocco attaccato come la riga dell'ordine che non c'è più: con la
+controprova (senza la graffa del blocco dice ancora di no).
+DAL VIVO (Chrome col tocco via Playwright, 390×844; copia del worktree
+col config d'esempio, relay morto, server nella gabbia; di cartone la
+lettura del libro, la fotografia seminata sul server e la manopola del
+cambio, che sa anche farlo scadere invecchiando la cache), 21 su 21.
+Entrato: la fila con sei card a 100.000, scorsa di lato col dito (225
+px); cambio a 125.000 e a 61 secondi dalla busta parte `/api/cambio`, la
+card passa da ≈ 98.000 a ≈ 78.400 sats e lo scorrimento resta a 225; la
+cache fatta scadere: al battito dopo compare la riga in vetrina, il
+numero resta 125.000 e le card non si muovono; un secondo telefono che
+apre in quel momento la trova dal primo disegno, col valore di riserva;
+sul libro la sua riga, sopra la prima card; il cambio torna, la tirata
+lo rilegge e le due righe si spengono. La pagina del MIO ordine a
+mercato da prendere: conto a ≈ 45.455 sats, cambio a 88.000 e dopo 61
+secondi la domanda parte e il conto dice ≈ 56.818; messa la cifra del
+coordinatore, 67 secondi senza una domanda. Anonimo (`/api/me` a 401):
+sul libro la seconda lettura dai relay parte da sola a 122 secondi,
+nessuna chiamata alla rotta degli scambi. Nessun errore di pagina; fuori
+dal server del giro solo gli script di Telegram che la pagina carica da
+sempre (per l'anonimo anche il Login Widget).
+RESTA DA GUARDARE. Sul telefono: Esplora con la fila in vista per un
+paio di minuti; la pagina di un proprio ordine a mercato non ancora
+preso. Il cambio fermo dal vivo non si vede finché CoinGecko risponde:
+lo dirà il journal («CoinGecko non risponde da dieci minuti» è il primo
+segno, la riga arriva a 24 ore). Sul VPS niente da toccare.
+NON FATTO, e si vede: i «≈» degli annunci in Esplora non seguono il
+battito (seguono la busta); la riga del cambio fermo non c'è su «I miei
+scambi» né sulla pagina di uno scambio; il foglio «prendi» resta col
+cambio di quando si apre.
+
+**IL VERBALE DEL PUSH (10 ott 2026, sera): il cambio, le cose notate.**
+Main è corso una volta a cantiere aperto, dieci commit non miei (i
+gesti prima di pagare il PayCode, la riga per Wallet of Satoshi, il
+sollecito del recapito, l'indirizzo Lightning di casa, il riquadro dei
+contanti a due metodi, la copertura e il nome breve della Mini App, coi
+loro verbali): un solo conflitto, la coda di CANTIERI, sciolto tenendo
+tutte le voci.
+COSA È GIRATO SU QUALE ALBERO. Sull'albero di partenza (`062d404`):
+suite severa 21.832 verdi e 0 rosse, 57 collaudi su 57 nella gabbia, la
+tortura 52 su 53 (una equivalente) e il giro dal vivo. Ribasato su
+`1b1d05f`, l'albero del push: ventidue sezioni — le due del cambio, il
+libro, la sintassi del client, la bussola, il tetto di CLAUDE.md, il
+config d'esempio e tutte quelle toccate o nate coi commit arrivati
+(1.599 verdi, 0 rosse) — e sette collaudi nella gabbia (il cambio, i
+freni, la CSP, i metodi delle rotte e i tre toccati dai commit
+arrivati); la suite intera e gli altri collaudi NON rifatti su
+quest'ultima punta.
+Tortura e giro dal vivo NON rifatti dopo il rebase. Lo scanner dei
+segreti sulle righe aggiunte: pulito, con la controprova. LA CI DI MAIN
+prima del push: la punta (`1b1d05f`) verde. Il sì al push è di Andrea:
+stava nel brief incollato, e l'ho richiesto prima di spingere.

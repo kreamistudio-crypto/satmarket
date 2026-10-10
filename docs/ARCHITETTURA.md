@@ -17486,8 +17486,31 @@
   dov'è) e con la bandiera `cambioRidisegna` alzata: in `renderP2P` la
   rilettura dei 60 secondi del libro dai relay NON parte da quel
   render — il cambio rifà i numeri, non decide quando si ribussa ai
-  relay. Il resto dell'app (vetrina, pagina di uno scambio, fila P2P di
-  Esplora) il cambio lo riceve come prima.
+  relay.
+  ...E OVUNQUE SI STIMA (10 ott 2026, sera, cantiere cambio-ovunque).
+  Il battito chiede anche con davanti la fila «Scambi P2P» di Esplora
+  (`filaDavantiP2P`: le condizioni del suo giro della fotografia più
+  «c'è almeno una card»; si ridisegna con `ridisegnaFilaFermaP2P`, che
+  rimette lo scorrimento di lato) e la pagina di UNO scambio finché il
+  suo conto è al cambio di adesso (`scambioAlCambioP2P`, PURO, le
+  stesse domande di `contoDettP2P` e `metroFissoP2P`: a mercato senza
+  `satsNetti`, a sats fissi senza `satsMiei`; un intervallo no). A
+  decidere cosa ridisegnare è `ridisegnaColCambioP2P`, che guarda cosa
+  c'è davanti quando la risposta ARRIVA. I «≈» degli annunci di Esplora
+  seguono ancora la busta.
+  IL CAMBIO FERMO: lo zero che il server risponde oltre
+  `ORE_CAMBIO_VALIDO` nel client non entra (resta il numero di prima, o
+  quello di riserva), ma si ricorda in `cambioFermo` e lo dicono due
+  righe nel markup fisso, spente di serie — `#cambioFermoVetrina` sopra
+  «In vetrina» e `#cambioFermoLibro` sopra le card del libro, classe
+  `.cambio-fermo`. Le accende e spegne `segnaCambioFermo`, chiamata da
+  `impostaCambio`: solo lo zero DETTO accende (una risposta storta o un
+  server muto no), ogni cambio buono spegne.
+  CHI NON È ENTRATO, SUL LIBRO: in `battitoScambiP2P`, prima della
+  rotta degli scambi che per lui non esiste, un ridisegno fermo ogni
+  `P2P_SCAMBI_OGNI_MS` — è il render che attraversa la rilettura dei 60
+  secondi, lo stesso passo che chi è entrato ha per via del ridisegno
+  dopo la domanda «i miei scambi».
   IL GESTO INDIETRO (lug 2026): il tasto indietro di Android, lo swipe
   dal bordo e il tasto del browser tornano indietro di un passo invece
   di chiudere l'app — prima chiudono i fogli aperti, poi smontano le

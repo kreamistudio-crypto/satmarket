@@ -2144,6 +2144,10 @@
   .p2p-vt-tutti{background:none;border:0;padding:4px 0;cursor:pointer;
     font:800 13px Nunito,sans-serif;color:var(--sats-text)}
   .p2p-cosa-corpo p{margin:0 0 10px;font-size:14px;line-height:1.5}
+  /* il cambio fermo: la stessa riga piccola e grigia, in vetrina e sul libro */
+  .cambio-fermo{padding:10px var(--pad) 0;font-size:12px;font-weight:700;
+    color:var(--muted);line-height:1.3}
+  .cambio-fermo[hidden]{display:none}
   /* la fila spenta: una riga piccola e discreta, col solo «Mostra» a colore */
   .p2p-vt-via{padding:12px var(--pad) 0;font-size:12px;font-weight:700;
     color:var(--muted);line-height:1.3}
@@ -10768,6 +10772,10 @@ document.getElementById('cartello')?.remove();</script>
       <span id="ospiteTesto"></span>
       <button type="button" class="btn mini" onclick="chiudiOspite()">Vai al mercatino</button>
     </div>
+    <!-- IL CAMBIO FERMO (10 ott 2026): la accende `mostraCambioFermo`
+         quando il server dichiara il cambio non disponibile. Testo
+         fisso, nessun dato ci passa. -->
+    <div id="cambioFermoVetrina" class="cambio-fermo" role="status" hidden>Prezzo del bitcoin non aggiornato: le cifre con ≈ sono indicative.</div>
     <div class="strumenti">
       <div class="conta-blocco">
         <div class="section-label riga-conta" id="gridLabel">In vetrina</div>
@@ -11162,6 +11170,8 @@ document.getElementById('cartello')?.remove();</script>
           È stato preso, è scaduto oppure chi l'aveva pubblicato l'ha ritirato. Qui sotto trovi gli altri ordini aperti.</div>
         <button type="button" class="order-x" aria-label="Chiudi l'avviso" onclick="ordineSparitoP2P(false)">✕</button>
       </div>
+      <!-- IL CAMBIO FERMO, la gemella di quella della vetrina -->
+      <div id="cambioFermoLibro" class="cambio-fermo" role="status" hidden>Prezzo del bitcoin non aggiornato: stime e percentuali sono indicative.</div>
       <div id="p2pCorpo"></div>
       <!-- LA RIGA DISCRETA DEL LIBRO SUBITO (26 set 2026): finche' i
            relay non hanno risposto, sopra la barra e fuori dal flusso
@@ -21807,12 +21817,41 @@ function cardParteOrdine(o, lato){
    omette, che e' il patto di sempre. */
 let eurPerSat = 0.00092;   // valore di riserva se il cambio non arriva
 let cambioVivo = false;    // true solo col cambio VERO in mano
+/* IL CAMBIO FERMO SI DICE (10 ott 2026, cantiere cambio-ovunque,
+   richiesta di Andrea). Quando CoinGecko tace da piu' di
+   ORE_CAMBIO_VALIDO il server risponde 0, «non disponibile», e qui lo
+   zero non entra (mai un numero inventato): resta in mano il cambio di
+   prima — o quello di riserva, per chi ha aperto l'app adesso — e le
+   conversioni continuavano a uscire come se niente fosse. Adesso
+   l'ultima parola del server si ricorda (`cambioFermo`) e la dicono due
+   righe piccole, una in vetrina e una sul libro del P2P: «Prezzo del
+   bitcoin non aggiornato». Il numero resta quello: meglio un ordine di
+   grandezza dichiarato vecchio che una pagina senza cifre.
+   SOLO LO ZERO DETTO: una risposta storta, un server muto, la rete
+   giu' non sono una dichiarazione, e non accendono niente (il patto
+   fail-open di sempre). Si spegne da sola al primo cambio buono. */
+let cambioFermo = false;   // l'ultima parola del server: «non disponibile»
 function eur(sats){ return (sats * eurPerSat).toFixed(0); }
 function impostaCambio(eurPerBtc){
   const v = Number(eurPerBtc) || 0;
+  if (v <= 0 && eurPerBtc === 0) segnaCambioFermo(true);
   if (v <= 0) return;   // 0 = «non disponibile»: mai un numero inventato
   eurPerSat = v / 100000000; cambioVivo = true;
   cambioChiesto = Date.now();   // un cambio appena arrivato non si richiede
+  segnaCambioFermo(false);
+}
+function segnaCambioFermo(fermo){
+  if (cambioFermo === fermo) return;
+  cambioFermo = fermo;
+  mostraCambioFermo();
+}
+/* le due righe stanno nel markup fisso, spente: qui si accendono e si
+   spengono soltanto, senza un render */
+function mostraCambioFermo(){
+  for (const id of ['cambioFermoVetrina', 'cambioFermoLibro']) {
+    const n = el(id);
+    if (n) n.hidden = !cambioFermo;
+  }
 }
 /* IL CAMBIO SUL LIBRO P2P (10 ott 2026, cantiere cambio-libro-p2p).
    La busta di /api/listings basta a chi sfoglia la vetrina, che la
@@ -21843,6 +21882,21 @@ function impostaCambio(eurPerBtc){
    capita» a «ogni minuto, per chiunque guardi» — una REQ ai relay che
    nessuno ha chiesto. Il cambio non decide quando si rilegge il libro:
    quello resta dei render di sempre e della tirata.
+   ANCHE LA FILA DI ESPLORA E LA PAGINA DI UNO SCAMBIO (10 ott 2026,
+   sera, cantiere cambio-ovunque: le cose notate, col si' di Andrea).
+   Il battito chiede il cambio anche quando davanti c'e':
+   - la fila «Scambi P2P» di Esplora (`filaDavantiP2P`: Esplora davanti,
+     la vetrina nuda, la fila non spenta da chi guarda e con dentro
+     almeno una card) — le sue card stimano i sats come quelle del
+     libro. Si ridisegna tenendo lo scorrimento di lato
+     (`ridisegnaFilaFermaP2P`): riscrivere la fila la riporta
+     all'inizio, e una volta al minuto sarebbe un dispetto;
+   - la pagina di UNO scambio, ma solo finche' il suo conto e' fatto col
+     cambio di ADESSO (`scambioAlCambioP2P`): un ordine a mercato a cui
+     il coordinatore non ha ancora detto i sats, o uno a sats fissi non
+     ancora preso (la riga della convenienza). Dalla presa in poi le
+     cifre sono un fatto e la pagina non chiede niente.
+   Il resto di Esplora (i «≈» degli annunci) segue ancora la busta.
    UNA DOMANDA ALLA VOLTA, e fail-open: server muto, risposta storta o
    cambio a zero lasciano quello che c'era (il patto di impostaCambio).
    Il tempo limite e' per la tirata, che questa risposta l'aspetta: la
@@ -21879,15 +21933,53 @@ function libroDavantiP2P(){
   const v = vistaAttivaP2P();
   return v === 'view-p2p' || v === 'view-p2pmiei';
 }
-function battitoCambioLibroP2P(){
-  if (Date.now() - cambioChiesto < CAMBIO_LIBRO_MS) return;
-  if (document.visibilityState === 'hidden' || !libroDavantiP2P()) return;
-  rileggiCambio().then(cambiato => {
-    /* nel frattempo si puo' essere usciti dal libro: li' renderP2P non
-       ha niente da dipingere, e il cambio nuovo resta in mano */
-    if (!cambiato || !libroDavantiP2P()) return;
+/* la fila «Scambi P2P» di Esplora si vede e ha delle card: le stesse
+   condizioni del suo giro della fotografia, piu' «c'e' qualcosa da
+   rifare». (I typeof: i banchi che fanno girare il solo blocco del
+   cambio non hanno ne' la fila ne' l'archivio degli scambi.) */
+function filaDavantiP2P(){
+  return typeof vetrinaDavantiP2P === 'function' && vetrinaDavantiP2P()
+    && vetrinaNudaP2P() && !filaP2PNascosta() && !!p2pVetrinaFirma;
+}
+/* PURA: il conto di questo scambio e' fatto col cambio di ADESSO? Le
+   stesse domande di `contoDettP2P` e `metroFissoP2P`, nello stesso
+   ordine: un intervallo non ha un conto, i sats fissi si misurano col
+   cambio di adesso finche' non sono presi (`satsMiei`), e a mercato si
+   stima finche' il coordinatore non dice la cifra (`satsNetti`). */
+function scambioAlCambioP2P(o){
+  if (!o || o.euroMax || !(Number(o.euro) > 0)) return false;
+  if (o.sats > 0) return !(o.satsMiei > 0);
+  return !(Math.floor(Number(o.satsNetti) || 0) > 0);
+}
+function scambioDavantiP2P(){
+  if (vistaAttivaP2P() !== 'view-p2pordine' || typeof ordiniP2P !== 'function') return false;
+  return scambioAlCambioP2P(ordiniP2P()[p2pOrdineAperto]);
+}
+function cambioDavantiP2P(){
+  return libroDavantiP2P() || scambioDavantiP2P() || filaDavantiP2P();
+}
+/* la fila riscritta TENENDO lo scorrimento di lato */
+function ridisegnaFilaFermaP2P(){
+  const fila = el('p2pVetrinaFila');
+  const x = fila ? fila.scrollLeft : 0;
+  renderVetrinaP2P();
+  if (fila && x) { fila.scrollLeft = x; aggiornaFrecce('p2pVetrinaFila'); }
+}
+/* col cambio nuovo si ridisegna quel che c'e' davanti ADESSO: nel
+   frattempo si puo' essere andati altrove, e li' non c'e' niente da
+   dipingere — il cambio nuovo resta in mano */
+function ridisegnaColCambioP2P(){
+  if (libroDavantiP2P()) {
     cambioRidisegna = true;
     try { ridisegnaLibroFermoP2P(); } finally { cambioRidisegna = false; }
+  } else if (scambioDavantiP2P()) renderOrdineP2P();
+  else if (filaDavantiP2P()) ridisegnaFilaFermaP2P();
+}
+function battitoCambioLibroP2P(){
+  if (Date.now() - cambioChiesto < CAMBIO_LIBRO_MS) return;
+  if (document.visibilityState === 'hidden' || !cambioDavantiP2P()) return;
+  rileggiCambio().then(cambiato => {
+    if (cambiato) ridisegnaColCambioP2P();
   }).catch(() => {});
 }
 
@@ -70976,6 +71068,20 @@ function battitoScambiP2P(){
   if (document.visibilityState === 'hidden') return;
   const v = vistaAttivaP2P();
   if (v !== 'view-p2p' && v !== 'view-p2pmiei' && v !== 'view-p2pordine') return;
+  /* CHI NON E' ENTRATO RILEGGE IL LIBRO LO STESSO (10 ott 2026, cantiere
+     cambio-ovunque). A chi e' entrato il libro si rilegge dai relay
+     ogni due minuti senza che nessuno l'abbia deciso: e' il ridisegno
+     qui sotto che attraversa la rilettura dei 60 secondi di renderP2P.
+     L'anonimo quella domanda non la fa (non ha scambi suoi), quindi
+     nessun render lo attraversava e il suo libro restava quello
+     dell'apertura, corretto solo dall'ascolto. Stesso passo anche per
+     lui, e solo sul libro: un ridisegno FERMO, che rilegge se il libro
+     ha piu' di un minuto e tiene quel che si sta guardando. Costa una
+     REQ ogni due minuti sul websocket che l'ascolto tiene gia' aperto. */
+  if (!DEMO && (VETRINA || !myTgId)) {
+    if (v === 'view-p2p') ridisegnaLibroFermoP2P();
+    return;
+  }
   chiediScambiServerP2P().then(ok => {
     if (!ok) return;
     renderP2P();
