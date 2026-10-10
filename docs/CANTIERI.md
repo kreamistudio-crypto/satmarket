@@ -45835,3 +45835,29 @@ nuovi anche alle firme della coda (la sessione conservata ora li porta).
 Il cartone chiude solo la PROPRIA sottoscrizione (`di === this`): un
 relay del caso prima si portava via quella del nuovo — lezione del
 banco, non del codice.
+
+## Login col bunker, il verbale del push (10 ott 2026, sera): cosa è girato su quale albero
+
+Main era corso di undici commit (da `ccea57f` a `87b3cf3`: il controllo
+della fattura, «I tuoi dati», il «Condividi» P2P, lo scanner dei
+segreti, la finestra del gesto a 30 minuti, «Apri nel wallet»): rebase
+dei tre commit del cantiere su `87b3cf3`, un conflitto solo, in coda a
+CANTIERI, sciolto tenendo le due code. Sull'albero ribasato: ogni
+simbolo nuovo contato una volta sola per nome, `node --check` sui tre
+script del client, le tre sezioni NIP-46 verdi (185), la suite intera
+severa (`PROVE_SEVERE=1`, nel worktree senza config): 21.345 passate,
+0 fallite, 0 saltate; i 52 collaudi della CI nella gabbia senza rete:
+52 verdi, 0 rossi. E UN SECONDO GIRO: al momento del push main era
+corso ancora (`f45b860`, «I tuoi dati» e il Nostr che prende: quattro
+righe di miniapp.html e quaranta di prove.py, fuori dal login): rebase
+di nuovo, lo stesso conflitto in coda sciolto allo stesso modo, e
+sull'albero `f45b860`: parse e `node --check`, le tre sezioni NIP-46 più
+freni e leva dei relay (249 verdi), i 52 collaudi della CI nella gabbia
+(52 verdi, 0 rossi). E UN TERZO: main corso ancora (`6bfa0b2`, il cantiere
+cookie-onion: 71 righe di server.py sui cookie, 242 di prove.py), rebase
+di nuovo con lo stesso conflitto in coda, e sull'albero `6bfa0b2` le
+stesse cinque sezioni (249 verdi), parse e `node --check`, i 52 collaudi
+nella gabbia (52 verdi, 0 rossi). La suite intera resta quella di `87b3cf3`. Il giro
+dal vivo resta quello dell'albero di prima (`ccea57f`): i tre commit non
+toccano niente che main abbia cambiato nel login. Chiusa su GitHub la
+PR 17 «Entrare con Amber».
