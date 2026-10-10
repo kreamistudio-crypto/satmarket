@@ -17451,6 +17451,33 @@
   nessuna busta, quindi resta il valore di riserva con `cambioVivo`
   falso — cioè il patto di sempre, dove il numero conta il «≈» si
   omette. Leva `ORE_CAMBIO_VALIDO` nel pannello «⚙️ Stato delle leve».
+  IL CAMBIO SUL LIBRO P2P (10 ott 2026, cantiere cambio-libro-p2p): la
+  busta basta a chi sfoglia la vetrina, che la rilegge di continuo; chi
+  RESTA sul libro del P2P non la chiede più, e lì il cambio fa le stime
+  in sats degli ordini a mercato (`satsMercatoP2P`) e i badge % di
+  quelli a sats fissi (`premioCardP2P`). Quindi una seconda porta sulla
+  STESSA fonte: `GET /api/cambio` → `{"cambio_eur": cambio_noto_ora()}`,
+  aperta, senza parametri, `no-store`, e come la busta legge la cache e
+  mai la rete né il database (una rotta aperta non deve poter far
+  bussare CoinGecko a comando; 0 = non disponibile). Nel client
+  `rileggiCambio()` è l'unico che la chiama — una domanda alla volta,
+  tempo limite di 8 s, fail-open: muto, storto o zero lasciano il
+  cambio di prima — e la chiamano due strade: la TIRATA sul libro
+  (`aggiornaVista`, insieme alla lettura nuova del libro: si ridisegna
+  dopo tutt'e due) e il BATTITO `battitoCambioLibroP2P`, nell'interval
+  unico dell'app, ogni `CAMBIO_LIBRO_MS` (60 s, la cadenza di
+  `CAMBIO_RINFRESCO_S`: più spesso si rileggerebbe lo stesso numero),
+  solo col libro o «I miei scambi» davanti e la pagina visibile.
+  `cambioChiesto` è l'orologio, e lo sposta ogni cambio arrivato, anche
+  dalla busta: chi torna sul libro con un cambio più vecchio di un
+  minuto lo riceve al primo battito. Il battito ridisegna solo se il
+  numero è cambiato, col ridisegno FERMO (`ridisegnaLibroFermoP2P`: il
+  cambio riordina le card per convenienza, e quella che si guarda resta
+  dov'è) e con la bandiera `cambioRidisegna` alzata: in `renderP2P` la
+  rilettura dei 60 secondi del libro dai relay NON parte da quel
+  render — il cambio rifà i numeri, non decide quando si ribussa ai
+  relay. Il resto dell'app (vetrina, pagina di uno scambio, fila P2P di
+  Esplora) il cambio lo riceve come prima.
   IL GESTO INDIETRO (lug 2026): il tasto indietro di Android, lo swipe
   dal bordo e il tasto del browser tornano indietro di un passo invece
   di chiudere l'app — prima chiudono i fogli aperti, poi smontano le

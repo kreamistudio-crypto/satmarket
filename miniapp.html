@@ -17958,7 +17958,14 @@ async function aggiornaVista(){
        e' la risposta che quella vista mostra, e il gesto e' esplicito
        come il «Riprova» (la bandierina e' l'unico gate) */
     if (v === 'p2pmiei') p2pMieiChiesto = false;
+    /* ...e si rilegge anche il CAMBIO (10 ott 2026, vedi «IL CAMBIO SUL
+       LIBRO P2P»): le stime in sats e i badge % si fanno con lui, e un
+       libro nuovo col bitcoin di un'ora fa e' aggiornato a meta'. Parte
+       INSIEME al libro e non dopo — sono due domande a due posti
+       diversi —, e non alza mai: se tace resta il cambio di prima. */
+    const cambio = rileggiCambio();
     await caricaLibroP2P(true).catch(()=>{});
+    await cambio;
     renderP2P();
     return;
   }
@@ -21754,6 +21761,83 @@ function impostaCambio(eurPerBtc){
   const v = Number(eurPerBtc) || 0;
   if (v <= 0) return;   // 0 = «non disponibile»: mai un numero inventato
   eurPerSat = v / 100000000; cambioVivo = true;
+  cambioChiesto = Date.now();   // un cambio appena arrivato non si richiede
+}
+/* IL CAMBIO SUL LIBRO P2P (10 ott 2026, cantiere cambio-libro-p2p).
+   La busta di /api/listings basta a chi sfoglia la vetrina, che la
+   rilegge di continuo; chi RESTA sul libro del P2P quella busta non la
+   chiede piu', e le stime in sats degli ordini a mercato
+   (`satsMercatoP2P`) e i badge % di quelli a sats fissi
+   (`premioCardP2P`) restavano fermi al bitcoin di quando si era aperta
+   l'app — anche tirando giu' per aggiornare, che rileggeva il libro e
+   non il cambio.
+   LA FONTE RESTA UNA, il nostro server: `/api/cambio` da' lo stesso
+   numero della busta, dalla stessa cache. Due strade lo chiedono:
+   - la TIRATA sul libro (aggiornaVista), insieme al libro;
+   - il BATTITO, ogni CAMBIO_LIBRO_MS — la cadenza con cui il server lo
+     rinfresca (CAMBIO_RINFRESCO_S): piu' spesso si rileggerebbe lo
+     stesso numero — e solo col libro DAVANTI e la pagina VISIBILE. Chi
+     torna sul libro, o sulla pagina, con un cambio piu' vecchio di un
+     minuto lo riceve al primo battito: il minuto vale per chi resta.
+   Il battito sta nell'interval unico dell'app, come i suoi fratelli, e
+   ridisegna SOLO se il numero e' cambiato davvero.
+   IL RIDISEGNO DEL BATTITO E' FERMO E PORTA SOLO I NUMERI (visto nel
+   giro dal vivo). FERMO: col cambio si muove la convenienza degli
+   ordini a sats fissi, e con lei l'ordine delle card — a chi sta
+   scorrendo la card che guarda resta dov'e' (`ridisegnaLibroFermoP2P`,
+   quello delle card arrivate dall'ascolto). SOLO I NUMERI: renderP2P
+   rilegge il libro dai relay quando lo attraversa un render e il libro
+   ha piu' di P2P_LIBRO_FRESCO_MS; questo render arriva ogni minuto, e
+   senza `cambioRidisegna` avrebbe portato quella rilettura da «quando
+   capita» a «ogni minuto, per chiunque guardi» — una REQ ai relay che
+   nessuno ha chiesto. Il cambio non decide quando si rilegge il libro:
+   quello resta dei render di sempre e della tirata.
+   UNA DOMANDA ALLA VOLTA, e fail-open: server muto, risposta storta o
+   cambio a zero lasciano quello che c'era (il patto di impostaCambio).
+   Il tempo limite e' per la tirata, che questa risposta l'aspetta: la
+   pastiglia non deve girare per sempre dietro a un server che tace. */
+const CAMBIO_LIBRO_MS = 60000;      // come CAMBIO_RINFRESCO_S del server
+const CAMBIO_ATTESA_MS = 8000;      // oltre, vale il cambio di prima
+let cambioChiesto = 0;              // l'ultima domanda, o l'ultimo arrivo
+let cambioGiro = null;              // la domanda in volo, se c'e'
+let cambioRidisegna = false;        // vero SOLO dentro il ridisegno del battito
+/* torna true se il cambio in mano e' CAMBIATO */
+function rileggiCambio(){
+  if (DEMO) return Promise.resolve(false);
+  if (cambioGiro) return cambioGiro;
+  cambioChiesto = Date.now();
+  cambioGiro = (async () => {
+    const prima = cambioVivo ? eurPerSat : 0;
+    const ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+    const t = setTimeout(() => { if (ctl) ctl.abort(); }, CAMBIO_ATTESA_MS);
+    try {
+      const r = await fetch(`${API_BASE}/cambio`,
+        {cache: 'no-store', signal: ctl ? ctl.signal : undefined});
+      if (!r.ok) return false;
+      const j = await r.json();
+      impostaCambio(j && j.cambio_eur);
+      return cambioVivo && eurPerSat !== prima;
+    } catch(e) {
+      return false;
+    } finally { clearTimeout(t); cambioGiro = null; }
+  })();
+  return cambioGiro;
+}
+/* il libro e' davanti: le due viste che renderP2P dipinge */
+function libroDavantiP2P(){
+  const v = vistaAttivaP2P();
+  return v === 'view-p2p' || v === 'view-p2pmiei';
+}
+function battitoCambioLibroP2P(){
+  if (Date.now() - cambioChiesto < CAMBIO_LIBRO_MS) return;
+  if (document.visibilityState === 'hidden' || !libroDavantiP2P()) return;
+  rileggiCambio().then(cambiato => {
+    /* nel frattempo si puo' essere usciti dal libro: li' renderP2P non
+       ha niente da dipingere, e il cambio nuovo resta in mano */
+    if (!cambiato || !libroDavantiP2P()) return;
+    cambioRidisegna = true;
+    try { ridisegnaLibroFermoP2P(); } finally { cambioRidisegna = false; }
+  }).catch(() => {});
 }
 
 /* ---------------- doppia valuta: la vista ₿/€ ----------------
@@ -22121,6 +22205,7 @@ setInterval(() => {
   battitoControlloTabP2P();
   battitoPagamentiP2P();
   battitoScambiP2P();
+  battitoCambioLibroP2P();
   /* «📍 Sono qui» dell'altra parte, a pagina del contanti aperta (1 ott 2026) */
   try { battitoContantiP2P(); } catch(e) {}
   document.querySelectorAll('.lampo-count').forEach(n => {
@@ -51660,8 +51745,12 @@ function renderP2P(){
      arrivando ridisegna FERMO (le card nuove col loro respiro, lo
      scorrimento tenuto). Se cade, la copia resta e l'avviso lo dice. */
   const adesso = Date.now();
+  /* ...E NON AL RIDISEGNO DEL CAMBIO (10 ott 2026, vedi «IL CAMBIO SUL
+     LIBRO P2P»): quello passa di qui ogni minuto per rifare i numeri, e
+     non e' un motivo per ribussare ai relay. */
   if ((p2pLibro.copia || adesso - (p2pLibro.quando || 0) > P2P_LIBRO_FRESCO_MS)
-      && adesso - p2pRiletto > P2P_LIBRO_FRESCO_MS && !p2pLettura) {
+      && adesso - p2pRiletto > P2P_LIBRO_FRESCO_MS && !p2pLettura
+      && !(typeof cambioRidisegna !== 'undefined' && cambioRidisegna)) {
     p2pRiletto = adesso;
     const copia = !!p2pLibro.copia;
     caricaLibroP2P().then(() => {

@@ -47297,3 +47297,147 @@ sulla card del libro a 375 px (è più lunga di prima: qui non l'ho vista
 a schermo), e il riquadro della recensione su uno scambio annullato da
 un moderatore. Sul VPS: «📬 Attese P2P: avvisati … (recensione)» il
 giorno dopo il primo scambio concluso.
+
+## Il cambio sul libro P2P: la tirata e il battito (10 ott 2026, cantiere cambio-libro-p2p, richiesta di Andrea)
+
+IL DIFETTO. Il cambio del bitcoin arrivava al client in un posto solo:
+la busta di prima pagina di `/api/listings` (`impostaCambio`, la «sola
+fonte» di agosto). Alla vetrina basta, perché la rilegge di continuo.
+Sul libro del P2P no: lì il cambio fa le stime in sats degli ordini a
+mercato (`satsMercatoP2P`) e i badge % di quelli a sats fissi
+(`premioCardP2P`), e chi restava sul libro li leggeva col bitcoin di
+quando aveva aperto l'app. Nemmeno «tira giù per aggiornare» rimediava:
+`aggiornaVista` sul libro rileggeva il libro dai relay e basta — libro
+nuovo, numeri vecchi.
+COSA SI È DECISO.
+- UNA SECONDA PORTA SULLA STESSA FONTE: `GET /api/cambio` risponde
+  `{"cambio_eur": cambio_noto_ora()}`. Aperta e senza parametri (il
+  cambio non è di nessuno, e il libro lo guarda anche l'anonimo),
+  `no-store`, e come la busta legge la CACHE: mai la rete, mai il
+  database. 0 = non disponibile.
+- Nel client `rileggiCambio()` è l'unico che la chiama: una domanda alla
+  volta, tempo limite di 8 secondi, fail-open — server muto, risposta
+  storta o cambio a zero lasciano quello che c'era (il patto di
+  `impostaCambio`).
+- LA TIRATA sul libro (e su «I miei scambi», che è lo stesso ramo)
+  chiede il cambio INSIEME al libro e ridisegna dopo tutt'e due. Un
+  relay muto non ferma il cambio; un server muto non tiene la pastiglia
+  a girare oltre il tempo limite.
+- IL RINFRESCO A TEMPO (il punto 2, da valutare: FATTO). Un battito in
+  più nell'interval unico dell'app, `battitoCambioLibroP2P`: ogni 60
+  secondi — la cadenza con cui il server rilegge CoinGecko
+  (`CAMBIO_RINFRESCO_S`): più spesso si riceverebbe lo stesso numero —
+  e solo col libro (o «I miei scambi») DAVANTI e la pagina VISIBILE.
+  L'orologio è `cambioChiesto`, e lo sposta ogni cambio arrivato, anche
+  quello della busta: così chi entra nel libro, o torna sulla pagina,
+  con un cambio più vecchio di un minuto lo riceve al primo battito, e
+  chi è appena arrivato non lo richiede. Costa una GET al minuto da una
+  riga di JSON, servita dalla memoria; si ridisegna solo se il numero è
+  cambiato davvero.
+LE STRADE SCARTATE.
+- Il cambio dentro la fotografia `/api/p2p/libro`: ha l'ETag sul momento
+  della fotografia, e un 304 terrebbe in mano il cambio vecchio; e chi
+  sta sul libro quella fotografia non la richiede (è della fila di
+  Esplora).
+- Rileggere `/api/listings` dal libro: rifà la vetrina, spegne il
+  barattolo e la vista ospite, e pesa cento volte la risposta che serve.
+- `await cambio_btc_eur()` nella rotta: è il percorso delle invoice, che
+  a cache fredda bussa a CoinGecko — in una rotta aperta vorrebbe dire
+  far bussare chiunque, a comando. La vetrina ha già scelto la cache per
+  la stessa ragione.
+- Un timer suo: «UN solo interval per tutta l'app» è già scritto, e il
+  battito ci entra come i suoi fratelli.
+- Una cache HTTP sulla rotta (anche di pochi secondi): un cambio tenuto
+  in una cache è di nuovo il cambio vecchio, e la risposta non costa
+  niente da rifare.
+- La leva nel config: il rinfresco non ha un valore da tarare che non
+  sia già `CAMBIO_RINFRESCO_S`, e una leva in più è una riga in più da
+  ricordare sul VPS.
+DAL GIRO DAL VIVO, due correzioni prima del commit.
+- IL RIDISEGNO DEL BATTITO NON RILEGGE IL LIBRO. `renderP2P` rilegge il
+  libro dai relay quando lo attraversa un render e il libro ha più di 60
+  secondi (`P2P_LIBRO_FRESCO_MS`). Il mio ridisegno arriva ogni minuto:
+  nel primo giro la terza lettura del libro è partita da lì, cioè una
+  REQ ai relay al minuto per chiunque guardi, anonimo compreso — non
+  chiesta, e non leggera. La bandiera `cambioRidisegna`, vera solo
+  dentro quel ridisegno, la esclude dalla condizione di `renderP2P`
+  (col `typeof` dei banchi che fanno girare `renderP2P` senza di lei).
+  Il cambio rifà i numeri; quando si ribussa ai relay lo decidono i
+  render di sempre e la tirata, come ieri.
+- IL RIDISEGNO È QUELLO FERMO (`ridisegnaLibroFermoP2P`, lo stesso delle
+  card arrivate dall'ascolto): col cambio si muove la convenienza degli
+  ordini a sats fissi e quindi l'ordine delle card, e a chi sta
+  scorrendo la card che guarda resta dov'è.
+PROVATO. `prove_cambio_libro_p2p`, 39: le sentinelle (la rotta sulla
+cache, il posto unico della fetch, la cadenza uguale a quella del
+server, l'interval unico, la tirata in ordine, la bandiera) e il banco
+node coi pezzi VERI — il blocco del cambio, la stima delle card,
+`aggiornaVista`, la condizione della rilettura presa da `renderP2P` — e
+server, orologio e timer di cartone: il battito a 59 e a 60 secondi, il
+numero uguale che non ridisegna, la pagina nascosta, le sette viste, la
+domanda in volo, chi esce dal libro a metà, sette risposte storte, la
+tirata nei due ordini d'arrivo, col relay muto e col server muto.
+Tortura: 40 mutazioni su 40 uccise, tutte con una rossa col suo nome
+(tre al primo giro facevano ESPLODERE la sezione: le sentinelle sono
+passate a `find`). `collaudo_cambio_libro_p2p`, 16, col server vero e
+anche nella gabbia: lo stesso numero della busta, la cache seguita
+senza giri in mezzo, cinque domande a cache fredda senza una lettura da
+CoinGecko né un'apertura del database — col controllo: sulla stessa
+cache il percorso delle invoice invece ci va —, lo zero oltre
+`ORE_CAMBIO_VALIDO`. È entrato nei due elenchi del workflow.
+DAL VIVO (Chrome col tocco via Playwright, 390×844; copia del worktree
+col config d'esempio, relay morto, server nella gabbia dei collaudi; di
+cartone la lettura del libro — due ordini finti, uno a mercato e uno a
+sats fissi — e una manopola del cambio al posto di CoinGecko), 16 su
+16: col cambio a 100.000 la card a mercato dice ≈ 98.000 sats e quella
+fissa «al prezzo di mercato»; cambio a 125.000 sul server e pagina
+ferma: niente si muove; TIRATA: una domanda a `/api/cambio`, il libro
+riletto, 78.400 sats e «25% più conveniente · Super affare»; cambio a
+80.000 senza toccare niente: dopo 61 secondi la domanda parte da sola,
+122.500 sats e «20% meno conveniente», e il libro NON si rilegge;
+pagina nascosta per 66 secondi: nessuna domanda, e al ritorno parte in
+due decimi; in Esplora per 66 secondi: nessuna domanda, e tornando sul
+libro parte subito. Nessun errore di pagina; fuori dal server del giro
+solo lo script di Telegram, che la pagina carica da sempre. La gabbia
+ha segnato un solo tentativo, del server all'avvio: lo storico della
+fee dinamica su CoinGecko, fermato.
+RESTA DA GUARDARE. Sul telefono vero: restare sul libro qualche minuto
+con un ordine a mercato sotto gli occhi e vedere la cifra muoversi da
+sola; tirare giù e vederla cambiare. Sul VPS niente da toccare: nessuna
+leva nuova, e la rotta nasce col deploy.
+NON FATTO, e si vede: la pagina di UNO scambio e il foglio «prendi» non
+seguono il battito (il foglio nasce col cambio del libro, quindi al più
+vecchio di un minuto); la fila «Scambi P2P» di Esplora resta col cambio
+della busta; un cambio che il server dichiara scaduto (0, oltre le 24
+ore) non spegne quello che il client ha già in mano — è il patto di
+`impostaCambio`, e vale anche per la vetrina.
+
+**IL VERBALE DEL PUSH (10 ott 2026, sera): il cambio sul libro P2P.**
+Main è corso sei volte a cantiere aperto, undici commit non miei
+(onion-android, la CSP accesa, le hold di prova G e H col loro verbale,
+il controllo della fattura terza tappa, i malus dopo la garanzia, il
+verbale del cookie sul tunnel, il codice di ritiro unico, la riga di
+CLAUDE.md sul config del VPS, i link dentro Telegram terzo giro, il
+feedback rifinito). COSA È GIRATO SU QUALE ALBERO. Sull'albero di
+partenza (`d0529f9`): suite severa 21.600 verdi e 0 rosse, 54 collaudi
+su 54 nella gabbia, la tortura 40 su 40 e il giro dal vivo. Ribasato su
+`31cb369`: suite 21.623 e 0 rosse, 54 collaudi su 54, lo scanner dei
+segreti pulito sulle righe aggiunte (con la controprova). Ribasato su
+`b14f5e2`: suite severa 21.637 verdi e 0 rosse, 55 collaudi su 55.
+Ribasato su `e1627d3`: 78 sezioni toccate (5.584 verdi, 0 rosse) e 56
+collaudi su 56. Ribasato su `384a3ce`: otto sezioni (330 verdi) e
+quattro collaudi. Ribasato su `660f1ed` (solo CLAUDE.md): la mia
+sezione, la bussola e il tetto. Ribasato su `6b4eb19`, l'albero del
+push: venti sezioni — la mia, la sintassi del client, la bussola, il
+tetto di CLAUDE.md, il config d'esempio e tutte quelle toccate o nate
+coi commit arrivati (973 verdi, 0 rosse) — e sei collaudi nella gabbia
+(il cambio, il promemoria, il feedback P2P, i freni, la CSP, i metodi
+delle rotte), più lo scanner dei segreti; la suite intera e gli altri
+collaudi NON rifatti su quest'ultima punta. I conflitti: la coda di
+CANTIERI quattro volte e due volte i due elenchi del workflow, sciolti
+tenendo tutte le voci. Tortura e giro dal vivo NON rifatti dopo i
+rebase: il giro è quindi di prima della CSP accesa (la fetch nuova va
+alla stessa origine, `connect-src 'self'`, e `collaudo_csp` è verde).
+LA CI DI MAIN prima del push: ho aspettato la punta (`6b4eb19`),
+verde, come le due prima di lei. Il sì al push è di Andrea: stava nel
+brief incollato, e l'ho richiesto prima di spingere.

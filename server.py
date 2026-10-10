@@ -13179,6 +13179,26 @@ async def scalda_cambio():
     _TASK_CAMBIO = asyncio.create_task(orologio_cambio())
 
 
+@app.get("/api/cambio")
+def cambio_da_solo():
+    """IL CAMBIO DA SOLO (10 ott 2026, cantiere cambio-libro-p2p): lo
+    stesso numero che viaggia nella busta di prima pagina di
+    /api/listings, per chi la vetrina non la sta rileggendo. Lo chiede
+    il libro P2P — alla tirata di aggiornamento e ogni minuto finche'
+    lo si guarda — perche' li' il cambio fa le stime in sats degli
+    ordini a mercato e i badge % di quelli a sats fissi, e chi restava
+    sul libro li leggeva col bitcoin di quando aveva aperto l'app.
+    LA FONTE RESTA UNA: `cambio_noto_ora`, la cache che l'orologio
+    rinfresca ogni CAMBIO_RINFRESCO_S. Mai la rete, mai il database: e'
+    una rotta aperta, e una rotta aperta non deve poter far bussare
+    CoinGecko a comando. 0 = non disponibile, come nella busta.
+    APERTA E SENZA PARAMETRI: il cambio non e' di nessuno, e il libro
+    lo guarda anche chi non ha una sessione. `no-store`: un cambio
+    tenuto in una cache e' di nuovo il cambio vecchio."""
+    return JSONResponse({"cambio_eur": cambio_noto_ora()},
+                        headers={"Cache-Control": "no-store"})
+
+
 # ==================== LA FEE DINAMICA (set 2026) =======================
 # ANCORA IN ANTEPRIMA — leggi la nota sopra FEE_DINAMICA_TOTALE_PERCENTO.
 # Il 5% del mercatino si sposta fra compratore e venditore secondo il

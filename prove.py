@@ -140587,6 +140587,392 @@ def prove_prova_wallet():
           [rh.index("in sospeso") < rh.index('id="p2pHoldQr"'), rc.index("in sospeso") < rc.index('id="p2pHoldQr"')])
 
 
+def prove_cambio_libro_p2p():
+    """IL CAMBIO SUL LIBRO P2P (10 ott 2026, cantiere «cambio-libro-p2p»,
+    richiesta di Andrea). Il cambio del bitcoin arrivava al client solo
+    nella busta di prima pagina di /api/listings: chi restava sul libro
+    del P2P leggeva le stime in sats degli ordini a mercato e i badge %
+    di quelli a sats fissi col bitcoin di quando aveva aperto l'app, e
+    «tira giu' per aggiornare» rileggeva il libro ma non il cambio.
+    Adesso c'e' `/api/cambio` (la stessa cache, mai la rete), e il client
+    lo chiede alla TIRATA sul libro e, finche' il libro e' davanti e la
+    pagina si vede, ogni minuto dal BATTITO dell'interval unico.
+
+    Quel che qui si rompe in silenzio: la tirata che ridisegna PRIMA che
+    il cambio sia arrivato (libro nuovo, numeri vecchi: il difetto di
+    partenza); il battito che chiede al secondo invece che al minuto, o a
+    pagina nascosta, o da Esplora; un cambio a zero o una risposta storta
+    che spengono il «≈» a chi un cambio buono ce l'aveva; un server muto
+    che lascia la pastiglia a girare per sempre; una rotta aperta che fa
+    bussare CoinGecko a comando.
+
+    1) le SENTINELLE sul testo, server e client;
+    2) il BANCO node coi pezzi VERI (il blocco del cambio, la stima delle
+       card, `aggiornaVista`) e un server, un orologio e un timer di
+       cartone. Il server VERO risponde in `collaudo_cambio_libro_p2p`."""
+    print("\n[il cambio sul libro P2P: la tirata e il battito]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    # --- 1) LE SENTINELLE --------------------------------------------------
+    # (coi `find`: una rotta tolta o una riga spostata devono dare una
+    # rossa col suo nome, non far esplodere la sezione)
+    i = src.find('@app.get("/api/cambio")')
+    rotta = src[i:src.index("\n\n\n", i)] if i >= 0 else ""
+    corpo = codice(_senza_prosa(rotta))
+    prova("la rotta del cambio c'e', in GET, e risponde con la cache: `cambio_noto_ora`, "
+          "mai il percorso che puo' bussare a CoinGecko, mai il database", [1, True, False, False, False],
+          [src.count('@app.get("/api/cambio")'),
+           '{"cambio_eur": cambio_noto_ora()}' in corpo,
+           "cambio_btc_eur" in corpo or "_rileggi_cambio" in corpo,
+           "db(" in corpo, "async def" in corpo or "await " in corpo])
+    prova("...senza parametri e senza identita' (il cambio non e' di nessuno), e `no-store`",
+          [True, True],
+          ["def cambio_da_solo():" in corpo,
+           'headers={"Cache-Control": "no-store"}' in corpo])
+    prova("...e la busta della vetrina resta: la fonte e' la stessa riga, due volte", 2,
+          src.count('"cambio_eur"] = cambio_noto_ora()') + src.count('{"cambio_eur": cambio_noto_ora()}'))
+
+    blocco = mini[mini.index("let eurPerSat = 0.00092;"):
+                  mini.index("/* ---------------- doppia valuta: la vista")]
+    cod = nudo(blocco)
+    prova("il client chiede il cambio in UN posto, a `/api/cambio`, senza cache del browser",
+          [1, 1, True],
+          [mini.count("${API_BASE}/cambio`"), cod.count("fetch("),
+           "fetch(`${API_BASE}/cambio`,\n        {cache: 'no-store', signal:" in cod])
+    m = re.search(r"\n    CAMBIO_RINFRESCO_S = (\d+)\n", src)
+    prova("il battito ha la cadenza del server: CAMBIO_LIBRO_MS e' CAMBIO_RINFRESCO_S di serie",
+          [True, True],
+          [bool(m) and "const CAMBIO_LIBRO_MS = %d;" % (int(m.group(1)) * 1000) in cod,
+           "Date.now() - cambioChiesto < CAMBIO_LIBRO_MS" in cod])
+    prova("...niente interval suo: batte in quello unico dell'app, dopo il fratello degli scambi",
+          [0, 0, True],
+          [cod.count("setInterval("), cod.count("addEventListener("),
+           "  battitoScambiP2P();\n  battitoCambioLibroP2P();\n" in mini])
+    prova("un cambio arrivato — dalla busta o da qui — sposta l'orologio del battito", True,
+          "cambioChiesto = Date.now();" in pezzo_js(mini, "function impostaCambio(", "\n}\n"))
+    av = nudo(pezzo_js(mini, "async function aggiornaVista(){", "\n}\n"))
+    ramo = av[max(0, av.find("if (v === 'p2p' || v === 'p2pmiei')")):]
+    prova("la tirata sul libro chiede il cambio INSIEME al libro e ridisegna dopo tutt'e due",
+          True,
+          0 < ramo.find("const cambio = rileggiCambio();")
+          < ramo.find("await caricaLibroP2P(true).catch(()=>{});")
+          < ramo.find("await cambio;") < ramo.find("renderP2P();"))
+    prova("...e solo li': la tirata della vetrina il cambio lo riceve gia' nella busta", 1,
+          av.count("rileggiCambio("))
+    bat = nudo(pezzo_js(mini, "function battitoCambioLibroP2P(){", "\n}\n"))
+    prova("il ridisegno del battito e' quello FERMO, dentro la sua bandiera, che scende "
+          "anche se il ridisegno alza; e nessun rigetto resta appeso", [True, True, 0],
+          ["cambioRidisegna = true;\n    try { ridisegnaLibroFermoP2P(); } "
+           "finally { cambioRidisegna = false; }" in bat,
+           "}).catch(() => {});" in bat, bat.count("renderP2P(")])
+    rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    m_ril = re.search(r"if \((\(p2pLibro\.copia \|\| adesso[^{]*?)\) \{\n    p2pRiletto = adesso;", rp)
+    prova("la rilettura dei 60 secondi del libro non parte dal ridisegno del cambio: la "
+          "condizione di renderP2P porta la bandiera, col typeof dei banchi; e la bandiera si "
+          "alza in un posto solo", [True, 1],
+          [bool(m_ril) and "&& !(typeof cambioRidisegna !== 'undefined' && cambioRidisegna)"
+           in m_ril.group(1), mini.count("cambioRidisegna = true")])
+    wf = open(os.path.join(".github", "workflows", "prove.yml"), encoding="utf-8").read()
+    prova("il collaudo del server vero sta nella CI: fra i file guardati e fra quelli che girano",
+          [True, True],
+          ["collaudo_cambio_libro_p2p.py" in wf,
+           bool(re.search(r"\n\s+collaudo_cambio_libro_p2p\n", wf))])
+
+    # --- 2) IL BANCO NODE --------------------------------------------------
+    js = r"""
+const out = {};
+let ORA = 1700000000000;
+Date.now = () => ORA;
+/* il timer di cartone: il tempo limite scatta quando lo dice il banco */
+let TIMER = [], tid = 0;
+globalThis.setTimeout = (f, ms) => { TIMER.push({id: ++tid, f, ms}); return tid; };
+globalThis.clearTimeout = id => { TIMER = TIMER.filter(t => t.id !== id); };
+const tick = () => new Promise(r => setImmediate(r));
+const cifra = () => Math.round(eurPerSat * 1e8);
+
+let DEMO = false, VETRINA = false;
+const API_BASE = '/api';
+const document = {visibilityState: 'visible'};
+let VISTA = 'view-p2p', PTR = 'p2p';
+function vistaAttivaP2P(){ return VISTA; }
+function ptrVista(){ return PTR; }
+let disegni = [], bandiere = [], fermi = [], FERMO_ALZA = false;
+function renderP2P(){ disegni.push(cifra()); bandiere.push(cambioRidisegna); }
+function ridisegnaLibroFermoP2P(){
+  fermi.push(cambioRidisegna);
+  if (FERMO_ALZA) throw new Error('ridisegno storto');
+  renderP2P();
+}
+out.rigetti = 0;
+process.on('unhandledRejection', () => { out.rigetti++; });
+function tabacchinoP2P(){ return false; }
+function euroFiloTabacchinoP2P(e){ return e; }
+
+/* il server di cartone */
+let chieste = [], RISPOSTA = {ok: true, corpo: {cambio_eur: 100000}}, appese = [];
+function fetch(url, opz){
+  chieste.push({url: url, cache: opz && opz.cache, segnale: !!(opz && opz.signal)});
+  const r = RISPOSTA;
+  if (r === 'rete') return Promise.reject(new Error('rete'));
+  if (r === 'appesa') return new Promise((si, no) => {
+    appese.push(si);
+    if (opz && opz.signal) opz.signal.addEventListener('abort', () => no(new Error('abort')));
+  });
+  return Promise.resolve({ok: r.ok,
+    json: async () => { if (r.storto) throw new Error('json'); return r.corpo; }});
+}
+
+/* il resto di aggiornaVista, di cartone */
+let passi = [], LIBRO = 'ok', libroSi = null, p2pMieiChiesto = true;
+function caricaLibroP2P(forza){
+  passi.push('libro:' + forza);
+  if (LIBRO === 'muto') return Promise.reject(new Error('relay muto'));
+  if (LIBRO === 'appeso') return new Promise(si => { libroSi = si; });
+  return Promise.resolve();
+}
+async function loadListings(){ passi.push('vetrina'); }
+function renderGrid(){}
+async function caricaPreferiti(){}
+function aggiornaJarCards(){}
+async function svuotaFirmeNostr(){}
+function go(v){ passi.push('go:' + v); }
+
+__BLOCCO__
+__STIMA__
+__TIRATA__
+
+(async () => {
+  const ordine = {euro: 100, premium: 0, metodi: []};
+  /* la busta della vetrina, all'apertura */
+  impostaCambio(100000);
+  out.inizio = [cifra(), cambioVivo, cambioChiesto === ORA, satsMercatoP2P(ordine)];
+
+  /* IL BATTITO */
+  RISPOSTA = {ok: true, corpo: {cambio_eur: 125000}};
+  ORA += 59000; battitoCambioLibroP2P(); await tick();
+  out.dentroIlMinuto = chieste.length;
+  ORA += 1000; battitoCambioLibroP2P(); await tick();
+  out.alMinuto = {chieste: chieste.slice(), disegni: disegni.slice(), stima: satsMercatoP2P(ordine)};
+  out.bandieraBattito = [fermi.slice(), bandiere.slice(), cambioRidisegna];
+  ORA += 1000; battitoCambioLibroP2P(); await tick();
+  out.ilSecondoDopo = chieste.length;
+  ORA += 60000; battitoCambioLibroP2P(); await tick();
+  out.numeroUguale = [chieste.length, disegni.length];
+
+  RISPOSTA = {ok: true, corpo: {cambio_eur: 130000}};
+  document.visibilityState = 'hidden';
+  ORA += 3600000; battitoCambioLibroP2P(); await tick();
+  out.nascosta = [chieste.length, cifra()];
+  document.visibilityState = 'visible';
+  battitoCambioLibroP2P(); await tick();
+  out.tornata = [chieste.length, disegni.length, cifra()];
+
+  const perVista = {};
+  for (const v of ['view-esplora', 'view-p2pordine', 'view-p2pinfo', 'view-affari', '', 'view-p2pmiei', 'view-p2p']) {
+    VISTA = v; ORA += 60000; const n = chieste.length;
+    battitoCambioLibroP2P(); await tick();
+    perVista[v || 'nessuna'] = chieste.length - n;
+  }
+  out.perVista = perVista;
+
+  /* una domanda alla volta, e chi esce dal libro mentre e' in volo */
+  VISTA = 'view-p2p'; RISPOSTA = 'appesa'; ORA += 60000;
+  let n = chieste.length, d = disegni.length;
+  battitoCambioLibroP2P(); battitoCambioLibroP2P();
+  const a = rileggiCambio(), b = rileggiCambio();
+  out.inVolo = [chieste.length - n, a === b, TIMER.map(t => t.ms)];
+  VISTA = 'view-esplora';
+  appese.shift()({ok: true, json: async () => ({cambio_eur: 140000})});
+  const cambiato = await a; await tick();
+  out.uscito = [cambiato, cifra(), disegni.length - d, TIMER.length];
+
+  /* fail-open: resta il cambio di prima, acceso, e non si ridisegna */
+  VISTA = 'view-p2p';
+  const storte = {};
+  for (const [nome, r] of [['rete', 'rete'], ['500', {ok: false, corpo: {cambio_eur: 1}}],
+                           ['zero', {ok: true, corpo: {cambio_eur: 0}}],
+                           ['json storto', {ok: true, storto: true}],
+                           ['vuoto', {ok: true, corpo: null}],
+                           ['parola', {ok: true, corpo: {cambio_eur: 'ciao'}}],
+                           ['negativo', {ok: true, corpo: {cambio_eur: -5}}]]) {
+    RISPOSTA = r; ORA += 60000; d = disegni.length; n = chieste.length;
+    battitoCambioLibroP2P(); await tick(); await tick();
+    storte[nome] = [chieste.length - n, cifra(), cambioVivo, disegni.length - d, TIMER.length];
+  }
+  out.storte = storte;
+  n = chieste.length; ORA += 1000; battitoCambioLibroP2P(); await tick();
+  out.dopoUnoStorto = chieste.length - n;
+
+  DEMO = true; ORA += 60000; n = chieste.length;
+  battitoCambioLibroP2P(); await tick();
+  out.demo = [chieste.length - n, await rileggiCambio()];
+  DEMO = false;
+
+  /* LA TIRATA: parte subito (il minuto non c'entra), cambio e libro insieme */
+  RISPOSTA = {ok: true, corpo: {cambio_eur: 140000}};
+  await rileggiCambio();                       // appena chiesto: il battito tacerebbe
+  RISPOSTA = 'appesa'; LIBRO = 'appeso'; PTR = 'p2p'; passi = [];
+  n = chieste.length; d = disegni.length;
+  const b0 = bandiere.length, f0 = fermi.length;
+  const tirata = aggiornaVista(); await tick();
+  out.tirataParte = [chieste.length - n, chieste[chieste.length - 1], passi.slice(), disegni.length - d];
+  libroSi(); await tick(); await tick();
+  out.tirataAspettaIlCambio = disegni.length - d;
+  appese.shift()({ok: true, json: async () => ({cambio_eur: 150000})});
+  await tirata;
+  out.tirataFine = [disegni.slice(d), satsMercatoP2P(ordine)];
+
+  /* all'incontrario: arriva prima il cambio, si aspetta il libro */
+  RISPOSTA = {ok: true, corpo: {cambio_eur: 155000}}; LIBRO = 'appeso'; d = disegni.length;
+  const tirata2 = aggiornaVista(); await tick(); await tick();
+  out.tirataAspettaIlLibro = [cifra(), disegni.length - d];
+  libroSi(); await tirata2;
+  out.tirataFine2 = disegni.slice(d);
+
+  /* il relay muto non ferma il cambio */
+  RISPOSTA = {ok: true, corpo: {cambio_eur: 160000}}; LIBRO = 'muto'; d = disegni.length;
+  await aggiornaVista();
+  out.tirataRelayMuto = disegni.slice(d);
+
+  /* «I miei scambi»: stessa strada, e la marcatura si riarma come prima */
+  LIBRO = 'ok'; PTR = 'p2pmiei'; p2pMieiChiesto = true; n = chieste.length;
+  RISPOSTA = {ok: true, corpo: {cambio_eur: 161000}}; d = disegni.length;
+  await aggiornaVista();
+  out.tirataMiei = [chieste.length - n, p2pMieiChiesto, disegni.slice(d)];
+
+  /* le altre viste non chiedono /api/cambio */
+  const altre = {};
+  for (const v of ['esplora', 'affari', 'profilo']) {
+    PTR = v; n = chieste.length; passi = [];
+    await aggiornaVista();
+    altre[v] = [chieste.length - n, passi.slice()];
+  }
+  out.tirataAltre = altre;
+
+  /* il server che tace: scatta il tempo limite, la tirata finisce col cambio di prima */
+  PTR = 'p2p'; RISPOSTA = 'appesa'; d = disegni.length;
+  let finita = false;
+  const muta = aggiornaVista().then(() => { finita = true; }); await tick(); await tick();
+  out.tirataMutaAspetta = [finita, TIMER.map(t => t.ms)];
+  TIMER.slice().forEach(t => t.f());
+  await muta;
+  out.tirataMuta = [finita, disegni.slice(d), cambioVivo, TIMER.length];
+
+  out.bandieraTirate = [bandiere.slice(b0), fermi.length - f0];
+
+  /* dopo una tirata il battito aspetta il suo minuto */
+  RISPOSTA = {ok: true, corpo: {cambio_eur: 170000}};
+  n = chieste.length; ORA += 59000; battitoCambioLibroP2P(); await tick();
+  const prima = chieste.length - n;
+  ORA += 1000; battitoCambioLibroP2P(); await tick();
+  out.dopoLaTirata = [prima, chieste.length - n, cifra()];
+
+  /* un ridisegno che alza non lascia la bandiera su (il libro non si rileggerebbe piu') */
+  FERMO_ALZA = true; RISPOSTA = {ok: true, corpo: {cambio_eur: 180000}};
+  ORA += 60000; battitoCambioLibroP2P(); await tick(); await tick();
+  out.fermoStorto = [fermi[fermi.length - 1], cambioRidisegna, cifra()];
+  FERMO_ALZA = false;
+
+  /* LA CONDIZIONE VERA della rilettura del libro, presa da renderP2P */
+  const P2P_LIBRO_FRESCO_MS = 60000;
+  const rilegge = (p2pLibro, adesso, p2pRiletto, p2pLettura) => !!(__RILETTURA__);
+  const vecchio = {quando: ORA - 61000}, fresco = {quando: ORA - 5000}, copia = {quando: ORA, copia: true};
+  const r = {};
+  r.vecchio = rilegge(vecchio, ORA, 0, null);
+  r.copia = rilegge(copia, ORA, 0, null);
+  r.fresco = rilegge(fresco, ORA, 0, null);
+  r.frenato = rilegge(vecchio, ORA, ORA - 1000, null);
+  r.inVolo = rilegge(vecchio, ORA, 0, Promise.resolve());
+  cambioRidisegna = true;
+  r.colCambio = [rilegge(vecchio, ORA, 0, null), rilegge(copia, ORA, 0, null)];
+  cambioRidisegna = false;
+  /* in un banco dove la bandiera non esiste (i tanti che fanno girare renderP2P) */
+  r.senzaBandiera = new Function('p2pLibro', 'adesso', 'p2pRiletto', 'p2pLettura', 'P2P_LIBRO_FRESCO_MS',
+    'return !!(' + __RILETTURA_TESTO__ + ');')(vecchio, ORA, 0, null, 60000);
+  out.rilettura = r;
+
+  console.log(JSON.stringify(out));
+})().catch(e => { console.error(e && e.stack || e); process.exit(1); });
+"""
+    stima = pezzo_js(mini, "function satsMercatoP2P(o){", "\n}\n") + "\n}\n"
+    tirata = pezzo_js(mini, "async function aggiornaVista(){", "\n}\n") + "\n}\n"
+    ril = m_ril.group(1) if m_ril else "false"
+    out = _node_banco(js.replace("__BLOCCO__", blocco).replace("__STIMA__", stima)
+                        .replace("__TIRATA__", tirata)
+                        .replace("__RILETTURA_TESTO__", json.dumps(ril))
+                        .replace("__RILETTURA__", ril))
+    if out is None:
+        salta("il banco del cambio sul libro", "node non c'e'")
+        return
+    DOMANDA = {"url": "/api/cambio", "cache": "no-store", "segnale": True}
+    prova("la busta della vetrina accende il cambio e ferma l'orologio del battito: 100 € "
+          "a mercato sono 100.000 sats", [100000, True, True, 100000], out.get("inizio"))
+    prova("a 59 secondi il battito tace", 0, out.get("dentroIlMinuto"))
+    prova("al minuto chiede UNA volta /api/cambio, e col numero nuovo ridisegna il libro: "
+          "gli stessi 100 € sono 80.000 sats",
+          {"chieste": [DOMANDA], "disegni": [125000], "stima": 80000}, out.get("alMinuto"))
+    prova("...passando dal ridisegno FERMO con la bandiera alzata (la vede anche renderP2P), "
+          "e subito dopo la bandiera e' giu'", [[True], [True], False], out.get("bandieraBattito"))
+    prova("...il secondo dopo non richiede (un minuto, non un secondo)", 1, out.get("ilSecondoDopo"))
+    prova("...e un minuto dopo richiede, ma con lo stesso numero NON ridisegna", [2, 1],
+          out.get("numeroUguale"))
+    prova("a pagina nascosta non chiede, nemmeno dopo un'ora; il cambio resta quello",
+          [2, 125000], out.get("nascosta"))
+    prova("...e tornata visibile lo chiede al primo battito e ridisegna", [3, 2, 130000],
+          out.get("tornata"))
+    prova("chiede solo col libro davanti: il libro e «I miei scambi», non Esplora, non la "
+          "pagina di uno scambio, non le info, non gli Ordini",
+          {"view-esplora": 0, "view-p2pordine": 0, "view-p2pinfo": 0, "view-affari": 0,
+           "nessuna": 0, "view-p2pmiei": 1, "view-p2p": 1}, out.get("perVista"))
+    prova("una domanda alla volta: due battiti e due chiamate sono UNA fetch, col suo tempo limite",
+          [1, True, [8000]], out.get("inVolo"))
+    prova("chi esce dal libro mentre la risposta e' in volo tiene il cambio nuovo e non "
+          "ridisegna niente; il timer si smonta", [True, 140000, 0, 0], out.get("uscito"))
+    prova("rete giu', 500, cambio a zero, JSON storto, corpo vuoto, una parola, un negativo: "
+          "una domanda, il cambio di prima ancora acceso, nessun ridisegno, nessun timer appeso",
+          {k: [1, 140000, True, 0, 0] for k in ("rete", "500", "zero", "json storto", "vuoto",
+                                               "parola", "negativo")},
+          out.get("storte"))
+    prova("...e dopo una risposta storta si aspetta comunque il minuto: nessuna raffica", 0,
+          out.get("dopoUnoStorto"))
+    prova("in DEMO non si chiede niente", [0, False], out.get("demo"))
+    prova("LA TIRATA sul libro parte subito anche col cambio appena chiesto: una domanda a "
+          "/api/cambio e la lettura NUOVA del libro, insieme, e ancora nessun disegno",
+          [1, DOMANDA, ["libro:true"], 0], out.get("tirataParte"))
+    prova("...arrivato il libro si aspetta ancora il cambio (era il difetto: libro nuovo, "
+          "numeri vecchi)", 0, out.get("tirataAspettaIlCambio"))
+    prova("...e si ridisegna UNA volta, col cambio nuovo: 100 € sono 66.667 sats",
+          [[150000], 66667], out.get("tirataFine"))
+    prova("all'incontrario: il cambio arriva prima, si aspetta il libro, un disegno solo",
+          [[155000, 0], [155000]], [out.get("tirataAspettaIlLibro"), out.get("tirataFine2")])
+    prova("un relay muto non ferma il cambio: il libro resta quello di prima, i numeri no",
+          [160000], out.get("tirataRelayMuto"))
+    prova("da «I miei scambi» la stessa strada, e la marcatura «e' mio» si riarma come prima",
+          [1, False, [161000]], out.get("tirataMiei"))
+    prova("le altre tirate non chiedono /api/cambio: la vetrina lo ha nella busta, Ordini e "
+          "Profilo passano da go()",
+          {"esplora": [0, ["vetrina"]], "affari": [0, ["go:affari"]],
+           "profilo": [0, ["go:profilo"]]}, out.get("tirataAltre"))
+    prova("un server che tace non tiene la pastiglia a girare: la tirata aspetta fino al "
+          "tempo limite...", [False, [8000]], out.get("tirataMutaAspetta"))
+    prova("...poi finisce col cambio di prima, ancora acceso, un disegno e nessun timer appeso",
+          [True, [161000], True, 0], out.get("tirataMuta"))
+    prova("i disegni delle tirate NON portano la bandiera (la tirata il libro lo rilegge da "
+          "se') e non passano dal ridisegno fermo", [[False] * 5, 0], out.get("bandieraTirate"))
+    prova("dopo una tirata il battito aspetta il SUO minuto, poi riprende",
+          [0, 1, 170000], out.get("dopoLaTirata"))
+    prova("un ridisegno che alza non lascia la bandiera su, non lascia rigetti appesi, e il "
+          "cambio nuovo resta in mano", [[True, False, 180000], 0],
+          [out.get("fermoStorto"), out.get("rigetti")])
+    prova("la condizione VERA di renderP2P: un libro vecchio o una copia si rileggono, uno "
+          "fresco, frenato o gia' in lettura no — e dentro il ridisegno del cambio MAI; nei "
+          "banchi senza la bandiera resta com'era",
+          {"vecchio": True, "copia": True, "fresco": False, "frenato": False, "inVolo": False,
+           "colCambio": [False, False], "senzaBandiera": True}, out.get("rilettura"))
+
+
 def prove_solleciti_p2p():
     """I SOLLECITI PER TUTTI I METODI (10 ott 2026, cantiere «solleciti
     p2p», richiesta di Andrea dopo lo studio sul feedback). Dopo la
@@ -142819,6 +143205,7 @@ def main():
               prove_garanzia_lunga,
               prove_promemoria_gesto,
               prove_solleciti_p2p,
+              prove_cambio_libro_p2p,
               prove_avvisi_nuovi_ordini,
               prove_anteprima_avvisi_p2p,
               prove_avvisi_mercatino,
