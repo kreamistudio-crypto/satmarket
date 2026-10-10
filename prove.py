@@ -35127,6 +35127,28 @@ def prove_cookie_onion():
           '"ONION_SEGNALE",' in codice(pezzo("_leve_stato")))
     prova("la pagina non cambia: il client non sa del segnale", False,
           "x-barattolo-onion" in open("miniapp.html", encoding="utf-8").read().lower())
+    # IL SEGRETO E' UN SEGRETO ANCHE PER LO SCANNER (10 ott 2026,
+    # seconda richiesta di Andrea): la lista FORME della CI guarda le
+    # chiavi nominate col valore tra virgolette, nei file e nella
+    # cronologia, e una leva segreta nuova che non ci sta e' una chiave
+    # che puo' finire in un documento senza che nessuno se ne accorga.
+    # Nei documenti il segnaposto e' `INCOLLA_QUI…`, come per le altre.
+    wf = open(os.path.join(".github", "workflows", "prove.yml"),
+              encoding="utf-8").read()
+    forme = next((r for r in wf.splitlines() if "SEGRETI_PROFILO_P2P" in r
+                  and "[[:space:]]*=" in r), "")
+    # ...e NON in coda: la sentinella del profilo P2P si ancora a
+    # `SEGRETI_PROFILO_P2P)` come ultimo nome, e un nome aggiunto dopo
+    # di lui l'ha fatta rossa al primo giro.
+    prova("ONION_SEGNALE sta nelle FORME dello scanner dei segreti", True,
+          "|ONION_SEGNALE|" in forme)
+    prova("...nella stessa alternativa delle chiavi nominate", True,
+          "(LNBITS_INVOICE_KEY|" in forme and
+          forme.index("(LNBITS_INVOICE_KEY|") < forme.index("|ONION_SEGNALE|")
+          < forme.index("SEGRETI_PROFILO_P2P)[[:space:]]*="))
+    prova("...e nel config d'esempio il valore e' vuoto, non un segnaposto "
+          "che lo scanner prenderebbe per una chiave", True,
+          '\nONION_SEGNALE = ""\n' in cfg)
 
 
 def prove_onion():
