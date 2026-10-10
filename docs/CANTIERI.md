@@ -49228,3 +49228,105 @@ collaudi vicini nella gabbia; suite intera e gli altri collaudi non
 rifatti sull'ultima punta. LA CI DI MAIN prima del push: aspettata
 verde anche la punta 4cb9761. Il sì al push è di Andrea: stava nel
 brief incollato («Poi push come detto»).
+
+## Un getMe caduto non è un no: il controllo della leva riprova da solo (11 ott 2026, cantiere getme-caduto, richiesta di Andrea)
+
+**IL DIFETTO**, visto leggendo il codice mentre cercavo un falso
+allarme (un link condiviso che sembrava quello del sito: era un errore
+di prova, la condivisione funzionava). All'avvio il server chiede a
+Telegram (`getMe`) se la leva `TELEGRAM_MINIAPP_LINK` regge. Il
+commento prometteva: «se Telegram non risponde la leva resta com'è
+scritta — un getMe caduto non è un no». Il codice però leggeva
+`result` dalla risposta e basta: a un errore di Telegram scritto in
+JSON — un 429 «troppe richieste», un 5xx, un `ok: false` qualunque —
+`result` non c'è, il nome del bot risultava vuoto, e il giudizio
+diceva «il bot del link è @ilbarattolobot, questo è @?»: la leva si
+SPEGNEVA per tutto il processo, cioè fino al riavvio dopo, e tutti i
+link dentro Telegram tornavano al sito senza che nessuno se ne
+accorgesse. Solo l'eccezione (rete giù, risposta non JSON) era
+trattata bene. Non l'ho visto succedere in produzione: l'ho riprodotto
+(`_giudizio_link_miniapp(leva, {})` dice di no).
+
+**LA CURA, in tre pezzi.**
+1) `_leggi_getme(stato, corpo)`, PURA: Telegram ha RISPOSTO solo con
+un 200, `ok` proprio vero e un `result` che porta il nome del bot.
+Tutto il resto è un getMe caduto, con una riga corta che dice quale
+(`429 Too Many Requests…`, `500 …`, `HTTP 502, risposta non JSON`,
+`risposta senza il nome del bot`) e i secondi che Telegram chiede di
+aspettare, se li dice e se sono credibili (da 1 secondo a un'ora).
+2) `_controllo_link_miniapp`: su una risposta vera giudica come prima;
+su un getMe caduto lascia la leva com'è scritta, lo scrive nel journal
+e RIPROVA DA SOLO — dopo 1, 5, 15 minuti, poi ogni ora per un giorno
+(`RIPROVE_GETME_MINIAPP`), ascoltando il `retry_after` di un 429 se è
+più lungo del passo. Quando Telegram risponde il journal dice «accesi
+su … (al tentativo N)» o «SPENTI». Finite le riprove si ferma e lo
+dice: la leva resta com'è scritta, il prossimo controllo è al riavvio.
+3) `_getme_telegram`: chi bussa, in un posto solo, con la sua guardia
+di collaudo (il censimento degli indirizzi `api.telegram.org` ha preso
+il nome nuovo al posto di `_chiedi`).
+QUANDO SI SPEGNE: solo su una risposta VERA che dice di no. Andrea ha
+scritto «solo se getMe risponde ok con uno username diverso»; ho
+tenuto anche il secondo no che c'era già — il bot giusto ma SENZA la
+Mini App principale, nella forma senza nome d'app — perché è anche
+quello una risposta vera, e senza quel controllo il link aprirebbe la
+chat del bot e basta. Se non lo vuole si toglie una riga.
+E UNA COSA TROVATA SCRIVENDO: il journal stampava il testo
+dell'eccezione di rete (`{e}`). Il testo di un errore di httpx può
+portare l'indirizzo chiamato, e l'indirizzo porta il TOKEN DEL BOT.
+Ora si scrive solo il tipo dell'errore (`rete: ConnectError`).
+STRADE SCARTATE: riprovare all'infinito (un token revocato scriverebbe
+una riga l'ora per sempre: dopo un giorno ci si ferma e lo si dice);
+spegnere la leva a riprove finite (l'ha scritta una persona, e un
+Telegram muto non dice niente su di lei); una leva nuova per
+l'indirizzo dell'API di Telegram, per provarla dal vivo (un indirizzo
+configurabile verso cui mandare il token è una superficie in più: il
+controllo prende `chiedi` e `dormi` da fuori, e basta quello).
+
+**PROVATO.** `prove_link_dentro_telegram` (118, erano 93): la lettura
+(200 giusto, 429 col suo `retry_after`, 500 in JSON, 502 non JSON,
+`ok: false` con un 200 davanti, `ok` non proprio vero, il nome che
+manca, lo stato che non è 200 con un corpo «ok», le attese storte), e
+il controllo VERO eseguito con un Telegram di cartone: getMe ok col bot
+giusto, ok con un altro bot, ok senza Mini App principale; 429, 500,
+502, rete giù e risposta senza nome seguiti da un ok (la leva non si
+spegne, un'attesa di un minuto, due righe di journal); tre cadute e
+poi un altro bot (spenta alla quarta); il 429 che chiede 20 minuti; la
+rete giù per sempre (27 attese, l'ultima riga, e MAI il token nel
+journal); in collaudo nessuno bussa. TORTURA sulla copia: 17 mutazioni
+su 17 mordono — alla prima passata erano 15: «lo stato HTTP non si
+guarda» restava verde e «il caduto si giudica come un no» faceva
+ESPLODERE il banco invece di farlo rosso; strette le due prove.
+COLLAUDO, `collaudo_promemoria_gesto` sezione 9 (47, erano 38), nella
+gabbia: il controllo del modulo VERO davanti a un Telegram di cartone
+che risponde per HTTP sul loopback (un `http.server`), con l'effetto
+guardato dove lo vede la gente — la riga «🫙 Apri Barattolo» delle
+tastiere: apre la Mini App durante l'attesa e dopo un 429, un 500, un
+502 e la rete giù (una porta dove non ascolta nessuno); torna al sito
+solo quando getMe risponde con un altro bot.
+DAL VIVO (il server vero in un processo suo, copia in collaudo col
+relay morto e la leva accesa nel config di cartone): parte senza
+errori, il journal dice «🔗 Link dentro Telegram: leva accesa, in
+collaudo non si chiede niente a Telegram», e la busta di prima pagina
+(`/api/listings?limit=30`) porta `tg_miniapp` = la leva.
+COSA NON SI È POTUTO PROVARE DA QUI, e va detto: la chiamata VERA a
+Telegram dal VPS. In collaudo non si bussa per regola, e un server in
+produzione col token vero fuori dal VPS non si avvia mai. Il pezzo che
+parla con Telegram (`_getme_telegram`, sei righe) lo prova solo il
+primo riavvio in produzione.
+DA GUARDARE dopo il deploy, nel journal del VPS: la riga «🔗 Link
+dentro Telegram: accesi su https://t.me/ilbarattolobot» dopo il
+riavvio; se al suo posto c'è «getMe non ha risposto (…) riprovo fra…»
+non è un guasto e non spegne niente — entro qualche minuto deve
+arrivare «accesi su … (al tentativo N)».
+
+**VERBALE DEL PUSH (getme-caduto): cosa è girato su quale albero.** SUL
+CANTIERE NUDO (sopra 41e859d): la suite intera, 22111 passate e 0
+fallite; i 58 collaudi del workflow, verdi; la tortura, 17 su 17; i due
+passi dello scanner dei segreti; il giro dal vivo. Poi main è corso di
+quattro commit (i percorsi del VPS nei documenti, il dominio nel
+journal degli indirizzi Lightning, l'elenco dei wallet al client, il
+cambio sui cartellini). SULL'ALBERO CHE PARTE (sopra 4cb9761): la suite
+intera di nuovo, 22130 e 0; `collaudo_promemoria_gesto` nella gabbia,
+verde; lo scanner. Gli altri collaudi su QUESTO albero li gira la CI.
+Un solo conflitto al rebase, la coda di questo file, risolto tenendo
+tutt'e due i lati.

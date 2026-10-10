@@ -17472,6 +17472,108 @@ def _giudizio_link_miniapp(leva: str, io: dict) -> str:
     return ""
 
 
+# UN GETME CADUTO NON E' UN NO (11 ott 2026, richiesta di Andrea). La
+# prima stesura leggeva `result` dalla risposta e basta: a un errore di
+# Telegram scritto in JSON — un 429 «troppe richieste», un 5xx, un
+# `ok: false` qualunque — `result` non c'e', il nome del bot risultava
+# vuoto, e il giudizio diceva «il bot del link e' un altro»: la leva si
+# SPEGNEVA fino al riavvio dopo, in silenzio per chi usa l'app. Il
+# contrario di quel che il commento prometteva. Ora la risposta si
+# LEGGE prima di giudicarla: Telegram ha RISPOSTO solo con un 200,
+# `ok: true` e un `result` che porta il nome del bot. Tutto il resto e'
+# un getMe caduto, come la rete giu'.
+# TORNA (io, perche', dopo): `io` e' il `result` o None; `perche'` e' la
+# riga corta per il journal; `dopo` sono i secondi che Telegram chiede
+# di aspettare (`parameters.retry_after` di un 429), 0 se non lo dice.
+def _leggi_getme(stato, corpo) -> tuple:
+    """PURA: la risposta di `getMe` e' una RISPOSTA o un getMe caduto?"""
+    if not isinstance(corpo, dict):
+        return None, f"HTTP {stato}, risposta non JSON", 0
+    if stato != 200 or corpo.get("ok") is not True:
+        # quanto aspettare lo dice Telegram, se lo dice e se e' credibile
+        # (un intero fra 1 secondo e un'ora): il resto non si ascolta
+        par = corpo.get("parameters")
+        dopo = par.get("retry_after") if isinstance(par, dict) else 0
+        if type(dopo) is not int or not 0 < dopo <= 3600:
+            dopo = 0
+        detto = " ".join(str(corpo.get("description") or "").split())[:80]
+        return None, f"{corpo.get('error_code') or stato} {detto}".strip(), dopo
+    io = corpo.get("result")
+    if not isinstance(io, dict) or not io.get("username"):
+        return None, "risposta senza il nome del bot", 0
+    return io, "", 0
+
+
+# QUANDO SI RIPROVA, da soli e senza aspettare un riavvio: dopo un
+# minuto, cinque, un quarto d'ora, e poi ogni ora per un giorno. Un 429
+# che chiede di aspettare di piu' viene ascoltato. Finite le riprove ci
+# si ferma e lo si dice: la leva resta com'e' scritta — l'ha scritta una
+# persona — e il prossimo controllo e' al prossimo riavvio.
+RIPROVE_GETME_MINIAPP = (60, 300, 900) + (3600,) * 24
+
+
+async def _getme_telegram():
+    """(stato HTTP, corpo JSON o None) del `getMe`; alza se la rete e'
+    giu'. In collaudo non chiama nessuno."""
+    if MODALITA_COLLAUDO:
+        return 0, None
+    async with httpx.AsyncClient(timeout=20) as c:
+        r = await c.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe")
+    try:
+        corpo = r.json()
+    except Exception:
+        corpo = None
+    return r.status_code, corpo
+
+
+async def _controllo_link_miniapp(chiedi=None, dormi=None) -> str:
+    """Il controllo della leva, con le sue riprove. Torna 'accesa',
+    'spenta' o 'non so' (riprove finite senza una risposta).
+
+    LA LEVA SI SPEGNE SOLO SU UNA RISPOSTA VERA che dice di no (vedi
+    `_giudizio_link_miniapp`: il bot e' un altro, o non ha la Mini App
+    principale). Un getMe caduto — errore di Telegram, rete giu' — la
+    lascia com'e' scritta e si riprova piu' tardi; ogni passo va nel
+    journal. `chiedi` e `dormi` si passano da fuori per provarla senza
+    Telegram e senza aspettare.
+    DELL'ECCEZIONE SI SCRIVE SOLO IL TIPO: il testo di un errore di rete
+    puo' portare l'indirizzo chiamato, e l'indirizzo porta il token del
+    bot — che nel journal non deve finire mai."""
+    global TELEGRAM_MINIAPP_LINK
+    chiedi, dormi = chiedi or _getme_telegram, dormi or asyncio.sleep
+    attese = list(RIPROVE_GETME_MINIAPP)
+    tentativo = 0
+    while True:
+        tentativo += 1
+        try:
+            io, perche, dopo = _leggi_getme(*(await chiedi()))
+        except Exception as e:
+            io, perche, dopo = None, f"rete: {type(e).__name__}", 0
+        if io is not None:
+            no = _giudizio_link_miniapp(TELEGRAM_MINIAPP_LINK, io)
+            if no:
+                print(f"⚠️ Link dentro Telegram SPENTI: {no}. I link restano "
+                      "quelli del sito.", flush=True)
+                TELEGRAM_MINIAPP_LINK = ""
+                return "spenta"
+            print(f"🔗 Link dentro Telegram: accesi su {TELEGRAM_MINIAPP_LINK}"
+                  + (f" (al tentativo {tentativo})" if tentativo > 1 else ""),
+                  flush=True)
+            return "accesa"
+        if not attese:
+            print(f"⚠️ Link dentro Telegram: getMe non ha risposto ({perche}) "
+                  f"per {tentativo} volte: mi fermo qui. La leva resta com'e' "
+                  "scritta; il prossimo controllo e' al prossimo riavvio.",
+                  flush=True)
+            return "non so"
+        attesa = max(attese.pop(0), dopo)
+        print(f"⚠️ Link dentro Telegram: getMe non ha risposto ({perche}): "
+              "la leva resta com'e' scritta, riprovo fra "
+              + (f"{attesa // 60} min" if attesa >= 60 else f"{attesa} s")
+              + f" (tentativo {tentativo})", flush=True)
+        await dormi(attesa)
+
+
 _TASK_LINK_MINIAPP = None     # stesso motivo di _TASK_WEBHOOK qui sopra
 
 
@@ -17482,37 +17584,19 @@ async def controlla_link_miniapp():
     chat del bot invece che allo scambio, e nessuno lo verrebbe a dire.
     Quindi all'avvio, in produzione, un `getMe`: se il giudizio dice di
     no la leva si SPEGNE per questo processo (i link tornano quelli del
-    sito) e il journal dice perche'. Se Telegram non risponde la leva
-    resta com'e' scritta — l'ha scritta una persona, e un getMe caduto
-    non e' un no. In collaudo non si chiama nessuno."""
+    sito) e il journal dice perche'. Se Telegram non risponde — o
+    risponde con un errore — la leva resta com'e' scritta: l'ha scritta
+    una persona, e un getMe caduto non e' un no; si riprova da soli piu'
+    tardi (`_controllo_link_miniapp`). In collaudo non si chiama
+    nessuno."""
     if not TELEGRAM_MINIAPP_LINK:
         return
     if MODALITA_COLLAUDO:
         print("🔗 Link dentro Telegram: leva accesa, in collaudo non si "
               "chiede niente a Telegram", flush=True)
         return
-
-    async def _chiedi():
-        global TELEGRAM_MINIAPP_LINK
-        try:
-            async with httpx.AsyncClient(timeout=20) as c:
-                r = await c.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe")
-            no = _giudizio_link_miniapp(TELEGRAM_MINIAPP_LINK,
-                                        (r.json() or {}).get("result") or {})
-        except Exception as e:
-            print(f"⚠️ Link dentro Telegram: getMe non ha risposto ({e}): "
-                  "la leva resta com'e' scritta", flush=True)
-            return
-        if no:
-            print(f"⚠️ Link dentro Telegram SPENTI: {no}. I link restano "
-                  "quelli del sito.", flush=True)
-            TELEGRAM_MINIAPP_LINK = ""
-        else:
-            print(f"🔗 Link dentro Telegram: accesi su {TELEGRAM_MINIAPP_LINK}",
-                  flush=True)
-
     global _TASK_LINK_MINIAPP
-    _TASK_LINK_MINIAPP = asyncio.create_task(_chiedi())
+    _TASK_LINK_MINIAPP = asyncio.create_task(_controllo_link_miniapp())
 
 
 _TASK_HANDLER_NOSTRO = None   # stesso motivo di _TASK_WEBHOOK qui sopra

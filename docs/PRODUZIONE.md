@@ -3480,6 +3480,19 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
      dentro Telegram SPENTI: …» dice perché no, e i link restano quelli
      del sito finché non si corregge e si riavvia. Il valore VIVO sta
      nel pannello «⚙️ Stato delle leve».
+     LA TERZA RIGA (11 ott 2026): «⚠️ Link dentro Telegram: getMe non ha
+     risposto (…): la leva resta com'è scritta, riprovo fra N min» —
+     Telegram non ha risposto o ha risposto con un errore (fra parentesi
+     quale: `429 Too Many Requests…`, `500 …`, `HTTP 502, risposta non
+     JSON`, `rete: ConnectError`). NON è un guasto nostro e NON spegne
+     niente: i link restano quelli della Mini App e il server riprova
+     da solo dopo 1, 5, 15 minuti e poi ogni ora per un giorno, senza
+     riavvii. Quando Telegram risponde si legge «accesi su … (al
+     tentativo N)» — oppure «SPENTI», se la risposta vera dice di no.
+     Se non risponde per un giorno intero l'ultima riga è «…mi fermo
+     qui. La leva resta com'è scritta; il prossimo controllo è al
+     prossimo riavvio». Per vederle tutte, dall'ultimo riavvio:
+     `journalctl -u barattolo --since "-2h" --no-pager | grep "Link dentro Telegram"`
   5) IL TELEFONO: far arrivare un promemoria («⚡ Apri lo scambio») e
      toccarlo; dalla Mini App, «Condividi» un ordine in una chat e
      toccare il link; mandare `/start` al bot e toccare «🫙 Apri

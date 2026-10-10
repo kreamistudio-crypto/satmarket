@@ -30700,7 +30700,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   vuota nel codice = ogni link resta barattolo.store. Forma storta =
   spenta; all'avvio in produzione `controlla_link_miniapp` chiede a
   Telegram (`getMe`) e `_giudizio_link_miniapp` la spegne se il bot non
-  è questo o non ha la Mini App principale. IL PARAMETRO è un
+  è questo o non ha la Mini App principale. UN GETME CADUTO NON È UN NO
+  (11 ott 2026): la risposta si legge prima di giudicarla
+  (`_leggi_getme`: vale solo un 200 con `ok: true` e il nome del bot);
+  un errore di Telegram (429, 5xx, `ok: false`, non JSON) o la rete giù
+  lasciano la leva com'è scritta, e `_controllo_link_miniapp` riprova
+  da solo (`RIPROVE_GETME_MINIAPP`: 1, 5, 15 minuti, poi ogni ora per
+  un giorno; il `retry_after` di un 429 si ascolta), scrivendo ogni
+  passo nel journal — dell'errore di rete solo il TIPO, mai il testo,
+  che porterebbe l'indirizzo col token del bot. A bussare è
+  `_getme_telegram`, che in collaudo si ferma da sé. IL PARAMETRO è un
   vocabolario chiuso, dentro i limiti che Telegram scrive per `start`
   (A-Z a-z 0-9 _ -, 64; per `startapp` scrive la sola lunghezza, 512,
   nel registro della Bot API 6.8): `p2p`, `scambio_<id>`, `ordine_<id>`. TRE

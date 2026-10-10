@@ -36,6 +36,11 @@ Qui gira il SERVER VERO sul database usa-e-getta:
   6. l'interruttore degli avvisi P2P spento: niente, e non risulta detto;
   7. il coordinatore che non ha ancora annunciato niente: il ripiego, e
      nessuna cifra inventata.
+  8. a leva `TELEGRAM_MINIAPP_LINK` accesa i link dentro Telegram aprono
+     la Mini App;
+  9. (11 ott 2026) il controllo di quella leva davanti a un Telegram di
+     cartone sul loopback: un getMe caduto (429, 500, 502, rete giu')
+     non la spegne e si riprova; la spegne solo un altro bot.
 
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
 `collaudo_pagamento_p2p`), niente Telegram, niente relay, niente
@@ -381,6 +386,133 @@ async def giro():
     prova("...spenta di nuovo, il bottone torna quello del sito", True,
           f"[bottone «⚡ Apri lo scambio» → {link}?scambio={n}]" in "".join(STAMPE))
     SRV.time = time
+
+    print("\n9) il controllo della leva: un getMe caduto non e' un no")
+    # UN GETME CADUTO NON E' UN NO (11 ott 2026). Il controllo VERO del
+    # modulo vero (`_controllo_link_miniapp`) davanti a un TELEGRAM DI
+    # CARTONE che risponde sul loopback, per HTTP vero: la prima stesura
+    # a un 429 o a un 500 spegneva la leva fino al riavvio dopo. Le
+    # attese non si aspettano (un `dormi` che segna e basta). L'effetto
+    # si guarda dove lo vede la gente: la riga «🫙 Apri Barattolo» delle
+    # tastiere, che a leva accesa apre la Mini App.
+    import http.server
+    import json
+    import socket
+    import threading
+
+    import httpx
+
+    BOT = "https://t.me/ilbarattolobot"
+    TOKEN = "123456:SEGRETO-DI-CARTONE"
+    IO = {"id": 1, "is_bot": True, "username": "ilbarattolobot", "has_main_web_app": True}
+    OK = (200, {"ok": True, "result": IO})
+    R429 = (429, {"ok": False, "error_code": 429,
+                  "description": "Too Many Requests: retry after 90",
+                  "parameters": {"retry_after": 90}})
+    R500 = (500, {"ok": False, "error_code": 500, "description": "Internal Server Error"})
+    R502 = (502, "<html><body>Bad Gateway</body></html>")
+    ALTRO = (200, {"ok": True, "result": dict(IO, username="altrobot")})
+    fila, bussate = [], []
+
+    class Cartone(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            bussate.append(self.path)
+            stato, corpo = fila.pop(0) if len(fila) > 1 else fila[0]
+            dati = (corpo if isinstance(corpo, str) else json.dumps(corpo)).encode()
+            self.send_response(stato)
+            self.send_header("Content-Type", "text/html" if isinstance(corpo, str)
+                             else "application/json")
+            self.send_header("Content-Length", str(len(dati)))
+            self.end_headers()
+            self.wfile.write(dati)
+
+        def log_message(self, *a):
+            pass
+
+    telegram = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Cartone)
+    threading.Thread(target=telegram.serve_forever, daemon=True).start()
+    porta = telegram.server_address[1]
+    with socket.socket() as s:      # una porta dove non ascolta nessuno
+        s.bind(("127.0.0.1", 0))
+        porta_morta = s.getsockname()[1]
+    giu = {"si": False}
+
+    async def chiedi():
+        """Come `_getme_telegram` del server, ma verso il loopback: lo
+        stato e il corpo JSON (o None), e la rete giu' alza."""
+        p_ = porta_morta if giu["si"] else porta
+        async with httpx.AsyncClient(timeout=5) as c:
+            r = await c.get(f"http://127.0.0.1:{p_}/bot{TOKEN}/getMe")
+        try:
+            corpo = r.json()
+        except Exception:
+            corpo = None
+        return r.status_code, corpo
+
+    async def controllo(risposte, rete_giu=False):
+        SRV.TELEGRAM_MINIAPP_LINK = BOT
+        fila[:] = list(risposte)
+        del bussate[:]
+        giu["si"] = rete_giu
+        dormite = []
+
+        async def dormi(s_):
+            dormite.append(s_)
+            # durante l'attesa la leva e' ACCESA: lo vede chi apre il bot
+            dormite.append(SRV.tastiera_bot()["inline_keyboard"][0][0]["url"])
+            giu["si"] = False       # la rete torna, se era giu'
+        carta = io.StringIO()
+        with contextlib.redirect_stdout(carta):
+            esito = await SRV._controllo_link_miniapp(chiedi, dormi)
+        return (esito, SRV.tastiera_bot()["inline_keyboard"][0][0]["url"],
+                dormite, carta.getvalue().splitlines())
+
+    APRE_APP = BOT + "?startapp=casa"
+    esito, bottone, dormite, righe = await controllo([OK])
+    prova("getMe risponde col bot giusto: accesa, una bussata sola, e il journal lo dice",
+          ["accesa", APRE_APP, [], ["/bot" + TOKEN + "/getMe"],
+           ["🔗 Link dentro Telegram: accesi su " + BOT]],
+          [esito, bottone, dormite, bussate, righe])
+    for nome, caduta, detto, attesa in (
+            ("un 429", R429, "429 Too Many Requests: retry after 90", "riprovo fra 1 min"),
+            ("un 500", R500, "500 Internal Server Error", "riprovo fra 1 min"),
+            ("un 502 che non e' JSON", R502, "HTTP 502, risposta non JSON", "riprovo fra 1 min")):
+        esito, bottone, dormite, righe = await controllo([caduta, OK])
+        prova(f"{nome}: la leva NON si spegne — accesa durante l'attesa e dopo —, si "
+              "riprova, e il journal dice le due cose",
+              ["accesa", APRE_APP, APRE_APP, 2, True, True],
+              [esito, bottone, dormite[1], len(bussate),
+               detto in righe[0] and "la leva resta com'e' scritta" in righe[0]
+               and attesa in righe[0],
+               righe[1] == "🔗 Link dentro Telegram: accesi su " + BOT + " (al tentativo 2)"])
+    prova("...il 429 che chiede 90 secondi viene ascoltato (il passo era di 60)", 90,
+          (await controllo([R429, OK]))[2][0])
+    esito, bottone, dormite, righe = await controllo([OK], rete_giu=True)
+    prova("la rete giu' (nessuno ascolta): la leva resta accesa, si riprova, e nel "
+          "journal c'e' il TIPO dell'errore e mai l'indirizzo col token",
+          ["accesa", APRE_APP, 60, True, False],
+          [esito, bottone, dormite[0], "rete: ConnectError" in righe[0],
+           TOKEN in "\n".join(righe) or "127.0.0.1" in "\n".join(righe)])
+    esito, bottone, dormite, righe = await controllo([R429, R500, ALTRO])
+    prova("getMe risponde con un ALTRO bot (dopo due cadute): la leva si spegne, il "
+          "bottone torna al sito, e il journal dice chi e'",
+          ["spenta", SRV.URL_PUBBLICO, [90, 300], True],
+          [esito, bottone, dormite[::2],
+           "SPENTI" in righe[-1] and "@altrobot" in righe[-1]])
+    esito, bottone, dormite, righe = await controllo([R500])
+    prova("Telegram che risponde 500 per un giorno: le riprove finiscono da sole, la "
+          "leva resta accesa e l'ultima riga lo dice",
+          ["non so", APRE_APP, list(SRV.RIPROVE_GETME_MINIAPP),
+           len(SRV.RIPROVE_GETME_MINIAPP) + 1, True],
+          [esito, bottone, dormite[::2], len(bussate),
+           "mi fermo qui" in righe[-1] and "prossimo riavvio" in righe[-1]])
+    # ...e senza cartone: in collaudo chi bussa davvero non bussa
+    del bussate[:]
+    prova("in collaudo `_getme_telegram` non chiama nessuno (e all'avvio il "
+          "controllo non parte nemmeno)", [(0, None), [], None],
+          [await SRV._getme_telegram(), bussate, await SRV.controlla_link_miniapp()])
+    telegram.shutdown()
+    SRV.TELEGRAM_MINIAPP_LINK = ""
 
 
 def main():

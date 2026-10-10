@@ -52856,12 +52856,157 @@ def prove_link_dentro_telegram():
     cl = pezzo("controlla_link_miniapp")
     prova("all'avvio: a leva spenta e in collaudo non si chiama nessuno",
           True, 0 < cl.find("if not TELEGRAM_MINIAPP_LINK:\n        return")
-          < cl.find("if MODALITA_COLLAUDO:") < cl.find("api.telegram.org"))
-    prova("...il no SPEGNE la leva, il silenzio di Telegram la lascia com'e'",
+          < cl.find("if MODALITA_COLLAUDO:")
+          < cl.find("asyncio.create_task(_controllo_link_miniapp())"))
+    prova("...e chi bussa a Telegram si ferma da se' in collaudo, col timeout di casa",
           [True, True],
-          ['TELEGRAM_MINIAPP_LINK = ""' in cl[cl.index("if no:"):],
-           "la leva resta com'e' scritta" in cl[:cl.index("if no:")]])
-    prova("...col timeout di casa", True, "httpx.AsyncClient(timeout=20)" in cl)
+          [0 < pezzo("_getme_telegram").find("if MODALITA_COLLAUDO:\n        return 0, None")
+           < pezzo("_getme_telegram").find("api.telegram.org"),
+           "httpx.AsyncClient(timeout=20)" in pezzo("_getme_telegram")])
+
+    # ---------------- 4bis) UN GETME CADUTO NON E' UN NO (11 ott 2026) -----
+    # La prima stesura leggeva `result` e basta: a un errore di Telegram
+    # scritto in JSON (429, 5xx, `ok: false`) il nome del bot risultava
+    # vuoto, il giudizio diceva «e' un altro bot» e la leva si SPEGNEVA
+    # fino al riavvio dopo. Ora la risposta si legge prima di giudicarla,
+    # e un getMe caduto si riprova da solo.
+    import asyncio as _aio
+    exec(pezzo("_leggi_getme"), amb)
+    leggi = amb["_leggi_getme"]
+    OK = {"ok": True, "result": dict(IO, id=1, is_bot=True)}
+    prova("la lettura: 200, ok e il nome del bot = una RISPOSTA", (OK["result"], "", 0),
+          leggi(200, OK))
+    prova("...un 429 e' un getMe caduto, e dice quanto aspettare",
+          (None, "429 Too Many Requests: retry after 35", 35),
+          leggi(429, {"ok": False, "error_code": 429,
+                      "description": "Too Many Requests: retry after 35",
+                      "parameters": {"retry_after": 35}}))
+    prova("...un 500 scritto in JSON pure", (None, "500 Internal Server Error", 0),
+          leggi(500, {"ok": False, "error_code": 500, "description": "Internal Server Error"}))
+    prova("...e un 502 che non e' JSON (la pagina di un proxy)",
+          (None, "HTTP 502, risposta non JSON", 0), leggi(502, None))
+    prova("...un `ok: false` qualunque, anche con un 200 davanti, e' caduto",
+          [None, None, None],
+          [leggi(200, {"ok": False, "error_code": 401, "description": "Unauthorized"})[0],
+           leggi(200, {"ok": False})[0], leggi(401, {"ok": False, "result": IO})[0]])
+    prova("...`ok: true` SENZA il nome del bot non e' una risposta: prima era «un altro bot»",
+          [(None, "risposta senza il nome del bot", 0)] * 4,
+          [leggi(200, {"ok": True}), leggi(200, {"ok": True, "result": {}}),
+           leggi(200, {"ok": True, "result": {"username": ""}}),
+           leggi(200, {"ok": True, "result": "x"})])
+    prova("...e lo STATO si guarda davvero: un 500 o un 429 con dentro un corpo "
+          "che dice `ok` non e' una risposta", [None, None, None],
+          [leggi(500, OK)[0], leggi(429, OK)[0], leggi(0, OK)[0]])
+    prova("...`ok` dev'essere proprio vero, non «qualcosa»", [None, None],
+          [leggi(200, {"ok": 1, "result": IO})[0], leggi(200, {"ok": "true", "result": IO})[0]])
+    prova("...l'attesa di Telegram si ascolta solo se e' credibile (1 s - 1 ora)",
+          [0, 0, 0, 0, 0, 0, 3600, 1],
+          [leggi(429, {"ok": False, "parameters": {"retry_after": x}})[2]
+           for x in (0, -5, 3601, "35", True, None, 3600, 1)])
+    prova("...e dei `parameters` storti non fanno esplodere niente", [0, 0],
+          [leggi(429, {"ok": False, "parameters": "x"})[2],
+           leggi(429, {"ok": False, "parameters": [35]})[2]])
+    prova("...e la riga per il journal resta corta e su una riga", True,
+          len(leggi(500, {"ok": False, "description": "a\nb " + "x" * 500})[1]) <= 90
+          and "\n" not in leggi(500, {"ok": False, "description": "a\nb"})[1])
+
+    i = src.index("\nRIPROVE_GETME_MINIAPP = ") + 1
+    exec(src[i:src.index("\n", i)], amb)
+    RIPROVE = amb["RIPROVE_GETME_MINIAPP"]
+    prova("le riprove: un minuto, cinque, un quarto d'ora, poi ogni ora per un giorno",
+          [(60, 300, 900), 24, {3600}], [RIPROVE[:3], len(RIPROVE[3:]), set(RIPROVE[3:])])
+    amb["asyncio"] = _aio
+    exec("async " + pezzo("_controllo_link_miniapp"), amb)
+    TOKEN = "123456:SEGRETO-DEL-BOT"
+
+    class _ReteGiu(Exception):
+        pass
+
+    def giro(risposte, leva=BOT):
+        """Il controllo VERO con un Telegram di cartone: `risposte` e' la
+        fila di quel che getMe dice (una coppia stato/corpo, o
+        un'eccezione da alzare); finita la fila ripete l'ultima."""
+        amb["TELEGRAM_MINIAPP_LINK"] = leva
+        fila, dormite, righe = list(risposte), [], []
+
+        async def chiedi():
+            r = fila.pop(0) if len(fila) > 1 else fila[0]
+            if isinstance(r, Exception):
+                raise r
+            return r
+
+        async def dormi(s):
+            dormite.append(s)
+        amb["print"] = lambda *a, **k: righe.append(" ".join(map(str, a)))
+        try:
+            esito = _aio.run(amb["_controllo_link_miniapp"](chiedi, dormi))
+        finally:
+            del amb["print"]
+        return esito, amb["TELEGRAM_MINIAPP_LINK"], dormite, righe
+
+    R429 = (429, {"ok": False, "error_code": 429,
+                  "description": "Too Many Requests: retry after 35",
+                  "parameters": {"retry_after": 35}})
+    R500 = (500, {"ok": False, "error_code": 500, "description": "Internal Server Error"})
+    ALTRO = (200, {"ok": True, "result": {"username": "altrobot", "has_main_web_app": True}})
+    GIU = _ReteGiu(f"connessione rifiutata verso https://api.telegram.org/bot{TOKEN}/getMe")
+
+    esito, leva, dormite, righe = giro([(200, OK)])
+    prova("getMe OK col bot giusto: la leva resta accesa, senza aspettare niente",
+          ["accesa", BOT, [], ["🔗 Link dentro Telegram: accesi su " + BOT]],
+          [esito, leva, dormite, righe])
+    esito, leva, dormite, righe = giro([ALTRO])
+    prova("getMe OK con un ALTRO bot: la leva si spegne, e il journal dice perche'",
+          ["spenta", "", [], True],
+          [esito, leva, dormite,
+           len(righe) == 1 and "SPENTI" in righe[0] and "@altrobot" in righe[0]])
+    esito, leva, dormite, righe = giro([(200, {"ok": True, "result": {"username": "ilbarattolobot"}})])
+    prova("...e il bot giusto SENZA la Mini App principale pure (una risposta vera che dice no)",
+          ["spenta", "", True], [esito, leva, "Mini App principale" in righe[0]])
+    for nome, caduta, detto in (("un 429", R429, "429 Too Many Requests"),
+                                ("un 500", R500, "500 Internal Server Error"),
+                                ("un 502 non JSON", (502, None), "HTTP 502"),
+                                ("la rete giu'", GIU, "rete: _ReteGiu"),
+                                ("`ok: true` senza nome", (200, {"ok": True}),
+                                 "senza il nome del bot")):
+        esito, leva, dormite, righe = giro([caduta, (200, OK)])
+        prova(f"{nome}, poi getMe risponde: la leva NON si spegne, si riprova dopo un "
+              "minuto e il journal lo dice",
+              ["accesa", BOT, [60], True, True, True],
+              [esito, leva, dormite,
+               detto in righe[0] and "la leva resta com'e' scritta, riprovo fra 1 min" in righe[0],
+               righe[1:2] == ["🔗 Link dentro Telegram: accesi su " + BOT + " (al tentativo 2)"],
+               "SPENTI" not in "".join(righe)])
+    esito, leva, dormite, righe = giro([R429, R500, GIU, ALTRO])
+    prova("la riprova GIUDICA davvero: caduto tre volte, poi un altro bot = spenta",
+          ["spenta", "", [60, 300, 900], 4], [esito, leva, dormite, len(righe)])
+    esito, leva, dormite, righe = giro([
+        (429, {"ok": False, "error_code": 429, "description": "Too Many Requests",
+               "parameters": {"retry_after": 1200}}), (200, OK)])
+    prova("un 429 che chiede di aspettare PIU' del passo viene ascoltato",
+          [[1200], True], [dormite, "riprovo fra 20 min" in righe[0]])
+    esito, leva, dormite, righe = giro([GIU])
+    prova("la rete giu' per sempre: la leva resta accesa, le riprove finiscono da sole "
+          "e l'ultima riga lo dice",
+          ["non so", BOT, list(RIPROVE), len(RIPROVE) + 1, True],
+          [esito, leva, dormite, len(righe),
+           "mi fermo qui" in righe[-1] and "prossimo riavvio" in righe[-1]
+           and f"per {len(RIPROVE) + 1} volte" in righe[-1]])
+    prova("...e nel journal non finisce MAI il testo dell'errore (porta l'indirizzo, "
+          "e l'indirizzo porta il token del bot)",
+          [False, False, True],
+          [TOKEN in "\n".join(righe), "api.telegram.org" in "\n".join(righe),
+           all("rete: _ReteGiu" in r for r in righe)])
+    esito, leva, dormite, righe = giro([R500])
+    prova("...lo stesso con Telegram che risponde 500 per un giorno intero",
+          ["non so", BOT, len(RIPROVE)], [esito, leva, len(dormite)])
+    # il collaudo: chi bussa davvero si ferma prima (e quel «niente» e' un
+    # getMe caduto, mai un no)
+    amb["MODALITA_COLLAUDO"] = True
+    exec("async " + pezzo("_getme_telegram"), amb)
+    prova("in collaudo `_getme_telegram` non tocca la rete, e la sua risposta "
+          "vuota e' un getMe caduto", [(0, None), None],
+          [_aio.run(amb["_getme_telegram"]()), leggi(0, None)[0]])
     prova("la busta di prima pagina porta la leva VIVA, anche vuota", True,
           'risposta["tg_miniapp"] = TELEGRAM_MINIAPP_LINK' in src)
     prova("...e il pannello delle leve la mostra viva", True,
@@ -95198,8 +95343,11 @@ def prove_telegram_simulato_collaudo():
     # si chiede a Telegram se la leva dei link dentro Telegram regge
     # (`controlla_link_miniapp`). In collaudo si ferma prima anche lui: lo
     # dice la riga qui sotto, che vale per ognuno dei cinque.
+    # (11 ott 2026) `_chiedi` e' diventata `_getme_telegram`, una funzione
+    # in cima al modulo con la SUA guardia: il controllo ora riprova da
+    # solo, e chi bussa sta in un posto solo.
     prova("il censimento trova i cinque indirizzi di oggi",
-          ["_chiedi", "_foto_profilo_telegram", "_manda_telegram", "_registra",
+          ["_foto_profilo_telegram", "_getme_telegram", "_manda_telegram", "_registra",
            "bot_api"], sorted(trovati))
     for nome, ok in sorted(trovati.items()):
         prova(f"{nome}: in collaudo si ferma prima di Telegram", True, ok)
