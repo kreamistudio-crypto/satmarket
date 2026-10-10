@@ -128744,7 +128744,7 @@ def prove_controllo_fattura_p2p():
           0 < w_ctl < w_add)
     prova("...e se ferma, la fattura del wallet resta nel campo (per leggerla, o per «usa comunque»)", True,
           "inpW.value = bolt;" in wallet and "return false;" in wallet[w_ctl:w_add])
-    ctl = nudo(pezzo_js(mini, "async function controlloFatturaP2P(o, testo){", "\n}\n"))
+    ctl = nudo(pezzo_js(mini, "async function controlloFatturaP2P(o, testo, sats){", "\n}\n"))
     prova("il controllo chiede a `/p2p/fattura` con ordine, testo, cifra dovuta e finestra", True,
           "`${API_BASE}/p2p/fattura`" in ctl and "satsDaRicevereP2P(o)" in ctl
           and "finestraFatturaP2P()" in ctl)
@@ -128758,12 +128758,12 @@ def prove_controllo_fattura_p2p():
     # cantiere, 10 ott 2026: il blocco era nato DENTRO il motore, e nove
     # sentinelle di altri cantieri sono diventate rosse insieme)
     prova("il controllo sta FUORI dal motore dello scambio, che non chiama mai il server", True,
-          mini.index("async function controlloFatturaP2P(o, testo){")
+          mini.index("async function controlloFatturaP2P(o, testo, sats){")
           > mini.index("/* ============ fine del motore dello scambio"))
     prova("...e dal motore lo si chiama con `typeof`, nei due punti", (True, True),
           ("typeof controlloFatturaP2P === 'function'\n      ? await controlloFatturaP2P(o, testo) : null" in invia,
            "typeof controlloFatturaP2P === 'function'\n      ? await controlloFatturaP2P(o, bolt) : null" in wallet))
-    mostra = nudo(pezzo_js(mini, "function mostraFermoFatturaP2P(fermo){", "\n}\n"))
+    mostra = nudo(pezzo_js(mini, "function mostraFermoFatturaP2P(fermo, dove){", "\n}\n"))
     prova("l'avviso passa da `esc` e il bottone «Usa comunque» c'e' solo col `comunque`", True,
           "esc(fermo.messaggio)" in mostra and "fermo.comunque\n    ? " in mostra
           and "Usa comunque questa fattura" in mostra)
@@ -128803,6 +128803,30 @@ def prove_controllo_fattura_p2p():
     w_rete, w_ctl = wallet.find("avvisoReteBolt11(bolt)"), wallet.find("controlloFatturaP2P(o, bolt)")
     prova("...e quella del wallet pure, prima della cifra", True,
           0 < w_rete < w_ctl and w_rete < wallet.find("b.sats !== deve"))
+    # LA CAUZIONE HA GLI STESSI CONTROLLI (10 ott 2026, terza tappa, sì di
+    # Andrea): rete nel client, cifra, poi il server, prima dell'add-bond-invoice
+    cauz = nudo(pezzo_js(mini, "async function inviaFatturaCauzioneP2P(){", "\n}\n"))
+    c_rete, c_ctl, c_add = (cauz.find("avvisoReteBolt11(bolt)"),
+                            cauz.find("controlloFatturaP2P(o, bolt, o.incasso.sats)"),
+                            cauz.find("chiamataOrdineP2P(o, 'add-bond-invoice'"))
+    prova("la fattura della cauzione incollata: rete nel client, poi il server con la CIFRA della cauzione, poi l'add-bond-invoice", True,
+          0 < c_rete < c_ctl < c_add and "mostraFermoFatturaP2P(fermo, FERMO_CAUZIONE_P2P); return;" in cauz
+          and "typeof controlloFatturaP2P === 'function'" in cauz)
+    cauzw = nudo(pezzo_js(mini, "async function fatturaCauzioneDalWalletP2P(id){", "\n}\n"))
+    w_rete, w_cifra, w_ctl, w_add = (cauzw.find("avvisoReteBolt11(bolt)"), cauzw.find("b.sats !== deve"),
+                                     cauzw.find("controlloFatturaP2P(o, bolt, deve)"),
+                                     cauzw.find("chiamataOrdineP2P(o, 'add-bond-invoice'"))
+    prova("...e quella dal wallet: rete, cifra, server, e la fattura resta nel campo se ferma", True,
+          0 < w_rete < w_cifra < w_ctl < w_add and "inpC.value = bolt;" in cauzw
+          and "return false;" in cauzw[w_ctl:w_add])
+    ctl3 = nudo(pezzo_js(mini, "async function controlloFatturaP2P(o, testo, sats){", "\n}\n"))
+    prova("il controllo prende la cifra come terzo argomento, e senza vale quella dello scambio", True,
+          "const cifra = sats === undefined ? satsDaRicevereP2P(o) : sats;" in ctl3 and "sats: cifra," in ctl3)
+    prova("...il foglio della cauzione dimentica l'«usa comunque» alla riapertura, come l'altro", True,
+          "p2pFatturaComunque = '';" in nudo(pezzo_js(mini, "function apriIncassoCauzioneP2P(){", "\n}\n")))
+    prova("...e l'«usa comunque» della cauzione rimanda dal suo campo al suo gesto", True,
+          "p2pFatturaComunque = String(inp.value || '').trim();" in nudo(pezzo_js(mini, "function usaComunqueFatturaCauzioneP2P(){", "\n}\n"))
+          and "'p2pCauzioneAvviso'" in mini and "usaComunqueFatturaCauzioneP2P()" in mini)
     avviso = nudo(pezzo_js(mini, "function avvisoReteBolt11(pr){", "\n}\n"))
     prova("...con la frase della rete, la stessa del server — e SENZA il custode, che a schermo non si nomina", True,
           "non di Bitcoin: qui si pagano solo fatture della rete vera" in avviso

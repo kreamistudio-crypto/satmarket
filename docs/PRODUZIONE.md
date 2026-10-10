@@ -43,7 +43,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   manca, e' vuota o e' scritta male non la vede NESSUNO (403 a tutti,
   e all'avvio una riga `[p2p] P2P_STATISTICHE_IDS non e' una lista`
   solo se e' storta). Si guarda prima cosa c'e':
-  `grep -n "P2P_STATISTICHE_IDS\|^ADMIN_IDS" ~/satmarket/config.py`,
+  `grep -n "P2P_STATISTICHE_IDS\|^ADMIN_IDS" /srv/barattolo/config.py`,
   poi si aggiunge la riga coi due id Telegram —
   `P2P_STATISTICHE_IDS = [id_di_andrea, id_di_alan]` — e
   `sudo systemctl restart barattolo`. Tutt'e due gli id devono stare
@@ -1061,7 +1061,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   cambia niente da nessuna parte (il perché e le prove: Architettura,
   «IL COOKIE SUL TUNNEL HA DUE TESTIMONI»). LA PROCEDURA, in ordine:
   1) il segreto, una riga da copiare in due posti: `openssl rand -hex 24`.
-  2) nel config del VPS (`~/satmarket/config.py`, da `barattolo`), accanto
+  2) nel config del VPS (`/srv/barattolo/config.py`, da `barattolo`), accanto
      a `ONION_HOST`: `ONION_SEGNALE = "INCOLLA_QUI_IL_SEGRETO"` (il valore vero al posto
      del segnaposto).
   3) nel Caddyfile (`/etc/caddy/Caddyfile`, da root), prima la copia:
@@ -1099,7 +1099,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   (`'unsafe-inline'`): la fase 2 è un cantiere a sé (CANTIERI, «La CSP
   accesa», lo studio). LA LEVA `CSP_ATTIVA` NASCE ACCESA NEL CODICE: non
   va aggiunta al config per accenderla. SE QUALCOSA SI ROMPE, senza
-  deploy: nel config del VPS (`~/satmarket/config.py`, da `barattolo`)
+  deploy: nel config del VPS (`/srv/barattolo/config.py`, da `barattolo`)
   la riga `CSP_ATTIVA = False`, poi `sudo systemctl restart barattolo`;
   la CSP torna in sola prova (`Content-Security-Policy-Report-Only`,
   stesse direttive, stesso cestino) e il pannello «⚙️ Stato delle leve»
@@ -1356,13 +1356,19 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   macaroon del set 2026 ha solo `offchain:read`: finché non si rifà, il
   journal dice «· Fattura P2P: … nodo negato (permission denied):
   non_disponibile» e la fattura PASSA (il controllo non ferma mai quando
-  non sa). Il macaroon NUOVO, sul NODO da `~/nodo`, con un root key
-  SUO (il 2 è quello vecchio, l'1 è di LNbits), un comando per riga:
-  `docker compose exec lnd lncli bakemacaroon --root_key_id 3 --save_to /tmp/barattolo-lettura.macaroon offchain:read info:read`
+  non sa).
+  ⚠️ FATTO IL 10 OTT 2026 (Andrea): sul nodo `lncli listmacaroonids`
+  dice `0, 1, 4` — la root key 2 del macaroon di set 2026 NON ESISTE
+  PIÙ, quindi la revoca `deletemacaroonid 2` non serve e non si fa; il
+  macaroon nel config del VPS risponde a `GetNodeInfo` su ACINQ (la
+  prova qui sotto), cioè ha `info:read`. Se un giorno si rifà: sul NODO
+  da `~/nodo`, con un root key LIBERO (uno che `listmacaroonids` non
+  elenca; l'1 è di LNbits), un comando per riga:
+  `docker compose exec lnd lncli bakemacaroon --root_key_id 5 --save_to /tmp/barattolo-lettura.macaroon offchain:read info:read`
   `docker compose exec lnd xxd -p -c 9999 /tmp/barattolo-lettura.macaroon`
   `docker compose exec lnd rm /tmp/barattolo-lettura.macaroon`
   (l'esadecimale NON si incolla in chat né nel canale Telegram). Sul VPS,
-  nel config (`~/satmarket/config.py`, a mano): si sostituisce il valore
+  nel config (`/srv/barattolo/config.py`, a mano): si sostituisce il valore
   di `LND_PONTE_MACAROON_LETTURA` con l'esadecimale nuovo, e si AGGIUNGE
   la leva `P2P_TETTO_ROTTA = 0.01` (lo specchio di `max_routing_fee` nel
   `settings.toml` del nodo: se cambia là, va cambiato qui). Poi:
@@ -1375,7 +1381,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   la dice `docker compose exec lnd lncli listchannels` alla voce
   `remote_pubkey`, e sul VPS si mette in `PK` a mano (è pubblica):
   `PK=INCOLLA_QUI_LA_REMOTE_PUBKEY`
-  `MAC=$(grep -oP '^LND_PONTE_MACAROON_LETTURA\s*=\s*"\K[0-9a-f]+' ~/satmarket/config.py)`
+  `MAC=$(grep -oP '^LND_PONTE_MACAROON_LETTURA\s*=\s*"\K[0-9a-f]+' /srv/barattolo/config.py)`
   `curl -s --cacert /etc/barattolo/lnd-tls.cert -H "Grpc-Metadata-macaroon: $MAC" https://127.0.0.1:18080/v1/graph/node/$PK | head -c 300; echo`
   `curl -s --cacert /etc/barattolo/lnd-tls.cert -H "Grpc-Metadata-macaroon: $MAC" -X POST -d '{"route_hints":[]}' https://127.0.0.1:18080/v1/graph/routes/$PK/1000 | head -c 400; echo`
   Col macaroon vecchio tutt'e due rispondono `"message": "permission
@@ -1384,9 +1390,12 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   …}]`. Se il secondo rispondesse «Not Found» o «405», la REST di quel
   LND non ha la POST su queryroutes: il controllo lo scrive come «rotte
   errore» e passa — si dice, e si cambia strada (la GET senza hint, o
-  EstimateRouteFee). Solo DOPO il verde: sul nodo `docker compose exec
-  lnd lncli deletemacaroonid 2` revoca il vecchio da solo (LNbits non lo
-  tocca). DOVE SI LEGGE: `journalctl -u barattolo | grep "Fattura P2P"`
+  EstimateRouteFee). Il vecchio, se c'è ancora, si revoca solo DOPO il
+  verde e solo dopo aver guardato chi lo usa: `lncli listmacaroonids` sul
+  nodo (le root key vive), `lncli printmacaroon --macaroon_file …` sul
+  macaroon di mostrod (il suo `root_key_id` dev'essere un altro), e
+  LNbits è la root key 1 per costruzione; poi `lncli deletemacaroonid
+  <id>`. DOVE SI LEGGE: `journalctl -u barattolo | grep "Fattura P2P"`
   — ⛔ fermata (importo, scadenza, rete, nodo assente, indirizzo), ⚠️
   avvisata col «Usa comunque» (nessuna strada, costo oltre il tetto),
   · non si è potuto controllare (col perché), ✅ ok; mai la fattura
@@ -2626,7 +2635,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   nuovi sono i DEFAULT del codice — mille prodotti letti per giro, il
   rodaggio a cento per ventiquattro ore — e NEL CONFIG DEL VPS NON SI
   AGGIUNGE NIENTE. Ma il config vince: prima del deploy, in sola
-  lettura, `grep -n "MAX_PRODOTTI_CONNETTORE\|MAX_NUOVI_CONNETTORE\|ORE_RODAGGIO\|DB_BUSY_TIMEOUT" ~/satmarket/config.py`
+  lettura, `grep -n "MAX_PRODOTTI_CONNETTORE\|MAX_NUOVI_CONNETTORE\|ORE_RODAGGIO\|DB_BUSY_TIMEOUT" /srv/barattolo/config.py`
   — una riga `MAX_PRODOTTI_CONNETTORE = 200` (copiata dal config
   d'esempio di prima) terrebbe il tetto a duecento: si porta a 1000 o si
   cancella, e si riavvia. Le leve si leggono vive nel pannello «⚙️ Stato
@@ -3129,7 +3138,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   900` («Info P2P» del client, che dal 1 ott dice la voce «La cauzione
   di chi prende» a leva accesa; o i tag del 38385 letti dai relay).
   8-bis) LA LEVA DEL CLIENT, SUL VPS, solo DOPO che il 38385 dice
-  `bond_enabled true`: `nano ~/satmarket/config.py`, la riga
+  `bond_enabled true`: `nano /srv/barattolo/config.py`, la riga
   `P2P_CAUZIONE = True` (solo `True` accende), poi `sudo systemctl
   restart barattolo` e il pannello «⚙️ Stato delle leve» → «Cauzione nel
   contanti di persona: acceso». Il client crede solo a tutt'e due: la
@@ -3307,8 +3316,8 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
      qualunque, toccare `https://t.me/ilbarattolobot?startapp=p2p`. Deve
      aprirsi la Mini App sul libro degli ordini. Se si apre la chat del
      bot, la Mini App principale non è accesa: NON mettere la riga.
-  3) IL CONFIG: aggiungere la riga a `~/satmarket/config.py` (prima
-     `grep -n "TELEGRAM_MINIAPP_LINK" ~/satmarket/config.py`: non deve
+  3) IL CONFIG: aggiungere la riga a `/srv/barattolo/config.py` (prima
+     `grep -n "TELEGRAM_MINIAPP_LINK" /srv/barattolo/config.py`: non deve
      esserci già) e riavviare il servizio.
   4) IL JOURNAL, subito dopo il riavvio:
      `journalctl -u barattolo -n 80 --no-pager | grep "Link dentro Telegram"`

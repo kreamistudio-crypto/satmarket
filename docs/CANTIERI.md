@@ -46796,3 +46796,41 @@ intera. COSA È GIRATO: sull'albero finale (31cb369 più il commit del
 cantiere) la suite `PROVE_SEVERE=1` intera (21.598 passate, 0 fallite) e
 i 54 collaudi nella gabbia, i 53 della CI più `collaudo_prova_hold`
 (54 verdi, 0 rossi); il giro dal vivo nel pane con l'LND di cartone.
+
+## Il controllo della fattura, terza tappa: la cauzione, la root key sparita, il percorso del config (10 ott 2026, cantiere cauzione-rete, richiesta di Andrea)
+
+**LA CAUZIONE COME LE ALTRE.** Era l'ultima cosa notata: la fattura della
+metà di cauzione bruciata all'altra persona (`add-bond-invoice`, foglio
+`p2pCauzioneSheet`, dal wallet o incollata) non aveva nessun controllo di
+rete, né client né server. Da oggi ha gli stessi delle altre: nel client
+la rete subito (`avvisoReteBolt11`, nel foglio e non in un toast: la
+frase è lunga), la cifra, poi il server con `controlloFatturaP2P(o, bolt,
+sats)` — il terzo argomento è nuovo, la cifra della cauzione non è
+`satsDaRicevereP2P`; senza argomento vale quella dello scambio, e i due
+punti di ieri non cambiano. Il fermo si mostra nel foglio della cauzione
+(`mostraFermoFatturaP2P(fermo, FERMO_CAUZIONE_P2P)`: l'avviso e il gesto
+dell'«Usa comunque» sono parametri, con i default di ieri) e
+`usaComunqueFatturaCauzioneP2P` rimanda dal suo campo; il foglio
+dimentica l'«usa comunque» alla riapertura. Il server non cambia: la
+rotta era già generica.
+
+**LA ROOT KEY 2 NON C'È PIÙ.** Andrea sul nodo: `listmacaroonids` dice
+`0, 1, 4`. Il macaroon di lettura di set 2026 (root key 2) non esiste
+più; quello nel config del VPS risponde a `GetNodeInfo` su ACINQ, cioè
+ha `info:read`. La revoca `deletemacaroonid 2` scritta ieri non serve e
+non si fa: PRODUZIONE corretta, con la regola per il giorno che si rifà
+(un id libero, e prima si guarda chi usa quello vecchio).
+
+**IL CONFIG DEL VPS È `/srv/barattolo/config.py`**, non `~/satmarket/
+config.py` (parola di Andrea): corretti tutti i percorsi in PRODUZIONE,
+9 righe, anche nelle procedure altrui (cookie-onion, le
+statistiche, il bond, la MiniApp). In CLAUDE.md resta il vecchio
+(`grep -n "MAX_PREFERITI" ~/satmarket/config.py`): è un file che si
+tocca solo per le regole, lo dico nel rapporto.
+
+**PROVATO.** `prove_controllo_fattura_p2p` 88: la cauzione incollata
+(rete, poi il server con la cifra della cauzione, poi l'add-bond-invoice,
+il fermo nel suo foglio, il `typeof`), quella dal wallet (rete, cifra,
+server, la fattura che resta nel campo), il terzo argomento del
+controllo, la riapertura che dimentica, l'«usa comunque» della cauzione.
+Il motore resta a zero fetch. Collaudi e suite: nel verbale del push.

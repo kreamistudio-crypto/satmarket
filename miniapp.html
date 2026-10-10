@@ -59865,6 +59865,7 @@ function apriIncassoCauzioneP2P(){
   if (!o || !o.incasso || !(o.incasso.sats > 0)) return;
   haptic();
   p2pCauzioneIncasso = id;
+  p2pFatturaComunque = '';
   const box = el('p2pCauzioneCorpo');
   const quanto = fmt(o.incasso.sats) + ' sats';
   box.innerHTML =
@@ -59897,7 +59898,20 @@ async function fatturaCauzioneDalWalletP2P(id){
     const bolt = String((r && r.invoice) || '').trim();
     const b = leggiBolt11(bolt);
     if (!b) throw new Error('ha risposto con una fattura che non si legge');
+    /* GLI STESSI CONTROLLI DELLE ALTRE FATTURE (10 ott 2026, terza tappa):
+       la rete prima della cifra, poi il server — nodo privato, strada,
+       costo — prima dell'add-bond-invoice. Se ferma o avvisa, la fattura
+       resta nel campo e «Usa comunque» la manda dal foglio a mano. */
+    if (avvisoReteBolt11(bolt)) throw new Error('ha fatto una fattura di ' + ({tb: 'testnet', tbs: 'signet', bcrt: 'regtest'}[reteBolt11(bolt)] || 'un\'altra rete') + ', non di Bitcoin');
     if (b.sats !== deve) throw new Error('ha fatto una fattura di ' + fmt(b.sats) + ' sats invece di ' + fmt(deve));
+    const fermoC = typeof controlloFatturaP2P === 'function'
+      ? await controlloFatturaP2P(o, bolt, deve) : null;
+    if (fermoC) {
+      const inpC = el('p2pCauzioneInp');
+      if (inpC) inpC.value = bolt;
+      mostraFermoFatturaP2P(fermoC, FERMO_CAUZIONE_P2P);
+      return false;
+    }
     if (p2pCauzioneIncasso !== id) return false;
     await chiamataOrdineP2P(o, 'add-bond-invoice', {payment_request: [null, bolt, null]});
     chiudiFoglioP2P('p2pCauzioneSheet');
@@ -59917,11 +59931,24 @@ async function inviaFatturaCauzioneP2P(){
   const bolt = String(inp.value || '').trim();
   const b = leggiBolt11(bolt);
   if (!b) { toast('Questa non sembra una fattura Lightning'); return; }
+  /* la rete subito, con le sue parole, nel foglio (10 ott 2026, terza tappa) */
+  const altraReteC = avvisoReteBolt11(bolt);
+  if (altraReteC) { mostraFermoFatturaP2P({messaggio: altraReteC, comunque: false}, FERMO_CAUZIONE_P2P); return; }
   if (b.sats !== o.incasso.sats) {
     toast('La fattura deve essere di ' + fmt(o.incasso.sats) + ' sats esatti: questa è di ' + fmt(b.sats));
     return;
   }
   haptic();
+  /* e il controllo del server, come per la fattura dello scambio: un
+     verdetto che ferma si legge nel foglio, uno che avvisa lascia «Usa
+     comunque», il silenzio lascia passare */
+  const ripC = attesaP2P('Controllo che sia pagabile…');
+  let fermo = null;
+  try {
+    fermo = typeof controlloFatturaP2P === 'function'
+      ? await controlloFatturaP2P(o, bolt, o.incasso.sats) : null;
+  } finally { ripC(); }
+  if (fermo) { mostraFermoFatturaP2P(fermo, FERMO_CAUZIONE_P2P); return; }
   const rip = attesaP2P('Mando la fattura…');
   try {
     await chiamataOrdineP2P(o, 'add-bond-invoice', {payment_request: [null, bolt, null]});
@@ -68530,15 +68557,18 @@ function haOrdiniViviP2P(){
    da solo trova un `null`, cioe' «non si sa», e manda come ieri. */
 let P2P_CONTROLLO_ATTESA_MS = 40000;   /* tre domande a LND da 10 s, piu' il wallet di un indirizzo */
 let p2pFatturaComunque = '';           /* il testo per cui si e' detto «usa comunque»: il controllo non si rifa' */
-async function controlloFatturaP2P(o, testo){
+async function controlloFatturaP2P(o, testo, sats){
   if (DEMO || VETRINA) return null;
   if (p2pFatturaComunque && p2pFatturaComunque === testo) return null;
+  /* la cifra: quella dovuta nello scambio, o quella passata — la meta'
+     della cauzione bruciata (10 ott 2026, terza tappa) */
+  const cifra = sats === undefined ? satsDaRicevereP2P(o) : sats;
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), P2P_CONTROLLO_ATTESA_MS);
   try {
     const r = await fetch(`${API_BASE}/p2p/fattura`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({ordine: o.id, testo: testo, sats: satsDaRicevereP2P(o),
+      body: JSON.stringify({ordine: o.id, testo: testo, sats: cifra,
                             finestra: finestraFatturaP2P()}),
       signal: ctl.signal});
     if (!r.ok) return null;
@@ -68553,11 +68583,12 @@ async function controlloFatturaP2P(o, testo){
 /* l'avviso nel foglio, e — quando il verdetto lo concede — il bottone
    per insistere. Ghost e non arancione: il gesto consigliato e' rifare
    la fattura, e il bottone grande resta «Invia» */
-function mostraFermoFatturaP2P(fermo){
-  const av = el('p2pIncassoAvviso');
+function mostraFermoFatturaP2P(fermo, dove){
+  const d = dove || {avviso: 'p2pIncassoAvviso', comunque: 'usaComunqueFatturaP2P()'};
+  const av = el(d.avviso);
   if (!av) return;
   av.innerHTML = esc(fermo.messaggio) + (fermo.comunque
-    ? '<br><button class="btn ghost" type="button" style="margin-top:8px" onclick="usaComunqueFatturaP2P()">Usa comunque questa fattura</button>'
+    ? '<br><button class="btn ghost" type="button" style="margin-top:8px" onclick="' + d.comunque + '">Usa comunque questa fattura</button>'
     : '');
   av.style.display = '';
 }
@@ -68567,6 +68598,15 @@ function usaComunqueFatturaP2P(){
   p2pFatturaComunque = String(inp.value || '').trim();
   haptic();
   inviaIncassoP2P();
+}
+/* la stessa cosa dal foglio della CAUZIONE (10 ott 2026, terza tappa) */
+const FERMO_CAUZIONE_P2P = {avviso: 'p2pCauzioneAvviso', comunque: 'usaComunqueFatturaCauzioneP2P()'};
+function usaComunqueFatturaCauzioneP2P(){
+  const inp = el('p2pCauzioneInp');
+  if (!inp) return;
+  p2pFatturaComunque = String(inp.value || '').trim();
+  haptic();
+  inviaFatturaCauzioneP2P();
 }
 
 /* ============ LA PORTA DEL PRIMO ORDINE (9 ott 2026) ============

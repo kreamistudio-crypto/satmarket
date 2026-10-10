@@ -30392,6 +30392,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   prima di tutto: `reteBolt11` e `avvisoReteBolt11` accanto a
   `importoBolt11`, nel foglio a mano subito dopo «non si legge» e nella
   fattura dal wallet prima della cifra; il server la rigiudica lo stesso.
+  E dalla terza tappa (stesso giorno) anche la fattura della CAUZIONE —
+  la metà bruciata all'altra persona, `add-bond-invoice`, dal wallet o
+  incollata — passa dagli stessi controlli: rete nel client, cifra, poi
+  `controlloFatturaP2P(o, bolt, o.incasso.sats)` (il terzo argomento è la
+  cifra; senza, vale quella dello scambio) e il fermo nel suo foglio
+  (`FERMO_CAUZIONE_P2P`, `usaComunqueFatturaCauzioneP2P`).
 
 - IL «CONDIVIDI» DI UN ORDINE P2P (10 ott 2026, perché in CANTIERI, «Il
   "Condividi" di un ordine P2P»). Un ordine del libro si manda fuori con
