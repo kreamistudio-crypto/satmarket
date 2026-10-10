@@ -139587,6 +139587,353 @@ def prove_prova_wallet():
           [rh.index("in sospeso") < rh.index('id="p2pHoldQr"'), rc.index("in sospeso") < rc.index('id="p2pHoldQr"')])
 
 
+def prove_solleciti_p2p():
+    """I SOLLECITI PER TUTTI I METODI (10 ott 2026, cantiere «solleciti
+    p2p», richiesta di Andrea dopo lo studio sul feedback). Dopo la
+    garanzia bloccata non c'era nessun orologio fino alle 48 ore: adesso
+    a chi compra si ricordano gli euro (un'ora, sei, un giorno) e a chi
+    vende il rilascio (un'ora, sei, venti) per OGNI metodo, non piu'
+    solo col PayCode.
+
+    Quel che qui si rompe in silenzio: «invia gli euro» detto a chi non
+    ha ancora un recapito a cui mandarli, o a chi li ha gia' segnati, o
+    dopo una disputa; il sollecito che parte al giro dopo, a un'altra
+    persona; il PayCode che ne riceve sei invece di tre; il contanti di
+    persona sollecitato a un'ora da un appuntamento di domani.
+
+    Il banco e' quello degli avvisi P2P (`_banco_eventi_p2p`: i giudici
+    VERI sul database vero in memoria) coi pezzi nuovi presi dal
+    sorgente; gli eventi passano dai due giudici della rotta e poi,
+    nell'ordine della rotta, da `_solleciti_evento_p2p` e da
+    `_avvisi_evento_p2p`."""
+    print("\n[i solleciti per tutti i metodi]")
+    import re as _re
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- 1) LE SENTINELLE --------------------------------------------------
+    rotta = src[src.index('@app.post("/api/p2p/evento")'):]
+    rotta = rotta[:rotta.index("\n\n\n")]
+    prova("la rotta degli eventi mette i solleciti DOPO la cronaca e gli esiti, solo su "
+          "un evento nuovo, col suo try: mai un 500 per loro", True,
+          0 < rotta.index("fatto = _registra_evento_p2p(") < rotta.index("_segna_esiti_p2p(")
+          < rotta.find("for riga in _solleciti_evento_p2p(con, ev, fatto, adesso):")
+          < rotta.index("garanzia_morta = False")
+          and "if fatto is not None:\n            try:\n                for riga in "
+              "_solleciti_evento_p2p(" in rotta
+          and "except Exception as e:" in rotta[rotta.index("_solleciti_evento_p2p("):
+                                                rotta.index("garanzia_morta = False")])
+    att = codice(_senza_prosa(pezzo("_scarica_attese_p2p")))
+    prova("il giudice del sollecito a chi compra sta PRIMA del timbro: quel che non parte "
+          "non risulta detto", True,
+          0 < att.find("_sollecito_euro_p2p_fermo(con, r)")
+          < att.index("INSERT OR IGNORE INTO p2p_avvisi"))
+    prova("i solleciti portano il bottone dello scambio, come il promemoria", True,
+          'r["fonte"] in ("promemoria", "sollecito", "sollecito_euro")' in att)
+    ev_p = pezzo("_avvisi_evento_p2p")
+    prova("i solleciti del PayCode nascono ancora dov'erano, e li' non e' entrato "
+          "nient'altro", [1, False],
+          [ev_p.count("SOLLECITI_PAYCODE_S"),
+           "SOLLECITI_RILASCIO_S" in ev_p or "sollecito_euro" in ev_p])
+    sol = codice(_senza_prosa(pezzo("_solleciti_evento_p2p")))
+    prova("...e qui il «pagato» col tabacchino non mette niente: il PayCode ha la sua porta",
+          True, 'if not dati["tabacchino"]:' in sol)
+    fermo = codice(_senza_prosa(pezzo("_sollecito_euro_p2p_fermo")))
+    prova("a dire se tocca a chi compra sono i giudici della pagina, non una regola nuova",
+          [True, True],
+          ['_stato_scambio_p2p(momenti, "compro", "", "", False)["stato"]' in fermo,
+           '_dati_frase_p2p(con, ordine)["recapito_detto"]' in fermo])
+
+    con, amb = _banco_eventi_p2p()
+    for riga in ("SOLLECITI_RILASCIO_S = ", "SOLLECITI_EURO_S = "):
+        i = src.index("\n" + riga) + 1
+        exec(src[i:src.index("\n", i)].split("  #")[0], amb)
+    for blocco in ("SOLLECITO_RILASCIO_TESTI = {", "SOLLECITO_RILASCIO_CONTANTI_TESTI = {",
+                   "SOLLECITO_EURO_TESTI = {", "SOLLECITO_EURO_PAYCODE_TESTI = {",
+                   "_PESO_MOMENTO_P2P = {"):
+        i = src.index("\n" + blocco) + 1
+        exec(src[i:src.index("}\n", i) + 2], amb)
+    for f in ("_stato_scambio_p2p", "_sollecito_euro_p2p_fermo", "_solleciti_evento_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    H = 3600
+    prova("gli intervalli: a chi vende gli stessi del PayCode (un'ora, sei, venti), a chi "
+          "compra un'ora, sei, un giorno", [(H, 6 * H, 20 * H), True, (H, 6 * H, 24 * H)],
+          [amb["SOLLECITI_RILASCIO_S"],
+           amb["SOLLECITI_RILASCIO_S"] is amb["SOLLECITI_PAYCODE_S"], amb["SOLLECITI_EURO_S"]])
+    famiglie = {n: amb[n] for n in ("SOLLECITO_RILASCIO_TESTI", "SOLLECITO_RILASCIO_CONTANTI_TESTI",
+                                    "SOLLECITO_EURO_TESTI", "SOLLECITO_EURO_PAYCODE_TESTI")}
+    prova("ogni famiglia ha i suoi tre testi", [[1, 2, 3]] * 4,
+          [sorted(t) for t in famiglie.values()])
+    tutti = [t for f in famiglie.values() for t in f.values()]
+    prova("i testi non portano importi, cifre ne' id, e nessun tag da chiudere", [],
+          [t for t in tutti if _re.search(r"[\d€<>]", t)])
+    prova("...e mai «assicurato» ne' il nome del protocollo", [],
+          [t for t in tutti if _re.search(r"assicurat|mostro|coordinator|escrow", t, _re.I)])
+    prova("a chi vende non si dice mai «libera» senza la condizione: gli euro (o i "
+          "contanti) devono esserci", [],
+          [t for n in ("SOLLECITO_RILASCIO_TESTI", "SOLLECITO_RILASCIO_CONTANTI_TESTI")
+           for t in famiglie[n].values()
+           if not _re.search(r"\b[Ss]e (sono arrivati|gli euro ci sono|li hai contati|"
+                             r"li hai ricevuti)[, ]", t.split("libera")[0])
+           and "libera i sats se li hai ricevuti" not in t])
+    prova("...e i bonifici in viaggio si aspettano: il primo e il terzo lo dicono", [True, True],
+          ["aspetta pure" in famiglie["SOLLECITO_RILASCIO_TESTI"][n] for n in (1, 3)])
+    prova("le etichette fra «» sono quelle dei bottoni VERI della pagina dello scambio",
+          [True] * 5,
+          ["'Ho consegnato i contanti' : 'Ho inviato gli euro';" in mini,
+           all("«Ho inviato gli euro»" in t for t in famiglie["SOLLECITO_EURO_TESTI"].values()),
+           ">✅ Ho pagato al tabacchino</button>" in mini
+           and all("«Ho pagato al tabacchino»" in t
+                   for t in famiglie["SOLLECITO_EURO_PAYCODE_TESTI"].values()),
+           ">✕ Annulla</button>" in mini
+           and all("«✕ Annulla»" in f[n] for f in (famiglie["SOLLECITO_EURO_TESTI"],
+                                                  famiglie["SOLLECITO_EURO_PAYCODE_TESTI"])
+                   for n in (2, 3)),
+           ">🔓 Libera i sats</button>" in mini])
+
+    # --- 2) LO SCAMBIO ------------------------------------------------------
+    pulisci, registra = amb["_evento_p2p_pulito"], amb["_registra_evento_p2p"]
+    avvisi, scarica = amb["_avvisi_evento_p2p"], amb["_scarica_attese_p2p"]
+    solleciti, recapito = amb["_solleciti_evento_p2p"], amb["_avviso_recapito_p2p"]
+    A, B = 6001, 6002                    # A compra, B vende
+    KA, KB, KX = "a" * 64, "b" * 64, "c" * 64     # KX non e' dei nostri
+    for chi, pub in ((A, KA), (B, KB)):
+        con.execute("INSERT INTO utenti VALUES(?,1)", (chi,))
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)",
+                    (pub, chi))
+    amb["_NOMI"].update({A: "Anna", B: "Bruno"})
+    giornale = []
+    amb["print"] = lambda *a, **k: giornale.append(" ".join(str(x) for x in a))
+    ORA = 1_790_000_000
+    conta = [0]
+    URL = "https://barattolo.store/p2p?scambio="
+
+    def nuovo(metodi='["SEPA"]', lato="sell", maker=B, taker=A):
+        conta[0] += 1
+        o = f"{conta[0]:08x}-7b2d-4c6a-9e11-aa00bb11cc33"
+        con.execute(
+            "INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, "
+            "preso_da, euro, sats, metodi) VALUES(?,?,0,'in-progress',?,1,?,"
+            "'10,00 €',15000,?)", (o, maker, lato, taker, metodi))
+        return o
+
+    def arriva(o, azione, attore="mostro", dettaglio="", quando=ORA, buyer=KA):
+        """Come la rotta: la cronaca, poi i solleciti, poi (nel task) gli
+        avvisi. Torna le righe di journal dei solleciti, o None al retry."""
+        d = {"v": 1, "order": o, "action": azione, "ts": quando,
+             "buyer": buyer, "seller": KB, "actor": attore}
+        if dettaglio:
+            d["detail"] = dettaglio
+        e = pulisci(d, quando)
+        fatto = registra(con, e, quando)
+        if fatto is None:
+            return None
+        righe = solleciti(con, e, fatto, quando)
+        giornale.extend(righe)           # la rotta le stampa: qui vanno nel giornale
+        avvisi(con, e, fatto, quando)
+        return righe
+
+    def attese(o, fonte):
+        return [(r["momento"], r["tg_id"], r["scade"]) for r in con.execute(
+            "SELECT momento, tg_id, scade FROM p2p_attese WHERE ordine=? AND fonte=? "
+            "ORDER BY scade, id", (o, fonte))]
+
+    def batte(quando, fonti=("sollecito", "sollecito_euro")):
+        """Un battito delle attese a quell'ora: ([(tg_id, testo)], [indirizzi])
+        dei soli solleciti."""
+        bottoni = {}
+        fuori, _ = scarica(con, quando, bottoni)
+        return ([(t, x) for t, x, f in fuori if f in fonti],
+                [bottoni[i][1] for i, (_, _, f) in enumerate(fuori)
+                 if f in fonti and i in bottoni])
+
+    def fino_alla_garanzia(o, t=ORA, buyer=KA):
+        """Una vendita di B presa da chi compra: fattura, garanzia chiesta e
+        pagata. Torna l'ora della garanzia pagata."""
+        arriva(o, "taken", "buyer", "invoice-next", t, buyer)
+        arriva(o, "buyer-invoice-requested", "mostro", "", t, buyer)
+        arriva(o, "buyer-invoice-added", "buyer", "hold-next", t + 40, buyer)
+        arriva(o, "hold-invoice-requested", "mostro", "invoice", t + 40, buyer)
+        arriva(o, "hold-invoice-paid", "seller", "active", t + 90, buyer)
+        return t + 90
+
+    EURO, RIL = amb["SOLLECITO_EURO_TESTI"], amb["SOLLECITO_RILASCIO_TESTI"]
+    # ---- lo scambio intero, col bonifico ----
+    o = nuovo()
+    G = fino_alla_garanzia(o)
+    prova("la garanzia bloccata mette in attesa i tre solleciti degli euro a chi compra: "
+          "un'ora, sei ore, un giorno",
+          [("euro_sollecito1", A, G + H), ("euro_sollecito2", A, G + 6 * H),
+           ("euro_sollecito3", A, G + 24 * H)], attese(o, "sollecito_euro"))
+    prova("...e a chi vende ancora niente", [], attese(o, "sollecito"))
+    giornale.clear()
+    prova("a un'ora, SENZA recapito, a chi compra non parte niente: non ha dove mandarli",
+          ([], []), batte(G + H))
+    prova("...il journal dice perche'", True,
+          any(f"{o[:8]} «euro_sollecito1» a {A} non parte" in r
+              and "non ha ancora detto dove ricevere gli euro" in r for r in giornale))
+    prova("...e quel che non e' partito non risulta detto", 0,
+          con.execute("SELECT COUNT(*) FROM p2p_avvisi WHERE ordine=? AND momento LIKE "
+                      "'euro_sollecito%'", (o,)).fetchone()[0])
+    recapito(con, o, B, G + 2 * H)
+    prova("detto il recapito, a sei ore parte il secondo — a chi compra, col bottone "
+          "che apre QUELLO scambio", ([(A, EURO[2])], [URL + o]), batte(G + 6 * H))
+    prova("una volta sola: ripassando non c'e' piu' niente", ([], []), batte(G + 6 * H + 60))
+    F = G + 7 * H
+    arriva(o, "fiat-sent", "buyer", "", F)
+    prova("il «pagato» porta via SUBITO i solleciti degli euro rimasti", [],
+          attese(o, "sollecito_euro"))
+    prova("...e mette in attesa i tre del rilascio a chi vende, anche col bonifico: "
+          "un'ora, sei, venti",
+          [("fiat_sollecito1", B, F + H), ("fiat_sollecito2", B, F + 6 * H),
+           ("fiat_sollecito3", B, F + 20 * H)], attese(o, "sollecito"))
+    prova("a un'ora dal «pagato», a chi vende: controlla il conto — col suo bottone",
+          ([(B, RIL[1])], [URL + o]), batte(F + H))
+    arriva(o, "released", "seller", "", F + 2 * H)
+    prova("il rilascio porta via subito gli altri due", [], attese(o, "sollecito"))
+    giornale.clear()
+    prova("...e a venti ore non parte niente", ([], []), batte(F + 21 * H))
+    prova("...e uno scambio andato bene non lascia righe di sollecito nel journal", [],
+          [r for r in giornale if "Sollecito P2P" in r])
+
+    # ---- chi compra ha PUBBLICATO: la fattura arriva dopo la garanzia ----
+    o = nuovo(lato="buy", maker=A, taker=B)
+    arriva(o, "taken", "seller", "hold-next", ORA)
+    arriva(o, "hold-invoice-requested", "mostro", "take", ORA)
+    arriva(o, "hold-invoice-paid", "seller", "invoice-next", ORA + 60)
+    arriva(o, "buyer-invoice-requested", "mostro", "", ORA + 60)
+    recapito(con, o, B, ORA + 70, False)
+    r1 = {"ordine": o, "giro": 1}
+    prova("garanzia bloccata ma fattura non ancora data: non tocca a chi compra mandare "
+          "gli euro", True, "non aspetta gli euro" in amb["_sollecito_euro_p2p_fermo"](con, r1))
+    arriva(o, "buyer-invoice-added", "buyer", "", ORA + 200)
+    prova("...data la fattura (scambio attivo, recapito detto) tocca a lui", "",
+          amb["_sollecito_euro_p2p_fermo"](con, r1))
+    prova("...e a un'ora dalla garanzia il primo parte", ([(A, EURO[1])], [URL + o]),
+          batte(ORA + 60 + H))
+
+    # ---- quel che ferma il sollecito a chi compra ----
+    o = nuovo()
+    G = fino_alla_garanzia(o)
+    recapito(con, o, B, G + 10)
+    arriva(o, "cancel-requested", "buyer", "", G + 100)
+    giornale.clear()
+    prova("chi ha chiesto di annullare non si sollecita a pagare", ([], []), batte(G + H))
+    prova("...e il journal dice in che stato e' lo scambio", True,
+          any("non aspetta gli euro" in r and "annullo_chiesto" in r for r in giornale))
+    for azione, attore, dettaglio in (("dispute-opened", "seller", ""),
+                                      ("canceled", "mostro", "cooperative"),
+                                      ("canceled", "mostro", "admin"),
+                                      ("canceled", "buyer", "republished")):
+        o = nuovo()
+        G = fino_alla_garanzia(o)
+        recapito(con, o, B, G + 10)
+        arriva(o, azione, attore, dettaglio, G + 100)
+        prova(f"«{azione}»/{dettaglio or '—'} porta via subito i solleciti degli euro",
+              [], attese(o, "sollecito_euro"))
+    # I DUE POST ARRIVATI ROVESCIATI (Tor): il «pagato» prima della garanzia
+    # pagata. Le attese nascono DOPO il fatto, e le ferma il giudice
+    o = nuovo()
+    arriva(o, "taken", "buyer", "invoice-next", ORA)
+    arriva(o, "buyer-invoice-added", "buyer", "hold-next", ORA + 40)
+    arriva(o, "fiat-sent", "buyer", "", ORA + 300)
+    arriva(o, "hold-invoice-paid", "seller", "active", ORA + 90)
+    recapito(con, o, B, ORA + 100)
+    prova("la garanzia pagata arrivata DOPO il «pagato» mette lo stesso le sue attese", 3,
+          len(attese(o, "sollecito_euro")))
+    giornale.clear()
+    prova("...ma alla scadenza il giudice le ferma: gli euro risultano inviati",
+          ([], []), batte(ORA + 90 + H, ("sollecito_euro",)))
+    prova("...e lo dice", True,
+          any(f"{o[:8]} «euro_sollecito1»" in r and "euro_inviati" in r for r in giornale))
+    # UN ALTRO GIRO: l'attesa del giro prima non parla alla persona di dopo
+    o = nuovo()
+    G = fino_alla_garanzia(o)
+    recapito(con, o, B, G + 10)
+    prova("nel suo giro l'attesa e' viva", "",
+          amb["_sollecito_euro_p2p_fermo"](con, {"ordine": o, "giro": 1}))
+    prova("...ma un'attesa di un altro giro no", True,
+          "un altro giro" in amb["_sollecito_euro_p2p_fermo"](con, {"ordine": o, "giro": 2}))
+    # la garanzia pagata RIFATTA nello stesso giro sposta, non aggiunge
+    arriva(o, "hold-invoice-paid", "seller", "active", G + 30)
+    prova("una garanzia pagata raccontata due volte nello stesso giro lascia tre attese, "
+          "non sei", 3, len(attese(o, "sollecito_euro")))
+    prova("...e il retry dello stesso evento non tocca niente", [None, 3],
+          [arriva(o, "hold-invoice-paid", "seller", "active", G + 30),
+           len(attese(o, "sollecito_euro"))])
+    # chi ha gli avvisi SPENTI non riceve, e non si timbra
+    con.execute("UPDATE utenti SET avvisi_p2p=0 WHERE tg_id=?", (A,))
+    prova("a chi ha gli avvisi P2P spenti il sollecito non parte, e non risulta detto",
+          [([], []), 0],
+          [batte(G + 30 + H),
+           con.execute("SELECT COUNT(*) FROM p2p_avvisi WHERE ordine=? AND momento LIKE "
+                       "'euro_sollecito%'", (o,)).fetchone()[0]])
+    con.execute("UPDATE utenti SET avvisi_p2p=1 WHERE tg_id=?", (A,))
+    # UN GIUDICE CHE INCIAMPA NON FERMA IL BATTITO: la riga se ne va, le
+    # altre attese partono lo stesso, e il journal lo dice
+    o2 = nuovo()
+    G2 = fino_alla_garanzia(o2)
+    recapito(con, o2, B, G2 + 10)
+    arriva(o2, "fiat-sent", "buyer", "", G2 + 20)
+    con.execute("INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, quando, scade, "
+                "fonte) VALUES(?,'euro_sollecito1',1,?,'x',?,?,'sollecito_euro')",
+                (o2, A, G2, G2 + 30))
+    vero_stato = amb["_stato_scambio_p2p"]
+
+    def stato_rotto(*a, **k):
+        raise RuntimeError("cartone")
+    amb["_stato_scambio_p2p"] = stato_rotto
+    giornale.clear()
+    fuori_rotto = batte(G2 + 20 + H)
+    amb["_stato_scambio_p2p"] = vero_stato
+    prova("se il giudice degli euro inciampa il battito NON cade: il sollecito di chi "
+          "vende, nello stesso giro, parte lo stesso", ([(B, RIL[1])], [URL + o2]),
+          fuori_rotto)
+    prova("...la riga inciampata se n'e' andata (non fa cadere i giri dopo), e il "
+          "journal lo dice", [0, True],
+          [con.execute("SELECT COUNT(*) FROM p2p_attese WHERE ordine=? AND "
+                       "fonte='sollecito_euro'", (o2,)).fetchone()[0],
+           any("il giudice e' inciampato (RuntimeError: cartone)" in r for r in giornale)])
+    # chi compra da un ALTRO client: per lui niente attese
+    o = nuovo(taker=0)
+    fino_alla_garanzia(o, buyer=KX)
+    prova("chi compra non e' dei nostri: nessun sollecito degli euro", [],
+          attese(o, "sollecito_euro"))
+    arriva(o, "fiat-sent", "buyer", "", ORA + 500, KX)
+    prova("...ma a chi vende, che e' dei nostri, quelli del rilascio si'", 3,
+          len(attese(o, "sollecito")))
+
+    # ---- IL CONTANTI DI PERSONA ----
+    CONT = amb["SOLLECITO_RILASCIO_CONTANTI_TESTI"]
+    for metodi, testi, nome in (('["Contanti"]', CONT, "col solo Contanti"),
+                                ('["Contanti", "Revolut"]', RIL, "col Contanti fra due metodi")):
+        o = nuovo(metodi)
+        giornale.clear()
+        G = fino_alla_garanzia(o)
+        prova(f"{nome}: a chi compra NESSUN sollecito degli euro (ci si da' appuntamento)",
+              [], attese(o, "sollecito_euro"))
+        prova(f"{nome}: ...e il journal lo dice", True,
+              any(f"Solleciti P2P: {o[:8]}" in r and "contanti di persona" in r
+                  for r in giornale))
+        arriva(o, "fiat-sent", "buyer", "", G + 100)
+        prova(f"{nome}: dopo il «pagato» a chi vende i tre del rilascio, con le parole giuste",
+              [(B, testi[1])], batte(G + 100 + H)[0])
+
+    # ---- IL PAYCODE: i suoi testi, e tre solleciti a chi vende, non sei ----
+    PAY = amb["SOLLECITO_EURO_PAYCODE_TESTI"]
+    o = nuovo('["Contanti al tabacchino 23.47"]')
+    G = fino_alla_garanzia(o)
+    recapito(con, o, B, G + 10)
+    prova("col PayCode a chi compra si dice di pagarlo al tabacchino",
+          ([(A, PAY[1])], [URL + o]), batte(G + H))
+    arriva(o, "fiat-sent", "buyer", "", G + 2 * H)
+    prova("...e dopo il «pagato» a chi vende restano i TRE solleciti del PayCode, coi "
+          "loro testi", [3, sorted(amb["SOLLECITO_PAYCODE_TESTI"].values())],
+          [len(attese(o, "sollecito")),
+           sorted(r[0] for r in con.execute("SELECT testo FROM p2p_attese WHERE ordine=? "
+                                            "AND fonte='sollecito'", (o,)))])
+
+
 def prove_reputazione_p2p():
     """LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, I TENTATIVI, IL
     FILTRO DI CHI PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, cantiere
@@ -140458,6 +140805,7 @@ def main():
               prove_testi_p2p_confondono,
               prove_garanzia_lunga,
               prove_promemoria_gesto,
+              prove_solleciti_p2p,
               prove_avvisi_nuovi_ordini,
               prove_anteprima_avvisi_p2p,
               prove_avvisi_mercatino,

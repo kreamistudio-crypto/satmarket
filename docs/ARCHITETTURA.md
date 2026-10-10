@@ -27756,6 +27756,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   messaggio che la chiede, per chi ha preso e per chi ha pubblicato —
   più la finestra del 38385. Il verbale: CANTIERI, «Il promemoria della
   garanzia» e «La scadenza vera della fattura».
+  I SOLLECITI PER TUTTI I METODI (10 ott 2026). Dopo la garanzia
+  bloccata il coordinatore non ha più un cronometro corto: ricordano le
+  ATTESE (`p2p_attese`). Le mette `_solleciti_evento_p2p`, chiamata
+  dalla ROTTA degli eventi dopo `_segna_esiti_p2p` (solo su un evento
+  nuovo, col suo `try`): a `garanzia_pagata` tre attese a chi COMPRA
+  (`euro_sollecito1..3`, fonte `sollecito_euro`, a `SOLLECITI_EURO_S`:
+  1, 6, 24 ore) — non dove fra i metodi c'è «Contanti»; a `fiat` tre
+  attese a chi VENDE (`fiat_sollecito1..3`, fonte `sollecito`, a
+  `SOLLECITI_RILASCIO_S`: 1, 6, 20 ore) per ogni metodo tranne il
+  PayCode, che le sue le mette da sempre `_avvisi_evento_p2p`. Quando lo
+  scambio si muove le attese superate se ne vanno subito (il «pagato»,
+  la disputa e ogni chiusura per quelle di chi compra;
+  `P2P_MOMENTI_CHIUDONO_FIAT` per quelle di chi vende). ALLA SCADENZA
+  (`_scarica_attese_p2p`) chi vende passa dal giudice di sempre
+  (`_sollecito_p2p_vivo`), chi compra da `_sollecito_euro_p2p_fermo`:
+  parte solo se nello STESSO giro lo scambio è ancora «attivo»
+  (`_stato_scambio_p2p`, il giudice della pagina) e il recapito è stato
+  detto (`_dati_frase_p2p`) — il calco di `_tocca_a_me_p2p`. I testi
+  sono quattro famiglie di tre (`SOLLECITO_EURO_TESTI`,
+  `SOLLECITO_EURO_PAYCODE_TESTI`, `SOLLECITO_RILASCIO_TESTI`,
+  `SOLLECITO_RILASCIO_CONTANTI_TESTI`), senza importi né id; tutti i
+  solleciti, PayCode compreso, portano il bottone «Apri lo scambio» del
+  promemoria. Anti-doppione: il timbro di sempre in `p2p_avvisi`. Il
+  verbale: CANTIERI, «I solleciti per tutti i metodi».
   IL RECAPITO (`_avviso_recapito_p2p`) riconosce le parti dallo SCAMBIO
   IN CORSO (`_parti_scambio_p2p`: prima `p2p_scambi`, cioè il
   coordinatore; poi, se lui tace, `p2p_ordini` come prima), e `vivo`

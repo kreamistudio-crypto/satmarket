@@ -1139,6 +1139,8 @@ tarda: controllo com'è andata…».
 | La richiesta della cauzione | qualche minuto (lo dice il foglio) | l'ordine torna nel libro, va ripreso |
 | Sats già in garanzia | circa quattro giorni | «Coi sats in garanzia avete **circa quattro giorni**. Se chi compra non ha ancora detto di aver pagato, allo scadere i sats **tornano da soli a chi vende**; se l'ha detto, si apre una disputa.» Dal sorgente della 0.19.0: il coordinatore si muove a ~92 ore; una disputa già aperta e non decisa la chiude LND a ~94 ore, coi sats a chi vende. ✈️ «⏰ **La garanzia è arrivata a scadenza: lo scambio è annullato.** I sats tornano a chi vende.» |
 | Barattozon, dopo «pagato» | 24 ore «a vista» per chi vende | promemoria a 1, 6, 20 ore; poi nulla di automatico |
+| Sats in garanzia, euro non ancora segnati | nessuna scadenza prima dei quattro giorni | ✈️ a chi compra un promemoria a 1, 6 e 24 ore dalla garanzia bloccata (dal 10 ott 2026; non col contanti di persona) |
+| Dopo «pagato», ogni altro metodo | nessuna scadenza prima dei quattro giorni | ✈️ a chi vende un promemoria a 1, 6 e 20 ore (dal 10 ott 2026) |
 | La fattura di chi compra | meglio almeno un giorno | se scade prima del rilascio: «Serve una fattura nuova» |
 | Appuntamento in contanti | entro una settimana | «Fissa l'incontro entro una settimana» |
 | Metà della cauzione vinta | 15 giorni per incassarla | dopo «il servizio se la tiene» |
@@ -1180,6 +1182,61 @@ l'app sia gli avvisi: qui sotto `<n>` è quel numero (15 fino al 10 ott
   non dice «annullato», perché lo decide il coordinatore, che passa una
   volta al minuto. Nel foglio «🔒 Blocca i sats» resta la riga di sempre
   («⏱ Scade tra <mm:ss>»), con la stessa scadenza.
+
+### I promemoria a garanzia bloccata: gli euro e il rilascio (10 ott 2026)
+
+Dopo la garanzia bloccata il coordinatore non ha più un cronometro corto
+(restano i quattro giorni della tabella). Da qui in poi ricorda
+Barattolo, su Telegram (o nel DM Nostr), sempre col bottone «**⚡ Apri lo
+scambio**». Ogni promemoria parte una volta sola, e solo se lo scambio è
+ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
+
+- ✈️ **A chi compra, finché non segna gli euro come inviati** — a 1 ora,
+  6 ore e 24 ore dalla garanzia bloccata. Parte solo se chi vende ha già
+  indicato dove ricevere gli euro; non parte dopo «pagato», dopo una
+  disputa, dopo una richiesta di annullo, né sugli ordini che si possono
+  pagare in **contanti di persona** (lì ci si dà appuntamento).
+  1. «💶 Promemoria: i sats sono in garanzia da un'ora e aspettano i tuoi
+     euro. Inviali al recapito che trovi nella pagina dello scambio, poi
+     tocca «Ho inviato gli euro». Se li hai già inviati, segnalo lì: chi
+     vende aspetta quel gesto.»
+  2. «💶 Sono passate sei ore: i sats di chi vende sono fermi in garanzia
+     e gli euro non risultano inviati. Inviali e tocca «Ho inviato gli
+     euro». Se non puoi più, tocca «✕ Annulla» nella pagina dello
+     scambio: chi vende deve accettare, e i sats gli tornano.»
+  3. «⏰ È passato un giorno: i sats di chi vende sono ancora fermi in
+     garanzia per te. Invia gli euro e tocca «Ho inviato gli euro»,
+     oppure tocca «✕ Annulla» nella pagina dello scambio. Chi vende può
+     aprire una disputa: a decidere sarà un moderatore.»
+  Con **Barattozon** le parole sono quelle del PayCode: «🧾 Promemoria: i
+  sats sono in garanzia da un'ora e aspettano il pagamento del PayCode.
+  Pagalo in contanti al tabacchino, poi tocca «Ho pagato al tabacchino»
+  nella pagina dello scambio…», «🧾 Sono passate sei ore: … il PayCode
+  non risulta pagato…», «⏰ È passato un giorno: … un PayCode non vale
+  per sempre…».
+- ✈️ **A chi vende, dopo «pagato», finché non libera** — a 1 ora, 6 ore e
+  20 ore, per ogni metodo (Barattozon tiene i suoi, §7). Non parte dopo
+  il rilascio, una disputa o un annullo.
+  1. «💶 Promemoria: un'ora fa chi compra ha detto di aver inviato gli
+     euro. Controlla il conto: se sono arrivati, libera i sats dalla
+     pagina dello scambio. Se non li vedi ancora aspetta pure — un
+     bonifico può metterci fino a un giorno lavorativo — e libera solo
+     quando ci sono davvero.»
+  2. «💶 Sono passate sei ore da quando chi compra ha detto di aver
+     inviato gli euro, e i sats sono ancora in garanzia. Controlla il
+     conto: se gli euro ci sono libera i sats; se qualcosa non torna,
+     apri una disputa dalla pagina dello scambio.»
+  3. «⏰ Venti ore da quando chi compra ha detto di aver inviato gli
+     euro, e i sats sono ancora in garanzia. Controlla il conto: se gli
+     euro ci sono libera i sats. Se è un bonifico ancora in viaggio — nel
+     fine settimana capita — aspetta pure; se invece qualcosa non torna
+     apri una disputa, e a decidere sarà un moderatore.»
+  Col solo **Contanti**: «💶 Promemoria: un'ora fa chi compra ha detto di
+  averti consegnato i contanti. Se li hai contati, libera i sats dalla
+  pagina dello scambio; se non li hai ricevuti, apri una disputa.», poi
+  «💶 Sono passate sei ore da quando chi compra ha detto di averti
+  consegnato i contanti…» e «⏰ Venti ore da quando chi compra ha detto
+  di averti consegnato i contanti…».
 
 ## 10. Disputa
 

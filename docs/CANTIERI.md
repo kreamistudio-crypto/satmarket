@@ -13352,6 +13352,10 @@ provata, lo scambio del 7 set non è stato votato, e un rifiuto del
 coordinatore non fa rumore da nessuna parte. Vale come i tre timer
 mai scaduti: si chiude alla tappa 8, guardando il journal del nodo
 mentre si vota.
+(CHIUSO IL 10 OTT 2026, parola di Andrea dal log del nodo: l'ordine
+`ea0af71a` porta nel tag `rating` del maker `total_reviews` 1 e
+`total_rating` 2.5 — il coordinatore i nostri voti li accetta. Vedi «I
+solleciti per tutti i metodi», in fondo.)
 
 **PUNTO 5 — CHI ENTRA DA NOSTR: DOVE FINISCE LA SUA RECENSIONE.** La
 domanda dava per scontato che non abbia un profilo nel mercatino, e la
@@ -46125,3 +46129,197 @@ verdi: la pagina di prova, il doppio wallet, la pagina d'acquisto, le
 anteprime, i due fogli P2P, la reputazione, apri-nel-wallet, onion) e i
 52 collaudi della CI, uno in più arrivato da main (52 verdi, 0 rossi);
 non la suite intera né il giro.
+
+## I solleciti per tutti i metodi: gli euro a chi compra, il rilascio a chi vende (10 ott 2026, cantiere solleciti-p2p, richiesta di Andrea dopo lo studio sul feedback)
+
+**Lo studio, e cosa ne è uscito.** Andrea ha chiesto uno studio senza
+codice sul feedback a fine scambio P2P: se c'è, come farlo, e quali
+buchi hanno i tempi e i malus di oggi. LA RISPOSTA SUL FEEDBACK: c'è già
+quasi tutto — la recensione ai due lati nella pagina dello scambio
+(stelle e commento, nella media del mercatino: «una reputazione sola»),
+l'invito nel messaggio «Scambio concluso», e il `rate-user` di Mostro
+che parte nello stesso gesto. Mancano un promemoria se la recensione
+non arriva, il conto degli scambi completati accanto al nome, la
+recensione dopo una disputa chiusa a favore di chi vende, e la busta
+chiusa contro la ritorsione. I BUCHI VERI STANNO NEI MALUS: le regole a
+tempo (i 30 minuti, il «non completato», 90/30 giorni, le 2 prese)
+coprono solo il PRIMO gesto. A garanzia bloccata non c'è nessun orologio
+fino alle ~92 ore del coordinatore, e nessuna conseguenza: 1) chi compra
+non manda gli euro e tiene fermi i sats di chi vende fino a quattro
+giorni, gratis; 2) chi vende non libera, e fuori dal PayCode nessuno
+glielo ricorda fino alle 48 ore — e se un moderatore dà ragione a chi
+compra il server segna «completato» anche a chi ha perso la disputa; 3)
+il finto «Ho inviato gli euro»; 4) la scusa del tentativo è infinita
+(basta aprire il foglio della garanzia ogni volta); 5) il limite delle 2
+prese guarda solo il primo gesto, e dare una fattura è gratis; 6) chi
+pubblica e sparisce (`maker-timeout`) non si conta mai; 7) gli scambi
+finti fra due account amici per arrivare a «5+»; 8) fuori da Barattolo
+filtro e limiti non valgono (la patch 0009, già a verbale).
+
+**Le decisioni di Andrea** (10 ott 2026): sì a tre pacchetti, in
+quest'ordine e in commit separati, ognuno col suo push — A) i solleciti
+(questa voce); B) i malus dopo la garanzia (la colpa segnata dal
+moderatore, la disputa persa che non vale «completato», l'annullo a 92
+ore contato a chi doveva pagare, la scusa del tentativo una volta al
+mese, un secondo limite sugli scambi in corso); C) il feedback rifinito
+(promemoria della recensione, il conto dei completati accanto al nome,
+la recensione dopo la disputa). NO per ora alla busta chiusa (D). Sui
+buchi 6 e 7 RESTA LA REGOLA DI OGGI. La cauzione estesa a tutti i
+metodi — la cura vera del buco 1 — è una decisione sul nodo, non presa.
+
+**IL `rate-user` È VERIFICATO** (10 ott 2026, parola di Andrea dal log
+del nodo): l'ordine `ea0af71a` porta nel tag `rating` del maker
+`total_reviews` 1 e `total_rating` 2.5. Il coordinatore i voti di
+Barattolo li ACCETTA: il dubbio aperto dal 16 set («Le recensioni degli
+scambi», punto 4: «mai verificato sul nodo vero») è chiuso, e lì c'è una
+riga che rimanda qui. Resta la decisione di allora: lo si manda, e in
+Barattolo non lo si legge.
+
+**A) Cosa fa.** Due famiglie di promemoria su Telegram (o nel DM Nostr),
+tutte ATTESE in `p2p_attese`, col bottone «⚡ Apri lo scambio»:
+- A CHI COMPRA, dalla garanzia bloccata (`garanzia_pagata`): a 1, 6 e 24
+  ore (`SOLLECITI_EURO_S`, fonte `sollecito_euro`, momenti
+  `euro_sollecito1..3`). Alla scadenza parte SOLO se tocca davvero a
+  lui: `_sollecito_euro_p2p_fermo` chiede ai giudici che la pagina usa
+  già — `_stato_scambio_p2p` dice «attivo» (garanzia bloccata, fattura
+  data, nessun «pagato», nessuna disputa, nessun annullo chiesto) nello
+  STESSO giro in cui l'attesa è nata, e il recapito è stato detto
+  (`_dati_frase_p2p`). Senza recapito non c'è niente da mandare: «invia
+  gli euro» sarebbe una frase falsa. Col PayCode le parole sono le sue
+  («Pagalo in contanti al tabacchino… «Ho pagato al tabacchino»»).
+- A CHI VENDE, dal «pagato» (`fiat`): a 1, 6 e 20 ore, gli stessi
+  intervalli del PayCode (`SOLLECITI_RILASCIO_S` È
+  `SOLLECITI_PAYCODE_S`), stessa fonte (`sollecito`), stessi momenti
+  (`fiat_sollecito1..3`), stesso giudice alla scadenza
+  (`_sollecito_p2p_vivo`). Per ogni metodo TRANNE il PayCode, che le sue
+  le mette da sempre `_avvisi_evento_p2p` coi suoi testi. Col solo
+  «Contanti» le parole di «Ho consegnato i contanti».
+A metterle in attesa è `_solleciti_evento_p2p`, chiamata dalla ROTTA
+degli eventi subito dopo `_segna_esiti_p2p`: solo su un evento nuovo,
+col suo `try`, mai un 500 per lei. Quando lo scambio si muove le attese
+superate se ne vanno SUBITO (il «pagato», la disputa e ogni chiusura
+portano via quelle di chi compra; tutto quel che chiude il «pagato»
+quelle di chi vende, PayCode compreso): i giudici alla scadenza restano
+— due POST possono arrivare rovesciati — ma di regola non trovano
+niente, e il journal non si riempie di «non parte» a ogni scambio andato
+bene. Un evento rifatto nello stesso giro SPOSTA le sue attese, non ne
+aggiunge (il calco del promemoria); il doppione lo ferma comunque il
+timbro di sempre in `p2p_avvisi`.
+
+**I testi**, approvati nella forma (un promemoria a chi deve mandare gli
+euro, uno a chi deve liberare): quattro famiglie di tre, senza importi,
+cifre né id, e mai il nome del protocollo. LA REGOLA CHE NON SI È
+PIEGATA: a chi vende non si dice mai «libera» senza «se gli euro ci
+sono» — un bonifico può essere in viaggio, e il primo e il terzo lo
+dicono («aspetta pure — un bonifico può metterci fino a un giorno
+lavorativo», «nel fine settimana capita»). Il sollecito non deve
+spingere a liberare senza aver incassato: sarebbe il regalo perfetto a
+chi segna un «pagato» finto. Le etichette fra «» sono quelle dei bottoni
+veri della pagina («Ho inviato gli euro», «Ho pagato al tabacchino», «✕
+Annulla», e «libera i sats» come «🔓 Libera i sats»), e una prova le
+lega a `miniapp.html`. I testi interi stanno in GUIDA-P2P-PASSI, §9.
+
+**Cosa NON fa, detto.** 1) NIENTE a chi compra dove fra i metodi c'è il
+CONTANTI di persona: lì ci si dà appuntamento, anche a giorni di
+distanza, e il server non sa quale metodo è stato scelto (viaggia
+cifrato fra i due telefoni). Sbaglia tacendo; il journal lo dice una
+volta, alla garanzia. 2) NIENTE a chi compra se chi vende NON ha detto
+il recapito — e quindi mai se chi vende scambia da un altro client, che
+a noi il recapito non lo dichiara. In quel caso a essere fermo è chi
+vende, e oggi non glielo ricorda nessuno prima delle 48 ore (vedi «da
+guardare»). 3) Chi non è dei nostri non riceve niente (vale 0). 4) Non
+conta niente a nessuno: i malus sono il pacchetto B. 5) Gli scambi già
+in corso al deploy non hanno attese: nascono dal prossimo
+`garanzia_pagata` e dal prossimo «pagato».
+
+**Le strade scartate.** Mettere le attese nuove dentro
+`_avvisi_evento_p2p`, accanto a quelle del PayCode: scartata —
+molti banchi di `prove.py` eseguono quella funzione con la lista
+dei nomi scritta a mano, e ogni costante nuova letta lì dentro li
+avrebbe fatti esplodere uno per uno; una funzione sua, chiamata dalla
+rotta come gli esiti, non tocca nessuno (e la prova di settembre «senza
+tabacchino il pagato non mette solleciti» resta vera per quel giudice,
+senza emendarla). Una costante per le fonti che portano il bottone:
+scartata per la stessa ragione — `_scarica_attese_p2p` la leggerebbe a
+ogni avviso, in ogni banco; la terna è scritta nella riga. Sollecitare
+chi compra anche senza recapito, con una frase a chi vende («indica dove
+ricevere gli euro»): NON fatta, non era nella richiesta (in fondo, fra
+le cose notate). Usare l'ora dell'appuntamento per il contanti: scartata,
+il server dell'appuntamento sa l'ora ma non che il metodo scelto sia
+quello. Un secondo giudice per «tocca a chi compra»: scartato, c'è già
+`_tocca_a_me_p2p` e il suo stato; qui si richiamano gli stessi due pezzi.
+
+**Due cose trovate facendolo.** 1) UN GIUDICE CHE INCIAMPA AVREBBE
+FERMATO TUTTE LE ATTESE: `_scarica_attese_p2p` toglie la riga e poi la
+giudica; un'eccezione nel giudice fa cadere il battito, il rollback
+rimette la riga, e il giro dopo cade sulla stessa — con lei si fermano
+promemoria, riserva del libro e «Sats in pagamento». Il giudice nuovo
+gira dentro un `try`: se inciampa la riga se ne va, il journal lo dice,
+le altre partono (c'è la prova). I giudici di prima non sono stati
+toccati. 2) NEL BANCO DUE EVENTI NELLO STESSO SECONDO PESANO UGUALE:
+garanzia chiesta e garanzia pagata hanno lo stesso peso in
+`_PESO_MOMENTO_P2P`, e a parità d'ora lo stato lo decideva il caso (il
+collaudo era verde o rosso a seconda del millisecondo). mostrod li tiene
+in fila di un secondo (`monotonic_order_event_timestamp`): il collaudo
+nuovo fa lo stesso (`ULTIMO_TS`). In produzione il pareggio non si dà.
+
+**Il bottone anche ai solleciti del PayCode.** I solleciti dicono «dalla
+pagina dello scambio»: il bottone «⚡ Apri lo scambio» del promemoria lo
+portano tutti e tre i tipi (`promemoria`, `sollecito`, `sollecito_euro`),
+quindi da oggi anche i tre del PayCode, che prima partivano senza. È
+l'unica cosa che cambia per loro.
+
+**Provato.** `prove_solleciti_p2p` (55, nuova): le sentinelle (la rotta
+chiama dopo gli esiti, su un evento nuovo, col suo try; il giudice prima
+del timbro; `_avvisi_evento_p2p` intatta; i giudici della pagina), gli
+intervalli, i testi (niente cifre, importi, id, protocollo; mai «libera»
+senza condizione; le etichette dei bottoni veri), e sul banco degli
+avvisi coi giudici veri: lo scambio intero col bonifico, chi compra ha
+pubblicato, quel che ferma (annullo chiesto, disputa, i tre annulli, i
+POST rovesciati, un altro giro, la garanzia raccontata due volte, il
+retry, gli avvisi spenti, il giudice che inciampa, chi non è dei
+nostri), il contanti solo e fra due metodi, il PayCode (i suoi testi, e
+TRE solleciti a chi vende, non sei). `collaudo_solleciti_p2p` (37,
+nuovo, nel workflow e nella gabbia): il server VERO col coordinatore e
+Telegram di cartone e le lancette che avanzano — le rotte
+`/api/p2p/evento` e `/api/p2p/recapito`, il battito vero
+`_giro_attese_p2p`, il ramo Telegram vero col bottone. La tortura:
+sedici mutazioni del server su una copia (il recapito, lo stato e il
+giro non guardati; il contanti sollecitato; il PayCode a sei; il pagato,
+la disputa e il rilascio che non portano via niente; i solleciti senza
+bottone; il giorno accorciato; i destinatari scambiati; il giudice e la
+rotta non chiamati; le parole sbagliate) — la prova le prende tutte e
+sedici, il collaudo quindici (gli sfugge «un altro giro», che dalle
+rotte non si riesce a mettere in scena: lo tiene la prova). Dal vivo sul
+telefono NON provato: è solo server, e il messaggio vero lo si vede al
+primo scambio (sotto).
+
+**Cosa è girato su quale albero.** La suite severa intera (21.353
+passate, 0 fallite) e i 52 collaudi della CI nella gabbia (52 verdi)
+sono girati sul commit ribasato su `f5a0868` (dopo i quattro del
+cantiere cookie-onion e la riga di CLAUDE.md sulla scadenza provata).
+Main è poi corso due volte, di otto commit non miei in tutto (il login
+col bunker, la seconda tappa del controllo della fattura, l'avviso del
+blocco sui filtri, «la stessa verità fuori da I tuoi dati»:
+`07e4dce`…`d2c77ef`): due rebase, ogni volta un conflitto solo qui in
+coda (tenute tutte le voci). Sull'albero ribasato su `0e0130d` sono
+rigirati la prova nuova con le sezioni degli avvisi P2P che le stanno
+intorno (eventi, PayCode, promemoria, garanzia lunga, reputazione: 587
+passate, 0 fallite) e tutti i 53 collaudi della CI nella gabbia (53
+verdi); sull'albero finale, sopra `d2c77ef`, di nuovo quelle sezioni
+(587, 0) e i dieci collaudi P2P nella gabbia. E UN TERZO REBASE al
+momento del push, sopra `df79b0d` (la pagina di prova dei link al
+wallet): due conflitti, qui in coda e in `prove.py` nel punto dove le
+due prove nuove sono nate una accanto all'altra — tenute tutte e due;
+rigirate le sezioni di prima più `prove_prova_wallet`, e il collaudo
+nuovo nella gabbia. Il resto lo dice la CI del push.
+Prima del push guardata la CI di main, come chiesto da Andrea.
+
+**Da guardare.** Sul VPS, il primo scambio dopo il deploy: nel journal
+la riga «📬 Attese P2P: avvisati … (sollecito_euro)» a un'ora dalla
+garanzia se gli euro non sono segnati, e «(sollecito)» a un'ora dal
+«pagato» col bonifico; e che a scambio andato bene NON compaiano righe
+«· Sollecito P2P». Sul telefono: che il bottone «⚡ Apri lo scambio» del
+sollecito apra quello scambio. Notato e non fatto: quando a garanzia
+bloccata manca il RECAPITO di chi vende, a lui non arriva nessun
+promemoria prima delle 48 ore.

@@ -48389,6 +48389,100 @@ P2P_IN_PAGAMENTO_TESTI = {
 }
 
 
+# ═══ I SOLLECITI PER TUTTI I METODI (10 ott 2026, cantiere «solleciti
+# p2p», richiesta di Andrea dopo lo studio sul feedback) ═══════════════
+# IL BUCO: le regole a tempo coprivano solo la prima mezz'ora (bloccare
+# la garanzia, dire dove ricevere i sats). DOPO, a garanzia bloccata,
+# nessun orologio fino alle 48 ore dell'avviso «garanzia lunga»: chi
+# compra poteva non mandare gli euro, chi vende non liberare, e fuori
+# dal PayCode nessuno glielo ricordava.
+# DUE FAMIGLIE, tutt'e due ATTESE in tabella (`p2p_attese`):
+# • A CHI VENDE, dopo il «pagato» (`fiat`), per OGNI metodo: gli stessi
+#   tre intervalli del PayCode (un'ora, sei, venti), stessa fonte
+#   (`sollecito`), stesso giudice alla scadenza (`_sollecito_p2p_vivo`).
+#   Il PayCode tiene i SUOI testi e la sua porta in `_avvisi_evento_p2p`:
+#   qui entrano gli altri. MAI «libera» senza «se gli euro ci sono»: un
+#   bonifico puo' essere in viaggio, e la regola resta «solo quando sono
+#   arrivati davvero».
+# • A CHI COMPRA, dalla garanzia bloccata (`garanzia_pagata`): un'ora,
+#   sei ore, un giorno, fonte `sollecito_euro`. Alla scadenza parte SOLO
+#   se tocca davvero a lui (`_sollecito_euro_p2p_fermo`): lo scambio e'
+#   ancora «attivo» nello stesso giro E chi vende ha gia' detto dove
+#   ricevere gli euro — senza recapito non c'e' niente da mandare, e
+#   «invia gli euro» sarebbe una frase falsa.
+#   NIENTE DOVE C'E' IL CONTANTI DI PERSONA fra i metodi: li' ci si da'
+#   appuntamento, anche a giorni di distanza, e il server non sa quale
+#   metodo e' stato scelto (viaggia cifrato fra i due telefoni). Sbaglia
+#   tacendo.
+# Testi senza importi ne' id, come le sveglie. Le etichette fra «» sono
+# quelle dei bottoni della pagina dello scambio.
+# A METTERLI IN ATTESA e' `_solleciti_evento_p2p`, chiamato dalla ROTTA
+# degli eventi come `_segna_esiti_p2p`: solo su un evento nuovo, col suo
+# `try`, mai un 500 per lui.
+SOLLECITI_RILASCIO_S = SOLLECITI_PAYCODE_S     # dal «pagato»: 1 ora, 6 ore, 20 ore
+SOLLECITO_RILASCIO_TESTI = {
+    1: "💶 Promemoria: un'ora fa chi compra ha detto di aver inviato gli "
+       "euro. Controlla il conto: se sono arrivati, libera i sats dalla "
+       "pagina dello scambio. Se non li vedi ancora aspetta pure — un "
+       "bonifico può metterci fino a un giorno lavorativo — e libera solo "
+       "quando ci sono davvero.",
+    2: "💶 Sono passate sei ore da quando chi compra ha detto di aver "
+       "inviato gli euro, e i sats sono ancora in garanzia. Controlla il "
+       "conto: se gli euro ci sono libera i sats; se qualcosa non torna, "
+       "apri una disputa dalla pagina dello scambio.",
+    3: "⏰ Venti ore da quando chi compra ha detto di aver inviato gli "
+       "euro, e i sats sono ancora in garanzia. Controlla il conto: se gli "
+       "euro ci sono libera i sats. Se è un bonifico ancora in viaggio — "
+       "nel fine settimana capita — aspetta pure; se invece qualcosa non "
+       "torna apri una disputa, e a decidere sarà un moderatore.",
+}
+# ...col SOLO «Contanti» le parole sono quelle di «Ho consegnato i contanti»
+SOLLECITO_RILASCIO_CONTANTI_TESTI = {
+    1: "💶 Promemoria: un'ora fa chi compra ha detto di averti consegnato i "
+       "contanti. Se li hai contati, libera i sats dalla pagina dello "
+       "scambio; se non li hai ricevuti, apri una disputa.",
+    2: "💶 Sono passate sei ore da quando chi compra ha detto di averti "
+       "consegnato i contanti, e i sats sono ancora in garanzia. Se li hai "
+       "ricevuti libera i sats; se no, apri una disputa dalla pagina dello "
+       "scambio.",
+    3: "⏰ Venti ore da quando chi compra ha detto di averti consegnato i "
+       "contanti, e i sats sono ancora in garanzia. Decidi dalla pagina "
+       "dello scambio: libera i sats se li hai ricevuti, o apri una "
+       "disputa — a decidere sarà un moderatore.",
+}
+SOLLECITI_EURO_S = (3600, 6 * 3600, 24 * 3600)   # dalla garanzia bloccata
+SOLLECITO_EURO_TESTI = {
+    1: "💶 Promemoria: i sats sono in garanzia da un'ora e aspettano i tuoi "
+       "euro. Inviali al recapito che trovi nella pagina dello scambio, poi "
+       "tocca «Ho inviato gli euro». Se li hai già inviati, segnalo lì: chi "
+       "vende aspetta quel gesto.",
+    2: "💶 Sono passate sei ore: i sats di chi vende sono fermi in garanzia "
+       "e gli euro non risultano inviati. Inviali e tocca «Ho inviato gli "
+       "euro». Se non puoi più, tocca «✕ Annulla» nella pagina dello "
+       "scambio: chi vende deve accettare, e i sats gli tornano.",
+    3: "⏰ È passato un giorno: i sats di chi vende sono ancora fermi in "
+       "garanzia per te. Invia gli euro e tocca «Ho inviato gli euro», "
+       "oppure tocca «✕ Annulla» nella pagina dello scambio. Chi vende può "
+       "aprire una disputa: a decidere sarà un moderatore.",
+}
+SOLLECITO_EURO_PAYCODE_TESTI = {
+    1: "🧾 Promemoria: i sats sono in garanzia da un'ora e aspettano il "
+       "pagamento del PayCode. Pagalo in contanti al tabacchino, poi tocca "
+       "«Ho pagato al tabacchino» nella pagina dello scambio. Se l'hai già "
+       "pagato, segnalo lì: chi vende aspetta quel gesto.",
+    2: "🧾 Sono passate sei ore: i sats di chi vende sono fermi in garanzia "
+       "e il PayCode non risulta pagato. Pagalo al tabacchino e tocca «Ho "
+       "pagato al tabacchino». Se non puoi più, tocca «✕ Annulla» nella "
+       "pagina dello scambio: chi vende deve accettare, e i sats gli "
+       "tornano.",
+    3: "⏰ È passato un giorno: i sats di chi vende sono ancora fermi in "
+       "garanzia per te, e un PayCode non vale per sempre. Se l'hai pagato "
+       "tocca «Ho pagato al tabacchino»; se no, tocca «✕ Annulla» nella "
+       "pagina dello scambio. Chi vende può aprire una disputa: a decidere "
+       "sarà un moderatore.",
+}
+
+
 # ═══ IL PROMEMORIA DEL GESTO A TEMPO (10 ott 2026, cantiere «promemoria
 # garanzia», richiesta di Andrea) ═══════════════════════════════════════
 # IL CASO: un PayCode Barattozon da 111,80 €. Alle 10:04 a chi vendeva
@@ -48535,6 +48629,101 @@ def _sollecito_p2p_vivo(momenti, quando_fiat: int) -> bool:
     return True
 
 
+def _sollecito_euro_p2p_fermo(con, r) -> str:
+    """IL SOLLECITO A CHI COMPRA HA ANCORA SENSO? Pura sulla connessione;
+    `r` e' la riga dell'attesa. Torna '' se parte, o il PERCHE' non parte
+    — per il journal (10 ott 2026, «I SOLLECITI PER TUTTI I METODI»).
+    PARTE SOLO SE TOCCA DAVVERO A LUI, e a dirlo sono i giudici che la
+    pagina usa gia': `_stato_scambio_p2p` sulla cronaca (lo scambio e'
+    «attivo»: garanzia bloccata, fattura data, nessun «pagato», nessuna
+    disputa, nessun annullo chiesto, niente che chiuda) e il recapito
+    detto in questo giro (`_dati_frase_p2p`, lo stesso della frase della
+    garanzia) — il calco di `_tocca_a_me_p2p` per chi compra.
+    NELLO STESSO GIRO in cui l'attesa e' nata: un ordine tornato in
+    vetrina e ripreso ha davanti un'altra persona, e un'altra garanzia.
+    Se sbaglia, sbaglia TACENDO: senza recapito (chi vende da un altro
+    client non lo dichiara mai a noi) il sollecito non parte."""
+    ordine, giro = r["ordine"], int(r["giro"] or 0)
+    momenti = [dict(m) for m in con.execute(
+        "SELECT momento, quando, attore, dettaglio, giro FROM p2p_momenti "
+        "WHERE ordine=? ORDER BY quando", (ordine,))]
+    ora_giro = max([int(m.get("giro") or 0) for m in momenti] or [0])
+    if ora_giro != giro:
+        return f"lo scambio e' a un altro giro ({ora_giro}, l'attesa era del {giro})"
+    stato = _stato_scambio_p2p(momenti, "compro", "", "", False)["stato"]
+    if stato != "attivo":
+        return f"lo scambio non aspetta gli euro (e' «{stato or 'non si sa'}»)"
+    if not _dati_frase_p2p(con, ordine)["recapito_detto"]:
+        return "chi vende non ha ancora detto dove ricevere gli euro"
+    return ""
+
+
+def _solleciti_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
+    """I SOLLECITI CHE NASCONO (E MUOIONO) DA UN EVENTO NUOVO di mostrod
+    (10 ott 2026, «I SOLLECITI PER TUTTI I METODI»). `fatto` e' quel che
+    torna `_registra_evento_p2p`. Pura sulla connessione; torna le righe
+    di journal. COMMITTA.
+    • `garanzia_pagata`: a chi COMPRA le tre attese degli euro — tranne
+      dove fra i metodi c'e' il contanti di persona. Col PayCode le
+      parole sono le sue.
+    • `fiat` (il «pagato»): a chi VENDE le tre attese del rilascio, per
+      ogni metodo TRANNE il PayCode, che le sue le mette da sempre
+      `_avvisi_evento_p2p`. Col solo «Contanti» le parole dei contanti.
+    • quando lo scambio SI MUOVE le attese che non servono piu' se ne
+      vanno subito: quelle di chi compra al «pagato», alla disputa e a
+      ogni chiusura; quelle di chi vende a tutto quel che chiude il
+      «pagato» (`P2P_MOMENTI_CHIUDONO_FIAT`). I giudici alla scadenza
+      restano — due POST possono arrivare rovesciati — ma di regola non
+      trovano niente, e il journal non si riempie di «non parte».
+    UN EVENTO RIFATTO NELLO STESSO GIRO sposta le sue attese, non ne
+    aggiunge: il calco del promemoria. E il doppione lo ferma comunque
+    l'anti-doppione di sempre (`p2p_avvisi`), all'invio.
+    Chi non e' dei nostri vale 0: per lui niente attese."""
+    righe = []
+    ordine, momento = ev["ordine"], str(fatto.get("momento") or "")
+    giro, ts = int(fatto.get("giro") or 0), int(ev["ts"])
+    compra = int(fatto.get("compratore") or 0)
+    vende = int(fatto.get("venditore") or 0)
+    corto = ordine[:8]
+    if momento in ("fiat", "disputa") or momento in P2P_MOMENTI_FINALI:
+        con.execute("DELETE FROM p2p_attese WHERE ordine=? AND "
+                    "fonte='sollecito_euro' AND quando<=?", (ordine, ts))
+    if momento in P2P_MOMENTI_CHIUDONO_FIAT:
+        con.execute("DELETE FROM p2p_attese WHERE ordine=? AND "
+                    "fonte='sollecito' AND quando<=?", (ordine, ts))
+
+    def in_attesa(nome, chi, testi, intervalli, fonte):
+        for livello, fra in enumerate(intervalli, 1):
+            con.execute("DELETE FROM p2p_attese WHERE ordine=? AND momento=? AND "
+                        "giro=? AND tg_id=? AND fonte=?",
+                        (ordine, f"{nome}{livello}", giro, chi, fonte))
+            con.execute(
+                "INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, "
+                "quando, scade, fonte) VALUES(?,?,?,?,?,?,?,?)",
+                (ordine, f"{nome}{livello}", giro, chi, testi[livello], ts,
+                 int(adesso) + int(fra), fonte))
+
+    if momento == "garanzia_pagata" and compra:
+        dati = _dati_frase_p2p(con, ordine)
+        if "Contanti" in _metodi_libro(dati["metodi_lista"]):
+            righe.append(f"· Solleciti P2P: {corto} si puo' pagare in contanti di "
+                         "persona: a chi compra nessun sollecito degli euro")
+        else:
+            in_attesa("euro_sollecito", compra,
+                      SOLLECITO_EURO_PAYCODE_TESTI if dati["tabacchino"]
+                      else SOLLECITO_EURO_TESTI,
+                      SOLLECITI_EURO_S, "sollecito_euro")
+    if momento == "fiat" and vende:
+        dati = _dati_frase_p2p(con, ordine)
+        if not dati["tabacchino"]:
+            in_attesa("fiat_sollecito", vende,
+                      SOLLECITO_RILASCIO_CONTANTI_TESTI if dati["contanti"]
+                      else SOLLECITO_RILASCIO_TESTI,
+                      SOLLECITI_RILASCIO_S, "sollecito")
+    con.commit()
+    return righe
+
+
 def _superato_p2p(con, ordine: str, momento: str, giro: int, quando: int,
                   fonte: str = "mostro") -> str:
     """UN AVVISO SUPERATO DAI FATTI NON PARTE (24 set 2026, i due
@@ -48636,9 +48825,25 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
                     "SELECT momento, quando FROM p2p_momenti WHERE ordine=? "
                     "AND giro=?", (r["ordine"], int(r["giro"] or 0))).fetchall()],
                 int(r["quando"] or 0)):
-            print(f"· Sollecito PayCode: {corto} «{r['momento']}» lo scambio "
+            print(f"· Sollecito P2P: {corto} «{r['momento']}» lo scambio "
                   "si è già mosso: non parte", flush=True)
             continue
+        if r["fonte"] == "sollecito_euro":
+            # IL SOLLECITO A CHI COMPRA (10 ott 2026, «I SOLLECITI PER
+            # TUTTI I METODI»): parte solo se tocca ancora a lui — scambio
+            # attivo nello stesso giro, e il recapito gia' detto.
+            # UN GIUDICE CHE INCIAMPA NON FERMA IL BATTITO: la riga e'
+            # gia' tolta, e se l'eccezione salisse il rollback la
+            # rimetterebbe li' a far cadere ogni giro dopo (e con lui
+            # tutte le altre attese). Sbaglia tacendo, e lo dice
+            try:
+                perche = _sollecito_euro_p2p_fermo(con, r)
+            except Exception as e:
+                perche = f"il giudice e' inciampato ({type(e).__name__}: {e})"
+            if perche:
+                print(f"· Sollecito P2P: {corto} «{r['momento']}» a "
+                      f"{r['tg_id']} non parte: {perche}", flush=True)
+                continue
         promemoria = ""
         if r["fonte"] == "promemoria":
             # IL PROMEMORIA DEL GESTO A TEMPO (10 ott 2026): parte solo se
@@ -48719,7 +48924,11 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
                       f"coordinatore NON l'ha raccontato in {P2P_RISERVA_S}s: "
                       "parla il libro (nel log del nodo: barattolo_eventi)",
                       flush=True)
-        if r["fonte"] == "promemoria" and bottoni is not None:
+        if (r["fonte"] in ("promemoria", "sollecito", "sollecito_euro")
+                and bottoni is not None):
+            # (dal 10 ott 2026 anche i solleciti — a chi vende e a chi
+            # compra — portano il bottone: dicono «dalla pagina dello
+            # scambio», e il bottone ce li porta)
             # l'ordine e' un id pubblico del libro (il `d` del 38383):
             # nell'indirizzo non viaggia niente di chi lo apre
             bottoni[len(fuori)] = (P2P_BOTTONE_SCAMBIO,
@@ -53187,6 +53396,16 @@ async def evento_p2p(req: Request):
             except Exception as e:
                 print(f"⚠️ Reputazione P2P: l'esito di {ev['ordine'][:8]} non si "
                       f"e' scritto ({type(e).__name__}: {e})", flush=True)
+        # I SOLLECITI (10 ott 2026, «I SOLLECITI PER TUTTI I METODI»): a
+        # chi compra dalla garanzia bloccata, a chi vende dal «pagato».
+        # Come gli esiti: solo su un evento nuovo, e mai un 500 per loro
+        if fatto is not None:
+            try:
+                for riga in _solleciti_evento_p2p(con, ev, fatto, adesso):
+                    print(riga, flush=True)
+            except Exception as e:
+                print(f"⚠️ Solleciti P2P: le attese di {ev['ordine'][:8]} non si "
+                      f"sono scritte ({type(e).__name__}: {e})", flush=True)
         # la garanzia morta non pagata: I PAGAMENTI CHE NON ARRIVANO. Mai
         # un 500 per lei: l'evento e' gia' registrato, e il retry di
         # mostrod troverebbe «ripetuto» e non avviserebbe le parti
