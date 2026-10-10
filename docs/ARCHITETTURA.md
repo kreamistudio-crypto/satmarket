@@ -5913,6 +5913,32 @@
   sha256 del suo unico script e senza `frame-ancestors`). Le direttive
   coi loro perché, e come si leggono le righe `🛡️ CSP:` del journal,
   stanno in CANTIERI, «CSP e le voci aperte degli audit — 1)».
+  ACCESA DAL 10 OTT 2026 (cantiere csp-accesa): la stessa riga, con
+  `Content-Security-Policy` al posto di `…-Report-Only` e il
+  `report-uri` che resta. La leva `CSP_ATTIVA` nasce ACCESA nel codice
+  — il verso opposto delle altre leve, voluto: il rischio è misurato
+  (nove giorni di journal, quasi tutto estensioni) e la via di fuga è
+  una riga del config più un riavvio (PRODUZIONE, «LA CSP ACCESA»).
+  `_nome_header_csp()` dà il nome dell'intestazione dalla leva, e
+  `cinture_http` non scrive più il nome a mano. DUE AGGIUNTE ALLE
+  DIRETTIVE: `telegram.org` su `style-src` e `font-src`, perché il
+  journal ha visto sulla home `widget-frame.css`, `font-roboto.css` e
+  il woff2 di Roboto — sono i fogli e il font dell'IFRAME del Login
+  Widget (`oauth.telegram.org/embed/<bot>` li carica da lì, verificato
+  sul suo HTML), riferiti contro la nostra pagina da qualche browser;
+  ammetterli costa zero (lo script da telegram.org era già ammesso) e
+  tiene in piedi il login dove serve. E `no_iframe`, con la sua leva
+  accesa, ora APPENDE `frame-ancestors` alla CSP delle pagine invece di
+  perderla col `setdefault`: gira fuori, la trova già scritta. L'EVAL
+  NON È NOSTRO: il journal ha visto `script-src ← eval` su due pagine
+  annuncio (9 ott); il censimento — le quattro pagine, il service
+  worker, i due bundle vendorizzati, gli script che il server scrive —
+  non ha nessun `eval`, `new Function` o timer con stringa, e una prova
+  lo tiene fermo; il Login Widget di Telegram un `eval` ce l'ha
+  (`__parseFunction`) ma lo chiama SOLO con `data-onauth`/`data-onunauth`,
+  che dal 1 ott non usiamo (login a redirect). Restano le estensioni e
+  i browser in-app, e la riga del journal lo dice: porta `@ file:riga`
+  e il campione.
   I FRENI (1 ott 2026, stesso cantiere, cura 4): `FRENI` è la tabella
   dei numeri (annunci e anteprima foto 60 l'ora, verifica-pagamento e
   ln-address 30 al minuto, login 30 al minuto, canale uno ogni dieci

@@ -1400,6 +1400,16 @@ MAX_ACCOUNT_BROWSER = 5
 # sola strada che questa leva puo' chiudere.
 PROTEGGI_IFRAME = False
 
+# LA CSP ACCESA (10 ott 2026): la Content-Security-Policy delle pagine
+# e' VERA — il browser blocca script da host estranei, base-uri, plugin
+# e form verso fuori, e riferisce a /api/csp-report (journal «🛡️ CSP:»).
+# NASCE ACCESA nel codice, al contrario delle altre leve: il rischio e'
+# stato misurato (nove giorni di sola prova) e la via di fuga e' questa
+# riga. Se qualcosa si rompe: `CSP_ATTIVA = False` qui, riavvio, e la
+# CSP torna in sola prova (Report-Only, stesse direttive, stesso
+# cestino) senza deploy. Poi si legge il journal e si riaccende.
+CSP_ATTIVA = True
+
 # --- L'altra porta: il servizio nascosto Tor (ago 2026) --------------
 # L'indirizzo `.onion` da cui Barattolo si raggiunge anche da Tor, SENZA
 # schema e senza porta: e' un HOST e si confronta con l'header Host.

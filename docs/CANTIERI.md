@@ -46579,3 +46579,119 @@ pagina «I tuoi dati» col config d'esempio e l'indirizzo vero, scatti in
 **NON PROVATO, DA GUARDARE.** Focus/Klar: l'about:config lì non è
 detto che ci sia (la riga segue il tester). Amethyst dal vivo: un
 avviso vero ricevuto sotto Tor con ntfy, dal telefono.
+## La CSP accesa, dietro una leva che nasce accesa (10 ott 2026, sera, cantiere csp-accesa, richiesta di Andrea)
+
+Andrea ha letto il journal della CSP in prova dal 1 ottobre: quasi
+tutto estensioni (tstats.online, nutrifunc.com, bitcashback.net,
+safari-extension, chrome-extension, Open Sans da fonts.gstatic.com), da
+bloccare. Due cose da capire prima di accenderla: i fogli e il font di
+telegram.org riferiti sulla home (11:09 UTC), e un `eval` su due pagine
+annuncio (9 ott, 01:17 e 23:09). Poi: accenderla dietro una leva che
+nasce ACCESA, col report che resta, e aprire lo studio della fase 2.
+
+**1) I FOGLI E IL FONT DI TELEGRAM.** Vengono dal Login Widget, ma non
+dal suo script: `telegram-widget.js?22` (scaricato e letto) crea solo
+un `<iframe>` verso `oauth.telegram.org/embed/<bot>`, e NON inietta
+fogli né font nella nostra pagina. È l'HTML dell'embed (scaricato
+anche quello) a caricare `telegram.org/css/font-roboto.css`,
+`css/widget-frame.css`, `js/widget-frame.js` e i Roboto. Un browser li
+ha riferiti con la nostra home come `document-uri`; Chromium non
+applica la CSP del genitore a un iframe di un'altra origine, quindi di
+là funzionava anche in prova, ma ammetterli costa zero e tiene in piedi
+il bottone ovunque: `style-src` e `font-src` prendono
+`https://telegram.org`, la stessa fiducia già data allo script. Provato
+dal vivo con la CSP ACCESA: il widget montato come fa
+`bottoneLoginTelegram` fuori dal collaudo (lo script da telegram.org,
+`data-auth-url`) carica lo script, apre l'iframe di
+`oauth.telegram.org/embed/ilbarattolobot` (238×40, che da 127.0.0.1
+dice «Bot domain invalid» perché l'origine non è quella registrata — su
+barattolo.store è il bottone vero), zero violazioni in console e zero
+POST a `/api/csp-report`. Il login completo vuole il dominio registrato
+e un account: è la controprova di Andrea sul sito dopo il deploy.
+
+**2) L'EVAL NON È NOSTRO.** Censimento su tutto quel che serviamo —
+miniapp.html, admin.html, offline.html, sw.js, vendor/nostr.bundle.js,
+vendor/qrcode.js — e sugli script che il server scrive (`WIDGET_JS`):
+nessun `eval(`, `new Function`, `Function(`, `setTimeout`/`setInterval`
+con stringa (il solo `Function(` di qrcode.js è `getMaskFunction(`).
+Una prova lo gira a ogni giro. Il Login Widget di Telegram un `eval`
+ce l'ha (`window.__parseFunction`, riga 3 dello script), ma lo chiama
+SOLO per `data-onauth` e `data-onunauth` (righe 193 e 211), che dal 1
+ott non usiamo più (login a redirect: una sentinella controlla che
+`data-onauth` non torni nel codice). Il Mini App SDK
+(`telegram-web-app.js`, 120 KB, letto) non ha né eval né Function. Le
+due righe del journal portano `@ file:riga «campione»`: è lì che si
+legge chi era (un'estensione, un browser in-app) — non le abbiamo
+viste, e vanno guardate.
+
+**3) ACCESA, DIETRO `CSP_ATTIVA`.** Nasce `True` nel codice (il verso
+opposto delle leve: il rischio è misurato e la via di fuga è una riga);
+`CSP_ATTIVA = False` nel config del VPS più un riavvio la riporta in
+sola prova senza deploy. `_nome_header_csp(attiva)` dà il nome
+dell'intestazione; `cinture_http` non lo scrive più a mano; le
+direttive e il `report-uri` sono gli stessi nei due casi, quindi il
+report resta attivo con la CSP accesa. Nel pannello delle leve. E un
+difetto che sarebbe nato accendendola: `no_iframe` con la SUA leva
+accesa metteva `Content-Security-Policy: frame-ancestors …` col
+`setdefault` — con la CSP delle pagine già scritta da `cinture_http`
+(che gira dentro), la leva dell'iframe avrebbe lasciato cadere il
+frame-ancestors, in silenzio. Ora, se trova la CSP delle pagine, gliela
+APPENDE; chi ha una CSP sua (la busta) resta com'è.
+
+**PROVATO.** `prove_csp_prova`: la leva nasce accesa, il nome segue la
+leva, telegram.org su stili e font, il cestino nella stessa riga, il
+config d'esempio, il pannello, `no_iframe` che appende, il censimento
+dell'eval sui file serviti e su WIDGET_JS, niente `data-onauth`.
+`collaudo_csp` (in gabbia e in CI): la pagina risponde con la CSP VERA,
+nessuna Report-Only accanto, telegram.org su stili e font, niente
+frame-ancestors a leva spenta. Dal vivo in collaudo con la CSP accesa:
+home anonima, login di collaudo, Vendi, Profilo, il foglio Nostr col
+bundle, il widget di Telegram montato a mano — zero violazioni, zero
+report (console e rete del Browser pane, e il journal del server).
+Suite e collaudi: nel verbale del push.
+
+**LO STUDIO DELLA FASE 2 — togliere `'unsafe-inline'` dagli script.**
+Senza, un XSS iniettato in pagina non parte: è la sola cosa che la CSP
+di oggi non ferma. IL CENSIMENTO (10 ott): 5 blocchi `<script>` inline
+in miniapp.html (1 in admin.html); 833 attributi `on*=` in miniapp
+(699 `onclick`, 58 `onerror`, 29 `oninput`, 20 `onchange`, 11
+`onkeydown`, 7 `onsubmit`, 3 `onload`, 2 `onblur`, 1 ciascuno `ontoggle`,
+`onpaste`, `ondrop`, `ondragover`), 4 in admin; 0 `href="javascript:`;
+0 `eval`; gli stili inline restano (`style-src 'unsafe-inline'` non si
+tocca: il rischio è di un altro ordine e gli hash sugli attributi
+`style` non esistono). IL PIANO, in quattro passi: (a) la DELEGA — un
+solo ascoltatore per evento sul `document` (`click`, `input`,
+`change`, `keydown`, `submit`, `toggle`, `paste`, `drop`, `dragover`,
+`blur` in cattura) che legge `data-on="nome"` e `data-arg='…'` (JSON)
+e chiama la funzione da un REGISTRO esplicito (`AZIONI = {nome: fn}`,
+whitelist: mai `window[nome]`); `this` ed `event` passano come
+argomenti; `onerror` sulle `<img>` e `onload` si spostano su listener
+messi nel render (non bolliscono); (b) la CONVERSIONE con un codemod
+(Python, sulle forme comuni — `fn()`, `fn('x')`, `fn(this)`,
+`fn(event)`, `fn(${id})` nei template, `return false`) e a mano per il
+resto, stimato un 10%; i template `innerHTML` producono `data-on` e
+non `onclick`, quindi la delega vale anche per il DOM nato dopo; (c) i
+5 blocchi inline con gli HASH `'sha256-…'` calcolati dal server
+all'avvio SUI BYTE SERVITI (il file è CRLF su Windows e LF sul VPS per
+`text=auto`: un hash scritto a mano direbbe il vero da una parte
+sola), e il bundle Nostr e il QR già passano da `'self'`; (d) il
+ROLLOUT senza rischio: una SECONDA intestazione `Report-Only` con la
+policy stretta accanto a quella accesa (i browser le applicano
+entrambe), il journal per una settimana, poi lo scambio. I BANCHI
+cambiano forma: una ventina di banchi node eseguono gli `onclick`
+estratti con `new Function` (`tocca(h)`), e dovranno leggere
+`data-on`/`data-arg` e chiamare il registro — è la metà nascosta del
+costo. Trusted Types (`require-trusted-types-for 'script'`) resta per
+una fase 3: 324 assegnazioni a `innerHTML`. IL COSTO: la delega e il
+registro 1 giorno; il codemod più la mano sui casi storti 2 giorni
+(833 attributi, con la sentinella che pretende zero `on*=` a fine
+corsa); i banchi 1-2 giorni; gli hash e il rollout mezza giornata;
+una settimana di journal in mezzo. In tutto 4-5 giorni di cantiere
+più l'attesa, in due o tre PR (delega+registro e codemod; banchi;
+hash e rollout). Nessun codice toccato per questo studio.
+
+**NON PROVATO, DA GUARDARE.** Il login Telegram vero sul sito (dominio
+registrato) con la CSP accesa; le due righe «eval» del journal lette
+con `@ file:riga «campione»`; il journal per una settimana dopo
+l'accensione; Telegram Web (iframe) con la CSP accesa — la CSP delle
+pagine non ha `frame-ancestors` e non lo chiude, ma va visto.

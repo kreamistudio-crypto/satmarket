@@ -132158,6 +132158,13 @@ def prove_pc_tema_e_ricerca():
           and not re.search(r"\.searchbar\{[^}]*margin", fuori))
 
 
+def codice_js_senza_commenti(testo):
+    """Via i commenti `/* */` e `<!-- -->`: la parola-spia che si cerca
+    nel CODICE vive anche nella prosa che spiega perche' non c'e'."""
+    testo = re.sub(r"/\*.*?\*/", "", testo, flags=re.S)
+    return re.sub(r"<!--.*?-->", "", testo, flags=re.S)
+
+
 def prove_csp_prova():
     """LE CINTURE HTTP, LA CSP IN PROVA E IL LOGIN WEB A REDIRECT (1 ott
     2026, cantiere «CSP e le voci aperte degli audit»).
@@ -132177,7 +132184,8 @@ def prove_csp_prova():
     print("\n🛡️ Le cinture HTTP e la CSP in prova")
 
     # --- le costanti e i giudici, eseguiti davvero ---------------------
-    i = _SORGENTE.index("CINTURE_HTTP = (")
+    # dalla leva CSP_ATTIVA (10 ott 2026), che sta subito sopra le cinture
+    i = _SORGENTE.index("try:\n    from config import CSP_ATTIVA")
     j = _SORGENTE.index('@app.middleware("http")\nasync def cinture_http(')
     amb = {"MODALITA_COLLAUDO": False, "re": re}
     exec(_SORGENTE[i:j], amb)
@@ -132190,6 +132198,49 @@ def prove_csp_prova():
           csp.count("'unsafe-inline'"))
     prova("gli script: casa, inline, e telegram.org per SDK e widget",
           "'self' 'unsafe-inline' https://telegram.org", direttive["script-src"])
+    # ACCESA (10 ott 2026, cantiere csp-accesa): la leva nasce accesa
+    # nel codice e si spegne dal config; i fogli e il font del Login
+    # Widget (l'iframe di oauth.telegram.org li carica da telegram.org,
+    # e il journal li ha visti riferiti sulla home) sono ammessi.
+    # si guarda il SORGENTE e non il valore in amb: l'exec fa davvero
+    # `from config import CSP_ATTIVA`, e un config.py nella cartella
+    # (un giro dal vivo con la leva spenta) direbbe il falso
+    prova("la leva CSP_ATTIVA nasce ACCESA nel codice", True,
+          "except ImportError:\n    CSP_ATTIVA = True" in _SORGENTE)
+    prova("...e il nome dell'intestazione la segue", [
+          "Content-Security-Policy", "Content-Security-Policy-Report-Only"],
+          [amb["_nome_header_csp"](True), amb["_nome_header_csp"](False)])
+    prova("stili e font: anche telegram.org, per il Login Widget",
+          ["'self' 'unsafe-inline' https://telegram.org", "'self' https://telegram.org"],
+          [direttive["style-src"], direttive["font-src"]])
+    prova("...e il cestino resta anche con la CSP accesa (report-uri nella "
+          "stessa riga)", True, "report-uri /api/csp-report" in csp)
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    prova("il config d'esempio la porta accesa, col modo di spegnerla", True,
+          "\nCSP_ATTIVA = True\n" in cfg and "CSP_ATTIVA = False" in cfg)
+    prova("il pannello delle leve la conosce", True,
+          '"CSP_ATTIVA",' in codice(pezzo("_leve_stato")))
+    # NESSUN EVAL IN CASA: il journal ha visto `script-src ← eval` su due
+    # pagine annuncio (9 ott). Qui si gira il censimento su TUTTO quel
+    # che serviamo (le pagine, il service worker, i bundle vendorizzati)
+    # e sugli script che il server scrive da se'. Il Login Widget di
+    # Telegram un eval ce l'ha, ma lo chiama SOLO con `data-onauth` /
+    # `data-onunauth`, che dal 1 ott non usiamo piu' (login a redirect).
+    import glob as _gl
+    forme_eval = re.compile(r"\beval\(|\bnew Function\b|\bFunction\(|"
+                            r"setTimeout\(\s*['\"]|setInterval\(\s*['\"]")
+    serviti = sorted(_gl.glob("*.html") + _gl.glob("*.js") + _gl.glob("vendor/*.js"))
+    prova("i file serviti ci sono tutti e quattro piu' i vendor", True,
+          {"miniapp.html", "admin.html", "offline.html", "sw.js",
+           "vendor/nostr.bundle.js", "vendor/qrcode.js"} <= set(x.replace("\\", "/") for x in serviti))
+    prova("nessun eval, new Function o timer con stringa in casa", [],
+          [f for f in serviti
+           if forme_eval.search(open(f, encoding="utf-8", errors="replace").read())])
+    prova("...nemmeno negli script che il server scrive (WIDGET_JS)", False,
+          bool(forme_eval.search(_SORGENTE[_SORGENTE.index('WIDGET_JS = """'):
+                                           _SORGENTE.index("\n\n\ndef _widget_pagina(")])))
+    prova("la pagina non chiama il widget con data-onauth (l'unico eval di telegram-widget.js)",
+          False, "data-onauth" in codice_js_senza_commenti(open("miniapp.html", encoding="utf-8").read()))
     prova("object-src e base-uri chiusi", ["'none'", "'none'"],
           [direttive["object-src"], direttive["base-uri"]])
     prova("le form restano in casa", "'self'", direttive["form-action"])
@@ -132250,6 +132301,17 @@ def prove_csp_prova():
           'request.url.path.startswith("/widget/")' in mw)
     prova("...e non a chi ha gia' una CSP vera (la busta)", True,
           '"Content-Security-Policy" not in r.headers' in mw)
+    prova("...col nome che segue la leva, non scritto a mano", True,
+          "setdefault(_nome_header_csp(), CSP_PROVA)" in mw
+          and "Report-Only" not in codice(mw))
+    # LA LEVA DELL'IFRAME NON SPEGNE LA CSP ACCESA: no_iframe gira
+    # FUORI e, trovando la CSP delle pagine, le appende il suo
+    # frame-ancestors; col solo setdefault l'avrebbe lasciata cadere.
+    ni = codice(pezzo("no_iframe"))
+    prova("no_iframe appende il frame-ancestors alla CSP accesa", True,
+          "if gia == CSP_PROVA:" in ni and 'gia + "; " + fa' in ni)
+    prova("...e lascia stare chi ha una CSP sua (setdefault per gli altri)",
+          True, 'r.headers.setdefault("Content-Security-Policy", fa)' in ni)
     prova("l'HSTS passa dal giudice dell'host", True, "_host_con_hsts(" in mw)
     # gira DENTRO no_iframe (prima nel file = piu' interno): vede la
     # risposta prima che la leva dell'iframe ci metta la sua CSP

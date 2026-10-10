@@ -41,7 +41,7 @@ def firma_widget(token, dati):
 
 def main():
     print("=" * 58)
-    print("  LE CINTURE HTTP, LA CSP IN PROVA, IL LOGIN A REDIRECT")
+    print("  LE CINTURE HTTP, LA CSP ACCESA, IL LOGIN A REDIRECT")
     print("=" * 58)
     banco.avvio()
     from fastapi.testclient import TestClient
@@ -50,15 +50,23 @@ def main():
 
     print("\n[le intestazioni della pagina]")
     g = c.get("/")
-    csp = g.headers.get("content-security-policy-report-only", "")
+    csp = g.headers.get("content-security-policy", "")
     prova("la pagina risponde 200", 200, g.status_code)
-    prova("...con la CSP in PROVA (report-only)", True, csp.startswith("default-src 'self'"))
+    # ACCESA (10 ott 2026): la leva nasce accesa, e il config di cartone
+    # non la tocca — la pagina risponde con la CSP VERA
+    prova("...con la CSP ACCESA (Content-Security-Policy)", True,
+          csp.startswith("default-src 'self'"))
+    prova("...e non c'e' piu' la riga di sola prova accanto", None,
+          g.headers.get("content-security-policy-report-only"))
+    prova("...telegram.org anche su stili e font (il Login Widget)", True,
+          "style-src 'self' 'unsafe-inline' https://telegram.org" in csp
+          and "font-src 'self' https://telegram.org" in csp)
     prova("...che nomina il cestino", True, "report-uri /api/csp-report" in csp)
     prova("...in collaudo con ws: per il relay morto", True,
           "connect-src 'self' wss: ws:" in csp)
     prova("...e senza unsafe-eval", False, "'unsafe-eval'" in csp)
-    prova("nessuna CSP vera: la leva dell'iframe e' spenta", None,
-          g.headers.get("content-security-policy"))
+    prova("senza la leva dell'iframe niente frame-ancestors", False,
+          "frame-ancestors" in csp)
     prova("nosniff, referrer e permissions ci sono",
           ["nosniff", "strict-origin-when-cross-origin",
            "camera=(self), microphone=(), payment=(), usb=(), midi=()"],

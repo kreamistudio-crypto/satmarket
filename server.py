@@ -1602,11 +1602,20 @@ async def guardia_csrf(request, call_next):
 #    l'ha) ne' in collaudo (http://127.0.0.1). Un anno, senza
 #    includeSubDomains (il relay e' un sottodominio con la sua vita) e
 #    senza preload (irreversibile).
-# E LA CSP, IN PROVA: `Content-Security-Policy-Report-Only` sulle sole
-# pagine HTML. Il browser NON blocca niente — riferisce soltanto, a
-# `/api/csp-report`, e la riga finisce nel journal con «🛡️ CSP:». E' il
-# patto del cantiere: si guarda per qualche giorno cosa l'app usa
-# davvero, e solo poi si decide come accenderla.
+# E LA CSP, ACCESA (10 ott 2026, cantiere csp-accesa; in prova dal 1
+# ott): `Content-Security-Policy` sulle sole pagine HTML, col
+# `report-uri` che RESTA — il browser blocca E riferisce a
+# `/api/csp-report`, e la riga finisce nel journal con «🛡️ CSP:».
+# Nove giorni di journal letti da Andrea: quasi tutto estensioni
+# (tstats.online, nutrifunc.com, bitcashback.net, safari-extension,
+# chrome-extension, Open Sans da fonts.gstatic.com), che e' giusto
+# fermare; i due pezzi veri — i fogli e il font del Login Widget, e un
+# `eval` non nostro — stanno in CANTIERI, «La CSP accesa».
+# LA LEVA `CSP_ATTIVA` NASCE ACCESA NEL CODICE: `CSP_ATTIVA = False` nel
+# config del VPS la riporta in sola prova (Report-Only, stesse
+# direttive, stesso cestino) con un riavvio, senza deploy. E' il verso
+# opposto delle leve che nascono spente, ed e' voluto: qui il rischio
+# e' misurato (nove giorni di report), e la via di fuga e' una riga.
 # PERCHE' `'unsafe-inline'` SUGLI SCRIPT: la pagina ha tre blocchi
 # inline e circa ottocento `onclick=` nel markup e nei template. Un
 # nonce li spegnerebbe TUTTI (coi nonce i browser ignorano
@@ -1625,6 +1634,11 @@ async def guardia_csrf(request, call_next):
 # download e' fallito restano su host esterni, per scelta.
 # `frame-ancestors` NON c'e': in report-only i browser lo ignorano, e a
 # tenerlo e' `no_iframe` con la sua leva.
+try:
+    from config import CSP_ATTIVA
+except ImportError:
+    CSP_ATTIVA = True
+
 CINTURE_HTTP = (
     ("X-Content-Type-Options", "nosniff"),
     ("Referrer-Policy", "strict-origin-when-cross-origin"),
@@ -1634,9 +1648,13 @@ HSTS_UN_ANNO = "max-age=31536000"
 DIRETTIVE_CSP_PROVA = (
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' https://telegram.org",
-    "style-src 'self' 'unsafe-inline'",
+    # telegram.org anche su stili e font (10 ott 2026): sono i fogli e
+    # il font Roboto del Login Widget — l'iframe di oauth.telegram.org
+    # li carica da li', e il journal li ha visti riferiti sulla home.
+    # Lo script da telegram.org era gia' ammesso: stessa fiducia.
+    "style-src 'self' 'unsafe-inline' https://telegram.org",
     "img-src 'self' data: blob: https:",
-    "font-src 'self'",
+    "font-src 'self' https://telegram.org",
     "connect-src 'self' wss:",
     "frame-src https://oauth.telegram.org",
     "worker-src 'self'",
@@ -1660,6 +1678,14 @@ def _csp_prova(collaudo: bool = MODALITA_COLLAUDO) -> str:
 
 
 CSP_PROVA = _csp_prova()
+
+
+def _nome_header_csp(attiva: bool = CSP_ATTIVA) -> str:
+    """Il nome dell'intestazione: la CSP vera con la leva accesa, la
+    sola prova (Report-Only) con la leva spenta. Le direttive e il
+    cestino sono gli stessi nei due casi."""
+    return ("Content-Security-Policy" if attiva
+            else "Content-Security-Policy-Report-Only")
 
 
 def _host_con_hsts(host: str, collaudo: bool = MODALITA_COLLAUDO) -> bool:
@@ -1690,7 +1716,7 @@ async def cinture_http(request, call_next):
     if (r.headers.get("content-type", "").startswith("text/html")
             and not request.url.path.startswith("/widget/")
             and "Content-Security-Policy" not in r.headers):
-        r.headers.setdefault("Content-Security-Policy-Report-Only", CSP_PROVA)
+        r.headers.setdefault(_nome_header_csp(), CSP_PROVA)
     return r
 
 
@@ -1927,10 +1953,19 @@ async def no_iframe(request, call_next):
         return await call_next(request)
     r = await call_next(request)
     if not request.url.path.startswith("/widget/"):
-        r.headers.setdefault(
-            "Content-Security-Policy",
-            "frame-ancestors 'self' https://web.telegram.org "
-            "https://*.telegram.org")
+        fa = ("frame-ancestors 'self' https://web.telegram.org "
+              "https://*.telegram.org")
+        # (10 ott 2026, cantiere csp-accesa) la CSP delle pagine ora e'
+        # ACCESA e arriva PRIMA (cinture_http gira dentro): a quella il
+        # frame-ancestors si APPENDE — col solo setdefault la leva
+        # dell'iframe, accesa, avrebbe spento la CSP delle pagine
+        # senza dirlo. Chi ha una CSP sua (la busta, con la sandbox)
+        # resta com'e'.
+        gia = r.headers.get("Content-Security-Policy", "")
+        if gia == CSP_PROVA:
+            r.headers["Content-Security-Policy"] = gia + "; " + fa
+        else:
+            r.headers.setdefault("Content-Security-Policy", fa)
     return r
 
 
@@ -27450,6 +27485,16 @@ def _leve_stato():
                          "sito: è com'è sempre stato, e accenderla è una "
                          "stretta — ma prima va provata la Mini App da "
                          "Telegram Web, che gira in un iframe"),
+            _leva("CSP accesa (Content-Security-Policy)", "CSP_ATTIVA",
+                  bool(CSP_ATTIVA),
+                  acceso="il browser BLOCCA script da host estranei, "
+                         "base-uri, plugin e form verso fuori, e riferisce "
+                         "a /api/csp-report (journal «🛡️ CSP:»). Lo script "
+                         "inline resta ammesso: la fase 2 è un cantiere a sé",
+                  spento="sola prova (Report-Only): il browser riferisce e "
+                         "non blocca niente. Nasce ACCESA nel codice: spenta "
+                         "vuol dire che qualcuno l'ha spenta dal config, da "
+                         "riaccendere quando il journal è pulito"),
             _leva("Servizio nascosto Tor", "ONION_HOST",
                   bool(ONION_HOST),
                   acceso="alle richieste che arrivano dall'indirizzo "

@@ -1091,6 +1091,28 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `systemctl restart barattolo` — il cookie torna Secure ovunque anche
   con le righe di Caddy ancora lì (un testimone solo non basta); le righe
   si tolgono con la copia di prima e `systemctl reload caddy`.
+- LA CSP ACCESA (10 ott 2026, cantiere csp-accesa): le pagine rispondono
+  con una `Content-Security-Policy` VERA — il browser blocca script da
+  host estranei, `<base>`, plugin e form verso fuori — e riferiscono
+  ancora a `/api/csp-report` (journal «🛡️ CSP:», una riga al minuto per
+  violazione, 120 al minuto in tutto). Lo script inline resta ammesso
+  (`'unsafe-inline'`): la fase 2 è un cantiere a sé (CANTIERI, «La CSP
+  accesa», lo studio). LA LEVA `CSP_ATTIVA` NASCE ACCESA NEL CODICE: non
+  va aggiunta al config per accenderla. SE QUALCOSA SI ROMPE, senza
+  deploy: nel config del VPS (`~/satmarket/config.py`, da `barattolo`)
+  la riga `CSP_ATTIVA = False`, poi `sudo systemctl restart barattolo`;
+  la CSP torna in sola prova (`Content-Security-Policy-Report-Only`,
+  stesse direttive, stesso cestino) e il pannello «⚙️ Stato delle leve»
+  la mostra spenta. Per riaccenderla: via la riga (o `True`) e riavvio.
+  COSA GUARDARE PRIMA E DOPO: il journal,
+  `journalctl -u barattolo --since "1 day ago" | grep "🛡️ CSP:"` — una
+  riga dice direttiva, cosa è stato bloccato, `@ file:riga` e la pagina,
+  più un campione fra «»; le righe da estensioni (host che non sono
+  nostri, `chrome-extension`, `safari-extension`) sono rumore giusto da
+  bloccare, una riga su un nostro file o su `telegram.org` va letta. E
+  il Login Widget sul sito (fuori da Telegram): deve comparire e far
+  entrare — i suoi fogli e il font (telegram.org/css, /fonts) sono
+  ammessi apposta su `style-src` e `font-src`.
 - LE SESSIONI CLOUD (24 set 2026, regola di Andrea): una sessione di
   Claude Code che gira nel cloud (claude.ai/code, o una sessione spostata
   lì dal PC) lavora su un ramo `cantiere/<nome>` e apre una PR verso
