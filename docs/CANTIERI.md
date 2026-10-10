@@ -47581,3 +47581,35 @@ qui Playwright. Suite e collaudi: nel verbale del push.
 e nell'APK. La decisione sul link pubblico di PuntoLis. La conferma
 «Hai pagato il PayCode al tabacchino?» e gli avvisi Telegram del
 percorso non dicono ancora niente del buono regalo.
+
+
+## I gesti prima di pagare il PayCode, il verbale del push (10 ott 2026, sera): cosa è girato su quale albero
+
+Main è corso quattro volte mentre il cantiere si chiudeva (altre
+sessioni, sul P2P, sui link di Telegram e sulla tendina di Android), e
+non si è inseguito oltre. COSA È GIRATO, E DOVE:
+- sull'albero di partenza (b14f5e2 più il cantiere): la suite intera
+  `PROVE_SEVERE=1`, 21.620 passate e 0 fallite; la tortura, 26 mutazioni
+  su 26; il giro dal vivo con Playwright, 47 controlli verdi;
+- dopo il primo rebase, su 384a3ce (CI di main verde): le 81 sezioni
+  di prove.py che nominano quel che il cantiere tocca (il riquadro, la
+  pagina dello scambio, «Info P2P», la guida dei tutorial, i due
+  documenti: scelte dal sorgente, non a memoria), 6.026 verdi; i 55
+  collaudi della CI nella gabbia, 55 verdi;
+- dopo il secondo rebase, su 6b4eb19 (CI di main verde, guardata): le
+  81 sezioni, 6.026 verdi; i 56 collaudi (era arrivato
+  `collaudo_feedback_p2p`), 56 verdi;
+- dopo il terzo rebase, su 4f60dac (il cambio sul libro P2P, col suo
+  collaudo nuovo; CI di main verde): le sezioni toccate, 82 con la
+  nuova, 6.065 verdi;
+- dopo il quarto rebase, su 062d404 (la tendina di Android: quattro
+  file, tredici righe, nessun conflitto): le sezioni toccate, rigirate
+  dopo aver scritto questa voce e prima del push — rosse, il push non
+  partiva. I collaudi NON sono rigirati sugli ultimi due alberi (dieci
+  minuti a giro, e main correva più in fretta): li gira la CI del
+  push, guardata fino al verde. La suite intera non è rigirata dopo i
+  rebase: è la regola del main che corre.
+I REBASE: nei primi tre un solo conflitto, in coda a CANTIERI (tutti
+accodano lì): preso il file di main e riaccodata la voce; nient'altro
+toccato a mano, i simboli del cantiere ricontati dopo ogni rebase. Il
+push porta solo i due commit del cantiere, firmati.
