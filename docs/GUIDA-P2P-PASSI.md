@@ -618,13 +618,11 @@ le sezioni in quest'ordine:
    legge, prima qualcuno prende l'offerta. A zero vale il prezzo di
    mercato del momento in cui l'offerta viene presa.»
 7. «Chi può prendere l'ordine» (dal 10 ott 2026): le quattro pillole
-   «Tutti» (accesa di serie), «1+ scambi», «3+ scambi», «5+ scambi», e
-   sotto «Facoltativo: puoi accettare solo chi ha già completato degli
-   scambi.»; scelta una soglia la riga dice «Solo chi ha almeno **3
-   scambi completati** su Barattolo, e nessuno scambio non completato
-   negli ultimi 30 giorni (il primo si tollera). Gli altri vedono
-   l'ordine, ma non possono prenderlo.» Sulla card del libro compare il
-   segno piccolo «🛡️ Da 3 scambi completati».
+   «Tutti» (accesa di serie, e sotto niente), «1+ scambi», «3+ scambi»,
+   «5+ scambi»; scelta una soglia, sotto una riga sola: «Solo chi ha
+   completato almeno 3 scambi e non ha nessun «non completato» segnalato
+   negli ultimi 30 giorni.» (con 1: «…almeno 1 scambio e…»). Sulla card
+   del libro compare il segno piccolo «🛡️ Da 3 scambi completati».
 8. «Quanto si può, e quanto costa»: per esempio «Al momento si accettano
    ordini fino a 500 000 sats — la fee P2P è dell'1,5% per parte» (a un
    Pioniere: «…la fee P2P è dell'1,5% per parte, e tu hai uno sconto

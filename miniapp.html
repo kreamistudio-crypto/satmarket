@@ -60435,12 +60435,18 @@ function sezioneAccessoNuovoP2P(){
     titolo: 'Chi può prendere l\'ordine',
     corpo: '<div class="p2p-accesso-scelte">' + voce(0, 'Tutti')
       + P2P_FILTRO_SOGLIE.map(n => voce(n, n + '+ scambi')).join('') + '</div>',
-    sotto: '<div class="hint">' + (p2pNuovoFiltro
-      ? 'Solo chi ha almeno <b>' + p2pNuovoFiltro + ' scambi completati</b> su Barattolo, '
-        + 'e nessuno scambio non completato negli ultimi 30 giorni (il primo si tollera). '
-        + 'Gli altri vedono l\'ordine, ma non possono prenderlo.'
-      : 'Facoltativo: puoi accettare solo chi ha già completato degli scambi.') + '</div>'
+    /* IL TESTO SOTTO LE SCELTE, CORTO (10 ott 2026, ritocco di Andrea):
+       con «Tutti» niente; con una soglia una frase sola, la stessa per
+       1, 3 e 5 — `fraseAccessoNuovoP2P`. La regola del filtro non cambia. */
+    sotto: p2pNuovoFiltro ? '<div class="hint">' + fraseAccessoNuovoP2P(p2pNuovoFiltro) + '</div>' : ''
   });
+}
+/* PURA: la frase di una soglia, al singolare per 1 */
+function fraseAccessoNuovoP2P(n){
+  n = sogliaFiltroP2P(n);
+  if (!n) return '';
+  return 'Solo chi ha completato almeno ' + n + (n === 1 ? ' scambio' : ' scambi')
+    + ' e non ha nessun «non completato» segnalato negli ultimi 30 giorni.';
 }
 function scegliFiltroNuovoP2P(n){
   haptic();

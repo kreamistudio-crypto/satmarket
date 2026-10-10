@@ -44963,3 +44963,21 @@ CI nella gabbia (51 verdi); sull'albero finale (c48e3a0 più il ritocco:
 in più una riga di documento) di nuovo le quindici sezioni, non i
 collaudi — il ritocco è testo e prove, e nessun collaudo legge né l'uno
 né le altre.
+
+
+## Il testo sotto «Chi può prendere l'ordine», corto (10 ott 2026, ritocco di Andrea al cantiere reputazione-p2p)
+
+Nel foglio «Pubblica», sotto le quattro pillole, c'erano due spiegazioni
+lunghe (la riga «Facoltativo…» con «Tutti», e con una soglia la regola
+intera con la tolleranza e «gli altri vedono l'ordine»). Andrea le ha
+volute corte: con «Tutti» NIENTE; con 1+/3+/5+ una frase sola, «Solo chi
+ha completato almeno N scambi e non ha nessun «non completato» segnalato
+negli ultimi 30 giorni.» (singolare a 1). La frase la scrive
+`fraseAccessoNuovoP2P` (pura), `sezioneAccessoNuovoP2P` la mette nel
+«sotto» solo con una soglia. LA REGOLA DEL FILTRO NON CAMBIA
+(`_giudice_presa_p2p`, la tolleranza del primo): «segnalato» dice proprio
+quello — il marchio che compare dal secondo. Prove: le tre righe della
+sezione in `prove_reputazione_p2p`, emendate (con «Tutti» nessun
+`.hint`; con 3+ la frase esatta e un solo `.hint`; la frase a 1, 5, 0 e
+fuori catalogo). Dal vivo: i quattro scatti delle quattro scelte in
+`.claude/giri/testi-accesso-p2p/`. GUIDA-P2P-PASSI §4 aggiornata.

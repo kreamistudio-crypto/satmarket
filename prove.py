@@ -138018,12 +138018,14 @@ p2pMiaRep = {completati: 1, mancati: 2}; c.mia.push(rigaMiaReputazioneP2P());
 p2pMiaRep = null; c.mia.push(rigaMiaReputazioneP2P());
 const sez = sezioneAccessoNuovoP2P();
 c.sezione = [(sez.match(/p2p-accesso-chip/g) || []).length, (sez.match(/ on"/g) || []).length,
-             sez.indexOf('>Tutti<') >= 0, sez.indexOf('Facoltativo') >= 0];
+             sez.indexOf('>Tutti<') >= 0, sez.indexOf('class="hint"') < 0];
 scegliFiltroNuovoP2P(3);
 const sez3 = sezioneAccessoNuovoP2P();
 c.sezione3 = [p2pNuovoFiltro, RIDISEGNI, (sez3.match(/ on"/g) || []).length,
-              sez3.indexOf('aria-pressed="true" data-n="3"') >= 0, sez3.indexOf('30 giorni') >= 0,
-              sez3.indexOf('3 scambi completati') >= 0];
+              sez3.indexOf('aria-pressed="true" data-n="3"') >= 0,
+              sez3.indexOf('Solo chi ha completato almeno 3 scambi e non ha nessun «non completato» segnalato negli ultimi 30 giorni.') >= 0,
+              (sez3.match(/class="hint"/g) || []).length === 1];
+c.frasiAccesso = [fraseAccessoNuovoP2P(1), fraseAccessoNuovoP2P(5), fraseAccessoNuovoP2P(0), fraseAccessoNuovoP2P(2)];
 scegliFiltroNuovoP2P(2); c.sezioneFuori = p2pNuovoFiltro;
 c.campi = [filtroDaCampiP2P({filtro: 5}), filtroDaCampiP2P({filtro: 2}), filtroDaCampiP2P(null)];
 MIE = {[ID]: {id: ID, mio: true, filtro: 3}, [ID2]: {id: ID2, mio: false, filtro: 3}};
@@ -138073,10 +138075,16 @@ console.log(JSON.stringify(c));
               [c["mia"][0], "<b>3</b> scambi completati" in c["mia"][1] and "non completati" not in c["mia"][1],
                "<b>1</b> scambio completato" in c["mia"][2] and "⚠️ 2 non completati" in c["mia"][2]
                and "90 giorni" in c["mia"][2], c["mia"][3]])
-        prova("client: la sezione del foglio: quattro scelte, «Tutti» accesa di serie, la riga facoltativa",
+        # EMENDATA (10 ott 2026, ritocco di Andrea): con «Tutti» nessun testo
+        # sotto; con una soglia la frase corta e sola
+        prova("client: la sezione del foglio: quattro scelte, «Tutti» accesa di serie, e sotto niente",
               [4, 1, True, True], c["sezione"])
-        prova("...scelto 3+: una sola accesa, il foglio si ridisegna, la riga dice la regola intera",
+        prova("...scelto 3+: una sola accesa, il foglio si ridisegna, sotto la frase corta e basta",
               [3, 1, 1, True, True, True], c["sezione3"])
+        prova("...la frase: singolare a 1, plurale a 5, niente a 0 e fuori catalogo",
+              ["Solo chi ha completato almeno 1 scambio e non ha nessun «non completato» segnalato negli ultimi 30 giorni.",
+               "Solo chi ha completato almeno 5 scambi e non ha nessun «non completato» segnalato negli ultimi 30 giorni.",
+               "", ""], c["frasiAccesso"])
         prova("...una soglia fuori catalogo torna a «tutti»", 0, c["sezioneFuori"])
         prova("...il filtro parte dai campi solo dal catalogo", [5, 0, 0], c["campi"])
         prova("...e all'intestazione si dichiarano i filtri dei SOLI miei ordini", {ID: 3}, c["dichiara"])
