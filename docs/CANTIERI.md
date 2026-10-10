@@ -49213,5 +49213,18 @@ PC non c'è cargo): la build è la liturgia `-bar7`, da fare sul nodo.
 Poi main è corso ancora di uno (e817faa, i percorsi del VPS: solo
 documenti): secondo rebase, la coda di CANTIERI, e le due sezioni coi
 documenti del fork (cauzione, dettaglio) rigirate verdi. LA CI DI MAIN
-prima del push: aspettata verde la punta 41e859d e poi la e817faa. Il
-sì al push è di Andrea: stava nel brief incollato («Ok al push»).
+prima del push: aspettata verde la punta 41e859d e poi la e817faa.
+POI LA LEVA (11 ott 2026, notte, la garanzia chiesta da Andrea: il
+terzo commit, `P2P_CAUZIONE_SUL_METODO`): suite intera 22.051 passate
+e la sola rossa (la leva mancante nell'ambiente degli avvisi) curata e
+rigirata verde; i 58 collaudi del workflow verdi; il giro dal vivo con
+la leva spenta e accesa (scatti 03-04). Terzo rebase, su 4cb9761 (tre
+commit: il dominio nel journal, gli indirizzi che non passano — con la
+SUA dodicesima chiave `indirizziNo`, che con la mia fa TREDICI —, il
+cambio): conflitti in coda a CANTIERI e in `prove.py` (la lista delle
+chiavi e l'ambiente delle leve, tenute tutt'e due); sull'albero del
+push le nove sezioni toccate o vicine (1.339 verdi, 0 rosse) e quattro
+collaudi vicini nella gabbia; suite intera e gli altri collaudi non
+rifatti sull'ultima punta. LA CI DI MAIN prima del push: aspettata
+verde anche la punta 4cb9761. Il sì al push è di Andrea: stava nel
+brief incollato («Poi push come detto»).
