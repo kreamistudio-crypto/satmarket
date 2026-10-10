@@ -54062,6 +54062,9 @@ def prove_card_parte_ordine():
     exec(_SORGENTE[i_l:_SORGENTE.index("]\n", i_l) + 1], amb)
     # il bollino 🛡️ Staff (6 ott 2026) ha la sua prova (prove_bollino_staff): qui nessuno e' dello staff
     amb["e_staff"] = lambda tg_id: False
+    # il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p) ha la
+    # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
+    amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
     for f in ("livello_utente", "_volti_persone", "miei_ordini"):
         exec(pezzo(f), amb)
     # la SPIA sul costruttore: chi gli si chiede, a ogni giro
@@ -56293,6 +56296,9 @@ def prove_ritocchi_prova_alan():
                "print": lambda *a, **k: STAMPE.append(" ".join(map(str, a)))}
         # il bollino 🛡️ Staff (6 ott 2026) ha la sua prova (prove_bollino_staff): qui nessuno e' dello staff
         amb["e_staff"] = lambda tg_id: False
+        # il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p) ha la
+        # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
+        amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
         for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "MAX_ORDINI_MAI_VISTI_P2P = ", "P2P_ORDINI_MAI_VISTI_S = ", "P2P_CAMBIO_PUB_SCARTO = "):
             i = _SORGENTE.index("\n" + riga) + 1
             exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
@@ -56304,6 +56310,8 @@ def prove_ritocchi_prova_alan():
                      # zone: senza le loro tre funzioni alzerebbe, e il suo
                      # fail-open lascerebbe indietro gli autori IN SILENZIO
                      "_metodi_lista_p2p", "_zone_p2p", "_zone_foto_p2p",
+                     # (10 ott 2026, reputazione-p2p) ...e i filtri di chi pubblica
+                     "_filtri_p2p", "_filtri_foto_p2p",
                      "_rinfresca_volti_foto_p2p", "_intesta_dal_canale_p2p"):
             exec(pezzo(nome), amb)
         EV = lambda d: {"kind": 38383, "created_at": 1, "tags": [["d", d]]}
@@ -63131,6 +63139,9 @@ def prove_parti_si_vedono():
     exec(_SORGENTE[i_l:_SORGENTE.index("]\n", i_l) + 1], amb)
     # il bollino 🛡️ Staff (6 ott 2026) ha la sua prova (prove_bollino_staff): qui nessuno e' dello staff
     amb["e_staff"] = lambda tg_id: False
+    # il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p) ha la
+    # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
+    amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
     for f in ("_ordini_puliti_p2p", "livello_utente", "_volti_persone",
               "_controparti_p2p"):
         exec(pezzo(f), amb)
@@ -66196,6 +66207,9 @@ def prove_volti_libro():
            "sqlite3": sqlite3}
     # il bollino 🛡️ Staff (6 ott 2026) ha la sua prova (prove_bollino_staff): qui nessuno e' dello staff
     amb["e_staff"] = lambda tg_id: False
+    # il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p) ha la
+    # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
+    amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
     for f in ("_ordini_puliti_p2p", "_registra_ordini_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p",
               "_facce_ordini_p2p"):
         exec(pezzo(f), amb)
@@ -71924,8 +71938,10 @@ def prove_p2p_pubblica():
     # altri metodi l'ordine e' quello di ieri
     prova("l'ordine delle scatole, e il bottone sotto l'ultima", True,
           # (10 ott 2026) la zona di scambio del contanti, subito sotto i metodi
+          # (10 ott 2026, reputazione-p2p) e «Chi puo' prendere l'ordine»
+          # dopo il premio, prima dei limiti
           "valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo) + quanti + premio"
-          " + riquadroLimitiP2P() + '<div class=\"foglio-piede sola\">'"
+          " + accesso + riquadroLimitiP2P() + '<div class=\"foglio-piede sola\">'"
           in re.sub(r"\s+", " ", _foglio))
     _riq = pezzo_js(mini, "function riquadroLimitiP2P(){", "\n}\n")
     prova("la scatola e' quella delle altre, senza icona", True,
@@ -82346,8 +82362,9 @@ def prove_premio_barattozon():
           '(d or {}).get("cambi"), cambio_noto_ora())' in pezzo("registra_ordini_p2p"))
     prova("...i volti portano i cambi accanto, la fotografia li da' a TUTTI, l'archivio per scambio",
           [True, True, True],
-          # (10 ott 2026) ...e accanto ai cambi le zone del contanti
-          ['return {"facce": facce, "cambi": cambi, "zone": zone}' in pezzo("facce_ordini_p2p"),
+          # (10 ott 2026) ...e accanto ai cambi le zone del contanti, e i
+          # filtri di chi pubblica (reputazione-p2p)
+          ['return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri}' in pezzo("facce_ordini_p2p"),
            'if fuori["eventi"] and F.get("cambi"):\n        fuori["cambi"] = F["cambi"]'
            in pezzo("libro_fotografato_p2p")
            and pezzo("libro_fotografato_p2p").index('fuori["cambi"]')
@@ -87556,7 +87573,10 @@ def _banco_eventi_p2p(eventi_attivi=True):
                           ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
                           ("p2p_attese", "ON p2p_attese(scade);"),
                           # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
-                          ("p2p_tolti", "\n    );")):
+                          ("p2p_tolti", "\n    );"),
+                          # (10 ott 2026, reputazione-p2p) gli esiti e i tentativi
+                          ("p2p_esiti", "ON p2p_esiti(tg_id, esito, quando);"),
+                          ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);")):
         i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
         schema += src[i:src.index(fine, i) + len(fine)] + "\n"
     schema += ("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, "
@@ -87585,6 +87605,8 @@ def _banco_eventi_p2p(eventi_attivi=True):
                  "P2P_EVENTO_OROLOGIO_S = ", "P2P_SATS_MAX_EVENTO = ",
                  "P2P_RECAPITO_MAX = ",
                  "P2P_LIBRO_MEMORIA_S = ", "FORMA_DETTAGLIO_P2P = ",
+                 # (10 ott 2026, reputazione-p2p) la memoria lunga degli esiti
+                 "P2P_ESITI_MEMORIA_S = ",
                  # gli stati finali del libro: la riserva superata (24 set)
                  "STATI_LIBRO_FINALI = ",
                  # il giudice del pagamento, per l'attesa del rilascio
@@ -91652,7 +91674,10 @@ def prove_p2p_orologio():
     for _tab, _fine in (("p2p_momenti", "\n    );"), ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
                         ("p2p_attese", "ON p2p_attese(scade);"), ("p2p_scambi", "\n    );"),
                         # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
-                        ("p2p_tolti", "\n    );")):
+                        ("p2p_tolti", "\n    );"),
+                        # (10 ott 2026, reputazione-p2p) gli esiti e i tentativi
+                        ("p2p_esiti", "ON p2p_esiti(tg_id, esito, quando);"),
+                        ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);")):
         _i = src.index(f"CREATE TABLE IF NOT EXISTS {_tab}(")
         schema += "\n" + src[_i:src.index(_fine, _i) + len(_fine)]
     con0 = sqlite3.connect(percorso)
@@ -91707,6 +91732,7 @@ def prove_p2p_orologio():
                "STATI_LIBRO_PRESO": ("in-progress", "waiting-buyer-invoice", "waiting-payment"),
                "TIMBRO_LIBRO_P2P": "p2p_libro_visto", "P2P_INFO_OGNI_S": 3600,
                "P2P_LIBRO_MEMORIA_S": 40 * 86400, "P2P_LIBRO_FRESCHI_S": 7200,
+           "P2P_ESITI_MEMORIA_S": 400 * 86400,
                "P2P_PRIMO_SGUARDO": 600, "P2P_BLOCCO": 100,
                "_P2P_INFO": {"fee": None, "ore": 0, "quando": 0},
                "P2P_RELAY_MAX_S": relay_max, "P2P_PASSATA_MAX_S": 0.4,
@@ -91937,7 +91963,10 @@ def prove_p2p_tutti_i_relay():
                         ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
                         ("p2p_attese", "ON p2p_attese(scade);"),
                         # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
-                        ("p2p_tolti", "\n    );")):
+                        ("p2p_tolti", "\n    );"),
+                        # (10 ott 2026, reputazione-p2p) gli esiti e i tentativi
+                        ("p2p_esiti", "ON p2p_esiti(tg_id, esito, quando);"),
+                        ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);")):
         _i = src.index(f"CREATE TABLE IF NOT EXISTS {_tab}(")
         schema += src[_i:src.index(_fine, _i) + len(_fine)] + "\n"
     schema += "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, avvisi_p2p INTEGER DEFAULT 1);"
@@ -91988,6 +92017,7 @@ def prove_p2p_tutti_i_relay():
            "STATI_LIBRO_PRESO": ("in-progress", "waiting-buyer-invoice", "waiting-payment"),
            "TIMBRO_LIBRO_P2P": "p2p_libro_visto", "P2P_INFO_OGNI_S": 3600,
            "P2P_LIBRO_MEMORIA_S": 40 * 86400, "P2P_LIBRO_FRESCHI_S": 7200,
+           "P2P_ESITI_MEMORIA_S": 400 * 86400,
            "P2P_PRIMO_SGUARDO": 600, "P2P_BLOCCO": 100, "P2P_MARGINE_S": 120,
            "P2P_ASCOLTO_RITARDO_S": 20,
            "_P2P_ASCOLTO": {"filo": None, "ferma": None, "stato": "spento",
@@ -92567,7 +92597,10 @@ def prove_p2p_ascolto():
                         ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
                         ("p2p_attese", "ON p2p_attese(scade);"),
                         # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
-                        ("p2p_tolti", "\n    );")):
+                        ("p2p_tolti", "\n    );"),
+                        # (10 ott 2026, reputazione-p2p) gli esiti e i tentativi
+                        ("p2p_esiti", "ON p2p_esiti(tg_id, esito, quando);"),
+                        ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);")):
         _i = src.index(f"CREATE TABLE IF NOT EXISTS {_tab}(")
         schema += src[_i:src.index(_fine, _i) + len(_fine)] + "\n"
     schema += "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, avvisi_p2p INTEGER DEFAULT 1);"
@@ -92609,6 +92642,7 @@ def prove_p2p_ascolto():
             "STATI_LIBRO_PRESO": ("in-progress", "waiting-buyer-invoice", "waiting-payment"),
             "TIMBRO_LIBRO_P2P": "p2p_libro_visto", "P2P_INFO_OGNI_S": 3600,
             "P2P_LIBRO_MEMORIA_S": 40 * 86400, "P2P_LIBRO_FRESCHI_S": 7200,
+           "P2P_ESITI_MEMORIA_S": 400 * 86400,
             "P2P_PRIMO_SGUARDO": 600, "P2P_BLOCCO": 100, "P2P_MARGINE_S": 120,
             "_P2P_INFO": {"fee": None, "ore": 0, "quando": 0},
             "P2P_RELAY_MAX_S": 2, "P2P_PASSATA_MAX_S": 5, "P2P_GIRO_S": 1.0,
@@ -93897,7 +93931,10 @@ def _schema_p2p_pieno(src):
                           ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
                           ("p2p_attese", "ON p2p_attese(scade);"),
                           # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
-                          ("p2p_tolti", "\n    );")):
+                          ("p2p_tolti", "\n    );"),
+                          # (10 ott 2026, reputazione-p2p) gli esiti e i tentativi
+                          ("p2p_esiti", "ON p2p_esiti(tg_id, esito, quando);"),
+                          ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);")):
         i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
         schema += src[i:src.index(fine, i) + len(fine)] + "\n"
     return schema + (
@@ -93925,7 +93962,9 @@ def _ambiente_libro_p2p(detto):
     scadenza zero, e i banchi guardano le frasi che prepara."""
     import html as _html
     amb = {"json": json, "P2P_EVENTI_SEGRETO": "", "P2P_RISERVA_S": 60,
-           "sqlite3": __import__("sqlite3")}
+           "sqlite3": __import__("sqlite3"),
+           # il marchio (10 ott 2026, reputazione-p2p): qui nessuno ce l'ha
+           "_marchi_mancati_p2p": lambda con, ids, adesso: {}}
     _m = _SORGENTE.index("\nMOMENTI_DEL_LIBRO_P2P = {") + 1
     exec(_SORGENTE[_m:_SORGENTE.index("}\n", _m) + 2], amb)
     return {**amb, "html": _html,
@@ -94171,7 +94210,10 @@ def prove_p2p_recapito_passo():
           # nell'anti-doppione di tutti, `p2p_avvisi`
           # ...e `preso_dichiarato` (23 set 2026, A1): la presa che aspetta
           # la parola di mostrod prima di diventare `preso_da`
-          ["creato", "euro", "lato", "maker", "metodi", "ordine", "preso_da",
+          # ...e `min_completati` (10 ott 2026, reputazione-p2p): chi puo'
+          # prendere l'ordine, dichiarato da chi pubblica come la zona —
+          # pubblica per dichiarazione, mai un recapito
+          ["creato", "euro", "lato", "maker", "metodi", "min_completati", "ordine", "preso_da",
            "preso_dichiarato", "recapito_avviso", "recapito_n", "sats", "stato",
            # ...e `zona` (10 ott 2026, contanti-zona): la zona INDICATIVA
            # dello scambio in contanti, che chi pubblica scrive perche' si
@@ -94233,6 +94275,9 @@ def prove_p2p_recapito_passo():
         exec(src[_i:src.index("\n", _i)], amb)
     # il bollino 🛡️ Staff (6 ott 2026) ha la sua prova (prove_bollino_staff): qui nessuno e' dello staff
     amb["e_staff"] = lambda tg_id: False
+    # il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p) ha la
+    # sua prova (prove_reputazione_p2p): qui nessuno ce l'ha
+    amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
     for f in _FUNZIONI_LIBRO_P2P + ("_volti_persone", "_controparti_p2p", "_nome_altro_p2p",
                                     # col contanti l'avviso dice l'appuntamento (1 ott 2026)
                                     "_tabacchino_libro", "_dati_frase_p2p",
@@ -135390,7 +135435,9 @@ def prove_contanti_zona():
     _fine = "ON p2p_ordini(tg_id);"
     schema = src[_i:src.index(_fine, _i) + len(_fine)]
     prova("la colonna c'e' nel CREATE e nel giro dei database di ieri", [True, True],
-          ["        zona TEXT DEFAULT ''\n    );" in schema, "\"zona TEXT DEFAULT ''\"):" in src])
+          # (10 ott 2026, reputazione-p2p) dopo la zona c'e' `min_completati`:
+          # la zona non chiude piu' ne' il CREATE ne' l'ALTER
+          ["        zona TEXT DEFAULT '',\n" in schema, "\"zona TEXT DEFAULT ''\",\n" in src])
     con = sqlite3.connect(":memory:")
     con.row_factory = sqlite3.Row
     con.executescript(schema)
@@ -135449,9 +135496,10 @@ def prove_contanti_zona():
     prova("...e il registro degli ordini non ha cambiato firma", True,
           "cambi=None, cambio_server: float = 0.0) -> dict:" in src)
     fac = pezzo("facce_ordini_p2p")
+    # (10 ott 2026, reputazione-p2p) ...e i filtri di chi pubblica, in coda
     prova("i volti portano le zone accanto, dagli stessi id", True,
           'zone = _zone_p2p(con, (d or {}).get("ordini"))' in fac
-          and 'return {"facce": facce, "cambi": cambi, "zone": zone}' in fac)
+          and 'return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri}' in fac)
     lib = pezzo("libro_fotografato_p2p")
     prova("la fotografia le da' a TUTTI, prima di chiedere chi guarda (non sono un volto)", True,
           'if fuori["eventi"] and F.get("zone"):\n        fuori["zone"] = F["zone"]' in lib
@@ -135493,13 +135541,16 @@ def prove_contanti_zona():
     prova("le zone arrivano dai volti e dalle due letture della fotografia", [True, True, True],
           ["if (prendiZoneP2P(d && d.zone)) nuove++;" in fn("async function chiediFacceP2P(ids){"),
            "const zone = prendiZoneP2P(d && d.zone);" in fn("async function chiediFotoLibroP2P(){")
-           and "> 0 || cambi || zone;" in fn("async function chiediFotoLibroP2P(){"),
+           # (10 ott 2026, reputazione-p2p) ...e i filtri, in coda alle zone
+           and "> 0 || cambi || zone || filtri;" in fn("async function chiediFotoLibroP2P(){"),
            mini.count("\n  prendiZoneP2P(d && d.zone);\n") == 1])
     riga = fn("function rigaOrdineP2P(o){")
     prova("la card del libro mette la zona sotto la scatola dei metodi; la card d'esempio no",
           [True, 1],
           ["const zona = typeof rigaZonaP2P === 'function' ? rigaZonaP2P(o) : '';" in riga
-           and "    ${paga}\n    ${zona}\n    ${rep ? " in riga,
+           # (10 ott 2026, reputazione-p2p) fra la zona e le stelline il
+           # segno piccolo del filtro di chi pubblica
+           and "    ${paga}\n    ${zona}\n    ${typeof segnoFiltroP2P === 'function' ? segnoFiltroP2P(o) : ''}\n    ${rep ? " in riga,
            riga.count("${zona}")])
     dett = fn("function metodiDettP2P(o){")
     prova("il dettaglio la mette sotto il metodo, con uno e con piu' metodi", [True, True, True],
@@ -135820,8 +135871,7 @@ def prove_contanti_zona():
           ["Milano centro", "", "", "", "", "", ""], o["canale"])
 
 
-# ====================================================================
-def prove_promemoria_gesto():
+# =============================================================def prove_promemoria_gesto():
     """IL PROMEMORIA DEL GESTO A TEMPO (10 ott 2026, cantiere «promemoria
     garanzia», richiesta di Andrea). Il caso: a chi vendeva arriva «Paga
     la garanzia» alle 10:04, il coordinatore gli da' un quarto d'ora,
@@ -136374,6 +136424,523 @@ console.log(JSON.stringify(out));
           [r.get("battitoZero"), r.get("fuoriPagina")])
 
 
+def prove_reputazione_p2p():
+    """LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, I TENTATIVI, IL
+    FILTRO DI CHI PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, cantiere
+    reputazione-p2p, richiesta di Andrea dopo un caso del giorno del
+    lancio: un venditore ha preso un ordine e non ha bloccato la
+    garanzia in tempo).
+    I giudici VERI del server girano su sqlite in memoria con lo schema
+    vero (il banco degli eventi, piu' le due tabelle nuove): gli eventi
+    di mostrod entrano dai due giudici della rotta e `_segna_esiti_p2p`
+    scrive gli esiti — il non completato SOLO a chi ha preso e non ha
+    provato, mai a chi ha pubblicato, mai su un tentativo, mai su un
+    ritiro o un maker-timeout; la finestra dei 90 giorni; la scritta da
+    due in su; il filtro e il limite rispettati dal giudice della presa;
+    gli ordini vecchi senza filtro; le stelline che non c'entrano. Poi
+    le funzioni VERE del client in node: il marchio, le frasi del veto,
+    il segno del filtro, la sezione del foglio, la frase del rifiuto.
+    Le sentinelle guardano i ganci: la rotta degli eventi, le due rotte
+    nuove, i volti, il negozio, la pulizia, «dimentica», la cintura
+    della presa, i tentativi dichiarati, dove si vede il marchio."""
+    print("\n[la reputazione del P2P: non completati, tentativi, filtro e limite]")
+    import sqlite3
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    m = mini.replace("\r\n", "\n")
+
+    # --- 1) IL SERVER, sui giudici veri ---------------------------------
+    con, amb = _banco_eventi_p2p()
+    amb["sqlite3"] = sqlite3
+    for riga in ("P2P_MANCATI_FINESTRA_S = ", "P2P_MANCATI_FILTRO_S = ",
+                 "P2P_MANCATI_TOLLERATI = ", "P2P_PRESE_APERTE_MAX = ",
+                 "P2P_PRESA_APERTA_S = ", "P2P_ESITI_MEMORIA_S = ",
+                 "P2P_TENTATIVO_MARGINE_S = "):
+        i = src.index("\n" + riga) + 1
+        exec(src[i:src.index("\n", i)].split("  #")[0], amb)
+    for blocco in ("P2P_FILTRO_SOGLIE = (", "P2P_GESTI_TENTATIVO = (", "P2P_MOTIVI_PRESA = ("):
+        i = src.index("\n" + blocco) + 1
+        exec(src[i:src.index(")\n", i) + 2], amb)
+    for f in ("_primo_gesto_p2p", "_marchio_mancati_p2p", "_ha_provato_p2p",
+              "_segna_esiti_p2p", "_reputazione_p2p", "_marchi_mancati_p2p",
+              "_prese_aperte_p2p", "_giudice_presa_p2p", "_soglia_filtro_p2p",
+              "_dichiara_filtri_p2p", "_filtri_p2p", "_posso_prendere_p2p",
+              "_segna_tentativo_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    prova("le soglie del foglio sono 1, 3 e 5; il limite delle prese e' 2; il primo si tollera",
+          [(1, 3, 5), 2, 1],
+          [amb["P2P_FILTRO_SOGLIE"], amb["P2P_PRESE_APERTE_MAX"], amb["P2P_MANCATI_TOLLERATI"]])
+    prova("...le finestre: 90 giorni il marchio, 30 il filtro, oltre un anno la memoria",
+          [90 * 86400, 30 * 86400, True],
+          [amb["P2P_MANCATI_FINESTRA_S"], amb["P2P_MANCATI_FILTRO_S"],
+           amb["P2P_ESITI_MEMORIA_S"] > 365 * 86400])
+    ORA = 1_790_000_000
+    KA, KB = "a" * 64, "b" * 64           # 222 (chi prende), 111 (chi pubblica)
+    con.execute("INSERT INTO utenti VALUES(111, 1)")
+    con.execute("INSERT INTO utenti VALUES(222, 1)")
+    con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", (KA, 222))
+    con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", (KB, 111))
+
+    def ordine(n, lato="sell", maker=111):
+        o = f"0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc{n:02d}"
+        con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker) "
+                    "VALUES(?,?,?,?,?,1)", (o, maker, ORA, "in-progress", lato))
+        return o
+
+    def ev(o, azione, attore="mostro", dettaglio="", ts=ORA, buyer=KA, seller=KB, **extra):
+        d = {"v": 1, "order": o, "action": azione, "ts": ts, "actor": attore,
+             "buyer": buyer, "seller": seller}
+        if dettaglio:
+            d["detail"] = dettaglio
+        d.update(extra)
+        e = amb["_evento_p2p_pulito"](d, ORA)
+        fatto = amb["_registra_evento_p2p"](con, e, ORA)
+        righe = amb["_segna_esiti_p2p"](con, e, fatto, ORA) if fatto else []
+        return fatto, righe
+
+    def esiti(tg):
+        return [tuple(r) for r in con.execute(
+            "SELECT esito, ordine, giro FROM p2p_esiti WHERE tg_id=? ORDER BY quando, esito", (tg,))]
+
+    def rep(tg):
+        return amb["_reputazione_p2p"](con, tg, ORA + 600)
+
+    # a) chi prende COMPRANDO non da' la fattura: il timeout e' suo
+    O1 = ordine(1)
+    ev(O1, "taken", "buyer", "invoice-next", ORA - 800)
+    ev(O1, "buyer-invoice-requested", "mostro", "", ORA - 800)
+    _, righe = ev(O1, "expired", "mostro", "taker-timeout", ORA - 10)
+    prova("a) chi ha preso comprando e non ha dato la fattura: un «mancato», a lui solo",
+          ([("mancato", O1, 1)], []), (esiti(222), esiti(111)))
+    prova("...e il journal lo dice, con chi e cosa", True,
+          any("a 222 si conta uno scambio non completato" in r and "dato la fattura" in r for r in righe))
+    prova("...ma al primo la scritta non c'e' ancora: il marchio tace (si tollera)",
+          (1, 0), (rep(222)["mancati"], amb["_marchio_mancati_p2p"](rep(222)["mancati"])))
+    # b) lo stesso, ma lui aveva mandato una fattura (poi rifiutata)
+    O2 = ordine(2)
+    ev(O2, "taken", "buyer", "invoice-next", ORA - 700)
+    ev(O2, "buyer-invoice-requested", "mostro", "", ORA - 700)
+    t = amb["_segna_tentativo_p2p"](con, 222, O2, "fattura_rifiutata", "invalid-invoice", ORA - 600)
+    prova("b) il tentativo di chi e' della partita si scrive, col motivo pulito",
+          ({"ok": True, "motivo": ""}, ("fattura_rifiutata", 1, "invalid-invoice")),
+          (t, tuple(con.execute("SELECT gesto, giro, motivo FROM p2p_tentativi WHERE ordine=?",
+                                (O2,)).fetchone())))
+    _, righe = ev(O2, "expired", "mostro", "taker-timeout", ORA - 9)
+    prova("...e al timeout il «mancato» NON si conta: ha provato", 1, len(esiti(222)))
+    prova("...e il journal dice perche'", True, any("ha provato" in r for r in righe))
+    # c) chi prende VENDENDO non blocca la garanzia (le chiavi girate: qui compra 111)
+    O3 = ordine(3, "buy")
+    ev(O3, "taken", "seller", "hold-next", ORA - 600, buyer=KB, seller=KA)
+    ev(O3, "hold-invoice-requested", "mostro", "take", ORA - 600, buyer=KB, seller=KA)
+    _, righe = ev(O3, "expired", "mostro", "taker-timeout", ORA - 8, buyer=KB, seller=KA)
+    prova("c) chi ha preso vendendo e non ha bloccato la garanzia: il secondo «mancato», a lui",
+          ([("mancato", O1, 1), ("mancato", O3, 1)], []), (esiti(222), esiti(111)))
+    prova("...e da due in su la scritta c'e': 2", (2, 2),
+          (rep(222)["mancati"], amb["_marchio_mancati_p2p"](rep(222)["mancati"])))
+    prova("...il journal: non ha bloccato la garanzia", True,
+          any("bloccato la garanzia" in r for r in righe))
+    # d) lo stesso, ma aveva aperto la richiesta della garanzia
+    O4 = ordine(4, "buy")
+    ev(O4, "taken", "seller", "hold-next", ORA - 500, buyer=KB, seller=KA)
+    ev(O4, "hold-invoice-requested", "mostro", "take", ORA - 500, buyer=KB, seller=KA)
+    amb["_segna_tentativo_p2p"](con, 222, O4, "garanzia_aperta", "", ORA - 400)
+    ev(O4, "expired", "mostro", "taker-timeout", ORA - 7, buyer=KB, seller=KA)
+    prova("d) ...ma con la richiesta della garanzia APERTA non si conta", 2, len(esiti(222)))
+    # e) un tentativo di un giro PRIMA non copre il giro dopo
+    O5 = ordine(5)
+    ev(O5, "taken", "buyer", "invoice-next", ORA - 900)
+    amb["_segna_tentativo_p2p"](con, 222, O5, "fattura_inviata", "", ORA - 890)
+    ev(O5, "expired", "mostro", "taker-timeout", ORA - 700)
+    ev(O5, "taken", "buyer", "invoice-next", ORA - 300)
+    ev(O5, "buyer-invoice-requested", "mostro", "", ORA - 300)
+    ev(O5, "expired", "mostro", "taker-timeout", ORA - 6)
+    prova("e) un tentativo del giro PRIMA non copre il giro dopo: il secondo timeout si conta",
+          [("mancato", O5, 2)], [x for x in esiti(222) if x[1] == O5])
+    # f) chi pubblica non si conta mai: maker-timeout, ritiro di chi ha preso, scaduto in libro
+    O6, O7, O8 = ordine(6), ordine(7), ordine(8)
+    ev(O6, "taken", "buyer", "invoice-next", ORA - 200)
+    ev(O6, "expired", "mostro", "maker-timeout", ORA - 5)
+    ev(O7, "taken", "buyer", "invoice-next", ORA - 200)
+    ev(O7, "canceled", "buyer", "republished", ORA - 5)
+    ev(O8, "expired", "mostro", "book", ORA - 5)
+    prova("f) maker-timeout, ritiro di chi ha preso e scaduto in libro: nessuno si conta",
+          (3, 0), (len(esiti(222)), len(esiti(111))))
+    # g) il concluso: «completato» a tutte e due
+    O9 = ordine(9)
+    ev(O9, "taken", "buyer", "invoice-next", ORA - 100)
+    ev(O9, "success", "mostro", "", ORA - 4, sats=15000, sats_buyer=14775, sats_seller=15225)
+    prova("g) lo scambio concluso vale un «completato» a tutte e due le parti",
+          ([("completato", O9, 1)], 1),
+          (esiti(111), sum(1 for x in esiti(222) if x[0] == "completato")))
+    # h) la cintura: il gesto risulta FATTO nella cronaca
+    O10 = ordine(10)
+    ev(O10, "taken", "buyer", "invoice-next", ORA - 90)
+    ev(O10, "buyer-invoice-added", "buyer", "hold-next", ORA - 80)
+    _, righe = ev(O10, "expired", "mostro", "taker-timeout", ORA - 3)
+    prova("h) se il primo gesto di chi ha preso risulta fatto, il timeout non e' il suo",
+          (3, True), (sum(1 for x in esiti(222) if x[0] == "mancato"),
+                      any("risulta fatto" in r for r in righe)))
+    # i) il retry di mostrod e chi non e' dei nostri
+    e = amb["_evento_p2p_pulito"]({"v": 1, "order": O1, "action": "expired", "ts": ORA - 10,
+                                   "actor": "mostro", "buyer": KA, "seller": KB,
+                                   "detail": "taker-timeout"}, ORA)
+    prova("i) il retry di mostrod non entra: la cronaca lo ferma prima degli esiti",
+          None, amb["_registra_evento_p2p"](con, e, ORA))
+    fatto = {"momento": "tornato", "giro": 1, "compratore": 222, "venditore": 111, "preso_dal": "buyer"}
+    amb["_segna_esiti_p2p"](con, e, fatto, ORA)
+    prova("...e anche chiamando gli esiti due volte la riga e' una", 1,
+          con.execute("SELECT COUNT(*) FROM p2p_esiti WHERE ordine=?", (O1,)).fetchone()[0])
+    O11 = ordine(11)
+    KX = "f" * 64
+    ev(O11, "taken", "buyer", "invoice-next", ORA - 50, buyer=KX)
+    _, righe = ev(O11, "expired", "mostro", "taker-timeout", ORA - 2, buyer=KX)
+    prova("...chi ha preso da un altro client non e' nessuno: non si conta, e lo si dice",
+          (3, True), (sum(1 for x in esiti(222) if x[0] == "mancato"),
+                      any("non e' dei nostri" in r for r in righe)))
+    # j) la finestra: 90 giorni il marchio, 30 il filtro
+    con.execute("INSERT INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, quando) "
+                "VALUES(333, 'vecchio-91', 1, 'mancato', 'compra', ?)", (ORA - 91 * 86400,))
+    con.execute("INSERT INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, quando) "
+                "VALUES(333, 'vecchio-45', 1, 'mancato', 'compra', ?)", (ORA - 45 * 86400,))
+    con.execute("INSERT INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, quando) "
+                "VALUES(333, 'vecchio-05', 1, 'mancato', 'compra', ?)", (ORA - 5 * 86400,))
+    con.execute("INSERT INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, quando) "
+                "VALUES(333, 'fatto-200', 1, 'completato', 'compra', ?)", (ORA - 200 * 86400,))
+    con.commit()
+    r3 = amb["_reputazione_p2p"](con, 333, ORA)
+    prova("j) la finestra: di tre mancati (91, 45 e 5 giorni fa) il marchio ne vede 2, il filtro 1; "
+          "il completato di 200 giorni fa conta", {"completati": 1, "mancati": 2, "mancati_30": 1}, r3)
+    prova("...il marchio: 0 e 1 tacciono, 2 e 7 si scrivono", [0, 0, 2, 7],
+          [amb["_marchio_mancati_p2p"](n) for n in (0, 1, 2, 7)])
+    prova("...e i marchi per i volti escono SOLO da due in su, in una mappa",
+          {222: 3, 333: 2}, amb["_marchi_mancati_p2p"](con, [111, 222, 333, 444], ORA))
+    con_nudo = sqlite3.connect(":memory:")
+    prova("...e un database senza la tabella vale «nessun marchio»", {},
+          amb["_marchi_mancati_p2p"](con_nudo, [222], ORA))
+    # k) il giudice della presa
+    g = amb["_giudice_presa_p2p"]
+    prova("k) senza filtro e senza prese aperte si prende", (True, ""), g(0, {"completati": 0, "mancati_30": 0}, 0))
+    prova("...al limite delle prese no, su OGNI ordine", (False, "prese"), g(0, {"completati": 9, "mancati_30": 0}, 2))
+    prova("...con la soglia 3 e due completati no: «filtro»", (False, "filtro"), g(3, {"completati": 2, "mancati_30": 0}, 0))
+    prova("...con tre completati e un mancato nel mese si' (il primo si tollera)",
+          (True, ""), g(3, {"completati": 3, "mancati_30": 1}, 1))
+    prova("...con due mancati nel mese no: «mancati»", (False, "mancati"), g(3, {"completati": 3, "mancati_30": 2}, 0))
+    prova("...senza filtro i mancati non fermano nessuno", (True, ""), g(0, {"completati": 0, "mancati_30": 5}, 1))
+    prova("...e i motivi sono i tre del catalogo", ("filtro", "mancati", "prese"), amb["P2P_MOTIVI_PRESA"])
+    # l) il filtro di chi pubblica: dichiarato come la zona
+    d = amb["_dichiara_filtri_p2p"]
+    prova("l) il filtro si scrive sulla riga di chi ha pubblicato, la prima resta, e solo dal catalogo",
+          [1, 0, 0, 0, 3],
+          [d(con, 111, {O1: 3}), d(con, 111, {O1: 5}), d(con, 222, {O2: 3}),
+           d(con, 111, {O2: 2, O3: "x", O4: True}),
+           con.execute("SELECT min_completati FROM p2p_ordini WHERE ordine=?", (O1,)).fetchone()[0]])
+    prova("...una soglia in forma di testo passa, un booleano no", (5, 0, 0),
+          (amb["_soglia_filtro_p2p"]("5"), amb["_soglia_filtro_p2p"](True), amb["_soglia_filtro_p2p"](4)))
+    prova("...e i filtri si leggono per id, solo quelli messi", {O1: 3},
+          amb["_filtri_p2p"](con, [O1, O2, O3]))
+    prova("...un database senza la colonna vale «nessun filtro»", {},
+          amb["_filtri_p2p"](sqlite3.connect(":memory:"), [O1]))
+    # m) le prese aperte e la risposta al telefono
+    O12, O13, O14 = ordine(12), ordine(13), ordine(14)
+    for o in (O12, O13):
+        ev(o, "taken", "buyer", "invoice-next", ORA - 30)
+        ev(o, "buyer-invoice-requested", "mostro", "", ORA - 30)
+    prova("m) due prese in attesa della fattura: due aperte", 2, amb["_prese_aperte_p2p"](con, 222, ORA))
+    r = amb["_posso_prendere_p2p"](con, 222, [O14, O1], ORA)
+    prova("...e la terza presa e' spenta su ogni ordine: «prese», coi numeri di chi chiede",
+          ({"ok": False, "motivo": "prese", "soglia": 0},
+           {"ok": False, "motivo": "prese", "soglia": 3}, 2, 2, 3),
+          (r["ordini"][O14], r["ordini"][O1], r["prese_aperte"], r["limite"], r["mancati"]))
+    ev(O12, "buyer-invoice-added", "buyer", "hold-next", ORA - 20)
+    prova("...data la fattura, ne resta una aperta", 1, amb["_prese_aperte_p2p"](con, 222, ORA))
+    prova("...e una presa di piu' di un'ora fa non si conta piu' (mostrod l'ha chiusa)",
+          0, amb["_prese_aperte_p2p"](con, 222, ORA + amb["P2P_PRESA_APERTA_S"] + 1))
+    r = amb["_posso_prendere_p2p"](con, 222, [O14, O1], ORA)
+    prova("...con una presa aperta: l'ordine vecchio senza filtro si prende, quello col filtro 3 no "
+          "(222 ha 1 completato, e 3 mancati nel mese)",
+          ({"ok": True, "motivo": "", "soglia": 0}, {"ok": False, "motivo": "filtro", "soglia": 3}, 1),
+          (r["ordini"][O14], r["ordini"][O1], r["completati"]))
+    r = amb["_posso_prendere_p2p"](con, 444, [O14, O1], ORA)
+    prova("...un utente senza storia: 0 e 0, prende gli ordini senza filtro, non quelli col filtro",
+          (0, 0, True, False), (r["completati"], r["mancati"], r["ordini"][O14]["ok"], r["ordini"][O1]["ok"]))
+    r = amb["_posso_prendere_p2p"](con, 333, [], ORA)
+    prova("...con la lista vuota tornano i soli numeri (il profilo di scambio)",
+          ({}, 1, 2, 1, 0), (r["ordini"], r["completati"], r["mancati"], r["mancati_30"], r["prese_aperte"]))
+    prova("...e una lista storta e' un ValueError, mai un 500", True,
+          bool(_alza(lambda: amb["_posso_prendere_p2p"](con, 222, ["x"], ORA))))
+    # n) i tentativi: le forme, l'estraneo, l'ordine ignoto
+    t = amb["_segna_tentativo_p2p"]
+    prova("n) un gesto fuori catalogo e una forma storta sono un ValueError", [True, True],
+          [bool(_alza(lambda: t(con, 222, O2, "ballo", "", ORA))),
+           bool(_alza(lambda: t(con, 222, "x", "fattura_inviata", "", ORA)))])
+    prova("...un ordine che il server non conosce non entra (e non cresce la tabella)",
+          {"ok": False, "motivo": "ignota"},
+          t(con, 222, "0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc99", "fattura_inviata", "", ORA))
+    prova("...e nemmeno un estraneo a un ordine di cui mostrod ha detto le parti",
+          {"ok": False, "motivo": "ignota"}, t(con, 333, O2, "fattura_inviata", "", ORA))
+    prova("...chi pubblica puo' dichiarare (la garanzia e' sua su un ordine di acquisto)",
+          {"ok": True, "motivo": ""}, t(con, 111, O2, "garanzia_copiata", "", ORA))
+    prova("...il motivo e' una parola a macchina: una frase si pulisce e si taglia",
+          "IBANIT60X0542811101000000123456abcdefghi",
+          (t(con, 222, O2, "fattura_scartata", "IBAN IT60 X054 2811 1010 0000 0123 456 abcdefghijklmnop", ORA),
+           con.execute("SELECT motivo FROM p2p_tentativi WHERE ordine=? AND gesto='fattura_scartata'",
+                       (O2,)).fetchone()[0])[1])
+    prova("...i nove gesti del catalogo", 9, len(amb["P2P_GESTI_TENTATIVO"]))
+    # o) la pulizia e la memoria lunga
+    n_prima = con.execute("SELECT COUNT(*) FROM p2p_esiti").fetchone()[0]
+    amb["_pulisci_memoria_p2p"](con, ORA + amb["P2P_LIBRO_MEMORIA_S"] + 10)
+    prova("o) la pulizia della cronaca porta via i tentativi, NON gli esiti (memoria lunga)",
+          (0, n_prima),
+          (con.execute("SELECT COUNT(*) FROM p2p_tentativi").fetchone()[0],
+           con.execute("SELECT COUNT(*) FROM p2p_esiti").fetchone()[0]))
+    amb["_pulisci_memoria_p2p"](con, ORA + amb["P2P_ESITI_MEMORIA_S"] + 10)
+    prova("...e oltre l'anno se ne vanno anche loro", 0,
+          con.execute("SELECT COUNT(*) FROM p2p_esiti").fetchone()[0])
+    # p) le stelline sono un'altra cosa
+    prova("p) le stelline NON c'entrano: la media non legge gli esiti, e gli esiti non toccano i feedback",
+          [False, False, False],
+          ["p2p_esiti" in pezzo("_ricalcola_rating"), "mancat" in pezzo("_ricalcola_rating"),
+           "feedback" in codice(_senza_prosa(pezzo("_segna_esiti_p2p")))])
+    blocco_srv = src[src.index("# ═══ LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI"):
+                     src.index("def _registra_ordini_p2p(")]
+    prova("...e in tutto il blocco nuovo del server non si scrive mai su feedback ne' su rating",
+          [], [s for s in ("INSERT INTO feedback", "UPDATE utenti", "rating") if s in codice(blocco_srv)])
+
+    # --- 2) LE SENTINELLE DEL SERVER -------------------------------------
+    rotta = src[src.index('@app.post("/api/p2p/evento")'):]
+    rotta = rotta[:rotta.index("\n\n\n")]
+    prova("la rotta degli eventi segna gli esiti DOPO la cronaca, solo su un evento nuovo, e mai un 500",
+          True, 0 < rotta.index("fatto = _registra_evento_p2p(") < rotta.index("if fatto is not None:")
+          < rotta.index("for riga in _segna_esiti_p2p(con, ev, fatto, adesso):")
+          and "except Exception as e:" in rotta[rotta.index("_segna_esiti_p2p("):rotta.index("garanzia_morta = False")])
+    for nome, fn in (("/api/p2p/tentativo", "tentativo_p2p"), ("/api/p2p/posso-prendere", "posso_prendere_p2p")):
+        r = pezzo(fn)
+        prova(f"la rotta {nome}: sessione, corpo da leggi_json, giudice puro, no-store", True,
+              f'@app.post("{nome}")' in src and "verifica_utente(x_tg_init_data, barattolo_sessione)" in r
+              and "await leggi_json(req)" in r and '"Cache-Control": "no-store"' in r
+              and "raise HTTPException(400, str(e))" in r)
+    prova("...e nessuna delle due ha il gate sulla leva (una protegge chi scrive, l'altra legge)",
+          [False, False], ["_p2p_per(" in pezzo("tentativo_p2p"), "_p2p_per(" in pezzo("posso_prendere_p2p")])
+    prova("il marchio sta nel volto del libro e nella card dell'altra parte, solo quando c'e'",
+          [True, True],
+          ['if marchi.get(int(r["autore"] or 0)):\n            volto["mancati"]' in pezzo("_facce_ordini_p2p"),
+           'if marchi.get(int(u["tg_id"])):\n            chi["mancati"]' in pezzo("_volti_persone")])
+    prova("...e sul profilo generale, accanto ai feedback: `non_completati`", True,
+          'venditore["non_completati"] = non_completati' in pezzo("negozio")
+          and "non_completati = _marchi_mancati_p2p(" in pezzo("negozio"))
+    prova("l'intestazione dichiara i filtri dalla stessa porta della zona", True,
+          '_dichiara_filtri_p2p(con, user["id"], (d or {}).get("filtri"))' in pezzo("registra_ordini_p2p"))
+    prova("i filtri escono coi volti e con la fotografia, a tutti", [True, True, 2],
+          ['"filtri": filtri' in pezzo("facce_ordini_p2p"),
+           'fuori["filtri"] = F["filtri"]' in pezzo("libro_fotografato_p2p"),
+           src.count('F["filtri"] = _filtri_foto_p2p(F["eventi"])')])
+    prova("«dimentica il profilo» toglie i tentativi e tiene gli esiti", [True, False],
+          ['DELETE FROM p2p_tentativi WHERE tg_id=?' in codice(pezzo("dimentica_chiavi_p2p")),
+           "p2p_esiti" in codice(pezzo("dimentica_chiavi_p2p"))])
+    prova("la fusione di due account porta esiti e tentativi sulla persona intera", True,
+          'for _t in ("p2p_esiti", "p2p_tentativi"):' in src)
+    prova("la colonna del filtro sta nel CREATE e nell'ALTER per i database di ieri", [True, True],
+          ["        min_completati INTEGER DEFAULT 0\n" in src, '"min_completati INTEGER DEFAULT 0"' in src])
+    patch = open("deploy/mostro/0007-events-tell-the-marketplace-server-about-every-order.patch",
+                 encoding="utf-8").read()
+    i_p = patch.index("if matches!(new_status, Status::Pending) {")
+    prova("il fork dice `taker-timeout` SOLO quando l'ordine torna in vetrina (Pending), se no maker-timeout",
+          True, i_p < patch.index('"taker-timeout"', i_p) < patch.index('"maker-timeout"', i_p) < i_p + 300)
+
+    # --- 3) IL CLIENT, in node ----------------------------------------------
+    ID, ID2 = "0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001", "0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002"
+    blocco = pezzo_js(m, "/* ---- LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI",
+                      "/* ============ fine della reputazione del P2P ============ */")
+    chiede = pezzo_js(m, "/* ============ LA REPUTAZIONE DEL P2P, LA PARTE CHE CHIEDE",
+                      "/* ============ fine della reputazione che chiede ============ */")
+    prova("il blocco che chiede sta fuori dal motore, dopo l'archivio; i giudici dentro", True,
+          m.index("/* ============ LA REPUTAZIONE DEL P2P, LA PARTE CHE CHIEDE")
+          > m.index("/* ============ fine dell'archivio del server")
+          > m.index("/* ============ fine del motore dello scambio")
+          > m.index("/* ---- LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI"))
+    prova("...il blocco dentro non ha nessuna fetch; quello fuori ne ha due, in POST",
+          [0, 2, 2], [re.sub(r"/\*[\s\S]*?\*/", "", blocco).count("fetch("),
+                      chiede.count("fetch("), chiede.count("method: 'POST'")])
+    banco = r"""
+const esc = s => String(s == null ? '' : s);
+const fmt = n => String(n);
+function haptic(){}
+let RIDISEGNI = 0;
+function renderNuovoOrdineP2P(){ RIDISEGNI++; }
+function icoNuovoP2P(){ return ''; }
+let MIE = {};
+function ordiniP2P(){ return MIE; }
+function satsDaRicevereP2P(o){ return o && o.deve ? o.deve : 0; }
+function finestraFatturaP2P(){ return 3600; }
+let DEMO = false, VETRINA = false, myTgId = 111;
+const API_BASE = '/api';
+const el = () => null;
+""" + "".join(_fn_js(m, f) for f in (
+        "function idMostroVero(id){", "function sezioneNuovoP2P(o){",
+        "function ragioneGestoP2P(e){", "function ragioneIncassoP2P(e, testo){")) \
+        + _riga_js(m, "function provvisorioP2P(id){") + _riga_js(m, "const P2P_NON_PARTITO = ") \
+        + _riga_js(m, "const P2P_INDIRIZZO_RIFIUTATO = ") + blocco + r"""
+const c = {};
+c.marchio = [0, 1, 2, 7, 'x'].map(n => marchioMancatiP2P(n, true));
+c.marchioBox = marchioMancatiP2P(2);
+c.frasi = [fraseMancatiP2P(1), fraseMancatiP2P(3)];
+c.veto = [fraseVetoP2P({ok: true}), fraseVetoP2P(null),
+  fraseVetoP2P({ok: false, motivo: 'filtro', soglia: 3}, {completati: 1}),
+  fraseVetoP2P({ok: false, motivo: 'mancati'}, {mancati_30: 2}),
+  fraseVetoP2P({ok: false, motivo: 'prese'}, {limite: 2}),
+  fraseVetoP2P({ok: false, motivo: 'boh'})];
+const ID = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001', ID2 = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002';
+c.filtri = [prendiFiltriP2P({[ID]: 3, 'nuovo:x': 5, [ID2]: 2, [ID2 + 'z']: 1}), Object.assign({}, p2pFiltri),
+            prendiFiltriP2P({[ID]: '3'}), prendiFiltriP2P('x')];
+c.segno = [segnoFiltroP2P({id: ID}), segnoFiltroP2P({id: ID2})];
+MIE = {[ID2]: {id: ID2, mio: true, filtro: 5}};
+c.mio = [filtroOrdineP2P({id: ID2}), filtroOrdineP2P({id: ID}), filtroOrdineP2P(null)];
+c.prendibili = [prendiPrendibiliP2P({ordini: {[ID]: {ok: false, motivo: 'filtro', soglia: 3}, [ID2]: 'x'},
+                                     completati: 1, mancati: 0, mancati_30: 0, prese_aperte: 0, limite: 2}, [ID, ID2]),
+                vetoPresaP2P(ID), vetoPresaP2P(ID2), prendiPrendibiliP2P(null, [ID]), prendiPrendibiliP2P({}, [])];
+c.riquadro = [rigaFiltroDettP2P(ID), avvisoVetoP2P(ID), avvisoVetoP2P(ID2)];
+p2pMiaRep = null; c.mia = [rigaMiaReputazioneP2P()];
+p2pMiaRep = {completati: 3, mancati: 1}; c.mia.push(rigaMiaReputazioneP2P());
+p2pMiaRep = {completati: 1, mancati: 2}; c.mia.push(rigaMiaReputazioneP2P());
+p2pMiaRep = null; c.mia.push(rigaMiaReputazioneP2P());
+const sez = sezioneAccessoNuovoP2P();
+c.sezione = [(sez.match(/p2p-accesso-chip/g) || []).length, (sez.match(/ on"/g) || []).length,
+             sez.indexOf('>Tutti<') >= 0, sez.indexOf('Facoltativo') >= 0];
+scegliFiltroNuovoP2P(3);
+const sez3 = sezioneAccessoNuovoP2P();
+c.sezione3 = [p2pNuovoFiltro, RIDISEGNI, (sez3.match(/ on"/g) || []).length,
+              sez3.indexOf('aria-pressed="true" data-n="3"') >= 0, sez3.indexOf('30 giorni') >= 0,
+              sez3.indexOf('3 scambi completati') >= 0];
+scegliFiltroNuovoP2P(2); c.sezioneFuori = p2pNuovoFiltro;
+c.campi = [filtroDaCampiP2P({filtro: 5}), filtroDaCampiP2P({filtro: 2}), filtroDaCampiP2P(null)];
+MIE = {[ID]: {id: ID, mio: true, filtro: 3}, [ID2]: {id: ID2, mio: false, filtro: 3}};
+c.dichiara = filtriDaDichiarareP2P([ID, ID2, 'nuovo:1']);
+const O = {id: ID, deve: 14775};
+c.rifiuto = [fraseFatturaRifiutataP2P(O), fraseFatturaRifiutataP2P({id: ID}),
+  fraseRifiutoIncassoP2P({cantDo: true, motivo: 'invalid-invoice', message: 'x'}, 'lnbc1', O),
+  fraseRifiutoIncassoP2P({cantDo: true, motivo: 'invalid-invoice', message: 'x'}, 'a@b.it', O),
+  fraseRifiutoIncassoP2P({cantDo: true, motivo: 'invalid-amount', message: 'ragione'}, 'lnbc1', O),
+  fraseRifiutoIncassoP2P(new Error('silenzio'), 'lnbc1', O),
+  fraseRifiutoIncassoP2P({cantDo: true, motivo: 'invalid-invoice', message: 'x'}, 'lnbc1', null)];
+c.pura = [ragioneIncassoP2P({cantDo: true, motivo: 'invalid-invoice', message: 'x'}, 'lnbc1xyz'),
+          ragioneIncassoP2P({cantDo: true, motivo: 'invalid-invoice', message: 'x'}, 'a@b.it') === P2P_INDIRIZZO_RIFIUTATO];
+console.log(JSON.stringify(c));
+"""
+    c = _node_banco(banco)
+    if c is None:
+        salta("il client della reputazione P2P", "node non c'e'")
+    else:
+        prova("client: il marchio tace sotto 2 e scrive da 2 in su, in riga e nel riquadro",
+              ["", "", True, True, "", True],
+              [c["marchio"][0], c["marchio"][1], "⚠️ 2 non completati" in c["marchio"][2],
+               "⚠️ 7 non completati" in c["marchio"][3], c["marchio"][4],
+               "2 scambi non completati" in c["marchioBox"] and "90 giorni" in c["marchioBox"]])
+        prova("...singolare e plurale", ["1 scambio non completato", "3 scambi non completati"], c["frasi"])
+        prova("client: le frasi del veto, dal codice del server, coi numeri di chi chiede",
+              ["", "", True, True, True, True],
+              [c["veto"][0], c["veto"][1],
+               "almeno 3 scambi completati" in c["veto"][2] and "(tu ne hai 1)" in c["veto"][2],
+               "30 giorni" in c["veto"][3] and "tu ne hai 2" in c["veto"][3],
+               "2 scambi presi" in c["veto"][4], "non si può prendere" in c["veto"][5]])
+        prova("client: i filtri del server entrano solo con id veri e soglie del catalogo",
+              [True, {ID: 3}, False, False], c["filtri"])
+        prova("...il segno sulla card c'e' solo col filtro, piccolo e con la soglia",
+              [True, ""], ['p2p-accesso' in c["segno"][0] and 'Da 3 scambi completati' in c["segno"][0], c["segno"][1]])
+        prova("...la mia riga vince sul server, il server vale per gli altri, niente e' 0",
+              [5, 3, 0], c["mio"])
+        prova("client: i verdetti del server entrano (uno storto no), e il veto si legge per id",
+              [1, True, "", 0, 0],
+              [c["prendibili"][0], "almeno 3 scambi completati" in c["prendibili"][1],
+               c["prendibili"][2], c["prendibili"][3], c["prendibili"][4]])
+        prova("...la riga del filtro nel dettaglio e il riquadro del veto", [True, True, ""],
+              ["almeno 3 scambi completati e nessuno scambio non completato" in c["riquadro"][0],
+               'id="p2pDettVeto"' in c["riquadro"][1] and "🚫" in c["riquadro"][1], c["riquadro"][2]])
+        prova("client: la riga del profilo di scambio: niente senza numeri, i completati, il marchio da 2",
+              ["", True, True, ""],
+              [c["mia"][0], "<b>3</b> scambi completati" in c["mia"][1] and "non completati" not in c["mia"][1],
+               "<b>1</b> scambio completato" in c["mia"][2] and "⚠️ 2 non completati" in c["mia"][2]
+               and "90 giorni" in c["mia"][2], c["mia"][3]])
+        prova("client: la sezione del foglio: quattro scelte, «Tutti» accesa di serie, la riga facoltativa",
+              [4, 1, True, True], c["sezione"])
+        prova("...scelto 3+: una sola accesa, il foglio si ridisegna, la riga dice la regola intera",
+              [3, 1, 1, True, True, True], c["sezione3"])
+        prova("...una soglia fuori catalogo torna a «tutti»", 0, c["sezioneFuori"])
+        prova("...il filtro parte dai campi solo dal catalogo", [5, 0, 0], c["campi"])
+        prova("...e all'intestazione si dichiarano i filtri dei SOLI miei ordini", {ID: 3}, c["dichiara"])
+        prova("client: la frase del rifiuto dice l'importo esatto, i minuti, cosa fare e che il tentativo e' registrato",
+              True, "14775 sats" in c["rifiuto"][0] and "60 minuti" in c["rifiuto"][0]
+              and "Rifalla dal wallet" in c["rifiuto"][0] and "registrato" in c["rifiuto"][0]
+              and "coordinatore" not in c["rifiuto"][0].lower())
+        prova("...senza la cifra nota dice «quello dovuto»", True, "quello dovuto" in c["rifiuto"][1])
+        prova("...il giudice del rifiuto: la frase sulla fattura, niente sull'indirizzo, la ragione piu' il "
+              "tentativo su un altro no, niente senza un no del coordinatore, niente senza l'ordine",
+              [True, "", True, "", ""],
+              [c["rifiuto"][2] == c["rifiuto"][0], c["rifiuto"][3],
+               c["rifiuto"][4].startswith("ragione") and "registrato" in c["rifiuto"][4],
+               c["rifiuto"][5], c["rifiuto"][6]])
+        prova("...e ragioneIncassoP2P resta pura e com'era", ["x", True], c["pura"])
+
+    # --- 4) LE SENTINELLE DEL CLIENT ----------------------------------------
+    def fn(firma):
+        return pezzo_js(m, firma, "\n}\n") + "\n}"
+    es = re.sub(r"/\*[\s\S]*?\*/", "", fn("async function eseguiPresaP2P(id, scelto, metodo){"))
+    prova("la cintura della presa chiede al server PRIMA di bruciare una chiave e di scrivere al coordinatore",
+          True, 0 < es.index("const veto = await vetoPresaServerP2P(id);")
+          < es.index("await assicuraMazzo();") < es.index("messaggioMostro(ord.lato === 'compro' ? 'take-sell' : 'take-buy'"))
+    prova("...e un «no» ferma, lo dice e ridisegna il dettaglio", True,
+          "if (veto) { toast('🚫 ' + veto, 7000); if (p2pDettOrdine === id) renderDettaglioP2P(); return; }" in es)
+    chiede_fn = fn("async function vetoPresaServerP2P(id){")
+    prova("...senza risposta del server si va avanti (il telefono non giudica)", True,
+          "if (!d) return '';" in chiede_fn and "catch(e) { return ''; }" in chiede_fn)
+    dett = fn("function renderDettaglioP2P(){")
+    prova("il dettaglio: il bottone e' spento col veto, il riquadro sta sopra i bottoni, la riga del filtro sotto chi ha pubblicato",
+          [True, True, True],
+          ["((typeof vetoPresaP2P === 'function' && vetoPresaP2P(o.id)) ? ' disabled' : '')" in dett,
+           dett.index("avvisoVetoP2P(o.id)") < dett.index("'<div class=\"foglio-piede sola\" id=\"p2pDettTuoPiede\">'"),
+           dett.index("repRiquadroP2P(p2pFacce[o.id], o.id) +") < dett.index("rigaFiltroDettP2P(o.id)") < dett.index("anelloneP2P(o) +")])
+    prova("...e l'apertura chiede al server, ridisegnando solo se e' ancora quell'ordine", True,
+          "chiediPossoPrendereP2P([id]).then(n => {\n      if (n && p2pDettOrdine === id" in fn("function apriDettaglioP2P(id){"))
+    prova("i tentativi dichiarati: la garanzia aperta, la cauzione aperta, la copia (nei due modi), il wallet",
+          [True, True, True, 1],
+          ["segnaTentativoP2P(id, 'garanzia_aperta')" in fn("async function apriHoldP2P(){"),
+           "segnaTentativoP2P(id, 'cauzione_aperta')" in fn("async function apriCauzioneP2P(){"),
+           "p2pHoldModo === 'cauzione' ? 'cauzione_copiata' : 'garanzia_copiata'" in fn("function copiaHoldP2P(){"),
+           m.count("pw.onclick = tentativoWalletP2P;")])
+    inc = re.sub(r"/\*[\s\S]*?\*/", "", fn("async function inviaIncassoP2P(){"))
+    prova("...la fattura: inviata PRIMA della chiamata, scartata nei tre casi, rifiutata nel catch",
+          [True, 3, True],
+          [inc.index("segnaTentativoP2P(o.id, 'fattura_inviata');") < inc.index("await chiamataOrdineP2P(o, 'add-invoice'"),
+           inc.count("'fattura_scartata'"),
+           inc.index("segnaTentativoP2P(o.id, 'fattura_rifiutata', e.motivo);") < inc.index("const perche = ragioneIncassoP2P(e, testo);")])
+    wal = re.sub(r"/\*[\s\S]*?\*/", "", fn("async function fatturaDalWalletP2P(id){"))
+    prova("...e dal wallet lo stesso: inviata prima, rifiutata nel catch con la frase chiara",
+          [True, True],
+          [wal.index("segnaTentativoP2P(o.id, 'fattura_inviata');") < wal.index("await chiamataOrdineP2P(o, 'add-invoice'"),
+           "segnaTentativoP2P(o.id, 'fattura_rifiutata', e.motivo);" in wal and "fraseRifiutoIncassoP2P(e, 'ln', o)" in wal])
+    prova("...e il foglio della garanzia dice cosa fare se il wallet non paga", True,
+          "Se il pagamento dal wallet non va a buon fine, riprova da qui: il tentativo è registrato" in fn("function renderHoldP2P(){"))
+    prova("l'intestazione manda i filtri con zone e cambi", True,
+          "filtri: filtri," in fn("async function registraOrdiniP2P(ids, pubblicati, presi){"))
+    prova("i filtri arrivano dalle tre letture, come le zone", 3, m.count("prendiFiltriP2P(d && d.filtri)"))
+    prova("dove si vede il marchio: il riquadro di chi ha pubblicato, la card dell'altra parte, il negozio, il mio profilo",
+          [True, True, True, True],
+          ["marchioMancatiP2P(f.mancati)" in fn("function repRiquadroP2P(f, id){"),
+           "marchioMancatiP2P(c.mancati, true)" in fn("function cardParte(c, chi, opz){"),
+           "marchioMancatiP2P(v.non_completati, true)" in fn("function renderNegozio(v, annunci, feedback=[], esauriti=[]){"),
+           "rigaMiaReputazioneP2P()" in fn("function renderProfiloP2P(){")])
+    prova("il foglio «Pubblica»: lo stato riparte da «tutti», i campi portano il filtro, la riga lo tiene",
+          [True, True, True],
+          ["p2pNuovoFiltro = 0;" in fn("function apriNuovoOrdineP2P(metodo){"),
+           "filtro: typeof p2pNuovoFiltro === 'number' ? p2pNuovoFiltro : 0," in fn("function campiNuovoP2P(){"),
+           "if (filtroOrd) ord.filtro = filtroOrd;" in fn("async function inviaNuovoOrdineP2P(confermato){")])
+    prova("le stelline del client sono intatte: nessuna parola del marchio nelle loro funzioni",
+          [False, False],
+          ["mancat" in fn("function stellineP2P(f){"), "mancat" in fn("function stellaP2P(media){")])
+    prova("...e il CSS del marchio e' arancio, il veto ha il suo riquadro, le scelte sono pillole",
+          [True, True, True],
+          [".p2p-mancati{color:var(--orange);" in m, ".p2p-veto{" in m, ".p2p-accesso-chip.on{" in m])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -136647,6 +137214,7 @@ def main():
               prove_prendi_metodo,
               prove_contanti_zona,
               prove_banner_ingresso, prove_tour_banner_p2p,
+              prove_reputazione_p2p,
               prove_x_risonanza,
               prove_config_esempio):
         try:

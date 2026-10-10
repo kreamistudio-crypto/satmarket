@@ -3588,6 +3588,20 @@
   .p2p-paga .p2p-contanti{display:inline-block;background:var(--trust-soft);
     color:var(--trust-text);font-weight:800;padding:1px 8px;border-radius:999px}
   .p2p-zona{color:var(--ink-soft);font-weight:700;overflow-wrap:anywhere}
+  /* LA REPUTAZIONE DEL P2P (10 ott 2026): il marchio «⚠️ N non
+     completati» (arancio, in riga o nel suo riquadro), il segno piccolo
+     del filtro sulla card, il veto sopra i bottoni del dettaglio e le
+     quattro scelte del foglio «Pubblica» */
+  .p2p-mancati{color:var(--orange);font-weight:800;white-space:nowrap}
+  .p2p-mancati-box{margin-top:8px;color:var(--ink-soft)}
+  .p2p-accesso{color:var(--ink-soft);font-weight:700;font-size:11.5px;padding:5px 8px}
+  .p2p-veto{background:rgba(255,138,0,.12);color:var(--ink);font-weight:700;
+    font-size:13px;line-height:1.4;margin-bottom:10px}
+  .p2p-accesso-scelte{display:flex;flex-wrap:wrap;gap:8px}
+  .p2p-accesso-chip{font:inherit;font-weight:800;font-size:13px;padding:8px 12px;
+    border-radius:999px;border:2px solid var(--chip-bg);background:var(--chip-bg);
+    color:var(--ink);cursor:pointer;min-height:36px}
+  .p2p-accesso-chip.on{border-color:var(--trust);background:var(--card);color:var(--trust)}
   .p2p-dett-zona{margin-top:8px;font-size:14px;font-weight:700;
     color:var(--ink-soft);overflow-wrap:anywhere}
   /* CHI C'E' DALL'ALTRA PARTE, nella sua scatola: il filo che la
@@ -21127,9 +21141,14 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
   const fiducia = sfilzaDistintivi(v.distintivi, 0, true);
   /* Le stelle compaiono solo quando c'e' un rating vero: "0 ★" in
      vetrina farebbe solo danno a un venditore appena arrivato */
+  /* IL MARCHIO «⚠️ N NON COMPLETATI» ANCHE QUI (10 ott 2026,
+     reputazione-p2p: «vale ovunque»), accanto ai feedback — il server
+     manda `non_completati` gia' passato dalla tolleranza, e la frase e'
+     di `marchioMancatiP2P`, la stessa del P2P */
+  const marchio = typeof marchioMancatiP2P === 'function' ? marchioMancatiP2P(v.non_completati, true) : '';
   const rep = (v.rating>0
     ? `<span class="stars">${'★'.repeat(Math.round(v.rating))}</span> ${v.rating}${contaFeedback(v.n_feedback, v.n_recensori)} · ` : '')
-    + `${v.vendite_ok||0} vendite concluse`;
+    + `${v.vendite_ok||0} vendite concluse` + (marchio ? ' · ' + marchio : '');
   /* Il PONTE verso il venditore, come nel dettaglio annuncio:
      Telegram se c'e' lo username pubblico, Nostr SOLO con la npub
      verificata (possesso dimostrato — e' anche cio' che accende il
@@ -50496,6 +50515,7 @@ function rigaOrdineP2P(o){
     ${badge ? `<div class="p2p-badge-riga">${badge}${affarone}</div>` : ''}
     ${paga}
     ${zona}
+    ${typeof segnoFiltroP2P === 'function' ? segnoFiltroP2P(o) : ''}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
   </div>`;
@@ -52409,6 +52429,12 @@ async function apriProfiloP2P(){
   /* si apre SUBITO e poi rilegge: il patto del rientro istantaneo della
      cassa — mai un'attesa davanti a un foglio già disegnabile */
   sincronizzaMazzo().then(renderProfiloP2P);
+  /* ...e i miei numeri — completati e non completati — dal server (10
+     ott 2026, reputazione-p2p), ridisegnando solo se il foglio e' aperto */
+  if (typeof chiediMiaReputazioneP2P === 'function')
+    chiediMiaReputazioneP2P().then(ok => {
+      if (ok && el('p2pProfiloSheet')?.classList.contains('open')) renderProfiloP2P();
+    }).catch(() => {});
 }
 /* LA STRADA SOVRANA E' USCITA DAL FOGLIO (set 2026, fase 6): il gesto
    «usa la tua chiave Nostr» non si offre piu' — resta nel patto come
@@ -52471,9 +52497,12 @@ function renderProfiloP2P(){
     /* L'AVVISO RESTA, IL RIMEDIO NO (fase 6): l'import e' uscito col
        foglio grande, ma dire il fatto — «una l'hai gia' creata
        altrove» — costa una riga e toglie una sorpresa a chi guarda. */
-    box.innerHTML = altrove
+    box.innerHTML = (altrove
       ? `<div class="trust-note"><span>⚠️</span><span>Su questo dispositivo il profilo di scambio non c'è, ma il tuo account ne ha già uno${quando}: l'hai creato altrove. Se ne nasce un altro qui, gli scambi e le recensioni restano attaccati a quello di prima.</span></div>`
-      : `<div class="hint">Non hai ancora un profilo di scambio: nasce da solo al primo scambio, legato al tuo account, e le recensioni che guadagni restano attaccate a lui.</div>`;
+      : `<div class="hint">Non hai ancora un profilo di scambio: nasce da solo al primo scambio, legato al tuo account, e le recensioni che guadagni restano attaccate a lui.</div>`)
+      /* i miei numeri sono dell'ACCOUNT (10 ott 2026, reputazione-p2p):
+         si leggono anche sul dispositivo dove il mazzo non c'e' */
+      + (typeof rigaMiaReputazioneP2P === 'function' ? rigaMiaReputazioneP2P() : '');
     return;
   }
   /* IL GIUDIZIO SI FA ANCHE DA QUI: al foglio ci si arriva da «I tuoi
@@ -52511,6 +52540,7 @@ function renderProfiloP2P(){
     ? '✓ Hai salvato il codice segreto.'
     : 'Il codice segreto è la tua copia: con lui il profilo torna su qualunque dispositivo, e le recensioni con lui. <b>Se lo perdi, la reputazione riparte da zero.</b> Gli scambi aperti restano qui.';
   box.innerHTML = `<div class="hint">Profilo attivo dal <b>${esc(dal)}</b>. ${dove}</div>
+    ${typeof rigaMiaReputazioneP2P === 'function' ? rigaMiaReputazioneP2P() : ''}
     <div class="hint">${debito}</div>
     ${dueProfili}
     <form id="p2pCodiceForm" onsubmit="codiceP2PSalvato(); return false;" style="display:${p2pCodiceVisibile ? '' : 'none'}">
@@ -56595,6 +56625,9 @@ function repRiquadroP2P(f, id){
       + '<div class="p2p-rep-col volto"><span class="volto-cornice">' + volto
       + bollinoVolto(id ? 'p2p:' + id : '') + '</span></div>'
       + '</div>'
+      /* il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p):
+         sotto le tre colonne, solo da due in su — lo dice il server */
+      + (typeof marchioMancatiP2P === 'function' ? marchioMancatiP2P(f.mancati) : '')
   });
 }
 /* La porta dal dettaglio al negozio: il gemello di `apriNegozioP2P`
@@ -57265,6 +57298,13 @@ function apriDettaglioP2P(id){
   renderDettaglioP2P();
   el('sheetBg').classList.add('open');
   el('p2pDettSheet').classList.add('open');
+  /* «posso prenderlo?» al server (10 ott 2026, reputazione-p2p): il
+     foglio si apre subito e si ridisegna quando la risposta arriva, se
+     e' ancora questo l'ordine aperto */
+  if (typeof chiediPossoPrendereP2P === 'function')
+    chiediPossoPrendereP2P([id]).then(n => {
+      if (n && p2pDettOrdine === id && el('p2pDettSheet').classList.contains('open')) renderDettaglioP2P();
+    }).catch(() => {});
 }
 /* IL DETTAGLIO RIAPERTO DALLA CRONOLOGIA (6 ott 2026): l'indietro dal
    negozio di chi ha pubblicato. Se in memoria c'e' ancora lui, si riapre
@@ -57355,6 +57395,8 @@ function renderDettaglioP2P(){
     /* la cauzione di chi prende, PRIMA di premere (1 ott 2026) */
     (tuo ? '' : rigaCauzioneDettP2P(o, p2pInfo, cauzioneAccesaP2P())) +
     repRiquadroP2P(p2pFacce[o.id], o.id) +
+    /* il filtro di chi ha pubblicato, a chi guarda (10 ott 2026) */
+    (tuo || typeof rigaFiltroDettP2P !== 'function' ? '' : rigaFiltroDettP2P(o.id)) +
     anelloneP2P(o) +
     (tuo ? '' : avvisoPresaTabacchinoP2P(o)) +
     /* IL CONTO SCORPORATO sotto l'anello: il calco del foglio «Paga»
@@ -57404,6 +57446,9 @@ function renderDettaglioP2P(){
     (myTgId < 0 && !myRiconosciP2P
       ? '<div class="hint">🕶️ Tu resti anonimo: sei entrato con un profilo senza nome, e chi ha pubblicato non saprà chi sei. Il suo profilo invece lo vedi qui sopra. Se vuoi farti riconoscere — e potervi recensire — c\'è l\'interruttore nel cassetto «🔔 Avvisi».</div>'
       : '') +
+    /* IL «NO» DEL SERVER, sopra i bottoni (10 ott 2026, reputazione-p2p):
+       il filtro di chi ha pubblicato o il limite delle prese, con la frase */
+    (tuo || typeof avvisoVetoP2P !== 'function' ? '' : avvisoVetoP2P(o.id)) +
     (tuo
       ? '<div class="foglio-piede sola" id="p2pDettTuoPiede">' +
           '<button type="button" class="btn ghost" onclick="navIndietro()">Indietro</button>' +
@@ -57420,6 +57465,9 @@ function renderDettaglioP2P(){
       '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>' +
       '<button type="button" class="btn ' + (daScegliere ? 'orange' : compro ? 'primary' : 'rosso')
         + '" id="p2pDettVai"' +
+        /* spento quando il server ha detto di no (10 ott 2026): la frase
+           sta nel riquadro qui sopra, e la cintura vera in `eseguiPresaP2P` */
+        ((typeof vetoPresaP2P === 'function' && vetoPresaP2P(o.id)) ? ' disabled' : '') +
         /* IL VERDE E IL ROSSO DEI DUE LATI (7 ott 2026, decisione di
            Andrea): «Compra» verde e «Vendi» rosso, gli stessi vestiti dei
            due «Pubblica ordine» (`vestitoInvioP2P`: `primary` e `rosso`) —
@@ -57658,6 +57706,14 @@ async function eseguiPresaP2P(id, scelto, metodo){
   if (ordineTuoP2P(id)) { toast('È il tuo ordine: non puoi prenderlo'); return; }
   const riga = ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id);
   if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
+  /* IL SERVER DICE SE POSSO (10 ott 2026, reputazione-p2p): il filtro di
+     chi ha pubblicato e il limite delle prese si richiedono ADESSO, prima
+     di bruciare una chiave e scrivere al coordinatore; un «no» ferma qui
+     e lo dice. Senza risposta si va avanti (il telefono non giudica). */
+  if (typeof vetoPresaServerP2P === 'function') {
+    const veto = await vetoPresaServerP2P(id);
+    if (veto) { toast('🚫 ' + veto, 7000); if (p2pDettOrdine === id) renderDettaglioP2P(); return; }
+  }
   const adesso = Math.floor(Date.now() / 1000);
   /* L'IMPORTO SCELTO SI RICORDA, e non e' un doppione di `euro`: la
      riga locale porta la cifra (quella si vede), questo porta il
@@ -58677,6 +58733,9 @@ async function apriHoldP2P(){
   haptic();
   p2pHoldOrdine = id;
   p2pHoldModo = 'hold';
+  /* «ci sto provando» (10 ott 2026, reputazione-p2p): aprire la
+     richiesta e' il primo gesto che il server puo' vedere */
+  if (typeof segnaTentativoP2P === 'function') segnaTentativoP2P(id, 'garanzia_aperta');
   /* il gesto comincia qui: a garanzia bloccata si torna (1 ott 2026) */
   if (typeof p2pPagamentoAperto !== 'undefined') p2pPagamentoAperto = id;
   renderHoldP2P();
@@ -58699,6 +58758,7 @@ async function apriCauzioneP2P(){
   haptic();
   p2pHoldOrdine = id;
   p2pHoldModo = 'cauzione';
+  if (typeof segnaTentativoP2P === 'function') segnaTentativoP2P(id, 'cauzione_aperta');
   if (typeof p2pPagamentoAperto !== 'undefined') p2pPagamentoAperto = id;
   renderHoldP2P();
   el('sheetBg').classList.add('open');
@@ -58757,7 +58817,10 @@ function renderHoldP2P(){
       '<span id="p2pHoldScade"></span>' +
       '<a class="btn mini" id="p2pHoldWallet" href="#">⚡ Apri nel wallet</a></div>' +
     '<button class="btn ghost" onclick="copiaHoldP2P()">📋 Copia la richiesta</button>' +
-    '<div class="hint">Quando i sats sono in garanzia questo foglio si chiude da solo: non c\'è niente da confermare.</div>';
+    '<div class="hint">Quando i sats sono in garanzia questo foglio si chiude da solo: non c\'è niente da confermare.' +
+      /* cosa fare se il wallet non paga (10 ott 2026, reputazione-p2p):
+         il server vede che hai provato, non il pagamento fallito */
+      ' Se il pagamento dal wallet non va a buon fine, riprova da qui: il tentativo è registrato e non conta come scambio non completato.</div>';
   el('p2pHoldInvoice').textContent = o.hold.bolt11;
   orologioHoldP2P(o);
 }
@@ -58801,6 +58864,11 @@ function orologioHoldP2P(o){
   const r = richiestaFoglioP2P(o);
   p2pHoldScadeIl = scadenzaFoglioP2P(o, p2pHoldModo);
   portaWallet(el('p2pHoldWallet'), r ? r.bolt11 : '');
+  /* il tocco su «Apri nel wallet» e' un tentativo (10 ott 2026,
+     reputazione-p2p): si aggancia qui, dove la porta si veste, e il
+     markup della riga resta quello del mercatino */
+  const pw = el('p2pHoldWallet');
+  if (pw && typeof tentativoWalletP2P === 'function') pw.onclick = tentativoWalletP2P;
   if (p2pHoldOrologio) { clearInterval(p2pHoldOrologio); p2pHoldOrologio = null; }
   /* una richiesta gia' morta all'apertura non accende nessun battito */
   if (!battitoHoldP2P()) return;
@@ -58889,6 +58957,9 @@ function copiaHoldP2P(){
   const r = richiestaFoglioP2P(ordiniP2P()[p2pHoldOrdine]);
   if (!r) return;
   copiaLink(r.bolt11, 'Richiesta di pagamento copiata 📋');
+  /* copiarla e' un tentativo (10 ott 2026, reputazione-p2p) */
+  if (typeof segnaTentativoP2P === 'function')
+    segnaTentativoP2P(p2pHoldOrdine, p2pHoldModo === 'cauzione' ? 'cauzione_copiata' : 'garanzia_copiata');
 }
 /* ---- INCASSARE LA META' DELLA CAUZIONE (1 ott 2026) ----
    Col wallet collegato la fattura la fa lui (la stessa strada di
@@ -59045,6 +59116,7 @@ async function fatturaDalWalletP2P(id){
       throw new Error('ha fatto una fattura che scade troppo presto');
     const cortaW = b.scade < adessoW + vitaMinimaFatturaP2P(o);
     if (p2pIncassoOrdine !== id) return false;   /* il foglio e' gia' passato ad altro */
+    if (typeof segnaTentativoP2P === 'function') segnaTentativoP2P(o.id, 'fattura_inviata');
     await chiamataOrdineP2P(o, 'add-invoice', {payment_request: [null, bolt, null]});
     ricordaFatturaP2P(id, b.scade);
     chiudiFoglioP2P('p2pIncassoSheet');
@@ -59055,6 +59127,15 @@ async function fatturaDalWalletP2P(id){
     else if (!torna) toast('⚡ Fattura fatta dal wallet e inviata ✅');
     return true;
   } catch(e){
+    /* il «no» del COORDINATORE sulla fattura del wallet non e' un guasto
+       del wallet (10 ott 2026, reputazione-p2p): si registra e si dice
+       cosa e' andato storto, come per quella incollata */
+    if (e && e.cantDo) {
+      if (typeof segnaTentativoP2P === 'function') segnaTentativoP2P(o.id, 'fattura_rifiutata', e.motivo);
+      dillo((typeof fraseRifiutoIncassoP2P === 'function' && fraseRifiutoIncassoP2P(e, 'ln', o))
+            || ragioneIncassoP2P(e, 'ln'));
+      return false;
+    }
     dillo('Il wallet non ha dato la fattura (' + ((e && e.message) || 'errore') + '). Puoi incollarne una qui, o dare il tuo indirizzo Lightning.');
     return false;
   } finally { if (cliente) cliente.chiudi(); }
@@ -59402,7 +59483,11 @@ async function inviaIncassoP2P(){
   let corta = false;   /* piu' corta del consiglio: parte, e lo si dice */
   if (bolt) {
     const b = leggiBolt11(testo);
-    if (!b) { dillo('Questa richiesta di pagamento non si legge: controlla di averla copiata tutta.'); return; }
+    if (!b) {
+      if (typeof segnaTentativoP2P === 'function') segnaTentativoP2P(o.id, 'fattura_scartata', 'illeggibile');
+      dillo('Questa richiesta di pagamento non si legge: controlla di averla copiata tutta.');
+      return;
+    }
     const q = b.sats;
     /* la cifra che il coordinatore pretende, non quella dell'ordine:
        vedi l'avviso su `satsDaRicevereP2P`. A cifra ignota non si
@@ -59410,6 +59495,7 @@ async function inviaIncassoP2P(){
        ragione che un «no» nostro su un numero inventato. */
     const deve = satsDaRicevereP2P(o);
     if (q > 0 && deve > 0 && q !== deve) {
+      if (typeof segnaTentativoP2P === 'function') segnaTentativoP2P(o.id, 'fattura_scartata', 'importo');
       dillo('La richiesta è di ' + fmt(q) + ' sats, ma ne devi ricevere ' + fmt(deve) + '. Rifalla dell\'importo esatto, oppure lascia l\'importo libero.');
       return;
     }
@@ -59421,6 +59507,7 @@ async function inviaIncassoP2P(){
     const adesso = Math.floor(Date.now() / 1000);
     if (b.scade < adesso + finestra) {
       const resta = Math.floor((b.scade - adesso) / 60);
+      if (typeof segnaTentativoP2P === 'function') segnaTentativoP2P(o.id, 'fattura_scartata', 'scadenza');
       /* «QUELLE DA UN'ORA ESATTA» SI DICE SOLO SE E' VERO (24 set 2026):
          la finestra la decide il nodo, e con una piu' corta di un'ora
          quella frase sarebbe falsa */
@@ -59448,6 +59535,8 @@ async function inviaIncassoP2P(){
     /* l'indirizzo Lightning si manda COSI' COM'E': lo risolve il
        coordinatore, che quel giro di rete lo sa gia' fare — e cosi'
        nessun wallet di terzi deve rispondere al nostro browser */
+    /* la fattura che parte e' un tentativo, comunque vada (10 ott 2026) */
+    if (typeof segnaTentativoP2P === 'function') segnaTentativoP2P(o.id, 'fattura_inviata');
     await chiamataOrdineP2P(o, 'add-invoice', {payment_request: [null, testo, null]});
     ricordaFatturaP2P(o.id, scadeData);
     chiudiFoglioP2P('p2pIncassoSheet');
@@ -59468,8 +59557,14 @@ async function inviaIncassoP2P(){
         dopoGestoRilettoP2P(o.id, fatturaPassataP2P).catch(() => {});
       return;
     }
+    /* il rifiuto del coordinatore si registra (10 ott 2026,
+       reputazione-p2p): «chi ci ha provato non si penalizza» */
+    if (e && e.cantDo && typeof segnaTentativoP2P === 'function')
+      segnaTentativoP2P(o.id, 'fattura_rifiutata', e.motivo);
     const perche = ragioneIncassoP2P(e, testo);
-    dillo(perche);
+    /* ...e sul «no» del coordinatore la frase coi numeri e cosa fare
+       (10 ott 2026): `fraseRifiutoIncassoP2P` tace dove non e' un suo no */
+    dillo((typeof fraseRifiutoIncassoP2P === 'function' && fraseRifiutoIncassoP2P(e, testo, o)) || perche);
     /* la risposta in ritardo (25 set 2026, caso A): la fattura puo'
        essere GIA' stata accettata — si chiede a chi lo sa, e se lo
        scambio e' andato avanti il foglio si chiude da solo */
@@ -60161,6 +60256,211 @@ const P2P_CONTANTI = 'Contanti';
 function contantiAManoP2P(metodi){
   return (metodi || []).some(m => String(m || '').trim() === P2P_CONTANTI);
 }
+/* ---- LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, IL FILTRO DI
+   CHI PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, cantiere
+   reputazione-p2p, richiesta di Andrea) ----
+   Nato da un caso del giorno del lancio: chi aveva preso un ordine non
+   ha bloccato la garanzia in tempo, e lo scambio si e' annullato. I
+   FATTI STANNO SUL SERVER (`p2p_esiti`, dagli eventi di mostrod) e i
+   giudizi pure (`/api/p2p/posso-prendere`): qui si MOSTRA, si CHIEDE e
+   si DICHIARA — quattro cose:
+   • IL MARCHIO «⚠️ N non completati»: il server lo manda accanto ai
+     volti (`mancati`, solo da due in su: il primo si tollera) e questo
+     blocco lo scrive dove si vede l'altra persona — il riquadro «Chi ha
+     pubblicato quest'ordine», la card dell'altra parte nella pagina
+     dello scambio (`cardParte`), il negozio (`non_completati`) — e nel
+     proprio profilo di scambio. `marchioMancatiP2P` e' l'unico che
+     scrive la frase, e la scrive solo da P2P_MANCATI_DA.
+   • IL FILTRO DI CHI PUBBLICA: nel foglio «Pubblica» la sezione «Chi
+     può prendere l'ordine» (tutti, o 1+/3+/5+ scambi completati);
+     parte con l'intestazione come la zona (`filtriDaDichiarareP2P`),
+     torna accanto ai volti e con la fotografia (`p2pFiltri`), e la card
+     mostra un segno piccolo (`segnoFiltroP2P`).
+   • «COMPRA/VENDI» SPENTO CON LA SPIEGAZIONE: il dettaglio chiede al
+     server (`chiediPossoPrendereP2P`) e la presa lo richiede PRIMA di
+     scrivere al coordinatore (`vetoPresaServerP2P`, la cintura in
+     `eseguiPresaP2P`). Il telefono non giudica mai da solo: senza una
+     risposta del server il bottone resta acceso, e il server lo ferma.
+   • I TENTATIVI: «chi ci ha provato non si penalizza». Il telefono
+     dichiara i gesti (`segnaTentativoP2P`) — la richiesta della
+     garanzia aperta, copiata, «Apri nel wallet»; la fattura mandata
+     (poi accettata o rifiutata), o incollata e scartata qui — e su un
+     rifiuto del coordinatore dice cosa e' andato storto e cosa fare
+     (`fraseFatturaRifiutataP2P`). Un pagamento che fallisce DENTRO il
+     wallet non lo vede nessuno: vale il gesto che l'ha preceduto.
+   LE STELLINE NON SI TOCCANO: `stellineP2P`, `stellaP2P` e la media del
+   mercatino restano come sono; il contatore e' una cosa a parte, accanto.
+   I GANCI NEI PEZZI VECCHI PASSANO DA UN `typeof`, come la zona. */
+const P2P_MANCATI_DA = 2;             // la scritta parte dal secondo (il server tollera il primo)
+const P2P_FILTRO_SOGLIE = [1, 3, 5];   // «almeno N scambi completati», le tre scelte
+let p2pFiltri = {};                   // ordine -> soglia, come la dice il server
+let p2pPrendibili = {};               // ordine -> {ok, motivo, soglia}, dal server
+let p2pMiaRep = null;                 // {completati, mancati, mancati_30, prese_aperte, limite}
+let p2pNuovoFiltro = 0;               // la scelta nel foglio «Pubblica»: 0 = tutti
+/* PURA: la frase del marchio, o '' sotto la soglia. `inRiga` = la
+   versione corta per una riga di reputazione («⚠️ 2 non completati»),
+   altrimenti il riquadro con la finestra. */
+function fraseMancatiP2P(n){
+  return n + (n === 1 ? ' scambio non completato' : ' scambi non completati');
+}
+function marchioMancatiP2P(n, inRiga){
+  n = Math.floor(Number(n) || 0);
+  if (!(n >= P2P_MANCATI_DA)) return '';
+  if (inRiga) return '<span class="p2p-mancati">⚠️ ' + n + ' non completati</span>';
+  return '<div class="p2p-box p2p-mancati-box"><span class="p2p-mancati">⚠️ ' + fraseMancatiP2P(n)
+    + '</span> negli ultimi 90 giorni</div>';
+}
+/* PURA: una soglia del catalogo, o 0 */
+function sogliaFiltroP2P(v){
+  const n = Math.floor(Number(v) || 0);
+  return P2P_FILTRO_SOGLIE.indexOf(n) >= 0 ? n : 0;
+}
+/* prende la mappa del server — solo id veri e soglie del catalogo —;
+   vero se ne e' entrata almeno una nuova (il calco di `prendiZoneP2P`) */
+function prendiFiltriP2P(m){
+  if (!m || typeof m !== 'object') return false;
+  let nuovi = false;
+  for (const id of Object.keys(m)) {
+    const s = idMostroVero(id) ? sogliaFiltroP2P(m[id]) : 0;
+    if (!s) continue;
+    if (p2pFiltri[id] !== s) { p2pFiltri[id] = s; nuovi = true; }
+  }
+  return nuovi;
+}
+/* il filtro di UN ordine, per chi lo guarda: dalla mia riga se l'ho
+   pubblicato io (appena pubblicato, prima che il server lo ridica), se
+   no da quel che ha detto il server */
+function filtroOrdineP2P(o){
+  if (!o || !o.id) return 0;
+  const mia = typeof ordiniP2P === 'function' ? ordiniP2P()[o.id] : null;
+  return sogliaFiltroP2P((mia && mia.mio && mia.filtro) || p2pFiltri[o.id]
+                         || (p2pPrendibili[o.id] || {}).soglia || 0);
+}
+/* il segno piccolo sulla card del libro: «🛡️ Da 3 scambi completati» */
+function segnoFiltroP2P(o){
+  const s = filtroOrdineP2P(o);
+  return s ? '<div class="p2p-box p2p-accesso" title="Chi ha pubblicato accetta solo chi ha almeno '
+    + s + ' scambi completati">🛡️ Da ' + s + ' scambi completati</div>' : '';
+}
+/* la riga nel dettaglio, sotto il riquadro di chi ha pubblicato */
+function rigaFiltroDettP2P(id){
+  const s = filtroOrdineP2P({id: id});
+  return s ? '<div class="p2p-box p2p-accesso">🛡️ Chi ha pubblicato accetta solo chi ha almeno '
+    + s + ' scambi completati e nessuno scambio non completato negli ultimi 30 giorni</div>' : '';
+}
+/* PURA: la frase del «no» del server, dal suo codice. `rep` sono i
+   numeri di chi chiede, se li ha gia' detti. */
+function fraseVetoP2P(v, rep){
+  if (!v || v.ok) return '';
+  const r = rep || {};
+  if (v.motivo === 'filtro')
+    return 'Chi ha pubblicato quest\'ordine accetta solo chi ha almeno ' + (v.soglia || 1)
+      + ' scambi completati' + (r.completati !== undefined ? ' (tu ne hai ' + r.completati + ')' : '') + '.';
+  if (v.motivo === 'mancati')
+    return 'Quest\'ordine accetta solo chi non ha scambi non completati negli ultimi 30 giorni'
+      + (r.mancati_30 !== undefined ? ': tu ne hai ' + r.mancati_30 : '') + '.';
+  if (v.motivo === 'prese')
+    return 'Hai già ' + (r.limite || 2) + ' scambi presi in attesa del tuo primo gesto: '
+      + 'finiscili (o lascia che scadano) prima di prenderne un altro.';
+  return 'Quest\'ordine non si può prendere adesso.';
+}
+function vetoPresaP2P(id){
+  return fraseVetoP2P(p2pPrendibili[id], p2pMiaRep);
+}
+/* il riquadro sopra i bottoni del dettaglio, quando il server ha detto di no */
+function avvisoVetoP2P(id){
+  const v = vetoPresaP2P(id);
+  return v ? '<div class="p2p-box p2p-veto" id="p2pDettVeto">🚫 ' + esc(v) + '</div>' : '';
+}
+/* prende la risposta del server: i verdetti degli ordini chiesti e i
+   miei numeri; torna quanti verdetti sono entrati */
+function prendiPrendibiliP2P(d, ids){
+  if (!d || typeof d !== 'object') return 0;
+  p2pMiaRep = {completati: Number(d.completati) || 0, mancati: Number(d.mancati) || 0,
+               mancati_30: Number(d.mancati_30) || 0, prese_aperte: Number(d.prese_aperte) || 0,
+               limite: Number(d.limite) || 2};
+  const verdetti = (d.ordini && typeof d.ordini === 'object') ? d.ordini : {};
+  let n = 0;
+  for (const id of ids || []) {
+    const v = verdetti[id];
+    if (!v || typeof v !== 'object') continue;
+    p2pPrendibili[id] = {ok: !!v.ok, motivo: String(v.motivo || ''), soglia: sogliaFiltroP2P(v.soglia)};
+    n++;
+  }
+  return n;
+}
+/* la riga nel foglio «Il tuo profilo di scambio» */
+function rigaMiaReputazioneP2P(){
+  const r = p2pMiaRep;
+  if (!r) return '';
+  const c = Number(r.completati) || 0;
+  const m = marchioMancatiP2P(r.mancati, true);
+  return '<div class="hint" id="p2pMiaRep">✅ <b>' + c + '</b> '
+    + (c === 1 ? 'scambio completato' : 'scambi completati')
+    + (m ? ' · ' + m + ' negli ultimi 90 giorni' : '') + '</div>';
+}
+/* ---- il foglio «Pubblica»: chi puo' prendere l'ordine ---- */
+function sezioneAccessoNuovoP2P(){
+  const voce = (n, testo) =>
+    '<button type="button" class="p2p-accesso-chip' + (p2pNuovoFiltro === n ? ' on' : '')
+    + '" aria-pressed="' + (p2pNuovoFiltro === n ? 'true' : 'false') + '" data-n="' + n
+    + '" onclick="scegliFiltroNuovoP2P(Number(this.dataset.n))">' + testo + '</button>';
+  return sezioneNuovoP2P({
+    titolo: 'Chi può prendere l\'ordine',
+    corpo: '<div class="p2p-accesso-scelte">' + voce(0, 'Tutti')
+      + P2P_FILTRO_SOGLIE.map(n => voce(n, n + '+ scambi')).join('') + '</div>',
+    sotto: '<div class="hint">' + (p2pNuovoFiltro
+      ? 'Solo chi ha almeno <b>' + p2pNuovoFiltro + ' scambi completati</b> su Barattolo, '
+        + 'e nessuno scambio non completato negli ultimi 30 giorni (il primo si tollera). '
+        + 'Gli altri vedono l\'ordine, ma non possono prenderlo.'
+      : 'Facoltativo: puoi accettare solo chi ha già completato degli scambi.') + '</div>'
+  });
+}
+function scegliFiltroNuovoP2P(n){
+  haptic();
+  p2pNuovoFiltro = sogliaFiltroP2P(n);
+  renderNuovoOrdineP2P();
+}
+/* il filtro che parte con l'ordine: dai campi */
+function filtroDaCampiP2P(campi){
+  return campi ? sogliaFiltroP2P(campi.filtro) : 0;
+}
+/* quel che si DICHIARA al server all'intestazione: i filtri dei MIEI
+   ordini in questa lista, dalle loro righe (il calco delle zone) */
+function filtriDaDichiarareP2P(ids){
+  const filtri = {}, mie = typeof ordiniP2P === 'function' ? ordiniP2P() : {};
+  for (const id of ids || []) {
+    const riga = mie[id];
+    const s = (riga && riga.mio) ? sogliaFiltroP2P(riga.filtro) : 0;
+    if (s) { filtri[id] = s; p2pFiltri[id] = s; }
+  }
+  return filtri;
+}
+/* PURA (legge due giudici del foglio): cosa e' andato storto e cosa fare,
+   quando il coordinatore rifiuta la fattura di chi compra */
+function fraseFatturaRifiutataP2P(o){
+  const deve = typeof satsDaRicevereP2P === 'function' ? satsDaRicevereP2P(o) : 0;
+  const min = typeof finestraFatturaP2P === 'function' ? Math.ceil(finestraFatturaP2P() / 60) : 0;
+  return 'La richiesta di pagamento è stata rifiutata. '
+    + (deve > 0 ? 'L\'importo deve essere esattamente ' + fmt(deve) + ' sats' : 'L\'importo deve essere quello dovuto')
+    + (min > 0 ? ', e la richiesta deve valere ancora più di ' + min + ' minuti quando arriva' : '')
+    + '. Rifalla dal wallet con questi numeri e incollala qui. Il tentativo è registrato: non conta come scambio non completato.';
+}
+const P2P_TENTATIVO_REGISTRATO = ' Il tentativo è registrato: non conta come scambio non completato.';
+/* PURA: IL RIFIUTO DEL COORDINATORE SULLA FATTURA DICE I NUMERI E COSA
+   FARE (10 ott 2026, reputazione-p2p), o '' quando non e' un suo «no»
+   (allora vale la ragione di sempre, `ragioneIncassoP2P`, che resta
+   pura e intatta): sull'indirizzo Lightning la frase e' quella di
+   sempre; su `invalid-invoice` l'importo esatto e i minuti; su ogni
+   altro «no» la ragione di sempre piu' la riga del tentativo. */
+function fraseRifiutoIncassoP2P(e, testo, o){
+  if (!(e && e.cantDo) || !o) return '';
+  if (String(testo || '').indexOf('@') >= 0) return '';
+  if (e.motivo === 'invalid-invoice') return fraseFatturaRifiutataP2P(o);
+  return ragioneGestoP2P(e) + P2P_TENTATIVO_REGISTRATO;
+}
+/* ============ fine della reputazione del P2P ============ */
+
 /* ---- LA ZONA DI SCAMBIO, E IL VESTITO DEL CONTANTI (10 ott 2026,
    cantiere contanti-zona, richiesta di Andrea) ----
    Chi pubblica con «Contanti» fra i metodi scrive una zona INDICATIVA —
@@ -61369,6 +61669,8 @@ function apriNuovoOrdineP2P(metodo){
   p2pNuovoEuro = ''; p2pNuovoEuroMax = ''; p2pNuovoSats = '';
   p2pNuovoMetodi = [];
   p2pNuovoZona = '';
+  /* ...e il filtro di chi puo' prendere riparte da «tutti» (10 ott 2026) */
+  p2pNuovoFiltro = 0;
   /* ...e la zona riparte dall'ULTIMA USATA, chiesta al server (10 ott
      2026): vedi `preparaZonaNuovoP2P` */
   if (typeof preparaZonaNuovoP2P === 'function') preparaZonaNuovoP2P();
@@ -61921,6 +62223,8 @@ function campiNuovoP2P(){
     metodi: p2pNuovoMetodi,
     /* la zona di scambio del contanti, come sta nel campo (10 ott 2026) */
     zona: typeof p2pNuovoZona === 'string' ? p2pNuovoZona : '',
+    /* chi puo' prendere l'ordine (10 ott 2026, reputazione-p2p): 0 = tutti */
+    filtro: typeof p2pNuovoFiltro === 'number' ? p2pNuovoFiltro : 0,
     premio: p2pNuovoPremio,
     /* il premio del percorso Barattozon, come scritto (23 set 2026) */
     premioTab: p2pNuovoPremioTab,
@@ -62387,6 +62691,9 @@ function renderNuovoOrdineP2P(){
      metodi, solo quando «Contanti» e' scelto — vedi
      `sezioneZonaNuovoP2P` */
   const zona = typeof sezioneZonaNuovoP2P === 'function' ? sezioneZonaNuovoP2P(p2pNuovoMetodi) : '';
+  /* CHI PUO' PRENDERE L'ORDINE (10 ott 2026, reputazione-p2p): la sua
+     sezione, dopo il premio e prima dei limiti — vedi `sezioneAccessoNuovoP2P` */
+  const accesso = typeof sezioneAccessoNuovoP2P === 'function' ? sezioneAccessoNuovoP2P() : '';
 
   /* I TRE DATI DEL TABACCHINO (set 2026), solo quando la voce e'
      scelta: numero, importo e scadenza dell'ordine Amazon, che chi
@@ -62513,7 +62820,7 @@ function renderNuovoOrdineP2P(){
        PRIMA del percorso (30 set 2026): il passo 4 e il riepilogo
        cambiano parole con lei, quindi si sceglie prima di arrivarci. */
     valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo)
-    + quanti + premio + riquadroLimitiP2P() +
+    + quanti + premio + accesso + riquadroLimitiP2P() +
     /* ⚠️ SOTTO LE SCATOLE NON C'E' PIU' NIENTE (17 set 2026,
        decisione di Andrea): qui stavano due righe sciolte — «Finche'
        nessuno lo prende puoi ritirarlo quando vuoi…» e l'avviso che le
@@ -64030,6 +64337,11 @@ async function inviaNuovoOrdineP2P(confermato){
   const zonaOrd = typeof zonaDaCampiP2P === 'function' ? zonaDaCampiP2P(campi) : '';
   if (zonaOrd) ord.zona = zonaOrd;
   if (zonaOrd && typeof ricordaZonaUltimaP2P === 'function') ricordaZonaUltimaP2P(zonaOrd);
+  /* IL FILTRO DI CHI PUO' PRENDERE STA SULLA RIGA (10 ott 2026,
+     reputazione-p2p): parte all'intestazione come la zona, e intanto la
+     mia card mostra il segno */
+  const filtroOrd = typeof filtroDaCampiP2P === 'function' ? filtroDaCampiP2P(campi) : 0;
+  if (filtroOrd) ord.filtro = filtroOrd;
   /* I TRE DATI DEL TABACCHINO STANNO SULLA RIGA (set 2026), e non
      nel ricordo per forma: sono di QUESTO ordine, e partono da soli
      verso chi compra appena si sa chi e' (`recapitoDaAutoInvio` li
@@ -67409,6 +67721,8 @@ async function chiediFotoLibroP2P(){
   const cambi = prendiCambiPubP2P(d && d.cambi);
   /* ...e le zone di scambio del contanti, a tutti come i cambi (10 ott 2026) */
   const zone = prendiZoneP2P(d && d.zone);
+  /* ...e i filtri di chi pubblica (10 ott 2026, reputazione-p2p) */
+  const filtri = typeof prendiFiltriP2P === 'function' && prendiFiltriP2P(d && d.filtri);
   /* ...e i miei secondo il server (28 set 2026): la stessa lista della
      fila della home, che il libro prima ignorava — e cosi' un ordine
      pubblicato da un altro dispositivo qui sembrava di un altro */
@@ -67416,7 +67730,7 @@ async function chiediFotoLibroP2P(){
   const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
   const quando = (Number(d && d.quando) || 0) * 1000;
   if (p2pLibro || !eventi.length || !(quando > 0)
-      || Date.now() - quando > P2P_COPIA_MAX_MS) return Object.keys(facce).length > 0 || cambi || zone;
+      || Date.now() - quando > P2P_COPIA_MAX_MS) return Object.keys(facce).length > 0 || cambi || zone || filtri;
   libroDaCopiaP2P(eventi, quando, 'server');
   /* i volti chiesti gia' qui: la domanda del render non ripartirebbe
      per un id che la fotografia ha gia' detto di non conoscere */
@@ -68103,6 +68417,7 @@ async function chiediFotoVetrinaP2P(){
   prendiCambiPubP2P(d && d.cambi);
   /* ...e le zone di scambio del contanti (10 ott 2026) */
   prendiZoneP2P(d && d.zone);
+  if (typeof prendiFiltriP2P === 'function') prendiFiltriP2P(d && d.filtri);
   /* i miei secondo il server (27 set 2026): ogni risposta prende il
      posto della precedente, e senza sessione non ce ne sono */
   p2pVetrinaMiei = new Set(Array.isArray(d && d.miei) ? d.miei.map(String) : []);
@@ -68358,6 +68673,9 @@ async function registraOrdiniP2P(ids, pubblicati, presi){
      che il server tiene la prima e ignora le altre: un'intestazione
      persa alla pubblicazione la recupera la sessione dopo */
   const zone = typeof zoneDaDichiarareP2P === 'function' ? zoneDaDichiarareP2P(lista) : {};
+  /* ...e CHI PUO' PRENDERE L'ORDINE (10 ott 2026, reputazione-p2p): la
+     stessa porta della zona, dalla riga di chi ha pubblicato */
+  const filtri = typeof filtriDaDichiarareP2P === 'function' ? filtriDaDichiarareP2P(lista) : {};
   try {
     const r = await fetch(`${API_BASE}/p2p/ordini`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
@@ -68373,6 +68691,7 @@ async function registraOrdiniP2P(ids, pubblicati, presi){
                                Telegram; per chi entra da Nostr lo ignora. */
                             presi: !!presi,
                             zone: zone,
+                            filtri: filtri,
                             cambi: cambi})});
     return r.ok;
   } catch(e){ return false; }
@@ -68518,6 +68837,8 @@ async function chiediFacceP2P(ids){
       if (prendiCambiPubP2P(d && d.cambi)) nuove++;
       /* ...e la zona di scambio del contanti (10 ott 2026) */
       if (prendiZoneP2P(d && d.zone)) nuove++;
+      /* ...e il filtro di chi pubblica (10 ott 2026, reputazione-p2p) */
+      if (typeof prendiFiltriP2P === 'function' && prendiFiltriP2P(d && d.filtri)) nuove++;
       return nuove > 0;
     } catch(e){ return false; }
     finally { p2pFacceGiro = null; }
@@ -68654,6 +68975,10 @@ function cardParte(c, chi, opz){
      oggi» — il contrario esatto del vero. Non si scrive niente. */
   if (c.giorni !== undefined)
     rep.push(c.giorni + (c.giorni === 1 ? ' giorno' : ' giorni') + ' qui');
+  /* IL MARCHIO «⚠️ N NON COMPLETATI» (10 ott 2026, reputazione-p2p): il
+     server lo manda solo da due in su, e qui si scrive in coda alla riga */
+  const marchio = typeof marchioMancatiP2P === 'function' ? marchioMancatiP2P(c.mancati, true) : '';
+  if (marchio) rep.push(marchio);
   /* IL TOCCO APRE IL NEGOZIO come il volto sulle card, e senza negozio
      resta un profilo e basta: mai una porta che non porta da nessuna
      parte. */
@@ -69323,6 +69648,79 @@ function portaAVistaCardP2P(id){
   }, P2P_EVIDENZA_MS + 50);
 }
 /* ============ fine dell'archivio del server ============ */
+
+/* ============ LA REPUTAZIONE DEL P2P, LA PARTE CHE CHIEDE (10 ott 2026) =========
+   Le due rotte di questo cantiere — «posso prendere questi ordini?» e
+   «ci sto provando» — stanno QUI, fuori dal motore, come l'archivio e le
+   parti: il motore non ha dentro nessuna `fetch` (c'e' la sentinella),
+   e i pezzi dentro di lui le chiamano da un `typeof`. I giudici puri e
+   il disegno stanno nel blocco «LA REPUTAZIONE DEL P2P», dentro. */
+let p2pPrendibiliQuando = {};         // ordine -> quando l'ho chiesto (ms)
+let p2pPrendibiliGiro = null;         // la domanda in volo
+const P2P_PRENDIBILI_OGNI_MS = 30000;
+async function postaPossoPrendereP2P(ids){
+  const r = await fetch(`${API_BASE}/p2p/posso-prendere`, {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify({ordini: ids || []})});
+  if (!r.ok) return null;
+  return r.json();
+}
+/* la domanda del dettaglio: una volta ogni mezzo minuto per ordine, una
+   sola in volo (il freno dei pagamenti) */
+async function chiediPossoPrendereP2P(ids){
+  if (DEMO || VETRINA || !myTgId) return false;
+  const adesso = Date.now();
+  const lista = (ids || []).filter(id => id && !provvisorioP2P(id)
+    && adesso - (p2pPrendibiliQuando[id] || 0) > P2P_PRENDIBILI_OGNI_MS);
+  if (!lista.length || p2pPrendibiliGiro) return false;
+  lista.forEach(id => { p2pPrendibiliQuando[id] = adesso; });
+  p2pPrendibiliGiro = (async () => {
+    try { return prendiPrendibiliP2P(await postaPossoPrendereP2P(lista), lista) > 0; }
+    catch(e) { return false; }
+    finally { p2pPrendibiliGiro = null; }
+  })();
+  return p2pPrendibiliGiro;
+}
+/* LA CINTURA DELLA PRESA: si richiede ADESSO, e un «no» ferma il gesto.
+   Senza risposta (rete, server) si va avanti: il telefono non giudica,
+   e un server muto non puo' chiudere la porta a nessuno. */
+async function vetoPresaServerP2P(id){
+  if (DEMO || VETRINA || !myTgId || !id || provvisorioP2P(id)) return '';
+  try {
+    const d = await postaPossoPrendereP2P([id]);
+    if (!d) return '';
+    prendiPrendibiliP2P(d, [id]);
+    p2pPrendibiliQuando[id] = Date.now();
+    return vetoPresaP2P(id);
+  } catch(e) { return ''; }
+}
+/* i miei numeri, per il profilo di scambio: la stessa rotta con la
+   lista vuota */
+async function chiediMiaReputazioneP2P(){
+  if (DEMO || VETRINA || !myTgId) return false;
+  try {
+    const d = await postaPossoPrendereP2P([]);
+    if (!d) return false;
+    prendiPrendibiliP2P(d, []);
+    return true;
+  } catch(e) { return false; }
+}
+/* ---- i tentativi: «ci sto provando», detto al server ---- */
+function segnaTentativoP2P(id, gesto, motivo){
+  if (DEMO || VETRINA || !myTgId || !id || provvisorioP2P(id) || !gesto) return false;
+  try {
+    fetch(`${API_BASE}/p2p/tentativo`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({ordine: id, gesto: gesto, motivo: String(motivo || '').slice(0, 40)})})
+      .catch(() => {});
+  } catch(e) { return false; }
+  return true;
+}
+/* «⚡ Apri nel wallet» del foglio della garanzia o della cauzione */
+function tentativoWalletP2P(){
+  segnaTentativoP2P(p2pHoldOrdine, p2pHoldModo === 'cauzione' ? 'cauzione_wallet' : 'garanzia_wallet');
+}
+/* ============ fine della reputazione che chiede ============ */
 
 /* ============ LA ✕ SU OGNI DISPOSITIVO (7 ott 2026) =========
    La domanda che la ✕ di «I miei scambi» fa prima di togliere: «questo

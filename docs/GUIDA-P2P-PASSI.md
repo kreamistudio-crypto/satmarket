@@ -156,7 +156,10 @@ vere sullo schermo, si salta come il tour):
   scambio** lo ricava il server dal tuo account, ed è lo stesso dal bot,
   dal sito e dall'app. 📱 Lo si guarda da «🔐 Il patto sui tuoi dati, per
   intero» (fondo di «Info P2P») → «👤 Il tuo profilo di scambio»: foglio
-  «👤 Il tuo profilo di scambio» con «Profilo attivo dal <data>.»,
+  «👤 Il tuo profilo di scambio» con «Profilo attivo dal <data>.», la
+  riga dei tuoi numeri (dal 10 ott 2026) «✅ **3** scambi completati» e,
+  solo da due in su negli ultimi 90 giorni, «· ⚠️ **2 non completati**
+  negli ultimi 90 giorni» (il primo si tollera e non si scrive),
   «Questo profilo **torna da solo** ogni volta che entri, su qualunque
   dispositivo: non c'è niente da salvare. Il codice segreto serve solo
   se vuoi portarlo fuori da Barattolo.», i bottoni «🔑 Mostra il codice
@@ -266,10 +269,27 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
      gli euro.» (chi vende: «… ricevere gli euro.») e la sezione si
      accende un attimo, con una vibrazione leggera. Scelto il metodo,
      «Compra» fa il suo. Prima delle 10:00 del 10 ott (chi non è
-     moderatore) il bottone resta spento e dice «Dalle 10:00 di domani»;
+     moderatore) il bottone resta spento e dice «Dalle 10:00 di domani».
+     Dal 10 ott 2026 il bottone resta **spento** anche quando il server
+     dice di no, e sopra i bottoni compare il riquadro arancio: «🚫 Chi
+     ha pubblicato quest'ordine accetta solo chi ha almeno 3 scambi
+     completati (tu ne hai 1).», oppure «🚫 Quest'ordine accetta solo chi
+     non ha scambi non completati negli ultimi 30 giorni: tu ne hai 2.»,
+     oppure — su qualunque ordine — «🚫 Hai già 2 scambi presi in attesa
+     del tuo primo gesto: finiscili (o lascia che scadano) prima di
+     prenderne un altro.»; una presa partita lo stesso si ferma con lo
+     stesso avviso in un toast;
    - (solo contanti) la regola e il tetto, vedi §6;
    - «Chi ha pubblicato quest'ordine»: media, recensioni, volto (il
-     tocco porta al suo negozio);
+     tocco porta al suo negozio) e, dal 10 ott 2026, se ne ha almeno due
+     negli ultimi 90 giorni, «⚠️ **2 scambi non completati** negli
+     ultimi 90 giorni» (lo scambio «non completato» si conta a chi
+     prende un ordine e non fa il suo primo gesto in tempo — la garanzia
+     se vende, la fattura se compra —, mai a chi ha pubblicato, mai a
+     chi ci ha provato);
+   - (solo se chi ha pubblicato ha messo il filtro) «🛡️ Chi ha
+     pubblicato accetta solo chi ha almeno 3 scambi completati e nessuno
+     scambio non completato negli ultimi 30 giorni»;
    - «Tempo rimasto: <6g 23:47:17>»;
    - il **conto**: «Controvalore di **50 €**», poi (se c'è) «Premio
      richiesto dall'utente» o «Sconto offerto dall'utente» e
@@ -305,6 +325,12 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
    cifra: <N>» — campo
    «Dove vuoi ricevere i sats» (segnaposto «tuonome@wallet.com oppure
    lnbc…») — bottone «Invia». Hai i minuti che dice il coordinatore (§9, «Il tempo di ogni passo»).
+   Se il coordinatore rifiuta
+   la fattura (dal 10 ott 2026): «La richiesta di pagamento è stata
+   rifiutata. L'importo deve essere esattamente <N> sats, e la richiesta
+   deve valere ancora più di 60 minuti quando arriva. Rifalla dal wallet
+   con questi numeri e incollala qui. Il tentativo è registrato: non
+   conta come scambio non completato.»
    📱 Dopo: toast «Inviato ✅», stato «**Chi vende sta bloccando i
    sats**» «Appena sono al sicuro in garanzia te lo diciamo: da lì potrai
    inviare gli euro.»
@@ -584,11 +610,19 @@ le sezioni in quest'ordine:
    sotto lo zero ne passano di più. Più il tuo premio è generoso per chi
    legge, prima qualcuno prende l'offerta. A zero vale il prezzo di
    mercato del momento in cui l'offerta viene presa.»
-7. «Quanto si può, e quanto costa»: per esempio «Al momento si accettano
+7. «Chi può prendere l'ordine» (dal 10 ott 2026): le quattro pillole
+   «Tutti» (accesa di serie), «1+ scambi», «3+ scambi», «5+ scambi», e
+   sotto «Facoltativo: puoi accettare solo chi ha già completato degli
+   scambi.»; scelta una soglia la riga dice «Solo chi ha almeno **3
+   scambi completati** su Barattolo, e nessuno scambio non completato
+   negli ultimi 30 giorni (il primo si tollera). Gli altri vedono
+   l'ordine, ma non possono prenderlo.» Sulla card del libro compare il
+   segno piccolo «🛡️ Da 3 scambi completati».
+8. «Quanto si può, e quanto costa»: per esempio «Al momento si accettano
    ordini fino a 500 000 sats — la fee P2P è dell'1,5% per parte» (a un
    Pioniere: «…la fee P2P è dell'1,5% per parte, e tu hai uno sconto
    dello 0,5%, quindi paghi l'1% di fee»).
-8. Il bottone «**⚡ Pubblica ordine**».
+9. Il bottone «**⚡ Pubblica ordine**».
 
 🧑 Tocca «⚡ Pubblica ordine». 📱 «Sto pubblicando…» → «Ordine
 pubblicato». Si apre la pagina del tuo ordine: «**Ordine pubblicato**»
@@ -1222,7 +1256,11 @@ l'app sia gli avvisi: qui sotto `<n>` è quel numero (15 fino al 10 ott
   bollino è un moderatore.» — «Ho capito».
 - Dalla presa in poi le due parti si vedono: nome, foto, stelline,
   livello, «<N> giorni qui», e i tondi per scriversi su Telegram o Nostr
-  (solo dove esistono).
+  (solo dove esistono). Dal 10 ott 2026, in coda alla riga, «⚠️ 2 non
+  completati» se l'altra persona ne ha almeno due negli ultimi 90
+  giorni: lo stesso marchio sta nel suo negozio, accanto ai feedback
+  («· ⚠️ 2 non completati»). Le stelline restano quelle di sempre: il
+  contatore è una cosa a parte.
 
 ### La ✕ in «I miei scambi»
 

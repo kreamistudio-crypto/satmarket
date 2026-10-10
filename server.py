@@ -5699,7 +5699,18 @@ def init_db():
         -- prima resta, esce accanto ai volti e con la fotografia.
         -- '' = non detta (gli ordini di prima, e quelli degli altri
         -- client): la card non mostra niente.
-        zona TEXT DEFAULT ''
+        zona TEXT DEFAULT '',
+        -- CHI PUO' PRENDERE L'ORDINE (10 ott 2026, cantiere
+        -- reputazione-p2p): 0 = tutti (gli ordini di prima e quelli
+        -- degli altri client), oppure una delle soglie
+        -- P2P_FILTRO_SOGLIE — «solo chi ha almeno N scambi completati»,
+        -- e con la soglia vale anche «nessuno scambio non completato
+        -- contato negli ultimi 30 giorni» (il primo si tollera). La
+        -- dichiara chi pubblica all'intestazione, come la zona; la
+        -- prima resta. E' pubblica come la zona: la card mostra il
+        -- segno a tutti, il giudizio lo fa il server
+        -- (`_posso_prendere_p2p`), mai il telefono.
+        min_completati INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_ordini_tg ON p2p_ordini(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_momenti(
@@ -5790,6 +5801,55 @@ def init_db():
         quando INTEGER NOT NULL,
         PRIMARY KEY(tg_id, ordine)
     );
+    CREATE TABLE IF NOT EXISTS p2p_esiti(
+        -- GLI ESITI DEGLI SCAMBI, PER ACCOUNT (10 ott 2026, cantiere
+        -- reputazione-p2p): una riga per persona, ordine e giro, con
+        -- l'esito — `completato` a scambio concluso (tutte e due le
+        -- parti), `mancato` a CHI HA PRESO l'ordine e non ha fatto il
+        -- suo primo gesto in tempo (`expired` + `taker-timeout` di
+        -- mostrod, e nessun tentativo in `p2p_tentativi`). E' LA
+        -- MEMORIA LUNGA che la cronaca non e': `p2p_momenti` se ne va
+        -- dopo P2P_LIBRO_MEMORIA_S, e il marchio guarda 90 giorni e il
+        -- conto dei completati tutta la storia (P2P_ESITI_MEMORIA_S).
+        -- `quando` e' l'ora di MOSTROD (quella dell'evento), `ruolo`
+        -- il lato (compra | vende), `dettaglio` la parola di mostrod.
+        -- La PK e' l'idempotenza: il retry di mostrod non scrive due
+        -- volte. Le stelline NON passano di qui: restano in `feedback`.
+        -- «Dimentica il profilo» NON le toglie, come non toglie le
+        -- recensioni: sono dell'account, non delle chiavi.
+        tg_id INTEGER NOT NULL,
+        ordine TEXT NOT NULL,
+        giro INTEGER NOT NULL DEFAULT 0,
+        esito TEXT NOT NULL,
+        ruolo TEXT DEFAULT '',
+        quando INTEGER NOT NULL,
+        dettaglio TEXT DEFAULT '',
+        PRIMARY KEY(tg_id, ordine, giro, esito)
+    );
+    CREATE INDEX IF NOT EXISTS idx_p2p_esiti_tg ON p2p_esiti(tg_id, esito, quando);
+    CREATE TABLE IF NOT EXISTS p2p_tentativi(
+        -- CHI CI HA PROVATO (10 ott 2026): i gesti che il telefono
+        -- dichiara al server mentre prova a fare il suo passo — ha
+        -- aperto o copiato la richiesta della garanzia, ha toccato
+        -- «Apri nel wallet», ha mandato una fattura (poi accettata o
+        -- rifiutata dal coordinatore), ne ha incollata una che il
+        -- telefono ha scartato. Un pagamento che fallisce nel wallet
+        -- di chi vende (la liquidita', un canale chiuso) il server NON
+        -- lo vede: vede il gesto che l'ha preceduto, e basta quello —
+        -- «chi ci ha provato non si penalizza». Una riga per gesto e
+        -- giro, `quando` e' la nostra ora; `motivo` e' la parola del
+        -- coordinatore su un rifiuto (`invalid-invoice`…), per il journal.
+        -- Scrive solo chi e' una delle due parti di un ordine che il
+        -- server conosce; se ne vanno con la cronaca.
+        tg_id INTEGER NOT NULL,
+        ordine TEXT NOT NULL,
+        giro INTEGER NOT NULL DEFAULT 0,
+        gesto TEXT NOT NULL,
+        quando INTEGER NOT NULL,
+        motivo TEXT DEFAULT '',
+        PRIMARY KEY(tg_id, ordine, giro, gesto)
+    );
+    CREATE INDEX IF NOT EXISTS idx_p2p_tentativi_ordine ON p2p_tentativi(ordine, tg_id, quando);
     CREATE TABLE IF NOT EXISTS p2p_avvisi_nuovi(
         -- GLI AVVISI DEI NUOVI ORDINI, PER PERSONA (9 ott 2026): una
         -- riga per ogni ordine nuovo del libro che passa le preferenze
@@ -7197,7 +7257,9 @@ def init_db():
                     # il premio del libro (27 set 2026)
                     "premio REAL DEFAULT 0",
                     # la zona di scambio del contanti (10 ott 2026)
-                    "zona TEXT DEFAULT ''"):
+                    "zona TEXT DEFAULT ''",
+                    # chi puo' prendere l'ordine (10 ott 2026, reputazione-p2p)
+                    "min_completati INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -15169,6 +15231,13 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE p2p_tolti SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM p2p_tolti WHERE tg_id=?", (id_nostr,))
+        # ...e GLI ESITI E I TENTATIVI (10 ott 2026, reputazione-p2p): la
+        # persona e' la stessa, e il suo conto la segue — OR IGNORE +
+        # DELETE come i tolti, che la PK ha il tg_id
+        for _t in ("p2p_esiti", "p2p_tentativi"):
+            con.execute(f"UPDATE OR IGNORE {_t} SET tg_id=? WHERE tg_id=?",
+                        (id_telegram, id_nostr))
+            con.execute(f"DELETE FROM {_t} WHERE tg_id=?", (id_nostr,))
         # ...e le DISPUTE P2P (28 set 2026): le due parti e chi l'ha
         # presa seguono l'utente come in `p2p_scambi`; nel registro
         # cambia il NOME di chi ha fatto il gesto, non il gesto — la
@@ -22878,12 +22947,18 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     # «🔔 Segui» (9 ott 2026): se CHI GUARDA segue questo venditore. Solo
     # a chi e' entrato; agli anonimi e sulla propria pagina vale falso.
     # Quanti lo seguono NON esce: chi segue resta un fatto privato.
+    # IL MARCHIO «⚠️ N NON COMPLETATI» ANCHE QUI (10 ott 2026,
+    # reputazione-p2p: «vale ovunque»): accanto ai feedback, cosi' chi
+    # vende un oggetto vede con chi ha a che fare. 0 = niente da scrivere
+    non_completati = _marchi_mancati_p2p(
+        con, [v["tg_id"]], int(time.time())).get(int(v["tg_id"]), 0)
     seguito = bool(user and int(user["id"]) != int(v["tg_id"]) and con.execute(
         "SELECT 1 FROM venditori_seguiti WHERE tg_id=? AND venditore_id=?",
         (user["id"], v["tg_id"])).fetchone())
     con.close()
     venditore = dict(v)
     venditore["seguito"] = seguito
+    venditore["non_completati"] = non_completati
     venditore["distintivi"] = [
         dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
              descrizione=d["descrizione"])
@@ -44177,6 +44252,357 @@ def _zona_ultima_p2p(con, tg_id: int) -> str:
         "ORDER BY creato DESC, rowid DESC LIMIT 1", (int(tg_id),)).fetchone()
     return _zona_pulita_p2p(r[0]) if r else ""
 
+# ═══ LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, IL FILTRO DI CHI
+# PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, cantiere reputazione-p2p,
+# richiesta di Andrea). Nasce da un caso del giorno del lancio: un
+# venditore ha preso un ordine di acquisto e non ha bloccato la garanzia
+# in tempo; mostrod ha rimesso l'ordine in vetrina e chi l'aveva
+# pubblicato e' rimasto ad aspettare per niente. Un utente ha proposto
+# due difese contro chi prende ordini solo per disturbare; Andrea ne ha
+# aggiunte due. Tutte e quattro stanno sul SERVER, che e' l'unico a
+# sapere i fatti (patch 0007: mostrod racconta ogni passo), e NESSUNA
+# tocca le stelline: quelle restano i voti di `feedback`, con la loro
+# media (`_ricalcola_rating`), e qui non si legge ne' si scrive una riga
+# di quella tabella.
+# 1) LO SCAMBIO NON COMPLETATO si conta a CHI HA PRESO l'ordine e non ha
+#    fatto il suo primo gesto in tempo: bloccare la garanzia se vende,
+#    dare la fattura se compra. Lo dice MOSTROD, non si deduce:
+#    `expired` + `taker-timeout` esce solo quando l'ordine TORNA in
+#    vetrina perche' a mancare e' stato chi ha preso (scheduler.rs del
+#    fork: `Pending` → `taker-timeout`, tutto il resto → `maker-timeout`).
+#    Mai a chi ha pubblicato — puo' non aver visto l'avviso, e per lui la
+#    conseguenza e' gia' l'ordine tornato in vetrina —, mai a chi ha
+#    aspettato, mai a chi si ritira prima che lo scambio parta
+#    (`canceled`/`republished`). Finestra del marchio: 90 giorni; la
+#    scritta «⚠️ N non completati» compare da N = 2 (il primo si tollera:
+#    P2P_MANCATI_TOLLERATI).
+# 2) CHI CI HA PROVATO NON SI PENALIZZA: i tentativi che il telefono
+#    dichiara (`p2p_tentativi`, rotta `/api/p2p/tentativo`) — la
+#    richiesta della garanzia aperta, copiata, «Apri nel wallet»; la
+#    fattura mandata al coordinatore (accettata o rifiutata), o incollata
+#    e scartata dal telefono — tolgono il conto a quel giro. Quel che il
+#    server NON vede: il pagamento che fallisce dentro il wallet di chi
+#    vende (liquidita' ACINQ, canale chiuso): vede il gesto prima, e
+#    basta. E un gesto gia' FATTO per mostrod (la fattura data, la
+#    garanzia pagata) e' una cintura in piu': se c'e', il timeout non e'
+#    il suo.
+# 3) IL FILTRO DI CHI PUBBLICA: `p2p_ordini.min_completati` (0 = tutti;
+#    1, 3, 5 = «solo chi ha almeno N scambi completati»), dichiarato
+#    all'intestazione come la zona, la prima resta. Con la soglia vale
+#    anche «nessuno scambio non completato negli ultimi 30 giorni», con
+#    la stessa tolleranza del primo. Chi non ha i requisiti vede
+#    l'ordine, e «Compra/Vendi» e' spento con la frase: lo decide il
+#    server (`_posso_prendere_p2p`), e il telefono lo chiede PRIMA di
+#    mandare la presa al coordinatore (la cintura in `eseguiPresaP2P`).
+# 4) IL LIMITE DELLE PRESE: al piu' P2P_PRESE_APERTE_MAX scambi presi e
+#    ancora in attesa del primo gesto di chi ha preso, contemporaneamente
+#    (`_prese_aperte_p2p`, dai momenti di mostrod); al terzo, la presa e'
+#    spenta con la frase.
+# ⚠️ VALE DENTRO BARATTOLO, e va detto: la presa e' un messaggio Nostr
+# firmato dal telefono verso mostrod, e il server di Barattolo non sta in
+# mezzo. Un altro client Mostro (o una pagina modificata) prende l'ordine
+# comunque: per far valere filtro e limite NEL coordinatore servirebbe
+# una patch al fork (vedi il verbale in CANTIERI). Il nodo e il fork non
+# si toccano in questo cantiere.
+P2P_MANCATI_FINESTRA_S = 90 * 86400   # la finestra del marchio «non completati»
+P2P_MANCATI_FILTRO_S = 30 * 86400     # la finestra che guarda il filtro di chi pubblica
+P2P_MANCATI_TOLLERATI = 1             # il primo si tollera: scritta e filtro partono dal secondo
+P2P_FILTRO_SOGLIE = (1, 3, 5)         # «almeno N scambi completati», le tre scelte del foglio
+P2P_PRESE_APERTE_MAX = 2              # prese in attesa del primo gesto, insieme
+# una presa senza il primo gesto piu' vecchia di cosi' non si conta piu'
+# fra le aperte: mostrod la chiude in quindici minuti, e un evento perso
+# per strada non deve tenere una persona fuori per sempre
+P2P_PRESA_APERTA_S = 3600
+P2P_ESITI_MEMORIA_S = 400 * 86400     # oltre un anno gli esiti se ne vanno
+# un tentativo conta per il giro se e' arrivato dalla presa in poi; il
+# margine copre i due orologi (quello di mostrod e il nostro)
+P2P_TENTATIVO_MARGINE_S = 60
+P2P_GESTI_TENTATIVO = ("garanzia_aperta", "garanzia_copiata", "garanzia_wallet",
+                       "cauzione_aperta", "cauzione_copiata", "cauzione_wallet",
+                       "fattura_inviata", "fattura_rifiutata", "fattura_scartata")
+P2P_MOTIVI_PRESA = ("filtro", "mancati", "prese")
+
+
+def _primo_gesto_p2p(preso_dal: str) -> str:
+    """PURA: il MOMENTO (vocabolario di `p2p_momenti`) che chi ha preso
+    deve far succedere per primo. Chi prende comprando (`buyer`) deve
+    dare la fattura; chi prende vendendo (`seller`) deve bloccare la
+    garanzia. '' se il lato non si sa."""
+    return {"buyer": "fattura_data", "seller": "garanzia_pagata"}.get(preso_dal or "", "")
+
+
+def _marchio_mancati_p2p(n) -> int:
+    """PURA: il numero da SCRIVERE, o 0. Il primo non completato si
+    tollera (P2P_MANCATI_TOLLERATI): la scritta parte dal secondo."""
+    n = int(n or 0)
+    return n if n > P2P_MANCATI_TOLLERATI else 0
+
+
+def _ha_provato_p2p(con, tg_id, ordine: str, dal: int) -> bool:
+    """Pura sulla connessione: questa persona ha dichiarato almeno un
+    tentativo su quest'ordine da `dal` in poi (la presa del giro, meno
+    il margine dei due orologi)?"""
+    return con.execute(
+        "SELECT 1 FROM p2p_tentativi WHERE tg_id=? AND ordine=? AND quando>=? "
+        "LIMIT 1", (int(tg_id or 0), ordine,
+                    int(dal or 0) - P2P_TENTATIVO_MARGINE_S)).fetchone() is not None
+
+
+def _segna_esiti_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
+    """GLI ESITI DA UN EVENTO NUOVO di mostrod (`fatto` e' quel che torna
+    `_registra_evento_p2p`: momento, giro, le due parti, preso_dal).
+    Pura sulla connessione; torna le righe di journal. COMMITTA.
+    • `concluso` (success): «completato» a tutte e due le parti nostre.
+    • `expired` + `taker-timeout`: «mancato» a chi ha PRESO — il lato lo
+      dice `preso_dal` e la persona `p2p_scambi` — tranne se il suo primo
+      gesto risulta FATTO nella cronaca di questo giro (allora il timeout
+      non e' il suo) o se ha PROVATO (un tentativo dalla presa in poi).
+      Chi non e' dei nostri (un altro client) vale 0 e non si conta.
+    • tutto il resto (annulli, ritiri, maker-timeout, scaduti in libro)
+      non scrive niente: la regola e' «mai a chi ha pubblicato, mai a chi
+      ha aspettato, mai a chi si ritira prima»."""
+    righe = []
+    ordine, giro = ev["ordine"], int(fatto.get("giro") or 0)
+    compra = int(fatto.get("compratore") or 0)
+    vende = int(fatto.get("venditore") or 0)
+    if fatto.get("momento") == "concluso":
+        for tg, ruolo in ((compra, "compra"), (vende, "vende")):
+            if tg:
+                con.execute(
+                    "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, "
+                    "ruolo, quando, dettaglio) VALUES(?,?,?,'completato',?,?,?)",
+                    (tg, ordine, giro, ruolo, int(ev["ts"]), ev.get("dettaglio") or ""))
+        con.commit()
+        return righe
+    if not (ev.get("azione") == "expired" and ev.get("dettaglio") == "taker-timeout"):
+        return righe
+    lato = fatto.get("preso_dal") or ""
+    tg, ruolo = {"buyer": (compra, "compra"), "seller": (vende, "vende")}.get(lato, (0, ""))
+    if not tg:
+        righe.append(f"· Reputazione P2P: {ordine[:8]} tornato in vetrina per il "
+                     f"timeout di chi ha preso, che non e' dei nostri"
+                     f"{'' if lato else ' (lato non detto)'}: non si conta a nessuno")
+        return righe
+    gesto = _primo_gesto_p2p(lato)
+    if gesto and con.execute(
+            "SELECT 1 FROM p2p_momenti WHERE ordine=? AND giro=? AND momento=? "
+            "AND fonte='mostro'", (ordine, giro, gesto)).fetchone():
+        righe.append(f"· Reputazione P2P: {ordine[:8]} tornato in vetrina, ma il "
+                     f"primo gesto di {tg} risulta fatto ({gesto}): non si conta")
+        return righe
+    presa = con.execute(
+        "SELECT MAX(quando) FROM p2p_momenti WHERE ordine=? AND giro=? "
+        "AND momento='preso' AND fonte='mostro'", (ordine, giro)).fetchone()[0]
+    if _ha_provato_p2p(con, tg, ordine, int(presa or 0) or int(ev["ts"]) - P2P_PRESA_APERTA_S):
+        righe.append(f"· Reputazione P2P: {ordine[:8]} tornato in vetrina, ma {tg} "
+                     f"ha provato a {'dare la fattura' if ruolo == 'compra' else 'bloccare la garanzia'}: "
+                     f"non si conta")
+        return righe
+    con.execute(
+        "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, quando, "
+        "dettaglio) VALUES(?,?,?,'mancato',?,?,?)",
+        (tg, ordine, giro, ruolo, int(ev["ts"]), ev.get("dettaglio") or ""))
+    con.commit()
+    righe.append(f"⚠️ Reputazione P2P: a {tg} si conta uno scambio non completato "
+                 f"({ordine[:8]}, giro {giro}: non ha "
+                 f"{'dato la fattura' if ruolo == 'compra' else 'bloccato la garanzia'} in tempo)")
+    return righe
+
+
+def _reputazione_p2p(con, tg_id, adesso: int) -> dict:
+    """Pura sulla connessione: `{completati, mancati, mancati_30}` di una
+    persona — i completati di tutta la memoria, i mancati degli ultimi
+    90 giorni (il marchio) e degli ultimi 30 (il filtro). Numeri GREZZI:
+    la tolleranza la applicano i giudici."""
+    tg = int(tg_id or 0)
+
+    def conta(esito, dal):
+        return int(con.execute(
+            "SELECT COUNT(*) FROM p2p_esiti WHERE tg_id=? AND esito=? AND quando>=?",
+            (tg, esito, int(dal))).fetchone()[0] or 0)
+    return {"completati": conta("completato", 0),
+            "mancati": conta("mancato", adesso - P2P_MANCATI_FINESTRA_S),
+            "mancati_30": conta("mancato", adesso - P2P_MANCATI_FILTRO_S)}
+
+
+def _marchi_mancati_p2p(con, ids, adesso: int) -> dict:
+    """`{tg_id: n}` dei marchi da scrivere accanto a un volto, in UNA
+    query per tutte le persone chieste — e SOLO chi arriva alla scritta
+    (`_marchio_mancati_p2p`): gli altri non compaiono, come `staff`.
+    Un database senza la tabella — i banchi di ieri — vale «nessun
+    marchio», mai un errore su un volto."""
+    ids = sorted({int(i) for i in ids or [] if i})
+    if not ids:
+        return {}
+    segni = ",".join("?" * len(ids))
+    try:
+        righe = con.execute(
+            f"SELECT tg_id, COUNT(*) AS n FROM p2p_esiti WHERE esito='mancato' "
+            f"AND quando>=? AND tg_id IN ({segni}) GROUP BY tg_id",
+            [int(adesso) - P2P_MANCATI_FINESTRA_S] + ids).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    fuori = {}
+    for r in righe:
+        n = _marchio_mancati_p2p(r[1])
+        if n:
+            fuori[int(r[0])] = n
+    return fuori
+
+
+def _prese_aperte_p2p(con, tg_id, adesso: int) -> int:
+    """Quanti scambi questa persona ha PRESO e tiene ancora in attesa del
+    suo primo gesto: dal posto che mostrod le ha dato (`p2p_scambi`,
+    `preso_dal` dal suo lato) e dalla cronaca di quel giro — una presa
+    recente (P2P_PRESA_APERTA_S), nessun momento finale, e il primo gesto
+    non ancora raccontato. Pura sulla connessione."""
+    tg = int(tg_id or 0)
+    if not tg:
+        return 0
+    n = 0
+    for s in con.execute(
+            "SELECT ordine, giro, preso_dal FROM p2p_scambi WHERE "
+            "(preso_dal='buyer' AND compratore=?) OR (preso_dal='seller' AND venditore=?)",
+            (tg, tg)).fetchall():
+        momenti = {r[0]: int(r[1] or 0) for r in con.execute(
+            "SELECT momento, MAX(quando) FROM p2p_momenti WHERE ordine=? AND giro=? "
+            "AND fonte='mostro' GROUP BY momento", (s["ordine"], int(s["giro"] or 0)))}
+        presa = momenti.get("preso", 0)
+        if not presa or presa < int(adesso) - P2P_PRESA_APERTA_S:
+            continue
+        if any(m in momenti for m in P2P_MOMENTI_FINALI):
+            continue
+        if _primo_gesto_p2p(s["preso_dal"]) in momenti:
+            continue
+        n += 1
+    return n
+
+
+def _giudice_presa_p2p(soglia, rep: dict, prese_aperte) -> tuple:
+    """PURA: `(ok, motivo)` — puo' prendere quest'ordine? Prima il limite
+    delle prese (vale su ogni ordine), poi il filtro di chi pubblica:
+    i completati sotto la soglia, o un non completato di troppo negli
+    ultimi 30 giorni (il primo si tollera). I motivi sono codici
+    (P2P_MOTIVI_PRESA): le frasi le scrive chi le mostra."""
+    if int(prese_aperte or 0) >= P2P_PRESE_APERTE_MAX:
+        return False, "prese"
+    soglia = int(soglia or 0)
+    if soglia > 0:
+        if int((rep or {}).get("completati") or 0) < soglia:
+            return False, "filtro"
+        if int((rep or {}).get("mancati_30") or 0) > P2P_MANCATI_TOLLERATI:
+            return False, "mancati"
+    return True, ""
+
+
+def _soglia_filtro_p2p(v) -> int:
+    """PURA: una soglia del catalogo, o 0 (tutti). Una storta vale 0."""
+    if isinstance(v, bool):
+        return 0
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        return 0
+    return n if n in P2P_FILTRO_SOGLIE else 0
+
+
+def _dichiara_filtri_p2p(con, tg_id: int, filtri) -> int:
+    """Scrive i filtri dichiarati, `{ordine: soglia}`, e torna quanti ne
+    ha scritti. La stessa porta della zona (`_dichiara_zone_p2p`): SOLO
+    sulla riga di chi l'ordine l'ha PUBBLICATO (`maker` acceso), e LA
+    PRIMA RESTA — un filtro non si cambia sotto gli occhi di chi sta
+    guardando la card. Chi dichiara per un ordine non suo non scrive
+    niente. Una mappa storta e' una mappa vuota; una soglia fuori
+    catalogo non entra."""
+    if not isinstance(filtri, dict):
+        return 0
+    scritti = 0
+    for ordine, v in list(filtri.items())[:MAX_ORDINI_P2P]:
+        if not isinstance(ordine, str) or not FORMA_ORDINE_P2P.fullmatch(ordine):
+            continue
+        soglia = _soglia_filtro_p2p(v)
+        if not soglia:
+            continue
+        scritti += con.execute(
+            "UPDATE p2p_ordini SET min_completati=? WHERE ordine=? AND tg_id=? "
+            "AND maker=1 AND (min_completati IS NULL OR min_completati=0)",
+            (soglia, ordine, int(tg_id))).rowcount
+    if scritti:
+        con.commit()
+    return scritti
+
+
+def _filtri_p2p(con, ordini) -> dict:
+    """Da una lista di id al filtro di chi li ha pubblicati: `{ordine:
+    soglia}`, solo quelli con un filtro. NON E' UN VOLTO, come la zona e
+    il cambio: chi l'ha messo l'ha messo perche' si legga sulla card,
+    quindi esce anche a chi guarda senza sessione (la fotografia). Alza
+    ValueError come le sorelle, sulla lista storta."""
+    pulite = _ordini_puliti_p2p(ordini)
+    segni = ",".join("?" * len(pulite))
+    try:
+        return {r[0]: int(r[1]) for r in con.execute(
+            f"SELECT ordine, min_completati FROM p2p_ordini "
+            f"WHERE ordine IN ({segni}) AND min_completati > 0", pulite)}
+    except sqlite3.OperationalError:
+        # un database senza la colonna — i banchi di ieri — vale «nessun
+        # filtro», mai un errore che lasci indietro i volti
+        return {}
+
+
+def _posso_prendere_p2p(con, io, ordini, adesso: int) -> dict:
+    """LA DOMANDA DEL TELEFONO PRIMA DELLA PRESA: per ogni ordine chiesto
+    `{ok, motivo, soglia}`, piu' i numeri di chi chiede — i completati,
+    il marchio (gia' passato dalla tolleranza), i mancati degli ultimi 30
+    giorni, le prese aperte e il limite. Con una lista vuota risponde i
+    soli numeri: e' cosi' che il profilo di scambio si legge i suoi.
+    Pura sulla connessione; ValueError sulla lista storta."""
+    pulite = _ordini_puliti_p2p(ordini) if ordini else []
+    rep = _reputazione_p2p(con, io, adesso)
+    prese = _prese_aperte_p2p(con, io, adesso)
+    filtri = _filtri_p2p(con, pulite) if pulite else {}
+    fuori = {}
+    for o in pulite:
+        ok, motivo = _giudice_presa_p2p(filtri.get(o, 0), rep, prese)
+        fuori[o] = {"ok": ok, "motivo": motivo, "soglia": filtri.get(o, 0)}
+    return {"ordini": fuori, "completati": rep["completati"],
+            "mancati": _marchio_mancati_p2p(rep["mancati"]),
+            "mancati_30": rep["mancati_30"], "prese_aperte": prese,
+            "limite": P2P_PRESE_APERTE_MAX, "tollerati": P2P_MANCATI_TOLLERATI}
+
+
+def _segna_tentativo_p2p(con, io, ordine, gesto, motivo, adesso: int) -> dict:
+    """UN TENTATIVO DICHIARATO DAL TELEFONO. Le forme si controllano qui
+    (ValueError, mai un 400 diretto), l'ordine dev'essere uno che il
+    server conosce (`p2p_scambi` o `p2p_ordini`: un id inventato non fa
+    crescere la tabella), e se mostrod ha gia' detto le due parti chi
+    dichiara dev'essere una delle due — a tutti gli altri si risponde
+    `ignota`, come alle recensioni, senza dire perche'. Il giro e'
+    quello corrente di `p2p_scambi`; `INSERT OR REPLACE` rinfresca l'ora
+    dello stesso gesto. Il `motivo` e' una parola a macchina, al piu' 40
+    caratteri: una frase non entra. Pura sulla connessione; COMMITTA."""
+    ordine = str(ordine or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        raise ValueError("Ordine in una forma sconosciuta")
+    gesto = str(gesto or "")
+    if gesto not in P2P_GESTI_TENTATIVO:
+        raise ValueError("Gesto sconosciuto")
+    motivo = re.sub(r"[^A-Za-z0-9_-]", "", str(motivo or ""))[:40]
+    s = con.execute("SELECT giro FROM p2p_scambi WHERE ordine=?", (ordine,)).fetchone()
+    if not s and not con.execute("SELECT 1 FROM p2p_ordini WHERE ordine=?",
+                                 (ordine,)).fetchone():
+        return {"ok": False, "motivo": "ignota"}
+    parti = _parti_mostro_p2p(con, ordine)
+    if parti["detto"] and int(io or 0) not in (parti["maker"], parti["taker"]):
+        return {"ok": False, "motivo": "ignota"}
+    con.execute(
+        "INSERT OR REPLACE INTO p2p_tentativi(tg_id, ordine, giro, gesto, quando, motivo) "
+        "VALUES(?,?,?,?,?,?)",
+        (int(io or 0), ordine, int(s["giro"] or 0) if s else 0, gesto, int(adesso), motivo))
+    con.commit()
+    return {"ok": True, "motivo": ""}
+
+
 
 def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int,
                          pubblicati: bool = False,
@@ -44363,6 +44789,9 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
         f"ELSE u.avatar END) AS avatar "
         f"FROM p2p_ordini p JOIN utenti u ON u.tg_id = p.tg_id "
         f"WHERE p.ordine IN ({segni})", pulite).fetchall()
+    # IL MARCHIO «⚠️ N NON COMPLETATI» (10 ott 2026, reputazione-p2p): una
+    # query per tutti gli autori, e la chiave c'e' SOLO da due in su
+    marchi = _marchi_mancati_p2p(con, [r["autore"] for r in righe], adesso)
     fuori = {}
     for r in righe:
         voti = int(r["n_feedback"] or 0)
@@ -44382,6 +44811,8 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
         iscritto = int(r["registrato"] or 0)
         if iscritto:
             volto["giorni"] = max(0, (adesso - iscritto) // 86400)
+        if marchi.get(int(r["autore"] or 0)):
+            volto["mancati"] = marchi[int(r["autore"] or 0)]
         fuori[r["ordine"]] = volto
     return fuori
 
@@ -44482,6 +44913,9 @@ def _volti_persone(con, ids, adesso) -> dict:
     if not ids:
         return {}
     segni_u = ",".join("?" * len(ids))
+    # il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p):
+    # «vale ovunque», e la card dell'altra parte e' uno dei posti
+    marchi = _marchi_mancati_p2p(con, ids, adesso)
     volti = {}
     for u in con.execute(
             f"SELECT tg_id, nome, username, npub, npub_verificata, "
@@ -44518,6 +44952,8 @@ def _volti_persone(con, ids, adesso) -> dict:
         iscritto = int(u["registrato"] or 0)
         if iscritto:
             chi["giorni"] = max(0, (adesso - iscritto) // 86400)
+        if marchi.get(int(u["tg_id"])):
+            chi["mancati"] = marchi[int(u["tg_id"])]
         volti[int(u["tg_id"])] = chi
     return volti
 
@@ -44557,6 +44993,9 @@ async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         # ha appena acceso `maker` sulla riga di chi pubblica — e
         # solo li' si scrive (`_dichiara_zone_p2p`)
         _dichiara_zone_p2p(con, user["id"], (d or {}).get("zone"))
+        # ...e CHI PUO' PRENDERE L'ORDINE (10 ott 2026, reputazione-p2p):
+        # stessa porta, stessa regola (solo da maker, la prima resta)
+        _dichiara_filtri_p2p(con, user["id"], (d or {}).get("filtri"))
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -44611,11 +45050,13 @@ async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         cambi = _cambi_pub_p2p(con, (d or {}).get("ordini"))
         # e la zona di scambio del contanti (10 ott 2026)
         zone = _zone_p2p(con, (d or {}).get("ordini"))
+        # e il filtro di chi pubblica (10 ott 2026, reputazione-p2p)
+        filtri = _filtri_p2p(con, (d or {}).get("ordini"))
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
         con.close()
-    return {"facce": facce, "cambi": cambi, "zone": zone}
+    return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri}
 
 
 @app.get("/api/p2p/zona")
@@ -44685,6 +45126,9 @@ def libro_fotografato_p2p(req: Request, x_tg_init_data: str = Header(""),
     # ragione: chi l'ha scritta l'ha scritta per la card
     if fuori["eventi"] and F.get("zone"):
         fuori["zone"] = F["zone"]
+    # ...e i filtri di chi pubblica (10 ott 2026): il segno sulla card
+    if fuori["eventi"] and F.get("filtri"):
+        fuori["filtri"] = F["filtri"]
     chi = _chi_guarda_p2p(x_tg_init_data, barattolo_sessione) \
         if fuori["eventi"] else 0
     if chi and F.get("facce"):
@@ -44878,6 +45322,56 @@ async def parte_riconosciuta_p2p(req: Request, x_tg_init_data: str = Header(""),
         print(f"🧾 PayCode P2P fermo: {str((d or {}).get('ordine') or '')[:8]} "
               f"per {user['id']}: {esito['motivo']}", flush=True)
     return esito
+
+
+@app.post("/api/p2p/tentativo")
+async def tentativo_p2p(req: Request, x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """«Ci sto provando»: il telefono dichiara un gesto del suo passo
+    (10 ott 2026, reputazione-p2p). Il giudice e' `_segna_tentativo_p2p`.
+    LA SESSIONE SERVE; NIENTE ID NELL'URL (un POST, come i volti).
+    NESSUN GATE SULLA LEVA, ed e' deliberato: la riga PROTEGGE chi la
+    scrive — e' la prova che ci ha provato — e uno scambio a meta' il
+    giorno che la leva si spegne deve poterla scrivere lo stesso. La
+    tabella non cresce con id inventati: il giudice vuole un ordine che
+    il server conosce. Un «no» esce come `ok: false`, mai un errore che
+    dica qualcosa dell'ordine."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        esito = _segna_tentativo_p2p(con, user["id"], d.get("ordine"),
+                                     d.get("gesto"), d.get("motivo"),
+                                     int(time.time()))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    return JSONResponse(esito, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/p2p/posso-prendere")
+async def posso_prendere_p2p(req: Request, x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """«Posso prendere questi ordini?» — la domanda che il dettaglio fa
+    quando si apre e che la presa rifa' PRIMA di scrivere al
+    coordinatore (10 ott 2026, reputazione-p2p). Il giudice e'
+    `_posso_prendere_p2p`: il limite delle prese e il filtro di chi ha
+    pubblicato, coi numeri di chi chiede. Con `ordini` vuoto tornano i
+    soli numeri (il profilo di scambio). LA SESSIONE SERVE: i numeri sono
+    di chi chiede. NESSUN GATE SULLA LEVA: qui non si scrive niente.
+    `no-store`: la risposta cambia a ogni presa."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        fuori = _posso_prendere_p2p(con, user["id"], d.get("ordini") or [],
+                                    int(time.time()))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    return JSONResponse(fuori, headers={"Cache-Control": "no-store"})
 
 
 # ═══ LE RECENSIONI DEGLI SCAMBI P2P (set 2026) ══════════════════════
@@ -45253,6 +45747,10 @@ def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
     # ...e la coda degli avvisi dei nuovi ordini (9 ott 2026): righe
     # (persona, ordine) che senza la persona non dicono piu' niente
     con.execute("DELETE FROM p2p_avvisi_nuovi WHERE tg_id=?", (user["id"],))
+    # ...e i miei tentativi (10 ott 2026, reputazione-p2p). GLI ESITI NO:
+    # completati e non completati sono dell'account, come le recensioni,
+    # e «dimentica il profilo» non e' il modo di togliersi un marchio
+    con.execute("DELETE FROM p2p_tentativi WHERE tg_id=?", (user["id"],))
     con.commit()
     con.close()
     return {"ok": True, "tolte": tolte, "volti": volti}
@@ -47148,9 +47646,15 @@ def _pulisci_memoria_p2p(con, adesso: int) -> int:
     for tabella, colonna in (("p2p_momenti", "arrivato"),
                              ("p2p_avvisi", "quando"),
                              ("p2p_scambi", "aggiornato"),
-                             ("p2p_tolti", "quando")):
+                             ("p2p_tolti", "quando"),
+                             # i tentativi (10 ott 2026) vivono quanto la cronaca
+                             ("p2p_tentativi", "quando")):
         tolte += con.execute(f"DELETE FROM {tabella} WHERE {colonna}<?",
                              (limite,)).rowcount
+    # GLI ESITI HANNO LA MEMORIA LUNGA (10 ott 2026, reputazione-p2p): il
+    # marchio guarda 90 giorni, il conto dei completati tutta la storia
+    tolte += con.execute("DELETE FROM p2p_esiti WHERE quando<?",
+                         (adesso - P2P_ESITI_MEMORIA_S,)).rowcount
     # le righe di p2p_ordini MAI VISTE sul libro da un giorno (cura 4):
     # id inventati, o un ordine che il coordinatore non ha mai
     # pubblicato. Le viste restano fino a P2P_LIBRO_MEMORIA_S come prima.
@@ -48370,6 +48874,8 @@ async def _fotografa_libro_p2p():
     F["cambi"] = _cambi_foto_p2p(F["eventi"])
     # ...e le zone di scambio del contanti (10 ott 2026)
     F["zone"] = _zone_foto_p2p(F["eventi"])
+    # ...e i filtri di chi pubblica (10 ott 2026, reputazione-p2p)
+    F["filtri"] = _filtri_foto_p2p(F["eventi"])
     # ...e CHI HA PUBBLICATO COSA (27 set 2026, la fila «Scambi P2P» senza
     # i propri ordini): resta in memoria e non esce MAI intero — la rotta
     # ne da' a ciascuno solo la sua parte (`miei`)
@@ -48539,6 +49045,7 @@ def _rinfresca_volti_foto_p2p(ordini=None) -> bool:
         F["facce"] = _facce_foto_p2p(F["eventi"], int(time.time()))
         F["cambi"] = _cambi_foto_p2p(F["eventi"])
         F["zone"] = _zone_foto_p2p(F["eventi"])
+        F["filtri"] = _filtri_foto_p2p(F["eventi"])
         F["autori"] = _autori_foto_p2p(F["eventi"])
     except Exception as e:
         print(f"⚠️ Fotografia del libro, volti non rifatti: {e}", flush=True)
@@ -48579,6 +49086,24 @@ def _zone_foto_p2p(eventi) -> dict:
     con = db()
     try:
         return _zone_p2p(con, ids)
+    except ValueError:
+        return {}
+    finally:
+        con.close()
+
+
+def _filtri_foto_p2p(eventi) -> dict:
+    """I filtri di chi pubblica sugli ordini della fotografia (10 ott
+    2026, reputazione-p2p), una volta per giro come le zone: il giudice
+    e' `_filtri_p2p`, sugli stessi id che la rotta serve."""
+    ids = [d for d in (_tag_evento_p2p(e, "d") for e in eventi or []
+                       if e.get("kind") == 38383)
+           if FORMA_ORDINE_P2P.fullmatch(d)][:MAX_ORDINI_P2P]
+    if not ids:
+        return {}
+    con = db()
+    try:
+        return _filtri_p2p(con, ids)
     except ValueError:
         return {}
     finally:
@@ -50991,6 +51516,16 @@ async def evento_p2p(req: Request):
         # col cambio di adesso, dalla cache: a una presa diventa il suo
         # metro (27 set 2026)
         fatto = _registra_evento_p2p(con, ev, adesso, cambio_noto_ora())
+        # GLI ESITI (10 ott 2026, reputazione-p2p): il completato alle due
+        # parti, il non completato a chi ha preso e non ha fatto il suo
+        # gesto. Mai un 500 per loro: l'evento e' gia' registrato
+        if fatto is not None:
+            try:
+                for riga in _segna_esiti_p2p(con, ev, fatto, adesso):
+                    print(riga, flush=True)
+            except Exception as e:
+                print(f"⚠️ Reputazione P2P: l'esito di {ev['ordine'][:8]} non si "
+                      f"e' scritto ({type(e).__name__}: {e})", flush=True)
         # la garanzia morta non pagata: I PAGAMENTI CHE NON ARRIVANO. Mai
         # un 500 per lei: l'evento e' gia' registrato, e il retry di
         # mostrod troverebbe «ripetuto» e non avviserebbe le parti

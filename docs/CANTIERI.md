@@ -44296,3 +44296,240 @@ adesso, vede «Hai ancora 14:56…» — la finestra intera dalla richiesta
 (col ripiego, perché senza relay il 38385 non c'è), e sulla riga nessun
 `presaAt`; lo scatto è l'undicesimo in `.claude/giri/promemoria-garanzia/`.
 Suite severa e collaudi della CI: nel rapporto.
+
+## La reputazione del P2P: gli scambi non completati, i tentativi, il filtro di chi pubblica e il limite delle prese (10 ott 2026, cantiere reputazione-p2p, richiesta di Andrea)
+
+**Il caso.** Il giorno del lancio un venditore ha preso un ordine di
+acquisto e non ha bloccato la garanzia in tempo: mostrod ha rimesso
+l'ordine in vetrina (`expired` + `taker-timeout`) e chi l'aveva
+pubblicato è rimasto ad aspettare per niente. Un utente ha proposto due
+difese contro chi prende ordini solo per disturbare; Andrea ne ha
+aggiunte due: un limite di prese e un marchio visibile su tutto il
+profilo. Quattro cose, tutte decise e giudicate dal SERVER, che è
+l'unico a sapere i fatti (patch 0007: mostrod racconta ogni passo).
+
+**1) Lo scambio non completato.** Si conta a CHI HA PRESO l'ordine e
+non ha fatto il suo primo gesto in tempo: bloccare la garanzia se
+vende, dare la fattura se compra. Lo dice mostrod, non si deduce: nel
+fork (`scheduler.rs`, `job_cancel_orders`) il dettaglio è
+`taker-timeout` SOLO quando l'ordine torna `Pending`, cioè quando a
+mancare è stato chi ha preso; se manca chi ha pubblicato l'ordine si
+annulla ed esce `maker-timeout`. Mai a chi ha pubblicato (può non aver
+visto l'avviso: per lui la conseguenza è già l'ordine tornato in
+vetrina), mai a chi ha aspettato, mai a chi si ritira prima
+(`canceled`/`republished`), mai sullo scaduto in libro (`book`). La
+riga sta in `p2p_esiti` (tg_id, ordine, giro, esito, ruolo, quando =
+l'ora di mostrod, dettaglio), con la memoria LUNGA (`P2P_ESITI_MEMORIA_S`,
+400 giorni): `p2p_momenti` se ne va dopo 40 giorni e il marchio ne
+guarda 90. Lo scambio concluso (`success`) scrive «completato» a tutte e
+due le parti. La scritta «⚠️ N non completati» compare da N = 2 (il
+primo si tollera, `P2P_MANCATI_TOLLERATI` = 1) e guarda 90 giorni
+(`P2P_MANCATI_FINESTRA_S`). Il giudice è `_segna_esiti_p2p`, chiamato
+dalla rotta degli eventi DOPO `_registra_evento_p2p` e solo su un evento
+nuovo (il retry di mostrod non raddoppia: lo ferma la cronaca, e la PK
+della tabella è la cintura); mai un 500 per lui.
+
+**2) Chi ci ha provato non si penalizza.** I tentativi stanno in
+`p2p_tentativi` e li dichiara il telefono con `POST /api/p2p/tentativo`
+(`segnaTentativoP2P`, fuori dal motore): la richiesta della garanzia
+APERTA (`garanzia_aperta`, in `apriHoldP2P`), COPIATA
+(`garanzia_copiata`, in `copiaHoldP2P`), «⚡ Apri nel wallet» toccato
+(`garanzia_wallet`, agganciato dal JS in `orologioHoldP2P` così il
+markup della riga resta quello del mercatino), le stesse tre per la
+cauzione, la fattura MANDATA (`fattura_inviata`, prima della chiamata,
+comunque vada), RIFIUTATA dal coordinatore (`fattura_rifiutata`, col
+motivo a macchina) o SCARTATA dal telefono prima di partire
+(`fattura_scartata`: illeggibile, importo, scadenza). Al timeout, un
+tentativo dalla presa del giro in poi (`_ha_provato_p2p`, col margine
+dei due orologi) toglie il conto; e se la cronaca dice che il primo
+gesto risulta FATTO (la fattura data, la garanzia pagata) il timeout
+non è il suo: cintura. Il server scrive solo per chi è una delle due
+parti di un ordine che conosce (un id inventato non fa crescere la
+tabella; l'estraneo prende `ignota`, come alle recensioni). COSA IL
+SERVER VEDE E COSA NO, detto ad Andrea: vede i gesti elencati; NON
+vede un pagamento che fallisce dentro il wallet di chi vende (la
+liquidità ACINQ, un canale chiuso) né un wallet che non parte — vede il
+gesto prima (il foglio aperto, la richiesta copiata, il wallet toccato),
+e quello basta a scusare. Non vede nemmeno chi scambia da un altro
+client Mostro: per lui non c'è conto (tg_id 0). SUL RIFIUTO DI UNA
+FATTURA il foglio dice cosa è andato storto e cosa fare
+(`fraseRifiutoIncassoP2P` → `fraseFatturaRifiutataP2P`): l'importo
+esatto, i minuti di vita, «rifalla dal wallet con questi numeri e
+incollala qui», e che il tentativo è registrato; sull'indirizzo
+Lightning resta la frase di sempre; su un altro «no» la ragione di
+sempre più la riga del tentativo. `ragioneIncassoP2P` resta PURA e
+intatta (la sua sentinella pinzava la chiamata). Il foglio della
+garanzia dice in coda cosa fare se il wallet non paga.
+
+**3) Il filtro di chi pubblica.** Nel foglio «Pubblica» la sezione «Chi
+può prendere l'ordine» (`sezioneAccessoNuovoP2P`, dopo il premio e
+prima dei limiti): «Tutti» di serie, oppure 1+/3+/5+ scambi completati
+(`P2P_FILTRO_SOGLIE`); scelta una soglia, la riga sotto dice la regola
+intera — vale anche «nessuno scambio non completato negli ultimi 30
+giorni», con la stessa tolleranza del primo (`P2P_MANCATI_FILTRO_S`).
+Vive in `p2p_ordini.min_completati` e parte con l'INTESTAZIONE come la
+zona (`filtriDaDichiarareP2P` dalla riga locale, `_dichiara_filtri_p2p`:
+solo da maker, la prima resta, solo dal catalogo); torna coi volti e
+con la fotografia a TUTTI (`_filtri_p2p`, `_filtri_foto_p2p`,
+`F["filtri"]`, `prendiFiltriP2P`), e la card mostra un segno piccolo
+(`segnoFiltroP2P`: «🛡️ Da 3 scambi completati»); nel dettaglio la riga
+sotto «Chi ha pubblicato quest'ordine» (`rigaFiltroDettP2P`). Gli ordini
+di prima e quelli degli altri client hanno 0: nessun filtro. IL GIUDIZIO
+È DEL SERVER: `POST /api/p2p/posso-prendere` (`_posso_prendere_p2p` →
+`_giudice_presa_p2p`) risponde per ogni ordine `{ok, motivo, soglia}`
+coi numeri di chi chiede; il dettaglio lo chiede all'apertura
+(`chiediPossoPrendereP2P`, una volta ogni mezzo minuto per ordine) e
+spegne «Compra/Vendi» col riquadro `avvisoVetoP2P` sopra i bottoni
+(`fraseVetoP2P`: «Chi ha pubblicato quest'ordine accetta solo chi ha
+almeno 3 scambi completati (tu ne hai 1).», «Quest'ordine accetta solo
+chi non ha scambi non completati negli ultimi 30 giorni: tu ne hai 2.»);
+e la presa lo RICHIEDE prima di bruciare una chiave e scrivere al
+coordinatore (`vetoPresaServerP2P`, la cintura in `eseguiPresaP2P`,
+prima di `assicuraMazzo`). Senza risposta del server si va avanti: il
+telefono non giudica, e un server muto non chiude la porta a nessuno.
+
+**4) Il limite delle prese.** Al più `P2P_PRESE_APERTE_MAX` (2) scambi
+presi e ancora in attesa del primo gesto di chi ha preso, insieme:
+`_prese_aperte_p2p` conta da `p2p_scambi` (il mio lato = `preso_dal`) e
+dalla cronaca del giro — presa recente (`P2P_PRESA_APERTA_S`, un'ora:
+mostrod chiude in quindici minuti, e un evento perso per strada non
+deve tenere fuori nessuno per sempre), nessun momento finale, il primo
+gesto non raccontato. Al terzo, «Hai già 2 scambi presi in attesa del
+tuo primo gesto: finiscili (o lascia che scadano) prima di prenderne un
+altro.» — il limite vale su OGNI ordine e si giudica PRIMA del filtro.
+
+**5) Il marchio vale ovunque.** Il server lo cuce sui volti solo da due
+in su (`_marchi_mancati_p2p`, una query per tutte le persone chieste,
+`sqlite3.OperationalError` = nessun marchio sui banchi di ieri): nel
+volto del libro (`_facce_ordini_p2p`, chiave `mancati`), nella card
+dell'altra parte (`_volti_persone`, quindi la pagina dello scambio P2P
+E il dettaglio di un ordine del mercatino, dove chi vende un oggetto
+vede con chi ha a che fare), sul profilo generale (`/api/negozio`,
+`non_completati`, accanto ai feedback), e nel mio profilo di scambio
+(`rigaMiaReputazioneP2P`, anche sul telefono senza mazzo: i numeri
+sono dell'account). Nel client scrive la frase UNO solo,
+`marchioMancatiP2P` (riga o riquadro, da `P2P_MANCATI_DA` = 2), e i
+posti sono `repRiquadroP2P`, `cardParte`, `renderNegozio`,
+`renderProfiloP2P`.
+
+**6) Le stelline sono intatte.** `_ricalcola_rating`, `feedback`,
+`stellineP2P`, `stellaP2P` non sono toccati; il blocco nuovo del server
+non scrive mai su feedback né su rating (c'è la sentinella). «Dimentica
+il profilo» toglie i miei tentativi e TIENE gli esiti, come tiene le
+recensioni: sono dell'account, non delle chiavi, e non è il modo di
+togliersi un marchio. La fusione di due account porta esiti e tentativi
+sulla persona intera.
+
+**La domanda di Andrea: valgono anche da un altro client Mostro?** No,
+e va detto: filtro e limite valgono DENTRO Barattolo. La presa è un
+messaggio Nostr firmato dal telefono verso mostrod; il server di
+Barattolo non sta in mezzo, e chi prende da un altro client — o da una
+pagina modificata — prende comunque. Il marchio invece vale per chiunque
+sia dei nostri (le chiavi in `chiavi_p2p`): un ordine preso da un
+estraneo non conta a nessuno. Per far valere filtro e limite NEL
+coordinatore servirebbe una patch al fork (una 0009): a) l'ordine
+dovrebbe portare la soglia — un campo nuovo in `new-order` e un tag nel
+38383, così anche gli altri client la vedono —; b) in `take_sell` /
+`take_buy` mostrod dovrebbe contare i trade completati di chi prende
+(la tabella `users` ce li ha, `total_trades`, ma SOLO per chi ha
+un'identità con reputazione: chi scambia in anonimo, chiave nuova a
+ogni scambio, non si conta) e tenere un contatore nuovo dei timeout da
+taker, con una migrazione; c) il limite delle prese si conta dagli
+ordini in `waiting-*` con quella trade key, di nuovo solo per chi non è
+anonimo; d) i tentativi mostrod li vede solo in parte (la fattura
+rifiutata sì, il foglio aperto no) — o si rinuncia alla scusa, o il
+server di Barattolo gliela racconta. Stima: 150-250 righe di Rust fra i
+due take, la migrazione e il tag, più le prove; e una regola che
+varrebbe solo per gli utenti con reputazione. Il nodo e il fork in
+questo cantiere NON si toccano (richiesta di Andrea).
+
+**Il filtro per il mercatino, come lo farei e quanto è grande.** Non
+fatto, come chiesto. La forma: una colonna `min_completati` su
+`annunci` (o una preferenza dell'account del venditore, «chi può
+comprare da me»), dichiarata dal form di vendita come il contanti a
+mano; il giudice sta in `crea_ordine` (la rotta che apre un affare), che
+legge `_reputazione_p2p` di chi compra — i completati P2P E le vendite/
+acquisti conclusi del mercatino (`vendite_ok`/`acquisti_ok`), che qui
+sono già fatti del server — e rifiuta con un 403 e una frase; nel
+client «🔒 Compra in sicurezza» spento con la spiegazione, dallo stesso
+tipo di domanda (`/api/annuncio/posso-comprare`, o il campo nella
+scheda). Qui il controllo è davvero del server (il mercatino passa
+tutto da lui, non c'è un coordinatore in mezzo). Grandezza: una
+colonna + migrazione, una riga nel form, un giudice e un gate in
+`crea_ordine`, il bottone spento e la frase, una prova e un collaudo:
+circa 150 righe fra server e client, mezza giornata con le prove.
+
+**Le strade scartate.** Dedurre il «non completato» dalla cronaca
+(garanzia chiesta e mai pagata) invece che dal dettaglio di mostrod:
+scartata, il fork lo dice già e dirlo in due modi diverge; la cronaca
+resta come CINTURA («il gesto risulta fatto»). Tenere gli esiti in
+`p2p_momenti`: scartata, se ne va dopo 40 giorni. Aggiungere il marchio
+ai volti all'uscita delle rotte invece che nei due costruttori: scartata,
+due costruttori divergerebbero — si è preferito lo stub nei banchi di
+`prove.py` (6 banchi) e il fail-open sulla tabella assente. Spegnere
+«Compra» finché il server non risponde: scartata, il telefono non
+giudica e un server lento non deve bloccare; la cintura vera è nella
+presa. Mettere il tocco sul wallet nel markup (`onclick` nell'`<a>`):
+scartata, la sentinella `RIGA` del foglio pinzava il markup e il
+mercatino usa la stessa riga — si aggancia dal JS. Nominare il
+coordinatore nella frase del rifiuto: scartata, la sentinella «il
+custode non si nomina» vale per tutto il motore. Il contatore nel
+messaggio Telegram del ritorno in vetrina: non chiesto, non fatto (vedi
+«da guardare»).
+
+**Le sentinelle emendate**, con la data accanto: le colonne di
+`p2p_ordini` (+`min_completati`), l'ordine delle scatole del foglio
+«Pubblica» (+`accesso`), il ritorno di `/api/p2p/facce` (+`filtri`, in
+due prove), la coda di `chiediFotoLibroP2P` (+`filtri`), la card del
+libro fra zona e stelline (+`segnoFiltroP2P`), la chiusura del CREATE
+e dell'ALTER sulla zona (ora c'è una colonna dopo). I banchi: le due
+tabelle nuove negli schemi veri (5 posti) e il doppio
+`_marchi_mancati_p2p` in 6 banchi, `P2P_ESITI_MEMORIA_S` in 4, i filtri
+nel rinfresco di Alan.
+
+**Provato.** `prove_reputazione_p2p` (99, nuova): i giudici veri del
+server su sqlite con lo schema vero — chi prende comprando/vendendo e
+non fa il gesto (a lui solo), il tentativo che scusa, un tentativo del
+giro prima che non copre il dopo, maker-timeout/ritiro/scaduto a
+nessuno, il concluso a tutti e due, il gesto risultato fatto, il retry,
+chi non è dei nostri, la finestra 90/30, il marchio 0/1/2/7, i marchi
+per i volti e il db senza tabella, il giudice della presa nei sei casi,
+il filtro dichiarato (prima resta, solo da maker, solo dal catalogo),
+le prese aperte e la risposta al telefono (lista vuota, utente senza
+storia, lista storta), i tentativi (forme, ignota, estraneo, motivo
+pulito), la pulizia e la memoria lunga, le stelline; le sentinelle del
+server (rotta degli eventi, le due rotte nuove senza gate, i volti, il
+negozio, l'intestazione, la fotografia, dimentica, la fusione, la
+colonna, il fork); il client in node (marchio, frasi del veto, filtri,
+segno, verdetti, riga del profilo, sezione del foglio, campi,
+dichiarazione, frase del rifiuto, `ragioneIncassoP2P` pura) e le sue
+sentinelle (la cintura prima del take e di `assicuraMazzo`, il bottone
+spento, l'apertura che chiede, i nove tentativi dichiarati, la fattura
+prima/scartata/rifiutata, il wallet, l'intestazione, le tre letture, i
+quattro posti del marchio, il foglio, le stelline intatte, il CSS).
+`collaudo_reputazione_p2p` (32, nuovo, nella gabbia della CI e nel
+workflow): le rotte VERE con gli eventi finti del coordinatore col
+bearer — la porta, i due timeout, il tentativo dalla rotta e l'estraneo,
+il retry, il concluso con le stelline di prima, i volti/la card/il
+negozio col marchio, il filtro dall'intestazione, il veterano con uno e
+due mancati, il limite e la fattura data, «dimentica». Suite severa
+intera: 20 823 + 99 verdi, 0 rosse; i 48 collaudi della CI nella gabbia:
+nel rapporto. Dal vivo a misura di telefono (Playwright con Chrome,
+390×844, tocchi veri, copia di cartone nello scratchpad col relay morto,
+tre persone e gli esiti seminati nel db, il libro dalla copia): gli otto
+scatti in `.claude/giri/reputazione-p2p/` — la card col segno del filtro,
+«Compra» spento col limite delle prese e, dopo un `buyer-invoice-added`
+POSTato al server, col filtro («tu ne hai 1»), il riquadro di chi ha
+pubblicato col marchio, il negozio col marchio accanto ai feedback, il
+mio profilo coi numeri, la fattura rifiutata con la frase, la card
+dell'altra parte nella pagina dello scambio. E la cintura: una presa
+diretta (libro dato per vero, `mostroChiama` e `assicuraMazzo` spiati)
+ha chiesto `/api/p2p/posso-prendere` e si è fermata a zero take; i due
+tentativi della fattura sono finiti in `p2p_tentativi` del db del giro.
+
+**Da guardare.** Il primo `taker-timeout` vero sul VPS: la riga
+«⚠️ Reputazione P2P: a … si conta uno scambio non completato» nel
+journal, e che il tentativo di chi ha aperto il foglio lo scusi. Il
+messaggio Telegram del ritorno in vetrina a chi ha preso NON dice che
+gli è stato contato: si può aggiungere una riga (non chiesto). Il
+filtro del mercatino (sopra). La patch 0009 al fork, se si vorrà.

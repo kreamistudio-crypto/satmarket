@@ -29951,6 +29951,67 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   💵 solo davanti a «Contanti», a parola intera). Prove: `prove_contanti_zona`, la
   coda di `prove_p2p_libro` e `prove_card_p2p_vetrina`.
 
+- LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, I TENTATIVI, IL
+  FILTRO DI CHI PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, perché
+  in CANTIERI, «La reputazione del P2P»). Due tabelle: `p2p_esiti`
+  (tg_id, ordine, giro, esito `completato` | `mancato`, ruolo, quando =
+  l'ora di mostrod, dettaglio; memoria `P2P_ESITI_MEMORIA_S`, 400
+  giorni, pulita da `_pulisci_memoria_p2p`; «dimentica» NON la tocca,
+  la fusione la porta sulla persona) e `p2p_tentativi` (tg_id, ordine,
+  giro, gesto fra `P2P_GESTI_TENTATIVO`, quando, motivo a macchina; vive
+  quanto la cronaca; «dimentica» la toglie). Una colonna:
+  `p2p_ordini.min_completati` (0 = tutti, o una soglia di
+  `P2P_FILTRO_SOGLIE` 1/3/5). I giudici, tutti puri sulla connessione,
+  sopra `_registra_ordini_p2p`: `_segna_esiti_p2p` (dalla rotta
+  `/api/p2p/evento`, dopo `_registra_evento_p2p`, solo su un evento
+  nuovo, mai un 500: il `success` scrive «completato» alle due parti;
+  `expired` + `taker-timeout` scrive «mancato» a chi ha preso — il lato
+  da `preso_dal`, la persona da `p2p_scambi` — tranne se il suo primo
+  gesto risulta fatto nella cronaca del giro o se ha provato,
+  `_ha_provato_p2p` dalla presa in poi col margine
+  `P2P_TENTATIVO_MARGINE_S`); `_reputazione_p2p` (completati di tutta la
+  memoria, mancati a 90 giorni `P2P_MANCATI_FINESTRA_S`, mancati a 30
+  `P2P_MANCATI_FILTRO_S`); `_marchio_mancati_p2p` (il numero da
+  scrivere, 0 sotto `P2P_MANCATI_TOLLERATI` + 1); `_marchi_mancati_p2p`
+  (una query per i volti, solo da due in su, tabella assente = niente);
+  `_prese_aperte_p2p` (le prese in attesa del primo gesto, presa più
+  giovane di `P2P_PRESA_APERTA_S`, nessun momento finale);
+  `_giudice_presa_p2p` (prima `prese` al limite `P2P_PRESE_APERTE_MAX`,
+  poi con la soglia `filtro` e `mancati`; i codici in `P2P_MOTIVI_PRESA`);
+  `_soglia_filtro_p2p`, `_dichiara_filtri_p2p` (la porta della zona:
+  solo da maker, la prima resta), `_filtri_p2p` (per id, a tutti, colonna
+  assente = niente), `_filtri_foto_p2p` (`F["filtri"]`),
+  `_posso_prendere_p2p`, `_segna_tentativo_p2p` (ordine noto, parte
+  della partita se mostrod ha parlato, `INSERT OR REPLACE`). LE ROTTE:
+  `POST /api/p2p/tentativo` e `POST /api/p2p/posso-prendere` (sessione,
+  `leggi_json`, no-store, nessun gate sulla leva; con `ordini` vuoto la
+  seconda dà i soli numeri), `/api/p2p/ordini` accetta `filtri`,
+  `/api/p2p/facce` e `/api/p2p/libro` servono `filtri`, i volti portano
+  `mancati` (`_facce_ordini_p2p`, `_volti_persone`: quindi anche la card
+  dell'altra parte di un ordine del mercatino) e `/api/negozio`
+  `non_completati`. NEL CLIENT due blocchi: «LA REPUTAZIONE DEL P2P»
+  dentro il motore (puro e disegno: `marchioMancatiP2P` l'unico che
+  scrive la frase, `fraseVetoP2P`, `vetoPresaP2P`, `prendiPrendibiliP2P`,
+  `prendiFiltriP2P`/`p2pFiltri`, `filtroOrdineP2P`, `segnoFiltroP2P` sulla
+  card, `rigaFiltroDettP2P` e `avvisoVetoP2P` nel dettaglio, la sezione
+  del foglio `sezioneAccessoNuovoP2P`/`scegliFiltroNuovoP2P`/
+  `p2pNuovoFiltro`, `filtroDaCampiP2P`, `filtriDaDichiarareP2P`,
+  `fraseFatturaRifiutataP2P`, `fraseRifiutoIncassoP2P`,
+  `rigaMiaReputazioneP2P`) e «LA PARTE CHE CHIEDE» dopo l'archivio del
+  server (le due `fetch`: `postaPossoPrendereP2P`,
+  `chiediPossoPrendereP2P` dal dettaglio, `vetoPresaServerP2P` la
+  cintura di `eseguiPresaP2P` prima di `assicuraMazzo`,
+  `chiediMiaReputazioneP2P` dal profilo, `segnaTentativoP2P` e
+  `tentativoWalletP2P`). I tentativi dichiarati: `apriHoldP2P`,
+  `apriCauzioneP2P`, `copiaHoldP2P`, il wallet da `orologioHoldP2P`
+  (`onclick` dal JS), `inviaIncassoP2P` (inviata prima della chiamata,
+  scartata nei tre casi, rifiutata nel catch) e `fatturaDalWalletP2P`.
+  Dove si vede il marchio: `repRiquadroP2P`, `cardParte`,
+  `renderNegozio`, `renderProfiloP2P`. Le stelline non si toccano.
+  Prove: `prove_reputazione_p2p`, `collaudo_reputazione_p2p` (gabbia
+  della CI). Vale dentro Barattolo: un altro client Mostro prende
+  comunque (il perché e la patch che servirebbe: CANTIERI).
+
 - LA CASSA DI RISONANZA SU X (9 ott 2026). I post di Barattolo su Nostr
   escono anche su X, dal server: un orologio in sottofondo
   (`orologio_x`, `X_GIRO_S` 5 minuti, parte da `avvia_x` SOLO se
