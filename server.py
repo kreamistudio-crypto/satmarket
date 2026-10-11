@@ -18302,6 +18302,74 @@ def copia_foto(annuncio_id: int, nomi_sorgente: list) -> tuple[list, list]:
     return nomi, scarti
 
 
+# ---------------------------------------------------------------------
+# ALMENO UNA FOTO PER PUBBLICARE (11 ott 2026, cantiere foto-obbligatorie)
+# ---------------------------------------------------------------------
+# Decisione di Andrea: sul mercatino un annuncio senza foto non nasce
+# piu'. Vale per TUTTI i tipi, digitali e servizi compresi (la domanda
+# e' stata fatta e la risposta e' «regola per tutti»: al giorno della
+# decisione ce l'avevano gia' 54 digitali su 55 e 19 servizi su 20).
+# Fino al 28 set la regola era un'altra — «non si perde in silenzio» —
+# e resta vera: qui si aggiunge il gradino prima, «non si pubblica
+# senza».
+# CHI C'E' GIA' RESTA: nessuna scopa, nessun annuncio spento. Un
+# annuncio nato senza foto resta online com'e'; il giorno che il suo
+# venditore lo MODIFICA, per salvare deve dargliene una — gli storici
+# si mettono in regola al primo ritocco, come per le condizioni.
+# LE PORTE: pubblica() (il foglio della Mini App e del sito, il
+# duplicato), modifica_annuncio(), l'import da file (la riga senza
+# foto e' uno scarto col motivo) e i due importatori automatici, che
+# un prodotto NUOVO senza foto non lo fanno entrare (`_una_riga` dei
+# negozi collegati, `importa_venditore` di Nostr). FUORI, apposta: la
+# modifica FIRMATA di un importato da Nostr (le sue foto vivono
+# nell'evento e dal nostro form non si toccano), il rifornimento dei
+# pezzi e «rimetti in vendita» (non sono una modifica dell'annuncio).
+# I due testi stanno qui e non nelle rotte: li cita il collaudo, e la
+# riga accanto alle foto nel form dice la stessa cosa con le stesse
+# parole («Aggiungi almeno una foto per pubblicare»).
+MSG_SERVE_UNA_FOTO = ("Per pubblicare serve almeno una foto: aggiungila "
+                      "e riprova. Quel che hai scritto è ancora qui.")
+MSG_SERVE_UNA_FOTO_MODIFICA = (
+    "Questo annuncio non ha ancora una foto: per salvare le modifiche "
+    "aggiungine almeno una. Quel che hai scritto è ancora qui.")
+MOTIVO_RIGA_SENZA_FOTO = ("manca la foto: ogni annuncio ne vuole almeno "
+                          "una (un indirizzo web, o un nome nello ZIP)")
+
+
+def ha_foto(valore) -> bool:
+    """«Qui c'e' almeno una foto?» — su quel che sta nella colonna
+    `foto` (il JSON dei nomi o degli URL, o la stringa vuota) oppure
+    su una lista gia' in mano. Un JSON storto vale NO: e' la risposta
+    che manda dal lato prudente, cioe' a chiedere la foto."""
+    if isinstance(valore, (list, tuple)):
+        return any(valore)
+    if not valore or not isinstance(valore, str):
+        return False
+    try:
+        lista = json.loads(valore)
+    except Exception:
+        return False
+    return isinstance(lista, list) and any(lista)
+
+
+def guardia_almeno_una_foto(nuove, gia=None, messaggio: str = ""):
+    """Alza il 400 comprensibile se non c'e' nessuna foto in arrivo
+    (`nuove`, la lista del payload) e nessuna su cui contare (`gia`:
+    le foto che l'annuncio ha, o quelle da ereditare nel duplicato).
+
+    GUARDA SOLO SE CE NE SONO, non se sono buone: quel giudizio e' di
+    `salva_foto`, che le apre — e se le scarta tutte l'annuncio non
+    nasce comunque (la pubblicazione ritirata del 28 set). Insieme le
+    due guardie chiudono il cerchio: nessuna foto scelta = no subito,
+    senza scrivere una riga; foto scelte e tutte scartate = no dopo,
+    col motivo di ognuna."""
+    if isinstance(nuove, list) and nuove:
+        return
+    if ha_foto(gia):
+        return
+    raise HTTPException(400, messaggio or MSG_SERVE_UNA_FOTO)
+
+
 def _miniatura_da_rifare(percorso_min, percorso_pieno) -> bool:
     """Una miniatura di una ricetta vecchia (lato piu' corto del
     catalogo attuale) va rifatta: si leggono solo le intestazioni
@@ -22516,6 +22584,16 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         if consegna in ("spedizione", "entrambe"):
             zone = {"dom": (0, 0.0)}
 
+    # ALMENO UNA FOTO (11 ott 2026, cantiere foto-obbligatorie). Qui,
+    # dopo i giudici dei campi e PRIMA della moderazione e dell'INSERT:
+    # un no che non costa una chiamata all'AI e non lascia nessuna riga
+    # da ritirare. Nel duplicato valgono le foto da ereditare — la
+    # stessa lettura che piu' sotto le copia, con la sua guardia di
+    # proprieta' (l'id di un altro, o storto, non presta le sue foto).
+    guardia_almeno_una_foto(
+        d.get("foto"),
+        foto_da_copiare(user["id"], d.get("copia_foto_da")))
+
     # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
     if categoria:
@@ -22664,8 +22742,11 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # appeso) e l'utente riceve un no che dice perche', col form ancora
     # pieno. Lo scudo anti-doppione guarda solo 'attivo' e 'revisione',
     # quindi il secondo tentativo con altre foto passa. Chi non sceglie
-    # nessuna foto pubblica come sempre: qui non si decide che la foto
-    # e' obbligatoria, si decide che non si perde in silenzio.
+    # nessuna foto qui non arriva piu' (11 ott 2026: l'ha gia' fermato
+    # `guardia_almeno_una_foto`, prima dell'INSERT); la condizione
+    # resta scritta per intero, da cintura — se un domani la guardia
+    # di sopra si allentasse, questo ramo continua a ritirare solo chi
+    # le foto le aveva scelte.
     if not nomi and ((d.get("foto") or []) or sorgenti):
         con = db()
         con.execute("UPDATE annunci SET stato='rimosso' WHERE id=?",
@@ -24534,6 +24615,17 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
                                  "serve solo cambiare i pezzi disponibili, "
                                  "puoi farlo subito con «🔄 Aggiorna i "
                                  "pezzi», anche ad affare aperto")
+    # ALMENO UNA FOTO ANCHE QUI (11 ott 2026, cantiere
+    # foto-obbligatorie): l'annuncio nato senza resta online com'e',
+    # ma chi lo ritocca per salvare deve dargliene una — gli storici si
+    # mettono in regola al primo ritocco, come per le condizioni. DOPO
+    # le guardie di proprieta', di stato e dell'affare in corso (chi
+    # non puo' modificare deve sentirsi dire quello, non «manca la
+    # foto») e PRIMA della moderazione, che costa una chiamata.
+    # Chi le foto le ha gia' non se ne accorge: la lista vuota continua
+    # a voler dire «restano quelle».
+    guardia_almeno_una_foto(d.get("foto"), a["foto"],
+                            MSG_SERVE_UNA_FOTO_MODIFICA)
 
     # --- Stessa moderazione di una pubblicazione nuova ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
@@ -64288,8 +64380,14 @@ MODELLO_IMPORT = (
     "titolo;descrizione;prezzo;valuta;categoria;zona;foto;"
     "consegna;spedizione;taglia;condizione;quantita;spedizione_punto;"
     "spedizione_extra\n"
+    # OGNI RIGA HA LA SUA FOTO (11 ott 2026, cantiere
+    # foto-obbligatorie): una riga senza e' uno scarto, e un modello
+    # che ne mostrasse una vuota insegnerebbe a farsi scartare. Le due
+    # vie restano: l'indirizzo web (la giacca) e il nome nello ZIP
+    # (tutte le altre).
     "Tastiera meccanica 60%;Come nuova, switch rossi, scatola "
-    "originale;35000;sats;Elettronica;Milano;;spedizione;450;piccolo;"
+    "originale;35000;sats;Elettronica;Milano;tastiera.jpg;spedizione;450;"
+    "piccolo;"
     "come nuovo;\n"
     "Giacca in pelle vintage;Taglia M, vera pelle anni 90;45,00;eur;"
     "Abbigliamento;Roma;https://esempio.it/giacca-fronte.jpg|"
@@ -64314,35 +64412,39 @@ MODELLO_IMPORT = (
     # scatola di uno solo. E' il caso del riso da 4 kg che ha aperto
     # il cantiere.
     "Miele di castagno 500g;Produzione propria 2026, vasetto in "
-    "vetro;12,00;eur;Alimenti e bevande;Cuneo;;spedizione;6,00;piccolo;"
+    "vetro;12,00;eur;Alimenti e bevande;Cuneo;miele.jpg;spedizione;6,00;"
+    "piccolo;"
     ";12;4,50;1,50\n"
     "Crema mani alla calendula;Vasetto 50ml, produzione artigianale;"
-    "9,00;eur;Bellezza e benessere;Bergamo;;spedizione;4,00;busta;;30\n"
+    "9,00;eur;Bellezza e benessere;Bergamo;crema.jpg;spedizione;4,00;"
+    "busta;;30\n"
     # la quarta via: consegna digitale (buoni, codici, licenze) —
     # niente spedizione ne' taglia, il codice si consegna dopo
     # l'acquisto dal dettaglio ordine. Dal (ago 2026) i buoni hanno la
     # loro casa, «Buoni ed esperienze», e la condizione resta VUOTA
     # come per gli alimenti: un buono e' nuovo per definizione
     "Buono regalo libreria 25 euro;Codice valido 12 mesi, consegna "
-    "immediata;25,00;eur;Buoni ed esperienze;;;digitale;;;;\n"
+    "immediata;25,00;eur;Buoni ed esperienze;;buono.jpg;digitale;;;;\n"
     # la combo col «+»: tessera spedita O codice in piattaforma,
     # sceglie chi compra
     "Gift card profumeria 50 euro;Tessera fisica spedita oppure codice "
-    "subito;50,00;eur;Buoni ed esperienze;Milano;;spedizione+digitale;"
+    "subito;50,00;eur;Buoni ed esperienze;Milano;giftcard.jpg;"
+    "spedizione+digitale;"
     "5,00;busta;;\n"
     # la quinta via: la PRESTAZIONE, ago 2026. Come il digitale non ha
     # ne' spedizione ne' taglia ne' condizione — e la zona serve solo
     # se la si eroga di persona. Il titolo mostra il confine che la
     # moderazione pretende: quanto dura e che cosa comprende.
     "Lezione di inglese online, un ora;Conversazione con madrelingua, "
-    "livello a scelta;30,00;eur;Lezioni e corsi;;;servizio;;;;\n")
+    "livello a scelta;30,00;eur;Lezioni e corsi;;lezione.jpg;servizio;;;;\n")
 
 
 @app.get("/api/import/modello")
 def modello_import():
     """Il CSV modello da compilare: separatore ; (l'Excel italiano),
-    BOM per l'UTF-8, quattro righe d'esempio che mostrano le tre vie
-    delle foto (nessuna, URL separati da |, nomi file nello ZIP) e
+    BOM per l'UTF-8, le righe d'esempio che mostrano le due vie
+    delle foto (URL separati da |, nomi file nello ZIP — una foto
+    serve sempre, dall'11 ott 2026) e
     le quattro modalita' di consegna (digitale compresa).
     Pubblico come il download dell'export: dentro Telegram il
     download non porta l'header di autenticazione, e qui non c'e'
@@ -64625,6 +64727,19 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
                            "motivo": f"filtro contenuti ({violata})"})
             continue
 
+        # ALMENO UNA FOTO (11 ott 2026, cantiere foto-obbligatorie): la
+        # stessa regola del foglio «Pubblica», detta dove l'import dice
+        # tutti i suoi no — fra gli scarti, col numero di riga, PRIMA
+        # della conferma. Per ultima, cosi' una riga con due difetti si
+        # sente dire prima quello che la foto non cura. Conta solo la
+        # foto che si puo' andare a prendere: un nome che nello ZIP non
+        # c'e', o un indirizzo non ammesso, ha gia' il suo avviso qui
+        # sopra, e questa riga dice cosa ne consegue.
+        if not foto:
+            scarti.append({"riga": numero,
+                           "motivo": MOTIVO_RIGA_SENZA_FOTO})
+            continue
+
         categoria = categoria_tollerante(cella(r, "categoria"))
         righe.append({"riga": numero, "titolo": titolo,
                       "descrizione": descrizione,
@@ -64793,6 +64908,25 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
             con.close()
         for p in problemi:
             lavoro["avvisi"].append({"riga": riga["riga"], "motivo": p})
+        if not nomi:
+            # NESSUNA FOTO E' ENTRATA (11 ott 2026, cantiere
+            # foto-obbligatorie): l'indirizzo non risponde, il file
+            # nello ZIP non e' un'immagine. La riga e' gia' nel database
+            # — il nome dei file vuole l'id — ma niente e' ancora
+            # partito: si ritira con la cancellazione morbida di casa,
+            # come fa pubblica() dal 28 set, e va fra i non riusciti
+            # col suo motivo. I perche' di ogni foto stanno gia' fra
+            # gli avvisi, qui sopra.
+            con = db()
+            con.execute("UPDATE annunci SET stato='rimosso' WHERE id=?",
+                        (annuncio_id,))
+            con.commit()
+            con.close()
+            lavoro["falliti"].append({
+                "riga": riga["riga"], "titolo": riga["titolo"],
+                "motivo": "nessuna foto è entrata: annuncio non "
+                          "pubblicato (controlla le foto e ricaricalo)"})
+            return
     if in_revisione:
         # in attesa dell'umano: fuori da ok (niente promo/match/Nostr),
         # la decisione arrivera' dalla sezione admin del Profilo
@@ -67471,6 +67605,14 @@ def _da_giudicare(prodotti: list, npub: str, venditore_id: int):
                 "WHERE titolo=? AND (venditore_id=? OR contatto_nostr=?)",
                 (titolo, venditore_id, npub)).fetchone()
         if riga is None:
+            # MAI VISTO E SENZA FOTO (11 ott 2026, cantiere
+            # foto-obbligatorie): l'import non lo fa nascere, quindi
+            # giudicarlo sarebbe pagare l'AI ogni ora per un annuncio
+            # che non entra. Sta fra i noti; il giorno che l'evento
+            # porta una foto e' un mai visto come gli altri.
+            if not importa_nostr.foto_evento(e):
+                noti.append(e)
+                continue
             nuovi.append(e)                     # mai visto: si giudica
         elif riga["stato"] != "attivo":
             noti.append(e)                      # gia' deciso, o in attesa
@@ -68769,7 +68911,12 @@ def _righe_da_giudicare(righe: list, connettore: dict,
     E LA BOZZA NON SI GIUDICA (1 ott 2026 sera, decisione di Andrea): una
     riga mai vista che il negozio non pubblica non nasce piu' (vedi
     `_una_riga`), quindi non va all'AI e non prende un posto — sta fra
-    le note, cioe' in `viste`, e nessuno la segna «non giudicata»."""
+    le note, cioe' in `viste`, e nessuno la segna «non giudicata».
+    E NEMMENO IL PRODOTTO SENZA FOTO (11 ott 2026, cantiere
+    foto-obbligatorie, decisione di Andrea): mai visto e senza
+    immagini, non nasce (`_una_riga` lo conta in `senza_foto`) — quindi
+    come la bozza non va all'AI e non prende un posto. Entrera', e si
+    giudichera', al giro in cui il negozio gli da' una foto."""
     con = db()
     nuove, note = [], []
     presi = 0
@@ -68783,6 +68930,9 @@ def _righe_da_giudicare(righe: list, connettore: dict,
         if riga is None:
             if not r.get("attivo", True):
                 note.append(r)                   # una bozza: non nasce
+                continue
+            if not r.get("foto"):
+                note.append(r)                   # senza foto: non nasce
                 continue
             if posti is not None:
                 if presi >= posti:
@@ -69112,6 +69262,17 @@ async def _chiudi_giro_connettore(c: dict, esito: dict):
     # queste chiavi, e il cassetto lo rilegge.
     if esito.get("rimandati"):
         pezzi.append(f"{esito['rimandati']} in arrivo ai prossimi giri")
+    # I SENZA FOTO SI DICONO (11 ott 2026, cantiere foto-obbligatorie),
+    # per la stessa ragione dei rimandati: un prodotto che non entra e
+    # nessuno dice perche' si legge come un import rotto. Un conto e
+    # non una riga per prodotto — e non fa squillare da solo: si dice
+    # quando il rapporto parte per altro, e resta nel cassetto.
+    if esito.get("senza_foto"):
+        n_sf = esito["senza_foto"]
+        pezzi.append(f"{n_sf} senza foto ("
+                     + ("entra" if n_sf == 1 else "entrano")
+                     + " appena sul negozio "
+                     + ("ne ha" if n_sf == 1 else "ne hanno") + " una)")
     coda = ""
     # I TITOLI ENTRATI (set 2026), coi digitali marcati: «quali
     # prodotti sono stati importati» e non solo quanti. I primi

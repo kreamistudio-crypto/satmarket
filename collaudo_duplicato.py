@@ -210,23 +210,49 @@ def main():
     con.commit()
     altrui = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.close()
-    r4 = pubblica({**BASE, "titolo": "Copio le foto di un altro",
-                   "foto": [], "copia_foto_da": altrui})
-    prova("le foto di un altro non si copiano", 0, r4["foto_salvate"])
-    prova("...ma l'annuncio nasce lo stesso", True, bool(r4.get("id")))
-    for storto in (None, "", "pippo", 999999):
-        r5 = pubblica({**BASE, "titolo": f"Storto {storto!r}",
-                       "foto": [], "copia_foto_da": storto})
-        prova(f"id storto ({storto!r}): zero foto, annuncio vivo",
-              (0, True), (r5["foto_salvate"], bool(r5.get("id"))))
+    # DALL'11 OTT 2026 (cantiere foto-obbligatorie) IL PATTO DEL CURSORE
+    # STORTO E' CAMBIATO: prima un id altrui o storto non copiava niente
+    # e l'annuncio nasceva lo stesso, senza foto. Adesso senza foto non
+    # nasce niente — quindi chi non ne sceglie e non ne ha da ereditare
+    # riceve il no della regola, e la guardia di proprieta' si vede dal
+    # fatto che le foto di un altro NON contano come «da ereditare».
+    def rifiuto(corpo):
+        try:
+            pubblica(corpo)
+        except SRV.HTTPException as e:
+            return e.status_code, e.detail
+        return 200, ""
 
-    print("\n[il mondo di ieri]")
-    r6 = pubblica({**BASE, "titolo": "Senza duplicato", "foto": []})
-    prova("pubblicare senza foto resta pubblicare", (0, []),
-          (r6["foto_salvate"], r6["foto_scarti"]))
+    def nate(titolo):
+        con = SRV.db()
+        n = con.execute("SELECT COUNT(*) FROM annunci WHERE titolo=?",
+                        (titolo,)).fetchone()[0]
+        con.close()
+        return n
+
+    r4 = rifiuto({**BASE, "titolo": "Copio le foto di un altro",
+                  "foto": [], "copia_foto_da": altrui})
+    prova("le foto di un altro non si copiano: senza foto sue, e' un no",
+          (400, SRV.MSG_SERVE_UNA_FOTO), r4)
+    prova("...e non nasce nessuna riga", 0,
+          nate("Copio le foto di un altro"))
+    for storto in (None, "", "pippo", 999999):
+        r5 = rifiuto({**BASE, "titolo": f"Storto {storto!r}",
+                      "foto": [], "copia_foto_da": storto})
+        prova(f"id storto ({storto!r}): niente da ereditare, e' un no",
+              (400, 0), (r5[0], nate(f"Storto {storto!r}")))
+    r4b = pubblica({**BASE, "titolo": "Le foto di un altro, ma con la mia",
+                    "foto": [uri(jpeg_vero(4))], "copia_foto_da": altrui})
+    prova("...con una foto propria si pubblica, e di quella altrui niente",
+          1, r4b["foto_salvate"])
+
+    print("\n[senza duplicato]")
+    r6 = rifiuto({**BASE, "titolo": "Senza duplicato", "foto": []})
+    prova("pubblicare senza foto non e' piu' pubblicare",
+          (400, SRV.MSG_SERVE_UNA_FOTO), r6)
     r7 = pubblica({**BASE, "titolo": "Con la sua foto",
                    "foto": [uri(jpeg_vero(3))]})
-    prova("...e con una foto pure", 1, r7["foto_salvate"])
+    prova("...con una foto si'", 1, r7["foto_salvate"])
 
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

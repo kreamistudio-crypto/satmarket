@@ -117,7 +117,7 @@ jobs:
              racconti.py collaudo_racconti_bozza.py collaudo_sponsor.py
              collaudo_numeri_negozio.py
              collaudo_letture_relay.py
-             collaudo_foto_scartate.py
+             collaudo_foto_scartate.py collaudo_foto_obbligatorie.py
              prepara_logo_consigliato.py
              prepara_banner_fee.py ritaglia_banner_fee.py
              collaudo_spedizione_standard.py
@@ -224,6 +224,7 @@ jobs:
              collaudo_inviti
              collaudo_letture_relay
              collaudo_foto_scartate
+             collaudo_foto_obbligatorie
              collaudo_spedizione_standard
              collaudo_catalogo_esterno
              collaudo_nuova_fattura

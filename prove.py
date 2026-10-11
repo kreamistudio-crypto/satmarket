@@ -14751,14 +14751,20 @@ def prove_foto_scarti():
         salta("le miniature mute e l'avviso, girati per davvero",
               "node non installato")
     else:
+        # (11 ott 2026, cantiere foto-obbligatorie: renderFotoPreview
+        # adesso chiama aggiornaObbligoFoto — entrano VERE anche loro,
+        # e il nodo di cartone impara style e gli attributi)
         _pz = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
-            "function anteprimaMuta(i){", "function renderFotoPreview(){",
+            "function anteprimaMuta(i){", "function fotoMancante(){",
+            "function aggiornaObbligoFoto(){",
+            "function renderFotoPreview(){",
             "function avvisoFoto(d, chieste){"))
         _b = """
           const anteprimeMute = new Set();
           let sellFoto = [], editandoId = null, duplicaDaId = null,
               fotoAttuali = [], editandoNostr = false;
-          const nodo = {innerHTML: ''};
+          const nodo = {innerHTML: '', style: {}, setAttribute(){},
+                        removeAttribute(){}};
           function el(){ return nodo; }
           function esc(s){ return s; }
         """ + _pz + """
@@ -14862,6 +14868,362 @@ def prove_foto_scarti():
           and "scarti.append(f\"" not in codice(_sf))
     prova("sentinella: il collaudo delle rotte vere c'e'", True,
           os.path.exists("collaudo_foto_scartate.py"))
+
+
+def prove_foto_obbligatorie():
+    """ALMENO UNA FOTO PER PUBBLICARE (11 ott 2026, cantiere
+    foto-obbligatorie, decisione di Andrea): un annuncio senza foto non
+    nasce piu', per nessun tipo di consegna; chi c'e' gia' resta, e chi
+    ritocca un annuncio nato senza per salvare gliene da' una.
+
+    Le rotte vere e i due importatori veri li gira
+    collaudo_foto_obbligatorie.py. Qui: il giudice del server eseguito,
+    l'ORDINE delle guardie (che un riordino innocente romperebbe senza
+    che nessuna prova funzionale se ne accorga), i due importatori nel
+    punto in cui decidono chi nasce, e il client GIRATO in node — la
+    riga accanto alle foto, il bottone spento ma toccabile, e publish()
+    vera che porta alle foto prima di chiedere titolo e prezzo."""
+    print("\n[almeno una foto per pubblicare]")
+    import json
+    import shutil
+    import sqlite3
+    import subprocess
+    import tempfile
+
+    mini = open("miniapp.html", encoding="utf-8").read()
+    negozio = open("importa_negozio.py", encoding="utf-8").read()
+    nostr = open("importa_nostr.py", encoding="utf-8").read()
+    FRASE = "Aggiungi almeno una foto per pubblicare"
+    FRASE_SALVA = "Aggiungi almeno una foto per salvare"
+
+    # ---- 1) IL GIUDICE DEL SERVER, eseguito --------------------------
+    class _No(Exception):
+        def __init__(self, status_code, detail):
+            self.status_code, self.detail = status_code, detail
+
+    amb = {"json": json, "HTTPException": _No}
+    i = _SORGENTE.index("MSG_SERVE_UNA_FOTO = (")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    exec(pezzo("ha_foto"), amb)
+    exec(pezzo("guardia_almeno_una_foto"), amb)
+    ha, guardia = amb["ha_foto"], amb["guardia_almeno_una_foto"]
+    prova("ha_foto: vuoto, JSON vuoto o storto = no; un nome o un URL = si'",
+          [False, False, False, False, False, False, True, True,
+           False, False, True],
+          [ha(v) for v in ("", None, "[]", '[""]', "storto", '{"a":1}',
+                           '["a1_0.jpg"]', '["https://x.test/a.jpg"]',
+                           [], [""], ["a1_0.jpg"])])
+
+    def esito(nuove, gia=None, messaggio=""):
+        try:
+            guardia(nuove, gia, messaggio)
+        except _No as e:
+            return e.status_code, e.detail
+        return 200, ""
+
+    prova("la guardia: nessuna foto in arrivo e nessuna su cui contare = "
+          "400 con la frase",
+          [(400, amb["MSG_SERVE_UNA_FOTO"])] * 5,
+          [esito(n, g) for n, g in ((None, None), ([], ""), ("stringa", ""),
+                                    ([], "[]"), ([], []))])
+    prova("...una in arrivo, o una gia' li', e passa",
+          [(200, "")] * 4,
+          [esito(["x"]), esito([], '["a1_0.jpg"]'), esito(None, ["a1_0.jpg"]),
+           esito(["x"], '["a1_0.jpg"]')])
+    prova("...e in modifica dice la SUA frase",
+          (400, amb["MSG_SERVE_UNA_FOTO_MODIFICA"]),
+          esito([], "", amb["MSG_SERVE_UNA_FOTO_MODIFICA"]))
+    prova("le frasi dicono «almeno una foto» come la riga del form, e "
+          "non parlano tecnico", True,
+          "almeno una foto" in amb["MSG_SERVE_UNA_FOTO"]
+          and "foto" in amb["MSG_SERVE_UNA_FOTO_MODIFICA"]
+          and "manca la foto" in amb["MOTIVO_RIGA_SENZA_FOTO"]
+          and not any(t in amb[k] for t in ("JSON", "payload", "400", "null")
+                      for k in ("MSG_SERVE_UNA_FOTO",
+                                "MSG_SERVE_UNA_FOTO_MODIFICA",
+                                "MOTIVO_RIGA_SENZA_FOTO")))
+
+    # ---- 2) LE PORTE UMANE: l'ordine delle guardie -------------------
+    _pub = pezzo("pubblica")
+    prova("pubblica(): la foto si chiede dopo i giudici dei campi, prima "
+          "dell'AI e dell'INSERT", True,
+          _pub.index("guardia_venditore_digitale(")
+          < _pub.index("guardia_almeno_una_foto(")
+          < _pub.index("controlla_vietato(")
+          < _pub.index('"INSERT INTO annunci('))
+    prova("...e nel duplicato contano le foto da ereditare, con la "
+          "guardia di proprieta'", True,
+          'foto_da_copiare(user["id"], d.get("copia_foto_da"))'
+          in _pub[_pub.index("guardia_almeno_una_foto("):
+                  _pub.index("controlla_vietato(")])
+    _mod = pezzo("modifica_annuncio")
+    prova("modifica: dopo proprieta', stato e affare in corso; prima "
+          "dell'AI e di ogni scrittura", True,
+          _mod.index("if in_corso:")
+          < _mod.index("guardia_almeno_una_foto(")
+          < _mod.index("controlla_vietato(")
+          < _mod.index("salva_foto, annuncio_id"))
+    prova("...guardando le foto che l'annuncio HA, con la frase del "
+          "salvataggio", True,
+          'guardia_almeno_una_foto(d.get("foto"), a["foto"],' in _mod
+          and "MSG_SERVE_UNA_FOTO_MODIFICA)" in _mod)
+    prova("la modifica FIRMATA di un importato resta fuori (le sue foto "
+          "vivono nell'evento)", (False, False),
+          ("guardia_almeno_una_foto" in pezzo("modifica_firmata_prepara"),
+           "guardia_almeno_una_foto" in pezzo("modifica_firmata")))
+    prova("...e le porte sono due: nessun'altra rotta la chiama", 2,
+          codice(_SORGENTE).count("guardia_almeno_una_foto(") - 1)
+    prova("nessuna scopa: niente spegne gli annunci nati senza foto",
+          False, bool(re.search(
+              r"UPDATE annunci SET stato=[^\n]*WHERE[^\n]*foto\s*(=|IS)",
+              _SORGENTE)))
+
+    # ---- 3) L'IMPORT DA FILE -----------------------------------------
+    _prep = pezzo("import_prepara")
+    prova("import da file: la riga senza foto e' uno scarto, dopo il "
+          "filtro e prima di entrare fra le valide", True,
+          _prep.index("controlla_vietato(titolo, descrizione)")
+          < _prep.index('"motivo": MOTIVO_RIGA_SENZA_FOTO')
+          < _prep.index("righe.append({"))
+    _crea = pezzo("_crea_riga_import")
+    prova("...e la riga le cui foto non entrano si ritira prima di "
+          "essere contata fra le riuscite", True,
+          _crea.index("if not nomi:") < _crea.index("SET stato='rimosso'")
+          < _crea.index('lavoro["falliti"].append(')
+          < _crea.index('lavoro["ok"].append('))
+    i = _SORGENTE.index("MODELLO_IMPORT = (")
+    amb_m = {}
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb_m)
+    righe_m = amb_m["MODELLO_IMPORT"].strip().splitlines()
+    prova("il modello CSV: la settima colonna e' `foto`, e ogni riga "
+          "d'esempio ce l'ha piena", ("foto", []),
+          (righe_m[0].split(";")[6],
+           [r.split(";")[0] for r in righe_m[1:] if not r.split(";")[6]]))
+
+    # ---- 4) I DUE IMPORTATORI: chi nasce -----------------------------
+    i = negozio.index("def _una_riga(")
+    _una = negozio[i:negozio.index("\n\n\ndef ", i)]
+    prova("negozi collegati: il prodotto senza foto non nasce — dopo la "
+          "bozza, prima dei posti e dell'INSERT", True,
+          _una.index('if not r["attivo"]:')
+          < _una.index('if not r["foto"]:')
+          < _una.index("if not puo_creare")
+          < _una.index('"INSERT INTO annunci('))
+    prova("...solo alla NASCITA: chi c'e' gia' e' passato prima, da "
+          "_aggiorna", True,
+          _una.index("_aggiorna(con, gia, r,")
+          < _una.index('if not r["foto"]:'))
+    prova("...e si conta, per dirlo al venditore", True,
+          '"senza_foto": 0' in negozio
+          and 'esito["senza_foto"] += 1' in _una
+          and 'esito.get("senza_foto")' in pezzo("_chiudi_giro_connettore"))
+    # il giudice delle righe, eseguito: una mai vista senza foto non va
+    # all'AI e non prende un posto (come la bozza)
+    with tempfile.TemporaryDirectory() as tmp:
+        percorso = os.path.join(tmp, "banco.db")
+
+        def db():
+            c = sqlite3.connect(percorso)
+            c.row_factory = sqlite3.Row
+            return c
+        con = db()
+        con.execute("CREATE TABLE annunci(connettore_id INT, origine_chiave "
+                    "TEXT, stato TEXT, titolo TEXT, descrizione TEXT)")
+        con.execute("INSERT INTO annunci VALUES(7,'gia','attivo','Miele','x')")
+        con.commit()
+        con.close()
+        amb_g = {"db": db, "controlla_vietato": lambda t, d: None}
+        exec(pezzo("_righe_da_giudicare"), amb_g)
+
+        def riga(k, foto=True, titolo=None):
+            return {"origine_chiave": k, "titolo": titolo or f"Cosa {k}",
+                    "descrizione": "x",
+                    "foto": [f"https://cdn/{k}.jpg"] if foto else []}
+        righe = [riga("s1", False), riga("s2", False), riga("c1"),
+                 riga("c2"), riga("gia", False, "Miele")]
+        nuove, note = amb_g["_righe_da_giudicare"](righe, {"id": 7}, 1)
+        prova("il giudice delle righe: le mai viste senza foto stanno fra "
+              "le note e non prendono il posto",
+              (["c1"], ["s1", "s2", "gia"], ["c2"]),
+              ([r["origine_chiave"] for r in nuove],
+               [r["origine_chiave"] for r in note],
+               [r["origine_chiave"] for r in righe if r.get("rimandata")]))
+    i = nostr.index("def importa_venditore(")
+    _imp = nostr[i:nostr.index("\n\n\ndef ", i)]
+    prova("Nostr: l'evento senza foto non nasce — dopo l'aggiornamento "
+          "di chi c'e' gia', prima dell'INSERT", True,
+          _imp.index('print(f"  ↻ aggiornato')
+          < _imp.index('if not a["foto"]:')
+          < _imp.index('"INSERT INTO annunci('))
+    amb_n = {"json": json}
+    i = nostr.index("def foto_evento(e)")
+    exec(nostr[i:nostr.index("\n\n\n", i)], amb_n)
+    fe = amb_n["foto_evento"]
+    prova("foto_evento: i tag `image` del NIP-99 e le `images` del "
+          "NIP-15, e niente dove non ce n'e'",
+          (["u1", "u2"], [], ["u3"], [], []),
+          (fe({"kind": 30402, "tags": [["image", "u1"], ["d", "x"],
+                                       ["image", "u2"], ["image"]]}),
+           fe({"kind": 30402, "tags": [["title", "t"]]}),
+           fe({"kind": 30018, "content": json.dumps({"images": ["u3", 5]})}),
+           fe({"kind": 30018, "content": "{storto"}),
+           fe({"kind": 30018, "content": "[]"})))
+    prova("...ed e' la stessa lettura di chi scrive l'annuncio (un posto "
+          "solo)", 2, nostr.count("foto = foto_evento(e)"))
+    prova("il server non paga l'AI per l'evento mai visto senza foto",
+          True, "if not importa_nostr.foto_evento(e):"
+          in pezzo("_da_giudicare"))
+
+    # ---- 5) IL CLIENT: la riga, il bottone, il tocco ------------------
+    vv = mini[mini.index('<div class="view" id="view-vendi">'):
+              mini.index("<!-- ============ VISTA: AFFARI")]
+    prova("la riga sta accanto alle foto: dopo il riquadro, prima delle "
+          "miniature", True,
+          vv.index('class="photo-drop"') < vv.index('id="sellFotoObbligo"')
+          < vv.index('id="photoPreview"'))
+    m = re.search(r'id="sellFotoObbligo"[^>]*>([^<]*)<', vv)
+    prova("...nasce accesa, con la frase chiesta", FRASE,
+          m.group(1) if m else None)
+    prova("...corta: una riga anche a 320 px (tetto 45 caratteri)", True,
+          len(FRASE) <= 45 and len(FRASE_SALVA) <= 45)
+    prova("il bottone nasce spento (aria-disabled), e resta un bottone "
+          "solo", True,
+          'id="sellSubmit" onclick="publish()" aria-disabled="true"' in vv)
+    i0 = mini.find("<style>")
+    stile = mini[i0 + 7:mini.find("</style>", i0)]
+    m = re.search(r'#sellSubmit\[aria-disabled="true"\]\{([^}]*)\}', stile)
+    regola = m.group(1) if m else ""
+    prova("lo spento ha il vestito di casa (il fondo neutro), ma il dito "
+          "PASSA", (True, False),
+          ("var(--b-off-bg" in regola and "var(--b-off-fg" in regola,
+           "pointer-events" in regola))
+    prova("...e non e' `disabled`: nessuno spegne davvero #sellSubmit per "
+          "la foto", False,
+          bool(re.search(r"btn\.disabled\s*=\s*manca", mini)))
+    aiuto = mini[mini.index("Hai un catalogo grande?"):
+                 mini.index("scaricaModelloImport()")]
+    prova("l'aiuto dell'import da file dice la regola, e non promette "
+          "piu' «oppure niente»", (True, False),
+          ("almeno una foto" in aiuto and "scartata" in aiuto,
+           "oppure niente" in aiuto))
+
+    if not shutil.which("node"):
+        salta("la riga e il bottone del form, girati per davvero",
+              "node non installato")
+        return
+    pezzi = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function fotoMancante(){", "function aggiornaObbligoFoto(){",
+        "function mostraObbligoFoto(){", "async function publish(){",
+        "function riepilogoGiroConnettore(e){"))
+    banco = """
+      const nodi = {};
+      function el(id){
+        return nodi[id] || (nodi[id] = {textContent: '', style: {},
+          attrs: {}, value: '', mosso: 0,
+          setAttribute(k, v){ this.attrs[k] = v; },
+          removeAttribute(k){ delete this.attrs[k]; },
+          scrollIntoView(){ this.mosso++; }});
+      }
+      const document = {querySelector(s){ return el('q:' + s); }};
+      const detti = [];
+      function toast(m){ detti.push(m); }
+      function tourRidotto(){ return true; }
+      function fmt(n){ return String(n); }
+      function esc(s){ return String(s); }
+      let sellFoto = [], editandoId = null, duplicaDaId = null,
+          fotoAttuali = [], editandoNostr = false, sellValuta = 'sats';
+    """ + pezzi + """
+      function stato(){
+        aggiornaObbligoFoto();
+        return {manca: fotoMancante(),
+                testo: el('sellFotoObbligo').textContent,
+                vista: el('sellFotoObbligo').style.display !== 'none',
+                spento: el('sellSubmit').attrs['aria-disabled'] === 'true'};
+      }
+      const metti = (f, id, dup, att, nostr) => {
+        sellFoto = f; editandoId = id; duplicaDaId = dup;
+        fotoAttuali = att; editandoNostr = nostr; return stato(); };
+      const out = {};
+      out.nuovo = metti([], null, null, [], false);
+      out.conFoto = metti(['data:image/jpeg;base64,X'], null, null, [], false);
+      out.caricando = metti(['caricando:1'], null, null, [], false);
+      out.modCon = metti([], 5, null, ['a5_0.jpg'], false);
+      out.modSenza = metti([], 5, null, [], false);
+      out.modSenzaNuova = metti(['data:image/jpeg;base64,X'], 5, null, [], false);
+      out.dupCon = metti([], null, 5, ['a5_0.jpg'], false);
+      out.dupSenza = metti([], null, 5, [], false);
+      out.firmata = metti([], 5, null, [], true);
+      (async () => {
+        metti([], null, null, [], false);
+        detti.length = 0;
+        await publish();
+        out.tocco = {detti: detti.slice(),
+                     mosso: el('q:#view-vendi .photo-drop').mosso};
+        metti(['data:image/jpeg;base64,X'], null, null, [], false);
+        detti.length = 0;
+        await publish();
+        out.oltre = detti.slice();
+        out.giro0 = riepilogoGiroConnettore({});
+        out.giro1 = riepilogoGiroConnettore({senza_foto: 1});
+        out.giro2 = riepilogoGiroConnettore({senza_foto: 2, nuovi: 1,
+          entrati: [{titolo: 'Miele'}]});
+        console.log(JSON.stringify(out));
+      })();
+    """
+    r = subprocess.run(["node", "-e", banco], capture_output=True, text=True,
+                       encoding="utf-8", timeout=60)
+    try:
+        o = json.loads((r.stdout or "").strip())
+    except Exception:
+        prova("il banco del form gira", True,
+              f"node ha detto: {(r.stderr or '')[:400]}")
+        return
+    acceso = {"manca": False, "vista": False, "spento": False}
+    senza = lambda d: {k: d[k] for k in ("manca", "vista", "spento")}
+    prova("form nuovo senza foto: la riga si vede, con la frase, e il "
+          "bottone e' spento",
+          {"manca": True, "testo": FRASE, "vista": True, "spento": True},
+          o["nuovo"])
+    prova("con una foto: la riga sparisce e il bottone si accende",
+          acceso, senza(o["conFoto"]))
+    prova("...anche mentre la foto sta ancora caricando (se poi non entra "
+          "si torna spenti)", acceso, senza(o["caricando"]))
+    prova("modifica di un annuncio che le foto le ha: niente da chiedere",
+          acceso, senza(o["modCon"]))
+    prova("modifica di un annuncio nato SENZA: per salvare ne serve una, "
+          "e la riga dice «per salvare»",
+          {"manca": True, "testo": FRASE_SALVA, "vista": True,
+           "spento": True}, o["modSenza"])
+    prova("...e scegliendola il bottone si accende", acceso,
+          senza(o["modSenzaNuova"]))
+    prova("duplicato: eredita le foto dell'originale; senza, e' un form "
+          "che pubblica", (acceso, {"manca": True, "testo": FRASE,
+                                    "vista": True, "spento": True}),
+          (senza(o["dupCon"]), o["dupSenza"]))
+    prova("la modifica firmata di un importato resta fuori: mai spenta "
+          "per la foto", acceso, senza(o["firmata"]))
+    prova("il tocco sul bottone spento porta alle foto e ripete la riga "
+          "— e non chiede altro", ([FRASE], 1),
+          (o["tocco"]["detti"], o["tocco"]["mosso"]))
+    prova("...con la foto publish() va oltre, ai controlli di sempre",
+          ["Titolo e prezzo sono obbligatori"], o["oltre"])
+    prova("il cassetto del negozio: i senza foto si dicono, uno o tanti, "
+          "e senza niente da dire tace",
+          ("", True, True),
+          (o["giro0"],
+           "1 senza foto: entra appena sul negozio ne ha una" in o["giro1"],
+           "2 senza foto: entrano appena sul negozio ne hanno una"
+           in o["giro2"]))
+
+    # ---- 6) IL COLLAUDO DELLE ROTTE VERE E' IN CI ---------------------
+    flusso = open(os.path.join(".github", "workflows", "prove.yml"),
+                  encoding="utf-8").read()
+    prova("collaudo_foto_obbligatorie.py c'e', compila e gira nella "
+          "gabbia", (True, True, True),
+          (os.path.exists("collaudo_foto_obbligatorie.py"),
+           "collaudo_foto_obbligatorie.py" in flusso,
+           re.search(r"^\s+collaudo_foto_obbligatorie\s*$", flusso, re.M)
+           is not None))
 
 
 def prove_foto_vuota():
@@ -101499,7 +101861,10 @@ def prove_connettori_ingresso():
     def riga(chiave, titolo="Miele", attivo=True, quantita=5, **kw):
         r = {"origine_chiave": chiave, "titolo": titolo,
              "descrizione": "Buono", "prezzo_sats": 1000,
-             "prezzo_eur": 7.5, "foto": [], "quantita": quantita,
+             "prezzo_eur": 7.5, "quantita": quantita,
+             # una foto a testa (11 ott 2026, cantiere foto-obbligatorie):
+             # senza, un prodotto mai visto non nasce piu'
+             "foto": [f"https://negozio.test/{chiave}.jpg"],
              "attivo": attivo}
         r.update(kw)
         return r
@@ -102021,8 +102386,11 @@ def prove_connettori_varianti():
     prova("il titolo lungo tiene l'opzione", (True, 120),
           (lungo.endswith("— cartaceo"), len(lungo)))
     # il prodotto semplice passa dall'esplosione COM'E'
+    # con la sua foto (11 ott 2026, cantiere foto-obbligatorie): senza,
+    # un prodotto mai visto non nasce piu'
     semplice = {"id": 9, "name": "Tazza", "type": "simple", "price": "5",
-                "status": "publish", "virtual": False}
+                "status": "publish", "virtual": False,
+                "images": [{"src": "https://cdn/tazza.jpg"}]}
     prova("il prodotto semplice e' invariato", (1, "9", "Tazza", False),
           (len(esplodi_w(semplice)),
            traduci([semplice], "woo", CAMBIO)[0]["origine_chiave"],
@@ -102352,7 +102720,10 @@ def prove_famiglie():
                 "status": "publish", "catalog_visibility": "visible",
                 "price": "30.00", "regular_price": "30.00",
                 "manage_stock": False, "stock_quantity": None,
-                "stock_status": "instock", "images": [],
+                "stock_status": "instock",
+                # una foto a testa (11 ott 2026, cantiere foto-obbligatorie):
+                # senza, un prodotto mai visto non nasce piu'
+                "images": [{"src": f"https://cdn/{pid}.jpg"}],
                 "categories": [{"name": "Abbigliamento"}],
                 **({"_variazioni": variazioni} if variazioni else {})}
 
@@ -102404,7 +102775,8 @@ def prove_famiglie():
 
     # --- Shopify: i nomi sul padre, i valori sulla variante ----------
     felpa = {"id": 4, "title": "Felpa", "body_html": "", "status": "active",
-             "images": [], "options": [{"name": "Taglia"}, {"name": "Colore"}],
+             "images": [{"src": "https://cdn/felpa.jpg"}],
+             "options": [{"name": "Taglia"}, {"name": "Colore"}],
              "variants": [{"id": 41, "title": "S / Nero", "price": "35.00",
                            "option1": "S", "option2": "Nero",
                            "inventory_management": None},
@@ -135370,7 +135742,10 @@ def prove_db_contesa_negozi():
 
     # --- 3) le sparizioni a lotti ------------------------------------------
     percorso3, con3 = banco()
-    gira(con3, [riga(k) for k in range(60)], lambda *a: None)
+    # con la loro foto (11 ott 2026, cantiere foto-obbligatorie): senza,
+    # le sessanta non nascerebbero, e non ci sarebbe niente da spegnere
+    gira(con3, [riga(k, (f"https://cdn/{k}.jpg",)) for k in range(60)],
+         lambda *a: None)
     tracce = []
     con3.set_trace_callback(tracce.append)
     esito = gira(con3, [], lambda *a: None)
@@ -135595,8 +135970,11 @@ def prove_negozi_grandi():
     giudica = amb_a["_righe_da_giudicare"]
 
     def riga(k, titolo=None, descr="x", **kw):
+        # con la sua foto (11 ott 2026, cantiere foto-obbligatorie):
+        # la mai vista senza foto non si giudica — lo prova
+        # prove_foto_obbligatorie, qui si provano i posti
         r = {"origine_chiave": k, "titolo": titolo or f"Cosa {k}",
-             "descrizione": descr}
+             "descrizione": descr, "foto": [f"https://cdn/{k}.jpg"]}
         r.update(kw)
         return r
 
@@ -135675,7 +136053,10 @@ def prove_negozi_grandi():
         return {"id": k, "name": titolo or f"Cosa {k}",
                 "description": f"<p>{descr}</p>", "type": "simple",
                 "status": "publish", "price": "7.50", "manage_stock": True,
-                "stock_quantity": 3, "stock_status": "instock", "images": [],
+                "stock_quantity": 3, "stock_status": "instock",
+                # una foto a testa (11 ott 2026, cantiere foto-obbligatorie):
+                # senza, un prodotto mai visto non nasce piu'
+                "images": [{"src": f"https://cdn/{k}.jpg"}],
                 "categories": [{"name": "Casa"}]}
 
     def banco_giro(catalogo, **leve):
@@ -135957,7 +136338,8 @@ def prove_negozi_grandi():
     def woo(pid, tipo="simple", variazioni=None, al_prossimo=False):
         p = {"id": pid, "name": f"Prodotto {pid}", "description": "x", "type": tipo,
              "status": "publish", "price": "5.00", "manage_stock": True,
-             "stock_quantity": 2, "stock_status": "instock", "images": [],
+             "stock_quantity": 2, "stock_status": "instock",
+             "images": [{"src": f"https://cdn/{pid}.jpg"}],
              "categories": []}
         if variazioni is not None:
             p["_variazioni"] = [{"id": v, "price": "5.00", "status": "publish",
@@ -136323,7 +136705,8 @@ def prove_negozi_grandi():
     db_l = banco_db()
     con_l = db_l()
     felpa = {"id": 300, "name": "Felpa", "description": "x", "type": "variable",
-             "status": "publish", "price": "5.00", "images": [], "categories": [],
+             "status": "publish", "price": "5.00",
+             "images": [{"src": "https://cdn/300.jpg"}], "categories": [],
              "_variazioni": [{"id": v, "price": "5.00", "status": "publish",
                               "manage_stock": True, "stock_quantity": 2,
                               "attributes": [{"name": "Taglia", "option": t_}]}
@@ -146526,6 +146909,7 @@ def main():
               prove_indirizzo_lightning,
               prove_logo_compra_vendi,
               prove_avviso_dm_nostr,
+              prove_foto_obbligatorie,
               prove_config_esempio):
         try:
             f()

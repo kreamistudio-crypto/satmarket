@@ -85,7 +85,11 @@ def prodotto_woo(pid, nome, tipo="simple", descrizione=None):
             "description": f"<p>{descrizione or f'Descrizione {pid}'}</p>",
             "type": tipo, "status": "publish", "catalog_visibility": "visible",
             "price": "7.50", "regular_price": "7.50", "manage_stock": True,
-            "stock_quantity": 12, "stock_status": "instock", "images": [],
+            "stock_quantity": 12, "stock_status": "instock",
+            # una foto a testa (11 ott 2026, cantiere
+            # foto-obbligatorie): senza, un prodotto mai visto non
+            # nasce — il download e' di cartone, resta l'indirizzo
+            "images": [{"src": f"https://negozio.test/{pid}.jpg"}],
             "categories": [{"id": 1, "name": "Casa"}]}
 
 
@@ -99,7 +103,8 @@ def variazione_woo(vid, opzione):
 
 def prodotto_shopify(pid):
     return {"id": pid, "title": f"Tazza {pid}", "body_html": "<p>Buona</p>",
-            "status": "active", "product_type": "Casa", "images": [],
+            "status": "active", "product_type": "Casa",
+            "images": [{"src": f"https://negozio.test/{pid}.jpg"}],
             "variants": [{"id": pid * 10, "price": "9.00",
                           "inventory_quantity": 4,
                           "inventory_management": "shopify"}]}

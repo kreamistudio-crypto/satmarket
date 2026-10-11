@@ -8549,6 +8549,19 @@
     background:var(--b-off-bg,var(--b-bg));color:var(--b-off-fg,var(--b-fg));
     border-color:var(--b-off-line,var(--b-line));box-shadow:var(--b-off-sh,var(--b-sh));
     opacity:var(--b-off-op)}
+  /* SPENTO MA SI TOCCA (11 ott 2026, cantiere foto-obbligatorie): il
+     «Pubblica» senza nemmeno una foto. Stesso vestito dello spento
+     qui sopra — il fondo neutro pieno, lo dice l'occhio — ma il dito
+     PASSA: un tocco porta al riquadro delle foto e ripete la riga
+     («Aggiungi almeno una foto per pubblicare»). Con `disabled` il
+     bottone in fondo allo schermo non risponderebbe e la ragione
+     starebbe in cima alla pagina, dove non si guarda: il bottone che
+     «non fa niente», la lezione di aggiungiFoto. Per questo
+     aria-disabled e non disabled, e solo su questo bottone. */
+  #sellSubmit[aria-disabled="true"]{
+    background:var(--b-off-bg,var(--b-bg));color:var(--b-off-fg,var(--b-fg));
+    border-color:var(--b-off-line,var(--b-line));box-shadow:var(--b-off-sh,var(--b-sh));
+    opacity:var(--b-off-op)}
   /* IN CORSO (aria-busy, da bottoneInAttesa): e' spento per il dito ma
      NON per l'occhio — tiene il colore del suo ruolo (le --b-off-… si
      svuotano e vince il ripiego) e una luce gli passa sopra. Ferma a
@@ -12225,6 +12238,13 @@ document.getElementById('cartello')?.remove();</script>
                     onclick="event.stopPropagation(); el('sellPhotos').click()">🖼️ Dalla galleria</button>
           </div>
         </div>
+        <!-- ALMENO UNA FOTO PER PUBBLICARE (11 ott 2026, cantiere
+             foto-obbligatorie, decisione di Andrea). La riga sta QUI,
+             attaccata al riquadro che la cura, e non sotto il bottone:
+             dice cosa manca nel posto dove lo si mette. Nasce accesa
+             (un form nuovo non ha foto) e la spegne aggiornaObbligoFoto
+             alla prima foto; in modifica dice «per salvare». -->
+        <div id="sellFotoObbligo" aria-live="polite" style="margin-top:6px;font-size:12.5px;font-weight:700;color:var(--sats-text);line-height:1.45">Aggiungi almeno una foto per pubblicare</div>
         <!-- LA REGOLA DELLE FOTO IN MODIFICA (ago 2026): o tutte o
              nessuna — se ne carichi di nuove sostituiscono in blocco
              quelle attuali, e se non ne tocchi nessuna restano quelle.
@@ -12412,7 +12432,7 @@ document.getElementById('cartello')?.remove();</script>
            bottone di sempre, in fondo al form. Vedi LA MORFOSI DEL + NEL
            MERCATINO, nel CSS. -->
       <div class="vendi-piede" id="vendiPiede">
-        <button class="btn orange" id="sellSubmit" onclick="publish()">⚡ Pubblica annuncio</button>
+        <button class="btn orange" id="sellSubmit" onclick="publish()" aria-disabled="true">⚡ Pubblica annuncio</button>
       </div>
     </div>
   </div>
@@ -12557,14 +12577,14 @@ document.getElementById('cartello')?.remove();</script>
         <div class="acc-b">
           <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
             Hai un catalogo grande? Compila il modello CSV (una riga = un
-            annuncio, massimo 500 per volta) e caricalo qui. Le foto in
-            tre modi: URL nella colonna <b>foto</b> (più d'uno separati
-            da <b>|</b>), nomi di file dentro uno ZIP, oppure niente —
-            le aggiungi poi con Modifica.</div>
+            annuncio, massimo 500 per volta) e caricalo qui. Ogni riga
+            vuole <b>almeno una foto</b>, in due modi: URL nella colonna
+            <b>foto</b> (più d'uno separati da <b>|</b>) oppure nomi di
+            file dentro uno ZIP. Una riga senza foto viene scartata.</div>
           <button class="btn ghost" style="margin-top:10px" onclick="scaricaModelloImport()">📄 Scarica il modello CSV</button>
           <div class="field" style="margin-top:12px"><label>Il tuo file CSV</label>
             <input id="importCsv" type="file" accept=".csv,text/csv"></div>
-          <div class="field"><label>ZIP delle foto (facoltativo)</label>
+          <div class="field"><label>ZIP delle foto (se nel file hai scritto i nomi)</label>
             <input id="importZip" type="file" accept=".zip,application/zip"></div>
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-top:4px;cursor:pointer">
             <input type="checkbox" id="importNostr" checked> Pubblica gli annunci anche su Nostr</label>
@@ -37541,7 +37561,11 @@ function riepilogoGiroConnettore(e){
   const entrati = Array.isArray(e.entrati) ? e.entrati.filter(x => x && x.titolo) : [];
   const saltati = Array.isArray(e.saltati) ? e.saltati.filter(x => x && x.perche) : [];
   const corrette = Number(e.consegna_corretta) || 0;
-  if (!entrati.length && !saltati.length && !corrette) return '';
+  /* i prodotti che non entrano perche' sul negozio non hanno nemmeno
+     un'immagine (11 ott 2026, cantiere foto-obbligatorie): un conto,
+     come lo manda il server — e il perche', che e' anche il rimedio */
+  const senzaFoto = Number(e.senza_foto) || 0;
+  if (!entrati.length && !saltati.length && !corrette && !senzaFoto) return '';
   const st = 'font-size:12px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:4px';
   const voce = t => `<div style="padding-left:10px">• ${t}</div>`;
   let h = `<div style="${st}">`;
@@ -37553,6 +37577,7 @@ function riepilogoGiroConnettore(e){
     if ((e.nuovi || entrati.length) > 5) h += voce(`…e altri ${fmt((e.nuovi || entrati.length) - 5)}`);
   }
   if (corrette) h += `<div>${fmt(corrette)} con la consegna corretta (digitale ⇄ del cassetto)</div>`;
+  if (senzaFoto) h += `<div>${fmt(senzaFoto)} senza foto: ${senzaFoto === 1 ? 'entra appena sul negozio ne ha' : 'entrano appena sul negozio ne hanno'} una</div>`;
   if (saltati.length){
     h += `<div>Saltati (${fmt(saltati.length)}):</div>`;
     h += saltati.slice(0, 5).map(x => voce(`${esc(x.titolo || '—')}: ${esc(x.perche)}`)).join('');
@@ -46309,9 +46334,15 @@ function aggiornaFormVendi(){
        dicono in una riga: la modifica e' subito in vetrina, ma
        ripassa dalla moderazione come un annuncio nuovo. */
     if (el('sellTitolo')) el('sellTitolo').textContent = 'Modifica annuncio';
+    /* «Sostituisci» e la nota parlano di foto che CI SONO. Sull'annuncio
+       nato senza (11 ott 2026, cantiere foto-obbligatorie: per salvare
+       ne serve una) direbbero di sostituire il niente, proprio accanto
+       alla riga che chiede di aggiungerne una: li' si dice «Aggiungi». */
     if (el('sellFotoEtichetta'))
-      el('sellFotoEtichetta').textContent = 'Sostituisci le foto (fino a 5)';
-    if (el('sellFotoNota')) el('sellFotoNota').style.display = '';
+      el('sellFotoEtichetta').textContent = fotoAttuali.length
+        ? 'Sostituisci le foto (fino a 5)' : 'Aggiungi foto (fino a 5)';
+    if (el('sellFotoNota'))
+      el('sellFotoNota').style.display = fotoAttuali.length ? '' : 'none';
     /* «la consegna compresa» solo dove la consegna si dichiara
        davvero: sui due importati digitali il blocco non c'e', e quella
        coda sarebbe una promessa che la pagina non mantiene (visto a
@@ -46384,6 +46415,9 @@ function aggiornaFormVendi(){
   /* Le foto degli importati vivono sui relay: qui non si cambiano
      (v1, invariato). */
   if (drop) drop.style.display = editandoNostr ? 'none' : '';
+  /* la riga «almeno una foto» e il bottone seguono la faccia del form
+     (pubblica / salva / firmata): cantiere foto-obbligatorie */
+  aggiornaObbligoFoto();
   /* LA CONSEGNA INVECE SI DICHIARA (ago 2026), e qui c'era scritto il
      contrario: «la modifica firmata rispecchia l'evento NIP-99, che
      non la porta — il form non deve fingere». Era vero prima del
@@ -47072,7 +47106,55 @@ function anteprimaMuta(i){
   }
 }
 
+/* ══ ALMENO UNA FOTO PER PUBBLICARE (11 ott 2026, cantiere
+   foto-obbligatorie, decisione di Andrea) ══
+   Un annuncio senza foto non nasce piu': il bottone resta spento e la
+   riga accanto al riquadro dice cosa manca. Il giudice vero e' il
+   SERVER (`guardia_almeno_una_foto`, stessa frase): qui si evita il
+   viaggio e si dice il no nel posto dove si cura.
+   CONTA COME FOTO: una scelta adesso (anche il chip che sta ancora
+   caricando — se poi non entra, aggiungiFoto la toglie e si torna
+   qui), oppure quelle che l'annuncio ha gia' (in modifica) o eredita
+   (nel duplicato). L'annuncio nato senza, che e' rimasto online: chi
+   lo ritocca per salvare ne aggiunge una.
+   FUORI la modifica FIRMATA di un importato da Nostr: le sue foto
+   vivono nell'evento e da questo form non si toccano (lo dice la riga
+   sotto le miniature), quindi chiederne una qui sarebbe chiedere una
+   cosa che il form non lascia fare. */
+function fotoMancante(){
+  if (editandoNostr) return false;
+  if (sellFoto.length) return false;
+  return !((editandoId || duplicaDaId) && fotoAttuali.length);
+}
+function aggiornaObbligoFoto(){
+  const manca = fotoMancante();
+  const riga = el('sellFotoObbligo'), btn = el('sellSubmit');
+  if (riga) {
+    riga.textContent = editandoId
+      ? 'Aggiungi almeno una foto per salvare'
+      : 'Aggiungi almeno una foto per pubblicare';
+    riga.style.display = manca ? '' : 'none';
+  }
+  /* aria-disabled e non disabled: il dito deve passare, e publish()
+     risponde portando alle foto (vedi il CSS, «SPENTO MA SI TOCCA») */
+  if (btn) {
+    if (manca) btn.setAttribute('aria-disabled', 'true');
+    else btn.removeAttribute('aria-disabled');
+  }
+}
+/* Il tocco sul bottone spento: si va al riquadro e la riga si ripete
+   in un toast, che e' il modo di casa di dire «manca questo». */
+function mostraObbligoFoto(){
+  aggiornaObbligoFoto();
+  const drop = document.querySelector('#view-vendi .photo-drop');
+  if (drop) drop.scrollIntoView({block:'center',
+    behavior: tourRidotto() ? 'auto' : 'smooth'});
+  toast(el('sellFotoObbligo')?.textContent
+    || 'Aggiungi almeno una foto per pubblicare');
+}
+
 function renderFotoPreview(){
+  aggiornaObbligoFoto();
   if ((editandoId || duplicaDaId) && !sellFoto.length && fotoAttuali.length){
     /* In modifica: si vedono le foto attuali; appena se ne scelgono
        di nuove, il set si sostituisce per intero. Per gli importati
@@ -47133,6 +47215,11 @@ function avvisoFoto(d, chieste){
 }
 
 async function publish(){
+  /* LA FOTO PER PRIMA (11 ott 2026, cantiere foto-obbligatorie): e' la
+     ragione per cui il bottone e' spento, quindi e' la prima cosa che
+     il tocco deve dire — prima di titolo e prezzo, che il bottone
+     acceso non promette comunque. */
+  if (fotoMancante()) { mostraObbligoFoto(); return; }
   const t = el('sellTitle').value.trim();
   const p = sellValuta==='eur' ? prezzoEurForm() : (parseInt(el('sellPrice').value)||0);
   if (!t || !p) { toast('Titolo e prezzo sono obbligatori'); return; }

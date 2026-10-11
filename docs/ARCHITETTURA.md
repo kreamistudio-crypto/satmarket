@@ -6353,8 +6353,12 @@
   copiano le proprie foto e mai quelle di un altro. Sono pubbliche e
   chiunque potrebbe riscaricarle a mano, ma qui si SCRIVONO dei file
   sul nostro disco, e ogni scrittura vuole il suo recinto. Un id
-  storto o inesistente non è un errore — non si copia niente, e
-  l'annuncio nasce lo stesso senza foto: il patto del cursore storto.
+  storto o inesistente non copia niente — e dall'11 ott 2026 (vedi
+  «ALMENO UNA FOTO PER PUBBLICARE») senza foto proprie l'annuncio non
+  nasce: prima nasceva lo stesso, vuoto (il patto del cursore storto),
+  adesso è il no della regola, con la sua frase. La guardia di
+  proprietà si vede proprio da lì: le foto di un altro non contano
+  come «da ereditare».
   E LA WHITELIST DELLE FORME (`NOME_FOTO`) VALE ANCHE QUI: quei nomi
   arrivano dal nostro database, ma una lettura di file non si apre mai
   su un nome che non si è guardato — ed è anche ciò che tiene fuori
@@ -6699,6 +6703,57 @@
   che partono grezze (`readAsDataURL`, niente canvas): le foto degli
   annunci passano dal canvas o da `/foto/anteprima`, che raddrizzavano
   già.
+  ALMENO UNA FOTO PER PUBBLICARE (11 ott 2026, cantiere
+  foto-obbligatorie, decisione di Andrea). Sul mercatino un annuncio
+  senza foto non nasce più, per NESSUN tipo di consegna: la domanda
+  sui contenuti digitali e sui servizi è stata fatta e la risposta è
+  «regola per tutti» (quel giorno la foto ce l'avevano già 54 digitali
+  su 55 e 19 servizi su 20). Il giudice è uno, nel server:
+  `guardia_almeno_una_foto(nuove, gia)`, con `ha_foto` che legge la
+  colonna (JSON di nomi o di URL; storto = no) e le tre frasi
+  (`MSG_SERVE_UNA_FOTO`, `MSG_SERVE_UNA_FOTO_MODIFICA`,
+  `MOTIVO_RIGA_SENZA_FOTO`). Guarda solo SE ce ne sono: se sono buone
+  lo dice `salva_foto`, e se le scarta tutte l'annuncio non nasce
+  comunque (la pubblicazione ritirata del 28 set). Insieme: nessuna
+  foto scelta = no SUBITO, prima dell'AI e dell'INSERT, senza una
+  riga da ritirare; scelte e tutte scartate = no DOPO, col motivo di
+  ognuna.
+  LE PORTE. `pubblica()` — il foglio della Mini App e del sito, che
+  sono la stessa pagina e la stessa rotta; nel duplicato contano le
+  foto da ereditare, lette con la guardia di proprietà.
+  `modifica_annuncio()` — dopo proprietà, stato e affare in corso
+  (chi non può modificare deve sentirsi dire quello) e prima dell'AI:
+  l'annuncio nato senza foto resta online com'è, ma per salvare un
+  ritocco ne serve una (gli storici si mettono in regola al primo
+  ritocco, come per le condizioni). L'import da file: la riga senza
+  una foto raggiungibile è uno SCARTO col motivo, nell'anteprima; la
+  riga le cui foto poi non entrano si ritira ('rimosso') e va fra i
+  non riusciti; il modello CSV porta una foto in ogni riga. I negozi
+  collegati (`_una_riga`) e Nostr (`importa_venditore`): un prodotto
+  MAI VISTO senza immagini non nasce — nessuna riga, nessuna lapide,
+  nessuna chiamata all'AI (`_righe_da_giudicare` e `_da_giudicare` lo
+  lasciano fra i noti) — ed entra al giro in cui la fonte gliene dà
+  una; nei negozi si conta (`senza_foto`) e il conto arriva al
+  venditore, nel rapporto e nel cassetto.
+  CHI C'È GIÀ RESTA, ed è una decisione: nessuna scopa, nessun
+  annuncio spento, nemmeno l'importato che la foto la PERDE alla
+  fonte (si aggiorna come sempre e resta in vetrina).
+  FUORI, apposta: la modifica FIRMATA di un importato da Nostr (le
+  sue foto vivono nell'evento, dal nostro form non si toccano), il
+  rifornimento dei pezzi e «rimetti in vendita» (non sono una
+  modifica dell'annuncio), il bot (non crea annunci) e il P2P (non
+  sono annunci).
+  IL CLIENT dice il no dove si cura: la riga `#sellFotoObbligo`
+  accanto al riquadro («Aggiungi almeno una foto per pubblicare», in
+  modifica «…per salvare») e il bottone `#sellSubmit` SPENTO MA
+  TOCCABILE — `aria-disabled`, non `disabled`: ha il vestito dello
+  spento di casa ma il dito passa, e `publish()` per prima cosa porta
+  alle foto e ripete la riga. Con `disabled` il bottone attaccato in
+  fondo allo schermo non risponderebbe e la ragione starebbe in cima
+  alla pagina. Conta come foto anche il chip che sta caricando e, in
+  modifica e nel duplicato, quelle che l'annuncio ha già
+  (`fotoMancante`, `aggiornaObbligoFoto`, chiamata da
+  `renderFotoPreview` e da `aggiornaFormVendi`).
   NESSUNA FOTO SPARISCE IN SILENZIO (ago 2026, caso dal campo: «carico
   un JPG dal computer, qualche mega, e non succede NULLA — nessun
   errore, nessun chip»). La causa NON era il canvas, ed è la prima

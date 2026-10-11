@@ -99,6 +99,12 @@ def avvio():
     os.chdir(QUI)
     import server
     SRV = server
+    # LA FOTO DI CARTONE (11 ott 2026, cantiere foto-obbligatorie):
+    # senza almeno una foto un annuncio non si pubblica piu', e questo
+    # collaudo non parla di foto. La rotta ne riceve una finta e
+    # `salva_foto` risponde col nome, senza scrivere nessun file.
+    server.salva_foto = lambda aid, foto, versione="": (
+        [f"a{aid}_0.jpg"], [])
 
     async def ok_ai(*a, **k):
         return None
@@ -191,7 +197,7 @@ def main():
     chi({"id": 222, "nome": "Vende", "first_name": "Vende", "username": "vende"})
     base = {"titolo": "Consulenza 30 min", "descrizione": "call di mezz'ora",
             "prezzo_sats": 30000, "categoria": "Lezioni e corsi",
-            "consegna": "servizio", "foto": []}
+            "consegna": "servizio", "foto": ["foto-di-cartone"]}
 
     # --- 1-3: pubblica IGNORA lo stock del client, scrive il limite --
     r = pubblica({**base, "quantita": 5})

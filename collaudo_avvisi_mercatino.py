@@ -92,6 +92,12 @@ def avvio():
     os.chdir(QUI)
     import server
     SRV = server
+    # LA FOTO DI CARTONE (11 ott 2026, cantiere foto-obbligatorie):
+    # senza almeno una foto un annuncio non si pubblica piu', e questo
+    # collaudo non parla di foto. La rotta ne riceve una finta e
+    # `salva_foto` risponde col nome, senza scrivere nessun file.
+    server.salva_foto = lambda aid, foto, versione="": (
+        [f"a{aid}_0.jpg"], [])
 
     async def zitto(*a, **k):
         return None
@@ -149,7 +155,8 @@ def chiama(rotta, corpo, tg_id, *args):
 def corpo_annuncio(titolo, categoria, sats):
     return {"titolo": titolo, "prezzo_sats": sats, "categoria": categoria,
             "zona": "Torino (TO)", "descrizione": "Una cosa", "consegna": "ritiro",
-            "quantita": 1, "condizione": "nuovo", "foto": []}
+            "quantita": 1, "condizione": "nuovo",
+            "foto": ["foto-di-cartone"]}
 
 
 def pubblica(tg_id, titolo, categoria=CAT, sats=30000):

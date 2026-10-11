@@ -146,9 +146,13 @@ def evento(d, titolo, sats=50_000, descrizione="Licenza annuale.",
            venduto=False, eid=None):
     """Un NIP-99 suo: firmato dalla SUA chiave, con una coordinata sua
     (mai `barattolo-N`, che sarebbe un riflesso e lo filtra un'altra
-    guardia). Niente tag `image`: cosi' non si scarica niente."""
+    guardia). Il tag `image` c'e' dall'11 ott 2026 (cantiere
+    foto-obbligatorie: un evento mai visto senza foto non nasce), e
+    non si scarica niente lo stesso: `importa()` passa uno scaricatore
+    di cartone, e resta l'indirizzo."""
     tags = [["d", d], ["title", titolo], ["price", str(sats), "SAT"],
-            ["location", "Pavia (PV)"]]
+            ["location", "Pavia (PV)"],
+            ["image", f"https://foto.test/{d}.jpg"]]
     if venduto:
         tags.append(["status", "sold"])
     return {"id": eid or ("ff" * 32), "pubkey": CHIAVE, "kind": 30402,
@@ -172,7 +176,8 @@ def importa():
     """Il giro VERO. Il cambio si passa a mano (il patto del `vaglio`):
     con None se lo leggerebbe da CoinGecko."""
     return IMP.importa_venditore(NPUB, VENDITORE, db=SRV.DB,
-                                 cambio={"EUR": 60_000.0, "USD": 65_000.0})
+                                 cambio={"EUR": 60_000.0, "USD": 65_000.0},
+                                 scarica=lambda url: None)
 
 
 def semina():

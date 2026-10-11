@@ -566,6 +566,25 @@ def testo_evento(e):
     return spoglia_titolo(titolo)[:120], (desc or "—").strip()[:1500]
 
 
+def foto_evento(e) -> list:
+    """Gli URL delle foto che l'evento dichiara, al massimo cinque: i
+    tag `image` del NIP-99, la lista `images` del NIP-15. E' la stessa
+    lettura di `estrai_annuncio`, messa in un posto solo l'11 ott 2026
+    (cantiere foto-obbligatorie) perche' adesso la fanno in due: chi
+    scrive l'annuncio e chi decide se un evento mai visto puo' nascere
+    (qui in `importa_venditore`, e nel server prima di pagare l'AI)."""
+    if e.get("kind") == 30402:                 # NIP-99 classified
+        return [t[1] for t in e.get("tags", [])
+                if t and t[0] == "image" and len(t) > 1][:5]
+    try:                                       # NIP-15 prodotto (30018)
+        c = json.loads(e.get("content", "{}"))
+    except Exception:
+        return []
+    if not isinstance(c, dict):
+        return []
+    return [u for u in (c.get("images") or []) if isinstance(u, str)][:5]
+
+
 def estrai_annuncio(e, valute_stall, cambio):
     """Trasforma un evento Nostr in un annuncio SatMarket (o None)."""
     titolo, descrizione = testo_evento(e)
@@ -579,8 +598,7 @@ def estrai_annuncio(e, valute_stall, cambio):
             return None
         importo, valuta = float(p[1]), p[2]
         sats = in_sats(importo, valuta, cambio)
-        foto = [t[1] for t in e.get("tags", [])
-                if t and t[0] == "image" and len(t) > 1][:5]
+        foto = foto_evento(e)
         # Le coordinate dell'evento origine: il tag "d" (serve alla
         # modifica firmata da Barattolo per SOSTITUIRE l'evento sui
         # relay) e gli URL originali delle foto (per non riscriverli
@@ -599,7 +617,7 @@ def estrai_annuncio(e, valute_stall, cambio):
             return None
         importo = float(c["price"])
         sats = in_sats(importo, valuta, cambio)
-        foto = [u for u in (c.get("images") or []) if isinstance(u, str)][:5]
+        foto = foto_evento(e)
         origine_d, origine_foto = "", ""       # la modifica firmata (v1)
                                                # parla solo NIP-99
 
@@ -1177,6 +1195,20 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
                 print(f"  ⏳ rimesso in revisione: {a['titolo'][:50]}")
             aggiornati += 1
             print(f"  ↻ aggiornato: {a['titolo'][:50]}")
+            continue
+        # ALMENO UNA FOTO PER ENTRARE (11 ott 2026, cantiere
+        # foto-obbligatorie, decisione di Andrea): la regola del foglio
+        # «Pubblica» vale anche per chi arriva dai relay. A chi scrive
+        # con un altro client non si puo' imporre niente — si puo' solo
+        # non far NASCERE qui l'annuncio che non ne ha: al giro in cui
+        # l'evento ne porta una e' un evento mai visto come gli altri,
+        # ed entra. SOLO LA NASCITA: chi e' gia' in vetrina si aggiorna
+        # come sempre qui sopra, anche se sui relay la foto e' sparita
+        # (gli annunci gia' online restano com'erano, e spegnerli da
+        # qui sarebbe togliere merce a un venditore senza dirglielo).
+        if not a["foto"]:
+            saltati += 1
+            print(f"  📷 senza foto, non entra: {a['titolo'][:50]}")
             continue
         cur = con.execute(
             "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"

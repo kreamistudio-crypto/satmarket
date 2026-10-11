@@ -16,7 +16,8 @@ domande che solo il server puo' chiudere:
     retry);
   · se ne entra ALMENO una, si pubblica e lo scarto si dice, con la
     posizione della foto;
-  · chi non sceglie nessuna foto pubblica come sempre;
+  · chi non sceglie nessuna foto NON pubblica (dall'11 ott 2026, cantiere
+    foto-obbligatorie): 400 prima dell'INSERT, nessuna riga;
   · una MODIFICA le cui foto nuove vengono scartate tutte non si salva
     affatto: campi di prima, foto di prima, file di prima sul disco;
   · una modifica con la lista VUOTA non tocca le foto;
@@ -226,11 +227,21 @@ def main():
           len(r.get("foto_scarti", [])) == 1 and r["foto_scarti"][0]
           .startswith("la foto 2 non è stata accettata: immagine vuota"))
 
-    print("\n[il mondo di ieri]")
-    codice, r = pubblica({**BASE, "titolo": "Senza foto, apposta",
-                          "foto": []})
-    prova("chi non sceglie foto pubblica come sempre", (200, 0),
-          (codice, r.get("foto_salvate")))
+    # IL MONDO DI IERI E' FINITO L'11 OTT 2026 (cantiere
+    # foto-obbligatorie): fino a quel giorno chi non sceglieva foto
+    # pubblicava come sempre, e questa prova lo diceva. Adesso e' un
+    # no, detto PRIMA dell'INSERT: nessuna riga da ritirare. Il resto
+    # della regola nuova lo gira collaudo_foto_obbligatorie.py.
+    print("\n[senza nessuna foto]")
+    codice, detto = pubblica({**BASE, "titolo": "Senza foto, apposta",
+                              "foto": []})
+    prova("chi non sceglie foto non pubblica piu': 400 che si capisce",
+          (400, SRV.MSG_SERVE_UNA_FOTO), (codice, detto))
+    con = SRV.db()
+    nate = con.execute("SELECT COUNT(*) FROM annunci WHERE titolo=?",
+                       ("Senza foto, apposta",)).fetchone()[0]
+    con.close()
+    prova("...e non lascia nessuna riga, nemmeno ritirata", 0, nate)
 
     print("\n[la modifica con tutte le foto nuove scartate]")
     codice, r = pubblica({**BASE, "titolo": "Annuncio con due foto",

@@ -85,6 +85,12 @@ def avvio():
     os.chdir(QUI)
     import server
     SRV = server
+    # LA FOTO DI CARTONE (11 ott 2026, cantiere foto-obbligatorie):
+    # senza almeno una foto un annuncio non si pubblica piu', e questo
+    # collaudo non parla di foto. La rotta ne riceve una finta e
+    # `salva_foto` risponde col nome, senza scrivere nessun file.
+    server.salva_foto = lambda aid, foto, versione="": (
+        [f"a{aid}_0.jpg"], [])
 
     async def ok_ai(*a, **k):
         return None
@@ -161,7 +167,7 @@ def main():
     chi({"id": 222, "nome": "Vende", "first_name": "Vende", "username": "vende"})
     base = {"titolo": "Lezione di inglese", "descrizione": "un'ora",
             "prezzo_sats": 50000, "categoria": "Lezioni e corsi",
-            "consegna": "servizio", "foto": []}
+            "consegna": "servizio", "foto": ["foto-di-cartone"]}
 
     # --- 2) di persona SENZA zona: passa
     r = pubblica({**base, "servizio_dove": "presenza", "durata_min": 60,

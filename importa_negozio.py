@@ -1630,7 +1630,11 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
              # (1 ott 2026, seconda parte) i prodotti in bozza o nascosti
              # sul negozio che non sono mai entrati: un conto, non una
              # riga — e non nascono, vedi `_una_riga`
-             "non_pubblicati": 0}
+             "non_pubblicati": 0,
+             # (11 ott 2026, cantiere foto-obbligatorie) i prodotti mai
+             # entrati che sul negozio non hanno nemmeno un'immagine:
+             # un conto anche loro, e non nascono finche' non ne hanno
+             "senza_foto": 0}
     viste = set()
     # i padri le cui figlie questo giro non le ha VISTE ne' le ha
     # cercate: sul negozio ci sono, e non si spengono (vedi sotto)
@@ -1743,6 +1747,8 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
           f"{esito['aggiornati']} aggiornati, {esito['invariati']} invariati, "
           f"{esito['spenti']} spenti, {esito['rimandati']} rimandati, "
           f"{len(esito['saltati'])} saltati"
+          + (f", {esito['senza_foto']} senza foto (non entrano)"
+             if esito["senza_foto"] else "")
           + (f", {esito['varianti_al_prossimo']} con le varianti al "
              f"prossimo giro" if esito["varianti_al_prossimo"] else ""))
     return esito
@@ -1834,6 +1840,22 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
     # dall'AI e dai posti).
     if not r["attivo"]:
         esito["non_pubblicati"] += 1
+        return
+    # IL PRODOTTO SENZA FOTO NON NASCE (11 ott 2026, cantiere
+    # foto-obbligatorie, decisione di Andrea): la regola del foglio
+    # «Pubblica» — almeno una foto per entrare in vetrina — vale anche
+    # per il catalogo di un negozio collegato. Come la bozza qui sopra
+    # non lascia nessuna riga (niente lapide: al giro in cui il negozio
+    # gli da' un'immagine e' una riga mai vista come le altre, e nasce)
+    # e non prende un posto ne' una chiamata all'AI
+    # (`_righe_da_giudicare` lo lascia fra le note). Si CONTA, e il
+    # conto arriva al venditore: un prodotto che non entra senza un
+    # perche' si legge come un import rotto.
+    # SOLO LA NASCITA: chi e' gia' in vetrina e perde le foto sul
+    # negozio resta com'e' (il ramo di sopra, che non passa di qui) —
+    # gli annunci gia' online non si spengono per questa regola.
+    if not r["foto"]:
+        esito["senza_foto"] += 1
         return
     if not puo_creare or r.get("rimandata"):
         esito["rimandati"] += 1

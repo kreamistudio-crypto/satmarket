@@ -176,10 +176,14 @@ def semina(prezzo=30_000, quantita=5, consegna="ritiro", n=2,
         cur = con.execute(
             "INSERT INTO annunci(venditore_id,titolo,descrizione,"
             "prezzo_sats,categoria,zona,stato,creato,consegna,quantita,"
-            "valuta,condizione,spedizione_sats) "
+            "valuta,condizione,spedizione_sats,foto) "
             "VALUES(222,?,'desc',?,'Altro','Torino (TO)','attivo',1,?,"
-            "?,'sats','buono',?)",
-            (f"Cosa {i}", prezzo, consegna, quantita, spedizione_sats))
+            # la foto (11 ott 2026, cantiere foto-obbligatorie): un
+            # annuncio vero ne ha almeno una, e senza la modifica
+            # del prezzo (sezione e) si fermerebbe a chiederla
+            "?,'sats','buono',?,?)",
+            (f"Cosa {i}", prezzo, consegna, quantita, spedizione_sats,
+             '["cosa.jpg"]'))
         ids.append(cur.lastrowid)
     con.commit()
     con.close()

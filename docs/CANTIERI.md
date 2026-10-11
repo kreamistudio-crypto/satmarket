@@ -49688,3 +49688,175 @@ RESTA DA GUARDARE (Andrea, sul VPS): la riga da aggiungere al config,
 `AVVISO_DM_NOSTR = True`, e riavvio; nel journal le due righe «in
 ascolto su …»; un DM di prova da un'altra chiave. La procedura:
 PRODUZIONE, «L'AVVISO DEI DM NOSTR».
+
+## Almeno una foto per pubblicare (11 ott 2026, sera, cantiere foto-obbligatorie, decisione di Andrea)
+
+**La regola**: sul mercatino, per pubblicare un annuncio serve almeno
+una foto. Il tasto «Pubblica» resta spento finché manca, con una riga
+accanto alle foto («Aggiungi almeno una foto per pubblicare»), e il
+server rifiuta l'annuncio senza foto con una frase che si capisce. Gli
+annunci già online senza foto restano come sono; chi li modifica, per
+salvare, ne aggiunge una.
+
+**LE STRADE, guardate prima di scrivere** (era il primo punto della
+richiesta). Un annuncio nasce da quattro `INSERT INTO annunci` e
+nient'altro: `pubblica()` (il foglio della Mini App e del sito, che
+sono la stessa pagina e la stessa rotta; il duplicato passa di lì),
+`_crea_riga_import` (l'import da file CSV + ZIP del Profilo),
+`importa_negozio._una_riga` (i negozi Shopify/WooCommerce collegati,
+ogni ora) e `importa_nostr.importa_venditore` (gli annunci scritti con
+altri client Nostr, ogni ora). Il bot Telegram non crea annunci
+(`/start`, `/vetrina`, `/punti`…); Barattozon e il P2P non sono
+annunci del mercatino. `semina_demo.py` è uno script locale.
+
+**LE DECISIONI DI ANDREA** (chieste, non prese da me — il punto 4
+della richiesta diceva «non decidere tu»):
+1. *Digitali e servizi*: **regola per tutti**. Il conto dalla vetrina
+   pubblica di quel giorno: 506 annunci attivi, 55 digitali di cui 54
+   con la foto, 20 servizi di cui 19 con la foto. La foto lì si usa
+   già (copertina, logo, schermata): un'eccezione sarebbe stata una
+   regola in più da spiegare per due annunci.
+2. *Import da file*: la riga senza foto è **scartata col motivo**.
+3. *Importatori automatici* (negozi collegati e Nostr): un prodotto
+   NUOVO senza foto **non entra** finché la fonte non gliene dà una;
+   quelli già dentro restano. Io avevo proposto di lasciarli fuori dal
+   cantiere; Andrea ha scelto di chiuderli subito.
+
+**IL CONTO DEGLI ANNUNCI SENZA FOTO, in sola lettura** (dalla vetrina
+pubblica, la GET che fa ogni visitatore): **5 su 506** — #354, #461,
+#462, #3067, #3068 — tutti nati dal nostro form, nessun importato.
+Sono i casi già raccontati qui («LA TELA NERA», «L'ORIENTAMENTO PRIMA
+DEL BISTURI») più tre. La vetrina non mostra quelli in revisione né i
+venduti: quel conto si fa sul VPS, col comando lasciato ad Andrea.
+
+**COM'È FATTO.** Un giudice solo nel server,
+`guardia_almeno_una_foto(nuove, gia)`, con `ha_foto` e le tre frasi
+accanto. In `pubblica()` sta dopo i giudici dei campi e PRIMA della
+moderazione e dell'INSERT: un no che non costa una chiamata all'AI e
+non lascia una riga da ritirare. In `modifica_annuncio()` sta dopo
+proprietà, stato e affare in corso — chi non può modificare deve
+sentirsi dire quello, non «manca la foto» — e prima dell'AI. La
+pubblicazione ritirata del 28 set resta dov'era: insieme le due
+guardie dicono «nessuna foto scelta = no subito; scelte e tutte
+scartate = no dopo, col motivo di ognuna».
+Nel client la riga `#sellFotoObbligo` sta attaccata al riquadro delle
+foto, e il bottone è SPENTO MA TOCCABILE: `aria-disabled` e non
+`disabled`. Sul telefono «Pubblica» è attaccato in fondo allo schermo
+e le foto stanno in cima: con `disabled` il tasto non risponderebbe e
+la ragione sarebbe dove non si guarda — il bottone che «non fa
+niente», la lezione di `aggiungiFoto`. Così ha il vestito dello spento
+di casa (il fondo neutro pieno) e un tocco porta alle foto e ripete la
+riga. In modifica la riga dice «…per salvare», e sull'annuncio nato
+senza foto il riquadro dice «Aggiungi» invece di «Sostituisci» (e la
+nota «sostituiscono tutte quelle attuali» tace: non c'è niente da
+sostituire).
+Nell'import da file lo scarto è l'ultimo dei controlli di riga, così
+una riga con due difetti si sente dire prima quello che la foto non
+cura; il modello CSV ora ha una foto in OGNI riga (ne aveva sei
+vuote: avrebbe insegnato a farsi scartare) e l'aiuto non promette più
+«oppure niente — le aggiungi poi». La riga le cui foto poi non
+entrano (indirizzo morto) si ritira come fa `pubblica()` e va fra i
+non riusciti.
+Negli importatori automatici il prodotto senza foto è trattato come
+la bozza del 1 ott: non nasce, non lascia una lapide ('rimosso' lo
+terrebbe fuori per sempre), non va all'AI e non prende un posto del
+giro. Nei negozi si CONTA (`senza_foto`) e il conto arriva al
+venditore nel rapporto e nel cassetto («2 senza foto: entrano appena
+sul negozio ne hanno una»): un prodotto che non entra senza un perché
+si legge come un import rotto. Non fa squillare da solo: si dice
+quando il rapporto parte per altro.
+
+**CAMBIATO, e va saputo**: il «patto del cursore storto» del
+duplicato. Prima un `copia_foto_da` altrui o storto non copiava niente
+e l'annuncio nasceva lo stesso, vuoto; adesso, senza foto proprie, è
+il no della regola. `collaudo_duplicato.py` lo diceva nel verso di
+ieri ed è stato riscritto nel verso di oggi.
+
+**SCARTATO.** `disabled` vero sul bottone (sopra). Una scopa che
+spegne o segnala i cinque annunci senza foto: la richiesta dice
+«restano online come sono». Spegnere l'importato che PERDE la foto
+alla fonte: sarebbe togliere merce a un venditore senza dirglielo, e
+«quelli già dentro restano». Un'eccezione per tipo di consegna: vedi
+la decisione 1. Chiedere la foto nella modifica FIRMATA di un
+importato da Nostr: da quel form le foto non si toccano (vivono
+nell'evento), quindi sarebbe chiedere una cosa che il form non lascia
+fare. Toccare «rimetti in vendita» e il rifornimento: non sono una
+modifica dell'annuncio.
+
+**I COLLAUDI CHE SI SONO FERMATI, e perché non è un danno.** Otto
+collaudi e quattro banchi di `prove.py` pubblicavano o importavano
+annunci senza foto, perché ieri si poteva: `foto_scartate` e
+`duplicato` provavano proprio quello e sono stati rovesciati; gli
+altri (`avvisi_mercatino`, `quantita_servizi`, `servizio_dove`,
+`offerta_carrello`, `negozi_grandi`, `due_teste`, e i banchi
+`prove_connettori_ingresso`, `prove_connettori_varianti`,
+`prove_negozi_grandi`, `prove_db_contesa_negozi`) non parlano di foto
+e hanno ricevuto una foto di cartone — un nome finto con `salva_foto`
+di cartone, o un indirizzo che nessuno scarica — per continuare a
+provare quello per cui sono nati.
+
+**PROVATO.** `prove_foto_obbligatorie`, 42 prove: il giudice eseguito,
+l'ordine delle guardie nelle due porte, la firmata che resta fuori,
+«nessuna scopa», lo scarto dell'import, il modello CSV, i due
+importatori nel punto in cui decidono chi nasce (`_righe_da_giudicare`
+eseguito), e il client girato in node con `fotoMancante`,
+`aggiornaObbligoFoto`, `mostraObbligoFoto`, `publish` e
+`riepilogoGiroConnettore` VERE (nuovo, con foto, chip in caricamento,
+modifica con e senza, duplicato con e senza, firmata, il tocco sul
+bottone spento). `collaudo_foto_obbligatorie.py`, 52 prove sulle
+rotte vere e sui due importatori veri: ogni strada di consegna senza
+e con foto, il duplicato, la modifica dello storico (e i no di
+proprietà e di stato che vengono prima), l'import da file col modello
+vero e lo ZIP delle sue foto, il negozio di cartone e i relay di
+cartone (non nasce, non va all'AI, entra quando ha la foto, chi è già
+dentro resta). La gabbia di `collaudi_ci` gli ha trovato una bussata
+a CoinGecko (le righe in euro del modello chiedevano il cambio): ha
+avuto il suo cambio di cartone.
+Tortura su una copia del repo intero: **20 mutazioni, 20 prese** (le
+due guardie tolte, la guardia che si fida di una colonna vuota, il
+duplicato che presta le foto di chiunque, lo scarto dell'import
+spento, la riga con le foto morte che resta in vetrina, i due
+importatori che fanno nascere o mandano all'AI, il client che non
+spegne, non accende, non risponde al tocco, chiede la foto alla
+firmata, dice «pubblicare» in modifica, il modello CSV con una riga
+vuota, il conto che non arriva al venditore).
+DAL VIVO, Chrome pilotato con tocchi veri (`elementFromPoint`, poi
+premuto e rilasciato) su una COPIA del worktree col config di cartone
+(relay morti, P2P spento, LNbits e Anthropic assenti), dentro il
+finto Telegram come 222, tema scuro, densità 3, a 375 e a 320: la
+riga accesa su una riga sola, il bottone spento, il tocco che porta
+alle foto e ripete la riga, la foto vera caricata dal selettore di
+file (riga spenta, bottone acceso, vestito cambiato), la ✕ che
+riporta tutto com'era; poi la rotta vera chiamata dalla pagina senza
+foto (400 con la frase, nessuna riga), la pubblicazione vera dal form
+(annuncio attivo, file sul disco), e l'annuncio seminato senza foto:
+in vetrina, in modifica «…per salvare», il salvataggio che non parte,
+poi la foto e il salvataggio che passa. 27 controlli su 27, nessun
+errore di pagina; lo stesso foglio guardato anche nel Browser pane.
+Gli scatti: `.claude/giri/foto-obbligatorie/`.
+
+**COSA È GIRATO SU QUALE ALBERO.** La tortura e il giro dal vivo
+sull'albero di partenza (bfd182f). Main è corso di due commit mentre
+lavoravo (1e1409a «il logo torna com'era», 5eaec7c «l'avviso dei DM»,
+CI verde sull'ultimo): un rebase, un conflitto solo (l'elenco di
+`main()` in `prove.py`, due sezioni nuove sulla stessa riga: restano
+tutte e due). Sull'albero ribasato, sopra 5eaec7c: `PROVE_SEVERE=1
+python prove.py` INTERA, 22282 passate e 0 fallite, nessuna saltata; i collaudi del workflow nella
+gabbia, 60 su 60 verdi (in tre gruppi da venti, in parallelo); `compileall`; lo scanner dei segreti sulle righe
+aggiunte, con le forme lette dal workflow e la sua controprova. Questa
+voce era già scritta quando la suite è girata, tranne i due conti di
+questo paragrafo.
+
+**NOTATO, NON TOCCATO.** A 320 px «Scatta foto» e «Dalla galleria»
+vanno su due righe: c'era già. La riga di registro `🏪 … N saltati`
+non diceva i non pubblicati (bozze) nemmeno prima: i senza foto invece
+li dice. Un annuncio di un negozio collegato o di Nostr che perde la
+foto alla fonte resta in vetrina senza foto: è la decisione («quelli
+già dentro restano»), ma è l'unica strada per cui il numero dei senza
+foto può ancora crescere.
+
+**RESTA DA GUARDARE.** Il foglio sul telefono vero, dentro Telegram
+vero (il tocco sul tasto spento, la foto scattata sul momento). Il
+conto completo sul VPS (revisione e venduti compresi). Il primo
+rapporto di un negozio collegato che ha prodotti senza immagini: deve
+dire quanti sono, e non deve squillare da solo.
