@@ -53299,7 +53299,7 @@ function riprendiParcheggioP2P(m){
    scrittura perche' la chiave d'accesso sta gia' nella lista di chi
    puo' scrivere (`/api/relay/chiavi`).
    ⚠️ I PERMESSI DEL BUNKER: `nip44_encrypt`, `nip44_decrypt` e
-   `sign_event:30078` stanno in NIP46_PERMESSI dall'11 ott 2026; una
+   `sign_event:30078` stanno nella costante dei permessi NIP-46 dall'11 ott 2026; una
    sessione conservata di prima li chiede al momento, e un rifiuto e'
    un esito detto («rifiutata»), non un errore muto. */
 const P2P_COPIA_KIND = 30078;
@@ -53627,6 +53627,29 @@ async function copiaP2PSalvata(){
   chiudiFoglioCopiaP2P(true);
 }
 function copiaP2PNonOra(){ chiudiFoglioCopiaP2P(false); }
+/* PURE, LE PAROLE PER CHI HA PERSO LE CHIAVI (12 ott 2026): chi entra
+   da Telegram legge la strada di casa (il profilo torna dall'account),
+   il nativo la sua (la stessa chiave); e il contatto del supporto e' il
+   bot per tutti, piu' il profilo di casa su Nostr solo per il nativo.
+   Stanno QUI e non nel motore dello scambio: la' una sentinella vieta
+   le parole di protocollo a schermo, per chi entra da Telegram. */
+function comeRiprendereChiaviP2P(){
+  return numeroConto(myTgId) < 0
+    ? 'Le ritrovi sul dispositivo dove hai preso lo scambio, o entrando con la stessa chiave Nostr se il profilo deriva da lei.'
+    : 'Le ritrovi sul dispositivo dove hai preso lo scambio, o aprendo Barattolo dal tuo Telegram: lì il profilo torna da solo.';
+}
+function contattoSupportoP2P(){
+  const bot = '<a href="https://t.me/ilbarattolobot" target="_blank" rel="noopener">@ilbarattolobot</a>';
+  if (!(numeroConto(myTgId) < 0)) return bot;
+  let npub = '';
+  try {
+    if (typeof pubCasa !== 'undefined' && /^[0-9a-f]{64}$/.test(pubCasa || '') && window.NostrTools)
+      npub = window.NostrTools.nip19.npubEncode(pubCasa);
+  } catch(e){ npub = ''; }
+  return bot + (npub
+    ? ' o su Nostr <a href="https://njump.me/' + esc(npub) + '" target="_blank" rel="noopener">' + esc(npub.slice(0, 12)) + '…</a>'
+    : '');
+}
 /* PURA: l'avviso di chi e' su Tor (11 ott 2026): nel libro, una riga */
 function avvisoMemoriaBrowserP2P(onion){
   if (!onion) return '';
@@ -57241,22 +57264,13 @@ const P2P_TOAST_CAUZIONE_MORTA = 'Chiuso prima che la cauzione fosse bloccata: n
    non sono in questo browser. La riga lunga, nella pagina, dice anche
    come riprenderle e dove scrivere se sono perse. PURE: la card e la
    pagina le chiamano con `lunga` falso e vero. */
-function contattoSupportoP2P(){
-  const bot = '<a href="https://t.me/ilbarattolobot" target="_blank" rel="noopener">@ilbarattolobot</a>';
-  let npub = '';
-  try {
-    if (typeof pubCasa !== 'undefined' && /^[0-9a-f]{64}$/.test(pubCasa || '') && window.NostrTools)
-      npub = window.NostrTools.nip19.npubEncode(pubCasa);
-  } catch(e){ npub = ''; }
-  return bot + (npub
-    ? ' o su Nostr <a href="https://njump.me/' + esc(npub) + '" target="_blank" rel="noopener">' + esc(npub.slice(0, 12)) + '…</a>'
-    : '');
-}
 function rigaChiaviAltroveP2P(o, lunga){
   const base = '🔑 Le chiavi di questo scambio non sono in questo browser: qui lo segui, i gesti si fanno da dove l\'hai aperto.';
   if (!lunga) return base;
-  return base + ' Le ritrovi sul dispositivo dove hai preso lo scambio, o entrando con la stessa chiave Nostr se il profilo deriva da lei. '
-    + 'Se quella memoria è andata persa (Tor Browser, navigazione privata, telefono cambiato), scrivici subito: ' + contattoSupportoP2P() + '.';
+  /* la via per riprenderle e il contatto vivono nel blocco del mazzo:
+     chi entra da Telegram legge la sua strada, il nativo la sua */
+  return base + ' ' + comeRiprendereChiaviP2P() + ' Se quella memoria è andata persa (Tor Browser, navigazione privata, telefono cambiato), scrivici subito: '
+    + contattoSupportoP2P() + '.';
 }
 /* PURA: l'UNICO bottone pieno della pagina. Chi compra consegna dove
    ricevere i sats e poi dice «ho inviato gli euro»; chi vende blocca

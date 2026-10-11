@@ -80817,8 +80817,11 @@ out.strisciaSubito = s1.includes('<loc ord-a>');
     # esattamente il guasto per cui questa riga esiste. Si contano le
     # USCITE: ogni `return null` e' un modo di non avere il profilo del
     # conto, e ognuno deve dire il suo perche'.
+    # ...PIU' DUE dall'11 ott 2026 («tor-chiavi-scambio»): il seme dal
+    # server (la riga di sempre) e il seme dalla NSEC nel browser, che
+    # torna prima della fetch con la sua traccia
     prova("ogni uscita della richiesta del seme lascia una traccia",
-          sp.count("return null;") + 1,
+          sp.count("return null;") + 2,
           sp.count("console.log('\U0001F511 [p2p] profilo:"))
     prova("...e dice il codice quando il conto non risponde", True,
           "il conto non risponde: ' + r.status" in sp)
@@ -84305,7 +84308,9 @@ def prove_p2p_campanello():
     # e non un elenco: si guardano tutte le chiamate del client, cosi'
     # il chiamante di domani ci entra da solo.
     _reg = _re.findall(r"registraChiaviP2P\(\[([^\]]*)\]\)", _mini)
-    prova("i chiamanti di registraChiaviP2P sono otto", 8, len(_reg))
+    # NOVE dall'11 ott 2026 («tor-chiavi-scambio»): la copia cifrata del
+    # profilo ripresa dai relay registra la sua pubblica, come le altre
+    prova("i chiamanti di registraChiaviP2P sono nove", 9, len(_reg))
     for _arg in _reg:
         prova(f"...e `{_arg}` non e' una chiave della chat", True,
               not any(s in _arg.lower() for s in ("conv", "firma", "chat")))
@@ -128923,8 +128928,9 @@ def prove_contanti_a_mano():
           ["if (contantiQui) bottoni.recapito = '<button class=\"btn orange\" onclick=\"apriCampiP2P()\">📍 Indica dove e quando vedervi</button>';" in ren,
            "' ti indichi dove e quando vedervi: appena arriva lo leggi in cima, il bottone si accende e ti avvisiamo.'" in stt,
            "' dove e quando vedervi: senza, non sa dove trovarti.'" in stt,
-           "(contanti ? 'deve indicarti dove e quando vedervi' : 'deve indicarti dove inviare gli euro')"
-           in nudo(fn("function attesaAltraParteP2P(o){")),
+           # (11 ott 2026) col PayCode la frase e' un'altra: la forma e' a tre vie
+           "(contanti ? 'deve indicarti dove e quando vedervi'" in nudo(fn("function attesaAltraParteP2P(o){"))
+           and ": 'deve indicarti dove inviare gli euro')" in nudo(fn("function attesaAltraParteP2P(o){")),
            "? '📍 ' + nomeControparteP2P(o, 'Chi vende') + ' ' + P2P_TOAST_APPUNTAMENTO"
            in nudo(fn("function campoScrivi(o, tipo, campo, mio){"))])
     i_b = mini.index("/* ============ IL CONTANTI DI PERSONA: «📍 SONO QUI» E L'APPUNTAMENTO (1 ott 2026)")
@@ -147662,7 +147668,6 @@ def prove_tor_chiavi_scambio():
         fn("async function pubblicaEventoSuRelay(relays, evento){"),
         fn("async function firmatarioNsec(nsec){"),
         fn("function firmatarioEstensione(){"),
-        fn("function contattoSupportoP2P(){"),
         fn("function rigaChiaviAltroveP2P(o, lunga){"),
         fn("function scadenzaPayCodeDaLibroP2P(scadeLibro, nato){"),
         fn("function vitaLibroTabacchinoP2P(scade, adesso){"),
@@ -147910,6 +147915,10 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
                    lunga.indexOf('Tor Browser') >= 0];
   pubCasa = '';
   out.contattoSenzaCasa = contattoSupportoP2P().indexOf('njump') < 0 && contattoSupportoP2P().indexOf('t.me/ilbarattolobot') >= 0;
+  pubCasa = conto('alice').pub; myTgId = 111;
+  const lungaTg = rigaChiaviAltroveP2P({}, true);
+  out.telegramParole = [/nostr|nsec|relay/i.test(lungaTg.replace(/https?:\/\/[^\s"]+/g, '')), lungaTg.indexOf('dal tuo Telegram') >= 0, lungaTg.indexOf('njump') >= 0];
+  myTgId = -555; pubCasa = '';
   /* la rovesciata del tempo nel libro: su ogni scadenza da un'ora a 72 ore */
   const nato = 1790000000; let giusti = 0, totale = 0;
   for (let ore = 1; ore <= 72; ore += 1) for (const extra of [0, 1799, 3599]) {
@@ -147972,6 +147981,8 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
     prova("la riga corta dice il fatto", "🔑 Le chiavi di questo scambio non sono in questo browser: qui lo segui, i gesti si fanno da dove l'hai aperto.", o["rigaCorta"])
     prova("...e la lunga aggiunge come riprenderle, Tor, il bot e il profilo Nostr di casa", [True, True, True, True], o["rigaLunga"])
     prova("...senza la chiave di casa resta il bot", True, o["contattoSenzaCasa"])
+    prova("per chi entra da Telegram la via e' Telegram e il contatto e' il bot: nessuna parola di protocollo",
+          [False, True, False], o["telegramParole"])
     prova("la rovesciata del tempo nel libro torna alla scadenza del PayCode (al secondo) su 216 casi, e zero sui dati che mancano",
           [216, 216, 0, 0, 0], o["rovesciata"])
     prova("l'avviso di Tor c'e' solo su Tor", [True, ""], o["avvisoTor"])
