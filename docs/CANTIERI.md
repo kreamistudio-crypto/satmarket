@@ -49860,3 +49860,179 @@ vero (il tocco sul tasto spento, la foto scattata sul momento). Il
 conto completo sul VPS (revisione e venduti compresi). Il primo
 rapporto di un negozio collegato che ha prodotti senza immagini: deve
 dire quanti sono, e non deve squillare da solo.
+
+## La guardia della liquidità: tre domande invece di una soglia, la grafica dei canali, `/canali` (11 ott 2026, cantiere allarme-liquidita, richiesta di Andrea)
+
+**DA DOVE SI PARTIVA.** Ad Andrea arrivava troppo spesso «ALLARME
+LIQUIDITA (guardia oraria ACINQ) — entrata ACINQ a 179616 sat utili
+(soglia 300000…) … canali 3/3 attivi in=5039600 out=1185950
+acinq_in=179616 acinq_out=1018879 copertura=1100000»: la guardia oraria
+del nodo (6 ott) guarda i SOLI canali ACINQ e ripete ogni sei ore, e
+con cinque milioni di entrata su LNBiG la domanda era se l'allarme
+fosse vero. La frase che lo regge — «Phoenix paga solo dal canale
+ACINQ» — veniva da UN acquisto fallito, il 5 ott (56.459 sats con
+28.898 di entrata ACINQ), il giorno stesso in cui il canale LNBiG
+nasceva: da allora nessuno l'aveva più verificata.
+
+**LA VERIFICA (punto 1), e quel che di lei NON è scritto qui.** `lncli
+queryroutes` non sa partire da un altro nodo: letto il sorgente della
+0.19.3, ha `--outgoing_chan_id` e `--ignore_pair` ma nessuna opzione
+per la sorgente e nessun `--last_hop`. La REST sì (`source_pub_key`),
+ed è la chiamata che il server fa dal 10 ott per il controllo della
+fattura. Da qui `deploy/nodo/sonda-rotte.py`, in sola lettura, col
+`readonly.macaroon` che LND ha già: i canali, le strade da ACINQ a noi
+per 100k, 300k, 500k e 1M (libera; senza il canale diretto dentro il
+tetto di Phoenix, 4 sat + 0,4 %; senza tetto), e da quale canale sono
+entrati gli ultimi incassi. Il primo giro sul nodo si è fermato con
+«la REST non risponde a nessuno di: 172.28.1.4:8080, 10.77.0.1:18080»
+— un difetto MIO: la sonda non diceva PERCHÉ, e prendeva il primo
+`readonly.macaroon` che `find` incontrava. Corretta (ogni indirizzo
+dice muto-col-motivo o vivo, ogni macaroon accettato o rifiutato,
+mainnet per primo), al secondo giro è passata: il macaroon buono sta
+sotto `/root/.lnd/data/…`, e una copia vecchia in `data-annullato-2`
+veniva rifiutata (parola di Andrea). ⚠️ L'USCITA DELLA SONDA NON È
+ARRIVATA IN QUESTA SESSIONE (il messaggio la nominava ma non la
+portava): i numeri delle strade NON li ho letti, e qui non li scrivo.
+Andrea l'ha letta come «l'allarme ACINQ è esagerato». Il verdetto sui
+numeri resta DA SCRIVERE; da adesso però lo dà anche `/canali`, che fa
+a LND la stessa domanda sul nodo vero.
+
+**LA DECISIONE: LA GUARDIA NEL SERVER, non sul nodo.** Il server ha già
+il ponte verso LND, il macaroon di SOLA LETTURA (`offchain:read
+info:read`), il bot e i timbri: nessun segreto nuovo, nessuno script da
+installare a mano sul nodo, le leve nel config del VPS, e la grafica in
+un posto solo per gli avvisi e per `/canali`. Com'è fatta: ARCHITETTURA,
+«LA GUARDIA DELLA LIQUIDITÀ E `/canali`»; come si accende: PRODUZIONE,
+«LA GUARDIA DELLA LIQUIDITÀ, DAL SERVER».
+
+**LA REGOLA NUOVA, tre domande:**
+1. ENTRATA: l'entrata spendibile di TUTTI i canali in linea regge la
+   garanzia più grossa (`LIQUIDITA_SCAMBIO_MAX` 500.000, lo specchio di
+   `max_order_amount`)?
+2. DA PHOENIX: il canale ACINQ diretto ha `LIQUIDITA_PHOENIX_MIN`
+   (300.000, la soglia di oggi)? Se no, si CHIEDE a LND una strada da
+   ACINQ a noi fuori dal canale diretto, dentro il tetto di Phoenix
+   (1.204 sats per 300.000), e l'ultimo canale deve avere l'entrata
+   vera. È un problema solo se non c'è nemmeno quella: è la regola di
+   prima, allentata dove le strade ci sono.
+3. USCITA: sopra `LIQUIDITA_USCITA_MIN`? SPENTA (0), e resta una leva
+   per chi vuole un pavimento. Il perché: i sats pagati a chi compra al
+   rilascio sono quelli della garanzia appena incassata, e il debito
+   verso i venditori sale e scende INSIEME al saldo dei canali (un
+   deposito alza tutt'e due, un payout li abbassa): quel che resta
+   fermo è il capitale nostro, che un giro all'ora non ha motivo di
+   guardare. Un pavimento fisso suonerebbe il giorno in cui tutti i
+   venditori sono stati pagati.
+Ogni voce è buona, cattiva o NON MISURATA: la terza non allarma e non
+rassicura (un singhiozzo del ponte non fa partire un allarme, e non fa
+dire «tornata a posto»).
+
+**NIENTE RIPETIZIONI.** Un avviso quando una domanda diventa cattiva
+(subito, anche se un'altra lo era già: è una notizia nuova), uno quando
+tornano tutte buone, in mezzo al massimo un promemoria al giorno. Lo
+stato sta nel timbro `liquidita_stato`, scritto PRIMA dell'invio: un
+deploy non raddoppia un allarme.
+
+**LA GRAFICA.** Per canale tre righe corte — pallino, nome e taglia; la
+barretta di dieci quadretti (piena = quanto esce) coi sats spendibili
+che escono e che entrano; lo stato (in linea, HTLC in sospeso con la
+somma, FUORI LINEA) — e sotto i totali dei soli canali in linea. Sta in
+ogni avviso della guardia e in `/canali` (solo admin, anche a guardia
+spenta).
+
+**LE LEVE.** `GUARDIA_LIQUIDITA = False` di serie: finché non si scrive
+la riga sul VPS non cambia niente, tranne `/canali` che risponde. Le
+altre hanno i valori di oggi (500.000, 300.000) o sono spente (uscita);
+il promemoria a 86.400 secondi è quello chiesto. Gli avvisi vanno agli
+stessi del guardiano del ponte (`GUARDIANO_PONTE_AVVISA`), senza una
+leva nuova.
+
+**STRADE SCARTATE.** `lncli queryroutes` e il giro su noi stessi
+(`--outgoing_chan_id` sul canale ACINQ verso la nostra chiave): parte
+dalla NOSTRA uscita su quel canale, e a 1M avrebbe detto «no» per un
+motivo che non c'entra. La guardia sul nodo con le rotte dentro
+`ronda-liquidita.sh`: un macaroon letto da root a ogni giro, la REST da
+trovare, l'installazione a mano con l'impronta, e la grafica scritta
+due volte (là e nel bot). Il pavimento d'uscita sulla «copertura»
+(`USCITA_ACINQ_MIN`): è un numero scritto a mano che invecchia a ogni
+deposito. Il debito letto dal saldo di LNbits: la cassaforte è un
+wallet misto, ed è già deciso (15 set) che non se ne fa un allarme. Una
+tabella a colonne o un blocco `<pre>`: sul telefono va a capo, e senza
+carattere a larghezza fissa le colonne non stanno in riga. La conferma
+del rientro su due giri (contro il ping-pong al bordo): non chiesta, e
+con le strade di mezzo le soglie non stanno più sul bordo — si aggiunge
+se il ping-pong si vede. Una leva a parte per i destinatari. Toccare
+`ronda-liquidita.sh`: resta com'è (dice canali spariti, lease, inbound);
+si spegne il suo timer orario e la sua terza domanda (`SOGLIA_ACINQ=0`)
+DOPO aver visto la guardia nuova funzionare — comandi in PRODUZIONE.
+
+**PROVATO.**
+- `prove_guardia_liquidita`, 64 verdi: i pezzi PURI di server.py (la
+  grafica coi numeri del 6 ott, i canali storti, le righe che non
+  devono andare a capo, il giudizio ai bordi, le cinque uscite della
+  strada con un LND di cartone dietro `chiedi`, il passo degli stati) e
+  le sentinelle (il timbro prima dell'invio, l'admin prima di LND, la
+  fuga dell'HTML, la leva spenta di serie, la sonda in sola lettura).
+- `collaudo_guardia_liquidita`, 42 verdi, anche nella gabbia senza
+  rete: il giro VERO e `/canali` con `_lnd_rest` vero davanti a un LND
+  di cartone in HTTPS, l'orologio spostato a mano — il caso di oggi
+  (ACINQ a 179.616, una strada da 750 sats: TACE), la strada che sale
+  a 5.000 (un allarme, poi silenzio, il promemoria a 24 ore), il
+  macaroon senza `info:read` e il nodo muto (niente «rientrato» falso),
+  il rientro, una domanda nuova che parla subito. Entrato nel workflow.
+- TORTURA, su una copia del repo: 35 mutazioni del blocco (il canale
+  fuori linea contato, la riserva non tolta, la coppia vietata al
+  contrario, il tetto non mandato a LND, la strada cara letta buona, un
+  «non so» letto «nessuna», i quattro bordi, le ignote dimenticate, il
+  rientro che tace, lo stato mai timbrato, `/canali` aperto a tutti, la
+  fuga dell'HTML tolta, la guardia accesa di serie, la strada chiesta da
+  noi invece che da ACINQ…): 35 uccise — 14 dalle sole prove, 1 dal solo
+  collaudo (il giro che giudica senza canali), 20 da tutt'e due. Girata
+  prima che la legenda si accorciasse (una riga di testo).
+- GIRO DAL VIVO: il server vero in collaudo (config da
+  `config_esempio.py` più coda: relay morto, LNbits morto, nsec
+  segnaposto) davanti al nodo di cartone su loopback, coi TOTALI
+  dell'avviso dell'11 ott (la spartizione fra i canali è una mia
+  stima). `/canali` dal campanello di collaudo (l'admin; un utente
+  qualunque riceve «Non conosco questo comando»); al primo giro, due
+  minuti dopo l'avvio, l'ALLARME (strada a 5.000 sats); cambiata la
+  scena, un minuto dopo «tornata a posto». Lo scatto è un Telegram di
+  CARTONE a 375 px (i testi sono quelli usciti dal journal del server,
+  il fumetto e il carattere no): la legenda andava a capo, ed è stata
+  accorciata; le righe delle barrette stanno su una riga. Gli scatti:
+  `.claude/giri/allarme-liquidita/`.
+- AL PRIMO GIRO DELLA SUITE, sette rosse, tutte mie: la riga nuova del
+  pannello delle leve chiama due giudici che il banco del pannello non
+  conosceva (la solita trappola, sei esplosioni lontane), e una cifra
+  davanti a «sats» non passava da `_fmt_sats` DENTRO la frase (la
+  sentinella dei sats). Curate tutt'e due.
+
+**COSA È GIRATO SU QUALE ALBERO.** Sull'albero del cantiere ribasato
+sopra 772c368 (la punta di main; un conflitto solo, nel banco del
+pannello delle leve, dove l'avviso dei DM Nostr aveva aggiunto la sua
+«decima volta»: tenute tutt'e due, la mia è l'undicesima — il messaggio
+del commit del codice dice ancora «decima»): `PROVE_SEVERE=1 python
+prove.py` INTERA, 22346 passate e 0 fallite, nessuna saltata; i 61
+collaudi del workflow nella gabbia, 61 verdi; lo scanner dei segreti
+sulle righe aggiunte, con le forme lette dal workflow e la sua
+controprova: zero. Prima del rebase, sopra bfd182f, la suite aveva dato
+una rossa A TEMPO in `prove_negozi_grandi` («il respiro misura il tempo
+DENTRO il database», soglia di 0,05 s) mentre accanto girava altro:
+rilanciata da sola tre volte, verde tre volte; non è del cantiere.
+
+**NOTATO, NON TOCCATO.** Gli avvisi della ronda di OGNI GIORNO del nodo
+(canali spariti, lease) non portano la grafica: vivono in uno script
+bash sul nodo, e mettercela vuol dire scriverla una seconda volta e
+installarla a mano. Il testo di «Pagamenti non arrivati» nomina ancora
+`acinq_in` della `--prova` del nodo: resta vero. La leva
+`USCITA_ACINQ_MIN` del nodo resta, per il ribilancio suggerito.
+
+**RESTA DA GUARDARE.** L'uscita della sonda letta da me, e il verdetto
+sul punto 1 scritto qui. Il primo `/canali` sul VPS: dice se la REST
+vera ha la forma che ho supposto (i nomi con `peer_alias_lookup`, lo
+stesso `chan_id` nei canali e nei salti della strada) e dà il giudizio
+sul nodo vero. Il messaggio su Telegram vero, sul telefono. Un
+pagamento vero da Phoenix sopra l'entrata ACINQ del momento: è l'unica
+prova che il nodo di ACINQ prenda davvero l'altra strada (LND da qui
+non conosce i saldi altrui). Sul nodo, dopo: il timer orario spento e
+`SOGLIA_ACINQ=0`.
