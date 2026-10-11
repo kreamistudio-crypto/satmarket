@@ -41321,8 +41321,11 @@ def prove_fogli_di_casa():
     # «Spedisci senza numero di tracciamento?» (`markShipped`), solo
     # quando il campo e' vuoto su un corriere vero — il consiglio
     # caldo al posto del toast che bloccava.
-    prova("i gesti che passano dalla domanda unica sono ottanta",
-          80, solo_codice(mini).count("chiediConferma({"))
+    # OTTANTUNO (11 ott 2026, la presa della disputa letta sul nodo
+    # vero): la ripresa di una disputa gia' presa sul coordinatore
+    # (`riprendiPresaDisputaP2P`) chiede conferma con la condizione scritta.
+    prova("i gesti che passano dalla domanda unica sono ottantuno",
+          81, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
