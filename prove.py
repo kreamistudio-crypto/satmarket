@@ -74418,6 +74418,7 @@ def prove_p2p_pubblica():
         + "\n" + re.search(r"const P2P_PREMIO_TAB_MAX = [^\n]*;", mini).group(0)
         # il tempo dei due lati (set 2026): il giudice unico della
         # scadenza, le fasce, il riquadro, l'avviso alla presa
+        + "\n" + _intera("function scadenzaPayCodeDaLibroP2P(scadeLibro, nato){")
         + "\n" + _intera("function scadenzaTabacchinoOrdineP2P(o){")
         + "\n" + _intera("function fasciaTabacchinoP2P(scade, adesso){")
         + "\n" + _intera("function statoTabacchinoP2P(o, adesso){")
@@ -77990,7 +77991,11 @@ def prove_p2p_conto_dispositivo():
     # conterebbe due volte)
     prova("il conto non passa mai da un bitwise", [],
           re.findall(r"conto\s*\|\s*0|conto\)\s*\|\s*0", blocco_mazzo))
-    prova("...e i giudici e il testo usano numeroConto", 6,
+    # UNDICI dall'11 ott 2026 («tor-chiavi-scambio»): il seme dalla nsec,
+    # la copia sui relay e il foglio chiedono «e' un nativo Nostr?» con
+    # `numeroConto(myTgId) < 0`, e il profilo derivato fuori da Telegram
+    # si riconosce da `numeroConto(m.conto) < 0`
+    prova("...e i giudici e il testo usano numeroConto", 11,
           blocco_mazzo.count("numeroConto(m.conto)")
           + blocco_mazzo.count("numeroConto(d.conto)")
           + blocco_mazzo.count("numeroConto(myTgId)"))
@@ -86239,7 +86244,11 @@ def prove_p2p_paycode():
             "function scadeDaCampoP2P(s){", "function campoDaScadeP2P(epoch){",
             "function dataTabacchinoP2P(epoch){", "function leggiDataTabacchinoP2P(testo){",
             "function payCodeDaTestoP2P(testo){", "function scadenzaTabacchinoP2P(testo){",
+            # (11 ott 2026, tor-chiavi-scambio) la rovesciata del tempo nel
+            # libro, e «il PayCode sta nella riga?»
+            "function scadenzaPayCodeDaLibroP2P(scadeLibro, nato){",
             "function scadenzaTabacchinoOrdineP2P(o){",
+            "function payCodeInRigaP2P(o){",
             "function statoPayCodeP2P(o){", "function inizioEuroInviatiP2P(o){",
             "function riquadroPayCodeP2P(o, adesso){",
             "function riquadroControlloTabP2P(o, adesso){",
@@ -92168,10 +92177,14 @@ def prove_scambi_ovunque():
           "                                      scade: Math.floor(Date.now() / 1000) + P2P_LAPIDE_TOLTO_S}));"
           in pezzo_js(mini, "function togliScambioP2P(id, ev){", "\n}")
           and "const P2P_LAPIDE_TOLTO_S = 40 * 86400;" in mini)
-    prova("la card e la pagina dicono «da un altro dispositivo» sulla riga solo da guardare", [True, True],
-          ["Aperto su un altro dispositivo" in pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n"),
-           "I messaggi cifrati di questo scambio sono sul dispositivo dove l\\'hai aperto"
-           in pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")])
+    # EMENDATA (11 ott 2026, «tor-chiavi-scambio»): «Aperto su un altro
+    # dispositivo» era falso per chi aveva perso la memoria dello STESSO
+    # browser; la card e la pagina dicono il fatto — le chiavi non sono
+    # in questo browser — con una frase sola (`rigaChiaviAltroveP2P`),
+    # corta sulla card e lunga nella pagina, col contatto del supporto
+    prova("la card e la pagina dicono «le chiavi non sono in questo browser» sulla riga solo da guardare", [True, True],
+          ["rigaChiaviAltroveP2P(o, false)" in pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n"),
+           "rigaChiaviAltroveP2P(o, true)" in pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")])
     # il blocco che chiede, fuori dal motore
     i_b = mini.index("/* ============ L'ARCHIVIO DEL SERVER: I MIEI SCAMBI SU OGNI DISPOSITIVO")
     i_fb = mini.index("/* ============ fine dell'archivio del server")
@@ -147513,12 +147526,463 @@ console.log(JSON.stringify(out));
           (o["nonNatoDentro"], o["nonNatoFuori"]))
 
 
+def prove_tor_chiavi_scambio():
+    """LE CHIAVI DELLO SCAMBIO DOPO LA MEMORIA SVUOTATA (11 ott 2026,
+    cantiere «tor-chiavi-scambio», decisione di Andrea a strati).
+
+    Dal campo: un nativo Nostr dal .onion con Tor Browser prende un
+    ordine Barattozon, paga il PayCode, e al rientro le chiavi dello
+    scambio non ci sono piu' — Tor Browser svuota la memoria a ogni
+    chiusura, e per un nativo Nostr il profilo nasceva a caso nel solo
+    browser (il server risponde 409 al seme, apposta).
+    LA CURA A STRATI: 1) chi entra con la nsec nel browser ricava il
+    profilo DALLA SUA CHIAVE, nella pagina, mai inviata
+    (`semeDaNsecP2P`); 2) chi entra col bunker o con l'estensione mette
+    una copia del profilo cifrata NIP-44 verso se stesso sui relay (NIP-78,
+    kind 30078), la rilegge per conferma, e al login dopo la riprende da
+    sola; mai sul nostro server; 3) la rete di sicurezza: a chi non e'
+    coperto, PRIMA della prima presa, il codice segreto con la conferma
+    «L'ho salvato»; 4) l'avviso su Tor; 5) la riga senza chiavi onesta,
+    il timer dal tag pubblico, la frase del PayCode e il contatto del
+    supporto. Qui: le sentinelle sul testo, e il banco node col bundle
+    VERO nei tre casi — nsec, bunker, estensione — con la memoria
+    svuotata e ripresa."""
+    print("\n[le chiavi dello scambio dopo la memoria svuotata]")
+    import json as _json
+    import os as _os
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = open("server.py", encoding="utf-8").read()
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    nudo = lambda t: re.sub(r"/\*[\s\S]*?\*/", "", t)
+    blocco_mazzo = mini[mini.index("const MOSTRO_CHIAVE = "):
+                        mini.index("/* ---- export CSV degli affari conclusi")]
+
+    # --- 1) IL SEME DALLA NSEC, NELLA PAGINA ---------------------------
+    seme = nudo(fn("async function semeProfiloP2P(){"))
+    prova("il seme dalla nsec si prova PRIMA di chiedere al server", True,
+          0 < seme.find("await nsecDelContoP2P()") < seme.find("semeDaNsecP2P(nsec)")
+          < seme.find("fetch(`${API_BASE}/p2p/seme`"))
+    nsec_fn = nudo(fn("async function nsecDelContoP2P(){"))
+    prova("...solo per un nativo Nostr (id negativo), e con le funzioni della nsec dietro un typeof", True,
+          "if (!(numeroConto(myTgId) < 0)) return '';" in nsec_fn
+          and "typeof nsecSalvate !== 'function'" in nsec_fn)
+    prova("...e la nsec non parte mai: la sola fetch del seme non ha corpo, e il seme derivato torna prima", True,
+          "body" not in seme and seme.count("fetch(") == 1
+          and seme.find("return {sk, versione: P2P_SEME_NSEC_VERSIONE};") < seme.find("fetch("))
+    sd = nudo(fn("function semeDaNsecP2P(skHex, giudice){"))
+    prova("la derivazione e' un HMAC con la nsec come chiave e l'etichetta col contatore nel messaggio", True,
+          "NT.hmac(NT.sha256, chiave, enc.encode(ETICHETTA_SEME_NSEC_P2P + '|' + giro))" in sd
+          and "const ETICHETTA_SEME_NSEC_P2P = 'barattolo/p2p/profilo/nsec/v1';" in mini)
+
+    # --- 2) LA COPIA CIFRATA SUI RELAY ----------------------------------
+    prova("il kind e il `d` della copia sono quelli di NIP-78, in un posto solo", True,
+          "const P2P_COPIA_KIND = 30078;" in mini and "const P2P_COPIA_D = 'barattolo/p2p/profilo/v1';" in mini)
+    ad = nudo(fn("function adottaProfiloContoP2P(){"))
+    prova("la gamba dell'app, senza seme, RIPRENDE la copia dai relay e non genera", True,
+          "if (!s) return await riprendiCopiaProfiloP2P();" in ad)
+    am = nudo(fn("function assicuraMazzo(){"))
+    prova("...e il gesto prova la copia PRIMA del caso", True,
+          0 < am.find("if (!nuovo) nuovo = await riprendiCopiaProfiloP2P();")
+          < am.find("NT.generateSecretKey()"))
+    prova("mai sul nostro server: il blocco della copia non ha nessuna fetch", 0,
+          nudo(mini[mini.index("/* ============ LA COPIA CIFRATA SUI RELAY"):
+                    mini.index("/* ============ fine della copia cifrata sui relay")]).count("fetch("))
+    prova("i tre firmatari sanno cifrare NIP-44 verso una pubkey (cifra44/decifra44)", [2, 2, 2],
+          [nudo(fn("function firmatarioEstensione(){")).count("44:"),
+           nudo(fn("async function firmatarioBunker(uri, skHex, modoCifrario, opz){")).count("44:"),
+           nudo(fn("async function firmatarioNsec(nsec){")).count("44:")])
+    prova("...l'estensione solo se la offre", True,
+          "n.nip44 && typeof n.nip44.encrypt === 'function'" in fn("function firmatarioEstensione(){"))
+    prova("i permessi del bunker chiedono la firma del 30078 e la cifratura NIP-44", True,
+          "sign_event:30078,nip44_encrypt,nip44_decrypt" in
+          re.search(r"const NIP46_PERMESSI = '([^']+)';", mini).group(1))
+    prova("il campo `copiaRelay` viaggia col mazzo, andata e ritorno", True,
+          "copiaRelay: m.copiaRelay|0," in fn("function mazzoSerializza(m){")
+          and "copiaRelay: d ? (d.copiaRelay|0) : 0," in fn("function mazzoDaTesto(testo){"))
+    rp = nudo(fn("function renderP2P(){"))
+    prova("il render tenta la copia una volta per sessione, senza aspettarla", True,
+          "if (mz && !daGiudicare && !p2pCopiaTentata && typeof assicuraCopiaProfiloP2P === 'function')" in rp)
+    prova("la busta porta i relay della copia e la chiave di casa, e la pagina li legge", True,
+          'risposta["relay_copia_p2p"] = _relay_copia_p2p()' in src
+          and 'risposta["pub_casa"] = _NOSTR[1] if _NOSTR else ""' in src
+          and "relayCopiaP2P = j.relay_copia_p2p.map(String)" in mini
+          and "pubCasa = j.pub_casa" in mini)
+    # il giudice dei relay di casa, PURO sui globali: si esegue da solo
+    g = {"RELAYS_VERIFICA": ["wss://relay.damus.io", "wss://nos.lol/", "", "wss://relay.damus.io"],
+         "MOSTRO_RELAY_SPECCHIO": ["wss://relay.barattolo.store", "http://no", "wss://nos.lol"]}
+    exec(pezzo("_relay_copia_p2p"), g)
+    prova("i relay della copia: casa piu' specchio, senza doppioni ne' indirizzi storti",
+          ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.barattolo.store"], g["_relay_copia_p2p"]())
+
+    # --- 3) LA RETE DI SICUREZZA ----------------------------------------
+    presa = nudo(fn("async function eseguiPresaP2P(id, scelto, metodo){"))
+    prova("la porta sta dopo il mazzo e PRIMA della chiave bruciata e della riga scritta", True,
+          0 < presa.find("const mz = await assicuraMazzo();")
+          < presa.find("if (!(await garantisciCopiaProfiloP2P(mz))) {")
+          < presa.find("chiaveScambio(mz.sk, indice)") < presa.find("scriviOrdineP2P(ord);"))
+    prova("il foglio esiste, ed e' un dialog", True,
+          '<div class="sheet" id="p2pCopiaSheet" role="dialog" aria-modal="true" aria-labelledby="p2pCopiaTit">' in mini)
+    prova("il codice entra col .value, mai in un template", True,
+          "if (c) c.value = esportaMazzo();" in fn("function renderFoglioCopiaP2P(m){")
+          and "${" not in nudo(fn("function renderFoglioCopiaP2P(m){")))
+
+    # --- 4) I TESTI ------------------------------------------------------
+    prova("la card e la pagina dicono il fatto: le chiavi non sono in questo browser", True,
+          "rigaChiaviAltroveP2P(o, false)" in fn("function rigaScambioP2P(o){")
+          and "rigaChiaviAltroveP2P(o, true)" in fn("function renderOrdineP2P(){")
+          and "Aperto su un altro dispositivo" not in nudo(fn("function rigaScambioP2P(o){")))
+    att = nudo(fn("function attesaAltraParteP2P(o){"))
+    prova("a sats in garanzia la riga senza chiavi non dice «aspetta», e col PayCode la frase dice il codice", True,
+          "else if (s === 'attivo' && compro && o.soloVista) return null;" in att
+          and "'deve mandarti il PayCode'" in att)
+    prova("«il PayCode qui sotto» solo se c'e'", True,
+          "payCodeInRigaP2P(o)" in fn("function statoPayCodeP2P(o){")
+          and "Il PayCode sta nel browser dove hai preso lo scambio" in fn("function statoPayCodeP2P(o){"))
+    prova("il timer senza il codice: il tag pubblico letto dal libro e rovesciato", True,
+          "o.libroScade = scadeLibro; scriviOrdineP2P(o);" in fn("async function statoPubblicoOrdini(ids){")
+          and "scadenzaPayCodeDaLibroP2P(o.libroScade, o.creato)" in fn("function scadenzaTabacchinoOrdineP2P(o){")
+          and "return riquadroScadenzaPayCodeP2P(o);" in fn("function recapitoCompratoreP2P(o){"))
+    prova("il riquadro del solo tempo batte col riquadro pieno (stesso id, stessa classe)", True,
+          'id="p2pTabPayResta"' in fn("function riquadroScadenzaPayCodeP2P(o, adesso){")
+          and "'<div class=\"p2p-paycode\" data-fine=\"' + scade + '\">'" in fn("function riquadroScadenzaPayCodeP2P(o, adesso){"))
+    prova("fuori da Telegram il foglio del profilo non parla di Telegram, e avvisa su Tor", True,
+          "const fuoriTelegram = !cloudTelegram();" in fn("function renderProfiloP2P(){")
+          and "Tor Browser o la navigazione privata" in fn("function renderProfiloP2P(){"))
+
+    # --- 5) IL BANCO NODE: i tre casi col bundle vero --------------------
+    node = _sh.which("node")
+    if not node:
+        salta("i tre casi girano col bundle vero", "node non c'e'")
+        return
+    pezzi = "\n".join([
+        blocco_mazzo,
+        fn("async function pubblicaEventoSuRelay(relays, evento){"),
+        fn("async function firmatarioNsec(nsec){"),
+        fn("function firmatarioEstensione(){"),
+        fn("function contattoSupportoP2P(){"),
+        fn("function rigaChiaviAltroveP2P(o, lunga){"),
+        fn("function scadenzaPayCodeDaLibroP2P(scadeLibro, nato){"),
+        fn("function vitaLibroTabacchinoP2P(scade, adesso){"),
+        "\n".join(re.search(r"const %s = [^\n]*;" % n, mini).group(0)
+                  for n in ("P2P_TABACCHINO_VITA_S", "P2P_TABACCHINO_MARGINE_S")),
+    ])
+    banco = r"""
+const fs = require('fs'), vm = require('vm');
+vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
+/* IL RELAY DI CARTONE: uno per url, con la memoria degli eventi e una
+   leva «giu'»; NT.Relay e' quello, il resto e' il bundle vero */
+const relayStore = new Map(), relayGiu = new Set(), pubblicati = [];
+function combacia(f, ev){
+  if (f.kinds && f.kinds.indexOf(ev.kind) < 0) return false;
+  if (f.authors && f.authors.indexOf(ev.pubkey) < 0) return false;
+  if (f['#d'] && !ev.tags.some(t => t[0] === 'd' && f['#d'].indexOf(t[1]) >= 0)) return false;
+  return true;
+}
+class RelayCartone {
+  constructor(url){ this.url = url; this.connected = true; }
+  static async connect(url){
+    if (relayGiu.has(url)) throw new Error('giu');
+    if (!relayStore.has(url)) relayStore.set(url, []);
+    return new RelayCartone(url);
+  }
+  async publish(ev){ pubblicati.push({url: this.url, ev}); relayStore.get(this.url).push(ev); return 'ok'; }
+  subscribe(filtri, opz){
+    const miei = relayStore.get(this.url) || [];
+    setTimeout(() => { for (const ev of miei) if (filtri.some(f => combacia(f, ev))) opz.onevent(ev); if (opz.oneose) opz.oneose(); }, 1);
+    return {close(){}};
+  }
+  close(){}
+}
+const NT = Object.assign({}, NostrTools, {Relay: RelayCartone});
+const window = {NostrTools: NT};
+const {bytesToHex, hexToBytes} = NT.utils;
+let store = new Map();
+const localStorage = {getItem: k => store.has(k) ? store.get(k) : null,
+  setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k)};
+let tg = null;                       /* fuori da Telegram: niente cloud */
+let DEMO = false, VETRINA = false, myTgId = -555;
+const API_BASE = '/api';
+function authHdr(){ return 'x'; }
+let fetches = [];
+async function fetch(url, opt){
+  fetches.push({url, opt});
+  if (String(url).endsWith('/p2p/seme')) return {ok: false, status: 409};
+  if (String(url).endsWith('/p2p/chiavi')) return {ok: true, json: async () => ({ok: true, indice: 0})};
+  return {ok: true};
+}
+let toasts = []; function toast(m){ toasts.push(m); }
+function haptic(){}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const log = []; const console = {log: m => log.push(String(m)), warn: m => log.push(String(m)), error: m => log.push(String(m))};
+const nodi = {};
+function el(id){ return nodi[id] || (nodi[id] = {id, value: '', innerHTML: '', _c: new Set(),
+  classList: {add(c){ nodi[id]._c.add(c); }, remove(c){ nodi[id]._c.delete(c); }, contains(c){ return nodi[id]._c.has(c); }}}); }
+function chiudiFoglioP2P(id){ el(id).classList.remove('open'); }
+const navigator = {clipboard: {writeText: async t => { copiato = t; }}}; let copiato = '';
+let renderProfiloChiamate = 0; function renderProfiloP2P(){ renderProfiloChiamate++; }
+function renderP2P(){}
+async function caricaNostrTools(){}
+let onion = false; function suOnion(){ return onion; }
+let relayCopiaP2P = ['wss://casa.test', 'wss://specchio.test'];
+let pubCasa = '';
+/* le chiavi d'accesso: una per caso */
+const CONTI = {};
+function conto(nome){
+  if (!CONTI[nome]) { const sk = NT.generateSecretKey(); CONTI[nome] = {sk, skHex: bytesToHex(sk), pub: NT.getPublicKey(sk)}; }
+  return CONTI[nome];
+}
+let contoAperto = null;              /* chi e' dentro adesso */
+let nsecInBrowser = {};              /* pub -> skHex, come `barattolo_nsec` */
+function nsecSalvate(){ return nsecInBrowser; }
+async function pubAccount(){ return contoAperto ? contoAperto.pub : ''; }
+/* i firmatari automatici di cartone: 'nsec' (il vero firmatarioNsec),
+   'bunker' (un oggetto che risponde come chiama()), 'estensione' (window.nostr
+   di cartone, col vero firmatarioEstensione), o nessuno */
+let modoFirma = ''; let bunkerRifiuta = false; let estensioneSenza44 = false;
+function bunkerCartone(c){
+  return {
+    pubkey: async () => c.pub,
+    firma: async ev => NT.finalizeEvent(ev, c.sk),
+    cifra44: async (pub, t) => { if (bunkerRifiuta) throw new Error('permission denied'); return NT.nip44.encrypt(t, NT.nip44.getConversationKey(c.sk, pub)); },
+    decifra44: async (pub, t) => { if (bunkerRifiuta) throw new Error('permission denied'); return NT.nip44.decrypt(t, NT.nip44.getConversationKey(c.sk, pub)); },
+    chiudi(){},
+  };
+}
+function nostrCartone(c){
+  const n = {getPublicKey: async () => c.pub, signEvent: async ev => NT.finalizeEvent(ev, c.sk)};
+  if (!estensioneSenza44) n.nip44 = {
+    encrypt: async (pub, t) => NT.nip44.encrypt(t, NT.nip44.getConversationKey(c.sk, pub)),
+    decrypt: async (pub, t) => NT.nip44.decrypt(t, NT.nip44.getConversationKey(c.sk, pub))};
+  return n;
+}
+async function firmatarioAutomatico(){
+  if (!contoAperto) return null;
+  if (modoFirma === 'nsec') return {f: await firmatarioNsec(NT.nip19.nsecEncode(contoAperto.sk)), chiudi: true};
+  if (modoFirma === 'bunker') return {f: bunkerCartone(contoAperto), chiudi: true};
+  if (modoFirma === 'estensione') { window.nostr = nostrCartone(contoAperto); return {f: firmatarioEstensione(), chiudi: false}; }
+  return null;
+}
+/* la memoria svuotata: Tor Browser alla chiusura, e una sessione nuova */
+function chiudiBrowser(){
+  store = new Map(); nsecInBrowser = {}; nodi.p2pCopiaSheet = undefined; delete nodi.p2pCopiaSheet;
+  azzeraSessioneP2P(); p2pAdozione = false; contoInCorso = null; mazzoInCorso = null;
+  p2pCopiaEsito = ''; p2pCopiaGiro = null; p2pCopiaTentata = false; p2pRelayUtente = null; p2pCopiaFoglio = null;
+  fetches = []; toasts = [];
+}
+function entra(nome, modo, conNsec){
+  contoAperto = conto(nome); modoFirma = modo;
+  if (conNsec) nsecInBrowser[contoAperto.pub] = contoAperto.skHex;
+}
+const pausa = ms => new Promise(r => setTimeout(r, ms));
+(async () => {
+  const out = {};
+  /* ===== A) LA NSEC NEL BROWSER: il profilo deriva dalla chiave ===== */
+  entra('alice', 'nsec', true);
+  const s1 = semeDaNsecP2P(contoAperto.skHex), s2 = semeDaNsecP2P(contoAperto.skHex);
+  out.seme = [s1 === s2, /^[0-9a-f]{64}$/.test(s1), s1 !== contoAperto.skHex,
+              semeDaNsecP2P(conto('bob').skHex) !== s1, semeDaNsecP2P('zz') === '', semeDaNsecP2P('') === ''];
+  /* il giudice finto: i primi tre candidati non valgono, il quarto si'; mai valido = niente */
+  let scarti = 0;
+  const s3 = semeDaNsecP2P(contoAperto.skHex, b => (++scarti > 3));
+  out.giro = [scarti, s3 !== s1 && /^[0-9a-f]{64}$/.test(s3), semeDaNsecP2P(contoAperto.skHex, b => false) === ''];
+  const m1 = await adottaProfiloContoP2P();
+  out.nsecAdotta = [!!m1, m1 && m1.sk === s1, m1 && m1.origine, m1 && numeroConto(m1.conto),
+                    fetches.filter(f => String(f.url).endsWith('/p2p/seme')).length,
+                    fetches.filter(f => String(f.url).endsWith('/p2p/chiavi')).length,
+                    log.some(l => l.indexOf('dalla chiave Nostr, nel browser') >= 0)];
+  out.nsecCoperto = [profiloCopertoP2P(m1, ''), await garantisciCopiaProfiloP2P(m1), !!nodi.p2pCopiaSheet];
+  out.nsecCopiaNo = await assicuraCopiaProfiloP2P({gesto: true});   /* un derivato non va sui relay */
+  /* Tor Browser si chiude: la memoria sparisce; si rientra con la stessa nsec */
+  chiudiBrowser(); entra('alice', 'nsec', true);
+  const m1b = await adottaProfiloContoP2P();
+  out.nsecTorna = [!!m1b, m1b && m1b.sk === s1, !!mazzoMostro()];
+  /* con un'altra nsec e' un altro profilo */
+  chiudiBrowser(); entra('bob', 'nsec', true);
+  const mb = await adottaProfiloContoP2P();
+  out.nsecAltra = [!!mb, mb && mb.sk !== s1, mb && mb.sk === semeDaNsecP2P(conto('bob').skHex)];
+  /* un conto Telegram (id positivo) non deriva dalla nsec, anche se c'e' */
+  chiudiBrowser(); entra('alice', 'nsec', true); myTgId = 111;
+  out.telegramNo = [await nsecDelContoP2P(), await adottaProfiloContoP2P()];
+  myTgId = -555;
+
+  /* ===== B) IL BUNKER: la copia cifrata sui relay ================== */
+  chiudiBrowser(); entra('carla', 'bunker', false);
+  /* il kind 10002 di carla sta gia' sui relay di casa (si legge UNA volta
+     per sessione, alla prima domanda): i suoi relay di scrittura vanno per primi */
+  const ev10002 = NT.finalizeEvent({kind: 10002, created_at: 100, content: '', tags: [
+    ['r', 'wss://mio.test/'], ['r', 'wss://solo-lettura.test', 'read'], ['r', 'wss://scrivo.test', 'write'],
+    ['r', 'wss://casa.test'], ['r', 'ftp://no'], ['r', 'wss://mio.test']]}, contoAperto.sk);
+  relayStore.set('wss://casa.test', [ev10002]);
+  out.bunkerAdottaVuoto = [await adottaProfiloContoP2P(), p2pCopiaEsito, !!mazzoMostro()];
+  const m2 = await assicuraMazzo();            /* il gesto: nasce a caso */
+  out.bunkerNasce = [!!m2, m2.origine, m2.copiaRelay | 0, profiloCopertoP2P(m2, '')];
+  out.relayScrittura = relayScritturaDaEventoP2P(ev10002);
+  out.relayPerCopia = await relayPerCopiaP2P(contoAperto.pub);
+  fetches = [];                                /* da qui in poi: la copia, e basta */
+  const esitoB = await assicuraCopiaProfiloP2P({gesto: true});
+  const copie = pubblicati.filter(p => p.ev.kind === 30078);
+  const prima = copie[0] && copie[0].ev;
+  let aperta = null;
+  try { aperta = JSON.parse(NT.nip44.decrypt(prima.content, NT.nip44.getConversationKey(contoAperto.sk, contoAperto.pub))); } catch(e) {}
+  out.bunkerCopia = [esitoB, [...new Set(copie.map(p => p.url))].sort(), prima && prima.pubkey === contoAperto.pub,
+                     prima && prima.tags.map(t => t.join('=')), prima && NT.verifyEvent(prima),
+                     aperta && aperta.sk === m2.sk, (mazzoMostro().copiaRelay | 0) > 0, profiloCopertoP2P(mazzoMostro(), ''),
+                     fetches.length];
+  out.bunkerPorta = [await garantisciCopiaProfiloP2P(mazzoMostro()), !!nodi.p2pCopiaSheet];
+  /* il browser si svuota; si rientra col bunker: la copia torna da sola */
+  chiudiBrowser(); entra('carla', 'bunker', false);
+  const m2b = await adottaProfiloContoP2P();
+  out.bunkerTorna = [!!m2b, m2b && m2b.sk === m2.sk, m2b && (m2b.copiaRelay | 0) > 0, p2pCopiaEsito,
+                     fetches.filter(f => String(f.url).endsWith('/p2p/chiavi')).length,
+                     log.some(l => l.indexOf('ripreso dalla copia cifrata sui relay') >= 0)];
+  /* una copia piu' recente vince, una d'altri non si guarda */
+  out.piuRecente = [copiaPiuRecenteP2P([
+      {kind: 30078, pubkey: 'a', created_at: 5, tags: [['d', P2P_COPIA_D]], id: 'uno'},
+      {kind: 30078, pubkey: 'a', created_at: 9, tags: [['d', P2P_COPIA_D]], id: 'due'},
+      {kind: 30078, pubkey: 'b', created_at: 99, tags: [['d', P2P_COPIA_D]], id: 'altrui'},
+      {kind: 30078, pubkey: 'a', created_at: 50, tags: [['d', 'altro']], id: 'altro-d'},
+      {kind: 1, pubkey: 'a', created_at: 60, tags: [['d', P2P_COPIA_D]], id: 'kind'}], 'a').id,
+    copiaPiuRecenteP2P([], 'a')];
+
+  /* ===== C) L'ESTENSIONE: lo stesso, col vero firmatarioEstensione === */
+  chiudiBrowser(); relayStore.clear(); pubblicati.length = 0; entra('dino', 'estensione', false);
+  const m3 = await assicuraMazzo();
+  const esitoC = await assicuraCopiaProfiloP2P({gesto: true});
+  chiudiBrowser(); entra('dino', 'estensione', false);
+  const m3b = await adottaProfiloContoP2P();
+  out.estensione = [esitoC, !!m3b, m3b && m3b.sk === m3.sk, pubblicati.filter(p => p.ev.kind === 30078).length];
+  /* ...e senza nip44 nell'estensione: nessun firmatario che cifri */
+  chiudiBrowser(); relayStore.clear(); pubblicati.length = 0; entra('elsa', 'estensione', false); estensioneSenza44 = true;
+  const m4 = await assicuraMazzo();
+  out.estensioneSenza44 = [await assicuraCopiaProfiloP2P({gesto: true}), (mazzoMostro().copiaRelay | 0), pubblicati.length];
+  estensioneSenza44 = false;
+
+  /* ===== D) LA RETE DI SICUREZZA: quando gli strati non coprono ====== */
+  /* relay giu': la copia non si rilegge, e si dice */
+  chiudiBrowser(); relayStore.clear(); pubblicati.length = 0; entra('fede', 'bunker', false);
+  relayGiu.add('wss://casa.test'); relayGiu.add('wss://specchio.test');
+  const m5 = await assicuraMazzo();
+  out.relayGiu = [await assicuraCopiaProfiloP2P({gesto: true}), (mazzoMostro().copiaRelay | 0), profiloCopertoP2P(mazzoMostro(), '')];
+  /* la porta della presa: il foglio, col codice, e «L'ho salvato» */
+  onion = true;
+  const portaP = garantisciCopiaProfiloP2P(mazzoMostro());
+  await pausa(5);
+  const corpo = el('p2pCopiaCorpo').innerHTML;
+  out.foglio = [el('p2pCopiaSheet').classList.contains('open'), el('sheetBg').classList.contains('open'),
+                el('p2pCopiaCodice').value === esportaMazzo(), el('p2pCopiaCodice').value.startsWith('nsec1'),
+                corpo.indexOf('Sei su Tor Browser') >= 0, corpo.indexOf('riproveremo') >= 0,
+                corpo.indexOf("L'ho salvato, vai avanti") >= 0, corpo.indexOf('Non ora') >= 0,
+                corpo.indexOf(esportaMazzo()) < 0];
+  await copiaCodiceFoglioP2P();
+  out.copiaCodice = [copiato === esportaMazzo(), toasts[toasts.length - 1]];
+  await copiaP2PSalvata();
+  out.salvato = [await portaP, !!mazzoMostro().backupFatto, el('p2pCopiaSheet').classList.contains('open'),
+                 await garantisciCopiaProfiloP2P(mazzoMostro())];
+  /* «Non ora» ferma: la porta dice no */
+  chiudiBrowser(); entra('gino', 'bunker', false);
+  const m6 = await assicuraMazzo();
+  const portaN = garantisciCopiaProfiloP2P(mazzoMostro());
+  await pausa(5);
+  copiaP2PNonOra();
+  out.nonOra = [await portaN, !!mazzoMostro().backupFatto, el('p2pCopiaSheet').classList.contains('open')];
+  relayGiu.clear(); onion = false;
+  /* il bunker che rifiuta di cifrare: esito «rifiutata», e il foglio lo dice */
+  chiudiBrowser(); entra('hana', 'bunker', false); bunkerRifiuta = true;
+  const m7 = await assicuraMazzo();
+  out.rifiutata = [await assicuraCopiaProfiloP2P({gesto: true}), testoReteSicurezzaP2P('rifiutata', false).indexOf('non ha concesso') >= 0];
+  bunkerRifiuta = false;
+  /* la tabella del profilo coperto */
+  out.coperto = [profiloCopertoP2P(null, 'copia'), profiloCopertoP2P({origine: 'conto'}, ''), profiloCopertoP2P({origine: 'mia'}, ''),
+                 profiloCopertoP2P({origine: '', backupFatto: true}, ''), profiloCopertoP2P({origine: '', copiaRelay: 5}, ''),
+                 profiloCopertoP2P({origine: ''}, 'copia'), profiloCopertoP2P({origine: ''}, 'muto'), profiloCopertoP2P({origine: ''}, '')];
+  /* un conto Telegram (id positivo) non va sui relay */
+  myTgId = 111; out.telegramCopia = await assicuraCopiaProfiloP2P({gesto: true}); myTgId = -555;
+
+  /* ===== E) I TESTI E IL TEMPO ======================================= */
+  out.rigaCorta = rigaChiaviAltroveP2P({}, false);
+  pubCasa = conto('alice').pub;
+  const lunga = rigaChiaviAltroveP2P({}, true);
+  out.rigaLunga = [lunga.startsWith(out.rigaCorta), lunga.indexOf('https://t.me/ilbarattolobot') >= 0,
+                   lunga.indexOf('https://njump.me/' + NT.nip19.npubEncode(pubCasa)) >= 0,
+                   lunga.indexOf('Tor Browser') >= 0];
+  pubCasa = '';
+  out.contattoSenzaCasa = contattoSupportoP2P().indexOf('njump') < 0 && contattoSupportoP2P().indexOf('t.me/ilbarattolobot') >= 0;
+  /* la rovesciata del tempo nel libro: su ogni scadenza da un'ora a 72 ore */
+  const nato = 1790000000; let giusti = 0, totale = 0;
+  for (let ore = 1; ore <= 72; ore += 1) for (const extra of [0, 1799, 3599]) {
+    const s = nato + ore * 3600 + extra;
+    const e = vitaLibroTabacchinoP2P(s, nato);
+    totale++; if (Math.abs(scadenzaPayCodeDaLibroP2P(e, nato) - s) <= 1) giusti++;
+  }
+  out.rovesciata = [giusti, totale, scadenzaPayCodeDaLibroP2P(0, nato), scadenzaPayCodeDaLibroP2P(nato + 10, 0), scadenzaPayCodeDaLibroP2P(nato - 5, nato)];
+  out.avvisoTor = [avvisoMemoriaBrowserP2P(true).indexOf('Tor Browser') >= 0, avvisoMemoriaBrowserP2P(false)];
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
+"""
+    cart = _tf.mkdtemp(prefix="tor_chiavi_")
+    pb = _os.path.join(cart, "banco.js")
+    open(pb, "w", encoding="utf-8").write(pezzi + banco)
+    r = _sp.run([node, pb, "vendor/nostr.bundle.js"], capture_output=True, text=True,
+                timeout=180, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco dei tre casi gira", "", (r.stderr or "")[-900:])
+    if r.returncode or not r.stdout.strip():
+        return
+    o = _json.loads(r.stdout.strip().splitlines()[-1])
+    prova("il seme dalla nsec: deterministico, 64 esadecimali, non la nsec, diverso per chiave, niente su una chiave storta",
+          [True, True, True, True, True, True], o["seme"])
+    prova("...e il giro del giudice: tre scarti, poi una chiave valida; mai valida, niente", [4, True, True], o["giro"])
+    prova("chi entra con la nsec adotta il profilo DERIVATO senza chiedere il seme al server, e registra la pubblica",
+          [True, True, "conto", -555, 0, 1, True], o["nsecAdotta"])
+    prova("...e' coperto: la porta passa senza foglio", [True, True, False], o["nsecCoperto"])
+    prova("...e un derivato non va sui relay", "copia", o["nsecCopiaNo"])
+    prova("Tor Browser si chiude, si rientra con la stessa nsec: lo stesso profilo", [True, True, True], o["nsecTorna"])
+    prova("con un'altra nsec e' un altro profilo", [True, True, True], o["nsecAltra"])
+    prova("un conto Telegram non deriva dalla nsec, anche se sta nel browser", ["", None], o["telegramNo"])
+    prova("col bunker, senza copia sui relay: niente si adotta e niente nasce guardando", [None, "niente", False], o["bunkerAdottaVuoto"])
+    prova("...al gesto nasce a caso, senza copia, scoperto", [True, "", 0, False], o["bunkerNasce"])
+    prova("i relay di scrittura dal kind 10002: senza marcatore o `write`, mai `read`, mai doppioni ne' schemi storti",
+          ["wss://mio.test", "wss://scrivo.test", "wss://casa.test"], o["relayScrittura"])
+    prova("...e la copia va PRIMA sui suoi, poi su quelli di casa, senza doppioni",
+          ["wss://mio.test", "wss://scrivo.test", "wss://casa.test", "wss://specchio.test"], o["relayPerCopia"])
+    prova("la copia: kind 30078 col `d` di casa, firmata dall'account, cifrata verso se stessi col mazzo dentro, "
+          "riletta, e il profilo e' coperto — senza una sola fetch",
+          ["copia", ["wss://casa.test", "wss://mio.test", "wss://scrivo.test", "wss://specchio.test"], True,
+           ["d=barattolo/p2p/profilo/v1"], True, True, True, True, 0], o["bunkerCopia"])
+    prova("...e la porta della presa passa senza foglio", [True, False], o["bunkerPorta"])
+    prova("il browser si svuota, si rientra col bunker: la copia torna da sola, registrata, e lo dice",
+          [True, True, True, "copia", 1, True], o["bunkerTorna"])
+    prova("fra piu' copie vince la piu' recente MIA col `d` giusto; senza, null", ["due", None], o["piuRecente"])
+    prova("con l'estensione (il vero firmatarioEstensione su un window.nostr di cartone) e' lo stesso",
+          ["copia", True, True, 2], o["estensione"])
+    prova("...e un'estensione senza nip44 non cifra: «niente», e niente parte", ["niente", 0, 0], o["estensioneSenza44"])
+    prova("relay giu': «muto», nessuna copia, scoperto", ["muto", 0, False], o["relayGiu"])
+    prova("la porta apre il foglio: il codice (nsec) nel .value e non nel testo, Tor detto, il perche', i due gesti",
+          [True, True, True, True, True, True, True, True, True], o["foglio"])
+    prova("«Copia» copia il codice e lo dice", [True, "Codice copiato: incollalo nel tuo gestore di password 🔐"], o["copiaCodice"])
+    prova("«L'ho salvato»: la porta passa, il profilo e' coperto, il foglio chiude, la volta dopo niente foglio",
+          [True, True, False, True], o["salvato"])
+    prova("«Non ora»: la porta dice no, niente salvato, foglio chiuso", [False, False, False], o["nonOra"])
+    prova("il bunker che rifiuta di cifrare: «rifiutata», e il foglio lo spiega", ["rifiutata", True], o["rifiutata"])
+    prova("la tabella del profilo coperto", [False, True, True, True, True, True, False, False], o["coperto"])
+    prova("un conto Telegram non mette niente sui relay", "", o["telegramCopia"])
+    prova("la riga corta dice il fatto", "🔑 Le chiavi di questo scambio non sono in questo browser: qui lo segui, i gesti si fanno da dove l'hai aperto.", o["rigaCorta"])
+    prova("...e la lunga aggiunge come riprenderle, Tor, il bot e il profilo Nostr di casa", [True, True, True, True], o["rigaLunga"])
+    prova("...senza la chiave di casa resta il bot", True, o["contattoSenzaCasa"])
+    prova("la rovesciata del tempo nel libro torna alla scadenza del PayCode (al secondo) su 216 casi, e zero sui dati che mancano",
+          [216, 216, 0, 0, 0], o["rovesciata"])
+    prova("l'avviso di Tor c'e' solo su Tor", [True, ""], o["avvisoTor"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_controllo_fattura_p2p, prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_tor_chiavi_scambio, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,

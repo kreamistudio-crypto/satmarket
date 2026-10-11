@@ -50452,3 +50452,162 @@ Telegram su Android, «Pubblica» senza foto e Compra/Vendi; lo stesso
 nell'app installata, col telefono NON in silenzioso; se è troppo o
 troppo poco, dire quale dei due posti — le tre costanti sono lì per
 questo.
+
+## Le chiavi dello scambio dopo la memoria svuotata: il seme dalla nsec, la copia cifrata sui relay, la rete di sicurezza (11-12 ott 2026, notte, cantiere tor-chiavi-scambio, decisione di Andrea a strati)
+
+**Il caso.** Un utente entra con Nostr dal .onion con Tor Browser sul
+telefono, prende un ordine Barattozon, paga il PayCode al tabacchino
+(ha lo scontrino). Tor Browser svuota la memoria a ogni chiusura: al
+rientro la pagina dice «Aperto su un altro dispositivo: qui lo segui, i
+gesti si fanno da là», il tasto «Ho pagato» è spento, il timer è
+sparito, e nel riquadro «Chi vende deve indicarti dove inviare gli
+euro» sta accanto a «Vai al tabacchino col PayCode qui sotto». Lo
+stesso telefono, nessun altro dispositivo: le chiavi originali sono
+perse. Lo sblocco dello scambio vero (`ea0af71a`) è nella voce sopra.
+
+**La causa, confermata dal codice.** Le quattro chiavi del P2P stanno in
+localStorage (`P2P_CHIAVI_DISPOSITIVO`). Per un nativo Nostr il server
+rifiuta apposta di derivare il profilo (`/api/p2p/seme` risponde 409 a
+un id negativo: «è venuto qui per non farsi ricavare niente»), quindi
+il profilo nasceva a caso nel solo browser, e le trade key si ricavano
+da lui (`chiaveScambio`, HMAC deterministico). Perso il profilo, perse
+tutte. Al rientro l'archivio del server (`/api/p2p/scambi`) ricostruisce
+la riga senza trade key → `soloVista` → nessun bottone; il PayCode
+cifrato non viaggia (Barattolo non lo legge) e non c'è; la scadenza si
+leggeva dal testo cifrato, quindi niente timer; e due giudici non si
+parlavano: `statoPayCodeP2P` prometteva «il PayCode qui sotto» guardando
+solo stato e metodo, mentre `attesaAltraParteP2P` diceva la frase
+generica degli euro perché il recapito «non era arrivato».
+
+**La cura, a strati (decisione di Andrea).**
+1) **Chi entra con la nsec nel browser** (vedi «LA NSEC SUL
+DISPOSITIVO») ricava il profilo DALLA SUA CHIAVE, nella pagina:
+`semeDaNsecP2P` — HMAC-SHA256 con la nsec come chiave e l'etichetta
+`barattolo/p2p/profilo/nsec/v1|<giro>` come messaggio, `getPublicKey`
+giudice dello scalare e il contatore come nel server e nelle trade key.
+`semeProfiloP2P` la prova PRIMA della fetch del seme: la nsec non parte
+mai, il 409 del server resta com'è. Il mazzo è `origine 'conto'` con un
+`conto` NEGATIVO, e il giudice unico, la mensola, il passaggio (`giudicaMazzoP2P`, `passaAlContoP2P`) funzionano identici: su un
+dispositivo con un profilo di ieri e una storia, «tenuto» col bottone
+«Usa il profilo del tuo account»; senza storia, cede il posto. Torna da
+solo su qualunque dispositivo, senza relay. A senso unico: dal profilo
+non si risale alla nsec, e l'identità Mostro non è collegabile alla
+npub. NON per il bunker né per l'estensione: lì la pagina non ha il
+segreto, e BIP-340 con aux casuale non dà una firma da cui derivare.
+2) **Chi entra col bunker o con l'estensione**: una COPIA del mazzo
+cifrata NIP-44 verso la propria pubkey (la chiave di conversazione con
+se stessi: i tre firmatari la calcolano uguale, `cifra44`/`decifra44`
+su `firmatarioEstensione` solo se `window.nostr.nip44` c'è, su
+`firmatarioBunker` con `nip44_encrypt`/`nip44_decrypt`, su
+`firmatarioNsec` col bundle), firmata con la chiave dell'account come
+NIP-78 (kind 30078, `d` = `barattolo/p2p/profilo/v1`), pubblicata sui
+relay di scrittura dell'utente (il suo kind 10002, letto UNA volta per
+sessione dai relay di casa, tag `r` senza marcatore o `write`, mai
+`read`, al massimo 6) più quelli che il server indica
+(`relay_copia_p2p` nella busta di prima pagina: RELAY_NOSTR, o i relay
+di serie, più MOSTRO_RELAY_SPECCHIO — il nostro — senza doppioni,
+`_relay_copia_p2p`). Poi si RILEGGE dai relay: contano i relay che la
+ridanno (`visto`), e con zero l'esito è «muto». `copiaRelay` (epoch
+della rilettura) viaggia col mazzo. Al login successivo
+`adottaProfiloContoP2P` e `assicuraMazzo`, senza seme, RIPRENDONO la
+copia più recente MIA col `d` giusto (`copiaPiuRecenteP2P`), la
+decifrano col firmatario automatico, e il profilo torna — indice
+compreso, col pavimento del server. Una volta per sessione dal render
+(`p2pCopiaTentata`), di nuovo a ogni gesto (`opz.gesto`), e «🔁 Riprova
+la copia sui relay» nel foglio del profilo. Esiti detti nel foglio:
+copia / muto / rifiutata (il bunker che nega la cifratura) / niente
+(nessun firmatario che cifri). MAI SUL NOSTRO SERVER (la regola ferrea
+2 letta per intero: la copia server-side, anche cifrata, è quella
+respinta per il secret NWC): il blocco della copia non ha una fetch. Il
+nostro relay accetta la scrittura perché la chiave d'accesso sta già in
+`/api/relay/chiavi` (la policy `chi-scrive.py` guarda la pubkey, non il
+kind; una chiave nuova entra entro dieci minuti, e il riprovo copre).
+`NIP46_PERMESSI` chiede da oggi anche `sign_event:30078`,
+`nip44_encrypt`, `nip44_decrypt`: una sessione di prima li concede al
+momento, o rifiuta — e il rifiuto è un esito detto.
+3) **La rete di sicurezza**: `profiloCopertoP2P(m, nuvola)` — 'conto' o
+'mia', codice salvato, copia riletta dai relay, o copia nel cloud di
+Telegram. A chi NON è coperto, in `eseguiPresaP2P` subito dopo
+`assicuraMazzo()` e PRIMA che una chiave si bruci e una riga si scriva,
+`garantisciCopiaProfiloP2P` tenta ancora la copia (col gesto in mano) e
+poi apre il foglio `p2pCopiaSheet`: perché (le chiavi vivono solo qui;
+Tor e la navigazione privata le svuotano a ogni chiusura; il perché
+della copia mancata), il codice segreto nel `.value` con 👁, «📋 Copia»,
+«✓ L'ho salvato, vai avanti» (`backupFatto`, e la presa prosegue) e
+«Non ora» (la presa si ferma, senza tracce: toast «Presa rimandata:
+prima metti al sicuro il profilo di scambio»). Il foglio chiuso dal
+velo o dall'indietro vale «non ora» (MutationObserver sulla classe).
+Per chi è coperto il codice resta nel profilo e non blocca niente.
+4) **L'avviso su Tor**: sopra il libro (`avvisoMemoriaBrowserP2P`, solo
+con `suOnion()`), nel foglio della rete di sicurezza («Sei su Tor
+Browser: …» / «Con Tor Browser o la navigazione privata …»), e nel
+foglio del profilo fuori da Telegram, dove la riga non parla più di «questo
+Telegram» (non c'è) e dice «Vale in questo browser. ⚠️ Con Tor Browser o
+la navigazione privata la memoria del browser si svuota alla chiusura,
+e con lei il profilo e gli scambi aperti.» — tranne per un profilo che
+torna da solo. La navigazione privata non si può riconoscere dalla
+pagina: si dice sempre, dove serve.
+5) **Le correzioni**: la riga senza chiavi è onesta
+(`rigaChiaviAltroveP2P`: «🔑 Le chiavi di questo scambio non sono in
+questo browser: qui lo segui, i gesti si fanno da dove l'hai aperto.»;
+nella pagina anche come riprenderle e, se la memoria è persa, «scrivici
+subito: @ilbarattolobot o su Nostr njump.me/npub…» — la chiave di casa
+arriva dalla busta come `pub_casa`, `contattoSupportoP2P`); il timer dal
+tag PUBBLICO `expires_at` del 38383, che per Barattozon c'è sempre anche
+dopo la presa: `statoPubblicoOrdini` lo scrive sulla riga
+(`libroScade`), `scadenzaPayCodeDaLibroP2P` ROVESCIA
+`vitaLibroTabacchinoP2P` (margine pieno se `e − n ≥ 2h`, altrimenti
+`s = 2e − n`, al secondo di arrotondamento; 216 casi provati) con
+`o.creato` come ora della pubblicazione, e `riquadroScadenzaPayCodeP2P`
+mostra il solo tempo, nello stesso `.p2p-paycode` col `#p2pTabPayResta`
+che il battito già aggiorna; «il PayCode qui sotto» solo se c'è
+(`payCodeInRigaP2P`), altrimenti «arriva cifrato da chi vende» o «sta
+nel browser dove hai preso lo scambio»; a sats in garanzia la riga senza
+chiavi non dice «aspetta» (la mossa è mia), e col PayCode la frase
+d'attesa dice «deve mandarti il PayCode» e non «dove inviare gli euro».
+6) **Compatibilità**: gli scambi in corso col profilo di oggi non si
+toccano (nessun gesto sostituisce un mazzo che c'è: l'invariante del
+cantiere del conto); il profilo nuovo entra solo dove il mazzo manca, e
+dove ce n'è uno di ieri decide il giudice unico con la mensola. Chi ha
+perso il profilo PRIMA di oggi non lo recupera con nessuno strato:
+questo cantiere protegge da domani. Un utente con la nsec sul telefono
+e il bunker sul PC ha DUE profili (il primo strato non pubblica sui
+relay, per decisione): lo dice il foglio, e la mensola li tiene.
+
+**Scartato.** Derivare dal bunker o dall'estensione con una firma (non
+è deterministica); la copia sul nostro server (respinta dalla scala
+Nostr); pubblicare la copia anche per chi deriva dalla nsec («senza
+relay» era la richiesta); riconoscere la navigazione privata dalla
+pagina (non si può); un timer «circa» senza rovesciare la funzione (si
+rovescia esatta).
+
+**Il lessico.** La sentinella del foglio del profilo («chi entra da
+Telegram non legge Nostr/nsec/relay/chiave») guarda il CODICE di
+`renderProfiloP2P`: i due testi nuovi vivono in `testoProfiloDerivatoFuoriP2P` e `rigaCopiaFuoriP2P`, coi nomi senza quelle parole.
+
+**Provato.** `prove_tor_chiavi_scambio` (56 verdi): le sentinelle del
+testo e il banco node col bundle VERO — la nsec (deterministico, il giro
+del giudice, l'adozione senza seme, Tor che si chiude e il profilo che
+torna, un'altra nsec un altro profilo, un conto Telegram che non deriva),
+il bunker (nasce a caso, i relay di scrittura dal 10002, la copia 30078
+cifrata verso se stessi col mazzo dentro e riletta, senza una fetch, la
+ripresa a memoria vuota, la più recente che vince), l'estensione (il vero
+`firmatarioEstensione` su un `window.nostr` di cartone, con e senza
+nip44), relay giù (muto), il foglio (codice nel .value, Tor, i due
+gesti, Copia, «L'ho salvato», «Non ora»), il bunker che rifiuta, la
+tabella del coperto, i testi, la rovesciata su 216 casi, il giudice dei
+relay di casa. `collaudo_chiavi_ritrovate` (35 ok, nel workflow): il
+SERVER VERO col CLIENT VERO in node — il 409 del seme, le pubbliche alla
+rotta vera, gli eventi di mostrod, l'archivio con `chiave_mia`, il
+browser svuotato e il dispositivo 2 che ritrova la trade key nei tre
+casi (riga non più solo da guardare, bottone «Ho inviato gli euro»), e
+il controllo negativo che resta solo da guardare coi gesti spenti.
+Le prove toccate e rilette: `prove_p2p_chiavi` (206), `prove_p2p_conto_dispositivo` (100, undici `numeroConto`), `prove_p2p_paycode` (142), `prove_scambi_ovunque` (81), `prove_p2p_pubblica` (345), `prove_tutorial`, `prove_p2p_stati`, `prove_ritocchi_scambio`.
+
+**Resta da guardare.** Sul telefono vero: Tor Browser col .onion e la
+nsec (il profilo che torna dopo la chiusura), Amber col bunker (il
+permesso `nip44_encrypt` chiesto a una sessione di prima, e la copia
+riletta dai relay veri), e un'estensione desktop con `nip44`. La
+rilettura dal nostro relay da Tor. Il margine dell'`expires_at` quando
+`o.creato` del server è più tardi della pubblicazione di qualche
+secondo.

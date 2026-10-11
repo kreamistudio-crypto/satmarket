@@ -29952,6 +29952,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    dispositivo») →
    mai custodia di segreti altrui SUL SERVER, mai firme che richiedano
    di consegnare chiavi al server.
+   DUE GRADINI IN PIÙ (11-12 ott 2026, «tor-chiavi-scambio», decisione
+   di Andrea): il PROFILO DI SCAMBIO DERIVATO DALLA NSEC NEL BROWSER
+   (`semeDaNsecP2P`: HMAC a senso unico, calcolato nella pagina dalla
+   nsec conservata, mai inviata; il server continua a rispondere 409 al
+   seme di un nativo Nostr) → la COPIA DEL PROFILO CIFRATA NIP-44 VERSO
+   SE STESSI SUI RELAY (NIP-78, kind 30078, firmata dall'account col
+   bunker, l'estensione o la nsec, sui relay dell'utente e su quelli di
+   casa, riletta per conferma; il server non la vede e non la custodisce
+   — la copia server-side, anche cifrata, resta RESPINTA come per il
+   secret NWC). La ricetta e le prove: CANTIERI, «Le chiavi dello
+   scambio dopo la memoria svuotata».
 - LE LETTURE DAI RELAY IN COLLAUDO (23 set 2026, regola di Andrea: nei
   collaudi e nei giri dal vivo non ci si collega MAI a un relay vero, e
   non si pubblica niente). Le PUBBLICAZIONI erano a posto da sempre —

@@ -13331,6 +13331,18 @@ document.getElementById('cartello')?.remove();</script>
     <h3 id="p2pProfiloTit">👤 Il tuo profilo di scambio</h3>
     <div id="p2pProfiloCorpo"></div>
   </div>
+  <!-- LA RETE DI SICUREZZA DEL PROFILO DI SCAMBIO (11 ott 2026, cantiere
+       «tor-chiavi-scambio»): si apre PRIMA della prima presa a chi ha un
+       profilo che vale in un browser solo — ne' derivato dal conto o
+       dalla nsec, ne' copiato cifrato sui relay, ne' nel cloud di
+       Telegram, ne' col codice gia' salvato — e chiede il gesto esplicito
+       «L'ho salvato». «Non ora» ferma la presa. `renderFoglioCopiaP2P`
+       lo riempie; il codice entra col .value, mai in un template. -->
+  <div class="sheet" id="p2pCopiaSheet" role="dialog" aria-modal="true" aria-labelledby="p2pCopiaTit">
+    <div class="grab"></div>
+    <h3 id="p2pCopiaTit">🔑 Metti al sicuro il profilo di scambio</h3>
+    <div id="p2pCopiaCorpo"></div>
+  </div>
   <!-- LA COPIA DELLA CHIAVE DI MODERATORE (1 ott 2026): un foglio per
        due gesti, esporta e importa, che `renderChiaveModP2P` riempie.
        La chiave privata ne esce SOLO cifrata (NIP-49) e ci rientra
@@ -14456,6 +14468,11 @@ function linkDentroTelegram(link){
    parte, che e' peggio di un bottone che manca. Cosi' resta vuota
    anche in DEMO da file://, dove un server non c'e'. */
 let relayNip46 = [];
+/* i relay su cui va la copia cifrata del profilo di scambio, e la chiave
+   pubblica di Barattolo per il contatto (11 ott 2026): dal server, mai
+   scritti a mano qui */
+let relayCopiaP2P = [];
+let pubCasa = '';
 
 
 /* ═══ IL GUSCIO DI APERTURA, E QUANDO SI TOGLIE (set 2026) ═══
@@ -16205,6 +16222,8 @@ async function loadListings(anonimo){
      ieri, o lista vuota) il bottone «Col telefono» non compare e le
      altre porte restano quelle di sempre */
   if (Array.isArray(j.relay_nip46)) relayNip46 = j.relay_nip46;
+  if (Array.isArray(j.relay_copia_p2p)) relayCopiaP2P = j.relay_copia_p2p.map(String);
+  if (typeof j.pub_casa === 'string' && /^[0-9a-f]{64}$/.test(j.pub_casa)) pubCasa = j.pub_casa;
   /* la leva dello scambio P2P per chi /api/me non ce l'ha (la vetrina
      anonima): il calco di asta_abilitata — chiave assente = server di
      ieri = si resta al coming soon, un'assenza e non una bugia */
@@ -48588,9 +48607,17 @@ function caricaNostrTools(){
 
 /* 1) Estensione NIP-07 (Alby, nos2x…): firma lei, noi non vediamo nulla */
 function firmatarioEstensione(){
+  const n = window.nostr;
   return {
-    pubkey: () => window.nostr.getPublicKey(),
-    firma:  (evento) => window.nostr.signEvent(evento),
+    pubkey: () => n.getPublicKey(),
+    firma:  (evento) => n.signEvent(evento),
+    /* la cifratura NIP-44 (11 ott 2026, la copia del profilo di
+       scambio): solo se l'estensione la offre — senza, il firmatario
+       non sa cifrare e chi lo chiede lo legge dal typeof */
+    ...(n.nip44 && typeof n.nip44.encrypt === 'function' ? {
+      cifra44:   (pub, testo) => n.nip44.encrypt(pub, testo),
+      decifra44: (pub, testo) => n.nip44.decrypt(pub, testo),
+    } : {}),
   };
 }
 
@@ -48616,7 +48643,11 @@ const NIP46_GRAZIA_MS = 2500;
    altre. Le strade che li chiedono sono due (la URI incollata e il QR)
    e scriverli due volte vuol dire che un giorno una delle due chiede
    un permesso in piu' o in meno di quello che poi usa. */
-const NIP46_PERMESSI = 'sign_event:22242,sign_event:30402';
+/* ...PIU' LA COPIA DEL PROFILO DI SCAMBIO (11 ott 2026, «tor-chiavi-
+   scambio»): la firma del kind 30078 e la cifratura NIP-44 verso se
+   stessi. Chi ha una sessione di prima li concede al momento, o rifiuta
+   — e il rifiuto e' un esito detto nel foglio del profilo. */
+const NIP46_PERMESSI = 'sign_event:22242,sign_event:30402,sign_event:30078,nip44_encrypt,nip44_decrypt';
 
 /* I TEMPI DELL'UMANO (10 ott 2026, dal campo: due utenti in due giorni
    fuori dalla porta, uno col bunker e uno con Clave su iPhone). Dall'altra
@@ -49309,6 +49340,11 @@ async function firmatarioBunker(uri, skHex, modoCifrario, opz){
   return {
     pubkey: () => chiama('get_public_key', []),
     firma:  async (evento) => JSON.parse(await chiama('sign_event', [JSON.stringify(evento)], NIP46_UMANO_MS)),
+    /* la cifratura NIP-44 (11 ott 2026, la copia del profilo di
+       scambio): il bunker risponde col testo cifrato, o con un rifiuto
+       che chi chiede legge come esito */
+    cifra44:   (pub, testo) => chiama('nip44_encrypt', [pub, testo], NIP46_UMANO_MS),
+    decifra44: (pub, testo) => chiama('nip44_decrypt', [pub, testo], NIP46_UMANO_MS),
     chiudi,
     /* per ricordaBunker: uri (con la stanza di ADESSO) + chiave client =
        la sessione riusabile */
@@ -49672,6 +49708,10 @@ async function firmatarioNsec(nsec){
   return {
     pubkey: async () => { viva(); return NT.getPublicKey(sk); },
     firma:  async (evento) => { viva(); return NT.finalizeEvent(evento, sk); },
+    /* la cifratura NIP-44 verso una pubkey (11 ott 2026): la chiave di
+       conversazione nasce qui, e come la firma non esce dalla chiusura */
+    cifra44:   async (pub, testo) => { viva(); return NT.nip44.encrypt(testo, NT.nip44.getConversationKey(sk, pub)); },
+    decifra44: async (pub, testo) => { viva(); return NT.nip44.decrypt(testo, NT.nip44.getConversationKey(sk, pub)); },
     /* la copia sul dispositivo si scrive solo quando la chiave e'
        PROVATA per l'account (il server ha accettato la sua firma, o la
        pubkey coincide): una nsec sbagliata non resta da nessuna parte */
@@ -51955,6 +51995,11 @@ function renderP2P(){
        voce «Il seme senza commit» di CANTIERI.md). */
     p2pPavimento = registraChiaviP2P([mz.pub]);
   }
+  /* LA COPIA CIFRATA SUI RELAY, una volta per sessione (11 ott 2026,
+     «tor-chiavi-scambio»): solo per un nativo Nostr con un profilo nato
+     nel browser; il giudice e' dentro, e un fallimento non ferma niente */
+  if (mz && !daGiudicare && !p2pCopiaTentata && typeof assicuraCopiaProfiloP2P === 'function')
+    assicuraCopiaProfiloP2P().catch(() => {});
   /* ...e il mazzo che NON c'e' si va a cercare nel cloud, una volta per
      sessione. GUARDARE IL P2P E' IL MOMENTO DI ADOTTARE: su un
      dispositivo nuovo il mazzo sta nel cloud e qui non c'e' ancora, e
@@ -52295,6 +52340,8 @@ function renderP2P(){
   const vuotoInAttesa = !!p2pLibro.copia && !p2pErrore && !vivi.length
     && typeof scheletroLibroP2P === 'function';
   box.innerHTML = avvisi
+    /* l'avviso di chi e' su Tor (11 ott 2026): una riga, sopra il libro */
+    + (typeof avvisoMemoriaBrowserP2P === 'function' ? avvisoMemoriaBrowserP2P(typeof suOnion === 'function' && suOnion()) : '')
     + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')
        : vuotoInAttesa ? scheletroLibroP2P()
        : `<div class="empty">${vivi.length
@@ -53228,6 +53275,365 @@ function riprendiParcheggioP2P(m){
   return true;
 }
 /* ============ fine del conto sul dispositivo ============ */
+/* ============ LA COPIA CIFRATA SUI RELAY (11 ott 2026, cantiere
+   «tor-chiavi-scambio», secondo strato) ============
+   Chi entra col bunker (NIP-46) o con l'estensione (NIP-07) non ha la
+   nsec nella pagina, quindi il primo strato non lo copre. Per lui il
+   profilo si mette al sicuro COSI': il mazzo serializzato si cifra
+   NIP-44 verso la PROPRIA pubkey (la chiave di conversazione con se
+   stessi: estensione, bunker e nsec la calcolano uguale), si firma con
+   la chiave dell'account come evento NIP-78 (kind 30078, `d` fisso) e
+   si pubblica sui relay: quelli di scrittura dell'utente (il suo kind
+   10002), piu' quelli che il server indica (`relay_copia_p2p`: i relay
+   pubblici di casa e il nostro). Poi si RILEGGE dai relay: una copia
+   che nessuno rida' non e' una copia, e il foglio lo dice.
+   AL LOGIN SUCCESSIVO si riprende da sola (`riprendiCopiaProfiloP2P`):
+   senza mazzo, senza nsec, col firmatario automatico si cerca la copia
+   piu' recente, la si decifra col firmatario, e il profilo torna —
+   indice compreso, e il pavimento del server fa il resto.
+   MAI SUL NOSTRO SERVER, ed e' la regola ferrea 2 letta per intero:
+   una copia server-side, anche cifrata, e' stata respinta per il
+   secret NWC (vedi «LA SCALA NOSTR APPROVATA»); sui relay il server
+   non vede niente e non custodisce niente — il testo lo apre solo la
+   chiave dell'utente, che noi non abbiamo. Il nostro relay accetta la
+   scrittura perche' la chiave d'accesso sta gia' nella lista di chi
+   puo' scrivere (`/api/relay/chiavi`).
+   ⚠️ I PERMESSI DEL BUNKER: `nip44_encrypt`, `nip44_decrypt` e
+   `sign_event:30078` stanno in NIP46_PERMESSI dall'11 ott 2026; una
+   sessione conservata di prima li chiede al momento, e un rifiuto e'
+   un esito detto («rifiutata»), non un errore muto. */
+const P2P_COPIA_KIND = 30078;
+const P2P_COPIA_D = 'barattolo/p2p/profilo/v1';
+const P2P_COPIA_MS = 8000;        /* quanto si aspetta un relay, in lettura */
+const P2P_COPIA_RELAY_MAX = 6;    /* quanti relay dell'utente, al massimo */
+let p2pCopiaEsito = '';           /* '' | copia | muto | niente | rifiutata */
+let p2pCopiaGiro = null;          /* la promessa in volo */
+let p2pCopiaTentata = false;      /* una volta per sessione dal render; il gesto riprova */
+let p2pRelayUtente = null;        /* {pub, relays}: il kind 10002, una volta per sessione */
+/* PURA: l'evento NIP-78 da firmare */
+function eventoCopiaProfiloP2P(cifrato, adesso){
+  return {kind: P2P_COPIA_KIND,
+          created_at: Math.floor(Number(adesso) || 0) || Math.floor(Date.now() / 1000),
+          tags: [['d', P2P_COPIA_D]], content: String(cifrato || '')};
+}
+/* PURA: fra piu' copie lette, la piu' recente che sia nostra e porti il
+   nostro `d`; null se nessuna */
+function copiaPiuRecenteP2P(eventi, pub){
+  let scelto = null;
+  for (const ev of (eventi || [])) {
+    if (!ev || ev.kind !== P2P_COPIA_KIND || ev.pubkey !== pub) continue;
+    if (!(ev.tags || []).some(t => t && t[0] === 'd' && t[1] === P2P_COPIA_D)) continue;
+    if (!scelto || (ev.created_at | 0) > (scelto.created_at | 0)) scelto = ev;
+  }
+  return scelto;
+}
+/* PURA: i relay di SCRITTURA di un kind 10002 (NIP-65): tag `r` senza
+   marcatore o con `write`, al massimo P2P_COPIA_RELAY_MAX, senza doppioni */
+function relayScritturaDaEventoP2P(ev){
+  const out = [];
+  for (const t of ((ev && ev.tags) || [])) {
+    if (!t || t[0] !== 'r' || !/^wss?:\/\//i.test(String(t[1] || ''))) continue;
+    if (t[2] && String(t[2]).toLowerCase() !== 'write') continue;
+    const u = String(t[1]).trim().replace(/\/+$/, '');
+    if (out.indexOf(u) < 0 && out.length < P2P_COPIA_RELAY_MAX) out.push(u);
+  }
+  return out;
+}
+/* PURA: IL PROFILO E' COPERTO? La tabella della rete di sicurezza: si
+   ricava dal conto o dalla nsec ('conto'), e' la chiave propria ('mia'),
+   il codice segreto e' stato salvato, una copia cifrata e' stata riletta
+   dai relay, o c'e' la copia nel cloud di Telegram. Tutto il resto vale
+   in un browser solo. */
+function profiloCopertoP2P(m, nuvola){
+  if (!m) return false;
+  if (m.origine === 'conto' || m.origine === 'mia') return true;
+  if (m.backupFatto) return true;
+  if ((m.copiaRelay | 0) > 0) return true;
+  return nuvola === 'copia';
+}
+/* un giro di lettura su piu' relay, in parallelo, finche' ogni relay
+   dice EOSE o scade il tempo: torna [{ev, relay}] */
+async function leggiDaRelayP2P(relays, filtro, ms){
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  const trovati = [];
+  await Promise.allSettled((relays || []).map(url => new Promise(fine => {
+    let relay = null, chiuso = false;
+    const basta = () => {
+      if (chiuso) return;
+      chiuso = true;
+      try { if (relay) relay.close(); } catch(e){}
+      fine();
+    };
+    const t = setTimeout(basta, ms || P2P_COPIA_MS);
+    NT.Relay.connect(url).then(r => {
+      relay = r;
+      if (chiuso) { try { r.close(); } catch(e){} return; }
+      r.subscribe([filtro], {
+        onevent(ev){ trovati.push({ev, relay: url}); },
+        oneose(){ clearTimeout(t); basta(); },
+        onclose(){ clearTimeout(t); basta(); }
+      });
+    }).catch(() => { clearTimeout(t); basta(); });
+  })));
+  return trovati;
+}
+/* i relay di scrittura dell'utente, dal suo kind 10002 letto sui relay
+   di casa — una volta per sessione, fail-open su una lista vuota */
+async function relayScritturaUtenteP2P(pub, da){
+  if (p2pRelayUtente && p2pRelayUtente.pub === pub) return p2pRelayUtente.relays;
+  let relays = [];
+  try {
+    const letti = await leggiDaRelayP2P(da, {kinds: [10002], authors: [pub]}, P2P_COPIA_MS);
+    let ev = null;
+    for (const x of letti)
+      if (x.ev && x.ev.kind === 10002 && x.ev.pubkey === pub
+          && (!ev || (x.ev.created_at | 0) > (ev.created_at | 0))) ev = x.ev;
+    relays = relayScritturaDaEventoP2P(ev);
+  } catch(e){}
+  p2pRelayUtente = {pub, relays};
+  return relays;
+}
+/* dove va la copia: i relay dell'utente PRIMA, poi quelli di casa; mai
+   un doppione, mai un indirizzo che non sia ws/wss */
+async function relayPerCopiaP2P(pub){
+  const casa = [...new Set((typeof relayCopiaP2P !== 'undefined' ? relayCopiaP2P : [])
+    .map(r => String(r || '').trim().replace(/\/+$/, ''))
+    .filter(r => /^wss?:\/\//i.test(r)))];
+  const suoi = await relayScritturaUtenteP2P(pub, casa);
+  return [...new Set([...suoi, ...casa])];
+}
+/* il firmatario automatico, se sa cifrare NIP-44 (estensione con
+   `nip44`, bunker, nsec): null altrimenti — e un firmatario che non
+   cifra si richiude subito */
+async function firmatarioCifranteP2P(){
+  if (typeof firmatarioAutomatico !== 'function') return null;
+  let auto = null;
+  try { auto = await firmatarioAutomatico(); } catch(e){ return null; }
+  if (!auto || !auto.f) return null;
+  if (typeof auto.f.cifra44 !== 'function' || typeof auto.f.decifra44 !== 'function') {
+    if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} }
+    return null;
+  }
+  return auto;
+}
+/* la pubblicazione E la rilettura: torna {ok, visto, relays} — `visto`
+   e' quanti relay ridanno l'evento appena scritto, ed e' l'unico numero
+   che conta */
+async function pubblicaCopiaProfiloP2P(m, auto){
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  const pub = String(await auto.f.pubkey() || '').toLowerCase();
+  if (!FORMA_HEX64.test(pub)) throw new Error('chiave dell\'account sconosciuta');
+  const cifrato = await auto.f.cifra44(pub, mazzoSerializza(m));
+  const ev = await auto.f.firma(eventoCopiaProfiloP2P(cifrato));
+  if (!ev || ev.pubkey !== pub || !NT.verifyEvent(ev)) throw new Error('firma della copia storta');
+  const relays = await relayPerCopiaP2P(pub);
+  if (!relays.length) throw new Error('nessun relay su cui scrivere');
+  const ok = typeof pubblicaEventoSuRelay === 'function' ? await pubblicaEventoSuRelay(relays, ev) : 0;
+  const letti = await leggiDaRelayP2P(relays,
+    {kinds: [P2P_COPIA_KIND], authors: [pub], '#d': [P2P_COPIA_D]}, P2P_COPIA_MS);
+  const visto = new Set(letti.filter(x => x.ev && x.ev.id === ev.id).map(x => x.relay)).size;
+  return {ok, visto, relays: relays.length};
+}
+/* L'INGRESSO: una volta per sessione dal render, e di nuovo a ogni
+   gesto che lo chiede (`opz.gesto`). Solo per un nativo Nostr con un
+   profilo nato nel browser e senza copia; torna l'esito, che il foglio
+   del profilo legge. Fail-open sempre: un relay giu' non ferma nessuno. */
+async function assicuraCopiaProfiloP2P(opz){
+  opz = opz || {};
+  const m = mazzoMostro();
+  if (!m || DEMO || VETRINA || !(numeroConto(myTgId) < 0)) return '';
+  if (m.origine === 'conto' || m.origine === 'mia' || (m.copiaRelay | 0) > 0) return 'copia';
+  if (!opz.gesto && p2pCopiaTentata) return p2pCopiaEsito;
+  if (p2pCopiaGiro) return p2pCopiaGiro;
+  p2pCopiaTentata = true;
+  p2pCopiaGiro = (async () => {
+    let auto = null;
+    try {
+      auto = await firmatarioCifranteP2P();
+      if (!auto) {
+        p2pCopiaEsito = 'niente';
+        console.log('🔑 [p2p] copia sui relay: nessun firmatario che sappia cifrare');
+        return p2pCopiaEsito;
+      }
+      const esito = await pubblicaCopiaProfiloP2P(m, auto);
+      if (esito.visto > 0) {
+        const ora = mazzoMostro();
+        if (ora && ora.sk === m.sk) { ora.copiaRelay = Math.floor(Date.now() / 1000); ricordaMazzo(ora); }
+        p2pCopiaEsito = 'copia';
+        console.log('🔑 [p2p] copia cifrata del profilo sui relay: la rileggono ' + esito.visto + ' su ' + esito.relays);
+      } else {
+        p2pCopiaEsito = 'muto';
+        console.log('🔑 [p2p] copia sui relay: nessun relay la rilegge (' + esito.ok + ' ok su ' + esito.relays + ')');
+      }
+    } catch(e) {
+      const perche = String((e && e.message) || e || '');
+      p2pCopiaEsito = /rifiut|denied|reject|permission|unauthori|not allowed/i.test(perche) ? 'rifiutata' : 'muto';
+      console.log('🔑 [p2p] copia sui relay: ' + perche);
+    } finally {
+      if (auto && auto.chiudi) { try { auto.f.chiudi(); } catch(e){} }
+    }
+    if (typeof renderProfiloP2P === 'function' && typeof el === 'function'
+        && el('p2pProfiloSheet')?.classList.contains('open')) renderProfiloP2P();
+    return p2pCopiaEsito;
+  })().finally(() => { p2pCopiaGiro = null; });
+  return p2pCopiaGiro;
+}
+/* LA RIPRESA: senza mazzo, senza nsec nel browser, per un nativo Nostr
+   col firmatario automatico — si cerca la copia piu' recente, si
+   decifra, e il profilo torna. Torna il mazzo o null; non genera mai
+   niente (l'invariante di `adottaProfiloContoP2P`). */
+async function riprendiCopiaProfiloP2P(){
+  if (DEMO || VETRINA || !(numeroConto(myTgId) < 0) || mazzoMostro()) return null;
+  if (await nsecDelContoP2P()) return null;    /* il primo strato fa da se' */
+  const auto = await firmatarioCifranteP2P();
+  if (!auto) return null;
+  try {
+    await caricaNostrTools();
+    const NT = window.NostrTools;
+    const pub = String(await auto.f.pubkey() || '').toLowerCase();
+    if (!FORMA_HEX64.test(pub)) return null;
+    const relays = await relayPerCopiaP2P(pub);
+    if (!relays.length) return null;
+    const letti = await leggiDaRelayP2P(relays,
+      {kinds: [P2P_COPIA_KIND], authors: [pub], '#d': [P2P_COPIA_D]}, P2P_COPIA_MS);
+    const ev = copiaPiuRecenteP2P(letti.map(x => x.ev), pub);
+    if (!ev) { p2pCopiaEsito = 'niente'; console.log('🔑 [p2p] copia sui relay: nessuna copia da riprendere'); return null; }
+    if (!NT.verifyEvent(ev)) return null;
+    const su = mazzoDaTesto(await auto.f.decifra44(pub, ev.content));
+    if (!su) { console.log('🔑 [p2p] copia sui relay: la copia non si apre'); return null; }
+    if (mazzoMostro()) return mazzoMostro();     /* nato nel frattempo: non si tocca */
+    su.copiaRelay = Math.max(su.copiaRelay | 0, ev.created_at | 0);
+    ricordaMazzo(su);
+    await registraChiaviP2P([su.pub]);
+    p2pCopiaEsito = 'copia';
+    console.log('🔑 [p2p] profilo: ripreso dalla copia cifrata sui relay');
+    return mazzoMostro();
+  } catch(e) {
+    console.log('🔑 [p2p] copia sui relay: ripresa fallita (' + ((e && e.message) || e) + ')');
+    return null;
+  } finally {
+    if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} }
+  }
+}
+/* ============ LA RETE DI SICUREZZA PRIMA DELLA PRIMA PRESA (11 ott 2026,
+   cantiere «tor-chiavi-scambio», terzo strato) ============
+   Se ne' il primo strato (il seme dalla nsec) ne' il secondo (la copia
+   cifrata sui relay) hanno coperto il profilo — bunker che rifiuta di
+   cifrare, relay giu', nessun firmatario — PRIMA della prima presa si
+   mostra il codice segreto con la spiegazione, il tasto Copia e la
+   conferma esplicita «L'ho salvato»: senza, la presa non parte. Chi e'
+   coperto non vede niente, e il codice resta nel profilo per chi lo
+   vuole. La porta sta in `eseguiPresaP2P`, dove passano tutte le prese,
+   PRIMA che una chiave si bruci e che una riga si scriva: un «non ora»
+   non lascia tracce. Il foglio chiuso da fuori (il velo, l'indietro)
+   vale «non ora». */
+let p2pCopiaFoglio = null;      /* {promessa, risolvi, sk} del foglio aperto */
+/* PURA: il testo del foglio, dall'esito della copia sui relay e dal
+   posto (Tor o no) */
+function testoReteSicurezzaP2P(esito, onion){
+  const perche = {
+    rifiutata: 'Il tuo firmatario non ha concesso di cifrare una copia sui relay.',
+    muto: 'Non siamo riusciti a mettere una copia cifrata sui tuoi relay: riproveremo.',
+    niente: 'Senza un firmatario che sappia cifrare (estensione o bunker) la copia sui relay non si può fare.'
+  }[esito] || '';
+  return '<div class="hint">Le chiavi dei tuoi scambi vivono <b>solo in questo browser</b>. Se questa memoria sparisce, uno scambio aperto resta senza chi possa muoverlo: né «pagato», né disputa, né chat col moderatore.</div>'
+    + '<div class="trust-note"><span>⚠️</span><span>' + (onion ? 'Sei su Tor Browser: ' : 'Con Tor Browser o la navigazione privata ')
+    + 'la memoria del browser si svuota <b>a ogni chiusura</b>.</span></div>'
+    + (perche ? '<div class="hint">' + perche + '</div>' : '')
+    + '<div class="hint"><b>Salva adesso il codice segreto</b>: con lui il profilo e gli scambi aperti tornano in qualunque browser, dal profilo di scambio in «I tuoi dati». Non lo vede nessuno, noi compresi.</div>';
+}
+/* la porta: vero se la presa puo' andare avanti */
+async function garantisciCopiaProfiloP2P(m){
+  if (!m || DEMO || VETRINA) return true;
+  if (profiloCopertoP2P(m, mazzoNuvola)) return true;
+  /* prima il secondo strato, con un gesto in mano: la copia sui relay */
+  try { await assicuraCopiaProfiloP2P({gesto: true}); } catch(e){}
+  const ora = mazzoMostro() || m;
+  if (profiloCopertoP2P(ora, mazzoNuvola)) return true;
+  return apriFoglioCopiaP2P(ora);
+}
+function apriFoglioCopiaP2P(m){
+  if (typeof el !== 'function' || !el('p2pCopiaSheet')) return Promise.resolve(false);
+  if (p2pCopiaFoglio) return p2pCopiaFoglio.promessa;
+  let risolvi = null;
+  const promessa = new Promise(ok => { risolvi = ok; });
+  p2pCopiaFoglio = {promessa, risolvi, sk: m.sk};
+  renderFoglioCopiaP2P(m);
+  el('sheetBg').classList.add('open');
+  el('p2pCopiaSheet').classList.add('open');
+  osservaChiusuraFoglioCopiaP2P();
+  return promessa;
+}
+function chiudiFoglioCopiaP2P(esito){
+  const f = p2pCopiaFoglio;
+  p2pCopiaFoglio = null;
+  if (typeof chiudiFoglioP2P === 'function') chiudiFoglioP2P('p2pCopiaSheet');
+  if (f) f.risolvi(!!esito);
+}
+/* chiuso da fuori (il velo, l'indietro): vale «non ora» */
+function osservaChiusuraFoglioCopiaP2P(){
+  const s = el('p2pCopiaSheet');
+  if (!s || typeof MutationObserver === 'undefined') return;
+  const oss = new MutationObserver(() => {
+    if (s.classList.contains('open')) return;
+    oss.disconnect();
+    const f = p2pCopiaFoglio;
+    if (f) { p2pCopiaFoglio = null; f.risolvi(false); }
+  });
+  oss.observe(s, {attributes: true, attributeFilter: ['class']});
+}
+function renderFoglioCopiaP2P(m){
+  const box = el('p2pCopiaCorpo');
+  if (!box) return;
+  const onion = typeof suOnion === 'function' && suOnion();
+  box.innerHTML = testoReteSicurezzaP2P(p2pCopiaEsito, onion)
+    + '<form id="p2pCopiaForm" onsubmit="copiaP2PSalvata(); return false;">'
+    + '<input type="text" name="username" value="barattolo-profilo-di-scambio" autocomplete="username" readonly tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px">'
+    + '<div class="field"><label>Il codice segreto del profilo</label>'
+    + '<div class="campo-pre"><input type="password" id="p2pCopiaCodice" name="password" autocomplete="new-password" readonly spellcheck="false" style="font-family:var(--mono)">'
+    + '<button type="button" class="btn mini" onclick="svelaCodiceFoglioP2P()" aria-label="Mostra o nascondi il codice">👁</button></div></div>'
+    + '<button type="button" class="btn ghost" onclick="copiaCodiceFoglioP2P()">📋 Copia il codice segreto</button>'
+    + '<button type="submit" class="btn orange" style="margin-top:10px">✓ L\'ho salvato, vai avanti</button>'
+    + '<button type="button" class="btn ghost" onclick="copiaP2PNonOra()">Non ora</button>'
+    + '</form>';
+  /* il codice entra col .value: mai dentro un template */
+  const c = el('p2pCopiaCodice');
+  if (c) c.value = esportaMazzo();
+}
+function svelaCodiceFoglioP2P(){
+  const c = el('p2pCopiaCodice');
+  if (c) c.type = c.type === 'password' ? 'text' : 'password';
+}
+async function copiaCodiceFoglioP2P(){
+  const c = el('p2pCopiaCodice');
+  if (!c || !c.value) return;
+  try {
+    await navigator.clipboard.writeText(c.value);
+    toast('Codice copiato: incollalo nel tuo gestore di password 🔐');
+  } catch(e) {
+    toast('Non riesco a copiare: mostra il codice e copialo a mano');
+  }
+}
+async function copiaP2PSalvata(){
+  const m = mazzoMostro();
+  if (m) {
+    m.backupFatto = true;
+    ricordaMazzo(m);
+    await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(m));
+  }
+  toast('Bene: il profilo ha la sua copia ✓');
+  chiudiFoglioCopiaP2P(true);
+}
+function copiaP2PNonOra(){ chiudiFoglioCopiaP2P(false); }
+/* PURA: l'avviso di chi e' su Tor (11 ott 2026): nel libro, una riga */
+function avvisoMemoriaBrowserP2P(onion){
+  if (!onion) return '';
+  return '<div class="hint p2p-tor">🧅 Su Tor Browser la memoria si svuota a ogni chiusura, e con lei le chiavi dei tuoi scambi: entra sempre con la stessa chiave Nostr, o salva il codice segreto del profilo da «I tuoi dati».</div>';
+}
+/* ============ fine della rete di sicurezza ============ */
+/* ============ fine della copia cifrata sui relay ============ */
 function mazzoMostro(){
   try {
     const d = JSON.parse(localStorage.getItem(chiaveP2P(MOSTRO_CHIAVE))) || null;
@@ -53244,6 +53650,7 @@ function mazzoSerializza(m){
   return JSON.stringify({sk: m.sk, pub: m.pub, indice: m.indice|0,
                          creato: m.creato|0, backupFatto: !!m.backupFatto,
                          origine: m.origine || '', versione: m.versione|0,
+                         copiaRelay: m.copiaRelay|0,
                          conto: numeroConto(m.conto)});
 }
 /* LA RICONCILIAZIONE COL CLOUD (set 2026, dal campo: telefono e
@@ -53425,6 +53832,9 @@ function mazzoDaTesto(testo){
           backupFatto: d ? !!d.backupFatto : true,
           origine: (d && d.origine) ? String(d.origine) : '',
           versione: d ? (d.versione|0) : 0,
+          /* `copiaRelay` e' QUANDO una copia cifrata del profilo e' stata
+             riletta dai relay (11 ott 2026): 0 = mai */
+          copiaRelay: d ? (d.copiaRelay|0) : 0,
           /* `conto` e' il tg_id da cui un profilo 'conto' e' nato (set 2026,
              «IL CONTO SUL DISPOSITIVO»): 0 per quelli di ieri, che si
              verificano una volta col seme */
@@ -53594,6 +54004,66 @@ function contaChiaviP2P(){
    IL 409 E' SILENZIO, il patto di `contaChiaviP2P`: leva spenta, fase
    chiusa, chi entra da Nostr, o un segreto che non c'e' — in tutti
    quei casi non si dice niente e si genera come sempre. */
+/* ============ IL SEME DALLA CHIAVE NOSTR (11 ott 2026, cantiere
+   «tor-chiavi-scambio») ============
+   DAL CAMPO: un utente entrato con Nostr dal .onion con Tor Browser ha
+   preso un ordine Barattozon, ha pagato il PayCode, e al rientro le
+   chiavi dello scambio non c'erano piu' — Tor Browser svuota la memoria
+   a ogni chiusura. Per chi entra da Telegram il profilo si RICAVA dal
+   conto (`/api/p2p/seme`) e torna da solo; per un nativo Nostr il server
+   risponde 409 APPOSTA («e' venuto qui per non farsi ricavare niente»),
+   e il profilo nasceva a caso, nel solo browser.
+   LA CURA, PRIMO STRATO: chi entra con la nsec nel browser (vedi «LA
+   NSEC SUL DISPOSITIVO») ricava il profilo DALLA SUA CHIAVE, qui nella
+   pagina — HMAC-SHA256 con la nsec come chiave e un'etichetta di
+   dominio come messaggio, la stessa ricetta del seme del server
+   (`_seme_profilo_p2p`) e delle trade key (`chiaveScambio`). E'
+   deterministico: stessa nsec, stesso profilo, su qualunque dispositivo
+   e senza nessun relay. E' a senso unico: dal profilo non si risale alla
+   nsec, e l'identita' Mostro non e' collegabile alla npub. LA NSEC NON
+   PARTE MAI: il server non la vede, e il suo 409 resta com'e'.
+   ⚠️ IL GIRO NON E' DECORATIVO (la lezione del server): un HMAC sono
+   256 bit uniformi, e possono non essere uno scalare valido;
+   `getPublicKey` fa da giudice e si riprova con un contatore nel
+   messaggio. `copiaRelay` e `origine 'conto'` con un conto NEGATIVO
+   dicono al foglio che questo profilo deriva dalla nsec: il server non
+   deriva niente per un id negativo, quindi non c'e' ambiguita'.
+   SOLO LA NSEC, non il bunker ne' l'estensione: li' la pagina non ha il
+   segreto, e una firma Schnorr non e' deterministica (BIP-340 con aux
+   casuale), quindi non c'e' niente da cui derivare. Per loro c'e' il
+   secondo strato, la copia cifrata sui relay (sotto). */
+const ETICHETTA_SEME_NSEC_P2P = 'barattolo/p2p/profilo/nsec/v1';
+const P2P_SEME_NSEC_VERSIONE = 1;
+/* PURA: il seme (64 esadecimali) da una nsec in esadecimale, '' se la
+   chiave e' storta o la libreria manca. `ordine` come nel server: il
+   ramo del riprovo si prova passando un giudice finto. */
+function semeDaNsecP2P(skHex, giudice){
+  const NT = window.NostrTools;
+  const s = String(skHex || '').toLowerCase();
+  if (!NT || !FORMA_HEX64.test(s)) return '';
+  const enc = new TextEncoder();
+  const chiave = NT.utils.hexToBytes(s);
+  const valida = giudice || (b => { NT.getPublicKey(b); return true; });
+  for (let giro = 0; giro < 256; giro++) {
+    const cand = NT.hmac(NT.sha256, chiave, enc.encode(ETICHETTA_SEME_NSEC_P2P + '|' + giro));
+    try { if (valida(cand)) return NT.utils.bytesToHex(cand); } catch(e) {}
+  }
+  return '';
+}
+/* la nsec dell'account aperto, se sta in QUESTO browser: '' altrimenti.
+   Solo per un nativo Nostr (id negativo): per chi entra da Telegram il
+   profilo e' quello del conto, anche se ha collegato una nsec. Le due
+   funzioni della nsec vivono fuori da questo blocco: col typeof, i
+   banchi che ritagliano il blocco restano in piedi. */
+async function nsecDelContoP2P(){
+  if (!(numeroConto(myTgId) < 0)) return '';
+  if (typeof nsecSalvate !== 'function' || typeof pubAccount !== 'function') return '';
+  try {
+    const pub = await pubAccount();
+    const sk = pub ? String(nsecSalvate()[pub] || '').toLowerCase() : '';
+    return FORMA_HEX64.test(sk) ? sk : '';
+  } catch(e){ return ''; }
+}
 async function semeProfiloP2P(){
   /* ⚠️ LA RIGA IN CONSOLE NON E' DECORAZIONE, ed e' la lezione dello
      specchio applicata qui: questa domanda fallisce in SILENZIO — 409,
@@ -53604,6 +54074,17 @@ async function semeProfiloP2P(){
   if (DEMO || VETRINA || !myTgId) {
     console.log('🔑 [p2p] profilo: nel browser (non si chiede: vetrina o demo)');
     return null;
+  }
+  /* LA NSEC NEL BROWSER PRIMA DEL SERVER (11 ott 2026, «tor-chiavi-
+     scambio»): per un nativo Nostr il server risponde 409 apposta, e
+     la risposta sta gia' qui — dalla sua chiave, senza rete. */
+  const nsec = await nsecDelContoP2P();
+  if (nsec) {
+    const sk = semeDaNsecP2P(nsec);
+    if (sk) {
+      console.log('🔑 [p2p] profilo: dalla chiave Nostr, nel browser (mai inviata)');
+      return {sk, versione: P2P_SEME_NSEC_VERSIONE};
+    }
   }
   try {
     const r = await fetch(`${API_BASE}/p2p/seme`, {method: 'POST',
@@ -53734,6 +54215,10 @@ function assicuraMazzo(){
       const s = await semeProfiloP2P();
       if (s) nuovo = mazzoDalSemeP2P(s);
     }
+    /* ...e prima del caso, la copia cifrata sui relay (11 ott 2026):
+       un gesto che arriva prima dell'adozione del render non deve far
+       nascere un secondo profilo a chi ne ha uno sui suoi relay */
+    if (!nuovo) nuovo = await riprendiCopiaProfiloP2P();
     if (!nuovo) {
       const sk = NT.utils.bytesToHex(NT.generateSecretKey());
       nuovo = {sk, pub: NT.getPublicKey(NT.utils.hexToBytes(sk)), indice: 0,
@@ -53785,7 +54270,9 @@ function adottaProfiloContoP2P(){
   if (mazzoNuvola === 'illeggibile' || mazzoNuvola === 'diverso') return Promise.resolve(null);
   if (!contoInCorso) contoInCorso = (async () => {
     const s = await semeProfiloP2P();
-    if (!s) return null;
+    /* senza seme (409: nativo Nostr senza nsec nel browser) resta la
+       copia cifrata sui relay (11 ott 2026): si RIPRENDE, non si genera */
+    if (!s) return await riprendiCopiaProfiloP2P();
     await caricaNostrTools();
     const NT = window.NostrTools;
     /* nel frattempo un gesto puo' aver fatto nascere il mazzo: quello
@@ -53844,6 +54331,36 @@ async function apriProfiloP2P(){
    propria chiave come profilo, continua a funzionare sotto il
    cofano — nessun gesto nuovo li propone, e il «diverso» del cloud
    resta un'informazione invece di un bivio. */
+/* PURA: la riga della copia cifrata sui relay nel foglio del profilo (11
+   ott 2026), solo per un nativo Nostr con un profilo nato nel browser.
+   IL NOME NON DICE «RELAY» apposta: la sentinella del lessico guarda il
+   codice di `renderProfiloP2P`, dove questa si chiama. */
+/* PURA: il testo del profilo che deriva dalla chiave d'accesso (11 ott
+   2026, primo strato), per chi entra con la nsec nel browser */
+function testoProfiloDerivatoFuoriP2P(){
+  return 'Questo profilo si ricava dalla <b>tua chiave Nostr</b>, qui nel browser e mai inviata: <b>torna da solo</b> ogni volta che entri con la stessa chiave, su qualunque dispositivo. Il codice segreto serve solo se vuoi portarlo fuori da Barattolo.';
+}
+function rigaCopiaFuoriP2P(m){
+  if (!m || !(numeroConto(myTgId) < 0) || m.origine === 'conto' || m.origine === 'mia') return '';
+  if ((m.copiaRelay | 0) > 0) {
+    const dal = new Date((m.copiaRelay | 0) * 1000).toLocaleDateString('it-IT', {day: 'numeric', month: 'short', year: 'numeric'});
+    return '<div class="hint">✓ Una <b>copia cifrata</b> del profilo sta sui tuoi relay Nostr (dal ' + esc(dal) + '): la apre solo la tua chiave. Entrando con la stessa chiave, da qualunque browser, torna da sola.</div>';
+  }
+  const testo = {
+    muto: '⚠️ Non siamo riusciti a mettere una copia cifrata del profilo sui tuoi relay: riproviamo al prossimo scambio. Intanto salva il codice segreto.',
+    rifiutata: '⚠️ Il tuo firmatario non ha concesso di cifrare una copia del profilo sui relay: salva il codice segreto, o concedi il permesso e riprova.',
+    niente: 'Nessun firmatario automatico (estensione o bunker) con cui cifrare una copia del profilo sui relay: salva il codice segreto.'
+  }[p2pCopiaEsito] || '';
+  if (!testo) return '';
+  return '<div class="hint">' + testo + '</div>'
+    + (p2pCopiaEsito === 'niente' ? '' : '<button class="btn ghost" onclick="riprovaCopiaRelayP2P()">🔁 Riprova la copia sui relay</button>');
+}
+async function riprovaCopiaRelayP2P(){
+  haptic();
+  toast('Provo a mettere la copia sui relay…');
+  try { await assicuraCopiaProfiloP2P({gesto: true}); } catch(e){}
+  renderProfiloP2P();
+}
 function renderProfiloP2P(){
   const box = el('p2pProfiloCorpo');
   if (!box) return;
@@ -53862,6 +54379,13 @@ function renderProfiloP2P(){
     illeggibile: `Nel tuo Telegram c'è una copia che non riusciamo a leggere, e non l'abbiamo toccata: il profilo vale su questo dispositivo.`,
     diverso: `Nel tuo Telegram c'è un profilo <b>diverso</b> da questo: non ne abbiamo toccato nessuno dei due.`
   }[mazzoNuvola] || `Vale su questo dispositivo.`;
+  /* FUORI DA TELEGRAM NON C'E' NESSUN TELEGRAM DI CUI PARLARE (11 ott
+     2026, «tor-chiavi-scambio»): la riga dice il browser, e l'avviso di
+     Tor e della navigazione privata; un profilo che torna da solo (dal
+     conto o dalla nsec) non ha bisogno di nessuna delle due */
+  const fuoriTelegram = !cloudTelegram();
+  const doveFuori = (m && m.origine === 'conto') ? ''
+    : 'Vale in questo browser. ⚠️ Con Tor Browser o la navigazione privata la memoria del browser si svuota alla chiusura, e con lei il profilo e gli scambi aperti.';
   if (!m) {
     /* IL FOGLIO NON DICE « non ne hai » SENZA AVER CHIESTO (set 2026):
        qui il mazzo non c'e' e il cloud non l'ha dato, ma il SERVER puo'
@@ -53922,16 +54446,23 @@ function renderProfiloP2P(){
      ingresso, quindi «se lo perdi riparti da zero» per lui non e' vero.
      Il codice segreto li' serve a un'altra cosa — portarlo FUORI da
      Barattolo — e si dice quella. */
-  const debito = m.origine === 'conto'
+  /* IL PROFILO DERIVATO FUORI DA TELEGRAM (11 ott 2026): un 'conto' con
+     un conto NEGATIVO deriva dalla chiave d'accesso nel browser, e lo
+     dice `testoProfiloDerivatoFuoriP2P` (il testo vive la' per la
+     sentinella del lessico) */
+  const debito = (m.origine === 'conto' && numeroConto(m.conto) < 0)
+    ? testoProfiloDerivatoFuoriP2P()
+    : m.origine === 'conto'
     ? 'Questo profilo <b>torna da solo</b> ogni volta che entri, su qualunque dispositivo: non c\'è niente da salvare. Il codice segreto serve solo se vuoi portarlo fuori da Barattolo.'
     : m.origine === 'mia'
     ? '✓ Il codice segreto ce l\'hai già tu: questo profilo non lo può ricavare nessun altro, noi compresi.'
     : m.backupFatto
     ? '✓ Hai salvato il codice segreto.'
     : 'Il codice segreto è la tua copia: con lui il profilo torna su qualunque dispositivo, e le recensioni con lui. <b>Se lo perdi, la reputazione riparte da zero.</b> Gli scambi aperti restano qui.';
-  box.innerHTML = `<div class="hint">Profilo attivo dal <b>${esc(dal)}</b>. ${dove}</div>
+  box.innerHTML = `<div class="hint">Profilo attivo dal <b>${esc(dal)}</b>. ${fuoriTelegram ? doveFuori : dove}</div>
     ${typeof rigaMiaReputazioneP2P === 'function' ? rigaMiaReputazioneP2P() : ''}
     <div class="hint">${debito}</div>
+    ${rigaCopiaFuoriP2P(m)}
     ${dueProfili}
     <form id="p2pCodiceForm" onsubmit="codiceP2PSalvato(); return false;" style="display:${p2pCodiceVisibile ? '' : 'none'}">
       <input type="text" name="username" value="barattolo-profilo-di-scambio" autocomplete="username" readonly tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px">
@@ -56703,6 +57234,30 @@ const P2P_TOAST_GIRO_MORTO = {
 };
 const P2P_TOAST_CAUZIONE_MORTA = 'Chiuso prima che la cauzione fosse bloccata: nessun sat si è mosso';
 
+/* ---- LA RIGA SENZA CHIAVI, ONESTA (11 ott 2026, «tor-chiavi-scambio») ----
+   Diceva «Aperto su un altro dispositivo»: falso per chi ha perso la
+   memoria dello STESSO browser (Tor Browser, navigazione privata). La
+   pagina non sa quale dei due e' successo, e dice il fatto: le chiavi
+   non sono in questo browser. La riga lunga, nella pagina, dice anche
+   come riprenderle e dove scrivere se sono perse. PURE: la card e la
+   pagina le chiamano con `lunga` falso e vero. */
+function contattoSupportoP2P(){
+  const bot = '<a href="https://t.me/ilbarattolobot" target="_blank" rel="noopener">@ilbarattolobot</a>';
+  let npub = '';
+  try {
+    if (typeof pubCasa !== 'undefined' && /^[0-9a-f]{64}$/.test(pubCasa || '') && window.NostrTools)
+      npub = window.NostrTools.nip19.npubEncode(pubCasa);
+  } catch(e){ npub = ''; }
+  return bot + (npub
+    ? ' o su Nostr <a href="https://njump.me/' + esc(npub) + '" target="_blank" rel="noopener">' + esc(npub.slice(0, 12)) + '…</a>'
+    : '');
+}
+function rigaChiaviAltroveP2P(o, lunga){
+  const base = '🔑 Le chiavi di questo scambio non sono in questo browser: qui lo segui, i gesti si fanno da dove l\'hai aperto.';
+  if (!lunga) return base;
+  return base + ' Le ritrovi sul dispositivo dove hai preso lo scambio, o entrando con la stessa chiave Nostr se il profilo deriva da lei. '
+    + 'Se quella memoria è andata persa (Tor Browser, navigazione privata, telefono cambiato), scrivici subito: ' + contattoSupportoP2P() + '.';
+}
 /* PURA: l'UNICO bottone pieno della pagina. Chi compra consegna dove
    ricevere i sats e poi dice «ho inviato gli euro»; chi vende blocca
    il pagamento e poi libera i sats. Mai due gesti insieme. */
@@ -57085,8 +57640,16 @@ function attesaAltraParteP2P(o){
   const contanti = typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o);
   if (s === 'attesa_hold_venditore') cosa = 'sta bloccando i sats in garanzia';
   else if (s === 'attesa_fattura_compratore') cosa = 'sta indicando dove ricevere i sats';
+  /* LA RIGA SENZA CHIAVI A SATS IN GARANZIA (11 ott 2026): il recapito
+     puo' essere arrivato dove le chiavi stanno, e la mossa e' la MIA
+     (pagare): niente «aspetta», lo dice la riga delle chiavi */
+  else if (s === 'attivo' && compro && o.soloVista) return null;
+  /* ...e col PayCode la frase dice la cosa giusta: non un recapito, un
+     codice (11 ott 2026, dal caso vero) */
   else if (s === 'attivo') cosa = compro
-    ? (contanti ? 'deve indicarti dove e quando vedervi' : 'deve indicarti dove inviare gli euro')
+    ? (contanti ? 'deve indicarti dove e quando vedervi'
+       : (typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi)) ? 'deve mandarti il PayCode'
+       : 'deve indicarti dove inviare gli euro')
     : contanti ? 'deve consegnarti i contanti' : 'deve inviarti gli euro';
   else if (s === 'euro_inviati') cosa = contanti
     ? 'deve contare i contanti e liberare i sats' : 'deve controllare gli euro e liberare i sats';
@@ -59237,6 +59800,14 @@ async function eseguiPresaP2P(id, scelto, metodo){
   };
   try {
     const mz = await assicuraMazzo();
+    /* LA RETE DI SICUREZZA (11 ott 2026, «tor-chiavi-scambio»): prima
+       di bruciare una chiave il profilo deve avere una copia — derivato,
+       sui relay, nel cloud, o il codice salvato a mano. Un «non ora»
+       ferma la presa QUI, prima di scrivere qualunque riga. */
+    if (!(await garantisciCopiaProfiloP2P(mz))) {
+      toast('Presa rimandata: prima metti al sicuro il profilo di scambio', 6000);
+      return;
+    }
     const NT = window.NostrTools;
     /* la reputazione si accumula solo se il profilo sa firmare bytes
        grezzi: altrimenti si scambia in anonimo, e l'indice non serve */
@@ -59572,6 +60143,11 @@ function campiOrdineP2P(o){
    ovunque. */
 function recapitoCompratoreP2P(o){
   const loro = (o && o.campiLoro) || {};
+  /* SENZA IL CODICE MA COL TEMPO (11 ott 2026): la riga senza chiavi, o
+     col PayCode non ancora arrivato, mostra la scadenza letta dal libro */
+  if (o && o.lato === 'compro' && !loro.euro && tabacchinoP2P(o.metodi)
+      && scadenzaTabacchinoOrdineP2P(o) > 0)
+    return riquadroScadenzaPayCodeP2P(o);
   if (!o || o.lato !== 'compro' || !loro.euro) return '';
   if (tabacchinoP2P(o.metodi) && payCodeDaTestoP2P(loro.euro.testo))
     return riquadroPayCodeP2P(o);
@@ -59680,6 +60256,27 @@ function apriMappaPayCodeP2P(){
 function apriPuntoLisPayCodeP2P(){
   if (tg?.initData && tg.openLink) { try { tg.openLink(LINK_PUNTOLIS_PAYCODE); return; } catch(e){} }
   window.open(LINK_PUNTOLIS_PAYCODE, '_blank', 'noopener');
+}
+/* ---- IL TEMPO SENZA IL CODICE (11 ott 2026, «tor-chiavi-scambio») ----
+   A chi compra senza il PayCode nella riga — le chiavi in un altro
+   browser, o il codice non ancora arrivato — ma con la scadenza letta
+   dal libro pubblico: solo il tempo, riscritto ogni secondo dallo
+   stesso battito del riquadro pieno (`#p2pTabPayResta` dentro
+   `.p2p-paycode`). */
+function riquadroScadenzaPayCodeP2P(o, adesso){
+  const ora = adesso || Math.floor(Date.now() / 1000);
+  const scade = scadenzaTabacchinoOrdineP2P(o);
+  if (!(scade > 0)) return '';
+  const manca = Math.max(0, scade - ora);
+  return '<div class="p2p-paycode" data-fine="' + scade + '">' +
+    '<div class="p2p-paycode-tit">🧾 Il PayCode ' + (o.soloVista ? 'sta nel browser dove hai preso lo scambio' : 'non è ancora arrivato') + '</div>' +
+    '<div class="p2p-paycode-riga"><span>Scade il</span><b>' + esc(dataTabacchinoP2P(scade)) + '</b></div>' +
+    '<div class="p2p-paycode-resta' + (manca <= 0 ? ' scaduto' : manca <= P2P_TAB_ULTIMA_S ? ' ultima' : '') + '">' +
+      (manca > 0 ? 'Tempo che resta: <b id="p2pTabPayResta">' + esc(contoRimastoP2P(manca)) + '</b>'
+                 : '<b id="p2pTabPayResta">Scaduto: non si può più pagare</b>') + '</div>' +
+    '<div class="hint">La scadenza è quella scritta nel libro pubblico dell\'ordine' +
+      (o.soloVista ? ': il codice e i gesti stanno dove lo scambio è stato aperto.' : '.') + '</div>' +
+  '</div>';
 }
 /* ---- IL RIQUADRO DEL PAYCODE, a chi compra (23 set 2026) ----
    Dal testo cifrato arrivato: PayCode (normalizzato), importo (quello
@@ -59826,11 +60423,22 @@ function battitoControlloTabP2P(){
    un nome suo: a garanzia bloccata e a «pagato». Null altrove, e allora
    vale la tabella degli stati. Sta DOPO `statoTabacchinoP2P`, che parla
    del tempo e vince. */
+/* PURA: il PayCode sta nella riga? (11 ott 2026) */
+function payCodeInRigaP2P(o){
+  return !!payCodeDaTestoP2P((((o || {}).campiLoro || {}).euro || {}).testo || '');
+}
 function statoPayCodeP2P(o){
   if (!o || !tabacchinoP2P(o.metodi)) return null;
   const compro = o.lato === 'compro';
+  /* IL PAYCODE «QUI SOTTO» SOLO SE C'E' (11 ott 2026, dal caso vero: la
+     riga ricostruita dal server non porta il codice cifrato, e la frase
+     lo prometteva lo stesso) */
   if (o.stato === 'attivo') return compro
-    ? {t: 'Sats in garanzia', d: 'I sats sono al sicuro in garanzia. Vai al tabacchino col PayCode qui sotto, paga in contanti alla cassa, tieni lo scontrino e poi torna qui a segnare «pagato».'}
+    ? {t: 'Sats in garanzia', d: payCodeInRigaP2P(o)
+        ? 'I sats sono al sicuro in garanzia. Vai al tabacchino col PayCode qui sotto, paga in contanti alla cassa, tieni lo scontrino e poi torna qui a segnare «pagato».'
+        : o.soloVista
+        ? 'I sats sono al sicuro in garanzia. Il PayCode sta nel browser dove hai preso lo scambio: da là vai al tabacchino, paga in contanti, tieni lo scontrino e segna «pagato».'
+        : 'I sats sono al sicuro in garanzia. Il PayCode da pagare arriva cifrato da chi vende: appena è qui sotto, vai al tabacchino, paga in contanti alla cassa, tieni lo scontrino e torna qui a segnare «pagato».'}
     : {t: 'Sats in garanzia', d: 'I tuoi sats sono bloccati. Chi compra ha il PayCode: aspetta che vada al tabacchino e segni «pagato».'};
   if (o.stato === 'euro_inviati') return compro
     ? {t: 'PayCode pagato', d: 'Hai detto di aver pagato al tabacchino. Chi vende controlla su Amazon che l\'ordine risulti saldato e libera i sats: tieni lo scontrino, è la tua prova.'}
@@ -60153,7 +60761,7 @@ function renderOrdineP2P(){
        lo scambio c'e' e si segue, ma le chiavi cifrate con cui si
        fanno i gesti stanno sul dispositivo dove e' stato aperto */
     (o.soloVista && P2P_FINALI.indexOf(o.stato) < 0
-      ? '<div class="trust-note"><span>📱</span><span>I messaggi cifrati di questo scambio sono sul dispositivo dove l\'hai aperto: qui lo vedi e lo segui, ma i gesti — la fattura, i sats, il recapito — si fanno da là.</span></div>'
+      ? '<div class="trust-note"><span>🔑</span><span>' + rigaChiaviAltroveP2P(o, true).replace(/^🔑 /, '') + '</span></div>'
       : '') +
     (avviso ? '<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⚠️ <span>' + esc(avviso) + '</span></div>' : '') +
     /* A DISPUTA APERTA: il moderatore, e il canale per scrivergli (28 set 2026) */
@@ -61853,6 +62461,21 @@ function vitaLibroTabacchinoP2P(scade, adesso){
   if (!(s > ora)) return 0;
   const margine = Math.min(P2P_TABACCHINO_MARGINE_S, Math.floor((s - ora) / 2));
   return Math.min(s - margine, ora + P2P_TABACCHINO_VITA_S);
+}
+/* PURA, LA FUNZIONE ROVESCIATA (11 ott 2026, «tor-chiavi-scambio»): la
+   scadenza del PayCode dall'`expires_at` PUBBLICO del 38383 e dall'ora
+   della pubblicazione. Serve alla riga che il codice cifrato non ce
+   l'ha (le chiavi in un altro browser): il tempo che resta si legge dal
+   libro, che per Barattozon porta sempre `expires_at`. Se alla
+   pubblicazione restavano almeno quattro ore il margine era pieno (due
+   ore), e `e − n ≥ 2h` lo dice; altrimenti il margine era la meta' del
+   tempo, e `s = 2e − n` (al secondo di arrotondamento). Zero se manca
+   un dato o la pubblicazione e' dopo la scadenza. */
+function scadenzaPayCodeDaLibroP2P(scadeLibro, nato){
+  const e = Math.floor(Number(scadeLibro) || 0), n = Math.floor(Number(nato) || 0);
+  if (!(e > 0) || !(n > 0) || e <= n) return 0;
+  if (e - n >= P2P_TABACCHINO_MARGINE_S) return e + P2P_TABACCHINO_MARGINE_S;
+  return 2 * e - n;
 }
 /* PURA: COSA E' BARATTOZON, in tre frasi e in un posto solo (24 set
    2026, parole di Andrea). Dette dal lato di chi legge: `mio` = sto
@@ -67187,7 +67810,9 @@ function scadenzaTabacchinoOrdineP2P(o){
   if (o.tabacchino && o.tabacchino.scade > 0) return Math.floor(o.tabacchino.scade);
   const mio = ((o.campiMiei || {}).euro || {}).testo;
   const loro = ((o.campiLoro || {}).euro || {}).testo;
-  return scadenzaTabacchinoP2P(o.lato === 'vendo' ? mio : loro) || 0;
+  /* ...e senza il testo cifrato, il tag pubblico del libro (11 ott 2026) */
+  return scadenzaTabacchinoP2P(o.lato === 'vendo' ? mio : loro)
+    || scadenzaPayCodeDaLibroP2P(o.libroScade, o.creato) || 0;
 }
 /* LE DUE SOGLIE (decisione di Andrea): «manca poco» a sei ore, e
    l'ultima ora. Sono TEMPO che resta, come quelle dell'anello, e
@@ -68432,7 +69057,7 @@ function rigaScambioP2P(o){
     /* LA RIGA SOLO DA GUARDARE LO DICE (24 set 2026, l'archivio del
        server): le chiavi stanno dove lo scambio e' stato aperto */
     + (o.soloVista && !finita
-        ? '<div class="hint p2p-altrove">📱 Aperto su un altro dispositivo: qui lo segui, i gesti si fanno da là</div>'
+        ? '<div class="hint p2p-altrove">' + rigaChiaviAltroveP2P(o, false) + '</div>'
         : '')
     /* IL PIEDE E' RIMASTO ALLA SOLA ✕: «tocca a te» e' salito nella
        casella, e le due non potevano comunque coesistere — l'una vive
@@ -68500,6 +69125,11 @@ async function statoPubblicoOrdini(ids){
        coordinatore dice ancora 'pending' resta dov'e' */
     if (!o || P2P_FINALI.indexOf(o.stato) >= 0) continue;
     const s = String(tagValore(ev, 's') || '');
+    /* LA SCADENZA PUBBLICA DEL PAYCODE (11 ott 2026): il 38383 la porta
+       anche dopo la presa, e la riga senza il codice cifrato la legge
+       da qui (`scadenzaPayCodeDaLibroP2P`) */
+    const scadeLibro = Math.floor(Number(tagValore(ev, 'expires_at')) || 0);
+    if (scadeLibro > 0 && o.libroScade !== scadeLibro) { o.libroScade = scadeLibro; scriviOrdineP2P(o); }
     const fine = (s === 'canceled' || s === 'expired') ? 'annullato'
                : s === 'success' ? 'concluso' : '';
     if (!fine) continue;

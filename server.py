@@ -22508,6 +22508,14 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # login lo apre soprattutto chi NON e' ancora entrato, e
         # /api/me in vetrina non esiste.
         risposta["relay_nip46"] = RELAYS_NIP46
+        # I RELAY DELLA COPIA CIFRATA DEL PROFILO DI SCAMBIO (11 ott 2026,
+        # cantiere «tor-chiavi-scambio»): quelli di casa (RELAY_NOSTR, o i
+        # relay di serie) piu' lo specchio nostro, senza doppioni. Il
+        # client ci aggiunge i relay di scrittura dell'utente. E LA CHIAVE
+        # PUBBLICA DI BARATTOLO, per il contatto di chi ha perso le chiavi
+        # di uno scambio: vuota se Nostr e' spento.
+        risposta["relay_copia_p2p"] = _relay_copia_p2p()
+        risposta["pub_casa"] = _NOSTR[1] if _NOSTR else ""
         # LO SCAMBIO P2P (set 2026): dove sta il coordinator e se la
         # funzione e' accesa. Sta QUI e non solo in /api/me perche' il
         # libro ordini si legge anche da anonimi in vetrina, dove
@@ -48840,6 +48848,20 @@ def _esiti_p2p_dice(segno: str, esiti: list):
     o di cartone) si dice come tale: mai un «ok» dedotto."""
     for tg_id, esito in esiti:
         print(f"   {segno} ↳ {tg_id}: {esito or 'esito non detto'}", flush=True)
+
+
+def _relay_copia_p2p() -> list:
+    """I relay su cui il client mette la copia cifrata del profilo di
+    scambio (11 ott 2026): RELAY_NOSTR (o i relay di serie) e lo
+    specchio nostro, senza doppioni, nell'ordine in cui stanno. PURA sui
+    globali, cosi' una prova la chiama e basta."""
+    visti, fuori = set(), []
+    for r in list(RELAYS_VERIFICA) + list(MOSTRO_RELAY_SPECCHIO):
+        r = str(r or "").strip().rstrip("/")
+        if r and r not in visti and r.startswith(("wss://", "ws://")):
+            visti.add(r)
+            fuori.append(r)
+    return fuori
 
 
 def _relay_p2p_dice(relay: str, muto: bool, perche: str = ""):

@@ -175,6 +175,38 @@ vere sullo schermo, si salta come il tour):
   fine dello scambio.», il bottone per il bot e «…o entra con Nostr».
   Dall'indirizzo .onion: «🧅 Entra con la tua chiave» e «Entra con
   Nostr».
+- **Con una chiave Nostr, il profilo di scambio** (12 ott 2026) 🧑 se sei
+  entrato con la **nsec** il profilo si ricava dalla tua chiave, qui nel
+  browser, e torna da solo a ogni ingresso con la stessa chiave; 📱 nel
+  foglio del profilo: «Questo profilo si ricava dalla **tua chiave
+  Nostr**, qui nel browser e mai inviata: **torna da solo** ogni volta
+  che entri con la stessa chiave, su qualunque dispositivo. Il codice
+  segreto serve solo se vuoi portarlo fuori da Barattolo.» Col **bunker**
+  o con l'**estensione** una copia cifrata del profilo va sui tuoi
+  relay: «✓ Una **copia cifrata** del profilo sta sui tuoi relay Nostr
+  (dal <data>): la apre solo la tua chiave. Entrando con la stessa
+  chiave, da qualunque browser, torna da sola.» — o, se non è riuscita,
+  «⚠️ Non siamo riusciti a mettere una copia cifrata del profilo sui
+  tuoi relay: riproviamo al prossimo scambio. Intanto salva il codice
+  segreto.» / «⚠️ Il tuo firmatario non ha concesso di cifrare una copia
+  del profilo sui relay: salva il codice segreto, o concedi il permesso e
+  riprova.» / «Nessun firmatario automatico (estensione o bunker) con cui
+  cifrare una copia del profilo sui relay: salva il codice segreto.», col
+  bottone «🔁 Riprova la copia sui relay». Fuori da Telegram la prima
+  riga dice «Vale in questo browser. ⚠️ Con Tor Browser o la navigazione
+  privata la memoria del browser si svuota alla chiusura, e con lei il
+  profilo e gli scambi aperti.» (non per un profilo che torna da solo).
+  Se NESSUNA delle due strade ti copre, alla PRIMA presa si apre il
+  foglio «🔑 Metti al sicuro il profilo di scambio»: «Le chiavi dei tuoi
+  scambi vivono **solo in questo browser**…», «⚠️ Con Tor Browser o la
+  navigazione privata la memoria del browser si svuota **a ogni
+  chiusura**.» (su Tor: «Sei su Tor Browser: …»), il codice segreto con
+  👁, «📋 Copia il codice segreto», «✓ L'ho salvato, vai avanti» e «Non
+  ora» (toast «Presa rimandata: prima metti al sicuro il profilo di
+  scambio»). Su Tor, sopra il libro: «🧅 Su Tor Browser la memoria si
+  svuota a ogni chiusura, e con lei le chiavi dei tuoi scambi: entra
+  sempre con la stessa chiave Nostr, o salva il codice segreto del
+  profilo da «I tuoi dati».»
 - **Con una chiave Nostr** 🧑 quando PRENDI un ordine resti sconosciuto
   all'altra persona — non al server: l'esito dello scambio si scrive
   comunque sul tuo account (10 ott 2026).
@@ -419,6 +451,26 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
 
 ### ⚠️ Cosa può andare storto (comprando)
 
+- Le chiavi dello scambio non sono in questo browser (un altro
+  dispositivo, o la memoria svuotata da Tor Browser / navigazione
+  privata; 12 ott 2026): sulla card «🔑 Le chiavi di questo scambio non
+  sono in questo browser: qui lo segui, i gesti si fanno da dove l'hai
+  aperto.», nella pagina la stessa frase più «Le ritrovi sul dispositivo
+  dove hai preso lo scambio, o entrando con la stessa chiave Nostr se il
+  profilo deriva da lei. Se quella memoria è andata persa (Tor Browser,
+  navigazione privata, telefono cambiato), scrivici subito:
+  @ilbarattolobot o su Nostr njump.me/npub….» Niente bottoni; col PayCode
+  il riquadro dice «I sats sono al sicuro in garanzia. Il PayCode sta nel
+  browser dove hai preso lo scambio: da là vai al tabacchino, paga in
+  contanti, tieni lo scontrino e segna «pagato».» e sotto il solo tempo,
+  letto dal libro pubblico: «🧾 Il PayCode sta nel browser dove hai preso
+  lo scambio», «Scade il …», «Tempo che resta: …», «La scadenza è quella
+  scritta nel libro pubblico dell'ordine: il codice e i gesti stanno dove
+  lo scambio è stato aperto.»
+- Il PayCode non è ancora arrivato (sats già in garanzia): «Il PayCode
+  da pagare arriva cifrato da chi vende: appena è qui sotto, vai al
+  tabacchino…», la riga «✋ Aspetta — Chi vende deve mandarti il
+  PayCode», e il riquadro «🧾 Il PayCode non è ancora arrivato» col tempo.
 - Fuori dalla fascia: toast «Scegli una cifra fra 20 e 100 €.»
 - Contanti sopra il tetto: «In contanti di persona il massimo è 250 €
   per scambio: sopra, si divide in più ordini»
