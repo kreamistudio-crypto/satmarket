@@ -8549,19 +8549,6 @@
     background:var(--b-off-bg,var(--b-bg));color:var(--b-off-fg,var(--b-fg));
     border-color:var(--b-off-line,var(--b-line));box-shadow:var(--b-off-sh,var(--b-sh));
     opacity:var(--b-off-op)}
-  /* SPENTO MA SI TOCCA (11 ott 2026, cantiere foto-obbligatorie): il
-     «Pubblica» senza nemmeno una foto. Stesso vestito dello spento
-     qui sopra — il fondo neutro pieno, lo dice l'occhio — ma il dito
-     PASSA: un tocco porta al riquadro delle foto e ripete la riga
-     («Aggiungi almeno una foto per pubblicare»). Con `disabled` il
-     bottone in fondo allo schermo non risponderebbe e la ragione
-     starebbe in cima alla pagina, dove non si guarda: il bottone che
-     «non fa niente», la lezione di aggiungiFoto. Per questo
-     aria-disabled e non disabled, e solo su questo bottone. */
-  #sellSubmit[aria-disabled="true"]{
-    background:var(--b-off-bg,var(--b-bg));color:var(--b-off-fg,var(--b-fg));
-    border-color:var(--b-off-line,var(--b-line));box-shadow:var(--b-off-sh,var(--b-sh));
-    opacity:var(--b-off-op)}
   /* IN CORSO (aria-busy, da bottoneInAttesa): e' spento per il dito ma
      NON per l'occhio — tiene il colore del suo ruolo (le --b-off-… si
      svuotano e vince il ripiego) e una luce gli passa sopra. Ferma a
@@ -8877,6 +8864,16 @@
   /* il riquadro si accende mentre la foto ci passa sopra: il segnale
      che il bersaglio c'e' davvero */
   .photo-drop.sopra{border-color:var(--sats);background:var(--sats-soft);color:var(--sats-text)}
+  /* IL RIQUADRO CHE ASPETTA UNA FOTO (11 ott 2026, sera, cantiere
+     pubblica-sempre-acceso, ritocco di Andrea). «Pubblica» adesso e'
+     SEMPRE acceso; toccato senza foto, a dire dove si cura e' il
+     riquadro: contorno PIENO nell'arancio dell'accento (da tratteggiato
+     a continuo, cosi' si legge anche senza il colore) e un alone
+     intorno. Resta finche' non arriva una foto — lo toglie
+     aggiornaObbligoFoto. Niente animazione: il richiamo e' la
+     vibrazione breve di casa (haptic), e nient'altro. */
+  .photo-drop.foto-manca{border-style:solid;border-color:var(--sats);
+    box-shadow:0 0 0 3px rgba(247,147,26,.3)}
 
   /* ---------- affari (ordini) ---------- */
   .order{
@@ -12215,7 +12212,7 @@ document.getElementById('cartello')?.remove();</script>
         <input type="file" id="sellScatta" accept="image/*" capture="environment" style="display:none" onchange="fotoScelte(event)">
         <!-- Si tocca E si trascina: sul desktop il riquadro tratteggiato
              chiede di essere usato cosi', e per un anno non lo era. -->
-        <div class="photo-drop" onclick="el('sellPhotos').click()"
+        <div class="photo-drop" id="sellFotoDrop" onclick="el('sellPhotos').click()"
              ondragenter="fotoSopra(event,true)" ondragover="fotoSopra(event,true)"
              ondragleave="fotoSopra(event,false)" ondrop="fotoLasciate(event)">
           <!-- IL «+» (1 ott 2026, chiesto da Andrea): la macchina
@@ -12243,7 +12240,10 @@ document.getElementById('cartello')?.remove();</script>
              attaccata al riquadro che la cura, e non sotto il bottone:
              dice cosa manca nel posto dove lo si mette. Nasce accesa
              (un form nuovo non ha foto) e la spegne aggiornaObbligoFoto
-             alla prima foto; in modifica dice «per salvare». -->
+             alla prima foto; in modifica dice «per salvare».
+             Il bottone invece resta SEMPRE acceso (ritocco della sera
+             stessa): toccato senza foto porta qui e accende il
+             riquadro, `.photo-drop.foto-manca`. -->
         <div id="sellFotoObbligo" aria-live="polite" style="margin-top:6px;font-size:12.5px;font-weight:700;color:var(--sats-text);line-height:1.45">Aggiungi almeno una foto per pubblicare</div>
         <!-- LA REGOLA DELLE FOTO IN MODIFICA (ago 2026): o tutte o
              nessuna — se ne carichi di nuove sostituiscono in blocco
@@ -12432,7 +12432,7 @@ document.getElementById('cartello')?.remove();</script>
            bottone di sempre, in fondo al form. Vedi LA MORFOSI DEL + NEL
            MERCATINO, nel CSS. -->
       <div class="vendi-piede" id="vendiPiede">
-        <button class="btn orange" id="sellSubmit" onclick="publish()" aria-disabled="true">⚡ Pubblica annuncio</button>
+        <button class="btn orange" id="sellSubmit" onclick="publish()">⚡ Pubblica annuncio</button>
       </div>
     </div>
   </div>
@@ -46415,7 +46415,7 @@ function aggiornaFormVendi(){
   /* Le foto degli importati vivono sui relay: qui non si cambiano
      (v1, invariato). */
   if (drop) drop.style.display = editandoNostr ? 'none' : '';
-  /* la riga «almeno una foto» e il bottone seguono la faccia del form
+  /* la riga «almeno una foto» e il riquadro acceso seguono la faccia del form
      (pubblica / salva / firmata): cantiere foto-obbligatorie */
   aggiornaObbligoFoto();
   /* LA CONSEGNA INVECE SI DICHIARA (ago 2026), e qui c'era scritto il
@@ -47108,10 +47108,16 @@ function anteprimaMuta(i){
 
 /* ══ ALMENO UNA FOTO PER PUBBLICARE (11 ott 2026, cantiere
    foto-obbligatorie, decisione di Andrea) ══
-   Un annuncio senza foto non nasce piu': il bottone resta spento e la
-   riga accanto al riquadro dice cosa manca. Il giudice vero e' il
-   SERVER (`guardia_almeno_una_foto`, stessa frase): qui si evita il
-   viaggio e si dice il no nel posto dove si cura.
+   Un annuncio senza foto non nasce piu', e la riga accanto al
+   riquadro dice cosa manca. Il giudice vero e' il SERVER
+   (`guardia_almeno_una_foto`, stessa frase): qui si evita il viaggio
+   e si dice il no nel posto dove si cura.
+   IL BOTTONE RESTA SEMPRE ACCESO (ritocco di Andrea, la sera stessa:
+   cantiere pubblica-sempre-acceso). Per qualche ora e' stato «spento
+   ma toccabile»; adesso ha l'aspetto di sempre e, toccato senza foto,
+   fa quel che faceva — porta alle foto e ripete la riga — e in piu'
+   ACCENDE IL RIQUADRO d'arancione, finche' una foto non arriva. Vale
+   uguale in modifica.
    CONTA COME FOTO: una scelta adesso (anche il chip che sta ancora
    caricando — se poi non entra, aggiungiFoto la toglie e si torna
    qui), oppure quelle che l'annuncio ha gia' (in modifica) o eredita
@@ -47126,27 +47132,40 @@ function fotoMancante(){
   if (sellFoto.length) return false;
   return !((editandoId || duplicaDaId) && fotoAttuali.length);
 }
+/* IL RIQUADRO ACCESO HA UN PADRONE SOLO: questa variabile, che ricorda
+   su QUALE faccia del form il tocco l'ha acceso (pubblica, la modifica
+   di quell'annuncio, quel duplicato). Cosi' il contorno resta «finche'
+   non aggiungi una foto» ma non segue chi cambia form: annullata la
+   modifica, il foglio nuovo non nasce gia' arancione per un tocco
+   fatto altrove. null = spento. */
+let fotoRichiamoPer = null;
+function facciaFormVendi(){
+  return `${editandoId || ''}|${duplicaDaId || ''}`;
+}
 function aggiornaObbligoFoto(){
   const manca = fotoMancante();
-  const riga = el('sellFotoObbligo'), btn = el('sellSubmit');
+  const riga = el('sellFotoObbligo'), drop = el('sellFotoDrop');
   if (riga) {
     riga.textContent = editandoId
       ? 'Aggiungi almeno una foto per salvare'
       : 'Aggiungi almeno una foto per pubblicare';
     riga.style.display = manca ? '' : 'none';
   }
-  /* aria-disabled e non disabled: il dito deve passare, e publish()
-     risponde portando alle foto (vedi il CSS, «SPENTO MA SI TOCCA») */
-  if (btn) {
-    if (manca) btn.setAttribute('aria-disabled', 'true');
-    else btn.removeAttribute('aria-disabled');
-  }
+  /* il contorno si spegne da solo: arrivata la foto, o cambiata la
+     faccia del form. Ad accenderlo e' SOLO il tocco su «Pubblica»
+     (mostraObbligoFoto): un foglio appena aperto non rimprovera. */
+  if (!manca || fotoRichiamoPer !== facciaFormVendi()) fotoRichiamoPer = null;
+  if (drop) drop.classList.toggle('foto-manca', fotoRichiamoPer !== null);
 }
-/* Il tocco sul bottone spento: si va al riquadro e la riga si ripete
-   in un toast, che e' il modo di casa di dire «manca questo». */
+/* Il tocco su «Pubblica» senza foto: si va al riquadro, che si accende
+   d'arancione, e la riga si ripete in un toast — il modo di casa di
+   dire «manca questo». Il richiamo e' la vibrazione breve (haptic):
+   niente lampi, il contorno che compare basta. */
 function mostraObbligoFoto(){
+  fotoRichiamoPer = facciaFormVendi();
   aggiornaObbligoFoto();
-  const drop = document.querySelector('#view-vendi .photo-drop');
+  haptic();
+  const drop = el('sellFotoDrop');
   if (drop) drop.scrollIntoView({block:'center',
     behavior: tourRidotto() ? 'auto' : 'smooth'});
   toast(el('sellFotoObbligo')?.textContent
@@ -47216,9 +47235,10 @@ function avvisoFoto(d, chieste){
 
 async function publish(){
   /* LA FOTO PER PRIMA (11 ott 2026, cantiere foto-obbligatorie): e' la
-     ragione per cui il bottone e' spento, quindi e' la prima cosa che
-     il tocco deve dire — prima di titolo e prezzo, che il bottone
-     acceso non promette comunque. */
+     prima cosa che il tocco deve dire, prima di titolo e prezzo — e'
+     in cima al form, ed e' l'unica che ha un posto preciso dove
+     portare. Il bottone e' sempre acceso (ritocco della sera): a dire
+     di no e' questa riga, accendendo il riquadro. */
   if (fotoMancante()) { mostraObbligoFoto(); return; }
   const t = el('sellTitle').value.trim();
   const p = sellValuta==='eur' ? prezzoEurForm() : (parseInt(el('sellPrice').value)||0);

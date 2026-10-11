@@ -6745,15 +6745,24 @@
   sono annunci).
   IL CLIENT dice il no dove si cura: la riga `#sellFotoObbligo`
   accanto al riquadro («Aggiungi almeno una foto per pubblicare», in
-  modifica «…per salvare») e il bottone `#sellSubmit` SPENTO MA
-  TOCCABILE — `aria-disabled`, non `disabled`: ha il vestito dello
-  spento di casa ma il dito passa, e `publish()` per prima cosa porta
-  alle foto e ripete la riga. Con `disabled` il bottone attaccato in
-  fondo allo schermo non risponderebbe e la ragione starebbe in cima
-  alla pagina. Conta come foto anche il chip che sta caricando e, in
-  modifica e nel duplicato, quelle che l'annuncio ha già
-  (`fotoMancante`, `aggiornaObbligoFoto`, chiamata da
-  `renderFotoPreview` e da `aggiornaFormVendi`).
+  modifica «…per salvare»). IL BOTTONE `#sellSubmit` RESTA SEMPRE
+  ACCESO, con l'aspetto normale (ritocco di Andrea la sera stessa,
+  cantiere pubblica-sempre-acceso: per qualche ora era stato «spento
+  ma toccabile», con `aria-disabled`). Toccato senza foto, `publish()`
+  per prima cosa porta alle foto, ripete la riga in un toast, dà la
+  vibrazione breve di casa (`haptic`) e ACCENDE IL RIQUADRO:
+  `.photo-drop.foto-manca`, contorno pieno nell'arancio dell'accento
+  con l'alone, senza animazioni. Il contorno resta finché non arriva
+  una foto e ha un padrone solo, `fotoRichiamoPer`, che ricorda su
+  quale faccia del form il tocco l'ha acceso (`facciaFormVendi`:
+  pubblica, la modifica di QUELL'annuncio, quel duplicato) — così
+  non segue chi cambia form, e un foglio appena aperto non nasce
+  arancione. Lo accende SOLO il tocco (`mostraObbligoFoto`); lo
+  spegne `aggiornaObbligoFoto`, alla foto o al cambio di faccia.
+  Vale uguale in modifica. Conta come foto anche il chip che sta
+  caricando e, in modifica e nel duplicato, quelle che l'annuncio ha
+  già (`fotoMancante`; `aggiornaObbligoFoto` la chiamano
+  `renderFotoPreview` e `aggiornaFormVendi`).
   NESSUNA FOTO SPARISCE IN SILENZIO (ago 2026, caso dal campo: «carico
   un JPG dal computer, qualche mega, e non succede NULLA — nessun
   errore, nessun chip»). La causa NON era il canvas, ed è la prima

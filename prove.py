@@ -14753,9 +14753,11 @@ def prove_foto_scarti():
     else:
         # (11 ott 2026, cantiere foto-obbligatorie: renderFotoPreview
         # adesso chiama aggiornaObbligoFoto — entrano VERE anche loro,
-        # e il nodo di cartone impara style e gli attributi)
+        # e il nodo di cartone impara style, gli attributi e, dal
+        # ritocco della sera, classList: il riquadro che si accende)
         _pz = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
             "function anteprimaMuta(i){", "function fotoMancante(){",
+            "function facciaFormVendi(){",
             "function aggiornaObbligoFoto(){",
             "function renderFotoPreview(){",
             "function avvisoFoto(d, chieste){"))
@@ -14764,7 +14766,8 @@ def prove_foto_scarti():
           let sellFoto = [], editandoId = null, duplicaDaId = null,
               fotoAttuali = [], editandoNostr = false;
           const nodo = {innerHTML: '', style: {}, setAttribute(){},
-                        removeAttribute(){}};
+                        removeAttribute(){}, classList: {toggle(){}}};
+          let fotoRichiamoPer = null;
           function el(){ return nodo; }
           function esc(s){ return s; }
         """ + _pz + """
@@ -14881,8 +14884,11 @@ def prove_foto_obbligatorie():
     l'ORDINE delle guardie (che un riordino innocente romperebbe senza
     che nessuna prova funzionale se ne accorga), i due importatori nel
     punto in cui decidono chi nasce, e il client GIRATO in node — la
-    riga accanto alle foto, il bottone spento ma toccabile, e publish()
-    vera che porta alle foto prima di chiedere titolo e prezzo."""
+    riga accanto alle foto, il bottone SEMPRE ACCESO (ritocco della sera
+    stessa, cantiere pubblica-sempre-acceso), il riquadro che al tocco
+    senza foto si accende d'arancione finche' una foto non arriva, e
+    publish() vera che porta alle foto prima di chiedere titolo e
+    prezzo."""
     print("\n[almeno una foto per pubblicare]")
     import json
     import shutil
@@ -15074,7 +15080,11 @@ def prove_foto_obbligatorie():
           True, "if not importa_nostr.foto_evento(e):"
           in pezzo("_da_giudicare"))
 
-    # ---- 5) IL CLIENT: la riga, il bottone, il tocco ------------------
+    # ---- 5) IL CLIENT: la riga, il bottone sempre acceso, il riquadro --
+    # (ritocco di Andrea, la sera stessa — cantiere
+    # pubblica-sempre-acceso: «Pubblica» non si spegne piu'; toccato
+    # senza foto porta alle foto, ripete la riga e ACCENDE il riquadro
+    # d'arancione finche' una foto non arriva. Anche in modifica.)
     vv = mini[mini.index('<div class="view" id="view-vendi">'):
               mini.index("<!-- ============ VISTA: AFFARI")]
     prova("la riga sta accanto alle foto: dopo il riquadro, prima delle "
@@ -15086,20 +15096,35 @@ def prove_foto_obbligatorie():
           m.group(1) if m else None)
     prova("...corta: una riga anche a 320 px (tetto 45 caratteri)", True,
           len(FRASE) <= 45 and len(FRASE_SALVA) <= 45)
-    prova("il bottone nasce spento (aria-disabled), e resta un bottone "
-          "solo", True,
-          'id="sellSubmit" onclick="publish()" aria-disabled="true"' in vv)
+    m = re.search(r'<button[^>]*id="sellSubmit"[^>]*>', vv)
+    bottone = m.group(0) if m else ""
+    prova("il bottone nasce ACCESO: ne' disabled ne' aria-disabled nel "
+          "markup", (True, False, False),
+          ('onclick="publish()"' in bottone, "disabled" in bottone,
+           "aria-disabled" in bottone))
     i0 = mini.find("<style>")
     stile = mini[i0 + 7:mini.find("</style>", i0)]
-    m = re.search(r'#sellSubmit\[aria-disabled="true"\]\{([^}]*)\}', stile)
+    prova("...e nessuna regola lo veste da spento per la foto", False,
+          "#sellSubmit[aria-disabled" in stile)
+    _agg = pezzo_js(mini, "function aggiornaObbligoFoto(){", "\n}\n")
+    prova("...e nessuno lo spegne dal codice: aggiornaObbligoFoto non "
+          "tocca #sellSubmit", (False, False, False),
+          ("sellSubmit" in _agg, "disabled" in _agg, "setAttribute" in _agg))
+    prova("il riquadro delle foto ha il suo nome", True,
+          '<div class="photo-drop" id="sellFotoDrop"' in vv)
+    m = re.search(r"\.photo-drop\.foto-manca\{([^}]*)\}", stile)
     regola = m.group(1) if m else ""
-    prova("lo spento ha il vestito di casa (il fondo neutro), ma il dito "
-          "PASSA", (True, False),
-          ("var(--b-off-bg" in regola and "var(--b-off-fg" in regola,
-           "pointer-events" in regola))
-    prova("...e non e' `disabled`: nessuno spegne davvero #sellSubmit per "
-          "la foto", False,
-          bool(re.search(r"btn\.disabled\s*=\s*manca", mini)))
+    prova("il riquadro che aspetta: contorno PIENO nell'arancio "
+          "dell'accento, con l'alone", (True, True, True),
+          ("border-color:var(--sats)" in regola,
+           "border-style:solid" in regola, "box-shadow:" in regola))
+    prova("...e niente di invadente: nessuna animazione sul riquadro",
+          (False, False),
+          ("animation" in regola,
+           bool(re.search(r"@keyframes[^{]*foto-manca", stile))))
+    prova("...l'arancio e' quello dell'accento anche nell'alone "
+          "(#F7931A = 247,147,26)", True,
+          "--sats:#F7931A" in stile and "rgba(247,147,26," in regola)
     aiuto = mini[mini.index("Hai un catalogo grande?"):
                  mini.index("scaricaModelloImport()")]
     prova("l'aiuto dell'import da file dice la regola, e non promette "
@@ -15108,61 +15133,99 @@ def prove_foto_obbligatorie():
            "oppure niente" in aiuto))
 
     if not shutil.which("node"):
-        salta("la riga e il bottone del form, girati per davvero",
-              "node non installato")
+        salta("la riga, il bottone e il riquadro del form, girati per "
+              "davvero", "node non installato")
         return
     pezzi = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
-        "function fotoMancante(){", "function aggiornaObbligoFoto(){",
+        "function fotoMancante(){", "function facciaFormVendi(){",
+        "function aggiornaObbligoFoto(){",
         "function mostraObbligoFoto(){", "async function publish(){",
         "function riepilogoGiroConnettore(e){"))
+    prova("il padrone del riquadro acceso nasce spento", True,
+          "\nlet fotoRichiamoPer = null;" in mini)
     banco = """
       const nodi = {};
       function el(id){
         return nodi[id] || (nodi[id] = {textContent: '', style: {},
-          attrs: {}, value: '', mosso: 0,
+          attrs: {}, value: '', mosso: 0, disabled: false,
+          classi: new Set(),
+          classList: {
+            toggle(c, on){ on ? nodi[id].classi.add(c) : nodi[id].classi.delete(c); },
+            contains(c){ return nodi[id].classi.has(c); }},
           setAttribute(k, v){ this.attrs[k] = v; },
           removeAttribute(k){ delete this.attrs[k]; },
           scrollIntoView(){ this.mosso++; }});
       }
       const document = {querySelector(s){ return el('q:' + s); }};
       const detti = [];
+      let vibra = 0;
       function toast(m){ detti.push(m); }
+      function haptic(){ vibra++; }
       function tourRidotto(){ return true; }
       function fmt(n){ return String(n); }
       function esc(s){ return String(s); }
       let sellFoto = [], editandoId = null, duplicaDaId = null,
           fotoAttuali = [], editandoNostr = false, sellValuta = 'sats';
+      let fotoRichiamoPer = null;
     """ + pezzi + """
       function stato(){
         aggiornaObbligoFoto();
+        const b = el('sellSubmit');
         return {manca: fotoMancante(),
                 testo: el('sellFotoObbligo').textContent,
                 vista: el('sellFotoObbligo').style.display !== 'none',
-                spento: el('sellSubmit').attrs['aria-disabled'] === 'true'};
+                acceso: !b.disabled && !('aria-disabled' in b.attrs),
+                arancio: el('sellFotoDrop').classList.contains('foto-manca')};
       }
       const metti = (f, id, dup, att, nostr) => {
         sellFoto = f; editandoId = id; duplicaDaId = dup;
         fotoAttuali = att; editandoNostr = nostr; return stato(); };
+      const FOTO = ['data:image/jpeg;base64,X'];
       const out = {};
-      out.nuovo = metti([], null, null, [], false);
-      out.conFoto = metti(['data:image/jpeg;base64,X'], null, null, [], false);
-      out.caricando = metti(['caricando:1'], null, null, [], false);
-      out.modCon = metti([], 5, null, ['a5_0.jpg'], false);
-      out.modSenza = metti([], 5, null, [], false);
-      out.modSenzaNuova = metti(['data:image/jpeg;base64,X'], 5, null, [], false);
-      out.dupCon = metti([], null, 5, ['a5_0.jpg'], false);
-      out.dupSenza = metti([], null, 5, [], false);
-      out.firmata = metti([], 5, null, [], true);
       (async () => {
+        // il form nuovo
+        out.nuovo = metti([], null, null, [], false);
+        detti.length = 0; vibra = 0;
+        await publish();
+        out.tocco = {...stato(), detti: detti.slice(), vibra,
+                     mosso: el('sellFotoDrop').mosso};
+        detti.length = 0;
+        await publish();                 // un secondo tocco: uguale
+        out.tocco2 = {...stato(), detti: detti.slice()};
+        out.caricando = metti(['caricando:1'], null, null, [], false);
         metti([], null, null, [], false);
+        await publish();
+        out.conFoto = metti(FOTO, null, null, [], false);
+        out.tolta = metti([], null, null, [], false);   // la x: non riaccende
+        detti.length = 0;
+        sellFoto = FOTO;
+        await publish();
+        out.oltre = {detti: detti.slice(), ...stato()};
+        // la modifica
+        out.modCon = metti([], 5, null, ['a5_0.jpg'], false);
         detti.length = 0;
         await publish();
-        out.tocco = {detti: detti.slice(),
-                     mosso: el('q:#view-vendi .photo-drop').mosso};
-        metti(['data:image/jpeg;base64,X'], null, null, [], false);
+        out.modConTocco = {detti: detti.slice(), ...stato()};
+        out.modSenza = metti([], 5, null, [], false);
+        detti.length = 0; vibra = 0;
+        await publish();
+        out.modSenzaTocco = {...stato(), detti: detti.slice(), vibra};
+        out.annullata = metti([], null, null, [], false);  // foglio nuovo
+        metti([], 5, null, [], false);
+        await publish();
+        out.altraModifica = metti([], 6, null, [], false);
+        metti([], 5, null, [], false);
+        await publish();
+        out.modSenzaNuova = metti(FOTO, 5, null, [], false);
+        // il duplicato e la firmata
+        out.dupCon = metti([], null, 5, ['a5_0.jpg'], false);
+        metti([], null, 5, [], false);
+        await publish();
+        out.dupSenzaTocco = stato();
+        metti([], 5, null, [], true);
         detti.length = 0;
         await publish();
-        out.oltre = detti.slice();
+        out.firmata = {detti: detti.slice(), ...stato()};
         out.giro0 = riepilogoGiroConnettore({});
         out.giro1 = riepilogoGiroConnettore({senza_foto: 1});
         out.giro2 = riepilogoGiroConnettore({senza_foto: 2, nuovi: 1,
@@ -15178,35 +15241,57 @@ def prove_foto_obbligatorie():
         prova("il banco del form gira", True,
               f"node ha detto: {(r.stderr or '')[:400]}")
         return
-    acceso = {"manca": False, "vista": False, "spento": False}
-    senza = lambda d: {k: d[k] for k in ("manca", "vista", "spento")}
-    prova("form nuovo senza foto: la riga si vede, con la frase, e il "
-          "bottone e' spento",
-          {"manca": True, "testo": FRASE, "vista": True, "spento": True},
-          o["nuovo"])
-    prova("con una foto: la riga sparisce e il bottone si accende",
-          acceso, senza(o["conFoto"]))
-    prova("...anche mentre la foto sta ancora caricando (se poi non entra "
-          "si torna spenti)", acceso, senza(o["caricando"]))
-    prova("modifica di un annuncio che le foto le ha: niente da chiedere",
-          acceso, senza(o["modCon"]))
-    prova("modifica di un annuncio nato SENZA: per salvare ne serve una, "
-          "e la riga dice «per salvare»",
-          {"manca": True, "testo": FRASE_SALVA, "vista": True,
-           "spento": True}, o["modSenza"])
-    prova("...e scegliendola il bottone si accende", acceso,
-          senza(o["modSenzaNuova"]))
-    prova("duplicato: eredita le foto dell'originale; senza, e' un form "
-          "che pubblica", (acceso, {"manca": True, "testo": FRASE,
-                                    "vista": True, "spento": True}),
-          (senza(o["dupCon"]), o["dupSenza"]))
-    prova("la modifica firmata di un importato resta fuori: mai spenta "
-          "per la foto", acceso, senza(o["firmata"]))
-    prova("il tocco sul bottone spento porta alle foto e ripete la riga "
-          "— e non chiede altro", ([FRASE], 1),
-          (o["tocco"]["detti"], o["tocco"]["mosso"]))
-    prova("...con la foto publish() va oltre, ai controlli di sempre",
-          ["Titolo e prezzo sono obbligatori"], o["oltre"])
+    TITOLO = ["Titolo e prezzo sono obbligatori"]
+    chiavi = ("manca", "vista", "acceso", "arancio")
+    solo = lambda d: tuple(d[k] for k in chiavi)
+    prova("form nuovo senza foto: la riga si vede, il bottone e' ACCESO e "
+          "il riquadro e' quello di sempre (un foglio appena aperto non "
+          "rimprovera)", (True, True, True, False, FRASE),
+          solo(o["nuovo"]) + (o["nuovo"]["testo"],))
+    prova("il tocco senza foto: porta alle foto, ripete la riga, una "
+          "vibrazione breve — e non chiede altro", ([FRASE], 1, 1),
+          (o["tocco"]["detti"], o["tocco"]["mosso"], o["tocco"]["vibra"]))
+    prova("...e il riquadro si accende d'arancione, col bottone che resta "
+          "acceso", (True, True, True, True), solo(o["tocco"]))
+    prova("...un secondo tocco fa lo stesso, e il riquadro resta acceso",
+          ([FRASE], True), (o["tocco2"]["detti"], o["tocco2"]["arancio"]))
+    prova("la foto che sta caricando spegne gia' il contorno (se poi non "
+          "entra, serve un altro tocco)", (False, False, True, False),
+          solo(o["caricando"]))
+    prova("aggiunta la foto: la riga sparisce e il contorno torna normale",
+          (False, False, True, False), solo(o["conFoto"]))
+    prova("...e tolta di nuovo con la ✕ torna la riga, NON il contorno: "
+          "quello lo accende solo il tocco", (True, True, True, False),
+          solo(o["tolta"]))
+    prova("con la foto publish() va oltre, ai controlli di sempre",
+          (TITOLO, False), (o["oltre"]["detti"], o["oltre"]["arancio"]))
+    prova("modifica di un annuncio che le foto le ha: niente da chiedere, "
+          "nemmeno al tocco", ((False, False, True, False), TITOLO, False),
+          (solo(o["modCon"]), o["modConTocco"]["detti"],
+           o["modConTocco"]["arancio"]))
+    prova("modifica di un annuncio nato SENZA: la riga dice «per salvare», "
+          "il bottone e' acceso", (True, True, True, False, FRASE_SALVA),
+          solo(o["modSenza"]) + (o["modSenza"]["testo"],))
+    prova("...e VALE ANCHE LI': al tocco il riquadro si accende, con la "
+          "riga del salvataggio", ((True, True, True, True),
+                                   [FRASE_SALVA], 1),
+          (solo(o["modSenzaTocco"]), o["modSenzaTocco"]["detti"],
+           o["modSenzaTocco"]["vibra"]))
+    prova("annullata la modifica, il foglio nuovo non nasce arancione "
+          "per un tocco fatto altrove", (True, True, True, False),
+          solo(o["annullata"]))
+    prova("...e nemmeno la modifica di un ALTRO annuncio",
+          False, o["altraModifica"]["arancio"])
+    prova("...scelta la foto in modifica, il contorno torna normale",
+          (False, False, True, False), solo(o["modSenzaNuova"]))
+    prova("duplicato: eredita le foto dell'originale; senza, al tocco si "
+          "accende come un form che pubblica",
+          ((False, False, True, False), (True, True, True, True), FRASE),
+          (solo(o["dupCon"]), solo(o["dupSenzaTocco"]),
+           o["dupSenzaTocco"]["testo"]))
+    prova("la modifica firmata di un importato resta fuori: mai la riga, "
+          "mai il contorno", ((False, False, True, False), TITOLO),
+          (solo(o["firmata"]), o["firmata"]["detti"]))
     prova("il cassetto del negozio: i senza foto si dicono, uno o tanti, "
           "e senza niente da dire tace",
           ("", True, True),

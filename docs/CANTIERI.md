@@ -50036,3 +50036,79 @@ pagamento vero da Phoenix sopra l'entrata ACINQ del momento: è l'unica
 prova che il nodo di ACINQ prenda davvero l'altra strada (LND da qui
 non conosce i saldi altrui). Sul nodo, dopo: il timer orario spento e
 `SOGLIA_ACINQ=0`.
+
+## «Pubblica» sempre acceso, il riquadro delle foto che si accende (11 ott 2026, tarda sera, cantiere pubblica-sempre-acceso, ritocco di Andrea)
+
+**Il ritocco**, a poche ore da «Almeno una foto per pubblicare» (la
+voce sopra): 1) il tasto «Pubblica» resta SEMPRE acceso, con l'aspetto
+normale, anche senza foto; 2) toccato senza foto fa quel che faceva —
+scorre alle foto e ripete la riga — e in più il riquadro delle foto si
+evidenzia col contorno arancione dell'accento, ben visibile, finché
+non si aggiunge una foto, con un piccolo richiamo non invadente; 3)
+vale anche in modifica. La regola del server non cambia di una riga.
+
+**COSA È CAMBIATO.** Via `aria-disabled` dal bottone (markup, CSS e
+`aggiornaObbligoFoto`, che `#sellSubmit` non lo nomina più). Il
+riquadro ha un nome (`#sellFotoDrop`) e una classe,
+`.photo-drop.foto-manca`: contorno da tratteggiato a PIENO
+nell'arancio di `--sats`, più un alone di 3 px — il cambio di tratto
+fa sì che si legga anche senza il colore. La accende SOLO il tocco su
+«Pubblica» (`mostraObbligoFoto`), la spegne `aggiornaObbligoFoto`.
+
+**IL PADRONE DEL CONTORNO È UNO**: `fotoRichiamoPer`, che ricorda su
+quale faccia del form il tocco l'ha acceso (`facciaFormVendi`:
+pubblica, la modifica di quell'annuncio, quel duplicato). «Finché non
+aggiungi una foto» vale sul form dove hai toccato; annullata la
+modifica, il foglio nuovo non nasce arancione per un tocco fatto
+altrove, e nemmeno la modifica di un altro annuncio. Con una semplice
+classe lasciata sul riquadro sarebbe rimasta accesa attraverso i
+cambi di form.
+
+**IL RICHIAMO È LA VIBRAZIONE, e basta.** Andrea ha scritto «es. una
+vibrazione breve o un lampo del contorno»: ho preso la variante più
+sobria — `haptic()`, la vibrazione di casa, che dentro Telegram c'è e
+altrove tace — e nessuna animazione nuova (la lezione del logo P2P
+dell'11 ott: un «per esempio» visivo = la variante più sobria). Il
+contorno che compare, il toast e lo scorrimento sono già tre segnali.
+Il lampo è una regola CSS in più, se lo vuole.
+
+**SCELTE DA SAPERE.** La riga «Aggiungi almeno una foto per
+pubblicare» resta visibile sotto il riquadro ogni volta che la foto
+manca, come prima: il ritocco chiedeva di cambiare il tasto, non la
+riga. Il foglio appena aperto NON è arancione: il contorno è la
+risposta a un tocco, non un rimprovero preventivo. Tolta la foto con
+la ✕ torna la riga, non il contorno. Il chip che sta ancora caricando
+spegne già il contorno (se poi la foto non entra serve un altro
+tocco).
+
+**PROVATO.** `prove_foto_obbligatorie` riscritta nella parte del
+client (53 prove in tutto): il bottone senza `disabled` né
+`aria-disabled` nel markup, nessuna regola che lo spenga, il riquadro
+col suo nome, la regola `.foto-manca` (arancio dell'accento, tratto
+pieno, alone, nessuna animazione), e il banco in node con le funzioni
+VERE: foglio nuovo, tocco, secondo tocco, chip, foto, ✕, modifica con
+e senza, annullo, un'altra modifica, duplicato, firmata. Tortura su
+una copia: 18 mutazioni di `miniapp.html`, 18 prese.
+DAL VIVO, Chrome pilotato con tocchi veri sulla copia col config di
+cartone, dentro il finto Telegram come 222, tema scuro, densità 3, a
+375 e a 320: tasto acceso (lo sfondo è il gradiente arancio di
+sempre), tocco senza foto (toast, riquadro in vista, UNA vibrazione
+contata), contorno letto dal browser (`rgb(247, 147, 26)`, `solid`,
+alone), che resta passato il toast; foto vera dal selettore e contorno
+tornato ESATTAMENTE quello di prima (stesso colore, stesso tratto,
+niente alone); la ✕; poi a 375 la pubblicazione vera dopo un tocco a
+vuoto, la modifica dell'annuncio nato senza foto (tocco, arancione,
+titolo non salvato, foto, salvataggio) e l'uscita dalla modifica dopo
+il tocco. 29 controlli su 29. Gli scatti:
+`.claude/giri/pubblica-sempre-acceso/`.
+
+**COSA È GIRATO SU QUALE ALBERO.** Tutto sull'albero del cantiere,
+sopra 55cf5d9 (la punta di main, con la sua CI verde): la tortura, il
+giro dal vivo, `PROVE_SEVERE=1 python prove.py` INTERA, 22357 passate e 0 fallite, nessuna saltata; i
+collaudi del workflow nella gabbia, 61 su 61 verdi (in tre gruppi, in parallelo); lo scanner dei
+segreti sulle righe aggiunte. La voce era già scritta quando la suite
+è girata, tranne i tre conti.
+
+**RESTA DA GUARDARE.** Sul telefono vero dentro Telegram: la
+vibrazione (qui è solo contata) e quanto si vede l'arancione in pieno
+sole, nei due temi (dal vivo ho guardato lo scuro).
