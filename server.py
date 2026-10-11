@@ -15626,14 +15626,17 @@ def timbro_scrivi(nome: str, valore: str):
         print(f"⚠️ Timbro «{nome}» non scritto ({e}): l'avviso puo' ripetersi")
 
 
-async def notifica_admin(testo: str):
+async def notifica_admin(testo: str, bottone: tuple = None):
     """Avvisa tutti i moderatori (nel collaudo anche l'identita' 999,
-    che stampa in console come le altre notifiche simulate)."""
+    che stampa in console come le altre notifiche simulate).
+    `bottone` (11 ott 2026, l'avviso dei DM Nostr) e' quello di
+    `notifica`, e le arriva SOLO quando c'e': chi non lo passa la
+    chiama come l'ha sempre chiamata."""
     destinatari = set(ADMIN_IDS)
     if MODALITA_COLLAUDO:
         destinatari.add(999)
     for tg_id in destinatari:
-        await notifica(tg_id, testo)
+        await notifica(tg_id, testo, *([bottone] if bottone else []))
 
 
 async def polso_ordini_admin(riga: str):
@@ -28583,6 +28586,9 @@ def _leve_stato():
             _leva("Polso degli ordini", "AVVISI_ORDINI_ADMIN",
                   bool(AVVISI_ORDINI_ADMIN),
                   spento="nessuna riga quando un ordine nasce o si chiude"),
+            # L'avviso dei DM Nostr (11 ott 2026): il fatto e lo stato
+            # VIVO dei fili, chiesti al loro giudice (`_dm_leve`).
+            *_dm_leve(),
             _leva("Termometro delle sottocategorie",
                   "TERMOMETRO_SOTTOCATEGORIE", bool(TERMOMETRO_SOTTOCATEGORIE),
                   spento="il lunedì non arriva più il report degli annunci "
@@ -57022,6 +57028,537 @@ async def manda_dm_nostr(dest_hex: str, testo: str) -> bool:
     except Exception as e:
         print(f"⚠️ DM Nostr saltato ({dest_hex[:16]}…): {e}")
         return False
+
+
+# --- L'AVVISO DEI DM A BARATTOLO (11 ott 2026) ----------------------
+# Richiesta di Andrea: chi scrive un DM al profilo Nostr di Barattolo
+# parlava a un muro — la chiave della piattaforma vive sul server, e
+# nessuno tiene un client aperto su quella. Da qui i moderatori
+# ricevono, nella chat degli altri avvisi, «📩 Nuovo DM su Nostr da
+# <chi>» con un bottone per andare a leggerlo in un client.
+# COSA SI ASCOLTA: i relay della NOSTRA lista DM (il kind 10050 di
+# Barattolo: `AVVISO_DM_NOSTR_RELAY`), un filo per relay sul calco
+# dell'ascolto P2P — una connessione tenuta viva e rifatta quando
+# cade, in un thread suo perche' websocket-client e' sincrona — con i
+# due tipi di DM indirizzati a noi (`#p`): le buste NIP-17 (kind 1059)
+# e i vecchi NIP-04 (kind 4).
+# IL TESTO NON SI LEGGE MAI, E NON PER PROMESSA: IL SERVER NON LO
+# DECIFRA. Un NIP-04 dice il mittente in chiaro (e' il suo difetto):
+# basta l'autore dell'evento, il contenuto non si tocca. Una busta
+# NIP-17 sono due buste una nell'altra: quella di FUORI (1059) e'
+# firmata da una chiave usa-e-getta e nasconde chi scrive; quella di
+# DENTRO (il sigillo, kind 13) e' firmata dal mittente e porta il
+# messaggio cifrato una seconda volta. Qui si apre SOLO quella di
+# fuori, con la chiave della piattaforma — che e' la NOSTRA, il DM e'
+# per noi: la regola ferrea 2 parla delle chiavi degli altri. Ne esce
+# il sigillo: la sua firma (verificata) dice chi scrive, e il suo
+# contenuto — il messaggio — resta cifrato com'e' arrivato. Nessuna
+# riga di questo blocco lo decifra, lo stampa o lo scrive: del
+# sigillo si tiene la chiave di chi firma e si butta il resto.
+# Il prezzo dichiarato: senza aprire la seconda busta non si sa la
+# data vera del messaggio ne' il suo tipo (una reazione dentro una
+# chat arriva come «nuovo DM»).
+# NIENTE AVVISI PER LA POSTA VECCHIA. Un 1059 porta una data FINTA,
+# arretrata fino a due giorni (e' la specifica: nessuno deve correlare
+# i tempi), quindi «dopo l'avvio» non si puo' chiedere al relay. Si
+# chiedono gli ultimi tre giorni, e tutto quel che il relay consegna
+# PRIMA del suo primo EOSE e' la posta che c'era gia': si segna come
+# vista e non si apre nemmeno. Da li' in poi quel che arriva e' nuovo.
+# Alla riconnessione dopo una caduta la finestra e' la stessa, e parla
+# solo cio' che non si era mai visto: il DM arrivato mentre il filo
+# era giu'. Un NIP-04 ha la data vera: vale se e' di dopo l'avvio.
+# NIENTE DOPPIONI: lo stesso DM da due relay ha lo stesso id, e l'id
+# visto una volta non parla piu' (`_dm_visto`, in memoria, col tetto).
+# IL TETTO CONTRO LO SPAM, in due piani: un avviso per mittente ogni
+# AVVISO_DM_PAUSA_MITTENTE_S (quel che arriva nel frattempo si conta, e
+# a pausa finita esce una riga sola: «3 nuovi DM da …»); e in tutto
+# AVVISO_DM_TETTO avvisi ogni AVVISO_DM_FINESTRA_S — oltre, i DM si
+# sommano in un riassunto senza nomi che esce al primo posto libero.
+# FAIL-OPEN VERSO IL SERVER: tutto gira in thread daemon e in un
+# orologio suo; un relay che cade, tace o dice sciocchezze costa una
+# riga nel journal e una riconnessione, mai un errore a chi sta
+# comprando. Niente database: lo stato vive in memoria, e un riavvio
+# riparte dalla posta gia' vista (cioe' zitto).
+# LA LEVA NASCE SPENTA e si accende con una riga nel config del VPS:
+# PRODUZIONE, «L'AVVISO DEI DM NOSTR».
+try:
+    from config import AVVISO_DM_NOSTR
+except ImportError:
+    AVVISO_DM_NOSTR = False
+try:
+    from config import AVVISO_DM_NOSTR_RELAY
+except ImportError:
+    AVVISO_DM_NOSTR_RELAY = ["wss://nos.lol", "wss://relay.damus.io"]
+
+AVVISO_DM_PASSO_S = 10              # ogni quanto l'orologio guarda la coda
+AVVISO_DM_PAUSA_MITTENTE_S = 600    # un avviso per mittente ogni 10 minuti
+AVVISO_DM_TETTO = 6                 # avvisi in tutto...
+AVVISO_DM_FINESTRA_S = 1800         # ...ogni mezz'ora: oltre, il riassunto
+AVVISO_DM_CODA_MAX = 2000           # arrivi tenuti fra un giro e l'altro
+AVVISO_DM_RELAY_MAX = 6             # un thread per relay: non di piu'
+AVVISO_DM_BUSTE_S = 3 * 86400       # i 2 giorni di data finta, piu' uno
+AVVISO_DM_RITORNO_S = 600           # NIP-04: quanto si riguarda indietro
+AVVISO_DM_VISTI_MAX = 20000         # id gia' visti tenuti in memoria
+AVVISO_DM_POLSO_S = 120             # ogni quanto si chiede «ci sei?»
+AVVISO_DM_EOSE_S = 20               # quanto si aspetta la risposta
+AVVISO_DM_ATTESA_S = 5              # fra un tentativo e l'altro (cresce)
+AVVISO_DM_FERMO_S = 180             # un filo senza segni: si abbandona
+_DM_AVVIO = int(time.time())        # la posta di prima non parla
+_DM_ASCOLTO: dict[str, dict] = {}   # relay -> lo stato del suo filo
+_DM_VISTI: dict[str, None] = {}     # id evento -> visto (in ordine d'arrivo)
+_DM_LOCK = threading.Lock()
+_DM_AVVISI = {"arrivi": [], "mittenti": {}, "mandati": [],
+              "folla": {"n": 0, "chi": set(), "oltre": False}}
+_TASK_AVVISO_DM = None
+# LA PORTA DEL BANCO: la connessione la fa questa, e i collaudi la
+# sostituiscono con una di cartone — il resto gira vero.
+_dm_connetti = create_connection
+
+
+def avviso_dm_vivo() -> bool:
+    """La leva accesa DAVVERO: serve la chiave della piattaforma (e'
+    il destinatario dei DM, e apre la busta di fuori) e la libreria
+    delle websocket. Una leva True senza queste vale spenta."""
+    return bool(AVVISO_DM_NOSTR and _NOSTR and create_connection)
+
+
+def _dm_relays() -> list:
+    """I relay da ascoltare: quelli del config, ripuliti. Solo ws:// e
+    wss://, senza doppioni, al massimo AVVISO_DM_RELAY_MAX (ognuno e'
+    un thread). Una riga storta nel config non fa cadere niente: da'
+    una lista vuota, e lo dice la riga d'avvio."""
+    fuori = []
+    lista = AVVISO_DM_NOSTR_RELAY
+    for r in (lista if isinstance(lista, (list, tuple)) else []):
+        r = str(r).strip()
+        if r.startswith(("ws://", "wss://")) and r not in fuori:
+            fuori.append(r)
+    return fuori[:AVVISO_DM_RELAY_MAX]
+
+
+def nip44_decifra(sk_bytes: bytes, mitt_hex: str, carico: str) -> str:
+    """L'inverso di `nip44_cifra` (NIP-44 v2): dal carico in base64 al
+    testo, con la chiave privata di chi riceve e la pubblica di chi ha
+    cifrato. Il MAC si controlla PRIMA di decifrare e a tempo costante;
+    l'imbottitura si rifa' e si confronta. Alza ValueError su tutto
+    quel che non torna. Stessa ATTENZIONE di la': la coordinata X nuda
+    del punto ECDH, mai `ecdh()` di coincurve."""
+    grezzo = base64.b64decode(carico, validate=True)
+    if not 99 <= len(grezzo) <= 65603 or grezzo[0] != 2:
+        raise ValueError("carico NIP-44 non valido")
+    nonce, cifrato, mac = grezzo[1:33], grezzo[33:-32], grezzo[-32:]
+    punto = ChiavePubblicaCompleta(
+        b"\x02" + bytes.fromhex(mitt_hex)).multiply(sk_bytes)
+    x_condivisa = punto.format(compressed=True)[1:33]
+    lavoro = _hkdf_espandi(_hkdf_estrai(b"nip44-v2", x_condivisa), nonce, 76)
+    atteso = hmac.new(lavoro[44:], nonce + cifrato, hashlib.sha256).digest()
+    if not hmac.compare_digest(mac, atteso):
+        raise ValueError("MAC NIP-44 sbagliato")
+    chiaro = CifrarioDM(
+        ChaCha20DM(lavoro[:32], b"\x00" * 4 + lavoro[32:44]),
+        mode=None).decryptor().update(cifrato)
+    n = int.from_bytes(chiaro[:2], "big")
+    if n < 1 or chiaro != _imbottisci(chiaro[2:2 + n]):
+        raise ValueError("imbottitura NIP-44 sbagliata")
+    return chiaro[2:2 + n].decode("utf-8")
+
+
+def _dm_visto(ev_id: str) -> bool:
+    """True se quell'id si era gia' visto; se no lo segna. E' l'unico
+    anti-doppione: lo stesso DM da due relay ha lo stesso id. Col
+    lucchetto, perche' i fili sono piu' d'uno; al tetto esce il piu'
+    vecchio."""
+    with _DM_LOCK:
+        if ev_id in _DM_VISTI:
+            return True
+        _DM_VISTI[ev_id] = None
+        if len(_DM_VISTI) > AVVISO_DM_VISTI_MAX:
+            del _DM_VISTI[next(iter(_DM_VISTI))]
+        return False
+
+
+def _dm_mittente_busta(pacco: dict):
+    """Apre la SOLA busta di fuori di un 1059 e dice chi ha firmato il
+    sigillo che c'e' dentro: la chiave del mittente, in hex.
+    None = non e' un DM per noi (non si apre con la nostra chiave, non
+    contiene un sigillo, o la firma del sigillo non torna): niente
+    avviso. '' = la busta resta chiusa perche' manca la cifratura
+    (`cryptography`): l'avviso parte senza nome.
+    IL MESSAGGIO NON SI DECIFRA: sta nel `content` del sigillo, cifrato
+    una seconda volta, e qui nessuno lo apre. Del sigillo esce la sola
+    `pubkey`; il resto muore con la variabile."""
+    if ChaCha20DM is None or not _NOSTR:
+        return ""
+    try:
+        sigillo = json.loads(nip44_decifra(
+            _NOSTR[0].secret, pacco["pubkey"], pacco["content"]))
+        if not isinstance(sigillo, dict) or sigillo.get("kind") != 13 \
+                or not _x_firma_valida(sigillo):
+            return None
+        return sigillo["pubkey"]
+    except Exception:
+        return None
+
+
+def _dm_setaccia(ev, nostra: str, base: bool, adesso: float):
+    """IL SETACCIO, nel filo: da un evento letto dal relay a «chi
+    avvisare di chi». Torna la chiave del mittente (hex), '' se il
+    mittente non si puo' sapere, None se non c'e' niente da dire.
+    In ordine: la forma (un 4 o un 1059 con la `p` nostra — il filtro
+    lo chiede al relay, ma un relay e' un programma); `base` — la posta
+    che c'era gia' al primo collegamento: un 1059 si segna visto e
+    basta, senza aprirlo; la FIRMA (id rifatto e Schnorr: un evento
+    che non e' di chi dice non occupa nemmeno un posto fra i visti);
+    il doppione; l'eta'; e per ultimo chi scrive. Un DM che ci siamo
+    mandati da soli (la copia che i client NIP-17 tengono per chi
+    scrive) non e' una notizia.
+    Non alza MAI, e non stampa: dell'evento non esce una riga."""
+    try:
+        if not isinstance(ev, dict) or ev.get("kind") not in (4, 1059):
+            return None
+        ev_id, autore, creato = ev.get("id"), ev.get("pubkey"), \
+            ev.get("created_at")
+        if not (isinstance(ev_id, str) and RE_HEX_64.fullmatch(ev_id)
+                and isinstance(autore, str) and RE_HEX_64.fullmatch(autore)
+                and isinstance(creato, int)):
+            return None
+        if not any(isinstance(t, list) and len(t) >= 2 and t[0] == "p"
+                   and t[1] == nostra for t in ev.get("tags") or []):
+            return None
+        if base and ev["kind"] == 1059:
+            _dm_visto(ev_id)
+            return None
+        if not _x_firma_valida(ev) or _dm_visto(ev_id):
+            return None
+        if ev["kind"] == 4:
+            if creato < _DM_AVVIO:
+                return None
+            mittente = autore
+        else:
+            if creato < adesso - AVVISO_DM_BUSTE_S:
+                return None
+            mittente = _dm_mittente_busta(ev)
+        if mittente is None or mittente == nostra:
+            return None
+        return mittente
+    except Exception:
+        return None
+
+
+def _dm_filtri(nostra: str, adesso: float, vivo_fino: float) -> list:
+    """I due filtri della sottoscrizione. Le buste: gli ultimi tre
+    giorni, perche' la loro data e' finta (vedi sopra). I NIP-04: da
+    quando il server e' partito, o da poco prima dell'ultima volta che
+    questo filo era vivo — alla riconnessione non si richiede tutto."""
+    return [{"kinds": [1059], "#p": [nostra],
+             "since": int(adesso) - AVVISO_DM_BUSTE_S},
+            {"kinds": [4], "#p": [nostra],
+             "since": int(max(_DM_AVVIO, vivo_fino - AVVISO_DM_RITORNO_S))}]
+
+
+def _dm_in_coda(mittente: str):
+    """La porta fra il filo e il loop (`call_soon_threadsafe`): un DM
+    da avvisare entra in coda, e l'orologio decide. Oltre il tetto
+    della coda non si tiene nemmeno il mittente: va nel riassunto."""
+    S = _DM_AVVISI
+    if len(S["arrivi"]) >= AVVISO_DM_CODA_MAX:
+        S["folla"]["n"] += 1
+        S["folla"]["oltre"] = True
+        return
+    S["arrivi"].append(mittente)
+
+
+def _dm_decidi(S: dict, adesso: float) -> list:
+    """IL GIUDICE DEGLI AVVISI: dalla coda a cosa si dice ADESSO.
+    PURA sullo stato che riceve (lo cambia, non tocca altro).
+    Torna una lista di voci: ("uno", mittente, quanti) — un avviso per
+    quel mittente — e ("folla", quanti, mittenti, oltre) — il riassunto.
+    Le regole, in ordine:
+    • chi e' stato avvisato da meno di AVVISO_DM_PAUSA_MITTENTE_S non
+      si riavvisa: i suoi DM si contano, e a pausa finita escono in
+      una riga sola;
+    • in AVVISO_DM_FINESTRA_S partono al massimo AVVISO_DM_TETTO
+      avvisi, riassunti compresi: chi non trova posto finisce nella
+      folla, che esce per PRIMA al primo posto libero;
+    • una folla di un mittente solo e' un avviso normale, col suo nome."""
+    M, F = S["mittenti"], S["folla"]
+    pausa = AVVISO_DM_PAUSA_MITTENTE_S
+    nuovi = {}
+    for m in S["arrivi"]:
+        if m in M:
+            M[m]["attesa"] += 1
+        else:
+            nuovi[m] = nuovi.get(m, 0) + 1
+    S["arrivi"] = []
+    S["mandati"] = [t for t in S["mandati"]
+                    if adesso - t < AVVISO_DM_FINESTRA_S]
+    in_fila = [(m, v["attesa"]) for m, v in M.items()
+               if v["attesa"] and adesso - v["ultimo"] >= pausa]
+    in_fila += list(nuovi.items())
+    fuori = []
+    if F["n"] and len(S["mandati"]) < AVVISO_DM_TETTO:
+        if len(F["chi"]) == 1 and not F["oltre"]:
+            solo = next(iter(F["chi"]))
+            fuori.append(("uno", solo, F["n"]))
+            M[solo] = {"ultimo": adesso, "attesa": 0}
+        else:
+            fuori.append(("folla", F["n"], len(F["chi"]), F["oltre"]))
+        S["mandati"].append(adesso)
+        S["folla"] = F = {"n": 0, "chi": set(), "oltre": False}
+    for m, n in in_fila:
+        if m in M and adesso - M[m]["ultimo"] < pausa:
+            M[m]["attesa"] += n
+        elif len(S["mandati"]) < AVVISO_DM_TETTO:
+            fuori.append(("uno", m, n))
+            S["mandati"].append(adesso)
+            M[m] = {"ultimo": adesso, "attesa": 0}
+        else:
+            F["n"] += n
+            if len(F["chi"]) < AVVISO_DM_CODA_MAX:
+                F["chi"].add(m)
+            else:
+                F["oltre"] = True
+            M.pop(m, None)
+    for m in [m for m, v in M.items()
+              if not v["attesa"] and adesso - v["ultimo"] >= pausa]:
+        del M[m]
+    return fuori
+
+
+def _dm_chi(mittente: str, nome: str = "") -> str:
+    """Come si nomina chi scrive: la npub abbreviata, e davanti il nome
+    del suo profilo se ne ha uno. La npub resta SEMPRE: il nome se lo
+    sceglie chi scrive, e chiunque puo' chiamarsi come un altro. `nome`
+    arriva GIA' scappato (la regola degli avvisi: si scappa
+    all'assegnazione)."""
+    npub = hex_to_npub(mittente)
+    corta = f"{npub[:10]}…{npub[-6:]}"
+    return f"{nome} ({corta})" if nome else corta
+
+
+def _dm_testo(voce: tuple, nome: str = "") -> str:
+    """Il testo dell'avviso. PURA. Dice che e' arrivato un DM e da chi:
+    il messaggio no, mai — qui non esiste nemmeno."""
+    if voce[0] == "uno":
+        _, mittente, n = voce
+        quanti = "Nuovo DM" if n == 1 else f"{n} nuovi DM"
+        if not mittente:
+            return f"📩 {quanti} su Nostr"
+        return f"📩 {quanti} su Nostr da {_dm_chi(mittente, nome)}"
+    _, n, mittenti, oltre = voce
+    quanti = "1 nuovo DM" if n == 1 else f"{n} nuovi DM"
+    if not mittenti:
+        return f"📩 {quanti} su Nostr"
+    da = "1 mittente" if mittenti == 1 else f"{mittenti} mittenti"
+    return f"📩 {quanti} su Nostr da {'almeno ' if oltre else ''}{da}"
+
+
+async def _dm_avvisa(voce: tuple):
+    """Un avviso ai moderatori. Per un mittente solo si chiede il nome
+    del suo profilo (kind 0, coi lettori di sempre: in collaudo non
+    esce dal computer) e si mette il bottone che apre il SUO profilo
+    su njump.me, da dove si sceglie il client: un link che apra «quel
+    DM» in ogni client non esiste. Il riassunto non ha nomi ne' bottone."""
+    nome, bottone = "", None
+    if voce[0] == "uno" and voce[1]:
+        npub = hex_to_npub(voce[1])
+        try:
+            nome = html.escape(nome_da_profilo(
+                await _profilo_nostr(npub) or {}))
+        except Exception:
+            nome = ""
+        bottone = ("🟣 Apri in un client", f"https://njump.me/{npub}")
+    await notifica_admin(_dm_testo(voce, nome), bottone)
+    print("📩 Avviso DM: un avviso ai moderatori", flush=True)
+
+
+def _dm_filo(relay: str, nostra: str, loop, ferma):
+    """IL FILO di un relay: una connessione, tenuta viva, e rifatta
+    quando cade (il calco di `_ascolto_p2p_filo`). SINCRONO, in un
+    thread daemon suo. Di ogni evento chiede al setaccio; quel che
+    passa va nel loop, e basta: non notifica, non scrive.
+    `ferma` e' di QUESTO filo: quando la guardia lo abbandona la alza.
+    Il polso (una REQ piccola, ogni AVVISO_DM_POLSO_S) e' cio' che
+    distingue un relay zitto da una connessione morta a meta'.
+    In collaudo verso un relay che non e' di casa non parte nemmeno
+    (vedi `lettura_simulata`): la guardia ha gia' chiesto, e questa e'
+    la sua, per chi lo facesse partire da un'altra parte."""
+    O = _DM_ASCOLTO[relay]
+    if lettura_simulata(relay, "dei DM a Barattolo (1059 e 4)"):
+        return
+    while not ferma.is_set():
+        ws = None
+        try:
+            O["segno"] = inizio = time.time()
+            ws = _dm_connetti(relay, timeout=10,
+                              sslopt={"cert_reqs": ssl.CERT_NONE})
+            ws.settimeout(5)
+            ws.send(json.dumps(["REQ", "dm", *_dm_filtri(
+                nostra, inizio, O["vivo_fino"])]))
+            vivo, polso_mandato, ultimo_polso = False, 0.0, inizio
+            while not ferma.is_set():
+                O["segno"] = time.time()
+                try:
+                    grezzo = ws.recv()
+                except Exception as e:
+                    # il timeout dei 5 secondi e' il BATTITO del filo,
+                    # non un guasto: serve a guardare gli orologi
+                    if "Timeout" not in type(e).__name__ \
+                            and not isinstance(e, socket.timeout):
+                        raise
+                    grezzo = None
+                adesso = time.time()
+                msg = json.loads(grezzo) if grezzo else None
+                if isinstance(msg, list) and len(msg) >= 2:
+                    if msg[0] == "EOSE" and msg[1] == "dm" and not vivo:
+                        vivo = True
+                        dopo = (f" dopo {O['cadute']} tentativi"
+                                if O["cadute"] else "")
+                        O.update(stato="connesso", da=adesso, cadute=0,
+                                 perche="", base=False)
+                        print(f"📩 Avviso DM: in ascolto su {relay}{dopo}",
+                              flush=True)
+                    elif msg[0] == "EOSE" and msg[1] == "polso":
+                        polso_mandato = 0.0
+                        ws.send(json.dumps(["CLOSE", "polso"]))
+                    elif msg[0] == "CLOSED" and msg[1] == "dm":
+                        raise RuntimeError(
+                            f"sottoscrizione chiusa dal relay: {msg[2:]}")
+                    elif msg[0] == "EVENT" and msg[1] == "dm" \
+                            and len(msg) > 2:
+                        chi = _dm_setaccia(msg[2], nostra,
+                                           O["base"] and not vivo, adesso)
+                        if chi is not None:
+                            loop.call_soon_threadsafe(_dm_in_coda, chi)
+                if vivo:
+                    O["vivo_fino"] = adesso
+                if not vivo and adesso - inizio > AVVISO_DM_EOSE_S:
+                    raise TimeoutError("nessun EOSE alla sottoscrizione")
+                if polso_mandato \
+                        and adesso - polso_mandato > AVVISO_DM_EOSE_S:
+                    raise TimeoutError(
+                        f"il polso non e' tornato in {AVVISO_DM_EOSE_S}s")
+                if vivo and not polso_mandato \
+                        and adesso - ultimo_polso >= AVVISO_DM_POLSO_S:
+                    ws.send(json.dumps(["REQ", "polso", {
+                        "kinds": [10050], "authors": [nostra],
+                        "limit": 1}]))
+                    polso_mandato = ultimo_polso = adesso
+        except Exception as e:
+            if ferma.is_set():
+                break
+            O["cadute"] += 1
+            # il perche' e' il NOME dell'errore e la parola del relay:
+            # mai un pezzo di evento (il setaccio non alza)
+            O["perche"] = f"{type(e).__name__}: {str(e)[:120]}"
+            if O["stato"] != "giu":
+                O.update(stato="giu", da=time.time())
+                print(f"📩 Avviso DM: {relay} CADUTO ({O['perche']}): "
+                      "riprovo da solo", flush=True)
+        finally:
+            try:
+                if ws is not None:
+                    ws.close()
+            except Exception:
+                pass
+        O["segno"] = time.time()
+        ferma.wait(min(AVVISO_DM_ATTESA_S * max(1, O["cadute"]), 60))
+
+
+def _dm_guardia():
+    """Lo sguardo sui fili, a ogni giro dell'orologio: li fa PARTIRE, e
+    li RIFA' se uno e' morto o non da' un segno da AVVISO_DM_FERMO_S.
+    Un thread non si uccide: a quello fermo si alza la sua `ferma` e lo
+    si abbandona (e' daemon), e ne nasce uno nuovo.
+    In collaudo un relay che non e' di casa non si ascolta (vedi
+    `lettura_simulata`): lo stato lo dice, e il filo non nasce — senza
+    questa riga uscirebbe subito e la guardia lo rifarebbe a ogni giro."""
+    nostra = _NOSTR[1]
+    adesso = time.time()
+    for relay in _dm_relays():
+        O = _DM_ASCOLTO.setdefault(relay, {
+            "stato": "parte", "da": adesso, "perche": "", "cadute": 0,
+            "segno": adesso, "filo": None, "ferma": None, "base": True,
+            "vivo_fino": 0.0})
+        if lettura_simulata(relay, "dei DM a Barattolo (1059 e 4)"):
+            O["stato"] = "simulato"
+            continue
+        filo = O["filo"]
+        if filo is not None and filo.is_alive():
+            if adesso - O["segno"] <= AVVISO_DM_FERMO_S:
+                continue
+            print(f"⚠️ Avviso DM: il filo di {relay} e' FERMO da "
+                  f"{int(adesso - O['segno'])}s: lo abbandono e ne faccio "
+                  "partire un altro", flush=True)
+            O["ferma"].set()
+        elif filo is not None:
+            print(f"💥 Avviso DM: il filo di {relay} e' MORTO: riparte "
+                  "adesso", flush=True)
+        ferma = threading.Event()
+        O.update(ferma=ferma, segno=adesso)
+        O["filo"] = threading.Thread(
+            target=_dm_filo, name=f"avviso-dm {relay}", daemon=True,
+            args=(relay, nostra, asyncio.get_running_loop(), ferma))
+        O["filo"].start()
+
+
+async def orologio_avviso_dm():
+    """L'orologio dell'avviso: ogni AVVISO_DM_PASSO_S guarda i fili e
+    svuota la coda. Ogni giro che cade lascia partire il prossimo, e
+    di un giro caduto si dice il NOME dell'errore e basta."""
+    while True:
+        try:
+            _dm_guardia()
+            for voce in _dm_decidi(_DM_AVVISI, time.time()):
+                await _dm_avvisa(voce)
+        except Exception as e:
+            print(f"⚠️ Avviso DM: giro saltato ({type(e).__name__}): il "
+                  "prossimo riparte da solo", flush=True)
+        await asyncio.sleep(AVVISO_DM_PASSO_S)
+
+
+@app.on_event("startup")
+async def avvia_avviso_dm():
+    """La riga all'avvio dice lo stato VIVO: una leva accesa senza la
+    chiave della piattaforma vale spenta, e qui lo si legge."""
+    global _TASK_AVVISO_DM
+    if not AVVISO_DM_NOSTR:
+        print("📩 Avviso DM Nostr: spento (AVVISO_DM_NOSTR)", flush=True)
+        return
+    if not avviso_dm_vivo() or not _dm_relays():
+        print("⚠️ AVVISO_DM_NOSTR accesa ma manca la chiave della "
+              "piattaforma (NOSTR_NSEC_PIATTAFORMA), websocket-client, o "
+              "un relay valido in AVVISO_DM_NOSTR_RELAY: l'avviso dei DM "
+              "vale SPENTO", flush=True)
+        return
+    print(f"📩 Avviso DM Nostr ACCESO: ascolto {_elenco(_dm_relays())} "
+          f"per {_NOSTR[1][:16]}…"
+          + ("" if ChaCha20DM is not None else
+             " — manca `cryptography`: le buste restano chiuse e gli "
+             "avvisi non dicono il mittente"), flush=True)
+    _TASK_AVVISO_DM = asyncio.create_task(orologio_avviso_dm())
+
+
+def _dm_leve() -> list:
+    """Le voci del pannello «Stato delle leve»: il fatto e lo stato
+    VIVO di ogni relay, cosi' un filo giu' si vede senza il journal."""
+    vivo = avviso_dm_vivo() and bool(_dm_relays())
+    stati = _elenco(
+        r.split("://", 1)[-1] + ": "
+        + _DM_ASCOLTO.get(r, {}).get("stato", "non partito")
+        for r in _dm_relays())
+    return [
+        _leva("Avviso dei DM a Barattolo su Nostr", "AVVISO_DM_NOSTR",
+              vivo, allarme=bool(AVVISO_DM_NOSTR) and not vivo,
+              acceso="un DM al profilo Nostr di Barattolo diventa «📩 "
+                     "Nuovo DM su Nostr da …» ai moderatori: mai il "
+                     "testo, che il server non decifra",
+              spento="nessuno viene avvisato dei DM al profilo Nostr di "
+                     "Barattolo; se la leva è True nel config, manca la "
+                     "chiave della piattaforma o un relay valido"),
+        _leva("Relay in ascolto per i DM", "AVVISO_DM_NOSTR_RELAY",
+              stati if vivo else _elenco(_dm_relays())),
+    ]
 
 
 def chiave_nostr_provata(u) -> str:

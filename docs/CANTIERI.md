@@ -49533,3 +49533,158 @@ workflow nella gabbia, 58 verdi in un giro solo, senza limite di tempo;
 lette dal workflow e la sua controprova: zero.
 RESTA DA GUARDARE: il telefono vero, che è il giudice di questo
 cantiere; la frase con TalkBack o VoiceOver.
+
+## L'avviso dei DM a Barattolo su Nostr: un avviso Telegram ai moderatori, mai il testo (11 ott 2026, cantiere avviso-dm-nostr, richiesta di Andrea)
+
+LA RICHIESTA. Un avviso nella chat dei moderatori quando qualcuno manda
+un DM al profilo Nostr di Barattolo: ascoltando i relay della nostra
+lista DM (kind 10050: nos.lol e relay.damus.io) i NIP-17 (kind 1059) e
+i vecchi NIP-04 (kind 4); «📩 Nuovo DM su Nostr da <nome o npub
+abbreviata>» con un bottone per aprirlo in un client, MAI il testo — né
+su Telegram né nel journal; niente doppioni, un tetto contro lo spam,
+niente avvisi per la posta vecchia; dietro una leva che nasce spenta;
+e un relay che non risponde non fa cadere il server.
+COSA SI È DECISO, e perché.
+1) LA BUSTA SI APRE, MA SOLO QUELLA DI FUORI. Era la domanda di Andrea
+(«dimmi se lo fai e come»). Un DM NIP-17 sono due buste: il pacco
+(1059), firmato da una chiave usa-e-getta, e dentro il sigillo (kind
+13), firmato da chi scrive, che porta il messaggio cifrato una seconda
+volta. Il server apre il pacco con la chiave della piattaforma — che è
+la nostra: il DM è per noi, e la regola ferrea 2 parla delle chiavi
+degli altri — verifica la firma del sigillo e ne tiene la sola
+`pubkey`. Il contenuto del sigillo NON si decifra: nessuna riga lo
+apre, quindi non c'è niente che si possa scrivere per sbaglio. Senza
+aprire il pacco il mittente non si saprebbe (è lo scopo del NIP-17), e
+senza mittente non c'è né il nome né il tetto per mittente né il modo
+di scartare la copia che ci mandiamo da soli o la spazzatura con la
+nostra `p` (una busta che non si apre con la nostra chiave non è un DM
+per noi: non avvisa). Per il NIP-04 non si apre niente: il mittente è
+l'autore dell'evento, in chiaro. `nip44_decifra` è nuova (l'inverso di
+`nip44_cifra`: MAC a tempo costante PRIMA di decifrare, imbottitura
+rifatta e confrontata).
+2) LA POSTA VECCHIA SI RICONOSCE DAL PRIMO EOSE, non dalla data. Un
+1059 ha la data arretrata a caso fino a due giorni, per specifica:
+chiedere «since adesso» al relay perderebbe quasi tutti i DM veri. Si
+chiedono gli ultimi tre giorni e quel che il relay consegna prima del
+suo primo EOSE è la posta che c'era già: si segna vista, senza aprirla.
+Alla riconnessione parla solo l'id mai visto — il DM arrivato mentre
+il filo era giù. Il NIP-04 ha la data vera: vale da `_DM_AVVIO`.
+3) UN AVVISO PER MITTENTE OGNI DIECI MINUTI, SEI IN MEZZ'ORA IN TUTTO.
+Quel che arriva dallo stesso mittente nella pausa si conta ed esce a
+pausa finita in una riga («3 nuovi DM su Nostr da …»): senza quella
+riga un secondo messaggio, letto il primo, non lo saprebbe nessuno.
+Oltre il tetto i DM vanno in un riassunto senza nomi («📩 12 nuovi DM
+su Nostr da 7 mittenti») che esce al primo posto libero. Il giudice
+(`_dm_decidi`) è puro sullo stato.
+4) IL NOME E LA NPUB INSIEME: «Mario (npub1abcde…wxyz12)». La richiesta
+diceva «nome o npub abbreviata»; il nome però se lo sceglie chi
+scrive, e chiunque può chiamarsi come un altro: la npub resta sempre.
+Il nome passa da `nome_da_profilo` (una riga, 40 caratteri) e si scappa
+all'assegnazione.
+5) IL BOTTONE APRE IL PROFILO DI CHI SCRIVE SU NJUMP.ME, da dove si
+sceglie il client. Un link che apra «quel DM» in ogni client non
+esiste, e un bottone Telegram vuole un indirizzo http. `notifica_admin`
+ha preso un `bottone` facoltativo, passato a `notifica` solo quando
+c'è (i chiamanti di prima la chiamano come prima).
+6) LO STATO IN MEMORIA, niente tabella. Visti, pause e tetto muoiono
+col processo: a ogni avvio si riparte dalla base, cioè zitti. Il
+prezzo, dichiarato: un DM arrivato nei secondi di un riavvio non
+avvisa.
+7) UN FILO PER RELAY, sul calco di `_ascolto_p2p_filo` e dell'orecchio
+della cassetta NIP-46: thread daemon, battito a 5 s, polso a 120 s,
+riconnessione con l'attesa che cresce fino a un minuto, e la guardia
+che rifà il filo morto o fermo. Il filo non notifica e non scrive:
+passa il mittente al loop.
+LE STRADE SCARTATE. Aprire anche il sigillo (darebbe la data vera e il
+tipo del messaggio, e lo chiede l'`unwrap` della specifica): è il passo
+che mette il testo in chiaro in memoria, e l'avviso non ne ha bisogno.
+Non aprire niente e dire solo «Nuovo DM»: niente nome, niente tetto
+per mittente, e la copia dei nostri DM in uscita avviserebbe ogni
+volta. Leggere la lista dei relay dal nostro kind 10050 all'avvio: una
+domanda di rete in più prima di partire, per due nomi che non cambiano
+(stanno nel config). Una tabella dei visti per non perdere il DM del
+riavvio: una migrazione per una finestra di secondi. L'autenticazione
+NIP-42 ai relay che la chiedono per i DM: non chiesta, e i due relay
+di oggi non la vogliono (se uno la chiede, il journal lo dice).
+`since` all'avvio per i 1059: vedi 2. Il link nel testo invece del
+bottone: Telegram ci aprirebbe sotto la scheda d'anteprima di njump.
+PROVATO. `prove_avviso_dm_nostr`, 67 prove senza fastapi: le
+sentinelle (la leva spenta, il database non toccato, la decifratura
+chiamata una volta sola e sul pacco, i `print` del blocco guardati
+sull'albero perché non nominino mai evento né mittente) e i pezzi VERI
+fatti girare con firme vere (`schnorr_puro`) e NIP-44 vero — il
+setaccio caso per caso, la busta col sigillo firmato e dentro un
+contenuto indecifrabile che dà lo stesso il mittente, il giudice degli
+avvisi, i testi. Dove coincurve c'è, il calco nuovo
+`schnorr_puro.PuntoCompleto` e la libreria si aprono le buste a
+vicenda. `collaudo_avviso_dm_nostr`, 33 prove col server VERO (in CI,
+nella gabbia): l'orologio, i fili, due relay di cartone; posta vecchia
+zitta, un avviso da due relay, la pausa e il conto, il NIP-04, quel che
+non è per noi, la raffica col riassunto, il relay che cade e torna col
+DM arrivato nel mentre, il filo rifatto dalla guardia, il polso, il
+pannello; e in tutto quel che il server ha stampato né il testo né le
+chiavi di chi ha scritto. Gira anche senza coincurve (come in CI),
+provato in locale con un `coincurve` che alza ModuleNotFoundError.
+La sezione ha fatto esplodere tre banchi lontani (`prove_leve`,
+`prove_guardiano_ponte`, `prove_p2p_server`): il pannello chiama
+`_dm_leve` e il banco delle leve non l'aveva — la decima volta della
+stessa trappola, curata dove sono le altre nove.
+DAL VIVO: il server del worktree in collaudo (porta 8137), due `nak
+serve` nel WSL (7793 e 7794, solo loopback), un terzo relay vero nella
+lista per vederlo «simulato»; chiave della piattaforma usa-e-getta,
+nata per il giro (non quella del config locale: senza una chiave la
+busta non si apre); i DM fatti da nostr-tools 2.25.2 (`wrapEvent` del
+NIP-17, `nip04.encrypt`), cioè da un'implementazione che non è la
+nostra. Posta vecchia (un 1059 e un kind 4) messa sui relay PRIMA
+dell'avvio: nessun avviso. Un NIP-17 di «Mario» sui due relay: UN
+avviso, «📩 Nuovo DM su Nostr da Mario del giro &lt;b&gt;&amp;
+(npub1mcmxt…z9pdqj)» col bottone su njump (il nome del kind 0 letto dal
+relay locale e scappato). Un NIP-04 di «Lucia»: l'avviso con la npub.
+Un secondo DM di Mario subito dopo: silenzio. Il relay 7793 spento:
+una riga «CADUTO (WebSocketConnectionClosedException…): riprovo da
+solo», `/api/salute` 200; riacceso: «in ascolto … dopo 3 tentativi», e
+il DM di «Gino» mandato solo lì ha avvisato. Nel registro del server
+il testo dei messaggi compare zero volte; il pannello delle leve dice
+«127.0.0.1:7793: connesso · 127.0.0.1:7794: connesso · relay.damus.io:
+simulato». L'estratto: `.claude/giri/avviso-dm-nostr/`.
+TORTURA: 19 mutazioni di `server.py` su una copia del repo, la sezione
+di prove e il collaudo dopo ognuna, col loro limite di tempo: 19 prese.
+Al primo giro (18) una era VIVA — il ramo di `_dm_decidi` che tiene in
+pausa chi è appena uscito dalla folla quando nello stesso giro arriva
+un altro suo DM: nessuna prova lo toccava. La prova è nata (la 67ª), e
+alla lista si è aggiunta la mutazione sulla riga VERA della pausa.
+Quattro mutazioni le prende la sola sezione di prove e non il collaudo
+(la leva che nasce accesa, il ritorno mancante a leva spenta, il MAC,
+il filo che non si riconnette: nel collaudo lo rifà la guardia).
+COSA È GIRATO SU QUALE ALBERO. Sull'albero del cantiere sopra bfd182f
+(la punta di main di allora, CI verde): `PROVE_SEVERE=1 python
+prove.py` INTERA, 22247 passate e 0 fallite, nessuna saltata (le 22180
+di main più le 67 nuove); i 59 collaudi del workflow nella gabbia, 59
+verdi al primo giro; la tortura; il giro dal vivo; `compileall` con
+l'elenco del workflow (127 file); lo scanner dei segreti sulle righe
+aggiunte, con le forme lette dal workflow e la sua controprova: zero.
+POI MAIN È CORSO di un commit — 1e1409a, «Il logo torna com'era» (non
+mio: `miniapp.html`, le sue prove, i suoi documenti; CI verde) — e il
+cantiere è stato ribasato. Un solo conflitto, la coda di questo file
+(due voci appese nello stesso punto): tenuta la voce di main, questa
+riappesa sotto. Sull'albero ribasato: la suite severa INTERA di nuovo,
+22240 passate e 0 fallite, nessuna saltata (le 22173 di main più le
+67); i 59 collaudi nella gabbia di nuovo, 59 verdi; `compileall` e lo
+scanner di nuovo. I conti dell'albero ribasato sono stati scritti qui
+DOPO i loro giri: da allora è cambiato solo questo paragrafo.
+NON PROVATO, e si dice: i due relay VERI (nos.lol, relay.damus.io) —
+la regola è mai relay veri nei giri — quindi che consegnino i 1059 a
+una sottoscrizione senza autenticazione si vede alla prima accensione
+sul VPS; un client vero (Amethyst, Damus, Primal) come mittente;
+l'avviso su Telegram vero (in collaudo si stampa); la pausa di dieci
+minuti e la finestra di mezz'ora aspettate per davvero (nei banchi si
+invecchia lo stato).
+NOTATO, NON TOCCATO. Barattolo non ha modo di RISPONDERE a un DM dal
+pannello: si legge e si risponde da un client con la chiave della
+piattaforma. In collaudo il lettore del kind 0 scrive nel journal le
+prime 16 cifre della chiave che cerca (`lettura_simulata`): è una riga
+di collaudo, in produzione non esiste.
+RESTA DA GUARDARE (Andrea, sul VPS): la riga da aggiungere al config,
+`AVVISO_DM_NOSTR = True`, e riavvio; nel journal le due righe «in
+ascolto su …»; un DM di prova da un'altra chiave. La procedura:
+PRODUZIONE, «L'AVVISO DEI DM NOSTR».

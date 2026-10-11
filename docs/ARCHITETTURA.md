@@ -29825,7 +29825,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   più `_guardia_ascolto_p2p` (senza la seconda il filo uscirebbe e la
   guardia lo farebbe ripartire a ogni sguardo, un «MORTO» nel journal
   ogni volta: lo stato diventa `simulato`, e la riga della passata dice
-  «spento: in collaudo lo specchio non è di casa»), e l'import orario
+  «spento: in collaudo lo specchio non è di casa»), `_dm_filo` più
+  `_dm_guardia` (l'avviso dei DM a Barattolo, 11 ott 2026: la stessa
+  coppia, per la stessa ragione), e l'import orario
   con la sua scoperta, che leggono con le funzioni di importa_nostr.py:
   la scoperta salta il relay che non è di casa, e l'import a testa
   riceve la lista già filtrata (`relays=` di `importa_venditore`;
@@ -30846,3 +30848,57 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `collaudo_indirizzo_lightning` (il server vero per HTTP con un LNbits
   di cartone, in CI nella gabbia). La procedura: PRODUZIONE,
   «L'INDIRIZZO LIGHTNING DI CASA».
+
+- L'AVVISO DEI DM A BARATTOLO (11 ott 2026, perché in CANTIERI,
+  «L'avviso dei DM a Barattolo su Nostr»). Un DM al profilo Nostr di
+  Barattolo diventa un avviso Telegram ai moderatori: «📩 Nuovo DM su
+  Nostr da <nome> (<npub abbreviata>)», col bottone che apre il profilo
+  di chi scrive su njump.me. In server.py, un blocco solo, subito dopo
+  i DM in uscita (`manda_dm_nostr`); leva `AVVISO_DM_NOSTR`, spenta nel
+  codice, e `AVVISO_DM_NOSTR_RELAY` (la nostra lista DM, il kind 10050:
+  nos.lol e relay.damus.io). Niente database, niente rotte.
+  I PEZZI, in fila. `_dm_filo` — un thread daemon per relay, il calco
+  di `_ascolto_p2p_filo`: una connessione tenuta viva e rifatta quando
+  cade (attesa che cresce fino a 60 s), col polso ogni 120 s che
+  distingue un relay zitto da una connessione morta; sottoscrive con
+  `_dm_filtri` le buste NIP-17 per noi (kind 1059, `#p`, ultimi tre
+  giorni) e i NIP-04 per noi (kind 4, dall'avvio). `_dm_setaccia` —
+  nel filo, da un evento a «chi ha scritto»: forma, base, firma
+  (`_x_firma_valida`: id rifatto e Schnorr), doppione (`_dm_visto`),
+  età, mittente. `_dm_in_coda` — la porta verso il loop
+  (`call_soon_threadsafe`). `orologio_avviso_dm` — ogni 10 s:
+  `_dm_guardia` (fa partire i fili, rifà quello morto o fermo) e
+  `_dm_decidi`, il giudice PURO di cosa si dice adesso; `_dm_avvisa`
+  chiede il nome al kind 0 (`_profilo_nostr`, `nome_da_profilo`,
+  scappato) e passa da `notifica_admin`, che dal cantiere porta un
+  `bottone` facoltativo.
+  IL TESTO NON SI DECIFRA. Di un NIP-04 si legge l'autore dell'evento.
+  Di una busta NIP-17 si apre la SOLA busta di fuori
+  (`_dm_mittente_busta`, con `nip44_decifra` e la chiave della
+  piattaforma — la nostra: il DM è per noi, la regola ferrea 2 parla
+  delle chiavi altrui): ne esce il sigillo (kind 13), la cui firma
+  verificata dice chi scrive; il suo `content`, il messaggio cifrato
+  una seconda volta, non lo apre nessuna riga. Lo provano una busta
+  col sigillo firmato e dentro un contenuto indecifrabile, che dà lo
+  stesso il mittente, e la sentinella che conta le chiamate a
+  `nip44_decifra`. Il prezzo: senza il rumor non si sa la data vera né
+  il tipo (una reazione in chat conta come DM). Nel journal non
+  entrano né testo né mittente: lo guarda una sentinella sull'albero
+  dei `print` del blocco.
+  LA POSTA VECCHIA. Un 1059 ha la data arretrata fino a due giorni,
+  quindi «dopo l'avvio» non si può chiedere al relay: si chiedono tre
+  giorni, e ciò che arriva prima del PRIMO EOSE di quel relay (`base`)
+  si segna visto senza aprirlo. Alla riconnessione la finestra è la
+  stessa e parla solo l'id mai visto. Un kind 4 vale se la sua data è
+  di dopo `_DM_AVVIO`. Lo stato è in memoria: un DM arrivato durante
+  un riavvio non avvisa (limite dichiarato).
+  IL TETTO, in `_dm_decidi`: un avviso per mittente ogni 600 s, col
+  conto di quel che arriva nel frattempo; 6 avvisi ogni 1800 s in
+  tutto, e oltre una «folla» che esce come riassunto senza nomi al
+  primo posto libero. Coda, visti e relay hanno ognuno il suo tetto.
+  IN COLLAUDO vale `lettura_simulata`: verso un relay non di casa il
+  filo non nasce (stato `simulato`). `_dm_connetti` è la porta che i
+  banchi sostituiscono. Dove coincurve manca (la CI) il calco è
+  `schnorr_puro.PuntoCompleto`.
+  LE PROVE: `prove_avviso_dm_nostr`, `collaudo_avviso_dm_nostr` (in CI,
+  nella gabbia). La procedura: PRODUZIONE, «L'AVVISO DEI DM NOSTR».

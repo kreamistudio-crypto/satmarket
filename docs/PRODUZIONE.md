@@ -3643,3 +3643,71 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   sole finché la leva è spenta: riaccesa, l'orologio le richiede a
   LNbits. Lo stato VIVO sta nel pannello «⚙️ Stato delle leve», gruppo
   «⚡ Indirizzo Lightning di casa».
+
+- L'AVVISO DEI DM NOSTR (11 ott 2026; perché in CANTIERI, «L'avviso dei
+  DM a Barattolo su Nostr»; com'è fatto in ARCHITETTURA, «L'AVVISO DEI
+  DM A BARATTOLO»). Quando qualcuno scrive un DM al profilo Nostr di
+  Barattolo, ai moderatori (`ADMIN_IDS`, la chat degli altri avvisi)
+  arriva «📩 Nuovo DM su Nostr da <nome> (<npub abbreviata>)» col
+  bottone «🟣 Apri in un client». Il testo del messaggio non c'è mai:
+  il server non lo decifra.
+  NASCE SPENTO, e un deploy non lo accende. PER ACCENDERLO, sul VPS:
+  1) si guarda che la riga non ci sia già:
+     `grep -n "AVVISO_DM" /srv/barattolo/config.py`
+  2) si aggiunge in fondo a `/srv/barattolo/config.py` UNA riga:
+     `AVVISO_DM_NOSTR = True`
+     I relay sono già quelli giusti nel codice — `wss://nos.lol` e
+     `wss://relay.damus.io`, la lista DM di Barattolo (il suo kind
+     10050). Solo se un giorno quella lista cambia si aggiunge anche
+     `AVVISO_DM_NOSTR_RELAY = ["wss://…", "wss://…"]` (al massimo sei:
+     ognuno è un thread).
+  3) si riavvia: `sudo systemctl restart barattolo`
+  4) si guarda il journal:
+     `journalctl -u barattolo --since "2 min ago" | grep "Avviso DM"`
+     Devono esserci «📩 Avviso DM Nostr ACCESO: ascolto wss://nos.lol ·
+     wss://relay.damus.io per <16 cifre>…» e, entro qualche secondo,
+     una riga «📩 Avviso DM: in ascolto su <relay>» per ognuno dei due.
+  5) LA PROVA: da un client Nostr con UN'ALTRA chiave si manda un DM
+     alla npub di Barattolo. Entro una ventina di secondi arriva
+     l'avviso su Telegram. Un secondo DM dalla stessa chiave entro
+     dieci minuti NON avvisa subito: esce a pausa finita, in una riga
+     col conto («2 nuovi DM su Nostr da …»).
+  COSA DICE IL JOURNAL, e cosa vuol dire:
+   · «📩 Avviso DM Nostr: spento (AVVISO_DM_NOSTR)»: la leva è False, o
+     la riga non c'è.
+   · «⚠️ AVVISO_DM_NOSTR accesa ma manca la chiave…: vale SPENTO»:
+     manca `NOSTR_NSEC_PIATTAFORMA`, o `websocket-client`, o la lista
+     dei relay è storta.
+   · «📩 Avviso DM: <relay> CADUTO (…): riprovo da solo»: quel relay
+     non risponde. Si riprova da solo, con un'attesa che cresce fino a
+     un minuto, e l'altro relay continua a portare la posta. Una riga
+     per caduta, non una per tentativo; quando torna: «in ascolto su
+     <relay> dopo N tentativi».
+   · «… CADUTO (RuntimeError: sottoscrizione chiusa dal relay: …)» che
+     torna a ogni tentativo, con dentro `auth-required`: quel relay
+     vuole l'autenticazione NIP-42 per consegnare i DM, e il server
+     non la fa (non è stata chiesta, e nos.lol e relay.damus.io non
+     l'hanno mai chiesta: da vedere qui, alla prima accensione). O si
+     toglie quel relay dalla lista, o è un cantiere.
+   · «⚠️ Avviso DM: il filo di <relay> è FERMO…» e «💥 … MORTO: riparte
+     adesso»: la guardia ha rifatto un filo. Non c'è niente da fare.
+   · «📩 Avviso DM: un avviso ai moderatori»: è partito un avviso. Non
+     dice da chi né cosa: nel journal non finiscono MAI il testo di un
+     messaggio né chi l'ha scritto.
+  I LIMITI stanno nel codice, non nel config: un avviso per mittente
+  ogni 10 minuti (`AVVISO_DM_PAUSA_MITTENTE_S`); 6 avvisi in mezz'ora in
+  tutto (`AVVISO_DM_TETTO`, `AVVISO_DM_FINESTRA_S`), oltre i quali esce
+  un riassunto «📩 N nuovi DM su Nostr da M mittenti», senza nomi né
+  bottone.
+  COSA NON FA. Non mostra i DM e non risponde: si leggono in un client,
+  con la chiave della piattaforma. Non avvisa della posta arrivata
+  PRIMA dell'avvio del server — e quindi nemmeno di un DM arrivato nei
+  secondi di un riavvio o di un deploy: lo stato vive in memoria, e a
+  ogni avvio la posta che trova sui relay è «già vista». Non avvisa dei
+  DM che Barattolo manda. Il bottone apre su njump.me il PROFILO di chi
+  ha scritto, e da lì il client: un link che apra «quel messaggio» in
+  ogni client non esiste.
+  LO STATO VIVO sta nel pannello «⚙️ Stato delle leve», gruppo «🔔
+  Avvisi ai moderatori»: la leva, e per ogni relay la sua parola —
+  `connesso`, `giu`, `parte`.
+  PER SPEGNERLO: `AVVISO_DM_NOSTR = False` (o via la riga) e riavvio.

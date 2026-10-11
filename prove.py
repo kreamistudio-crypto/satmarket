@@ -31279,7 +31279,11 @@ def _censimento(acceso, dopo=None):
               # volta della trappola, `_zap_leve()` e i suoi giudici
               "zap_wallet", "zap_vivo", "zap_destinatario",
               "zap_nostr_vivo", "zap_max_sats", "zap_indirizzo",
-              "_zap_leve", "_leve_stato"):
+              "_zap_leve",
+              # l'avviso dei DM Nostr (11 ott 2026): la decima volta
+              # della trappola, `_dm_leve()` e i suoi due giudici — le
+              # solite tre esplosioni lontane
+              "avviso_dm_vivo", "_dm_relays", "_dm_leve", "_leve_stato"):
         exec(pezzo(f), amb)
     # la campagna a tutti (9 ott 2026): l'ottava volta, la riga del
     # pannello CHIAMA `timbro_letto` — che aprirebbe il database — e
@@ -108639,6 +108643,463 @@ def prove_indirizzo_lightning():
           and "/.well-known/lnurlp/zap" in prod)
 
 
+def prove_avviso_dm_nostr():
+    """L'AVVISO DEI DM A BARATTOLO (11 ott 2026, richiesta di Andrea) —
+    senza fastapi: le sentinelle sul testo, e i pezzi VERI fatti girare
+    con firme vere (`schnorr_puro`) e cifratura vera (NIP-44, col calco
+    `PuntoCompleto` dove coincurve non c'e'): il setaccio, la busta che
+    si apre da fuori e basta, il giudice degli avvisi, i testi.
+    Il giro col server VERO — i fili, la riconnessione, i doppioni da
+    due relay — sta in `collaudo_avviso_dm_nostr` (CI)."""
+    print("\n[l'avviso dei DM a Barattolo su Nostr]")
+    import asyncio as _aio
+    import base64 as _b64
+    import hashlib as _hl
+    import hmac as _hmac
+    import html as _html
+    import secrets as _sec
+    import threading as _th
+    import schnorr_puro
+    src = _SORGENTE
+    i = src.index("# --- L'AVVISO DEI DM A BARATTOLO")
+    blocco = src[i:src.index("\ndef chiave_nostr_provata(", i)]
+    cod = codice(blocco)
+    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- la leva, e dove nasce ---
+    prova("la leva nasce SPENTA nel codice", True,
+          "    from config import AVVISO_DM_NOSTR\nexcept ImportError:\n"
+          "    AVVISO_DM_NOSTR = False\n" in blocco)
+    prova("...e spenta nel config d'esempio, coi due relay della nostra "
+          "lista DM", (True, True),
+          ("\nAVVISO_DM_NOSTR = False\n" in esempio,
+           'AVVISO_DM_NOSTR_RELAY = [\n    "wss://nos.lol",\n'
+           '    "wss://relay.damus.io",\n]' in esempio))
+    prova("i relay di serie nel codice sono gli stessi due", True,
+          'AVVISO_DM_NOSTR_RELAY = ["wss://nos.lol", "wss://relay.damus.io"]'
+          in blocco)
+    avvio = pezzo("avvia_avviso_dm")
+    prova("all'avvio: a leva spenta si esce PRIMA di far nascere "
+          "l'orologio, e una leva accesa senza chiave vale spenta",
+          (True, True, True),
+          ('@app.on_event("startup")\nasync def avvia_avviso_dm' in blocco,
+           avvio.index("if not AVVISO_DM_NOSTR:")
+           < avvio.index("if not avviso_dm_vivo()")
+           < avvio.index("asyncio.create_task(orologio_avviso_dm())"),
+           codice(avvio).count("return") == 2))
+    prova("la leva viva vuole la chiave della piattaforma e le websocket",
+          True, "return bool(AVVISO_DM_NOSTR and _NOSTR and create_connection)"
+          in pezzo("avviso_dm_vivo"))
+    prova("il pannello delle leve chiede al giudice vivo", (True, True),
+          ("\n            *_dm_leve(),\n" in src,
+           '"AVVISO_DM_NOSTR",\n              vivo,' in pezzo("_dm_leve")))
+
+    # --- cosa NON fa ---
+    prova("il blocco NON tocca il database: lo stato vive in memoria",
+          (False, False), ("con.execute" in cod, "db()" in cod))
+    prova("la decifratura si chiama UNA volta, e sulla busta di FUORI: "
+          "chiave nostra, autore e contenuto del 1059", (1, True),
+          (cod.count("nip44_decifra(") - 1,
+           'nip44_decifra(\n            _NOSTR[0].secret, pacco["pubkey"], '
+           'pacco["content"])' in cod))
+    prova("...del sigillo si leggono solo il tipo, la firma e chi firma: "
+          "il suo contenuto (il messaggio) non lo nomina nessuno",
+          (False, False, True),
+          ('sigillo["content"]' in cod, 'sigillo.get("content")' in cod,
+           'return sigillo["pubkey"]' in cod))
+    prova("il setaccio, la busta, il giudice e i testi non stampano niente",
+          [False] * 6, ["print(" in codice(pezzo(f)) for f in (
+              "_dm_setaccia", "_dm_mittente_busta", "nip44_decifra",
+              "_dm_decidi", "_dm_testo", "_dm_chi")])
+    # IL JOURNAL NON NOMINA MAI L'EVENTO NE' CHI SCRIVE: ogni print del
+    # blocco, coi nomi che usa, guardato sull'albero e non a occhio
+    vietati = {"ev", "msg", "grezzo", "sigillo", "pacco", "voce", "nome",
+               "mittente", "chi", "testo", "carico", "chiaro", "npub",
+               "bottone"}
+    usati = set()
+    stampe = 0
+    for nodo in ast.walk(ast.parse(blocco)):
+        if isinstance(nodo, ast.Call) and isinstance(nodo.func, ast.Name) \
+                and nodo.func.id == "print":
+            stampe += 1
+            usati |= {n.id for a in nodo.args for n in ast.walk(a)
+                      if isinstance(n, ast.Name)}
+    prova("ogni riga del journal dice il relay e lo stato, mai l'evento "
+          "ne' chi scrive", (True, set()),
+          (stampe >= 8, usati & vietati))
+    prova("...e di un giro caduto si dice il NOME dell'errore e basta",
+          (True, False),
+          ("({type(e).__name__}): il" in pezzo("orologio_avviso_dm"),
+           "str(e)" in pezzo("orologio_avviso_dm")))
+
+    # --- i fili ---
+    filo, guardia = pezzo("_dm_filo"), pezzo("_dm_guardia")
+    prova("in collaudo verso un relay che non e' di casa non si esce: lo "
+          "chiede il filo e lo chiede la guardia", (True, True),
+          ('    if lettura_simulata(relay, "dei DM a Barattolo (1059 e 4)"):'
+           '\n        return\n' in filo,
+           'if lettura_simulata(relay, "dei DM a Barattolo (1059 e 4)"):'
+           '\n            O["stato"] = "simulato"\n            continue'
+           in guardia))
+    prova("la connessione passa da una porta che il banco sostituisce",
+          (True, True), ("_dm_connetti = create_connection" in blocco,
+                         "ws = _dm_connetti(relay, timeout=10," in filo))
+    prova("un filo per relay, daemon, e la guardia rifa' quello morto o "
+          "fermo", (True, True, True),
+          ('name=f"avviso-dm {relay}", daemon=True,' in guardia,
+           "if adesso - O[\"segno\"] <= AVVISO_DM_FERMO_S:" in guardia,
+           'O["ferma"].set()' in guardia))
+    prova("il filo si rifa' da solo quando cade, con un'attesa che cresce "
+          "fino a un minuto", (True, True),
+          ("while not ferma.is_set():\n        ws = None" in filo,
+           "ferma.wait(min(AVVISO_DM_ATTESA_S * max(1, O[\"cadute\"]), 60))"
+           in filo))
+    prova("...e il polso distingue un relay zitto da una connessione morta",
+          (True, True),
+          ('ws.send(json.dumps(["REQ", "polso", {' in filo,
+           "il polso non e' tornato in" in filo))
+    prova("la posta di prima del primo EOSE e' la base: lo dice il filo "
+          "al setaccio, e smette di dirlo all'EOSE", (True, True),
+          ('O["base"] and not vivo, adesso)' in filo,
+           'perche="", base=False)' in filo))
+    prova("dal filo al loop si passa da `call_soon_threadsafe`: il filo "
+          "non notifica", (True, False, False),
+          ("loop.call_soon_threadsafe(_dm_in_coda, chi)" in filo,
+           "notifica(" in filo, "notifica_admin" in filo))
+    prova("l'orologio: ogni giro che cade lascia partire il prossimo",
+          True, "except Exception" in codice(pezzo("orologio_avviso_dm")))
+    prova("i numeri scelti: un avviso per mittente ogni 10 minuti, 6 in "
+          "mezz'ora in tutto, buste degli ultimi 3 giorni",
+          {"AVVISO_DM_PAUSA_MITTENTE_S": "600", "AVVISO_DM_TETTO": "6",
+           "AVVISO_DM_FINESTRA_S": "1800",
+           "AVVISO_DM_BUSTE_S": "3 * 86400"},
+          {k: re.search(rf"\n{k} = ([^#\n]+?) *(#|\n)", blocco).group(1)
+           for k in ("AVVISO_DM_PAUSA_MITTENTE_S", "AVVISO_DM_TETTO",
+                     "AVVISO_DM_FINESTRA_S", "AVVISO_DM_BUSTE_S")})
+    prova("il collaudo del server vero sta nella CI", True,
+          "collaudo_avviso_dm_nostr" in wf[wf.index("python collaudi_ci.py"):])
+
+    # --- notifica_admin porta il bottone solo quando c'e' ---
+    andate = []
+
+    async def _notifica(*a):
+        andate.append(a)
+    amb0 = {"ADMIN_IDS": [5], "MODALITA_COLLAUDO": False,
+            "notifica": _notifica}
+    exec("async " + pezzo("notifica_admin"), amb0)
+    _aio.run(amb0["notifica_admin"]("ciao"))
+    _aio.run(amb0["notifica_admin"]("ciao", ("Apri", "https://x")))
+    prova("`notifica_admin` senza bottone chiama `notifica` come sempre, "
+          "col bottone glielo passa",
+          [(5, "ciao"), (5, "ciao", ("Apri", "https://x"))], andate)
+
+    # --- i pezzi veri, fatti girare ---
+    try:
+        from cryptography.hazmat.primitives.ciphers import Cipher as _Cif
+        from cryptography.hazmat.primitives.ciphers.algorithms import \
+            ChaCha20 as _Cha
+    except ImportError:
+        salta("l'avviso dei DM coi byte veri", "manca `cryptography`")
+        return
+    adesso = int(time.time())
+    amb = {"json": json, "base64": _b64, "hashlib": _hl, "hmac": _hmac,
+           "html": _html, "secrets": _sec, "threading": _th, "time": time,
+           "re": re, "create_connection": None,
+           "RE_HEX_64": re.compile(r"[0-9a-f]{64}"),
+           "CHARSET_BECH32": "qpzry9x8gf2tvdw0s3jn54khce6mua7l",
+           "ChiavePubblicaNostr": None,
+           "ChiavePubblicaCompleta": schnorr_puro.PuntoCompleto,
+           "CifrarioDM": _Cif, "ChaCha20DM": _Cha,
+           "AVVISO_DM_NOSTR_RELAY": ["wss://nos.lol"]}
+    j = blocco.index("AVVISO_DM_PASSO_S = 10")
+    exec(blocco[j:blocco.index("def avviso_dm_vivo(", j)], amb)
+    for f in ("_bech32_polymod", "hex_to_npub", "npub_to_hex",
+              "evento_non_firmato", "_x_firma_valida", "_hkdf_estrai",
+              "_hkdf_espandi", "_imbottisci", "nip44_cifra",
+              "nip44_decifra", "_dm_relays", "_dm_visto",
+              "_dm_mittente_busta", "_dm_setaccia", "_dm_filtri",
+              "_dm_in_coda", "_dm_decidi", "_dm_chi", "_dm_testo"):
+        exec(pezzo(f), amb)
+    amb["_DM_AVVIO"] = adesso - 100
+
+    def chiave(n):
+        """Una chiave di cartone, costruita e mai scritta per esteso."""
+        sk = bytes([n]) * 31 + bytes([n + 16])
+        return sk, schnorr_puro.pubblica(sk).hex()
+
+    sk_noi, noi = chiave(7)
+    sk_mario, mario = chiave(9)
+    sk_lucia, lucia = chiave(11)
+    sk_eff, _eff = chiave(13)
+    sk_altro, altro = chiave(15)
+
+    class _Noi:
+        secret = sk_noi
+    amb["_NOSTR"] = (_Noi(), noi)
+
+    def firmato(sk, kind, tags, content, creato=None):
+        ev = amb["evento_non_firmato"](schnorr_puro.pubblica(sk).hex(), kind,
+                                       tags, content, creato or adesso)
+        ev["sig"] = schnorr_puro.firma(sk, bytes.fromhex(ev["id"])).hex()
+        return ev
+
+    SEGRETO = "il testo che nessuno deve leggere"
+
+    def busta(sk_mitt, dest=noi, dentro=None, kind_sigillo=13, creato=None,
+              eff=sk_eff, etichetta=""):
+        """Un DM NIP-17 intero: rumor → sigillo → pacco."""
+        pub = schnorr_puro.pubblica(sk_mitt).hex()
+        rumor = amb["evento_non_firmato"](pub, 14, [["p", dest]],
+                                          SEGRETO + etichetta, adesso)
+        if dentro is None:
+            dentro = amb["nip44_cifra"](sk_mitt, dest, json.dumps(rumor))
+        sigillo = firmato(sk_mitt, kind_sigillo, [], dentro, adesso - 4000)
+        return firmato(eff, 1059, [["p", noi]], amb["nip44_cifra"](
+            eff, dest, json.dumps(sigillo)), creato or adesso - 90000)
+
+    # NIP-44: andata e ritorno, e le tre guardie
+    cif, dec = amb["nip44_cifra"], amb["nip44_decifra"]
+    testi = ["a", "ciao 🫙 — è per te", "x" * 33, "y" * 4000]
+    prova("NIP-44: quel che `nip44_cifra` chiude verso di noi "
+          "`nip44_decifra` lo riapre (corto, accentato, lungo)", testi,
+          [dec(sk_noi, mario, cif(sk_mario, noi, t)) for t in testi])
+
+    def _alza(f):
+        try:
+            f()
+            return "nessun errore"
+        except ValueError as e:
+            return str(e)
+    c0 = bytearray(_b64.b64decode(cif(sk_mario, noi, "ciao")))
+    c1 = bytearray(c0)
+    c1[40] ^= 1
+    c2 = bytearray(c0)
+    c2[0] = 1
+    prova("...un byte ritoccato si ferma al MAC, PRIMA di decifrare; una "
+          "versione diversa dalla 2 non si prova nemmeno; la chiave di un "
+          "altro non apre",
+          ["MAC NIP-44 sbagliato", "carico NIP-44 non valido",
+           "MAC NIP-44 sbagliato"],
+          [_alza(lambda: dec(sk_noi, mario, _b64.b64encode(bytes(c1)).decode())),
+           _alza(lambda: dec(sk_noi, mario, _b64.b64encode(bytes(c2)).decode())),
+           _alza(lambda: dec(sk_altro, mario, _b64.b64encode(bytes(c0)).decode()))])
+    prova("...e il MAC si confronta a tempo costante, prima della "
+          "decifratura", True,
+          pezzo("nip44_decifra").index("hmac.compare_digest(mac, atteso)")
+          < pezzo("nip44_decifra").index(".decryptor()"))
+
+    # il setaccio
+    S = amb["_dm_setaccia"]
+    b1 = busta(sk_mario, etichetta="1")
+    prova("una busta NIP-17 nuova, con la data finta di ieri: esce chi "
+          "l'ha scritta", mario, S(b1, noi, False, adesso))
+    prova("...la stessa da un secondo relay (stesso id): niente", None,
+          S(dict(b1), noi, False, adesso))
+    b_rotto = busta(sk_mario, dentro="questo non e' nemmeno cifrato",
+                    etichetta="2")
+    prova("IL MESSAGGIO NON SI DECIFRA: una busta col sigillo firmato e "
+          "dentro un contenuto che non si puo' aprire dice lo stesso chi "
+          "scrive", mario, S(b_rotto, noi, False, adesso))
+    b_base = busta(sk_lucia, etichetta="3")
+    prova("la posta che c'era gia' (prima del primo EOSE): niente, e "
+          "resta vista — rimandata dopo, tace", (None, None, True),
+          (S(b_base, noi, True, adesso), S(dict(b_base), noi, False, adesso),
+           b_base["id"] in amb["_DM_VISTI"]))
+    prova("una busta piu' vecchia della finestra (data finta compresa) e' "
+          "posta vecchia", None,
+          S(busta(sk_lucia, creato=adesso - 3 * 86400 - 60, etichetta="4"),
+            noi, False, adesso))
+    prova("la copia che ci siamo mandati da soli non e' una notizia", None,
+          S(busta(sk_noi, etichetta="5"), noi, False, adesso))
+    prova("una busta con la `p` nostra ma chiusa per un altro non si apre: "
+          "non e' un DM per noi", None,
+          S(busta(sk_mario, dest=altro, etichetta="6"), noi, False, adesso))
+    prova("...e nemmeno una che dentro non ha un sigillo (kind 13)", None,
+          S(busta(sk_mario, kind_sigillo=1, etichetta="7"), noi, False, adesso))
+
+    def _sigillo_falso():
+        """Un sigillo che DICE di essere di Lucia ma lo firma Mario."""
+        rumor = amb["evento_non_firmato"](lucia, 14, [["p", noi]], SEGRETO,
+                                          adesso)
+        sig = amb["evento_non_firmato"](
+            lucia, 13, [], amb["nip44_cifra"](sk_mario, noi, json.dumps(rumor)),
+            adesso - 50)
+        sig["sig"] = schnorr_puro.firma(sk_mario, bytes.fromhex(sig["id"])).hex()
+        return firmato(sk_eff, 1059, [["p", noi]], amb["nip44_cifra"](
+            sk_eff, noi, json.dumps(sig)), adesso - 10)
+    prova("un sigillo che dice di essere di un altro (firma che non torna) "
+          "non fa nomi: niente avviso", None,
+          S(_sigillo_falso(), noi, False, adesso))
+    storto = busta(sk_mario, etichetta="8")
+    id_buono = storto["id"]
+    falso = dict(storto, content=storto["content"][:-4] + "AAAA")
+    prova("un evento con l'id di un DM vero ma il contenuto ritoccato si "
+          "butta SENZA occupare il posto fra i visti: quello vero, dopo, "
+          "parla", (None, False, mario),
+          (S(falso, noi, False, adesso), id_buono in amb["_DM_VISTI"],
+           S(storto, noi, False, adesso)))
+    k4 = firmato(sk_lucia, 4, [["p", noi]], "cifrato?iv=nip04", adesso - 5)
+    prova("un NIP-04 di dopo l'avvio: esce l'autore, senza toccare il "
+          "contenuto", lucia, S(k4, noi, False, adesso))
+    prova("...anche se arriva prima del primo EOSE di quel relay (la sua "
+          "data e' vera: basta lei)", lucia,
+          S(firmato(sk_lucia, 4, [["p", noi]], "x?iv=y", adesso - 6), noi,
+            True, adesso))
+    prova("...uno di PRIMA dell'avvio no; uno per un altro no; un kind "
+          "diverso no; una forma storta no", [None] * 5,
+          [S(firmato(sk_lucia, 4, [["p", noi]], "x", adesso - 500), noi,
+             False, adesso),
+           S(firmato(sk_lucia, 4, [["p", altro]], "x", adesso), noi, False,
+             adesso),
+           S(firmato(sk_lucia, 1, [["p", noi]], "x", adesso), noi, False,
+             adesso),
+           S({"kind": 4, "id": "corto"}, noi, False, adesso),
+           S("non un evento", noi, False, adesso)])
+    b_chiusa = busta(sk_mario, etichetta="9")
+    amb["ChaCha20DM"] = None
+    prova("senza `cryptography` la busta resta chiusa: l'avviso parte "
+          "senza nome ('' e non None)", "",
+          S(b_chiusa, noi, False, adesso))
+    amb["ChaCha20DM"] = _Cha
+    amb["AVVISO_DM_VISTI_MAX"] = 3
+    amb["_DM_VISTI"].clear()
+    visto = amb["_dm_visto"]
+    prova("i visti hanno un tetto: al quarto esce il piu' vecchio",
+          ([False, False, False, False], ["b", "c", "d"], True),
+          ([visto(x) for x in "abcd"], list(amb["_DM_VISTI"]), visto("d")))
+
+    # i filtri e i relay
+    f = amb["_dm_filtri"](noi, adesso, 0.0)
+    prova("la sottoscrizione: le buste per noi degli ultimi tre giorni, i "
+          "NIP-04 per noi dall'avvio",
+          [{"kinds": [1059], "#p": [noi], "since": adesso - 3 * 86400},
+           {"kinds": [4], "#p": [noi], "since": adesso - 100}], f)
+    prova("...alla riconnessione i NIP-04 si richiedono da poco prima "
+          "dell'ultima volta che il filo era vivo, non da capo",
+          adesso + 4000 - 600,
+          amb["_dm_filtri"](noi, adesso + 5000, adesso + 4000)[1]["since"])
+    prova("...e mai da prima dell'avvio", adesso - 100,
+          amb["_dm_filtri"](noi, adesso, adesso - 50)[1]["since"])
+    rel = amb["_dm_relays"]
+    amb["AVVISO_DM_NOSTR_RELAY"] = ["wss://a.example", " wss://a.example ",
+                                    "http://no.example", 7, "ws://127.0.0.1:1"]
+    prova("i relay del config si ripuliscono: solo ws/wss, senza doppioni",
+          ["wss://a.example", "ws://127.0.0.1:1"], rel())
+    amb["AVVISO_DM_NOSTR_RELAY"] = "wss://una-stringa-e-non-una-lista"
+    prova("...una stringa al posto della lista non si itera a lettere: "
+          "nessun relay", [], rel())
+    amb["AVVISO_DM_NOSTR_RELAY"] = [f"wss://r{n}.example" for n in range(9)]
+    prova("...e al massimo sei: ognuno e' un thread", 6, len(rel()))
+
+    # il giudice degli avvisi
+    D = amb["_dm_decidi"]
+
+    def stato():
+        return {"arrivi": [], "mittenti": {}, "mandati": [],
+                "folla": {"n": 0, "chi": set(), "oltre": False}}
+    St = stato()
+    St["arrivi"] = ["m1"]
+    prova("un DM: un avviso", [("uno", "m1", 1)], D(St, 1000))
+    St["arrivi"] = ["m1", "m1"]
+    prova("altri due dallo stesso mittente entro la pausa: silenzio",
+          [], D(St, 1100))
+    prova("...a pausa finita escono in UNA riga col conto",
+          [("uno", "m1", 2)], D(St, 1000 + 600))
+    prova("...e dopo un'altra pausa senza posta il mittente si dimentica",
+          ([], {}), (D(St, 1600 + 600), St["mittenti"]))
+    St = stato()
+    St["arrivi"] = [f"s{n}" for n in range(9)] + ["s0"]
+    fuori = D(St, 5000)
+    prova("nove mittenti insieme: sei avvisi (il tetto), il resto nella "
+          "folla", ([("uno", f"s{n}", 2 if n == 0 else 1) for n in range(6)],
+                    3, {"s6", "s7", "s8"}),
+          (fuori, St["folla"]["n"], St["folla"]["chi"]))
+    St["arrivi"] = ["s9"]
+    prova("...finche' la finestra e' piena non esce niente, e chi arriva "
+          "si somma", ([], 4), (D(St, 5100), St["folla"]["n"]))
+    prova("...al primo posto libero esce il RIASSUNTO, senza nomi, e la "
+          "folla si svuota", ([("folla", 4, 4, False)], 0),
+          (D(St, 5000 + 1800), St["folla"]["n"]))
+    St = stato()
+    St["mandati"] = [100.0] * 6
+    St["arrivi"] = ["solo", "solo"]
+    D(St, 200)
+    prova("una folla di UN mittente solo esce come avviso normale, col suo "
+          "nome", [("uno", "solo", 2)], D(St, 100 + 1800))
+    St = stato()
+    St["mandati"] = [100.0] * 6
+    St["arrivi"] = ["solo", "solo"]
+    D(St, 200)
+    St["arrivi"] = ["solo"]
+    prova("...e se nello stesso giro ne arriva un altro suo, NON esce un "
+          "secondo avviso: aspetta la sua pausa",
+          ([("uno", "solo", 2)], 1),
+          (D(St, 100 + 1800), St["mittenti"]["solo"]["attesa"]))
+    St = stato()
+    amb["_DM_AVVISI"] = St
+    amb["AVVISO_DM_CODA_MAX"] = 2
+    for m in ("a", "b", "c", "d"):
+        amb["_dm_in_coda"](m)
+    prova("la coda ha un tetto: oltre, il DM si conta e il mittente non si "
+          "tiene", (["a", "b"], 2, True),
+          (St["arrivi"], St["folla"]["n"], St["folla"]["oltre"]))
+    St["mandati"] = [0.0] * 5
+    prova("...e il riassunto dice «almeno» quando ha perso il conto dei "
+          "mittenti", [("folla", 2, 0, True), ],
+          [v for v in D(St, 10) if v[0] == "folla"])
+    amb["AVVISO_DM_CODA_MAX"] = 2000
+
+    # i testi
+    T = amb["_dm_testo"]
+    npub = amb["hex_to_npub"](mario)
+    corta = f"{npub[:10]}…{npub[-6:]}"
+    prova("il testo: «📩 Nuovo DM su Nostr da <npub abbreviata>»",
+          f"📩 Nuovo DM su Nostr da {corta}", T(("uno", mario, 1)))
+    prova("...col nome del profilo davanti, e la npub che resta (il nome "
+          "se lo sceglie chi scrive)",
+          f"📩 Nuovo DM su Nostr da Mario ({corta})",
+          T(("uno", mario, 1), "Mario"))
+    prova("...piu' d'uno, il conto", f"📩 3 nuovi DM su Nostr da {corta}",
+          T(("uno", mario, 3)))
+    prova("...senza mittente (busta rimasta chiusa): solo «Nuovo DM»",
+          ["📩 Nuovo DM su Nostr", "📩 2 nuovi DM su Nostr"],
+          [T(("uno", "", 1)), T(("uno", "", 2))])
+    prova("...il riassunto: quanti e da quanti, senza nomi",
+          ["📩 12 nuovi DM su Nostr da 7 mittenti",
+           "📩 12 nuovi DM su Nostr da almeno 7 mittenti",
+           "📩 5 nuovi DM su Nostr"],
+          [T(("folla", 12, 7, False)), T(("folla", 12, 7, True)),
+           T(("folla", 5, 0, True))])
+    prova("la npub abbreviata torna quella del mittente (inizio e coda)",
+          (True, mario), (npub.startswith(corta[:10]) and npub.endswith(corta[-6:]),
+                          amb["npub_to_hex"](npub)))
+    avvisa = pezzo("_dm_avvisa")
+    prova("il nome del profilo arriva da un estraneo: si accorcia e si "
+          "SCAPPA all'assegnazione, prima di entrare nel testo", True,
+          "nome = html.escape(nome_da_profilo(" in avvisa)
+    prova("il bottone apre il profilo di chi scrive su njump.me; il "
+          "riassunto non ne ha", (True, True),
+          ('bottone = ("🟣 Apri in un client", f"https://njump.me/{npub}")'
+           in avvisa,
+           'if voce[0] == "uno" and voce[1]:' in avvisa))
+
+    # [coincurve] dove c'e': il calco di cartone e la libreria vera si
+    # aprono le buste a vicenda (in CI non c'e', e si dice)
+    try:
+        from coincurve import PublicKey as _Pk
+    except ImportError:
+        print("  · (coincurve non c'e': il confronto col calco gira in locale)")
+        return
+    amb_v = dict(amb, ChiavePubblicaCompleta=_Pk)
+    for f in ("nip44_cifra", "nip44_decifra"):
+        exec(pezzo(f), amb_v)
+    prova("[coincurve] il calco `PuntoCompleto` e coincurve si aprono le "
+          "buste a vicenda", ["di cartone", "vera"],
+          [amb_v["nip44_decifra"](sk_noi, mario, cif(sk_mario, noi, "di cartone")),
+           dec(sk_noi, mario, amb_v["nip44_cifra"](sk_mario, noi, "vera"))])
+
+
 def prove_config_esempio():
     """`config_esempio.py` E' IL FILE DA CUI SI COPIA (ago 2026, dal
     campo: le sei leve dei connettori erano cablate, funzionavano col
@@ -146064,6 +146525,7 @@ def main():
               prove_x_risonanza,
               prove_indirizzo_lightning,
               prove_logo_compra_vendi,
+              prove_avviso_dm_nostr,
               prove_config_esempio):
         try:
             f()

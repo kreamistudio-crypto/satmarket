@@ -1412,6 +1412,22 @@ AVVISI_ISCRITTI_MAX_ORA = 6
 # conto di quelli ancora aperti. Solo titolo e importi, mai nomi.
 AVVISI_ORDINI_ADMIN = True
 
+# L'avviso dei DM su Nostr (ott 2026): quando qualcuno scrive un DM al
+# profilo Nostr di Barattolo (la chiave di NOSTR_NSEC_PIATTAFORMA) i
+# moderatori ricevono «📩 Nuovo DM su Nostr da <nome o npub>» con un
+# bottone per aprirlo in un client. MAI il testo del messaggio: il
+# server non lo decifra (di una busta NIP-17 apre solo quella di
+# fuori, per sapere chi scrive). Al massimo un avviso ogni 10 minuti
+# per mittente e 6 in mezz'ora in tutto: oltre, un riassunto senza
+# nomi. Nasce SPENTO: True e riavvia per accenderlo.
+AVVISO_DM_NOSTR = False
+# I relay su cui ascoltare: quelli della lista DM di Barattolo (il suo
+# kind 10050). Se un giorno quella lista cambia, si cambia anche qui.
+AVVISO_DM_NOSTR_RELAY = [
+    "wss://nos.lol",
+    "wss://relay.damus.io",
+]
+
 # --- Sicurezza degli accessi ------------------------------------------
 # Quanto vale un initData di Telegram: e' la credenziale di OGNI
 # chiamata dentro la Mini App, quindi senza scadenza uno catturato

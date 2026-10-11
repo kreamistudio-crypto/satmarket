@@ -124,6 +124,34 @@ class ChiaveXOnly:
         return verifica(self.pub, msg, sig)
 
 
+class PuntoCompleto:
+    """Il calco di `coincurve.PublicKey` che serve alla cifratura NIP-44
+    del server (11 ott 2026, l'avviso dei DM Nostr):
+    `PuntoCompleto(b"\\x02" + x).multiply(sk).format()[1:33]` e' la
+    coordinata X del punto ECDH. I banchi lo montano al posto di
+    `ChiavePubblicaCompleta` dove coincurve non c'e'. Lento e non a
+    tempo costante: e' per le prove, mai per una chiave vera."""
+
+    def __init__(self, compressa: bytes):
+        punto = _alza_x(int.from_bytes(compressa[1:], "big")) \
+            if len(compressa) == 33 else None
+        if punto is None:
+            raise ValueError("chiave pubblica non valida")
+        self.punto = punto
+
+    def multiply(self, sk: bytes):
+        k = int.from_bytes(sk, "big")
+        if not 1 <= k < N:
+            raise ValueError("chiave privata fuori misura")
+        nuovo = PuntoCompleto.__new__(PuntoCompleto)
+        nuovo.punto = _moltiplica(self.punto, k)
+        return nuovo
+
+    def format(self, compressed: bool = True) -> bytes:
+        return (b"\x02" if self.punto[1] % 2 == 0 else b"\x03") \
+            + _byte_x(self.punto)
+
+
 if __name__ == "__main__":
     import os
     sk = os.urandom(32)
