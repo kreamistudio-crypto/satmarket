@@ -50611,3 +50611,15 @@ riletta dai relay veri), e un'estensione desktop con `nip44`. La
 rilettura dal nostro relay da Tor. Il margine dell'`expires_at` quando
 `o.creato` del server è più tardi della pubblicazione di qualche
 secondo.
+
+**COSA È GIRATO SU QUALE ALBERO.** Sopra 5d24f9b (la punta di main dopo
+il push della presa, CI verde): la suite intera `PROVE_SEVERE=1 python
+prove.py` su una COPIA pulita di f55d637 — 22416 passate, 5 fallite,
+tutte sentinelle (curate in f22f150: le parole di protocollo fuori dal
+motore per chi entra da Telegram, e quattro conti); poi sulla copia di
+f22f150 — 22421 passate, 1 fallita (il conto di `numeroConto`, tredici
+con la via per riprendere le chiavi e il contatto: curato qui); i 62
+collaudi del workflow nella gabbia, 62 su 62 verdi nelle due copie
+(`collaudo_chiavi_ritrovate` compreso); lo scanner dei segreti della CI
+passa nel job `segreti`. La suite finale sulla copia di questo commit: il
+conto sta nella riga sotto, scritta dopo che è girata.

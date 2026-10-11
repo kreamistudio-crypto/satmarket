@@ -77991,11 +77991,12 @@ def prove_p2p_conto_dispositivo():
     # conterebbe due volte)
     prova("il conto non passa mai da un bitwise", [],
           re.findall(r"conto\s*\|\s*0|conto\)\s*\|\s*0", blocco_mazzo))
-    # UNDICI dall'11 ott 2026 («tor-chiavi-scambio»): il seme dalla nsec,
-    # la copia sui relay e il foglio chiedono «e' un nativo Nostr?» con
+    # TREDICI dall'11-12 ott 2026 («tor-chiavi-scambio»): il seme dalla
+    # nsec, la copia sui relay, il foglio, la via per riprendere le chiavi
+    # e il contatto del supporto chiedono «e' un nativo Nostr?» con
     # `numeroConto(myTgId) < 0`, e il profilo derivato fuori da Telegram
     # si riconosce da `numeroConto(m.conto) < 0`
-    prova("...e i giudici e il testo usano numeroConto", 11,
+    prova("...e i giudici e il testo usano numeroConto", 13,
           blocco_mazzo.count("numeroConto(m.conto)")
           + blocco_mazzo.count("numeroConto(d.conto)")
           + blocco_mazzo.count("numeroConto(myTgId)"))
