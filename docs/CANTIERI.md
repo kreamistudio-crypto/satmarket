@@ -50245,3 +50245,67 @@ relay.damus.io deve passare a «📩 Avviso DM: in ascolto su
 wss://relay.damus.io (autenticato, NIP-42)»; se invece esce «RIFIUTA
 (…): riprovo fra un'ora», la frase fra parentesi dice perché. La
 procedura aggiornata: PRODUZIONE, «L'AVVISO DEI DM NOSTR».
+## La presa della disputa letta sul nodo vero: il giudice della risposta e la ripresa (11 ott 2026, notte, cantiere tor-chiavi-scambio, urgenza di Andrea)
+
+**Il caso.** Alan (chi vende) apre la disputa dell'ordine `ea0af71a`
+(Barattozon, il compratore senza più le chiavi: la voce sotto). Andrea
+tocca «Prendi la disputa» e l'app dice «Non è riuscito: la disputa
+presa NON è di questo ordine. Non decidere niente: avvisa Andrea».
+Sul nodo la tabella `disputes` dice il contrario: `in-progress`,
+`solver_pubkey` = la sua chiave, `taken_at` 21:19 UTC. La presa era
+riuscita, e l'app l'ha respinta.
+
+**La causa.** `eseguiPresaDisputaP2P` pretendeva `payload.order.id`
+uguale all'ordine della pagina. Quella forma della risposta
+(`admin-took-dispute` all'admin) l'aveva SUPPOSTA il coordinatore di
+cartone delle prove dalle pagine del protocollo, e la voce del 28 set
+la segnava «da confermare»: sul nodo vero quel campo non porta l'id
+dell'ordine (cosa porti esattamente lo dice `admin_take_dispute.rs`
+del fork, da leggere sul nodo; il comando è nel rapporto). E dopo
+l'errore il client chiamava `lascia`, che scrive solo a registro:
+server «aperta», nodo «presa» — e riprovare «Prendi» non serve,
+perché il coordinatore rifiuta una disputa già in corso.
+
+**La cura.** 1) `presaDiQuestoOrdineP2P(r, ordine, disputaId)`, PURA:
+fail-open sui campi che mancano, fail-closed su quelli che
+smentiscono. Si rifiuta solo un `order.id` diverso dall'ordine E
+dall'id della disputa chiesta, o un `id` del messaggio diverso dalla
+disputa E dall'ordine; un ordine senza id, l'id della disputa, un
+payload senza ordine passano. La cintura resta contro la disputa
+SBAGLIATA, quella di un altro ordine che il coordinatore nomina. 2) La
+risposta finisce in console (`⚖️ [mod] admin-took-dispute: …`, solo
+id e chiavi pubbliche): il verbale che alla disputa vera è mancato.
+3) `const ord = … || {}`: un payload senza ordine non esplode più.
+4) LA RIPRESA: l'elenco del server dice `presa_fallita_da_me` (riga
+`presa_fallita` a registro di QUESTO moderatore, disputa ancora
+aperta), e solo allora la card mostra «⚖️ Sul nodo risulta già presa
+con la tua chiave? Riprendila qui»: conferma esplicita con la
+condizione scritta, poi il SOLO secondo tempo sul server (`prendi`,
+`fatto: true`), che apre la decisione e manda le due trade key con
+l'elenco; al coordinatore non parte niente. Se la condizione fosse
+falsa, la decisione cadrebbe al coordinatore con un no detto, e il
+registro lo terrebbe. **Per il caso vivo**, prima del deploy, la
+stessa cosa dalla console del browser dove sta la chiave (il comando
+nel rapporto): `modFetch('moderazione/prendi', {…, fatto: true})`.
+
+**Scartato.** Riprovare `admin-take-dispute` (il nodo rifiuta); far
+«lasciare» una disputa presa (il server dice 409 dal 1 ott, e a
+ragione); un bottone di ripresa sempre visibile (premuto a vuoto
+lascerebbe il server su «presa» senza strada indietro).
+
+**Provato.** `prove_moderazione_p2p` (135 verdi): il coordinatore di
+cartone sa rispondere nelle quattro forme — l'ordine con l'id, con
+l'id della DISPUTA, senza id, nessun ordine nel payload — e la presa
+tiene e si conferma al server; la tabella del giudice (nove casi,
+tre rifiuti); la ripresa col bottone solo a presa fallita mia, la
+conferma, il solo secondo tempo, niente pubblicato; la riga di
+console con l'ordine dentro; dieci chiamate al server (erano nove).
+`collaudo_dispute_p2p` (55 ok): `presa_fallita_da_me` falso prima,
+vero dopo `lascia` per chi l'ha tentata e falso per un altro
+moderatore, il solo secondo tempo che registra «presa» e spegne la
+ripresa.
+
+**Resta da guardare.** La forma vera di `payload.order` del fork
+(dalla console alla prossima presa, o dal sorgente sul nodo), e
+l'esito di `ea0af71a`: la decisione «sats a chi compra», il payout
+alla fattura di chi compra col wallet acceso.

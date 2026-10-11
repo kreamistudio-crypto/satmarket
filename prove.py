@@ -130035,12 +130035,19 @@ function mostroFinto(ev){
                                     action: 'cant-do', payload: {cant_do: copione.motivo}});
     return;
   }
-  if (m.action === 'admin-take-dispute')
+  if (m.action === 'admin-take-dispute') {
+    /* (11 ott 2026, ea0af71a) le forme: l'ordine con l'id dell'ordine,
+       con l'id della DISPUTA, senza id, un payload senza ordine, e
+       quella di un altro ordine */
+    const ordine = {kind: 'sell', status: 'dispute', amount: 13603, fiat_code: 'EUR', fiat_amount: 10,
+                    payment_method: 'Contanti', premium: 0,
+                    buyer_trade_pubkey: COMPRA.pub, seller_trade_pubkey: VENDE.pub, created_at: 1};
+    if (copione.tipo === 'altro-ordine') ordine.id = 'ffffffff-0000-4000-8000-000000000000';
+    else if (copione.tipo === 'id-disputa') ordine.id = m.id;
+    else if (copione.tipo !== 'senza-id') ordine.id = ordineDetto;
     rispondi(ev.pubkey, 'dispute', {version: 2, request_id: null, id: m.id, action: 'admin-took-dispute',
-      payload: {order: {id: copione.tipo === 'altro-ordine' ? 'ffffffff-0000-4000-8000-000000000000' : ordineDetto,
-                        kind: 'sell', status: 'dispute', amount: 13603, fiat_code: 'EUR', fiat_amount: 10,
-                        payment_method: 'Contanti', premium: 0,
-                        buyer_trade_pubkey: COMPRA.pub, seller_trade_pubkey: VENDE.pub, created_at: 1}}});
+      payload: copione.tipo === 'senza-ordine' ? {dispute: [m.id, null]} : {order: ordine}});
+  }
   else if (m.action === 'admin-settle')
     rispondi(ev.pubkey, 'order', {version: 2, request_id: m.request_id, id: m.id, action: 'admin-settled', payload: null});
   else if (m.action === 'admin-cancel')
@@ -130118,6 +130125,48 @@ function giro(){ toasts = []; chiamate.length = 0; ricevuti.length = 0; pubblica
   giro(); scriviArchivioModP2P({}); copione = {tipo: 'altro-ordine'};
   await eseguiPresaDisputaP2P(ORD);
   out.presaAltroOrdine = [eventi.slice(), toasts[0], Object.keys(archivioModP2P())];
+  /* ...LE FORME DEL NODO VERO (11 ott 2026, ea0af71a): l'ordine senza id,
+     con l'id della disputa, o nessun ordine nel payload — la presa tiene,
+     si conferma al server, e le chiavi restano quando ci sono */
+  const presaCon = async tipo => {
+    giro(); scriviArchivioModP2P({}); copione = {tipo};
+    await eseguiPresaDisputaP2P(ORD);
+    const a = archivioModP2P()[ORD] || {};
+    return [toasts[0], p2pModAperta === ORD,
+            chiamate.filter(c => c.percorso === 'moderazione/prendi' && c.corpo.fatto === true).length,
+            a.compra === COMPRA.pub, a.disputa === DISP];
+  };
+  out.presaSenzaId = await presaCon('senza-id');
+  out.presaIdDisputa = await presaCon('id-disputa');
+  out.presaSenzaOrdine = await presaCon('senza-ordine');
+  out.giudicePresa = [
+    presaDiQuestoOrdineP2P({id: DISP, payload: {order: {id: ORD}}}, ORD, DISP),
+    presaDiQuestoOrdineP2P({id: DISP, payload: {order: {id: DISP}}}, ORD, DISP),
+    presaDiQuestoOrdineP2P({id: DISP, payload: {order: {}}}, ORD, DISP),
+    presaDiQuestoOrdineP2P({id: DISP, payload: {dispute: [DISP, null]}}, ORD, DISP),
+    presaDiQuestoOrdineP2P({id: null, payload: null}, ORD, DISP),
+    presaDiQuestoOrdineP2P({id: DISP, payload: {order: {id: ORD.toUpperCase()}}}, ORD, DISP),
+    presaDiQuestoOrdineP2P({id: DISP, payload: {order: {id: 'ffffffff-0000-4000-8000-000000000000'}}}, ORD, DISP),
+    presaDiQuestoOrdineP2P({id: 'd15b0000-aaaa-4bbb-8ccc-0000000000d9', payload: {order: {id: ORD}}}, ORD, DISP),
+    presaDiQuestoOrdineP2P({id: 'd15b0000-aaaa-4bbb-8ccc-0000000000d9', payload: null}, ORD, DISP)];
+  /* ...e LA RIPRESA di una disputa che il nodo dice gia' nostra: il
+     bottone c'e' solo con `presa_fallita_da_me`, chiede conferma, fa
+     il solo secondo tempo sul server e al coordinatore non manda niente */
+  giro(); serverMod.dispute = [disputa({presa_fallita_da_me: true})];
+  p2pModAperta = ORD; await chiediModerazioneP2P(true); renderModerazioneP2P();
+  const htmlRipresa = el('p2pModCorpo').innerHTML;
+  giro(); serverMod.dispute = [disputa({})];
+  p2pModAperta = ORD; await chiediModerazioneP2P(true); renderModerazioneP2P();
+  const htmlSenza = el('p2pModCorpo').innerHTML;
+  giro(); serverMod.dispute = [disputa({presa_fallita_da_me: true})];
+  riprendiPresaDisputaP2P(ORD);
+  const confRipresa = [conferme.length, conferme[0] && conferme[0].titolo, conferme[0] && conferme[0].etichetta,
+                       !!(conferme[0] && conferme[0].corpo.indexOf('al coordinatore non parte niente') >= 0)];
+  await conferme[0].poi();
+  out.ripresa = [htmlRipresa.indexOf('Riprendila qui') >= 0, htmlSenza.indexOf('Riprendila qui') >= 0,
+                 confRipresa, eventi.slice(), toasts[0],
+                 chiamate.filter(c => c.percorso === 'moderazione/prendi').map(c => [c.corpo.ordine === ORD, c.corpo.chiave === K.pub, c.corpo.fatto === true]),
+                 p2pModAperta === ORD];
   /* ...la chiave non e' sul nodo */
   giro(); copione = {tipo: 'cantdo', motivo: 'invalid_pubkey'};
   await eseguiPresaDisputaP2P(ORD);
@@ -130327,8 +130376,10 @@ def prove_moderazione_p2p():
     # le CHIAMATE, non la definizione: cominciano tutte col nome della rotta
     chiamate_server = re.findall(r"modFetch\('(?:[^()]|\([^()]*\))*\)", nudo(modulo))
     # NOVE dal 1 ott 2026: l'import della chiave registra la pubblica
-    # (`moderazione/chiave`, la stessa rotta della creazione)
-    prova("il banco chiama il server in nove punti", 9, len(chiamate_server))
+    # (`moderazione/chiave`, la stessa rotta della creazione). DIECI
+    # dall'11 ott 2026: la ripresa di una disputa gia' presa sul
+    # coordinatore registra il solo secondo tempo (`prendi`, `fatto`)
+    prova("il banco chiama il server in dieci punti", 10, len(chiamate_server))
     prova("...e in NESSUNO passa la chiave privata", [],
           [c for c in chiamate_server if ".sk" in c or "sk:" in c])
     prova("la chiave nasce a caso su questo dispositivo, e al server va la pubblica", True,
@@ -130349,9 +130400,14 @@ def prove_moderazione_p2p():
           0 < pre.find("modFetch('moderazione/prendi', {ordine: ordine, chiave: k.pub})")
           < pre.find("moderatoreChiama(")
           < pre.find("modFetch('moderazione/prendi', {ordine: ordine, chiave: k.pub, fatto: true})"))
+    # (11 ott 2026, ea0af71a) il giudice e' puro e sta prima dell'archivio;
+    # quel che arriva finisce in console, e un ordine assente non esplode
     prova("...e VERIFICA che la disputa presa sia di quell'ordine, prima di tenerla", True,
-          0 < pre.find("String(ord.id || '').toLowerCase() !== String(ordine).toLowerCase()")
+          0 < pre.find("if (!presaDiQuestoOrdineP2P(r, ordine, id))")
           < pre.find("scriviArchivioModP2P(a)"))
+    prova("...scrivendo in console la risposta, e senza esplodere su un payload senza ordine", True,
+          "console.log('⚖️ [mod] admin-took-dispute: '" in pre
+          and "const ord = (r.payload && r.payload.order) || {};" in pre)
     av = nudo(fn("function avanzaOrdineP2P(ordine, azione, payload){"))
     prova("il moderatore NON e' la controparte: `admin-took-dispute` non tocca `peer`", True,
           "if (azione === 'admin-took-dispute') {\n    if (p && p.peer && p.peer.pubkey) o.moderatore = String(p.peer.pubkey);\n"
@@ -130632,8 +130688,14 @@ def prove_moderazione_p2p():
     prova("il banco della moderazione gira", "", (r.stderr or "")[-900:])
     if r.returncode or not r.stdout.strip():
         return
-    o = _json.loads(r.stdout)
+    # L'ULTIMA RIGA E' IL VERDETTO (11 ott 2026): prima ci sono le righe
+    # di console della presa — il verbale che alla disputa ea0af71a e'
+    # mancato — e si contano, con l'ordine dentro
+    righe_out = r.stdout.strip().splitlines()
+    o = _json.loads(righe_out[-1])
     ORD_B = "5a1e0000-d15b-4a2b-9c3d-0000000000a1"
+    prova("la presa scrive in console la risposta del coordinatore, con l'ordine dentro", True,
+          sum(1 for x in righe_out if x.startswith("⚖️ [mod] admin-took-dispute: ") and ORD_B in x) >= 1)
     DISP_B = "d15b0000-aaaa-4bbb-8ccc-0000000000d1"
     prova("senza chiave non si prende: lo si dice, e nessun foglio si apre",
           [None, ["Prima crea la tua chiave di moderatore"], 0], o["senzaChiave"])
@@ -130664,6 +130726,17 @@ def prove_moderazione_p2p():
           [["server:moderazione/prendi", "publish", "server:moderazione/lascia", "server:moderazione"],
            "Non è riuscito: la disputa presa NON è di questo ordine. Non decidere niente: avvisa Andrea", []],
           o["presaAltroOrdine"])
+    # (11 ott 2026, ea0af71a) le forme viste sul nodo vero non fermano piu' la presa
+    for nome, chiave_out in (("senza id", "presaSenzaId"), ("con l'id della disputa", "presaIdDisputa"),
+                             ("senza ordine nel payload", "presaSenzaOrdine")):
+        prova(f"il coordinatore risponde con l'ordine {nome}: la presa tiene, confermata al server",
+              ["Disputa presa ✓", True, 1, nome != "senza ordine nel payload", True], o[chiave_out])
+    prova("il giudice della presa: passa quel che non smentisce, rifiuta un ALTRO ordine o un'altra disputa",
+          [True, True, True, True, True, True, False, False, False], o["giudicePresa"])
+    prova("la ripresa: il bottone solo con la presa fallita mia, conferma, il solo secondo tempo, niente al coordinatore",
+          [True, False, [1, "La disputa è già tua sul coordinatore?", "Sì, è già mia", True],
+           ["server:moderazione/prendi:fatto", "server:moderazione"], "Presa registrata ✓",
+           [[True, True, True]], True], o["ripresa"])
     prova("la chiave non e' sul nodo: lo si dice con parole nostre, e il server lo sa",
           [["server:moderazione/prendi", "publish", "server:moderazione/lascia", "server:moderazione"],
            "Non è riuscito: la tua chiave di moderatore non è ancora stata aggiunta al nodo",

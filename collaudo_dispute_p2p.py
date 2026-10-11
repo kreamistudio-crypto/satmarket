@@ -302,7 +302,30 @@ def main():
            list(banco.DETTO), riga(R)["stato"]])
     prova("la decisione prima della presa non si scrive", 409,
           banco.errore(SRV.moderazione_decisione_p2p, rotte[3][1])[0])
+    # (11 ott 2026, ea0af71a) la presa fallita DOPO la risposta del
+    # coordinatore: il server la dice ancora aperta, ma sa che la MIA presa
+    # e' fallita — e lo dice solo a me
+    e = __import__("json").loads(asyncio.run(SRV.moderazione_p2p()).body)
+    prova("prima di un fallimento l'elenco non propone la ripresa", False,
+          [x for x in e["dispute"] if x["ordine"] == R][0]["presa_fallita_da_me"])
+    banco.esito(SRV.moderazione_lascia_p2p, {"ordine": R, "motivo": "la disputa presa NON e' di questo ordine"})
+    e = __import__("json").loads(asyncio.run(SRV.moderazione_p2p()).body)
+    prova("dopo `lascia` l'elenco dice: la tua presa e' fallita, la disputa e' ancora aperta",
+          [True, "aperta"], (lambda d: [d["presa_fallita_da_me"], d["stato"]])(
+              [x for x in e["dispute"] if x["ordine"] == R][0]))
+    banco.come(banco.ESTRANEO)
+    SRV.ADMIN_IDS = [999, banco.ESTRANEO]
+    e = __import__("json").loads(asyncio.run(SRV.moderazione_p2p()).body)
+    prova("...e a un altro moderatore no: la presa fallita e' di chi l'ha tentata", False,
+          [x for x in e["dispute"] if x["ordine"] == R][0]["presa_fallita_da_me"])
+    SRV.ADMIN_IDS = [999]
+    banco.come(MOD)
+    # il solo secondo tempo, senza ripassare dal primo: e' il gesto della ripresa
     banco.esito(SRV.moderazione_prendi_p2p, {"ordine": R, "chiave": KM, "fatto": True})
+    e = __import__("json").loads(asyncio.run(SRV.moderazione_p2p()).body)
+    prova("...e il solo secondo tempo la registra presa, e la ripresa non si propone piu'",
+          ["presa", False], (lambda d: [d["stato"], d["presa_fallita_da_me"]])(
+              [x for x in e["dispute"] if x["ordine"] == R][0]))
     prova("dopo la firma: presa, e lo sanno le due parti (e nessun altro: il moderatore e' uno)",
           ["presa", MOD, [C, V]],
           [riga(R)["stato"], riga(R)["presa_da"], sorted(c for c, _ in banco.DETTO)[::-1]])

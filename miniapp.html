@@ -72494,6 +72494,48 @@ async function cercaDisputaIdP2P(d){
   return disputaFraEventiP2P(eventi, d);
 }
 
+/* ---- LA PRESA GIA' FATTA SUL COORDINATORE (11 ott 2026, ea0af71a) ----
+   Quando la presa fallisce DOPO la risposta del coordinatore — la
+   verifica di qui sopra che si ferma, o un errore nostro — il nodo
+   l'ha gia' assegnata alla nostra chiave, mentre il server, che ha
+   ricevuto `lascia`, la dice ancora «aperta». Riprovare «Prendi» non
+   serve: il coordinatore rifiuta una disputa gia' in corso. Questo
+   gesto fa il SOLO secondo tempo sul server (`fatto: true`), che apre
+   la decisione e manda le chiavi delle due parti con l'elenco; al
+   coordinatore non parte niente. Compare solo dove il server sa di una
+   presa fallita di QUESTO moderatore (`presa_fallita_da_me`), e la
+   conferma dice la condizione: sul nodo la disputa deve risultare presa
+   con questa chiave. Se non lo fosse, la decisione cadrebbe al
+   coordinatore con un «no» detto, e il registro lo terrebbe. */
+function riprendiPresaDisputaP2P(ordine){
+  const d = disputaModP2P(ordine);
+  if (!d) return;
+  haptic();
+  const k = chiaveModeratoreP2P();
+  if (!k) { toast('Prima crea la tua chiave di moderatore'); return; }
+  chiediConferma({
+    titolo: 'La disputa è già tua sul coordinatore?',
+    corpo: 'Solo se sul nodo questa disputa risulta presa con la tua chiave di moderatore ('
+      + npubP2P(k.pub).slice(0, 12) + '…). Qui si registra la presa e si apre la decisione: al coordinatore non parte niente.',
+    etichetta: 'Sì, è già mia',
+    poi: () => eseguiRipresaDisputaP2P(ordine)
+  });
+}
+async function eseguiRipresaDisputaP2P(ordine){
+  const k = chiaveModeratoreP2P();
+  if (!k) return;
+  const rip = attesaP2P('Registro la presa…');
+  try {
+    await modFetch('moderazione/prendi', {ordine: ordine, chiave: k.pub, fatto: true});
+    p2pModAperta = ordine;
+    toast('Presa registrata ✓');
+  } catch(e) {
+    toast('Non è riuscito: ' + String((e && e.message) || e), 8000);
+  } finally { rip(); }
+  await chiediModerazioneP2P(true);
+  renderModerazioneP2P();
+}
+
 /* ---- «Prendi la disputa» ---- */
 function prendiDisputaP2P(ordine){
   const d = disputaModP2P(ordine);
@@ -72506,6 +72548,32 @@ function prendiDisputaP2P(ordine){
     etichetta: 'Sì, la prendo',
     poi: () => eseguiPresaDisputaP2P(ordine)
   });
+}
+/* ---- LA RISPOSTA DEL COORDINATORE E' DI QUESTO ORDINE? (11 ott 2026,
+   dalla disputa VERA ea0af71a) ----
+   Fin qui la presa pretendeva `payload.order.id` uguale all'ordine della
+   pagina: una forma che il coordinatore di cartone delle prove aveva
+   SUPPOSTO dalle pagine del protocollo, e che la voce di CANTIERI
+   segnava «da confermare». Sul nodo vero la presa e' riuscita (la
+   tabella `disputes` aveva solver e `in-progress`) e l'app ha detto
+   «NON e' di questo ordine»: il campo non portava l'id dell'ordine.
+   PURA, e FAIL-OPEN SUI CAMPI CHE MANCANO, FAIL-CLOSED SU QUELLI CHE
+   SMENTISCONO: si rifiuta solo quando un id c'e' e parla di un ALTRO
+   ordine (o di un'altra disputa) — un `order.id` diverso dall'ordine e
+   dall'id della disputa chiesta, o un `id` del messaggio diverso dalla
+   disputa chiesta e dall'ordine. Un ordine senza id, un id che e' quello
+   della disputa, o un payload senza ordine passano: la cintura resta
+   contro la disputa SBAGLIATA — quella di un altro ordine, che il
+   coordinatore nomina — e quel che arriva davvero finisce in console
+   per il verbale. */
+function presaDiQuestoOrdineP2P(r, ordine, disputaId){
+  const o = String(ordine || '').toLowerCase(), dsp = String(disputaId || '').toLowerCase();
+  const ord = (r && r.payload && r.payload.order) || null;
+  const idOrd = String((ord && ord.id) || '').toLowerCase();
+  if (idOrd && idOrd !== o && idOrd !== dsp) return false;
+  const idMsg = String((r && r.id) || '').toLowerCase();
+  if (idMsg && idMsg !== dsp && idMsg !== o) return false;
+  return true;
 }
 async function eseguiPresaDisputaP2P(ordine){
   const d = disputaModP2P(ordine);
@@ -72529,11 +72597,15 @@ async function eseguiPresaDisputaP2P(ordine){
       messaggioMostro('admin-take-dispute',
         {requestId: nuovaRichiestaP2P(), indice: null, id: id, busta: 'dispute'}),
       ['admin-took-dispute']);
-    const ord = (r.payload && r.payload.order) || null;
+    const ord = (r.payload && r.payload.order) || {};
+    /* QUEL CHE E' ARRIVATO SI SCRIVE IN CONSOLE (11 ott 2026): niente di
+       segreto — l'id, l'azione e le chiavi PUBBLICHE delle parti — ed e'
+       il verbale che alla disputa ea0af71a e' mancato */
+    console.log('⚖️ [mod] admin-took-dispute: ' + JSON.stringify({id: r.id, request_id: r.request_id, payload: r.payload}));
     /* LA VERIFICA: l'id l'aveva dichiarato un telefono, o l'abbiamo
-       trovato noi per vicinanza. Il coordinatore dice di QUALE ordine
-       e' la disputa presa: se non e' questo, ci si ferma e lo si dice */
-    if (!ord || String(ord.id || '').toLowerCase() !== String(ordine).toLowerCase())
+       trovato noi per vicinanza. Se il coordinatore nomina un ALTRO
+       ordine ci si ferma e lo si dice (`presaDiQuestoOrdineP2P`) */
+    if (!presaDiQuestoOrdineP2P(r, ordine, id))
       throw Object.assign(new Error('la disputa presa NON è di questo ordine. Non decidere niente: avvisa Andrea'),
                           {altra: true});
     const a = archivioModP2P();
@@ -72990,6 +73062,12 @@ function cardDisputaModP2P(d, ho){
   if (d.stato === 'aperta')
     return h + (ho
       ? '<button class="btn orange" onclick="prendiDisputaP2P(this.dataset.o)" data-o="' + esc(d.ordine) + '">Prendi la disputa</button>'
+        /* la presa fallita DOPO la risposta del coordinatore (11 ott
+           2026): il nodo la dice gia' nostra, il server no — vedi
+           `riprendiPresaDisputaP2P` */
+        + (d.presa_fallita_da_me
+            ? '<button class="btn ghost" onclick="riprendiPresaDisputaP2P(this.dataset.o)" data-o="' + esc(d.ordine) + '">⚖️ Sul nodo risulta già presa con la tua chiave? Riprendila qui</button>'
+            : '')
       : '<div class="hint">Per prenderla serve la tua chiave di moderatore su questo dispositivo.</div>')
       + '</div>';
   /* presa da me */

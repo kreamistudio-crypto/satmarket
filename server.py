@@ -54223,6 +54223,13 @@ def _riga_disputa_p2p(con, r, io: int) -> dict:
         "sei_parte": parte,
         "presa_da": (nudo(_persona_disputa_p2p(con, r["presa_da"])) if r["presa_da"] else ""),
         "presa_da_me": mia, "presa_il": int(r["presa_il"] or 0),
+        # LA MIA PRESA FALLITA (11 ott 2026, ea0af71a): il coordinatore
+        # l'ha assegnata alla mia chiave e il client si e' fermato dopo;
+        # il server ha ricevuto `lascia` e la dice ancora aperta. Con
+        # questo il client mostra il gesto che registra la sola presa.
+        "presa_fallita_da_me": (r["stato"] == "aperta" and bool(con.execute(
+            "SELECT 1 FROM p2p_dispute_registro WHERE ordine=? AND gesto='presa_fallita' "
+            "AND tg_id=? LIMIT 1", (ordine, int(io))).fetchone())),
         "esito": r["esito"] or "", "chiusa_da": r["chiusa_da"] or "",
         "chiusa_il": int(r["chiusa_il"] or 0),
         "decisione": ({"esito": dec["esito"], "motivo": str(dec["motivo"] or ""),
