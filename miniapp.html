@@ -2263,78 +2263,39 @@
     .p2p-logo-pila.scossa{animation:none}
   }
   /* ---- IL LOGO CHE VOLTA IL LIBRO (11 ott 2026, richiesta di Andrea,
-     cantiere «logo-compra-vendi») ----
-     Il logo fra i due tab non e' piu' un ornamento: e' un BOTTONE, e un
-     tocco passa da «Compra BTC» a «Vendi BTC» e ritorno. Il lato NON ha
-     un secondo padrone: il tocco chiama `voltaLatoP2P`, che passa da
-     `setLatoP2P` — l'unica che scrive `p2pLato` e `body.p2p-vendo` — e
-     tutto quel che si vede qui lo legge da li': i gemelli, il colore
-     della pastiglia, la frase per il lettore di schermo. Tab e logo non
-     possono dire due cose diverse perche' non c'e' una seconda copia da
-     tenere in pari.
-     CHE SI TOCCA LO DICE LA PASTIGLIA «⇄», appesa dove il disegno poggia
-     sulla linea dei tab: sta nel vuoto che la linea lascia sotto il
-     logo, quindi la riga si legge «Compra BTC ⇄ Vendi BTC» senza una
-     scritta in piu' (i due nomi sono gia' li' accanto, e ripeterli sotto
-     sarebbe la seconda copia della stessa verita'). DA CHE PARTE SI E'
-     lo dicono in tre: il tab acceso, la freccia accesa del logo e il
-     colore della pastiglia — verde a comprare, rosso a vendere.
-     LA MISURA NON SI SPOSTA: il bottone non ha bordo ne' respiro, e il
-     margine negativo resta sulla pila (qui sotto, `.p2p-lati
-     .p2p-logo-pila`): la riga e' alta quanto prima e al tab restano gli
-     stessi pixel, a 320 come a 375. La pastiglia e' fuori dal flusso e
-     sporge di 8px nei 12 di margine sotto la riga: ne restano 4 d'aria
-     sopra le pillole.
-     IL SEGNO E' DEL COLORE DEL FONDO (`--bg`) e non bianco: di sera il
-     verde e il rosso si schiariscono, e il bianco sopra non si
-     leggerebbe piu'. L'anello attorno e' lo stesso fondo: stacca la
-     pastiglia dalla freccia del disegno che tocca. */
+     cantiere «logo-compra-vendi»; RIFATTO la sera stessa, cantiere
+     «logo-come-prima») ----
+     Il logo fra i due tab e' un BOTTONE: un tocco passa da «Compra BTC»
+     a «Vendi BTC» e ritorno. E NON SI VEDE CHE LO E': ha esattamente
+     l'aspetto di prima, e al tocco succede quel che succede toccando
+     l'ALTRO TAB — il dondolio, i gemelli che sfumano, la vibrazione —,
+     nient'altro (`voltaLatoP2P` chiama `setLatoP2P` come un tab).
+     ⚠️ LA PRIMA STESURA aveva una pastiglia «⇄» appesa sotto il logo e
+     una capovolta di taglio «a moneta». Andrea l'ha provata sul
+     telefono e le ha tolte tutt'e due: al marchio non si aggiungono
+     segni, e non ha un'animazione sua. NON TORNANO.
+     IL BOTTONE E' NUDO: niente bordo, fondo, respiro ne' margine, e il
+     margine negativo resta sulla pila (`.p2p-lati .p2p-logo-pila`): la
+     riga e' la stessa al pixel — confrontata con lo scatto di prima, a
+     comprare e a vendere. L'unico segno e' il contorno del FUOCO, che
+     compare a chi arriva col tasto Tab e mai col dito o col mouse:
+     senza, chi naviga da tastiera non saprebbe dove si trova. */
   .p2p-volta{position:relative;flex:0 0 auto;display:flex;padding:0;margin:0;
     border:none;background:none;color:inherit;font:inherit;cursor:pointer;
     border-radius:18px;-webkit-tap-highlight-color:transparent;
     touch-action:manipulation}
   .p2p-volta:focus-visible{outline:2.5px solid var(--sats);outline-offset:2px}
-  .p2p-volta-segno{position:absolute;left:50%;bottom:-8px;margin-left:-15px;
-    display:flex;align-items:center;justify-content:center;
-    width:30px;height:16px;border-radius:999px;
-    background:var(--trust);color:var(--bg);box-shadow:0 0 0 2.5px var(--bg);
-    transition:background-color .3s ease}
-  body.p2p-vendo .p2p-volta-segno{background:var(--rosso-p2p)}
-  .p2p-volta-segno svg{width:16px;height:10px;fill:none;stroke:currentColor;
-    stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
-    transition:transform .3s ease}
-  /* mezzo giro: a riposo il segno e' identico, ma si VEDE girare */
-  body.p2p-vendo .p2p-volta-segno svg{transform:rotate(180deg)}
   /* LE DUE FRASI PER IL LETTORE DI SCHERMO stanno nel bottone, fuori
      dalla vista, e se ne legge UNA: l'altra e' `display:none`, che la
      toglie anche dal nome del bottone. Le accende `body.p2p-vendo`, non
-     una riga di JS: e' lo stesso interruttore dei gemelli. */
+     una riga di JS: e' lo stesso interruttore dei gemelli, quindi la
+     frase non puo' dire un lato diverso da quello che si vede. */
   .p2p-volta .solo-voce{position:absolute;width:1px;height:1px;
     margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);
     white-space:nowrap;border:0}
   .p2p-volta .su-vendi{display:none}
   body.p2p-vendo .p2p-volta .su-compra{display:none}
   body.p2p-vendo .p2p-volta .su-vendi{display:block}
-  /* LA CAPOVOLTA al tocco del logo: gira di taglio, e a meta' corsa —
-     quando del disegno non si vede niente — cambia gemello; poi arriva
-     dall'altra parte, come una moneta. Per questo, finche' dura, il
-     cambio di gemello non sfuma: SCATTA a meta' (0s, ritardo .2s su .4).
-     La scossa resta la risposta al dito sul TAB; questa e' la risposta
-     al dito sul LOGO, e sta DOPO la scossa: se arrivano insieme vince
-     lei. La classe la toglie il JS a fine giro (`giraLogoP2P`), per la
-     stessa ragione della scossa. */
-  .p2p-logo-pila.volta{animation:logoVolta .4s linear}
-  .p2p-logo-pila.volta .p2p-logo{transition:opacity 0s linear .2s}
-  @keyframes logoVolta{
-    0%{transform:perspective(520px) rotateY(0);animation-timing-function:ease-in}
-    49.9%{transform:perspective(520px) rotateY(90deg)}
-    50%{transform:perspective(520px) rotateY(-90deg);animation-timing-function:ease-out}
-    100%{transform:perspective(520px) rotateY(0)}}
-  @media (prefers-reduced-motion:reduce){
-    .p2p-logo-pila.volta{animation:none}
-    .p2p-logo-pila.volta .p2p-logo{transition:none}
-    .p2p-volta-segno,.p2p-volta-segno svg{transition:none}
-  }
   /* I DUE TAB DEL LATO (il modello sono i libri P2P veri: tab larghi,
      testo grosso, colore SOLO sull'attivo). Compra parla il verde
      della protezione (--trust), vendi il rosso di casa (--danger) —
@@ -11186,12 +11147,12 @@ document.getElementById('cartello')?.remove();</script>
           <button class="p2p-lato compra attiva" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compra BTC</button>
           <!-- IL LOGO E' IL BOTTONE CHE VOLTA IL LIBRO (11 ott 2026, vedi
                IL LOGO CHE VOLTA IL LIBRO nel CSS): un tocco passa da
-               Compra a Vendi e ritorno, dalla stessa porta dei due tab.
-               Un bottone vero, non un tab: dice dove si e' e dove porta
-               con una delle due frasi fuori dalla vista. -->
+               Compra a Vendi e ritorno, come toccare l'altro tab. Non
+               si vede che e' un bottone — dentro c'e' la pila di sempre
+               e nient'altro da vedere —; lo sa il lettore di schermo,
+               che legge una delle due frasi fuori dalla vista. -->
           <button class="p2p-volta" id="p2pVolta" type="button" onclick="voltaLatoP2P()">
             <span class="p2p-logo-pila" aria-hidden="true"><img class="p2p-logo compra" src="/assets/p2p-logo-compra.webp" alt="" onerror="this.remove()"><img class="p2p-logo vendi" src="/assets/p2p-logo-vendi.webp" alt="" onerror="this.remove()"></span>
-            <span class="p2p-volta-segno" aria-hidden="true"><svg viewBox="0 0 16 10" focusable="false"><path d="M1 3h13M11 .8 14 3l-3 2.2M15 7H2M5 4.8 2 7l3 2.2"/></svg></span>
             <span class="solo-voce su-compra">Sei su Compra BTC. Tocca per passare a Vendi BTC</span>
             <span class="solo-voce su-vendi">Sei su Vendi BTC. Tocca per passare a Compra BTC</span>
           </button>
@@ -50838,33 +50799,6 @@ let p2pLogoSalutato = false;
    il + fuori dal libro che riporta al libro su «Compra BTC» — non scuote
    il logo e non vibra: la vibrazione la da' gia' go(), e la scossa e' la
    risposta al tab. */
-/* IL LOGO CHE VOLTA IL LIBRO (11 ott 2026, cantiere «logo-compra-vendi»):
-   il tocco sul logo passa all'ALTRO lato. Non tiene un conto suo: legge
-   `p2pLato` e lo fa cambiare a `setLatoP2P`, la stessa porta dei due
-   tab — quindi da qualunque parte si cambi (tab, logo, il + che riporta
-   al libro, un ordine aperto da un link) il lato e' uno. `senzaScossa`
-   perche' qui il logo non dondola: si capovolge (`giraLogoP2P`), e la
-   vibrazione la da' questa riga.
-   LA CLASSE SE NE VA A FINE GIRO, col suo tempo e non con
-   `animationend`, come la scossa e per la stessa ragione (vedi sopra):
-   450ms, un soffio oltre i 400 della capovolta. */
-let p2pVoltaTimer = null;
-function giraLogoP2P(){
-  document.querySelectorAll('.p2p-logo-pila').forEach(p => {
-    p.classList.remove('scossa');
-    p.classList.remove('volta');
-    void p.offsetWidth;
-    p.classList.add('volta');
-  });
-  clearTimeout(p2pVoltaTimer);
-  p2pVoltaTimer = setTimeout(() => document.querySelectorAll('.p2p-logo-pila')
-    .forEach(p => p.classList.remove('volta')), 450);
-}
-function voltaLatoP2P(){
-  giraLogoP2P();
-  haptic();
-  setLatoP2P(p2pLato === 'compro' ? 'vendo' : 'compro', true);
-}
 function setLatoP2P(lato, senzaScossa){
   if (!P2P_LATO_K[lato]) return;
   if (!senzaScossa) scuotiLogoP2P();
@@ -50877,6 +50811,16 @@ function setLatoP2P(lato, senzaScossa){
      e al ritorno il lato e' ancora quello scelto. */
   document.body.classList.toggle('p2p-vendo', p2pLato === 'vendo');
   renderP2P();
+}
+/* IL LOGO CHE VOLTA IL LIBRO (11 ott 2026, cantieri «logo-compra-vendi»
+   e «logo-come-prima»): il tocco sul logo e' il tocco sull'ALTRO tab,
+   ne' piu' ne' meno — la stessa chiamata, senza `senzaScossa`: il logo
+   dondola, vibra, i gemelli sfumano, coi tempi di sempre. Non tiene un
+   conto suo: legge `p2pLato` e lo fa cambiare a `setLatoP2P`, quindi
+   da qualunque parte si cambi il lato e' uno. Una capovolta sua il
+   logo l'ha avuta per un pomeriggio: tolta da Andrea, non torna. */
+function voltaLatoP2P(){
+  setLatoP2P(p2pLato === 'compro' ? 'vendo' : 'compro');
 }
 
 /* quanto manca alla scadenza, a grana grossa: e' un ordine di qualcun

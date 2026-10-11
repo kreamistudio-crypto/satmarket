@@ -145496,15 +145496,19 @@ console.log(JSON.stringify(c));
 
 def prove_logo_compra_vendi():
     """IL LOGO CHE VOLTA IL LIBRO (11 ott 2026, richiesta di Andrea,
-    cantiere «logo-compra-vendi»). Il logo fra i due tab del libro P2P
-    e' un bottone: un tocco passa da «Compra BTC» a «Vendi BTC» e
-    ritorno, con una capovolta breve. Quel che queste prove tengono
-    fermo: e' un bottone VERO, col suo nome per il lettore di schermo;
-    il lato ha UN padrone (`setLatoP2P`), quindi logo e tab non possono
-    dire due cose; la riga non cambia misura; il movimento ha i suoi
-    tempi in pari e si spegne con gli effetti ridotti. Il banco fa
-    girare le funzioni VERE con un orologio finto."""
-    print("\n[il logo che volta il libro: Compra ⇄ Vendi]")
+    cantiere «logo-compra-vendi»; RIFATTO la sera stessa, cantiere
+    «logo-come-prima»). Il logo fra i due tab del libro P2P e' un
+    bottone: un tocco passa da «Compra BTC» a «Vendi BTC» e ritorno.
+    E NON SI VEDE CHE LO E'. La prima stesura aveva una pastiglia «⇄»
+    sotto il logo e una capovolta «a moneta»: Andrea l'ha provata sul
+    telefono e le ha tolte. Quel che queste prove tengono fermo, quindi:
+    il logo ha l'aspetto di PRIMA (le sue regole sono quelle, il bottone
+    e' nudo, dentro non c'e' niente da vedere oltre la pila); al tocco
+    succede quel che succede toccando l'ALTRO TAB, ne' piu' ne' meno (il
+    banco confronta le due mosse sulle funzioni vere); resta un bottone
+    vero con la sua frase per il lettore di schermo; e pastiglia e
+    capovolta non tornano."""
+    print("\n[il logo che volta il libro: un bottone che non si vede]")
     import json as _json, shutil as _sh, subprocess as _sp, tempfile as _tf
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
     css = mini[mini.index("<style>") + len("<style>"):mini.index("</style>")]
@@ -145518,16 +145522,16 @@ def prove_logo_compra_vendi():
           [mini.count('id="p2pVolta"'), testa in lati,
            testa in lati and lati.index('id="p2pLatoCompro"')
            < lati.index(testa) < lati.index('id="p2pLatoVendo"')])
-    bott = lati[lati.index(testa):] if testa in lati else ""
+    bott = lati[lati.index(testa) + len(testa):] if testa in lati else ""
     bott = bott[:bott.index("</button>")] if "</button>" in bott else ""
     prova("...e' un bottone, non un terzo tab: i tab restano due",
           [2, 0], [lati.count('role="tab"'), bott.count("role=")])
-    prova("dentro ci sono i due gemelli di sempre e la pastiglia ⇄, "
-          "muti per il lettore di schermo", True,
-          '<span class="p2p-logo-pila" aria-hidden="true">' in bott
-          and "/assets/p2p-logo-compra.webp" in bott
-          and "/assets/p2p-logo-vendi.webp" in bott
-          and '<span class="p2p-volta-segno" aria-hidden="true"><svg ' in bott)
+    PILA = ('<span class="p2p-logo-pila" aria-hidden="true"><img class="p2p-logo compra" '
+            'src="/assets/p2p-logo-compra.webp" alt="" onerror="this.remove()">'
+            '<img class="p2p-logo vendi" src="/assets/p2p-logo-vendi.webp" alt="" '
+            'onerror="this.remove()"></span>')
+    prova("dentro c'e' la pila dei due gemelli, la STESSA riga di prima "
+          "del cantiere, muta per il lettore di schermo", 1, bott.count(PILA))
     # le due frasi si scrivono coi nomi dei TAB, letti dal markup: se un
     # giorno un tab cambia nome, la frase rimasta indietro esce qui
     nomi = dict(re.findall(r'id="p2pLato(Compro|Vendo)"[^>]*>([^<]+)</button>', lati))
@@ -145536,15 +145540,21 @@ def prove_logo_compra_vendi():
                "su-vendi": "Sei su %s. Tocca per passare a %s"
                % (nomi["Vendo"], nomi["Compro"])}
               if len(nomi) == 2 else {})
+    frasi = re.findall(r'<span class="solo-voce (su-compra|su-vendi)">'
+                       r'([^<]+)</span>', bott)
     prova("il lettore di schermo sente dove si e' e dove si va, coi nomi "
-          "dei due tab", attese,
-          dict(re.findall(r'<span class="solo-voce (su-compra|su-vendi)">'
-                          r'([^<]+)</span>', bott)))
+          "dei due tab", attese, dict(frasi))
     prova("...e il nome del bottone viene da li': niente aria-label ne' "
           "title che lo coprano", False,
           "aria-label" in bott or "title=" in bott)
+    resto = bott.replace(PILA, "")
+    for _c, _f in frasi:
+        resto = resto.replace('<span class="solo-voce %s">%s</span>' % (_c, _f), "")
+    prova("NIENT'ALTRO nel bottone: la pila e le due frasi fuori dalla "
+          "vista — nessun segno, freccia o disegno aggiunto al logo", "",
+          resto.strip())
 
-    # --- 2) LA CASCATA: una frase sola, e il colore del lato ----------
+    # --- 2) LA CASCATA: una frase sola --------------------------------
     regole, _sq = _regole_css(css)
 
     def catena(vendo, classi):
@@ -145566,85 +145576,88 @@ def prove_logo_compra_vendi():
           [["su-compra"], ["su-vendi"]], [si_legge(False), si_legge(True)])
     prova("...e tutt'e due stanno fuori dalla vista, non spente (spente "
           "non le leggerebbe nessuno)",
-          ["absolute", "1px", "rect(0 0 0 0)"],
+          ["absolute", "1px", "1px", "hidden", "rect(0 0 0 0)"],
           [vince(False, "solo-voce su-compra", p)
-           for p in ("position", "width", "clip")])
-    prova("la pastiglia veste il lato: verde a comprare, rossa a vendere",
-          ["var(--trust)", "var(--rosso-p2p)"],
-          [vince(False, "p2p-volta-segno", "background"),
-           vince(True, "p2p-volta-segno", "background")])
-    prova("...col segno del colore del FONDO, non bianco: di sera il "
-          "verde e il rosso si schiariscono", "var(--bg)",
-          vince(False, "p2p-volta-segno", "color"))
+           for p in ("position", "width", "height", "overflow", "clip")])
 
-    # --- 3) LE MISURE: la riga dei tab non si sposta ------------------
-    vb = pezzo_js(css, "  .p2p-volta{", "}")
-    prova("il bottone non ha bordo, respiro ne' margine: al tab restano "
-          "gli stessi pixel", True,
-          "flex:0 0 auto;" in vb and "padding:0;margin:0;" in vb
-          and "border:none;" in vb and "position:relative;" in vb)
-    prova("...e il margine negativo resta sulla pila, dov'era", True,
+    # --- 3) NESSUN CAMBIO VISIVO: il bottone e' nudo ------------------
+    # Tutte le regole che nominano il bottone, una per una: una regola in
+    # piu' (un segno, un'ombra, un :hover, un :active) esce qui.
+    mie = [(sel.strip(), corpo) for lista, corpo, _g in regole
+           for sel in _dividi_css(lista) if "p2p-volta" in sel]
+    prova("le regole del bottone sono queste sei e basta: lui, il fuoco "
+          "da tastiera, le frasi fuori vista e il loro interruttore",
+          [".p2p-volta", ".p2p-volta:focus-visible", ".p2p-volta .solo-voce",
+           ".p2p-volta .su-vendi", "body.p2p-vendo .p2p-volta .su-compra",
+           "body.p2p-vendo .p2p-volta .su-vendi"], [s for s, _c in mie])
+    nudo = {}
+    for d in (dict(mie).get(".p2p-volta") or "").split(";"):
+        k, due, v = d.partition(":")
+        if due:
+            nudo[k.strip()] = " ".join(v.split())
+    prova("il bottone non veste niente: azzera quel che un bottone porta "
+          "di suo (bordo, fondo, respiro, margine, carattere) e non "
+          "aggiunge nulla che si veda",
+          {"position": "relative", "flex": "0 0 auto", "display": "flex",
+           "padding": "0", "margin": "0", "border": "none",
+           "background": "none", "color": "inherit", "font": "inherit",
+           "cursor": "pointer", "border-radius": "18px",
+           "-webkit-tap-highlight-color": "transparent",
+           "touch-action": "manipulation"}, nudo)
+    prova("l'unico segno e' il contorno del fuoco, e solo da tastiera "
+          "(:focus-visible, mai :focus ne' :hover ne' :active)", True,
+          ".p2p-volta:focus-visible{outline:2.5px solid var(--sats);"
+          "outline-offset:2px}" in css
+          and not re.search(r"\.p2p-volta:(?!focus-visible)", css))
+    # LE REGOLE DEL LOGO SONO QUELLE DI PRIMA DEL CANTIERE, alla lettera:
+    # la pila, i gemelli, la sfumata, il dondolio, gli effetti ridotti.
+    LOGO_DI_PRIMA = (
+        "  .p2p-logo-pila{display:grid}\n"
+        "  .p2p-logo{grid-area:1/1;width:var(--logo-p2p,76px);height:var(--logo-p2p,76px);\n"
+        "    filter:drop-shadow(0 3px 6px rgba(60,45,10,.18));\n"
+        "    transition:opacity .3s ease}\n"
+        "  .p2p-logo.vendi{opacity:0}\n"
+        "  body.p2p-vendo .p2p-logo.vendi{opacity:1}\n"
+        "  /* LA SCOSSA al tocco del tab (set 2026): un dondolio breve sulla\n"
+        "     pila intera, riavviato dal JS togli-e-rimetti (scuotiLogoP2P) */\n"
+        "  .p2p-logo-pila.scossa{animation:logoScossa .35s ease}\n"
+        "  @keyframes logoScossa{0%{transform:rotate(0)}25%{transform:rotate(-5deg)}\n"
+        "    55%{transform:rotate(4deg)}80%{transform:rotate(-2deg)}100%{transform:rotate(0)}}\n"
+        "  @media (prefers-reduced-motion:reduce){\n"
+        "    .p2p-logo{transition:none}\n"
+        "    .p2p-logo-pila.scossa{animation:none}\n"
+        "  }\n")
+    prova("le regole del logo sono quelle di prima del cantiere, alla "
+          "lettera: stessa sfumata (.3s), stesso dondolio (.35s), stessi "
+          "effetti ridotti", 1, css.count(LOGO_DI_PRIMA))
+    quelle_del_logo = sorted(set(
+        sel.strip() for lista, _c, _g in regole for sel in _dividi_css(lista)
+        if "p2p-logo" in sel and "p2p-logo-grande" not in sel))
+    prova("...e nessun'altra regola veste il logo: l'elenco e' quello di "
+          "prima",
+          [".p2p-lati .p2p-logo-pila", ".p2p-logo", ".p2p-logo-pila",
+           ".p2p-logo-pila.scossa", ".p2p-logo.vendi",
+           "body.p2p-vendo .p2p-logo.vendi"], quelle_del_logo)
+    prova("...col margine negativo sulla pila, dov'era: la riga non "
+          "cambia misura", True,
           "margin:0 0 calc(var(--logo-p2p) * -.105)"
           in pezzo_js(css, "  .p2p-lati .p2p-logo-pila{", "}"))
-    m_s = re.search(r"\.p2p-volta-segno\{position:absolute;left:50%;"
-                    r"bottom:-(\d+)px;margin-left:-(\d+)px;", css)
-    m_w = re.search(r"\n    width:(\d+)px;height:(\d+)px;border-radius:999px;\n"
-                    r"    background:var\(--trust\)", css)
-    m_m = re.search(r"\.p2p-lati\{display:flex;align-items:flex-end;"
-                    r"margin:0 0 (\d+)px;", css)
-    m_l = re.search(r"--logo-p2p:clamp\((\d+)px,", css)
-    prova("la pastiglia si legge e i conti delle misure ci sono", True,
-          bool(m_s and m_w and m_m and m_l))
-    if m_s and m_w and m_m and m_l:
-        sporge, meta = int(m_s.group(1)), int(m_s.group(2))
-        larga, alta = int(m_w.group(1)), int(m_w.group(2))
-        prova("...sta in mezzo (il margine e' meta' della larghezza)",
-              larga, meta * 2)
-        prova("...sporge sotto la riga MENO del margine che c'e': non "
-              "tocca le pillole", True, 0 < sporge < int(m_m.group(1)))
-        prova("...e sta dentro il logo piu' piccolo (76px a 320)", True,
-              larga < int(m_l.group(1)) and sporge < alta)
-    prova("il fuoco da tastiera si vede", True,
-          ".p2p-volta:focus-visible{outline:2.5px solid var(--sats);"
-          "outline-offset:2px}" in css)
+    prova("la pastiglia «⇄» e la capovolta NON TORNANO (tolte da Andrea "
+          "l'11 ott 2026, provate sul telefono)",
+          [0, 0, 0, 0, 0, 0],
+          [mini.count("p2p-volta-segno"), mini.count("logoVolta"),
+           mini.count("giraLogoP2P"), mini.count("p2pVoltaTimer"),
+           len(re.findall(r"\.volta\b", css)),
+           len(re.findall(r"classList\.add\('volta'\)", mini))])
+    prova("...e di animazioni del logo ce n'e' una: il dondolio", 1,
+          len(re.findall(r"@keyframes logo\w+\{", css)))
 
-    # --- 4) IL MOVIMENTO: i tempi in pari, e gli effetti ridotti ------
-    m_d = re.search(r"\.p2p-logo-pila\.volta\{animation:logoVolta (\.\d+)s linear\}", css)
-    m_r = re.search(r"\.p2p-logo-pila\.volta \.p2p-logo\{transition:opacity 0s "
-                    r"linear (\.\d+)s\}", css)
-    gl = pezzo_js(mini, "function giraLogoP2P(){", "\n}\n")
-    m_t = re.search(r"\.forEach\(p => p\.classList\.remove\('volta'\)\), (\d+)\);", gl)
-    prova("la capovolta ha la sua durata, il suo scatto e il suo ritiro",
-          True, bool(m_d and m_r and m_t))
-    if m_d and m_r and m_t:
-        dur, rit, ms = float(m_d.group(1)), float(m_r.group(1)), int(m_t.group(1))
-        prova("...breve: fra tre e cinque decimi", True, 0.3 <= dur <= 0.5)
-        prova("...il gemello cambia a META' corsa, quando il disegno e' "
-              "di taglio", dur, rit * 2)
-        prova("...e la classe se ne va un soffio DOPO: prima la "
-              "taglierebbe", True, dur * 1000 < ms <= dur * 1000 + 100)
-    prova("di taglio a meta': 90 gradi, e riparte da -90 (una moneta, "
-          "non una porta)", True,
-          "49.9%{transform:perspective(520px) rotateY(90deg)}" in css
-          and "50%{transform:perspective(520px) rotateY(-90deg);" in css
-          and "100%{transform:perspective(520px) rotateY(0)}}" in css)
-    prova("la capovolta sta scritta DOPO la scossa: se arrivano insieme "
-          "vince lei", True,
-          ".p2p-logo-pila.scossa{animation:logoScossa" in css
-          and css.index(".p2p-logo-pila.scossa{animation:logoScossa")
-          < css.index(".p2p-logo-pila.volta{animation:logoVolta"))
-    prova("con gli effetti ridotti: niente capovolta, niente scatto "
-          "ritardato, niente giro del segno", True,
-          "    .p2p-logo-pila.volta{animation:none}\n"
-          "    .p2p-logo-pila.volta .p2p-logo{transition:none}\n"
-          "    .p2p-volta-segno,.p2p-volta-segno svg{transition:none}\n" in css)
-
-    # --- 5) UN PADRONE SOLO --------------------------------------------
+    # --- 4) IL TOCCO E' QUELLO DEL TAB ---------------------------------
     vl = pezzo_js(mini, "function voltaLatoP2P(){", "\n}\n")
-    prova("il tocco sul logo passa dalla porta dei tab, e non scrive il "
-          "lato da se'", [True, False],
-          ["setLatoP2P(p2pLato === 'compro' ? 'vendo' : 'compro', true);" in vl,
-           bool(re.search(r"p2pLato\s*=[^=]", vl)) or "classList.toggle(" in vl])
+    prova("il tocco sul logo e' UNA chiamata: la porta dei tab, verso "
+          "l'altro lato, senza `senzaScossa`",
+          "function voltaLatoP2P(){\n"
+          "  setLatoP2P(p2pLato === 'compro' ? 'vendo' : 'compro');", vl)
     prova("il lato lo scrive setLatoP2P e nessun altro: una riga per la "
           "variabile, una per il body", [1, 1, True],
           [len(re.findall(r"(?<![\w.])p2pLato = ", mini)) - 1,
@@ -145657,25 +145670,31 @@ def prove_logo_compra_vendi():
     prova("...e i due tab lo leggono da li', a ogni ridisegno", True,
           all(r in rp for r in righe_tab))
 
-    # --- 6) IL BANCO: le funzioni vere, l'orologio finto ---------------
+    # --- 5) IL BANCO: le funzioni vere, l'orologio finto ---------------
+    # La domanda e' una: il tocco sul logo lascia la pagina ESATTAMENTE
+    # come il tocco sull'altro tab? Stesse classi sul logo, stesse
+    # chiamate nello stesso ordine, stessi timer in coda.
     node = _sh.which("node")
     if not node:
         salta("il banco del logo che volta il libro", "node non c'e'")
         return
     i0 = mini.index("let p2pScossaTimer = null;")
-    i1 = mini.index("\n}\n", mini.index("function setLatoP2P(lato, senzaScossa){")) + 3
+    i1 = mini.index("\n}\n", mini.index("function voltaLatoP2P(){")) + 3
     banco = r"""
 let p2pLato = 'compro';
 const P2P_LATO_K = {compro: 'sell', vendo: 'buy'};
 let fatti = [];
 function haptic(){ fatti.push('vibra'); }
 const classi = () => { const s = new Set(); return {s,
-  remove(c){ s.delete(c); }, add(c){ s.add(c); }, contains(c){ return s.has(c); },
+  remove(c){ s.delete(c); }, add(c){ s.add(c); fatti.push('classe+' + c); },
+  contains(c){ return s.has(c); },
   toggle(c, on){ if (on) s.add(c); else s.delete(c); }}; };
 const pila = {classList: classi(), get offsetWidth(){ fatti.push('reflow'); return 1; }};
-const tab = {p2pLatoCompro: {classList: classi()}, p2pLatoVendo: {classList: classi()}};
+const quiete = () => { const s = new Set(); return {s, remove(c){ s.delete(c); }, add(c){ s.add(c); },
+  contains(c){ return s.has(c); }, toggle(c, on){ if (on) s.add(c); else s.delete(c); }}; };
+const tab = {p2pLatoCompro: {classList: quiete()}, p2pLatoVendo: {classList: quiete()}};
 const el = id => tab[id] || null;
-const document = {body: {classList: classi()},
+const document = {body: {classList: quiete()},
   querySelectorAll: s => s === '.p2p-logo-pila' ? [pila] : []};
 let coda = [], nid = 1;
 function setTimeout(f, ms){ const id = nid++; coda.push({id, f, ms}); return id; }
@@ -145693,19 +145712,20 @@ const foto = () => ({lato: p2pLato, body: document.body.classList.contains('p2p-
 const pari = () => (document.body.classList.contains('p2p-vendo') === (p2pLato === 'vendo'))
   && (tab.p2pLatoCompro.classList.contains('attiva') === (p2pLato === 'compro'))
   && (tab.p2pLatoVendo.classList.contains('attiva') === (p2pLato === 'vendo'));
-function zero(){ scorri(); p2pLato = 'vendo'; setLatoP2P('compro', true); scorri(); fatti = []; }
+function parti(da){ scorri(); p2pLato = da === 'compro' ? 'vendo' : 'compro'; setLatoP2P(da, true); scorri(); fatti = []; }
 const out = {};
-function caso(nome, f){ try { zero(); out[nome] = f(); } catch(e) { out[nome] = 'ESPLOSO: ' + e.message; } }
-caso('logo', () => { voltaLatoP2P(); const a = foto(); scorri(); return [a, [...pila.classList.s]]; });
-caso('ritorno', () => { voltaLatoP2P(); scorri(); fatti = []; voltaLatoP2P(); return foto(); });
-caso('tabPoiLogo', () => { setLatoP2P('vendo'); const sulTab = [...pila.classList.s];
-  fatti = []; voltaLatoP2P(); return [sulTab, foto()]; });
-caso('logoPoiTab', () => { voltaLatoP2P(); fatti = []; setLatoP2P('vendo'); const a = foto();
-  setLatoP2P('compro'); return [a.lato, a.fatti, foto().lato, pari()]; });
-caso('dueTocchi', () => { voltaLatoP2P(); voltaLatoP2P(); const a = foto(); scorri();
+function caso(nome, f){ try { out[nome] = f(); } catch(e) { out[nome] = 'ESPLOSO: ' + e.message; } }
+/* la stessa partenza, le due mosse: il TAB dell'altro lato e il LOGO */
+for (const da of ['compro', 'vendo']) {
+  const altro = da === 'compro' ? 'vendo' : 'compro';
+  caso('tab_da_' + da, () => { parti(da); setLatoP2P(altro); const a = foto(); scorri(); return [a, [...pila.classList.s]]; });
+  caso('logo_da_' + da, () => { parti(da); voltaLatoP2P(); const a = foto(); scorri(); return [a, [...pila.classList.s]]; });
+}
+caso('dueTocchi', () => { parti('compro'); voltaLatoP2P(); voltaLatoP2P(); const a = foto(); scorri();
   return [a.lato, a.tempi, [...pila.classList.s]]; });
-caso('zitto', () => { setLatoP2P('vendo', true); return foto(); });
-caso('misto', () => { let storti = 0, atteso = 'compro', seme = 7;
+caso('tabPoiLogoPoiTab', () => { parti('compro'); setLatoP2P('vendo'); const a = p2pLato;
+  voltaLatoP2P(); const b = p2pLato; setLatoP2P('vendo'); return [a, b, p2pLato, pari()]; });
+caso('misto', () => { parti('compro'); let storti = 0, atteso = 'compro', seme = 7;
   const mosse = [() => { voltaLatoP2P(); atteso = atteso === 'compro' ? 'vendo' : 'compro'; },
                  () => { setLatoP2P('compro'); atteso = 'compro'; },
                  () => { setLatoP2P('vendo'); atteso = 'vendo'; },
@@ -145729,33 +145749,27 @@ console.log(JSON.stringify(out));
     if out is None:
         prova("il banco del logo che volta il libro gira", "", (r.stderr or "")[-600:])
         return
-    prova("un tocco sul logo: si passa a Vendi, il body e i due tab lo "
-          "dicono, il logo si capovolge (non dondola), una vibrazione, "
-          "un ridisegno — e a fine giro la classe se ne va",
-          [{"lato": "vendo", "body": True, "compra": False, "vendi": True,
-            "pila": ["volta"], "fatti": ["reflow", "vibra", "render"],
-            "tempi": [450]}, []], out["logo"])
-    prova("...un secondo tocco riporta a Compra, allo stesso modo",
-          {"lato": "compro", "body": False, "compra": True, "vendi": False,
-           "pila": ["volta"], "fatti": ["reflow", "vibra", "render"],
-           "tempi": [450]}, out["ritorno"])
-    prova("dal tab a Vendi (il logo dondola, come sempre) e poi il logo: "
-          "si torna a Compra, e la scossa cede alla capovolta",
-          [["scossa"], {"lato": "compro", "body": False, "compra": True,
-                        "vendi": False, "pila": ["volta"],
-                        "fatti": ["reflow", "vibra", "render"],
-                        "tempi": [400, 450]}], out["tabPoiLogo"])
-    prova("dal logo a Vendi e poi il tab «Vendi»: gia' li', quindi solo "
-          "il dondolio e nessun ridisegno; poi il tab «Compra» riporta "
-          "indietro, tutto in pari",
-          ["vendo", ["reflow"], "compro", True], out["logoPoiTab"])
+    come_il_tab = lambda lato: [
+        {"lato": lato, "body": lato == "vendo", "compra": lato == "compro",
+         "vendi": lato == "vendo", "pila": ["scossa"],
+         "fatti": ["reflow", "classe+scossa", "vibra", "render"],
+         "tempi": [400]}, []]
+    prova("il tab «Vendi» toccato da Compra: il logo dondola, una "
+          "vibrazione, un ridisegno, la classe via a 400ms (il "
+          "comportamento di sempre, qui solo fotografato)",
+          come_il_tab("vendo"), out["tab_da_compro"])
+    prova("IL LOGO toccato da Compra fa ESATTAMENTE lo stesso: stesse "
+          "classi, stesse chiamate nello stesso ordine, stesso timer",
+          out["tab_da_compro"], out["logo_da_compro"])
+    prova("il tab «Compra» toccato da Vendi, idem",
+          come_il_tab("compro"), out["tab_da_vendo"])
+    prova("...e il logo toccato da Vendi fa esattamente lo stesso",
+          out["tab_da_vendo"], out["logo_da_vendo"])
     prova("due tocchi di fila sul logo: si e' di nuovo a Compra, un solo "
-          "ritiro in coda, e poi la classe via", ["compro", [450], []],
+          "ritiro in coda, e poi la classe via", ["compro", [400], []],
           out["dueTocchi"])
-    prova("chi mette il lato senza dito (il +, un ordine da un link) non "
-          "capovolge e non vibra — ma tab, body e logo lo seguono",
-          {"lato": "vendo", "body": True, "compra": False, "vendi": True,
-           "pila": [], "fatti": ["render"], "tempi": []}, out["zitto"])
+    prova("tab, logo, tab: Vendi, Compra, Vendi — sempre in pari",
+          ["vendo", "compro", "vendo", True], out["tabPoiLogoPoiTab"])
     prova("duecento mosse mescolate (logo, tab, cambi muti, un lato "
           "storto): lato, body e tab non si scollano mai", 0, out["misto"])
 

@@ -49359,6 +49359,10 @@ push solo dopo aver RILETTO la coda del verbale.
 
 ## Il logo che volta il libro: Compra ⇄ Vendi dal logo P2P (11 ott 2026, cantiere logo-compra-vendi, richiesta di Andrea)
 
+⚠️ SUPERATA IN DUE PUNTI la sera stessa (voce «Il logo torna com'era»):
+la pastiglia «⇄» del punto 2 e la capovolta del punto 5 NON CI SONO PIÙ,
+tolte da Andrea dopo averle provate sul telefono. Restano il bottone,
+il padrone unico e le due frasi per il lettore di schermo.
 LA RICHIESTA: in cima al libro degli ordini il logo P2P cliccabile — un
 tocco passa da «Compra» a «Vendi» e ritorno, con un'animazione breve;
 che si capisca che si tocca e da che parte si è; allineato a quel che
@@ -49445,3 +49449,87 @@ e al tab ne restano 98 per una scritta da 102), identico col markup di
 prima. I due tab non hanno `aria-selected`.
 RESTA DA GUARDARE: il movimento sul telefono vero e dentro Telegram
 vero; la frase con TalkBack o VoiceOver.
+
+## Il logo torna com'era: resta un bottone, senza pastiglia né capovolta (11 ott 2026, sera, cantiere logo-come-prima, correzione di Andrea)
+
+LA CORREZIONE, dal telefono di Andrea: «non va bene così». 1) Via la
+pastiglia «⇄» sotto il logo e qualsiasi freccia o segno aggiunto: il
+logo ha esattamente l'aspetto di prima del cantiere. 2) Via la
+capovolta a moneta: al tocco del logo succede esattamente quel che
+succedeva toccando l'altro tab, stessa animazione e stessi tempi,
+nient'altro. 3) Resta un bottone vero per il lettore di schermo, con la
+sua frase, senza nessun cambio visivo.
+COSA SI È FATTO. Tolti dal CSS la pastiglia, la capovolta
+(`logoVolta`, la classe `volta`, lo scatto ritardato del gemello) e
+dal JS `giraLogoP2P` col suo timer. `voltaLatoP2P` è una riga:
+`setLatoP2P(altro)`, SENZA `senzaScossa` — la chiamata che fa un tab,
+quindi il dondolio (0,35 s), la sfumata dei gemelli (0,3 s), la
+vibrazione e il ritiro della classe a 400 ms sono quelli di sempre
+perché sono le stesse righe. Nel bottone restano la pila dei gemelli
+(la riga di markup di prima, intatta) e le due frasi fuori dalla vista.
+Rispetto a e319907, l'ultimo commit prima del cantiere, `miniapp.html`
+ha SOLO righe in più: il bottone attorno alla pila, le sue sei regole,
+la funzione di una riga. Nessuna regola del logo è cambiata.
+IL FUOCO DA TASTIERA RESTA, e va detto perché è l'unica cosa che può
+farsi vedere: il contorno compare a chi arriva sul bottone col tasto
+Tab (`:focus-visible`), mai col dito né col mouse. Toglierlo
+lascerebbe chi naviga da tastiera senza sapere dove si trova; il
+browser, del resto, uno suo lo disegnerebbe comunque. Se Andrea non lo
+vuole si toglie con una riga. Sul PC il cursore sopra il logo è la
+manina, come sui tab.
+LA LEZIONE (mia). Nel brief «per esempio il logo con sotto o accanto
+"Compra ⇄ Vendi"… il logo che gira o si capovolge» erano esempi: li ho
+presi come licenza di disegnare, e ho aggiunto un segno a un marchio e
+un'animazione nuova senza mostrarli prima. Su un marchio la variante
+giusta di un «per esempio» è la più sobria, e uno scatto si manda
+PRIMA del push, non dopo.
+PROVATO. `prove_logo_compra_vendi` riscritta, 26 prove: nel bottone
+c'è la pila e le due frasi e NIENT'ALTRO; le regole che nominano il
+bottone sono sei, elencate, e quella del bottone ha solo azzeramenti;
+le regole del logo sono quelle di prima ALLA LETTERA (il blocco
+intero, confrontato come testo) e l'elenco dei loro selettori è quello
+di prima; pastiglia e capovolta non tornano (contate a zero); il banco
+in node, sulle funzioni vere, fa la STESSA partenza due volte — una
+col tab dell'altro lato, una col logo — e confronta tutto: classi
+sulla pila, chiamate nell'ordine, timer in coda. Uguali. Tortura: 33
+mutazioni, 33 prese (un segno nel bottone, un `::after`, un `:hover`,
+un'ombra, la sfumata o il dondolio ritoccati, una vibrazione in più,
+il logo muto…).
+DAL VIVO, prima/dopo a 375 px: due server in collaudo col relay morto
+— uno sul worktree fermo a e319907, uno su questo —, Chrome pilotato
+con tocchi veri, lo stesso libro seminato a numeri fissi, chiaro e
+scuro. PRIMA si tocca il tab «Vendi», DOPO si tocca il logo.
+• Le misure della riga (tab, pila, immagine, pillole) sono identiche
+  al centesimo di pixel.
+• Gli scatti interi a Compra e a Vendi: ZERO pixel diversi, nei due
+  temi. (Al primo giro 150 pixel diversi a Compra chiaro: una cifra
+  del «% meno conveniente» di una card, perché i due server avevano
+  letto il cambio in due momenti; al secondo giro zero. La controprova:
+  Compra contro Vendi dà 199.287.)
+• L'animazione: il browser dichiara le stesse due — `logoScossa`
+  350 ms sulla pila, la transizione di `opacity` 300 ms `ease` sul
+  gemello —, stessi fotogrammi chiave; i due elenchi sono uguali come
+  dati. Col tocco vero la classe `scossa` resta 383-384 ms in tutti e
+  quattro i giri e la sfumata dura 217 ms di fotogrammi intermedi.
+• Sei fotogrammi fermi del ritorno a Compra (0, 60, 120, 200, 280,
+  340 ms, orologio delle animazioni messo a mano): identici al pixel,
+  salvo quello a 280 ms nel chiaro, dove 58 pixel del disegno
+  differiscono di 1-2 livelli su 255 — non si vede, ed è dell'ordine
+  del rumore del banco (nello scuro la STESSA pagina differisce da sé
+  fra due giri di 51 pixel per 1 livello). Detto perché «identico»
+  qui è una misura.
+• Solo dopo: il nome del bottone letto da Chrome nei due lati; logo,
+  tab e logo di nuovo, sempre in pari; dentro Telegram di cartone una
+  vibrazione per tocco e il tasto indietro; con gli effetti ridotti
+  nessuna animazione e il lato cambia. Nessun errore di pagina.
+Gli scatti: `.claude/giri/logo-come-prima/` (`00-prima-dopo-chiaro.png`
+e `-scuro.png` sono i fogli affiancati).
+COSA È GIRATO SU QUALE ALBERO. Sull'albero di questo cantiere, sopra
+bfd182f (la punta di main, con la sua CI verde): `PROVE_SEVERE=1 python
+prove.py` INTERA, 22173 passate e 0 fallite, nessuna saltata (sette in
+meno del pomeriggio: la sezione è scesa da 33 a 26); i 58 collaudi del
+workflow nella gabbia, 58 verdi in un giro solo, senza limite di tempo;
+`compileall`; lo scanner dei segreti sulle righe aggiunte, con le forme
+lette dal workflow e la sua controprova: zero.
+RESTA DA GUARDARE: il telefono vero, che è il giudice di questo
+cantiere; la frase con TalkBack o VoiceOver.

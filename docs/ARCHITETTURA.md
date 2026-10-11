@@ -27431,14 +27431,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   DONDOLA alla prima apertura della sessione (`p2pLogoSalutato`, in
   `go()`) e al tocco di un tab, mai a ogni ritorno: `scuotiLogoP2P`
   toglie la classe dopo 400ms.
-  IL LOGO DEL LIBRO E' UN BOTTONE (11 ott 2026): `#p2pVolta` fra i due
-  tab, `voltaLatoP2P` passa all'altro lato dalla porta dei tab
-  (`setLatoP2P(altro, true)`, l'unica che scrive `p2pLato` e
-  `body.p2p-vendo`) e capovolge il logo (`giraLogoP2P`, classe `volta`
-  via dopo 450ms). Gemello, colore della pastiglia «⇄» e frase per il
-  lettore di schermo li accende `body.p2p-vendo` dal CSS: nessuna
-  seconda copia del lato. Verbale: CANTIERI, «Il logo che volta il
-  libro» (`prove_logo_compra_vendi`).
+  IL LOGO DEL LIBRO E' UN BOTTONE CHE NON SI VEDE (11 ott 2026):
+  `#p2pVolta` fra i due tab, e `voltaLatoP2P` e' il tocco sull'ALTRO
+  tab — `setLatoP2P(altro)`, senza `senzaScossa`: stesso dondolio,
+  stessa sfumata, stessa vibrazione. Nessun segno aggiunto al logo e
+  nessuna animazione sua (una pastiglia «⇄» e una capovolta sono
+  durate un pomeriggio: tolte da Andrea, non tornano). La frase per
+  il lettore di schermo sta nel bottone, fuori dalla vista, accesa da
+  `body.p2p-vendo`. Verbale: CANTIERI, «Il logo torna com'era»
+  (`prove_logo_compra_vendi`).
   LE CORSE DELLA BARRA P2P (24 set 2026, ritocco di Andrea): UNA durata
   e UNA curva (`--p2p-corsa` 320ms, `--p2p-curva` quella dolce della
   morfosi, che `P2P_MORFO_MS` tiene in pari), e sul telefono SOLO
