@@ -109178,7 +109178,7 @@ def prove_avviso_dm_nostr():
     # blocco, coi nomi che usa, guardato sull'albero e non a occhio
     vietati = {"ev", "msg", "grezzo", "sigillo", "pacco", "voce", "nome",
                "mittente", "chi", "testo", "carico", "chiaro", "npub",
-               "bottone"}
+               "bottone", "risposta", "sfida", "richiesta", "auth_id"}
     usati = set()
     stampe = 0
     for nodo in ast.walk(ast.parse(blocco)):
@@ -109215,7 +109215,7 @@ def prove_avviso_dm_nostr():
     prova("il filo si rifa' da solo quando cade, con un'attesa che cresce "
           "fino a un minuto", (True, True),
           ("while not ferma.is_set():\n        ws = None" in filo,
-           "ferma.wait(min(AVVISO_DM_ATTESA_S * max(1, O[\"cadute\"]), 60))"
+           "                   min(AVVISO_DM_ATTESA_S * max(1, O[\"cadute\"]), 60))"
            in filo))
     prova("...e il polso distingue un relay zitto da una connessione morta",
           (True, True),
@@ -109273,6 +109273,9 @@ def prove_avviso_dm_nostr():
            "ChiavePubblicaNostr": None,
            "ChiavePubblicaCompleta": schnorr_puro.PuntoCompleto,
            "CifrarioDM": _Cif, "ChaCha20DM": _Cha,
+           "urlparse": __import__("urllib.parse").parse.urlparse,
+           "URL_PUBBLICO": "https://barattolo.store",
+           "ONION_HOST": "barattoloabcdefghijklmnop.onion",
            "AVVISO_DM_NOSTR_RELAY": ["wss://nos.lol"]}
     j = blocco.index("AVVISO_DM_PASSO_S = 10")
     exec(blocco[j:blocco.index("def avviso_dm_vivo(", j)], amb)
@@ -109281,7 +109284,8 @@ def prove_avviso_dm_nostr():
               "_hkdf_espandi", "_imbottisci", "nip44_cifra",
               "nip44_decifra", "_dm_relays", "_dm_visto",
               "_dm_mittente_busta", "_dm_setaccia", "_dm_filtri",
-              "_dm_in_coda", "_dm_decidi", "_dm_chi", "_dm_testo"):
+              "_dm_in_coda", "_dm_decidi", "_dm_chi", "_dm_testo",
+              "firma_evento", "_dm_vuole_auth", "_dm_auth", "_dm_riposa"):
         exec(pezzo(f), amb)
     amb["_DM_AVVIO"] = adesso - 100
 
@@ -109298,6 +109302,9 @@ def prove_avviso_dm_nostr():
 
     class _Noi:
         secret = sk_noi
+
+        def sign_schnorr(self, msg):
+            return schnorr_puro.firma(sk_noi, msg)
     amb["_NOSTR"] = (_Noi(), noi)
 
     def firmato(sk, kind, tags, content, creato=None):
@@ -109545,6 +109552,116 @@ def prove_avviso_dm_nostr():
           ('bottone = ("🟣 Apri in un client", f"https://njump.me/{npub}")'
            in avvisa,
            'if voce[0] == "uno" and voce[1]:' in avvisa))
+
+    # --- NIP-42 (11 ott 2026, sera): l'autenticazione ai relay dei DM ---
+    # Acceso in produzione, relay.damus.io ha chiuso la sottoscrizione
+    # con «auth-required». Il giro col relay di cartone che la chiede
+    # in sei modi sta nel collaudo; qui le sentinelle e i pezzi puri.
+    prova("la sfida si firma in UN posto solo del server, e ha UN "
+          "chiamante: il filo dell'avviso dei DM", (1, 2, True),
+          (src.count("firma_evento(22242"), src.count("_dm_auth("),
+           "else _dm_auth(relay, msg[1])" in filo))
+    prova("...una firma per connessione: non se ne fa una seconda finche' "
+          "la prima e' in volo, ne' dopo che e' andata", True,
+          "risposta = None if (autenticato or auth_id) \\\n" in filo)
+    prova("...e il 22242 viaggia solo nel messaggio AUTH: non si pubblica",
+          (True, False),
+          ('ws.send(json.dumps(["AUTH", risposta]))' in filo,
+           '["EVENT", risposta' in blocco))
+    prova("all'OK del relay la sottoscrizione si RIFA' (quella di prima "
+          "l'aveva chiusa)", True,
+          'autenticato, auth_id, attesa_da = True, "", adesso\n'
+          '                        ws.send(richiesta)' in filo)
+    prova("un OK che dice no e' un rifiuto, non una caduta", True,
+          "if len(msg) < 3 or msg[2] is not True:\n"
+          "                            raise DmRifiutato(" in filo)
+    prova("chiuso ancora da autenticati: si rifa' la richiesta UNA volta, "
+          "poi e' un rifiuto", (True, True),
+          ("elif rifatte < 1:\n                            rifatte += 1\n"
+           "                            ws.send(richiesta)" in filo,
+           '"sottoscrizione rifiutata anche dopo "' in filo))
+    prova("un rifiuto aspetta AVVISO_DM_RIFIUTO_S (un'ora), una caduta al "
+          "massimo un minuto", (True, "3600"),
+          ("_dm_riposa(O, ferma, AVVISO_DM_RIFIUTO_S if rifiutato else\n"
+           in filo,
+           re.search(r"\nAVVISO_DM_RIFIUTO_S = (\d+)", blocco).group(1)))
+    prova("...con UNA riga nel journal, al cambio di stato: i tentativi "
+          "dell'ora dopo non scrivono", (True, True),
+          ('if rifiutato and O["stato"] != "rifiutato":' in filo,
+           "riprovo fra un'ora" in filo))
+    prova("...e che si e' autenticato lo dice la riga «in ascolto», non "
+          "una sua: nel filo i print restano tre", 3,
+          codice(filo).count("print("))
+    prova("la chiusura per autenticazione non e' piu' una caduta: prima "
+          "si guarda il perche'", True,
+          filo.index("if not _dm_vuole_auth(")
+          < filo.index('f"sottoscrizione chiusa dal relay: {msg[2:]}")'))
+
+    vuole = amb["_dm_vuole_auth"]
+    prova("il perche' di una chiusura parla di autenticazione? La frase di "
+          "relay.damus.io (col suo «ERROR:» davanti), i due prefissi della "
+          "specifica; non un rate-limit, non il vuoto",
+          [True, True, True, False, False, False],
+          [vuole("ERROR: auth-required: requested filter requires "
+                 "authentication"),
+           vuole("auth-required: chi sei?"), vuole("restricted: non puoi"),
+           vuole("rate-limited: piano"), vuole(""), vuole(None)])
+    auth = amb["_dm_auth"]
+    ev = auth("wss://relay.damus.io", "la-sfida-del-relay")
+    prova("la risposta alla sfida: kind 22242, i due tag della specifica — "
+          "il relay scritto da NOI, la sfida sua —, contenuto vuoto, "
+          "firmata dalla chiave della piattaforma",
+          (22242, [["relay", "wss://relay.damus.io"],
+                   ["challenge", "la-sfida-del-relay"]], "", noi, True, True),
+          (ev["kind"], ev["tags"], ev["content"], ev["pubkey"],
+           amb["_x_firma_valida"](ev), abs(ev["created_at"] - adesso) < 60))
+    prova("una sfida che non e' una stringa, vuota, o oltre il tetto non "
+          "si firma; al tetto si'", [None, None, None, None, True],
+          [auth("wss://r.example", 123), auth("wss://r.example", ""),
+           auth("wss://r.example", ["x"]), auth("wss://r.example", "x" * 257),
+           bool(auth("wss://r.example", "x" * 256))])
+    prova("MAI a un relay che sta sul nostro nome, sito o onion: quella "
+          "firma varrebbe come login da Barattolo (`verifica_evento_login` "
+          "legge lo stesso kind e crede al tag `relay` di casa)",
+          [None, None, None, None],
+          [auth("wss://barattolo.store/relay", "s"),
+           auth("wss://BARATTOLO.store:443", "s"),
+           auth("ws://barattoloabcdefghijklmnop.onion", "s"),
+           auth("wss://utente@barattolo.store", "s")])
+    prova("...e il login chiede davvero quel che la cintura nega: il tag "
+          "`relay` uguale al nostro host", True,
+          "if not host or urlparse(origine).netloc != host:"
+          in pezzo("verifica_evento_login"))
+    amb["ONION_HOST"] = ""
+    prova("...senza un onion nel config la cintura non scambia il vuoto "
+          "per un nome di casa", (True, None),
+          (bool(auth("wss://nos.lol", "s")),
+           auth("wss://barattolo.store", "s")))
+    senza = amb["_NOSTR"]
+    amb["_NOSTR"] = None
+    prova("senza la chiave della piattaforma non esce niente, e niente "
+          "esplode", None, auth("wss://r.example", "s"))
+    amb["_NOSTR"] = senza
+    riposa = amb["_dm_riposa"]
+    amb["AVVISO_DM_RIPOSO_PASSO_S"] = 0.01
+    Or, alt = {"segno": 0.0}, _th.Event()
+    t0 = time.time()
+    riposa(Or, alt, 0.08)
+    prova("l'attesa a fette dura quel che deve e intanto il filo da' "
+          "segni (la guardia non lo crede fermo)", (True, True),
+          (0.07 <= time.time() - t0 < 1.0, Or["segno"] >= t0 + 0.07))
+    alt.set()
+    t0 = time.time()
+    riposa(Or, alt, 3600)
+    prova("...e con la `ferma` alzata un'ora finisce subito", True,
+          time.time() - t0 < 0.5)
+    prova("i numeri scelti: sfida fino a 256 caratteri, dieci secondi per "
+          "l'OK, il passo dell'attesa lunga sotto il «fermo» della guardia",
+          ("256", "10", True),
+          (re.search(r"\nAVVISO_DM_SFIDA_MAX = (\d+)", blocco).group(1),
+           re.search(r"\nAVVISO_DM_AUTH_OK_S = (\d+)", blocco).group(1),
+           int(re.search(r"\nAVVISO_DM_RIPOSO_PASSO_S = (\d+)", blocco).group(1))
+           * 3 < int(re.search(r"\nAVVISO_DM_FERMO_S = (\d+)", blocco).group(1))))
 
     # [coincurve] dove c'e': il calco di cartone e la libreria vera si
     # aprono le buste a vicenda (in CI non c'e', e si dice)

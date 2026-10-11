@@ -50112,3 +50112,136 @@ segreti sulle righe aggiunte. La voce era già scritta quando la suite
 **RESTA DA GUARDARE.** Sul telefono vero dentro Telegram: la
 vibrazione (qui è solo contata) e quanto si vede l'arancione in pieno
 sole, nei due temi (dal vivo ho guardato lo scuro).
+
+## L'avviso dei DM: l'autenticazione NIP-42 ai relay, e il rifiuto che aspetta un'ora (11 ott 2026, sera, cantiere avviso-dm-auth, richiesta di Andrea)
+
+DAL CAMPO. Accesa la leva in produzione, nos.lol ascolta e
+relay.damus.io risponde «CADUTO (sottoscrizione chiusa dal relay:
+['ERROR: auth-required: requested filter requires authentication'])»,
+riprovando ogni minuto. Era il «non provato» dichiarato nel verbale di
+prima (mai relay veri nei giri): damus i DM li consegna solo a chi
+dimostra di essere il destinatario.
+LA RICHIESTA. 1) Quando il relay manda AUTH il server risponde con un
+kind 22242 firmato con la chiave della piattaforma e rifà la
+sottoscrizione — solo per i relay dell'avviso DM. 2) Se un relay
+rifiuta anche dopo l'AUTH non si riprova ogni minuto: una riga nel
+journal, poi ogni ora.
+COSA SI È DECISO, e perché.
+1) SI RISPONDE ALLA SFIDA, UNA VOLTA PER CONNESSIONE (`_dm_auth`, dal
+solo `_dm_filo`). Il tag `relay` è l'indirizzo scritto da NOI nel
+config, mai una parola del relay; la sfida è una stringa di al più 256
+caratteri; il 22242 viaggia nel messaggio AUTH e non si pubblica. Una
+seconda sfida a connessione già autenticata, o con la prima risposta
+in volo, non si firma (`nak serve --eager-auth` la manda due volte:
+visto dal vivo).
+2) ALL'OK LA SOTTOSCRIZIONE SI RIFÀ, perché quella mandata alla
+connessione il relay l'ha già chiusa. La richiesta parte comunque
+subito, prima di sapere se il relay vorrà l'autenticazione: nos.lol
+non la chiede, e aspettare una sfida che non arriva sarebbe un ritardo
+per tutti. Un relay che non dice OK entro 10 secondi si prova lo
+stesso (la specifica lo vuole, ma un silenzio non è un no).
+3) LA FRASE SI CERCA DENTRO, NON IN TESTA (`_dm_vuole_auth`): la
+specifica mette `auth-required:` come prefisso, damus scrive «ERROR:
+auth-required: …». Vale anche `restricted:`.
+4) UN NO NON È UNA CADUTA (`DmRifiutato`). Tre casi: il relay respinge
+la firma (OK false); chiude ancora da autenticati — e qui UNA volta si
+rifà la richiesta, perché la chiusura può essere quella della PRIMA,
+arrivata dopo l'OK —; chiede l'autenticazione e non manda una sfida a
+cui si possa rispondere. Stato `rifiutato` (lo dice anche il pannello
+delle leve), UNA riga — «RIFIUTA (…): riprovo fra un'ora» — e il
+prossimo tentativo fra 3600 secondi. I tentativi dell'ora dopo non
+scrivono niente finché lo stato non cambia. Una caduta vera resta
+com'era: una riga, e attesa che cresce fino a un minuto.
+5) CHE SI È AUTENTICATO LO DICE LA RIGA «IN ASCOLTO», non una sua:
+«in ascolto su <relay> (autenticato, NIP-42)». Nata come riga a parte
+all'OK, toccata dal collaudo: un relay che accetta la firma e poi
+rifiuta l'avrebbe scritta a ogni ora, e la riga del rifiuto non
+sarebbe stata l'unica.
+6) L'ATTESA LUNGA È A FETTE (`_dm_riposa`, 30 secondi): la guardia
+abbandona un filo che non dà segni da 180 secondi, e un'ora di
+silenzio sarebbe diventata tre minuti con un filo nuovo ogni volta.
+7) LA CINTURA SUL NOSTRO NOME. Il login di Barattolo
+(`verifica_evento_login`) legge lo stesso kind 22242 e crede a una
+firma il cui tag `relay` è casa nostra, con una sfida presa alla sua
+porta pubblica. Un relay col nostro nome messo un giorno in questa
+lista potrebbe farsi firmare proprio quella. `_dm_auth` a un relay che
+sta sul nome del sito o dell'onion non firma mai. Verso ogni altro
+relay il tag non combacia e quella firma, da noi, non vale.
+8) UN CLOSED AL POLSO È UNA RISPOSTA: un relay che al «ci sei?» (la
+piccola REQ sul 10050) rispondesse con una chiusura invece che con
+l'EOSE è vivo, e il filo non deve cadere ogni due minuti per questo.
+LE STRADE SCARTATE. Aspettare la sfida prima di mandare la richiesta:
+vedi 2. Autenticarsi solo dopo un `auth-required` e non a ogni sfida:
+la richiesta diceva «quando il relay manda AUTH», e un relay che la
+manda subito senza poi pretenderla riceve una firma in più, niente
+altro. Una leva a parte per l'autenticazione: i relay di questa lista
+li scegliamo noi, e senza AUTH damus non serve a niente. Contare i
+rifiuti e togliere il relay dalla lista da soli: la lista è una
+decisione, non un automatismo. Verificare i certificati dei relay solo
+in questo filo: sarebbe giusto, ma è la convenzione di tutti i lettori
+di casa e non si può provare senza relay veri — notato sotto.
+PROVATO. `prove_avviso_dm_nostr` sale a 87 prove (20 nuove): le
+sentinelle (un solo posto che firma un 22242 e un solo chiamante, una
+firma per connessione, la richiesta rifatta all'OK, l'ora, la riga
+unica) e i pezzi veri — la risposta alla sfida con la firma
+verificata, le sfide che non si firmano, la cintura sul nostro nome
+col login che chiede proprio quel tag, l'attesa a fette.
+`collaudo_avviso_dm_nostr` sale a 53: il relay di cartone impara a
+chiedere l'autenticazione in sei modi e risponde nell'ordine in cui
+riceve, come uno vero — sfida subito, sfida solo alla chiusura, OK mai
+detto, rifiuto da autenticati, firma respinta, sfida mai mandata — più
+il polso chiuso. Per il rifiuto: tre richieste e una firma, nessun
+tentativo negli otto decimi dopo (con l'ora accorciata a un secondo e
+mezzo), il filo ancora lo stesso con la guardia a quattro decimi, un
+secondo tentativo passata l'attesa, e nel journal UNA riga in tutto
+con quel relay. Nessuna firma ai relay che non la chiedono, nessuna
+firma nel journal.
+DAL VIVO: il server del worktree in collaudo, tre `nak serve` nel WSL
+(solo loopback) — 7793 con `--auth`, 7794 con `--auth --eager-auth`,
+7795 senza — e chiave della piattaforma usa-e-getta. Senza
+autenticarsi i primi due rispondono `["AUTH", sfida]` e `["CLOSED",
+…, "auth-required: subscribe"]`. Il server: «in ascolto su …7795», «in
+ascolto su …7793 (autenticato, NIP-42)», «in ascolto su …7794
+(autenticato, NIP-42)»; la posta vecchia messa prima dell'avvio non ha
+avvisato; un NIP-17 pubblicato SOLO sul 7793 e un NIP-04 SOLO sul 7794
+(da nostr-tools 2.25.2, che per scrivere lì si è autenticato a sua
+volta) hanno avvisato; il 7793 spento e riacceso: «CADUTO», poi «in
+ascolto … (autenticato, NIP-42) dopo 3 tentativi», e il DM mandato
+dopo ha avvisato. Nel registro: zero volte il testo, zero righe con
+la sfida o la firma. L'estratto: `.claude/giri/avviso-dm-auth/`.
+TORTURA: 27 mutazioni di `server.py` su una copia del repo — 19 nuove
+sull'autenticazione e sul rifiuto, 8 del cantiere di prima rifatte sul
+codice di oggi —, la sezione di prove e il collaudo dopo ognuna, col
+loro limite di tempo: 27 prese.
+COSA È GIRATO SU QUALE ALBERO. Sull'albero del cantiere sopra 55cf5d9
+(la punta di main di allora, CI verde): `PROVE_SEVERE=1 python
+prove.py` INTERA, 22366 passate e 0 fallite, nessuna saltata (le 22346
+di main più le 20 nuove); i 61 collaudi del workflow nella gabbia, 61
+verdi al primo giro; il collaudo e la sezione anche senza coincurve,
+come in CI; la tortura; il giro dal vivo.
+POI MAIN È CORSO di un commit — e7441a9, «"Pubblica" sempre acceso»
+(non mio: `miniapp.html`, le sue prove, i suoi documenti; CI verde) —
+e il cantiere è stato ribasato. Un solo conflitto, la coda di questo
+file: tenuta la voce di main, questa riappesa sotto. Sull'albero
+ribasato: la suite severa INTERA di nuovo, 22377 passate e 0 fallite,
+nessuna saltata (le 22357 di main più le 20); i 61 collaudi nella
+gabbia di nuovo, 61 verdi; `compileall` e lo scanner dei segreti sulle
+righe aggiunte (forme lette dal workflow, con la controprova): zero.
+I conti dell'albero ribasato sono stati scritti qui DOPO i loro giri:
+da allora è cambiato solo questo paragrafo.
+NON PROVATO, e si dice: relay.damus.io VERO (la regola è mai relay
+veri nei giri): che accetti questa risposta e poi consegni i 1059 si
+vede dal journal del VPS dopo il deploy; il relay che rifiuta, DAL
+VIVO (`nak serve` non sa rifiutare un autenticato: sta nel collaudo, a
+tempi accorciati); l'ora vera.
+NOTATO, NON TOCCATO. Le connessioni ai relay non verificano il
+certificato (`cert_reqs: CERT_NONE`, come tutti i lettori di casa):
+chi stesse in mezzo fra il VPS e il relay potrebbe mandare lui la
+sfida. Non ci guadagna un login da noi (la cintura) né più di quel che
+già vedrebbe facendo da tramite, ma con l'autenticazione vale la pena
+di deciderlo.
+RESTA DA GUARDARE (Andrea, sul VPS, dopo il deploy): nel journal
+relay.damus.io deve passare a «📩 Avviso DM: in ascolto su
+wss://relay.damus.io (autenticato, NIP-42)»; se invece esce «RIFIUTA
+(…): riprovo fra un'ora», la frase fra parentesi dice perché. La
+procedura aggiornata: PRODUZIONE, «L'AVVISO DEI DM NOSTR».

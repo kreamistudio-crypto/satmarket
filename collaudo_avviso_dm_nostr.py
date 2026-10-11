@@ -62,17 +62,35 @@ class WsCartone:
     mandate e serve quel che il banco ci mette. `recv` aspetta il
     timeout e poi alza come fa websocket-client; un'eccezione messa in
     coda cade dalla `recv` (e' il relay che butta giu' la linea); un
-    relay fra i `rotti` rifiuta la connessione."""
+    relay fra i `rotti` rifiuta la connessione.
+    I `modi` (NIP-42) ne fanno un relay che chiede l'autenticazione, e
+    risponde da solo come farebbe uno vero, nell'ordine in cui riceve:
+      auth          manda la sfida alla connessione; senza AUTH chiude la
+                    richiesta con «auth-required», dopo la serve
+      auth-pigro    come sopra, ma la sfida la manda solo quando chiude
+      ok-muto       accetta l'AUTH senza rispondere OK
+      auth-rifiuta  accetta l'AUTH e poi chiude lo stesso («restricted»)
+      auth-no       respinge l'AUTH (OK false)
+      senza-sfida   chiude con «auth-required» e la sfida non la manda
+      polso-chiuso  serve i DM a tutti, ma al «ci sei?» risponde CLOSED
+    La `posta` di un relay e' quel che consegna prima dell'EOSE."""
     mandate = []
     code = {}
     aperte = {}
     rotti = set()
+    modi = {}
+    posta = {}
+    CHIUSA = "ERROR: auth-required: requested filter requires authentication"
 
     def __init__(self, relay, timeout=10, sslopt=None):
         if relay in WsCartone.rotti:
             raise ConnectionRefusedError("relay di cartone spento")
         WsCartone.aperte[relay] = WsCartone.aperte.get(relay, 0) + 1
         self.relay, self.t = relay, timeout
+        self.autenticato = WsCartone.modi.get(relay) == "polso-chiuso"
+        if WsCartone.modi.get(relay) in ("auth", "ok-muto", "auth-rifiuta",
+                                         "auth-no"):
+            metti(relay, ["AUTH", "sfida-di-" + relay[-4:]])
 
     def settimeout(self, t):
         self.t = min(t, 0.05)            # il battito, ma svelto
@@ -80,12 +98,35 @@ class WsCartone:
     def send(self, s):
         msg = json.loads(s)
         WsCartone.mandate.append((self.relay, msg))
+        modo = WsCartone.modi.get(self.relay)
         if msg[0] == "REQ" and msg[1] == "polso":
-            metti(self.relay, ["EOSE", "polso"])
+            metti(self.relay, ["CLOSED", "polso", WsCartone.CHIUSA]
+                  if modo == "polso-chiuso" else ["EOSE", "polso"])
+        elif modo and msg[0] == "AUTH":
+            if modo == "auth-no":
+                metti(self.relay, ["OK", msg[1]["id"], False,
+                                   "restricted: questa chiave non entra"])
+                return
+            self.autenticato = True
+            if modo != "ok-muto":
+                metti(self.relay, ["OK", msg[1]["id"], True, ""])
+        elif modo and msg[0] == "REQ" and msg[1] == "dm":
+            if not self.autenticato:
+                metti(self.relay, ["CLOSED", "dm", WsCartone.CHIUSA])
+                if modo == "auth-pigro":
+                    metti(self.relay, ["AUTH", "sfida-di-" + self.relay[-4:]])
+            elif modo == "auth-rifiuta":
+                metti(self.relay, ["CLOSED", "dm",
+                                   "restricted: non sei fra gli ammessi"])
+            else:
+                for ev in WsCartone.posta.get(self.relay, []):
+                    metti(self.relay, ["EVENT", "dm", ev])
+                metti(self.relay, ["EOSE", "dm"])
 
     def recv(self):
         try:
-            cosa = WsCartone.code[self.relay].get(timeout=self.t)
+            cosa = WsCartone.code.setdefault(
+                self.relay, queue.Queue()).get(timeout=self.t)
         except queue.Empty:
             raise TimeoutError("timed out")
         if isinstance(cosa, Exception):
@@ -154,6 +195,9 @@ def main():
 
     class _Noi:
         secret = sk_noi
+
+        def sign_schnorr(self, msg):
+            return schnorr_puro.firma(sk_noi, msg)
     if S.ChiavePrivataNostr is not None:
         noi_chiave = S.ChiavePrivataNostr(sk_noi)
         prova("[coincurve] la chiave di casa del collaudo e' quella vera "
@@ -387,6 +431,138 @@ def main():
            "relay.vero.example: simulato"
            in voci["AVVISO_DM_NOSTR_RELAY"]["valore"]))
 
+    # ================= NIP-42 (11 ott 2026, sera) =================
+    # Acceso in produzione, relay.damus.io ha chiuso la sottoscrizione
+    # con «ERROR: auth-required: requested filter requires
+    # authentication». Qui i relay di cartone la chiedono in sei modi.
+    def aggiungi(porta, modo):
+        relay = f"ws://127.0.0.1:{porta}"
+        WsCartone.modi[relay] = modo
+        S.AVVISO_DM_NOSTR_RELAY.append(relay)
+        return relay
+
+    def di(relay, tipo, sub=None):
+        return [m for r, m in list(WsCartone.mandate) if r == relay
+                and m[0] == tipo and (sub is None or m[1] == sub)]
+
+    def stato(relay):
+        return S._DM_ASCOLTO.get(relay, {}).get("stato")
+
+    S.AVVISO_DM_RELAY_MAX = 12
+    S._DM_AVVISI["mandati"] = []
+
+    print("\n[NIP-42: il relay chiede l'autenticazione, il server risponde]")
+    n0 = len(AVVISI)
+    RELAY_C = "ws://127.0.0.1:7803"
+    WsCartone.posta[RELAY_C] = [busta(sk_gino, "vecchia-sul-relay-chiuso")]
+    aggiungi(7803, "auth")
+    prova("un relay che chiude con «auth-required» e manda la sfida: il "
+          "filo si autentica e arriva in ascolto", True,
+          aspetta(lambda: stato(RELAY_C) == "connesso"))
+    risposte = di(RELAY_C, "AUTH")
+    ev = risposte[0][1] if risposte else {}
+    prova("...con UNA risposta: il kind 22242 firmato dalla chiave della "
+          "piattaforma, col relay che abbiamo scritto NOI e la sua sfida",
+          (1, 22242, NOI, [["relay", RELAY_C], ["challenge", "sfida-di-7803"]],
+           "", True, True),
+          (len(risposte), ev.get("kind"), ev.get("pubkey"), ev.get("tags"),
+           ev.get("content"), S._x_firma_valida(ev),
+           abs(ev.get("created_at", 0) - time.time()) < 60))
+    richieste = di(RELAY_C, "REQ", "dm")
+    prova("...e la sottoscrizione RIFATTA dopo l'OK: due richieste uguali, "
+          "una prima e una dopo", (2, True),
+          (len(richieste), richieste[0] == richieste[-1]))
+    time.sleep(0.3)
+    prova("...la posta che stava gia' su quel relay non avvisa", n0,
+          len(AVVISI))
+    metti(RELAY_C, ["EVENT", "dm", busta(chiave(40)[0], "dopo-l-auth")])
+    prova("...e un DM nuovo arrivato li', dopo l'autenticazione, avvisa",
+          True, aspetta(lambda: len(AVVISI) == n0 + 1))
+    prova("ai relay che non la chiedono non si manda nessuna firma",
+          [0, 0, 0], [len(di(r, "AUTH")) for r in (RELAY_A, RELAY_B,
+                                                   RELAY_VERO)])
+
+    RELAY_D = aggiungi(7804, "auth-pigro")
+    prova("la sfida mandata solo DOPO la chiusura (il relay pigro): uguale, "
+          "una firma e in ascolto", (True, 1, 2),
+          (aspetta(lambda: stato(RELAY_D) == "connesso"),
+           len(di(RELAY_D, "AUTH")), len(di(RELAY_D, "REQ", "dm"))))
+
+    S.AVVISO_DM_AUTH_OK_S = 0.3
+    RELAY_H = aggiungi(7808, "ok-muto")
+    prova("un relay che accetta l'AUTH senza dire OK: dopo l'attesa si "
+          "riprova lo stesso, e va", (True, 1, 2),
+          (aspetta(lambda: stato(RELAY_H) == "connesso"),
+           len(di(RELAY_H, "AUTH")), len(di(RELAY_H, "REQ", "dm"))))
+
+    print("\n[NIP-42: il relay che rifiuta anche dopo: un'ora, non un minuto]")
+    S.AVVISO_DM_RIFIUTO_S = 1.5
+    S.AVVISO_DM_RIPOSO_PASSO_S = 0.05
+    fermo = S.AVVISO_DM_FERMO_S
+    S.AVVISO_DM_FERMO_S = 0.4
+    RELAY_E = aggiungi(7805, "auth-rifiuta")
+    prova("autenticato e chiuso lo stesso: lo stato e' «rifiutato», col "
+          "perche' del relay", (True, True),
+          (aspetta(lambda: stato(RELAY_E) == "rifiutato"),
+           "non sei fra gli ammessi" in S._DM_ASCOLTO[RELAY_E]["perche"]))
+    prova("...dopo UNA sola richiesta in piu' (la chiusura poteva essere "
+          "quella di prima, arrivata tardi): tre in tutto, una firma",
+          (3, 1), (len(di(RELAY_E, "REQ", "dm")), len(di(RELAY_E, "AUTH"))))
+    filo_e = S._DM_ASCOLTO[RELAY_E]["filo"]
+    time.sleep(0.8)
+    prova("...e NON si riprova subito: dopo otto decimi (una caduta "
+          "normale qui ne avrebbe fatti una decina) la connessione e' "
+          "ancora una, e la guardia non ha scambiato l'attesa per un filo "
+          "fermo", (1, True, True),
+          (WsCartone.aperte[RELAY_E],
+           S._DM_ASCOLTO[RELAY_E]["filo"] is filo_e, filo_e.is_alive()))
+    prova("...passata l'attesa lunga riprova, UNA volta, e resta "
+          "«rifiutato»", (True, "rifiutato"),
+          (aspetta(lambda: WsCartone.aperte[RELAY_E] == 2, 3000),
+           [time.sleep(0.3), stato(RELAY_E)][1]))
+    S.AVVISO_DM_FERMO_S = fermo
+
+    RELAY_F = aggiungi(7806, "auth-no")
+    prova("un relay che RESPINGE la firma (OK false): «rifiutato», senza "
+          "rifare la richiesta", (True, True, 1),
+          (aspetta(lambda: stato(RELAY_F) == "rifiutato"),
+           "autenticazione respinta" in S._DM_ASCOLTO[RELAY_F]["perche"],
+           len(di(RELAY_F, "REQ", "dm"))))
+
+    eose = S.AVVISO_DM_EOSE_S
+    S.AVVISO_DM_EOSE_S = 0.4
+    RELAY_G = aggiungi(7807, "senza-sfida")
+    prova("un relay che chiede l'autenticazione e la sfida non la manda: "
+          "niente da firmare, «rifiutato»", (True, True, 0),
+          (aspetta(lambda: stato(RELAY_G) == "rifiutato"),
+           "non c'e' una sfida" in S._DM_ASCOLTO[RELAY_G]["perche"],
+           len(di(RELAY_G, "AUTH"))))
+    RELAY_I = aggiungi(7809, "polso-chiuso")
+    aspetta(lambda: stato(RELAY_I) == "connesso")
+    S.AVVISO_DM_POLSO_S = 0.1
+    time.sleep(1.2)
+    prova("un relay che al «ci sei?» risponde CLOSED invece di EOSE ha "
+          "risposto: e' vivo, e il filo non cade (tre volte l'attesa del "
+          "polso, una connessione sola)", ("connesso", 1, True),
+          (stato(RELAY_I), WsCartone.aperte[RELAY_I],
+           len(di(RELAY_I, "REQ", "polso")) >= 3))
+    S.AVVISO_DM_POLSO_S = polsi
+    S.AVVISO_DM_EOSE_S = eose
+
+    WsCartone.modi[RELAY_C] = None
+    metti(RELAY_C, ["AUTH", 12345])
+    metti(RELAY_C, ["AUTH", "x" * 300])
+    metti(RELAY_C, ["AUTH", "una-seconda-sfida"])
+    time.sleep(0.3)
+    prova("una sfida che non e' una stringa, una troppo lunga, una seconda "
+          "a connessione gia' autenticata: nessuna firma in piu'", 1,
+          len(di(RELAY_C, "AUTH")))
+    voci = {v["chiave"]: v for v in S._dm_leve()}
+    prova("il pannello delle leve dice chi e' rifiutato", True,
+          "127.0.0.1:7805: rifiutato"
+          in voci["AVVISO_DM_NOSTR_RELAY"]["valore"])
+    firme = [m[1]["sig"] for r, m in list(WsCartone.mandate) if m[0] == "AUTH"]
+
     # --- si spegne tutto ---
     orologio.cancel()
     for o in S._DM_ASCOLTO.values():
@@ -410,6 +586,19 @@ def main():
            for x in (k, S.hex_to_npub(k))])
     prova("...e nemmeno negli avvisi: il testo non c'e'", False,
           any(SEGRETO in t for t, _ in AVVISI))
+    prova("che si e' autenticato lo dice la riga «in ascolto», e solo per "
+          "chi l'ha fatto", (True, False),
+          (f"📩 Avviso DM: in ascolto su {RELAY_C} (autenticato, NIP-42)"
+           in detto,
+           f"in ascolto su {RELAY_A} (autenticato" in detto))
+    prova("il relay che rifiuta lascia nel journal UNA riga in tutto — "
+          "«RIFIUTA … riprovo fra un'ora» — anche se nel frattempo ha "
+          "riprovato (e si e' riautenticato)", (1, 1, True),
+          (sum(1 for r in detto.splitlines() if RELAY_E in r),
+           detto.count(f"📩 Avviso DM: {RELAY_E} RIFIUTA ("),
+           WsCartone.aperte[RELAY_E] >= 2))
+    prova("...e le firme delle risposte AUTH nel journal non ci sono",
+          (True, False), (len(firme) >= 5, any(f in detto for f in firme)))
 
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")

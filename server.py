@@ -57185,6 +57185,18 @@ async def manda_dm_nostr(dest_hex: str, testo: str) -> bool:
 # riga nel journal e una riconnessione, mai un errore a chi sta
 # comprando. Niente database: lo stato vive in memoria, e un riavvio
 # riparte dalla posta gia' vista (cioe' zitto).
+# L'AUTENTICAZIONE AI RELAY (NIP-42, 11 ott 2026, sera). Acceso in
+# produzione, relay.damus.io ha chiuso la sottoscrizione con
+# «auth-required»: i DM li consegna solo a chi dimostra di essere il
+# destinatario. Quando un relay di QUESTA lista manda la sfida (AUTH) il
+# filo risponde col kind 22242 firmato dalla chiave della piattaforma
+# (`_dm_auth`) e rifa' la sottoscrizione. Vale solo qui: nessun altro
+# lettore del server si autentica, e il 22242 non si pubblica mai. Il
+# relay viene cosi' a sapere che dietro quella connessione c'e' la
+# chiave di Barattolo — lo intuiva gia' dal filtro, e la npub e l'IP
+# del VPS sono pubblici. UN NO NON SI RICHIEDE OGNI MINUTO: se il relay
+# rifiuta anche dopo (`DmRifiutato`) si scrive una riga e si riprova
+# fra un'ora.
 # LA LEVA NASCE SPENTA e si accende con una riga nel config del VPS:
 # PRODUZIONE, «L'AVVISO DEI DM NOSTR».
 try:
@@ -57209,6 +57221,10 @@ AVVISO_DM_POLSO_S = 120             # ogni quanto si chiede «ci sei?»
 AVVISO_DM_EOSE_S = 20               # quanto si aspetta la risposta
 AVVISO_DM_ATTESA_S = 5              # fra un tentativo e l'altro (cresce)
 AVVISO_DM_FERMO_S = 180             # un filo senza segni: si abbandona
+AVVISO_DM_SFIDA_MAX = 256           # NIP-42: una sfida piu' lunga non si firma
+AVVISO_DM_AUTH_OK_S = 10            # quanto si aspetta l'OK all'AUTH
+AVVISO_DM_RIFIUTO_S = 3600          # dopo un NO del relay: fra un'ora
+AVVISO_DM_RIPOSO_PASSO_S = 30       # l'attesa lunga, a fette (la guardia)
 _DM_AVVIO = int(time.time())        # la posta di prima non parla
 _DM_ASCOLTO: dict[str, dict] = {}   # relay -> lo stato del suo filo
 _DM_VISTI: dict[str, None] = {}     # id evento -> visto (in ordine d'arrivo)
@@ -57478,6 +57494,67 @@ async def _dm_avvisa(voce: tuple):
     print("📩 Avviso DM: un avviso ai moderatori", flush=True)
 
 
+class DmRifiutato(Exception):
+    """Il relay ha detto NO, e riprovare subito non cambia la risposta:
+    ha respinto l'autenticazione, o rifiuta la sottoscrizione anche da
+    autenticati, o la chiede senza dare il modo di farla. Il filo non
+    lo tratta come una caduta: una riga, e si riprova fra un'ora."""
+
+
+def _dm_vuole_auth(motivo: str) -> bool:
+    """PURA: il perche' di un CLOSED parla di autenticazione? I due
+    prefissi di NIP-42 — `auth-required` (non ti conosco) e
+    `restricted` (ti conosco, e non puoi) — cercati DENTRO la frase e
+    non in testa: relay.damus.io scrive «ERROR: auth-required: …»."""
+    motivo = str(motivo or "").lower()
+    return "auth-required" in motivo or "restricted" in motivo
+
+
+def _dm_auth(relay: str, sfida) -> dict | None:
+    """LA RISPOSTA ALLA SFIDA (NIP-42): l'evento kind 22242 firmato con
+    la chiave della piattaforma, coi due tag della specifica. None se
+    la sfida non e' una stringa sensata o la firma non riesce.
+    COSA SI FIRMA, e cosa no. Il tag `relay` e' l'indirizzo che abbiamo
+    scritto NOI nel config, mai una parola del relay: la firma vale
+    per quel relay e basta, e un altro relay che la ricevesse la deve
+    rifiutare. La sfida e' sua, e ha un tetto di lunghezza. Un 22242
+    non e' un evento da pubblicare e non lo diventa: viaggia solo nel
+    messaggio AUTH di quella connessione.
+    MAI A UN RELAY CHE STA SUL NOSTRO NOME (il sito o l'onion): il
+    login di Barattolo (`verifica_evento_login`) legge lo stesso kind
+    e crede a una firma il cui tag `relay` e' casa nostra, con una
+    sfida presa alla sua porta pubblica. Un relay con quel nome nella
+    lista potrebbe farsi firmare proprio quella, ed entrare da
+    Barattolo. Verso ogni altro relay il tag non combacia, e li' quella
+    firma non vale niente."""
+    if not isinstance(sfida, str) \
+            or not 0 < len(sfida) <= AVVISO_DM_SFIDA_MAX:
+        return None
+    try:
+        casa = {(urlparse(URL_PUBBLICO).hostname or "").lower(),
+                str(ONION_HOST or "").lower()} - {""}
+        if (urlparse(relay).hostname or "").lower() in casa:
+            return None
+        return firma_evento(22242, [["relay", relay],
+                                    ["challenge", sfida]], "")
+    except Exception:
+        return None
+
+
+def _dm_riposa(O: dict, ferma, secondi: float):
+    """L'attesa fra un tentativo e l'altro, A FETTE: un filo che
+    aspetta un'ora senza dare segni sarebbe «fermo» per la guardia, che
+    lo abbandonerebbe e ne farebbe partire un altro — e l'ora
+    diventerebbe tre minuti. Ogni AVVISO_DM_RIPOSO_PASSO_S il filo
+    dice che c'e'; con `ferma` alzata esce subito."""
+    fine = time.time() + secondi
+    while not ferma.is_set():
+        O["segno"] = adesso = time.time()
+        if adesso >= fine:
+            break
+        ferma.wait(min(AVVISO_DM_RIPOSO_PASSO_S, fine - adesso))
+
+
 def _dm_filo(relay: str, nostra: str, loop, ferma):
     """IL FILO di un relay: una connessione, tenuta viva, e rifatta
     quando cade (il calco di `_ascolto_p2p_filo`). SINCRONO, in un
@@ -57486,6 +57563,16 @@ def _dm_filo(relay: str, nostra: str, loop, ferma):
     `ferma` e' di QUESTO filo: quando la guardia lo abbandona la alza.
     Il polso (una REQ piccola, ogni AVVISO_DM_POLSO_S) e' cio' che
     distingue un relay zitto da una connessione morta a meta'.
+    L'AUTENTICAZIONE (NIP-42, 11 ott 2026): quando il relay manda la
+    sfida (`AUTH`) il filo risponde con `_dm_auth`, una volta per
+    connessione, e all'OK RIFA' la sottoscrizione — quella di prima il
+    relay l'ha chiusa con `auth-required`. Un relay che non risponde
+    OK entro AVVISO_DM_AUTH_OK_S si prova lo stesso. Se dice NO —
+    respinge la firma, o chiude ancora da autenticati (una volta si
+    riprova: puo' essere la chiusura della PRIMA richiesta arrivata
+    tardi), o chiede l'autenticazione senza mandare la sfida — e'
+    `DmRifiutato`: una riga, e il prossimo tentativo fra
+    AVVISO_DM_RIFIUTO_S, non fra un minuto.
     In collaudo verso un relay che non e' di casa non parte nemmeno
     (vedi `lettura_simulata`): la guardia ha gia' chiesto, e questa e'
     la sua, per chi lo facesse partire da un'altra parte."""
@@ -57494,14 +57581,22 @@ def _dm_filo(relay: str, nostra: str, loop, ferma):
         return
     while not ferma.is_set():
         ws = None
+        rifiutato = False
         try:
             O["segno"] = inizio = time.time()
             ws = _dm_connetti(relay, timeout=10,
                               sslopt={"cert_reqs": ssl.CERT_NONE})
             ws.settimeout(5)
-            ws.send(json.dumps(["REQ", "dm", *_dm_filtri(
-                nostra, inizio, O["vivo_fino"])]))
+            richiesta = json.dumps(["REQ", "dm", *_dm_filtri(
+                nostra, inizio, O["vivo_fino"])])
+            ws.send(richiesta)
             vivo, polso_mandato, ultimo_polso = False, 0.0, inizio
+            # NIP-42, per QUESTA connessione: l'id della risposta in
+            # volo e da quando, se e' andata, se il relay l'ha chiesta,
+            # e quante volte si e' rifatta la richiesta da autenticati
+            attesa_da = inizio
+            auth_id, auth_da = "", 0.0
+            autenticato, chiesta, rifatte = False, False, 0
             while not ferma.is_set():
                 O["segno"] = time.time()
                 try:
@@ -57516,10 +57611,26 @@ def _dm_filo(relay: str, nostra: str, loop, ferma):
                 adesso = time.time()
                 msg = json.loads(grezzo) if grezzo else None
                 if isinstance(msg, list) and len(msg) >= 2:
-                    if msg[0] == "EOSE" and msg[1] == "dm" and not vivo:
+                    if msg[0] == "AUTH":
+                        risposta = None if (autenticato or auth_id) \
+                            else _dm_auth(relay, msg[1])
+                        if risposta:
+                            auth_id, auth_da = risposta["id"], adesso
+                            ws.send(json.dumps(["AUTH", risposta]))
+                    elif msg[0] == "OK" and auth_id and msg[1] == auth_id:
+                        if len(msg) < 3 or msg[2] is not True:
+                            raise DmRifiutato(
+                                f"autenticazione respinta: {msg[3:]}")
+                        autenticato, auth_id, attesa_da = True, "", adesso
+                        ws.send(richiesta)
+                    elif msg[0] == "EOSE" and msg[1] == "dm" and not vivo:
                         vivo = True
-                        dopo = (f" dopo {O['cadute']} tentativi"
-                                if O["cadute"] else "")
+                        # che si e' autenticato lo dice QUESTA riga e non
+                        # una sua: un relay che accetta la firma e poi
+                        # rifiuta non deve scrivere niente a ogni ora
+                        dopo = (" (autenticato, NIP-42)" if autenticato
+                                else "") + (f" dopo {O['cadute']} tentativi"
+                                            if O["cadute"] else "")
                         O.update(stato="connesso", da=adesso, cadute=0,
                                  perche="", base=False)
                         print(f"📩 Avviso DM: in ascolto su {relay}{dopo}",
@@ -57527,18 +57638,40 @@ def _dm_filo(relay: str, nostra: str, loop, ferma):
                     elif msg[0] == "EOSE" and msg[1] == "polso":
                         polso_mandato = 0.0
                         ws.send(json.dumps(["CLOSE", "polso"]))
+                    elif msg[0] == "CLOSED" and msg[1] == "polso":
+                        polso_mandato = 0.0     # ha risposto: e' vivo
                     elif msg[0] == "CLOSED" and msg[1] == "dm":
-                        raise RuntimeError(
-                            f"sottoscrizione chiusa dal relay: {msg[2:]}")
+                        if not _dm_vuole_auth(msg[2] if len(msg) > 2
+                                              else ""):
+                            raise RuntimeError(
+                                f"sottoscrizione chiusa dal relay: {msg[2:]}")
+                        vivo, attesa_da = False, adesso
+                        if not autenticato:
+                            chiesta = True      # si aspetta la sfida, o l'OK
+                        elif rifatte < 1:
+                            rifatte += 1
+                            ws.send(richiesta)
+                        else:
+                            raise DmRifiutato(
+                                "sottoscrizione rifiutata anche dopo "
+                                f"l'autenticazione: {msg[2:]}")
                     elif msg[0] == "EVENT" and msg[1] == "dm" \
                             and len(msg) > 2:
                         chi = _dm_setaccia(msg[2], nostra,
                                            O["base"] and not vivo, adesso)
                         if chi is not None:
                             loop.call_soon_threadsafe(_dm_in_coda, chi)
+                if auth_id and adesso - auth_da > AVVISO_DM_AUTH_OK_S:
+                    # il relay non ha detto ne' si' ne' no: si prova
+                    autenticato, auth_id, attesa_da = True, "", adesso
+                    ws.send(richiesta)
                 if vivo:
                     O["vivo_fino"] = adesso
-                if not vivo and adesso - inizio > AVVISO_DM_EOSE_S:
+                if not vivo and adesso - attesa_da > AVVISO_DM_EOSE_S:
+                    if chiesta and not autenticato:
+                        raise DmRifiutato(
+                            "il relay chiede l'autenticazione ma non c'e' "
+                            "una sfida a cui si possa rispondere")
                     raise TimeoutError("nessun EOSE alla sottoscrizione")
                 if polso_mandato \
                         and adesso - polso_mandato > AVVISO_DM_EOSE_S:
@@ -57554,10 +57687,15 @@ def _dm_filo(relay: str, nostra: str, loop, ferma):
             if ferma.is_set():
                 break
             O["cadute"] += 1
+            rifiutato = isinstance(e, DmRifiutato)
             # il perche' e' il NOME dell'errore e la parola del relay:
             # mai un pezzo di evento (il setaccio non alza)
             O["perche"] = f"{type(e).__name__}: {str(e)[:120]}"
-            if O["stato"] != "giu":
+            if rifiutato and O["stato"] != "rifiutato":
+                O.update(stato="rifiutato", da=time.time())
+                print(f"📩 Avviso DM: {relay} RIFIUTA ({O['perche']}): "
+                      "riprovo fra un'ora", flush=True)
+            elif not rifiutato and O["stato"] != "giu":
                 O.update(stato="giu", da=time.time())
                 print(f"📩 Avviso DM: {relay} CADUTO ({O['perche']}): "
                       "riprovo da solo", flush=True)
@@ -57567,8 +57705,10 @@ def _dm_filo(relay: str, nostra: str, loop, ferma):
                     ws.close()
             except Exception:
                 pass
-        O["segno"] = time.time()
-        ferma.wait(min(AVVISO_DM_ATTESA_S * max(1, O["cadute"]), 60))
+        # UN NO NON SI RICHIEDE OGNI MINUTO: dopo un rifiuto l'attesa e'
+        # un'ora; dopo una caduta cresce fino a un minuto, come prima
+        _dm_riposa(O, ferma, AVVISO_DM_RIFIUTO_S if rifiutato else
+                   min(AVVISO_DM_ATTESA_S * max(1, O["cadute"]), 60))
 
 
 def _dm_guardia():

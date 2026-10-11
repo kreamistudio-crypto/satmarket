@@ -31017,6 +31017,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   conto di quel che arriva nel frattempo; 6 avvisi ogni 1800 s in
   tutto, e oltre una «folla» che esce come riassunto senza nomi al
   primo posto libero. Coda, visti e relay hanno ognuno il suo tetto.
+  L'AUTENTICAZIONE AI RELAY (NIP-42, 11 ott 2026, sera; perché in
+  CANTIERI, «L'avviso dei DM: l'autenticazione NIP-42»). relay.damus.io
+  consegna i DM solo a chi dimostra di essere il destinatario. Quando
+  un relay di QUESTA lista manda la sfida (`AUTH`), `_dm_filo` risponde
+  con `_dm_auth` — il kind 22242 firmato dalla chiave della
+  piattaforma, tag `relay` = l'indirizzo scritto da NOI nel config,
+  tag `challenge` = la sfida (stringa, al più 256 caratteri) — una
+  volta per connessione, e all'OK RIFÀ la sottoscrizione. Un relay che
+  non dice OK entro 10 s si prova lo stesso. `_dm_vuole_auth` legge il
+  perché di un CLOSED (i prefissi `auth-required` e `restricted`,
+  cercati dentro la frase: damus scrive «ERROR: auth-required: …»).
+  È L'UNICO PUNTO del server che si autentica a un relay, e il 22242
+  non si pubblica: viaggia solo nel messaggio AUTH. LA CINTURA: a un
+  relay che sta sul NOSTRO nome (sito o onion) la sfida non si firma
+  mai — `verifica_evento_login` legge lo stesso kind e crede al tag
+  `relay` di casa, quindi quella firma varrebbe come login.
+  UN NO NON È UNA CADUTA (`DmRifiutato`): firma respinta, chiusura
+  anche da autenticati (una volta si rifà la richiesta: può essere la
+  chiusura della prima, arrivata tardi), autenticazione chiesta senza
+  una sfida. Stato `rifiutato`, UNA riga nel journal, e si riprova
+  ogni `AVVISO_DM_RIFIUTO_S` (un'ora) invece che ogni minuto.
+  `_dm_riposa` fa l'attesa a fette da 30 s, perché la guardia non
+  scambi un filo che aspetta per uno fermo. Limite dichiarato: le
+  connessioni ai relay non verificano il certificato (come tutti i
+  lettori di casa), quindi la sfida può arrivare anche da chi sta in
+  mezzo.
   IN COLLAUDO vale `lettura_simulata`: verso un relay non di casa il
   filo non nasce (stato `simulato`). `_dm_connetti` è la porta che i
   banchi sostituiscono. Dove coincurve manca (la CI) il calco è

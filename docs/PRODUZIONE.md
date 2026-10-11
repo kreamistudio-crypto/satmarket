@@ -3745,7 +3745,10 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
      `journalctl -u barattolo --since "2 min ago" | grep "Avviso DM"`
      Devono esserci «📩 Avviso DM Nostr ACCESO: ascolto wss://nos.lol ·
      wss://relay.damus.io per <16 cifre>…» e, entro qualche secondo,
-     una riga «📩 Avviso DM: in ascolto su <relay>» per ognuno dei due.
+     una riga «📩 Avviso DM: in ascolto su <relay>» per ognuno dei due
+     — per relay.damus.io con «(autenticato, NIP-42)» in coda: i DM li
+     consegna solo a chi dimostra di essere il destinatario, e dall'11
+     ott 2026 (sera) il server glielo dimostra da solo.
   5) LA PROVA: da un client Nostr con UN'ALTRA chiave si manda un DM
      alla npub di Barattolo. Entro una ventina di secondi arriva
      l'avviso su Telegram. Un secondo DM dalla stessa chiave entro
@@ -3762,12 +3765,24 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
      un minuto, e l'altro relay continua a portare la posta. Una riga
      per caduta, non una per tentativo; quando torna: «in ascolto su
      <relay> dopo N tentativi».
-   · «… CADUTO (RuntimeError: sottoscrizione chiusa dal relay: …)» che
-     torna a ogni tentativo, con dentro `auth-required`: quel relay
-     vuole l'autenticazione NIP-42 per consegnare i DM, e il server
-     non la fa (non è stata chiesta, e nos.lol e relay.damus.io non
-     l'hanno mai chiesta: da vedere qui, alla prima accensione). O si
-     toglie quel relay dalla lista, o è un cantiere.
+   · «📩 Avviso DM: in ascolto su <relay> (autenticato, NIP-42)»: quel
+     relay ha chiesto chi siamo (è successo con relay.damus.io alla
+     prima accensione, l'11 ott 2026: «auth-required: requested filter
+     requires authentication») e il server ha risposto firmando la sua
+     sfida con la chiave della piattaforma. Non c'è niente da fare: lo
+     rifà da solo a ogni riconnessione.
+   · «📩 Avviso DM: <relay> RIFIUTA (…): riprovo fra un'ora»: il relay
+     ha detto NO anche dopo l'autenticazione (o ha respinto la firma, o
+     la chiede senza mandare la sfida). Fra parentesi c'è la sua frase.
+     È UNA riga sola: i tentativi dopo, uno all'ora, non scrivono più
+     niente finché non cambia qualcosa. Gli altri relay continuano a
+     portare la posta. Se resta così per giorni: quel relay non ci
+     vuole, e si toglie dalla lista (`AVVISO_DM_NOSTR_RELAY` nel config,
+     e dal kind 10050 di Barattolo, che è la lista che i client
+     leggono per sapere DOVE scriverci).
+   · «… CADUTO (RuntimeError: sottoscrizione chiusa dal relay: …)» con
+     un motivo che NON parla di autenticazione (un rate-limit, un
+     filtro non ammesso): resta una caduta, e si riprova ogni minuto.
    · «⚠️ Avviso DM: il filo di <relay> è FERMO…» e «💥 … MORTO: riparte
      adesso»: la guardia ha rifatto un filo. Non c'è niente da fare.
    · «📩 Avviso DM: un avviso ai moderatori»: è partito un avviso. Non
@@ -3788,5 +3803,5 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   ogni client non esiste.
   LO STATO VIVO sta nel pannello «⚙️ Stato delle leve», gruppo «🔔
   Avvisi ai moderatori»: la leva, e per ogni relay la sua parola —
-  `connesso`, `giu`, `parte`.
+  `connesso`, `giu`, `rifiutato`, `parte`.
   PER SPEGNERLO: `AVVISO_DM_NOSTR = False` (o via la riga) e riavvio.
