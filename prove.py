@@ -145494,6 +145494,272 @@ console.log(JSON.stringify(c));
           [".p2p-mancati{color:var(--orange);" in m, ".p2p-veto{" in m, ".p2p-accesso-chip.on{" in m])
 
 
+def prove_logo_compra_vendi():
+    """IL LOGO CHE VOLTA IL LIBRO (11 ott 2026, richiesta di Andrea,
+    cantiere «logo-compra-vendi»). Il logo fra i due tab del libro P2P
+    e' un bottone: un tocco passa da «Compra BTC» a «Vendi BTC» e
+    ritorno, con una capovolta breve. Quel che queste prove tengono
+    fermo: e' un bottone VERO, col suo nome per il lettore di schermo;
+    il lato ha UN padrone (`setLatoP2P`), quindi logo e tab non possono
+    dire due cose; la riga non cambia misura; il movimento ha i suoi
+    tempi in pari e si spegne con gli effetti ridotti. Il banco fa
+    girare le funzioni VERE con un orologio finto."""
+    print("\n[il logo che volta il libro: Compra ⇄ Vendi]")
+    import json as _json, shutil as _sh, subprocess as _sp, tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    css = mini[mini.index("<style>") + len("<style>"):mini.index("</style>")]
+
+    # --- 1) IL MARKUP: un bottone vero fra i due tab ------------------
+    lati = mini[mini.index('<div class="p2p-lati" role="tablist">'):]
+    lati = re.sub(r"<!--.*?-->", "", lati[:lati.index("</div>")], flags=re.S)
+    testa = '<button class="p2p-volta" id="p2pVolta" type="button" onclick="voltaLatoP2P()">'
+    prova("il logo e' un bottone vero, uno solo, fra i due tab",
+          [1, True, True],
+          [mini.count('id="p2pVolta"'), testa in lati,
+           testa in lati and lati.index('id="p2pLatoCompro"')
+           < lati.index(testa) < lati.index('id="p2pLatoVendo"')])
+    bott = lati[lati.index(testa):] if testa in lati else ""
+    bott = bott[:bott.index("</button>")] if "</button>" in bott else ""
+    prova("...e' un bottone, non un terzo tab: i tab restano due",
+          [2, 0], [lati.count('role="tab"'), bott.count("role=")])
+    prova("dentro ci sono i due gemelli di sempre e la pastiglia ⇄, "
+          "muti per il lettore di schermo", True,
+          '<span class="p2p-logo-pila" aria-hidden="true">' in bott
+          and "/assets/p2p-logo-compra.webp" in bott
+          and "/assets/p2p-logo-vendi.webp" in bott
+          and '<span class="p2p-volta-segno" aria-hidden="true"><svg ' in bott)
+    # le due frasi si scrivono coi nomi dei TAB, letti dal markup: se un
+    # giorno un tab cambia nome, la frase rimasta indietro esce qui
+    nomi = dict(re.findall(r'id="p2pLato(Compro|Vendo)"[^>]*>([^<]+)</button>', lati))
+    attese = ({"su-compra": "Sei su %s. Tocca per passare a %s"
+               % (nomi["Compro"], nomi["Vendo"]),
+               "su-vendi": "Sei su %s. Tocca per passare a %s"
+               % (nomi["Vendo"], nomi["Compro"])}
+              if len(nomi) == 2 else {})
+    prova("il lettore di schermo sente dove si e' e dove si va, coi nomi "
+          "dei due tab", attese,
+          dict(re.findall(r'<span class="solo-voce (su-compra|su-vendi)">'
+                          r'([^<]+)</span>', bott)))
+    prova("...e il nome del bottone viene da li': niente aria-label ne' "
+          "title che lo coprano", False,
+          "aria-label" in bott or "title=" in bott)
+
+    # --- 2) LA CASCATA: una frase sola, e il colore del lato ----------
+    regole, _sq = _regole_css(css)
+
+    def catena(vendo, classi):
+        return [{"tag": "body", "attr": {},
+                 "classi": {"p2p-vendo"} if vendo else set()},
+                {"tag": "div", "attr": {}, "classi": {"p2p-lati"}},
+                {"tag": "button", "attr": {"id": "p2pVolta"},
+                 "classi": {"p2p-volta"}},
+                {"tag": "span", "attr": {}, "classi": set(classi.split())}]
+
+    def vince(vendo, classi, p):
+        return (_vince_css(regole, catena(vendo, classi), [p]).get(p) or ("",))[0]
+
+    def si_legge(vendo):
+        return [c for c in ("su-compra", "su-vendi")
+                if vince(vendo, "solo-voce " + c, "display") != "none"]
+    prova("a comprare si legge la sola frase del compra, a vendere la "
+          "sola del vendi: le accende body.p2p-vendo",
+          [["su-compra"], ["su-vendi"]], [si_legge(False), si_legge(True)])
+    prova("...e tutt'e due stanno fuori dalla vista, non spente (spente "
+          "non le leggerebbe nessuno)",
+          ["absolute", "1px", "rect(0 0 0 0)"],
+          [vince(False, "solo-voce su-compra", p)
+           for p in ("position", "width", "clip")])
+    prova("la pastiglia veste il lato: verde a comprare, rossa a vendere",
+          ["var(--trust)", "var(--rosso-p2p)"],
+          [vince(False, "p2p-volta-segno", "background"),
+           vince(True, "p2p-volta-segno", "background")])
+    prova("...col segno del colore del FONDO, non bianco: di sera il "
+          "verde e il rosso si schiariscono", "var(--bg)",
+          vince(False, "p2p-volta-segno", "color"))
+
+    # --- 3) LE MISURE: la riga dei tab non si sposta ------------------
+    vb = pezzo_js(css, "  .p2p-volta{", "}")
+    prova("il bottone non ha bordo, respiro ne' margine: al tab restano "
+          "gli stessi pixel", True,
+          "flex:0 0 auto;" in vb and "padding:0;margin:0;" in vb
+          and "border:none;" in vb and "position:relative;" in vb)
+    prova("...e il margine negativo resta sulla pila, dov'era", True,
+          "margin:0 0 calc(var(--logo-p2p) * -.105)"
+          in pezzo_js(css, "  .p2p-lati .p2p-logo-pila{", "}"))
+    m_s = re.search(r"\.p2p-volta-segno\{position:absolute;left:50%;"
+                    r"bottom:-(\d+)px;margin-left:-(\d+)px;", css)
+    m_w = re.search(r"\n    width:(\d+)px;height:(\d+)px;border-radius:999px;\n"
+                    r"    background:var\(--trust\)", css)
+    m_m = re.search(r"\.p2p-lati\{display:flex;align-items:flex-end;"
+                    r"margin:0 0 (\d+)px;", css)
+    m_l = re.search(r"--logo-p2p:clamp\((\d+)px,", css)
+    prova("la pastiglia si legge e i conti delle misure ci sono", True,
+          bool(m_s and m_w and m_m and m_l))
+    if m_s and m_w and m_m and m_l:
+        sporge, meta = int(m_s.group(1)), int(m_s.group(2))
+        larga, alta = int(m_w.group(1)), int(m_w.group(2))
+        prova("...sta in mezzo (il margine e' meta' della larghezza)",
+              larga, meta * 2)
+        prova("...sporge sotto la riga MENO del margine che c'e': non "
+              "tocca le pillole", True, 0 < sporge < int(m_m.group(1)))
+        prova("...e sta dentro il logo piu' piccolo (76px a 320)", True,
+              larga < int(m_l.group(1)) and sporge < alta)
+    prova("il fuoco da tastiera si vede", True,
+          ".p2p-volta:focus-visible{outline:2.5px solid var(--sats);"
+          "outline-offset:2px}" in css)
+
+    # --- 4) IL MOVIMENTO: i tempi in pari, e gli effetti ridotti ------
+    m_d = re.search(r"\.p2p-logo-pila\.volta\{animation:logoVolta (\.\d+)s linear\}", css)
+    m_r = re.search(r"\.p2p-logo-pila\.volta \.p2p-logo\{transition:opacity 0s "
+                    r"linear (\.\d+)s\}", css)
+    gl = pezzo_js(mini, "function giraLogoP2P(){", "\n}\n")
+    m_t = re.search(r"\.forEach\(p => p\.classList\.remove\('volta'\)\), (\d+)\);", gl)
+    prova("la capovolta ha la sua durata, il suo scatto e il suo ritiro",
+          True, bool(m_d and m_r and m_t))
+    if m_d and m_r and m_t:
+        dur, rit, ms = float(m_d.group(1)), float(m_r.group(1)), int(m_t.group(1))
+        prova("...breve: fra tre e cinque decimi", True, 0.3 <= dur <= 0.5)
+        prova("...il gemello cambia a META' corsa, quando il disegno e' "
+              "di taglio", dur, rit * 2)
+        prova("...e la classe se ne va un soffio DOPO: prima la "
+              "taglierebbe", True, dur * 1000 < ms <= dur * 1000 + 100)
+    prova("di taglio a meta': 90 gradi, e riparte da -90 (una moneta, "
+          "non una porta)", True,
+          "49.9%{transform:perspective(520px) rotateY(90deg)}" in css
+          and "50%{transform:perspective(520px) rotateY(-90deg);" in css
+          and "100%{transform:perspective(520px) rotateY(0)}}" in css)
+    prova("la capovolta sta scritta DOPO la scossa: se arrivano insieme "
+          "vince lei", True,
+          ".p2p-logo-pila.scossa{animation:logoScossa" in css
+          and css.index(".p2p-logo-pila.scossa{animation:logoScossa")
+          < css.index(".p2p-logo-pila.volta{animation:logoVolta"))
+    prova("con gli effetti ridotti: niente capovolta, niente scatto "
+          "ritardato, niente giro del segno", True,
+          "    .p2p-logo-pila.volta{animation:none}\n"
+          "    .p2p-logo-pila.volta .p2p-logo{transition:none}\n"
+          "    .p2p-volta-segno,.p2p-volta-segno svg{transition:none}\n" in css)
+
+    # --- 5) UN PADRONE SOLO --------------------------------------------
+    vl = pezzo_js(mini, "function voltaLatoP2P(){", "\n}\n")
+    prova("il tocco sul logo passa dalla porta dei tab, e non scrive il "
+          "lato da se'", [True, False],
+          ["setLatoP2P(p2pLato === 'compro' ? 'vendo' : 'compro', true);" in vl,
+           bool(re.search(r"p2pLato\s*=[^=]", vl)) or "classList.toggle(" in vl])
+    prova("il lato lo scrive setLatoP2P e nessun altro: una riga per la "
+          "variabile, una per il body", [1, 1, True],
+          [len(re.findall(r"(?<![\w.])p2pLato = ", mini)) - 1,
+           mini.count("classList.toggle('p2p-vendo'"),
+           "p2pLato = lato;" in pezzo_js(
+               mini, "function setLatoP2P(lato, senzaScossa){", "\n}\n")])
+    rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    righe_tab = ["  el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');",
+                 "  el('p2pLatoVendo')?.classList.toggle('attiva', p2pLato === 'vendo');"]
+    prova("...e i due tab lo leggono da li', a ogni ridisegno", True,
+          all(r in rp for r in righe_tab))
+
+    # --- 6) IL BANCO: le funzioni vere, l'orologio finto ---------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco del logo che volta il libro", "node non c'e'")
+        return
+    i0 = mini.index("let p2pScossaTimer = null;")
+    i1 = mini.index("\n}\n", mini.index("function setLatoP2P(lato, senzaScossa){")) + 3
+    banco = r"""
+let p2pLato = 'compro';
+const P2P_LATO_K = {compro: 'sell', vendo: 'buy'};
+let fatti = [];
+function haptic(){ fatti.push('vibra'); }
+const classi = () => { const s = new Set(); return {s,
+  remove(c){ s.delete(c); }, add(c){ s.add(c); }, contains(c){ return s.has(c); },
+  toggle(c, on){ if (on) s.add(c); else s.delete(c); }}; };
+const pila = {classList: classi(), get offsetWidth(){ fatti.push('reflow'); return 1; }};
+const tab = {p2pLatoCompro: {classList: classi()}, p2pLatoVendo: {classList: classi()}};
+const el = id => tab[id] || null;
+const document = {body: {classList: classi()},
+  querySelectorAll: s => s === '.p2p-logo-pila' ? [pila] : []};
+let coda = [], nid = 1;
+function setTimeout(f, ms){ const id = nid++; coda.push({id, f, ms}); return id; }
+function clearTimeout(id){ coda = coda.filter(t => t.id !== id); }
+function scorri(){ const t = coda; coda = []; t.forEach(x => x.f()); }
+/* il ridisegno di cartone porta le due righe VERE dei tab */
+function renderP2P(){ fatti.push('render');
+""" + "\n".join(righe_tab) + r"""
+}
+""" + mini[i0:i1] + r"""
+const foto = () => ({lato: p2pLato, body: document.body.classList.contains('p2p-vendo'),
+  compra: tab.p2pLatoCompro.classList.contains('attiva'),
+  vendi: tab.p2pLatoVendo.classList.contains('attiva'),
+  pila: [...pila.classList.s].sort(), fatti: fatti.slice(), tempi: coda.map(t => t.ms).sort()});
+const pari = () => (document.body.classList.contains('p2p-vendo') === (p2pLato === 'vendo'))
+  && (tab.p2pLatoCompro.classList.contains('attiva') === (p2pLato === 'compro'))
+  && (tab.p2pLatoVendo.classList.contains('attiva') === (p2pLato === 'vendo'));
+function zero(){ scorri(); p2pLato = 'vendo'; setLatoP2P('compro', true); scorri(); fatti = []; }
+const out = {};
+function caso(nome, f){ try { zero(); out[nome] = f(); } catch(e) { out[nome] = 'ESPLOSO: ' + e.message; } }
+caso('logo', () => { voltaLatoP2P(); const a = foto(); scorri(); return [a, [...pila.classList.s]]; });
+caso('ritorno', () => { voltaLatoP2P(); scorri(); fatti = []; voltaLatoP2P(); return foto(); });
+caso('tabPoiLogo', () => { setLatoP2P('vendo'); const sulTab = [...pila.classList.s];
+  fatti = []; voltaLatoP2P(); return [sulTab, foto()]; });
+caso('logoPoiTab', () => { voltaLatoP2P(); fatti = []; setLatoP2P('vendo'); const a = foto();
+  setLatoP2P('compro'); return [a.lato, a.fatti, foto().lato, pari()]; });
+caso('dueTocchi', () => { voltaLatoP2P(); voltaLatoP2P(); const a = foto(); scorri();
+  return [a.lato, a.tempi, [...pila.classList.s]]; });
+caso('zitto', () => { setLatoP2P('vendo', true); return foto(); });
+caso('misto', () => { let storti = 0, atteso = 'compro', seme = 7;
+  const mosse = [() => { voltaLatoP2P(); atteso = atteso === 'compro' ? 'vendo' : 'compro'; },
+                 () => { setLatoP2P('compro'); atteso = 'compro'; },
+                 () => { setLatoP2P('vendo'); atteso = 'vendo'; },
+                 () => { setLatoP2P('compro', true); atteso = 'compro'; },
+                 () => { setLatoP2P('vendo', true); atteso = 'vendo'; },
+                 () => { setLatoP2P('storto'); }];
+  for (let k = 0; k < 200; k++) { seme = (seme * 1103515245 + 12345) % 2147483648;
+    mosse[seme % mosse.length](); if (!pari() || p2pLato !== atteso) storti++; }
+  return storti; });
+console.log(JSON.stringify(out));
+"""
+    d = _tf.mkdtemp()
+    try:
+        p = os.path.join(d, "banco_logo_volta.js")
+        open(p, "w", encoding="utf-8").write(banco)
+        r = _sp.run([node, p], capture_output=True, encoding="utf-8", timeout=60)
+        out = (_json.loads(r.stdout.strip().splitlines()[-1])
+               if r.returncode == 0 and r.stdout.strip() else None)
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+    if out is None:
+        prova("il banco del logo che volta il libro gira", "", (r.stderr or "")[-600:])
+        return
+    prova("un tocco sul logo: si passa a Vendi, il body e i due tab lo "
+          "dicono, il logo si capovolge (non dondola), una vibrazione, "
+          "un ridisegno — e a fine giro la classe se ne va",
+          [{"lato": "vendo", "body": True, "compra": False, "vendi": True,
+            "pila": ["volta"], "fatti": ["reflow", "vibra", "render"],
+            "tempi": [450]}, []], out["logo"])
+    prova("...un secondo tocco riporta a Compra, allo stesso modo",
+          {"lato": "compro", "body": False, "compra": True, "vendi": False,
+           "pila": ["volta"], "fatti": ["reflow", "vibra", "render"],
+           "tempi": [450]}, out["ritorno"])
+    prova("dal tab a Vendi (il logo dondola, come sempre) e poi il logo: "
+          "si torna a Compra, e la scossa cede alla capovolta",
+          [["scossa"], {"lato": "compro", "body": False, "compra": True,
+                        "vendi": False, "pila": ["volta"],
+                        "fatti": ["reflow", "vibra", "render"],
+                        "tempi": [400, 450]}], out["tabPoiLogo"])
+    prova("dal logo a Vendi e poi il tab «Vendi»: gia' li', quindi solo "
+          "il dondolio e nessun ridisegno; poi il tab «Compra» riporta "
+          "indietro, tutto in pari",
+          ["vendo", ["reflow"], "compro", True], out["logoPoiTab"])
+    prova("due tocchi di fila sul logo: si e' di nuovo a Compra, un solo "
+          "ritiro in coda, e poi la classe via", ["compro", [450], []],
+          out["dueTocchi"])
+    prova("chi mette il lato senza dito (il +, un ordine da un link) non "
+          "capovolge e non vibra — ma tab, body e logo lo seguono",
+          {"lato": "vendo", "body": True, "compra": False, "vendi": True,
+           "pila": [], "fatti": ["render"], "tempi": []}, out["zitto"])
+    prova("duecento mosse mescolate (logo, tab, cambi muti, un lato "
+          "storto): lato, body e tab non si scollano mai", 0, out["misto"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -145783,6 +146049,7 @@ def main():
               prove_feedback_p2p,
               prove_x_risonanza,
               prove_indirizzo_lightning,
+              prove_logo_compra_vendi,
               prove_config_esempio):
         try:
             f()

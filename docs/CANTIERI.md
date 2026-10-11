@@ -49356,3 +49356,92 @@ partito lo stesso. Il CODICE partito è quello provato qui sopra;
 sbagliata era quella frase, corretta con questo commit di soli
 documenti. La lezione: verbale e push in due chiamate separate, e il
 push solo dopo aver RILETTO la coda del verbale.
+
+## Il logo che volta il libro: Compra ⇄ Vendi dal logo P2P (11 ott 2026, cantiere logo-compra-vendi, richiesta di Andrea)
+
+LA RICHIESTA: in cima al libro degli ordini il logo P2P cliccabile — un
+tocco passa da «Compra» a «Vendi» e ritorno, con un'animazione breve;
+che si capisca che si tocca e da che parte si è; allineato a quel che
+c'è già, anche tornando sul libro, nei link e dentro Telegram; un
+bottone vero, a 320 px, di sera e dentro Telegram.
+COSA C'ERA: due tab larghi, «Compra BTC» e «Vendi BTC» (`role="tab"`,
+l'acceso verde o rosso), col logo in mezzo come ORNAMENTO
+(`aria-hidden`): due gemelli impilati che sfumano uno nell'altro e un
+dondolio al tocco di un tab. Lo stato è UNO, `p2pLato`, e lo scrive la
+sola `setLatoP2P`, che veste anche `body.p2p-vendo`. Né pillole né un
+filtro del lato: il filtro è dei metodi. Il lato non si ricorda fra una
+visita e l'altra (a pagina ricaricata è «Compra») e non viaggia nel
+link del libro; il link di UN ordine apre il lato di quell'ordine.
+COSA SI È DECISO.
+1) IL LOGO È UN `<button>` (`#p2pVolta`, `voltaLatoP2P`), figlio della
+riga dei tab ma NON un terzo tab. Dentro tiene la pila dei gemelli
+com'era. Niente bordo, respiro o margine: la riga è alta quanto prima e
+ai tab restano gli stessi pixel (misurato: identici a ogni larghezza,
+col bottone e col markup di prima).
+2) CHE SI TOCCA LO DICE UNA PASTIGLIA «⇄» appesa sotto il logo, nel
+vuoto che la linea dei tab lascia lì: la riga si legge «Compra BTC ⇄
+Vendi BTC». DA CHE PARTE SI È lo dicono in tre: il tab acceso, la
+freccia accesa del disegno e il colore della pastiglia (verde/rosso).
+Il segno è del colore del fondo e non bianco: di sera verde e rosso si
+schiariscono e il bianco non si leggeva.
+3) UN PADRONE SOLO. Il tocco legge `p2pLato` e lo fa cambiare a
+`setLatoP2P(altro, true)`: la porta dei tab. Tutto quel che il bottone
+mostra — gemello, colore, frase per il lettore di schermo — lo accende
+`body.p2p-vendo` dal CSS. Non c'è una seconda copia dello stato da
+tenere in pari, ed è per questo che ritorno sul libro, il + che riporta
+a «Compra», l'ordine aperto da un link e Telegram non hanno chiesto
+una riga: passano tutti da lì.
+4) LA VOCE: due frasi nel bottone, fuori dalla vista — «Sei su Compra
+BTC. Tocca per passare a Vendi BTC» e la gemella — e se ne legge una
+(l'altra è `display:none`, che la toglie anche dal nome del bottone).
+5) LA CAPOVOLTA: 0,4 s, di taglio come una moneta (90° e riparte da
+-90°); il gemello non sfuma ma SCATTA a metà corsa, quando del disegno
+non si vede niente. Il dondolio resta la risposta al dito sul TAB. La
+classe se ne va a tempo (450 ms) e non con `animationend`, come la
+scossa e per la stessa ragione. Con gli effetti ridotti: niente
+movimento, il lato cambia lo stesso.
+LE STRADE SCARTATE. La scritta «Compra ⇄ Vendi» sotto il logo: i due
+nomi stanno già accanto, sarebbe la seconda copia; a 320 è più larga
+del logo e alza la testata ferma. L'`aria-label` scritto da
+`renderP2P`: una copia dello stato in JS, e una riga in più in una
+funzione che molti banchi delle prove fanno girare a pezzi. Il bottone
+fuori dalla riga dei tab, in posizione assoluta: avrebbe rovesciato
+l'ordine nel markup che le prove del libro tengono fermo. La piastra
+tonda dietro al disegno: il velo dietro la testata Andrea l'aveva
+tolto il 22 set. Il logo che ruota in piano: il barattolo finirebbe a
+testa in giù.
+NON FATTO, e non chiesto: il lato nel link del libro (`/p2p?lato=…`) e
+il lato ricordato fra le visite. Sono una funzione nuova (il
+vocabolario chiuso di `startapp` sta anche sul server).
+PROVATO. `prove_logo_compra_vendi`, 33 prove: markup, cascata (quale
+frase si legge e di che colore è la pastiglia nei due lati, chieste a
+`_vince_css`), misure, tempi, effetti ridotti, il padrone unico, e il
+banco in node con `voltaLatoP2P`, `giraLogoP2P`, `setLatoP2P` e
+`scuotiLogoP2P` VERE e l'orologio finto (logo, ritorno, tab poi logo,
+logo poi tab, due tocchi, cambio muto, duecento mosse mescolate).
+Tortura: 29 mutazioni di `miniapp.html` su una copia del repo, 29
+prese. DAL VIVO, Chrome pilotato con tocchi veri sul server del
+worktree in collaudo (relay morto, libro seminato in pagina): sito a
+375 e 320, chiaro e scuro; dentro Telegram di cartone (link
+`startapp=p2p`, identità dall'hash) a 375 e 320, col tasto indietro;
+PC a 1280 con la tastiera (Tab, Invio, Spazio, il contorno del fuoco);
+effetti ridotti. In ogni passo lato, body, tab, frase e pastiglia
+dicono lo stesso; la capovolta campionata fotogramma per fotogramma
+(classe presente 433 ms, opacità del gemello solo 0 e 1); nessun
+errore di pagina. Il nome accessibile l'ha letto Chrome
+(`getByRole('button', {name})`), non un lettore di schermo vero.
+Gli scatti: `.claude/giri/logo-compra-vendi/`.
+COSA È GIRATO SU QUALE ALBERO. Sull'albero del cantiere, sopra e319907
+(la punta di main, con la sua CI verde): `PROVE_SEVERE=1 python
+prove.py` INTERA, 22180 passate e 0 fallite, nessuna saltata; i 58
+collaudi del workflow nella gabbia, verdi — 55 al primo giro, il 56º
+(`collaudo_feedback_p2p`) tagliato al sesto secondo dal MIO limite di
+tempo e segnato rosso per quello: rilanciato coi due rimasti, verdi
+tutti e tre; `compileall`; lo scanner dei segreti sulle righe aggiunte,
+con le forme lette dal workflow e la sua controprova: zero.
+NOTATO, NON TOCCATO. A 320 px «Compra BTC» va su due righe e le
+pillole sotto vanno a capo: c'era già (sotto i 341 px il logo resta 76
+e al tab ne restano 98 per una scritta da 102), identico col markup di
+prima. I due tab non hanno `aria-selected`.
+RESTA DA GUARDARE: il movimento sul telefono vero e dentro Telegram
+vero; la frase con TalkBack o VoiceOver.
