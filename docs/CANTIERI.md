@@ -50623,3 +50623,4 @@ collaudi del workflow nella gabbia, 62 su 62 verdi nelle due copie
 (`collaudo_chiavi_ritrovate` compreso); lo scanner dei segreti della CI
 passa nel job `segreti`. La suite finale sulla copia di questo commit: il
 conto sta nella riga sotto, scritta dopo che è girata.
+La suite finale, sulla copia pulita di 56848ee (il commit dei conti): 22422 passate, 0 fallite, nessuna saltata; i 62 collaudi del workflow nella gabbia, 62 su 62 verdi.
