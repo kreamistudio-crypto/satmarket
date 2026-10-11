@@ -57232,10 +57232,19 @@ try:
     from config import AVVISO_DM_NOSTR
 except ImportError:
     AVVISO_DM_NOSTR = False
+# I RELAY (12 ott 2026, cantiere secondo-relay-dm): nos.lol e
+# relay.primal.net. Damus c'era ed e' uscito: i DM li da' solo a chi
+# si autentica, e alla nostra risposta dice «relay needs serviceUrl to
+# be configured before AUTH can work» — un difetto suo, che da qui non
+# si cura. Primal e' stato scelto sondandolo in SOLA LETTURA: serve le
+# buste per `#p` senza autenticazione (come nos.lol), ne tiene di
+# vecchie di oltre 120 giorni e ne riceve da decine di chiavi diverse.
+# LA LISTA DEVE ESSERE QUELLA DEL KIND 10050 DI BARATTOLO: e' li' che i
+# client leggono DOVE scriverci (PRODUZIONE, «IL KIND 10050»).
 try:
     from config import AVVISO_DM_NOSTR_RELAY
 except ImportError:
-    AVVISO_DM_NOSTR_RELAY = ["wss://nos.lol", "wss://relay.damus.io"]
+    AVVISO_DM_NOSTR_RELAY = ["wss://nos.lol", "wss://relay.primal.net"]
 
 AVVISO_DM_PASSO_S = 10              # ogni quanto l'orologio guarda la coda
 AVVISO_DM_PAUSA_MITTENTE_S = 600    # un avviso per mittente ogni 10 minuti

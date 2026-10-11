@@ -31014,7 +31014,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   di chi scrive su njump.me. In server.py, un blocco solo, subito dopo
   i DM in uscita (`manda_dm_nostr`); leva `AVVISO_DM_NOSTR`, spenta nel
   codice, e `AVVISO_DM_NOSTR_RELAY` (la nostra lista DM, il kind 10050:
-  nos.lol e relay.damus.io). Niente database, niente rotte.
+  nos.lol e relay.primal.net; fino al 12 ott 2026 il secondo era
+  relay.damus.io, che i DM li dà solo a chi si autentica e la cui
+  autenticazione non funziona — CANTIERI, «Il secondo relay dei DM»).
+  Niente database, niente rotte.
   I PEZZI, in fila. `_dm_filo` — un thread daemon per relay, il calco
   di `_ascolto_p2p_filo`: una connessione tenuta viva e rifatta quando
   cade (attesa che cresce fino a 60 s), col polso ogni 120 s che

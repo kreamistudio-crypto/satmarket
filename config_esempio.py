@@ -1441,9 +1441,11 @@ AVVISI_ORDINI_ADMIN = True
 AVVISO_DM_NOSTR = False
 # I relay su cui ascoltare: quelli della lista DM di Barattolo (il suo
 # kind 10050). Se un giorno quella lista cambia, si cambia anche qui.
+# relay.damus.io NON va messo: i DM li consegna solo a chi si
+# autentica, e la sua autenticazione oggi non funziona (ott 2026).
 AVVISO_DM_NOSTR_RELAY = [
     "wss://nos.lol",
-    "wss://relay.damus.io",
+    "wss://relay.primal.net",
 ]
 
 # --- Sicurezza degli accessi ------------------------------------------

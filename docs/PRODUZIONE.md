@@ -3736,19 +3736,21 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   2) si aggiunge in fondo a `/srv/barattolo/config.py` UNA riga:
      `AVVISO_DM_NOSTR = True`
      I relay sono già quelli giusti nel codice — `wss://nos.lol` e
-     `wss://relay.damus.io`, la lista DM di Barattolo (il suo kind
-     10050). Solo se un giorno quella lista cambia si aggiunge anche
-     `AVVISO_DM_NOSTR_RELAY = ["wss://…", "wss://…"]` (al massimo sei:
-     ognuno è un thread).
+     `wss://relay.primal.net` (dal 12 ott 2026: prima c'era
+     relay.damus.io, vedi sotto «IL KIND 10050») —, la lista DM di
+     Barattolo (il suo kind 10050). Solo se un giorno quella lista
+     cambia si aggiunge anche `AVVISO_DM_NOSTR_RELAY = ["wss://…",
+     "wss://…"]` (al massimo sei: ognuno è un thread). ⚠️ Se quella
+     riga nel config del VPS C'È GIÀ, vince lei sul codice: va cambiata
+     lì, o tolta.
   3) si riavvia: `sudo systemctl restart barattolo`
   4) si guarda il journal:
      `journalctl -u barattolo --since "2 min ago" | grep "Avviso DM"`
      Devono esserci «📩 Avviso DM Nostr ACCESO: ascolto wss://nos.lol ·
-     wss://relay.damus.io per <16 cifre>…» e, entro qualche secondo,
-     una riga «📩 Avviso DM: in ascolto su <relay>» per ognuno dei due
-     — per relay.damus.io con «(autenticato, NIP-42)» in coda: i DM li
-     consegna solo a chi dimostra di essere il destinatario, e dall'11
-     ott 2026 (sera) il server glielo dimostra da solo.
+     wss://relay.primal.net per <16 cifre>…» e, entro qualche secondo,
+     una riga «📩 Avviso DM: in ascolto su <relay>» per ognuno dei due.
+     Nessuno dei due chiede l'autenticazione; un relay che la chiede
+     esce con «(autenticato, NIP-42)» in coda.
   5) LA PROVA: da un client Nostr con UN'ALTRA chiave si manda un DM
      alla npub di Barattolo. Entro una ventina di secondi arriva
      l'avviso su Telegram. Un secondo DM dalla stessa chiave entro
@@ -3766,11 +3768,12 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
      per caduta, non una per tentativo; quando torna: «in ascolto su
      <relay> dopo N tentativi».
    · «📩 Avviso DM: in ascolto su <relay> (autenticato, NIP-42)»: quel
-     relay ha chiesto chi siamo (è successo con relay.damus.io alla
-     prima accensione, l'11 ott 2026: «auth-required: requested filter
-     requires authentication») e il server ha risposto firmando la sua
+     relay ha chiesto chi siamo e il server ha risposto firmando la sua
      sfida con la chiave della piattaforma. Non c'è niente da fare: lo
-     rifà da solo a ogni riconnessione.
+     rifà da solo a ogni riconnessione. (relay.damus.io l'ha chiesto
+     alla prima accensione, l'11 ott 2026, e alla nostra risposta ha
+     detto «relay needs serviceUrl to be configured before AUTH can
+     work»: un difetto suo. È uscito dalla lista il 12 ott.)
    · «📩 Avviso DM: <relay> RIFIUTA (…): riprovo fra un'ora»: il relay
      ha detto NO anche dopo l'autenticazione (o ha respinto la firma, o
      la chiede senza mandare la sfida). Fra parentesi c'è la sua frase.
@@ -3805,3 +3808,64 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   Avvisi ai moderatori»: la leva, e per ogni relay la sua parola —
   `connesso`, `giu`, `rifiutato`, `parte`.
   PER SPEGNERLO: `AVVISO_DM_NOSTR = False` (o via la riga) e riavvio.
+
+- IL KIND 10050 DI BARATTOLO, LA LISTA DEI RELAY DEI DM (12 ott 2026;
+  perché in CANTIERI, «Il secondo relay dei DM»). Il kind 10050 è il
+  biglietto in cui un profilo Nostr dice ai client DOVE scrivergli i DM
+  (NIP-17): senza, chi scrive alla npub riceve «DM inbox relay not
+  found». DEVE DIRE GLI STESSI RELAY CHE IL SERVER ASCOLTA
+  (`AVVISO_DM_NOSTR_RELAY`): un relay nel biglietto e non nella lista
+  è posta che arriva e nessuno sente; uno nella lista e non nel
+  biglietto è un filo che ascolta il vuoto.
+  OGGI: `wss://nos.lol` e `wss://relay.primal.net`. MAI
+  `relay.barattolo.store` (accetta solo le chiavi in whitelist, e una
+  busta 1059 la firma una chiave usa-e-getta) e MAI un relay che dà i
+  DM solo a chi si autentica senza averlo provato: relay.damus.io
+  chiede l'AUTH e poi risponde «relay needs serviceUrl to be configured
+  before AUTH can work».
+  PER CAMBIARLO lo fa Andrea dal WSL, dove sta la chiave, con `nak`
+  (v0.21.0), un comando alla volta. PRIMA il deploy del server con la
+  lista nuova (journal: «in ascolto su» per ogni relay), POI il
+  biglietto: nos.lol sta in tutt'e due le liste, quindi nel mezzo non
+  si perde niente.
+  D0) la chiave PUBBLICA, dalla npub (senza rete):
+      `cd ~ && mkdir -p dm10050 && cd dm10050`
+      `HEX=$(nak decode npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy)`
+      `echo $HEX` — comincia per `2e7afe3f` e finisce per `fe831b`.
+  D1) CONTROLLO PRIMA — cosa c'è adesso:
+      `nak req -k 10050 -a $HEX wss://nos.lol wss://relay.primal.net wss://relay.damus.io < /dev/null`
+      Una riga, coi tag `relay` di oggi.
+  D2) LA FIRMA A SCHERMO SPENTO, senza nessun relay nel comando:
+      `read -rs NOSTR_SECRET_KEY` — si incolla la nsec e Invio: non si
+      vede niente, ed è giusto così.
+      `export NOSTR_SECRET_KEY`
+      `nak event -k 10050 -t relay=wss://nos.lol -t relay=wss://relay.primal.net -c '' < /dev/null > firmato.json`
+      `unset NOSTR_SECRET_KEY`
+  D3) CONTROLLO CHI FIRMA — ⚠️ senza chiave `nak` firma lo stesso, con
+      una chiave «della macchina»: per questo si guarda PRIMA di
+      pubblicare.
+      `python3 -c "import json;e=json.load(open('firmato.json'));print('OK: firmato da Barattolo' if e['pubkey']=='$HEX' else 'NO: NON PUBBLICARE', e['kind'], [t[1] for t in e['tags']])"`
+      Deve dire «OK: firmato da Barattolo 10050» e i due relay.
+      `nak verify < firmato.json && echo firma valida`
+  D4) PUBBLICA il già firmato (questo comando non rifirma):
+      `nak event wss://nos.lol wss://relay.primal.net wss://relay.damus.io wss://nostr.mom < firmato.json`
+      Per ogni relay «publishing to … success.». Va anche a damus e a
+      nostr.mom: non per riceverci i DM, ma perché è lì che i client
+      cercano il biglietto, e quello vecchio va sostituito ovunque.
+  D5) CONTROLLO DOPO, un relay alla volta:
+      `nak req -k 10050 -a $HEX wss://nos.lol < /dev/null`
+      `nak req -k 10050 -a $HEX wss://relay.primal.net < /dev/null`
+      `nak req -k 10050 -a $HEX wss://relay.damus.io < /dev/null`
+      Ognuno deve dare UNA riga coi due relay nuovi (un 10050 nuovo
+      sostituisce il vecchio: è un evento «replaceable»).
+  I comandi sono stati provati come sono scritti la notte fra l'11 e
+  il 12 ott 2026, su un
+  `nak serve` locale e con una chiave usa-e-getta (la trappola del D3
+  compresa); D1 anche sui relay veri, che è una lettura.
+  PER SCEGLIERE UN RELAY NUOVO si guarda, in sola lettura: che risponda
+  EOSE a `{"kinds":[1059],"#p":[<noi>]}` senza chiedere l'AUTH (o che
+  la sua AUTH funzioni davvero); che tenga buste 1059 di chiavi
+  DIVERSE e anche vecchie di mesi (`{"kinds":[1059],"until":…}`), che è
+  la prova che le accetta da chiunque e non le butta; il NIP-11
+  (`payment_required`, `auth_required`); i tempi su tre giri. La
+  riserva misurata quella notte: `wss://nostr.oxtr.dev`.

@@ -33177,8 +33177,23 @@ def prove_relay_leva():
     # finisse in una lista nuova per un motivo suo, questa riga
     # diventa rossa e chi la guarda legge questo commento e decide —
     # che e' quel che una sentinella deve fare.
-    for _r in ("wss://relay.primal.net", "wss://nostr.mom"):
-        prova(f"{_r} sta in un posto solo", 1, _SORGENTE.count(_r))
+    # QUEL GIORNO E' ARRIVATO PER PRIMAL (12 ott 2026, cantiere
+    # secondo-relay-dm), e la decisione e' questa: relay.primal.net ha
+    # un SECONDO posto legittimo, la lista dei relay dei DM
+    # (`AVVISO_DM_NOSTR_RELAY`), che ha un mestiere suo — «chi consegna
+    # le buste 1059 a Barattolo senza un'autenticazione che non
+    # funziona» (damus ne e' uscito per questo) — e che deve dire gli
+    # stessi nomi del kind 10050, non quelli della lista di serie. Non
+    # e' una copia tornata: si conta DUE, e si guarda che il secondo
+    # sia proprio quello. A fare da sentinella della copia resta
+    # nostr.mom, che vive solo nella lista di serie.
+    prova("wss://nostr.mom sta in un posto solo", 1,
+          _SORGENTE.count("wss://nostr.mom"))
+    prova("wss://relay.primal.net sta in DUE posti, e il secondo e' la "
+          "lista dei relay dei DM", (2, True),
+          (_SORGENTE.count("wss://relay.primal.net"),
+           'AVVISO_DM_NOSTR_RELAY = ["wss://nos.lol", '
+           '"wss://relay.primal.net"]' in _SORGENTE))
     prova("in importa_nostr.py sono la lista piu' il venditore", 5,
           _IMP.count("wss://"))
 
@@ -109159,10 +109174,31 @@ def prove_avviso_dm_nostr():
           "lista DM", (True, True),
           ("\nAVVISO_DM_NOSTR = False\n" in esempio,
            'AVVISO_DM_NOSTR_RELAY = [\n    "wss://nos.lol",\n'
-           '    "wss://relay.damus.io",\n]' in esempio))
+           '    "wss://relay.primal.net",\n]' in esempio))
     prova("i relay di serie nel codice sono gli stessi due", True,
-          'AVVISO_DM_NOSTR_RELAY = ["wss://nos.lol", "wss://relay.damus.io"]'
+          'AVVISO_DM_NOSTR_RELAY = ["wss://nos.lol", "wss://relay.primal.net"]'
           in blocco)
+    # (12 ott 2026, cantiere secondo-relay-dm) damus i DM li da' solo a
+    # chi si autentica, e la sua autenticazione risponde «relay needs
+    # serviceUrl to be configured»: fuori dalla lista, nel codice e nel
+    # file da cui si copia — li' resta solo NOMINATO, nel commento che
+    # dice di non rimetterlo
+    _riga_dm = esempio[esempio.index("AVVISO_DM_NOSTR_RELAY = ["):]
+    _riga_dm = _riga_dm[:_riga_dm.index("]")]
+    _serie = blocco[blocco.index("    AVVISO_DM_NOSTR_RELAY = ["):]
+    prova("relay.damus.io non sta piu' fra i relay dell'avviso DM, ne' nel "
+          "codice ne' nel config d'esempio", (False, False),
+          ("damus" in _serie[:_serie.index("]")], "damus" in _riga_dm))
+    prova("...e le due liste sono LA STESSA, nello stesso ordine (il "
+          "config d'esempio e' il file da cui si copia)", True,
+          re.findall(r'"(wss://[^"]+)"', _riga_dm)
+          == re.findall(r'"(wss://[^"]+)"', _serie[:_serie.index("]")])
+          == ["wss://nos.lol", "wss://relay.primal.net"])
+    prova("...tutte e due stanno fra i relay di serie di casa: Barattolo "
+          "ci pubblica gia', e i client li conoscono", [True, True],
+          [f'    "{r}",\n' in src[src.index("RELAY_DI_SERIE = ["):
+                                  src.index("RELAY_DI_SERIE = [") + 400]
+           for r in ("wss://nos.lol", "wss://relay.primal.net")])
     avvio = pezzo("avvia_avviso_dm")
     prova("all'avvio: a leva spenta si esce PRIMA di far nascere "
           "l'orologio, e una leva accesa senza chiave vale spenta",

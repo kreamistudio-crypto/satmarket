@@ -50624,3 +50624,114 @@ collaudi del workflow nella gabbia, 62 su 62 verdi nelle due copie
 passa nel job `segreti`. La suite finale sulla copia di questo commit: il
 conto sta nella riga sotto, scritta dopo che è girata.
 La suite finale, sulla copia pulita di 56848ee (il commit dei conti): 22422 passate, 0 fallite, nessuna saltata; i 62 collaudi del workflow nella gabbia, 62 su 62 verdi.
+
+## Il secondo relay dei DM: fuori relay.damus.io, dentro relay.primal.net (12 ott 2026, cantiere secondo-relay-dm, richiesta di Andrea)
+
+DAL CAMPO. Dopo il deploy dell'autenticazione NIP-42, relay.damus.io
+alla nostra risposta dice «relay needs serviceUrl to be configured
+before AUTH can work»: la sfida la manda, ma il relay non è
+configurato per accettare la risposta di nessuno. È un difetto loro.
+L'avviso dei DM ascolta quindi solo su nos.lol, e il kind 10050 di
+Barattolo manda ancora i client anche a damus.
+LA RICHIESTA. 1) Trovare uno o due relay pubblici affidabili che
+accettano i 1059 da chiunque e lasciano leggere a Barattolo i suoi,
+provandoli da qui in SOLA LETTURA, senza pubblicare niente. 2) Mettere
+il migliore al posto di damus nella lista del server. 3) Dare i
+comandi `nak` per ripubblicare il 10050, e fermarsi lì.
+COME SI È SCELTO. Una sonda in sola lettura (nessun EVENT, nessuna
+AUTH mandata) su diciassette relay: il NIP-11; le buste 1059 per noi
+(`#p`); le ultime 40 buste di chiunque, contando gli autori — è la
+prova che un relay le ACCETTA da chiavi qualunque: una busta la firma
+una chiave usa-e-getta —; il nostro 10050. Poi, sui migliori, tre giri
+per i tempi, le buste vecchie di 14, 45 e 120 giorni (le tiene o le
+butta?), venti secondi di sottoscrizione aperta. Dei 1059 si sono
+guardati data e autore, mai il contenuto.
+COSA È USCITO (la notte fra l'11 e il 12 ott 2026, dal PC di
+sviluppo).
+- nos.lol: strfry 1.1.3, EOSE senza AUTH in 0,07 s, 39 autori su 40
+  buste, ne tiene di 120 giorni. Ha il nostro 10050. Resta.
+- relay.primal.net: strfry 1.1.3, EOSE senza AUTH in 0,03 s, 38 autori
+  su 40, ne tiene di 120 giorni, quattro buste nuove in venti secondi;
+  tre giri in 0,19-0,25 s. Ha già il nostro 10050, ed è uno dei
+  quattro relay di serie di casa. SCELTO.
+- nostr.oxtr.dev: strfry 1.0.4, EOSE senza AUTH, 40 autori su 40, ne
+  tiene di 120 giorni. Buono, operatore più piccolo: la RISERVA.
+- relay.nos.social, nostr-pub.wellorder.net, purplerelay.com: leggono
+  senza AUTH e hanno buste di molti autori; non approfonditi.
+- relay.damus.io: sfida e «auth-required» (e poi il difetto detto).
+- auth.nostr1.com: chiede l'AUTH per TUTTO, anche per il 10050. È
+  fatto apposta per i DM e protegge di più (nessun altro può contare
+  le buste per noi), ma senza autenticarsi da qui non si poteva
+  provare, e dopo damus un relay con l'AUTH non provata non si mette.
+- relay.snort.social: software «memlay» 0.2.0, memoria volatile: no.
+- offchain.pub: 40 buste di 4 autori soli; nostr.bitcoiner.social: 4,7
+  s per connettersi; nostr.einundzwanzig.space: nessuna busta;
+  relay.fountain.fm: «kinds not supported».
+- nostr.mom (errore TLS da questo PC: è il relay che l'antivirus aveva
+  fermato il 23 set, e forse è ancora lui), relay.nostr.band, relay.nostr.net, relay.0xchat.com: non
+  raggiunti, quindi non giudicati.
+COSA SI È DECISO, e perché.
+1) DUE RELAY, NON TRE: nos.lol e relay.primal.net. Due operatori
+grandi e indipendenti, lo stesso software, tutti e due leggibili senza
+autenticazione — quindi senza dipendere da una configurazione altrui,
+che è il guasto di damus. La specifica chiede liste piccole (da uno a
+tre): ogni relay in più è una consegna in più per chiunque ci scriva,
+e un filo in più da tenere. Il terzo si aggiunge il giorno in cui uno
+dei due dà segni: la riserva è misurata.
+2) DAMUS ESCE ANCHE DALL'ASCOLTO, non solo dal biglietto: tenerlo
+sarebbe un filo che ogni ora chiede e si sente dire no, per posta che
+dal nuovo 10050 in poi non ci arriva più.
+3) L'ORDINE: prima il deploy (il server ascolta nos.lol e primal), poi
+il 10050. nos.lol sta nella lista vecchia e in quella nuova, quindi in
+nessun momento c'è un DM che arriva dove nessuno ascolta.
+4) IL PREZZO DI LEGGERE SENZA AUTENTICAZIONE, detto: su nos.lol e su
+primal chiunque può contare le buste indirizzate a Barattolo (quante e
+quando; non da chi, né cosa). È lo stato di oggi su nos.lol, ed è il
+rovescio della ragione per cui damus le chiude.
+COSA È CAMBIATO NEL CODICE: la lista di serie di
+`AVVISO_DM_NOSTR_RELAY` in server.py e in config_esempio.py, e
+nient'altro. Se nel config del VPS quella riga c'è, vince lei.
+UNA SENTINELLA DI CASA È DIVENTATA ROSSA, ed era giusto: in
+`prove_relay_leva` «wss://relay.primal.net sta in un posto solo»
+(server.py) fa la guardia contro una copia a mano della lista di
+serie, e il suo commento dice cosa fare il giorno che uno dei due nomi
+finisce in una lista nuova per un motivo suo: leggere, e decidere. La
+decisione: la lista dei DM è un secondo posto legittimo — ha un
+mestiere suo e deve dire i nomi del 10050, non quelli della lista di
+serie. Per primal il conto diventa DUE, guardando che il secondo sia
+proprio quella riga; a fare da sentinella della copia resta nostr.mom.
+Scartato: derivare la lista dei DM da quella di serie per non
+riscrivere il nome — legherebbe due liste che devono poter divergere.
+PROVATO. `prove_avviso_dm_nostr` sale a 90 (tre nuove: damus fuori da
+tutt'e due le liste, le due liste uguali e nello stesso ordine, i due
+relay fra quelli di serie di casa); quattro mutazioni sulle due liste
+(damus che torna nel codice, nel config d'esempio, l'ordine diverso,
+un relay che non è di casa), quattro prese. I comandi `nak` del 10050 provati
+come sono scritti su un `nak serve` locale con una chiave usa-e-getta:
+prima, firma senza relay con la chiave letta da `read -rs`, controllo
+di chi firma, `nak verify`, pubblicazione del già firmato (stesso id:
+non rifirma), dopo; e la trappola — senza chiave `nak` firma con
+un'altra, e il controllo lo dice. D1 anche sui relay veri (è una
+lettura): il 10050 di oggi sta su nos.lol, primal e damus, coi relay
+nos.lol e damus.
+COSA È GIRATO SU QUALE ALBERO. Sopra 2c84c0d (la punta di main alla
+partenza): la suite severa INTERA, 22380 passate e 0 fallite (dopo la
+sentinella aggiornata; al primo giro era lei la sola rossa), e i 61
+collaudi del workflow nella gabbia, 61 verdi. MAIN È CORSO DUE VOLTE,
+sette commit non miei (17a07fd e 5d24f9b, poi a78f309, 320b0a6,
+e3954a5, 6eb56d9, a0983ec: le chiavi dello scambio P2P, la vibrazione,
+i loro verbali). Primo rebase, sopra 5d24f9b: suite intera 22387 e 0,
+i 61 collaudi di nuovo, 61 verdi. Al secondo si è chiesto ad Andrea,
+com'è la regola, e ha scelto «solo le sezioni toccate»: sopra a0983ec
+(CI verde) le sei sezioni toccate (259 prove) e la suite severa INTERA,
+22470 passate e 0 fallite, nessuna saltata; i collaudi NON rifatti su
+quest'ultimo albero (li rifà la CI). A ogni rebase lo stesso unico
+conflitto, la coda di questo file. `compileall` e lo scanner dei
+segreti sulle righe aggiunte: zero.
+NON PROVATO, e si dice: che relay.primal.net ACCETTI una busta per noi
+(si è visto che ne accetta da decine di chiavi, non si è pubblicato
+niente); il server VERO in ascolto su primal (si vede dal journal dopo
+il deploy); il 10050 nuovo, che pubblica Andrea.
+RESTA DA FARE (Andrea): i passi D0-D5 di PRODUZIONE, «IL KIND 10050 DI
+BARATTOLO», dopo aver visto nel journal «in ascolto su
+wss://relay.primal.net»; poi un DM di prova da un'altra chiave.
