@@ -147316,6 +147316,203 @@ def prove_guardia_liquidita():
            if "print(" in r and re.search(r"\b(esa|mac)\b", r)])
 
 
+def prove_vibrazione():
+    """LA VIBRAZIONE DI CASA (11 ott 2026, cantiere vibrazione; dal
+    campo: «nell'app non vibra niente», dentro Telegram e nell'app
+    installata su Android).
+
+    `haptic` era una riga che parlava solo a Telegram, e con lo stile
+    che su Android non si sente; fuori da Telegram non chiedeva a
+    nessuno. Adesso e' la porta UNICA: dentro Telegram la strada di
+    Telegram, fuori `navigator.vibrate` dove esiste, niente a chi ha
+    chiesto meno movimento, e mai un errore che fermi il gesto.
+
+    Qui la funzione VERA gira in node dentro mondi di cartone (il
+    telefono, e lo script di Telegram, non ci sono): si prova CHE COSA
+    chiede e A CHI, non che il telefono si muova — quello lo dice solo
+    un telefono. Il Telegram di cartone fuori da Telegram ha
+    `initData` vuota come quello vero, e la sua HapticFeedback SEGNA
+    chi la tocca: e' cosi' che si vede che fuori non la si chiama."""
+    print("\n[la vibrazione di casa]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i = mini.index("/* ══ LA VIBRAZIONE DI CASA")
+    j = mini.index("\n}\n", mini.index("function haptic(tipo){", i)) + 3
+    blocco, fuori = mini[i:j], mini[:i] + mini[j:]
+    codice = blocco[blocco.index("const VIBRA_MS"):]
+
+    # --- 1) UNA PORTA SOLA -------------------------------------------
+    nomi = ("HapticFeedback", "impactOccurred", "notificationOccurred",
+            "selectionChanged", "navigator.vibrate", ".vibrate(")
+    prova("una porta sola: fuori dal suo blocco nessuno nomina "
+          "HapticFeedback, i suoi verbi o navigator.vibrate", [0] * 6,
+          [fuori.count(n) for n in nomi])
+    prova("...la funzione e' una, e nessuno la riassegna", (1, []),
+          (len(re.findall(r"function haptic\(", mini)),
+           re.findall(r"\bhaptic\s*=[^=]", mini)))
+    prova("il barattolo dei preferiti passa dalla porta, col suo avviso",
+          True, "haptic('success');\n      toast('Messo nel barattolo! 🫙');"
+          in fuori)
+    prova("chi ha chiesto meno movimento si chiede al giudice di casa, "
+          "per prima cosa", True,
+          0 < codice.find("if (effettiRidotti()) return;")
+          < codice.find("tg?.initData"))
+    prova("...e `prefers-reduced-motion` qui non si interroga a parte",
+          False, "prefers-reduced-motion" in codice or "matchMedia" in codice)
+    prova("dentro Telegram il giudice e' `initData`, come nel resto "
+          "della pagina", True, "if (tg?.initData) {" in codice)
+
+    # --- 2) LA FUNZIONE VERA, NEI SUOI MONDI ---------------------------
+    banco = "const PEZZO = " + json.dumps(codice) + """;
+function conf(a, b){
+  const x = a.split('.').map(Number), y = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++){
+    const d = (x[i] || 0) - (y[i] || 0); if (d) return d; }
+  return 0;
+}
+function mondo(m){
+  const fatti = [];
+  const tg = m.senzaTg ? undefined : {
+    initData: m.dentro ? 'query_id=AAA&user=%7B%7D' : '',
+    platform: m.dentro ? (m.platform || 'android') : 'unknown',
+    isVersionAtLeast(v){
+      return conf(m.versione || (m.dentro ? '8.0' : '6.0'), v) >= 0; },
+    HapticFeedback: {
+      impactOccurred(s){ if (m.rompe) throw new Error('rotto');
+        fatti.push(['tg-tocco', s]); },
+      notificationOccurred(t){ if (m.rompe) throw new Error('rotto');
+        fatti.push(['tg-avviso', t]); },
+      selectionChanged(){ fatti.push(['tg-selezione']); } } };
+  if (tg && m.senzaHaptic) delete tg.HapticFeedback;
+  if (tg && m.senzaVersione) delete tg.isVersionAtLeast;
+  const navigator = {};
+  // come nel browser: staccata dal suo `navigator` e' «Illegal invocation»
+  if (!m.senzaVibrate) navigator.vibrate = function(p){
+    if (this !== navigator) throw new TypeError('Illegal invocation');
+    if (m.rompe) throw new Error('rotto');
+    fatti.push(['vibrate', p]); return true; };
+  const giudice = m.nonNato
+    ? () => { throw new ReferenceError('non ancora nato'); }
+    : () => !!m.ridotti;
+  const casa = new Function('tg', 'navigator', 'effettiRidotti', PEZZO
+    + '\\nreturn {haptic, VIBRA_MS, VIBRA_STILE_ANDROID, VIBRA_STILE};')(
+    tg, navigator, giudice);
+  return {casa, fatti};
+}
+function gira(m, tipi){
+  const w = mondo(m); let errore = null; const reso = [];
+  for (const t of tipi){
+    try { reso.push(t === null ? w.casa.haptic() : w.casa.haptic(t)); }
+    catch(e){ errore = String(e); } }
+  return {fatti: w.fatti, errore,
+          muta: reso.length === tipi.length && reso.every(r => r === undefined)};
+}
+const TUTTI = [null, 'success', 'warning', 'error'];
+const c = mondo({}).casa;
+const out = {ms: c.VIBRA_MS, stili: [c.VIBRA_STILE_ANDROID, c.VIBRA_STILE]};
+out.fuori = gira({}, TUTTI);
+out.fuoriIgnoto = gira({}, ['boh', {type: 'click'}, 0, '', 'tocco']);
+out.iphone = gira({senzaVibrate: true}, TUTTI);
+out.onion = gira({senzaTg: true}, [null]);
+out.onionIphone = gira({senzaTg: true, senzaVibrate: true}, TUTTI);
+out.android = gira({dentro: true}, TUTTI);
+out.ios = gira({dentro: true, platform: 'ios'}, TUTTI);
+out.desktop = gira({dentro: true, platform: 'tdesktop'}, [null]);
+out.dentroIgnoto = gira({dentro: true}, ['boh', {type: 'click'}]);
+out.limite = gira({dentro: true, versione: '6.1'}, [null]);
+out.vecchio = gira({dentro: true, versione: '6.0'}, TUTTI);
+out.senzaHaptic = gira({dentro: true, senzaHaptic: true}, TUTTI);
+out.senzaVersione = gira({dentro: true, senzaVersione: true}, TUTTI);
+out.ridottiDentro = gira({dentro: true, ridotti: true}, TUTTI);
+out.ridottiFuori = gira({ridotti: true}, TUTTI);
+out.ridottiOnion = gira({senzaTg: true, ridotti: true}, TUTTI);
+out.rottoDentro = gira({dentro: true, rompe: true}, TUTTI);
+out.rottoFuori = gira({rompe: true}, TUTTI);
+out.nonNatoDentro = gira({dentro: true, nonNato: true}, [null]);
+out.nonNatoFuori = gira({nonNato: true}, [null]);
+console.log(JSON.stringify(out));
+"""
+    o = _node_banco(banco)
+    if o is None:
+        salta("la vibrazione girata nei suoi mondi", "node non installato")
+        return
+    if not o:
+        prova("il banco della vibrazione gira", True, False)
+        return
+    ms, (st_android, st_altri) = o["ms"], o["stili"]
+    zitto = {"fatti": [], "errore": None, "muta": True}
+    detto = lambda fatti: {"fatti": fatti, "errore": None, "muta": True}
+
+    # le misure: si leggono dal file (si ritoccano li', in un posto solo)
+    # ma dentro un recinto — un tocco non e' una sveglia
+    prova("il tocco e' un colpo solo e breve (fra 8 e 30 ms)", True,
+          isinstance(ms["tocco"], int) and 8 <= ms["tocco"] <= 30)
+    prova("i tre avvisi sono colpi-pausa-colpi, e nessuno passa i 200 ms",
+          [True] * 3,
+          [isinstance(ms[k], list) and len(ms[k]) % 2 == 1
+           and all(isinstance(x, int) and 5 <= x <= 80 for x in ms[k])
+           and sum(ms[k]) <= 200 for k in ("success", "warning", "error")])
+    STILI = {"light", "medium", "heavy", "rigid", "soft"}
+    prova("gli stili chiesti a Telegram sono fra i cinque che conosce "
+          "(uno storto e' un'eccezione nella sua libreria)", True,
+          st_android in STILI and st_altri in STILI)
+    prova("su Android NON e' `light` — 7 ms a un quarto della forza: il "
+          "guasto del campo — e altrove resta `light`", (True, "light"),
+          (st_android != "light", st_altri))
+
+    # FUORI DA TELEGRAM
+    prova("fuori da Telegram (sito, app installata): navigator.vibrate, "
+          "un colpo per il tocco e la sua figura per ogni avviso — e la "
+          "HapticFeedback di Telegram non si tocca",
+          detto([["vibrate", ms["tocco"]], ["vibrate", ms["success"]],
+                 ["vibrate", ms["warning"]], ["vibrate", ms["error"]]]),
+          o["fuori"])
+    prova("...un tipo che non conosce (o l'evento di un click passato "
+          "per sbaglio) e' un tocco", detto([["vibrate", ms["tocco"]]] * 5),
+          o["fuoriIgnoto"])
+    prova("iPhone fuori da Telegram (niente navigator.vibrate): niente, "
+          "e nessun errore", zitto, o["iphone"])
+    prova("sulla .onion (lo script di Telegram non c'e' proprio): vibra "
+          "lo stesso", detto([["vibrate", ms["tocco"]]]), o["onion"])
+    prova("...e li', senza navigator.vibrate, niente e nessun errore",
+          zitto, o["onionIphone"])
+
+    # DENTRO TELEGRAM
+    prova("dentro Telegram su Android: SOLO la strada di Telegram — il "
+          "tocco con lo stile di Android, gli avvisi col loro nome — e "
+          "navigator.vibrate non si chiama (sarebbero due colpi)",
+          detto([["tg-tocco", st_android], ["tg-avviso", "success"],
+                 ["tg-avviso", "warning"], ["tg-avviso", "error"]]),
+          o["android"])
+    prova("dentro Telegram su iPhone: uguale, col tocco `light`",
+          detto([["tg-tocco", "light"], ["tg-avviso", "success"],
+                 ["tg-avviso", "warning"], ["tg-avviso", "error"]]),
+          o["ios"])
+    prova("dentro Telegram su un client che non e' Android: `light`",
+          detto([["tg-tocco", "light"]]), o["desktop"])
+    prova("...un tipo che non conosce e' un tocco anche qui (a Telegram "
+          "non arriva mai un avviso dal nome storto)",
+          detto([["tg-tocco", st_android]] * 2), o["dentroIgnoto"])
+    prova("dalla 6.1, la prima che vibra, si chiede",
+          detto([["tg-tocco", st_android]]), o["limite"])
+    prova("un Telegram piu' vecchio della 6.1: niente — nemmeno "
+          "l'avviso in console della sua libreria, e nessun ripiego",
+          zitto, o["vecchio"])
+    prova("...e cosi' un Telegram senza HapticFeedback, o che non sa "
+          "dire la sua versione", (zitto, zitto),
+          (o["senzaHaptic"], o["senzaVersione"]))
+
+    # MENO MOVIMENTO, E I GUASTI
+    prova("chi ha chiesto meno movimento non riceve niente: dentro "
+          "Telegram, fuori, sulla .onion", (zitto, zitto, zitto),
+          (o["ridottiDentro"], o["ridottiFuori"], o["ridottiOnion"]))
+    prova("una vibrazione che esplode non ferma il gesto: dentro e fuori "
+          "nessun errore esce dalla porta", (zitto, zitto),
+          (o["rottoDentro"], o["rottoFuori"]))
+    prova("...nemmeno chiamata mentre la pagina si carica, col giudice "
+          "non ancora nato: li' si tace", (zitto, zitto),
+          (o["nonNatoDentro"], o["nonNatoFuori"]))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -147609,6 +147806,7 @@ def main():
               prove_logo_compra_vendi,
               prove_avviso_dm_nostr,
               prove_foto_obbligatorie,
+              prove_vibrazione,
               prove_config_esempio):
         try:
             f()

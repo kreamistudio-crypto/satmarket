@@ -50309,3 +50309,146 @@ ripresa.
 (dalla console alla prossima presa, o dal sorgente sul nodo), e
 l'esito di `ea0af71a`: la decisione «sats a chi compra», il payout
 alla fattura di chi compra col wallet acceso.
+
+## La vibrazione di casa: una porta sola, dentro e fuori da Telegram (11 ott 2026, notte, cantiere vibrazione, richiesta di Andrea)
+
+DAL CAMPO. «Nell'app non vibra niente: né il tocco su "Pubblica" senza
+foto, né il cambio Compra/Vendi del libro P2P, né altro», provato
+dentro Telegram e nell'app installata su Android, con la vibrazione al
+tocco del telefono accesa.
+
+**COM'ERA, E PERCHÉ TACEVA.** Tutta la vibrazione dell'app passava da
+una riga, `function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }`
+(325 chiamate), più una seconda riga a parte per il barattolo dei
+preferiti (`notificationOccurred('success')`). A `navigator.vibrate`
+non chiedeva nessuno. Due guasti diversi:
+1. FUORI DA TELEGRAM (sito, app installata): lo script
+   `telegram-web-app.js` crea `Telegram.WebApp` sempre, anche senza un
+   client dietro; lì si crede alla versione 6.0, e la sua HapticFeedback
+   sotto la 6.1 scrive in console «HapticFeedback is not supported in
+   version 6.0» e torna senza fare niente. Quindi `tg?.…` non era mai
+   vuoto, e non vibrava mai. CERTO: letto nello script e rivisto dal
+   vivo (la riga di ieri rifatta sulla pagina: l'avviso in console, e
+   zero chiamate a `navigator.vibrate`).
+2. DENTRO TELEGRAM la richiesta partiva giusta — dal vivo lo script
+   vero spedisce `web_app_trigger_haptic_feedback` con
+   `impact_style: light` — ma il client Android la traduce in un colpo
+   di 7 millesimi a 65 su 255 di forza (`BotWebViewVibrationEffect.java`
+   del sorgente pubblico: `IMPACT_LIGHT(new long[] {7}, new int[] {65},
+   new long[] {60})`; i 60 ms sono per i telefoni che la forza non la
+   sanno dosare). Su un telefono che la dosa, 7 ms a un quarto non si
+   sentono. È LA CAUSA PIÙ PROBABILE, NON PROVATA: l'ho letta nel
+   codice di Telegram, non l'ho sentita su un telefono.
+
+**COSA SI È FATTO.** `haptic(tipo)` è la porta unica (blocco «LA
+VIBRAZIONE DI CASA» in `miniapp.html`; l'architettura ha la voce con lo
+stesso nome): `haptic()` è il tocco, `haptic('success' | 'warning' |
+'error')` l'avviso. Dentro Telegram (`initData`, il giudice di casa)
+solo la strada di Telegram, dalla 6.1; fuori `navigator.vibrate` dove
+esiste; dove non esiste niente, senza errori; chi ha chiesto meno
+movimento (`effettiRidotti()`: il sistema, o «🌗 Aspetto») non riceve
+niente; il tutto in un `try`, perché dopo `haptic()` c'è sempre il
+lavoro vero. Le 325 chiamate non si sono toccate — passavano già dalla
+porta —; il barattolo è diventato `haptic('success')`.
+
+**LE SCELTE, E I PERCHÉ.**
+- SU ANDROID DENTRO TELEGRAM SI CHIEDE `soft`, non `light`
+  (`VIBRA_STILE_ANDROID`). Dei cinque stili del client è quello col
+  colpo più lungo sui telefoni che dosano la forza (10 ms a 175 contro
+  7 a 65) e, sugli altri, NON più lungo di ieri (55 ms contro 60):
+  nessuno riceve più di prima, e chi non sentiva niente riceve circa
+  quattro volte tanto. `heavy` (7 ms a 255) dà la stessa energia ma 80
+  ms sui telefoni senza dosaggio: scartato. Su iPhone `light` si sente
+  già e resta. Se sul telefono di Andrea `soft` non bastasse, la
+  costante è una parola da cambiare.
+- DENTRO TELEGRAM MAI `navigator.vibrate`, nemmeno come ripiego su un
+  Telegram troppo vecchio: l'ha chiesto Andrea («dentro Telegram usa
+  HapticFeedback»), e le due strade insieme sarebbero due colpi.
+- FUORI, IL TOCCO È 15 ms e gli avvisi sono figure corte (success
+  15-65-15, sul calco di quelle di Telegram). Sono una stima: Chrome
+  vibra alla forza di serie del telefono e la durata giusta si sente
+  solo in mano. Stanno in `VIBRA_MS`, un posto solo; le prove tengono
+  il tocco fra 8 e 30 ms e ogni avviso sotto i 200.
+- MENO MOVIMENTO = NESSUNA VIBRAZIONE, e il giudice è quello degli
+  effetti ridotti, non una domanda nuova a `prefers-reduced-motion`.
+- UN TIPO SCONOSCIUTO È UN TOCCO: a Telegram un avviso dal nome storto
+  farebbe alzare un'eccezione alla sua libreria.
+
+**PROVATO.** `prove_vibrazione` (25 prove): la porta è una sola (fuori
+dal blocco nessuno nomina HapticFeedback, i suoi verbi o
+`navigator.vibrate`), e la funzione VERA girata in node in venti mondi
+di cartone — sito Android, iPhone senza `vibrate`, .onion senza lo
+script di Telegram, Telegram Android/iPhone/desktop, la 6.1 e la 6.0,
+Telegram senza HapticFeedback, meno movimento nei tre posti, la
+vibrazione che esplode, la chiamata a pagina non ancora caricata.
+Tortura su una copia: 20 mutazioni di `miniapp.html`, 20 prese.
+DAL VIVO, Chrome e WebKit pilotati con tocchi veri sulla copia col
+config di cartone (relay al relay morto, nessuna chiave), lo script
+VERO di Telegram, spiando `navigator.vibrate` e la porta
+`TelegramWebviewProxy` da cui Telegram riceve le richieste. Otto mondi,
+gli stessi otto gesti in ognuno (barattolo messo e tolto, una tessera
+della home, entrare nel P2P, «Vendi BTC», il logo che volta, il tab
+già acceso, «Pubblica» senza foto):
+- sito su Android: `vibrate(15)` a ogni gesto, `[15,65,15]` al
+  barattolo, e Chrome risponde `true` (richiesta accettata); il tab
+  già acceso, niente, come prima;
+- dentro Telegram su Android: a Telegram arriva `impact soft` a ogni
+  gesto e `notification success` al barattolo; `navigator.vibrate` mai;
+- dentro Telegram su iPhone (WebKit): `impact light`, uguale;
+- sito su iPhone (WebKit, `navigator.vibrate` non esiste): niente, e
+  nessun errore di pagina;
+- meno movimento chiesto dal sistema (sito e Telegram) e da «🌗
+  Aspetto» (anche dopo una ricarica): niente, e i gesti funzionano
+  tutti (il lato cambia, il riquadro delle foto si accende);
+- un Telegram alla 6.0: niente, e nessun avviso in console.
+Gli esiti e lo script: `.claude/giri/vibrazione/`.
+
+**NON PROVATO, e si dice.** Nessun telefono vero: non so se la mano
+SENTE il colpo. In particolare: 1) che `soft` dentro Telegram su
+Android si senta (è la parte che poggia su una lettura del codice di
+Telegram); 2) che 15 ms nell'app installata siano giusti — né troppo
+deboli né fastidiosi; 3) iPhone dentro Telegram (lì ho visto solo la
+richiesta partire, in WebKit, non il Taptic Engine); 4) l'app
+installata vera (TWA): ho provato Chrome che emula un Pixel, non
+l'APK. Il browser da scrivania risponde `true` a `vibrate` anche senza
+motore: dice che la richiesta è passata, non che qualcosa si è mosso.
+
+**DA SAPERE PER CHI PROVA.** Nell'app installata Chrome NON vibra col
+telefono in silenzioso (proprio muto, non «vibrazione»: sta nel
+sorgente di Chrome, `VibrationManagerAndroid.java`), né prima del primo
+tocco sulla pagina. E chi ha «Rimuovi animazioni» acceso nel sistema, o
+gli effetti ridotti da «🌗 Aspetto», adesso non riceve vibrazioni: è
+voluto.
+
+**NOTATO, NON TOCCATO.** Entrando nel P2P partono DUE colpi di fila, e
+al barattolo il tocco più l'avviso: era già così (le chiamate non sono
+cambiate), prima non si sentiva e adesso forse sì.
+
+**COSA È GIRATO SU QUALE ALBERO.** Sull'albero del cantiere sopra
+2c84c0d (la punta di main di allora, con la sua CI verde): la tortura,
+il giro dal vivo, `PROVE_SEVERE=1 python prove.py` INTERA, 22402
+passate e 0 fallite, nessuna saltata; i 61 collaudi del workflow nella
+gabbia, 61 verdi (in tre gruppi, in parallelo); `compileall`; lo
+scanner dei segreti sulle righe aggiunte, con le forme lette dal
+workflow e la controprova: zero. La voce era già scritta quando la
+suite è girata, tranne questo paragrafo.
+POI MAIN È CORSO di due commit — 17a07fd e 5d24f9b, «La presa della
+disputa letta sul nodo vero» e la sua sentinella (non miei, cantiere
+tor-chiavi-scambio: `miniapp.html`, `server.py`, un collaudo, le loro
+prove e la loro voce qui sopra) — e il cantiere è stato ribasato. Un
+solo conflitto, la coda di questo file: tenuta la voce di main, questa
+riappesa sotto. Cercato per nome quel che è arrivato: una chiamata
+`haptic()` in più, che passa dalla porta come le altre. Sull'albero
+ribasato: `prove_vibrazione` 25 su 25, la suite severa INTERA di
+nuovo, 22409 passate e 0 fallite, nessuna saltata; i 61 collaudi nella
+gabbia di nuovo, 61 verdi; `compileall` e lo scanner dei segreti:
+zero. Tortura e giro dal vivo NON rifatti sull'albero ribasato (il
+blocco della vibrazione è identico byte per byte). I conti
+dell'albero ribasato sono stati scritti qui DOPO i loro giri: da
+allora è cambiato solo questo paragrafo.
+
+**RESTA DA GUARDARE** (Andrea, sul telefono, dopo il deploy): dentro
+Telegram su Android, «Pubblica» senza foto e Compra/Vendi; lo stesso
+nell'app installata, col telefono NON in silenzioso; se è troppo o
+troppo poco, dire quale dei due posti — le tre costanti sono lì per
+questo.

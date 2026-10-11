@@ -18288,6 +18288,32 @@
   usa (Web Animations, View Transitions, SMIL) e chi chiama
   `requestAnimationFrame` col suo perché — un effetto nuovo che non ci
   passa esce rosso col suo nome.
+  LA VIBRAZIONE DI CASA (11 ott 2026, cantiere vibrazione; dal campo:
+  «nell'app non vibra niente»). `haptic(tipo)` è la PORTA UNICA della
+  vibrazione: senza argomento è il tocco, con `'success'`, `'warning'`
+  o `'error'` è un avviso (oggi l'unico avviso è il barattolo dei
+  preferiti). Nessun altro punto della pagina nomina `HapticFeedback` o
+  `navigator.vibrate`, e `prove_vibrazione` li conta. TRE REGOLE, in
+  quest'ordine: 1) chi ha chiesto meno movimento (`effettiRidotti()`,
+  il giudice di qui sopra: il sistema o «🌗 Aspetto») non riceve
+  niente; 2) DENTRO TELEGRAM (`tg.initData`, il giudice di casa) solo
+  la strada di Telegram, dalla versione 6.1 — `impactOccurred` per il
+  tocco, `notificationOccurred` per l'avviso — e mai le due strade
+  insieme; 3) FUORI (sito, app installata, .onion) `navigator.vibrate`
+  dove esiste, con le durate di `VIBRA_MS`; dove non esiste (iPhone:
+  Safari non ce l'ha) niente, e nessun errore. Tutto dentro un `try`:
+  una vibrazione mancata non ferma mai il gesto che la chiedeva.
+  PERCHÉ PRIMA TACEVA: fuori da Telegram lo script di Telegram crea
+  `tg` lo stesso ma si crede alla 6.0 e la sua HapticFeedback rifiuta
+  con un avviso in console; dentro, su Android, lo stile `light` è un
+  colpo di 7 ms a un quarto della forza (`BotWebViewVibrationEffect`
+  del client). Per questo su Android si chiede `soft`
+  (`VIBRA_STILE_ANDROID`: 10 ms a 175 su 255, e 55 ms sui telefoni che
+  la forza non la dosano, contro i 60 di `light`), altrove `light`.
+  Le misure si ritoccano in quelle tre costanti e in nessun altro posto.
+  DA SAPERE: Chrome non vibra col telefono in silenzioso né prima di un
+  tocco sulla pagina, e il sistema può spegnere tutto dalle sue
+  impostazioni — da lì la pagina non lo vede.
   Cartello «fase di test» (lug 2026): l'avviso di rodaggio
   all'apertura — modale a tutto schermo col velo SFOCATO
   (`#testModale`, z-index 90: sopra i fogli e sopra il tour), si
