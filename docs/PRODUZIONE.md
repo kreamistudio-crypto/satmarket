@@ -710,6 +710,85 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   prima), mai il giorno del lancio, e senza toccare il database.
   Il P2P (garanzia mai pagata) non si usa per la prova: c'è di mezzo
   una controparte.
+- LA GUARDIA DELLA LIQUIDITÀ, DAL SERVER (11 ott 2026; il perché in
+  CANTIERI, «La guardia della liquidità»; com'è fatta in ARCHITETTURA).
+  Sostituisce la guardia oraria del nodo qui sopra: guarda l'entrata
+  TOTALE, chiede a LND se chi paga da Phoenix ha una strada anche fuori
+  dal canale ACINQ diretto, avvisa ai cambi e al massimo una volta al
+  giorno, e ogni avviso porta la grafica dei canali. NASCE SPENTA.
+  `/canali` NEL BOT (solo admin) funziona appena il deploy è passato,
+  anche a guardia spenta: è il modo di vedere il giudizio PRIMA di
+  accenderla. Se risponde «al server manca il macaroon di lettura» o
+  «non ha il permesso», si guarda «IL MACAROON DI SOLA LETTURA» più
+  sotto; una voce «❔ … non l'ho potuta misurare (getinfo negato)» vuol
+  dire macaroon senza `info:read`.
+  ACCENDERLA, sul VPS. Prima si guarda che il config non abbia già
+  righe sue (il config vince sul codice):
+  `grep -n "LIQUIDITA" /srv/barattolo/config.py`
+  poi nel config, a mano, UNA riga:
+  `GUARDIA_LIQUIDITA = True`
+  e `sudo systemctl restart barattolo`, poi
+  `journalctl -u barattolo -n 300 --no-pager | grep "💧"`
+  (si aspetta «💧 Guardia della liquidità: accesa — un giro ogni 60
+  minuti, avvisi a …»; il primo giro parte due minuti dopo l'avvio e
+  tace se va tutto bene). Le altre leve hanno già il valore giusto nel
+  codice e si scrivono SOLO per cambiarle:
+  `LIQUIDITA_SCAMBIO_MAX = 500000` (la garanzia più grossa: se cambia
+  `max_order_amount` nel `settings.toml` del nodo, cambia qui),
+  `LIQUIDITA_PHOENIX_MIN = 300000` (quanto deve poter entrare da
+  Phoenix; 0 = quella domanda non si fa),
+  `LIQUIDITA_USCITA_MIN = 0` (0 = nessun minimo d'uscita),
+  `LIQUIDITA_PROMEMORIA_S = 86400`, `LIQUIDITA_OGNI_S = 3600`.
+  Gli avvisi vanno agli stessi del guardiano del ponte
+  (`GUARDIANO_PONTE_AVVISA`, o i moderatori).
+  DOVE SI LEGGE: `journalctl -u barattolo | grep "💧"` — una riga a
+  ogni CAMBIO («allarme (phoenix)», «promemoria», «rientrato») e a ogni
+  giro saltato («canali non letti (muto)»), più una per destinatario.
+  Lo stato sta nel timbro `liquidita_stato`.
+  SPEGNERLA: via la riga (o `False`) e riavvio. Il timbro resta e non
+  dà fastidio; se si riaccende mesi dopo con uno stato vecchio, il
+  primo giro buono manda un «tornata a posto» di troppo.
+  SUL NODO, DOPO che la guardia del server si è vista funzionare (un
+  `/canali` giusto e la riga «accesa» nel journal), si spegne la
+  guardia oraria vecchia, un comando per riga:
+  `sudo systemctl disable --now nodo-liquidita-acinq.timer`
+  `systemctl list-timers --all | grep liquidita`
+  (la riga della guardia oraria non c'è più; il giro di ogni giorno
+  resta), e alla ronda di ogni giorno si toglie la terza domanda, che è
+  la stessa soglia
+  ACINQ. Prima si guarda che la leva non sia già scritta (nel file
+  vale la PRIMA riga con quel nome):
+  `grep -n "SOGLIA_ACINQ" /etc/default/ronda-liquidita`
+  se non c'è:
+  `echo 'SOGLIA_ACINQ=0' | sudo tee -a /etc/default/ronda-liquidita`
+  `sudo /usr/local/bin/ronda-liquidita.sh --prova`
+  (il quadro arriva su Telegram come sempre, e non parla più di ACINQ
+  basso). La ronda di ogni giorno continua a dire canali spariti o
+  inattivi, lease, e l'inbound totale sotto `SOGLIA_IN`. RITORNO
+  INDIETRO: `sudo systemctl enable --now nodo-liquidita-acinq.timer` e
+  via la riga `SOGLIA_ACINQ=0` dal file.
+  LA SONDA A MANO, dal nodo, in sola lettura
+  (`deploy/nodo/sonda-rotte.py`): i canali, le strade da ACINQ a noi per
+  100k, 300k, 500k e 1M (libera, senza il canale diretto nel tetto di
+  Phoenix, senza tetto) e da quale canale sono entrati gli ultimi
+  incassi. Usa il `readonly.macaroon` che LND ha già (non sa pagare) e
+  non lo stampa. Dal PC in PowerShell:
+  `git -C C:\Users\Andrea\Documents\GitHub\satmarket fetch origin`
+  `cmd /c "git -C C:\Users\Andrea\Documents\GitHub\satmarket show origin/main:deploy/nodo/sonda-rotte.py > %TEMP%\sonda-rotte.py"`
+  `(Get-FileHash $env:TEMP\sonda-rotte.py).Hash.ToLower()`
+  `scp -i $env:USERPROFILE\.ssh\lnvps $env:TEMP\sonda-rotte.py debian@vm-1937.lnvps.cloud:/tmp/`
+  sul nodo: `sha256sum /tmp/sonda-rotte.py` (le stesse cifre) e
+  `python3 /tmp/sonda-rotte.py`. Le prime righe dicono dove si ferma:
+  «REST …: muta (perché)» o «risponde», e per ogni macaroon trovato nel
+  container «accettato» o «rifiutato» — l'11 ott quello buono era
+  sotto `/root/.lnd/data/…`, e una copia vecchia in `data-annullato-2`
+  veniva rifiutata. Se la REST sta su un altro indirizzo:
+  `python3 /tmp/sonda-rotte.py IP:PORTA`.
+  LA PROVA CHE CHIUDE LA DOMANDA «Phoenix entra solo da ACINQ?» non è
+  la sonda (LND non conosce i saldi altrui): è un pagamento vero da un
+  Phoenix, più grosso dell'entrata ACINQ del momento, e poi
+  `lncli lookupinvoice <r_hash>` sul nodo per leggere da quale canale
+  sono arrivati i pezzi (la lista `htlcs`).
 - LA QUINTA DOMANDA DELLA RONDA, OGNI GIORNO: `ronda-tor.sh` +
   `nodo-tor.timer` (09:20 UTC, Persistent), copie in `deploy/nodo/`.
   Tre giudici dal namespace di mostro: la curl a check.torproject.org

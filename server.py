@@ -17368,6 +17368,8 @@ async def gestisci_update(update: dict):
         return await comando_vetrina(mittente, testo)
     if testo.startswith("/punti"):
         return await comando_punti(mittente, testo)
+    if testo.startswith("/canali"):
+        return await comando_canali(mittente, testo)
     if testo.startswith("/sfoglia") or testo.startswith("/categorie"):
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": TESTO_SFOGLIA, "parse_mode": "HTML",
@@ -27826,6 +27828,18 @@ def _leve_stato():
                          "«cassaforte») fino a chiusura, rimborsi compresi. "
                          "False e riavvia rimanda il nuovo sul SaaS — le "
                          "righe del nodo continuano a chiudersi lì"),
+            _leva("Guardia della liquidità del nodo", "GUARDIA_LIQUIDITA",
+                  _guardia_liquidita_attiva(),
+                  spento=("nessuno guarda i canali dal server: /canali li "
+                          "mostra quando lo chiedi, ma non arriva nessun "
+                          "avviso" if _lnd_configurato() else
+                          "manca il macaroon di lettura del nodo: i canali "
+                          "non si possono leggere"),
+                  acceso="ogni ora legge i canali dal ponte e chiede a LND "
+                         "se da ACINQ c'è una strada: avvisa quando "
+                         "l'entrata, la strada di Phoenix o l'uscita "
+                         "diventano un problema, quando tornano a posto, e "
+                         "in mezzo al massimo una volta al giorno"),
             # Allarme se c'e' un nodo e nessuno guarda il suo ponte: e'
             # il mondo del 18 set 2026, nove ore di acquisti falliti.
             _leva("Guardiano del ponte verso LND", "GUARDIANO_PONTE",
@@ -63135,6 +63149,531 @@ def _incasso_del_motivo(motivo: str):
     quando servono, e un banco puo' metterci le sue casse di cartone."""
     return {"banner": _incassa_sblocco,
             "negozio_slug": _incassa_slug_negozio}.get(motivo)
+
+
+# ---------- LA GUARDIA DELLA LIQUIDITA' (11 ott 2026) ------------------
+# DA DOVE SI PARTIVA. Sul nodo la guardia oraria (`ronda-liquidita.sh
+# --acinq`) suonava quando l'entrata dei SOLI canali ACINQ scendeva
+# sotto 300.000, e ripeteva ogni sei ore: con cinque milioni di entrata
+# su un altro canale l'avviso arrivava di continuo, e un allarme che
+# arriva di continuo e' tappezzeria. La frase che lo reggeva — «Phoenix
+# paga solo dal canale ACINQ» — veniva da UN acquisto fallito, il 5
+# ott, il giorno stesso in cui il canale LNBiG nasceva.
+# LA DOMANDA VERA e' se il nodo puo' fare gli scambi, e sono tre:
+#  1) ENTRATA: sommando i canali in linea, ci sta la garanzia piu'
+#     grossa? (`LIQUIDITA_SCAMBIO_MAX`, lo specchio di `max_order_amount`
+#     del coordinatore.)
+#  2) DA PHOENIX: chi paga da Phoenix parte dal nodo di ACINQ. Se il
+#     canale diretto non basta (`LIQUIDITA_PHOENIX_MIN`), si CHIEDE a
+#     LND una strada da ACINQ a noi che non passi di li', dentro quel
+#     che Phoenix lascia spendere di rete (4 sat + 0,4 %); e l'ultimo
+#     salto — un canale nostro — deve avere l'entrata VERA per reggerla.
+#     Solo se non c'e' nemmeno quella, e' un problema.
+#  3) USCITA: sommando i canali in linea, resta almeno
+#     `LIQUIDITA_USCITA_MIN`? SPENTA di serie (0), ed e' voluto: i sats
+#     che si pagano a chi compra al rilascio sono quelli della garanzia
+#     appena incassata, quindi l'uscita di uno scambio se la porta lo
+#     scambio. Un pavimento fisso suonerebbe proprio il giorno in cui
+#     tutti i venditori sono stati pagati.
+# NIENTE RIPETIZIONI: un avviso quando una domanda passa da buona a
+# cattiva, uno quando tornano tutte buone, e in mezzo al massimo un
+# promemoria ogni `LIQUIDITA_PROMEMORIA_S`. Lo stato sta nei timbri
+# (come il freno del ponte): un deploy non raddoppia un allarme.
+# QUI E NON SUL NODO, perche' qui ci sono gia' il ponte verso LND, il
+# macaroon di SOLA LETTURA (`offchain:read info:read`, lo stesso del
+# controllo della fattura P2P) e il bot: nessun segreto nuovo, nessuno
+# script da installare la'. `lncli queryroutes` poi non sa partire da un
+# altro nodo; la REST si' (`source_pub_key`).
+# QUEL CHE NON SA: LND non conosce i saldi degli altri. La strada da
+# ACINQ esiste «sulla carta» (canali, capienze, tariffe); che il nodo di
+# ACINQ la scelga davvero lo dice solo un pagamento vero.
+try:
+    from config import GUARDIA_LIQUIDITA
+except ImportError:
+    GUARDIA_LIQUIDITA = False
+try:
+    from config import LIQUIDITA_OGNI_S
+except ImportError:
+    LIQUIDITA_OGNI_S = 3600           # ogni ora, come la guardia del nodo
+try:
+    from config import LIQUIDITA_SCAMBIO_MAX
+except ImportError:
+    LIQUIDITA_SCAMBIO_MAX = 500_000   # max_order_amount del coordinatore
+try:
+    from config import LIQUIDITA_PHOENIX_MIN
+except ImportError:
+    LIQUIDITA_PHOENIX_MIN = 300_000   # la SOGLIA_ACINQ del nodo, 6 ott
+try:
+    from config import LIQUIDITA_USCITA_MIN
+except ImportError:
+    LIQUIDITA_USCITA_MIN = 0          # 0 = nessun pavimento d'uscita
+try:
+    from config import LIQUIDITA_PROMEMORIA_S
+except ImportError:
+    LIQUIDITA_PROMEMORIA_S = 86_400   # al massimo un promemoria al giorno
+# ACINQ per PREFISSO della pubkey, come la ronda del nodo: i 16
+# caratteri bastano fra i nostri vicini.
+LIQUIDITA_PREFISSO_ACINQ = "03864ef025fde8fb"
+PHOENIX_FISSO_SATS = 4        # quel che Phoenix lascia spendere di rete:
+PHOENIX_PER_MILLE = 4         # 4 sat + 0,4 % dell'importo
+LIQUIDITA_PRIMO_GIRO_S = 120  # il primo sguardo, a server avviato
+TIMBRO_LIQUIDITA = "liquidita_stato"
+BARRA_CANALE = 10             # i quadretti della barretta
+CANALI_LND = "/v1/channels?peer_alias_lookup=true"
+_TASK_LIQUIDITA = None
+
+
+def _sats_canale(c: dict, lato: str) -> int:
+    """I sats SPENDIBILI di un lato del canale — `local` esce, `remote`
+    entra — cioe' il saldo meno la riserva che quel lato deve tenere.
+    Non alza mai: un canale scritto storto vale zero."""
+    try:
+        saldo = int(c.get(lato + "_balance") or 0)
+        riserva = int((c.get(lato + "_constraints") or {})
+                      .get("chan_reserve_sat") or 0)
+    except (TypeError, ValueError, AttributeError):
+        return 0
+    return max(0, saldo - riserva)
+
+
+def _taglia_canale(sats) -> str:
+    """La capienza in corto: 5M, 1,5M, 400k."""
+    try:
+        n = int(sats or 0)
+    except (TypeError, ValueError):
+        return "?"
+    if n >= 1_000_000:
+        return (f"{n / 1_000_000:.1f}".rstrip("0").rstrip(".")
+                .replace(".", ",") + "M")
+    if n >= 1000:
+        return f"{n // 1000}k"
+    return str(n)
+
+
+def _nome_canale(c: dict) -> str:
+    """Il nome del vicino come lo dice LND; senza, ACINQ si riconosce
+    dal prefisso e gli altri si chiamano col pezzo di chiave."""
+    nome = str(c.get("peer_alias") or "").strip()
+    pk = str(c.get("remote_pubkey") or "")
+    if nome and not nome.startswith("unable to lookup"):
+        return nome[:28]      # la riga del nome non va a capo sul telefono
+    if pk.startswith(LIQUIDITA_PREFISSO_ACINQ):
+        return "ACINQ"
+    return (pk[:10] + "…") if pk else "canale senza nome"
+
+
+def _numeri_liquidita(canali: list) -> dict:
+    """I totali che servono al giudizio. Contano SOLO i canali in linea:
+    da un canale fuori linea non entra e non esce niente."""
+    vivi = [c for c in canali if c.get("active")]
+    acinq = [c for c in vivi if str(c.get("remote_pubkey") or "")
+             .startswith(LIQUIDITA_PREFISSO_ACINQ)]
+    chiave = next((str(c.get("remote_pubkey")) for c in canali
+                   if str(c.get("remote_pubkey") or "")
+                   .startswith(LIQUIDITA_PREFISSO_ACINQ)), "")
+    return {"canali": len(canali), "vivi": len(vivi),
+            "entra": sum(_sats_canale(c, "remote") for c in vivi),
+            "esce": sum(_sats_canale(c, "local") for c in vivi),
+            "entra_acinq": sum(_sats_canale(c, "remote") for c in acinq),
+            "pk_acinq": chiave}
+
+
+def _grafica_canali(canali: list) -> str:
+    """I canali, da leggere sul telefono: per ognuno il nome, la
+    barretta (piena = quanto ESCE sul totale spendibile), i sats che
+    escono e che entrano, lo stato; sotto, i totali dei canali in
+    linea. TESTO NUDO: chi lo manda con l'HTML di Telegram lo scappa
+    (il nome di un nodo lo sceglie il nodo). Tre righe corte per canale
+    invece di una tabella: senza un carattere a larghezza fissa le
+    colonne non stanno in riga, e una riga lunga va a capo a caso."""
+    if not canali:
+        return "Nessun canale aperto."
+    # la legenda sta su UNA riga del telefono (lo scatto a 375 la
+    # mandava a capo quando diceva anche «tolte le riserve»)
+    righe = ["↑ esce · ↓ entra (sats spendibili)"]
+
+    def capienza(c):
+        try:
+            return int(c.get("capacity") or 0)
+        except (TypeError, ValueError):
+            return 0
+    for c in sorted(canali, key=lambda c: (-capienza(c),
+                                           str(c.get("channel_point") or ""))):
+        esce, entra = _sats_canale(c, "local"), _sats_canale(c, "remote")
+        pieni = round(BARRA_CANALE * esce / (esce + entra)) if esce + entra else 0
+        sospesi = c.get("pending_htlcs") or []
+        if not c.get("active"):
+            stato = "FUORI LINEA"
+        elif sospesi:
+            somma = 0
+            for h in sospesi:
+                try:
+                    somma += int((h or {}).get("amount") or 0)
+                except (TypeError, ValueError, AttributeError):
+                    pass
+            stato = (f"in linea · {len(sospesi)} HTLC in sospeso "
+                     f"({_fmt_sats(somma)} sats)")
+        else:
+            stato = "in linea · nessun HTLC in sospeso"
+        righe += ["",
+                  f"{'🟢' if c.get('active') else '🔴'} {_nome_canale(c)} · "
+                  f"{_taglia_canale(c.get('capacity'))}",
+                  f"[{'█' * pieni}{'░' * (BARRA_CANALE - pieni)}] "
+                  f"↑ {_fmt_sats(esce)} ↓ {_fmt_sats(entra)}",
+                  stato]
+    n = _numeri_liquidita(canali)
+    righe += ["",
+              f"Totale, {n['vivi']} in linea su {n['canali']}:",
+              f"↑ esce {_fmt_sats(n['esce'])} · ↓ entra {_fmt_sats(n['entra'])}"]
+    return "\n".join(righe)
+
+
+def _tetto_phoenix(sats: int) -> int:
+    return PHOENIX_FISSO_SATS + int(sats) * PHOENIX_PER_MILLE // 1000
+
+
+async def _strada_phoenix(canali: list, sats: int, chiedi=None) -> dict:
+    """Da ACINQ a noi SENZA il canale diretto, per `sats`, dentro il
+    tetto di Phoenix. Torna `esito`:
+      'ok'           la strada c'e', costa `costo` e arriva da `da`
+      'cara'         c'e', ma costa piu' del tetto
+      'stretta'      c'e', ma l'ultimo canale ha solo `entra` di entrata
+      'nessuna'      LND non ne trova
+      'non_misurata' non si e' potuto chiedere (col `perche`)
+    NON ALZA MAI. La coppia vietata e' DIREZIONALE (da ACINQ a noi) e
+    toglie di mezzo tutti i canali diretti in un colpo."""
+    chiedi = chiedi or _lnd_rest
+    pk = _numeri_liquidita(canali)["pk_acinq"]
+    if not pk:
+        return {"esito": "non_misurata", "perche": "nessun canale con ACINQ"}
+    try:
+        stato, info = await chiedi("GET", "/v1/getinfo", None, "chi siamo")
+        noi = str(info.get("identity_pubkey") or "")
+        if stato != "ok" or not noi:
+            return {"esito": "non_misurata", "perche": f"getinfo {stato}"}
+        tetto = _tetto_phoenix(sats)
+        corpo = {"source_pub_key": pk, "use_mission_control": False,
+                 "ignored_pairs": [{
+                     "from": base64.b64encode(bytes.fromhex(pk)).decode(),
+                     "to": base64.b64encode(bytes.fromhex(noi)).decode()}]}
+
+        async def chiedi_via(limite):
+            c = dict(corpo)
+            if limite is not None:
+                c["fee_limit"] = {"fixed": str(limite)}
+            stato, r = await chiedi(
+                "POST", f"/v1/graph/routes/{noi}/{int(sats)}", c,
+                "strada da ACINQ")
+            vie = r.get("routes") if stato == "ok" else None
+            if vie and isinstance(vie[0], dict):
+                return "ok", vie[0]
+            m = str(r.get("message") or "").lower()
+            if stato == "ok" or (stato == "errore" and (
+                    "unable to find a path" in m or "no path" in m)):
+                return "nessuna", {}
+            return stato, {}
+
+        esito, via = await chiedi_via(tetto)
+        cara = False
+        if esito == "nessuna":
+            # senza tetto: «non c'e'» e «costa troppo» non sono la
+            # stessa notizia, e la seconda si cura cambiando vicino
+            esito, via = await chiedi_via(None)
+            cara = esito == "ok"
+        if esito == "nessuna":
+            return {"esito": "nessuna", "tetto": tetto}
+        if esito != "ok":
+            return {"esito": "non_misurata", "perche": f"rotte {esito}"}
+        salti = [s for s in (via.get("hops") or []) if isinstance(s, dict)]
+        costo = (int(via.get("total_fees_msat") or 0) + 999) // 1000
+        ultimo = next((c for c in canali if salti and str(c.get("chan_id"))
+                       == str(salti[-1].get("chan_id"))), None)
+        if ultimo is None:
+            return {"esito": "non_misurata",
+                    "perche": "l'ultimo salto non è un canale nostro"}
+        fatto = {"costo": costo, "tetto": tetto, "da": _nome_canale(ultimo),
+                 "salti": len(salti),
+                 "entra": _sats_canale(ultimo, "remote")
+                 if ultimo.get("active") else 0}
+        if cara:
+            return {"esito": "cara", **fatto}
+        if fatto["entra"] < int(sats):
+            return {"esito": "stretta", **fatto}
+        return {"esito": "ok", **fatto}
+    except Exception as e:
+        return {"esito": "non_misurata", "perche": type(e).__name__}
+
+
+def _giudizio_liquidita(n: dict, strada: dict | None) -> list:
+    """Le tre domande, ognuna con la sua voce: (chiave, esito, testo),
+    dove esito e' True (buona), False (cattiva) o None (non si e' potuta
+    misurare: non allarma e non rassicura). PURA: i numeri e la strada
+    arrivano da fuori. Il testo e' NUDO (lo scappa chi lo manda)."""
+    voci = []
+    if LIQUIDITA_SCAMBIO_MAX:
+        if n["entra"] >= LIQUIDITA_SCAMBIO_MAX:
+            voci.append(("entrata", True,
+                         f"✅ Entrata: {_fmt_sats(n['entra'])} sats in tutto "
+                         f"(la garanzia più grossa è di "
+                         f"{_fmt_sats(LIQUIDITA_SCAMBIO_MAX)})."))
+        else:
+            voci.append(("entrata", False,
+                         f"⚠️ Entrata: solo {_fmt_sats(n['entra'])} sats in "
+                         f"tutto. Una garanzia da "
+                         f"{_fmt_sats(LIQUIDITA_SCAMBIO_MAX)} non entra."))
+    if LIQUIDITA_PHOENIX_MIN:
+        diretto = f"canale ACINQ a {_fmt_sats(n['entra_acinq'])} sats"
+        serve = _fmt_sats(LIQUIDITA_PHOENIX_MIN)
+        s = strada or {}
+        if n["entra_acinq"] >= LIQUIDITA_PHOENIX_MIN:
+            voci.append(("phoenix", True, f"✅ Da Phoenix: {diretto}."))
+        elif s.get("esito") == "ok":
+            voci.append(("phoenix", True,
+                         f"✅ Da Phoenix: {diretto}, ma {serve} entrano da "
+                         f"{s['da']} (costo {_fmt_sats(s['costo'])} sats, "
+                         f"Phoenix ne lascia {_fmt_sats(s['tetto'])})."))
+        elif s.get("esito") == "cara":
+            voci.append(("phoenix", False,
+                         f"⚠️ Da Phoenix: {diretto}. L'altra strada, da "
+                         f"{s['da']}, costa {_fmt_sats(s['costo'])} sats: "
+                         f"più dei {_fmt_sats(s['tetto'])} che Phoenix "
+                         f"lascia spendere per {serve}."))
+        elif s.get("esito") == "stretta":
+            voci.append(("phoenix", False,
+                         f"⚠️ Da Phoenix: {diretto}. L'altra strada arriva "
+                         f"da {s['da']}, che ha solo "
+                         f"{_fmt_sats(s['entra'])} sats di entrata: {serve} "
+                         "non passano."))
+        elif s.get("esito") == "nessuna":
+            voci.append(("phoenix", False,
+                         f"⚠️ Da Phoenix: {diretto}, e LND non trova "
+                         "un'altra strada da ACINQ per "
+                         f"{_fmt_sats(LIQUIDITA_PHOENIX_MIN)} sats. Gli "
+                         "acquisti più grossi da Phoenix possono fallire."))
+        else:
+            voci.append(("phoenix", None,
+                         f"❔ Da Phoenix: {diretto}. L'altra strada non "
+                         "l'ho potuta misurare"
+                         + (f" ({s['perche']})." if s.get("perche") else ".")))
+    if LIQUIDITA_USCITA_MIN:
+        if n["esce"] >= LIQUIDITA_USCITA_MIN:
+            voci.append(("uscita", True,
+                         f"✅ Uscita: {_fmt_sats(n['esce'])} sats in tutto "
+                         f"(minimo {_fmt_sats(LIQUIDITA_USCITA_MIN)})."))
+        else:
+            voci.append(("uscita", False,
+                         f"⚠️ Uscita: {_fmt_sats(n['esce'])} sats in tutto, "
+                         f"sotto il minimo di "
+                         f"{_fmt_sats(LIQUIDITA_USCITA_MIN)}."))
+    else:
+        voci.append(("uscita", True,
+                     f"• Uscita: {_fmt_sats(n['esce'])} sats in tutto "
+                     "(nessun minimo impostato)."))
+    return voci
+
+
+def _liquidita_passo(prima: dict, cattive, ignote, adesso: float) -> tuple:
+    """UN giro nella vita della guardia: dallo stato di prima e dalle
+    domande cattive di adesso dice cosa fare — 'allarme', 'promemoria',
+    'rientrato' o '' — e lo stato da timbrare. PURA: niente rete e
+    niente orologio. Le regole:
+     · una domanda cattiva che prima non lo era: ALLARME, subito (anche
+       se un'altra era gia' cattiva: e' una notizia nuova);
+     · le stesse di prima, o meno: silenzio, fino al promemoria;
+     · nessuna cattiva, e prima ce n'erano: RIENTRATO, una volta;
+     · una domanda che non si e' potuta misurare resta com'era: non
+       fa partire un allarme e non fa dire «rientrato».
+    Uno stato storto, o timbrato nel futuro, vale «mai avvisato»: il
+    verso di `timbro_letto`, fra un doppione e un guasto taciuto."""
+    if not isinstance(prima, dict):
+        prima = {}
+    vecchie = set(str(k) for k in (prima.get("chiavi") or []))
+    ora = set(cattive) | (vecchie & set(ignote))
+    try:
+        avvisato = float(prima.get("avvisato") or 0)
+        da = float(prima.get("da") or 0)
+    except (TypeError, ValueError):
+        avvisato = da = 0.0
+    if not ora:
+        return ("rientrato" if vecchie else ""), {}
+    if not vecchie or ora - vecchie:
+        return "allarme", {"chiavi": sorted(ora), "avvisato": adesso,
+                           "da": da if vecchie and da else adesso}
+    if avvisato > adesso or adesso - avvisato >= LIQUIDITA_PROMEMORIA_S:
+        return "promemoria", {"chiavi": sorted(ora), "avvisato": adesso,
+                              "da": da or adesso}
+    return "", {"chiavi": sorted(ora), "avvisato": avvisato, "da": da}
+
+
+def _liquidita_stato_letto() -> dict:
+    try:
+        d = json.loads(timbro_letto(TIMBRO_LIQUIDITA) or "{}")
+    except ValueError:
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def _da_quanto(secondi: float) -> str:
+    ore = int(max(0, secondi) // 3600)
+    if ore < 1:
+        return "meno di un'ora"
+    if ore < 48:
+        return "un'ora" if ore == 1 else f"{ore} ore"
+    return f"{ore // 24} giorni"
+
+
+def _testo_liquidita(azione: str, voci: list, canali: list,
+                     prima: dict, adesso: float) -> str:
+    """L'avviso: il titolo dice cosa e' cambiato, sotto le tre domande
+    e la grafica dei canali. Sempre la grafica: un allarme senza numeri
+    manda a cercarli sul nodo."""
+    try:
+        da = float((prima or {}).get("da") or 0)
+    except (TypeError, ValueError):
+        da = 0.0
+    if azione == "rientrato":
+        testa = ("✅ <b>Liquidità del nodo: tornata a posto</b>"
+                 + (f" (dopo {_da_quanto(adesso - da)})" if da else ""))
+        coda = ""
+    elif azione == "promemoria":
+        testa = ("⏰ <b>Liquidità del nodo: ancora da sistemare</b>"
+                 + (f" (da {_da_quanto(adesso - da)})" if da else ""))
+        coda = ("\n\nProssimo promemoria fra "
+                f"{_da_quanto(LIQUIDITA_PROMEMORIA_S)}, se resta così.")
+    else:
+        testa = "⚠️ <b>Liquidità del nodo: c'è un problema</b>"
+        coda = ("\n\nNon lo ripeto: ti scrivo quando torna a posto, e in "
+                "mezzo al massimo un promemoria ogni "
+                f"{_da_quanto(LIQUIDITA_PROMEMORIA_S)}.")
+    return (testa + "\n\n"
+            + "\n".join(html.escape(t, quote=False) for _, _, t in voci)
+            + "\n\n" + html.escape(_grafica_canali(canali), quote=False) + coda)
+
+
+async def _avvisa_liquidita(testo: str):
+    """Agli stessi a cui scrive il guardiano del ponte (la leva
+    `GUARDIANO_PONTE_AVVISA`, o i moderatori): e' un avviso di macchina,
+    e va dove gli avvisi di macchina sono stati chiesti. Fail-open, una
+    riga nel journal per destinatario."""
+    for chat in _destinatari_ponte(GUARDIANO_PONTE_AVVISA, ADMIN_IDS):
+        try:
+            esito = await _manda_telegram(chat, testo)
+            print(f"   💧 ↳ {chat}: {esito or 'mandato'}", flush=True)
+        except Exception as e:
+            print(f"⚠️ Avviso della liquidità NON consegnato a {chat}: {e}",
+                  flush=True)
+
+
+async def _quadro_liquidita() -> tuple:
+    """Canali, numeri e giudizio, letti ADESSO dal nodo. Torna (stato,
+    canali, voci): con uno stato diverso da 'ok' i canali non si sono
+    letti e non c'e' niente da giudicare. La strada da ACINQ si chiede
+    solo quando serve: col canale diretto sopra la soglia e' una
+    domanda in meno a LND."""
+    stato, r = await _lnd_rest("GET", CANALI_LND, None, "canali")
+    if stato != "ok":
+        return stato, [], []
+    canali = [c for c in (r.get("channels") or []) if isinstance(c, dict)]
+    n = _numeri_liquidita(canali)
+    strada = None
+    if LIQUIDITA_PHOENIX_MIN and n["entra_acinq"] < LIQUIDITA_PHOENIX_MIN:
+        strada = await _strada_phoenix(canali, LIQUIDITA_PHOENIX_MIN)
+    return "ok", canali, _giudizio_liquidita(n, strada)
+
+
+async def _giro_guardia_liquidita() -> str:
+    """Un giro: legge, giudica, e parla SOLO se il passo lo dice. Il
+    timbro si scrive PRIMA dell'invio (il patto di `timbro_scrivi`).
+    Canali non letti = giro saltato: del ponte muto parla il suo
+    guardiano, e uno stato che non si conosce non si cambia."""
+    stato, canali, voci = await _quadro_liquidita()
+    if stato != "ok":
+        print(f"💧 Guardia della liquidità: canali non letti ({stato}), "
+              "giro saltato", flush=True)
+        return "saltato"
+    adesso = time.time()
+    prima = _liquidita_stato_letto()
+    azione, dopo = _liquidita_passo(
+        prima, {k for k, e, _ in voci if e is False},
+        {k for k, e, _ in voci if e is None}, adesso)
+    if dopo != prima:
+        timbro_scrivi(TIMBRO_LIQUIDITA, json.dumps(dopo))
+    if azione:
+        print(f"💧 Guardia della liquidità: {azione} "
+              f"({', '.join(dopo.get('chiavi') or []) or 'tutto buono'})",
+              flush=True)
+        await _avvisa_liquidita(
+            _testo_liquidita(azione, voci, canali, prima, adesso))
+    return azione
+
+
+async def guardia_liquidita():
+    """Il ciclo. Un giro che muore non ferma i successivi."""
+    await asyncio.sleep(LIQUIDITA_PRIMO_GIRO_S)
+    while True:
+        try:
+            await _giro_guardia_liquidita()
+        except Exception as e:
+            print(f"⚠️ Guardia della liquidità: giro saltato ({e})",
+                  flush=True)
+        await asyncio.sleep(max(60, int(LIQUIDITA_OGNI_S or 3600)))
+
+
+def _guardia_liquidita_attiva() -> bool:
+    """La leva E il macaroon di lettura: senza quello LND e' «spento», e
+    una guardia che non puo' leggere i canali salterebbe ogni giro."""
+    return bool(GUARDIA_LIQUIDITA) and _lnd_configurato()
+
+
+@app.on_event("startup")
+async def avvia_guardia_liquidita():
+    """La riga nel journal c'e' SEMPRE, accesa o spenta."""
+    if not _guardia_liquidita_attiva():
+        perche = ("GUARDIA_LIQUIDITA = False" if not GUARDIA_LIQUIDITA else
+                  "manca LND_PONTE_MACAROON_LETTURA nel config")
+        print(f"💧 Guardia della liquidità: spenta ({perche})", flush=True)
+        return
+    print("💧 Guardia della liquidità: accesa — un giro ogni "
+          f"{max(60, int(LIQUIDITA_OGNI_S or 3600)) // 60} minuti, avvisi a "
+          f"{_chi_avvisa_ponte()}", flush=True)
+    global _TASK_LIQUIDITA
+    _TASK_LIQUIDITA = asyncio.create_task(guardia_liquidita())
+
+
+async def comando_canali(mittente: dict, testo: str):
+    """`/canali` — i canali del nodo, adesso. Solo admin.
+
+    La stessa grafica e le stesse tre domande degli avvisi della
+    guardia, chieste a mano: non tocca lo stato della guardia e non fa
+    partire avvisi. Funziona anche a guardia spenta — basta il macaroon
+    di lettura — e in quel caso lo dice."""
+    chat = mittente["id"]
+    if not e_admin_bot(mittente):
+        return await _comando_sconosciuto(chat)
+    stato, canali, voci = await _quadro_liquidita()
+    if stato != "ok":
+        perche = {
+            LND_SPENTO: "al server manca il macaroon di lettura del nodo "
+                        "(<code>LND_PONTE_MACAROON_LETTURA</code>).",
+            LND_MUTO: "il nodo non risponde dal ponte. Riprova fra un "
+                      "minuto: se il ponte è giù lo dice il suo guardiano.",
+            LND_NEGATO: "il macaroon di lettura non ha il permesso "
+                      "<code>offchain:read</code>.",
+        }.get(stato, "LND ha risposto con un errore.")
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "📊 <b>Canali del nodo</b>\n\nNon li ho potuti "
+                    "leggere: " + perche,
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    guardia = ("La guardia è accesa: se una di queste voci diventa ⚠️ ti "
+               "avviso io." if _guardia_liquidita_attiva() else
+               "La guardia è spenta (<code>GUARDIA_LIQUIDITA</code>): "
+               "questo quadro lo vedi solo quando lo chiedi.")
+    return await bot_api("sendMessage", {"chat_id": chat,
+        "text": "📊 <b>Canali del nodo</b>\n\n"
+                + html.escape(_grafica_canali(canali), quote=False) + "\n\n"
+                + "\n".join(html.escape(t, quote=False) for _, _, t in voci)
+                + "\n\n" + guardia,
+        "parse_mode": "HTML", "reply_markup": tastiera_bot()})
 
 
 # ---------- I PAGAMENTI CHE NON ARRIVANO (5 ott 2026) ------------------

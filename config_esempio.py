@@ -113,6 +113,24 @@ GUARDIANO_PONTE_AVVISA = []  # a chi scrive, per id Telegram: es.
                              # deve poter restare senza nessuno che lo
                              # sappia, come il 18 set 2026
 
+# LA GUARDIA DELLA LIQUIDITA' (11 ott 2026): ogni ora il server legge i
+# canali del nodo dal ponte (col macaroon di sola lettura qui sotto) e
+# avvisa su Telegram — agli stessi del guardiano del ponte — quando il
+# nodo non puo' piu' fare gli scambi, quando torna a posto, e in mezzo
+# al massimo un promemoria al giorno. Ogni avviso porta la grafica dei
+# canali; `/canali` nel bot (solo admin) la mostra quando si vuole,
+# anche a guardia spenta. Tre domande: l'entrata totale regge la
+# garanzia piu' grossa? chi paga da Phoenix ha una strada (il canale
+# ACINQ diretto, o un'altra che LND trova)? l'uscita totale sta sopra il
+# minimo? Vedi docs/PRODUZIONE.md, «LA GUARDIA DELLA LIQUIDITA'».
+GUARDIA_LIQUIDITA = False          # True = accesa
+LIQUIDITA_SCAMBIO_MAX = 500000     # la garanzia piu' grossa (sats): lo
+                                   # specchio di max_order_amount del nodo
+LIQUIDITA_PHOENIX_MIN = 300000     # quanto deve poter entrare da Phoenix
+LIQUIDITA_USCITA_MIN = 0           # 0 = nessun minimo d'uscita
+LIQUIDITA_PROMEMORIA_S = 86400     # fra un promemoria e l'altro
+LIQUIDITA_OGNI_S = 3600            # ogni quanto guarda
+
 # LA VERITA' DEI PAGAMENTI IN USCITA (set 2026): prima di decidere o di
 # ritentare un pagamento, il server chiede com'e' finito anche a LND,
 # attraverso lo stesso ponte di LNbits. Serve un macaroon SUO, di SOLA

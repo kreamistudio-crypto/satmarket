@@ -127,6 +127,7 @@ jobs:
              collaudo_pionieri.py
              collaudo_contanti_p2p.py schnorr_puro.py
              collaudo_controllo_fattura.py
+             collaudo_guardia_liquidita.py deploy/nodo/sonda-rotte.py
              collaudo_avviso_chi_annulla.py
              collaudo_recapito_aggiornato.py
              collaudo_garanzia_lunga.py
@@ -234,6 +235,7 @@ jobs:
              collaudo_pionieri
              collaudo_contanti_p2p
              collaudo_controllo_fattura
+             collaudo_guardia_liquidita
              collaudo_csp
              collaudo_freni
              collaudo_db_contesa

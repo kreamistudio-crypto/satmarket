@@ -29618,6 +29618,63 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   non secondi, il freno sulla cura — sta in CANTIERI, «Il guardiano
   del ponte verso LND»; i comandi in PRODUZIONE, «IL GUARDIANO DEL
   PONTE».
+- LA GUARDIA DELLA LIQUIDITÀ E `/canali` (11 ott 2026): un task asyncio
+  del server (`guardia_liquidita`, avviato allo startup SOLO con
+  `GUARDIA_LIQUIDITA = True` e il macaroon di lettura) che ogni
+  `LIQUIDITA_OGNI_S` legge i canali del nodo dal ponte
+  (`GET /v1/channels?peer_alias_lookup=true`, `offchain:read`) e
+  risponde a tre domande, in `_giudizio_liquidita` (PURA):
+  1) ENTRATA — l'entrata spendibile dei canali in linea regge la
+  garanzia più grossa (`LIQUIDITA_SCAMBIO_MAX`, lo specchio di
+  `max_order_amount` del coordinatore)?
+  2) DA PHOENIX — il canale ACINQ diretto ha `LIQUIDITA_PHOENIX_MIN`?
+  Se no, `_strada_phoenix` CHIEDE a LND una strada da ACINQ a noi che
+  non passi dal canale diretto: `POST /v1/graph/routes/{noi}/{sats}` con
+  `source_pub_key` = ACINQ, `ignored_pairs` = la coppia direzionale da
+  ACINQ a noi (bytes in base64), `fee_limit.fixed` = quel che Phoenix
+  lascia spendere di rete (4 sat + 0,4 %), mission control spenta. La
+  strada vale solo se l'ultimo salto — un canale nostro — ha l'entrata
+  VERA per l'importo. Cinque esiti: `ok`, `cara` (c'è ma sopra il
+  tetto: lo si scopre richiedendo senza tetto), `stretta`, `nessuna`,
+  `non_misurata`. `lncli queryroutes` non sa partire da un altro nodo
+  (letto il sorgente della 0.19.3: nessuna opzione per la sorgente); la
+  REST sì.
+  3) USCITA — l'uscita spendibile sta sopra `LIQUIDITA_USCITA_MIN`?
+  SPENTA di serie (0), ed è voluto: i sats che si pagano a chi compra al
+  rilascio sono quelli della garanzia appena incassata, e il debito
+  verso i venditori del mercatino sale e scende insieme al saldo dei
+  canali — un pavimento fisso suonerebbe proprio il giorno in cui tutti
+  i venditori sono stati pagati.
+  Ogni voce è buona, cattiva, o NON MISURATA (`None`): la terza non
+  allarma e non rassicura. GLI STATI stanno in `_liquidita_passo`
+  (PURA) e nel timbro `liquidita_stato` (JSON: le chiavi cattive,
+  l'ultimo avviso, da quando): una domanda che diventa cattiva = un
+  avviso, subito, anche se un'altra lo era già; le stesse o meno =
+  silenzio fino al promemoria (`LIQUIDITA_PROMEMORIA_S`, un giorno);
+  nessuna cattiva dopo che ce n'erano = «tornata a posto», una volta;
+  una non misurata resta com'era. Il timbro si scrive PRIMA dell'invio.
+  Canali non letti = giro saltato (del ponte muto parla il suo
+  guardiano). Gli avvisi vanno a `_destinatari_ponte` (la leva
+  `GUARDIANO_PONTE_AVVISA`, o i moderatori) e portano SEMPRE la
+  grafica dei canali (`_grafica_canali`): per canale nome e taglia, la
+  barretta di dieci quadretti (piena = quanto esce), i sats spendibili
+  che escono e che entrano (tolte le riserve), lo stato (in linea, HTLC
+  in sospeso con la somma, FUORI LINEA), e sotto i totali dei soli
+  canali in linea. Tre righe corte per canale e non una tabella: senza
+  un carattere a larghezza fissa le colonne non stanno in riga. Testo
+  nudo, scappato da chi lo manda (il nome di un nodo lo sceglie il
+  nodo). `/canali` (solo admin, `comando_canali`) mostra la stessa
+  grafica e le stesse tre voci quando lo si chiede: funziona anche a
+  guardia spenta, non timbra e non avvisa. NIENTE SEGRETI NUOVI: è lo
+  stesso macaroon di sola lettura del controllo della fattura P2P.
+  QUEL CHE NON SA: LND non conosce i saldi degli altri nodi, quindi la
+  strada da ACINQ esiste «sulla carta»; che il nodo di ACINQ la scelga
+  lo dice solo un pagamento vero. Sul nodo resta `ronda-liquidita.sh`
+  (canali spariti, lease, inbound); la sua guardia oraria `--acinq` è
+  quella che questa sostituisce (PRODUZIONE, «LA GUARDIA DELLA
+  LIQUIDITÀ»). `deploy/nodo/sonda-rotte.py` è la sonda a mano, in sola
+  lettura, che fa le stesse domande dal nodo. Il perché: CANTIERI,
+  «La guardia della liquidità».
 - IL SERVER CHE SI RIAVVIA (30 set 2026): nel client un portinaio
   solo attorno a `fetch`, `fetchCheRiprova` in cima allo script
   dell'app, montato PRIMA di ogni chiamata. Riprova da solo, con

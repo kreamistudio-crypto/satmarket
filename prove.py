@@ -31645,7 +31645,12 @@ def _censimento(acceso, dopo=None):
               # l'avviso dei DM Nostr (11 ott 2026): la decima volta
               # della trappola, `_dm_leve()` e i suoi due giudici — le
               # solite tre esplosioni lontane
-              "avviso_dm_vivo", "_dm_relays", "_dm_leve", "_leve_stato"):
+              "avviso_dm_vivo", "_dm_relays", "_dm_leve",
+              # la guardia della liquidita' (11 ott 2026): l'undicesima
+              # volta della trappola, la riga del pannello CHIAMA
+              # `_guardia_liquidita_attiva()` e `_lnd_configurato()`
+              "_lnd_configurato", "_guardia_liquidita_attiva",
+              "_leve_stato"):
         exec(pezzo(f), amb)
     # la campagna a tutti (9 ott 2026): l'ottava volta, la riga del
     # pannello CHIAMA `timbro_letto` — che aprirebbe il database — e
@@ -146618,6 +146623,421 @@ console.log(JSON.stringify(out));
           "storto): lato, body e tab non si scollano mai", 0, out["misto"])
 
 
+def prove_guardia_liquidita():
+    """LA GUARDIA DELLA LIQUIDITA' E /canali (11 ott 2026, cantiere
+    allarme-liquidita, richiesta di Andrea).
+
+    L'allarme del nodo guardava i soli canali ACINQ e ripeteva ogni sei
+    ore; con cinque milioni di entrata altrove arrivava di continuo. La
+    guardia nuova vive nel server: tre domande (entrata totale, una
+    strada per chi paga da Phoenix, uscita totale), un avviso ai cambi
+    e al massimo un promemoria al giorno, la grafica dei canali in ogni
+    avviso e in `/canali`. Qui girano i pezzi PURI di server.py — la
+    grafica, il giudizio, il passo degli stati, la strada con un LND di
+    cartone dietro `chiedi` — e le sentinelle; il giro intero con
+    `_lnd_rest` vero sta in `collaudo_guardia_liquidita`.
+
+    Le cose che si rompono in silenzio: un canale fuori linea contato
+    nei totali; il nome di un nodo che diventa un tag di Telegram; un
+    «non l'ho potuta misurare» letto come un «no» (allarme a ogni
+    singhiozzo del ponte) o come un «si'» (un «rientrato» falso);
+    l'allarme che si ripete a ogni giro, o che dopo il primo non parla
+    piu' nemmeno quando si rompe un'altra cosa; il canale diretto non
+    vietato nella domanda a LND (risponderebbe sempre «si'», a costo
+    zero); la guardia accesa di serie."""
+    print("\n[la guardia della liquidita' e /canali]")
+    import asyncio as _as
+    import ast as _ast
+    import base64 as _b64
+
+    i = _SORGENTE.index("try:\n    from config import GUARDIA_LIQUIDITA")
+    K = {}
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\ndef _sats_canale(", i)], K)
+    K.pop("__builtins__", None)
+    prova("le leve di serie: guardia SPENTA, garanzia piu' grossa 500.000 "
+          "(max_order_amount), Phoenix 300.000 (la soglia del nodo), "
+          "nessun minimo d'uscita, un promemoria al giorno, un giro all'ora",
+          (False, 500000, 300000, 0, 86400, 3600),
+          (K["GUARDIA_LIQUIDITA"], K["LIQUIDITA_SCAMBIO_MAX"],
+           K["LIQUIDITA_PHOENIX_MIN"], K["LIQUIDITA_USCITA_MIN"],
+           K["LIQUIDITA_PROMEMORIA_S"], K["LIQUIDITA_OGNI_S"]))
+    prova("ACINQ per prefisso, lo stesso della ronda del nodo; nessun "
+          "esadecimale lungo nel blocco", (True, None),
+          ('PREFISSO_ACINQ=${PREFISSO_ACINQ:-' + K["LIQUIDITA_PREFISSO_ACINQ"]
+           + "}" in open(os.path.join(QUI, "deploy", "nodo",
+                                      "ronda-liquidita.sh"),
+                         encoding="utf-8").read(),
+           re.search(r"[0-9a-fA-F]{40,}", _SORGENTE[i:_SORGENTE.index(
+               "\n# ---------- I PAGAMENTI CHE NON ARRIVANO", i)])))
+
+    S = {**K, "_fmt_sats": reale("_fmt_sats"), "base64": _b64}
+    for nome in ("_sats_canale", "_taglia_canale", "_nome_canale",
+                 "_numeri_liquidita", "_grafica_canali", "_tetto_phoenix",
+                 "_giudizio_liquidita", "_liquidita_passo", "_da_quanto"):
+        exec(pezzo(nome), S)
+    exec("async " + pezzo("_strada_phoenix"), S)
+
+    ACINQ = K["LIQUIDITA_PREFISSO_ACINQ"] + "a1" * 25
+    LNBIG = "02" + "b2" * 32
+    NOI = "03" + "c3" * 32
+
+    def canale(pk, nome, scid, cap, loc, rem, ris, attivo=True, sospesi=()):
+        return {"active": attivo, "remote_pubkey": pk, "peer_alias": nome,
+                "channel_point": f"{scid}:0", "chan_id": str(scid),
+                "capacity": str(cap), "local_balance": str(loc),
+                "remote_balance": str(rem),
+                "local_constraints": {"chan_reserve_sat": str(ris)},
+                "remote_constraints": {"chan_reserve_sat": str(ris)},
+                "pending_htlcs": list(sospesi)}
+
+    # i numeri del 6 ott (STUDIO-INSTRADAMENTO §9)
+    sei = [canale(ACINQ, "ACINQ", 101, 400000, 395056, 4000, 4000),
+           canale(ACINQ, "ACINQ", 102, 1000000, 784179, 214876, 10000),
+           canale(LNBIG, "LNBiG [Hub-2]", 103, 5000000, 121703, 4877352, 50000)]
+
+    # --- la grafica -----------------------------------------------------
+    g = S["_grafica_canali"](sei)
+    prova("grafica: il canale piu' grosso per primo; nome, barretta, "
+          "sats che escono e che entrano, stato", True,
+          "🟢 LNBiG [Hub-2] · 5M\n[░░░░░░░░░░] ↑ 71.703 ↓ 4.827.352\n"
+          "in linea · nessun HTLC in sospeso" in g
+          and g.index("LNBiG") < g.index("ACINQ · 1M") < g.index("ACINQ · 400k"))
+    prova("...i sats sono quelli SPENDIBILI (tolta la riserva), e la "
+          "barretta piena dice quanto esce", True,
+          "🟢 ACINQ · 1M\n[████████░░] ↑ 774.179 ↓ 204.876" in g
+          and "🟢 ACINQ · 400k\n[██████████] ↑ 391.056 ↓ 0" in g)
+    prova("...sotto, i totali dei canali in linea", True,
+          g.endswith("Totale, 3 in linea su 3:\n"
+                     "↑ esce 1.236.938 · ↓ entra 5.032.228"))
+    prova("...la legenda in cima dice cosa sono le frecce, su una riga "
+          "del telefono", (True, True),
+          (g.startswith("↑ esce · ↓ entra (sats spendibili)\n\n"),
+           len(g.split("\n")[0]) <= 36))
+    spento = [dict(c) for c in sei]
+    spento[2]["active"] = False
+    spento[1]["pending_htlcs"] = [{"incoming": True, "amount": "21000"},
+                                  {"incoming": False, "amount": "9000"},
+                                  {"amount": None}, "storto"]
+    g = S["_grafica_canali"](spento)
+    prova("un canale FUORI LINEA si vede (rosso, e lo dice) ma NON entra "
+          "nei totali", (True, True),
+          ("🔴 LNBiG [Hub-2] · 5M\n[░░░░░░░░░░] ↑ 71.703 ↓ 4.827.352\n"
+           "FUORI LINEA" in g,
+           g.endswith("Totale, 2 in linea su 3:\n"
+                      "↑ esce 1.165.235 · ↓ entra 204.876")))
+    prova("gli HTLC in sospeso: quanti e la somma (uno scritto storto non "
+          "rompe niente)", True,
+          "in linea · 4 HTLC in sospeso (30.000 sats)" in g)
+    prova("nessun canale: lo dice, senza totali", "Nessun canale aperto.",
+          S["_grafica_canali"]([]))
+    storti = [{}, {"active": True, "remote_pubkey": ACINQ, "capacity": "x",
+                   "local_balance": None, "remote_balance": "abc",
+                   "local_constraints": "no", "pending_htlcs": None},
+              canale("02" + "ee" * 32, "", 9, 1500000, 0, 0, 0),
+              canale(LNBIG, "unable to lookup peer alias: x", 8, 950, 0, 0, 0)]
+    try:
+        g = S["_grafica_canali"](storti)
+    except Exception as e:
+        g = f"ESPLOSA: {type(e).__name__}"
+    prova("canali scritti storti: non esplode, e una barretta vuota resta "
+          "lunga dieci", (False, 4),
+          (g.startswith("ESPLOSA"), g.count("[░░░░░░░░░░] ↑ 0 ↓ 0")))
+    prova("...senza nome: ACINQ dal prefisso, gli altri dal pezzo di chiave "
+          "(anche quando LND risponde «unable to lookup»); le taglie 1,5M e 950",
+          (True, True, True, True),
+          ("🟢 ACINQ · ?" in g, "🟢 02eeeeeeee… · 1,5M" in g,
+           "🟢 02b2b2b2b2… · 950" in g, "🔴 canale senza nome · 0" in g))
+    lungo = [canale(LNBIG, "N" * 80, 1, 99000000, 9999999 + 1, 9999999 + 1, 1)]
+    g = S["_grafica_canali"](lungo)
+    prova("le righe che non devono andare a capo sul telefono: il nome e' "
+          "tagliato, la barretta coi numeri da sette cifre sta in 36",
+          (True, True),
+          (max(len(r) for r in g.split("\n") if r.startswith(("🟢", "🔴"))) <= 36,
+           max(len(r) for r in g.split("\n") if r.startswith("[")) <= 36))
+    prova("ogni barretta e' lunga dieci, in ogni proporzione", [10],
+          sorted({len(re.search(r"\[([█░]*)\]", S["_grafica_canali"](
+              [canale(LNBIG, "x", 1, 1000, a, 1000 - a, 0)])).group(1))
+              for a in range(0, 1001, 37)}))
+
+    # --- i numeri e il giudizio ------------------------------------------
+    n = S["_numeri_liquidita"](sei)
+    prova("i numeri del 6 ott: entra, esce, entra da ACINQ (utili)",
+          (5032228, 1236938, 204876, 3, 3, ACINQ),
+          (n["entra"], n["esce"], n["entra_acinq"], n["vivi"], n["canali"],
+           n["pk_acinq"]))
+    prova("la chiave di ACINQ si trova anche se i suoi canali sono fuori "
+          "linea (serve per chiedere la strada)", (0, ACINQ),
+          (lambda m: (m["entra_acinq"], m["pk_acinq"]))(S["_numeri_liquidita"](
+              [dict(c, active=False) if c["remote_pubkey"] == ACINQ else c
+               for c in sei])))
+
+    def voci(n, strada=None, **leve):
+        vecchie = {k: S[k] for k in leve}
+        S.update(leve)
+        try:
+            return S["_giudizio_liquidita"](n, strada)
+        finally:
+            S.update(vecchie)
+
+    def esiti(v):
+        return {k: e for k, e, _ in v}
+
+    prova("il 6 ott SENZA strada misurata: Phoenix e' un «non so», non un "
+          "allarme e non un via libera",
+          {"entrata": True, "phoenix": None, "uscita": True}, esiti(voci(n)))
+    prova("...con la strada buona: tutto buono, e dice da dove entra e "
+          "quanto costa", (True, True),
+          (lambda v: (esiti(v)["phoenix"],
+                      "✅ Da Phoenix: canale ACINQ a 204.876 sats, ma 300.000 "
+                      "entrano da LNBiG [Hub-2] (costo 750 sats, Phoenix ne "
+                      "lascia 1.204)." in [t for _, _, t in v]))(
+              voci(n, {"esito": "ok", "costo": 750, "tetto": 1204,
+                       "da": "LNBiG [Hub-2]", "entra": 4827352})))
+    for esito, pezzo_testo in (("cara", "costa 5.000 sats: più dei 1.204"),
+                               ("stretta", "ha solo 120.000 sats di entrata"),
+                               ("nessuna", "LND non trova un'altra strada")):
+        v = voci(n, {"esito": esito, "costo": 5000, "tetto": 1204,
+                     "da": "LNBiG [Hub-2]", "entra": 120000})
+        prova(f"...strada «{esito}»: Phoenix e' cattiva, e il testo dice "
+              "perche'", (False, True),
+              (esiti(v)["phoenix"],
+               any(pezzo_testo in t and t.startswith("⚠️ Da Phoenix: canale "
+                                                      "ACINQ a 204.876 sats")
+                   for _, _, t in v)))
+    alto = dict(n, entra_acinq=300000)
+    prova("col canale ACINQ ALLA soglia la strada non conta (nemmeno una "
+          "«nessuna»)", True,
+          esiti(voci(alto, {"esito": "nessuna"}))["phoenix"])
+    prova("entrata totale sotto la garanzia piu' grossa: cattiva, con le "
+          "cifre; ALLA soglia: buona", (False, True, True),
+          (esiti(voci(dict(n, entra=499999)))["entrata"],
+           any(t == "⚠️ Entrata: solo 499.999 sats in tutto. Una garanzia da "
+                    "500.000 non entra."
+               for _, _, t in voci(dict(n, entra=499999))),
+           esiti(voci(dict(n, entra=500000)))["entrata"]))
+    prova("uscita: a leva spenta non giudica mai (e lo dice), a leva "
+          "scritta si'", (True, True, False, True),
+          (esiti(voci(dict(n, esce=0)))["uscita"],
+           any("(nessun minimo impostato)" in t
+               for _, _, t in voci(dict(n, esce=0))),
+           esiti(voci(n, LIQUIDITA_USCITA_MIN=1236939))["uscita"],
+           esiti(voci(n, LIQUIDITA_USCITA_MIN=1236938))["uscita"]))
+    prova("le leve a zero spengono la loro domanda", ["uscita"],
+          sorted(esiti(voci(dict(n, entra=0, entra_acinq=0),
+                            LIQUIDITA_SCAMBIO_MAX=0, LIQUIDITA_PHOENIX_MIN=0))))
+
+    # --- la strada da ACINQ, con LND di cartone ---------------------------
+    chieste = []
+
+    def lnd(strada="ok", costo=750, ultimo="103", info="ok", rotte=None):
+        async def chiedi(metodo, percorso, corpo, cosa):
+            chieste.append((metodo, percorso, corpo))
+            if percorso == "/v1/getinfo":
+                return info, ({"identity_pubkey": NOI} if info == "ok" else {})
+            if rotte is not None:
+                if isinstance(rotte, Exception):
+                    raise rotte
+                return rotte, {"message": "boh"}
+            tetto = (corpo.get("fee_limit") or {}).get("fixed")
+            if strada == "nessuna" or (tetto is not None and costo > int(tetto)):
+                return "errore", {"message": "unable to find a path to destination"}
+            return "ok", {"routes": [{"total_fees_msat": str(costo * 1000),
+                                      "hops": [{"chan_id": "7"},
+                                               {"chan_id": ultimo}]}]}
+        return chiedi
+
+    gira = lambda co: _as.run(co)
+    chieste.clear()
+    r = gira(S["_strada_phoenix"](sei, 300000, lnd()))
+    prova("strada: c'e', dentro il tetto, e l'ultimo canale la regge",
+          {"esito": "ok", "costo": 750, "tetto": 1204, "da": "LNBiG [Hub-2]",
+           "salti": 2, "entra": 4827352}, r)
+    prova("...la domanda a LND: chi siamo, poi UNA POST da ACINQ a noi col "
+          "canale diretto vietato (coppia direzionale, base64), il tetto di "
+          "Phoenix e la mission control spenta",
+          [("GET", "/v1/getinfo", None),
+           ("POST", f"/v1/graph/routes/{NOI}/300000",
+            {"source_pub_key": ACINQ, "use_mission_control": False,
+             "ignored_pairs": [{"from": _b64.b64encode(bytes.fromhex(ACINQ)).decode(),
+                                "to": _b64.b64encode(bytes.fromhex(NOI)).decode()}],
+             "fee_limit": {"fixed": "1204"}})], chieste)
+    prova("il tetto di Phoenix: 4 sat + 0,4 %", (404, 1204, 2004, 4004),
+          tuple(S["_tetto_phoenix"](x) for x in (100000, 300000, 500000, 1000000)))
+    chieste.clear()
+    r = gira(S["_strada_phoenix"](sei, 300000, lnd(costo=1205)))
+    prova("un sat sopra il tetto: «cara», scoperta chiedendo di nuovo "
+          "SENZA tetto", ("cara", 1205, [True, False]),
+          (r["esito"], r["costo"], ["fee_limit" in c for _, _, c in chieste[1:]]))
+    prova("al tetto giusto: ok", "ok",
+          gira(S["_strada_phoenix"](sei, 300000, lnd(costo=1204)))["esito"])
+    prova("nessuna strada nemmeno senza tetto: «nessuna»", "nessuna",
+          gira(S["_strada_phoenix"](sei, 300000, lnd("nessuna")))["esito"])
+    stretti = [dict(c) for c in sei]
+    stretti[2]["remote_balance"] = "349999"        # 299.999 utili
+    prova("la strada c'e' ma l'ultimo canale ha un sat meno di quel che "
+          "serve: «stretta»; con un sat in piu': ok", ("stretta", 299999, "ok"),
+          (lambda a, b: (a["esito"], a["entra"], b["esito"]))(
+              gira(S["_strada_phoenix"](stretti, 300000, lnd())),
+              gira(S["_strada_phoenix"](
+                  [dict(stretti[2], remote_balance="350000")] + sei[:2],
+                  300000, lnd()))))
+    prova("...e se l'ultimo canale e' fuori linea vale zero", ("stretta", 0),
+          (lambda a: (a["esito"], a["entra"]))(gira(S["_strada_phoenix"](
+              sei[:2] + [dict(sei[2], active=False)], 300000, lnd()))))
+    non_so = {
+        "getinfo negato": lnd(info="negato"),
+        "rotte negato": lnd(rotte="negato"),
+        "rotte muto": lnd(rotte="muto"),
+        "rotte errore": lnd(rotte="errore"),      # un errore che non e' «no path»
+        "l'ultimo salto non è un canale nostro": lnd(ultimo="555"),
+        "RuntimeError": lnd(rotte=RuntimeError("giu'")),
+    }
+    prova("tutto quel che non e' una risposta e' «non misurata», col "
+          "perche' — mai un «nessuna» (allarmerebbe a ogni singhiozzo)",
+          [("non_misurata", p) for p in non_so],
+          [(lambda a: (a["esito"], a.get("perche")))(
+              gira(S["_strada_phoenix"](sei, 300000, c))) for c in non_so.values()])
+    prova("senza un canale con ACINQ non c'e' da dove partire: non misurata",
+          ("non_misurata", "nessun canale con ACINQ"),
+          (lambda a: (a["esito"], a["perche"]))(
+              gira(S["_strada_phoenix"]([sei[2]], 300000, lnd()))))
+
+    # --- il passo degli stati ---------------------------------------------
+    passo = S["_liquidita_passo"]
+    T = 1_800_000_000.0
+    prova("tutto buono, e prima pure: silenzio", ("", {}), passo({}, set(), set(), T))
+    az, st = passo({}, {"phoenix"}, set(), T)
+    prova("da buono a cattivo: ALLARME, e lo stato dice da quando",
+          ("allarme", {"chiavi": ["phoenix"], "avvisato": T, "da": T}), (az, st))
+    prova("un'ora dopo, uguale: silenzio, stato com'era", ("", st),
+          passo(st, {"phoenix"}, set(), T + 3600))
+    prova("a 24 ore meno un secondo: silenzio; a 24 ore: PROMEMORIA",
+          ("", "promemoria"),
+          (passo(st, {"phoenix"}, set(), T + 86399)[0],
+           passo(st, {"phoenix"}, set(), T + 86400)[0]))
+    az2, st2 = passo(st, {"phoenix"}, set(), T + 86400)
+    prova("...il promemoria sposta l'avviso, non il «da quando»",
+          {"chiavi": ["phoenix"], "avvisato": T + 86400, "da": T}, st2)
+    prova("...e il successivo e' un altro giorno dopo", ("", "promemoria"),
+          (passo(st2, {"phoenix"}, set(), T + 2 * 86400 - 1)[0],
+           passo(st2, {"phoenix"}, set(), T + 2 * 86400)[0]))
+    az3, st3 = passo(st, {"phoenix", "entrata"}, set(), T + 7200)
+    prova("una domanda NUOVA che va male parla subito, senza aspettare il "
+          "promemoria; il «da quando» resta il primo",
+          ("allarme", {"chiavi": ["entrata", "phoenix"], "avvisato": T + 7200,
+                       "da": T}), (az3, st3))
+    az4, st4 = passo(st3, {"entrata"}, set(), T + 10800)
+    prova("una in meno non e' un rientro: silenzio, e lo stato si stringe",
+          ("", ["entrata"]), (az4, st4["chiavi"]))
+    prova("...cosi' se quella torna cattiva e' di nuovo una notizia",
+          "allarme", passo(st4, {"entrata", "phoenix"}, set(), T + 14400)[0])
+    prova("da cattivo a tutto buono: RIENTRATO, una volta, stato pulito",
+          (("rientrato", {}), ("", {})),
+          (passo(st, set(), set(), T + 3600), passo({}, set(), set(), T + 7200)))
+    prova("una domanda che non si misura, quando prima era cattiva, RESTA "
+          "cattiva: niente «rientrato» falso", ("", ["phoenix"]),
+          (lambda a: (a[0], a[1]["chiavi"]))(
+              passo(st, set(), {"phoenix"}, T + 3600)))
+    prova("...e quando prima era buona NON fa partire un allarme",
+          ("", {}), passo({}, set(), {"phoenix"}, T))
+    prova("uno stato storto, o timbrato nel futuro, vale «mai avvisato»: "
+          "parla (fra un doppione e un guasto taciuto, il doppione)",
+          ("allarme", "allarme", "promemoria", "promemoria"),
+          (passo("storto", {"x"}, set(), T)[0], passo(None, {"x"}, set(), T)[0],
+           passo({"chiavi": ["x"], "avvisato": T + 999}, {"x"}, set(), T)[0],
+           passo({"chiavi": ["x"], "avvisato": "boh"}, {"x"}, set(), T)[0]))
+    prova("da quanto: meno di un'ora, un'ora, 24 ore, 2 giorni",
+          ("meno di un'ora", "un'ora", "24 ore", "2 giorni"),
+          tuple(S["_da_quanto"](x) for x in (120, 3600, 86400, 172800)))
+
+    # --- le sentinelle sugli agganci --------------------------------------
+    giro = codice(pezzo("_giro_guardia_liquidita"))
+    prova("giro: il timbro PRIMA dell'invio, e solo se lo stato e' cambiato",
+          True, "if dopo != prima:\n        timbro_scrivi(TIMBRO_LIQUIDITA"
+          in giro and giro.index("timbro_scrivi(") < giro.index("_avvisa_liquidita("))
+    prova("giro: canali non letti = saltato, PRIMA di guardare lo stato",
+          True, giro.index('return "saltato"') < giro.index("_liquidita_stato_letto()"))
+    prova("giro: cattive e ignote vengono dalle voci (False e None), non "
+          "da due elenchi a mano", True,
+          "{k for k, e, _ in voci if e is False}" in giro
+          and "{k for k, e, _ in voci if e is None}" in giro)
+    cmd = codice(pezzo("comando_canali"))
+    prova("/canali: chi non e' admin esce PRIMA che si chieda qualcosa a LND",
+          True, cmd.index("if not e_admin_bot(mittente):\n        return await "
+                          "_comando_sconosciuto(chat)") < cmd.index("_quadro_liquidita()"))
+    prova("/canali non tocca lo stato della guardia e non avvisa nessuno",
+          (False, False, False),
+          ("timbro_scrivi" in cmd, "_avvisa_liquidita" in cmd,
+           "_liquidita_passo" in cmd))
+    testo = codice(pezzo("_testo_liquidita"))
+    prova("grafica e voci si SCAPPANO in tutt'e due i messaggi (il nome di "
+          "un nodo lo sceglie il nodo)", (2, 2),
+          ((cmd + testo).count("html.escape(_grafica_canali(canali), quote=False)"),
+           (cmd + testo).count("html.escape(t, quote=False) for _, _, t in voci")))
+    prova("i canali si chiedono coi nomi (la REST di serie non li da')",
+          "/v1/channels?peer_alias_lookup=true", K["CANALI_LND"])
+    quadro = codice(pezzo("_quadro_liquidita"))
+    prova("la strada si chiede a LND solo quando il canale diretto non basta",
+          True, 'if LIQUIDITA_PHOENIX_MIN and n["entra_acinq"] < '
+                "LIQUIDITA_PHOENIX_MIN:\n        strada = await _strada_phoenix("
+          in quadro)
+    smista = codice(pezzo("gestisci_update"))
+    prova("il bot smista /canali (e /canale resta suo: nessuno dei due e' "
+          "prefisso dell'altro)", (True, False, False),
+          ('if testo.startswith("/canali"):\n        return await '
+           "comando_canali(mittente, testo)" in smista,
+           "/canali".startswith("/canale"), "/canale".startswith("/canali")))
+    avvio = codice(pezzo("avvia_guardia_liquidita"))
+    prova("avvio: senza la leva (o senza macaroon) il task NON nasce, e il "
+          "journal lo dice", True,
+          avvio.index("if not _guardia_liquidita_attiva():") < avvio.index("return")
+          < avvio.index("asyncio.create_task(guardia_liquidita())")
+          and "spenta (" in avvio
+          and "return bool(GUARDIA_LIQUIDITA) and _lnd_configurato()"
+          in pezzo("_guardia_liquidita_attiva"))
+    ciclo = codice(pezzo("guardia_liquidita"))
+    prova("ciclo: un giro che muore non ferma i successivi, e mai piu' "
+          "fitto di un minuto", True,
+          "except Exception as e:" in ciclo and "max(60, int(LIQUIDITA_OGNI_S"
+          in ciclo)
+    prova("il pannello delle leve dice se la guardia e' accesa", True,
+          '_leva("Guardia della liquidità del nodo", "GUARDIA_LIQUIDITA",\n'
+          "                  _guardia_liquidita_attiva()," in _SORGENTE)
+    es = open(os.path.join(QUI, "config_esempio.py"), encoding="utf-8").read()
+    prova("config_esempio: la guardia spenta e le leve coi valori del codice",
+          [f"{k} = {K[k]}" for k in ("GUARDIA_LIQUIDITA", "LIQUIDITA_SCAMBIO_MAX",
+                                     "LIQUIDITA_PHOENIX_MIN", "LIQUIDITA_USCITA_MIN",
+                                     "LIQUIDITA_PROMEMORIA_S", "LIQUIDITA_OGNI_S")],
+          [m.group(0) for k in ("GUARDIA_LIQUIDITA", "LIQUIDITA_SCAMBIO_MAX",
+                                "LIQUIDITA_PHOENIX_MIN", "LIQUIDITA_USCITA_MIN",
+                                "LIQUIDITA_PROMEMORIA_S", "LIQUIDITA_OGNI_S")
+           for m in [re.search(rf"^{k} = \w+", es, re.M)] if m])
+
+    # --- la sonda del nodo (deploy/nodo/sonda-rotte.py) -------------------
+    sonda = open(os.path.join(QUI, "deploy", "nodo", "sonda-rotte.py"),
+                 encoding="utf-8").read()
+    try:
+        _ast.parse(sonda)
+        legge = True
+    except SyntaxError:
+        legge = False
+    prova("sonda: si legge, nessun esadecimale lungo, stesso prefisso ACINQ",
+          (True, None, True),
+          (legge, re.search(r"[0-9a-fA-F]{40,}", sonda),
+           f'PREFISSO_ACINQ = "{K["LIQUIDITA_PREFISSO_ACINQ"]}"' in sonda))
+    righe = codice(sonda)
+    prova("sonda: SOLA LETTURA — il macaroon e' quello readonly, mai "
+          "l'admin; nessun file scritto; di LND solo domande", (True, [], []),
+          ("readonly.macaroon" in righe and "admin.macaroon" not in righe,
+           re.findall(r"open\([^)]*[\"'][wa]b?[\"']", righe),
+           sorted(set(re.findall(r'"/v\d/[a-z/]+', righe))
+                  - {'"/v1/state', '"/v1/getinfo', '"/v1/channels',
+                     '"/v1/graph/node/', '"/v1/graph/routes/', '"/v1/invoices'})))
+    prova("sonda: il macaroon non finisce mai in una print", [],
+          [r.strip() for r in righe.split("\n")
+           if "print(" in r and re.search(r"\b(esa|mac)\b", r)])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -146742,6 +147162,7 @@ def main():
               prove_giudice_deploy, prove_collaudi_in_ci,
               prove_servizio_non_root,
               prove_guardiano_ponte,
+              prove_guardia_liquidita,
               prove_bussola, prove_tetto_claude_md,
               prove_canale_comunita,
               prove_podio_sfondo,
