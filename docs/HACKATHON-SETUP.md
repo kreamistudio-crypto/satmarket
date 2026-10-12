@@ -1086,6 +1086,22 @@ tre gambe di §1, `rgb_http.py` rilanciato senza `source` → `/salute` dice
 Barattolo al posto di quelli di Mutinynet. I wallet signet sono intatti:
 nessuno li ha più toccati dall'8.
 
+> ⚠️ **12 ott, sera: due cose cambiano questa lista.** 1) Il **Pop!_OS di
+> Alan è il 24.04 LTS, glibc 2.39** (le due righe del punto 0, lanciate da
+> Alan il 12): variante ORIGINALE del wallet, cioè il punto **3a**; il 3b
+> (override) resta solo per il portatile di riserva, se è a base 22.04 (le
+> sue righe devono ancora arrivare, e Alan deve confermare che il Pop!_OS è
+> quello da 32 GB). 2) Dal 12 il portatile da 32 GB non è più la riserva:
+> è **la macchina della demo** (§12.10). Quindi al punto 9 il wallet che
+> nasce lì è QUELLO DELLA DEMO, riempito dalla VM (sats dalla scorta di
+> `barattolo`, 3 UTXO, due fatture, due invii: i comandi si scrivono dopo
+> la migrazione del 13, con gli id veri); la frase «Sul portatile di Alan
+> NON stanno…» in fondo al punto 10 non vale più per lui (gli servono
+> l'accesso alla VM con una chiave SSH dedicata, il config di collaudo di
+> Barattolo, il servizio NWC con la sua connection string: l'elenco in
+> §12.10); e la prova di riavvio completa si fa quel giorno, su di lui. Il
+> modello di QVAC è Qwen3.5 2B (§12.4), copiato come file.
+
 **15 ott, i due portatili di Alan, a casa di Andrea, con la rete**
 (cambio del 9 ott: niente installazione in sala). Sono DUE Linux a base
 Ubuntu — **Pop!_OS 32 GB** (il portatile principale della demo di Alan,
@@ -1699,7 +1715,9 @@ la rete propria ammessa. Da correggere, nel cantiere del 13:
    i nomi dei modelli in §4, §5 e §10.
 6. La chiavetta di riserva va rinfrescata: i modelli nuovi,
    `identita.mjs` con gli id, `qvac.config.json`.
-7. Un passo in più: il giro intero della variante OVERRIDE (12.10).
+7. Un passo in più SOLO SE il portatile di riserva è a base 22.04: il
+   giro intero della variante OVERRIDE (12.10). Il portatile della demo
+   non ne ha bisogno (Pop!_OS 24.04, glibc 2.39).
 8. Escono dal piano: l'USDT come secondo dollaro (studio del 9, punto
    12; la riga «dom 12:30-13:00» di §11.3) e la prova da dieci minuti
    col wallet `SIGNET_CUSTOM` e il faucet (studio del 9, punto 7), che
@@ -1778,6 +1796,59 @@ Cosa dice:
   In CPU, o sull'Arc via Vulkan, STIMO da 5 a 10 secondi per risposta
   col 2B; si misura il 15. La RAM (2-3 GB) sta larga nei 16 e nei 32 GB.
 
+**La risposta dei mentor di QVAC (12 ott, sera, topic «Qvac q&A»), e il
+confronto che ne è seguito.** Hanno risposto alle domande 8 e 9: Qwen3.5
+2B è una buona scelta; `qvac serve` sul portatile, chiamato dalla pagina
+sulla stessa macchina, **conta come on-device**; e per spegnere il
+ragionamento consigliano di aggiungere `/no_think` al prompt di sistema e
+di TOGLIERE `reasoning_budget` («Remove reasoning_budget»). Andrea ha
+chiesto il confronto sul 2B, stessi otto casi e nostro schema (il
+`chiedi` vero di `consiglio.py`, col corpo cambiato SOLO in quel che si
+prova), sul fisso, col server di prova:
+
+| Combinazione | Errore 500 | JSON valido | Regola rispettata | «Perché» pulito (senza cifre) |
+|---|---|---|---|---|
+| a) solo `reasoning_budget: false` (quel che mandiamo) | 0 su 8 | 8 su 8 | 8 su 8 | 1 su 8 |
+| b) solo `/no_think`, in coda al prompt di sistema | **8 su 8** | 0 su 8 | 0 su 8 | nessuna risposta |
+| b) solo `/no_think`, in testa al prompt di sistema | **8 su 8** | 0 su 8 | 0 su 8 | nessuna risposta |
+| c) tutti e due | 0 su 8 | 8 su 8 | 8 su 8 | 2 su 8 |
+
+Le controprove:
+
+- **Più campioni alla temperatura della pagina** (0,2; otto casi per tre
+  giri): a) regola 24 su 24, «perché» pulito 2 su 24; c) regola 24 su
+  24, pulito 1 su 24. Fra a) e c) non c'è differenza che si veda.
+- **La richiesta VERA di `consigliami-prova.html`** (suo prompt, suo
+  schema, quattro giri): a) 200 quattro volte, la scelta attesa 4 su 4;
+  b) 500 quattro volte; c) 200 quattro volte, la scelta attesa 2 su 4.
+  Il `/no_think` in più non aiuta, e alla pagina semmai toglie.
+- **La b) guardata a fondo** (richiesta di Andrea dopo «Remove
+  reasoning_budget»), sui DUE modelli, due giri per riga, sempre senza
+  `reasoning_budget`: `/no_think` in coda al sistema, in testa, su una
+  riga sua, in coda al messaggio utente, nel sistema e nell'utente
+  insieme, con `max_tokens` 2000, con `json_object` al posto dello
+  schema; e `enable_thinking: false`, in cima e dentro
+  `chat_template_kwargs`: **500 ogni volta**. Con `reasoning_budget:
+  false` (o col numero 0): 200 ogni volta. Con `reasoning_budget: true`:
+  500.
+- **Senza schema `/no_think` non spegne nemmeno il ragionamento**: nel
+  sistema o in coda alla domanda, la risposta arriva con
+  `reasoning_content` pieno. Con `reasoning_budget: false` non pensa.
+- **L'errore**, dal log del server (`-v`), identico tutte le 64 volte:
+  `RPCError: Unexpected empty grammar stack after accepting piece: ? (30)`,
+  alzato da `@qvac/llm-llamacpp` 0.55.0 (`_handleAddonOutputEvent`); al
+  client arriva solo «An internal error occurred».
+
+**Si tiene la a): `reasoning_budget: false`, senza `/no_think`.**
+`consiglio.py` e `consigliami-prova.html` lo mandano già e NON cambiano.
+Il consiglio del mentor non regge su questa versione (`@qvac/sdk` 0.21.0,
+`@qvac/cli` 0.15.0); la risposta per lui:
+
+```text
+Thanks! We tried it on Qwen3.5 2B and 0.8B (@qvac/sdk 0.21.0, @qvac/cli 0.15.0, @qvac/llm-llamacpp 0.55.0, Windows 11, Vulkan): with `reasoning_budget` removed and `/no_think` in the system prompt (start, end, or in the user message), any structured output (`response_format` json_schema or json_object) returns HTTP 500, every time. Server log: "RPCError: Unexpected empty grammar stack after accepting piece: ? (30)". Without a schema, `/no_think` still produces `reasoning_content`.
+With `reasoning_budget: false` (or 0) it works every time: valid JSON, no reasoning. So we keep `reasoning_budget: false`. Is `/no_think` expected to work with the Qwen3.5 template in this build, or is there a newer version we should use?
+```
+
 **Un difetto di QVAC su Windows, trovato scaricando.** Il primo scarico
 è fallito con «Could not download … from the registry on this network
 (Invalid device file, was modified)». La causa NON è la rete: il runtime
@@ -1793,8 +1864,8 @@ rifà uno. Fatto il 12: il vecchio è
 `~/.qvac/registry-corestore.messo-da-parte-12ott` (120 MB, si può
 cancellare). Con l'archivio nuovo i due modelli sono scesi in meno di un
 minuto. Su Linux NON è provato: sui portatili di Alan i modelli arrivano
-comunque dalla chiavetta, come file. Due righe per il topic dei mentor,
-da aggiungere alle undici:
+comunque dalla chiavetta, come file. Due righe per il topic dei mentor (la A è
+ormai dentro la risposta al mentor qui sopra: resta da mandare la B):
 
 ```text
 QVAC, two findings from tonight (Windows 11, @qvac/sdk 0.21.0, @qvac/cli 0.15.0, bare-runtime 1.34.1):
@@ -1833,9 +1904,9 @@ Aggiornato la sera del 12, dopo la scelta della macchina (12.10).
 | Giorno | Cosa | Chi | Tempo |
 |---|---|---|---|
 | lun 12 | Le undici domande nel topic (12.8) | Andrea | ☑ inviate |
-| lun 12, sera | Le risposte dei mentor; la scelta fra `signet` e `signetcustom` (12.3). Alan manda le cinque righe dei due portatili (12.4: RAM, GPU, Vulkan, glibc, sistema) | Andrea le porta | |
+| lun 12, sera | Le risposte dei mentor: arrivate quelle di QVAC (12.4, 12.8); mancano RGB, KaleidoSwap e UTEXO, quindi la scelta fra `signet` e `signetcustom` (12.3) resta aperta. Alan ha mandato le due righe del Pop!_OS (24.04 LTS, glibc 2.39: 12.10); mancano quelle dell'altro portatile e la conferma di quale sia il 32 GB | Andrea le porta | |
 | mar 13, mattina | Il cantiere: la lista datata 13 con le correzioni di 12.3, l'alias del modello con la sua prova, la dichiarazione in §5 | sessione | 1,5 h |
-| mar 13 | La migrazione sul FISSO, i dieci passi di §10 (comandi uno per riga, risposta attesa, Andrea incolla gli output), più il giro dell'override (12.10) | Andrea, la sessione legge | 3-4 h |
+| mar 13 | La migrazione sul FISSO, i dieci passi di §10 (comandi uno per riga, risposta attesa, Andrea incolla gli output); il giro dell'override solo se la riserva è a base 22.04 (12.10) | Andrea, la sessione legge | 3-4 h |
 | mar 13, sera | Gli id nei file, il backup a due catene, la chiavetta rinfrescata, il push (aspetta il sì di Andrea) | sessione | 1 h |
 | mer 14 | Niente: Andrea è a Lugano. `rgb_http.py` fermo dalla sera del 13 (il backup delle 03:30) | | |
 | gio 15 | **Il portatile di Alan da 32 GB diventa la macchina della demo**: installazione, chiave SSH dedicata, il wallet della demo che NASCE lì e si riempie dalla VM, NWC, Barattolo in collaudo e semina, QVAC, la prova di riavvio completa e quella col Wi-Fi spento, il backup del wallet nuovo (12.10) | insieme, a casa di Andrea | 4-5 h |
@@ -1899,7 +1970,8 @@ di Andrea del 12).
 
 1. **La macchina della demo arriva il 15.** Un pomeriggio per
    installare, far nascere e riempire il wallet, collegare tutto e
-   provare, su un portatile mai visto (glibc, Vulkan, l'Arc). Il 16 è
+   provare, su un portatile mai visto (la glibc è nota dal 12 sera: 2.39,
+   variante originale; restano Vulkan e l'Arc). Il 16 è
    margine solo per quel che Alan può fare da solo.
 2. **Nessuna interoperabilità con KaleidoSwap.** I loro wallet e il
    faucet RGB non vedono i nostri asset, e noi non vediamo i loro. Si
@@ -1960,8 +2032,17 @@ Judging and submission
 11. Submission by pull request: to which repository, and by what time? Our marketplace repository is private. We planned a small separate repository with the weekend's dated commits. Is that acceptable, and must it be public?
 ```
 
-Le risposte si scrivono qui sotto quando arrivano (la sera del 12 o
-dopo): ☐.
+**Le risposte, man mano che arrivano.**
+
+- **8 (QVAC, 12 ott sera)**: Qwen3.5 2B è una buona scelta; per il
+  ragionamento, `/no_think` nel prompt di sistema e via
+  `reasoning_budget`. ☑ ricevuta, e provata la sera stessa: con lo schema
+  dà 500, quindi si tiene `reasoning_budget: false` (12.4, con la
+  risposta da mandargli).
+- **9 (QVAC, 12 ott sera)**: sì, `qvac serve` sul portatile, chiamato
+  dalla pagina sulla stessa macchina, conta come on-device. ☑
+- **1-7, 10 e 11** (la rete RGB, KaleidoSwap, UTEXO, il giudizio, la
+  consegna): ☐.
 
 ### 12.9 La bozza della dichiarazione per la pull request
 
@@ -2041,20 +2122,22 @@ nasce il wallet del cliente? Andrea ha chiesto fra due strade.
 
 Fra A e B è più sicura la A; la C le batte tutt'e due.
 
-**La glibc dei due portatili decide la variante**, e si sa subito: Alan
-manda le cinque righe di 12.4 (bastano `ldd --version | head -1` e
-`grep PRETTY_NAME /etc/os-release`). Dalla 2.38 in su (base Ubuntu
-24.04) si usa la variante ORIGINALE, la stessa del fisso, provata dal 1
-ott. Sotto (base 22.04: Pop!_OS 22.04, Zorin OS 17) serve l'override,
-di cui finora sono provati solo `nuovo`, `indirizzo` e `saldo`. Quindi
-**il 13, dentro la migrazione, si prova il giro intero dell'override**
-nella distro `jammy-pulita` (Ubuntu 22.04): un wallet usa-e-getta riceve
-5 MOON dal negozio e ne rimanda 2, con la beta.7 Python dall'altra
-parte. Dieci minuti e due comandi in più sulla VM, e si fa comunque: il
-portatile di riserva è con ogni probabilità a base 22.04. Se quel giro
-fallisce, su un portatile a base 22.04 la variante originale gira dentro
-un contenitore Ubuntu 24.04 (`distrobox`, che condivide casa e rete):
-da preparare il 15, e si scrive solo se serve.
+**La glibc decide la variante, e per il portatile della demo si sa** (12
+ott, sera: Alan ha lanciato i due comandi): **Pop!_OS 24.04 LTS, `ldd
+(Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39`**. Dalla 2.38 in su si usa la
+variante ORIGINALE, la stessa del fisso, provata dal 1 ott: sul portatile
+della demo **niente override** (punto 3a della lista del 15). Da
+confermare: che il Pop!_OS sia quello da 32 GB, e le righe dell'altro
+portatile. L'override (`rgb-sdk` 1.0.6, binario beta.13), di cui finora
+sono provati solo `nuovo`, `indirizzo` e `saldo`, resta una faccenda del
+solo portatile di RISERVA, e solo se è a base 22.04 (Zorin OS 17): in
+quel caso se ne prova il giro intero nella distro `jammy-pulita` (un
+wallet usa-e-getta riceve 5 MOON dal negozio e ne rimanda 2, con la
+beta.7 Python dall'altra parte: dieci minuti e due comandi in più sulla
+VM), il 13 se le righe sono arrivate, sennò il giorno in cui arrivano:
+non dipende dalla migrazione. Se quel giro fallisse, su un portatile a
+base 22.04 la variante originale gira dentro un contenitore Ubuntu 24.04
+(`distrobox`, che condivide casa e rete): si scrive solo se serve.
 
 **Cosa cambia nella lista «15 ott» di §10**, che era scritta per i
 portatili di Alan come RISERVA («NON stanno: il wallet della demo, le

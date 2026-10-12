@@ -51813,6 +51813,25 @@ mattina del 13 (la lista datata 13, l'alias del modello, la
 dichiarazione in §5); la chiave SSH dedicata per la VM e dove gira la
 sessione a Torino, da decidere il 15.
 
+**Addendum, la sera stessa: i mentor di QVAC e il portatile di Alan.** I
+mentor hanno risposto alle domande 8 e 9: Qwen3.5 2B va bene, `qvac
+serve` sul portatile conta come on-device, e per il ragionamento
+consigliano `/no_think` nel prompt di sistema TOGLIENDO
+`reasoning_budget`. Provato subito sul fisso, stessi otto casi e nostro
+schema: il solo `/no_think` dà 500 otto volte su otto (in coda, in testa,
+nel messaggio utente, con `json_object`, sui due modelli: `Unexpected
+empty grammar stack after accepting piece` da `@qvac/llm-llamacpp`
+0.55.0), e senza schema non spegne nemmeno il ragionamento;
+`reasoning_budget: false` funziona sempre, da solo o insieme a
+`/no_think`, e insieme non migliora niente. **Si tiene quel che
+mandavamo**: `consiglio.py` e la pagina di prova non cambiano; in §12.4
+la tabella, le controprove e le righe da rispondere al mentor. E il
+Pop!_OS di Alan è il 24.04 LTS con glibc 2.39: sul portatile della demo
+la variante ORIGINALE del wallet, niente override, che resta solo per la
+riserva se è a base 22.04 (§12.10, e l'avviso in testa alla lista «15
+ott» di §10). La cartella `registry-corestore.messo-da-parte-12ott` è
+stata tolta, con l'ok di Andrea. Solo documenti.
+
 ## Chi è l'altro: riconosciuti tutti, l'anonimato è una chiave nuova (12 ott 2026, cantiere chi-e-l-altro, decisione di Andrea con Alan, dal caso ea0af71a)
 
 **Il caso.** Nello scambio ea0af71a (Alan vende, Sweegmiao compra entrando
