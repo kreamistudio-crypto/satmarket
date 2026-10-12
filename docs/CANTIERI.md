@@ -54543,3 +54543,42 @@ sopra la pagina (la fattura, il QR): sta sotto il foglio, e si vede
 alla chiusura. Se l'app è aperta su UN'ALTRA pagina (l'elenco, il
 libro) la chat di quella parte parte quando apre lo scambio, come
 prima: lì l'altra persona legge ancora «Si apre appena…», ed è vero.
+
+**IL VERBALE DEL PUSH (13 ott 2026): cosa è girato su quale albero.**
+Main è corso DUE volte mentre il cantiere si chiudeva, per commit non
+miei: i quattro di punti-ritiro (`dba8b76`, `b6a7709`, `1e95da2`,
+`7da34fb`) e poi i tre di voto-dopo-concluso e pausa-nativi
+(`865c75b`, `827c26b`, `f2717b0`). Due rebase, e ogni volta il solo
+conflitto è stato in coda a CANTIERI (voci accodate: tenute tutte, la
+mia per ultima); `miniapp.html` e `prove.py` si sono fusi da soli, e i
+miei simboli li ho ricontati per nome, uno ciascuno. SULL'ALBERO DI
+PRIMA (base `400a3ea`): la tortura (15 su 15), la misura «prima della
+cura» (119 s) e i primi giri dal vivo. SUL PRIMO ALBERO RIBASATO (sopra
+`7da34fb`) la suite intera severa ha trovato DUE ROSSE MIE in
+`prove_effetti_ridotti`: la scorsa del richiamo chiedeva
+`prefers-reduced-motion` al sistema invece che al giudice
+(`tourRidotto`) — avevo girato la sola sezione della chat. Curate nel
+commit dopo («la scorsa chiede al giudice degli effetti»), e su
+QUELL'albero (`a300dc4`) sono girati PER INTERO la suite severa —
+23.306 passate, 0 fallite — e i 73 collaudi della CI nella gabbia, 73
+verdi; i due giri dal vivo rifatti (15 su 15 a 390×844 e a 1280×800:
+gli scatti sono di lì), `node` sui tre script, lo scanner dei segreti a
+zero con la controprova (3 su 3). SULL'ALBERO DEL PUSH (sopra
+`f2717b0`), secondo la consegna di Andrea («fetch, rebase, push
+subito») e senza inseguire main: le sezioni mie e quelle toccate dai
+tre commit arrivati — `prove_chat_scambio`, `prove_effetti_ridotti`,
+`prove_avvisi_nuovi_ordini`, `prove_contanti_a_mano`,
+`prove_giro_nuovo_stesso_id`, `prove_indirizzo_non_verificato`,
+`prove_p2p_server`, `prove_tempo_di_chi_pubblica`,
+`prove_tor_chiavi_scambio`, `prove_voto_dopo_concluso`, con la bussola,
+il tetto e i collaudi in CI: 1.111 passate, 0 fallite — e cinque
+collaudi nella gabbia (`collaudo_chat_scambio`,
+`collaudo_voto_dopo_concluso`, `collaudo_tempo_pubblica`,
+`collaudo_tolti_ovunque`, `collaudo_scambi_ovunque`), verdi. I tre
+commit arrivati non portano leve nuove in `server.py` e nel blocco
+della chat non toccano niente; in `renderOrdineP2P` aggiungono righe
+loro, lontano dal richiamo. La suite intera e i 74 collaudi
+sull'albero del push li dice la CI. LA CI DI MAIN, guardata prima del
+push: verde sulla punta (`f2717b0`), e `pronto` era lì. L'ok al push
+di Andrea stava nel brief («pusha solo se suite e collaudi sono verdi:
+fetch e rebase, push subito»).
