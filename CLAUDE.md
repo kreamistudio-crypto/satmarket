@@ -23,7 +23,7 @@ I documenti in `docs/` NON sono import: si aprono quando servono.
   `docs/STUDIO-BOLT-CARD-2026-09-24.md`,
   `docs/STUDIO-RISTORANTI-2026-09-24.md`,
   `docs/STUDIO-CONTANTI-A-MANO-2026-09-25.md`,
-  `docs/STUDIO-MOSTRO-0190-2026-09-30.md` (la 0.19.0 in preparazione),
+  `docs/STUDIO-MOSTRO-0190-2026-09-30.md` (la salita alla 0.19.0),
   `docs/STUDIO-HACKATHON-RGB-2026-10.md` (Torino, 17-18 ott 2026; il
   setup fatto e la scaletta: `docs/HACKATHON-SETUP.md`),
   `docs/STUDIO-LIQUIDITA-NODO-2026-10-01.md` (sweep e canale da 5M),
@@ -144,10 +144,10 @@ modo in cui si rifà un errore già pagato.
 ⚠️ Non è il VPS di Barattolo: è il coordinator Mostro P2P su LNVPS
 (Dublino, `185.18.221.96`), tutto in container (bitcoind pruned, LND,
 tor, mostrod), canale da 400.000 sat verso ACINQ. Gira il nostro fork
-di Mostro (immagine `mostro:v0.18.8-bar5`: PRODUZIONE, «LA SALITA A
-MOSTRO 0.18.8»). Tutto il verbale — audit, timer, sonda, dev fee,
-risposte del team — sta in `docs/NODO-MOSTRO.md`. Le regole che valgono
-in ogni sessione:
+di Mostro, immagine `mostro:v0.19.0-bar7` (otto patch più la 0010:
+PRODUZIONE, «LA SALITA ALLA -bar7»). Il verbale — audit, timer, sonda,
+dev fee, risposte del team — sta in `docs/NODO-MOSTRO.md`. Le regole che
+valgono in ogni sessione:
 - L'AUDIT DI SICUREZZA È FATTO (2 set 2026): non riproporre le sue sei
   domande come «da fare». Il documento `auditnodomostro202609` sta nel
   canale Telegram del nodo, coi perché: si chiede quello. I canali
@@ -247,7 +247,8 @@ Stato al 30 set 2026 (parola di Andrea):
 - I PIONIERI sono congelati a 101.
 - La cassaforte del mercatino è quella «nodo» (LNbits self-hosted col
   LND del nodo: Cantieri, «Il doppio wallet»).
-- In preparazione l'aggiornamento a Mostro 0.19.0.
+- Il nodo gira Mostro 0.19.0 (`-bar7`, patch 0010): la cauzione solo a chi
+  prende scegliendo «Contanti»; `P2P_CAUZIONE_SUL_METODO` ACCESA sul VPS.
 - Nessun limite di prezzo attivo (`TETTO_SATS_ANNUNCIO` spenta). Quali
   leve sono ACCESE lo dice il pannello «⚙️ Stato delle leve» dell'admin,
   che chiede al valore VIVO e non alla costante nel codice.
