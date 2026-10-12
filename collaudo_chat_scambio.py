@@ -32,7 +32,11 @@ database usa-e-getta, con l'autenticazione VERA (niente `come()`):
   10. la scopa del minuto, per lo scambio finito senza che l'evento
       passasse di qui;
   11. niente nel database di tutti (quello dei backup), niente testo
-      nel journal, e gli accessi riusciti fuori dal registro.
+      nel journal, e gli accessi riusciti fuori dal registro;
+  12. il pallino dei messaggi non letti: la domanda che non sposta
+      nessun segnalibro e non ferma l'avviso fuori dall'app;
+  13. la leva `P2P_CHAT_SCAMBIO` spenta: niente buste nuove, quelle che
+      ci sono restano e se ne vanno a scambio finito; riaccesa, riprende.
 
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
 `collaudo_pagamento_p2p`), niente Telegram, niente relay, niente
@@ -545,6 +549,66 @@ async def giro():
                passa("/api/p2p/chat/invia", 429), passa("/api/p2p/chat/leggi", 500),
                passa("/api/p2p/recapito", 200)])
 
+    async def s12():
+        novita = SRV.chat_novita_p2p
+        o11, o12 = ordine(11), ordine(12)
+        prima = [tuple(x) for x in cassetto("SELECT * FROM letture ORDER BY ordine, tg_id")]
+        r = await chiama(novita, N1, {"ordini": [o11, o12, ordine(999)]})
+        ultimo = cassetto("SELECT MAX(n) FROM buste WHERE ordine=? AND tipo='msg' AND da=?",
+                          o11, TG_V)[0][0]
+        prova("a chi compra il numero dell'ultimo messaggio di chi vende, e solo per i SUOI scambi",
+              ({o11: ultimo}, False, True), (r.get("ultimi"), r.get("spenta"), (ultimo or 0) > 0))
+        prova("...e la domanda non sposta nessun segnalibro", prima,
+              [tuple(x) for x in cassetto("SELECT * FROM letture ORDER BY ordine, tg_id")])
+        prova("un estraneo non impara niente degli scambi altrui", {},
+              (await chiama(novita, ESTRANEO, {"ordini": [o11, o12]})).get("ultimi"))
+        prova("una domanda storta: 400", [400, 400, 400],
+              [no(await chiama(novita, N1, {"ordini": "tutti"})),
+               no(await chiama(novita, N1, {"ordini": [o11] * (SRV.P2P_CHAT_NOVITA_MAX + 1)})),
+               no(await chiama(novita, N1, {"ordini": ["../etc"]}))])
+        # chi ha l'app aperta su un'ALTRA pagina: il pallino chiede, ma
+        # l'avviso fuori dall'app deve partire lo stesso
+        await chiama(leggi, N1, {"ordine": o11, "dopo": 0})
+        del DETTI[:]
+        await asyncio.sleep(ASSENTE)
+        await chiama(novita, N1, {"ordini": [o11]})
+        await chiama(invia, TG_V, {"ordine": o11, "tipo": "msg", "busta": busta("dopo-il-pallino")})
+        await asyncio.sleep(0.4)
+        prova("la domanda del pallino non dice «sta guardando»: l'avviso fuori dall'app parte lo stesso",
+              [N1], [chi for chi, _, _ in avvisi_chat()])
+        r = await chiama(novita, N1, {"ordini": [o11]})
+        prova("...e il pallino vede il messaggio nuovo", True,
+              (r.get("ultimi") or {}).get(o11, 0) > (ultimo or 0))
+
+    async def s13():
+        novita = SRV.chat_novita_p2p
+        o11, o12 = ordine(11), ordine(12)
+        quante = len(cassetto("SELECT 1 FROM buste WHERE ordine=?", o12))
+        SRV.P2P_CHAT_SCAMBIO = False
+        try:
+            r = await chiama(leggi, N1, {"ordine": o11, "dopo": 0})
+            prova("leva spenta: la chat non si apre, e il server dice che e' SPENTA (non finita)",
+                  (False, True, False), (r.get("aperta"), r.get("spenta"), r.get("finita")))
+            prova("...non accetta buste nuove, di nessun tipo", [409, 409],
+                  [no(await chiama(invia, TG_V, {"ordine": o11, "tipo": "msg",
+                                                 "busta": busta("a-leva-spenta")})),
+                   no(await chiama(invia, TG_V, {"ordine": o11, "tipo": "saluto",
+                                                 "busta": busta("saluto-a-leva-spenta")}))])
+            r = await chiama(novita, N1, {"ordini": [o11]})
+            prova("...il pallino tace", ({}, True), (r.get("ultimi"), r.get("spenta")))
+            prova("...la busta delle leve lo dice al telefono", False, SRV._p2p_leve().get("chat"))
+            prova("...le buste che c'erano restano dov'erano", (True, quante),
+                  (quante > 0, len(cassetto("SELECT 1 FROM buste WHERE ordine=?", o12))))
+            await evento(o12, "released", "seller", "", chiave(0x32), chiave(0x12))
+            prova("...e a scambio finito se ne vanno come sempre: la scopa non guarda la leva", 0,
+                  len(cassetto("SELECT 1 FROM buste WHERE ordine=?", o12)))
+        finally:
+            SRV.P2P_CHAT_SCAMBIO = True
+        prova("riaccesa, la busta delle leve lo ridice", True, SRV._p2p_leve().get("chat"))
+        r = await chiama(leggi, N1, {"ordine": o11, "dopo": 0})
+        prova("...e la chat di uno scambio in corso riprende con le sue buste", (True, True),
+              (r.get("aperta"), len(r.get("buste") or []) >= 4))
+
     await sezione(1, "LE QUATTRO COPPIE DI ACCESSO", s1)
     await sezione(2, "PRIMA DELLA PRESA, E PER UN ESTRANEO", s2)
     await sezione(3, "LA CONSEGNA A CHI E' OFFLINE", s3)
@@ -556,6 +620,8 @@ async def giro():
     await sezione(9, "L'ORDINE TORNATO NEL LIBRO E RIPRESO DA UN ALTRO", s9)
     await sezione(10, "LA SCOPA DEL MINUTO", s10)
     await sezione(11, "NIENTE ALTROVE", s11)
+    await sezione(12, "IL PALLINO: LA DOMANDA CHE NON SEGNA NIENTE", s12)
+    await sezione(13, "LA LEVA SPENTA", s13)
     for gruppo in (SRV._TASK_EVENTI_P2P, SRV._TASK_CHAT_P2P):
         if gruppo:
             await asyncio.gather(*list(gruppo), return_exceptions=True)

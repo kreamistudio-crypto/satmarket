@@ -29177,6 +29177,15 @@ def _leve_stato():
                   spento="come ieri: niente pausa né badge, un solo "
                          "promemoria a metà tempo, e chi pubblica non "
                          "viene mai contato"),
+            # LA CHAT NELLO SCAMBIO (12 ott 2026): accesa di serie
+            _leva("Chat nello scambio P2P", "P2P_CHAT_SCAMBIO",
+                  P2P_CHAT_SCAMBIO,
+                  acceso="nella pagina di ogni scambio preso le due parti "
+                         "si scrivono; il server tiene le buste chiuse "
+                         "e le cancella a scambio finito",
+                  spento="la chat non compare e il server non accetta "
+                         "buste nuove; quelle che ci sono si cancellano "
+                         "come sempre, a scambio finito"),
             # GLI AVVISI DEI NUOVI ORDINI (9 ott 2026): la leva globale e la
             # finestra del raggruppamento; la preferenza resta per persona
             _leva("Avvisi dei nuovi ordini P2P", "P2P_AVVISI_NUOVI_ORDINI",
@@ -45335,6 +45344,9 @@ def _p2p_leve() -> dict:
             # il tempo di chi pubblica (12 ott 2026): pausa degli ordini,
             # badge e regole nuove; il client le mostra solo con questa
             "tempoPubblica": bool(P2P_TEMPO_DI_CHI_PUBBLICA),
+            # la chat nello scambio (12 ott 2026): accesa di serie; a
+            # leva spenta il client non mostra il riquadro
+            "chat": bool(P2P_CHAT_SCAMBIO),
             # gli avvisi dei nuovi ordini (9 ott 2026): la leva globale
             # e la finestra, perche' la riga del Profilo e il bottone
             # della testata compaiano solo se esistono, e dicano
@@ -49298,6 +49310,20 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
 # accanto al codice.
 DB_CHAT = os.path.join(os.path.dirname(os.path.realpath(DB)),
                        "chat-scambi.db")
+# LA LEVA (12 ott 2026, sera, richiesta di Andrea prima del push):
+# ACCESA di serie. Spenta — `P2P_CHAT_SCAMBIO = False` nel config del
+# VPS, e riavvio — la chat sparisce dalla pagina dello scambio e il
+# server non accetta buste nuove ne' ne consegna; quelle che ci sono
+# restano dove sono e se ne vanno come sempre, a scambio finito (la
+# scopa NON guarda la leva). Solo un False scritto spegne: una riga
+# storta non deve togliere la chat a chi la sta usando.
+try:
+    from config import P2P_CHAT_SCAMBIO
+    if not isinstance(P2P_CHAT_SCAMBIO, bool):
+        print("[p2p] P2P_CHAT_SCAMBIO non e' True/False: la chat resta accesa")
+    P2P_CHAT_SCAMBIO = P2P_CHAT_SCAMBIO is not False
+except ImportError:
+    P2P_CHAT_SCAMBIO = True
 P2P_CHAT_BUSTA_MAX = 4096         # 500 caratteri, chiusi e in base64, stanno sotto
 P2P_CHAT_BUSTA_MOD_MAX = 16384    # la busta per un moderatore porta piu' chiavi
 P2P_CHAT_MSG_MAX = 200            # messaggi per scambio: ~0,6 MB nel caso peggiore
@@ -49308,6 +49334,7 @@ P2P_CHAT_RITIRO_MAX = 300         # buste per risposta
 P2P_CHAT_PRESENTE_S = 20          # chi ha ritirato da meno di cosi' sta guardando
 P2P_CHAT_AVVISI_MAX = 30          # avvisi per scambio e per persona: anti-abuso
 P2P_CHAT_VITA_MAX_S = 30 * 86400  # la rete sotto la scopa: nessuno scambio dura tanto
+P2P_CHAT_NOVITA_MAX = 30          # scambi per domanda del pallino
 P2P_CHAT_TIPI = ("saluto", "msg", "mod")
 FORMA_BUSTA_CHAT = re.compile(r"^[A-Za-z0-9+/]{40,}={0,2}$")
 _CHAT_PRONTA = {"file": ""}
@@ -49606,6 +49633,9 @@ def _chat_p2p_chiede(d: dict, user: dict) -> tuple:
     ordine = str((d or {}).get("ordine") or "").strip()
     if not FORMA_ORDINE_P2P.fullmatch(ordine):
         raise HTTPException(400, "Richiesta non valida")
+    # LA LEVA SPENTA: niente buste nuove e niente da ritirare, per nessuno
+    if not P2P_CHAT_SCAMBIO:
+        return ordine, {"aperta": False, "giro": 0, "altro": 0, "perche": "spenta"}
     con = db()
     try:
         st = _chat_p2p_stato(con, ordine, user["id"])
@@ -49622,7 +49652,8 @@ def _chat_p2p_chiusa(ordine: str, st: dict):
         _chat_p2p_dopo_evento(ordine)
     return JSONResponse({"ok": True, "aperta": False, "giro": st["giro"],
                          "finita": st["perche"] == "finito",
-                         "senza_altro": st["perche"] == "solo"},
+                         "senza_altro": st["perche"] == "solo",
+                         "spenta": st["perche"] == "spenta"},
                         headers={"Cache-Control": "no-store"})
 
 
@@ -49727,6 +49758,53 @@ async def chat_moderatori_p2p(req: Request, x_tg_init_data: str = Header(""),
     finally:
         con.close()
     return JSONResponse({"ok": True, "aperta": True, "chiavi": chiavi},
+                        headers={"Cache-Control": "no-store"})
+
+
+def _chat_p2p_novita(con, cc, io: int, ordini) -> dict:
+    """IL PALLINO DELL'APP: per ognuno degli scambi nominati di cui chi
+    chiede e' una parte, a chat aperta, il numero dell'ultimo MESSAGGIO
+    dell'altra parte (0 = nessuno). Pura sulle due connessioni.
+    NON SPOSTA NESSUN SEGNALIBRO e non dice «sta guardando»: e' la
+    domanda dell'app aperta su un'altra pagina, e chi non ha aperto la
+    chat l'avviso lo deve ricevere lo stesso. Uno scambio di cui chi
+    chiede non e' una parte non compare nella risposta, e basta."""
+    fuori = {}
+    for o in ordini:
+        st = _chat_p2p_stato(con, o, io)
+        if not st["aperta"]:
+            continue
+        r = cc.execute("SELECT MAX(n) FROM buste WHERE ordine=? AND giro=? "
+                       "AND tipo='msg' AND da<>?", (o, st["giro"], int(io))).fetchone()
+        fuori[o] = int((r and r[0]) or 0)
+    return fuori
+
+
+@app.post("/api/p2p/chat/novita")
+async def chat_novita_p2p(req: Request, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """Il pallino dei messaggi non letti. Nel corpo `{ordini: [...]}`, gli
+    scambi vivi che il telefono ha; risponde `{ultimi: {ordine: n}}`, il
+    numero dell'ultimo messaggio dell'altra parte in ognuno. Il telefono
+    lo confronta con l'ultimo che ha APERTO. Non segna niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    d = await leggi_json(req)
+    ordini = d.get("ordini")
+    if not isinstance(ordini, list) or len(ordini) > P2P_CHAT_NOVITA_MAX \
+            or not all(isinstance(o, str) and FORMA_ORDINE_P2P.fullmatch(o)
+                       for o in ordini):
+        raise HTTPException(400, "Richiesta non valida")
+    ultimi = {}
+    if P2P_CHAT_SCAMBIO and ordini:
+        con, cc = db(), db_chat()
+        try:
+            ultimi = _chat_p2p_novita(con, cc, user["id"], ordini)
+        finally:
+            con.close()
+            cc.close()
+    return JSONResponse({"ok": True, "spenta": not P2P_CHAT_SCAMBIO, "ultimi": ultimi},
                         headers={"Cache-Control": "no-store"})
 
 

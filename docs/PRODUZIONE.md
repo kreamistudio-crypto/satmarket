@@ -4300,8 +4300,9 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   relay (`CHAT_ID` in `/opt/relay/telegram.conf`), i canali pubblici.
 - LA CHAT NELLO SCAMBIO: IL FILE DELLE BUSTE (12 ott 2026, cantiere
   chat-nello-scambio; com'è fatta in ARCHITETTURA, «LA CHAT NELLO
-  SCAMBIO»). AL DEPLOY NON C'È NIENTE DA FARE: nessuna leva da
-  aggiungere al config, nessuna migrazione di `satmarket.db`. Alla
+  SCAMBIO»). AL DEPLOY NON C'È NIENTE DA FARE: la leva è accesa di
+  serie anche senza la sua riga nel config (vedi in fondo a questa
+  voce), e non c'è nessuna migrazione di `satmarket.db`. Alla
   prima busta il server crea da solo `chat-scambi.db` ACCANTO al
   database vero — sul VPS `/srv/barattolo/dati/chat-scambi.db`, perché
   `satmarket.db` è un collegamento a quella cartella — coi permessi
@@ -4336,3 +4337,15 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   uno scambio preso, due messaggi per parte, l'avviso senza testo
   sull'altro telefono ad app chiusa; a scambio concluso il riquadro
   sparisce su tutti e due, e il conto qui sopra torna a zero.
+  LA LEVA, PER SPEGNERE LA CHAT SENZA UN DEPLOY (12 ott 2026, sera):
+  `P2P_CHAT_SCAMBIO`, accesa di serie anche senza la sua riga. Per
+  spegnerla: nel config del VPS la riga `P2P_CHAT_SCAMBIO = False`, e
+  riavvio del servizio (`systemctl restart barattolo`). Si guarda prima
+  se la riga c'è già: `grep -n "P2P_CHAT_SCAMBIO" ~/satmarket/config.py`.
+  Da spenta la chat sparisce dalla pagina dello scambio, il pallino
+  tace, e il server non accetta buste nuove né ne consegna; le buste
+  che ci sono restano nel file e se ne vanno come sempre, a scambio
+  finito. Riaccesa (riga a True, o tolta, e riavvio), le chat degli
+  scambi ancora in corso riprendono con le loro buste e le loro chiavi.
+  Lo stato vero lo dice il pannello «⚙️ Stato delle leve», voce «Chat
+  nello scambio P2P».

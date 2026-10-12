@@ -1748,6 +1748,18 @@ tutti e due.
   la disputa, appena riapre lo scambio.»
 - **Il recapito per gli euro resta dov'era** («🤝 I vostri recapiti», §3 e
   §5): la chat serve a parlarsi, non sostituisce quel riquadro.
+- **Il pallino dei messaggi non letti**: in «I miei scambi» la card dello
+  scambio porta «● **Nuovo messaggio nella chat**», sotto lo stato, e il
+  pallino si accende sulla voce «I miei scambi» del menu (e sul tasto «P2P»
+  del mercatino: è lo stesso pallino di «tocca a te»). Ad app aperta arriva
+  entro mezzo minuto, e si spegne aprendo lo scambio. Dove lo scambio si può
+  solo guardare («Le chiavi di questo scambio non sono in questo browser…»)
+  non si accende.
+- **Nel profilo dell'altra persona**, dove si leggeva «per parlarvi restano
+  i recapiti qui sotto, cifrati fra voi due», ora si legge «per parlarvi
+  **c'è la chat qui sotto.**» — nella nota «Non ha lasciato nessun canale
+  pubblico: …» e nelle frasi di chi non ha ancora un volto. Con chi scambia
+  da un'altra app la chat non c'è, e resta la frase dei recapiti.
 
 ## Notato strada facendo — chiuso il 7 ott 2026
 

@@ -865,6 +865,14 @@ P2P_CAUZIONE_SUL_METODO = False
 # funzionano e la regola di ieri («mai a chi ha pubblicato») resta.
 # Solo True accende.
 P2P_TEMPO_DI_CHI_PUBBLICA = False
+# LA CHAT NELLO SCAMBIO (12 ott 2026): ACCESA di serie. Dentro ogni
+# scambio preso le due parti si scrivono; i messaggi passano dal server
+# gia' chiusi dal telefono, stanno in un file a parte (`chat-scambi.db`,
+# accanto al database: i backup NON lo copiano, ed e' voluto) e a scambio
+# finito si cancellano. A False la chat sparisce dalla pagina dello
+# scambio e il server non accetta buste nuove; quelle che ci sono se ne
+# vanno come sempre, a scambio finito. Solo False spegne.
+P2P_CHAT_SCAMBIO = True
 # GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026): chi lo chiede dal
 # bottone 🔔 della testata del libro o dal cassetto Avvisi del Profilo
 # riceve un messaggio quando nel libro compaiono ordini nuovi — del tipo

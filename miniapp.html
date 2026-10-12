@@ -3428,6 +3428,10 @@
     .chatsc-riga small{font-size:12px}
     .chatsc-riga .btn{width:auto;min-width:120px}
     .chatsc>.hint:last-child{margin-top:10px}
+    /* il messaggio non letto sulla card di «I miei scambi» */
+    .p2p-chat-nuovo{display:flex;align-items:center;gap:7px;margin-top:8px;
+      font-size:13px;font-weight:700;color:var(--ink)}
+    .chatsc-pallino{flex:none;width:9px;height:9px;border-radius:50%;background:var(--danger)}
     .chatmod textarea,.mod-decidi textarea{width:100%;box-sizing:border-box;margin-top:6px;
       padding:10px 12px;border-radius:12px;border:1px solid var(--field-line);
       background:var(--bg);color:var(--ink);font:inherit;font-size:16px;resize:vertical}
@@ -68998,8 +69002,7 @@ function apriDisputaP2P(){
      senza le parole dell'impianto, che in questo foglio non entrano.
      Dove la chat non c'e' (l'altra parte non e' di qui) resta la frase
      di prima. */
-  const conChat = typeof chatScServeP2P === 'function' && chatScServeP2P(o)
-    && !o.soloVista && !((p2pChatScSapere[o.id] || {}).senzaAltro);
+  const conChat = typeof chatScCeP2P === 'function' && chatScCeP2P(o) && !o.soloVista;
   chiediConferma({
     titolo: 'Aprire una disputa?',
     corpo: 'Un moderatore guarderà il caso e deciderà chi riceve i sats.\n\n'
@@ -69667,6 +69670,9 @@ function rigaScambioP2P(o){
     /* ...e quando non tocca a me la casella dice «✋ Aspetta» con la
        riga di cosa fa l'altra persona (24 set 2026) */
     + '<span>' + esc(st.t) + '</span>' + (agire || pillolaAttesaP2P(o)) + rigaAttesaP2P(o) + '</div>'
+    /* IL MESSAGGIO NON LETTO DELLA CHAT (12 ott 2026): sotto lo stato,
+       col suo pallino; si spegne aprendo lo scambio */
+    + (typeof chatScSegnoCardP2P === 'function' ? chatScSegnoCardP2P(o) : '')
     + (metodi.length ? '<div class="p2p-box p2p-paga'
              + (senzaNomi ? ' p2p-paga-marchio' : '')
              + (senzaNomi && finita ? ' p2p-paga-spenta' : '') + '" title="'
@@ -72597,21 +72603,28 @@ function testoContropartePerMotivoP2P(motivo){
 }
 function profiloControparteP2P(o){
   if (!o || !o.peer) return '';
+  /* DOVE LA CHAT C'E', PER PARLARSI C'E' LA CHAT (12 ott 2026, sera,
+     parole di Andrea): la chiusa «restano i recapiti qui sotto» resta
+     dove la chat non c'e' — con chi scambia da un'altra app, o a leva
+     spenta. Coi typeof: questo blocco gira anche senza quello della chat */
+  const conChat = typeof chatScCeP2P === 'function' && chatScCeP2P(o);
+  const parlarvi = (t, si) => (si && typeof chatScParlarviP2P === 'function') ? chatScParlarviP2P(t, true) : t;
   const c = p2pControparti[o.id];
   if (!c) {
     chiediContropartiP2P([o.id]).then(n => {
       if (n && p2pOrdineAperto === o.id) renderOrdineP2P();
     }).catch(() => {});
     return '<div class="trust-note nota-scambio"><span>🕶️</span><span>'
-      + testoContropartePerMotivoP2P(p2pContropartiMotivo[o.id] || '') + '</span></div>';
+      + parlarvi(testoContropartePerMotivoP2P(p2pContropartiMotivo[o.id] || ''),
+                 conChat && p2pContropartiMotivo[o.id] !== 'esterno') + '</span></div>';
   }
   /* IL NOME DI BATTESIMO per la frase del tondo («Scrivi a Mario»),
      il nome intero nel riquadro: e' lo stesso taglio del negozio. */
   const primo = String(c.nome || '—').split(' ')[0];
   return cardParte(c, primo ? 'a ' + esc(primo) : "all'altra persona", {
     porta: true,
-    nota: '<div class="hint">Non ha lasciato nessun canale pubblico: per '
-          + 'parlarvi restano i recapiti qui sotto, cifrati fra voi due.</div>'});
+    nota: parlarvi('<div class="hint">Non ha lasciato nessun canale pubblico: per '
+          + 'parlarvi restano i recapiti qui sotto, cifrati fra voi due.</div>', conChat)});
 }
 /* ============ fine delle parti che si vedono ============ */
 
@@ -75119,6 +75132,14 @@ let p2pChatScSegreti = {};        // sk:pub -> la chiave fra due chiavi (costa: 
 let p2pChatScUltimoInvio = 0;
 let p2pChatScUltimoGiro = {};     // ordine -> quando si e' ritirato l'ultima volta
 let p2pChatScModTentato = {};     // ordine -> quando si e' provato a dare la chiave ai moderatori
+let p2pChatScSpenta = false;      // il server ha detto che la leva e' spenta
+let p2pChatScUltimi = {};         // ordine -> il numero dell'ultimo messaggio dell'altra persona (dal server)
+let p2pChatScNovitaInVolo = null;
+let p2pChatScBattiti = 0;
+const CHATSC_NOVITA_OGNI = 6;     // un giro del pallino ogni sei battiti del polso: 30 secondi
+/* le due chiuse delle frasi del profilo: vedi `chatScParlarviP2P` */
+const CHATSC_FRASE_RECAPITI = 'restano i recapiti qui sotto, cifrati fra voi due.';
+const CHATSC_FRASE_CHAT = 'c\'è la chat qui sotto.';
 
 /* ---- il cassetto: una voce per scambio, solo su questo dispositivo ---- */
 function chatScTutteP2P(){
@@ -75148,6 +75169,7 @@ function chatScButtaP2P(id){
   delete p2pChatScBozza[id];
   delete p2pChatScUltimoGiro[id];
   delete p2pChatScModTentato[id];
+  delete p2pChatScUltimi[id];
 }
 /* PURA: la chat ha senso per questa riga? Dalla presa — la controparte
    si conosce — a quando chi vende ha liberato i sats o lo scambio e'
@@ -75165,6 +75187,107 @@ function chatScPotaP2P(){
   for (const id of Object.keys(t))
     if (!chatScServeP2P(righe[id]) || (t[id] && t[id].peer && t[id].peer !== righe[id].peer))
       chatScButtaP2P(id);
+}
+
+/* ---- LA LEVA (12 ott 2026, sera, richiesta di Andrea) ----
+   `P2P_CHAT_SCAMBIO` sul server, accesa di serie: arriva nella busta
+   delle leve (`p2pLeve.chat`) e, per chi ha la pagina gia' aperta, la
+   ripete ogni rotta della chat (`spenta`). Spenta, il riquadro non
+   c'e', non si ritira e non si spedisce; chiave e messaggi restano nel
+   cassetto e se ne vanno come sempre, a scambio finito. */
+function chatScAccesaP2P(){
+  if (p2pChatScSpenta) return false;
+  return !(typeof p2pLeve !== 'undefined' && p2pLeve && p2pLeve.chat === false);
+}
+function chatScSpegniP2P(){
+  if (p2pChatScSpenta) return;
+  p2pChatScSpenta = true;
+  chatScSegnaP2P();
+  if (typeof document !== 'undefined' && vistaAttivaP2P() === 'view-p2pordine') renderOrdineP2P();
+}
+/* IN QUESTO SCAMBIO LA CHAT C'E' (o sta per aprirsi)? La leva accesa,
+   lo scambio fra la presa e la fine, e il server non ha detto ne' che
+   e' finita ne' che l'altra persona non e' di qui. La chiedono il
+   riquadro, il foglio della disputa, il pallino e le frasi del profilo. */
+function chatScCeP2P(o){
+  const sa = p2pChatScSapere[o && o.id] || {};
+  return chatScAccesaP2P() && chatScServeP2P(o) && !sa.chiusa && !sa.senzaAltro;
+}
+/* PURA: LA CHIUSA DELLE FRASI DEL PROFILO (12 ott 2026, sera, parole di
+   Andrea). Il profilo dell'altra persona diceva «per parlarvi restano i
+   recapiti qui sotto»: dove la chat c'e', per parlarsi c'e' la chat.
+   Dove non c'e' — l'altra persona scambia da un'altra app, o la leva e'
+   spenta — la frase resta quella dei recapiti. Le frasi sono di
+   `testoContropartePerMotivoP2P` e di `profiloControparteP2P`, che
+   restano come sono: qui si cambia la sola chiusa, e se un giorno la
+   chiusa cambiasse la' una prova lo dice. */
+function chatScParlarviP2P(testo, conChat){
+  return conChat ? String(testo).replace(CHATSC_FRASE_RECAPITI, CHATSC_FRASE_CHAT) : testo;
+}
+
+/* ---- IL PALLINO DEI MESSAGGI NON LETTI (12 ott 2026, sera, richiesta
+   di Andrea) ----
+   Sulla card dello scambio e sul pallino di «I miei scambi» (lo stesso
+   di «tocca a te»: `aggiornaPallinoScambiP2P`). Si accende quando
+   l'ultimo messaggio dell'altra persona che il SERVER conosce e' oltre
+   l'ultimo che su questo dispositivo si e' APERTO (`vistoFino`, nel
+   cassetto), e si spegne aprendo la chat. A dirlo e' una domanda
+   leggera (`/api/p2p/chat/novita`) ogni mezzo minuto ad app in vista:
+   una per tutti gli scambi, che NON ritira niente e non dice al server
+   «sto guardando» — chi ha l'app aperta su un'altra pagina l'avviso
+   fuori dall'app lo riceve lo stesso. */
+function chatScNonLettoP2P(o){
+  if (!o || !chatScCeP2P(o)) return false;
+  /* SOLO DOVE LA CHAT SI PUO' APRIRE (dal giro dal vivo): su un
+     dispositivo che lo scambio lo puo' soltanto guardare — le chiavi
+     stanno altrove — la chat non si apre, quindi il pallino non si
+     spegnerebbe mai. La' non si accende. */
+  if (!chatScTradeP2P(o)) return false;
+  const c = chatScDiP2P(o.id);
+  return (p2pChatScUltimi[o.id] | 0) > ((c && c.vistoFino) | 0);
+}
+function chatScNonLettiP2P(){
+  const righe = ordiniP2P();
+  return Object.keys(righe).filter(id => chatScNonLettoP2P(righe[id])).length;
+}
+/* PURA (sul cassetto): il segno sulla card di «I miei scambi» */
+function chatScSegnoCardP2P(o){
+  return chatScNonLettoP2P(o)
+    ? '<div class="p2p-chat-nuovo"><span class="chatsc-pallino" aria-hidden="true"></span>'
+      + 'Nuovo messaggio nella chat</div>' : '';
+}
+/* il pallino e le card si rimettono in pari con quel che si sa adesso */
+function chatScSegnaP2P(){
+  if (typeof aggiornaPallinoScambiP2P === 'function') aggiornaPallinoScambiP2P();
+  if (typeof document !== 'undefined' && typeof renderP2P === 'function'
+      && vistaAttivaP2P() === 'view-p2pmiei') renderP2P();
+}
+/* la chat e' aperta davanti: quel che e' arrivato fin qui e' VISTO */
+function chatScVistoP2P(id){
+  const c = chatScDiP2P(id);
+  if (!c) return;
+  const prima = chatScNonLettiP2P();
+  if ((c.vistoFino | 0) < (c.cursore | 0)) { c.vistoFino = c.cursore | 0; chatScScriviP2P(id, c); }
+  if (chatScNonLettiP2P() !== prima) chatScSegnaP2P();
+}
+function chatScNovitaP2P(){
+  if (p2pChatScNovitaInVolo) return p2pChatScNovitaInVolo;
+  if ((typeof VETRINA !== 'undefined' && VETRINA) || (typeof DEMO !== 'undefined' && DEMO) || !myTgId
+      || !chatScAccesaP2P())
+    return Promise.resolve();
+  const righe = ordiniP2P();
+  const ids = Object.keys(righe)
+    .filter(id => chatScServeP2P(righe[id]) && chatScTradeP2P(righe[id])).slice(0, 30);
+  if (!ids.length) return Promise.resolve();
+  p2pChatScNovitaInVolo = chatScFetch('novita', {ordini: ids}).then(d => {
+    if (d.spenta) { chatScSpegniP2P(); return; }
+    const prima = ids.filter(id => chatScNonLettoP2P(ordiniP2P()[id])).join(',');
+    /* la parola del server e' quella che vale: uno scambio che non
+       nomina (la chat non e' aperta per me) torna a zero */
+    for (const id of ids) p2pChatScUltimi[id] = ((d.ultimi || {})[id]) | 0;
+    if (ids.filter(id => chatScNonLettoP2P(ordiniP2P()[id])).join(',') !== prima) chatScSegnaP2P();
+  }).catch(() => {}).finally(() => { p2pChatScNovitaInVolo = null; });
+  return p2pChatScNovitaInVolo;
 }
 
 /* ---- le chiavi ---- */
@@ -75348,7 +75471,7 @@ function chatScRitiraP2P(id){
   if ((typeof VETRINA !== 'undefined' && VETRINA) || (typeof DEMO !== 'undefined' && DEMO) || !myTgId)
     return Promise.resolve();
   const o0 = ordiniP2P()[id];
-  if (!chatScServeP2P(o0) || !chatScTradeP2P(o0)) return Promise.resolve();
+  if (!chatScAccesaP2P() || !chatScServeP2P(o0) || !chatScTradeP2P(o0)) return Promise.resolve();
   p2pChatScUltimoGiro[id] = Date.now();
   p2pChatScInVolo[id] = (async () => {
     await caricaNostrTools();
@@ -75358,6 +75481,9 @@ function chatScRitiraP2P(id){
     const tk = chatScTradeP2P(o);
     if (!chatScServeP2P(o) || !tk) return;
     const ieri = p2pChatScSapere[id] || {};
+    /* la leva e' stata spenta a pagina aperta: il riquadro se ne va,
+       il cassetto resta fino alla fine dello scambio */
+    if (d.spenta) { chatScSpegniP2P(); return; }
     if (!d.aperta) {
       /* FINITA: lo dice il server, che la fine la sa dal coordinatore.
          Chiave e messaggi se ne vanno adesso */
@@ -75378,7 +75504,17 @@ function chatScRitiraP2P(id){
     if (c0 && d.perso) { chatScButtaP2P(id); c0 = null; }
     const esito = chatScPosaP2P(o, tk, c0, d.buste, d.giro);
     chatScScriviP2P(id, esito.c);
+    /* l'ultimo messaggio dell'altra persona, per il pallino: lo dicono
+       le buste appena ritirate, prima ancora della domanda leggera */
+    for (const b of (d.buste || []))
+      if (b && b.tipo === 'msg' && !b.mia && (b.n | 0) > (p2pChatScUltimi[id] | 0)) p2pChatScUltimi[id] = b.n | 0;
     try { await chatScPresentaP2P(id, false); } catch(e) {}
+    /* LA CHAT E' APERTA DAVANTI: quel che e' arrivato e' visto, e il
+       pallino si spegne. Dietro un'altra pagina, o ad app nascosta, no */
+    if (p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine'
+        && (typeof document === 'undefined' || document.visibilityState === 'visible'))
+      chatScVistoP2P(id);
+    else chatScSegnaP2P();
     if (esito.nuovi) {
       haptic();
       if (!(p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine'))
@@ -75470,6 +75606,7 @@ async function chatScAiModeratoriP2P(id){
   let c = chatScDiP2P(id);
   const tk = chatScTradeP2P(o);
   if (!o || o.stato !== 'in_disputa' || !o.disputaMia || !tk) return;
+  if (!chatScAccesaP2P()) return;
   if (!c || !c.sk || !(c.loroTutte || []).length) return;
   const cosa = (c.loroTutte || []).map(l => l.pub).join(',');
   if (c.modDato && c.modTutti && Object.keys(c.modDato).every(m => c.modDato[m] === cosa)) {
@@ -75589,7 +75726,7 @@ function chatScListaP2P(o, c){
 /* PURA: il riquadro della chat nella pagina dello scambio. `sa` e'
    l'ultima parola del server su questa chat. */
 function chatScBloccoHTML(o, c, sa){
-  if (!chatScServeP2P(o) || (sa && sa.chiusa)) return '';
+  if (!chatScAccesaP2P() || !chatScServeP2P(o) || (sa && sa.chiusa)) return '';
   if (sa && sa.senzaAltro)
     return '<div class="trust-note"><span>💬</span><span>Con questa persona la chat non c\'è: '
       + 'non sta scambiando da Barattolo, o non si è fatta riconoscere.</span></div>';
@@ -75611,7 +75748,7 @@ function chatScBloccoHTML(o, c, sa){
    riscrive intera, e a chi sta scrivendo sparirebbe il campo da sotto
    le dita. */
 function bloccoChatScambioP2P(o){
-  if (!chatScServeP2P(o)) return '';
+  if (!chatScAccesaP2P() || !chatScServeP2P(o)) return '';
   if (typeof document !== 'undefined') {
     if (Date.now() - (p2pChatScUltimoGiro[o.id] || 0) > 2000)
       setTimeout(() => { chatScRitiraP2P(o.id); }, 0);
@@ -75657,11 +75794,14 @@ if (typeof document !== 'undefined' && document.addEventListener) {
   setInterval(() => {
     try { chatScPotaP2P(); } catch(e) {}
     if (document.visibilityState !== 'visible') return;
+    /* il pallino: una domanda ogni mezzo minuto, su qualunque pagina */
+    if (!(p2pChatScBattiti++ % CHATSC_NOVITA_OGNI)) chatScNovitaP2P();
     if (!p2pOrdineAperto || vistaAttivaP2P() !== 'view-p2pordine') return;
     chatScRitiraP2P(p2pOrdineAperto);
   }, CHATSC_POLSO_MS);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
+    chatScNovitaP2P();
     if (p2pOrdineAperto && vistaAttivaP2P() === 'view-p2pordine') chatScRitiraP2P(p2pOrdineAperto);
   });
 }
@@ -75904,8 +76044,15 @@ function aggiornaPallinoScambiP2P(){
           && typeof p2pArchivioRinfrescato !== 'undefined' && !p2pArchivioRinfrescato)
         n = p2pToccaServer;
     }
+    /* ...E I MESSAGGI NON LETTI DELLA CHAT (12 ott 2026, richiesta di
+       Andrea): lo stesso pallino si accende anche quando in uno scambio
+       c'e' un messaggio che non hai ancora aperto. Il conto di «tocca a
+       te» resta il suo (`n` torna com'era): sono due ragioni per lo
+       stesso segno. Col typeof, per la stessa ragione di qui sopra */
+    const chat = (!DEMO && !VETRINA && myTgId && typeof chatScNonLettiP2P === 'function')
+      ? chatScNonLettiP2P() : 0;
     document.querySelectorAll('.scambi-dot')
-      .forEach(d => d.classList.toggle('on', n > 0));
+      .forEach(d => d.classList.toggle('on', n > 0 || chat > 0));
   } catch(e) { }
   return n;
 }

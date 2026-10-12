@@ -58616,6 +58616,7 @@ def prove_ritocchi_prova_alan():
                      "_rinfresca_volti_foto_p2p", "_intesta_dal_canale_p2p"):
             exec(pezzo(nome), amb)
         amb["P2P_TEMPO_DI_CHI_PUBBLICA"] = False
+        amb["P2P_CHAT_SCAMBIO"] = True
         EV = lambda d: {"kind": 38383, "created_at": 1, "tags": [["d", d]]}
         # la fotografia ha GIA' l'ordine appena pubblicato (il giro subito e'
         # arrivato prima di /p2p/ordini), senza volto e senza autore: e' il
@@ -79385,6 +79386,7 @@ def prove_p2p_server():
              "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
+             "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              # i wallet il cui indirizzo non passa (10 ott 2026), in busta
@@ -79412,8 +79414,9 @@ def prove_p2p_server():
     # (10 ott 2026) DODICI: l'elenco dei wallet il cui indirizzo non passa;
     # (11 ott 2026) TREDICI: la cauzione sul metodo scelto, dietro la -bar7
     # (12 ott 2026) QUATTORDICI: il tempo di chi pubblica — pausa, badge, regole
-    prova("le chiavi sono quattordici e sono sempre quelle",
-          ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "cauzioneSulMetodo", "commissione",
+    # (12 ott 2026, sera) QUINDICI: la chat nello scambio, accesa di serie
+    prova("le chiavi sono quindici e sono sempre quelle",
+          ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "cauzioneSulMetodo", "chat", "commissione",
            "indirizziNo", "maxEuro", "maxEuroContanti", "minEuroBz", "mostro", "relay",
            "specchio", "tempoPubblica"],
           sorted(piena.keys()))
@@ -90357,7 +90360,8 @@ def _banco_eventi_p2p(eventi_attivi=True):
            "P2P_CAUZIONE": False, "_P2P_FOTO": {"info": None},
            # il tempo di chi pubblica (12 ott 2026): la leva SPENTA di
            # serie — «come ieri» —, e la prova che la vuole la accende
-           "P2P_TEMPO_DI_CHI_PUBBLICA": False, "sqlite3": sqlite3,
+           "P2P_TEMPO_DI_CHI_PUBBLICA": False, "P2P_CHAT_SCAMBIO": True,
+           "sqlite3": sqlite3,
            # il bottone del promemoria (10 ott 2026) porta alla pagina P2P
            "LINK_LIBRO_P2P": "https://barattolo.store/p2p"}
     # le costanti si prendono dal sorgente, non si ricopiano: una
@@ -91359,6 +91363,10 @@ function renderOrdineP2P(){}
 function renderModerazioneP2P(){}
 function nomeControparteP2P(o, ripiego){ return ripiego; }
 let p2pOrdineAperto = '';
+/* la busta delle leve, il pallino degli scambi e la lista: di cartone */
+let p2pLeve = null;
+let pallinoChiamato = 0; function aggiornaPallinoScambiP2P(){ pallinoChiamato++; }
+function renderP2P(){}
 /* I DISPOSITIVI: ognuno ha il suo conto, il suo mazzo, le sue righe e
    il SUO magazzino — e' la' che vive la chiave usa-e-getta, e un
    magazzino solo per tutti farebbe sembrare «ritrovata» una chiave che
@@ -91380,12 +91388,23 @@ function archivioModP2P(){ return ARCH; }
 /* ---- IL POSTINO DI CARTONE: le stesse rotte, in memoria. Il postino
    VERO gira in `collaudo_chat_scambio`; qui serve a vedere cosa il
    telefono gli manda, e a fargli fare il furbo ---- */
-const srv = {buste: [], n: 0, parti: {}, vivo: true, giro: 1, moderatori: [], chiamate: [], perso: false};
+const srv = {buste: [], n: 0, parti: {}, vivo: true, giro: 1, moderatori: [], chiamate: [], perso: false,
+             spenta: false};
 async function fetch(url, opz){
   const corpo = JSON.parse(opz.body);
   const io = myTgId;
   srv.chiamate.push({url, corpo: opz.body, metodo: opz.method});
   const rispondi = (codice, d) => ({ok: codice === 200, status: codice, json: async () => d});
+  /* il pallino: l'ultimo messaggio dell'ALTRA parte, senza segnare niente */
+  if (url.endsWith('/novita')) {
+    const ultimi = {};
+    for (const o of corpo.ordini) {
+      if ((srv.parti[o] || []).indexOf(io) < 0 || !srv.vivo) continue;
+      ultimi[o] = Math.max(0, ...srv.buste.filter(b => b.ordine === o && b.tipo === 'msg' && b.da !== io)
+        .map(b => b.n));
+    }
+    return rispondi(200, {ok: true, spenta: srv.spenta, ultimi: srv.spenta ? {} : ultimi});
+  }
   const parti = srv.parti[corpo.ordine] || [];
   if (url.endsWith('/p2p/moderazione/chat'))
     return rispondi(200, {ok: true,
@@ -91394,6 +91413,8 @@ async function fetch(url, opz){
       chiavi: srv.buste.filter(b => b.ordine === corpo.ordine && b.tipo === 'mod' && b.per === MOD.pub)
         .map(b => ({n: b.n, busta: b.busta}))});
   if (parti.indexOf(io) < 0) return rispondi(403, {detail: 'Non sei una delle due parti di questo scambio'});
+  if (srv.spenta) return rispondi(url.endsWith('/invia') ? 409 : 200,
+                                  {ok: true, aperta: false, spenta: true, giro: 0});
   if (!srv.vivo) return rispondi(url.endsWith('/invia') ? 409 : 200,
                                  {ok: true, aperta: false, finita: true, giro: srv.giro});
   if (url.endsWith('/leggi')) {
@@ -91465,6 +91486,43 @@ let rifiuto = '';
 su('a'); disp.a.magazzino[chiaveP2P(CHATSC_CHIAVE)] = disp.a.magazzino[chiaveP2P(CHATSC_CHIAVE)];
 try { await chatScInviaP2P('5a1e0000-c2c2-4a2b-9c3d-0000000000ff', 'a nessuno'); } catch(e) { rifiuto = e.message; }
 out.senzaChatNonParte = rifiuto;
+
+/* ===== 2b) il pallino dei messaggi non letti =====
+   (la memoria di sessione e' una sola per tutti i telefoni del banco:
+   si azzera a ogni cambio di telefono) */
+su('a'); p2pChatScUltimi = {}; p2pOrdineAperto = '';
+const cursorePrima = chatScDiP2P(ORD).cursore, chiamatePrima = srv.chiamate.length;
+await chatScNovitaP2P();
+out.novitaChiede = srv.chiamate.slice(chiamatePrima).map(c => c.url.split('/').pop() + ':' + c.corpo);
+out.nonLetto = [chatScNonLettoP2P(disp.a.ordini[ORD]), chatScNonLettiP2P(),
+                chatScSegnoCardP2P(disp.a.ordini[ORD]).indexOf('Nuovo messaggio nella chat') > 0,
+                pallinoChiamato > 0];
+out.novitaNonRitira = chatScDiP2P(ORD).cursore === cursorePrima;
+/* aprire la chat lo spegne */
+p2pOrdineAperto = ORD; await chatScRitiraP2P(ORD);
+out.apertaSiSpegne = [chatScNonLettoP2P(disp.a.ordini[ORD]), chatScSegnoCardP2P(disp.a.ordini[ORD]),
+                      chatScDiP2P(ORD).vistoFino === chatScDiP2P(ORD).cursore];
+/* un messaggio MIO non accende niente a me... */
+await chatScInviaP2P(ORD, 'Ti scrivo io'); p2pOrdineAperto = '';
+/* (la busta del MIO messaggio torna dal server al ritiro, dietro un'altra
+   pagina: non e' una cosa da leggere — e si guarda PRIMA della domanda
+   del pallino, che la parola del server la riscriverebbe) */
+await chatScRitiraP2P(ORD);
+out.ilMioDalRitiro = chatScNonLettoP2P(disp.a.ordini[ORD]);
+await chatScNovitaP2P();
+out.ilMioNonAccende = chatScNonLettoP2P(disp.a.ordini[ORD]);
+/* ...ma accende l'altra persona, che la chat non ce l'ha davanti */
+su('b'); p2pChatScUltimi = {}; await chatScNovitaP2P();
+out.accendeLAltro = chatScNonLettoP2P(disp.b.ordini[ORD]);
+p2pOrdineAperto = ORD; await chatScRitiraP2P(ORD); p2pOrdineAperto = '';
+out.poiSiSpegne = chatScNonLettoP2P(disp.b.ordini[ORD]);
+p2pChatScUltimi = {};
+/* le frasi del profilo: la chiusa dei recapiti diventa quella della chat */
+out.frasi = ['esterno', 'anonimo_prima', ''].map(m =>
+  chatScParlarviP2P(testoContropartePerMotivoP2P(m), true).endsWith(" Per parlarvi c'è la chat qui sotto."));
+out.frasiSenzaChat = ['esterno', 'anonimo_prima', ''].every(m =>
+  chatScParlarviP2P(testoContropartePerMotivoP2P(m), false) === testoContropartePerMotivoP2P(m)
+  && testoContropartePerMotivoP2P(m).endsWith(' Per parlarvi restano i recapiti qui sotto, cifrati fra voi due.'));
 
 /* ===== 3) il server vede buste e basta ===== */
 const tutto = JSON.stringify(srv.buste) + JSON.stringify(srv.chiamate);
@@ -91589,6 +91647,26 @@ const storto = chatPartiApriP2P(MOD, {compra: tkA.pub, vende: NT.getPublicKey(al
 out.partiSbagliateNiente = storto.msgs.length;
 out.riquadroMod = chatPartiModP2P({ordine: ORD}).indexOf('La chat fra le due parti') > 0;
 
+/* ===== 7b) la leva spenta ===== */
+su('a'); p2pChatScUltimi = {}; p2pChatScUltimi[ORD] = 999;
+out.levaAccesa = [chatScAccesaP2P(), chatScCeP2P(disp.a.ordini[ORD]), chatScNonLettoP2P(disp.a.ordini[ORD])];
+/* una riga che qui si puo' solo GUARDARE (le chiavi stanno su un altro
+   dispositivo): la chat non si apre, quindi il pallino non si accende */
+out.soloVistaNonAccende = chatScNonLettoP2P(Object.assign({}, disp.a.ordini[ORD], {soloVista: true}));
+p2pLeve = {chat: false};
+out.levaSpenta = [chatScAccesaP2P(), chatScCeP2P(disp.a.ordini[ORD]),
+                  chatScBloccoHTML(disp.a.ordini[ORD], chatScDiP2P(ORD), {}),
+                  chatScNonLettoP2P(disp.a.ordini[ORD])];
+const chiamatePrimaLeva = srv.chiamate.length;
+await chatScRitiraP2P(ORD); await chatScNovitaP2P(); p2pChatScModTentato = {}; await chatScAiModeratoriP2P(ORD);
+out.levaSpentaNonChiama = srv.chiamate.length - chiamatePrimaLeva;
+out.levaSpentaCassettoResta = !!chatScDiP2P(ORD).sk;
+p2pLeve = {chat: true}; p2pChatScUltimi = {};
+/* ...e se la spegne il server a pagina aperta, lo dice la rotta */
+srv.spenta = true; await chatScRitiraP2P(ORD);
+out.spentaDalServer = [chatScAccesaP2P(), !!chatScDiP2P(ORD).sk];
+srv.spenta = false; p2pChatScSpenta = false;
+
 /* ===== 8) il cassetto del server rinato ===== */
 srv.buste = []; srv.perso = true;
 ca = await giro('a');
@@ -91678,9 +91756,9 @@ def prove_chat_scambio():
            "sorgente = sqlite3.connect(f\"file:{DB}?mode=ro\", uri=True)" in open("deploy.sh", encoding="utf-8").read(),
            "*.db" in codice(open("deploy/backup-fuori.sh", encoding="utf-8").read()),
            "DB_CHAT" in open("deploy.sh", encoding="utf-8").read()))
-    prova("le rotte sono quattro, tutte POST col corpo: niente GET, niente dato nell'indirizzo",
-          (4, 0, 0),
-          (len(re.findall(r'@app\.post\("/api/p2p/(?:chat/(?:leggi|invia|moderatori)|moderazione/chat)"\)', src)),
+    prova("le rotte sono cinque, tutte POST col corpo: niente GET, niente dato nell'indirizzo",
+          (5, 0, 0),
+          (len(re.findall(r'@app\.post\("/api/p2p/(?:chat/(?:leggi|invia|moderatori|novita)|moderazione/chat)"\)', src)),
            len(re.findall(r'@app\.get\("/api/p2p/chat', src)),
            len(re.findall(r'/api/p2p/chat/[a-z]+[{?]', src))))
     avv = _senza_prosa(pezzo("_chat_p2p_avviso"))
@@ -91728,6 +91806,24 @@ def prove_chat_scambio():
     orol = orol[:orol.index("\n\n\n")]
     prova("...e la scopa ripassa a ogni battito pieno dell'orologio P2P", True,
           "await asyncio.wait_for(_giro_chat_p2p(), P2P_PASSATA_MAX_S)" in orol)
+    prova("LA LEVA: accesa di serie, e solo un False scritto la spegne", True,
+          "    P2P_CHAT_SCAMBIO = P2P_CHAT_SCAMBIO is not False\nexcept ImportError:\n"
+          "    P2P_CHAT_SCAMBIO = True\n" in blocco_srv)
+    prova("...dichiarata ACCESA nel config d'esempio", True,
+          "\nP2P_CHAT_SCAMBIO = True\n" in open("config_esempio.py", encoding="utf-8").read())
+    prova("...viaggia nella busta delle leve, e sta nel pannello «Stato delle leve»", (True, True),
+          ('"chat": bool(P2P_CHAT_SCAMBIO),' in pezzo("_p2p_leve"),
+           '_leva("Chat nello scambio P2P", "P2P_CHAT_SCAMBIO",' in pezzo("_leve_stato")))
+    chiede = pezzo("_chat_p2p_chiede")
+    prova("...spenta, nessuna rotta delle parti apre la chat: lo dice il loro inizio comune, "
+          "prima di guardare lo scambio", True,
+          0 <= chiede.find("if not P2P_CHAT_SCAMBIO:") < chiede.find("st = _chat_p2p_stato(con, ordine"))
+    prova("...ma la scopa NON guarda la leva: le buste che ci sono se ne vanno come sempre", False,
+          "P2P_CHAT_SCAMBIO" in pezzo("_chat_p2p_spazza") + pezzo("_giro_chat_p2p")
+          + pezzo("_chat_p2p_dopo_evento"))
+    prova("IL PALLINO non scrive niente: la sua domanda non ha un INSERT, un UPDATE ne' un DELETE",
+          [], [p for p in ("INSERT", "UPDATE", "DELETE")
+               if p in codice(_senza_prosa(pezzo("_chat_p2p_novita")))])
     prova("le parti e la fine le dice il giudice di tutti, non una regola nuova", True,
           "p = _parti_scambio_p2p(con, ordine)" in pezzo("_chat_p2p_stato")
           and 'if not p["vivo"]:' in pezzo("_chat_p2p_stato"))
@@ -91736,7 +91832,8 @@ def prove_chat_scambio():
     con, amb = _banco_eventi_p2p()
     for riga in re.findall(r"\n(P2P_CHAT_[A-Z_]+ = [^\n]+)", blocco_srv):
         exec(riga.split("  #")[0], amb)
-    for f in ("_chat_p2p_stato", "_chat_p2p_ritira", "_chat_p2p_posa", "_chat_p2p_avviso"):
+    for f in ("_chat_p2p_stato", "_chat_p2p_ritira", "_chat_p2p_posa", "_chat_p2p_avviso",
+              "_chat_p2p_novita"):
         exec(_senza_prosa(pezzo(f)), amb)
     stato, ritira = amb["_chat_p2p_stato"], amb["_chat_p2p_ritira"]
     posa, avviso = amb["_chat_p2p_posa"], amb["_chat_p2p_avviso"]
@@ -91825,6 +91922,15 @@ def prove_chat_scambio():
     tetto = avviso(cc, o, 1, A, 7, ORA + 700)
     prova("il tetto anti-abuso: oltre, non parte piu' niente e lo dice col ⛔",
           (0, True), (tetto[0], tetto[1].startswith("⛔ TETTO ANTI-ABUSO")))
+    # IL PALLINO DELL'APP: l'ultimo messaggio dell'altra parte, senza segnare niente
+    nov = amb["_chat_p2p_novita"]
+    letture_prima = [tuple(x) for x in cc.execute("SELECT * FROM letture ORDER BY ordine, tg_id")]
+    prova("IL PALLINO: a chi compra il numero dell'ultimo messaggio di chi vende; a chi vende, "
+          "che non ne ha ricevuti, zero", ({o: 7}, {o: 0}), (nov(con, cc, A, [o]), nov(con, cc, B, [o])))
+    prova("...senza spostare nessun segnalibro: non e' un ritiro, e non dice «sta guardando»",
+          letture_prima, [tuple(x) for x in cc.execute("SELECT * FROM letture ORDER BY ordine, tg_id")])
+    prova("...uno scambio di cui non si e' parte, o dove la chat non e' aperta, non compare",
+          ({}, {}), (nov(con, cc, X, [o]), nov(con, cc, B, [o2])))
     o3 = "c4a70000-0000-4000-8000-0000000000c3"
     nasce(o3)
     arriva(o3, "taken", "buyer", "invoice-next", ORA)
@@ -91870,10 +91976,11 @@ def prove_chat_scambio():
                            "campoInvia(", "campoScrivi(", "mazzoNuvola", "CloudStorage")
                if n in cod])
     chiamate = re.findall(r"chatScFetch\('([a-z]+)', \{([^}]*)\}", cod)
-    prova("AL SERVER VANNO SOLO BUSTE: le richieste portano l'ordine, il segnalibro, il tipo e la busta",
+    prova("AL SERVER VANNO SOLO BUSTE: le richieste portano l'ordine (o gli ordini), il segnalibro, il tipo e la busta",
           [("invia", "ordine: id, tipo: 'mod', per: m, busta: busta"), ("invia", "ordine: id, tipo: 'msg', busta: b.busta"),
            ("invia", "ordine: id, tipo: 'saluto', busta: c.saluto.busta"),
-           ("leggi", "ordine: id, dopo: (prima && prima.cursore) | 0"), ("moderatori", "ordine: id")],
+           ("leggi", "ordine: id, dopo: (prima && prima.cursore) | 0"), ("moderatori", "ordine: id"),
+           ("novita", "ordini: ids")],
           sorted((a, b.strip()) for a, b in chiamate))
     prova("...e nessuna porta una chiave segreta o un testo", [],
           [b for _, b in chiamate if re.search(r"\bsk\b|testo|\.msgs", b)])
@@ -91909,6 +92016,25 @@ def prove_chat_scambio():
     prova("NELLA PAGINA: sotto il profilo dell'altra persona, sopra i recapiti", True,
           0 <= ren.find("profiloControparteP2P(o)") < ren.find("bloccoChatScambioP2P(o)")
           < ren.find("campiOrdineP2P(o)"))
+    pall = pezzo_js(mini, "function aggiornaPallinoScambiP2P(", "\n}\n")
+    prova("IL PALLINO e' quello degli scambi, acceso anche dai messaggi non letti — e il conto "
+          "di «tocca a te» resta il suo", (True, True),
+          (".forEach(d => d.classList.toggle('on', n > 0 || chat > 0));" in pall,
+           "  return n;" in pall))
+    prova("...sulla card di «I miei scambi», sotto lo stato", True,
+          "chatScSegnoCardP2P(o)" in pezzo_js(mini, "function rigaScambioP2P(", "\n}\n"))
+    prova("...chiesto ogni mezzo minuto ad app in vista, su qualunque pagina", (True, True),
+          ("if (!(p2pChatScBattiti++ % CHATSC_NOVITA_OGNI)) chatScNovitaP2P();" in blocco,
+           "const CHATSC_NOVITA_OGNI = 6;" in blocco))
+    pc = pezzo_js(mini, "function profiloControparteP2P(", "\n}\n")
+    chiusa = re.search(r"const CHATSC_FRASE_RECAPITI = '([^']+)';", blocco).group(1)
+    prova("LE FRASI DEL PROFILO: con un'altra app restano i recapiti, anche a chat accesa", True,
+          "conChat && p2pContropartiMotivo[o.id] !== 'esterno')" in pc)
+    prova("...anche la nota di chi non ha canali pubblici passa dalla stessa porta", True,
+          "cifrati fra voi due.</div>', conChat)});" in pc)
+    prova("...e la chiusa che si cambia e' quella VERA, nelle tre frasi e nella nota", (True, True),
+          ("' Per parlarvi " + chiusa + "'" in pezzo_js(mini, "function testoContropartePerMotivoP2P(motivo){", "\n}\n"),
+           "parlarvi " + chiusa + "</div>'" in pc))
     serve = pezzo_js(mini, "function chatScServeP2P(", "\n}\n")
     prova("dalla presa (la controparte si conosce) alla fine, e non oltre", True,
           "o.peer && idMostroVero(o.id)" in serve and "P2P_FINALI.indexOf(o.stato) < 0" in serve
@@ -91976,6 +92102,8 @@ def prove_chat_scambio():
         return
     pezzi = (re.search(r"const MAZZO_INFO = [^\n]+", mini).group(0) + "\n"
              + pezzo_js(mini, "function chiaveScambio(", "\n}\n") + "\n}\n"
+             # le tre frasi del profilo, VERE: e' la loro chiusa che la chat cambia
+             + pezzo_js(mini, "function testoContropartePerMotivoP2P(motivo){", "\n}\n") + "\n}\n"
              + blocco)
     with _tf.TemporaryDirectory() as d:
         f = os.path.join(d, "chatsc.js")
@@ -92008,8 +92136,31 @@ def prove_chat_scambio():
           True, o["serverSenzaTesto"])
     prova("...NE' UNA CHIAVE: ne' le due usa-e-getta (segrete e pubbliche) ne' quelle dello scambio",
           True, o["serverSenzaChiavi"])
-    prova("...e riceve solo POST, con quattro forme di corpo e nessun dato nell'indirizzo",
-          (True, ["busta,ordine,tipo", "dopo,ordine"]), (o["soloPost"], o["corpi"]))
+    prova("...e riceve solo POST, con tre forme di corpo e nessun dato nell'indirizzo",
+          (True, ["busta,ordine,tipo", "dopo,ordine", "ordini"]), (o["soloPost"], o["corpi"]))
+    prova("IL PALLINO chiede gli ultimi numeri dei suoi scambi vivi, e basta",
+          ['novita:{"ordini":["5a1e0000-c2c2-4a2b-9c3d-000000000001"]}'], o["novitaChiede"])
+    prova("...un messaggio dell'altra persona non ancora aperto: acceso sulla card e sul pallino degli scambi",
+          [True, 1, True, True], o["nonLetto"])
+    prova("...e la domanda NON ritira niente: il segnalibro resta dov'era", True,
+          o["novitaNonRitira"])
+    prova("...APERTA LA CHAT SI SPEGNE, e quel che e' arrivato e' segnato come visto",
+          [False, "", True], o["apertaSiSpegne"])
+    prova("...un messaggio mio non accende il mio, accende quello dell'altra persona — che aprendo lo spegne",
+          (False, False, True, False),
+          (o["ilMioDalRitiro"], o["ilMioNonAccende"], o["accendeLAltro"], o["poiSiSpegne"]))
+    prova("LE FRASI DEL PROFILO: dove la chat c'e', la chiusa dei recapiti diventa «c'è la chat qui sotto»",
+          [True, True, True], o["frasi"])
+    prova("...e dove non c'e' restano com'erano, coi recapiti", True, o["frasiSenzaChat"])
+    prova("LA LEVA accesa (o non detta): la chat c'e'", [True, True, True], o["levaAccesa"])
+    prova("IL PALLINO NON SI ACCENDE DOVE LA CHAT NON SI PUO' APRIRE (lo scambio solo da guardare): "
+          "la' non si spegnerebbe mai", False, o["soloVistaNonAccende"])
+    prova("...SPENTA: niente riquadro, niente pallino, e la chat «non c'e'» per le frasi e per la disputa",
+          [False, False, "", False], o["levaSpenta"])
+    prova("...il telefono non chiama nemmeno il server, e chiave e messaggi restano nel cassetto fino alla fine",
+          (0, True), (o["levaSpentaNonChiama"], o["levaSpentaCassettoResta"]))
+    prova("...e se la spegne il server a pagina aperta, il telefono lo impara dalla rotta",
+          [False, True], o["spentaDalServer"])
     prova("la riga dello scambio resta com'era, e la chat ha un cassetto solo",
           (True, "barattolo_p2p_chat@222"), (o["rigaPulita"], o["unCassettoSolo"]))
     prova("IL RIQUADRO: l'avviso fisso, la riga del patto, il campo a 500",
@@ -92054,6 +92205,7 @@ def prove_chat_scambio():
     prova("IL MODERATORE LEGGE, e sa chi ha scritto cosa dalle firme",
           ([["vende", "Ciao, ti ho mandato il recapito"],
             ["compra", "Visto, faccio il bonifico: https://truffa.example.com/paga"],
+            ["vende", "Ti scrivo io"],
             ["vende", "Mi leggi dal telefono nuovo?"]], True),
           (o["modLegge"], o["modMuteEChiave"][1]))
     prova("...un altro moderatore, con un'altra chiave, non apre niente", [0, False],
@@ -108065,6 +108217,7 @@ def prove_avvisi_nuovi_ordini():
              "P2P_CONTANTI_MAX_EURO": 250, "BARATTOZON_MIN_EURO": 25, "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
+             "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              "P2P_INDIRIZZI_NON_PASSANO": {}}
     exec(_senza_prosa(pezzo("_p2p_leve")), amb_l)
@@ -130395,6 +130548,7 @@ def prove_contanti_a_mano():
              "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
+             "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              "P2P_INDIRIZZI_NON_PASSANO": {}}
@@ -140506,6 +140660,7 @@ def prove_indirizzo_non_verificato():
              "P2P_CONTANTI_MAX_EURO": 250, "BARATTOZON_MIN_EURO": 25, "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
+             "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              "P2P_INDIRIZZI_NON_PASSANO": elenco}
         exec(pezzo("_p2p_leve"), a)

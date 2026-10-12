@@ -31503,3 +31503,42 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   LE PROVE: `prove_chat_scambio` (le sentinelle e il banco node col
   bundle vero), `collaudo_chat_scambio` (in CI, nella gabbia). La
   procedura: PRODUZIONE, «LA CHAT NELLO SCAMBIO: IL FILE DELLE BUSTE».
+  LA LEVA (12 ott 2026, sera): `P2P_CHAT_SCAMBIO`, ACCESA di serie —
+  solo un False scritto la spegne —, dichiarata in `config_esempio.py`,
+  nel pannello «⚙️ Stato delle leve» (`_leve_stato`) e nella busta delle
+  leve (`_p2p_leve`, chiave `chat`: le chiavi sono quindici). Spenta,
+  `_chat_p2p_chiede` — l'inizio comune delle rotte delle parti —
+  risponde `perche: "spenta"` prima di guardare lo scambio: `leggi` e
+  `moderatori` dicono `{aperta: false, spenta: true}`, `invia` è un 409,
+  `novita` torna vuota con `spenta`. LA SCOPA NON GUARDA LA LEVA: le
+  buste che ci sono se ne vanno come sempre. Sul client
+  `chatScAccesaP2P` (la busta, o la parola di una rotta:
+  `chatScSpegniP2P`) spegne riquadro, ritiro e pallino; il cassetto
+  resta fino alla fine dello scambio. `chatScCeP2P(o)` è il giudice «in
+  questo scambio la chat c'è»: la leva, `chatScServeP2P`, e il server
+  che non ha detto né «finita» né «senza l'altra parte».
+  IL PALLINO DEI NON LETTI (12 ott 2026, sera): `POST
+  /api/p2p/chat/novita` `{ordini: [...]}` (al più
+  `P2P_CHAT_NOVITA_MAX`) → `{ultimi: {ordine: n}}`, il numero
+  dell'ultimo `msg` dell'ALTRA parte negli scambi di cui chi chiede è
+  una parte, a chat aperta (`_chat_p2p_novita`). Non scrive niente: non
+  sposta `letture` e non dice «sta guardando», quindi l'avviso fuori
+  dall'app parte lo stesso. Il client la chiede ogni
+  `CHATSC_NOVITA_OGNI` battiti del polso (30 s) ad app in vista
+  (`chatScNovitaP2P`), tiene la risposta in `p2pChatScUltimi` e la
+  confronta con `vistoFino` del cassetto (`chatScNonLettoP2P`), che
+  `chatScVistoP2P` porta al segnalibro quando la chat è aperta davanti.
+  Il segno: `chatScSegnoCardP2P` nella card di `rigaScambioP2P`, e lo
+  stesso `.scambi-dot` di «tocca a te» (`aggiornaPallinoScambiP2P`: `n`
+  torna com'era, il pallino si accende anche con `chat > 0`). NON si
+  accende dove la chat non si può aprire (la riga solo da guardare, o
+  senza il mazzo): là non si spegnerebbe mai. È per dispositivo: un
+  messaggio letto su un telefono resta «non letto» sull'altro finché
+  non lo si apre anche lì.
+  LE FRASI DEL PROFILO (12 ott 2026, sera): `chatScParlarviP2P(testo,
+  conChat)` cambia la chiusa «restano i recapiti qui sotto, cifrati fra
+  voi due.» in «c'è la chat qui sotto.». La chiama
+  `profiloControparteP2P`, con `chatScCeP2P(o)`, sulle tre frasi di
+  `testoContropartePerMotivoP2P` — mai col motivo `esterno`: con
+  un'altra app la chat non c'è, e restano i recapiti — e sulla nota di
+  chi non ha canali pubblici. Le frasi restano dove sono, intatte.

@@ -52829,3 +52829,77 @@ soli; `compileall`; i tre blocchi script della pagina compilano; lo
 scanner dei segreti sulle righe aggiunte, con le forme lette dal
 workflow e la controprova: zero. La voce era già scritta quando la
 suite è girata, tranne questo paragrafo.
+
+**LE TRE AGGIUNTE PRIMA DEL PUSH (12 ott 2026, sera, richieste di Andrea
+dopo aver letto il verbale — e il suo sì al push).** Tre cose che qui
+sopra stavano fra «cosa non si è fatto», e che quindi cambiano quel che
+quelle righe dicono: il punto 7 («niente leva») e l'elenco delle cose
+non fatte sono EMENDATI da questo paragrafo.
+1) LE DUE FRASI DEL PROFILO. «Per parlarvi restano i recapiti qui
+sotto, cifrati fra voi due» diventa «per parlarvi c'è la chat qui
+sotto» dove la chat c'è; con chi scambia da un'altra app (il motivo
+`esterno`) e a leva spenta resta la frase dei recapiti. NON ho
+riscritto le frasi di chi-e-l-altro: `chatScParlarviP2P` cambia la sola
+chiusa, e `profiloControparteP2P` la chiama sulle tre frasi e sulla
+nota. Così la firma di `testoContropartePerMotivoP2P` e le sue prove
+restano intatte, e una prova mia dice se un giorno la chiusa cambiasse
+là. I tasti Telegram/Nostr del profilo restano come sono (decisione).
+2) IL PALLINO DEI MESSAGGI NON LETTI, sulla card dello scambio e sul
+pallino di «I miei scambi» (lo stesso di «tocca a te»: il suo conto
+resta il suo). La domanda è nuova e leggera — `/api/p2p/chat/novita`,
+una per tutti gli scambi ogni mezzo minuto ad app in vista — e NON è un
+ritiro: non sposta nessun segnalibro e non dice al server «sto
+guardando», o chi ha l'app aperta su un'altra pagina perderebbe
+l'avviso su Telegram. Il «visto» sta nel cassetto del dispositivo
+(`vistoFino`), quindi è PER DISPOSITIVO: un messaggio letto su un
+telefono resta non letto sull'altro finché non lo si apre anche lì.
+3) LA LEVA `P2P_CHAT_SCAMBIO`, accesa di serie: nel config d'esempio,
+nella busta delle leve e nel pannello. Solo un False scritto spegne —
+una riga storta non deve togliere la chat a chi la sta usando. Spenta,
+il riquadro sparisce e il server non accetta né consegna buste; la
+scopa NON guarda la leva, e le buste che ci sono se ne vanno come
+sempre a scambio finito. Il moderatore di una disputa già presa
+continua a leggere quel che c'è.
+**QUEL CHE HANNO TROVATO I BANCHI, anche stavolta.** • IL GIRO DAL VIVO
+ha trovato un difetto vero del pallino: su un dispositivo che lo
+scambio lo può solo guardare (le chiavi stanno altrove) si accendeva e
+non si poteva più spegnere, perché lì la chat non si apre. Ora si
+accende solo dove la chat si può aprire. • La leva nuova nella busta
+faceva esplodere i banchi che eseguono `_p2p_leve` coi globali contati
+a mano: aggiunta nei sei posti, accanto a quella del tempo di chi
+pubblica, PRIMA di lanciare la suite (la lezione dell'11 ott). • La
+prova di casa che conta le chiavi della busta: quattordici → quindici,
+emendata con la sua nota. • E IL MIO BANCO AVEVA UN CASO IMPOSSIBILE:
+cercava la frase del profilo su un'identità di collaudo che ha il
+Telegram, e lì la frase non c'è proprio. Si guarda col profilo senza
+canali e coi tre motivi, con le funzioni vere della pagina.
+**LE PROVE DELLE AGGIUNTE.** `prove_chat_scambio` sale a 140 (la leva
+e il pallino sui giudici veri e nel banco node, le frasi con le tre
+frasi VERE del profilo); `collaudo_chat_scambio` a 94 (la domanda del
+pallino che non sposta i segnalibri e non ferma l'avviso, la leva
+spenta e riaccesa sulle rotte vere, la fine a leva spenta). Giro dal
+vivo in Chrome a 390 px: 8 controlli, tre scatti nuovi (11, 12, 13).
+La tortura corta sulle sole aggiunte (tredici mutazioni: quattro sul
+server, nove sul telefono): al primo giro dodici uccise e UNA VIVA —
+«un messaggio mio accende il mio pallino»: il banco lo guardava solo
+dopo la domanda del pallino, che la parola del server la riscrive. Ora
+si guarda anche al ritiro, e al secondo giro sono tredici su tredici,
+senza botti.
+
+**IL VERBALE DEL PUSH, SECONDO TEMPO: cosa è girato su quale albero.**
+Dopo il sì di Andrea main era corso una QUARTA volta (dieci commit
+fino a `6cf04a6`: il tempo di chi pubblica): rebase PRIMA di scrivere
+le aggiunte, un conflitto di sola coda in CANTIERI. SOPRA `6cf04a6`,
+con le tre aggiunte: la suite intera severa UNA volta, 22.971 passate
+e 2 fallite — il conto delle chiavi della busta (emendato a quindici)
+e una mia attesa vecchia, nel processo partito prima delle prove
+nuove. DOPO le due cure (quel conto, e il pallino dove la chat non si
+apre) sono girati: `prove_p2p_server` e `prove_chat_scambio` (449
+passate, 0 fallite; la sola `prove_chat_scambio` 140), i 68 collaudi
+del workflow nella gabbia in tre gruppi (68 verdi, col mio a 94), il
+giro dal vivo delle aggiunte (8 su 8), la tortura corta (13 su 13),
+`compileall`, i tre blocchi script della pagina, lo scanner dei
+segreti sulle righe aggiunte con la controprova. La suite INTERA
+sull'albero che si pusha la dice la CI: è la parola di Andrea («se
+main corre ancora, basta la CI»). La tortura lunga (39 su 39) e il
+giro dal vivo lungo (34 controlli) restano quelli del primo tempo.
