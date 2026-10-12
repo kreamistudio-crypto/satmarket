@@ -54999,3 +54999,168 @@ server; nel riquadro dell'appuntamento la frase e il bottone «Confermo,
 ci sono» stanno attaccati, senza respiro; un banco node che esplode fa
 UNA rossa e nasconde il resto della sua sezione (qui trenta prove
 dietro una).
+
+## L'ordine pubblicato dentro la pausa: la 🔔 che aspetta, il libro che dice il vero, l'avviso prima di pubblicare (notte fra il 12 e il 13 ott 2026, cantiere libro-vuoto, dal campo di Andrea)
+
+**IL CASO.** Alle 23:33 del 12 ott arriva la 🔔 «1 nuovo ordine nel libro
+P2P — vendita BTC da da 50,00 a 100,00 € via SEPA Instant, Revolut, 8%
+meno conveniente» (un utente vero). Nel libro, su due account diversi:
+«Filtro | 0 offerte», «Nessun ordine col tuo filtro. Ci sono 1 offerte,
+ma nessuna passa il filtro. Togli il filtro» — e il tocco non faceva
+niente.
+
+**LA CAUSA, trovata prima di scrivere una riga e confermata sul VPS.**
+Non un guasto dei deploy della sera: la pausa degli ordini (cantiere
+tempo-di-chi-pubblica, `5880109`, il pomeriggio) nasconde dal libro gli
+ordini di chi è in pausa, anche senza filtro, e lo fa dentro
+`passaFiltroP2P`. L'utente aveva salvato «ogni giorno 22:00-07:00» alle
+21:24:32 UTC dal foglio che pubblica, e pubblicato alle 21:24:44:
+DENTRO la sua pausa, pensando alle notti dopo. Tre buchi intorno a
+quella regola, tutti e tre di chi l'ha scritta senza pensare a questo
+giro: 1) la schermata vuota conosceva due vuoti («niente» e «il filtro»)
+e l'ordine in pausa cadeva nel secondo; 2) «Togli il filtro» azzerava
+un filtro già spento; 3) chi accoda la 🔔 non guardava la pausa. Più il
+«da da» (la cifra di un intervallo porta già il suo «da»). Toccava solo
+gli ordini non Barattozon di chi era in pausa in quel momento, per
+tutti tranne l'autore.
+
+**LE DECISIONI DI ANDREA.** La scelta A: l'ordine in pausa RESTA
+nascosto (la decisione del pomeriggio non si rovescia; scartata la B,
+la card visibile a tutti con «⏸ In pausa» e il tasto spento), ma senza
+bugie. E cinque punti: la 🔔 aspetta la fine della pausa; la schermata
+dice il vero; l'avviso prima di pubblicare coi due tasti; la grammatica;
+il collaudo.
+
+**COSA SI È FATTO.**
+1) LA 🔔 ASPETTA. `_ferme_nuovi_p2p` chiede al giudice unico
+(`_pause_p2p`) quali ordini in coda sono fermi adesso;
+`_scarica_nuovi_p2p` li lascia in coda — non li manda e non li consuma
+— e il timbro è diventato PER ORDINE. Alla fine della pausa l'ordine
+esce dai fermi e parte col primo giro, se è ancora nel libro; se è
+sparito si consuma come gli altri. Passando da `_pause_p2p` eredita le
+sue due regole senza riscriverle: Barattozon non si ferma, e a leva
+spenta non si ferma niente.
+2) I VUOTI SONO TRE, e li dice un giudice puro, `vuotoLibroP2P`:
+niente offerte; offerte che il filtro ferma; offerte il cui autore è in
+pausa — «C'è 1 offerta, ma chi l'ha pubblicata è in pausa fino a domani
+alle 07:00.» «Togli il filtro» c'è solo nel secondo, e solo se un
+filtro c'è. Le offerte in pausa NON si contano fra quelle del filtro:
+toglierlo non le farebbe comparire.
+3) L'AVVISO PRIMA DI PUBBLICARE. «⚡ Pubblica ordine» in pausa apre la
+domanda di casa: «Sei in pausa fino a domani alle 07:00: il tuo ordine
+non si vedrà fino ad allora», coi due tasti «Pubblica lo stesso» e
+«Togli la pausa per stanotte». Il foglio di conferma ha imparato una
+SECONDA azione (`altra`), e con lei «Annulla» non c'è: i tasti sono
+due, come chiesto, e si esce col gesto di sempre.
+4) «TOGLI LA PAUSA PER STANOTTE» NON BUTTA LE FASCE. Una colonna,
+`p2p_pause.salta_fino`: fino a quell'ora — la fine della pausa che era
+aperta — la pausa non vale; da domani sera è quella di sempre. Il
+giudice lo fa in una riga dentro `_fine_pausa_p2p`, quindi lo seguono
+tutti quelli che passano di lì (fotografia, volti, «posso prendere?»,
+la tutela della presa in pausa: chi ha tolto la pausa ha scelto di
+esserci, e una presa di stanotte gli conta).
+5) NEL FOGLIO DELLA PAUSA, sotto «Una volta sola» e sopra «Salva», una
+riga dice se quel che c'è SCRITTO vale adesso, e cambia sotto le dita:
+«⏸ Attiva adesso: i tuoi ordini escono dal libro fino a domani alle
+07:00.» / «Adesso non è attiva: i tuoi ordini si vedono.» Ha preso il
+posto del riquadro in cima, che diceva solo il salvato.
+6) «C'è 1 offerta» / «Ci sono N offerte», e «da da» → «da».
+
+**LE STRADE SCARTATE.**
+- NON ACCODARE la 🔔 di un ordine in pausa: alla fine della pausa non
+sarebbe più «nuovo» (il segnalibro è passato) e non si annuncerebbe
+mai. Si accoda come sempre e si TIENE.
+- CANCELLARE LA PAUSA per «togli per stanotte»: l'utente ha scritto le
+sue notti una volta, e «per stanotte» dice che domani le rivuole.
+- RISCRIVERE LE FASCE dal telefono saltando oggi: sette giorni su sette
+non si può dire «tutti tranne stanotte» senza una data.
+- UN TERZO TASTO «Annulla» nella domanda: Andrea ne ha chiesti due.
+- LA REGOLA DELLA PAUSA FUORI DA `passaFiltroP2P`: sarebbe stato più
+pulito (non è un filtro), ma dodici prove la pinzano lì, e a mentire
+non era lei: era chi raccontava il vuoto.
+- L'ORA DEL SECONDO TASTO FISSA: «per stanotte» a mezzogiorno, su una
+pausa 8-20, sarebbe stata una frase storta — di giorno dice «per
+adesso» (dalle 18 alle 6 «stanotte»). È una mia aggiunta al testo di
+Andrea, detta nel rapporto.
+
+**LE LEZIONI.**
+- UNA REGOLA CHE NASCONDE HA TRE VICINI: chi conta, chi racconta il
+vuoto, chi annuncia. Il cantiere del pomeriggio aveva provato il
+nascosto (la card non c'è, «posso prendere?» dice no) e nessuno dei
+tre. Chi aggiunge un motivo per non mostrare cerca per nome i posti
+dove si dice «non c'è niente» e dove si dice «c'è una cosa nuova».
+- «SALVA» CHE VALE GIÀ ADESSO VA DETTO PRIMA: una pausa «22-7» salvata
+alle 23 è una pausa di stanotte, e chi la scrive pensa a domani.
+- IL PRIMO GIRO DELLA SUITE SEMBRAVA FERMO e non lo era: l'uscita su
+file senza `-u` arriva a blocchi, e la coda restava la stessa riga per
+dieci minuti. `python -u`, sempre, quando si guarda un file che cresce.
+- UN HEREDOC HA MANGIATO UN `\n` dentro una stringa Python (la
+memoria lo diceva già): gli script col Write, non dalla shell.
+
+**PROVATO.** `prove_ordine_in_pausa` (sezione nuova, 42 prove: il «da
+da»; la coda vera su sqlite coi fermi, la fine della pausa, l'ordine
+sparito; il salto su sqlite, la tabella di ieri senza la colonna, la
+rotta; le sentinelle della pagina; in node, nel fuso di Roma, i tre
+vuoti, la fine della pausa nell'ora del telefono con la notte dell'ora
+solare, la riga del foglio, l'avviso, e il foglio di conferma VERO coi
+due tasti — compreso che la domanda dopo non eredita il secondo). Undici
+prove di ieri emendate dove pinzavano la forma di prima (i due vuoti,
+il conto dei gesti della domanda unica: ottantadue, i chiamanti del
+giudice «è mio»: otto, le fetch della pausa: tre, la forma vuota con
+`salta_fino`, il riquadro in cima al foglio, la chiamata e il timbro
+della coda). `collaudo_ordine_in_pausa` (nuovo, 44 passi, in CI nella
+gabbia): il caso con le sue ore — l'orologio del server fermo alle
+23:24:32 di Roma —, le rotte vere della pausa, dei volti e di «posso
+prendere?», il giro VERO degli avvisi, e i giudici veri della pagina in
+node sulle risposte del server: la pausa già aperta, l'ordine dodici
+secondi dopo, il libro di chi guarda e quello dell'autore, la 🔔 che
+non parte, non parte un quarto d'ora dopo, parte alle 07:00 con un «da»
+solo; l'ordine sparito nella notte; il salto con le fasce che restano e
+la sera dopo; la leva spenta.
+LA TORTURA, su una copia del repo intero: 28 mutazioni — la 🔔 che parte
+per l'ordine fermo, nessun ordine mai fermo, il timbro che prende anche
+le righe ferme, l'ordine sparito che non si consuma, il salto che non
+vale o che butta le fasce, la rotta che non conosce `salta`, il «da da»,
+le offerte in pausa contate fra quelle del filtro, «Togli il filtro» nel
+vuoto da pausa, «Ci sono 1 offerte», l'ora sbagliata, il fermo che manca
+o che ferma anche Barattozon, la pubblicazione a pausa non tolta, il
+secondo tasto e la seconda azione appesi alla domanda dopo, «Annulla»
+che resta, la fine della pausa sommando i secondi, la fascia di ieri
+sera, la catena, il salto ignorato dalla pagina, «per stanotte» a
+mezzogiorno, la riga che torna in cima — tutte prese. Alla prima
+passata UNA restava viva: la seconda azione appesa alla domanda dopo,
+perché la prova la ESEGUIVA prima di aprire la domanda dopo, e
+eseguirla la azzera da sola. Il caso vero è la domanda della pausa
+aperta e lasciata lì: adesso la prova fa quello. (E una, il «da da»,
+aveva l'ancora sbagliata nel banco: la stessa riga c'è quattro volte nel
+server. Rifatta con l'ancora giusta, presa.)
+IL GIRO DAL VIVO a 375×812 nel browser, sul server del worktree con un
+config di cartone tenuto fuori dal repo (dal config d'esempio, relay
+morto, LNbits su una porta chiusa), identità di collaudo 111: il libro
+con un ordine in pausa dice «0 offerte», «Nessun ordine da prendere
+adesso — C'è 1 offerta, ma chi l'ha pubblicata è in pausa fino alle
+07:00.», senza bottone e col filtro spento; il foglio della pausa con
+«Ogni giorno 22–7» composta dopo mezzanotte dice «⏸ Attiva adesso: i
+tuoi ordini escono dal libro fino alle 07:00.» sopra «Salva»; salvata
+sul server vero, il fermo apre «Pubblichi durante la pausa?» coi due
+tasti e senza «Annulla»; il tocco vero su «Togli la pausa per stanotte»
+arriva al server (`fino` 0, la fascia ancora lì, `salta_fino` acceso),
+la riga di stato torna «⏸ Pausa: notti 22-7» e il foglio dice «Tolta
+fino alle 07:00: adesso i tuoi ordini si vedono.» L'ordine nel libro e
+la mappa delle pause sono stati MESSI A MANO nella pagina (col relay
+morto il libro non arriva), e il fermo è stato chiamato senza passare
+dal foglio «Pubblica» compilato: il gesto intero col coordinatore non è
+girato dal vivo — lo tengono la sentinella sul punto d'innesto e il
+banco node.
+
+**NON PROVATO.** Nessun telefono vero, né dentro Telegram. Il gesto
+«⚡ Pubblica ordine» → domanda → pubblicazione con un coordinatore (né
+vero né di cartone). La 🔔 su Telegram vero alla fine di una pausa vera.
+`zoneinfo` sul VPS con un fuso fuori dall'Europa.
+
+**DA GUARDARE.** 1) Sul telefono: una pausa attiva, «+», un ordine SEPA,
+«⚡ Pubblica ordine» → la domanda coi due tasti; «Togli la pausa per
+stanotte» → l'ordine nel libro dell'altro account entro un minuto, e la
+sua 🔔. 2) L'ordine `fa17a63d` del caso: la sua 🔔 è GIÀ partita la sera
+del 12, quindi alle 07:00 non ne parte un'altra (la riga è timbrata).
+3) Il titolo «Nessun ordine da prendere adesso» a 375 va su due righe.

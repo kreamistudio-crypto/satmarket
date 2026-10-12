@@ -6243,13 +6243,20 @@ def init_db():
         -- ⚠️ VALE DENTRO BARATTOLO: per il coordinatore l'ordine resta
         -- `pending`, e un'altra app Mostro lo vede e lo prende. Niente
         -- di qui esce verso i relay.
+        -- `salta_fino` (12 ott 2026, notte, cantiere libro-vuoto): «togli
+        -- la pausa per stanotte». Fino a quell'epoch la pausa NON VALE,
+        -- e le fasce restano scritte: da domani sera e' quella di
+        -- sempre. La scrive `_salta_pausa_p2p`, ed e' la fine della
+        -- pausa che era aperta in quel momento; salvare una pausa nuova
+        -- la riporta a 0.
         tg_id INTEGER PRIMARY KEY,
         fasce TEXT NOT NULL DEFAULT '[]',
         fuso TEXT DEFAULT '',
         scarto INTEGER DEFAULT 0,
         una_da INTEGER DEFAULT 0,
         una_fino INTEGER DEFAULT 0,
-        aggiornato INTEGER DEFAULT 0
+        aggiornato INTEGER DEFAULT 0,
+        salta_fino INTEGER DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS p2p_semi(
         -- IL SALE DEL PROFILO DI SCAMBIO (set 2026): la chiave
@@ -7504,6 +7511,12 @@ def init_db():
     # consolidamento le riempie da solo dove la cronaca c'e' ancora
     try:
         con.execute("ALTER TABLE p2p_conti ADD COLUMN garanzia INTEGER DEFAULT -1")
+    except sqlite3.OperationalError:
+        pass
+    # «togli la pausa per stanotte» (12 ott 2026, notte, cantiere
+    # libro-vuoto): vedi lo schema di `p2p_pause`
+    try:
+        con.execute("ALTER TABLE p2p_pause ADD COLUMN salta_fino INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
     # (le quattro colonne del gate e dell'eco su `chiavi_p2p` non si
@@ -46805,8 +46818,12 @@ def _fine_pausa_p2p(pausa, adesso: int) -> int:
     (o ne e' gia' aperta) un'altra, la fine e' quella dell'ultima — «in
     pausa fino alle 6:00» deve dire quando gli ordini tornano davvero.
     Oltre P2P_PAUSA_CATENA_MAX anelli si ferma: chi ha coperto tutta la
-    settimana e' in pausa e basta, e la data e' solo un «non prima di»."""
+    settimana e' in pausa e basta, e la data e' solo un «non prima di».
+    `salta_fino` (12 ott 2026, notte, cantiere libro-vuoto): fino a
+    quell'ora la pausa non vale — «togli la pausa per stanotte»."""
     if not pausa:
+        return 0
+    if int(adesso) < int(pausa.get("salta_fino") or 0):
         return 0
 
     def scarto_di(e):
@@ -46837,6 +46854,15 @@ def _pausa_p2p(con, tg_id):
         return None
     if not r:
         return None
+    # `salta_fino` si legge A PARTE (12 ott 2026, notte, cantiere
+    # libro-vuoto): su una tabella di ieri senza la colonna la pausa
+    # resta quella che e', e non «nessuna pausa»
+    try:
+        s = con.execute("SELECT salta_fino FROM p2p_pause WHERE tg_id=?",
+                        (int(tg_id or 0),)).fetchone()
+        salta = int((s and s[0]) or 0)
+    except sqlite3.OperationalError:
+        salta = 0
     try:
         fasce = json.loads(r[0] or "[]")
         fasce = [f for f in fasce if isinstance(f, dict)
@@ -46845,14 +46871,43 @@ def _pausa_p2p(con, tg_id):
         fasce = []
     return {"fasce": fasce, "fuso": r[1] or "", "scarto": int(r[2] or 0),
             "una_da": int(r[3] or 0), "una_fino": int(r[4] or 0),
-            "aggiornato": int(r[5] or 0)}
+            "aggiornato": int(r[5] or 0), "salta_fino": salta}
+
+
+def _salta_pausa_p2p(con, tg_id, adesso: int) -> dict:
+    """«TOGLI LA PAUSA PER STANOTTE» (12 ott 2026, notte, cantiere
+    libro-vuoto, richiesta di Andrea dopo il caso dal vivo: una pausa
+    «ogni giorno 22-7» salvata alle 23:24, un ordine pubblicato dodici
+    secondi dopo, e nessuno che lo vedeva). Se chi chiede e' in pausa
+    ADESSO, la pausa non vale fino alla sua fine (`salta_fino`): gli
+    ordini tornano nel libro subito, e LE FASCE RESTANO — da domani sera
+    e' la pausa di sempre. La pausa una tantum che finisce dentro quel
+    tratto se ne va: era proprio lei. Chi non e' in pausa non scrive
+    niente. Torna quel che `_mia_pausa_p2p` direbbe subito dopo. Pura
+    sulla connessione; COMMITTA."""
+    tg = int(tg_id or 0)
+    p = _pausa_p2p(con, tg)
+    fine = _fine_pausa_p2p(p, adesso) if p else 0
+    if fine:
+        con.execute("UPDATE p2p_pause SET salta_fino=? WHERE tg_id=?", (int(fine), tg))
+        con.execute("UPDATE p2p_pause SET una_da=0, una_fino=0 "
+                    "WHERE tg_id=? AND una_fino<=?", (tg, int(fine)))
+        # ...e se non resta niente la riga se ne va: «nessuna pausa» non
+        # lascia niente in tabella (la regola di `_scrivi_pausa_p2p`)
+        resta = _pausa_p2p(con, tg)
+        if resta and not resta["fasce"] and not resta["una_fino"]:
+            con.execute("DELETE FROM p2p_pause WHERE tg_id=?", (tg,))
+        con.commit()
+    return _mia_pausa_p2p(con, tg, adesso)
 
 
 def _scrivi_pausa_p2p(con, tg_id, pausa: dict, adesso: int) -> dict:
     """Scrive la pausa di una persona (gia' pulita: `_pausa_pulita_p2p`)
     e torna quel che `_mia_pausa_p2p` direbbe subito dopo. Una pausa senza
     fasce e senza una tantum TOGLIE la riga: «nessuna pausa» non lascia
-    niente in tabella. Pura sulla connessione; COMMITTA."""
+    niente in tabella. Pura sulla connessione; COMMITTA. La riga si
+    RISCRIVE intera, quindi `salta_fino` torna a 0: una pausa salvata
+    adesso e' un'intenzione nuova."""
     tg = int(tg_id or 0)
     if not pausa["fasce"] and not pausa["una_fino"]:
         con.execute("DELETE FROM p2p_pause WHERE tg_id=?", (tg,))
@@ -46874,9 +46929,12 @@ def _mia_pausa_p2p(con, tg_id, adesso: int) -> dict:
     p = _pausa_p2p(con, tg_id) or {"fasce": [], "fuso": "", "scarto": 0,
                                     "una_da": 0, "una_fino": 0, "aggiornato": 0}
     viva = int(p["una_fino"]) > int(adesso)
+    salta = int(p.get("salta_fino") or 0)
     return {"fasce": p["fasce"], "fuso": p["fuso"],
             "una_da": int(p["una_da"]) if viva else 0,
             "una_fino": int(p["una_fino"]) if viva else 0,
+            # la pausa tolta «per stanotte»: fino a quando non vale (0 = vale)
+            "salta_fino": salta if salta > int(adesso) else 0,
             "fino": _fine_pausa_p2p(p, adesso),
             "massimo_fasce": P2P_PAUSA_FASCE_MAX,
             "massimo_giorni": P2P_PAUSA_UNA_MAX_S // 86400}
@@ -48749,7 +48807,13 @@ async def scrivi_pausa_p2p(req: Request, x_tg_init_data: str = Header(""),
     adesso = int(time.time())
     con = db()
     try:
-        fuori = _scrivi_pausa_p2p(con, user["id"], _pausa_pulita_p2p(d, adesso), adesso)
+        # «TOGLI LA PAUSA PER STANOTTE» (12 ott 2026, notte, cantiere
+        # libro-vuoto): `{"salta": true}` e nient'altro non riscrive le
+        # fasce — le tiene, e salta solo la pausa aperta adesso
+        if isinstance(d, dict) and d.get("salta") is True:
+            fuori = _salta_pausa_p2p(con, user["id"], adesso)
+        else:
+            fuori = _scrivi_pausa_p2p(con, user["id"], _pausa_pulita_p2p(d, adesso), adesso)
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -54089,7 +54153,11 @@ def _testo_avviso_nuovi_p2p(righe: list) -> str:
     if noti:
         m = max(noti, key=lambda r: float(r["conv"]))
         cosa = NOMI_TIPI_AVVISI_NUOVI_P2P.get(m.get("tipo"), "ordine")
-        cifra = f" da {m['euro']}" if m.get("euro") else ""
+        # «DA DA 50,00» (12 ott 2026, notte, cantiere libro-vuoto): la cifra
+        # di un intervallo porta gia' il suo «da» («da 50,00 a 100,00 €»,
+        # `_euro_libro`), e la frase gliene metteva davanti un altro
+        euro = str(m.get("euro") or "")
+        cifra = "" if not euro else f" {euro}" if euro.startswith("da ") else f" da {euro}"
         via = f" via {html.escape(str(m['metodi']))}" if m.get("metodi") else ""
         testo += (f"\n{'Il più conveniente per te' if n > 1 else 'Per te'}: "
                   f"{cosa}{cifra}{via}, {_frase_convenienza_p2p(m['conv'])}")
@@ -54170,14 +54238,46 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
     return scritte
 
 
-def _scarica_nuovi_p2p(con, adesso: int, vivi) -> list:
+def _ferme_nuovi_p2p(con, adesso: int, vivi) -> set:
+    """GLI ORDINI IN CODA CHE ADESSO NON SI ANNUNCIANO (12 ott 2026,
+    notte, cantiere libro-vuoto): quelli ancora nel libro il cui autore
+    e' in pausa. IL CASO: la 🔔 «1 nuovo ordine nel libro P2P» arrivata a
+    tutti per un ordine pubblicato dentro la pausa del suo autore, che
+    nel libro di Barattolo non si vedeva e da qui non si prendeva. Il
+    giudice e' quello di sempre, `_pause_p2p` — quindi gli ordini
+    Barattozon non si fermano mai (in pausa restano nel libro), e a leva
+    spenta non si ferma niente. A pezzi di MAX_ORDINI_P2P; un id in una
+    forma che non conosce non e' di nessuno dei nostri, e non si ferma.
+    Pura sulla connessione."""
+    try:
+        righe = con.execute("SELECT DISTINCT ordine FROM p2p_avvisi_nuovi "
+                            "WHERE mandato=0").fetchall()
+    except sqlite3.OperationalError:
+        return set()
+    ids = [r[0] for r in righe if r[0] in vivi and FORMA_ORDINE_P2P.fullmatch(str(r[0]))]
+    ferme = set()
+    for k in range(0, len(ids), MAX_ORDINI_P2P):
+        try:
+            ferme.update(_pause_p2p(con, ids[k:k + MAX_ORDINI_P2P], adesso))
+        except ValueError:
+            continue
+    return ferme
+
+
+def _scarica_nuovi_p2p(con, adesso: int, vivi, ferme=None) -> list:
     """La regola 2: per ogni persona con righe in coda, se dall'ultimo
     messaggio sono passati P2P_AVVISI_NUOVI_MINUTI (o non ce n'e' mai
     stato uno) si compone UN messaggio con le righe i cui ordini sono
     ANCORA nel libro (`vivi`: gli id della fotografia), e le righe si
     timbrano PRIMA dell'invio col patto di sempre. Le righe di ordini
     gia' spariti, e quelle di chi ha spento nel frattempo, si consumano
-    senza messaggio. Torna [(tg_id, testo, riga di journal)]. Committa."""
+    senza messaggio. Torna [(tg_id, testo, riga di journal)]. Committa.
+    LE RIGHE FERME RESTANO IN CODA (12 ott 2026, notte, cantiere
+    libro-vuoto): un ordine il cui autore e' in pausa (`ferme`, da
+    `_ferme_nuovi_p2p`) non si annuncia e non si consuma. Alla fine
+    della pausa esce da `ferme` e parte col primo giro, se e' ancora nel
+    libro; se intanto e' sparito si consuma come gli altri."""
+    ferme = ferme or set()
     finestra = int(P2P_AVVISI_NUOVI_MINUTI) * 60
     con.execute("UPDATE p2p_avvisi_nuovi SET mandato=1 WHERE mandato=0 AND tg_id IN "
                 "(SELECT tg_id FROM utenti WHERE avvisi_nuovi_p2p=0)")
@@ -54196,13 +54296,18 @@ def _scarica_nuovi_p2p(con, adesso: int, vivi) -> list:
         righe = con.execute(
             "SELECT ordine, tipo, conv, euro, metodi FROM p2p_avvisi_nuovi "
             "WHERE tg_id=? AND mandato=0 ORDER BY quando, ordine", (tg,)).fetchall()
-        vive = [dict(r) for r in righe if r["ordine"] in vivi]
+        # gli ordini spariti si consumano; quelli FERMI per la pausa del
+        # loro autore restano in coda, e a questo giro non contano
+        con.executemany(
+            "UPDATE p2p_avvisi_nuovi SET mandato=1 WHERE tg_id=? AND ordine=? AND mandato=0",
+            [(tg, r["ordine"]) for r in righe if r["ordine"] not in vivi])
+        vive = [dict(r) for r in righe
+                if r["ordine"] in vivi and r["ordine"] not in ferme]
         if not vive:
-            con.execute("UPDATE p2p_avvisi_nuovi SET mandato=1 WHERE tg_id=? AND mandato=0",
-                        (tg,))
             continue
-        con.execute("UPDATE p2p_avvisi_nuovi SET mandato=? WHERE tg_id=? AND mandato=0",
-                    (adesso, tg))
+        con.executemany(
+            "UPDATE p2p_avvisi_nuovi SET mandato=? WHERE tg_id=? AND ordine=? AND mandato=0",
+            [(adesso, tg, r["ordine"]) for r in vive])
         fuori.append((tg, _testo_avviso_nuovi_p2p(vive),
                       f"🔔 Nuovi ordini P2P: {len(vive)} a {tg}"))
     con.execute("DELETE FROM p2p_avvisi_nuovi WHERE accodato < ?",
@@ -54248,7 +54353,9 @@ async def _giro_avvisi_nuovi_p2p():
     con = db()
     try:
         accodati = _accoda_nuovi_p2p(con, nuovi, cambio, adesso)
-        avvisi = _scarica_nuovi_p2p(con, adesso, vivi)
+        # chi ha pubblicato in pausa: il suo ordine aspetta in coda
+        ferme = _ferme_nuovi_p2p(con, adesso, vivi)
+        avvisi = _scarica_nuovi_p2p(con, adesso, vivi, ferme)
     finally:
         con.close()
     # il segnalibro: il created_at piu' nuovo che la fotografia conosce,

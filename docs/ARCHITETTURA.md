@@ -27962,7 +27962,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   piu' conveniente per lei col giudice della card
   `_convenienza_nuovo_p2p`, il link a `/p2p`), timbrando le righe PRIMA
   dell'invio; un ordine sparito dal libro nel frattempo non si
-  annuncia. Il canale lo sceglie `notifica()`. L'ANTEPRIMA DI QUEL
+  annuncia. E UN ORDINE IL CUI AUTORE E' IN PAUSA ASPETTA IN CODA (13
+  ott 2026, cantiere `libro-vuoto`): `_ferme_nuovi_p2p` chiede a
+  `_pause_p2p` quali ordini della coda sono fermi adesso,
+  `_scarica_nuovi_p2p(con, adesso, vivi, ferme)` non li manda e non li
+  consuma, e il timbro e' PER ORDINE — alla fine della pausa partono col
+  primo giro. Il canale lo sceglie `notifica()`. L'ANTEPRIMA DI QUEL
   LINK E' IN MINIATURA (9 ott 2026): `_manda_telegram` riconosce il
   messaggio dall'href `LINK_LIBRO_P2P` e chiede `link_preview_options`
   con l'url ESPLICITO (senza, l'API Bot ignora la misura) e
@@ -31052,6 +31057,35 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   volti e per «posso prendere?»; la pagina non ne ha una sua, la dice e
   basta (`P2P_PAUSA_BARATTOZON`). `_presa_in_pausa_p2p` NON è cambiata:
   la tutela della presa arrivata in pausa resta di ogni ordine.
+  • L'ORDINE PUBBLICATO DENTRO LA PAUSA (13 ott 2026, cantiere
+  `libro-vuoto`, dal campo: una pausa «ogni giorno 22-7» salvata alle
+  23:24 e un ordine pubblicato dodici secondi dopo, che nessuno vedeva
+  mentre la 🔔 lo annunciava a tutti). QUATTRO PEZZI. 1) LA 🔔 ASPETTA:
+  vedi gli avvisi dei nuovi ordini (`_ferme_nuovi_p2p`). 2) IL LIBRO
+  VUOTO HA TRE VUOTI, e li dice un giudice puro della pagina,
+  `vuotoLibroP2P(vivi, filtro, lato, adesso)` → `{logo, titolo, frase,
+  togli}`: niente offerte; offerte che il filtro ferma (`togli` vero:
+  è l'unico caso in cui «Togli il filtro» compare); offerte il cui
+  autore è in pausa (la frase dice fino a quando, nessun bottone). Le
+  offerte in pausa non si contano fra quelle del filtro. 3) «TOGLI LA
+  PAUSA PER STANOTTE»: colonna `p2p_pause.salta_fino` (migrata
+  all'avvio), scritta da `_salta_pausa_p2p` con la fine della pausa
+  aperta in quel momento; `_fine_pausa_p2p` torna 0 finché l'ora è
+  prima di lei, quindi fotografia, volti, «posso prendere?» e la tutela
+  della presa in pausa la seguono senza saperlo. Le fasce restano; la
+  una tantum che finisce in quel tratto se ne va; salvare una pausa la
+  riporta a 0. La rotta è la stessa, `POST /api/p2p/pausa` col corpo
+  `{"salta": true}`; `GET` la rende come `salta_fino`. 4) L'AVVISO
+  PRIMA DI PUBBLICARE: `inviaNuovoOrdineP2P` passa da
+  `fermaPerPausaP2P` (dal `typeof`, non per Barattozon), che chiede a
+  `finoMiaPausaP2P` — la parola del server, e se la lettura è vecchia
+  le proprie fasce contro l'orologio del telefono (`finePausaLocaleP2P`,
+  il calco di `_fine_pausa_p2p`) — e apre la domanda di casa con DUE
+  azioni: `chiediConferma` ha imparato `altra: {etichetta, poi}` (il
+  bottone `#confAltra`, nascosto di serie; con lei «Annulla» non c'è;
+  la esegue `eseguiConfermaAltra`). Nel foglio della pausa
+  `rigaAdessoPausaP2P` dice se quel che c'è SCRITTO vale adesso, sotto
+  «Una volta sola» e sopra «Salva».
   • IL SELETTORE DI CASA E IL FOGLIO LEGGERO DELLA PAUSA (12 ott 2026,
   notte, cantiere `pausa-leggera`, richiesta di Andrea dal telefono: il
   foglio aveva troppo testo, e «Una volta sola» apriva il selettore

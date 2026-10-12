@@ -13792,6 +13792,12 @@ document.getElementById('cartello')?.remove();</script>
          ripensamento qui sparisce, che due bottoni per lo stesso
          niente sono un bivio senza risposta giusta. Un modo del foglio
          che c'e', non un quarto foglio: e' il patto di questa sezione. -->
+    <!-- LA SECONDA STRADA (12 ott 2026, notte, cantiere libro-vuoto):
+         nascosta di serie, compare solo a chi la chiede (`altra` in
+         chiediConferma) — «Pubblica lo stesso» / «Togli la pausa per
+         stanotte». Con lei «Annulla» non c'e': i tasti restano due, e
+         si esce col gesto di sempre. -->
+    <button class="btn ghost" id="confAltra" style="display:none" onclick="eseguiConfermaAltra(this)"></button>
     <button class="btn ghost" id="confNo" onclick="navIndietro()">Annulla</button>
   </div>
 
@@ -32819,6 +32825,7 @@ async function inviaRisposta(id, azione, importo){
    stare. Il corpo si scrive con textContent, quindi il testo va NUDO:
    niente HTML da ricordarsi di scappare. */
 let confermaAzione = null;
+let confermaAltra = null;     // la seconda strada, quando c'e' (vedi `altra`)
 function chiediConferma(c){
   haptic();
   /* Con `avviso` non c'e' niente da eseguire: l'azione e' un niente
@@ -32843,6 +32850,17 @@ function chiediConferma(c){
      di sempre, che e' la guardia (vedi prove_onion) */
   if (c.vestito === 'bz') ok.insertAdjacentHTML('afterbegin', LOGO_BZ_HTML);
   el('confNo').style.display = c.avviso ? 'none' : '';
+  /* LA SECONDA STRADA (12 ott 2026, notte, cantiere libro-vuoto): chi
+     passa `altra: {etichetta, poi}` ha DUE azioni vere e nessun
+     «Annulla». Il foglio e' uno per tutti, quindi a ogni apertura il
+     bottone si rimette com'era: nascosto, e senza azione. */
+  confermaAltra = (c.altra && c.altra.poi) || null;
+  const altra = el('confAltra');
+  if (altra) {
+    altra.textContent = c.altra ? (c.altra.etichetta || '') : '';
+    altra.style.display = c.altra ? '' : 'none';
+  }
+  if (c.altra) el('confNo').style.display = 'none';
   /* IL NOME DEL RIPENSAMENTO (27 set 2026): di serie «Annulla», e chi
      chiede di ANNULLARE qualcosa lo chiama «Indietro» — sotto «Sì,
      annulla» due «annulla» erano due strade con lo stesso nome */
@@ -32875,6 +32893,20 @@ async function eseguiConferma(btn){
      e cio' che l'azione ha da dire lo dice col toast. Chiusura MIRATA
      e mai closeSheet — il pollTimer non e' roba di questo foglio, ma
      la regola vale per tutti. */
+  el('confermaSheet').classList.remove('open');
+  if (!document.querySelector('.sheet.open'))
+    el('sheetBg').classList.remove('open');
+  const ripristina = bottoneInAttesa(btn, '…');
+  try { await poi(); }
+  finally { ripristina(); }
+}
+/* la seconda strada del foglio: la gemella di `eseguiConferma`, con
+   l'altra azione. Chiude prima di agire, come lei. */
+async function eseguiConfermaAltra(btn){
+  haptic();
+  const poi = confermaAltra; if (!poi) return;
+  confermaAzione = null;
+  confermaAltra = null;
   el('confermaSheet').classList.remove('open');
   if (!document.querySelector('.sheet.open'))
     el('sheetBg').classList.remove('open');
@@ -51313,6 +51345,44 @@ function passaRepP2P(f, faccia){
   if (!voti || !(media > 0)) return f.repDa <= vuoto.repDa;
   return !(media < f.repDa || media > f.repA);
 }
+/* LO STATO VUOTO DEL LIBRO DICE QUALE VUOTO E' (12 ott 2026, notte,
+   cantiere libro-vuoto, dal campo di Andrea). I vuoti erano due — «non
+   c'e' niente» e «il tuo filtro non lascia passare niente» — e la pausa
+   di chi pubblica ne ha portato un TERZO che nessuno aveva nominato: le
+   offerte ci sono, ma chi le ha pubblicate e' in pausa. Finiva nel
+   secondo: «Ci sono 1 offerte, ma nessuna passa il filtro», a filtro
+   spento, con un «Togli il filtro» che azzerava il niente.
+   PURA sul libro che le si passa (`vivi`: le offerte del lato, prima di
+   ogni regola): torna `{logo, titolo, frase, togli}` — testo NUDO, lo
+   scappa chi disegna.
+   • `togli` e' vero SOLO se un filtro c'e' e fra le offerte ce n'e'
+     almeno una che senza filtro si vedrebbe: e' l'unico caso in cui il
+     bottone cambia qualcosa.
+   • LE OFFERTE IN PAUSA NON SI CONTANO FRA QUELLE DEL FILTRO: toglierlo
+     non le farebbe comparire.
+   • «C'e' 1 offerta» / «Ci sono N offerte»: il numero decide il verbo.
+   • l'ora e' la PRIMA pausa che finisce, nell'ora di chi legge. */
+function vuotoLibroP2P(vivi, filtro, lato, adesso){
+  const tutte = Array.isArray(vivi) ? vivi : [];
+  const ferme = tutte.filter(o => typeof nascostoPerPausaP2P === 'function' && nascostoPerPausaP2P(o));
+  const libere = tutte.length - ferme.length;
+  const quante = n => n === 1 ? 'C\'è 1 offerta' : 'Ci sono ' + n + ' offerte';
+  if (libere > 0 && filtro)
+    return {logo: true, togli: true, titolo: 'Nessun ordine col tuo filtro',
+            frase: quante(libere) + (libere === 1 ? ', ma non passa il filtro.' : ', ma nessuna passa il filtro.')};
+  if (ferme.length) {
+    const fini = ferme.map(o => pausaOrdineP2P(o.id, adesso)).filter(f => f > 0);
+    const quando = fini.length ? ' fino ' + quandoPausaP2P(Math.min.apply(null, fini), adesso) : '';
+    return {logo: true, togli: false, titolo: 'Nessun ordine da prendere adesso',
+            frase: ferme.length === 1
+              ? 'C\'è 1 offerta, ma chi l\'ha pubblicata è in pausa' + quando + '.'
+              : 'Ci sono ' + ferme.length + ' offerte, ma chi le ha pubblicate è in pausa'
+                + (quando ? ' almeno' + quando : '') + '.'};
+  }
+  return {logo: false, togli: false, titolo: 'Nessun ordine aperto',
+          frase: lato === 'compro' ? 'In questo momento nessuno sta vendendo sats in euro.'
+                                   : 'In questo momento nessuno sta comprando sats in euro.'};
+}
 
 /* IL GIUDICE DEGLI «ESCLUSI A INTERVALLO» NON C'E' PIU' (set 2026,
    col ridisegno delle card): i range ENTRANO nel libro come ordini
@@ -53169,22 +53239,24 @@ function renderP2P(){
      una cosa non ancora chiesta — al suo posto lo scheletro. */
   const vuotoInAttesa = !!p2pLibro.copia && !p2pErrore && !vivi.length
     && typeof scheletroLibroP2P === 'function';
+  /* I VUOTI SONO TRE, E LI DICE UN GIUDICE (12 ott 2026, notte, cantiere
+     libro-vuoto): il terzo e' «le offerte ci sono, ma chi le ha
+     pubblicate e' in pausa» — vedi `vuotoLibroP2P` */
+  const vuoto = mostrati.length ? null : vuotoLibroP2P(vivi, p2pFiltro, p2pLato);
   box.innerHTML = avvisi
     /* l'avviso di chi e' su Tor (11 ott 2026): una riga, sopra il libro */
     + (typeof avvisoMemoriaBrowserP2P === 'function' ? avvisoMemoriaBrowserP2P(typeof suOnion === 'function' && suOnion()) : '')
     + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')
        : vuotoInAttesa ? scheletroLibroP2P()
-       : `<div class="empty">${vivi.length
+       : `<div class="empty">${vuoto.logo
            ? '<img class="p2p-simbolo" src="/assets/p2p-logo-grande.webp" alt="" onerror="this.remove()">'
            : '<img class="scambi-img scambi-libro" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">'
-         }<span class="empty-title">${
-           vivi.length ? 'Nessun ordine col tuo filtro' : 'Nessun ordine aperto'}</span>${
-           vivi.length
-             ? 'Ci sono ' + vivi.length + ' offerte, ma nessuna passa il filtro. '
-               + '<button type="button" class="scopri-link" onclick="azzeraFiltroP2P()">Togli il filtro</button>'
-             : p2pLato === 'compro'
-               ? 'In questo momento nessuno sta vendendo sats in euro.'
-               : 'In questo momento nessuno sta comprando sats in euro.'}</div>`)
+         }<span class="empty-title">${esc(vuoto.titolo)}</span>${esc(vuoto.frase)}${
+           /* «Togli il filtro» SOLO SE UN FILTRO C'E': a filtro spento
+              azzerava il niente, e il libro restava com'era */
+           vuoto.togli
+             ? ' <button type="button" class="scopri-link" onclick="azzeraFiltroP2P()">Togli il filtro</button>'
+             : ''}</div>`)
     + comeFunziona;
   /* ...E LA STESSA RIGA DI STRUMENTI ANCHE DI LA' (set 2026, ridisegno
      di Andrea): «Ordina» a sinistra, «Filtro» in mezzo, la levetta del
@@ -64248,6 +64320,102 @@ function segnoPausaP2P(o){
   const f = o && o.id ? pausaOrdineP2P(o.id) : 0;
   return f ? '<div class="p2p-box p2p-pausa">⏸ In pausa fino ' + esc(quandoPausaP2P(f)) + '</div>' : '';
 }
+/* ---- LA PAUSA DI ADESSO, DETTA PRIMA (12 ott 2026, notte, cantiere
+   libro-vuoto, dal campo di Andrea) ----
+   Il caso: una pausa «ogni giorno 22-7» salvata alle 23:24 dal foglio
+   che pubblica, e un ordine pubblicato dodici secondi dopo — dentro la
+   pausa, che valeva GIA'. Nel libro non lo vedeva nessuno, e chi l'aveva
+   scritto pensava alle notti dopo. Da qui due cose: il foglio della
+   pausa dice se quel che c'e' scritto e' attivo ADESSO, e «Pubblica»
+   si ferma a chiedere, con le due strade. */
+/* PURA: il calco di `_fine_pausa_p2p` del server nell'ora del TELEFONO —
+   l'epoch a cui la pausa aperta adesso finisce, 0 se adesso non e'
+   aperta. Segue la catena (una fascia che ne tocca un'altra) fino a 16
+   anelli, come il server. I giorni si fanno col calendario (`Date`), mai
+   sommando 86400: la notte dell'ora legale le sette restano le sette. */
+function finePausaLocaleP2P(fasce, unaFino, adesso){
+  let t = Math.floor(Number(adesso) || 0), fine = 0;
+  const una = Math.floor(Number(unaFino) || 0);
+  for (let anello = 0; anello < 16; anello++) {
+    let f = una > t ? una : 0;
+    const d = new Date(t * 1000);
+    for (const x of fasce || []) {
+      if (!x || !Array.isArray(x.g)) continue;
+      const da = Number(x.da) || 0, dura = ((Number(x.a) || 0) - da + 1440) % 1440;
+      for (const ieri of [0, 1]) {
+        const giorno = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ieri);
+        if (x.g.map(Number).indexOf((giorno.getDay() + 6) % 7) < 0) continue;
+        const y = giorno.getFullYear(), m = giorno.getMonth(), g = giorno.getDate();
+        const inizio = Math.floor(new Date(y, m, g, 0, da).getTime() / 1000);
+        const stop = Math.floor(new Date(y, m, g, 0, da + dura).getTime() / 1000);
+        if (inizio <= t && t < stop) f = Math.max(f, stop);
+      }
+    }
+    if (f <= t) break;
+    fine = t = f;
+  }
+  return fine;
+}
+/* fino a quando sono in pausa ADESSO, 0 se non lo sono. Prima la parola
+   del server (`fino`); poi, se la lettura e' di qualche minuto fa, le mie
+   fasce contro l'orologio del telefono — una pausa cominciata dopo
+   l'ultima lettura vale lo stesso. La pausa tolta «per stanotte»
+   (`salta_fino`) non vale. */
+function finoMiaPausaP2P(adesso){
+  const p = p2pMiaPausa;
+  if (!p) return 0;
+  adesso = adesso || Math.floor(Date.now() / 1000);
+  const fino = Math.floor(Number(p.fino) || 0);
+  if (fino > adesso) return fino;
+  if ((Number(p.salta_fino) || 0) > adesso) return 0;
+  return finePausaLocaleP2P(bozzaPausaP2P(p).fasce, p.una_fino, adesso);
+}
+/* PURA: la riga sotto le fasce del foglio — quel che c'e' SCRITTO
+   (`bozza`) e' una pausa attiva adesso? Vuota senza niente di scritto.
+   `saltaFino` e' la pausa tolta per stanotte: vale solo finche' la
+   bozza e' ancora quella salvata (`salvata` vero). */
+function rigaAdessoPausaP2P(bozza, adesso, saltaFino, salvata){
+  const b = bozza || {fasce: [], unaFino: 0};
+  const fasce = (b.fasce || []).filter(f => f && f.g && f.g.length && f.da !== f.a);
+  if (!fasce.length && !(b.unaFino > adesso)) return '';
+  if (salvata && saltaFino > adesso)
+    return 'Tolta fino ' + quandoPausaP2P(saltaFino, adesso) + ': adesso i tuoi ordini si vedono.';
+  const fine = finePausaLocaleP2P(fasce, b.unaFino, adesso);
+  return fine ? '⏸ Attiva adesso: i tuoi ordini escono dal libro fino ' + quandoPausaP2P(fine, adesso) + '.'
+              : 'Adesso non è attiva: i tuoi ordini si vedono.';
+}
+/* PURA: i testi dell'avviso prima di pubblicare in pausa. La seconda
+   strada si chiama «per stanotte» di sera e di notte (dalle 18 alle 6),
+   «per adesso» di giorno: una pausa 8-20 tolta a mezzogiorno non e' una
+   notte. */
+function avvisoPausaPubblicaP2P(fino, adesso){
+  const ora = new Date((adesso || Date.now() / 1000) * 1000).getHours();
+  return {titolo: 'Pubblichi durante la pausa?',
+          corpo: 'Sei in pausa fino ' + quandoPausaP2P(fino, adesso)
+            + ': il tuo ordine non si vedrà fino ad allora.',
+          etichetta: 'Pubblica lo stesso',
+          altra: 'Togli la pausa per ' + ((ora >= 18 || ora < 6) ? 'stanotte' : 'adesso')};
+}
+/* IL FERMO PRIMA DI PUBBLICARE: se adesso sono in pausa apre la domanda
+   di casa con le due strade e torna vero (chi chiama si ferma li').
+   «Pubblica lo stesso» richiama il gesto col timbro; «Togli la pausa
+   per stanotte» la toglie sul server e POI pubblica — se il server non
+   risponde non pubblica niente, e il foglio resta com'era. Gli ordini
+   Barattozon non passano di qui: in pausa restano nel libro. */
+function fermaPerPausaP2P(){
+  if (!tempoPubblicaP2P()) return false;
+  const adesso = Math.floor(Date.now() / 1000);
+  const fino = finoMiaPausaP2P(adesso);
+  if (!fino) return false;
+  const t = avvisoPausaPubblicaP2P(fino, adesso);
+  chiediConferma({titolo: t.titolo, corpo: t.corpo, etichetta: t.etichetta,
+    poi: () => inviaNuovoOrdineP2P(true),
+    altra: {etichetta: t.altra, poi: async () => {
+      if (typeof togliPausaAdessoP2P !== 'function' || !(await togliPausaAdessoP2P())) return;
+      await inviaNuovoOrdineP2P(true);
+    }}});
+  return true;
+}
 /* ---- la pausa: il foglio ---- */
 /* PURA: «22:00» <-> minuti dalla mezzanotte (-1 se non e' un'ora) */
 function minutiDaOraP2P(s){
@@ -64445,8 +64613,16 @@ function renderPausaP2P(){
   const adesso = Math.floor(Date.now() / 1000);
   const p = p2pMiaPausa;
   const ap = p2pPausaAperto;
-  const stato = (p && p.fino > 0)
-    ? '<div class="p2p-box p2p-pausa">⏸ Adesso sei in pausa fino ' + esc(quandoPausaP2P(p.fino)) + '</div>' : '';
+  /* ATTIVA ADESSO O NO, SOTTO LE FASCE (12 ott 2026, notte, cantiere
+     libro-vuoto): la riga parla di quel che c'e' SCRITTO nel foglio, e
+     cambia sotto le dita — «Ogni giorno 22–7» composta alle 23 dice
+     subito che vale gia' da stanotte. Ha preso il posto del riquadro in
+     cima («Adesso sei in pausa fino a…»), che diceva solo il salvato. */
+  const adessoRiga = rigaAdessoPausaP2P(b, adesso, Number(p && p.salta_fino) || 0,
+    JSON.stringify(b) === JSON.stringify(bozzaPausaP2P(p)));
+  const stato = adessoRiga
+    ? '<div class="p2p-box p2p-pausa' + (adessoRiga.charAt(0) === '⏸' ? '' : ' libera')
+      + '" id="p2pPausaAdesso">' + esc(adessoRiga) + '</div>' : '';
   const ora = (f, i, quale, parola) => {
     const su = !!ap && ap !== 'una' && ap.i === i && ap.quale === quale;
     return '<button type="button" class="sel-casa-riga" aria-expanded="' + (su ? 'true' : 'false')
@@ -64469,7 +64645,6 @@ function renderPausaP2P(){
   const scelta = b.unaFino > adesso;
   box.innerHTML =
     '<div class="hint p2p-pausa-testa">' + esc(P2P_PAUSA_RIGA) + '</div>'
-    + stato
     + '<div class="field"><label>Ogni settimana</label>' + fasce
     + (b.fasce.length < P2P_PAUSA_FASCE_MAX
        ? '<button type="button" class="btn ghost" onclick="aggiungiFasciaPausaP2P()">＋ Aggiungi una fascia</button>' : '')
@@ -64483,6 +64658,7 @@ function renderPausaP2P(){
     + '</div>'
     + ((ap === 'una' && typeof selGiorniHtml === 'function') ? selettoreUnaPausaP2P(scelta ? b.unaFino : 0, adesso) : '')
     + '<div class="hint" style="margin:6px 0 0">Da adesso, al massimo ' + P2P_PAUSA_GIORNI_MAX + ' giorni.</div></div>'
+    + stato
     + (p2pPausaErrore ? '<div class="p2p-box p2p-veto">🚫 ' + esc(p2pPausaErrore) + '</div>' : '')
     + '<button type="button" class="btn orange" id="p2pPausaSalva" onclick="salvaPausaP2P(this)">Salva</button>'
     + '<button type="button" class="p2p-pausa-come" aria-expanded="' + (p2pPausaInfo ? 'true' : 'false')
@@ -68445,6 +68621,14 @@ async function inviaNuovoOrdineP2P(confermato){
   const campi = campiNuovoP2P();
   const g = valeNuovoOrdineP2P(campi);
   if (!g.ok) { avvisaMancaP2P(g); return; }
+  /* IN PAUSA SI PUBBLICA SAPENDOLO (12 ott 2026, notte, cantiere
+     libro-vuoto): chi e' in pausa ADESSO vede prima la domanda — «Sei
+     in pausa fino alle 07:00: il tuo ordine non si vedra' fino ad
+     allora» — con le due strade, e tutt'e due richiamano QUESTA
+     funzione col timbro. Non per Barattozon: quegli ordini in pausa
+     restano nel libro. Vedi `fermaPerPausaP2P`. */
+  if (!confermato && !tabacchinoP2P(campi.metodi)
+      && typeof fermaPerPausaP2P === 'function' && fermaPerPausaP2P()) return;
   /* IL RIEPILOGO PRIMA DI PUBBLICARE (23 set 2026, percorso
      Barattozon): PayCode, importo, scadenza, sconto e i sats, da
      rileggere; il si' richiama QUESTA funzione col timbro, e da li'
@@ -74548,6 +74732,34 @@ async function salvaPausaP2P(bottone){
     p2pPausaErrore = 'La pausa non si è salvata: controlla la connessione e riprova';
     renderPausaP2P();
   } finally { if (bottone) bottone.disabled = false; }
+}
+/* «TOGLI LA PAUSA PER STANOTTE» (12 ott 2026, notte, cantiere
+   libro-vuoto): la pausa aperta ADESSO non vale fino alla sua fine, e
+   le fasce restano — da domani sera e' quella di sempre. Lo decide il
+   server (`{salta: true}`); qui si prende la risposta e si rivestono le
+   righe. Vero se e' andata: chi chiama pubblica solo allora. */
+async function togliPausaAdessoP2P(){
+  try {
+    const r = await fetch(`${API_BASE}/p2p/pausa`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({salta: true})});
+    const d = await r.json().catch(() => null);
+    if (!r.ok || !d) {
+      toast((d && d.detail) ? String(d.detail) : 'La pausa non si è tolta: riprova', 5000);
+      return false;
+    }
+    p2pMiaPausa = d;
+    p2pMiaPausaChiesta = Date.now();
+    /* i MIEI ordini tornano nel libro: il segno «⏸ In pausa» sulle mie
+       card se ne va subito, senza aspettare la prossima fotografia */
+    Object.keys(p2pPause).forEach(id => { if (ordineTuoP2P(id)) delete p2pPause[id]; });
+    if (typeof rivestiRighePausaP2P === 'function') rivestiRighePausaP2P();
+    toast('Pausa tolta: il tuo ordine si vede subito');
+    return true;
+  } catch(e) {
+    toast('La pausa non si è tolta: controlla la connessione e riprova', 5000);
+    return false;
+  }
 }
 /* ============ fine della pausa che chiede ============ */
 

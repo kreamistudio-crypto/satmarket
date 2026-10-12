@@ -1391,9 +1391,14 @@ le frasi qui sotto restano quelle di §«Il tempo di ogni passo».
   apre sotto il selettore — **Giorno** (otto bottoni: «Oggi», «Domani»,
   «mer 14»…), **Ora** (quelle già passate sono spente), **Minuti** — e
   la riga diventa «**Fino a domani alle 08:00 ▾**», con la ✕ per
-  toglierla; sotto, «Da adesso, al massimo 7 giorni.» E «**Salva**»,
-  che riporta dov'eri (nel foglio dell'ordine, metodo e importo sono
-  ancora lì). In fondo «**ℹ️ Come funziona ▾**», chiuso; aperto dice tre
+  toglierla; sotto, «Da adesso, al massimo 7 giorni.» Poi, se nel
+  foglio c'è scritta una pausa, UNA RIGA CHE DICE SE VALE ADESSO (dal 13
+  ott 2026): «⏸ Attiva adesso: i tuoi ordini escono dal libro fino a
+  domani alle 07:00.» oppure «Adesso non è attiva: i tuoi ordini si
+  vedono.» — cambia mentre si toccano giorni e ore, PRIMA di salvare; se
+  la pausa è stata tolta per stanotte dice «Tolta fino a domani alle
+  07:00: adesso i tuoi ordini si vedono.» E «**Salva**», che riporta
+  dov'eri (nel foglio dell'ordine, metodo e importo sono ancora lì). In fondo «**ℹ️ Come funziona ▾**», chiuso; aperto dice tre
   righe: «La scadenza dei tuoi ordini non si ferma.» · «Vale dentro
   Barattolo: da un'altra app collegata i tuoi ordini si vedono ancora.»
   · «Gli ordini Barattozon restano visibili: hanno già la scadenza del
@@ -1409,6 +1414,33 @@ le frasi qui sotto restano quelle di §«Il tempo di ogni passo».
   P2P» della home), e il conto delle offerte lo dice. Chi lo apre da un
   link trova «Compra» spento e il riquadro «🚫 Chi ha pubblicato
   quest'ordine è in pausa fino a domani alle 06:00: riprova più tardi.»
+- 📱 **Se nel libro restano solo ordini in pausa** (dal 13 ott 2026): la
+  pillola dice «0 offerte» e la schermata «**Nessun ordine da prendere
+  adesso**» — «C'è 1 offerta, ma chi l'ha pubblicata è in pausa fino a
+  domani alle 07:00.» (con più offerte: «Ci sono 3 offerte, ma chi le ha
+  pubblicate è in pausa almeno fino a domani alle 07:00.»). NESSUN
+  bottone: non c'è niente da togliere. Il vuoto da filtro resta «Nessun
+  ordine col tuo filtro» — «C'è 1 offerta, ma non passa il filtro.» /
+  «Ci sono 3 offerte, ma nessuna passa il filtro.» — col link «**Togli
+  il filtro**», che compare SOLO lì.
+- 🔔 **L'avviso «nuovo ordine nel libro» aspetta la fine della pausa**
+  (dal 13 ott 2026): per un ordine pubblicato mentre il suo autore è in
+  pausa non parte niente; quando la pausa finisce parte, se l'ordine è
+  ancora nel libro. Gli ordini Barattozon non aspettano (in pausa
+  restano visibili).
+- 📱 **Pubblicare mentre si è in pausa** (dal 13 ott 2026; non per gli
+  ordini Barattozon): toccando «⚡ Pubblica ordine» si apre prima la
+  domanda «**Pubblichi durante la pausa?**» — «Sei in pausa fino a
+  domani alle 07:00: il tuo ordine non si vedrà fino ad allora.» — con
+  DUE tasti: «**Pubblica lo stesso**» (l'ordine parte e resta nascosto
+  fino alla fine della pausa) e «**Togli la pausa per stanotte**» (di
+  giorno: «Togli la pausa per adesso»), che toglie SOLO la pausa aperta
+  adesso — le fasce restano, da domani sera è quella di sempre —, dice
+  «Pausa tolta: il tuo ordine si vede subito» e pubblica. Non c'è
+  «Annulla»: per ripensarci si chiude il foglio col gesto di sempre, e
+  il foglio dell'ordine è ancora lì. Se la pausa non si toglie (rete):
+  «La pausa non si è tolta: controlla la connessione e riprova», e
+  l'ordine NON parte.
 
 **Il badge «⚡ Risponde in fretta» (con la leva accesa).**
 - 📱 Sulla card del libro, sotto le stelline: «⚡ Risponde in fretta». Nel
