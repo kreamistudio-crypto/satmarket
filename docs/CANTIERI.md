@@ -50806,3 +50806,88 @@ cifrata sta sui tuoi relay»), poi Amber ritrova l'ordine; il relay di
 casa che accetta la copia dalla sua npub (è nella lista di chi scrive).
 
 **COSA È GIRATO SU QUALE ALBERO.** Sopra a0983ec (la punta di main dopo il push della cura, CI verde): la suite intera `PROVE_SEVERE=1 python prove.py` sulla copia pulita di 340bf2b (il commit del cantiere) — 22473 passate, 0 fallite, nessuna saltata; i 62 collaudi del workflow nella gabbia, 62 su 62 verdi (`collaudo_chiavi_ritrovate` coi tre passaggi compreso).
+
+## Le scritte sui contanti solo a «Contanti» scelto, la -bar7 in servizio, e la prova caduta nella build (12 ott 2026, cantiere contanti-solo-scelti, richieste di Andrea)
+
+**LA -BAR7 È IN SERVIZIO** (riferito da Andrea il 12 ott 2026; la liturgia
+l'ha eseguita lui, un comando alla volta). Il nodo gira
+`mostro:v0.19.0-bar7` con la patch 0010; i 17 ordini del database
+intatti, nessun errore nei log. La leva `P2P_CAUZIONE_SUL_METODO` è
+accesa sul VPS. Provato da lui dal telefono: su un ordine misto, con
+SEPA la cauzione non compare, con Contanti sì. Uno scambio vero non c'è
+ancora stato: quel che resta da vedere sta in NODO-MOSTRO, «LA -bar7 IN
+SERVIZIO».
+
+**1) LE SCRITTE SUI CONTANTI NEL FOGLIO DI CHI PRENDE.** IL DIFETTO, visto
+da Andrea dal telefono: aprendo un «SEPA + Contanti», prima di scegliere
+un metodo, c'era già «💵 Contanti di persona — al massimo 250 € per
+scambio…». Era il gemello della cauzione di due giorni fa: `renderDettaglioP2P`
+passava a `regolaContantiFoglioP2P` il metodo scelto e, SENZA scelta, i
+metodi dell'ORDINE. Guardate tutte le scritte sui contanti del foglio:
+- LA REGOLA COL TETTO (e coi consigli dell'incontro: è una riga sola):
+  ora riceve il metodo scelto, o i metodi dell'ordine se è UNO solo o se
+  l'ordine è MIO, se no nessuno. Con più metodi compare scegliendo
+  «Contanti» e sparisce cambiando metodo.
+- LA ZONA sotto le pillole: usciva con «Contanti» fra i metodi, qualunque
+  fosse la scelta. `metodiDettP2P` adesso la chiede allo STESSO giudice
+  (`zonaDettP2P` → `zonaOrdineP2P`, che la dà solo se «Contanti» è fra i
+  metodi) passandogli il metodo scelto al posto di quelli dell'ordine:
+  nessuna scelta, nessuna zona. Niente nomi nuovi (i banchi ritagliano
+  `metodiDettP2P` per nome: una funzione nuova chiamata da lì farebbe
+  rosse a cascata).
+- IL TETTO NEL FOGLIO DELL'IMPORTO (`confermaQuantoP2P`): giudicava sui
+  metodi dell'ordine quando la scelta mancava; ora sul metodo scelto o
+  sull'unico. La conferma del dettaglio (`confermaDettaglioP2P`) era già
+  giusta: prima chiede il metodo, poi giudica.
+- LA CAUZIONE: già sul metodo scelto dal cantiere di prima (a leva
+  accesa, com'è in produzione). I PASSI di «Come funziona»: già sul
+  metodo scelto (6 ott).
+- COL SOLO «CONTANTI» tutto resta visibile da subito, come oggi. SUL MIO
+  ORDINE (il foglio dice «È il tuo ordine») regola e zona restano com'erano:
+  lì nessuno sceglie, e la zona l'ho scritta io.
+- NON TOCCATI, perché non sono il foglio di chi prende: la zona sulla
+  card del libro (dice a chi guarda se lo scambio fa per lui), il foglio
+  Pubblica (dove «Contanti» lo sto mettendo io). A LEVA SPENTA (il
+  rollback) la riga della cauzione su un ordine misto resta anche senza
+  scelta: lì il nodo la chiede davvero a tutti.
+
+**2) LA PROVA CADUTA NELLA BUILD: `util::tests::connect_nostr_builds_client_with_configured_relays`.**
+NON l'ha introdotta la 0010: c'era già. È una prova di UPSTREAM (sta nel
+tag `v0.19.0`, `src/util.rs`) che legge i relay dalle impostazioni
+globali dei test: `MOSTRO_CONFIG` è un `OnceLock`, la prima `set` vince.
+Il suo `init_globals` mette `test_settings()` (un relay c'è); cinque
+moduli di upstream mettono invece un `Settings` a mano con
+`relays: vec![]` (`app/bond/flow.rs`, `app/bond/payout.rs`,
+`app/dev_fee.rs`, `app/rate_user.rs`, `lightning/mod.rs`). Se uno di
+quelli parte per primo, la globale nasce senza relay e la prova cade:
+dipende dall'ordine dei thread, e da sola passa — quel che ha visto
+Andrea. A FARLA GIRARE È STATO IL MIO FILTRO: nella liturgia `-bar7`
+avevo aggiunto `util` in coda (per `get_fiat_amount_requested`), nello
+stesso lancio di `flow`, che pesca `app::bond::flow`; fino alla `-bar6`
+nessun filtro la pescava. Le `.patch` 0008 e 0010 non nominano né
+`MOSTRO_CONFIG` né `init_globals` (contate: zero righe). NEL FORK NON
+SERVE NIENTE: il binario non c'entra, l'immagine in servizio è giusta, e
+una patch solo-test vorrebbe una build in più sul nodo per niente. LA
+CURA sta dove ha morso, nella liturgia (PRODUZIONE, punto 3 della
+`-bar7`): due lanci — il filtro senza `util`, e `util::tests::` da solo,
+che pesca soltanto `src/util.rs` e `src/config/util.rs` — col perché
+scritto accanto. La cura vera è di upstream: non fatta, non proposta.
+
+SCARTATO. Una funzione nuova «i metodi su cui cadono le scritte» (i
+banchi ritagliano per nome: si è scritto dentro, con nomi che c'erano).
+Nascondere la zona anche sulla card del libro. Togliere regola e zona
+dal mio ordine. Una patch 0011 solo-test nel fork. `--skip` della prova
+nella liturgia (la nasconderebbe: due lanci la tengono viva).
+
+PROVATO. Nella pagina VERA del banco node (`prove_p2p_dettaglio`, coi
+giudici veri della zona portati dentro e le due leve accese): un «SEPA,
+Contanti» appena aperto senza nessuna delle tre scritte (regola, zona,
+cauzione) e con la riga del metodo fissato; con SEPA niente; con
+Contanti tutte e tre e la zona di chi ha pubblicato; di nuovo SEPA
+niente; il solo-Contanti tutte da subito; un ordine d'acquisto a tre
+metodi (niente, poi con Contanti la regola di chi VENDE, poi PayPal
+niente); il mio ordine con regola e zona e senza cauzione. Le sentinelle
+sul testo in `prove_contanti_a_mano` (dettaglio e foglio dell'importo) e
+`prove_contanti_zona` (la zona chiesta col metodo scelto). TORTURA su una
+copia del repo, sei mutazioni che rimettono il codice vecchio pezzo per
+pezzo: nel verbale del push, col giro dal vivo, la suite e i collaudi.

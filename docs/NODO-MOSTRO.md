@@ -488,8 +488,9 @@ restano VERE fino a quel riavvio, e da lì DIVENTANO FALSE per il solo
 metodo «Contanti» (e DAL 10 OTT 2026, con la `-bar7` e la patch 0010,
 solo a chi prende SCEGLIENDO «Contanti»: la scelta viaggia nel take come
 `Payload::Order.payment_method`, e un «SEPA, Contanti» preso con SEPA non
-chiede niente — PRODUZIONE, «LA SALITA ALLA -bar7», da fare; fino ad
-allora il nodo decide sull'ordine intero): la patch 0008 del fork limita l'`anti_abuse_bond` ai
+chiede niente — PRODUZIONE, «LA SALITA ALLA -bar7»; ✅ LA `-bar7` È IN
+SERVIZIO, riferito da Andrea il 12 ott 2026: vedi in fondo, «LA -bar7 IN
+SERVIZIO»): la patch 0008 del fork limita l'`anti_abuse_bond` ai
 metodi che `only_payment_methods` nomina, e le tarature sono
 `amount_pct = 0.03`, `base_amount_sats = 1000`, `apply_to = "take"`,
 `slash_on_waiting_timeout = false`, `hold_invoice_expiration_window =
@@ -507,3 +508,29 @@ l'ordine a `pending` senza dire niente al taker), la corsa fra due
 prese (vince chi paga per primo), la bruciatura e il payout della metà
 (`add-bond-invoice`, 15 giorni), e il `cargo test` dei due moduli della
 0008.
+
+LA `-bar7` IN SERVIZIO (riferito da Andrea il 12 ott 2026; la liturgia in
+PRODUZIONE, «LA SALITA ALLA -bar7», il perché in CANTIERI, «La cauzione
+sul metodo scelto» e «Le scritte sui contanti solo a «Contanti» scelto»).
+Il nodo gira `mostro:v0.19.0-bar7`: le otto patch più la 0010, la
+cauzione decisa sul metodo che chi prende DICHIARA nel take. Alla salita
+i 17 ordini del database erano intatti e nei log nessun errore. Sul VPS
+la leva `P2P_CAUZIONE_SUL_METODO` è ACCESA: il client manda il metodo
+scelto (`Payload::Order.payment_method`) e promette la cauzione solo a
+chi sceglie «Contanti». Provato da Andrea dal telefono: su un ordine
+misto, scegliendo SEPA la cauzione non compare, scegliendo Contanti sì.
+`settings.toml` non è cambiato (nessuna settings nuova, nessuna
+migrazione), il 38385 nemmeno. RESTA NON PROVATO, finché non c'è uno
+scambio vero: un «SEPA, Contanti» preso con SEPA che arriva alla garanzia
+SENZA `pay-bond-invoice`; lo stesso preso con Contanti CON la cauzione;
+un intervallo preso con la cifra scelta dentro `Payload::Order`
+(`fiat_amount`); e quel che già mancava della cauzione (la richiesta
+lasciata scadere, la corsa fra due prese, la bruciatura e il payout).
+NEI TEST DELLA BUILD è caduta una prova, e non è del fork:
+`util::tests::connect_nostr_builds_client_with_configured_relays`, di
+upstream, che dipende dall'ordine dei test (le impostazioni globali dei
+test sono un `OnceLock`, e cinque moduli di upstream le impostano coi
+relay vuoti); da sola passa. La liturgia la lancia in un giro suo, e il
+perché sta al suo punto 3. IL ROLLBACK resta quello scritto là: la leva
+a `False` sul VPS e riavvio, e se serve la riga dell'immagine a
+`mostro:v0.19.0-bar6` con `docker compose up -d mostro` a libro fermo.

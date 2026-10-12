@@ -58525,7 +58525,11 @@ function confermaQuantoP2P(){
   if (!g.ok) { toast(g.dillo); return; }
   /* il tetto del contanti sulla cifra scelta (30 set 2026): lo stesso
      giudice del dettaglio e del foglio Pubblica */
-  const troppo = giudiceContantiP2P(g.euro, p2pDettMetodo ? [p2pDettMetodo] : (riga.metodi || []),
+  /* ...sul metodo SCELTO, o sull'unico (12 ott 2026, contanti-solo-
+     scelti): con piu' metodi e nessuna scelta il tetto del contanti non
+     parla — lo rifa' la conferma del dettaglio, col metodo in mano */
+  const troppo = giudiceContantiP2P(g.euro, p2pDettMetodo ? [p2pDettMetodo]
+                                      : ((riga.metodi || []).length === 1 ? riga.metodi : []),
                                     maxEuroContantiP2P());
   if (troppo) { toast(troppo); return; }
   const id = p2pQuantoOrdine;
@@ -59323,13 +59327,22 @@ function metodiDettP2P(o){
      scelta di chi prende le pillole non ci sono). Lo si dice dove si
      sceglie, non dopo. */
   const fisso = o.mio ? '' : '<div class="hint p2p-metodo-fisso">' + esc(P2P_METODO_FISSO) + '</div>';
+  /* LA ZONA, CON PIU' METODI, SOLO A «CONTANTI» SCELTO (12 ott 2026,
+     contanti-solo-scelti): e' la zona dell'incontro, e a chi paga con
+     SEPA non dice niente. Si chiede allo STESSO giudice della zona
+     (`zonaDettP2P` → `zonaOrdineP2P`, che la da' solo se «Contanti» sta
+     fra i metodi) passandogli il metodo scelto al posto di quelli
+     dell'ordine: nessuna scelta = nessun metodo = nessuna zona. Sul mio
+     ordine resta: l'ho scritta io. */
+  const zonaScelta = (o.mio || typeof zonaDettP2P !== 'function') ? zona
+    : zonaDettP2P(Object.assign({}, o, {metodi: p2pDettMetodo ? [p2pDettMetodo] : []}));
   return sezioneNuovoP2P({
     ico: 'metodi', titolo: titolo,
     corpo: domanda + '<div class="p2p-metodi">' + metodi.map(m =>
       '<button type="button" class="tema-pill' + (m === p2pDettMetodo ? ' active' : '')
       + (vesteMetodoP2P(m) ? ' p2p-pill-marchio' : '')
       + '" data-m="' + esc(m) + '" onclick="scegliMetodoDettP2P(this.dataset.m)">'
-      + marchioMetodoP2P(m) + '</button>').join('') + '</div>' + fisso + zona
+      + marchioMetodoP2P(m) + '</button>').join('') + '</div>' + fisso + zonaScelta
   });
 }
 /* la frase, scritta una volta: la legge il dettaglio sotto le pillole e
@@ -59511,9 +59524,17 @@ function renderDettaglioP2P(){
   box.innerHTML =
     (tuo ? '<div class="p2p-box p2p-tuo">È il tuo ordine: l\'hai pubblicato tu, e non si può prendere.</div>' : '') +
     metodiDettP2P(o) +
-    /* la regola e il tetto del contanti, a chi sta per prendere (30 set 2026) */
-    regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo] : (o.metodi || []), maxEuroContantiP2P(),
-                            compro ? 'compro' : 'vendo') +
+    /* la regola e il tetto del contanti, a chi sta per prendere (30 set 2026).
+       SOLO SCEGLIENDO «CONTANTI» (12 ott 2026, cantiere contanti-solo-scelti,
+       ritocco di Andrea dal telefono): con piu' metodi e nessuna scelta la
+       riga usciva gia' all'apertura — «Contanti di persona: al massimo
+       250 €…» a chi stava per pagare con SEPA. Adesso, come la cauzione:
+       con piu' metodi compare scegliendo «Contanti» e sparisce cambiando
+       metodo; con un metodo solo c'e' da subito; sul MIO ordine (nessuno
+       sceglie) resta com'era. */
+    regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo]
+                              : ((tuo || (o.metodi || []).length === 1) ? (o.metodi || []) : []),
+                            maxEuroContantiP2P(), compro ? 'compro' : 'vendo') +
     /* la cauzione di chi prende, PRIMA di premere (1 ott 2026) */
     (tuo ? '' : rigaCauzioneDettP2P(o, p2pInfo, cauzioneAccesaP2P(), p2pDettMetodo, cauzioneSulMetodoP2P())) +
     repRiquadroP2P(p2pFacce[o.id], o.id) +

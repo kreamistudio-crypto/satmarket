@@ -30297,7 +30297,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `REGOLA_CONTANTI_VENDE`, `CONSIGLI_CONTANTI` — e quattro posti:
   `regolaContantiFoglioP2P(metodi, tetto, lato)` sotto il metodo nel
   foglio Pubblica e nel dettaglio di chi prende (dal proprio lato, col
-  tetto), `riquadroContantiP2P(o)` nella pagina dello scambio (sopra il
+  tetto; NEL DETTAGLIO, dal 12 ott 2026 — CANTIERI, «Le scritte sui
+  contanti solo a «Contanti» scelto» —, con più metodi compare SOLO
+  scegliendo «Contanti»: `renderDettaglioP2P` le passa il metodo scelto,
+  o i metodi dell'ordine se è uno solo o se l'ordine è mio, se no
+  nessuno; lo stesso per la zona sotto le pillole — `metodiDettP2P`
+  chiede a `zonaDettP2P` col metodo scelto al posto di quelli
+  dell'ordine — e per il giudice del tetto nel foglio dell'importo,
+  `confermaQuantoP2P`), `riquadroContantiP2P(o)` nella pagina dello scambio (sopra il
   bottone del passo, finché lo stato sta in `P2P_DISPUTABILI`, e a
   `in_disputa` con la sola prova), e la voce «Contanti di persona» di
   «Info P2P» (`#p2pinfo-contanti`, il tetto vivo in

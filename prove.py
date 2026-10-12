@@ -63720,6 +63720,8 @@ def prove_p2p_dettaglio():
         "function giudiceContantiP2P(euro, metodi, tetto){",
         "function regolaContantiFoglioP2P(metodi, tetto, lato){",
         "function maxEuroContantiP2P(){",
+        # (12 ott 2026, contanti-solo-scelti) la zona nel dettaglio, coi suoi giudici veri
+        "function zonaPulitaP2P(t){", "function zonaOrdineP2P(o){", "function zonaDettP2P(o){",
         # la cauzione di chi prende (1 ott 2026): la riga e i suoi giudici
         "function rigaCauzioneDettP2P(o, info, leva, scelto, sulMetodo){",
         "function cauzioneServeP2P(o, info, leva, sulMetodo){",
@@ -63752,6 +63754,8 @@ def prove_p2p_dettaglio():
                  "const P2P_CONTANTI_ICO = ",
                  # (10 ott 2026, cauzione-metodo-scelto) il metodo fissato
                  "const P2P_METODO_FISSO = ",
+                 # (12 ott 2026, contanti-solo-scelti) la zona
+                 "const P2P_ZONA_MAX = ", "let p2pZone = ",
                  "const REGOLA_CONTANTI_VENDE = ", "const CONSIGLI_CONTANTI = ",
                  "const P2P_GLIFI = ", "const P2P_ULTIMO_GIORNO_S = ",
                  "const P2P_ANELLO_VICINA_S = ", "const P2P_ANELLONE_TACCHE = ",
@@ -64197,6 +64201,31 @@ TUOI.clear();
 /* ...a leva spenta niente cauzione nel primo passo */
 p2pLevaPubblica = {mostro: 'm', commissione: 2, cauzione: false};
 apriDettaglioP2P('ord-6'); out.passi.cauzioneSpenta = passiDi(el('p2pDettCorpo').innerHTML);
+/* ---- LE SCRITTE SUI CONTANTI SOLO A «CONTANTI» SCELTO (12 ott 2026,
+   cantiere contanti-solo-scelti) ----
+   La pagina vera, coi giudici veri e le due leve accese come in
+   produzione: [la regola col tetto, la zona, la cauzione]. */
+const scritte = () => { const h = el('p2pDettCorpo').innerHTML;
+  return [h.indexOf('class="hint contanti-regola"') >= 0, h.indexOf('class="p2p-dett-zona"') >= 0,
+          h.indexOf('cauzione-regola') >= 0]; };
+p2pLevaPubblica = {mostro: 'm', commissione: 2, cauzione: true, cauzioneSulMetodo: true, maxEuroContanti: 250};
+p2pInfo = {fee: 0.02, cauzione: {accesa: true, pct: 0.01, base: 1000, applyTo: 'take', metodi: ['contanti']}};
+p2pLibro = {ordini: [ordine({id: 'ord-20', metodi: ['SEPA', 'Contanti'], zona: 'Milano centro'}),
+                     ordine({id: 'ord-21', metodi: ['Contanti'], zona: 'Rimini mare'}),
+                     ordine({id: 'ord-22', lato: 'buy', metodi: ['Satispay', 'PayPal', 'Contanti'], zona: 'Bergamo'})]};
+out.scritte = {};
+apriDettaglioP2P('ord-20'); out.scritte.aperto = scritte();
+out.scritte.fissoAperto = el('p2pDettCorpo').innerHTML.indexOf('p2p-metodo-fisso') >= 0;
+scegliMetodoDettP2P('SEPA'); out.scritte.sepa = scritte();
+scegliMetodoDettP2P('Contanti'); out.scritte.contanti = scritte();
+out.scritte.zonaDetta = el('p2pDettCorpo').innerHTML.indexOf('📍 Milano centro') >= 0;
+scegliMetodoDettP2P('SEPA'); out.scritte.dinuovoSepa = scritte();
+apriDettaglioP2P('ord-21'); out.scritte.soloContanti = scritte();
+apriDettaglioP2P('ord-22'); out.scritte.vendoAperto = scritte();
+scegliMetodoDettP2P('Contanti'); out.scritte.vendoContanti = scritte();
+out.scritte.regolaVende = el('p2pDettCorpo').innerHTML.indexOf(esc(REGOLA_CONTANTI_VENDE)) >= 0;
+scegliMetodoDettP2P('PayPal'); out.scritte.vendoPayPal = scritte();
+TUOI.add('ord-20'); apriDettaglioP2P('ord-20'); out.scritte.mio = scritte(); TUOI.clear();
 p2pLevaPubblica = levaPrima; p2pInfo = infoPrimaC;
 
 /* ---- il lettore del metodo scelto, coi due lati ---- */
@@ -64250,6 +64279,23 @@ console.log(JSON.stringify(out));
           [_ps["contanti"], _ps["contantiVendi"]])
     prova("passi: contanti fra due metodi non scelto e' il generico, scelto diventa contanti",
           [_c_gen, _c_con], [_ps["contantiNonScelto"], _ps["contantiScelto"]])
+    # --- (12 ott 2026, contanti-solo-scelti) LE SCRITTE SUI CONTANTI ----
+    # [la regola col tetto, la zona, la cauzione], nella pagina vera
+    _sc = crudo["scritte"]
+    prova("un «SEPA, Contanti» appena aperto: NESSUNA scritta sui contanti (era il difetto: la regola col tetto usciva subito), "
+          "e la riga del metodo fissato c'e'",
+          [[False, False, False], True], [_sc["aperto"], _sc["fissoAperto"]])
+    prova("...scegliendo SEPA niente; scegliendo Contanti compaiono tutte e tre, con la zona di chi ha pubblicato; "
+          "tornando a SEPA spariscono",
+          [[False, False, False], [True, True, True], True, [False, False, False]],
+          [_sc["sepa"], _sc["contanti"], _sc["zonaDetta"], _sc["dinuovoSepa"]])
+    prova("...un ordine col SOLO Contanti le ha tutte da subito, come oggi", [True, True, True], _sc["soloContanti"])
+    prova("...lo stesso prendendo un ordine d'acquisto a tre metodi: niente all'apertura, tutte con Contanti "
+          "(con la regola di chi VENDE), niente con PayPal",
+          [[False, False, False], [True, True, True], True, [False, False, False]],
+          [_sc["vendoAperto"], _sc["vendoContanti"], _sc["regolaVende"], _sc["vendoPayPal"]])
+    prova("...e sul MIO ordine a due metodi regola e zona restano (nessuno sceglie), la cauzione mai",
+          [True, True, False], _sc["mio"])
     prova("passi: Barattozon al terzo passo", _c_gen[:2] + ["Paghi il PayCode al tabacchino", _c_gen[3]],
           _ps["tab"])
     prova("passi: con la cauzione cambia solo il primo, dai due lati",
@@ -128860,9 +128906,11 @@ def prove_contanti_a_mano():
     prova("la regola sta SOTTO IL METODO nel foglio Pubblica, col tetto vivo e dal proprio lato", True,
           "regolaContantiFoglioP2P(p2pNuovoMetodi, maxEuroContantiP2P(), compro ? 'compro' : 'vendo')" in rn)
     rd = nudo(fn("function renderDettaglioP2P(){"))
-    prova("...e nel dettaglio di chi prende, sul metodo scelto o su quelli dell'ordine, dal suo lato", True,
-          "regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo] : (o.metodi || []), maxEuroContantiP2P(),"
-          in rd and "compro ? 'compro' : 'vendo') +" in rd)
+    # (12 ott 2026, contanti-solo-scelti) con piu' metodi solo a «Contanti» scelto
+    prova("...e nel dettaglio di chi prende, sul metodo scelto o sull'UNICO dell'ordine (o sul mio), dal suo lato", True,
+          "regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo]" in rd
+          and ": ((tuo || (o.metodi || []).length === 1) ? (o.metodi || []) : [])," in rd
+          and "maxEuroContantiP2P(), compro ? 'compro' : 'vendo') +" in rd)
     cd = nudo(fn("function confermaDettaglioP2P(){"))
     # (7 ott 2026) su un intervallo senza cifra il bottone e' «Scegli» e
     # apre «Quanto» SENZA chiudere il foglio; con la cifra scelta il tetto
@@ -128876,6 +128924,9 @@ def prove_contanti_a_mano():
     cq = nudo(fn("function confermaQuantoP2P(){"))
     prova("...e in «Quanto» il tetto passa PRIMA che la cifra diventi quella scelta", True,
           0 < cq.find("giudiceContantiP2P(g.euro,") < cq.find("p2pDettImporto = g.euro;"))
+    # (12 ott 2026, contanti-solo-scelti) con piu' metodi e nessuna scelta il tetto non parla
+    prova("...nel foglio dell'importo il tetto cade sul metodo scelto o sull'unico, mai su «Contanti» fra tanti", True,
+          ": ((riga.metodi || []).length === 1 ? riga.metodi : [])," in cq)
     ren = nudo(fn("function renderOrdineP2P(){"))
     prova("il riquadro del contanti sta nella pagina dello scambio, SOPRA il bottone del passo", True,
           0 < ren.find("riquadroContantiP2P(o, azione) +") < ren.find("(bottoni[azione] || '') +"))
@@ -142042,7 +142093,12 @@ def prove_contanti_zona():
           ["const zona = typeof zonaDettP2P === 'function' ? zonaDettP2P(o) : '';" in dett,
            "+ marchioMetodoP2P(metodi[0]) + '</b>' + zona});" in dett,
            # (10 ott 2026, cauzione-metodo-scelto) fra le pillole e la zona sta la riga del metodo fissato
-           "+ marchioMetodoP2P(m) + '</button>').join('') + '</div>' + fisso + zona\n" in dett])
+           "+ marchioMetodoP2P(m) + '</button>').join('') + '</div>' + fisso + zonaScelta\n" in dett])
+    # (12 ott 2026, contanti-solo-scelti) con piu' metodi la zona solo a «Contanti» scelto
+    prova("...con piu' metodi la zona la decide il metodo SCELTO, chiesto allo stesso giudice; sul mio ordine resta",
+          [True, True],
+          ["zonaDettP2P(Object.assign({}, o, {metodi: p2pDettMetodo ? [p2pDettMetodo] : []}));" in dett,
+           "const zonaScelta = (o.mio || typeof zonaDettP2P !== 'function') ? zona" in dett])
     mar = fn("function marchioMetodoP2P(m, conTesto){")
     prova("il vestito del metodo chiede l'etichetta al blocco del contanti, e il 💵 non lo scrive a mano",
           [True, 0],
@@ -142218,7 +142274,7 @@ def prove_contanti_zona():
           len(re.findall(r"contanti-regola[a-z-]*\">" + chr(0x1F4B6), mini)))
     prova("...nel foglio e nel dettaglio e' la STESSA funzione", [True, True],
           ["regolaContantiFoglioP2P(p2pNuovoMetodi," in fog,
-           "regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo] : (o.metodi || [])," in mini])
+           "regolaContantiFoglioP2P(p2pDettMetodo ? [p2pDettMetodo]\n" in mini.replace("\r\n", "\n")])
     prova("...a schermo: «💵 Contanti di persona», per chi vende e per chi compra; senza contanti niente",
           [True, True, ""],
           [o["regola"][0].startswith('<div class="hint contanti-regola">💵 <b>Contanti di persona</b> — al massimo <b>250 €</b>'),

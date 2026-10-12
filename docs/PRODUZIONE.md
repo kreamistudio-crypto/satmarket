@@ -3320,9 +3320,13 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   bruciare». Nel database del nodo, in sola lettura, `SELECT role, state,
   amount_sats, slashed_reason FROM bonds` racconta le stesse cose.
 - LA SALITA ALLA `-bar7`, immagine `mostro:v0.19.0-bar7` (preparata il
-  10 ott 2026 sera, cantiere `cauzione-metodo-scelto`; ⚠️ DA FARE SUL
-  NODO, un comando alla volta, i comandi scritti da Claude: NON li
-  esegue lui). Cosa cambia: la patch 0010 del fork — la cauzione sul
+  10 ott 2026 sera, cantiere `cauzione-metodo-scelto`; ✅ FATTA SUL NODO
+  da Andrea, riferito il 12 ott 2026: `mostro:v0.19.0-bar7` in servizio
+  con la 0010, i 17 ordini intatti, nessun errore nei log, e la leva
+  `P2P_CAUZIONE_SUL_METODO` accesa sul VPS — punto 9; dal telefono, su un
+  ordine misto, con SEPA la cauzione non compare e con Contanti sì; uno
+  scambio vero non c'è ancora stato. Nei test del punto 3 è caduta UNA
+  prova di upstream, per il filtro: vedi sotto). Cosa cambia: la patch 0010 del fork — la cauzione sul
   metodo che chi prende DICHIARA nel take (decisione di Andrea: la
   cauzione si chiede SOLO a chi sceglie i contanti; su «SEPA, Contanti»
   chi sceglie SEPA, Satispay, PayPal o il PayCode non blocca niente).
@@ -3373,9 +3377,33 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   `git am ~/nodo/patch-bar7/0010-*.patch`: stesso albero, verificato sul
   PC il 10 ott — tree `1385488c`.)
   3) I TEST PRIMA DELLA BUILD VERA (il filtro della `-bar6` con i test
-  della 0010, `barattolo_bond_take`, dentro `barattolo_bond`):
+  della 0010, `barattolo_bond_take`, dentro `barattolo_bond`), in DUE
+  lanci:
   `docker build -f docker/Dockerfile --target builder -t mostro-test:bar7 .`
-  `docker run --rm mostro-test:bar7 cargo test --release -- app::take_buy app::take_sell flow barattolo_bond toml_only_payment_methods util`
+  `docker run --rm mostro-test:bar7 cargo test --release -- app::take_buy app::take_sell flow barattolo_bond toml_only_payment_methods`
+  `docker run --rm mostro-test:bar7 cargo test --release -- util::tests::`
+  ⚠️ PERCHÉ DUE (12 ott 2026, dalla build vera): col filtro `util` in
+  coda al primo lancio — com'era scritto qui il 10 ott — è caduta
+  `util::tests::connect_nostr_builds_client_with_configured_relays`
+  («configured relays must be registered»), che da sola passa. NON è
+  della 0010: è una prova di UPSTREAM (c'è già nel tag `v0.19.0`) che
+  legge i relay dalle impostazioni GLOBALI dei test (`MOSTRO_CONFIG`, un
+  `OnceLock`: la prima `set` vince e le altre non fanno niente). Il suo
+  `init_globals` mette `test_settings()`, che un relay ce l'ha; ma cinque
+  moduli di upstream mettono un `Settings` fatto a mano con
+  `relays: vec![]` — `app/bond/flow.rs`, `app/bond/payout.rs`,
+  `app/dev_fee.rs`, `app/rate_user.rs`, `lightning/mod.rs` — e il filtro
+  `flow` pesca proprio `app::bond::flow`: se uno dei suoi test parte per
+  primo, la globale nasce senza relay e quella prova cade. Dipende
+  dall'ordine dei thread di `cargo test`, non dal codice: nelle liturgie
+  fino alla `-bar6` il filtro non la pescava (`config::util` non è
+  `util::tests`), e a pescarla è stato il `util` aggiunto qui. Da sola
+  (`util::tests::` pesca solo `src/util.rs` e `src/config/util.rs`, che
+  la globale non la tocca) vede sempre `test_settings()`. La 0010 e la
+  0008 non toccano né `MOSTRO_CONFIG` né `init_globals` (zero righe nelle
+  due `.patch`). Il binario non c'entra: è una prova, e l'immagine in
+  servizio è quella giusta. La cura vera è di upstream (la prova non
+  dovrebbe leggere una globale che altri moduli impostano diversa).
   Fra i verdi devono comparire `barattolo_bond_take::declared_method_decides_when_the_order_offers_it`,
   `…::a_declaration_the_order_does_not_offer_falls_back_to_the_order`,
   `…::an_empty_policy_still_covers_every_take` e i tre della 0008. Se la

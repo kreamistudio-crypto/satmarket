@@ -6,7 +6,14 @@ Andrea: la cauzione si chiede SOLO a chi sceglie i contanti). Sta sopra
 la 0008, ha il suo patcher (`patch-0010-cauzione-metodo-dichiarato.py`)
 e la sua voce in fondo a «LE SETTE PATCH»; la 0009 resta la PROPOSTA in
 `proposte/`, non applicata, e il numero è suo. ⚠️ NON compilata sul PC:
-la prima build è la `-bar7` (PRODUZIONE, «LA SALITA ALLA -bar7»). Fatta
+la prima build è stata la `-bar7` sul nodo (PRODUZIONE, «LA SALITA ALLA
+-bar7»), ✅ in servizio — riferito da Andrea il 12 ott 2026. Nei test
+della build è caduta una prova di UPSTREAM,
+`util::tests::connect_nostr_builds_client_with_configured_relays`, per
+l'ordine dei test e non per la 0010 (le impostazioni globali
+`MOSTRO_CONFIG` sono un `OnceLock` che cinque moduli di upstream
+impostano coi relay vuoti): la liturgia adesso la lancia in un giro suo,
+e il perché sta lì, al punto 3. Fatta
 come le altre: patcher a `--secco` e poi per davvero su un clone pulito
 della `v0.19.0` con le otto applicate via `git am`, un commit,
 `git format-patch -1 --start-number 10`; e `git am` delle nove su un
