@@ -243,14 +243,14 @@ tor, mostrod), due canali: 400.000 sat verso ACINQ e, dal 5 ott 2026,
 Stato al 12 ott 2026 (parola di Andrea):
 - P2P PUBBLICO DAL 10 OTT 2026 (lancio fatto): `P2P_IN_VETRINA` sta nel
   config del VPS, nel codice è False (PRODUZIONE, «LE CARD P2P IN VETRINA»).
-- I PIONIERI sono congelati a 101.
-- La cassaforte del mercatino è quella «nodo» (LNbits self-hosted col
-  LND del nodo: Cantieri, «Il doppio wallet»).
+- I PIONIERI sono congelati a 101. La cassaforte del mercatino è «nodo»
+  (LNbits self-hosted col LND del nodo: Cantieri, «Il doppio wallet»).
 - Il nodo gira Mostro 0.19.0 (`-bar7`, patch 0010): la cauzione solo a chi
   prende scegliendo «Contanti»; `P2P_CAUZIONE_SUL_METODO` ACCESA sul VPS.
-- Nessun limite di prezzo attivo (`TETTO_SATS_ANNUNCIO` spenta). Quali
-  leve sono ACCESE lo dice il pannello «⚙️ Stato delle leve» dell'admin,
-  che chiede al valore VIVO e non alla costante nel codice.
+- TETTI. Mercatino: nessun prezzo massimo (`TETTO_SATS_ANNUNCIO` spenta).
+  P2P: 250 € SOLO nei contanti di persona (`P2P_CONTANTI_MAX_EURO`); per
+  tutti gli ordini c'è `P2P_MAX_EURO`, 0 nel codice. I valori VIVI li dice
+  il pannello «⚙️ Stato delle leve» dell'admin.
 
 Backlog concordato: commissione minima fissa; a lancio fatto, il tracking
 verificato via API corrieri (con la MAPPA dei punti), l'escrow on-chain
