@@ -52017,8 +52017,10 @@ un collaudo di cartone con due rosse «NO» separate da duecento righe di
 rumore e un KeyError in fondo, girato dal lanciatore vero: tutt'e due
 nel registro (la prima solo nell'elenco, perché la coda non la
 raggiunge; la seconda nella coda e nell'elenco), tutt'e due con la loro
-annotazione, e l'annotazione del Traceback che dice «KeyError: 'fine'». Suite intera e tre
-collaudi col lanciatore nuovo: nel verbale del push.
+annotazione, e l'annotazione del Traceback che dice «KeyError: 'fine'».
+Sull'albero committato (8f3405e, sopra 8baccf6 che è la punta di main):
+la suite intera 22662 passate, 0 fallite; quattro collaudi col lanciatore
+nuovo (chi-e-l-altro, recensione, pagamento, db_contesa) verdi.
 
 **Resta da guardare.** La prossima rossa vera in CI: le annotazioni in
 cima alla corsa devono essere tante quante le rosse.
