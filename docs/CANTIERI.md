@@ -55155,3 +55155,113 @@ file senza `-u` arriva a blocchi. `python -u`, sempre, quando si guarda
 un file che cresce.
 - UN HEREDOC HA MANGIATO UN `\n` dentro una stringa Python, due volte
 (la memoria lo diceva già): gli script col Write, non dalla shell.
+
+**PROVATO (cantiere libro-vuoto).** `prove_ordine_in_pausa` (sezione
+nuova, 57 prove: il «da da»; la coda vera su sqlite coi fermi, la fine
+della pausa, l'ordine sparito; il salto su sqlite, la tabella di ieri
+senza la colonna, la rotta; le sentinelle — la pausa fuori dal filtro,
+la card, la porta della presa, il battito nell'interval, il CSS del
+grigio e dello scuotimento, nessuna frase che dica ancora «spariscono»;
+in node, nel fuso di Roma: i due vuoti, «fra quanto» in parole, la
+scritta della carta ferma, il tocco rifiutato con l'avviso e lo
+scuotimento che riparte, il conto che scende in place e il ridisegno
+alla fine, la fine della pausa nell'ora del telefono con la notte
+dell'ora solare, la riga del foglio, l'avviso, e il foglio di conferma
+VERO coi due tasti). `prove_vibrazione` con l'eccezione (una volta, dalla
+strada di sempre, solo con `true`). Le prove di ieri emendate dove
+pinzavano la forma di prima: i due vuoti, il conto dei gesti della
+domanda unica (ottantadue), i chiamanti del giudice «è mio» (otto), le
+fetch della pausa (tre), la forma vuota con `salta_fino`, il riquadro in
+cima al foglio, la chiamata e il timbro della coda, «la pausa entra nel
+filtro» (rovesciata), le frasi del foglio corto, di «Come funziona» e
+del profilo. `collaudo_ordine_in_pausa` (nuovo, 45 passi, in CI nella
+gabbia): il caso con le sue ore — l'orologio del server fermo alle
+23:24:32 di Roma —, le rotte vere della pausa, dei volti e di «posso
+prendere?», il giro VERO degli avvisi, e i giudici veri della pagina in
+node sulle risposte del server: la pausa già aperta, l'ordine dodici
+secondi dopo che nel libro C'È e si conta, la scritta «⏸ Puoi prenderlo
+tra 7 h 27 min», il tocco rifiutato con scuotimento e vibrazione
+d'avviso, i minuti che scendono, il ritorno allo scadere; la 🔔 che non
+parte, non parte un quarto d'ora dopo, parte alle 07:00 con un «da»
+solo; l'ordine sparito nella notte; il salto con le fasce che restano e
+la sera dopo; la leva spenta.
+LA TORTURA, su una copia del repo intero, in due giri. Il primo (28
+mutazioni, sul disegno «nascosto»): una viva alla prima passata — la
+seconda azione del foglio di conferma appesa alla domanda dopo, perché
+la prova la ESEGUIVA prima, e eseguirla la azzera da sola; il caso vero
+è la domanda aperta e lasciata lì. Il secondo (53 mutazioni, sul
+disegno di oggi: la 🔔 e il salto sul server; l'ordine che sparisce di
+nuovo, la carta senza grigio o senza scritta, la scritta sul proprio, i
+minuti in giù, «0 min», il grigio sulla carta intera, la variabile che
+non esiste; la carta che si apre, il «no» muto, o muto coi movimenti
+ridotti, o col tocco normale, senza scuotimento, sul proprio ordine,
+tutte le carte che si scuotono, lo scuotimento che non riparte, o coi
+ridotti, o infinito; il conto fermo, la carta che non torna, il libro
+ridisegnato a ogni battito; l'eccezione della vibrazione tolta, larga, o
+rovesciata; il fermo, i due tasti, la pausa locale, la riga, l'avviso):
+una viva — «Togli il filtro» a filtro spento, che nessuna prova chiedeva
+al giudice perché nel libro non succede; era però il difetto del caso.
+Chiesta, presa: 53 su 53.
+IL GIRO DAL VIVO in Chrome (Playwright, 390×844, tocchi veri alle
+coordinate), sul server del worktree con un config di cartone tenuto
+fuori dal repo (dal config d'esempio, relay morto, LNbits su una porta
+chiusa); ordini e pause SEMINATI NEL DATABASE del server, così la pausa
+arriva dalla rotta vera. Movimenti normali, chi guarda (222): «3
+offerte», due carte grigie (`grayscale(1)`, opacità 0,42 sui figli) con
+la scritta arancio piena — «⏸ Puoi prenderlo tra 6 h 35 min» e «tra 1
+min» —, la terza normale; il tocco sulla prima: nessun foglio, la
+classe dello scuotimento, l'animazione `p2p-no` in corso e la carta
+spostata, la vibrazione `[20, 65, 20]`; dopo quattordici secondi la
+seconda è tornata normale DA SOLA, e il tocco la apre (col tocco di
+sempre, 15 ms). Con «riduci movimento»: la classe `fx-ridotti`, nessuna
+animazione, nessun foglio, e la vibrazione `[20, 65, 20]` c'è. Chi ha
+pubblicato (111): la sua carta com'era, «⏸ In pausa fino alle 07:22» e
+«È il tuo ordine»; e l'avviso «Pubblichi durante la pausa?» con la frase
+nuova e i due tasti. Nessun errore di pagina. Sei scatti in
+`.claude/giri/libro-vuoto/`. Prima, nel pannello del browser (375×812),
+sul disegno di ieri: il foglio della pausa con la riga «Attiva adesso»,
+il salvataggio vero, e il tocco vero su «Togli la pausa per stanotte»
+fino al server (`fino` 0, la fascia ancora lì, `salta_fino` acceso).
+
+**NON PROVATO.** Nessun telefono vero, né dentro Telegram vero. Il gesto
+«⚡ Pubblica ordine» → domanda → pubblicazione con un coordinatore (né
+vero né di cartone): lo tengono la sentinella sul punto d'innesto e il
+banco node. La 🔔 su Telegram vero alla fine di una pausa vera. Il tema
+scuro (gli scatti sono in chiaro). `zoneinfo` sul VPS con un fuso fuori
+dall'Europa. Il motore di Safari.
+
+**DA GUARDARE.** 1) Sul telefono: il libro con un ordine in pausa di un
+altro account — grigio, la scritta, il tocco che scuote e vibra; con
+«riduci movimento» acceso, che vibri e non si muova. 2) Una pausa
+attiva, «+», un ordine SEPA, «⚡ Pubblica ordine» → la domanda coi due
+tasti; «Togli la pausa per stanotte» → l'ordine prendibile dall'altro
+account entro un minuto, e la sua 🔔. 3) L'ordine `fa17a63d` del caso:
+la sua 🔔 è GIÀ partita la sera del 12, quindi alle 07:00 non ne parte
+un'altra (la riga è timbrata). 4) DECISIONI APERTE, segnalate e non
+toccate: `var(--orange)` che non esiste (`.p2p-mio`, `.p2p-tuo`,
+`.p2p-mancati`, `.p2p-fee-banner` restano del colore del testo); la fila
+«Scambi P2P» della home, dove l'ordine in pausa continua a non esserci;
+gli ordini in pausa in mezzo agli altri nell'ordinamento (non in fondo);
+la vibrazione coi movimenti ridotti, che vale solo per questo gesto.
+
+**COSA È GIRATO SU QUALE ALBERO** (il verbale, 13 ott 2026). MAIN È
+CORSO QUATTRO VOLTE durante il cantiere (`7da34fb` punti-ritiro,
+`865c75b` voto-dopo-concluso, `f2717b0` pausa-nativi — il cantiere
+gemello: `_pause_p2p` adesso vale anche per chi è nato su Nostr, e la 🔔
+che aspetta lo eredita senza toccare niente —, `ea93474` chat-subito);
+a ogni rebase il conflitto era la coda di questo file (due sessioni,
+due voci in fondo: tenute tutte e due), una volta anche `prove.py` (due
+sezioni nuove prima di `main`: tenute tutte e due).
+PRIMO DISEGNO («nascosto»), sopra `400a3ea`: suite severa intera 23.227
+passate e 0 fallite, la tortura dei 28, il giro nel pannello.
+SECONDO DISEGNO (la carta grigia), sopra `865c75b`: suite severa intera
+23.393 passate e 0 fallite; i 75 collaudi del workflow nella gabbia, 75
+verdi; la tortura dei 53 (sulla stessa punta, più la prova stretta); il
+giro dal vivo coi sei scatti.
+ALBERO ULTIMO, sopra `ea93474`, tre commit firmati: la suite severa
+INTERA, 23.423 passate e 0 fallite; i collaudi del workflow nella
+gabbia, 75 verdi su 75; `node` sui tre script della pagina; le forme dei
+segreti cercate nelle righe nuove (nessuna). La tortura e il giro dal
+vivo sono dell'albero di prima degli ultimi due rebase. IL PUSH aspetta
+l'ok di Andrea: quello del brief era scritto prima del lavoro, e si
+richiede a lavoro fatto.
