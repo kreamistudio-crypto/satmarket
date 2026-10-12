@@ -51344,4 +51344,15 @@ finché dura la beta, e a fine beta salirà (cifra da decidere); nel
 codice la leva è 0. Avevo scritto «solo nei contanti» leggendo il solo
 codice: il config del VPS vince sul default, ed è la regola di CLAUDE.md.
 PROVATO. La controprova qui sopra; il collaudo nella gabbia
-(`collaudi_ci.py`); suite e collaudi interi nel verbale del push.
+(`collaudi_ci.py`), tre volte verde.
+IL VERBALE DEL PUSH: cosa è girato su quale albero. Sull'albero di
+partenza (`2c317ab` + il cantiere): suite PROVE_SEVERE intera, 22.494
+passate e 0 fallite; i 62 collaudi del workflow nella gabbia, tutti
+verdi. Main è corso di tre commit (le dispute P2P nel cruscotto, fino
+a `88ed663`: server, prove, un collaudo nuovo): un rebase, un solo
+conflitto in coda a CANTIERI, tenute le due voci. SULL'ALBERO RIBASATO,
+quello del push, rifatto tutto: suite intera 22.537 passate e 0
+fallite, 63 collaudi su 63 verdi (il collaudo curato in 16 secondi).
+CLAUDE.md a 261 righe contro un tetto di 262. LA CI DI MAIN prima del
+push: aspettata verde sulla punta `88ed663`. Il sì al push è di
+Andrea: stava nel brief incollato («Ok al push»).
