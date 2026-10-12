@@ -31009,6 +31009,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   proprio ordine). «Dimentica il profilo» la toglie, la fusione degli
   account la sposta. ⚠️ VALE DENTRO BARATTOLO, come filtro e limite: per
   il coordinatore l'ordine resta `pending`.
+  CHI È NATO SU NOSTR È DEI NOSTRI (13 ott 2026, cantiere
+  `pausa-nativi`): `_pause_p2p` scarta lo ZERO di «non è dei nostri»
+  (`tg_id <> 0`), non il segno — un id negativo in pausa esce dal libro
+  come gli altri. Col `> 0` di prima la pausa di un nativo si scriveva e
+  si leggeva, ma i suoi ordini restavano prendibili.
   • LA PAUSA IN VISTA (12 ott 2026, sera, cantiere `pausa-in-vista`,
   richiesta di Andrea: stava solo nel profilo di scambio, dietro la
   pagina dei dati personali). NIENTE REGOLE NUOVE, cambia dove si vede,

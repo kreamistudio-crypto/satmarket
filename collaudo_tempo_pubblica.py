@@ -32,6 +32,8 @@ profilo» — su un database usa-e-getta, e si guarda cosa resta scritto:
      compare sul volto dei suoi ordini;
   8. il badge: tre scambi conclusi con tre persone diverse, risposta
      entro dieci minuti → `veloce` sul volto e nei propri numeri;
+  8-ter. chi e' NATO SU NOSTR (id negativo) in pausa esce dal libro e
+     non si prende, come tutti (13 ott 2026, cantiere pausa-nativi);
   9. «dimentica il profilo» porta via la pausa.
 
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
@@ -370,6 +372,52 @@ async def giro():
         SRV.P2P_TEMPO_DI_CHI_PUBBLICA = True
     prova("il link del bottone e' uno di quelli che dentro Telegram aprono la Mini App",
           "pausa", SRV._startapp_da_link(SRV.URL_PUBBLICO + "/p2p?pausa=1"))
+
+    print("\n8-ter) un nativo Nostr in pausa: l'id negativo e' dei nostri come gli altri")
+    # (13 ott 2026, cantiere pausa-nativi, il notato verificato su
+    # richiesta di Andrea) chi e' NATO SU NOSTR ha un id negativo: la
+    # pausa la scriveva e il foglio gliela diceva, ma il giudice del libro
+    # chiedeva `tg_id > 0` e i suoi ordini restavano in vetrina
+    NATIVO = -7301234567890123
+    NA1 = "7e3a0000-1111-4a2b-9c3d-000000000021"
+    NA2 = "7e3a0000-1212-4a2b-9c3d-000000000022"
+    FUORI = "7e3a0000-1313-4a2b-9c3d-000000000023"
+    con = banco.con_db()
+    # CHI CHIEDE E' UNA PERSONA NUOVA: PRENDE a questo punto ha tre prese
+    # aperte, e il suo «no» sarebbe `prese` qualunque cosa dica la pausa
+    PASSA = 777
+    for tg, nome, negozio in ((NATIVO, "Nata su Nostr", "nostrina"), (PASSA, "Passante", "neg777")):
+        con.execute("INSERT OR IGNORE INTO utenti(tg_id,nome,negozio,registrato,ln_address) "
+                    "VALUES(?,?,?,1,'')", (tg, nome, negozio))
+    for ordine, chi in ((NA1, NATIVO), (NA2, NATIVO), (FUORI, 0)):
+        con.execute("INSERT OR REPLACE INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,"
+                    "sats,euro,metodi) VALUES(?,?,?,'pending','sell',?,15000,'10,00 €',?)",
+                    (ordine, chi, int(time.time()), 1 if chi else 0, json.dumps(["SEPA"])))
+    con.commit()
+    con.close()
+    f = await facce(PASSA, [NA1, NA2, FUORI])
+    p = (await posso(PASSA, [NA1, NA2, FUORI]))["ordini"]
+    prova("senza pausa i suoi ordini stanno nel libro e si prendono",
+          ([], [True, True, True]), (sorted(f["pause"]), [p[o]["ok"] for o in (NA1, NA2, FUORI)]))
+    r = await scrivi_pausa(NATIVO, {"una_fino": int(time.time()) + 3600})
+    prova("la sua pausa si scrive dalla rotta vera, e il suo foglio dice fino a quando",
+          (True, True), (r["attiva"], r["fino"] > time.time()))
+    f = await facce(PASSA, [NA1, NA2, FUORI])
+    prova("IN PAUSA i suoi due ordini escono fra le pause del libro, con la stessa fine "
+          "del suo foglio; quello di chi non e' dei nostri no",
+          ([NA1, NA2], r["fino"], r["fino"]),
+          (sorted(f["pause"]), f["pause"].get(NA1), f["pause"].get(NA2)))
+    p = (await posso(PASSA, [NA1, NA2, FUORI]))["ordini"]
+    prova("...«posso prendere?» li ferma col motivo `pausa`, e l'altro si prende",
+          ("pausa", "pausa", r["fino"], True),
+          (p[NA1]["motivo"], p[NA2]["motivo"], p[NA1].get("fino"), p[FUORI]["ok"]))
+    prova("...a LEI il suo ordine non dice «pausa»", True,
+          (await posso(NATIVO, [NA1]))["ordini"][NA1]["motivo"] != "pausa")
+    await scrivi_pausa(NATIVO, {})
+    f = await facce(PASSA, [NA1, NA2])
+    p = (await posso(PASSA, [NA1, NA2]))["ordini"]
+    prova("tolta la pausa tornano da soli: fuori dalle pause, e si prendono",
+          ([], True, True), (sorted(f["pause"]), p[NA1]["ok"], p[NA2]["ok"]))
 
     print("\n9) dimentica il profilo")
     await scrivi_pausa(PUBBLICA, {"una_fino": int(time.time()) + 3600})

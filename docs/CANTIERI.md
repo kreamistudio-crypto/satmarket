@@ -54314,3 +54314,54 @@ controprova; nessun nome e nessun numero d'account degli utenti nel
 diff. Alcune istruzioni di Andrea sono arrivate come testo incollato
 che rispondeva punto per punto ai miei rapporti: prese per sue, e
 detto; l'ok finale al push l'ha scritto lui in chiaro.
+
+## La pausa vale anche per chi è nato su Nostr (13 ott 2026, cantiere pausa-nativi, difetto notato studiando il paracadute, verifica e correzione chieste da Andrea)
+
+**IL DIFETTO, online dal 12 ott.** Chi è nato su Nostr ha un id
+NEGATIVO (`tg_id` derivato dalla sua chiave). La sua pausa si scriveva
+(`POST /api/p2p/pausa` scrive per chiunque abbia una sessione), il suo
+foglio diceva «⏸ In pausa fino a…» (`_mia_pausa_p2p`), la presa
+arrivata in pausa gli veniva scusata (`_presa_in_pausa_p2p`) — ma i
+suoi ordini RESTAVANO NEL LIBRO E SI PRENDEVANO: `_pause_p2p`, il
+giudice unico da cui passano la fotografia, i volti e «posso
+prendere?», chiedeva `tg_id > 0`.
+
+**LA CAUSA.** Quel `> 0` voleva scartare lo ZERO, che in `p2p_ordini`
+vuol dire «non è dei nostri» (un ordine pubblicato da un'altra app).
+Scartava anche il segno. È la stessa svista letta al contrario di
+`/api/p2p/seme`, dove `tg_id > 0` è voluto («la strada derivata è solo
+per chi entra da Telegram»): lì il segno è la regola, qui era un
+effetto.
+
+**LA CURA.** Una riga: `tg_id <> 0`. Lo zero resta fuori — una riga di
+pausa senza persona non deve nascondere gli ordini di chi pubblica da
+un'altra app —, il segno no. Nient'altro è cambiato: il client non ha
+una regola sua (nasconde quel che la mappa `pause` del server gli
+dice), e le altre tre funzioni della pausa l'id negativo lo trattavano
+già bene.
+
+**PROVATO, e prima visto ROSSO.** `prove_tempo_di_chi_pubblica`, sette
+controlli nuovi nella sezione della pausa: i due ordini di un nativo
+(id negativo) in pausa escono dal libro con la sua fine; «posso
+prendere?» li ferma col motivo `pausa`, e a lui il suo no; la presa
+arrivata nella sua pausa è scusata e il suo foglio dice la stessa fine
+del libro; di giorno tornano da soli; LO ZERO RESTA FUORI (una riga di
+pausa con `tg_id` 0 scritta a mano non nasconde l'ordine di chi non è
+dei nostri); la riga del giudice. Sul codice di prima quattro di
+questi erano rossi. `collaudo_tempo_pubblica`, passo 8-ter, sulle
+ROTTE VERE: la pausa scritta da `/api/p2p/pausa` come nativa, i due
+ordini fra le `pause` di `/api/p2p/facce`, il «no» di
+`/api/p2p/posso-prendere`, e il ritorno a pausa tolta — chiesto da una
+persona nuova, perché a quel punto del collaudo chi prende ha già tre
+prese aperte e il suo «no» sarebbe `prese`. Girato contro il
+`server.py` di main: due rossi; con la riga nuova: 44 su 44.
+
+**NOTATO, non toccato.** `_autori_foto_p2p` ha lo stesso `tg_id > 0`:
+serve a dire a chi guarda quali ordini della fila «Scambi P2P» di
+Esplora sono suoi, e a un nativo Nostr non lo dice — i suoi ordini gli
+compaiono nella fila anche sugli altri dispositivi. Segnalato ad
+Andrea.
+
+**RESTA DA GUARDARE** (Andrea, dopo il deploy, se ha sotto mano un
+account nato su Nostr): una pausa «una volta sola» di prova, e dal
+secondo account l'ordine che esce dal libro.

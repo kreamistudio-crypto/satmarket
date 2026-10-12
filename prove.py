@@ -149230,6 +149230,46 @@ def prove_tempo_di_chi_pubblica():
           ["if _tabacchino_libro(_metodi_lista_p2p(r[2])):\n            continue"
            in pezzo("_pause_p2p"),
            "tabacchino" in pezzo("_pause_foto_p2p"), "abacchino" in pezzo("_presa_in_pausa_p2p")])
+    # (13 ott 2026, cantiere pausa-nativi: il notato del paracadute,
+    # verificato su richiesta di Andrea) CHI E' NATO SU NOSTR HA UN ID
+    # NEGATIVO, e la pausa e' sua come di tutti. Il giudice chiedeva
+    # `tg_id > 0` per scartare lo zero di «non e' dei nostri», e insieme
+    # allo zero scartava loro: in pausa sul proprio foglio, nel libro e
+    # prendibili per tutti gli altri
+    N = -7301234567890123
+    con.execute("INSERT INTO utenti VALUES(?,1)", (N,))
+    o_n, o_n2 = ordine(maker=N), ordine(maker=N)
+    scrivi(con, N, pulita({"fasce": [NOTTI], "fuso": "Europe/Rome", "scarto": 120}, T4), T4)
+    alba = utc(2026, 7, 23, 4)
+    prova("UN NATIVO NOSTR IN PAUSA (id negativo): i suoi ordini escono dal libro come "
+          "quelli di tutti, con la fine della sua pausa",
+          {o_p: alba, o_n: alba, o_n2: alba}, pause(con, [o_p, o_n, o_n2, o_altro], T4))
+    r = posso(con, T, [o_n, o_n2], T4)["ordini"]
+    prova("...«posso prendere?» li ferma col motivo `pausa` e l'ora del ritorno",
+          [{"ok": False, "motivo": "pausa", "soglia": 0, "fino": alba}] * 2,
+          [r[o_n], r[o_n2]])
+    prova("...ma a LUI il suo ordine non dice «pausa»", True,
+          posso(con, N, [o_n], T4)["ordini"][o_n]["motivo"] != "pausa")
+    prova("...la presa arrivata nella sua pausa e' scusata come le altre, e il suo foglio "
+          "dice la stessa fine del libro", [True, alba],
+          [amb["_presa_in_pausa_p2p"](con, N, T4), amb["_mia_pausa_p2p"](con, N, T4)["fino"]])
+    prova("...di giorno i suoi ordini tornano da soli", {},
+          pause(con, [o_n, o_n2], T4 - 6 * 3600))
+    # LO ZERO RESTA FUORI, ed era tutto il mestiere di quel `> 0`: zero e'
+    # «non e' dei nostri», e una riga di pausa senza persona non deve
+    # nascondere gli ordini di chi pubblica da un'altra app
+    o_zero = ordine(maker=0)
+    con.execute("INSERT OR REPLACE INTO p2p_pause(tg_id, fasce, fuso, scarto, una_da, "
+                "una_fino, aggiornato) VALUES(0, ?, 'Europe/Rome', 120, 0, 0, ?)",
+                ('[{"g":[0,1,2,3,4,5,6],"da":1320,"a":360}]', T4))
+    prova("...e LO ZERO RESTA FUORI: una riga di pausa senza persona non nasconde gli "
+          "ordini di chi non e' dei nostri", [False, True],
+          [o_zero in pause(con, [o_zero, o_n], T4), o_n in pause(con, [o_zero, o_n], T4)])
+    con.execute("DELETE FROM p2p_pause WHERE tg_id=0")
+    prova("...la riga del giudice: scarta lo zero, non il segno", [True, False],
+          ["AND tg_id <> 0 AND tg_id IN (SELECT tg_id FROM p2p_pause)" in pezzo("_pause_p2p"),
+           "tg_id > 0" in pezzo("_pause_p2p")])
+    scrivi(con, N, pulita({}, T4), T4)
     mia = amb["_mia_pausa_p2p"]
     prova("la mia pausa, per il foglio: le fasce, e `fino` solo se adesso sono in pausa",
           [[NOTTI], utc(2026, 7, 23, 4), 0, 6, 7],

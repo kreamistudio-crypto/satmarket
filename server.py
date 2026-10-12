@@ -46855,10 +46855,15 @@ def _pause_p2p(con, ordini, adesso: int) -> dict:
     if not P2P_TEMPO_DI_CHI_PUBBLICA:
         return {}
     segni = ",".join("?" * len(pulite))
+    # `tg_id <> 0` E NON `> 0` (13 ott 2026, cantiere pausa-nativi): lo
+    # zero e' «non e' dei nostri» e resta fuori, ma chi e' NATO SU NOSTR
+    # ha un id NEGATIVO ed e' dei nostri come gli altri. Col `> 0` la sua
+    # pausa si scriveva, il suo foglio diceva «in pausa», e i suoi ordini
+    # restavano nel libro e si prendevano
     try:
         righe = con.execute(
             f"SELECT ordine, tg_id, metodi FROM p2p_ordini WHERE ordine IN ({segni}) "
-            f"AND tg_id > 0 AND tg_id IN (SELECT tg_id FROM p2p_pause)",
+            f"AND tg_id <> 0 AND tg_id IN (SELECT tg_id FROM p2p_pause)",
             pulite).fetchall()
     except sqlite3.OperationalError:
         return {}
