@@ -57472,13 +57472,9 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
         esiti = []
         for tg_id, testo in avvisi:
             try:
-                if bottoni.get(tg_id):
-                    # col bottone SOLO dove c'e': chi non l'ha parte
-                    # com'e' sempre partito
-                    esiti.append((tg_id, await _recapita_p2p(
-                        tg_id, testo, bottone=bottoni[tg_id])))
-                    continue
-                esiti.append((tg_id, await _recapita_p2p(tg_id, testo)))
+                # il bottone solo dove c'e' (None per tutti gli altri):
+                # `_recapita_p2p` a `notifica()` lo passa solo allora
+                esiti.append((tg_id, await _recapita_p2p(tg_id, testo, bottone=bottoni.get(tg_id))))
             except Exception as e:
                 esiti.append((tg_id, f"SALTATO ({type(e).__name__}: {e})"))
             await asyncio.sleep(0.2)

@@ -97630,11 +97630,15 @@ def prove_p2p_esito_notifiche():
     # attese, e la rotta del recapito — il giro del libro non manda piu'
     # (12 ott 2026) gli eventi mandano con `_recapita_p2p`: e' `notifica`
     # per le parti, e la porta del gruppo degli admin per i moderatori
-    for nome, segno, manda in (("_manda_evento_p2p", "🛰️", "_recapita_p2p"),
-                               ("_giro_attese_p2p", "📬", "notifica")):
+    # (12 ott 2026, sera, pausa-in-vista) ...e porta il bottone della
+    # pausa a chi tocca, `None` per tutti gli altri: la chiamata resta UNA
+    for nome, segno, manda in (
+            ("_manda_evento_p2p", "🛰️",
+             "_recapita_p2p(tg_id, testo, bottone=bottoni.get(tg_id))"),
+            ("_giro_attese_p2p", "📬", "notifica(tg_id, testo)")):
         corpo = codice(pezzo(nome))
         prova(f"`{nome}` raccoglie l'esito di ogni notifica e lo scrive sotto «avvisati»",
-              True, f"await {manda}(tg_id, testo)" in corpo and "esiti.append((tg_id, " in corpo
+              True, f"await {manda}" in corpo and "esiti.append((tg_id, " in corpo
               and f'_esiti_p2p_dice("{segno}", esiti)' in corpo)
     prova("...e la rotta del recapito pure", True,
           '_esiti_p2p_dice("💶", [(a_chi, esito)])' in src)
@@ -148911,12 +148915,13 @@ def prove_pausa_in_vista():
            < invio.find("avvisi = avvisi + _disputa_evento_p2p("),
            bool(re.search(r"try:\s+bottoni = \{tg: _bottone_pausa_p2p\(con, ev, fatto, tg\) "
                           r"for tg, _ in avvisi\}\s+except Exception:\s+bottoni = \{\}", invio))])
-    prova("...lo passa SOLO dove c'e' (chi non l'ha parte com'e' sempre partito), e al "
-          "gruppo degli admin non arriva mai",
-          [True, True, True],
-          ["await _recapita_p2p(\n                        tg_id, testo, bottone=bottoni[tg_id])"
-           in invio,
-           "esiti.append((tg_id, await _recapita_p2p(tg_id, testo)))" in invio,
+    prova("...la consegna resta UNA chiamata, col bottone o con None; a `notifica()` "
+          "arriva SOLO dove c'e' (chi non l'ha parte com'e' sempre partito), e al gruppo "
+          "degli admin non arriva mai",
+          [True, 1, True],
+          ["esiti.append((tg_id, await _recapita_p2p(tg_id, testo, "
+           "bottone=bottoni.get(tg_id))))" in invio,
+           invio.count("_recapita_p2p("),
            "return await notifica(tg_id, testo, *([bottone] if bottone else []))"
            in pezzo("_recapita_p2p")
            and "bottone" not in pezzo("_recapita_p2p").split("_al_gruppo_admin(", 1)[1]])
