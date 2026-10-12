@@ -52243,3 +52243,38 @@ dall'altro account. Sul VPS: `grep -n "P2P_TEMPO_DI_CHI_PUBBLICA"
 /srv/barattolo/config.py` prima di accendere, e il pannello delle leve
 dopo. Sul nodo: la `-bar8`, quando dà l'ok. Poi i numeri: quante prese
 restano senza risposta con le tre ore, e se le ore vanno ritoccate.
+
+**COSA È GIRATO SU QUALE ALBERO** (il verbale prima del push, 12 ott
+2026). PRIMA STESURA, sopra `2c317ab` (la punta di main quando il
+cantiere è stato chiuso): la suite severa intera, 22.649 passate e 0
+fallite; i 63 collaudi del workflow nella gabbia, tutti verdi; la
+tortura (17 su 17); il giro dal vivo coi tredici scatti; il patcher
+della 0011 sul fork ricostruito. Quella suite è partita PRIMA di
+quattro ritocchi senza codice: due commenti di `server.py` (la regola
+del 10 ott annotata dove era scritta), una riga della guida ai passi,
+`CLAUDE.md` e `deploy/mostro/.gitattributes`.
+MAIN È CORSO DUE VOLTE mentre si chiudeva, e sono due rebase: prima
+`c29faf3`, `44cae5f`, `88ed663` (le dispute nel cruscotto), poi
+`a180fa6`, `e460c2f`, `02dec6b` (il tetto dei 250 € in `CLAUDE.md`, il
+collaudo ballerino degli avvisi). Conflitti solo nelle code: questa
+voce in fondo a CANTIERI e i due elenchi dei collaudi nel workflow —
+tenute tutte le righe, le mie per ultime; contro main quei file danno
+solo aggiunte. `CLAUDE.md` si è fuso da solo (loro «Adesso», io il
+nodo) e resta a 261 righe.
+ALBERO ULTIMO, sopra `02dec6b`: la suite severa intera, 22.692 passate
+e 0 fallite (dentro c'è `prove_dispute_cruscotto_p2p`, arrivata da
+main); i 64 collaudi del workflow nella gabbia — i 63 più
+`collaudo_dispute_cruscotto`, loro — tutti verdi, in tre gruppi insieme
+alla suite; `node` sui tre script della pagina, 0 rotti; lo scanner dei
+segreti sulle 5.043 righe aggiunte, pulito, con la controprova. NON
+RIFATTI su quest'albero: la tortura e il giro dal vivo — i sei commit
+arrivati non toccano `miniapp.html`, e in `server.py` aggiungono la
+sezione delle dispute, che legge e non scrive.
+UN INCROCIO DA SAPERE, non toccato perché è dell'altro cantiere: la
+sezione delle dispute, quando la cronaca non c'è più (oltre i quaranta
+giorni), deduce dal registro che uno scambio `tornato` NON aveva la
+garanzia bloccata. Col ritorno nel libro per colpa di chi pubblica
+(`maker-republished`) su un ordine di ACQUISTO la garanzia c'era: chi
+vende l'aveva già bloccata. Sbaglia nel verso che quella voce dichiara
+già (uno scambio senza disputa in meno nel conto), e solo con la
+`-bar8` in servizio.
