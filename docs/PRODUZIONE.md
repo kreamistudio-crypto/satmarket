@@ -66,6 +66,32 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   IL ROUTING vuole il ponte di LND (`LND_PONTE_MACAROON_LETTURA`): senza,
   la sezione dice «non disponibile» e le commissioni nette non hanno
   una cifra. Coi perche': Architettura, «I CONTI DEL P2P».
+- LA SOGLIA DELLE DISPUTE P2P (12 ott 2026): la card «⚖️ Dispute P2P»
+  del cruscotto `/admin` la vedono tutti i moderatori e non vuole
+  niente sul VPS. L'AVVISO su Telegram parte quando negli ultimi 30
+  giorni le dispute passano la leva `P2P_DISPUTE_SOGLIA_PERCENTO` (di
+  serie 5) con almeno 3 dispute: uno per superamento, e si riarma
+  quando la percentuale scende di un punto sotto. La riga nel config
+  del VPS serve SOLO per cambiare il numero o spegnere (0): si guarda
+  prima — `grep -n "P2P_DISPUTE_SOGLIA" /srv/barattolo/config.py` —, si
+  scrive `P2P_DISPUTE_SOGLIA_PERCENTO = 8` e
+  `sudo systemctl restart barattolo`. Una riga storta vale 5 e lo dice
+  all'avvio (`[p2p] P2P_DISPUTE_SOGLIA_PERCENTO non e' un numero`). Il
+  pannello «⚙️ Stato delle leve» dice il valore vivo («Soglia delle
+  dispute P2P (%)»). Nel journal: «⚖️ P2P: dispute sopra la soglia,
+  moderatori avvisati» quando parte; «⚠️ P2P: la soglia delle dispute
+  non si è potuta guardare» se il conto alza (le attese e la scopa
+  vanno avanti lo stesso). PER FARLO RISUONARE A MANO (dopo aver
+  cambiato soglia, per esempio) si toglie il timbro, in sola scrittura
+  di quella riga: `DELETE FROM timbri WHERE nome='soglia_dispute_p2p'`
+  sul db vero (`/srv/barattolo/dati/satmarket.db`, con python3). COSA
+  C'E' DENTRO, in sola lettura: `SELECT substr(ordine,1,8), giro,
+  datetime(aperta_il,'unixepoch'), stato, esito, chiusa_da FROM
+  p2p_dispute ORDER BY aperta_il` — se li' ci sono dispute di PROVA
+  (le prove di fine settembre e della 0.19.0), contano in «da sempre»
+  e nei 30 giorni finche' non ne escono: si guarda prima di fidarsi
+  della percentuale. Coi perche': Architettura, «LE DISPUTE NEL
+  CRUSCOTTO».
 - LE CARD P2P IN VETRINA (26 set 2026): la leva `P2P_IN_VETRINA` si
   AGGIUNGE al config del VPS come le altre, e finche' manca o e'
   `False` le card le vedono solo i moderatori e chi e' in

@@ -719,6 +719,15 @@ P2P_PROVA_IDS = []
 # scritta male) = non la vede NESSUNO, e il server risponde 403 a
 # tutti. Si riempie sul VPS e si riavvia.
 P2P_STATISTICHE_IDS = []
+# LA SOGLIA DELLE DISPUTE P2P (12 ott 2026): la sezione «⚖️ Dispute P2P»
+# del cruscotto /admin dice quanti scambi presi finiscono in disputa.
+# Sopra questa PERCENTUALE negli ultimi 30 giorni — e con almeno 3
+# dispute, perche' una su dieci scambi non e' un segnale — i moderatori
+# ricevono UN avviso su Telegram: uno per superamento, e si riarma solo
+# quando la percentuale scende di un punto sotto la soglia.
+# 0 = nessun avviso (i numeri nel cruscotto restano). Non dichiarata o
+# scritta male vale 5.
+P2P_DISPUTE_SOGLIA_PERCENTO = 5
 # IL SEGRETO DEL PROFILO DI SCAMBIO (set 2026): da qui si ricava la
 # chiave d'identita' Mostro di chi entra da Telegram, cosi' i suoi
 # scambi si vedono uguali dal bot, dal sito e dall'app. Serve anche il

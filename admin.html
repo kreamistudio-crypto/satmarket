@@ -326,7 +326,9 @@ function disegna(){
       : `<div class="nota">Non disponibili${L.canali_motivo ? ': ' + esc(L.canali_motivo) : ''}.</div>`}
   </div>
 
-  ${cardZap(D.zap)}`;
+  ${cardZap(D.zap)}
+
+  ${cardDisputeP2P(D.dispute_p2p)}`;
 
   barre(el('gNuovi'), ks, [{colore:colore('--s-tg')}, {colore:colore('--s-nostr')}], nuovi,
     (k, v) => `${esc(etichetta(k, modo))} · Telegram ${fmt(v[0])} · Nostr ${fmt(v[1])}`);
@@ -403,6 +405,52 @@ function cardZap(Z){
     </div>
     <div class="tab">${tabella(['Quando', 'Sats', 'Da chi', 'Messaggio'], (Z.ultimi || []).map(u => [data(u.pagato_il), fmt(u.sats), chi(u), esc(u.commento || '')]), [1])}</div>
     <div class="nota">Gli ultimi venti. I sats si spostano a mano dal pannello di LNbits (wallet «zap»): il server ha la sola chiave che incassa.</div>
+  </div>`;
+}
+
+/* ---- DISPUTE P2P (12 ott 2026): quanti scambi presi finiscono in
+   disputa ----
+   La vedono tutti i moderatori: solo numeri, e delle aperte l'id
+   dell'ordine accorciato. `X` nullo = un server senza P2P: niente card.
+   Uno scambio sta nel periodo in cui e' stato PRESO e la disputa sta col
+   suo scambio; la tendenza e' in PUNTI percentuali sul periodo prima,
+   lungo uguale. Senza scambi la percentuale e' «—», mai 0%. */
+const percD = p => p == null ? '—' : fmtd(p, 1) + '%';
+function tendenzaD(p){
+  if (!p.prima) return '—';
+  if (p.tendenza == null) return p.prima.presi ? '—' : 'prima nessuno scambio';
+  const segno = p.tendenza > 0 ? '▲ +' : p.tendenza < 0 ? '▼ −' : '= ';
+  /* due righe corte: su un telefono la colonna e' larga ottanta pixel */
+  return `<span style="white-space:nowrap">${segno}${fmtd(Math.abs(p.tendenza), 1)}</span><br><span class="sub" style="white-space:nowrap">era ${percD(p.prima.percento)}</span>`;
+}
+function cardDisputeP2P(X){
+  if (!X) return '';
+  const P7 = X.periodi['7'], P30 = X.periodi['30'], PT = X.periodi.tutto, S = X.soglia;
+  const su = p => `${fmt(p.con_disputa)} ${p.con_disputa === 1 ? 'disputa' : 'dispute'} su ${fmt(p.presi)} ${p.presi === 1 ? 'scambio preso' : 'scambi presi'}`;
+  const t = (k, v, d, rosso) => `<div class="tile"><div class="k">${k}</div><div class="v"${rosso ? ' style="color:var(--err)"' : ''}>${v}</div><div class="d">${d}</div></div>`;
+  const giorni = ts => Math.max(0, Math.floor((Date.now() / 1000 - ts) / 86400));
+  const aperte = X.aperte.map(a => `<span class="mono">${esc(a.ordine)}</span> <span class="sub">${giorni(a.aperta_il) ? 'da ' + fmt(giorni(a.aperta_il)) + ' g' : 'da oggi'}${a.presa ? '' : ', nessuno l\'ha presa'}</span>`).join(' · ');
+  const riga = (nome, f) => [nome, f(P7, 7), f(P30, 30), f(PT, 0)];
+  const dal = X.dal ? new Date(X.dal * 1000).toLocaleDateString('it-IT', {day: 'numeric', month: 'short', year: 'numeric'}) : '';
+  return `<div class="card" id="disputeP2P"><h2>⚖️ Dispute P2P</h2>
+    ${PT.presi ? `
+    <div class="tiles">
+      ${t('Ultimi 7 giorni', percD(P7.percento), su(P7))}
+      ${t('Ultimi 30 giorni', percD(P30.percento), su(P30) + (S.sopra ? ' · sopra la soglia' : ''), S.sopra)}
+      ${t('Da sempre', percD(PT.percento), su(PT))}
+      ${t('Ancora aperte', fmt(X.aperte.length), aperte || 'nessuna')}
+    </div>
+    <div class="tab">${tabella(['', '7 giorni', '30 giorni', 'Da sempre'], [
+      riga('Scambi presi', p => fmt(p.presi)),
+      riga('Con disputa', p => fmt(p.con_disputa)),
+      riga('Percentuale', p => `<b>${percD(p.percento)}</b>`),
+      riga('Punti sul periodo prima', tendenzaD),
+      riga('Chiuse a favore di chi compra', p => fmt(p.compratore)),
+      riga('Chiuse a favore di chi vende', p => fmt(p.venditore)),
+      riga('Ancora aperte', p => fmt(p.aperte))])}</div>
+    <div class="nota">Uno scambio conta nel periodo in cui è stato preso, e la disputa col suo scambio${dal ? ` («da sempre» parte dal ${esc(dal)})` : ''}. «A favore di» dice dove sono andati i sats: ${fmt(PT.moderatore)} su ${fmt(PT.compratore + PT.venditore)} le ha decise un moderatore, le altre si sono chiuse fra le parti o per scadenza.</div>
+    <div class="nota">${S.percento > 0 ? `I moderatori ricevono un avviso se negli ultimi 30 giorni si passa il ${fmtd(S.percento, 1)}%, con almeno ${fmt(S.minimo)} dispute.` : 'L\'avviso ai moderatori è spento.'}</div>`
+    : '<div class="nota">Ancora nessuno scambio preso.</div>'}
   </div>`;
 }
 

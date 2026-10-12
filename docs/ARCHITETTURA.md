@@ -10451,6 +10451,39 @@
   routing di tutti gli scambi del periodo si conosce. La risposta si
   tiene un minuto in memoria (`P2P_CONTI_CACHE_S`); gli ultimi scambi
   portano le iniziali (`_iniziali_p2p`), mai nomi ne' id.
+  LE DISPUTE NEL CRUSCOTTO (12 ott 2026, cantiere dispute-nel-cruscotto):
+  la card «⚖️ Dispute P2P», l'ultima del cruscotto di TUTTI i moderatori
+  (`dati_cruscotto` porta `dispute_p2p`; non passa da
+  `vede_statistiche_p2p`: sono conteggi, non incassi). Il giudice e'
+  `dati_dispute_p2p(con, adesso)`, che NON scrive e non ha tabelle sue.
+  GLI SCAMBI PRESI sono i giri di `p2p_conti` (completato, annullato,
+  tornato) piu' quelli che la cronaca dei quaranta giorni racconta e il
+  registro non ha ancora (`_esiti_cronaca_p2p`: in corso, o chiusi
+  nell'ultima ora) — a parita' di ordine e giro vince il registro; LE
+  DISPUTE sono `p2p_dispute`, che non si pota. Uno scambio sta nel
+  periodo in cui e' stato PRESO (presa, o chiusura se la presa non si
+  sa) e la disputa sta col suo scambio: la percentuale non passa il
+  cento; una disputa senza piu' il suo scambio in registro e cronaca lo
+  porta con se', dall'ora dell'apertura. Tre periodi
+  (`P2P_DISPUTE_PERIODI`: 7, 30, tutto); per 7 e 30 il periodo PRIMA,
+  lungo uguale, e la `tendenza` in punti percentuali; senza scambi la
+  percentuale e' None, mai 0. Delle chiuse si dice dove sono andati i
+  sats (`compratore` | `venditore`) e quante le ha decise un moderatore;
+  delle aperte l'id dell'ordine ACCORCIATO a 8 e da quando. Nessun
+  account esce di li'. Un database senza le tabelle del P2P da' None e
+  la pagina non disegna la card. NON SI CONTA la disputa che il
+  coordinatore apre da solo alla scadenza della garanzia: non la
+  racconta (vedi «LA GARANZIA LUNGA»).
+  L'AVVISO: `_avviso_soglia_dispute_p2p`, dal giro dell'ora del P2P
+  (`_giro_attese_p2p`, dopo i conti e la scopa, dentro
+  `_soglia_dispute_salva_p2p` che non alza mai). SOPRA vuol dire: leva
+  `P2P_DISPUTE_SOGLIA_PERCENTO` > 0, almeno `P2P_DISPUTE_SOGLIA_MINIMO`
+  (3) dispute nei 30 giorni, percentuale ARROTONDATA strettamente sopra
+  (`_sopra_soglia_dispute_p2p`). Lo stato sta nei `timbri`
+  (`soglia_dispute_p2p`: 'sopra' | 'sotto'), scritto PRIMA dell'invio:
+  suona una volta al superamento, tace finche' resta sopra, si riarma
+  quando scende di `P2P_DISPUTE_SOGLIA_RIARMO` (1 punto) sotto la soglia.
+  Va a `notifica_admin`; porta numeri e id accorciati.
   I VANTAGGI DI OGNI LIVELLO (ott 2026, parola di Andrea): `/api/me`
   porta `livelli_scala` (`scala_livelli`): un gradino per livello con
   soglie XP/affari e i vantaggi che apre OGGI, letti dalle leve vive —

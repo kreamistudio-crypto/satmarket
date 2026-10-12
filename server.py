@@ -27380,6 +27380,9 @@ def dati_cruscotto(con) -> dict:
         if dom:
             wallet[dom]["incassi"] += 1
     return {"annulli": dati_annulli(con),
+            # «⚖️ Dispute P2P» (12 ott 2026): solo numeri, a tutti i
+            # moderatori; None dove il P2P non ha le sue tabelle
+            "dispute_p2p": dati_dispute_p2p(con, int(time.time())),
             "iscritti": sorted([g, v[0], v[1]] for g, v in iscritti.items()),
             "iscritti_totali": tot,
             "volume": sorted([g, *v] for g, v in volume.items()),
@@ -28460,6 +28463,18 @@ def _leve_stato():
                   spento="la sezione «Scambi P2P» del cruscotto non la "
                          "vede nessuno, e la sua rotta risponde 403 a "
                          "tutti: si riempie nel config del VPS"),
+            # LA SOGLIA DELLE DISPUTE (12 ott 2026): il valore VIVO,
+            # quello con cui il giro dell'ora sta confrontando
+            _leva("Soglia delle dispute P2P (%)",
+                  "P2P_DISPUTE_SOGLIA_PERCENTO", P2P_DISPUTE_SOGLIA_PERCENTO,
+                  acceso="sopra questa percentuale di scambi in disputa "
+                         f"negli ultimi 30 giorni (e con almeno "
+                         f"{P2P_DISPUTE_SOGLIA_MINIMO} dispute) i "
+                         "moderatori ricevono un avviso, uno solo per "
+                         "superamento",
+                  spento="nessun avviso quando le dispute salgono: i "
+                         "numeri restano nel cruscotto, sezione «⚖️ "
+                         "Dispute P2P»"),
             _leva("Relay del coordinator", "MOSTRO_RELAY",
                   _elenco(MOSTRO_RELAY),
                   spento="senza i relay lo scambio non si accende: qui "
@@ -44507,6 +44522,34 @@ except (TypeError, ValueError):
           "statistiche del P2P non le vede NESSUNO")
 
 
+# LA SOGLIA DELLE DISPUTE P2P (12 ott 2026, cantiere dispute-nel-cruscotto,
+# richiesta di Andrea): sopra questa percentuale di scambi finiti in
+# disputa negli ultimi 30 giorni i moderatori ricevono UN avviso su
+# Telegram (`_avviso_soglia_dispute_p2p`). 0 = avviso spento; la sezione
+# «⚖️ Dispute P2P» del cruscotto resta comunque.
+# PERCHE' 5: dove i numeri si conoscono (un coordinatore RoboSats, il
+# vecchio Paxful) le dispute stanno attorno al 2% degli scambi; 5 e' piu'
+# del doppio, cioe' «qualcosa e' cambiato», non il rumore di un giorno
+# storto. Da ritarare sui numeri nostri dopo le prime settimane.
+# UNA RIGA STORTA (una parola, un numero fuori da 0-100) vale il 5 di
+# serie e lo dice all'avvio: sbagliare verso il silenzio spegnerebbe
+# l'allarme senza che nessuno l'abbia deciso.
+try:
+    from config import P2P_DISPUTE_SOGLIA_PERCENTO
+    if isinstance(P2P_DISPUTE_SOGLIA_PERCENTO, bool) \
+            or not isinstance(P2P_DISPUTE_SOGLIA_PERCENTO, (int, float)):
+        raise TypeError("la soglia e' un numero")
+    if not 0 <= P2P_DISPUTE_SOGLIA_PERCENTO <= 100:
+        raise ValueError("la soglia e' una percentuale")
+    P2P_DISPUTE_SOGLIA_PERCENTO = float(P2P_DISPUTE_SOGLIA_PERCENTO)
+except ImportError:
+    P2P_DISPUTE_SOGLIA_PERCENTO = 5.0
+except (TypeError, ValueError):
+    P2P_DISPUTE_SOGLIA_PERCENTO = 5.0
+    print("[p2p] P2P_DISPUTE_SOGLIA_PERCENTO non e' un numero fra 0 e 100: "
+          "vale il 5 di serie")
+
+
 
 # IL SEGRETO DA CUI NASCE IL PROFILO DI SCAMBIO (set 2026, decisione di
 # Andrea): chi entra da Telegram non si porta piu' dietro un mazzo per
@@ -50733,6 +50776,202 @@ async def statistiche_p2p_admin(periodo: str = "oggi",
     return JSONResponse(dati, headers={"Cache-Control": "no-store"})
 
 
+# --- LE DISPUTE NEL CRUSCOTTO (12 ott 2026, cantiere dispute-nel-cruscotto) ---
+# Richiesta di Andrea, alla vigilia del cambio dei tempi di chi pubblica:
+# tenere d'occhio QUANTI scambi presi finiscono in disputa — 7 giorni, 30
+# giorni, da sempre —, come si chiudono, quante sono aperte, e come va
+# rispetto al periodo prima. La sezione «⚖️ Dispute P2P» di `/admin` la
+# vedono TUTTI i moderatori (sta in `dati_cruscotto`): le dispute sono il
+# loro mestiere, e qui non c'e' un importo.
+# NIENTE DI NUOVO NEL DATABASE. Si legge quel che c'e':
+# • gli SCAMBI PRESI: il registro (`p2p_conti`: completati, annullati,
+#   tornati in vetrina) piu' la cronaca dei quaranta giorni
+#   (`p2p_momenti`), che porta quelli in corso e quelli non ancora
+#   consolidati. Uno scambio e' un GIRO di un ordine;
+# • le DISPUTE: `p2p_dispute`, una riga per ordine, che non si pota.
+# UNO SCAMBIO STA NEL PERIODO IN CUI E' STATO PRESO, e la disputa sta col
+# suo scambio: cosi' la percentuale e' «di cento scambi presi, quanti in
+# disputa» e non puo' passare il cento. Una disputa prova che lo scambio
+# c'era: se registro e cronaca non lo ricordano piu', conta dall'ora in
+# cui e' stata aperta.
+# SOLO NUMERI, e delle aperte l'id dell'ordine ACCORCIATO: gli account
+# che `p2p_dispute` porta di qui non escono.
+# QUEL CHE NON SI SA: la disputa che il coordinatore apre DA SOLO alla
+# scadenza della garanzia (vedi «LA GARANZIA LUNGA») non la racconta a
+# nessuno, e qui non si conta.
+P2P_DISPUTE_PERIODI = (("7", 7), ("30", 30), ("tutto", 0))
+# sotto tre dispute nei 30 giorni la percentuale e' rumore: una su dieci
+# scambi fa «10%» e non dice niente
+P2P_DISPUTE_SOGLIA_MINIMO = 3
+# l'avviso si riarma solo quando la percentuale scende di un punto sotto
+# la soglia: a cavallo della riga un solo scambio che esce dai 30 giorni
+# la farebbe risuonare senza una disputa nuova
+P2P_DISPUTE_SOGLIA_RIARMO = 1.0
+TIMBRO_SOGLIA_DISPUTE_P2P = "soglia_dispute_p2p"
+
+
+def _perc_it(n) -> str:
+    """PURA: una percentuale come si legge in italiano — «5», «5,5»."""
+    return f"{float(n or 0):.1f}".replace(".0", "").replace(".", ",")
+
+
+def _sopra_soglia_dispute_p2p(p30: dict, soglia: float) -> bool:
+    """PURA: i 30 giorni sono SOPRA la soglia? Solo con la soglia accesa,
+    almeno `P2P_DISPUTE_SOGLIA_MINIMO` dispute, e la percentuale — quella
+    arrotondata che si legge nel cruscotto — strettamente sopra."""
+    return bool(soglia and soglia > 0
+                and int(p30.get("con_disputa") or 0) >= P2P_DISPUTE_SOGLIA_MINIMO
+                and p30.get("percento") is not None
+                and p30["percento"] > soglia)
+
+
+def dati_dispute_p2p(con, adesso: int):
+    """LA SEZIONE «⚖️ Dispute P2P» DEL CRUSCOTTO. Pura sulla connessione,
+    e NON SCRIVE: il registro lo consolida chi lo fa gia'. Torna None su
+    un database senza le tabelle del P2P (i banchi di ieri): la pagina
+    allora non disegna la sezione, e il resto del cruscotto vive.
+    Per ogni periodo: `presi`, `con_disputa`, `percento` (None senza
+    scambi, mai 0%), dove sono andati i sats delle chiuse (`compratore`,
+    `venditore`; `moderatore` = quante di quelle le ha decise un
+    moderatore), `aperte`, e — per 7 e 30 — `prima` (lo stesso conto
+    sul periodo precedente, lungo uguale) con `tendenza`, la differenza
+    in PUNTI percentuali (None se uno dei due non ha scambi)."""
+    adesso = int(adesso)
+    try:
+        presi = {}
+        for r in con.execute("SELECT ordine, giro, preso, chiuso FROM p2p_conti "
+                             "WHERE esito IN ('completato','annullato','tornato')"):
+            presi[(r["ordine"], int(r["giro"] or 0))] = int(
+                r["preso"] or r["chiuso"] or adesso)
+        per_ordine = {}
+        for r in con.execute("SELECT ordine, momento, quando, giro, attore, "
+                             "dettaglio FROM p2p_momenti WHERE fonte='mostro'"):
+            per_ordine.setdefault(r["ordine"], []).append(r)
+        dispute = [dict(r) for r in con.execute(
+            "SELECT ordine, giro, aperta_il, stato, esito, chiusa_da "
+            "FROM p2p_dispute ORDER BY aperta_il, ordine")]
+    except sqlite3.OperationalError:
+        return None
+    for ordine, momenti in per_ordine.items():
+        for e in _esiti_cronaca_p2p(momenti):
+            if e["esito"] in ("scaduto", "ritirato"):
+                continue              # un ordine morto senza essere preso
+            # il registro vince: di una cronaca potata a meta' ricorda
+            # la presa vera
+            presi.setdefault((ordine, e["giro"]),
+                             int(e["preso"] or e["chiuso"] or adesso))
+    for d in dispute:
+        chiave = (d["ordine"], int(d["giro"] or 0))
+        d["quando"] = presi.setdefault(chiave, int(d["aperta_il"] or adesso))
+
+    def conto(da, fino=None):
+        dentro = lambda q: q >= da and (fino is None or q < fino)
+        sue = [d for d in dispute if dentro(d["quando"])]
+        chiuse = [d for d in sue if d["stato"] == "chiusa"]
+        n = sum(1 for q in presi.values() if dentro(q))
+        return {"presi": n, "con_disputa": len(sue),
+                "percento": round(len(sue) * 100 / n, 1) if n else None,
+                "compratore": sum(1 for d in chiuse if d["esito"] == "compratore"),
+                "venditore": sum(1 for d in chiuse if d["esito"] == "venditore"),
+                "moderatore": sum(1 for d in chiuse if d["chiusa_da"] == "moderatore"),
+                "aperte": len(sue) - len(chiuse)}
+    periodi = {}
+    for nome, giorni in P2P_DISPUTE_PERIODI:
+        if not giorni:
+            periodi[nome] = conto(0)
+            continue
+        ora = conto(adesso - giorni * 86400)
+        prima = conto(adesso - 2 * giorni * 86400, adesso - giorni * 86400)
+        ora["prima"] = {k: prima[k] for k in ("presi", "con_disputa", "percento")}
+        ora["tendenza"] = (round(ora["percento"] - prima["percento"], 1)
+                           if None not in (ora["percento"], prima["percento"])
+                           else None)
+        periodi[nome] = ora
+    return {"periodi": periodi,
+            # le aperte ADESSO, dalla piu' vecchia: l'id corto e da quando
+            "aperte": [{"ordine": d["ordine"][:8], "aperta_il": int(d["aperta_il"] or 0),
+                        "presa": d["stato"] == "presa"}
+                       for d in dispute if d["stato"] != "chiusa"],
+            "dal": min(presi.values()) if presi else 0,
+            "soglia": {"percento": P2P_DISPUTE_SOGLIA_PERCENTO,
+                       "minimo": P2P_DISPUTE_SOGLIA_MINIMO,
+                       "sopra": _sopra_soglia_dispute_p2p(
+                           periodi["30"], P2P_DISPUTE_SOGLIA_PERCENTO)}}
+
+
+def _testo_soglia_dispute_p2p(d: dict) -> str:
+    """PURA: l'avviso ai moderatori, dai dati della sezione. Numeri e id
+    d'ordine accorciati, e nient'altro."""
+    p, s = d["periodi"]["30"], d["soglia"]
+    righe = ["⚖️ <b>Dispute P2P sopra la soglia</b>", "",
+             f"Negli ultimi 30 giorni sono finiti in disputa "
+             f"{p['con_disputa']} scambi su {p['presi']} presi: "
+             f"<b>{_perc_it(p['percento'])}%</b> (la soglia è "
+             f"{_perc_it(s['percento'])}%)."]
+    prima = p["prima"]
+    if prima["percento"] is not None:
+        righe.append(f"Nei 30 giorni prima: {_perc_it(prima['percento'])}% "
+                     f"({prima['con_disputa']} su {prima['presi']}).")
+    if d["aperte"]:
+        righe.append("Ancora aperte: " + ", ".join(
+            f"<code>{html.escape(a['ordine'])}</code>" for a in d["aperte"][:10])
+            + ("…" if len(d["aperte"]) > 10 else "") + ".")
+    righe += ["", "I numeri sono nel cruscotto, sezione «⚖️ Dispute P2P». "
+              "Questo avviso non si ripete finché la percentuale non scende "
+              f"al {_perc_it(max(0.0, s['percento'] - P2P_DISPUTE_SOGLIA_RIARMO))}% "
+              "o sotto."]
+    return "\n".join(righe)
+
+
+def _avviso_soglia_dispute_p2p(con, adesso: int) -> str:
+    """UN AVVISO PER SUPERAMENTO, non uno all'ora. Pura sulla connessione;
+    torna il testo da mandare ai moderatori, o ''. Lo stato sta nei
+    `timbri` ('sopra' = ha gia' suonato), scritto PRIMA dell'invio: un
+    riavvio non lo ripete, un invio caduto al peggio lo perde.
+    SUONA quando i 30 giorni passano sopra (`_sopra_soglia_dispute_p2p`)
+    e il timbro non dice gia' 'sopra'. SI RIARMA quando la percentuale
+    scende di `P2P_DISPUTE_SOGLIA_RIARMO` punti sotto la soglia (o non
+    ci sono piu' scambi nei 30 giorni): in mezzo tace. Soglia a 0 =
+    spento, e il timbro non si tocca."""
+    soglia = P2P_DISPUTE_SOGLIA_PERCENTO
+    if not soglia or soglia <= 0:
+        return ""
+    d = dati_dispute_p2p(con, adesso)
+    if not d:
+        return ""
+    t = con.execute("SELECT valore FROM timbri WHERE nome=?",
+                    (TIMBRO_SOGLIA_DISPUTE_P2P,)).fetchone()
+    suonato = bool(t) and t[0] == "sopra"
+
+    def timbra(valore):
+        con.execute("INSERT OR REPLACE INTO timbri(nome, valore, quando) "
+                    "VALUES(?,?,?)", (TIMBRO_SOGLIA_DISPUTE_P2P, valore, int(adesso)))
+        con.commit()
+    percento = d["periodi"]["30"]["percento"]
+    if d["soglia"]["sopra"]:
+        if suonato:
+            return ""
+        timbra("sopra")
+        return _testo_soglia_dispute_p2p(d)
+    if suonato and (percento is None or percento
+                    <= max(0.0, soglia - P2P_DISPUTE_SOGLIA_RIARMO)):
+        timbra("sotto")
+    return ""
+
+
+def _soglia_dispute_salva_p2p(con, adesso: int) -> str:
+    """Il giro dell'ora chiede l'avviso senza poterci cadere dentro: un
+    guasto qui non deve fermare le attese ne' la scopa. Il journal dice
+    il solo tipo dell'errore."""
+    try:
+        return _avviso_soglia_dispute_p2p(con, adesso)
+    except Exception as e:
+        con.rollback()
+        print(f"⚠️ P2P: la soglia delle dispute non si è potuta guardare "
+              f"({type(e).__name__})", flush=True)
+        return ""
+
+
 def _pulisci_memoria_p2p(con, adesso: int) -> int:
     """La cronaca non e' un archivio: oltre `P2P_LIBRO_MEMORIA_S` — la
     vita piu' lunga che un ordine possa avere, scambio compreso — le
@@ -50777,6 +51016,7 @@ async def _giro_attese_p2p():
     adesso = int(time.time())
     con = db()
     bottoni = {}
+    soglia_dispute = ""
     try:
         avvisi, prossima = _scarica_attese_p2p(con, adesso, bottoni)
         if adesso - _P2P_ATTESE.get("pulito", 0) > 3600:
@@ -50788,8 +51028,18 @@ async def _giro_attese_p2p():
             if tolte:
                 print(f"🧹 P2P: tolte {tolte} righe di cronaca piu' vecchie "
                       f"di {P2P_LIBRO_MEMORIA_S // 86400} giorni", flush=True)
+            # LA SOGLIA DELLE DISPUTE (12 ott 2026): una volta all'ora, e
+            # il timbro e' gia' scritto quando il testo esce di qui
+            soglia_dispute = _soglia_dispute_salva_p2p(con, adesso)
     finally:
         con.close()
+    if soglia_dispute:
+        try:
+            await notifica_admin(soglia_dispute)
+            print("⚖️ P2P: dispute sopra la soglia, moderatori avvisati", flush=True)
+        except Exception as e:
+            print(f"⚠️ P2P: l'avviso della soglia delle dispute è saltato "
+                  f"({type(e).__name__})", flush=True)
     _P2P_ATTESE["scade"] = prossima
     esiti = []
     for posto, (tg_id, testo, _) in enumerate(avvisi):

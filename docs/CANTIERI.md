@@ -51050,3 +51050,161 @@ Telegram su Android, un tocco qualunque (per esempio Compra/Vendi) e
 «Pubblica» senza foto, col telefono NON in silenzioso. Se non vibra
 nemmeno così, dirlo: vuol dire che la WebView di Telegram non lascia
 passare `navigator.vibrate`, e c'è da guardare cosa risponde.
+
+## Le dispute P2P nel cruscotto: quanti scambi presi finiscono in disputa, e l'avviso sopra soglia (12 ott 2026, cantiere dispute-nel-cruscotto, richiesta di Andrea)
+
+**LA RICHIESTA.** Alla vigilia del cambio dei tempi di chi pubblica
+(studio «tempo-di-chi-pubblica») e di possibili penalità: tenere
+d'occhio la percentuale di dispute. Nel cruscotto `/admin` una sezione
+«⚖️ Dispute P2P» — scambi presi, scambi con disputa, percentuale, a 7
+giorni, 30 giorni e da sempre; chiuse a favore di chi compra e di chi
+vende; ancora aperte; la tendenza sul periodo prima — e un avviso ai
+moderatori su Telegram quando i 30 giorni passano una soglia, uno solo
+per superamento. Coi dati che il server ha già, senza dati personali.
+
+**COSA C'ERA GIÀ, letto prima di scrivere: non è servito aggiungere
+niente.** Le dispute stanno in `p2p_dispute` (dal 28 set 2026, una riga
+per ordine, con l'esito e chi l'ha chiusa), che NON si pota; gli scambi
+presi stanno nel registro `p2p_conti` (dal 10 ott, con la cronaca dei
+quaranta giorni prima) e, per quelli in corso, nella cronaca
+`p2p_momenti`; il «ha già suonato» sta nella tabella `timbri`. Nessuna
+tabella, nessuna colonna, nessuna rotta nuova.
+
+**LE DECISIONI.**
+- UNO SCAMBIO STA NEL PERIODO IN CUI È STATO PRESO, e la disputa sta
+  col suo scambio. È una coorte: «di cento scambi presi in questi 30
+  giorni, quanti in disputa», e non può passare il cento. L'altra
+  strada — dispute APERTE nel periodo su scambi presi nel periodo —
+  mescola due orologi.
+- «SCAMBI PRESI» sono le prese raccontate dal coordinatore, la stessa
+  misura della tessera «Presi» di «🔁 Scambi P2P»: completati,
+  annullati, tornati in vetrina, in corso. Dentro ci sono anche le
+  prese cadute prima della garanzia, dove una disputa non può nascere:
+  la percentuale è quindi sul numero più largo.
+- IL GIUDICE NON SCRIVE (`dati_dispute_p2p`): legge registro e cronaca
+  insieme, a parità di ordine e giro vince il registro (di una cronaca
+  potata a metà ricorda la presa vera). Chiamare il consolidamento dal
+  cruscotto avrebbe fatto scrivere una pagina che fin qui legge e basta.
+- UNA DISPUTA PROVA CHE LO SCAMBIO C'ERA: se registro e cronaca non lo
+  ricordano più (uno scambio fermo in disputa oltre i quaranta giorni
+  non entra nel registro, e la cronaca se ne va), conta dall'ora
+  dell'apertura. Senza, «da sempre» avrebbe perso proprio le dispute
+  più lunghe.
+- CHI LA VEDE: tutti i moderatori, dentro `dati_cruscotto` come
+  chiesto. Non passa da `P2P_STATISTICHE_IDS`: quella leva protegge
+  volume e incassi, qui ci sono conteggi, e le dispute sono il mestiere
+  di chi modera. Il numero degli scambi presi, che finora stava solo
+  nella sezione degli amministratori, ora lo legge ogni moderatore.
+- «A FAVORE DI» è dove sono andati i sats (`esito` di `p2p_dispute`), e
+  la nota dice quante di quelle le ha DECISE un moderatore: una disputa
+  chiusa perché chi vende ha liberato non è una sentenza.
+- LA TENDENZA è in PUNTI percentuali sul periodo prima, lungo uguale
+  (7 su 7, 30 su 30); senza scambi da una delle due parti non c'è, e
+  senza scambi la percentuale è «—», mai 0%.
+- LA SOGLIA: `P2P_DISPUTE_SOGLIA_PERCENTO`, di serie 5, 0 = spento.
+  Perché 5: dove un numero pubblico esiste le dispute stanno attorno al
+  2% (un coordinatore RoboSats ha raccontato il 2,1% su 565 ordini;
+  Paxful diceva una ogni 56 scambi; il Bisq del 2018 stava fra 9 e 16 e
+  puntava al 6): 5 è più del doppio del normale. Sono cifre dette da
+  chi le ha, non verificate: la soglia va ritarata sui numeri nostri.
+  PIÙ UN PAVIMENTO DI TRE DISPUTE nei 30 giorni (costante,
+  `P2P_DISPUTE_SOGLIA_MINIMO`): ai volumi del lancio una disputa su
+  dieci scambi fa «10%» e non dice niente.
+- UN AVVISO PER SUPERAMENTO: lo stato nei `timbri` ('sopra' | 'sotto'),
+  scritto PRIMA dell'invio; si riarma quando la percentuale scende di UN
+  PUNTO sotto la soglia (`P2P_DISPUTE_SOGLIA_RIARMO`). Senza quel punto,
+  a cavallo della riga basta uno scambio pulito che esce dai 30 giorni
+  per risuonare senza una disputa nuova. Nessun avviso di «rientrato»:
+  non era chiesto.
+- UNA LEVA STORTA VALE 5, non 0: sbagliare verso il silenzio spegnerebbe
+  l'allarme senza che nessuno l'abbia deciso.
+- DOVE GIRA: nel giro dell'ora del P2P (`_giro_attese_p2p`, dopo i conti
+  e la scopa), dentro `_soglia_dispute_salva_p2p`, che non alza: un
+  guasto qui non ferma le attese.
+
+**LE STRADE SCARTATE.** • Una colonna «disputa» in `p2p_conti`: il dato
+c'è già in `p2p_dispute`, e una migrazione per un doppione. • L'avviso
+agganciato all'evento `dispute-opened`: è la strada calda degli avvisi
+alle parti, e un conto non deve poterla fermare; l'ora basta. • Il
+bottone «Apri il cruscotto» nell'avviso: il testo dice dove guardare.
+• Una leva anche per il pavimento e per il riarmo: due numeri in più
+nel config per due tarature che non sono decisioni.
+
+**QUEL CHE NON SI SA, detto nella pagina dei perché e qui.** La disputa
+che il coordinatore apre DA SOLO alla scadenza della garanzia (a ~92
+ore, in `fiat-sent`: `enforce_escrow_deadline_pass`) non viene
+raccontata al server — la patch 0007 aggancia `dispute_action` — e
+quindi non si conta. Se quelle dispute diventassero frequenti, il
+numero sarebbe basso a torto: serve una riga nella patch del nodo, non
+qui. E «da sempre» parte da dove partono i registri: le dispute dal 28
+set 2026, gli scambi da quel che la cronaca ricordava il 10 ott.
+
+**DOVE STA.** `server.py`: la leva accanto a `P2P_STATISTICHE_IDS`; il
+blocco «LE DISPUTE NEL CRUSCOTTO» dopo la rotta delle statistiche
+(`dati_dispute_p2p`, `_sopra_soglia_dispute_p2p`,
+`_testo_soglia_dispute_p2p`, `_avviso_soglia_dispute_p2p`,
+`_soglia_dispute_salva_p2p`); una riga in `dati_cruscotto`, cinque in
+`_giro_attese_p2p`, una nel pannello delle leve. `admin.html`:
+`cardDisputeP2P`, ultima card del cruscotto. `config_esempio.py`: la
+riga, a 5.
+
+**UN RITOCCO NATO DAL GIRO.** A 390 px la cella della tendenza («▼ −1,7
+punti era 10%») andava a capo su tre righe in una colonna da ottanta
+pixel: ora sono due righe corte che non si spezzano («▼ −1,7» e sotto
+«era 10%»), e la parola «punti» è salita nell'intestazione della riga.
+
+**PROVATO.** `prove_dispute_cruscotto_p2p` (39 prove): il giudice sul
+DDL vero con un registro e una cronaca fatti per contare — 10 scambi e
+1 disputa nei 7 giorni, 40 e 3 nei 30, 70 e 4 da sempre; scaduti e
+ritirati fuori; due giri dello stesso ordine; la presa che manca; lo
+scambio in due fonti (vince il registro); la disputa orfana; nessun
+account e nessun id intero nella risposta; il giudice che non scrive —
+poi la soglia (la riga esatta, il pavimento), l'avviso che suona una
+volta, tace al 5% preciso senza riarmarsi, si riarma al 4% e risuona,
+la leva nei suoi versi (8, 2,5, 0; assente, parola, True, 150, −1), e
+la card DISEGNATA in node dalle funzioni vere della pagina: piena,
+senza scambi, senza sezione, con un id scritto per fare danni, a leva
+spenta. In `prove_cruscotto_admin`: su un database senza P2P la sezione
+è None e il resto vive. `collaudo_dispute_cruscotto` (25 passi, nella
+gabbia della CI): la rotta VERA — 403 all'utente normale, la sezione al
+moderatore che non vede i conti —, quattro scambi e una disputa dalla
+porta del coordinatore, la decisione di un moderatore, e l'avviso dal
+BATTITO VERO dell'ora: tace sotto le tre dispute, parte una volta alla
+terza, tace l'ora dopo e dopo un «riavvio», tace a leva spenta; la
+scopa dei quaranta giorni non cambia «da sempre». LA TORTURA, su una
+copia del repo: sedici mutazioni (la cronaca che vince sul registro,
+gli scaduti contati, il periodo prima senza tetto, l'orfana senza
+scambio, la soglia col maggiore-uguale, senza pavimento, il riarmo
+subito, il timbro non scritto, l'id intero, le aperte fra le chiuse,
+la sezione tolta dal cruscotto, il giro dell'ora che non guarda, l'id
+senza `esc()`, la tendenza rovesciata, la leva storta a zero), 16 prese
+su 16 al primo giro: tutte dalla prova, sette anche dal collaudo. IL
+GIRO DAL VIVO (Browser pane sul server del worktree, porta sua,
+collaudo, config di cartone coi relay morti e la nsec segnaposto,
+registro e dispute seminati a mano perché la porta degli eventi rifiuta
+le ore vecchie): `/admin?collaudo=999` a 390 px, la card sopra la soglia
+(8,3% / 7,3% in rosso / 5,6%, due aperte coi loro id corti), la scena
+calma, il tema scuro forzato, nessuno scorrimento orizzontale (tabella
+325 su 325), console pulita; 111 legge «riservata agli admin». Lo
+scanner dei segreti sulle 940 righe aggiunte, con le forme lette dal
+workflow e la controprova: zero.
+
+**DA GUARDARE** (Andrea). • Prima di fidarsi del numero, sul VPS in
+sola lettura: cosa c'è in `p2p_dispute` (la query è in PRODUZIONE, «LA
+SOGLIA DELLE DISPUTE P2P») — se ci sono dispute di prova contano, e con
+tre nei 30 giorni l'avviso può partire al primo giro dell'ora dopo il
+deploy. • La soglia a 5 è una proposta: dopo due o tre settimane di
+numeri veri si ritara (la riga nel config del VPS serve solo per
+cambiarla). • La disputa automatica del coordinatore non si conta: se
+ne capita una, il cruscotto non la mostra.
+
+**UNA REGRESSIONE MIA, presa dalla suite intera e non dalle prove
+vicine.** `prove_p2p_orologio` e `prove_p2p_tutti_i_relay` eseguono
+`_giro_attese_p2p` in un banco con le sue funzioni contate a mano: la
+riga nuova chiamava `_soglia_dispute_salva_p2p`, che il banco non
+conosceva, e le due prove sono ESPLOSE (22.496 passate, 2 fallite). La
+cura è nei banchi — lo stesso stub che il 10 ott aveva avuto
+`_conti_salvi_p2p`, accanto a lui, nei tre posti —, non nel server. È
+la lezione di «firma cambiata, ancore nei banchi» in un'altra forma:
+una chiamata nuova dentro una funzione che i banchi eseguono si cerca
+per NOME in `prove.py` prima della suite, non dopo.

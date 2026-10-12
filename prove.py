@@ -94380,6 +94380,8 @@ def prove_p2p_orologio():
         # i conti prima della scopa (10 ott 2026) hanno la loro prova:
         # qui si guarda l'orologio, e la scopa passa come prima
         amb["_conti_salvi_p2p"] = lambda con, adesso: True
+        # ...e la soglia delle dispute (12 ott 2026) pure: qui tace
+        amb["_soglia_dispute_salva_p2p"] = lambda con, adesso: ""
 
         # UNA PASSATA e' il libro e poi le attese, come nell'orologio: il
         # libro prepara, le attese mandano
@@ -94656,6 +94658,8 @@ def prove_p2p_tutti_i_relay():
         exec(("async " if f in asincrone else "") + testo, amb)
     # i conti prima della scopa (10 ott 2026) hanno la loro prova
     amb["_conti_salvi_p2p"] = lambda con, adesso: True
+    # ...e la soglia delle dispute (12 ott 2026) pure: qui tace
+    amb["_soglia_dispute_salva_p2p"] = lambda con, adesso: ""
 
     async def _passata():
         # il libro prepara, le attese mandano: come nell'orologio
@@ -95295,6 +95299,8 @@ def prove_p2p_ascolto():
         exec(("async " if f in asincrone else "") + _senza_prosa(pezzo(f)), amb6)
     # i conti prima della scopa (10 ott 2026) hanno la loro prova
     amb6["_conti_salvi_p2p"] = lambda con, adesso: True
+    # ...e la soglia delle dispute (12 ott 2026) pure: qui tace
+    amb6["_soglia_dispute_salva_p2p"] = lambda con, adesso: ""
 
     ORD, ALTRUI = "ordine-del-lampo", "ordine-di-un-altro"
     c = _db()
@@ -112882,8 +112888,8 @@ def prove_cruscotto_admin():
     exec(_SORGENTE[i:_SORGENTE.index("}\n", i) + 2], amb)
     i = _SORGENTE.index("ORE_FINESTRA_CRUSCOTTO = ")
     exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
-    for f in ("_giorno", "dati_annulli", "dati_cruscotto", "hash_rimborsi",
-              "hash_nostri", "conti_instradamento"):
+    for f in ("_giorno", "dati_annulli", "dati_dispute_p2p", "dati_cruscotto",
+              "hash_rimborsi", "hash_nostri", "conti_instradamento"):
         exec(pezzo(f), amb)
     con = sqlite3.connect(":memory:")
     con.row_factory = sqlite3.Row
@@ -112921,6 +112927,9 @@ def prove_cruscotto_admin():
     prova("...e la serie per giorno, senza chi non ha la data",
           [[amb["_giorno"](G1), 2, 0], [amb["_giorno"](G2), 1, 2]],
           d["iscritti"])
+    prova("su un database senza le tabelle del P2P la sezione delle "
+          "dispute e' None, e il resto del cruscotto vive", (True, None),
+          ("dispute_p2p" in d, d["dispute_p2p"]))
     prova("volume: i soli rilasciati, fuori i collaudi; la merce senza "
           "spedizione e protezione",
           {"ordini": 3, "sats": 18000, "merce": 15900}, d["volume_totale"])
@@ -113636,6 +113645,345 @@ def prove_statistiche_p2p():
           "testo", (False, False, False, True),
           ("<img src=x" in o["cattivo"], "<script>x" in o["cattivo"],
            "<b>A.</b>" in o["cattivo"], "&lt;img src=x" in o["cattivo"]))
+
+
+def prove_dispute_cruscotto_p2p():
+    """LE DISPUTE NEL CRUSCOTTO (12 ott 2026, cantiere dispute-nel-cruscotto).
+    Il giudice gira per davvero sul DDL VERO, con un registro e una
+    cronaca di cartone fatti per contare: scambi presi in ogni finestra,
+    dal registro, dalla sola cronaca, da tutt'e due, e una disputa di cui
+    registro e cronaca non ricordano piu' lo scambio. Poi la soglia (il
+    pavimento delle tre dispute, la riga esatta), l'avviso che suona UNA
+    volta e si riarma un punto sotto, la leva nei suoi versi, e la card
+    disegnata dalle funzioni vere della pagina."""
+    import sqlite3, json as _js, html as _html
+    print("\n[le dispute P2P nel cruscotto]")
+    src = _SORGENTE
+    amb = {"time": time, "sqlite3": sqlite3, "html": _html,
+           "P2P_DISPUTE_SOGLIA_PERCENTO": 5.0,
+           "print": lambda *a, **k: None}
+    for capo, coda in (("_PESO_MOMENTO_P2P = {", "}\n"),
+                       ("P2P_MOMENTI_IN_CORSO = (", ")\n"),
+                       ("P2P_DISPUTE_PERIODI = (",
+                        'TIMBRO_SOGLIA_DISPUTE_P2P = "soglia_dispute_p2p"\n')):
+        i = src.index(capo)
+        exec(src[i:src.index(coda, i) + len(coda)], amb)
+    for f in ("_motivo_annullo_p2p", "_esiti_cronaca_p2p", "_perc_it",
+              "_sopra_soglia_dispute_p2p", "dati_dispute_p2p",
+              "_testo_soglia_dispute_p2p", "_avviso_soglia_dispute_p2p",
+              "_soglia_dispute_salva_p2p"):
+        exec(pezzo(f), amb)
+    dati, sopra = amb["dati_dispute_p2p"], amb["_sopra_soglia_dispute_p2p"]
+
+    def base():
+        c = sqlite3.connect(":memory:")
+        c.row_factory = sqlite3.Row
+        for capo, coda in (
+                ("CREATE TABLE IF NOT EXISTS p2p_ordini(",
+                 "CREATE TABLE IF NOT EXISTS p2p_tolti("),
+                ("CREATE TABLE IF NOT EXISTS p2p_dispute(",
+                 "CREATE TABLE IF NOT EXISTS p2p_moderatori("),
+                ("CREATE TABLE IF NOT EXISTS p2p_conti(",
+                 "CREATE TABLE IF NOT EXISTS punti_ritiro("),
+                ("CREATE TABLE IF NOT EXISTS timbri(",
+                 "CREATE TABLE IF NOT EXISTS fatture_scadute(")):
+            i = src.index(capo)
+            c.executescript(src[i:src.index(coda, i)])
+        return c
+    con = base()
+    ORA, G = 1760270400, 86400
+    COMPRA, VENDE = 111222333, 444555666        # id che NON devono uscire
+
+    def registro(ordine, giorni_fa, esito="completato", giro=1, preso=None):
+        quando = ORA - int(giorni_fa * G)
+        con.execute("INSERT INTO p2p_conti(ordine, giro, esito, preso, chiuso) "
+                    "VALUES(?,?,?,?,?)",
+                    (ordine, giro, esito, quando if preso is None else preso,
+                     quando + 600))
+
+    def cronaca(ordine, giorni_fa, momenti, giro=1):
+        for n, (momento, attore, dettaglio) in enumerate(momenti):
+            q = ORA - int(giorni_fa * G) + n * 60
+            con.execute(
+                "INSERT INTO p2p_momenti(ordine, momento, quando, fonte, giro, "
+                "attore, dettaglio, arrivato) VALUES(?,?,?,'mostro',?,?,?,?)",
+                (ordine, momento, q, giro, attore, dettaglio, q))
+
+    def disputa(ordine, giorni_fa, stato="chiusa", esito="", chiusa_da="", giro=1):
+        con.execute(
+            "INSERT INTO p2p_dispute(ordine, giro, aperta_il, aperta_da, "
+            "compratore, venditore, stato, presa_da, esito, chiusa_da) "
+            "VALUES(?,?,?,'compra',?,?,?,?,?,?)",
+            (ordine, giro, ORA - int(giorni_fa * G) + 1800, COMPRA, VENDE,
+             stato, VENDE if stato != "aperta" else 0, esito, chiusa_da))
+    APERTA = "d15b0001-aaaa-4bbb-8ccc-0000000000d1"
+    # --- gli ultimi 7 giorni: 10 scambi presi, 1 in disputa -------------
+    for n in range(7):
+        registro(f"sette-{n}", 1 + n * 0.8)
+    cronaca("non-consolidato", 0.5, [("preso", "buyer", ""),
+                                     ("rilasciato", "seller", ""),
+                                     ("concluso", "mostro", "")])
+    cronaca("in-corso", 0.1, [("preso", "buyer", ""),
+                              ("garanzia_pagata", "seller", "active")])
+    cronaca(APERTA, 2, [("preso", "buyer", ""), ("garanzia_pagata", "seller", ""),
+                        ("fiat", "buyer", ""), ("disputa", "buyer", "")])
+    disputa(APERTA, 2, stato="presa")
+    # ...e quel che NON e' uno scambio preso: scaduti e ritirati
+    registro("mai-preso", 1, esito="scaduto", giro=0)
+    registro("tolto-a-mano", 2, esito="ritirato", giro=0)
+    cronaca("scaduto-ora", 3, [("scaduto", "mostro", "book")], giro=0)
+    # --- da 7 a 14 giorni fa: 8 scambi, nessuna disputa ----------------
+    for n in range(6):
+        registro(f"prima-{n}", 8 + n)
+    # un ordine tornato in vetrina e ripreso: due giri, due scambi
+    registro("due-giri", 10, esito="tornato", giro=1)
+    registro("due-giri", 9, esito="annullato", giro=2)
+    # --- da 14 a 30 giorni fa: 22 scambi, 2 in disputa -----------------
+    for n in range(18):
+        registro(f"mese-{n}", 14.5 + n * 0.8)
+    registro("disputa-mod", 20)
+    disputa("disputa-mod", 20, esito="compratore", chiusa_da="moderatore")
+    registro("disputa-parti", 25, esito="annullato")
+    disputa("disputa-parti", 25, esito="venditore", chiusa_da="parti")
+    # la presa non si sa: vale la chiusura
+    registro("senza-presa", 15, preso=0)
+    # nel registro E in una cronaca potata a meta', che da sola direbbe
+    # «13 giorni fa»: vince il registro (16), e conta una volta sola
+    registro("due-fonti", 16)
+    cronaca("due-fonti", 13, [("concluso", "mostro", "")])
+    # --- da 30 a 60 giorni fa: 20 scambi, 1 in disputa -----------------
+    for n in range(19):
+        registro(f"due-mesi-{n}", 31 + n * 1.5)
+    # una disputa di cui ne' registro ne' cronaca ricordano lo scambio:
+    # lo scambio c'era, e conta dall'ora in cui e' stata aperta
+    disputa("disputa-orfana", 45, esito="venditore", chiusa_da="moderatore")
+    # --- prima: 10 scambi, nessuna disputa -----------------------------
+    for n in range(10):
+        registro(f"vecchio-{n}", 61 + n * 3)
+    con.commit()
+    prima_del_conto = con.total_changes
+    d = dati(con, ORA)
+    p7, p30, pt = (d["periodi"][k] for k in ("7", "30", "tutto"))
+    prova("7 giorni: 10 scambi presi (registro, cronaca non consolidata, "
+          "in corso), 1 in disputa — scaduti e ritirati fuori",
+          (10, 1, 10.0), (p7["presi"], p7["con_disputa"], p7["percento"]))
+    prova("...la disputa e' ancora aperta, e nessuna chiusa",
+          (1, 0, 0, 0), (p7["aperte"], p7["compratore"], p7["venditore"],
+                         p7["moderatore"]))
+    prova("...e sui 7 giorni prima (8 scambi, due giri dello stesso "
+          "ordine compresi, zero dispute) la tendenza e' +10 punti",
+          ({"presi": 8, "con_disputa": 0, "percento": 0.0}, 10.0),
+          (p7["prima"], p7["tendenza"]))
+    prova("30 giorni: 40 scambi, 3 in disputa, 7,5% — la presa che manca "
+          "vale la chiusura, e chi sta in due fonti conta una volta, dove "
+          "dice il registro", (40, 3, 7.5),
+          (p30["presi"], p30["con_disputa"], p30["percento"]))
+    prova("...una a chi compra (decisa da un moderatore), una a chi vende "
+          "(fra le parti), una aperta", (1, 1, 1, 1),
+          (p30["compratore"], p30["venditore"], p30["moderatore"], p30["aperte"]))
+    prova("...e sui 30 giorni prima (20 scambi con la disputa orfana, "
+          "5%) la tendenza e' +2,5 punti",
+          ({"presi": 20, "con_disputa": 1, "percento": 5.0}, 2.5),
+          (p30["prima"], p30["tendenza"]))
+    prova("da sempre: 70 scambi, 4 dispute, 5,7%; due a chi vende, due "
+          "decise da un moderatore; senza un «prima»",
+          (70, 4, 5.7, 1, 2, 2, 1, False),
+          (pt["presi"], pt["con_disputa"], pt["percento"], pt["compratore"],
+           pt["venditore"], pt["moderatore"], pt["aperte"], "prima" in pt))
+    prova("le aperte adesso: l'id ACCORCIATO, da quando, e se un "
+          "moderatore l'ha presa",
+          [{"ordine": APERTA[:8], "aperta_il": ORA - 2 * G + 1800, "presa": True}],
+          d["aperte"])
+    prova("«da sempre» dice da quando: la presa piu' vecchia",
+          ORA - 88 * G, d["dal"])
+    prova("la soglia viaggia con la sezione: 5%, almeno 3 dispute, e qui "
+          "si e' sopra", {"percento": 5.0, "minimo": 3, "sopra": True},
+          d["soglia"])
+    testo = _js.dumps(d)
+    prova("SOLO NUMERI: nessun account, e nessun id d'ordine intero",
+          (False, False, False),
+          (str(COMPRA) in testo, str(VENDE) in testo, APERTA in testo))
+    prova("...e il giudice non scrive niente", prima_del_conto, con.total_changes)
+    vuoto = dati(base(), ORA)
+    prova("senza scambi la percentuale non c'e' (None, mai 0%), niente "
+          "tendenza, niente soglia passata",
+          (0, None, None, False, [], 0),
+          (vuoto["periodi"]["30"]["presi"], vuoto["periodi"]["30"]["percento"],
+           vuoto["periodi"]["30"]["tendenza"], vuoto["soglia"]["sopra"],
+           vuoto["aperte"], vuoto["dal"]))
+    prova("un database senza le tabelle del P2P: None, senza alzare", None,
+          dati(sqlite3.connect(":memory:"), ORA))
+    prova("il cruscotto porta la sezione a tutti i moderatori", True,
+          '"dispute_p2p": dati_dispute_p2p(con, int(time.time()))'
+          in pezzo("dati_cruscotto"))
+
+    # --- LA SOGLIA -----------------------------------------------------
+    f30 = lambda n, perc: {"con_disputa": n, "percento": perc}
+    prova("sopra: almeno 3 dispute E la percentuale strettamente sopra",
+          (True, False, False, False, False, False),
+          (sopra(f30(3, 5.1), 5.0), sopra(f30(3, 5.0), 5.0),
+           sopra(f30(2, 50.0), 5.0), sopra(f30(9, 4.9), 5.0),
+           sopra(f30(0, None), 5.0), sopra(f30(9, 90.0), 0)))
+    avviso = amb["_avviso_soglia_dispute_p2p"]
+
+    def timbro():
+        r = con.execute("SELECT valore FROM timbri WHERE nome='soglia_dispute_p2p'"
+                        ).fetchone()
+        return r[0] if r else None
+    primo = avviso(con, ORA)
+    prova("la prima volta sopra la soglia l'avviso parte, coi numeri: 3 su "
+          "40, 7,5%, la soglia, i 30 giorni prima, l'aperta, il riarmo",
+          [], [x for x in ("3 scambi su 40 presi", "<b>7,5%</b>",
+                           "la soglia è 5%", "Nei 30 giorni prima: 5% (1 su 20)",
+                           f"<code>{APERTA[:8]}</code>", "scende al 4% o sotto",
+                           "«⚖️ Dispute P2P»") if x not in primo])
+    prova("...senza un account, senza un nome, senza l'id intero",
+          (False, False, False, False),
+          (str(COMPRA) in primo, str(VENDE) in primo, APERTA in primo,
+           "@" in primo))
+    prova("...e il timbro dice «sopra»", "sopra", timbro())
+    prova("un'ora dopo, ancora sopra: silenzio", "", avviso(con, ORA + 3600))
+    # venti scambi puliti: 3 su 60 = 5,0% — non piu' sopra, non ancora
+    # un punto sotto
+    for n in range(20):
+        registro(f"pulito-{n}", 0.2)
+    prova("scesa al 5% preciso: tace, e NON si riarma (serve un punto "
+          "sotto)", ("", "sopra", 5.0),
+          (avviso(con, ORA), timbro(), dati(con, ORA)["periodi"]["30"]["percento"]))
+    con.execute("DELETE FROM p2p_conti WHERE ordine LIKE 'pulito-%'")
+    prova("...risalita al 7,5% senza essersi mai riarmata: tace ancora",
+          ("", "sopra"), (avviso(con, ORA), timbro()))
+    for n in range(35):
+        registro(f"pulito-{n}", 0.2)
+    prova("scesa al 4%: si riarma, in silenzio", ("", "sotto", 4.0),
+          (avviso(con, ORA), timbro(), dati(con, ORA)["periodi"]["30"]["percento"]))
+    con.execute("DELETE FROM p2p_conti WHERE ordine LIKE 'pulito-%'")
+    prova("...e al superamento dopo, UN avviso nuovo", (True, "sopra", ""),
+          ("7,5%" in avviso(con, ORA), timbro(), avviso(con, ORA + 60)))
+    amb["P2P_DISPUTE_SOGLIA_PERCENTO"] = 0.0
+    con.execute("DELETE FROM timbri")
+    prova("soglia a 0: nessun avviso, e il timbro non si tocca", ("", None),
+          (avviso(con, ORA), timbro()))
+    amb["P2P_DISPUTE_SOGLIA_PERCENTO"] = 5.0
+    av = pezzo("_avviso_soglia_dispute_p2p")
+    prova("il timbro si scrive PRIMA di consegnare il testo", True,
+          av.index('timbra("sopra")') < av.index("return _testo_soglia_dispute_p2p(d)"))
+    senza_timbri = sqlite3.connect(":memory:")
+    senza_timbri.row_factory = sqlite3.Row
+    i = src.index("CREATE TABLE IF NOT EXISTS p2p_ordini(")
+    senza_timbri.executescript(
+        src[i:src.index("CREATE TABLE IF NOT EXISTS p2p_tolti(", i)])
+    for capo, coda in (("CREATE TABLE IF NOT EXISTS p2p_dispute(",
+                        "CREATE TABLE IF NOT EXISTS p2p_moderatori("),
+                       ("CREATE TABLE IF NOT EXISTS p2p_conti(",
+                        "CREATE TABLE IF NOT EXISTS punti_ritiro(")):
+        i = src.index(capo)
+        senza_timbri.executescript(src[i:src.index(coda, i)])
+    prova("un guasto (qui: la tabella dei timbri che manca) non alza nel "
+          "giro dell'ora", "",
+          amb["_soglia_dispute_salva_p2p"](senza_timbri, ORA))
+    giro = pezzo("_giro_attese_p2p")
+    prova("il giro dell'ora la guarda dopo i conti, e l'avviso parte a "
+          "connessione chiusa, ai moderatori", True,
+          giro.index("_conti_salvi_p2p(con, adesso)")
+          < giro.index("soglia_dispute = _soglia_dispute_salva_p2p(con, adesso)")
+          < giro.index("con.close()")
+          < giro.index("await notifica_admin(soglia_dispute)"))
+
+    # --- LA LEVA -------------------------------------------------------
+    i_l = src.index("try:\n    from config import P2P_DISPUTE_SOGLIA_PERCENTO")
+    blocco = src[i_l:src.index("\n\n\n", i_l)]
+
+    def _leva_con(valore):
+        a = {"print": lambda *x, **k: None}
+        finto = type("C", (), {})()
+        if valore is not None:
+            finto.P2P_DISPUTE_SOGLIA_PERCENTO = valore
+        import sys as _s
+        vecchio = _s.modules.get("config")
+        _s.modules["config"] = finto
+        try:
+            exec(blocco, a)
+        finally:
+            if vecchio is None:
+                _s.modules.pop("config", None)
+            else:
+                _s.modules["config"] = vecchio
+        return a["P2P_DISPUTE_SOGLIA_PERCENTO"]
+
+    prova("la leva legge il numero, e lo zero che spegne", (8.0, 2.5, 0.0),
+          (_leva_con(8), _leva_con(2.5), _leva_con(0)))
+    prova("...non dichiarata, una parola, un True, un 150, un negativo: "
+          "il 5 di serie (mai il silenzio per sbaglio)", (5.0,) * 5,
+          (_leva_con(None), _leva_con("dieci"), _leva_con(True),
+           _leva_con(150), _leva_con(-1)))
+    prova("config_esempio.py porta la riga, a 5", True,
+          "\nP2P_DISPUTE_SOGLIA_PERCENTO = 5\n"
+          in open("config_esempio.py", encoding="utf-8").read())
+    prova("il pannello delle leve dice il valore vivo", True,
+          '"P2P_DISPUTE_SOGLIA_PERCENTO", P2P_DISPUTE_SOGLIA_PERCENTO,'
+          in pezzo("_leve_stato"))
+
+    # --- LA PAGINA -----------------------------------------------------
+    pagina = open("admin.html", encoding="utf-8").read()
+    prova("la pagina disegna la sezione dentro il cruscotto di tutti i "
+          "moderatori", True, "${cardDisputeP2P(D.dispute_p2p)}" in pagina
+          and pagina.index("${cardDisputeP2P(D.dispute_p2p)}")
+          < pagina.index("function simula(){"))
+    import shutil as _sh, subprocess as _sp, tempfile as _tf
+    node = _sh.which("node")
+    if not node:
+        salta("la sezione delle dispute P2P si disegna", "node non installato")
+        return
+    cattivo = _js.loads(_js.dumps(d))
+    cattivo["aperte"][0]["ordine"] = "<img src=x onerror=alert(1)>"
+    spenta = _js.loads(_js.dumps(d))
+    spenta["soglia"].update(percento=0.0, sopra=False)
+
+    def fetta(capo, coda):
+        i = pagina.index(capo)
+        return pagina[i:pagina.index(coda, i)]
+    banco = "\n".join([
+        fetta("const esc = s =>", "\nconst el = "),
+        fetta("const percD = p =>", "\nfunction tabella(testa, righe, numeriche){"),
+        fetta("function tabella(testa, righe, numeriche){", "\n/* un nodo:"),
+        "const fuori = {};",
+        "for (const [nome, r] of Object.entries(%s))"
+        " fuori[nome] = cardDisputeP2P(r);" % _js.dumps(
+            {"pieno": d, "vuoto": vuoto, "niente": None, "cattivo": cattivo,
+             "spenta": spenta}),
+        "console.log(JSON.stringify(fuori));"])
+    pf = os.path.join(_tf.mkdtemp(prefix="dispute_p2p_"), "sezione.js")
+    open(pf, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, pf], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco della sezione gira", "", (r.stderr or "")[-600:])
+    if r.returncode:
+        return
+    o = _js.loads(r.stdout)
+    prova("a schermo: le tre percentuali, i conti, la tendenza in punti "
+          "col «era», l'aperta col suo id corto, la soglia",
+          [], [x for x in ("⚖️ Dispute P2P", ">10%<", ">7,5%<", ">5,7%<",
+                           "1 disputa su 10 scambi presi",
+                           "3 dispute su 40 scambi presi", "sopra la soglia",
+                           "Punti sul periodo prima", "▲ +10</span>",
+                           "era 0%", "▲ +2,5</span>", "era 5%",
+                           f'<span class="mono">{APERTA[:8]}</span>',
+                           "Chiuse a favore di chi compra",
+                           "Chiuse a favore di chi vende",
+                           "2 su 3 le ha decise un moderatore",
+                           "si passa il 5%, con almeno 3 dispute")
+               if x not in o["pieno"]])
+    prova("senza scambi: una riga sola, nessuna tabella, nessun «0%»",
+          (True, False, False),
+          ("Ancora nessuno scambio preso." in o["vuoto"], "<table" in o["vuoto"],
+           "0%" in o["vuoto"]))
+    prova("senza la sezione (un server senza P2P) la card non c'e'", "",
+          o["niente"])
+    prova("un id scritto per fare danni esce come testo", (False, True),
+          ("<img src=x" in o["cattivo"], "&lt;img src=x" in o["cattivo"]))
+    prova("a leva spenta la pagina lo dice", True,
+          "L'avviso ai moderatori è spento." in o["spenta"]
+          and "sopra la soglia" not in o["spenta"])
 
 
 def prove_vantaggi_livelli():
@@ -148260,7 +148608,7 @@ def main():
               prove_tracking_corretto, prove_tracking_venditore,
               prove_tracking_facoltativo,
               prove_vantaggi_livelli, prove_cruscotto_admin,
-              prove_statistiche_p2p,
+              prove_statistiche_p2p, prove_dispute_cruscotto_p2p,
               prove_buoni_cumulabili,
               prove_barattolo,
               prove_savers_proprietario, prove_visualizzazioni,
