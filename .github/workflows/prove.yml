@@ -280,6 +280,10 @@ jobs:
              collaudo_canale_admin
              collaudo_punti_barattolo
              collaudo_punti_corrieri
+             collaudo_reti
+             collaudo_nota
+             collaudo_busta_diretta
+             collaudo_email_corriere
              collaudo_csp
              collaudo_freni
              collaudo_db_contesa

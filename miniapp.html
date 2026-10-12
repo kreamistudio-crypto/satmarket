@@ -12478,13 +12478,15 @@ document.getElementById('cartello')?.remove();</script>
            0 scritto = gratis al punto. -->
       <div class="field" id="sellSpedPuntoField" style="display:none"><label>Costo verso un punto di ritiro (facoltativo)</label>
         <div class="sats-input"><input id="sellSpedPunto" type="number" inputmode="numeric" placeholder="come sopra"><span class="suffix" id="sellSpedPuntoCur" style="pointer-events:none">sats</span></div>
-        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Spesso costa meno che a casa. Vuoto&nbsp;= vale il costo qui sopra; 0&nbsp;= gratis al punto.</div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Spesso costa meno che a casa. Vuoto&nbsp;= vale il costo qui sopra; 0&nbsp;= gratis al punto.</div></div>
         <!-- la riga discreta del secondo giro, e dal 12 ott 2026
              dice la regola nuova: senza un corriere che consegna a
              una rete di punti la via punto NON si offre — il
              promemoria vive dove il venditore sta gia' pensando alla
-             spedizione -->
-        <div id="sellSpedizioniereHint" style="display:none;margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4">💡 Indica nel Profilo (📦&nbsp;Come spedisci) <b>con quali corrieri spedisci</b>: con Poste Italiane, SDA o InPost chi compra potrà scegliere anche un punto di ritiro.</div></div>
+             spedizione. FUORI DAL CAMPO del costo verso il punto, che
+             a chi non ha dichiarato corrieri e' nascosto: dentro,
+             sparirebbe proprio per chi deve leggerla. -->
+        <div id="sellSpedizioniereHint" style="display:none;margin:-6px 0 14px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4">💡 Indica nel Profilo (📦&nbsp;Come spedisci) <b>con quali corrieri spedisci</b>: con Poste Italiane, SDA o InPost chi compra potrà scegliere anche un punto di ritiro.</div>
       <!-- Il TERZO costo (ago 2026, dal campo: il riso da 4 kg venduto
            a sacchi con la spedizione di UNO dichiarata). Vale per
            tutte e due le strade qui sopra — dipende dall'oggetto, non
@@ -34127,7 +34129,7 @@ function apriInvitoCorrieri(){
 function disegnaPilloleCorrieri(){
   const box = el('corrieriPillole');
   if (!box) return;
-  box.innerHTML = spedizionieriCatalogo.map(s => {
+  box.innerHTML = corrieriDichiarabili().map(s => {
     const on = retiFoglio.has(s);
     return `<button data-rete="${esc(s)}" onclick="toggleReteFoglio(this)" style="font:inherit;font-size:13px;font-weight:700;border:1px solid ${on?'var(--sats)':'var(--line)'};background:${on?'var(--sats)':'transparent'};color:${on?'#fff':'var(--muted)'};border-radius:99px;padding:7px 14px;cursor:pointer">${esc(s)}</button>`;
   }).join('');
@@ -34538,6 +34540,8 @@ let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
    chi guarda «ne ho dichiarata almeno una»; le reti vere sono
    `mieRetiSped`, ed e' quella che decide mappe e scelta. */
 let mySpedizioniere = '', spedizionieriCatalogo = [], mieRetiSped = [];
+/* ci sono punti Barattolo accesi? Lo dice /api/me (12 ott 2026) */
+let reteBarattoloViva = false;
 /* Quante volte il foglio dei corrieri si e' gia' aperto (colonna, non
    localStorage: e' un fatto della persona) e il suo tetto. */
 let myInvitoCorrieri = 0, invitoCorrieriMax = 0;
@@ -36574,7 +36578,7 @@ function renderSpedizioniere(){
       nell'ordine. Con gli altri, o senza dichiararli, vendi lo
       stesso: il pacco va all'indirizzo che indica chi compra.</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-      ${spedizionieriCatalogo.map(pill).join('')}</div>
+      ${corrieriDichiarabili().map(pill).join('')}</div>
     ${bloccoSpedStd()}
     <button class="btn orange" onclick="salvaReti()">Salva</button>`;
 }
@@ -36913,9 +36917,16 @@ async function salvaReti(){
   renderSpedizioniere();
   /* il toast dice cio' che e' CAMBIATO: le reti come sempre, e lo
      standard quando e' lui la novita' */
-  const toastReti = mieRetiSped.length
-    ? `📦 Spedisci con ${mieRetiSped.join(' e ')}: chi compra sceglierà il punto della rete giusta`
-    : 'Corrieri tolti: chi sceglie il punto si accorderà in chat';
+  /* TRE CASI, dal 12 ott 2026 (il caso dell'ordine 213): le due frasi
+     di prima promettevano il punto a chiunque avesse dei corrieri, e
+     l'accordo in chat a chi non ne aveva — adesso il punto c'e' solo
+     coi corrieri che ai punti consegnano, e senza si va a un
+     indirizzo. Il giudice e' `offroPunti`, lo stesso del form. */
+  const toastReti = !mieRetiSped.length
+    ? 'Corrieri tolti: chi compra riceverà il pacco a un indirizzo'
+    : offroPunti()
+      ? '📦 Corrieri salvati: chi compra potrà scegliere anche un punto di ritiro'
+      : '📦 Corrieri salvati. Senza Poste Italiane, SDA o InPost chi compra riceve a un indirizzo';
   const toastStd = mySpedStd
     ? `🚚 Costo standard: ${cifraStdSalvato(mySpedStd)}. Lo trovi già scritto negli articoli nuovi`
     : 'Costo standard tolto: gli articoli nuovi partono col campo vuoto';
@@ -40659,6 +40670,28 @@ function corriereCompatibile(rete, corriere){
   const ammessi = corrieriDellaRete(rete);
   if (!ammessi.length || CORRIERI_SENZA_RETE.includes(corriere)) return true;
   return ammessi.includes(corriere);
+}
+/* I CORRIERI CHE SI POSSONO SPUNTARE (12 ott 2026, richiesta di
+   Andrea): la rete di casa non si propone finche' non c'e' un punto
+   Barattolo acceso — una pillola che non porta a niente e' una
+   domanda senza risposta. Il CATALOGO non si accorcia (e' lui che
+   dice quali punti salvati sono vivi, e il Salva lo usa per mettere
+   in ordine): qui si decide solo cosa si DISEGNA.
+   CHI L'AVEVA GIA' DICHIARATA LA VEDE ANCORA, ed e' la meta' da non
+   togliere: senza, la sua spunta resterebbe scritta sul server ma
+   invisibile, e non potrebbe piu' toglierla. */
+function corrieriDichiarabili(){
+  return spedizionieriCatalogo.filter(c => c !== RETE_BARATTOLO
+    || reteBarattoloViva || mieRetiSped.includes(RETE_BARATTOLO));
+}
+/* «Fra i miei corrieri ce n'e' uno che consegna a una rete di
+   punti?» — il gemello di `reti_punto` del server, sulle MIE spunte:
+   Poste Italiane, SDA, InPost, e la rete di casa solo a punti accesi
+   (il suo gate). E' la domanda del form di Vendi: il costo verso un
+   punto di ritiro ha senso solo per chi il punto lo offre. */
+function offroPunti(){
+  return mieRetiSped.some(c => c === RETE_BARATTOLO
+    ? reteBarattoloViva : !!RETE_DEL_CORRIERE[c]);
 }
 function fraseCorriereSbagliato(rete, corriere){
   const conChi = (corriere && corriere !== 'Altro corriere')
@@ -46647,9 +46680,19 @@ function aggiornaConsegnaForm(){
      queste tre un tag non esiste — vivrebbero solo su Barattolo. Chi
      compra non ci perde niente: la via «punto di ritiro» si offre lo
      stesso, e la sua tariffa ripiega su quella di casa. */
+  /* IL COSTO VERSO UN PUNTO SOLO A CHI IL PUNTO LO OFFRE (12 ott
+     2026, richiesta di Andrea): dal caso dell'ordine 213 la via punto
+     alla cassa c'e' solo coi corrieri che ai punti consegnano, e a
+     chi non ne ha dichiarati questo campo chiedeva un numero che
+     nessuno avrebbe mai pagato. IN DEMO RESTA: li' il catalogo non
+     arriva e nessuno ha dichiarato niente — sparirebbe per tutti, e
+     la demo serve a far vedere il form. Quel che c'e' gia' scritto
+     (una modifica, il costo standard) non si tocca: nascosto, viaggia
+     com'era. */
   if (el('sellSpedPuntoField'))
     el('sellSpedPuntoField').style.display =
-      (sped && !asta && !editandoNostr) ? '' : 'none';
+      (sped && !asta && !editandoNostr && (DEMO || offroPunti()))
+        ? '' : 'none';
   if (el('sellSpedExtraField'))
     el('sellSpedExtraField').style.display =
       (sped && !asta && !editandoNostr) ? '' : 'none';
@@ -77856,6 +77899,7 @@ async function avvia(){
        quando la rete e' una — l'unico caso che quel server conosce */
     mieRetiSped = me.spedizionieri_miei
       || (mySpedizioniere ? [mySpedizioniere] : []);
+    reteBarattoloViva = !!me.rete_barattolo_viva;
     retiBozza = null;      // la bozza si rifa' dal salvato appena arrivato
     /* il costo di spedizione STANDARD (set 2026): null = nessuno, che e'
        anche cio' che vale da un server di ieri (la chiave non la manda).

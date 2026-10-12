@@ -25260,8 +25260,13 @@ def prove_punti_corrieri():
     # --- lo specchio del client, e i suoi giudici FATTI GIRARE -------
     try:
         prog = (
-            mini[mini.index("const esc = s =>"):
-                 mini.index("const el = id =>")]
+            # le variabili della pagina che i giudici dei corrieri
+            # leggono: il catalogo e' quello VERO del server
+            "const RETE_BARATTOLO = 'Barattolo';\n"
+            "let spedizionieriCatalogo = " + json.dumps(list(catalogo))
+            + ", mieRetiSped = [], reteBarattoloViva = false;\n"
+            + mini[mini.index("const esc = s =>"):
+                   mini.index("const el = id =>")]
             + mini[mini.index("const RETE_DEL_CORRIERE = {"):
                    mini.index("\n/* LA RETE DI CASA")]
             + pezzo_js(mini, "const TIPI_PUNTO = [", "\n\n") + "\n"
@@ -25279,7 +25284,14 @@ const ord = x => Object.assign({role:'buyer', state:'dispute',
   consegnaScelta:'spedizione'}, x);
 const vista = x => { const o = ord(x); return puntoInVista(o, o.state); };
 const casi = """ + json.dumps([[c[0], c[1]] for c in casi]) + r""";
+const P = (viva, mie) => { reteBarattoloViva = viva; mieRetiSped = mie;
+  const d = corrieriDichiarabili();
+  return [d.includes('Barattolo'), d.length, offroPunti()]; };
 console.log(JSON.stringify({
+  spunte: [P(false, []), P(true, []), P(false, ['Barattolo']),
+           P(true, ['Barattolo']), P(false, ['DHL']), P(false, ['SDA']),
+           P(false, ['Poste Italiane', 'DHL']), P(false, ['InPost']),
+           P(false, ['Altro', 'BRT', 'GLS', 'UPS'])],
   tabella: Object.entries(RETE_DEL_CORRIERE),
   senzaRete: CORRIERI_SENZA_RETE,
   compat: casi.map(c => corriereCompatibile(c[0], c[1])),
@@ -25379,6 +25391,67 @@ console.log(JSON.stringify({
     prova("gli ordini di prima hanno l'avviso che non ferma", 1,
           mini.count("senza conoscere il tuo corriere</b>: controlla "
                      "che lo accetti prima di spedire."))
+
+    # --- LA PILLOLA «BARATTOLO» E IL COSTO VERSO IL PUNTO ------------
+    # (12 ott 2026, richieste di Andrea dopo il primo giro) La rete di
+    # casa non si propone fra i corrieri finche' non c'e' un punto
+    # acceso; e il campo «costo verso un punto di ritiro» del form di
+    # Vendi si mostra solo a chi il punto lo offre.
+    n = len(catalogo)
+    sp = out.get("spunte") or [[None] * 3] * 9
+    prova("a punti spenti la pillola «Barattolo» non si disegna",
+          [False, n - 1], sp[0][:2])
+    prova("...a punti accesi si'", [True, n], sp[1][:2])
+    prova("...e chi l'aveva gia' dichiarata la ritrova, o non potrebbe "
+          "piu' toglierla", [True, n], sp[2][:2])
+    prova("la rete di casa da' il punto solo a punti accesi",
+          [False, True], [sp[2][2], sp[3][2]])
+    prova("offro punti: niente e DHL no; SDA, Poste (anche con DHL) e "
+          "InPost si'; i soli corrieri senza mappa no",
+          [False, False, True, True, True, False],
+          [sp[0][2], sp[4][2], sp[5][2], sp[6][2], sp[7][2], sp[8][2]])
+    prova("le DUE file di pillole passano dal giudice", 2,
+          mini.count("corrieriDichiarabili().map("))
+    prova("...e nessuna disegna piu' il catalogo nudo", 0,
+          mini.count("spedizionieriCatalogo.map("))
+    # il CATALOGO pero' non si accorcia: e' lui che dice quali punti
+    # salvati sono vivi, e i due Salva lo usano per mettere in ordine
+    prova("il catalogo che arriva dal server resta INTERO", True,
+          'profilo["spedizionieri"] = list(SPEDIZIONIERI)' in src)
+    prova("...e i due Salva filtrano ancora su quello (chi l'aveva "
+          "dichiarata non la perde in silenzio)", 2,
+          mini.count("const scelte = spedizionieriCatalogo.filter("))
+    prova("il server dice alla pagina se ci sono punti accesi", 1,
+          src.count('profilo["rete_barattolo_viva"] = '
+                    'rete_barattolo_viva()'))
+    prova("...e la pagina lo legge da /api/me", True,
+          "reteBarattoloViva = !!me.rete_barattolo_viva;" in mini)
+    cf = pezzo_js(mini, "function aggiornaConsegnaForm(){", "\n}")
+    prova("il costo verso il punto si mostra solo a chi il punto lo "
+          "offre (in demo resta)", True,
+          "(sped && !asta && !editandoNostr && (DEMO || offroPunti()))"
+          in cf)
+    # IL PROMEMORIA STA FUORI DAL CAMPO: dentro, sparirebbe proprio
+    # per chi non ha dichiarato corrieri — cioe' per chi deve leggerlo.
+    # Si conta: fra l'apertura del campo e il promemoria i <div e i
+    # </div> devono essere pari, cioe' il campo e' gia' chiuso.
+    i_campo = mini.index('<div class="field" id="sellSpedPuntoField"')
+    i_riga = mini.index('<div id="sellSpedizioniereHint"')
+    mezzo = mini[i_campo:i_riga]
+    prova("il promemoria dei corrieri sta FUORI dal campo nascosto",
+          (True, 0), (i_campo < i_riga,
+                      mezzo.count("<div") - mezzo.count("</div>")))
+    prova("...e resta acceso per chi non ha dichiarato niente", True,
+          "&& !mieRetiSped.length) ? '' : 'none';" in cf)
+    # I TRE AVVISI DEL SALVA: le due frasi di prima promettevano il
+    # punto a chiunque avesse corrieri e l'accordo in chat a chi no
+    prova("il Salva non promette piu' il punto a chiunque", False,
+          "sceglierà il punto della rete giusta" in mini
+          or "si accorderà in chat" in mini)
+    prova("...e dice i tre casi veri", True,
+          "chi compra potrà scegliere anche un punto di ritiro'" in mini
+          and "chi compra riceve a un indirizzo'" in mini
+          and "chi compra riceverà il pacco a un indirizzo'" in mini)
 
 
 def prove_punti_salvati():

@@ -102,7 +102,19 @@ def avvio():
     async def notifica_finta(chi, testo, *a, **k):
         DETTO.append((chi, testo))
 
+    # DUE REGISTRI, DUE MESTIERI (12 ott 2026, cantiere punti-ritiro):
+    # dal gruppo degli admin la nota della DISPUTA non e' piu' un ciclo
+    # di `notifica()` su ADMIN_IDS — passa da `notifica_admin` con
+    # l'argomento «dispute» — e questo finto la buttava fra i testi
+    # della ronda, dove la sezione della disputa non guarda: rossa su
+    # main da quel giorno, e nessuno lo vedeva perche' questo collaudo
+    # non era fra quelli della CI (adesso c'e'). La nota al moderatore
+    # torna fra i DETTI a 999, l'unico admin di questo config; il resto
+    # e' della ronda. E' il calco di collaudo_punti_barattolo.
     async def admin_finto(testo, *a, **k):
+        if k.get("argomento") == "dispute":
+            DETTO.append((999, testo))
+            return
         ADMIN.append(testo)
 
     async def zitto(*a, **k):
@@ -347,7 +359,8 @@ def main():
     DETTO.clear()
     come(111)
     chiama(SRV.apri_disputa, o_disp)
-    # la nota ai moderatori viaggia con notifica() verso ADMIN_IDS
+    # la nota ai moderatori viaggia con notifica_admin(), argomento
+    # «dispute»: il finto dell'avvio la registra fra i DETTI a 999
     nota = " || ".join(t for chi, t in DETTO if chi == 999)
     prova("la nota dice la dichiarazione, con l'etichetta di parte",
           True, "ha DICHIARATO" in nota

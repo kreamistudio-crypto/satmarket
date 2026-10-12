@@ -41241,6 +41241,15 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # cancellerebbe da solo, in silenzio. Il gate vive sull'ACQUISTO.
     profilo["spedizionieri_miei"] = reti_venditore(
         u["spedizionieri"], u["spedizioniere"], True)
+    # CI SONO PUNTI NOSTRI ACCESI? (12 ott 2026, cantiere punti-ritiro)
+    # Serve alla pagina per due cose: non proporre la pillola
+    # «Barattolo» fra i corrieri finche' non c'e' un punto a cui
+    # consegnare, e sapere se quella rete da' davvero un punto a chi
+    # l'ha dichiarata (il campo «costo verso un punto» del form). Il
+    # catalogo qui sopra NON si accorcia: e' lui che dice quali punti
+    # salvati sono ancora vivi, e chi l'aveva gia' dichiarata deve
+    # ritrovare la sua spunta (o al primo Salva la perderebbe).
+    profilo["rete_barattolo_viva"] = rete_barattolo_viva()
     # IL COSTO DI SPEDIZIONE STANDARD (set 2026), per il cassetto e per
     # la precompilazione del form di Vendi. Dal SELECT * la colonna esce
     # GREZZA, una stringa JSON, e qui la si sostituisce con la lettura

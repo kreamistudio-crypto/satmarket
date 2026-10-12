@@ -53892,21 +53892,55 @@ Poste; il pannello «⚙️ Stato delle leve», voce «Avviso «indica i tuoi
 corrieri»», spenta; quando decide di accenderla, la riga nel config
 del VPS (PRODUZIONE) e la riga del journal con gli id avvisati.
 
-**GIÀ ROSSI SU MAIN, non toccati** (non sono fra i collaudi della CI):
-`collaudo_busta_diretta.py` (1 rossa) e `collaudo_email_corriere.py`
-(4 rosse), tutte sulla nota al moderatore in disputa — verificato su
-una copia pulita di `origin/main`: aspettano la nota da `notifica()`
-verso l'admin, e dal cantiere del gruppo degli admin passa da
-`notifica_admin`.
-
-**COSA È GIRATO SU QUALE ALBERO** (12 ott 2026, sera, sopra `236d5b8`,
-la punta di main: non è corso nel frattempo). Sull'albero ultimo del
-cantiere, prima di questo paragrafo: la suite severa INTERA, 23.160
-passate e 0 fallite; i 69 collaudi del workflow nella gabbia, tutti
-verdi, col nuovo dentro; i quattro collaudi fuori CI che toccano il
-punto (`collaudo_reti` 56, `collaudo_nota` 30,
-`collaudo_punto_concordato` 46, `collaudo_conto` 232), verdi; la
-tortura, 22 su 22; lo scanner dei segreti rifatto in locale com'è
-scritto nel workflow, pulito. Il giro dal vivo è dell'albero di poco
-prima (mancava solo questo verbale). Nessun push: aspetta l'ok di
-Andrea.
+**IL SECONDO GIRO, i quattro notati** (stesso giorno, richiesta di
+Andrea prima del push).
+1. `collaudo_busta_diretta.py` (1 rossa) e `collaudo_email_corriere.py`
+   (4 rosse) erano ROSSI SU MAIN, verificato su una copia pulita di
+   `origin/main`. IL PERCHÉ: dal cantiere del gruppo degli admin la
+   nota della disputa non è più un ciclo di `notifica()` su
+   `ADMIN_IDS` — passa da `notifica_admin` con l'argomento «dispute» —
+   e il finto dei due banchi la metteva fra i testi della ronda, dove
+   la sezione della disputa non guarda. Nessuno lo vedeva perché non
+   erano fra i collaudi della CI. LA CURA è nel banco, non nel server
+   (il server fa la cosa giusta): la nota con quell'argomento torna
+   fra i detti a 999, il calco di `collaudo_punti_barattolo`. Tutti e
+   due nella CI.
+2. `collaudo_reti.py` e `collaudo_nota.py`: verdi (li aveva già
+   allineati il primo giro), provati nella gabbia e messi nella CI.
+3. LA PILLOLA «BARATTOLO» fra i corrieri si nasconde finché non c'è
+   un punto Barattolo acceso (`corrieriDichiarabili`, nel cassetto del
+   Profilo e nel foglio). Il CATALOGO che arriva dal server non si
+   accorcia: è lui che dice quali punti salvati sono vivi, e i due
+   Salva lo usano per mettere in ordine. Chi l'aveva GIÀ dichiarata la
+   vede ancora — senza, la sua spunta resterebbe scritta sul server ma
+   invisibile, e non potrebbe più toglierla (è la ragione scritta nel
+   server accanto a `spedizionieri_miei`). La pagina lo sa da una
+   chiave nuova di `/api/me`, `rete_barattolo_viva`.
+4. IL CAMPO «Costo verso un punto di ritiro» del form di Vendi si
+   mostra solo a chi il punto lo offre (`offroPunti`: Poste Italiane,
+   SDA, InPost, e la rete di casa a punti accesi — il gemello di
+   `reti_punto` sulle spunte di chi vende); in demo resta. Il
+   promemoria «indica i tuoi corrieri» stava DENTRO quel campo: è
+   uscito, o sarebbe sparito proprio per chi deve leggerlo. Quel che
+   c'è già scritto nel campo (una modifica, il costo standard) non si
+   tocca: nascosto, viaggia com'era. Lo stesso campo nel cassetto del
+   Profilo («Verso un punto di ritiro») resta: lì si sta scegliendo i
+   corrieri, e non era nella richiesta.
+E UNA COSA TROVATA FACENDO IL 4, mia: i due avvisi del Salva dei
+corrieri («chi compra sceglierà il punto della rete giusta», «chi
+sceglie il punto si accorderà in chat») erano diventati falsi con la
+regola nuova; adesso sono tre, veri, sullo stesso giudice del form.
+PROVATO: sedici prove in più in `prove_punti_corrieri` (i due giudici
+fatti girare in node sui nove casi, il conto dei `<div` che dice che
+il promemoria è fuori dal campo); una sezione in più nel collaudo
+(cosa dice `/api/me` a punti spenti e accesi, 70 passi in tutto);
+undici mutazioni in più nella tortura, comprese le due che tolgono la
+cura ai collaudi e quella che fa tacere la nota nel server. IL GIRO
+DAL VIVO a 375 px, otto scatti: il cassetto e il foglio senza la
+pillola; la venditrice che l'aveva dichiarata la ritrova; il form di
+Vendi senza corrieri (niente campo, c'è il promemoria), con DHL
+(niente campo, niente promemoria), con Poste e InPost (il campo c'è);
+dichiarata SDA dal Profilo il campo compare, passati a DHL sparisce,
+coi due avvisi giusti. La pillola «a punti accesi» dal vivo non si è
+vista: nel catalogo non c'è nessun punto, lo dicono il banco node e il
+collaudo.

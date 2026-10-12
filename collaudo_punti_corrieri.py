@@ -552,6 +552,43 @@ def prove_disputa():
           v[0].get("punto_ritiro") if v else None)
 
 
+def prove_profilo():
+    print("\n── IL PROFILO: cosa sa la pagina dei punti di casa ──")
+    # la pagina nasconde la pillola «Barattolo» finche' non c'e' un
+    # punto acceso, e per saperlo chiede a /api/me: qui si prova la
+    # risposta vera, a punti spenti e accesi
+    semina(["DHL"])
+    come(222)
+    me = asyncio.run(SRV.mio_profilo("", ""))
+    prova("a punti spenti il profilo lo dice", False,
+          me.get("rete_barattolo_viva"))
+    prova("...ma il catalogo arriva INTERO (e' lui che dice quali punti "
+          "salvati sono vivi)", list(SRV.SPEDIZIONIERI),
+          me.get("spedizionieri"))
+    prova("...e le spunte sono quelle dichiarate", ["DHL"],
+          me.get("spedizionieri_miei"))
+    # un punto di cartone, acceso col gesto del bot
+    prima = (SRV.PUNTI_BARATTOLO, SRV.ID_PUNTI_BARATTOLO)
+    SRV.PUNTI_BARATTOLO = ({"id": "bar-luna", "nome": "Bar Luna",
+                            "indirizzo": "Via Roma 1",
+                            "comune": "Torino (TO)", "orari": "lun-sab",
+                            "negozio": "neg333"},)
+    SRV.ID_PUNTI_BARATTOLO = ("bar-luna",)
+    SRV._PUNTI = None
+    SRV.imposta_punti(["bar-luna"])
+    SRV._PUNTI = None
+    me = asyncio.run(SRV.mio_profilo("", ""))
+    prova("acceso un punto, il profilo lo dice", True,
+          me.get("rete_barattolo_viva"))
+    SRV.imposta_punti([])
+    SRV.PUNTI_BARATTOLO, SRV.ID_PUNTI_BARATTOLO = prima
+    SRV._PUNTI = None
+    me = asyncio.run(SRV.mio_profilo("", ""))
+    prova("...e spento di nuovo, torna a dire di no", False,
+          me.get("rete_barattolo_viva"))
+    come(111)
+
+
 def prove_campagna():
     print("\n── LA CAMPAGNA «INDICA I TUOI CORRIERI», DIETRO LA LEVA ──")
     con = SRV.db()
@@ -628,6 +665,7 @@ def main():
     prove_ordini_di_prima()
     prove_importati()
     prove_disputa()
+    prove_profilo()
     prove_campagna()
     print("\n" + "=" * 66)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

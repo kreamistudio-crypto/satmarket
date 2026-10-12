@@ -19798,7 +19798,17 @@
   timbra. Il vecchio avviso per-venditore (`avvisato_spedizioniere`)
   resta per chi arriva dopo, con lo STESSO testo della campagna: quello
   di agosto prometteva il punto a chi non dichiara, e non era più vero.
-  Collaudo: `collaudo_punti_corrieri.py` (65 passi, nella gabbia della
+  CHI VENDE VEDE SOLO QUEL CHE GLI SERVE (secondo giro, stesso
+  giorno): la pillola «Barattolo» fra i corrieri non si disegna finché
+  non c'è un punto nostro acceso (`corrieriDichiarabili`; il catalogo
+  che arriva da `/api/me` resta INTERO, e chi l'aveva già dichiarata
+  la ritrova: sennò non potrebbe più toglierla), e il campo «Costo
+  verso un punto di ritiro» del form di Vendi si mostra solo a chi il
+  punto lo offre (`offroPunti`, il gemello di `reti_punto` sulle
+  spunte di chi vende; in demo resta). La pagina sa dei punti accesi
+  da `rete_barattolo_viva` in `/api/me`. Il promemoria dei corrieri
+  sta FUORI da quel campo.
+  Collaudo: `collaudo_punti_corrieri.py` (70 passi, nella gabbia della
   CI). Procedura della leva: PRODUZIONE.
   LA VIA PUNTO SI OFFRE SEMPRE dove c'è la spedizione (secondo giro,
   ago 2026 — la decisione di Andrea che SUPERA quella del primo
