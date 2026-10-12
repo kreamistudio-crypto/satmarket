@@ -1464,9 +1464,12 @@ ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
   caso e deciderà chi riceve i sats. Da quel momento lo scambio si ferma:
   né tu né l'altra persona potete più muovere i sats. A decidere è
   Barattolo, e le strade restano due: i sats vanno a chi compra o tornano
-  a chi vende. Prima di aprirla, dai tempo all'altra persona: quasi sempre
-  è un ritardo. Se qui sopra c'è il suo profilo coi bottoni per
-  scrivergli, provate prima a sentirvi.» —
+  a chi vende. Prima di aprirla, dai tempo all'altra persona e scrivile
+  nella chat dello scambio: quasi sempre è un ritardo. Se la apri, i
+  moderatori potranno leggere la chat di questo scambio.» (dal 12 ott
+  2026, §13; dove la chat non c'è resta la chiusa di prima: «…Se qui
+  sopra c'è il suo profilo coi bottoni per scrivergli, provate prima a
+  sentirvi.») —
   «Sì, apri la disputa» → «Apro la disputa…» → «Disputa aperta».
 - 📱 Stato per tutti e due: «**Disputa aperta**» «Un moderatore esaminerà
   lo scambio. I sats restano bloccati fino alla decisione.»
@@ -1685,6 +1688,66 @@ ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
 | Cifre | euro interi; solo Barattozon coi centesimi | il campo non accetta la virgola |
 
 ---
+
+## 13. La chat dello scambio (12 ott 2026)
+
+Dentro ogni scambio **preso** c'è una chat fra le due parti, nella pagina
+dello scambio, sotto il profilo dell'altra persona. C'è **dalla presa**
+fino a quando chi vende libera i sats (o lo scambio si annulla); con una
+disputa aperta resta finché la disputa non è chiusa. Poi sparisce per
+tutti e due.
+
+- **Dov'è**: pagina dello scambio → riquadro «💬 **Chat con <nome>**»
+  (senza un nome: «Chat con l'altra persona»).
+- **In cima, sempre**: «🛡️ Barattolo non ti scrive mai qui. Non uscire
+  dallo scambio per pagare. Non mandare codici o chiavi.»
+- **In fondo, sempre**: «🔒 Cifrata fra voi due: Barattolo la trasporta ma
+  non la può leggere, e a fine scambio la cancella. Un moderatore la legge
+  solo se una di voi due apre una disputa.»
+- **Appena preso l'ordine**, finché l'altra persona non ha aperto lo
+  scambio: «Si apre appena <nome> apre lo scambio.» (il campo per scrivere
+  non c'è ancora).
+- **Per scrivere**: campo «Scrivi un messaggio…», contatore «0/500»,
+  bottone «**Invia**». Solo testo, 500 caratteri. Vuoto: «Scrivi qualcosa,
+  prima». Due invii troppo vicini: «Un momento: un messaggio alla volta».
+  Troppi in un minuto: «Non è partito: Stai scrivendo troppo in fretta:
+  aspetta un momento».
+- **I messaggi**: «Tu · 14:32» e «<nome> · 14:33». Senza messaggi: «Ancora
+  nessun messaggio.»
+- **I link non si aprono**: si vedono sottolineati, in rosso. Sotto un
+  messaggio dell'altra persona che ne porta uno: «⚠️ C'è un link: non
+  aprirlo per pagare o per «verificare» qualcosa.» Sotto uno che chiede di
+  spostarsi (Telegram, WhatsApp, «scrivimi», «in privato»…): «⚠️ Ti chiede
+  di spostarti altrove: fuori dallo scambio Barattolo non può aiutarti.»
+- ✈️ **L'avviso all'altra persona**, se non sta guardando la chat: «💬 **Hai
+  un nuovo messaggio nello scambio #<prime quattro cifre>.** Aprilo per
+  leggerlo: è cifrato fra voi due, e di qui il testo non passa.» col
+  bottone «⚡ Apri lo scambio». Uno per ogni volta che c'è da leggere, non
+  uno per messaggio. Ad app aperta su un'altra pagina: «💬 Nuovo messaggio
+  nello scambio».
+- **Da un altro telefono** (o da un browser che dimentica): «Hai aperto
+  questa chat da un altro dispositivo. Se la continui qui, i messaggi di
+  prima qui non si vedono.» → «**Continua la chat qui**». All'altra persona
+  compare: «🔑 <nome> ha ripreso la chat da un altro dispositivo: i messaggi
+  di prima lì non li vede.» Se restano messaggi illeggibili: «N messaggi di
+  prima non si possono leggere da questo dispositivo.»
+- **Se l'altra persona non è di Barattolo** (scambia da un'altra app, o
+  non si è fatta riconoscere): «💬 Con questa persona la chat non c'è: non
+  sta scambiando da Barattolo, o non si è fatta riconoscere.»
+- **Da un dispositivo che lo scambio lo può solo guardare**: «💬 Per
+  scrivere all'altra persona apri lo scambio dal dispositivo da cui l'hai
+  fatto.»
+- **In disputa**: chi tocca «C'è un problema» legge, prima di confermare,
+  «Se la apri, i moderatori potranno leggere la chat di questo scambio.»
+  (§10). Il moderatore che prende la disputa trova, nella sua card, «💬 **La
+  chat fra le due parti**» — «La leggi perché chi ha aperto la disputa ti ha
+  dato la chiave. Qui non si scrive: alle parti rispondi nei due riquadri
+  qui sopra. A disputa chiusa si cancella.» — con «↻ Rileggi la chat». Se la
+  chiave non è ancora arrivata: «Ci sono N messaggi, ma la chiave per
+  leggerli non è ancora arrivata: la consegna il telefono di chi ha aperto
+  la disputa, appena riapre lo scambio.»
+- **Il recapito per gli euro resta dov'era** («🤝 I vostri recapiti», §3 e
+  §5): la chat serve a parlarsi, non sostituisce quel riquadro.
 
 ## Notato strada facendo — chiuso il 7 ott 2026
 

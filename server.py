@@ -49245,6 +49245,565 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
     return {"ok": True}
 
 
+# ═══ LA CHAT NELLO SCAMBIO: IL SERVER FA IL POSTINO (12 ott 2026,
+# cantiere chat-nello-scambio, decisione di Andrea con Alan) ═══════════
+# Dentro ogni scambio P2P preso le due parti si scrivono. Il 9 set 2026
+# la chat libera era uscita (fase 6) e al suo posto erano rimasti i
+# recapiti cifrati: questa la RIMETTE, ed e' un emendamento dichiarato.
+# Non e' pero' la chat di allora, che viaggiava sui relay con le chiavi
+# dello scambio. Le tre decisioni che la reggono:
+# 1) CHIAVI USA-E-GETTA. Ogni telefono fa nascere per lo scambio una
+#    chiave a caso, la presenta all'altro firmata con la chiave dello
+#    scambio, e a scambio finito la butta. NON si ricalcola dal codice
+#    segreto: una busta di ieri non la riapre piu' nessuno, nemmeno chi
+#    l'ha scritta. Il prezzo e' dichiarato: chi cambia telefono a meta'
+#    scambio i messaggi di prima non li rivede.
+# 2) NIENTE RELAY: le buste passano di QUI, gia' chiuse dal telefono. Il
+#    server e' il postino — tiene la busta, la consegna, non la apre
+#    (non ha con che cosa: nessuna chiave passa mai di qui, e non c'e'
+#    una colonna dove finirebbe), e a scambio finito la CANCELLA.
+# 3) IL MODERATORE legge solo se una delle due parti apre una disputa:
+#    e' il telefono di chi la apre a chiudere la chiave di lettura in
+#    una busta per ogni moderatore (`tipo` 'mod'). A disputa chiusa si
+#    cancella tutto, come a fine scambio.
+# COSA VEDE IL SERVER, tutto e solo: su quale scambio, chi dei due ha
+# spedito (deve saperlo: consegna all'altro e lo avvisa), a che ora,
+# quanto pesa la busta, fin dove l'altro ha ritirato. Il testo no.
+# ⚠️ LE BUSTE NON STANNO NEL DATABASE DI TUTTI, e non e' un vezzo: i due
+# backup (il pre-deploy di deploy.sh e il giornaliero di
+# deploy/backup-fuori.sh) copiano `satmarket.db` INTERO — cinque copie
+# sul VPS, e una al giorno nel canale dei backup e sul PC. Una busta li'
+# dentro sopravvivrebbe alla sua cancellazione per sempre. Stanno in un
+# file a parte, accanto a quello vero, che nessun backup nomina: perso
+# quello si perde una chat in corso, e nient'altro.
+# `secure_delete`: sqlite di suo lascia i byte di una riga cancellata
+# nelle pagine libere del file finche' non le riusa; con l'interruttore
+# li azzera subito. «Cancellata» qui vuol dire che nel file non c'e'.
+# ⚠️ NIENTE GET, E NIENTE RIGA PER BUSTA NEL JOURNAL: uvicorn scrive nel
+# suo registro l'indirizzo di ogni richiesta, e il journal resta quando
+# la chat non c'e' piu'. Le rotte sono POST col corpo, le righe degli
+# accessi riusciti di queste strade non si scrivono
+# (`_ChatFuoriDalJournal`), e a parlare e' il solo AVVISO: una riga
+# quando parte, come per ogni altro passo dello scambio.
+# LE PARTI E LA FINE LE DICE `_parti_scambio_p2p`, il giudice di tutti:
+# la chat e' aperta finche' lo scambio e' VIVO (dalla presa a un momento
+# che lo chiude; una disputa lo tiene vivo), e vale per il GIRO in
+# corso — un ordine tornato nel libro e ripreso da un altro riparte da
+# zero, e le buste del giro di prima si cancellano.
+# `realpath` e non `abspath`: sul VPS `satmarket.db` e' un collegamento
+# alla cartella dei dati, e il file nuovo deve nascere LI' — accanto a
+# quello vero, non nella cartella del codice. NON E' UNA LEVA DEL
+# CONFIG, apposta: il posto lo decide quello del database vero, e una
+# riga copiata dal config d'esempio con un nome nudo lo farebbe nascere
+# accanto al codice.
+DB_CHAT = os.path.join(os.path.dirname(os.path.realpath(DB)),
+                       "chat-scambi.db")
+P2P_CHAT_BUSTA_MAX = 4096         # 500 caratteri, chiusi e in base64, stanno sotto
+P2P_CHAT_BUSTA_MOD_MAX = 16384    # la busta per un moderatore porta piu' chiavi
+P2P_CHAT_MSG_MAX = 200            # messaggi per scambio: ~0,6 MB nel caso peggiore
+P2P_CHAT_SALUTI_MAX = 20          # chiavi presentate, per parte
+P2P_CHAT_MOD_MAX = 40             # buste per i moderatori, per parte
+P2P_CHAT_RAFFICA = 20             # messaggi al minuto, per chi scrive
+P2P_CHAT_RITIRO_MAX = 300         # buste per risposta
+P2P_CHAT_PRESENTE_S = 20          # chi ha ritirato da meno di cosi' sta guardando
+P2P_CHAT_AVVISI_MAX = 30          # avvisi per scambio e per persona: anti-abuso
+P2P_CHAT_VITA_MAX_S = 30 * 86400  # la rete sotto la scopa: nessuno scambio dura tanto
+P2P_CHAT_TIPI = ("saluto", "msg", "mod")
+FORMA_BUSTA_CHAT = re.compile(r"^[A-Za-z0-9+/]{40,}={0,2}$")
+_CHAT_PRONTA = {"file": ""}
+_TASK_CHAT_P2P = set()
+
+
+def db_chat():
+    """IL CASSETTO DELLE BUSTE: un file sqlite a parte (vedi sopra il
+    perche'), che si prepara da solo alla prima apertura. `buste`: una
+    riga per busta — `n` cresce sempre (AUTOINCREMENT: un numero non
+    torna mai, nemmeno dopo una cancellazione, ed e' il segnalibro dei
+    telefoni), `da` e' l'account che l'ha spedita, `per` la chiave
+    pubblica del moderatore a cui e' destinata (solo `tipo` 'mod').
+    `letture`: fin dove ogni parte ha ritirato e fin dove e' stata
+    avvisata. Tutte e due si svuotano a scambio finito."""
+    con = sqlite3.connect(DB_CHAT, timeout=DB_BUSY_TIMEOUT)
+    con.row_factory = sqlite3.Row
+    con.execute("PRAGMA secure_delete = ON")
+    if _CHAT_PRONTA["file"] != DB_CHAT:
+        con.executescript("""
+            CREATE TABLE IF NOT EXISTS buste(
+                n INTEGER PRIMARY KEY AUTOINCREMENT,
+                ordine TEXT NOT NULL,
+                giro INTEGER NOT NULL,
+                da INTEGER NOT NULL,
+                tipo TEXT NOT NULL,
+                per TEXT NOT NULL DEFAULT '',
+                busta TEXT NOT NULL,
+                quando INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_buste_ordine ON buste(ordine, giro, n);
+            CREATE TABLE IF NOT EXISTS letture(
+                ordine TEXT NOT NULL,
+                giro INTEGER NOT NULL,
+                tg_id INTEGER NOT NULL,
+                letto_fino INTEGER NOT NULL DEFAULT 0,
+                visto_il INTEGER NOT NULL DEFAULT 0,
+                avvisato_fino INTEGER NOT NULL DEFAULT 0,
+                avvisi INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(ordine, giro, tg_id)
+            );
+        """)
+        con.commit()
+        try:
+            os.chmod(DB_CHAT, 0o600)      # lo legge solo chi fa girare il server
+        except OSError:
+            pass
+        _CHAT_PRONTA["file"] = DB_CHAT
+    return con
+
+
+def _chat_p2p_stato(con, ordine: str, io: int) -> dict:
+    """LA CHAT DI QUESTO SCAMBIO E' APERTA, PER CHI CHIEDE? Pura sulla
+    connessione (quella del database di tutti). Torna `{aperta, giro,
+    altro, perche}`; `perche` e' '' quando e' aperta, altrimenti:
+    • `finito` — lo scambio non e' in corso (non ancora preso, o chiuso);
+    • `estraneo` — chi chiede non e' una delle due parti;
+    • `solo` — l'altra parte non e' un account di qui (scambia da
+      un'altra app, o non si e' fatta riconoscere): non c'e' nessuno a
+      cui consegnare."""
+    p = _parti_scambio_p2p(con, ordine)
+    giro = int(p["giro"] or 0)
+    io = int(io or 0)
+    parti = (int(p["compratore"] or 0), int(p["venditore"] or 0))
+    if not io or io not in parti:
+        return {"aperta": False, "giro": giro, "altro": 0, "perche": "estraneo"}
+    if not p["vivo"]:
+        return {"aperta": False, "giro": giro, "altro": 0, "perche": "finito"}
+    altro = parti[0] if parti[1] == io else parti[1]
+    if not altro or altro == io:
+        return {"aperta": False, "giro": giro, "altro": 0, "perche": "solo"}
+    return {"aperta": True, "giro": giro, "altro": altro, "perche": ""}
+
+
+def _chat_p2p_ritira(cc, ordine: str, giro: int, io: int, dopo: int,
+                     adesso: int) -> dict:
+    """IL RITIRO: le buste di questo giro oltre il segnalibro `dopo`, le
+    mie e quelle dell'altra parte (le mie servono a un secondo
+    dispositivo, e a sapere quale chiave ho presentato). Mai le buste
+    per i moderatori. Pura sulla connessione del cassetto. Segna fin
+    dove chi chiede ha ritirato e che ADESSO sta guardando: e' quel che
+    decide se un messaggio nuovo merita un avviso.
+    IL CASSETTO PERSO (`perso`): il segnalibro del telefono e' oltre
+    l'ultima busta che questo scambio ha — cioe' ha visto buste che qui
+    non ci sono piu'. Dentro un giro le buste non si tolgono mai una per
+    una, quindi vuol dire che il file e' rinato (un ripristino, un
+    trasloco). Si dice, e si riparte da zero: senza, il telefono
+    aspetterebbe per sempre numeri che non verranno."""
+    massimo = cc.execute("SELECT MAX(n) FROM buste WHERE ordine=? AND giro=?",
+                         (ordine, giro)).fetchone()[0]
+    perso = int(dopo) > int(massimo or 0)
+    if perso:
+        dopo = 0
+    righe = cc.execute(
+        "SELECT n, da, tipo, busta, quando FROM buste WHERE ordine=? AND giro=? "
+        "AND tipo IN ('saluto','msg') AND n>? ORDER BY n LIMIT ?",
+        (ordine, giro, int(dopo), P2P_CHAT_RITIRO_MAX)).fetchall()
+    fino = int(righe[-1]["n"]) if righe else int(dopo)
+    cc.execute(
+        "INSERT INTO letture(ordine, giro, tg_id, letto_fino, visto_il) "
+        "VALUES(?,?,?,?,?) ON CONFLICT(ordine, giro, tg_id) DO UPDATE SET "
+        "letto_fino=MAX(letto_fino, excluded.letto_fino), visto_il=excluded.visto_il",
+        (ordine, giro, int(io), fino, adesso))
+    cc.commit()
+    return {"buste": [{"n": int(r["n"]), "tipo": r["tipo"],
+                       "mia": int(r["da"]) == int(io), "busta": r["busta"],
+                       "quando": int(r["quando"])} for r in righe],
+            "fino": fino, "perso": perso}
+
+
+def _chat_p2p_posa(cc, ordine: str, giro: int, io: int, tipo: str,
+                   busta: str, per: str, adesso: int) -> tuple:
+    """UNA BUSTA ENTRA NEL CASSETTO. Pura sulla connessione del
+    cassetto. Torna `(200, {n, quando, doppia})` o `(codice, perche')`.
+    I TETTI SONO QUI E NON SOLO NEL TELEFONO: un client ritoccato non
+    deve poter riempire il disco. La stessa busta rimandata (un invio
+    che il telefono non ha visto arrivare) torna il numero di prima e
+    non suona due volte."""
+    gia = cc.execute("SELECT n, quando FROM buste WHERE ordine=? AND giro=? AND da=? "
+                     "AND busta=?", (ordine, giro, int(io), busta)).fetchone()
+    if gia:
+        return (200, {"n": int(gia["n"]), "quando": int(gia["quando"]), "doppia": True})
+    conta = lambda dove, *a: int(cc.execute(
+        "SELECT COUNT(*) FROM buste WHERE ordine=? AND giro=? AND " + dove,
+        (ordine, giro) + a).fetchone()[0] or 0)
+    if tipo == "msg":
+        if conta("tipo='msg'") >= P2P_CHAT_MSG_MAX:
+            return (409, "Questo scambio ha raggiunto il limite di messaggi")
+        if conta("tipo='msg' AND da=? AND quando>?", int(io), adesso - 60) \
+                >= P2P_CHAT_RAFFICA:
+            return (429, "Stai scrivendo troppo in fretta: aspetta un momento")
+    elif tipo == "saluto":
+        if conta("tipo='saluto' AND da=?", int(io)) >= P2P_CHAT_SALUTI_MAX:
+            return (409, "La chat di questo scambio e' stata riaperta troppe volte")
+    elif conta("tipo='mod' AND da=?", int(io)) >= P2P_CHAT_MOD_MAX:
+        return (409, "La chiave ai moderatori e' gia' stata data troppe volte")
+    n = cc.execute("INSERT INTO buste(ordine, giro, da, tipo, per, busta, quando) "
+                   "VALUES(?,?,?,?,?,?,?)",
+                   (ordine, giro, int(io), tipo, per, busta, adesso)).lastrowid
+    cc.commit()
+    return (200, {"n": int(n), "quando": adesso, "doppia": False})
+
+
+def _chat_p2p_avviso(cc, ordine: str, giro: int, altro: int, n: int,
+                     adesso: int, accesi: bool = True) -> tuple:
+    """A CHI DIRE «HAI UN NUOVO MESSAGGIO», E SE. Pura sulla connessione
+    del cassetto. Torna `(tg_id, testo)`, o `(0, perche')`.
+    UN AVVISO PER OGNI «C'E' DA LEGGERE», NON UNO PER MESSAGGIO: dopo un
+    avviso non ne parte un altro finche' l'altra parte non ha ritirato.
+    E a chi sta guardando la chat (ha ritirato da pochi secondi) non si
+    dice niente: il perche' `guarda` fa ripassare chi chiama fra poco —
+    chi ha chiuso l'app un secondo prima dell'arrivo non deve restare
+    senza avviso.
+    IL TESTO DEL MESSAGGIO NON C'E', e non puo' esserci: qui e' una
+    busta chiusa. L'avviso dice che c'e', e porta a leggerlo."""
+    r = cc.execute("SELECT letto_fino, visto_il, avvisato_fino, avvisi FROM letture "
+                   "WHERE ordine=? AND giro=? AND tg_id=?",
+                   (ordine, giro, int(altro))).fetchone()
+    letto = int(r["letto_fino"]) if r else 0
+    visto = int(r["visto_il"]) if r else 0
+    avvisato = int(r["avvisato_fino"]) if r else 0
+    quanti = int(r["avvisi"]) if r else 0
+    if letto >= int(n):
+        return 0, "letto"
+    if avvisato > letto:
+        return 0, "gia' avvisato: non ha ancora ritirato"
+    if adesso - visto < P2P_CHAT_PRESENTE_S:
+        return 0, "guarda"
+    if quanti >= P2P_CHAT_AVVISI_MAX:
+        return 0, (f"⛔ TETTO ANTI-ABUSO: gia' {quanti} avvisi di messaggio su "
+                   f"questo scambio (tetto {P2P_CHAT_AVVISI_MAX}), a {altro} non "
+                   "parte piu' niente")
+    if not accesi:
+        return 0, f"{altro} ha gli avvisi P2P spenti"
+    # il timbro PRIMA dell'invio, come per ogni avviso dello scambio
+    cc.execute(
+        "INSERT INTO letture(ordine, giro, tg_id, avvisato_fino, avvisi) "
+        "VALUES(?,?,?,?,1) ON CONFLICT(ordine, giro, tg_id) DO UPDATE SET "
+        "avvisato_fino=excluded.avvisato_fino, avvisi=avvisi+1",
+        (ordine, giro, int(altro), int(n)))
+    cc.commit()
+    return int(altro), (
+        f"💬 <b>Hai un nuovo messaggio nello scambio #{html.escape(ordine[:4])}.</b>\n"
+        "Aprilo per leggerlo: è cifrato fra voi due, e di qui il testo non passa.")
+
+
+async def _chat_p2p_avvisa(ordine: str, giro: int, altro: int, n: int,
+                           dopo: float = 0.0):
+    """L'avviso di un messaggio nuovo: il giudice, poi `notifica`. Con
+    `dopo` aspetta prima di guardare — e' il secondo sguardo su chi
+    «stava guardando». Mai un errore a chi chiama: la busta e' gia'
+    consegnata, e un avviso che non parte non la deve far fallire."""
+    try:
+        if dopo:
+            await asyncio.sleep(dopo)
+        adesso = int(time.time())
+        con = db()
+        try:
+            st = _chat_p2p_stato(con, ordine, altro)
+            accesi = _avvisi_p2p_accesi(con, altro)
+        finally:
+            con.close()
+        if not st["aperta"] or int(st["giro"]) != int(giro):
+            return
+        cc = db_chat()
+        try:
+            a_chi, testo = _chat_p2p_avviso(cc, ordine, giro, altro, n, adesso, accesi)
+        finally:
+            cc.close()
+        if not a_chi:
+            if testo == "guarda" and not dopo:
+                t = asyncio.create_task(_chat_p2p_avvisa(
+                    ordine, giro, altro, n, P2P_CHAT_PRESENTE_S + 1))
+                _TASK_CHAT_P2P.add(t)
+                t.add_done_callback(_TASK_CHAT_P2P.discard)
+            elif testo.startswith("⛔"):
+                print(f"⛔ Chat P2P: sullo scambio {ordine[:8]}: {testo[2:]}", flush=True)
+            return
+        try:
+            esito = await notifica(a_chi, testo, (P2P_BOTTONE_SCAMBIO,
+                                                  f"{LINK_LIBRO_P2P}?scambio={ordine}"))
+        except Exception as e:
+            esito = f"SALTATO ({type(e).__name__}: {e})"
+        print(f"💬 Chat P2P: nuovo messaggio sullo scambio {ordine[:8]}, "
+              f"avvisato {a_chi}", flush=True)
+        _esiti_p2p_dice("💬", [(a_chi, esito)])
+    except Exception as e:
+        print(f"⚠️ Chat P2P: l'avviso sullo scambio {ordine[:8]} non e' partito "
+              f"({type(e).__name__}: {e})", flush=True)
+
+
+def _chat_p2p_spazza(ordine: str = "") -> int:
+    """LA SCOPA: via le buste (e i segnalibri) di ogni scambio che non e'
+    piu' in corso, e di ogni giro che non e' piu' quello vivo. Con
+    `ordine` guarda solo quello — la chiamano le rotte e l'evento che
+    chiude lo scambio, cosi' la cancellazione non aspetta il minuto.
+    Torna quanti scambi ha svuotato. E sotto, la rete: una busta piu'
+    vecchia di `P2P_CHAT_VITA_MAX_S` se ne va comunque."""
+    adesso = int(time.time())
+    cc = db_chat()
+    try:
+        dove, arg = (" WHERE ordine=?", (ordine,)) if ordine else ("", ())
+        ordini = [r[0] for r in cc.execute(
+            "SELECT ordine FROM buste" + dove + " UNION SELECT ordine FROM letture"
+            + dove, arg + arg)]
+        vivi = {}
+        if ordini:
+            con = db()
+            try:
+                for o in ordini:
+                    p = _parti_scambio_p2p(con, o)
+                    vivi[o] = int(p["giro"] or 0) if p["vivo"] else -1
+            finally:
+                con.close()
+        svuotati = 0
+        for o, giro in vivi.items():
+            via = cc.execute("DELETE FROM buste WHERE ordine=? AND giro<>?",
+                             (o, giro)).rowcount
+            via += cc.execute("DELETE FROM letture WHERE ordine=? AND giro<>?",
+                              (o, giro)).rowcount
+            svuotati += 1 if via else 0
+        if not ordine:
+            cc.execute("DELETE FROM buste WHERE quando<?",
+                       (adesso - P2P_CHAT_VITA_MAX_S,))
+        cc.commit()
+        return svuotati
+    finally:
+        cc.close()
+
+
+async def _giro_chat_p2p():
+    """La scopa della chat, nel battito pieno dell'orologio P2P."""
+    n = _chat_p2p_spazza()
+    if n:
+        print(f"🧹 Chat P2P: cancellate le buste di {n} "
+              f"{'scambio finito' if n == 1 else 'scambi finiti'}", flush=True)
+
+
+def _chat_p2p_dopo_evento(ordine: str):
+    """Il coordinatore ha raccontato un passo: se ha chiuso lo scambio,
+    la sua chat se ne va ADESSO. Mai un errore a chi chiama."""
+    try:
+        if _chat_p2p_spazza(ordine):
+            print(f"🧹 Chat P2P: lo scambio {ordine[:8]} e' finito, buste cancellate",
+                  flush=True)
+    except Exception as e:
+        print(f"⚠️ Chat P2P: le buste di {ordine[:8]} non si sono cancellate "
+              f"({type(e).__name__}: {e}): ripassa la scopa del minuto", flush=True)
+
+
+def _chat_p2p_chiede(d: dict, user: dict) -> tuple:
+    """L'inizio comune delle rotte della chat: l'ordine in forma, e lo
+    stato per chi chiede. Torna `(ordine, stato)`; un estraneo e' 403."""
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    ordine = str((d or {}).get("ordine") or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        raise HTTPException(400, "Richiesta non valida")
+    con = db()
+    try:
+        st = _chat_p2p_stato(con, ordine, user["id"])
+    finally:
+        con.close()
+    if st["perche"] == "estraneo":
+        raise HTTPException(403, "Non sei una delle due parti di questo scambio")
+    return ordine, st
+
+
+def _chat_p2p_chiusa(ordine: str, st: dict):
+    """La risposta a chat chiusa — e, se lo scambio e' finito, la scopa."""
+    if st["perche"] == "finito":
+        _chat_p2p_dopo_evento(ordine)
+    return JSONResponse({"ok": True, "aperta": False, "giro": st["giro"],
+                         "finita": st["perche"] == "finito",
+                         "senza_altro": st["perche"] == "solo"},
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/p2p/chat/leggi")
+async def chat_leggi_p2p(req: Request, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """Il telefono ritira le buste della chat di uno scambio. Nel corpo
+    `{ordine, dopo}`: `dopo` e' il numero dell'ultima busta gia' avuta.
+    Risponde `{aperta, giro, buste, fino}`; a chat chiusa `aperta` e'
+    falso, e `finita` dice al telefono di buttare chiave e messaggi."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    ordine, st = _chat_p2p_chiede(d, user)
+    if not st["aperta"]:
+        return _chat_p2p_chiusa(ordine, st)
+    try:
+        dopo = max(0, int(d.get("dopo") or 0))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Richiesta non valida")
+    cc = db_chat()
+    try:
+        # le buste di un giro di prima, se ce ne sono ancora: via
+        cc.execute("DELETE FROM buste WHERE ordine=? AND giro<>?", (ordine, st["giro"]))
+        cc.execute("DELETE FROM letture WHERE ordine=? AND giro<>?", (ordine, st["giro"]))
+        corpo = _chat_p2p_ritira(cc, ordine, st["giro"], user["id"], dopo,
+                                 int(time.time()))
+    finally:
+        cc.close()
+    corpo.update(ok=True, aperta=True, giro=st["giro"])
+    return JSONResponse(corpo, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/p2p/chat/invia")
+async def chat_invia_p2p(req: Request, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """Il telefono consegna una busta chiusa. Nel corpo `{ordine, tipo,
+    busta}` — `tipo`: `saluto` (la chiave usa-e-getta presentata
+    all'altra parte), `msg` (un messaggio), `mod` (la chiave di lettura
+    per un moderatore, con `per` = la sua chiave pubblica: parte solo
+    dal telefono di chi apre una disputa). La busta e' testo cifrato in
+    base64: qui non si apre, non c'e' con che cosa.
+    Un `msg` avvisa l'altra parte, SENZA il testo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    ordine, st = _chat_p2p_chiede(d, user)
+    if not st["aperta"]:
+        raise HTTPException(409, "La chat di questo scambio non e' aperta")
+    tipo, busta, per = d.get("tipo"), d.get("busta"), d.get("per") or ""
+    if tipo not in P2P_CHAT_TIPI or not isinstance(busta, str) \
+            or not isinstance(per, str):
+        raise HTTPException(400, "Richiesta non valida")
+    if len(busta) > (P2P_CHAT_BUSTA_MOD_MAX if tipo == "mod" else P2P_CHAT_BUSTA_MAX):
+        raise HTTPException(413, "Messaggio troppo lungo")
+    if not FORMA_BUSTA_CHAT.fullmatch(busta):
+        raise HTTPException(400, "Richiesta non valida")
+    if tipo == "mod":
+        # solo verso una chiave di moderatore che esiste davvero
+        con = db()
+        try:
+            noto = FORMA_PUBKEY_P2P.fullmatch(per) and con.execute(
+                "SELECT 1 FROM p2p_moderatori WHERE chiave=?", (per,)).fetchone()
+        finally:
+            con.close()
+        if not noto:
+            raise HTTPException(400, "Richiesta non valida")
+    elif per:
+        raise HTTPException(400, "Richiesta non valida")
+    cc = db_chat()
+    try:
+        codice, corpo = _chat_p2p_posa(cc, ordine, st["giro"], user["id"], tipo,
+                                       busta, per, int(time.time()))
+    finally:
+        cc.close()
+    if codice != 200:
+        raise HTTPException(codice, str(corpo))
+    if tipo == "msg" and not corpo["doppia"]:
+        t = asyncio.create_task(_chat_p2p_avvisa(ordine, st["giro"], st["altro"],
+                                                 corpo["n"]))
+        _TASK_CHAT_P2P.add(t)
+        t.add_done_callback(_TASK_CHAT_P2P.discard)
+    return JSONResponse({"ok": True, "n": corpo["n"], "quando": corpo["quando"]},
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/p2p/chat/moderatori")
+async def chat_moderatori_p2p(req: Request, x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """Le chiavi PUBBLICHE dei moderatori, per chi sta aprendo una
+    disputa: e' a quelle che il suo telefono chiude la chiave di lettura
+    della chat. Solo a una delle due parti di uno scambio in corso.
+    Sono le chiavi gia' aggiunte al nodo come solver: non dicono niente
+    di nessuno."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    ordine, st = _chat_p2p_chiede(d, user)
+    if not st["aperta"]:
+        return _chat_p2p_chiusa(ordine, st)
+    con = db()
+    try:
+        chiavi = sorted({r[0] for r in con.execute("SELECT chiave FROM p2p_moderatori")
+                         if FORMA_PUBKEY_P2P.fullmatch(r[0] or "")})
+    finally:
+        con.close()
+    return JSONResponse({"ok": True, "aperta": True, "chiavi": chiavi},
+                        headers={"Cache-Control": "no-store"})
+
+
+def _chat_p2p_per_moderatore(con, cc, io: int, ordine: str) -> tuple:
+    """LA CHAT DELLE DUE PARTI, PER IL MODERATORE CHE HA PRESO LA
+    DISPUTA. Pura sulle due connessioni. Torna `(200, corpo)` o
+    `(codice, perche')`. Solo a disputa PRESA e solo a chi l'ha presa:
+    le buste dei messaggi (chiuse: le apre il suo telefono, se una delle
+    parti gli ha dato la chiave) e le buste `mod` chiuse per la SUA
+    chiave. `lato` dice chi ha spedito ('compra' | 'vende'). Non sposta
+    nessun segnalibro: il moderatore che legge non e' una parte che ha
+    ritirato."""
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        return (400, "Richiesta non valida")
+    r = con.execute("SELECT giro, compratore, venditore, stato, presa_da, "
+                    "chiave_moderatore FROM p2p_dispute WHERE ordine=?",
+                    (ordine,)).fetchone()
+    if not r:
+        return (404, "Disputa non trovata")
+    if r["stato"] != "presa" or int(r["presa_da"] or 0) != int(io):
+        return (409, "La chat si legge dopo aver preso la disputa")
+    giro = int(r["giro"] or 0)
+    lato = lambda da: ("compra" if int(da) == int(r["compratore"] or 0) else
+                       "vende" if int(da) == int(r["venditore"] or 0) else "")
+    buste = [{"n": int(b["n"]), "lato": lato(b["da"]), "busta": b["busta"],
+              "quando": int(b["quando"])} for b in cc.execute(
+        "SELECT n, da, busta, quando FROM buste WHERE ordine=? AND giro=? "
+        "AND tipo='msg' ORDER BY n", (ordine, giro))]
+    chiavi = [{"n": int(b["n"]), "lato": lato(b["da"]), "busta": b["busta"]}
+              for b in cc.execute(
+        "SELECT n, da, busta FROM buste WHERE ordine=? AND giro=? AND tipo='mod' "
+        "AND per=? ORDER BY n", (ordine, giro, r["chiave_moderatore"] or ""))]
+    return (200, {"ok": True, "buste": buste, "chiavi": chiavi})
+
+
+@app.post("/api/p2p/moderazione/chat")
+async def moderazione_chat_p2p(req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """SOLO IL MODERATORE CHE HA PRESO LA DISPUTA: le buste della chat
+    fra le due parti, e la chiave di lettura che una di loro gli ha
+    chiuso aprendo la disputa. Nel corpo `{ordine}`."""
+    user = _moderatore_o_403(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con, cc = db(), db_chat()
+    try:
+        codice, corpo = _chat_p2p_per_moderatore(
+            con, cc, user["id"], str(d.get("ordine") or "").strip())
+    finally:
+        con.close()
+        cc.close()
+    return _risposta_moderazione(codice, corpo)
+
+
+class _ChatFuoriDalJournal(logging.Filter):
+    """GLI ACCESSI RIUSCITI DELLA CHAT NON VANNO NEL JOURNAL: una riga
+    per busta spedita e una ogni pochi secondi per chi la tiene aperta
+    direbbero, a chat cancellata, chi scriveva a chi e a che ora — e il
+    journal resta. Le righe degli ERRORI (dal 400 in su) restano: un
+    guasto si deve poter leggere. Non alza mai: e' un filtro sul
+    registro di tutti."""
+
+    def filter(self, record):
+        try:
+            a = record.args
+            if isinstance(a, tuple) and len(a) >= 5 and isinstance(a[2], str) \
+                    and (a[2].startswith("/api/p2p/chat/")
+                         or a[2].startswith("/api/p2p/moderazione/chat")) \
+                    and int(a[4]) < 400:
+                return False
+        except Exception:
+            pass
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_ChatFuoriDalJournal())
+
+
 # ═══ IL CONTROLLO DELLA FATTURA PRIMA DEL COORDINATORE (10 ott 2026,
 # cantiere controllo-fattura, richiesta di Andrea) ═══════════════════
 # IL PERCHE': il 10 ott 2026 un payout P2P da 180.917 sats e' fallito
@@ -53388,6 +53947,16 @@ async def orologio_p2p():
                 print(f"⚠️ Avvisi nuovi ordini P2P: battito saltato "
                       f"({type(e).__name__}: {e})", flush=True)
             _P2P_BATTITO["vivo"] = time.time()
+        # LA SCOPA DELLA CHAT (12 ott 2026): nel battito pieno, col suo
+        # try — le buste di uno scambio finito se ne vanno entro il
+        # minuto anche se l'evento che lo chiudeva si e' perso
+        if not lampo and not solo_attese:
+            try:
+                await asyncio.wait_for(_giro_chat_p2p(), P2P_PASSATA_MAX_S)
+            except Exception as e:
+                print(f"⚠️ Chat P2P: la scopa ha saltato un battito "
+                      f"({type(e).__name__}: {e})", flush=True)
+            _P2P_BATTITO["vivo"] = time.time()
         # UNA RIGA A PASSATA, ANCHE A VUOTO: e' quella che distingue
         # «gira e non trova niente» da «non gira» — la domanda che il
         # 17 set e' costata un'ora. Si spegne con P2P_LOG_PASSATE=False
@@ -56863,6 +57432,9 @@ async def evento_p2p(req: Request):
         t.add_done_callback(_TASK_EVENTI_P2P.discard)
         # ...e la fotografia del libro si rifa' subito (LA FOTOGRAFIA SUBITO)
         _foto_dopo_evento_p2p(ev)
+        # ...e se questo passo ha chiuso lo scambio, la sua chat se ne
+        # va adesso (LA CHAT NELLO SCAMBIO, 12 ott 2026)
+        _chat_p2p_dopo_evento(ev["ordine"])
         if garanzia_morta:
             t = asyncio.create_task(segnala_fatture_scadute(
                 "p2p", [f"{ev['ordine']}:{fatto['giro']}"]))

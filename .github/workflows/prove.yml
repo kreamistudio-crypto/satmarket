@@ -132,6 +132,7 @@ jobs:
              collaudo_canale_admin.py
              collaudo_avviso_chi_annulla.py
              collaudo_recapito_aggiornato.py
+             collaudo_chat_scambio.py
              collaudo_garanzia_lunga.py
              collaudo_promemoria_gesto.py
              collaudo_x_risonanza.py
@@ -258,6 +259,7 @@ jobs:
              collaudo_giro_nuovo
              collaudo_avviso_chi_annulla
              collaudo_recapito_aggiornato
+             collaudo_chat_scambio
              collaudo_garanzia_lunga
              collaudo_promemoria_gesto
              collaudo_x_risonanza

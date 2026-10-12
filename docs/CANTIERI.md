@@ -52599,3 +52599,233 @@ la CI (la regola di «main che corre»: non la si insegue).
 Barattolo aggiornato» in 📊 Riepiloghi e non in privato. E, in sola
 lettura sul VPS, se c'è qualche script fuori dal repo che scrive su
 Telegram (il comando nel rapporto).
+
+## La chat nello scambio: chiavi usa-e-getta, il server fa il postino, il moderatore solo in disputa (12 ott 2026, cantiere chat-nello-scambio, decisione di Andrea con Alan)
+
+**LA RICHIESTA.** Dentro ogni scambio P2P preso, una chat privata fra le
+due parti, che sparisce a scambio concluso: il profilo dell'altra
+persona dice CON CHI scambi, la chat serve a PARLARSI. Con l'avviso
+fisso contro le truffe, i link che non si aprono, l'avviso di nuovo
+messaggio senza il testo, il moderatore che la legge in disputa.
+
+**IL 9 SET LA CHAT ERA USCITA, E IL PERCHÉ NON È SCRITTO.** Andrea l'ha
+chiesto prima di tutto, e la risposta è questa. La voce «FASE 6, TERZA
+TAPPA: I DUE RECAPITI CIFRATI AL POSTO DELLA CHAT» dice «la decisione
+di Andrea, eseguita: niente più chat libera» e spiega il COME (i due
+campi sullo stesso canale cifrato, vince il più recente così l'IBAN si
+corregge); il perché no. Non lo dicono il suo commit (`2eeba11`), le
+due tappe vicine («il P2P è Barattolo, punto»), ARCHITETTURA né
+l'audit del 23 set. Di truffe, abusi, spam o privacy non c'è una
+parola, da nessuna parte. Quindi questa voce NON rovescia un perché:
+rovescia una decisione, ed è un EMENDAMENTO DICHIARATO — il commento
+del motore («è uscita con la fase 6 e non rientra») e la frase di
+ARCHITETTURA («nella pagina dello scambio NON c'è una chat») sono
+emendati dove stanno. Chi un giorno ritrovasse il perché lo scriva
+qui.
+
+**LA PRIMA STRADA, SCARTATA: IL CANALE DI MOSTRO.** Il piano era
+rimettere la chat sul canale dei recapiti, compatibile con le app
+Mostro. Letto il 12 ott sulle tre fonti pubbliche (la pagina del
+protocollo, mostro-core 0.17.3, Mostro Mobile 1.5.0 del 2 ott): la chat
+fra le parti di Mostro è IDENTICA al nostro canale — ECDH x-only, HKDF
+senza sale, le due etichette, busta kind 14 firmata da K_sign col tag
+`p` = pub(K_conv), dentro un kind 1 firmato dalla chiave dello scambio;
+il test vector che pubblicano è quello che il nostro banco fa già
+girare. Le differenze: l'app mobile mette un tag `u` (un numero a caso)
+nell'evento di dentro e manda gli allegati come JSON nel testo; nessuna
+delle tre ha la cancellazione (NIP-09) né la scadenza (NIP-40) sulla
+chat; la consegna di K_conv a chi risolve una disputa è A MANO (si
+copia dall'app). Compatibile, dunque — ma con quelle chiavi «sparisce»
+non sarebbe stato vero: si ricalcolano dal codice segreto, e una busta
+rimasta su un relay la riaprono per sempre le due parti. Andrea l'ha
+letto e con Alan ha cambiato strada: **chiavi usa-e-getta, solo fra
+utenti Barattolo, niente relay, il server fa il postino.** NON
+VERIFICATO, e non serve più: lo scambio di messaggi con l'app Mostro
+vera su un telefono. Il canale dei recapiti NON è stato toccato.
+
+**COM'È FATTA** (per intero in ARCHITETTURA, «LA CHAT NELLO SCAMBIO»).
+Ogni telefono tira a sorte una chiave per quello scambio e la presenta
+all'altro in un SALUTO firmato dalla chiave dello scambio — quella che
+il coordinatore ha già detto all'altra parte: il server, che il saluto
+lo trasporta, non può metterne uno suo. Ogni messaggio è chiuso fra le
+due chiavi usa-e-getta e firmato da quella di chi scrive. Il server
+tiene le buste in un file a parte, le consegna, avvisa senza il testo,
+e a scambio finito le cancella. Chi apre una disputa chiude la chiave
+di lettura in un pacco per i moderatori.
+
+**LE SCELTE MIE, COI PERCHÉ** (le cinque righe mandate ad Andrea prima
+di scrivere, più quel che è venuto fuori facendo).
+1) LA CHIAVE PERSA NON SI RECUPERA: se si potesse ricalcolare dalla
+chiave dello scambio non sarebbe usa-e-getta. Chi riapre da un altro
+telefono (o da un browser che dimentica) vede «Continua la chat qui»:
+un saluto nuovo, firmato come il primo, e all'altra persona compare una
+riga che lo dice. UN TOCCO, MAI DA SOLO: due dispositivi dello stesso
+conto se la ruberebbero a turno a ogni ritiro.
+2) LE BUSTE STANNO IN UN FILE A PARTE, ed è la cosa trovata leggendo
+`deploy.sh` e `deploy/backup-fuori.sh`: i due backup copiano
+`satmarket.db` intero — cinque copie sul VPS, una al giorno nel canale
+dei backup e sul PC. Lì dentro una busta sarebbe sopravvissuta alla sua
+cancellazione per sempre, e «niente copie altrove» sarebbe stato falso.
+`chat-scambi.db` nasce accanto al database vero (`realpath`: sul VPS è
+un collegamento, e la cartella del codice il servizio non la può
+scrivere) e nessun backup lo nomina — una prova fallisce se succede.
+3) `secure_delete`: sqlite di suo lascia i byte di una riga cancellata
+nelle pagine libere. Il collaudo legge il FILE e non li trova.
+4) UN AVVISO PER OGNI «C'È DA LEGGERE», non «uno ogni dieci minuti»
+come nel piano: con la pausa, una risposta arrivata al terzo minuto
+restava muta, in uno scambio coi minuti contati. Dopo un avviso non ne
+parte un altro finché l'altra persona non ha ritirato; a chi sta
+guardando la chat non si dice niente — ma il server ripassa una volta,
+poco dopo, per chi l'ha chiusa un secondo prima.
+5) LA FINE LA DICE IL GIUDICE DI TUTTI (`_parti_scambio_p2p`), non una
+regola nuova: quindi la chat finisce quando chi vende LIBERA i sats
+(«rilasciato»), non a «concluso». Una disputa tiene vivo lo scambio, e
+la sua chiusura lo finisce: «a disputa chiusa si cancella» viene da sé.
+Il patto lo dice («concluso, annullato, o quando chi vende ha liberato
+i sats»).
+6) IL MODERATORE. Alla lettera di Andrea: il pacco parte dal telefono
+di chi APRE la disputa, verso le chiavi dei moderatori. `o.disputaMia`
+la scrive il motore quando il coordinatore CONFERMA
+(`dispute-initiated-by-you`), non il tocco: un «no» del coordinatore
+non deve aver già consegnato niente. Il server dà il pacco solo a chi
+ha PRESO la disputa; e il pacco si apre con le due chiavi dello scambio
+che il coordinatore dice al moderatore prendendola — prima non le ha.
+Legge e non scrive: la chiave usa-e-getta non parte. Nel foglio «Aprire
+una disputa?» c'è scritto prima del tocco: «Se la apri, i moderatori
+potranno leggere la chat di questo scambio».
+7) NIENTE LEVA NEL CONFIG: non è stata chiesta. E il posto del file
+NON è una leva — nella prima stesura lo era (`from config import
+DB_CHAT`), e la prova «ogni leva letta sta nel config d'esempio» l'ha
+presa: dichiararla là voleva dire una riga che, copiata sul VPS, lo
+avrebbe fatto nascere nella cartella del codice.
+8) I DUE EVENTI DI DENTRO NON SONO KIND 1 (28470 e 28471): una nota
+firmata dalla chiave dello scambio è la forma dei recapiti, e con un
+altro numero un saluto non si può rimettere in giro là.
+9) IL CASSETTO PERSO: se il file delle buste rinasce (un ripristino),
+il server lo dice al telefono (`perso`: il suo segnalibro è oltre
+l'ultima busta dello scambio) e la chat riparte, invece di aspettare
+numeri che non verranno.
+10) «UN TUO CONTATTO», che Andrea chiedeva se togliere: non si manda
+più dal 17 set («Le parti si vedono»), resta la sola lettura di uno
+arrivato da un'app di ieri. Non c'era niente da togliere.
+11) NEL JOURNAL NIENTE RIGA PER BUSTA, e gli accessi riusciti delle
+rotte della chat fuori dal registro di uvicorn: il journal resta
+quando la chat non c'è più, e direbbe chi scriveva a chi e a che ora.
+Resta la riga dell'avviso partito, come per ogni passo dello scambio.
+
+**COSA NON SI È FATTO, e si dice.** Gli allegati (decisione). Un
+pallino in «I miei scambi» per i messaggi non letti: ad app aperta su
+un'altra pagina arriva l'avviso su Telegram o Nostr, non un segno
+nell'app. La chat con chi non è un account di Barattolo (un'altra app,
+o chi non si fa riconoscere): il riquadro lo dice. Una leva per
+spegnerla senza deploy. I ponti Telegram/Nostr del profilo, che portano
+fuori mentre l'avviso fisso dice di non uscire: sono di «chi è
+l'altro». E una frase vista nel giro dal vivo, che con la chat è
+invecchiata — «Per parlarvi restano i recapiti qui sotto, cifrati fra
+voi due»: quel blocco l'ha riscritto oggi il cantiere chi-e-l-altro,
+atterrato mentre chiudevo (la frase ora sta in
+`testoContropartePerMotivoP2P` e nella nota di
+`profiloControparteP2P`), con parole decise da Andrea. Non l'ho
+toccata: serve un suo sì.
+
+**I VICINI.** canale-admin è atterrato su main a metà cantiere: rebase
+con due conflitti di sola coda (ARCHITETTURA e PRODUZIONE, tenute
+tutte e due le voci), nessuno nel codice; il suo `_recapita_p2p` è per
+gli avvisi ai moderatori, il mio va a una PARTE e passa da `notifica`.
+chi-e-l-altro è atterrato al SECONDO rebase, a cantiere quasi chiuso:
+un conflitto vero, nel patto sui dati — avevano RISCRITTO il paragrafo
+che stava sopra il mio. Tenuto il loro paragrafo nuovo e, sotto, il
+solo paragrafo della chat: non quello vecchio, che il mio lato del
+conflitto si portava dietro come contesto (è la trappola delle code
+unite, in un'altra forma). Più la coda di CANTIERI, tutte e due le
+voci, controllata con `git diff origin/main`: solo aggiunte.
+tempo-di-chi-pubblica non è ancora su main: con lui mi incrocio su UNA
+riga di `renderOrdineP2P` (il riquadro sotto il profilo), sull'elenco
+in `main()` di prove.py e sul workflow, dove il collaudo sta accanto a
+quello del recapito e non in coda.
+
+**QUEL CHE HANNO TROVATO I BANCHI.** • La parola «chiave» nel foglio
+della disputa: la sentinella di casa la vieta in `apriDisputaP2P`, e la
+frase è diventata «i moderatori potranno leggere la chat». • Il conto
+dei `try` dell'orologio P2P (sei, con la scopa). • DAL GIRO DAL VIVO,
+che il banco node non poteva vedere: toccando «Invia» il campo perdeva
+il fuoco, cioè sul telefono la tastiera si sarebbe chiusa a ogni
+messaggio — il bottone ora non se lo prende (`onpointerdown`); e «3
+messaggi di prima non si possono leggere» seguito da «Ancora nessun
+messaggio». • E IL BANCO HA MENTITO UNA VOLTA: `execFileSync` (la
+semina in Python) blocca il giro degli eventi di node, e la richiesta
+vista da Playwright arrivava dopo il controllo — una rossa del banco,
+non del codice. • E IL COLLAUDO NUOVO ERA BALLERINO, e l'ha preso la
+tortura nel suo giro a codice intatto: verde quattro volte nel
+worktree, esploso sulla copia a macchina carica. Due cause, la stessa
+famiglia. Due prese dello stesso ordine nello stesso secondo sono, per
+la rotta degli eventi, il RETRY del coordinatore, e la seconda non si
+registra; e la soglia «sta guardando» era di un secondo contro un
+orologio a secondi interi (un ritiro alle 10,99 e un invio alle 11,01
+distano «un secondo»). Ora fra le due prese passa un secondo pieno, la
+soglia nel collaudo è 3 e le attese si scrivono rispetto a lei; ogni
+sezione ha il suo `try` («N) la sezione gira») e il no di una rotta si
+legge con `no()`, così una rotta che doveva rifiutare e non rifiuta è
+una rossa col suo nome. Rigirato sette volte di fila, sempre verde.
+
+**LE PROVE.** `prove_chat_scambio`: le sentinelle dei due blocchi, i
+giudici VERI del server su sqlite in memoria, e il blocco del client in
+node col bundle vero — due telefoni, un secondo telefono, un estraneo,
+un moderatore e un postino di cartone che prova a presentare una
+chiave sua. `collaudo_chat_scambio` (in CI, nella gabbia): le rotte
+vere con l'autenticazione vera, le quattro coppie di accesso
+(Telegram/Telegram, Telegram/Nostr, Nostr/Telegram, Nostr/Nostr), la
+parte che scambia da un'altra app, la consegna a chi è offline, gli
+avvisi, i tetti, la disputa e il moderatore, la fine letta nel FILE, il
+giro nuovo, la scopa, niente nel database di tutti e niente nel
+journal. IL GIRO DAL VIVO (Chrome guidato da Playwright a 390 px, coi
+tocchi veri; quattro contesti separati — chi vende, chi compra, il suo
+telefono nuovo, il moderatore — più uno a 320; il server è una copia
+del worktree col config di cartone, i relay al relay morto, la nsec
+segnaposto; il coordinatore è di cartone): la presa, i messaggi, la
+riga rossa e il link che non si apre, quel che ha visto la rete (solo
+POST, nessun testo, nessuna chiave), l'avviso nel journal senza testo,
+il telefono nuovo, la disputa col pacco che parte solo dopo la
+conferma, il moderatore che legge, la fine con le buste sparite dal
+file e il riquadro che se ne va da solo; 34 controlli, a 390 e a 320,
+nei due temi, console pulita. Dieci scatti in
+`.claude/giri/chat-nello-scambio/` della cartella principale. LA
+TORTURA, su quattro copie intere del repo in parallelo (il giro a
+codice intatto verde e coi conti della repo: 113 e 80): 39 mutazioni —
+venti sul server, diciannove sul telefono — 39 uccise, nessuna viva.
+Al primo giro cinque uccise si portavano dietro un botto (una sezione
+del collaudo esplosa invece di una rossa col suo nome): curate nel
+collaudo, e al secondo giro i botti sono zero. Due mutazioni le prende
+solo il collaudo («la scopa non cancella a scambio finito», «un pacco
+verso una chiave qualunque»): la scopa vuole i due database veri.
+
+**DA GUARDARE** (Andrea). • LA PROVA SUL CAMPO con due telefoni dopo il
+deploy (PRODUZIONE, «LA CHAT NELLO SCAMBIO: IL FILE DELLE BUSTE»):
+l'avviso vero su Telegram, e su iPhone che la tastiera resti aperta
+dopo «Invia» (provato su Chrome). • Sul VPS, dopo il primo messaggio:
+che `chat-scambi.db` sia nato in `/srv/barattolo/dati/`. • La frase del
+profilo «Per parlarvi restano i recapiti qui sotto» (di chi-e-l-altro,
+ora su main), da allineare alla chat: serve un sì. • Se serve una leva per spegnere la chat
+senza deploy. • I ponti Telegram/Nostr accanto all'avviso «non uscire
+dallo scambio».
+
+**IL VERBALE: cosa è girato su quale albero.** Il cantiere è nato sopra
+`88ed663`. Main è corso TRE volte mentre chiudevo, e ad Andrea l'ho
+detto alla seconda, come vuole la sua regola. (1) Otto commit fino a
+`811e2f0` (canale-admin e altri): rebase con due conflitti di sola
+coda nei documenti. LÌ SOPRA sono girati la suite intera severa
+(22.762 passate, 0 fallite), la tortura (39 su 39) e il giro dal vivo
+(34 controlli, i dieci scatti). (2) Otto commit fino a `8baccf6`
+(chi-e-l-altro): il conflitto nel patto sui dati e la coda di CANTIERI.
+(3) Due commit fino a `7516640` (collaudi-rosse): la coda di CANTIERI.
+I due rebase dopo il primo non hanno toccato il blocco della chat, né
+sul server né sul telefono. SULL'ALBERO CHE SI PUSHA, sopra `7516640`
+(la punta di main, ricontrollata col fetch a giro finito: ferma):
+`PROVE_SEVERE=1 python prove.py` INTERA, 22.775 passate e 0 fallite,
+nessuna saltata; i 67 collaudi del workflow nella gabbia
+(`collaudi_ci.py`, tre gruppi in parallelo), 67 verdi;
+`prove_chat_scambio` (113) e `collaudo_chat_scambio` (80) anche da
+soli; `compileall`; i tre blocchi script della pagina compilano; lo
+scanner dei segreti sulle righe aggiunte, con le forme lette dal
+workflow e la controprova: zero. La voce era già scritta quando la
+suite è girata, tranne questo paragrafo.

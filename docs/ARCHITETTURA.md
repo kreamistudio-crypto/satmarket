@@ -27427,9 +27427,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   chi vende, nel solo stato `attivo`,
   `promemoriaMappaVendoP2P` ricorda che il punto lo puo' cercare lui
   col CAP di chi paga. «Info P2P» ripete tutto, col paragrafo «Se ti
-  danno un buono regalo». Nella pagina dello scambio NON c'e' una chat
-  fra le parti (ci sono i tasti del profilo e i recapiti cifrati): i
-  testi non la nominano. DAL SECONDO CANTIERE (stessa sera): accanto
+  danno un buono regalo». ⚠️ EMENDATA (12 ott 2026): fin qui nella
+  pagina dello scambio non c'era una chat fra le parti, e i testi
+  non la nominavano; adesso c'è — «LA CHAT NELLO SCAMBIO», in
+  fondo — e quei testi restano veri com'erano. DAL SECONDO CANTIERE (stessa sera): accanto
   alla mappa il link pubblico di PuntoLis (`apriPuntoLisPayCodeP2P` su
   `LINK_PUNTOLIS_PAYCODE`, per chi non ha un account Amazon: si cerca
   per CAP e si spunta «Amazon Paga in Contanti»); i quattro gesti hanno
@@ -31419,3 +31420,86 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   ⚠️ LO SCRIPT NUOVO ENTRA IN VIGORE AL GIRO DOPO (il servizio esegue
   una copia, vedi `deploy/barattolo-deploy.service`): il deploy che
   porta una modifica a `avvisa()` si annuncia ancora con quella vecchia.
+- LA CHAT NELLO SCAMBIO (12 ott 2026, cantiere chat-nello-scambio;
+  perché in CANTIERI, «La chat nello scambio»). Dalla presa alla fine,
+  nella pagina dello scambio, le due parti si scrivono. NON è il canale
+  dei recapiti (quello resta sui relay, `chiaviPeer` e `campoArriva`,
+  col vocabolario chiuso) e NON è la chat col moderatore (`chatMod`).
+  LE CHIAVI (client, il blocco fra i marcatori «LA CHAT NELLO SCAMBIO»
+  e «fine: la chat nello scambio»). Ogni dispositivo tira a sorte una
+  chiave per quello scambio (`sk`, `pub`: `NT.generateSecretKey`), che
+  vive SOLO nel cassetto `barattolo_p2p_chat@<conto>` del localStorage:
+  non sulla riga dello scambio, non nel mazzo, non nel cloud, mai verso
+  il server. La presenta con un SALUTO: evento kind `CHATSC_SALUTO`
+  (28470) firmato dalla chiave dello scambio, tag `o` = id dell'ordine,
+  contenuto = la pubblica usa-e-getta, chiuso NIP-44 fra le due chiavi
+  dello scambio (`chatScSalutoP2P`, `chatScApriSalutoP2P`). Un
+  MESSAGGIO è un kind `CHATSC_MSG` (28471) firmato dalla usa-e-getta di
+  chi scrive, chiuso NIP-44 fra le due usa-e-getta (`chatScBustaP2P`,
+  `chatScApriMsgP2P`). I due numeri non sono kind 1 apposta: una nota
+  firmata dalla chiave dello scambio è la forma dei recapiti.
+  `chatScPosaP2P` (pura) mette le buste ritirate nel cassetto: per ogni
+  parte vale l'ULTIMO saluto (l'ora di dentro, poi il numero del
+  server); `muti` conta le buste scritte per un'altra chiave.
+  `chatScAltroveP2P`: il mio ultimo saluto presenta una chiave che qui
+  non c'è → «Continua la chat qui» (`continuaChatScambioP2P` →
+  `chatScPresentaP2P(id, true)`), mai da solo. `chatScProntaP2P`: si
+  può scrivere. LA FINE: `chatScButtaP2P` (chiave e messaggi) quando il
+  server risponde `finita` o `perso`, quando cambia il `giro` o la
+  controparte, e dalla potatura `chatScPotaP2P` (riga chiusa, sparita,
+  o negli stati `CHATSC_DOPO`), che gira col polso su ogni pagina.
+  LA PAGINA: `bloccoChatScambioP2P(o)` sotto `profiloControparteP2P`
+  in `renderOrdineP2P`; il markup è di `chatScBloccoHTML` (pura):
+  l'avviso fisso `CHATSC_AVVISO`, la lista, il piede (`chatScPiedeP2P`,
+  modi `scrivi` | `attesa` | `altrove`), la riga `CHATSC_PATTO`. I link
+  restano testo (`chatScTestoHTML`: mai un `<a>`) e `chatScAllarmiP2P`
+  mette la riga rossa sotto i messaggi ALTRUI con un link o un invito a
+  spostarsi. `CHATSC_MAX_TESTO` 500, un invio ogni `CHATSC_FRENO_MS`.
+  Il ritiro (`chatScRitiraP2P`) parte all'apertura dello scambio e ogni
+  `CHATSC_POLSO_MS` (5 s) a pagina in vista; a un arrivo si riscrive la
+  sola lista (`chatScRidisegnaP2P`), non la pagina.
+  IL SERVER (il blocco «LA CHAT NELLO SCAMBIO: IL SERVER FA IL
+  POSTINO»). Le buste stanno in `DB_CHAT` (`chat-scambi.db` accanto al
+  database vero, col `realpath`; non è una leva del config; `db_chat()`,
+  `secure_delete` acceso) — NON in `satmarket.db`, perché i due backup
+  lo copiano intero. Tabelle
+  `buste` (`n` AUTOINCREMENT, ordine, giro, da, tipo `saluto` | `msg` |
+  `mod`, per, busta, quando) e `letture` (letto_fino, visto_il,
+  avvisato_fino, avvisi). Le rotte, tutte POST col corpo e `no-store`:
+  `/api/p2p/chat/leggi` `{ordine, dopo}` → `{aperta, giro, buste, fino,
+  perso}` oppure `{aperta: false, finita, senza_altro}`;
+  `/api/p2p/chat/invia` `{ordine, tipo, busta[, per]}`;
+  `/api/p2p/chat/moderatori` `{ordine}` → le chiavi pubbliche di
+  `p2p_moderatori`; `/api/p2p/moderazione/chat` `{ordine}` (solo chi ha
+  PRESO la disputa). I giudici: `_chat_p2p_stato` (parti e fine da
+  `_parti_scambio_p2p`: aperta a scambio VIVO e con due account;
+  `finito`, `estraneo` → 403, `solo`); `_chat_p2p_ritira`;
+  `_chat_p2p_posa` (i tetti: `P2P_CHAT_BUSTA_MAX` 4096,
+  `P2P_CHAT_MSG_MAX` 200, `P2P_CHAT_RAFFICA` 20 al minuto, 20 saluti e
+  40 buste `mod` per parte; la stessa busta rimandata torna il numero
+  di prima); `_chat_p2p_avviso` (un avviso per ogni «c'è da leggere»:
+  non parte se `avvisato_fino > letto_fino`, né a chi ha ritirato da
+  meno di `P2P_CHAT_PRESENTE_S` — e allora `_chat_p2p_avvisa` ripassa
+  una volta, poco dopo; tetto `P2P_CHAT_AVVISI_MAX`; rispetta
+  `avvisi_p2p`). Il testo è «💬 Hai un nuovo messaggio nello scambio
+  #xxxx», col bottone `P2P_BOTTONE_SCAMBIO`; il messaggio non c'è. LA
+  CANCELLAZIONE è `_chat_p2p_spazza`: dalla rotta degli eventi
+  (`_chat_p2p_dopo_evento`, appena un momento chiude il giro), dalle
+  rotte della chat a scambio finito, e dal battito pieno dell'orologio
+  P2P (`_giro_chat_p2p`); sotto, la rete `P2P_CHAT_VITA_MAX_S`.
+  `_ChatFuoriDalJournal` toglie dal registro di uvicorn gli accessi
+  riusciti di queste strade.
+  IL MODERATORE. Il motore scrive `o.disputaMia` su
+  `dispute-initiated-by-you`; solo allora `chatScAiModeratoriP2P`
+  chiede le chiavi dei moderatori e chiude per ognuna un pacco
+  (`chatScPaccoP2P`: i saluti firmati e le chiavi di conversazione),
+  NIP-44 fra la chiave dello scambio e quella del moderatore, `tipo`
+  `mod`. Nella card della disputa presa `chatPartiModP2P` →
+  `leggiChatPartiModP2P` → `chatPartiApriP2P`: apre il pacco con la
+  chiave di moderatore e le due chiavi dello scambio che ha
+  nell'archivio, verifica i saluti, attribuisce ogni messaggio dalla
+  firma. In sola lettura e in memoria (`p2pModChatParti`): niente
+  nell'archivio del moderatore.
+  LE PROVE: `prove_chat_scambio` (le sentinelle e il banco node col
+  bundle vero), `collaudo_chat_scambio` (in CI, nella gabbia). La
+  procedura: PRODUZIONE, «LA CHAT NELLO SCAMBIO: IL FILE DELLE BUSTE».

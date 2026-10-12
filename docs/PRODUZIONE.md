@@ -4298,3 +4298,41 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   (`deploy/backup-fuori.sh`, col suo bot e il suo `CHAT_ID_BACKUP`), le
   ronde del nodo (`TG_CHAT` in `telegram.env`, sul nodo), la ronda del
   relay (`CHAT_ID` in `/opt/relay/telegram.conf`), i canali pubblici.
+- LA CHAT NELLO SCAMBIO: IL FILE DELLE BUSTE (12 ott 2026, cantiere
+  chat-nello-scambio; com'è fatta in ARCHITETTURA, «LA CHAT NELLO
+  SCAMBIO»). AL DEPLOY NON C'È NIENTE DA FARE: nessuna leva da
+  aggiungere al config, nessuna migrazione di `satmarket.db`. Alla
+  prima busta il server crea da solo `chat-scambi.db` ACCANTO al
+  database vero — sul VPS `/srv/barattolo/dati/chat-scambi.db`, perché
+  `satmarket.db` è un collegamento a quella cartella — coi permessi
+  600. Il posto NON è una leva: lo decide quello del database vero.
+  ⚠️ QUEL FILE NON VA NEI BACKUP, ED È VOLUTO. Dentro ci sono le buste
+  cifrate delle chat IN CORSO, che a scambio finito si cancellano. Il
+  pre-deploy (`deploy.sh`) e il giornaliero (`deploy/backup-fuori.sh`)
+  copiano `satmarket.db` per nome, e questo non lo toccano. NON
+  aggiungerlo, e non copiare a mano la cartella dei dati intera: una
+  copia farebbe sopravvivere le buste alla loro cancellazione. Una
+  prova (`prove_chat_scambio`) fallisce se uno dei due script lo
+  nomina.
+  SE IL FILE SI PERDE (un ripristino da backup, un trasloco su un'altra
+  macchina): non si recupera, e non serve. Rinasce vuoto; i telefoni
+  che avevano una chat aperta se ne accorgono al primo ritiro (il
+  server risponde `perso`), buttano la chiave vecchia e ripartono con
+  una nuova. Si perdono i messaggi delle chat in corso, e basta: gli
+  scambi non ne dipendono.
+  GUARDARE, in sola lettura (il testo non c'è: sono buste chiuse):
+  `ls -la /srv/barattolo/dati/chat-scambi.db`
+  `sqlite3 -readonly /srv/barattolo/dati/chat-scambi.db "SELECT COUNT(*), COUNT(DISTINCT ordine) FROM buste;"`
+  Quante buste, su quanti scambi: a mercato fermo deve tornare a zero.
+  NEL JOURNAL (`journalctl -u barattolo | grep "Chat P2P"`): «💬 Chat
+  P2P: nuovo messaggio sullo scambio …, avvisato …» quando parte un
+  avviso; «🧹 Chat P2P: lo scambio … e' finito, buste cancellate» alla
+  fine di uno scambio; «🧹 … cancellate le buste di N scambi finiti»
+  quando le trova la scopa del minuto; «⛔ Chat P2P» se scatta il tetto
+  anti-abuso degli avvisi. Una riga per busta NON c'è, apposta, e gli
+  accessi riusciti alle rotte della chat non compaiono nel registro di
+  uvicorn (gli errori sì).
+  LA PROVA SUL CAMPO, da fare con due telefoni dopo il primo deploy:
+  uno scambio preso, due messaggi per parte, l'avviso senza testo
+  sull'altro telefono ad app chiusa; a scambio concluso il riquadro
+  sparisce su tutti e due, e il conto qui sopra torna a zero.
