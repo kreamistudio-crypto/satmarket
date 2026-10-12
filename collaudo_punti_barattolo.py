@@ -394,8 +394,12 @@ def a_inpost(aid):
 
 def spedisci(oid, chi=222):
     come(chi)
+    # InPost e non piu' BRT (12 ott 2026, cantiere «punti-ritiro»):
+    # questo aiuto spedisce sia verso i punti di casa — dove il
+    # corriere e' libero — sia verso un locker InPost, e li' dal caso
+    # dell'ordine 213 un corriere che non ci consegna viene fermato
     return esegui(SRV.segna_spedito, oid, None,
-                  corpo={"corriere": "BRT", "tracking": "1234567890"})
+                  corpo={"corriere": "InPost", "tracking": "1234567890"})
 
 
 def prendi(oid, chi=333):

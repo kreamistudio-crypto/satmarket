@@ -4376,3 +4376,21 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   Due righe `saluto` dello stesso account nello stesso scambio vogliono
   dire due chiavi presentate (un «Continua la chat qui»); una riga
   `chiave` per ogni chiave vuol dire che le copie ci sono.
+- L'AVVISO «INDICA I TUOI CORRIERI» (12 ott 2026, cantiere
+  punti-ritiro): la leva `AVVISO_CORRIERI_PUNTI`, SPENTA di serie nel
+  codice. Dal deploy di quel cantiere il ritiro in un punto si offre
+  solo dove il venditore ha dichiarato un corriere che ai punti
+  consegna (Poste Italiane, SDA, InPost); a leva accesa parte UN
+  messaggio in chat, una volta sola, ai venditori con annunci a
+  spedizione attivi e nessun corriere dichiarato (o solo «Altro»):
+  «Indica i tuoi corrieri per offrire anche il ritiro nei punti».
+  Per accenderla: nel `config.py` del VPS la riga
+  `AVVISO_CORRIERI_PUNTI = True`, poi `sudo systemctl restart
+  barattolo`. Si guarda prima se la riga c'è già: `grep -n
+  "AVVISO_CORRIERI_PUNTI" ~/satmarket/config.py`. Parte al primo giro
+  dell'orologio dopo il riavvio, e nel journal lascia la riga
+  «📦 Campagna «corrieri per i punti»: avvisati N venditori [...]» con
+  gli id: è il modo di sapere a chi è arrivata. Partita una volta non
+  riparte (timbro `campagna_corrieri_punti` nella tabella `timbri`), e
+  rispegnerla non serve. Lo stato vero lo dice il pannello «⚙️ Stato
+  delle leve», voce «Avviso «indica i tuoi corrieri»».

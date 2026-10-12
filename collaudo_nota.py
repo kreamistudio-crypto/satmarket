@@ -146,8 +146,13 @@ def endpoint(fn, oid, corpo):
 
 def semina(db):
     con = sqlite3.connect(db)
-    con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,username,negozio) "
-                "VALUES(222,'Vende','vende','negozio22')")
+    # il venditore DICHIARA InPost: dal 12 ott 2026 (cantiere
+    # «punti-ritiro») senza un corriere che consegna a una rete di
+    # punti la via punto non si offre, e la nota qui si prova su
+    # TUTTE le vie
+    con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,username,negozio,"
+                "spedizionieri,spedizioniere) "
+                "VALUES(222,'Vende','vende','negozio22','|InPost|','InPost')")
     con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,username,negozio) "
                 "VALUES(111,'Compra','compra','negozio11')")
     # quattro annunci, uno per strada: la nota non dipende dalla via, ed

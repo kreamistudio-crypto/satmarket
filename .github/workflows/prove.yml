@@ -145,6 +145,7 @@ jobs:
              marca_prove.py recupera_xp_ordini.py livelli_prova.py
              collaudo_inviti.py
              collaudo_offerta_carrello.py collaudo_punti_barattolo.py
+             collaudo_punti_corrieri.py
              spoglia_foto_esistenti.py collaudo_verita_lnd.py
              collaudo_prova_hold.py
              giudice_deploy.py collaudi_ci.py
@@ -278,6 +279,7 @@ jobs:
              collaudo_guardia_liquidita
              collaudo_canale_admin
              collaudo_punti_barattolo
+             collaudo_punti_corrieri
              collaudo_csp
              collaudo_freni
              collaudo_db_contesa

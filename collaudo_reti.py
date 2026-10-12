@@ -316,21 +316,26 @@ def prove_scelta():
     prova("una rete sola: si fissa alla nascita, il client non la manda",
           "InPost", riga_ordine(r["ordine_id"])["rete_punto"])
 
-    # --- ZERO reti: il mondo di ieri, byte per byte ---------------
+    # --- ZERO reti: la via punto NON si offre (12 ott 2026) -------
+    # Qui c'era «il mondo di ieri, byte per byte»: senza reti la via
+    # punto passava lo stesso, col punto scritto alla cieca. L'ha
+    # rovesciato il caso dell'ordine 213 (cantiere «punti-ritiro»): un
+    # pacco DHL rifiutato dalla tabaccheria scelta cosi'. Il giro
+    # intero di quel caso sta in `collaudo_punti_corrieri.py`; qui
+    # resta la riga che dice che il mondo di ieri e' finito apposta.
     aid = semina("")
-    r = compra(aid, {"punto_ritiro": "Un punto qualunque"})
-    riga = riga_ordine(r["ordine_id"])
-    prova("nessuna rete dichiarata: la colonna resta vuota",
-          "", riga["rete_punto"])
-    prova("...e il punto si scrive lo stesso (via punto sempre offerta)",
-          ("Un punto qualunque", 1),
-          (riga["punto_ritiro"], riga["via_punto"]))
-    # e senza reti il punto NON e' obbligatorio: e' il patto del
-    # quarto giro, il residuo lo copre il campo dentro l'ordine
-    aid = semina("")
-    r = compra(aid, {})
-    prova("...e senza reti il punto puo' arrivare dopo (400 solo con rete)",
-          "", riga_ordine(r["ordine_id"])["punto_ritiro"])
+    prima = len(INVOICES)
+    alza("nessuna rete dichiarata: la via punto si rifiuta",
+         lambda: compra(aid, {"punto_ritiro": "Un punto qualunque"}),
+         "non spedisce ai punti di ritiro")
+    alza("...anche senza punto scritto, e dice la strada che resta",
+         lambda: compra(aid, {}),
+         "scegli la spedizione a un indirizzo")
+    con = SRV.db()
+    nati = con.execute("SELECT COUNT(*) FROM ordini").fetchone()[0]
+    con.close()
+    prova("...e non nasce nessun ordine, ne' si chiede una fattura",
+          (0, 0), (nati, len(INVOICES) - prima))
 
     # --- la via CASA non si porta dietro nessuna rete -------------
     aid = semina("|InPost|Poste Italiane|")

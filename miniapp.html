@@ -12479,11 +12479,12 @@ document.getElementById('cartello')?.remove();</script>
       <div class="field" id="sellSpedPuntoField" style="display:none"><label>Costo verso un punto di ritiro (facoltativo)</label>
         <div class="sats-input"><input id="sellSpedPunto" type="number" inputmode="numeric" placeholder="come sopra"><span class="suffix" id="sellSpedPuntoCur" style="pointer-events:none">sats</span></div>
         <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Spesso costa meno che a casa. Vuoto&nbsp;= vale il costo qui sopra; 0&nbsp;= gratis al punto.</div>
-        <!-- la riga discreta del secondo giro: la via punto si offre
-             comunque, ma senza rete dichiarata chi compra deve
-             accordarsi in chat — il promemoria vive dove il venditore
-             sta gia' pensando alla spedizione -->
-        <div id="sellSpedizioniereHint" style="display:none;margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4">💡 Indica nel Profilo (📦&nbsp;Come spedisci) <b>con quali corrieri spedisci</b>: chi compra sceglierà un punto della rete giusta, senza accordi in chat.</div></div>
+        <!-- la riga discreta del secondo giro, e dal 12 ott 2026
+             dice la regola nuova: senza un corriere che consegna a
+             una rete di punti la via punto NON si offre — il
+             promemoria vive dove il venditore sta gia' pensando alla
+             spedizione -->
+        <div id="sellSpedizioniereHint" style="display:none;margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4">💡 Indica nel Profilo (📦&nbsp;Come spedisci) <b>con quali corrieri spedisci</b>: con Poste Italiane, SDA o InPost chi compra potrà scegliere anche un punto di ritiro.</div></div>
       <!-- Il TERZO costo (ago 2026, dal campo: il riso da 4 kg venduto
            a sacchi con la spedizione di UNO dichiarata). Vale per
            tutte e due le strade qui sopra — dipende dall'oggetto, non
@@ -13827,12 +13828,11 @@ document.getElementById('cartello')?.remove();</script>
     <h3 id="corrieriTit">📦 Come spedirai?</h3>
     <div style="font-size:13.5px;color:var(--desc);font-weight:600;
       line-height:1.55;margin-bottom:12px">
-      Seleziona <b>con quali corrieri spedirai</b>: chi compra
-      sceglierà il locker o il punto di ritiro della rete giusta,
-      senza accordi in chat. Per spedizioni senza intoppi — e per
-      proteggere la tua privacy coi locker — ti consigliamo
-      <b>InPost o Poste Italiane</b>; puoi comunque spedire con altri
-      corrieri, se ti trovi meglio così.
+      Seleziona <b>con quali corrieri spedirai</b>. Non è
+      obbligatorio, ma con <b>Poste Italiane, SDA o InPost</b> chi
+      compra potrà scegliere anche un <b>locker o un punto di
+      ritiro</b>; con gli altri, o senza dichiararli, riceverà il
+      pacco all'indirizzo che indica.
     </div>
     <div id="corrieriPillole" style="display:flex;gap:6px;flex-wrap:wrap;
       margin-bottom:14px"></div>
@@ -22367,6 +22367,42 @@ function puntoBanner(o){
                              : 'Punto di ritiro dell\'acquirente'}: `
        + `<b>${esc(o.puntoRitiro)}</b>`;
 }
+/* DOVE SI VEDE LA RIGA DEL PUNTO (12 ott 2026, dal caso dell'ordine
+   213): viveva solo su 'shipped' e 'delivered', e in DISPUTA spariva
+   per tutti e tre — proprio dove il moderatore deve leggere a quale
+   banco e' andato il pacco. Adesso resta finche' l'ordine e' aperto
+   dopo la spedizione, resi e disputa compresi.
+   L'ADMIN LA VEDE SEMPRE: e' l'unico che non ha ne' il campo di chi
+   compra ne' il riquadro «Spedisci a» di chi vende. Le due parti no
+   dove il punto ce l'hanno gia' sotto le dita (il campo su 'locked',
+   il riquadro di chi spedisce): il dato in due posti e' il peccato
+   che questo punto ha gia' commesso. */
+const STATI_PUNTO_IN_VISTA = ['shipped', 'delivered', 'dispute',
+                              'return_pending', 'return_shipped'];
+function puntoInVista(o, s){
+  if (!o.puntoRitiro) return false;
+  if (o.role === 'admin') return true;
+  if (serveSpedisciA(o)) return false;
+  /* il caso incagliato: 'confirmed'/'refund' con la disputa ancora
+     da decidere e' una disputa, e si legge come tale */
+  return STATI_PUNTO_IN_VISTA.includes(s)
+      || (!!o.disputata && ['confirmed', 'refund'].includes(s));
+}
+/* QUEL CHE SERVE A CHI DECIDE, e solo a lui: di che rete e tipo era
+   il punto (o che la rete non c'era: gli ordini di prima) e quante
+   volte chi vende l'aveva contestato prima di spedire — il contatore
+   `punto_obiezioni`, che il server tiene apposta per il moderatore e
+   che fin qui non si leggeva da nessuna parte. */
+function puntoBannerAdmin(o){
+  if (o.role !== 'admin' || !o.puntoRitiro) return '';
+  const n = o.puntoObiezioni || 0;
+  const contestato = n
+    ? `ha contestato il punto <b>${n} ${n === 1 ? 'volta' : 'volte'}</b>`
+    : 'non ha mai contestato il punto';
+  return `<br><span class="eur-hint">⚖️ ${esc(nomePunto(o.tipoPunto, o.retePunto))}`
+       + `${o.retePunto ? '' : ' · rete non indicata'}`
+       + ` · il venditore ${contestato}</span>`;
+}
 /* LA CARD DELL'ALTRA PARTE DENTRO UN ORDINE DEL MERCATINO (24 set
    2026, ritocco di Andrea): al posto dei bottoni giganti «Scrivi al
    venditore / all'acquirente su Telegram / su Nostr», in fondo alla
@@ -25391,12 +25427,12 @@ function preventivoDemo(l){
         strade.push({via:'casa', spedizione_sats:sped, spedizione_eur:spedEur,
                      totale_sats:art+sped+prot, totale_eur:totEur, stima,
                      supplemento_sats:suppl, pezzi:qtaScelta});
-        if (zonaDemo === 'dom')
-          strade.push({via:'punto', spedizione_sats:sped,
-                       spedizione_eur:spedEur,
-                       totale_sats:art+sped+prot, totale_eur:totEur, stima,
-                       supplemento_sats:suppl, pezzi:qtaScelta,
-                       fallback_casa:true});
+        /* LA VIA PUNTO IN DEMO NON C'E' (12 ott 2026): dal caso
+           dell'ordine 213 il server la offre solo dove il venditore
+           ha dichiarato un corriere che consegna a una rete di punti,
+           e i venditori della demo non hanno dichiarato niente —
+           offrirla qui mostrerebbe una strada che la pagina vera, a
+           parita' di venditore, non ha. */
       }
     } else {
       strade.push({via:v, spedizione_sats:0, spedizione_eur:0,
@@ -26328,8 +26364,17 @@ function renderAcquisto(){
      stato un FATTO — non un ripensamento. Chi lo rigirasse una
      terza volta porti un fatto nuovo, non una simmetria.
      Senza scelta (una rete sola, o nessuna) valgono le dichiarate,
-     che e' anche quel che la frase dice. */
-  const retiMappa = sceglieRete ? (d.rete ? [d.rete] : []) : reti;
+     che e' anche quel che la frase dice.
+     E DAL 12 OTT 2026 I BOTTONI SONO DI NUOVO TUTTI (decisione di
+     Andrea, col caso dell'ordine 213: chi dichiara Poste e InPost fa
+     vedere tutte e due le ricerche) — ma il fatto di agosto resta
+     vero, e a tenerlo a bada non e' piu' nascondere un bottone: IL
+     TOCCO SULLA MAPPA DI UN'ALTRA RETE SCEGLIE QUELLA RETE
+     (`apriMappaCassa`). Cosi' la rete scritta nell'ordine e' sempre
+     quella della mappa su cui si e' cercato, che e' la sola cosa che
+     «la mappa segue la rete» proteggeva — e a «Segna come spedito» il
+     corriere si confronta con quella. */
+  const retiMappa = reti;
   /* I PUNTI DI CASA (ago 2026): sulla rete nostra il «dove» non e' un
      campo di testo ma un ELENCO — sono punti che proponiamo noi,
      quindi li conosciamo, e farli riscrivere a mano sarebbe chiedere
@@ -26343,7 +26388,7 @@ function renderAcquisto(){
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Via Roma 1, Pavia"
       oninput="if(acqDati){acqDati.punto=this.value;acqDati.puntoToccato=true;aggiornaRigaRicorda()}">
-    ${mappePunti(retiMappa)}
+    ${mappePunti(retiMappa, sceglieRete ? 'apriMappaCassa' : 'apriMappaPunti')}
     <div id="acqRicorda">${rigaRicordaPunto(d, retePerSalvare(d))}</div>
     ${notaOnionRecapito()}`;
   /* L'EMAIL PER IL CORRIERE (ago 2026): sotto il campo del punto,
@@ -26707,11 +26752,13 @@ function renderAcquisto(){
      questa riga non aggiunge niente. La sua formula e' vietata da
      una prova, e per questo qui non si cita: la sentinella legge
      anche i commenti. */
-  /* la via punto SENZA rete dichiarata: la riga onesta del quarto
-     giro — si sceglie un punto senza sapere la rete, e la rete di
-     sicurezza e' la correzione dall'ordine */
-  if (!reti.length && d.via==='punto')
-    note += `<div class="acq-nota">📦 Il venditore non ha ancora dichiarato il corriere: stai scegliendo il punto senza sapere con che rete viaggerà il pacco — puoi correggerlo dall'ordine finché non spedisce.</div>`;
+  /* LA VIA PUNTO SENZA RETE NON ESISTE PIU' (12 ott 2026, dal caso
+     dell'ordine 213): qui viveva la riga onesta del quarto giro, che
+     avvisava chi sceglieva un punto alla cieca. Era onesta ma non
+     bastava — il pacco e' tornato indietro lo stesso — e adesso il
+     server quella via senza una rete di punti non la offre: si da'
+     un indirizzo. Una riga per un caso che non c'e' sarebbe un
+     cartello su una porta murata. */
   if (d.via==='digitale')
     note += `<div class="acq-nota">💾 Un codice, una volta rivelato, non torna indietro: hai <b>${TEMPI.confermaDig} ore</b> per aprire una disputa, poi l'acquisto è definitivo.</div>`;
   /* E CON LEI LA RIGA CHE SPIEGAVA LA CONVERSIONE (ago 2026, stessa
@@ -33590,7 +33637,7 @@ function openOrder(id){
         </div>
       </div>
       ${pannelloPagamento(o)}
-      ${s==='dispute' && !inPagamento(o) ? `<div class="trust-note" style="background:var(--warn-bg);color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore esaminerà la conversazione e i sats resteranno bloccati fino alla decisione.</span></div>`:''}
+      ${s==='dispute' && !inPagamento(o) ? `<div class="trust-note" style="background:var(--warn-bg);color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore guarda l'ordine e il tracciamento e vi scrive su Telegram o Nostr; i sats restano nel deposito di garanzia fino alla decisione.</span></div>`:''}
       ${/* IL BANNER E' DEL PUNTO, E DI NIENT'ALTRO (ago 2026): diceva
             anche «Spedito con X — tracciamento Y», che e' parola per
             parola il passo «Oggetto spedito» dentro il recinto, due
@@ -33609,7 +33656,7 @@ function openOrder(id){
             trovarlo sulla mappa. Il «Copia» del primo giro e' uscito —
             un bottone per ogni dato faceva confusione — e la frase del
             banner si seleziona con la pressione lunga, come un testo. */''}
-      ${(['shipped','delivered'].includes(s) && o.puntoRitiro && !serveSpedisciA(o)) ? `<div class="trust-note nota-punto">📍 <span>${puntoBanner(o)}</span></div>`:''}
+      ${puntoInVista(o, s) ? `<div class="trust-note nota-punto">📍 <span>${puntoBanner(o)}${puntoBannerAdmin(o)}</span></div>`:''}
       ${bottoneNotifichePacco(o, s)}
       ${pannelloTrackingAdmin(o, s)}
       ${/* IL CASO INCAGLIATO (ago 2026): quando lo sblocco o il
@@ -33703,6 +33750,11 @@ function openOrder(id){
                 col cartello — il dato in due posti e' il peccato che
                 questo punto ha gia' commesso una volta. */''}
           ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto <b>${esc(nomePunto(o.tipoPunto, o.retePunto))}</b>${o.tipoPunto ? '' : ' <span class="eur-hint">(tipo non indicato)</span>'}: il punto e i recapiti sono in cima, in <b>«📦 Spedisci a»</b>.</div>` : ''}
+          ${/* GLI ORDINI DI PRIMA (12 ott 2026): la' il punto si
+                sceglieva senza conoscere il corriere, e la rete non
+                c'e' — quindi non si puo' ne' fermare ne' tacere.
+                Si dice, e a decidere resta chi spedisce. */''}
+          ${(o.viaPunto && o.puntoRitiro && !o.puntoBarattolo && !corrieriDellaRete(o.retePunto).length) ? `<div class="hint">⚠️ L'acquirente ha scelto il punto <b>senza conoscere il tuo corriere</b>: controlla che lo accetti prima di spedire.</div>` : ''}
           ${obiezioneVenditore(o)}
           ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker/punto di ritiro</b>${o.retePunto ? ` <b>${esc(o.retePunto)}</b>` : ''} ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione${o.retePunto ? '.' : ' — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
           ${o.viaPunto ? `<div class="hint">📮 ${RIGA_CODICE_CORRIERE}</div>` : ''}
@@ -33731,7 +33783,14 @@ function openOrder(id){
                 CORRIERI: InPost e Poste Italiane ci sono entrambe,
                 'Altro' no, e li' il selettore resta com'era. */''}
           ${selettoreCorriere('shipCorriere',
-              CORRIERI.includes(o.retePunto) ? o.retePunto : '')}
+              CORRIERI.includes(o.retePunto) ? o.retePunto : '',
+              'aggiornaAvvisoCorriere()')}
+          ${/* IL CORRIERE SBAGLIATO SI FERMA QUI (12 ott 2026, dal caso
+                dell'ordine 213): l'avviso nasce sotto il selettore
+                appena si sceglie un corriere che a quel punto non
+                consegna, con le due uscite. Vuoto finche' va bene. */''}
+          <div id="shipCorriereAvviso">${htmlAvvisoCorriere(o,
+              CORRIERI.includes(o.retePunto) ? o.retePunto : CORRIERI[0])}</div>
           <textarea id="shipTracking" style="min-height:38px" placeholder="Numero di tracciamento (consigliato)"></textarea>
           ${/* IL TRACCIAMENTO E' FACOLTATIVO MA SI CONSIGLIA CALDAMENTE
                 (9 ott 2026, decisione di Andrea): il cartello sta sotto
@@ -36508,11 +36567,12 @@ function renderSpedizioniere(){
   };
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
-      Con quali corrieri spedisci? Spuntali tutti: chi sceglie la
-      <b style="color:var(--ink)">consegna a un punto di ritiro</b>
-      (locker o negozio convenzionato) dirà con quale vuole il pacco,
-      e tu lo trovi scritto nell'ordine. Senza, dovrete accordarvi in
-      chat sul punto.</div>
+      Con quali corrieri spedisci? Spuntali tutti. Con
+      <b style="color:var(--ink)">Poste Italiane, SDA o InPost</b>
+      chi compra può scegliere anche la consegna a un punto di ritiro
+      (locker o negozio convenzionato), e la rete la trovi scritta
+      nell'ordine. Con gli altri, o senza dichiararli, vendi lo
+      stesso: il pacco va all'indirizzo che indica chi compra.</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
       ${spedizionieriCatalogo.map(pill).join('')}</div>
     ${bloccoSpedStd()}
@@ -40104,8 +40164,8 @@ const CORRIERI = ['Poste Italiane','BRT','GLS','SDA','DHL','UPS','InPost',
 /* `scelto` preseleziona un corriere: serve alla correzione del
    moderatore, che parte da quello che c'e' gia' (nove volte su dieci
    e' giusto il corriere e sbagliato il codice). */
-function selettoreCorriere(id, scelto){
-  return `<select id="${id}" style="width:100%;border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;font-weight:600;background:var(--bg);margin:12px 0 8px;outline:none">
+function selettoreCorriere(id, scelto, cambia = ''){
+  return `<select id="${id}"${cambia ? ` onchange="${cambia}"` : ''} style="width:100%;border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;font-weight:600;background:var(--bg);margin:12px 0 8px;outline:none">
     ${CORRIERI.map(c=>`<option${c===scelto?' selected':''}>${c}</option>`).join('')}</select>`;
 }
 
@@ -40406,6 +40466,13 @@ async function markShipped(){
   haptic();
   const corriere = el('shipCorriere')?.value || '';
   const tracking = el('shipTracking')?.value.trim() || '';
+  /* il corriere che a quel punto non consegna: ferma, e porta gli
+     occhi sull'avviso con le due uscite (vedi htmlAvvisoCorriere) */
+  if (aggiornaAvvisoCorriere()) {
+    el('shipCorriereAvviso')?.scrollIntoView({block: 'center'});
+    toast('⚠️ Con questo corriere il punto rifiuterà il pacco');
+    return;
+  }
   /* la forma del codice: avvisa, non blocca (vedi FORME_TRACKING) */
   if (!trackingDaControllare(corriere, tracking, 'shipAvviso')) return;
   /* la busta diretta: la spunta esiste solo sulla via punto — il
@@ -40453,6 +40520,40 @@ async function inviaSpedito(corriere, tracking, bustaDiretta){
     if (riga) riga.bustaDirettaIl = ts;
   }
   toast('📦 Segnato come spedito'); openOrder(currentOrder.id);
+}
+
+/* IL CORRIERE CHE A QUEL PUNTO NON CONSEGNA (12 ott 2026, dal caso
+   dell'ordine 213: un pacco DHL verso un punto Poste, tornato
+   indietro senza che Barattolo avesse avvisato nessuno). L'avviso
+   FERMA — il server rifiuta comunque, questo e' il no detto prima e
+   con le uscite accanto: cambiare corriere, o contestare il punto col
+   gesto che c'e' gia' («Questo punto non va bene»).
+   Il giudice e' `corriereCompatibile`: dove la rete non si sa torna
+   vero, e qui non esce niente. */
+function htmlAvvisoCorriere(o, corriere){
+  if (!o || !o.viaPunto || !o.puntoRitiro) return '';
+  if (corriereCompatibile(o.retePunto, corriere)) return '';
+  return `<div class="trust-note" style="background:var(--warn-bg);color:var(--danger);margin:0 0 8px">⚠️ <span>${esc(fraseCorriereSbagliato(o.retePunto, corriere))}
+      <span style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button type="button" class="btn mini" onclick="el('shipCorriere')?.focus()">Cambia corriere</button>
+        <button type="button" class="btn mini" onclick="contestaPuntoDaAvviso()">Il punto non va bene</button>
+      </span></span></div>`;
+}
+/* ridisegna il solo avviso (il selettore non si tocca, o perderebbe
+   la scelta): torna vero se l'avviso c'e', cioe' se si deve fermare */
+function aggiornaAvvisoCorriere(){
+  const box = el('shipCorriereAvviso');
+  if (!box) return false;
+  box.innerHTML = htmlAvvisoCorriere(currentOrder,
+                                     el('shipCorriere')?.value || '');
+  return !!box.innerHTML;
+}
+/* la seconda uscita: apre l'obiezione col motivo gia' scelto — chi
+   arriva da qui lo sta dicendo, «non è della mia rete» */
+function contestaPuntoDaAvviso(){
+  apriObiezione();
+  setMotivoObiezione('rete');
+  el('obiezionePannello')?.scrollIntoView({block: 'center'});
 }
 
 /* Il gemello di markShipped per il ritiro in zona: niente corriere,
@@ -40534,6 +40635,37 @@ function apriMappaPunti(rete){
    arrivato un '' hardcodato e si vedevano sempre tutte e due le
    mappe anche a rete dichiarata. */
 const RETE_MAPPA = {'InPost': 'inpost', 'Poste Italiane': 'poste'};
+
+/* A QUALE RETE DI PUNTI CONSEGNA OGNI CORRIERE (12 ott 2026, cantiere
+   «punti-ritiro», dal caso dell'ordine 213): lo SPECCHIO di
+   RETE_DEL_CORRIERE del server, tenuto in pari da una prova — il
+   patto di MAX_NOTA. Il giudice resta il server (e' lui che offre la
+   via punto e che ferma la spedizione); qui serve a dire il no PRIMA
+   della POST, con le due uscite accanto. Chi non c'e' (BRT, GLS, DHL,
+   UPS) una rete nel mondo ce l'ha, ma noi non ne abbiamo la mappa. */
+const RETE_DEL_CORRIERE = {'InPost': 'InPost',
+                           'Poste Italiane': 'Poste Italiane',
+                           'SDA': 'Poste Italiane'};
+/* chi consegna di persona non ha una rete da confrontare */
+const CORRIERI_SENZA_RETE = ['Consegna a mano', 'Ritiro in zona'];
+function corrieriDellaRete(rete){
+  return Object.keys(RETE_DEL_CORRIERE)
+    .filter(c => RETE_DEL_CORRIERE[c] === rete);
+}
+/* DOVE NON SAPPIAMO, PASSA: la rete vuota degli ordini di prima,
+   «Altro» e la rete di casa non hanno una riga in tabella — un ordine
+   gia' aperto non si rompe con una regola che nessuno gli aveva detto. */
+function corriereCompatibile(rete, corriere){
+  const ammessi = corrieriDellaRete(rete);
+  if (!ammessi.length || CORRIERI_SENZA_RETE.includes(corriere)) return true;
+  return ammessi.includes(corriere);
+}
+function fraseCorriereSbagliato(rete, corriere){
+  const conChi = (corriere && corriere !== 'Altro corriere')
+    ? 'con ' + corriere : 'con un altro corriere';
+  return `Questo punto accetta solo ${corrieriDellaRete(rete).join('/')}: `
+       + `${conChi} il pacco verrà rifiutato.`;
+}
 
 /* LA RETE DI CASA (ago 2026): il gemello di RETE_BARATTOLO del
    server. Non sta in RETE_MAPPA APPOSTA, ed e' quel che la fa
@@ -40832,7 +40964,11 @@ function fraseReti(reti){
   if (!dichiarate.length)
     return 'Il venditore non ha dichiarato con che corriere spedisce: '
          + 'InPost e Punto Poste sono le reti più diffuse.';
-  return 'Il venditore spedisce con '
+  /* «consegna ai punti», non «spedisce con» (12 ott 2026): da quando
+     il catalogo dice i corrieri, qui arrivano le RETI dei punti — chi
+     ha dichiarato SDA consegna ai punti Poste Italiane, e «spedisce
+     con Poste Italiane» sarebbe falso. */
+  return 'Il venditore consegna ai punti '
        + conMappa.map(r => `<b>${esc(r)}</b>`).join(' e ') + '.';
 }
 
@@ -40845,14 +40981,42 @@ function fraseReti(reti){
    in mente: dopo aver scelto InPost, la mappa Poste porta a un punto
    della rete sbagliata. A tenerlo a bada c'e' la label del campo,
    che nomina la rete SCELTA due righe piu' giu'. */
-function mappePunti(reti){
+function mappePunti(reti, gesto = 'apriMappaPunti'){
   const {mappe} = retiMappe(reti);
   if (!mappe.length) return '';
   const link = mappe.map(r =>
-    `<button type="button" class="btn mini" onclick="apriMappaPunti('${r}')">🔎 ${MAPPE_PUNTI[r].nome}</button>`
+    `<button type="button" class="btn mini" onclick="${gesto}('${r}')">🔎 ${MAPPE_PUNTI[r].nome}</button>`
   ).join(' ');
   return `<div class="mappe-punti">${link}</div>`
        + `<div class="hint" style="margin-top:6px">${NOTA_LOCKER}</div>`;
+}
+
+/* LA MAPPA ALLA CASSA, DOVE LE RETI SONO DUE (12 ott 2026): chi apre
+   la ricerca di Poste sta per scrivere un punto Poste, e lo dice da
+   solo — la rete scelta lo segue, cosi' l'ordine non nasce con la
+   rete di una mappa e il punto di un'altra. Con una rete sola non
+   c'e' niente da scegliere e si chiama `apriMappaPunti` dritta. */
+function apriMappaCassa(chiave){
+  /* la rete di quella mappa la dice il giudice unico (le due liste
+     che rende sono appaiate): qui la tabella non si rilegge */
+  const {conMappa, mappe} = retiMappe(acqDati?.preventivo?.reti || []);
+  const rete = conMappa[mappe.indexOf(chiave)];
+  if (acqDati && rete && acqDati.rete !== rete) {
+    /* IL TIPO GIA' SCELTO RESTA (trovato nel giro dal vivo, non
+       leggendo il codice): `setReteAcquisto` rimette il punto salvato
+       della rete nuova e, se non ce n'e' uno, azzera anche il tipo —
+       giusto quando si tocca la pillola, ma qui il campo sparirebbe
+       sotto il dito di chi ha appena chiesto una mappa, e per riaverlo
+       dovrebbe rispondere di nuovo a «locker o punto?». Se il punto
+       salvato porta un tipo suo, vince quello. */
+    const tipo = acqDati.tipoPunto;
+    setReteAcquisto(rete);
+    if (tipo && !acqDati.tipoPunto) {
+      acqDati.tipoPunto = tipo;
+      renderAcquisto();
+    }
+  }
+  apriMappaPunti(chiave);
 }
 
 /* Le due rese INSIEME, per il campo dentro l'ORDINE: li' la frase e

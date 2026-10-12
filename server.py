@@ -649,6 +649,18 @@ except ImportError:
     # righe che si contendono l'attenzione.
     # 0 = niente foglio, resta la sola riga (freno d'emergenza).
     INVITO_CORRIERI_MAX = 3
+try:
+    from config import AVVISO_CORRIERI_PUNTI
+except ImportError:
+    # La campagna una-tantum «indica i tuoi corrieri per offrire anche
+    # il ritiro nei punti» (12 ott 2026, cantiere «punti-ritiro»): un
+    # messaggio in chat ai venditori con annunci a spedizione attivi e
+    # nessun corriere dichiarato. SPENTA DI SERIE (decisione di
+    # Andrea): un messaggio a tutti i venditori non parte da solo con
+    # un deploy, lo accende lui dal config del VPS quando vuole. Una
+    # volta partita non riparte (timbro in `timbri`), e rispegnerla
+    # non serve.
+    AVVISO_CORRIERI_PUNTI = False
 
 # La protezione acquisti (lug 2026, modello Vinted): percentuale a
 # carico del COMPRATORE sul solo prezzo articolo, si aggiunge al conto
@@ -21266,7 +21278,32 @@ MODALITA_CONSEGNA = ("spedizione", "ritiro", "entrambe", "digitale",
                      "servizio")
 TAGLIE_PACCO = ("busta", "piccolo", "medio", "grande", "ingombrante")
 
-SPEDIZIONIERI = ("Barattolo", "InPost", "Poste Italiane", "Altro")
+# I CORRIERI CHE UN VENDITORE PUO' DICHIARARE (12 ott 2026, cantiere
+# «punti-ritiro»): dal caso dell'ordine 213 il catalogo dice CHI PORTA
+# IL PACCO, non piu' solo le reti dei punti. Prima erano tre voci
+# (InPost, Poste Italiane, Altro) e chi spediva con DHL non aveva
+# niente da dichiarare: restava «non dichiarato», la via punto si
+# offriva lo stesso con le mappe di Poste e InPost, e il pacco DHL
+# tornava indietro dalla tabaccheria. Le voci di ieri restano con lo
+# stesso nome (stanno in `utenti.spedizionieri` e in
+# `ordini.rete_punto`): si AGGIUNGE, non si rinomina.
+# SU UNA RIGA SOLA, anche se e' lunga: i banchi di prove.py la leggono
+# dal sorgente fino al primo a capo, e una tupla spezzata li farebbe
+# esplodere tutti per una questione d'impaginazione.
+SPEDIZIONIERI = ("Barattolo", "InPost", "Poste Italiane", "SDA", "BRT", "GLS", "DHL", "UPS", "Altro")
+
+# A QUALE RETE DI PUNTI CONSEGNA OGNI CORRIERE: la tabella UNICA della
+# compatibilita', letta da chi offre la via punto alla cassa
+# (`reti_punto`) e da chi ferma la spedizione col corriere sbagliato
+# (`corriere_compatibile`). Chi non c'e' — BRT, GLS, DHL, UPS, Altro —
+# una rete sua nel mondo ce l'ha, ma noi non ne abbiamo la mappa, e
+# un punto che chi compra non puo' cercare e' un indirizzo scritto a
+# caso: per loro la via punto NON si offre, e si spedisce a un
+# indirizzo. Aggiungere una mappa domani e' una riga qui e una in
+# MAPPE_PUNTI del client.
+RETE_DEL_CORRIERE = {"InPost": "InPost",
+                     "Poste Italiane": "Poste Italiane",
+                     "SDA": "Poste Italiane"}
 
 
 # ------------------- I PUNTI DI RITIRO DI BARATTOLO -----------------
@@ -21518,6 +21555,81 @@ def reti_venditore(spedizionieri: str, spedizioniere: str = "",
         grezze = [spedizioniere]
     return [s for s in SPEDIZIONIERI if s in grezze
             and (barattolo or s != RETE_BARATTOLO)]
+
+
+def reti_punto(dichiarati: list) -> list:
+    """LE RETI DI PUNTI A CUI QUESTO VENDITORE SA CONSEGNARE (12 ott
+    2026, dal caso dell'ordine 213): dai corrieri che ha dichiarato a
+    quelle che si offrono alla cassa. E' il giudice della via punto —
+    lista vuota = la via NON si offre, e chi compra da' un indirizzo.
+
+    ROVESCIA «la via punto si offre sempre» dell'ago 2026 (il perche'
+    di allora: meglio l'accordo in chat che la porta chiusa), e lo fa
+    con un FATTO: un pacco DHL rifiutato da una tabaccheria scelta
+    sulle nostre mappe, senza che Barattolo avvisasse nessuno dei due.
+    La porta non si chiude sulla VENDITA — senza corrieri si pubblica
+    e si vende, a un indirizzo — ma su una promessa che non sapevamo
+    mantenere.
+
+    Giudice PURO sopra `reti_venditore` (che resta «cosa ha dichiarato
+    lui», e serve al Profilo): Poste Italiane e SDA danno la stessa
+    rete una volta sola, la rete di casa passa com'e' — a gatarla ha
+    gia' pensato chi chiama `reti_venditore`."""
+    fuori = []
+    for c in dichiarati or []:
+        rete = (RETE_BARATTOLO if c == RETE_BARATTOLO
+                else RETE_DEL_CORRIERE.get(c, ""))
+        if rete and rete not in fuori:
+            fuori.append(rete)
+    return fuori
+
+
+# I corrieri-sentinella che non portano un pacco a un banco: la
+# consegna la fa il venditore di persona, e non c'e' niente da
+# confrontare con la rete del punto.
+CORRIERI_SENZA_RETE = ("Consegna a mano", "Ritiro in zona")
+
+
+def corrieri_della_rete(rete: str) -> list:
+    """Chi consegna ai punti di QUESTA rete, nell'ordine del catalogo.
+    Lista vuota = rete che non sappiamo giudicare ('' degli ordini di
+    ieri, «Altro», la rete di casa)."""
+    return [c for c in SPEDIZIONIERI if RETE_DEL_CORRIERE.get(c) == rete]
+
+
+def corriere_compatibile(rete: str, corriere: str) -> bool:
+    """«Questo corriere consegna a un punto di questa rete?» — la
+    domanda di `segna_spedito` sulla via punto.
+
+    DOVE NON SAPPIAMO, PASSA: una rete vuota (gli ordini nati prima
+    del 12 ott 2026, quando il punto si sceglieva senza conoscere il
+    corriere), «Altro» e la rete di casa non hanno una riga nella
+    tabella, e fermare li' vorrebbe dire rompere un ordine gia' aperto
+    con una regola che nessuno gli aveva detto. Dove invece la rete
+    c'e', il no e' secco: un punto Poste non prende un pacco DHL, ed
+    e' il silenzio su questo che ha fatto tornare indietro il 213."""
+    ammessi = corrieri_della_rete(rete)
+    if not ammessi or corriere in CORRIERI_SENZA_RETE:
+        return True
+    return corriere in ammessi
+
+
+# Il rifiuto della via punto dove il venditore non ci arriva: UNA
+# frase per i due acquisti (mono e carrello), che dice la strada che
+# resta invece del solo no.
+MSG_NIENTE_PUNTI = ("Questo venditore non spedisce ai punti di ritiro: "
+                    "scegli la spedizione a un indirizzo")
+
+
+def frase_corriere_sbagliato(rete: str, corriere: str) -> str:
+    """L'avviso che ferma, uguale a quello della pagina: dice chi
+    accetta il punto, cosa succede col corriere scelto e le due uscite."""
+    ammessi = "/".join(corrieri_della_rete(rete))
+    con_chi = (f"con {corriere}" if corriere in SPEDIZIONIERI
+               and corriere != "Altro" else "con un altro corriere")
+    return (f"Questo punto accetta solo {ammessi}: {con_chi} il pacco "
+            f"verrà rifiutato. Cambia corriere, oppure segnala che il "
+            f"punto non va bene.")
 
 
 def rete_da_payload(grezza: str, reti: list) -> str:
@@ -29361,6 +29473,13 @@ def _leve_stato():
                   spento="niente foglio a chi pubblica una spedizione "
                          "senza corrieri dichiarati: resta la sola riga "
                          "nel form"),
+            _leva("Avviso «indica i tuoi corrieri»",
+                  "AVVISO_CORRIERI_PUNTI", AVVISO_CORRIERI_PUNTI,
+                  acceso="un messaggio, una volta sola, ai venditori "
+                         "con annunci a spedizione e nessun corriere "
+                         "dichiarato; partito una volta non riparte",
+                  spento="nessun messaggio: chi non dichiara lo scopre "
+                         "dal foglio quando pubblica"),
         ]},
     ]
 
@@ -34770,8 +34889,18 @@ async def _compra_set(user: dict, d: dict) -> dict:
         # della invoice, il patto del ricontrollo non si tocca.
         sp = con.execute("SELECT spedizionieri, spedizioniere FROM utenti "
                          "WHERE tg_id=?", (venditore_id,)).fetchone()
-        reti = reti_venditore(sp["spedizionieri"], sp["spedizioniere"],
-                              rete_barattolo_viva()) if sp else []
+        reti = reti_punto(reti_venditore(
+            sp["spedizionieri"], sp["spedizioniere"],
+            rete_barattolo_viva())) if sp else []
+        # LA VIA PUNTO SOLO DOVE IL VENDITORE CI ARRIVA (12 ott 2026,
+        # dal caso dell'ordine 213): senza una rete di punti fra i
+        # suoi corrieri il preventivo la via non la offre, e questa e'
+        # la cintura per la pagina rimasta aperta da prima e per il
+        # body scritto a mano. Il messaggio dice la strada che resta:
+        # la vendita non si ferma, cambia solo dove arriva il pacco.
+        if not reti:
+            con.close()
+            raise HTTPException(400, MSG_NIENTE_PUNTI)
         # L'ORDINE E' INVERTITO rispetto a ieri, e non e' un riordino:
         # sulla rete di CASA il testo del punto lo compone il SERVER,
         # quindi il campo del client e' vuoto per costruzione e la
@@ -35325,7 +35454,7 @@ def _strade_preventivo(righe: list, articolo: int, cambio: float,
                        sconto: int = 0, sconto_eur: float = 0.0,
                        sped_gratis: bool = False,
                        accordo: int = 0, accordo_eur: float = 0.0,
-                       paese: str = "") -> list:
+                       paese: str = "", punto: bool = False) -> list:
     """Le strade del preventivo coi loro totali, nell'ordine FISSO
     ritiro → casa → punto → digitale. `disponibili` le decide il
     CHIAMANTE — per il mono le strade dell'annuncio, per il set
@@ -35336,11 +35465,13 @@ def _strade_preventivo(righe: list, articolo: int, cambio: float,
     avrebbe detto la spedizione di UN pezzo e la invoice quella di
     dieci (col supplemento a zero i due numeri coincidono, ed e'
     esattamente il motivo per cui il buco poteva restare a lungo
-    invisibile). La via 'punto' c'e'
-    SEMPRE dove c'e' la spedizione — anche senza spedizioniere
-    dichiarato (secondo giro, la decisione che SUPERA il gate: meglio
-    l'accordo in chat che la porta chiusa; la rete, se dichiarata, la
-    dice il campo `spedizioniere` della risposta).
+    invisibile). La via 'punto' c'e' SOLO SE IL CHIAMANTE LO DICE
+    (`punto`, 12 ott 2026, dal caso dell'ordine 213): la offre chi ha
+    un venditore che sa consegnare a una rete di punti — `reti_punto`
+    non vuota — e nasce SPENTA, l'idioma di `barattolo` in
+    `reti_venditore`: chi vuole offrirla lo scrive. Rovescia «la via
+    punto c'e' sempre» dell'ago 2026; senza, resta la via di casa, e
+    la vendita non si ferma.
     Una tariffa ancorata all'euro senza cambio = strada che esce con
     `cambio_assente` e senza numeri: si spegne col motivo, le altre
     restano comprabili — mai un 503 che spegne anche il ritiro.
@@ -35410,15 +35541,15 @@ def _strade_preventivo(righe: list, articolo: int, cambio: float,
     if "ritiro" in disponibili:
         _entra("ritiro", 0, False)
     if "spedizione" in disponibili:
-        # la via punto c'e' SEMPRE dove c'e' la spedizione (secondo
-        # giro, decisione di Andrea che SUPERA il gate dello
-        # spedizioniere) — senza rete il punto arriva dopo, dal campo
-        # dell'ordine (terzo giro); la tariffa e' il fallback casa.
+        # la via punto c'e' solo dove il venditore sa consegnare a
+        # una rete di punti (`punto`, deciso dal chiamante con
+        # `reti_punto`: 12 ott 2026, il caso dell'ordine 213); la
+        # tariffa, se non ne ha dichiarata una sua, e' il fallback casa.
         # FUORI DAL DOMESTICO LA VIA PUNTO NON C'E': le reti sono
         # italiane, e offrirla vorrebbe dire promettere un locker che
         # in quel paese non esiste.
         a_casa = all(_zona_ordine(a, paese) == "dom" for a, _ in righe)
-        vie = ("casa", "punto") if a_casa else ("casa",)
+        vie = ("casa", "punto") if (a_casa and punto) else ("casa",)
         # LA PORTA CHIUSA, e in una riga sola: basta un annuncio del
         # carrello che in quella zona non spedisca.
         zona_ok = all(_zona_offerta(a, _zona_ordine(a, paese))
@@ -35588,8 +35719,12 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
                      "sped_gratis_soglia_eur, sped_gratis_valuta "
                      "FROM utenti WHERE tg_id=?",
                      (a["venditore_id"],)).fetchone()
-    reti = reti_venditore(sp["spedizionieri"], sp["spedizioniere"],
-                          rete_barattolo_viva()) if sp else []
+    # LE RETI DEI PUNTI, non i corrieri dichiarati (12 ott 2026, dal
+    # caso dell'ordine 213): chi ha dichiarato solo DHL qui esce
+    # vuoto, e vuoto vuol dire che la via punto non si offre.
+    reti = reti_punto(reti_venditore(
+        sp["spedizionieri"], sp["spedizioniere"],
+        rete_barattolo_viva())) if sp else []
     # la stringa resta per il client rimasto in cache, che di reti ne
     # legge una sola: gli si da' la prima, che e' un'omissione e non
     # una bugia (la regola d'oro di _sconto_pubblico)
@@ -35935,7 +36070,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
                                          disponibili, articolo_eur,
                                          sconto, sconto_eur,
                                          sped_gratis=gratis,
-                                         paese=paese),
+                                         paese=paese, punto=bool(reti)),
             # LA DESTINAZIONE TORNA INDIETRO, e non e' un'eco inutile:
             # la pagina disegna le zone con quel che il SERVER ha
             # capito, non con quel che credeva di aver mandato — e' lo
@@ -36136,8 +36271,10 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
                      "sped_gratis_soglia_eur, sped_gratis_valuta "
                      "FROM utenti WHERE tg_id=?",
                      (venditore_id,)).fetchone()
-    reti = reti_venditore(sp["spedizionieri"], sp["spedizioniere"],
-                          rete_barattolo_viva()) if sp else []
+    # le reti dei PUNTI, come nel mono: vuoto = niente via punto
+    reti = reti_punto(reti_venditore(
+        sp["spedizionieri"], sp["spedizioniere"],
+        rete_barattolo_viva())) if sp else []
     spedizioniere = reti[0] if reti else ""
     # il gemello del ramo mono: stesso giudice, stessa SELECT sola
     punti_salvati = punti_per_venditore(
@@ -36438,7 +36575,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
                                                  next(iter(tutti.values())),
                                                  paese) if tutti else "dom"),
                                          accordo_sats_v, accordo_eur,
-                                         paese),
+                                         paese, punto=bool(reti)),
             "paese": paese,
             # la zona del set: una sola per costruzione (i pezzi sono
             # di un venditore solo; se i loro paesi di casa
@@ -36598,8 +36735,18 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         # (Lettura prima della invoice: il patto del ricontrollo.)
         sp = con.execute("SELECT spedizionieri, spedizioniere FROM utenti "
                          "WHERE tg_id=?", (a["venditore_id"],)).fetchone()
-        reti = reti_venditore(sp["spedizionieri"], sp["spedizioniere"],
-                              rete_barattolo_viva()) if sp else []
+        reti = reti_punto(reti_venditore(
+            sp["spedizionieri"], sp["spedizioniere"],
+            rete_barattolo_viva())) if sp else []
+        # LA VIA PUNTO SOLO DOVE IL VENDITORE CI ARRIVA (12 ott 2026,
+        # dal caso dell'ordine 213): senza una rete di punti fra i
+        # suoi corrieri il preventivo la via non la offre, e questa e'
+        # la cintura per la pagina rimasta aperta da prima e per il
+        # body scritto a mano. Il messaggio dice la strada che resta:
+        # la vendita non si ferma, cambia solo dove arriva il pacco.
+        if not reti:
+            con.close()
+            raise HTTPException(400, MSG_NIENTE_PUNTI)
         # L'ORDINE E' INVERTITO rispetto a ieri, e non e' un riordino:
         # sulla rete di CASA il testo del punto lo compone il SERVER,
         # quindi il campo del client e' vuoto per costruzione e la
@@ -39558,6 +39705,19 @@ async def segna_spedito(ordine_id: int, req: Request,
                                  "nell'ordine potrai segnare la "
                                  "spedizione (se serve, ricordaglielo "
                                  "in chat)")
+    if (o["via_punto"] and o["punto_ritiro"]
+            and not corriere_compatibile(o["rete_punto"] or "", corriere)):
+        # IL CORRIERE SBAGLIATO SI FERMA QUI (12 ott 2026, dal caso
+        # dell'ordine 213: un pacco DHL verso un punto Poste, tornato
+        # indietro senza che nessuno avesse avvisato). Le due uscite
+        # stanno nella frase e nella pagina: cambiare corriere, o
+        # contestare il punto — che e' il gesto che il venditore ha
+        # gia' («Il punto non va bene», motivo «Non è della mia rete»).
+        # Dove la rete non si sa (gli ordini di prima) il giudice
+        # lascia passare: un ordine gia' aperto non si rompe.
+        rete_o = o["rete_punto"] or ""
+        con.close()
+        raise HTTPException(400, frase_corriere_sbagliato(rete_o, corriere))
     # LA SPEDIZIONE CHIUDE L'OBIEZIONE (ago 2026): se il venditore
     # segnala che il punto non va bene e poi spedisce lo stesso — si
     # sono chiariti in chat, o ha cambiato idea — l'obiezione non deve
@@ -41634,8 +41794,9 @@ async def scegli_spedizioniere(req: Request,
                                barattolo_sessione: str = Cookie("")):
     """«📦 Come spedisci»: con quali reti di punti di ritiro lavora il
     negozio (catalogo SPEDIZIONIERI). Lista vuota = non dichiarato —
-    la via punto resta offerta lo stesso, e chi compra sceglie il
-    punto senza sapere la rete. Qui non c'e' una «realta'» da
+    e dal 12 ott 2026 senza un corriere che consegna a una rete di
+    punti (`reti_punto`) la via punto NON si offre: si vende lo
+    stesso, a un indirizzo. Qui non c'e' una «realta'» da
     controllare: e' una dichiarazione di negozio, non una credenziale.
 
     LE DUE COLONNE SI SCRIVONO INSIEME, in un UPDATE solo: la
@@ -73943,19 +74104,88 @@ async def avvisa_spedizioniere_mancante():
     con.close()
     for tg in da_avvisare:
         try:
-            await notifica(tg, (
-                "📦 <b>Novità: il ritiro al punto (locker).</b> Da oggi "
-                "i compratori possono scegliere la spedizione a un "
-                "locker/punto di ritiro sui tuoi annunci. Indica nel "
-                "Profilo → "
-                "«📦 Come spedisci» se spedisci con InPost o Poste "
-                "Italiane: chi compra saprà di che rete cercare il "
-                "punto, ed eviti gli accordi in chat."))
+            # IL TESTO E' QUELLO DELLA REGOLA DEL 12 OTT 2026: quello
+            # di agosto prometteva «i compratori possono scegliere il
+            # punto sui tuoi annunci», che senza corrieri dichiarati
+            # non e' piu' vero. Un testo solo con la campagna, piu'
+            # sotto: due frasi direbbero due regole.
+            await notifica(tg, MSG_CORRIERI_PUNTI)
         except Exception as e:
             print(f"⚠️ Avviso spedizioniere saltato per {tg}: {e}")
         await asyncio.sleep(0.2)
     print(f"📦 Avviso spedizioniere mandato a {len(da_avvisare)} "
           f"venditori")
+
+
+TIMBRO_CAMPAGNA_CORRIERI_PUNTI = "campagna_corrieri_punti"
+
+MSG_CORRIERI_PUNTI = (
+    "📦 <b>Indica i tuoi corrieri per offrire anche il ritiro nei "
+    "punti.</b>\n\n"
+    "Chi compra può scegliere un locker o un punto di ritiro "
+    "solo se dichiari un corriere che ci consegna: Poste Italiane, "
+    "SDA o InPost. Senza, i tuoi annunci si vendono lo stesso, con la "
+    "consegna a un indirizzo.\n\n"
+    "Li scegli in Profilo → «📦 Come spedisci».")
+
+
+async def avvisa_corrieri_per_punti():
+    """LA CAMPAGNA DEL ROVESCIAMENTO SUI PUNTI (12 ott 2026, cantiere
+    «punti-ritiro», dal caso dell'ordine 213): fino a ieri la via
+    punto si offriva su ogni annuncio a spedizione, da oggi solo dove
+    il venditore ha dichiarato un corriere che a quei punti consegna.
+    Chi ha annunci attivi a spedizione e non ha dichiarato niente — o
+    solo «Altro», la voce senza mappa di ieri — ha perso una strada
+    senza toccare niente: glielo si dice, UNA volta.
+
+    DIETRO UNA LEVA SPENTA DI SERIE (`AVVISO_CORRIERI_PUNTI`,
+    decisione di Andrea): un messaggio a tutti i venditori non parte
+    da solo con un deploy. A leva spenta non si legge e non si timbra
+    niente, cosi' il giorno che si accende la campagna e' ancora
+    intera.
+
+    UNA TANTUM GLOBALE col timbro in `timbri`, il calco di
+    `avvisa_sconto_su_mono` e per la stessa ragione: e' un evento — il
+    giorno in cui la regola e' cambiata — e non una condizione che
+    ricorre. Chi pubblica DOPO il foglio «📦 Come spedirai?» lo trova
+    a ogni pubblicazione, e non gli serve una campagna. Il timbro si
+    scrive PRIMA degli invii: un errore di rete puo' perdere un avviso
+    di cortesia, mai raddoppiarlo. Il vecchio `avvisato_spedizioniere`
+    (ago 2026) non si riusa: e' gia' bruciato, e diceva un'altra cosa
+    — «puoi dichiarare», non «senza dichiarare il punto non c'e'»."""
+    if not AVVISO_CORRIERI_PUNTI:
+        return
+    if timbro_letto(TIMBRO_CAMPAGNA_CORRIERI_PUNTI):
+        return
+    con = db()
+    righe = con.execute(
+        "SELECT DISTINCT u.tg_id, u.spedizionieri, u.spedizioniere "
+        "FROM utenti u JOIN annunci a ON a.venditore_id = u.tg_id "
+        "WHERE a.stato='attivo' "
+        "AND a.consegna IN ('spedizione','entrambe')").fetchall()
+    con.close()
+    timbro_scrivi(TIMBRO_CAMPAGNA_CORRIERI_PUNTI, "fatto")
+    # «senza corrieri» lo dice il giudice e non la colonna: chi ha
+    # dichiarato solo «Altro» ha la stessa pagina di chi non ha
+    # dichiarato niente, e la rete di casa qui non conta (`True`: si
+    # guarda cosa ha scritto lui, non cosa e' acceso oggi)
+    da_avvisare = [
+        r["tg_id"] for r in righe
+        if not [c for c in reti_venditore(r["spedizionieri"],
+                                          r["spedizioniere"], True)
+                if c != "Altro"]]
+    mandati = []
+    for tg in da_avvisare:
+        try:
+            await notifica(tg, MSG_CORRIERI_PUNTI)
+            mandati.append(tg)
+        except Exception as e:
+            print(f"⚠️ Avviso corrieri-per-punti saltato per {tg}: {e}")
+        await asyncio.sleep(0.2)
+    # la riga nel journal, SEMPRE quando la campagna gira: e' il modo
+    # di sapere a chi e' arrivata (il patto dei timbri)
+    print(f"📦 Campagna «corrieri per i punti»: avvisati {len(mandati)} "
+          f"venditori {mandati}")
 
 
 TIMBRO_CAMPAGNA_SCONTO_MONO = "campagna_sconto_mono"
@@ -74263,6 +74493,12 @@ async def orologio():
             await avvisa_sconto_su_mono()
         except Exception as e:
             print(f"⚠️ Campagna sconto-su-mono saltata: {e}")
+        try:
+            # una-tantum GLOBALE dietro la leva AVVISO_CORRIERI_PUNTI
+            # (spenta di serie): la via punto solo coi corrieri giusti
+            await avvisa_corrieri_per_punti()
+        except Exception as e:
+            print(f"⚠️ Campagna corrieri-per-punti saltata: {e}")
         try:
             # una-tantum GLOBALE (timbro in `timbri`): il debito scritto
             # sulla tabella `interessi` — chi ha premuto «Avvisami»

@@ -131,6 +131,31 @@ def gemelli_trackbot(amb=None):
     amb.setdefault("re", re)
     amb.setdefault("html", __import__("html"))
     exec(src[i:j], amb)
+    # dal 12 ott 2026 segna_spedito chiede anche se il corriere
+    # consegna alla rete del punto: chi lo esegue vuole quei pezzi
+    gemelli_corrieri(amb)
+    return amb
+
+
+def gemelli_corrieri(amb=None):
+    """I pezzi VERI della compatibilita' fra corrieri e reti di punti
+    (12 ott 2026, cantiere «punti-ritiro», dal caso dell'ordine 213) —
+    il catalogo, la tabella, le due liste e i quattro giudici — montati
+    in `amb` per i banchi che eseguono chi li chiama (segna_spedito, i
+    due acquisti) e per la prova che li fa girare. Pezzi veri, mai stub
+    (vedi `reale`)."""
+    amb = {} if amb is None else amb
+    src = _SORGENTE
+    for ancora in ('SPEDIZIONIERI = ("', 'RETE_BARATTOLO = "'):
+        i = src.index(ancora)
+        exec(src[i:src.index("\n", i)], amb)
+    for ancora in ("RETE_DEL_CORRIERE = {", "CORRIERI_SENZA_RETE = (",
+                   "MSG_NIENTE_PUNTI = ("):
+        i = src.index(ancora)
+        exec(src[i:src.index("\n\n", i)], amb)
+    for nome in ("reti_punto", "corrieri_della_rete",
+                 "corriere_compatibile", "frase_corriere_sbagliato"):
+        exec(pezzo(nome), amb)
     return amb
 
 
@@ -9693,6 +9718,7 @@ def prove_busta_ritiro():
         id INTEGER PRIMARY KEY, compratore_id INT, venditore_id INT,
         stato TEXT, consegna_scelta TEXT DEFAULT 'spedizione',
         via_punto INT DEFAULT 0, punto_ritiro TEXT DEFAULT '',
+        rete_punto TEXT DEFAULT '',
         corriere TEXT DEFAULT '', tracking TEXT DEFAULT '',
         spedito_il INT DEFAULT 0, aggiornato INT DEFAULT 0,
         consegnato INT DEFAULT 0, annuncio_id INT DEFAULT 1,
@@ -12986,8 +13012,16 @@ def prove_dettaglio_ordine():
     # tocca; qui resta il punto, e senza punto il banner non nasce.
     # (6 ott 2026) e tace a chi vende quando il punto sta gia' in
     # «📦 Spedisci a», in cima: lo stesso dato due volte no
+    # (12 ott 2026, dal caso dell'ordine 213) e DOVE si vede non e'
+    # piu' una lista scritta nel template: lo decide `puntoInVista`,
+    # che lo tiene in vista anche in disputa — dove prima spariva per
+    # tutti e tre. Il giudice si fa girare in prove_punti_corrieri.
     prova("il banner e' del punto, e di nient'altro", True,
-          "(['shipped','delivered'].includes(s) && o.puntoRitiro && !serveSpedisciA(o))" in det)
+          "${puntoInVista(o, s) ? `" in det
+          and "${puntoBanner(o)}${puntoBannerAdmin(o)}" in det)
+    prova("...e la lista di stati scritta a mano nel template e' morta",
+          False, "['shipped','delivered'].includes(s) && o.puntoRitiro"
+          in det)
     prova("...quindi il tracciamento non si ripete sotto il recinto",
           False, "Spedito con <b>" in det)
     # e il «segui il pacco» di 17track e' uscito dall'ordine: la strada
@@ -17578,6 +17612,7 @@ def prove_tracking_facoltativo():
         d = {"id": 7, "compratore_id": 111, "venditore_id": 222,
              "stato": "locked", "consegna_scelta": "spedizione",
              "annuncio_id": 3, "via_punto": 0, "punto_ritiro": "",
+             "rete_punto": "",
              "busta_il": 0, "indirizzo_atteso": 0, "indirizzo_il": 0}
         d.update(extra)
         return d
@@ -21608,8 +21643,10 @@ def prove_zone_spedizione():
           True, "len(zone_viste) > 1" in pezzo("_compra_set"))
     # LA VIA PUNTO E' DI CASA: le reti sono italiane
     _sp = pezzo("_strade_preventivo")
+    # (12 ott 2026) ...e a casa solo dove il venditore ci arriva: il
+    # secondo fattore lo passa il chiamante, da `reti_punto`
     prova("fuori casa la via punto non si offre nemmeno", True,
-          '("casa", "punto") if a_casa else ("casa",)' in _sp)
+          '("casa", "punto") if (a_casa and punto) else ("casa",)' in _sp)
     prova("...e la strada spenta esce col MOTIVO, senza numeri", True,
           '"zona_non_offerta": True' in _sp)
     # I DUE INSERT scrivono la zona, e solo sulla spedizione
@@ -24325,8 +24362,14 @@ def prove_reti_corriere():
     reti_venditore = amb["reti_venditore"]
     _reti_serializza = amb["_reti_serializza"]
     rete_da_payload = amb["rete_da_payload"]
+    # DAL 12 OTT 2026 IL CATALOGO DICE I CORRIERI (cantiere
+    # «punti-ritiro», dal caso dell'ordine 213): cinque voci in piu',
+    # e le quattro di ieri restano con lo stesso nome e nello stesso
+    # ordine fra loro — stanno scritte in `utenti.spedizionieri` e in
+    # `ordini.rete_punto`, e la serializzazione segue la tupla.
     prova("il catalogo di prova e' quello VERO del server",
-          ("Barattolo", "InPost", "Poste Italiane", "Altro"),
+          ("Barattolo", "InPost", "Poste Italiane", "SDA", "BRT", "GLS",
+           "DHL", "UPS", "Altro"),
           amb["SPEDIZIONIERI"])
     # LA RETE DI CASA E' IN TESTA, e non e' un vezzo: l'ordine della
     # tupla governa la serializzazione, quindi e' quel che decide come
@@ -24626,7 +24669,9 @@ def prove_reti_corriere():
     # nel Profilo — che quel nome lo scrive per ogni punto salvato.
     # QUATTRO dal 6 ott 2026: il tipo di consegna in testa a «📦
     # Spedisci a», in cima alla pagina dell'ordine di chi vende.
-    prova("...e lo chiamano le superfici che lo scrivono", 4,
+    # CINQUE dal 12 ott 2026: la riga del moderatore sotto il punto
+    # (`puntoBannerAdmin`), che dice di che rete e tipo era.
+    prova("...e lo chiamano le superfici che lo scrivono", 5,
           mini.count("nomePunto(") - mini.count("function nomePunto("))
     # E SI FA GIRARE, non si guarda soltanto: le sentinelle qui sopra
     # dicono che il giudice ESISTE ed e' uno, mai che risponda giusto
@@ -25021,6 +25066,321 @@ globalThis.document = { querySelectorAll: () => BOXES };
         prova(nome, atteso, {k: avuto.get(k) for k in atteso})
 
 # ====================================================================
+def prove_punti_corrieri():
+    """IL PUNTO DI RITIRO SOLO DOVE IL CORRIERE CI ARRIVA (12 ott 2026,
+    cantiere «punti-ritiro»).
+
+    Il caso da cui nasce, l'ordine 213: venditore senza corrieri
+    dichiarati, alla cassa la via punto offerta lo stesso con le mappe
+    di Poste e InPost, chi compra scrive una tabaccheria, il venditore
+    spedisce con DHL senza contestare, la tabaccheria rifiuta il
+    pacco. Barattolo non ha avvisato nessuno dei due, e in disputa il
+    punto non si leggeva da nessuna parte.
+
+    Le cose che questa famiglia difende:
+    · la TABELLA della compatibilita' e' una, e il client ne ha lo
+      specchio esatto;
+    · la via punto si offre solo dove il venditore ha un corriere che
+      a una rete di punti CONSEGNA — e senza si vende lo stesso;
+    · a «Segna come spedito» il corriere sbagliato si ferma, ma un
+      ordine nato prima (rete vuota) NON si rompe;
+    · in disputa il punto resta in vista, e l'admin legge le obiezioni;
+    · la campagna sta dietro una leva SPENTA di serie."""
+    print("\n[i punti di ritiro e i corrieri]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    amb = gemelli_corrieri()
+    catalogo = amb["SPEDIZIONIERI"]
+    reti_punto = amb["reti_punto"]
+    compatibile = amb["corriere_compatibile"]
+    frase = amb["frase_corriere_sbagliato"]
+
+    # --- il catalogo: i corrieri, e i nomi di ieri fermi -------------
+    prova("i corrieri senza mappa si possono dichiarare", True,
+          all(c in catalogo for c in ("SDA", "BRT", "GLS", "DHL", "UPS")))
+    prova("...e le voci di ieri hanno lo stesso nome", True,
+          all(c in catalogo for c in ("Barattolo", "InPost",
+                                      "Poste Italiane", "Altro")))
+    prova("...nello stesso ordine fra loro (la serializzazione lo segue)",
+          ["Barattolo", "InPost", "Poste Italiane", "Altro"],
+          [c for c in catalogo if c in ("Barattolo", "InPost",
+                                        "Poste Italiane", "Altro")])
+    prova("la tabella nomina solo corrieri del catalogo", True,
+          all(c in catalogo for c in amb["RETE_DEL_CORRIERE"]))
+    prova("...e le sue reti sono a loro volta voci del catalogo", True,
+          all(r in catalogo for r in amb["RETE_DEL_CORRIERE"].values()))
+
+    # --- reti_punto: dai corrieri dichiarati alle reti offerte -------
+    prova("niente dichiarato = nessuna rete = la via punto non si offre",
+          [], reti_punto([]))
+    prova("solo DHL: nessuna rete (il caso che il 213 avrebbe voluto)",
+          [], reti_punto(["DHL"]))
+    prova("solo corrieri senza mappa: nessuna rete", [],
+          reti_punto(["BRT", "GLS", "DHL", "UPS", "Altro"]))
+    prova("Poste Italiane da' i punti Poste", ["Poste Italiane"],
+          reti_punto(["Poste Italiane"]))
+    prova("SDA da' i punti Poste, anche da sola", ["Poste Italiane"],
+          reti_punto(["SDA"]))
+    prova("Poste e SDA insieme: la rete e' UNA", ["Poste Italiane"],
+          reti_punto(["Poste Italiane", "SDA"]))
+    prova("InPost da' InPost", ["InPost"], reti_punto(["InPost"]))
+    prova("due reti con la mappa: tutte e due",
+          ["InPost", "Poste Italiane"],
+          reti_punto(["InPost", "Poste Italiane", "DHL"]))
+    prova("la rete di casa passa com'e' (a gatarla pensa chi chiama)",
+          ["Barattolo", "InPost"], reti_punto(["Barattolo", "InPost"]))
+    prova("None non esplode", [], reti_punto(None))
+
+    # --- corriere_compatibile: il giudice di «Segna come spedito» ----
+    casi = [
+        # (rete del punto, corriere, passa?)
+        ("Poste Italiane", "Poste Italiane", True),
+        ("Poste Italiane", "SDA", True),
+        ("Poste Italiane", "DHL", False),      # il 213, se la rete c'era
+        ("Poste Italiane", "InPost", False),
+        ("Poste Italiane", "Altro corriere", False),
+        ("InPost", "InPost", True),
+        ("InPost", "Poste Italiane", False),
+        ("InPost", "SDA", False),
+        ("InPost", "BRT", False),
+        # di persona non c'e' una rete da confrontare
+        ("InPost", "Consegna a mano", True),
+        ("Poste Italiane", "Ritiro in zona", True),
+        # DOVE NON SAPPIAMO, PASSA: gli ordini di prima non si rompono
+        ("", "DHL", True),                     # il 213 com'era davvero
+        ("", "Altro corriere", True),
+        ("Altro", "GLS", True),
+        ("Barattolo", "BRT", True),
+    ]
+    prova("il giudice risponde giusto sui quindici casi",
+          [c[2] for c in casi], [compatibile(c[0], c[1]) for c in casi])
+    prova("la frase dice chi accetta, cosa succede e le due uscite",
+          "Questo punto accetta solo Poste Italiane/SDA: con DHL il "
+          "pacco verrà rifiutato. Cambia corriere, oppure segnala che "
+          "il punto non va bene.", frase("Poste Italiane", "DHL"))
+    prova("...e un corriere senza nome non lo inventa",
+          "Questo punto accetta solo InPost: con un altro corriere il "
+          "pacco verrà rifiutato. Cambia corriere, oppure segnala che "
+          "il punto non va bene.", frase("InPost", "Altro corriere"))
+
+    # --- il server: chi offre e chi ferma ----------------------------
+    # i quattro posti della cassa passano TUTTI dal giudice dei punti:
+    # ne restasse uno sul nudo `reti_venditore`, quel percorso
+    # offrirebbe la via punto a chi ha dichiarato solo DHL
+    for nome in ("compra", "_compra_set"):
+        corpo = codice(pezzo(nome))
+        prova(f"{nome}: le reti della cassa sono quelle dei PUNTI", 1,
+              corpo.count("reti = reti_punto(reti_venditore("))
+        prova(f"...e mai il nudo elenco dei corrieri dichiarati", 1,
+              corpo.count("reti_venditore("))
+        prova(f"...e senza reti la via punto si rifiuta, prima della "
+              f"rete e del punto", True,
+              corpo.index("raise HTTPException(400, MSG_NIENTE_PUNTI)")
+              < corpo.index("rete = rete_da_payload("))
+    prova("i due preventivi fanno lo stesso", 4,
+          src.count("reti = reti_punto(reti_venditore("))
+    prova("il Profilo invece legge i corrieri DICHIARATI (non le reti)",
+          True,
+          'profilo["spedizionieri_miei"] = reti_venditore(' in src)
+    sped = codice(pezzo("segna_spedito"))
+    i_gate = sped.index("not corriere_compatibile(")
+    prova("segna_spedito: il corriere sbagliato si ferma PRIMA di "
+          "scrivere", True,
+          i_gate < sped.index("UPDATE ordini SET stato='shipped'"))
+    prova("...e dopo il gate del punto mancante (prima si sa dove)",
+          True, sped.index('o["via_punto"] and not o["punto_ritiro"]')
+          < i_gate)
+    prova("...solo sulla via punto col punto scritto", True,
+          'o["via_punto"] and o["punto_ritiro"]' in sped)
+    prova("...con la frase del giudice, non una scritta a mano", True,
+          "frase_corriere_sbagliato(rete_o, corriere)" in sped)
+    prova("la correzione del tracciamento NON ha il gate (il pacco e' "
+          "gia' partito: li' si registra un fatto)", False,
+          "corriere_compatibile" in src[src.index("CORRIERI_SENTINELLA = ("):])
+
+    # --- la campagna dietro la leva ----------------------------------
+    prova("AVVISO_CORRIERI_PUNTI nasce False nel codice", True,
+          "\n    AVVISO_CORRIERI_PUNTI = False\n" in src)
+    prova("...e si legge dal config col pattern di casa", True,
+          "try:\n    from config import AVVISO_CORRIERI_PUNTI\n"
+          "except ImportError:" in src)
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    prova("...e il config d'esempio la porta SPENTA", True,
+          "\nAVVISO_CORRIERI_PUNTI = False\n" in esempio)
+    prova("...e il pannello delle leve la mostra", True,
+          '"AVVISO_CORRIERI_PUNTI", AVVISO_CORRIERI_PUNTI,' in src)
+    camp = codice(pezzo("avvisa_corrieri_per_punti").split('"""')[-1])
+    prova("a leva spenta la campagna non legge e non timbra niente",
+          True, camp.index("if not AVVISO_CORRIERI_PUNTI:")
+          < camp.index("timbro_letto(")
+          < camp.index("db()"))
+    prova("il timbro si scrive PRIMA degli invii", True,
+          camp.index("timbro_scrivi(TIMBRO_CAMPAGNA_CORRIERI_PUNTI")
+          < camp.index("await notifica("))
+    prova("...ed e' un timbro SUO, non quello bruciato di agosto",
+          False, "avvisato_spedizioniere" in camp)
+    prova("l'orologio la chiama", 1,
+          src.count("await avvisa_corrieri_per_punti()"))
+    i = src.index("MSG_CORRIERI_PUNTI = (")
+    msg = src[i:src.index("\n\n", i)]
+    prova("il messaggio dice la regola: i tre corrieri che danno i "
+          "punti", True, "Poste Italiane, " in msg and "SDA o InPost"
+          in msg)
+    prova("...e che senza si vende lo stesso", True,
+          "si vendono lo stesso" in msg)
+    prova("...e dove si fa", True, "Come spedisci" in msg)
+    # il vecchio avviso per-venditore prometteva una cosa non piu' vera
+    prova("l'avviso di agosto non promette piu' il punto a chi non "
+          "dichiara", False,
+          "possono scegliere la spedizione a un" in src)
+    prova("...e dice la stessa frase della campagna", True,
+          "await notifica(tg, MSG_CORRIERI_PUNTI)"
+          in pezzo("avvisa_spedizioniere_mancante"))
+
+    # --- i testi della pagina ----------------------------------------
+    prova("in disputa si dice cosa succede davvero", 1, mini.count(
+        "Disputa aperta. Un moderatore guarda l'ordine e il "
+        "tracciamento e vi scrive su Telegram o Nostr; i sats restano "
+        "nel deposito di garanzia fino alla decisione."))
+    prova("...e la conversazione che non c'e' non si nomina piu'",
+          False, "esaminerà la conversazione" in mini)
+    i = mini.index('id="corrieriSheet"')
+    foglio = mini[i:mini.index("</button>", i)]
+    prova("il foglio dei corrieri dice che non e' obbligatorio", True,
+          "Non è\n      obbligatorio" in foglio)
+    prova("...e cosa si guadagna a dichiararli", True,
+          "Poste Italiane, SDA o InPost" in foglio
+          and "punto di\n      ritiro" in foglio)
+    prova("...e resta mai bloccante: «Pubblica lo stesso» c'e'", True,
+          'onclick="pubblicaLoStesso()"' in mini)
+    demo = pezzo_js(mini, "function preventivoDemo(l){", "\n}")
+    prova("in demo la via punto non si offre (i suoi venditori non "
+          "dichiarano)", False, "via:'punto'" in demo)
+
+    # --- lo specchio del client, e i suoi giudici FATTI GIRARE -------
+    try:
+        prog = (
+            mini[mini.index("const esc = s =>"):
+                 mini.index("const el = id =>")]
+            + mini[mini.index("const RETE_DEL_CORRIERE = {"):
+                   mini.index("\n/* LA RETE DI CASA")]
+            + pezzo_js(mini, "const TIPI_PUNTO = [", "\n\n") + "\n"
+            + pezzo_js(mini, "function nomePunto(tipo, rete){", "\n}")
+            + "}\n"
+            + pezzo_js(mini, "function serveSpedisciA(o){", "\n}") + "}\n"
+            + mini[mini.index("const STATI_PUNTO_IN_VISTA = ["):
+                   mini.index("/* LA CARD DELL'ALTRA PARTE")]
+            + pezzo_js(mini, "function htmlAvvisoCorriere(o, corriere){",
+                       "\n}") + "}\n"
+            + r"""
+const ord = x => Object.assign({role:'buyer', state:'dispute',
+  viaPunto:true, puntoRitiro:'Tabaccheria Rossi, Via Roma 1',
+  retePunto:'Poste Italiane', tipoPunto:'banco', puntoObiezioni:0,
+  consegnaScelta:'spedizione'}, x);
+const vista = x => { const o = ord(x); return puntoInVista(o, o.state); };
+const casi = """ + json.dumps([[c[0], c[1]] for c in casi]) + r""";
+console.log(JSON.stringify({
+  tabella: Object.entries(RETE_DEL_CORRIERE),
+  senzaRete: CORRIERI_SENZA_RETE,
+  compat: casi.map(c => corriereCompatibile(c[0], c[1])),
+  frasi: [fraseCorriereSbagliato('Poste Italiane', 'DHL'),
+          fraseCorriereSbagliato('InPost', 'Altro corriere')],
+  vista: [
+    vista({role:'buyer'}), vista({role:'seller'}), vista({role:'admin'}),
+    vista({role:'buyer', state:'locked'}),
+    vista({role:'seller', state:'locked'}),
+    vista({role:'admin', state:'locked'}),
+    vista({role:'buyer', state:'shipped'}),
+    vista({role:'seller', state:'shipped'}),
+    vista({role:'buyer', state:'return_pending'}),
+    vista({role:'seller', state:'return_shipped'}),
+    vista({role:'buyer', state:'confirmed', disputata:1}),
+    vista({role:'buyer', state:'confirmed'}),
+    vista({role:'buyer', state:'released'}),
+    vista({role:'admin', puntoRitiro:''}),
+  ],
+  admin: [
+    puntoBannerAdmin(ord({role:'admin'})),
+    puntoBannerAdmin(ord({role:'admin', puntoObiezioni:1})),
+    puntoBannerAdmin(ord({role:'admin', puntoObiezioni:2})),
+    puntoBannerAdmin(ord({role:'admin', retePunto:''})),
+    puntoBannerAdmin(ord({role:'buyer', puntoObiezioni:2})),
+    puntoBannerAdmin(ord({role:'seller', puntoObiezioni:2})),
+  ],
+  avviso: [
+    htmlAvvisoCorriere(ord({role:'seller', state:'locked'}), 'DHL'),
+    htmlAvvisoCorriere(ord({role:'seller', state:'locked'}), 'SDA'),
+    htmlAvvisoCorriere(ord({role:'seller', state:'locked',
+                            retePunto:''}), 'DHL'),
+    htmlAvvisoCorriere(ord({role:'seller', state:'locked'}),
+                       'Consegna a mano'),
+    htmlAvvisoCorriere(ord({role:'seller', state:'locked',
+                            viaPunto:false}), 'DHL'),
+  ]}));
+""")
+        out = _node_banco(prog)
+    except ValueError as e:
+        out = {"ancora": str(e)}
+    if out is None:
+        salta("lo specchio del client e i suoi giudici", "node non installato")
+        return
+    prova("la tabella del client e' lo SPECCHIO di quella del server",
+          [list(x) for x in amb["RETE_DEL_CORRIERE"].items()],
+          out.get("tabella"))
+    prova("...e i corrieri di persona pure",
+          list(amb["CORRIERI_SENZA_RETE"]), out.get("senzaRete"))
+    prova("il giudice del client risponde come quello del server",
+          [c[2] for c in casi], out.get("compat"))
+    prova("...e la sua frase e' l'inizio di quella del server", True,
+          bool(out.get("frasi"))
+          and frase("Poste Italiane", "DHL").startswith(out["frasi"][0])
+          and frase("InPost", "Altro corriere").startswith(out["frasi"][1]))
+    prova("IN DISPUTA il punto si vede: acquirente, venditore, admin",
+          [True, True, True], (out.get("vista") or [])[0:3])
+    prova("su 'locked' le parti lo hanno gia' sotto le dita, l'admin no",
+          [False, False, True], (out.get("vista") or [])[3:6])
+    prova("spedito: chi compra lo vede, chi vende ce l'ha in «Spedito a»",
+          [True, False], (out.get("vista") or [])[6:8])
+    prova("nei resi resta in vista", [True, True],
+          (out.get("vista") or [])[8:10])
+    prova("il caso incagliato e' una disputa, e si legge come tale",
+          [True, False], (out.get("vista") or [])[10:12])
+    prova("a ordine chiuso non resta, e senza punto non nasce",
+          [False, False], (out.get("vista") or [])[12:14])
+    adm = out.get("admin") or [""] * 6
+    prova("l'admin legge che il venditore non ha mai contestato", True,
+          "non ha mai contestato il punto" in adm[0])
+    prova("...o quante volte: una", True,
+          "ha contestato il punto <b>1 volta</b>" in adm[1])
+    prova("...o due", True,
+          "ha contestato il punto <b>2 volte</b>" in adm[2])
+    prova("...e di che rete e tipo era il punto", True,
+          "Punto Poste Italiane" in adm[0])
+    prova("...o che la rete non c'era (gli ordini di prima)", True,
+          "rete non indicata" in adm[3])
+    prova("le due parti quella riga non la vedono", ["", ""], adm[4:6])
+    avv = out.get("avviso") or [""] * 5
+    prova("l'avviso del corriere sbagliato dice chi accetta e cosa "
+          "succede", True,
+          "Questo punto accetta solo Poste Italiane/SDA: con DHL il "
+          "pacco verrà rifiutato." in avv[0])
+    prova("...con le DUE uscite", True,
+          ">Cambia corriere</button>" in avv[0]
+          and ">Il punto non va bene</button>" in avv[0])
+    prova("...e tace col corriere giusto, sugli ordini senza rete, "
+          "di persona, fuori dalla via punto", ["", "", "", ""], avv[1:5])
+    ms = pezzo_js(mini, "async function markShipped(){", "\n}")
+    prova("markShipped si ferma PRIMA di ogni altra domanda", True,
+          ms.index("if (aggiornaAvvisoCorriere()) {")
+          < ms.index("trackingDaControllare("))
+    prova("la seconda uscita apre l'obiezione col motivo gia' scelto",
+          True, "apriObiezione();\n  setMotivoObiezione('rete');"
+          in mini)
+    prova("gli ordini di prima hanno l'avviso che non ferma", 1,
+          mini.count("senza conoscere il tuo corriere</b>: controlla "
+                     "che lo accetti prima di spedire."))
+
+
 def prove_punti_salvati():
     """I PUNTI DI RITIRO CHE CHI COMPRA SI TIENE (ago 2026).
 
@@ -25703,10 +26063,30 @@ def prove_pagina_acquisto():
     #    gate sullo spedizioniere e' durato un giro e non deve
     #    tornare di soppiatto (meglio l'accordo in chat che la porta
     #    chiusa). Ne' il 400 di ieri, ne' un filtro nel preventivo.
-    prova("il 400 «non spedisce ai punti» non esiste piu'", False,
-          "non spedisce ai punti" in src)
-    prova("_strade_preventivo non filtra piu' sullo spedizioniere",
+    #    ⚠️ E IL 12 OTT 2026 LA REGOLA E' TORNATA INDIETRO, alla luce
+    #    del sole (decisione di Andrea, cantiere «punti-ritiro»): a
+    #    rovesciarla e' un FATTO — l'ordine 213, un pacco DHL
+    #    rifiutato da una tabaccheria scelta sulle nostre mappe,
+    #    venditore senza corrieri dichiarati, nessuno avvisato. Questa
+    #    sentinella vietava il ritorno «di soppiatto»: adesso chiede
+    #    che il ritorno ci sia, in UNA frase e in un giudice solo. La
+    #    porta non si chiude sulla vendita — senza corrieri si vende a
+    #    un indirizzo — ma sulla promessa che non sapevamo mantenere.
+    prova("il 400 «non spedisce ai punti» e' tornato, in UNA frase", 1,
+          src.count('"Questo venditore non spedisce ai punti di ritiro: "'))
+    prova("...e lo alzano i due acquisti, non uno", 2,
+          src.count("raise HTTPException(400, MSG_NIENTE_PUNTI)"))
+    prova("...e la frase dice la strada che resta", True,
+          "scegli la spedizione a un indirizzo" in src)
+    # il filtro non vive DENTRO le strade (che restano pure): lo decide
+    # il chiamante, e gli arriva come argomento che nasce spento
+    prova("_strade_preventivo non filtra sullo spedizioniere da se'",
           False, "not spedizioniere" in pezzo("_strade_preventivo"))
+    prova("...la via punto gliela dice il chiamante, e nasce SPENTA",
+          True, "punto: bool = False) -> list:"
+          in pezzo("_strade_preventivo"))
+    prova("...e i due preventivi la passano dalle reti dei punti", 2,
+          src.count("punto=bool(reti))"))
 
     # 5ter. IL QUARTO GIRO (decisione di Andrea che ROVESCIA il terzo):
     #    la scelta del punto torna SEMPRE prima di «Paga», come su
@@ -25741,8 +26121,12 @@ def prove_pagina_acquisto():
           mini3.count("spedizioniere && !"))
     prova("client: la riga «lo indicherai dopo l'acquisto» e' morta "
           "col quarto giro", False, "lo indicherai dopo l'acquisto" in mini3)
-    prova("client: la riga onesta senza rete esiste", True,
-          "senza sapere con che rete" in mini3)
+    # (12 ott 2026) LA RIGA ONESTA E' MORTA COL SUO CASO: avvisava
+    # chi sceglieva un punto senza sapere la rete, ed era onesta ma
+    # non bastava — il pacco del 213 e' tornato indietro lo stesso.
+    # Adesso quella via senza una rete di punti non si offre.
+    prova("client: la riga onesta senza rete e' morta col suo caso",
+          False, "senza sapere con che rete" in mini3)
     prova("client: il campo dentro l'ordine esiste", True,
           "salvaPuntoRitiro" in mini3 and "puntoRitiroInp" in mini3)
 
@@ -25975,10 +26359,12 @@ def prove_pagina_acquisto():
     prova("...ma il ≈ delle cifre resta vivo", True,
           "(p.stima || (stradaSel && stradaSel.stima)) ? '≈ ' : ''"
           in mini3)
-    # e la riga onesta di chi NON ha dichiarato un corriere non e' fra
-    # quelle tolte: quella dice una cosa che nessun altro dice
-    prova("...mentre la riga onesta senza corriere resta", True,
-          "senza sapere con che rete" in mini3)
+    # e la riga onesta di chi NON ha dichiarato un corriere era
+    # rimasta, perche' diceva una cosa che nessun altro diceva. Dal
+    # 12 ott 2026 quel caso non c'e' piu' (senza una rete di punti la
+    # via non si offre), e la riga se n'e' andata con lui.
+    prova("...e la riga onesta senza corriere se n'e' andata col "
+          "suo caso", False, "senza sapere con che rete" in mini3)
 
     # 5quinquies. LE CIFRE DELLE VIE SOLO QUANDO DICONO QUALCOSA e IL
     #    CASSETTO DENTRO IL RIQUADRO (ago 2026, decisioni di Andrea).
@@ -26765,7 +27151,10 @@ def prove_pagina_acquisto():
     # giorno diranno reti diverse.
     _rm = pezzo_js(mini, "function retiMappe(reti){", "\n}")
     _fr = pezzo_js(mini, "function fraseReti(reti){", "\n}")
-    _mp = pezzo_js(mini, "function mappePunti(reti){", "\n}")
+    # la firma ha un secondo argomento dal 12 ott 2026: il GESTO del
+    # bottone, che alla cassa con due reti non e' lo stesso dell'ordine
+    _mp = pezzo_js(mini, "function mappePunti(reti, gesto = "
+                         "'apriMappaPunti'){", "\n}")
     _lk = pezzo_js(mini, "function linkMappePunti(reti){", "\n}")
     prova("il giudice delle reti e' UNO (retiMappe)", 1,
           mini.count("function retiMappe"))
@@ -26830,7 +27219,8 @@ def prove_pagina_acquisto():
     prova("...e la compone il giudice, non la cassa", 1,
           mini.count("const fraseCorriere = fraseReti(reti);"))
     prova("...e i bottoni restano sotto il campo", True,
-          "${mappePunti(retiMappa)}" in mini)
+          "${mappePunti(retiMappa, sceglieRete ? 'apriMappaCassa' "
+          ": 'apriMappaPunti')}" in mini)
     # ...E SEGUONO LA RETE SCELTA, non le dichiarate come la frase
     # (ago 2026, decisione di Andrea dal campo: un pacco fermo per un
     # punto sbagliato). Dopo aver scelto InPost un bottone verso
@@ -26842,10 +27232,34 @@ def prove_pagina_acquisto():
     # — le dichiarate, come la frase — e a rovesciare quel giorno e'
     # stato un FATTO dal campo, non un ripensamento. La prima e la
     # terza dicono la stessa cosa: e' il giro di mezzo l'eccezione.
-    prova("...e seguono la rete SCELTA, che la frase e' un'altra "
-          "domanda", True,
-          "const retiMappa = sceglieRete ? (d.rete ? [d.rete] : [])"
-          " : reti;" in mini)
+    # ⚠️ TERZA VOLTA (12 ott 2026), E NON PER SIMMETRIA: decisione
+    # di Andrea col caso dell'ordine 213 — chi dichiara Poste e InPost
+    # fa vedere TUTTE E DUE le ricerche. Il fatto di agosto pero'
+    # resta vero (dopo InPost, la mappa di Poste porta a un punto
+    # della rete sbagliata), e a tenerlo a bada non e' piu' nascondere
+    # un bottone: IL TOCCO SULLA MAPPA DI UN'ALTRA RETE SCEGLIE QUELLA
+    # RETE. Cosi' la rete scritta nell'ordine e' quella della mappa su
+    # cui si e' cercato — e a «Segna come spedito» il corriere si
+    # confronta con quella. Le tre sentinelle qui sotto sono la regola
+    # intera: tolta la seconda, torna il difetto di agosto.
+    prova("...e sono di TUTTE le reti dichiarate", True,
+          "const retiMappa = reti;" in mini)
+    _amc = pezzo_js(mini, "function apriMappaCassa(chiave){", "\n}")
+    prova("...ma il tocco sulla mappa di un'altra rete SCEGLIE quella "
+          "rete", True,
+          "acqDati.rete !== rete) {" in _amc
+          and "    setReteAcquisto(rete);" in _amc)
+    # il tipo gia' scelto resta (dal giro dal vivo): senza, il campo
+    # spariva sotto il dito di chi aveva appena chiesto una mappa
+    prova("...senza far sparire il campo: il tipo gia' scelto resta",
+          True, "if (tipo && !acqDati.tipoPunto) {" in _amc
+          and _amc.index("const tipo = acqDati.tipoPunto;")
+          < _amc.index("    setReteAcquisto(rete);"))
+    prova("...e la rete di quella mappa la dice il giudice unico", True,
+          "retiMappe(acqDati?.preventivo?.reti || [])" in _amc
+          and "RETE_MAPPA" not in _amc)
+    prova("...e la mappa si apre comunque", True,
+          "apriMappaPunti(chiave);" in _amc)
     # E IL GIUDICE RESTA UNO anche adesso che gli argomenti sono due:
     # a divergere non sono le LETTURE di RETE_MAPPA (quella e' una
     # sola, c'e' il censimento qui sotto) ma cosa gli si passa.
@@ -26867,7 +27281,10 @@ def prove_pagina_acquisto():
     # ma solo girando si vede che la frase non la nomina.
     import json as _js6, shutil as _sh6, subprocess as _sp6, tempfile as _tf6
     _node6 = _sh6.which("node")
-    _F6 = "Il venditore spedisce con "
+    # «consegna ai punti», non «spedisce con» (12 ott 2026): alla
+    # cassa arrivano le RETI dei punti, e chi ha dichiarato SDA
+    # consegna ai punti Poste Italiane — «spedisce con Poste» era falso
+    _F6 = "Il venditore consegna ai punti "
     _B6 = lambda s: "<b>" + s + "</b>"
     _GEN6 = ("Il venditore non ha dichiarato con che corriere spedisce: "
              "InPost e Punto Poste sono le reti più diffuse.")
@@ -26907,7 +27324,8 @@ def prove_pagina_acquisto():
                 _esc6 + _cost6 + "\n" + _rmap6 + "\n"
                 + pezzo_js(mini, "function retiMappe(reti){", "\n}") + "}\n"
                 + pezzo_js(mini, "function fraseReti(reti){", "\n}") + "}\n"
-                + pezzo_js(mini, "function mappePunti(reti){", "\n}") + "}\n"
+                + pezzo_js(mini, "function mappePunti(reti, gesto = "
+                                 "'apriMappaPunti'){", "\n}") + "}\n"
                 + "const casi = " + _js6.dumps([c[0] for c in _casi6])
                 + ";\nconsole.log(JSON.stringify(casi.map(r => {\n"
                 "  const f = fraseReti(r), m = mappePunti(r);\n"
@@ -26937,15 +27355,12 @@ def prove_pagina_acquisto():
         # mappe sono due pari: li' il «non lo so» E' il messaggio.
         # Scritto come regola e non come lista, cosi' il caso che
         # qualcuno aggiungera' domani ci entra da solo.
-        # ⚠️ DELL'ARGOMENTO E NON DELLA PAGINA, ed e' la riga da
-        # leggere prima di allargarlo: nella CASSA i due argomenti
-        # sono diversi apposta (la frase le reti dichiarate, i
-        # bottoni quella scelta), quindi li' con due reti la frase ne
-        # nomina due e il bottone e' uno — e' voluto, non una
-        # divergenza. Cio' che questa prova garantisce e' che a non
-        # divergere sia il GIUDICE: nessuno rilegge RETE_MAPPA per
-        # conto suo. Nel campo dentro l'ORDINE l'argomento e' uno
-        # solo, e li' la coppia combacia sempre.
+        # ⚠️ DELL'ARGOMENTO E NON DELLA PAGINA: cio' che questa prova
+        # garantisce e' che a non divergere sia il GIUDICE — nessuno
+        # rilegge RETE_MAPPA per conto suo. (Dal 12 ott 2026 anche
+        # nella CASSA frase e bottoni prendono lo stesso argomento, le
+        # reti dichiarate: fino a ieri i bottoni seguivano la sola
+        # rete scelta, e la coppia li' non combaciava apposta.)
         prova("...e frase e bottoni non dicono mai reti diverse",
               [True] * len(_casi6),
               [(o[2] == o[1]) if r else True
@@ -34209,6 +34624,7 @@ def prove_avviso_spedizione():
         d = {"id": 7, "compratore_id": 111, "venditore_id": 222,
              "stato": "locked", "consegna_scelta": "spedizione",
              "annuncio_id": 3, "via_punto": 0, "punto_ritiro": "",
+             "rete_punto": "",
              "busta_il": 0,
              # l'ordine del mondo di ieri: l'indirizzo non l'ha mai
              # chiesto, quindi il gate di segna_spedito non lo tocca
@@ -34612,6 +35028,7 @@ async function tocca(o){
         o = {"id": 7, "compratore_id": 111, "venditore_id": 222,
              "stato": "locked", "consegna_scelta": "spedizione",
              "annuncio_id": 3, "via_punto": 0, "punto_ritiro": "",
+             "rete_punto": "",
              "busta_il": 0, "indirizzo_atteso": 0, "indirizzo_il": 0}
         diretta = extra.pop("diretta", False)
         o.update(extra)
@@ -119783,8 +120200,11 @@ def prove_dati_spedizione_copia():
           (0, 1),
           (det.count("rigaDato('', o.puntoRitiro)"),
            det.count("il punto e i recapiti sono in cima, in <b>«📦 Spedisci a»</b>.")))
+    # (12 ott 2026) accanto alla frase c'e' la riga del SOLO moderatore
+    # — rete, tipo e contestazioni del punto, `puntoBannerAdmin` — che
+    # per le due parti e' vuota: il banner resta una frase, senza bottone
     prova("...e il banner del pacco e' la sua frase, senza bottone", 1,
-          det.count('<div class="trust-note nota-punto">📍 <span>${puntoBanner(o)}</span></div>'))
+          det.count('<div class="trust-note nota-punto">📍 <span>${puntoBanner(o)}${puntoBannerAdmin(o)}</span></div>'))
     # IL RIQUADRO IN CIMA: sotto prezzo e conto, prima del recinto
     # della cassaforte; i dati si caricano DOPO il disegno
     _i_rq = det.find("${riquadroSpedisciA(o)}")
@@ -154011,6 +154431,7 @@ def main():
               prove_vetrina_canale, prove_relay_leva,
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,
+              prove_punti_corrieri,
               prove_punti_barattolo, prove_presa_in_carico,
               prove_punti_pubblici,
               prove_punti_salvati,

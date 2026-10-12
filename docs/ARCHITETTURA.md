@@ -19645,7 +19645,10 @@
   ancora spento) — `chiediConferma` non è await-abile e il pattern di
   casa è early-return + callback che richiama la funzione, come
   `annullaModificaChiedendo`.
-  RESTA FUORI, dichiarato: il catalogo largo dei SETTE corrieri del
+  RESTA FUORI, dichiarato (⚠️ la prima voce è SUPERATA dal 12 ott
+  2026: il catalogo adesso li porta tutti, e chi non ha una mappa non
+  offre il punto — vedi «IL PUNTO SOLO DOVE IL CORRIERE CI ARRIVA»):
+  il catalogo largo dei SETTE corrieri del
   tracking (per BRT, GLS, SDA, DHL e UPS non abbiamo l'URL della loro
   mappa dei punti, e una voce senza mappa è lo stato «Altro»); UNA
   TARIFFA per rete (decisione di Andrea: `spedizione_punto_sats` resta
@@ -19715,6 +19718,88 @@
   passava TUTTE. È la SESTA volta che una prova sulla forma certifica
   un ramo disonesto: quella classe di sentinella va sempre in coppia
   con una che fa girare il pezzo.
+  IL PUNTO SOLO DOVE IL CORRIERE CI ARRIVA (12 ott 2026, cantiere
+  «punti-ritiro», decisione di Andrea che ROVESCIA «la via punto si
+  offre sempre» qui sotto — e la rovescia con un FATTO, l'ordine 213:
+  venditore senza corrieri dichiarati, la via punto offerta lo stesso
+  con le mappe di Poste e InPost, chi compra scrive una tabaccheria,
+  il venditore spedisce con DHL senza contestare, la tabaccheria
+  rifiuta il pacco, disputa. Barattolo non aveva avvisato nessuno dei
+  due, e in disputa il punto non si leggeva da nessuna parte).
+  IL CATALOGO DICE I CORRIERI: `SPEDIZIONIERI` = Barattolo, InPost,
+  Poste Italiane, SDA, BRT, GLS, DHL, UPS, Altro. Le voci di ieri
+  restano con lo stesso nome (stanno in `utenti.spedizionieri` e in
+  `ordini.rete_punto`): si è aggiunto, non rinominato, e nessuna
+  migrazione. La tupla sta su UNA riga apposta: i banchi di `prove.py`
+  la leggono dal sorgente fino al primo a capo.
+  LA TABELLA È UNA: `RETE_DEL_CORRIERE` (InPost → InPost; Poste
+  Italiane e SDA → Poste Italiane), col suo SPECCHIO nel client tenuto
+  in pari da una prova che li confronta girando. La leggono in due:
+  `reti_punto(corrieri dichiarati)` — le reti di punti che si offrono
+  alla cassa; lista vuota = la via punto NON si offre — e
+  `corriere_compatibile(rete, corriere)`, il giudice di «Segna come
+  spedito». `reti_venditore` resta «cosa ha dichiarato lui» e serve al
+  Profilo; alla cassa (i due preventivi, `compra`, `_compra_set`) si
+  passa SEMPRE da `reti_punto(reti_venditore(...))`, e una prova conta
+  che non ne resti uno sul nudo elenco. Aggiungere domani una mappa
+  (DHL ServicePoint, BRT Fermopoint, GLS) è una riga in quella tabella
+  e una in `MAPPE_PUNTI`/`RETE_MAPPA` del client.
+  NESSUNA VENDITA SI BLOCCA, ed è la metà della decisione: senza
+  corrieri (o coi soli corrieri senza mappa) si pubblica e si vende, a
+  un indirizzo. `_strade_preventivo` prende `punto` dal chiamante e
+  nasce SPENTO (l'idioma di `barattolo` in `reti_venditore`); `compra`
+  e `_compra_set` rifiutano la via punto con `MSG_NIENTE_PUNTI`, che
+  dice la strada che resta — la cintura per la pagina rimasta aperta
+  da prima. In DEMO la via punto non c'è (i suoi venditori non
+  dichiarano). La riga onesta «stai scegliendo il punto senza sapere
+  la rete» è morta col suo caso: era onesta e non era bastata.
+  GLI IMPORTATI DA NOSTR E I NEGOZI COLLEGATI seguono la stessa
+  regola, e i corrieri li ereditano dal Profilo senza una riga di
+  codice: l'annuncio importato porta il `venditore_id` dell'account
+  nativo Nostr (`_accogli_venditore_nostr`), che è la stessa riga in
+  cui si entra facendo il login con quella chiave (`npub_accesso` ha
+  l'indice unico). C'è il collaudo.
+  ALLA CASSA I BOTTONI SONO DI TUTTE LE RETI DICHIARATE (terzo giro
+  della stessa sentinella, e non per simmetria: decisione di Andrea
+  col 213). Il fatto di agosto — dopo InPost, la mappa di Poste porta
+  a un punto della rete sbagliata — resta vero, e a tenerlo a bada non
+  è più nascondere un bottone: `apriMappaCassa` fa sì che IL TOCCO
+  SULLA MAPPA DI UN'ALTRA RETE SCELGA QUELLA RETE (e tiene il tipo già
+  scelto, o il campo sparirebbe sotto il dito: trovato nel giro dal
+  vivo). Così la rete scritta nell'ordine è quella della mappa su cui
+  si è cercato. La frase dice «consegna ai punti X», non «spedisce
+  con X»: alla cassa arrivano reti di punti, e chi ha dichiarato SDA
+  consegna ai punti Poste Italiane.
+  «SEGNA COME SPEDITO» FERMA IL CORRIERE SBAGLIATO, nel server (400
+  con `frase_corriere_sbagliato`, prima dell'UPDATE e dopo il gate del
+  punto mancante) e nella pagina (`htmlAvvisoCorriere`, sotto il
+  selettore, con le due uscite: «Cambia corriere» e «Il punto non va
+  bene», che apre l'obiezione col motivo «Non è della mia rete» già
+  scelto). DOVE NON SAPPIAMO, PASSA: rete vuota (gli ordini nati
+  prima), «Altro», la rete di casa, la consegna a mano. Sugli ordini
+  di prima la pagina dice soltanto «l'acquirente ha scelto il punto
+  senza conoscere il tuo corriere: controlla che lo accetti». La
+  correzione del tracciamento NON ha il gate: lì il pacco è già
+  partito e si registra un fatto.
+  IN DISPUTA IL PUNTO RESTA IN VISTA: `puntoInVista(o, s)` al posto
+  della lista di stati scritta nel template — spedito, consegnato,
+  disputa, resi, e il caso incagliato con la disputa da decidere;
+  l'admin SEMPRE (è l'unico senza il campo di chi compra e senza
+  «Spedisci a»); le due parti no dove ce l'hanno già sotto le dita.
+  `puntoBannerAdmin` aggiunge per il solo moderatore rete, tipo e
+  quante volte il venditore aveva contestato il punto
+  (`punto_obiezioni`, che il server teneva apposta e non si leggeva da
+  nessuna parte). La frase della disputa dice cosa succede davvero:
+  il moderatore guarda l'ordine e il tracciamento e scrive alle parti.
+  LA CAMPAGNA sta dietro `AVVISO_CORRIERI_PUNTI`, SPENTA di serie
+  (decisione di Andrea: un messaggio a tutti i venditori non parte da
+  solo con un deploy): una-tantum globale col timbro in `timbri`, il
+  calco di `avvisa_sconto_su_mono`; a leva spenta non legge e non
+  timbra. Il vecchio avviso per-venditore (`avvisato_spedizioniere`)
+  resta per chi arriva dopo, con lo STESSO testo della campagna: quello
+  di agosto prometteva il punto a chi non dichiara, e non era più vero.
+  Collaudo: `collaudo_punti_corrieri.py` (65 passi, nella gabbia della
+  CI). Procedura della leva: PRODUZIONE.
   LA VIA PUNTO SI OFFRE SEMPRE dove c'è la spedizione (secondo giro,
   ago 2026 — la decisione di Andrea che SUPERA quella del primo
   giro, «punto solo con spedizioniere dichiarato»; il perché:

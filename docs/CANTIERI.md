@@ -53743,3 +53743,170 @@ script della pagina. La suite intera la dice la CI.
 nato su Nostr ha una COPIA CIFRATA sui suoi relay (dal cantiere
 «tor-chiavi-scambio»: lo dice il foglio del profilo, non «I tuoi
 dati»): segnalato ad Andrea, non toccato.
+
+## Il punto di ritiro solo dove il corriere ci arriva: i corrieri dichiarati, l'avviso a «Segna come spedito», il punto in disputa (12 ott 2026, cantiere punti-ritiro, dal caso dell'ordine 213, richiesta di Andrea)
+
+**IL CASO.** Ordine 213: il venditore non aveva dichiarato corrieri
+(`rete_punto` vuota). Alla cassa l'acquirente ha scelto «punto di
+ritiro» e ha scritto a mano una tabaccheria — gli avevamo offerto le
+sole mappe di Punto Poste e InPost. Il venditore ha spedito con DHL
+senza contestare (`punto_obiezioni` 0). La tabaccheria con DHL non
+lavora: «errore nell'indirizzo», «il destinatario ha rifiutato», il
+pacco torna indietro, disputa. Barattolo non aveva avvisato nessuno
+dei due, e l'admin nel dettaglio della disputa il punto non lo vedeva.
+
+**COSA SI È DECISO (Andrea), e i perché.**
+1. LA VIA PUNTO SI OFFRE SOLO DOVE IL VENDITORE CI ARRIVA. Rovescia
+   la decisione dell'ago 2026 («la via punto si offre sempre: meglio
+   l'accordo in chat che la porta chiusa»), che aveva una sentinella in
+   CI contro il ritorno «di soppiatto» del blocco: è tornato alla luce
+   del sole, con questo fatto, e la sentinella adesso chiede che ci
+   sia. La porta non si chiude sulla VENDITA: senza corrieri si
+   pubblica e si vende lo stesso, a un indirizzo qualunque (casa,
+   ufficio, un parente). Vale anche per gli importati da Nostr e per i
+   negozi collegati.
+2. IL VENDITORE DICHIARA I CORRIERI NEL PROFILO (non nell'annuncio:
+   vale per tutti i suoi annunci, e il cassetto «📦 Come spedisci» e
+   il foglio «📦 Come spedirai?» a ogni «Pubblica» c'erano già). Il
+   catalogo si è allargato: Poste Italiane, SDA, InPost, BRT, GLS,
+   DHL, UPS, Altro (più la rete di casa). Il foglio dice che non è
+   obbligatorio e cosa si guadagna.
+3. LA COMPATIBILITÀ È UNA TABELLA: Punto Poste ← Poste Italiane, SDA;
+   InPost ← InPost. Chi dichiara solo corrieri senza mappa non offre
+   il punto.
+4. PIÙ RETI = TUTTI I BOTTONI alla cassa; a «Segna come spedito» il
+   corriere deve consegnare alla rete del punto SCELTO.
+5. «SEGNA COME SPEDITO» FERMA il corriere sbagliato con le due uscite
+   (cambiare corriere, contestare il punto).
+6. IN DISPUTA il punto resta in vista per tutti e tre, e l'admin
+   legge quante volte il venditore l'aveva contestato. La frase:
+   «Disputa aperta. Un moderatore guarda l'ordine e il tracciamento e
+   vi scrive su Telegram o Nostr; i sats restano nel deposito di
+   garanzia fino alla decisione.» (quella di prima parlava di una
+   conversazione che dentro Barattolo non esiste).
+7. L'AVVISO AI VENDITORI GIÀ PUBBLICATI sta dietro una leva spenta di
+   serie, `AVVISO_CORRIERI_PUNTI`, che accende Andrea.
+8. LE MAPPE di DHL ServicePoint, BRT Fermopoint e GLS: sì, in un
+   cantiere a parte, una alla volta.
+
+**COM'È FATTO** (il dettaglio in ARCHITETTURA, «IL PUNTO SOLO DOVE IL
+CORRIERE CI ARRIVA»). Server: `RETE_DEL_CORRIERE`, `reti_punto`,
+`corriere_compatibile`, `frase_corriere_sbagliato`, `MSG_NIENTE_PUNTI`;
+`_strade_preventivo(..., punto=)` che nasce spento; i quattro posti
+della cassa passano da `reti_punto(reti_venditore(...))`; il gate in
+`segna_spedito`; `avvisa_corrieri_per_punti` e la leva. Pagina: lo
+specchio della tabella, `apriMappaCassa`, `htmlAvvisoCorriere` con
+`aggiornaAvvisoCorriere` e `contestaPuntoDaAvviso`, `puntoInVista` e
+`puntoBannerAdmin`, i testi del foglio, del cassetto e della riga del
+form. Nessuna colonna nuova, nessuna migrazione, nessuno stato nuovo.
+
+**GLI IMPORTATI DA NOSTR, la domanda di Andrea** («se il venditore
+entra con la stessa npub e dichiara i corrieri, deve valere anche per
+i suoi importati: dimmi se oggi è così»). ERA GIÀ COSÌ, e non è
+servito codice: l'import assegna l'annuncio all'account nativo Nostr
+di quella chiave, che è la stessa riga in cui si entra col login
+Nostr; preventivo e acquisto leggono i corrieri da quella riga. Lo
+prova una sezione del collaudo, invece di crederci. Il limite che
+resta: il foglio «Come spedirai?» non compare nella modifica FIRMATA
+di un importato (lì `publish()` non lo apre): quel venditore lo trova
+nel Profilo.
+
+**GLI ORDINI GIÀ APERTI NON SI ROMPONO.** Niente migra. Un ordine nato
+verso un punto senza rete resta valido: il campo del compratore, la
+contestazione e la spedizione funzionano come ieri, e a «Segna come
+spedito» — dove la rete non si sa — non si ferma niente: la pagina
+dice soltanto «l'acquirente ha scelto il punto senza conoscere il tuo
+corriere: controlla che lo accetti prima di spedire». Lo stesso per la
+rete «Altro» di ieri.
+
+**LE STRADE SCARTATE.** (a) La dichiarazione per ANNUNCIO: un dato da
+ripetere a ogni pubblicazione per una cosa che è del negozio. (b)
+Tenere la mappa che segue la sola rete scelta (la regola di agosto):
+Andrea ha chiesto tutti i bottoni; il difetto che quella regola
+preveniva lo chiude il tocco che sceglie la rete. (c) Restringere i
+punti SALVATI alle sole reti con la mappa: fatto e tolto nello stesso
+giro — chi ne aveva uno sotto «Altro» non avrebbe più potuto
+toglierlo, e un punto salvato sotto un corriere senza mappa è innocuo
+(nessuna cassa lo offre). (d) Un permesso «spedisci lo stesso» dentro
+l'avviso: Andrea ha chiesto che fermi; l'uscita per il caso vero (il
+punto è anche di un'altra rete) è contestarlo. (e) Far partire la
+campagna da sola al deploy: no, leva. (f) Riusare il timbro
+`avvisato_spedizioniere` di agosto: è bruciato e diceva un'altra cosa;
+quell'avviso per-venditore resta per chi arriva dopo, ma col testo
+nuovo — quello vecchio prometteva il punto a chi non dichiara.
+
+**LE PROVE ROVESCIATE, col perché scritto sopra ognuna.** In
+`prove.py`: «il 400 non spedisce ai punti non esiste più» (ora deve
+esistere, in una frase e due chiamanti); «la riga onesta senza rete
+esiste/resta» (morta col suo caso); «i bottoni seguono la rete
+SCELTA» (terza volta, col fatto e col tocco che sceglie); il catalogo
+di tre voci; il banner del punto con la lista di stati nel template;
+il conto dei chiamanti di `nomePunto` (5). I banchi che eseguono
+`segna_spedito` hanno avuto `rete_punto` nelle righe finte e i pezzi
+veri della compatibilità (`gemelli_corrieri`). Nei collaudi:
+`collaudo_reti` («zero reti: il mondo di ieri» → la via punto si
+rifiuta), `collaudo_nota` (il venditore dichiara InPost),
+`collaudo_punti_barattolo` (l'aiuto spediva con BRT verso un locker
+InPost).
+
+**COSA È STATO PROVATO.** La sezione nuova `prove_punti_corrieri` (i
+giudici del server e quelli della pagina FATTI GIRARE in node, lo
+specchio della tabella confrontato, i quindici casi del corriere, dove
+si vede il punto per ruolo e stato). `collaudo_punti_corrieri.py`, 65
+passi su database usa-e-getta, messo fra i collaudi della CI: il 213
+rifatto (niente punto, a un indirizzo si compra), i corrieri senza
+mappa, SDA che vale Punto Poste, due reti, il corriere fermato senza
+che l'ordine cambi e senza avvisi falsi, le due uscite, gli ordini di
+prima, gli importati, cosa riceve l'admin in disputa (il punto, la
+rete, le contestazioni — mai indirizzo o email), la campagna a leva
+spenta e accesa. LA TORTURA, su una copia del repo intero: ventidue
+mutazioni (i gate tolti, il giudice ammorbidito nei due versi, la
+tabella alterata nei due lati, la leva ignorata, il timbro tolto, il
+punto nascosto in disputa…), tutte prese. IL GIRO DAL VIVO a 375×812
+(Chrome senza finestra coi tocchi veri, server di una copia col config
+dell'esempio più la coda del giro, relay morti, LNbits irraggiungibile,
+nessuna fattura chiesta): la cassa senza corrieri e con DHL (solo
+«Spedizione a casa»), con Poste e InPost (le due ricerche; toccata
+quella di Poste con InPost scelto, la rete diventa Poste e il campo
+resta), con SDA (un bottone, Punto Poste); il venditore che sceglie
+DHL verso un punto Poste (l'avviso con le due uscite, il tocco su
+«Segna come spedito» fermato, nessuna richiesta partita), «Il punto
+non va bene» che apre l'obiezione con «Non è della mia rete» accesa,
+SDA che parte; un ordine di prima con l'avviso che non ferma; il 213
+in disputa visto da acquirente, venditore e admin; il foglio dei
+corrieri e il cassetto del Profilo. Ventidue scatti. IL GIRO HA
+TROVATO UN DIFETTO MIO che le prove non vedevano: toccando la mappa
+dell'altra rete il tipo già scelto si azzerava e il campo spariva —
+curato in `apriMappaCassa`, con la sua sentinella.
+
+**NON PROVATO.** Nessun telefono vero, e Telegram vero nemmeno. Il
+foglio «Come spedirai?» è stato aperto col suo gesto (`apriInvitoCorrieri`)
+e non compilando tutto il form fino a «Pubblica». La campagna non è
+mai partita davvero: la leva è spenta. La notifica vera in chat del
+messaggio dei corrieri (nel giro è simulata: si è letto cosa riceve
+`notifica()`).
+
+**DA GUARDARE DOPO IL DEPLOY** (Andrea): un acquisto di prova da un
+venditore senza corrieri (deve offrire solo l'indirizzo) e da uno con
+Poste; il pannello «⚙️ Stato delle leve», voce «Avviso «indica i tuoi
+corrieri»», spenta; quando decide di accenderla, la riga nel config
+del VPS (PRODUZIONE) e la riga del journal con gli id avvisati.
+
+**GIÀ ROSSI SU MAIN, non toccati** (non sono fra i collaudi della CI):
+`collaudo_busta_diretta.py` (1 rossa) e `collaudo_email_corriere.py`
+(4 rosse), tutte sulla nota al moderatore in disputa — verificato su
+una copia pulita di `origin/main`: aspettano la nota da `notifica()`
+verso l'admin, e dal cantiere del gruppo degli admin passa da
+`notifica_admin`.
+
+**COSA È GIRATO SU QUALE ALBERO** (12 ott 2026, sera, sopra `236d5b8`,
+la punta di main: non è corso nel frattempo). Sull'albero ultimo del
+cantiere, prima di questo paragrafo: la suite severa INTERA, 23.160
+passate e 0 fallite; i 69 collaudi del workflow nella gabbia, tutti
+verdi, col nuovo dentro; i quattro collaudi fuori CI che toccano il
+punto (`collaudo_reti` 56, `collaudo_nota` 30,
+`collaudo_punto_concordato` 46, `collaudo_conto` 232), verdi; la
+tortura, 22 su 22; lo scanner dei segreti rifatto in locale com'è
+scritto nel workflow, pulito. Il giro dal vivo è dell'albero di poco
+prima (mancava solo questo verbale). Nessun push: aspetta l'ok di
+Andrea.

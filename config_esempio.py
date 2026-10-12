@@ -632,6 +632,18 @@ SUGGERIMENTI_OGNI_GIORNI = 7    # al massimo uno ogni N giorni PER
 INVITO_CORRIERI_MAX = 3         # quante volte al massimo. 0 = niente
                                 # foglio, resta la sola riga nel form
 
+# --- L'avviso «indica i tuoi corrieri» (12 ott 2026) -----------------
+# Dal cantiere «punti-ritiro» il ritiro in un punto si offre solo dove
+# il venditore ha dichiarato un corriere che a quei punti consegna
+# (Poste Italiane, SDA, InPost). Accendendo questa leva parte UN
+# messaggio in chat, una volta sola, ai venditori con annunci a
+# spedizione attivi e nessun corriere dichiarato: «indica i tuoi
+# corrieri per offrire anche il ritiro nei punti».
+# SPENTA DI SERIE: un messaggio a tutti i venditori non parte da solo
+# con un deploy. Si accende qui e si riavvia; partita una volta non
+# riparte (timbro nel database), e rispegnerla non serve.
+AVVISO_CORRIERI_PUNTI = False
+
 # --- Offerta lampo (sconto a tempo su tutto l'annuncio) --------------
 # Modello Vinted «sconto ai follower»: quando qualcuno mette l'annuncio
 # nel suo barattolo il venditore riceve un avviso anonimo e puo' lanciare
