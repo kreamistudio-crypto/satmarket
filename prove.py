@@ -156167,6 +156167,10 @@ c.filtro = [vuotoLibroP2P([O(ID)], SATISPAY, 'compro', SERA),
 p2pPause = {[ID]: loc(13, 7), [ID2]: loc(13, 0, 8), [ID3]: SERA - 5};
 c.passa = [passaFiltroP2P(O(ID), null), passaFiltroP2P(O(ID3), null), passaFiltroP2P(O(ID), SATISPAY)];
 c.filtroPausa = vuotoLibroP2P([O(ID)], SATISPAY, 'compro');
+/* a filtro SPENTO il bottone non c'e' mai, nemmeno se al giudice arrivano
+   delle offerte (nel libro non succede: senza filtro si mostrano) — la
+   tortura l'ha trovata viva finche' questo caso non si chiedeva */
+c.senzaFiltro = [vuotoLibroP2P([O(ID)], null, 'compro').togli, vuotoLibroP2P([O(ID), O(ID2)], undefined, 'vendo').togli];
 c.tra = [20, 59, 60, 61, 2100, 3600, 23700, 23641, 86400, 183660, 0, -5].map(traQuantoP2P);
 const E = etichettaPausaP2P(O(ID), SERA);
 c.etichetta = [E.replace(String(loc(13, 7)), 'FINE'), etichettaPausaP2P(O(ID2), SERA).replace(/<[^>]+>/g, ''),
@@ -156304,6 +156308,8 @@ console.log(JSON.stringify(c));
     prova("LA CARTA IN PAUSA RESTA NEL LIBRO: passa come le altre (e una pausa finita non "
           "c'entra); un filtro la ferma come ogni offerta, e allora il vuoto e' quello del "
           "filtro", ([True, True, False], FILTRO1), (r.get("passa"), r.get("filtroPausa")))
+    prova("«Togli il filtro» a filtro SPENTO non c'e' mai: un bottone che azzera il niente "
+          "era il difetto del caso", [False, False], r.get("senzaFiltro"))
     prova("FRA QUANTO, in parole corte: i minuti in su (mai «0 min»), le ore, l'ora tonda, "
           "i giorni",
           ["1 min", "1 min", "1 min", "2 min", "35 min", "1 h", "6 h 35 min", "6 h 35 min",
