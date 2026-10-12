@@ -51812,3 +51812,84 @@ marcatura); la glibc dei due portatili di Alan; il cantiere della
 mattina del 13 (la lista datata 13, l'alias del modello, la
 dichiarazione in §5); la chiave SSH dedicata per la VM e dove gira la
 sessione a Torino, da decidere il 15.
+
+## Chi è l'altro: riconosciuti tutti, l'anonimato è una chiave nuova (12 ott 2026, cantiere chi-e-l-altro, decisione di Andrea con Alan, dal caso ea0af71a)
+
+**Il caso.** Nello scambio ea0af71a (Alan vende, Sweegmiao compra entrando
+da Tor con la sua npub) Alan leggeva già durante lo scambio «Chi è l'altra
+persona non possiamo dirtelo…» e a fine scambio «Questa persona non ha un
+profilo su Barattolo: non c'è un posto dove lasciarle una recensione». Ma
+Sweegmiao un profilo ce l'ha.
+
+**La causa.** Il server sapeva chi era: la sua trade key sta in
+`chiavi_p2p` col suo account (registrata alla presa) e `p2p_scambi` lo
+nomina come compratore. Ma volto e recensione passavano da
+`p2p_ordini.preso_da`, e per un nativo Nostr che PRENDE `preso_da` non si
+scriveva — la decisione del 16-17 set 2026 («Fatti riconoscere negli
+scambi» spento di serie per chi entra da Nostr). Sconosciuto per regola,
+non per mancanza di dati. (Resta aperta l'ipotesi di Alan che la chiave
+di quello scambio non fosse legata al suo account — un profilo perso su
+Tor prima della cura: lo dice il comando in sola lettura nel rapporto;
+in ogni caso il passato non si ricostruisce.)
+
+**La decisione.** Chi scambia DA Barattolo è riconosciuto dalla
+controparte con qualunque login — Telegram, nsec, bunker, estensione:
+nome e profilo durante lo scambio, recensione possibile alla fine. Il
+collegamento chiave-di-scambio → account lo sa solo il server e lo mostra
+solo alla controparte di quello scambio, mai in pubblico né sui relay.
+L'interruttore «Fatti riconoscere» ESCE del tutto (prima stesura: acceso
+di serie con lo spegnimento come scelta; poi, con Alan, via): chi vuole
+l'anonimato entra con una chiave Nostr nuova, che per l'altra persona è
+un'altra persona. Gli scambi già chiusi NON sono retroattivi: la promessa
+del 17 set vale sul passato. A chi oggi entra da Nostr col vecchio default
+un avviso una tantum: «Da ora l'altra persona ti riconosce negli scambi…
+se vuoi restare anonimo, entra con una chiave Nostr nuova» — «Ho capito».
+
+**Com'è fatto.** `_p2p_riconosciuto` resta il giudice unico e dice sì a
+chiunque sia qualcuno: la presa si annota per tutti (`preso_da`), e da
+lì volti e recensioni funzionano come per chi entra da Telegram. La
+rotta dell'interruttore è uscita; la colonna `riconosci_p2p` resta per il
+passato e per l'avviso; nasce `avviso_riconosci` (1 = detto). `/api/me`
+dà `riconosci_p2p` DERIVATO dal giudice e `avviso_riconosci`
+(`_avviso_riconosci_p2p`: nativo, mai avvisato, mai acceso, con una
+chiave di scambio registrata); «Ho capito» → `/api/me/avviso-riconosci-visto`.
+I MOTIVI dello sconosciuto (`_motivo_sconosciuto_p2p`, da `p2p_scambi` +
+`chiavi_p2p`, niente di nuovo si scrive): `esterno` (la chiave non è di
+nessuno dei nostri: un'altra app Mostro), `anonimo_prima` (dei nostri, ma
+la presa non è annotata: uno scambio di prima del 12 ott), `ignota` (il
+coordinatore non ha detto niente, o chi chiede non è una parte). La
+rotta della controparte porta `motivi` accanto ai volti; `recensibile`
+precisa «ignota» con lo stesso giudice; la pagina dice SOLO il vero
+(`testoContropartePerMotivoP2P`, `testoRecensioneMancanteP2P`): «scambia
+da un'altra app, non da Barattolo», «lo scambio è di prima del 12 ottobre
+2026», «non lo sappiamo ancora» — e mai «non ha un profilo» a chi ce l'ha.
+Chi ha preso senza la presa annotata (lo scambio di prima) vede comunque
+chi ha pubblicato: `_controparti_p2p` legge le due parti di mostrod nella
+stessa query (LEFT JOIN, due query e non N) e serve quel volto già
+pubblico. Il patto «I tuoi dati» e la guida dicono la regola nuova; il
+cassetto «🔔 Avvisi» ha una riga in meno.
+
+**Scartato.** Rendere retroattivo il riconoscimento (la promessa del 17
+set); l'interruttore acceso di serie con lo spegnimento (la prima stesura
+di oggi: Alan e Andrea hanno preferito una regola sola, senza un quarto
+caso di testo); una leva a data per distinguere «prima» e «dopo» (basta
+`preso_da`: il passato non lo ha, il presente sì).
+
+**Provato.** `prove_chi_e_l_altro` (25 verdi): i giudici su un database
+in memoria (i tre motivi, l'avviso una tantum, il riconoscimento per
+tutti) e le sentinelle su rotte, pagina e patto. Le prove toccate
+riscritte: `prove_recensione_p2p` (la sezione 12: l'interruttore è
+uscito), `prove_dati_reputazione_p2p`, `prove_p2p_avvisi_libro`,
+`prove_parti_si_vedono`, `prove_card_parte_ordine`, `prove_fogli_di_casa`
+(ottantadue gesti della domanda unica). `collaudo_chi_e_l_altro` (21 ok,
+nel workflow): le quattro coppie di login sul server vero (volto nei due
+versi, recensione nei due versi), lo scambio di prima («anonimo_prima»,
+il volto di chi vende a chi ha preso), l'altra app («esterno»), mostrod
+muto, l'avviso una tantum e «Ho capito», il riconoscimento derivato in
+`/api/me`. `collaudo_recensione_p2p` riscritto nella sezione 10. Il giro
+dal vivo nel pane: sotto.
+
+**Resta da guardare.** Sul telefono di Andrea e su quello di Alan: il
+prossimo scambio con un nativo (volto e recensione); l'avviso una tantum
+a chi entra da Nostr col vecchio default; l'esito del comando in sola
+lettura su ea0af71a (la chiave di Sweegmiao in `chiavi_p2p`).

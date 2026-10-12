@@ -28,7 +28,10 @@ fare e' far girare il giro intero su un database vero. Qui si cammina:
   8. il posto di chi ha preso non si ruba a cose fatte (o si
      dirotterebbe la recensione di un altro);
   9. l'invito nella notifica compare SOLO dove porta a qualcosa;
- 10. L'INTERRUTTORE del riconoscimento: chi entra da Nostr prende un
+ 10. (12 ott 2026) chi entra da Nostr e' riconosciuto come tutti: la
+     presa si annota, la recensione si apre nei due versi; lo scambio di
+     prima (presa mai annotata) non si recupera. Prima diceva:
+     L'INTERRUTTORE del riconoscimento: chi entra da Nostr prende un
      ordine e resta invisibile — nessuna recensione, in nessuno dei due
      versi — poi lo accende, e dal prossimo scambio le due parti si
      recensiscono;
@@ -428,37 +431,18 @@ def main():
     prova("...ma lo scambio resta concluso", True,
           "Scambio concluso" in senza)
 
-    print("\n[10. l'interruttore: chi entra da Nostr si fa riconoscere]")
-    # -77 e' l'account nato da Nostr: a interruttore SPENTO la sua
-    # presa non si annota, e senza quell'annotazione una recensione non
-    # ha dove andare — in nessuno dei due versi.
+    print("\n[10. chi entra da Nostr e' riconosciuto come tutti (12 ott 2026)]")
+    # -77 e' l'account nato da Nostr: dal 12 ott 2026 (cantiere
+    # chi-e-l-altro, decisione di Andrea con Alan) la sua presa si annota
+    # come quella di chiunque, e la recensione ha un posto nei due versi.
+    # L'interruttore «Fatti riconoscere» non esiste piu': per l'anonimato
+    # c'e' una chiave Nostr nuova.
+    prova("la rotta dell'interruttore e' uscita", False,
+          hasattr(SRV, "scegli_riconoscimi_p2p"))
     come(-77)
-    chiama(SRV.registra_ordini_p2p, {"ordini": [DA_NOSTR], "presi": True})
-    prova("a interruttore spento la presa non si annota", 0,
-          preso_da(DA_NOSTR))
-    concludi(DA_NOSTR)
-    come(111)
-    e = errore(SRV.recensione_p2p, {"ordine": DA_NOSTR, "voto": 5})
-    prova("...e a scambio concluso chi ha pubblicato non ha chi recensire",
-          (400, "Dell'altra persona non sappiamo il profilo: la recensione "
-                "non avrebbe dove andare"), e)
-    come(-77)
-    r = chiama(SRV.recensibile_p2p, {"ordine": DA_NOSTR})
-    prova("...e nemmeno lui, che di quello scambio non risulta parte",
-          {"si": False, "motivo": "ignota", "gia": False}, r)
-
-    # ...lo accende LUI, e su quello scambio NON cambia niente: vale da
-    # qui in avanti, e il posto di chi ha preso a cose fatte non si
-    # prende piu' (e' la stessa guardia del caso 8)
-    chiama(SRV.scegli_riconoscimi_p2p, {"attivo": True})
-    prova("l'interruttore si accende", 1, riconosce(-77))
-    chiama(SRV.registra_ordini_p2p, {"ordini": [DA_NOSTR], "presi": True})
-    prova("...ma lo scambio gia' chiuso non si recupera", 0,
-          preso_da(DA_NOSTR))
-
-    # ...e dal prossimo scambio si vedono e si recensiscono
     chiama(SRV.registra_ordini_p2p, {"ordini": [DA_NOSTR2], "presi": True})
-    prova("la presa del nuovo scambio si annota", -77, preso_da(DA_NOSTR2))
+    prova("la presa del nativo si annota, senza nessun interruttore", -77,
+          preso_da(DA_NOSTR2))
     concludi(DA_NOSTR2)
     r = chiama(SRV.recensibile_p2p, {"ordine": DA_NOSTR2})
     prova("...e la recensione si apre", {"si": True, "motivo": "",
@@ -471,20 +455,21 @@ def main():
     prova("...e il voto e' arrivato anche a chi non ha un nome",
           (4.0, 1), (utente(-77)["rating"], utente(-77)["n_feedback"]))
 
-    # ...e chi entra da Telegram non lo puo' nemmeno chiedere: lui e'
-    # riconosciuto da sempre, e un «spegni» che non spegne sarebbe una
-    # promessa che non manteniamo
-    e = errore(SRV.scegli_riconoscimi_p2p, {"attivo": False})
-    prova("a chi entra da Telegram la rotta dice no",
-          (409, "Chi entra da Telegram e' gia' riconosciuto negli scambi"), e)
-
-    # ...e spegnendolo il PREGRESSO resta: quello scambio e' chiuso e
-    # le recensioni ci sono
+    # LO SCAMBIO DI PRIMA — la presa mai annotata, com'era per chi entrava
+    # da Nostr fino al 12 ott — NON si recupera a cose fatte: la promessa
+    # del 17 set vale sul passato (e la guardia del caso 8 tiene)
+    concludi(DA_NOSTR)
+    come(111)
+    e = errore(SRV.recensione_p2p, {"ordine": DA_NOSTR, "voto": 5})
+    prova("uno scambio di prima: chi ha pubblicato non ha chi recensire",
+          (400, "Dell'altra persona non sappiamo il profilo: la recensione "
+                "non avrebbe dove andare"), e)
     come(-77)
-    chiama(SRV.scegli_riconoscimi_p2p, {"attivo": False})
-    prova("spento, l'interruttore torna a zero", 0, riconosce(-77))
-    prova("...ma la presa gia' annotata resta", -77, preso_da(DA_NOSTR2))
-    prova("...e le recensioni pure", 2, len(recensioni(DA_NOSTR2)))
+    r = chiama(SRV.recensibile_p2p, {"ordine": DA_NOSTR})
+    prova("...e per lui il server non sa che e' parte: «ignota»",
+          {"si": False, "motivo": "ignota", "gia": False}, r)
+    chiama(SRV.registra_ordini_p2p, {"ordini": [DA_NOSTR], "presi": True})
+    prova("...e a cose fatte la presa non si annota piu'", 0, preso_da(DA_NOSTR))
 
     print("\n[11. la fusione non esplode]")
     come(-77)

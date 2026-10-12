@@ -216,25 +216,18 @@ vere sullo schermo, si salta come il tour):
   svuota a ogni chiusura, e con lei le chiavi dei tuoi scambi: entra
   sempre con la stessa chiave Nostr, o salva il codice segreto del
   profilo da «I tuoi dati».»
-- **Con una chiave Nostr** 🧑 quando PRENDI un ordine resti sconosciuto
-  all'altra persona — non al server: l'esito dello scambio si scrive
-  comunque sul tuo account (10 ott 2026).
-  📱 Nel dettaglio: «🕶️ Per chi ha pubblicato resti sconosciuto: sei
-  entrato con un profilo senza nome, e non saprà chi sei. Il suo profilo
-  invece lo vedi qui sopra. L'esito dello scambio si scrive comunque sul
-  tuo account. Se vuoi farti riconoscere — e potervi recensire — c'è
-  l'interruttore nel cassetto «🔔 Avvisi».» Nel
-  cassetto «🔔 Avvisi» del Profilo: «👤 Fatti riconoscere negli scambi»
-  — «Se lo accendi, quando prendi un ordine l'altra parte vede il tuo
-  profilo e potete recensirvi; se resta spento, per l'altra parte resti
-  sconosciuto e su quegli scambi non ci sono recensioni. L'esito dello
-  scambio si scrive sul tuo account in tutti e due i casi.» — «Spento» /
-  «Attivo».
-  Toast: «👤 Da ora chi scambia con te ti vede, e potete recensirvi» /
-  «Da ora, quando prendi un ordine, l'altra persona non ti vede (gli
-  scambi già presi restano)». Chi entra con Nostr e PUBBLICA si mostra comunque col nome
-  e la foto della sua chiave. L'interruttore chi entra da Telegram non
-  lo vede.
+- **Con una chiave Nostr** 🧑 dal 12 ott 2026 quando PRENDI un ordine
+  sei riconosciuto dall'altra persona come chi entra da Telegram: vede il
+  tuo profilo e potete recensirvi. Non c'è un interruttore: per restare
+  anonimo si entra con una chiave Nostr nuova. Chi scambia da un'altra
+  app Mostro legge «L'altra persona scambia da un'altra app, non da
+  Barattolo: qui non ha un profilo…»; sugli scambi di prima del 12 ott
+  «L'altra persona è su Barattolo ma resta anonima: lo scambio è di
+  prima del 12 ottobre 2026…»; finché il coordinatore non ha detto chi
+  è: «Chi è l'altra persona non lo sappiamo ancora…». Al primo ingresso
+  dopo il cambio, a chi entrava da Nostr col vecchio default: «Da ora
+  l'altra persona ti riconosce negli scambi» — «…Se vuoi restare
+  anonimo, entra con una chiave Nostr nuova.» — «Ho capito».
 - **Gli avvisi**, per tutti, nel cassetto «🔔 Avvisi»: «⚡ Avvisi sugli
   scambi P2P» — «Quando il tuo ordine viene preso, quando lo scambio si
   chiude e quando tocca a te. Spenti, non ti scriviamo nulla dello

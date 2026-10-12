@@ -41371,8 +41371,10 @@ def prove_fogli_di_casa():
     # OTTANTUNO (11 ott 2026, la presa della disputa letta sul nodo
     # vero): la ripresa di una disputa gia' presa sul coordinatore
     # (`riprendiPresaDisputaP2P`) chiede conferma con la condizione scritta.
-    prova("i gesti che passano dalla domanda unica sono ottantuno",
-          81, solo_codice(mini).count("chiediConferma({"))
+    # OTTANTADUE (12 ott 2026, chi-e-l-altro): l'avviso una tantum del
+    # riconoscimento, «Ho capito».
+    prova("i gesti che passano dalla domanda unica sono ottantadue",
+          82, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -65481,8 +65483,10 @@ def prove_parti_si_vedono():
     # riga tiene un'ancora VIVA nel pezzo che resta.
     # (10 ott 2026: l'ancora era «tu resti anonimo», la frase del foglio
     # dove si prende; ora quella frase dice a CHI si resta sconosciuti)
+    # (12 ott 2026: quella frase e' uscita con l'interruttore; l'ancora
+    # viva e' la riga di chi non ha ancora un volto)
     prova("il censimento guarda davvero il client", True,
-          "per chi ha pubblicato resti sconosciuto" in _fuori)
+          "non lo sappiamo ancora" in _fuori)
     for _frase in ("appena lo prendi vi vedete",
                    "appena qualcuno lo prende vi vedete",
                    "vi vedete:",
@@ -65540,8 +65544,13 @@ out.primaDellaPresa = profiloControparteP2P(ord({peer: ''})) === '';
 out.primaNonChiede = chiamate === 0;
 /* 2) NON SI SA ANCORA: una riga sola, e non si indovina fra i casi */
 const attesa = profiloControparteP2P(ord({}));
-out.nonSiSa = attesa.indexOf('non possiamo dirtelo') >= 0
+out.nonSiSa = attesa.indexOf('non lo sappiamo ancora') >= 0
   && attesa.indexOf('seller') < 0;
+/* (12 ott 2026) i quattro motivi, ognuno con la sua frase vera */
+out.motivi = ['esterno', 'anonimo_prima', ''].map(m => testoContropartePerMotivoP2P(m));
+p2pContropartiMotivo['ord-1'] = 'esterno';
+out.conMotivo = profiloControparteP2P(ord({})).indexOf('scambia da un') >= 0;
+delete p2pContropartiMotivo['ord-1'];
 await new Promise(r => setTimeout(r, 0));
 out.haChiesto = chiamate === 1;
 /* 3) IL PROFILO PIENO, coi due canali */
@@ -65619,7 +65628,8 @@ process.stdout.write(JSON.stringify(out));
     for k, nome in (
             ("primaDellaPresa", "prima della presa il profilo non c'e'"),
             ("primaNonChiede", "...e non si chiede niente al server"),
-            ("nonSiSa", "quando non si sa si dice una cosa sola"),
+            ("nonSiSa", "quando non si sa ancora si dice solo quello"),
+            ("conMotivo", "...e col motivo del server la frase e' la sua (un'altra app)"),
             ("haChiesto", "...e intanto si chiede, una volta"),
             ("nome", "il profilo porta il nome"),
             ("stelline", "...le stelline e i giorni"),
@@ -93825,9 +93835,12 @@ def prove_p2p_avvisi_libro():
     # reputazione-p2p non era piu' vero per intero — l'esito si scrive
     # sul suo account. Ora dice a CHI resta sconosciuto: all'altra
     # persona. Il resto lo guarda `prove_dati_reputazione_p2p`.)
-    prova("il patto dichiara che chi entra da Nostr e prende resta sconosciuto all'altra persona, e cosa comporta",
-          True, "Chi entra <b>da Nostr</b> e prende un ordine <b>resta sconosciuto all'altra persona</b>"
-          in _mini and "il tuo nome negli avvisi dell'altra persona non compare" in _mini)
+    # (12 ott 2026, chi-e-l-altro) il patto dice il verso nuovo: riconosciuto
+    # con qualunque login, anonimo solo per scelta
+    prova("il patto dichiara che chi scambia da Barattolo e' riconosciuto dall'altra persona, con qualunque login, e che l'anonimato e' una chiave nuova",
+          True, "chi scambia da Barattolo è <b>riconosciuto dall'altra persona</b> con qualunque modo di entrare"
+          in _mini and "entra con una <b>chiave Nostr nuova</b>" in _mini
+          and "il tuo nome negli avvisi dell'altra persona non compare" not in _mini)
     prova("...e nessun testo promette piu' l'avviso generico", False,
           "ricevi l'avviso generico" in _mini or "riceve l'avviso generico" in _mini)
     prova("«dimentica il profilo» scollega anche le prese", True,
@@ -119543,6 +119556,8 @@ console.log(JSON.stringify(out));
     banco2 = "\n".join([
         mini[mini.index("const esc = s =>"):mini.index("const el = id =>")],
         pezzo_js(mini, "function riquadroRecensioneP2P(o, rec){", "\n}\n") + "\n}",
+        # (12 ott 2026) la frase per motivo di chi non ha un posto
+        pezzo_js(mini, "function testoRecensioneMancanteP2P(motivo){", "\n}\n") + "\n}",
         pezzo_js(mini, "function moduloRecensioneP2P(o){", "\n}\n") + "\n}",
         pezzo_js(mini, "function gestoRecensioneP2P(o, rec){", "\n}\n") + "\n}",
         pezzo_js(mini, "function stelleSceltaP2P(){", "\n}\n") + "\n}",
@@ -119632,121 +119647,57 @@ console.log(JSON.stringify(out));
     prova("a scambio aperto niente riquadro", "", o2.get("apertoNiente"))
     prova("...e finche' il server non risponde, niente (il gesto non cambia sotto il dito)",
           "", o2.get("senzaRisposta"))
+    # (12 ott 2026, chi-e-l-altro) la frase e' per motivo; a motivo ignoto
+    # dice che non si sa chi e', mai «non ha un profilo» a chi ce l'ha
     prova("senza un posto, la riga che dice perche'", True,
-          "non ha un profilo su Barattolo" in (o2.get("senzaPosto") or ""))
-    # --- 12) L'INTERRUTTORE DEL RICONOSCIMENTO (17 set 2026) --------
-    # «Fatti riconoscere negli scambi»: chi entra da Nostr non viene
-    # annotato quando PRENDE, e senza quell'annotazione una recensione
-    # non ha dove andare (ne' in un verso ne' nell'altro). L'unica cosa
-    # che apre quella porta e' un gesto SUO.
+          "un posto dove lasciarle una recensione" in (o2.get("senzaPosto") or "")
+          and "non ha un profilo su Barattolo" not in (o2.get("senzaPosto") or ""))
+    # --- 12) L'INTERRUTTORE DEL RICONOSCIMENTO E' USCITO (12 ott 2026,
+    # cantiere chi-e-l-altro, decisione di Andrea con Alan) --------
+    # Chi scambia da Barattolo e' riconosciuto dalla controparte con
+    # qualunque login; per l'anonimato una chiave Nostr nuova. Il
+    # giudice resta uno, e dice si' a chiunque sia qualcuno.
     amb2 = {}
     exec(pezzo("_p2p_riconosciuto"), amb2)
     ric = amb2["_p2p_riconosciuto"]
     con2 = _sq.connect(":memory:")
     con2.execute("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, "
-                 "riconosci_p2p INTEGER DEFAULT 0)")
-    con2.execute("INSERT INTO utenti VALUES(111, 0)")
-    con2.execute("INSERT INTO utenti VALUES(-77, 0)")
-    con2.execute("INSERT INTO utenti VALUES(-88, 1)")
-    # ⚠️ CHI ENTRA DA TELEGRAM E' RICONOSCIUTO ANCHE COLLA COLONNA A
-    # ZERO: la sua presa si annota dal 16 set, l'interruttore non lo
-    # vede nemmeno, e un interruttore che non cambia niente mente.
-    prova("chi entra da Telegram e' riconosciuto, colonna o non colonna",
-          True, ric(con2, 111))
-    prova("...anche se in `utenti` non c'e' nemmeno", True,
-          ric(con2, 222))
-    prova("chi entra da Nostr parte SPENTO", False, ric(con2, -77))
-    prova("...e acceso e' acceso", True, ric(con2, -88))
-    # FAIL-CLOSED, al contrario del fratello degli avvisi: qui il
-    # silenzio protegge, e un default acceso regalerebbe un'identita'
-    # che nessuno ha chiesto di dare.
-    prova("una chiave Nostr senza riga vale SPENTO (fail-closed)", False,
-          ric(con2, -99))
+                 "riconosci_p2p INTEGER DEFAULT 0, avviso_riconosci INTEGER DEFAULT 0)")
+    con2.execute("INSERT INTO utenti VALUES(111, 0, 0)")
+    con2.execute("INSERT INTO utenti VALUES(-77, 0, 0)")
+    prova("riconosciuti tutti: Telegram, il nativo col vecchio zero, chi in `utenti` non c'e'",
+          [True, True, True, True], [ric(con2, 111), ric(con2, -77), ric(con2, 222), ric(con2, -99)])
+    prova("...e lo zero dell'anonimo in vetrina resta un no", False, ric(con2, 0))
     con2.close()
-    prova("la colonna nasce a ZERO", True,
-          '"riconosci_p2p INTEGER DEFAULT 0"' in _SORGENTE)
-    # ...e il gemello degli avvisi resta col suo verso, che le due
-    # righe del cassetto non si confondano
+    prova("la colonna di ieri resta (il passato) e quella dell'avviso nasce a zero; nessuna scelta di anonimato", True,
+          '"riconosci_p2p INTEGER DEFAULT 0"' in _SORGENTE
+          and '"avviso_riconosci INTEGER DEFAULT 0"' in _SORGENTE
+          and "anonimo_p2p" not in _SORGENTE)
     prova("...mentre gli avvisi restano accesi di serie", True,
           '"avvisi_p2p INTEGER DEFAULT 1"' in _SORGENTE)
     _gate = codice(pezzo("registra_ordini_p2p"))
-    prova("il cancello della presa chiede al giudice", True,
+    prova("il cancello della presa chiede al giudice unico (che dice si' a tutti)", True,
           "_p2p_riconosciuto(con, user[\"id\"])" in _gate)
-    prova("...e non guarda piu' il segno del tg_id da se'", False,
-          'user["id"] > 0' in _gate)
-    _rot = codice(pezzo("scegli_riconoscimi_p2p"))
-    prova("la rotta scrive la colonna", True,
-          "UPDATE utenti SET riconosci_p2p=? WHERE tg_id=?" in _rot)
-    prova("...e a chi entra da Telegram dice NO invece di farlo credere",
-          True, 'if user["id"] > 0:' in _rot and "409" in _rot)
-    prova("...e la risposta dice com'e' finita", True,
-          'return {"ok": True, "attivo": bool(attivo)}' in _rot)
-
-    # il cassetto: la riga c'e' solo per chi serve, e dice i DUE versi
-    _riga = pezzo_js(mini, "const rigaRiconosciP2P = () =>", "\n\n")
-    prova("la riga del cassetto e' solo di chi entra da Nostr", True,
-          "!(myTgId < 0)) ? '' : `" in _riga)
-    prova("...e solo a P2P accesso", True,
-          "!p2pLeve || !p2pLeve.attivo" in _riga)
-    prova("...si chiama come l'ha chiamata Andrea", True,
-          "Fatti riconoscere negli scambi" in _riga)
-    # ⚠️ LA FRASE STA SU TRE RIGHE DI HTML: si cerca sugli spazi
-    # normalizzati, o una sentinella sana esce rossa per l'andare a capo
-    _pian = " ".join(_riga.split())
-    prova("...e dice cosa comporta, nei due versi", True,
-          "l'altra parte vede il tuo profilo e potete recensirvi" in _pian
-          and "per l'altra parte resti sconosciuto e su quegli scambi non "
-              "ci sono recensioni" in _pian
-          # (10 ott 2026) ...e che l'esito si scrive comunque: «invisibile»
-          # da solo prometteva piu' di quel che il server fa
-          and "L'esito dello scambio si scrive sul tuo account in tutti e due "
-              "i casi" in _pian)
-    prova("...e nasce SPENTO", True,
-          "let myRiconosciP2P = false;" in mini)
-    _set = pezzo_js(mini, "async function setRiconosciP2P(attivo){", "\n}\n")
-    prova("l'interruttore parla con la rotta giusta", True,
-          "/me/riconoscimi-p2p`" in _set
-          and "myRiconosciP2P = !!d.attivo" in _set)
-    # SPEGNENDOLO SI DICE CHE IL PREGRESSO RESTA: gli scambi gia' presi
-    # sono scambi in corso (l'altra parte aspetta le sue frasi) o
-    # chiusi con una recensione magari gia' scritta, e una recensione
-    # non si ritira con una leva.
-    prova("...e spegnendolo dice che gli scambi gia' presi restano", True,
-          "gli scambi già presi restano" in _set)
-    prova("lo stato arriva dal server col verso rovesciato", True,
-          "myRiconosciP2P = !!me.riconosci_p2p;" in mini)
-    # e le due righe che dicevano «resti anonimo» ora guardano
-    # l'interruttore: erano la verita' di ieri, e a chi si e' fatto
-    # riconoscere direbbero il falso — che e' l'unica cosa che una riga
-    # di avvertenza non puo' fare.
-    _av = pezzo_js(mini, "const rigaAvvisiP2P = () =>", "\n\n")
-    prova("la riga degli avvisi guarda l'interruttore", True,
-          "myRiconosciP2P" in _av
-          # (patch 0007) la differenza non e' piu' «frase coi numeri o
-          # avviso generico»: e' se il tuo NOME compare negli avvisi altrui
-          and "l'altra persona vede il tuo nome, anche negli avvisi" in _av
-          and "il tuo nome negli avvisi dell'altra persona non compare" in _av)
+    prova("la rotta dell'interruttore non esiste piu'", False,
+          "riconoscimi-p2p" in _SORGENTE or "scegli_riconoscimi_p2p" in _SORGENTE)
+    _mini_cod = re.sub(r"/\*[\s\S]*?\*/", "", mini)
+    prova("nella pagina non c'e' piu' l'interruttore, ne' la sua variabile, ne' la sua rotta", [0, 0, 0, 0],
+          [_mini_cod.count("rigaRiconosciP2P"), _mini_cod.count("setRiconosciP2P"),
+           _mini_cod.count("myRiconosciP2P"), _mini_cod.count("riconoscimi-p2p")])
+    prova("...e il nome dell'interruttore e' sparito dai testi a schermo", 0,
+          _mini_cod.count("Fatti riconoscere negli scambi"))
     _det = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
-    prova("...e il foglio dove si prende un ordine pure", True,
-          "myTgId < 0 && !myRiconosciP2P" in _det)
-    prova("...e a chi resta anonimo dice dov'e' l'interruttore", True,
-          # RAW: nel sorgente del client gli apostrofi sono sfuggiti
-          # (`l\'`), e in una stringa normale Python se li mangia —
-          # cercava una cosa che nel file non c'e' (visto scrivendolo)
-          r"c\'è l\'interruttore nel cassetto" in _det)
-
-    # «I TUOI DATI» lo dice nelle due righe che prima lo negavano
+    prova("...e il foglio dove si prende non dice piu' «resti sconosciuto»", False,
+          "resti sconosciuto" in _det)
+    # «I TUOI DATI» dice la regola nuova, nei due paragrafi
     dati = mini[mini.index('<h3 id="priv-p2p">'):]
     dati = dati[:dati.index('<h3 id="priv-tor">')]
-    prova("«I tuoi dati» nomina l'interruttore", 2,
-          dati.count("Fatti riconoscere negli scambi"))
-    prova("...dicendo che e' spento di serie", True,
-          dati.count("spento di serie") >= 2)
-    prova("...e che accendendolo si apre la recensione", True,
-          "possono <b>recensirsi</b>" in dati
-          and "apre le <b>recensioni</b>" in dati)
+    prova("«I tuoi dati»: riconosciuto con qualunque login, nessun interruttore, l'anonimato e' una chiave nuova", True,
+          "con qualunque modo di entrare" in dati and "Fatti riconoscere" not in dati
+          and dati.count("chiave Nostr nuova") >= 2)
     prova("...e che il pregresso non si tocca", True,
-          "gli scambi già presi restano come erano" in dati)
+          "quella promessa resta valida sul passato" in dati
+          and "Gli scambi già presi prima del 12 ottobre restano come erano" in dati)
 
 
 def prove_guscio_apertura():
@@ -143717,15 +143668,17 @@ def prove_dati_reputazione_p2p():
                        "resta anonimo quando prende",
                        "per chi non vuole lasciare tracce")
            if f in re.sub(r"<[^>]+>", "", dati)])
+    # (12 ott 2026, chi-e-l-altro) i due paragrafi dicono ora «riconosciuto
+    # dall'altra persona», con l'anonimato come scelta
     nostr = [p for p in re.sub(r"<[^>]+>", "", dati).split("\n")
-             if "resta sconosciuto all'altra persona" in p]
-    prova("...lo dicono i due paragrafi che ne parlano: sconosciuto "
-          "all'altra persona, e l'esito sul suo account", (2, 2),
+             if "riconosciuto dall'altra persona" in p]
+    prova("...lo dicono i due paragrafi che ne parlano: riconosciuto "
+          "dall'altra persona, e l'esito sul suo account", (2, 2),
           (len(nostr), sum("l'esito dello scambio" in p.lower()
                            and "si scrive sul suo account" in p for p in nostr)))
-    prova("...«sconosciuto all'altra persona, non al server», con la "
+    prova("...«riconosciuto dall'altra persona, e dal server», con la "
           "cronaca e i quattrocento giorni", True,
-          "Sconosciuto all'altra persona, non al server" in nostr[0]
+          "Riconosciuto dall'altra persona, e dal server" in nostr[0]
           and "circa quattrocento giorni" in nostr[0]
           and "fra quali due account" in nostr[0])
     prova("...e «dimentica il profilo» toglie le prese annotate, non gli "
@@ -143751,32 +143704,32 @@ def prove_dati_reputazione_p2p():
                        "resti invisibile e")
            if f in senza_commenti])
     piano = " ".join(senza_commenti.split())
-    prova("...e i tre posti che parlano a chi prende da Nostr dicono che "
-          "l'esito si scrive sul suo account: gli avvisi, l'interruttore, "
-          "il foglio dove si prende",
-          (True, True, True),
-          ("per lei resti sconosciuto. L'esito dello scambio si scrive "
-           "comunque sul tuo account." in piano,
-           "L'esito dello scambio si scrive sul tuo account in tutti e due i "
-           "casi." in piano,
-           "Per chi ha pubblicato resti sconosciuto: sei entrato con un "
-           "profilo senza nome, e non saprà chi sei." in piano
-           and "L\\'esito dello scambio si scrive comunque sul tuo account. "
-               "Se vuoi farti riconoscere" in piano))
-    prova("...a chi guarda l'altra parte non diciamo «non sappiamo "
-          "niente»: diciamo che non possiamo dirglielo", True,
-          "Chi è l'altra persona non possiamo dirtelo" in piano)
+    # (12 ott 2026, chi-e-l-altro) i tre posti che parlavano a chi prende
+    # da Nostr — gli avvisi, l'interruttore, il foglio dove si prende —
+    # non esistono piu': nessuno resta sconosciuto scambiando da Barattolo
+    prova("...e nessun testo dice piu' a chi prende da Nostr che resta sconosciuto",
+          (False, False, False),
+          ("per lei resti sconosciuto" in piano,
+           "in tutti e due i casi" in piano and "Fatti riconoscere" in piano,
+           "Per chi ha pubblicato resti sconosciuto" in piano))
+    # (12 ott 2026) e a chi guarda l'altra parte si dice SOLO il vero,
+    # per motivo: non ancora detto, un'altra app, anonima per scelta,
+    # uno scambio di prima della regola
+    prova("...a chi guarda l'altra parte si dice il vero, per motivo (tre casi)", True,
+          "Chi è l\\'altra persona non lo sappiamo ancora" in piano
+          and "ha scelto di restare anonima" not in piano
+          and "scambia da un\\'altra app, non da Barattolo" in piano
+          and "lo scambio è di prima del 12 ottobre 2026" in piano)
     guida = " ".join(open(os.path.join("docs", "GUIDA-P2P-PASSI.md"),
                           encoding="utf-8").read().split())
+    # (12 ott 2026) la guida dice la regola nuova: niente interruttore,
+    # l'anonimato e' una chiave nuova, e i testi di ieri sono usciti
     prova("...e la guida cita i testi nuovi, non quelli di ieri",
-          (True, True, True, []),
-          ("«🕶️ Per chi ha pubblicato resti sconosciuto: sei entrato con un "
-           "profilo senza nome, e non saprà chi sei." in guida,
-           "per l'altra parte resti sconosciuto e su quegli scambi non ci "
-           "sono recensioni. L'esito dello scambio si scrive sul tuo account "
-           "in tutti e due i casi.»" in guida,
-           "«Da ora, quando prendi un ordine, l'altra persona non ti vede "
-           "(gli scambi già presi restano)»" in guida,
+          (True, True, False, []),
+          ("entra con una chiave Nostr nuova" in guida,
+           "scambia da un'altra app, non da Barattolo" in guida,
+           "Per chi ha pubblicato resti sconosciuto" in guida
+           or "Fatti riconoscere negli scambi" in guida,
            [f for f in ("Tu resti anonimo", "non vengono annotate",
                         "resti invisibile") if f in guida]))
     prova("i tentativi: il gesto, mai la fattura ne' il pagamento",
@@ -146070,7 +146023,8 @@ function nomeControparteP2P(o, altrimenti){ return altrimenti; }
 """ + "".join(_fn_js(m, f) for f in (
         "function completatiP2P(n, inRiga){", "function stellineP2P(f){",
         "function gestoRecensioneP2P(o, rec){",
-        "function riquadroRecensioneP2P(o, rec){", "function moduloRecensioneP2P(o){")) + r"""
+        "function riquadroRecensioneP2P(o, rec){", "function moduloRecensioneP2P(o){",
+        "function testoRecensioneMancanteP2P(motivo){")) + r"""
 const c = {};
 c.riga = [0, 1, 2, 12, 'x', -3].map(n => completatiP2P(n, true));
 c.box = [completatiP2P(1), completatiP2P(12), completatiP2P(0)];
@@ -149610,12 +149564,169 @@ def prove_canale_admin():
            in pezzo("callback_banner")))
 
 
+
+def prove_chi_e_l_altro():
+    """CHI E' L'ALTRO (12 ott 2026, cantiere chi-e-l-altro, decisione di
+    Andrea, dal caso ea0af71a: Alan leggeva «non possiamo dirtelo» e
+    «non ha un profilo su Barattolo» di Sweegmiao, che un profilo ce l'ha
+    ma, entrato da Nostr, era anonimo di serie).
+
+    LA REGOLA: chi scambia DA Barattolo e' riconosciuto dalla controparte
+    con qualunque login; «Fatti riconoscere» resta, ACCESO di serie; chi
+    lo spegne resta anonimo e all'altra parte si dice che l'ha scelto;
+    chi scambia da un'altra app Mostro resta sconosciuto e si dice quello;
+    gli scambi di prima non si toccano; a chi aveva il vecchio default
+    un avviso una tantum. Qui: i due giudici del server eseguiti su un
+    database in memoria, e le sentinelle su rotte, pagina e patto."""
+    print("\n[chi e' l'altro: riconosciuto, anonimo per scelta, un'altra app]")
+    import sqlite3 as _sq
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    nudo = lambda t: re.sub(r"/\*[\s\S]*?\*/", "", t)
+
+    # --- 1) I MOTIVI DELLO SCONOSCIUTO, sul giudice vero ----------------
+    amb = {"re": re, "time": time}
+    for nome in ("STATI_LIBRO_PRESO", "P2P_MOMENTI_FINALI", "P2P_MOMENTI_IN_CORSO",
+                 "MOTIVI_SCONOSCIUTO_P2P"):
+        m = re.search(nome + r" = \(.*?\)\n", src, re.S)
+        exec(m.group(0), amb)
+    exec(pezzo("_parti_scambio_p2p"), amb)
+    exec(pezzo("_motivo_sconosciuto_p2p"), amb)
+    exec(pezzo("_motivi_controparti_p2p"), amb)
+    exec(pezzo("_avviso_riconosci_p2p"), amb)
+    exec(pezzo("_p2p_riconosciuto"), amb)
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.executescript("""
+      CREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, tg_id INTEGER, preso_da INTEGER DEFAULT 0,
+                              stato TEXT, lato TEXT, tornati INTEGER DEFAULT 0);
+      CREATE TABLE p2p_scambi(ordine TEXT PRIMARY KEY, compratore INTEGER, venditore INTEGER, giro INTEGER);
+      CREATE TABLE p2p_momenti(ordine TEXT, giro INTEGER, momento TEXT, quando INTEGER, fonte TEXT);
+      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, riconosci_p2p INTEGER DEFAULT 0,
+                          avviso_riconosci INTEGER DEFAULT 0);
+      CREATE TABLE chiavi_p2p(pubkey TEXT PRIMARY KEY, tg_id INTEGER);
+      INSERT INTO utenti VALUES(111, 0, 0);
+      INSERT INTO utenti VALUES(-77, 0, 0);   -- nativo, vecchio default, mai avvisato
+      INSERT INTO utenti VALUES(-66, 0, 0);   -- un altro nativo col vecchio default (la presa mai annotata)
+      INSERT INTO utenti VALUES(-55, 1, 1);   -- nativo che si era gia' fatto riconoscere
+      INSERT INTO chiavi_p2p VALUES('k77', -77);
+      -- a) chi vende 111 ha pubblicato, il nativo -77 ha preso: mostrod l'ha detto, la presa NON e' annotata
+      INSERT INTO p2p_ordini VALUES('o-prima', 111, 0, 'in-progress', 'sell', 0);
+      INSERT INTO p2p_scambi VALUES('o-prima', -77, 111, 1);
+      INSERT INTO p2p_momenti VALUES('o-prima', 1, 'preso', 100, 'mostro');
+      -- b) il nativo -66, un altro scambio di prima: la presa non annotata
+      INSERT INTO p2p_ordini VALUES('o-anon', 111, 0, 'in-progress', 'sell', 0);
+      INSERT INTO p2p_scambi VALUES('o-anon', -66, 111, 1);
+      INSERT INTO p2p_momenti VALUES('o-anon', 1, 'preso', 100, 'mostro');
+      -- c) un altro client Mostro ha preso: la sua chiave non e' di nessuno
+      INSERT INTO p2p_ordini VALUES('o-est', 111, 0, 'in-progress', 'sell', 0);
+      INSERT INTO p2p_scambi VALUES('o-est', 0, 111, 1);
+      INSERT INTO p2p_momenti VALUES('o-est', 1, 'preso', 100, 'mostro');
+      -- d) mostrod non ha ancora detto niente
+      INSERT INTO p2p_ordini VALUES('o-muto', 111, 0, 'pending', 'sell', 0);
+      -- e) la presa annotata (il nuovo default): un volto, nessun motivo
+      INSERT INTO p2p_ordini VALUES('o-visto', 111, -55, 'in-progress', 'sell', 0);
+      INSERT INTO p2p_scambi VALUES('o-visto', -55, 111, 1);
+    """)
+    mot = amb["_motivo_sconosciuto_p2p"]
+    prova("il nativo col vecchio default che ha preso: «anonimo_prima» (lo scambio di prima, la promessa resta)",
+          "anonimo_prima", mot(con, "o-prima", 111))
+    prova("un altro scambio di prima, stessa cosa: «anonimo_prima» (un caso «per scelta» non esiste piu')",
+          "anonimo_prima", mot(con, "o-anon", 111))
+    prova("una chiave che non e' di nessuno dei nostri: «esterno» (un'altra app)", "esterno", mot(con, "o-est", 111))
+    prova("mostrod non ha detto niente: «ignota»", "ignota", mot(con, "o-muto", 111))
+    prova("chi non e' una delle due parti legge «ignota», sempre", ["ignota", "ignota", "ignota"],
+          [mot(con, "o-prima", 222), mot(con, "o-anon", 222), mot(con, "o-est", 222)])
+    prova("...e dall'altro lato il giudizio e' lo stesso (il nativo guarda chi vende: un volto, niente motivo)",
+          {}, amb["_motivi_controparti_p2p"](con, ["o-prima"], -77, {"o-prima": {"nome": "x"}}))
+    prova("i motivi per piu' ordini, solo dove un volto non c'e', e mai «ignota»",
+          {"o-prima": "anonimo_prima", "o-anon": "anonimo_prima", "o-est": "esterno"},
+          amb["_motivi_controparti_p2p"](con, ["o-prima", "o-anon", "o-est", "o-muto", "o-visto"], 111,
+                                         {"o-visto": {"nome": "y"}}))
+    prova("i tre motivi stanno in una tupla sola", ("esterno", "anonimo_prima", "ignota"),
+          amb["MOTIVI_SCONOSCIUTO_P2P"])
+    # --- 2) IL GIUDICE DEL RICONOSCIMENTO E L'AVVISO UNA TANTUM ---------
+    ric, avv = amb["_p2p_riconosciuto"], amb["_avviso_riconosci_p2p"]
+    u = lambda tg: con.execute("SELECT * FROM utenti WHERE tg_id=?", (tg,)).fetchone()
+    prova("riconosciuti tutti: Telegram e i nativi, col vecchio zero o gia' accesi",
+          [True, True, True, True], [ric(con, 111), ric(con, -77), ric(con, -55), ric(con, -66)])
+    prova("l'avviso una tantum va SOLO al nativo col vecchio default che il P2P l'ha usato",
+          [False, True, False, False], [avv(con, u(111)), avv(con, u(-77)), avv(con, u(-66)), avv(con, u(-55))])
+    con.execute("INSERT INTO utenti VALUES(-44, 0, 0)")    # nativo nuovo, mai una chiave
+    prova("...non a un nativo che non ha mai usato il P2P", False, avv(con, u(-44)))
+    con.execute("UPDATE utenti SET avviso_riconosci=1 WHERE tg_id=-77")
+    prova("...e dopo «Ho capito» non torna", False, avv(con, u(-77)))
+    con.close()
+
+    # --- 3) LE SENTINELLE: rotte, pagina, patto --------------------------
+    rot = codice(pezzo("controparte_p2p"))
+    prova("la rotta della controparte porta anche i motivi, calcolati dal giudice", True,
+          '"motivi": motivi' in rot and "_motivi_controparti_p2p(" in rot)
+    cp = codice(pezzo("_controparti_p2p"))
+    prova("chi ha preso senza la presa annotata (lo scambio di prima) vede chi ha pubblicato: lo dice mostrod, e il volto e' gia' pubblico", True,
+          "if not altro and maker and io != maker:" in cp
+          and "LEFT JOIN p2p_scambi s ON s.ordine = o.ordine" in cp
+          and "if io in parti and maker in parti:" in cp)
+    rec = codice(pezzo("recensibile_p2p"))
+    prova("la recensibilita' precisa «ignota» col giudice dei motivi", True,
+          'if motivo == "ignota":' in rec and "_motivo_sconosciuto_p2p(con2, ordine, user[\"id\"])" in rec)
+    me = codice(pezzo("mio_profilo"))
+    prova("/api/me dice il riconoscimento DERIVATO dal giudice, e l'avviso una tantum", True,
+          '_ric = 1 if (u and _p2p_riconosciuto(con, user["id"])) else 0' in me
+          and '_avv = _avviso_riconosci_p2p(con, u) if u else False' in me
+          and me.index("_avv = _avviso_riconosci_p2p") < me.index("con.close()")
+          and 'profilo["avviso_riconosci"] = _avv' in me)
+    prova("la rotta «avviso letto» esiste e scrive la colonna", True,
+          '@app.post("/api/me/avviso-riconosci-visto")' in src
+          and "UPDATE utenti SET avviso_riconosci=1 WHERE tg_id=?" in codice(pezzo("avviso_riconosci_visto")))
+    gate = codice(pezzo("registra_ordini_p2p"))
+    prova("il cancello della presa chiede ancora al giudice unico (che ora dice si' di serie)", True,
+          "_p2p_riconosciuto(con, user[\"id\"])" in gate)
+    # la pagina
+    ch = nudo(fn("async function chiediContropartiP2P(ids){"))
+    prova("la pagina tiene i motivi accanto ai volti, e un motivo nuovo ridisegna", True,
+          "p2pContropartiMotivo[id] = String(motivi[id]); nuove++;" in ch)
+    pc = nudo(fn("function profiloControparteP2P(o){"))
+    prova("...e senza volto dice la frase del motivo, mai piu' «non possiamo dirtelo»", True,
+          "testoContropartePerMotivoP2P(p2pContropartiMotivo[o.id] || '')" in pc
+          and "non possiamo dirtelo" not in pc)
+    tx = nudo(fn("function testoContropartePerMotivoP2P(motivo){"))
+    prova("le tre frasi: un'altra app, scambio di prima, non ancora detto — e nessuna «per scelta»",
+          [True, False, True, True],
+          ["scambia da un\\'altra app, non da Barattolo" in tx,
+           "ha scelto di restare anonima" in tx,
+           "lo scambio è di prima del 12 ottobre 2026" in tx,
+           "non lo sappiamo ancora" in tx])
+    rm = nudo(fn("function testoRecensioneMancanteP2P(motivo){"))
+    prova("...e le tre della recensione che non c'e'", [True, False, True, True],
+          ["scambia da un\\'altra app e non ha un profilo su Barattolo" in rm,
+           "ha scelto di restare anonima" in rm,
+           "Scambio di prima del 12 ottobre 2026" in rm,
+           "non lo sappiamo: non c\\'è un posto" in rm])
+    av = nudo(fn("function mostraAvvisoRiconosciP2P(){"))
+    prova("l'avviso una tantum: solo a un nativo, una domanda unica con «Ho capito», che lo registra al server, e la strada dell'anonimato e' una chiave nuova", True,
+          "!(myTgId < 0)) return;" in av and "etichetta: 'Ho capito'" in av
+          and "/me/avviso-riconosci-visto`" in av and "ti riconosce negli scambi" in av
+          and "entra con una chiave Nostr nuova" in av)
+    prova("...e parte dal /api/me, una volta, se il server lo chiede", True,
+          "if (me.avviso_riconosci === true && typeof mostraAvvisoRiconosciP2P === 'function')" in mini)
+    # il patto e il cassetto
+    dati = mini[mini.index('<h3 id="priv-p2p">'):]
+    dati = dati[:dati.index('<h3 id="priv-tor">')]
+    prova("il patto: riconosciuto con qualunque login, il collegamento solo alla controparte, l'anonimato e' una chiave nuova, il passato intatto",
+          [True, True, True, True],
+          ["riconosciuto dall'altra persona</b> con qualunque modo di entrare" in dati,
+           "lo mostra solo all'altra parte di quello scambio: mai in pubblico, mai sui relay" in dati,
+           "chiave Nostr nuova" in dati and "ha scelto di restare anonima" not in dati,
+           "quella promessa resta valida sul passato" in dati])
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_controllo_fattura_p2p, prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_tor_chiavi_scambio, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,

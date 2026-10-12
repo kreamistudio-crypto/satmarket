@@ -28157,9 +28157,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   e fra quali due account. La cronaca si cancella a 40 giorni
   (`_pulisci_memoria_p2p`) e con «Dimentica il profilo»; la fusione
   dei conti porta con sé le tre tabelle. Chi entra da Nostr riceve i
-  SUOI avvisi (le sue chiavi sono in `chiavi_p2p` per questo), ma
-  `preso_da` continua a non scriversi senza «Fatti riconoscere», quindi
-  il suo nome non esce negli avvisi altrui. Sul lato mostrod:
+  SUOI avvisi (le sue chiavi sono in `chiavi_p2p` per questo). Dal 12
+  ott 2026 («chi-e-l-altro», decisione di Andrea con Alan) `preso_da` si
+  scrive per TUTTI: l'interruttore «Fatti riconoscere» è uscito, chi
+  scambia da Barattolo è riconosciuto dalla controparte con qualunque
+  login, e per l'anonimato c'è una chiave Nostr nuova; il passato
+  (prese mai annotate) resta com'era. Sul lato mostrod:
   `deploy/mostro/` (`barattolo_eventi.rs`, 24 agganci, fire-and-forget:
   8 s + un retry a 12 s in un task suo, mai bloccante). Il verbale:
   CANTIERI, «Mostro è l'unica fonte degli avvisi P2P».
@@ -29471,7 +29474,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   chiunque abbia una sessione (è la faccia che sta già sulla card),
   questa risponde **solo a una delle due parti** di quello scambio,
   perché chi ha PRESO un ordine non sta su nessuna card. `_controparti_p2p`
-  guarda la riga di `p2p_ordini` dai due lati (`tg_id`, `preso_da`) e
+  guarda la riga di `p2p_ordini` dai due lati (`tg_id`, `preso_da`; dal
+  12 ott 2026 con le due parti di mostrod nella stessa query, così chi
+  ha preso senza la presa annotata vede comunque chi ha pubblicato) e,
+  per chi un volto non ce l'ha, porta un MOTIVO vero — `esterno`
+  (un'altra app Mostro), `anonimo_prima` (uno scambio di prima del 12
+  ott), `ignota` (il coordinatore non ha detto niente) — che la pagina
+  traduce in tre frasi; `recensibile` precisa «ignota» allo stesso modo.
+  Il giudice: `_motivo_sconosciuto_p2p`. Guarda la riga dai due lati e
   serve sempre L'ALTRO; a un estraneo non dà un errore ma una risposta
   SENZA quell'id — indistinguibile da un ordine che non esiste, e lo è
   apposta. POST e non GET come per i volti: gli id in una query

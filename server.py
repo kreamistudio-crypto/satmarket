@@ -7322,6 +7322,16 @@ def init_db():
                     # regalerebbe un'identita' che nessuno ha chiesto
                     # di dare. Giudice unico: `_p2p_riconosciuto`.
                     "riconosci_p2p INTEGER DEFAULT 0",
+                    # «FATTI RICONOSCERE» E' USCITO (12 ott 2026, cantiere
+                    # chi-e-l-altro, decisione di Andrea con Alan): chi
+                    # scambia DA Barattolo e' riconosciuto dalla
+                    # controparte con qualunque login, e chi vuole
+                    # l'anonimato entra con una chiave Nostr nuova. La
+                    # colonna qui sopra resta per il passato (lo zero di
+                    # chi non si era fatto riconoscere) e per l'avviso una
+                    # tantum qui sotto: 1 = gli abbiamo detto che da ora
+                    # l'altra persona lo riconosce.
+                    "avviso_riconosci INTEGER DEFAULT 0",
                     # «NON MOSTRARMI IN CLASSIFICA» (set 2026, ritocchi
                     # piccoli, decisione di Andrea): 1 = il suo nome non
                     # esce dalla classifica pubblica. Il LIVELLO invece
@@ -40901,8 +40911,20 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # server sa ogni passo dalla patch 0007, e il telefono che apre
     # l'app nel mercatino non ascolta i relay — vedi `_quanti_tocca_p2p`
     p2p_tocca = _quanti_tocca_p2p(con, user["id"], int(time.time()))
+    # (12 ott 2026) il giudizio e l'avviso si leggono PRIMA di chiudere
+    _ric = 1 if (u and _p2p_riconosciuto(con, user["id"])) else 0
+    _avv = _avviso_riconosci_p2p(con, u) if u else False
     con.close()
     profilo = dict(u) if u else {}
+    # IL RICONOSCIMENTO LO DICE IL GIUDICE (12 ott 2026, chi-e-l-altro):
+    # acceso di serie, spento solo da chi ha scelto l'anonimato — la
+    # colonna `riconosci_p2p` da sola direbbe ancora il default di ieri.
+    # E L'AVVISO UNA TANTUM: a chi aveva il vecchio default (nativo,
+    # mai toccato l'interruttore, con un profilo di scambio gia' usato)
+    # si dice una volta che da ora viene riconosciuto e come spegnerlo.
+    if u:
+        profilo["riconosci_p2p"] = _ric
+        profilo["avviso_riconosci"] = _avv
     # LA FOTO SPENTA NON ESCE NEMMENO A LUI (ago 2026): questa era
     # l'unica rotta che mandava l'avatar GREZZO — «e' il tuo profilo,
     # devi vedere cosa hai» — ed e' precisamente cio' che faceva
@@ -43449,34 +43471,82 @@ async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header("")
          "avvisi_nuovi_soglia": soglia})}
 
 
-@app.post("/api/me/riconoscimi-p2p")
-async def scegli_riconoscimi_p2p(req: Request, x_tg_init_data: str = Header(""),
+def _avviso_riconosci_p2p(con, u) -> bool:
+    """PURA sulla connessione: va mostrato l'avviso una tantum del 12 ott
+    2026? Solo a un nativo Nostr che aveva il vecchio default (anonimo
+    di serie: `riconosci_p2p` 0, avviso mai dato) e che il P2P l'aveva
+    gia' usato (una chiave di scambio registrata): a chi arriva dopo il
+    cambio, o si era gia' fatto riconoscere, non c'e' niente da
+    annunciare."""
+    try:
+        if int(u["tg_id"] or 0) >= 0:
+            return False
+        if int(u["avviso_riconosci"] or 0) or int(u["riconosci_p2p"] or 0):
+            return False
+    except (KeyError, IndexError, TypeError):
+        return False
+    return bool(con.execute("SELECT 1 FROM chiavi_p2p WHERE tg_id=? LIMIT 1",
+                            (u["tg_id"],)).fetchone())
+
+
+@app.post("/api/me/avviso-riconosci-visto")
+async def avviso_riconosci_visto(x_tg_init_data: str = Header(""),
                                  barattolo_sessione: str = Cookie("")):
-    """«Fatti riconoscere negli scambi» (17 set 2026, decisione di
-    Andrea): chi entra da Nostr lo accende per farsi annotare quando
-    PRENDE un ordine — cosi' l'altra parte vede il suo profilo e le due
-    possono recensirsi. Spento di serie, e spento vuol dire invisibile:
-    su quegli scambi non ci sono recensioni, in nessuno dei due versi.
-    Un si' o un no, come i suggerimenti e come gli avvisi.
-    ⚠️ A CHI ENTRA DA TELEGRAM SI RISPONDE NO, e non e' pignoleria: lui
-    e' riconosciuto da sempre (la sua presa si annota dal 16 set), il
-    cassetto l'interruttore non glielo mostra, e accettare un «spegni»
-    che non spegne niente sarebbe una promessa che non manteniamo — il
-    patto del bottone che non deve poter mentire.
-    IL PREGRESSO NON SI TOCCA: vedi `_p2p_riconosciuto`, dove c'e'
-    scritto perche' e qual e' il gesto che invece lo cancella."""
+    """«Ho capito» sull'avviso una tantum del riconoscimento (12 ott
+    2026: da ora l'altra persona ti riconosce; per l'anonimato una chiave
+    nuova): da qui non si ripropone. Nessun corpo."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    if user["id"] > 0:
-        raise HTTPException(409, "Chi entra da Telegram e' gia' "
-                                 "riconosciuto negli scambi")
-    d = await leggi_json(req)
-    attivo = 1 if d.get("attivo") else 0
     con = db()
-    con.execute("UPDATE utenti SET riconosci_p2p=? WHERE tg_id=?",
-                (attivo, user["id"]))
+    con.execute("UPDATE utenti SET avviso_riconosci=1 WHERE tg_id=?", (user["id"],))
     con.commit()
     con.close()
-    return {"ok": True, "attivo": bool(attivo)}
+    return {"ok": True}
+
+
+# I MOTIVI DELLO SCONOSCIUTO (12 ott 2026, chi-e-l-altro): quando
+# l'altra parte non ha un volto da mostrare, la pagina deve dire SOLO
+# quel che e' vero. `esterno` = il coordinatore l'ha nominata e la sua
+# chiave non e' di nessuno dei nostri (un altro client Mostro);
+# `anonimo_prima` = e' dei nostri ma la presa non e' annotata: uno
+# scambio di prima del 12 ott 2026, quando chi entrava da Nostr restava
+# anonimo di serie — la promessa di allora vale sul passato; `ignota` =
+# il coordinatore non ha ancora detto niente, o chi chiede non e' una
+# delle due parti. (Il caso «ha scelto di restare anonimo» non esiste:
+# l'interruttore e' uscito, e l'anonimato e' una chiave Nostr nuova.) La
+# sola fonte e' quel che il server gia' sa (`p2p_scambi` + `chiavi_p2p`):
+# niente di nuovo si scrive, e niente esce verso chi non e' della partita.
+MOTIVI_SCONOSCIUTO_P2P = ("esterno", "anonimo_prima", "ignota")
+
+
+def _motivo_sconosciuto_p2p(con, ordine: str, io: int) -> str:
+    """Uno dei `MOTIVI_SCONOSCIUTO_P2P`, per chi chiede `io`."""
+    parti = _parti_scambio_p2p(con, ordine)
+    if parti.get("fonte") != "mostro":
+        return "ignota"
+    io = int(io or 0)
+    compra, vende = int(parti["compratore"] or 0), int(parti["venditore"] or 0)
+    if io and io == compra:
+        altro = vende
+    elif io and io == vende:
+        altro = compra
+    else:
+        return "ignota"
+    if not altro:
+        return "esterno"
+    return "anonimo_prima"
+
+
+def _motivi_controparti_p2p(con, ordini, io: int, serviti) -> dict:
+    """{ordine: motivo} per gli ordini chiesti di cui NON e' uscito un
+    volto; `serviti` sono quelli col volto. Pura sulla connessione."""
+    fuori = {}
+    for o in ordini:
+        if o in serviti:
+            continue
+        m = _motivo_sconosciuto_p2p(con, o, io)
+        if m != "ignota":
+            fuori[o] = m
+    return fuori
 
 
 @app.post("/api/me/classifica-nascosta")
@@ -47092,14 +47162,28 @@ def _controparti_p2p(con, ordini, io: int, adesso) -> dict:
     if not io:
         return {}
     segni = ",".join("?" * len(pulite))
+    # (12 ott 2026) con le due parti dette da mostrod nella STESSA query:
+    # restano due query e non N, com'e' scritto sotto
     righe = con.execute(
-        f"SELECT ordine, tg_id, preso_da FROM p2p_ordini "
-        f"WHERE ordine IN ({segni})", pulite).fetchall()
+        f"SELECT o.ordine, o.tg_id, o.preso_da, s.compratore, s.venditore "
+        f"FROM p2p_ordini o LEFT JOIN p2p_scambi s ON s.ordine = o.ordine "
+        f"WHERE o.ordine IN ({segni})", pulite).fetchall()
     # ordine -> il tg_id DELL'ALTRO, per le sole righe di cui sono parte
     altri = {}
     for r in righe:
         maker, taker = int(r["tg_id"] or 0), int(r["preso_da"] or 0)
         altro = taker if io == maker else (maker if io == taker else 0)
+        # CHI HA PRESO SENZA LA PRESA ANNOTATA vede comunque chi ha
+        # pubblicato (12 ott 2026, chi-e-l-altro): il volto di chi
+        # pubblica sta gia' sulla card del libro, e che io sia l'altra
+        # parte lo dice mostrod (`p2p_scambi`, le due trade key tradotte
+        # da `chiavi_p2p`). E' lo scambio di prima della regola nuova:
+        # il nativo che allora restava anonimo non deve restare anche
+        # cieco. Niente di nuovo esce: solo un volto gia' pubblico.
+        if not altro and maker and io != maker:
+            parti = {int(r["compratore"] or 0), int(r["venditore"] or 0)}
+            if io in parti and maker in parti:
+                altro = maker
         # `altro == io` non capita (un ordine non si prende da soli, e
         # mostrod lo rifiuta), ma se capitasse sarebbe il proprio volto
         # servito come se fosse quello di un altro: si tace.
@@ -47438,11 +47522,15 @@ async def controparte_p2p(req: Request, x_tg_init_data: str = Header(""),
     try:
         chi = _controparti_p2p(con, (d or {}).get("ordini"), user["id"],
                                int(time.time()))
+        # ...e per chi non ha un volto, il PERCHE' (12 ott 2026): la
+        # pagina dice solo quel che e' vero
+        motivi = _motivi_controparti_p2p(
+            con, _ordini_puliti_p2p((d or {}).get("ordini")), user["id"], chi)
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
         con.close()
-    return {"controparti": chi}
+    return {"controparti": chi, "motivi": motivi}
 
 
 # ═══ IL PAYCODE NON PARTE VERSO CHI NON RICONOSCIAMO (24 set 2026) ═══
@@ -47771,6 +47859,15 @@ async def recensibile_p2p(req: Request, x_tg_init_data: str = Header(""),
     if not r:
         return {"si": False, "motivo": "ignota", "gia": False}
     per, motivo = _parti_recensione_p2p(r["tg_id"], r["preso_da"], user["id"])
+    # «IGNOTA» SI PRECISA (12 ott 2026, chi-e-l-altro): da un'altra app,
+    # anonima per scelta, o uno scambio di prima della regola — cosi'
+    # la pagina non dice «non ha un profilo» a chi ce l'ha
+    if motivo == "ignota":
+        con2 = db()
+        try:
+            motivo = _motivo_sconosciuto_p2p(con2, ordine, user["id"])
+        finally:
+            con2.close()
     # ⚠️ E A CHI NON E' DELLA PARTITA SI RISPONDE COME A UN ID CHE NON
     # ESISTE (la lezione di Q3: «non ti riconosco» si serve COME una
     # lista vuota). Distinguere i due casi direbbe a chiunque abbia una
@@ -53189,11 +53286,15 @@ def _p2p_riconosciuto(con, tg_id: int) -> bool:
     stata scritta, e una recensione non si ritira spegnendo una leva.
     A cancellare il pregresso c'e' «Dimentica il profilo», che e' il
     gesto che esiste per quello e che porta via anche i volti."""
-    if tg_id > 0:
-        return True
-    r = con.execute("SELECT riconosci_p2p FROM utenti WHERE tg_id=?",
-                    (tg_id,)).fetchone()
-    return bool(r and r[0])
+    # DAL 12 OTT 2026 (cantiere chi-e-l-altro, decisione di Andrea con
+    # Alan) l'interruttore NON ESISTE PIU': chi scambia da Barattolo e'
+    # riconosciuto dalla controparte con qualunque login — nsec, bunker,
+    # estensione — e chi vuole l'anonimato entra con una chiave Nostr
+    # nuova. Il passato resta com'era: le prese non annotate di prima
+    # non si riscrivono, e la promessa del 17 set vale su quegli scambi.
+    # Il giudice resta UNO, cosi' chi lo chiama non cambia, e dice si' a
+    # chiunque sia qualcuno (lo zero dell'anonimo in vetrina resta no).
+    return int(tg_id or 0) != 0
 
 
 def _passaggio_libro_p2p(prima: str, dopo: str, maker: int,
