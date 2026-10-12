@@ -50888,6 +50888,28 @@ niente; il solo-Contanti tutte da subito; un ordine d'acquisto a tre
 metodi (niente, poi con Contanti la regola di chi VENDE, poi PayPal
 niente); il mio ordine con regola e zona e senza cauzione. Le sentinelle
 sul testo in `prove_contanti_a_mano` (dettaglio e foglio dell'importo) e
-`prove_contanti_zona` (la zona chiesta col metodo scelto). TORTURA su una
+`prove_contanti_zona` (la zona chiesta col metodo scelto).
+
+**IL VERBALE DEL PUSH: cosa è girato su quale albero.** Tutto sull'albero
+del push (`2fc9b3d` + il cantiere: main non è corso). TORTURA su una
 copia del repo, sei mutazioni che rimettono il codice vecchio pezzo per
-pezzo: nel verbale del push, col giro dal vivo, la suite e i collaudi.
+pezzo, sei uccise: la regola sui metodi dell'ordine (3 rosse), la zona
+che non guarda la scelta (4), la zona chiesta coi metodi dell'ordine
+(4), la regola tolta dal mio ordine (2); DUE le prende la sola
+sentinella sul testo, e si dice: il tetto nel foglio dell'importo (il
+banco non esegue `confermaQuantoP2P`) e «il solo-Contanti perde la
+regola» (in pagina è la stessa cosa: `apriDettaglioP2P` sceglie da sé
+l'unico metodo, quindi la clausola «un metodo solo» è una cintura).
+GIRO DAL VIVO (Browser pane a larghezza telefono, copia in collaudo col
+relay morto, le DUE leve accese come in produzione, due ordini da 100 €
+seminati nel libro con la zona): il «SEPA, Contanti» appena aperto senza
+regola, senza zona e senza cauzione, con la riga del metodo fissato;
+scelto SEPA uguale; scelto Contanti «📍 Milano centro» sotto le
+pillole, «💵 Contanti di persona — al massimo 250 €…» e la riga della
+cauzione; di nuovo SEPA, sparite; il solo-Contanti con «📍 Rimini mare»,
+regola e cauzione da subito (quattro scatti in
+`.claude/giri/contanti-solo-scelti/`). Suite PROVE_SEVERE intera:
+22.483 passate, 0 fallite, 0 saltate. Collaudi del workflow nella
+gabbia: 62 su 62 verdi. Il fork NON è stato toccato né compilato (non
+serviva). LA CI DI MAIN prima del push: verde sulla punta `2fc9b3d`.
+Il sì al push è di Andrea: stava nel brief incollato («Ok al push»).
