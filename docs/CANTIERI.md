@@ -51832,6 +51832,24 @@ riserva se è a base 22.04 (§12.10, e l'avviso in testa alla lista «15
 ott» di §10). La cartella `registry-corestore.messo-da-parte-12ott` è
 stata tolta, con l'ok di Andrea. Solo documenti.
 
+**Secondo addendum, la notte del 12: i mentor su RGB e KaleidoSwap, e la
+decisione.** Le risposte confermano l'analisi del pomeriggio: `signet` e
+`signetcustom` sono reti RGB separate sulla stessa catena, e il WDK di
+UTEXO sta solo sulla prima. Una correzione: l'USDT del faucet è NIA, non
+IFA (lo zero di `issued_supply` è un difetto di visualizzazione): la
+deduzione di §12.2 era sbagliata, e l'ostacolo è uno solo, la marcatura.
+In più: Esplora e proxy di KaleidoSwap usabili tutto il weekend senza
+polling stretto; i wallet si caricano prima di arrivare (un milione di
+sats al giorno dal faucet); il pagamento RGB on-chain con una conferma
+vale per «Payments and checkout»; la consegna, istruzioni in arrivo; e il
+consiglio di provare in locale con un regtest. **Decisione di Andrea**:
+teniamo il WDK ed emettiamo noi dollaro di prova e punti come NIA su
+`signet` (Mutinynet); niente USDT di KaleidoSwap. In §12.11 le risposte,
+i sats (un milione il 13 dal fisso, un milione il 15 per il portatile di
+Alan), la regola del polling e il giudizio sul regtest: un banco di
+sviluppo sulla VM, da fare semmai il 16, mai al posto della migrazione.
+La migrazione del 13 aspetta l'ok di Andrea sul piano. Solo documenti.
+
 ## Chi è l'altro: riconosciuti tutti, l'anonimato è una chiave nuova (12 ott 2026, cantiere chi-e-l-altro, decisione di Andrea con Alan, dal caso ea0af71a)
 
 **Il caso.** Nello scambio ea0af71a (Alan vende, Sweegmiao compra entrando

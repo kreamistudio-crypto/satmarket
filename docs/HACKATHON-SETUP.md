@@ -1656,7 +1656,7 @@ recipient id, nelle fatture e nel genesis di ogni contratto.
 | Fatto | Fonte (letta o provata il 12 ott) |
 |---|---|
 | Il maker di KaleidoSwap dichiara `"network":"signetcustom"` | `https://api.signet.kaleidoswap.com/api/v1/market/assets` |
-| L'USDT di prova è «Tether USD», precisione 6, `issued_supply` 0; lo XAUT «Tether Gold», precisione 9, `issued_supply` 0. Un NIA non può nascere con zero unità emesse, un IFA sì: è la firma di un IFA (DEDUZIONE, lo schema non è scritto da nessuna parte: domanda 3) | la stessa API, e `…/api/v1/lsps1/get_info` |
+| L'USDT di prova è «Tether USD», precisione 6, `issued_supply` 0; lo XAUT «Tether Gold», precisione 9, `issued_supply` 0. Un NIA non può nascere con zero unità emesse, un IFA sì: sembrava la firma di un IFA (DEDUZIONE, **SMENTITA dai mentor la sera del 12**: l'USDT è NIA, e lo zero è un difetto di visualizzazione: 12.11) | la stessa API, e `…/api/v1/lsps1/get_info` |
 | Gli id sul faucet: USDT `rgb:lX~ToKsO-Iup7dJ5-UM794sA-9WD21ge-VHYzBGb-E9PA_h0`, XAUT `rgb:qrilKFY5-VBmdIOF-cH5ziA8-9K9MIFS-OwsjmXe-yOv3Oa8`; la pagina non dice né schema né rete | `https://faucet.mutinynet.kaleidoswap.com` (riletta il 12: invariata dal 9) |
 | Il wallet browser di KaleidoSwap apre signet/mutinynet come `SignetCustom`, e il commento dice che quei recipient id «won't validate against a standard `Signet` wallet»; fuori da mainnet accetta gli schemi `Nia` e `Ifa` | `kaleidoswap/wallet-engine` 1.0.0-beta.76, `src/adapters/wdk/RgbLibWasmAdapter.ts` (`toRgbNetwork`, `supportedSchemas`) |
 | Il loro adattatore NATIVO usa `@utexo/wdk-wallet-rgb ^2.0.3` con `network: 'signet'`, indexer `https://esplora.signet.kaleidoswap.com`, proxy `rpcs://proxy.iriswallet.com/0.2/json-rpc`: è il nostro stesso stack, e nei loro test i due wallet si scambiano un NIA emesso da loro (non ricevono dal faucet) | stesso repo, `src/adapters/wdk/RgbLibWdkAdapter.ts`, `test/integration/config.ts`, `test/integration/rgb-lib.mutinynet.integration.test.ts` |
@@ -1668,9 +1668,10 @@ recipient id, nelle fatture e nel genesis di ogni contratto.
 | Il kit non è cambiato dal 9: dà il proxy, NON dà un Esplora, non nomina `signetcustom`; consiglia «Qwen3.5 2B through QVAC» | `https://kaleidoswap.github.io/rgb-hackathon/` |
 | Su npm, il 12: `@utexo/wdk-wallet-rgb` 2.0.3 è ancora l'ultima; `@utexo/rgb-sdk` arriva alla 1.0.6; `@qvac/sdk` 0.21.0 e `@qvac/cli` 0.15.0 sono le ultime | `npm view` |
 
-Quindi fra l'USDT del faucet e il nostro wallet WDK gli ostacoli sono
-DUE, indipendenti: la marcatura (`sbc:` contro `sb:`) e lo schema (IFA,
-se la deduzione è giusta, contro `Nia, Cfa, Uda`).
+Quindi fra l'USDT del faucet e il nostro wallet WDK l'ostacolo è UNO, e
+basta: la marcatura (`sbc:` contro `sb:`). Lo schema no: la sera del 12
+i mentor hanno detto che l'USDT è NIA (12.11), e la deduzione dell'IFA
+qui sopra era sbagliata.
 
 ### 12.3 La scelta
 
@@ -1683,13 +1684,11 @@ se la deduzione è giusta, contro `Nia, Cfa, Uda`).
   rgb-lib `SIGNET`). Fra i nostri wallet tutto funziona; con faucet RGB,
   USDT e wallet di KaleidoSwap non c'è interoperabilità, e si dice
   apertamente (domanda 4, e la riga «Network» della dichiarazione).
-- **La marcatura sta nel genesis: si decide PRIMA di emettere.** Si
-  passa a `signetcustom` solo se UTEXO la sera del 12 dà un build o un
-  ramo pronto di `wdk-wallet-rgb`/`rgb-sdk` (domanda 2) E una prova di
-  45 minuti la mattina del 13 passa. Sarebbe una scelta per catena in
-  `rgb.py` (`BitcoinNetwork.SIGNET_CUSTOM`) e in
-  `punti.mjs`/`nwc-wdk.mjs` (`network`): mezz'ora di codice con le sue
-  prove. Senza risposta, o senza build: `signet`.
+- **La marcatura sta nel genesis, e si decide PRIMA di emettere: è
+  `signet`, DECISO la sera del 12** (12.11). I mentor hanno confermato
+  che il WDK di UTEXO e `rgb-sdk` stanno solo su `signet`: un build per
+  `signetcustom` non c'è, e la prova da 45 minuti della mattina del 13,
+  che era la condizione scritta qui fino a ieri, non si fa.
 
 **Cosa cambia rispetto a `948ac56` e alla lista «Domenica 11 ott».**
 Confermato: l'adattatore (`wdk-wallet-rgb` 2.0.3, lo stesso che usa
@@ -1904,8 +1903,8 @@ Aggiornato la sera del 12, dopo la scelta della macchina (12.10).
 | Giorno | Cosa | Chi | Tempo |
 |---|---|---|---|
 | lun 12 | Le undici domande nel topic (12.8) | Andrea | ☑ inviate |
-| lun 12, sera | Le risposte dei mentor: arrivate quelle di QVAC (12.4, 12.8); mancano RGB, KaleidoSwap e UTEXO, quindi la scelta fra `signet` e `signetcustom` (12.3) resta aperta. Alan ha mandato le due righe del Pop!_OS (24.04 LTS, glibc 2.39: 12.10); mancano quelle dell'altro portatile e la conferma di quale sia il 32 GB | Andrea le porta | |
-| mar 13, mattina | Il cantiere: la lista datata 13 con le correzioni di 12.3, l'alias del modello con la sua prova, la dichiarazione in §5 | sessione | 1,5 h |
+| lun 12, sera | Le risposte dei mentor: arrivate quelle di QVAC (12.4, 12.8) e quelle su RGB, KaleidoSwap e consegna (12.11). La marcatura è decisa: `signet`. Alan ha mandato le due righe del Pop!_OS (24.04 LTS, glibc 2.39: 12.10); mancano quelle dell'altro portatile e la conferma di quale sia il 32 GB | Andrea le porta | ☑ |
+| mar 13, mattina | Il piano in dieci righe ad Andrea e il suo ok (12.11); poi il cantiere: la lista datata 13 con le correzioni di 12.3 e i sats di 12.11, l'alias del modello con la sua prova, la dichiarazione in §5 | sessione | 1,5 h |
 | mar 13 | La migrazione sul FISSO, i dieci passi di §10 (comandi uno per riga, risposta attesa, Andrea incolla gli output); il giro dell'override solo se la riserva è a base 22.04 (12.10) | Andrea, la sessione legge | 3-4 h |
 | mar 13, sera | Gli id nei file, il backup a due catene, la chiavetta rinfrescata, il push (aspetta il sì di Andrea) | sessione | 1 h |
 | mer 14 | Niente: Andrea è a Lugano. `rgb_http.py` fermo dalla sera del 13 (il backup delle 03:30) | | |
@@ -1973,7 +1972,8 @@ di Andrea del 12).
    provare, su un portatile mai visto (la glibc è nota dal 12 sera: 2.39,
    variante originale; restano Vulkan e l'Arc). Il 16 è
    margine solo per quel che Alan può fare da solo.
-2. **Nessuna interoperabilità con KaleidoSwap.** I loro wallet e il
+2. **Nessuna interoperabilità con KaleidoSwap** (confermata dai mentor
+   la sera del 12: 12.11). I loro wallet e il
    faucet RGB non vedono i nostri asset, e noi non vediamo i loro. Si
    chiede (domanda 4) e si dichiara.
 3. **L'Esplora e il proxy di KaleidoSwap con settanta squadre.** Un
@@ -1985,10 +1985,10 @@ di Andrea del 12).
    provato sul fisso (12.4); resta da misurare sui portatili di Alan.
    La discesa è scritta: 2B, 0.8B, 600M.
 
-**La raccomandazione**: restare su `signet` con USDB e MOON nostri; il
-modello passa al 2B (provato); a `signetcustom` solo con un build pronto
-di UTEXO e una prova di 45 minuti la mattina del 13; il wallet della
-demo nasce il 15 sul portatile di Alan, senza traslochi (12.10).
+**La raccomandazione**, diventata DECISIONE di Andrea la sera del 12
+(12.11): `signet` con USDB e MOON nostri, NIA, e il WDK tenuto per il
+bonus; il modello passa al 2B (provato); il wallet della demo nasce il
+15 sul portatile di Alan, senza traslochi (12.10).
 
 **Le scelte di Andrea (12 ott, sera):**
 
@@ -2041,8 +2041,16 @@ Judging and submission
   risposta da mandargli).
 - **9 (QVAC, 12 ott sera)**: sì, `qvac serve` sul portatile, chiamato
   dalla pagina sulla stessa macchina, conta come on-device. ☑
-- **1-7, 10 e 11** (la rete RGB, KaleidoSwap, UTEXO, il giudizio, la
-  consegna): ☐.
+- **1, 3, 5, 6, 10 e 11 (RGB e KaleidoSwap, 12 ott sera)**: ☑ arrivate,
+  in 12.11. In breve: le due reti sono separate; l'USDT è NIA ma su
+  `signetcustom`; Esplora e proxy usabili senza polling stretto; i
+  wallet si caricano prima di arrivare; il pagamento on-chain con una
+  conferma vale per «Payments and checkout»; la consegna, istruzioni
+  nei prossimi giorni.
+- **2 (seconda metà), 4 e 7**: ☐. Che il WDK su `signet` valga per il
+  bonus la risposta 1 lo dà per buono; restano da sentire dalla loro
+  voce il giudizio sugli asset che i wallet di KaleidoSwap non tengono,
+  e la glibc con l'override.
 
 ### 12.9 La bozza della dichiarazione per la pull request
 
@@ -2164,3 +2172,115 @@ chiavi SSH della VM, …»). Sul portatile da 32 GB adesso servono:
 7. Da decidere il 15: se il portatile resta da Andrea fino al 17 (il 16
    torna a essere un giorno di prove) o torna a casa con Alan; e dove
    gira la sessione a Torino, con quali credenziali di GitHub.
+
+### 12.11 Le risposte dei mentor su RGB e KaleidoSwap (12 ott, sera), la decisione, i sats, il regtest
+
+Riportate da Andrea, coi LORO numeri; fra parentesi la nostra domanda di
+12.8.
+
+1. (la nostra 1) `signet` (`sb:`) e `signetcustom` (`sbc:`) sono reti RGB
+   separate sulla stessa catena Mutinynet. Faucet, maker e wallet di
+   KaleidoSwap stanno su `signetcustom`; il WDK di UTEXO (e `rgb-sdk`)
+   solo su `signet`: un wallet WDK non può ricevere dal loro faucet né
+   dai loro wallet. È quel che 12.2 aveva trovato.
+2. (la nostra 3) L'USDT del faucet è **NIA**: `issued_supply` 0 è un
+   difetto di visualizzazione. La deduzione di 12.2 («la firma di un
+   IFA») era SBAGLIATA, ed è corretta lì. Resta fuori lo stesso: è su
+   `signetcustom`, e UTEXO non lo può tenere.
+4. (la nostra 5) L'Esplora e il proxy di KaleidoSwap si possono usare
+   tutto il weekend, **senza polling stretto**; `mutinynet.com/api` va
+   come riserva ma ha un limite di richieste, e in sede l'IP è
+   condiviso.
+5. (la nostra 6) I wallet si caricano PRIMA di arrivare: BTC da
+   `faucet.mutinynet.com`, fino a 1.000.000 di sats per IP, per utente e
+   per indirizzo ogni 24 ore.
+6. (la nostra 10) Un pagamento RGB on-chain con una conferma **vale per
+   «Payments and checkout»**; RGB su Lightning è un bonus.
+7. (la nostra 11) Le istruzioni per la consegna arrivano nei prossimi
+   giorni.
+
+E un consiglio loro: provare tutto in locale con un regtest.
+
+**La decisione di Andrea (12 ott, sera)**: teniamo il WDK (bonus +5) ed
+emettiamo noi il dollaro di prova e i punti fedeltà come NIA su `signet`
+(Mutinynet). Niente USDT di KaleidoSwap. La migrazione del 13 parte dopo
+il suo ok al piano.
+
+**Cosa cambia rispetto a 12.3-12.7:**
+
+- **La marcatura è decisa** (`signet`): la condizione su UTEXO e la
+  prova da 45 minuti della mattina del 13 cadono.
+- **L'ostacolo dell'USDT è uno solo**, la marcatura: lo schema è NIA.
+  Non cambia la scelta.
+- **Il checkout on-chain è nel filone giusto**: il pagamento diretto in
+  USDB con una conferma, com'è disegnato in §11.2, vale. RGB su
+  Lightning non lo inseguiamo.
+- **Niente polling stretto.** Il server non interroga il wallet mercante
+  a tempo fisso: fa `refresh` ogni 30 secondi (un blocco) e SOLO finché
+  un trasferimento è in attesa, poi smette. È lavoro del weekend; qui è
+  la regola. `rgb_http.py` va in rete a ogni richiesta: le pagine lo
+  chiamano quando serve, non in un ciclo.
+- **In sede il tunnel e il traffico verso l'Esplora passano
+  dall'hotspot**, non dal Wi-Fi della sala (lo diceva già §11.3): l'IP
+  non è condiviso con le altre squadre, e la riserva `mutinynet.com/api`
+  resta usabile.
+- **La consegna**: la bozza di 12.9 resta com'è, in attesa delle loro
+  istruzioni.
+
+**I sats: quanti, e quando.** STIMA dei consumi dal giro del 1 ott: una
+transazione RGB costa 300-500 sats di fee, e un UTXO colorabile ne
+immobilizza 1.000.
+
+| Quando, da dove | Dal faucet | A chi |
+|---|---|---|
+| mar 13, dal fisso (login GitHub di Andrea) | 1.000.000, il tetto delle 24 ore | `barattolo` 600.000 (il mercante, e la scorta di casa: fa da faucet agli altri con `rgb.py btc`), `to-the-mooon` 150.000, `usdb` 100.000, il wallet utente di prova del fisso 150.000 |
+| gio 15, da casa di Andrea (sono passate 48 ore) | 1.000.000 | il wallet della demo sul portatile di Alan 300.000, quello del portatile di riserva 100.000 (se si installa), `barattolo` altri 600.000 |
+
+La migrazione del 13 ne consuma meno di 50.000 (gli UTXO e una manciata
+di invii). Un ordine intero della demo (pagamento in USDB, 40 MOON
+spesi, bonus, riscatto del premio: quattro trasferimenti) costa sui
+3.500 sats fra fee e UTXO nuovi, sommando i tre wallet: cento ordini di
+prova nel weekend sono 350.000. Con 2.000.000 il margine è di cinque
+volte, e in sala il faucet non serve. Se ne volessimo ancora: Alan da
+casa sua (altro IP, altro utente) può mandarne 1.000.000 al giorno
+all'indirizzo di `barattolo`, che è pubblico.
+
+**Il regtest locale: sì come banco di sviluppo, non adesso e non per la
+demo.** A favore: blocchi a comando, sats illimitati, nessun faucet,
+nessun limite di richieste, niente dipendenza dai servizi di KaleidoSwap
+mentre si scrivono i metodi `rgb_*` e le rotte; e il modulo WDK di UTEXO
+dichiara `regtest` fra le reti supportate. Contro: non è sul percorso
+critico, e il calendario non ha margine (il 13 e il 15 sono pieni, il 14
+è fermo). Sul fisso Docker non c'è (decisione dell'8 ott); c'è sulla VM,
+dove bitcoind, electrs e proxy girano già in versione signet: un secondo
+compose in regtest è quasi una copia, più una terza catena
+(`RGB_CATENA=regtest`) nei cinque programmi, con le prove. STIMA: due o
+tre ore di sessione e venti minuti di comandi di Andrea sulla VM. La
+demo resta su Mutinynet: ai giudici servono transazioni vere su una
+rete di prova pubblica, e Mutinynet coi blocchi da 30 secondi è già
+abbastanza svelta per sviluppare. **Proposta**: lo si prepara venerdì
+16, giorno di margine, SOLO se il 13 e il 15 sono andati lisci; sennò
+si salta senza rimpianti, perché a coprire i guasti c'è già il piano B
+su signet (12.6), che ha il nostro indexer e non dipende da nessuno. Lo
+decide Andrea.
+
+**Il piano del 13 in dieci righe**, mandato ad Andrea la notte del 12 (la
+migrazione aspetta il suo ok):
+
+1. Il cantiere della mattina: la lista di §10 datata 13, l'alias
+   `consigliami` sul 2B con la sua prova, la dichiarazione in §5. Il
+   push aspetta il suo sì.
+2. I file sulla VM e nel WSL (passo 0 della lista).
+3. I wallet nuovi: tre sulla VM, quello di prova sul fisso (passo 1).
+4. Il faucet: 1.000.000 nelle quattro quote della tabella qui sopra
+   (passo 2).
+5. Gli UTXO colorabili (passo 3).
+6. La riemissione di USDB e MOON come NIA, marcati `signet`, e subito i
+   backup (passo 4).
+7. Gli id nuovi nei file: li incolla la sessione (passo 5).
+8. Gli asset al wallet di prova e al mercante; `rgb_http.py` e il
+   servizio NWC con l'ambiente di Mutinynet (passi 6-8).
+9. Il backup a due catene e il pull dal PC (passo 9); la chiavetta
+   rinfrescata coi modelli nuovi.
+10. La sera `rgb_http.py` si ferma. Il 14 niente. Il 15 il secondo
+    milione, e il wallet della demo nasce sul portatile di Alan (12.10).
