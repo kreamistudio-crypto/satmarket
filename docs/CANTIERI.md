@@ -53706,3 +53706,40 @@ sono dell'albero di prima del rebase. LA CI DI MAIN, guardata prima del
 push: l'ultima conclusa è verde (`eb68d8d`), quella sulla punta
 (`5c71c7f`) era in corso. L'«ok al push» di Andrea è arrivato
 rispondendo alla richiesta di conferma, insieme ai quattro ritocchi.
+
+## Il patto sul profilo di scambio: «nato su Nostr / nato con Telegram», non «se entri» (12 ott 2026, notte, cantiere patto-profilo-nato, coda di «La chat segue lo scambio»)
+
+**IL FATTO.** Corretta la frase della chat e poi quella dei recapiti
+(«conta dove è nato l'account, non come entri»), nel patto restavano
+i due paragrafi sul PROFILO di scambio con la formula di prima — «Se
+entri da Telegram», «Se entri con una chiave Nostr che è tua» — e le
+due righe gemelle in «Come funziona» («Chi sei, qui dentro»). Le avevo
+segnalate senza toccarle; Andrea ha detto sì.
+
+**COSA È CAMBIATO, solo testi.** Il cappello del patto: «dipende da
+dove è nato il tuo account, non da come entri». «Se il tuo account è
+nato con Telegram (anche se poi entri con Nostr), il profilo lo
+ricaviamo noi dal tuo account»: il resto del paragrafo — il prezzo, il
+«potremmo», le due cose insieme — è quello di prima, parola per
+parola. «Se il tuo account è nato su Nostr, il profilo non lo può
+ricavare nessuno tranne te, noi compresi». LA STRADA SOVRANA NON SI È
+PERSA: il paragrafo di prima parlava di chi «in passato ha reso il suo
+profilo di scambio una chiave Nostr sua», e quella promessa vale anche
+per un account nato con Telegram che l'aveva fatto — resta detta, nella
+stessa frase («vale anche se in passato… dovunque sia nato
+l'account»), e in «Come funziona» con un «o se in passato». Il terzo
+paragrafo («Negli altri casi») non è toccato. Le due righe di «I tuoi
+dati» su cosa RICEVIAMO all'ingresso («Se entri da Telegram riceviamo…
+/ da Nostr…») restano come sono: lì conta proprio come si entra.
+
+**PROVATO.** Due controlli nuovi in `prove_p2p_chiavi` (la formula nel
+patto e in «Come funziona», e in tutta la pagina nessun «Se entri da
+Telegram» o «Se entri con una chiave Nostr» in grassetto); le diciotto
+sezioni che leggono il patto, «Come funziona» e la pagina dei dati,
+col tetto di CLAUDE.md: 1.778 passate e 0 fallite. `node` sui tre
+script della pagina. La suite intera la dice la CI.
+
+**DA GUARDARE.** Il patto non dice ancora che il profilo di un account
+nato su Nostr ha una COPIA CIFRATA sui suoi relay (dal cantiere
+«tor-chiavi-scambio»: lo dice il foglio del profilo, non «I tuoi
+dati»): segnalato ad Andrea, non toccato.

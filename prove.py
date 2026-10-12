@@ -68988,6 +68988,29 @@ def prove_p2p_chiavi():
           and "ricaviamo noi dal tuo account" in priv
           and "ricavare nessuno tranne te" in priv
           and "vive sul dispositivo" in priv)
+    # CONTA DOV'E' NATO L'ACCOUNT, NON COME SI ENTRA (12 ott 2026, notte,
+    # la formula di Andrea, la stessa della chat e dei recapiti): un
+    # account nato con Telegram e collegato a una npub resta ricavato dal
+    # server anche se entra con Amber. La strada sovrana di ieri resta
+    # detta, per chiunque l'abbia presa.
+    prova("...con la formula di Andrea: nato con Telegram (anche se poi entri con Nostr), nato su "
+          "Nostr — e non «se entri da»", [],
+          [f for f in ("<b>Se il tuo account è nato con Telegram</b> (anche se poi entri con Nostr), "
+                       "il profilo lo <b>ricaviamo noi dal tuo account</b>",
+                       "<b>Se il tuo account è nato su Nostr</b>, il profilo <b>non lo può ricavare "
+                       "nessuno tranne te</b>, noi compresi",
+                       "dipende da dove è nato il tuo account, non da come entri",
+                       "se in passato hai reso il tuo profilo di scambio una chiave Nostr che è tua")
+           if f not in priv])
+    prova("...in «Come funziona» le due righe gemelle dicono lo stesso, e in tutta la pagina "
+          "nessuno dice piu' «se entri da Telegram» o «se entri con una chiave Nostr»",
+          (True, True, []),
+          ("<b>Se il tuo account è nato con Telegram</b> (anche se poi entri con Nostr), il tuo "
+           "profilo di scambio lo ricaviamo dal tuo account" in mini,
+           "<b>Se il tuo account è nato su Nostr</b>, o se in passato hai reso il tuo profilo di "
+           "scambio una chiave Nostr tua, quel profilo <b>non lo può ricavare nessuno</b>" in mini,
+           [f for f in ("<b>Se entri da Telegram</b>", "<b>Se entri con una chiave Nostr",
+                        "dipende da come entri") if f in mini]))
     # ...E DALLA FASE 6 E' ANCHE LA PORTA DEL FOGLIETTO: il codice
     # segreto e il «dimentica» si raggiungono SOLO da qui.
     prova("...e porta il bottone del foglietto ridotto", True,
