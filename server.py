@@ -6271,6 +6271,15 @@ def init_db():
         parti_note INTEGER DEFAULT 0,
         routing_msat INTEGER DEFAULT -1,
         routing_rif TEXT DEFAULT '',
+        -- LA GARANZIA ERA BLOCCATA? (12 ott 2026, cantiere
+        -- dispute-garanzia-escluse, si' di Andrea): 1 = si', 0 = no,
+        -- -1 = non si sa. La scrive `_consolida_conti_p2p` finche' la
+        -- cronaca c'e' (`_garanzia_dalla_cronaca_p2p`), perche' dopo i
+        -- quaranta giorni nessuno puo' piu' dirlo: e' il denominatore
+        -- della percentuale di dispute («⚖️ Dispute P2P»), che senza
+        -- questa colonna oltre i quaranta giorni andava DEDOTTO. Un
+        -- fatto sullo scambio, non una persona: il patto qui sopra resta.
+        garanzia INTEGER DEFAULT -1,
         PRIMARY KEY(ordine, giro, esito)
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_conti_chiuso ON p2p_conti(chiuso);
@@ -7426,6 +7435,13 @@ def init_db():
             con.execute(f"ALTER TABLE p2p_scambi ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # la garanzia bloccata nel registro dei conti (12 ott 2026): vedi lo
+    # schema di `p2p_conti`. Le righe gia' scritte nascono a -1, e il
+    # consolidamento le riempie da solo dove la cronaca c'e' ancora
+    try:
+        con.execute("ALTER TABLE p2p_conti ADD COLUMN garanzia INTEGER DEFAULT -1")
+    except sqlite3.OperationalError:
+        pass
     # (le quattro colonne del gate e dell'eco su `chiavi_p2p` non si
     # aggiungono piu': dalla patch 0007 non le legge nessuno. Dove ci
     # sono gia' restano, morte — vedi lo schema)
@@ -28475,6 +28491,16 @@ def _leve_stato():
                   spento="nessun avviso quando le dispute salgono: i "
                          "numeri restano nel cruscotto, sezione «⚖️ "
                          "Dispute P2P»"),
+            # LE DISPUTE TOLTE DAL CONTO (12 ott 2026): gli id degli
+            # ordini, accorciati — sono id pubblici, non persone
+            _leva("Dispute P2P escluse dal conto", "P2P_DISPUTE_ESCLUSE",
+                  _elenco(i[:8] for i in P2P_DISPUTE_ESCLUSE),
+                  acceso="queste dispute (nate da un nostro bug o da una "
+                         "prova) non entrano nella percentuale del "
+                         "cruscotto né nell'avviso: per i moderatori "
+                         "restano dove sono",
+                  spento="nessuna disputa è esclusa: la percentuale del "
+                         "cruscotto le conta tutte"),
             _leva("Relay del coordinator", "MOSTRO_RELAY",
                   _elenco(MOSTRO_RELAY),
                   spento="senza i relay lo scambio non si accende: qui "
@@ -44550,6 +44576,35 @@ except (TypeError, ValueError):
           "vale il 5 di serie")
 
 
+# LE DISPUTE DA NON CONTARE (12 ott 2026, cantiere dispute-garanzia-escluse,
+# richiesta di Andrea): una disputa nata da un nostro bug o da una prova
+# non e' una disputa, e nella percentuale farebbe rumore — o farebbe
+# partire l'avviso. Qui vanno gli id degli ORDINI, interi o accorciati
+# agli 8 caratteri che si leggono nel cruscotto e negli avvisi (sono id
+# pubblici: il `d` del 38383). Chi e' in lista esce dalla card «⚖️
+# Dispute P2P» e dall'avviso; la disputa resta dov'e' per i moderatori,
+# e la card dice quali ha tolto.
+# IL VUOTO E' «CONTO TUTTO», e lo e' anche una riga STORTA (un id piu'
+# corto di 8, un carattere che in un id non c'e'): sbagliare verso il
+# togliere nasconderebbe una disputa vera, e con meno di 8 caratteri un
+# capo ne prenderebbe piu' d'una. Lo dice all'avvio.
+try:
+    from config import P2P_DISPUTE_ESCLUSE
+    if isinstance(P2P_DISPUTE_ESCLUSE, str):
+        P2P_DISPUTE_ESCLUSE = [P2P_DISPUTE_ESCLUSE]    # un id solo, scritto nudo
+    P2P_DISPUTE_ESCLUSE = tuple(sorted(
+        {str(i).strip().lower() for i in P2P_DISPUTE_ESCLUSE}))
+    if any(not re.fullmatch(r"[0-9a-f]{8}[0-9a-f-]{0,28}", i)
+           for i in P2P_DISPUTE_ESCLUSE):
+        raise ValueError("un id d'ordine ha almeno 8 caratteri esadecimali")
+except ImportError:
+    P2P_DISPUTE_ESCLUSE = ()
+except (TypeError, ValueError):
+    P2P_DISPUTE_ESCLUSE = ()
+    print("[p2p] P2P_DISPUTE_ESCLUSE non e' una lista di id d'ordine (almeno "
+          "8 caratteri ciascuno): NESSUNA disputa e' esclusa dal conto")
+
+
 
 # IL SEGRETO DA CUI NASCE IL PROFILO DI SCAMBIO (set 2026, decisione di
 # Andrea): chi entra da Telegram non si porta piu' dietro un mazzo per
@@ -50266,6 +50321,12 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
 P2P_PERIODI_CONTI = ("oggi", "7", "30", "tutto")
 P2P_CONTI_CACHE_S = 60          # i conti si rifanno al piu' una volta al minuto
 P2P_ULTIMI_CONTI = 20           # le righe della tabella degli ultimi scambi
+# i momenti della cronaca che vogliono dire «la garanzia e' bloccata»: il
+# pagamento della hold, o un passo che viene solo dopo (di una cronaca
+# potata a meta' puo' restare solo quello)
+P2P_MOMENTI_CON_GARANZIA = ("garanzia_pagata", "fiat", "disputa",
+                            "annullo_chiesto", "rilasciato",
+                            "payout_fallito", "concluso")
 # la finestra in cui un pagamento di LND puo' essere il pagamento a chi
 # compra di uno scambio: da cinque minuti prima del rilascio (i due
 # orologi) a un giorno dopo (una fattura rifatta dopo un tentativo
@@ -50399,6 +50460,23 @@ def _metodi_conti_p2p(testo) -> list:
             for m in _metodi_libro(_metodi_lista_p2p(testo))]
 
 
+def _garanzia_dalla_cronaca_p2p(momenti) -> dict:
+    """PURA: la cronaca di UN ordine dice, giro per giro, se la garanzia
+    e' stata bloccata — `{giro: 1 | 0 | -1}`.
+    1 = SI', ed e' un fatto: mostrod ha raccontato la garanzia pagata, o
+    un passo che viene solo dopo (`P2P_MOMENTI_CON_GARANZIA`).
+    0 = NO, ed e' un fatto anche questo: la cronaca di quel giro c'e'
+    DALL'INIZIO (ha la presa) e la garanzia non compare.
+    -1 = NON SI SA: la cronaca comincia a meta' (la presa non c'e' piu')
+    e la garanzia non compare — potrebbe essere stata potata con lei."""
+    visti = {}
+    for m in momenti or []:
+        visti.setdefault(int(m["giro"] or 0), set()).add(str(m["momento"] or ""))
+    return {giro: (1 if nomi & set(P2P_MOMENTI_CON_GARANZIA)
+                   else (0 if "preso" in nomi else -1))
+            for giro, nomi in visti.items()}
+
+
 def _consolida_conti_p2p(con, adesso: int) -> list:
     """DALLA CRONACA AL REGISTRO. Pura sulla connessione. Legge tutta la
     cronaca di mostrod (al piu' quaranta giorni: e' quel che la scopa
@@ -50413,10 +50491,16 @@ def _consolida_conti_p2p(con, adesso: int) -> list:
     ordine tornato in vetrina e ripreso ha le parti del giro nuovo.
     UNA CRONACA POTATA A META' (la presa oltre i quaranta giorni,
     l'annullo no) leggerebbe l'annullo come un ritiro dal libro: se il
-    registro ha gia' l'annullo di quel giro, il ritiro non si scrive."""
-    gia = {(r[0], int(r[1] or 0), r[2]): int(r[3] or 0) for r in con.execute(
-        "SELECT ordine, giro, esito, pagato FROM p2p_conti WHERE chiuso>=?",
-        (int(adesso) - P2P_LIBRO_MEMORIA_S - 2 * 86400,))}
+    registro ha gia' l'annullo di quel giro, il ritiro non si scrive.
+    LA GARANZIA (12 ott 2026) si scrive con lo scambio, dal fatto che la
+    cronaca dice (`_garanzia_dalla_cronaca_p2p`), e a una riga scritta
+    PRIMA della colonna — nata a -1 — si aggiunge finche' la cronaca
+    c'e': e' il solo altro ritocco a una riga gia' scritta, e va in un
+    verso solo (da «non si sa» a un fatto)."""
+    gia = {(r[0], int(r[1] or 0), r[2]): (int(r[3] or 0), int(
+        r[4] if r[4] is not None else -1)) for r in con.execute(
+        "SELECT ordine, giro, esito, pagato, garanzia FROM p2p_conti "
+        "WHERE chiuso>=?", (int(adesso) - P2P_LIBRO_MEMORIA_S - 2 * 86400,))}
     per_ordine = {}
     for r in con.execute(
             "SELECT ordine, momento, quando, giro, attore, dettaglio "
@@ -50424,8 +50508,13 @@ def _consolida_conti_p2p(con, adesso: int) -> list:
         per_ordine.setdefault(r["ordine"], []).append(r)
     in_corso, scritte = [], 0
     for ordine, momenti in per_ordine.items():
+        garanzie = _garanzia_dalla_cronaca_p2p(momenti)
         for e in _esiti_cronaca_p2p(momenti):
             giro, esito = e["giro"], e["esito"]
+            # la garanzia e' di uno SCAMBIO: un ordine scaduto o ritirato
+            # senza essere preso resta a -1
+            garanzia = (garanzie.get(giro, -1) if esito in (
+                "completato", "annullato", "tornato") else -1)
             if esito == "in_corso":
                 in_corso.append({"ordine": ordine[:8], "giro": giro,
                                  "preso": e["preso"], "ultimo": e["ultimo"],
@@ -50433,10 +50522,15 @@ def _consolida_conti_p2p(con, adesso: int) -> list:
                 continue
             chiave = (ordine, giro, esito)
             if chiave in gia:
-                if e["pagato"] and not gia[chiave]:
+                if e["pagato"] and not gia[chiave][0]:
                     scritte += con.execute(
                         "UPDATE p2p_conti SET pagato=1 WHERE ordine=? AND "
                         "giro=? AND esito=?", chiave).rowcount
+                if garanzia >= 0 and gia[chiave][1] < 0:
+                    scritte += con.execute(
+                        "UPDATE p2p_conti SET garanzia=? WHERE ordine=? AND "
+                        "giro=? AND esito=? AND garanzia<0",
+                        (garanzia,) + chiave).rowcount
                 continue
             if esito == "ritirato" and (ordine, giro, "annullato") in gia:
                 continue
@@ -50462,7 +50556,7 @@ def _consolida_conti_p2p(con, adesso: int) -> list:
                 "INSERT OR IGNORE INTO p2p_conti(ordine, giro, esito, motivo, "
                 "preso, chiuso, pagato, lato, euro, metodi, sats, "
                 "sats_compratore, sats_venditore, cambio, sconto_c, sconto_v, "
-                "parti_note) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "parti_note, garanzia) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (ordine, giro, esito, e["motivo"], e["preso"], e["chiuso"],
                  1 if e["pagato"] else 0, lato,
                  # un intervallo ancora da scegliere non e' una cifra
@@ -50475,7 +50569,7 @@ def _consolida_conti_p2p(con, adesso: int) -> list:
                  float(s["cambio_presa"] or 0) if s else 0.0,
                  _sconto_p2p(con, parti[0])["motivo"] if fatto and parti[0] else "",
                  _sconto_p2p(con, parti[1])["motivo"] if fatto and parti[1] else "",
-                 sum(1 for p in parti if p))).rowcount
+                 sum(1 for p in parti if p), garanzia)).rowcount
     if scritte:
         con.commit()
     return in_corso
@@ -50793,11 +50887,20 @@ async def statistiche_p2p_admin(periodo: str = "oggi",
 # Andrea, 12 ott 2026): una disputa puo' nascere solo li', e le prese
 # cadute prima — la garanzia mai pagata, chi ha preso che si ritira —
 # annacquerebbero il numero. CHE LA GARANZIA FOSSE BLOCCATA lo dice la
-# cronaca finche' c'e' (`P2P_MOMENTI_CON_GARANZIA`: la garanzia pagata, o
-# un passo che viene solo dopo); oltre i quaranta giorni resta il
-# registro, che non ha una colonna per questo, e si DEDUCE da esito,
-# motivo e lato (`_garanzia_dal_registro_p2p`). Una disputa lo prova da
-# sola. Gli scambi presi restano nella risposta, accanto.
+# cronaca finche' c'e' (`_garanzia_dalla_cronaca_p2p`: la garanzia
+# pagata, o un passo che viene solo dopo), e il consolidamento lo SCRIVE
+# nel registro (`p2p_conti.garanzia`, dal 12 ott 2026, si' di Andrea):
+# oltre i quaranta giorni il fatto resta. Solo per le righe nate prima
+# della colonna e gia' fuori dalla cronaca si DEDUCE ancora da esito,
+# motivo e lato (`_garanzia_dal_registro_p2p`), e la risposta dice
+# quante sono (`dedotti`). Una disputa lo prova da sola. Gli scambi
+# presi restano nella risposta, accanto.
+# LE DISPUTE ESCLUSE A MANO (`P2P_DISPUTE_ESCLUSE`, richiesta di Andrea):
+# una disputa nata da un nostro bug o da una prova non e' una disputa.
+# Per il conto e' come se non fosse mai stata aperta — non sta fra le
+# dispute, ne' fra le chiuse, ne' fra le aperte, e l'avviso non la vede
+# —; il suo scambio resta, con la garanzia che cronaca e registro gli
+# danno. Quelle tolte davvero si dicono (`escluse`, id accorciati).
 # UNO SCAMBIO STA NEL PERIODO IN CUI E' STATO PRESO, e la disputa sta col
 # suo scambio: cosi' la percentuale e' «di cento scambi con garanzia,
 # quanti in disputa» e non puo' passare il cento. Una disputa prova che
@@ -50809,12 +50912,6 @@ async def statistiche_p2p_admin(periodo: str = "oggi",
 # scadenza della garanzia (vedi «LA GARANZIA LUNGA») non la racconta a
 # nessuno, e qui non si conta.
 P2P_DISPUTE_PERIODI = (("7", 7), ("30", 30), ("tutto", 0))
-# i momenti della cronaca che vogliono dire «la garanzia e' bloccata»: il
-# pagamento della hold, o un passo che viene solo dopo (di una cronaca
-# potata a meta' puo' restare solo quello)
-P2P_MOMENTI_CON_GARANZIA = ("garanzia_pagata", "fiat", "disputa",
-                            "annullo_chiesto", "rilasciato",
-                            "payout_fallito", "concluso")
 # sotto tre dispute nei 30 giorni la percentuale e' rumore: una su dieci
 # scambi fa «10%» e non dice niente
 P2P_DISPUTE_SOGLIA_MINIMO = 3
@@ -50840,10 +50937,19 @@ def _sopra_soglia_dispute_p2p(p30: dict, soglia: float) -> bool:
                 and p30["percento"] > soglia)
 
 
+def _disputa_esclusa_p2p(ordine) -> bool:
+    """PURA: la disputa di quest'ordine e' fra quelle tolte a mano
+    (`P2P_DISPUTE_ESCLUSE`)? Vale l'id intero o il suo capo: «ea0af71a»
+    toglie l'ordine che comincia cosi'."""
+    ordine = str(ordine or "").lower()
+    return any(ordine.startswith(capo) for capo in P2P_DISPUTE_ESCLUSE)
+
+
 def _garanzia_dal_registro_p2p(esito: str, motivo: str, lato: str) -> bool:
     """PURA: in questo scambio CHIUSO la garanzia era stata bloccata? Dal
-    solo registro, per quando la cronaca non c'e' piu'. E' una DEDUZIONE,
-    e si dice:
+    solo registro, per le righe nate PRIMA della colonna `garanzia` e
+    gia' fuori dalla cronaca (dal 12 ott 2026 il fatto lo scrive il
+    consolidamento). E' una DEDUZIONE, e si dice:
     • `completato`: si', sempre — senza garanzia non si rilascia;
     • `tornato` in vetrina: no — chi aveva preso non ha fatto il suo
       primo gesto, e la garanzia viene dopo;
@@ -50874,18 +50980,26 @@ def dati_dispute_p2p(con, adesso: int):
     `venditore`; `moderatore` = quante di quelle le ha decise un
     moderatore), `aperte`, e — per 7 e 30 — `prima` (lo stesso conto
     sul periodo precedente, lungo uguale) con `tendenza`, la differenza
-    in PUNTI percentuali (None se uno dei due non ha scambi)."""
+    in PUNTI percentuali (None se uno dei due non ha scambi).
+    In piu': `dedotti` (gli scambi la cui garanzia e' ancora una
+    deduzione) ed `escluse` (le dispute tolte da `P2P_DISPUTE_ESCLUSE`)."""
     adesso = int(adesso)
     try:
-        presi, garanzia = {}, set()
+        presi, garanzia, da_dedurre = {}, set(), set()
         for r in con.execute("SELECT ordine, giro, esito, motivo, lato, preso, "
-                             "chiuso FROM p2p_conti "
+                             "chiuso, garanzia FROM p2p_conti "
                              "WHERE esito IN ('completato','annullato','tornato')"):
             chiave = (r["ordine"], int(r["giro"] or 0))
             presi[chiave] = int(r["preso"] or r["chiuso"] or adesso)
-            if _garanzia_dal_registro_p2p(r["esito"], r["motivo"] or "",
-                                          r["lato"] or ""):
-                garanzia.add(chiave)
+            scritta = int(r["garanzia"] if r["garanzia"] is not None else -1)
+            if scritta > 0:
+                garanzia.add(chiave)              # il fatto, scritto a suo tempo
+            elif scritta < 0:
+                # una riga nata prima della colonna: si deduce
+                da_dedurre.add(chiave)
+                if _garanzia_dal_registro_p2p(r["esito"], r["motivo"] or "",
+                                              r["lato"] or ""):
+                    garanzia.add(chiave)
         per_ordine = {}
         for r in con.execute("SELECT ordine, momento, quando, giro, attore, "
                              "dettaglio FROM p2p_momenti WHERE fonte='mostro'"):
@@ -50895,11 +51009,12 @@ def dati_dispute_p2p(con, adesso: int):
             "FROM p2p_dispute ORDER BY aperta_il, ordine")]
     except sqlite3.OperationalError:
         return None
+    # le dispute tolte a mano: per il conto non sono mai state aperte
+    escluse = [d for d in dispute if _disputa_esclusa_p2p(d["ordine"])]
+    dispute = [d for d in dispute if not _disputa_esclusa_p2p(d["ordine"])]
     for ordine, momenti in per_ordine.items():
         # la garanzia la dice la cronaca, giro per giro: e' un fatto
-        visti = {}
-        for m in momenti:
-            visti.setdefault(int(m["giro"] or 0), set()).add(str(m["momento"] or ""))
+        garanzie = _garanzia_dalla_cronaca_p2p(momenti)
         for e in _esiti_cronaca_p2p(momenti):
             if e["esito"] in ("scaduto", "ritirato"):
                 continue              # un ordine morto senza essere preso
@@ -50907,12 +51022,16 @@ def dati_dispute_p2p(con, adesso: int):
             # la presa vera
             presi.setdefault((ordine, e["giro"]),
                              int(e["preso"] or e["chiuso"] or adesso))
-            if visti.get(e["giro"], set()) & set(P2P_MOMENTI_CON_GARANZIA):
+            fatto = garanzie.get(e["giro"], -1)
+            if fatto > 0:
                 garanzia.add((ordine, e["giro"]))
+            if fatto >= 0:
+                da_dedurre.discard((ordine, e["giro"]))
     for d in dispute:
         chiave = (d["ordine"], int(d["giro"] or 0))
         d["quando"] = presi.setdefault(chiave, int(d["aperta_il"] or adesso))
         garanzia.add(chiave)          # una disputa lo prova da sola
+        da_dedurre.discard(chiave)
 
     def conto(da, fino=None):
         dentro = lambda q: q >= da and (fino is None or q < fino)
@@ -50946,6 +51065,8 @@ def dati_dispute_p2p(con, adesso: int):
                         "presa": d["stato"] == "presa"}
                        for d in dispute if d["stato"] != "chiusa"],
             "dal": min(presi.values()) if presi else 0,
+            "dedotti": len(da_dedurre),
+            "escluse": sorted({d["ordine"][:8] for d in escluse}),
             "soglia": {"percento": P2P_DISPUTE_SOGLIA_PERCENTO,
                        "minimo": P2P_DISPUTE_SOGLIA_MINIMO,
                        "sopra": _sopra_soglia_dispute_p2p(

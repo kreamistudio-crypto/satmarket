@@ -23,7 +23,18 @@ eventi nella forma che la patch 0007 manda davvero:
      riavvio (la memoria del processo persa) tace ancora: il timbro sta
      nel database; a leva spenta tace del tutto;
   5. la scopa dei quaranta giorni: i conti di «da sempre» restano gli
-     stessi — registro e `p2p_dispute` non si potano.
+     stessi — registro e `p2p_dispute` non si potano —, e la garanzia
+     non e' piu' dedotta: sta SCRITTA nel registro, riga per riga.
+
+E DAL 12 OTT 2026 (cantiere dispute-garanzia-escluse):
+
+  0. il database di IERI: un registro senza la colonna `garanzia`, con
+     una riga dentro; la migrazione vera (`init_db`) la aggiunge, la
+     riga vecchia resta «non si sa» e la sezione la conta per deduzione,
+     dicendolo (`dedotti`);
+  4-bis. una disputa tolta dal conto con `P2P_DISPUTE_ESCLUSE`: esce da
+     dispute e aperte, la sezione la nomina, il suo scambio resta — e il
+     battito dell'ora TACE (due dispute); tolta la leva, parte.
 
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
 `collaudo_pagamento_p2p`), niente Telegram, niente relay, niente nodo.
@@ -114,6 +125,34 @@ def main():
     SRV.dati_zap_cruscotto = zap_finto
     SRV.notifica_admin = admin_finto
 
+    print("\n0) il database di ieri: la colonna arriva con la migrazione")
+    VECCHIA = "c0de0000-5a1e-4a2b-9c3d-0000000000aa"
+    con = banco.con_db()
+    con.execute("ALTER TABLE p2p_conti DROP COLUMN garanzia")
+    con.execute("INSERT INTO p2p_conti(ordine, giro, esito, preso, chiuso) "
+                "VALUES(?, 1, 'completato', ?, ?)",
+                (VECCHIA, adesso - 50 * 86400, adesso - 50 * 86400 + 600))
+    con.commit()
+    prova("senza la colonna la sezione non c'e' (None) e niente alza", None,
+          SRV.dati_dispute_p2p(con, adesso))
+    con.close()
+    SRV.init_db()
+    con = banco.con_db()
+    prova("la migrazione vera aggiunge la colonna, e la riga di ieri nasce "
+          "a «non si sa»", [-1],
+          [r[0] for r in con.execute("SELECT garanzia FROM p2p_conti")])
+    SRV.init_db()
+    prova("...due volte non fa danni", [-1],
+          [r[0] for r in con.execute("SELECT garanzia FROM p2p_conti")])
+    v = SRV.dati_dispute_p2p(con, adesso)
+    prova("...e la sezione la conta per deduzione (concluso = con "
+          "garanzia), dicendo che e' dedotta", (1, 1, 1),
+          (v["periodi"]["tutto"]["presi"], v["periodi"]["tutto"]["con_garanzia"],
+           v["dedotti"]))
+    con.execute("DELETE FROM p2p_conti WHERE ordine=?", (VECCHIA,))
+    con.commit()
+    con.close()
+
     print("\n1) la porta")
     banco.come(banco.ESTRANEO)
     prova("l'utente normale: 403, nessun numero", 403, cruscotto())
@@ -156,7 +195,9 @@ def main():
           (banco.CHIAVE_COMPRA in testo, banco.CHIAVE_VENDE in testo,
            any(o in testo for o in O)))
     prova("...e le sole voci previste",
-          ["aperte", "dal", "periodi", "soglia"], sorted(d))
+          ["aperte", "dal", "dedotti", "escluse", "periodi", "soglia"], sorted(d))
+    prova("...niente di dedotto (la cronaca c'e' tutta) e niente di escluso",
+          (0, []), (d["dedotti"], d["escluse"]))
     banco.come(banco.ESTRANEO)
     prova("l'utente normale resta fuori anche coi numeri dentro", 403, cruscotto())
     banco.come(MODERATORE)
@@ -209,6 +250,28 @@ def main():
     prova("a leva spenta (0) tace anche senza timbro", [], battito())
     SRV.P2P_DISPUTE_SOGLIA_PERCENTO = 5.0
 
+    print("\n4-bis) una disputa tolta dal conto a mano")
+    # il timbro non c'e' e la soglia e' accesa: se il battito tace, e'
+    # la leva delle escluse che lo fa tacere
+    SRV.P2P_DISPUTE_ESCLUSE = (O[5][:8],)
+    d = cruscotto()["dispute_p2p"]
+    p30 = d["periodi"]["30"]
+    prova("esclusa per id accorciato: 2 dispute su 6 con garanzia (il suo "
+          "scambio resta), una sola aperta", (7, 6, 2, 33.3, [O[4][:8]]),
+          (p30["presi"], p30["con_garanzia"], p30["con_disputa"], p30["percento"],
+           [a["ordine"] for a in d["aperte"]]))
+    prova("...e la sezione dice quale ha tolto", [O[5][:8]], d["escluse"])
+    prova("...con due dispute il battito dell'ora tace", [], battito())
+    SRV.P2P_DISPUTE_ESCLUSE = (O[5],)
+    prova("...lo stesso con l'id scritto intero", 2,
+          cruscotto()["dispute_p2p"]["periodi"]["30"]["con_disputa"])
+    prova("...e il battito tace ancora", [], battito())
+    SRV.P2P_DISPUTE_ESCLUSE = ()
+    partiti = battito()
+    prova("tolta la leva la disputa torna nel conto, e l'avviso parte: era "
+          "lei a farlo tacere", (1, True),
+          (len(partiti), "3 scambi su 6 con garanzia" in (partiti or [""])[0]))
+
     print("\n5) la scopa dei quaranta giorni non cambia «da sempre»")
     prima = cruscotto()["dispute_p2p"]["periodi"]["tutto"]
     dopo_la_memoria = adesso + SRV.P2P_LIBRO_MEMORIA_S + 3600
@@ -217,8 +280,18 @@ def main():
     tolte = SRV._pulisci_memoria_p2p(con, dopo_la_memoria)
     prova("la scopa porta via la cronaca", (True, 0),
           (tolte > 0, con.execute("SELECT COUNT(*) FROM p2p_momenti").fetchone()[0]))
-    dopo = SRV.dati_dispute_p2p(con, adesso)["periodi"]["tutto"]
+    intero = SRV.dati_dispute_p2p(con, adesso)
+    dopo = intero["periodi"]["tutto"]
+    scritte = {r[0][:8]: r[1] for r in con.execute(
+        "SELECT ordine, garanzia FROM p2p_conti WHERE esito IN "
+        "('completato','annullato','tornato')")}
     con.close()
+    prova("nel registro la garanzia e' SCRITTA: si' per i tre conclusi e "
+          "per quello deciso dal moderatore, no per la presa che non l'ha "
+          "mai pagata", {O[0][:8]: 1, O[1][:8]: 1, O[2][:8]: 1, O[3][:8]: 1,
+                         O[6][:8]: 0}, scritte)
+    prova("...e senza cronaca la sezione non deduce piu' niente", 0,
+          intero["dedotti"])
     prova("...e i sette scambi presi, i sei con garanzia e le tre dispute "
           "ci sono ancora — anche i due ancora in disputa, che nel registro "
           "non sono entrati; la presa senza garanzia resta fuori dal "

@@ -729,6 +729,16 @@ P2P_STATISTICHE_IDS = []
 # 0 = nessun avviso (i numeri nel cruscotto restano). Non dichiarata o
 # scritta male vale 5.
 P2P_DISPUTE_SOGLIA_PERCENTO = 5
+# LE DISPUTE DA NON CONTARE (12 ott 2026): una disputa nata da un nostro
+# bug o da una prova non e' una disputa vera. Qui vanno gli id dei loro
+# ORDINI — interi, o accorciati agli 8 caratteri che si leggono nel
+# cruscotto e negli avvisi, es. ["ea0af71a"] — e quelle dispute escono
+# dalla percentuale della card «⚖️ Dispute P2P» e dall'avviso. Per i
+# moderatori restano dove sono, e la card dice quali ha tolto.
+# ⚠️ Almeno 8 caratteri per id (con meno, un capo ne prenderebbe piu'
+# d'una). VUOTA, assente o scritta male = le conta TUTTE, e se e'
+# scritta male lo dice all'avvio.
+P2P_DISPUTE_ESCLUSE = []
 # IL SEGRETO DEL PROFILO DI SCAMBIO (set 2026): da qui si ricava la
 # chiave d'identita' Mostro di chi entra da Telegram, cosi' i suoi
 # scambi si vedono uguali dal bot, dal sito e dall'app. Serve anche il

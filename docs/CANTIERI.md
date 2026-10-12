@@ -51356,3 +51356,115 @@ fallite, 63 collaudi su 63 verdi (il collaudo curato in 16 secondi).
 CLAUDE.md a 261 righe contro un tetto di 262. LA CI DI MAIN prima del
 push: aspettata verde sulla punta `88ed663`. Il sì al push è di
 Andrea: stava nel brief incollato («Ok al push»).
+## La garanzia scritta nel registro, e le dispute da non contare (12 ott 2026, cantiere dispute-garanzia-escluse, due sì di Andrea)
+
+**DA DOVE SI PARTIVA.** La card «⚖️ Dispute P2P» era su main da un'ora
+(la voce qui sopra) con due cose lasciate aperte: la garanzia oltre i
+quaranta giorni era DEDOTTA dal motivo dell'annullo, e la sola disputa
+vera sul VPS, `ea0af71a`, non era una disputa: era nata dal bug delle
+chiavi perse su Tor. Andrea: sì alla colonna, e una leva per togliere
+dal conto le dispute nate da un nostro bug o da una prova.
+
+**1) LA COLONNA `garanzia` IN `p2p_conti`.** 1 = bloccata, 0 = no, -1 =
+non si sa. La scrive `_consolida_conti_p2p` con lo scambio, dal fatto
+che la cronaca dice (`_garanzia_dalla_cronaca_p2p`): 1 se mostrod ha
+raccontato la garanzia pagata o un passo che viene solo dopo; 0 se la
+cronaca di quel giro c'è DALLA PRESA e la garanzia non compare; -1 se
+comincia a metà e non la mostra (potrebbe essere stata potata con la
+presa). Per un ordine scaduto o ritirato senza essere preso resta -1:
+la garanzia è di uno scambio. LE RIGHE GIÀ SCRITTE (nate a -1 con la
+migrazione) si riempiono da sole al primo consolidamento, finché la
+loro cronaca c'è: sul VPS vuol dire tutto, tranne quel che si è chiuso
+prima di inizio settembre. È il secondo ritocco ammesso a una riga già
+scritta (il primo è il «pagato» che arriva dopo), e va in un verso
+solo: da «non si sa» a un fatto, con la guardia due volte — nel codice
+e nella `WHERE`. Il giudice legge la colonna e DEDUCE solo dove dice
+-1 e la cronaca non c'è più; quanti sono lo dice (`dedotti`), e la
+nota della card compare solo se ce ne sono.
+La colonna non è una persona: il patto di `p2p_conti` («nessun
+account, nessuna chiave») resta, e la prova che lo guarda passa.
+
+**2) `P2P_DISPUTE_ESCLUSE`.** Una lista di id d'ORDINE, interi o
+accorciati agli 8 caratteri che si leggono nel cruscotto e negli
+avvisi. LE DECISIONI:
+- COSA VUOL DIRE «NON CONTA»: per il conto quella disputa non è mai
+  stata aperta. Non sta fra le dispute, né fra le chiuse, né fra le
+  aperte; l'avviso non la vede. IL SUO SCAMBIO RESTA, con la garanzia
+  che cronaca e registro gli danno: lo scambio c'è stato davvero, è la
+  disputa che non era una disputa. (Una disputa orfana esclusa non
+  porta più con sé lo scambio: era lei la sola prova.)
+- LA RIGA IN `p2p_dispute` NON SI TOCCA: per i moderatori la disputa
+  resta dov'è, col suo registro. La leva corregge un NUMERO, non la
+  storia.
+- UN NUMERO CORRETTO A MANO SI DEVE VEDERE: la card nomina le dispute
+  tolte («Una disputa non contata per scelta (leva
+  P2P_DISPUTE_ESCLUSE): ea0af71a»), e il pannello delle leve dice gli
+  id accorciati. Solo quelle tolte DAVVERO: un id che non è di nessuna
+  disputa non compare.
+- ALMENO 8 CARATTERI, E DAL CAPO: con meno, un capo ne prenderebbe più
+  d'una; e «contiene» invece di «comincia con» avrebbe tolto dispute a
+  caso.
+- IL VUOTO È «LE CONTO TUTTE», e lo è anche una riga STORTA: sbagliare
+  verso il togliere nasconderebbe una disputa vera. Una lista con un
+  solo id sbagliato cade TUTTA, e lo dice all'avvio — meglio una
+  disputa di troppo nel conto per un giorno che una tolta per un
+  refuso. Un id solo scritto nudo (`"ea0af71a"` senza le quadre) vale.
+
+**LE STRADE SCARTATE.** • Cancellare la riga da `p2p_dispute` sul VPS:
+è il registro dei moderatori, e una disputa cancellata non si può più
+spiegare. • Una colonna «non contare» in `p2p_dispute` con un bottone
+nell'app dei moderatori: era la strada più comoda domani, e voleva una
+rotta che scrive, una prova di chi può, un gesto reversibile — per un
+caso che oggi è UNO. La leva nel config costa un riavvio ed è
+dichiarata nel pannello. • Togliere dal conto anche lo scambio della
+disputa esclusa: per `ea0af71a` lo scambio è vero. • Riempire la
+colonna anche con la deduzione (scrivere 1 o 0 dedotti): un fatto e una
+deduzione nella stessa colonna non si distinguono più.
+
+**«I TUOI DATI» NON È STATA TOCCATA.** Il paragrafo sul registro dice
+che di ogni scambio chiuso restano «le date, come è finito, gli
+importi…». Se la garanzia era stata bloccata è un pezzo di «come è
+finito», e non è un dato su una persona; ma quel testo l'ha riletto
+Andrea riga per riga, e una parola in più lì si chiede: segnato in
+fondo.
+
+**PROVATO.** `prove_statistiche_p2p` (+7): il consolidamento VERO sulla
+cronaca di cartone scrive la colonna caso per caso (conclusi e
+concordato 1; garanzia mai pagata, tornato in vetrina e annullo prima
+della garanzia 0; scaduto e ritirato -1), riempie le righe rimesse a
+-1, non riscrive un fatto; `_garanzia_dalla_cronaca_p2p` nei cinque
+casi. `prove_dispute_cruscotto_p2p` (58, erano 42): la colonna scritta
+che vince sulla deduzione nei due versi, `dedotti` (62 nello scenario),
+le escluse — per capo, per id intero, maiuscole, un id che non c'è,
+l'orfana —, l'avviso che non parte, la leva nei suoi versi (lista, id
+nudo, spazi e doppioni; assente e vuota; corta, non esadecimale, un
+numero, una voce vuota), config d'esempio e pannello; la card in node
+con le escluse (scappate) e senza più la frase della deduzione. In
+`prove_leve` lo stub della lista (senza, il banco esplodeva: cercato
+per nome PRIMA della suite, stavolta). `collaudo_dispute_cruscotto` (38
+passi, erano 25): IL DATABASE DI IERI — il registro senza la colonna,
+con una riga dentro, e la migrazione vera (`init_db`, due volte) —; la
+disputa esclusa per id accorciato e per id intero che fa TACERE il
+battito dell'ora, e tolta la leva l'avviso parte; dopo la scopa la
+garanzia è scritta riga per riga e la sezione non deduce più niente.
+LA TORTURA, su una copia: le mutazioni e il loro conto stanno nel
+verbale qui sotto, con quel che ha insegnato. IL GIRO DAL VIVO (Browser pane,
+server del worktree su una porta sua, config di cartone coi relay
+morti, la leva nel config del giro): a 390 px la card con `d1c4d558`
+esclusa — 2 dispute su 38 con garanzia invece di 3, 5,3%, non più
+sopra soglia, una sola aperta, e in fondo «Una disputa non contata per
+scelta (leva P2P_DISPUTE_ESCLUSE): d1c4d558»; la frase «per 68 scambi
+più vecchi la garanzia è dedotta» (il seme del giro scrive righe senza
+la colonna, apposta); tabella 324 su 324, console pulita; il pannello
+delle leve chiesto alla rotta vera dice «Dispute P2P escluse dal
+conto: d1c4d558».
+
+**DA FARE SUL VPS** (Andrea, dopo il deploy): la riga
+`P2P_DISPUTE_ESCLUSE = ["ea0af71a"]`, coi sei comandi di PRODUZIONE,
+«LA SOGLIA DELLE DISPUTE P2P» (copia prima, controllo del file prima
+del riavvio, riavvio, journal). **DA GUARDARE.** • La card deve dire
+zero dispute e in fondo «Una disputa non contata per scelta:
+ea0af71a». • Dopo il primo giro dell'ora, la query di PRODUZIONE sulla
+colonna: quante righe restano a -1 (sono gli scambi chiusi prima di
+inizio settembre). • «I tuoi dati»: se nominare la garanzia nel
+paragrafo del registro.

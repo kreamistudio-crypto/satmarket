@@ -10463,12 +10463,30 @@
   DISPUTE sono `p2p_dispute`, che non si pota. IL DENOMINATORE DELLA
   PERCENTUALE sono gli scambi CON LA GARANZIA BLOCCATA (`con_garanzia`;
   correzione di Andrea prima del push): una disputa puo' nascere solo
-  li'. Che fosse bloccata lo dice la cronaca finche' c'e' — la garanzia
-  pagata, o un passo che viene solo dopo (`P2P_MOMENTI_CON_GARANZIA`) —;
-  oltre i quaranta giorni il registro non ha una colonna per questo e
-  si DEDUCE (`_garanzia_dal_registro_p2p`: completato si', tornato no,
-  annullato si' per moderatore, concordato, garanzia scaduta e fattura
-  mai data su un ordine di acquisto); una disputa lo prova da sola. Gli
+  li'. Che fosse bloccata lo dice la cronaca finche' c'e'
+  (`_garanzia_dalla_cronaca_p2p`, giro per giro: 1 = la garanzia
+  pagata, o un passo che viene solo dopo, `P2P_MOMENTI_CON_GARANZIA`;
+  0 = la cronaca c'e' dalla presa e la garanzia non compare; -1 = la
+  cronaca comincia a meta' e non la mostra), e DAL 12 OTT 2026 il
+  consolidamento LO SCRIVE nel registro: `p2p_conti.garanzia` (1 | 0 |
+  -1, colonna aggiunta col si' di Andrea; la migrazione sta in
+  `init_db`). `_consolida_conti_p2p` la scrive con lo scambio e la
+  aggiunge alle righe nate prima della colonna finche' la loro cronaca
+  c'e' (solo da -1 a un fatto, mai il contrario). Cosi' oltre i
+  quaranta giorni il fatto resta. Solo dove la colonna dice -1 e la
+  cronaca non c'e' piu' si DEDUCE ancora (`_garanzia_dal_registro_p2p`:
+  completato si', tornato no, annullato si' per moderatore, concordato,
+  garanzia scaduta e fattura mai data su un ordine di acquisto), e la
+  risposta dice quanti sono (`dedotti`); una disputa lo prova da sola.
+  LE DISPUTE ESCLUSE A MANO: la leva `P2P_DISPUTE_ESCLUSE` (id d'ordine
+  interi o il loro capo, almeno 8 caratteri; vuota, assente o storta =
+  nessuna) toglie una disputa nata da un nostro bug o da una prova
+  (`_disputa_esclusa_p2p`): per il conto non e' mai stata aperta — non
+  sta fra dispute, chiuse e aperte, l'avviso non la vede, una orfana
+  non porta piu' il suo scambio —, mentre il suo scambio resta con la
+  garanzia che cronaca e registro gli danno, e la riga in `p2p_dispute`
+  non si tocca. Quelle tolte davvero escono in `escluse` (id
+  accorciati) e la card le nomina. Gli
   scambi `presi` restano nella risposta, accanto. Uno scambio sta nel
   periodo in cui e' stato PRESO (presa, o chiusura se la presa non si
   sa) e la disputa sta col suo scambio: la percentuale non passa il

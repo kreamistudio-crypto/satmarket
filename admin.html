@@ -417,7 +417,10 @@ function cardZap(Z){
    per confronto. Uno scambio sta nel periodo in cui e' stato PRESO e la
    disputa sta col suo scambio; la tendenza e' in PUNTI percentuali sul
    periodo prima, lungo uguale. Senza scambi con garanzia la percentuale
-   e' «—», mai 0%. */
+   e' «—», mai 0%. `X.dedotti` = gli scambi vecchi la cui garanzia e'
+   ancora una deduzione; `X.escluse` = le dispute tolte a mano dal conto
+   (leva P2P_DISPUTE_ESCLUSE), che la card NOMINA: un numero corretto a
+   mano si deve vedere. */
 const percD = p => p == null ? '—' : fmtd(p, 1) + '%';
 function tendenzaD(p){
   if (!p.prima) return '—';
@@ -452,7 +455,8 @@ function cardDisputeP2P(X){
       riga('Chiuse a favore di chi compra', p => fmt(p.compratore)),
       riga('Chiuse a favore di chi vende', p => fmt(p.venditore)),
       riga('Ancora aperte', p => fmt(p.aperte))])}</div>
-    <div class="nota">La percentuale è sugli scambi con la garanzia bloccata, dove una disputa può nascere; per gli annullati più vecchi di quaranta giorni la garanzia è dedotta dal motivo. Uno scambio conta nel periodo in cui è stato preso${dal ? ` («da sempre» parte dal ${esc(dal)})` : ''}. «A favore di» dice dove sono andati i sats: ${fmt(PT.moderatore)} su ${fmt(PT.compratore + PT.venditore)} le ha decise un moderatore, le altre si sono chiuse fra le parti o per scadenza.</div>
+    <div class="nota">La percentuale è sugli scambi con la garanzia bloccata, dove una disputa può nascere${X.dedotti ? `; per ${fmt(X.dedotti)} ${X.dedotti === 1 ? 'scambio più vecchio' : 'scambi più vecchi'} la garanzia è dedotta dal motivo` : ''}. Uno scambio conta nel periodo in cui è stato preso${dal ? ` («da sempre» parte dal ${esc(dal)})` : ''}. «A favore di» dice dove sono andati i sats: ${fmt(PT.moderatore)} su ${fmt(PT.compratore + PT.venditore)} le ha decise un moderatore, le altre si sono chiuse fra le parti o per scadenza.</div>
+    ${(X.escluse || []).length ? `<div class="nota">${X.escluse.length === 1 ? 'Una disputa non contata' : fmt(X.escluse.length) + ' dispute non contate'} per scelta (leva P2P_DISPUTE_ESCLUSE): ${X.escluse.map(e => `<span class="mono">${esc(e)}</span>`).join(', ')}.</div>` : ''}
     <div class="nota">${S.percento > 0 ? `I moderatori ricevono un avviso se negli ultimi 30 giorni si passa il ${fmtd(S.percento, 1)}%, con almeno ${fmt(S.minimo)} dispute.` : 'L\'avviso ai moderatori è spento.'}</div>`
     : '<div class="nota">Ancora nessuno scambio preso.</div>'}
   </div>`;

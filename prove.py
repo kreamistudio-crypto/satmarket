@@ -31530,6 +31530,9 @@ def _censimento(acceso, dopo=None):
     # cui il pannello dice la sola LUNGHEZZA — e a leve spente e' vuoto,
     # che qui vuol dire «nessuno»
     amb["P2P_STATISTICHE_IDS"] = {1, 2} if acceso else set()
+    # LE DISPUTE ESCLUSE DAL CONTO (12 ott 2026): una tupla di id, che
+    # il pannello accorcia — a leve spente e' vuota, cioe' «le conto tutte»
+    amb["P2P_DISPUTE_ESCLUSE"] = ("ea0af71a-0000", "0123abcd") if acceso else ()
     amb["MOSTRO_HEX"] = "ab" * 32 if acceso else ""
     # LA FASE DI PROVA RGB E I NOMI NIP-05 (ott 2026): la stessa forma
     # della fase P2P — un insieme e un dizionario che il pannello
@@ -113062,7 +113065,8 @@ def prove_statistiche_p2p():
               "_inizio_periodo_p2p", "_motivo_annullo_p2p", "_esiti_cronaca_p2p",
               "_euro_tabacchino", "_metodi_libro", "_metodi_lista_p2p",
               "_metodi_conti_p2p", "_euro_numero_p2p", "_euri_numero_p2p",
-              "_sconto_p2p_fatti", "_sconto_p2p", "_consolida_conti_p2p",
+              "_sconto_p2p_fatti", "_sconto_p2p",
+              "_garanzia_dalla_cronaca_p2p", "_consolida_conti_p2p",
               "_conti_salvi_p2p", "uscite_altrui_lnd", "_abbina_routing_p2p",
               "_iniziali_p2p", "_statistiche_p2p"):
         exec(pezzo(f), amb)
@@ -113335,6 +113339,11 @@ def prove_statistiche_p2p():
     # --- 5) IL REGISTRO -----------------------------------------------
     consolida, conti = amb["_consolida_conti_p2p"], amb["_statistiche_p2p"]
     in_corso = consolida(con, ORA)
+    # la garanzia com'e' ALLA NASCITA della riga, prima che un secondo
+    # giro possa riempirla (la tortura del 12 ott: senza questa foto, un
+    # consolidamento che la scriveva a -1 passava per buono)
+    alla_nascita = {(r[0], r[1]): r[2] for r in con.execute(
+        "SELECT ordine, giro, garanzia FROM p2p_conti")}
     righe = con.execute("SELECT COUNT(*) FROM p2p_conti").fetchone()[0]
     prova("il consolidamento scrive gli scambi chiusi e gli ordini morti "
           "(5 conclusi, 5 annullati o tornati, 1 scaduto, 1 ritirato)",
@@ -113345,6 +113354,54 @@ def prove_statistiche_p2p():
     consolida(con, ORA)
     prova("...due volte non raddoppia niente", righe,
           con.execute("SELECT COUNT(*) FROM p2p_conti").fetchone()[0])
+
+    # LA GARANZIA NEL REGISTRO (12 ott 2026, cantiere
+    # dispute-garanzia-escluse): il consolidamento la scrive dal fatto
+    # che la cronaca dice, finche' la cronaca c'e'
+    def garanzie():
+        return {(r[0], r[1]): r[2] for r in con.execute(
+            "SELECT ordine, giro, garanzia FROM p2p_conti")}
+    scritte = garanzie()
+    prova("il registro scrive se la garanzia era bloccata: si' per i "
+          "conclusi e per l'annullo concordato, no per la garanzia mai "
+          "pagata, per chi torna in vetrina e per l'annullo prima della "
+          "garanzia",
+          (1, 1, 1, 1, 0, 0, 0),
+          tuple(scritte[k] for k in (("ordine-a", 1), ("ordine-b", 1),
+                                     ("ordine-e", 1), ("ordine-g", 1),
+                                     ("ordine-c", 1), ("ordine-d", 1),
+                                     ("ordine-d", 2))))
+    prova("...ed e' scritta ALLA NASCITA della riga, non al giro dopo",
+          scritte, alla_nascita)
+    prova("...e un ordine scaduto o ritirato senza essere preso resta a "
+          "-1: la garanzia e' di uno scambio", (-1, -1),
+          (scritte[("ordine-h", 0)], scritte[("ordine-i", 0)]))
+    prova("...in tutto il registro, nessuno scambio con la cronaca intera "
+          "resta «non si sa»", [],
+          sorted(k for k, v in scritte.items()
+                 if v < 0 and k[0] not in ("ordine-h", "ordine-i")))
+    # le righe nate PRIMA della colonna (a -1) si riempiono da sole
+    con.execute("UPDATE p2p_conti SET garanzia=-1")
+    consolida(con, ORA)
+    prova("le righe scritte prima della colonna si riempiono al primo "
+          "consolidamento, uguali", scritte, garanzie())
+    con.execute("UPDATE p2p_conti SET garanzia=0 WHERE ordine='ordine-a'")
+    consolida(con, ORA)
+    prova("...e un fatto gia' scritto non si riscrive: il ritocco va solo "
+          "da «non si sa» a un fatto", 0, garanzie()[("ordine-a", 1)])
+    con.execute("UPDATE p2p_conti SET garanzia=1 WHERE ordine='ordine-a'")
+    con.commit()
+    gc = amb["_garanzia_dalla_cronaca_p2p"]
+    m = lambda giro, *nomi: [{"giro": giro, "momento": x} for x in nomi]
+    prova("la cronaca dice la garanzia giro per giro: 1 se pagata (o se "
+          "resta solo un passo che viene dopo), 0 se la presa c'e' e la "
+          "garanzia no, -1 se comincia a meta' e non la mostra",
+          {1: 1, 2: 0, 3: -1, 4: 1, 5: 0},
+          gc(m(1, "preso", "garanzia_chiesta", "garanzia_pagata")
+             + m(2, "preso", "garanzia_chiesta", "annullato")
+             + m(3, "annullato") + m(4, "concluso")
+             + m(5, "preso", "fattura_chiesta", "tornato")))
+    prova("...e senza cronaca non dice niente", {}, gc([]))
     colonne = [r[1] for r in con.execute("PRAGMA table_info(p2p_conti)")]
     prova("il registro NON ha un posto per un account ne' per una chiave",
           [], [c for c in colonne
@@ -113662,18 +113719,19 @@ def prove_dispute_cruscotto_p2p():
     import sqlite3, json as _js, html as _html
     print("\n[le dispute P2P nel cruscotto]")
     src = _SORGENTE
-    amb = {"time": time, "sqlite3": sqlite3, "html": _html,
-           "P2P_DISPUTE_SOGLIA_PERCENTO": 5.0,
+    amb = {"time": time, "sqlite3": sqlite3, "html": _html, "re": re,
+           "P2P_DISPUTE_SOGLIA_PERCENTO": 5.0, "P2P_DISPUTE_ESCLUSE": (),
            "print": lambda *a, **k: None}
     for capo, coda in (("_PESO_MOMENTO_P2P = {", "}\n"),
                        ("P2P_MOMENTI_IN_CORSO = (", ")\n"),
-                       ("P2P_DISPUTE_PERIODI = (", "))\n"),
-                       ("P2P_MOMENTI_CON_GARANZIA = (",
+                       ("P2P_MOMENTI_CON_GARANZIA = (", ")\n"),
+                       ("P2P_DISPUTE_PERIODI = (",
                         'TIMBRO_SOGLIA_DISPUTE_P2P = "soglia_dispute_p2p"\n')):
         i = src.index(capo)
         exec(src[i:src.index(coda, i) + len(coda)], amb)
     for f in ("_motivo_annullo_p2p", "_esiti_cronaca_p2p", "_perc_it",
               "_sopra_soglia_dispute_p2p", "_garanzia_dal_registro_p2p",
+              "_garanzia_dalla_cronaca_p2p", "_disputa_esclusa_p2p",
               "dati_dispute_p2p",
               "_testo_soglia_dispute_p2p", "_avviso_soglia_dispute_p2p",
               "_soglia_dispute_salva_p2p"):
@@ -113700,12 +113758,13 @@ def prove_dispute_cruscotto_p2p():
     COMPRA, VENDE = 111222333, 444555666        # id che NON devono uscire
 
     def registro(ordine, giorni_fa, esito="completato", giro=1, preso=None,
-                 motivo="", lato="sell"):
+                 motivo="", lato="sell", garanzia=-1):
+        # di serie -1: una riga nata PRIMA della colonna, da dedurre
         quando = ORA - int(giorni_fa * G)
         con.execute("INSERT INTO p2p_conti(ordine, giro, esito, motivo, lato, "
-                    "preso, chiuso) VALUES(?,?,?,?,?,?,?)",
+                    "preso, chiuso, garanzia) VALUES(?,?,?,?,?,?,?,?)",
                     (ordine, giro, esito, motivo, lato,
-                     quando if preso is None else preso, quando + 600))
+                     quando if preso is None else preso, quando + 600, garanzia))
 
     def cronaca(ordine, giorni_fa, momenti, giro=1):
         for n, (momento, attore, dettaglio) in enumerate(momenti):
@@ -113785,10 +113844,15 @@ def prove_dispute_cruscotto_p2p():
     # una disputa di cui ne' registro ne' cronaca ricordano lo scambio:
     # lo scambio c'era, e conta dall'ora in cui e' stata aperta
     disputa("disputa-orfana", 45, esito="venditore", chiusa_da="moderatore")
-    # --- prima: 10 scambi, 9 con garanzia, nessuna disputa -------------
+    # --- prima: 13 scambi, 11 con garanzia, nessuna disputa ------------
     for n in range(9):
         registro(f"vecchio-{n}", 61 + n * 3)
     registro("vecchio-tornato", 70, esito="tornato")
+    # LA COLONNA SCRITTA VINCE SULLA DEDUZIONE, nei due versi: a mano ma
+    # la garanzia c'era (1), concordato ma il registro dice di no (0)
+    registro("scritta-si", 72, esito="annullato", motivo="a_mano", garanzia=1)
+    registro("scritta-no", 74, esito="annullato", motivo="concordato", garanzia=0)
+    registro("scritta-conclusa", 76, garanzia=1)
     con.commit()
     prima_del_conto = con.total_changes
     d = dati(con, ORA)
@@ -113822,9 +113886,10 @@ def prove_dispute_cruscotto_p2p():
           "5,3%) la tendenza e' +3,3 punti",
           ({"presi": 20, "con_garanzia": 19, "con_disputa": 1, "percento": 5.3},
            3.3), (p30["prima"], p30["tendenza"]))
-    prova("da sempre: 70 scambi presi, 63 con garanzia, 4 dispute, 6,3%; "
-          "due a chi vende, due decise da un moderatore; senza un «prima»",
-          (70, 63, 4, 6.3, 1, 2, 2, 1, False),
+    prova("da sempre: 73 scambi presi, 65 con garanzia, 4 dispute, 6,2% — "
+          "la colonna scritta vince sulla deduzione nei due versi; due a "
+          "chi vende, due decise da un moderatore; senza un «prima»",
+          (73, 65, 4, 6.2, 1, 2, 2, 1, False),
           (pt["presi"], pt["con_garanzia"], pt["con_disputa"], pt["percento"],
            pt["compratore"], pt["venditore"], pt["moderatore"], pt["aperte"],
            "prima" in pt))
@@ -113860,6 +113925,11 @@ def prove_dispute_cruscotto_p2p():
           d["aperte"])
     prova("«da sempre» dice da quando: la presa piu' vecchia",
           ORA - 85 * G, d["dal"])
+    prova("la sezione dice quanti scambi hanno ancora la garanzia DEDOTTA: "
+          "le righe nate prima della colonna, tolte quelle che la cronaca "
+          "o una disputa confermano", 62, d["dedotti"])
+    prova("...e nessuna disputa e' esclusa finche' la leva e' vuota", [],
+          d["escluse"])
     prova("la soglia viaggia con la sezione: 5%, almeno 3 dispute, e qui "
           "si e' sopra", {"percento": 5.0, "minimo": 3, "sopra": True},
           d["soglia"])
@@ -113878,6 +113948,81 @@ def prove_dispute_cruscotto_p2p():
            vuoto["aperte"], vuoto["dal"]))
     prova("un database senza le tabelle del P2P: None, senza alzare", None,
           dati(sqlite3.connect(":memory:"), ORA))
+
+    # --- LE DISPUTE ESCLUSE A MANO -------------------------------------
+    esclusa = amb["_disputa_esclusa_p2p"]
+    amb["P2P_DISPUTE_ESCLUSE"] = (APERTA[:8],)
+    prova("una disputa e' esclusa dall'id intero o dal suo capo, senza "
+          "badare alle maiuscole; un altro ordine no",
+          (True, True, False, False),
+          (esclusa(APERTA), esclusa(APERTA.upper()), esclusa("disputa-mod"),
+           esclusa("")))
+    prova("...e vale il CAPO dell'id, non un pezzo qualunque", False,
+          esclusa("0000aaaa-" + APERTA))
+    senza = dati(con, ORA)
+    s7, s30 = senza["periodi"]["7"], senza["periodi"]["30"]
+    prova("esclusa l'aperta: nei 7 giorni zero dispute su 8 con garanzia "
+          "(il suo scambio RESTA, con la garanzia che la cronaca gli da'), "
+          "0%", (10, 8, 0, 0.0, 0),
+          (s7["presi"], s7["con_garanzia"], s7["con_disputa"], s7["percento"],
+           s7["aperte"]))
+    prova("...nei 30 giorni 2 su 35 (5,7%), e non e' piu' fra le aperte",
+          (35, 2, 5.7, 0, []),
+          (s30["con_garanzia"], s30["con_disputa"], s30["percento"],
+           s30["aperte"], senza["aperte"]))
+    prova("...con due dispute non si e' piu' sopra la soglia, e la sezione "
+          "dice quale ha tolto", (False, [APERTA[:8]]),
+          (senza["soglia"]["sopra"], senza["escluse"]))
+    prova("...e l'avviso non parte", "", amb["_avviso_soglia_dispute_p2p"](con, ORA))
+    amb["P2P_DISPUTE_ESCLUSE"] = ("disputa-orfana",)
+    orf = dati(con, ORA)["periodi"]["30"]["prima"]
+    prova("esclusa la disputa orfana: non porta piu' con se' il suo scambio "
+          "(19 presi, 18 con garanzia, zero dispute)",
+          {"presi": 19, "con_garanzia": 18, "con_disputa": 0, "percento": 0.0}, orf)
+    amb["P2P_DISPUTE_ESCLUSE"] = ("ffffffff",)
+    prova("un id che non e' di nessuna disputa non toglie niente e non "
+          "compare fra le escluse", (d["periodi"], []),
+          (dati(con, ORA)["periodi"], dati(con, ORA)["escluse"]))
+    amb["P2P_DISPUTE_ESCLUSE"] = ()
+    i_e = src.index("try:\n    from config import P2P_DISPUTE_ESCLUSE")
+    blocco_e = src[i_e:src.index("\n\n\n", i_e)]
+
+    def _escluse_con(valore):
+        a = {"print": lambda *x, **k: None, "re": re}
+        finto = type("C", (), {})()
+        if valore is not None:
+            finto.P2P_DISPUTE_ESCLUSE = valore
+        import sys as _s
+        vecchio = _s.modules.get("config")
+        _s.modules["config"] = finto
+        try:
+            exec(blocco_e, a)
+        finally:
+            if vecchio is None:
+                _s.modules.pop("config", None)
+            else:
+                _s.modules["config"] = vecchio
+        return a["P2P_DISPUTE_ESCLUSE"]
+
+    prova("la leva legge gli id — accorciati o interi, in minuscolo, senza "
+          "spazi né doppioni — e anche un id solo scritto nudo",
+          (("ea0af71a",), ("ea0af71a",), (APERTA, "ea0af71a")),
+          (_escluse_con(["ea0af71a"]), _escluse_con("ea0af71a"),
+           _escluse_con([" EA0AF71A ", APERTA.upper(), "ea0af71a"])))
+    prova("...non dichiarata, o vuota: nessuna esclusa", ((), ()),
+          (_escluse_con(None), _escluse_con([])))
+    prova("...STORTA — un capo piu' corto di 8 (ne prenderebbe piu' "
+          "d'una), un carattere che in un id non c'e', un numero al posto "
+          "della lista — vale NESSUNA esclusa: mai nascondere una disputa "
+          "per sbaglio", ((), (), (), ()),
+          (_escluse_con(["ea0af71"]), _escluse_con(["ea0af71a", "pippo123"]),
+           _escluse_con(123), _escluse_con(["ea0af71a", ""])))
+    prova("config_esempio.py porta la riga, vuota", True,
+          "\nP2P_DISPUTE_ESCLUSE = []\n"
+          in open("config_esempio.py", encoding="utf-8").read())
+    prova("il pannello delle leve dice gli id accorciati", True,
+          '"P2P_DISPUTE_ESCLUSE",\n                  '
+          '_elenco(i[:8] for i in P2P_DISPUTE_ESCLUSE),' in pezzo("_leve_stato"))
     prova("il cruscotto porta la sezione a tutti i moderatori", True,
           '"dispute_p2p": dati_dispute_p2p(con, int(time.time()))'
           in pezzo("dati_cruscotto"))
@@ -114005,6 +114150,9 @@ def prove_dispute_cruscotto_p2p():
     cattivo["aperte"][0]["ordine"] = "<img src=x onerror=alert(1)>"
     spenta = _js.loads(_js.dumps(d))
     spenta["soglia"].update(percento=0.0, sopra=False)
+    tolta = _js.loads(_js.dumps(senza))
+    tolta["dedotti"] = 0
+    tolta["escluse"].append("<i>x</i>")
 
     def fetta(capo, coda):
         i = pagina.index(capo)
@@ -114017,7 +114165,7 @@ def prove_dispute_cruscotto_p2p():
         "for (const [nome, r] of Object.entries(%s))"
         " fuori[nome] = cardDisputeP2P(r);" % _js.dumps(
             {"pieno": d, "vuoto": vuoto, "niente": None, "cattivo": cattivo,
-             "spenta": spenta}),
+             "spenta": spenta, "tolta": tolta}),
         "console.log(JSON.stringify(fuori));"])
     pf = os.path.join(_tf.mkdtemp(prefix="dispute_p2p_"), "sezione.js")
     open(pf, "w", encoding="utf-8").write(banco)
@@ -114028,10 +114176,10 @@ def prove_dispute_cruscotto_p2p():
     o = _js.loads(r.stdout)
     prova("a schermo: le tre percentuali, i conti, la tendenza in punti "
           "col «era», l'aperta col suo id corto, la soglia",
-          [], [x for x in ("⚖️ Dispute P2P", ">12,5%<", ">8,6%<", ">6,3%<",
+          [], [x for x in ("⚖️ Dispute P2P", ">12,5%<", ">8,6%<", ">6,2%<",
                            "1 disputa su 8 scambi con garanzia",
                            "3 dispute su 35 scambi con garanzia",
-                           "4 dispute su 63 scambi con garanzia",
+                           "4 dispute su 65 scambi con garanzia",
                            "sopra la soglia", "Scambi presi",
                            "Scambi con garanzia",
                            "Punti sul periodo prima", "▲ +12,5</span>",
@@ -114054,7 +114202,15 @@ def prove_dispute_cruscotto_p2p():
           "«scambi presi», e la nota dice dove la garanzia e' dedotta",
           (False, False, True),
           ("scambi presi<" in o["pieno"], "scambio preso<" in o["pieno"],
-           "la garanzia è dedotta dal motivo" in o["pieno"]))
+           "per 62 scambi più vecchi la garanzia è dedotta dal motivo"
+           in o["pieno"]))
+    prova("la card dice le dispute tolte dal conto, coi loro id corti "
+          "(scappati), e tace sulla deduzione quando non ce n'e' piu'",
+          (True, True, False, False, False),
+          (f'<span class="mono">{APERTA[:8]}</span>' in o["tolta"],
+           "non contat" in o["tolta"] and "&lt;i&gt;x" in o["tolta"],
+           "<i>x</i>" in o["tolta"], "dedotta" in o["tolta"],
+           "non contat" in o["pieno"]))
     prova("a leva spenta la pagina lo dice", True,
           "L'avviso ai moderatori è spento." in o["spenta"]
           and "sopra la soglia" not in o["spenta"])

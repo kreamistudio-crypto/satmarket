@@ -82,7 +82,43 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   dispute P2P (%)»). Nel journal: «⚖️ P2P: dispute sopra la soglia,
   moderatori avvisati» quando parte; «⚠️ P2P: la soglia delle dispute
   non si è potuta guardare» se il conto alza (le attese e la scopa
-  vanno avanti lo stesso). PER FARLO RISUONARE A MANO (dopo aver
+  vanno avanti lo stesso). LE DISPUTE DA NON CONTARE (12 ott 2026):
+  una disputa nata da un nostro bug o da una prova si toglie dalla
+  percentuale e dall'avviso con la leva `P2P_DISPUTE_ESCLUSE`, che si
+  AGGIUNGE al config del VPS — gli id degli ORDINI, interi o accorciati
+  agli 8 caratteri del cruscotto. La prima: `ea0af71a`, la disputa nata
+  dal bug delle chiavi perse su Tor. UN COMANDO ALLA VOLTA:
+  1) cosa c'e' gia': `grep -n "P2P_DISPUTE" /srv/barattolo/config.py`;
+  2) la copia di prima, fuori dalla cartella del servizio:
+     `sudo cp -p /srv/barattolo/config.py /root/config.py.prima-delle-escluse`;
+  3) la riga in fondo (il `\n` davanti la tiene staccata dall'ultima):
+     `printf '\nP2P_DISPUTE_ESCLUSE = ["ea0af71a"]\n' | sudo tee -a /srv/barattolo/config.py`
+     — se al passo 1 la riga c'era gia', NON se ne aggiunge un'altra:
+     si apre con `sudo nano /srv/barattolo/config.py` e si allunga la
+     lista, `["ea0af71a", "altro-id"]`;
+  4) che il file si legga ancora, PRIMA di riavviare:
+     `sudo -u barattolo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('config ok')"`;
+  5) `sudo systemctl restart barattolo`;
+  6) `sudo journalctl -u barattolo --since "2 min ago" --no-pager | grep -E "P2P_DISPUTE|Traceback"`
+     — NIENTE righe e' il buon segno; una riga `[p2p]
+     P2P_DISPUTE_ESCLUSE non e' una lista di id d'ordine` vuol dire che
+     e' scritta male e che NESSUNA disputa e' esclusa.
+  Poi il pannello «⚙️ Stato delle leve» dice «Dispute P2P escluse dal
+  conto: ea0af71a», e la card in fondo «Una disputa non contata per
+  scelta». PER TORNARE INDIETRO:
+  `sudo cp -p /root/config.py.prima-delle-escluse /srv/barattolo/config.py`
+  e il riavvio. Un id piu' corto di 8 caratteri o con un carattere che
+  in un id non c'e' fa cadere TUTTA la lista (si contano tutte): mai
+  nascondere una disputa per sbaglio. La disputa esclusa resta per i
+  moderatori dov'e' (la riga in `p2p_dispute` non si tocca).
+  LA COLONNA `garanzia` DI `p2p_conti` (12 ott 2026) nasce da sola al
+  riavvio dopo il deploy e si riempie da sola al primo giro dell'ora,
+  per tutti gli scambi la cui cronaca c'e' ancora (quaranta giorni).
+  Per guardarla, in sola lettura: `SELECT garanzia, COUNT(*) FROM
+  p2p_conti WHERE esito IN ('completato','annullato','tornato') GROUP
+  BY garanzia` — 1 = bloccata, 0 = no, -1 = non si sa (dedotta: sono
+  quelle che la card conta in «per N scambi piu' vecchi la garanzia e'
+  dedotta»). PER FARLO RISUONARE A MANO (dopo aver
   cambiato soglia, per esempio) si toglie il timbro, in sola scrittura
   di quella riga: `DELETE FROM timbri WHERE nome='soglia_dispute_p2p'`
   sul db vero (`/srv/barattolo/dati/satmarket.db`, con python3). COSA
