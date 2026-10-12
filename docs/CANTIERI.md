@@ -53032,6 +53032,28 @@ rimessi, e il diff è tornato di sedici righe. Su `prove.yml`,
 `prove.py` e i documenti: uno script Python con `newline=""`, mai `sed
 -i`.
 
+**COSA È GIRATO SU QUALE ALBERO.** SOPRA 42bb81f (dove il cantiere è
+nato): `PROVE_SEVERE=1 python prove.py` intera, 22889 passate e 0
+fallite; i 67 collaudi dell'elenco del workflow nella gabbia, 67 verdi
+(partiti prima della voce di CANTIERI, che non leggono); la tortura, 7
+su 7. POI MAIN È CORSO di due commit non miei (la chat nello scambio,
+8ffcaf0 e aabdd05): un conflitto solo, la coda di questo file — tenuta
+la loro voce, la mia riappesa in fondo. Quel che è arrivato tocca il
+workflow in un punto solo (un collaudo in più nell'elenco), lontano dai
+tre `runs-on`. SULL'ALBERO DEL PUSH, sopra aabdd05: la suite severa
+INTERA di nuovo, 23029 passate e 0 fallite; la tortura, 7 su 7;
+`collaudo_chat_scambio`, quello arrivato da main, verde nella gabbia;
+le righe aggiunte passate alle forme dei segreti, con la controprova.
+Gli altri 67 collaudi sull'albero ribasato li fa la CI.
+
+**UNA SECONDA SVISTA, AL REBASE.** Lo script che riappendeva la voce
+cercava il titolo con l'a-capo CRLF dentro un blob letto da git, dove
+gli a-capo sono LF: asserzione fallita, e la riga dopo ha continuato il
+rebase lo stesso — il commit ribasato è nato SENZA questa voce. Visto
+dal `git diff --stat` (due file invece di tre), voce riappesa e commit
+corretto prima di ogni push. È la lezione «un heredoc fallito non ferma
+la catena»: lo script e il `rebase --continue` in due chiamate.
+
 **RESTA DA GUARDARE.** Dopo questo push: che `pronto` sia arrivato a
 main (il commit tocca il workflow). Dal 19 novembre 2026: la salita,
 coi nove passi qui sopra, quando Andrea dice sì.
