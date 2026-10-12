@@ -467,6 +467,83 @@ liturgia `-bar7`. Nasce da `patch-0010-cauzione-metodo-dichiarato.py`
 `taker_bond_required_for` in `flow.rs`; si ferma se la 0010 è già
 dentro; controlla che nessun aggancio sia finito sotto `#[cfg(test)]`).
 
+## LA 0011: IL TEMPO DI CHI PUBBLICA (12 ott 2026)
+
+Preparata il 12 ott 2026 (cantiere `tempo-di-chi-pubblica`, decisioni di
+Andrea dopo lo studio); entra con l'immagine `-bar8` (PRODUZIONE, «LA
+SALITA ALLA -bar8»). ⚠️ MAI COMPILATA SUL PC: il primo `cargo build` e il
+primo `cargo test` sono quelli sul nodo.
+
+IL PROBLEMA. Upstream dà UNA finestra (`expiration_seconds`) a chi deve
+fare il gesto, e se a lasciarla scadere è chi ha PUBBLICATO l'ordine,
+l'ordine muore. Chi prende ha il telefono in mano; chi ha pubblicato no
+— gli ordini presi di notte si annullavano e andavano ripubblicati a mano.
+
+COSA FA, tutto spento finché nel `[mostro]` del `settings.toml` non ci
+sono le due chiavi (senza, il demone è upstream byte per byte):
+
+- **`maker_expiration_seconds`** — la finestra di chi ha pubblicato
+  quando il dovere è suo: pagare la garanzia della sua vendita
+  (`waiting-payment` su un `sell`), dare la fattura del suo acquisto
+  (`waiting-buyer-invoice` su un `buy`). Chi prende resta a
+  `expiration_seconds`. `find_order_by_seconds` sceglie con la più corta
+  delle due e tiene le righe la cui finestra è scaduta davvero;
+  `reconfirm_timeout_eligibility` giudica con la stessa.
+- **`maker_timeout_limit`** — dopo quante mancate risposte DI FILA di chi
+  ha pubblicato l'ordine si toglie. Con 2: la prima rimette l'ordine nel
+  libro (lo stesso ramo del tempo scaduto di chi ha preso: `NewOrder` a
+  chi ha pubblicato, `Canceled` a chi ha preso, la quotazione azzerata
+  sugli ordini a mercato), la seconda lo annulla. Assente, 0 o 1 =
+  upstream.
+
+LE MANCATE RISPOSTE si contano in una tabella A PARTE,
+`barattolo_maker_lapses`, creata con `CREATE TABLE IF NOT EXISTS` FUORI
+dalle migrazioni sqlx, come `barattolo_fees`: il rollback resta la riga
+dell'immagine nel compose. Il conto è idempotente per `taken_at` (il
+demone lo ri-timbra a ogni presa e a ogni passaggio di turno): un giro
+dello scheduler che riprova lo stesso tempo scaduto non conta due volte.
+Non serve azzerarlo: fatto il suo passo, lo scambio parte e
+quell'ordine nel libro non torna.
+
+LA PAROLA AL SERVER. L'evento della 0007 diceva `taker-timeout` ogni volta
+che l'ordine tornava `Pending`; il ritorno per colpa di chi ha pubblicato
+ha adesso la sua, `expired` + **`maker-republished`**. ⚠️ Il server di
+Barattolo va aggiornato PRIMA del nodo: quello di ieri la leggerebbe come
+un annullo.
+
+I DUE TAG NEL 38385, `maker_expiration_seconds` e `maker_timeout_limit`,
+ciascuno solo quando è in vigore: il client li legge per dire a chi ha
+pubblicato quanto tempo ha davvero, e il server per decidere se il «non
+completato» a chi pubblica vale (solo col tempo lungo).
+
+LA VENDITA CHE RESTAVA «PENDING» (stessa patch, una riga in `nip33.rs`):
+`waiting-payment` usciva in-progress solo sugli ordini di acquisto; una
+vendita presa da un'altra app con la fattura già nel take saltava
+`waiting-buyer-invoice` e restava `pending` nel libro per tutta l'attesa.
+Ora esce in-progress anche lei. Il prezzo: sulle vendite prese dalla
+nostra app l'in-progress esce due volte (alla presa e alla fattura data),
+un evento sostituibile in più a scambio. La prova upstream che diceva il
+contrario (`status_tags_map_lifecycle_statuses_to_nip69_buckets`) è
+emendata dal patcher: è l'UNICO aggancio dentro i test.
+
+COSA NON TOCCA, e perché:
+- **`bond/slash.rs`**. Sul tempo scaduto di chi ha pubblicato
+  `order_republishes_on_timeout` dice ancora «no», quindi ogni cauzione
+  sull'ordine viene liberata: giusto per quella di chi ha preso, che non
+  c'entra. La cauzione di chi PUBBLICA non esiste da noi (`apply_to =
+  "take"`), e su un nodo dove esiste (`make`, `both`) il ritorno è
+  SPENTO: un ordine rimesso nel libro ci starebbe con la sua cauzione già
+  liberata. Lì resta l'annullo upstream, e il tag del limite non esce.
+- **`cancel.rs`**: chi aspetta può già annullare da solo prima della
+  garanzia, senza penalità.
+- **Nessuna migrazione**, nessuna dipendenza nuova.
+
+I TEST, nel modulo (`barattolo_tempo::tests`): di chi è il dovere nei
+quattro incroci stato/lato; la finestra senza la chiave; il limite
+(spento sotto 2 e dove chi pubblica ha la cauzione); i tag solo se in
+vigore; la mancata risposta contata UNA volta per `taken_at`; il dovere di
+chi ha preso che non scrive niente.
+
 ## GLI OTTO PATCHER (più il decimo)
 
 Dal 22 set 2026 OGNI patch ha il suo script accanto, tutti con la stessa
@@ -488,6 +565,7 @@ fermano («porta gia' questa modifica»).
 | 0007 | `patch-0007-eventi-al-server.py` + `barattolo_eventi.rs` | 25 agganci in 13 file |
 | 0008 | `patch-0008-cauzione-solo-contanti.py` | 20 agganci in 10 file (il ventesimo, 1 ott 2026, emenda il test della 0007 sugli importi), più i test in coda a `flow.rs` e `nip33.rs` (1 ott 2026) |
 | 0010 | `patch-0010-cauzione-metodo-dichiarato.py` | 8 agganci in 5 file (`util.rs`, `bond/flow.rs`, `bond/mod.rs`, `take_buy.rs`, `take_sell.rs`), più i test in coda a `flow.rs` (10 ott 2026); pretende la 0008 |
+| 0011 | `patch-0011-tempo-di-chi-pubblica.py` + `barattolo_tempo.rs` | 13 agganci in 7 file (`main.rs`, `config/types.rs`, `settings.tpl.toml`, `db.rs`, `scheduler.rs`, `barattolo_eventi.rs`, `nip33.rs`), coi test dentro il modulo (12 ott 2026); pretende la 0007 |
 
 I primi tre sono nati il 22 set 2026 (fino ad allora quelle patch
 esistevano solo come `.patch`, da ritocchi a mano sul nodo); la 0004 ha

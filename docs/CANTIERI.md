@@ -52024,3 +52024,222 @@ nuovo (chi-e-l-altro, recensione, pagamento, db_contesa) verdi.
 
 **Resta da guardare.** La prossima rossa vera in CI: le annotazioni in
 cima alla corsa devono essere tante quante le rosse.
+
+
+## Il tempo di chi pubblica: tre ore, il ritorno nel libro, la pausa, il badge e la penalità (12 ott 2026, cantiere tempo-di-chi-pubblica, decisioni di Andrea dopo lo studio)
+
+**IL PROBLEMA, coi casi veri.** Quando qualcuno prende un ordine, chi
+l'ha PUBBLICATO aveva lo stesso tempo di chi prende — mezz'ora dal 10
+ott — per il suo primo passo: pagare la garanzia se vende, dare la
+fattura se compra. Se dormiva, lo scambio saltava e l'ordine MORIVA:
+da ripubblicare a mano. È successo a Bitvero (una vendita presa di
+notte), a SatoSats, a un utente nel weekend, a uno alle sei del mattino.
+Letto sul fork prima di decidere (`scheduler.rs`, `job_cancel_orders`):
+se manca chi ha PRESO l'ordine torna `Pending`, se manca chi ha
+PUBBLICATO va a `Canceled`; nessuna penalità di mostrod a nessuno (la
+cauzione c'è solo sul contanti e a tempo scaduto non brucia); e chi
+aspetta può annullare da solo, subito, senza penalità (`cancel.rs`).
+
+**LE DECISIONI DI ANDREA**, dopo lo studio (nove punti, con le proposte
+di Alan e di un utente):
+1. CHI PRENDE RESTA A MEZZ'ORA, CHI PUBBLICA HA TRE ORE. Il principio è
+   suo: chi prende ha il telefono in mano, chi pubblica non sa quando
+   glielo prenderanno. Le ore sono tre e non le dodici proposte da Alan:
+   sugli ordini a mercato il cambio si ferma alla presa, e in dodici ore
+   si muove quanto il premio di un ordine tipico (un'opzione gratuita
+   per chi pubblica); in tre resta sotto. Sono una riga del
+   `settings.toml` del nodo (`maker_expiration_seconds = 10800`), si
+   cambiano senza ricompilare.
+2. L'ORDINE TORNA NEL LIBRO invece di morire, e alla SECONDA mancata
+   risposta di fila si toglie (`maker_timeout_limit = 2`): ogni giro a
+   vuoto costa a qualcuno l'attesa, e sugli acquisti i sats fermi in
+   garanzia.
+3. LA PENALITÀ A CHI PUBBLICA, che ROVESCIA la regola del 10 ott («mai a
+   chi ha pubblicato»), sapendolo. Quella regola nasceva coi trenta
+   minuti, quando «può non aver visto l'avviso» era vero; con tre ore,
+   quattro avvisi e una pausa per nascondersi non lo è più. E senza un
+   costo le tre ore sarebbero l'opzione gratuita di cui sopra: LA
+   PENALITÀ È IL CONTRAPPESO DEL TEMPO LUNGO (NODO-MOSTRO, «LA REGOLA,
+   RISCRITTA»). Per questo il server la conta SOLO se il coordinatore il
+   tempo lungo lo dà davvero: leva accesa E `maker_expiration_seconds`
+   maggiore di `expiration_seconds` nel 38385. Coi trenta minuti di
+   tutti resta la regola del 10 ott, da sola.
+   Conta il tempo scaduto e — IL BUCO CHIUSO — l'annullo a mano dopo una
+   presa: senza, bastava annullare invece di lasciar scadere. Tre
+   tutele: una sola per ordine anche con due mancate di fila; mai se la
+   presa è arrivata in pausa o nella mezz'ora prima; mai se ha annullato
+   chi ha preso. Stesso esito `mancato` di chi prende, quindi stesse
+   soglie (90 giorni il marchio, 30 il filtro, il primo tollerato) e la
+   stessa scusa del tentativo, una ogni 30 giorni PER PERSONA (non una
+   per ruolo).
+4. LA PAUSA DEGLI ORDINI, solo dentro Barattolo per ora: ricorrente (più
+   fasce, per giorni e ore) e una volta sola (fino a 7 giorni); per
+   persona, dal profilo di scambio; il fuso lo dà il telefono, l'ora
+   legale la fa il server.
+5. GLI AVVISI a chi pubblica: subito, a 10 minuti, a un'ora, mezz'ora
+   prima della scadenza, sul canale che ha scelto.
+6. CHI HA PRESO, mentre aspetta, legge quanto tempo ha l'altro e che può
+   annullare senza penalità.
+7. IL BADGE «⚡ risponde in fretta».
+8. NIENTE coda né campanello (la proposta di un utente): un ordine preso
+   ha un solo posto nel coordinatore, e il subentro non può essere
+   automatico — la presa la firma il telefono di chi subentra.
+
+**COM'È FATTO.** Tre posti, ognuno col suo mestiere (ARCHITETTURA, «IL
+TEMPO DI CHI PUBBLICA»). IL NODO decide tempi e ritorno (patch 0011 del
+fork, immagine `-bar8`: README del fork «LA 0011», liturgia in
+PRODUZIONE). IL SERVER tiene i fatti, dietro UNA leva spenta di serie,
+`P2P_TEMPO_DI_CHI_PUBBLICA`: pausa, mancata risposta, badge, avvisi.
+L'APP mostra e scrive la propria pausa.
+I TEMPI NON SONO DELLA LEVA: il server e l'app leggono dal 38385 la
+finestra di chi deve fare il gesto anche a leva spenta — è la regola di
+sempre («il tempo è del coordinatore, mai nostro»). Quindi la parte A
+funziona coi trenta minuti di oggi: accesa la leva prima della `-bar8`,
+pausa, badge e avvisi vanno, e la penalità resta spenta finché il nodo
+non annuncia il tempo lungo.
+
+**LE SCELTE DI DISEGNO, coi perché.**
+- LA PAUSA NON SCRIVE NIENTE SUGLI ORDINI. Una riga per persona
+  (`p2p_pause`), e chi serve il libro CHIEDE all'orologio se a quell'ora
+  quella persona è in pausa. Così alla fine gli ordini «tornano da soli»
+  senza un battito che li riaccenda, e una pausa non può restare
+  attaccata a un ordine per un riavvio caduto a metà.
+- LA PRESA IN PAUSA SI SCRIVE ALLA PRESA (`p2p_scambi.pausa_presa`), con
+  la pausa di QUEL momento: una pausa messa dopo non scusa una presa di
+  prima — se no bastava accenderla al risveglio. «Subito prima» è
+  mezz'ora (`P2P_PAUSA_PRIMA_S`): chi viene preso alle 21:50 con la
+  pausa alle 22 avrebbe le sue ore tutte di notte.
+- IL FATTO NUDO E LA PENALITÀ SONO DUE RIGHE. `senza_risposta` si scrive
+  a ogni mancata risposta (tranne che in pausa), anche quando il «non
+  completato» non scatta: è quella che toglie il badge. Senza, a leva
+  accesa ma col nodo di ieri il badge non si sarebbe mai perso.
+- IL BADGE SI CALCOLA DAI FATTI CHE C'ERANO GIÀ: i `completato` in cui la
+  persona era chi aveva pubblicato (ruolo e lato dell'ordine combaciano),
+  la controparte dall'altro `completato` dello stesso giro, i secondi
+  dalla cronaca (che vive quaranta giorni, più dei trenta della
+  finestra). Nessuna tabella nuova, e c'è dal primo giorno.
+- L'ORA LEGALE SUL SERVER: zoneinfo col nome IANA detto dal telefono.
+  Dove tzdata non c'è (il PC di Andrea, e si è visto: le prove qui
+  girano sul ripiego) lo scarto in minuti che il telefono aveva al
+  salvataggio, e per i fusi `Europe/…` la regola europea sopra il suo
+  scarto d'inverno — la stessa di `_epoch_roma`.
+- NEL FORK, LA TABELLA A PARTE e non una migrazione: il conto delle
+  mancate risposte sta in `barattolo_maker_lapses`, creata fuori da sqlx
+  come `barattolo_fees`. Il rollback resta la riga dell'immagine.
+- `slash.rs` NON SI TOCCA: sul tempo scaduto di chi pubblica ogni
+  cauzione sull'ordine viene liberata, ed è giusto per quella di chi ha
+  preso; e dove chi PUBBLICA ha una cauzione (`apply_to = make|both`,
+  non da noi) il ritorno è spento.
+- LA PAROLA NUOVA (`maker-republished`) e non un dettaglio in più su
+  `taker-timeout`: il server di ieri contava un «non completato» a chi
+  ha PRESO su ogni `expired` che riportava l'ordine a `Pending`. Per
+  questo va online PRIMA il server, POI il nodo.
+
+**LE STRADE SCARTATE.**
+- DODICI ORE (Alan): l'opzione sul cambio vale quanto il premio; e sugli
+  acquisti chi ha preso avrebbe i sats fermi mezza giornata.
+- TOGLIERE IL PRIMO PASSO A CHI COMPRA mettendo l'indirizzo Lightning
+  nell'ordine (mostrod lo accetta nel `new-order`): toglie anche il
+  controllo «sei sveglio?» — pagata la garanzia lo scambio sarebbe
+  subito attivo, e i sats di chi ha preso fermi finché l'altro non paga
+  gli euro, senza più una scadenza corta.
+- LA PAUSA FATTA DAL TELEFONO (annulla e ripubblica): serve l'app aperta
+  alle 22 e alle 6, e l'ordine cambia id a ogni giro (i link condivisi
+  muoiono). E LA PAUSA FIRMATA DAL SERVER: per chi entra da Telegram il
+  server la chiave la saprebbe ricavare, ma firmare al posto dell'utente
+  è custodia — regola ferrea 2.
+- LA PAUSA VERA PER LE ALTRE APP, rimandata: la scheda dell'ordine nel
+  libro la firma il coordinatore, quindi a nasconderla davvero può
+  essere solo lui (una patch che chiede al server la lista degli ordini
+  in pausa e li pubblica in-progress). Prima i numeri: quanti scambi
+  hanno una parte fuori da Barattolo.
+- LA CODA di chi si prenota dietro al primo: sopra.
+- UN CONTATORE AZZERATO «al primo passo fatto» nel fork: non serve —
+  fatto il suo passo lo scambio parte, e quell'ordine nel libro non
+  torna. Il conto è per `taken_at`, e non si azzera mai.
+
+**I TESTI.** «Info P2P»: i due tempi («chi l'ha preso … 30 minuti … chi
+l'ha pubblicato … 3 ore», coi numeri letti dal 38385), «se il tempo
+scade» col ritorno nel libro, e la sezione nuova «Se pubblichi un
+ordine» (gli avvisi, la pausa, se non rispondi, il badge) — solo a leva
+accesa, e «se non rispondi» solo col tempo lungo. «I tuoi dati»: la
+regola nuova accanto a quella di chi prende, la riga della presa senza
+risposta, il badge, e cosa teniamo della pausa. La pagina dello scambio
+di chi ha preso: «Chi ha pubblicato ha fino a 3 ore per rispondere
+(ancora 2:58:55). Puoi annullare quando vuoi, senza penalità.» Gli
+avvisi a chi pubblica: «⏳ Hai 3 ore, poi l'ordine torna nel libro e ti
+conta come scambio non completato.»
+
+**I DUE NOTATI DELLO STUDIO, curati.** La vendita presa da un'altra app
+con la fattura già nel take restava `pending` nel libro per tutta
+l'attesa (`create_status_tags` pubblicava `waiting-payment` solo sugli
+acquisti): una riga nella stessa patch, e la prova upstream emendata.
+Il commento «mostrod la chiude in quindici minuti» in `server.py` dice
+ora la mezz'ora del 10 ott.
+
+**E UNA LETTURA SBAGLIATA MIA, nello studio.** Avevo dato ad Andrea
+`SELECT parti_note, COUNT(*) FROM p2p_conti` per contare gli scambi con
+una parte fuori da Barattolo, e ne sono usciti 97 con `parti_note = 0`.
+Non sono 97 scambi con altre app: `_consolida_conti_p2p` scrive zero
+parti anche per gli ordini SCADUTI o RITIRATI senza essere presi (non
+c'è nessuna parte) e per i giri PRECEDENTI di un ordine tornato nel
+libro (`p2p_scambi` tiene solo le parti dell'ultimo giro). La domanda
+giusta guarda l'esito accanto: sta in PRODUZIONE e nel rapporto.
+
+**PROVATO.** `prove_tempo_di_chi_pubblica` (il server, sul banco degli
+eventi coi giudici veri): la finestra per ruolo, la penalità spenta
+senza il tempo lungo, il piano dei promemoria, la pausa (i feriali, la
+notte che passa la mezzanotte, l'estate e l'inverno, la notte in cui
+cambia l'ora, la catena, la una tantum, le forme storte), il badge, e
+lo scambio intero nei suoi casi — leva spenta, leva senza tempo lungo,
+il «mancato» a chi pubblica e NIENTE a chi ha preso, la seconda di fila
+contata una volta, l'annullo a mano, la presa in pausa e nella mezz'ora
+prima, la pausa messa dopo, la scusa del tentativo, chi non è dei
+nostri. `prove_tempo_pubblica_app` (l'app, coi pezzi veri in node): le
+sentinelle dei blocchi e dei ganci, la finestra del proprio gesto, il
+conto alla rovescia che passa le ore, l'attesa di chi ha preso, le
+pause che arrivano dal server, i segni, il foglio disegnato e i suoi
+gesti, i testi coi numeri legati alle costanti del server.
+`collaudo_tempo_pubblica` sulle ROTTE VERE (nella gabbia della CI):
+31 passi. Le sezioni di ieri emendate dove la regola è cambiata (i
+motivi della presa sono sei, le chiavi della busta quattordici, il
+giudice unico ha sette chiamanti, «I tuoi dati» dice tutt'e due i
+giudici, la rotta dei volti porta le pause).
+IL GIRO DAL VIVO a larghezza telefono (390×844, Chrome senza finestra
+pilotato coi tocchi veri, due identità di collaudo, server della copia
+col relay morto e il 38385 di cartone coi due tempi): dal profilo al
+foglio della pausa, due fasce più la una tantum, salvata sul server
+vero (`fuso: Europe/Rome`); il proprio ordine con «⏸ In pausa fino a
+domani alle 20:00» (la CATENA dal vivo: la una tantum fino alle 12:26
+si attacca alla fascia dei feriali 8-20); l'altro telefono con UNA
+offerta sola nel libro, e nel dettaglio «Compra» spento col perché;
+tolta la pausa, l'ordine torna col badge; l'attesa di chi ha preso col
+conto che batte (2:58:56 → 2:58:53); il tempo di chi ha pubblicato
+(«poi l'ordine torna nel libro»); «Info P2P». Tredici scatti; nessuna
+pagina più larga del telefono.
+LA PATCH 0011: il fork ricostruito sul PC (tag `v0.19.0` + le nove
+patch con `git am`), il patcher a secco («13 agganci in 7 file») e per
+davvero, il diff riletto riga per riga, la `.patch` esportata.
+
+**NON PROVATO, e si dice.** LA PATCH NON È MAI STATA COMPILATA: sul PC
+non c'è cargo. Il primo `cargo build` e il primo `cargo test` sono
+quelli sul nodo (PRODUZIONE, punto 3): un errore di tipo lì è
+possibile, e si incolla. I filtri `scheduler` e `nip33` sono nuovi
+nella liturgia dei test: possono pescare una prova di upstream che
+cade per la globale dei test, come è successo con la `-bar7`. La
+scadenza vera — l'ordine che torna nel libro e alla seconda sparisce —
+si vede solo lasciando scadere un ordine apposta (fase 5 della
+liturgia). Nessun telefono vero: il foglio della pausa usa i campi
+d'ora del sistema (`type="time"`, `datetime-local`), e come li disegna
+Telegram su iPhone e su Android va guardato. E l'app Mostro di altri:
+chi prende da lì un ordine di chi ha tre ore potrebbe vedere un conto
+alla rovescia di trenta minuti che arriva a zero senza che succeda
+niente — non l'ho provato.
+
+**RESTA DA GUARDARE** (Andrea). Sul telefono, dopo il deploy e la leva:
+il foglio della pausa dentro Telegram (i due campi d'ora, i sette
+giorni in una riga), una pausa di prova e l'ordine che sparisce
+dall'altro account. Sul VPS: `grep -n "P2P_TEMPO_DI_CHI_PUBBLICA"
+/srv/barattolo/config.py` prima di accendere, e il pannello delle leve
+dopo. Sul nodo: la `-bar8`, quando dà l'ok. Poi i numeri: quante prese
+restano senza risposta con le tre ore, e se le ore vanno ritoccate.

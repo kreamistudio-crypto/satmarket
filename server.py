@@ -5873,6 +5873,14 @@ def init_db():
         chiave_compratore TEXT DEFAULT '',
         chiave_venditore TEXT DEFAULT '',
         aggiornato INTEGER DEFAULT 0,
+        -- LA PRESA E' ARRIVATA IN PAUSA? (12 ott 2026, tempo-di-chi-
+        -- pubblica): 1 se, quando mostrod ha raccontato la presa di
+        -- questo giro, chi aveva pubblicato era in pausa o ci sarebbe
+        -- entrato entro P2P_PAUSA_PRIMA_S. Si scrive ALLORA, con la
+        -- pausa di allora: una pausa messa dopo non scusa una presa di
+        -- prima. La legge il giudice del «non completato» a chi
+        -- pubblica (`_esito_chi_pubblica_p2p`).
+        pausa_presa INTEGER DEFAULT 0,
         -- IL CAMBIO DELLA PRESA (27 set 2026): euro per bitcoin che il
         -- server stava servendo quando mostrod ha raccontato la presa di
         -- questo giro. A sats fissi la convenienza di uno scambio si
@@ -6199,6 +6207,37 @@ def init_db():
         creata INTEGER NOT NULL,
         avvisata INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (tg_id, quando)
+    );
+    CREATE TABLE IF NOT EXISTS p2p_pause(
+        -- LA PAUSA DEGLI ORDINI, PER PERSONA (12 ott 2026, cantiere
+        -- tempo-di-chi-pubblica): chi pubblica dice QUANDO non c'e', e
+        -- in quelle ore i suoi ordini non si vedono nel libro di
+        -- Barattolo e non si prendono da qui. Una riga per persona, non
+        -- per ordine: «dormo dalle 22 alle 6» vale per tutto quel che
+        -- ho in vetrina.
+        -- `fasce` e' la pausa RICORRENTE, una lista JSON di al piu'
+        -- P2P_PAUSA_FASCE_MAX voci `{"g": [0..6], "da": minuti, "a":
+        -- minuti}` — i giorni in cui la fascia COMINCIA (0 = lunedi'), e
+        -- i minuti dalla mezzanotte nell'ora di chi l'ha scritta; `a`
+        -- non dopo `da` vuol dire che finisce il giorno dopo (22-6).
+        -- `fuso` e' il nome IANA che da' il telefono («Europe/Rome»):
+        -- l'ora legale la fa il server (`_scarto_fuso_p2p`); `scarto`
+        -- sono i minuti a est di UTC che il telefono aveva quando ha
+        -- salvato, il ripiego dove il nome non si sa leggere.
+        -- `una_da`/`una_fino` e' la pausa UNA TANTUM (epoch, 0 = non
+        -- c'e'), al piu' P2P_PAUSA_UNA_MAX_S: alla fine gli ordini
+        -- tornano da soli, perche' qui non si scrive «in pausa» su
+        -- nessun ordine — si CHIEDE a queste quattro colonne che ora e'.
+        -- ⚠️ VALE DENTRO BARATTOLO: per il coordinatore l'ordine resta
+        -- `pending`, e un'altra app Mostro lo vede e lo prende. Niente
+        -- di qui esce verso i relay.
+        tg_id INTEGER PRIMARY KEY,
+        fasce TEXT NOT NULL DEFAULT '[]',
+        fuso TEXT DEFAULT '',
+        scarto INTEGER DEFAULT 0,
+        una_da INTEGER DEFAULT 0,
+        una_fino INTEGER DEFAULT 0,
+        aggiornato INTEGER DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS p2p_semi(
         -- IL SALE DEL PROFILO DI SCAMBIO (set 2026): la chiave
@@ -7440,6 +7479,8 @@ def init_db():
     # su ogni dispositivo»): vedi lo schema di `p2p_scambi`
     for colonna in ("chiave_compratore TEXT DEFAULT ''",
                     "chiave_venditore TEXT DEFAULT ''",
+                    # la presa arrivata in pausa (12 ott 2026)
+                    "pausa_presa INTEGER DEFAULT 0",
                     # il cambio della presa (27 set 2026)
                     "cambio_presa REAL DEFAULT 0"):
         try:
@@ -16426,6 +16467,11 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE p2p_sveglie SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM p2p_sveglie WHERE tg_id=?", (id_nostr,))
+        # ...e la pausa degli ordini (12 ott 2026) segue l'utente: la PK
+        # e' il tg_id, e se le due meta' ne hanno una vince la Telegram
+        con.execute("UPDATE OR IGNORE p2p_pause SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("DELETE FROM p2p_pause WHERE tg_id=?", (id_nostr,))
         # I punti di ritiro salvati seguono l'utente, stessa forma.
         # SULLA STESSA RETE VINCE LA META' TELEGRAM, e va DICHIARATO
         # perche' qui la scelta non e' neutra come per i preferiti: la'
@@ -24463,6 +24509,9 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     dispute_perse = _marchi_dispute_p2p(
         con, [v["tg_id"]], int(time.time())).get(int(v["tg_id"]), 0)
     scambi_completati = _completati_p2p(con, [v["tg_id"]]).get(int(v["tg_id"]), 0)
+    # ...e il badge «⚡ risponde in fretta» (12 ott 2026, tempo-di-chi-pubblica)
+    risponde_in_fretta = int(v["tg_id"]) in _veloci_p2p(
+        con, [v["tg_id"]], int(time.time()))
     seguito = bool(user and int(user["id"]) != int(v["tg_id"]) and con.execute(
         "SELECT 1 FROM venditori_seguiti WHERE tg_id=? AND venditore_id=?",
         (user["id"], v["tg_id"])).fetchone())
@@ -24473,6 +24522,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     venditore["dispute_perse"] = dispute_perse
     # ...e quanti scambi P2P ha completato (10 ott 2026, feedback-p2p)
     venditore["scambi_completati"] = scambi_completati
+    venditore["risponde_in_fretta"] = risponde_in_fretta
     venditore["distintivi"] = [
         dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
              descrizione=d["descrizione"])
@@ -29114,6 +29164,19 @@ def _leve_stato():
                   spento="come ieri: la cauzione dell'ordine intero, "
                          "anche a chi sceglie SEPA su un ordine con i "
                          "contanti; da accendere dopo la -bar7"),
+            # IL TEMPO DI CHI PUBBLICA (12 ott 2026): il pacchetto di
+            # Barattolo; le ore le decide il nodo (settings.toml,
+            # `maker_expiration_seconds`, patch 0011) e le annuncia nel 38385
+            _leva("Tempo di chi pubblica: pausa, badge, penalità",
+                  "P2P_TEMPO_DI_CHI_PUBBLICA", P2P_TEMPO_DI_CHI_PUBBLICA,
+                  acceso="pausa degli ordini, badge «⚡ risponde in "
+                         "fretta» e quattro avvisi a chi pubblica; il "
+                         "«non completato» a chi pubblica e non risponde "
+                         "conta solo se il nodo gli dà più tempo di chi "
+                         "prende (-bar8)",
+                  spento="come ieri: niente pausa né badge, un solo "
+                         "promemoria a metà tempo, e chi pubblica non "
+                         "viene mai contato"),
             # GLI AVVISI DEI NUOVI ORDINI (9 ott 2026): la leva globale e la
             # finestra del raggruppamento; la preferenza resta per persona
             _leva("Avvisi dei nuovi ordini P2P", "P2P_AVVISI_NUOVI_ORDINI",
@@ -44918,6 +44981,24 @@ try:
     P2P_CAUZIONE_SUL_METODO = P2P_CAUZIONE_SUL_METODO is True
 except ImportError:
     P2P_CAUZIONE_SUL_METODO = False
+# IL TEMPO DI CHI PUBBLICA (12 ott 2026, cantiere tempo-di-chi-pubblica):
+# spenta di serie. Accesa, il server e l'app mettono in campo il
+# pacchetto — la pausa degli ordini, il badge «⚡ risponde in fretta», i
+# quattro avvisi a chi pubblica, e il «non completato» a chi pubblica e
+# non risponde. I TEMPI NON SONO SUOI: quanto ha chi pubblica lo dice il
+# coordinatore nel 38385 (`maker_expiration_seconds`, patch 0011 del
+# fork, `-bar8`), e si legge anche a leva spenta. E IL «NON COMPLETATO» A
+# CHI PUBBLICA VUOLE TUTT'E DUE: la leva E un coordinatore che gli da'
+# piu' tempo di chi prende (`_penalita_pubblica_p2p`) — con la mezz'ora
+# di ieri resta la regola di ieri. Solo True accende.
+try:
+    from config import P2P_TEMPO_DI_CHI_PUBBLICA
+    if not isinstance(P2P_TEMPO_DI_CHI_PUBBLICA, bool):
+        print("[p2p] P2P_TEMPO_DI_CHI_PUBBLICA non e' True/False: pausa, "
+              "badge e regole nuove di chi pubblica restano SPENTI")
+    P2P_TEMPO_DI_CHI_PUBBLICA = P2P_TEMPO_DI_CHI_PUBBLICA is True
+except ImportError:
+    P2P_TEMPO_DI_CHI_PUBBLICA = False
 # GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026, richiesta di Andrea):
 # chi lo chiede riceve un messaggio quando nel libro P2P compaiono
 # ordini nuovi — raggruppati, al piu' uno ogni P2P_AVVISI_NUOVI_MINUTI
@@ -45251,6 +45332,9 @@ def _p2p_leve() -> dict:
             "cauzione": bool(P2P_CAUZIONE),
             # ...e sul metodo scelto (11 ott 2026): solo col nodo alla -bar7
             "cauzioneSulMetodo": bool(P2P_CAUZIONE_SUL_METODO),
+            # il tempo di chi pubblica (12 ott 2026): pausa degli ordini,
+            # badge e regole nuove; il client le mostra solo con questa
+            "tempoPubblica": bool(P2P_TEMPO_DI_CHI_PUBBLICA),
             # gli avvisi dei nuovi ordini (9 ott 2026): la leva globale
             # e la finestra, perche' la riga del Profilo e il bottone
             # della testata compaiano solo se esistono, e dicano
@@ -46102,7 +46186,12 @@ def _zona_ultima_p2p(con, tg_id: int) -> str:
 #    Mai a chi ha pubblicato — puo' non aver visto l'avviso, e per lui la
 #    conseguenza e' gia' l'ordine tornato in vetrina —, mai a chi ha
 #    aspettato, mai a chi si ritira prima che lo scambio parta
-#    (`canceled`/`republished`). Finestra del marchio: 90 giorni; la
+#    (`canceled`/`republished`). ⚠️ IL «MAI A CHI HA PUBBLICATO» HA LA
+#    SUA ECCEZIONE DAL 12 OTT 2026 (decisione di Andrea, cantiere
+#    tempo-di-chi-pubblica): valeva coi trenta minuti di tutti; da quando
+#    il coordinatore gli da' ore sue, una mancata risposta gli si conta —
+#    con la leva, e solo col tempo lungo. Il perche' e le tutele stanno
+#    piu' sotto, «IL TEMPO DI CHI PUBBLICA». Finestra del marchio: 90 giorni; la
 #    scritta «⚠️ N non completati» compare da N = 2 (il primo si tollera:
 #    P2P_MANCATI_TOLLERATI).
 # 2) CHI CI HA PROVATO NON SI PENALIZZA: i tentativi che il telefono
@@ -46139,7 +46228,8 @@ P2P_MANCATI_TOLLERATI = 1             # il primo si tollera: scritta e filtro pa
 P2P_FILTRO_SOGLIE = (1, 3, 5)         # «almeno N scambi completati», le tre scelte del foglio
 P2P_PRESE_APERTE_MAX = 2              # prese in attesa del primo gesto, insieme
 # una presa senza il primo gesto piu' vecchia di cosi' non si conta piu'
-# fra le aperte: mostrod la chiude in quindici minuti, e un evento perso
+# fra le aperte: mostrod la chiude da solo (la finestra di chi prende:
+# mezz'ora dal 10 ott 2026, `expiration_seconds`), e un evento perso
 # per strada non deve tenere una persona fuori per sempre
 P2P_PRESA_APERTA_S = 3600
 P2P_ESITI_MEMORIA_S = 400 * 86400     # oltre un anno gli esiti se ne vanno
@@ -46149,7 +46239,7 @@ P2P_TENTATIVO_MARGINE_S = 60
 P2P_GESTI_TENTATIVO = ("garanzia_aperta", "garanzia_copiata", "garanzia_wallet",
                        "cauzione_aperta", "cauzione_copiata", "cauzione_wallet",
                        "fattura_inviata", "fattura_rifiutata", "fattura_scartata")
-P2P_MOTIVI_PRESA = ("filtro", "mancati", "prese", "sospesi", "dispute")
+P2P_MOTIVI_PRESA = ("filtro", "mancati", "prese", "sospesi", "dispute", "pausa")
 # ═══ I MALUS DOPO LA GARANZIA (10 ott 2026, cantiere malus-p2p, richiesta
 # di Andrea dopo lo studio sul feedback). Le quattro regole qui sopra
 # guardano il PRIMO gesto; a garanzia bloccata non c'era nessuna
@@ -46190,12 +46280,625 @@ P2P_MOTIVI_PRESA = ("filtro", "mancati", "prese", "sospesi", "dispute")
 #    si possono pagare in contanti di persona.
 # Quel che RESTA COM'ERA, per decisione di Andrea: mai a chi ha
 # pubblicato e non prosegue (`maker-timeout`), e nessun controllo sugli
-# scambi fra gli stessi due account.
+# scambi fra gli stessi due account. (La prima meta' e' la regola del 10
+# ott, e dal 12 ott 2026 vale solo finche' chi pubblica ha il tempo di
+# chi prende: vedi «IL TEMPO DI CHI PUBBLICA», qui sotto.)
 P2P_DISPUTE_FINESTRA_S = 90 * 86400   # la finestra del marchio «dispute perse»
 P2P_SCUSA_FINESTRA_S = 30 * 86400     # una scusa del tentativo ogni 30 giorni
 P2P_EURO_SOSPESI_MAX = 2              # scambi con gli euro in sospeso, insieme
 P2P_EURO_SOSPESI_DOPO_S = 3600        # da quando la garanzia bloccata «aspetta»
 P2P_EURO_SOSPESI_FINO_S = 4 * 86400   # oltre, la garanzia non c'e' piu'
+# ═══ IL TEMPO DI CHI PUBBLICA (12 ott 2026, cantiere tempo-di-chi-
+# pubblica, decisioni di Andrea dopo lo studio). Chi PRENDE un ordine ha
+# il telefono in mano, e resta a mezz'ora; chi l'ha PUBBLICATO non sa
+# quando glielo prenderanno, e il coordinatore gli da' piu' tempo
+# (`maker_expiration_seconds` nel 38385: tre ore, patch 0011 del fork).
+# Se non risponde, l'ordine non muore piu': TORNA NEL LIBRO, e solo alla
+# seconda mancata risposta di fila il coordinatore lo toglie. Qui sta
+# tutto quel che e' del SERVER, dietro la leva P2P_TEMPO_DI_CHI_PUBBLICA:
+# 1) LA PAUSA DEGLI ORDINI (`p2p_pause`): ricorrente, per giorni e
+#    fasce, e una tantum fino a sette giorni. In pausa gli ordini di
+#    quella persona non si vedono nel libro di Barattolo e non si
+#    prendono da qui (`_posso_prendere_p2p`, motivo `pausa`). ⚠️ VALE
+#    DENTRO BARATTOLO, come il filtro e il limite: per il coordinatore
+#    l'ordine resta `pending`, e un'altra app Mostro lo prende.
+# 2) IL «NON COMPLETATO» A CHI PUBBLICA E NON RISPONDE — la regola del
+#    10 ott («mai a chi ha pubblicato») ROVESCIATA SAPENDOLO: nasceva
+#    coi trenta minuti, quando «puo' non aver visto l'avviso» era vero.
+#    Con tre ore, quattro avvisi e una pausa per nascondersi non lo e'
+#    piu', e senza un costo le tre ore sarebbero un'opzione gratuita sul
+#    cambio (chi pubblica risponde solo se il prezzo si e' mosso a suo
+#    favore): LA PENALITA' E' IL CONTRAPPESO DEL TEMPO LUNGO, e infatti
+#    vale solo se il coordinatore il tempo lungo lo da' davvero
+#    (`_penalita_pubblica_p2p`). Conta come mancata risposta il tempo
+#    scaduto (`maker-timeout`, `maker-republished`) e l'ANNULLO A MANO
+#    DOPO UNA PRESA (`maker-annullo`): senza, bastava annullare invece
+#    di lasciar scadere. Le tutele: UNA SOLA PER ORDINE, anche con due
+#    mancate di fila; MAI se la presa e' arrivata in pausa o nella
+#    mezz'ora prima (`p2p_scambi.pausa_presa`, scritta alla presa); mai
+#    se ad annullare e' stato chi ha preso (non e' nemmeno un suo
+#    evento). Stesso esito `mancato` di chi prende, quindi stesse soglie
+#    (90 e 30 giorni, il primo tollerato) e stessa scusa del tentativo,
+#    una ogni 30 giorni per persona.
+# 3) IL BADGE «⚡ RISPONDE IN FRETTA» (`_veloci_p2p`): negli ultimi 30
+#    giorni almeno 3 scambi CONCLUSI da chi ha pubblicato, con 3 persone
+#    diverse, tempo mediano di risposta entro 10 minuti, e nessuna presa
+#    rimasta senza risposta (`senza_risposta`, che si scrive anche
+#    quando il «non completato» non scatta). Solo dentro Barattolo.
+# 4) GLI AVVISI A CHI PUBBLICA: subito, a 10 minuti, a un'ora e mezz'ora
+#    prima della scadenza (`_piano_promemoria_p2p`), sul canale scelto.
+P2P_PAUSA_FASCE_MAX = 6               # fasce ricorrenti per persona
+P2P_PAUSA_UNA_MAX_S = 7 * 86400       # il tetto della pausa una tantum
+P2P_PAUSA_UNA_ENTRO_S = 30 * 86400    # quanto in la' puo' cominciare
+P2P_PAUSA_PRIMA_S = 1800              # «subito prima»: la presa nella mezz'ora prima della pausa
+P2P_PAUSA_CATENA_MAX = 16             # fasce attaccate una all'altra: oltre non si segue
+P2P_VELOCE_FINESTRA_S = 30 * 86400    # la finestra del badge
+P2P_VELOCE_SCAMBI_MIN = 3             # scambi conclusi da chi ha pubblicato, con persone diverse
+P2P_VELOCE_MEDIANA_S = 600            # il tempo mediano di risposta, al piu'
+P2P_PROMEMORIA_PUBBLICA_S = (600, 3600)   # dalla richiesta del gesto
+P2P_PROMEMORIA_PUBBLICA_PRIMA_S = 1800    # ...e prima della scadenza
+P2P_PROMEMORIA_DISTANZA_S = 300           # due promemoria piu' vicini di cosi' sono uno
+FORMA_FUSO_P2P = re.compile(r"[A-Za-z0-9_+\-/]{1,64}")
+
+
+def _tag_secondi_p2p(info, nome: str) -> int:
+    """PURA: un tag di secondi del 38385, o 0 se manca o e' storto."""
+    try:
+        s = int(float(_tag_evento_p2p(info, nome))) if isinstance(info, dict) else 0
+    except (TypeError, ValueError, OverflowError):
+        s = 0
+    return s if s > 0 else 0
+
+
+def _finestra_pubblica_p2p(info) -> tuple:
+    """PURA: quanto tempo ha CHI HA PUBBLICATO per il suo primo gesto,
+    come lo annuncia il coordinatore (`maker_expiration_seconds`, patch
+    0011 del fork). Torna `(secondi, letta)` come `_finestra_gesto_p2p`,
+    che e' anche il suo ripiego: un coordinatore che il tag non lo
+    scrive da' a tutti lo stesso tempo."""
+    s = _tag_secondi_p2p(info, "maker_expiration_seconds")
+    if s:
+        return s, True
+    return _finestra_gesto_p2p(info)
+
+
+def _finestra_di_p2p(info, pubblica: bool) -> tuple:
+    """PURA: la finestra del gesto di chi deve farlo — chi ha pubblicato
+    o chi ha preso."""
+    return _finestra_pubblica_p2p(info) if pubblica else _finestra_gesto_p2p(info)
+
+
+def _limite_pubblica_p2p(info) -> int:
+    """PURA: dopo quante mancate risposte DI FILA di chi ha pubblicato il
+    coordinatore toglie l'ordine (`maker_timeout_limit` del 38385). 0 =
+    non lo dice: e' un coordinatore che al primo tempo scaduto l'ordine
+    lo annulla, come ieri."""
+    try:
+        n = int(float(_tag_evento_p2p(info, "maker_timeout_limit"))) \
+            if isinstance(info, dict) else 0
+    except (TypeError, ValueError, OverflowError):
+        n = 0
+    return n if 0 < n < 100 else 0
+
+
+def _penalita_pubblica_p2p(info) -> bool:
+    """PURA: il «non completato» a chi pubblica e non risponde VALE?
+    Solo con la leva accesa E un coordinatore che a chi pubblica da'
+    piu' tempo di chi prende: la penalita' e' il contrappeso del tempo
+    lungo, e senza il tempo lungo resta la regola del 10 ott."""
+    if not P2P_TEMPO_DI_CHI_PUBBLICA:
+        return False
+    sua = _tag_secondi_p2p(info, "maker_expiration_seconds")
+    return sua > _finestra_gesto_p2p(info)[0]
+
+
+def _dopo_scadenza_p2p(info, pubblica: bool) -> str:
+    """PURA: COSA SUCCEDE se il gesto non arriva in tempo, in parole —
+    la coda di «Hai tre ore, poi …» e del promemoria. A chi ha pubblicato,
+    con un coordinatore che rimette l'ordine nel libro, si dice quello (e
+    che conta, se conta); a tutti gli altri la frase di sempre."""
+    if pubblica and _limite_pubblica_p2p(info):
+        return "l'ordine torna nel libro" + (
+            " e ti conta come scambio non completato"
+            if _penalita_pubblica_p2p(info) else "")
+    return "lo scambio si annulla"
+
+
+def _legale_europea_p2p(epoch) -> bool:
+    """PURA: a quest'ora in Europa c'e' l'ora legale? Dall'ultima
+    domenica di marzo all'ultima di ottobre, alle 01:00 UTC — la stessa
+    regola di `_epoch_roma`, ferma dal 1996."""
+    from datetime import datetime, timedelta, timezone
+    t = datetime.fromtimestamp(int(epoch or 0), timezone.utc).replace(tzinfo=None)
+
+    def ultima_domenica(mese):
+        d = datetime(t.year, mese, 31)
+        return d - timedelta(days=(d.weekday() + 1) % 7)
+    return ultima_domenica(3).replace(hour=1) <= t < ultima_domenica(10).replace(hour=1)
+
+
+def _scarto_fuso_p2p(fuso, scarto, salvato, epoch) -> int:
+    """I SECONDI A EST DI UTC di un fuso a una certa ora: e' qui che il
+    server fa l'ora legale al posto del telefono. `fuso` e' il nome IANA
+    detto dal telefono; dove il sistema lo sa leggere (zoneinfo, sul VPS)
+    decide lui. IL RIPIEGO, dove non c'e' tzdata (il PC di Andrea, i
+    banchi): lo scarto in minuti che il telefono aveva al salvataggio
+    (`scarto`, all'ora `salvato`), e per i fusi `Europe/…` la regola
+    dell'ora legale europea sopra il suo scarto d'inverno. Fuori
+    dall'Europa il ripiego e' uno scarto fisso: sbaglia di un'ora due
+    volte l'anno, e solo dove zoneinfo manca."""
+    try:
+        from datetime import datetime, timezone
+        from zoneinfo import ZoneInfo
+        d = datetime.fromtimestamp(int(epoch or 0), timezone.utc).astimezone(
+            ZoneInfo(str(fuso or "")))
+        return int(d.utcoffset().total_seconds())
+    except Exception:
+        pass
+    base = int(scarto or 0) * 60
+    if str(fuso or "").startswith("Europe/"):
+        inverno = base - (3600 if _legale_europea_p2p(salvato) else 0)
+        return inverno + (3600 if _legale_europea_p2p(epoch) else 0)
+    return base
+
+
+def _pausa_pulita_p2p(d, adesso: int) -> dict:
+    """PURA: la pausa come la manda il telefono, pulita — o ValueError
+    con la frase da mostrare. Le fasce: al piu' P2P_PAUSA_FASCE_MAX, ognuna
+    coi suoi giorni (0 = lunedi', quelli in cui COMINCIA) e i due minuti
+    dalla mezzanotte, diversi fra loro (`a` non dopo `da` = finisce il
+    giorno dopo). La pausa una tantum: comincia adesso o entro
+    P2P_PAUSA_UNA_ENTRO_S, e dura al piu' P2P_PAUSA_UNA_MAX_S. Il fuso e'
+    un nome in una forma nota o niente; lo scarto fra -14 e +14 ore."""
+    if not isinstance(d, dict):
+        raise ValueError("Pausa in una forma sconosciuta")
+    fasce = d.get("fasce")
+    fasce = [] if fasce is None else fasce
+    if not isinstance(fasce, list):
+        raise ValueError("Pausa in una forma sconosciuta")
+    if len(fasce) > P2P_PAUSA_FASCE_MAX:
+        raise ValueError(f"Al massimo {P2P_PAUSA_FASCE_MAX} fasce")
+
+    def intero(v, minimo, massimo):
+        return (not isinstance(v, bool)) and isinstance(v, int) and minimo <= v <= massimo
+    pulite = []
+    for f in fasce:
+        if not isinstance(f, dict):
+            raise ValueError("Pausa in una forma sconosciuta")
+        g, da, a = f.get("g"), f.get("da"), f.get("a")
+        if not isinstance(g, list) or not g or not all(intero(x, 0, 6) for x in g):
+            raise ValueError("Scegli almeno un giorno per ogni fascia")
+        if not intero(da, 0, 1439) or not intero(a, 0, 1439):
+            raise ValueError("Un orario non è valido")
+        if da == a:
+            raise ValueError("L'inizio e la fine di una fascia non possono coincidere")
+        pulite.append({"g": sorted(set(g)), "da": da, "a": a})
+    fuso = str(d.get("fuso") or "")
+    if not FORMA_FUSO_P2P.fullmatch(fuso):
+        fuso = ""
+    scarto = d.get("scarto")
+    scarto = scarto if intero(scarto, -840, 840) else 0
+    una_da, una_fino = d.get("una_da") or 0, d.get("una_fino") or 0
+    if not intero(una_da, 0, 2 ** 40) or not intero(una_fino, 0, 2 ** 40):
+        raise ValueError("Una data non è valida")
+    if una_fino:
+        una_da = max(una_da, int(adesso))
+        if una_da > int(adesso) + P2P_PAUSA_UNA_ENTRO_S:
+            raise ValueError("La pausa può cominciare al più tardi fra 30 giorni")
+        if una_fino <= una_da:
+            raise ValueError("La pausa deve finire dopo l'inizio")
+        # due minuti di margine: l'orologio del telefono non e' il nostro
+        if una_fino - una_da > P2P_PAUSA_UNA_MAX_S + 120:
+            raise ValueError("La pausa può durare al massimo 7 giorni")
+    else:
+        una_da = 0
+    return {"fasce": pulite, "fuso": fuso, "scarto": scarto,
+            "una_da": int(una_da), "una_fino": int(una_fino)}
+
+
+def _fine_fascia_p2p(fasce, scarto_di, t: int) -> int:
+    """PURA: se all'ora `t` una fascia ricorrente e' aperta, l'epoch a cui
+    finisce (la piu' lontana, se sono piu' d'una); 0 se nessuna.
+    `scarto_di(epoch)` da' i secondi a est di UTC di chi l'ha scritta. Si
+    ragiona in «secondi locali» (epoch + scarto): il giorno locale, e il
+    suo giorno della settimana — il 1 gen 1970 era giovedi', 3 con
+    lunedi' = 0. Una fascia vale per il giorno in cui COMINCIA, quindi si
+    guardano oggi e ieri (quella di ieri sera puo' essere ancora aperta).
+    La fine torna a epoch con lo scarto di ALLORA: la notte in cui cambia
+    l'ora legale le sei del mattino restano le sei."""
+    t = int(t)
+    scarto = scarto_di(t)
+    locale = t + scarto
+    oggi = locale // 86400
+    fine = 0
+    for f in fasce or []:
+        dura = ((int(f["a"]) - int(f["da"])) % 1440) * 60
+        for giorno in (oggi, oggi - 1):
+            if (giorno + 3) % 7 not in f["g"]:
+                continue
+            inizio = giorno * 86400 + int(f["da"]) * 60
+            if inizio <= locale < inizio + dura:
+                e = inizio + dura - scarto
+                e = inizio + dura - scarto_di(e)
+                fine = max(fine, e)
+    return fine
+
+
+def _fine_pausa_p2p(pausa, adesso: int) -> int:
+    """PURA: QUESTA PERSONA E' IN PAUSA a quest'ora? Torna l'epoch a cui
+    la pausa FINISCE, o 0 se non lo e'. Guarda la pausa una tantum e le
+    fasce ricorrenti, e SEGUE LA CATENA: se alla fine di una ne comincia
+    (o ne e' gia' aperta) un'altra, la fine e' quella dell'ultima — «in
+    pausa fino alle 6:00» deve dire quando gli ordini tornano davvero.
+    Oltre P2P_PAUSA_CATENA_MAX anelli si ferma: chi ha coperto tutta la
+    settimana e' in pausa e basta, e la data e' solo un «non prima di»."""
+    if not pausa:
+        return 0
+
+    def scarto_di(e):
+        return _scarto_fuso_p2p(pausa.get("fuso"), pausa.get("scarto"),
+                                pausa.get("aggiornato"), e)
+    t, fine = int(adesso), 0
+    for _ in range(P2P_PAUSA_CATENA_MAX):
+        f = 0
+        if int(pausa.get("una_da") or 0) <= t < int(pausa.get("una_fino") or 0):
+            f = int(pausa["una_fino"])
+        f = max(f, _fine_fascia_p2p(pausa.get("fasce"), scarto_di, t))
+        if f <= t:
+            break
+        fine = t = f
+    return fine
+
+
+def _pausa_p2p(con, tg_id):
+    """La pausa di una persona come sta nel database, o None. Pura sulla
+    connessione. Un database senza la tabella — i banchi di ieri — e una
+    riga con le fasce illeggibili valgono «nessuna pausa»: mai un errore
+    su una card per una pausa storta."""
+    try:
+        r = con.execute(
+            "SELECT fasce, fuso, scarto, una_da, una_fino, aggiornato FROM p2p_pause "
+            "WHERE tg_id=?", (int(tg_id or 0),)).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    if not r:
+        return None
+    try:
+        fasce = json.loads(r[0] or "[]")
+        fasce = [f for f in fasce if isinstance(f, dict)
+                 and isinstance(f.get("g"), list)] if isinstance(fasce, list) else []
+    except ValueError:
+        fasce = []
+    return {"fasce": fasce, "fuso": r[1] or "", "scarto": int(r[2] or 0),
+            "una_da": int(r[3] or 0), "una_fino": int(r[4] or 0),
+            "aggiornato": int(r[5] or 0)}
+
+
+def _scrivi_pausa_p2p(con, tg_id, pausa: dict, adesso: int) -> dict:
+    """Scrive la pausa di una persona (gia' pulita: `_pausa_pulita_p2p`)
+    e torna quel che `_mia_pausa_p2p` direbbe subito dopo. Una pausa senza
+    fasce e senza una tantum TOGLIE la riga: «nessuna pausa» non lascia
+    niente in tabella. Pura sulla connessione; COMMITTA."""
+    tg = int(tg_id or 0)
+    if not pausa["fasce"] and not pausa["una_fino"]:
+        con.execute("DELETE FROM p2p_pause WHERE tg_id=?", (tg,))
+    else:
+        con.execute(
+            "INSERT OR REPLACE INTO p2p_pause(tg_id, fasce, fuso, scarto, una_da, "
+            "una_fino, aggiornato) VALUES(?,?,?,?,?,?,?)",
+            (tg, json.dumps(pausa["fasce"], separators=(",", ":")), pausa["fuso"],
+             int(pausa["scarto"]), int(pausa["una_da"]), int(pausa["una_fino"]),
+             int(adesso)))
+    con.commit()
+    return _mia_pausa_p2p(con, tg, adesso)
+
+
+def _mia_pausa_p2p(con, tg_id, adesso: int) -> dict:
+    """La pausa di chi chiede, per il suo foglio: le fasce, la una tantum
+    se non e' gia' finita, e `fino` — l'epoch a cui la pausa di ADESSO
+    finisce, 0 se adesso non e' in pausa. Pura sulla connessione."""
+    p = _pausa_p2p(con, tg_id) or {"fasce": [], "fuso": "", "scarto": 0,
+                                    "una_da": 0, "una_fino": 0, "aggiornato": 0}
+    viva = int(p["una_fino"]) > int(adesso)
+    return {"fasce": p["fasce"], "fuso": p["fuso"],
+            "una_da": int(p["una_da"]) if viva else 0,
+            "una_fino": int(p["una_fino"]) if viva else 0,
+            "fino": _fine_pausa_p2p(p, adesso),
+            "massimo_fasce": P2P_PAUSA_FASCE_MAX,
+            "massimo_giorni": P2P_PAUSA_UNA_MAX_S // 86400}
+
+
+def _pause_p2p(con, ordini, adesso: int) -> dict:
+    """Da una lista di id a `{ordine: fino}` per gli ordini il cui AUTORE
+    e' in pausa adesso (`fino` = quando finisce). NON E' UN VOLTO, come
+    la zona e il filtro: dice solo «questo ordine adesso non si prende
+    da qui», e a chi non ha la sessione non dice di chi e'. A leva spenta
+    e' vuoto. Alza ValueError come le sorelle, sulla lista storta; un
+    database senza le tabelle vale «nessuna pausa»."""
+    pulite = _ordini_puliti_p2p(ordini)
+    if not P2P_TEMPO_DI_CHI_PUBBLICA:
+        return {}
+    segni = ",".join("?" * len(pulite))
+    try:
+        righe = con.execute(
+            f"SELECT ordine, tg_id FROM p2p_ordini WHERE ordine IN ({segni}) "
+            f"AND tg_id > 0 AND tg_id IN (SELECT tg_id FROM p2p_pause)",
+            pulite).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    fini, fuori = {}, {}
+    for r in righe:
+        tg = int(r[1])
+        if tg not in fini:
+            fini[tg] = _fine_pausa_p2p(_pausa_p2p(con, tg), adesso)
+        if fini[tg]:
+            fuori[r[0]] = fini[tg]
+    return fuori
+
+
+def _presa_in_pausa_p2p(con, tg_id, quando: int) -> bool:
+    """LA PRESA E' ARRIVATA IN PAUSA, O SUBITO PRIMA? Pura sulla
+    connessione. `tg_id` e' chi ha pubblicato, `quando` l'ora di mostrod
+    della presa. Vale la pausa aperta a quell'ora, o che si sarebbe
+    aperta entro P2P_PAUSA_PRIMA_S: chi viene preso alle 21:59 con la
+    pausa alle 22 avrebbe le sue ore tutte di notte. A leva spenta no."""
+    if not P2P_TEMPO_DI_CHI_PUBBLICA or not int(tg_id or 0):
+        return False
+    p = _pausa_p2p(con, tg_id)
+    if not p:
+        return False
+    return bool(_fine_pausa_p2p(p, int(quando))
+                or _fine_pausa_p2p(p, int(quando) + P2P_PAUSA_PRIMA_S))
+
+
+def _chi_pubblica_p2p(fatto: dict) -> tuple:
+    """PURA: `(tg_id, ruolo)` di CHI HA PUBBLICATO l'ordine, da quel che
+    mostrod ha detto del giro (`fatto`: le due parti e `preso_dal`):
+    l'altro lato rispetto a chi ha preso. `(0, '')` se il lato non si sa
+    o la persona non e' dei nostri."""
+    lato = (fatto or {}).get("preso_dal") or ""
+    return {"buyer": (int(fatto.get("venditore") or 0), "vende"),
+            "seller": (int(fatto.get("compratore") or 0), "compra")}.get(lato, (0, ""))
+
+
+def _tocca_a_chi_pubblica_p2p(con, ordine: str, tg_id) -> bool:
+    """Questa persona, su quest'ordine, e' CHI L'HA PUBBLICATO? Dal posto
+    che mostrod ha dato alle parti (`p2p_scambi`). Pura sulla
+    connessione; nel dubbio no — e allora vale la finestra di chi prende,
+    che e' la piu' corta."""
+    try:
+        s = con.execute("SELECT compratore, venditore, preso_dal FROM p2p_scambi "
+                        "WHERE ordine=?", (ordine,)).fetchone()
+    except sqlite3.OperationalError:
+        return False
+    if not s:
+        return False
+    tg, _ = _chi_pubblica_p2p({"compratore": s[0], "venditore": s[1], "preso_dal": s[2]})
+    return bool(tg) and tg == int(tg_id or 0)
+
+
+def _mancata_risposta_p2p(ev: dict, fatto: dict) -> str:
+    """PURA: questo evento e' una MANCATA RISPOSTA di chi ha pubblicato?
+    Torna la parola con cui si scrive (`maker-timeout`, `maker-
+    republished`, `maker-annullo`) o ''. Il tempo scaduto lo dice mostrod
+    con le sue due parole — l'ordine tolto, o rimesso nel libro (patch
+    0011). L'ANNULLO A MANO DOPO UNA PRESA e' `canceled` SENZA dettaglio
+    fatto dal lato che ha pubblicato: mostrod lo racconta cosi' solo
+    quando l'ordine era preso e non ancora attivo (il ritiro di un ordine
+    mai preso e' `pending`, l'annullo d'accordo `cooperative`)."""
+    azione, dettaglio = ev.get("azione"), ev.get("dettaglio") or ""
+    if azione == "expired" and dettaglio in ("maker-timeout", "maker-republished"):
+        return dettaglio
+    lato_pubblica = {"buyer": "seller", "seller": "buyer"}.get(
+        (fatto or {}).get("preso_dal") or "", "")
+    if azione == "canceled" and not dettaglio and lato_pubblica \
+            and ev.get("attore") == lato_pubblica:
+        return "maker-annullo"
+    return ""
+
+
+def _esito_chi_pubblica_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
+    """GLI ESITI DI CHI HA PUBBLICATO E NON HA RISPOSTO (12 ott 2026,
+    tempo-di-chi-pubblica). Pura sulla connessione; torna le righe di
+    journal. NON COMMITTA: lo fa `_segna_esiti_p2p`, che la chiama.
+    A LEVA SPENTA NON SCRIVE NIENTE: e' la regola del 10 ott.
+    Su una mancata risposta (`_mancata_risposta_p2p`), nell'ordine:
+    • chi ha pubblicato non e' dei nostri, o il lato non si sa: niente;
+    • il suo primo gesto risulta FATTO in questo giro: il tempo scaduto
+      non e' il suo (la cintura, come per chi prende);
+    • la presa era arrivata IN PAUSA o subito prima (`pausa_presa`):
+      niente, nemmeno per il badge;
+    • si scrive `senza_risposta` — il fatto nudo, che toglie il badge;
+    • il «non completato» vale solo col tempo lungo
+      (`_penalita_pubblica_p2p`), ed e' UNO SOLO PER ORDINE;
+    • la scusa del tentativo, una ogni P2P_SCUSA_FINESTRA_S per persona
+      (la stessa di chi prende: `scusato`), poi `mancato`."""
+    righe = []
+    come = _mancata_risposta_p2p(ev, fatto)
+    if not come or not P2P_TEMPO_DI_CHI_PUBBLICA:
+        return righe
+    ordine, giro, ts = ev["ordine"], int(fatto.get("giro") or 0), int(ev["ts"])
+    corto = ordine[:8]
+    tg, ruolo = _chi_pubblica_p2p(fatto)
+    if not tg:
+        righe.append(f"· Reputazione P2P: {corto} senza risposta di chi ha pubblicato "
+                     f"({come}), che non e' dei nostri"
+                     f"{'' if fatto.get('preso_dal') else ' (lato non detto)'}: "
+                     "non si conta a nessuno")
+        return righe
+    gesto = _primo_gesto_p2p({"vende": "seller", "compra": "buyer"}[ruolo])
+    if con.execute(
+            "SELECT 1 FROM p2p_momenti WHERE ordine=? AND giro=? AND momento=? "
+            "AND fonte='mostro'", (ordine, giro, gesto)).fetchone():
+        righe.append(f"· Reputazione P2P: {corto} {come}, ma il primo gesto di {tg} "
+                     f"risulta fatto ({gesto}): non si conta")
+        return righe
+    s = con.execute("SELECT giro, pausa_presa FROM p2p_scambi WHERE ordine=?",
+                    (ordine,)).fetchone()
+    if s and int(s[0] or 0) == giro and int(s[1] or 0):
+        righe.append(f"· Reputazione P2P: {corto} {come}, ma la presa era arrivata "
+                     f"con {tg} in pausa (o nella mezz'ora prima): non si conta")
+        return righe
+    con.execute(
+        "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, quando, "
+        "dettaglio) VALUES(?,?,?,'senza_risposta',?,?,?)",
+        (tg, ordine, giro, ruolo, ts, come))
+    if not _penalita_pubblica_p2p(_P2P_FOTO["info"]):
+        righe.append(f"· Reputazione P2P: {corto} {come} di {tg}: presa senza "
+                     "risposta (il badge), ma il «non completato» a chi pubblica "
+                     "vale solo col tempo lungo del coordinatore: non si conta")
+        return righe
+    if con.execute(
+            "SELECT 1 FROM p2p_esiti WHERE tg_id=? AND ordine=? AND esito IN "
+            "('mancato','scusato') AND dettaglio LIKE 'maker-%' LIMIT 1",
+            (tg, ordine)).fetchone():
+        righe.append(f"· Reputazione P2P: {corto} {come} di {tg}, ma su quest'ordine "
+                     "una mancata risposta gli e' gia' stata contata (o scusata): "
+                     "una sola per ordine")
+        return righe
+    presa = con.execute(
+        "SELECT MAX(quando) FROM p2p_momenti WHERE ordine=? AND giro=? "
+        "AND momento='preso' AND fonte='mostro'", (ordine, giro)).fetchone()[0]
+    cosa = "pagato la garanzia" if ruolo == "vende" else "dato la fattura"
+    dettaglio = come
+    if _ha_provato_p2p(con, tg, ordine, int(presa or 0)
+                       or ts - _finestra_pubblica_p2p(_P2P_FOTO["info"])[0]):
+        gia = con.execute(
+            "SELECT 1 FROM p2p_esiti WHERE tg_id=? AND esito='scusato' AND quando>=? "
+            "AND NOT (ordine=? AND giro=?) LIMIT 1",
+            (tg, ts - P2P_SCUSA_FINESTRA_S, ordine, giro)).fetchone()
+        if not gia:
+            con.execute(
+                "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, "
+                "quando, dettaglio) VALUES(?,?,?,'scusato',?,?,?)",
+                (tg, ordine, giro, ruolo, ts, dettaglio))
+            righe.append(f"· Reputazione P2P: {corto} {come}, ma {tg} ha provato a "
+                         f"rispondere: non si conta (la scusa del tentativo, una "
+                         f"ogni {P2P_SCUSA_FINESTRA_S // 86400} giorni)")
+            return righe
+        dettaglio += "+tentativo"
+    con.execute(
+        "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, quando, "
+        "dettaglio) VALUES(?,?,?,'mancato',?,?,?)",
+        (tg, ordine, giro, ruolo, ts, dettaglio))
+    righe.append(f"⚠️ Reputazione P2P: a {tg} si conta uno scambio non completato "
+                 f"({corto}, giro {giro}: ha pubblicato e non ha {cosa}"
+                 + (" — ha annullato dopo la presa" if come == "maker-annullo" else " in tempo")
+                 + (", e la scusa del tentativo l'aveva gia' usata"
+                    if dettaglio.endswith("+tentativo") else "") + ")")
+    return righe
+
+
+def _risposta_pubblica_p2p(con, ordine: str, giro: int, lato: str) -> int:
+    """IN QUANTI SECONDI chi ha pubblicato ha fatto il suo primo gesto in
+    quel giro, dalla cronaca di mostrod; -1 se non si sa. Pura sulla
+    connessione. `lato` e' quello dell'ORDINE (`sell` | `buy`). Chi vende
+    risponde pagando la garanzia: dall'ultima `garanzia_chiesta` prima di
+    lei. Chi compra risponde dando la fattura (non quella rifatta dopo un
+    pagamento fallito): dall'ultima `garanzia_pagata` prima di lei, che
+    e' il momento in cui il coordinatore gliel'ha chiesta."""
+    chiesto, fatto = {"sell": ("garanzia_chiesta", "garanzia_pagata"),
+                      "buy": ("garanzia_pagata", "fattura_data")}.get(lato, ("", ""))
+    if not fatto:
+        return -1
+    f = con.execute(
+        "SELECT MIN(quando) FROM p2p_momenti WHERE ordine=? AND giro=? AND momento=? "
+        "AND fonte='mostro' AND dettaglio<>'new-invoice'",
+        (ordine, int(giro or 0), fatto)).fetchone()[0]
+    if not f:
+        return -1
+    c = con.execute(
+        "SELECT MAX(quando) FROM p2p_momenti WHERE ordine=? AND giro=? AND momento=? "
+        "AND fonte='mostro' AND quando<=?",
+        (ordine, int(giro or 0), chiesto, int(f))).fetchone()[0]
+    return int(f) - int(c) if c else -1
+
+
+def _veloce_p2p(tempi, persone, senza_risposta) -> bool:
+    """PURA: IL BADGE «⚡ RISPONDE IN FRETTA» SI E' GUADAGNATO? `tempi` sono
+    i secondi di risposta degli scambi conclusi da chi ha pubblicato,
+    `persone` le controparti di quegli scambi, `senza_risposta` quante
+    prese ha lasciato senza risposta — tutto nella finestra. Almeno
+    P2P_VELOCE_SCAMBI_MIN scambi con altrettante persone DIVERSE,
+    mediana entro P2P_VELOCE_MEDIANA_S, e nemmeno una presa senza
+    risposta: alla prima si perde."""
+    tempi = sorted(int(t) for t in tempi or [] if int(t) >= 0)
+    if int(senza_risposta or 0) > 0 or len(tempi) < P2P_VELOCE_SCAMBI_MIN:
+        return False
+    if len({int(p) for p in persone or [] if p}) < P2P_VELOCE_SCAMBI_MIN:
+        return False
+    meta = len(tempi) // 2
+    mediana = tempi[meta] if len(tempi) % 2 else (tempi[meta - 1] + tempi[meta]) / 2
+    return mediana <= P2P_VELOCE_MEDIANA_S
+
+
+def _veloci_p2p(con, ids, adesso: int) -> set:
+    """CHI HA IL BADGE fra queste persone: l'insieme dei tg_id. Pura
+    sulla connessione; a leva spenta e' vuoto, e un database senza le
+    tabelle — i banchi di ieri — pure: mai un errore su un volto.
+    Gli scambi sono i `completato` della finestra in cui la persona era
+    chi aveva PUBBLICATO (il suo ruolo e il lato dell'ordine combaciano:
+    vende un `sell`, compra un `buy`); la controparte e' l'altro
+    `completato` dello stesso giro, e uno scambio con chi non e' dei
+    nostri non ha una persona da contare. Il tempo lo da' la cronaca
+    (`_risposta_pubblica_p2p`), che vive piu' della finestra."""
+    ids = sorted({int(i) for i in ids or [] if i})
+    if not ids or not P2P_TEMPO_DI_CHI_PUBBLICA:
+        return set()
+    dal = int(adesso) - P2P_VELOCE_FINESTRA_S
+    segni = ",".join("?" * len(ids))
+    try:
+        senza = {int(r[0]): int(r[1]) for r in con.execute(
+            f"SELECT tg_id, COUNT(*) FROM p2p_esiti WHERE esito='senza_risposta' "
+            f"AND quando>=? AND tg_id IN ({segni}) GROUP BY tg_id", [dal] + ids)}
+        fatti = con.execute(
+            f"SELECT e.tg_id, e.ordine, e.giro, o.lato, "
+            f"(SELECT MAX(a.tg_id) FROM p2p_esiti a WHERE a.ordine=e.ordine AND "
+            f"a.giro=e.giro AND a.esito='completato' AND a.tg_id<>e.tg_id) AS altro "
+            f"FROM p2p_esiti e JOIN p2p_ordini o ON o.ordine=e.ordine "
+            f"WHERE e.esito='completato' AND e.quando>=? AND e.tg_id IN ({segni}) "
+            f"AND ((e.ruolo='vende' AND o.lato='sell') OR "
+            f"(e.ruolo='compra' AND o.lato='buy'))", [dal] + ids).fetchall()
+        tempi, persone = {}, {}
+        for r in fatti:
+            s = _risposta_pubblica_p2p(con, r[1], r[2], r[3])
+            if s < 0 or not r[4]:
+                continue
+            tempi.setdefault(int(r[0]), []).append(s)
+            persone.setdefault(int(r[0]), []).append(int(r[4]))
+    except sqlite3.OperationalError:
+        return set()
+    return {tg for tg in tempi
+            if _veloce_p2p(tempi[tg], persone.get(tg), senza.get(tg, 0))}
+
+
+def _piano_promemoria_p2p(quando: int, scadenza: int, pacchetto: bool) -> list:
+    """PURA: QUANDO ricordare un gesto a tempo — la lista di `(coda del
+    nome, epoch)`, in ordine. Senza il pacchetto (chi prende, o la leva
+    spenta) e' UNO, a meta' tempo, come dal 10 ott. A chi ha PUBBLICATO,
+    con la leva: a P2P_PROMEMORIA_PUBBLICA_S dalla richiesta e a
+    P2P_PROMEMORIA_PUBBLICA_PRIMA_S dalla scadenza — quelli che cadono
+    DENTRO la finestra (con mezz'ora di tempo resta il primo), e mai due
+    a meno di P2P_PROMEMORIA_DISTANZA_S. Se non ne resta nessuno, quello
+    di meta' tempo. Il primo avviso («subito») non e' qui: e' la frase
+    della presa."""
+    quando, scadenza = int(quando or 0), int(scadenza or 0)
+    meta = [("", _quando_promemoria_p2p(quando, scadenza))]
+    if not pacchetto:
+        return meta
+    ore = sorted([quando + s for s in P2P_PROMEMORIA_PUBBLICA_S]
+                 + [scadenza - P2P_PROMEMORIA_PUBBLICA_PRIMA_S])
+    scelte = []
+    for o in ore:
+        if not (quando + P2P_PROMEMORIA_MINIMO_S < o
+                < scadenza - P2P_PROMEMORIA_MINIMO_S):
+            continue
+        if scelte and o - scelte[-1] < P2P_PROMEMORIA_DISTANZA_S:
+            continue
+        scelte.append(o)
+    if not scelte:
+        return meta
+    return [("" if i == 0 else str(i + 1), o) for i, o in enumerate(scelte)]
 
 
 def _primo_gesto_p2p(preso_dal: str) -> str:
@@ -46408,7 +47111,10 @@ def _segna_esiti_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
       Chi non e' dei nostri (un altro client) vale 0 e non si conta.
     • tutto il resto (annulli, ritiri, maker-timeout, scaduti in libro)
       non scrive niente: la regola e' «mai a chi ha pubblicato, mai a chi
-      ha aspettato, mai a chi si ritira prima»."""
+      ha aspettato, mai a chi si ritira prima».
+    • DAL 12 OTT 2026, con la leva P2P_TEMPO_DI_CHI_PUBBLICA, il «mai a
+      chi ha pubblicato» ha la sua eccezione, scritta a parte: la mancata
+      risposta di chi pubblica (`_esito_chi_pubblica_p2p`)."""
     righe = []
     ordine, giro = ev["ordine"], int(fatto.get("giro") or 0)
     compra = int(fatto.get("compratore") or 0)
@@ -46416,6 +47122,10 @@ def _segna_esiti_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     # DOPO LA GARANZIA (10 ott 2026, «I MALUS DOPO LA GARANZIA»): la
     # disputa persa con colpa e la garanzia arrivata a scadenza
     righe.extend(_esiti_dopo_garanzia_p2p(con, ev, fatto))
+    # CHI HA PUBBLICATO E NON RISPONDE (12 ott 2026, tempo-di-chi-
+    # pubblica): il tempo scaduto e l'annullo a mano dopo una presa. A
+    # leva spenta non scrive niente, e le uscite qui sotto committano
+    righe.extend(_esito_chi_pubblica_p2p(con, ev, fatto, adesso))
     if fatto.get("momento") == "concluso":
         for tg, ruolo in ((compra, "compra"), (vende, "vende")):
             # ...e a chi ha PERSO LA DISPUTA CON COLPA questo scambio non
@@ -46654,8 +47364,24 @@ def _posso_prendere_p2p(con, io, ordini, adesso: int) -> dict:
         sospesi = _euro_sospesi_p2p(con, io, adesso)
     except Exception:
         sospesi = 0
+    # LA PAUSA DI CHI HA PUBBLICATO (12 ott 2026, tempo-di-chi-pubblica):
+    # un ordine in pausa da qui non si prende, e `fino` dice quando torna.
+    # I PROPRI ordini no — nessuno prende il suo, e li deve poter aprire.
+    # Un conto che non riesce non chiude la porta a nessuno
+    try:
+        pause = _pause_p2p(con, pulite, adesso) if pulite else {}
+        miei = {r[0] for r in con.execute(
+            f"SELECT ordine FROM p2p_ordini WHERE tg_id=? AND ordine IN "
+            f"({','.join('?' * len(pause))})", [int(io or 0)] + sorted(pause))} \
+            if pause else set()
+    except Exception:
+        pause, miei = {}, set()
     fuori = {}
     for o in pulite:
+        if o in pause and o not in miei:
+            fuori[o] = {"ok": False, "motivo": "pausa", "soglia": filtri.get(o, 0),
+                        "fino": pause[o]}
+            continue
         if sospesi >= P2P_EURO_SOSPESI_MAX:
             fuori[o] = {"ok": False, "motivo": "sospesi", "soglia": filtri.get(o, 0)}
             continue
@@ -46674,7 +47400,9 @@ def _posso_prendere_p2p(con, io, ordini, adesso: int) -> dict:
             "fino_dispute": _blocco_dispute_fino_p2p(con, io, adesso),
             # fino a quando il filtro non lo accetta (0 = non bloccato), per
             # la riga «Potrai riprenderli dal …» del riquadro del veto
-            "fino": _blocco_filtro_fino_p2p(con, io, adesso)}
+            "fino": _blocco_filtro_fino_p2p(con, io, adesso),
+            # ...e il mio badge «⚡ risponde in fretta» (12 ott 2026)
+            "veloce": int(io or 0) in _veloci_p2p(con, [io], adesso)}
 
 
 def _segna_tentativo_p2p(con, io, ordine, gesto, motivo, adesso: int) -> dict:
@@ -47036,6 +47764,9 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
     perse = _marchi_dispute_p2p(con, [r["autore"] for r in righe], adesso)
     # ...e gli scambi completati, accanto alle stelline (feedback-p2p)
     fatti = _completati_p2p(con, [r["autore"] for r in righe])
+    # ...e il badge «⚡ risponde in fretta» (12 ott 2026): la chiave c'e'
+    # SOLO per chi ce l'ha, come lo staff
+    veloci = _veloci_p2p(con, [r["autore"] for r in righe], adesso)
     fuori = {}
     for r in righe:
         voti = int(r["n_feedback"] or 0)
@@ -47061,6 +47792,8 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
             volto["dispute"] = perse[int(r["autore"] or 0)]
         if fatti.get(int(r["autore"] or 0)):
             volto["completati"] = fatti[int(r["autore"] or 0)]
+        if int(r["autore"] or 0) in veloci:
+            volto["veloce"] = True
         fuori[r["ordine"]] = volto
     return fuori
 
@@ -47184,6 +47917,8 @@ def _volti_persone(con, ids, adesso) -> dict:
     perse = _marchi_dispute_p2p(con, ids, adesso)
     # ...e gli scambi completati, accanto alle stelline (feedback-p2p)
     fatti = _completati_p2p(con, ids)
+    # ...e il badge «⚡ risponde in fretta» (12 ott 2026)
+    veloci = _veloci_p2p(con, ids, adesso)
     volti = {}
     for u in con.execute(
             f"SELECT tg_id, nome, username, npub, npub_verificata, "
@@ -47226,6 +47961,8 @@ def _volti_persone(con, ids, adesso) -> dict:
             chi["dispute"] = perse[int(u["tg_id"])]
         if fatti.get(int(u["tg_id"])):
             chi["completati"] = fatti[int(u["tg_id"])]
+        if int(u["tg_id"]) in veloci:
+            chi["veloce"] = True
         volti[int(u["tg_id"])] = chi
     return volti
 
@@ -47323,11 +48060,13 @@ async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         zone = _zone_p2p(con, (d or {}).get("ordini"))
         # e il filtro di chi pubblica (10 ott 2026, reputazione-p2p)
         filtri = _filtri_p2p(con, (d or {}).get("ordini"))
+        # e gli ordini in pausa adesso (12 ott 2026, tempo-di-chi-pubblica)
+        pause = _pause_p2p(con, (d or {}).get("ordini"), int(time.time()))
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
         con.close()
-    return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri}
+    return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri, "pause": pause}
 
 
 @app.get("/api/p2p/zona")
@@ -47400,6 +48139,10 @@ def libro_fotografato_p2p(req: Request, x_tg_init_data: str = Header(""),
     # ...e i filtri di chi pubblica (10 ott 2026): il segno sulla card
     if fuori["eventi"] and F.get("filtri"):
         fuori["filtri"] = F["filtri"]
+    # ...e gli ordini in pausa (12 ott 2026): `{ordine: fino}`, senza dire
+    # di chi sono — il client li toglie dal libro di chi non li ha scritti
+    if fuori["eventi"] and F.get("pause"):
+        fuori["pause"] = F["pause"]
     chi = _chi_guarda_p2p(x_tg_init_data, barattolo_sessione) \
         if fuori["eventi"] else 0
     if chi and F.get("facce"):
@@ -47647,6 +48390,53 @@ async def posso_prendere_p2p(req: Request, x_tg_init_data: str = Header(""),
     finally:
         con.close()
     return JSONResponse(fuori, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/p2p/pausa")
+def mia_pausa_p2p(x_tg_init_data: str = Header(""),
+                  barattolo_sessione: str = Cookie("")):
+    """«Com'e' la mia pausa?» (12 ott 2026, tempo-di-chi-pubblica): la
+    chiede il foglio «⏸ Pausa degli ordini» quando si apre, e la pagina
+    P2P per scrivere «in pausa fino alle …» sui propri ordini. NESSUN
+    PARAMETRO, il patto di /api/p2p/zona: si chiede solo di se'. A leva
+    spenta risponde `attiva: false` e niente altro. `no-store`: `fino`
+    cambia con l'orologio."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not P2P_TEMPO_DI_CHI_PUBBLICA:
+        return JSONResponse({"attiva": False}, headers={"Cache-Control": "no-store"})
+    con = db()
+    try:
+        fuori = _mia_pausa_p2p(con, user["id"], int(time.time()))
+    finally:
+        con.close()
+    return JSONResponse(dict(fuori, attiva=True), headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/p2p/pausa")
+async def scrivi_pausa_p2p(req: Request, x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """Scrive la pausa di chi chiede: le fasce ricorrenti e, se c'e', la
+    pausa una tantum. Il corpo intero SOSTITUISCE quel che c'era — il
+    foglio manda sempre tutto —, e un corpo senza fasce ne' una tantum la
+    toglie. I giudici sono `_pausa_pulita_p2p` (le forme, i tetti) e
+    `_scrivi_pausa_p2p`. LA LEVA SERVE: a leva spenta e' un 409, come le
+    altre scritture del P2P. Niente verso i relay, niente al
+    coordinatore: la pausa vale dentro Barattolo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not P2P_TEMPO_DI_CHI_PUBBLICA:
+        raise HTTPException(409, "La pausa degli ordini non è attiva")
+    d = await leggi_json(req)
+    adesso = int(time.time())
+    con = db()
+    try:
+        fuori = _scrivi_pausa_p2p(con, user["id"], _pausa_pulita_p2p(d, adesso), adesso)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    # la fotografia del libro la rilegge al prossimo giro; la porta vera
+    # (`_posso_prendere_p2p`) l'ora la chiede al momento
+    return JSONResponse(dict(fuori, attiva=True), headers={"Cache-Control": "no-store"})
 
 
 # ═══ LE RECENSIONI DEGLI SCAMBI P2P (set 2026) ══════════════════════
@@ -48058,6 +48848,10 @@ def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
     # completati e non completati sono dell'account, come le recensioni,
     # e «dimentica il profilo» non e' il modo di togliersi un marchio
     con.execute("DELETE FROM p2p_tentativi WHERE tg_id=?", (user["id"],))
+    # ...e la pausa degli ordini (12 ott 2026): senza ordini non ha
+    # niente da nascondere, e una pausa dimenticata li' nasconderebbe
+    # quelli del profilo nuovo
+    con.execute("DELETE FROM p2p_pause WHERE tg_id=?", (user["id"],))
     con.commit()
     con.close()
     return {"ok": True, "tolte": tolte, "volti": volti}
@@ -50279,21 +51073,33 @@ def _frase_tempo_gesto_p2p(secondi) -> str:
     m = (int(secondi or 0) + 30) // 60
     if m < 1:
         return ""
+    # DALL'ORA IN SU SI DICE IN ORE (12 ott 2026, tempo-di-chi-pubblica):
+    # chi pubblica ha tre ore, e «180 minuti» non e' una frase
+    if m >= 60:
+        ore, resto = divmod(m, 60)
+        testo = "1 ora" if ore == 1 else f"{ore} ore"
+        if resto:
+            testo += " e " + ("1 minuto" if resto == 1 else f"{resto} minuti")
+        return testo
     return "1 minuto" if m == 1 else f"{m} minuti"
 
 
-def _testo_promemoria_p2p(gesto: str, secondi: int, letta: bool) -> str:
+def _testo_promemoria_p2p(gesto: str, secondi: int, letta: bool,
+                          dopo: str = "") -> str:
     """PURA: la frase del promemoria. Coi minuti SOLO se la finestra e'
     stata letta dal coordinatore; col ripiego dice che il tempo sta
-    finendo, senza una cifra che nessuno ha detto."""
+    finendo, senza una cifra che nessuno ha detto. `dopo` (12 ott 2026)
+    e' cosa succede se il gesto non arriva, detto da `_dopo_scadenza_p2p`:
+    a chi ha pubblicato l'ordine torna nel libro, a tutti gli altri — e a
+    chi non lo passa — lo scambio si annulla, come sempre."""
     cosa = P2P_GESTI_PAROLE.get(gesto, "")
     if not cosa:
         return ""
     tempo = _frase_tempo_gesto_p2p(secondi) if letta else ""
-    coda = ", altrimenti lo scambio si annulla."
+    coda = f", altrimenti {dopo or 'lo scambio si annulla'}."
     if not tempo:
         return f"⏳ <b>Il tempo per {cosa} sta finendo:</b> fallo adesso" + coda
-    resta = "Resta" if tempo.startswith("1 ") else "Restano"
+    resta = "Resta" if tempo in ("1 minuto", "1 ora") else "Restano"
     return f"⏳ <b>{resta} circa {tempo} per {cosa}</b>" + coda
 
 
@@ -50310,8 +51116,10 @@ def _promemoria_p2p_vivo(con, r, adesso: int) -> tuple:
     un server tornato su tardi non ricorda una scadenza gia' passata.
     I MINUTI SI CONTANO ADESSO, con la finestra di ADESSO: se quando
     l'attesa e' nata il 38385 non c'era ancora, qui c'e'."""
+    # (12 ott 2026) a chi ha pubblicato i promemoria sono piu' d'uno, e
+    # dal secondo il nome porta un numero in coda: il gesto e' lo stesso
     chiesto = {v[0] + "_promemoria": k for k, v in P2P_GESTI_A_TEMPO.items()}.get(
-        str(r["momento"]), "")
+        re.sub(r"\d+$", "", str(r["momento"])), "")
     if not chiesto:
         return "", "un momento che non si conosce"
     gesto, _, fatto = P2P_GESTI_A_TEMPO[chiesto]
@@ -50323,10 +51131,17 @@ def _promemoria_p2p_vivo(con, r, adesso: int) -> tuple:
     if chiuso:
         return "", f"lo scambio si e' chiuso ({chiuso})"
     finestra, letta = _finestra_gesto_p2p(_P2P_FOTO["info"])
+    # LA FINESTRA E' DI CHI DEVE FARE IL GESTO (12 ott 2026, tempo-di-chi-
+    # pubblica): a chi ha pubblicato il coordinatore da' la sua, e se non
+    # risponde l'ordine torna nel libro invece di annullarsi
+    pubblica = _tocca_a_chi_pubblica_p2p(con, ordine, r["tg_id"])
+    if pubblica:
+        finestra, letta = _finestra_pubblica_p2p(_P2P_FOTO["info"])
     resta = _scadenza_gesto_p2p(quando, finestra) - int(adesso)
     if resta < P2P_PROMEMORIA_MINIMO_S:
         return "", "non resta nemmeno un minuto"
-    return _testo_promemoria_p2p(gesto, resta, letta), ""
+    return _testo_promemoria_p2p(
+        gesto, resta, letta, _dopo_scadenza_p2p(_P2P_FOTO["info"], pubblica)), ""
 
 
 def _sollecito_p2p_vivo(momenti, quando_fiat: int) -> bool:
@@ -52969,6 +53784,9 @@ async def _fotografa_libro_p2p():
     # i propri ordini): resta in memoria e non esce MAI intero — la rotta
     # ne da' a ciascuno solo la sua parte (`miei`)
     F["autori"] = _autori_foto_p2p(F["eventi"])
+    # ...e gli ordini in pausa adesso (12 ott 2026, tempo-di-chi-pubblica):
+    # per ULTIMI — se il loro giudice inciampa, volti e autori ci sono gia'
+    F["pause"] = _pause_foto_p2p(F["eventi"], adesso)
     if intera:
         F["intera"] = adesso
 
@@ -53136,6 +53954,7 @@ def _rinfresca_volti_foto_p2p(ordini=None) -> bool:
         F["zone"] = _zone_foto_p2p(F["eventi"])
         F["filtri"] = _filtri_foto_p2p(F["eventi"])
         F["autori"] = _autori_foto_p2p(F["eventi"])
+        F["pause"] = _pause_foto_p2p(F["eventi"], int(time.time()))
     except Exception as e:
         print(f"⚠️ Fotografia del libro, volti non rifatti: {e}", flush=True)
         return False
@@ -53175,6 +53994,27 @@ def _zone_foto_p2p(eventi) -> dict:
     con = db()
     try:
         return _zone_p2p(con, ids)
+    except ValueError:
+        return {}
+    finally:
+        con.close()
+
+
+def _pause_foto_p2p(eventi, adesso: int) -> dict:
+    """Gli ordini della fotografia che ADESSO sono in pausa (12 ott 2026,
+    tempo-di-chi-pubblica), una volta per giro come le zone e i filtri:
+    il giudice e' `_pause_p2p`, sugli stessi id che la rotta serve. La
+    fotografia si rifa' ogni minuto, e una pausa che comincia alle 22:00
+    si vede entro le 22:01: la porta vera resta `_posso_prendere_p2p`,
+    che l'ora la chiede al momento."""
+    ids = [d for d in (_tag_evento_p2p(e, "d") for e in eventi or []
+                       if e.get("kind") == 38383)
+           if FORMA_ORDINE_P2P.fullmatch(d)][:MAX_ORDINI_P2P]
+    if not ids:
+        return {}
+    con = db()
+    try:
+        return _pause_p2p(con, ids, adesso)
     except ValueError:
         return {}
     finally:
@@ -53881,12 +54721,19 @@ def _momento_evento_p2p(azione: str, dettaglio: str) -> str:
     (`republished`); `expired` e' lo SCADUTO di un ordine che nessuno
     ha preso (`book`), il RITORNO se non ha proseguito chi aveva preso
     (`taker-timeout`), l'ANNULLO se non ha proseguito chi aveva
-    pubblicato o se la garanzia e' arrivata al capolinea."""
+    pubblicato o se la garanzia e' arrivata al capolinea.
+    E DAL 12 OTT 2026 IL RITORNO HA DUE COLPE (patch 0011 del fork): se
+    non risponde chi aveva PUBBLICATO l'ordine torna nel libro lo stesso,
+    e mostrod lo dice con una parola sua (`maker-republished`) — o chi
+    conta gli esiti lo scambierebbe per il tempo scaduto di chi ha
+    preso. Alla seconda di fila l'ordine lo toglie, col `maker-timeout`
+    di sempre."""
     if azione == "canceled":
         return "tornato" if dettaglio == "republished" else "annullato"
     if azione == "expired":
         return {"book": "scaduto",
-                "taker-timeout": "tornato"}.get(dettaglio, "annullato")
+                "taker-timeout": "tornato",
+                "maker-republished": "tornato"}.get(dettaglio, "annullato")
     return {"taken": "preso",
             "hold-invoice-requested": "garanzia_chiesta",
             "hold-invoice-paid": "garanzia_pagata",
@@ -54042,6 +54889,19 @@ def _registra_evento_p2p(con, ev: dict, adesso: int, cambio: float = 0.0):
         if ev["momento"] == "preso":
             con.execute("UPDATE p2p_scambi SET cambio_presa=? WHERE ordine=?",
                         (cambio if cambio > 0 else 0, ev["ordine"]))
+            # LA PRESA ARRIVATA IN PAUSA (12 ott 2026, tempo-di-chi-
+            # pubblica): si scrive ADESSO, con la pausa di adesso — e ogni
+            # presa nuova la riscrive, come il cambio. Un database senza
+            # la colonna (i banchi di ieri) non la scrive, e la presa
+            # resta registrata lo stesso
+            try:
+                con.execute(
+                    "UPDATE p2p_scambi SET pausa_presa=? WHERE ordine=?",
+                    (1 if _presa_in_pausa_p2p(con, _chi_pubblica_p2p(
+                        dict(parti, preso_dal=preso_dal))[0], ev["ts"]) else 0,
+                     ev["ordine"]))
+            except sqlite3.OperationalError:
+                pass
     # I DUE POSTI DEL LIBRO SI ALLINEANO A QUEL CHE HA DETTO (23 set
     # 2026, A1): la presa dichiarata dal telefono si conferma o cade, e
     # un'intestazione che mostrod smentisce si corregge. Il journal lo
@@ -54300,6 +55160,16 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
     # quel numero la riga non c'e': non si inventa
     tempo = (f"\n\n⏳ <b>Hai {dati['tempo_gesto']}</b>, poi lo scambio si annulla."
              if dati.get("tempo_gesto") else "")
+    # ...e a chi ha PUBBLICATO, con un coordinatore che rimette l'ordine
+    # nel libro (12 ott 2026, tempo-di-chi-pubblica), la coda e' la sua
+    if tempo and dati.get("dopo_scadenza"):
+        tempo = (f"\n\n⏳ <b>Hai {dati['tempo_gesto']}</b>, poi "
+                 f"{dati['dopo_scadenza']}.")
+    # LA RIGA DEL CONTO A CHI HA PUBBLICATO (12 ott 2026): sulla SUA
+    # mancata risposta — il tempo scaduto, o l'annullo a mano dopo una
+    # presa — la stessa riga che riceve chi prende, gia' fatta nei dati
+    conto_pubblica = ("\n\n" + str(dati["conto_pubblica"])
+                      if dati.get("conto_pubblica") else "")
     if momento == "preso":
         testa = (("🧾 <b>Il tuo PayCode è stato preso" if paycode and vende
                   else "⚡ <b>Il tuo ordine è stato preso")
@@ -54431,7 +55301,8 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
         if dettaglio == "cooperative":
             return (f"❌ <b>Hai accettato di annullare: lo scambio con "
                     f"{l_altro} è annullato.</b>{tornati}")
-        return f"❌ <b>Hai annullato lo scambio con {l_altro}.</b>{tornati}"
+        return (f"❌ <b>Hai annullato lo scambio con {l_altro}.</b>{tornati}"
+                + (conto_pubblica if maker else ""))
     if momento == "annullato":
         coda = tornati or " I sats eventualmente in garanzia tornano a chi vende."
         if dettaglio == "cooperative":
@@ -54441,9 +55312,16 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
             return (f"⚖️ <b>Un moderatore ha annullato lo scambio.</b>{coda}"
                     + ("\n\n" + str(dati.get("riga_persa") or "")
                        if dati.get("persa_di") == ruolo and dati.get("riga_persa") else ""))
+        if dettaglio == "maker-timeout" and maker and dati.get("mancate_di_fila"):
+            # (12 ott 2026) il coordinatore l'aveva gia' rimesso nel libro
+            # una volta: questa e' la seconda di fila, e l'ordine si toglie
+            return ("⏰ <b>Non hai risposto a due prese di fila:</b> il tuo "
+                    "ordine è stato tolto dal libro. Puoi ripubblicarlo quando "
+                    "vuoi." + conto_pubblica)
         if dettaglio == "maker-timeout" and maker:
             return ("⏰ <b>Non hai proseguito in tempo:</b> il tuo ordine è "
-                    "stato annullato. Puoi ripubblicarlo quando vuoi.")
+                    "stato annullato. Puoi ripubblicarlo quando vuoi."
+                    + conto_pubblica)
         if dettaglio == "maker-timeout":
             return ("⏰ <b>Chi aveva pubblicato l'ordine non ha proseguito in "
                     f"tempo:</b> lo scambio è annullato, non devi fare niente.{tornati}")
@@ -54455,6 +55333,16 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
                     "annullato.</b>" + (tornati or " I sats tornano a chi vende.")
                     + ("\n\n" + conto if conto else ""))
         return f"❌ <b>{altro} ha annullato lo scambio.</b>{coda}"
+    if momento == "tornato" and dettaglio == "maker-republished":
+        # IL RITORNO PER COLPA DI CHI HA PUBBLICATO (12 ott 2026, patch
+        # 0011 del fork): l'ordine torna nel libro, e le due frasi sono
+        # rovesciate rispetto al ritorno di sempre
+        if maker:
+            return ("⏰ <b>Non hai risposto in tempo:</b> il tuo ordine è "
+                    "tornato nel libro. Se anche la prossima presa resta senza "
+                    "risposta, viene tolto." + conto_pubblica)
+        return ("⏰ <b>Chi aveva pubblicato l'ordine non ha risposto in "
+                f"tempo:</b> lo scambio è annullato, non devi fare niente.{tornati}")
     if momento == "tornato":
         if dettaglio == "republished":
             return (f"🔄 <b>{altro} ha annullato lo scambio.</b> Il tuo ordine "
@@ -54718,6 +55606,23 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         except Exception:
             dati["conto_compra"] = ""
     lato_maker = {"buyer": "vende", "seller": "compra"}.get(fatto["preso_dal"], "")
+    # LA MANCATA RISPOSTA DI CHI HA PUBBLICATO (12 ott 2026, tempo-di-chi-
+    # pubblica): la riga del conto a lui (`_segna_esiti_p2p` gira prima di
+    # qui), e se l'ordine era gia' tornato nel libro per colpa sua — allora
+    # questo `maker-timeout` e' la seconda di fila. Nei banchi di ieri i
+    # giudici non ci sono, e tace
+    try:
+        if _mancata_risposta_p2p(ev, fatto):
+            chi_pubblica = _chi_pubblica_p2p(fatto)[0]
+            if chi_pubblica:
+                dati["conto_pubblica"] = _conto_esito_p2p(
+                    con, chi_pubblica, ordine, giro, adesso)["riga"]
+            dati["mancate_di_fila"] = bool(con.execute(
+                "SELECT 1 FROM p2p_momenti WHERE ordine=? AND fonte='mostro' AND "
+                "momento='tornato' AND dettaglio='maker-republished' AND quando<? "
+                "LIMIT 1", (ordine, ev["ts"])).fetchone())
+    except Exception:
+        pass
     fuori = []
 
     def recensibile(chi):
@@ -54746,16 +55651,25 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     finestra, finestra_letta = _finestra_gesto_p2p(_P2P_FOTO["info"])
     if gesto and fatto["venditore" if gesto[1] == "vende" else "compratore"]:
         chi_deve = fatto["venditore" if gesto[1] == "vende" else "compratore"]
-        scadenza = _scadenza_gesto_p2p(ev["ts"], finestra)
-        con.execute("DELETE FROM p2p_attese WHERE ordine=? AND momento=? AND "
+        # A CHI HA PUBBLICATO LA SUA FINESTRA E I SUOI AVVISI (12 ott
+        # 2026, tempo-di-chi-pubblica): il tempo e' quello che il
+        # coordinatore gli da' (`maker_expiration_seconds`), e con la
+        # leva i promemoria sono a 10 minuti, a un'ora e mezz'ora prima
+        # della scadenza (`_piano_promemoria_p2p`); a chi ha preso, e a
+        # leva spenta, resta quello di meta' tempo
+        tocca_pubblica = bool(lato_maker) and gesto[1] == lato_maker
+        finestra_sua = _finestra_di_p2p(_P2P_FOTO["info"], tocca_pubblica)[0]
+        scadenza = _scadenza_gesto_p2p(ev["ts"], finestra_sua)
+        con.execute("DELETE FROM p2p_attese WHERE ordine=? AND momento LIKE ? AND "
                     "giro=? AND tg_id=? AND fonte='promemoria'",
-                    (ordine, gesto[0] + "_promemoria", giro, chi_deve))
-        con.execute(
-            "INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, "
-            "quando, scade, fonte) VALUES(?,?,?,?,?,?,?,'promemoria')",
-            (ordine, gesto[0] + "_promemoria", giro, chi_deve,
-             _testo_promemoria_p2p(gesto[0], 0, False), ev["ts"],
-             _quando_promemoria_p2p(ev["ts"], scadenza)))
+                    (ordine, gesto[0] + "_promemoria%", giro, chi_deve))
+        for coda_nome, scade in _piano_promemoria_p2p(
+                ev["ts"], scadenza, P2P_TEMPO_DI_CHI_PUBBLICA and tocca_pubblica):
+            con.execute(
+                "INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, "
+                "quando, scade, fonte) VALUES(?,?,?,?,?,?,?,'promemoria')",
+                (ordine, gesto[0] + "_promemoria" + coda_nome, giro, chi_deve,
+                 _testo_promemoria_p2p(gesto[0], 0, False), ev["ts"], scade))
     # ...E QUANDO IL GESTO ARRIVA, o lo scambio si chiude, la sua attesa
     # se ne va SUBITO. Il giudice alla scadenza resta (`_promemoria_p2p_vivo`:
     # due POST possono arrivare rovesciati, e allora l'attesa nasce dopo),
@@ -54765,9 +55679,9 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     # resta dov'e'.
     for g in P2P_GESTI_A_TEMPO.values():
         if momento == g[2] or momento in P2P_MOMENTI_FINALI:
-            con.execute("DELETE FROM p2p_attese WHERE ordine=? AND momento=? AND "
+            con.execute("DELETE FROM p2p_attese WHERE ordine=? AND momento LIKE ? AND "
                         "fonte='promemoria' AND quando<=?",
-                        (ordine, g[0] + "_promemoria", ev["ts"]))
+                        (ordine, g[0] + "_promemoria%", ev["ts"]))
     # ...E IL PRIMO AVVISO DICE QUANTO TEMPO C'E', col numero del
     # coordinatore: i minuti che restano ADESSO al gesto che questo
     # momento apre (la presa che chiede subito la garanzia, la garanzia
@@ -54778,8 +55692,15 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
             "garanzia_pagata": "" if ev["dettaglio"] == "active" else "fattura_chiesta",
             "fattura_chiesta": "fattura_chiesta"}.get(momento, "")
     if apre and finestra_letta:
-        dati["tempo_gesto"] = _frase_tempo_gesto_p2p(
-            _scadenza_gesto_p2p(ev["ts"], finestra) - adesso)
+        # (12 ott 2026) il gesto che si apre e' di chi vende o di chi
+        # compra: se e' chi ha PUBBLICATO, il tempo e' il suo, e con un
+        # coordinatore che rimette l'ordine nel libro la frase dice
+        # quello (`_dopo_scadenza_p2p`)
+        apre_pubblica = bool(lato_maker) and P2P_GESTI_A_TEMPO[apre][1] == lato_maker
+        dati["tempo_gesto"] = _frase_tempo_gesto_p2p(_scadenza_gesto_p2p(
+            ev["ts"], _finestra_di_p2p(_P2P_FOTO["info"], apre_pubblica)[0]) - adesso)
+        if apre_pubblica and _limite_pubblica_p2p(_P2P_FOTO["info"]):
+            dati["dopo_scadenza"] = _dopo_scadenza_p2p(_P2P_FOTO["info"], True)
     if momento == "rilasciato" and ev["attore"] == "seller" and fatto["venditore"]:
         # L'ATTESA DI CHI VENDE: se in un minuto il pagamento a chi
         # compra non e' passato, gli arriva «Sats in pagamento». Ha il

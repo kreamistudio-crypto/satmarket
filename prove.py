@@ -56328,6 +56328,7 @@ def prove_card_parte_ordine():
     amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
     amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
     amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
+    amb["_veloci_p2p"] = lambda con, ids, adesso: set()   # (12 ott 2026, il badge)
     for f in ("livello_utente", "_volti_persone", "miei_ordini"):
         exec(pezzo(f), amb)
     # la SPIA sul costruttore: chi gli si chiede, a ogni giro
@@ -58564,6 +58565,7 @@ def prove_ritocchi_prova_alan():
         amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
         amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
         amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
+        amb["_veloci_p2p"] = lambda con, ids, adesso: set()   # (12 ott 2026, il badge)
         for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "MAX_ORDINI_MAI_VISTI_P2P = ", "P2P_ORDINI_MAI_VISTI_S = ", "P2P_CAMBIO_PUB_SCARTO = "):
             i = _SORGENTE.index("\n" + riga) + 1
             exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
@@ -58577,8 +58579,11 @@ def prove_ritocchi_prova_alan():
                      "_metodi_lista_p2p", "_zone_p2p", "_zone_foto_p2p",
                      # (10 ott 2026, reputazione-p2p) ...e i filtri di chi pubblica
                      "_filtri_p2p", "_filtri_foto_p2p",
+                     # (12 ott 2026, tempo-di-chi-pubblica) ...e le pause, a leva spenta
+                     "_pause_p2p", "_pause_foto_p2p",
                      "_rinfresca_volti_foto_p2p", "_intesta_dal_canale_p2p"):
             exec(pezzo(nome), amb)
+        amb["P2P_TEMPO_DI_CHI_PUBBLICA"] = False
         EV = lambda d: {"kind": 38383, "created_at": 1, "tags": [["d", d]]}
         # la fotografia ha GIA' l'ordine appena pubblicato (il giro subito e'
         # arrivato prima di /p2p/ordini), senza volto e senza autore: e' il
@@ -65476,6 +65481,7 @@ def prove_parti_si_vedono():
     amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
     amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
     amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
+    amb["_veloci_p2p"] = lambda con, ids, adesso: set()   # (12 ott 2026, il badge)
     for f in ("_ordini_puliti_p2p", "livello_utente", "_volti_persone",
               "_controparti_p2p"):
         exec(pezzo(f), amb)
@@ -68563,6 +68569,7 @@ def prove_volti_libro():
     amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
     amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
     amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
+    amb["_veloci_p2p"] = lambda con, ids, adesso: set()   # (12 ott 2026, il badge)
     for f in ("_ordini_puliti_p2p", "_registra_ordini_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p",
               "_facce_ordini_p2p"):
         exec(pezzo(f), amb)
@@ -79345,6 +79352,7 @@ def prove_p2p_server():
              # la cauzione di chi prende (1 ott 2026), in busta
              "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
+             "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              # i wallet il cui indirizzo non passa (10 ott 2026), in busta
@@ -79371,10 +79379,11 @@ def prove_p2p_server():
     # avvisi dei nuovi ordini — la leva globale e la finestra in minuti
     # (10 ott 2026) DODICI: l'elenco dei wallet il cui indirizzo non passa;
     # (11 ott 2026) TREDICI: la cauzione sul metodo scelto, dietro la -bar7
-    prova("le chiavi sono tredici e sono sempre quelle",
+    # (12 ott 2026) QUATTORDICI: il tempo di chi pubblica — pausa, badge, regole
+    prova("le chiavi sono quattordici e sono sempre quelle",
           ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "cauzioneSulMetodo", "commissione",
            "indirizziNo", "maxEuro", "maxEuroContanti", "minEuroBz", "mostro", "relay",
-           "specchio"],
+           "specchio", "tempoPubblica"],
           sorted(piena.keys()))
     # IL LISTINO VIAGGIA SEMPRE, come npub e relay: e' pubblico, e il
     # client lo usa solo per dire quando la fee viva e' una promo.
@@ -80180,8 +80189,11 @@ def prove_p2p_server():
     # stesso giudice se l'ordine del libro e' mio, per scegliere il verbo
     # («Vendo» sul mio, «Vendesi» su quello di un altro:
     # `ordineDaCondividereP2P`).
+    # ...E DAL 12 OTT 2026 IN SETTE: la pausa degli ordini nasconde dal
+    # libro quelli degli ALTRI, e a dire se un ordine e' mio e' lo stesso
+    # giudice (`nascostoPerPausaP2P`).
     prova("...e il giudice unico lo chiamano la card, la porta, la cintura, il "
-          "dettaglio, la fila della home e il «Condividi»", 6,
+          "dettaglio, la fila della home, il «Condividi» e la pausa", 7,
           solo_codice(mini).count("ordineTuoP2P(") - 1)
     # --- 15c) LA CINTURA PRIMA DI FIRMARE (14 set 2026) ------------
     # Lo strato sotto all'avviso: OTTO posti derivano la trade key dal
@@ -84885,7 +84897,8 @@ def prove_premio_barattozon():
           [True, True, True],
           # (10 ott 2026) ...e accanto ai cambi le zone del contanti, e i
           # filtri di chi pubblica (reputazione-p2p)
-          ['return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri}' in pezzo("facce_ordini_p2p"),
+          # (12 ott 2026, tempo-di-chi-pubblica) ...e in coda le pause
+          ['return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri, "pause": pause}' in pezzo("facce_ordini_p2p"),
            'if fuori["eventi"] and F.get("cambi"):\n        fuori["cambi"] = F["cambi"]'
            in pezzo("libro_fotografato_p2p")
            and pezzo("libro_fotografato_p2p").index('fuori["cambi"]')
@@ -90288,7 +90301,9 @@ def _banco_eventi_p2p(eventi_attivi=True):
                           ("p2p_tolti", "\n    );"),
                           # (10 ott 2026, reputazione-p2p) gli esiti e i tentativi
                           ("p2p_esiti", "ON p2p_esiti(tg_id, esito, quando);"),
-                          ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);")):
+                          ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);"),
+                          # (12 ott 2026, tempo-di-chi-pubblica) la pausa degli ordini
+                          ("p2p_pause", "\n    );")):
         i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
         schema += src[i:src.index(fine, i) + len(fine)] + "\n"
     schema += ("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, "
@@ -90308,6 +90323,9 @@ def _banco_eventi_p2p(eventi_attivi=True):
            # la cauzione (1 ott 2026): la leva e il 38385 della
            # fotografia, SPENTI di serie — la prova che li vuole li accende
            "P2P_CAUZIONE": False, "_P2P_FOTO": {"info": None},
+           # il tempo di chi pubblica (12 ott 2026): la leva SPENTA di
+           # serie — «come ieri» —, e la prova che la vuole la accende
+           "P2P_TEMPO_DI_CHI_PUBBLICA": False, "sqlite3": sqlite3,
            # il bottone del promemoria (10 ott 2026) porta alla pagina P2P
            "LINK_LIBRO_P2P": "https://barattolo.store/p2p"}
     # le costanti si prendono dal sorgente, non si ricopiano: una
@@ -90326,7 +90344,14 @@ def _banco_eventi_p2p(eventi_attivi=True):
                  "_DOPO_RILASCIO_P2P = ",
                  # il promemoria del gesto a tempo (10 ott 2026)
                  "P2P_FINESTRA_GESTO_RIPIEGO_S = ", "P2P_PROMEMORIA_MINIMO_S = ",
-                 "P2P_BOTTONE_SCAMBIO = "):
+                 "P2P_BOTTONE_SCAMBIO = ",
+                 # il tempo di chi pubblica (12 ott 2026): pausa, badge, promemoria
+                 "P2P_PAUSA_FASCE_MAX = ", "P2P_PAUSA_UNA_MAX_S = ",
+                 "P2P_PAUSA_UNA_ENTRO_S = ", "P2P_PAUSA_PRIMA_S = ",
+                 "P2P_PAUSA_CATENA_MAX = ", "P2P_VELOCE_FINESTRA_S = ",
+                 "P2P_VELOCE_SCAMBI_MIN = ", "P2P_VELOCE_MEDIANA_S = ",
+                 "P2P_PROMEMORIA_PUBBLICA_S = ", "P2P_PROMEMORIA_PUBBLICA_PRIMA_S = ",
+                 "P2P_PROMEMORIA_DISTANZA_S = ", "FORMA_FUSO_P2P = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)].split("  #")[0], amb)
     for blocco, fine in (("STATI_LIBRO_PRESO = (", ")\n"),
@@ -90371,7 +90396,19 @@ def _banco_eventi_p2p(eventi_attivi=True):
               # il promemoria del gesto a tempo (10 ott 2026)
               "_finestra_gesto_p2p", "_scadenza_gesto_p2p",
               "_quando_promemoria_p2p", "_frase_tempo_gesto_p2p",
-              "_testo_promemoria_p2p", "_promemoria_p2p_vivo"):
+              "_testo_promemoria_p2p", "_promemoria_p2p_vivo",
+              # il tempo di chi pubblica (12 ott 2026): la finestra per
+              # ruolo, la pausa, la mancata risposta, il badge, il piano
+              # dei promemoria — i giudici veri, e la leva sta spenta
+              "_tag_secondi_p2p", "_finestra_pubblica_p2p", "_finestra_di_p2p",
+              "_limite_pubblica_p2p", "_penalita_pubblica_p2p", "_dopo_scadenza_p2p",
+              "_legale_europea_p2p", "_scarto_fuso_p2p", "_pausa_pulita_p2p",
+              "_fine_fascia_p2p", "_fine_pausa_p2p", "_pausa_p2p",
+              "_scrivi_pausa_p2p", "_mia_pausa_p2p", "_pause_p2p",
+              "_presa_in_pausa_p2p", "_chi_pubblica_p2p", "_tocca_a_chi_pubblica_p2p",
+              "_mancata_risposta_p2p", "_esito_chi_pubblica_p2p",
+              "_risposta_pubblica_p2p", "_veloce_p2p", "_veloci_p2p",
+              "_piano_promemoria_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
     return con, amb
 
@@ -96723,7 +96760,9 @@ def _ambiente_libro_p2p(detto):
            # (10 ott 2026, malus-p2p) il gemello delle dispute perse
            "_marchi_dispute_p2p": lambda con, ids, adesso: {},
            # (10 ott 2026, feedback-p2p) gli scambi completati accanto al nome
-           "_completati_p2p": lambda con, ids: {}}
+           "_completati_p2p": lambda con, ids: {},
+           # (12 ott 2026) e il badge «⚡ risponde in fretta»
+           "_veloci_p2p": lambda con, ids, adesso: set()}
     _m = _SORGENTE.index("\nMOMENTI_DEL_LIBRO_P2P = {") + 1
     exec(_SORGENTE[_m:_SORGENTE.index("}\n", _m) + 2], amb)
     return {**amb, "html": _html,
@@ -97035,6 +97074,10 @@ def prove_p2p_recapito_passo():
                   "P2P_SATS_MAX_EVENTO = "):
         _i = src.index("\n" + _riga) + 1
         exec(src[_i:src.index("\n", _i)], amb)
+    # la presa arrivata in pausa (12 ott 2026) ha la sua prova
+    # (prove_tempo_di_chi_pubblica): qui nessuno e' in pausa
+    amb["_presa_in_pausa_p2p"] = lambda con, tg_id, quando: False
+    amb["_chi_pubblica_p2p"] = lambda fatto: (0, "")
     # il bollino 🛡️ Staff (6 ott 2026) ha la sua prova (prove_bollino_staff): qui nessuno e' dello staff
     amb["e_staff"] = lambda tg_id: False
     # il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p) ha la
@@ -97042,6 +97085,7 @@ def prove_p2p_recapito_passo():
     amb["_marchi_mancati_p2p"] = lambda con, ids, adesso: {}
     amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
     amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
+    amb["_veloci_p2p"] = lambda con, ids, adesso: set()   # (12 ott 2026, il badge)
     for f in _FUNZIONI_LIBRO_P2P + ("_volti_persone", "_controparti_p2p", "_nome_altro_p2p",
                                     # col contanti l'avviso dice l'appuntamento (1 ott 2026)
                                     "_tabacchino_libro", "_recapito_contanti_p2p", "_dati_frase_p2p",
@@ -107247,6 +107291,7 @@ def prove_avvisi_nuovi_ordini():
              "MOSTRO_RELAY_SPECCHIO": [], "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
              "P2P_CONTANTI_MAX_EURO": 250, "BARATTOZON_MIN_EURO": 25, "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
+             "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              "P2P_INDIRIZZI_NON_PASSANO": {}}
     exec(_senza_prosa(pezzo("_p2p_leve")), amb_l)
@@ -129540,6 +129585,7 @@ def prove_contanti_a_mano():
              # la cauzione (1 ott 2026), entrata in busta il giorno dopo
              "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
+             "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              "P2P_INDIRIZZI_NON_PASSANO": {}}
@@ -139650,6 +139696,7 @@ def prove_indirizzo_non_verificato():
              "MOSTRO_RELAY_SPECCHIO": [], "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
              "P2P_CONTANTI_MAX_EURO": 250, "BARATTOZON_MIN_EURO": 25, "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
+             "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              "P2P_INDIRIZZI_NON_PASSANO": elenco}
         exec(pezzo("_p2p_leve"), a)
@@ -142696,7 +142743,7 @@ def prove_contanti_zona():
     # (10 ott 2026, reputazione-p2p) ...e i filtri di chi pubblica, in coda
     prova("i volti portano le zone accanto, dagli stessi id", True,
           'zone = _zone_p2p(con, (d or {}).get("ordini"))' in fac
-          and 'return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri}' in fac)
+          and 'return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri, "pause": pause}' in fac)
     lib = pezzo("libro_fotografato_p2p")
     prova("la fotografia le da' a TUTTI, prima di chiedere chi guarda (non sono un volto)", True,
           'if fuori["eventi"] and F.get("zone"):\n        fuori["zone"] = F["zone"]' in lib
@@ -142738,8 +142785,9 @@ def prove_contanti_zona():
     prova("le zone arrivano dai volti e dalle due letture della fotografia", [True, True, True],
           ["if (prendiZoneP2P(d && d.zone)) nuove++;" in fn("async function chiediFacceP2P(ids){"),
            "const zone = prendiZoneP2P(d && d.zone);" in fn("async function chiediFotoLibroP2P(){")
-           # (10 ott 2026, reputazione-p2p) ...e i filtri, in coda alle zone
-           and "> 0 || cambi || zone || filtri;" in fn("async function chiediFotoLibroP2P(){"),
+           # (10 ott 2026, reputazione-p2p) ...e i filtri, in coda alle zone;
+           # (12 ott 2026, tempo-di-chi-pubblica) e in coda ai filtri le pause
+           and "> 0 || cambi || zone || filtri || pause;" in fn("async function chiediFotoLibroP2P(){"),
            mini.count("\n  prendiZoneP2P(d && d.zone);\n") == 1])
     riga = fn("function rigaOrdineP2P(o){")
     prova("la card del libro mette la zona sotto la scatola dei metodi; la card d'esempio no",
@@ -143703,13 +143751,20 @@ def prove_dati_reputazione_p2p():
     prova("cosa sta in una riga: niente importi, e la pagina lo dice",
           (False, True),
           (any(x in segna for x in ("sats", "euro")), "niente importi" in testo))
-    prova("...«completato» a tutte e due, «non completato» solo a chi ha "
-          "preso: come scrive il giudice",
-          (True, True, True, True),
+    # (EMENDATA il 12 ott 2026, cantiere tempo-di-chi-pubblica, decisione
+    # di Andrea: il «non completato» si conta anche a chi ha PUBBLICATO e
+    # non risponde, dove il servizio gli da' piu' tempo di chi prende. Il
+    # giudice di chi prende resta il suo ramo; quello di chi pubblica e'
+    # una funzione a parte, e la pagina li dice tutti e due)
+    prova("...«completato» a tutte e due, «non completato» a chi ha preso e — "
+          "col tempo lungo — a chi ha pubblicato: come scrivono i due giudici",
+          (True, True, True, True, True, True),
           ("for tg, ruolo in ((compra, \"compra\"), (vende, \"vende\")):" in segna,
            '"taker-timeout"' in segna,
+           "_esito_chi_pubblica_p2p(con, ev, fatto, adesso)" in segna,
            "a tutte e due le parti" in testo,
-           "solo a chi ha preso un ordine" in testo))
+           "si conta a chi ha preso un ordine" in testo,
+           "si conta anche a chi ha pubblicato un ordine" in testo))
     # (EMENDATE il 10 ott 2026, cantiere feedback-p2p, decisione di Andrea
     # col pacchetto C dello studio sul feedback: gli scambi COMPLETATI non
     # li vede piu' solo l'interessato — stanno accanto alle stelline, dove
@@ -146763,6 +146818,1057 @@ console.log(JSON.stringify(c));
               [c["corpoSenza"], c["corpoCon"]])
 
 
+def prove_tempo_di_chi_pubblica():
+    """IL TEMPO DI CHI PUBBLICA (12 ott 2026, cantiere tempo-di-chi-pubblica):
+    chi prende resta a mezz'ora, chi pubblica ha il tempo che il
+    coordinatore gli da' (`maker_expiration_seconds`, patch 0011); se non
+    risponde l'ordine torna nel libro, e con la leva gli si conta — con
+    le sue tutele. Piu' la pausa degli ordini, il badge e gli avvisi.
+
+    Quel che qui si rompe in silenzio: il «tornato» per colpa di chi
+    pubblica contato a chi ha PRESO; la penalita' che scatta coi trenta
+    minuti di ieri; due mancate di fila contate due volte; la pausa messa
+    DOPO che scusa una presa di prima; l'ora legale che sposta di un'ora
+    la fine della pausa; il badge a chi scambia sempre con la stessa
+    persona; il promemoria che dice «si annulla» quando l'ordine torna.
+
+    Il banco e' quello degli avvisi P2P (`_banco_eventi_p2p`) coi giudici
+    veri della reputazione; il 38385 e' di cartone coi soli tag che
+    servono, e l'orologio lo sposta la prova."""
+    print("\n[il tempo di chi pubblica: finestra per ruolo, pausa, mancata risposta, badge]")
+    import calendar as _cal
+    import re as _re
+    import sqlite3
+    src = _SORGENTE
+
+    # --- 1) LE SENTINELLE ------------------------------------------------
+    prova("la leva e' spenta di serie, e solo True la accende",
+          [True, True],
+          ["    P2P_TEMPO_DI_CHI_PUBBLICA = P2P_TEMPO_DI_CHI_PUBBLICA is True\n"
+           "except ImportError:\n    P2P_TEMPO_DI_CHI_PUBBLICA = False\n" in src,
+           '"tempoPubblica": bool(P2P_TEMPO_DI_CHI_PUBBLICA),' in src])
+    prova("...e sta nel pannello delle leve, col suo nome", True,
+          '"P2P_TEMPO_DI_CHI_PUBBLICA", P2P_TEMPO_DI_CHI_PUBBLICA,' in pezzo("_leve_stato"))
+    flusso = open(os.path.join(".github", "workflows", "prove.yml"),
+                  encoding="utf-8").read()
+    prova("il collaudo delle rotte vere gira in CI, nella gabbia", [True, True],
+          ["             collaudo_tempo_pubblica\n" in flusso,
+           "             collaudo_tempo_pubblica.py\n" in flusso])
+    prova("la parola nuova del coordinatore e' un RITORNO, e non quello di chi ha preso",
+          [True, True],
+          ['"maker-republished": "tornato"' in pezzo("_momento_evento_p2p"),
+           '"maker-republished"' not in codice(_senza_prosa(pezzo("_segna_esiti_p2p")))])
+    segna = codice(_senza_prosa(pezzo("_segna_esiti_p2p")))
+    prova("chi pubblica si giudica PRIMA delle uscite, e il ramo di chi prende resta il suo",
+          [True, True],
+          [0 < segna.find("righe.extend(_esito_chi_pubblica_p2p(con, ev, fatto, adesso))")
+           < segna.index('if fatto.get("momento") == "concluso":'),
+           'ev.get("dettaglio") == "taker-timeout"):' in segna])
+    pub = codice(_senza_prosa(pezzo("_esito_chi_pubblica_p2p")))
+    prova("a leva spenta il giudice di chi pubblica esce subito, senza scrivere",
+          True, pub.index("if not come or not P2P_TEMPO_DI_CHI_PUBBLICA:")
+          < pub.index("INSERT OR IGNORE INTO p2p_esiti"))
+    prova("...e la tutela della pausa sta PRIMA di ogni scrittura (nemmeno il badge si perde)",
+          True, pub.index("pausa_presa") < pub.index("INSERT OR IGNORE INTO p2p_esiti"))
+    prova("la presa in pausa si scrive ALLA PRESA, coi fatti di allora", True,
+          "UPDATE p2p_scambi SET pausa_presa=? WHERE ordine=?" in pezzo("_registra_evento_p2p"))
+    prova("la pausa non scrive niente sugli ordini e non esce verso i relay: si chiede l'ora",
+          [False, False],
+          ["UPDATE p2p_ordini" in pezzo("_scrivi_pausa_p2p"),
+           any(x in pezzo("_scrivi_pausa_p2p") + pezzo("_pause_p2p")
+               for x in ("pubblica_evento", "relay", "38383"))])
+    prova("le due rotte della pausa: la lettura senza parametri, la scrittura con la leva",
+          [True, True, True],
+          ['@app.get("/api/p2p/pausa")' in src, '@app.post("/api/p2p/pausa")' in src,
+           'raise HTTPException(409, "La pausa degli ordini non è attiva")' in src])
+    prova("«dimentica il profilo» porta via la pausa, e la fusione degli account la sposta",
+          [True, True],
+          ['con.execute("DELETE FROM p2p_pause WHERE tg_id=?", (user["id"],))' in src,
+           'con.execute("UPDATE OR IGNORE p2p_pause SET tg_id=? WHERE tg_id=?",' in src])
+
+    # --- 2) I PEZZI PURI -------------------------------------------------
+    con, amb = _banco_eventi_p2p()
+    for riga in ("P2P_MANCATI_FINESTRA_S = ", "P2P_MANCATI_FILTRO_S = ",
+                 "P2P_MANCATI_TOLLERATI = ", "P2P_PRESE_APERTE_MAX = ",
+                 "P2P_PRESA_APERTA_S = ", "P2P_TENTATIVO_MARGINE_S = ",
+                 "P2P_DISPUTE_FINESTRA_S = ", "P2P_SCUSA_FINESTRA_S = ",
+                 "P2P_EURO_SOSPESI_MAX = ", "P2P_EURO_SOSPESI_DOPO_S = ",
+                 "P2P_EURO_SOSPESI_FINO_S = "):
+        i = src.index("\n" + riga) + 1
+        exec(src[i:src.index("\n", i)].split("  #")[0], amb)
+    for blocco in ("P2P_FILTRO_SOGLIE = (", "P2P_GESTI_TENTATIVO = (", "P2P_MOTIVI_PRESA = (",
+                   "P2P_RIGA_SCUSA = (", "P2P_RIGA_SCUSA_USATA = (", "MESI_IT = ("):
+        i = src.index("\n" + blocco) + 1
+        exec(src[i:src.index(")\n", i) + 2], amb)
+    i_p = src.index("\n_PESO_MOMENTO_P2P = {") + 1
+    exec(src[i_p:src.index("}\n", i_p) + 2], amb)
+    for f in ("_primo_gesto_p2p", "_marchio_mancati_p2p", "_ha_provato_p2p",
+              "_segna_esiti_p2p", "_reputazione_p2p", "_marchi_mancati_p2p",
+              "_prese_aperte_p2p", "_giudice_presa_p2p", "_soglia_filtro_p2p",
+              "_filtri_p2p", "_posso_prendere_p2p", "_segna_tentativo_p2p",
+              "_blocco_filtro_fino_p2p", "_riga_conto_p2p", "_conto_esito_p2p",
+              "_colpa_disputa_p2p", "_esiti_dopo_garanzia_p2p", "_marchi_dispute_p2p",
+              "_euro_sospesi_p2p", "_sollecito_euro_p2p_fermo", "_stato_scambio_p2p",
+              "_metodi_lista_p2p", "_blocco_dispute_fino_p2p", "_riga_disputa_persa_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+
+    def info(prende=1800, pubblica=0, limite=0):
+        tags = [["d", "x"], ["expiration_seconds", str(prende)]]
+        if pubblica:
+            tags.append(["maker_expiration_seconds", str(pubblica)])
+        if limite:
+            tags.append(["maker_timeout_limit", str(limite)])
+        return {"kind": 38385, "tags": tags}
+
+    fin_p, fin_di = amb["_finestra_pubblica_p2p"], amb["_finestra_di_p2p"]
+    prova("la finestra di chi pubblica si legge dal 38385; senza il tag e' quella di tutti",
+          [(10800, True), (1800, True), (900, False), (1800, True)],
+          [fin_p(info(1800, 10800)), fin_p(info(1800)), fin_p(None),
+           fin_p(info(1800, "abc"))])
+    prova("...e ognuno ha la sua: chi prende resta a mezz'ora",
+          [(1800, True), (10800, True)],
+          [fin_di(info(1800, 10800), False), fin_di(info(1800, 10800), True)])
+    pen = amb["_penalita_pubblica_p2p"]
+    prova("la penalita' a leva SPENTA non c'e' mai", [False, False],
+          [pen(info(1800, 10800, 2)), pen(info(1800))])
+    amb["P2P_TEMPO_DI_CHI_PUBBLICA"] = True
+    prova("...e a leva accesa vuole il tempo LUNGO: coi trenta minuti di ieri resta la "
+          "regola di ieri", [True, False, False, False],
+          [pen(info(1800, 10800, 2)), pen(info(1800)), pen(info(1800, 1800, 2)), pen(None)])
+    dopo = amb["_dopo_scadenza_p2p"]
+    prova("cosa succede dopo: a chi pubblica, con un coordinatore che rimette nel libro, "
+          "l'ordine torna (e conta, se conta); a tutti gli altri si annulla",
+          ["l'ordine torna nel libro e ti conta come scambio non completato",
+           "l'ordine torna nel libro", "lo scambio si annulla", "lo scambio si annulla"],
+          [dopo(info(1800, 10800, 2), True), dopo(info(1800, 1800, 2), True),
+           dopo(info(1800, 10800, 2), False), dopo(info(1800, 10800), True)])
+    frase = amb["_frase_tempo_gesto_p2p"]
+    prova("il tempo in parole: dall'ora in su si dice in ore",
+          ["3 ore", "2 ore e 50 minuti", "1 ora", "1 ora e 1 minuto", "59 minuti", "30 minuti"],
+          [frase(10800), frase(10200), frase(3600), frase(3660), frase(3540), frase(1800)])
+    tp = amb["_testo_promemoria_p2p"]
+    prova("il promemoria a chi pubblica dice che l'ordine TORNA, e il singolare regge",
+          ["⏳ <b>Restano circa 2 ore e 50 minuti per bloccare la garanzia</b>, altrimenti "
+           "l'ordine torna nel libro.",
+           "⏳ <b>Resta circa 1 ora per indicare dove ricevere i sats</b>, altrimenti "
+           "lo scambio si annulla."],
+          [tp("garanzia", 10200, True, "l'ordine torna nel libro"), tp("fattura", 3600, True)])
+    piano = amb["_piano_promemoria_p2p"]
+    prova("il piano dei promemoria: senza pacchetto uno a meta' tempo, come dal 10 ott",
+          [[("", 6400)], [("", 1900)]],
+          [piano(1000, 11800, False), piano(1000, 2800, False)])
+    prova("...a chi pubblica, con tre ore: a 10 minuti, a un'ora e mezz'ora prima della fine",
+          [("", 1600), ("2", 4600), ("3", 10000)], piano(1000, 11800, True))
+    prova("...con mezz'ora resta quello dei 10 minuti; con un'ora i due che ci stanno",
+          [[("", 1600)], [("", 1600), ("2", 2800)]],
+          [piano(1000, 2800, True), piano(1000, 4600, True)])
+    prova("...due promemoria attaccati sono uno, e una finestra minuscola torna a meta' tempo",
+          [[("", 1600), ("2", 4600)], [("", 1150)]],
+          [piano(1000, 6500, True), piano(1000, 1300, True)])
+
+    # LA PAUSA: le fasce, la catena, la una tantum, l'ora legale
+    def utc(a, m, g, h, mi=0):
+        return _cal.timegm((a, m, g, h, mi, 0))
+    ESTATE = utc(2026, 7, 15, 10)          # mercoledi' 15 lug 2026, 12:00 a Roma
+    fine = amb["_fine_pausa_p2p"]
+
+    def pausa(fasce, una_da=0, una_fino=0, salvato=ESTATE, scarto=120):
+        return {"fasce": fasce, "fuso": "Europe/Rome", "scarto": scarto,
+                "una_da": una_da, "una_fino": una_fino, "aggiornato": salvato}
+    NOTTI = {"g": [0, 1, 2, 3, 4, 5, 6], "da": 22 * 60, "a": 6 * 60}
+    FERIALI = {"g": [0, 1, 2, 3, 4], "da": 8 * 60, "a": 20 * 60}
+    prova("la pausa dei giorni feriali 8-20: mercoledi' a mezzogiorno si', e finisce alle 20",
+          utc(2026, 7, 15, 18), fine(pausa([FERIALI]), ESTATE))
+    prova("...sabato a mezzogiorno no, e la sera del mercoledi' nemmeno",
+          [0, 0], [fine(pausa([FERIALI]), utc(2026, 7, 18, 10)),
+                   fine(pausa([FERIALI]), utc(2026, 7, 15, 18, 30))])
+    prova("la notte 22-6 vale per il giorno in cui COMINCIA: alle 23 e alle 3 del mattino "
+          "dopo e' la stessa pausa, e finisce alle 6",
+          [utc(2026, 7, 16, 4), utc(2026, 7, 16, 4), 0],
+          [fine(pausa([NOTTI]), utc(2026, 7, 15, 21)),
+           fine(pausa([NOTTI]), utc(2026, 7, 16, 1)),
+           fine(pausa([NOTTI]), utc(2026, 7, 16, 4))])
+    prova("...solo il venerdi' sera: sabato alle 3 e' ancora pausa, domenica alle 3 no",
+          [utc(2026, 7, 18, 4), 0],
+          [fine(pausa([dict(NOTTI, g=[4])]), utc(2026, 7, 18, 1)),
+           fine(pausa([dict(NOTTI, g=[4])]), utc(2026, 7, 19, 1))])
+    prova("d'INVERNO le stesse 22-6 cadono un'ora dopo in UTC: l'ora legale la fa il server",
+          utc(2026, 12, 16, 5), fine(pausa([NOTTI]), utc(2026, 12, 15, 21, 30)))
+    prova("...e la notte in cui l'ora cambia (25 ott 2026) le sei restano le sei",
+          utc(2026, 10, 25, 5), fine(pausa([NOTTI]), utc(2026, 10, 24, 21)))
+    prova("LA CATENA: una fascia che finisce dove ne comincia un'altra da' la fine dell'ultima",
+          utc(2026, 7, 16, 4),
+          fine(pausa([{"g": [2], "da": 20 * 60, "a": 22 * 60}, NOTTI]), utc(2026, 7, 15, 19)))
+    prova("la pausa UNA TANTUM: dentro si', prima e dopo no; e si attacca alle fasce",
+          [ESTATE + 5000, 0, 0, utc(2026, 7, 16, 4)],
+          [fine(pausa([], ESTATE - 10, ESTATE + 5000), ESTATE),
+           fine(pausa([], ESTATE + 10, ESTATE + 5000), ESTATE),
+           fine(pausa([], ESTATE - 10, ESTATE + 5000), ESTATE + 5000),
+           fine(pausa([NOTTI], ESTATE - 10, utc(2026, 7, 15, 21)), ESTATE)])
+    prova("nessuna pausa, o una riga vuota: non in pausa", [0, 0],
+          [fine(None, ESTATE), fine(pausa([]), ESTATE)])
+    pulita = amb["_pausa_pulita_p2p"]
+    buona = pulita({"fasce": [{"g": [4, 0, 0], "da": 1320, "a": 360}], "fuso": "Europe/Rome",
+                    "scarto": 120, "una_fino": ESTATE + 86400}, ESTATE)
+    prova("la pausa pulita: i giorni in ordine e senza doppioni, la una tantum parte adesso",
+          {"fasce": [{"g": [0, 4], "da": 1320, "a": 360}], "fuso": "Europe/Rome",
+           "scarto": 120, "una_da": ESTATE, "una_fino": ESTATE + 86400}, buona)
+    prova("...un fuso in una forma strana non entra, e lo scarto fuori scala nemmeno",
+          ["", 0], [pulita({"fuso": "../../etc/passwd; x", "scarto": 9999}, ESTATE)[k]
+                    for k in ("fuso", "scarto")])
+    storte = [
+        "non un dizionario", {"fasce": "x"}, {"fasce": [{"g": [], "da": 1, "a": 2}]},
+        {"fasce": [{"g": [7], "da": 1, "a": 2}]}, {"fasce": [{"g": [True], "da": 1, "a": 2}]},
+        {"fasce": [{"g": [1], "da": 1440, "a": 2}]}, {"fasce": [{"g": [1], "da": 5, "a": 5}]},
+        {"fasce": [{"g": [1], "da": 1, "a": 2}] * 7},
+        {"una_fino": ESTATE - 5}, {"una_fino": ESTATE + 8 * 86400},
+        {"una_da": ESTATE + 40 * 86400, "una_fino": ESTATE + 41 * 86400}]
+    prova("...e le forme storte alzano tutte ValueError: giorni, orari, sette fasce, "
+          "una tantum finita, piu' lunga di 7 giorni o troppo in la'",
+          [True] * len(storte), [bool(_alza(lambda d=d: pulita(d, ESTATE))) for d in storte])
+    prova("...sette giorni precisi (col margine dei due orologi) passano", ESTATE + 7 * 86400 + 60,
+          pulita({"una_fino": ESTATE + 7 * 86400 + 60}, ESTATE)["una_fino"])
+    veloce = amb["_veloce_p2p"]
+    prova("il badge: tre scambi con tre persone e mediana entro 10 minuti",
+          [True, True, False, False, False, False],
+          [veloce([100, 600, 5000], [1, 2, 3], 0), veloce([60, 500, 600, 700], [1, 2, 3, 3], 0),
+           veloce([100, 601, 5000], [1, 2, 3], 0),      # la mediana sfora
+           veloce([100, 200, 300], [1, 2, 2], 0),       # due persone sole
+           veloce([100, 200], [1, 2], 0),               # due scambi soli
+           veloce([100, 200, 300], [1, 2, 3], 1)])      # una presa senza risposta
+
+    # --- 3) LO SCAMBIO, SUL BANCO ---------------------------------------
+    _tag = _re.compile(r"</?[bi]>")
+    ORA = utc(2026, 7, 15, 10)
+    KA, KB, KC, KD = "a" * 64, "b" * 64, "c" * 64, "d" * 64
+    P, T = 111, 222                       # chi pubblica (vende), chi prende (compra)
+    for chi, chiave in ((P, KB), (T, KA), (333, KC), (444, KD)):
+        con.execute("INSERT INTO utenti VALUES(?,1)", (chi,))
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)",
+                    (chiave, chi))
+    # il nome e' quello che CIASCUNO VEDE dell'altra parte (il cartone del banco)
+    amb["_NOMI"].update({P: "Tina", T: "Piero"})
+    conta = [0]
+
+    def ordine(lato="sell", maker=P):
+        conta[0] += 1
+        o = f"{conta[0]:08x}-7b2d-4c6a-9e11-aa00bb11cc22"
+        con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, "
+                    "euro, sats, metodi) VALUES(?,?,?,'in-progress',?,1,'10,00 €',"
+                    "15000,'[\"SEPA\"]')", (o, maker, ORA, lato))
+        return o
+
+    def ev(o, azione, attore="mostro", dettaglio="", ts=ORA, buyer=KA, seller=KB):
+        d = {"v": 1, "order": o, "action": azione, "ts": ts, "actor": attore,
+             "buyer": buyer, "seller": seller}
+        if dettaglio:
+            d["detail"] = dettaglio
+        e = amb["_evento_p2p_pulito"](d, ts)
+        fatto = amb["_registra_evento_p2p"](con, e, ts)
+        if fatto is None:
+            return {}, []
+        righe = amb["_segna_esiti_p2p"](con, e, fatto, ts)
+        detti = {t: _tag.sub("", x) for t, x in amb["_avvisi_evento_p2p"](con, e, fatto, ts)}
+        return detti, righe
+
+    def presa(o, t, buyer=KA):
+        """Una vendita di P presa da chi compra: fino alla garanzia chiesta a P."""
+        ev(o, "taken", "buyer", "invoice-next", t, buyer)
+        ev(o, "buyer-invoice-requested", "mostro", "", t, buyer)
+        ev(o, "buyer-invoice-added", "buyer", "hold-next", t + 60, buyer)
+        return ev(o, "hold-invoice-requested", "mostro", "invoice", t + 60, buyer)
+
+    def esiti(chi, o=None):
+        q, a = "SELECT esito, ruolo, dettaglio, giro FROM p2p_esiti WHERE tg_id=?", [chi]
+        if o:
+            q, a = q + " AND ordine=?", a + [o]
+        return sorted(tuple(r) for r in con.execute(q, a))
+
+    def attese(o):
+        return [(r["momento"], r["tg_id"], r["scade"]) for r in con.execute(
+            "SELECT momento, tg_id, scade FROM p2p_attese WHERE ordine=? "
+            "AND fonte='promemoria' ORDER BY scade", (o,))]
+
+    # a) A LEVA SPENTA: la regola del 10 ott, e i promemoria di ieri
+    amb["P2P_TEMPO_DI_CHI_PUBBLICA"] = False
+    amb["_P2P_FOTO"]["info"] = info(1800, 10800, 2)
+    o = ordine()
+    detti, _ = presa(o, ORA)
+    prova("a) leva spenta: il primo avviso a chi pubblica dice comunque le SUE ore (il tempo "
+          "e' del coordinatore), e che l'ordine torna nel libro — senza la penalita'",
+          "🔒 Paga la garanzia: la richiesta è nell'app. Tina ha indicato dove ricevere i "
+          "sats, ora tocca a te.\n\n⏳ Hai 3 ore, poi l'ordine torna nel libro.", detti.get(P))
+    prova("a) ...il promemoria e' UNO, a meta' delle sue tre ore",
+          [("garanzia_promemoria", P, ORA + 60 + 5400)],
+          [a for a in attese(o) if a[1] == P])
+    detti, righe = ev(o, "expired", "mostro", "maker-republished", ORA + 60 + 10800)
+    prova("a) ...e il tempo scaduto di chi pubblica non scrive niente a nessuno",
+          [[], [], []], [esiti(P), esiti(T), righe])
+    prova("a) ...ma le due frasi sono gia' quelle giuste: a chi pubblica «tornato nel libro», "
+          "a chi ha preso «non devi fare niente»",
+          ["⏰ Non hai risposto in tempo: il tuo ordine è tornato nel libro. Se anche la "
+           "prossima presa resta senza risposta, viene tolto.",
+           "⏰ Chi aveva pubblicato l'ordine non ha risposto in tempo: lo scambio è annullato, "
+           "non devi fare niente."], [detti.get(P), detti.get(T)])
+
+    # b) LEVA ACCESA, MA IL COORDINATORE DA' A TUTTI MEZZ'ORA: il fatto nudo, niente penalita'
+    amb["P2P_TEMPO_DI_CHI_PUBBLICA"] = True
+    amb["_P2P_FOTO"]["info"] = info(1800)
+    o = ordine()
+    presa(o, ORA)
+    prova("b) leva accesa, mezz'ora per tutti: a chi pubblica il promemoria dei 10 minuti",
+          [("garanzia_promemoria", P, ORA + 60 + 600)], [a for a in attese(o) if a[1] == P])
+    _, righe = ev(o, "expired", "mostro", "maker-timeout", ORA + 60 + 1800)
+    prova("b) ...e allo scadere si scrive `senza_risposta` (il badge), ma NON il mancato",
+          [[("senza_risposta", "vende", "maker-timeout", 1)], True],
+          [esiti(P, o), any("vale solo col tempo lungo" in r for r in righe)])
+
+    # c) LEVA E TEMPO LUNGO: il non completato a chi pubblica
+    amb["_P2P_FOTO"]["info"] = info(1800, 10800, 2)
+    o = ordine()
+    detti, _ = presa(o, ORA)
+    prova("c) il primo avviso: tre ore, poi l'ordine torna e CONTA",
+          "🔒 Paga la garanzia: la richiesta è nell'app. Tina ha indicato dove ricevere i "
+          "sats, ora tocca a te.\n\n⏳ Hai 3 ore, poi l'ordine torna nel libro e ti conta "
+          "come scambio non completato.", detti.get(P))
+    prova("c) ...e i promemoria sono TRE: a 10 minuti, a un'ora, mezz'ora prima della fine",
+          [("garanzia_promemoria", P, ORA + 60 + 600), ("garanzia_promemoria2", P, ORA + 60 + 3600),
+           ("garanzia_promemoria3", P, ORA + 60 + 9000)], [a for a in attese(o) if a[1] == P])
+    fuori, _ = amb["_scarica_attese_p2p"](con, ORA + 60 + 600)
+    prova("c) ...quello dei 10 minuti dice quanto RESTA delle sue ore, e cosa succede dopo",
+          [(P, "⏳ Restano circa 2 ore e 50 minuti per bloccare la garanzia, altrimenti "
+               "l'ordine torna nel libro e ti conta come scambio non completato.", "promemoria")],
+          [(t, _tag.sub("", x), f) for t, x, f in fuori if t == P])
+    fuori, _ = amb["_scarica_attese_p2p"](con, ORA + 60 + 3600)
+    prova("c) ...il secondo parte anche lui (ha il suo nome: l'anti-doppione non lo ferma)",
+          [P], [t for t, _, f in fuori if f == "promemoria"])
+    detti, righe = ev(o, "expired", "mostro", "maker-republished", ORA + 60 + 10800)
+    prova("c) allo scadere: `mancato` a CHI HA PUBBLICATO, e a chi ha preso NIENTE",
+          [[("mancato", "vende", "maker-republished", 1),
+            ("senza_risposta", "vende", "maker-republished", 1)], []],
+          [esiti(P, o), esiti(T, o)])
+    prova("c) ...la frase a chi pubblica porta la riga del conto, quella a chi ha preso no",
+          [True, True, "⏰ Chi aveva pubblicato l'ordine non ha risposto in tempo: lo scambio "
+                       "è annullato, non devi fare niente."],
+          [detti.get(P, "").startswith("⏰ Non hai risposto in tempo: il tuo ordine è tornato "
+                                        "nel libro."),
+           "\n\nQuesto conta come scambio non completato." in detti.get(P, ""), detti.get(T)])
+    prova("c) ...e i promemoria rimasti se ne vanno col ritorno", [], attese(o))
+    # d) LA SECONDA DI FILA: l'ordine si toglie, e NON si conta due volte
+    presa(o, ORA + 20000, KC)
+    detti, righe = ev(o, "expired", "mostro", "maker-timeout", ORA + 20060 + 10800, KC)
+    prova("d) due mancate di fila sullo stesso ordine: UNA sola penalita'",
+          [[("mancato", "vende", "maker-republished", 1),
+            ("senza_risposta", "vende", "maker-republished", 1),
+            ("senza_risposta", "vende", "maker-timeout", 2)], True],
+          [esiti(P, o), any("una sola per ordine" in r for r in righe)])
+    prova("d) ...e la frase dice che l'ordine e' stato TOLTO, alla seconda",
+          "⏰ Non hai risposto a due prese di fila: il tuo ordine è stato tolto dal libro. "
+          "Puoi ripubblicarlo quando vuoi.", detti.get(P))
+    # e) L'ANNULLO A MANO DOPO UNA PRESA conta; quello di chi ha preso no
+    o = ordine()
+    presa(o, ORA + 40000)
+    amb["P2P_SCUSA_FINESTRA_S"] = -10 ** 9
+    detti, righe = ev(o, "canceled", "seller", "", ORA + 40500)
+    prova("e) chi pubblica annulla a mano dopo la presa: e' una mancata risposta",
+          [("mancato", "vende", "maker-annullo", 1), ("senza_risposta", "vende", "maker-annullo", 1)],
+          esiti(P, o))
+    prova("e) ...e lo sente, con la riga del conto in coda al suo «hai annullato»",
+          [True, True],
+          [detti.get(P, "").startswith("❌ Hai annullato lo scambio con Tina."),
+           "Questo conta come scambio non completato" in detti.get(P, "")])
+    o = ordine()
+    presa(o, ORA + 41000)
+    ev(o, "canceled", "buyer", "republished", ORA + 41500)
+    o2 = ordine()
+    ev(o2, "canceled", "seller", "pending", ORA + 41600)
+    prova("e) ...l'annullo di chi ha PRESO e il ritiro di un ordine mai preso non contano",
+          [[], []], [esiti(P, o), esiti(P, o2)])
+    # f) LA PRESA IN PAUSA, E NELLA MEZZ'ORA PRIMA
+    scrivi = amb["_scrivi_pausa_p2p"]
+    T1 = utc(2026, 7, 20, 19, 50)          # lunedi' 21:50 a Roma
+    scrivi(con, P, pulita({"fasce": [NOTTI], "fuso": "Europe/Rome", "scarto": 120}, ORA), ORA)
+    o = ordine()
+    presa(o, T1)
+    _, righe = ev(o, "expired", "mostro", "maker-republished", T1 + 60 + 10800)
+    prova("f) presa alle 21:50 con la pausa alle 22: non si conta, e nemmeno il badge si perde",
+          [[], True], [esiti(P, o), any("in pausa" in r for r in righe)])
+    o = ordine()
+    presa(o, utc(2026, 7, 20, 23))          # all'una di notte: in pausa
+    ev(o, "expired", "mostro", "maker-republished", utc(2026, 7, 21, 2, 1))
+    prova("f) ...presa IN pausa: lo stesso", [], esiti(P, o))
+    o = ordine()
+    T2 = utc(2026, 7, 21, 12)               # martedi' alle 14: fuori dalla pausa
+    presa(o, T2)
+    scrivi(con, P, pulita({"una_fino": T2 + 86400}, T2 + 100), T2 + 100)
+    ev(o, "expired", "mostro", "maker-republished", T2 + 60 + 10800)
+    prova("f) ...ma una pausa messa DOPO la presa non scusa niente (un ordine nuovo: conta)",
+          [("mancato", "vende", "maker-republished", 1),
+           ("senza_risposta", "vende", "maker-republished", 1)], esiti(P, o))
+    scrivi(con, P, pulita({}, T2), T2)
+    prova("f) una pausa vuota TOGLIE la riga", 0,
+          con.execute("SELECT COUNT(*) FROM p2p_pause").fetchone()[0])
+    # g) LA SCUSA DEL TENTATIVO, la stessa di chi prende: una ogni 30 giorni per persona
+    con.execute("DELETE FROM p2p_esiti")
+    amb["P2P_SCUSA_FINESTRA_S"] = 30 * 86400
+    T3 = utc(2026, 8, 1, 10)
+    o = ordine()
+    presa(o, T3)
+    amb["_segna_tentativo_p2p"](con, P, o, "garanzia_aperta", "", T3 + 300)
+    _, righe = ev(o, "expired", "mostro", "maker-republished", T3 + 60 + 10800)
+    prova("g) chi pubblica ci ha provato: scusato (ma il badge lo perde lo stesso)",
+          [("scusato", "vende", "maker-republished", 1),
+           ("senza_risposta", "vende", "maker-republished", 1)], esiti(P, o))
+    o = ordine()
+    presa(o, T3 + 86400)
+    amb["_segna_tentativo_p2p"](con, P, o, "garanzia_aperta", "", T3 + 86400 + 300)
+    ev(o, "expired", "mostro", "maker-republished", T3 + 86400 + 60 + 10800)
+    prova("g) ...la seconda volta nel mese la scusa e' gia' usata: conta",
+          [("mancato", "vende", "maker-republished+tentativo", 1),
+           ("senza_risposta", "vende", "maker-republished", 1)], esiti(P, o))
+    # h) CHI NON E' DEI NOSTRI, e il gesto gia' fatto
+    o = ordine()
+    presa(o, T3 + 200000)
+    _, righe = ev(o, "expired", "mostro", "maker-republished", T3 + 211000,
+                  seller="e" * 64)
+    prova("h) chi ha pubblicato non e' dei nostri: non si conta a nessuno", True,
+          any("non e' dei nostri" in r for r in righe))
+    o = ordine()
+    presa(o, T3 + 300000)
+    ev(o, "hold-invoice-paid", "seller", "active", T3 + 300400)
+    _, righe = ev(o, "expired", "mostro", "maker-timeout", T3 + 311000)
+    prova("h) il primo gesto di chi pubblica risulta fatto: il tempo scaduto non e' il suo",
+          [[], True], [esiti(P, o), any("risulta fatto" in r for r in righe)])
+
+    # --- 4) LA PAUSA NEL LIBRO E NELLA PRESA ----------------------------
+    con.execute("DELETE FROM p2p_esiti")
+    o_p, o_altro = ordine(), ordine(maker=333)
+    T4 = utc(2026, 7, 22, 21)               # mercoledi' alle 23 a Roma
+    scrivi(con, P, pulita({"fasce": [NOTTI], "fuso": "Europe/Rome", "scarto": 120}, T4), T4)
+    pause = amb["_pause_p2p"]
+    prova("la pausa nel libro: l'ordine di chi e' in pausa esce con la sua fine, gli altri no",
+          {o_p: utc(2026, 7, 23, 4)}, pause(con, [o_p, o_altro], T4))
+    prova("...di giorno niente, e a leva spenta niente", [{}, {}],
+          [pause(con, [o_p, o_altro], T4 - 6 * 3600),
+           (amb.__setitem__("P2P_TEMPO_DI_CHI_PUBBLICA", False), pause(con, [o_p], T4),
+            amb.__setitem__("P2P_TEMPO_DI_CHI_PUBBLICA", True))[1]])
+    posso = amb["_posso_prendere_p2p"]
+    r = posso(con, T, [o_p, o_altro], T4)["ordini"]
+    prova("...e «posso prendere?» lo ferma col motivo `pausa` e l'ora del ritorno",
+          [{"ok": False, "motivo": "pausa", "soglia": 0, "fino": utc(2026, 7, 23, 4)}, True],
+          [r[o_p], r[o_altro]["ok"]])
+    prova("...ma a chi l'ha pubblicato il SUO ordine non dice «pausa»", True,
+          posso(con, P, [o_p], T4)["ordini"][o_p]["motivo"] != "pausa")
+    mia = amb["_mia_pausa_p2p"]
+    prova("la mia pausa, per il foglio: le fasce, e `fino` solo se adesso sono in pausa",
+          [[NOTTI], utc(2026, 7, 23, 4), 0, 6, 7],
+          [mia(con, P, T4)["fasce"], mia(con, P, T4)["fino"], mia(con, P, T4 - 6 * 3600)["fino"],
+           mia(con, P, T4)["massimo_fasce"], mia(con, P, T4)["massimo_giorni"]])
+    prova("...chi non ne ha una riceve la forma vuota, non un errore",
+          {"fasce": [], "fuso": "", "una_da": 0, "una_fino": 0, "fino": 0,
+           "massimo_fasce": 6, "massimo_giorni": 7}, mia(con, 444, T4))
+    prova("...e su un database senza la tabella vale «nessuna pausa»", [None, {}],
+          [amb["_pausa_p2p"](sqlite3.connect(":memory:"), P),
+           pause(sqlite3.connect(":memory:"), [o_p], T4)])
+    scrivi(con, P, pulita({}, T4), T4)
+
+    # --- 5) IL BADGE, DAI FATTI ------------------------------------------
+    veloci = amb["_veloci_p2p"]
+    T5 = utc(2026, 9, 1, 10)
+
+    def scambio(t, buyer, risposta):
+        """Una vendita di P presa, pagata dopo `risposta` secondi, conclusa."""
+        o = ordine()
+        presa(o, t, buyer)
+        ev(o, "hold-invoice-paid", "seller", "active", t + 60 + risposta, buyer)
+        ev(o, "success", "mostro", "", t + 5000, buyer)
+        return o
+    scambio(T5, KA, 120)
+    scambio(T5 + 10000, KC, 500)
+    prova("il badge: due scambi non bastano", set(), veloci(con, [P, T], T5 + 30000))
+    scambio(T5 + 20000, KA, 90)
+    prova("...tre scambi ma con due persone sole: ancora no", set(),
+          veloci(con, [P, T], T5 + 30000))
+    scambio(T5 + 21000, KD, 700)
+    prova("...con la terza persona si': quattro scambi, mediana entro 10 minuti — e solo a "
+          "chi ha PUBBLICATO (chi ha preso quegli ordini non lo riceve)",
+          {P}, veloci(con, [P, T, 333, 444], T5 + 30000))
+    prova("...a leva spenta non lo ha nessuno, e fuori dai 30 giorni nemmeno",
+          [set(), set()],
+          [(amb.__setitem__("P2P_TEMPO_DI_CHI_PUBBLICA", False), veloci(con, [P], T5 + 30000),
+            amb.__setitem__("P2P_TEMPO_DI_CHI_PUBBLICA", True))[1],
+           veloci(con, [P], T5 + 40 * 86400)])
+    amb["_P2P_FOTO"]["info"] = info(1800)        # mezz'ora per tutti: niente penalita'
+    o = ordine()
+    presa(o, T5 + 25000)
+    ev(o, "expired", "mostro", "maker-timeout", T5 + 25060 + 1800)
+    prova("...e alla prima presa senza risposta SI PERDE, anche dove la penalita' non scatta",
+          [set(), [("senza_risposta", "vende", "maker-timeout", 1)]],
+          [veloci(con, [P], T5 + 30000), esiti(P, o)])
+    lenti = amb["_risposta_pubblica_p2p"]
+    prova("il tempo di risposta di un giro senza il gesto non si sa", -1, lenti(con, o, 1, "sell"))
+    prova("...e su un database senza le tabelle il badge tace", set(),
+          veloci(sqlite3.connect(":memory:"), [P], T5))
+    # un ACQUISTO pubblicato da 333: risponde dando la fattura dopo la garanzia
+    o = ordine("buy", 333)
+    ev(o, "taken", "seller", "hold-next", T5 + 50000, KC, KB)
+    ev(o, "hold-invoice-requested", "mostro", "take", T5 + 50000, KC, KB)
+    ev(o, "hold-invoice-paid", "seller", "invoice-next", T5 + 50200, KC, KB)
+    ev(o, "buyer-invoice-requested", "mostro", "", T5 + 50200, KC, KB)
+    ev(o, "buyer-invoice-added", "buyer", "active", T5 + 50500, KC, KB)
+    prova("chi pubblica un ACQUISTO risponde con la fattura: dalla garanzia pagata",
+          300, lenti(con, o, 1, "buy"))
+    prova("...e il lato dice a chi tocca: in quell'acquisto chi pubblica e' chi compra",
+          [True, False],
+          [amb["_tocca_a_chi_pubblica_p2p"](con, o, 333),
+           amb["_tocca_a_chi_pubblica_p2p"](con, o, P)])
+
+    # --- 6) LA PATCH 0011 DEL FORK, E LE SUE CARTE ---------------------
+    cartella = os.path.join("deploy", "mostro")
+    patcher = open(os.path.join(cartella, "patch-0011-tempo-di-chi-pubblica.py"),
+                   encoding="utf-8").read().replace("\r\n", "\n")
+    patch = [f for f in os.listdir(cartella) if f.startswith("0011-") and f.endswith(".patch")]
+    prova("la patch 0011 c'e' UNA volta, in LF, e il patcher accanto con `--secco` pretende "
+          "la 0007 sotto e il suo modulo accanto", [1, True, True, True],
+          [len(patch), bool(patch) and b"\r" not in open(os.path.join(cartella, patch[0]), "rb").read(),
+           'SECCO = "--secco" in sys.argv' in patcher
+           and 'if not os.path.isfile("src/barattolo_eventi.rs"):' in patcher,
+           'modulo = os.path.join(QUI, "barattolo_tempo.rs")' in patcher])
+    testo_patch = open(os.path.join(cartella, patch[0]), encoding="utf-8").read() if patch else ""
+    for pezzo_ in ("+pub mod barattolo_tempo;",
+                   "+    pub maker_expiration_seconds: Option<u32>,",
+                   "+    pub maker_timeout_limit: Option<u32>,",
+                   "+    let exp_seconds = crate::barattolo_tempo::shortest_window(taker_seconds) as u64;",
+                   "+    let window = crate::barattolo_tempo::window_of(&fresh.status, &fresh.kind, exp_seconds);",
+                   "+                                    if maker_back_to_book =>",
+                   '+                                    "maker-republished"',
+                   "+        Status::WaitingPayment => Ok((true, Status::InProgress)),",
+                   "+    for (name, value) in crate::barattolo_tempo::info_pairs(mostro_settings, bond_settings) {"):
+        prova(f"...e porta «{pezzo_[:60].strip()}»", True, pezzo_ in testo_patch)
+    modulo = open(os.path.join(cartella, "barattolo_tempo.rs"),
+                  encoding="utf-8").read().replace("\r\n", "\n")
+    i = testo_patch.find("+++ b/src/barattolo_tempo.rs")
+    nel_patch = ""
+    if i >= 0:
+        fine = testo_patch.find("\ndiff --git", i)
+        corpo = testo_patch[i:fine if fine >= 0 else len(testo_patch)].split("\n")[2:]
+        nel_patch = "\n".join(r[1:] for r in corpo if r.startswith("+")) + "\n"
+    prova("il modulo nel repo e' QUELLO della patch, riga per riga (il patcher lo copia da li')",
+          True, bool(nel_patch) and nel_patch == modulo)
+    prova("NESSUNA migrazione, nessun ritocco alle cauzioni e all'annullo: il rollback resta "
+          "la riga dell'immagine", [False, False, False, True],
+          ["migrations/" in testo_patch, "src/app/bond/" in testo_patch,
+           "src/app/cancel.rs" in testo_patch,
+           "CREATE TABLE IF NOT EXISTS barattolo_maker_lapses" in modulo])
+    prova("la mancata risposta si conta UNA volta per presa (`taken_at`), e dove chi pubblica "
+          "ha la cauzione il ritorno e' spento", [True, True],
+          ["lapses = lapses + (taken_at <> excluded.taken_at)," in modulo,
+           "Some(n) if n >= 2 && !maker_is_bonded => n," in modulo])
+    mini_ = open("miniapp.html", encoding="utf-8").read()
+    prova("le parole fra nodo e server sono le STESSE: il ritorno, i due tag del 38385",
+          [True, True, True, True, True],
+          ['"maker-republished"' in pezzo("_mancata_risposta_p2p"),
+           '("maker_expiration_seconds", secs.to_string())' in modulo
+           and '_tag_secondi_p2p(info, "maker_expiration_seconds")' in src,
+           '("maker_timeout_limit", limit.to_string())' in modulo
+           and '_tag_evento_p2p(info, "maker_timeout_limit")' in src,
+           "num('maker_expiration_seconds')" in mini_, "num('maker_timeout_limit')" in mini_])
+    agganci = len(_re.findall(r'", "(?:dopo|prima|al posto)"\),\n', patcher))
+    readme = open(os.path.join(cartella, "README.md"), encoding="utf-8").read().replace("\r\n", "\n")
+    produzione = open(os.path.join("docs", "PRODUZIONE.md"),
+                      encoding="utf-8").read().replace("\r\n", "\n")
+    prova("il README del fork censisce la 0011, e la liturgia -bar8 la lancia a secco con la "
+          "frase che il patcher dira' davvero", [True, True, 13, True, True],
+          ["| 0011 | `patch-0011-tempo-di-chi-pubblica.py` + `barattolo_tempo.rs` |" in readme,
+           "patch-0011-tempo-di-chi-pubblica.py --secco" in produzione,
+           agganci,
+           f"«A SECCO: {agganci} agganci in 7 file, tutte le ancore uniche,\n  piu' "
+           "src/barattolo_tempo.rs. Niente scritto.»" in produzione,
+           "timeout: give the maker a waiting window of his own, and put the order back in the "
+           "book when he lets a take lapse" in produzione])
+    prova("...con le due righe del settings.toml, il backup prima, il rollback, e PRIMA il "
+          "server POI il nodo", [True, True, True, True, True],
+          ["`maker_expiration_seconds = 10800`" in produzione
+           and "`maker_timeout_limit = 2`" in produzione,
+           "cp ~/nodo/mostro/mostro.db ~/nodo/mostro/mostro.db.prima-bar8" in produzione,
+           "ROLLBACK: `cd ~/nodo`, la riga dell'immagine a `mostro:v0.19.0-bar7`" in produzione,
+           "PRIMA IL SERVER, POI IL NODO" in produzione,
+           "solo con l'ok esplicito di Andrea" in produzione])
+    voce_vps = produzione[produzione.index("- IL TEMPO DI CHI PUBBLICA, SUL VPS"):
+                          produzione.index("- LA SALITA ALLA `-bar7`")]
+    prova("...e le letture sul VPS sono in python3, sul database che c'e'", [True, False],
+          ["sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); "
+           "print(c.execute('SELECT tg_id, fasce, fuso, una_fino, aggiornato FROM p2p_pause')"
+           in voce_vps,
+           "/srv/barattolo/dati/satmarket.db" in voce_vps])
+    nodo = open(os.path.join("docs", "NODO-MOSTRO.md"), encoding="utf-8").read()
+    prova("la regola dei tempi e' RISCRITTA dove stava: per ruolo, col contrappeso detto, e "
+          "la riga di ieri non resta in piedi da sola", [True, True, False],
+          ["LA REGOLA, RISCRITTA IL 12 OTT 2026" in nodo,
+           "IL CONTRAPPESO NON È LA CAUZIONE, È LA PENALITÀ" in nodo,
+           "LA REGOLA CHE RESTA: oltre i 1800 non si va" in nodo])
+    prova("ARCHITETTURA, CANTIERI e la guida ai passi hanno la loro voce", [True, True, True],
+          ["- IL TEMPO DI CHI PUBBLICA (12 ott 2026, cantiere `tempo-di-chi-pubblica`;"
+           in open(os.path.join("docs", "ARCHITETTURA.md"), encoding="utf-8").read(),
+           "## Il tempo di chi pubblica: tre ore, il ritorno nel libro, la pausa, il badge e la "
+           "penalità (12 ott 2026, cantiere tempo-di-chi-pubblica"
+           in open(os.path.join("docs", "CANTIERI.md"), encoding="utf-8").read(),
+           "### Il tempo di chi pubblica: le sue ore, la pausa, il badge (12 ott 2026)"
+           in open(os.path.join("docs", "GUIDA-P2P-PASSI.md"), encoding="utf-8").read()])
+
+
+def prove_tempo_pubblica_app():
+    """IL TEMPO DI CHI PUBBLICA, NELL'APP (12 ott 2026, cantiere tempo-di-
+    chi-pubblica): la finestra per ruolo, l'attesa di chi ha preso, la
+    pausa degli ordini, il badge, e i testi che dicono le regole nuove.
+
+    Quel che qui si rompe in silenzio: chi ha pubblicato che legge «30
+    minuti» mentre ne ha tre ore (o il contrario: chi ha preso che legge
+    tre ore); il conto alla rovescia che scrive «179:10»; l'ordine di un
+    ALTRO in pausa che resta nel libro, o il PROPRIO che sparisce; una
+    pausa finita ieri che nasconde ancora; il foglio che manda una fascia
+    senza giorni; «Info P2P» e «I tuoi dati» che restano alla regola del
+    10 ott; una frase del motore che nomina il custode.
+
+    I pezzi VERI di miniapp.html girano in node; le ore sono costruite
+    nell'ora LOCALE del banco, cosi' il fuso di chi lancia non conta."""
+    print("\n[il tempo di chi pubblica, nell'app: finestra per ruolo, attesa, pausa, badge]")
+    src = _SORGENTE
+    m = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- 1) LE SENTINELLE ------------------------------------------------
+    blocco = pezzo_js(m, "/* ---- IL TEMPO DI CHI PUBBLICA: LA PAUSA DEGLI ORDINI, IL BADGE, LA",
+                      "/* ============ fine del tempo di chi pubblica ============ */")
+    chiede = pezzo_js(m, "/* ============ LA PAUSA DEGLI ORDINI, LA PARTE CHE CHIEDE",
+                      "/* ============ fine della pausa che chiede ============ */")
+    nudo = re.sub(r"/\*[\s\S]*?\*/", "", blocco)
+    prova("i giudici e il disegno stanno DENTRO il motore, le due rotte fuori, dopo l'archivio",
+          True,
+          m.index("/* ============ fine della reputazione del P2P ============ */")
+          < m.index("/* ---- IL TEMPO DI CHI PUBBLICA: LA PAUSA DEGLI ORDINI, IL BADGE, LA")
+          < m.index("/* ============ fine del motore dello scambio")
+          < m.index("/* ============ fine dell'archivio del server")
+          < m.index("/* ============ LA PAUSA DEGLI ORDINI, LA PARTE CHE CHIEDE"))
+    prova("...il blocco dentro non ha nessuna fetch; quello fuori ne ha due, una lettura e "
+          "una scrittura, tutte e due su /p2p/pausa",
+          [0, 2, 2, 1],
+          [nudo.count("fetch("), chiede.count("fetch("), chiede.count("${API_BASE}/p2p/pausa"),
+           chiede.count("method: 'POST'")])
+    prova("il custode non si nomina nemmeno qui: nessuna frase del blocco dice «coordinatore» "
+          "o «Mostro»", [],
+          [x for x in re.findall(r"'((?:[^'\\]|\\.)*)'", nudo)
+           if re.search(r"coordinator|mostro", x, re.I)])
+    prova("il foglio c'e', e si chiude con gli altri",
+          [True, True],
+          ['<div class="sheet" id="p2pPausaSheet" role="dialog" aria-modal="true" '
+           'aria-labelledby="p2pPausaTit">' in m,
+           "el('p2pPausaSheet').classList.remove('open');" in _fn_js(m, "function closeSheet(){")])
+    info = _fn_js(m, "function infoDaEvento(ev){") if "function infoDaEvento(ev){" in m else m
+    prova("il 38385 porta il tempo di chi pubblica e il limite, letti e mai cablati",
+          [True, True],
+          ["scadenzaPubblicaSec: Math.floor(num('maker_expiration_seconds'))," in info,
+           "limitePubblica: Math.floor(num('maker_timeout_limit'))," in info])
+
+    def fn(firma):
+        return re.sub(r"/\*[\s\S]*?\*/", "", _fn_js(m, firma))
+    quattro = [fn("function holdVivaP2P(o){"), fn("function scadenzaFoglioP2P(o, modo){")
+               if "function scadenzaFoglioP2P(o, modo){" in m else "",
+               fn("function scadenzaGestoP2P(o){"), fn("function renderHoldP2P(){")]
+    gancio = "typeof finestraMiaP2P === 'function' ? finestraMiaP2P(o)"
+    prova("il MIO gesto conta la finestra di chi deve farlo: i quattro posti passano da "
+          "`finestraMiaP2P`, dal typeof (i banchi del motore non ce l'hanno)",
+          [True, True, True, True],
+          [gancio in quattro[0], (not quattro[1]) or gancio in quattro[1], gancio in quattro[2],
+           "typeof finestraMiaP2P === 'function' ? tempoParoleP2P(finestraMiaP2P(o))" in quattro[3]])
+    prova("...la frase del gesto di sempre non cambia firma; quella dell'ordine che torna e' "
+          "una sorella, scelta dalla riga", [True, True],
+          ["function testoTempoGestoP2P(azione, resta){" in m,
+           "(torna ? testoTempoTornaP2P : testoTempoGestoP2P)(azione, fine - Date.now() / 1000)"
+           in fn("function rigaTempoGestoP2P(o, azione){")])
+    prova("...e i testi di «Info P2P» stanno FUORI dal motore, accanto a chi li usa: li' "
+          "Telegram e Nostr si nominano", True,
+          m.index("function testoPubblicaInfoP2P(info, accesa){")
+          < m.index("function renderP2PInfo(){") < m.index("const MOSTRO_ORDINI_CHIAVE"))
+    prova("la pausa entra nel libro PRIMA di ogni altra regola, e nella fila della home",
+          [True, True],
+          [fn("function passaFiltroP2P(o, f){").index("nascostoPerPausaP2P(o)) return false;")
+           < fn("function passaFiltroP2P(o, f){").index("if (!o || !f) return true;"),
+           "nascostoPerPausaP2P(o)" in fn("function ordiniVetrinaP2P(libro, adesso, mio){")])
+    prova("...arriva con la fotografia (intera), con la fila e coi volti (per gli id chiesti)",
+          [2, 1],
+          [m.count("prendiPauseP2P(d && d.pause)"), m.count("prendiPauseP2P(d && d.pause, lista)")])
+    prova("i segni: sulla card il badge per tutti e la pausa solo sul PROPRIO ordine; nel "
+          "dettaglio la pausa a chi l'ha pubblicato; nella pagina l'attesa di chi ha preso",
+          [True, True, True, True],
+          ["${typeof segnoVeloceP2P === 'function' ? segnoVeloceP2P(o) : ''}" in m,
+           "${mio && typeof segnoPausaP2P === 'function' ? segnoPausaP2P(o) : ''}" in m,
+           "(tuo && typeof segnoPausaP2P === 'function' ? segnoPausaP2P(o) : '') +" in m,
+           "(typeof rigaAttesaPubblicaP2P === 'function' ? rigaAttesaPubblicaP2P(o) : '') +"
+           in fn("function renderOrdineP2P(){")])
+    prova("il badge sta dove si vede chi ha pubblicato: il riquadro, la card dell'altra "
+          "parte, il negozio, il proprio profilo", [True, True, True, True],
+          ["badgeVeloceP2P(f.veloce)" in fn("function repRiquadroP2P(f, id){"),
+           "badgeVeloceP2P(c.veloce, true)" in fn("function cardParte(c, chi, opz){"),
+           "badgeVeloceP2P(v.risponde_in_fretta, true)"
+           in fn("function renderNegozio(v, annunci, feedback=[], esauriti=[]){"),
+           "badgeVeloceP2P(r.veloce, false, true)" in fn("function rigaMiaReputazioneP2P(){")])
+    prova("la riga della pausa sta nel profilo di scambio, nei due rami, e il profilo la rilegge",
+          [2, True],
+          [fn("function renderProfiloP2P(){").count("rigaPausaProfiloP2P()"),
+           "chiediMiaPausaP2P().then(ok => {" in fn("async function apriProfiloP2P(){")])
+
+    # --- 2) I PEZZI VERI, in node ---------------------------------------
+    ID, ID2 = "0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001", "0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002"
+    rep = pezzo_js(m, "/* ---- LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI",
+                   "/* ============ fine della reputazione del P2P ============ */")
+    banco = r"""
+const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const fmt = n => String(n);
+function haptic(){}
+function renderNuovoOrdineP2P(){}
+function icoNuovoP2P(){ return ''; }
+function sezioneNuovoP2P(o){ return ''; }
+function leggiDataTabacchinoP2P(){ return 0; }
+let MIE = {}, MIEI = {};
+function ordiniP2P(){ return MIE; }
+function ordineTuoP2P(id){ return !!MIEI[id]; }
+let LEVE = {tempoPubblica: true};
+function p2pCoord(){ return LEVE; }
+let p2pInfo = null, p2pFacce = {};
+const NODI = {};
+function el(id){ return NODI[id] || (NODI[id] = {innerHTML: ''}); }
+""" + "".join(_fn_js(m, f) for f in (
+        "function idMostroVero(id){", "function minutiSecondi(sec){",
+        "function scadeDaCampoP2P(s){", "function campoDaScadeP2P(epoch){",
+        "function scadenzaGestoP2P(o){", "function testoTempoGestoP2P(azione, resta){",
+        # i tre testi di «Info P2P», che vivono fuori dal motore
+        "function testoDueTempiInfoP2P(info){", "function testoScadeInfoP2P(info){",
+        "function testoPubblicaInfoP2P(info, accesa){")) \
+        + "function scadenzaFoglioP2P(){ return 0; }\n" + rep + blocco + r"""
+const c = {};
+const ID = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001', ID2 = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002';
+c.parole = [1800, 10800, 10200, 3600, 3660, 60, 20].map(tempoParoleP2P);
+c.conto = [125, 3599, 3600, 10750, 0].map(contoLungoP2P);
+c.contoComeSempre = [0, 59, 60, 125, 3599].every(n => contoLungoP2P(n) === minutiSecondi(n));
+const I = {scadenzaSec: 1800, scadenzaPubblicaSec: 10800, limitePubblica: 2};
+c.finestre = [finestraDiP2P(I, false), finestraDiP2P(I, true), finestraDiP2P({scadenzaSec: 1800}, true),
+              finestraDiP2P(null, true), finestraDiP2P(null, false)];
+p2pInfo = I;
+c.mia = [finestraMiaP2P({mio: true}), finestraMiaP2P({mio: false}), finestraMiaP2P(null)];
+c.torna = [tornaNelLibroP2P({mio: true}), tornaNelLibroP2P({mio: false})];
+p2pInfo = {scadenzaSec: 1800};
+c.tornaIeri = tornaNelLibroP2P({mio: true});
+p2pInfo = I;
+c.scadGesto = [scadenzaGestoP2P({stato: 'attesa_mia_fattura', ultimaMossa: 1000, mio: true}),
+               scadenzaGestoP2P({stato: 'attesa_mia_fattura', ultimaMossa: 1000, mio: false})];
+c.testoGesto = [testoTempoTornaP2P('hold', 10750), testoTempoTornaP2P('hold', 0),
+                testoTempoGestoP2P('hold', 125), testoTempoGestoP2P('fattura', 125)];
+/* l'attesa di chi ha preso */
+c.scadAttesa = [scadenzaAttesaPubblicaP2P({stato: 'attesa_hold_venditore', ultimaMossa: 1000}, I),
+                scadenzaAttesaPubblicaP2P({stato: 'attesa_fattura_compratore', ultimaMossa: 1000}, I),
+                scadenzaAttesaPubblicaP2P({stato: 'attesa_hold_venditore', ultimaMossa: 1000, mio: true}, I),
+                scadenzaAttesaPubblicaP2P({stato: 'attivo', ultimaMossa: 1000}, I),
+                scadenzaAttesaPubblicaP2P({stato: 'attesa_hold_venditore'}, I)];
+c.testoAttesa = [testoAttesaPubblicaP2P(10800, 9670), testoAttesaPubblicaP2P(10800, 0),
+                 testoAttesaPubblicaP2P(1800, 60), testoAttesaPubblicaP2P(0, 0)];
+const ORA = Math.floor(Date.now() / 1000);
+c.rigaAttesa = [rigaAttesaPubblicaP2P({stato: 'attesa_hold_venditore', ultimaMossa: ORA - 100}),
+                rigaAttesaPubblicaP2P({stato: 'attesa_hold_venditore', ultimaMossa: ORA - 100, mio: true}),
+                rigaAttesaPubblicaP2P({stato: 'attivo', ultimaMossa: ORA - 100}),
+                rigaAttesaPubblicaP2P({stato: 'attesa_hold_venditore', ultimaMossa: ORA - 100, soloVista: true}),
+                rigaAttesaPubblicaP2P({stato: 'attesa_fattura_compratore'})];
+/* il badge */
+c.badge = [badgeVeloceP2P(true, true), badgeVeloceP2P(true), badgeVeloceP2P(false), badgeVeloceP2P(1), badgeVeloceP2P('true')];
+p2pFacce = {[ID]: {veloce: true}, [ID2]: {voti: 3}};
+c.segnoVeloce = [segnoVeloceP2P({id: ID}), segnoVeloceP2P({id: ID2}), segnoVeloceP2P({id: 'x', faccia: {veloce: true}}), segnoVeloceP2P(null)];
+/* la pausa: quel che dice il server */
+c.prendi = [prendiPauseP2P({[ID]: ORA + 3600, 'nuovo:x': ORA + 5, [ID2]: 0}), Object.assign({}, p2pPause),
+            prendiPauseP2P({[ID]: ORA + 3600}), prendiPauseP2P({[ID2]: ORA + 60}), Object.keys(p2pPause),
+            prendiPauseP2P({}, [ID]), Object.keys(p2pPause), prendiPauseP2P(null), Object.keys(p2pPause)];
+p2pPause = {[ID]: ORA + 3600, [ID2]: ORA - 5};
+c.pausaOrdine = [pausaOrdineP2P(ID) === ORA + 3600, pausaOrdineP2P(ID2), pausaOrdineP2P('x')];
+MIEI = {};
+c.nascosto = [nascostoPerPausaP2P({id: ID}), nascostoPerPausaP2P({id: ID2}), nascostoPerPausaP2P(null)];
+MIEI = {[ID]: true};
+c.nascostoMio = nascostoPerPausaP2P({id: ID});
+/* le ore in parole, nell'ora LOCALE del banco */
+const loc = (g, h, mi) => Math.floor(new Date(2026, 6, g, h, mi, 0).getTime() / 1000);
+const mezzogiorno = loc(15, 12, 0);
+c.quando = [quandoPausaP2P(loc(15, 18, 30), mezzogiorno), quandoPausaP2P(loc(16, 6, 0), mezzogiorno),
+            quandoPausaP2P(loc(18, 6, 0), mezzogiorno)];
+p2pPause = {[ID]: loc(16, 6, 0)};
+const _adesso = Date.now;
+Date.now = () => mezzogiorno * 1000;
+c.segnoPausa = [segnoPausaP2P({id: ID}), segnoPausaP2P({id: ID2})];
+c.veto = [fraseVetoP2P({ok: false, motivo: 'pausa', fino: loc(16, 6, 0)}), fraseVetoP2P({ok: false, motivo: 'pausa'})];
+c.verdetto = [prendiPrendibiliP2P({ordini: {[ID]: {ok: false, motivo: 'pausa', soglia: 0, fino: loc(16, 6, 0)}}, veloce: true}, [ID]),
+              p2pPrendibili[ID].fino === loc(16, 6, 0), p2pMiaRep.veloce, vetoPresaP2P(ID)];
+p2pMiaRep = {completati: 4, mancati: 0, veloce: true};
+c.miaRep = rigaMiaReputazioneP2P();
+/* il foglio */
+c.ore = [minutiDaOraP2P('22:00'), minutiDaOraP2P('06:05'), minutiDaOraP2P('24:00'), minutiDaOraP2P('x'),
+         oraDaMinutiP2P(1320), oraDaMinutiP2P(365), oraDaMinutiP2P(-3), oraDaMinutiP2P(9999)];
+c.frasiFascia = [fraseFasciaP2P({g: [0, 1, 2, 3, 4, 5, 6], da: 1320, a: 360}),
+                 fraseFasciaP2P({g: [4, 0, 1, 2, 3], da: 480, a: 1200}),
+                 fraseFasciaP2P({g: [5, 6], da: 600, a: 720}), fraseFasciaP2P({g: [0, 2, 4], da: 60, a: 120}),
+                 fraseFasciaP2P({g: [], da: 60, a: 120})];
+c.bozza = [bozzaPausaP2P({fasce: [{g: [0, '4', 9], da: 1320, a: 360}, 'x', {da: 1}], una_fino: 123.7}),
+           bozzaPausaP2P(null)];
+const B = {fasce: [{g: [4, 0], da: 1320, a: 360}], unaFino: mezzogiorno + 86400};
+c.corpo = [corpoPausaP2P(B, mezzogiorno, 'Europe/Rome', 120),
+           corpoPausaP2P({fasce: [{g: [], da: 1, a: 2}], unaFino: 0}, mezzogiorno, '', 0),
+           corpoPausaP2P({fasce: [{g: [1], da: 5, a: 5}], unaFino: 0}, mezzogiorno, '', 0),
+           corpoPausaP2P({fasce: [], unaFino: mezzogiorno - 1}, mezzogiorno, '', 0),
+           corpoPausaP2P({fasce: [], unaFino: mezzogiorno + 8 * 86400}, mezzogiorno, '', 0),
+           corpoPausaP2P({fasce: [], unaFino: 0}, mezzogiorno, 'Europe/Rome', 120)];
+/* il foglio disegnato */
+p2pMiaPausa = {fino: loc(16, 6, 0), fasce: [{g: [0], da: 1, a: 2}], una_fino: 0, attiva: true};
+p2pPausaBozza = {fasce: [{g: [0, 1, 2, 3, 4, 5, 6], da: 1320, a: 360}, {g: [], da: 480, a: 1200}], unaFino: 0};
+renderPausaP2P();
+const F = NODI.p2pPausaCorpo.innerHTML;
+c.foglio = [(F.match(/class="p2p-pausa-fascia"/g) || []).length, (F.match(/p2p-accesso-chip/g) || []).length,
+            (F.match(/p2p-accesso-chip on"/g) || []).length, (F.match(/type="time"/g) || []).length,
+            F.indexOf('value="22:00"') >= 0 && F.indexOf('value="06:00"') >= 0,
+            F.indexOf('⏸ Adesso sei in pausa fino a domani alle 06:00') >= 0,
+            F.indexOf('tutti i giorni 22:00–06:00 (fino al giorno dopo)') >= 0,
+            F.indexOf('＋ Aggiungi una fascia') >= 0, F.indexOf('type="datetime-local"') >= 0,
+            F.indexOf('onclick="salvaPausaP2P(this)"') >= 0];
+giornoPausaP2P(1, 2); giornoPausaP2P(1, 4); giornoPausaP2P(0, 6);
+oraPausaP2P(1, 'da', '09:30'); oraPausaP2P(1, 'a', 'boh'); oraPausaP2P(9, 'da', '10:00');
+c.gesti = [p2pPausaBozza.fasce[1].g.slice(), p2pPausaBozza.fasce[0].g.length, p2pPausaBozza.fasce[1].da, p2pPausaBozza.fasce[1].a];
+for (let i = 0; i < 9; i++) aggiungiFasciaPausaP2P();
+c.tetto = [p2pPausaBozza.fasce.length, NODI.p2pPausaCorpo.innerHTML.indexOf('＋ Aggiungi una fascia') < 0];
+togliFasciaPausaP2P(0);
+c.tolta = p2pPausaBozza.fasce.length;
+unaPausaP2P(campoDaScadeP2P(mezzogiorno + 7200));
+c.una = [p2pPausaBozza.unaFino === mezzogiorno + 7200,
+         NODI.p2pPausaCorpo.innerHTML.indexOf('aria-label="Togli la pausa una volta sola"') >= 0];
+unaPausaP2P('');
+c.unaTolta = p2pPausaBozza.unaFino;
+/* la riga nel profilo */
+c.profilo = [rigaPausaProfiloP2P()];
+p2pMiaPausa = {fino: 0, fasce: [{g: [0], da: 1, a: 2}], una_fino: 0}; c.profilo.push(rigaPausaProfiloP2P());
+p2pMiaPausa = null; c.profilo.push(rigaPausaProfiloP2P());
+LEVE = {tempoPubblica: false}; c.profilo.push(rigaPausaProfiloP2P());
+c.leva = [tempoPubblicaP2P(), (LEVE = {tempoPubblica: 'si'}, tempoPubblicaP2P()), (LEVE = null, tempoPubblicaP2P())];
+Date.now = _adesso;
+/* Info P2P */
+c.info = [testoDueTempiInfoP2P(I), testoDueTempiInfoP2P({scadenzaSec: 1800}), testoDueTempiInfoP2P(null),
+          testoScadeInfoP2P(I), testoScadeInfoP2P({limitePubblica: 3}), testoScadeInfoP2P({scadenzaSec: 1800}),
+          testoPubblicaInfoP2P(I, true), testoPubblicaInfoP2P({scadenzaSec: 1800}, true), testoPubblicaInfoP2P(I, false)];
+console.log(JSON.stringify(c));
+"""
+    c = _node_banco(banco)
+    if c is None:
+        salta("il client del tempo di chi pubblica", "node non c'e'")
+        return
+    prova("app: i secondi in parole, il calco del server (dall'ora in su in ore)",
+          ["30 minuti", "3 ore", "2 ore e 50 minuti", "1 ora", "1 ora e 1 minuto", "1 minuto", ""],
+          c["parole"])
+    prova("...e il conto alla rovescia passa le ore («2:59:10»); sotto l'ora e' byte per byte "
+          "quello di sempre", [["2:05", "59:59", "1:00:00", "2:59:10", "0:00"], True],
+          [c["conto"], c["contoComeSempre"]])
+    prova("la finestra per ruolo: chi prende mezz'ora, chi pubblica le sue ore; senza il tag "
+          "ha il tempo di tutti, senza il 38385 il ripiego",
+          [1800, 10800, 1800, 900, 900], c["finestre"])
+    prova("...il MIO gesto: le ore di chi pubblica solo se l'ordine l'ho pubblicato io",
+          [[10800, 1800, 1800], [11800, 2800]], [c["mia"], c["scadGesto"]])
+    prova("...e il mio ordine torna nel libro solo se l'ho pubblicato io E il servizio lo dice",
+          [[True, False], False], [c["torna"], c["tornaIeri"]])
+    prova("la riga del mio gesto, quando l'ordine torna: il conto lungo e «torna nel libro»",
+          [{"prima": "⏱ Hai ancora ", "conto": "2:59:10",
+            "dopo": " per bloccare i sats, poi l'ordine torna nel libro."},
+           {"prima": "⌛ Il tempo per bloccare i sats è finito: l'ordine sta per tornare nel libro.",
+            "conto": "", "dopo": ""}], c["testoGesto"][:2])
+    prova("...e senza `torna` e' la frase di sempre, byte per byte",
+          [{"prima": "⏱ Hai ancora ", "conto": "2:05",
+            "dopo": " per bloccare i sats, poi lo scambio si annulla."},
+           {"prima": "⏱ Hai ancora ", "conto": "2:05",
+            "dopo": " per dire dove ricevere i sats, poi lo scambio si annulla."}],
+          c["testoGesto"][2:])
+    prova("L'ATTESA DI CHI HA PRESO: il tempo di chi ha pubblicato parte dall'ultima mossa, "
+          "nei due versi; a chi ha pubblicato, fuori dai due stati o senza l'ora non c'e'",
+          [11800, 11800, 0, 0, 0], c["scadAttesa"])
+    prova("...la frase: quanto ha, quanto resta, e che si annulla senza penalita'",
+          [{"prima": "Chi ha pubblicato ha fino a 3 ore per rispondere (ancora ",
+            "conto": "2:41:10", "dopo": "). Puoi annullare quando vuoi, senza penalità."},
+           {"prima": "Chi ha pubblicato ha fino a 3 ore per rispondere. Puoi annullare quando "
+                     "vuoi, senza penalità.", "conto": "", "dopo": ""},
+           {"prima": "Chi ha pubblicato ha fino a 30 minuti per rispondere (ancora ",
+            "conto": "1:00", "dopo": "). Puoi annullare quando vuoi, senza penalità."},
+           {"prima": "Puoi annullare quando vuoi, senza penalità.", "conto": "", "dopo": ""}],
+          c["testoAttesa"])
+    r0 = c["rigaAttesa"][0]
+    prova("...la riga nella pagina: col conto che batte per chi ha preso; niente a chi ha "
+          "pubblicato, fuori dai due stati e sulla riga solo da guardare",
+          [True, True, True, "", "", ""],
+          [r0.startswith('<div class="p2p-gesto-tempo p2p-attesa-pubblica" role="timer" data-fine="'),
+           "⏱ Chi ha pubblicato ha fino a 3 ore per rispondere (ancora <b class=\"mono\">2:5" in r0,
+           r0.endswith("). Puoi annullare quando vuoi, senza penalità.</div>"),
+           c["rigaAttesa"][1], c["rigaAttesa"][2], c["rigaAttesa"][3]])
+    prova("...e senza l'ora dell'ultima mossa dice il tempo ma non conta: `finito`, il battito "
+          "non la tocca", True,
+          'class="p2p-gesto-tempo p2p-attesa-pubblica finito"' in c["rigaAttesa"][4]
+          and "data-fine" not in c["rigaAttesa"][4]
+          and "ha fino a 3 ore per rispondere. Puoi annullare" in c["rigaAttesa"][4])
+    prova("IL BADGE: solo un `true` vero lo accende, in riga e nel riquadro",
+          ['<span class="p2p-veloce">⚡ Risponde in fretta</span>', True, "", "", ""],
+          [c["badge"][0], "⚡ Risponde in fretta</span> quando gli prendono un ordine" in c["badge"][1],
+           c["badge"][2], c["badge"][3], c["badge"][4]])
+    prova("...e il segno sulla card: dal volto del server, o da quello che la card porta",
+          [True, "", True, ""],
+          ["⚡ Risponde in fretta</div>" in c["segnoVeloce"][0], c["segnoVeloce"][1],
+           "⚡ Risponde in fretta</div>" in c["segnoVeloce"][2], c["segnoVeloce"][3]])
+    prova("LA PAUSA dal server: entrano solo id veri e ore vere; la fotografia intera prende "
+          "il posto di quella di prima, la risposta su una lista tocca solo quegli id",
+          [True, [ID], False, True, [ID2], False, [ID2], True, []],
+          [c["prendi"][0], sorted(c["prendi"][1]), c["prendi"][2], c["prendi"][3],
+           c["prendi"][4], c["prendi"][5], c["prendi"][6], c["prendi"][7], c["prendi"][8]])
+    prova("...una pausa gia' finita non e' una pausa", [True, 0, 0], c["pausaOrdine"])
+    prova("...nel libro l'ordine di un ALTRO in pausa non passa; il PROPRIO si'",
+          [[True, False, False], False], [c["nascosto"], c["nascostoMio"]])
+    prova("«fino» in parole, nell'ora di chi legge: oggi, domani, piu' in la'",
+          ["alle 18:30", "a domani alle 06:00", True],
+          [c["quando"][0], c["quando"][1],
+           bool(re.fullmatch(r"a \w+ 18 \w+, 06:00", c["quando"][2]))])
+    prova("il segno sul proprio ordine, e la frase del veto col ritorno",
+          ['<div class="p2p-box p2p-pausa">⏸ In pausa fino a domani alle 06:00</div>', "",
+           "Chi ha pubblicato quest'ordine è in pausa fino a domani alle 06:00: riprova più tardi.",
+           "Chi ha pubblicato quest'ordine è in pausa: riprova più tardi."],
+          c["segnoPausa"] + c["veto"])
+    prova("...il verdetto del server porta il `fino`, e i miei numeri il badge",
+          [1, True, True, "Chi ha pubblicato quest'ordine è in pausa fino a domani alle 06:00: "
+                          "riprova più tardi."], c["verdetto"])
+    prova("...che compare in coda alla riga dei miei numeri, e li' parla a chi legge («ti»)",
+          True,
+          c["miaRep"].endswith('<div class="hint"><span class="p2p-veloce">⚡ Risponde in fretta'
+                               '</span> quando ti prendono un ordine</div>'))
+    prova("IL FOGLIO: le ore avanti e indietro, e fuori scala niente",
+          [1320, 365, -1, -1, "22:00", "06:05", "00:00", "23:59"], c["ore"])
+    prova("...la fascia in parole: tutti i giorni, la fila dei feriali, i giorni sparsi, e "
+          "«fino al giorno dopo» quando passa la mezzanotte",
+          ["tutti i giorni 22:00–06:00 (fino al giorno dopo)", "lun-ven 08:00–20:00",
+           "sab, dom 10:00–12:00", "lun, mer, ven 01:00–02:00", ""], c["frasiFascia"])
+    prova("...la bozza dalla risposta del server: solo fasce vere, giorni veri",
+          [{"fasce": [{"g": [0, 4], "da": 1320, "a": 360}], "unaFino": 123},
+           {"fasce": [], "unaFino": 0}],
+          [{"fasce": [dict(f, g=sorted(f["g"])) for f in c["bozza"][0]["fasce"]],
+            "unaFino": c["bozza"][0]["unaFino"]}, c["bozza"][1]])
+    prova("...il corpo che parte: i giorni in ordine, il fuso e lo scarto del telefono",
+          {"fasce": [{"g": [0, 4], "da": 1320, "a": 360}], "fuso": "Europe/Rome", "scarto": 120},
+          {k: c["corpo"][0][k] for k in ("fasce", "fuso", "scarto")})
+    prova("...e i quattro «no» detti PRIMA di chiedere al server: senza giorni, inizio e fine "
+          "uguali, una tantum nel passato, piu' lunga di 7 giorni",
+          [True, True, True, True, False],
+          ["almeno un giorno" in c["corpo"][1].get("errore", ""),
+           "non possono coincidere" in c["corpo"][2].get("errore", ""),
+           "più avanti di adesso" in c["corpo"][3].get("errore", ""),
+           "al massimo 7 giorni" in c["corpo"][4].get("errore", ""), "errore" in c["corpo"][5]])
+    prova("...un corpo vuoto e' la pausa TOLTA, e non un errore",
+          {"fasce": [], "una_fino": 0, "fuso": "Europe/Rome", "scarto": 120}, c["corpo"][5])
+    prova("il foglio disegnato: una scatola per fascia, sette giorni ciascuna (quelli scelti "
+          "accesi), due ore, lo stato di adesso, la frase della fascia, i due campi e «Salva»",
+          [2, 14, 7, 4, True, True, True, True, True, True], c["foglio"])
+    prova("...i gesti: il tocco su un giorno lo accende e lo spegne, l'ora storta e la fascia "
+          "che non c'e' non cambiano niente", [[2, 4], 6, 570, 1200], c["gesti"])
+    prova("...al piu' sei fasce (il tetto del server), e la sesta toglie «Aggiungi»",
+          [[6, True], 5], [c["tetto"], c["tolta"]])
+    prova("...la pausa una volta sola si mette dal campo e si toglie con la ✕",
+          [[True, True], 0], [c["una"], c["unaTolta"]])
+    prova("la riga nel profilo: in pausa (con l'ora), impostata ma adesso visibile, mai "
+          "impostata; a leva spenta non c'e'",
+          [True, True, True, ""],
+          ["⏸ Adesso i tuoi ordini sono in pausa fino a domani alle 06:00." in c["profilo"][0]
+           and 'onclick="apriPausaP2P()">⏸ Pausa degli ordini</button>' in c["profilo"][0],
+           "Hai una pausa impostata: adesso i tuoi ordini sono visibili." in c["profilo"][1],
+           "Quando non ci sei puoi nascondere i tuoi ordini dal libro." in c["profilo"][2],
+           c["profilo"][3]])
+    prova("...e la leva e' un `true` vero: una stringa o niente non la accendono",
+          [False, False, False], c["leva"])
+
+    # --- 3) I TESTI: «INFO P2P» E «I TUOI DATI» --------------------------
+    amb = {}
+    for riga in ("P2P_PAUSA_FASCE_MAX = ", "P2P_PAUSA_UNA_MAX_S = ", "P2P_PAUSA_PRIMA_S = ",
+                 "P2P_VELOCE_FINESTRA_S = ", "P2P_VELOCE_SCAMBI_MIN = ", "P2P_VELOCE_MEDIANA_S = ",
+                 "P2P_PROMEMORIA_PUBBLICA_S = ", "P2P_PROMEMORIA_PUBBLICA_PRIMA_S = ",
+                 "P2P_SCUSA_FINESTRA_S = "):
+        j = src.index("\n" + riga) + 1
+        exec(src[j:src.index("\n", j)].split("  #")[0], amb)
+    prova("i tetti del foglio sono quelli del server: sei fasce, sette giorni",
+          [True, True],
+          [f"const P2P_PAUSA_FASCE_MAX = {amb['P2P_PAUSA_FASCE_MAX']};" in m,
+           f"const P2P_PAUSA_GIORNI_MAX = {amb['P2P_PAUSA_UNA_MAX_S'] // 86400};" in m])
+    due, ieri, niente = c["info"][0], c["info"][1], c["info"][2]
+    prova("«Info P2P», i tempi: coi due tempi dice chi ha quanto e perche'; con un tempo solo "
+          "resta la frase di sempre",
+          [True, "", ""],
+          ["chi l'ha preso, che ha <b>30 minuti</b>: ha il telefono in mano." in due
+           and "chi l'ha pubblicato, che ha <b>3 ore</b>: non sa quando glielo prenderanno." in due,
+           ieri, niente])
+    prova("...e «se il tempo scade»: l'ordine torna nel libro anche se manca chi l'ha "
+          "pubblicato, e alla seconda di fila si toglie (col numero del servizio)",
+          [True, True, ""],
+          ["alla <b>seconda presa di fila</b> senza risposta l'ordine si toglie." in c["info"][3],
+           "dopo <b>3 prese di fila</b> senza risposta l'ordine si toglie." in c["info"][4],
+           c["info"][5]])
+    prova("...la voce statica resta quella di ieri (la riscrive `renderP2PInfo` solo se serve)",
+          True, '<li id="p2pInfoScade">Se il tempo scade <b>prima</b>' in m
+          and "se è stato chi l'ha <i>pubblicato</i>, si chiude.</li>" in m)
+    sez, sez_ieri = c["info"][6], c["info"][7]
+    prova("la sezione «Se pubblichi un ordine»: a leva spenta non c'e'", "", c["info"][8])
+    minuti = [s // 60 for s in amb["P2P_PROMEMORIA_PUBBLICA_S"]] \
+        + [amb["P2P_PROMEMORIA_PUBBLICA_PRIMA_S"] // 60]
+    prova("...gli avvisi sono quelli del server: a 10 minuti, a un'ora, mezz'ora prima",
+          [[10, 60, 30], True],
+          [minuti, "<b>subito</b>, poi <b>dopo dieci minuti</b>, <b>dopo un'ora</b> e "
+                   "<b>mezz'ora prima</b> che il tuo tempo finisca" in sez])
+    prova("...la pausa: fino a sette giorni, non ferma la scadenza, vale dentro Barattolo",
+          [True, True, True],
+          [f"fino a <b>{amb['P2P_PAUSA_UNA_MAX_S'] // 86400} giorni</b>" in sez,
+           "La scadenza dell'ordine non si ferma." in sez,
+           "La pausa vale <b>dentro Barattolo</b>" in sez])
+    prova("...«se non rispondi» si scrive SOLO col tempo lungo, coi numeri del server: una "
+          "per ordine, la scusa ogni 30 giorni, mai in pausa o nella mezz'ora prima",
+          [True, False, 30, 30],
+          ["<b>Se non rispondi.</b>" in sez and "una volta ogni 30 giorni" in sez
+           and "<b>una volta sola per ordine</b>" in sez
+           and "mentre eri in pausa o nella mezz'ora prima" in sez,
+           "<b>Se non rispondi.</b>" in sez_ieri,
+           amb["P2P_SCUSA_FINESTRA_S"] // 86400, amb["P2P_PAUSA_PRIMA_S"] // 60])
+    prova("...e il badge dice la sua regola: 30 giorni, tre scambi con tre persone, dieci minuti",
+          [30, 3, 10, True],
+          [amb["P2P_VELOCE_FINESTRA_S"] // 86400, amb["P2P_VELOCE_SCAMBI_MIN"],
+           amb["P2P_VELOCE_MEDIANA_S"] // 60,
+           "negli ultimi 30 giorni hai concluso almeno tre scambi pubblicati da te, con tre "
+           "persone diverse, rispondendo di solito entro dieci minuti" in sez
+           and "Si perde alla prima presa lasciata senza risposta." in sez])
+    dati = m[m.index('<h3 id="priv-p2p">'):]
+    dati = dati[:dati.index("apriProfiloP2P()")]
+    testo = re.sub(r"<[^>]+>", "", dati)
+    prova("«I TUOI DATI» dice la regola nuova: anche a chi ha pubblicato, col tempo lungo, "
+          "una per ordine, mai in pausa", [True, True, True, False],
+          ["Dal 12 ottobre 2026, dove il servizio di scambio dà a chi pubblica più tempo di "
+           "chi prende, si conta anche a chi ha pubblicato un ordine" in testo,
+           "non risponde in tempo o annulla dopo la presa: una sola volta per ordine" in testo,
+           "mai se la presa è arrivata mentre i suoi ordini erano in pausa o nella mezz'ora "
+           "prima" in testo,
+           "Mai a chi ha pubblicato" in testo])
+    prova("...la riga della presa senza risposta e il badge, coi numeri del server", True,
+          "Di ogni presa rimasta senza risposta teniamo comunque una riga" in testo
+          and "negli ultimi 30 giorni, ha concluso almeno tre scambi pubblicati da lui con tre "
+              "persone diverse rispondendo di solito entro dieci minuti" in testo)
+    prova("...e la pausa: cosa teniamo, a cosa serve, che non esce e quando se ne va", True,
+          "La pausa degli ordini, se la imposti, sta legata al tuo account: i giorni, le ore e "
+          "il nome del tuo fuso orario" in testo
+          and "Non esce da Barattolo, resta finché non la togli, e se ne va subito se "
+              "dimentichi il profilo." in testo)
+    prova("...che e' quel che il server fa: la pausa via col profilo, il fuso un nome e basta",
+          [True, True],
+          ['con.execute("DELETE FROM p2p_pause WHERE tg_id=?", (user["id"],))'
+           in pezzo("dimentica_chiavi_p2p"),
+           "fuso TEXT DEFAULT ''," in src])
+
+
 def prove_reputazione_p2p():
     """LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI, I TENTATIVI, IL
     FILTRO DI CHI PUBBLICA E IL LIMITE DELLE PRESE (10 ott 2026, cantiere
@@ -146994,9 +148100,10 @@ def prove_reputazione_p2p():
           (True, ""), g(3, {"completati": 3, "mancati_30": 1}, 1))
     prova("...con due mancati nel mese no: «mancati»", (False, "mancati"), g(3, {"completati": 3, "mancati_30": 2}, 0))
     prova("...senza filtro i mancati non fermano nessuno", (True, ""), g(0, {"completati": 0, "mancati_30": 5}, 1))
-    # (emendata il 10 ott 2026, malus-p2p: gli euro in sospeso e la disputa persa)
-    prova("...e i motivi sono i cinque del catalogo",
-          ("filtro", "mancati", "prese", "sospesi", "dispute"), amb["P2P_MOTIVI_PRESA"])
+    # (emendata il 10 ott 2026, malus-p2p: gli euro in sospeso e la disputa persa;
+    # e il 12 ott 2026, tempo-di-chi-pubblica: la pausa di chi ha pubblicato)
+    prova("...e i motivi sono i sei del catalogo",
+          ("filtro", "mancati", "prese", "sospesi", "dispute", "pausa"), amb["P2P_MOTIVI_PRESA"])
     # l) il filtro di chi pubblica: dichiarato come la zona
     d = amb["_dichiara_filtri_p2p"]
     prova("l) il filtro si scrive sulla riga di chi ha pubblicato, la prima resta, e solo dal catalogo",
@@ -150094,6 +151201,8 @@ def main():
               prove_avviso_dm_nostr,
               prove_foto_obbligatorie,
               prove_vibrazione,
+              prove_tempo_di_chi_pubblica,
+              prove_tempo_pubblica_app,
               prove_config_esempio):
         try:
             f()

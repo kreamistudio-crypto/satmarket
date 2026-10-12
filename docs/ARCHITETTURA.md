@@ -30781,6 +30781,83 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   un altro client Mostro prende comunque (il perché e la patch che
   servirebbe: CANTIERI).
 
+- IL TEMPO DI CHI PUBBLICA (12 ott 2026, cantiere `tempo-di-chi-pubblica`;
+  il perché in CANTIERI, la liturgia del nodo in PRODUZIONE, «LA SALITA
+  ALLA -bar8»). TRE POSTI, e ognuno fa una cosa sola.
+  IL NODO (patch 0011 del fork, README del fork «LA 0011») decide i TEMPI
+  e cosa succede allo scadere: `maker_expiration_seconds` è la finestra
+  di chi ha pubblicato (chi prende resta a `expiration_seconds`), e sul
+  suo tempo scaduto l'ordine torna `Pending` fino a
+  `maker_timeout_limit` mancate risposte di fila. Li annuncia nel 38385
+  coi due tag omonimi, e al server dice quel ritorno con una parola sua
+  (`expired` + `maker-republished`).
+  IL SERVER, dietro la leva `P2P_TEMPO_DI_CHI_PUBBLICA` (spenta di serie,
+  in busta come `tempoPubblica`, nel pannello delle leve), tiene i FATTI:
+  • I TEMPI LETTI: `_finestra_pubblica_p2p` / `_finestra_di_p2p` (la
+  finestra di chi deve fare il gesto, dal 38385; senza il tag è quella di
+  tutti), `_limite_pubblica_p2p`, `_dopo_scadenza_p2p` (la coda delle
+  frasi: «l'ordine torna nel libro», «…e ti conta»). Si leggono ANCHE a
+  leva spenta: il tempo è del coordinatore.
+  • LA PAUSA: tabella `p2p_pause` (una riga per persona: `fasce` JSON di
+  al più `P2P_PAUSA_FASCE_MAX` voci `{g, da, a}`, `fuso` IANA, `scarto`
+  in minuti, `una_da`/`una_fino`). `_pausa_pulita_p2p` (le forme e i
+  tetti, ValueError con la frase), `_scarto_fuso_p2p` (zoneinfo dove c'è;
+  dove manca tzdata la regola dell'ora legale europea sullo scarto detto
+  dal telefono), `_fine_fascia_p2p` e `_fine_pausa_p2p` (pure: «a
+  quest'ora è in pausa? fino a quando?», seguendo le fasce attaccate),
+  `_pause_p2p` (`{ordine: fino}` per gli ordini il cui autore è in pausa
+  ADESSO), `_pause_foto_p2p` (`F["pause"]`, con zone e filtri). NIENTE si
+  scrive sugli ordini e niente esce verso i relay: la pausa si CHIEDE
+  all'orologio. LE ROTTE: `GET /api/p2p/pausa` (la propria, senza
+  parametri; a leva spenta `attiva: false`) e `POST /api/p2p/pausa` (il
+  corpo intero sostituisce; vuoto = toglie; 409 a leva spenta);
+  `/api/p2p/facce` e `/api/p2p/libro` servono `pause`;
+  `_posso_prendere_p2p` ferma col motivo `pausa` e il `fino` (mai sul
+  proprio ordine). «Dimentica il profilo» la toglie, la fusione degli
+  account la sposta. ⚠️ VALE DENTRO BARATTOLO, come filtro e limite: per
+  il coordinatore l'ordine resta `pending`.
+  • LA MANCATA RISPOSTA DI CHI PUBBLICA: `_mancata_risposta_p2p` (pura:
+  `maker-timeout`, `maker-republished`, e `maker-annullo` = `canceled`
+  senza dettaglio dal lato che ha pubblicato, cioè l'annullo a mano dopo
+  una presa) e `_esito_chi_pubblica_p2p`, chiamata da `_segna_esiti_p2p`
+  prima delle sue uscite. Nell'ordine: non dei nostri → niente; primo
+  gesto già fatto → niente; `p2p_scambi.pausa_presa` (scritta ALLA PRESA
+  da `_presa_in_pausa_p2p`: in pausa, o entro `P2P_PAUSA_PRIMA_S`) →
+  niente; poi `senza_risposta` in `p2p_esiti` (il fatto nudo); poi, solo
+  se `_penalita_pubblica_p2p` (leva E tempo lungo nel 38385), UNA sola
+  volta per ordine, la scusa del tentativo (`scusato`, una ogni 30 giorni
+  per persona, la stessa di chi prende) o `mancato` col dettaglio
+  `maker-…`. Stesso esito di chi prende: stesse soglie, stesso marchio,
+  stesso filtro, stessa riga del conto (`conto_pubblica` nei dati
+  dell'avviso).
+  • IL BADGE: `_risposta_pubblica_p2p` (i secondi fra la richiesta e il
+  gesto di chi ha pubblicato, dalla cronaca), `_veloce_p2p` (pura: almeno
+  `P2P_VELOCE_SCAMBI_MIN` scambi conclusi con altrettante persone
+  diverse, mediana entro `P2P_VELOCE_MEDIANA_S`, nessuna
+  `senza_risposta`), `_veloci_p2p` (l'insieme, in poche query; a leva
+  spenta vuoto). Esce come `veloce` sui due volti e nei numeri di
+  `/api/p2p/posso-prendere`, `risponde_in_fretta` nel negozio.
+  • GLI AVVISI: `_piano_promemoria_p2p` (a chi ha pubblicato, con la
+  leva: a `P2P_PROMEMORIA_PUBBLICA_S` dalla richiesta e a
+  `P2P_PROMEMORIA_PUBBLICA_PRIMA_S` dalla scadenza, solo quelli dentro
+  la finestra; a tutti gli altri uno a metà tempo). Le attese si chiamano
+  `<gesto>_promemoria`, `…2`, `…3`; `_promemoria_p2p_vivo` le giudica con
+  la finestra di chi deve (`_tocca_a_chi_pubblica_p2p`).
+  L'APP mostra e scrive la propria pausa. Dentro il motore, il blocco
+  «IL TEMPO DI CHI PUBBLICA» (zero `fetch`): `finestraDiP2P` /
+  `finestraMiaP2P` (i quattro posti del proprio gesto ci passano da un
+  `typeof`), `tornaNelLibroP2P` e `testoTempoTornaP2P`,
+  `rigaAttesaPubblicaP2P` (chi ha preso, mentre tocca all'altro: quanto
+  ha, il conto, «puoi annullare quando vuoi»), `prendiPauseP2P`,
+  `nascostoPerPausaP2P` (in `passaFiltroP2P` e nella fila della home),
+  `segnoPausaP2P`, `badgeVeloceP2P` / `segnoVeloceP2P`, il foglio
+  (`renderPausaP2P` e i suoi gesti, `corpoPausaP2P`). Fuori, dopo
+  l'archivio: `chiediMiaPausaP2P`, `apriPausaP2P`, `salvaPausaP2P`. I
+  testi di «Info P2P» (`testoDueTempiInfoP2P`, `testoScadeInfoP2P`,
+  `testoPubblicaInfoP2P`) stanno accanto a `renderP2PInfo`, fuori dal
+  motore. Prove: `prove_tempo_di_chi_pubblica`,
+  `prove_tempo_pubblica_app`, `collaudo_tempo_pubblica` (gabbia della CI).
+
 - LA CASSA DI RISONANZA SU X (9 ott 2026). I post di Barattolo su Nostr
   escono anche su X, dal server: un orologio in sottofondo
   (`orologio_x`, `X_GIRO_S` 5 minuti, parte da `avvia_x` SOLO se

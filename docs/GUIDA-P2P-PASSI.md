@@ -341,8 +341,9 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
      negli ultimi 90 giorni, «⚠️ **2 scambi non completati** negli
      ultimi 90 giorni» (lo scambio «non completato» si conta a chi
      prende un ordine e non fa il suo primo gesto in tempo — la garanzia
-     se vende, la fattura se compra —, mai a chi ha pubblicato, mai a
-     chi ci ha provato);
+     se vende, la fattura se compra —, mai a chi ci ha provato; a chi ha
+     PUBBLICATO si conta solo dal 12 ott 2026, con la leva e col nodo che
+     gli dà le sue tre ore: vedi §9, «Il tempo di chi pubblica»);
    - (solo se chi ha pubblicato ha messo il filtro) «🛡️ Chi ha
      pubblicato accetta solo chi ha almeno 3 scambi completati, nessuno
      scambio non completato negli ultimi 30 giorni e nessuna disputa
@@ -1243,6 +1244,7 @@ tarda: controllo com'è andata…».
 | Un ordine nel libro | 7 giorni (168 h, dal nodo) | «Info P2P»: «Un ordine vive nel libro **7 giorni**. Scaduto quello sparisce da solo, e non è successo niente.» ✈️ a chi l'ha pubblicato: «⏰ **Il tuo ordine è scaduto** senza che la presa fosse completata: vendevi/compravi <N> sats per <cifra> via <metodo>. Puoi ripubblicarlo quando vuoi.» |
 | Un ordine Barattozon | fino a 2 h prima della scadenza del PayCode (mai oltre 72 h) | esce da solo, avviso dedicato (§7) |
 | Ogni passo dopo la presa | <n> minuti, letti dal coordinatore (15 fino al 10 ott 2026, poi 30) | «Preso l'ordine, **ogni passo ha <n> minuti**, e il primo tocca sempre a chi l'ha preso: se compri, dici dove vuoi i sats e poi chi vende li blocca; se vendi, blocchi i sats e poi chi compra dice dove li vuole. Il cronometro **riparte a ogni mossa**.» Se manca chi ha **preso**, l'ordine torna nel libro; se manca chi ha **pubblicato**, si chiude. Nessuno perde niente. |
+| Il primo passo di chi ha PUBBLICATO (col nodo alla `-bar8`) | 3 ore, lette dal coordinatore | l'ordine torna nel libro; alla seconda presa di fila senza risposta si toglie. Dal 12 ott 2026, con la leva, a chi ha pubblicato conta come scambio non completato (vedi «Il tempo di chi pubblica») |
 | La richiesta della cauzione | qualche minuto (lo dice il foglio) | l'ordine torna nel libro, va ripreso |
 | Sats in garanzia fino alla scadenza, col recapito ricevuto e gli euro mai segnati | circa quattro giorni | dal 10 ott 2026 a chi **compra** conta come scambio non completato. ✈️ in coda a «La garanzia è arrivata a scadenza…»: «Gli euro non risultano inviati. Questo conta come scambio non completato. Il primo è tollerato; …» (la riga di §3). Senza recapito, o col «pagato» segnato, o con una disputa, non si conta a nessuno. |
 | Sats già in garanzia | circa quattro giorni | «Coi sats in garanzia avete **circa quattro giorni**. Se chi compra non ha ancora detto di aver pagato, allo scadere i sats **tornano da soli a chi vende**; se l'ha detto, si apre una disputa.» Dal sorgente della 0.19.0: il coordinatore si muove a ~92 ore; una disputa già aperta e non decisa la chiude LND a ~94 ore, coi sats a chi vende. ✈️ «⏰ **La garanzia è arrivata a scadenza: lo scambio è annullato.** I sats tornano a chi vende.» |
@@ -1291,6 +1293,88 @@ l'app sia gli avvisi: qui sotto `<n>` è quel numero (15 fino al 10 ott
   non dice «annullato», perché lo decide il coordinatore, che passa una
   volta al minuto. Nel foglio «🔒 Blocca i sats» resta la riga di sempre
   («⏱ Scade tra <mm:ss>»), con la stessa scadenza.
+
+### Il tempo di chi pubblica: le sue ore, la pausa, il badge (12 ott 2026)
+
+⚠️ DUE INTERRUTTORI, e prima di girare si guardano tutt'e due. La leva
+del VPS (`P2P_TEMPO_DI_CHI_PUBBLICA`, pannello «⚙️ Stato delle leve»)
+accende pausa, badge e avvisi; le ORE di chi pubblica le dà il nodo
+(dalla `-bar8`: tre ore, e l'ordine che torna nel libro). Con la leva
+accesa e il nodo di prima, chi pubblica ha ancora i minuti di tutti e
+le frasi qui sotto restano quelle di §«Il tempo di ogni passo».
+
+**I due tempi (col nodo alla `-bar8`).**
+- 📱 «Info P2P» → «I tempi»: «Preso l'ordine, il primo passo tocca sempre
+  a chi l'ha preso, che ha **30 minuti**: ha il telefono in mano. Poi
+  tocca a chi l'ha pubblicato, che ha **3 ore**: non sa quando glielo
+  prenderanno. …» e sotto: «Se il tempo scade **prima** che i sats siano
+  bloccati, la richiesta di pagamento si annulla e **nessuno perde
+  niente**: l'ordine **torna nel libro** per qualcun altro. Se a non
+  rispondere è chi l'ha *pubblicato*, alla **seconda presa di fila**
+  senza risposta l'ordine si toglie.»
+- ✈️ **A chi ha pubblicato, il primo avviso**: in coda a «Paga la
+  garanzia: la richiesta è nell'app.» la riga «⏳ **Hai 3 ore**, poi
+  l'ordine torna nel libro e ti conta come scambio non completato.»
+- ✈️ **Tre promemoria** a chi ha pubblicato e non ha ancora fatto il
+  gesto: a **10 minuti**, a **un'ora** e **mezz'ora prima** della fine:
+  «⏳ **Restano circa 2 ore e 50 minuti per bloccare la garanzia**,
+  altrimenti l'ordine torna nel libro e ti conta come scambio non
+  completato.», col bottone «**⚡ Apri lo scambio**». A chi ha PRESO resta
+  il promemoria solo, a metà dei suoi 30 minuti.
+- 📱 **Nella pagina dello scambio di chi ha pubblicato**: «⏱ Hai ancora
+  **2:58:56** per bloccare i sats, poi l'ordine torna nel libro.» (il
+  conto passa le ore). A tempo finito: «⌛ Il tempo per bloccare i sats è
+  finito: l'ordine sta per tornare nel libro.»
+- 📱 **Nella pagina dello scambio di chi ha PRESO**, mentre tocca
+  all'altro, sopra «✕ Annulla»: «⏱ Chi ha pubblicato ha fino a 3 ore
+  per rispondere (ancora **2:58:55**). Puoi annullare quando vuoi, senza
+  penalità.»
+- ✈️ **Se chi ha pubblicato non risponde**: a lui «⏰ **Non hai risposto
+  in tempo:** il tuo ordine è tornato nel libro. Se anche la prossima
+  presa resta senza risposta, viene tolto.» (con sotto la riga del
+  conto, se gli è stato contato); a chi aveva preso «⏰ **Chi aveva
+  pubblicato l'ordine non ha risposto in tempo:** lo scambio è
+  annullato, non devi fare niente.» Alla seconda di fila, a chi ha
+  pubblicato: «⏰ **Non hai risposto a due prese di fila:** il tuo ordine
+  è stato tolto dal libro. Puoi ripubblicarlo quando vuoi.»
+
+**La pausa degli ordini (con la leva accesa).**
+- 📱 Si apre dal **profilo di scambio** («👤 Il tuo profilo di scambio»):
+  sotto i propri numeri la riga «Quando non ci sei puoi nascondere i
+  tuoi ordini dal libro.» e il bottone «**⏸ Pausa degli ordini**».
+- 📱 Il foglio «⏸ Pausa degli ordini»: «In pausa i tuoi ordini non si
+  vedono nel libro e da Barattolo nessuno li prende. Alla fine tornano
+  da soli.» Poi **Ogni settimana**: «**＋ Aggiungi una fascia**» mette
+  una scatola coi sette giorni in tondi (L M M G V S D, verdi quelli
+  scelti: si toccano per accenderli e spegnerli), **Dalle** e **Alle**
+  (la prima proposta è 22:00–06:00, tutti i giorni) e la ✕ per
+  toglierla; sotto ogni scatola la fascia in parole («tutti i giorni
+  22:00–06:00 (fino al giorno dopo)», «lun-ven 08:00–20:00»). Fino a
+  sei fasce. Poi **Una volta sola, fino a**: giorno e ora col selettore
+  del telefono, «Parte adesso e dura al massimo 7 giorni.» E «**Salva**».
+  In fondo: «La scadenza dei tuoi ordini non si ferma. La pausa vale
+  dentro Barattolo: chi usa un'altra app collegata allo stesso servizio
+  di scambio li vede ancora.»
+- 📱 I toast: «Pausa salvata: i tuoi ordini sono nascosti ⏸» (se la
+  pausa è già attiva), «Pausa salvata ⏸» (se comincia più tardi), «Pausa
+  tolta: i tuoi ordini sono visibili».
+- 📱 **Sul proprio ordine**, nel libro e nel dettaglio: «⏸ In pausa fino
+  a domani alle 06:00» (oggi: «fino alle 06:00»). Nel profilo: «⏸ Adesso
+  i tuoi ordini sono in pausa fino a domani alle 06:00.»
+- 📱 **Per gli altri l'ordine sparisce dal libro** (e dalla fila «Scambi
+  P2P» della home), e il conto delle offerte lo dice. Chi lo apre da un
+  link trova «Compra» spento e il riquadro «🚫 Chi ha pubblicato
+  quest'ordine è in pausa fino a domani alle 06:00: riprova più tardi.»
+
+**Il badge «⚡ Risponde in fretta» (con la leva accesa).**
+- 📱 Sulla card del libro, sotto le stelline: «⚡ Risponde in fretta». Nel
+  riquadro «Chi ha pubblicato quest'ordine»: «⚡ Risponde in fretta
+  quando gli prendono un ordine». Nel proprio profilo di scambio: «⚡
+  Risponde in fretta quando ti prendono un ordine».
+- La regola, in «Info P2P» → «Se pubblichi un ordine»: «Compare accanto
+  al tuo nome se negli ultimi 30 giorni hai concluso almeno tre scambi
+  pubblicati da te, con tre persone diverse, rispondendo di solito entro
+  dieci minuti. Si perde alla prima presa lasciata senza risposta.»
 
 ### I promemoria a garanzia bloccata: gli euro e il rilascio (10 ott 2026)
 

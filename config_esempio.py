@@ -854,6 +854,17 @@ P2P_CAUZIONE = False
 # accesa prima, un nodo senza la 0010 rifiuterebbe le prese sugli
 # intervalli e chiederebbe la cauzione a chi aveva letto «niente».
 P2P_CAUZIONE_SUL_METODO = False
+# IL TEMPO DI CHI PUBBLICA (12 ott 2026): spenta di serie. Accesa, mette in
+# campo la pausa degli ordini (ricorrente e una volta sola), il badge «⚡
+# risponde in fretta», i quattro avvisi a chi pubblica quando gli prendono
+# un ordine, e il «non completato» a chi pubblica e non risponde. Le ORE
+# non stanno qui: le decide il nodo (`maker_expiration_seconds` nel suo
+# settings.toml, patch 0011 del fork, `-bar8`) e le annuncia nel 38385; e
+# il «non completato» a chi pubblica conta SOLO se il nodo gli da' piu'
+# tempo di chi prende — accesa prima della `-bar8`, pausa e badge
+# funzionano e la regola di ieri («mai a chi ha pubblicato») resta.
+# Solo True accende.
+P2P_TEMPO_DI_CHI_PUBBLICA = False
 # GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026): chi lo chiede dal
 # bottone 🔔 della testata del libro o dal cassetto Avvisi del Profilo
 # riceve un messaggio quando nel libro compaiono ordini nuovi — del tipo

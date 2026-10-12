@@ -371,9 +371,46 @@ resta sotto commissione e premio), ma non più niente; e chi prende senza
 proseguire tiene fermo l'ordine altrui 30 minuti invece di 15. La
 cauzione oggi copre il solo «Contanti» e al timeout NON brucia
 (`slash_on_waiting_timeout = false`), quindi quella difesa non c'è.
-LA REGOLA CHE RESTA: oltre i 1800 non si va senza la cauzione che brucia
-al timeout, su tutti i metodi — il ragionamento di sopra vale intero per
-2, 6 e 12 ore. BARATTOLO SEGUE DA SOLO: il numero lo leggono dal 38385
+LA REGOLA, RISCRITTA IL 12 OTT 2026 (decisione di Andrea, cantiere
+`tempo-di-chi-pubblica`; fino ad allora diceva «oltre i 1800 non si va
+senza la cauzione che brucia al timeout, su tutti i metodi — il
+ragionamento di sopra vale intero per 2, 6 e 12 ore»). Il ragionamento
+non è caduto: è stato diviso per RUOLO, e ha cambiato contrappeso.
+• CHI PRENDE RESTA A 1800. Ha il telefono in mano in quel momento, e per
+lui vale tutto quel che è scritto sopra: una finestra lunga a chi prende
+è un'opzione gratuita sul cambio e un ordine altrui tenuto fermo, e non
+si allunga senza un costo.
+• CHI PUBBLICA HA TRE ORE (`maker_expiration_seconds = 10800`, patch
+0011, immagine `-bar8`): non sa quando gli prenderanno l'ordine. I casi
+veri del lancio sono ordini presi di notte o all'alba e annullati mentre
+dormiva, da ripubblicare a mano. E se non risponde l'ordine NON MUORE
+PIÙ: torna nel libro, e solo alla seconda mancata risposta di fila si
+toglie (`maker_timeout_limit = 2`).
+• IL CONTRAPPESO NON È LA CAUZIONE, È LA PENALITÀ. L'opzione sul cambio
+in tre ore c'è anche per chi pubblica — su un ordine a mercato il prezzo
+si ferma alla presa, e lui può rispondere solo se si è mosso a suo
+favore —, e senza un costo sarebbe gratuita. Il costo è su Barattolo:
+chi pubblica e non risponde entro le sue ore, o annulla a mano dopo una
+presa, prende un «non completato», lo stesso contatore di chi prende con
+le stesse soglie (CANTIERI, «Il tempo di chi pubblica»). È per questo
+che il server la conta SOLO se il nodo il tempo lungo lo dà davvero
+(`_penalita_pubblica_p2p`): tempo lungo e penalità stanno insieme o non
+stanno. Una cauzione che brucia resterebbe la difesa più forte, e
+varrebbe anche per chi usa un'altra app; la penalità vale dentro
+Barattolo — il prezzo accettato, detto.
+• PERCHÉ TRE E NON DODICI (la proposta di Alan): il movimento del cambio
+cresce col tempo, e a dodici ore vale quanto il premio di un ordine
+tipico; a tre resta sotto. E chi ha preso aspetta: sugli acquisti i suoi
+sats sono già in garanzia per tutta l'attesa (li riprende quando vuole,
+annullando da solo e senza penalità — `cancel.rs`, letto sul fork).
+PER CAMBIARE LE ORE: la sola riga del `settings.toml` e un `docker
+compose restart mostro` a libro fermo, senza ricompilare. Sopra le venti
+ore non si va senza toccare anche la scadenza della fattura di garanzia
+(86400 secondi, il default di LND: vedi sopra).
+⚠️ NON ANCORA IN SERVIZIO finché la `-bar8` non è sul nodo (PRODUZIONE,
+«LA SALITA ALLA -bar8»): fino ad allora chi pubblica ha i 1800 di tutti,
+l'ordine muore al primo tempo scaduto, e su Barattolo vale la regola del
+10 ott («mai a chi ha pubblicato»). BARATTOLO SEGUE DA SOLO: il numero lo leggono dal 38385
 l'app (`scadenzaSec`: «Hai circa 30 minuti», il conto alla rovescia) e il
 server (`_finestra_gesto_p2p`: «⏳ Hai 30 minuti», il promemoria a metà
 tempo), e non c'è niente da girare sul VPS (CANTIERI, «Il promemoria

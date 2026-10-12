@@ -1,0 +1,659 @@
+From c0bdff3c253c65c706f5f73e5156ef5901eaf9fa Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@example.invalid>
+Date: Mon, 12 Oct 2026 16:36:21 +0200
+Subject: [PATCH] timeout: give the maker a waiting window of his own, and put
+ the order back in the book when he lets a take lapse
+
+Upstream gives one window (`expiration_seconds`) to whoever holds the
+waiting duty, and cancels the order outright when the party who lets it
+lapse is its maker. That fits a taker, who has the phone in his hand; it
+does not fit a maker, who published hours or days before and cannot know
+when the order will be taken.
+
+Two optional keys in `[mostro]`; with both absent the daemon behaves as
+upstream:
+
+- `maker_expiration_seconds`: the maker's own window when the duty is his.
+  `find_order_by_seconds` selects with the shorter of the two windows and
+  keeps the rows whose own window has elapsed; `reconfirm_timeout_eligibility`
+  judges with the same.
+- `maker_timeout_limit`: after how many maker lapses in a row the order is
+  removed. Below it, a maker-responsible timeout republishes the order
+  (same branch and same messages as a taker timeout). Lapses are counted
+  in a side table kept out of the sqlx migrations, once per `taken_at`.
+  Off on a node that bonds the maker.
+
+Both are advertised in the info event, each only when in force.
+
+The marketplace event for a republish that is the maker's fault is
+`expired` + `maker-republished`: the server read every return to
+`Pending` as a taker timeout.
+
+`waiting-payment` is published as in-progress on sell orders too: a sell
+order taken with the invoice already in the take stayed `pending` on the
+book for the whole wait.
+---
+ settings.tpl.toml       |   8 +
+ src/barattolo_eventi.rs |   2 +
+ src/barattolo_tempo.rs  | 355 ++++++++++++++++++++++++++++++++++++++++
+ src/config/types.rs     |  16 ++
+ src/db.rs               |  16 +-
+ src/main.rs             |   1 +
+ src/nip33.rs            |  18 +-
+ src/scheduler.rs        |  59 ++++++-
+ 8 files changed, 468 insertions(+), 7 deletions(-)
+ create mode 100644 src/barattolo_tempo.rs
+
+diff --git a/settings.tpl.toml b/settings.tpl.toml
+index 54ebea8..57fd035 100644
+--- a/settings.tpl.toml
++++ b/settings.tpl.toml
+@@ -107,6 +107,14 @@ expiration_hours = 24
+ max_expiration_days = 15
+ # Expiration of pending orders
+ expiration_seconds = 900
++# Barattolo fork (patch 0011). The window above is the one of whoever
++# holds the waiting duty. Uncomment to give the order's MAKER a window
++# of his own (he cannot know when the order will be taken), and to put
++# the order back in the book when he lets a take lapse — until this
++# many lapses in a row, then the order is cancelled (2 = back to the
++# book once). Both absent = upstream behaviour.
++# maker_expiration_seconds = 10800
++# maker_timeout_limit = 2
+ # User rate events scheduled time interval
+ user_rates_sent_interval_seconds = 3600
+ # Relay list event time interval
+diff --git a/src/barattolo_eventi.rs b/src/barattolo_eventi.rs
+index 7fcc27d..6d6b87f 100644
+--- a/src/barattolo_eventi.rs
++++ b/src/barattolo_eventi.rs
+@@ -80,6 +80,8 @@ pub const PAYOUT_FAILED: &str = "payout-failed";
+ //   buyer-invoice-added     active | hold-next | new-invoice
+ //   canceled                cooperative | republished | pending | admin
+ //   expired                 book | taker-timeout | maker-timeout | escrow-deadline
++//                           | maker-republished (patch 0011: the order is back in
++//                           the book although the lapse was its maker's)
+ //   released                admin (a moderator settled a dispute)
+ //   bond-slashed            buyer | seller (whose bond was slashed; `sats` = the
+ //                           bond, `sats_buyer` / `sats_seller` = what each receives)
+diff --git a/src/barattolo_tempo.rs b/src/barattolo_tempo.rs
+new file mode 100644
+index 0000000..8eb7e6d
+--- /dev/null
++++ b/src/barattolo_tempo.rs
+@@ -0,0 +1,355 @@
++//! Barattolo fork (patch 0011): the maker's own waiting window, and an order
++//! that goes back to the book when its maker lets a take lapse.
++//!
++//! Upstream gives ONE window (`expiration_seconds`) to whoever holds the
++//! waiting duty, and when it is the MAKER who lets it lapse the order is
++//! cancelled outright. That fits a taker — he has the phone in his hand —
++//! and it does not fit a maker: he published hours or days ago and cannot
++//! know when someone will take the order. A maker who was asleep finds
++//! the order gone and has to publish it again by hand.
++//!
++//! Two optional keys in `[mostro]`. With both absent the daemon behaves
++//! exactly as upstream, byte for byte on the wire:
++//!
++//! - `maker_expiration_seconds`: the waiting window of the MAKER, when he
++//!   is the one on duty (paying the hold invoice of his sell order, or
++//!   giving the invoice of his buy order). The taker keeps
++//!   `expiration_seconds`. Absent or 0: the maker has the taker's window.
++//! - `maker_timeout_limit`: after how many maker lapses IN A ROW the order
++//!   is removed. `2` means the first lapse puts the order back in the
++//!   book and the second cancels it. Absent, 0 or 1: upstream (the first
++//!   lapse cancels).
++//!
++//! Both are advertised in the kind 38385 info event, under the same
++//! names, only when they are in force — so a client can tell the maker
++//! how long he really has, and that the order comes back.
++//!
++//! THE LAPSES are counted in a side table, `barattolo_maker_lapses`,
++//! created with `CREATE TABLE IF NOT EXISTS` and deliberately kept OUT of
++//! the sqlx migrations, like `barattolo_fees`: rolling back to an image
++//! without this patch needs nothing, and a new upstream migration never
++//! collides. The count is idempotent per waiting episode — it is keyed on
++//! `taken_at`, which the daemon re-stamps at every take and every duty
++//! handoff — so a scheduler tick that retries the same timeout does not
++//! count it twice. It never needs a reset: once a maker takes his step
++//! the trade is on, and that order does not come back to the book.
++//!
++//! NOT ON A NODE THAT BONDS THE MAKER (`apply_to = "make" | "both"`): on a
++//! maker-responsible timeout the bond code releases every bond on the
++//! order — right for the taker's, who is not at fault — and a republished
++//! order would sit in the book with its maker bond already released.
++//! There the upstream cancel stays, and the limit is not advertised.
++
++use crate::config::types::{AntiAbuseBondSettings, MostroSettings};
++use sqlx::SqlitePool;
++use tracing::{info, warn};
++
++const WAITING_PAYMENT: &str = "waiting-payment";
++const WAITING_BUYER_INVOICE: &str = "waiting-buyer-invoice";
++
++/// The `[mostro]` settings, or `None` where they were never loaded (unit
++/// tests of the callers): then every function here is the upstream rule.
++fn settings() -> Option<&'static MostroSettings> {
++    crate::config::MOSTRO_CONFIG.get().map(|s| &s.mostro)
++}
++
++/// Is the party on duty in this waiting state the order's MAKER? A sell
++/// order waits for its maker in `waiting-payment` (he pays the hold
++/// invoice), a buy order in `waiting-buyer-invoice` (he gives the invoice).
++/// It is the complement of the scheduler's republish arm.
++pub fn duty_is_makers(status: &str, kind: &str) -> bool {
++    matches!(
++        (status, kind),
++        (WAITING_PAYMENT, "sell") | (WAITING_BUYER_INVOICE, "buy")
++    )
++}
++
++/// PURE: the maker's window — the configured one when set and positive,
++/// otherwise the taker's.
++pub fn maker_window_from(configured: Option<u32>, taker_secs: u32) -> u32 {
++    configured.filter(|s| *s > 0).unwrap_or(taker_secs)
++}
++
++fn maker_window(taker_secs: u32) -> u32 {
++    maker_window_from(
++        settings().and_then(|s| s.maker_expiration_seconds),
++        taker_secs,
++    )
++}
++
++/// PURE: the window of whoever holds the duty, given both.
++pub fn window_with(status: &str, kind: &str, taker_secs: u32, maker_secs: u32) -> u32 {
++    if duty_is_makers(status, kind) {
++        maker_secs
++    } else {
++        taker_secs
++    }
++}
++
++/// The waiting window, in seconds, of whoever holds the duty in this state.
++pub fn window_of(status: &str, kind: &str, taker_secs: u32) -> u32 {
++    window_with(status, kind, taker_secs, maker_window(taker_secs))
++}
++
++/// The shorter of the two windows: the cutoff `find_order_by_seconds`
++/// selects with, before each row is judged on its own window.
++pub fn shortest_window(taker_secs: u32) -> u32 {
++    taker_secs.min(maker_window(taker_secs))
++}
++
++/// Has the window of whoever holds the duty really elapsed?
++pub fn elapsed(status: &str, kind: &str, taken_at: i64, now: i64, taker_secs: u32) -> bool {
++    taken_at < now - window_of(status, kind, taker_secs) as i64
++}
++
++/// PURE: after how many maker lapses in a row the order is removed, or 0
++/// when the republish is off — not configured, below 2, or a node that
++/// bonds the maker.
++pub fn limit_from(configured: Option<u32>, maker_is_bonded: bool) -> u32 {
++    match configured {
++        Some(n) if n >= 2 && !maker_is_bonded => n,
++        _ => 0,
++    }
++}
++
++fn maker_is_bonded(bond: Option<&AntiAbuseBondSettings>) -> bool {
++    bond.is_some_and(|b| b.enabled && b.apply_to.applies_to_maker())
++}
++
++/// The two tags of the info event, as `(name, value)`; each one only when
++/// it is in force, so a node without the keys publishes what it always did.
++pub fn info_pairs(
++    mostro: &MostroSettings,
++    bond: Option<&AntiAbuseBondSettings>,
++) -> Vec<(&'static str, String)> {
++    let mut pairs = Vec::new();
++    if let Some(secs) = mostro.maker_expiration_seconds.filter(|s| *s > 0) {
++        pairs.push(("maker_expiration_seconds", secs.to_string()));
++    }
++    let limit = limit_from(mostro.maker_timeout_limit, maker_is_bonded(bond));
++    if limit > 0 {
++        pairs.push(("maker_timeout_limit", limit.to_string()));
++    }
++    pairs
++}
++
++async fn ensure_table(pool: &SqlitePool) -> Result<(), sqlx::Error> {
++    sqlx::query(
++        "CREATE TABLE IF NOT EXISTS barattolo_maker_lapses (
++            order_id TEXT PRIMARY KEY,
++            lapses INTEGER NOT NULL,
++            taken_at INTEGER NOT NULL,
++            updated_at INTEGER NOT NULL
++        )",
++    )
++    .execute(pool)
++    .await
++    .map(|_| ())
++}
++
++/// Counts this maker lapse and returns how many the order has had in a
++/// row. Idempotent per waiting episode: the same `taken_at` counted again
++/// (a tick that retries after a failed persist) leaves the count alone.
++pub async fn record_lapse(
++    pool: &SqlitePool,
++    order_id: &str,
++    taken_at: i64,
++) -> Result<u32, sqlx::Error> {
++    ensure_table(pool).await?;
++    sqlx::query(
++        "INSERT INTO barattolo_maker_lapses (order_id, lapses, taken_at, updated_at)
++         VALUES (?1, 1, ?2, strftime('%s','now'))
++         ON CONFLICT(order_id) DO UPDATE SET
++            lapses = lapses + (taken_at <> excluded.taken_at),
++            taken_at = excluded.taken_at,
++            updated_at = excluded.updated_at",
++    )
++    .bind(order_id)
++    .bind(taken_at)
++    .execute(pool)
++    .await?;
++    let row = sqlx::query_as::<_, (i64,)>(
++        "SELECT lapses FROM barattolo_maker_lapses WHERE order_id = ?1",
++    )
++    .bind(order_id)
++    .fetch_one(pool)
++    .await?;
++    Ok(row.0.max(0) as u32)
++}
++
++/// Does this waiting-state timeout put the order BACK IN THE BOOK although
++/// the party at fault is its maker? Counts the lapse while answering, so
++/// call it once per timeout, after the bond step and before the
++/// cancel/republish decision. `false` whenever the duty is the taker's
++/// (upstream already republishes), the feature is off, this lapse reaches
++/// the limit, or the count cannot be written — then upstream's cancel runs.
++pub async fn maker_back_to_book(
++    pool: &SqlitePool,
++    order_id: &str,
++    status: &str,
++    kind: &str,
++    taken_at: i64,
++    bond: Option<&AntiAbuseBondSettings>,
++) -> bool {
++    if !duty_is_makers(status, kind) {
++        return false;
++    }
++    let limit = limit_from(
++        settings().and_then(|s| s.maker_timeout_limit),
++        maker_is_bonded(bond),
++    );
++    if limit == 0 {
++        return false;
++    }
++    match record_lapse(pool, order_id, taken_at).await {
++        Ok(lapses) if lapses < limit => {
++            info!("barattolo_tempo: order {order_id}: maker lapse {lapses} of {limit}, back to the book");
++            true
++        }
++        Ok(lapses) => {
++            info!("barattolo_tempo: order {order_id}: maker lapse {lapses} of {limit}, the order is removed");
++            false
++        }
++        Err(e) => {
++            warn!("barattolo_tempo: could not count the maker lapse of {order_id} ({e}): cancelling as upstream does");
++            false
++        }
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use sqlx::sqlite::SqlitePoolOptions;
++
++    async fn pool() -> SqlitePool {
++        // one connection: every connection to `sqlite::memory:` is its own db
++        SqlitePoolOptions::new()
++            .max_connections(1)
++            .connect("sqlite::memory:")
++            .await
++            .unwrap()
++    }
++
++    #[test]
++    fn the_duty_is_the_makers_in_the_two_states_upstream_cancels() {
++        // the maker of a sell order pays the hold invoice
++        assert!(duty_is_makers("waiting-payment", "sell"));
++        // the maker of a buy order gives the invoice
++        assert!(duty_is_makers("waiting-buyer-invoice", "buy"));
++        // the other two are the taker's, and upstream republishes them
++        assert!(!duty_is_makers("waiting-buyer-invoice", "sell"));
++        assert!(!duty_is_makers("waiting-payment", "buy"));
++        // nothing else is a waiting duty
++        assert!(!duty_is_makers("active", "sell"));
++        assert!(!duty_is_makers("pending", "buy"));
++    }
++
++    #[test]
++    fn without_the_key_the_maker_has_the_takers_window() {
++        assert_eq!(maker_window_from(None, 1800), 1800);
++        assert_eq!(maker_window_from(Some(0), 1800), 1800);
++        assert_eq!(maker_window_from(Some(10_800), 1800), 10_800);
++        // a maker window SHORTER than the taker's is the operator's choice
++        assert_eq!(maker_window_from(Some(600), 1800), 600);
++    }
++
++    #[test]
++    fn each_party_is_judged_on_its_own_window() {
++        // sell order: the buyer (taker) gives the invoice in 30 minutes...
++        assert_eq!(window_with("waiting-buyer-invoice", "sell", 1800, 10_800), 1800);
++        // ...then the seller (maker) pays the hold invoice in three hours
++        assert_eq!(window_with("waiting-payment", "sell", 1800, 10_800), 10_800);
++        // buy order: the seller (taker) pays in 30 minutes, the buyer
++        // (maker) gives the invoice in three hours
++        assert_eq!(window_with("waiting-payment", "buy", 1800, 10_800), 1800);
++        assert_eq!(window_with("waiting-buyer-invoice", "buy", 1800, 10_800), 10_800);
++    }
++
++    #[test]
++    fn with_no_settings_loaded_the_rule_is_upstreams() {
++        // unit tests of the callers never load `MOSTRO_CONFIG` with the new
++        // keys: there the window is the one they pass in, for both parties
++        if settings().is_some_and(|s| s.maker_expiration_seconds.is_some()) {
++            return;
++        }
++        assert_eq!(window_of("waiting-payment", "sell", 900), 900);
++        assert_eq!(shortest_window(900), 900);
++        assert!(elapsed("waiting-payment", "sell", 1_000, 1_901, 900));
++        assert!(!elapsed("waiting-payment", "sell", 1_000, 1_900, 900));
++    }
++
++    #[test]
++    fn the_limit_is_off_unless_it_can_put_the_order_back_at_least_once() {
++        assert_eq!(limit_from(None, false), 0);
++        assert_eq!(limit_from(Some(0), false), 0);
++        // 1 = the first lapse removes the order: that is upstream
++        assert_eq!(limit_from(Some(1), false), 0);
++        assert_eq!(limit_from(Some(2), false), 2);
++        assert_eq!(limit_from(Some(3), false), 3);
++        // a node that bonds the maker keeps upstream's cancel
++        assert_eq!(limit_from(Some(2), true), 0);
++    }
++
++    #[test]
++    fn the_info_event_carries_only_what_is_in_force() {
++        let off = MostroSettings::default();
++        assert!(info_pairs(&off, None).is_empty());
++
++        let on = MostroSettings {
++            maker_expiration_seconds: Some(10_800),
++            maker_timeout_limit: Some(2),
++            ..MostroSettings::default()
++        };
++        assert_eq!(
++            info_pairs(&on, None),
++            vec![
++                ("maker_expiration_seconds", "10800".to_string()),
++                ("maker_timeout_limit", "2".to_string()),
++            ]
++        );
++
++        // a limit of 1 is upstream's rule: it is not advertised
++        let window_only = MostroSettings {
++            maker_expiration_seconds: Some(10_800),
++            maker_timeout_limit: Some(1),
++            ..MostroSettings::default()
++        };
++        assert_eq!(
++            info_pairs(&window_only, None),
++            vec![("maker_expiration_seconds", "10800".to_string())]
++        );
++    }
++
++    #[tokio::test]
++    async fn a_lapse_is_counted_once_per_waiting_episode() {
++        let pool = pool().await;
++        // first take, the maker lets it lapse
++        assert_eq!(record_lapse(&pool, "order-a", 1_000).await.unwrap(), 1);
++        // the tick retries the same timeout: same `taken_at`, same count
++        assert_eq!(record_lapse(&pool, "order-a", 1_000).await.unwrap(), 1);
++        // the order went back to the book and was taken again: a new episode
++        assert_eq!(record_lapse(&pool, "order-a", 5_000).await.unwrap(), 2);
++        assert_eq!(record_lapse(&pool, "order-a", 5_000).await.unwrap(), 2);
++        // another order has its own count
++        assert_eq!(record_lapse(&pool, "order-b", 5_000).await.unwrap(), 1);
++    }
++
++    #[tokio::test]
++    async fn the_takers_duty_never_touches_the_count() {
++        let pool = pool().await;
++        // whatever the settings, a taker-responsible timeout is not ours:
++        // upstream republishes it, and no row is written
++        assert!(
++            !maker_back_to_book(&pool, "order-c", "waiting-buyer-invoice", "sell", 1_000, None)
++                .await
++        );
++        assert!(!maker_back_to_book(&pool, "order-c", "waiting-payment", "buy", 1_000, None).await);
++        ensure_table(&pool).await.unwrap();
++        let rows = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM barattolo_maker_lapses")
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++        assert_eq!(rows.0, 0);
++    }
++}
+diff --git a/src/config/types.rs b/src/config/types.rs
+index 70fe9c9..50aaf39 100644
+--- a/src/config/types.rs
++++ b/src/config/types.rs
+@@ -730,6 +730,20 @@ pub struct MostroSettings {
+     pub expiration_hours: u32,
+     /// Expiration seconds
+     pub expiration_seconds: u32,
++    /// Barattolo fork (patch 0011): the waiting window of the order's
++    /// MAKER when the duty is his (paying the hold invoice of his sell
++    /// order, giving the invoice of his buy order). The taker keeps
++    /// `expiration_seconds`. `None` or 0 ⇒ the maker has the taker's
++    /// window, so existing configs behave exactly as before. Read through
++    /// `barattolo_tempo`.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub maker_expiration_seconds: Option<u32>,
++    /// Barattolo fork (patch 0011): after how many maker lapses IN A ROW
++    /// the order is removed. `2` ⇒ the first lapse puts the order back in
++    /// the book, the second cancels it. `None`, 0 or 1 ⇒ upstream: the
++    /// first lapse cancels.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub maker_timeout_limit: Option<u32>,
+     /// User rates sent interval seconds
+     pub user_rates_sent_interval_seconds: u32,
+     /// Maximum expiration days
+@@ -864,6 +878,8 @@ impl Default for MostroSettings {
+             min_payment_amount: 100,
+             expiration_hours: 24,
+             expiration_seconds: 900,
++            maker_expiration_seconds: None,
++            maker_timeout_limit: None,
+             user_rates_sent_interval_seconds: 3600,
+             max_expiration_days: 15,
+             publish_relays_interval: 60,
+diff --git a/src/db.rs b/src/db.rs
+index c268ca7..3631c97 100644
+--- a/src/db.rs
++++ b/src/db.rs
+@@ -663,7 +663,13 @@ pub async fn find_order_by_date(pool: &SqlitePool) -> Result<Vec<Order>, MostroE
+ 
+ pub async fn find_order_by_seconds(pool: &SqlitePool) -> Result<Vec<Order>, MostroError> {
+     let mostro_settings = Settings::get_mostro();
+-    let exp_seconds = mostro_settings.expiration_seconds as u64;
++    // Barattolo fork (patch 0011): the maker has a waiting window of his
++    // own. Select with the SHORTER of the two, then keep the rows whose own
++    // window — the one of whoever holds the duty — has really elapsed.
++    // Without the new key the two are the same number, and this is
++    // upstream's query.
++    let taker_seconds = mostro_settings.expiration_seconds;
++    let exp_seconds = crate::barattolo_tempo::shortest_window(taker_seconds) as u64;
+     let expire_time = Timestamp::now() - exp_seconds;
+     let order = sqlx::query_as::<_, Order>(
+         r#"
+@@ -677,7 +683,13 @@ pub async fn find_order_by_seconds(pool: &SqlitePool) -> Result<Vec<Order>, Most
+     .await
+     .map_err(|e| MostroInternalErr(ServiceError::DbAccessError(e.to_string())))?;
+ 
+-    Ok(order)
++    let now = Timestamp::now().as_secs() as i64;
++    Ok(order
++        .into_iter()
++        .filter(|o| {
++            crate::barattolo_tempo::elapsed(&o.status, &o.kind, o.taken_at, now, taker_seconds)
++        })
++        .collect())
+ }
+ 
+ pub async fn find_dispute_by_order_id(
+diff --git a/src/main.rs b/src/main.rs
+index ae39918..fdac07b 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,6 +1,7 @@
+ pub mod app;
+ pub mod barattolo_eventi;
+ pub mod barattolo_fee;
++pub mod barattolo_tempo;
+ mod bitcoin_price;
+ pub mod cashu;
+ pub mod cli;
+diff --git a/src/nip33.rs b/src/nip33.rs
+index 2f99fbe..23ec2b6 100644
+--- a/src/nip33.rs
++++ b/src/nip33.rs
+@@ -349,7 +349,12 @@ fn create_status_tags(order: &Order) -> Result<(bool, Status), MostroError> {
+ 
+     match status {
+         Status::WaitingBuyerInvoice => Ok((order.is_sell_order().is_ok(), Status::InProgress)),
+-        Status::WaitingPayment => Ok((order.is_buy_order().is_ok(), Status::InProgress)),
++        // Barattolo fork (patch 0011): `waiting-payment` is published as
++        // in-progress on a SELL order too. Upstream emitted it only for buy
++        // orders, so a sell order taken with the invoice already in the take
++        // (it skips `waiting-buyer-invoice`) stayed `pending` on the book for
++        // the whole wait, while nobody could take it.
++        Status::WaitingPayment => Ok((true, Status::InProgress)),
+         Status::Canceled
+         | Status::CanceledByAdmin
+         | Status::CooperativelyCanceled
+@@ -688,6 +693,12 @@ pub fn info_to_tags(ln_status: &LnStatus, maintenance: bool) -> Tags {
+ 
+     tags_vec.extend(invoice_window_tags(ln_settings));
+     tags_vec.extend(bond_policy_tags(bond_settings));
++    // Barattolo fork (patch 0011): the maker's own waiting window, and after
++    // how many maker lapses in a row the order is removed — each tag only
++    // when it is in force.
++    for (name, value) in crate::barattolo_tempo::info_pairs(mostro_settings, bond_settings) {
++        tags_vec.push(Tag::custom(name, vec![value]));
++    }
+     tags_vec.push(Tag::custom(
+         "maintenance_mode",
+         vec![maintenance.to_string()],
+@@ -1825,11 +1836,12 @@ mod tests {
+             (true, Status::InProgress)
+         );
+ 
+-        // WaitingPayment on a sell order → not a buy order → don't emit.
++        // Barattolo fork (patch 0011): WaitingPayment on a sell order is
++        // emitted too (upstream: not a buy order → don't emit).
+         order.status = Status::WaitingPayment.to_string();
+         assert_eq!(
+             create_status_tags(&order).unwrap(),
+-            (false, Status::InProgress)
++            (true, Status::InProgress)
+         );
+ 
+         // WaitingPayment on a buy order → emit as InProgress.
+diff --git a/src/scheduler.rs b/src/scheduler.rs
+index d95443b..beb5e71 100644
+--- a/src/scheduler.rs
++++ b/src/scheduler.rs
+@@ -501,7 +501,10 @@ async fn reconfirm_timeout_eligibility(
+     };
+     let still_waiting = fresh.status == Status::WaitingBuyerInvoice.to_string()
+         || fresh.status == Status::WaitingPayment.to_string();
+-    let still_expired = fresh.taken_at < Utc::now().timestamp() - exp_seconds as i64;
++    // Barattolo fork (patch 0011): the window is the one of whoever holds
++    // the duty — the maker has a window of his own.
++    let window = crate::barattolo_tempo::window_of(&fresh.status, &fresh.kind, exp_seconds);
++    let still_expired = fresh.taken_at < Utc::now().timestamp() - window as i64;
+     (still_waiting && still_expired).then_some(fresh)
+ }
+ 
+@@ -657,6 +660,22 @@ async fn job_cancel_orders(ctx: AppContext) {
+                             }
+                         }
+ 
++                        // Barattolo fork (patch 0011): when it is the MAKER who
++                        // let the take lapse, the order goes back to the book
++                        // instead of being cancelled — until
++                        // `maker_timeout_limit` lapses in a row. Counted here,
++                        // after the bond step (a retried tick counts the same
++                        // `taken_at` once) and on the pre-mutation snapshot,
++                        // whose waiting status is intact.
++                        let maker_back_to_book = crate::barattolo_tempo::maker_back_to_book(
++                            pool,
++                            &order.id.to_string(),
++                            &order.status,
++                            &order.kind,
++                            order.taken_at,
++                            Settings::get_bond(),
++                        )
++                        .await;
+                         let (maker_action, new_status, edited_order) =
+                             match (order_status, order_kind) {
+                                 (Status::WaitingBuyerInvoice, Kind::Sell)
+@@ -685,6 +704,37 @@ async fn job_cancel_orders(ctx: AppContext) {
+                                         edit_pubkeys_order(pool, &order).await,
+                                     )
+                                 }
++                                // Barattolo fork (patch 0011): the maker let the
++                                // take lapse and this is not the lapse that removes
++                                // the order — back to the book, as for a taker
++                                // timeout.
++                                (Status::WaitingBuyerInvoice, Kind::Buy)
++                                | (Status::WaitingPayment, Kind::Sell)
++                                    if maker_back_to_book =>
++                                {
++                                    let _ = update_order_to_initial_state(
++                                        pool,
++                                        order.id,
++                                        order.amount,
++                                        order.fee,
++                                        order.dev_fee,
++                                    )
++                                    .await;
++                                    info!(
++                                        "Republishing order Id {}, {}",
++                                        order.id,
++                                        if order_status == Status::WaitingPayment {
++                                            "maker (seller) did not pay the hold invoice in time"
++                                        } else {
++                                            "maker (buyer) did not send their invoice in time"
++                                        }
++                                    );
++                                    (
++                                        Some(Action::NewOrder),
++                                        Status::Pending,
++                                        edit_pubkeys_order(pool, &order).await,
++                                    )
++                                }
+                                 (Status::WaitingBuyerInvoice, Kind::Buy)
+                                 | (Status::WaitingPayment, Kind::Sell) => {
+                                     // Update order status
+@@ -730,7 +780,12 @@ async fn job_cancel_orders(ctx: AppContext) {
+                                 "expired",
+                                 &order,
+                                 "mostro",
+-                                if matches!(new_status, Status::Pending) {
++                                // Barattolo fork (patch 0011): a republish that is
++                                // the MAKER's fault has a word of its own, or the
++                                // server would read `Pending` as the taker's timeout.
++                                if maker_back_to_book {
++                                    "maker-republished"
++                                } else if matches!(new_status, Status::Pending) {
+                                     "taker-timeout"
+                                 } else {
+                                     "maker-timeout"
+-- 
+2.55.0.windows.3
+

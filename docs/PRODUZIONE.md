@@ -3382,6 +3382,179 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   lato SENZA cauzione deve tornare «su quel lato non c'è una cauzione da
   bruciare». Nel database del nodo, in sola lettura, `SELECT role, state,
   amount_sats, slashed_reason FROM bonds` racconta le stesse cose.
+- IL TEMPO DI CHI PUBBLICA, SUL VPS: LA LEVA E LE LETTURE (12 ott 2026,
+  cantiere `tempo-di-chi-pubblica`; il perché in CANTIERI, «Il tempo di
+  chi pubblica»). La leva è `P2P_TEMPO_DI_CHI_PUBBLICA`, nel codice
+  `False`. ACCESA mette in campo: la pausa degli ordini (ricorrente e una
+  volta sola, dal profilo di scambio), il badge «⚡ risponde in fretta», i
+  quattro avvisi a chi pubblica (subito, a 10 minuti, a un'ora, mezz'ora
+  prima della scadenza) e il «non completato» a chi pubblica e non
+  risponde. ⚠️ LE ORE NON STANNO QUI: le decide il nodo
+  (`maker_expiration_seconds` nel suo `settings.toml`, patch 0011) e le
+  annuncia nel 38385 — e IL «NON COMPLETATO» A CHI PUBBLICA CONTA SOLO SE
+  IL NODO GLI DÀ PIÙ TEMPO DI CHI PRENDE. Quindi si può accendere PRIMA
+  della `-bar8`: pausa, badge e avvisi funzionano, e coi trenta minuti di
+  tutti resta la regola del 10 ott («mai a chi ha pubblicato»). Dopo la
+  `-bar8` la penalità scatta da sola, senza toccare altro.
+  PER ACCENDERLA: `nano /srv/barattolo/config.py`, in coda la riga
+  `P2P_TEMPO_DI_CHI_PUBBLICA = True` (da AGGIUNGERE), poi
+  `sudo systemctl restart barattolo` e il pannello «⚙️ Stato delle leve»
+  → «Tempo di chi pubblica: pausa, badge, penalità: acceso». PER
+  SPEGNERLA: la riga a `False` e riavvio. Le pause salvate restano in
+  `p2p_pause` e smettono di contare (gli ordini tornano tutti visibili);
+  gli esiti già scritti restano.
+  LE LETTURE (sul VPS `sqlite3` non c'è: `python3`, sola lettura; il
+  database è `/srv/barattolo/satmarket.db`, detto da Andrea il 12 ott
+  2026 — i comandi più vecchi di questo file che puntano altrove vanno
+  letti con questo percorso). Chi ha una pausa impostata:
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print(c.execute('SELECT tg_id, fasce, fuso, una_fino, aggiornato FROM p2p_pause').fetchall())"`
+  Le mancate risposte di chi pubblica (`senza_risposta` è il fatto nudo,
+  che toglie il badge; `mancato` e `scusato` col dettaglio che comincia
+  per `maker-` sono la penalità e la sua scusa):
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print(c.execute(\"SELECT esito, dettaglio, COUNT(*) FROM p2p_esiti WHERE dettaglio LIKE 'maker-%' GROUP BY 1,2\").fetchall())"`
+  QUANTI SCAMBI HANNO UNA PARTE FUORI DA BARATTOLO (serve a decidere se la
+  pausa va portata anche nel nodo): `parti_note` si legge ACCANTO
+  all'esito, mai da sola — vale 0 anche per gli ordini scaduti o
+  ritirati senza una presa e per i giri precedenti di un ordine tornato
+  nel libro, che parti non ne hanno:
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print(c.execute('SELECT esito, parti_note, COUNT(*) FROM p2p_conti GROUP BY 1,2 ORDER BY 1,2').fetchall())"`
+  Contano le righe `completato`: con `parti_note` 2 tutt'e due di
+  Barattolo, con 1 una sola, con 0 nessuna delle due.
+  Nel journal: `journalctl -u barattolo --since today | grep "Reputazione P2P"`
+  — ogni mancata risposta lascia la sua riga, anche quando NON si conta
+  (in pausa, non dei nostri, già contata su quell'ordine, senza il tempo
+  lungo), col perché.
+- LA SALITA ALLA `-bar8`, immagine `mostro:v0.19.0-bar8` (PREPARATA il 12
+  ott 2026, cantiere `tempo-di-chi-pubblica`; ⚠️ NON ANCORA FATTA: build
+  e riavvio del nodo solo con l'ok esplicito di Andrea, un comando alla
+  volta, a libro fermo). Cosa cambia: la patch 0011 del fork — chi ha
+  PUBBLICATO ha la sua finestra (`maker_expiration_seconds`), e se la
+  lascia scadere l'ordine TORNA NEL LIBRO invece di morire, fino a
+  `maker_timeout_limit` mancate risposte di fila; il 38385 annuncia i due
+  numeri; l'evento al server per quel ritorno è `maker-republished`; e
+  una vendita presa da un'altra app con la fattura nel take esce
+  in-progress invece di restare `pending` (README del fork, «LA 0011»).
+  DUE RIGHE NUOVE nel `settings.toml` (punto 6-bis); NESSUNA migrazione:
+  le mancate risposte stanno in una tabella a parte, fuori da sqlx.
+  ⚠️ PRIMA IL SERVER, POI IL NODO: il VPS deve avere online il commit di
+  questo cantiere PRIMA che il nodo cominci a dire `maker-republished` —
+  il server di ieri la leggerebbe come un annullo, e a chi ha pubblicato
+  direbbe «il tuo ordine è stato annullato» con l'ordine nel libro. Si
+  guarda sul VPS: `git -C ~/satmarket log -1 --oneline`. La LEVA del VPS
+  invece non ha un ordine obbligato (voce qui sopra).
+  ⚠️ MAI COMPILATA SUL PC (non c'è cargo): il patcher è girato a secco e
+  per davvero su un clone del tag `v0.19.0` con le nove patch applicate
+  (`git am`), il diff è stato riletto riga per riga, e niente altro. Il
+  punto 3 qui sotto è la PRIMA compilazione: va guardato, e un errore si
+  incolla a Claude senza ritocchi a mano.
+  Host, in cima a tutto: `ssh debian@185.18.221.96`
+  FASE 1 — IN SOLA LETTURA, tutt'e tre:
+  a) `docker inspect --format '{{.Config.Image}}' nodo-mostro-1`
+  → `mostro:v0.19.0-bar7`.
+  b) `cd ~/nodo/mostro-src && git status && git log --oneline v0.19.0..HEAD`
+  → branch `barattolo/v0.19.0`, albero PULITO, NOVE righe (la 0010 in
+  cima: «bond: decide the taker bond on the payment method the taker
+  declares»). Se non è pulito NON si va avanti.
+  c) IL LIBRO FERMO (`mode=ro`):
+  `sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); print(c.execute('SELECT status, COUNT(*) FROM orders GROUP BY status ORDER BY 2 DESC').fetchall())"`
+  Devono comparire SOLO `pending` e stati finali; uno fra
+  `waiting-payment`, `waiting-buyer-invoice`, `waiting-taker-bond`,
+  `active`, `fiat-sent`, `settled-hold-invoice`, `in-progress` o
+  `dispute` = c'è uno scambio in corso: si ASPETTA.
+  FASE 2 — IL BACKUP (costa un secondo), tre copie:
+  `cp ~/nodo/mostro/mostro.db ~/nodo/mostro/mostro.db.prima-bar8`
+  `cp ~/nodo/docker-compose.yml ~/nodo/docker-compose.yml.prima-bar8`
+  `cp ~/nodo/mostro/settings.toml ~/nodo/mostro/settings.toml.prima-bar8`
+  FASE 3 — LA BUILD:
+  1) SUL PC, i tre file al nodo, in una cartella NUOVA e FUORI da
+  `mostro-src` (il `.rs` deve stare ACCANTO al patcher):
+  `ssh debian@185.18.221.96 mkdir -p nodo/patch-bar8`
+  `scp deploy/mostro/patch-0011-tempo-di-chi-pubblica.py deploy/mostro/barattolo_tempo.rs deploy/mostro/0011-timeout-give-the-maker-a-waiting-window-of-his-own-a.patch debian@185.18.221.96:nodo/patch-bar8/`
+  2) SUL NODO, a secco e poi per davvero, un commit:
+  `cd ~/nodo/mostro-src`
+  `python3 ~/nodo/patch-bar8/patch-0011-tempo-di-chi-pubblica.py --secco`
+  → deve dire «A SECCO: 13 agganci in 7 file, tutte le ancore uniche,
+  piu' src/barattolo_tempo.rs. Niente scritto.» (la stessa riga del PC,
+  12 ott). Un FERMO qualunque si incolla a Claude.
+  `python3 ~/nodo/patch-bar8/patch-0011-tempo-di-chi-pubblica.py && git add -A && git commit -m "timeout: give the maker a waiting window of his own, and put the order back in the book when he lets a take lapse"`
+  `git log --oneline v0.19.0..HEAD` → DIECI righe. (Strada equivalente:
+  `git am ~/nodo/patch-bar8/0011-*.patch`: stesso albero.)
+  3) I TEST PRIMA DELLA BUILD VERA, in DUE lanci come per la `-bar7` (il
+  perché dei due sta lì sotto: una prova di upstream che legge una
+  globale): il primo coi filtri di ieri più quelli della 0011, il secondo
+  `util::tests::` da solo.
+  `docker build -f docker/Dockerfile --target builder -t mostro-test:bar8 .`
+  `docker run --rm mostro-test:bar8 cargo test --release -- app::take_buy app::take_sell flow barattolo_bond toml_only_payment_methods barattolo_tempo scheduler nip33 find_order_by_seconds`
+  `docker run --rm mostro-test:bar8 cargo test --release -- util::tests::`
+  Fra i verdi devono comparire gli otto di `barattolo_tempo::tests::` —
+  `the_duty_is_the_makers_in_the_two_states_upstream_cancels`,
+  `without_the_key_the_maker_has_the_takers_window`,
+  `each_party_is_judged_on_its_own_window`,
+  `with_no_settings_loaded_the_rule_is_upstreams`,
+  `the_limit_is_off_unless_it_can_put_the_order_back_at_least_once`,
+  `the_info_event_carries_only_what_is_in_force`,
+  `a_lapse_is_counted_once_per_waiting_episode`,
+  `the_takers_duty_never_touches_the_count` —, i quattro
+  `reconfirm_timeout_eligibility_…` dello scheduler, i due
+  `find_order_by_seconds…` e `status_tags_map_lifecycle_statuses_to_nip69_buckets`
+  (quella emendata). ⚠️ I filtri `scheduler` e `nip33` sono NUOVI in
+  questa liturgia: se cade una prova che NON è fra queste, la si rilancia
+  da sola (`cargo test --release -- <nome intero>`); se da sola passa è
+  la globale dei test, come per la `-bar7`, e lo si scrive qui. Se la
+  build o i test si fermano su una delle nostre: l'errore si incolla a
+  Claude, sul nodo `git reset --hard HEAD~1` (torna alla 0010) e niente
+  ritocchi a mano.
+  4) VERDI: `git format-patch -1 --start-number 11 -o ~/nodo/patch-bar8/export`
+  e la `.patch` torna sul PC con `scp`: `diff` contro quella nel repo
+  deve dire solo `index`, `From` e `Date`, MAI una riga di codice.
+  5) LA BUILD VERA: `docker build -f docker/Dockerfile -t mostro:v0.19.0-bar8 .`
+  — tag nuovo; la `-bar7` resta sulla macchina.
+  6) IL COMPOSE: `cd ~/nodo` e con `nano docker-compose.yml` la SOLA
+  riga dell'immagine a `mostro:v0.19.0-bar8`.
+  6-bis) IL `settings.toml`: `nano ~/nodo/mostro/settings.toml`, nel
+  blocco `[mostro]`, SOTTO la riga `expiration_seconds = 1800` (che NON
+  si tocca: è il tempo di chi prende), le due righe nuove:
+  `maker_expiration_seconds = 10800`
+  `maker_timeout_limit = 2`
+  Si rilegge: `grep -n "expiration_seconds\|maker_timeout_limit" ~/nodo/mostro/settings.toml`
+  → tre righe (1800, 10800, 2), tutte dentro `[mostro]`.
+  FASE 4 — IL RIAVVIO DEL SOLO CONTAINER MOSTRO, e il controllo:
+  7) IL LIBRO FERMO, di nuovo (la query della fase 1, c). Se è fermo:
+  `docker compose up -d mostro`
+  (`up -d`, non `restart`: la riga dell'immagine è cambiata).
+  8) `docker inspect --format '{{.Config.Image}}' nodo-mostro-1` →
+  `-bar8`; `docker compose logs mostro --since 2m` → «Settings
+  correctly loaded», `Transport: nip44`, NESSUNA riga di migrazione,
+  `barattolo_eventi: order events go to …`. Poi, dall'app («Info P2P» →
+  «I tempi»): «chi l'ha preso, che ha 30 minuti … chi l'ha pubblicato,
+  che ha 3 ore», e sotto «alla seconda presa di fila senza risposta
+  l'ordine si toglie» — è il 38385 nuovo letto dal telefono
+  (`maker_expiration_seconds 10800`, `maker_timeout_limit 2`); gli altri
+  tag come prima (`bond_enabled true`, `bond_only_payment_methods
+  Contanti`). E QUI CI SI FERMA.
+  FASE 5 — LA PROVA DELLA SCADENZA, di Andrea, a due telefoni, dopo. È
+  la prova che mancava da settembre (NODO-MOSTRO: «la riconsegna al
+  libro» mai vista dal vivo). Una vendita piccola pubblicata dal
+  telefono A, presa dal B, e A NON paga la garanzia: allo scadere delle
+  ore di A l'ordine deve TORNARE nel libro (a A «Non hai risposto in
+  tempo: il tuo ordine è tornato nel libro», a B «Chi aveva pubblicato
+  l'ordine non ha risposto in tempo»), e alla seconda volta deve
+  SPARIRE (a A «Non hai risposto a due prese di fila»). Aspettare tre ore
+  per due volte è lungo: per la prova si può mettere
+  `maker_expiration_seconds = 600` al punto 6-bis e riportarlo a 10800
+  DOPO la prova con un `docker compose restart mostro` a libro fermo — è
+  una riga del `settings.toml`, non serve ricompilare. Lo decide Andrea.
+  Nel log del nodo: `docker compose logs mostro --since 4h | grep barattolo_tempo`
+  → «maker lapse 1 of 2, back to the book» e poi «maker lapse 2 of 2,
+  the order is removed».
+  ROLLBACK: `cd ~/nodo`, la riga dell'immagine a `mostro:v0.19.0-bar7`
+  e le due righe nuove del `settings.toml` commentate (la `-bar7` le
+  ignorerebbe comunque: `[mostro]` non rifiuta le chiavi che non
+  conosce), poi `docker compose up -d mostro` a libro fermo. La tabella
+  `barattolo_maker_lapses` resta nel database e non dà fastidio a
+  nessuno: non è una migrazione. Sul VPS non c'è niente da toccare: senza
+  il tag del tempo lungo nel 38385 il «non completato» a chi pubblica si
+  spegne da solo, e pausa e badge restano.
 - LA SALITA ALLA `-bar7`, immagine `mostro:v0.19.0-bar7` (preparata il
   10 ott 2026 sera, cantiere `cauzione-metodo-scelto`; ✅ FATTA SUL NODO
   da Andrea, riferito il 12 ott 2026: `mostro:v0.19.0-bar7` in servizio
