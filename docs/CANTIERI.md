@@ -51893,3 +51893,30 @@ dal vivo nel pane: sotto.
 prossimo scambio con un nativo (volto e recensione); l'avviso una tantum
 a chi entra da Nostr col vecchio default; l'esito del comando in sola
 lettura su ea0af71a (la chiave di Sweegmiao in `chiavi_p2p`).
+
+**La suite intera, e quel che ha trovato.** Sulla copia pulita del
+primo commit (39ba942) la suite ha detto 4 prove rosse e 2 collaudi
+rossi, tutti figli del taglio dell'interruttore e non visti dalle prove
+mirate: lo stub `myRiconosciP2P` e la riga «resti sconosciuto» nel
+banco del dettaglio; `prove_parti_si_vedono`, il cui database in memoria
+non aveva `p2p_scambi` (il giudice ora la legge nella stessa query:
+tabella aggiunta e un caso in più — chi ha preso senza la presa annotata
+vede chi ha pubblicato da mostrod, chi ha pubblicato continua a non
+vedere lui); le due sentinelle del cassetto Avvisi («tre sorelle», ora
+due). I due collaudi, `collaudo_avviso_chi_annulla` e
+`collaudo_recapito_aggiornato`, dicevano la regola vecchia: chi ha PRESO
+legge ora il NOME di chi ha pubblicato appena mostrod nomina le due
+parti («Chi compra» / «Chi vende» maiuscoli sono i nomi che il banco
+semina), chi ha pubblicato senza una presa dichiarata resta sul ruolo
+minuscolo. La lezione: dopo aver tolto un simbolo si cerca PER NOME in
+tutta prove.py e nei collaudi, non solo nelle prove che si credono
+toccate — la suite intera è l'unica che lo dice davvero.
+
+**Cosa è girato su quale albero.** Main è corso durante il cantiere
+(37a0de5, 464f839 la vibrazione su Android, 2c317ab: CLAUDE.md e
+miniapp): rebase su 2c317ab, un solo conflitto in coda a CANTIERI
+sciolto tenendo tutt'e due le voci. Sull'albero ribasato (cbcd020), su
+una copia pulita: la suite intera 22505 passate, 0 fallite; i collaudi
+della CI 63 verdi, 0 rossi. Prima del rebase, sull'albero del
+cantiere: le sette prove toccate 556 verdi e i sei collaudi vicini in
+gabbia verdi.
