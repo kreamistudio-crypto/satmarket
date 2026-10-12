@@ -53284,3 +53284,26 @@ pagina più larga del telefono.
 **NON PROVATO.** Nessun telefono vero; il bottone dentro Telegram vero
 (l'avviso nel collaudo è simulato: si è guardato cosa riceve
 `notifica()`); il messaggio Nostr col link.
+
+**COSA È GIRATO SU QUALE ALBERO** (il verbale del push, 12 ott 2026,
+notte). PRIMA STESURA, sopra `42bb81f`: la suite severa intera, 22.921
+passate e 1 fallita — `prove_canale_admin`, che conta le consegne del
+P2P da `_recapita_p2p` e ne vedeva due in `_manda_evento_p2p` —, curata
+tornando a una chiamata sola; i 67 collaudi del workflow nella gabbia,
+tutti verdi; la tortura del cantiere (21 su 21), quella del margine (12
+su 12) e il giro dal vivo coi nove scatti.
+MAIN È CORSO DUE VOLTE: prima `8ffcaf0`, `aabdd05`, `87dc662`,
+`efd69ec` (la chat nello scambio, che tocca la stessa pagina, e il
+runner della CI), poi `634ee30` (Node della CI col numero). Un
+conflitto vero, sulla card di «I miei scambi»: la chat e la pausa
+aggiungevano una riga nello stesso punto, sotto la casella dello stato
+— tenute tutte e due, prima il messaggio non letto e poi il segno della
+pausa. Il resto, la coda di CANTIERI.
+ALBERO ULTIMO, sopra `634ee30`, con la punta del codice a `0f018e5`: la
+suite severa INTERA, 23.079 passate e 0 fallite; i 68 collaudi del
+workflow nella gabbia, tutti verdi; `node` sui tre script della pagina;
+lo scanner dei segreti con la controprova. Le torture e il giro dal
+vivo sono dell'albero di prima dei rebase. LA CI DI MAIN, guardata
+prima del push: l'ultima conclusa è verde (`efd69ec`), quella sulla
+punta era in corso. L'«Ok al push» di Andrea stava nel brief e l'ha
+ridetto rispondendo alla richiesta di conferma, col numero del punto 6.
