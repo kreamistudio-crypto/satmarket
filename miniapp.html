@@ -11518,13 +11518,14 @@ document.getElementById('cartello')?.remove();</script>
            `CHATSC_PATTO`: una prova le tiene in pari. -->
       <h3 id="p2pinfo-chat">La chat dello scambio</h3>
       <p>Da quando l'ordine è <b>preso</b> a quando lo scambio finisce, nella sua pagina c'è una <b>chat fra voi due</b>: serve a mettervi d'accordo, a dirvi «fatto», a chiedere «ti è arrivato?». Solo testo, niente allegati. Il recapito per gli euro resta nel suo riquadro, così non si perde fra i messaggi.</p>
-      <p><b>È cifrata fra voi due.</b> Ogni telefono fa nascere una chiave apposta per quello scambio; Barattolo trasporta i messaggi <b>già chiusi</b> e non li può leggere. <b>A fine scambio la cancella</b>: i telefoni buttano chiave e messaggi, il nostro server cancella le buste, e nei backup non ci sono mai entrate.</p>
+      <p><b>È cifrata fra voi due.</b> Ogni telefono fa nascere a caso una chiave apposta per quello scambio; Barattolo trasporta i messaggi <b>già chiusi</b>. <b>A fine scambio la cancella</b>: i telefoni buttano chiave e messaggi, il nostro server cancella le buste, e nei backup non ci sono mai entrate.</p>
       <ul class="sicu-lista">
         <li><b>Barattolo non ti scrive mai qui.</b> Chi nella chat si presenta come «assistenza» è l'altra persona.</li>
         <li><b>Non uscire dallo scambio per pagare.</b> I link nella chat non si aprono, e sotto un messaggio che ne porta uno, o che ti chiede di spostarti altrove, compare una riga rossa.</li>
         <li><b>Non mandare codici o chiavi.</b> Per completare uno scambio non servono a nessuno.</li>
       </ul>
-      <p><b>Se cambi telefono a metà scambio</b>, i messaggi di prima lì non si leggono: la chiave è nata sul primo e non si ricalcola da niente. Tocchi «Continua la chat qui» e si riparte.</p>
+      <p><b>Se cambi telefono o browser a metà scambio</b> la chat ti segue, con tutti i messaggi: appena nasce, il telefono lascia sul nostro server una <b>copia sigillata</b> della chiave, chiusa con la chiave di quello scambio. La apre solo chi ha il tuo profilo di scambio, il server la riconsegna solo a te, e a fine scambio sparisce con il resto.</p>
+      <p><b>Chi la può aprire.</b> La chat è cifrata fra voi due e Barattolo la trasporta. Se il tuo account è nato su Nostr, Barattolo non la può aprire. Se è nato con Telegram (anche se poi entri con Nostr), il tuo profilo di scambio lo ricava il server: per questo ritrovi scambio e chat su ogni dispositivo, e per questo Barattolo durante lo scambio potrebbe tecnicamente aprirla. Non lo fa. A fine scambio la chat si cancella, per tutti. Il moderatore la legge solo se una di voi due apre una disputa.</p>
       <p><b>In una disputa</b> il moderatore legge la chat <b>solo se una di voi due la apre</b>: è il telefono di chi apre la disputa a dargli la chiave, e glielo diciamo prima del tocco. Legge e non scrive al posto vostro; a disputa chiusa si cancella tutto, come a fine scambio.</p>
 
       <h3 id="p2pinfo-avvisi">Gli avvisi: cosa ti diciamo, e quando</h3>
@@ -12098,7 +12099,7 @@ document.getElementById('cartello')?.remove();</script>
       <p>Se togli uno scambio chiuso con la ✕, il server ricorda <b>il numero dell'ordine e quando l'hai tolto</b>, così sparisce anche dagli altri tuoi dispositivi. Si cancella da solo dopo quaranta giorni, e subito se dimentichi il profilo.</p>
       <p>Dal <b>17 settembre 2026</b>, quando un ordine viene <b>preso</b>, le due parti si vedono: chi ha pubblicato e chi ha preso vedono il <b>profilo</b> l'uno dell'altra — lo stesso che sta già sotto ogni annuncio del mercatino: nome, foto, stelline, livello e titolo — e i <b>bottoni per scriversi</b> su Telegram o su Nostr, ma solo dove quei canali esistono davvero (la npub soltanto se ne hai dimostrato il possesso). <b>Prima della presa non si vede niente</b>, e non c'è nessun altro modo di chiederlo: a questa domanda il server risponde solo a una delle due parti di quello scambio. Il perché è che dall'altra parte c'è una persona a cui stai per mandare dei soldi veri, e un volto con una reputazione è quello che rende <i>pesabile</i> la fiducia — la stessa ragione per cui nel mercatino chi vende ha un nome. Te lo diciamo <b>prima</b>: nel foglio dove pubblichi e in quello dove prendi. Al posto dei campi dove prima ci si scriveva il proprio contatto a mano, che non erano verificati da nessuno.</p>
       <p><b>Negli scambi l'altra persona vede il tuo profilo Barattolo: il nome e la foto che hai scelto, le recensioni, il livello, da quanto sei iscritto, gli scambi completati e non completati e, se li hai, il tuo @username Telegram e la tua chiave Nostr (npub), così potete scrivervi. Non vede mai il tuo numero di telefono, da dove ti colleghi, i tuoi recapiti né cosa hai comprato. Se vuoi scambiare senza profilo, entra con una chiave Nostr nuova.</b> Vale con qualunque modo di entrare: anche chi entra con una chiave Nostr è riconosciuto dall'altra persona come tutti (dal 12 ottobre 2026) — chi ha pubblicato vede il suo profilo, e le due parti possono recensirsi. Una chiave Nostr nuova, per l'altra persona, è un'altra persona: non c'è un interruttore, e non c'è un modo di scambiare da Barattolo senza farsi vedere dall'altra parte. <b>L'esito dello scambio si scrive sul suo account come per tutti</b> — è il paragrafo qui sopra sugli esiti degli scambi —, e se arriva al contatore «⚠️ N non completati» quello compare dove compare lui: nella pagina del suo negozio e sugli ordini che pubblica. Gli scambi già presi prima del 12 ottobre restano come erano, e a cancellare il pregresso c'è «dimentica il profilo» — che toglie le prese annotate, <b>non gli esiti</b>. Chi entra con una chiave e <b>pubblica</b>, invece, si mostra — col profilo che ha qui, cioè il nome e la foto della sua chiave: è così da quando le card del libro hanno un volto, e il foglio dove si pubblica lo dice prima.</p>
-      <p>Dal <b>12 ottobre 2026</b>, dentro ogni scambio <b>preso</b> c'è una <b>chat</b>. <b>La chat è cifrata fra voi due: Barattolo la trasporta ma non la può leggere, e a fine scambio la cancella. Il moderatore la legge solo se una di voi due apre una disputa.</b> Per intero. Ogni telefono fa nascere una <b>chiave usa-e-getta</b> per quello scambio: non lascia il dispositivo e <b>non si ricalcola da niente</b>, nemmeno dal tuo profilo di scambio — per questo, se cambi telefono a metà, i messaggi di prima lì non si leggono. I messaggi arrivano al nostro server <b>già chiusi</b>. Di ognuno il server vede <b>su quale scambio, chi dei due l'ha spedito, a che ora, quanto pesa e fin dove l'altra persona ha ritirato</b>: gli serve per consegnarlo e per avvisare. Il testo no, e la chiave non passa mai di lì. L'avviso «hai un nuovo messaggio» <b>non porta il testo</b>. A scambio finito — concluso, annullato, o quando chi vende ha liberato i sats — i due telefoni <b>buttano chiave e messaggi</b> e il server <b>cancella le buste e quegli orari</b>: stanno in un archivio a parte che <b>non entra nei backup</b>, e nel registro del server non resta una riga per messaggio, solo quella di un avviso partito. Se una di voi due <b>apre una disputa</b>, il suo telefono chiude la chiave di lettura in una busta per i moderatori — lo legge scritto prima di confermare —; la apre solo il moderatore che prende la disputa, che legge e non può scrivere al posto vostro, e a disputa chiusa si cancella tutto allo stesso modo. Quello che non possiamo cancellare: quel che l'altra persona ha <b>copiato o fotografato</b> dal suo schermo.</p>
+      <p>Dal <b>12 ottobre 2026</b>, dentro ogni scambio <b>preso</b> c'è una <b>chat</b>. <b>La chat è cifrata fra voi due e Barattolo la trasporta. Se il tuo account è nato su Nostr, Barattolo non la può aprire. Se è nato con Telegram (anche se poi entri con Nostr), il tuo profilo di scambio lo ricava il server: per questo ritrovi scambio e chat su ogni dispositivo, e per questo Barattolo durante lo scambio potrebbe tecnicamente aprirla. Non lo fa. A fine scambio la chat si cancella, per tutti. Il moderatore la legge solo se una di voi due apre una disputa.</b> Per intero. Ogni telefono fa nascere <b>a caso</b> una <b>chiave usa-e-getta</b> per quello scambio: <b>non si ricalcola da niente</b>. Perché tu ritrovi la chat se cambi telefono o browser, o se la memoria del browser si svuota, il telefono ne lascia sul nostro server una <b>copia sigillata</b>, chiusa con la chiave di quello scambio: la apre solo chi ha il tuo <b>profilo di scambio</b>, e il server la riconsegna <b>solo a te</b> — mai all'altra persona, mai a un moderatore. È qui la differenza, e conta dove è nato l'account, non come entri: il profilo di scambio di un account nato su Nostr lo ha solo lui; quello di un account nato con Telegram lo ricava il nostro server dall'account — anche quando poi entri con una chiave Nostr collegata —, ed è per questo che torna da solo su ogni dispositivo. I messaggi arrivano al nostro server <b>già chiusi</b>. Di ognuno il server vede <b>su quale scambio, chi dei due l'ha spedito, a che ora, quanto pesa e fin dove l'altra persona ha ritirato</b>: gli serve per consegnarlo e per avvisare. Il testo no. L'avviso «hai un nuovo messaggio» <b>non porta il testo</b>. A scambio finito — concluso, annullato, o quando chi vende ha liberato i sats — i due telefoni <b>buttano chiave e messaggi</b> e il server <b>cancella le buste, le copie sigillate e quegli orari</b>: stanno in un archivio a parte che <b>non entra nei backup</b>, e nel registro del server non resta una riga per messaggio, solo quella di un avviso partito. Se una di voi due <b>apre una disputa</b>, il suo telefono chiude la chiave di lettura in una busta per i moderatori — lo legge scritto prima di confermare —; la apre solo il moderatore che prende la disputa, che legge e non può scrivere al posto vostro, e a disputa chiusa si cancella tutto allo stesso modo. Quello che non possiamo cancellare: quel che l'altra persona ha <b>copiato o fotografato</b> dal suo schermo.</p>
       <p>Le <b>conversazioni fuori da Barattolo</b> non sono nostre: se vi scrivete su Telegram o su Nostr quella chat è vostra e di chi la trasporta — non la leggiamo, non ce l'abbiamo, e <b>in una disputa non possiamo usarla</b>. A decidere sono i fatti dello scambio: chi ha bloccato i sats, chi ha detto di aver mandato gli euro, chi li ha liberati.</p>
       <p>Dal <b>10 ottobre 2026</b>, negli scambi <b>in contanti di persona</b>, ci sono «📍 Sono qui» e l'appuntamento. <b>«Sono qui»</b> lo tocchi tu, se e quando vuoi: il server riceve una nota firmata con la tua chiave usa-e-getta, con l'<b>ora</b> e — solo se il telefono la dà — la <b>posizione</b> (il telefono te la chiede, e si può dire di no); se la dai, ne ricaviamo subito la distanza dall'altra persona e dal luogo dell'appuntamento. <b>L'appuntamento</b> lo scrive chi vende nel recapito, che viaggia cifrato fra voi due: al server arrivano solo l'<b>ora</b> e le <b>coordinate</b> del punto, se l'indirizzo è stato riconosciuto — mai il testo. Mentre chi vende scrive l'indirizzo, i suggerimenti li chiediamo noi a <b>Photon</b>, che usa i dati di OpenStreetMap, mandando <b>solo il testo cercato</b>: né chi sei né dove sei; «Usa la mia posizione» non esce dal nostro server. <b>Chi legge:</b> l'altra persona vede l'ora delle tue presenze, mai la tua posizione; un moderatore vede il confronto se si apre una disputa. Posizioni e testi cercati non li scriviamo nei registri del server. <b>Per quanto:</b> le posizioni e il punto restano solo finché una disputa sui contanti è possibile — si cancellano quando i sats vengono liberati o lo scambio si chiude (annullato, scaduto, tornato nel libro), e in ogni caso entro <b>quindici giorni</b>; restano le ore e le distanze, che se ne vanno con la cronaca dopo quaranta giorni. Con «dimentica il profilo» se ne vanno anche le tue presenze e i tuoi appuntamenti; su uno scambio ancora aperto resta solo l'ora, perché l'altra persona l'ha già vista. Il GPS si può falsificare: per noi è una conferma, non una prova assoluta.</p>
       <button class="btn ghost" onclick="apriProfiloP2P()">👤 Il tuo profilo di scambio</button>
@@ -54874,10 +54875,12 @@ const TAPPE_TOUR_P2P = [
    testo: 'SEPA, Revolut, Satispay, contanti — e con Barattozon i tuoi '
         + 'contanti dal tabaccaio diventano sats.'},
   {fig: '/assets/tour-p2p/recapiti.webp',
-   /* (12 ott 2026) dentro lo scambio c'e' anche la chat: stessa
-      promessa, stessa ragione */
+   /* (12 ott 2026) dentro lo scambio c'e' anche la chat. E DALLA
+      NOTTE la riga non giura piu' «lo dice la matematica»: con la
+      copia sigillata, per un account nato con Telegram non sarebbe
+      esatto (vedi il patto). Dice quel che vale per tutti */
    testo: 'I recapiti e la chat restano fra voi due, cifrati. Barattolo '
-        + 'non li legge: lo dice la matematica, non una promessa.'},
+        + 'non li legge, e a fine scambio la chat si cancella.'},
   {fig: '/assets/tour-p2p/reputazione.webp',
    testo: 'Chi è onesto nel mercatino è onesto anche qui: la '
         + 'reputazione è una sola. Guarda le stelle prima di scambiare.'},
@@ -75291,18 +75294,23 @@ function avvisaRecapitoP2P(id){
    lo trasporta, non puo' presentarne uno suo al posto mio. Da li' ogni
    messaggio e' chiuso fra le due chiavi usa-e-getta e firmato da
    quella di chi scrive.
-   LA CHIAVE VIVE SOLO QUI, in un cassetto suo del dispositivo
+   LA CHIAVE VIVE QUI, in un cassetto suo del dispositivo
    (`CHATSC_CHIAVE`): non sulla riga dello scambio, non nel mazzo, non
-   nel cloud, mai verso il server. A scambio finito il cassetto di
-   quello scambio si svuota — chiave e messaggi — e da quel momento le
-   buste, anche se qualcuno le avesse conservate, non le apre piu'
-   nessuno.
-   IL PREZZO, dichiarato: chi riapre lo scambio da un altro dispositivo
-   (o da un browser che dimentica) la chiave non ce l'ha, e i messaggi
-   di prima li' non si leggono. Si riparte con «Continua la chat qui»:
-   un saluto nuovo, firmato come il primo. Vale l'ULTIMO saluto di ogni
-   parte; il gesto e' un tocco e non parte da solo, o due dispositivi
-   dello stesso conto se la ruberebbero a turno.
+   nel cloud. Verso il server va solo SIGILLATA (vedi «LA COPIA
+   SIGILLATA DELLA CHIAVE», piu' sotto). A scambio finito il cassetto
+   di quello scambio si svuota — chiave e messaggi — e il server
+   cancella buste e copie: da quel momento le buste, anche se qualcuno
+   le avesse conservate, non le apre piu' nessuno.
+   LA CHAT SEGUE LO SCAMBIO (12 ott 2026, notte, decisione di Andrea).
+   Il prezzo della prima stesura — «da un altro dispositivo i messaggi
+   non si leggono» — costava troppo: bastava il tasto dell'avviso
+   Telegram, che apre la Mini App, per trovarsi «su un altro
+   dispositivo» con lo stesso telefono in mano. Adesso chi ritrova lo
+   scambio ritrova la chiave, dalla sua copia sigillata, e con lei
+   tutti i messaggi. «Continua la chat qui» resta per il solo caso
+   vero: una chiave la cui copia non c'e' (una chat aperta prima della
+   cura, da un telefono che non torna). Vale l'ULTIMO saluto di ogni
+   parte; il gesto e' un tocco e non parte da solo.
    QUEL CHE SI VEDE dell'altra persona e' testo e basta: niente
    allegati, i link non si aprono, e sotto un messaggio che porta un
    link o che chiede di spostarsi altrove c'e' una riga rossa. */
@@ -75320,7 +75328,7 @@ const CHATSC_DOPO = ['rilasciato', 'fattura_nuova', 'pagamento_ritentato'];
 /* `let` e non `const`: il banco lo accorcia */
 let CHATSC_POLSO_MS = 5000;
 const CHATSC_AVVISO = 'Barattolo non ti scrive mai qui. Non uscire dallo scambio per pagare. Non mandare codici o chiavi.';
-const CHATSC_PATTO = 'Cifrata fra voi due: Barattolo la trasporta ma non la può leggere, e a fine scambio la cancella. Un moderatore la legge solo se una di voi due apre una disputa.';
+const CHATSC_PATTO = 'Cifrata fra voi due: Barattolo la trasporta e non la legge, e a fine scambio la cancella. Un moderatore la legge solo se una di voi due apre una disputa.';
 const CHATSC_RIGA_LINK = 'C\'è un link: non aprirlo per pagare o per «verificare» qualcosa.';
 const CHATSC_RIGA_FUORI = 'Ti chiede di spostarti altrove: fuori dallo scambio Barattolo non può aiutarti.';
 let p2pChatScBozza = {};          // ordine -> quel che si sta scrivendo
@@ -75357,12 +75365,13 @@ function chatScScriviP2P(id, c){
 }
 /* BUTTARE: chiave e messaggi di uno scambio, per sempre. E' il gesto
    della fine — e di ogni volta che la chat riparte da zero (un altro
-   giro, un'altra controparte). */
+   giro). Con la chiave in mano se ne vanno quelle ritrovate dalle
+   copie sigillate: stanno nella stessa voce. */
 function chatScButtaP2P(id){
   const c = chatScDiP2P(id);
-  if (c && c.sk)
+  for (const mia of (typeof chatScMieChiaviP2P === 'function' ? chatScMieChiaviP2P(c) : []))
     for (const k of Object.keys(p2pChatScSegreti))
-      if (k.indexOf(c.sk + ':') === 0) delete p2pChatScSegreti[k];
+      if (k.indexOf(mia.sk + ':') === 0) delete p2pChatScSegreti[k];
   chatScScriviP2P(id, null);
   delete p2pChatScBozza[id];
   delete p2pChatScUltimoGiro[id];
@@ -75376,15 +75385,26 @@ function chatScServeP2P(o){
   return !!(o && o.peer && idMostroVero(o.id)
     && P2P_FINALI.indexOf(o.stato) < 0 && CHATSC_DOPO.indexOf(o.stato) < 0);
 }
-/* LA POTATURA: ogni voce del cassetto il cui scambio non c'e' piu', o
-   e' finito, se ne va. Gira col polso, su qualunque pagina: una chat
-   non deve sopravvivere al suo scambio perche' nessuno l'ha riaperto. */
-function chatScPotaP2P(){
+/* LA POTATURA (riscritta il 12 ott 2026, notte, richiesta di Andrea): LA
+   CHIAVE SI BUTTA SOLO QUANDO IL SERVER DICE CHE LO SCAMBIO E' FINITO.
+   La prima stesura girava ogni cinque secondi e guardava la riga
+   LOCALE: una riga che mancava per un attimo — messa da parte e fatta
+   rinascere, o rimasta un giro senza controparte — sarebbe costata la
+   chiave per sempre, e la chat sarebbe tornata con «l'hai aperta da un
+   altro dispositivo». Adesso la fine la dice chi la sa: `finite`, gli
+   scambi che il server dichiara finiti, nella risposta della domanda
+   del pallino (`chatScNovitaP2P`). Torna quante voci ha buttato. */
+function chatScPotaP2P(finite){
   const t = chatScTutteP2P();
-  const righe = ordiniP2P();
-  for (const id of Object.keys(t))
-    if (!chatScServeP2P(righe[id]) || (t[id] && t[id].peer && t[id].peer !== righe[id].peer))
-      chatScButtaP2P(id);
+  let n = 0;
+  for (const id of (Array.isArray(finite) ? finite : [])) {
+    if (!t[id]) continue;
+    if (typeof diarioP2P === 'function')
+      diarioP2P('chat ' + String(id).slice(0, 8) + ': scambio finito per il server, chiave e messaggi buttati');
+    chatScButtaP2P(id);
+    n++;
+  }
+  return n;
 }
 
 /* ---- LA LEVA (12 ott 2026, sera, richiesta di Andrea) ----
@@ -75470,14 +75490,19 @@ function chatScVistoP2P(id){
 }
 function chatScNovitaP2P(){
   if (p2pChatScNovitaInVolo) return p2pChatScNovitaInVolo;
-  if ((typeof VETRINA !== 'undefined' && VETRINA) || (typeof DEMO !== 'undefined' && DEMO) || !myTgId
-      || !chatScAccesaP2P())
+  if ((typeof VETRINA !== 'undefined' && VETRINA) || (typeof DEMO !== 'undefined' && DEMO) || !myTgId)
     return Promise.resolve();
   const righe = ordiniP2P();
-  const ids = Object.keys(righe)
-    .filter(id => chatScServeP2P(righe[id]) && chatScTradeP2P(righe[id])).slice(0, 30);
+  /* gli scambi dove la chat si puo' aprire, per il pallino... */
+  const vivi = chatScAccesaP2P() ? Object.keys(righe)
+    .filter(id => chatScServeP2P(righe[id]) && chatScTradeP2P(righe[id])) : [];
+  /* ...e OGNI voce del cassetto, per sapere dal server se il suo
+     scambio e' finito: e' l'unica cosa che fa buttare una chiave */
+  const ids = vivi.concat(Object.keys(chatScTutteP2P())
+    .filter(id => idMostroVero(id) && vivi.indexOf(id) < 0)).slice(0, 30);
   if (!ids.length) return Promise.resolve();
   p2pChatScNovitaInVolo = chatScFetch('novita', {ordini: ids}).then(d => {
+    chatScPotaP2P(d.finite);
     if (d.spenta) { chatScSpegniP2P(); return; }
     const prima = ids.filter(id => chatScNonLettoP2P(ordiniP2P()[id])).join(',');
     /* la parola del server e' quella che vale: uno scambio che non
@@ -75527,6 +75552,58 @@ function chatScApriSalutoP2P(o, tk, busta){
   if (!/^[0-9a-f]{64}$/.test(ev.content || '')) return null;
   return {pub: ev.content, t: ev.created_at || 0, mio: ev.pubkey === tk.pub, ev: ev};
 }
+/* ---- LA COPIA SIGILLATA DELLA CHIAVE (12 ott 2026, notte, decisione
+   di Andrea: «la chat segue lo scambio») ----
+   DAL CAMPO: chat aperta nella web app installata, poi il tasto «Apri
+   lo scambio» dell'avviso Telegram — che apre la Mini App, un'altra
+   memoria dello STESSO telefono — e li' «l'hai aperta da un altro
+   dispositivo»; un tocco su «Continua la chat qui» e l'app installata
+   diventava lei l'altro dispositivo. La chiave stava in UNA memoria.
+   ADESSO la chiave resta CASUALE e usa-e-getta, ma appena nasce il
+   telefono ne lascia fra le buste del server una COPIA SIGILLATA,
+   chiusa (NIP-44) con la chiave di QUELLO scambio verso se stessa: la
+   apre solo chi ha la chiave dello scambio, cioe' chi ha il mio
+   profilo di scambio. Chi ritrova lo scambio — la memoria svuotata,
+   un altro browser, la Mini App, un altro telefono — ritrova la
+   chiave e TUTTI i messaggi, che sul server restano fino alla fine.
+   IL SERVER LA SERVE SOLO A CHI L'HA SPEDITA: mai all'altra parte, mai
+   al moderatore. E SE NE VA CON LE BUSTE: a scambio finito non c'e'
+   piu' da nessuna parte, e non si ricalcola da niente.
+   ⚠️ IL COSTO, scritto nel patto. CONTA DOV'E' NATO L'ACCOUNT, non
+   come si entra (la correzione di Andrea): per un account nato con
+   Telegram il profilo di scambio lo ricava il server dall'account —
+   e' per questo che torna da solo, e vale anche se poi si entra con
+   una chiave Nostr collegata —, quindi durante lo scambio il server
+   POTREBBE aprire la copia di quella parte. Per un account nato su
+   Nostr no. */
+function chatScCopiaP2P(o, tk, sk){
+  const NT = window.NostrTools;
+  return NT.nip44.encrypt(JSON.stringify({v: 1, ordine: String(o.id),
+    pub: NT.getPublicKey(NT.utils.hexToBytes(sk)), sk: sk}), chatScSegretoP2P(tk.sk, tk.pub));
+}
+/* PURA: una copia che torna. NIP-44 e' cifratura AUTENTICATA: una busta
+   che si apre con la mia chiave dello scambio l'ha chiusa chi ha quella
+   chiave. Dentro deve esserci QUESTO scambio, e la pubblica deve essere
+   quella della segreta. Torna `{sk, pub}` o null. */
+function chatScApriCopiaP2P(o, tk, busta){
+  const NT = window.NostrTools;
+  let d;
+  try { d = JSON.parse(NT.nip44.decrypt(busta, chatScSegretoP2P(tk.sk, tk.pub))); }
+  catch(e) { return null; }
+  if (!d || d.v !== 1 || d.ordine !== String(o.id) || !/^[0-9a-f]{64}$/.test(d.sk || '')) return null;
+  let pub = '';
+  try { pub = NT.getPublicKey(NT.utils.hexToBytes(d.sk)); } catch(e) { return null; }
+  return pub === d.pub ? {sk: d.sk, pub: pub} : null;
+}
+/* PURA: le MIE chiavi usa-e-getta di questo scambio — quella in mano
+   per prima, poi le altre ritrovate dalle copie. */
+function chatScMieChiaviP2P(c){
+  const v = [];
+  if (c && c.sk && c.pub) v.push({sk: c.sk, pub: c.pub});
+  for (const k of ((c && c.mieChiavi) || []))
+    if (k && k.sk && k.pub && !v.some(x => x.pub === k.pub)) v.push({sk: k.sk, pub: k.pub});
+  return v;
+}
 /* PURA: un messaggio, dentro e fuori — chiuso fra la mia chiave
    usa-e-getta e quella dell'altra parte, firmato dalla mia. */
 function chatScBustaP2P(o, c, testo, quando){
@@ -75537,52 +75614,88 @@ function chatScBustaP2P(o, c, testo, quando){
   return {dentro: dentro,
           busta: NT.nip44.encrypt(JSON.stringify(dentro), chatScSegretoP2P(c.sk, c.loro.pub))};
 }
-/* PURA: un messaggio che arriva. Si prova con ogni chiave che l'altra
-   parte ha presentato (di solito una); a firmare dev'essere una delle
-   due chiavi di QUELLA coppia. Torna `{id, t, mio, testo}` o null. */
+/* PURA: un messaggio che arriva. Si prova con ogni chiave MIA (quella
+   in mano e quelle ritrovate dalle copie) e con ogni chiave che
+   l'altra parte ha presentato (di solito una e una); a firmare
+   dev'essere una delle due chiavi di QUELLA coppia. Torna
+   `{id, t, mio, testo}` o null. */
 function chatScApriMsgP2P(o, c, busta){
   const NT = window.NostrTools;
-  if (!c || !c.sk) return null;
-  for (const l of (c.loroTutte || []).slice().reverse()) {
-    let ev;
-    try { ev = JSON.parse(NT.nip44.decrypt(busta, chatScSegretoP2P(c.sk, l.pub))); }
-    catch(e) { continue; }
-    if (!ev || ev.kind !== CHATSC_MSG || !NT.verifyEvent(ev)) return null;
-    if (ev.pubkey !== c.pub && ev.pubkey !== l.pub) return null;
-    if (((ev.tags || []).find(t => t[0] === 'o') || [])[1] !== String(o.id)) return null;
-    return {id: ev.id, t: ev.created_at || 0, mio: ev.pubkey === c.pub,
-            testo: String(ev.content || '').slice(0, CHATSC_MAX_TESTO)};
-  }
+  for (const mia of chatScMieChiaviP2P(c))
+    for (const l of ((c && c.loroTutte) || []).slice().reverse()) {
+      let ev;
+      try { ev = JSON.parse(NT.nip44.decrypt(busta, chatScSegretoP2P(mia.sk, l.pub))); }
+      catch(e) { continue; }
+      if (!ev || ev.kind !== CHATSC_MSG || !NT.verifyEvent(ev)) return null;
+      if (ev.pubkey !== mia.pub && ev.pubkey !== l.pub) return null;
+      if (((ev.tags || []).find(t => t[0] === 'o') || [])[1] !== String(o.id)) return null;
+      return {id: ev.id, t: ev.created_at || 0, mio: ev.pubkey === mia.pub,
+              testo: String(ev.content || '').slice(0, CHATSC_MAX_TESTO)};
+    }
   return null;
 }
-/* PURA: le buste ritirate entrano nella voce del cassetto. Prima i
-   saluti, poi i messaggi: un messaggio si apre con la chiave che il
-   suo saluto ha presentato. Torna `{c, nuovi}` — `nuovi` conta i
-   messaggi dell'altra parte arrivati adesso. `c.muti` conta le buste
-   che questo dispositivo non sa aprire (scritte per un'altra chiave). */
+/* PURA: le buste ritirate entrano nella voce del cassetto. Prima le
+   COPIE SIGILLATE delle mie chiavi, poi i saluti, poi i messaggi: un
+   messaggio si apre con la chiave che il suo saluto ha presentato.
+   Torna `{c, nuovi, rileggi, adottata}` — `nuovi` conta i messaggi
+   dell'altra parte arrivati adesso; `c.muti` le buste che questo
+   dispositivo non sa aprire (scritte per una chiave che non ha).
+   LA CHIAVE SI ADOTTA: se il mio ultimo saluto presenta una chiave che
+   qui non e' quella in mano, ma la sua copia sigillata c'e', quella
+   diventa la chiave in mano — e' la stessa chat, aperta da un'altra
+   memoria — e la vecchia resta fra le ritrovate, per i messaggi suoi.
+   `rileggi`: si e' imparata una chiave, quindi il segnalibro torna a
+   zero e al prossimo ritiro si riapre tutto (i messaggi gia' aperti
+   non raddoppiano: hanno un id). */
 function chatScPosaP2P(o, tk, c0, buste, giro){
   const c = Object.assign({giro: giro, peer: o.peer, cursore: 0, msgs: [], loroTutte: [], muti: 0}, c0 || {});
   c.msgs = (c.msgs || []).slice();
   c.loroTutte = (c.loroTutte || []).slice();
-  let nuovi = 0;
+  c.mieChiavi = (c.mieChiavi || []).slice();
+  c.mieTutte = (c.mieTutte || []).slice();
+  c.copie = Object.assign({}, c.copie);
+  let nuovi = 0, imparate = 0, adottata = false;
   const lista = Array.isArray(buste) ? buste : [];
   const dopo = (a, b) => !b || a.t > b.t || (a.t === b.t && a.n > b.n);
+  for (const b of lista) {
+    if (!b || b.tipo !== 'chiave') continue;
+    const k = chatScApriCopiaP2P(o, tk, b.busta);
+    if (!k) continue;
+    /* questa copia sul server c'e': non si rimanda */
+    c.copie[k.pub] = 1;
+    if (c.sk && k.pub === c.pub) continue;
+    if (!c.mieChiavi.some(x => x.pub === k.pub)) { c.mieChiavi.push(k); imparate++; }
+  }
   for (const b of lista) {
     if (!b || b.tipo !== 'saluto') continue;
     const s = chatScApriSalutoP2P(o, tk, b.busta);
     if (!s) continue;
     const voce = {pub: s.pub, t: s.t, n: b.n | 0};
     if (s.mio) {
+      /* i miei saluti si tengono: in una disputa e' da quelli che il
+         moderatore sa quali chiavi usa-e-getta sono mie */
+      if (!c.mieTutte.some(x => x.pub === s.pub)) c.mieTutte.push({pub: s.pub, t: s.t, ev: s.ev});
       if (dopo(voce, c.mioUltimo)) c.mioUltimo = voce;
       continue;
     }
     if (!c.loroTutte.some(l => l.pub === s.pub)) c.loroTutte.push({pub: s.pub, t: s.t, ev: s.ev});
     if (dopo(voce, c.loro)) {
-      /* l'altra parte ha ripreso la chat da un altro dispositivo: si
-         dice, perche' i messaggi di prima li' non li vede */
+      /* l'altra parte ha ripreso la chat con una chiave nuova (un
+         «Continua la chat qui»): si dice */
       if (c.loro && c.loro.pub !== s.pub)
         c.msgs.push({id: 'sis:' + s.pub.slice(0, 16), t: s.t, n: b.n | 0, sis: 1});
       c.loro = voce;
+    }
+  }
+  if (c.mioUltimo && c.mioUltimo.pub !== c.pub) {
+    const sua = c.mieChiavi.find(x => x.pub === c.mioUltimo.pub);
+    if (sua) {
+      if (c.sk && c.pub) c.mieChiavi.push({sk: c.sk, pub: c.pub});
+      c.mieChiavi = c.mieChiavi.filter(x => x.pub !== sua.pub);
+      c.sk = sua.sk; c.pub = sua.pub;
+      c.saluto = null; c.copia = null;
+      adottata = true;
+      imparate++;
     }
   }
   for (const b of lista) {
@@ -75602,7 +75715,9 @@ function chatScPosaP2P(o, tk, c0, buste, giro){
   c.msgs.sort((a, b) => ((a.n || 1e15) - (b.n || 1e15)) || ((a.t || 0) - (b.t || 0)));
   c.msgs = c.msgs.slice(-CHATSC_MAX_MSG);
   for (const b of lista) if (b && (b.n | 0) > (c.cursore | 0)) c.cursore = b.n | 0;
-  return {c: c, nuovi: nuovi};
+  /* UNA CHIAVE MIA IN PIU' apre buste che prima erano mute */
+  if (imparate) { c.cursore = 0; c.muti = 0; }
+  return {c: c, nuovi: nuovi, rileggi: imparate > 0, adottata: adottata};
 }
 /* PURA: questa chat l'ha in mano un ALTRO mio dispositivo? Il mio
    ultimo saluto sul server presenta una chiave che qui non c'e'. */
@@ -75626,9 +75741,16 @@ async function chatScFetch(percorso, corpo){
                                  {codice: r.status});
   return d || {};
 }
-/* LA MIA CHIAVE SI PRESENTA: nasce se non c'e', e il suo saluto parte
-   (o riparte: la stessa busta rimandata non conta due volte). `forza`
-   e' il tocco di «Continua la chat qui». */
+/* LA MIA CHIAVE SI PRESENTA: nasce se non c'e', la sua COPIA SIGILLATA
+   va sul server, e poi parte il saluto (o riparte: la stessa busta
+   rimandata non conta due volte). `forza` e' il tocco di «Continua la
+   chat qui».
+   LA COPIA PRIMA DEL SALUTO: una chiave presentata all'altra persona
+   senza la sua copia sarebbe di nuovo una chiave che vive in una
+   memoria sola. Se la copia non parte il saluto aspetta, e si riprova
+   al battito dopo.
+   E LE CHAT GIA' APERTE prima di questa cura si mettono in pari da
+   sole: la chiave c'e', la copia no — parte adesso, senza saluto. */
 async function chatScPresentaP2P(id, forza){
   const NT = window.NostrTools;
   const o = ordiniP2P()[id];
@@ -75636,34 +75758,64 @@ async function chatScPresentaP2P(id, forza){
   let c = chatScDiP2P(id);
   if (!o || !tk || !c) return;
   if (chatScAltroveP2P(c) && !forza) return;
-  const serve = !c.sk || !c.saluto || forza
-    || !c.mioUltimo || c.mioUltimo.pub !== c.pub;
-  if (!serve) return;
+  const alSicuro = (v, pub) => !!(v && v.copie && v.copie[pub]);
+  const daPresentare = !c.sk || !!forza || !c.mioUltimo || c.mioUltimo.pub !== c.pub;
+  const diPrima = v => chatScMieChiaviP2P(v).filter(k => !alSicuro(v, k.pub));
+  if (!daPresentare && !diPrima(c).length) return;
   if (!c.sk) {
     const sk = NT.generateSecretKey();
     c.sk = NT.utils.bytesToHex(sk);
     c.pub = NT.getPublicKey(sk);
-    c.saluto = null;
+    c.saluto = null; c.copia = null;
   }
-  if (!c.saluto || forza) {
-    /* dopo l'ultimo saluto mio che il server ha: e' cosi' che questo vince */
-    const quando = Math.max(Math.floor(Date.now() / 1000), ((c.mioUltimo && c.mioUltimo.t) | 0) + 1);
-    c.saluto = {t: quando, busta: chatScSalutoP2P(o, tk, c.pub, quando).busta};
+  if (!alSicuro(c, c.pub)) {
+    if (!c.copia) c.copia = chatScCopiaP2P(o, tk, c.sk);
+    /* PRIMA si scrive, POI si spedisce: una chiave presentata e poi
+       persa qui sarebbe una chat che l'altro scrive a nessuno */
+    chatScScriviP2P(id, c);
+    await chatScFetch('invia', {ordine: id, tipo: 'chiave', busta: c.copia});
+    c = chatScDiP2P(id);
+    if (!c) return;
+    c.copie = Object.assign({}, c.copie); c.copie[c.pub] = 1;
+    c.copia = null;
+    chatScScriviP2P(id, c);
   }
-  /* PRIMA si scrive, POI si spedisce: una chiave presentata e poi
-     persa qui sarebbe una chat che l'altro scrive a nessuno */
-  chatScScriviP2P(id, c);
-  const r = await chatScFetch('invia', {ordine: id, tipo: 'saluto', busta: c.saluto.busta});
-  c = chatScDiP2P(id);
-  if (!c) return;
-  const mio = {pub: c.pub, t: c.saluto.t, n: r.n | 0};
-  if (!c.mioUltimo || mio.t > c.mioUltimo.t || (mio.t === c.mioUltimo.t && mio.n > (c.mioUltimo.n | 0)))
-    c.mioUltimo = mio;
-  chatScScriviP2P(id, c);
+  if (daPresentare) {
+    if (!c.saluto || forza) {
+      /* dopo l'ultimo saluto mio che il server ha: e' cosi' che questo vince */
+      const quando = Math.max(Math.floor(Date.now() / 1000), ((c.mioUltimo && c.mioUltimo.t) | 0) + 1);
+      c.saluto = {t: quando, busta: chatScSalutoP2P(o, tk, c.pub, quando).busta};
+    }
+    chatScScriviP2P(id, c);
+    const r = await chatScFetch('invia', {ordine: id, tipo: 'saluto', busta: c.saluto.busta});
+    c = chatScDiP2P(id);
+    if (!c) return;
+    const mio = {pub: c.pub, t: c.saluto.t, n: r.n | 0};
+    if (!c.mioUltimo || mio.t > c.mioUltimo.t || (mio.t === c.mioUltimo.t && mio.n > (c.mioUltimo.n | 0)))
+      c.mioUltimo = mio;
+    chatScScriviP2P(id, c);
+  }
+  /* ...E LE CHIAVI DI PRIMA che questo telefono ha ancora in mano e il
+     server no (una chat ripresa altrove prima di questa cura): la loro
+     copia parte adesso, cosi' i messaggi vecchi si leggono ovunque. Se
+     non parte si riprova al battito dopo, e la chat intanto funziona */
+  for (const k of diPrima(c)) {
+    const vecchia = chatScCopiaP2P(o, tk, k.sk);
+    try { await chatScFetch('invia', {ordine: id, tipo: 'chiave', busta: vecchia}); }
+    catch(e) { break; }
+    c = chatScDiP2P(id);
+    if (!c) return;
+    c.copie = Object.assign({}, c.copie); c.copie[k.pub] = 1;
+    chatScScriviP2P(id, c);
+  }
 }
 /* IL RITIRO: le buste nuove dal server, dentro il cassetto. Una alla
    volta per scambio. Quel che il server dice della chat (aperta,
-   finita, senza l'altra parte) resta in `p2pChatScSapere`. */
+   finita, senza l'altra parte) resta in `p2pChatScSapere`.
+   A BUTTARE LA CHIAVE E' SOLO LA PAROLA DEL SERVER (12 ott 2026, notte): lo
+   scambio finito, un altro giro, il cassetto rinato. Lo stato della
+   riga di QUESTO telefono non butta piu' niente — e ogni volta che una
+   chiave se ne va il diario lo scrive, con la ragione. */
 function chatScRitiraP2P(id){
   if (p2pChatScInVolo[id]) return p2pChatScInVolo[id];
   if ((typeof VETRINA !== 'undefined' && VETRINA) || (typeof DEMO !== 'undefined' && DEMO) || !myTgId)
@@ -75671,6 +75823,9 @@ function chatScRitiraP2P(id){
   const o0 = ordiniP2P()[id];
   if (!chatScAccesaP2P() || !chatScServeP2P(o0) || !chatScTradeP2P(o0)) return Promise.resolve();
   p2pChatScUltimoGiro[id] = Date.now();
+  const corto = String(id).slice(0, 8);
+  const scrivi = riga => { if (typeof diarioP2P === 'function') diarioP2P('chat ' + corto + ': ' + riga); };
+  let rileggi = false;
   p2pChatScInVolo[id] = (async () => {
     await caricaNostrTools();
     const prima = chatScDiP2P(id);
@@ -75685,23 +75840,31 @@ function chatScRitiraP2P(id){
     if (!d.aperta) {
       /* FINITA: lo dice il server, che la fine la sa dal coordinatore.
          Chiave e messaggi se ne vanno adesso */
-      if (d.finita && prima) chatScButtaP2P(id);
+      if (d.finita && prima) { scrivi('scambio finito per il server, chiave e messaggi buttati'); chatScButtaP2P(id); }
       p2pChatScSapere[id] = {chiusa: !!d.finita, senzaAltro: !!d.senza_altro};
       if (!!ieri.chiusa !== !!d.finita || !!ieri.senzaAltro !== !!d.senza_altro) chatScRidisegnaP2P(id);
       return;
     }
     p2pChatScSapere[id] = {};
-    /* un altro giro (l'ordine e' tornato nel libro ed e' stato
-       ripreso) o un'altra controparte: quella di prima non c'entra piu' */
+    /* UN ALTRO GIRO (l'ordine e' tornato nel libro ed e' stato
+       ripreso): lo dice il server, e la chat di prima non c'entra piu' */
     let c0 = chatScDiP2P(id);
-    if (c0 && (c0.giro !== d.giro || c0.peer !== o.peer)) { chatScButtaP2P(id); c0 = null; }
+    if (c0 && c0.giro !== d.giro) {
+      scrivi('il server dice il giro ' + d.giro + ', la chat era del giro ' + c0.giro + ': si riparte');
+      chatScButtaP2P(id); c0 = null;
+    }
     /* IL CASSETTO DEL SERVER E' RINATO (`perso`): le buste che questo
        telefono aveva visto la' non ci sono piu', saluti compresi. Si
        riparte da zero con una chiave nuova — l'altro telefono fa lo
        stesso al suo prossimo giro */
-    if (c0 && d.perso) { chatScButtaP2P(id); c0 = null; }
+    if (c0 && d.perso) {
+      scrivi('le buste sul server non ci sono piu\': si riparte');
+      chatScButtaP2P(id); c0 = null;
+    }
     const esito = chatScPosaP2P(o, tk, c0, d.buste, d.giro);
     chatScScriviP2P(id, esito.c);
+    if (esito.adottata) scrivi('chiave ritrovata dalla copia sigillata, la chat continua qui');
+    rileggi = !!esito.rileggi;
     /* l'ultimo messaggio dell'altra persona, per il pallino: lo dicono
        le buste appena ritirate, prima ancora della domanda leggera */
     for (const b of (d.buste || []))
@@ -75713,7 +75876,7 @@ function chatScRitiraP2P(id){
         && (typeof document === 'undefined' || document.visibilityState === 'visible'))
       chatScVistoP2P(id);
     else chatScSegnaP2P();
-    if (esito.nuovi) {
+    if (esito.nuovi && !esito.rileggi) {
       haptic();
       if (!(p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine'))
         toast('💬 Nuovo messaggio nello scambio', 5000);
@@ -75724,7 +75887,12 @@ function chatScRitiraP2P(id){
     /* il server non sa ancora della presa, o la rete e' caduta: si
        riprova al prossimo battito, e non si butta niente */
     console.log('💬 [p2p] chat: il ritiro non riesce (' + (e && e.message || e) + ')');
-  }).finally(() => { delete p2pChatScInVolo[id]; });
+  }).finally(() => {
+    delete p2pChatScInVolo[id];
+    /* una chiave ritrovata: si rilegge SUBITO da capo, senza aspettare
+       il battito — e' il momento in cui i messaggi di prima tornano */
+    if (rileggi) setTimeout(() => { chatScRitiraP2P(id); }, 0);
+  });
   return p2pChatScInVolo[id];
 }
 /* ---- quel che si scrive ---- */
@@ -75793,10 +75961,16 @@ function chatScContaP2P(){
    chiave usa-e-getta, che non parte. */
 function chatScPaccoP2P(o, c){
   const NT = window.NostrTools;
-  return {v: 1, ordine: String(o.id),
-          saluti: (c.mioSaluti || []).concat((c.loroTutte || []).map(l => l.ev)).filter(Boolean),
-          chiavi: (c.loroTutte || []).map(l => ({a: c.pub, b: l.pub,
-            k: NT.utils.bytesToHex(chatScSegretoP2P(c.sk, l.pub))}))};
+  /* TUTTE le mie chiavi (quella in mano e le ritrovate) per tutte le
+     sue: il moderatore legge la chat intera, da qualunque memoria sia
+     passata. I saluti dicono di chi e' ogni chiave */
+  const saluti = (c.mieTutte || []).map(x => x.ev).concat(c.mioSaluti || [])
+    .concat((c.loroTutte || []).map(l => l.ev)).filter(Boolean);
+  const chiavi = [];
+  for (const mia of chatScMieChiaviP2P(c))
+    for (const l of (c.loroTutte || []))
+      chiavi.push({a: mia.pub, b: l.pub, k: NT.utils.bytesToHex(chatScSegretoP2P(mia.sk, l.pub))});
+  return {v: 1, ordine: String(o.id), saluti: saluti, chiavi: chiavi};
 }
 async function chatScAiModeratoriP2P(id){
   const NT = window.NostrTools;
@@ -75806,7 +75980,7 @@ async function chatScAiModeratoriP2P(id){
   if (!o || o.stato !== 'in_disputa' || !o.disputaMia || !tk) return;
   if (!chatScAccesaP2P()) return;
   if (!c || !c.sk || !(c.loroTutte || []).length) return;
-  const cosa = (c.loroTutte || []).map(l => l.pub).join(',');
+  const cosa = chatScMieChiaviP2P(c).map(m => m.pub).join(',') + '|' + (c.loroTutte || []).map(l => l.pub).join(',');
   if (c.modDato && c.modTutti && Object.keys(c.modDato).every(m => c.modDato[m] === cosa)) {
     /* gia' dato a tutti quelli che c'erano: si richiede l'elenco solo
        ogni tanto, per un moderatore arrivato dopo */
@@ -75895,7 +76069,7 @@ function oraBreveChatScP2P(ts){
 function chatScPiedeP2P(o, c){
   if (chatScAltroveP2P(c) || (c && !c.sk && c.mioUltimo))
     return {modo: 'altrove', html:
-      '<div class="hint">Hai aperto questa chat da un altro dispositivo. Se la continui qui, i messaggi di prima qui non si vedono.</div>'
+      '<div class="hint">Questa chat è aperta su un altro dispositivo o browser. Riaprila da lì e torna anche qui; se la continui qui, i messaggi di prima qui non si vedono.</div>'
       + '<button class="btn ghost" onclick="continuaChatScambioP2P()">Continua la chat qui</button>'};
   if (!chatScProntaP2P(c))
     return {modo: 'attesa', html:
@@ -75986,11 +76160,11 @@ function chatScRidisegnaP2P(id){
   if (piede.dataset.modo !== p.modo) { piede.dataset.modo = p.modo; piede.innerHTML = p.html; }
 }
 /* IL POLSO DELLA CHAT: finche' lo scambio e' davanti e la pagina e' in
-   vista, un ritiro ogni pochi secondi. E a ogni battito la potatura,
-   su qualunque pagina. */
+   vista, un ritiro ogni pochi secondi. LA POTATURA NON STA PIU' QUI
+   (12 ott 2026, notte): la fa la risposta del pallino, con la parola
+   del server — vedi `chatScPotaP2P`. */
 if (typeof document !== 'undefined' && document.addEventListener) {
   setInterval(() => {
-    try { chatScPotaP2P(); } catch(e) {}
     if (document.visibilityState !== 'visible') return;
     /* il pallino: una domanda ogni mezzo minuto, su qualunque pagina */
     if (!(p2pChatScBattiti++ % CHATSC_NOVITA_OGNI)) chatScNovitaP2P();

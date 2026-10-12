@@ -113,8 +113,8 @@ riporta al libro su «Compra BTC».
    i soldi: si sbloccano solo a scambio concluso.»
 3. «SEPA, Revolut, Satispay, contanti — e con Barattozon i tuoi contanti
    dal tabaccaio diventano sats.»
-4. «I recapiti ve li scambiate voi due, cifrati. Barattolo non li legge:
-   lo dice la matematica, non una promessa.»
+4. «I recapiti e la chat restano fra voi due, cifrati. Barattolo non li
+   legge, e a fine scambio la chat si cancella.»
 5. «Chi è onesto nel mercatino è onesto anche qui: la reputazione è una
    sola. Guarda le stelle prima di scambiare.»
 6. (col marchio Barattozon) «Con Barattozon chi vende sats prepara il
@@ -1732,8 +1732,8 @@ tutti e due.
   (senza un nome: «Chat con l'altra persona»).
 - **In cima, sempre**: «🛡️ Barattolo non ti scrive mai qui. Non uscire
   dallo scambio per pagare. Non mandare codici o chiavi.»
-- **In fondo, sempre**: «🔒 Cifrata fra voi due: Barattolo la trasporta ma
-  non la può leggere, e a fine scambio la cancella. Un moderatore la legge
+- **In fondo, sempre**: «🔒 Cifrata fra voi due: Barattolo la trasporta e
+  non la legge, e a fine scambio la cancella. Un moderatore la legge
   solo se una di voi due apre una disputa.»
 - **Appena preso l'ordine**, finché l'altra persona non ha aperto lo
   scambio: «Si apre appena <nome> apre lo scambio.» (il campo per scrivere
@@ -1756,12 +1756,18 @@ tutti e due.
   bottone «⚡ Apri lo scambio». Uno per ogni volta che c'è da leggere, non
   uno per messaggio. Ad app aperta su un'altra pagina: «💬 Nuovo messaggio
   nello scambio».
-- **Da un altro telefono** (o da un browser che dimentica): «Hai aperto
-  questa chat da un altro dispositivo. Se la continui qui, i messaggi di
-  prima qui non si vedono.» → «**Continua la chat qui**». All'altra persona
-  compare: «🔑 <nome> ha ripreso la chat da un altro dispositivo: i messaggi
-  di prima lì non li vede.» Se restano messaggi illeggibili: «N messaggi di
-  prima non si possono leggere da questo dispositivo.»
+- **Da un altro telefono, da un altro browser, dalla Mini App** (o se la
+  memoria del browser si svuota): la chat c'è, con tutti i messaggi. Non
+  compare nessuna scritta: si legge e si scrive come prima (dal 12 ott
+  2026, notte). È così anche dal bottone «⚡ Apri lo scambio» dell'avviso
+  Telegram, che apre la Mini App.
+- **Solo per una chat aperta altrove prima di quella data**: «Questa chat
+  è aperta su un altro dispositivo o browser. Riaprila da lì e torna anche
+  qui; se la continui qui, i messaggi di prima qui non si vedono.» →
+  «**Continua la chat qui**». All'altra persona compare: «🔑 <nome> ha
+  ripreso la chat da un altro dispositivo: i messaggi di prima lì non li
+  vede.» Se restano messaggi illeggibili: «N messaggi di prima non si
+  possono leggere da questo dispositivo.»
 - **Se l'altra persona non è di Barattolo** (scambia da un'altra app, o
   non si è fatta riconoscere): «💬 Con questa persona la chat non c'è: non
   sta scambiando da Barattolo, o non si è fatta riconoscere.»

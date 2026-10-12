@@ -4360,3 +4360,19 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   scambi ancora in corso riprendono con le loro buste e le loro chiavi.
   Lo stato vero lo dice il pannello «⚙️ Stato delle leve», voce «Chat
   nello scambio P2P».
+- LA CHAT NELLO SCAMBIO: LE COPIE SIGILLATE (12 ott 2026, notte, cantiere
+  chat-stesso-dispositivo; com'è fatta in ARCHITETTURA, «LA CHAT SEGUE
+  LO SCAMBIO: LA COPIA SIGILLATA»). AL DEPLOY NON C'È NIENTE DA FARE:
+  nessuna migrazione (`tipo` è testo, e `chiave` è un valore in più),
+  nessuna leva nuova, nessuna riga da aggiungere al config. In
+  `chat-scambi.db` compaiono righe con `tipo='chiave'`: sono le copie
+  sigillate delle chiavi della chat, una o poche per parte, e se ne
+  vanno con le altre buste a scambio finito. Il file resta FUORI dai
+  backup, a maggior ragione adesso. Le chat aperte PRIMA di questo
+  deploy si mettono in pari da sole, al primo ritiro del telefono che
+  ha la chiave. PER GUARDARE cos'ha uno scambio (sola lettura, senza il
+  contenuto delle buste):
+  `sudo -u barattolo sqlite3 -readonly /srv/barattolo/dati/chat-scambi.db "SELECT ordine, giro, da, tipo, n, quando FROM buste ORDER BY n DESC LIMIT 40"`.
+  Due righe `saluto` dello stesso account nello stesso scambio vogliono
+  dire due chiavi presentate (un «Continua la chat qui»); una riga
+  `chiave` per ogni chiave vuol dire che le copie ci sono.

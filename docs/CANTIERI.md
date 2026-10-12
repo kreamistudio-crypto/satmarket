@@ -53325,3 +53325,152 @@ vivo sono dell'albero di prima dei rebase. LA CI DI MAIN, guardata
 prima del push: l'ultima conclusa è verde (`efd69ec`), quella sulla
 punta era in corso. L'«Ok al push» di Andrea stava nel brief e l'ha
 ridetto rispondendo alla richiesta di conferma, col numero del punto 6.
+
+## La chat segue lo scambio: la copia sigillata della chiave, e la potatura che non butta più (12 ott 2026, notte, cantiere chat-stesso-dispositivo, dal campo di Andrea)
+
+**IL FATTO.** Prova dal vivo di Andrea, poche ore dopo la chat nello
+scambio: sul telefono, nella web app installata, con l'account Telegram
+collegato alla sua npub, scambio preso, la chat funziona. Chiusa l'app
+e riaperta dalla stessa icona, senza rifare il login: «Hai aperto
+questa chat da un altro dispositivo. Se la continui qui, i messaggi di
+prima qui non si vedono». Sul PC, entrato solo con Nostr, no.
+
+**LA CAUSA, riprodotta: la chiave non era stata buttata, era stata
+SCAVALCATA.** La chiave della chat viveva in UNA memoria: il
+localStorage di quel browser (`barattolo_p2p_chat@<conto>`). Ma lo
+scambio no: il profilo di scambio di un account Telegram si ricava dal
+conto, e la riga torna dall'archivio del server con la sua chiave — su
+qualunque memoria. E per un account Telegram una seconda memoria è a
+un tocco: l'avviso «💬 Hai un nuovo messaggio nello scambio» porta il
+tasto «⚡ Apri lo scambio», che apre la **Mini App dentro Telegram**
+(`_link_dentro_telegram`, leva `TELEGRAM_MINIAPP_LINK`; a leva spenta
+il browser interno di Telegram: un'altra memoria lo stesso). Lì la riga
+c'è, la chiave della chat no, e la pagina diceva — vero per il codice,
+falso per chi ha il telefono in mano — «l'hai aperta da un altro
+dispositivo». Un tocco su «Continua la chat qui» presenta una chiave
+nuova; e l'app installata, riaperta con la memoria INTATTA e la sua
+chiave ancora nel cassetto, trova che il suo ultimo saluto ne presenta
+un'altra: la scritta. Il banco (`ripro_due_porte`, nello scratchpad:
+due memorie di Chrome, la seconda dentro il finto Telegram) lo
+riproduce passo per passo — nell'app installata la chiave c'è ancora,
+nessun «butta», e il piede è «altrove». Sul PC entrato con Nostr
+l'avviso è un DM: quella porta non c'è. Lo stesso vale per ogni
+seconda memoria — un altro browser, la memoria svuotata: profilo dal
+conto, riga dal server, chat no (riprodotto anche questo).
+⚠️ QUEL CHE NON SO: se sul telefono di Andrea sia andata proprio così
+(il tasto dell'avviso, e «Continua la chat qui» di là). È l'unica
+strada che, a memoria intatta, porta a quella scritta; la conferma è
+una riga sola sul VPS (PRODUZIONE, «LE COPIE SIGILLATE»): due `saluto`
+dello stesso account nello stesso scambio.
+
+**COSA NON ERA, provato e non supposto.** *I due login*: un account
+Telegram collegato a una npub ha lo stesso numero di conto da tutte e
+due le porte, quindi lo stesso cassetto (chiuso e riaperto con la
+sessione web: la chat torna). *La potatura* (`chatScPotaP2P`, ogni
+cinque secondi, sulla riga locale): un registratore su ogni «butta la
+chiave» non l'ha mai vista scattare — col relay morto; con lo stesso
+ordine ripreso dopo una presa caduta; con la presa caduta a chat
+avviata; e col MOTORE VERO contro un relay vivo di cartone (il
+websocket intercettato da Playwright, niente sulla rete), svelto e
+lento (tre e quattro secondi a domanda): la presa di `eseguiPresaP2P`,
+un coordinatore di cartone che risponde alla presa e alla restore, e
+il relay che alla riapertura ripete i suoi messaggi. La riga resta
+ferma e la chat torna. *Il server*: nessuna strada lascia le buste a
+un telefono che ha buttato la chiave (la fine le cancella con la
+stessa parola con cui la dice).
+
+**LE DECISIONI DI ANDREA.** 1) LA POTATURA NON BUTTA PIÙ PER LO STATO
+DELLA RIGA: la chiave si butta solo quando il server dice che lo
+scambio è finito. Era fragile anche senza essere il colpevole: una
+riga che manca per un attimo sarebbe costata la chiave per sempre.
+2) LA CHAT SEGUE LO SCAMBIO, PER TUTTI (la strada «a»): chi ritrova lo
+scambio ritrova la chat, con qualunque login. 3) IL COSTO SI SCRIVE,
+E CONTA DOV'È NATO L'ACCOUNT, NON COME SI ENTRA (la correzione di
+Andrea alla frase che gli avevo proposto, che diceva «se entri con
+Telegram»): per un account nato con Telegram il profilo di scambio
+lo ricava il server dal conto — è per questo che torna da solo, e
+resta così anche se poi si entra con Amber o con un'altra chiave
+Nostr collegata — quindi durante lo scambio Barattolo POTREBBE
+tecnicamente aprire la chat di quella parte; per un account nato su
+Nostr no. La frase del patto è la sua, parola per parola, nel patto
+e in «Come funziona»; e la slide del giro guidato non giura più «lo
+dice la matematica»: dice «Barattolo non li legge, e a fine scambio
+la chat si cancella», che vale per tutti. SUL TASTO DELL'AVVISO,
+letto il rapporto: Andrea non ricorda se l'ha toccato («può darsi»),
+e la cura copre comunque tutti i casi.
+
+**COM'È FATTA** (per intero in ARCHITETTURA, «LA CHAT SEGUE LO
+SCAMBIO: LA COPIA SIGILLATA»). La chiave resta casuale e usa-e-getta.
+Appena nasce, il telefono ne lascia sul server una COPIA SIGILLATA —
+NIP-44 con la chiave di quello scambio verso se stessa, una busta di
+tipo `chiave` — e solo dopo presenta la chiave all'altra persona. Il
+postino la riconsegna SOLO a chi l'ha spedita (mai all'altra parte,
+mai al moderatore), e la cancella con le altre buste. Un'altra memoria
+dello stesso profilo la riceve al primo ritiro, la apre con la chiave
+dello scambio, e ADOTTA quella chiave: stessa chat, tutti i messaggi,
+nessun saluto nuovo e nessuna scritta. Le chat aperte prima della cura
+si mettono in pari da sole (il telefono che ha la chiave manda la
+copia al primo ritiro). «Continua la chat qui» resta per il solo caso
+vero — una chiave la cui copia non c'è — e la scritta dice la strada
+che non perde niente: «Riaprila da lì e torna anche qui». E dopo un
+«Continua» il telefono di prima non resta più fuori: prende la chiave
+nuova dalla sua copia e mette al sicuro la vecchia. La potatura riceve
+dal server gli scambi finiti (`finite`, nella risposta della domanda
+del pallino, che per questo chiede anche di ogni voce del cassetto), e
+ogni chiave buttata o ritrovata lascia una riga nel diario del P2P:
+la prossima volta «Copia la diagnosi» dice chi è stato.
+
+**LE STRADE SCARTATE.** *La chiave ricavata dalla chiave dello
+scambio* (niente copia, niente stato): a scambio finito si potrebbe
+ricalcolare; con la copia a fine scambio la chiave non esiste più da
+nessuna parte. *La copia solo dove il server non può ricavare il
+profilo* (la strada «b»): il patto restava com'era, e il caso dal
+campo pure. *La copia chiusa con la npub* (il firmatario): un gesto in
+più a ogni apertura, e chi entra solo da Telegram non ce l'ha. *Il
+cloud di Telegram*: esiste solo dentro la Mini App.
+
+**PROVATO.** `prove_chat_scambio`: 170 controlli (erano 140) — i
+giudici veri del server (la copia torna solo a chi l'ha spedita, il
+tetto, le `finite` con e senza leva) e il banco di node col bundle
+vero: la seconda memoria, la memoria cancellata, la chat di prima
+della cura che si mette in pari, il «Continua» col telefono di prima
+che segue, la potatura che non guarda la riga, il diario.
+`collaudo_chat_scambio`: due sezioni nuove sulle rotte vere — le tre
+porte dello stesso account (web col cookie, web entrata con Nostr,
+Mini App), la memoria cancellata, l'altra parte e il moderatore che
+la copia non la ricevono mai, i byte spariti dal file alla fine, e le
+quattro coppie di accesso. IL GIRO DAL VIVO a 390 px (`giro_segue`,
+sette scatti in `.claude/giri/chat-stesso-dispositivo/`): 14 su 14 —
+app installata, chiudi e riapri, la Mini App dal tasto dell'avviso
+(la chat c'è, si scrive, chi vende non vede nessun «ha ripreso»),
+di nuovo l'app installata, la memoria cancellata, il caso vero con la
+scritta nuova, la fine. E il motore vero col relay di cartone lento,
+sul codice della cura: presa, copia prima del saluto, chiudi e riapri.
+LA TORTURA CORTA, su una copia intera: sedici mutazioni (undici sul
+telefono, cinque sul server), sedici uccise con una rossa col suo
+nome. Al primo giro una era VIVA — «il moderatore riceve solo la
+chiave in mano» — e ha fatto nascere la prova che mancava (chi ha due
+chiavi le dà tutte e due, e il moderatore legge la chat intera); tre
+morivano solo facendo esplodere il banco, e sono state curate.
+I NUMERI, sull'albero di questo commit (sopra `236d5b8`): la suite
+severa INTERA, 23.110 passate e 0 fallite; i 68 collaudi del workflow
+nella gabbia,
+tutti verdi (girati un attimo prima degli ultimi ritocchi — la slide
+del giro guidato, tre punti del banco delle prove — e
+`collaudo_chat_scambio`, 114 controlli, rifatto due volte dopo: verde
+tre volte di fila); `node` sui tre script della pagina; lo scanner dei
+segreti sulle righe aggiunte, con la controprova. Il push aspetta
+l'ok di Andrea.
+
+**COSA RESTA DA GUARDARE.** Sul telefono vero: l'avviso Telegram col
+suo tasto, la Mini App che apre la chat coi messaggi, e l'app
+installata dopo. La riga sul VPS che conferma la causa, se lo scambio
+di prova è ancora aperto. Al
+primo deploy, le chat già aperte: si mettono in pari quando il
+telefono che ha la chiave le riapre — fino ad allora, da un'altra
+memoria, la scritta c'è ancora ed è vera.
+
+**LA LEZIONE.** Un avviso con un tasto è una seconda porta: quello che
+vive in una memoria sola va provato entrando anche dall'altra. Il giro
+dal vivo della chat aveva due telefoni e un «secondo telefono», mai lo
+STESSO telefono da due memorie — che è il caso di ogni utente Telegram.

@@ -609,6 +609,140 @@ async def giro():
         prova("...e la chat di uno scambio in corso riprende con le sue buste", (True, True),
               (r.get("aperta"), len(r.get("buste") or []) >= 4))
 
+    async def s14():
+        # IL CASO DAL CAMPO (12 ott 2026, notte): un account Telegram
+        # COLLEGATO a una npub, con TRE PORTE sullo stesso telefono — la
+        # web app installata entrata con Telegram (un cookie), la stessa
+        # entrata con Nostr (un altro cookie, STESSO account: il login
+        # Nostr di un account collegato apre quello), e la Mini App
+        # dentro Telegram, dove porta il tasto dell'avviso (l'initData).
+        # Dall'altra parte un nativo Nostr. La copia sigillata e' una
+        # busta di cartone: il server non la apre, la riconsegna.
+        novita = SRV.chat_novita_p2p
+        TG_L, WEB, NOSTR, MINI = 444, "web-444", "nostr-444", "mini-444"
+        npub = "npub1" + "collaudo" * 6
+        con = banco.con_db()
+        con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,registrato,ln_address,"
+                    "npub,npub_verificata,npub_accesso) VALUES(?,?,?,1,'',?,1,?)",
+                    (TG_L, "Collegato", "neg444", npub, npub))
+        con.commit()
+        con.close()
+        ACCESSO[WEB] = {"x_tg_init_data": "", "barattolo_sessione": SRV.crea_sessione(TG_L)}
+        ACCESSO[NOSTR] = {"x_tg_init_data": "", "barattolo_sessione": SRV.crea_sessione(TG_L)}
+        ACCESSO[MINI] = {"x_tg_init_data": f"collaudo:{TG_L}:Collegato", "barattolo_sessione": ""}
+        prova("le tre porte sono lo stesso account: due cookie e l'initData di Telegram",
+              [TG_L, TG_L, TG_L],
+              [SRV.verifica_utente(ACCESSO[p]["x_tg_init_data"], ACCESSO[p]["barattolo_sessione"])["id"]
+               for p in (WEB, NOSTR, MINI)])
+        t = await scambio(140, N1, TG_L, chiave(0x41), chiave(0x42))
+        copia, copia_altro = busta("copia-sigillata-di-444"), busta("copia-sigillata-di-N1")
+        del DETTI[:]
+        r = await chiama(invia, WEB, {"ordine": t, "tipo": "chiave", "busta": copia})
+        prova("la web app installata lascia la COPIA SIGILLATA della sua chiave: il postino la prende",
+              True, (r.get("n") or 0) > 0)
+        await chiama(invia, WEB, {"ordine": t, "tipo": "saluto", "busta": busta("saluto-444")})
+        await chiama(invia, N1, {"ordine": t, "tipo": "chiave", "busta": copia_altro})
+        await chiama(invia, N1, {"ordine": t, "tipo": "saluto", "busta": busta("saluto-N1")})
+        await asyncio.sleep(0.4)
+        prova("...una copia (come un saluto) non avvisa nessuno: avvisa solo un messaggio", [], avvisi_chat())
+        prova("...e non porta un destinatario: con `per` e' una richiesta storta", 400,
+              no(await chiama(invia, WEB, {"ordine": t, "tipo": "chiave", "busta": copia,
+                                           "per": chiave(0xAB)})))
+        await chiama(invia, WEB, {"ordine": t, "tipo": "msg", "busta": busta("dalla-web-app")})
+        await chiama(invia, N1, {"ordine": t, "tipo": "msg", "busta": busta("dal-nativo")})
+
+        def vede(r):
+            return sorted((b["tipo"], b["mia"], b["busta"]) for b in (r.get("buste") or []))
+        tutto_444 = sorted([("chiave", True, copia), ("saluto", True, busta("saluto-444")),
+                            ("saluto", False, busta("saluto-N1")), ("msg", True, busta("dalla-web-app")),
+                            ("msg", False, busta("dal-nativo"))])
+        r = await chiama(leggi, WEB, {"ordine": t, "dopo": 0})
+        fino = r.get("fino") or 0
+        prova("STESSA PORTA: ritira la sua copia, i due saluti e i due messaggi", tutto_444, vede(r))
+        r = await chiama(leggi, WEB, {"ordine": t, "dopo": fino})
+        prova("CHIUDI E RIAPRI SENZA LOGIN (stesso cookie, stesso segnalibro): niente di nuovo, niente di perso",
+              (True, [], False), (r.get("aperta"), r.get("buste"), bool(r.get("perso"))))
+        prova("LA MEMORIA DEL BROWSER CANCELLATA (stesso cookie, segnalibro a zero): torna tutto, copia compresa",
+              tutto_444, vede(await chiama(leggi, WEB, {"ordine": t, "dopo": 0})))
+        prova("LA MINI APP DENTRO TELEGRAM (il tasto dell'avviso): stesso account, ritrova la copia e tutta la chat",
+              tutto_444, vede(await chiama(leggi, MINI, {"ordine": t, "dopo": 0})))
+        prova("LA WEB APP ENTRATA CON NOSTR (account collegato): lo stesso",
+              tutto_444, vede(await chiama(leggi, NOSTR, {"ordine": t, "dopo": 0})))
+        r = await chiama(leggi, N1, {"ordine": t, "dopo": 0})
+        prova("L'ALTRA PARTE ritira la SUA copia e mai quella di chi compra",
+              ([copia_altro], False),
+              ([b["busta"] for b in (r.get("buste") or []) if b["tipo"] == "chiave"],
+               copia in json.dumps(r)))
+        prova("...un estraneo resta fuori", 403, no(await chiama(leggi, ESTRANEO, {"ordine": t, "dopo": 0})))
+        await chiama(invia, MINI, {"ordine": t, "tipo": "msg", "busta": busta("dalla-mini-app")})
+        r = await chiama(leggi, WEB, {"ordine": t, "dopo": fino})
+        prova("un messaggio scritto dalla Mini App la web app lo ritira come SUO, e l'altra parte lo riceve",
+              ([("msg", True, busta("dalla-mini-app"))], True),
+              (vede(r), busta("dalla-mini-app") in json.dumps(await chiama(leggi, N1, {"ordine": t, "dopo": 0}))))
+        # in disputa: il moderatore riceve i messaggi chiusi e il pacco, MAI le copie
+        await evento(t, "dispute-opened", "buyer", "", chiave(0x42), chiave(0x41))
+        for _ in range(50):
+            con = banco.con_db()
+            c_e = con.execute("SELECT 1 FROM p2p_dispute WHERE ordine=?", (t,)).fetchone()
+            con.close()
+            if c_e:
+                break
+            await asyncio.sleep(0.1)
+        con = banco.con_db()
+        con.execute("UPDATE p2p_dispute SET stato='presa', presa_da=?, presa_il=?, chiave_moderatore=? "
+                    "WHERE ordine=?", (ADMIN, adesso(), kmod, t))
+        con.commit()
+        con.close()
+        m = await chiama(mod_chat, ADMIN, {"ordine": t})
+        prova("IL MODERATORE che ha preso la disputa riceve i messaggi chiusi, e nessuna copia sigillata",
+              (3, False, False), (len(m.get("buste") or []), copia in json.dumps(m), copia_altro in json.dumps(m)))
+        # le chat finite: l'unica cosa che fa buttare una chiave al telefono
+        ignoto = ordine(149)
+        r = await chiama(novita, WEB, {"ordini": [t, ignoto]})
+        prova("LE CHAT FINITE: a scambio in corso nessuna — tranne lo scambio che il server non conosce",
+              [ignoto], r.get("finite"))
+        grezzo = open(SRV.DB_CHAT, "rb").read()
+        prova("(prima della fine la copia nel file c'e', e nel database di tutti no)", (True, False),
+              (copia.encode() in grezzo, copia.encode() in open(SRV.DB, "rb").read()))
+        await evento(t, "released", "mostro", "admin", chiave(0x42), chiave(0x41))
+        grezzo = open(SRV.DB_CHAT, "rb").read()
+        prova("LA FINE: le copie sigillate se ne vanno con le buste, anche dai byte del file",
+              (0, False, False), (len(cassetto("SELECT 1 FROM buste WHERE ordine=?", t)),
+                                  copia.encode() in grezzo, copia_altro.encode() in grezzo))
+        prova("...e il server lo dice a tutte le porte delle due parti, non a chi non c'entra",
+              [[t], [t], [t], [t], []],
+              [(await chiama(novita, p, {"ordini": [t]})).get("finite")
+               for p in (WEB, NOSTR, MINI, N1, ESTRANEO)])
+        SRV.P2P_CHAT_SCAMBIO = False
+        try:
+            r = await chiama(novita, MINI, {"ordini": [t]})
+            prova("...anche a leva spenta: uno scambio finito e' finito", ([t], True, {}),
+                  (r.get("finite"), r.get("spenta"), r.get("ultimi")))
+        finally:
+            SRV.P2P_CHAT_SCAMBIO = True
+        prova("...e a scambio finito una copia non entra piu'", 409,
+              no(await chiama(invia, WEB, {"ordine": t, "tipo": "chiave", "busta": busta("copia-tardi")})))
+
+    async def s15():
+        # LE QUATTRO COPPIE DI ACCESSO, con la copia: a ognuno torna la
+        # SUA, da qualunque porta sia entrato l'altro
+        coppie = [("Telegram e Telegram", TG_V, TG_C), ("Telegram e Nostr", TG_V, N2),
+                  ("Nostr e Telegram", N3, TG_C), ("Nostr e Nostr", N3, N4)]
+        esiti = []
+        for i, (nome, vende, compra) in enumerate(coppie):
+            t = await scambio(150 + i, vende, compra, chiave(0x50 + i), chiave(0x60 + i))
+            cv, cc_ = busta(f"copia-di-chi-vende-{i}"), busta(f"copia-di-chi-compra-{i}")
+            await chiama(invia, vende, {"ordine": t, "tipo": "chiave", "busta": cv})
+            await chiama(invia, compra, {"ordine": t, "tipo": "chiave", "busta": cc_})
+            rv = await chiama(leggi, vende, {"ordine": t, "dopo": 0})
+            rc = await chiama(leggi, compra, {"ordine": t, "dopo": 0})
+            esiti.append((nome,
+                          [b["busta"] for b in (rv.get("buste") or []) if b["tipo"] == "chiave"] == [cv],
+                          [b["busta"] for b in (rc.get("buste") or []) if b["tipo"] == "chiave"] == [cc_]))
+            await evento(t, "canceled", "buyer", "", chiave(0x60 + i), chiave(0x50 + i))
+        prova("la copia sigillata torna solo a chi l'ha spedita, con tutte e quattro le coppie di accesso",
+              [(n, True, True) for n, _, _ in coppie], esiti)
+
     await sezione(1, "LE QUATTRO COPPIE DI ACCESSO", s1)
     await sezione(2, "PRIMA DELLA PRESA, E PER UN ESTRANEO", s2)
     await sezione(3, "LA CONSEGNA A CHI E' OFFLINE", s3)
@@ -622,6 +756,8 @@ async def giro():
     await sezione(11, "NIENTE ALTROVE", s11)
     await sezione(12, "IL PALLINO: LA DOMANDA CHE NON SEGNA NIENTE", s12)
     await sezione(13, "LA LEVA SPENTA", s13)
+    await sezione(14, "LA CHAT SEGUE LO SCAMBIO: LA COPIA SIGILLATA E LE TRE PORTE DELLO STESSO ACCOUNT", s14)
+    await sezione(15, "LA COPIA, CON LE QUATTRO COPPIE DI ACCESSO", s15)
     for gruppo in (SRV._TASK_EVENTI_P2P, SRV._TASK_CHAT_P2P):
         if gruppo:
             await asyncio.gather(*list(gruppo), return_exceptions=True)

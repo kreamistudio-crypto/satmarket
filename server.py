@@ -49373,6 +49373,7 @@ P2P_CHAT_BUSTA_MAX = 4096         # 500 caratteri, chiusi e in base64, stanno so
 P2P_CHAT_BUSTA_MOD_MAX = 16384    # la busta per un moderatore porta piu' chiavi
 P2P_CHAT_MSG_MAX = 200            # messaggi per scambio: ~0,6 MB nel caso peggiore
 P2P_CHAT_SALUTI_MAX = 20          # chiavi presentate, per parte
+P2P_CHAT_CHIAVI_MAX = 20          # copie sigillate della propria chiave, per parte
 P2P_CHAT_MOD_MAX = 40             # buste per i moderatori, per parte
 P2P_CHAT_RAFFICA = 20             # messaggi al minuto, per chi scrive
 P2P_CHAT_RITIRO_MAX = 300         # buste per risposta
@@ -49380,7 +49381,10 @@ P2P_CHAT_PRESENTE_S = 20          # chi ha ritirato da meno di cosi' sta guardan
 P2P_CHAT_AVVISI_MAX = 30          # avvisi per scambio e per persona: anti-abuso
 P2P_CHAT_VITA_MAX_S = 30 * 86400  # la rete sotto la scopa: nessuno scambio dura tanto
 P2P_CHAT_NOVITA_MAX = 30          # scambi per domanda del pallino
-P2P_CHAT_TIPI = ("saluto", "msg", "mod")
+# `chiave` (12 ott 2026, notte): la copia sigillata della chiave usa-e-getta,
+# chiusa dal telefono con la chiave dello scambio. Torna SOLO a chi l'ha
+# spedita (`_chat_p2p_ritira`), e se ne va con le altre buste
+P2P_CHAT_TIPI = ("saluto", "msg", "mod", "chiave")
 FORMA_BUSTA_CHAT = re.compile(r"^[A-Za-z0-9+/]{40,}={0,2}$")
 _CHAT_PRONTA = {"file": ""}
 _TASK_CHAT_P2P = set()
@@ -49434,24 +49438,31 @@ def db_chat():
 def _chat_p2p_stato(con, ordine: str, io: int) -> dict:
     """LA CHAT DI QUESTO SCAMBIO E' APERTA, PER CHI CHIEDE? Pura sulla
     connessione (quella del database di tutti). Torna `{aperta, giro,
-    altro, perche}`; `perche` e' '' quando e' aperta, altrimenti:
+    altro, perche, noto}`; `perche` e' '' quando e' aperta, altrimenti:
     • `finito` — lo scambio non e' in corso (non ancora preso, o chiuso);
     • `estraneo` — chi chiede non e' una delle due parti;
     • `solo` — l'altra parte non e' un account di qui (scambia da
       un'altra app, o non si e' fatta riconoscere): non c'e' nessuno a
-      cui consegnare."""
+      cui consegnare.
+    `noto` dice se il server SA di quello scambio (12 ott 2026, notte):
+    di uno che non conosce piu' — la cronaca se n'e' andata coi suoi
+    quaranta giorni — non c'e' nessuna chat da tenere."""
     p = _parti_scambio_p2p(con, ordine)
     giro = int(p["giro"] or 0)
     io = int(io or 0)
+    noto = bool(p["fonte"])
     parti = (int(p["compratore"] or 0), int(p["venditore"] or 0))
     if not io or io not in parti:
-        return {"aperta": False, "giro": giro, "altro": 0, "perche": "estraneo"}
+        return {"aperta": False, "giro": giro, "altro": 0, "perche": "estraneo",
+                "noto": noto}
     if not p["vivo"]:
-        return {"aperta": False, "giro": giro, "altro": 0, "perche": "finito"}
+        return {"aperta": False, "giro": giro, "altro": 0, "perche": "finito",
+                "noto": noto}
     altro = parti[0] if parti[1] == io else parti[1]
     if not altro or altro == io:
-        return {"aperta": False, "giro": giro, "altro": 0, "perche": "solo"}
-    return {"aperta": True, "giro": giro, "altro": altro, "perche": ""}
+        return {"aperta": False, "giro": giro, "altro": 0, "perche": "solo",
+                "noto": noto}
+    return {"aperta": True, "giro": giro, "altro": altro, "perche": "", "noto": noto}
 
 
 def _chat_p2p_ritira(cc, ordine: str, giro: int, io: int, dopo: int,
@@ -49462,6 +49473,10 @@ def _chat_p2p_ritira(cc, ordine: str, giro: int, io: int, dopo: int,
     per i moderatori. Pura sulla connessione del cassetto. Segna fin
     dove chi chiede ha ritirato e che ADESSO sta guardando: e' quel che
     decide se un messaggio nuovo merita un avviso.
+    LA COPIA SIGILLATA DELLA CHIAVE (`chiave`, 12 ott 2026, notte) TORNA
+    SOLO A CHI L'HA SPEDITA: e' cosi' che un'altra memoria dello stesso
+    profilo — un altro browser, la Mini App, un altro telefono — ritrova
+    la chat. All'altra parte non arriva mai, e al moderatore nemmeno.
     IL CASSETTO PERSO (`perso`): il segnalibro del telefono e' oltre
     l'ultima busta che questo scambio ha — cioe' ha visto buste che qui
     non ci sono piu'. Dentro un giro le buste non si tolgono mai una per
@@ -49475,8 +49490,9 @@ def _chat_p2p_ritira(cc, ordine: str, giro: int, io: int, dopo: int,
         dopo = 0
     righe = cc.execute(
         "SELECT n, da, tipo, busta, quando FROM buste WHERE ordine=? AND giro=? "
-        "AND tipo IN ('saluto','msg') AND n>? ORDER BY n LIMIT ?",
-        (ordine, giro, int(dopo), P2P_CHAT_RITIRO_MAX)).fetchall()
+        "AND (tipo IN ('saluto','msg') OR (tipo='chiave' AND da=?)) "
+        "AND n>? ORDER BY n LIMIT ?",
+        (ordine, giro, int(io), int(dopo), P2P_CHAT_RITIRO_MAX)).fetchall()
     fino = int(righe[-1]["n"]) if righe else int(dopo)
     cc.execute(
         "INSERT INTO letture(ordine, giro, tg_id, letto_fino, visto_il) "
@@ -49513,6 +49529,9 @@ def _chat_p2p_posa(cc, ordine: str, giro: int, io: int, tipo: str,
             return (429, "Stai scrivendo troppo in fretta: aspetta un momento")
     elif tipo == "saluto":
         if conta("tipo='saluto' AND da=?", int(io)) >= P2P_CHAT_SALUTI_MAX:
+            return (409, "La chat di questo scambio e' stata riaperta troppe volte")
+    elif tipo == "chiave":
+        if conta("tipo='chiave' AND da=?", int(io)) >= P2P_CHAT_CHIAVI_MAX:
             return (409, "La chat di questo scambio e' stata riaperta troppe volte")
     elif conta("tipo='mod' AND da=?", int(io)) >= P2P_CHAT_MOD_MAX:
         return (409, "La chiave ai moderatori e' gia' stata data troppe volte")
@@ -49806,32 +49825,46 @@ async def chat_moderatori_p2p(req: Request, x_tg_init_data: str = Header(""),
                         headers={"Cache-Control": "no-store"})
 
 
-def _chat_p2p_novita(con, cc, io: int, ordini) -> dict:
-    """IL PALLINO DELL'APP: per ognuno degli scambi nominati di cui chi
-    chiede e' una parte, a chat aperta, il numero dell'ultimo MESSAGGIO
-    dell'altra parte (0 = nessuno). Pura sulle due connessioni.
-    NON SPOSTA NESSUN SEGNALIBRO e non dice «sta guardando»: e' la
-    domanda dell'app aperta su un'altra pagina, e chi non ha aperto la
-    chat l'avviso lo deve ricevere lo stesso. Uno scambio di cui chi
-    chiede non e' una parte non compare nella risposta, e basta."""
-    fuori = {}
+def _chat_p2p_novita(con, cc, io: int, ordini, accesa: bool = True) -> dict:
+    """IL PALLINO DELL'APP, E LE CHAT FINITE. Pura sulle due connessioni.
+    Torna `{ultimi, finite}`.
+    `ultimi`: per ognuno degli scambi nominati di cui chi chiede e' una
+    parte, a chat aperta, il numero dell'ultimo MESSAGGIO dell'altra
+    parte (0 = nessuno). NON SPOSTA NESSUN SEGNALIBRO e non dice «sta
+    guardando»: e' la domanda dell'app aperta su un'altra pagina, e chi
+    non ha aperto la chat l'avviso lo deve ricevere lo stesso. Uno
+    scambio di cui chi chiede non e' una parte non compare, e basta. A
+    leva spenta (`accesa` falso) e' vuoto.
+    `finite` (12 ott 2026, notte, richiesta di Andrea): gli scambi
+    nominati che per chi chiede sono FINITI — una sua parte, e lo
+    scambio non e' piu' in corso — o che il server non conosce piu'. E'
+    L'UNICA COSA CHE FA BUTTARE AL TELEFONO UNA CHIAVE: lo stato della
+    riga sul telefono non conta, perche' una riga che manca per un
+    attimo costerebbe una chat. Non guarda la leva: uno scambio finito
+    e' finito anche a chat spenta."""
+    ultimi, finite = {}, []
     for o in ordini:
         st = _chat_p2p_stato(con, o, io)
-        if not st["aperta"]:
-            continue
-        r = cc.execute("SELECT MAX(n) FROM buste WHERE ordine=? AND giro=? "
-                       "AND tipo='msg' AND da<>?", (o, st["giro"], int(io))).fetchone()
-        fuori[o] = int((r and r[0]) or 0)
-    return fuori
+        if st["aperta"]:
+            if accesa:
+                r = cc.execute("SELECT MAX(n) FROM buste WHERE ordine=? AND giro=? "
+                               "AND tipo='msg' AND da<>?",
+                               (o, st["giro"], int(io))).fetchone()
+                ultimi[o] = int((r and r[0]) or 0)
+        elif st["perche"] == "finito" or not st["noto"]:
+            finite.append(o)
+    return {"ultimi": ultimi, "finite": finite}
 
 
 @app.post("/api/p2p/chat/novita")
 async def chat_novita_p2p(req: Request, x_tg_init_data: str = Header(""),
                           barattolo_sessione: str = Cookie("")):
-    """Il pallino dei messaggi non letti. Nel corpo `{ordini: [...]}`, gli
-    scambi vivi che il telefono ha; risponde `{ultimi: {ordine: n}}`, il
-    numero dell'ultimo messaggio dell'altra parte in ognuno. Il telefono
-    lo confronta con l'ultimo che ha APERTO. Non segna niente."""
+    """Il pallino dei messaggi non letti, e le chat finite. Nel corpo
+    `{ordini: [...]}`, gli scambi che il telefono ha (quelli vivi e
+    quelli di cui tiene ancora una chiave); risponde `{ultimi: {ordine:
+    n}, finite: [ordine]}`. Il telefono confronta `ultimi` con l'ultimo
+    messaggio che ha APERTO, e butta chiave e messaggi dei `finite`.
+    Non segna niente."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not _p2p_per(user["id"])["attivo"]:
         raise HTTPException(409, "Lo scambio P2P non e' attivo")
@@ -49841,15 +49874,17 @@ async def chat_novita_p2p(req: Request, x_tg_init_data: str = Header(""),
             or not all(isinstance(o, str) and FORMA_ORDINE_P2P.fullmatch(o)
                        for o in ordini):
         raise HTTPException(400, "Richiesta non valida")
-    ultimi = {}
-    if P2P_CHAT_SCAMBIO and ordini:
+    corpo = {"ultimi": {}, "finite": []}
+    if ordini:
         con, cc = db(), db_chat()
         try:
-            ultimi = _chat_p2p_novita(con, cc, user["id"], ordini)
+            corpo = _chat_p2p_novita(con, cc, user["id"], ordini,
+                                     bool(P2P_CHAT_SCAMBIO))
         finally:
             con.close()
             cc.close()
-    return JSONResponse({"ok": True, "spenta": not P2P_CHAT_SCAMBIO, "ultimi": ultimi},
+    return JSONResponse({"ok": True, "spenta": not P2P_CHAT_SCAMBIO,
+                         "ultimi": corpo["ultimi"], "finite": corpo["finite"]},
                         headers={"Cache-Control": "no-store"})
 
 

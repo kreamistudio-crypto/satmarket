@@ -31489,12 +31489,42 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   parte vale l'ULTIMO saluto (l'ora di dentro, poi il numero del
   server); `muti` conta le buste scritte per un'altra chiave.
   `chatScAltroveP2P`: il mio ultimo saluto presenta una chiave che qui
-  non c'è → «Continua la chat qui» (`continuaChatScambioP2P` →
-  `chatScPresentaP2P(id, true)`), mai da solo. `chatScProntaP2P`: si
-  può scrivere. LA FINE: `chatScButtaP2P` (chiave e messaggi) quando il
-  server risponde `finita` o `perso`, quando cambia il `giro` o la
-  controparte, e dalla potatura `chatScPotaP2P` (riga chiusa, sparita,
-  o negli stati `CHATSC_DOPO`), che gira col polso su ogni pagina.
+  non c'è, e nemmeno la sua copia sigillata (vedi sotto) → «Continua la
+  chat qui» (`continuaChatScambioP2P` → `chatScPresentaP2P(id, true)`),
+  mai da solo. `chatScProntaP2P`: si può scrivere. LA FINE:
+  `chatScButtaP2P` (chiave e messaggi) SOLO SULLA PAROLA DEL SERVER:
+  quando risponde `finita` o `perso`, quando cambia il `giro`, e dalla
+  potatura `chatScPotaP2P(finite)` — che dal 12 ott 2026 (notte) non
+  guarda più la riga del telefono e non gira più col polso: riceve gli
+  scambi che il server dichiara finiti dalla domanda del pallino
+  (`chatScNovitaP2P`, che per questo chiede anche di ogni voce del
+  cassetto, e anche a leva spenta). Ogni chiave buttata o ritrovata
+  lascia una riga nel diario del P2P («chat <id>: …»), quella che
+  «Copia la diagnosi» porta a chi aiuta.
+  LA CHAT SEGUE LO SCAMBIO: LA COPIA SIGILLATA (12 ott 2026, notte,
+  cantiere chat-stesso-dispositivo, decisione di Andrea; il perché in
+  CANTIERI, «La chat segue lo scambio»). La chiave resta casuale, ma
+  appena nasce `chatScPresentaP2P` ne manda al server una copia
+  (`chatScCopiaP2P`: NIP-44 con la chiave dello scambio verso se
+  stessa, una busta di tipo `chiave`) PRIMA del saluto: senza la copia
+  al sicuro il saluto aspetta. `chatScPosaP2P` apre le copie che
+  tornano (`chatScApriCopiaP2P`: lo scambio dev'essere questo, e la
+  pubblica quella della segreta), le tiene in `mieChiavi`, e se il mio
+  ultimo saluto presenta una di quelle la ADOTTA come chiave in mano —
+  la vecchia resta fra le ritrovate, il segnalibro torna a zero e si
+  rilegge tutto (`rileggi`). `chatScApriMsgP2P` prova ogni chiave mia
+  (`chatScMieChiaviP2P`) con ogni chiave dell'altra parte, e
+  `chatScPaccoP2P` le dà tutte al moderatore. Una chat aperta prima
+  della cura si mette in pari da sola: il telefono che ha la chiave
+  manda la copia al primo ritiro (`copie`, una voce per chiave), senza
+  un saluto nuovo. Sul server `_chat_p2p_ritira` riconsegna le buste
+  `chiave` SOLO a chi le ha spedite, `_chat_p2p_per_moderatore` non le
+  nomina, la scopa le toglie con le altre (tetto
+  `P2P_CHAT_CHIAVI_MAX`); `_chat_p2p_novita` torna `{ultimi, finite}`,
+  e `finite` non guarda la leva. IL COSTO, scritto nel patto: per un
+  account Telegram il profilo di scambio lo ricava il server
+  (`/api/p2p/seme`), quindi durante lo scambio il server potrebbe
+  aprire la copia di quella parte; per un nativo Nostr no.
   LA PAGINA: `bloccoChatScambioP2P(o)` sotto `profiloControparteP2P`
   in `renderOrdineP2P`; il markup è di `chatScBloccoHTML` (pura):
   l'avviso fisso `CHATSC_AVVISO`, la lista, il piede (`chatScPiedeP2P`,

@@ -57115,7 +57115,7 @@ def prove_tour_p2p():
     # contanti dal tabaccaio e' chi COMPRA sats, e a preparare
     # l'ordine Amazon e' chi VENDE. Le code seguono i testi.
     for coda in ("come e a che prezzo.", "solo a scambio concluso.",
-                 "dal tabaccaio diventano sats.", "non una promessa.",
+                 "dal tabaccaio diventano sats.", "la chat si cancella.",
                  "prima di scambiare.", "si sbloccano verso di te."):
         prova(f"...e il testo che finisce «{coda}» c'e'", True,
               coda in _frasi)
@@ -91384,6 +91384,9 @@ const disp = {};
 function dispositivo(nome, conto, mazzo){ disp[nome] = {conto, mazzo, ordini: {}, magazzino: {}}; }
 let myTgId = 0;
 function su(nome){ QUI = nome; myTgId = disp[nome].conto; }
+/* il diario del P2P, di cartone: la chat ci scrive ogni chiave che butta o che ritrova */
+const DIARIO = [];
+function diarioP2P(riga){ DIARIO.push(String(riga)); }
 function chiaveP2P(base){ return myTgId ? base + '@' + myTgId : base; }
 const localStorage = {getItem: k => (k in disp[QUI].magazzino ? disp[QUI].magazzino[k] : null),
                       setItem: (k, v) => { disp[QUI].magazzino[k] = String(v); }};
@@ -91405,13 +91408,15 @@ async function fetch(url, opz){
   const rispondi = (codice, d) => ({ok: codice === 200, status: codice, json: async () => d});
   /* il pallino: l'ultimo messaggio dell'ALTRA parte, senza segnare niente */
   if (url.endsWith('/novita')) {
-    const ultimi = {};
+    const ultimi = {}, finite = [];
     for (const o of corpo.ordini) {
-      if ((srv.parti[o] || []).indexOf(io) < 0 || !srv.vivo) continue;
+      /* FINITA: lo scambio non e' piu' in corso per una sua parte, o il postino non lo conosce */
+      if (!srv.parti[o] || (srv.parti[o].indexOf(io) >= 0 && !srv.vivo)) { finite.push(o); continue; }
+      if (srv.parti[o].indexOf(io) < 0) continue;
       ultimi[o] = Math.max(0, ...srv.buste.filter(b => b.ordine === o && b.tipo === 'msg' && b.da !== io)
         .map(b => b.n));
     }
-    return rispondi(200, {ok: true, spenta: srv.spenta, ultimi: srv.spenta ? {} : ultimi});
+    return rispondi(200, {ok: true, spenta: srv.spenta, ultimi: srv.spenta ? {} : ultimi, finite: finite});
   }
   const parti = srv.parti[corpo.ordine] || [];
   if (url.endsWith('/p2p/moderazione/chat'))
@@ -91429,7 +91434,8 @@ async function fetch(url, opz){
     const perso = srv.perso && corpo.dopo > 0;
     return rispondi(200, {ok: true, aperta: true, giro: srv.giro, perso: perso,
       buste: srv.buste.filter(b => b.ordine === corpo.ordine && b.giro === srv.giro
-                                   && b.tipo !== 'mod' && b.n > (perso ? 0 : corpo.dopo))
+                                   && b.tipo !== 'mod' && (b.tipo !== 'chiave' || b.da === io)
+                                   && b.n > (perso ? 0 : corpo.dopo))
         .map(b => ({n: b.n, tipo: b.tipo, mia: b.da === io, busta: b.busta, quando: 0}))});
   }
   if (url.endsWith('/moderatori')) return rispondi(200, {ok: true, aperta: true, chiavi: srv.moderatori});
@@ -91463,7 +91469,10 @@ su('b'); const tkB = chiaveScambio(disp.b.mazzo.sk, 5);
 disp.a.ordini[ORD] = {id: ORD, indice: 3, peer: tkB.pub, stato: 'attivo', lato: 'vendo'};
 disp.b.ordini[ORD] = {id: ORD, indice: 5, peer: tkA.pub, stato: 'attivo', lato: 'compro'};
 disp.b2.ordini[ORD] = {id: ORD, indice: 5, peer: tkA.pub, stato: 'attivo', lato: 'compro'};
-const giro = async chi => { su(chi); await chatScRitiraP2P(ORD); return chatScDiP2P(ORD); };
+/* (una chiave ritrovata fa rileggere SUBITO da capo: si aspetta anche quel giro, sullo stesso dispositivo) */
+const giro = async chi => { su(chi); await chatScRitiraP2P(ORD);
+  await new Promise(r => setTimeout(r, 5)); await (p2pChatScInVolo[ORD] || null);
+  return chatScDiP2P(ORD); };
 
 /* ===== 1) i due saluti ===== */
 let ca = await giro('a');
@@ -91602,23 +91611,86 @@ const primaDelFalso = ca.msgs.length;
 ca = await giro('a');
 out.msgFalsoIgnorato = [ca.msgs.length === primaDelFalso, ca.muti];
 
-/* ===== 6) il secondo telefono: niente chiave, e non ruba la chat ===== */
-const salutiPrimaDiB2 = srv.buste.filter(b => b.tipo === 'saluto').length;
-let c2 = await giro('b2');
-out.b2Altrove = [!!c2.sk, chatScAltroveP2P(c2), chatScProntaP2P(c2), c2.msgs.length, c2.muti > 0,
-                 chatScPiedeP2P(disp.b2.ordini[ORD], c2).modo];
-await giro('b2');
-out.b2NonSiPresentaDaSolo = srv.buste.filter(b => b.tipo === 'saluto').length - salutiPrimaDiB2;
-su('b2'); await chatScPresentaP2P(ORD, true);
-c2 = await giro('b2');
-out.b2Continua = [chatScProntaP2P(c2), c2.msgs.length];
-ca = await giro('a');
-out.aVedeIlCambio = ca.msgs.some(m => m.sis) && ca.loro.pub === c2.pub;
-su('a'); await chatScInviaP2P(ORD, 'Mi leggi dal telefono nuovo?');
-c2 = await giro('b2');
-out.b2LeggeIlNuovo = c2.msgs.map(m => m.testo);
+/* ===== 6) LA SECONDA MEMORIA DELLO STESSO PROFILO: la chat la segue =====
+   (un altro browser, la Mini App dentro Telegram, un altro telefono: lo
+   stesso mazzo, quindi la stessa chiave dello scambio) */
 cb = await giro('b');
-out.bVecchioAltrove = [chatScAltroveP2P(cb), chatScProntaP2P(cb)];
+const salutiPrimaDiB2 = srv.buste.filter(b => b.tipo === 'saluto').length;
+out.copieSulServer = srv.buste.filter(b => b.tipo === 'chiave').map(b => b.da).sort();
+/* il postino da' a ognuno solo la SUA copia */
+su('a'); out.copieCheRitiraA = (await (await fetch('/api/p2p/chat/leggi', {method: 'POST',
+  body: JSON.stringify({ordine: ORD, dopo: 0})})).json()).buste.filter(b => b.tipo === 'chiave').map(b => b.mia);
+/* ...e chi non ha la chiave dello scambio la copia non la apre */
+out.copiaChiusaPerGliAltri = chatScApriCopiaP2P(disp.a.ordini[ORD], tkA,
+  (srv.buste.find(b => b.tipo === 'chiave' && b.da === 111) || {busta: ''}).busta);
+let c2 = await giro('b2');
+out.b2Ritrova = [!!c2.sk, c2.pub === cb.pub, chatScAltroveP2P(c2), chatScProntaP2P(c2),
+                 c2.msgs.map(m => m.testo).join('|') === cb.msgs.map(m => m.testo).join('|'),
+                 c2.msgs.length, c2.muti, chatScPiedeP2P(disp.b2.ordini[ORD], c2).modo];
+await giro('b2');
+out.b2NonSiPresenta = [srv.buste.filter(b => b.tipo === 'saluto').length - salutiPrimaDiB2,
+                       srv.buste.filter(b => b.tipo === 'chiave' && b.da === 111).length];
+/* ...e scrive dalla seconda memoria: l'altra persona legge, la prima memoria pure, e nessuno dice «altrove» */
+/* (dentro un try: se la seconda memoria la chat non l'ha ritrovata, lo dicono le prove col loro nome) */
+try { su('b2'); await chatScInviaP2P(ORD, 'Ti scrivo dalla seconda memoria'); } catch(e) {}
+ca = await giro('a'); cb = await giro('b');
+out.dueMemorieUnaChat = [ca.msgs.some(m => !m.mio && m.testo === 'Ti scrivo dalla seconda memoria'),
+                         cb.msgs.some(m => m.mio && m.testo === 'Ti scrivo dalla seconda memoria'),
+                         ca.msgs.some(m => m.sis), chatScAltroveP2P(cb)];
+/* LA MEMORIA CANCELLATA sullo STESSO telefono: il cassetto se ne va, il resto (mazzo e riga) torna dal conto */
+su('b'); delete disp.b.magazzino[Object.keys(disp.b.magazzino).find(k => k.indexOf('barattolo_p2p_chat') === 0)];
+out.cancellataVuota = chatScDiP2P(ORD) === null;
+cb = await giro('b');
+out.cancellataRitrova = [chatScProntaP2P(cb), cb.pub === c2.pub, cb.msgs.length, cb.muti,
+                         srv.buste.filter(b => b.tipo === 'saluto').length - salutiPrimaDiB2];
+
+/* ===== 6b) UNA CHAT APERTA PRIMA DI QUESTA CURA: sul server la copia non c'e' =====
+   il telefono che l'ha aperta la chiave ce l'ha, e la copia non l'ha mai lasciata */
+const senzaCopie = () => {
+  srv.buste = srv.buste.filter(b => !(b.tipo === 'chiave' && b.da === 111));
+  su('b'); const v = chatScDiP2P(ORD); delete v.copie; chatScScriviP2P(ORD, v);
+};
+const altraMemoria = nome => { dispositivo(nome, 111, null); disp[nome].mazzo = disp.b.mazzo;
+  disp[nome].ordini[ORD] = {id: ORD, indice: 5, peer: tkA.pub, stato: 'attivo', lato: 'compro'}; };
+senzaCopie();
+altraMemoria('b3');
+const salutiPrimaDiB3 = srv.buste.filter(b => b.tipo === 'saluto').length;
+let c3 = await giro('b3');
+out.b3Altrove = [!!c3.sk, chatScAltroveP2P(c3), chatScProntaP2P(c3), c3.msgs.length, c3.muti > 0,
+                 chatScPiedeP2P(disp.b3.ordini[ORD], c3).modo];
+await giro('b3');
+out.b3NonSiPresentaDaSolo = srv.buste.filter(b => b.tipo === 'saluto').length - salutiPrimaDiB3;
+out.piedeAltrove = chatScPiedeP2P(disp.b3.ordini[ORD], c3).html.indexOf('Riaprila da lì e torna anche qui') > 0;
+/* IL TELEFONO DI PRIMA SI RIAPRE: lascia la copia, senza un saluto nuovo, e l'altra memoria la ritrova da sola */
+cb = await giro('b');
+out.bMetteInPari = [srv.buste.filter(b => b.tipo === 'chiave' && b.da === 111).length,
+                    srv.buste.filter(b => b.tipo === 'saluto').length - salutiPrimaDiB3];
+c3 = await giro('b3');
+out.b3Ritrova = [chatScProntaP2P(c3), c3.pub === cb.pub, c3.msgs.length === cb.msgs.length, c3.muti];
+
+/* ===== 6c) «CONTINUA LA CHAT QUI», il caso VERO: la copia non arriva (il telefono di prima non torna) ===== */
+senzaCopie();
+altraMemoria('b4');
+let c4 = await giro('b4');
+out.b4Altrove = chatScPiedeP2P(disp.b4.ordini[ORD], c4).modo;
+su('b4'); await chatScPresentaP2P(ORD, true);
+c4 = await giro('b4');
+out.b4Continua = [chatScProntaP2P(c4), c4.msgs.length, c4.pub !== cb.pub];
+ca = await giro('a');
+out.aVedeIlCambio = ca.msgs.some(m => m.sis) && ca.loro.pub === c4.pub;
+su('a'); await chatScInviaP2P(ORD, 'Mi leggi dal telefono nuovo?');
+c4 = await giro('b4');
+out.b4LeggeIlNuovo = c4.msgs.map(m => m.testo);
+/* ...E IL TELEFONO DI PRIMA NON RESTA FUORI: la chiave nuova ha la sua copia, la prende da solo; i messaggi
+   vecchi li legge ancora con la sua, e mette al sicuro anche quella */
+cb = await giro('b');
+out.bSegue = [chatScAltroveP2P(cb), chatScProntaP2P(cb), cb.pub === c4.pub,
+              cb.msgs.some(m => m.testo === 'Mi leggi dal telefono nuovo?'), cb.msgs.length > c4.msgs.length, cb.muti];
+c4 = await giro('b4');
+out.b4RileggeTutto = [c4.msgs.length === cb.msgs.length, c4.muti];
+/* la seconda memoria di prima si rimette in pari anche lei: in disputa serve la chat intera */
+c2 = await giro('b2');
+out.b2InPari = [chatScProntaP2P(c2), c2.pub === c4.pub, c2.muti];
 
 /* ===== 7) la disputa: la chiave ai moderatori solo da chi l'ha aperta ===== */
 const modSk = NT.generateSecretKey();
@@ -91654,6 +91726,16 @@ const storto = chatPartiApriP2P(MOD, {compra: tkA.pub, vende: NT.getPublicKey(al
   {buste: srv.buste.filter(b => b.tipo === 'msg'), chiavi: pacchi()});
 out.partiSbagliateNiente = storto.msgs.length;
 out.riquadroMod = chatPartiModP2P({ordine: ORD}).indexOf('La chat fra le due parti') > 0;
+/* CHI HA DUE CHIAVI (quella di prima e quella ripresa) le da' TUTTE E DUE: il moderatore legge la chat intera */
+su('b');
+const paccoB = chatScPaccoP2P(disp.b.ordini[ORD], chatScDiP2P(ORD));
+out.paccoDueChiavi = [new Set(paccoB.chiavi.map(k => k.a)).size, chatScMieChiaviP2P(chatScDiP2P(ORD)).length,
+                      JSON.stringify(paccoB).indexOf(chatScDiP2P(ORD).sk) < 0];
+const lettaB = chatPartiApriP2P(MOD, ARCH[ORD], ORD,
+  {buste: srv.buste.filter(b => b.tipo === 'msg').map(b => ({n: b.n, busta: b.busta})),
+   chiavi: [{n: 1, busta: NT.nip44.encrypt(JSON.stringify(paccoB),
+     NT.nip44.getConversationKey(NT.utils.hexToBytes(tkB.sk), MOD.pub))}]});
+out.modLeggeTuttoDaB = [lettaB.msgs.map(m => m.testo), lettaB.mute];
 
 /* ===== 7b) la leva spenta ===== */
 su('a'); p2pChatScUltimi = {}; p2pChatScUltimi[ORD] = 999;
@@ -91667,7 +91749,7 @@ out.levaSpenta = [chatScAccesaP2P(), chatScCeP2P(disp.a.ordini[ORD]),
                   chatScNonLettoP2P(disp.a.ordini[ORD])];
 const chiamatePrimaLeva = srv.chiamate.length;
 await chatScRitiraP2P(ORD); await chatScNovitaP2P(); p2pChatScModTentato = {}; await chatScAiModeratoriP2P(ORD);
-out.levaSpentaNonChiama = srv.chiamate.length - chiamatePrimaLeva;
+out.levaSpentaNonChiama = srv.chiamate.slice(chiamatePrimaLeva).map(c => c.url.split('/').pop());
 out.levaSpentaCassettoResta = !!chatScDiP2P(ORD).sk;
 p2pLeve = {chat: true}; p2pChatScUltimi = {};
 /* ...e se la spegne il server a pagina aperta, lo dice la rotta */
@@ -91687,13 +91769,31 @@ const skDiPrima = ca.sk;
 ca = await giro('a');
 out.finitaButta = [ca === null, JSON.stringify(disp.a.magazzino).indexOf(skDiPrima) < 0,
                    chatScBloccoHTML(disp.a.ordini[ORD], null, p2pChatScSapere[ORD])];
-/* ...e la potatura fa lo stesso da sola, quando la riga e' chiusa o sparita */
+/* LA POTATURA NON GUARDA PIU' LA RIGA DEL TELEFONO: una riga chiusa, o sparita, non butta niente */
+srv.vivo = true;
 disp.b2.ordini[ORD].stato = 'concluso';
 su('b2'); chatScPotaP2P();
-out.potaturaChiusa = chatScDiP2P(ORD) === null;
+const rigaChiusaTiene = !!(chatScDiP2P(ORD) && chatScDiP2P(ORD).sk);
+delete disp.b2.ordini[ORD]; chatScPotaP2P();
+out.potaturaNonGuardaLaRiga = [rigaChiusaTiene, !!(chatScDiP2P(ORD) && chatScDiP2P(ORD).sk)];
+/* ...nemmeno la domanda del pallino, finche' il server dice che lo scambio e' in corso */
+await chatScNovitaP2P();
+out.inCorsoNonButta = !!(chatScDiP2P(ORD) && chatScDiP2P(ORD).sk);
+/* LA BUTTA LA PAROLA DEL SERVER: scambio finito → la domanda del pallino porta `finite`, e la voce se ne va
+   (anche senza la riga, anche a leva spenta) */
+srv.vivo = false; p2pLeve = {chat: false};
+const chiamatePrimaFine = srv.chiamate.length;
+await chatScNovitaP2P();
+out.finitaDalPallino = [chatScDiP2P(ORD) === null,
+                        srv.chiamate.slice(chiamatePrimaFine).map(c => c.url.split('/').pop() + ':' + c.corpo)];
+p2pLeve = {chat: true};
 su('b'); out.bHaAncora = chatScDiP2P(ORD) !== null;
-delete disp.b.ordini[ORD]; chatScPotaP2P();
-out.potaturaSparita = chatScDiP2P(ORD) === null;
+/* ...e uno scambio che il server non conosce piu' e' finito */
+delete srv.parti[ORD];
+await chatScNovitaP2P();
+out.sconosciutoButta = chatScDiP2P(ORD) === null;
+/* IL DIARIO dice ogni chiave che se ne va, con la ragione: e' quel che «Copia la diagnosi» porta a chi aiuta */
+out.diario = [...new Set(DIARIO.map(r => r.replace(/[0-9a-f]{8}/, 'ID')))].sort();
 console.log(JSON.stringify(out));
 })().catch(e => { console.log('ESPLOSO: ' + (e && e.stack || e)); process.exit(1); });
 """
@@ -91934,11 +92034,56 @@ def prove_chat_scambio():
     nov = amb["_chat_p2p_novita"]
     letture_prima = [tuple(x) for x in cc.execute("SELECT * FROM letture ORDER BY ordine, tg_id")]
     prova("IL PALLINO: a chi compra il numero dell'ultimo messaggio di chi vende; a chi vende, "
-          "che non ne ha ricevuti, zero", ({o: 7}, {o: 0}), (nov(con, cc, A, [o]), nov(con, cc, B, [o])))
+          "che non ne ha ricevuti, zero", ({o: 7}, {o: 0}),
+          (nov(con, cc, A, [o])["ultimi"], nov(con, cc, B, [o])["ultimi"]))
     prova("...senza spostare nessun segnalibro: non e' un ritiro, e non dice «sta guardando»",
           letture_prima, [tuple(x) for x in cc.execute("SELECT * FROM letture ORDER BY ordine, tg_id")])
     prova("...uno scambio di cui non si e' parte, o dove la chat non e' aperta, non compare",
-          ({}, {}), (nov(con, cc, X, [o]), nov(con, cc, B, [o2])))
+          ({}, {}), (nov(con, cc, X, [o])["ultimi"], nov(con, cc, B, [o2])["ultimi"]))
+    # LA COPIA SIGILLATA DELLA CHIAVE (12 ott 2026, notte): il postino la
+    # tiene come una busta, e la riconsegna SOLO a chi l'ha spedita
+    o4 = "c4a70000-0000-4000-8000-0000000000c4"
+    nasce(o4)
+    arriva(o4, "taken", "buyer", "invoice-next", ORA + 800)
+    posa(cc, o4, 1, A, "chiave", "QUJD" * 20, "", ORA + 801)
+    posa(cc, o4, 1, A, "saluto", "REVG" * 20, "", ORA + 802)
+    posa(cc, o4, 1, B, "chiave", "R0hJ" * 20, "", ORA + 803)
+    posa(cc, o4, 1, B, "saluto", "SktM" * 20, "", ORA + 804)
+    tipi = lambda chi: [(b["tipo"], b["mia"]) for b in ritira(cc, o4, 1, chi, 0, ORA + 805)["buste"]]
+    prova("LA COPIA SIGILLATA TORNA SOLO A CHI L'HA SPEDITA: ognuno ritira la sua e i due saluti, "
+          "mai la copia dell'altra parte",
+          ([("chiave", True), ("saluto", True), ("saluto", False)],
+           [("saluto", False), ("chiave", True), ("saluto", True)]), (tipi(A), tipi(B)))
+    prova("...al moderatore non arriva mai: lui riceve solo i messaggi chiusi e i pacchi per lui", True,
+          "tipo='chiave'" not in pezzo("_chat_p2p_per_moderatore")
+          and "AND tipo='msg' ORDER BY n" in pezzo("_chat_p2p_per_moderatore")
+          and "AND tipo='mod' " in pezzo("_chat_p2p_per_moderatore"))
+    doppia = posa(cc, o4, 1, A, "chiave", "QUJD" * 20, "", ORA + 806)
+    for i in range(amb["P2P_CHAT_CHIAVI_MAX"] - 1):
+        posa(cc, o4, 1, A, "chiave", "QUJD" * 19 + "%04d" % i, "", ORA + 807)
+    troppe = posa(cc, o4, 1, A, "chiave", "QUJD" * 19 + "ZZZZ", "", ORA + 808)
+    prova("...la stessa copia rimandata non raddoppia, e oltre il tetto (venti, come i saluti) non entra",
+          (True, 409, 20), (doppia[1]["doppia"], troppe[0], cc.execute(
+              "SELECT COUNT(*) FROM buste WHERE ordine=? AND tipo='chiave' AND da=?", (o4, A)).fetchone()[0]))
+    prova("...ed e' un tipo di busta come gli altri: se ne va con la scopa, senza una riga in piu'", True,
+          'P2P_CHAT_TIPI = ("saluto", "msg", "mod", "chiave")' in blocco_srv
+          and "tipo" not in pezzo("_chat_p2p_spazza").split('"""')[2])
+    # LE CHAT FINITE: l'unica cosa che fa buttare una chiave al telefono
+    ignoto = "c4a70000-0000-4000-8000-0000000000ff"
+    prova("LE CHAT FINITE, nella risposta del pallino: a scambio in corso nessuna",
+          [], nov(con, cc, A, [o4])["finite"])
+    arriva(o4, "canceled", "buyer", "", ORA + 900)
+    prova("...a scambio finito lo dice alle due parti e non a chi non c'entra; e uno scambio che il "
+          "server non conosce e' finito per chiunque lo chieda",
+          ([o4], [o4], [], [ignoto]),
+          (nov(con, cc, A, [o4])["finite"], nov(con, cc, B, [o4])["finite"],
+           nov(con, cc, X, [o4])["finite"], nov(con, cc, A, [ignoto])["finite"]))
+    spento = nov(con, cc, A, [o4], False)
+    prova("...e non guarda la leva: a chat spenta gli ultimi sono vuoti, le finite ci sono lo stesso",
+          ({}, [o4]), (spento["ultimi"], spento["finite"]))
+    prova("...la rotta le manda sempre, anche a leva spenta", True,
+          'corpo = _chat_p2p_novita(con, cc, user["id"], ordini,' in blocco_srv
+          and '"ultimi": corpo["ultimi"], "finite": corpo["finite"]},' in blocco_srv)
     o3 = "c4a70000-0000-4000-8000-0000000000c3"
     nasce(o3)
     arriva(o3, "taken", "buyer", "invoice-next", ORA)
@@ -91985,7 +92130,8 @@ def prove_chat_scambio():
                if n in cod])
     chiamate = re.findall(r"chatScFetch\('([a-z]+)', \{([^}]*)\}", cod)
     prova("AL SERVER VANNO SOLO BUSTE: le richieste portano l'ordine (o gli ordini), il segnalibro, il tipo e la busta",
-          [("invia", "ordine: id, tipo: 'mod', per: m, busta: busta"), ("invia", "ordine: id, tipo: 'msg', busta: b.busta"),
+          [("invia", "ordine: id, tipo: 'chiave', busta: c.copia"), ("invia", "ordine: id, tipo: 'chiave', busta: vecchia"),
+           ("invia", "ordine: id, tipo: 'mod', per: m, busta: busta"), ("invia", "ordine: id, tipo: 'msg', busta: b.busta"),
            ("invia", "ordine: id, tipo: 'saluto', busta: c.saluto.busta"),
            ("leggi", "ordine: id, dopo: (prima && prima.cursore) | 0"), ("moderatori", "ordine: id"),
            ("novita", "ordini: ids")],
@@ -92004,8 +92150,8 @@ def prove_chat_scambio():
           "const CHATSC_AVVISO = 'Barattolo non ti scrive mai qui. Non uscire dallo scambio "
           "per pagare. Non mandare codici o chiavi.';" in blocco)
     prova("...e la riga di cosa vuol dire «sparisce», la stessa del patto", True,
-          "const CHATSC_PATTO = 'Cifrata fra voi due: Barattolo la trasporta ma non la può "
-          "leggere, e a fine scambio la cancella. Un moderatore la legge solo se una di voi "
+          "const CHATSC_PATTO = 'Cifrata fra voi due: Barattolo la trasporta e non la legge, "
+          "e a fine scambio la cancella. Un moderatore la legge solo se una di voi "
           "due apre una disputa.';" in blocco)
     testi = {n: re.search(r"const %s = '((?:[^'\\]|\\.)*)';" % n, blocco).group(1)
              for n in ("CHATSC_AVVISO", "CHATSC_PATTO", "CHATSC_RIGA_LINK", "CHATSC_RIGA_FUORI")}
@@ -92050,10 +92196,35 @@ def prove_chat_scambio():
           and "const CHATSC_DOPO = ['rilasciato', 'fattura_nuova', 'pagamento_ritentato'];" in blocco)
     rit = pezzo_js(mini, "function chatScRitiraP2P(", "\n}\n")
     prova("FINITA lo dice il server, e il telefono butta chiave e messaggi", True,
-          "if (d.finita && prima) chatScButtaP2P(id);" in rit)
-    prova("...e li butta anche a giro o controparte cambiati, e a cassetto perso", True,
-          "if (c0 && (c0.giro !== d.giro || c0.peer !== o.peer)) { chatScButtaP2P(id); c0 = null; }" in rit
-          and "if (c0 && d.perso) { chatScButtaP2P(id); c0 = null; }" in rit)
+          "if (d.finita && prima) { scrivi('scambio finito per il server, chiave e messaggi buttati'); "
+          "chatScButtaP2P(id); }" in rit)
+    prova("...e li butta a giro cambiato e a cassetto perso: SOLO sulla parola del server", True,
+          "if (c0 && c0.giro !== d.giro) {" in rit and "if (c0 && d.perso) {" in rit
+          and rit.count("chatScButtaP2P(id)") == 3)
+    pota = pezzo_js(mini, "function chatScPotaP2P(", "\n}\n")
+    polso = mini[mini.index("/* IL POLSO DELLA CHAT:"):mini.index("/* ---- LA CHAT DELLE DUE PARTI, PER IL MODERATORE")]
+    prova("LA RIGA DEL TELEFONO NON BUTTA PIU' NIENTE (richiesta di Andrea): il ritiro non guarda la "
+          "controparte della riga, la potatura non legge le righe, e il polso non la chiama",
+          (False, False, False, True),
+          ("c0.peer !== o.peer" in rit, "ordiniP2P" in pota or "chatScServeP2P" in pota,
+           "chatScPotaP2P(" in polso, "function chatScPotaP2P(finite){" in mini))
+    novita = pezzo_js(mini, "function chatScNovitaP2P(", "\n}\n")
+    prova("...la fa la risposta del pallino, che chiede anche di ogni voce del cassetto — e prima di "
+          "guardare la leva", True,
+          "chatScPotaP2P(d.finite);\n    if (d.spenta) { chatScSpegniP2P(); return; }" in novita
+          and "Object.keys(chatScTutteP2P())" in novita)
+    pres = pezzo_js(mini, "async function chatScPresentaP2P(", "\n}\n")
+    prova("LA COPIA PRIMA DEL SALUTO: una chiave non si presenta all'altra persona finche' la sua "
+          "copia sigillata non e' sul server", True,
+          0 < pres.find("tipo: 'chiave', busta: c.copia") < pres.find("tipo: 'saluto', busta: c.saluto.busta")
+          and "chatScCopiaP2P(o, tk, c.sk)" in pres)
+    copia = pezzo_js(mini, "function chatScCopiaP2P(", "\n}\n")
+    prova("...chiusa con la chiave dello SCAMBIO verso se stessa (la apre chi ha il profilo di scambio), "
+          "e all'apertura si controlla lo scambio e che la pubblica sia quella della segreta", True,
+          "chatScSegretoP2P(tk.sk, tk.pub)" in copia
+          and "chatScSegretoP2P(tk.sk, tk.pub)" in pezzo_js(mini, "function chatScApriCopiaP2P(", "\n}\n")
+          and "d.ordine !== String(o.id)" in pezzo_js(mini, "function chatScApriCopiaP2P(", "\n}\n")
+          and "return pub === d.pub ? {sk: d.sk, pub: pub} : null;" in mini)
     prova("un ritiro che non riesce NON butta niente (il server puo' non sapere ancora della presa)",
           False, "chatScButtaP2P" in rit[rit.index("})().catch("):])
     pres = pezzo_js(mini, "async function chatScPresentaP2P(", "\n}\n")
@@ -92087,17 +92258,29 @@ def prove_chat_scambio():
           [], [f for f in ("<b>Barattolo non ti scrive mai qui.</b>",
                            "<b>Non uscire dallo scambio per pagare.</b>",
                            "<b>Non mandare codici o chiavi.</b>",
-                           "Continua la chat qui", "solo se una di voi due la apre") if f not in info])
+                           "Se cambi telefono o browser a metà scambio", "solo se una di voi due la apre") if f not in info])
     prova("...l'avviso «nuovo messaggio» sta fra gli avvisi, e dice che non porta il testo", True,
           "<b>«Hai un nuovo messaggio nello scambio»</b>" in mini
           and "Il testo <b>non è nell'avviso</b>" in mini)
     prova("...e quando qualcosa va storto si scrive all'altra persona nella chat", True,
           "<b>dai tempo all'altra persona</b>, e <b>scrivile nella chat dello scambio</b>" in mini)
     patto = mini[mini.index('<h3 id="priv-p2p">'):mini.index('<h3 id="priv-tor">')]
-    prova("IL PATTO SUI DATI porta la frase di Andrea, parola per parola", True,
-          "<b>La chat è cifrata fra voi due: Barattolo la trasporta ma non la può leggere, "
-          "e a fine scambio la cancella. Il moderatore la legge solo se una di voi due apre "
-          "una disputa.</b>" in patto)
+    FRASE_PATTO = ("La chat è cifrata fra voi due e Barattolo la trasporta. Se il tuo account è nato su Nostr, Barattolo non la può aprire. Se è nato con Telegram (anche se poi entri con Nostr), il tuo profilo di scambio lo ricava il server: per questo ritrovi scambio e chat su ogni dispositivo, e per questo Barattolo durante lo scambio potrebbe tecnicamente aprirla. Non lo fa. A fine scambio la chat si cancella, per tutti. Il moderatore la legge solo se una di voi due apre una disputa.")
+    prova("IL PATTO SUI DATI porta la frase di Andrea sulla chat, parola per parola: l'account nato su "
+          "Nostr, quello nato con Telegram (anche se poi entra con Nostr), la fine, il moderatore",
+          True, "<b>" + FRASE_PATTO + "</b>" in patto)
+    prova("...la stessa frase sta in «Come funziona», e li' si dice della copia sigillata", True,
+          "<p><b>Chi la può aprire.</b> " + FRASE_PATTO + "</p>" in info
+          and "una <b>copia sigillata</b> della chiave" in info)
+    prova("...e il patto spiega la copia: chi la apre, a chi torna, quando se ne va", [],
+          [f for f in ("una <b>copia sigillata</b>", "la apre solo chi ha il tuo <b>profilo di scambio</b>",
+                       "<b>solo a te</b> — mai all'altra persona, mai a un moderatore",
+                       "<b>cancella le buste, le copie sigillate e quegli orari</b>",
+                       "conta dove è nato l'account, non come entri",
+                       "lo ricava il nostro server dall'account") if f not in patto])
+    prova("...niente promette piu' quel che non e' vero per tutti", [],
+          [f for f in ("non la può leggere", "non li può leggere", "la chiave non passa mai di lì",
+                       "non lascia il dispositivo") if f in patto + info + blocco])
     prova("...e dice cosa il server vede, che i backup non la tengono, e cosa non si puo' cancellare",
           [], [f for f in ("chi dei due l'ha spedito, a che ora, quanto pesa",
                            "<b>non entra nei backup</b>", "<b>non si ricalcola da niente</b>",
@@ -92165,8 +92348,9 @@ def prove_chat_scambio():
           "la' non si spegnerebbe mai", False, o["soloVistaNonAccende"])
     prova("...SPENTA: niente riquadro, niente pallino, e la chat «non c'e'» per le frasi e per la disputa",
           [False, False, "", False], o["levaSpenta"])
-    prova("...il telefono non chiama nemmeno il server, e chiave e messaggi restano nel cassetto fino alla fine",
-          (0, True), (o["levaSpentaNonChiama"], o["levaSpentaCassettoResta"]))
+    prova("...il telefono non ritira e non consegna (chiede solo se lo scambio e' finito), e chiave e "
+          "messaggi restano nel cassetto fino alla fine",
+          (["novita"], True), (o["levaSpentaNonChiama"], o["levaSpentaCassettoResta"]))
     prova("...e se la spegne il server a pagina aperta, il telefono lo impara dalla rotta",
           [False, True], o["spentaDalServer"])
     prova("la riga dello scambio resta com'era, e la chat ha un cassetto solo",
@@ -92192,16 +92376,40 @@ def prove_chat_scambio():
           True, o["salutiFalsiIgnorati"])
     prova("...e un messaggio firmato da un terzo non entra, anche se chiuso con la chiave giusta",
           [True, 1], o["msgFalsoIgnorato"])
-    prova("IL SECONDO TELEFONO: non ha la chiave, non legge, non scrive — e lo dice",
-          [False, True, False, 0, True, "altrove"], o["b2Altrove"])
-    prova("...e NON si presenta da solo, nemmeno al secondo giro: la chat resta del primo", 0,
-          o["b2NonSiPresentaDaSolo"])
-    prova("«Continua la chat qui»: riparte, coi messaggi di prima che li' non si vedono",
-          [True, 0], o["b2Continua"])
+    prova("LA COPIA SIGILLATA: ogni parte ne lascia una, e il postino riconsegna a ognuno solo la sua",
+          ([111, 222], [True]), (o["copieSulServer"], o["copieCheRitiraA"]))
+    prova("...chi non ha la chiave di QUELLO scambio non la apre (nemmeno l'altra parte)", None,
+          o["copiaChiusaPerGliAltri"])
+    prova("LA SECONDA MEMORIA DELLO STESSO PROFILO (un altro browser, la Mini App, un altro telefono) "
+          "RITROVA LA CHAT: la stessa chiave, tutti i messaggi, si scrive — e «altro dispositivo» non esce",
+          [True, True, False, True, True, 3, 1, "scrivi"], o["b2Ritrova"])
+    # (la busta muta e' quella FALSA di poco sopra: non la apre nessuno, su nessuna memoria)
+    prova("...senza presentarsi di nuovo e senza un'altra copia: e' la stessa chat", [0, 1],
+          o["b2NonSiPresenta"])
+    prova("...da li' si scrive: l'altra persona legge, la prima memoria pure, nessuno vede «ha ripreso "
+          "la chat» e nessuno resta «altrove»", [True, True, False, False], o["dueMemorieUnaChat"])
+    prova("LA MEMORIA DEL BROWSER CANCELLATA sullo stesso telefono: il cassetto non c'e' piu'...", True,
+          o["cancellataVuota"])
+    prova("...e alla riapertura la chat torna com'era: stessa chiave, tutti i messaggi, nessun saluto nuovo",
+          [True, True, 4, 1, 0], o["cancellataRitrova"])
+    prova("UNA CHAT APERTA PRIMA DI QUESTA CURA (la copia non c'e'): «altro dispositivo» esce, ed e' VERO — "
+          "non ha la chiave, non legge, non scrive", [False, True, False, 0, True, "altrove"], o["b3Altrove"])
+    prova("...NON si presenta da sola, nemmeno al secondo giro, e la scritta dice la strada che non perde niente",
+          (0, True), (o["b3NonSiPresentaDaSolo"], o["piedeAltrove"]))
+    prova("...IL TELEFONO DI PRIMA SI RIAPRE e si mette in pari da solo: lascia la copia, senza un saluto nuovo",
+          [1, 0], o["bMetteInPari"])
+    prova("...e l'altra memoria la ritrova senza un tocco: stessa chiave, tutti i messaggi",
+          [True, True, True, 1], o["b3Ritrova"])
+    prova("«CONTINUA LA CHAT QUI», quando la copia non arriva: riparte con una chiave nuova, coi "
+          "messaggi di prima che li' non si vedono", ("altrove", [True, 0, True]),
+          (o["b4Altrove"], o["b4Continua"]))
     prova("...l'altra persona lo vede scritto, e da li' scrive alla chiave nuova",
-          (True, ["Mi leggi dal telefono nuovo?"]), (o["aVedeIlCambio"], o["b2LeggeIlNuovo"]))
-    prova("...e il telefono di prima adesso e' lui quello «altrove»", [True, False],
-          o["bVecchioAltrove"])
+          (True, ["Mi leggi dal telefono nuovo?"]), (o["aVedeIlCambio"], o["b4LeggeIlNuovo"]))
+    prova("...E IL TELEFONO DI PRIMA NON RESTA FUORI: prende la chiave nuova dalla sua copia, legge il "
+          "nuovo e il vecchio", [False, True, True, True, True, 1], o["bSegue"])
+    prova("...e mette al sicuro anche la chiave di prima: la memoria nuova rilegge TUTTO",
+          [True, 1], o["b4RileggeTutto"])
+    prova("...come ogni altra memoria dello stesso profilo", [True, True, 1], o["b2InPari"])
     prova("LA CHIAVE AI MODERATORI: prima della disputa non parte", 0,
           o["primaDellaDisputaNiente"])
     prova("...a disputa aperta NON parte da chi non l'ha aperta", 0,
@@ -92214,8 +92422,15 @@ def prove_chat_scambio():
           ([["vende", "Ciao, ti ho mandato il recapito"],
             ["compra", "Visto, faccio il bonifico: https://truffa.example.com/paga"],
             ["vende", "Ti scrivo io"],
+            ["compra", "Ti scrivo dalla seconda memoria"],
             ["vende", "Mi leggi dal telefono nuovo?"]], True),
           (o["modLegge"], o["modMuteEChiave"][1]))
+    prova("...e chi ha DUE chiavi (quella di prima e quella ripresa) gliele da' tutte e due, senza la "
+          "segreta: il moderatore legge la chat INTERA, non solo l'ultimo pezzo",
+          ([2, 2, True], (["Ciao, ti ho mandato il recapito",
+                           "Visto, faccio il bonifico: https://truffa.example.com/paga", "Ti scrivo io",
+                           "Ti scrivo dalla seconda memoria", "Mi leggi dal telefono nuovo?"], 1)),
+          (o["paccoDueChiavi"], tuple(o["modLeggeTuttoDaB"])))
     prova("...un altro moderatore, con un'altra chiave, non apre niente", [0, False],
           o["altroModCieco"])
     prova("...e nemmeno quello giusto, se le chiavi dello scambio non sono quelle", 0,
@@ -92225,8 +92440,21 @@ def prove_chat_scambio():
           [0, True, 1], o["persoRiparte"])
     prova("LA FINE: chiave e messaggi via dal telefono, e il riquadro sparisce",
           [True, True, ""], o["finitaButta"])
-    prova("...e la potatura lo fa da sola: a scambio concluso, e a riga sparita",
-          (True, True, True), (o["potaturaChiusa"], o["bHaAncora"], o["potaturaSparita"]))
+    prova("LA POTATURA NON GUARDA LA RIGA DEL TELEFONO: a riga chiusa, e a riga sparita, la chiave resta",
+          [True, True], o["potaturaNonGuardaLaRiga"])
+    prova("...e finche' il server dice che lo scambio e' in corso la domanda del pallino non butta niente",
+          True, o["inCorsoNonButta"])
+    prova("LA BUTTA LA PAROLA DEL SERVER: a scambio finito la risposta del pallino lo dice e la voce se "
+          "ne va — anche senza la riga e a leva spenta, con una domanda che porta solo l'ordine",
+          [True, ['novita:{"ordini":["5a1e0000-c2c2-4a2b-9c3d-000000000001"]}']], o["finitaDalPallino"])
+    prova("...ogni memoria per conto suo, e uno scambio che il server non conosce piu' e' finito",
+          (True, True), (o["bHaAncora"], o["sconosciutoButta"]))
+    prova("IL DIARIO dice ogni chiave che se ne va e ogni chiave ritrovata, con la ragione (lo porta "
+          "«Copia la diagnosi»)", [],
+          [r for r in ("chat ID: chiave ritrovata dalla copia sigillata, la chat continua qui",
+                       "chat ID: le buste sul server non ci sono piu': si riparte",
+                       "chat ID: scambio finito per il server, chiave e messaggi buttati")
+           if r not in o["diario"]])
 
 
 def prove_recapito_aggiornato():
